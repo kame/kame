@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002
+ * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/if_fwevar.h,v 1.1 2002/09/13 12:31:56 ikob Exp $
+ * $FreeBSD: src/sys/dev/firewire/if_fwevar.h,v 1.3 2003/04/17 03:38:02 simokawa Exp $
  */
 
 #ifndef _NET_IF_FWEVAR_H_
@@ -43,8 +43,9 @@ struct fwe_softc {
 	short stream_ch;
 	short dma_ch;
 	struct fw_pkt pkt_hdr;
+	STAILQ_HEAD(, fw_xfer) xferlist;
 	struct fwe_eth_softc {
-		/* XXX this must be first for if_ethersub.c */
+		/* XXX this must be the first for if_ethersub.c */
 		struct arpcom	arpcom;	/* ethernet common data      */
 		#define fwe_if		eth_softc.arpcom.ac_if
 		struct fwe_softc *fwe;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.21 2002/08/29 02:02:28 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.23 2003/05/01 03:56:29 peter Exp $
  */
 
 #include <stand.h>
@@ -62,7 +62,7 @@ struct fs_ops *file_system[] = {
     &cd9660_fsops,
     &splitfs_fsops,
 #ifdef LOADER_GZIP_SUPPORT
-    &zipfs_fsops,
+    &gzipfs_fsops,
 #endif
 #ifdef LOADER_BZIP2_SUPPORT
     &bzipfs_fsops,
@@ -82,9 +82,11 @@ struct fs_ops *file_system[] = {
  * rather than reading the file go first.
  */
 extern struct file_format	i386_elf;
+extern struct file_format	amd64_elf;
 
 struct file_format *file_formats[] = {
     &i386_elf,
+    &amd64_elf,
     NULL
 };
 

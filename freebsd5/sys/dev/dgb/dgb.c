@@ -1,5 +1,5 @@
 /*-
- *  dgb.c $FreeBSD: src/sys/dev/dgb/dgb.c,v 1.71 2002/09/28 17:14:27 phk Exp $
+ *  dgb.c $FreeBSD: src/sys/dev/dgb/dgb.c,v 1.76 2003/03/05 08:16:28 das Exp $
  *
  *  Digiboard driver.
  *
@@ -58,6 +58,7 @@
 
 #include "opt_compat.h"
 #include "opt_dgb.h"
+#include "opt_tty.h"
 
 #include "dgb.h"
 
@@ -76,7 +77,6 @@
 #include <sys/systm.h>
 #include <sys/tty.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
@@ -243,20 +243,16 @@ static	d_ioctl_t	dgbioctl;
 
 #define	CDEV_MAJOR	58
 static struct cdevsw dgb_cdevsw = {
-	/* open */	dgbopen,
-	/* close */	dgbclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	dgbioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"dgb",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	dgbopen,
+	.d_close =	dgbclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	dgbioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"dgb",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 static	speed_t	dgbdefaultrate = TTYDEF_SPEED;
@@ -1232,7 +1228,7 @@ static void
 dgb_pause(chan)
 	void *chan;
 {
-	wakeup((caddr_t)chan);
+	wakeup(chan);
 }
 
 static void

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aacreg.h,v 1.14.2.1 2003/01/13 23:48:42 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aacreg.h,v 1.16 2003/03/26 17:50:11 scottl Exp $
  */
 
 /*
@@ -128,8 +128,8 @@ struct aac_queue_table {
  * our private command structure and don't touch these)
  */
 struct aac_fib_list_entry {
-	struct fib_list_entry	*Flink;
-	struct fib_list_entry	*Blink;
+	u_int32_t	Flink;
+	u_int32_t	Blink;
 } __packed;
 
 /*
@@ -271,12 +271,12 @@ struct aac_adapter_init {
 	u_int32_t	InitStructRevision;
 #define AAC_INIT_STRUCT_REVISION		3
 	u_int32_t	MiniPortRevision;
-#define	AAC_INIT_STRUCT_MINIPORT_REVISION	1
+#define AAC_INIT_STRUCT_MINIPORT_REVISION	1
 	u_int32_t	FilesystemRevision;
 	u_int32_t	CommHeaderAddress;
 	u_int32_t	FastIoCommAreaAddress;
 	u_int32_t	AdapterFibsPhysicalAddress;
-	u_int32_t	AdapterFibsVirtualAddress;
+	u_int32_t 	AdapterFibsVirtualAddress;
 	u_int32_t	AdapterFibsSize;
 	u_int32_t	AdapterFibAlign;
 	u_int32_t	PrintfBufferAddress;
@@ -341,6 +341,11 @@ struct aac_sg_entry {
 	u_int32_t	SgByteCount;
 } __packed;
 
+struct aac_sg_entry64 {
+	u_int64_t	SgAddress;
+	u_int32_t	SgByteCount;
+} __packed;
+
 struct aac_sg_table {
 	u_int32_t		SgCount;
 	struct aac_sg_entry	SgEntry[0];
@@ -350,10 +355,8 @@ struct aac_sg_table {
  * Host-side scatter/gather list for 64-bit commands.
  */
 struct aac_sg_table64 {
-	u_int8_t	SgCount;
-	u_int8_t	SgSectorsPerPage;
-	u_int16_t	SgByteOffset;
-	u_int64_t	SgEntry[0];
+	u_int32_t	SgCount;
+	struct aac_sg_entry64	SgEntry64[0];
 } __packed;
 
 /*
@@ -488,6 +491,13 @@ typedef enum
 #define AAC_SUPPORTED_64BIT_DATA	0x08
 #define AAC_SUPPORTED_HOST_TIME_FIB	0x10
 #define AAC_SUPPORTED_RAID50		0x20
+#define AAC_SUPPORTED_4GB_WINDOW	0x40
+#define AAC_SUPPORTED_SCSI_UPGRADEABLE	0x80
+#define AAC_SUPPORTED_SOFT_ERR_REPORT	0x100
+#define AAC_SUPPORTED_NOT_RECONDITION	0x200
+#define AAC_SUPPORTED_SGMAP_HOST64	0x400
+#define AAC_SUPPORTED_ALARM		0x800
+#define AAC_SUPPORTED_NONDASD		0x1000
 
 /* 
  * Structure used to respond to a RequestAdapterInfo fib.
@@ -526,6 +536,7 @@ struct aac_adapter_info {
 #define AAC_MONKER_INITSTRUCT	0x05
 #define AAC_MONKER_SYNCFIB	0x0c
 #define AAC_MONKER_GETKERNVER	0x11
+#define AAC_MONKER_GETINFO	0x19
 
 /*
  *  Adapter Status Register
@@ -961,6 +972,8 @@ typedef enum _VM_COMMANDS {
 	VM_CtBlockRead64,
 	VM_CtBlockWrite64,
 	VM_CtBlockVerify64,
+	VM_CtHostRead64,
+	VM_CtHostWrite64,
 } AAC_VMCommand;
 
 /*
@@ -971,8 +984,8 @@ struct aac_mntobj {
 	char				FileSystemName[16];
 	struct aac_container_creation	CreateInfo;
 	u_int32_t			Capacity;
-	AAC_FSAVolType			VolType;
-	AAC_FType			ObjType;
+	u_int32_t			VolType;
+	u_int32_t			ObjType;
 	u_int32_t			ContentState;
 #define FSCS_READONLY		0x0002		/* XXX need more information
 						 * than this */
@@ -983,14 +996,14 @@ struct aac_mntobj {
 } __packed;
 
 struct aac_mntinfo {
-	AAC_VMCommand		Command;
-	AAC_FType		MntType;
+	u_int32_t		Command;
+	u_int32_t		MntType;
 	u_int32_t		MntCount;
 } __packed;
 
 struct aac_mntinforesp {
-	AAC_FSAStatus		Status;
-	AAC_FType		MntType;
+	u_int32_t		Status;
+	u_int32_t		MntType;
 	u_int32_t		MntRespCount;
 	struct aac_mntobj	MntTable[1];
 } __packed;
@@ -1008,13 +1021,13 @@ struct aac_closecommand {
  */
 #define CT_GET_SCSI_METHOD	64
 struct aac_ctcfg {
-	AAC_VMCommand		Command;
+	u_int32_t		Command;
 	u_int32_t		cmd;
 	u_int32_t		param;
 } __packed;
 
 struct aac_ctcfg_resp {
-	AAC_FSAStatus		Status;
+	u_int32_t		Status;
 	u_int32_t		resp;
 	u_int32_t		param;
 } __packed;
@@ -1038,8 +1051,8 @@ struct aac_getbusinf {
 } __packed;
 
 struct aac_vmioctl {
-	AAC_VMCommand		Command;
-	AAC_FType		ObjType;
+	u_int32_t		Command;
+	u_int32_t		ObjType;
 	u_int32_t		MethId;
 	u_int32_t		ObjId;
 	u_int32_t		IoctlCmd;
@@ -1047,8 +1060,8 @@ struct aac_vmioctl {
 } __packed;
 
 struct aac_vmi_businf_resp {
-	AAC_FSAStatus		Status;
-	AAC_FType		ObjType;
+	u_int32_t		Status;
+	u_int32_t		ObjType;
 	u_int32_t		MethId;
 	u_int32_t		ObjId;
 	u_int32_t		IoctlCmd;
@@ -1060,8 +1073,8 @@ struct aac_vmi_businf_resp {
 #define GetDeviceProbeInfo 0x5
 
 struct aac_vmi_devinfo_resp {
-	AAC_FSAStatus		Status;
-	AAC_FType		ObjType;
+	u_int32_t		Status;
+	u_int32_t		ObjType;
 	u_int32_t		MethId;
 	u_int32_t		ObjId;
 	u_int32_t		IoctlCmd;
@@ -1127,39 +1140,59 @@ typedef enum {
  */
 
 struct aac_blockread {
-	AAC_VMCommand		Command;	/* not FSACommand! */
+	u_int32_t		Command;	/* not FSACommand! */
 	u_int32_t		ContainerId;
 	u_int32_t		BlockNumber;
 	u_int32_t		ByteCount;
 	struct aac_sg_table	SgMap;		/* variable size */
 } __packed;
 
+struct aac_blockread64 {
+	u_int32_t		Command;
+	u_int16_t		ContainerId;
+	u_int16_t		SectorCount;
+	u_int32_t		BlockNumber;
+	u_int16_t		Pad;
+	u_int16_t		Flags;
+	struct aac_sg_table64	SgMap64;
+} __packed;
+
 struct aac_blockread_response {
-	AAC_FSAStatus		Status;
+	u_int32_t		Status;
 	u_int32_t		ByteCount;
 } __packed;
 
 struct aac_blockwrite {
-	AAC_VMCommand		Command;	/* not FSACommand! */
+	u_int32_t		Command;	/* not FSACommand! */
 	u_int32_t		ContainerId;
 	u_int32_t		BlockNumber;
 	u_int32_t		ByteCount;
-	AAC_CacheLevel	Stable;
+	u_int32_t		Stable;
 	struct aac_sg_table	SgMap;		/* variable size */
 } __packed;
 
+struct aac_blockwrite64 {
+	u_int32_t		Command;	/* not FSACommand! */
+	u_int16_t		ContainerId;
+	u_int16_t		SectorCount;
+	u_int32_t		BlockNumber;
+	u_int16_t		Pad;
+	u_int16_t		Flags;
+	struct aac_sg_table64	SgMap64;	/* variable size */
+} __packed;
+
 struct aac_blockwrite_response {
-	AAC_FSAStatus	Status;
+	u_int32_t		Status;
 	u_int32_t		ByteCount;
-	AAC_CommitLevel	Committed;
+	u_int32_t		Committed;
 } __packed;
 
 /*
  * Container shutdown command.
  */
 struct aac_close_command {
-	AAC_VMCommand      Command;
-	u_int32_t          ContainerId;
+	u_int32_t		Command;
+	u_int32_t		ContainerId;
 };
 
 /*

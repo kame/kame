@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.17 2002/11/06 22:58:55 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.18 2003/03/04 23:19:54 jlemon Exp $
  *
  */
 
@@ -64,7 +64,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.17 2002/11/06 22:58:55 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.18 2003/03/04 23:19:54 jlemon Exp $");
 #endif
 
 
@@ -479,9 +479,7 @@ retry:
 		/*
 		 * Schedule callback
 		 */
-		if (IF_HANDOFF(&atm_intrq, mhead, NULL)) {
-			schednetisr(NETISR_ATM);
-		} else {
+		if (! netisr_queue(NETISR_ATM, mhead)) {
 			fup->fu_stats->st_drv.drv_rv_ifull++;
 			goto free_ent;
 		}

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/linux/linux.h,v 1.56 2001/10/15 20:06:34 des Exp $
+ * $FreeBSD: src/sys/alpha/linux/linux.h,v 1.58 2003/04/16 20:04:47 jhb Exp $
  */
 
 #ifndef _ALPHA_LINUX_LINUX_H_
@@ -38,8 +38,8 @@
  */
 extern u_char linux_debug_map[]; 
 #define ldebug(name)	isclr(linux_debug_map, LINUX_SYS_linux_ ## name)
-#define ARGS(nm, fmt)	"linux(%ld): "#nm"("fmt")\n", (long)p->p_pid 
-#define LMSG(fmt)	"linux(%ld): "fmt"\n", (long)p->p_pid 
+#define ARGS(nm, fmt)	"linux(%ld): "#nm"("fmt")\n", (long)td->td_proc->p_pid 
+#define LMSG(fmt)	"linux(%ld): "fmt"\n", (long)td->td_proc->p_pid 
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_LINUX);
@@ -421,6 +421,7 @@ union l_semun {
 #define	LINUX_AF_AX25		3
 #define	LINUX_AF_IPX		4
 #define	LINUX_AF_APPLETALK	5
+#define	LINUX_AF_INET6		10
 
 #define	LINUX_SOL_SOCKET	1
 #define	LINUX_SOL_IP		0

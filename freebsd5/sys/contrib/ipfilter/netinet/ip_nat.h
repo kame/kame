@@ -5,7 +5,7 @@
  *
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.17.2.14 2000/11/18 03:58:04 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_nat.h,v 1.19 2002/08/28 13:41:36 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_nat.h,v 1.20 2003/02/15 06:23:45 darrenr Exp $
  */
 
 #ifndef	__IP_NAT_H__
@@ -85,6 +85,7 @@ typedef	struct	nat	{
 	u_short	nat_use;
 	u_char	nat_tcpstate[2];
 	u_char	nat_p;			/* protocol for NAT */
+	u_32_t	nat_mssclamp;	/* if != zero clamp MSS to this */
 	struct	ipnat	*nat_ptr;	/* pointer back to the rule */
 	struct	hostmap	*nat_hm;
 	struct	nat	*nat_next;
@@ -114,6 +115,7 @@ typedef	struct	ipnat	{
 	u_short	in_pnext;
 	u_short	in_ippip;	/* IP #'s per IP# */
 	u_32_t	in_flags;	/* From here to in_dport must be reflected */
+	u_32_t	in_mssclamp;	/* if != zero clamp MSS to this */
 	u_short	in_spare;
 	u_short	in_ppip;	/* ports per IP */
 	u_short	in_port[2];	/* correctly in IPN_CMPSIZ */

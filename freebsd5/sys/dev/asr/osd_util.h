@@ -18,7 +18,7 @@
  * arising in any way out of the use of this driver software, even if advised
  * of the possibility of such damage.
  *
- * $FreeBSD: src/sys/dev/asr/osd_util.h,v 1.8 2002/05/14 21:59:10 obrien Exp $
+ * $FreeBSD: src/sys/dev/asr/osd_util.h,v 1.9 2003/01/01 18:48:49 schweikh Exp $
  */
 
 #ifndef		__OSD_UTIL_H
@@ -325,7 +325,7 @@ uSHORT		osdDestroySemaphore(SEMAPHORE_T);
 uLONG		osdRequestSemaphore(SEMAPHORE_T,uLONG);
   /* Release access to the specified mutually exclusive semaphore */
 uSHORT		osdReleaseSemaphore(SEMAPHORE_T);
-	/* wait for a event to happen */
+	/* wait for an event to happen */
 uLONG				 osdWaitForEventSemaphore(SEMAPHORE_T, uLONG);
 	/* signal an event */
 uLONG				 osdSignalEventSemaphore(SEMAPHORE_T);

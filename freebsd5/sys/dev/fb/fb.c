@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/fb.c,v 1.20 2002/04/13 22:34:15 obrien Exp $
+ * $FreeBSD: src/sys/dev/fb/fb.c,v 1.26 2003/03/25 00:07:00 jake Exp $
  */
 
 #include "opt_fb.h"
@@ -352,6 +352,7 @@ fbattach(device_t dev)
 #define FB_UNIT(dev)	minor(dev)
 #define FB_MKMINOR(unit) (u)
 
+#if experimental
 static d_open_t		fbopen;
 static d_close_t	fbclose;
 static d_read_t		fbread;
@@ -362,20 +363,16 @@ static d_mmap_t		fbmmap;
 #define CDEV_MAJOR	123	/* XXX */
 
 static struct cdevsw fb_cdevsw = {
-	/* open */	fbopen,
-	/* close */	fbclose,
-	/* read */	fbread,
-	/* write */	fbwrite,
-	/* ioctl */	fbioctl,
-	/* poll */	nopoll,
-	/* mmap */	fbmmap,
-	/* strategy */	nostrategy,
-	/* name */	FB_DRIVER_NAME,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	fbopen,
+	.d_close =	fbclose,
+	.d_read =	fbread,
+	.d_write =	fbwrite,
+	.d_ioctl =	fbioctl,
+	.d_mmap =	fbmmap,
+	.d_name =	FB_DRIVER_NAME,
+	.d_maj =	CDEV_MAJOR,
 };
+#endif
 
 
 static int
@@ -384,7 +381,6 @@ fb_modevent(module_t mod, int type, void *data)
 
 	switch (type) { 
 	case MOD_LOAD: 
-		cdevsw_add(&fb_cdevsw);
 		break; 
 	case MOD_UNLOAD: 
 		printf("fb module unload - not possible for this module type\n"); 
@@ -438,6 +434,7 @@ fb_detach(dev_t dev, video_adapter_t *adp, struct cdevsw *cdevsw)
 	return 0;
 }
 
+#if experimental
 static int
 fbopen(dev_t dev, int flag, int mode, struct thread *td)
 {
@@ -501,7 +498,7 @@ fbioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 }
 
 static int
-fbmmap(dev_t dev, vm_offset_t offset, int nprot)
+fbmmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	int unit;
 
@@ -509,10 +506,9 @@ fbmmap(dev_t dev, vm_offset_t offset, int nprot)
 	if (vidcdevsw[unit] == NULL)
 		return ENXIO;
 	return (*vidcdevsw[unit]->d_mmap)(makedev(0, adapter[unit]->va_minor),
-					  offset, nprot);
+					  offset, paddr, nprot);
 }
 
-#if experimental
 DEV_DRIVER_MODULE(fb, ???, fb_driver, fb_devclass, fb_cdevsw, 0, 0);
 #endif
 
@@ -591,9 +587,9 @@ int genfbioctl(genfb_softc_t *sc, video_adapter_t *adp, u_long cmd,
 }
 
 int genfbmmap(genfb_softc_t *sc, video_adapter_t *adp, vm_offset_t offset,
-	      int prot)
+	      vm_offset_t *paddr, int prot)
 {
-	return (*vidsw[adp->va_index]->mmap)(adp, offset, prot);
+	return (*vidsw[adp->va_index]->mmap)(adp, offset, paddr, prot);
 }
 
 #endif /* FB_INSTALL_CDEV */

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/proc.h,v 1.15 2002/07/31 19:37:02 jhb Exp $ */
+/* $FreeBSD: src/sys/alpha/include/proc.h,v 1.16 2003/04/17 21:57:16 jhb Exp $ */
 /* From: NetBSD: proc.h,v 1.3 1997/04/06 08:47:36 cgd Exp */
 
 /*
@@ -62,7 +62,7 @@ struct mdthread {
 #define	MDP_UAC_MASK	(MDP_UAC_NOPRINT | MDP_UAC_NOFIX | MDP_UAC_SIGBUS)
 
 struct mdproc {
-	u_int	md_uac;			/* Unaligned Access Check flags. */
+	u_int	md_uac;			/* (c) Unaligned Access Check flags. */
 };
 
 #endif /* !_MACHINE_PROC_H_ */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acfreebsd.h - OS specific defines, etc.
- *       $Revision: 10 $
+ *       $Revision: 11 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2002, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -127,6 +127,14 @@
 
 #include "acgcc.h"
 #include <machine/acpica_machdep.h>
+
+#ifdef _KERNEL
+#include "opt_acpi.h"
+#endif
+
+#ifdef ACPI_DEBUG
+#define ACPI_DEBUG_OUTPUT	/* for backward compatibility */
+#endif
 
 #ifdef _KERNEL
 #include "opt_acpi.h"

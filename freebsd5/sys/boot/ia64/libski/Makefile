@@ -1,10 +1,11 @@
-# $FreeBSD: src/sys/boot/ia64/libski/Makefile,v 1.8 2002/05/13 11:09:06 ru Exp $
+# $FreeBSD: src/sys/boot/ia64/libski/Makefile,v 1.9 2003/02/01 22:50:08 marcel Exp $
 
 LIB=		ski
 INTERNALLIB=	true
 
 SRCS=	skiconsole.c time.c copy.c devicename.c module.c exit.c
 SRCS+=	delay.c skifs.c elf_freebsd.c bootinfo.c ssc.c
+SRCS+=	acpi_stub.c efi_stub.c pal_stub.s sal_stub.c
 
 CFLAGS+=	-ffreestanding -fpic -g
 CFLAGS+=	-I${.CURDIR}/../include

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_pt.c,v 1.33 2002/08/15 20:54:03 njl Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_pt.c,v 1.37 2003/04/01 15:06:22 phk Exp $
  */
 
 #include <sys/param.h>
@@ -76,7 +76,7 @@ typedef enum {
 
 struct pt_softc {
 	struct	 bio_queue_head bio_queue;
-	struct	 devstat device_stats;
+	struct	 devstat *device_stats;
 	LIST_HEAD(, ccb_hdr) pending_ccbs;
 	pt_state state;
 	pt_flags flags;	
@@ -118,19 +118,14 @@ PERIPHDRIVER_DECLARE(pt, ptdriver);
 #define PT_CDEV_MAJOR 61
 
 static struct cdevsw pt_cdevsw = {
-	/* open */	ptopen,
-	/* close */	ptclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	ptioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	ptstrategy,
-	/* name */	"pt",
-	/* maj */	PT_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	ptopen,
+	.d_close =	ptclose,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	ptioctl,
+	.d_strategy =	ptstrategy,
+	.d_name =	"pt",
+	.d_maj =	PT_CDEV_MAJOR,
 };
 
 #ifndef SCSI_PT_DEFAULT_TIMEOUT
@@ -321,7 +316,7 @@ ptctor(struct cam_periph *periph, void *arg)
 
 	periph->softc = softc;
 	
-	devstat_add_entry(&softc->device_stats, "pt",
+	softc->device_stats = devstat_new_entry("pt",
 			  periph->unit_number, 0,
 			  DEVSTAT_NO_BLOCKSIZE,
 			  SID_TYPE(&cgd->inq_data) | DEVSTAT_TYPE_IF_SCSI,
@@ -358,7 +353,6 @@ ptoninvalidate(struct cam_periph *periph)
 {
 	int s;
 	struct pt_softc *softc;
-	struct bio *q_bp;
 	struct ccb_setasync csa;
 
 	softc = (struct pt_softc *)periph->softc;
@@ -388,11 +382,7 @@ ptoninvalidate(struct cam_periph *periph)
 	 * XXX Handle any transactions queued to the card
 	 *     with XPT_ABORT_CCB.
 	 */
-	while ((q_bp = bioq_first(&softc->bio_queue)) != NULL){
-		bioq_remove(&softc->bio_queue, q_bp);
-		q_bp->bio_resid = q_bp->bio_bcount;
-		biofinish(q_bp, NULL, ENXIO);
-	}
+	bioq_flush(&softc->bio_queue, NULL, ENXIO);
 
 	splx(s);
 
@@ -407,7 +397,7 @@ ptdtor(struct cam_periph *periph)
 
 	softc = (struct pt_softc *)periph->softc;
 
-	devstat_remove_entry(&softc->device_stats);
+	devstat_remove_entry(softc->device_stats);
 
 	destroy_dev(softc->dev);
 
@@ -507,7 +497,7 @@ ptstart(struct cam_periph *periph, union ccb *start_ccb)
 
 		bioq_remove(&softc->bio_queue, bp);
 
-		devstat_start_transaction(&softc->device_stats);
+		devstat_start_transaction_bio(softc->device_stats, bp);
 
 		scsi_send_receive(&start_ccb->csio,
 				  /*retries*/4,
@@ -579,8 +569,6 @@ ptdone(struct cam_periph *periph, union ccb *done_ccb)
 				return;
 			}
 			if (error != 0) {
-				struct bio *q_bp;
-
 				s = splbio();
 
 				if (error == ENXIO) {
@@ -598,12 +586,7 @@ ptdone(struct cam_periph *periph, union ccb *done_ccb)
 				 * the client can retry these I/Os in the
 				 * proper order should it attempt to recover.
 				 */
-				while ((q_bp = bioq_first(&softc->bio_queue))
-					!= NULL) {
-					bioq_remove(&softc->bio_queue, q_bp);
-					q_bp->bio_resid = q_bp->bio_bcount;
-					biofinish(q_bp, NULL, EIO);
-				}
+				bioq_flush(&softc->bio_queue, NULL, EIO);
 				splx(s);
 				bp->bio_error = error;
 				bp->bio_resid = bp->bio_bcount;
@@ -636,7 +619,7 @@ ptdone(struct cam_periph *periph, union ccb *done_ccb)
 		LIST_REMOVE(&done_ccb->ccb_h, periph_links.le);
 		splx(oldspl);
 
-		biofinish(bp, &softc->device_stats, 0);
+		biofinish(bp, softc->device_stats, 0);
 		break;
 	}
 	case PT_CCB_WAITING:

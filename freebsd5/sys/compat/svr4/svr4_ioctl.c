@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_ioctl.c,v 1.14.2.1 2002/12/19 09:40:06 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_ioctl.c,v 1.19 2003/01/13 00:28:57 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -112,7 +112,7 @@ svr4_sys_ioctl(td, uap)
 
 #if defined(DEBUG_SVR4)
 	if (fp->f_type == DTYPE_SOCKET) {
-	        struct socket *so = (struct socket *)fp->f_data;
+	        struct socket *so = fp->f_data;
 		DPRINTF(("<<< IN: so_state = 0x%x\n", so->so_state));
 	}
 #endif
@@ -157,7 +157,7 @@ svr4_sys_ioctl(td, uap)
 	if (fp->f_type == DTYPE_SOCKET) {
 	        struct socket *so;
 
-	        so = (struct socket *)fp->f_data;
+	        so = fp->f_data;
 		DPRINTF((">>> OUT: so_state = 0x%x\n", so->so_state));
 	}
 #endif

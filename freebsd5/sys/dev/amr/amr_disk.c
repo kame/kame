@@ -54,7 +54,7 @@
  * SUCH DAMAGE.
  *
  *
- * $FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.21 2002/12/11 20:59:46 emoore Exp $
+ * $FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.28 2003/04/01 15:06:22 phk Exp $
  */
 
 /*
@@ -68,8 +68,6 @@
 #include <dev/amr/amr_compat.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 
 #include <machine/bus.h>
 #include <sys/rman.h>
@@ -84,34 +82,10 @@ static int amrd_probe(device_t dev);
 static int amrd_attach(device_t dev);
 static int amrd_detach(device_t dev);
 
-static	d_open_t	amrd_open;
-static	d_close_t	amrd_close;
-static	d_strategy_t	amrd_strategy;
-static	d_ioctl_t	amrd_ioctl;
-
-#define AMRD_CDEV_MAJOR	133
-
-static struct cdevsw amrd_cdevsw = {
-		/* open */	amrd_open,
-		/* close */	amrd_close,
-		/* read */	physread,
-		/* write */	physwrite,
-		/* ioctl */	amrd_ioctl,
-		/* poll */	nopoll,
-		/* mmap */	nommap,
-		/* strategy */	amrd_strategy,
-		/* name */ 	"amrd",
-		/* maj */	AMRD_CDEV_MAJOR,
-		/* dump */	nodump,
-		/* psize */ 	nopsize,
-		/* flags */	D_DISK,
-#if __FreeBSD_version < 500000
-		/* bmaj */	-1
-#endif
-};
+static	disk_open_t	amrd_open;
+static	disk_strategy_t	amrd_strategy;
 
 static devclass_t	amrd_devclass;
-static struct cdevsw	amrddisk_cdevsw;
 #ifdef FREEBSD_4
 static int		disks_registered = 0;
 #endif
@@ -132,9 +106,9 @@ static driver_t amrd_driver = {
 DRIVER_MODULE(amrd, amr, amrd_driver, amrd_devclass, 0, 0);
 
 static int
-amrd_open(dev_t dev, int flags, int fmt, d_thread_t *td)
+amrd_open(struct disk *dp)
 {
-    struct amrd_softc	*sc = (struct amrd_softc *)dev->si_drv1;
+    struct amrd_softc	*sc = (struct amrd_softc *)dp->d_drv1;
 #if __FreeBSD_version < 500000		/* old buf style */
     struct disklabel    *label;
 #endif
@@ -165,28 +139,7 @@ amrd_open(dev_t dev, int flags, int fmt, d_thread_t *td)
     sc->amrd_disk.d_fwheads = sc->amrd_drive->al_heads;
 #endif
 
-    sc->amrd_flags |= AMRD_OPEN;
     return (0);
-}
-
-static int
-amrd_close(dev_t dev, int flags, int fmt, d_thread_t *td)
-{
-    struct amrd_softc	*sc = (struct amrd_softc *)dev->si_drv1;
-
-    debug_called(1);
-
-    if (sc == NULL)
-	return (ENXIO);
-    sc->amrd_flags &= ~AMRD_OPEN;
-    return (0);
-}
-
-static int
-amrd_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, d_thread_t *td)
-{
-
-    return (ENOTTY);
 }
 
 /*
@@ -198,7 +151,7 @@ amrd_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, d_thread_t *td)
 static void
 amrd_strategy(struct bio *bio)
 {
-    struct amrd_softc	*sc = (struct amrd_softc *)bio->bio_dev->si_drv1;
+    struct amrd_softc	*sc = (struct amrd_softc *)bio->bio_disk->d_drv1;
 
     /* bogus disk? */
     if (sc == NULL) {
@@ -206,7 +159,6 @@ amrd_strategy(struct bio *bio)
 	goto bad;
     }
 
-    devstat_start_transaction(&sc->amrd_stats);
     amr_submit_bio(sc->amrd_controller, bio);
     return;
 
@@ -225,7 +177,6 @@ void
 amrd_intr(void *data)
 {
     struct bio *bio = (struct bio *)data;
-    struct amrd_softc *sc = (struct amrd_softc *)bio->bio_dev->si_drv1;
 
     debug_called(2);
 
@@ -268,19 +219,15 @@ amrd_attach(device_t dev)
 		  sc->amrd_drive->al_size, sc->amrd_drive->al_properties & AMR_DRV_RAID_MASK, 
 		  amr_describe_code(amr_table_drvstate, AMR_DRV_CURSTATE(sc->amrd_drive->al_state)));
 
-    devstat_add_entry(&sc->amrd_stats, "amrd", sc->amrd_unit, AMR_BLKSIZE,
-		      DEVSTAT_NO_ORDERED_TAGS,
-		      DEVSTAT_TYPE_STORARRAY | DEVSTAT_TYPE_IF_OTHER, 
-		      DEVSTAT_PRIORITY_ARRAY);
-
-    sc->amrd_dev_t = disk_create(sc->amrd_unit, &sc->amrd_disk, 0, &amrd_cdevsw, &amrddisk_cdevsw);
-    sc->amrd_dev_t->si_drv1 = sc;
+    sc->amrd_disk.d_drv1 = sc;
+    sc->amrd_disk.d_maxsize = (AMR_NSEG - 1) * PAGE_SIZE;
+    sc->amrd_disk.d_open = amrd_open;
+    sc->amrd_disk.d_strategy = amrd_strategy;
+    sc->amrd_disk.d_name = "amrd";
+    disk_create(sc->amrd_unit, &sc->amrd_disk, 0, NULL, NULL);
 #ifdef FREEBSD_4
     disks_registered++;
 #endif
-
-    /* set maximum I/O size to match the maximum s/g size */
-    sc->amrd_dev_t->si_iosize_max = (AMR_NSEG - 1) * PAGE_SIZE;
 
     return (0);
 }
@@ -292,15 +239,14 @@ amrd_detach(device_t dev)
 
     debug_called(1);
 
-    if (sc->amrd_flags & AMRD_OPEN)
+    if (sc->amrd_disk.d_flags & DISKFLAG_OPEN)
 	return(EBUSY);
 
-    devstat_remove_entry(&sc->amrd_stats);
 #ifdef FREEBSD_4
     if (--disks_registered == 0)
 	cdevsw_remove(&amrddisk_cdevsw);
 #else
-    disk_destroy(sc->amrd_dev_t);
+    disk_destroy(&sc->amrd_disk);
 #endif
     return(0);
 }

@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/vga.c,v 1.19 2002/11/08 20:59:23 jhb Exp $
+ * $FreeBSD: src/sys/dev/fb/vga.c,v 1.27 2003/05/23 05:10:49 peter Exp $
  */
 
 #include "opt_vga.h"
@@ -40,14 +40,15 @@
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/fbio.h>
-#include <sys/stdint.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 
 #include <machine/md_var.h>
+#ifdef __i386__
 #include <machine/pc/bios.h>
+#endif
 #include <machine/bus.h>
 
 #include <dev/fb/fbreg.h>
@@ -57,6 +58,15 @@
 
 #ifndef VGA_DEBUG
 #define VGA_DEBUG		0
+#endif
+
+/* XXX machine/pc/bios.h has got too much i386-specific stuff in it */
+#ifndef BIOS_PADDRTOVADDR
+#if !defined(__amd64__)
+#define	BIOS_PADDRTOVADDR(x)	(x)
+#else
+#define BIOS_PADDRTOVADDR(x) (((x) - ISA_HOLE_START) + atdevbase)
+#endif
 #endif
 
 int
@@ -133,9 +143,10 @@ vga_ioctl(dev_t dev, vga_softc_t *sc, u_long cmd, caddr_t arg, int flag,
 }
 
 int
-vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset, int prot)
+vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset, vm_offset_t *paddr,
+	 int prot)
 {
-	return genfbmmap(&sc->gensc, sc->adp, offset, prot);
+	return genfbmmap(&sc->gensc, sc->adp, offset, paddr, prot);
 }
 
 #endif /* FB_INSTALL_CDEV */
@@ -143,7 +154,9 @@ vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset, int prot)
 /* LOW-LEVEL */
 
 #include <machine/clock.h>
+#ifdef __i386__
 #include <machine/pc/vesa.h>
+#endif
 
 #define probe_done(adp)		((adp)->va_flags & V_ADP_PROBED)
 #define init_done(adp)		((adp)->va_flags & V_ADP_INITIALIZED)
@@ -163,7 +176,7 @@ vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset, int prot)
 #endif
 
 /* architecture dependent option */
-#if defined(__alpha__) || defined(__ia64__)
+#ifndef __i386__
 #define VGA_NO_BIOS		1
 #endif
 
@@ -1315,7 +1328,7 @@ set_display_start(video_adapter_t *adp, int x, int y)
     return 0;
 }
 
-#ifdef __i386__	/* XXX */
+#if defined(__i386__) || defined(__amd64__)	/* XXX */
 static void
 fill(int val, void *d, size_t size)
 {
@@ -1779,7 +1792,7 @@ vga_save_font(video_adapter_t *adp, int page, int fontsize, u_char *data,
 {
 #ifndef VGA_NO_FONT_LOADING
     u_char buf[PARAM_BUFSIZE];
-    u_int32_t segment;
+    vm_offset_t segment;
     int c;
 #ifdef VGA_ALT_SEQACCESS
     int s;
@@ -1820,10 +1833,10 @@ vga_save_font(video_adapter_t *adp, int page, int fontsize, u_char *data,
 
     set_font_mode(adp, buf);
     if (fontsize == 32) {
-	bcopy_fromio(segment + ch*32, data, fontsize*count);
+	bcopy_fromio((uintptr_t)segment + ch*32, data, fontsize*count);
     } else {
 	for (c = ch; count > 0; ++c, --count) {
-	    bcopy_fromio(segment + c*32, data, fontsize);
+	    bcopy_fromio((uintptr_t)segment + c*32, data, fontsize);
 	    data += fontsize;
 	}
     }
@@ -1859,7 +1872,7 @@ vga_load_font(video_adapter_t *adp, int page, int fontsize, u_char *data,
 {
 #ifndef VGA_NO_FONT_LOADING
     u_char buf[PARAM_BUFSIZE];
-    u_int32_t segment;
+    vm_offset_t segment;
     int c;
 #ifdef VGA_ALT_SEQACCESS
     int s;
@@ -1900,10 +1913,10 @@ vga_load_font(video_adapter_t *adp, int page, int fontsize, u_char *data,
 
     set_font_mode(adp, buf);
     if (fontsize == 32) {
-	bcopy_toio(data, segment + ch*32, fontsize*count);
+	bcopy_toio(data, (uintptr_t)segment + ch*32, fontsize*count);
     } else {
 	for (c = ch; count > 0; ++c, --count) {
-	    bcopy_toio(data, segment + c*32, fontsize);
+	    bcopy_toio(data, (uintptr_t)segment + c*32, fontsize);
 	    data += fontsize;
 	}
     }
@@ -2449,7 +2462,8 @@ vga_blank_display(video_adapter_t *adp, int mode)
  * all adapters
  */
 static int
-vga_mmap_buf(video_adapter_t *adp, vm_offset_t offset, int prot)
+vga_mmap_buf(video_adapter_t *adp, vm_offset_t offset, vm_paddr_t *paddr,
+   	     int prot)
 {
     if (adp->va_info.vi_flags & V_INFO_LINEAR)
 	return -1;
@@ -2463,15 +2477,8 @@ vga_mmap_buf(video_adapter_t *adp, vm_offset_t offset, int prot)
     if (offset > adp->va_window_size - PAGE_SIZE)
 	return -1;
 
-#ifdef __i386__
-    return i386_btop(adp->va_info.vi_window + offset);
-#endif
-#ifdef __alpha__
-    return alpha_btop(adp->va_info.vi_window + offset);
-#endif
-#ifdef __ia64__
-    return ia64_btop(adp->va_info.vi_window + offset);
-#endif
+    *paddr = adp->va_info.vi_window + offset;
+    return 0;
 }
 
 #ifndef VGA_NO_MODE_CHANGE

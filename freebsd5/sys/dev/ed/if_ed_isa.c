@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.11 2002/07/26 17:33:58 takawata Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.12 2003/04/15 06:37:22 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -152,4 +152,6 @@ static driver_t ed_isa_driver = {
 	sizeof(struct ed_softc)
 };
 
-DRIVER_MODULE(if_ed, isa, ed_isa_driver, ed_devclass, 0, 0);
+DRIVER_MODULE(ed, isa, ed_isa_driver, ed_devclass, 0, 0);
+MODULE_DEPEND(ed, isa, 1, 1, 1);
+MODULE_DEPEND(ed, ether, 1, 1, 1);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/support.s,v 1.12 2002/06/20 07:40:53 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/support.s,v 1.13 2003/04/04 17:29:54 des Exp $
  */
 
 /*
@@ -270,16 +270,11 @@ NESTED(copyoutstr, 4, 16, ra, 0, 0)
 	
 /*
  * Copy a bytes within the kernel's address space.
- *
- * In the kernel, bcopy() doesn't have to handle the overlapping
- * case; that's that ovbcopy() is for.  However, it doesn't hurt
- * to do both in bcopy, and it does provide a measure of safety.
+ * Handles overlapping regions.
  *
  * void bcopy(char *from, char *to, size_t len);
- * void ovbcopy(char *from, char *to, size_t len);
  */
 LEAF(bcopy,3)
-XLEAF(ovbcopy,3)
 
 	/* Check for negative length */
 	ble	a2,bcopy_done

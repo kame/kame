@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hea/eni_buffer.c,v 1.15 2002/11/08 18:27:28 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni_buffer.c,v 1.16 2003/02/27 08:56:41 harti Exp $
  *
  */
 
@@ -54,7 +54,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_buffer.c,v 1.15 2002/11/08 18:27:28 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_buffer.c,v 1.16 2003/02/27 08:56:41 harti Exp $");
 #endif
 
 static int	eni_test_memory(Eni_unit *);
@@ -267,7 +267,7 @@ eni_allocate_buffer ( eup, size )
 		    /*
 		     * If we use this alignment, will it still fit?
 		     */
-		    if ( (eptr->size - (nbase - eptr->base)) >= 0 )
+		    if ( (eptr->size - (nbase - eptr->base)) >= nsize )
 		    {
 			Mbd	*etmp;
 

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/eisa/eisaconf.c,v 1.63 2002/10/31 00:45:49 peter Exp $
+ * $FreeBSD: src/sys/dev/eisa/eisaconf.c,v 1.64 2003/04/29 13:35:59 kan Exp $
  */
 
 #include "opt_eisa.h"
@@ -36,12 +36,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/queue.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 
-#include <machine/limits.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>

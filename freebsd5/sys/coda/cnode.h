@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/cnode.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $ 
- * $FreeBSD: src/sys/coda/cnode.h,v 1.9 2002/05/16 21:25:34 trhodes Exp $
+ * $FreeBSD: src/sys/coda/cnode.h,v 1.12 2003/03/06 10:48:03 tjr Exp $
  * 
  */
 
@@ -154,6 +154,7 @@ struct coda_mntinfo {
     struct mount	*mi_vfsp;
     struct vcomm	 mi_vcomm;
     dev_t                dev;
+    int                  mi_started;
 };
 extern struct coda_mntinfo coda_mnttbl[]; /* indexed by minor device number */
 

@@ -30,7 +30,7 @@
 #include "opt_fb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.4 2002/11/08 21:04:44 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.6 2003/03/25 00:07:01 jake Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -313,12 +313,12 @@ pcigfb_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 }
 
 int
-pcigfb_mmap(dev_t dev, vm_offset_t offset, int prot)
+pcigfb_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	struct gfb_softc *sc;
 
 	sc = (struct gfb_softc *)devclass_get_softc(gfb_devclass, minor(dev));
-	return genfbmmap(&sc->gensc, sc->adp, offset, prot);
+	return genfbmmap(&sc->gensc, sc->adp, offset, paddr, prot);
 }
 
 #endif /*FB_INSTALL_CDEV*/

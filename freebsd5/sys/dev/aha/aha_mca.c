@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aha/aha_mca.c,v 1.5 2002/10/09 08:54:31 peter Exp $
+ * $FreeBSD: src/sys/dev/aha/aha_mca.c,v 1.6 2003/03/29 09:46:10 mdodd Exp $
  *
  * Based on aha_isa.c
  */
@@ -172,18 +172,19 @@ aha_mca_attach (device_t dev)
 
 	isa_dmacascade(rman_get_start(drq));
 
-	error = bus_dma_tag_create(/* parent	*/	NULL,
-				   /* alignemnt	*/	1,
-				   /* boundary	*/	0,
-				   			BUS_SPACE_MAXADDR_24BIT,
-				   /* highaddr	*/	BUS_SPACE_MAXADDR,
-				   			NULL,
-							NULL,
-				   /* maxsize	*/	BUS_SPACE_MAXSIZE_24BIT,
-				   /* nsegments	*/	~0,
-				   /* maxsegsz	*/	BUS_SPACE_MAXSIZE_24BIT,
-				   /* flags	*/	0,
-							&sc->parent_dmat);
+	error = bus_dma_tag_create(
+				/* parent	*/ NULL,
+				/* alignemnt	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR_24BIT,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ BUS_SPACE_MAXSIZE_24BIT,
+				/* nsegments	*/ ~0,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
+				/* flags	*/ 0,
+				&sc->parent_dmat);
 	if (error) {
 		device_printf(dev, "bus_dma_tag_create() failed!\n");
 		goto bad;

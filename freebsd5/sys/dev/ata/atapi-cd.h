@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.33 2002/09/23 18:54:29 alfred Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.35 2003/02/20 20:01:01 sos Exp $
  */
 
 /* CDROM Table Of Contents */
@@ -299,7 +299,7 @@ struct write_param {
 #define CDR_WTYPE_RAW		0x03
 
     u_int8_t	test_write	:1;	/* test write enable */
-    u_int8_t	link_size_valid	:1;
+    u_int8_t	link_size_valid :1;
     u_int8_t	burnproof	:1;	/* BurnProof enable */
     u_int8_t	reserved2_7	:1;
     u_int8_t	track_mode	:4;	/* track mode */
@@ -392,7 +392,6 @@ struct acd_softc {
     time_t			timestamp;	/* this instance timestamp */
     int				disk_size;	/* size of current media */
     int				block_size;	/* blocksize currently used */
-    struct disklabel		disklabel;	/* fake disk label */
     struct devstat		*stats;		/* devstat entry */
     dev_t			dev;		/* device place holders */
     eventhandler_tag		clone_evh;

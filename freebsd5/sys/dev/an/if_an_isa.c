@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.8 2002/11/14 23:54:49 sam Exp $
  */
 
 /*
@@ -40,7 +38,11 @@
  * Columbia University, New York City
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.12 2003/04/15 06:37:19 mdodd Exp $");
+
 #include "opt_inet.h"
+
 #ifdef INET
 #define ANCACHE
 #endif
@@ -70,11 +72,6 @@
 
 #include <dev/an/if_aironet_ieee.h>
 #include <dev/an/if_anreg.h>
-
-#ifndef lint
-static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.8 2002/11/14 23:54:49 sam Exp $";
-#endif
 
 static struct isa_pnp_id an_ids[] = {
 	{ 0x0100ec06, "Aironet ISA4500/ISA4800" },
@@ -118,18 +115,23 @@ an_attach_isa(dev)
 	an_alloc_port(dev, sc->port_rid, 1);
 	an_alloc_irq(dev, sc->irq_rid, 0);
 
+	sc->an_bhandle = rman_get_bushandle(sc->port_res);
+	sc->an_btag = rman_get_bustag(sc->port_res);
+	sc->an_dev = dev;
+
+	error = an_attach(sc, device_get_unit(dev), flags);
+	if (error) {
+		an_release_resources(dev);
+		return (error);
+	}
+
 	error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET,
 			       an_intr, sc, &sc->irq_handle);
 	if (error) {
 		an_release_resources(dev);
 		return (error);
 	}
-
-	sc->an_bhandle = rman_get_bushandle(sc->port_res);
-	sc->an_btag = rman_get_bustag(sc->port_res);
-	sc->an_dev = dev;
-
-	return an_attach(sc, device_get_unit(dev), flags);
+	return (0);
 }
 
 static int
@@ -164,4 +166,6 @@ static driver_t an_isa_driver = {
 
 static devclass_t an_isa_devclass;
 
-DRIVER_MODULE(if_an, isa, an_isa_driver, an_isa_devclass, 0, 0);
+DRIVER_MODULE(an, isa, an_isa_driver, an_isa_devclass, 0, 0);
+MODULE_DEPEND(an, isa, 1, 1, 1);
+MODULE_DEPEND(an, wlan, 1, 1, 1);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.26 2002/12/12 22:23:06 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.34 2003/05/30 09:22:19 scottl Exp $
  */
 
 /*
@@ -39,10 +39,9 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 
-#include <dev/aac/aac_compat.h>
+#include <sys/bio.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
 #include <sys/disk.h>
 
 #include <machine/bus_memio.h>
@@ -93,40 +92,42 @@ struct aac_ident
 	int			quirks;
 	char			*desc;
 } aac_identifiers[] = {
-	{0x1028, 0x0001, 0x1028, 0x0001, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0001, 0x1028, 0x0001, AAC_HWIF_I960RX, 0,
 	"Dell PERC 2/Si"},
-	{0x1028, 0x0002, 0x1028, 0x0002, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0002, 0x1028, 0x0002, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x0003, 0x1028, 0x0003, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0003, 0x1028, 0x0003, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Si"},
-	{0x1028, 0x0004, 0x1028, 0x00d0, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0004, 0x1028, 0x00d0, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Si"},
-	{0x1028, 0x0002, 0x1028, 0x00d1, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0002, 0x1028, 0x00d1, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x0002, 0x1028, 0x00d9, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0002, 0x1028, 0x00d9, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x0008, 0x1028, 0x00cf, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x0008, 0x1028, 0x00cf, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x000a, 0x1028, 0x0106, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x000a, 0x1028, 0x0106, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x000a, 0x1028, 0x011b, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x000a, 0x1028, 0x011b, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x000a, 0x1028, 0x0121, AAC_HWIF_I960RX, AAC_QUIRK_NOCAM,
+	{0x1028, 0x000a, 0x1028, 0x0121, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1011, 0x0046, 0x9005, 0x0364, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM,
+	{0x1011, 0x0046, 0x9005, 0x0364, AAC_HWIF_STRONGARM, 0,
 	"Adaptec AAC-364"},
-	{0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM,
+	{0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM, 0,
 	 "Adaptec SCSI RAID 5400S"},
-	{0x1011, 0x0046, 0x9005, 0x1364, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM |
-	 AAC_QUIRK_PERC2QC, "Dell PERC 2/QC"},
-	{0x1011, 0x0046, 0x103c, 0x10c2, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM,
+	{0x1011, 0x0046, 0x9005, 0x1364, AAC_HWIF_STRONGARM, AAC_FLAGS_PERC2QC,
+	 "Dell PERC 2/QC"},
+	{0x1011, 0x0046, 0x103c, 0x10c2, AAC_HWIF_STRONGARM, 0,
 	 "HP NetRaid-4M"},
-	{0x9005, 0x0285, 0x9005, 0x0285, AAC_HWIF_I960RX, 0,
-	 "Adaptec SCSI RAID 2200S"},
-	{0x9005, 0x0285, 0x1028, 0x0287, AAC_HWIF_I960RX, 0,
-	 "Dell PERC 320/DC"},
-	{0x9005, 0x0285, 0x9005, 0x0286, AAC_HWIF_I960RX, 0,
-	 "Adaptec SCSI RAID 2120S"},
+	{0x9005, 0x0285, 0x9005, 0x0285, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB |
+	 AAC_FLAGS_256FIBS, "Adaptec SCSI RAID 2200S"},
+	{0x9005, 0x0285, 0x1028, 0x0287, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB |
+	 AAC_FLAGS_256FIBS, "Dell PERC 320/DC"},
+	{0x9005, 0x0285, 0x9005, 0x0286, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB |
+	 AAC_FLAGS_256FIBS, "Adaptec SCSI RAID 2120S"},
+	{0x9005, 0x0285, 0x9005, 0x0290, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Adaptec SCSI RAID 2410SA"},
 	{0, 0, 0, 0, 0, 0, 0}
 };
 
@@ -223,8 +224,9 @@ aac_pci_attach(device_t dev)
 #ifndef INTR_ENTROPY
 #define INTR_ENTROPY 0
 #endif
-	if (bus_setup_intr(sc->aac_dev, sc->aac_irq, INTR_TYPE_BIO|INTR_ENTROPY,
-			   aac_intr, sc, &sc->aac_intr)) {
+	if (bus_setup_intr(sc->aac_dev, sc->aac_irq,
+			   INTR_MPSAFE|INTR_TYPE_BIO|INTR_ENTROPY, aac_intr,
+			   sc, &sc->aac_intr)) {
 		device_printf(sc->aac_dev, "can't set up interrupt\n");
 		goto out;
 	}
@@ -239,48 +241,15 @@ aac_pci_attach(device_t dev)
 	 */
 	if (bus_dma_tag_create(NULL, 			/* parent */
 			       PAGE_SIZE, 0,		/* algnmnt, boundary */
-			       BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+			       BUS_SPACE_MAXADDR,	/* lowaddr */
 			       BUS_SPACE_MAXADDR, 	/* highaddr */
 			       NULL, NULL, 		/* filter, filterarg */
-			       MAXBSIZE, 		/* maxsize */
+			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsize */
 			       AAC_MAXSGENTRIES,	/* nsegments */
 			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			       BUS_DMA_ALLOCNOW,	/* flags */
+			       0,			/* flags */
 			       &sc->aac_parent_dmat)) {
 		device_printf(sc->aac_dev, "can't allocate parent DMA tag\n");
-		goto out;
-	}
-
-	/*
-	 * Create DMA tag for mapping buffers into controller-addressable space.
-	 */
-	if (bus_dma_tag_create(sc->aac_parent_dmat, 	/* parent */
-			   1, 0, 			/* algnmnt, boundary */
-			   BUS_SPACE_MAXADDR,		/* lowaddr */
-			   BUS_SPACE_MAXADDR, 		/* highaddr */
-			   NULL, NULL, 			/* filter, filterarg */
-			   MAXBSIZE, AAC_MAXSGENTRIES,	/* maxsize, nsegments */
-			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			   0,				/* flags */
-			   &sc->aac_buffer_dmat)) {
-		device_printf(sc->aac_dev, "can't allocate buffer DMA tag\n");
-		goto out;
-	}
-
-	/*
-	 * Create DMA tag for mapping FIBs into controller-addressable space..
-	 */
-	if (bus_dma_tag_create(sc->aac_parent_dmat,	/* parent */
-			   1, 0, 			/* algnmnt, boundary */
-			   BUS_SPACE_MAXADDR,		/* lowaddr */
-			   BUS_SPACE_MAXADDR, 		/* highaddr */
-			   NULL, NULL, 			/* filter, filterarg */
-			   AAC_FIB_COUNT *
-			   sizeof(struct aac_fib), 1,	/* maxsize, nsegments */
-			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			   0,				/* flags */
-			   &sc->aac_fib_dmat)) {
-		device_printf(sc->aac_dev, "can't allocate FIB DMA tag\n");;
 		goto out;
 	}
 
@@ -312,7 +281,7 @@ aac_pci_attach(device_t dev)
 			}
 
 			/* Set up quirks */
-			sc->quirks = aac_identifiers[i].quirks;
+			sc->flags = aac_identifiers[i].quirks;
 
 			break;
 		}

@@ -41,7 +41,7 @@
 ** SUCH DAMAGE.
 */
 
-/* $FreeBSD: src/sys/boot/ficl/words.c,v 1.38 2002/08/31 01:04:53 scottl Exp $ */
+/* $FreeBSD: src/sys/boot/ficl/words.c,v 1.39 2002/12/30 21:18:06 schweikh Exp $ */
 
 #ifdef TESTMAIN
 #include <stdlib.h>
@@ -4535,7 +4535,7 @@ static void funcname(FICL_VM *pVM)
 /**************************************************************************
                         f i c l W o r d C l a s s i f y
 ** This public function helps to classify word types for SEE
-** and the deugger in tools.c. Given an pointer to a word, it returns
+** and the deugger in tools.c. Given a pointer to a word, it returns
 ** a member of WOR
 **************************************************************************/
 WORDKIND ficlWordClassify(FICL_WORD *pFW)

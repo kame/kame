@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.reg,v 1.5 2002/12/04 22:51:29 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.reg,v 1.14 2003/05/30 02:14:22 scottl Exp $
  */
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.reg#56 $"
+VERSION = "$Id: aic79xx.reg,v 1.13 2003/05/26 21:26:51 gibbs Exp $"
 
 /*
  * This file is processed by the aic7xxx_asm utility for use in assembling
@@ -173,11 +173,29 @@ register SEQINTCODE {
 		STATUS_OVERRUN,
 		CFG4OVERRUN,
 		ENTERING_NONPACK,
+		TASKMGMT_FUNC_COMPLETE,		/*
+						 * Task management function
+						 * request completed with
+						 * an expected busfree.
+						 */
+		TASKMGMT_CMD_CMPLT_OKAY,	/*
+						 * A command with a non-zero
+						 * task management function
+						 * has completed via the normal
+						 * command completion method
+						 * for commands with a zero
+						 * task management function.
+						 * This happens when an attempt
+						 * to abort a command loses
+						 * the race for the command to
+						 * complete normally.
+						 */
 		TRACEPOINT0,
 		TRACEPOINT1,
 		TRACEPOINT2,
 		TRACEPOINT3,
-		SAW_HWERR
+		SAW_HWERR,
+		BAD_SCB_STATUS
 	}
 }
 
@@ -265,16 +283,17 @@ register HESCB_QOFF {
  * Host Mailbox
  */
 register HS_MAILBOX {
-	address			0x0B
+	address			0x00B
 	access_mode	RW
 	mask	HOST_TQINPOS	0x80	/* Boundary at either 0 or 128 */
+	mask	ENINT_COALESCE	0x40	/* Perform interrupt coalescing */
 }
 
 /*
  * Sequencer Interupt Status
  */
 register SEQINTSTAT {
-	address			0x0C
+	address			0x00C
 	access_mode	RO
 	field	SEQ_SWTMRTO	0x10
 	field	SEQ_SEQINT	0x08
@@ -287,7 +306,7 @@ register SEQINTSTAT {
  * Clear SEQ Interrupt
  */
 register CLRSEQINTSTAT {
-	address			0x0C0
+	address			0x00C
 	access_mode	WO
 	field	CLRSEQ_SWTMRTO	0x10
 	field	CLRSEQ_SEQINT	0x08
@@ -300,7 +319,7 @@ register CLRSEQINTSTAT {
  * Software Timer
  */
 register SWTIMER {
-	address			0x0E0
+	address			0x00E
 	access_mode	RW
 	size		2
 }
@@ -1358,7 +1377,10 @@ register LUNLEN {
 	address			0x030
 	access_mode	RW
 	modes		M_CFG
+	mask		ILUNLEN	0x0F
+	mask		TLUNLEN	0xF0
 }
+const LUNLEN_SINGLE_LEVEL_LUN 0xF
 
 /*
  * CDB Limit
@@ -2053,14 +2075,14 @@ register LQIMODE1 {
 	address			0x051
 	access_mode	RW
 	modes		M_CFG
-	field	ENLQIPHASE_LQ	0x80
-	field	ENLQIPHASE_NLQ	0x40
+	field	ENLQIPHASE_LQ	0x80	/* LQIPHASE1 */
+	field	ENLQIPHASE_NLQ	0x40	/* LQIPHASE2 */
 	field	ENLIQABORT	0x20
-	field	ENLQICRCI_LQ	0x10
-	field	ENLQICRCI_NLQ	0x08
+	field	ENLQICRCI_LQ	0x10	/* LQICRCI1 */
+	field	ENLQICRCI_NLQ	0x08	/* LQICRCI2 */
 	field	ENLQIBADLQI	0x04
-	field	ENLQIOVERI_LQ	0x02
-	field	ENLQIOVERI_NLQ	0x01
+	field	ENLQIOVERI_LQ	0x02	/* LQIOVERI1 */
+	field	ENLQIOVERI_NLQ	0x01	/* LQIOVERI2 */
 }
 
 /*
@@ -2527,10 +2549,10 @@ const	AHD_PRECOMP_CUTBACK_37	0x07
 const	AHD_SLEWRATE_MASK	0x78
 const	AHD_SLEWRATE_SHIFT	3
 /*
- * Rev A has only a single bit of slew adjustment.
- * Rev B has 4 bits.
+ * Rev A has only a single bit (high bit of field) of slew adjustment.
+ * Rev B has 4 bits.  The current default happens to be the same for both.
  */
-const	AHD_SLEWRATE_DEF_REVA	0x01
+const	AHD_SLEWRATE_DEF_REVA	0x08
 const	AHD_SLEWRATE_DEF_REVB	0x08
 
 /* Rev A does not have any amplitude setting. */
@@ -3106,21 +3128,6 @@ register RCVRBIASCALC {
 }
 
 /*
- * Data FIFO Debug Control
- */
-register DFDBCTL {
-	address				0x0C8
-	access_mode	RW
-	modes		M_DFF0, M_DFF1
-	field	DFF_CIO_WR_RDY		0x20
-	field	DFF_CIO_RD_RDY		0x10
-	field	DFF_DIR_ERR		0x08
-	field	DFF_RAMBIST_FAIL	0x04
-	field	DFF_RAMBIST_DONE	0x02
-	field	DFF_RAMBIST_EN		0x01
-}
-
-/*
  * Data FIFO Backup Read Pointer
  * Contains the data FIFO address to be restored if the last
  * data accessed from the data FIFO was not transferred successfully.
@@ -3139,6 +3146,21 @@ register SKEWCALC {
 	address			0x0C9
 	access_mode	RO
 	modes		M_CFG
+}
+
+/*
+ * Data FIFO Debug Control
+ */
+register DFDBCTL {
+	address				0x0CB
+	access_mode	RW
+	modes		M_DFF0, M_DFF1
+	field	DFF_CIO_WR_RDY		0x20
+	field	DFF_CIO_RD_RDY		0x10
+	field	DFF_DIR_ERR		0x08
+	field	DFF_RAMBIST_FAIL	0x04
+	field	DFF_RAMBIST_DONE	0x02
+	field	DFF_RAMBIST_EN		0x01
 }
 
 /*
@@ -3226,7 +3248,8 @@ register SEQINTCTL {
 	field	INT1_CONTEXT	0x20
 	field	SCS_SEQ_INT1M1	0x10
 	field	SCS_SEQ_INT1M0	0x08
-	field	INTMASK		0x06
+	field	INTMASK2	0x04
+	field	INTMASK1	0x02
 	field	IRET		0x01
 }
 
@@ -3465,9 +3488,6 @@ scratch_ram {
 	LONGJMP_ADDR {
 		size		2
 	}
-	LONGJMP_SCB {
-		size		2
-	}
 	ACCUM_SAVE {
 		size		1
 	}
@@ -3687,6 +3707,53 @@ scratch_ram {
 	}
 
 	/*
+	 * The maximum amount of time to wait, when interrupt coalescing
+	 * is enabled, before issueing a CMDCMPLT interrupt for a completed
+	 * command.
+	 */
+	INT_COALESCING_TIMER {
+		size		2
+	}
+
+	/*
+	 * The maximum number of commands to coalesce into a single interrupt.
+	 * Actually the 2's complement of that value to simplify sequencer
+	 * code.
+	 */
+	INT_COALESCING_MAXCMDS {
+		size		1
+	}
+
+	/*
+	 * The minimum number of commands still outstanding required
+	 * to continue coalescing (2's complement of value).
+	 */
+	INT_COALESCING_MINCMDS {
+		size		1
+	}
+
+	/*
+	 * Number of commands "in-flight".
+	 */
+	CMDS_PENDING {
+		size		2
+	}
+
+	/*
+	 * The count of commands that have been coalesced.
+	 */
+	INT_COALESCING_CMDCOUNT {
+		size		1
+	}
+
+	/*
+	 * Since the HS_MAIBOX is self clearing, copy its contents to
+	 * this position in scratch ram every time it changes.
+	 */
+	LOCAL_HS_MAILBOX {
+		size		1
+	}
+	/*
 	 * Target-mode CDB type to CDB length table used
 	 * in non-packetized operation.
 	 */
@@ -3703,16 +3770,17 @@ scb {
 	SCB_RESIDUAL_DATACNT {
 		size	4
 		alias	SCB_CDB_STORE
+		alias	SCB_HOST_CDB_PTR
 	}
 	SCB_RESIDUAL_SGPTR {
 		size	4
-		alias	SCB_CDB_PTR
 		field	SG_ADDR_MASK		0xf8	/* In the last byte */
 		field	SG_OVERRUN_RESID	0x02	/* In the first byte */
 		field	SG_LIST_NULL		0x01	/* In the first byte */
 	}
 	SCB_SCSI_STATUS {
 		size	1
+		alias	SCB_HOST_CDB_LEN
 	}
 	SCB_TARGET_PHASES {
 		size	1
@@ -3733,7 +3801,35 @@ scb {
 		alias	SCB_NEXT_COMPLETE
 	}
 	SCB_TAG {
+		alias	SCB_FIFO_USE_COUNT
 		size	2
+	}
+	SCB_CONTROL {
+		size	1
+		field	TARGET_SCB	0x80
+		field	DISCENB		0x40
+		field	TAG_ENB		0x20
+		field	MK_MESSAGE	0x10
+		field	STATUS_RCVD	0x08
+		field	DISCONNECTED	0x04
+		field	SCB_TAG_TYPE	0x03
+	}
+	SCB_SCSIID {
+		size	1
+		field	TID	0xF0
+		field	OID	0x0F
+	}
+	SCB_LUN {
+		size	1
+		field	LID	0xff
+	}
+	SCB_TASK_ATTRIBUTE {
+		size	1
+		/*
+		 * Overloaded field for non-packetized 
+		 * ignore wide residue message handling.
+		 */
+		field	SCB_XFERLEN_ODD	0x01
 	}
 	SCB_CDB_LEN {
 		size	1
@@ -3741,13 +3837,6 @@ scb {
 	}
 	SCB_TASK_MANAGEMENT {
 		size	1
-	}
-	SCB_NEXT {
-		alias	SCB_NEXT_SCB_BUSADDR
-		size	2
-	}
-	SCB_NEXT2 {
-		size	2
 	}
 	SCB_DATAPTR {
 		size	8
@@ -3767,30 +3856,15 @@ scb {
 		field	SG_FULL_RESID	0x02	/* In the first byte */
 		field	SG_LIST_NULL	0x01	/* In the first byte */
 	}
-	SCB_CONTROL {
-		size	1
-		field	TARGET_SCB	0x80
-		field	DISCENB		0x40
-		field	TAG_ENB		0x20
-		field	MK_MESSAGE	0x10
-		field	STATUS_RCVD	0x08
-		field	DISCONNECTED	0x04
-		field	SCB_TAG_TYPE	0x03
-	}
-	SCB_SCSIID {
-		size	1
-		field	TID	0xF0
-		field	OID	0x0F
-	}
-	SCB_LUN {
-		size	1
-		field	LID				0xff
-	}
-	SCB_TASK_ATTRIBUTE {
-		size	1
-	}
 	SCB_BUSADDR {
 		size	4
+	}
+	SCB_NEXT {
+		alias	SCB_NEXT_SCB_BUSADDR
+		size	2
+	}
+	SCB_NEXT2 {
+		size	2
 	}
 	SCB_SPARE {
 		size	8
@@ -3859,6 +3933,13 @@ const SCB_TRANSFER_SIZE_FULL_LUN	56
 const SCB_TRANSFER_SIZE_1BYTE_LUN	48
 /* PKT_OVERRUN_BUFSIZE must be a multiple of 256 less than 64K */
 const PKT_OVERRUN_BUFSIZE	512
+
+/*
+ * Timer parameters.
+ */
+const AHD_TIMER_US_PER_TICK	25
+const AHD_TIMER_MAX_TICKS	0xFFFF
+const AHD_TIMER_MAX_US		(AHD_TIMER_MAX_TICKS * AHD_TIMER_US_PER_TICK)
 
 /*
  * Downloaded (kernel inserted) constants

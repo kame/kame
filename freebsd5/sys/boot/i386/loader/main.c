@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/main.c,v 1.26 2002/10/01 19:31:09 iwasaki Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/main.c,v 1.27 2003/05/01 03:56:29 peter Exp $
  */
 
 /*
@@ -144,6 +144,8 @@ main(void)
     extract_currdev();				/* set $currdev and $loaddev */
     setenv("LINES", "24", 1);			/* optional */
     
+    bios_getsmap();
+
     archsw.arch_autoload = i386_autoload;
     archsw.arch_getdev = i386_getdev;
     archsw.arch_copyin = i386_copyin;

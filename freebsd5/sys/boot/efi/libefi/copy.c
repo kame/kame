@@ -24,10 +24,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/efi/libefi/copy.c,v 1.4 2002/05/19 04:42:18 marcel Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/copy.c,v 1.5 2003/04/03 21:36:29 obrien Exp $");
 
 /*
  * MD primitives supporting placement of module data 

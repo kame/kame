@@ -1,12 +1,14 @@
-# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.28 2002/08/29 02:02:28 peter Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.29 2003/05/01 03:56:29 peter Exp $
 #
 LIB=			i386
 INTERNALLIB=		true
 
 SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
-	biospci.c bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \
+	biospci.c biossmap.c bootinfo.c bootinfo32.c bootinfo64.c \
+	comconsole.c devicename.c elf32_freebsd.c \
+	elf64_freebsd.c gatea20.c \
 	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
-	time.c vidconsole.c
+	time.c vidconsole.c amd64_tramp.S
 
 CFLAGS+=	-ffreestanding
 BOOT_COMCONSOLE_PORT?= 0x3f8

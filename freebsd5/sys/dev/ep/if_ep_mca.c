@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_mca.c,v 1.3 2000/09/20 19:31:37 imp Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_mca.c,v 1.4 2003/03/29 22:27:41 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -149,6 +149,7 @@ static device_method_t ep_mca_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ep_mca_probe),
 	DEVMETHOD(device_attach,	ep_mca_attach),
+	DEVMETHOD(device_detach,	ep_detach),
 
 	{ 0, 0 }
 };

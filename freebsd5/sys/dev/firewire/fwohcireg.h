@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 1998-2001 Katsushi Kobayashi and Hidetoshi Shimokawa
+ * Copyright (c) 2003 Hidetoshi Shimokawa
+ * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +31,39 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.2.4.2 2003/01/07 13:43:50 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.10 2003/04/24 07:29:52 simokawa Exp $
  *
  */
 #define		PCI_CBMEM		0x10
 
-#define		FW_VENDORID_NEC		(0x1033 << 16)
-#define		FW_VENDORID_TI		(0x104c << 16)
-#define		FW_VENDORID_SONY	(0x104d << 16)
-#define		FW_VENDORID_VIA		(0x1106 << 16)
-#define		FW_VENDORID_RICOH	(0x1180 << 16)
-#define		FW_VENDORID_APPLE	(0x106b << 16)
-#define		FW_VENDORID_LUCENT	(0x11c1 << 16)
+#define		FW_VENDORID_NEC		0x1033
+#define		FW_VENDORID_TI		0x104c
+#define		FW_VENDORID_SONY	0x104d
+#define		FW_VENDORID_VIA		0x1106
+#define		FW_VENDORID_RICOH	0x1180
+#define		FW_VENDORID_APPLE	0x106b
+#define		FW_VENDORID_LUCENT	0x11c1
 
-#define		FW_DEVICE_UPD861	0x0063
-#define		FW_DEVICE_TITSB22	0x8009
-#define		FW_DEVICE_TITSB23	0x8019
-#define		FW_DEVICE_TITSB26	0x8020
-#define		FW_DEVICE_TITSB43	0x8021
-#define		FW_DEVICE_TITSB43A	0x8023
-#define		FW_DEVICE_TIPCI4450	0x8011
-#define		FW_DEVICE_TIPCI4410A	0x8017
-#define		FW_DEVICE_CX3022	0x8039
-#define		FW_DEVICE_VT6306	0x3044
-#define		FW_DEVICE_R5C552	0x0552
-#define		FW_DEVICE_PANGEA	0x0030
-#define		FW_DEVICE_UNINORTH	0x0031
-#define		FW_DEVICE_FW322		0x5811
+#define		FW_DEVICE_UPD861	(0x0063 << 16)
+#define		FW_DEVICE_UPD871	(0x00ce << 16)
+#define		FW_DEVICE_UPD72870	(0x00cd << 16)
+#define		FW_DEVICE_UPD72874	(0x00f2 << 16)
+#define		FW_DEVICE_TITSB22	(0x8009 << 16)
+#define		FW_DEVICE_TITSB23	(0x8019 << 16)
+#define		FW_DEVICE_TITSB26	(0x8020 << 16)
+#define		FW_DEVICE_TITSB43	(0x8021 << 16)
+#define		FW_DEVICE_TITSB43A	(0x8023 << 16)
+#define		FW_DEVICE_TITSB43AB23	(0x8024 << 16)
+#define		FW_DEVICE_TIPCI4410A	(0x8017 << 16)
+#define		FW_DEVICE_TIPCI4450	(0x8011 << 16)
+#define		FW_DEVICE_TIPCI4451	(0x8027 << 16)
+#define		FW_DEVICE_CX3022	(0x8039 << 16)
+#define		FW_DEVICE_VT6306	(0x3044 << 16)
+#define		FW_DEVICE_R5C551	(0x0551 << 16)
+#define		FW_DEVICE_R5C552	(0x0552 << 16)
+#define		FW_DEVICE_PANGEA	(0x0030 << 16)
+#define		FW_DEVICE_UNINORTH	(0x0031 << 16)
+#define		FW_DEVICE_FW322		(0x5811 << 16)
 
 #define PCI_INTERFACE_OHCI	0x10
 
@@ -70,17 +77,31 @@
 
 typedef volatile u_int32_t 	fwohcireg_t;
 
+/* for PCI */
+#if BYTE_ORDER == BIG_ENDIAN
+#define FWOHCI_DMA_WRITE(x, y)	((x) = htole32(y))
+#define FWOHCI_DMA_READ(x)	le32toh(x)
+#define FWOHCI_DMA_SET(x, y)	((x) |= htole32(y))
+#define FWOHCI_DMA_CLEAR(x, y)	((x) &= htole32(~(y)))
+#else
+#define FWOHCI_DMA_WRITE(x, y)	((x) = (y))
+#define FWOHCI_DMA_READ(x)	(x)
+#define FWOHCI_DMA_SET(x, y)	((x) |= (y))
+#define FWOHCI_DMA_CLEAR(x, y)	((x) &= ~(y))
+#endif
+
 struct fwohcidb {
 	union {
 		struct {
 			volatile u_int32_t cmd;
 			volatile u_int32_t addr;
 			volatile u_int32_t depend;
-			volatile u_int32_t count:16,
-					   status:16;
+			volatile u_int32_t res;
 		} desc;
 		volatile u_int32_t immed[4];
 	} db;
+#define OHCI_STATUS_SHIFT	16
+#define OHCI_COUNT_MASK		0xffff
 #define OHCI_OUTPUT_MORE	(0 << 28)
 #define OHCI_OUTPUT_LAST	(1 << 28)
 #define OHCI_INPUT_MORE		(2 << 28)
@@ -296,8 +317,9 @@ struct fwohcidb_tr{
 	STAILQ_ENTRY(fwohcidb_tr) link;
 	struct fw_xfer *xfer;
 	volatile struct fwohcidb *db;
+	bus_dmamap_t dma_map;
 	caddr_t buf;
-	caddr_t dummy;
+	bus_addr_t bus_addr;
 	int dbcnt;
 };
 
@@ -308,31 +330,55 @@ struct fwohci_txpkthdr{
 	union{
 		u_int32_t ld[4];
 		struct {
-			u_int32_t res3:4,
-				  tcode:4,
-				  res2:8,
+#if BYTE_ORDER == BIG_ENDIAN
+			u_int32_t :13,
 				  spd:3,
-				  res1:13;
+				  :8,
+				  tcode:4,
+				  :4;
+#else
+			u_int32_t :4,
+				  tcode:4,
+				  :8,
+				  spd:3,
+				  :13;
+#endif
 		}common;
 		struct {
-			u_int32_t res3:4,
-				 tcode:4,
-				 tlrt:8,
-				 spd:3,
-				 res2:4,
-				 srcbus:1,
-				 res1:8;
-		  	u_int32_t res4:16,
-				 dst:16;
+#if BYTE_ORDER == BIG_ENDIAN
+			u_int32_t :8,
+				  srcbus:1,
+				  :4,
+				  spd:3,
+				  tlrt:8,
+				  tcode:4,
+				  :4;
+#else
+			u_int32_t :4,
+				  tcode:4,
+				  tlrt:8,
+				  spd:3,
+				  :4,
+				  srcbus:1,
+				  :8;
+#endif
+			BIT16x2(dst, );
 		}asycomm;
 		struct {
+#if BYTE_ORDER == BIG_ENDIAN
+			u_int32_t :13,
+			          spd:3,
+				  chtag:8,
+				  tcode:4,
+				  sy:4;
+#else
 			u_int32_t sy:4,
 				  tcode:4,
 				  chtag:8,
 			          spd:3,
-				  res1:13;
-			u_int32_t res2:16,
-				  len:16;
+				  :13;
+#endif
+			BIT16x2(len, );
 		}stream;
 	}mode;
 };

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_cbus.c,v 1.5 2002/03/20 02:07:18 alfred Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_cbus.c,v 1.9 2003/04/15 06:37:22 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -754,7 +754,7 @@ ed98_probe_Novell(dev, port_rid, flags)
 	/*
 	 * I don't know if this is necessary; probably cruft leftover from
 	 * Clarkson packet driver code. Doesn't do a thing on the boards I've
-	 * tested. -DG [note that a outb(0x84, 0) seems to work here, and is
+	 * tested. -DG [note that an outb(0x84, 0) seems to work here, and is
 	 * non-invasive...but some boards don't seem to reset and I don't have
 	 * complete documentation on what the 'right' thing to do is...so we
 	 * do the invasive thing for now. Yuck.]
@@ -939,7 +939,7 @@ ed_probe_SIC98(dev, port_rid, flags)
 	for (i = 0; i < sc->mem_size; i++) {
 		if (sc->mem_start[i]) {
 			device_printf(dev, "failed to clear shared memory "
-				"at %lx - check configuration\n",
+				"at %x - check configuration\n",
 				kvtop(sc->mem_start + i));
 
 			return (ENXIO);
@@ -1101,7 +1101,7 @@ ed_probe_CNET98(dev, port_rid, flags)
 	if (((rman_get_start(sc->port_res) & 0x0fff) != 0x03d0)
 	||  ((rman_get_start(sc->port_res) & 0xf000) < (u_short) 0xa000)) {
 #ifdef DIAGNOSTIC
-		device_printf(dev, "Invalid i/o port configuration (0x%x) "
+		device_printf(dev, "Invalid i/o port configuration (0x%lx) "
 			"must be %s for %s\n", rman_get_start(sc->port_res),
 			"0x[a-f]3d0", "CNET98");
 #endif
@@ -1120,7 +1120,7 @@ ed_probe_CNET98(dev, port_rid, flags)
 	tmp_s &= 0x0f;
 	tmp    = rman_get_start(sc->port_res) >> 12;
 	if ((tmp_s <= tmp) && (tmp < (tmp_s + 4))) {
-		device_printf(dev, "Please change iobase address(0x%x) "
+		device_printf(dev, "Please change iobase address(0x%lx) "
 			"or window address(0x%x)\n",
 	   		rman_get_start(sc->port_res), kvtop(sc->mem_start));
 		return (ENXIO);
@@ -1173,7 +1173,7 @@ ed_probe_CNET98(dev, port_rid, flags)
 	for (i = 0; i < sc->mem_size; i++) {
 		if (sc->mem_start[i]) {
 			device_printf(dev, "failed to clear shared memory "
-				"at %lx - check configuration\n",
+				"at %x - check configuration\n",
 				kvtop(sc->mem_start + i));
 
 			return (ENXIO);
@@ -1263,7 +1263,7 @@ ed_probe_CNET98EL(dev, port_rid, flags)
 	/* Check I/O address. 0x[0-f]3d0 are allowed. */
 	if ((rman_get_start(sc->port_res) & 0x0fff) != 0x03d0) {
 #ifdef DIAGNOSTIC
-		device_printf(dev, "Invalid i/o port configuration (0x%x) "
+		device_printf(dev, "Invalid i/o port configuration (0x%lx) "
 			"must be %s for %s\n", rman_get_start(sc->port_res),
 			"0x?3d0", "CNET98E/L");
 #endif
@@ -1556,7 +1556,7 @@ ed_probe_SB98(dev, port_rid, flags)
 	/* Check I/O address. 00d[02468ace] are allowed. */
 	if ((rman_get_start(sc->port_res) & ~0x000e) != 0x00d0) {
 #ifdef DIAGNOSTIC
-		device_printf(dev, "Invalid i/o port configuration (0x%x) "
+		device_printf(dev, "Invalid i/o port configuration (0x%lx) "
 			"must be %s for %s\n", rman_get_start(sc->port_res),
 			"0xd?", "SB9801");
 #endif
@@ -1753,4 +1753,6 @@ static driver_t ed_isa_driver = {
 	sizeof(struct ed_softc)
 };
 
-DRIVER_MODULE(if_ed, isa, ed_isa_driver, ed_devclass, 0, 0);
+DRIVER_MODULE(ed, isa, ed_isa_driver, ed_devclass, 0, 0);
+MODULE_DEPEND(ed, isa, 1, 1, 1);
+MODULE_DEPEND(ed, ether, 1, 1, 1);

@@ -19,7 +19,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.20 2002/03/20 02:07:19 alfred Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.23 2003/03/30 08:13:47 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -250,6 +250,7 @@ static device_method_t ep_eisa_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ep_eisa_probe),
 	DEVMETHOD(device_attach,	ep_eisa_attach),
+	DEVMETHOD(device_detach,	ep_detach),
 
 	{ 0, 0 }
 };

@@ -27,7 +27,7 @@
  *
  *	from: NetBSD: if_hme_pci.c,v 1.4 2001/08/27 22:18:49 augustss Exp
  *
- * $FreeBSD: src/sys/dev/hme/if_hme_pci.c,v 1.3 2002/03/23 19:37:11 tmm Exp $
+ * $FreeBSD: src/sys/dev/hme/if_hme_pci.c,v 1.6 2003/04/16 03:16:54 mdodd Exp $
  */
 
 /*
@@ -77,11 +77,19 @@ struct hme_pci_softc {
 
 static int hme_pci_probe(device_t);
 static int hme_pci_attach(device_t);
+static int hme_pci_detach(device_t);
+static int hme_pci_suspend(device_t);
+static int hme_pci_resume(device_t);
 
 static device_method_t hme_pci_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		hme_pci_probe),
 	DEVMETHOD(device_attach,	hme_pci_attach),
+	DEVMETHOD(device_detach,	hme_pci_detach),
+	DEVMETHOD(device_suspend,	hme_pci_suspend),
+	DEVMETHOD(device_resume,	hme_pci_resume),
+	/* Can just use the suspend method here. */
+	DEVMETHOD(device_shutdown,	hme_pci_suspend),
 
 	/* bus interface */
 	DEVMETHOD(bus_print_child,	bus_generic_print_child),
@@ -101,7 +109,9 @@ static driver_t hme_pci_driver = {
 	sizeof(struct hme_pci_softc)
 };
 
-DRIVER_MODULE(if_hme, pci, hme_pci_driver, hme_devclass, 0, 0);
+DRIVER_MODULE(hme, pci, hme_pci_driver, hme_devclass, 0, 0);
+MODULE_DEPEND(hme, pci, 1, 1, 1);
+MODULE_DEPEND(hme, ether, 1, 1, 1);
 
 int
 hme_pci_probe(device_t dev)
@@ -127,7 +137,6 @@ hme_pci_attach(device_t dev)
 	 * gross; but the hme comes up with neither enabled.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_MEMORY);
 
 	sc->sc_pci = 1; /* XXXXX should all be done in bus_dma. */
 	sc->sc_dev = dev;
@@ -182,6 +191,7 @@ hme_pci_attach(device_t dev)
 	if ((error = bus_setup_intr(dev, hsc->hsc_ires, INTR_TYPE_NET, hme_intr,
 	     sc, &hsc->hsc_ih)) != 0) {
 		device_printf(dev, "couldn't establish interrupt\n");
+		hme_detach(sc);
 		goto fail_ires;
 	}
 	return (0);
@@ -191,4 +201,38 @@ fail_ires:
 fail_sres:
 	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_srid, hsc->hsc_sres);
 	return (ENXIO);
+}
+
+static int
+hme_pci_detach(device_t dev)
+{
+	struct hme_pci_softc *hsc = device_get_softc(dev);
+	struct hme_softc *sc = &hsc->hsc_hme;
+
+	hme_detach(sc);
+
+	bus_teardown_intr(dev, hsc->hsc_ires, hsc->hsc_ih);
+	bus_release_resource(dev, SYS_RES_IRQ, hsc->hsc_irid, hsc->hsc_ires);
+	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_srid, hsc->hsc_sres);
+	return (0);
+}
+
+static int
+hme_pci_suspend(device_t dev)
+{
+	struct hme_pci_softc *hsc = device_get_softc(dev);
+	struct hme_softc *sc = &hsc->hsc_hme;
+
+	hme_suspend(sc);
+	return (0);
+}
+
+static int
+hme_pci_resume(device_t dev)
+{
+	struct hme_pci_softc *hsc = device_get_softc(dev);
+	struct hme_softc *sc = &hsc->hsc_hme;
+
+	hme_resume(sc);
+	return (0);
 }

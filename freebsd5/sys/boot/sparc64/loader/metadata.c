@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.29
- * $FreeBSD: src/sys/boot/sparc64/loader/metadata.c,v 1.8 2002/11/10 19:17:36 jake Exp $
+ * $FreeBSD: src/sys/boot/sparc64/loader/metadata.c,v 1.9 2003/04/30 22:00:16 peter Exp $
  */
 
 #include <stand.h>
@@ -296,7 +296,9 @@ md_load(char *args, vm_offset_t *modulep)
     addr = roundup(addr, PAGE_SIZE);
 
     kernend = 0;
-    kfp = file_findfile(NULL, "elf kernel");
+    kfp = file_findfile(NULL, "elf64 kernel");
+    if (kfp == NULL)
+	kfp = file_findfile(NULL, "elf kernel");
     if (kfp == NULL)
 	panic("can't find kernel file");
     file_addmetadata(kfp, MODINFOMD_HOWTO, sizeof howto, &howto);

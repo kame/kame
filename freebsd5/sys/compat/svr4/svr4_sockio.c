@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_sockio.c,v 1.13 2002/10/17 22:27:21 robert Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_sockio.c,v 1.14 2002/12/22 05:35:01 hsu Exp $
  */
 
 #include <sys/param.h>
@@ -100,7 +100,7 @@ svr4_sock_ioctl(fp, td, retval, fd, cmd, data)
 			 * fix is to make SVR4_SIOCGIFCONF return only one
 			 * entry per physical interface?
 			 */
-
+			IFNET_RLOCK();
 			TAILQ_FOREACH(ifp, &ifnet, if_link)
 				if (TAILQ_FIRST(&ifp->if_addrhead) == NULL)
 					ifnum++;
@@ -108,8 +108,7 @@ svr4_sock_ioctl(fp, td, retval, fd, cmd, data)
 					TAILQ_FOREACH(ifa, &ifp->if_addrhead,
 					    ifa_link)
 						ifnum++;
-
-
+			IFNET_RUNLOCK();
 			DPRINTF(("SIOCGIFNUM %d\n", ifnum));
 			return copyout(&ifnum, data, sizeof(ifnum));
 		}

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.22 2002/11/07 16:04:07 iedowse Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.27 2003/04/30 01:54:38 imp Exp $
  */
 
 /*
@@ -38,6 +38,19 @@
  * This must be a power of two.
  */
 #define FXP_NTXCB       128
+
+/*
+ * Size of the TxCB list.
+ */
+#define FXP_TXCB_SZ	(FXP_NTXCB * sizeof(struct fxp_cb_tx))
+
+/*
+ * Macro to obtain the DMA address of a virtual address in the
+ * TxCB list based on the base DMA address of the TxCB list.
+ */
+#define FXP_TXCB_DMA_ADDR(sc, addr)					\
+	(sc->fxp_desc.cbl_addr + (uintptr_t)addr -			\
+	(uintptr_t)sc->fxp_desc.cbl_list)
 
 /*
  * Number of completed TX commands at which point an interrupt
@@ -91,6 +104,9 @@
 #if __FreeBSD_version < 500000
 #define	FXP_LOCK(_sc)
 #define	FXP_UNLOCK(_sc)
+#define	INTR_MPSAFE		0
+#define mtx_owned(a)		0
+#define mtx_assert(a, b)
 #define mtx_init(a, b, c, d)
 #define mtx_destroy(a)
 struct mtx { int dummy; };
@@ -99,10 +115,36 @@ struct mtx { int dummy; };
 #define	FXP_UNLOCK(_sc)		mtx_unlock(&(_sc)->sc_mtx)
 #endif
 
-#ifdef __alpha__
-#undef vtophys
-#define vtophys(va)	alpha_XXX_dmamap((vm_offset_t)(va))
-#endif /* __alpha__ */
+/*
+ * Structures to handle TX and RX descriptors.
+ */
+struct fxp_rx {
+	struct fxp_rx *rx_next;
+	struct mbuf *rx_mbuf;
+	bus_dmamap_t rx_map;
+	u_int32_t rx_addr;
+};
+
+struct fxp_tx {
+	struct fxp_tx *tx_next;
+	struct fxp_cb_tx *tx_cb;
+	struct mbuf *tx_mbuf;
+	bus_dmamap_t tx_map;
+};
+
+struct fxp_desc_list {
+	struct fxp_rx rx_list[FXP_NRFABUFS];
+	struct fxp_tx tx_list[FXP_NTXCB];
+	struct fxp_tx mcs_tx;
+	struct fxp_rx *rx_head;
+	struct fxp_rx *rx_tail;
+	struct fxp_tx *tx_first;
+	struct fxp_tx *tx_last;
+	struct fxp_rfa *rfa_list;
+	struct fxp_cb_tx *cbl_list;
+	u_int32_t cbl_addr;
+	bus_dma_tag_t rx_tag;
+};
 
 /*
  * NOTE: Elements are ordered for optimal cacheline behavior, and NOT
@@ -118,17 +160,23 @@ struct fxp_softc {
 	struct mtx sc_mtx;
 	bus_space_tag_t sc_st;		/* bus space tag */
 	bus_space_handle_t sc_sh;	/* bus space handle */
-	struct mbuf *rfa_headm;		/* first mbuf in receive frame area */
-	struct mbuf *rfa_tailm;		/* last mbuf in receive frame area */
-	struct fxp_cb_tx *cbl_first;	/* first active TxCB in list */
+	bus_dma_tag_t fxp_mtag;		/* bus DMA tag for mbufs */
+	bus_dma_tag_t fxp_stag;		/* bus DMA tag for stats */
+	bus_dmamap_t fxp_smap;		/* bus DMA map for stats */
+	bus_dma_tag_t cbl_tag;		/* DMA tag for the TxCB list */
+	bus_dmamap_t cbl_map;		/* DMA map for the TxCB list */
+	bus_dma_tag_t mcs_tag;		/* DMA tag for the multicast setup */
+	bus_dmamap_t mcs_map;		/* DMA map for the multicast setup */
+	bus_dmamap_t spare_map;		/* spare DMA map */
+	struct fxp_desc_list fxp_desc;	/* descriptors management struct */
 	int tx_queued;			/* # of active TxCB's */
 	int need_mcsetup;		/* multicast filter needs programming */
-	struct fxp_cb_tx *cbl_last;	/* last active TxCB in list */
 	struct fxp_stats *fxp_stats;	/* Pointer to interface stats */
+	u_int32_t stats_addr;		/* DMA address of the stats structure */
 	int rx_idle_secs;		/* # of seconds RX has been idle */
 	struct callout_handle stat_ch;	/* Handle for canceling our stat timeout */
-	struct fxp_cb_tx *cbl_base;	/* base of TxCB list */
 	struct fxp_cb_mcs *mcsp;	/* Pointer to mcast setup descriptor */
+	u_int32_t mcs_addr;		/* DMA address of the multicast cmd */
 	struct ifmedia sc_media;	/* media information */
 	device_t miibus;
 	device_t dev;
@@ -137,7 +185,7 @@ struct fxp_softc {
 	int tunable_int_delay;		/* interrupt delay value for ucode */
 	int tunable_bundle_max;		/* max # frames per interrupt (ucode) */
 	int eeprom_size;		/* size of serial EEPROM */
-	int suspended;			/* 0 = normal  1 = suspended (APM) */
+	int suspended;			/* 0 = normal  1 = suspended or dead */
 	int cu_resume_bug;
 	int revision;
 	int flags;
@@ -146,6 +194,8 @@ struct fxp_softc {
 	u_int8_t saved_intline;
 	u_int8_t saved_cachelnsz;
 	u_int8_t saved_lattimer;
+	u_int8_t rfa_size;
+        u_int32_t tx_cmd;
 };
 
 #define FXP_FLAG_MWI_ENABLE	0x0001	/* MWI enable */
@@ -158,6 +208,7 @@ struct fxp_softc {
 #define FXP_FLAG_CU_RESUME_BUG	0x0080	/* requires workaround for CU_RESUME */
 #define FXP_FLAG_UCODE		0x0100	/* ucode is loaded */
 #define FXP_FLAG_DEFERRED_RNR	0x0200	/* DEVICE_POLLING deferred RNR */
+#define FXP_FLAG_EXT_RFA	0x0400	/* extended RFDs for csum offload */
 
 /* Macros to ease CSR access. */
 #define	CSR_READ_1(sc, reg)						\

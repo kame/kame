@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.10 2001/02/26 22:25:30 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.11 2003/03/08 08:01:28 phk Exp $
  */
 
 /*
@@ -170,7 +170,6 @@ struct idad_softc {
 	device_t	dev;
 	struct 		ida_softc *controller;
 	struct		disk disk;
-	struct		devstat stats;
 	int		drive;			/* per controller */
 	int		unit;			/* global */
 	int		cylinders;

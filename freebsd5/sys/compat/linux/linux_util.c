@@ -27,7 +27,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: svr4_util.c,v 1.5 1995/01/22 23:44:50 christos Exp
- * $FreeBSD: src/sys/compat/linux/linux_util.c,v 1.19 2002/09/01 21:15:37 iedowse Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_util.c,v 1.22 2003/02/19 05:46:58 imp Exp $
  */
 
 #include <sys/param.h>
@@ -36,6 +36,8 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/vnode.h>
+
+#include <machine/stdarg.h>
 
 #include <compat/linux/linux_util.h>
 
@@ -199,4 +201,18 @@ keeporig:
 	/* Keep the original path; copy it back to the start of the buffer. */
 	bcopy(ptr, buf, len);
 	return error;
+}
+
+void
+linux_msg(const struct thread *td, const char *fmt, ...)
+{
+	va_list ap;
+	struct proc *p;
+
+	p = td->td_proc;
+	printf("linux: pid %d (%s): ", (int)p->p_pid, p->p_comm);
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+	printf("\n");
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ex/if_exvar.h,v 1.2 2001/01/19 09:04:56 jhb Exp $
+ *	$FreeBSD: src/sys/dev/ex/if_exvar.h,v 1.4 2003/03/29 15:38:53 mdodd Exp $
  */
 
 struct ex_softc {
@@ -67,6 +67,8 @@ struct ex_softc {
 					/* frame in the chain.		*/
 };
 
+extern devclass_t ex_devclass;
+
 extern char	irq2eemap[];
 extern u_char	ee2irqmap[];
 extern char	plus_irq2eemap[];
@@ -75,6 +77,7 @@ extern u_char	plus_ee2irqmap[];
 int		ex_alloc_resources	(device_t);
 void		ex_release_resources	(device_t);
 int		ex_attach		(device_t);
+int		ex_detach		(device_t);
 
 driver_intr_t	ex_intr;
 

@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.36.2.1 2002/12/19 09:40:07 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.44 2003/02/19 05:46:59 imp Exp $
  */
 
 /*
@@ -329,9 +329,6 @@ svr4_recvit(td, s, mp, namelenp)
 		if (len <= 0 || fromsa == 0)
 			len = 0;
 		else {
-#ifndef MIN
-#define MIN(a,b) ((a)>(b)?(b):(a))
-#endif
 			/* save sa_len before it is destroyed by MSG_COMPAT */
 			len = MIN(len, fromsa->sa_len);
 			error = copyout(fromsa,
@@ -644,7 +641,7 @@ getparm(fp, pa)
 	if (st == NULL)
 		return;
 
-	so = (struct socket *) fp->f_data;
+	so = fp->f_data;
 
 	pa->family = st->s_family;
 

@@ -1,5 +1,5 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD: src/sys/conf/kmod.mk,v 1.132 2002/12/13 00:32:29 jake Exp $
+# $FreeBSD: src/sys/conf/kmod.mk,v 1.137 2003/03/03 22:51:22 ru Exp $
 #
 # The include file <bsd.kmod.mk> handles installing Kernel Loadable Device
 # drivers (KLD's).
@@ -213,7 +213,7 @@ _kmodinstall:
 
 .include <bsd.links.mk>
 
-.if !defined(NO_XREF) && ${MACHINE_ARCH} != "sparc64"
+.if !defined(NO_XREF)
 afterinstall: _kldxref
 .ORDER: realinstall _kldxref
 .ORDER: _installlinks _kldxref
@@ -254,7 +254,7 @@ MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/pci/pcib_if.m dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m \
     dev/usb/usb_if.m dev/sound/pcm/ac97_if.m dev/sound/pcm/channel_if.m \
     dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m pci/agp_if.m \
-    opencrypto/crypto_if.m
+    opencrypto/crypto_if.m pc98/pc98/canbus_if.m
 
 .for _srcsrc in ${MFILES}
 .for _ext in c h
@@ -286,6 +286,17 @@ vnode_if.${_ext}: @/tools/vnode_if.awk @/kern/vnode_if.src
 .endif
 .endfor
 
+.if ${SRCS:Mmiidevs.h} != ""
+CLEANFILES+=	miidevs.h
+.if !exists(@)
+miidevs.h: @
+.endif
+.if exists(@)
+miidevs.h: @/tools/devlist2h.awk @/dev/mii/miidevs
+.endif
+	${AWK} -f @/tools/devlist2h.awk @/dev/mii/miidevs
+.endif
+
 regress:
 
 lint: ${SRCS}
@@ -293,9 +304,9 @@ lint: ${SRCS}
 
 .include <bsd.dep.mk>
 
-.if !exists(${DEPENDFILE})
+.if !exists(${.OBJDIR}/${DEPENDFILE})
 ${OBJS}: ${SRCS:M*.h}
 .endif
 
 .include <bsd.obj.mk>
-.include <bsd.kern.mk>
+.include "kern.mk"

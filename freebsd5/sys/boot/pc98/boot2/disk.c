@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:49  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.6 2002/10/03 16:20:14 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.9 2003/04/04 16:35:15 phk Exp $
  */
 
 /*
@@ -43,8 +43,8 @@
 
 #include "boot.h"
 #include <sys/disklabel.h>
-#include <sys/diskslice.h>
 #include <sys/diskpc98.h>
+#include <machine/bootinfo.h>
 
 #define	BIOS_DEV_FLOPPY	0x0
 #define	BIOS_DEV_WIN	0x80
@@ -77,7 +77,7 @@ static char *Bread(int dosdev, int sector);
 int
 devopen(void)
 {
-	struct dos_partition *dptr;
+	struct pc98_partition *dptr;
 	struct disklabel *dl;
 	char *p;
 	int i, sector = 0, di, dosdev_copy;
@@ -99,7 +99,7 @@ devopen(void)
 #else	/* EMBEDDED_DISKLABEL */
 #ifdef PC98
 		p = Bread(dosdev_copy, 1);
-		dptr = (struct dos_partition *)p;
+		dptr = (struct pc98_partition *)p;
 		slice = WHOLE_DISK_SLICE;
 		for (i = 0; i < NDOSPART; i++, dptr++)
 			if (dptr->dp_mid == DOSPTYP_386BSD) {
@@ -128,17 +128,6 @@ devopen(void)
 		if (dl->d_magic != DISKMAGIC) {
 			printf("bad disklabel\n");
 			return 1;
-		}
-		if( (maj == 4) || (maj == 0) || (maj == 1))
-		{
-			if (dl->d_type == DTYPE_SCSI)
-			{
-				maj = 4; /* use scsi as boot dev */
-			}
-			else
-			{
-				maj = 0; /* must be ESDI/IDE */
-			}
 		}
 		/* This little trick is for OnTrack DiskManager disks */
 		boff = dl->d_partitions[part].p_offset -

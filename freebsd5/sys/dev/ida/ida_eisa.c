@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.8 2001/03/01 17:09:01 markm Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.11 2003/04/01 15:06:23 phk Exp $
  */
 
 #include <sys/param.h>
@@ -33,13 +33,14 @@
 #include <sys/bus.h>
 
 #include <sys/bio.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
+#include <sys/conf.h>
 
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
+
+#include <geom/geom_disk.h>
 
 #include <dev/ida/idavar.h>
 #include <dev/ida/idareg.h>

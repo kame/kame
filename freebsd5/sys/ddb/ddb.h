@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ddb/ddb.h,v 1.30 2002/09/21 17:29:36 markm Exp $
+ * $FreeBSD: src/sys/ddb/ddb.h,v 1.33 2003/02/16 19:22:21 phk Exp $
  */
 
 /*
@@ -79,6 +79,9 @@ extern db_expr_t db_tab_stop_width;
 
 struct vm_map;
 
+#ifdef ALT_BREAK_TO_DEBUGGER
+int		db_alt_break(int, int *);
+#endif
 void		db_check_interrupt(void);
 void		db_clear_watchpoints(void);
 db_addr_t	db_disasm(db_addr_t loc, boolean_t altfmt);
@@ -104,6 +107,8 @@ void		db_trap(int type, int code);
 int		db_value_of_name(const char *name, db_expr_t *valuep);
 void		db_write_bytes(vm_offset_t addr, size_t size, char *data);
 				/* machine-dependent */
+void		db_stack_thread(db_expr_t addr, boolean_t have_addr,
+				db_expr_t count, char *modif);
 void		kdb_init(void);
 
 db_cmdfcn_t	db_breakpoint_cmd;
@@ -125,11 +130,11 @@ db_cmdfcn_t	db_trace_until_call_cmd;
 db_cmdfcn_t	db_trace_until_matching_cmd;
 db_cmdfcn_t	db_watchpoint_cmd;
 db_cmdfcn_t	db_write_cmd;
+db_cmdfcn_t	db_show_one_thread;
 
 #if 0
 db_cmdfcn_t	db_help_cmd;
 db_cmdfcn_t	db_show_all_threads;
-db_cmdfcn_t	db_show_one_thread;
 db_cmdfcn_t	ipc_port_print;
 db_cmdfcn_t	vm_page_print;
 #endif
@@ -156,7 +161,7 @@ struct command {
 /*
  * Routines to support GDB on an sio port.
  */
-extern dev_t	   gdbdev;
+extern void	 *gdb_arg;
 extern cn_getc_t *gdb_getc;
 extern cn_putc_t *gdb_putc;
 #endif

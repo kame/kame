@@ -19,7 +19,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.8 2002/11/14 23:54:51 sam Exp $
+ * $FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.9 2003/04/10 04:36:01 imp Exp $
  */
 
 #include <sys/param.h>
@@ -82,7 +82,8 @@ fe_pccard_match(device_t dev)
         if ((pp = pccard_product_lookup(dev,
 	    (const struct pccard_product *)fe_pccard_products,
             sizeof(fe_pccard_products[0]), NULL)) != NULL) {
-                device_set_desc(dev, pp->pp_name);
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
                 return 0;
         }
         return EIO;

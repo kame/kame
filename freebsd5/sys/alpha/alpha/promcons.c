@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.26 2002/04/01 21:30:29 jhb Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.28 2003/03/03 12:15:38 phk Exp $ */
 /* $NetBSD: promcons.c,v 1.13 1998/03/21 22:52:59 mycroft Exp $ */
 
 /*
@@ -64,19 +64,14 @@ static	d_ioctl_t	promioctl;
 
 #define CDEV_MAJOR 97
 static struct cdevsw prom_cdevsw = {
-	/* open */	promopen,
-	/* close */	promclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	promioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"prom",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	promopen,
+	.d_close =	promclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	promioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"prom",
+	.d_maj =	CDEV_MAJOR,
 };
 
 
@@ -209,7 +204,7 @@ promstart(tp)
 
 	tp->t_state |= TS_BUSY;
 	while (tp->t_outq.c_cc != 0)
-		promcnputc(tp->t_dev, getc(&tp->t_outq));
+		promcnputc(NULL, getc(&tp->t_outq));
 	tp->t_state &= ~TS_BUSY;
 
 	ttwwakeup(tp);
@@ -240,7 +235,7 @@ promtimeout(v)
 	struct tty *tp = v;
 	int c;
 
-	while ((c = promcncheckc(tp->t_dev)) != -1) {
+	while ((c = promcncheckc(NULL)) != -1) {
 		if (tp->t_state & TS_ISOPEN)
 			(*linesw[tp->t_line].l_rint)(c, tp);
 	}

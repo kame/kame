@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/advansys.c,v 1.21 2002/09/28 17:14:20 phk Exp $
+ * $FreeBSD: src/sys/dev/advansys/advansys.c,v 1.24 2003/05/27 04:59:56 scottl Exp $
  */
 /*
  * Ported from:
@@ -1335,28 +1335,38 @@ adv_attach(adv)
 		max_sg = 255;
 
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(adv->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXPHYS,
-			       /*nsegments*/max_sg,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/BUS_DMA_ALLOCNOW,
-			       &adv->buffer_dmat) != 0) {
+	if (bus_dma_tag_create(
+			/* parent	*/ adv->parent_dmat,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ BUS_SPACE_MAXADDR,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ MAXPHYS,
+			/* nsegments	*/ max_sg,
+			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* flags	*/ BUS_DMA_ALLOCNOW,
+			&adv->buffer_dmat) != 0) {
 		return (ENXIO);
 	}
 	adv->init_level++;
 
 	/* DMA tag for our sense buffers */
-	if (bus_dma_tag_create(adv->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       sizeof(struct scsi_sense_data)*adv->max_openings,
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &adv->sense_dmat) != 0) {
+	if (bus_dma_tag_create(
+			/* parent	*/ adv->parent_dmat,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ BUS_SPACE_MAXADDR,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ sizeof(struct scsi_sense_data) *
+					   adv->max_openings,
+			/* nsegments	*/ 1,
+			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* flags	*/ 0,
+			&adv->sense_dmat) != 0) {
 		return (ENXIO);
         }
 

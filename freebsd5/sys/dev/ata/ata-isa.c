@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,13 +25,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.10 2002/12/03 20:19:37 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.14 2003/03/29 13:37:09 sos Exp $
  */
 
 #include "opt_ata.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/ata.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -49,27 +50,29 @@ static struct isa_pnp_id ata_ids[] = {
     {0x0106d041,	"Plus Hardcard II"},			/* PNP0601 */
     {0x0206d041,	"Plus Hardcard IIXL/EZ"},		/* PNP0602 */
     {0x0306d041,	"Generic ATA"},				/* PNP0603 */
+								/* PNP0680 */
+    {0x8006d041,	"Standard bus mastering IDE hard disk controller"},
     {0}
 };
 
-static int
-ata_isa_intrnoop(struct ata_channel *ch)
-{
-    return 1;
-
-}
 static void
 ata_isa_lock(struct ata_channel *ch, int type)
 {
+}
+
+static void
+ata_isa_setmode(struct ata_device *atadev, int mode)
+{
+    atadev->mode = ata_limit_mode(atadev, mode, ATA_PIO_MAX);
 }
 
 static int
 ata_isa_probe(device_t dev)
 {
     struct ata_channel *ch = device_get_softc(dev);
-    struct resource *io;
+    struct resource *io = NULL, *altio = NULL;
     u_long tmp;
-    int rid;
+    int i, rid;
 
     /* check isapnp ids */
     if (ISA_PNP_PROBE(device_get_parent(dev), dev, ata_ids) == ENXIO)
@@ -80,7 +83,7 @@ ata_isa_probe(device_t dev)
     io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
 			    ATA_IOSIZE, RF_ACTIVE);
     if (!io)
-	return ENOMEM;
+	return ENXIO;
 
     /* set the altport range */
     if (bus_get_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID, &tmp, &tmp)) {
@@ -88,11 +91,29 @@ ata_isa_probe(device_t dev)
 			 rman_get_start(io) + ATA_ALTOFFSET, ATA_ALTIOSIZE);
     }
 
-    bus_release_resource(dev, SYS_RES_IOPORT, rid, io);
+    /* allocate the altport range */
+    rid = ATA_ALTADDR_RID; 
+    altio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
+                               ATA_ALTIOSIZE, RF_ACTIVE);
+    if (!altio) {
+        bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, io);
+        return ENXIO;
+    }
+
+    /* setup the resource vectors */
+    for (i = ATA_DATA; i <= ATA_STATUS; i++) {
+	ch->r_io[i].res = io;
+	ch->r_io[i].offset = i;
+    }
+    ch->r_io[ATA_ALTSTAT].res = altio;
+    ch->r_io[ATA_ALTSTAT].offset = 0;
+    
+    /* initialize softc for this channel */
     ch->unit = 0;
     ch->flags |= ATA_USE_16BIT;
-    ch->intr_func = ata_isa_intrnoop;
-    ch->lock_func = ata_isa_lock;
+    ch->locking = ata_isa_lock;
+    ch->device[MASTER].setmode = ata_isa_setmode;
+    ch->device[SLAVE].setmode = ata_isa_setmode;
     return ata_probe(dev);
 }
 
@@ -111,54 +132,3 @@ static driver_t ata_isa_driver = {
 };
 
 DRIVER_MODULE(ata, isa, ata_isa_driver, ata_devclass, 0, 0);
-
-/* 
- * the following is a bandaid to get ISA only setups to link,
- * since these are getting rare the ugliness is kept here
- */
-#ifdef ATA_NOPCI
-int
-ata_dmaalloc(struct ata_device *atadev)
-{
-    return ENXIO;
-}
-
-void
-ata_dmafree(struct ata_device *atadev)
-{
-}
-
-void
-ata_dmafreetags(struct ata_channel *ch)
-{
-}
-
-void
-ata_dmainit(struct ata_device *atadev, int piomode, int wdmamode, int udmamode)
-{
-}
-
-int
-ata_dmasetup(struct ata_device *atadev, caddr_t data, int32_t count)
-{
-    return -1;
-}
-
-int
-ata_dmastart(struct ata_device *atadev, caddr_t data, int32_t count, int dir)
-{
-    return -1;
-}
-
-int
-ata_dmadone(struct ata_device *atadev)
-{
-    return -1;
-}
-
-int
-ata_dmastatus(struct ata_channel *ch)
-{
-    return -1;
-}
-#endif

@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/alpha/linux/syscalls.master,v 1.51 2002/01/23 22:46:14 gallatin Exp $
+ $FreeBSD: src/sys/alpha/linux/syscalls.master,v 1.52 2003/02/16 02:31:05 tjr Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -94,7 +94,7 @@
 49	UNIMPL	LINUX
 50	UNIMPL	LINUX
 51	NOPROTO	LINUX	{ int acct(char *path); }
-52	STD	LINUX	{ int linux_sigpending(void); }
+52	MSTD	LINUX	{ int linux_sigpending(void); }
 53	UNIMPL	LINUX
 54	STD	LINUX	{ int linux_ioctl(l_uint fd, l_uint cmd, \
 				l_ulong arg); }

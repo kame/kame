@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/svr4/svr4.h,v 1.6 2000/01/09 12:29:45 bde Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4.h,v 1.7 2003/05/12 05:08:38 phk Exp $
  */
 
 #include "opt_svr4.h"
@@ -33,8 +33,6 @@
 #define _SVR4_H
 
 extern struct sysentvec svr4_sysvec;
-
-#define memset(x,y,z) bzero(x,z)
 
 #define COMPAT_SVR4_SOLARIS2
 #define KTRACE

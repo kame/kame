@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/awi/if_awi_pccard.c,v 1.8 2002/11/14 23:54:49 sam Exp $
+ * $FreeBSD: src/sys/dev/awi/if_awi_pccard.c,v 1.10 2003/04/10 04:36:01 imp Exp $
  */
 
 #include <sys/param.h>
@@ -85,7 +85,8 @@ awi_pccard_match(device_t dev)
 
 	if ((pp = pccard_product_lookup(dev, awi_pccard_products,
 	    sizeof(awi_pccard_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->pp_name);
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
 		return 0;
 	}
 	return ENXIO;
@@ -281,3 +282,4 @@ static driver_t awi_pccard_driver = {
 extern devclass_t awi_devclass;
 
 DRIVER_MODULE(awi, pccard, awi_pccard_driver, awi_devclass, 0, 0);
+MODULE_DEPEND(awi, rc4, 1, 1, 1);

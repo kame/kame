@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.128 2002/09/23 04:55:32 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.132 2003/03/08 08:01:26 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -38,7 +38,6 @@
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/md5.h>
-#include <sys/devicestat.h>
 #include <sys/interrupt.h>
 #include <sys/sbuf.h>
 
@@ -636,19 +635,11 @@ static d_close_t xptclose;
 static d_ioctl_t xptioctl;
 
 static struct cdevsw xpt_cdevsw = {
-	/* open */	xptopen,
-	/* close */	xptclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	xptioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"xpt",
-	/* maj */	XPT_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	xptopen,
+	.d_close =	xptclose,
+	.d_ioctl =	xptioctl,
+	.d_name =	"xpt",
+	.d_maj =	XPT_CDEV_MAJOR,
 };
 
 static struct intr_config_hook *xpt_config_hook;

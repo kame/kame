@@ -6,7 +6,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_sysctl.c,v 1.6 2002/09/24 07:02:54 mini Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_sysctl.c,v 1.11 2003/03/03 09:17:12 des Exp $
  */
 
 #include <sys/param.h>
@@ -35,9 +35,12 @@
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
+#include <sys/sbuf.h>
 
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+
+#include <compat/linux/linux_util.h>
 
 #define	LINUX_CTL_KERN		1
 #define	LINUX_CTL_VM		2
@@ -78,10 +81,11 @@ int
 linux_sysctl(struct thread *td, struct linux_sysctl_args *args)
 {
 	struct l___sysctl_args la;
+	struct sbuf *sb;
 	l_int *mib;
 	int error, i;
 
-	error = copyin((caddr_t)args->args, &la, sizeof(la));
+	error = copyin(args->args, &la, sizeof(la));
 	if (error)
 		return (error);
 
@@ -113,10 +117,18 @@ linux_sysctl(struct thread *td, struct linux_sysctl_args *args)
 		break;
 	}
 
-	printf("linux: sysctl: unhandled name=");
-	for (i = 0; i < la.nlen; i++)
-		printf("%c%d", (i) ? ',' : '{', mib[i]);
-	printf("}\n");
+	sb = sbuf_new(NULL, NULL, 20 + la.nlen * 5, SBUF_AUTOEXTEND);
+	if (sb == NULL) {
+		linux_msg(td, "sysctl is not implemented");
+	} else {
+		sbuf_printf(sb, "sysctl ");
+		for (i = 0; i < la.nlen; i++)
+			sbuf_printf(sb, "%c%d", (i) ? ',' : '{', mib[i]);
+		sbuf_printf(sb, "} is not implemented");
+		sbuf_finish(sb);
+		linux_msg(td, "%s", sbuf_data(sb));
+		sbuf_delete(sb);
+	}
 
 	free(mib, M_TEMP);
 	return (ENOTDIR);

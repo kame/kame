@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.42 2002/07/22 18:35:01 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.46 2003/05/02 13:47:44 sos Exp $
  */
 
 /* structure describing an ATA disk request */
@@ -71,13 +71,11 @@ struct ad_softc {
     struct ad_request		*tags[32];	/* tag array of requests */
     int				outstanding;	/* tags not serviced yet */
     struct bio_queue_head	queue;		/* head of request queue */
-    struct devstat		stats;		/* devstat entry */
     struct disk			disk;		/* disklabel/slice stuff */
-    dev_t			dev;		/* device place holder */
 };
 
 void ad_attach(struct ata_device *);
-void ad_detach(struct ata_device *, int);
+void ad_detach(struct ata_device *);
 void ad_reinit(struct ata_device *);
 void ad_start(struct ata_device *);
 int ad_transfer(struct ad_request *);

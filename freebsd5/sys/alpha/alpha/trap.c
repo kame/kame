@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/trap.c,v 1.102 2002/10/24 23:09:47 julian Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/trap.c,v 1.113 2003/04/30 17:59:26 jhb Exp $ */
 /* $NetBSD: trap.c,v 1.31 1998/03/26 02:21:46 thorpej Exp $ */
 
 /*
@@ -31,7 +31,6 @@
 /* #include "opt_fix_unaligned_vax_fp.h" */
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
-#include "opt_simos.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,7 +38,6 @@
 #include <sys/sysproto.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
-#include <sys/kse.h>
 #include <sys/exec.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -296,16 +294,10 @@ trap(a0, a1, a2, entry, framep)
 	CTR5(KTR_TRAP, "%s trap: pid %d, (%lx, %lx, %lx)",
 	    user ? "user" : "kernel", p->p_pid, a0, a1, a2);
 	if (user)  {
-		sticks = td->td_kse->ke_sticks;
+		sticks = td->td_sticks;
 		td->td_frame = framep;
 		if (td->td_ucred != p->p_ucred)
 			cred_update_thread(td);
-		if ((p->p_flag & P_WEXIT) && (p->p_singlethread != td)) {
-			PROC_LOCK(p);
-			mtx_lock_spin(&sched_lock);
-			thread_exit();
-			/* NOTREACHED */
-		}
 	} else {
 		sticks = 0;		/* XXX bogus -Wuninitialized warning */
 		KASSERT(cold || td->td_ucred != NULL,
@@ -380,11 +372,7 @@ trap(a0, a1, a2, entry, framep)
 			 * might have set a breakpoint.
 			 */
 			if (a0 == ALPHA_IF_CODE_BUGCHK ||
-			    a0 == ALPHA_IF_CODE_BPT
-#ifdef SIMOS
-			    || a0 == ALPHA_IF_CODE_GENTRAP
-#endif
-			    ) {
+			    a0 == ALPHA_IF_CODE_BPT) {
 				if (kdb_trap(a0, a1, a2, entry, framep))
 					goto out;
 			}
@@ -590,7 +578,7 @@ trap(a0, a1, a2, entry, framep)
 	framep->tf_regs[FRAME_TRAPARG_A0] = a0;
 	framep->tf_regs[FRAME_TRAPARG_A1] = a1;
 	framep->tf_regs[FRAME_TRAPARG_A2] = a2;
-	trapsignal(p, i, ucode);
+	trapsignal(td, i, ucode);
 out:
 	if (user) {
 		framep->tf_regs[FRAME_SP] = alpha_pal_rdusp();
@@ -666,10 +654,10 @@ syscall(code, framep)
 	cnt.v_syscall++;
 	td->td_frame = framep;
 	opc = framep->tf_regs[FRAME_PC] - 4;
-	sticks = td->td_kse->ke_sticks;
+	sticks = td->td_sticks;
 	if (td->td_ucred != p->p_ucred)
 		cred_update_thread(td);
-	if (p->p_flag & P_KSES)
+	if (p->p_flag & P_THREADED)
 		thread_user_enter(p, td);
 #ifdef DIAGNOSTIC
 	alpha_fpstate_check(td);
@@ -789,12 +777,8 @@ syscall(code, framep)
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);
 #endif
-#ifdef WITNESS
-	if (witness_list(td)) {
-		panic("system call %s returning with mutex(s) held\n",
-		    syscallnames[code]);
-	}
-#endif
+	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
+	    (code >= 0 && code < SYS_MAXSYSCALL) ? syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	mtx_assert(&Giant, MA_NOTOWNED);
 }

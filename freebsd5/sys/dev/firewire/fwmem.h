@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002
+ * Copyright (C) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwmem.h,v 1.3 2002/11/12 13:49:17 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwmem.h,v 1.5 2003/04/17 03:38:02 simokawa Exp $
  */
 
 struct fw_xfer *fwmem_read_quad(struct fw_device *, caddr_t, u_int8_t,
@@ -40,6 +40,8 @@ struct fw_xfer *fwmem_write_quad(struct fw_device *, caddr_t, u_int8_t,
 	u_int16_t, u_int32_t, u_int32_t, void (*)(struct fw_xfer *));
 struct fw_xfer *fwmem_read_block(struct fw_device *, caddr_t, u_int8_t,
 	u_int16_t, u_int32_t, int, void (*)(struct fw_xfer *));
+struct fw_xfer *fwmem_write_block(struct fw_device *, caddr_t, u_int8_t,
+	u_int16_t, u_int32_t, int, char *, void (*)(struct fw_xfer *));
 
 d_open_t	fwmem_open;
 d_close_t	fwmem_close;

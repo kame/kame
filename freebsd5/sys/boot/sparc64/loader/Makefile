@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/sparc64/loader/Makefile,v 1.14 2002/11/10 19:17:36 jake Exp $
+# $FreeBSD: src/sys/boot/sparc64/loader/Makefile,v 1.15 2002/12/20 04:32:10 jake Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -16,7 +16,6 @@ LOADER_CD9660_SUPPORT?=	yes
 LOADER_NET_SUPPORT?=	yes
 LOADER_NFS_SUPPORT?=	yes
 LOADER_TFTP_SUPPORT?=	yes
-LOADER_ZIP_SUPPORT?=	yes
 LOADER_GZIP_SUPPORT?=	yes
 LOADER_BZIP2_SUPPORT?=	no
 
@@ -28,9 +27,6 @@ CFLAGS+=	-DLOADER_UFS_SUPPORT
 .endif
 .if ${LOADER_CD9660_SUPPORT} == "yes"
 CFLAGS+=	-DLOADER_CD9660_SUPPORT
-.endif
-.if ${LOADER_ZIP_SUPPORT} == "yes"
-CFLAGS+=	-DLOADER_ZIP_SUPPORT
 .endif
 .if ${LOADER_GZIP_SUPPORT} == "yes"
 CFLAGS+=	-DLOADER_GZIP_SUPPORT

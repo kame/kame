@@ -22,7 +22,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/ofw/libofw/ofw_disk.c,v 1.8 2002/11/10 19:17:36 jake Exp $
+ * $FreeBSD: src/sys/boot/ofw/libofw/ofw_disk.c,v 1.9 2003/04/16 21:09:41 phk Exp $
  */
 
 /*
@@ -30,7 +30,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/disklabel.h>
 
 #include <netinet/in.h>
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_debug.c,v 1.11 2002/05/24 05:58:13 peter Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_debug.c,v 1.15 2003/04/01 15:06:22 phk Exp $
  */
 
 /*
@@ -37,15 +37,14 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/conf.h>
 
-#include <dev/aac/aac_compat.h>
 #include <sys/bus.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 
 #include <machine/resource.h>
 #include <machine/bus.h>
 
+#include <dev/aac/aac_compat.h>
 #include <dev/aac/aacreg.h>
 #include <dev/aac/aac_ioctl.h>
 #include <dev/aac/aacvar.h>
@@ -185,6 +184,11 @@ aac_panic(struct aac_softc *sc, char *reason)
 void
 aac_print_fib(struct aac_softc *sc, struct aac_fib *fib, const char *caller)
 {
+	if (fib == NULL) {
+		device_printf(sc->aac_dev,
+			      "aac_print_fib called with NULL fib\n");
+		return;
+	}
 	device_printf(sc->aac_dev, "%s: FIB @ %p\n", caller, fib);
 	device_printf(sc->aac_dev, "  XferState %b\n", fib->Header.XferState,
 		      "\20"

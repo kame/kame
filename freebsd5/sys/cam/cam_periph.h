@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.h,v 1.12 2001/02/07 07:05:56 peter Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.h,v 1.13 2003/03/08 08:01:26 phk Exp $
  */
 
 #ifndef _CAM_CAM_PERIPH_H
@@ -34,6 +34,8 @@
 #include <sys/queue.h>
 
 #ifdef _KERNEL
+
+struct devstat;
 
 extern struct cam_periph *xpt_periph;
 

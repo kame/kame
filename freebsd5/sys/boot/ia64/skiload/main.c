@@ -25,10 +25,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/ia64/skiload/main.c,v 1.2 2002/09/23 05:55:10 peter Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ia64/skiload/main.c,v 1.3 2003/04/03 21:36:29 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.mk,v 1.31 2002/10/13 02:52:22 marcel Exp $
+# $FreeBSD: src/sys/conf/kern.mk,v 1.36 2003/05/30 01:06:58 peter Exp $
 
 #
 # Warning flags for compiling the kernel and components of the kernel.
@@ -8,7 +8,7 @@
 # also pop up, but are easier to fix.
 CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Winline -Wcast-qual \
-		-fformat-extensions -ansi
+		-fformat-extensions -std=c99
 #
 # The following flags are next up for working on:
 #	-W
@@ -41,6 +41,25 @@ CFLAGS+=	-mno-fp-regs -ffixed-8 -Wa,-mev6
 #
 .if ${MACHINE_ARCH} == "ia64"
 CFLAGS+=	-ffixed-r13 -mfixed-range=f32-f127 -mno-sdata
+.endif
+
+#
+# For sparc64 we want medlow code model, and we tell gcc to use floating
+# point emulation.  This avoids using floating point registers for integer
+# operations which it has a tendency to do.
+#
+.if ${MACHINE_ARCH} == "sparc64"
+CFLAGS+=	-mcmodel=medlow -msoft-float
+.endif
+
+#
+# For AMD64, use a medium model for now.  We'll switch to "kernel"
+# once pmap is ready.  Be excessively careful to not generate FPU code.
+#
+.if ${MACHINE_ARCH} == "amd64"
+CFLAGS+=	-mcmodel=kernel -mno-red-zone \
+		-mfpmath=387 -mno-sse -mno-sse2 -mno-mmx -mno-3dnow \
+		-msoft-float -fno-asynchronous-unwind-tables
 .endif
 
 #

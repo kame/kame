@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.365 2002/11/26 17:32:39 rwatson Exp $
+# $FreeBSD: src/sys/conf/options,v 1.393 2003/05/18 03:46:30 scottl Exp $
 #
 #        On the handling of kernel options
 #
@@ -72,45 +72,61 @@ ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
 					# mapped I/O
 
 # Miscellaneous options.
-ALQ		opt_alq.h
 ADAPTIVE_MUTEXES
+ALQ
 COMPAT_43	opt_compat.h
 COMPAT_FREEBSD4	opt_compat.h
 COMPAT_SUNOS	opt_compat.h
-NO_COMPAT_FREEBSD4	opt_compat.h
 COMPILING_LINT	opt_global.h
-CY_PCI_FASTINTR
 CONSPEED	opt_comconsole.h
+CY_PCI_FASTINTR
 DDB
 DDB_NOKLDSYM	opt_ddb.h
 DDB_TRACE
 DDB_UNATTENDED
 GDB_REMOTE_CHAT	opt_ddb.h
 GDBSPEED	opt_ddb.h
-NO_GEOM		opt_geom.h
 GEOM_AES	opt_geom.h
+GEOM_APPLE	opt_geom.h
 GEOM_BDE	opt_geom.h
 GEOM_BSD	opt_geom.h
 GEOM_GPT	opt_geom.h
 GEOM_MBR	opt_geom.h
+GEOM_MIRROR	opt_geom.h
 GEOM_PC98	opt_geom.h
 GEOM_SUNLABEL	opt_geom.h
+GEOM_VOL	opt_geom.h
 HW_WDOG
 KSTACK_PAGES
 KSTACK_MAX_PAGES
 KTRACE
 KTRACE_REQUEST_POOL	opt_ktrace.h
 LIBICONV
+MAC
+MAC_ALWAYS_LABEL_MBUF	opt_mac.h
+MAC_BIBA	opt_dontuse.h
+MAC_BSDEXTENDED	opt_dontuse.h
+MAC_DEBUG	opt_mac.h
+MAC_IFOFF	opt_dontuse.h
+MAC_LOMAC	opt_dontuse.h
+MAC_MLS		opt_dontuse.h
+MAC_NONE	opt_dontuse.h
+MAC_PARTITION	opt_dontuse.h
+MAC_PORTACL	opt_dontuse.h
+MAC_SEEOTHERUIDS	opt_dontuse.h
+MAC_TEST	opt_dontuse.h
 MD_ROOT		opt_md.h
 MD_ROOT_SIZE	opt_md.h
 NDGBPORTS	opt_dgb.h
-NODEVFS		opt_devfs.h
-NTIMECOUNTER	opt_ntp.h
 NSWAPDEV	opt_swap.h
+NSWBUF_MIN	opt_swap.h
+NTIMECOUNTER	opt_ntp.h
 PANIC_REBOOT_WAIT_TIME	opt_panic.h
 PPS_SYNC	opt_ntp.h
 PUC_FASTINTR	opt_puc.h
 QUOTA
+SCHED_4BSD	opt_sched.h
+SCHED_ULE	opt_sched.h
 SHOW_BUSYBUFS
 SPX_HACK
 SUIDDIR		opt_suiddir.h
@@ -138,26 +154,12 @@ SYSVSHM		opt_sysvipc.h
 VFS_AIO
 WLCACHE		opt_wavelan.h
 WLDEBUG		opt_wavelan.h
+TTYHOG		opt_tty.h
+DIRECTIO	opt_directio.h
 
 # POSIX kernel options
 _KPOSIX_PRIORITY_SCHEDULING	opt_posix.h
 P1003_1B_SEMAPHORES		opt_posix.h
-
-#####################################################################
-# SECURITY POLICY PARAMETERS
-
-# Support for Mandatory Access Control (MAC)
-MAC		opt_mac.h
-MAC_BIBA	opt_dontuse.h
-MAC_BSDEXTENDED	opt_dontuse.h
-MAC_DEBUG	opt_mac.h
-MAC_IFOFF	opt_dontuse.h
-MAC_LOMAC	opt_dontuse.h
-MAC_MLS		opt_dontuse.h
-MAC_NONE	opt_dontuse.h
-MAC_PARTITION	opt_dontuse.h
-MAC_SEEOTHERUIDS	opt_dontuse.h
-MAC_TEST	opt_dontuse.h
 
 # Do we want the config file compiled into the kernel?
 INCLUDE_CONFIG_FILE	opt_config.h
@@ -170,24 +172,24 @@ CD9660		opt_dontuse.h
 CODA		opt_dontuse.h
 EXT2FS		opt_dontuse.h
 FDESCFS		opt_dontuse.h
+HPFS		opt_dontuse.h
 LINPROCFS	opt_dontuse.h
 MSDOSFS		opt_dontuse.h
+NTFS		opt_dontuse.h
 NULLFS		opt_dontuse.h
 NWFS		opt_dontuse.h
 PORTALFS	opt_dontuse.h
 PROCFS		opt_dontuse.h
 PSEUDOFS	opt_dontuse.h
-UMAPFS		opt_dontuse.h
-NTFS		opt_dontuse.h
-HPFS		opt_dontuse.h
 SMBFS		opt_dontuse.h
-UNIONFS		opt_dontuse.h
 UDF		opt_dontuse.h
+UMAPFS		opt_dontuse.h
+UNIONFS		opt_dontuse.h
 
 # Broken - ffs_snapshot() dependency from ufs_lookup() :-(
 FFS		opt_ffs_broken_fixme.h
 
-# These static filesystems has one slightly bogus static dependency in
+# These static filesystems have one slightly bogus static dependency in
 # sys/i386/i386/autoconf.c.  If any of these filesystems are
 # statically compiled into the kernel, code for mounting them as root
 # filesystems will be enabled - but look below.
@@ -214,7 +216,8 @@ UFS_EXTATTR_AUTOSTART	opt_ufs.h
 # Enable fast hash lookups for large directories on UFS-based filesystems.
 UFS_DIRHASH	opt_ufs.h
 
-# The above static dependencies are planned removed, with a
+# The below sentence is not in English, and neither is this one.
+# We plan to remove the static dependences above, with a
 # <filesystem>_ROOT option to control if it usable as root.  This list
 # allows these options to be present in config files already (though
 # they won't make any difference yet).
@@ -249,8 +252,6 @@ CAM_NEW_TRAN_CODE	opt_cam.h
 SCSI_DELAY		opt_scsi.h
 SCSI_NO_SENSE_STRINGS	opt_scsi.h
 SCSI_NO_OP_STRINGS	opt_scsi.h
-
-
 
 # Options used only in cam/scsi/scsi_cd.c
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
@@ -293,6 +294,10 @@ ISP_TARGET_MODE		opt_isp.h
 ISP_FW_CRASH_DUMP	opt_isp.h
 
 # Options used in the 'ata' ATA/ATAPI driver
+ACD_DEBUG		opt_ata.h
+AST_DEBUG		opt_ata.h
+ATAPI_DEBUG		opt_ata.h
+ATA_DEBUG		opt_ata.h
 ATA_STATIC_ID		opt_ata.h
 ATA_NOPCI		opt_ata.h
 DEV_ATADISK		opt_ata.h
@@ -300,10 +305,6 @@ DEV_ATAPICD		opt_ata.h
 DEV_ATAPIST		opt_ata.h
 DEV_ATAPIFD		opt_ata.h
 DEV_ATAPICAM		opt_ata.h
-ATA_DEBUG		opt_ata.h
-ATAPI_DEBUG		opt_ata.h
-ACD_DEBUG		opt_ata.h
-AST_DEBUG		opt_ata.h
 
 # Net stuff.
 ACCEPT_FILTER_DATA
@@ -324,6 +325,7 @@ INET6			opt_inet6.h
 IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
+IPSEC_FILTERGIF		opt_ipsec.h
 FAST_IPSEC		opt_ipsec.h
 IPDIVERT
 DUMMYNET		opt_ipdn.h
@@ -341,13 +343,11 @@ IPV6FIREWALL_VERBOSE	opt_ip6fw.h
 IPV6FIREWALL_VERBOSE_LIMIT	opt_ip6fw.h
 IPV6FIREWALL_DEFAULT_TO_ACCEPT	opt_ip6fw.h
 IPSTEALTH
-IPX			opt_ipx.h
+IPX
 IPXIP			opt_ipx.h
-IPTUNNEL		opt_ipx.h
 LIBMCHAIN
-NCP			opt_ncp.h
+NCP
 NETATALK		opt_atalk.h
-NS			opt_ns.h
 PPP_BSDCOMP		opt_ppp.h
 PPP_DEFLATE		opt_ppp.h
 PPP_FILTER		opt_ppp.h
@@ -356,6 +356,7 @@ SLIP_IFF_OPTS		opt_slip.h
 TCPDEBUG
 TCP_DROP_SYNFIN		opt_tcp_input.h
 XBONEHACK
+MBUF_STRESS_TEST		opt_mbuf_stress_test.h
 
 # Netgraph(4). Use option NETGRAPH to enable the base netgraph code.
 # Each netgraph node type can be either be compiled into the kernel
@@ -375,8 +376,8 @@ NETGRAPH_HOLE		opt_netgraph.h
 NETGRAPH_IFACE		opt_netgraph.h
 NETGRAPH_IP_INPUT	opt_netgraph.h
 NETGRAPH_KSOCKET	opt_netgraph.h
-NETGRAPH_LMI		opt_netgraph.h
 NETGRAPH_L2TP		opt_netgraph.h
+NETGRAPH_LMI		opt_netgraph.h
 # MPPC compression requires proprietary files (not included)
 NETGRAPH_MPPC_COMPRESSION	opt_netgraph.h
 NETGRAPH_MPPC_ENCRYPTION	opt_netgraph.h
@@ -393,9 +394,7 @@ NETGRAPH_UI		opt_netgraph.h
 NETGRAPH_VJC		opt_netgraph.h
 
 # DRM options
-DRM_LINUX		opt_drm.h
 DRM_DEBUG		opt_drm.h
-
 
 ZERO_COPY_SOCKETS	opt_zero.h
 TI_PRIVATE_JUMBOS	opt_ti.h
@@ -410,7 +409,7 @@ ATM_UNI			opt_atm.h
 
 # XXX Conflict: # of devices vs network protocol (Native ATM).
 # This makes "atm.h" unusable.
-NATM			opt_natm.h
+NATM
 
 DPT_ALLOW_MEMIO		opt_dpt.h	# Allow PCI devices to use memory
 					# mapped I/O
@@ -433,6 +432,9 @@ VP0_DEBUG		opt_vpo.h
 LPT_DEBUG		opt_lpt.h
 PLIP_DEBUG		opt_plip.h
 LOCKF_DEBUG		opt_debug_lockf.h
+MUTEX_DEBUG		opt_global.h
+MUTEX_NOINLINE		opt_global.h
+MUTEX_PROFILING		opt_global.h
 NPX_DEBUG		opt_debug_npx.h
 NETATALKDEBUG		opt_atalk.h
 SI_DEBUG		opt_debug_si.h
@@ -453,11 +455,10 @@ BLKDEV_IOSIZE		opt_global.h
 DEBUG			opt_global.h
 DEBUG_LOCKS		opt_global.h
 DEBUG_VFS_LOCKS		opt_global.h
-LOOKUP_SHARED		opt_global.h
 DIAGNOSTIC		opt_global.h
-ENABLE_VFS_IOOPT	opt_global.h
 INVARIANT_SUPPORT	opt_global.h
 INVARIANTS		opt_global.h
+LOOKUP_SHARED		opt_global.h
 MCLSHIFT		opt_global.h
 MSIZE			opt_global.h
 REGRESSION		opt_global.h
@@ -469,6 +470,7 @@ VM_KMEM_SIZE		opt_vm.h
 VM_KMEM_SIZE_SCALE	opt_vm.h
 VM_KMEM_SIZE_MAX	opt_vm.h
 NO_SWAPPING		opt_vm.h
+MALLOC_MAKE_FAILURES	opt_vm.h
 MALLOC_PROFILE		opt_vm.h
 PQ_NOOPT		opt_vmpage.h
 PQ_NORMALCACHE		opt_vmpage.h
@@ -519,15 +521,11 @@ METEOR_SYSTEM_DEFAULT	opt_meteor.h
 METEOR_DEALLOC_PAGES	opt_meteor.h
 METEOR_DEALLOC_ABOVE	opt_meteor.h
 
-# Various mi ISA bus flags
+# options for serial support
 COM_ESP			opt_sio.h
 COM_MULTIPORT		opt_sio.h
 BREAK_TO_DEBUGGER	opt_comconsole.h
 ALT_BREAK_TO_DEBUGGER	opt_comconsole.h
-DEV_ISA			opt_isa.h
-
-# Include tweaks for running under the SimOS machine simulator.
-SIMOS			opt_simos.h
 
 # options for bus/device framework
 BUS_DEBUG		opt_bus.h
@@ -545,9 +543,11 @@ UMASS_DEBUG		opt_usb.h
 UMS_DEBUG		opt_usb.h
 URIO_DEBUG		opt_usb.h
 UKBD_DFLT_KEYMAP	opt_ukbd.h
+UVSCOM_DEFAULT_OPKTSIZE	opt_uvscom.h
 
 # Vinum options
 VINUMDEBUG		opt_vinum.h
+VINUM_AUTOSTART		opt_vinum.h
 
 # Embedded system options
 INIT_PATH		opt_init_path.h
@@ -557,11 +557,11 @@ ROOTDEVNAME		opt_rootdevname.h
 FDC_DEBUG		opt_fdc.h
 PCFCLOCK_VERBOSE	opt_pcfclock.h
 PCFCLOCK_MAX_RETRIES	opt_pcfclock.h
+TDFX_LINUX		opt_tdfx.h
 
 # RAIDframe options
 RAID_AUTOCONFIG		opt_raid.h
 RAID_DEBUG		opt_raid.h
-TDFX_LINUX opt_tdfx.h
 
 KTR			opt_global.h
 KTR_ALQ			opt_ktr.h
@@ -570,7 +570,6 @@ KTR_CPUMASK		opt_ktr.h
 KTR_COMPILE		opt_global.h
 KTR_ENTRIES		opt_global.h
 KTR_VERBOSE		opt_ktr.h
-MUTEX_DEBUG		opt_global.h
 WITNESS			opt_global.h
 WITNESS_DDB		opt_witness.h
 WITNESS_SKIPSPIN	opt_witness.h
@@ -585,6 +584,7 @@ NDEVFSINO		opt_devfs.h
 NDEVFSOVERFLOW		opt_devfs.h
 
 # various 'device presence' options.
+DEV_ISA			opt_isa.h
 DEV_MCA			opt_mca.h
 DEV_BPF			opt_bpf.h
 
@@ -594,9 +594,12 @@ ED_NO_MIIBUS		opt_ed.h
 # wi driver
 WI_SYMBOL_FIRMWARE	opt_wi.h
 
-# Polling device handling
+# XXX bogusly global.
 DEVICE_POLLING		opt_global.h
+# options for ubsec driver
+UBSEC_DEBUG		opt_ubsec.h
+UBSEC_RNDTEST		opt_ubsec.h
 
-# Mutex profiling
-MUTEX_PROFILING		opt_global.h
-
+# options for hifn driver
+HIFN_DEBUG		opt_hifn.h
+HIFN_RNDTEST		opt_hifn.h

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/contrib/dev/fla/fla.c,v 1.32 2002/09/20 19:35:54 phk Exp $ 
+ * $FreeBSD: src/sys/contrib/dev/fla/fla.c,v 1.39 2003/04/01 15:06:22 phk Exp $ 
  *
  */
 
@@ -17,10 +17,9 @@
 #include <sys/bio.h>
 #include <sys/malloc.h>
 #include <sys/conf.h>
-#include <sys/disk.h>
-#include <sys/devicestat.h>
 #include <sys/module.h>
 #include <machine/resource.h>
+#include <geom/geom_disk.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -34,33 +33,6 @@
 #include <contrib/dev/fla/msysosak.h>
 
 static MALLOC_DEFINE(M_FLA, "fla driver", "fla driver storage");
-
-static int fla_debug = 0;
-SYSCTL_INT(_debug, OID_AUTO, fladebug, CTLFLAG_RW, &fla_debug, 0, "");
-
-#define CDEV_MAJOR	102
-
-static d_strategy_t flastrategy;
-static d_open_t flaopen;
-static d_close_t flaclose;
-static d_ioctl_t flaioctl;
-
-static struct cdevsw fla_cdevsw = {
-        /* open */      flaopen,
-        /* close */     flaclose,
-        /* read */      physread,
-        /* write */     physwrite,
-        /* ioctl */     flaioctl,
-        /* poll */      nopoll,
-        /* mmap */      nommap,
-        /* strategy */  flastrategy,
-        /* name */      "fla",
-        /* maj */       CDEV_MAJOR,
-        /* dump */      nodump,
-        /* psize */     nopsize,
-        /* flags */     D_DISK | D_CANFREE,
-};
-static struct cdevsw fladisk_cdevsw;
 
 void *
 doc2k_malloc(int bytes) 
@@ -106,23 +78,18 @@ static struct fla_s {
 	unsigned nsect;
 	struct doc2k_stat ds;
 	struct bio_queue_head bio_queue;
-	struct devstat stats;
 	struct disk disk;
 	dev_t dev;
 } softc[8];
 
 static int
-flaopen(dev_t dev, int flag, int fmt, struct thread *td)
+flaopen(struct disk *dp)
 {
 	struct fla_s *sc;
 	int error;
 	u_int spu, ncyl, nt, ns;
 
-	if (fla_debug)
-		printf("flaopen(%s %x %x %p)\n",
-			devtoname(dev), flag, fmt, td);
-
-	sc = dev->si_drv1;
+	sc = dp->d_drv1;
 
 	error = doc2k_open(sc->unit);
 
@@ -141,16 +108,12 @@ flaopen(dev_t dev, int flag, int fmt, struct thread *td)
 }
 
 static int
-flaclose(dev_t dev, int flags, int fmt, struct thread *td)
+flaclose(struct disk *dp)
 {
 	int error;
 	struct fla_s *sc;
 
-	if (fla_debug)
-		printf("flaclose(%s %x %x %p)\n",
-			devtoname(dev), flags, fmt, td);
-
-	sc = dev->si_drv1;
+	sc = dp->d_drv1;
 
 	error = doc2k_close(sc->unit);
 	if (error) {
@@ -160,39 +123,19 @@ flaclose(dev_t dev, int flags, int fmt, struct thread *td)
 	return (0);
 }
 
-static int
-flaioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
-{
-
-	if (fla_debug)
-		printf("flaioctl(%s %lx %p %x %p)\n",
-			devtoname(dev), cmd, addr, flags, td);
-
-	return (ENOIOCTL);
-}
-
 static void
 flastrategy(struct bio *bp)
 {
 	int unit, error;
-	int s;
 	struct fla_s *sc;
 	enum doc2k_work what;
 
-	if (fla_debug > 1)
-		printf("flastrategy(%p) %s %x, %lld, %ld, %p)\n",
-		    bp, devtoname(bp->bio_dev), bp->bio_flags,
-		    (long long)bp->bio_blkno, 
-		    bp->bio_bcount / DEV_BSIZE, bp->bio_data);
+	sc = bp->bio_disk->d_drv1;
 
-	sc = bp->bio_dev->si_drv1;
 
-	s = splbio();
-
-	bioqdisksort(&sc->bio_queue, bp);
+	bioq_disksort(&sc->bio_queue, bp);
 
 	if (sc->busy) {
-		splx(s);
 		return;
 	}
 
@@ -202,11 +145,9 @@ flastrategy(struct bio *bp)
 		bp = bioq_first(&sc->bio_queue);
 		if (bp)
 			bioq_remove(&sc->bio_queue, bp);
-		splx(s);
 		if (!bp)
 			break;
 
-		devstat_start_transaction(&sc->stats);
 		bp->bio_resid = bp->bio_bcount;
 		unit = sc->unit;
 
@@ -224,10 +165,10 @@ flastrategy(struct bio *bp)
 
 		ENTER();
 
-		if (fla_debug > 1 || error) {
-			printf("fla%d: %d = rwe(%p, %d, %d, %lld, %ld, %p)\n",
+		if (error) {
+			printf("fla%d: %d = rwe(%p, %d, %d, %jd, %ld, %p)\n",
 			    unit, error, bp, unit, what,
-			    (long long)bp->bio_pblkno, 
+			    (intmax_t)bp->bio_pblkno, 
 			    bp->bio_bcount / DEV_BSIZE, bp->bio_data);
 		}
 		if (error) {
@@ -236,9 +177,8 @@ flastrategy(struct bio *bp)
 		} else {
 			bp->bio_resid = 0;
 		}
-		biofinish(bp, &sc->stats, 0);
+		biodone(bp);
 
-		s = splbio();
 	}
 	sc->busy = 0;
 	return;
@@ -315,14 +255,14 @@ flaattach (device_t dev)
 
 	bioq_init(&sc->bio_queue);
 
-	devstat_add_entry(&softc[unit].stats, "fla", unit, DEV_BSIZE,
-		DEVSTAT_NO_ORDERED_TAGS, 
-		DEVSTAT_TYPE_DIRECT | DEVSTAT_TYPE_IF_OTHER,
-		DEVSTAT_PRIORITY_DISK);
-
-	sc->dev = disk_create(unit, &sc->disk, 0, &fla_cdevsw, &fladisk_cdevsw);
-	sc->dev->si_drv1 = sc;
+	sc->disk.d_open = flaopen;
+	sc->disk.d_close = flaclose;
+	sc->disk.d_strategy = flastrategy;
+	sc->disk.d_drv1 = sc;
+	sc->disk.d_name = "fla";
+	sc->disk.d_maxsize = MAXPHYS;
 	sc->unit = unit;
+	disk_create(unit, &sc->disk, DISKFLAG_CANDELETE, NULL, NULL);
 
 	return (0);
 }

@@ -47,7 +47,7 @@
  *
  ******************************************************************************
  *
- * $FreeBSD: src/sys/dev/idt/idtvar.h,v 1.1 2002/09/30 05:12:34 mdodd Exp $
+ * $FreeBSD: src/sys/dev/idt/idtvar.h,v 1.2 2003/01/01 18:48:50 schweikh Exp $
  */
 
 /*******************************************************************************
@@ -196,7 +196,7 @@ typedef struct idt_softc IDT;
  * Device VCC Entry
  * 
  * Contains the common and IDT-specific information for each VCC
- * which is opened through a IDT device.
+ * which is opened through an IDT device.
  */
 struct nidt_vcc {
 	struct cmn_vcc iv_cmn;  /* Common VCC stuff */

@@ -26,7 +26,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/include/prom.h,v 1.8 2002/03/20 18:58:45 obrien Exp $
+ * $FreeBSD: src/sys/alpha/include/prom.h,v 1.9 2003/02/20 20:54:43 phk Exp $
  */
 
 #ifndef	ASSEMBLER
@@ -97,9 +97,9 @@ int	prom_getenv(int, char *, int);
 #ifdef _KERNEL
 void	promcnattach(int);
 void	promcndetach(void);
-void	promcnputc(dev_t, int);
-int	promcngetc(dev_t);
-int	promcncheckc(dev_t);
+cn_putc_t	promcnputc;
+cn_getc_t	promcngetc;
+cn_checkc_t	promcncheckc;
 
 u_int64_t	prom_dispatch(u_int64_t, u_int64_t, u_int64_t, u_int64_t,
 		    u_int64_t);

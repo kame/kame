@@ -25,19 +25,21 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_mib.h,v 1.6 2002/03/24 04:04:50 bde Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_mib.h,v 1.8 2003/03/26 18:29:44 jhb Exp $
  */
 
 #ifndef _LINUX_MIB_H_
 #define _LINUX_MIB_H_
 
-void	linux_get_osname(struct proc *p, char *dst);
-int	linux_set_osname(struct proc *p, char *osname);
+void	linux_mib_destroy(void);
 
-void	linux_get_osrelease(struct proc *p, char *dst);
-int	linux_set_osrelease(struct proc *p, char *osrelease);
+void	linux_get_osname(struct thread *td, char *dst);
+int	linux_set_osname(struct thread *td, char *osname);
 
-int	linux_get_oss_version(struct proc *p);
-int	linux_set_oss_version(struct proc *p, int oss_version);
+void	linux_get_osrelease(struct thread *td, char *dst);
+int	linux_set_osrelease(struct thread *td, char *osrelease);
+
+int	linux_get_oss_version(struct thread *td);
+int	linux_set_oss_version(struct thread *td, int oss_version);
 
 #endif /* _LINUX_MIB_H_ */

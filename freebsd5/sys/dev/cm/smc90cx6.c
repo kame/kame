@@ -1,5 +1,5 @@
 /*	$NetBSD: smc90cx6.c,v 1.38 2001/07/07 15:57:53 thorpej Exp $ */
-/*	$FreeBSD: src/sys/dev/cm/smc90cx6.c,v 1.4 2002/11/14 23:54:50 sam Exp $ */
+/*	$FreeBSD: src/sys/dev/cm/smc90cx6.c,v 1.9 2003/02/19 05:47:02 imp Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
 
 /* #define CMSOFTCOPY */
 #define CMRETRANSMIT /**/
-#undef CM_DEBUG
+/* #define CM_DEBUG */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,13 +68,6 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/if_arc.h>
-#include <net/bpf.h>
-
-#if 0
-#if NBPFILTER > 0
-#include <net/bpfdesc.h>
-#endif
-#endif
 
 #include <dev/cm/smc90cx6reg.h>
 #include <dev/cm/smc90cx6var.h>
@@ -346,7 +339,7 @@ cm_attach(sc, unit)
 #endif
 	}
 
-	if_printf(ifp, "link addr 0x%02x(%d)\n", linkaddress, linkaddress);
+	if_printf(ifp, "link addr 0x%02x (%d)\n", linkaddress, linkaddress);
 	return 0;
 }
 
@@ -512,15 +505,6 @@ cm_start(ifp)
 	if (m == 0)
 		return;
 
-	/*
-	 * If bpf is listening on this interface, let it
-	 * see the packet before we commit it to the wire
-	 *
-	 * (can't give the copy in A2060 card RAM to bpf, because
-	 * that RAM is just accessed as on every other byte)
-	 */
-	BPF_MTAP(ifp, m);
-
 #ifdef CM_DEBUG
 	if (m->m_len < ARC_HDRLEN)
 		m = m_pullup(m, ARC_HDRLEN);/* gcc does structure padding */
@@ -531,7 +515,7 @@ cm_start(ifp)
 	if (m->m_len < 2)
 		m = m_pullup(m, 2);
 #endif
-	cm_ram_ptr = buffer*512;
+	cm_ram_ptr = buffer * 512;
 
 	if (m == 0)
 		return;
@@ -666,7 +650,7 @@ cm_srint(vsc)
 	 * (2*sizeof(ulong) - CM_HDRNEWLEN)), packet type dependent.
 	 */
 
-	cm_ram_ptr = buffer*512;
+	cm_ram_ptr = buffer * 512;
 	offset = GETMEM(cm_ram_ptr + 2);
 	if (offset)
 		len = 256 - offset;
@@ -844,7 +828,7 @@ cmintr(arg)
 		return;
 	do {
 
-#if defined(CM_DEBUG) && (CM_DEBUG>1)
+#if defined(CM_DEBUG) && (CM_DEBUG > 1)
 		if_printf(ifp, "intr: status 0x%02x, intmask 0x%02x\n",
 		    isr, sc->sc_intmask);
 #endif
@@ -905,7 +889,7 @@ cmintr(arg)
 
 			buffer = sc->sc_rx_act;
 			/* look if buffer is marked invalid: */
-			if (GETMEM(buffer*512) == 0) {
+			if (GETMEM(buffer * 512) == 0) {
 				/*
 				 * invalid marked buffer (or illegally
 				 * configured sender)
@@ -959,7 +943,7 @@ cmintr(arg)
 		isr = GETREG(CMSTAT);
 		maskedisr = isr & sc->sc_intmask;
 	} while (maskedisr);
-#if defined(CM_DEBUG) && (CM_DEBUG>1)
+#if defined(CM_DEBUG) && (CM_DEBUG > 1)
 	if_printf(ifp, "intr (exit): status 0x%02x, intmask 0x%02x\n",
 	    isr, sc->sc_intmask);
 #endif
@@ -1008,6 +992,7 @@ cm_ioctl(ifp, command, data)
 
 	switch (command) {
 	case SIOCSIFADDR:
+	case SIOCGIFADDR:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMTU:
@@ -1049,7 +1034,7 @@ cm_ioctl(ifp, command, data)
  * software has not enabled the Receiver, would make our hardware wait forever
  * Discovered this after 20 times reading the docs.
  *
- * Only thing we do is disable transmitter. We'll get an transmit timeout,
+ * Only thing we do is disable transmitter. We'll get a transmit timeout,
  * and the int handler will have to decide not to retransmit (in case
  * retransmission is implemented).
  *

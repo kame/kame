@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/dec_2100_a500.c,v 1.12 2002/08/22 19:52:15 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/dec_2100_a500.c,v 1.13 2003/04/21 16:34:18 obrien Exp $
  */
 
 #include "opt_ddb.h"
@@ -51,14 +51,14 @@ static int comcnrate = CONSPEED;
 
 void dec_2100_a500_init(int);
 static void dec_2100_a500_cons_init(void);
-static void dec_2100_a500_intr_init(void );
+static void dec_2100_a500_intr_init(void);
 
 extern int siocnattach(int, int);
 extern int siogdbattach(int, int);
 extern int sccnattach(void);
 
 void
-dec_2100_a500_init(cputype)
+dec_2100_a500_init(int cputype)
 {
 	/*
 	 * See if we're a `Sable' or a `Lynx'.
@@ -140,7 +140,7 @@ dec_2100_a500_cons_init()
 
 
 void
-dec_2100_a500_intr_init(void )
+dec_2100_a500_intr_init(void)
 {
 
 	outb(SLAVE0_ICU, 0);

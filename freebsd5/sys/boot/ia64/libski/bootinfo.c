@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/ia64/libski/bootinfo.c,v 1.6 2002/06/20 06:29:42 peter Exp $
+ * $FreeBSD: src/sys/boot/ia64/libski/bootinfo.c,v 1.8 2003/02/20 06:47:54 marcel Exp $
  */
 
 #include <stand.h>
@@ -33,8 +33,6 @@
 #include <sys/linker.h>
 #include <machine/elf.h>
 #include <machine/bootinfo.h>
-
-#include <efi.h>
 
 #include "bootstrap.h"
 
@@ -60,6 +58,7 @@ static struct
 };
 
 extern char *ski_fmtdev(void *vdev);
+extern int ski_init_stubs(struct bootinfo *);
 
 int
 bi_getboothowto(char *kargs)
@@ -246,11 +245,9 @@ bi_load(struct bootinfo *bi, struct preloaded_file *fp, char *args)
     struct ski_devdesc		*rootdev;
     struct preloaded_file	*xp;
     vm_offset_t			addr, bootinfo_addr;
-    u_int			pad;
     char			*kernelname;
     vm_offset_t			ssym, esym;
     struct file_metadata	*md;
-    EFI_MEMORY_DESCRIPTOR	*memp;
 
     /*
      * Version 1 bootinfo.
@@ -296,23 +293,17 @@ bi_load(struct bootinfo *bi, struct preloaded_file *fp, char *args)
 	if (addr < (xp->f_addr + xp->f_size))
 	    addr = xp->f_addr + xp->f_size;
     }
+
     /* pad to a page boundary */
-    pad = (u_int)addr & PAGE_MASK;
-    if (pad != 0) {
-	pad = PAGE_SIZE - pad;
-	addr += pad;
-    }
+    addr = (addr + PAGE_MASK) & ~PAGE_MASK;
 
     /* copy our environment */
     bi->bi_envp = addr;
     addr = bi_copyenv(addr);
 
     /* pad to a page boundary */
-    pad = (u_int)addr & PAGE_MASK;
-    if (pad != 0) {
-	pad = PAGE_SIZE - pad;
-	addr += pad;
-    }
+    addr = (addr + PAGE_MASK) & ~PAGE_MASK;
+
     /* copy module list and metadata */
     bi->bi_modulep = addr;
     addr = bi_copymodules(addr);
@@ -320,25 +311,5 @@ bi_load(struct bootinfo *bi, struct preloaded_file *fp, char *args)
     /* all done copying stuff in, save end of loaded object space */
     bi->bi_kernend = addr;
 
-    /* Describe the SKI memory map. */
-    bi->bi_memmap = (u_int64_t)(bi + 1);
-    bi->bi_memmap_size = 2 * sizeof(EFI_MEMORY_DESCRIPTOR);
-    bi->bi_memdesc_size = sizeof(EFI_MEMORY_DESCRIPTOR);
-    bi->bi_memdesc_version = 1;
-
-    memp = (EFI_MEMORY_DESCRIPTOR *) bi->bi_memmap;
-
-    memp[0].Type = EfiConventionalMemory;
-    memp[0].PhysicalStart = 2L*1024*1024;
-    memp[0].VirtualStart = 0;
-    memp[0].NumberOfPages = (64L*1024*1024)>>12;
-    memp[0].Attribute = EFI_MEMORY_WB;
-
-    memp[1].Type = EfiMemoryMappedIOPortSpace;
-    memp[1].PhysicalStart = 0xffffc000000;
-    memp[1].VirtualStart = 0;
-    memp[1].NumberOfPages = (64L*1024*1024)>>12;
-    memp[1].Attribute = EFI_MEMORY_UC;
-
-    return(0);
+    return (ski_init_stubs(bi));
 }

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.14 2002/08/15 20:54:03 njl Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.16 2003/02/02 13:17:27 alfred Exp $
  */
 
 #include <sys/param.h>
@@ -68,8 +68,6 @@ typedef enum {
 #define MAX_ACCEPT	8
 #define MAX_IMMEDIATE	16
 #define MAX_BUF_SIZE	256	/* Max inquiry/sense/mode page transfer */
-
-#define MIN(a, b) ((a > b) ? b : a)
 
 /* Offsets into our private CCB area for storing accept information */
 #define ccb_type	ppriv_field0
@@ -221,10 +219,6 @@ targbhasync(void *callback_arg, u_int32_t code,
 					  AC_PATH_REGISTERED,
 					  cpi);
 		xpt_free_path(new_path);
-		if (status != CAM_REQ_CMP
-		 && status != CAM_REQ_INPROG)
-			printf("targbhasync: Unable to allocate new periph "
-			       "due to status 0x%x\n", status);
 		break;
 	}
 	case AC_PATH_DEREGISTERED:

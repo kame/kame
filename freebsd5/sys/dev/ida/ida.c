@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida.c,v 1.20 2002/11/07 22:23:46 jhb Exp $
+ * $FreeBSD: src/sys/dev/ida/ida.c,v 1.27 2003/05/27 04:59:57 scottl Exp $
  */
 
 /*
@@ -40,19 +40,19 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
-#include <sys/stdint.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 
 #include <sys/bio.h>
 #include <sys/bus.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
+#include <sys/conf.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
+
+#include <geom/geom_disk.h>
 
 #include <dev/ida/idareg.h>
 #include <dev/ida/idavar.h>
@@ -444,7 +444,7 @@ ida_wait(struct ida_softc *ida, struct ida_qcb *qcb)
 	int delay;
 
 	if (ida->flags & IDA_INTERRUPTS) {
-		if (tsleep((caddr_t)qcb, PRIBIO, "idacmd", 5 * hz))
+		if (tsleep(qcb, PRIBIO, "idacmd", 5 * hz))
 			return (ETIMEDOUT);
 		return (0);
 	}

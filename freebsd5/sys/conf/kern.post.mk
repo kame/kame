@@ -6,20 +6,40 @@
 # should be defined in the kern.pre.mk so that port makefiles can
 # override or augment them.
 #
-# $FreeBSD: src/sys/conf/kern.post.mk,v 1.31 2002/11/03 23:48:14 scottl Exp $
+# $FreeBSD: src/sys/conf/kern.post.mk,v 1.41 2003/04/30 12:19:25 markm Exp $
 #
 
-# XXX why are only some phony targets marked phony?
-.PHONY:	all modules
+.MAIN: all
 
-clean:  kernel-clean
-cleandepend:  kernel-cleandepend
-cleandir:
-clobber: kernel-clobber
-depend: kernel-depend
-install: kernel-install
-reinstall: kernel-reinstall
-tags:  kernel-tags
+.for target in all clean cleandepend cleandir clobber depend install \
+    obj reinstall tags
+${target}: kernel-${target}
+.if !defined(MODULES_WITH_WORLD) && !defined(NO_MODULES) && exists($S/modules)
+${target}: modules-${target}
+modules-${target}:
+	cd $S/modules; ${MKMODULESENV} ${MAKE} \
+	    ${target:S/^reinstall$/install/:S/^clobber$/cleandir/}
+.endif
+.endfor
+
+.ORDER: kernel-install modules-install
+
+kernel-all: ${KERNEL_KO}
+
+kernel-cleandir: kernel-clean
+
+kernel-clobber:
+	find . -maxdepth 1 ! -type d ! -name version -delete
+
+kernel-obj:
+
+.if !defined(MODULES_WITH_WORLD) && !defined(NO_MODULES) && exists($S/modules)
+modules: modules-all
+
+.if !defined(NO_MODULES_OBJ)
+modules-all modules-depend: modules-obj
+.endif
+.endif
 
 .if !defined(DEBUG)
 FULLKERNEL=	${KERNEL_KO}
@@ -38,7 +58,7 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	${SYSTEM_LD_TAIL}
 
 .if !exists(.depend)
-${SYSTEM_OBJS}: vnode_if.h ${BEFORE_DEPEND:M*.h} ${MFILES:T:S/.m$/.h/}
+${SYSTEM_OBJS}: assym.s vnode_if.h ${BEFORE_DEPEND:M*.h} ${MFILES:T:S/.m$/.h/}
 .endif
 
 .for mfile in ${MFILES}
@@ -50,18 +70,21 @@ ${mfile:T:S/.m$/.h/}: ${mfile}
 	${AWK} -f $S/tools/makeobjops.awk ${mfile} -h
 .endfor
 
+.if !exists(.depend)
+acphy.o amphy.o bmtphy.o brgphy.o dcphy.o e1000phy.o exphy.o if_bge.o if_tx.o \
+inphy.o lxtphy.o nsgphy.o nsphy.o pnaphy.o pnphy.o qsphy.o rlphy.o tdkphy.o \
+tlphy.o xmphy.o: miidevs.h
+.endif
+
 kernel-clean:
 	rm -f *.o *.so *.So *.ko *.s eddep errs \
 	      ${FULLKERNEL} ${KERNEL_KO} linterrs makelinks tags \
-	      vers.c vnode_if.c vnode_if.h \
+	      vers.c vnode_if.c vnode_if.h majors.c \
 	      ${MFILES:T:S/.m$/.c/} ${MFILES:T:S/.m$/.h/} \
 	      ${CLEAN}
 
-kernel-clobber:
-	find . -type f ! -name version -delete
-
 lint: ${CFILES}
-	@${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC}
+	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC}
 
 # This is a hack.  BFD "optimizes" away dynamic mode if there are no
 # dynamic references.  We could probably do a '-Bforcedynamic' mode like
@@ -98,14 +121,14 @@ GEN_M_CFILES=	${MFILES:T:S/.m$/.c/}
 
 # The argument list can be very long, so use make -V and xargs to
 # pass it to mkdep.
-_kernel-depend: assym.s vnode_if.h ${BEFORE_DEPEND} \
+_kernel-depend: assym.s vnode_if.h miidevs.h ${BEFORE_DEPEND} \
 	    ${CFILES} ${SYSTEM_CFILES} ${GEN_CFILES} ${GEN_M_CFILES} \
-	    ${SFILES} ${SYSTEM_SFILES} ${MFILES:T:S/.m$/.h/}
+	    ${SFILES} ${MFILES:T:S/.m$/.h/}
 	if [ -f .olddep ]; then mv .olddep .depend; fi
 	rm -f .newdep
 	${MAKE} -V CFILES -V SYSTEM_CFILES -V GEN_CFILES -V GEN_M_CFILES | \
 	    MKDEP_CPP="${CC} -E" CC="${CC}" xargs mkdep -a -f .newdep ${CFLAGS}
-	${MAKE} -V SFILES -V SYSTEM_SFILES | \
+	${MAKE} -V SFILES | \
 	    MKDEP_CPP="${CC} -E" xargs mkdep -a -f .newdep ${ASM_CFLAGS}
 	rm -f .depend
 	mv .newdep .depend
@@ -160,63 +183,18 @@ kernel-install:
 .endif
 	mkdir -p ${DESTDIR}${KODIR}
 .if defined(DEBUG) && defined(INSTALL_DEBUG)
-	${INSTALL} -m 555 -o root -g wheel ${FULLKERNEL} ${DESTDIR}${KODIR}
+	${INSTALL} -p -m 555 -o root -g wheel ${FULLKERNEL} ${DESTDIR}${KODIR}
 .else
-	${INSTALL} -m 555 -o root -g wheel ${KERNEL_KO} ${DESTDIR}${KODIR}
+	${INSTALL} -p -m 555 -o root -g wheel ${KERNEL_KO} ${DESTDIR}${KODIR}
 .endif
 
 kernel-reinstall:
 	@-chflags -R noschg ${DESTDIR}${KODIR}
 .if defined(DEBUG) && defined(INSTALL_DEBUG)
-	${INSTALL} -m 555 -o root -g wheel ${FULLKERNEL} ${DESTDIR}${KODIR}
+	${INSTALL} -p -m 555 -o root -g wheel ${FULLKERNEL} ${DESTDIR}${KODIR}
 .else
-	${INSTALL} -m 555 -o root -g wheel ${KERNEL_KO} ${DESTDIR}${KODIR}
+	${INSTALL} -p -m 555 -o root -g wheel ${KERNEL_KO} ${DESTDIR}${KODIR}
 .endif
-
-.if !defined(MODULES_WITH_WORLD) && !defined(NO_MODULES) && exists($S/modules)
-all:	modules
-clean:  modules-clean
-cleandepend:  modules-cleandepend
-cleandir:  modules-cleandir
-clobber:  modules-clobber
-depend: modules-depend
-install: modules-install
-.ORDER: kernel-install modules-install
-reinstall: modules-reinstall
-tags:  modules-tags
-.endif
-
-modules:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} all
-
-modules-clean:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} clean
-
-modules-cleandepend:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} cleandepend
-
-modules-cleandir:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} cleandir
-
-modules-clobber:	modules-clean
-	rm -rf ${MKMODULESENV}
-
-modules-depend:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} depend
-
-modules-obj:
-	@mkdir -p ${.OBJDIR}/modules
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} obj
-
-.if !defined(NO_MODULES_OBJ)
-modules modules-depend: modules-obj
-.endif
-
-modules-tags:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} tags
-
-modules-install modules-reinstall:
-	cd $S/modules ; ${MKMODULESENV} ${MAKE} install
 
 config.o:
 	${NORMAL_C}
@@ -244,4 +222,10 @@ vnode_if.h: $S/tools/vnode_if.awk $S/kern/vnode_if.src
 vnode_if.o:
 	${NORMAL_C}
 
-.include <bsd.kern.mk>
+majors.c: $S/conf/majors $S/conf/majors.awk
+	${AWK} -f $S/conf/majors.awk $S/conf/majors > majors.c
+
+majors.o:
+	${NORMAL_C}
+
+.include "kern.mk"

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_load.c,v 1.27 2002/06/24 05:03:44 arr Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_load.c,v 1.28 2003/03/03 12:15:42 phk Exp $
  *
  */
 
@@ -67,7 +67,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_load.c,v 1.27 2002/06/24 05:03:44 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_load.c,v 1.28 2003/03/03 12:15:42 phk Exp $");
 #endif
 
 static int fore_probe(device_t);
@@ -507,19 +507,7 @@ fore_reset(fup)
  * Driver entry points
  */
 static struct cdevsw fore_cdev = {
-	/* open */	noopen,
-	/* close */	noclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	noname,
-	/* maj */	-1,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_maj =	-1,
 };
 
 

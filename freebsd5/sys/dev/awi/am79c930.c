@@ -1,5 +1,5 @@
 /* $NetBSD: am79c930.c,v 1.5 2000/03/23 13:57:58 onoe Exp $ */
-/* $FreeBSD: src/sys/dev/awi/am79c930.c,v 1.3 2002/03/20 02:02:35 alfred Exp $ */
+/* $FreeBSD: src/sys/dev/awi/am79c930.c,v 1.4 2003/04/21 16:27:45 obrien Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -438,6 +438,7 @@ void am79c930_regdump (sc)
 
 void am79c930_chip_init (sc, how)
 	struct am79c930_softc *sc;
+	int how;
 {
 	/* zero the bank select register, and leave it that way.. */
 	bus_space_write_1(sc->sc_iot, sc->sc_ioh, AM79C930_BSS, 0);

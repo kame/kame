@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.255 2002/11/08 22:33:14 jhb Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.270 2003/05/01 13:44:24 nyan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -33,20 +33,10 @@ svr4_assym.h			optional	compat_svr4		\
 	no-obj no-implicit-rule before-depend				\
 	clean		"svr4_assym.h"
 #
-atkbdmap.h			optional	atkbd_dflt_keymap	\
-	compile-with	"/usr/sbin/kbdcontrol -L ${ATKBD_DFLT_KEYMAP} | sed -e 's/^static keymap_t.* = /static keymap_t key_map = /' -e 's/^static accentmap_t.* = /static accentmap_t accent_map = /' > atkbdmap.h"			\
-	no-obj no-implicit-rule before-depend				\
-	clean		"atkbdmap.h"
-#
 ukbdmap.h			optional	ukbd_dflt_keymap	\
 	compile-with	"/usr/sbin/kbdcontrol -L ${UKBD_DFLT_KEYMAP} | sed -e 's/^static keymap_t.* = /static keymap_t key_map = /' -e 's/^static accentmap_t.* = /static accentmap_t accent_map = /' > ukbdmap.h"			\
 	no-obj no-implicit-rule before-depend				\
 	clean		"ukbdmap.h"
-#
-msysosak.o			optional	fla			\
-	dependency	"$S/contrib/dev/fla/i386/msysosak.o.uu" 	\
-	compile-with	"uudecode < $S/contrib/dev/fla/i386/msysosak.o.uu" \
-	no-implicit-rule
 #
 trlld.o				optional	oltr			\
 	dependency	"$S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
@@ -83,7 +73,6 @@ compat/svr4/svr4_sysent.c		optional	compat_svr4
 compat/svr4/svr4_sysvec.c		optional	compat_svr4
 compat/svr4/svr4_termios.c		optional	compat_svr4
 compat/svr4/svr4_ttold.c		optional	compat_svr4
-contrib/dev/fla/fla.c		optional	fla
 contrib/dev/oltr/if_oltr.c	optional	oltr
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
@@ -106,8 +95,6 @@ crypto/des/des_setkey.c			optional	crypto
 dev/aic/aic_cbus.c		optional	aic isa
 dev/ar/if_ar.c			optional	ar
 dev/ar/if_ar_pci.c		optional	ar pci
-dev/ar/if_ar_isa.c		optional	ar isa
-dev/cm/if_cm_isa.c		optional	cm isa
 dev/ct/bshw_machdep.c		optional	ct
 dev/ct/ct.c			optional	ct
 dev/ct/ct_isa.c			optional	ct isa
@@ -123,14 +110,12 @@ dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	pckbd
 dev/lnc/if_lnc_cbus.c		optional	lnc isa
 dev/sbni/if_sbni.c		optional	sbni
-dev/sbni/if_sbni_isa.c		optional	sbni isa
 dev/sbni/if_sbni_pci.c		optional	sbni pci
 dev/snc/dp83932.c		optional	snc
 dev/snc/dp83932subr.c		optional	snc
 dev/snc/if_snc.c		optional	snc
 dev/snc/if_snc_cbus.c		optional	snc isa
 dev/snc/if_snc_pccard.c		optional	snc card
-dev/sr/if_sr_isa.c		optional	sr isa
 dev/syscons/apm/apm_saver.c	optional	apm_saver apm
 dev/syscons/schistory.c		optional	sc
 dev/syscons/scmouse.c		optional	sc
@@ -139,7 +124,9 @@ dev/syscons/scterm-dumb.c	optional	sc
 dev/syscons/scvidctl.c		optional	sc
 dev/syscons/sysmouse.c		optional	sc
 geom/geom_bsd.c			standard
+geom/geom_bsd_enc.c		standard
 geom/geom_pc98.c		standard
+geom/geom_pc98_enc.c		standard
 gnu/i386/fpemul/div_small.s	optional	gpl_math_emulate \
 	warning "kernel contains GPL contaminated math emulator"
 gnu/i386/fpemul/errors.c	optional	gpl_math_emulate
@@ -172,6 +159,7 @@ gnu/i386/fpemul/reg_u_mul.s	optional	gpl_math_emulate
 gnu/i386/fpemul/reg_u_sub.s	optional	gpl_math_emulate
 gnu/i386/fpemul/wm_shrx.s	optional	gpl_math_emulate
 gnu/i386/fpemul/wm_sqrt.s	optional	gpl_math_emulate
+i386/bios/apm.c			optional	apm
 i386/i386/atomic.c		standard				\
 	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} ${.IMPSRC}"
 i386/i386/autoconf.c		standard
@@ -192,9 +180,7 @@ i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
 i386/i386/k6_mem.c		standard
 i386/i386/legacy.c		standard
-# locore.s needs to be handled in Makefile to put it first.  Otherwise it's
-# now normal.
-# i386/i386/locore.s		standard
+i386/i386/locore.s		standard	no-obj
 i386/i386/math_emulate.c	optional	math_emulate
 i386/i386/mem.c			standard
 i386/i386/mp_clock.c		optional	smp
@@ -209,6 +195,7 @@ i386/i386/support.s		standard
 i386/i386/swtch.s		standard
 i386/i386/sys_machdep.c		standard
 i386/i386/trap.c		standard
+i386/i386/tsc.c			standard
 i386/i386/vm86.c		standard
 i386/i386/vm_machdep.c		standard
 i386/ibcs2/ibcs2_errno.c	optional	ibcs2
@@ -234,7 +221,6 @@ i386/isa/bs/bs.c		optional	bs
 i386/isa/bs/bsfunc.c		optional	bs
 i386/isa/bs/bshw.c		optional	bs
 i386/isa/bs/bsif.c		count		bs
-i386/isa/asc.c			count		asc
 i386/isa/cronyx.c		optional	cx
 i386/isa/ctx.c			count		ctx
 i386/isa/cx.c			count		cx
@@ -242,7 +228,6 @@ i386/isa/cy.c			count		cy
 i386/isa/elink.c		optional	ep
 i386/isa/elink.c		optional	ie
 i386/isa/gpib.c			optional	gp
-i386/isa/gsc.c			count		gsc
 i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		count		el
 i386/isa/if_le.c		count		le
@@ -255,12 +240,11 @@ i386/isa/isa_compat.c		optional	isa compat_oldisa	\
 i386/isa/istallion.c		optional	stli nowerror
 i386/isa/loran.c		optional	loran
 i386/isa/npx.c			optional	npx
-i386/isa/pcf.c			optional	pcf
 i386/isa/pmtimer.c		optional	pmtimer
 i386/isa/prof_machdep.c		optional	profiling-routine
+i386/isa/spkr.c			optional	speaker
 i386/isa/spigot.c		count		spigot
 i386/isa/stallion.c		optional	stl nowerror
-i386/isa/tw.c			count		tw
 i386/isa/wt.c			count		wt
 i386/linux/imgact_linux.c	optional	compat_linux
 i386/linux/linux_dummy.c	optional	compat_linux
@@ -367,21 +351,21 @@ i4b/layer1/itjc/i4b_itjc_l1fsm.c	optional	itjc
 #
 kern/imgact_aout.c		optional	compat_aout
 kern/imgact_gzip.c		optional	gzip
-kern/subr_diskmbr.c		count		compat_atdisk
 libkern/divdi3.c		standard
 libkern/moddi3.c		standard
 libkern/qdivrem.c		standard
 libkern/ucmpdi2.c		standard
 libkern/udivdi3.c		standard
 libkern/umoddi3.c		standard
-pc98/apm/apm.c			optional	apm
 pc98/apm/apm_bioscall.s		optional	apm
 pc98/i386/busio.s		standard
 pc98/i386/busiosubr.c		standard
 pc98/i386/machdep.c		standard
 pc98/pc98/atapi.c		optional	wdc
+pc98/pc98/canbepm.c		optional	canbepm
+pc98/pc98/canbus.c		optional        canbus
+pc98/pc98/canbus_if.m		optional	canbus
 pc98/pc98/clock.c		standard
-pc98/pc98/diskslice_machdep.c	standard
 pc98/pc98/fd.c			optional	fdc
 pc98/pc98/isa_dma.c		optional	isa
 pc98/pc98/mse.c			optional	mse
@@ -397,12 +381,15 @@ pc98/pc98/scterm-sck.c		optional	sc
 pc98/pc98/scvtbpc98.c		optional	sc
 pc98/pc98/sio.c			optional	sio
 pc98/pc98/sio_cbus.c		optional	sio isa
-pc98/pc98/spkr.c		optional	speaker
 pc98/pc98/syscons.c		optional	sc
 pc98/pc98/syscons_pc98.c	optional	sc
 pc98/pc98/wd.c			count		wdc
 pc98/pc98/wd_cd.c		count		wcd wdc
-pc98/pc98/wfd.c			count		wfd wdc
-pc98/pc98/wst.c			count		wst wdc
 pccard/mecia.c			optional	mecia card
 pci/cy_pci.c			optional	cy pci
+pci/agp_intel.c			optional	agp
+pci/agp_via.c			optional	agp
+pci/agp_sis.c			optional	agp
+pci/agp_ali.c			optional	agp
+pci/agp_amd.c			optional	agp
+pci/agp_i810.c			optional	agp

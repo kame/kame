@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.alpha,v 1.95 2002/10/05 16:35:26 phk Exp $
+# $FreeBSD: src/sys/conf/files.alpha,v 1.101 2003/04/17 07:39:03 phk Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -69,9 +69,7 @@ alpha/alpha/fp_emulate.c	standard
 alpha/alpha/ieee_float.c	standard
 alpha/alpha/in_cksum.c		optional	inet
 alpha/alpha/interrupt.c		standard
-# locore.s needs to be handled in Makefile to put it first.  Otherwise it's
-# now normal.
-# alpha/alpha/locore.s		standard
+alpha/alpha/locore.s		standard	no-obj
 alpha/alpha/machdep.c		standard
 alpha/alpha/mem.c		standard
 alpha/alpha/pmap.c		standard
@@ -194,6 +192,7 @@ dev/syscons/scvtb.c		optional	sc
 dev/syscons/syscons.c		optional	sc
 dev/syscons/sysmouse.c		optional	sc
 geom/geom_bsd.c			standard
+geom/geom_bsd_enc.c		standard
 isa/atkbd_isa.c			optional	atkbd
 isa/atkbdc_isa.c		optional	atkbdc
 isa/fd.c			optional	fdc
@@ -201,7 +200,6 @@ isa/ppc.c                       optional        ppc
 isa/psm.c			optional	psm
 isa/syscons_isa.c		optional	sc
 isa/vga_isa.c			optional	vga
-kern/subr_diskmbr.c		standard
 libkern/alpha/bswap16.S		standard
 libkern/alpha/bswap32.S		standard
 libkern/bcmp.c			standard
@@ -212,3 +210,4 @@ dev/tga/tga_pci.c		optional	tga
 dev/fb/fb.c			optional	tga
 dev/fb/gfb.c			optional	tga
 dev/gfb/gfb_pci.c		optional	tga
+pci/agp_amd.c			optional	agp

@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/r128.h,v 1.1 2002/04/27 20:47:57 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128.h,v 1.2 2003/03/09 02:08:28 anholt Exp $
  */
 
 #ifndef __R128_H__
@@ -44,6 +44,36 @@
 #define __HAVE_CTX_BITMAP	1
 #define __HAVE_SG		1
 #define __HAVE_PCI_DMA		1
+
+#define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
+
+#define DRIVER_NAME		"r128"
+#define DRIVER_DESC		"ATI Rage 128"
+#define DRIVER_DATE		"20021029"
+
+#define DRIVER_MAJOR		2
+#define DRIVER_MINOR		3
+#define DRIVER_PATCHLEVEL	0
+
+
+#define DRIVER_IOCTLS							    \
+   [DRM_IOCTL_NR(DRM_IOCTL_DMA)]             = { r128_cce_buffers,  1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_INIT)]       = { r128_cce_init,     1, 1 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_START)]  = { r128_cce_start,    1, 1 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_STOP)]   = { r128_cce_stop,     1, 1 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_RESET)]  = { r128_cce_reset,    1, 1 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_IDLE)]   = { r128_cce_idle,     1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_RESET)]      = { r128_engine_reset, 1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_FULLSCREEN)] = { r128_fullscreen,   1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_SWAP)]       = { r128_cce_swap,     1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_CLEAR)]      = { r128_cce_clear,    1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_VERTEX)]     = { r128_cce_vertex,   1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_INDICES)]    = { r128_cce_indices,  1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_BLIT)]       = { r128_cce_blit,     1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_DEPTH)]      = { r128_cce_depth,    1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_STIPPLE)]    = { r128_cce_stipple,  1, 0 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_INDIRECT)]   = { r128_cce_indirect, 1, 1 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_GETPARAM)]   = { r128_getparam, 1, 0 },
 
 /* Driver customization:
  */
@@ -63,6 +93,9 @@
 /* DMA customization:
  */
 #define __HAVE_DMA		1
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_VBL_IRQ		1
+#define __HAVE_SHARED_IRQ       1
 
 #if 0
 /* GH: Remove this for now... */

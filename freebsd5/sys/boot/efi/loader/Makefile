@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/efi/loader/Makefile,v 1.18 2002/05/10 09:26:31 obrien Exp $
+# $FreeBSD: src/sys/boot/efi/loader/Makefile,v 1.19 2003/02/26 06:18:52 obrien Exp $
 
 .PATH: ${.CURDIR}/../common
 
@@ -12,18 +12,17 @@ STRIP=		# We must not strip loader.efi at install time.
 SRCS+=		main.c conf.c dev_net.c
 
 CFLAGS+=	-ffreestanding
+
+.if !defined(NOFORTH)
 # Enable BootForth
 BOOT_FORTH=	yes
-CFLAGS+=	-I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/${MACHINE_ARCH}
-.if BOOT_FORTH
 CFLAGS+=	-DBOOT_FORTH
+CFLAGS+=	-I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/${MACHINE_ARCH}
 .if exists(${.OBJDIR}/../../ficl/libficl.a)
 LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
 .else
 LIBFICL=	${.CURDIR}/../../ficl/libficl.a
 .endif
-.else
-LIBFICL=
 .endif
 
 # where to get libstand from

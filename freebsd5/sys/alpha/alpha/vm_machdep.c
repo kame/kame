@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.77 2002/12/10 02:33:43 julian Exp $
+ * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.84 2003/04/17 21:57:16 jhb Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -73,6 +73,7 @@
 #include <sys/malloc.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/cons.h>
 #include <sys/mutex.h>
 #include <sys/vnode.h>
 #include <sys/vmmeter.h>
@@ -97,22 +98,6 @@
 #include <sys/user.h>
 
 /*
- * quick version of vm_fault
- */
-int
-vm_fault_quick(v, prot)
-	caddr_t v;
-	int prot;
-{
-	int r;
-	if (prot & VM_PROT_WRITE)
-		r = subyte(v, fubyte(v));
-	else
-		r = fubyte(v);
-	return(r);
-}
-
-/*
  * Finish a fork operation, with process p2 nearly set up.
  * Copy and update the pcb, set up the stack so that the child
  * ready to run and return to user mode.
@@ -134,7 +119,9 @@ cpu_fork(td1, p2, td2, flags)
 	td2->td_pcb = (struct pcb *)
 	    (td2->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
 	td2->td_md.md_flags = td1->td_md.md_flags & MDTD_FPUSED;
+	PROC_LOCK(p2);
 	p2->p_md.md_uac = p1->p_md.md_uac;
+	PROC_UNLOCK(p2);
 
 	/*
 	 * Cache the physical address of the pcb, so we can
@@ -325,7 +312,7 @@ cpu_set_upcall(struct thread *td, void *pcb)
 }
 
 void
-cpu_set_upcall_kse(struct thread *td, struct kse *ke)
+cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
 
 	/* XXX */
@@ -335,75 +322,6 @@ void
 cpu_wait(p)
 	struct proc *p;
 {
-}
-
-/*
- * Map an IO request into kernel virtual address space.
- *
- * All requests are (re)mapped into kernel VA space.
- * Notice that we use b_bufsize for the size of the buffer
- * to be mapped.  b_bcount might be modified by the driver.
- */
-void
-vmapbuf(bp)
-	register struct buf *bp;
-{
-	register caddr_t addr, v, kva;
-	vm_offset_t pa;
-
-	GIANT_REQUIRED;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vmapbuf");
-
-	for (v = bp->b_saveaddr, addr = (caddr_t)trunc_page(bp->b_data);
-	    addr < bp->b_data + bp->b_bufsize;
-	    addr += PAGE_SIZE, v += PAGE_SIZE) {
-		/*
-		 * Do the vm_fault if needed; do the copy-on-write thing
-		 * when reading stuff off device into memory.
-		 */
-		vm_fault_quick((addr >= bp->b_data) ? addr : bp->b_data,
-			(bp->b_iocmd == BIO_READ)?(VM_PROT_READ|VM_PROT_WRITE):VM_PROT_READ);
-		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
-		if (pa == 0)
-			panic("vmapbuf: page not present");
-		vm_page_hold(PHYS_TO_VM_PAGE(pa));
-		pmap_kenter((vm_offset_t) v, pa);
-	}
-
-	kva = bp->b_saveaddr;
-	bp->b_saveaddr = bp->b_data;
-	bp->b_data = kva + (((vm_offset_t) bp->b_data) & PAGE_MASK);
-}
-
-/*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
- */
-void
-vunmapbuf(bp)
-	register struct buf *bp;
-{
-	register caddr_t addr;
-	vm_offset_t pa;
-
-	GIANT_REQUIRED;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vunmapbuf");
-
-	vm_page_lock_queues();
-	for (addr = (caddr_t)trunc_page(bp->b_data);
-	    addr < bp->b_data + bp->b_bufsize;
-	    addr += PAGE_SIZE) {
-		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
-		pmap_kremove((vm_offset_t) addr);
-		vm_page_unhold(PHYS_TO_VM_PAGE(pa));
-	}
-	vm_page_unlock_queues();
-
-	bp->b_data = bp->b_saveaddr;
 }
 
 /*

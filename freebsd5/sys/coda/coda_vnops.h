@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_vnops.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_vnops.h,v 1.11 2002/05/16 21:25:34 trhodes Exp $
+ * $FreeBSD: src/sys/coda/coda_vnops.h,v 1.12 2003/03/05 13:48:51 tjr Exp $
  * 
   */
 
@@ -78,6 +78,7 @@ int coda_islocked(void *);
 int coda_vop_error(void *);
 int coda_vop_nop(void *);
 int coda_fbsd_getpages	(void *);
+int coda_pathconf(void *);
 
 int coda_rdwr(struct vnode *vp, struct uio *uiop, enum uio_rw rw,
     int ioflag, struct ucred *cred, struct thread *td);

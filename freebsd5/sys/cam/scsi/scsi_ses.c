@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.23 2002/11/09 12:55:04 alfred Exp $ */
+/* $FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.25 2003/03/08 08:01:26 phk Exp $ */
 /*
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
@@ -34,7 +34,6 @@
 #include <sys/fcntl.h>
 #include <sys/conf.h>
 #include <sys/errno.h>
-#include <sys/devicestat.h>
 #include <machine/stdarg.h>
 
 #include <cam/cam.h>
@@ -176,19 +175,11 @@ PERIPHDRIVER_DECLARE(ses, sesdriver);
 
 static struct cdevsw ses_cdevsw = 
 {
-	/* open */	sesopen,
-	/* close */	sesclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	sesioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ses",
-	/* maj */	SES_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	sesopen,
+	.d_close =	sesclose,
+	.d_ioctl =	sesioctl,
+	.d_name =	"ses",
+	.d_maj =	SES_CDEV_MAJOR,
 };
 
 static void

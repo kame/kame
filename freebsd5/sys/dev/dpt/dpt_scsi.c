@@ -43,7 +43,7 @@
  *	       arrays that span controllers (Wow!).
  */
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.34 2002/11/06 21:19:17 jhb Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.42 2003/05/27 04:59:57 scottl Exp $"
 
 #define _DPT_C_
 
@@ -60,6 +60,10 @@
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 
+#include <machine/resource.h>
+#include <sys/rman.h>
+
+#include <machine/clock.h>
 
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
@@ -75,12 +79,8 @@
 #include <dev/dpt/dpt.h>
 
 /* dpt_isa.c, dpt_eisa.c, and dpt_pci.c need this in a central place */
-int dpt_controllers_present;
-
-u_long	dpt_unit;	/* Next unit number to use */
-
-/* The linked list of softc structures */
-struct dpt_softc_list dpt_softcs = TAILQ_HEAD_INITIALIZER(dpt_softcs);
+int		dpt_controllers_present;
+devclass_t	dpt_devclass;
 
 #define microtime_now dpt_time_now()
 
@@ -447,7 +447,8 @@ dpt_pio_get_conf (u_int32_t base)
 	for (i = 0; i < (sizeof(dpt_conf_t) / 2); i++) {
 
 		if (dpt_pio_wait(base, HA_RSTATUS, HA_SDRQ, 0)) {
-			printf("dpt: timeout in data read.\n");
+			if (bootverbose)
+				printf("dpt: timeout in data read.\n");
 			return (NULL);
 		}
 
@@ -456,7 +457,8 @@ dpt_pio_get_conf (u_int32_t base)
 	}
 
 	if (inb(base + HA_RSTATUS) & HA_SERROR) {
-		printf("dpt: error reading configuration data.\n");
+		if (bootverbose)
+			printf("dpt: error reading configuration data.\n");
 		return (NULL);
 	}
 
@@ -1178,26 +1180,24 @@ dpt_send_eata_command(dpt_softc_t *dpt, eata_ccb_t *cmd_block,
 
 
 /* ==================== Exported Function definitions =======================*/
-dpt_softc_t *
-dpt_alloc(device_t dev, bus_space_tag_t tag, bus_space_handle_t bsh)
+void
+dpt_alloc(device_t dev)
 {
 	dpt_softc_t	*dpt = device_get_softc(dev);
 	int    i;
 
-	bzero(dpt, sizeof(dpt_softc_t));
-	dpt->tag = tag;
-	dpt->bsh = bsh;
+	dpt->tag = rman_get_bustag(dpt->io_res);
+	dpt->bsh = rman_get_bushandle(dpt->io_res) + dpt->io_offset;
 	dpt->unit = device_get_unit(dev);
 	SLIST_INIT(&dpt->free_dccb_list);
 	LIST_INIT(&dpt->pending_ccb_list);
-	TAILQ_INSERT_TAIL(&dpt_softcs, dpt, links);
 	for (i = 0; i < MAX_CHANNELS; i++)
 		dpt->resetlevel[i] = DPT_HA_OK;
 
 #ifdef DPT_MEASURE_PERFORMANCE
 	dpt_reset_performance(dpt);
 #endif /* DPT_MEASURE_PERFORMANCE */
-	return (dpt);
+	return;
 }
 
 void
@@ -1232,7 +1232,55 @@ dpt_free(struct dpt_softc *dpt)
 	case 0:
 		break;
 	}
-	TAILQ_REMOVE(&dpt_softcs, dpt, links);
+}
+
+int
+dpt_alloc_resources (device_t dev)
+{
+	dpt_softc_t *	dpt;
+	int		error;
+
+	dpt = device_get_softc(dev);
+
+	dpt->io_res = bus_alloc_resource(dev, dpt->io_type, &dpt->io_rid,
+					 0, ~0, 1, RF_ACTIVE);
+	if (dpt->io_res == NULL) {
+		device_printf(dev, "No I/O space?!\n");
+		error = ENOMEM;
+		goto bad;
+	}
+
+	dpt->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &dpt->irq_rid,
+					  0, ~0, 1, RF_ACTIVE);
+	if (dpt->irq_res == NULL) {
+		device_printf(dev, "No IRQ!\n");
+		error = ENOMEM;
+		goto bad;
+	}
+
+	return (0);
+bad:
+	return(error);
+}
+
+
+void
+dpt_release_resources (device_t dev)
+{
+	struct dpt_softc *	dpt;
+
+	dpt = device_get_softc(dev);
+
+	if (dpt->ih)
+		bus_teardown_intr(dev, dpt->irq_res, dpt->ih);
+        if (dpt->io_res)
+                bus_release_resource(dev, dpt->io_type, dpt->io_rid, dpt->io_res);
+        if (dpt->irq_res)
+                bus_release_resource(dev, SYS_RES_IRQ, dpt->irq_rid, dpt->irq_res);
+        if (dpt->drq_res)
+                bus_release_resource(dev, SYS_RES_DRQ, dpt->drq_rid, dpt->drq_res);
+
+	return;
 }
 
 static u_int8_t string_sizes[] =
@@ -1264,13 +1312,18 @@ dpt_init(struct dpt_softc *dpt)
 	/* XXX Shouldn't we poll a status register or something??? */
 #endif
 	/* DMA tag for our S/G structures.  We allocate in page sized chunks */
-	if (bus_dma_tag_create(dpt->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       PAGE_SIZE, /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &dpt->sg_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ dpt->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ PAGE_SIZE,
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ 0,
+				&dpt->sg_dmat) != 0) {
 		goto error_exit;
         }
 
@@ -1386,14 +1439,18 @@ dpt_init(struct dpt_softc *dpt)
 		dpt->sgsize = dpt_max_segs;
 	
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(dpt->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/dpt->sgsize,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/BUS_DMA_ALLOCNOW,
-			       &dpt->buffer_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ dpt->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ MAXBSIZE,
+				/* nsegments	*/ dpt->sgsize,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ BUS_DMA_ALLOCNOW,
+				&dpt->buffer_dmat) != 0) {
 		printf("dpt: bus_dma_tag_create(...,dpt->buffer_dmat) failed\n");
 		goto error_exit;
 	}
@@ -1401,15 +1458,20 @@ dpt_init(struct dpt_softc *dpt)
 	dpt->init_level++;
 
 	/* DMA tag for our ccb structures and interrupt status packet */
-	if (bus_dma_tag_create(dpt->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       (dpt->max_dccbs * sizeof(struct dpt_ccb))
-			       + sizeof(dpt_sp_t),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &dpt->dccb_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ dpt->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ (dpt->max_dccbs *
+						    sizeof(struct dpt_ccb)) +
+						    sizeof(dpt_sp_t),
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ 0,
+				&dpt->dccb_dmat) != 0) {
 		printf("dpt: bus_dma_tag_create(...,dpt->dccb_dmat) failed\n");
 		goto error_exit;
         }
@@ -1522,6 +1584,31 @@ dpt_attach(dpt_softc_t *dpt)
 	return (i);
 }
 
+int
+dpt_detach (device_t dev)
+{
+	struct dpt_softc *	dpt;
+	int			i;
+
+	dpt = device_get_softc(dev);
+
+	for (i = 0; i < dpt->channels; i++) {
+#if 0
+	        xpt_async(AC_LOST_DEVICE, dpt->paths[i], NULL);
+#endif
+        	xpt_free_path(dpt->paths[i]);
+        	xpt_bus_deregister(cam_sim_path(dpt->sims[i]));
+        	cam_sim_free(dpt->sims[i], /*free_devq*/TRUE);
+	}
+
+	dptshutdown((void *)dpt, SHUTDOWN_PRI_DEFAULT);
+
+	dpt_release_resources(dev);
+
+	dpt_free(dpt);
+
+	return (0);
+}
 
 /*
  * This is the interrupt handler for the DPT driver.
@@ -1561,7 +1648,7 @@ dpt_intr(void *arg)
 
 		/* Ignore status packets with EOC not set */
 		if (dpt->sp->EOC == 0) {
-			printf("dpt%d ERROR: Request %d recieved with "
+			printf("dpt%d ERROR: Request %d received with "
 			       "clear EOC.\n     Marking as LOST.\n",
 			       dpt->unit, dccb->transaction_id);
 

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/boot/efi/libefi/elf_freebsd.c,v 1.10 2002/11/28 03:25:51 marcel Exp $ */
+/* $FreeBSD: src/sys/boot/efi/libefi/elf_freebsd.c,v 1.11 2003/05/01 03:56:29 peter Exp $ */
 /* $NetBSD: loadfile.c,v 1.10 1998/06/25 06:45:46 ross Exp $ */
 
 /*-
@@ -94,9 +94,9 @@
 
 #define _KERNEL
 
-static int	elf_exec(struct preloaded_file *amp);
+static int	elf64_exec(struct preloaded_file *amp);
 
-struct file_format ia64_elf = { elf_loadfile, elf_exec };
+struct file_format ia64_elf = { elf64_loadfile, elf64_exec };
 
 static __inline u_int64_t
 disable_ic()
@@ -136,7 +136,7 @@ enter_kernel(u_int64_t start, struct bootinfo *bi)
 }
 
 static int
-elf_exec(struct preloaded_file *fp)
+elf64_exec(struct preloaded_file *fp)
 {
 	struct file_metadata	*md;
 	Elf_Ehdr		*hdr;

@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adv_eisa.c,v 1.12 2002/10/09 08:50:26 peter Exp $
+ * $FreeBSD: src/sys/dev/advansys/adv_eisa.c,v 1.13 2003/03/29 09:46:10 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -171,16 +171,19 @@ adv_eisa_attach(device_t dev)
 		 * by the MI portions of the advansys driver
 		 */
 		/* XXX Should be a child of the PCI bus dma tag */
-		error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
-					   /*boundary*/0,
-					   /*lowaddr*/ADV_EISA_MAX_DMA_ADDR,
-					   /*highaddr*/BUS_SPACE_MAXADDR,
-					   /*filter*/NULL, /*filterarg*/NULL,
-					   /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
-					   /*nsegments*/~0,
-					   /*maxsegsz*/ADV_EISA_MAX_DMA_COUNT,
-					   /*flags*/0,
-					   &adv_b->parent_dmat);
+		error = bus_dma_tag_create(
+				/* parent	*/ NULL,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ ADV_EISA_MAX_DMA_ADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* nsegments	*/ ~0,
+				/* maxsegsz	*/ ADV_EISA_MAX_DMA_COUNT,
+				/* flags	*/ 0,
+				&adv_b->parent_dmat);
  
 		if (error != 0) {
 			printf("%s: Could not allocate DMA tag - error %d\n",
@@ -206,16 +209,19 @@ adv_eisa_attach(device_t dev)
 		 * by the MI portions of the advansys driver
 		 */
 		/* XXX Should be a child of the PCI bus dma tag */
-		error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
-					   /*boundary*/0,
-					   /*lowaddr*/ADV_EISA_MAX_DMA_ADDR,
-					   /*highaddr*/BUS_SPACE_MAXADDR,
-					   /*filter*/NULL, /*filterarg*/NULL,
-					   /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
-					   /*nsegments*/~0,
-					   /*maxsegsz*/ADV_EISA_MAX_DMA_COUNT,
-					   /*flags*/0,
-					   &adv->parent_dmat);
+		error = bus_dma_tag_create(
+				/* parent	*/ NULL,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ ADV_EISA_MAX_DMA_ADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* nsegments	*/ ~0,
+				/* maxsegsz	*/ ADV_EISA_MAX_DMA_COUNT,
+				/* flags	*/ 0,
+				&adv->parent_dmat);
  
 		if (error != 0) {
 			printf("%s: Could not allocate DMA tag - error %d\n",
@@ -234,18 +240,19 @@ adv_eisa_attach(device_t dev)
 
 	if (overrun_buf == NULL) {
 		/* Need to allocate our overrun buffer */
-		if (bus_dma_tag_create(adv->parent_dmat,
-				       /*alignment*/8,
-				       /*boundary*/0,
-				       ADV_EISA_MAX_DMA_ADDR,
-				       BUS_SPACE_MAXADDR,
-				       /*filter*/NULL,
-				       /*filterarg*/NULL,
-				       ADV_OVERRUN_BSIZE,
-				       /*nsegments*/1,
-				       BUS_SPACE_MAXSIZE_32BIT,
-				       /*flags*/0,
-				       &overrun_dmat) != 0) {
+		if (bus_dma_tag_create(
+				/* parent	*/ adv->parent_dmat,
+				/* alignment	*/ 8,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ ADV_EISA_MAX_DMA_ADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ ADV_OVERRUN_BSIZE,
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ 0,
+				&overrun_dmat) != 0) {
 			adv_free(adv);
 			goto bad;
        		}

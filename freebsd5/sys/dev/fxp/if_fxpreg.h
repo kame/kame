@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpreg.h,v 1.26 2001/10/25 05:25:58 jlemon Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpreg.h,v 1.35 2003/05/14 20:33:41 mux Exp $
  */
 
 #define FXP_VENDORID_INTEL	0x8086
@@ -111,119 +111,134 @@
  * Command block definitions
  */
 struct fxp_cb_nop {
-	void *fill[2];
-	volatile u_int16_t cb_status;
-	volatile u_int16_t cb_command;
-	volatile u_int32_t link_addr;
+	u_int16_t cb_status;
+	u_int16_t cb_command;
+	u_int32_t link_addr;
 };
 struct fxp_cb_ias {
-	void *fill[2];
-	volatile u_int16_t cb_status;
-	volatile u_int16_t cb_command;
-	volatile u_int32_t link_addr;
-	volatile u_int8_t macaddr[6];
+	u_int16_t cb_status;
+	u_int16_t cb_command;
+	u_int32_t link_addr;
+	u_int8_t macaddr[6];
 };
+
 /* I hate bit-fields :-( */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define __FXP_BITFIELD2(a, b)			a, b
+#define __FXP_BITFIELD3(a, b, c)		a, b, c
+#define __FXP_BITFIELD4(a, b, c, d)		a, b, c, d
+#define __FXP_BITFIELD5(a, b, c, d, e)		a, b, c, d, e
+#define __FXP_BITFIELD6(a, b, c, d, e, f)	a, b, c, d, e, f
+#define __FXP_BITFIELD7(a, b, c, d, e, f, g)	a, b, c, d, e, f, g
+#define __FXP_BITFIELD8(a, b, c, d, e, f, g, h)	a, b, c, d, e, f, g, h
+#else
+#define __FXP_BITFIELD2(a, b)			b, a
+#define __FXP_BITFIELD3(a, b, c)		c, b, a
+#define __FXP_BITFIELD4(a, b, c, d)		d, c, b, a
+#define __FXP_BITFIELD5(a, b, c, d, e)		e, d, c, b, a
+#define __FXP_BITFIELD6(a, b, c, d, e, f)	f, e, d, c, b, a
+#define __FXP_BITFIELD7(a, b, c, d, e, f, g)	g, f, e, d, c, b, a
+#define __FXP_BITFIELD8(a, b, c, d, e, f, g, h)	h, g, f, e, d, c, b, a
+#endif
+
 struct fxp_cb_config {
-	void *fill[2];
-	volatile u_int16_t	cb_status;
-	volatile u_int16_t	cb_command;
-	volatile u_int32_t	link_addr;
-	volatile u_int		byte_count:6,
-				:2;
-	volatile u_int		rx_fifo_limit:4,
-				tx_fifo_limit:3,
-				:1;
-	volatile u_int8_t	adaptive_ifs;
-	volatile u_int		mwi_enable:1,			/* 8,9 */
-				type_enable:1,			/* 8,9 */
-				read_align_en:1,		/* 8,9 */
-				end_wr_on_cl:1,			/* 8,9 */
-				:4;
-	volatile u_int		rx_dma_bytecount:7,
-				:1;
-	volatile u_int		tx_dma_bytecount:7,
-				dma_mbce:1;
-	volatile u_int		late_scb:1,			/* 7 */
-				direct_dma_dis:1,		/* 8,9 */
-				tno_int_or_tco_en:1,		/* 7,9 */
-				ci_int:1,
-				ext_txcb_dis:1,			/* 8,9 */
-				ext_stats_dis:1,		/* 8,9 */
-				keep_overrun_rx:1,
-				save_bf:1;
-	volatile u_int		disc_short_rx:1,
-				underrun_retry:2,
-				:3,
-				two_frames:1,			/* 8,9 */
-				dyn_tbd:1;			/* 8,9 */
-	volatile u_int		mediatype:1,			/* 7 */
-				:6,
-				csma_dis:1;			/* 8,9 */
-	volatile u_int		tcp_udp_cksum:1,		/* 9 */
-				:3,
-				vlan_tco:1,			/* 8,9 */
-				link_wake_en:1,			/* 8,9 */
-				arp_wake_en:1,			/* 8 */
-				mc_wake_en:1;			/* 8 */
-	volatile u_int		:3,
-				nsai:1,
-				preamble_length:2,
-				loopback:2;
-	volatile u_int		linear_priority:3,		/* 7 */
-				:5;
-	volatile u_int		linear_pri_mode:1,		/* 7 */
-				:3,
-				interfrm_spacing:4;
-	volatile u_int		:8;
-	volatile u_int		:8;
-	volatile u_int		promiscuous:1,
-				bcast_disable:1,
-				wait_after_win:1,		/* 8,9 */
-				:1,
-				ignore_ul:1,			/* 8,9 */
-				crc16_en:1,			/* 9 */
-				:1,
-				crscdt:1;
-	volatile u_int		fc_delay_lsb:8;			/* 8,9 */
-	volatile u_int		fc_delay_msb:8;			/* 8,9 */
-	volatile u_int		stripping:1,
-				padding:1,
-				rcv_crc_xfer:1,
-				long_rx_en:1,			/* 8,9 */
-				pri_fc_thresh:3,		/* 8,9 */
-				:1;
-	volatile u_int		ia_wake_en:1,			/* 8 */
-				magic_pkt_dis:1,		/* 8,9,!9ER */
-				tx_fc_dis:1,			/* 8,9 */
-				rx_fc_restop:1,			/* 8,9 */
-				rx_fc_restart:1,		/* 8,9 */
-				fc_filter:1,			/* 8,9 */
-				force_fdx:1,
-				fdx_pin_en:1;
-	volatile u_int		:5,
-				pri_fc_loc:1,			/* 8,9 */
-				multi_ia:1,
-				:1;
-	volatile u_int		:3,
-				mc_all:1,
-				:4;
+	u_int16_t	cb_status;
+	u_int16_t	cb_command;
+	u_int32_t	link_addr;
+
+	/* Bytes 0 - 21 -- common to all i8255x */
+	u_int		__FXP_BITFIELD2(byte_count:6, :2);
+	u_int		__FXP_BITFIELD3(rx_fifo_limit:4, tx_fifo_limit:3, :1);
+	u_int8_t	adaptive_ifs;
+	u_int		__FXP_BITFIELD5(mwi_enable:1,		/* 8,9 */
+			    type_enable:1,			/* 8,9 */
+			    read_align_en:1,			/* 8,9 */
+			    end_wr_on_cl:1,			/* 8,9 */
+			    :4);
+	u_int		__FXP_BITFIELD2(rx_dma_bytecount:7, :1);
+	u_int		__FXP_BITFIELD2(tx_dma_bytecount:7, dma_mbce:1);
+	u_int		__FXP_BITFIELD8(late_scb:1,		/* 7 */
+			    direct_dma_dis:1,			/* 8,9 */
+			    tno_int_or_tco_en:1,		/* 7,9 */
+			    ci_int:1,
+			    ext_txcb_dis:1,			/* 8,9 */
+			    ext_stats_dis:1,			/* 8,9 */
+			    keep_overrun_rx:1,
+			    save_bf:1);
+	u_int		__FXP_BITFIELD6(disc_short_rx:1,
+			    underrun_retry:2,
+			    :2,
+			    ext_rfa:1,				/* 550 */
+			    two_frames:1,			/* 8,9 */
+			    dyn_tbd:1);				/* 8,9 */
+	u_int		__FXP_BITFIELD3(mediatype:1,		/* 7 */
+			    :6,
+			    csma_dis:1);			/* 8,9 */
+	u_int		__FXP_BITFIELD6(tcp_udp_cksum:1,	/* 9 */
+			    :3,
+			    vlan_tco:1,				/* 8,9 */
+			    link_wake_en:1,			/* 8,9 */
+			    arp_wake_en:1,			/* 8 */
+			    mc_wake_en:1);			/* 8 */
+	u_int		__FXP_BITFIELD4(:3,
+			    nsai:1,
+			    preamble_length:2,
+			    loopback:2);
+	u_int		__FXP_BITFIELD2(linear_priority:3,	/* 7 */
+			    :5);
+	u_int		__FXP_BITFIELD3(linear_pri_mode:1,	/* 7 */
+			    :3,
+			    interfrm_spacing:4);
+	u_int		:8;
+	u_int		:8;
+	u_int		__FXP_BITFIELD8(promiscuous:1,
+			    bcast_disable:1,
+			    wait_after_win:1,			/* 8,9 */
+			    :1,
+			    ignore_ul:1,			/* 8,9 */
+			    crc16_en:1,				/* 9 */
+			    :1,
+			    crscdt:1);
+	u_int		fc_delay_lsb:8;				/* 8,9 */
+	u_int		fc_delay_msb:8;				/* 8,9 */
+	u_int		__FXP_BITFIELD6(stripping:1,
+			    padding:1,
+			    rcv_crc_xfer:1,
+			    long_rx_en:1,			/* 8,9 */
+			    pri_fc_thresh:3,			/* 8,9 */
+			    :1);
+	u_int		__FXP_BITFIELD8(ia_wake_en:1,		/* 8 */
+			    magic_pkt_dis:1,			/* 8,9,!9ER */
+			    tx_fc_dis:1,			/* 8,9 */
+			    rx_fc_restop:1,			/* 8,9 */
+			    rx_fc_restart:1,			/* 8,9 */
+			    fc_filter:1,			/* 8,9 */
+			    force_fdx:1,
+			    fdx_pin_en:1);
+	u_int		__FXP_BITFIELD4(:5,
+			    pri_fc_loc:1,			/* 8,9 */
+			    multi_ia:1,
+			    :1);
+	u_int		__FXP_BITFIELD3(:3, mc_all:1, :4);
+
+	/* Bytes 22 - 31 -- i82550 only */
+	u_int		__FXP_BITFIELD3(gamla_rx:1,
+			    vlan_drop_en:1,
+			    :6);
+	u_int8_t	pad[9];
 };
 
 #define MAXMCADDR 80
 struct fxp_cb_mcs {
-	struct fxp_cb_tx *next;
-	struct mbuf *mb_head;
-	volatile u_int16_t cb_status;
-	volatile u_int16_t cb_command;
-	volatile u_int32_t link_addr;
-	volatile u_int16_t mc_cnt;
-	volatile u_int8_t mc_addr[MAXMCADDR][6];
+	u_int16_t cb_status;
+	u_int16_t cb_command;
+	u_int32_t link_addr;
+	u_int16_t mc_cnt;
+	u_int8_t mc_addr[MAXMCADDR][6];
 };
 
 #define MAXUCODESIZE 192
 struct fxp_cb_ucode {
-	void *fill[2];
 	u_int16_t cb_status;
 	u_int16_t cb_command;
 	u_int32_t link_addr;
@@ -231,36 +246,73 @@ struct fxp_cb_ucode {
 };
 
 /*
- * Number of DMA segments in a TxCB. Note that this is carefully
- * chosen to make the total struct size an even power of two. It's
- * critical that no TxCB be split across a page boundry since
- * no attempt is made to allocate physically contiguous memory.
+ * Number of DMA segments in a TxCB.
  */
-#define FXP_TXCB_FIXED  16              /* cb_status .. tbd_number */
-#define FXP_NTXSEG      ((256 - (sizeof(void *) * 2) - FXP_TXCB_FIXED) / 8)
+#define FXP_NTXSEG	32
 
 struct fxp_tbd {
-	volatile u_int32_t tb_addr;
-	volatile u_int32_t tb_size;
+	u_int32_t tb_addr;
+	u_int32_t tb_size;
 };
+
+struct fxp_ipcb {
+	/*
+	 * The following fields are valid only when
+	 * using the IPCB command block for TX checksum offload
+	 * (and TCP large send, VLANs, and (I think) IPsec). To use
+	 * them, you must enable extended TxCBs (available only
+	 * on the 82559 and later) and use the IPCBXMIT command.
+	 * Note that Intel defines the IPCB to be 32 bytes long,
+	 * the last 8 bytes of which comprise the first entry
+	 * in the TBD array (see note below). This means we only
+	 * have to define 8 extra bytes here.
+         */
+	u_int16_t ipcb_schedule_low;
+	u_int8_t ipcb_ip_schedule;
+	u_int8_t ipcb_ip_activation_high;
+	u_int16_t ipcb_vlan_id;
+	u_int8_t ipcb_ip_header_offset;
+	u_int8_t ipcb_tcp_header_offset;
+};
+
 struct fxp_cb_tx {
-	struct fxp_cb_tx *next;
-	struct mbuf *mb_head;
-	volatile u_int16_t cb_status;
-	volatile u_int16_t cb_command;
-	volatile u_int32_t link_addr;
-	volatile u_int32_t tbd_array_addr;
-	volatile u_int16_t byte_count;
-	volatile u_int8_t tx_threshold;
-	volatile u_int8_t tbd_number;
+	u_int16_t cb_status;
+	u_int16_t cb_command;
+	u_int32_t link_addr;
+	u_int32_t tbd_array_addr;
+	u_int16_t byte_count;
+	u_int8_t tx_threshold;
+	u_int8_t tbd_number;
+
 	/*
 	 * The following structure isn't actually part of the TxCB,
 	 * unless the extended TxCB feature is being used.  In this
 	 * case, the first two elements of the structure below are 
 	 * fetched along with the TxCB.
 	 */
-	volatile struct fxp_tbd tbd[FXP_NTXSEG];
+	union {
+		struct fxp_ipcb ipcb;
+		struct fxp_tbd tbd[FXP_NTXSEG];
+	} tx_cb_u;
 };
+
+#define tbd			tx_cb_u.tbd
+#define ipcb_schedule_low	tx_cb_u.ipcb.ipcb_schedule_low
+#define ipcb_ip_schedule	tx_cb_u.ipcb.ipcb_ip_schedule
+#define ipcb_ip_activation_high tx_cb_u.ipcb.ipcb_ip_activation_high
+#define ipcb_vlan_id		tx_cb_u.ipcb.ipcb_vlan_id
+#define ipcb_ip_header_offset	tx_cb_u.ipcb.ipcb_ip_header_offset
+#define ipcb_tcp_header_offset	tx_cb_u.ipcb.ipcb_tcp_header_offset
+
+/*
+ * IPCB field definitions
+ */
+#define FXP_IPCB_IP_CHECKSUM_ENABLE	0x10
+#define FXP_IPCB_TCPUDP_CHECKSUM_ENABLE	0x20
+#define FXP_IPCB_TCP_PACKET		0x40
+#define FXP_IPCB_LARGESEND_ENABLE	0x80
+#define FXP_IPCB_HARDWAREPARSING_ENABLE	0x01
+#define FXP_IPCB_INSERTVLAN_ENABLE	0x02
 
 /*
  * Control Block (CB) definitions
@@ -278,6 +330,9 @@ struct fxp_cb_tx {
 #define FXP_CB_COMMAND_UCODE	0x5
 #define FXP_CB_COMMAND_DUMP	0x6
 #define FXP_CB_COMMAND_DIAG	0x7
+#define FXP_CB_COMMAND_LOADFILT	0x8
+#define FXP_CB_COMMAND_IPCBXMIT 0x9
+
 /* command flags */
 #define FXP_CB_COMMAND_SF	0x0008	/* simple/flexible mode */
 #define FXP_CB_COMMAND_I	0x2000	/* generate interrupt on completion */
@@ -289,15 +344,31 @@ struct fxp_cb_tx {
  */
 
 struct fxp_rfa {
-	volatile u_int16_t rfa_status;
-	volatile u_int16_t rfa_control;
-        volatile u_int8_t link_addr[4];
-        volatile u_int8_t rbd_addr[4];
-	volatile u_int16_t actual_size;
-	volatile u_int16_t size;
-};
+	u_int16_t rfa_status;
+	u_int16_t rfa_control;
+	u_int32_t link_addr;
+	u_int32_t rbd_addr;
+	u_int16_t actual_size;
+	u_int16_t size;
+
+	/*
+	 * The following fields are only available when using
+	 * extended receive mode on an 82550/82551 chipset.
+	 */
+	u_int16_t rfax_vlan_id;
+	u_int8_t rfax_rx_parser_sts;
+	u_int8_t rfax_rsvd0;
+	u_int16_t rfax_security_sts;
+	u_int8_t rfax_csum_sts;
+	u_int8_t rfax_zerocopy_sts;
+	u_int8_t rfax_pad[8];
+} __packed;
+#define FXP_RFAX_LEN 16
+
 #define FXP_RFA_STATUS_RCOL	0x0001	/* receive collision */
 #define FXP_RFA_STATUS_IAMATCH	0x0002	/* 0 = matches station address */
+#define FXP_RFA_STATUS_NOAMATCH	0x0004	/* 1 = doesn't match anything */
+#define FXP_RFA_STATUS_PARSE	0x0008	/* pkt parse ok (82550/1 only) */
 #define FXP_RFA_STATUS_S4	0x0010	/* receive error from PHY */
 #define FXP_RFA_STATUS_TL	0x0020	/* type/length */
 #define FXP_RFA_STATUS_FTS	0x0080	/* frame too short */
@@ -312,27 +383,40 @@ struct fxp_rfa {
 #define FXP_RFA_CONTROL_S	0x4000	/* suspend after reception */
 #define FXP_RFA_CONTROL_EL	0x8000	/* end of list */
 
+/* Bits in the 'csum_sts' byte */
+#define FXP_RFDX_CS_TCPUDP_CSUM_BIT_VALID	0x10
+#define FXP_RFDX_CS_TCPUDP_CSUM_VALID		0x20
+#define FXP_RFDX_CS_IP_CSUM_BIT_VALID		0x01
+#define FXP_RFDX_CS_IP_CSUM_VALID		0x02
+
+/* Bits in the 'packet parser' byte */
+#define FXP_RFDX_P_PARSE_BIT			0x08
+#define FXP_RFDX_P_CSUM_PROTOCOL_MASK		0x03
+#define FXP_RFDX_P_TCP_PACKET			0x00
+#define FXP_RFDX_P_UDP_PACKET			0x01
+#define FXP_RFDX_P_IP_PACKET			0x03
+
 /*
  * Statistics dump area definitions
  */
 struct fxp_stats {
-	volatile u_int32_t tx_good;
-	volatile u_int32_t tx_maxcols;
-	volatile u_int32_t tx_latecols;
-	volatile u_int32_t tx_underruns;
-	volatile u_int32_t tx_lostcrs;
-	volatile u_int32_t tx_deffered;
-	volatile u_int32_t tx_single_collisions;
-	volatile u_int32_t tx_multiple_collisions;
-	volatile u_int32_t tx_total_collisions;
-	volatile u_int32_t rx_good;
-	volatile u_int32_t rx_crc_errors;
-	volatile u_int32_t rx_alignment_errors;
-	volatile u_int32_t rx_rnr_errors;
-	volatile u_int32_t rx_overrun_errors;
-	volatile u_int32_t rx_cdt_errors;
-	volatile u_int32_t rx_shortframes;
-	volatile u_int32_t completion_status;
+	u_int32_t tx_good;
+	u_int32_t tx_maxcols;
+	u_int32_t tx_latecols;
+	u_int32_t tx_underruns;
+	u_int32_t tx_lostcrs;
+	u_int32_t tx_deffered;
+	u_int32_t tx_single_collisions;
+	u_int32_t tx_multiple_collisions;
+	u_int32_t tx_total_collisions;
+	u_int32_t rx_good;
+	u_int32_t rx_crc_errors;
+	u_int32_t rx_alignment_errors;
+	u_int32_t rx_rnr_errors;
+	u_int32_t rx_overrun_errors;
+	u_int32_t rx_cdt_errors;
+	u_int32_t rx_shortframes;
+	u_int32_t completion_status;
 };
 #define FXP_STATS_DUMP_COMPLETE	0xa005
 #define FXP_STATS_DR_COMPLETE	0xa007

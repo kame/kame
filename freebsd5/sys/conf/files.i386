@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.429 2002/11/08 22:33:14 jhb Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.444 2003/04/27 05:40:53 imp Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -128,9 +128,6 @@ dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	vt
 dev/lnc/if_lnc_isa.c		optional	lnc isa
-dev/pst/pst-pci.c		optional	pst pci
-dev/pst/pst-iop.c		optional	pst
-dev/pst/pst-raid.c		optional	pst
 dev/sbni/if_sbni.c		optional	sbni
 dev/sbni/if_sbni_isa.c		optional	sbni isa
 dev/sbni/if_sbni_pci.c		optional	sbni pci
@@ -150,7 +147,9 @@ dev/syscons/scvtb.c		optional	sc
 dev/syscons/syscons.c		optional	sc
 dev/syscons/sysmouse.c		optional	sc
 geom/geom_bsd.c			standard
+geom/geom_bsd_enc.c		standard
 geom/geom_mbr.c			standard
+geom/geom_mbr_enc.c		standard
 gnu/i386/fpemul/div_small.s	optional	gpl_math_emulate \
 	warning "kernel contains GPL contaminated math emulator"
 gnu/i386/fpemul/errors.c	optional	gpl_math_emulate
@@ -192,7 +191,12 @@ acpi_wakecode.h			optional	acpi			\
 	no-obj no-implicit-rule before-depend				\
 	clean		"acpi_wakecode.h acpi_wakecode.o acpi_wakecode.bin"
 #
-i386/apm/apm.c			optional	apm
+i386/bios/apm.c			optional	apm
+i386/bios/mca_machdep.c		optional	mca
+i386/bios/smapi.c		optional	smapi
+i386/bios/smapi_bios.S		optional	smapi
+i386/bios/smbios.c		optional	smbios
+i386/bios/vpd.c			optional	vpd
 i386/i386/atomic.c		standard				\
 	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} ${.IMPSRC}"
 i386/i386/autoconf.c		standard
@@ -214,9 +218,7 @@ i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
 i386/i386/k6_mem.c		standard
 i386/i386/legacy.c		standard
-# locore.s needs to be handled in Makefile to put it first.  Otherwise it's
-# now normal.
-# i386/i386/locore.s		standard
+i386/i386/locore.s		standard	no-obj
 i386/i386/machdep.c		standard
 i386/i386/math_emulate.c	optional	math_emulate
 i386/i386/mem.c			standard
@@ -232,6 +234,7 @@ i386/i386/support.s		standard
 i386/i386/swtch.s		standard
 i386/i386/sys_machdep.c		standard
 i386/i386/trap.c		standard
+i386/i386/tsc.c			standard
 i386/i386/vm86.c		standard
 i386/i386/vm_machdep.c		standard
 i386/ibcs2/ibcs2_errno.c	optional	ibcs2
@@ -267,7 +270,6 @@ i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		count		el
 i386/isa/if_le.c		count		le
 i386/isa/if_rdp.c		count		rdp
-i386/isa/if_wlp.c		optional	wlp
 i386/isa/intr_machdep.c		standard
 i386/isa/ithread.c		standard
 i386/isa/isa.c			optional	isa
@@ -276,7 +278,6 @@ i386/isa/isa_compat.c		optional	isa compat_oldisa	\
 i386/isa/isa_dma.c		optional	isa
 i386/isa/istallion.c		optional	stli nowerror
 i386/isa/loran.c		optional	loran
-i386/isa/mca_machdep.c		optional	mca
 i386/isa/mse.c			optional	mse
 i386/isa/npx.c			optional	npx
 i386/isa/pcaudio.c		optional	pca
@@ -293,7 +294,6 @@ i386/isa/spic.c			optional	spic
 i386/isa/spigot.c		count		spigot
 i386/isa/spkr.c			optional	speaker
 i386/isa/stallion.c		optional	stl nowerror
-i386/isa/tw.c			count		tw
 i386/isa/vesa.c			optional	vga vesa
 i386/isa/wt.c			count		wt
 i386/linux/imgact_linux.c	optional	compat_linux
@@ -408,7 +408,6 @@ isa/syscons_isa.c		optional	sc
 isa/vga_isa.c			optional	vga
 kern/imgact_aout.c		optional	compat_aout
 kern/imgact_gzip.c		optional	gzip
-kern/subr_diskmbr.c		standard
 libkern/divdi3.c		standard
 libkern/moddi3.c		standard
 libkern/qdivrem.c		standard
@@ -416,3 +415,9 @@ libkern/ucmpdi2.c		standard
 libkern/udivdi3.c		standard
 libkern/umoddi3.c		standard
 pci/cy_pci.c			optional	cy pci
+pci/agp_intel.c			optional	agp
+pci/agp_via.c			optional	agp
+pci/agp_sis.c			optional	agp
+pci/agp_ali.c			optional	agp
+pci/agp_amd.c			optional	agp
+pci/agp_i810.c			optional	agp

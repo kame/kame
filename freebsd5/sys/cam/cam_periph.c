@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.c,v 1.43 2002/11/14 05:35:57 imp Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.c,v 1.48 2003/04/06 22:21:03 alc Exp $
  */
 
 #include <sys/param.h>
@@ -534,7 +534,7 @@ cam_periph_unlock(struct cam_periph *periph)
 int
 cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 {
-	int numbufs, i;
+	int numbufs, i, j;
 	int flags[CAM_PERIPH_MAXMAPS];
 	u_int8_t **data_ptrs[CAM_PERIPH_MAXMAPS];
 	u_int32_t lengths[CAM_PERIPH_MAXMAPS];
@@ -605,29 +605,10 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 
 		if (dirs[i] & CAM_DIR_OUT) {
 			flags[i] = BIO_WRITE;
-			if (!useracc(*data_ptrs[i], lengths[i], 
-				     VM_PROT_READ)) {
-				printf("cam_periph_mapmem: error, "
-					"address %p, length %lu isn't "
-					"user accessible for READ\n",
-					(void *)*data_ptrs[i],
-					(u_long)lengths[i]);
-				return(EACCES);
-			}
 		}
 
 		if (dirs[i] & CAM_DIR_IN) {
 			flags[i] = BIO_READ;
-			if (!useracc(*data_ptrs[i], lengths[i], 
-				     VM_PROT_WRITE)) {
-				printf("cam_periph_mapmem: error, "
-					"address %p, length %lu isn't "
-					"user accessible for WRITE\n",
-					(void *)*data_ptrs[i],
-					(u_long)lengths[i]);
-
-				return(EACCES);
-			}
 		}
 
 	}
@@ -659,8 +640,28 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		/* set the direction */
 		mapinfo->bp[i]->b_iocmd = flags[i];
 
-		/* map the buffer into kernel memory */
-		vmapbuf(mapinfo->bp[i]);
+		/*
+		 * Map the buffer into kernel memory.
+		 *
+		 * Note that useracc() alone is not a  sufficient test.
+		 * vmapbuf() can still fail due to a smaller file mapped
+		 * into a larger area of VM, or if userland races against
+		 * vmapbuf() after the useracc() check.
+		 */
+		if (vmapbuf(mapinfo->bp[i]) < 0) {
+			printf("cam_periph_mapmem: error, "
+				"address %p, length %lu isn't "
+				"user accessible any more\n",
+				(void *)*data_ptrs[i],
+				(u_long)lengths[i]);
+			for (j = 0; j < i; ++j) {
+				*data_ptrs[j] = mapinfo->bp[j]->b_saveaddr;
+				mapinfo->bp[j]->b_flags &= ~B_PHYS;
+				relpbuf(mapinfo->bp[j], NULL);
+			}
+			PRELE(curproc);
+			return(EACCES);
+		}
 
 		/* set our pointer to the new mapped area */
 		*data_ptrs[i] = mapinfo->bp[i]->b_data;
@@ -846,7 +847,7 @@ cam_periph_runccb(union ccb *ccb,
 	 * this particular type of ccb, record the transaction start.
 	 */
 	if ((ds != NULL) && (ccb->ccb_h.func_code == XPT_SCSI_IO))
-		devstat_start_transaction(ds);
+		devstat_start_transaction(ds, NULL);
 
 	xpt_action(ccb);
  
@@ -876,7 +877,7 @@ cam_periph_runccb(union ccb *ccb,
 					CAM_DIR_NONE) ?  DEVSTAT_NO_DATA : 
 					(ccb->ccb_h.flags & CAM_DIR_OUT) ?
 					DEVSTAT_WRITE : 
-					DEVSTAT_READ);
+					DEVSTAT_READ, NULL, NULL);
 
 	return(error);
 }

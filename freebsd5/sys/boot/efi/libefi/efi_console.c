@@ -24,10 +24,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/efi/libefi/efi_console.c,v 1.3 2002/12/08 19:46:11 marcel Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/efi_console.c,v 1.4 2003/04/03 21:36:29 obrien Exp $");
 
 #include <efi.h>
 #include <efilib.h>

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.23 2002/03/26 19:46:40 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.24 2003/02/20 20:54:43 phk Exp $ */
 /*
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
@@ -34,6 +34,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/bus.h>
+#include <sys/cons.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
 #include <sys/proc.h>

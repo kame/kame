@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.13 2002/06/24 05:03:44 arr Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.14 2003/03/02 16:54:33 des Exp $
  *
  */
 
@@ -63,7 +63,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.13 2002/06/24 05:03:44 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.14 2003/03/02 16:54:33 des Exp $");
 #endif
 
 /*
@@ -329,7 +329,7 @@ fore_cmd_drain(fup)
 			/*
 			 * Poke whoever is waiting on the stats
 			 */
-			wakeup((caddr_t)&fup->fu_stats);
+			wakeup(&fup->fu_stats);
 			break;
 
 		case CMD_GET_PROM:
@@ -416,7 +416,7 @@ fore_cmd_free(fup)
 				 * Just in case someone is sleeping on this
 				 */
 				fup->fu_stats_ret = EIO;
-				wakeup((caddr_t)&fup->fu_stats);
+				wakeup(&fup->fu_stats);
 				break;
 			}
 

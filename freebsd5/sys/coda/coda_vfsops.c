@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  *  	@(#) src/sys/cfs/coda_vfsops.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_vfsops.c,v 1.41 2002/08/04 10:29:24 jeff Exp $
+ * $FreeBSD: src/sys/coda/coda_vfsops.c,v 1.43 2003/03/07 09:18:15 tjr Exp $
  * 
  */
 
@@ -181,6 +181,7 @@ coda_mount(vfsp, path, data, ndp, td)
     vfs_getnewfsid (vfsp);
 
     mi->mi_vfsp = vfsp;
+    mi->mi_started = 0;			/* XXX See coda_root() */
     
     /*
      * Make a root vnode to placate the Vnode interface, but don't
@@ -301,9 +302,21 @@ coda_root(vfsp, vpp)
     result = NULL;
     
     if (vfsp == mi->mi_vfsp) {
+	/*
+	 * Cache the root across calls. We only need to pass the request
+	 * on to Venus if the root vnode is the dummy we installed in
+	 * coda_mount() with all c_fid members zeroed.
+	 *
+	 * XXX In addition, if we are called between coda_mount() and
+	 * coda_start(), we assume that the request is from vfs_mount()
+	 * (before the call to checkdirs()) and return the dummy root
+	 * node to avoid a deadlock. This bug is fixed in the Coda CVS
+	 * repository but not in any released versions as of 6 Mar 2003.
+	 */
 	if ((VTOC(mi->mi_rootvp)->c_fid.Volume != 0) ||
 	    (VTOC(mi->mi_rootvp)->c_fid.Vnode != 0) ||
-	    (VTOC(mi->mi_rootvp)->c_fid.Unique != 0))
+	    (VTOC(mi->mi_rootvp)->c_fid.Unique != 0) ||
+	    mi->mi_started == 0)
 	    { /* Found valid root. */
 		*vpp = mi->mi_rootvp;
 		/* On Mach, this is vref.  On NetBSD, VOP_LOCK */
@@ -371,6 +384,18 @@ coda_root(vfsp, vpp)
     return(error);
 }
 
+int
+coda_start(mp, flags, td)
+	struct mount *mp;
+	int flags;
+	struct thread *td;
+{
+
+	/* XXX See coda_root(). */
+	vftomi(mp)->mi_started = 1;
+	return (0);
+}
+
 /*
  * Get filesystem statistics.
  */
@@ -405,6 +430,7 @@ coda_nb_statfs(vfsp, sbp, td)
     bcopy((caddr_t)&(vfsp->mnt_stat.f_fsid), (caddr_t)&(sbp->f_fsid), sizeof (fsid_t));
     snprintf(sbp->f_mntonname, sizeof(sbp->f_mntonname), "/coda");
     snprintf(sbp->f_mntfromname, sizeof(sbp->f_mntfromname), "CODA");
+    snprintf(sbp->f_fstypename, sizeof(sbp->f_fstypename), "coda");
 /*  MARK_INT_SAT(CODA_STATFS_STATS); */
     return(0);
 }
@@ -526,7 +552,7 @@ struct mount *devtomp(dev)
 
 struct vfsops coda_vfsops = {
     coda_mount,
-    vfs_stdstart,
+    coda_start,
     coda_unmount,
     coda_root,
     vfs_stdquotactl,

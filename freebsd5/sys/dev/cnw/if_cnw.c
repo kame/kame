@@ -1,5 +1,5 @@
 /*	$NetBSD: if_cnw.c,v 1.15 2000/10/16 10:26:41 itojun Exp $	*/
-/* $FreeBSD: src/sys/dev/cnw/if_cnw.c,v 1.7 2002/11/14 23:54:50 sam Exp $ */
+/* $FreeBSD: src/sys/dev/cnw/if_cnw.c,v 1.11 2003/04/15 06:37:21 mdodd Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -337,7 +337,8 @@ static driver_t cnw_pccard_driver = {
 
 static devclass_t cnw_pccard_devclass;
 
-DRIVER_MODULE(if_cnw, pccard, cnw_pccard_driver, cnw_pccard_devclass, 0, 0);
+DRIVER_MODULE(cnw, pccard, cnw_pccard_driver, cnw_pccard_devclass, 0, 0);
+MODULE_DEPEND(cnw, ether, 1, 1, 1);
 
 #endif /* !defined(__FreeBSD__) */
 
@@ -1578,7 +1579,7 @@ static int cnw_pccard_detach(dev)
 
 	cnw_stop(sc);
 
-	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+	ether_ifdetach(ifp);
 	cnw_free(dev);
 	sc->cnw_gone = 1;
 

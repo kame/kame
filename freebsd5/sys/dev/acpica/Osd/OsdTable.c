@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdTable.c,v 1.2 2002/07/30 19:35:30 iwasaki Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdTable.c,v 1.3 2003/04/29 18:50:34 njl Exp $
  */
 
 /*
@@ -37,6 +37,26 @@
 
 #undef _COMPONENT
 #define _COMPONENT      ACPI_TABLES
+
+static char acpi_os_name[128];
+
+ACPI_STATUS
+AcpiOsPredefinedOverride (
+    const ACPI_PREDEFINED_NAMES *InitVal,
+    ACPI_STRING                 *NewVal)
+{
+    if (InitVal == NULL || NewVal == NULL)
+        return(AE_BAD_PARAMETER);
+
+    *NewVal = NULL;
+    if (strncmp(InitVal->Name, "_OS_", 4) == 0 &&
+      getenv_string("hw.acpi.os_name", acpi_os_name, sizeof(acpi_os_name))) {
+        printf("ACPI: Overriding _OS definition with \"%s\"\n", acpi_os_name);
+        *NewVal = acpi_os_name;
+    }
+
+    return(AE_OK);
+}
 
 ACPI_STATUS
 AcpiOsTableOverride (

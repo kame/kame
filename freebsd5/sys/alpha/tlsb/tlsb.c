@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/tlsb/tlsb.c,v 1.13 2001/05/10 07:08:03 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/tlsb.c,v 1.14 2003/02/25 00:42:40 marcel Exp $ */
 
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob
@@ -35,8 +35,6 @@
  * Autoconfiguration and support routines for the TurboLaser System Bus
  * found on AlphaServer 8200 and 8400 systems.
  */
-
-#include "opt_simos.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -130,19 +128,9 @@ tlsb_probe(device_t dev)
 		/*
 		 * Check for invalid address.
 		 */
-#ifdef SIMOS
-		if (node != 0 && node != 8) {
-			continue;
-		} else if (node == 0) {
-			tldev = TLDEV_DTYPE_SCPU4;
-		} else {
-			tldev = TLDEV_DTYPE_KFTIA;
-		}
-#else
 		if (badaddr(TLSB_NODE_REG_ADDR(node, TLDEV), sizeof(u_int32_t)))
 			continue;
 		tldev = TLSB_GET_NODEREG(node, TLDEV);
-#endif
 		if (tldev == 0) {
 			/* Nothing at this node. */
 			continue;

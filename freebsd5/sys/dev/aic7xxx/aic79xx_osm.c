@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.c#24 $
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.c#26 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.6 2002/11/30 20:04:10 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.12 2003/05/27 04:59:57 scottl Exp $
  */
 
 #include <dev/aic7xxx/aic79xx_osm.h>
@@ -465,6 +465,7 @@ ahd_action(struct cam_sim *sim, union ccb *ccb)
 			hscb->cdb_len = 0;
 			scb->flags |= SCB_DEVICE_RESET;
 			hscb->control |= MK_MESSAGE;
+			hscb->task_management = SIU_TASKMGMT_LUN_RESET;
 			ahd_execute_scb(scb, NULL, 0, 0);
 		} else {
 #ifdef AHD_TARGET_MODE
@@ -488,6 +489,7 @@ ahd_action(struct cam_sim *sim, union ccb *ccb)
 				    ahd_htole16(ccb->csio.tag_id);
 			}
 #endif
+			hscb->task_management = 0;
 			if (ccb->ccb_h.flags & CAM_TAG_ACTION_VALID)
 				hscb->control |= ccb->csio.tag_action;
 			
@@ -1112,8 +1114,11 @@ ahd_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments,
 	 && (ccb->ccb_h.flags & CAM_DIS_DISCONNECT) == 0)
 		scb->hscb->control |= DISCENB;
 
-	if ((tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ) != 0)
+	if ((tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
 		scb->flags |= SCB_PACKETIZED;
+		if (scb->hscb->task_management != 0)
+			scb->hscb->control &= ~MK_MESSAGE;
+	}
 
 	if ((ccb->ccb_h.flags & CAM_NEGOTIATE) != 0
 	 && (tinfo->goal.width != 0
@@ -1183,6 +1188,11 @@ ahd_setup_data(struct ahd_softc *ahd, struct cam_sim *sim,
 			 && (ccb_h->flags & CAM_CDB_PHYS) == 0) {
 				u_long s;
 
+				/*
+				 * Should CAM start to support CDB sizes
+				 * greater than 16 bytes, we could use
+				 * the sense buffer to store the CDB.
+				 */
 				ahd_set_transaction_status(scb,
 							   CAM_REQ_INVALID);
 				ahd_lock(ahd, &s);
@@ -1192,8 +1202,11 @@ ahd_setup_data(struct ahd_softc *ahd, struct cam_sim *sim,
 				return;
 			}
 			if ((ccb_h->flags & CAM_CDB_PHYS) != 0) {
-				hscb->shared_data.idata.cdbptr =
+				hscb->shared_data.idata.cdb_from_host.cdbptr =
 				   ahd_htole64((uintptr_t)csio->cdb_io.cdb_ptr);
+				hscb->shared_data.idata.cdb_from_host.cdblen =
+				   csio->cdb_len;
+				hscb->cdb_len |= SCB_CDB_LEN_PTR;
 			} else {
 				memcpy(hscb->shared_data.idata.cdb, 
 				       csio->cdb_io.cdb_ptr,
@@ -1252,7 +1265,8 @@ ahd_setup_data(struct ahd_softc *ahd, struct cam_sim *sim,
 					panic("ahd_setup_data - Transfer size "
 					      "larger than can device max");
 
-				seg.ds_addr = (bus_addr_t)csio->data_ptr;
+				seg.ds_addr =
+				    (bus_addr_t)(vm_offset_t)csio->data_ptr;
 				seg.ds_len = csio->dxfer_len;
 				ahd_execute_scb(scb, &seg, 1, 0);
 			}

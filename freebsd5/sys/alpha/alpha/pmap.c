@@ -43,7 +43,7 @@
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
  *	from:	i386 Id: pmap.c,v 1.193 1998/04/19 15:22:48 bde Exp
  *		with some ideas from NetBSD's alpha pmap
- * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.114 2002/11/18 01:36:09 alc Exp $
+ * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.122 2003/04/10 18:42:06 jhb Exp $
  */
 
 /*
@@ -304,8 +304,6 @@ vm_offset_t avail_end;		/* PA of last available physical page */
 vm_offset_t virtual_avail;	/* VA of first avail page (after kernel bss) */
 vm_offset_t virtual_end;	/* VA of last avail page (end of kernel AS) */
 static boolean_t pmap_initialized = FALSE;	/* Has pmap_init completed? */
-
-static vm_object_t kptobj;
 
 static int nklev3, nklev2;
 vm_offset_t kernel_vm_end;
@@ -582,16 +580,21 @@ uma_small_alloc(uma_zone_t zone, int bytes, u_int8_t *flags, int wait)
 	if (wait & M_ZERO)
 		pflags |= VM_ALLOC_ZERO;
 
-	m = vm_page_alloc(NULL, color++, pflags | VM_ALLOC_NOOBJ);
-
-	if (m) {
-		va = (void *)ALPHA_PHYS_TO_K0SEG(m->phys_addr);
-		if ((m->flags & PG_ZERO) == 0)
-			bzero(va, PAGE_SIZE);
-		return (va);
+	for (;;) {
+		m = vm_page_alloc(NULL, color++, pflags | VM_ALLOC_NOOBJ);
+		if (m == NULL) {
+			if (wait & M_NOWAIT)
+				return (NULL);
+			else
+				VM_WAIT;
+		} else
+			break;
 	}
 
-	return (NULL);	
+	va = (void *)ALPHA_PHYS_TO_K0SEG(m->phys_addr);
+	if ((m->flags & PG_ZERO) == 0)
+		bzero(va, PAGE_SIZE);
+	return (va);
 }
 
 void
@@ -630,7 +633,6 @@ pmap_init(phys_start, phys_end)
 		m = &vm_page_array[i];
 		TAILQ_INIT(&m->md.pv_list);
 		m->md.pv_list_count = 0;
-		m->md.pv_flags = 0;
  	}
 
 	/*
@@ -642,10 +644,6 @@ pmap_init(phys_start, phys_end)
 	pvzone = uma_zcreate("PV ENTRY", sizeof (struct pv_entry), NULL, NULL,
 	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_VM);
 	uma_prealloc(pvzone, initial_pvs);
-	/*
-	 * object for kernel page table pages
-	 */
-	kptobj = vm_object_allocate(OBJT_DEFAULT, NKLEV3MAPS + NKLEV2MAPS);
 
 	/*
 	 * Now it is safe to enable pv_table recording.
@@ -1011,9 +1009,11 @@ pmap_new_thread(struct thread *td, int pages)
 		if (oldpte) 
 			pmap_invalidate_page(kernel_pmap, ks + i * PAGE_SIZE);
 
+		vm_page_lock_queues();
 		vm_page_wakeup(m);
 		vm_page_flag_clear(m, PG_ZERO);
 		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_unlock_queues();
 	}
 }
 
@@ -1040,10 +1040,10 @@ pmap_dispose_thread(td)
 		m = vm_page_lookup(ksobj, i);
 		if (m == NULL)
 			panic("pmap_dispose_thread: kstack already missing?");
-		vm_page_busy(m);
 		ptek[i] = 0;
 		pmap_invalidate_page(kernel_pmap, ks + i * PAGE_SIZE);
 		vm_page_lock_queues();
+		vm_page_busy(m);
 		vm_page_unwire(m, 0);
 		vm_page_free(m);
 		vm_page_unlock_queues();
@@ -1174,8 +1174,8 @@ static int
 _pmap_unwire_pte_hold(pmap_t pmap, vm_offset_t va, vm_page_t m)
 {
 
-	while (vm_page_sleep_busy(m, FALSE, "pmuwpt"))
-		;
+	while (vm_page_sleep_if_busy(m, FALSE, "pmuwpt"))
+		vm_page_lock_queues();
 
 	if (m->hold_count == 0) {
 		vm_offset_t pteva;
@@ -1199,8 +1199,10 @@ _pmap_unwire_pte_hold(pmap_t pmap, vm_offset_t va, vm_page_t m)
 		if (m->pindex < NUSERLEV3MAPS) {
 			/* unhold the level 2 page table */
 			vm_page_t lev2pg;
-			lev2pg = pmap_page_lookup(pmap->pm_pteobj,
+			lev2pg = vm_page_lookup(pmap->pm_pteobj,
 						  NUSERLEV3MAPS + pmap_lev1_index(va));
+			while (vm_page_sleep_if_busy(lev2pg, FALSE, "pulook"))
+				vm_page_lock_queues();
 			vm_page_unhold(lev2pg);
 			if (lev2pg->hold_count == 0)
 				_pmap_unwire_pte_hold(pmap, va, lev2pg);
@@ -1257,7 +1259,9 @@ pmap_unuse_pt(pmap_t pmap, vm_offset_t va, vm_page_t mpte)
 			(pmap->pm_ptphint->pindex == ptepindex)) {
 			mpte = pmap->pm_ptphint;
 		} else {
-			mpte = pmap_page_lookup(pmap->pm_pteobj, ptepindex);
+			while ((mpte = vm_page_lookup(pmap->pm_pteobj, ptepindex)) != NULL &&
+			       vm_page_sleep_if_busy(mpte, FALSE, "pulook"))
+				vm_page_lock_queues();
 			pmap->pm_ptphint = mpte;
 		}
 	}
@@ -1305,13 +1309,12 @@ pmap_pinit(pmap)
 	 * allocate the page directory page
 	 */
 	lev1pg = vm_page_grab(pmap->pm_pteobj, NUSERLEV3MAPS + NUSERLEV2MAPS,
-			      VM_ALLOC_NORMAL | VM_ALLOC_RETRY);
+	    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
 
-	lev1pg->wire_count = 1;
-	++cnt.v_wire_count;
-
+	vm_page_lock_queues();
 	vm_page_flag_clear(lev1pg, PG_BUSY);
 	lev1pg->valid = VM_PAGE_BITS_ALL;
+	vm_page_unlock_queues();
 
 	pmap->pm_lev1 = (pt_entry_t*) ALPHA_PHYS_TO_K0SEG(VM_PAGE_TO_PHYS(lev1pg));
 	if ((lev1pg->flags & PG_ZERO) == 0)
@@ -1433,14 +1436,10 @@ _pmap_allocpte(pmap, ptepindex)
 	 * Find or fabricate a new pagetable page
 	 */
 	m = vm_page_grab(pmap->pm_pteobj, ptepindex,
-			VM_ALLOC_ZERO | VM_ALLOC_RETRY);
+	    VM_ALLOC_WIRED | VM_ALLOC_ZERO | VM_ALLOC_RETRY);
 
 	KASSERT(m->queue == PQ_NONE,
 		("_pmap_allocpte: %p->queue != PQ_NONE", m));
-
-	if (m->wire_count == 0)
-		cnt.v_wire_count++;
-	m->wire_count++;
 
 	/*
 	 * Increment the hold count for the page table page
@@ -1485,9 +1484,11 @@ _pmap_allocpte(pmap, ptepindex)
 	if ((m->flags & PG_ZERO) == 0)
 		bzero((caddr_t) ALPHA_PHYS_TO_K0SEG(ptepa), PAGE_SIZE);
 
+	vm_page_lock_queues();
 	m->valid = VM_PAGE_BITS_ALL;
 	vm_page_flag_clear(m, PG_ZERO);
 	vm_page_wakeup(m);
+	vm_page_unlock_queues();
 
 	return m;
 }
@@ -1638,8 +1639,8 @@ pmap_growkernel(vm_offset_t addr)
 		if (!pmap_pte_v(pte)) {
 			int pindex = NKLEV3MAPS + pmap_lev1_index(kernel_vm_end) - K1SEGLEV1I;
 
-			nkpg = vm_page_alloc(kptobj, pindex,
-			    VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED);
+			nkpg = vm_page_alloc(NULL, pindex,
+			    VM_ALLOC_NOOBJ | VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED);
 			if (!nkpg)
 				panic("pmap_growkernel: no memory to grow kernel");
 			printf("pmap_growkernel: growing to %lx\n", addr);
@@ -1673,8 +1674,8 @@ pmap_growkernel(vm_offset_t addr)
 		/*
 		 * This index is bogus, but out of the way
 		 */
-		nkpg = vm_page_alloc(kptobj, nklev3,
-		    VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED);
+		nkpg = vm_page_alloc(NULL, nklev3,
+		    VM_ALLOC_NOOBJ | VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED);
 		if (!nkpg)
 			panic("pmap_growkernel: no memory to grow kernel");
 
@@ -2134,7 +2135,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 */
 	if (opa) {
 		int err;
+		vm_page_lock_queues();
 		err = pmap_remove_pte(pmap, pte, va);
+		vm_page_unlock_queues();
 		if (err)
 			panic("pmap_enter: pte vanished, va: 0x%lx", va);
 	}
@@ -2259,8 +2262,11 @@ retry:
 	 */
 	pte = vtopte(va);
 	if (*pte) {
-		if (mpte)
+		if (mpte != NULL) {
+			vm_page_lock_queues();
 			pmap_unwire_pte_hold(pmap, va, mpte);
+			vm_page_unlock_queues();
+		}
 		alpha_pal_imb();		/* XXX overkill? */
 		return 0;
 	}
@@ -2800,13 +2806,6 @@ pmap_page_protect(vm_page_t m, vm_prot_t prot)
 	}
 }
 
-vm_offset_t
-pmap_phys_address(ppn)
-	int ppn;
-{
-	return (alpha_ptob(ppn));
-}
-
 /*
  *	pmap_ts_referenced:
  *
@@ -2899,19 +2898,6 @@ pmap_clear_modify(vm_page_t m)
 			pmap_invalidate_page(pv->pv_pmap, pv->pv_va);
 		}
 	}
-}
-
-/*
- *	pmap_page_is_free:
- *
- *	Called when a page is freed to allow pmap to clean up
- *	any extra state associated with the page.  In this case
- *	clear modified/referenced bits.
- */
-void
-pmap_page_is_free(vm_page_t m)
-{
-	m->md.pv_flags = 0;
 }
 
 /*

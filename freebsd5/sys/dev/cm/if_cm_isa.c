@@ -1,5 +1,5 @@
 /*	$NetBSD: if_bah_zbus.c,v 1.6 2000/01/23 21:06:12 aymeric Exp $ */
-/*	$FreeBSD: src/sys/dev/cm/if_cm_isa.c,v 1.2 2002/03/20 02:04:09 alfred Exp $ */
+/*	$FreeBSD: src/sys/dev/cm/if_cm_isa.c,v 1.3 2003/04/15 06:37:21 mdodd Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -132,4 +132,5 @@ static driver_t cm_isa_driver = {
 	sizeof(struct cm_softc)
 };
 
-DRIVER_MODULE(if_cm, isa, cm_isa_driver, cm_devclass, 0, 0);
+DRIVER_MODULE(cm, isa, cm_isa_driver, cm_devclass, 0, 0);
+MODULE_DEPEND(cm, isa, 1, 1, 1);

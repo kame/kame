@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_command.c,v 1.46 2002/10/01 21:59:46 phk Exp $
+ * $FreeBSD: src/sys/ddb/db_command.c,v 1.48 2003/02/16 19:22:21 phk Exp $
  */
 
 /*
@@ -383,9 +383,7 @@ static struct command db_show_cmds[] = {
 	{ "all",	0,			0,	db_show_all_cmds },
 	{ "registers",	db_show_regs,		0,	0 },
 	{ "breaks",	db_listbreak_cmd, 	0,	0 },
-#if 0
 	{ "thread",	db_show_one_thread,	0,	0 },
-#endif
 #if 0
 	{ "port",	ipc_port_print,		0,	0 },
 #endif
@@ -552,7 +550,7 @@ db_fncall(dummy1, dummy2, dummy3, dummy4)
 
 /* Enter GDB remote protocol debugger on the next trap. */
 
-dev_t	   gdbdev = NODEV;
+void	  *gdb_arg = NULL;
 cn_getc_t *gdb_getc;
 cn_putc_t *gdb_putc;
 
@@ -564,7 +562,7 @@ db_gdb (dummy1, dummy2, dummy3, dummy4)
 	char *		dummy4;
 {
 
-	if (gdbdev == NODEV) {
+	if (gdb_arg == NULL) {
 		db_printf("No gdb port enabled. Set flag 0x80 on desired port\n");
 		db_printf("in your configuration file (currently sio only).\n");
 		return;

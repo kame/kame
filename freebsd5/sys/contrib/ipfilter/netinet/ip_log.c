@@ -4,7 +4,7 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: ip_log.c,v 2.5.2.1 2000/07/19 13:11:47 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_log.c,v 1.23 2002/04/27 16:56:25 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_log.c,v 1.24 2003/02/15 06:23:45 darrenr Exp $
  */
 #include <sys/param.h>
 #if defined(KERNEL) && !defined(_KERNEL)
@@ -105,6 +105,9 @@
 # include <netinet/tcp.h>
 # include <netinet/udp.h>
 # include <netinet/ip_icmp.h>
+# ifdef USE_INET6
+#  include <netinet/icmp6.h>
+# endif
 # include <netinet/ip_var.h>
 # ifndef _KERNEL
 #  include <syslog.h>
@@ -217,6 +220,26 @@ mb_t *m;
 				break;
 			}
 		}
+#ifdef USE_INET6
+		else if (p == IPPROTO_ICMPV6) {
+			struct icmp6_hdr *icmp;
+
+			icmp = (struct icmp6_hdr *)fin->fin_dp;
+	 
+			/*
+			 * For ICMPV6, if the packet is an error packet, also
+			 * include the information about the packet which
+			 * caused the error.
+			 */
+			if (icmp->icmp6_type < 128) {
+				hlen += MIN(sizeof(struct icmp6_hdr) + 8,
+					    fin->fin_dlen);
+			} else {
+				hlen += MIN(sizeof(struct icmp6_hdr),
+					    fin->fin_dlen);
+			}
+		}
+#endif
 	}
 	/*
 	 * Get the interface number and name to which this packet is
@@ -340,10 +363,10 @@ int *types, cnt;
 	ipl->ipl_dsize = len;
 # ifdef _KERNEL
 #  if SOLARIS || defined(sun)
-	uniqtime((struct timeval *)&ipl->ipl_sec);
+	uniqtime(&ipl->ipl_tv);
 #  else
 #   if BSD >= 199306 || defined(__FreeBSD__) || defined(__sgi)
-	microtime((struct timeval *)&ipl->ipl_sec);
+	microtime(&ipl->ipl_tv);
 #   endif
 #  endif
 # else

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.40 2002/07/31 19:37:02 jhb Exp $
+ * $FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.41 2003/02/17 09:55:08 julian Exp $
  */
 
 #include <sys/param.h>
@@ -78,13 +78,12 @@ ASSYM(MTX_RECURSE, offsetof(struct mtx, mtx_recurse));
 ASSYM(MTX_UNOWNED, MTX_UNOWNED);
 
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
-ASSYM(TD_KSE, offsetof(struct thread, td_kse));
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 
-ASSYM(KE_FLAGS, offsetof(struct kse, ke_flags));
+ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 
-ASSYM(KEF_ASTPENDING, KEF_ASTPENDING);
-ASSYM(KEF_NEEDRESCHED, KEF_NEEDRESCHED);
+ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
+ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 
 ASSYM(TD_MD_FLAGS, offsetof(struct thread, td_md.md_flags));
 ASSYM(TD_MD_PCBPADDR, offsetof(struct thread, td_md.md_pcbpaddr));

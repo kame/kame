@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_pass.c,v 1.34 2002/08/15 20:54:03 njl Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_pass.c,v 1.37 2003/03/08 21:41:54 phk Exp $
  */
 
 #include <sys/param.h>
@@ -72,13 +72,9 @@ struct pass_softc {
 	pass_flags		flags;
 	u_int8_t		pd_type;
 	union ccb		saved_ccb;
-	struct devstat		device_stats;
+	struct devstat		*device_stats;
 	dev_t			dev;
 };
-
-#ifndef MIN
-#define MIN(x,y) ((x<y) ? x : y)
-#endif
 
 #define PASS_CDEV_MAJOR 31
 
@@ -109,19 +105,11 @@ static struct periph_driver passdriver =
 PERIPHDRIVER_DECLARE(pass, passdriver);
 
 static struct cdevsw pass_cdevsw = {
-	/* open */	passopen,
-	/* close */	passclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	passioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"pass",
-	/* maj */	PASS_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	passopen,
+	.d_close =	passclose,
+	.d_ioctl =	passioctl,
+	.d_name =	"pass",
+	.d_maj =	PASS_CDEV_MAJOR,
 };
 
 static void
@@ -198,7 +186,7 @@ passcleanup(struct cam_periph *periph)
 
 	softc = (struct pass_softc *)periph->softc;
 
-	devstat_remove_entry(&softc->device_stats);
+	devstat_remove_entry(softc->device_stats);
 
 	destroy_dev(softc->dev);
 
@@ -296,7 +284,7 @@ passregister(struct cam_periph *periph, void *arg)
 	 * it even has a blocksize.
 	 */
 	no_tags = (cgd->inq_data.flags & SID_CmdQue) == 0;
-	devstat_add_entry(&softc->device_stats, "pass", periph->unit_number, 0,
+	softc->device_stats = devstat_new_entry("pass", periph->unit_number, 0,
 			  DEVSTAT_NO_BLOCKSIZE
 			  | (no_tags ? DEVSTAT_NO_ORDERED_TAGS : 0),
 			  softc->pd_type |
@@ -608,7 +596,7 @@ passsendccb(struct cam_periph *periph, union ccb *ccb, union ccb *inccb)
 				  passerror : NULL,
 				  /* cam_flags */ CAM_RETRY_SELTO,
 				  /* sense_flags */SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	if (need_unmap != 0)
 		cam_periph_unmapmem(ccb, &mapinfo);

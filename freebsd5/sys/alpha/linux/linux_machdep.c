@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.24 2002/10/02 14:30:14 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.30 2003/04/22 18:23:47 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -35,6 +35,7 @@
 #include <sys/mount.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/unistd.h>
 #include <sys/user.h>
@@ -129,12 +130,11 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 	struct proc *p2;
 	struct thread *td2;
 	int exit_signal;
-	vm_offset_t start;
 
 #ifdef DEBUG
 	if (ldebug(clone)) {
-		printf(ARGS(clone, "flags %x, stack %x"), 
-		    (unsigned int)args->flags, (unsigned int)args->stack);
+		printf(ARGS(clone, "flags %x, stack %p"),
+		    (unsigned int)args->flags, args->stack);
 		if (args->flags & CLONE_PID)
 		    printf(LMSG("CLONE_PID not yet supported"));
 	}
@@ -158,10 +158,8 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 	if (!(args->flags & CLONE_FILES))
 		ff |= RFFDG;
 
-	error = 0;
-	start = 0;
-
-	if ((error = fork1(td, ff, 0, &p2)) != 0)
+	error = fork1(td, ff, 0, &p2);
+	if (error)
 		return (error);
 
 	PROC_LOCK(p2);
@@ -181,7 +179,7 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 	 */
 	mtx_lock_spin(&sched_lock);
 	TD_SET_CAN_RUN(td2);
-	setrunqueue(FIRST_THREAD_IN_PROC(p2));
+	setrunqueue(td2);
 	mtx_unlock_spin(&sched_lock);
 
 	td->td_retval[0] = p2->p_pid;
@@ -208,7 +206,7 @@ linux_mmap(struct thread *td, struct linux_mmap_args *linux_args)
 
 #ifdef DEBUG
 	if (ldebug(mmap))
-		printf(ARGS(mmap, "%p, 0x%lx, 0x%x, 0x%x, 0x%x, 0x%lx"),
+		printf(ARGS(mmap, "%p, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx"),
 		    (void *)linux_args->addr, linux_args->len,
 		    linux_args->prot, linux_args->flags, linux_args->fd,
 		    linux_args->pos);
@@ -281,7 +279,7 @@ linux_mmap(struct thread *td, struct linux_mmap_args *linux_args)
 	bsd_args.pad = 0;
 #ifdef DEBUG
 	if (ldebug(mmap))
-		printf(ARGS(mmap, "%p, 0x%lx, 0x%x, 0x%x, 0x%x, 0x%lx)",
+		printf(ARGS(mmap, "%p, 0x%lx, 0x%x, 0x%x, 0x%x, 0x%lx"),
 		    (void *)bsd_args.addr,
 		    bsd_args.len,
 		    bsd_args.prot,
@@ -294,7 +292,7 @@ linux_mmap(struct thread *td, struct linux_mmap_args *linux_args)
 	error = mmap(td, &bsd_args);
 #ifdef DEBUG
 	if (ldebug(mmap))
-		printf(LMSG("mmap returns %d, 0x%lx", error, td->td_retval[0]);
+		printf(LMSG("mmap returns %d, 0x%lx"), error, td->td_retval[0]);
 #endif
 	return (error);
 }
@@ -306,15 +304,11 @@ linux_rt_sigsuspend(td, uap)
 {
 	int error;
 	l_sigset_t lmask;
-	sigset_t *bmask;
-	struct sigsuspend_args bsd;
-	caddr_t sg;
-
-	sg = stackgap_init();
+	sigset_t bmask;
 
 #ifdef DEBUG
 	if (ldebug(rt_sigsuspend))
-		printf(ARGS(rt_sigsuspend, "%p, %d"),
+		printf(ARGS(rt_sigsuspend, "%p, %zd"),
 		    (void *)uap->newset, uap->sigsetsize);
 #endif
 	if (uap->sigsetsize != sizeof(l_sigset_t))
@@ -324,10 +318,8 @@ linux_rt_sigsuspend(td, uap)
 	if (error)
 		return (error);
 
-	bmask = stackgap_alloc(&sg, sizeof(sigset_t));
-	linux_to_bsd_sigset(&lmask, bmask);
-	bsd.sigmask = bmask;
-	return (sigsuspend(td, &bsd));
+	linux_to_bsd_sigset(&lmask, &bmask);
+	return (kern_sigsuspend(td, bmask));
 }
 
 int
@@ -338,7 +330,7 @@ linux_mprotect(td, uap)
 
 #ifdef DEBUG
 	if (ldebug(mprotect))
-		printf(ARGS(mprotect, "%p, 0x%lx, 0x%x)",
+		printf(ARGS(mprotect, "%p, 0x%zx, 0x%lx"),
 		    (void *)uap->addr, uap->len, uap->prot);
 #endif
 	return (mprotect(td, (void *)uap));
@@ -352,7 +344,7 @@ linux_munmap(td, uap)
 
 #ifdef DEBUG
 	if (ldebug(munmap))
-		printf(ARGS(munmap, "%p, 0x%lx",
+		printf(ARGS(munmap, "%p, 0x%lx"),
 		    (void *)uap->addr, uap->len);
 #endif
 	return (munmap(td, (void *)uap));
@@ -387,7 +379,7 @@ linux_setrlimit(td, uap)
 		return EINVAL;
 
 	if ((error =
-	   copyin((caddr_t)uap->rlim, (caddr_t)&rlim, sizeof (struct rlimit))))
+	   copyin(uap->rlim, &rlim, sizeof (struct rlimit))))
 		return (error);
 	return dosetrlimit(td,  which, &rlim);
 }
@@ -412,6 +404,6 @@ linux_getrlimit(td, uap)
 	if (which == -1)
 		return EINVAL;
 
-	return (copyout((caddr_t)&td->td_proc->p_rlimit[which],
-	    (caddr_t)uap->rlim, sizeof (struct rlimit)));
+	return (copyout(&td->td_proc->p_rlimit[which],
+	    uap->rlim, sizeof (struct rlimit)));
 }

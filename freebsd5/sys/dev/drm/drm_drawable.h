@@ -28,25 +28,24 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_drawable.h,v 1.1 2002/04/27 20:47:57 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_drawable.h,v 1.2 2003/03/09 02:08:28 anholt Exp $
  */
 
-#define __NO_VERSION__
 #include "dev/drm/drmP.h"
 
-int DRM(adddraw)( DRM_OS_IOCTL )
+int DRM(adddraw)( DRM_IOCTL_ARGS )
 {
 	drm_draw_t draw;
 
 	draw.handle = 0;	/* NOOP */
 	DRM_DEBUG("%d\n", draw.handle);
 	
-	DRM_OS_KRNTOUSR( (drm_draw_t *)data, draw, sizeof(draw) );
+	DRM_COPY_TO_USER_IOCTL( (drm_draw_t *)data, draw, sizeof(draw) );
 
 	return 0;
 }
 
-int DRM(rmdraw)( DRM_OS_IOCTL )
+int DRM(rmdraw)( DRM_IOCTL_ARGS )
 {
 	return 0;		/* NOOP */
 }

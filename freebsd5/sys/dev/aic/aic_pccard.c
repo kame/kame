@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aic/aic_pccard.c,v 1.9 2002/11/14 05:08:22 imp Exp $
+ * $FreeBSD: src/sys/dev/aic/aic_pccard.c,v 1.10 2003/04/10 04:36:01 imp Exp $
  */
 
 #include <sys/param.h>
@@ -113,7 +113,8 @@ aic_pccard_match(device_t dev)
 
 	if ((pp = pccard_product_lookup(dev, aic_pccard_products,
 	    sizeof(aic_pccard_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->pp_name);
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
 		return 0;
 	}
 	return EIO;

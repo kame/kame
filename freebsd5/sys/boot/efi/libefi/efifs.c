@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/efi/libefi/efifs.c,v 1.6 2002/04/11 09:50:11 peter Exp $
+ * $FreeBSD: src/sys/boot/efi/libefi/efifs.c,v 1.7 2003/02/26 09:13:05 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -35,6 +35,9 @@
 #include <efi.h>
 #include <efilib.h>
 #include "efiboot.h"
+
+/* Perform I/O in blocks of size EFI_BLOCK_SIZE. */
+#define	EFI_BLOCK_SIZE	(1024 * 1024)
 
 static int
 efifs_open(const char *upath, struct open_file *f)
@@ -123,8 +126,8 @@ efifs_read(struct open_file *f, void *buf, size_t size, size_t *resid)
 	bufp = buf;
 	while (size > 0) {
 		sz = size;
-		if (sz > 8192)
-			sz = 8192;
+		if (sz > EFI_BLOCK_SIZE)
+			sz = EFI_BLOCK_SIZE;
 		status = file->Read(file, &sz, bufp);
 		twiddle();
 		if (EFI_ERROR(status))
@@ -150,8 +153,8 @@ efifs_write(struct open_file *f, void *buf, size_t size, size_t *resid)
 	bufp = buf;
 	while (size > 0) {
 		sz = size;
-		if (sz > 8192)
-			sz = 8192;
+		if (sz > EFI_BLOCK_SIZE)
+			sz = EFI_BLOCK_SIZE;
 		status = file->Write(file, &sz, bufp);
 		twiddle();
 		if (EFI_ERROR(status))

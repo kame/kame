@@ -17,12 +17,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/sparc64/boot1/boot1.c,v 1.14 2002/06/05 12:12:25 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/sparc64/boot1/boot1.c,v 1.16 2003/04/16 21:09:41 phk Exp $");
 
 #include <sys/param.h>
-#include <sys/reboot.h>
-#include <sys/diskslice.h>
-#include <sys/disklabel.h>
 #include <sys/dirent.h>
 #include <machine/elf.h>
 #include <machine/stdarg.h>

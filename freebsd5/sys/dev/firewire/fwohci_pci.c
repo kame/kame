@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
  *
@@ -30,8 +31,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohci_pci.c,v 1.6.2.2 2003/01/07 13:43:50 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohci_pci.c,v 1.22 2003/04/24 07:29:52 simokawa Exp $
  */
+
+#define BOUNCE_BUFFER_TEST	0
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,6 +44,7 @@
 #include <sys/queue.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
+#include <sys/malloc.h>
 #include <machine/resource.h>
 
 #include <pci/pcivar.h>
@@ -49,6 +53,7 @@
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/firewirereg.h>
 
+#include <dev/firewire/fwdma.h>
 #include <dev/firewire/fwohcireg.h>
 #include <dev/firewire/fwohcivar.h>
 
@@ -64,9 +69,21 @@ fwohci_pci_probe( device_t dev )
 #if 1
 	u_int32_t id;
 
-	id = (pci_get_vendor(dev) << 16) | pci_get_device(dev);
+	id = pci_get_devid(dev);
 	if (id == (FW_VENDORID_NEC | FW_DEVICE_UPD861)) {
 		device_set_desc(dev, "NEC uPD72861");
+		return 0;
+	}
+	if (id == (FW_VENDORID_NEC | FW_DEVICE_UPD871)) {
+		device_set_desc(dev, "NEC uPD72871/2");
+		return 0;
+	}
+	if (id == (FW_VENDORID_NEC | FW_DEVICE_UPD72870)) {
+		device_set_desc(dev, "NEC uPD72870");
+		return 0;
+	}
+	if (id == (FW_VENDORID_NEC | FW_DEVICE_UPD72874)) {
+		device_set_desc(dev, "NEC uPD72874");
 		return 0;
 	}
 	if (id == (FW_VENDORID_TI | FW_DEVICE_TITSB22)) {
@@ -89,6 +106,10 @@ fwohci_pci_probe( device_t dev )
 		device_set_desc(dev, "Texas Instruments TSB43AB22/A");
 		return 0;
 	}
+	if (id == (FW_VENDORID_TI | FW_DEVICE_TITSB43AB23)) {
+		device_set_desc(dev, "Texas Instruments TSB43AB23");
+		return 0;
+	}
 	if (id == (FW_VENDORID_TI | FW_DEVICE_TIPCI4450)) {
 		device_set_desc(dev, "Texas Instruments PCI4450");
 		return 0;
@@ -97,12 +118,20 @@ fwohci_pci_probe( device_t dev )
 		device_set_desc(dev, "Texas Instruments PCI4410A");
 		return 0;
 	}
+	if (id == (FW_VENDORID_TI | FW_DEVICE_TIPCI4451)) {
+		device_set_desc(dev, "Texas Instruments PCI4451");
+		return 0;
+	}
 	if (id == (FW_VENDORID_SONY | FW_DEVICE_CX3022)) {
-		device_set_desc(dev, "SONY CX3022");
+		device_set_desc(dev, "Sony CX3022");
 		return 0;
 	}
 	if (id == (FW_VENDORID_VIA | FW_DEVICE_VT6306)) {
 		device_set_desc(dev, "VIA VT6306");
+		return 0;
+	}
+	if (id == (FW_VENDORID_RICOH | FW_DEVICE_R5C551)) {
+		device_set_desc(dev, "Ricoh R5C551");
 		return 0;
 	}
 	if (id == (FW_VENDORID_RICOH | FW_DEVICE_R5C552)) {
@@ -145,32 +174,37 @@ fwohci_dummy_intr(void *arg)
 static int
 fwohci_pci_init(device_t self)
 {
-	int latency, cache_line;
+	int olatency, latency, ocache_line, cache_line;
 	u_int16_t cmd;
 
 	cmd = pci_read_config(self, PCIR_COMMAND, 2);
-	cmd |= PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN | PCIM_CMD_MWRICEN;
+	cmd |= PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN | PCIM_CMD_MWRICEN |
+		PCIM_CMD_SERRESPEN | PCIM_CMD_PERRESPEN;
+#if 1
+	cmd &= ~PCIM_CMD_MWRICEN; 
+#endif
 	pci_write_config(self, PCIR_COMMAND, cmd, 2);
 
-	latency = pci_read_config(self, PCIR_LATTIMER, 1);
-#define DEF_LATENCY 250 /* Derived from Max Bulk Transfer size 512 Bytes*/
-	if( latency < DEF_LATENCY ) {
+	latency = olatency = pci_read_config(self, PCIR_LATTIMER, 1);
+#define DEF_LATENCY 0x20
+	if (olatency < DEF_LATENCY) {
 		latency = DEF_LATENCY;
-		device_printf(self, "PCI bus latency was changing to");
-		pci_write_config(self, PCIR_LATTIMER,latency, 1);
-	} else
-	 {
-		device_printf(self, "PCI bus latency is");
+		pci_write_config(self, PCIR_LATTIMER, latency, 1);
 	}
-	printf(" %d.\n", (int) latency);
-	cache_line = pci_read_config(self, PCIR_CACHELNSZ, 1);
-#if 0
-#define DEF_CACHE_LINE 0xc
-	cache_line = DEF_CACHE_LINE;
-	pci_write_config(self, PCIR_CACHELNSZ, cache_line, 1);
-#endif
-	if (bootverbose)
-		device_printf(self, "cache size %d.\n", (int) cache_line);
+
+	cache_line = ocache_line = pci_read_config(self, PCIR_CACHELNSZ, 1);
+#define DEF_CACHE_LINE 8
+	if (ocache_line < DEF_CACHE_LINE) {
+		cache_line = DEF_CACHE_LINE;
+		pci_write_config(self, PCIR_CACHELNSZ, cache_line, 1);
+	}
+
+	if (firewire_debug) {
+		device_printf(self, "latency timer %d -> %d.\n",
+			olatency, latency);
+		device_printf(self, "cache size %d -> %d.\n",
+			ocache_line, cache_line);
+	}
 
 	return 0;
 }
@@ -180,7 +214,7 @@ fwohci_pci_attach(device_t self)
 {
 	fwohci_softc_t *sc = device_get_softc(self);
 	int err;
-	int rid;
+	int rid, s;
 #if __FreeBSD_version < 500000
 	int intr;
 	/* For the moment, put in a message stating what is wrong */
@@ -190,11 +224,11 @@ fwohci_pci_attach(device_t self)
 #ifdef __i386__
 		device_printf(self, "Please switch PNP-OS to 'No' in BIOS\n");
 #endif
-#if 0
-		return ENXIO;
-#endif
 	}
 #endif
+
+	if (bootverbose)
+		firewire_debug = bootverbose;
 
 	fwohci_pci_init(self);
 
@@ -226,7 +260,12 @@ fwohci_pci_attach(device_t self)
 	}
 	device_set_ivars(sc->fc.bdev, sc);
 
-	err = bus_setup_intr(self, sc->irq_res, INTR_TYPE_NET,
+	err = bus_setup_intr(self, sc->irq_res,
+#if FWOHCI_TASKQUEUE
+			INTR_TYPE_NET | INTR_MPSAFE,
+#else
+			INTR_TYPE_NET,
+#endif
 		     (driver_intr_t *) fwohci_intr, sc, &sc->ih);
 #if __FreeBSD_version < 500000
 	/* XXX splcam() should mask this irq for sbp.c*/
@@ -237,6 +276,26 @@ fwohci_pci_attach(device_t self)
 		device_printf(self, "Could not setup irq, %d\n", err);
 		fwohci_pci_detach(self);
 		return ENXIO;
+	}
+
+	err = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
+				/*boundary*/0,
+#if BOUNCE_BUFFER_TEST
+				/*lowaddr*/BUS_SPACE_MAXADDR_24BIT,
+#else
+				/*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
+#endif
+				/*highaddr*/BUS_SPACE_MAXADDR,
+				/*filter*/NULL, /*filterarg*/NULL,
+				/*maxsize*/0x100000,
+				/*nsegments*/0x20,
+				/*maxsegsz*/0x8000,
+				/*flags*/BUS_DMA_ALLOCNOW,
+				&sc->fc.dmat);
+	if (err != 0) {
+		printf("fwohci_pci_attach: Could not allocate DMA tag "
+			"- error %d\n", err);
+			return (ENOMEM);
 	}
 
 	err = fwohci_init(sc, self);
@@ -250,6 +309,14 @@ fwohci_pci_attach(device_t self)
 		return EIO;
 	}
 
+	/* XXX
+	 * Clear the bus reset event flag to start transactions even when
+	 * interrupt is disabled during the boot process.
+	 */
+	s = splfw();
+	fwohci_intr((void *)sc);
+	splx(s);
+
 	return 0;
 }
 
@@ -262,7 +329,7 @@ fwohci_pci_detach(device_t self)
 
 	s = splfw();
 
-	fwohci_shutdown(sc, self);
+	fwohci_stop(sc, self);
 	bus_generic_detach(self);
 
 	/* disable interrupts that might have been switched on */
@@ -314,7 +381,7 @@ fwohci_pci_suspend(device_t dev)
 	err = bus_generic_suspend(dev);
 	if (err)
 		return err;
-	/* fwohci_shutdown(dev); */
+	/* fwohci_stop(dev); */
 	return 0;
 }
 
@@ -335,7 +402,8 @@ fwohci_pci_shutdown(device_t dev)
 {
 	fwohci_softc_t *sc = device_get_softc(dev);
 
-	fwohci_shutdown(sc, dev);
+	bus_generic_shutdown(dev);
+	fwohci_stop(sc, dev);
 	return 0;
 }
 

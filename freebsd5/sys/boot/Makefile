@@ -1,7 +1,14 @@
-# $FreeBSD: src/sys/boot/Makefile,v 1.14 2002/07/07 18:10:38 jake Exp $
+# $FreeBSD: src/sys/boot/Makefile,v 1.16 2003/04/30 22:13:36 peter Exp $
 
+.if ${MACHINE_ARCH} == "amd64"
+MACHINE_ARCH=i386
+MACHINE=i386
+.endif
+
+.if !defined(NOFORTH)
 # Build the add-in FORTH interpreter
 SUBDIR+=		ficl
+.endif
 
 # Build OpenFirmware library
 .if ${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "sparc64"

@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_symbol.c#23 $
+ * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_symbol.c#24 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.c,v 1.22 2002/11/27 07:06:43 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.c,v 1.23 2003/01/20 18:01:37 gibbs Exp $
  */
 
 #include <sys/types.h>
@@ -546,7 +546,7 @@ symtable_dump(FILE *ofile, FILE *dfile)
 				if (num_entries == 0)
 					aic_print_reg_dump_start(dfile,
 								 curnode);
-				else
+				else if (dfile != NULL)
 					fputs(",\n", dfile);
 				num_entries++;
 				aic_print_reg_dump_entry(dfile, fieldnode);

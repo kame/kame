@@ -1,13 +1,13 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.13 2002/08/29 02:02:28 peter Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.14 2003/05/01 13:17:06 nyan Exp $
 #
 LIB=			pc98
 INTERNALLIB=		true
 
 .PATH:	${.CURDIR}/../../i386/libi386
 
-SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
-	biospci.c bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \
-	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
+SRCS=	bioscd.c biosdisk.c biosmem.c biospnp.c biospci.c biossmap.c \
+	bootinfo.c bootinfo32.c comconsole.c devicename.c elf32_freebsd.c \
+	gatea20.c i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
 	time.c vidconsole.c
 
 CFLAGS+=	-ffreestanding

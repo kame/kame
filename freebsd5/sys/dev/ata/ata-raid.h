@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2000 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-raid.h,v 1.19 2002/09/23 18:54:29 alfred Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-raid.h,v 1.24 2003/05/04 16:17:54 sos Exp $
  */
 
 /* misc defines */
@@ -35,7 +35,7 @@
 #define AR_READ		0x01
 #define AR_WRITE	0x02
 #define AR_WAIT		0x04
-#define AR_STRATEGY(x)	(x)->bio_dev->si_disk->d_devsw->d_strategy((x))
+#define AR_STRATEGY(x)	(x)->bio_disk->d_strategy((x))
 #define AD_SOFTC(x)	((struct ad_softc *)(x.device->driver))
 #define ATA_MAGIC	"FreeBSD ATA driver RAID "
 
@@ -64,6 +64,7 @@ struct ar_softc {
 #define AR_F_PROMISE_RAID	0x1000
 #define AR_F_HIGHPOINT_RAID	0x2000
 #define AR_F_FREEBSD_RAID	0x4000
+#define AR_F_TOGGLE		0x8000
     
     int			total_disks;	/* number of disks in this array */
     int			generation;	/* generation of this array */
@@ -80,7 +81,6 @@ struct ar_softc {
     u_int64_t		lock_end;	/* end of locked area for rebuild */
     struct disk		disk;		/* disklabel/slice stuff */
     struct proc		*pid;		/* rebuilder process id */
-    dev_t		dev;		/* device place holder */
 };
 
 struct ar_buf {
@@ -222,11 +222,11 @@ struct promise_raid_conf {
     u_int32_t		checksum;
 } __packed;
 
-int ata_raiddisk_probe(struct ad_softc *);
 int ata_raiddisk_attach(struct ad_softc *);
 int ata_raiddisk_detach(struct ad_softc *);
 void ata_raid_attach(void);
 int ata_raid_create(struct raid_setup *);
 int ata_raid_delete(int);
-int ata_raid_status(int array, struct raid_status *);
+int ata_raid_status(int, struct raid_status *);
+int ata_raid_addspare(int, int);
 int ata_raid_rebuild(int);

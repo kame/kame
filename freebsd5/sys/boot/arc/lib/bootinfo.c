@@ -23,13 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/arc/lib/bootinfo.c,v 1.4 2001/02/18 10:25:41 asmodai Exp $
+ * $FreeBSD: src/sys/boot/arc/lib/bootinfo.c,v 1.5 2003/04/04 16:35:14 phk Exp $
  */
 
 #include <stand.h>
 #include <string.h>
 #include <sys/param.h>
-#include <sys/reboot.h>
 #include <sys/linker.h>
 #include <machine/elf.h>
 #include <machine/prom.h>

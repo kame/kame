@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/contrib/dev/oltr/if_oltr.c,v 1.21 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/contrib/dev/oltr/if_oltr.c,v 1.28 2003/03/16 00:24:18 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -92,7 +92,6 @@
 
 #define PCI_VENDOR_OLICOM 0x108D
 
-#define MIN(A,B) (((A) < (B)) ? (A) : (B))
 #define MIN3(A,B,C) (MIN(A, (MIN(B, C))))
 
 char *AdapterName[] = {
@@ -258,6 +257,8 @@ static driver_t oltr_driver = {
 static devclass_t oltr_devclass;
 
 DRIVER_MODULE(oltr, pci, oltr_driver, oltr_devclass, 0, 0);
+MODULE_DEPEND(oltr, pci, 1, 1, 1);
+MODULE_DEPEND(oltr, iso88025, 1, 1, 1);
 
 static int
 oltr_pci_probe(device_t dev)
@@ -390,11 +391,11 @@ oltr_pci_attach(device_t dev)
 	ifp->if_softc	= sc;
 	ifp->if_unit	= device_get_unit(dev);
 	ifp->if_name	= "oltr";
-	ifp->if_output	= iso88025_output;
 	ifp->if_init	= oltr_init;
 	ifp->if_start	= oltr_start;
 	ifp->if_ioctl	= oltr_ioctl;
 	ifp->if_flags	= IFF_BROADCAST;
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 	bcopy(sc->config.macaddress, sc->arpcom.ac_enaddr, sizeof(sc->config.macaddress));
 
 	/*
@@ -424,13 +425,7 @@ oltr_pci_attach(device_t dev)
 	/*
 	 * Attach the interface
 	 */
-	if_attach(ifp);
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
-	iso88025_ifattach(ifp);
-
-#if (NBPFILTER > 0) || (__FreeBSD_version > 400000)
-	bpfattach(ifp, DLT_IEEE802, sizeof(struct iso88025_header));
-#endif
+	iso88025_ifattach(ifp, ISO88025_BPF_SUPPORTED);
 
 	splx(s);
 	return(0);
@@ -452,7 +447,7 @@ oltr_pci_detach(device_t dev)
 
 	s = splimp();
 
-	if_detach(ifp);
+	iso88025_ifdetach(ifp, ISO88025_BPF_SUPPORTED);
 	if (sc->state > OL_CLOSED)
 		oltr_stop(sc);
 
@@ -670,10 +665,6 @@ oltr_pci_attach(pcici_t config_id, int unit)
 	if_attach(ifp);
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 	iso88025_ifattach(ifp);
-
-#if (NBPFILTER > 0) || (__FreeBSD_version > 400000)
-	bpfattach(ifp, DLT_IEEE802, sizeof(struct iso88025_header));
-#endif
 
 	splx(s);
 	return;
@@ -1398,8 +1389,7 @@ DriverReceiveFrameCompleted(void *DriverHandle, int ByteCount, int FragmentCount
 	struct oltr_softc 	*sc = (struct oltr_softc *)DriverHandle;
 	struct ifnet		*ifp = (struct ifnet *)&sc->arpcom.ac_if;
 	struct mbuf		*m0, *m1, *m;
-	struct iso88025_header	*th;
-	int			frame_len = ByteCount, hdr_len, i = (int)FragmentHandle, rc, s;
+	int			frame_len = ByteCount, i = (int)FragmentHandle, rc, s;
 	int			mbuf_offset, mbuf_size, frag_offset, copy_length;
 	char			*fragment = sc->rx_ring[RING_BUFFER(i)].data;
 	
@@ -1424,8 +1414,6 @@ DriverReceiveFrameCompleted(void *DriverHandle, int ByteCount, int FragmentCount
 			m0->m_pkthdr.len = ByteCount;
 			m0->m_len = 0;
 			m0->m_data += 2;
-			th = mtod(m0, struct iso88025_header *);
-			m0->m_pkthdr.header = (void *)th;
 
 			m = m0;
 			mbuf_offset = 0;
@@ -1470,32 +1458,9 @@ DriverReceiveFrameCompleted(void *DriverHandle, int ByteCount, int FragmentCount
 					m->m_len = 0;
 				}
 			}
-#if (NBPFILTER > 0) || (__FreeBSD_version > 400000)
-			BPF_MTAP(ifp, m0);
-#endif
-
-			/*if (ifp->if_flags & IFF_PROMISC) {*/
-				if (bcmp(th->iso88025_dhost, etherbroadcastaddr
-				    , sizeof(th->iso88025_dhost))) {
-					if ((bcmp(th->iso88025_dhost + 1, sc->arpcom.ac_enaddr + 1, ISO88025_ADDR_LEN - 1)) ||
-					    ((th->iso88025_dhost[0] & 0x7f) != sc->arpcom.ac_enaddr[0])) {
-						m_freem(m0);
-						goto dropped;
-					}
-				}
-			/*}*/
 			ifp->if_ipackets++;
 
-			hdr_len = ISO88025_HDR_LEN;
-			if (th->iso88025_shost[0] & 0x80)
-				hdr_len += (ntohs(th->rcf) & 0x1f00) >> 8;
-
-			m0->m_pkthdr.len -= hdr_len;
-			m0->m_len -= hdr_len;
-			m0->m_data += hdr_len;
-
-			iso88025_input(ifp, th, m0);
-
+			iso88025_input(ifp, m0);
 		} else {	/* Receiver error */
 			if (ReceiveStatus != TRLLD_RCV_NO_DATA) {
 				printf("oltr%d: receive error %d\n", sc->unit,

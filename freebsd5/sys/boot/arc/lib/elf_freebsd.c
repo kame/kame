@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/boot/arc/lib/elf_freebsd.c,v 1.3 2000/05/01 17:41:20 bp Exp $ */
+/* $FreeBSD: src/sys/boot/arc/lib/elf_freebsd.c,v 1.4 2003/05/01 03:56:29 peter Exp $ */
 /* $NetBSD: loadfile.c,v 1.10 1998/06/25 06:45:46 ross Exp $ */
 
 /*-
@@ -90,16 +90,16 @@
 
 #define _KERNEL
 
-static int	elf_exec(struct preloaded_file *amp);
+static int	elf64_exec(struct preloaded_file *amp);
 int		bi_load(struct bootinfo_v1 *, vm_offset_t *,
 			struct preloaded_file *);
 
-struct file_format alpha_elf = { elf_loadfile, elf_exec };
+struct file_format alpha_elf = { elf64_loadfile, elf64_exec };
 
 vm_offset_t ffp_save, ptbr_save;
 
 static int
-elf_exec(struct preloaded_file *fp)
+elf64_exec(struct preloaded_file *fp)
 {
 #if 0
     static struct bootinfo_v1	bootinfo_v1;

@@ -23,12 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/arc/lib/devicename.c,v 1.2 1999/08/28 00:39:38 peter Exp $
+ * $FreeBSD: src/sys/boot/arc/lib/devicename.c,v 1.3 2003/04/16 21:09:41 phk Exp $
  */
 
 #include <stand.h>
 #include <string.h>
-#include <sys/disklabel.h>
 #include "bootstrap.h"
 #include "libarc.h"
 

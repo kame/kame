@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/alpha/include/bus.h,v 1.15 2002/11/08 20:49:43 jhb Exp $ */
+/* $FreeBSD: src/sys/alpha/include/bus.h,v 1.21 2003/05/30 20:40:32 hmp Exp $ */
 
 #ifndef _ALPHA_BUS_H_
 #define _ALPHA_BUS_H_
@@ -82,7 +82,7 @@ typedef u_int32_t		bus_space_handle_t;
 
 #define BUS_SPACE_MAXSIZE_24BIT	0xFFFFFF
 #define BUS_SPACE_MAXSIZE_32BIT 0xFFFFFFFF
-#define BUS_SPACE_MAXSIZE	(64 * 1024) /* Maximum supported size */
+#define BUS_SPACE_MAXSIZE	0xFFFFFFFFFFFFFFFF
 #define BUS_SPACE_MAXADDR_24BIT	0xFFFFFF
 #define BUS_SPACE_MAXADDR_32BIT 0xFFFFFFFF
 /* The largest address space known so far is 40 bits */
@@ -469,7 +469,7 @@ void busspace_generic_barrier(struct alpha_busspace *space,
 #define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
 #define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMAMEM_NOSYNC	0x04	/* map memory to not require sync */
+#define	BUS_DMA_COHERENT	0x04	/* hint: map memory in a coherent way */
 #define	BUS_DMA_ISA		0x10	/* map memory for ISA dma */
 #define	BUS_DMA_BUS2		0x20	/* placeholders for bus functions... */
 #define	BUS_DMA_BUS3		0x40
@@ -480,16 +480,13 @@ struct mbuf;
 struct uio;
 
 /*
- *	bus_dmasync_op_t
- *
  *	Operations performed by bus_dmamap_sync().
  */
-typedef enum {
-	BUS_DMASYNC_PREREAD,
-	BUS_DMASYNC_POSTREAD,
-	BUS_DMASYNC_PREWRITE,
-	BUS_DMASYNC_POSTWRITE
-} bus_dmasync_op_t;
+typedef int bus_dmasync_op_t;
+#define	BUS_DMASYNC_PREREAD	1
+#define	BUS_DMASYNC_POSTREAD	2
+#define	BUS_DMASYNC_PREWRITE	4
+#define	BUS_DMASYNC_POSTWRITE	8
 
 /*
  *	bus_dma_tag_t

@@ -31,10 +31,8 @@
  *	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/efi/loader/conf.c,v 1.7 2002/07/20 03:46:43 peter Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/loader/conf.c,v 1.9 2003/04/03 21:36:29 obrien Exp $");
 
 #include <stand.h>
 #include <efi.h>
@@ -62,7 +60,7 @@ struct fs_ops *file_system[] = {
 	&efi_fsops,
 /*	&ufs_fsops, */
 	&nfs_fsops,
-	&zipfs_fsops,
+	&gzipfs_fsops,
 	NULL
 };
 

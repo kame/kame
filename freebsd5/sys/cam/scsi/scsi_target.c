@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.46 2002/11/25 19:28:05 njl Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.53 2003/03/03 16:24:43 phk Exp $
  */
 
 #include <sys/param.h>
@@ -105,20 +105,15 @@ static struct filterops targread_filtops =
 
 #define TARG_CDEV_MAJOR 65
 static struct cdevsw targ_cdevsw = {
-	/* open */	targopen,
-	/* close */	targclose,
-	/* read */	targread,
-	/* write */	targwrite,
-	/* ioctl */	targioctl,
-	/* poll */	targpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"targ",
-	/* maj */	TARG_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_KQFILTER,
-	/* kqfilter */	targkqfilter
+	.d_open =	targopen,
+	.d_close =	targclose,
+	.d_read =	targread,
+	.d_write =	targwrite,
+	.d_ioctl =	targioctl,
+	.d_poll =	targpoll,
+	.d_name =	"targ",
+	.d_maj =	TARG_CDEV_MAJOR,
+	.d_kqfilter =	targkqfilter
 };
 
 static cam_status	targendislun(struct cam_path *path, int enable,
@@ -214,7 +209,7 @@ targclose(dev_t dev, int flag, int fmt, struct thread *td)
 	softc = (struct targ_softc *)dev->si_drv1;
 	TARG_LOCK(softc);
 	error = targdisable(softc);
-	if (error == 0) {
+	if (error == CAM_REQ_CMP) {
 		dev->si_drv1 = 0;
 		mtx_lock(&targ_mtx);
 		if (softc->periph != NULL) {
@@ -1031,7 +1026,6 @@ targinit(void)
 {
 	mtx_init(&targ_mtx, "targ global", NULL, MTX_DEF);
 	EVENTHANDLER_REGISTER(dev_clone, targclone, 0, 1000);
-	cdevsw_add(&targ_cdevsw);
 }
 
 static void

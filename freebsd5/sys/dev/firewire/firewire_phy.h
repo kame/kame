@@ -30,7 +30,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/firewire_phy.h,v 1.1 2002/09/13 12:31:56 ikob Exp $
+ * $FreeBSD: src/sys/dev/firewire/firewire_phy.h,v 1.2 2003/04/17 03:38:02 simokawa Exp $
  *
  */
 
@@ -83,5 +83,3 @@
 
 #define FW_PHY_EDEL_REG			0x03
 #define FW_PHY_EDEL			15<<0
-
-

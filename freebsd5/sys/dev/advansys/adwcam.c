@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.11 2001/03/01 17:08:55 markm Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.15 2003/05/27 04:59:56 scottl Exp $
  */
 /*
  * Ported from:
@@ -71,8 +71,6 @@
 /* Definitions for our use of the SIM private CCB area */
 #define ccb_acb_ptr spriv_ptr0
 #define ccb_adw_ptr spriv_ptr1
-
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 u_long adw_unit;
 
@@ -1031,30 +1029,40 @@ adw_init(struct adw_softc *adw)
 	printf("%s: SCSI ID %d, ", adw_name(adw), adw->initiator_id);
 
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(adw->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/ADW_SGSIZE,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/BUS_DMA_ALLOCNOW,
-			       &adw->buffer_dmat) != 0) {
+	if (bus_dma_tag_create(
+			/* parent	*/ adw->parent_dmat,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ BUS_SPACE_MAXADDR_32BIT,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ MAXBSIZE,
+			/* nsegments	*/ ADW_SGSIZE,
+			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* flags	*/ BUS_DMA_ALLOCNOW,
+			&adw->buffer_dmat) != 0) {
 		return (ENOMEM);
 	}
 
 	adw->init_level++;
 
 	/* DMA tag for our ccb carrier structures */
-	if (bus_dma_tag_create(adw->parent_dmat, /*alignment*/0x10,
-			       /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       (adw->max_acbs + ADW_NUM_CARRIER_QUEUES + 1)
-				* sizeof(struct adw_carrier),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &adw->carrier_dmat) != 0) {
+	if (bus_dma_tag_create(
+			/* parent	*/ adw->parent_dmat,
+			/* alignment	*/ 0x10,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ BUS_SPACE_MAXADDR_32BIT,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ (adw->max_acbs +
+					    ADW_NUM_CARRIER_QUEUES + 1) *
+					    sizeof(struct adw_carrier),
+			/* nsegments	*/ 1,
+			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* flags	*/ 0,
+			&adw->carrier_dmat) != 0) {
 		return (ENOMEM);
         }
 
@@ -1101,14 +1109,19 @@ adw_init(struct adw_softc *adw)
 	adw->init_level++;
 
 	/* DMA tag for our acb structures */
-	if (bus_dma_tag_create(adw->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       adw->max_acbs * sizeof(struct acb),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &adw->acb_dmat) != 0) {
+	if (bus_dma_tag_create(
+			/* parent	*/ adw->parent_dmat,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ BUS_SPACE_MAXADDR,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ adw->max_acbs * sizeof(struct acb),
+			/* nsegments	*/ 1,
+			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* flags	*/ 0,
+			&adw->acb_dmat) != 0) {
 		return (ENOMEM);
         }
 
@@ -1131,13 +1144,19 @@ adw_init(struct adw_softc *adw)
 	bzero(adw->acbs, adw->max_acbs * sizeof(struct acb)); 
 
 	/* DMA tag for our S/G structures.  We allocate in page sized chunks */
-	if (bus_dma_tag_create(adw->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       PAGE_SIZE, /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &adw->sg_dmat) != 0) {
+	if (bus_dma_tag_create(
+			/* parent	*/ adw->parent_dmat,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ BUS_SPACE_MAXADDR,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ PAGE_SIZE,
+			/* nsegments	*/ 1,
+			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* flags	*/ 0,
+			&adw->sg_dmat) != 0) {
 		return (ENOMEM);
         }
 

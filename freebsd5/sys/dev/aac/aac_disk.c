@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.24 2002/09/20 19:35:55 phk Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.31 2003/03/08 08:01:27 phk Exp $
  */
 
 #include "opt_aac.h"
@@ -36,10 +36,8 @@
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 
-#include <dev/aac/aac_compat.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
 #include <sys/disk.h>
 
 #include <vm/vm.h>
@@ -63,37 +61,12 @@ static int aac_disk_detach(device_t dev);
 /*
  * Interface to the device switch.
  */
-static	d_open_t	aac_disk_open;
-static	d_close_t	aac_disk_close;
-static	d_strategy_t	aac_disk_strategy;
-static	d_dump_t	aac_disk_dump;
-
-#define AAC_DISK_CDEV_MAJOR	151
-
-static struct cdevsw aac_disk_cdevsw = {
-	/* open */		aac_disk_open,
-	/* close */		aac_disk_close,
-	/* read */		physread,
-	/* write */		physwrite,
-	/* ioctl */		noioctl,
-	/* poll */		nopoll,
-	/* mmap */		nommap,
-	/* strategy */		aac_disk_strategy,
-	/* name */ 		"aacd",
-	/* maj */		AAC_DISK_CDEV_MAJOR,
-	/* dump */		aac_disk_dump,
-	/* psize */ 		nopsize,
-	/* flags */		D_DISK,
-#if __FreeBSD_version < 500005
-	/* bmaj */		-1
-#endif
-};
+static	disk_open_t	aac_disk_open;
+static	disk_close_t	aac_disk_close;
+static	disk_strategy_t	aac_disk_strategy;
+static	dumper_t	aac_disk_dump;
 
 static devclass_t	aac_disk_devclass;
-static struct cdevsw	aac_disk_disk_cdevsw;
-#ifdef FREEBSD_4
-static int		disks_registered = 0;
-#endif
 
 static device_method_t aac_disk_methods[] = {
 	DEVMETHOD(device_probe,	aac_disk_probe),
@@ -127,25 +100,25 @@ SYSCTL_UINT(_hw_aac, OID_AUTO, iosize_max, CTLFLAG_RD, &aac_iosize_max, 0,
  * basic device geometry paramters.
  */
 static int
-aac_disk_open(dev_t dev, int flags, int fmt, d_thread_t *td)
+aac_disk_open(struct disk *dp)
 {
 	struct aac_disk	*sc;
 
 	debug_called(4);
 
-	sc = (struct aac_disk *)dev->si_drv1;
+	sc = (struct aac_disk *)dp->d_drv1;
 	
-	if (sc == NULL)
+	if (sc == NULL) {
+		printf("aac_disk_open: No Softc\n");
 		return (ENXIO);
+	}
 
 	/* check that the controller is up and running */
-	if (sc->ad_controller->aac_state & AAC_STATE_SUSPEND)
+	if (sc->ad_controller->aac_state & AAC_STATE_SUSPEND) {
+		printf("Controller Suspended controller state = 0x%x\n",
+		       sc->ad_controller->aac_state);
 		return(ENXIO);
-
-	sc->ad_disk.d_sectorsize = AAC_BLOCK_SIZE;
-	sc->ad_disk.d_mediasize = (off_t)sc->ad_size * AAC_BLOCK_SIZE;
-	sc->ad_disk.d_fwsectors = sc->ad_sectors;
-	sc->ad_disk.d_fwheads = sc->ad_heads;
+	}
 
 	sc->ad_flags |= AAC_DISK_OPEN;
 	return (0);
@@ -155,13 +128,13 @@ aac_disk_open(dev_t dev, int flags, int fmt, d_thread_t *td)
  * Handle last close of the disk device.
  */
 static int
-aac_disk_close(dev_t dev, int flags, int fmt, d_thread_t *td)
+aac_disk_close(struct disk *dp)
 {
 	struct aac_disk	*sc;
 
 	debug_called(4);
 
-	sc = (struct aac_disk *)dev->si_drv1;
+	sc = (struct aac_disk *)dp->d_drv1;
 	
 	if (sc == NULL)
 		return (ENXIO);
@@ -180,7 +153,7 @@ aac_disk_strategy(struct bio *bp)
 
 	debug_called(4);
 
-	sc = (struct aac_disk *)bp->bio_dev->si_drv1;
+	sc = (struct aac_disk *)bp->bio_disk->d_drv1;
 
 	/* bogus disk? */
 	if (sc == NULL) {
@@ -198,10 +171,12 @@ aac_disk_strategy(struct bio *bp)
 	}
 
 	/* perform accounting */
-	devstat_start_transaction(&sc->ad_stats);
 
 	/* pass the bio to the controller - it can work out who we are */
+	AAC_LOCK_ACQUIRE(&sc->ad_controller->aac_io_lock);
 	aac_submit_bio(bp);
+	AAC_LOCK_RELEASE(&sc->ad_controller->aac_io_lock);
+
 	return;
 }
 
@@ -236,7 +211,7 @@ aac_dump_map_sg(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
  * Send out one command at a time with up to AAC_MAXIO of data.
  */
 static int
-aac_disk_dump(dev_t dev, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+aac_disk_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
 {
 	struct aac_disk *ad;
 	struct aac_softc *sc;
@@ -246,8 +221,10 @@ aac_disk_dump(dev_t dev, void *virtual, vm_offset_t physical, off_t offset, size
 	int size;
 	static bus_dmamap_t dump_datamap;
 	static int first = 0;
+	struct disk *dp;
 
-	ad = dev->si_drv1;
+	dp = arg;
+	ad = dp->d_drv1;
 
 	if (ad == NULL)
 		return (EINVAL);
@@ -301,22 +278,11 @@ aac_biodone(struct bio *bp)
 
 	debug_called(4);
 
-	sc = (struct aac_disk *)bp->bio_dev->si_drv1;
+	sc = (struct aac_disk *)bp->bio_disk->d_drv1;
 
-	devstat_end_transaction_bio(&sc->ad_stats, bp);
-	if (bp->bio_flags & BIO_ERROR) {
-#if __FreeBSD_version > 500039
+	if (bp->bio_flags & BIO_ERROR)
 		disk_err(bp, "hard error", -1, 1);
-#elif __FreeBSD_version > 500005
-		int blkno;
-		blkno = (sc->ad_label.d_nsectors) ? 0 : -1;
-		diskerr(bp, (char *)bp->bio_driver1, blkno, &sc->ad_label);
-#else
-		int blkno;
-		blkno = (sc->ad_label.d_nsectors) ? 0 : -1;
-		diskerr(bp, (char *)bp->bio_driver1, 0, blkno, &sc->ad_label);
-#endif
-	}
+
 	biodone(bp);
 }
 
@@ -371,21 +337,20 @@ aac_disk_attach(device_t dev)
 		      sc->ad_size / ((1024 * 1024) / AAC_BLOCK_SIZE),
 		      sc->ad_size);
 
-	devstat_add_entry(&sc->ad_stats, "aacd", device_get_unit(dev),
-			  AAC_BLOCK_SIZE, DEVSTAT_NO_ORDERED_TAGS,
-			  DEVSTAT_TYPE_STORARRAY | DEVSTAT_TYPE_IF_OTHER, 
-			  DEVSTAT_PRIORITY_ARRAY);
-
 	/* attach a generic disk device to ourselves */
-	sc->ad_dev_t = disk_create(device_get_unit(dev), &sc->ad_disk, 0,
-				   &aac_disk_cdevsw, &aac_disk_disk_cdevsw);
-	sc->ad_dev_t->si_drv1 = sc;
-#ifdef FREEBSD_4
-	disks_registered++;
-#endif
-
-	sc->ad_dev_t->si_iosize_max = aac_iosize_max;
 	sc->unit = device_get_unit(dev);
+	sc->ad_disk.d_drv1 = sc;
+	sc->ad_disk.d_name = "aacd";
+	sc->ad_disk.d_maxsize = aac_iosize_max;
+	sc->ad_disk.d_open = aac_disk_open;
+	sc->ad_disk.d_close = aac_disk_close;
+	sc->ad_disk.d_strategy = aac_disk_strategy;
+	sc->ad_disk.d_dump = aac_disk_dump;
+	sc->ad_disk.d_sectorsize = AAC_BLOCK_SIZE;
+	sc->ad_disk.d_mediasize = (off_t)sc->ad_size * AAC_BLOCK_SIZE;
+	sc->ad_disk.d_fwsectors = sc->ad_sectors;
+	sc->ad_disk.d_fwheads = sc->ad_heads;
+	disk_create(sc->unit, &sc->ad_disk, DISKFLAG_NOGIANT, NULL, NULL);
 
 	return (0);
 }
@@ -405,12 +370,7 @@ aac_disk_detach(device_t dev)
 	if (sc->ad_flags & AAC_DISK_OPEN)
 		return(EBUSY);
 
-	devstat_remove_entry(&sc->ad_stats);
-	disk_destroy(sc->ad_dev_t);
-#ifdef FREEBSD_4
-	if (--disks_registered == 0)
-		cdevsw_remove(&aac_disk_cdevsw);
-#endif
+	disk_destroy(&sc->ad_disk);
 
 	return(0);
 }

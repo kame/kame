@@ -1,8 +1,8 @@
-# $FreeBSD: src/sys/conf/options.powerpc,v 1.5 2002/11/18 06:17:07 jmallett Exp $
+# $FreeBSD: src/sys/conf/options.powerpc,v 1.7 2003/04/12 09:40:37 des Exp $
 # Options specific to the powerpc platform kernels
 
-MPC750			opt_global.h
-IPKDB			opt_ipkdb.h
+OEA			opt_global.h
+IPKDB
 
 POWERMAC		opt_platform.h
-PSIM			opt_psim.h
+PSIM

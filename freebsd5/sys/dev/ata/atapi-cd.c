@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.127.2.1 2002/12/17 20:49:17 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.137 2003/04/01 15:06:23 phk Exp $
  */
 
 #include "opt_ata.h"
@@ -37,7 +37,6 @@
 #include <sys/proc.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
-#include <sys/disklabel.h>
 #include <sys/devicestat.h>
 #include <sys/cdio.h>
 #include <sys/cdrio.h>
@@ -56,19 +55,15 @@ static d_close_t	acdclose;
 static d_ioctl_t	acdioctl;
 static d_strategy_t	acdstrategy;
 static struct cdevsw acd_cdevsw = {
-	/* open */	acdopen,
-	/* close */	acdclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	acdioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	acdstrategy,
-	/* name */	"acd",
-	/* maj */	117,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_DISK | D_TRACKCLOSE,
+	.d_open =	acdopen,
+	.d_close =	acdclose,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	acdioctl,
+	.d_strategy =	acdstrategy,
+	.d_name =	"acd",
+	.d_maj =	117,
+	.d_flags =	D_DISK | D_TRACKCLOSE,
 };
 
 /* prototypes */
@@ -164,12 +159,16 @@ acdattach(struct ata_device *atadev)
 		tmpcdp->slot = count;
 		tmpcdp->changer_info = chp;
 		acd_make_dev(tmpcdp);
-		devstat_add_entry(tmpcdp->stats, "acd", tmpcdp->lun, DEV_BSIZE,
+		tmpcdp->stats = devstat_new_entry("acd", tmpcdp->lun, DEV_BSIZE,
 				  DEVSTAT_NO_ORDERED_TAGS,
 				  DEVSTAT_TYPE_CDROM | DEVSTAT_TYPE_IF_IDE,
 				  DEVSTAT_PRIORITY_CD);
 	    }
-	    name = malloc(strlen(atadev->name) + 2, M_ACD, M_NOWAIT);
+	    if (!(name = malloc(strlen(atadev->name) + 2, M_ACD, M_NOWAIT))) {
+		ata_prtdev(atadev, "out of memory\n");
+		free(cdp, M_ACD);
+		return 0;
+	    }
 	    strcpy(name, atadev->name);
 	    strcat(name, "-");
 	    ata_free_name(atadev);
@@ -179,7 +178,7 @@ acdattach(struct ata_device *atadev)
     }
     else {
 	acd_make_dev(cdp);
-	devstat_add_entry(cdp->stats, "acd", cdp->lun, DEV_BSIZE,
+	cdp->stats = devstat_new_entry("acd", cdp->lun, DEV_BSIZE,
 			  DEVSTAT_NO_ORDERED_TAGS,
 			  DEVSTAT_TYPE_CDROM | DEVSTAT_TYPE_IF_IDE,
 			  DEVSTAT_PRIORITY_CD);
@@ -194,17 +193,13 @@ acddetach(struct ata_device *atadev)
 {   
     struct acd_softc *cdp = atadev->driver;
     struct acd_devlist *entry;
-    struct bio *bp;
     int subdev;
     
     if (cdp->changer_info) {
 	for (subdev = 0; subdev < cdp->changer_info->slots; subdev++) {
 	    if (cdp->driver[subdev] == cdp)
 		continue;
-	    while ((bp = bioq_first(&cdp->driver[subdev]->queue))) {
-		bioq_remove(&cdp->driver[subdev]->queue, bp);
-		biofinish(bp, NULL, ENXIO);
-	    }
+	    bioq_flush(&cdp->driver[subdev]->queue, NULL, ENXIO);
 	    destroy_dev(cdp->driver[subdev]->dev);
 	    while ((entry = TAILQ_FIRST(&cdp->driver[subdev]->dev_list))) {
 		destroy_dev(entry->dev);
@@ -212,15 +207,13 @@ acddetach(struct ata_device *atadev)
 		free(entry, M_ACD);
 	    }
 	    devstat_remove_entry(cdp->driver[subdev]->stats);
-	    free(cdp->driver[subdev]->stats, M_ACD);
 	    ata_free_lun(&acd_lun_map, cdp->driver[subdev]->lun);
 	    free(cdp->driver[subdev], M_ACD);
 	}
 	free(cdp->driver, M_ACD);
 	free(cdp->changer_info, M_ACD);
     }
-    while ((bp = bioq_first(&cdp->queue)))
-	biofinish(bp, NULL, ENXIO);
+    bioq_flush(&cdp->queue, NULL, ENXIO);
     while ((entry = TAILQ_FIRST(&cdp->dev_list))) {
 	destroy_dev(entry->dev);
 	TAILQ_REMOVE(&cdp->dev_list, entry, chain);
@@ -229,7 +222,6 @@ acddetach(struct ata_device *atadev)
     destroy_dev(cdp->dev);
     EVENTHANDLER_DEREGISTER(dev_clone, cdp->clone_evh);
     devstat_remove_entry(cdp->stats);
-    free(cdp->stats, M_ACD);
     ata_free_name(atadev);
     ata_free_lun(&acd_lun_map, cdp->lun);
     free(cdp, M_ACD);
@@ -250,11 +242,6 @@ acd_init_lun(struct ata_device *atadev)
     cdp->block_size = 2048;
     cdp->slot = -1;
     cdp->changer_info = NULL;
-    if (!(cdp->stats = malloc(sizeof(struct devstat), M_ACD,
-			      M_NOWAIT | M_ZERO))) {
-	free(cdp, M_ACD);
-	return NULL;
-    }
     return cdp;
 }
 
@@ -272,7 +259,7 @@ acd_clone(void *arg, char *name, int namelen, dev_t *dev)
     if (*p != '\0' && strcmp(p, "a") != 0 && strcmp(p, "c") != 0)
 	return;
     if (unit == cdp->lun)
-	*dev = makedev(acd_cdevsw.d_maj, dkmakeminor(cdp->lun, 0, 0));
+	*dev = makedev(acd_cdevsw.d_maj, cdp->lun);
 }
 
 static void
@@ -280,10 +267,8 @@ acd_make_dev(struct acd_softc *cdp)
 {
     dev_t dev;
 
-    dev = make_dev(&acd_cdevsw, dkmakeminor(cdp->lun, 0, 0),
+    dev = make_dev(&acd_cdevsw, cdp->lun,
 		   UID_ROOT, GID_OPERATOR, 0644, "acd%d", cdp->lun);
-    make_dev_alias(dev, "acd%da", cdp->lun);
-    make_dev_alias(dev, "acd%dc", cdp->lun);
     dev->si_drv1 = cdp;
     cdp->dev = dev;
     cdp->device->flags |= ATA_D_MEDIA_CHANGED;
@@ -513,11 +498,6 @@ acdopen(dev_t dev, int flags, int fmt, struct thread *td)
     
     if (!cdp)
 	return ENXIO;
-
-    if (flags & FWRITE) {
-	if (count_dev(dev) > 1)
-	    return EBUSY;
-    }
 
     /* wait if drive is not finished loading the medium */
     while (timeout--) {
@@ -1032,7 +1012,7 @@ acdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 	break;
 
     case CDRIOCWRITESPEED:
-    	{
+	{
 	    int speed = *(int *)addr;
 
 	    if (speed < 177)
@@ -1059,11 +1039,11 @@ acdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 	break;
 
     case CDRIOCREADFORMATCAPS:
-    	error = acd_read_format_caps(cdp, (struct cdr_format_capacities *)addr);
+	error = acd_read_format_caps(cdp, (struct cdr_format_capacities *)addr);
 	break;
 
     case CDRIOCFORMAT:
-    	error = acd_format(cdp, (struct cdr_format_params *)addr);
+	error = acd_format(cdp, (struct cdr_format_params *)addr);
 	break;
 
     case DVDIOCREPORTKEY:
@@ -1085,22 +1065,6 @@ acdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 	    error = EINVAL;
 	else
 	    error = acd_read_structure(cdp, (struct dvd_struct *)addr);
-	break;
-
-    case DIOCGDINFO:
-	*(struct disklabel *)addr = cdp->disklabel;
-	break;
-
-    case DIOCWDINFO:
-    case DIOCSDINFO:
-	if ((flags & FWRITE) == 0)
-	    error = EBADF;
-	else
-	    error = setdisklabel(&cdp->disklabel, (struct disklabel *)addr, 0);
-	break;
-
-    case DIOCWLABEL:
-	error = EBADF;
 	break;
 
     default:
@@ -1131,7 +1095,7 @@ acdstrategy(struct bio *bp)
     bp->bio_resid = bp->bio_bcount;
 
     s = splbio();
-    bioqdisksort(&cdp->queue, bp);
+    bioq_disksort(&cdp->queue, bp);
     splx(s);
     ata_start(cdp->device->channel);
 }
@@ -1233,7 +1197,7 @@ acd_start(struct ata_device *atadev)
     ccb[7] = count>>8;
     ccb[8] = count;
 
-    devstat_start_transaction(cdp->stats);
+    devstat_start_transaction_bio(cdp->stats, bp);
     bp->bio_caller1 = cdp;
     atapi_queue_cmd(cdp->device, ccb, bp->bio_data, count * blocksize,
 		    bp->bio_cmd == BIO_READ ? ATPR_F_READ : 0, 
@@ -1309,30 +1273,6 @@ acd_read_toc(struct acd_softc *cdp)
 	return;
     }
     cdp->disk_size = ntohl(sizes[0]) + 1;
-
-    bzero(&cdp->disklabel, sizeof(struct disklabel));
-    strncpy(cdp->disklabel.d_typename, "	       ", 
-	    sizeof(cdp->disklabel.d_typename));
-    strncpy(cdp->disklabel.d_typename, cdp->device->name, 
-	    min(strlen(cdp->device->name),sizeof(cdp->disklabel.d_typename)-1));
-    strncpy(cdp->disklabel.d_packname, "unknown	       ", 
-	    sizeof(cdp->disklabel.d_packname));
-    cdp->disklabel.d_secsize = cdp->block_size;
-    cdp->disklabel.d_nsectors = 100;
-    cdp->disklabel.d_ntracks = 1;
-    cdp->disklabel.d_ncylinders = (cdp->disk_size / 100) + 1;
-    cdp->disklabel.d_secpercyl = 100;
-    cdp->disklabel.d_secperunit = cdp->disk_size;
-    cdp->disklabel.d_rpm = 300;
-    cdp->disklabel.d_interleave = 1;
-    cdp->disklabel.d_flags = D_REMOVABLE;
-    cdp->disklabel.d_npartitions = 1;
-    cdp->disklabel.d_partitions[0].p_offset = 0;
-    cdp->disklabel.d_partitions[0].p_size = cdp->disk_size;
-    cdp->disklabel.d_partitions[0].p_fstype = FS_BSDFFS;
-    cdp->disklabel.d_magic = DISKMAGIC;
-    cdp->disklabel.d_magic2 = DISKMAGIC;
-    cdp->disklabel.d_checksum = dkcksum(&cdp->disklabel);
 
     while ((entry = TAILQ_FIRST(&cdp->dev_list))) {
 	destroy_dev(entry->dev);

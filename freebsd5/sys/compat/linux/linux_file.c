@@ -6,7 +6,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_file.c,v 1.72 2002/12/08 18:30:44 iedowse Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_file.c,v 1.80 2003/04/23 18:13:26 jhb Exp $
  */
 
 #include "opt_compat.h"
@@ -97,7 +97,7 @@ linux_open(struct thread *td, struct linux_open_args *args)
     bsd_flags = 0;
     if (args->flags & LINUX_O_RDONLY)
 	bsd_flags |= O_RDONLY;
-    if (args->flags & LINUX_O_WRONLY) 
+    if (args->flags & LINUX_O_WRONLY)
 	bsd_flags |= O_WRONLY;
     if (args->flags & LINUX_O_RDWR)
 	bsd_flags |= O_RDWR;
@@ -126,8 +126,8 @@ linux_open(struct thread *td, struct linux_open_args *args)
 	SESS_LEADER(p) && !(p->p_flag & P_CONTROLT)) {
 	struct file *fp;
 
-	error = fget(td, td->td_retval[0], &fp);
 	PROC_UNLOCK(p);
+	error = fget(td, td->td_retval[0], &fp);
 	if (!error) {
 		if (fp->f_type == DTYPE_VNODE)
 			fo_ioctl(fp, TIOCSCTTY, (caddr_t) 0, td->td_ucred,
@@ -191,7 +191,7 @@ linux_llseek(struct thread *td, struct linux_llseek_args *args)
 	if ((error = lseek(td, &bsd_args)))
 		return error;
 
-	if ((error = copyout(td->td_retval, (caddr_t)args->res, sizeof (off_t))))
+	if ((error = copyout(td->td_retval, args->res, sizeof (off_t))))
 		return error;
 
 	td->td_retval[0] = 0;
@@ -245,7 +245,7 @@ static int
 getdents_common(struct thread *td, struct linux_getdents64_args *args,
     int is64bit)
 {
-	register struct dirent *bdp;
+	struct dirent *bdp;
 	struct vnode *vp;
 	caddr_t inp, buf;		/* BSD-format */
 	int len, reclen;		/* BSD-format */
@@ -270,7 +270,7 @@ getdents_common(struct thread *td, struct linux_getdents64_args *args,
 		return (EBADF);
 	}
 
-	vp = (struct vnode *) fp->f_data;
+	vp = fp->f_data;
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return (EINVAL);
@@ -320,7 +320,7 @@ again:
 	/*
 	 * Do directory search MAC check using non-cached credentials.
 	 */
-	if ((error = mac_check_vnode_readdir(td->td_proc->p_ucred, vp)))
+	if ((error = mac_check_vnode_readdir(td->td_ucred, vp)))
 		goto out;
 #endif /* MAC */
 	if ((error = VOP_READDIR(vp, &auio, fp->f_cred, &eofflag, &ncookies,
@@ -735,23 +735,23 @@ int
 linux_mount(struct thread *td, struct linux_mount_args *args)
 {
 	struct ufs_args ufs;
-        char fstypename[MFSNAMELEN];
-        char mntonname[MNAMELEN], mntfromname[MNAMELEN];
+	char fstypename[MFSNAMELEN];
+	char mntonname[MNAMELEN], mntfromname[MNAMELEN];
 	int error;
 	int fsflags;
 	const char *fstype;
 	void *fsdata;
 
-        error = copyinstr(args->filesystemtype, fstypename, MFSNAMELEN - 1,
+	error = copyinstr(args->filesystemtype, fstypename, MFSNAMELEN - 1,
 	    NULL);
 	if (error)
-                return (error);
-        error = copyinstr(args->specialfile, mntfromname, MFSNAMELEN - 1, NULL);
+		return (error);
+	error = copyinstr(args->specialfile, mntfromname, MFSNAMELEN - 1, NULL);
 	if (error)
-                return (error);
-        error = copyinstr(args->dir, mntonname, MFSNAMELEN - 1, NULL);
+		return (error);
+	error = copyinstr(args->dir, mntonname, MFSNAMELEN - 1, NULL);
 	if (error)
-                return (error);
+		return (error);
 
 #ifdef DEBUG
 	if (ldebug(mount))
@@ -782,15 +782,15 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 		 * FreeBSD has is !ASYNC, which is our default.
 		 */
 		if (args->rwflag & LINUX_MS_RDONLY)
-			fsflags |= MNT_RDONLY; 
+			fsflags |= MNT_RDONLY;
 		if (args->rwflag & LINUX_MS_NOSUID)
-			fsflags |= MNT_NOSUID; 
+			fsflags |= MNT_NOSUID;
 		if (args->rwflag & LINUX_MS_NODEV)
-			fsflags |= MNT_NODEV; 
+			fsflags |= MNT_NODEV;
 		if (args->rwflag & LINUX_MS_NOEXEC)
-			fsflags |= MNT_NOEXEC; 
+			fsflags |= MNT_NOEXEC;
 		if (args->rwflag & LINUX_MS_REMOUNT)
-			fsflags |= MNT_UPDATE; 
+			fsflags |= MNT_UPDATE;
 	}
 
 	return (vfs_mount(td, fstype, mntonname, fsflags, fsdata));
@@ -980,7 +980,7 @@ fcntl_common(struct thread *td, struct linux_fcntl64_args *args)
 		return (kern_fcntl(td, args->fd, F_SETFL, arg));
 
 	case LINUX_F_GETLK:
-		error = copyin((caddr_t)args->arg, &linux_flock,
+		error = copyin((void *)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -989,11 +989,11 @@ fcntl_common(struct thread *td, struct linux_fcntl64_args *args)
 		if (error)
 			return (error);
 		bsd_to_linux_flock(&bsd_flock, &linux_flock);
-		return (copyout(&linux_flock, (caddr_t)args->arg,
+		return (copyout(&linux_flock, (void *)args->arg,
 		    sizeof(linux_flock)));
 
 	case LINUX_F_SETLK:
-		error = copyin((caddr_t)args->arg, &linux_flock,
+		error = copyin((void *)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1002,7 +1002,7 @@ fcntl_common(struct thread *td, struct linux_fcntl64_args *args)
 		    (intptr_t)&bsd_flock));
 
 	case LINUX_F_SETLKW:
-		error = copyin((caddr_t)args->arg, &linux_flock,
+		error = copyin((void *)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1065,7 +1065,7 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 
 	switch (args->cmd) {
 	case LINUX_F_GETLK64:
-		error = copyin((caddr_t)args->arg, &linux_flock,
+		error = copyin((void *)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1074,11 +1074,11 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 		if (error)
 			return (error);
 		bsd_to_linux_flock64(&bsd_flock, &linux_flock);
-		return (copyout(&linux_flock, (caddr_t)args->arg,
-		    sizeof(linux_flock)));
+		return (copyout(&linux_flock, (void *)args->arg,
+			    sizeof(linux_flock)));
 
 	case LINUX_F_SETLK64:
-		error = copyin((caddr_t)args->arg, &linux_flock,
+		error = copyin((void *)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1087,7 +1087,7 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 		    (intptr_t)&bsd_flock));
 
 	case LINUX_F_SETLKW64:
-		error = copyin((caddr_t)args->arg, &linux_flock,
+		error = copyin((void *)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.79 2002/12/03 20:19:37 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.85 2003/04/01 15:06:23 phk Exp $
  */
 
 #include <sys/param.h>
@@ -36,37 +36,20 @@
 #include <sys/bio.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/disk.h>
-#include <sys/devicestat.h>
 #include <sys/cdio.h>
 #include <machine/bus.h>
+#include <geom/geom_disk.h>
 #include <dev/ata/ata-all.h>
 #include <dev/ata/atapi-all.h>
 #include <dev/ata/atapi-fd.h>
 
-/* device structures */
-static	d_open_t	afdopen;
-static	d_close_t	afdclose;
-static	d_ioctl_t	afdioctl;
-static	d_strategy_t	afdstrategy;
-static struct cdevsw afd_cdevsw = {
-	/* open */	afdopen,
-	/* close */	afdclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	afdioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	afdstrategy,
-	/* name */	"afd",
-	/* maj */	118,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_DISK | D_TRACKCLOSE,
-};
-static struct cdevsw afddisk_cdevsw;
-
 /* prototypes */
+static	disk_open_t	afdopen;
+static	disk_close_t	afdclose;
+#ifdef notyet
+static	disk_ioctl_t	afdioctl;
+#endif
+static	disk_strategy_t	afdstrategy;
 static int afd_sense(struct afd_softc *);
 static void afd_describe(struct afd_softc *);
 static int afd_done(struct atapi_request *);
@@ -82,7 +65,6 @@ int
 afdattach(struct ata_device *atadev)
 {
     struct afd_softc *fdp;
-    dev_t dev;
 
     fdp = malloc(sizeof(struct afd_softc), M_AFD, M_NOWAIT | M_ZERO);
     if (!fdp) {
@@ -100,14 +82,16 @@ afdattach(struct ata_device *atadev)
 	return 0;
     }
 
-    devstat_add_entry(&fdp->stats, "afd", fdp->lun, DEV_BSIZE,
-		      DEVSTAT_NO_ORDERED_TAGS,
-		      DEVSTAT_TYPE_DIRECT | DEVSTAT_TYPE_IF_IDE,
-		      DEVSTAT_PRIORITY_WFD);
-    dev = disk_create(fdp->lun, &fdp->disk, 0, &afd_cdevsw, &afddisk_cdevsw);
-    dev->si_drv1 = fdp;
-    fdp->dev = dev;
-    fdp->dev->si_iosize_max = 256 * DEV_BSIZE;
+    fdp->disk.d_open = afdopen;
+    fdp->disk.d_close = afdclose;
+#ifdef notyet
+    fdp->disk.d_ioctl = afdioctl;
+#endif
+    fdp->disk.d_strategy = afdstrategy;
+    fdp->disk.d_name = "afd";
+    fdp->disk.d_drv1 = fdp;
+    fdp->disk.d_maxsize = 256 * DEV_BSIZE;
+    disk_create(fdp->lun, &fdp->disk, 0, NULL, NULL);
 
     afd_describe(fdp);
     atadev->flags |= ATA_D_MEDIA_CHANGED;
@@ -119,15 +103,9 @@ void
 afddetach(struct ata_device *atadev)
 {   
     struct afd_softc *fdp = atadev->driver;
-    struct bio *bp;
     
-    while ((bp = bioq_first(&fdp->queue))) {
-	bioq_remove(&fdp->queue, bp);
-	biofinish(bp, NULL, ENXIO);
-    }
-    disk_invalidate(&fdp->disk);
-    disk_destroy(fdp->dev);
-    devstat_remove_entry(&fdp->stats);
+    bioq_flush(&fdp->queue, NULL, ENXIO);
+    disk_destroy(&fdp->disk);
     ata_free_name(atadev);
     ata_free_lun(&afd_lun_map, fdp->lun);
     free(fdp, M_AFD);
@@ -205,8 +183,8 @@ afd_describe(struct afd_softc *fdp)
 		printf("Unknown (0x%x)", fdp->cap.medium_type);
 	    }
 	    if (fdp->cap.wp) printf(", writeprotected");
+	    printf("\n");
 	}
-	printf("\n");
     }
     else {
 	ata_prtdev(fdp->device, "%luMB <%.40s> [%d/%d/%d] at ata%d-%s %s\n",
@@ -221,9 +199,9 @@ afd_describe(struct afd_softc *fdp)
 }
 
 static int
-afdopen(dev_t dev, int flags, int fmt, struct thread *td)
+afdopen(struct disk *dp)
 {
-    struct afd_softc *fdp = dev->si_drv1;
+    struct afd_softc *fdp = dp->d_drv1;
 
     /* hold off access to we are fully attached */
     while (ata_delayed_attach)
@@ -231,8 +209,7 @@ afdopen(dev_t dev, int flags, int fmt, struct thread *td)
 
     atapi_test_ready(fdp->device);
 
-    if (count_dev(dev) == 1)
-	afd_prevent_allow(fdp, 1);
+    afd_prevent_allow(fdp, 1);
 
     if (afd_sense(fdp))
 	ata_prtdev(fdp->device, "sense media type failed\n");
@@ -249,19 +226,22 @@ afdopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int 
-afdclose(dev_t dev, int flags, int fmt, struct thread *td)
+afdclose(struct disk *dp)
 {
-    struct afd_softc *fdp = dev->si_drv1;
+    struct afd_softc *fdp = dp->d_drv1;
 
-    if (count_dev(dev) == 1)
-	afd_prevent_allow(fdp, 0); 
+    afd_prevent_allow(fdp, 0); 
+    if (0)
+	afd_eject(fdp, 0);	/* to keep gcc quiet */
+
     return 0;
 }
 
+#ifdef notyet
 static int 
-afdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+afdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 {
-    struct afd_softc *fdp = dev->si_drv1;
+    struct afd_softc *fdp = dp->d_drv1;
 
     switch (cmd) {
     case CDIOCEJECT:
@@ -278,11 +258,12 @@ afdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 	return ENOIOCTL;
     }
 }
+#endif
 
 static void 
 afdstrategy(struct bio *bp)
 {
-    struct afd_softc *fdp = bp->bio_dev->si_drv1;
+    struct afd_softc *fdp = bp->bio_disk->d_drv1;
     int s;
 
     if (fdp->device->flags & ATA_D_DETACHING) {
@@ -298,7 +279,7 @@ afdstrategy(struct bio *bp)
     }
 
     s = splbio();
-    bioqdisksort(&fdp->queue, bp);
+    bioq_disksort(&fdp->queue, bp);
     splx(s);
     ata_start(fdp->device->channel);
 }
@@ -343,8 +324,6 @@ afd_start(struct ata_device *atadev)
     ccb[7] = count>>8;
     ccb[8] = count;
 
-    devstat_start_transaction(&fdp->stats);
-
     atapi_queue_cmd(fdp->device, ccb, data_ptr, count * fdp->cap.sector_size,
 		    (bp->bio_cmd == BIO_READ) ? ATPR_F_READ : 0, 30,
 		    afd_done, bp);
@@ -354,7 +333,6 @@ static int
 afd_done(struct atapi_request *request)
 {
     struct bio *bp = request->driver;
-    struct afd_softc *fdp = request->device->driver;
 
     if (request->error || (bp->bio_flags & BIO_ERROR)) {
 	bp->bio_error = request->error;
@@ -362,7 +340,7 @@ afd_done(struct atapi_request *request)
     }
     else
 	bp->bio_resid = bp->bio_bcount - request->donecount;
-    biofinish(bp, &fdp->stats, 0);
+    biodone(bp);
     return 0;
 }
 

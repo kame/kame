@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/alpha/alpha/mp_machdep.c,v 1.39 2002/05/08 23:12:00 mjacob Exp $
+ *	$FreeBSD: src/sys/alpha/alpha/mp_machdep.c,v 1.41 2003/02/20 20:54:42 phk Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
+#include <sys/cons.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -43,7 +44,6 @@
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <sys/user.h>
-#include <sys/dkstat.h>
 
 #include <machine/atomic.h>
 #include <machine/pmap.h>

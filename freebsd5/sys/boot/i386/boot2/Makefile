@@ -1,11 +1,11 @@
-# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.40.2.1 2002/12/23 01:02:45 imp Exp $
+# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.46 2003/02/25 15:41:49 ru Exp $
 
 PROG=		boot2
 NOMAN=
 STRIP=
 BINDIR?=	/boot
 BINMODE=	444
-CLEANFILES+=	boot1 boot1.out boot1.o \
+CLEANFILES=	boot boot1 boot1.out boot1.o \
 		boot2.ldr boot2.bin boot2.ld boot2.out boot2.o boot2.h \
 		boot2.s sio.o
 
@@ -47,7 +47,10 @@ CFLAGS=	-elf -ffreestanding -Os -fno-builtin \
 
 LDFLAGS=-nostdlib -static -N --gc-sections
 
-all: boot1 boot2
+all: boot1 boot2 boot
+
+boot: boot1 boot2
+	cat boot1 boot2 > boot
 
 boot1: boot1.out
 	objcopy -S -O binary boot1.out ${.TARGET}
@@ -98,6 +101,8 @@ sio.o: sio.s
 		${.IMPSRC} -o ${.TARGET}
 
 install:
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+		boot ${DESTDIR}${BINDIR}/boot
 	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		boot1 ${DESTDIR}${BINDIR}/boot1
 	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \

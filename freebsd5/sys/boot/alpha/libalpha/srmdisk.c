@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/alpha/libalpha/srmdisk.c,v 1.11 2001/04/05 20:45:25 obrien Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/srmdisk.c,v 1.12 2003/04/04 16:35:14 phk Exp $
  */
 
 /*
@@ -40,7 +40,6 @@
 #include <stand.h>
 
 #include <sys/disklabel.h>
-#include <sys/diskslice.h>
 
 #include <machine/stdarg.h>
 #include <machine/prom.h>

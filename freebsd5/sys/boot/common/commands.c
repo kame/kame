@@ -23,12 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/commands.c,v 1.17 2001/11/04 02:58:39 jhb Exp $
+ * $FreeBSD: src/sys/boot/common/commands.c,v 1.18 2003/04/04 16:35:14 phk Exp $
  */
 
 #include <stand.h>
 #include <string.h>
-#include <sys/reboot.h>
 
 #include "bootstrap.h"
 

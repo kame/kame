@@ -1,7 +1,10 @@
-# $FreeBSD: src/sys/Makefile,v 1.26 2002/04/26 17:55:21 ru Exp $
+# $FreeBSD: src/sys/Makefile,v 1.27 2003/05/08 06:35:39 peter Exp $
 
+SUBDIR=
 # The boot loader
-SUBDIR=	boot
+.if ${MACHINE_ARCH} != "amd64"
+SUBDIR+=boot
+.endif
 
 # KLD modules build for both a.out and ELF
 .if defined(MODULES_WITH_WORLD)

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/bt_eisa.c,v 1.14 2002/10/09 08:54:32 peter Exp $
+ * $FreeBSD: src/sys/dev/buslogic/bt_eisa.c,v 1.15 2003/03/29 09:46:10 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -309,14 +309,18 @@ bt_eisa_attach(device_t dev)
 
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*nsegments*/~0,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &bt->parent_dmat) != 0) {
+	if (bus_dma_tag_create( /* parent	*/ NULL,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR_32BIT,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* nsegments	*/ ~0,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ 0,
+				&bt->parent_dmat) != 0) {
 		bt_eisa_release_resources(dev);
 		return -1;
 	}

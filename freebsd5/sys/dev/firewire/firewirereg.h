@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
  *
@@ -30,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.3.2.1 2003/01/07 13:43:50 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.25 2003/04/29 13:27:13 simokawa Exp $
  *
  */
 
@@ -42,15 +43,13 @@ typedef	struct proc fw_proc;
 #include <sys/select.h>
 #endif
 
+#include <sys/uio.h>
+
 #define	splfw splimp
 
 struct fw_device{
 	u_int16_t dst;
 	struct fw_eui64 eui;
-#if 0
-	u_int32_t spec;
-	u_int32_t ver;
-#endif
 	u_int8_t speed;
 	u_int8_t maxrec;
 	u_int8_t nport;
@@ -65,12 +64,9 @@ struct fw_device{
 #define FWDEVINIT	1
 #define FWDEVATTACHED	2
 #define FWDEVINVAL	3
-	TAILQ_ENTRY(fw_device) link;
-#if 0
-	LIST_HEAD(, fw_xfer) txqueue;
-	LIST_HEAD(, fw_xfer) rxqueue;
-#endif
+	STAILQ_ENTRY(fw_device) link;
 };
+
 struct firewire_softc {
 #if __FreeBSD_version >= 500000
 	dev_t dev;
@@ -79,12 +75,15 @@ struct firewire_softc {
 #endif
 	struct firewire_comm *fc;
 };
+
 #define FW_MAX_DMACH 0x20
 #define FW_MAX_DEVCH FW_MAX_DMACH
 #define FW_XFERTIMEOUT 1
+
 struct firewire_dev_comm {
 	device_t dev;
 	struct firewire_comm *fc;
+	void (*post_busreset) __P((void *));
 	void (*post_explore) __P((void *));
 };
 
@@ -121,11 +120,6 @@ struct firewire_comm{
 #define	FWMAXCSRDIR     16
 	SLIST_HEAD(, csrdir) ongocsr;
 	SLIST_HEAD(, csrdir) csrfree;
-	struct csrdir{
-		u_int32_t ongoaddr;
-		u_int32_t off;
-		SLIST_ENTRY(csrdir) link;
-	};
 	u_int32_t status;
 #define	FWBUSRESET	0
 #define	FWBUSINIT	1
@@ -137,87 +131,13 @@ struct firewire_comm{
 #define	FWBUSEXPDONE	7
 #define	FWBUSCOMPLETION	10
 	int nisodma;
-	u_int8_t eui[8];
-	STAILQ_HEAD(fw_queue, fw_xfer);
-	struct fw_xferq {
-		int flag;
-#define FWXFERQ_CHTAGMASK 0xff
-#define FWXFERQ_RUNNING (1 << 8)
-#define FWXFERQ_STREAM (1 << 9)
-
-#define FWXFERQ_PACKET (1 << 10)
-#define FWXFERQ_BULK (1 << 11)
-#define FWXFERQ_DV (1 << 12)
-#define FWXFERQ_MODEMASK (7 << 10)
-
-#define FWXFERQ_EXTBUF (1 << 13)
-#define FWXFERQ_OPEN (1 << 14)
-
-#define FWXFERQ_HANDLER (1 << 16)
-#define FWXFERQ_WAKEUP (1 << 17)
-
-		void (*start) __P((struct firewire_comm*));
-		void (*drain) __P((struct firewire_comm*, struct fw_xfer*));
-		struct fw_queue q;
-		u_int queued;
-		u_int maxq;
-		u_int psize;
-		u_int packets;
-		u_int error;
-		STAILQ_HEAD(, fw_bind) binds;
-		caddr_t buf;
-		u_int bnchunk;
-		u_int bnpacket;
-		u_int btpacket;
-		struct fw_bulkxfer *bulkxfer;
-		STAILQ_HEAD(, fw_bulkxfer) stvalid;
-		STAILQ_HEAD(, fw_bulkxfer) stfree;
-		struct fw_bulkxfer *stdma;
-		struct fw_bulkxfer *stdma2;
-		struct fw_bulkxfer *stproc;
-		u_int procptr;
-		int dvdbc, dvdiff, dvsync;
-		struct fw_dvbuf *dvbuf;
-		STAILQ_HEAD(, fw_dvbuf) dvvalid;
-		STAILQ_HEAD(, fw_dvbuf) dvfree;
-		struct fw_dvbuf *dvdma;
-		struct fw_dvbuf *dvproc;
-		u_int dvptr;
-		u_int dvpacket;
-		u_int need_wakeup;
-		struct selinfo rsel;
-		caddr_t sc;
-		void (*hand) __P((struct fw_xferq *));
-	};
+	struct fw_eui64 eui;
 	struct fw_xferq
 		*arq, *atq, *ars, *ats, *it[FW_MAX_DMACH],*ir[FW_MAX_DMACH];
-	struct fw_bulkxfer{
-		u_int32_t flag;
-		caddr_t buf;
-		STAILQ_ENTRY(fw_bulkxfer) link;
-		caddr_t start;
-		caddr_t end;
-		u_int npacket;
-	};
-	struct fw_dvbuf{
-		caddr_t buf;
-		STAILQ_ENTRY(fw_dvbuf) link;
-	};
-	struct tlabel{
-		struct fw_xfer  *xfer;
-		STAILQ_ENTRY(tlabel) link;
-	};
 	STAILQ_HEAD(, tlabel) tlabels[0x40];
-	struct fw_bind{
-		u_int32_t start_hi, start_lo, addrlen;
-		struct fw_xfer* xfer;
-		STAILQ_ENTRY(fw_bind) fclist;
-		STAILQ_ENTRY(fw_bind) chlist;
-	};
 	STAILQ_HEAD(, fw_bind) binds;
-	TAILQ_HEAD(, fw_device) devices;
+	STAILQ_HEAD(, fw_device) devices;
 	STAILQ_HEAD(, fw_xfer)	pending;
-	volatile u_int32_t *sid_buf;
 	u_int  sid_cnt;
 #define CSRSIZE 0x4000
 	u_int32_t csr_arc[CSRSIZE/4];
@@ -226,9 +146,9 @@ struct firewire_comm{
 	struct fw_topology_map *topology_map;
 	struct fw_speed_map *speed_map;
 	struct callout busprobe_callout;
-	struct callout_handle bmrhandle;
-	struct callout_handle timeouthandle;
-	struct callout_handle retry_probe_handle;
+	struct callout bmr_callout;
+	struct callout timeout_callout;
+	struct callout retry_probe_callout;
 	u_int32_t (*cyctimer) __P((struct  firewire_comm *));
 	void (*ibr) __P((struct firewire_comm *));
 	u_int32_t (*set_bmr) __P((struct firewire_comm *, u_int32_t));
@@ -243,20 +163,85 @@ struct firewire_comm{
 	void (*irx_post) __P((struct firewire_comm *, u_int32_t *));
 	void (*itx_post) __P((struct firewire_comm *, u_int32_t *));
 	struct tcode_info *tcode;
+	bus_dma_tag_t dmat;
 };
 #define CSRARC(sc, offset) ((sc)->csr_arc[(offset)/4])
 
+struct csrdir{
+	u_int32_t ongoaddr;
+	u_int32_t off;
+	SLIST_ENTRY(csrdir) link;
+};
+
+struct fw_xferq {
+	int flag;
+#define FWXFERQ_CHTAGMASK 0xff
+#define FWXFERQ_RUNNING (1 << 8)
+#define FWXFERQ_STREAM (1 << 9)
+
+#define FWXFERQ_BULK (1 << 11)
+#define FWXFERQ_MODEMASK (7 << 10)
+
+#define FWXFERQ_EXTBUF (1 << 13)
+#define FWXFERQ_OPEN (1 << 14)
+
+#define FWXFERQ_HANDLER (1 << 16)
+#define FWXFERQ_WAKEUP (1 << 17)
+
+	void (*start) __P((struct firewire_comm*));
+	STAILQ_HEAD(, fw_xfer) q;
+	u_int queued;
+	u_int maxq;
+	u_int psize;
+	STAILQ_HEAD(, fw_bind) binds;
+	struct fwdma_alloc_multi *buf;
+	u_int bnchunk;
+	u_int bnpacket;
+	struct fw_bulkxfer *bulkxfer;
+	STAILQ_HEAD(, fw_bulkxfer) stvalid;
+	STAILQ_HEAD(, fw_bulkxfer) stfree;
+	STAILQ_HEAD(, fw_bulkxfer) stdma;
+	struct fw_bulkxfer *stproc;
+	struct selinfo rsel;
+	caddr_t sc;
+	void (*hand) __P((struct fw_xferq *));
+};
+
+struct fw_bulkxfer{
+	int poffset;
+	struct mbuf *mbuf;
+	STAILQ_ENTRY(fw_bulkxfer) link;
+	caddr_t start;
+	caddr_t end;
+	int resp;
+};
+
+struct tlabel{
+	struct fw_xfer  *xfer;
+	STAILQ_ENTRY(tlabel) link;
+};
+
+struct fw_bind{
+	u_int32_t start_hi, start_lo, addrlen;
+	STAILQ_HEAD(, fw_xfer) xferlist;
+	STAILQ_ENTRY(fw_bind) fclist;
+	STAILQ_ENTRY(fw_bind) chlist;
+#define FWACT_NULL	0
+#define FWACT_XFER	2
+#define FWACT_CH	3
+	u_int8_t act_type;
+	u_int8_t sub;
+};
 
 struct fw_xfer{
 	caddr_t sc;
 	struct firewire_comm *fc;
 	struct fw_xferq *q;
-	struct callout_handle ch;
-	time_t time;
-	struct fw_tlabel *tlabel;
+	struct timeval tv;
+	/* XXX should be removed */
+	u_int32_t dst; /* XXX for if_fwe */
 	u_int8_t spd;
-	u_int8_t tcode;
-	int resp;
+	int8_t resp;
 #define FWXF_INIT 0
 #define FWXF_INQ 1
 #define FWXF_START 2
@@ -264,47 +249,30 @@ struct fw_xfer{
 #define FWXF_SENTERR 4
 #define FWXF_BUSY 8
 #define FWXF_RCVD 10
-	int state;
+	u_int8_t state;
 	u_int8_t retry;
 	u_int8_t tl;
-	int sub;
-	int32_t dst;
-	u_int8_t act_type;
-#define FWACT_NULL	0
-#define FWACT_XFER	2
-#define FWACT_CH	3
 	void (*retry_req) __P((struct fw_xfer *));
 	union{
 		void (*hand) __P((struct fw_xfer *));
-
 	} act;
-	union{
-		struct {
-			struct fw_device *device;
-		} req;
-		struct {
-			struct stch *channel;
-		} stream;
-	} mode;
 	struct {
-		u_int16_t len, off;
+		int len;
 		caddr_t buf;
 	} send, recv;
 	struct mbuf *mbuf;
 	STAILQ_ENTRY(fw_xfer) link;
+	struct malloc_type *malloc;
 };
-void fw_sidrcv __P((struct firewire_comm *, caddr_t, u_int, u_int));
-void fw_rcv __P((struct firewire_comm *, caddr_t, u_int, u_int, u_int, u_int));
+void fw_sidrcv __P((struct firewire_comm *, u_int32_t *, u_int));
+void fw_rcv __P((struct firewire_comm *, struct iovec *, int, u_int, u_int));
+void fw_xfer_unload __P(( struct fw_xfer*));
 void fw_xfer_free __P(( struct fw_xfer*));
-struct fw_xfer *fw_xfer_alloc __P((void));
+struct fw_xfer *fw_xfer_alloc __P((struct malloc_type *));
+struct fw_xfer *fw_xfer_alloc_buf __P((struct malloc_type *, int, int));
 void fw_init __P((struct firewire_comm *));
 int fw_tbuf_update __P((struct firewire_comm *, int, int));
 int fw_rbuf_update __P((struct firewire_comm *, int, int));
-int fw_readreqq __P((struct firewire_comm *, u_int32_t, u_int32_t, u_int32_t *));
-int fw_writereqb __P((struct firewire_comm *, u_int32_t, u_int32_t, u_int32_t, u_int32_t *));
-int fw_readresb __P((struct firewire_comm *, u_int32_t, u_int32_t, u_int32_t, u_int32_t*));
-int fw_writeres __P((struct firewire_comm *, u_int32_t, u_int32_t));
-u_int32_t getcsrdata __P((struct fw_device *, u_int8_t));
 void fw_asybusy __P((struct fw_xfer *));
 int fw_bindadd __P((struct firewire_comm *, struct fw_bind *));
 int fw_bindremove __P((struct firewire_comm *, struct fw_bind *));
@@ -314,43 +282,22 @@ u_int16_t fw_crc16 __P((u_int32_t *, u_int32_t));
 void fw_xfer_timeout __P((void *));
 void fw_xfer_done __P((struct fw_xfer *));
 void fw_asy_callback __P((struct fw_xfer *));
-struct fw_device *fw_noderesolve __P((struct firewire_comm *, struct fw_eui64));
+struct fw_device *fw_noderesolve_nodeid __P((struct firewire_comm *, int));
+struct fw_device *fw_noderesolve_eui64 __P((struct firewire_comm *, struct fw_eui64 *));
 struct fw_bind *fw_bindlookup __P((struct firewire_comm *, u_int32_t, u_int32_t));
+void fw_drain_txq __P((struct firewire_comm *));
 
 
 extern int firewire_debug;
 extern devclass_t firewire_devclass;
 
-#define DV_BROADCAST_ON (1<<30)
-#define		IP_CHANNELS	0x0234
-
-#define		STATE_CLEAR	0x0000
-#define		STATE_SET	0x0004
-#define		NODE_IDS	0x0008
-#define		RESET_START	0x000c
-#define		SPLIT_TIMEOUT_HI	0x0018
-#define		SPLIT_TIMEOUT_LO	0x001c
-#define		CYCLE_TIME	0x0200
-#define		BUS_TIME	0x0210
-#define		BUS_MGR_ID	0x021c
-#define		BANDWIDTH_AV	0x0220
-#define		CHANNELS_AV_HI	0x0224
-#define		CHANNELS_AV_LO	0x0228
-
-#define		CONF_ROM	0x0400
-
-#define		TOPO_MAP	0x1000
-#define		SPED_MAP	0x2000
-
-#define		oMPR		0x900
-#define		oPCR		0x904
-
-#define		iMPR		0x980
-#define		iPCR		0x984
-
 #define		FWPRI		((PZERO+8)|PCATCH)
 
-#ifdef __alpha__
-#undef vtophys
-#define vtophys(va)	alpha_XXX_dmamap((vm_offset_t)(va))
-#endif /* __alpha__ */
+#if __FreeBSD_version >= 500000
+#define CALLOUT_INIT(x) callout_init(x, 0 /* mpsafe */)
+#else
+#define CALLOUT_INIT(x) callout_init(x)
+#endif
+
+MALLOC_DECLARE(M_FW);
+MALLOC_DECLARE(M_FWXFER);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/digi/digi.c,v 1.29 2002/09/28 17:14:28 phk Exp $
+ * $FreeBSD: src/sys/dev/digi/digi.c,v 1.34 2003/03/03 16:24:43 phk Exp $
  */
 
 /*-
@@ -143,20 +143,16 @@ const struct digi_control_signals digi_normal_signals = {
 };
 
 static struct cdevsw digi_sw = {
-	digiopen,		/* open */
-	digiclose,		/* close */
-	digiread,		/* read */
-	digiwrite,		/* write */
-	digiioctl,		/* ioctl */
-	ttypoll,		/* poll */
-	nommap,			/* mmap */
-	nostrategy,		/* strategy */
-	driver_name,		/* name */
-	CDEV_MAJOR,		/* maj */
-	nodump,			/* dump */
-	nopsize,		/* psize */
-	D_TTY | D_KQFILTER,	/* flags */
-	ttykqfilter		/* bmaj */
+	.d_open =	digiopen,
+	.d_close =	digiclose,
+	.d_read =	digiread,
+	.d_write =	digiwrite,
+	.d_ioctl =	digiioctl,
+	.d_poll =	ttypoll,
+	.d_name =	driver_name,
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter
 };
 
 static void

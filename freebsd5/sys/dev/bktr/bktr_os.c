@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.31 2002/12/09 09:04:09 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.34 2003/03/25 00:07:00 jake Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -247,19 +247,15 @@ static	d_poll_t	bktr_poll;
 
 #define CDEV_MAJOR 92 
 static struct cdevsw bktr_cdevsw = {
-	/* open */	bktr_open,
-	/* close */	bktr_close,
-	/* read */	bktr_read,
-	/* write */	bktr_write,
-	/* ioctl */	bktr_ioctl,
-	/* poll */	bktr_poll,
-	/* mmap */	bktr_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"bktr",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	bktr_open,
+	.d_close =	bktr_close,
+	.d_read =	bktr_read,
+	.d_write =	bktr_write,
+	.d_ioctl =	bktr_ioctl,
+	.d_poll =	bktr_poll,
+	.d_mmap =	bktr_mmap,
+	.d_name =	"bktr",
+	.d_maj =	CDEV_MAJOR,
 };
 
 DRIVER_MODULE(bktr, pci, bktr_driver, bktr_devclass, 0, 0);
@@ -753,7 +749,7 @@ bktr_ioctl( dev_t dev, ioctl_cmd_t cmd, caddr_t arg, int flag, struct thread *td
  * 
  */
 static int
-bktr_mmap( dev_t dev, vm_offset_t offset, int nprot )
+bktr_mmap( dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot )
 {
 	int		unit;
 	bktr_ptr_t	bktr;
@@ -779,7 +775,8 @@ bktr_mmap( dev_t dev, vm_offset_t offset, int nprot )
 	if (offset >= bktr->alloc_pages * PAGE_SIZE)
 		return( -1 );
 
-	return( atop(vtophys(bktr->bigbuf) + offset) );
+	*paddr = vtophys(bktr->bigbuf) + offset;
+	return( 0 );
 }
 
 static int

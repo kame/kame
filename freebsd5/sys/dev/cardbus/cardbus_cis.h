@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/cardbus/cardbus_cis.h,v 1.7 2002/11/27 06:56:29 imp Exp $
+ * $FreeBSD: src/sys/dev/cardbus/cardbus_cis.h,v 1.8 2003/01/27 05:47:01 imp Exp $
  */
 
 /*
@@ -35,7 +35,7 @@
 struct cis_tupleinfo;
 
 int	cardbus_do_cis(device_t, device_t);
-int	cardbus_cis_read(device_t, device_t, u_int8_t, struct cis_tupleinfo**,
+int	cardbus_cis_read(device_t, device_t, uint8_t, struct cis_tupleinfo**,
 	    int*);
 void	cardbus_cis_free(device_t, struct cis_tupleinfo*, int*);
 

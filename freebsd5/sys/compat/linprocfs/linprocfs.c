@@ -38,14 +38,13 @@
  *
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.59 2002/10/21 22:27:36 julian Exp $
+ * $FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.65 2003/05/13 20:35:57 jhb Exp $
  */
 
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/blist.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/exec.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
@@ -117,9 +116,9 @@ linprocfs_domeminfo(PFS_FILL_ARGS)
 	unsigned long memfree;		/* free memory in bytes */
 	unsigned long memshared;	/* shared memory ??? */
 	unsigned long buffers, cached;	/* buffer / cache memory ??? */
-	u_quad_t swaptotal;		/* total swap space in bytes */
-	u_quad_t swapused;		/* used swap space in bytes */
-	u_quad_t swapfree;		/* free swap space in bytes */
+	unsigned long long swaptotal;	/* total swap space in bytes */
+	unsigned long long swapused;	/* used swap space in bytes */
+	unsigned long long swapfree;	/* free swap space in bytes */
 	vm_object_t object;
 
 	memtotal = physmem * PAGE_SIZE;
@@ -210,20 +209,20 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 	    "cpu\t\t\t: Alpha\n"
 	    "cpu model\t\t: %s\n"
 	    "cpu variation\t\t: %ld\n"
-	    "cpu revision\t\t: %ld\n"
+	    "cpu revision\t\t: %d\n"
 	    "cpu serial number\t: %s\n"
 	    "system type\t\t: %s\n"
 	    "system variation\t: %s\n"
-	    "system revision\t\t: %ld\n"
+	    "system revision\t\t: %d\n"
 	    "system serial number\t: %s\n"
 	    "cycle frequency [Hz]\t: %lu\n"
-	    "timer frequency [Hz]\t: %lu\n"
+	    "timer frequency [Hz]\t: %u\n"
 	    "page size [bytes]\t: %ld\n"
 	    "phys. address bits\t: %ld\n"
 	    "max. addr. space #\t: %ld\n"
-	    "BogoMIPS\t\t: %lu.%02lu\n"
-	    "kernel unaligned acc\t: %ld (pc=%lx,va=%lx)\n"
-	    "user unaligned acc\t: %ld (pc=%lx,va=%lx)\n"
+	    "BogoMIPS\t\t: %u.%02u\n"
+	    "kernel unaligned acc\t: %d (pc=%x,va=%x)\n"
+	    "user unaligned acc\t: %d (pc=%x,va=%x)\n"
 	    "platform string\t\t: %s\n"
 	    "cpus detected\t\t: %d\n"
 	    ,
@@ -422,7 +421,7 @@ linprocfs_dostat(PFS_FILL_ARGS)
 	    cnt.v_swappgsout,
 	    cnt.v_intr,
 	    cnt.v_swtch,
-	    (quad_t)boottime.tv_sec);
+	    (long long)boottime.tv_sec);
 	return (0);
 }
 
@@ -436,7 +435,7 @@ linprocfs_douptime(PFS_FILL_ARGS)
 
 	getmicrouptime(&tv);
 	sbuf_printf(sb, "%lld.%02ld %ld.%02ld\n",
-	    (quad_t)tv.tv_sec, tv.tv_usec / 10000,
+	    (long long)tv.tv_sec, tv.tv_usec / 10000,
 	    T2S(cp_time[CP_IDLE]), T2J(cp_time[CP_IDLE]) % 100);
 	return (0);
 }
@@ -450,8 +449,8 @@ linprocfs_doversion(PFS_FILL_ARGS)
 	char osname[LINUX_MAX_UTSNAME];
 	char osrelease[LINUX_MAX_UTSNAME];
 
-	linux_get_osname(td->td_proc, osname);
-	linux_get_osrelease(td->td_proc, osrelease);
+	linux_get_osname(td, osname);
+	linux_get_osrelease(td, osrelease);
 
 	sbuf_printf(sb,
 	    "%s version %s (des@freebsd.org) (gcc version " __VERSION__ ")"
@@ -515,8 +514,8 @@ linprocfs_doprocstat(PFS_FILL_ARGS)
 	PS_ADD("timeout",	"%u",	0); /* XXX */
 	PS_ADD("itrealvalue",	"%u",	0); /* XXX */
 	PS_ADD("starttime",	"%d",	0); /* XXX */
-	PS_ADD("vsize",		"%u",	kp.ki_size);
-	PS_ADD("rss",		"%u",	P2K(kp.ki_rssize));
+	PS_ADD("vsize",		"%ju",	(uintmax_t)kp.ki_size);
+	PS_ADD("rss",		"%ju",	P2K((uintmax_t)kp.ki_rssize));
 	PS_ADD("rlim",		"%u",	0); /* XXX */
 	PS_ADD("startcode",	"%u",	(unsigned)0);
 	PS_ADD("endcode",	"%u",	0); /* XXX */
@@ -548,14 +547,16 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 	char *state;
 	segsz_t lsize;
 	struct thread *td2;
+	struct sigacts *ps;
 	int i;
 
-	mtx_lock_spin(&sched_lock);
+	PROC_LOCK(p);
 	td2 = FIRST_THREAD_IN_PROC(p); /* XXXKSE pretend only one thread */
 
 	if (P_SHOULDSTOP(p)) {
 		state = "T (stopped)";
 	} else {
+		mtx_lock_spin(&sched_lock);
 		switch(p->p_state) {
 		case PRS_NEW:
 			state = "I (idle)";
@@ -585,10 +586,9 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 			state = "? (unknown)";
 			break;
 		}
+		mtx_unlock_spin(&sched_lock);
 	}
-	mtx_unlock_spin(&sched_lock);
 
-	PROC_LOCK(p);
 	fill_kinfo_proc(p, &kp);
 	sbuf_printf(sb, "Name:\t%s\n",		p->p_comm); /* XXX escape */
 	sbuf_printf(sb, "State:\t%s\n",		state);
@@ -626,15 +626,15 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 	 * could also compute VmLck, but I don't really care enough to
 	 * implement it. Submissions are welcome.
 	 */
-	sbuf_printf(sb, "VmSize:\t%8u kB\n",	B2K(kp.ki_size));
+	sbuf_printf(sb, "VmSize:\t%8ju kB\n",	B2K((uintmax_t)kp.ki_size));
 	sbuf_printf(sb, "VmLck:\t%8u kB\n",	P2K(0)); /* XXX */
-	sbuf_printf(sb, "VmRss:\t%8u kB\n",	P2K(kp.ki_rssize));
-	sbuf_printf(sb, "VmData:\t%8u kB\n",	P2K(kp.ki_dsize));
-	sbuf_printf(sb, "VmStk:\t%8u kB\n",	P2K(kp.ki_ssize));
-	sbuf_printf(sb, "VmExe:\t%8u kB\n",	P2K(kp.ki_tsize));
+	sbuf_printf(sb, "VmRss:\t%8ju kB\n",	P2K((uintmax_t)kp.ki_rssize));
+	sbuf_printf(sb, "VmData:\t%8ju kB\n",	P2K((uintmax_t)kp.ki_dsize));
+	sbuf_printf(sb, "VmStk:\t%8ju kB\n",	P2K((uintmax_t)kp.ki_ssize));
+	sbuf_printf(sb, "VmExe:\t%8ju kB\n",	P2K((uintmax_t)kp.ki_tsize));
 	lsize = B2P(kp.ki_size) - kp.ki_dsize -
 	    kp.ki_ssize - kp.ki_tsize - 1;
-	sbuf_printf(sb, "VmLib:\t%8u kB\n",	P2K(lsize));
+	sbuf_printf(sb, "VmLib:\t%8ju kB\n",	P2K((uintmax_t)lsize));
 
 	/*
 	 * Signal masks
@@ -654,8 +654,11 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 	 * relation to struct proc, so SigBlk is left unimplemented.
 	 */
 	sbuf_printf(sb, "SigBlk:\t%08x\n",	0); /* XXX */
-	sbuf_printf(sb, "SigIgn:\t%08x\n",	p->p_sigignore.__bits[0]);
-	sbuf_printf(sb, "SigCgt:\t%08x\n",	p->p_sigcatch.__bits[0]);
+	ps = p->p_sigacts;
+	mtx_lock(&ps->ps_mtx);
+	sbuf_printf(sb, "SigIgn:\t%08x\n",	ps->ps_sigignore.__bits[0]);
+	sbuf_printf(sb, "SigCgt:\t%08x\n",	ps->ps_sigcatch.__bits[0]);
+	mtx_unlock(&ps->ps_mtx);
 	PROC_UNLOCK(p);
 	
 	/*
@@ -725,6 +728,7 @@ linprocfs_donetdev(PFS_FILL_ARGS)
 	    "bytes    packets errs drop fifo frame compressed",
 	    "bytes    packets errs drop fifo frame compressed");
 
+	IFNET_RLOCK();
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 		linux_ifname(ifp, ifname, sizeof ifname);
 			sbuf_printf(sb, "%6.6s:", ifname);
@@ -733,6 +737,7 @@ linprocfs_donetdev(PFS_FILL_ARGS)
 		sbuf_printf(sb, "%8lu %7lu %4lu %4lu %4lu %5lu %7lu %10lu\n",
 		    0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
 	}
+	IFNET_RUNLOCK();
 	
 	return (0);
 }

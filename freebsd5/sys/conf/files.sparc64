@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.sparc64,v 1.34 2002/10/20 17:03:14 tmm Exp $
+# $FreeBSD: src/sys/conf/files.sparc64,v 1.42 2003/04/21 19:54:11 phk Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -18,11 +18,16 @@ dev/ofw/openfirmio.c		standard
 dev/sio/sio.c			optional	sio
 dev/sio/sio_isa.c		optional	sio isa
 geom/geom_bsd.c			standard
+geom/geom_bsd_enc.c		standard
 geom/geom_sunlabel.c		standard
+geom/geom_sunlabel_enc.c	standard
 libkern/ffs.c			standard
-kern/subr_diskmbr.c		standard
 kern/syscalls.c			optional	ktr
+sparc64/central/central.c	optional	central
 sparc64/ebus/ebus.c		optional	ebus
+sparc64/fhc/fhc.c		optional	fhc
+sparc64/fhc/fhc_central.c	optional	fhc central
+sparc64/fhc/fhc_nexus.c		optional	fhc
 sparc64/isa/isa.c		optional	isa
 sparc64/isa/ofw_isa.c		optional	ebus
 sparc64/isa/ofw_isa.c		optional	isa
@@ -33,6 +38,7 @@ sparc64/sbus/sbus.c		optional	sbus
 sparc64/sparc64/autoconf.c	standard
 sparc64/sparc64/bus_machdep.c	standard
 sparc64/sparc64/cache.c		standard
+sparc64/sparc64/cheetah.c	standard
 sparc64/sparc64/clock.c		standard
 sparc64/sparc64/counter.c	standard
 sparc64/sparc64/critical.c	standard
@@ -42,18 +48,17 @@ sparc64/sparc64/db_trace.c	optional	ddb
 sparc64/sparc64/db_hwwatch.c	optional	ddb
 sparc64/sparc64/dump_machdep.c	standard
 sparc64/sparc64/elf_machdep.c	standard
-# locore.S and exception.S need to be handled in the Makefile to put them
-# first.  Otherwise they're normal.
-# sparc64/sparc64/locore.S	standard
-# sparc64/sparc64/exception.S	standard
-# sparc64/sparc64/interrupt.S	standard
+sparc64/sparc64/exception.S	standard	no-obj
 sparc64/sparc64/eeprom.c	optional	eeprom
 sparc64/sparc64/eeprom_ebus.c	optional	eeprom ebus
+sparc64/sparc64/eeprom_fhc.c	optional	eeprom fhc
 sparc64/sparc64/eeprom_sbus.c	optional	eeprom sbus
 sparc64/sparc64/identcpu.c	standard
 sparc64/sparc64/in_cksum.c	optional	inet
+sparc64/sparc64/interrupt.S	standard	no-obj
 sparc64/sparc64/intr_machdep.c	standard
 sparc64/sparc64/iommu.c		standard
+sparc64/sparc64/locore.S	standard	no-obj
 sparc64/sparc64/machdep.c	standard
 sparc64/sparc64/mem.c		standard
 sparc64/sparc64/mp_exception.S	optional	smp
@@ -66,6 +71,7 @@ sparc64/sparc64/pmap.c		standard
 sparc64/sparc64/prof_machdep.c	optional	profiling-routine
 sparc64/sparc64/rwindow.c	standard
 sparc64/sparc64/sparcbus_if.m	standard
+sparc64/sparc64/spitfire.c	standard
 sparc64/sparc64/support.S	standard
 sparc64/sparc64/sys_machdep.c	standard
 sparc64/sparc64/swtch.S		standard

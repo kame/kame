@@ -53,7 +53,7 @@
  * SUCH DAMAGE.
  *
  *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.14 2002/12/11 20:59:46 emoore Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.16 2003/04/01 15:06:22 phk Exp $
  */
 
 #include <sys/param.h>
@@ -63,8 +63,6 @@
 #include <dev/amr/amr_compat.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>

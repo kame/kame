@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.69 2002/09/14 16:54:46 scottl Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.72 2003/02/03 17:53:14 jake Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -472,16 +472,19 @@ alpha_clock_interrupt(struct trapframe *framep)
 #endif
 			(*platform.clockintr)(framep);
 			/* divide hz (1024) by 8 to get stathz (128) */
-			if ((++schedclk2 & 0x7) == 0)
+			if ((++schedclk2 & 0x7) == 0) {
+				if (profprocs != 0)
+					profclock((struct clockframe *)framep);
 				statclock((struct clockframe *)framep);
+			}
 #ifdef SMP
 		} else {
-			mtx_lock_spin(&sched_lock);
-			hardclock_process(curthread, TRAPF_USERMODE(framep));
-			if ((schedclk2 & 0x7) == 0)
-				statclock_process(curkse, TRAPF_PC(framep),
-				    TRAPF_USERMODE(framep));
-			mtx_unlock_spin(&sched_lock);
+			hardclock_process((struct clockframe *)framep);
+			if ((schedclk2 & 0x7) == 0) {
+				if (profprocs != 0)
+					profclock((struct clockframe *)framep);
+				statclock((struct clockframe *)framep);
+			}
 		}
 #endif
 		critical_exit();

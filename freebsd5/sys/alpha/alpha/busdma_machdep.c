@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/busdma_machdep.c,v 1.24 2002/10/04 20:40:39 sam Exp $
+ * $FreeBSD: src/sys/alpha/alpha/busdma_machdep.c,v 1.37 2003/05/27 04:59:56 scottl Exp $
  */
 
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
 #include <sys/interrupt.h>
+#include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -41,12 +42,11 @@
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 
+#include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/sgmap.h>
 #include <machine/md_var.h>
 
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #define MAX_BPAGES 128
 
 struct bus_dma_tag {
@@ -101,6 +101,7 @@ static STAILQ_HEAD(, bus_dmamap) bounce_map_waitinglist;
 static STAILQ_HEAD(, bus_dmamap) bounce_map_callbacklist;
 static struct bus_dmamap nobounce_dmamap;
 
+static void init_bounce_pages(void *dummy);
 static int alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages);
 static int reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map);
 static vm_offset_t add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map,
@@ -179,9 +180,8 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 			newtag->filterarg = parent->filterarg;
 			newtag->parent = parent->parent;
 		}
-		if (newtag->parent != NULL) {
-			parent->ref_count++;
-		}
+		if (newtag->parent != NULL)
+			atomic_add_int(&parent->ref_count, 1);
 	}
 	
 	if (newtag->lowaddr < ptoa(Maxmem) && (flags & BUS_DMA_ALLOCNOW) != 0) {
@@ -228,7 +228,7 @@ bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			bus_dma_tag_t parent;
 
 			parent = dmat->parent;
-			dmat->ref_count--;
+			atomic_subtract_int(&dmat->ref_count, 1);
 			if (dmat->ref_count == 0) {
 				free(dmat, M_DEVBUF);
 			}
@@ -365,10 +365,12 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 		 *     and handles multi-seg allocations.  Nobody is doing
 		 *     multi-seg allocations yet though.
 		 */
+		mtx_lock(&Giant);
 		*vaddr = contigmalloc(dmat->maxsize, M_DEVBUF,
 		    (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK,
 		    0ul, dmat->lowaddr, dmat->alignment? dmat->alignment : 1ul,
 		    dmat->boundary);
+		mtx_unlock(&Giant);
 	}
 	if (*vaddr == NULL)
 		return (ENOMEM);
@@ -390,11 +392,14 @@ bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 		panic("bus_dmamem_free: Invalid map freed\n");
 	if ((dmat->maxsize <= PAGE_SIZE) && dmat->lowaddr >= ptoa(Maxmem))
 		free(vaddr, M_DEVBUF);
-	else
+	else {
+		mtx_lock(&Giant);
 		contigfree(vaddr, dmat->maxsize, M_DEVBUF);
+		mtx_unlock(&Giant);
+	}
 }
 
-#define BUS_DMAMAP_NSEGS ((BUS_SPACE_MAXSIZE / PAGE_SIZE) + 1)
+#define BUS_DMAMAP_NSEGS ((64 * 1024 / PAGE_SIZE) + 1)
 
 /*
  * Map the buffer buf into bus space using the dmamap map.
@@ -468,9 +473,7 @@ bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 
 	/* Reserve Necessary Bounce Pages */
 	if (map->pagesneeded != 0) {
-		int s;
-
-		s = splhigh();
+		mtx_lock(&bounce_lock);
 	 	if (reserve_bounce_pages(dmat, map) != 0) {
 
 			/* Queue us for resources */
@@ -481,11 +484,10 @@ bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 			map->callback_arg = callback_arg;
 
 			STAILQ_INSERT_TAIL(&bounce_map_waitinglist, map, links);
-			splx(s);
-
+			mtx_unlock(&bounce_lock);
 			return (EINPROGRESS);
 		}
-		splx(s);
+		mtx_unlock(&bounce_lock);
 	}
 
 	vaddr = (vm_offset_t)buf;
@@ -647,8 +649,7 @@ bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
 
 	KASSERT(dmat->lowaddr >= ptoa(Maxmem) || map != NULL,
 		("bus_dmamap_load_mbuf: No support for bounce pages!"));
-	KASSERT(m0->m_flags & M_PKTHDR,
-		("bus_dmamap_load_mbuf: no packet header"));
+	M_ASSERTPKTHDR(m0);
 
 	nsegs = 0;
 	error = 0;
@@ -658,11 +659,14 @@ bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
 		struct mbuf *m;
 
 		for (m = m0; m != NULL && error == 0; m = m->m_next) {
-			error = _bus_dmamap_load_buffer(dmat,
-					dm_segments,
-					m->m_data, m->m_len,
-					NULL, flags, &lastaddr, &nsegs, first);
-			first = 0;
+			if (m->m_len > 0) {
+				error = _bus_dmamap_load_buffer(dmat,
+						dm_segments,
+						m->m_data, m->m_len,
+						NULL, flags, &lastaddr,
+						&nsegs, first);
+				first = 0;
+			}
 		}
 	} else {
 		error = EINVAL;
@@ -722,13 +726,15 @@ bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map,
 			resid < iov[i].iov_len ? resid : iov[i].iov_len;
 		caddr_t addr = (caddr_t) iov[i].iov_base;
 
-		error = _bus_dmamap_load_buffer(dmat,
-				dm_segments,
-				addr, minlen,
-				td, flags, &lastaddr, &nsegs, first);
-		first = 0;
+		if (minlen > 0) {
+			error = _bus_dmamap_load_buffer(dmat,
+					dm_segments,
+					addr, minlen,
+					td, flags, &lastaddr, &nsegs, first);
+			first = 0;
 
-		resid -= minlen;
+			resid -= minlen;
+		}
 	}
 
 	if (error) {
@@ -774,31 +780,40 @@ _bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 		 * want to add support for invalidating
 		 * the caches on broken hardware
 		 */
-		switch (op) {
-		case BUS_DMASYNC_PREWRITE:
+		if (op & BUS_DMASYNC_PREWRITE) {
 			while (bpage != NULL) {
 				bcopy((void *)bpage->datavaddr,
 				      (void *)bpage->vaddr,
 				      bpage->datacount);
 				bpage = STAILQ_NEXT(bpage, links);
 			}
-			break;
+		}
 
-		case BUS_DMASYNC_POSTREAD:
+		if (op & BUS_DMASYNC_POSTREAD) {
 			while (bpage != NULL) {
 				bcopy((void *)bpage->vaddr,
 				      (void *)bpage->datavaddr,
 				      bpage->datacount);
 				bpage = STAILQ_NEXT(bpage, links);
 			}
-			break;
-		case BUS_DMASYNC_PREREAD:
-		case BUS_DMASYNC_POSTWRITE:
-			/* No-ops */
-			break;
 		}
 	}
 }
+
+static void
+init_bounce_pages(void *dummy __unused)
+{
+
+	free_bpages = 0;
+	reserved_bpages = 0;
+	active_bpages = 0;
+	total_bpages = 0;
+	STAILQ_INIT(&bounce_page_list);
+	STAILQ_INIT(&bounce_map_waitinglist);
+	STAILQ_INIT(&bounce_map_callbacklist);
+	mtx_init(&bounce_lock, "bounce pages lock", NULL, MTX_DEF);
+}
+SYSINIT(bpages, SI_SUB_LOCK, SI_ORDER_ANY, init_bounce_pages, NULL);
 
 static int
 alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
@@ -806,13 +821,6 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 	int count;
 
 	count = 0;
-	if (total_bpages == 0) {
-		mtx_init(&bounce_lock, "BouncePage", NULL, MTX_DEF);
-		STAILQ_INIT(&bounce_page_list);
-		STAILQ_INIT(&bounce_map_waitinglist);
-		STAILQ_INIT(&bounce_map_callbacklist);
-	}
-	
 	while (numpages > 0) {
 		struct bounce_page *bpage;
 
@@ -821,11 +829,13 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 
 		if (bpage == NULL)
 			break;
+		mtx_lock(&Giant);
 		bpage->vaddr = (vm_offset_t)contigmalloc(PAGE_SIZE, M_DEVBUF,
 							 M_NOWAIT, 0ul,
 							 dmat->lowaddr,
 							 PAGE_SIZE,
 							 dmat->boundary);
+		mtx_unlock(&Giant);
 		if (bpage->vaddr == NULL) {
 			free(bpage, M_DEVBUF);
 			break;
@@ -847,6 +857,7 @@ reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 	int pages;
 
+	mtx_assert(&bounce_lock, MA_OWNED);
 	pages = MIN(free_bpages, map->pagesneeded - map->pagesreserved);
 	free_bpages -= pages;
 	reserved_bpages += pages;

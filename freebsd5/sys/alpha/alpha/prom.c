@@ -24,10 +24,8 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/alpha/prom.c,v 1.24 2002/11/08 15:24:32 jhb Exp $
+ * $FreeBSD: src/sys/alpha/alpha/prom.c,v 1.26 2003/02/25 00:42:39 marcel Exp $
  */
-
-#include "opt_simos.h"
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
@@ -99,18 +97,12 @@ static int alpha_console;
 void
 init_bootstrap_console()
 {
-#ifndef SIMOS
 	char buf[4];
-#endif
 
 	init_prom_interface(hwrpb);
 
-#ifdef SIMOS
-	alpha_console = 0;
-#else
 	prom_getenv(PROM_E_TTY_DEV, buf, 4);
 	alpha_console = buf[0] - '0';
-#endif
 	promcnattach(alpha_console);
 }
 
@@ -129,9 +121,7 @@ static void leave_prom(critical_t);
  * of the console area.
  */
 void
-promcnputc(dev, c)
-	dev_t dev;
-	int c;
+promcnputc(struct consdev *cp, int c)
 {
         prom_return_t ret;
 	unsigned char *to = (unsigned char *)0x20000000;
@@ -153,8 +143,7 @@ promcnputc(dev, c)
  * Wait for the prom to get a real char and pass it back.
  */
 int
-promcngetc(dev)
-	dev_t dev;
+promcngetc(struct consdev *cp)
 {
         prom_return_t ret;
 	register_t s;
@@ -174,8 +163,7 @@ promcngetc(dev)
  * If a char is ready, return it, otherwise return -1.
  */
 int
-promcncheckc(dev)
-	dev_t dev;
+promcncheckc(struct consdev *cp)
 {
         prom_return_t ret;
 	register_t s;
@@ -198,20 +186,6 @@ enter_prom()
 	s = intr_disable();
 
 	if (!prom_mapped) {
-#ifdef SIMOS
-		/*
-		 * SimOS console uses floating point.
-		 */
-		if (curthread != PCPU_GET(fpcurthread)) {
-			alpha_pal_wrfen(1);
-			if (PCPU_GET(fpcurthread)) {
-				savefpstate(&PCPU_GET(fpcurthread)->td_pcb->pcb_fp);
-				PCPU_GET(fpcurthread)->td_pcb->pcb_hw.apcb_flags &= ~ALPHA_PCB_FLAGS_FEN;
-			}
-			PCPU_SET(fpcurthread, curthread);
-			restorefpstate(&PCPU_GET(fpcurthread)->td_pcb->pcb_fp);
-		}
-#endif
 		if (!pmap_uses_prom_console())
 			panic("enter_prom");
 		lev1map = rom_lev1map();	/* XXX */

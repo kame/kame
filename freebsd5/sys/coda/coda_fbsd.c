@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_fbsd.cr,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_fbsd.c,v 1.25 2002/03/20 05:00:21 alfred Exp $
+ * $FreeBSD: src/sys/coda/coda_fbsd.c,v 1.29 2003/03/27 12:47:53 tjr Exp $
  * 
  */
 
@@ -66,19 +66,14 @@
 #define VC_DEV_NO      93
 
 static struct cdevsw codadevsw = {
-	/* open */	vc_nb_open,
-	/* close */	vc_nb_close,
-	/* read */	vc_nb_read,
-	/* write */	vc_nb_write,
-	/* ioctl */	vc_nb_ioctl,
-	/* poll */	vc_nb_poll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"Coda",
-	/* maj */	VC_DEV_NO,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	vc_nb_open,
+	.d_close =	vc_nb_close,
+	.d_read =	vc_nb_read,
+	.d_write =	vc_nb_write,
+	.d_ioctl =	vc_nb_ioctl,
+	.d_poll =	vc_nb_poll,
+	.d_name =	"Coda",
+	.d_maj =	VC_DEV_NO,
 };
 
 int     vcdebug = 1;
@@ -178,6 +173,8 @@ static void coda_fbsd_drvinit(void *unused);
 static void coda_fbsd_drvuninit(void *unused);
 static void coda_fbsd_clone(void *arg, char *name, int namelen, dev_t *dev);
 
+static eventhandler_tag clonetag;
+
 static void coda_fbsd_clone(arg, name, namelen, dev)
     void *arg;
     char *name;
@@ -201,8 +198,7 @@ static void coda_fbsd_drvinit(unused)
 {
     int i;
 
-    EVENTHANDLER_REGISTER(dev_clone,coda_fbsd_clone,0,1000);
-    cdevsw_add(&codadevsw);
+    clonetag = EVENTHANDLER_REGISTER(dev_clone,coda_fbsd_clone,0,1000);
     for(i=0;i<NVCODA;i++)
 	coda_mnttbl[i].dev = NULL; 
 }
@@ -212,11 +208,10 @@ static void coda_fbsd_drvuninit(unused)
 {
     int i;
 
-    EVENTHANDLER_DEREGISTER(dev_clone,NULL);
+    EVENTHANDLER_DEREGISTER(dev_clone,clonetag);
     for(i=0;i<NVCODA;i++)
 	if(coda_mnttbl[i].dev)
 	    destroy_dev(coda_mnttbl[i].dev);
-    cdevsw_remove(&codadevsw);
 }
 
 SYSINIT(coda_fbsd_dev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+VC_DEV_NO,coda_fbsd_drvinit,NULL);

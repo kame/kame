@@ -25,10 +25,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/efi/loader/main.c,v 1.16 2002/12/10 20:11:20 marcel Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/loader/main.c,v 1.19 2003/04/03 21:36:29 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>
@@ -36,6 +34,7 @@ static const char rcsid[] =
 #include <machine/sal.h>
 #include <machine/pal.h>
 #include <machine/pte.h>
+#include <machine/dig64.h>
 
 #include <efi.h>
 #include <efilib.h>
@@ -130,12 +129,15 @@ main(int argc, CHAR16 *argv[])
 
 	efinet_init_driver();
 
+
+	/* Get our loaded image protocol interface structure. */
+	BS->HandleProtocol(IH, &imgid, (VOID**)&img);
+
+	printf("Image base: 0x%016lx\n", (u_long)img->ImageBase);
+
 	printf("\n");
 	printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
 	printf("(%s, %s)\n", bootprog_maker, bootprog_date);
-#if 0
-	printf("Memory: %ld k\n", memsize() / 1024);
-#endif
 
 	/*
 	 * XXX quick and dirty check to see if we're loaded from the
@@ -143,8 +145,6 @@ main(int argc, CHAR16 *argv[])
 	 * other cases we set the default device to 'disk'. We presume
 	 * fixed positions in devsw for both net and disk.
 	 */
-	BS->HandleProtocol(IH, &imgid, (VOID**)&img);
-
 	status = BS->HandleProtocol(img->DeviceHandle, &netid, (VOID**)&net);
 	if (status == EFI_SUCCESS && net != NULL) {
 		currdev.d_dev = devsw[1];	/* XXX net */
@@ -495,3 +495,77 @@ command_dtr(int argc, char *argv[])
 	return print_trs(1);
 }
 
+COMMAND_SET(hcdp, "hcdp", "Dump HCDP info", command_hcdp);
+
+static char *
+hcdp_string(char *s, u_int len)
+{
+	static char buffer[256];
+
+	memcpy(buffer, s, len);
+	buffer[len] = 0;
+	return (buffer);
+}
+	
+static int
+command_hcdp(int argc, char *argv[])
+{
+	struct dig64_hcdp_table *tbl;
+	struct dig64_hcdp_entry *ent;
+	struct dig64_gas *gas;
+	int i;
+
+	tbl = efi_get_table(&hcdp);
+	if (tbl == NULL) {
+		printf("No HCDP table present\n");
+		return (CMD_OK);
+	}
+	if (memcmp(tbl->signature, HCDP_SIGNATURE, sizeof(tbl->signature))) {
+		printf("HCDP table has invalid signature\n");
+		return (CMD_OK);
+	}
+	if (tbl->length < sizeof(*tbl) - sizeof(*tbl->entry)) {
+		printf("HCDP table too short\n");
+		return (CMD_OK);
+	}
+	printf("HCDP table at 0x%016lx\n", (u_long)tbl);
+	printf("Signature  = %s\n", hcdp_string(tbl->signature, 4));
+	printf("Length     = %u\n", tbl->length);
+	printf("Revision   = %u\n", tbl->revision);
+	printf("Checksum   = %u\n", tbl->checksum);
+	printf("OEM Id     = %s\n", hcdp_string(tbl->oem_id, 6));
+	printf("Table Id   = %s\n", hcdp_string(tbl->oem_tbl_id, 8));
+	printf("OEM rev    = %u\n", tbl->oem_rev);
+	printf("Creator Id = %s\n", hcdp_string(tbl->creator_id, 4));
+	printf("Creator rev= %u\n", tbl->creator_rev);
+	printf("Entries    = %u\n", tbl->entries);
+	for (i = 0; i < tbl->entries; i++) {
+		ent = tbl->entry + i;
+		printf("Entry #%d:\n", i + 1);
+		printf("    Type      = %u\n", ent->type);
+		printf("    Databits  = %u\n", ent->databits);
+		printf("    Parity    = %u\n", ent->parity);
+		printf("    Stopbits  = %u\n", ent->stopbits);
+		printf("    PCI seg   = %u\n", ent->pci_segment);
+		printf("    PCI bus   = %u\n", ent->pci_bus);
+		printf("    PCI dev   = %u\n", ent->pci_device);
+		printf("    PCI func  = %u\n", ent->pci_function);
+		printf("    Interrupt = %u\n", ent->interrupt);
+		printf("    PCI flag  = %u\n", ent->pci_flag);
+		printf("    Baudrate  = %lu\n",
+		    ((u_long)ent->baud_high << 32) + (u_long)ent->baud_low);
+		gas = &ent->address;
+		printf("    Addr space= %u\n", gas->addr_space);
+		printf("    Bit width = %u\n", gas->bit_width);
+		printf("    Bit offset= %u\n", gas->bit_offset);
+		printf("    Address   = 0x%016lx\n",
+		    ((u_long)gas->addr_high << 32) + (u_long)gas->addr_low);
+		printf("    PCI type  = %u\n", ent->pci_devid);
+		printf("    PCI vndr  = %u\n", ent->pci_vendor);
+		printf("    IRQ       = %u\n", ent->irq);
+		printf("    PClock    = %u\n", ent->pclock);
+		printf("    PCI iface = %u\n", ent->pci_interface);
+	}
+	printf("<EOT>\n");
+	return (CMD_OK);
+}

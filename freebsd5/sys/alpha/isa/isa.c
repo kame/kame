@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/isa/isa.c,v 1.29 2002/02/08 18:30:36 jhb Exp $
+ * $FreeBSD: src/sys/alpha/isa/isa.c,v 1.31 2003/04/11 13:30:32 gallatin Exp $
  */
 
 #include <sys/param.h>
@@ -389,17 +389,31 @@ isa_teardown_intr(device_t dev, device_t child,
 		  struct resource *irq, void *cookie)
 {
 	struct isa_intr *ii = cookie;
+	struct intrhand *ih, *handler = (struct intrhand *)ii->ih;
+	struct ithd *ithread = handler->ih_ithread;
+	int num_handlers = 0;
 
-	mtx_lock_spin(&icu_lock);
-	isa_intr_disable(irq->r_start);
-	mtx_unlock_spin(&icu_lock);
+	mtx_lock(&ithread->it_lock);
+	TAILQ_FOREACH(ih, &ithread->it_handlers, ih_next)
+		num_handlers++;
+	mtx_unlock(&ithread->it_lock);
 
-	if (platform.isa_teardown_intr) {
-		platform.isa_teardown_intr(dev, child, irq, cookie);	
-		return 0;
+	/* 
+	 * Only disable the interrupt in hardware if there are no
+	 * other handlers sharing it.
+	 */
+
+	if (num_handlers == 1) {
+		mtx_lock_spin(&icu_lock);
+		isa_intr_disable(irq->r_start);
+		mtx_unlock_spin(&icu_lock);
+		if (platform.isa_teardown_intr) {
+			platform.isa_teardown_intr(dev, child, irq, 
+						   cookie);	
+			return 0;
+		}
+
 	}
-
 	alpha_teardown_intr(ii->ih);
-
 	return 0;
 }

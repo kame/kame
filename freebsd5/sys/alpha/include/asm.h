@@ -22,8 +22,11 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *	From: NetBSD: asm.h,v 1.18 1997/11/03 04:22:06 ross Exp
- * $FreeBSD: src/sys/alpha/include/asm.h,v 1.14 2002/09/17 01:48:54 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/asm.h,v 1.15 2003/01/18 23:43:12 obrien Exp $
  */
+
+#ifndef _MACHINE_ASM_H_
+#define	_MACHINE_ASM_H_
 
 /*
  *	Assembly coding style
@@ -642,3 +645,5 @@ label:	ASCIZ msg;						\
 #else
 #define __FBSDID(s)	/* nothing */
 #endif /* not lint and not STRIP_FBSDID */
+
+#endif /* !_MACHINE_ASM_H_ */

@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#73 $
+ * $Id: aic79xx.h,v 1.11 2003/05/26 21:10:58 gibbs Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.6 2002/12/01 08:13:37 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.12 2003/05/30 02:14:22 scottl Exp $
  */
 
 #ifndef _AIC79XX_H_
@@ -97,6 +97,14 @@ struct scb_platform_data;
 	SCB_GET_TARGET(ahd, scb)
 #define SCB_GET_TARGET_MASK(ahd, scb) \
 	(0x01 << (SCB_GET_TARGET_OFFSET(ahd, scb)))
+#ifdef AHD_DEBUG
+#define SCB_IS_SILENT(scb)					\
+	((ahd_debug & AHD_SHOW_MASKED_ERRORS) == 0		\
+      && (((scb)->flags & SCB_SILENT) != 0))
+#else
+#define SCB_IS_SILENT(scb)					\
+	(((scb)->flags & SCB_SILENT) != 0)
+#endif
 /*
  * TCLs have the following format: TTTTLLLLLLLL
  */
@@ -172,7 +180,7 @@ do {								\
 
 /*
  * Define the size of our QIN and QOUT FIFOs.  They must be a power of 2
- * in size and accomodate as many transactions as can be queued concurrently.
+ * in size and accommodate as many transactions as can be queued concurrently.
  */
 #define	AHD_QIN_SIZE	AHD_MAX_QUEUE
 #define	AHD_QOUT_SIZE	AHD_MAX_QUEUE
@@ -250,27 +258,30 @@ typedef enum {
 	AHD_PCIX_CHIPRST_BUG	= 0x0040,
 	/* MMAPIO is not functional in PCI-X mode.  */
 	AHD_PCIX_MMAPIO_BUG	= 0x0080,
+	/* Reads to SCBRAM fail to reset the discard timer. */
+	AHD_PCIX_SCBRAM_RD_BUG  = 0x0100,
 	/* Bug workarounds that can be disabled on non-PCIX busses. */
 	AHD_PCIX_BUG_MASK	= AHD_PCIX_CHIPRST_BUG
-				| AHD_PCIX_MMAPIO_BUG,
+				| AHD_PCIX_MMAPIO_BUG
+				| AHD_PCIX_SCBRAM_RD_BUG,
 	/*
 	 * LQOSTOP0 status set even for forced selections with ATN
 	 * to perform non-packetized message delivery.
 	 */
-	AHD_LQO_ATNO_BUG	= 0x0100,
+	AHD_LQO_ATNO_BUG	= 0x0200,
 	/* FIFO auto-flush does not always trigger.  */
-	AHD_AUTOFLUSH_BUG	= 0x0200,
+	AHD_AUTOFLUSH_BUG	= 0x0400,
 	/* The CLRLQO registers are not self-clearing. */
-	AHD_CLRLQO_AUTOCLR_BUG	= 0x0400,
+	AHD_CLRLQO_AUTOCLR_BUG	= 0x0800,
 	/* The PACKETIZED status bit refers to the previous connection. */
-	AHD_PKTIZED_STATUS_BUG  = 0x0800,
+	AHD_PKTIZED_STATUS_BUG  = 0x1000,
 	/* "Short Luns" are not placed into outgoing LQ packets correctly. */
-	AHD_PKT_LUN_BUG		= 0x1000,
+	AHD_PKT_LUN_BUG		= 0x2000,
 	/*
 	 * Only the FIFO allocated to the non-packetized connection may
 	 * be in use during a non-packetzied connection.
 	 */
-	AHD_NONPACKFIFO_BUG	= 0x2000,
+	AHD_NONPACKFIFO_BUG	= 0x4000,
 	/*
 	 * Writing to a DFF SCBPTR register may fail if concurent with
 	 * a hardware write to the other DFF SCBPTR register.  This is
@@ -278,30 +289,44 @@ typedef enum {
 	 * this bug have the AHD_NONPACKFIFO_BUG and all writes of concern
 	 * occur in non-packetized connections.
 	 */
-	AHD_MDFF_WSCBPTR_BUG	= 0x4000,
+	AHD_MDFF_WSCBPTR_BUG	= 0x8000,
 	/* SGHADDR updates are slow. */
-	AHD_REG_SLOW_SETTLE_BUG	= 0x8000,
+	AHD_REG_SLOW_SETTLE_BUG	= 0x10000,
 	/*
 	 * Changing the MODE_PTR coincident with an interrupt that
 	 * switches to a different mode will cause the interrupt to
 	 * be in the mode written outside of interrupt context.
 	 */
-	AHD_SET_MODE_BUG	= 0x10000,
+	AHD_SET_MODE_BUG	= 0x20000,
 	/* Non-packetized busfree revision does not work. */
-	AHD_BUSFREEREV_BUG	= 0x20000,
+	AHD_BUSFREEREV_BUG	= 0x40000,
 	/*
 	 * Paced transfers are indicated with a non-standard PPR
 	 * option bit in the neg table, 160MHz is indicated by
 	 * sync factor 0x7, and the offset if off by a factor of 2.
 	 */
-	AHD_PACED_NEGTABLE_BUG	= 0x40000,
+	AHD_PACED_NEGTABLE_BUG	= 0x80000,
 	/* LQOOVERRUN false positives. */
-	AHD_LQOOVERRUN_BUG	= 0x80000,
+	AHD_LQOOVERRUN_BUG	= 0x100000,
 	/*
 	 * Controller write to INTSTAT will lose to a host
 	 * write to CLRINT.
 	 */
-	AHD_INTCOLLISION_BUG	= 0x100000
+	AHD_INTCOLLISION_BUG	= 0x200000,
+	/*
+	 * The GEM318 violates the SCSI spec by not waiting
+	 * the mandated bus settle delay between phase changes
+	 * in some situations.  Some aic79xx chip revs. are more
+	 * strict in this regard and will treat REQ assertions
+	 * that fall within the bus settle delay window as
+	 * glitches.  This flag tells the firmware to tolerate
+	 * early REQ assertions.
+	 */
+	AHD_EARLY_REQ_BUG	= 0x400000,
+	/*
+	 * The LED does not stay on long enough in packetized modes.
+	 */
+	AHD_FAINT_LED_BUG	= 0x800000
 } ahd_bug;
 
 /*
@@ -311,10 +336,7 @@ typedef enum {
  */
 typedef enum {
 	AHD_FNONE	      = 0x00000,
-	AHD_PRIMARY_CHANNEL   = 0x00003,/*
-					 * The channel that should
-					 * be probed first.
-					 */
+	AHD_BOOT_CHANNEL      = 0x00001,/* We were set as the boot channel. */
 	AHD_USEDEFAULTS	      = 0x00004,/*
 					 * For cards without an seeprom
 					 * or a BIOS to initialize the chip's
@@ -348,14 +370,16 @@ typedef enum {
 	AHD_CURRENT_SENSING   = 0x40000,
 	AHD_SCB_CONFIG_USED   = 0x80000,/* No SEEPROM but SCB had info. */
 	AHD_HP_BOARD	      = 0x100000,
-	AHD_RESET_POLL_ACTIVE = 0x200000
+	AHD_RESET_POLL_ACTIVE = 0x200000,
+	AHD_UPDATE_PEND_CMDS  = 0x400000,
+	AHD_RUNNING_QOUTFIFO  = 0x800000
 } ahd_flag;
 
 /************************* Hardware  SCB Definition ***************************/
 
 /*
  * The driver keeps up to MAX_SCB scb structures per card in memory.  The SCB
- * consists of a "hardware SCB" mirroring the fields availible on the card
+ * consists of a "hardware SCB" mirroring the fields available on the card
  * and additional information the kernel stores for each transaction.
  *
  * To minimize space utilization, a portion of the hardware scb stores
@@ -394,14 +418,17 @@ struct target_status {
  * Initiator mode SCB shared data area.
  * If the embedded CDB is 12 bytes or less, we embed
  * the sense buffer address in the SCB.  This allows
- * us to retrieve sense information without interupting
+ * us to retrieve sense information without interrupting
  * the host in packetized mode.
  */
 typedef uint32_t sense_addr_t;
 #define MAX_CDB_LEN 16
 #define MAX_CDB_LEN_WITH_SENSE_ADDR (MAX_CDB_LEN - sizeof(sense_addr_t))
 union initiator_data {
-	uint64_t cdbptr;
+	struct {
+		uint64_t cdbptr;
+		uint8_t  cdblen;
+	} cdb_from_host;
 	uint8_t	 cdb[MAX_CDB_LEN];
 	struct {
 		uint8_t	 cdb[MAX_CDB_LEN_WITH_SENSE_ADDR];
@@ -467,22 +494,22 @@ struct hardware_scb {
  *	  transfer.
  */ 
 #define SG_PTR_MASK	0xFFFFFFF8
-/*16*/	uint16_t tag;
-/*18*/	uint8_t  cdb_len;
-/*19*/	uint8_t  task_management;
-/*20*/	uint32_t next_hscb_busaddr;
-/*24*/	uint64_t dataptr;
-/*32*/	uint32_t datacnt;	/* Byte 3 is spare. */
-/*36*/	uint32_t sgptr;
-/*40*/	uint8_t  control;	/* See SCB_CONTROL in aic79xx.reg for details */
-/*41*/	uint8_t	 scsiid;	/*
+/*16*/	uint16_t tag;		/* Reused by Sequencer. */
+/*18*/	uint8_t  control;	/* See SCB_CONTROL in aic79xx.reg for details */
+/*19*/	uint8_t	 scsiid;	/*
 				 * Selection out Id
 				 * Our Id (bits 0-3) Their ID (bits 4-7)
 				 */
-/*42*/	uint8_t  lun;
-/*43*/	uint8_t  task_attribute;
-/*44*/	uint32_t hscb_busaddr;
-/******* Long lun field only downloaded for full 8 byte lun support *******/
+/*20*/	uint8_t  lun;
+/*21*/	uint8_t  task_attribute;
+/*22*/	uint8_t  cdb_len;
+/*23*/	uint8_t  task_management;
+/*24*/	uint64_t dataptr;
+/*32*/	uint32_t datacnt;	/* Byte 3 is spare. */
+/*36*/	uint32_t sgptr;
+/*40*/	uint32_t hscb_busaddr;
+/*44*/	uint32_t next_hscb_busaddr;
+/********** Long lun field only downloaded for full 8 byte lun support ********/
 /*48*/  uint8_t	 pkt_long_lun[8];
 /******* Fields below are not Downloaded (Sequencer may use for scratch) ******/
 /*56*/  uint8_t	 spare[8];
@@ -560,7 +587,13 @@ typedef enum {
 	SCB_EXPECT_PPR_BUSFREE	= 0x01000,
 	SCB_PKT_SENSE		= 0x02000,
 	SCB_CMDPHASE_ABORT	= 0x04000,
-	SCB_ON_COL_LIST		= 0x08000
+	SCB_ON_COL_LIST		= 0x08000,
+	SCB_SILENT		= 0x10000 /*
+					   * Be quiet about transmission type
+					   * errors.  They are expected and we
+					   * don't want to upset the user.  This
+					   * flag is typically used during DV.
+					   */
 } scb_flag;
 
 struct scb {
@@ -707,12 +740,11 @@ struct ahd_tmode_lstate;
 #define AHD_TRANS_ACTIVE	0x03	/* Assume this target is on the bus */
 #define AHD_TRANS_GOAL		0x04	/* Modify negotiation goal */
 #define AHD_TRANS_USER		0x08	/* Modify user negotiation settings */
-#define AHD_PERIOD_ASYNC	0xFF
 #define AHD_PERIOD_10MHz	0x19
 
 #define AHD_WIDTH_UNKNOWN	0xFF
 #define AHD_PERIOD_UNKNOWN	0xFF
-#define AHD_OFFSET_UNKNOWN	0x0
+#define AHD_OFFSET_UNKNOWN	0xFF
 #define AHD_PPR_OPTS_UNKNOWN	0xFF
 
 /*
@@ -757,7 +789,6 @@ struct ahd_tmode_tstate {
 /*
  * Points of interest along the negotiated transfer scale.
  */
-#define AHD_SYNCRATE_MAX	0x8
 #define AHD_SYNCRATE_160	0x8
 #define AHD_SYNCRATE_PACED	0x8
 #define AHD_SYNCRATE_DT		0x9
@@ -768,6 +799,7 @@ struct ahd_tmode_tstate {
 #define AHD_SYNCRATE_SYNC	0x32
 #define AHD_SYNCRATE_MIN	0x60
 #define	AHD_SYNCRATE_ASYNC	0xFF
+#define AHD_SYNCRATE_MAX	AHD_SYNCRATE_160
 
 /* Safe and valid period for async negotiations. */
 #define	AHD_ASYNC_XFER_PERIOD	0x44
@@ -869,6 +901,40 @@ struct seeprom_config {
 	uint16_t checksum;		/* word 31 */
 };
 
+/*
+ * Vital Product Data used during POST and by the BIOS.
+ */
+struct vpd_config {
+	uint8_t  bios_flags;
+#define		VPDMASTERBIOS	0x0001
+#define		VPDBOOTHOST	0x0002
+	uint8_t  reserved_1[21];
+	uint8_t  resource_type;
+	uint8_t  resource_len[2];
+	uint8_t  resource_data[8];
+	uint8_t  vpd_tag;
+	uint16_t vpd_len;
+	uint8_t  vpd_keyword[2];
+	uint8_t  length;
+	uint8_t  revision;
+	uint8_t  device_flags;
+	uint8_t  termnation_menus[2];
+	uint8_t  fifo_threshold;
+	uint8_t  end_tag;
+	uint8_t  vpd_checksum;
+	uint16_t default_target_flags;
+	uint16_t default_bios_flags;
+	uint16_t default_ctrl_flags;
+	uint8_t  default_irq;
+	uint8_t  pci_lattime;
+	uint8_t  max_target;
+	uint8_t  boot_lun;
+	uint16_t signature;
+	uint8_t  reserved_2;
+	uint8_t  checksum;
+	uint8_t	 reserved_3[4];
+};
+
 /****************************** Flexport Logic ********************************/
 #define FLXADDR_TERMCTL			0x0
 #define		FLX_TERMCTL_ENSECHIGH	0x8
@@ -901,11 +967,12 @@ struct seeprom_config {
 #define		FLX_CSTAT_INVALID	0x3
 
 int		ahd_read_seeprom(struct ahd_softc *ahd, uint16_t *buf,
-				 u_int start_addr, u_int count);
+				 u_int start_addr, u_int count, int bstream);
 
 int		ahd_write_seeprom(struct ahd_softc *ahd, uint16_t *buf,
 				  u_int start_addr, u_int count);
 int		ahd_wait_seeprom(struct ahd_softc *ahd);
+int		ahd_verify_vpd_cksum(struct vpd_config *vpd);
 int		ahd_verify_cksum(struct seeprom_config *sc);
 int		ahd_acquire_seeprom(struct ahd_softc *ahd);
 void		ahd_release_seeprom(struct ahd_softc *ahd);
@@ -1050,6 +1117,16 @@ struct ahd_softc {
 	 * Timer handles for timer driven callbacks.
 	 */
 	ahd_timer_t		  reset_timer;
+	ahd_timer_t		  stat_timer;
+
+	/*
+	 * Statistics.
+	 */
+#define	AHD_STAT_UPDATE_US	250000 /* 250ms */
+#define	AHD_STAT_BUCKETS	4
+	u_int			  cmdcmplt_bucket;
+	uint32_t		  cmdcmplt_counts[AHD_STAT_BUCKETS];
+	uint32_t		  cmdcmplt_total;
 
 	/*
 	 * Card characteristics
@@ -1092,6 +1169,12 @@ struct ahd_softc {
 	 */
 	struct target_cmd	 *targetcmds;
 	uint8_t			  tqinfifonext;
+
+	/*
+	 * Cached verson of the hs_mailbox so we can avoid
+	 * pausing the sequencer during mailbox updates.
+	 */
+	uint8_t			  hs_mailbox;
 
 	/*
 	 * Incoming and outgoing message handling.
@@ -1140,6 +1223,22 @@ struct ahd_softc {
 
 	/* Selection Timer settings */
 	int			  seltime;
+
+	/*
+	 * Interrupt coalescing settings.
+	 */
+#define	AHD_INT_COALESCING_TIMER_DEFAULT		250 /*us*/
+#define	AHD_INT_COALESCING_MAXCMDS_DEFAULT		10
+#define	AHD_INT_COALESCING_MAXCMDS_MAX			127
+#define	AHD_INT_COALESCING_MINCMDS_DEFAULT		5
+#define	AHD_INT_COALESCING_MINCMDS_MAX			127
+#define	AHD_INT_COALESCING_THRESHOLD_DEFAULT		2000
+#define	AHD_INT_COALESCING_STOP_THRESHOLD_DEFAULT	1000
+	u_int			  int_coalescing_timer;
+	u_int			  int_coalescing_maxcmds;
+	u_int			  int_coalescing_mincmds;
+	u_int			  int_coalescing_threshold;
+	u_int			  int_coalescing_stop_threshold;
 
 	uint16_t	 	  user_discenable;/* Disconnection allowed  */
 	uint16_t		  user_tagenable;/* Tagged Queuing allowed */
@@ -1227,6 +1326,7 @@ extern const int ahd_num_aic7770_devs;
 
 /*************************** Function Declarations ****************************/
 /******************************************************************************/
+void			ahd_reset_cmds_pending(struct ahd_softc *ahd);
 u_int			ahd_find_busy_tcl(struct ahd_softc *ahd, u_int tcl);
 void			ahd_busy_tcl(struct ahd_softc *ahd,
 				     u_int tcl, u_int busyid);
@@ -1257,9 +1357,17 @@ int			 ahd_softc_init(struct ahd_softc *);
 void			 ahd_controller_info(struct ahd_softc *ahd, char *buf);
 int			 ahd_init(struct ahd_softc *ahd);
 int			 ahd_default_config(struct ahd_softc *ahd);
+int			 ahd_parse_vpddata(struct ahd_softc *ahd,
+					   struct vpd_config *vpd);
 int			 ahd_parse_cfgdata(struct ahd_softc *ahd,
 					   struct seeprom_config *sc);
 void			 ahd_intr_enable(struct ahd_softc *ahd, int enable);
+void			 ahd_update_coalescing_values(struct ahd_softc *ahd,
+						      u_int timer,
+						      u_int maxcmds,
+						      u_int mincmds);
+void			 ahd_enable_coalescing(struct ahd_softc *ahd,
+					       int enable);
 void			 ahd_pause_and_flushwork(struct ahd_softc *ahd);
 int			 ahd_suspend(struct ahd_softc *ahd); 
 int			 ahd_resume(struct ahd_softc *ahd);
@@ -1282,6 +1390,7 @@ int			ahd_wait_flexport(struct ahd_softc *ahd);
 /*************************** Interrupt Services *******************************/
 void			ahd_pci_intr(struct ahd_softc *ahd);
 void			ahd_clear_intstat(struct ahd_softc *ahd);
+void			ahd_flush_qoutfifo(struct ahd_softc *ahd);
 void			ahd_run_qoutfifo(struct ahd_softc *ahd);
 #ifdef AHD_TARGET_MODE
 void			ahd_run_tqinfifo(struct ahd_softc *ahd, int paused);
@@ -1405,7 +1514,8 @@ extern uint32_t ahd_debug;
 #define AHD_SHOW_QUEUE		0x02000
 #define AHD_SHOW_TQIN		0x04000
 #define AHD_SHOW_SG		0x08000
-#define AHD_DEBUG_SEQUENCER	0x10000
+#define AHD_SHOW_INT_COALESCING	0x10000
+#define AHD_DEBUG_SEQUENCER	0x20000
 #endif
 void			ahd_print_scb(struct scb *scb);
 void			ahd_print_devinfo(struct ahd_softc *ahd,

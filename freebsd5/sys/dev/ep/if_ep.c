@@ -38,7 +38,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/dev/ep/if_ep.c,v 1.110 2002/11/14 23:54:51 sam Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep.c,v 1.114 2003/03/29 22:27:41 mdodd Exp $
  *
  *  Promiscuous mode added and interrupt logic slightly changed
  *  to reduce the number of adapter failures. Transceiver select
@@ -123,42 +123,54 @@ eeprom_rdy(sc)
     }
     if (i >= MAX_EEPROMBUSY) {
 	printf("ep%d: eeprom failed to come ready.\n", sc->unit);
-	return (0);
+	return (ENXIO);
     }
-    return (1);
+    return (0);
 }
 
 /*
  * get_e: gets a 16 bits word from the EEPROM. we must have set the window
  * before
  */
-u_int16_t
-get_e(sc, offset)
-    struct ep_softc *sc;
-    u_int16_t offset;
+int
+get_e(sc, offset, result)
+	struct ep_softc *sc;
+	u_int16_t offset;
+	u_int16_t *result;
 {
-    if (!eeprom_rdy(sc))
+
+	if (eeprom_rdy(sc))
+		return (ENXIO);
+	outw(BASE + EP_W0_EEPROM_COMMAND,
+	     (EEPROM_CMD_RD << sc->epb.cmd_off) | offset);
+	if (eeprom_rdy(sc))
+		return (ENXIO);
+	(*result) = inw(BASE + EP_W0_EEPROM_DATA);
+
 	return (0);
-    outw(BASE + EP_W0_EEPROM_COMMAND, (EEPROM_CMD_RD << sc->epb.cmd_off) | offset);
-    if (!eeprom_rdy(sc))
-	return (0);
-    return (inw(BASE + EP_W0_EEPROM_DATA));
 }
 
-void
+int
 ep_get_macaddr(sc, addr)
 	struct ep_softc	*	sc;
 	u_char *		addr;
 {
 	int			i;
-	u_int16_t * 		macaddr = (u_int16_t *)addr;
+	u_int16_t		result;
+	int			error;
+	u_int16_t * 		macaddr;
+
+	macaddr = (u_int16_t *)addr;
 
 	GO_WINDOW(0);
         for(i = EEPROM_NODE_ADDR_0; i <= EEPROM_NODE_ADDR_2; i++) {
-		macaddr[i] = htons(get_e(sc, i));
+		error = get_e(sc, i, &result);
+		if (error)
+			return (error);
+		macaddr[i] = htons(result);
         }
 
-	return;
+	return (0);
 }
 
 int
@@ -167,6 +179,7 @@ ep_alloc(device_t dev)
 	struct ep_softc	*	sc = device_get_softc(dev);
 	int			rid;
 	int			error = 0;
+	u_int16_t		result;
 
         rid = 0;
         sc->iobase = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
@@ -200,8 +213,16 @@ ep_alloc(device_t dev)
 
         GO_WINDOW(0);
 	sc->epb.cmd_off = 0;
-	sc->epb.prod_id = get_e(sc, EEPROM_PROD_ID);
-	sc->epb.res_cfg = get_e(sc, EEPROM_RESOURCE_CFG);
+
+	error = get_e(sc, EEPROM_PROD_ID, &result);
+	if (error)
+		goto bad;
+	sc->epb.prod_id = result;
+
+	error = get_e(sc, EEPROM_RESOURCE_CFG, &result);
+	if (error)
+		goto bad;
+	sc->epb.res_cfg = result;
 
 bad:
 	return (error);
@@ -242,6 +263,8 @@ ep_free(device_t dev)
 {
 	struct ep_softc	*	sc = device_get_softc(dev);
 
+	if (sc->ep_intrhand)
+		bus_teardown_intr(dev, sc->irq, sc->ep_intrhand);
 	if (sc->iobase)
 		bus_release_resource(dev, SYS_RES_IOPORT, 0, sc->iobase);
 	if (sc->irq)
@@ -259,10 +282,15 @@ ep_attach(sc)
 	u_short *		p;
 	int			i;
 	int			attached;
+	int			error;
 
 	sc->gone = 0;
 
-	ep_get_macaddr(sc, (u_char *)&sc->arpcom.ac_enaddr);
+	error = ep_get_macaddr(sc, (u_char *)&sc->arpcom.ac_enaddr);
+	if (error) {
+		device_printf(sc->dev, "Unable to retrieve Ethernet address!\n");
+		return (ENXIO);
+	}
 
 	/*
 	 * Setup the station address
@@ -323,6 +351,31 @@ ep_attach(sc)
 	epstop(sc);
 
 	return 0;
+}
+
+int
+ep_detach(device_t dev)
+{
+	struct ep_softc *sc;
+	struct ifnet *ifp;
+
+	sc = device_get_softc(dev);
+	ifp = &sc->arpcom.ac_if;
+
+	if (sc->gone) {
+		device_printf(dev, "already unloaded\n");
+		return (0);
+	}
+
+	epstop(sc);
+
+	ifp->if_flags &= ~IFF_RUNNING;
+	ether_ifdetach(ifp);
+
+	sc->gone = 1;
+	ep_free(dev);
+
+	return (0);
 }
 
 /*

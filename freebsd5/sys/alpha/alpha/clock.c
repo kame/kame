@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/clock.c,v 1.31 2002/05/26 11:23:00 des Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/clock.c,v 1.32 2003/02/03 17:53:14 jake Exp $ */
 /* $NetBSD: clock.c,v 1.20 1998/01/31 10:32:47 ross Exp $ */
 
 /*
@@ -446,17 +446,18 @@ handleclock(void *arg)
 	hardclock(arg);
 }
 
-/*
- * We assume newhz is either stathz or profhz, and that neither will
- * change after being set up above.  Could recalculate intervals here
- * but that would be a drag.
- */
 void
-setstatclockrate(newhz)
-	int newhz;
+cpu_startprofclock(void)
 {
 
-	/* nothing we can do */
+	/* nothing to do */
+}
+
+void
+cpu_stopprofclock(void)
+{
+
+	/* nothing to do */
 }
 
 /*

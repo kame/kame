@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_isa.c,v 1.12 2000/12/09 04:25:07 nyan Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_isa.c,v 1.17 2003/03/29 22:27:41 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -46,18 +46,22 @@
 #include <net/if_arp.h>
 #include <net/if_media.h> 
 
-
 #include <isa/isavar.h>
 
 #include <dev/ep/if_epreg.h>
 #include <dev/ep/if_epvar.h>
+
+#ifdef __i386__
 #include <i386/isa/elink.h>
+#endif
 
+#ifdef __i386__
 static u_int16_t	get_eeprom_data	(int, int);
-
 static void		ep_isa_identify	(driver_t *, device_t);
+#endif
 static int		ep_isa_probe	(device_t);
 static int		ep_isa_attach	(device_t);
+static int		ep_eeprom_cksum (struct ep_softc *);
 
 struct isa_ident {
 	u_int32_t	id;
@@ -76,6 +80,7 @@ const char * ep_isa_match_id (u_int32_t, struct isa_ident *);
 #define ISA_ID_3C569B_TPO   0x506d5695
 #endif
 
+#ifdef __i386__
 static struct isa_ident ep_isa_devs[] = {
 	{ ISA_ID_3C509_TP,	"3Com 3C509-TP EtherLink III" },
 	{ ISA_ID_3C509_BNC,	"3Com 3C509-BNC EtherLink III" },
@@ -88,6 +93,7 @@ static struct isa_ident ep_isa_devs[] = {
 #endif
 	{ 0,			NULL },
 };
+#endif
 
 static struct isa_pnp_id ep_ids[] = {
 	{ 0x90506d50,	"3Com 3C509B-TP EtherLink III (PnP)" },	/* TCM5090 */
@@ -111,7 +117,7 @@ static struct isa_pnp_id ep_ids[] = {
  * the AX register which is conveniently returned to us by inb().  Hence; we
  * read 16 times getting one bit of data with each read.
  */
-
+#ifdef __i386__
 static u_int16_t
 get_eeprom_data(id_port, offset)
 	int	id_port;
@@ -128,6 +134,7 @@ get_eeprom_data(id_port, offset)
 	}
 	return (data);
 }
+#endif
 
 const char *
 ep_isa_match_id (id, isa_devs)
@@ -151,6 +158,7 @@ ep_isa_match_id (id, isa_devs)
 	return (NULL);
 }
 
+#ifdef __i386__
 static void
 ep_isa_identify (driver_t *driver, device_t parent)
 {
@@ -286,6 +294,7 @@ ep_isa_identify (driver_t *driver, device_t parent)
 
 	return;
 }
+#endif
 
 static int
 ep_isa_probe (device_t dev)
@@ -335,6 +344,12 @@ ep_isa_attach (device_t dev)
 		goto bad;
 	}
 
+	error = ep_eeprom_cksum(sc);
+	if (error) {
+		device_printf(sc->dev, "Invalid EEPROM checksum!\n");
+		goto bad;
+	}
+
 	if ((error = bus_setup_intr(dev, sc->irq, INTR_TYPE_NET, ep_intr,
 				   sc, &sc->ep_intrhand))) {
 		device_printf(dev, "bus_setup_intr() failed! (%d)\n", error);
@@ -347,11 +362,50 @@ bad:
 	return (error);
 }
 
+static int
+ep_eeprom_cksum (sc)
+	struct ep_softc *	sc;
+{
+	int                     i;
+	int                     error;
+	u_int16_t               val;
+	u_int16_t               cksum;
+	u_int8_t                cksum_high = 0;
+	u_int8_t                cksum_low = 0;
+
+	error = get_e(sc, 0x0f, &val);
+	if (error)
+	       return (ENXIO);
+	cksum = val;
+
+	for (i = 0; i < 0x0f; i++) {
+		error = get_e(sc, i, &val);
+		if (error)
+			return (ENXIO);
+		switch (i) {
+			case 0x08:
+			case 0x09:
+			case 0x0d:
+				cksum_low ^= (u_int8_t)(val & 0x00ff) ^
+					     (u_int8_t)((val & 0xff00) >> 8);
+				break;
+			default:
+				cksum_high ^= (u_int8_t)(val & 0x00ff) ^
+					      (u_int8_t)((val & 0xff00) >> 8);
+				break;
+		}
+	}
+	return (cksum != ((u_int16_t)cksum_low | (u_int16_t)(cksum_high << 8)));
+}
+
 static device_method_t ep_isa_methods[] = {
 	/* Device interface */
+#ifdef __i386__
 	DEVMETHOD(device_identify,	ep_isa_identify),
+#endif
 	DEVMETHOD(device_probe,		ep_isa_probe),
 	DEVMETHOD(device_attach,	ep_isa_attach),
+	DEVMETHOD(device_detach,	ep_detach),
 
 	{ 0, 0 }
 };
@@ -365,3 +419,6 @@ static driver_t ep_isa_driver = {
 extern devclass_t ep_devclass;
 
 DRIVER_MODULE(ep, isa, ep_isa_driver, ep_devclass, 0, 0);
+#ifdef __i386__
+MODULE_DEPEND(ep, elink, 1, 1, 1);
+#endif

@@ -19,7 +19,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_epvar.h,v 1.5 2000/05/14 02:18:31 archie Exp $
+ * $FreeBSD: src/sys/dev/ep/if_epvar.h,v 1.7 2003/03/29 22:27:41 mdodd Exp $
  */
 
 struct ep_board {
@@ -76,8 +76,9 @@ struct ep_softc {
 
 int		ep_alloc	(device_t);
 void		ep_free		(device_t);
+int		ep_detach	(device_t);
 void		ep_get_media	(struct ep_softc *);
 int		ep_attach	(struct ep_softc *);
 void		ep_intr		(void *);
-u_int16_t	get_e		(struct ep_softc *, int);
-void		ep_get_macaddr	(struct ep_softc *, u_char *);
+int		get_e		(struct ep_softc *, u_int16_t, u_int16_t *);
+int		ep_get_macaddr	(struct ep_softc *, u_char *);

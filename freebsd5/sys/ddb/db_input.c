@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_input.c,v 1.32 2002/09/28 17:14:19 phk Exp $
+ * $FreeBSD: src/sys/ddb/db_input.c,v 1.33 2003/04/04 12:10:04 des Exp $
  */
 
 /*
@@ -329,8 +329,8 @@ db_readline(lstart, lsize)
 	    /* Maintain input line history for non-empty lines. */
 	    if (++db_lhistidx == db_lhist_nlines) {
 		/* Rotate history. */
-		ovbcopy(db_lhistory + db_lhistlsize, db_lhistory,
-			db_lhistlsize * (db_lhist_nlines - 1));
+		bcopy(db_lhistory + db_lhistlsize, db_lhistory,
+		      db_lhistlsize * (db_lhist_nlines - 1));
 		db_lhistidx--;
 	    }
 	    bcopy(lstart, db_lhistory + db_lhistidx * db_lhistlsize,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/boot/alpha/common/conf.c,v 1.3 2000/05/01 17:41:17 bp Exp $
+ *	$FreeBSD: src/sys/boot/alpha/common/conf.c,v 1.4 2002/12/19 19:34:58 jake Exp $
  */
 
 #include <stand.h>
@@ -65,7 +65,7 @@ struct fs_ops *file_system[] = {
 #ifdef LOADER_NET_SUPPORT
     &nfs_fsops,
 #endif
-    &zipfs_fsops,
+    &gzipfs_fsops,
     NULL
 };
 

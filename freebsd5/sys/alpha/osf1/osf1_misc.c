@@ -29,14 +29,13 @@
 
 /*
  * Additional Copyright (c) 1999 by Andrew Gallatin
- * $FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.33.2.1 2002/12/19 09:40:06 alfred Exp $
+ * $FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.41 2003/04/25 19:51:41 jhb Exp $
  */
 
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/dkstat.h>
 #include <sys/exec.h>
 #include <sys/fcntl.h>
 #include <sys/filedesc.h>
@@ -1498,6 +1497,7 @@ int osf1_gettimeofday(td, uap)
 {
 	int error;
 	struct timeval atv;
+	struct timezone tz;
 	struct osf1_timeval otv;
 
 	error = 0;
@@ -1510,8 +1510,11 @@ int osf1_gettimeofday(td, uap)
 		    sizeof (otv))))
 			return (error);
 	}
-	if (uap->tzp)
+	if (uap->tzp) {
+		tz.tz_minuteswest = tz_minuteswest;
+		tz.tz_dsttime = tz_dsttime;
 		error = copyout((caddr_t)&tz, (caddr_t)uap->tzp, sizeof (tz));
+	}
 	return (error);
 }
 
@@ -1778,6 +1781,9 @@ osf1_table(td, uap)
 }
 
 
+/*
+ * MPSAFE
+ */
 int
 osf1_sysinfo(td, uap)
 	struct thread *td;
@@ -1801,8 +1807,10 @@ osf1_sysinfo(td, uap)
 		len = uap->count;
 		name[0] = CTL_KERN;
 		name[1] = KERN_HOSTNAME;
+		mtx_lock(&Giant);
 		retval = userland_sysctl(td, name, 2, uap->buf, &len,
 					1, 0, 0, &bytes);
+		mtx_unlock(&Giant);
 		td->td_retval[0] =  bytes;
 		return(retval);
 		break;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.72 2002/11/07 22:23:46 jhb Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.80 2003/05/05 10:11:17 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -38,9 +38,7 @@
 #include <sys/bio.h>
 #include <sys/bus.h>
 #include <sys/mtio.h>
-#include <sys/disklabel.h>
 #include <sys/devicestat.h>
-#include <sys/stdint.h>
 #include <machine/bus.h>
 #include <dev/ata/ata-all.h>
 #include <dev/ata/atapi-all.h>
@@ -52,19 +50,15 @@ static	d_close_t	astclose;
 static	d_ioctl_t	astioctl;
 static	d_strategy_t	aststrategy;
 static struct cdevsw ast_cdevsw = {
-	/* open */	astopen,
-	/* close */	astclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	astioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	aststrategy,
-	/* name */	"ast",
-	/* maj */	119,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TAPE | D_TRACKCLOSE,
+	.d_open =	astopen,
+	.d_close =	astclose,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	astioctl,
+	.d_strategy =	aststrategy,
+	.d_name =	"ast",
+	.d_maj =	119,
+	.d_flags =	D_TAPE | D_TRACKCLOSE,
 };
 
 /* prototypes */
@@ -126,16 +120,16 @@ astattach(struct ata_device *atadev)
 	ast_read_position(stp, 0, &position);
     }
 
-    devstat_add_entry(&stp->stats, "ast", stp->lun, DEV_BSIZE,
+    stp->stats = devstat_new_entry("ast", stp->lun, DEV_BSIZE,
 		      DEVSTAT_NO_ORDERED_TAGS,
 		      DEVSTAT_TYPE_SEQUENTIAL | DEVSTAT_TYPE_IF_IDE,
 		      DEVSTAT_PRIORITY_TAPE);
-    dev = make_dev(&ast_cdevsw, dkmakeminor(stp->lun, 0, 0),
+    dev = make_dev(&ast_cdevsw, 2 * stp->lun,
 		   UID_ROOT, GID_OPERATOR, 0640, "ast%d", stp->lun);
     dev->si_drv1 = stp;
     dev->si_iosize_max = 256 * DEV_BSIZE;
     stp->dev1 = dev;
-    dev = make_dev(&ast_cdevsw, dkmakeminor(stp->lun, 0, 1),
+    dev = make_dev(&ast_cdevsw, 2 * stp->lun + 1,
 		   UID_ROOT, GID_OPERATOR, 0640, "nast%d", stp->lun);
     dev->si_drv1 = stp;
     dev->si_iosize_max = 256 * DEV_BSIZE;
@@ -150,15 +144,11 @@ void
 astdetach(struct ata_device *atadev)
 {   
     struct ast_softc *stp = atadev->driver;
-    struct bio *bp;
     
-    while ((bp = bioq_first(&stp->queue))) {
-	bioq_remove(&stp->queue, bp);
-	biofinish(bp, NULL, ENXIO);
-    }
+    bioq_flush(&stp->queue, NULL, ENXIO);
     destroy_dev(stp->dev1);
     destroy_dev(stp->dev2);
-    devstat_remove_entry(&stp->stats);
+    devstat_remove_entry(stp->stats);
     ata_free_name(atadev);
     ata_free_lun(&ast_lun_map, stp->lun);
     free(stp, M_AST);
@@ -290,7 +280,7 @@ astclose(dev_t dev, int flags, int fmt, struct thread *td)
     if (stp->cap.lock && count_dev(dev) == 1)
 	ast_prevent_allow(stp, 0);
 
-    stp->flags &= F_CTL_WARN;
+    stp->flags &= ~F_CTL_WARN;
 #ifdef AST_DEBUG
     ata_prtdev(stp->device, "%ju total bytes transferred\n",
 	(uintmax_t)ast_total);
@@ -481,7 +471,7 @@ ast_start(struct ata_device *atadev)
     ccb[3] = blkcount>>8;
     ccb[4] = blkcount;
 
-    devstat_start_transaction(&stp->stats);
+    devstat_start_transaction_bio(stp->stats, bp);
 
     atapi_queue_cmd(stp->device, ccb, bp->bio_data, blkcount * stp->blksize, 
 		    (bp->bio_cmd == BIO_READ) ? ATPR_F_READ : 0,
@@ -504,7 +494,7 @@ ast_done(struct atapi_request *request)
 	bp->bio_resid = bp->bio_bcount - request->donecount;
 	ast_total += (bp->bio_bcount - bp->bio_resid);
     }
-    biofinish(bp, &stp->stats, 0);
+    biofinish(bp, stp->stats, 0);
     return 0;
 }
 

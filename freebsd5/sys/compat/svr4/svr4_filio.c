@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_filio.c,v 1.19.2.1 2002/12/19 09:40:06 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_filio.c,v 1.28 2003/05/13 20:35:57 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -115,7 +115,7 @@ svr4_sys_read(td, uap)
      }
 
      if (fp->f_type == DTYPE_SOCKET) {
-       so = (struct socket *)fp->f_data;
+       so = fp->f_data;
        DPRINTF(("fd %d is a socket\n", uap->fd));
        if (so->so_state & SS_ASYNC) {
 	 DPRINTF(("fd %d is an ASYNC socket!\n", uap->fd));
@@ -132,10 +132,21 @@ svr4_sys_read(td, uap)
      DPRINTF(("svr4_read(%d, 0x%0x, %d) = %d\n", 
 	     uap->fd, uap->buf, uap->nbyte, rv));
      if (rv == EAGAIN) {
-       DPRINTF(("sigmask = 0x%x\n", td->td_proc->p_sigmask));
-       DPRINTF(("sigignore = 0x%x\n", td->td_proc->p_sigignore));
-       DPRINTF(("sigcaught = 0x%x\n", td->td_proc->p_sigcatch));
-       DPRINTF(("siglist = 0x%x\n", td->td_proc->p_siglist));
+#ifdef DEBUG_SVR4
+       struct sigacts *ps;
+
+       PROC_LOCK(td->td_proc);
+       ps = td->td_proc->p_sigacts;
+       mtx_lock(&ps->ps_mtx);
+#endif
+       DPRINTF(("sigmask = 0x%x\n", td->td_sigmask));
+       DPRINTF(("sigignore = 0x%x\n", ps->ps_sigignore));
+       DPRINTF(("sigcaught = 0x%x\n", ps->ps_sigcatch));
+       DPRINTF(("siglist = 0x%x\n", td->td_siglist));
+#ifdef DEBUG_SVR4
+       mtx_unlock(&ps->ps_mtx);
+       PROC_UNLOCK(td->td_proc);
+#endif
      }
 
 #if defined(GROTTY_READ_HACK)

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.17 2002/02/04 19:23:40 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.19 2003/03/08 21:32:59 phk Exp $
  */
 
 /* ATAPI tape drive Capabilities and Mechanical Status Page */
@@ -157,6 +157,6 @@ struct ast_softc {
     struct bio_queue_head	queue;		/* queue of i/o requests */
     struct atapi_params		*param;		/* drive parameters table */
     struct ast_cappage		cap;		/* capabilities page info */
-    struct devstat		stats;		/* devstat entry */
+    struct devstat		*stats;		/* devstat entry */
     dev_t			dev1, dev2;	/* device place holders */
 };

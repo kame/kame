@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpi_battery.c,v 1.6 2002/10/16 17:28:52 jhb Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpi_battery.c,v 1.7 2003/02/15 01:46:22 takawata Exp $
  */
 
 #include "opt_acpi.h"		/* XXX trim includes */
@@ -138,6 +138,12 @@ acpi_battery_ioctl(u_long cmd, caddr_t addr, void *arg)
 
 	ioctl_arg = (union acpi_battery_ioctl_arg *)addr;
 	error = 0;
+
+	/*
+         * No security check required: information retrieval only.  If
+         * new functions are added here, a check might be required.
+         */
+
 	switch (cmd) {
 	case ACPIIO_BATT_GET_UNITS:
 		*(int *)addr = acpi_battery_get_units();

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/boot/ia64/libski/elf_freebsd.c,v 1.6 2002/05/19 04:42:18 marcel Exp $ */
+/* $FreeBSD: src/sys/boot/ia64/libski/elf_freebsd.c,v 1.8 2003/05/01 03:56:29 peter Exp $ */
 /* $NetBSD: loadfile.c,v 1.10 1998/06/25 06:45:46 ross Exp $ */
 
 /*-
@@ -91,9 +91,9 @@
 
 #define _KERNEL
 
-static int	elf_exec(struct preloaded_file *amp);
+static int	elf64_exec(struct preloaded_file *amp);
 
-struct file_format ia64_elf = { elf_loadfile, elf_exec };
+struct file_format ia64_elf = { elf64_loadfile, elf64_exec };
 
 #define PTE_MA_WB	0
 #define PTE_MA_UC	4
@@ -130,6 +130,8 @@ struct ia64_pte {
 	u_int64_t	pte_ig	:11;	/* bits 53..63 */
 };
 
+static struct bootinfo bootinfo;
+
 void
 enter_kernel(const char* filename, u_int64_t start, struct bootinfo *bi)
 {
@@ -152,7 +154,7 @@ enter_kernel(const char* filename, u_int64_t start, struct bootinfo *bi)
 }
 
 static int
-elf_exec(struct preloaded_file *fp)
+elf64_exec(struct preloaded_file *fp)
 {
 	struct file_metadata	*md;
 	Elf_Ehdr		*hdr;
@@ -167,7 +169,7 @@ elf_exec(struct preloaded_file *fp)
 	 * Ugly hack, similar to linux. Dump the bootinfo into a
 	 * special page reserved in the link map.
 	 */
-	bi = (struct bootinfo *) 0x508000;
+	bi = &bootinfo;
 	bzero(bi, sizeof(struct bootinfo));
 	bi_load(bi, fp);
 

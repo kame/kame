@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/fbreg.h,v 1.11 2002/04/13 22:34:15 obrien Exp $
+ * $FreeBSD: src/sys/dev/fb/fbreg.h,v 1.15 2003/05/01 04:21:05 peter Exp $
  */
 
 #ifndef _DEV_FB_FBREG_H_
@@ -43,7 +43,40 @@
 #define fillw_io(p, d, c)	fillw((p), (void *)(d), (c))
 void generic_bcopy(const void *s, void *d, size_t c);
 void generic_bzero(void *d, size_t c);
-#else /* !__i386__ */
+#elif __amd64__
+#define bcopy_io(s, d, c)	bcopy((void *)(s), (void *)(d), (c))
+#define bcopy_toio(s, d, c)	bcopy((void *)(s), (void *)(d), (c))
+#define bcopy_fromio(s, d, c)	bcopy((void *)(s), (void *)(d), (c))
+#define bzero_io(d, c)		bzero((void *)(d), (c))
+#define fill_io(p, d, c)	fill((p), (void *)(d), (c))
+#define fillw_io(p, d, c)	fillw((p), (void *)(d), (c))
+#elif __ia64__
+#include <machine/bus.h>
+#define	bcopy_fromio(s, d, c)	\
+	bus_space_read_region_1(IA64_BUS_SPACE_MEM, s, 0, (void*)(d), c)
+#define	bcopy_io(s, d, c)	\
+	bus_space_copy_region_1(IA64_BUS_SPACE_MEM, s, 0, d, 0, c)
+#define	bcopy_toio(s, d, c)	\
+	bus_space_write_region_1(IA64_BUS_SPACE_MEM, d, 0, (void*)(s), c)
+#define	bzero_io(d, c)		\
+	bus_space_set_region_1(IA64_BUS_SPACE_MEM, d, 0, 0, c)
+#define	fill_io(p, d, c)	\
+	bus_space_set_region_1(IA64_BUS_SPACE_MEM, d, 0, p, c)
+#define	fillw_io(p, d, c)	\
+	bus_space_set_region_2(IA64_BUS_SPACE_MEM, d, 0, p, c)
+#define	readw(a)		\
+	bus_space_read_2(IA64_BUS_SPACE_MEM, a, 0)
+#define	writew(a, v)		\
+	bus_space_write_2(IA64_BUS_SPACE_MEM, a, 0, v)
+#define	writel(a, v)		\
+	bus_space_write_4(IA64_BUS_SPACE_MEM, a, 0, v)
+static __inline void
+fillw(int val, uint16_t *buf, size_t size)
+{
+	while (size--)
+		*buf++ = val;
+}
+#else /* !__i386__ && !__ia64__ && !__amd64__ */
 #define bcopy_io(s, d, c)	memcpy_io((d), (s), (c))
 #define bcopy_toio(s, d, c)	memcpy_toio((d), (void *)(s), (c))
 #define bcopy_fromio(s, d, c)	memcpy_fromio((void *)(d), (s), (c))
@@ -81,7 +114,8 @@ typedef int vi_blank_display_t(video_adapter_t *adp, int mode);
 #define V_DISPLAY_STAND_BY	2
 #define V_DISPLAY_SUSPEND	3
 */
-typedef int vi_mmap_t(video_adapter_t *adp, vm_offset_t offset, int prot);
+typedef int vi_mmap_t(video_adapter_t *adp, vm_offset_t offset,
+		      vm_paddr_t *paddr, int prot);
 typedef int vi_ioctl_t(video_adapter_t *adp, u_long cmd, caddr_t data);
 typedef int vi_clear_t(video_adapter_t *adp);
 typedef int vi_fill_rect_t(video_adapter_t *adp, int val, int x, int y,
@@ -212,7 +246,7 @@ int		genfbwrite(genfb_softc_t *sc, video_adapter_t *adp,
 int		genfbioctl(genfb_softc_t *sc, video_adapter_t *adp,
 			   u_long cmd, caddr_t arg, int flag, struct thread *td);
 int		genfbmmap(genfb_softc_t *sc, video_adapter_t *adp,
-			  vm_offset_t offset, int prot);
+			  vm_offset_t offset, vm_offset_t *paddr, int prot);
 
 #endif /* FB_INSTALL_CDEV */
 

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hea/eni_transmit.c,v 1.15 2002/11/06 22:58:55 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni_transmit.c,v 1.16 2003/04/21 16:27:45 obrien Exp $
  *
  */
 
@@ -63,7 +63,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_transmit.c,v 1.15 2002/11/06 22:58:55 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_transmit.c,v 1.16 2003/04/21 16:27:45 obrien Exp $");
 #endif
 
 /*
@@ -110,6 +110,7 @@ int	eni_pdu_print = 0;
 int
 eni_set_dma ( eup, rx, dma_list, list_size, idx, val, addr, size )
 Eni_unit *eup;
+int	rx;
 u_long	*dma_list;
 int	list_size;
 long	*idx;

@@ -23,11 +23,18 @@
  */
 
 /*
- * $FreeBSD: src/sys/boot/common/ufsread.c,v 1.8.2.1 2002/12/23 01:02:45 imp Exp $
+ * $FreeBSD: src/sys/boot/common/ufsread.c,v 1.11 2003/02/25 00:10:20 obrien Exp $
  */
 
 #include <ufs/ufs/dinode.h>
 #include <ufs/ffs/fs.h>
+#ifdef __i386__
+/* XXX: Revert to old (broken for over 1.5Tb filesystems) version of cgbase
+   (see sys/ufs/ffs/fs.h rev 1.39) so that i386 boot loader (boot2) can
+   support both UFS1 and UFS2 again. */
+#undef cgbase
+#define cgbase(fs, c)   ((ufs2_daddr_t)((fs)->fs_fpg * (c)))
+#endif
 
 /*
  * We use 4k `virtual' blocks for filesystem data, whatever the actual

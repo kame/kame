@@ -31,13 +31,16 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.18.2.1 2002/12/19 09:40:06 alfred Exp $
+ * $FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.24 2003/04/25 20:04:02 jhb Exp $
  *
  */
+
+#include "opt_mac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
+#include <sys/mac.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/sysent.h>
@@ -74,7 +77,7 @@ sysarch(td, uap)
 	struct thread *td;
 	register struct sysarch_args *uap;
 {
-	int error = 0;
+	int error;
 
 	switch(uap->op) {
 	case ALPHA_SETHAE:
@@ -113,6 +116,12 @@ alpha_sethae(struct thread *td, char *args)
 	error = copyin(args, &ua, sizeof(struct alpha_sethae_args));
 	if (error)
 		return (error);
+
+#ifdef MAC
+	error = mac_check_sysarch_ioperm(td->td_ucred);
+	if (error)
+		return (error);
+#endif
 
 	error = securelevel_gt(td->td_ucred, 0);
 	if (error)
@@ -200,7 +209,7 @@ alpha_get_uac(struct thread *td, char *args)
 	pp = p->p_pptr;
 	if (pp != NULL) {
 		PROC_LOCK(pp);
-		uac = p->p_md.md_uac;
+		uac = pp->p_md.md_uac;
 		PROC_UNLOCK(pp);
 		PROC_UNLOCK(p);
 		error = copyout(&uac, args, sizeof(uac));

@@ -31,7 +31,7 @@
  *
  * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic7xxx_osm.h#14 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.h,v 1.20 2002/12/04 22:51:29 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.h,v 1.21 2003/05/26 21:43:29 gibbs Exp $
  */
 
 #ifndef _AIC7XXX_FREEBSD_H_
@@ -329,7 +329,7 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 
 /* Lock held during ahc_list manipulation and ahc softc frees */
 static __inline void
-ahc_list_lockinit()
+ahc_list_lockinit(void)
 {
 }
 

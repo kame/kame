@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.33 2002/09/20 19:35:59 phk Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.40 2003/04/01 15:06:23 phk Exp $
  */
 
 /*
@@ -38,8 +38,6 @@
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
@@ -50,6 +48,8 @@
 #include <vm/pmap.h>
 #include <machine/md_var.h>
 
+#include <geom/geom_disk.h>
+
 #include <dev/ida/idareg.h>
 #include <dev/ida/idavar.h>
 
@@ -58,32 +58,10 @@ static int idad_probe(device_t dev);
 static int idad_attach(device_t dev);
 static int idad_detach(device_t dev);
 
-static	d_open_t	idad_open;
-static	d_close_t	idad_close;
 static	d_strategy_t	idad_strategy;
-static	d_dump_t	idad_dump;
-
-#define IDAD_CDEV_MAJOR	109
-
-static struct cdevsw id_cdevsw = {
-	/* open */	idad_open,
-	/* close */	idad_close,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	idad_strategy,
-	/* name */ 	"idad",
-	/* maj */	IDAD_CDEV_MAJOR,
-	/* dump */	idad_dump,
-	/* psize */ 	nopsize,
-	/* flags */	D_DISK,
-};
+static	dumper_t	idad_dump;
 
 static devclass_t	idad_devclass;
-static struct cdevsw 	idaddisk_cdevsw;
-static int		disks_registered = 0;
 
 static device_method_t idad_methods[] = {
 	DEVMETHOD(device_probe,		idad_probe),
@@ -100,41 +78,6 @@ static driver_t idad_driver = {
 
 DRIVER_MODULE(idad, ida, idad_driver, idad_devclass, 0, 0);
 
-static __inline struct idad_softc *
-idad_getsoftc(dev_t dev)
-{
-
-	return ((struct idad_softc *)dev->si_drv1);
-}
-
-static int
-idad_open(dev_t dev, int flags, int fmt, struct thread *td)
-{
-	struct idad_softc *drv;
-
-	drv = idad_getsoftc(dev);
-	if (drv == NULL)
-		return (ENXIO);
-
-	drv->disk.d_sectorsize = drv->secsize;
-	drv->disk.d_mediasize = (off_t)drv->secperunit * drv->secsize;
-	drv->disk.d_fwsectors = drv->sectors;
-	drv->disk.d_fwheads = drv->heads;
-
-	return (0);
-}
-
-static int
-idad_close(dev_t dev, int flags, int fmt, struct thread *td)
-{
-	struct idad_softc *drv;
-
-	drv = idad_getsoftc(dev);
-	if (drv == NULL)
-		return (ENXIO);
-	return (0);
-}
-
 /*
  * Read/write routine for a buffer.  Finds the proper unit, range checks
  * arguments, and schedules the transfer.  Does not wait for the transfer
@@ -147,7 +90,7 @@ idad_strategy(struct bio *bp)
 	struct idad_softc *drv;
 	int s;
 
-	drv = idad_getsoftc(bp->bio_dev);
+	drv = bp->bio_disk->d_drv1;
 	if (drv == NULL) {
     		bp->bio_error = EINVAL;
 		goto bad;
@@ -161,9 +104,7 @@ idad_strategy(struct bio *bp)
 		goto bad;
 	}
 
-	bp->bio_driver1 = drv;
 	s = splbio();
-	devstat_start_transaction(&drv->stats);
 	ida_submit_buf(drv->controller, bp);
 	splx(s);
 	return;
@@ -180,69 +121,41 @@ bad:
 }
 
 static int
-idad_dump(dev_t dev, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+idad_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
 {
 
-	/* This needs modified to the new dump API */
-	return (ENXIO);
-#if 0
 	struct idad_softc *drv;
-	u_int count, blkno, secsize;
-	long blkcnt;
-	int i, error, dumppages;
-        caddr_t va;
-	vm_offset_t addr, a;
+	int error = 0;
+	struct disk *dp;
 
-	if ((error = disk_dumpcheck(dev, &count, &blkno, &secsize)))
-		return (error);
-
-	drv = idad_getsoftc(dev);
+	dp = arg;
+	drv = dp->d_drv1;
 	if (drv == NULL)
 		return (ENXIO);
 
-	addr = 0;
-	blkcnt = howmany(PAGE_SIZE, secsize);
+	drv->controller->flags &= ~IDA_INTERRUPTS;
 
-	while (count > 0) {
-		va = NULL;
-
-		dumppages = imin(count / blkcnt, MAXDUMPPGS); 
-
-		for (i = 0; i < dumppages; i++) {
-			a = addr + (i * PAGE_SIZE);
-			if (is_physical_memory(a))
-				va = pmap_kenter_temporary(trunc_page(a), i);
-			else
-				va = pmap_kenter_temporary(trunc_page(0), i);
-		}
-
-		error = ida_command(drv->controller, CMD_WRITE, va,
-		    PAGE_SIZE * dumppages, drv->drive, blkno, DMA_DATA_OUT);
-		if (error)
-			return (error);
-
-		if (dumpstatus(addr, (off_t)count * DEV_BSIZE) < 0)
-			return (EINTR);
-
-		blkno += blkcnt * dumppages;
-		count -= blkcnt * dumppages;
-		addr += PAGE_SIZE * dumppages;
+	if (length > 0) {
+		error = ida_command(drv->controller, CMD_WRITE, virtual,
+		    length, drv->drive, offset / DEV_BSIZE, DMA_DATA_OUT);
 	}
-	return (0);
-#endif
+	drv->controller->flags |= IDA_INTERRUPTS;
+	return (error);
 }
 
 void
 idad_intr(struct bio *bp)
 {
-	struct idad_softc *drv = (struct idad_softc *)bp->bio_driver1;
+	struct idad_softc *drv;
+
+	drv = bp->bio_disk->d_drv1;
 
 	if (bp->bio_flags & BIO_ERROR)
 		bp->bio_error = EIO;
 	else
 		bp->bio_resid = 0;
 
-	biofinish(bp, &drv->stats, 0);
+	biodone(bp);
 }
 
 static int
@@ -259,7 +172,6 @@ idad_attach(device_t dev)
 	struct ida_drive_info dinfo;
 	struct idad_softc *drv;
 	device_t parent;
-	dev_t dsk;
 	int error;
 
 	drv = (struct idad_softc *)device_get_softc(dev);
@@ -289,17 +201,16 @@ idad_attach(device_t dev)
 	    drv->secperunit / ((1024 * 1024) / drv->secsize),
 	    drv->secperunit, drv->secsize);
 
-	devstat_add_entry(&drv->stats, "idad", drv->unit, drv->secsize,
-	    DEVSTAT_NO_ORDERED_TAGS,
-	    DEVSTAT_TYPE_STORARRAY| DEVSTAT_TYPE_IF_OTHER,
-	    DEVSTAT_PRIORITY_ARRAY);
-
-	dsk = disk_create(drv->unit, &drv->disk, 0,
-	    &id_cdevsw, &idaddisk_cdevsw);
-
-	dsk->si_drv1 = drv;
-	dsk->si_iosize_max = DFLTPHYS;		/* XXX guess? */
-	disks_registered++;
+	drv->disk.d_strategy = idad_strategy;
+	drv->disk.d_name = "idad";
+	drv->disk.d_dump = idad_dump;
+	drv->disk.d_sectorsize = drv->secsize;
+	drv->disk.d_mediasize = (off_t)drv->secperunit * drv->secsize;
+	drv->disk.d_fwsectors = drv->sectors;
+	drv->disk.d_fwheads = drv->heads;
+	drv->disk.d_drv1 = drv;
+	drv->disk.d_maxsize = DFLTPHYS;		/* XXX guess? */
+	disk_create(drv->unit, &drv->disk, 0, NULL, NULL);
 
 	return (0);
 }
@@ -310,9 +221,6 @@ idad_detach(device_t dev)
 	struct idad_softc *drv;
 
 	drv = (struct idad_softc *)device_get_softc(dev);
-	devstat_remove_entry(&drv->stats);
-
-	if (--disks_registered == 0)
-		cdevsw_remove(&idaddisk_cdevsw);
+	disk_destroy(&drv->disk);
 	return (0);
 }

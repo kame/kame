@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/tlsb/zs_tlsb.c,v 1.33 2002/04/01 21:30:29 jhb Exp $
+ * $FreeBSD: src/sys/alpha/tlsb/zs_tlsb.c,v 1.35 2003/03/03 12:15:38 phk Exp $
  */
 /*
  * This driver is a somewhat hack. A real driver might use the zs driver
@@ -69,19 +69,14 @@ static	d_ioctl_t	zsioctl;
 
 #define CDEV_MAJOR 135
 static struct cdevsw zs_cdevsw = {
-	/* open */	zsopen,
-	/* close */	zsclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	zsioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"zs",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	zsopen,
+	.d_close =	zsclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	zsioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"zs",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void	zsstart(struct tty *);
@@ -216,9 +211,9 @@ zs_putc(caddr_t base, int chan, int c)
 /*
  * Console support
  */
-int		zs_cngetc(dev_t);
-int		zs_cncheckc(dev_t);
-void		zs_cnputc(dev_t, int);
+cn_getc_t	zs_cngetc;
+cn_checkc_t	zs_cncheckc;
+cn_putc_t	zs_cnputc;
 
 static caddr_t zs_console_addr;
 CONS_DRIVER(zs, NULL, NULL, NULL, zs_cngetc, zs_cncheckc, zs_cnputc, NULL);
@@ -237,28 +232,28 @@ zs_cnattach(vm_offset_t base, vm_offset_t offset)
 }
 
 int
-zs_cngetc(dev_t dev)
+zs_cngetc(struct consdev *cp)
 {
 	int s = spltty();
-	int c = zs_getc(zs_console_addr, minor(dev));
+	int c = zs_getc(zs_console_addr, minor(cp->cn_dev));
 	splx(s);
 	return c;
 }
 
 int
-zs_cncheckc(dev_t dev)
+zs_cncheckc(struct consdev *cp)
 {
 	int s = spltty();
-	int c = zs_maygetc(zs_console_addr, minor(dev));
+	int c = zs_maygetc(zs_console_addr, minor(cp->cn_dev));
 	splx(s);
 	return c;
 }
 
 void
-zs_cnputc(dev_t dev, int c)
+zs_cnputc(struct consdev *cp, int c)
 {
 	int s = spltty();
-	zs_putc(zs_console_addr, minor(dev), c);
+	zs_putc(zs_console_addr, minor(cp->cn_dev), c);
 	splx(s);
 }
 

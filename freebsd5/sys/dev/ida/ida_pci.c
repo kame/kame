@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.19 2001/03/01 17:09:01 markm Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.22 2003/04/01 15:06:23 phk Exp $
  */
 
 #include <sys/param.h>
@@ -32,8 +32,7 @@
 
 #include <sys/bio.h>
 #include <sys/bus.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
+#include <sys/conf.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
@@ -43,6 +42,8 @@
 
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
+
+#include <geom/geom_disk.h>
 
 #include <dev/ida/idavar.h>
 #include <dev/ida/idareg.h>

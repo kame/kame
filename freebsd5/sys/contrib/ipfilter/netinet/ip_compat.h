@@ -5,7 +5,7 @@
  *
  * @(#)ip_compat.h	1.8 1/14/96
  * $Id: ip_compat.h,v 2.26.2.9 2001/01/14 14:58:01 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_compat.h,v 1.19 2002/08/28 13:41:35 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_compat.h,v 1.20 2003/02/15 06:23:45 darrenr Exp $
  */
 
 #ifndef	__IP_COMPAT_H__
@@ -533,6 +533,7 @@ extern	ill_t	*get_unit __P((char *, int));
 
 # ifdef sun
 #  if !SOLARIS
+#   include	<sys/time.h>
 #   include	<sys/kmem_alloc.h>
 #   define	GETUNIT(n, v)	ifunit(n, IFNAMSIZ)
 #   define	IFNAME(x)	((struct ifnet *)x)->if_name
@@ -655,6 +656,7 @@ extern	vm_map_t	kmem_map;
 # define	IWCOPYPTR	iwcopyptr
 # define	IFNAME(x)	get_ifname((struct ifnet *)x)
 # define	UIOMOVE(a,b,c,d)	ipfuiomove(a,b,c,d)
+# include	<sys/time.h>
 extern	void	m_copydata __P((mb_t *, int, int, caddr_t));
 extern	int	ipfuiomove __P((caddr_t, int, int, struct uio *));
 #endif /* KERNEL */

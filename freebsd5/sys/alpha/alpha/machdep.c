@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.192 2002/11/16 06:35:51 deischen Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.202 2003/05/13 20:35:56 jhb Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -90,7 +90,6 @@
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
-#include "opt_simos.h"
 #include "opt_msgbuf.h"
 #include "opt_maxmem.h"
 
@@ -111,6 +110,7 @@
 #include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
+#include <sys/cons.h>
 #include <sys/mbuf.h>
 #include <sys/vmmeter.h>
 #include <sys/msgbuf.h>
@@ -476,27 +476,13 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	nobootinfo:
 		bootinfo.ssym = (u_long)&_end;
 		bootinfo.esym = (u_long)&_end;
-#ifdef SIMOS
-		{
-			char* p = (char*)bootinfo.ssym + 8;
-			if (p[EI_MAG0] == ELFMAG0
-			    && p[EI_MAG1] == ELFMAG1
-			    && p[EI_MAG2] == ELFMAG2
-			    && p[EI_MAG3] == ELFMAG3) {
-				bootinfo.ssym = (u_long) p;
-				bootinfo.esym = (u_long)p + *(u_long*)(p - 8);
-			}
-		}
-#endif
 		bootinfo.hwrpb_phys = ((struct rpb *)HWRPB_ADDR)->rpb_phys;
 		bootinfo.hwrpb_size = ((struct rpb *)HWRPB_ADDR)->rpb_size;
 		init_prom_interface((struct rpb *)HWRPB_ADDR);
 		prom_getenv(PROM_E_BOOTED_OSFLAGS, bootinfo.boot_flags,
 			    sizeof bootinfo.boot_flags);
-#ifndef SIMOS
 		prom_getenv(PROM_E_BOOTED_FILE, bootinfo.booted_kernel,
 			    sizeof bootinfo.booted_kernel);
-#endif
 		prom_getenv(PROM_E_BOOTED_DEV, bootinfo.booted_dev,
 			    sizeof bootinfo.booted_dev);
 	}
@@ -633,12 +619,6 @@ alpha_init(pfn, ptb, bim, bip, biv)
 
 	kernstartpfn = atop(ALPHA_K0SEG_TO_PHYS(kernstart));
 	kernendpfn = atop(ALPHA_K0SEG_TO_PHYS(kernend));
-#ifdef SIMOS
-	/* 
-	 * SimOS console puts the bootstrap stack after kernel
-	 */
-	kernendpfn += 4;
-#endif
 
 	/*
 	 * Find out how much memory is available, by looking at
@@ -826,7 +806,9 @@ alpha_init(pfn, ptb, bim, bip, biv)
 		size_t nsz;
 		if (physmem - sz > Maxmem) {
 			phys_avail[i] = 0;
+			phys_avail[i+1] = 0;
 			phys_avail_cnt -= 2;
+			physmem -= sz;
 		} else {
 			nsz = sz - (physmem - Maxmem);
 			phys_avail[i+1] = phys_avail[i] + alpha_ptob(nsz);
@@ -1089,7 +1071,6 @@ bzero(void *buf, size_t len)
 void
 DELAY(int n)
 {
-#ifndef	SIMOS
 	unsigned long pcc0, pcc1, curcycle, cycles;
         int usec;
 
@@ -1126,7 +1107,6 @@ DELAY(int n)
 		}
 		pcc0 = pcc1;
         }
-#endif
 }
 
 /*
@@ -1152,12 +1132,14 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 
 	td = curthread;
 	p = td->td_proc;
-	frame = td->td_frame;
-	oonstack = sigonstack(alpha_pal_rdusp());
-	fsize = sizeof ksi;
-	rndfsize = ((fsize + 15) / 16) * 16;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
+
+	frame = td->td_frame;
+	fsize = sizeof ksi;
+	rndfsize = ((fsize + 15) / 16) * 16;
+	oonstack = sigonstack(alpha_pal_rdusp());
 
 	/*
 	 * Allocate and validate space for the signal handler
@@ -1175,6 +1157,7 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 #endif
 	} else
 		sip = (osiginfo_t *)(alpha_pal_rdusp() - rndfsize);
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/*
@@ -1219,11 +1202,7 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		 * instruction to halt it in its tracks.
 		 */
 		PROC_LOCK(p);
-		SIGACTION(p, SIGILL) = SIG_DFL;	
-		SIGDELSET(p->p_sigignore, SIGILL);
-		SIGDELSET(p->p_sigcatch, SIGILL);
-		SIGDELSET(p->p_sigmask, SIGILL);
-		psignal(p, SIGILL);
+		sigexit(td, SIGILL);
 		return;
 	}
 
@@ -1234,7 +1213,8 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	frame->tf_regs[FRAME_A0] = sig;
 	frame->tf_regs[FRAME_FLAGS] = 0; /* full restore */
 	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig))
+	mtx_lock(&psp->ps_mtx);
+	if (SIGISMEMBER(psp->ps_siginfo, sig))
 		frame->tf_regs[FRAME_A1] = (u_int64_t)sip;
 	else
 		frame->tf_regs[FRAME_A1] = code;
@@ -1259,6 +1239,7 @@ freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 
 	frame = td->td_frame;
 	oonstack = sigonstack(alpha_pal_rdusp());
@@ -1300,6 +1281,7 @@ freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 #endif
 	} else
 		sfp = (struct sigframe4 *)(alpha_pal_rdusp() - rndfsize);
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/* save the floating-point state, if necessary, then copy it. */
@@ -1325,11 +1307,7 @@ freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		 * instruction to halt it in its tracks.
 		 */
 		PROC_LOCK(p);
-		SIGACTION(p, SIGILL) = SIG_DFL;
-		SIGDELSET(p->p_sigignore, SIGILL);
-		SIGDELSET(p->p_sigcatch, SIGILL);
-		SIGDELSET(p->p_sigmask, SIGILL);
-		psignal(p, SIGILL);
+		sigexit(td, SIGILL);
 		return;
 	}
 
@@ -1339,7 +1317,8 @@ freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	frame->tf_regs[FRAME_PC] = PS_STRINGS - szfreebsd4_sigcode;
 	frame->tf_regs[FRAME_A0] = sig;
 	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	mtx_lock(&psp->ps_mtx);
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		frame->tf_regs[FRAME_A1] = (u_int64_t)&(sfp->sf_si);
 
 		/* Fill in POSIX parts */
@@ -1371,6 +1350,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 #ifdef COMPAT_FREEBSD4
 	if (SIGISMEMBER(psp->ps_freebsd4, sig)) {
 		freebsd4_sendsig(catcher, sig, mask, code);
@@ -1425,6 +1405,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 #endif
 	} else
 		sfp = (struct sigframe *)(alpha_pal_rdusp() - rndfsize);
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/* save the floating-point state, if necessary, then copy it. */
@@ -1450,11 +1431,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		 * instruction to halt it in its tracks.
 		 */
 		PROC_LOCK(p);
-		SIGACTION(p, SIGILL) = SIG_DFL;
-		SIGDELSET(p->p_sigignore, SIGILL);
-		SIGDELSET(p->p_sigcatch, SIGILL);
-		SIGDELSET(p->p_sigmask, SIGILL);
-		psignal(p, SIGILL);
+		sigexit(td, SIGILL);
 		return;
 	}
 
@@ -1464,7 +1441,8 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	frame->tf_regs[FRAME_PC] = PS_STRINGS - szsigcode;
 	frame->tf_regs[FRAME_A0] = sig;
 	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	mtx_lock(&psp->ps_mtx);
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		frame->tf_regs[FRAME_A1] = (u_int64_t)&(sfp->sf_si);
 
 		/* Fill in POSIX parts */
@@ -1533,9 +1511,9 @@ osigreturn(struct thread *td,
 	 * sigmask is stored in sc_reserved, sc_mask is only used for
 	 * backward compatibility.
 	 */
-	SIGSETOLD(p->p_sigmask, ksc.sc_mask);
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	SIGSETOLD(td->td_sigmask, ksc.sc_mask);
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	set_regs(td, (struct reg *)ksc.sc_regs);
@@ -1615,9 +1593,9 @@ freebsd4_sigreturn(struct thread *td,
 		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
-	p->p_sigmask = uc.uc_sigmask;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = uc.uc_sigmask;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	/* XXX ksc.sc_ownedfp ? */
@@ -1691,9 +1669,9 @@ sigreturn(struct thread *td,
 		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
-	p->p_sigmask = uc.uc_sigmask;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = uc.uc_sigmask;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	return (EJUSTRETURN);
@@ -2009,13 +1987,17 @@ set_regs(td, regs)
 }
 
 int
-get_mcontext(struct thread *td, mcontext_t *mcp)
+get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
 	/*
 	 * Use a trapframe for getsetcontext, so just copy the
 	 * threads trapframe.
 	 */
-	bcopy(&td->td_frame, &mcp->mc_regs, sizeof(td->td_frame));
+	bcopy(td->td_frame, &mcp->mc_regs, sizeof(struct trapframe));
+	if (clear_ret != 0) {
+		mcp->mc_regs[FRAME_V0] = 0;
+		mcp->mc_regs[FRAME_A4] = 0;
+	}
 
 	/*
 	 * When the thread is the current thread, the user stack pointer
@@ -2025,7 +2007,9 @@ get_mcontext(struct thread *td, mcontext_t *mcp)
 		mcp->mc_regs[FRAME_SP] = alpha_pal_rdusp();
 
 	mcp->mc_format = _MC_REV0_TRAPFRAME;
+	PROC_LOCK(curthread->td_proc);
 	mcp->mc_onstack = sigonstack(alpha_pal_rdusp()) ? 1 : 0;
+	PROC_UNLOCK(curthread->td_proc);
 	get_fpcontext(td, mcp);
 	return (0);
 }
@@ -2059,7 +2043,7 @@ set_mcontext(struct thread *td, const mcontext_t *mcp)
 		 * The context is a trapframe, so just copy it over the
 		 * threads frame.
 		 */
-		bcopy(&mcp->mc_regs, &td->td_frame, sizeof(td->td_frame));
+		bcopy(&mcp->mc_regs, td->td_frame, sizeof(struct trapframe));
 	}
 	return (0);
 }
@@ -2355,4 +2339,10 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t sz)
 		((caddr_t) pcpu + sz - sizeof(struct trapframe));
 	pcpu->pc_idlepcb.apcb_ptbr = thread0.td_pcb->pcb_hw.apcb_ptbr;
 	pcpu->pc_current_asngen = 1;
+}
+
+intptr_t
+casuptr(intptr_t *p, intptr_t old, intptr_t new)
+{
+	return (-1);
 }

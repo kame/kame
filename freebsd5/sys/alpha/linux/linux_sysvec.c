@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/linux/linux_sysvec.c,v 1.84 2002/09/01 21:41:22 jake Exp $
+ * $FreeBSD: src/sys/alpha/linux/linux_sysvec.c,v 1.87 2003/03/27 18:18:35 jhb Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -60,6 +60,7 @@
 
 #include <alpha/linux/linux.h>
 #include <alpha/linux/linux_proto.h>
+#include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_util.h>
 #undef szsigcode
 
@@ -81,25 +82,26 @@ SET_DECLARE(linux_ioctl_handler_set, struct linux_ioctl_handler);
 
 void osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code);
 
-static int	elf_linux_fixup(long **stack_base,
+static int	elf_linux_fixup(register_t **stack_base,
     struct image_params *iparams);
 static int	exec_linux_imgact_try(struct image_params *iparams);
 
 static int
-elf_linux_fixup(long **stack_base, struct image_params *imgp)
+elf_linux_fixup(register_t **stack_base, struct image_params *imgp)
 {
-	long *pos;
 	Elf64_Auxargs *args;
+	register_t *pos;
 
+	KASSERT(curthread->td_proc == imgp->proc &&
+	    (curthread->td_proc->p_flag & P_THREADED) == 0,
+	    ("unsafe elf_linux_fixup(), should be curproc"));
 	args = (Elf64_Auxargs *)imgp->auxargs;
 	pos = *stack_base + (imgp->argc + imgp->envc + 2);
 
-	if (args->trace) {
+	if (args->trace)
 		AUXARGS_ENTRY(pos, AT_DEBUG, 1);
-	}
-	if (args->execfd != -1) {
+	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
-	}       
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
@@ -107,19 +109,17 @@ elf_linux_fixup(long **stack_base, struct image_params *imgp)
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
-	PROC_LOCK(imgp->proc);
 	AUXARGS_ENTRY(pos, AT_UID, imgp->proc->p_ucred->cr_ruid);
 	AUXARGS_ENTRY(pos, AT_EUID, imgp->proc->p_ucred->cr_svuid);
 	AUXARGS_ENTRY(pos, AT_GID, imgp->proc->p_ucred->cr_rgid);
 	AUXARGS_ENTRY(pos, AT_EGID, imgp->proc->p_ucred->cr_svgid);
-	PROC_UNLOCK(imgp->proc);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 	
 	free(imgp->auxargs, M_TEMP);      
 	imgp->auxargs = NULL;
 
 	(*stack_base)--;
-	**stack_base = (long)imgp->argc;
+	**stack_base = (register_t)imgp->argc;
 	return 0;
 }
 
@@ -265,6 +265,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				linux_ioctl_unregister_handler(*lihp);
 			if (bootverbose)
 				printf("Linux ELF exec handler removed\n");
+			linux_mib_destroy();
 		} else
 			printf("Could not deinstall ELF interpreter entry\n");
 		break;

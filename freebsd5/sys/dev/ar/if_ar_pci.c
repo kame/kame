@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ar/if_ar_pci.c,v 1.6 2001/01/30 10:01:15 jhay Exp $
+ * $FreeBSD: src/sys/dev/ar/if_ar_pci.c,v 1.8 2003/04/23 15:40:11 jhay Exp $
  */
 
 #include <sys/param.h>
@@ -71,7 +71,8 @@ static driver_t ar_pci_driver = {
 	sizeof(struct ar_hardc),
 };
 
-DRIVER_MODULE(if_ar, pci, ar_pci_driver, ar_devclass, 0, 0);
+DRIVER_MODULE(ar, pci, ar_pci_driver, ar_devclass, 0, 0);
+MODULE_DEPEND(ar, pci, 1, 1, 1);
 
 static int
 ar_pci_probe(device_t device)
@@ -106,7 +107,6 @@ ar_pci_attach(device_t device)
 {
 	int error;
 	u_int i, tmp;
-	u_char *inten;
 	struct ar_hardc *hc;
 
 	hc = (struct ar_hardc *)device_get_softc(device);
@@ -124,13 +124,11 @@ ar_pci_attach(device_t device)
 	if(error)
 		goto errexit;
 
-	hc->plx_mem = rman_get_virtual(hc->res_plx_memory);
 	hc->mem_start = rman_get_virtual(hc->res_memory);
 
 	hc->cunit = device_get_unit(device);
 	hc->sca[0] = (sca_regs *)(hc->mem_start + AR_PCI_SCA_1_OFFSET);
 	hc->sca[1] = (sca_regs *)(hc->mem_start + AR_PCI_SCA_2_OFFSET);
-	hc->iobase = 0;
 	hc->orbase = (u_char *)(hc->mem_start + AR_PCI_ORBASE_OFFSET);
 
 	tmp = hc->orbase[AR_BMI * 4];
@@ -158,8 +156,8 @@ ar_pci_attach(device_t device)
 	ar_attach(device);
 
 	/* Magic to enable the card to generate interrupts. */
-	inten = (u_char *)hc->plx_mem;
-	inten[0x69] = 0x09;
+	bus_space_write_1(rman_get_bustag(hc->res_plx_memory),
+	    rman_get_bushandle(hc->res_plx_memory), 0x69, 0x09);
 
 	return (0);
 

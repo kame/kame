@@ -25,13 +25,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/boot/pc98/boot0.5/start.s,v 1.1 2000/08/02 08:46:08 kato Exp $
+# $FreeBSD: src/sys/boot/pc98/boot0.5/start.s,v 1.2 2003/05/02 09:33:12 kato Exp $
 #
 	.global	start
 	.code16
 
 	.text
 start:
+	jmp	start1
+
+	.org	0x2d4
+start1:
 	cli
 	movw	%cs, %ax
 	movw	%ax, %ds

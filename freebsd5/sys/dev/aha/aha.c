@@ -55,7 +55,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aha/aha.c,v 1.42 2002/10/09 09:30:57 peter Exp $
+ * $FreeBSD: src/sys/dev/aha/aha.c,v 1.47 2003/05/27 04:59:56 scottl Exp $
  */
 
 #include <sys/param.h>
@@ -83,10 +83,6 @@
  * did for the CF and CP.
  */
 #define PROBABLY_NEW_BOARD(REV) (REV > 0x43 && REV < 0x56)
-
-#ifndef MAX
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
 
 /* MailBox Management functions */
 static __inline void	ahanextinbox(struct aha_softc *aha);
@@ -306,7 +302,7 @@ aha_probe(struct aha_softc* aha)
 
 	/*
 	 * Get the board ID.  We use this to see if we're dealing with
-	 * a buslogic card or a aha card (or clone).
+	 * a buslogic card or an aha card (or clone).
 	 */
 	error = aha_cmd(aha, AOP_INQUIRE_BOARD_ID, NULL, /*parmlen*/0,
 		       (u_int8_t*)&board_id, sizeof(board_id),
@@ -485,28 +481,37 @@ aha_init(struct aha_softc* aha)
 	 */
 
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(aha->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/AHA_NSEG,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_24BIT,
-			       /*flags*/BUS_DMA_ALLOCNOW,
-			       &aha->buffer_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ aha->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ MAXBSIZE,
+				/* nsegments	*/ AHA_NSEG,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
+				/* flags	*/ BUS_DMA_ALLOCNOW,
+				&aha->buffer_dmat) != 0) {
 		goto error_exit;
 	}
 
 	aha->init_level++;
 	/* DMA tag for our mailboxes */
-	if (bus_dma_tag_create(aha->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       aha->num_boxes * (sizeof(aha_mbox_in_t)
-					       + sizeof(aha_mbox_out_t)),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_24BIT,
-			       /*flags*/0, &aha->mailbox_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ aha->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ aha->num_boxes *
+						   (sizeof(aha_mbox_in_t) +
+						    sizeof(aha_mbox_out_t)),
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
+				/* flags	*/ 0,
+				&aha->mailbox_dmat) != 0) {
 		goto error_exit;
         }
 
@@ -534,14 +539,19 @@ aha_init(struct aha_softc* aha)
 	ahainitmboxes(aha);
 
 	/* DMA tag for our ccb structures */
-	if (bus_dma_tag_create(aha->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       aha->max_ccbs * sizeof(struct aha_ccb),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_24BIT,
-			       /*flags*/0, &aha->ccb_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ aha->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ aha->max_ccbs *
+						   sizeof(struct aha_ccb),
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
+				/* flags	*/ 0,
+				&aha->ccb_dmat) != 0) {
 		goto error_exit;
         }
 
@@ -564,13 +574,18 @@ aha_init(struct aha_softc* aha)
 	aha->init_level++;
 
 	/* DMA tag for our S/G structures.  We allocate in page sized chunks */
-	if (bus_dma_tag_create(aha->parent_dmat, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       PAGE_SIZE, /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_24BIT,
-			       /*flags*/0, &aha->sg_dmat) != 0) {
+	if (bus_dma_tag_create(	/* parent	*/ aha->parent_dmat,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ PAGE_SIZE,
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
+				/* flags	*/ 0,
+				&aha->sg_dmat) != 0) {
 		goto error_exit;
         }
 
@@ -806,7 +821,7 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 		struct	aha_hccb *hccb;
 
 		/*
-		 * get a accb to use.
+		 * Get an accb to use.
 		 */
 		if ((accb = ahagetccb(aha)) == NULL) {
 			int s;

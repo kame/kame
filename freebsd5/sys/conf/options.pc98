@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.157 2002/11/18 06:17:07 jmallett Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.162 2003/04/12 09:40:37 des Exp $
 # Options specific to the pc98 platform kernels
 
 MATH_EMULATE		opt_math_emulate.h
@@ -6,6 +6,8 @@ GPL_MATH_EMULATE	opt_math_emulate.h
 DISABLE_PSE		opt_pmap.h
 PMAP_SHPGPERPROC	opt_pmap.h
 DISABLE_PG_G		opt_pmap.h
+LAZY_SWITCH		opt_swtch.h
+SWTCH_OPTIM_STATS	opt_swtch.h
 PPC_PROBE_CHIPSET	opt_ppc.h
 PPC_DEBUG		opt_ppc.h
 MAXMEM
@@ -92,7 +94,7 @@ SC_RENDER_DEBUG		opt_syscons.h
 SC_TWOBUTTON_MOUSE	opt_syscons.h
 SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
 
-GDC			opt_gdc.h
+GDC
 
 KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h
 KBD_INSTALL_CDEV	opt_kbd.h
@@ -104,29 +106,6 @@ KBDIO_DEBUG		opt_kbd.h
 # Video spigot
 SPIGOT_UNSECURE		opt_spigot.h
 
-# -------------------------------
-# isdn4bsd: passive ISA cards
-# -------------------------------
-TEL_S0_8		opt_i4b.h
-TEL_S0_16		opt_i4b.h
-TEL_S0_16_3		opt_i4b.h
-AVM_A1			opt_i4b.h
-USR_STI			opt_i4b.h
-ITKIX1			opt_i4b.h
-ELSA_PCC16		opt_i4b.h
-# -------------------------------
-# isdn4bsd: passive ISA PnP cards
-# -------------------------------
-CRTX_S0_P		opt_i4b.h
-DRN_NGO                 opt_i4b.h
-TEL_S0_16_3_P		opt_i4b.h
-SEDLBAUER		opt_i4b.h
-DYNALINK		opt_i4b.h
-ASUSCOM_IPAC		opt_i4b.h
-ELSA_QS1ISA		opt_i4b.h
-SIEMENS_ISURF2		opt_i4b.h
-EICON_DIVA		opt_i4b.h
-COMPAQ_M610		opt_i4b.h
 # -------------------------------
 # isdn4bsd: passive PCI cards
 # -------------------------------

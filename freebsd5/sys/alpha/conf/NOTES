@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/alpha/conf/NOTES,v 1.147 2002/07/23 06:36:23 peter Exp $
+# $FreeBSD: src/sys/alpha/conf/NOTES,v 1.151 2003/04/15 20:21:56 jhb Exp $
 #
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
@@ -65,8 +65,14 @@ device		tga		# TGA video card driver
 
 
 #####################################################################
-# SIMULATOR OPTIONS
+# ABI Emulation
 
-# Include support for running under the SIMOS simulator.
-device		simos
-options 	SIMOS
+# Enable OSF/1 ABI emulation
+options 	COMPAT_OSF1
+
+# Enable Linux ABI emulation (requires COMPAT_OSF1)
+options 	COMPAT_LINUX
+
+# Enable the linux-like proc filesystem support (requires COMPAT_LINUX
+# and PSEUDOFS)
+options 	LINPROCFS

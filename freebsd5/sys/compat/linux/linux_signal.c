@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.38 2002/10/01 17:15:50 jmallett Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.44 2003/04/28 19:43:11 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -227,40 +227,33 @@ static int
 linux_do_sigprocmask(struct thread *td, int how, l_sigset_t *new,
 		     l_sigset_t *old)
 {
+	sigset_t omask, nmask;
+	sigset_t *nmaskp;
 	int error;
-	sigset_t mask;
-	struct proc *p = td->td_proc;
 
-	error = 0;
 	td->td_retval[0] = 0;
 
-	PROC_LOCK(p);
-	if (old != NULL)
-		bsd_to_linux_sigset(&p->p_sigmask, old);
-
-	if (new != NULL) {
-		linux_to_bsd_sigset(new, &mask);
-
-		switch (how) {
-		case LINUX_SIG_BLOCK:
-			SIGSETOR(p->p_sigmask, mask);
-			SIG_CANTMASK(p->p_sigmask);
-			break;
-		case LINUX_SIG_UNBLOCK:
-			SIGSETNAND(p->p_sigmask, mask);
-			signotify(p);
-			break;
-		case LINUX_SIG_SETMASK:
-			p->p_sigmask = mask;
-			SIG_CANTMASK(p->p_sigmask);
-			signotify(p);
-			break;
-		default:
-			error = EINVAL;
-			break;
-		}
+	switch (how) {
+	case LINUX_SIG_BLOCK:
+		how = SIG_BLOCK;
+		break;
+	case LINUX_SIG_UNBLOCK:
+		how = SIG_UNBLOCK;
+		break;
+	case LINUX_SIG_SETMASK:
+		how = SIG_SETMASK;
+		break;
+	default:
+		return (EINVAL);
 	}
-	PROC_UNLOCK(p);
+	if (new != NULL) {
+		linux_to_bsd_sigset(new, &nmask);
+		nmaskp = &nmask;
+	} else
+		nmaskp = NULL;
+	error = kern_sigprocmask(td, how, nmaskp, &omask, 0);
+	if (error == 0 && old != NULL)
+		bsd_to_linux_sigset(&omask, old);
 
 	return (error);
 }
@@ -345,7 +338,7 @@ linux_sgetmask(struct thread *td, struct linux_sgetmask_args *args)
 #endif
 
 	PROC_LOCK(p);
-	bsd_to_linux_sigset(&p->p_sigmask, &mask);
+	bsd_to_linux_sigset(&td->td_sigmask, &mask);
 	PROC_UNLOCK(p);
 	td->td_retval[0] = mask.__bits[0];
 	return (0);
@@ -364,18 +357,21 @@ linux_ssetmask(struct thread *td, struct linux_ssetmask_args *args)
 #endif
 
 	PROC_LOCK(p);
-	bsd_to_linux_sigset(&p->p_sigmask, &lset);
+	bsd_to_linux_sigset(&td->td_sigmask, &lset);
 	td->td_retval[0] = lset.__bits[0];
 	LINUX_SIGEMPTYSET(lset);
 	lset.__bits[0] = args->mask;
 	linux_to_bsd_sigset(&lset, &bset);
-	p->p_sigmask = bset;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = bset;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 	return (0);
 }
 
+/*
+ * MPSAFE
+ */
 int
 linux_sigpending(struct thread *td, struct linux_sigpending_args *args)
 {
@@ -391,9 +387,10 @@ linux_sigpending(struct thread *td, struct linux_sigpending_args *args)
 
 	PROC_LOCK(p);
 	bset = p->p_siglist;
-	SIGSETAND(bset, p->p_sigmask);
-	bsd_to_linux_sigset(&bset, &lset);
+	SIGSETOR(bset, td->td_siglist);
+	SIGSETAND(bset, td->td_sigmask);
 	PROC_UNLOCK(p);
+	bsd_to_linux_sigset(&bset, &lset);
 	mask = lset.__bits[0];
 	return (copyout(&mask, args->mask, sizeof(mask)));
 }

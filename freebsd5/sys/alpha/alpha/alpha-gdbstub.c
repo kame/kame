@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/alpha-gdbstub.c,v 1.12 2001/07/08 04:56:04 julian Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/alpha-gdbstub.c,v 1.13 2003/02/16 19:22:20 phk Exp $ */
 /****************************************************************************
 
 		THIS SOFTWARE IS NOT COPYRIGHTED
@@ -153,18 +153,18 @@ strcpy (char *dst, const char *src)
 static int
 putDebugChar (int c)		/* write a single character      */
 {
-  if (gdbdev == NODEV)
+  if (gdb_arg == NULL)
 	return 0;
-  (*gdb_putc)(gdbdev, c);
+  (*gdb_putc)(gdb_arg, c);
   return 1;
 }
 
 static int
 getDebugChar (void)		/* read and return a single char */
 {
-  if (gdbdev == NODEV)
+  if (gdb_arg == NULL)
 	return -1;
-  return (*gdb_getc)(gdbdev);
+  return (*gdb_getc)(gdb_arg);
 }
 
 static const char hexchars[]="0123456789abcdef";
@@ -625,7 +625,7 @@ gdb_handle_exception (db_regs_t *raw_regs, int type, int code)
 
   while (1)
     {
-      if (gdbdev == NODEV)	/* somebody's removed it */
+      if (gdb_arg == NULL)	/* somebody's removed it */
 	return;			/* get out of here */
       remcomOutBuffer[0] = 0;
 

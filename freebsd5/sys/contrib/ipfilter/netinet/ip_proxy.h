@@ -4,7 +4,7 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: ip_proxy.h,v 2.8.2.4 2000/12/02 00:15:03 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_proxy.h,v 1.12 2002/08/28 13:41:36 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_proxy.h,v 1.13 2003/02/15 06:23:45 darrenr Exp $
  */
 
 #ifndef	__IP_PROXY_H__
@@ -100,6 +100,7 @@ typedef struct  ftpside {
 	u_32_t	ftps_len;
 	int	ftps_junk;
 	int	ftps_cmds;
+	int	ftps_cmd;
 	char	ftps_buf[FTP_BUFSZ];
 } ftpside_t;
 

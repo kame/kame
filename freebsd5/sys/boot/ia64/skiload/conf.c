@@ -31,10 +31,8 @@
  *	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/ia64/skiload/conf.c,v 1.1 2001/09/12 08:34:27 dfr Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ia64/skiload/conf.c,v 1.4 2003/04/04 02:12:56 marcel Exp $");
 
 #include <stand.h>
 
@@ -58,7 +56,7 @@ struct devsw *devsw[] = {
 struct fs_ops *file_system[] = {
 	&ski_fsops,
 	&ufs_fsops,
-	&zipfs_fsops,
+	&gzipfs_fsops,
 	NULL
 };
 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.134 2002/10/17 22:00:30 robert Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.143 2003/04/29 13:35:59 kan Exp $
  */
 
 #include "opt_mac.h"
@@ -36,6 +36,7 @@
 #include <sys/imgact_aout.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mac.h>
 #include <sys/malloc.h>
@@ -64,8 +65,6 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 #include <vm/swap_pager.h>
-
-#include <machine/limits.h>
 
 #include <posix4/sched.h>
 
@@ -154,7 +153,7 @@ linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
 
 	sysinfo.procs = 20; /* Hack */
 
-	return copyout(&sysinfo, (caddr_t)args->info, sizeof(sysinfo));
+	return copyout(&sysinfo, args->info, sizeof(sysinfo));
 }
 #endif /*!__alpha__*/
 
@@ -164,7 +163,7 @@ linux_alarm(struct thread *td, struct linux_alarm_args *args)
 {
 	struct itimerval it, old_it;
 	struct timeval tv;
-	int s;
+	struct proc *p;
 
 #ifdef DEBUG
 	if (ldebug(alarm))
@@ -178,18 +177,19 @@ linux_alarm(struct thread *td, struct linux_alarm_args *args)
 	it.it_value.tv_usec = 0;
 	it.it_interval.tv_sec = 0;
 	it.it_interval.tv_usec = 0;
-	s = splsoftclock();
-	old_it = td->td_proc->p_realtimer;
+	p = td->td_proc;
+	PROC_LOCK(p);
+	old_it = p->p_realtimer;
 	getmicrouptime(&tv);
 	if (timevalisset(&old_it.it_value))
-		callout_stop(&td->td_proc->p_itcallout);
+		callout_stop(&p->p_itcallout);
 	if (it.it_value.tv_sec != 0) {
-		callout_reset(&td->td_proc->p_itcallout, tvtohz(&it.it_value),
-		    realitexpire, td->td_proc);
+		callout_reset(&p->p_itcallout, tvtohz(&it.it_value),
+		    realitexpire, p);
 		timevaladd(&it.it_value, &tv);
 	}
-	td->td_proc->p_realtimer = it;
-	splx(s);
+	p->p_realtimer = it;
+	PROC_UNLOCK(p);
 	if (timevalcmp(&old_it.it_value, &tv, >)) {
 		timevalsub(&old_it.it_value, &tv);
 		if (old_it.it_value.tv_usec != 0)
@@ -415,8 +415,8 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 			goto cleanup;
 
 		/* copy from kernel VM space to user space */
-		error = copyout((caddr_t)(uintptr_t)(buffer + file_offset),
-		    (caddr_t)vmaddr, a_out->a_text + a_out->a_data);
+		error = copyout((void *)(buffer + file_offset),
+		    (void *)vmaddr, a_out->a_text + a_out->a_data);
 
 		/* release temporary kernel space */
 		vm_map_remove(kernel_map, buffer, buffer +
@@ -491,8 +491,7 @@ linux_select(struct thread *td, struct linux_select_args *args)
 	 * time left.
 	 */
 	if (args->timeout) {
-		if ((error = copyin((caddr_t)args->timeout, &utv,
-		    sizeof(utv))))
+		if ((error = copyin(args->timeout, &utv, sizeof(utv))))
 			goto select_out;
 #ifdef DEBUG
 		if (ldebug(select))
@@ -556,8 +555,7 @@ linux_select(struct thread *td, struct linux_select_args *args)
 			printf(LMSG("outgoing timeout (%ld/%ld)"),
 			    utv.tv_sec, utv.tv_usec);
 #endif
-		if ((error = copyout(&utv, (caddr_t)args->timeout,
-		    sizeof(utv))))
+		if ((error = copyout(&utv, args->timeout, sizeof(utv))))
 			goto select_out;
 	}
 
@@ -569,20 +567,20 @@ select_out:
 	return error;
 }
 
-int     
+int
 linux_mremap(struct thread *td, struct linux_mremap_args *args)
 {
 	struct munmap_args /* {
 		void *addr;
 		size_t len;
-	} */ bsd_args; 
+	} */ bsd_args;
 	int error = 0;
- 
+
 #ifdef DEBUG
 	if (ldebug(mremap))
 		printf(ARGS(mremap, "%p, %08lx, %08lx, %08lx"),
-		    (void *)args->addr, 
-		    (unsigned long)args->old_len, 
+		    (void *)args->addr,
+		    (unsigned long)args->old_len,
 		    (unsigned long)args->new_len,
 		    (unsigned long)args->flags);
 #endif
@@ -635,7 +633,7 @@ linux_time(struct thread *td, struct linux_time_args *args)
 
 	microtime(&tv);
 	tm = tv.tv_sec;
-	if (args->tm && (error = copyout(&tm, (caddr_t)args->tm, sizeof(tm))))
+	if (args->tm && (error = copyout(&tm, args->tm, sizeof(tm))))
 		return error;
 	td->td_retval[0] = tm;
 	return 0;
@@ -680,7 +678,7 @@ linux_times(struct thread *td, struct linux_times_args *args)
 	tms.tms_cutime = CONVTCK(td->td_proc->p_stats->p_cru.ru_utime);
 	tms.tms_cstime = CONVTCK(td->td_proc->p_stats->p_cru.ru_stime);
 
-	if ((error = copyout(&tms, (caddr_t)args->buf, sizeof(tms))))
+	if ((error = copyout(&tms, args->buf, sizeof(tms))))
 		return error;
 
 	microuptime(&tv);
@@ -700,8 +698,8 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 		printf(ARGS(newuname, "*"));
 #endif
 
-	linux_get_osname(td->td_proc, osname);
-	linux_get_osrelease(td->td_proc, osrelease);
+	linux_get_osname(td, osname);
+	linux_get_osrelease(td, osrelease);
 
 	bzero(&utsname, sizeof(utsname));
 	strlcpy(utsname.sysname, osname, LINUX_MAX_UTSNAME);
@@ -711,7 +709,7 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 	strlcpy(utsname.machine, machine, LINUX_MAX_UTSNAME);
 	strlcpy(utsname.domainname, domainname, LINUX_MAX_UTSNAME);
 
-	return (copyout(&utsname, (caddr_t)args->buf, sizeof(utsname)));
+	return (copyout(&utsname, args->buf, sizeof(utsname)));
 }
 
 #if defined(__i386__)
@@ -736,7 +734,7 @@ linux_utime(struct thread *td, struct linux_utime_args *args)
 #endif
 
 	if (args->times) {
-		if ((error = copyin((caddr_t)args->times, &lut, sizeof lut))) {
+		if ((error = copyin(args->times, &lut, sizeof lut))) {
 			LFREEPATH(fname);
 			return error;
 		}
@@ -786,8 +784,7 @@ linux_waitpid(struct thread *td, struct linux_waitpid_args *args)
 		return error;
 
 	if (args->status) {
-		if ((error = copyin((caddr_t)args->status, &tmpstat,
-		    sizeof(int))) != 0)
+		if ((error = copyin(args->status, &tmpstat, sizeof(int))) != 0)
 			return error;
 		tmpstat &= 0xffff;
 		if (WIFSIGNALED(tmpstat))
@@ -796,7 +793,7 @@ linux_waitpid(struct thread *td, struct linux_waitpid_args *args)
 		else if (WIFSTOPPED(tmpstat))
 			tmpstat = (tmpstat & 0xffff00ff) |
 			    (BSD_TO_LINUX_SIGNAL(WSTOPSIG(tmpstat)) << 8);
-		return copyout(&tmpstat, (caddr_t)args->status, sizeof(int));
+		return copyout(&tmpstat, args->status, sizeof(int));
 	}
 
 	return 0;
@@ -813,6 +810,7 @@ linux_wait4(struct thread *td, struct linux_wait4_args *args)
 		struct	rusage *rusage;
 	} */ tmp;
 	int error, tmpstat;
+	struct proc *p;
 
 #ifdef DEBUG
 	if (ldebug(wait4))
@@ -832,11 +830,13 @@ linux_wait4(struct thread *td, struct linux_wait4_args *args)
 	if ((error = wait4(td, &tmp)) != 0)
 		return error;
 
-	SIGDELSET(td->td_proc->p_siglist, SIGCHLD);
+	p = td->td_proc;
+	PROC_LOCK(p);
+	SIGDELSET(p->p_siglist, SIGCHLD);
+	PROC_UNLOCK(p);
 
 	if (args->status) {
-		if ((error = copyin((caddr_t)args->status, &tmpstat,
-		    sizeof(int))) != 0)
+		if ((error = copyin(args->status, &tmpstat, sizeof(int))) != 0)
 			return error;
 		tmpstat &= 0xffff;
 		if (WIFSIGNALED(tmpstat))
@@ -845,7 +845,7 @@ linux_wait4(struct thread *td, struct linux_wait4_args *args)
 		else if (WIFSTOPPED(tmpstat))
 			tmpstat = (tmpstat & 0xffff00ff) |
 			    (BSD_TO_LINUX_SIGNAL(WSTOPSIG(tmpstat)) << 8);
-		return copyout(&tmpstat, (caddr_t)args->status, sizeof(int));
+		return copyout(&tmpstat, args->status, sizeof(int));
 	}
 
 	return 0;
@@ -881,7 +881,7 @@ linux_personality(struct thread *td, struct linux_personality_args *args)
 {
 #ifdef DEBUG
 	if (ldebug(personality))
-		printf(ARGS(personality, "%d"), args->per);
+		printf(ARGS(personality, "%lu"), (unsigned long)args->per);
 #endif
 #ifndef __alpha__
 	if (args->per != 0)
@@ -912,13 +912,13 @@ linux_setitimer(struct thread *td, struct linux_setitimer_args *args)
 	bsa.itv = (struct itimerval *)args->itv;
 	bsa.oitv = (struct itimerval *)args->oitv;
 	if (args->itv) {
-	    if ((error = copyin((caddr_t)args->itv, &foo, sizeof(foo))))
+	    if ((error = copyin(args->itv, &foo, sizeof(foo))))
 		return error;
 #ifdef DEBUG
 	    if (ldebug(setitimer)) {
-	        printf("setitimer: value: sec: %ld, usec: %ld\n",
+		printf("setitimer: value: sec: %ld, usec: %ld\n",
 		    foo.it_value.tv_sec, foo.it_value.tv_usec);
-	        printf("setitimer: interval: sec: %ld, usec: %ld\n",
+		printf("setitimer: interval: sec: %ld, usec: %ld\n",
 		    foo.it_interval.tv_sec, foo.it_interval.tv_usec);
 	    }
 #endif
@@ -964,8 +964,7 @@ linux_setgroups(struct thread *td, struct linux_setgroups_args *args)
 	ngrp = args->gidsetsize;
 	if (ngrp >= NGROUPS)
 		return (EINVAL);
-	error = copyin((caddr_t)args->grouplist, linux_gidset,
-	    ngrp * sizeof(l_gid_t));
+	error = copyin(args->grouplist, linux_gidset, ngrp * sizeof(l_gid_t));
 	if (error)
 		return (error);
 	newcred = crget();
@@ -1038,7 +1037,7 @@ linux_getgroups(struct thread *td, struct linux_getgroups_args *args)
 		ngrp++;
 	}
 
-	if ((error = copyout(linux_gidset, (caddr_t)args->grouplist,
+	if ((error = copyout(linux_gidset, args->grouplist,
 	    ngrp * sizeof(l_gid_t))))
 		return (error);
 
@@ -1068,7 +1067,7 @@ linux_setrlimit(struct thread *td, struct linux_setrlimit_args *args)
 	if (which == -1)
 		return (EINVAL);
 
-	error = copyin((caddr_t)args->rlim, &rlim, sizeof(rlim));
+	error = copyin(args->rlim, &rlim, sizeof(rlim));
 	if (error)
 		return (error);
 
@@ -1105,7 +1104,7 @@ linux_old_getrlimit(struct thread *td, struct linux_old_getrlimit_args *args)
 	rlim.rlim_max = (unsigned long)bsd_rlp->rlim_max;
 	if (rlim.rlim_max == ULONG_MAX)
 		rlim.rlim_max = LONG_MAX;
-	return (copyout(&rlim, (caddr_t)args->rlim, sizeof(rlim)));
+	return (copyout(&rlim, args->rlim, sizeof(rlim)));
 }
 
 int
@@ -1132,7 +1131,7 @@ linux_getrlimit(struct thread *td, struct linux_getrlimit_args *args)
 
 	rlim.rlim_cur = (l_ulong)bsd_rlp->rlim_cur;
 	rlim.rlim_max = (l_ulong)bsd_rlp->rlim_max;
-	return (copyout(&rlim, (caddr_t)args->rlim, sizeof(rlim)));
+	return (copyout(&rlim, args->rlim, sizeof(rlim)));
 }
 #endif /*!__alpha__*/
 

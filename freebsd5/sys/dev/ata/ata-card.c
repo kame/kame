@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-card.c,v 1.7 2002/12/06 19:29:53 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-card.c,v 1.12 2003/05/12 15:26:05 phk Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/ata.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -43,9 +44,21 @@
 #include <dev/pccard/pccardvar.h>
 #include <dev/pccard/pccarddevs.h>
 
+static const struct pccard_product ata_pccard_products[] = {
+	/* NetBSD has a few others that need to migrate into pccarddevs */
+	/* XXX */
+	PCMCIA_CARD(EXP, EXPMULTIMEDIA, 0),
+	PCMCIA_CARD(IODATA, CBIDE2, 0),
+	PCMCIA_CARD(OEM2, CDROM1, 0),
+	PCMCIA_CARD(PANASONIC, KXLC005, 0),
+	PCMCIA_CARD(TEAC, IDECARDII, 0),
+	{NULL}
+};
+
 static int
 ata_pccard_match(device_t dev)
 {
+    const struct pccard_product *pp;
     u_int32_t fcn = PCCARD_FUNCTION_UNSPEC;
     int error = 0;
 
@@ -57,14 +70,14 @@ ata_pccard_match(device_t dev)
     if (fcn == PCCARD_FUNCTION_DISK)
 	return (0);
 
-    /* other devices might need to be matched here */
+    /* Match other devices here, primarily cdrom/dvd rom */
+    if ((pp = pccard_product_lookup(dev, ata_pccard_products,
+      sizeof(ata_pccard_products[0]), NULL)) != NULL) {
+	if (pp->pp_name)
+	    device_set_desc(dev, pp->pp_name);
+	return (0);
+    }
     return(ENXIO);
-}
-
-static int
-ata_pccard_intrnoop(struct ata_channel *ch)
-{
-    return 1;
 }
 
 static void
@@ -72,12 +85,18 @@ ata_pccard_locknoop(struct ata_channel *ch, int type)
 {
 }
 
+static void
+ata_pccard_setmode(struct ata_device *atadev, int mode)
+{
+    atadev->mode = ata_limit_mode(atadev, mode, ATA_PIO_MAX);
+}
+
 static int
 ata_pccard_probe(device_t dev)
 {
     struct ata_channel *ch = device_get_softc(dev);
-    struct resource *io;
-    int rid, len, start, end;
+    struct resource *io, *altio;
+    int i, rid, len, start, end;
     u_long tmp;
 
     /* allocate the io range to get start and length */
@@ -86,7 +105,7 @@ ata_pccard_probe(device_t dev)
     io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
 			    ATA_IOSIZE, RF_ACTIVE);
     if (!io)
-	return ENOMEM;
+	return ENXIO;
 
     /* reallocate the io address to only cover the io ports */
     start = rman_get_start(io);
@@ -94,7 +113,6 @@ ata_pccard_probe(device_t dev)
     bus_release_resource(dev, SYS_RES_IOPORT, rid, io);
     io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 			    start, end, ATA_IOSIZE, RF_ACTIVE);
-    bus_release_resource(dev, SYS_RES_IOPORT, rid, io);
 
     /* 
      * if we got more than the default ATA_IOSIZE ports, this is likely
@@ -111,21 +129,58 @@ ata_pccard_probe(device_t dev)
 			     start + ATA_ALTOFFSET, ATA_ALTIOSIZE);
 	}
     }
-    else
-	return ENOMEM;
+    else {
+	bus_release_resource(dev, SYS_RES_IOPORT, rid, io);
+	return ENXIO;
+    }
 
+    /* allocate the altport range */
+    rid = ATA_ALTADDR_RID;
+    altio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
+			       ATA_ALTIOSIZE, RF_ACTIVE);
+    if (!altio) {
+	bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, io);
+	return ENXIO;
+    }
+
+    /* setup the resource vectors */
+    for (i = ATA_DATA; i <= ATA_STATUS; i++) {
+	ch->r_io[i].res = io;
+	ch->r_io[i].offset = i;
+    }
+    ch->r_io[ATA_ALTSTAT].res = altio;
+    ch->r_io[ATA_ALTSTAT].offset = 0;
+
+    /* initialize softc for this channel */
     ch->unit = 0;
     ch->flags |= (ATA_USE_16BIT | ATA_NO_SLAVE);
-    ch->intr_func = ata_pccard_intrnoop;
-    ch->lock_func = ata_pccard_locknoop;
+    ch->locking = ata_pccard_locknoop;
+    ch->device[MASTER].setmode = ata_pccard_setmode;
+    ch->device[SLAVE].setmode = ata_pccard_setmode;
     return ata_probe(dev);
+}
+
+static int
+ata_pccard_detach(device_t dev)
+{
+    struct ata_channel *ch = device_get_softc(dev);
+    int i;
+
+    ata_detach(dev);
+    bus_release_resource(dev, SYS_RES_IOPORT,
+			 ATA_ALTADDR_RID, ch->r_io[ATA_ALTSTAT].res);
+    bus_release_resource(dev, SYS_RES_IOPORT,
+			 ATA_IOADDR_RID, ch->r_io[ATA_DATA].res);
+    for (i = ATA_DATA; i < ATA_MAX_RES; i++)
+	ch->r_io[i].res = NULL;
+    return 0;
 }
 
 static device_method_t ata_pccard_methods[] = {
     /* device interface */
     DEVMETHOD(device_probe,	pccard_compat_probe),
     DEVMETHOD(device_attach,	pccard_compat_attach),
-    DEVMETHOD(device_detach,	ata_detach),
+    DEVMETHOD(device_detach,	ata_pccard_detach),
 
     /* Card interface */
     DEVMETHOD(card_compat_match,	ata_pccard_match),

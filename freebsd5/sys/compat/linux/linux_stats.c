@@ -6,7 +6,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.46 2002/09/05 08:13:20 bde Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.53 2003/04/29 17:03:22 mbr Exp $
  */
 
 #include "opt_mac.h"
@@ -56,6 +56,7 @@ newstat_copyout(struct stat *buf, void *ubuf)
 	struct cdevsw *cdevsw;
 	dev_t dev;
 
+	bzero(&tbuf, sizeof(tbuf));
 	tbuf.st_dev = uminor(buf->st_dev) | (umajor(buf->st_dev) << 8);
 	tbuf.st_ino = buf->st_ino;
 	tbuf.st_mode = buf->st_mode;
@@ -141,7 +142,7 @@ linux_newlstat(struct thread *td, struct linux_newlstat_args *args)
 	LFREEPATH(path);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF); 
+	NDFREE(&nd, NDF_ONLY_PNBUF);
 
 	error = vn_stat(nd.ni_vp, &sb, td->td_ucred, NOCRED, td);
 	vput(nd.ni_vp);
@@ -251,7 +252,7 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	bsd_statfs = &mp->mnt_stat;
 	vrele(ndp->ni_vp);
 #ifdef MAC
-	error = mac_check_mount_stat(td->td_proc->p_ucred, mp);
+	error = mac_check_mount_stat(td->td_ucred, mp);
 	if (error)
 		return (error);
 #endif
@@ -264,13 +265,12 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	linux_statfs.f_blocks = bsd_statfs->f_blocks;
 	linux_statfs.f_bfree = bsd_statfs->f_bfree;
 	linux_statfs.f_bavail = bsd_statfs->f_bavail;
-  	linux_statfs.f_ffree = bsd_statfs->f_ffree;
+	linux_statfs.f_ffree = bsd_statfs->f_ffree;
 	linux_statfs.f_files = bsd_statfs->f_files;
 	linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
 	linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
 	linux_statfs.f_namelen = MAXNAMLEN;
-	return copyout((caddr_t)&linux_statfs, (caddr_t)args->buf,
-	    sizeof(linux_statfs));
+	return copyout(&linux_statfs, args->buf, sizeof(linux_statfs));
 }
 
 int
@@ -291,7 +291,7 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 		return error;
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 #ifdef MAC
-	error = mac_check_mount_stat(td->td_proc->p_ucred, mp);
+	error = mac_check_mount_stat(td->td_ucred, mp);
 	if (error) {
 		fdrop(fp, td);
 		return (error);
@@ -309,18 +309,17 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	linux_statfs.f_blocks = bsd_statfs->f_blocks;
 	linux_statfs.f_bfree = bsd_statfs->f_bfree;
 	linux_statfs.f_bavail = bsd_statfs->f_bavail;
-  	linux_statfs.f_ffree = bsd_statfs->f_ffree;
+	linux_statfs.f_ffree = bsd_statfs->f_ffree;
 	linux_statfs.f_files = bsd_statfs->f_files;
 	linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
 	linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
 	linux_statfs.f_namelen = MAXNAMLEN;
-	error = copyout((caddr_t)&linux_statfs, (caddr_t)args->buf,
-	    sizeof(linux_statfs));
+	error = copyout(&linux_statfs, args->buf, sizeof(linux_statfs));
 	fdrop(fp, td);
 	return error;
 }
 
-struct l_ustat 
+struct l_ustat
 {
 	l_daddr_t	f_tfree;
 	l_ino_t		f_tinode;
@@ -360,8 +359,7 @@ linux_ustat(struct thread *td, struct linux_ustat_args *args)
 		if (vp->v_mount == NULL)
 			return (EINVAL);
 #ifdef MAC
-		error = mac_check_mount_stat(td->td_proc->p_ucred,
-		    vp->v_mount);
+		error = mac_check_mount_stat(td->td_ucred, vp->v_mount);
 		if (error)
 			return (error);
 #endif
@@ -383,6 +381,8 @@ static int
 stat64_copyout(struct stat *buf, void *ubuf)
 {
 	struct l_stat64 lbuf;
+	struct cdevsw *cdevsw;
+	dev_t dev;
 
 	bzero(&lbuf, sizeof(lbuf));
 	lbuf.st_dev = uminor(buf->st_dev) | (umajor(buf->st_dev) << 8);
@@ -398,6 +398,23 @@ stat64_copyout(struct stat *buf, void *ubuf)
 	lbuf.st_ctime = buf->st_ctime;
 	lbuf.st_blksize = buf->st_blksize;
 	lbuf.st_blocks = buf->st_blocks;
+
+	/* Lie about disk drives which are character devices
+	 * in FreeBSD but block devices under Linux.
+	 */
+	if (S_ISCHR(lbuf.st_mode) &&
+	    (dev = udev2dev(buf->st_rdev, 0)) != NODEV) {
+		cdevsw = devsw(dev);
+		if (cdevsw != NULL && (cdevsw->d_flags & D_DISK)) {
+			lbuf.st_mode &= ~S_IFMT;
+			lbuf.st_mode |= S_IFBLK;
+
+			/* XXX this may not be quite right */
+			/* Map major number to 0 */
+			lbuf.st_dev = uminor(buf->st_dev) & 0xf;
+			lbuf.st_rdev = buf->st_rdev & 0xff;
+		}
+	}
 
 	/*
 	 * The __st_ino field makes all the difference. In the Linux kernel
@@ -462,7 +479,7 @@ linux_lstat64(struct thread *td, struct linux_lstat64_args *args)
 	LFREEPATH(filename);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF); 
+	NDFREE(&nd, NDF_ONLY_PNBUF);
 
 	error = vn_stat(nd.ni_vp, &sb, td->td_ucred, NOCRED, td);
 	vput(nd.ni_vp);

@@ -103,7 +103,7 @@
  *			use proprietary packet creation instead of scsi_inquire
  *			CAM layer sends synchronize commands.
  *
- * $FreeBSD: src/sys/dev/asr/asr.c,v 1.26.2.1 2003/01/10 05:18:08 rwatson Exp $
+ * $FreeBSD: src/sys/dev/asr/asr.c,v 1.34 2003/04/16 20:46:30 phk Exp $
  */
 
 #define	ASR_VERSION	1
@@ -216,7 +216,7 @@ static dpt_sig_S ASR_sig = {
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/conf.h>
-#include <sys/disklabel.h>
+#include <sys/ioccom.h>
 #include <sys/proc.h>
 #include <sys/bus.h>
 #include <machine/resource.h>
@@ -238,10 +238,10 @@ static dpt_sig_S ASR_sig = {
 
 #if defined(__i386__)
 #include <i386/include/cputypes.h>
-#include <i386/include/vmparam.h>
 #elif defined(__alpha__)
 #include <alpha/include/pmap.h>
 #endif
+#include <machine/vmparam.h>
 
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
@@ -577,19 +577,11 @@ DATA_SET (mode0_pciset, mode0_pcidev);
  */
 #define	CDEV_MAJOR 154	 /* preferred default character major */
 STATIC struct cdevsw asr_cdevsw = {
-	asr_open,	/* open	    */
-	asr_close,	/* close    */
-	noread,		/* read	    */
-	nowrite,	/* write    */
-	asr_ioctl,	/* ioctl    */
-	nopoll,		/* poll	    */
-	nommap,		/* mmap	    */
-	nostrategy,	/* strategy */
-	"asr",	/* name	    */
-	CDEV_MAJOR,	/* maj	    */
-	nodump,		/* dump	    */
-	nopsize,	/* psize    */
-	0,		/* flags    */
+	.d_open =	asr_open,
+	.d_close =	asr_close,
+	.d_ioctl =	asr_ioctl,
+	.d_name =	"asr",
+	.d_maj =	CDEV_MAJOR,
 };
 
 #ifdef ASR_MEASURE_PERFORMANCE
@@ -988,7 +980,7 @@ ASR_queue_s (
 } /* ASR_queue_s */
 
 /*
- *	Send a message synchronously to a Asr_softc_t
+ *	Send a message synchronously to an Asr_softc_t.
  */
 STATIC int
 ASR_queue_c (
@@ -1101,7 +1093,7 @@ ASR_failActiveCommands (
 		if (ccb->path) {
 			xpt_done ((union ccb *)ccb);
 		} else {
-			wakeup ((caddr_t)ccb);
+			wakeup (ccb);
 		}
 	}
 	splx(s);
@@ -3798,7 +3790,7 @@ asr_intr (
 		if (ccb->ccb_h.path) {
 			xpt_done ((union ccb *)ccb);
 		} else {
-			wakeup ((caddr_t)ccb);
+			wakeup (ccb);
 		}
 	}
 #ifdef ASR_MEASURE_PERFORMANCE
@@ -4313,7 +4305,7 @@ ASR_queue_i(
 		}
 		/* Check every second for BlinkLed */
 		/* There is no PRICAM, but outwardly PRIBIO is functional */
-		tsleep((caddr_t)ccb, PRIBIO, "asr", hz);
+		tsleep(ccb, PRIBIO, "asr", hz);
 	}
 	splx(s);
 

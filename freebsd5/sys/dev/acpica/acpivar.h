@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpivar.h,v 1.38 2002/12/11 18:48:50 takawata Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpivar.h,v 1.41 2003/05/13 16:59:46 jhb Exp $
  */
 
 #include "bus_if.h"
@@ -38,6 +38,10 @@
 
 #include <machine/bus.h>
 #include <machine/resource.h>
+
+#if __FreeBSD_version < 500000
+typedef vm_offset_t vm_paddr_t;
+#endif
 
 struct acpi_softc {
     device_t		acpi_dev;
@@ -72,7 +76,7 @@ struct acpi_softc {
     bus_dma_tag_t	acpi_waketag;
     bus_dmamap_t	acpi_wakemap;
     vm_offset_t		acpi_wakeaddr;
-    vm_offset_t		acpi_wakephys;
+    vm_paddr_t		acpi_wakephys;
 
     struct sysctl_ctx_list	 acpi_battery_sysctl_ctx;
     struct sysctl_oid		*acpi_battery_sysctl_tree;
@@ -141,6 +145,8 @@ extern struct mtx	acpi_mutex;
 #define	ACPI_INTR_APIC		1
 #define	ACPI_INTR_SAPIC		2
 
+/* XXX this is no longer referenced anywhere, remove? */
+#if 0
 /*
  * This is a cheap and nasty way to get around the horrid counted list
  * argument format that AcpiEvalateObject uses.
@@ -168,6 +174,7 @@ acpi_AllocObjectList(int nobj)
     l->count = nobj;
     return(l);
 }
+#endif /* unused */
 
 /*
  * Note that the low ivar values are reserved to provide
@@ -386,11 +393,13 @@ extern int	acpi_cmbat_get_battinfo(int, struct acpi_battinfo *);
 
 extern int	acpi_acad_get_acline(int *);
 
+#if __FreeBSD_version >= 500000
 #ifndef ACPI_MAX_THREADS
 #define ACPI_MAX_THREADS	3
 #endif
 #if ACPI_MAX_THREADS > 0
 #define ACPI_USE_THREADS
+#endif
 #endif
 
 #ifdef ACPI_USE_THREADS

@@ -38,10 +38,8 @@
  * 
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/efi/libefi/time.c,v 1.3 2001/09/22 18:33:09 dfr Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/time.c,v 1.4 2003/04/03 21:36:29 obrien Exp $");
 
 #include <efi.h>
 #include <efilib.h>

@@ -10,8 +10,13 @@
 	described by the term.  A term enclosed with [...] is optional,
 	and may not be required by all forms of the command.
 
-	Some commands may not be availalble.  Use the '?' command to list
+	Some commands may not be available.  Use the '?' command to list
 	most available commands.
+
+	If needed, disable the use of ACPI with:
+
+	unset acpi_load
+	$hint.acpi.0.disabled="1"
 
 ################################################################################
 # Tautoboot DBoot after a delay
@@ -199,8 +204,8 @@
 	set module_path=<path>[;<path>...]
 
 	Sets the list of directories which will be searched in for modules
-	named in a load command or implicitly required by a dependancy. The
-	default module_path is "/boot/kernel;/boot/modules;/modules".
+	named in a load command or implicitly required by a dependency. The
+	default module_path is "/boot/kernel;/boot/modules".
 
 ################################################################################
 # Tset Sprompt DSet the command prompt
@@ -225,7 +230,7 @@
 ################################################################################
 # Tset Stunables DSet kernel tunable values
 
-	Various kernel tunable parameters can be overriden by specifying new 
+	Various kernel tunable parameters can be overridden by specifying new 
 	values in the environment.
 
 	set kern.ipc.nmbclusters=<value>	NMBCLUSTERS
@@ -234,11 +239,15 @@
 		cannot be set below the default determined when the kernel
 		was compiled.
 
+	set kern.ipc.nsfbufs=<value>		NSFBUFS
+
+		Set the number of sendfile buffers to be allocated.  This
+		overrides the value determined when the kernel was compiled.
+
 	set kern.vm.kmem.size=<value>		VM_KMEM_SIZE
 
 		Sets the size of kernel memory (bytes).  This overrides
-		completely the value determined when the kernel was
-		compiled.
+		the value determined when the kernel was compiled.
 
 	set machdep.disable_mtrrs=1
 
@@ -248,6 +257,12 @@
 
 		Overrides the compile-time set value of TCBHASHSIZE or
 		the preset default of 512.  Must be a power of 2.
+
+	hw.syscons.sc_no_suspend_vtswitch=<value>
+
+		Disable VT switching on suspend.
+
+		value is 0 (default) or non-zero to enable.
 
 	set hw.physmem=<value>			MAXMEM (i386 only)
 

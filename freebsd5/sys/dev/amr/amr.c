@@ -53,7 +53,7 @@
  * SUCH DAMAGE.
  *
  *
- *	$FreeBSD: src/sys/dev/amr/amr.c,v 1.36.2.2 2003/01/09 22:29:05 emoore Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr.c,v 1.46 2003/04/01 15:06:22 phk Exp $
  */
 
 /*
@@ -68,8 +68,6 @@
 #include <dev/amr/amr_compat.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 #include <sys/stat.h>
 
 #include <machine/bus_memio.h>
@@ -94,19 +92,11 @@ static d_close_t        amr_close;
 static d_ioctl_t        amr_ioctl;
 
 static struct cdevsw amr_cdevsw = {
-		/* open */	amr_open,
-		/* close */	amr_close,
-		/* read */	noread,
-		/* write */	nowrite,
-		/* ioctl */	amr_ioctl,
-		/* poll */	nopoll,
-		/* mmap */	nommap,
-		/* strategy */	nostrategy,
-		/* name */ 	"amr",
-		/* maj */	AMR_CDEV_MAJOR,
-		/* dump */	nodump,
-		/* psize */ 	nopsize,
-		/* flags */	0,
+	.d_open =	amr_open,
+	.d_close =	amr_close,
+	.d_ioctl =	amr_ioctl,
+	.d_name =	"amr",
+	.d_maj =	AMR_CDEV_MAJOR,
 };
 
 /*
@@ -883,7 +873,7 @@ amr_bio_command(struct amr_softc *sc, struct amr_command **acp)
 	ac->ac_flags |= AMR_CMD_DATAOUT;
 	cmd = AMR_CMD_LWRITE;
     }
-    amrd = (struct amrd_softc *)bio->bio_dev->si_drv1;
+    amrd = (struct amrd_softc *)bio->bio_disk->d_drv1;
     driveno = amrd->amrd_drive - sc->amr_drive;
     blkcount = (bio->bio_bcount + AMR_BLKSIZE - 1) / AMR_BLKSIZE;
 
@@ -1370,7 +1360,7 @@ amr_done(struct amr_softc *sc)
     /* handle completion and timeouts */
 #if __FreeBSD_version >= 500005
     if (sc->amr_state & AMR_STATE_INTEN) 
-	taskqueue_enqueue(taskqueue_swi, &sc->amr_task_complete);
+	taskqueue_enqueue(taskqueue_swi_giant, &sc->amr_task_complete);
     else
 #endif
 	amr_complete(sc, 0);

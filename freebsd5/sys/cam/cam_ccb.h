@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.22 2001/06/24 18:17:45 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.24 2003/04/30 00:35:22 ken Exp $
  */
 
 #ifndef _CAM_CAM_CCB_H
@@ -35,7 +35,7 @@
 #include <sys/cdefs.h>
 #include <sys/time.h>
 #ifdef CAM_NEW_TRAN_CODE
-#include <machine/limits.h>
+#include <sys/limits.h>
 #endif /* CAM_NEW_TRAN_CODE */
 #ifndef _KERNEL
 #include <sys/callout.h>
@@ -488,7 +488,7 @@ struct ccb_dev_match {
 /*
  * Definitions for the path inquiry CCB fields.
  */
-#define CAM_VERSION	0x14	/* Hex value for current version */
+#define CAM_VERSION	0x15	/* Hex value for current version */
 
 typedef enum {
 	PI_MDP_ABLE	= 0x80,	/* Supports MDP message */
@@ -789,8 +789,8 @@ struct ccb_trans_settings {
 struct ccb_calc_geometry {
 	struct	  ccb_hdr ccb_h;
 	u_int32_t block_size;
-	u_int32_t volume_size;
-	u_int16_t cylinders;		
+	u_int64_t volume_size;
+	u_int32_t cylinders;		
 	u_int8_t  heads;
 	u_int8_t  secs_per_track;
 };

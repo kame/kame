@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdDebug.c,v 1.4 2002/08/29 01:52:27 iwasaki Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdDebug.c,v 1.5 2003/04/29 18:50:34 njl Exp $
  */
 
 /*
@@ -50,7 +50,7 @@
 #include <dev/acpica/acpivar.h>
 
 UINT32
-AcpiOsGetLine(NATIVE_CHAR *Buffer)
+AcpiOsGetLine(char *Buffer)
 {
 #ifdef DDB
     char	*cp;
@@ -67,7 +67,7 @@ AcpiOsGetLine(NATIVE_CHAR *Buffer)
 }
 
 void
-AcpiOsDbgAssert(void *FailedAssertion, void *FileName, UINT32 LineNumber, NATIVE_CHAR *Message)
+AcpiOsDbgAssert(void *FailedAssertion, void *FileName, UINT32 LineNumber, char *Message)
 {
     printf("ACPI: %s:%d - %s\n", (char *)FileName, LineNumber, Message);
     printf("ACPI: assertion  %s\n", (char *)FailedAssertion);
@@ -79,7 +79,7 @@ AcpiOsSignal (
     void                    *Info)
 {
     ACPI_SIGNAL_FATAL_INFO	*fatal;
-    NATIVE_CHAR			*message;
+    char			*message;
     
     switch(Function) {
     case ACPI_SIGNAL_FATAL:
@@ -90,7 +90,7 @@ AcpiOsSignal (
 	break;
 	
     case ACPI_SIGNAL_BREAKPOINT:
-	message = (NATIVE_CHAR *)Info;
+	message = (char *)Info;
 	Debugger(message);
 	break;
 

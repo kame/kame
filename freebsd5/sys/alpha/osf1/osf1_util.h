@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/osf1/osf1_util.h,v 1.4.2.1 2002/12/19 09:40:06 alfred Exp $
+ * $FreeBSD: src/sys/alpha/osf1/osf1_util.h,v 1.7 2002/12/14 01:56:24 alfred Exp $
  */
 
 #include <vm/vm.h>

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ex/if_ex_pccard.c,v 1.3 2002/03/20 02:07:20 alfred Exp $
+ *	$FreeBSD: src/sys/dev/ex/if_ex_pccard.c,v 1.5 2003/03/29 15:38:53 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -51,13 +51,12 @@
 /* Bus Front End Functions */
 static int	ex_pccard_probe		(device_t);
 static int	ex_pccard_attach	(device_t);
-static int	ex_pccard_detach	(device_t);
 
 static device_method_t ex_pccard_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ex_pccard_probe),
 	DEVMETHOD(device_attach,	ex_pccard_attach),
-	DEVMETHOD(device_detach,	ex_pccard_detach),
+	DEVMETHOD(device_detach,	ex_detach),
 
 	{ 0, 0 }
 };
@@ -67,8 +66,6 @@ static driver_t ex_pccard_driver = {
 	ex_pccard_methods,
 	sizeof(struct ex_softc),
 };
-
-extern devclass_t ex_devclass;
 
 DRIVER_MODULE(ex, pccard, ex_pccard_driver, ex_devclass, 0, 0);
 
@@ -146,17 +143,4 @@ ex_pccard_attach(device_t dev)
 bad:
 	ex_release_resources(dev);
 	return (error);
-}
-
-static int
-ex_pccard_detach(device_t dev)
-{
-	struct ex_softc		*sc = device_get_softc(dev);
-	struct ifnet		*ifp = &sc->arpcom.ac_if;
-
-	ex_stop(sc);
-	ifp->if_flags &= ~IFF_RUNNING;
-	if_detach(ifp);
-	ex_release_resources(dev);
-	return (0);
 }

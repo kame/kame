@@ -26,13 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpi.c,v 1.82.2.1 2003/01/10 05:18:08 rwatson Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpi.c,v 1.89 2003/05/01 18:51:43 jhb Exp $
  */
 
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
+#include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -73,19 +74,11 @@ static d_ioctl_t	acpiioctl;
 
 #define CDEV_MAJOR 152
 static struct cdevsw acpi_cdevsw = {
-    acpiopen,
-    acpiclose,
-    noread,
-    nowrite,
-    acpiioctl,
-    nopoll,
-    nommap,
-    nostrategy,
-    "acpi",
-    CDEV_MAJOR,
-    nodump,
-    nopsize,
-    0
+	.d_open =	acpiopen,
+	.d_close =	acpiclose,
+	.d_ioctl =	acpiioctl,
+	.d_name =	"acpi",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static const char* sleep_state_names[] = {
@@ -114,6 +107,7 @@ static struct resource *acpi_alloc_resource(device_t bus, device_t child, int ty
 					    u_long start, u_long end, u_long count, u_int flags);
 static int	acpi_release_resource(device_t bus, device_t child, int type, int rid, struct resource *r);
 static u_int32_t acpi_isa_get_logicalid(device_t dev);
+static u_int32_t acpi_isa_get_compatid(device_t dev);
 static int	acpi_isa_pnp_probe(device_t bus, device_t child, struct isa_pnp_id *ids);
 
 static void	acpi_probe_children(device_t bus);
@@ -126,6 +120,7 @@ static void	acpi_enable_fixed_events(struct acpi_softc *sc);
 
 static void	acpi_system_eventhandler_sleep(void *arg, int state);
 static void	acpi_system_eventhandler_wakeup(void *arg, int state);
+static int	acpi_supported_sleep_state_sysctl(SYSCTL_HANDLER_ARGS);
 static int	acpi_sleep_state_sysctl(SYSCTL_HANDLER_ARGS);
 
 static int	acpi_pm_func(u_long cmd, void *arg, ...);
@@ -404,6 +399,9 @@ acpi_attach(device_t dev)
 			       SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO,
 			       device_get_name(dev), CTLFLAG_RD, 0, "");
     SYSCTL_ADD_PROC(&sc->acpi_sysctl_ctx, SYSCTL_CHILDREN(sc->acpi_sysctl_tree),
+	OID_AUTO, "supported_sleep_state", CTLTYPE_STRING | CTLFLAG_RD,
+	0, 0, acpi_supported_sleep_state_sysctl, "A", "");
+    SYSCTL_ADD_PROC(&sc->acpi_sysctl_ctx, SYSCTL_CHILDREN(sc->acpi_sysctl_tree),
 	OID_AUTO, "power_button_state", CTLTYPE_STRING | CTLFLAG_RW,
 	&sc->acpi_power_button_sx, 0, acpi_sleep_state_sysctl, "A", "");
     SYSCTL_ADD_PROC(&sc->acpi_sysctl_ctx, SYSCTL_CHILDREN(sc->acpi_sysctl_tree),
@@ -487,7 +485,7 @@ acpi_attach(device_t dev)
     /*
      * Create the control device
      */
-    sc->acpi_dev_t = make_dev(&acpi_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600,
+    sc->acpi_dev_t = make_dev(&acpi_cdevsw, 0, UID_ROOT, GID_WHEEL, 0644,
 	"acpi");
     sc->acpi_dev_t->si_drv1 = sc;
 
@@ -726,11 +724,39 @@ out:
     return_VALUE(pnpid);
 }
 
+static u_int32_t
+acpi_isa_get_compatid(device_t dev)
+{
+    ACPI_HANDLE		h;
+    ACPI_DEVICE_INFO	devinfo;
+    ACPI_STATUS		error;
+    u_int32_t		pnpid;
+    ACPI_LOCK_DECL;
+
+    ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
+
+    pnpid = 0;
+    ACPI_LOCK;
+    
+    /* fetch and validate the HID */
+    if ((h = acpi_get_handle(dev)) == NULL)
+	goto out;
+    if (ACPI_FAILURE(error = AcpiGetObjectInfo(h, &devinfo)))
+	goto out;
+    if (ACPI_FAILURE(error = acpi_EvaluateInteger(h, "_CID", &pnpid)))
+	goto out;
+
+out:
+    ACPI_UNLOCK;
+    return_VALUE(pnpid);
+}
+
+
 static int
 acpi_isa_pnp_probe(device_t bus, device_t child, struct isa_pnp_id *ids)
 {
     int			result;
-    u_int32_t		pnpid;
+    u_int32_t		lid, cid;
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
@@ -742,9 +768,10 @@ acpi_isa_pnp_probe(device_t bus, device_t child, struct isa_pnp_id *ids)
     result = ENXIO;
 
     /* scan the supplied IDs for a match */
-    pnpid = acpi_isa_get_logicalid(child);
+    lid = acpi_isa_get_logicalid(child);
+    cid = acpi_isa_get_compatid(child);
     while (ids && ids->ip_id) {
-	if (pnpid == ids->ip_id) {
+	if (lid == ids->ip_id || cid == ids->ip_id) {
 	    result = 0;
 	    goto out;
 	}
@@ -1844,6 +1871,15 @@ acpiioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
     }
 
     /*
+     * Core ioctls are  not permitted for non-writable user.
+     * Currently, other ioctls just fetch information.
+     * Not changing system behavior.
+     */
+    if(!(flag & FWRITE)){
+	    return EPERM;
+    }
+
+    /*
      * Core system ioctls.
      */
     switch (cmd) {
@@ -1878,6 +1914,25 @@ acpiioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 
 out:
     ACPI_UNLOCK;
+    return(error);
+}
+
+static int
+acpi_supported_sleep_state_sysctl(SYSCTL_HANDLER_ARGS)
+{
+    char sleep_state[4];
+    char buf[16];
+    int error;
+    UINT8 state, TypeA, TypeB;
+
+    buf[0] = '\0';
+    for (state = ACPI_STATE_S1; state < ACPI_S_STATES_MAX+1; state++) {
+	if (ACPI_SUCCESS(AcpiGetSleepTypeData(state, &TypeA, &TypeB))) {
+	    sprintf(sleep_state, "S%d ", state);
+	    strcat(buf, sleep_state);
+	}
+    }
+    error = sysctl_handle_string(oidp, buf, sizeof(buf), req);
     return(error);
 }
 
@@ -1960,12 +2015,11 @@ static struct debugtag	dbg_layer[] = {
 };
 
 static struct debugtag dbg_level[] = {
-    {"ACPI_LV_OK",		ACPI_LV_OK},
-    {"ACPI_LV_INFO",		ACPI_LV_INFO},
-    {"ACPI_LV_WARN",		ACPI_LV_WARN},
     {"ACPI_LV_ERROR",		ACPI_LV_ERROR},
-    {"ACPI_LV_FATAL",		ACPI_LV_FATAL},
+    {"ACPI_LV_WARN",		ACPI_LV_WARN},
+    {"ACPI_LV_INIT",		ACPI_LV_INIT},
     {"ACPI_LV_DEBUG_OBJECT",	ACPI_LV_DEBUG_OBJECT},
+    {"ACPI_LV_INFO",		ACPI_LV_INFO},
     {"ACPI_LV_ALL_EXCEPTIONS",	ACPI_LV_ALL_EXCEPTIONS},
 
     /* Trace verbosity level 1 [Standard Trace Level] */
@@ -1982,7 +2036,7 @@ static struct debugtag dbg_level[] = {
     {"ACPI_LV_RESOURCES",	ACPI_LV_RESOURCES},
     {"ACPI_LV_USER_REQUESTS",	ACPI_LV_USER_REQUESTS},
     {"ACPI_LV_PACKAGE",		ACPI_LV_PACKAGE},
-    {"ACPI_LV_INIT",		ACPI_LV_INIT},
+    {"ACPI_LV_INIT_NAMES",	ACPI_LV_INIT_NAMES},
     {"ACPI_LV_VERBOSITY1",	ACPI_LV_VERBOSITY1},
 
     /* Trace verbosity level 2 [Function tracing and memory allocation] */

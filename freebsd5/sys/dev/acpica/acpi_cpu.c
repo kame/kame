@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpi_cpu.c,v 1.14 2002/10/16 17:28:52 jhb Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpi_cpu.c,v 1.16 2003/01/23 22:18:14 njl Exp $
  */
 
 #include "opt_acpi.h"
@@ -295,8 +295,9 @@ acpi_cpu_init_throttling(void *arg)
     /* set initial speed */
     acpi_cpu_power_profile(NULL);
     
-    printf("acpi_cpu: CPU throttling enabled, %d steps from 100%% to %d.%d%%\n", 
-	   CPU_MAX_SPEED, CPU_SPEED_PRINTABLE(1));
+    printf("acpi_cpu: throttling enabled, %d steps (100%% to %d.%d%%), " 
+	   "currently %d.%d%%\n", CPU_MAX_SPEED, CPU_SPEED_PRINTABLE(1),
+	   CPU_SPEED_PRINTABLE(cpu_current_state));
 }
 
 /*

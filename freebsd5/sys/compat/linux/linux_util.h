@@ -28,7 +28,7 @@
  *
  * from: svr4_util.h,v 1.5 1994/11/18 02:54:31 christos Exp
  * from: linux_util.h,v 1.2 1995/03/05 23:23:50 fvdl Exp
- * $FreeBSD: src/sys/compat/linux/linux_util.h,v 1.19 2002/09/01 21:15:37 iedowse Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_util.h,v 1.21 2003/01/02 02:19:10 alfred Exp $
  */
 
 /*
@@ -45,6 +45,7 @@
 #include <machine/vmparam.h>
 #include <sys/exec.h>
 #include <sys/sysent.h>
+#include <sys/syslog.h>
 #include <sys/cdefs.h>
 #include <sys/uio.h>
 
@@ -108,16 +109,18 @@ int linux_emul_find(struct thread *, caddr_t *, char *, char **, int);
 int									\
 linux_ ## s(struct thread *p, struct linux_ ## s ## _args *args)	\
 {									\
-	return (unsupported_msg(p, #s));				\
+	return (unimplemented_syscall(p, #s));				\
 }									\
 struct __hack
 
+void linux_msg(const struct thread *td, const char *fmt, ...)
+	__printflike(2, 3);
+
 static __inline int
-unsupported_msg(struct thread *td, const char *fname)
+unimplemented_syscall(struct thread *td, const char *syscallname)
 {
 
-	printf("linux: syscall %s is obsoleted or not implemented (pid=%ld)\n",
-	    fname, (long)td->td_proc->p_pid);
+	linux_msg(td, "syscall %s not implemented", syscallname);
 	return (ENOSYS);
 }
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/module.c,v 1.23 2002/04/11 10:00:44 peter Exp $
+ * $FreeBSD: src/sys/boot/common/module.c,v 1.24 2003/03/03 22:53:35 ru Exp $
  */
 
 /*
@@ -65,7 +65,7 @@ static void			moduledir_rebuild(void);
 /* load address should be tweaked by first module loaded (kernel) */
 static vm_offset_t	loadaddr = 0;
 
-static const char	*default_searchpath ="/boot/kernel;/boot/modules;/modules";
+static const char	*default_searchpath ="/boot/kernel;/boot/modules";
 
 static STAILQ_HEAD(, moduledir) moduledir_list = STAILQ_HEAD_INITIALIZER(moduledir_list);
 

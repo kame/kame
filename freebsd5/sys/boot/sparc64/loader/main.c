@@ -6,7 +6,7 @@
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file. 
  *
- * $FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.17 2002/11/10 19:17:36 jake Exp $
+ * $FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.19 2003/05/01 04:39:22 peter Exp $
  */
 /*
  * FreeBSD/sparc64 kernel loader - machine dependent part
@@ -56,7 +56,7 @@ extern void dtlb_enter(u_long vpn, u_long data);
 extern vm_offset_t itlb_va_to_pa(vm_offset_t);
 extern vm_offset_t dtlb_va_to_pa(vm_offset_t);
 extern vm_offset_t md_load(char *, vm_offset_t *);
-static int elf_exec(struct preloaded_file *);
+static int __elfN(exec)(struct preloaded_file *);
 static int sparc64_autoload(void);
 static int mmu_mapin(vm_offset_t, vm_size_t);
 
@@ -92,8 +92,8 @@ struct devsw *devsw[] = {
 struct arch_switch archsw;
 
 struct file_format sparc64_elf = {
-	elf_loadfile,
-	elf_exec
+	__elfN(loadfile),
+	__elfN(exec)
 };
 struct file_format *file_formats[] = {
 	&sparc64_elf,
@@ -106,8 +106,11 @@ struct fs_ops *file_system[] = {
 #ifdef LOADER_CD9660_SUPPORT
 	&cd9660_fsops,
 #endif
-#ifdef LOADER_GZIP_SUPPORT
+#ifdef LOADER_ZIP_SUPPORT
 	&zipfs_fsops,
+#endif
+#ifdef LOADER_GZIP_SUPPORT
+	&gzipfs_fsops,
 #endif
 #ifdef LOADER_BZIP2_SUPPORT
 	&bzipfs_fsops,
@@ -215,7 +218,7 @@ sparc64_copyin(const void *src, vm_offset_t dest, size_t len)
  * other MD functions
  */
 static int
-elf_exec(struct preloaded_file *fp)
+__elfN(exec)(struct preloaded_file *fp)
 {
 	struct file_metadata *fmp;
 	vm_offset_t mdp;

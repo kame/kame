@@ -24,10 +24,9 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/ia64/libski/module.c,v 1.1 2001/09/12 08:34:27 dfr Exp $";
-#endif /* not lint */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ia64/libski/module.c,v 1.2 2003/04/03 21:36:29 obrien Exp $");
 
 #include <stand.h>
 

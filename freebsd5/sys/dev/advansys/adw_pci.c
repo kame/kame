@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adw_pci.c,v 1.14 2002/10/09 08:50:26 peter Exp $
+ * $FreeBSD: src/sys/dev/advansys/adw_pci.c,v 1.15 2003/03/29 09:46:10 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -256,16 +256,19 @@ adw_pci_attach(device_t dev)
 
 	/* Allocate a dmatag for our transfer DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
-				   /*boundary*/0,
-				   /*lowaddr*/ADW_PCI_MAX_DMA_ADDR,
-				   /*highaddr*/BUS_SPACE_MAXADDR,
-				   /*filter*/NULL, /*filterarg*/NULL,
-				   /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
-				   /*nsegments*/~0,
-				   /*maxsegsz*/ADW_PCI_MAX_DMA_COUNT,
-				   /*flags*/0,
-				   &adw->parent_dmat);
+	error = bus_dma_tag_create(
+			/* parent	*/ NULL,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ ADW_PCI_MAX_DMA_ADDR,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* nsegments	*/ ~0,
+			/* maxsegsz	*/ ADW_PCI_MAX_DMA_COUNT,
+			/* flags	*/ 0,
+			&adw->parent_dmat);
 
 	adw->init_level++;
  

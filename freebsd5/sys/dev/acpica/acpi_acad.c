@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/acpica/acpi_acad.c,v 1.13 2002/11/03 10:49:24 iwasaki Exp $
+ * $FreeBSD: src/sys/dev/acpica/acpi_acad.c,v 1.14 2003/02/15 01:46:22 takawata Exp $
  */
 
 #include "opt_acpi.h"
@@ -194,6 +194,11 @@ acpi_acad_ioctl(u_long cmd, caddr_t addr, void *arg)
 	if ((sc = device_get_softc(dev)) == NULL) {
 		return(ENXIO);
 	}
+
+        /*
+         * No security check required: information retrieval only.  If
+         * new functions are added here, a check might be required.
+         */
 
 	switch (cmd) {
 	case ACPIIO_ACAD_GET_STATUS:

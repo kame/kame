@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/NOTES,v 1.1118 2002/12/09 03:38:03 rwatson Exp $
+# $FreeBSD: src/sys/conf/NOTES,v 1.1149 2003/05/15 02:10:29 jmallett Exp $
 #
 # NOTES -- Lines that can be cut/pasted into kernel and hints configs.
 #
@@ -44,9 +44,9 @@ ident		LINT
 
 #
 # The `maxusers' parameter controls the static sizing of a number of
-# internal system tables by a formula defined in subr_param.c.  Setting
-# maxusers to 0 will cause the system to auto-size based on physical 
-# memory.
+# internal system tables by a formula defined in subr_param.c.
+# Omitting this parameter or setting it to 0 will cause the system to
+# auto-size based on physical memory.
 #
 maxusers	10
 
@@ -75,6 +75,8 @@ makeoptions	CONF_CFLAGS=-fno-builtin  #Don't allow use of memcmp, etc.
 #makeoptions	KERNEL=foo		#Build kernel "foo" and install "/foo"
 # Only build Linux API modules and plus those parts of the sound system I need.
 #makeoptions	MODULES_OVERRIDE="linux sound/snd sound/pcm sound/driver/maestro3"
+makeoptions	DESTDIR=/tmp
+
 
 #
 # Certain applications can grow to be larger than the 512M limit
@@ -114,13 +116,15 @@ options 	PQ_CACHESIZE=512	# color for 512k/16k cache
 #
 options 	INCLUDE_CONFIG_FILE     # Include this file in kernel
 
-options 	GEOM_AES
-options 	GEOM_BDE
-options 	GEOM_BSD
-options 	GEOM_GPT
-options 	GEOM_MBR
-options 	GEOM_PC98
-options 	GEOM_SUNLABEL
+options 	GEOM_AES		# Don't use, use GEOM_BDE
+options 	GEOM_APPLE		# Apple partitioning
+options 	GEOM_BDE		# Disk encryption.
+options 	GEOM_BSD		# BSD disklabels
+options 	GEOM_GPT		# GPT partitioning
+options 	GEOM_MBR		# DOS/MBR partitioning
+options 	GEOM_PC98		# NEC PC9800 partitioning
+options 	GEOM_SUNLABEL		# Sun/Solaris partitioning
+options 	GEOM_VOL		# Volume names from UFS superblock
 
 #
 # The root device and filesystem type can be compiled in;
@@ -130,6 +134,23 @@ options 	GEOM_SUNLABEL
 #
 options 	ROOTDEVNAME=\"ufs:da0s2e\"
 
+
+#####################################################################
+# Scheduler options:
+#
+# Specifying one of SCHED_4BSD or SCHED_ULE is mandatory.  These options
+# select which scheduler is compiled in.
+#
+# SCHED_4BSD is the historical, proven, BSD scheduler.  It has a global run
+# queue and no cpu affinity which makes it suboptimal for SMP.  It has very
+# good interactivity and priority selection.
+#
+# SCHED_ULE is a new experimental scheduler that has been designed for SMP,
+# but will work just fine on UP too.  Users of this scheduler should expect
+# some hicups and be prepaired to provide feedback.
+#
+options		SCHED_4BSD
+#options	SCHED_ULE
 
 #####################################################################
 # SMP OPTIONS:
@@ -187,9 +208,18 @@ options 	MUTEX_PROFILING
 #
 # Implement system calls compatible with 4.3BSD and older versions of
 # FreeBSD.  You probably do NOT want to remove this as much current code
-# still relies on the 4.3 emulation.
+# still relies on the 4.3 emulation.  Note that some architectures that
+# are supported by FreeBSD do not include support for certain important
+# aspects of this compatibility option, namely those related to the
+# signal delivery mechanism.
 #
 options 	COMPAT_43
+
+#
+# Be compatible with SunOS.  The COMPAT_43 option above pulls in most
+# (all?) of the changes that this option turns on.
+#
+options 	COMPAT_SUNOS
 
 # Enable FreeBSD4 compatibility syscalls
 options 	COMPAT_FREEBSD4
@@ -335,29 +365,33 @@ options 	COMPILING_LINT
 #
 # Protocol families:
 #  Only the INET (Internet) family is officially supported in FreeBSD.
-#  Source code for the NS (Xerox Network Service) is provided for amusement
-#  value.
 #
 options 	INET			#Internet communications protocols
 options 	INET6			#IPv6 communications protocols
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 options 	IPSEC_DEBUG		#debug for IP security
+#
+# Set IPSEC_FILTERGIF to force packets coming through a gif tunnel
+# to be processed by any configured packet filtering (ipfw, ipf).
+# The default is that packets coming from a tunnel are _not_ processed;
+# they are assumed trusted.
+#
+# Note that enabling this can be problematic as there are no mechanisms
+# in place for distinguishing packets coming out of a tunnel (e.g. no
+# encX devices as found on openbsd).
+#
+#options 	IPSEC_FILTERGIF		#filter ipsec packets from a tunnel
 
 #options 	FAST_IPSEC		#new IPsec (cannot define w/ IPSEC)
 
 options 	IPX			#IPX/SPX communications protocols
 options 	IPXIP			#IPX in IP encapsulation (not available)
-options 	IPTUNNEL		#IP in IPX encapsulation (not available)
 
 #options 	NCP			#NetWare Core protocol
 
 options 	NETATALK		#Appletalk communications protocols
 options 	NETATALKDEBUG		#Appletalk debugging
-
-# These are currently broken but are shipped due to interest.
-#options 	NS			#Xerox NS protocols
-#options 	NSIP			#XNS over IP
 
 #
 # SMB/CIFS requester
@@ -415,8 +449,11 @@ device		musycc	# LMC/SBE LMC1504 quad T1/E1
 # Network interfaces:
 #  The `loop' device is MANDATORY when networking is enabled.
 #  The `ether' device provides generic code to handle
-#  Ethernets; it is MANDATORY when a Ethernet device driver is
+#  Ethernets; it is MANDATORY when an Ethernet device driver is
 #  configured or token-ring is enabled.
+#  The 'wlan' device provides generic code to support 802.11
+#  drivers, including host AP mode; it is MANDATORY for the wi
+#  driver and will eventually be required by all 802.11 drivers.
 #  The `fddi' device provides generic code to support FDDI.
 #  The `arcnet' device provides generic code to support Arcnet.
 #  The `sppp' device serves a similar role for certain types
@@ -453,6 +490,7 @@ device		musycc	# LMC/SBE LMC1504 quad T1/E1
 #
 device		ether			#Generic Ethernet
 device		vlan			#VLAN support
+device		wlan			#802.11 support
 device		token			#Generic TokenRing
 device		fddi			#Generic FDDI
 device		arcnet			#Generic Arcnet
@@ -538,6 +576,12 @@ options 	IPFILTER_DEFAULT_BLOCK	#block all packets by default
 options 	IPSTEALTH		#support for stealth forwarding
 options 	PFIL_HOOKS
 options 	TCPDEBUG
+
+# The MBUF_STRESS_TEST option enables options which create
+# various random failures / extreme cases related to mbuf
+# functions.  See the mbuf(9) manpage for a list of available
+# test cases.
+options		MBUF_STRESS_TEST
 
 # RANDOM_IP_ID causes the ID field in IP packets to be randomized
 # instead of incremented by 1 with each packet generated.  This
@@ -642,7 +686,6 @@ options 	SMBFS			#SMB/CIFS filesystem
 options 	UDF			#Universal Disk Format
 options 	UMAPFS			#UID map filesystem
 options 	UNIONFS			#Union filesystem
-# options 	NODEVFS			#disable devices filesystem
 # The xFS_ROOT options REQUIRE the associated ``options xFS''
 options 	NFS_ROOT		#NFS usable as root device
 
@@ -727,21 +770,6 @@ options 	EXT2FS
 # unsuitable for inclusion on machines with untrusted local users.
 options 	VFS_AIO
 
-# Enable the code UFS IO optimization through the VM system.  This allows
-# use VM operations instead of copying operations when possible.
-# 
-# Even with this enabled, actual use of the code is still controlled by the
-# sysctl vfs.ioopt.  0 gives no optimization, 1 gives normal (use VM
-# operations if a request happens to fit), 2 gives agressive optimization
-# (the operations are split to do as much as possible through the VM system.)
-#
-# Enabling this will probably not give an overall speedup except for
-# special workloads.
-#
-# WARNING: Do not enable this, it is known to be broken, and will result
-# in system instability, as well as possible data loss.
-options 	ENABLE_VFS_IOOPT
-
 # Cryptographically secure random number generator; /dev/[u]random
 device		random
 
@@ -771,6 +799,7 @@ options 	MAC_LOMAC
 options 	MAC_MLS
 options 	MAC_NONE
 options 	MAC_PARTITION
+options 	MAC_PORTACL
 options 	MAC_SEEOTHERUIDS
 options 	MAC_TEST
 
@@ -1002,6 +1031,9 @@ options 	LIBICONV
 # Size of the kernel message buffer.  Should be N * pagesize.
 options 	MSGBUF_SIZE=40960
 
+# Maximum size of a tty or pty input buffer.
+options 	TTYHOG=8193
+
 
 #####################################################################
 # HARDWARE DEVICE CONFIGURATION
@@ -1071,7 +1103,6 @@ options 	VGA_SLOW_IOACCESS	# do byte-wide i/o's to TS and GDC regs
 options 	VGA_WIDTH90		# support 90 column modes
 
 options 	FB_DEBUG		# Frame buffer debugging
-options 	FB_INSTALL_CDEV		# install a CDEV entry in /dev
 
 device		splash			# Splash screen and screen saver support
 
@@ -1518,6 +1549,7 @@ device		miibus
 #       card which is 32-bit.
 # sis:  Support for NICs based on the Silicon Integrated Systems SiS 900,
 #       SiS 7016 and NS DP83815 PCI fast ethernet controller chips.
+# sbsh:	Support for Granch SBNI16 SHDSL modem PCI adapters
 # sk:   Support for the SysKonnect SK-984x series PCI gigabit ethernet NICs.
 #       This includes the SK-9841 and SK-9842 single port cards (single mode
 #       and multimode fiber) and the SK-9843 and SK-9844 dual port cards
@@ -1594,6 +1626,7 @@ device		my		# Myson Fast Ethernet (MTD80X, MTD89X)
 device		rl		# RealTek 8129/8139
 device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		sf		# Adaptec AIC-6915 (``Starfire'')
+device		sbsh		# Granch SBNI16 SHDSL modem
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		tl		# Texas Instruments ThunderLAN
@@ -1978,7 +2011,7 @@ device		iicsmb		# smb over i2c bridge
 options 	PPC_PROBE_CHIPSET # Enable chipset specific detection
 				  # (see flags in ppc(4))
 options 	DEBUG_1284	# IEEE1284 signaling protocol debug
-options 	PERIPH_1284	# Makes your computer act as a IEEE1284
+options 	PERIPH_1284	# Makes your computer act as an IEEE1284
 				# compliant peripheral
 options 	DONTPROBE_1284	# Avoid boot detection of PnP parallel devices
 options 	VP0_DEBUG	# ZIP/ZIP+ debug
@@ -2016,8 +2049,9 @@ options 	BOOTP_WIRED_TO=fxp0 # Use interface fxp0 for BOOTP
 options 	HW_WDOG
 
 #
-# Disable swapping. This option removes all code which actually performs
-# swapping, so it's not possible to turn it back on at run-time.
+# Disable swapping of upages and stack pages.  This option removes all
+# code which actually performs swapping, so it's not possible to turn
+# it back on at run-time.
 #
 # This is sometimes usable for systems which don't have any swap space
 # (see also sysctls "vm.defer_swapspace_pageouts" and
@@ -2049,6 +2083,8 @@ options 	DEBUG_LOCKS
 device		uhci
 # OHCI controller
 device		ohci
+# EHCI controller
+device		ehci
 # General USB code (mandatory for USB)
 device		usb
 #
@@ -2104,6 +2140,10 @@ device		cue
 # the Netgear EA101, the D-Link DSB-650, the SMC 2102USB
 # and 2104USB, and the Corega USB-T.
 device		kue
+#
+# RealTek RTL8150 USB to fast ethernet. Supports the Melco LUA-KTX
+# and the GREEN HOUSE GH-USB100B.
+device		rue
 
 # debugging options for the USB subsystem
 #
@@ -2112,6 +2152,9 @@ options 	USB_DEBUG
 # options for ukbd:
 options 	UKBD_DFLT_KEYMAP	# specify the built-in keymap
 makeoptions	UKBD_DFLT_KEYMAP=it.iso
+
+# options for uvscom:
+options		UVSCOM_DEFAULT_OPKTSIZE=8	# default output packet size
 
 #####################################################################
 # Firewire support
@@ -2133,8 +2176,15 @@ device		fwe		# Ethernet over Firewire (non-standard!)
 device		crypto		# core crypto support
 device		cryptodev	# /dev/crypto for access to h/w
 
+device		rndtest		# FIPS 140-2 entropy tester
+
 device		hifn		# Hifn 7951, 7781, etc.
+options		HIFN_DEBUG	# enable debugging support: hw.hifn.debug
+options		HIFN_RNDTEST	# enable rndtest support
+
 device		ubsec		# Broadcom 5501, 5601, 58xx
+options		UBSEC_DEBUG	# enable debugging support: hw.ubsec.debug
+options		UBSEC_RNDTEST	# enable rndtest support
 
 #####################################################################
 
@@ -2148,7 +2198,6 @@ options 	INIT_PATH=/sbin/init:/stand/sysinstall
 # Debug options
 options 	BUS_DEBUG	# enable newbus debugging
 options 	DEBUG_VFS_LOCKS	# enable vfs lock debugging
-options 	NPX_DEBUG	# enable npx debugging (FPU/math emu)
 
 #####################################################################
 # SYSV IPC KERNEL PARAMETERS
@@ -2201,6 +2250,19 @@ options 	SHMSEG=9
 # the system will wait indefinitely until a key is pressed on the
 # console.
 options 	PANIC_REBOOT_WAIT_TIME=16
+
+# Attempt to bypass the buffer cache and put data directly into the
+# userland buffer for read operation when O_DIRECT flag is set on the
+# file.  Both offset and length of the read operation must be
+# multiples of the physical media sector size. 
+#
+#options		DIRECTIO
+
+# Specify a lower limit for the number of swap I/O buffers.  They are
+# (among other things) used when bypassing the buffer cache due to
+# DIRECTIO kernel option enabled and O_DIRECT flag set on file.
+#
+#options		NSWBUF_MIN=120
 
 #####################################################################
 

@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:36:34  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/sys.c,v 1.2 1999/08/28 00:40:26 peter Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/sys.c,v 1.4 2003/04/04 16:35:15 phk Exp $
  */
 
 /*
@@ -33,7 +33,6 @@
 
 #include "boot.h"
 #include <sys/dirent.h>
-#include <sys/reboot.h>
 
 #if 0
 /* #define BUFSIZE 4096 */
@@ -275,8 +274,8 @@ openrd(void)
 	switch(maj)
 	{
 #ifdef PC98
-	case 4: /* sd */
-		dosdev_copy = biosdrive | 0xa0;
+	case 4:	/* da */
+		dosdev_copy = biosdrive | 0xA0; /* SCSI HD or MO */
 #else	/* IBM-PC */
 	case 0:
 	case 4:
@@ -284,8 +283,8 @@ openrd(void)
 #endif
 		break;
 #ifdef PC98
-	case 0:
-	case 2:
+	case 0:	/* wd */
+	case 2:	/* 1200KB fd */
 		dosdev_copy = (maj << 3) | unit | 0x80;
 #else
 	case 2:
@@ -293,7 +292,7 @@ openrd(void)
 #endif
 		break;
 #ifdef PC98
-	case 6:/* 1.44MB FD */
+	case 6:	/* 1440KB fd */
 		dosdev_copy = (maj << 3) | unit;
 		break;
 #endif

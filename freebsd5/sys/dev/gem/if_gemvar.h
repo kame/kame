@@ -25,7 +25,7 @@
  *
  *	from: NetBSD: gemvar.h,v 1.8 2002/05/15 02:36:12 matt Exp
  *
- * $FreeBSD: src/sys/dev/gem/if_gemvar.h,v 1.4 2002/07/10 10:24:23 benno Exp $
+ * $FreeBSD: src/sys/dev/gem/if_gemvar.h,v 1.8 2003/05/15 16:57:55 tmm Exp $
  */
 
 #ifndef	_IF_GEMVAR_H
@@ -42,12 +42,15 @@
 /*
  * Transmit descriptor list size.  This is arbitrary, but allocate
  * enough descriptors for 64 pending transmissions and 16 segments
- * per packet.
+ * per packet. This limit is not actually enforced (packets with more segments
+ * can be sent, depending on the busdma backend); it is however used as an
+ * estimate for the tx window size.
  */
 #define	GEM_NTXSEGS		16
 
 #define	GEM_TXQUEUELEN		64
 #define	GEM_NTXDESC		(GEM_TXQUEUELEN * GEM_NTXSEGS)
+#define	GEM_MAXTXFREE		(GEM_NTXDESC - 1)
 #define	GEM_NTXDESC_MASK	(GEM_NTXDESC - 1)
 #define	GEM_NEXTTX(x)		((x + 1) & GEM_NTXDESC_MASK)
 
@@ -104,21 +107,7 @@ STAILQ_HEAD(gem_txsq, gem_txsoft);
 /* Argument structure for busdma callback */
 struct gem_txdma {
 	struct gem_softc *txd_sc;
-	int txd_nexttx;
-	int txd_lasttx;
-	int txd_nsegs;
-	int txd_flags;
-#define	GTXD_FIRST	1
-#define	GTXD_LAST	2
-	int txd_error;
-};
-
-/* Transmit job descriptor */
-struct gem_txjob {
-	int txj_nexttx;
-	int txj_lasttx;
-	int txj_nsegs;
-	STAILQ_HEAD(, gem_txsoft) txj_txsq;
+	struct gem_txsoft	*txd_txs;
 };
 
 /*
@@ -144,7 +133,8 @@ struct gem_softc {
 	/* The following bus handles are to be provided by the bus front-end */
 	bus_space_tag_t	sc_bustag;	/* bus tag */
 	bus_dma_tag_t	sc_pdmatag;	/* parent bus dma tag */
-	bus_dma_tag_t	sc_dmatag;	/* bus dma tag */
+	bus_dma_tag_t	sc_rdmatag;	/* RX bus dma tag */
+	bus_dma_tag_t	sc_tdmatag;	/* TX bus dma tag */
 	bus_dma_tag_t	sc_cdmatag;	/* control data bus dma tag */
 	bus_dmamap_t	sc_dmamap;	/* bus dma handle */
 	bus_space_handle_t sc_h;	/* bus space handle for all regs */
@@ -197,10 +187,6 @@ struct gem_softc {
 	int		sc_inited;
 	int		sc_debug;
 	int		sc_ifflags;
-
-	/* Special hardware hooks */
-	void	(*sc_hwreset)(struct gem_softc *);
-	void	(*sc_hwinit)(struct gem_softc *);
 };
 
 #define	GEM_DMA_READ(sc, v)	(((sc)->sc_pci) ? le64toh(v) : be64toh(v))
@@ -209,16 +195,8 @@ struct gem_softc {
 #define	GEM_CDTXADDR(sc, x)	((sc)->sc_cddma + GEM_CDTXOFF((x)))
 #define	GEM_CDRXADDR(sc, x)	((sc)->sc_cddma + GEM_CDRXOFF((x)))
 
-#define	GEM_CDSPADDR(sc)	((sc)->sc_cddma + GEM_CDSPOFF)
-
-#define	GEM_CDTXSYNC(sc, x, n, ops)					\
-	bus_dmamap_sync((sc)->sc_dmatag, (sc)->sc_cddmamap, (ops));	\
-
-#define	GEM_CDRXSYNC(sc, x, ops)					\
-	bus_dmamap_sync((sc)->sc_dmatag, (sc)->sc_cddmamap, (ops))
-
-#define	GEM_CDSPSYNC(sc, ops)						\
-	bus_dmamap_sync((sc)->sc_dmatag, (sc)->sc_cddmamap, (ops))
+#define	GEM_CDSYNC(sc, ops)						\
+	bus_dmamap_sync((sc)->sc_cdmatag, (sc)->sc_cddmamap, (ops));	\
 
 #define	GEM_INIT_RXDESC(sc, x)						\
 do {									\
@@ -233,14 +211,15 @@ do {									\
 	    GEM_DMA_WRITE((sc),						\
 			(((__m->m_ext.ext_size)<<GEM_RD_BUFSHIFT)	\
 				& GEM_RD_BUFSIZE) | GEM_RD_OWN);	\
-	GEM_CDRXSYNC((sc), (x), BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE); \
 } while (0)
 
 #ifdef _KERNEL
 extern devclass_t gem_devclass;
 
 int	gem_attach(struct gem_softc *);
-int	gem_detach(struct gem_softc *);
+void	gem_detach(struct gem_softc *);
+void	gem_suspend(struct gem_softc *);
+void	gem_resume(struct gem_softc *);
 void	gem_intr(void *);
 
 int	gem_mediachange(struct ifnet *);

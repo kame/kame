@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.51.2.1 2002/12/19 09:40:07 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.63 2003/05/13 20:35:57 jhb Exp $
  */
 
 /*
@@ -88,6 +88,7 @@
 #include <vm/vm_map.h>
 #if defined(__FreeBSD__)
 #include <vm/uma.h>
+#include <vm/vm_extern.h>
 #endif
 
 #if defined(NetBSD)
@@ -271,7 +272,7 @@ svr4_sys_getdents64(td, uap)
 		return (EBADF);
 	}
 
-	vp = (struct vnode *) fp->f_data;
+	vp = fp->f_data;
 
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
@@ -451,7 +452,7 @@ svr4_sys_getdents(td, uap)
 		return (EBADF);
 	}
 
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return (EINVAL);
@@ -627,7 +628,7 @@ svr4_sys_fchroot(td, uap)
 		return error;
 	if ((error = getvnode(fdp, uap->fd, &fp)) != 0)
 		return error;
-	vp = (struct vnode *) fp->f_data;
+	vp = fp->f_data;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	if (vp->v_type != VDIR)
 		error = ENOTDIR;
@@ -1271,10 +1272,8 @@ loop:
 			continue;
 		}
 		nfound++;
-		mtx_lock_spin(&sched_lock);
 		if ((q->p_state == PRS_ZOMBIE) && 
 		    ((uap->options & (SVR4_WEXITED|SVR4_WTRAPPED)))) {
-			mtx_unlock_spin(&sched_lock);
 			PROC_UNLOCK(q);
 			sx_sunlock(&proctree_lock);
 			*retval = 0;
@@ -1364,12 +1363,8 @@ loop:
 			sx_xunlock(&proctree_lock);
 
 			PROC_LOCK(q);
-			if (--q->p_procsig->ps_refcnt == 0) {
-				if (q->p_sigacts != &q->p_uarea->u_sigacts)
-					FREE(q->p_sigacts, M_SUBPROC);
-				FREE(q->p_procsig, M_SUBPROC);
-				q->p_procsig = NULL;
-			}
+			sigacts_free(q->p_sigacts);
+			q->p_sigacts = NULL;
 			PROC_UNLOCK(q);
 
 			/*
@@ -1377,12 +1372,15 @@ loop:
 			 * to free anything that cpu_exit couldn't
 			 * release while still running in process context.
 			 */
-			cpu_wait(q);
+			vm_waitproc(q);
 #if defined(__NetBSD__)
 			pool_put(&proc_pool, q);
 #endif
 #ifdef __FreeBSD__
 			mtx_destroy(&q->p_mtx);
+#ifdef MAC
+                        mac_destroy_proc(q);
+#endif
 			uma_zfree(proc_zone, q);
 #endif
 			nprocs--;
@@ -1392,7 +1390,6 @@ loop:
 		if (P_SHOULDSTOP(q) && ((q->p_flag & P_WAITED) == 0) &&
 		    (q->p_flag & P_TRACED ||
 		     (uap->options & (SVR4_WSTOPPED|SVR4_WCONTINUED)))) {
-			mtx_unlock_spin(&sched_lock);
 			DPRINTF(("jobcontrol %d\n", q->p_pid));
 		        if (((uap->options & SVR4_WNOWAIT)) == 0)
 				q->p_flag |= P_WAITED;
@@ -1401,7 +1398,6 @@ loop:
 			return svr4_setinfo(q, W_STOPCODE(q->p_xstat),
 					    uap->info);
 		}
-		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(q);
 	}
 
@@ -1415,7 +1411,7 @@ loop:
 		return 0;
 	}
 
-	if ((error = tsleep((caddr_t)td->td_proc, PWAIT | PCATCH, "svr4_wait", 0)) != 0)
+	if ((error = tsleep(td->td_proc, PWAIT | PCATCH, "svr4_wait", 0)) != 0)
 		return error;
 	goto loop;
 }

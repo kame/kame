@@ -25,13 +25,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cam.c,v 1.10 2002/10/22 20:18:51 thomas Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cam.c,v 1.16 2003/05/14 14:20:22 thomas Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/devicestat.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/ata.h>
@@ -168,7 +167,14 @@ atapi_cam_detach_bus(struct ata_channel *ata_ch)
 void
 atapi_cam_reinit_bus(struct ata_channel *ata_ch) {
     struct atapi_xpt_softc *scp = get_softc(ata_ch);
-    reinit_bus(scp, RESET);
+
+    /*
+     * scp might be null if the bus is being reinitialised during
+     * the boot-up sequence, before the ATAPI bus is registered.
+     */
+
+    if (scp != NULL)
+	reinit_bus(scp, RESET);
 }
 
 static void
@@ -231,6 +237,7 @@ atapi_action(struct cam_sim *sim, union ccb *ccb)
 
 	cpi->version_num = 1;
 	cpi->hba_inquiry = 0;
+	cpi->target_sprt = 0;
 	cpi->hba_misc = 0;
 	cpi->hba_eng_cnt = 0;
 	bzero(cpi->vuhba_flags, sizeof(cpi->vuhba_flags));
@@ -419,36 +426,6 @@ atapi_action(struct cam_sim *sim, union ccb *ccb)
 	    }
 	    break;
 	}
-	case MODE_SELECT_6:
-	    /* FALLTHROUGH */
-
-	case MODE_SENSE_6:
-	    /*
-	     * not supported by ATAPI/MMC devices (per SCSI MMC spec)
-	     * translate to _10 equivalent.
-	     * (actually we should do this only if we have tried 
-	     * MODE_foo_6 and received ILLEGAL_REQUEST or
-	     * INVALID COMMAND OPERATION CODE)
-	     * alternative fix: behave like a honest CAM transport, 
-	     * do not muck with CDB contents, and change scsi_cd to 
-	     * always use MODE_SENSE_10 in cdgetmode(), or let scsi_cd
-	     * know that this specific unit is an ATAPI/MMC one, 
-	     * and in /that case/ use MODE_SENSE_10
-	     */
-
-	    CAM_DEBUG(ccb_h->path, CAM_DEBUG_SUBTRACE, 
-		      ("Translating %s into _10 equivalent\n",
-		      (hcb->cmd[0] == MODE_SELECT_6) ?
-		      "MODE_SELECT_6" : "MODE_SENSE_6"));
-	    hcb->cmd[0] |= 0x40;
-	    hcb->cmd[6] = 0;
-	    hcb->cmd[7] = 0;
-	    hcb->cmd[8] = hcb->cmd[4];
-	    hcb->cmd[9] = hcb->cmd[5];
-	    hcb->cmd[4] = 0;
-	    hcb->cmd[5] = 0;
-	    break;
-
 	case READ_6:
 	    /* FALLTHROUGH */
 

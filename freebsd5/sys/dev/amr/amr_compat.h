@@ -53,7 +53,7 @@
  * SUCH DAMAGE.
  *
  *
- * $FreeBSD: src/sys/dev/amr/amr_compat.h,v 1.5 2002/10/30 22:00:11 emoore Exp $
+ * $FreeBSD: src/sys/dev/amr/amr_compat.h,v 1.6 2003/03/08 08:01:27 phk Exp $
  */
 /*
  * Backwards compatibility support.
@@ -91,7 +91,7 @@
 #else
 # include <sys/bio.h>
 # define BIO_IS_READ(x)				((x)->bio_cmd == BIO_READ)
-# define AMR_BIO_FINISH(x)                      biofinish(x, &sc->amrd_stats, 0)
+# define AMR_BIO_FINISH(x)                      biodone(x)
 #endif
 
 /************************************************************************

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.31 2002/09/28 17:14:05 phk Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.35 2003/03/08 21:41:15 phk Exp $
  */
 /*
  * Derived from the NetBSD SCSI changer driver.
@@ -142,7 +142,7 @@ struct ch_softc {
 	ch_state	state;
 	ch_quirks	quirks;
 	union ccb	saved_ccb;
-	struct devstat	device_stats;
+	struct devstat	*device_stats;
 	dev_t		dev;
 
 	int		sc_picker;	/* current picker */
@@ -211,19 +211,11 @@ static struct periph_driver chdriver =
 PERIPHDRIVER_DECLARE(ch, chdriver);
 
 static struct cdevsw ch_cdevsw = {
-	/* open */	chopen,
-	/* close */	chclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	chioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ch",
-	/* maj */	CH_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	chopen,
+	.d_close =	chclose,
+	.d_ioctl =	chioctl,
+	.d_name =	"ch",
+	.d_maj =	CH_CDEV_MAJOR,
 };
 
 static void
@@ -291,7 +283,7 @@ chcleanup(struct cam_periph *periph)
 
 	softc = (struct ch_softc *)periph->softc;
 
-	devstat_remove_entry(&softc->device_stats);
+	devstat_remove_entry(softc->device_stats);
 	destroy_dev(softc->dev);
 	xpt_print_path(periph->path);
 	printf("removing device entry\n");
@@ -377,7 +369,7 @@ chregister(struct cam_periph *periph, void *arg)
 	 * Changers don't have a blocksize, and obviously don't support
 	 * tagged queueing.
 	 */
-	devstat_add_entry(&softc->device_stats, "ch",
+	softc->device_stats = devstat_new_entry("ch",
 			  periph->unit_number, 0,
 			  DEVSTAT_NO_BLOCKSIZE | DEVSTAT_NO_ORDERED_TAGS,
 			  SID_TYPE(&cgd->inq_data)| DEVSTAT_TYPE_IF_SCSI,
@@ -853,7 +845,7 @@ chmove(struct cam_periph *periph, struct changer_move *cm)
 
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	xpt_release_ccb(ccb);
 
@@ -916,7 +908,7 @@ chexchange(struct cam_periph *periph, struct changer_exchange *ce)
 
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	xpt_release_ccb(ccb);
 
@@ -962,7 +954,7 @@ chposition(struct cam_periph *periph, struct changer_position *cp)
 
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	xpt_release_ccb(ccb);
 
@@ -1118,7 +1110,7 @@ chgetelemstatus(struct cam_periph *periph,
 
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	if (error)
 		goto done;
@@ -1154,7 +1146,7 @@ chgetelemstatus(struct cam_periph *periph,
 	
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	if (error)
 		goto done;
@@ -1233,7 +1225,7 @@ chielem(struct cam_periph *periph,
 
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	xpt_release_ccb(ccb);
 
@@ -1320,7 +1312,7 @@ chsetvoltag(struct cam_periph *periph,
 	
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /*sense_flags*/ SF_RETRY_UA,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	xpt_release_ccb(ccb);
 
@@ -1384,7 +1376,7 @@ chgetparams(struct cam_periph *periph)
 
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /* sense_flags */ SF_RETRY_UA|SF_NO_PRINT,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	if (error) {
 		if (dbd) {
@@ -1397,7 +1389,7 @@ chgetparams(struct cam_periph *periph)
 			error = cam_periph_runccb(ccb, cherror,
 						  /*cam_flags*/ CAM_RETRY_SELTO,
 				  		  /*sense_flags*/ SF_RETRY_UA,
-						  &softc->device_stats);
+						  softc->device_stats);
 		} else {
 			/*
 			 * Since we disabled sense printing above, print
@@ -1447,7 +1439,7 @@ chgetparams(struct cam_periph *periph)
 	
 	error = cam_periph_runccb(ccb, cherror, /*cam_flags*/ CAM_RETRY_SELTO,
 				  /* sense_flags */ SF_RETRY_UA | SF_NO_PRINT,
-				  &softc->device_stats);
+				  softc->device_stats);
 
 	if (error) {
 		if (dbd) {
@@ -1460,7 +1452,7 @@ chgetparams(struct cam_periph *periph)
 			error = cam_periph_runccb(ccb, cherror,
 						  /*cam_flags*/ CAM_RETRY_SELTO,
 				  		  /*sense_flags*/ SF_RETRY_UA,
-						  &softc->device_stats);
+						  softc->device_stats);
 		} else {
 			/*
 			 * Since we disabled sense printing above, print

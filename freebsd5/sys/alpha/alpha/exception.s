@@ -24,7 +24,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *	$NetBSD: locore.s,v 1.47 1998/03/22 07:26:32 thorpej Exp $
- * $FreeBSD: src/sys/alpha/alpha/exception.s,v 1.16 2002/07/31 19:37:02 jhb Exp $
+ * $FreeBSD: src/sys/alpha/alpha/exception.s,v 1.17 2003/02/17 09:55:08 julian Exp $
  */
 
 #include <machine/asm.h>
@@ -133,9 +133,8 @@
 2:	ldiq	a0, ALPHA_PSL_IPL_HIGH		/* disable all interrupts */
 	call_pal PAL_OSF1_swpipl
 	ldq	s0, PC_CURTHREAD(pcpup)		/* checking for pending asts */
-	ldq	s1, TD_KSE(s0)			/*  atomically with returning */
-	ldl	s1, KE_FLAGS(s1)
-	ldiq	s2, KEF_ASTPENDING | KEF_NEEDRESCHED
+	ldl	s1, TD_FLAGS(s0)
+	ldiq	s2, TDF_ASTPENDING | TDF_NEEDRESCHED
 	and	s1, s2
 	beq	s1, 3f
 	ldiq	a0, ALPHA_PSL_IPL_0		/* reenable interrupts */
@@ -278,9 +277,8 @@ Ler1:	LDGP(pv)
 	/* Handle any AST's or resched's. */
 1:	ldiq	a0, ALPHA_PSL_IPL_HIGH		/* disable all interrupts */
 	call_pal PAL_OSF1_swpipl
-	ldq	s2, TD_KSE(s0)			/* checking for pending asts */
-	ldl	s2, KE_FLAGS(s2)		/*  atomically with returning */
-	ldiq	s3, KEF_ASTPENDING | KEF_NEEDRESCHED
+	ldl	s2, TD_FLAGS(s0)		/*  atomically with returning */
+	ldiq	s3, TDF_ASTPENDING | TDF_NEEDRESCHED
 	and	s2, s3
 	beq	s2, 2f
 	ldiq	a0, ALPHA_PSL_IPL_0		/* reenable interrupts */

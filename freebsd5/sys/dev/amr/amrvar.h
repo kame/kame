@@ -53,11 +53,12 @@
  * SUCH DAMAGE.
  *
  *
- *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.14 2002/12/11 20:59:46 emoore Exp $
+ *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.18 2003/04/01 15:06:22 phk Exp $
  */
 
 #if __FreeBSD_version >= 500005
 # include <sys/taskqueue.h>
+# include <geom/geom_disk.h>
 #endif
 
 #ifdef AMR_DEBUG
@@ -250,14 +251,10 @@ extern int		amr_cam_command(struct amr_softc *sc, struct amr_command **acp);
 struct amrd_softc 
 {
     device_t		amrd_dev;
-    dev_t		amrd_dev_t;
     struct amr_softc	*amrd_controller;
     struct amr_logdrive	*amrd_drive;
     struct disk		amrd_disk;
-    struct devstat	amrd_stats;
     int			amrd_unit;
-    int			amrd_flags;
-#define AMRD_OPEN	(1<<0)		/* drive is open (can't detach) */
 };
 
 /*

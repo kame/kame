@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.36 2002/03/10 22:33:04 sobomax Exp $
+ * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.38 2003/05/01 03:56:29 peter Exp $
  */
 
 #include <sys/types.h>
@@ -210,7 +210,7 @@ struct preloaded_file
 struct file_format
 {
     /* Load function must return EFTYPE if it can't handle the module supplied */
-    int		(* l_load)(char *filename, vm_offset_t dest, struct preloaded_file **result);
+    int		(* l_load)(char *filename, u_int64_t dest, struct preloaded_file **result);
     /* Only a loader that will load a kernel (first module) should have an exec handler */
     int		(* l_exec)(struct preloaded_file *mp);
 };
@@ -231,10 +231,9 @@ int  file_addmodule(struct preloaded_file *fp, char *modname, int version,
 
 
 /* MI module loaders */
-int		aout_loadfile(char *filename, vm_offset_t dest, struct preloaded_file **result);
-vm_offset_t	aout_findsym(char *name, struct preloaded_file *fp);
-
-int	elf_loadfile(char *filename, vm_offset_t dest, struct preloaded_file **result);
+#ifdef __elfN
+int	__elfN(loadfile)(char *filename, u_int64_t dest, struct preloaded_file **result);
+#endif
 
 /*
  * Support for commands 

@@ -75,7 +75,7 @@
  *
  ******************************************************************************
  *
- * $FreeBSD: src/sys/dev/idt/idt.c,v 1.1 2002/09/30 05:12:34 mdodd Exp $
+ * $FreeBSD: src/sys/dev/idt/idt.c,v 1.5 2003/02/19 05:47:06 imp Exp $
  */
 
 #include <sys/param.h>
@@ -951,8 +951,8 @@ idt_connect_opencls(IDT * idt, CONNECTION * connection, int opflag)
  *    the DMA address.
  *
  *    returns -1 if queue is full, the address is not word aligned, or
- *    a invalid queue is specified
- *    returns 0 if parameters were acceptable
+ *    an invalid queue is specified.
+ *    returns 0 if parameters were acceptable.
  */
 
 int
@@ -2571,7 +2571,6 @@ idt_transmit(IDT * idt, struct mbuf * mfirst, int vpi, int vci, int flags)
  *  m_pkthdr.header      TX queue pointer (06/01/2001)
  *  m_pkthdr.csum_flags  Unused, keep zero
  *  m_pkthdr.csum_data   Number of SCQ entries needed or used
- *  m_pkthdr.aux         Unused, keep NULL
  *
  *******************************************************************************
  *
@@ -3110,12 +3109,6 @@ nicstar_recv(nicstar_reg_t * idt)
 			mptr->m_pkthdr.rcvif = NULL;
 			mptr->m_nextpkt = NULL;
 
-			if (mptr->m_pkthdr.aux != NULL) {
-				device_printf(idt->dev,
-					"received pkthdr.aux=%x\n",
-					(int)mptr->m_pkthdr.aux);
-				mptr->m_pkthdr.aux = NULL;
-			}
 			if (mptr->m_pkthdr.csum_flags) {
 				device_printf(idt->dev,
 					"received pkthdr.csum_flags=%x\n",
@@ -3212,10 +3205,13 @@ nicstar_intr(void *arg)
 	volatile u_long stat_val, config_val;
 	int int_flags;
 	volatile int i;
+	int s;
 
 	idt = (IDT *) arg;
 
 	i = 0;
+
+	s = splnet();
 
 	config_val = *idt->reg_cfg;
 	stat_val = *idt->reg_stat;
@@ -3302,6 +3298,8 @@ nicstar_intr(void *arg)
 		}
 		stat_val = *idt->reg_stat;
 	}
+
+	splx(s);
 	if (i < 1 || i > 50)
 		device_printf(idt->dev, "i=%3d, status=%08x\n", i, (int)stat_val);
 }

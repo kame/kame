@@ -30,7 +30,7 @@
  *
  * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic7xxx_osm.c#12 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.c,v 1.31 2002/11/30 19:08:58 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.c,v 1.35 2003/05/27 04:59:57 scottl Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
@@ -1386,7 +1386,8 @@ ahc_setup_data(struct ahc_softc *ahc, struct cam_sim *sim,
 					panic("ahc_setup_data - Transfer size "
 					      "larger than can device max");
 
-				seg.ds_addr = (bus_addr_t)csio->data_ptr;
+				seg.ds_addr =
+				    (bus_addr_t)(vm_offset_t)csio->data_ptr;
 				seg.ds_len = csio->dxfer_len;
 				ahc_execute_scb(scb, &seg, 1, 0);
 			}

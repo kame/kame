@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/advlib.c,v 1.17 2000/10/15 14:17:58 phk Exp $
+ * $FreeBSD: src/sys/dev/advansys/advlib.c,v 1.20 2003/02/24 04:44:53 obrien Exp $
  */
 /*
  * Ported from:
@@ -257,6 +257,10 @@ adv_sgcount_to_qcount(int sgcount)
 	return (n_sg_list_qs + 1);
 }
 
+#if BYTE_ORDER == BIG_ENDIAN
+static void	 adv_adj_endian_qdone_info(struct adv_q_done_info *);
+static void	 adv_adj_scsiq_endian(struct adv_scsi_q *);
+#endif
 static void	 adv_get_q_info(struct adv_softc *adv, u_int16_t s_addr,
 				u_int16_t *inbuf, int words);
 static u_int	 adv_get_num_free_queues(struct adv_softc *adv, u_int8_t n_qs);
@@ -1170,8 +1174,6 @@ adv_period_offset_to_sdtr(struct adv_softc *adv, u_int *period,
 		period = &dummy_period;
 	}
 
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-
 	*offset = MIN(ADV_SYN_MAX_OFFSET, *offset);
 	if (*period != 0 && *offset != 0) {
 		for (i = 0; i < adv->sdtr_period_tbl_size; i++) {
@@ -1868,6 +1870,22 @@ adv_put_scsiq(struct adv_softc *adv, u_int16_t s_addr,
 		ADV_OUTW(adv, ADV_LRAM_DATA, *buffer);
 	}
 }
+
+#if BYTE_ORDER == BIG_ENDIAN
+void
+adv_adj_endian_qdone_info(struct adv_q_done_info *scsiq)
+{
+
+	panic("adv(4) not supported on big-endian machines.\n");
+}
+
+void
+adv_adj_scsiq_endian(struct adv_scsi_q *scsiq)
+{
+
+	panic("adv(4) not supported on big-endian machines.\n");
+}
+#endif
 
 static void
 adv_handle_extmsg_in(struct adv_softc *adv, u_int16_t halt_q_addr,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.9 2002/09/05 08:13:20 bde Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.10 2003/03/03 09:14:25 des Exp $
  */
 
 #include <sys/param.h>
@@ -101,8 +101,7 @@ linux_setgroups16(struct thread *td, struct linux_setgroups16_args *args)
 	ngrp = args->gidsetsize;
 	if (ngrp >= NGROUPS)
 		return (EINVAL);
-	error = copyin((caddr_t)args->gidset, linux_gidset,
-	    ngrp * sizeof(l_gid16_t));
+	error = copyin(args->gidset, linux_gidset, ngrp * sizeof(l_gid16_t));
 	if (error)
 		return (error);
 	newcred = crget();
@@ -180,8 +179,7 @@ linux_getgroups16(struct thread *td, struct linux_getgroups16_args *args)
 		ngrp++;
 	}
 
-	error = copyout(linux_gidset, (caddr_t)args->gidset,
-	    ngrp * sizeof(l_gid16_t));
+	error = copyout(linux_gidset, args->gidset, ngrp * sizeof(l_gid16_t));
 	if (error)
 		return (error);
 

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/float.h,v 1.3 2002/03/20 18:58:45 obrien Exp $ */
+/* $FreeBSD: src/sys/alpha/include/float.h,v 1.4 2003/02/08 20:37:54 mike Exp $ */
 /* From: NetBSD: float.h,v 1.6 1997/07/17 21:36:03 thorpej Exp */
 
 /*
@@ -45,6 +45,8 @@ __END_DECLS
 
 #define FLT_RADIX	2		/* b */
 #define FLT_ROUNDS	__flt_rounds()
+#define	FLT_EVAL_METHOD	0		/* no promotions */
+#define	DECIMAL_DIG	17		/* max precision in decimal digits */
 
 #define FLT_MANT_DIG	24		/* p */
 #define FLT_EPSILON	1.19209290E-07F	/* b**(1-p) */

@@ -43,7 +43,7 @@
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
  *	from: i386 pmap.h,v 1.54 1997/11/20 19:30:35 bde Exp
- * $FreeBSD: src/sys/alpha/include/pmap.h,v 1.19 2002/08/07 18:02:59 alc Exp $
+ * $FreeBSD: src/sys/alpha/include/pmap.h,v 1.23 2003/04/10 18:42:06 jhb Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -161,7 +161,6 @@ struct	pv_entry;
 
 struct md_page {
 	int pv_list_count;
-	int			pv_flags;
 	TAILQ_HEAD(,pv_entry)	pv_list;
 };
 
@@ -177,7 +176,7 @@ struct pmap {
 	struct {
 		u_int32_t	asn:ASN_BITS;	/* address space number */
 		u_int32_t	gen:ASNGEN_BITS; /* generation number */
-	}			pm_asn[MAXCPU];
+	}			pm_asn[MAXSMPCPU];
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	struct	vm_page		*pm_ptphint;	/* pmap ptp hint */
 	LIST_ENTRY(pmap)	pm_list;	/* list of all pmaps. */
@@ -208,11 +207,6 @@ typedef struct pv_entry {
 	vm_page_t	pv_ptem;	/* VM page for pte */
 } *pv_entry_t;
 
-#define	PV_ENTRY_NULL	((pv_entry_t) 0)
-
-#define	PV_CI		0x01	/* all entries must be cache inhibited */
-#define	PV_PTPAGE	0x02	/* entry maps a page table page */
-
 #ifdef	_KERNEL
 
 extern caddr_t	CADDR1;
@@ -229,12 +223,13 @@ struct vmspace;
 
 vm_offset_t pmap_steal_memory(vm_size_t);
 void	pmap_bootstrap(vm_offset_t, u_int);
+void	pmap_kenter(vm_offset_t va, vm_offset_t pa);
+void	pmap_kremove(vm_offset_t);
 void	pmap_setdevram(unsigned long long basea, vm_offset_t sizea);
 int	pmap_uses_prom_console(void);
 void	*pmap_mapdev(vm_offset_t, vm_size_t);
 void	pmap_unmapdev(vm_offset_t, vm_size_t);
 unsigned *pmap_pte(pmap_t, vm_offset_t) __pure2;
-vm_page_t pmap_use_pt(pmap_t, vm_offset_t);
 void	pmap_set_opt	(unsigned *);
 void	pmap_set_opt_bsp	(void);
 void	pmap_deactivate(struct thread *td);

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_socket.c,v 1.13.2.1 2002/12/19 09:40:07 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_socket.c,v 1.20 2003/02/19 05:46:59 imp Exp $
  */
 
 /*
@@ -82,7 +82,7 @@ svr4_find_socket(td, fp, dev, ino)
 	ino_t ino;
 {
 	struct svr4_sockcache_entry *e;
-	void *cookie = ((struct socket *) fp->f_data)->so_emuldata;
+	void *cookie = ((struct socket *)fp->f_data)->so_emuldata;
 
 	if (svr4_str_initialized != 2) {
 		if (atomic_cmpset_acq_int(&svr4_str_initialized, 0, 1)) {

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdStream.c,v 1.2 2002/02/23 05:32:51 msmith Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdStream.c,v 1.3 2003/04/29 18:50:34 njl Exp $
  */
 
 /*
@@ -34,7 +34,7 @@
 #include "acpi.h"
 
 void
-AcpiOsPrintf (const NATIVE_CHAR *Format, ...)
+AcpiOsPrintf (const char *Format, ...)
 {
     va_list	ap;
 
@@ -44,7 +44,7 @@ AcpiOsPrintf (const NATIVE_CHAR *Format, ...)
 }
 
 void
-AcpiOsVprintf (const NATIVE_CHAR *Format, va_list Args)
+AcpiOsVprintf (const char *Format, va_list Args)
 {
     vprintf(Format, Args);
 }

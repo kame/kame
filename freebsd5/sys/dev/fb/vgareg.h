@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/vgareg.h,v 1.5 2001/09/12 08:37:05 julian Exp $
+ * $FreeBSD: src/sys/dev/fb/vgareg.h,v 1.6 2003/02/25 03:21:19 mux Exp $
  */
 
 #ifndef _DEV_FB_VGAREG_H_
@@ -87,7 +87,7 @@ int		vga_write(dev_t dev, vga_softc_t *sc, struct uio *uio, int flag);
 int		vga_ioctl(dev_t dev, vga_softc_t *sc, u_long cmd, caddr_t arg,
 			  int flag, struct thread *td);
 int		vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset,
-			 int prot);
+			 vm_offset_t *paddr, int prot);
 #endif
 
 extern int	(*vga_sub_configure)(int flags);

@@ -1,7 +1,7 @@
 # Makefile.ia64 -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: src/sys/conf/Makefile.alpha,v 1.76
-# $FreeBSD: src/sys/conf/Makefile.ia64,v 1.53 2002/10/13 07:07:51 marcel Exp $
+# $FreeBSD: src/sys/conf/Makefile.ia64,v 1.56 2003/05/16 21:26:40 marcel Exp $
 #
 # Makefile for FreeBSD
 #
@@ -19,7 +19,7 @@
 GCC3=	you bet
 
 # Which version of config(8) is required.
-%VERSREQ=	500011
+%VERSREQ=	500012
 
 STD8X16FONT?=	iso
 
@@ -31,6 +31,8 @@ S=	../../..
 .endif
 .endif
 .include "$S/conf/kern.pre.mk"
+
+INCLUDES+= -I$S/contrib/ia64/libuwx/src
 
 CFLAGS+= -mconstant-gp
 
@@ -47,9 +49,6 @@ ASM_CFLAGS= -x assembler-with-cpp -Wa,-x -DLOCORE ${CFLAGS}
 %FILES.m
 
 %CLEAN
-
-locore.o: $S/$M/$M/locore.s assym.s
-	${NORMAL_S}
 
 %RULES
 

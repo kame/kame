@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.11 2000/12/08 22:11:08 msmith Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.12 2003/02/25 00:42:39 marcel Exp $ */
 /* $NetBSD: dec_kn8ae.c,v 1.15 1998/02/13 00:12:50 thorpej Exp $ */
 
 /*
@@ -30,8 +30,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "opt_simos.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>

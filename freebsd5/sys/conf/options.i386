@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.183 2002/11/18 06:17:07 jmallett Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.191 2003/04/12 09:40:37 des Exp $
 # Options specific to the i386 platform kernels
 
 MATH_EMULATE		opt_math_emulate.h
@@ -6,6 +6,8 @@ GPL_MATH_EMULATE	opt_math_emulate.h
 DISABLE_PSE		opt_pmap.h
 PMAP_SHPGPERPROC	opt_pmap.h
 DISABLE_PG_G		opt_pmap.h
+LAZY_SWITCH		opt_swtch.h
+SWTCH_OPTIM_STATS	opt_swtch.h
 PPC_PROBE_CHIPSET	opt_ppc.h
 PPC_DEBUG		opt_ppc.h
 MAXMEM
@@ -32,6 +34,9 @@ APIC_IO			opt_global.h
 
 # Change KVM size.  Changes things all over the kernel.
 KVA_PAGES		opt_global.h
+
+# Physical address extensions and support for >4G ram.  As above.
+PAE			opt_global.h
 
 CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h
@@ -63,6 +68,10 @@ CPU_ENABLE_SSE			opt_cpu.h
 CPU_ATHLON_SSE_HACK		opt_cpu.h
 CPU_DISABLE_SSE			opt_cpu.h
 CPU_DISABLE_CMPXCHG		opt_global.h
+
+# Options for the AMD Elan CPU
+ELAN_PPS		opt_cpu.h
+ELAN_XTAL		opt_cpu.h
 
 # The CPU type affects the endian conversion functions all over the kernel.
 I386_CPU		opt_global.h
@@ -100,7 +109,7 @@ VGA_NO_MODE_CHANGE	opt_vga.h
 VGA_SLOW_IOACCESS	opt_vga.h
 VGA_WIDTH90		opt_vga.h
 
-VESA			opt_vesa.h
+VESA
 VESA_DEBUG		opt_vesa.h
 
 PSM_HOOKRESUME		opt_psm.h

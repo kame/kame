@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/ciss.c,v 1.10 2002/10/27 12:27:04 mux Exp $
+ *	$FreeBSD: src/sys/dev/ciss/ciss.c,v 1.21 2003/05/21 07:17:06 ps Exp $
  */
 
 /*
@@ -74,9 +74,7 @@
 #include <sys/kernel.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
 #include <sys/stat.h>
-#include <sys/stdint.h>
 
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
@@ -217,9 +215,11 @@ static d_ioctl_t	ciss_ioctl;
 #define CISS_CDEV_MAJOR  166
 
 static struct cdevsw ciss_cdevsw = {
-    ciss_open, ciss_close, noread, nowrite, ciss_ioctl,
-    nopoll, nommap, nostrategy, "ciss", CISS_CDEV_MAJOR,
-    nodump, nopsize, 0, nokqfilter
+	.d_open =	ciss_open,
+	.d_close =	ciss_close,
+	.d_ioctl =	ciss_ioctl,
+	.d_name =	"ciss",
+	.d_maj =	CISS_CDEV_MAJOR,
 };
 
 /************************************************************************
@@ -242,6 +242,11 @@ static struct
     { 0x0e11, 0x4070, CISS_BOARD_SA5,	"Compaq Smart Array 5300" },
     { 0x0e11, 0x4080, CISS_BOARD_SA5B,	"Compaq Smart Array 5i" },
     { 0x0e11, 0x4082, CISS_BOARD_SA5B,	"Compaq Smart Array 532" },
+    { 0x0e11, 0x4083, CISS_BOARD_SA5B,	"HP Smart Array 5312" },
+    { 0x0e11, 0x409A, CISS_BOARD_SA5,	"HP Smart Array 641" },
+    { 0x0e11, 0x409B, CISS_BOARD_SA5,	"HP Smart Array 642" },
+    { 0x0e11, 0x409C, CISS_BOARD_SA5,	"HP Smart Array 6400" },
+    { 0x0e11, 0x409D, CISS_BOARD_SA5,	"HP Smart Array 6400 EM" },
     { 0, 0, 0, NULL }
 };
 
@@ -765,6 +770,7 @@ ciss_init_requests(struct ciss_softc *sc)
 	cr = &sc->ciss_request[i];
 	cr->cr_sc = sc;
 	cr->cr_tag = i;
+	bus_dmamap_create(sc->ciss_buffer_dmat, 0, &cr->cr_datamap);
 	ciss_enqueue_free(cr);
     }
     return(0);
@@ -1011,6 +1017,67 @@ ciss_init_logical(struct ciss_softc *sc)
     return(error);
 }
 
+static int
+ciss_inquiry_logical(struct ciss_softc *sc, struct ciss_ldrive *ld)
+{
+    struct ciss_request			*cr;
+    struct ciss_command			*cc;
+    struct scsi_inquiry			*inq;
+    int					error;
+    int					command_status;
+    int					lun;
+
+    cr = NULL;
+    lun = ld->cl_address.logical.lun;
+
+    bzero(&ld->cl_geometry, sizeof(ld->cl_geometry));
+
+    if ((error = ciss_get_request(sc, &cr)) != 0)
+	goto out;
+
+    cc = CISS_FIND_COMMAND(cr);
+    cr->cr_data = &ld->cl_geometry;
+    cr->cr_length = sizeof(ld->cl_geometry);
+    cr->cr_flags = CISS_REQ_DATAIN;
+
+    cc->header.address.logical.mode = CISS_HDR_ADDRESS_MODE_LOGICAL;
+    cc->header.address.logical.lun  = lun;
+    cc->cdb.cdb_length = 6;
+    cc->cdb.type = CISS_CDB_TYPE_COMMAND;
+    cc->cdb.attribute = CISS_CDB_ATTRIBUTE_SIMPLE;
+    cc->cdb.direction = CISS_CDB_DIRECTION_READ;
+    cc->cdb.timeout = 30;
+
+    inq = (struct scsi_inquiry *)&(cc->cdb.cdb[0]);
+    inq->opcode = INQUIRY;
+    inq->byte2 = SI_EVPD;
+    inq->page_code = CISS_VPD_LOGICAL_DRIVE_GEOMETRY;
+    inq->length = sizeof(ld->cl_geometry);
+
+    if ((error = ciss_synch_request(cr, 60 * 1000)) != 0) {
+	ciss_printf(sc, "error getting geometry (%d)\n", error);
+	goto out;
+    }
+
+    ciss_report_request(cr, &command_status, NULL);
+    switch(command_status) {
+    case CISS_CMD_STATUS_SUCCESS:
+    case CISS_CMD_STATUS_DATA_UNDERRUN:
+	break;
+    case CISS_CMD_STATUS_DATA_OVERRUN:
+	ciss_printf(sc, "WARNING: Data overrun\n");
+	break;
+    default:
+	ciss_printf(sc, "Error detecting logical drive geometry (%s)\n",
+		    ciss_name_command_status(command_status));
+	break;
+    }
+
+out:
+    if (cr != NULL)
+	ciss_release_request(cr);
+    return(error);
+}
 /************************************************************************
  * Identify a logical drive, initialise state related to it.
  */
@@ -1068,6 +1135,12 @@ ciss_identify_logical(struct ciss_softc *sc, struct ciss_ldrive *ld)
      * Build a CISS BMIC command to get the logical drive status.
      */
     if ((error = ciss_get_ldrive_status(sc, ld)) != 0)
+	goto out;
+
+    /*
+     * Get the logical drive geometry.
+     */
+    if ((error = ciss_inquiry_logical(sc, ld)) != 0)
 	goto out;
 
     /*
@@ -1269,6 +1342,8 @@ ciss_accept_media_complete(struct ciss_request *cr)
 static void
 ciss_free(struct ciss_softc *sc)
 {
+    struct ciss_request *cr;
+
     debug_called(1);
 
     /* we're going away */
@@ -1300,6 +1375,9 @@ ciss_free(struct ciss_softc *sc)
     /* destroy DMA tags */
     if (sc->ciss_parent_dmat)
 	bus_dma_tag_destroy(sc->ciss_parent_dmat);
+
+    while ((cr = ciss_dequeue_free(sc)) != NULL)
+	bus_dmamap_destroy(sc->ciss_buffer_dmat, cr->cr_datamap);
     if (sc->ciss_buffer_dmat)
 	bus_dma_tag_destroy(sc->ciss_buffer_dmat);
 
@@ -1308,7 +1386,7 @@ ciss_free(struct ciss_softc *sc)
 	bus_dmamap_unload(sc->ciss_command_dmat, sc->ciss_command_map);
 	bus_dmamem_free(sc->ciss_command_dmat, sc->ciss_command, sc->ciss_command_map);
     }
-    if (sc->ciss_buffer_dmat)
+    if (sc->ciss_command_dmat)
 	bus_dma_tag_destroy(sc->ciss_command_dmat);
 
     /* disconnect from CAM */
@@ -2067,6 +2145,7 @@ ciss_cam_rescan_all(struct ciss_softc *sc)
 static void
 ciss_cam_rescan_callback(struct cam_periph *periph, union ccb *ccb)
 {
+    xpt_free_path(ccb->ccb_h.path);
     free(ccb, M_TEMP);
 }
 
@@ -2076,11 +2155,19 @@ ciss_cam_rescan_callback(struct cam_periph *periph, union ccb *ccb)
 static void
 ciss_cam_action(struct cam_sim *sim, union ccb *ccb)
 {
+    struct ciss_softc	*sc;
+    struct ccb_scsiio	*csio;
+    int			target;
+
+    sc = cam_sim_softc(sim);
+    csio = (struct ccb_scsiio *)&ccb->csio;
+    target = csio->ccb_h.target_id;
+
     switch (ccb->ccb_h.func_code) {
 
 	/* perform SCSI I/O */
     case XPT_SCSI_IO:
-	if (!ciss_cam_action_io(sim, (struct ccb_scsiio *)&ccb->csio))
+	if (!ciss_cam_action_io(sim, csio))
 	    return;
 	break;
 
@@ -2088,20 +2175,27 @@ ciss_cam_action(struct cam_sim *sim, union ccb *ccb)
     case XPT_CALC_GEOMETRY:
     {
 	struct ccb_calc_geometry	*ccg = &ccb->ccg;
-        u_int32_t			secs_per_cylinder;
+	struct ciss_ldrive		*ld = &sc->ciss_logical[target];
 
 	debug(1, "XPT_CALC_GEOMETRY %d:%d:%d", cam_sim_bus(sim), ccb->ccb_h.target_id, ccb->ccb_h.target_lun);
 
 	/*
-	 * This is the default geometry; hopefully we will have
-	 * successfully talked to the 'disk' and obtained its private
-	 * settings.
+	 * Use the cached geometry settings unless the fault tolerance
+	 * is invalid.
 	 */
-	ccg->heads = 255;
-	ccg->secs_per_track = 32;
-	secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-        ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-        ccb->ccb_h.status = CAM_REQ_CMP;
+	if (ld->cl_geometry.fault_tolerance == 0xFF) {
+	    u_int32_t			secs_per_cylinder;
+
+	    ccg->heads = 255;
+	    ccg->secs_per_track = 32;
+	    secs_per_cylinder = ccg->heads * ccg->secs_per_track;
+	    ccg->cylinders = ccg->volume_size / secs_per_cylinder;
+	} else {
+	    ccg->heads = ld->cl_geometry.heads;
+	    ccg->secs_per_track = ld->cl_geometry.sectors;
+	    ccg->cylinders = ntohs(ld->cl_geometry.cylinders);
+	}
+	ccb->ccb_h.status = CAM_REQ_CMP;
         break;
     }
 

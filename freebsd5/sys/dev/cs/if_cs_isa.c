@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/cs/if_cs_isa.c,v 1.2 2001/02/23 08:08:21 imp Exp $
+ * $FreeBSD: src/sys/dev/cs/if_cs_isa.c,v 1.3 2003/04/15 06:37:22 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -126,4 +126,6 @@ static driver_t cs_isa_driver = {
 
 extern devclass_t cs_devclass;
 
-DRIVER_MODULE(if_cs, isa, cs_isa_driver, cs_devclass, 0, 0);
+DRIVER_MODULE(cs, isa, cs_isa_driver, cs_devclass, 0, 0);
+MODULE_DEPEND(cs, isa, 1, 1, 1);
+MODULE_DEPEND(cs, ether, 1, 1, 1);

@@ -6,7 +6,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -25,18 +25,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_ipc.c,v 1.31 2002/10/11 11:43:08 sobomax Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_ipc.c,v 1.36 2003/05/05 09:22:58 mbr Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/proc.h>
+#include <sys/limits.h>
 #include <sys/msg.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
-
-#include <machine/limits.h>
 
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -260,7 +260,7 @@ linux_ipc_perm_to_ipc64_perm(struct l_ipc_perm *in, struct l_ipc64_perm *out)
 	out->mode = in->mode;
 	out->seq = in->seq;
 }
-    
+
 static int
 linux_msqid_pullup(l_int ver, struct l_msqid_ds *linux_msqid, caddr_t uaddr)
 {
@@ -531,7 +531,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		error = __semctl(td, &bsd_args);
 		if (error)
 			return error;
-		td->td_retval[0] = IXSEQ_TO_IPCID(bsd_args.semid, 
+		td->td_retval[0] = IXSEQ_TO_IPCID(bsd_args.semid,
 							unptr->buf->sem_perm);
 		bsd_to_linux_semid_ds(unptr->buf, &linux_semid);
 		return (linux_semid_pushdown(args->cmd & LINUX_IPC_64,
@@ -545,8 +545,8 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		linux_seminfo.semusz = used_semids;
 		linux_seminfo.semaem = used_sems;
 */
-		error = copyout((caddr_t)&linux_seminfo, (caddr_t)args->arg.buf,
-						sizeof(linux_seminfo) );
+		error = copyout(&linux_seminfo, args->arg.buf,
+		    sizeof(linux_seminfo));
 		if (error)
 			return error;
 		td->td_retval[0] = seminfo.semmni;
@@ -556,7 +556,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 	case LINUX_SETALL:
 		/* FALLTHROUGH */
 	default:
-		uprintf("linux: 'ipc' typ=%d not implemented\n",
+		linux_msg(td, "ipc type %d is not implemented",
 		  args->cmd & ~LINUX_IPC_64);
 		return EINVAL;
 	}
@@ -567,10 +567,10 @@ int
 linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 {
     struct msgsnd_args /* {
-	int     msqid;   
-	void    *msgp;   
-	size_t  msgsz;   
-	int     msgflg; 
+	int     msqid;
+	void    *msgp;
+	size_t  msgsz;
+	int     msgflg;
     } */ bsd_args;
 
     bsd_args.msqid = args->msqid;
@@ -583,13 +583,13 @@ linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 int
 linux_msgrcv(struct thread *td, struct linux_msgrcv_args *args)
 {
-    struct msgrcv_args /* {     
-        int 	msqid;   
-	void	*msgp;   
-	size_t	msgsz;   
-	long	msgtyp; 
-	int	msgflg; 
-    } */ bsd_args; 
+    struct msgrcv_args /* {
+	int	msqid;
+	void	*msgp;
+	size_t	msgsz;
+	long	msgtyp;
+	int	msgflg;
+    } */ bsd_args;
 
     bsd_args.msqid = args->msqid;
     bsd_args.msgp = args->msgp;
@@ -604,7 +604,7 @@ linux_msgget(struct thread *td, struct linux_msgget_args *args)
 {
     struct msgget_args /* {
 	key_t	key;
-        int 	msgflg;
+	int	msgflg;
     } */ bsd_args;
 
     bsd_args.key = args->key;
@@ -616,7 +616,7 @@ int
 linux_msgctl(struct thread *td, struct linux_msgctl_args *args)
 {
     struct msgctl_args /* {
-	int     msqid; 
+	int     msqid;
 	int     cmd;
 	struct	msqid_ds *buf;
     } */ bsd_args;
@@ -665,7 +665,7 @@ linux_shmat(struct thread *td, struct linux_shmat_args *args)
     if ((error = shmat(td, &bsd_args)))
 	return error;
 #ifdef __i386__
-    if ((error = copyout(td->td_retval, (caddr_t)args->raddr, sizeof(l_ulong))))
+    if ((error = copyout(td->td_retval, args->raddr, sizeof(l_ulong))))
 	return error;
     td->td_retval[0] = 0;
 #endif
@@ -704,87 +704,98 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
     struct l_shmid_ds linux_shmid;
 	struct l_shminfo linux_shminfo;
 	struct l_shm_info linux_shm_info;
-    struct shmctl_args /* {
-	int shmid;
-	int cmd;
-	struct shmid_ds *buf;
-    } */ bsd_args;
+	struct shmid_ds bsd_shmid;
+	size_t bufsz;
     int error;
-    caddr_t sg = stackgap_init();
 
     switch (args->cmd & ~LINUX_IPC_64) {
 
-	case LINUX_IPC_INFO:
-	bsd_args.shmid = args->shmid;
-	bsd_args.cmd = IPC_INFO;
-	bsd_args.buf = (struct shmid_ds*)stackgap_alloc(&sg, sizeof(struct shminfo));
-	if ((error = shmctl(td, &bsd_args)))
+	case LINUX_IPC_INFO: {
+	    struct shminfo bsd_shminfo;
+
+	    /* Perform shmctl wanting removed segments lookup */
+	    error = kern_shmctl(td, args->shmid, IPC_INFO,
+	        (void *)&bsd_shminfo, &bufsz, 1);
+	    if (error)
 		return error;
-	bsd_to_linux_shminfo( (struct shminfo *)bsd_args.buf, &linux_shminfo );
-	return (linux_shminfo_pushdown(args->cmd & LINUX_IPC_64,
-	  &linux_shminfo, (caddr_t)args->buf));
+	
+	    bsd_to_linux_shminfo(&bsd_shminfo, &linux_shminfo);
 
-	case LINUX_SHM_INFO:
-	bsd_args.shmid = args->shmid;
-	bsd_args.cmd = SHM_INFO;
-	bsd_args.buf = (struct shmid_ds*)stackgap_alloc(&sg, sizeof(struct shm_info));
-	if ((error = shmctl(td, &bsd_args)))
-	    return error;
-	bsd_to_linux_shm_info( (struct shm_info *)bsd_args.buf, &linux_shm_info );
-	return copyout(&linux_shm_info, (caddr_t)args->buf, sizeof(struct shm_info));
-
-    case LINUX_IPC_STAT:
-	bsd_args.shmid = args->shmid;
-	bsd_args.cmd = IPC_STAT;
-	bsd_args.buf = (struct shmid_ds*)stackgap_alloc(&sg, sizeof(struct shmid_ds));
-	if ((error = shmctl(td, &bsd_args)))
-	    return error;
-	bsd_to_linux_shmid_ds(bsd_args.buf, &linux_shmid);
-	return (linux_shmid_pushdown(args->cmd & LINUX_IPC_64,
-	  &linux_shmid, (caddr_t)args->buf));
-
-	case LINUX_SHM_STAT:
-	bsd_args.shmid = args->shmid;
-	bsd_args.cmd = SHM_STAT;
-	bsd_args.buf = (struct shmid_ds*)stackgap_alloc(&sg, sizeof(struct shmid_ds));
-	if ((error = shmctl(td, &bsd_args))) {
-	    return error;
+	    return (linux_shminfo_pushdown(args->cmd & LINUX_IPC_64,
+	       &linux_shminfo, (caddr_t)args->buf));
 	}
-	bsd_to_linux_shmid_ds(bsd_args.buf, &linux_shmid);
-	return (linux_shmid_pushdown(args->cmd & LINUX_IPC_64,
+
+	case LINUX_SHM_INFO: {
+	    struct shm_info bsd_shm_info;
+
+	    /* Perform shmctl wanting removed segments lookup */
+	    error = kern_shmctl(td, args->shmid, SHM_INFO,
+	        (void *)&bsd_shm_info, &bufsz, 1);
+	    if (error)
+		return error;
+
+	    bsd_to_linux_shm_info(&bsd_shm_info, &linux_shm_info);
+
+	    return copyout(&linux_shm_info, (caddr_t)args->buf,
+	        sizeof(struct l_shm_info));
+	}
+
+	case LINUX_IPC_STAT:
+	    /* Perform shmctl wanting removed segments lookup */
+	    error = kern_shmctl(td, args->shmid, IPC_STAT,
+	        (void *)&bsd_shmid, &bufsz, 1);
+	    if (error)
+		return error;
+		
+	    bsd_to_linux_shmid_ds(&bsd_shmid, &linux_shmid);
+
+	    return (linux_shmid_pushdown(args->cmd & LINUX_IPC_64,
 	  &linux_shmid, (caddr_t)args->buf));
+
+    case LINUX_SHM_STAT:
+	/* Perform shmctl wanting removed segments lookup */
+	error = kern_shmctl(td, args->shmid, IPC_STAT,
+	    (void *)&bsd_shmid, &bufsz, 1);
+	if (error)
+		return error;
+		
+	bsd_to_linux_shmid_ds(&bsd_shmid, &linux_shmid);
+	
+	return (linux_shmid_pushdown(args->cmd & LINUX_IPC_64,
+	   &linux_shmid, (caddr_t)args->buf));
 
     case LINUX_IPC_SET:
 	error = linux_shmid_pullup(args->cmd & LINUX_IPC_64,
 	  &linux_shmid, (caddr_t)args->buf);
-	if (error != 0)
-	    return error;
-	bsd_args.buf = (struct shmid_ds*)stackgap_alloc(&sg, sizeof(struct shmid_ds));
-	linux_to_bsd_shmid_ds(&linux_shmid, bsd_args.buf);
-	bsd_args.shmid = args->shmid;
-	bsd_args.cmd = IPC_SET;
-	return shmctl(td, &bsd_args);
+	if (error)
+    		return error;
 
-    case LINUX_IPC_RMID:
-	bsd_args.shmid = args->shmid;
-	bsd_args.cmd = IPC_RMID;
+	linux_to_bsd_shmid_ds(&linux_shmid, &bsd_shmid);
+
+	/* Perform shmctl wanting removed segments lookup */
+	return kern_shmctl(td, args->shmid, IPC_SET,
+	    (void *)&bsd_shmid, &bufsz, 1);
+
+    case LINUX_IPC_RMID: {
+	void *buf;
+		
 	if (args->buf == NULL)
-	    bsd_args.buf = NULL;
+    		buf = NULL;
 	else {
-	    error = linux_shmid_pullup(args->cmd & LINUX_IPC_64,
-	      &linux_shmid, (caddr_t)args->buf);
-	    if (error != 0)
-		return error;
-	    bsd_args.buf = (struct shmid_ds*)stackgap_alloc(&sg, sizeof(struct shmid_ds));
-	    linux_to_bsd_shmid_ds(&linux_shmid, bsd_args.buf);
+    		error = linux_shmid_pullup(args->cmd & LINUX_IPC_64,
+		    &linux_shmid, (caddr_t)args->buf);
+		if (error)
+			return error;
+		linux_to_bsd_shmid_ds(&linux_shmid, &bsd_shmid);
+		buf = (void *)&bsd_shmid;
 	}
-	return shmctl(td, &bsd_args);
+	return kern_shmctl(td, args->shmid, IPC_RMID, buf, &bufsz, 1);
+    }
 
     case LINUX_SHM_LOCK:
     case LINUX_SHM_UNLOCK:
     default:
-	uprintf("linux: 'ipc' typ=%d not implemented\n",
-	  args->cmd & ~LINUX_IPC_64);
+	linux_msg(td, "ipc typ=%d not implemented", args->cmd & ~LINUX_IPC_64);
 	return EINVAL;
     }
 }

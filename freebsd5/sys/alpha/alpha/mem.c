@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.41 2002/10/11 14:58:27 mike Exp $
+ * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.44 2003/03/25 00:06:59 jake Exp $
  */
 
 /*
@@ -80,19 +80,15 @@ static	d_mmap_t	memmmap;
 
 #define CDEV_MAJOR 2
 static struct cdevsw mem_cdevsw = {
-	/* open */	mmopen,
-	/* close */	mmclose,
-	/* read */	mmrw,
-	/* write */	mmrw,
-	/* ioctl */	mmioctl,
-	/* poll */	(d_poll_t *)seltrue,
-	/* mmap */	memmmap,
-	/* strategy */	nostrategy,
-	/* name */	"mem",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_MEM,
+	.d_open =	mmopen,
+	.d_close =	mmclose,
+	.d_read =	mmrw,
+	.d_write =	mmrw,
+	.d_ioctl =	mmioctl,
+	.d_mmap =	memmmap,
+	.d_name =	"mem",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_MEM,
 };
 
 struct mem_range_softc mem_range_softc;
@@ -222,7 +218,7 @@ kmemphys:
 * instead of going through read/write			*
 \*******************************************************/
 static int
-memmmap(dev_t dev, vm_offset_t offset, int prot)
+memmmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	/*
 	 * /dev/mem is the only one that makes sense through this
@@ -238,7 +234,8 @@ memmmap(dev_t dev, vm_offset_t offset, int prot)
 	 */
 	if ((prot & alpha_pa_access(atop((vm_offset_t)offset))) != prot)
 		return (-1);
-	return (alpha_btop(ALPHA_PHYS_TO_K0SEG(offset)));
+	*paddr = ALPHA_PHYS_TO_K0SEG(offset);
+	return (0);
 }
 
 static int

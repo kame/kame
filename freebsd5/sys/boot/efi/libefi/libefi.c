@@ -24,10 +24,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/boot/efi/libefi/libefi.c,v 1.4 2002/12/10 20:11:20 marcel Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/libefi.c,v 1.6 2003/04/03 21:36:29 obrien Exp $");
 
 #include <efi.h>
 #include <efilib.h>
@@ -120,7 +118,7 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	 * If the string is already in Unicode-16, we make a copy so that
 	 * we know we can always modify the string.
 	 */
-	if (img->LoadOptionsSize) {
+	if (img->LoadOptionsSize > 0 && img->LoadOptions != NULL) {
 		if (img->LoadOptionsSize == strlen(img->LoadOptions) + 1) {
 			args = malloc(img->LoadOptionsSize << 1);
 			for (argc = 0; argc < img->LoadOptionsSize; argc++)

@@ -14,12 +14,10 @@
  */
 
 /*
- * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.52.2.2 2003/01/14 07:06:40 imp Exp $
+ * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.63 2003/04/04 16:35:14 phk Exp $
  */
 
 #include <sys/param.h>
-#include <sys/reboot.h>
-#include <sys/diskslice.h>
 #include <sys/disklabel.h>
 #include <sys/diskmbr.h>
 #include <sys/dirent.h>
@@ -111,7 +109,7 @@ static struct dsk {
 } dsk;
 static char cmd[512];
 static char kname[1024];
-static uint32_t opts = 0;
+static uint32_t opts;
 static struct bootinfo bootinfo;
 static uint8_t ioctrl = IO_KEYBOARD;
 

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.24 2002/05/24 05:21:36 peter Exp $
+ * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.28 2003/05/27 04:59:56 scottl Exp $
  */
 
 #include <sys/param.h>
@@ -54,8 +54,6 @@
 
 #define ccb_ecb_ptr spriv_ptr0
 #define ccb_ahb_ptr spriv_ptr1
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 #define ahb_inb(ahb, port)				\
 	bus_space_read_1((ahb)->tag, (ahb)->bsh, port)
@@ -294,28 +292,37 @@ ahbattach(device_t dev)
 	 */
 	/* DMA tag for mapping buffers into device visible space. */
 	/* XXX Should be a child of the EISA bus dma tag */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/AHB_NSEG,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/BUS_DMA_ALLOCNOW,
-			       &ahb->buffer_dmat) != 0)
+	if (bus_dma_tag_create(	/* parent	*/ NULL,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR_32BIT,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ MAXBSIZE,
+				/* nsegments	*/ AHB_NSEG,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ BUS_DMA_ALLOCNOW,
+				&ahb->buffer_dmat) != 0)
 		goto error_exit;
 
 	ahb->init_level++;
 
 	/* DMA tag for our ccb structures and ha inquiry data */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/1, /*boundary*/0,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       (AHB_NECB * sizeof(struct ecb))
-			       + sizeof(*ahb->ha_inq_data),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &ahb->ecb_dmat) != 0)
+	if (bus_dma_tag_create(	/* parent	*/ NULL,
+				/* alignment	*/ 1,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ BUS_SPACE_MAXADDR_32BIT,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ (AHB_NECB *
+						    sizeof(struct ecb))
+						    + sizeof(*ahb->ha_inq_data),
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ 0,
+				&ahb->ecb_dmat) != 0)
 		goto error_exit;
 
 	ahb->init_level++;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.4 2002/08/10 19:55:00 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.11 2003/03/26 17:50:11 scottl Exp $
  */
 
 /*
@@ -46,10 +46,8 @@
 #include <cam/scsi/scsi_all.h>
 #include <cam/scsi/scsi_message.h>
 
-#include <dev/aac/aac_compat.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
 #include <sys/disk.h>
 
 #include <machine/md_var.h>
@@ -62,11 +60,10 @@
 #include <dev/aac/aacreg.h>
 #include <dev/aac/aac_ioctl.h>
 #include <dev/aac/aacvar.h>
-#include <dev/aac/aac_cam.h>
 
 struct aac_cam {
 	device_t		dev;
-	struct aac_cam_inf	*inf;
+	struct aac_sim		*inf;
 	struct cam_sim		*sim;
 	struct cam_path		*path;
 };
@@ -105,7 +102,6 @@ MALLOC_DEFINE(M_AACCAM, "aaccam", "AAC CAM info");
 static int
 aac_cam_probe(device_t dev)
 {
-
 	debug_called(2);
 
 	return (0);
@@ -114,7 +110,16 @@ aac_cam_probe(device_t dev)
 static int
 aac_cam_detach(device_t dev)
 {
+	struct aac_cam *camsc;
+	debug_called(2);
 
+	camsc = (struct aac_cam *)device_get_softc(dev);
+
+	xpt_async(AC_LOST_DEVICE, camsc->path, NULL);
+	xpt_free_path(camsc->path);
+	xpt_bus_deregister(cam_sim_path(camsc->sim));
+	cam_sim_free(camsc->sim, /*free_devq*/TRUE);
+	
 	return (0);
 }
 
@@ -128,12 +133,12 @@ aac_cam_attach(device_t dev)
 	struct cam_sim *sim;
 	struct cam_path *path;
 	struct aac_cam *camsc;
-	struct aac_cam_inf *inf;
+	struct aac_sim *inf;
 
 	debug_called(1);
 
 	camsc = (struct aac_cam *)device_get_softc(dev);
-	inf = (struct aac_cam_inf *)device_get_ivars(dev);
+	inf = (struct aac_sim *)device_get_ivars(dev);
 	camsc->inf = inf;
 
 	devq = cam_simq_alloc(inf->TargetsPerBus);
@@ -220,7 +225,9 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->version_num = 1;
 		cpi->hba_inquiry = PI_WIDE_16;
 		cpi->target_sprt = 0;
-		cpi->hba_misc = 0;
+
+		/* Resetting via the passthrough causes problems. */
+		cpi->hba_misc = PIM_NOBUSRESET;
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = camsc->inf->TargetsPerBus;
 		cpi->max_lun = 8;	/* Per the controller spec */
@@ -252,7 +259,7 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 		xpt_done(ccb);
 		return;
 	case XPT_RESET_BUS:
-		if (!(sc->quirks & AAC_QUIRK_CAM_NORESET)) {
+		if (!(sc->flags & AAC_FLAGS_CAM_NORESET)) {
 			ccb->ccb_h.status = aac_cam_reset_bus(sim, ccb);
 		} else {
 			ccb->ccb_h.status = CAM_REQ_CMP;
@@ -277,7 +284,9 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 
 	/* Async ops that require communcation with the controller */
 
+	AAC_LOCK_ACQUIRE(&sc->aac_io_lock);
 	if (aac_alloc_command(sc, &cm)) {
+		AAC_LOCK_RELEASE(&sc->aac_io_lock);
 		xpt_freeze_simq(sim, 1);
 		ccb->ccb_h.status = CAM_REQUEUE_REQ;
 		xpt_done(ccb);
@@ -357,7 +366,7 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 		break;
 	}
 	case XPT_RESET_DEV:
-		if (!(sc->quirks & AAC_QUIRK_CAM_NORESET)) {
+		if (!(sc->flags & AAC_FLAGS_CAM_NORESET)) {
 			srb->function = AAC_SRB_FUNC_RESET_DEVICE;
 			break;
 		} else {
@@ -392,6 +401,8 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 
 	aac_enqueue_ready(cm);
 	aac_startio(cm->cm_sc);
+
+	AAC_LOCK_RELEASE(&sc->aac_io_lock);
 
 	return;
 }
@@ -465,7 +476,7 @@ aac_cam_complete(struct aac_command *cm)
 				 */
 				if ((device == T_DIRECT) ||
 				    (device == T_PROCESSOR) ||
-				    (sc->quirks & AAC_QUIRK_CAM_PASSONLY))
+				    (sc->flags & AAC_FLAGS_CAM_PASSONLY))
 					ccb->csio.data_ptr[0] =
 					    ((device & 0xe0) | T_NODEVICE);
 			}
@@ -514,7 +525,7 @@ aac_cam_reset_bus(struct cam_sim *sim, union ccb *ccb)
 	e = aac_sync_fib(sc, ContainerCommand, 0, fib,
 	    sizeof(struct aac_vmioctl));
 	if (e) {
-		device_printf(sc->aac_dev, "Error 0x%x sending passthrough\n",
+		device_printf(sc->aac_dev,"Error %d sending ResetBus command\n",
 		    e);
 		aac_release_sync_fib(sc);
 		return (CAM_REQ_ABORTED);
@@ -557,18 +568,21 @@ aac_cam_get_tran_settings(struct aac_softc *sc, struct ccb_trans_settings *cts, 
 	error = aac_sync_fib(sc, ContainerCommand, 0, fib,
 	    sizeof(struct aac_vmioctl));
 	if (error) {
-		device_printf(sc->aac_dev, "Error %d sending VMIoctl command\n",
-		    error);
+		device_printf(sc->aac_dev, "Error %d sending GetDeviceProbeInfo"
+		              " command\n", error);
 		aac_release_sync_fib(sc);
 		return (CAM_REQ_INVALID);
 	}
 
 	vmi_resp = (struct aac_vmi_devinfo_resp *)&fib->data[0];
 	if (vmi_resp->Status != ST_OK) {
-		device_printf(sc->aac_dev, "VM_Ioctl returned %d\n",
-		    vmi_resp->Status);
+		/*
+		 * The only reason why this command will return an error is
+		 * if the requested device doesn't exist.
+		 */
+		debug(1, "GetDeviceProbeInfo returned %d\n", vmi_resp->Status);
 		aac_release_sync_fib(sc);
-		return (CAM_REQ_CMP_ERR);
+		return (CAM_DEV_NOT_THERE);
 	}
 
 	cts->bus_width = ((vmi_resp->Inquiry7 & 0x60) >> 5);

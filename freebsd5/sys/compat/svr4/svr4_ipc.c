@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/compat/svr4/svr4_ipc.c,v 1.9.2.1 2002/12/19 09:40:07 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_ipc.c,v 1.12 2002/12/14 01:56:24 alfred Exp $
  *	Derived from:
  *	$NetBSD: svr4_ipc.c,v 1.7 1998/10/19 22:43:00 tron Exp $	*/
 

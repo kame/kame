@@ -23,11 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/ofw/libofw/devicename.c,v 1.12 2002/12/02 01:46:22 jake Exp $
+ * $FreeBSD: src/sys/boot/ofw/libofw/devicename.c,v 1.13 2003/04/16 21:09:41 phk Exp $
  */
 
 #include <stand.h>
-#include <sys/disklabel.h>
 #include "libofw.h"
 
 static int ofw_parsedev(struct ofw_devdesc **, const char *, const char **);

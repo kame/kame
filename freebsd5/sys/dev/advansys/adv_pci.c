@@ -57,7 +57,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adv_pci.c,v 1.17 2002/10/09 08:50:26 peter Exp $
+ * $FreeBSD: src/sys/dev/advansys/adv_pci.c,v 1.18 2003/03/29 09:46:10 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -185,16 +185,19 @@ adv_pci_attach(device_t dev)
 
 	/* Allocate a dmatag for our transfer DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
-				   /*boundary*/0,
-				   /*lowaddr*/ADV_PCI_MAX_DMA_ADDR,
-				   /*highaddr*/BUS_SPACE_MAXADDR,
-				   /*filter*/NULL, /*filterarg*/NULL,
-				   /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
-				   /*nsegments*/~0,
-				   /*maxsegsz*/ADV_PCI_MAX_DMA_COUNT,
-				   /*flags*/0,
-				   &adv->parent_dmat);
+	error = bus_dma_tag_create(
+			/* parent	*/ NULL,
+			/* alignment	*/ 1,
+			/* boundary	*/ 0,
+			/* lowaddr	*/ ADV_PCI_MAX_DMA_ADDR,
+			/* highaddr	*/ BUS_SPACE_MAXADDR,
+			/* filter	*/ NULL,
+			/* filterarg	*/ NULL,
+			/* maxsize	*/ BUS_SPACE_MAXSIZE_32BIT,
+			/* nsegments	*/ ~0,
+			/* maxsegsz	*/ ADV_PCI_MAX_DMA_COUNT,
+			/* flags	*/ 0,
+			&adv->parent_dmat);
  
 	if (error != 0) {
 		printf("%s: Could not allocate DMA tag - error %d\n",
@@ -208,13 +211,19 @@ adv_pci_attach(device_t dev)
 
 	if (overrun_buf == NULL) {
 		/* Need to allocate our overrun buffer */
-		if (bus_dma_tag_create(adv->parent_dmat,
-				       /*alignment*/8, /*boundary*/0,
-				       ADV_PCI_MAX_DMA_ADDR, BUS_SPACE_MAXADDR,
-				       /*filter*/NULL, /*filterarg*/NULL,
-				       ADV_OVERRUN_BSIZE, /*nsegments*/1,
-				       BUS_SPACE_MAXSIZE_32BIT, /*flags*/0,
-				       &overrun_dmat) != 0) {
+		if (bus_dma_tag_create(
+				/* parent	*/ adv->parent_dmat,
+				/* alignment	*/ 8,
+				/* boundary	*/ 0,
+				/* lowaddr	*/ ADV_PCI_MAX_DMA_ADDR,
+				/* highaddr	*/ BUS_SPACE_MAXADDR,
+				/* filter	*/ NULL,
+				/* filterarg	*/ NULL,
+				/* maxsize	*/ ADV_OVERRUN_BSIZE,
+				/* nsegments	*/ 1,
+				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
+				/* flags	*/ 0,
+				&overrun_dmat) != 0) {
 			bus_dma_tag_destroy(adv->parent_dmat);
 			adv_free(adv);
 			bus_release_resource(dev, SYS_RES_IOPORT, rid, iores);

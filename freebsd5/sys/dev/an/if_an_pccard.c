@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.14 2002/11/14 23:54:49 sam Exp $
  */
 
 /*
@@ -39,6 +37,9 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.20 2003/04/15 06:37:19 mdodd Exp $");
 
 #include "opt_inet.h"
 
@@ -69,11 +70,6 @@
 #include <dev/pccard/pccardvar.h>
 #include <dev/pccard/pccarddevs.h>
 #include "card_if.h"
-
-#ifndef lint
-static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.14 2002/11/14 23:54:49 sam Exp $";
-#endif
 
 #include <dev/an/if_aironet_ieee.h>
 #include <dev/an/if_anreg.h>
@@ -109,7 +105,9 @@ static driver_t an_pccard_driver = {
 
 static devclass_t an_pccard_devclass;
 
-DRIVER_MODULE(if_an, pccard, an_pccard_driver, an_pccard_devclass, 0, 0);
+DRIVER_MODULE(an, pccard, an_pccard_driver, an_pccard_devclass, 0, 0);
+MODULE_DEPEND(an, wlan, 1, 1, 1);
+MODULE_DEPEND(an, pccard, 1, 1, 1);
 
 static const struct pccard_product an_pccard_products[] = {
 	PCMCIA_CARD(AIRONET, PC4800, 0),
@@ -125,7 +123,8 @@ an_pccard_match(device_t dev)
 
 	if ((pp = pccard_product_lookup(dev, an_pccard_products,
 	    sizeof(an_pccard_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->pp_name);
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
 		return (0);
 	}
 	return (ENXIO);
@@ -178,19 +177,26 @@ an_pccard_attach(device_t dev)
 	an_alloc_port(dev, sc->port_rid, AN_IOSIZ);
 	an_alloc_irq(dev, sc->irq_rid, 0);
 
-	error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET,
-			       an_intr, sc, &sc->irq_handle);
-	if (error) {
-		printf("setup intr failed %d \n", error);
-		an_release_resources(dev);
-		return (error);
-	}
-
 	sc->an_bhandle = rman_get_bushandle(sc->port_res);
 	sc->an_btag = rman_get_bustag(sc->port_res);
 	sc->an_dev = dev;
 
 	error = an_attach(sc, device_get_unit(dev), flags);
+	if (error) {
+		goto fail;
+	}
+	
+	/*
+	 * Must setup the interrupt after the an_attach to prevent racing.
+	 */
+	error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET,
+			       an_intr, sc, &sc->irq_handle);
+	if (error) {
+		goto fail;
+	}
+
+fail:
+	if (error)
+		an_release_resources(dev);
 	return (error);
 }
-

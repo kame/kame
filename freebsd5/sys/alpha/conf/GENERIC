@@ -18,13 +18,12 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.154.2.1 2002/12/18 08:11:24 scottl Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.160.2.2 2003/05/31 15:18:41 scottl Exp $
 
 machine		alpha
 cpu		EV4
 cpu		EV5
 ident		GENERIC
-maxusers	0
 
 #To statically compile in device wiring instead of /boot/device.hints
 #hints		"GENERIC.hints"
@@ -46,6 +45,7 @@ options 	DEC_KN8AE		# AlphaServer 8200/8400 (Turbolaser)
 options 	DEC_KN300		# AlphaServer 4100 (Rawhide),
 					# AlphaServer 1200 (Tincup)
 
+options 	SCHED_4BSD		#4BSD scheduler
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
 options 	FFS			#Berkeley Fast Filesystem
@@ -95,6 +95,7 @@ device		atapist		# ATAPI tape drives
 # SCSI Controllers
 device		ahc		# AHA2940 and onboard AIC7xxx devices
 device		isp		# Qlogic family
+device		ispfw		# Firmware module for Qlogic host adapters
 device		mpt		# LSI-Logic MPT-Fusion
 #device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets + those of `ncr')
@@ -184,5 +185,11 @@ device		umass		# Disks/Mass storage - Requires scbus and da0
 device		ums		# Mouse
 # USB Ethernet
 device		aue		# ADMtek USB ethernet
+device		axe		# ASIX Electronics USB ethernet
 device		cue		# CATC USB ethernet
 device		kue		# Kawasaki LSI USB ethernet
+
+# FireWire support
+device		firewire	# FireWire bus code
+device		sbp		# SCSI over FireWire (Requires scbus and da)
+device		fwe		# Ethernet over FireWire (non-standard!)

@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/boot/arc/loader/conf.c,v 1.3 2000/05/01 17:41:21 bp Exp $
+ * $FreeBSD: src/sys/boot/arc/loader/conf.c,v 1.4 2002/12/19 19:34:58 jake Exp $
  * From	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
  */
 
@@ -55,7 +55,7 @@ struct devsw *devsw[] = {
 
 struct fs_ops *file_system[] = {
     &ufs_fsops,
-    &zipfs_fsops,
+    &gzipfs_fsops,
     NULL
 };
 

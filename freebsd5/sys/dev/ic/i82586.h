@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ic/i82586.h,v 1.10 2001/07/02 05:29:57 imp Exp $
+ * $FreeBSD: src/sys/dev/ic/i82586.h,v 1.11 2003/03/28 06:27:07 mdodd Exp $
  */
 
 /*
@@ -323,6 +323,7 @@ Alignvol(volatile void *ptr) {
 	return (volatile void *)l;
 }
 
+#if 0
 static __inline void
 ie_ack(volatile struct ie_sys_ctl_block *scb,
 				  u_int mask, int unit,
@@ -330,3 +331,4 @@ ie_ack(volatile struct ie_sys_ctl_block *scb,
 	scb->ie_command = scb->ie_status & mask;
 	(*ca)(unit);
 }
+#endif

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.17 2002/06/19 12:41:05 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.20 2003/03/08 08:01:28 phk Exp $
  */
 
 /* ATAPI Rewriteable drive Capabilities and Mechanical Status Page */
@@ -74,7 +74,5 @@ struct afd_softc {
     struct bio_queue_head	queue;		/* queue of i/o requests */
     struct afd_cappage		cap;		/* capabilities page info */
     struct disk			disk;		/* virtual drives */
-    struct devstat		stats;
-    dev_t			dev;		/* device place holder */
 };
 

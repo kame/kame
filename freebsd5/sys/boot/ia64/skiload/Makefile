@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/ia64/skiload/Makefile,v 1.9 2002/05/10 09:26:32 obrien Exp $
+# $FreeBSD: src/sys/boot/ia64/skiload/Makefile,v 1.10 2003/02/26 06:18:52 obrien Exp $
 
 .PATH: ${.CURDIR}/../common
 
@@ -9,20 +9,18 @@ BINDIR?=	/boot
 
 SRCS+=		main.c conf.c
 
+CFLAGS+=	-ffreestanding
+
+.if !defined(NOFORTH)
 # Enable BootForth
 BOOT_FORTH=	yes
-CFLAGS+=	-ffreestanding
-CFLAGS+=	-g
-CFLAGS+=	-I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/ia64
-.if BOOT_FORTH
 CFLAGS+=	-DBOOT_FORTH
+CFLAGS+=	-I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/${MACHINE_ARCH}
 .if exists(${.OBJDIR}/../../ficl/libficl.a)
 LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
 .else
 LIBFICL=	${.CURDIR}/../../ficl/libficl.a
 .endif
-.else
-LIBFICL=
 .endif
 
 # where to get libstand from

@@ -35,7 +35,7 @@
  *
  *	from: NetBSD: if_hme_sbus.c,v 1.9 2001/11/13 06:58:17 lukem Exp
  *
- * $FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.2 2002/03/23 19:37:11 tmm Exp $
+ * $FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.4 2003/04/15 06:37:24 mdodd Exp $
  */
 
 /*
@@ -92,11 +92,19 @@ struct hme_sbus_softc {
 
 static int hme_sbus_probe(device_t);
 static int hme_sbus_attach(device_t);
+static int hme_sbus_detach(device_t);
+static int hme_sbus_suspend(device_t);
+static int hme_sbus_resume(device_t);
 
 static device_method_t hme_sbus_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		hme_sbus_probe),
 	DEVMETHOD(device_attach,	hme_sbus_attach),
+	DEVMETHOD(device_detach,	hme_sbus_detach),
+	DEVMETHOD(device_suspend,	hme_sbus_suspend),
+	DEVMETHOD(device_resume,	hme_sbus_resume),
+	/* Can just use the suspend method here. */
+	DEVMETHOD(device_shutdown,	hme_sbus_suspend),
 
 	/* bus interface */
 	DEVMETHOD(bus_print_child,	bus_generic_print_child),
@@ -116,7 +124,8 @@ static driver_t hme_sbus_driver = {
 	sizeof(struct hme_sbus_softc)
 };
 
-DRIVER_MODULE(if_hme, sbus, hme_sbus_driver, hme_devclass, 0, 0);
+DRIVER_MODULE(hme, sbus, hme_sbus_driver, hme_devclass, 0, 0);
+MODULE_DEPEND(hme, ether, 1, 1, 1);
 
 static int
 hme_sbus_probe(device_t dev)
@@ -249,6 +258,7 @@ hme_sbus_attach(device_t dev)
 	if ((error = bus_setup_intr(dev, hsc->hsc_ires, INTR_TYPE_NET, hme_intr,
 	     sc, &hsc->hsc_ih)) != 0) {
 		device_printf(dev, "couldn't establish interrupt\n");
+		hme_detach(sc);
 		goto fail_ires;
 	}
 	return (0);
@@ -273,4 +283,48 @@ fail_seb_res:
 	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_seb_rid,
 	    hsc->hsc_seb_res);
 	return (ENXIO);
+}
+
+static int
+hme_sbus_detach(device_t dev)
+{
+	struct hme_sbus_softc *hsc = device_get_softc(dev);
+	struct hme_softc *sc = &hsc->hsc_hme;
+
+	hme_detach(sc);
+
+	bus_teardown_intr(dev, hsc->hsc_ires, hsc->hsc_ih);
+	if (hsc->hsc_mif_res != NULL) {
+		bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_mif_rid,
+		    hsc->hsc_mif_res);
+	}
+	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_mac_rid,
+	    hsc->hsc_mac_res);
+	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_erx_rid,
+	    hsc->hsc_erx_res);
+	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_etx_rid,
+	    hsc->hsc_etx_res);
+	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_seb_rid,
+	    hsc->hsc_seb_res);
+	return (0);
+}
+
+static int
+hme_sbus_suspend(device_t dev)
+{
+	struct hme_sbus_softc *hsc = device_get_softc(dev);
+	struct hme_softc *sc = &hsc->hsc_hme;
+
+	hme_suspend(sc);
+	return (0);
+}
+
+static int
+hme_sbus_resume(device_t dev)
+{
+	struct hme_sbus_softc *hsc = device_get_softc(dev);
+	struct hme_softc *sc = &hsc->hsc_hme;
+
+	hme_resume(sc);
+	return (0);
 }
