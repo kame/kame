@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.90 2002/06/21 06:51:45 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.91 2002/06/21 06:58:34 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -49,7 +49,6 @@
 #include <net/if_var.h>
 #endif
 #include <net/if_dl.h>
-#include <net/route.h>
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
@@ -103,12 +102,10 @@ static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
 static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
 				  ssize_t, struct dhcp6_optinfo *));
-static void client6_sleep __P((void));
 void client6_hup __P((int));
 static struct dhcp6_event *find_event_withid __P((struct dhcp6_if *,
 						  u_int32_t));
 static int sa2plen __P((struct sockaddr_in6 *));
-static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 
 struct dhcp6_timer *client6_timo __P((void *));
 void client6_send_renew __P((struct dhcp6_event *));
@@ -378,6 +375,12 @@ client6_init()
 	ifp->outsock = outsock;
 
 	prefix6_init();
+
+	if (signal(SIGHUP, client6_hup) == SIG_ERR) {
+		dprintf(LOG_WARNING, "%s" "failed to set signal: %s",
+			FNAME, strerror(errno));
+		/* XXX: assert? */
+	}
 }
 
 static void
@@ -548,149 +551,6 @@ sa2plen(sa6)
 	}
 
 	return(masklen);
-}
-
-static void
-client6_sleep()
-{
-	char msg[2048], *lim;
-	struct rt_msghdr *rtm;
-	int n, ret;
-	fd_set r;
-	struct sockaddr *sa, *dst, *mask, *rti_info[RTAX_MAX];
-
-	dprintf(LOG_DEBUG, "%s" "start sleeping", FNAME);
-
-	if (signal(SIGHUP, client6_hup) == SIG_ERR) {
-		dprintf(LOG_WARNING, "%s" "failed to set signal: %s",
-			FNAME, strerror(errno));
-		/* XXX: assert? */
-	}
-
-  again:
-	signaled = 0;
-	FD_ZERO(&r);
-	FD_SET(rtsock, &r);
-
-	ret = select(rtsock + 1, &r, NULL, NULL, NULL);
-	if (ret == -1) { 
-		if (errno == EINTR && signaled) {
-			dprintf(LOG_INFO, "%s" "signal from a user received."
-				FNAME);
-			goto activate;
-		}
-		dprintf(LOG_WARNING, "%s" "select was interrupted by an "
-			"unexpected signal", FNAME);
-		goto again;	/* XXX: or assert? */
-	}
-
-	n = read(rtsock, msg, sizeof(msg));
-	if (n < 0) {
-		dprintf(LOG_WARNING, "%s" "read failed: %s", FNAME,
-			strerror(errno));
-		goto again;
-	}
-	dprintf(LOG_DEBUG, "%s" "received a routing message (len = %d)",
-		FNAME, n);
-
-	lim = msg + n;
-	for (rtm = (struct rt_msghdr *)msg;
-	     rtm < (struct rt_msghdr *)lim;
-	     rtm = (struct rt_msghdr *)(((char *)rtm) + rtm->rtm_msglen)) {
-		/* just for safety */
-		if (!rtm->rtm_msglen) {
-			dprintf(LOG_WARNING, "%s" "rtm_msglen is 0 "
-				"(msgbuf=%p lim=%p rtm=%p)",
-				FNAME, msg, lim, rtm);
-			break;
-		}
-		dprintf(LOG_DEBUG, "%s" "message type=%d", FNAME,
-			rtm->rtm_type);
-
-		if (rtm->rtm_type != RTM_ADD)
-			continue;
-
-		sa = (struct sockaddr *)(rtm + 1);
-		get_rtaddrs(rtm->rtm_addrs, sa, rti_info);
-		if ((dst = rti_info[RTAX_DST]) == NULL ||
-		    dst->sa_family != AF_INET6 ||
-		    (mask = rti_info[RTAX_NETMASK]) == NULL)
-			continue;
-
-		if (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)dst)->sin6_addr) &&
-		    sa2plen((struct sockaddr_in6 *)mask) == 0) {
-			struct sockaddr *gw;
-
-			dprintf(LOG_INFO, "%s" "default router has changed. "
-				"activate DHCPv6.", FNAME);
-			if ((gw = rti_info[RTAX_GATEWAY]) != NULL) {
-				switch (gw->sa_family) {
-				case AF_INET6:
-					dprintf(LOG_INFO, "%s"
-						"new gateway: %s", FNAME,
-						addr2str(gw));
-					break;
-				case AF_LINK:
-				{
-					struct sockaddr_dl *sdl;
-					char ifnambuf[IF_NAMESIZE];
-
-					sdl = (struct sockaddr_dl *)gw;
-					if (if_indextoname(sdl->sdl_index,
-							   ifnambuf) != NULL) {
-						dprintf(LOG_INFO, "%s"
-							"new default to %s",
-							FNAME, ifnambuf);
-					} else {
-						dprintf(LOG_INFO, "%s"
-							"new default to ?",
-							FNAME);
-					}
-					break;
-				}
-				}
-			}
-
-			goto activate;
-		}
-		else {
-			dprintf(LOG_DEBUG, "%s"
-				"rtmsg add dst = %s, mask = %s", FNAME,
-				addr2str(dst), addr2str(mask));
-		}
-	}
-
-	goto again;
-
-  activate:
-	/* stop the signal handler and wake up */
-	if (signal(SIGHUP, SIG_IGN) == SIG_ERR)
-		dprintf(LOG_WARNING, "%s" "failed to reset signal: %s",
-			FNAME, strerror(errno));
-	dprintf(LOG_DEBUG, "%s" "activated", FNAME);
-	return;
-}
-
-/* used by client6_sleep */
-#define ROUNDUP(a, size) \
-	(((a) & ((size)-1)) ? (1 + ((a) | ((size)-1))) : (a))
-
-#define NEXT_SA(ap) (ap) = (struct sockaddr *) \
-	((caddr_t)(ap) + ((ap)->sa_len ? ROUNDUP((ap)->sa_len,\
-						 sizeof(u_long)) :\
-			  			 sizeof(u_long)))
-static void
-get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
-{
-	int i;
-	
-	for (i = 0; i < RTAX_MAX; i++) {
-		if (addrs & (1 << i)) {
-			rti_info[i] = sa;
-			NEXT_SA(sa);
-		} else
-			rti_info[i] = NULL;
-	}
 }
 
 static void
