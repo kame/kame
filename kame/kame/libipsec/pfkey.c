@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.35 2000/10/03 15:40:21 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.36 2000/12/01 10:13:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1153,6 +1153,7 @@ pfkey_send_x2(so, type, satype, mode, src, dst, spi)
 
 	/* create new sadb_msg to reply. */
 	len = sizeof(struct sadb_msg)
+		+ sizeof(struct sadb_x_sa2)
 		+ sizeof(struct sadb_sa)
 		+ sizeof(struct sadb_address)
 		+ PFKEY_ALIGN8(src->sa_len)
@@ -1172,6 +1173,11 @@ pfkey_send_x2(so, type, satype, mode, src, dst, spi)
 		return -1;
 	}
 	p = pfkey_setsadbsa(p, ep, spi, 0, 0, 0, 0);
+	if (!p) {
+		free(newmsg);
+		return -1;
+	}
+	p = pfkey_setsadbxsa2(p, ep, mode, 0);
 	if (!p) {
 		free(newmsg);
 		return -1;
