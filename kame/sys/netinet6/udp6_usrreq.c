@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.61 2000/10/19 01:05:20 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.62 2000/10/19 01:11:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,6 +570,7 @@ udp6_ctlinput(cmd, sa, d)
 			uhp = &uh;
 		} else
 			uhp = (struct udphdr *)(mtod(m, caddr_t) + off);
+
 #ifdef __NetBSD__
 		if (cmd == PRC_MSGSIZE) {
 			/*
@@ -606,6 +607,7 @@ udp6_ctlinput(cmd, sa, d)
 			return;
 		}
 #endif
+
 		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6,
 					uhp->uh_dport, &s,
 					uhp->uh_sport, cmd, notify);
