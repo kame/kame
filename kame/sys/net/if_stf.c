@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.80 2002/07/23 08:49:38 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.81 2002/08/05 23:36:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -158,6 +158,8 @@
 #define IN6_IS_ADDR_6TO4(x)	(ntohs((x)->s6_addr16[0]) == 0x2002)
 #define GET_V4(x)	((struct in_addr *)(&(x)->s6_addr16[1]))
 
+#define STF_MTU		(1500 - 20)
+
 struct stf_softc {
 	struct ifnet	sc_if;	   /* common area */
 	union {
@@ -278,7 +280,7 @@ stf_clone_create(ifc, unit)
 		return (ENOMEM);
 	}
 
-	sc->sc_if.if_mtu    = IPV6_MMTU;
+	sc->sc_if.if_mtu    = STF_MTU;
 	sc->sc_if.if_flags  = 0;
 	sc->sc_if.if_ioctl  = stf_ioctl;
 	sc->sc_if.if_output = stf_output;
@@ -405,7 +407,7 @@ stfattach(dummy)
 		sc->encap_cookie = p;
 
 		sc->sc_if.if_addrlen = 0;
-		sc->sc_if.if_mtu    = IPV6_MMTU;
+		sc->sc_if.if_mtu    = STF_MTU;
 		sc->sc_if.if_flags  = 0;
 		sc->sc_if.if_ioctl  = stf_ioctl;
 		sc->sc_if.if_output = stf_output;
@@ -1075,7 +1077,7 @@ stf_rtrequest(cmd, rt, sa)
 {
 
 	if (rt)
-		rt->rt_rmx.rmx_mtu = IPV6_MMTU;
+		rt->rt_rmx.rmx_mtu = STF_MTU;
 }
 
 static int
