@@ -1178,6 +1178,13 @@ in_addmulti(ap, ifp)
 #endif /* IGMPV3 */
 		igmp_joingroup(inm);
 	}
+#ifdef IGMPV3
+	if (newhead != NULL)
+		/* Each ias is linked from new curhead, so only newhead (not
+		 * ias_list) is freed */
+		FREE(newhead, M_MSFILTER);
+#endif
+
 	splx(s);
 	return (inm);
 }
