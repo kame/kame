@@ -77,7 +77,6 @@ struct rp_addr {
 LIST_HEAD(rr_prhead, rr_prefix);
 
 extern struct rr_prhead rr_prefix;
-extern int ip6_rr_prune;
 
 void in6_rr_timer __P((void *));
 int delete_each_prefix  __P((struct socket *so, struct rr_prefix *rpp,
