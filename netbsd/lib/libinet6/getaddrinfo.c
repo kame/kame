@@ -1,4 +1,4 @@
-/*	$NetBSD: getaddrinfo.c,v 1.34 2000/02/22 05:47:15 itojun Exp $	*/
+/*	$NetBSD: getaddrinfo.c,v 1.37 2000/04/03 01:12:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -296,6 +296,7 @@ do { \
 	/* external reference: error, and label bad */ \
 	error = (err); \
 	goto bad; \
+	/*NOTREACHED*/ \
 } while (/*CONSTCOND*/0)
 
 #define MATCH_FAMILY(x, y, w) \
@@ -703,7 +704,6 @@ explore_numeric(pai, hostname, servname, res)
 	struct addrinfo sentinel;
 	int error;
 	char pton[PTON_MAX];
-	int flags;
 
 	*res = NULL;
 	sentinel.ai_next = NULL;
@@ -716,7 +716,6 @@ explore_numeric(pai, hostname, servname, res)
 		return 0;
 
 	afd = find_afd(pai->ai_family);
-	flags = pai->ai_flags;
 
 	switch (afd->a_af) {
 #if 0 /*X/Open spec*/
@@ -821,7 +820,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 		for (cur = *res; cur; cur = cur->ai_next) {
 			if (cur->ai_family != AF_INET6)
 				continue;
-			sin6 = (struct sockaddr_in6 *)cur->ai_addr;
+			sin6 = (struct sockaddr_in6 *)(void *)cur->ai_addr;
 			if ((scopeid = ip6_str2scopeid(scope, sin6)) == -1) {
 				free(hostname2);
 				return(EAI_NONAME); /* XXX: is return OK? */
@@ -866,12 +865,12 @@ get_ai(pai, afd, addr)
 		return NULL;
 
 	memcpy(ai, pai, sizeof(struct addrinfo));
-	ai->ai_addr = (struct sockaddr *)(ai + 1);
+	ai->ai_addr = (struct sockaddr *)(void *)(ai + 1);
 	memset(ai->ai_addr, 0, (size_t)afd->a_socklen);
 	ai->ai_addr->sa_len = afd->a_socklen;
 	ai->ai_addrlen = afd->a_socklen;
 	ai->ai_addr->sa_family = ai->ai_family = afd->a_af;
-	p = (char *)(ai->ai_addr);
+	p = (char *)(void *)(ai->ai_addr);
 	memcpy(p + afd->a_off, addr, (size_t)afd->a_addrlen);
 	return ai;
 }
@@ -883,6 +882,7 @@ get_portmatch(ai, servname)
 {
 
 	/* get_port does not touch first argument. when matchonly == 1. */
+	/* LINTED const cast */
 	return get_port((struct addrinfo *)ai, servname, 1);
 }
 
@@ -950,11 +950,13 @@ get_port(ai, servname, matchonly)
 	if (!matchonly) {
 		switch (ai->ai_family) {
 		case AF_INET:
-			((struct sockaddr_in *)ai->ai_addr)->sin_port = port;
+			((struct sockaddr_in *)(void *)
+			    ai->ai_addr)->sin_port = port;
 			break;
 #ifdef INET6
 		case AF_INET6:
-			((struct sockaddr_in6 *)ai->ai_addr)->sin6_port = port;
+			((struct sockaddr_in6 *)(void *)
+			    ai->ai_addr)->sin6_port = port;
 			break;
 #endif
 		}
@@ -1065,14 +1067,12 @@ getanswer(answer, anslen, qname, qtype, pai)
 	int type, class, buflen, ancount, qdcount;
 	int haveanswer, had_error;
 	char tbuf[MAXDNAME];
-	const char *tname;
 	int (*name_ok) __P((const char *));
 	char hostbuf[8*1024];
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
 
-	tname = qname;
 	canonname = NULL;
 	eom = answer->buf + anslen;
 	switch (qtype) {
@@ -1214,7 +1214,7 @@ getanswer(answer, anslen, qname, qtype, pai)
 				cp += n;
 				continue;
 			}
-			cur->ai_next = get_ai(&ai, afd, cp);
+			cur->ai_next = get_ai(&ai, afd, (const char *)cp);
 			if (cur->ai_next == NULL)
 				had_error++;
 			while (cur && cur->ai_next)
@@ -1253,7 +1253,6 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	const struct addrinfo *pai;
 	struct addrinfo sentinel, *cur;
 	struct res_target q, q2;
-	int ancount;
 
 	name = va_arg(ap, char *);
 	pai = va_arg(ap, const struct addrinfo *);
@@ -1291,7 +1290,7 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	default:
 		return NS_UNAVAIL;
 	}
-	if ((ancount = res_searchN(name, &q)) < 0)
+	if (res_searchN(name, &q) < 0)
 		return NS_NOTFOUND;
 	ai = getanswer(&buf, q.n, q.name, q.type, pai);
 	if (ai) {
@@ -1451,13 +1450,13 @@ _yphostent(line, pai)
 	const char *addr, *canonname;
 	char *nextline;
 	char *cp;
-	int more;
 
 	addr = canonname = NULL;
 
-nextline:
-	more = 0;
+	memset(&sentinel, 0, sizeof(sentinel));
+	cur = &sentinel;
 
+nextline:
 	/* terminate line */
 	cp = strchr(p, '\n');
 	if (cp) {
