@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.27 2000/12/01 05:32:08 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.28 2001/01/06 07:03:00 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #include <netinet6/ah.h>
 #include <netkey/key.h>
 #endif /* IPSEC */

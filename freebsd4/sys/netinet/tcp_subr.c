@@ -92,9 +92,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#ifdef INET6
-#include <netinet6/ipsec6.h>
-#endif
 #endif /*IPSEC*/
 
 #include <machine/in_cksum.h>

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.149 2001/01/23 04:43:20 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.150 2001/01/23 08:59:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,9 +131,6 @@ extern int ipsec_esp_trans_default_level;
 extern int ipsec_esp_network_default_level;
 #else
 #include <netinet6/ipsec.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
-#include <netinet6/ipsec6.h>
-#endif
 #include <netkey/key.h>
 #endif
 #endif /* IPSEC */

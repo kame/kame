@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.47 2001/01/23 04:42:29 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.48 2001/01/23 08:59:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,9 +84,6 @@
 #endif
 
 #include <netinet6/ipsec.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#include <netinet6/ipsec6.h>
-#endif
 #include <netinet6/ah.h>
 #include <netkey/key.h>
 #include <netkey/keydb.h>

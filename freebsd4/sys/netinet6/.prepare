@@ -12,8 +12,6 @@ exclude tcp6_usrreq.c
 exclude udp6.h
 conflict in6_pcb.c
 conflict in6_pcb.h
-conflict ipsec.h
-conflict ipsec6.h
 conflict raw_ip6.c
 conflict tcp6_var.h
 conflict udp6_usrreq.c

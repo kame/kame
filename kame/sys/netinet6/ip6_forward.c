@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.60 2001/01/11 11:00:18 sumikawa Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.61 2001/01/23 08:59:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,9 +72,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
-#include <netinet6/ipsec6.h>
-#endif
 #include <netkey/key.h>
 #endif /* IPSEC */
 
