@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.15 2001/07/11 09:13:27 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.16 2001/07/31 13:36:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -986,7 +986,7 @@ grp_prefix_config()
 	for (pl = grp_prefix; pl; pl = pl->next) {
 		if (!IN6_IS_ADDR_MULTICAST(&pl->attru.prefix.paddr)) {
 			log(LOG_WARNING, 0,
-			    "Config error: %s is not a mulicast address(ignored)",
+			    "Config error: %s is not a multicast address(ignored)",
 			    inet6_fmt(&pl->attru.prefix.paddr));
 			continue;
 		}
