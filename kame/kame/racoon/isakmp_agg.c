@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.16 2000/02/09 05:32:39 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.17 2000/02/16 05:55:44 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -256,8 +256,17 @@ agg_i2recv(iph1, msg)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CR:
+			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Certificate Request.\n");
+			break;
+		case ISAKMP_NPTYPE_CERT:
+			if (oakley_savecert(iph1, pa->ptr) < 0)
+				goto end;
+			break;
+		case ISAKMP_NPTYPE_SIG:
+			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -275,12 +284,7 @@ agg_i2recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL
-	 || iph1->id_p == NULL || iph1->pl_hash == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"few isakmp message received.\n");
-		goto end;
-	}
+	/* XXX to be checked each authentication method. */
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(sa_tmp, iph1) < 0) {
@@ -406,6 +410,13 @@ agg_i2send(iph1, msg)
 		if (iph1->cert != NULL)
 			tlen += sizeof(*gen) + iph1->cert->l;
 
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+
 		/* set isakmp header */
 		p = set_isakmp_header(iph1->sendbuf, iph1, iph1->cert != NULL
 							? ISAKMP_NPTYPE_CERT
@@ -419,11 +430,11 @@ agg_i2send(iph1, msg)
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 		break;
+#endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;
 		break;
-#endif
 	}
 
 #ifdef HAVE_PRINT_ISAKMP_C
@@ -535,6 +546,7 @@ agg_r1recv(iph1, msg)
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
+			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Certificate Request.\n");
 			break;
@@ -549,12 +561,7 @@ agg_r1recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL
-	 || iph1->id_p == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"few isakmp message received.\n");
-		goto end;
-	}
+	/* XXX to be checked each authentication method. */
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(sa_tmp, iph1) < 0) {
@@ -852,6 +859,14 @@ agg_r2recv(iph1, msg0)
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			break;
+		case ISAKMP_NPTYPE_CERT:
+			if (oakley_savecert(iph1, pa->ptr) < 0)
+				goto end;
+			break;
+		case ISAKMP_NPTYPE_SIG:
+			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
+				goto end;
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
