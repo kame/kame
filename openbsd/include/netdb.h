@@ -207,11 +207,11 @@ struct	protoent {
 #define EAI_NONAME	-2	/* name or service is not known */
 #define EAI_AGAIN	-3	/* temporary failure in name resolution */
 #define EAI_FAIL	-4	/* non-recoverable failure in name resolution */
-#define EAI_NODATA	-5	/* no address associated with name */
+/* #define EAI_NODATA	-5	(obsoleted) */
 #define EAI_FAMILY	-6	/* ai_family not supported */
 #define EAI_SOCKTYPE	-7	/* ai_socktype not supported */
 #define EAI_SERVICE	-8	/* service not supported for ai_socktype */
-#define EAI_ADDRFAMILY	-9	/* address family for name not supported */
+/* #define EAI_ADDRFAMILY	(obsoleted) */
 #define EAI_MEMORY	-10	/* memory allocation failure */
 #define EAI_SYSTEM	-11	/* system error (code indicated in errno) */
 #define EAI_BADHINTS	-12	/* invalid value for hints */
