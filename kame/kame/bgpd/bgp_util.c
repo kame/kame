@@ -862,9 +862,15 @@ find_apeer_by_addr(struct in6_addr *addr)
 
   while(bnp) {
     llhackaddr = bnp->rp_laddr;
-    if (bnp->rp_ife)
-      SET_IN6_LINKLOCAL_IFINDEX(&llhackaddr,
-				bnp->rp_ife->ifi_ifn->if_index);
+    if (!IN6_IS_ADDR_UNSPECIFIED(&llhackaddr)) {
+      if (bnp->rp_ife)
+	SET_IN6_LINKLOCAL_IFINDEX(&llhackaddr,
+				  bnp->rp_ife->ifi_ifn->if_index);
+      else if (IN6_IS_ADDR_LINKLOCAL(&bnp->rp_addr.sin6_addr) &&
+	       bnp->rp_addr.sin6_scope_id) {
+	SET_IN6_LINKLOCAL_IFINDEX(&llhackaddr, bnp->rp_addr.sin6_scope_id);
+      }
+    }
     if (!(bnp->rp_mode & BGPO_PASSIVE) &&
 	(IN6_ARE_ADDR_EQUAL(&bnp->rp_gaddr, addr) ||
 	 (!IN6_IS_ADDR_UNSPECIFIED(&llhackaddr) &&

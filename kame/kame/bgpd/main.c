@@ -375,7 +375,14 @@ main_listen_accept()
 	if ((bnp->rp_ife = find_if_by_index(pktinfo->ipi6_ifindex)) == NULL)
 	  fatalx("<main_listen_accept>: find_if_by_index: Unknown I/F");
 
-      free(cmsgp);		/* XXX: ugly, but important */
+	IFLOG(LOG_BGPINPUT)
+	  syslog(LOG_DEBUG,
+		 "<%s>: accepted a BGP connection from %s to %s on %s",
+		 __FUNCTION__, ip6str2(&fromaddr),
+		 ip6str(&pktinfo->ipi6_addr, 0),
+		 bnp->rp_ife->ifi_ifn->if_name);
+
+	free(cmsgp);		/* XXX: ugly, but important */
 #else  /* !ADVANCEDAPI */
       if ((bnp->rp_ife = find_if_by_addr(&bnp->rp_myaddr.sin6_addr)) == NULL)
 	fatalx("<main_listen_accept>: find_if_by_addr Unknown I/F");
