@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.4 2005/03/01 17:34:01 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.5 2005/03/01 17:38:01 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -229,20 +229,13 @@ main (argc, argv)
 		 * no interfaces are specified by users, babymdd uses all the
 		 * available interfaces 
 		 */
-		struct ifaddrs *ifa, *ifap;
-
-		if (getifaddrs(&ifap) != 0) {
-			syslog(LOG_ERR, "getifaddrs failed: %s\n", 
-				strerror(errno));
-			exit(-1);
-		}
-
-		for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-			ifinfo = init_if(ifa->ifa_name);
+		char ifname[IFNAMSIZ];
+		while ((ifname = if_indextoname(++argc, NULL)) != NULL) {
+			ifinfo = init_if(ifname);
 			if (ifinfo)
 				ifinfo->priority = priority++;
+
 		}
-		freeifaddrs(ifap);
 
 	} else {
 		while (argc--) {
