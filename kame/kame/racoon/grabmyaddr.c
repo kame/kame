@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.27 2001/08/16 14:37:28 itojun Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.28 2001/12/12 15:29:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -593,3 +593,32 @@ initmyaddr()
 	return 0;
 }
 
+/* select the socket to be sent */
+/* should implement other method. */
+int
+getsockmyaddr(my)
+	struct sockaddr *my;
+{
+	struct myaddrs *p, *lastresort = NULL;
+
+	for (p = lcconf->myaddrs; p; p = p->next) {
+		if (p->addr == NULL)
+			continue;
+		if (my->sa_family == p->addr->sa_family)
+			lastresort = p;
+		if (my->sa_len == p->addr->sa_len
+		 && memcmp(my, p->addr, my->sa_len) == 0) {
+			break;
+		}
+	}
+	if (!p)
+		p = lastresort;
+	if (!p) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no socket matches address family %d\n",
+			my->sa_family);
+		return -1;
+	}
+
+	return p->sock;
+}

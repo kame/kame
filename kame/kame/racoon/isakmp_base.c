@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.47 2001/12/11 20:33:41 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.48 2001/12/12 15:29:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,7 +153,8 @@ base_i1send(iph1, msg)
 
 	/* send the packet, add to the schedule to resend */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
-	isakmp_ph1resend_stub(iph1);
+	if (isakmp_ph1resend(iph1) == -1)
+		goto end;
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
@@ -414,7 +415,15 @@ base_i2send(iph1, msg)
 
 	/* send the packet, add to the schedule to resend */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
-	isakmp_ph1resend_stub(iph1);
+	if (isakmp_ph1resend(iph1) == -1)
+		goto end;
+
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
 
 	iph1->status = PHASE1ST_MSG2SENT;
 
@@ -752,7 +761,15 @@ base_r1send(iph1, msg)
 
 	/* send the packet, add to the schedule to resend */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
-	isakmp_ph1resend_stub(iph1);
+	if (isakmp_ph1resend(iph1) == -1)
+		goto end;
+
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
@@ -1022,6 +1039,13 @@ base_r2send(iph1, msg)
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
+
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_skeyid_dae(iph1) < 0)
 		goto end;
@@ -1042,4 +1066,3 @@ end:
 		vfree(vid);
 	return error;
 }
-

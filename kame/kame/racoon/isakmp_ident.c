@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.61 2001/12/11 20:33:41 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.62 2001/12/12 15:29:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,16 +141,10 @@ ident_i1send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	if (isakmp_ph1resend(iph1) == -1)
 		goto end;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
-	}
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
@@ -306,15 +300,16 @@ ident_i2send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send HDR;KE;NONCE to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	if (isakmp_ph1resend(iph1) == -1)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
 	}
 
 	iph1->status = PHASE1ST_MSG2SENT;
@@ -437,9 +432,9 @@ end:
  * 	rev: HDR*, HASH_I
  */
 int
-ident_i3send(iph1, msg)
+ident_i3send(iph1, msg0)
 	struct ph1handle *iph1;
-	vchar_t *msg;
+	vchar_t *msg0;
 {
 	int error = -1;
 	int dohash = 1;
@@ -500,15 +495,16 @@ ident_i3send(iph1, msg)
 	if (iph1->sendbuf == NULL)
 		goto end;
 
-	/* send HDR;ID;HASH to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	if (isakmp_ph1resend(iph1) == -1)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg0) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
 	}
 
 	/* see handler.h about IV synchronization. */
@@ -871,15 +867,16 @@ ident_r1send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	if (isakmp_ph1resend(iph1) == -1)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
 	}
 
 	iph1->status = PHASE1ST_MSG1SENT;
@@ -1041,15 +1038,16 @@ ident_r2send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send HDR;KE;NONCE to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	if (isakmp_ph1resend(iph1) == -1)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
 	}
 
 	/* compute sharing secret of DH */
@@ -1066,13 +1064,6 @@ ident_r2send(iph1, msg)
 		goto end;
 	if (oakley_newiv(iph1) < 0)
 		goto end;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
-	}
 
 	iph1->status = PHASE1ST_MSG2SENT;
 
@@ -1301,11 +1292,10 @@ end:
  * 	rev: HDR*, HASH_R
  */
 int
-ident_r3send(iph1, msg0)
+ident_r3send(iph1, msg)
 	struct ph1handle *iph1;
-	vchar_t *msg0;
+	vchar_t *msg;
 {
-	vchar_t *msg = NULL;
 	int error = -1;
 	int dohash = 1;
 #ifdef HAVE_GSSAPI
@@ -1349,16 +1339,16 @@ ident_r3send(iph1, msg0)
 	if (iph1->sendbuf == NULL)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
-	}
-
 	/* send HDR;ID;HASH to responder */
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
+
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph1->remote, iph1->local, iph1->sendbuf, msg) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
 
 	/* see handler.h about IV synchronization. */
 	memcpy(iph1->ivm->ive->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
@@ -1368,8 +1358,6 @@ ident_r3send(iph1, msg0)
 	error = 0;
 
 end:
-	if (msg != NULL)
-		vfree(msg);
 
 	return error;
 }
@@ -1707,4 +1695,3 @@ end:
 
 	return buf;
 }
-

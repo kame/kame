@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.168 2001/12/11 20:33:41 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.169 2001/12/12 15:29:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,6 +246,16 @@ isakmp_handler(so_isakmp)
 
 	/* XXX: I don't know how to check isakmp half connection attack. */
 
+	/* simply reply if the packet was processed. */
+	if (check_recvdpkt((struct sockaddr *)&remote,
+			(struct sockaddr *)&local, buf)) {
+		plog(LLV_NOTIFY, LOCATION, NULL,
+			"the packet is retransmited by %s.\n",
+			saddr2str((struct sockaddr *)&remote));
+		error = 0;
+		goto end;
+	}
+
 	/* isakmp main routine */
 	if (isakmp_main(buf, (struct sockaddr *)&remote,
 			(struct sockaddr *)&local) != 0) goto end;
@@ -422,13 +432,6 @@ isakmp_main(msg, remote, local)
 			return -1;
 		}
 
-		/* check a packet retransmited. */
-		if (check_recvedpkt(msg, iph1->rlist)) {
-			plog(LLV_DEBUG, LOCATION, iph1->remote,
-				"the packet retransmited by peer.\n");
-			return -1;
-		}
-
 		/* call main process of phase 1 */
 		if (ph1_main(iph1, msg) < 0) {
 			plog(LLV_ERROR, LOCATION, iph1->remote,
@@ -508,13 +511,6 @@ isakmp_main(msg, remote, local)
 			/*NOTREACHED*/
 		}
 
-		/* check a packet retransmited. */
-		if (check_recvedpkt(msg, iph2->rlist)) {
-			plog(LLV_DEBUG, LOCATION, remote,
-				"the packet retransmited by peer.\n");
-			return -1;
-		}
-
 		/* commit bit. */
 		/* XXX
 		 * we keep to set commit bit during negotiation.
@@ -575,13 +571,6 @@ ph1_main(iph1, msg)
 	if (iph1->status == PHASE1ST_ESTABLISHED)
 		return 0;
 
-	/* add the message to received-list before processing it */
-	if (add_recvedpkt(msg, &iph1->rlist)) {
-		plog(LLV_ERROR, LOCATION, iph1->remote,
-		    "failed to manage a received packet.\n");
-		return -1;
-	}
-
 #ifdef ENABLE_STATS
 	gettimeofday(&start, NULL);
 #endif
@@ -623,12 +612,8 @@ ph1_main(iph1, msg)
 	iph1->sendbuf = NULL;
 
 	/* turn off schedule */
-	if (iph1->scr == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"nothing scheduled.\n"); 
-		return -1;
-	}
-	SCHED_KILL(iph1->scr);
+	if (iph1->scr)
+		SCHED_KILL(iph1->scr);
 
 	/* send */
 	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
@@ -703,13 +688,6 @@ quick_main(iph2, msg)
 	 || iph2->status == PHASE2ST_GETSPISENT)
 		return 0;
 
-	/* add the message to received-list before processing it */
-	if (add_recvedpkt(msg, &iph2->rlist)) {
-		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
-		    "failed to manage a received packet.\n");
-		return -1;
-	}
-
 #ifdef ENABLE_STATS
 	gettimeofday(&start, NULL);
 #endif
@@ -748,12 +726,8 @@ quick_main(iph2, msg)
 	iph2->sendbuf = NULL;
 
 	/* turn off schedule */
-	if (iph2->scr == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"no buffer found as sendbuf\n"); 
-		return -1;
-	}
-	SCHED_KILL(iph2->scr);
+	if (iph2->scr)
+		SCHED_KILL(iph2->scr);
 
 	/* send */
 	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
@@ -772,6 +746,7 @@ quick_main(iph2, msg)
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
 #endif
+
 	return 0;
 }
 
@@ -946,12 +921,6 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 		timedelta(&start, &end));
 #endif
 
-	if (add_recvedpkt(msg, &iph1->rlist)) {
-		plog(LLV_ERROR, LOCATION, remote,
-			"failed to manage a received packet.\n");
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -1120,12 +1089,6 @@ isakmp_ph2begin_r(iph1, msg)
 		timedelta(&start, &end));
 #endif
 
-	if (add_recvedpkt(msg, &iph2->rlist)) {
-		plog(LLV_ERROR , LOCATION, iph2->ph1->remote,
-			"failed to manage a received packet.\n");
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -1242,6 +1205,7 @@ isakmp_init()
 	initph1tree();
 	initph2tree();
 	initctdtree();
+	init_recvdpkt();
 
 	srandom(time(0));
 
@@ -1431,41 +1395,22 @@ isakmp_close()
 }
 
 int
-isakmp_send(iph1, buf)
+isakmp_send(iph1, sbuf)
 	struct ph1handle *iph1;
-	vchar_t *buf;
+	vchar_t *sbuf;
 {
-	struct sockaddr *sa;
 	int len = 0;
-	struct myaddrs *p, *lastresort = NULL;
+	int s;
 
-	sa = iph1->local;
-
-	/* send to responder */
-	for (p = lcconf->myaddrs; p; p = p->next) {
-		if (p->addr == NULL)
-			continue;
-		if (sa->sa_family == p->addr->sa_family)
-			lastresort = p;
-		if (sa->sa_len == p->addr->sa_len
-		 && memcmp(sa, p->addr, sa->sa_len) == 0) {
-			break;
-		}
-	}
-	if (!p)
-		p = lastresort;
-	if (!p) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"no socket matches address family %d\n",
-			sa->sa_family);
+	/* select the socket to be sent */
+	s = getsockmyaddr(iph1->local);
+	if (s == -1)
 		return -1;
-	}
 
-	len = sendfromto(p->sock, buf->v, buf->l,
+	len = sendfromto(s, sbuf->v, sbuf->l,
 			iph1->local, iph1->remote, lcconf->count_persend);
 	if (len == -1) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"sendfromto failed\n");
+		plog(LLV_ERROR, LOCATION, NULL, "sendfromto failed\n");
 		return -1;
 	}
 
@@ -1477,10 +1422,10 @@ void
 isakmp_ph1resend_stub(p)
 	void *p;
 {
-	isakmp_ph1resend((struct ph1handle *)p);
+	(void)isakmp_ph1resend((struct ph1handle *)p);
 }
 
-void
+int
 isakmp_ph1resend(iph1)
 	struct ph1handle *iph1;
 {
@@ -1491,11 +1436,11 @@ isakmp_ph1resend(iph1)
 
 		remph1(iph1);
 		delph1(iph1);
-		return;
+		return -1;
 	}
 
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
-		return;
+		return -1;
 
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"resend phase1 packet %s\n",
@@ -1505,6 +1450,8 @@ isakmp_ph1resend(iph1)
 
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 		isakmp_ph1resend_stub, iph1);
+
+	return 0;
 }
 
 /* called from scheduler */
@@ -1513,10 +1460,10 @@ isakmp_ph2resend_stub(p)
 	void *p;
 {
 
-	isakmp_ph2resend((struct ph2handle *)p);
+	(void)isakmp_ph2resend((struct ph2handle *)p);
 }
 
-void
+int
 isakmp_ph2resend(iph2)
 	struct ph2handle *iph2;
 {
@@ -1527,11 +1474,11 @@ isakmp_ph2resend(iph2)
 		unbindph12(iph2);
 		remph2(iph2);
 		delph2(iph2);
-		return;
+		return -1;
 	}
 
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
-		return;
+		return -1;
 
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"resend phase2 packet %s\n",
@@ -1541,6 +1488,8 @@ isakmp_ph2resend(iph2)
 
 	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
 		isakmp_ph2resend_stub, iph2);
+
+	return 0;
 }
 
 /* called from scheduler */

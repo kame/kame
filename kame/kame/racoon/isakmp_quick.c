@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.88 2001/12/11 20:33:41 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.89 2001/12/12 15:29:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -279,13 +279,10 @@ quick_i1send(iph2, msg)
 	if (iph2->sendbuf == NULL)
 		goto end;
 
-	/* send HDR*;HASH(1);SA;Nr to responder */
-	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
-		goto end;
-
 	/* send the packet, add to the schedule to resend */
 	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-	isakmp_ph2resend_stub(iph2);
+	if (isakmp_ph2resend(iph2) == -1)
+		goto end;
 
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_MSG1SENT;
@@ -603,11 +600,25 @@ quick_i2send(iph2, msg0)
 	if (iph2->sendbuf == NULL)
 		goto end;
 
-	/* send HDR*;HASH(3) */
-	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
-		goto end;
+	/* if there is commit bit, need resending */
+	if (ISSET(iph2->flags, ISAKMP_FLAG_C)) {
+		/* send the packet, add to the schedule to resend */
+		iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
+		if (isakmp_ph2resend(iph2) == -1)
+			goto end;
+	} else {
+		/* send the packet */
+		if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
+			goto end;
+	}
 
-	/* XXX: How resend ? */
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph2->ph1->remote, iph2->ph1->local,
+			iph2->sendbuf, msg0) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
 
 	/* compute both of KEYMATs */
 	if (oakley_compute_keymat(iph2, INITIATOR) < 0)
@@ -1068,6 +1079,12 @@ quick_r1recv(iph2, msg0)
 		goto end;
 	}
 
+	/*
+	 * save the packet from the initiator in order to resend the
+	 * responder's first packet against this packet.
+	 */
+	iph2->msg1 = vdup(msg0);
+
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_STATUS2;
 
@@ -1133,7 +1150,7 @@ end:
 int
 quick_r2send(iph2, msg)
 	struct ph2handle *iph2;
-	vchar_t *msg;	/* to be zero */
+	vchar_t *msg;
 {
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
@@ -1300,13 +1317,17 @@ quick_r2send(iph2, msg)
 	if (iph2->sendbuf == NULL)
 		goto end;
 
-	/* send HDR*;HASH(1);SA;Nr to responder */
-	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
-		goto end;
-
 	/* send the packet, add to the schedule to resend */
 	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-	isakmp_ph2resend_stub(iph2);
+	if (isakmp_ph2resend(iph2) == -1)
+		goto end;
+
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph2->ph1->remote, iph2->ph1->local, iph2->sendbuf, iph2->msg1) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
 
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_MSG1SENT;
@@ -1520,11 +1541,16 @@ quick_r3send(iph2, msg0)
 	if (iph2->sendbuf == NULL)
 		goto end;
 
-	/* send HDR*;HASH(3) */
+	/* send the packet */
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
 		goto end;
 
-	/* XXX: How resend ? */
+	/* the sending message is added to the received-list. */
+	if (add_recvdpkt(iph2->ph1->remote, iph2->ph1->local, iph2->sendbuf, msg0) == -1) {
+		plog(LLV_ERROR , LOCATION, NULL,
+			"failed to add a response packet to the tree.\n");
+		goto end;
+	}
 
 	iph2->status = PHASE2ST_COMMIT;
 
