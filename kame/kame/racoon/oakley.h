@@ -1,4 +1,4 @@
-/*	$KAME: oakley.h,v 1.13 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: oakley.h,v 1.14 2000/10/03 21:38:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.13 2000/09/13 04:50:27 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.14 2000/10/03 21:38:21 itojun Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -40,10 +40,15 @@
 #define   OAKLEY_ATTR_ENC_ALG_RC5		4
 #define   OAKLEY_ATTR_ENC_ALG_3DES		5
 #define   OAKLEY_ATTR_ENC_ALG_CAST		6
+#define   OAKLEY_ATTR_ENC_ALG_RIJNDAEL		7
+#define   OAKLEY_ATTR_ENC_ALG_AES		7
 #define OAKLEY_ATTR_HASH_ALG		2 /* B */
 #define   OAKLEY_ATTR_HASH_ALG_MD5		1
 #define   OAKLEY_ATTR_HASH_ALG_SHA		2
 #define   OAKLEY_ATTR_HASH_ALG_TIGER		3
+#define   OAKLEY_ATTR_HASH_ALG_SHA2_256		4
+#define   OAKLEY_ATTR_HASH_ALG_SHA2_384		5
+#define   OAKLEY_ATTR_HASH_ALG_SHA2_512		6
 #define OAKLEY_ATTR_AUTH_METHOD		3 /* B */
 #define   OAKLEY_ATTR_AUTH_METHOD_PSKEY		1
 #define   OAKLEY_ATTR_AUTH_METHOD_DSSSIG	2

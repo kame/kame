@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.27 2000/09/29 20:58:02 itojun Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.28 2000/10/03 21:38:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.27 2000/09/29 20:58:02 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.28 2000/10/03 21:38:21 itojun Exp $ */
 
 /* refered to RFC2407 */
 
@@ -50,6 +50,9 @@
 #define   IPSECDOI_AH_MD5                              2
 #define   IPSECDOI_AH_SHA                              3
 #define   IPSECDOI_AH_DES                              4
+#define   IPSECDOI_AH_SHA2_256                         5
+#define   IPSECDOI_AH_SHA2_384                         6
+#define   IPSECDOI_AH_SHA2_512                         7
 
 /* 4.4.1 IPSEC Security Protocol Identifiers */
 #define IPSECDOI_PROTO_IPSEC_ESP                     3
@@ -65,13 +68,13 @@
 #define   IPSECDOI_ESP_DES_IV32                        9
 #define   IPSECDOI_ESP_RC4                            10
 #define   IPSECDOI_ESP_NULL                           11
+#define   IPSECDOI_ESP_RIJNDAEL				12
+#define   IPSECDOI_ESP_AES				12
 #if 1
   /* draft-ietf-ipsec-ciph-aes-cbc-00.txt */
-#define   IPSECDOI_ESP_RIJNDAEL				251
 #define   IPSECDOI_ESP_TWOFISH				253
 #else
   /* SSH uses these value for now */
-#define   IPSECDOI_ESP_RIJNDAEL				254
 #define   IPSECDOI_ESP_TWOFISH				250
 #endif
 
