@@ -940,12 +940,20 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		pfsync_setmtu(sc, sc->sc_if.if_mtu);
 
 		if (imo->imo_num_memberships > 0) {
+#ifdef IGMPV3
+			int error;
+			in_delmulti(imo->imo_membership[--imo->imo_num_memberships], 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
 			in_delmulti(imo->imo_membership[--imo->imo_num_memberships]);
+#endif
 			imo->imo_multicast_ifp = NULL;
 		}
 
 		if (sc->sc_sync_ifp) {
 			struct in_addr addr;
+#ifdef IGMPV3
+			int error;
+#endif
 
 #ifdef __FreeBSD__
 			PF_UNLOCK();		/* addmulti mallocs w/ WAITOK */
@@ -953,8 +961,14 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #else
 			addr.s_addr = INADDR_PFSYNC_GROUP;
 #endif
+#ifdef IGMPV3
 			if ((imo->imo_membership[0] =
-			    in_addmulti(&addr, sc->sc_sync_ifp)) == NULL) {
+			    in_addmulti(&addr, sc->sc_sync_ifp, 0, NULL, MCAST_EXCLUDE, 0, &error)) == NULL)
+#else
+			if ((imo->imo_membership[0] =
+			    in_addmulti(&addr, sc->sc_sync_ifp)) == NULL)
+#endif
+			{
 				splx(s);
 				return (ENOBUFS);
 			}

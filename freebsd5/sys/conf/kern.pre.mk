@@ -72,7 +72,7 @@ CFLAGS+= ${INCLUDES} -D_KERNEL -include opt_global.h
 CFLAGS+= -fno-common -finline-limit=${INLINE_LIMIT}
 CFLAGS+= --param inline-unit-growth=100
 CFLAGS+= --param large-function-growth=1000
-WERROR?= -Werror
+#WERROR?= -Werror
 .endif
 
 # XXX LOCORE means "don't declare C stuff" not "for locore.s".

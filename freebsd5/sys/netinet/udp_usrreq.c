@@ -376,8 +376,10 @@ udp_input(m, off)
 			 * Receive multicast data which fits MSF condition.
 			 */
 			if (match_msf4_per_socket(inp, &ip->ip_src,
-			    &ip->ip_dst) == 0)
-				goto docontinue;
+			    &ip->ip_dst) == 0) {
+				INP_UNLOCK(inp);
+				continue;
+			}
 #endif
 
 			if (last != NULL) {

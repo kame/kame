@@ -184,7 +184,7 @@ static int addrlen = sizeof(struct in_addr);
 	ip->ip_tos = 0xc0; \
 	ip->ip_off = 0; \
 	ip->ip_p = IPPROTO_IGMP; \
-	ip->ip_src = zeroin_addr; \
+	ip->ip_src.s_addr = INADDR_ANY; \
 	ip->ip_dst.s_addr = htonl(INADDR_NEW_ALLRTRS_GROUP); \
 	igmp_rhdr = (struct igmp_report_hdr *)((char *)ip + buflen); \
 	igmp_rhdr->igmp_type = IGMP_V3_MEMBERSHIP_REPORT; \
@@ -572,7 +572,7 @@ igmpv2_query:
 		*/
 		mtx_lock(&igmp_mtx);
 		if (igmpalways_v3 == 0 &&
-		    igmp->igmp_group.s_addr == zeroin_addr.s_addr)
+		    igmp->igmp_group.s_addr == INADDR_ANY)
 			igmp_set_hostcompat(ifp, rti, query_ver);
 		mtx_unlock(&igmp_mtx);
 #endif
@@ -591,7 +591,7 @@ igmpv3_query:
 			/*
 			 * Check query types and keep source list if needed.
 			 */
-			if (igmp->igmp_group.s_addr == zeroin_addr.s_addr &&
+			if (igmp->igmp_group.s_addr == INADDR_ANY &&
 					(igmp->igmp_numsrc == 0)) {
 				if (ip->ip_dst.s_addr
 					!= htonl(INADDR_ALLHOSTS_GROUP)) {
@@ -993,9 +993,9 @@ igmp_sendbuf(m, ifp)
 		igmp_ghdr = (struct igmp_group_record_hdr *)
 					((char *)igmp_rhdr + len);
 		len += ghdrlen + SOURCE_RECORD_LEN(igmp_ghdr->numsrc);
-		HTONS(igmp_ghdr->numsrc);
+		igmp_ghdr->numsrc = htons(igmp_ghdr->numsrc);
 	}
-	HTONS(igmp_rhdr->igmp_grpnum);
+	igmp_rhdr->igmp_grpnum = htons(igmp_rhdr->igmp_grpnum);
 	igmp_rhdr->igmp_cksum = 0;
 	igmp_rhdr->igmp_cksum = in_cksum(m, len);
 	m->m_data -= sizeof(struct ip);
