@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.93 2002/02/03 08:27:10 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.94 2002/02/04 13:40:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -498,8 +498,12 @@ gif_validate6(m, sc, ifp)
 	gsrc = (struct sockaddr_in6 *)sc->gif_psrc;
 	gdst = (struct sockaddr_in6 *)sc->gif_pdst;
 
-	/* check for address match */
-	if (!SA6_ARE_ADDR_EQUAL(gsrc, psrc) || !SA6_ARE_ADDR_EQUAL(gdst, pdst))
+	/*
+	 * Check for address match.  Note that the check is for an incoming
+	 * packet.  We should compare the *source* address in our configuration
+	 * and the *destination* address of the packet, and vice versa.
+	 */
+	if (!SA6_ARE_ADDR_EQUAL(gsrc, pdst) || !SA6_ARE_ADDR_EQUAL(gdst, psrc))
 		return 0;
 
 	/* martian filters on outer source - done in ip6_input */
@@ -516,7 +520,7 @@ gif_validate6(m, sc, ifp)
 #ifndef SCOPEDROUTING
 		sin6.sin6_scope_id = 0; /* XXX */
 #endif
-		/* XXX scopeid */
+
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
 #else
