@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.123 2001/02/15 23:31:35 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.124 2001/02/16 12:23:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2310,7 +2310,9 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	size_t newlen;
 {
 	struct in6_defrouter *d, *de;
+	struct in6_prefix *p, *pe;
 	struct nd_defrouter *dr;
+	struct nd_prefix *pr;
 	size_t ol, l;
 	int error;
 
@@ -2351,6 +2353,79 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 			l += sizeof(*d);
 			if (d)
 				d++;
+		}
+		if (oldp) {
+			*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */
+			if (l > ol)
+				error = ENOMEM;
+		} else
+			*oldlenp = l;
+		break;
+	case ICMPV6CTL_ND6_PRLIST:
+		if (oldp) {
+			p = (struct in6_prefix *)oldp;
+			pe = (struct in6_prefix *)((caddr_t)oldp + *oldlenp);
+		}
+		l = 0;
+		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+			u_short advrtrs;
+			size_t advance;
+			struct sockaddr_in6 *sin6, *s6;
+			struct nd_pfxrouter *pfr;
+
+			if (oldp && p + 1 <= pe) {
+				bzero(p, sizeof(*p));
+				sin6 = (struct sockaddr_in6 *)(p + 1);
+
+				p->prefix = pr->ndpr_prefix;
+				if (in6_recoverscope(&p->prefix,
+				    &p->prefix.sin6_addr, pr->ndpr_ifp) != 0)
+					log(LOG_ERR,
+					    "scope error in prefix list (%s)\n",
+					    ip6_sprintf(&p->prefix.sin6_addr));
+				p->raflags = pr->ndpr_raf;
+				p->prefixlen = pr->ndpr_plen;
+				p->vltime = pr->ndpr_vltime;
+				p->pltime = pr->ndpr_pltime;
+				p->if_index = pr->ndpr_ifp->if_index;
+				p->expire = pr->ndpr_expire;
+				p->refcnt = pr->ndpr_refcnt;
+				p->flags = pr->ndpr_stateflags;
+				p->origin = PR_ORIG_RA;
+				advrtrs = 0;
+				for (pfr = pr->ndpr_advrtrs.lh_first;
+				     pfr;
+				     pfr = pfr->pfr_next) {
+					if ((void *)&sin6[advrtrs + 1] >
+					    (void *)pe) {
+						advrtrs++;
+						continue;
+					}
+					s6 = &sin6[advrtrs];
+					bzero(s6, sizeof(*s6));
+					s6->sin6_family = AF_INET6;
+					s6->sin6_len = sizeof(*sin6);
+					if (in6_recoverscope(s6,
+					    &pfr->router->rtaddr,
+					    pfr->router->ifp) != 0)
+						log(LOG_ERR,
+						    "scope error in "
+						    "prefix list (%s)\n",
+						    ip6_sprintf(&pfr->router->rtaddr));
+					advrtrs++;
+				}
+				p->advrtrs = advrtrs;
+			} else {
+				advrtrs = 0;
+				for (pfr = pr->ndpr_advrtrs.lh_first;
+				     pfr;
+				     pfr = pfr->pfr_next)
+					advrtrs++;
+			}
+			advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
+			l += advance;
+			if (p)
+				p = (struct in6_prefix *)((caddr_t)p + advance);
 		}
 		if (oldp) {
 			*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */

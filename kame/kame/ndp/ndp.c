@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.60 2001/02/16 03:52:48 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.61 2001/02/16 12:23:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -989,9 +989,10 @@ rtrlist()
 
 	ep = (struct in6_defrouter *)(buf + l);
 	for (p = (struct in6_defrouter *)buf; p < ep; p++) {
-		getnameinfo((struct sockaddr *)&p->rtaddr, p->rtaddr.sin6_len,
-		    host_buf, sizeof(host_buf), NULL, 0,
-		    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+		if (getnameinfo((struct sockaddr *)&p->rtaddr,
+		    p->rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
+		    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0)) != 0)
+			strlcpy(host_buf, "?", sizeof(host_buf));
 		
 		printf("%s if=%s", host_buf,
 		       if_indextoname(p->if_index, ifix_buf));
@@ -1053,6 +1054,116 @@ rtrlist()
 void
 plist()
 {
+#ifdef ICMPV6CTL_ND6_PRLIST
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_ICMPV6, ICMPV6CTL_ND6_PRLIST };
+	char *buf;
+	struct in6_prefix *p, *ep, *n;
+	struct sockaddr_in6 *advrtr;
+	size_t l;
+	struct timeval time;
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+	int ninflags = (nflag ? NI_NUMERICHOST : 0) | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+	int ninflags = nflag ? NI_NUMERICHOST : 0;
+#endif
+	char namebuf[NI_MAXHOST];
+
+	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), NULL, &l, NULL, 0) < 0) {
+		err(1, "sysctl(ICMPV6CTL_ND6_PRLIST)");
+		/*NOTREACHED*/
+	}
+	buf = malloc(l);
+	if (!buf) {
+		errx(1, "not enough core");
+		/*NOTREACHED*/
+	}
+	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), buf, &l, NULL, 0) < 0) {
+		err(1, "sysctl(ICMPV6CTL_ND6_PRLIST)");
+		/*NOTREACHED*/
+	}
+
+	ep = (struct in6_prefix *)(buf + l);
+	for (p = (struct in6_prefix *)buf; p < ep; p = n) {
+		advrtr = (struct sockaddr_in6 *)(p + 1);
+		n = (struct in6_prefix *)&advrtr[p->advrtrs];
+
+		if (getnameinfo((struct sockaddr *)&p->prefix,
+		    p->prefix.sin6_len, namebuf, sizeof(namebuf),
+		    NULL, 0, niflags) != 0)
+			strlcpy(namebuf, "?", sizeof(namebuf));
+		printf("%s/%d if=%s\n", namebuf, p->prefixlen,
+		       if_indextoname(p->if_index, ifix_buf));
+
+		gettimeofday(&time, 0);
+		/*
+		 * meaning of fields, especially flags, is very different
+		 * by origin.  notify the difference to the users.
+		 */
+		printf("flags=%s%s%s%s",
+		       p->raflags.onlink ? "L" : "",
+		       p->raflags.autonomous ? "A" : "",
+		       (p->flags & NDPRF_ONLINK) != 0 ? "O" : "",
+		       (p->flags & NDPRF_DETACHED) != 0 ? "D" : "");
+		if (p->vltime == ND6_INFINITE_LIFETIME)
+			printf(" vltime=infinity");
+		else
+			printf(" vltime=%ld", (long)p->vltime);
+		if (p->pltime == ND6_INFINITE_LIFETIME)
+			printf(", pltime=infinity");
+		else
+			printf(", pltime=%ld", (long)p->pltime);
+		if (p->expire == 0)
+			printf(", expire=Never");
+		else if (p->expire >= time.tv_sec)
+			printf(", expire=%s",
+				sec2str(p->expire - time.tv_sec));
+		else
+			printf(", expired");
+		printf(", ref=%d", p->refcnt);
+		printf("\n");
+		/*
+		 * "advertising router" list is meaningful only if the prefix
+		 * information is from RA.
+		 */
+		if (p->advrtrs) {
+			int j;
+			struct sockaddr_in6 *sin6;
+
+			sin6 = (struct sockaddr_in6 *)(p + 1);
+			printf("  advertised by\n");
+			for (j = 0; j < p->advrtrs; j++) {
+				struct in6_nbrinfo *nbi;
+
+				if (getnameinfo((struct sockaddr *)sin6,
+				    sin6->sin6_len, namebuf, sizeof(namebuf),
+				    NULL, 0, ninflags) != 0)
+					strlcpy(namebuf, "?", sizeof(namebuf));
+				printf("    %s", namebuf);
+
+				nbi = getnbrinfo(&sin6->sin6_addr, p->if_index,
+						 0);
+				if (nbi) {
+					switch(nbi->state) {
+					case ND6_LLINFO_REACHABLE:
+					case ND6_LLINFO_STALE:
+					case ND6_LLINFO_DELAY:
+					case ND6_LLINFO_PROBE:
+						printf(" (reachable)\n");
+						break;
+					default:
+						printf(" (unreachable)\n");
+					}
+				} else
+					printf(" (no neighbor state)\n");
+				sin6++;
+			}
+		} else
+			printf("  No advertising router\n");
+	}
+	free(buf);
+#else
 	struct in6_prlist pr;
 	int s, i;
 	struct timeval time;
@@ -1117,10 +1228,10 @@ plist()
 		 * meaning of fields, especially flags, is very different
 		 * by origin.  notify the difference to the users.
 		 */
-		if (0) {       /* prefix origin is almost obsoleted */
-			printf("  %s",
-			       PR.origin == PR_ORIG_RA ? "" : "advertise: ");
-		}
+#if 0
+		printf("  %s",
+		       PR.origin == PR_ORIG_RA ? "" : "advertise: ");
+#endif
 #ifdef NDPRF_ONLINK
 		printf("flags=%s%s%s%s",
 		       PR.raflags.onlink ? "L" : "",
@@ -1150,25 +1261,25 @@ plist()
 #ifdef NDPRF_ONLINK
 		printf(", ref=%d", PR.refcnt);
 #endif
-		if (0) {	/* prefix origin is almost obsoleted */
-			switch (PR.origin) {
-			case PR_ORIG_RA:
-				printf(", origin=RA");
-				break;
-			case PR_ORIG_RR:
-				printf(", origin=RR");
-				break;
-			case PR_ORIG_STATIC:
-				printf(", origin=static");
-				break;
-			case PR_ORIG_KERNEL:
-				printf(", origin=kernel");
-				break;
-			default:
-				printf(", origin=?");
-				break;
-			}
+#if 0
+		switch (PR.origin) {
+		case PR_ORIG_RA:
+			printf(", origin=RA");
+			break;
+		case PR_ORIG_RR:
+			printf(", origin=RR");
+			break;
+		case PR_ORIG_STATIC:
+			printf(", origin=static");
+			break;
+		case PR_ORIG_KERNEL:
+			printf(", origin=kernel");
+			break;
+		default:
+			printf(", origin=?");
+			break;
 		}
+#endif
 		printf("\n");
 		/*
 		 * "advertising router" list is meaningful only if the prefix
@@ -1219,6 +1330,7 @@ plist()
 	}
 #undef PR
 	close(s);
+#endif
 }
 
 void
