@@ -71,6 +71,7 @@
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
+#include <sys/ucred.h>
 #endif
 
 #include <net/if.h>
@@ -127,6 +128,8 @@
 #define ip_mtudisc	0
 
 MALLOC_DEFINE(M_PF, "pf", "PF packet filter");
+
+#undef ALTQ /* for now */
 #endif
 
 
@@ -2044,7 +2047,14 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 {
 	struct pf_addr		*saddr, *daddr;
 	u_int16_t		 sport, dport;
+#ifdef __FreeBSD__
+	struct inpcbhead	*tb;
+#else
 	struct inpcbtable	*tb;
+#endif
+#ifdef __NetBSD__
+	struct in6pcb		*tb6;
+#endif
 	struct inpcb		*inp;
 #ifdef __NetBSD__
 	struct in6pcb		*in6p;
@@ -2056,12 +2066,26 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 	case IPPROTO_TCP:
 		sport = pd->hdr.tcp->th_sport;
 		dport = pd->hdr.tcp->th_dport;
+#ifdef __FreeBSD__
+		tb = &tcb;
+#else
 		tb = &tcbtable;
+#endif
+#ifdef __NetBSD__
+		tb6 = &tcb6;
+#endif
 		break;
 	case IPPROTO_UDP:
 		sport = pd->hdr.udp->uh_sport;
 		dport = pd->hdr.udp->uh_dport;
+#ifdef __FreeBSD__
+		tb = &udb;
+#else
 		tb = &udbtable;
+#endif
+#ifdef __NetBSD__
+		tb6 = &udb6;
+#endif
 		break;
 	default:
 		return (0);
@@ -2089,10 +2113,10 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 				return (0);
 		}
 #else
-		inp = in_pcblookup_connect(&tcbtable, saddr->v4, sport,
+		inp = in_pcblookup_connect(tb6, saddr->v4, sport,
 		    daddr->v4, dport);
 		if (inp == NULL) {
-			inp = in_pcblookup_bind(&tcbtable, daddr->v4, dport);
+			inp = in_pcblookup_bind(tb6, daddr->v4, dport);
 			if (inp == NULL)
 				return (0);
 		}
@@ -2118,9 +2142,9 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 				return (0);
 		}
 #else
-		in6p = in6_pcblookup_connect(&tcb6, &s, sport, &d, dport, 0);
+		in6p = in6_pcblookup_connect(tb6, &s, sport, &d, dport, 0);
 		if (in6p == NULL) {
-			in6p = in6_pcblookup_bind(&tcb6, &d, dport, 0);
+			in6p = in6_pcblookup_bind(tb6, &d, dport, 0);
 			if (in6p == NULL)
 				return (0);
 		}
@@ -2135,7 +2159,7 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 #ifdef __OpenBSD__
 	*uid = inp->inp_socket->so_euid;
 	*gid = inp->inp_socket->so_egid;
-#else
+#elif defined(__NetBSD__)
 	switch (af) {
 	case AF_INET:
 		*uid = inp->inp_socket->so_uid;
@@ -2143,6 +2167,11 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 	case AF_INET6:
 		*uid = in6p->in6p_socket->so_uid;
 		break;
+	}
+#elif defined(__FreeBSD__)
+	if (inp->inp_socket->so_cred) {
+		*uid = inp->inp_socket->so_cred->cr_uid;
+		*gid = inp->inp_socket->so_cred->cr_groups[0];
 	}
 #endif
 	return (1);
