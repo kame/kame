@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.101 2002/02/02 08:27:12 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.102 2002/02/02 08:47:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -261,16 +261,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Construct sockaddr format source address.
 		 */
-		bzero(&udp_in6, sizeof(udp_in6));
-		udp_in6.sin6_len = sizeof(struct sockaddr_in6);
-		udp_in6.sin6_family = AF_INET6;
-		udp_in6.sin6_port = uh->uh_sport;
-#if 0 /* XXX inbound flowinfo */
-		udp_in6.sin6_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
-#endif
-		/* KAME hack: recover scopeid */
-		(void)in6_recoverscope(&udp_in6, &ip6->ip6_src,
-		    m->m_pkthdr.rcvif);
+		fromsa.sin6_port = uh->uh_sport;
 
 		/*
 		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
