@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.101 2004/12/27 05:41:16 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.102 2005/01/24 02:43:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -708,11 +708,13 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 		error = ENOBUFS;
 		goto gc;
 	}
+	bzero(ep->addrpack, l);
 	ep->maskpack = malloc(l, M_NETADDR, M_NOWAIT);
 	if (ep->maskpack == NULL) {
 		error = ENOBUFS;
 		goto gc;
 	}
+	bzero(ep->maskpack, l);
 
 	ep->af = af;
 	ep->proto = proto;
