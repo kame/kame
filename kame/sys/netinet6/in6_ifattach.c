@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.54 2000/04/18 08:19:09 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.55 2000/04/27 15:39:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -925,7 +925,7 @@ in6_ifdetach(ifp)
 #endif
 		}
 
-		free(ia, M_IFADDR);
+		free(oia, M_IFADDR);
 	}
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
