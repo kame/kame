@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.38 2000/12/22 05:54:36 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.39 2000/12/22 15:11:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -378,6 +378,7 @@ main(argc, argv)
 	int ch, i, on, probe, seq, hops, rcvcmsglen;
 	static u_char *rcvcmsgbuf;
 	char hbuf[NI_MAXHOST], src0[NI_MAXHOST];
+	char *ep;
 
 	/*
 	 * Receive ICMP
@@ -423,7 +424,13 @@ main(argc, argv)
 			options |= SO_DEBUG;
 			break;
 		case 'f':
-			first_hop = atoi(optarg);
+			ep = NULL;
+			first_hop = strtoul(optarg, &ep, 0);
+			if (!*argv || *ep) {
+				Fprintf(stderr,
+				    "traceroute6: invalid min hoplimit.\n");
+				exit(1);
+			}
 			if (first_hop > max_hops) {
 				Fprintf(stderr,
 				    "traceroute6: min hoplimit must be <= %d.\n", max_hops);
@@ -470,7 +477,13 @@ main(argc, argv)
 			lflag++;
 			break;
 		case 'm':
-			max_hops = atoi(optarg);
+			ep = NULL;
+			max_hops = strtoul(optarg, &ep, 0);
+			if (!*argv || *ep) {
+				Fprintf(stderr,
+				    "traceroute6: invalid max hoplimit.\n");
+				exit(1);
+			}
 			if (max_hops < first_hop) {
 				Fprintf(stderr,
 				    "traceroute6: max hoplimit must be >= %d.\n", first_hop);
@@ -481,7 +494,13 @@ main(argc, argv)
 			nflag++;
 			break;
 		case 'p':
-			port = atoi(optarg);
+			ep = NULL;
+			port = strtoul(optarg, &ep, 0);
+			if (!*argv || *ep) {
+				Fprintf(stderr,
+				    "traceroute6: port.\n");
+				exit(1);
+			}
 			if (port < 1) {
 				Fprintf(stderr,
 				    "traceroute6: port must be >0.\n");
@@ -489,7 +508,13 @@ main(argc, argv)
 			}
 			break;
 		case 'q':
-			nprobes = atoi(optarg);
+			ep = NULL;
+			nprobes = strtoul(optarg, &ep, 0);
+			if (!*argv || *ep) {
+				Fprintf(stderr,
+				    "traceroute6: invalid nprobes.\n");
+				exit(1);
+			}
 			if (nprobes < 1) {
 				Fprintf(stderr,
 				    "traceroute6: nprobes must be >0.\n");
@@ -510,7 +535,13 @@ main(argc, argv)
 			verbose++;
 			break;
 		case 'w':
-			waittime = atoi(optarg);
+			ep = NULL;
+			waittime = strtoul(optarg, &ep, 0);
+			if (!*argv || *ep) {
+				Fprintf(stderr,
+				    "traceroute6: invalid wait time.\n");
+				exit(1);
+			}
 			if (waittime <= 1) {
 				Fprintf(stderr,
 				    "traceroute6: wait must be >1 sec.\n");
@@ -555,8 +586,15 @@ main(argc, argv)
 		exit(1);
 	}
 
-	if (*++argv)
-		datalen = atoi(*argv);
+	if (*++argv) {
+		ep = NULL;
+		datalen = strtoul(*argv, &ep, 0);
+		if (!*argv || *ep) {
+			Fprintf(stderr,
+			    "traceroute6: invalid packet length.\n");
+			exit(1);
+		}
+	}
 	if (datalen < 0 || datalen >= MAXPACKET - sizeof(struct opacket)) {
 		Fprintf(stderr,
 		    "traceroute6: packet size must be 0 <= s < %ld.\n",
