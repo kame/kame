@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.167 2001/07/21 03:54:45 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.168 2001/07/23 11:45:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2162,7 +2162,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 
 	/*
 	 * If the neighbor cache entry has a state other than INCOMPLETE
-	 * (i.e. its link-layer address is already reloved), just
+	 * (i.e. its link-layer address is already resolved), just
 	 * send the packet.
 	 */
 	if (ln->ln_state > ND6_LLINFO_INCOMPLETE)
