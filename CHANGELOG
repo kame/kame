@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2273 2002/11/07 03:26:08 itojun Exp $
+$KAME: CHANGELOG,v 1.2274 2002/11/08 06:39:57 kjc Exp $
 
 <200211>
+Fri Nov  8 15:37:51 JST 2002	kjc@csl.sony.co.jp
+	* a major rework of HFSC in ALTQ.
+	 - extend HFSC to support upper-limit.
+	   a class can have guaranteed and upper-limit bandwidth, e.g.,
+		class hfsc fxp0 http_class tcp_class bandwidth 25M ulimit 40M
+	 - various improvements of the algorithms and implementtions.
+	based on work by Oleg Cherevko <olwi@aq.l.org.ua>
+
 Thu Nov  7 12:57:55 JST 2002
 	* sctp changes from randall:
 	  - in_proto's need to NOT have PR_ATOMIC for SCTP
