@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.27 2002/05/29 14:23:55 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.28 2002/05/29 14:25:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -103,7 +103,9 @@ if_dump()
 {
 	struct rainfo *rai;
 	struct prefix *pfx;
+#ifdef ROUTEINFO
 	struct rtinfo *rti;
+#endif
 	char prefixbuf[INET6_ADDRSTRLEN];
 	int first;
 	struct timeval now;
