@@ -374,7 +374,7 @@ rip6_input(mp, offp, proto)
 	!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, &ip6->ip6_src))
       continue;
     /* inp_icmp6filt must not be NULL, but we add a check for safety */
-    if ((icmp6type > 0) && inp->inp_icmp6filt && 
+    if ((icmp6type >= 0) && inp->inp_icmp6filt && 
 	ICMP6_FILTER_WILLBLOCK(icmp6type, inp->inp_icmp6filt))
       continue;
 
