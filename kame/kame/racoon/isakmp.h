@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.2 1999/12/22 06:01:16 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.3 2000/01/02 08:40:32 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -88,10 +88,10 @@ struct isakmp {
 		u_int8_t ver;
 		struct {
 #if BYTE_ORDER == LITTLE_ENDIAN
-			u_int v_min:4,		/* MnVer */
+			u_int8_t v_min:4,	/* MnVer */
 				v_maj:4;	/* MjVer */
 #else
-			u_int v_maj:4,		/* MnVer */
+			u_int8_t v_maj:4,	/* MnVer */
 				v_min:4;	/* MjVer */
 #endif
 		} x;
