@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.784 2000/04/18 02:25:37 jinmei Exp $
+$Id: CHANGELOG,v 1.785 2000/04/18 03:44:17 sakane Exp $
 
 <200003>
+Tue Apr 18 12:44:24 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	improve phase1 DH group check.
+	dh_group must be defined by each proposal in a configuration file.
+
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6relay.c: added to support DHCPv6 relay
 	agent. The implementation currently handles DHCP Solicit and
