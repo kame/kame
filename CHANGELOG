@@ -1,9 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.123 1999/09/19 23:49:14 itojun Exp $
+$Id: CHANGELOG,v 1.124 1999/09/20 08:42:10 itojun Exp $
 
 
 <199909>
+Mon Sep 20 17:38:03 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/in6_ifattach.c: allow MD5(hostname) to be used
+	  as interface id for pseudo interfaces, when no other choices are
+	  available (need to be revisited).
+	* kame/sys/netinet6/*: merge in ARCnet support from NetBSD-current.
+	* netbsd/sys/netinet/udp_usrreq.c: support IPv4 mapped address on
+	  udp6 socket.
+
 1999-09-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/usr.bin/Makefile: added v6test to SUBDIR.
 	  *bsd*/usr.bin/v6test/Makefile: added to install v6test.
