@@ -42,6 +42,8 @@ struct servtab *servtab;
 
 static void usage __P((void));
 static void mainloop __P((void));
+static int getifaddr __P((struct in6_addr *, char *, struct in6_addr *, int));
+static int transmit_sa __P((int, struct sockaddr *, int, char *, size_t));
 static int transmit __P((int, char *, char *, int, char *, size_t));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
@@ -127,9 +129,11 @@ callback_register(fd, cap, func)
 #endif
 
 static int
-getlifaddr(addr, ifnam)
+getifaddr(addr, ifnam, prefix, plen)
 	struct in6_addr *addr;
 	char *ifnam;
+	struct in6_addr *prefix;
+	int plen;
 {
 	int s;
 	unsigned int maxif;
@@ -175,8 +179,22 @@ getlifaddr(addr, ifnam)
 		if (ifr->ifr_addr.sa_family != AF_INET6)
 			continue;
 		memcpy(&sin6, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
-		if (!IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr))
-			continue;
+		if (plen % 8 == 0) {
+			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
+				continue;
+		} else {
+			struct in6_addr a, m;
+			int i;
+			memcpy(&a, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
+			memset(&m, 0, sizeof(m));
+			memset(&m, 0xff, plen / 8);
+			m.s6_addr[plen / 8] = (0xff00 >> (plen % 8)) & 0xff;
+			for (i = 0; i < sizeof(a); i++)
+				a.s6_addr[i] &= m.s6_addr[i];
+
+			if (memcmp(&a, prefix, plen / 8) != 0)
+				continue;
+		}
 		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
 		error = 0;
 		break;
@@ -459,6 +477,8 @@ server6_react_solicit(agent, buf, siz)
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
+	struct in6_addr myaddr, target;
+	int hlim;
 
 	dprintf((stderr, "react_solicit\n"));
 
@@ -513,17 +533,40 @@ server6_react_solicit(agent, buf, siz)
 	len = sizeof(*dh6a);
 	memset(dh6a, 0, sizeof(*dh6a));
 	dh6a->dh6adv_msgtype = DH6_ADVERT;
+	memcpy(&dh6a->dh6adv_cliaddr, &dh6s->dh6sol_cliaddr,
+		sizeof(dh6s->dh6sol_cliaddr));
 	if (!IN6_IS_ADDR_UNSPECIFIED(&dh6s->dh6sol_relayaddr)) {
 		memcpy(&dh6a->dh6adv_relayaddr, &dh6s->dh6sol_relayaddr,
 			sizeof(dh6s->dh6sol_relayaddr));
 		dst.sin6_addr = dh6a->dh6adv_relayaddr;
+		inet_pton(AF_INET6, "fec0::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 10) != 0) {
+			inet_pton(AF_INET6, "2000::", &target, sizeof(target));
+			if (getifaddr(&myaddr, device, &target, 3) != 0) {
+				errx(1, "no matching address on %s", device);
+				/*NOTREACHED*/
+			}
+		}
+		hlim = 64;
 	} else {
 		dst.sin6_addr = dh6s->dh6sol_cliaddr;
 		dst.sin6_scope_id = if_nametoindex(device);
 		dh6a->dh6adv_flags = DH6ADV_SERVPRESENT;
+		inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 10) != 0) {
+			errx(1, "no matching address on %s", device);
+			/*NOTREACHED*/
+		}
+		hlim = 1;
 	}
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&myaddr))
+		myaddr.s6_addr[2] = myaddr.s6_addr[3] = 0;
+#endif
+	memcpy(&dh6a->dh6adv_serveraddr, &myaddr, sizeof(myaddr));
+	dh6a->dh6adv_pref = 255;	/*XXX*/
 
-	if (transmit_sa(outsock, (struct sockaddr *)&dst, 1, sbuf, len) != 0) {
+	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
 		err(1, "transmit failed");
 		/*NOTREACHED*/
 	}
