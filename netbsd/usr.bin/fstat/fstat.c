@@ -1,4 +1,4 @@
-/*	$NetBSD: fstat.c,v 1.42.4.2 2002/02/13 23:28:22 he Exp $	*/
+/*	$NetBSD: fstat.c,v 1.55 2002/02/12 03:28:20 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1988, 1993\n\
 #if 0
 static char sccsid[] = "@(#)fstat.c	8.3 (Berkeley) 5/2/95";
 #else
-__RCSID("$NetBSD: fstat.c,v 1.42.4.2 2002/02/13 23:28:22 he Exp $");
+__RCSID("$NetBSD: fstat.c,v 1.55 2002/02/12 03:28:20 simonb Exp $");
 #endif
 #endif /* not lint */
 
@@ -60,12 +60,10 @@ __RCSID("$NetBSD: fstat.c,v 1.42.4.2 2002/02/13 23:28:22 he Exp $");
 #include <sys/unpcb.h>
 #include <sys/sysctl.h>
 #include <sys/filedesc.h>
+#include <sys/pipe.h>
 #define	_KERNEL
-#define _LKM
 #include <sys/file.h>
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
-#undef _LKM
 #undef _KERNEL
 #define _KERNEL
 #include <sys/mount.h>
@@ -168,6 +166,7 @@ void	usage __P((void));
 char   *vfilestat __P((struct vnode *, struct filestat *));
 void	vtrans __P((struct vnode *, int, int));
 void	ftrans __P((struct file *, int));
+void	ptrans __P((struct file *, struct pipe *, int));
 
 int
 main(argc, argv)
@@ -232,7 +231,7 @@ main(argc, argv)
 			if (getfname(*argv))
 				checkfile = 1;
 		}
-		if (!checkfile)	/* file(s) specified, but none accessable */
+		if (!checkfile)	/* file(s) specified, but none accessible */
 			exit(1);
 	}
 
@@ -388,14 +387,22 @@ ftrans (fp, i)
 		    i, fp, Pid);
 		return;
 	}
-	if (file.f_type == DTYPE_VNODE)
+	switch (file.f_type) {
+	case DTYPE_VNODE:
 		vtrans((struct vnode *)file.f_data, i, file.f_flag);
-	else if (file.f_type == DTYPE_SOCKET) {
+		break;
+	case DTYPE_SOCKET:
 		if (checkfile == 0)
 			socktrans((struct socket *)file.f_data, i);
-	} else {
+		break;
+	case DTYPE_PIPE:
+		if (checkfile == 0)
+			ptrans(&file, (struct pipe *)file.f_data, i);
+		break;
+	default:
 		dprintf("unknown file type %d for file %d of pid %d",
 		    file.f_type, i, Pid);
+		break;
 	}
 }
 
@@ -516,7 +523,7 @@ vtrans(vp, i, flag)
 		break;
 	}
 	default:
-		printf(" %6qd", (long long)fst.size);
+		printf(" %6lld", (long long)fst.size);
 	}
 	rw[0] = '\0';
 	if (flag & FREAD)
@@ -907,6 +914,35 @@ socktrans(sock, i)
 		/* print protocol number and socket address */
 		printf(" %d %lx", proto.pr_protocol, (long)sock);
 	}
+	printf("\n");
+	return;
+bad:
+	printf("* error\n");
+}
+
+void
+ptrans(fp, cpipe, i)
+	struct file *fp;
+	struct pipe *cpipe;
+	int i;
+{
+	struct pipe cp;
+
+	PREFIX(i);
+	
+	/* fill in pipe */
+	if (!KVM_READ(cpipe, &cp, sizeof(struct pipe))) {
+		dprintf("can't read pipe at %p", cpipe);
+		goto bad;
+	}
+
+	/* pipe descriptor is either read or write, never both */
+	printf("* pipe %p %s %p %s%s%s", cpipe,
+		(fp->f_flag & FWRITE) ? "->" : "<-",
+		cp.pipe_peer,
+		(fp->f_flag & FWRITE) ? "w" : "r",
+		(fp->f_flag & FNONBLOCK) ? "n" : "",
+		(cp.pipe_state & PIPE_ASYNC) ? "a" : "");
 	printf("\n");
 	return;
 bad:

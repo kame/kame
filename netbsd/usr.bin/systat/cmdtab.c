@@ -1,4 +1,4 @@
-/*	$NetBSD: cmdtab.c,v 1.15.4.1 2000/09/01 16:36:04 ad Exp $	*/
+/*	$NetBSD: cmdtab.c,v 1.16 2000/07/05 11:03:21 ad Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)cmdtab.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: cmdtab.c,v 1.15.4.1 2000/09/01 16:36:04 ad Exp $");
+__RCSID("$NetBSD: cmdtab.c,v 1.16 2000/07/05 11:03:21 ad Exp $");
 #endif /* not lint */
 
 #include "systat.h"

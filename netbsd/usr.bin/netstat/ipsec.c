@@ -1,4 +1,4 @@
-/*	$NetBSD: ipsec.c,v 1.1.4.2 2000/10/04 17:44:29 itojun Exp $	*/
+/*	$NetBSD: ipsec.c,v 1.5 2002/03/21 04:23:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -68,7 +68,7 @@
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
 #ifdef __NetBSD__
-__RCSID("$NetBSD: ipsec.c,v 1.1.4.2 2000/10/04 17:44:29 itojun Exp $");
+__RCSID("$NetBSD: ipsec.c,v 1.5 2002/03/21 04:23:38 itojun Exp $");
 #endif
 #endif
 #endif /* not lint */
@@ -96,6 +96,7 @@ __RCSID("$NetBSD: ipsec.c,v 1.1.4.2 2000/10/04 17:44:29 itojun Exp $");
  */
 #ifdef __bsdi__
 #define plural(x)	PLURAL(x)
+#define plurales(x)	PLURALES(x)
 #endif
 /*
  * XXX see PORTABILITY for the twist
@@ -212,6 +213,8 @@ print_ipsecstats()
 {
 #define	p(f, m) if (ipsecstat.f || sflag <= 1) \
     printf(m, (CAST)ipsecstat.f, plural(ipsecstat.f))
+#define	pes(f, m) if (ipsecstat.f || sflag <= 1) \
+    printf(m, (CAST)ipsecstat.f, plurales(ipsecstat.f))
 #define hist(f, n, t) \
     ipsec_hist((f), sizeof(f)/sizeof(f[0]), (n), sizeof(n)/sizeof(n[0]), (t));
 
@@ -240,7 +243,10 @@ print_ipsecstats()
 	hist(ipsecstat.out_ahhist, ipsec_ahnames, "AH output");
 	hist(ipsecstat.out_esphist, ipsec_espnames, "ESP output");
 	hist(ipsecstat.out_comphist, ipsec_compnames, "IPComp output");
+	p(spdcachelookup, "\t" LLU " SPD cache lookup%s\n");
+	pes(spdcachemiss, "\t" LLU " SPD cache miss%s\n");
 #undef p
+#undef pes
 #undef hist
 }
 
@@ -300,9 +306,9 @@ pfkey_stats(off, name)
 #define	p(f, m) if (pfkeystat.f || sflag <= 1) \
     printf(m, (CAST)pfkeystat.f, plural(pfkeystat.f))
 
-	/* kernel -> userland */
-	p(out_total, "\t" LLU " request%s sent to userland\n");
-	p(out_bytes, "\t" LLU " byte%s sent to userland\n");
+	/* userland -> kernel */
+	p(out_total, "\t" LLU " request%s sent from userland\n");
+	p(out_bytes, "\t" LLU " byte%s sent from userland\n");
 	for (first = 1, type = 0;
 	     type < sizeof(pfkeystat.out_msgtype)/sizeof(pfkeystat.out_msgtype[0]);
 	     type++) {
@@ -325,9 +331,9 @@ pfkey_stats(off, name)
 	p(out_invsatype, "\t" LLU " message%s with invalid sa type\n");
 	p(out_invaddr, "\t" LLU " message%s with invalid address extension\n");
 
-	/* userland -> kernel */
-	p(in_total, "\t" LLU " request%s sent from userland\n");
-	p(in_bytes, "\t" LLU " byte%s sent from userland\n");
+	/* kernel -> userland */
+	p(in_total, "\t" LLU " request%s sent to userland\n");
+	p(in_bytes, "\t" LLU " byte%s sent to userland\n");
 	for (first = 1, type = 0;
 	     type < sizeof(pfkeystat.in_msgtype)/sizeof(pfkeystat.in_msgtype[0]);
 	     type++) {

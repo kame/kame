@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp.c,v 1.6.2.1 2000/09/01 16:38:18 ad Exp $	*/
+/*	$NetBSD: tcp.c,v 1.9 2001/06/12 15:17:29 wiz Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Andrew Doran <ad@NetBSD.org>
@@ -29,12 +29,10 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: tcp.c,v 1.6.2.1 2000/09/01 16:38:18 ad Exp $");
+__RCSID("$NetBSD: tcp.c,v 1.9 2001/06/12 15:17:29 wiz Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/sysctl.h>
 
 #include <netinet/in.h>
@@ -42,16 +40,11 @@ __RCSID("$NetBSD: tcp.c,v 1.6.2.1 2000/09/01 16:38:18 ad Exp $");
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_fsm.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
 
-#include <stdlib.h>
-#include <string.h>
-#include <paths.h>
-#include <nlist.h>
 #include <kvm.h>
+#include <string.h>
 
 #include "systat.h"
 #include "extern.h"
@@ -165,7 +158,7 @@ labeltcpsyn(void)
 	LHD(0,  "entries added");		
 	LHD(1,  "connections completed");
 	LHD(2,  "entries timed out");
-	LHD(3,  "duplicate SYNs recieved");
+	LHD(3,  "duplicate SYNs received");
 	LHD(4,  "hash collisions");
 	LHD(5,  "retransmissions");
 	LHD(6,  "entries aborted (no memory)");

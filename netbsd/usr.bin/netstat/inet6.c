@@ -1,4 +1,4 @@
-/*	$NetBSD: inet6.c,v 1.9.2.2 2000/10/18 01:32:48 tv Exp $	*/
+/*	$NetBSD: inet6.c,v 1.23 2001/10/18 09:26:16 itojun Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 
 /*
@@ -68,7 +68,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$NetBSD: inet6.c,v 1.9.2.2 2000/10/18 01:32:48 tv Exp $");
+__RCSID("$NetBSD: inet6.c,v 1.23 2001/10/18 09:26:16 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -117,6 +117,7 @@ extern char *tcpstates[];
 #include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/pim6_var.h>
+#include <netinet6/raw_ip6.h>
 
 #include <arpa/inet.h>
 #if 0
@@ -205,9 +206,9 @@ ip6protopr(off, name)
 		}
 		if (Aflag) {
 			if (istcp)
-				printf("%8p ", in6pcb.in6p_ppcb);
+				printf("%8lx ", (u_long) in6pcb.in6p_ppcb);
 			else
-				printf("%8p ", next);
+				printf("%8lx ", (u_long) next);
 		}
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc);
@@ -355,262 +356,98 @@ udp6_stats(off, name)
 }
 
 static	char *ip6nh[] = {
-	"hop by hop",
+/*0*/	"hop by hop",
 	"ICMP",
 	"IGMP",
-	"#3",
+	NULL,
 	"IP",
-	"#5",
+/*5*/	NULL,
 	"TCP",
-	"#7",
-	"#8",
-	"#9",
-	"#10",
-	"#11",
-	"#12",
-	"#13",
-	"#14",
-	"#15",
-	"#16",
+	NULL,
+	NULL,
+	NULL,
+/*10*/	NULL, NULL, NULL, NULL, NULL,
+/*15*/	NULL,
+	NULL,
 	"UDP",
-	"#18",
-	"#19",	
-	"#20",
-	"#21",
+	NULL,
+	NULL,
+/*20*/	NULL,
+	NULL,
 	"IDP",
-	"#23",
-	"#24",
-	"#25",
-	"#26",
-	"#27",
-	"#28",
-	"TP",	
-	"#30",
-	"#31",
-	"#32",
-	"#33",
-	"#34",
-	"#35",
-	"#36",
-	"#37",
-	"#38",
-	"#39",	
-	"#40",
+	NULL,
+	NULL,
+/*25*/	NULL,
+	NULL,
+	NULL,
+	NULL,
+	"TP",
+/*30*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*40*/	NULL,
 	"IP6",
-	"#42",
+	NULL,
 	"routing",
 	"fragment",
-	"#45",
-	"#46",
-	"#47",
-	"#48",
-	"#49",	
-	"ESP",
+/*45*/	NULL, NULL, NULL, NULL, NULL,
+/*50*/	"ESP",
 	"AH",
-	"#52",
-	"#53",
-	"#54",
-	"#55",
-	"#56",
-	"#57",
+	NULL,
+	NULL,
+	NULL,
+/*55*/	NULL,
+	NULL,
+	NULL,
 	"ICMP6",
-	"no next header",	
-	"destination option",
-	"#61",
-	"#62",
-	"#63",
-	"#64",
-	"#65",
-	"#66",
-	"#67",
-	"#68",
-	"#69",	
-	"#70",
-	"#71",
-	"#72",
-	"#73",
-	"#74",
-	"#75",
-	"#76",
-	"#77",
-	"#78",
-	"#79",	
-	"ISOIP",
-	"#81",
-	"#82",
-	"#83",
-	"#84",
-	"#85",
-	"#86",
-	"#87",
-	"#88",
-	"OSPF",	
-	"#80",
-	"#91",
-	"#92",
-	"#93",
-	"#94",
-	"#95",
-	"#96",
+	"no next header",
+/*60*/	"destination option",
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+/*65*/	NULL, NULL, NULL, NULL, NULL,
+/*70*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*80*/	"ISOIP",
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	"OSPF",
+/*90*/	NULL, NULL, NULL, NULL, NULL,
+/*95*/	NULL,
+	NULL,
 	"Ethernet",
-	"#98",
-	"#99",	
-	"#100",
-	"#101",
-	"#102",
+	NULL,
+	NULL,
+/*100*/	NULL,
+	NULL,
+	NULL,
 	"PIM",
-	"#104",
-	"#105",
-	"#106",
-	"#107",
-	"#108",
-	"#109",	
-	"#110",
-	"#111",
-	"#112",
-	"#113",
-	"#114",
-	"#115",
-	"#116",
-	"#117",
-	"#118",
-	"#119",	
-	"#120",
-	"#121",
-	"#122",
-	"#123",
-	"#124",
-	"#125",
-	"#126",
-	"#127",
-	"#128",
-	"#129",	
-	"#130",
-	"#131",
-	"#132",
-	"#133",
-	"#134",
-	"#135",
-	"#136",
-	"#137",
-	"#138",
-	"#139",	
-	"#140",
-	"#141",
-	"#142",
-	"#143",
-	"#144",
-	"#145",
-	"#146",
-	"#147",
-	"#148",
-	"#149",	
-	"#150",
-	"#151",
-	"#152",
-	"#153",
-	"#154",
-	"#155",
-	"#156",
-	"#157",
-	"#158",
-	"#159",	
-	"#160",
-	"#161",
-	"#162",
-	"#163",
-	"#164",
-	"#165",
-	"#166",
-	"#167",
-	"#168",
-	"#169",	
-	"#170",
-	"#171",
-	"#172",
-	"#173",
-	"#174",
-	"#175",
-	"#176",
-	"#177",
-	"#178",
-	"#179",	
-	"#180",
-	"#181",
-	"#182",
-	"#183",
-	"#184",
-	"#185",
-	"#186",
-	"#187",
-	"#188",
-	"#189",	
-	"#180",
-	"#191",
-	"#192",
-	"#193",
-	"#194",
-	"#195",
-	"#196",
-	"#197",
-	"#198",
-	"#199",	
-	"#200",
-	"#201",
-	"#202",
-	"#203",
-	"#204",
-	"#205",
-	"#206",
-	"#207",
-	"#208",
-	"#209",	
-	"#210",
-	"#211",
-	"#212",
-	"#213",
-	"#214",
-	"#215",
-	"#216",
-	"#217",
-	"#218",
-	"#219",	
-	"#220",
-	"#221",
-	"#222",
-	"#223",
-	"#224",
-	"#225",
-	"#226",
-	"#227",
-	"#228",
-	"#229",	
-	"#230",
-	"#231",
-	"#232",
-	"#233",
-	"#234",
-	"#235",
-	"#236",
-	"#237",
-	"#238",
-	"#239",	
-	"#240",
-	"#241",
-	"#242",
-	"#243",
-	"#244",
-	"#245",
-	"#246",
-	"#247",
-	"#248",
-	"#249",	
-	"#250",
-	"#251",
-	"#252",
-	"#253",
-	"#254",
-	"#255",
+	NULL,
+/*105*/	NULL, NULL, NULL, NULL, NULL,
+/*110*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*120*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*130*/	NULL,
+	NULL,
+	"SCTP",
+	NULL,
+	NULL,
+/*135*/	NULL, NULL, NULL, NULL, NULL,
+/*140*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*160*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*180*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*200*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*220*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*240*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
 /*
@@ -623,6 +460,8 @@ ip6_stats(off, name)
 {
 	struct ip6stat ip6stat;
 	int first, i;
+	struct protoent *ep;
+	const char *n;
 
 	if (off == 0)
 		return;
@@ -663,14 +502,23 @@ ip6_stats(off, name)
 	for (first = 1, i = 0; i < 256; i++)
 		if (ip6stat.ip6s_nxthist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %llu\n", ip6nh[i],
-			       (unsigned long long)ip6stat.ip6s_nxthist[i]);
+			n = NULL;
+			if (ip6nh[i])
+				n = ip6nh[i];
+			else if ((ep = getprotobynumber(i)) != NULL)
+				n = ep->p_name;
+			if (n)
+				printf("\t\t%s: %llu\n", n,
+				    (unsigned long long)ip6stat.ip6s_nxthist[i]);
+			else
+				printf("\t\t#%d: %llu\n", i,
+				    (unsigned long long)ip6stat.ip6s_nxthist[i]);
 		}
-	printf("\tMbuf statics:\n");
-	printf("\t\t%llu one mbuf\n", (unsigned long long)ip6stat.ip6s_m1);
+	printf("\tMbuf statistics:\n");
+	p(ip6s_m1, "\t\t%llu one mbuf%s\n");
 	for (first = 1, i = 0; i < 32; i++) {
 		char ifbuf[IFNAMSIZ];
 		if (ip6stat.ip6s_m2m[i] != 0) {		
@@ -683,10 +531,8 @@ ip6_stats(off, name)
 			       (unsigned long long)ip6stat.ip6s_m2m[i]);
 		}
 	}
-	printf("\t\t%llu one ext mbuf\n",
-	    (unsigned long long)ip6stat.ip6s_mext1);
-	printf("\t\t%llu two or more ext mbuf\n",
-	    (unsigned long long)ip6stat.ip6s_mext2m);	
+	p(ip6s_mext1, "\t\t%llu one ext mbuf%s\n");
+	p(ip6s_mext2m, "\t\t%llu two or more ext mbuf%s\n");
 	p(ip6s_exthdrtoolong,
 	    "\t%llu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%llu tunneling packet%s that can't find gif\n");
@@ -761,6 +607,9 @@ ip6_stats(off, name)
 			PRINT_SCOPESTAT(ip6s_sources_deprecated[i], i);
 		}
 	}
+
+	p1(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
+	p1(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
 #undef p
 #undef p1
 }
@@ -778,15 +627,15 @@ ip6_ifstats(ifname)
     printf(m, (unsigned long long)ifr.ifr_ifru.ifru_stat.f, \
 	plural(ifr.ifr_ifru.ifru_stat.f))
 #define	p_5(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
-    printf(m, ip6stat.f)
+    printf(m, (unsigned long long)ip6stat.f)
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		perror("Warning: socket(AF_INET6)");
 		return;
 	}
 
-	strcpy(ifr.ifr_name, ifname);
-	printf("ip6 on %s:\n", ifr.ifr_name);
+	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	printf("ip6 on %s:\n", ifname);
 
 	if (ioctl(s, SIOCGIFSTAT_IN6, (char *)&ifr) < 0) {
 		perror("Warning: ioctl(SIOCGIFSTAT_IN6)");
@@ -958,9 +807,9 @@ static	char *icmp6names[] = {
 	"multicast listener report",
 	"multicast listener done",
 	"router solicitation",
-	"router advertisment",
+	"router advertisement",
 	"neighbor solicitation",
-	"neighbor advertisment",
+	"neighbor advertisement",
 	"redirect",
 	"router renumbering",
 	"node information request",
@@ -1100,16 +949,18 @@ icmp6_stats(off, name)
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)icmp6stat.f, plural(icmp6stat.f))
+#define p_5(f, m) if (icmp6stat.f || sflag <= 1) \
+    printf(m, (unsigned long long)icmp6stat.f)
 
 	p(icp6s_error, "\t%llu call%s to icmp6_error\n");
 	p(icp6s_canterror,
 	    "\t%llu error%s not generated because old message was icmp6 or so\n");
 	p(icp6s_toofreq,
-	    "\t%llu error%s not generated because rate limitation\n");
+	    "\t%llu error%s not generated because of rate limitation\n");
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
-				printf("\tOutput histogram:\n");
+				printf("\tOutput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
@@ -1122,15 +973,38 @@ icmp6_stats(off, name)
 	for (first = 1, i = 0; i < ICMP6_MAXTYPE; i++)
 		if (icmp6stat.icp6s_inhist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
 				(unsigned long long)icmp6stat.icp6s_inhist[i]);
 		}
+	printf("\tHistogram of error messages to be generated:\n");
+	p_5(icp6s_odst_unreach_noroute, "\t\t%llu no route\n");
+	p_5(icp6s_odst_unreach_admin, "\t\t%llu administratively prohibited\n");
+	p_5(icp6s_odst_unreach_beyondscope, "\t\t%llu beyond scope\n");
+	p_5(icp6s_odst_unreach_addr, "\t\t%llu address unreachable\n");
+	p_5(icp6s_odst_unreach_noport, "\t\t%llu port unreachable\n");
+	p_5(icp6s_opacket_too_big, "\t\t%llu packet too big\n");
+	p_5(icp6s_otime_exceed_transit, "\t\t%llu time exceed transit\n");
+	p_5(icp6s_otime_exceed_reassembly, "\t\t%llu time exceed reassembly\n");
+	p_5(icp6s_oparamprob_header, "\t\t%llu erroneous header field\n");
+	p_5(icp6s_oparamprob_nextheader, "\t\t%llu unrecognized next header\n");
+	p_5(icp6s_oparamprob_option, "\t\t%llu unrecognized option\n");
+	p_5(icp6s_oredirect, "\t\t%llu redirect\n");
+	p_5(icp6s_ounknown, "\t\t%llu unknown\n");
+
 	p(icp6s_reflect, "\t%llu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%llu message%s with too many ND options\n");
+	p(icp6s_nd_badopt, "\t%llu message%s with bad ND options\n");
+	p(icp6s_badns, "\t%llu bad neighbor solicitation message%s\n");
+	p(icp6s_badna, "\t%llu bad neighbor advertisement message%s\n");
+	p(icp6s_badrs, "\t%llu bad router solicitation message%s\n");
+	p(icp6s_badra, "\t%llu bad router advertisement message%s\n");
+	p(icp6s_badredirect, "\t%llu bad redirect message%s\n");
+	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
 #undef p
+#undef p_5
 }
 
 /*
@@ -1151,8 +1025,8 @@ icmp6_ifstats(ifname)
 		return;
 	}
 
-	strcpy(ifr.ifr_name, ifname);
-	printf("icmp6 on %s:\n", ifr.ifr_name);
+	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	printf("icmp6 on %s:\n", ifname);
 
 	if (ioctl(s, SIOCGIFSTAT_ICMP6, (char *)&ifr) < 0) {
 		perror("Warning: ioctl(SIOCGIFSTAT_ICMP6)");
@@ -1228,10 +1102,46 @@ pim6_stats(off, name)
 }
 
 /*
- * Pretty print an Internet address (net address + port).
- * If the nflag was specified, use numbers instead of names.
+ * Dump raw ip6 statistics structure.
  */
+void
+rip6_stats(off, name)
+	u_long off;
+	char *name;
+{
+	struct rip6stat rip6stat;
+	u_quad_t delivered;
 
+	if (off == 0)
+		return;
+	kread(off, (char *)&rip6stat, sizeof(rip6stat));
+	printf("%s:\n", name);
+
+#define	p(f, m) if (rip6stat.f || sflag <= 1) \
+    printf(m, (unsigned long long)rip6stat.f, plural(rip6stat.f))
+	p(rip6s_ipackets, "\t%llu message%s received\n");
+	p(rip6s_isum, "\t%llu checksum calcuration%s on inbound\n");
+	p(rip6s_badsum, "\t%llu message%s with bad checksum\n");
+	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
+	p(rip6s_nosockmcast,
+	    "\t%llu multicast message%s dropped due to no socket\n");
+	p(rip6s_fullsock,
+	    "\t%llu message%s dropped due to full socket buffers\n");
+	delivered = rip6stat.rip6s_ipackets -
+		    rip6stat.rip6s_badsum -
+		    rip6stat.rip6s_nosock -
+		    rip6stat.rip6s_nosockmcast -
+		    rip6stat.rip6s_fullsock;
+	if (delivered || sflag <= 1)
+		printf("\t%llu delivered\n", (unsigned long long)delivered);
+	p(rip6s_opackets, "\t%llu datagram%s output\n");
+#undef p
+}
+
+/*
+ * Pretty print an Internet address (net address + port).
+ * Take numeric_addr and numeric_port into consideration.
+ */
 void
 inet6print(in6, port, proto)
 	register struct in6_addr *in6;
@@ -1254,14 +1164,16 @@ do {\
 	width = Aflag ? 12 : 16;
 	if (vflag && width < strlen(inet6name(in6)))
 		width = strlen(inet6name(in6));
-	sprintf(line, "%.*s.", width, inet6name(in6));
+	snprintf(line, sizeof(line), "%.*s.", width, inet6name(in6));
 	cp = index(line, '\0');
-	if (!nflag && port)
+	if (!numeric_port && port)
 		GETSERVBYPORT6(port, proto, sp);
 	if (sp || port == 0)
-		sprintf(cp, "%.8s", sp ? sp->s_name : "*");
+		snprintf(cp, sizeof(line) - (cp - line),
+		    "%.8s", sp ? sp->s_name : "*");
 	else
-		sprintf(cp, "%d", ntohs((u_short)port));
+		snprintf(cp, sizeof(line) - (cp - line),
+		    "%d", ntohs((u_short)port));
 	width = Aflag ? 18 : 22;
 	if (vflag && width < strlen(line))
 		width = strlen(line);
@@ -1270,7 +1182,7 @@ do {\
 
 /*
  * Construct an Internet address representation.
- * If the nflag has been supplied, give
+ * If the numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
  */
 
@@ -1279,28 +1191,28 @@ inet6name(in6p)
 	struct in6_addr *in6p;
 {
 	register char *cp;
-	static char line[50];
+	static char line[NI_MAXHOST];
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
 	char hbuf[NI_MAXHOST];
 	struct sockaddr_in6 sin6;
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_NUMERICHOST;
 #endif
 
-	if (first && !nflag) {
+	if (first && !numeric_addr) {
 		first = 0;
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
 		    (cp = index(domain, '.')))
-			(void) strcpy(domain, cp + 1);
+			(void) strlcpy(domain, cp + 1, sizeof(domain));
 		else
 			domain[0] = 0;
 	}
 	cp = 0;
-	if (!nflag && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
+	if (!numeric_addr && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
 		hp = gethostbyaddr((char *)in6p, sizeof(*in6p), AF_INET6);
 		if (hp) {
 			if ((cp = index(hp->h_name, '.')) &&
@@ -1310,10 +1222,10 @@ inet6name(in6p)
 		}
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(in6p))
-		strcpy(line, "*");
+		strlcpy(line, "*", sizeof(line));
 	else if (cp)
-		strcpy(line, cp);
-	else  {
+		strlcpy(line, cp, sizeof(line));
+	else {
 		memset(&sin6, 0, sizeof(sin6));
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_family = AF_INET6;
@@ -1327,9 +1239,9 @@ inet6name(in6p)
 		}
 #endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
-				hbuf, sizeof(hbuf), NULL, 0, niflag))
-			strcpy(hbuf, "?");
-		sprintf(line, "%s", hbuf);
+				hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
+			strlcpy(hbuf, "?", sizeof(hbuf));
+		strlcpy(line, hbuf, sizeof(line));
 	}
 	return (line);
 }

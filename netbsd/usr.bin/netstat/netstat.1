@@ -1,4 +1,4 @@
-.\"	$NetBSD: netstat.1,v 1.26.4.1 2001/04/05 12:42:24 he Exp $
+.\"	$NetBSD: netstat.1,v 1.33 2001/12/01 16:43:21 wiz Exp $
 .\"
 .\" Copyright (c) 1983, 1990, 1992, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
 .\"
 .\"	@(#)netstat.1	8.8 (Berkeley) 4/18/94
 .\"
-.Dd April 18, 1994
+.Dd December 13, 1999
 .Dt NETSTAT 1
 .Os
 .Sh NAME
@@ -46,7 +46,7 @@
 .Op Fl M Ar core
 .Op Fl N Ar system
 .Nm ""
-.Op Fl dgiLmnrsv
+.Op Fl dgiLmnrsSv
 .Op Fl f Ar address_family
 .Op Fl M Ar core
 .Op Fl N Ar system
@@ -114,7 +114,7 @@ With either interface display (option
 .Fl i
 or an interval, as described below),
 show the number of dropped packets.
-.It Fl f Ar address_family 
+.It Fl f Ar address_family
 Limit statistics or address control block reports to those
 of the specified
 .Ar address family  .
@@ -126,6 +126,9 @@ for
 .Ar inet6 ,
 for
 .Dv AF_INET6 ;
+.Ar arp ,
+for
+.Dv AF_ARP ;
 .Ar ns ,
 for
 .Dv AF_NS ;
@@ -147,7 +150,7 @@ By default, show the IP Multicast virtual-interface and routing tables.
 If the
 .Fl s
 option is also present, show multicast routing statistics.
-.It Fl I Ar interface 
+.It Fl I Ar interface
 Show information about the specified interface;
 used with a
 .Ar wait
@@ -160,10 +163,10 @@ option) or the
 .Fl p Ar protocol
 option is present, show per-interface statistics on the
 .Ar interface
-for the specfied
+for the specified
 .Ar address_family
 or
-.Ar protocol,
+.Ar protocol ,
 respectively.
 .It Fl i
 Show the state of interfaces which have been auto-configured
@@ -182,10 +185,10 @@ option (with the
 option) or the
 .Fl p Ar protocol
 option is present, show per-interface statistics on all interfaces
-for the specfied
+for the specified
 .Ar address_family
 or
-.Ar protocol,
+.Ar protocol ,
 respectively.
 .It Fl L
 Don't show link-level routes (e.g., IPv4 ARP or IPv6 neighbour cache).
@@ -200,11 +203,15 @@ Show statistics recorded by the memory management routines
 Extract the name list from the specified system instead of the default
 .Pa /netbsd .
 .It Fl n
-Show network addresses as numbers (normally
+Show network addresses and ports as numbers (normally
 .Nm
-interprets addresses and attempts to display them
+interprets addresses and ports and attempts to display them
 symbolically).
 This option may be used with any of the display formats.
+.It Fl S
+Show network addresses as numbers (as with
+.Fl n )
+but show ports symbolically).
 .It Fl P Ar pcbaddr
 Dump the contents of the protocol control block (PCB) located at kernel
 virtual address
@@ -214,7 +221,7 @@ This address may be obtained using the
 flag.  The default protocol is TCP, but may be overridden using the
 .Fl p
 flag.
-.It Fl p Ar protocol 
+.It Fl p Ar protocol
 Show statistics about
 .Ar protocol  ,
 which is either a well-known name for a protocol or an alias for it.  Some
@@ -264,6 +271,9 @@ refer to
 .Xr inet 3 ) .
 Unspecified,
 or ``wildcard'', addresses and ports appear as ``*''.
+You can use the
+.Xr fstat 1
+to find out which process or processes hold references to a socket.
 .Pp
 The interface display provides a table of cumulative
 statistics regarding packets transferred, errors, and collisions.
@@ -282,19 +292,19 @@ and
 manual pages.
 The mapping between letters and flags is:
 .Bl -column XXXX RTF_BLACKHOLE
-1	RTF_PROTO2	Protocol specific routing flag #1 
-2	RTF_PROTO1	Protocol specific routing flag #2 
-B	RTF_BLACKHOLE	Just discard pkts (during updates) 
-C	RTF_CLONING	Generate new routes on use 
+1	RTF_PROTO2	Protocol specific routing flag #1
+2	RTF_PROTO1	Protocol specific routing flag #2
+B	RTF_BLACKHOLE	Just discard pkts (during updates)
+C	RTF_CLONING	Generate new routes on use
 c	RTF_CLONED	Cloned routes (generated from RTF_CLONING)
-D	RTF_DYNAMIC	Created dynamically (by redirect) 
+D	RTF_DYNAMIC	Created dynamically (by redirect)
 G	RTF_GATEWAY	Destination requires forwarding by intermediary
-H	RTF_HOST	Host entry (net otherwise) 
+H	RTF_HOST	Host entry (net otherwise)
 L	RTF_LLINFO	Valid protocol to link address translation.
-M	RTF_MODIFIED	Modified dynamically (by redirect) 
-R	RTF_REJECT	Host or net unreachable 
-S	RTF_STATIC	Manually added 
-U	RTF_UP	Route usable 
+M	RTF_MODIFIED	Modified dynamically (by redirect)
+R	RTF_REJECT	Host or net unreachable
+S	RTF_STATIC	Manually added
+U	RTF_UP	Route usable
 X	RTF_XRESOLVE	External daemon translates proto to link address
 .El
 .Pp
@@ -309,7 +319,7 @@ to the same destination.
 The use field provides a count of the number of packets
 sent using that route.  The mtu entry shows the mtu associated with
 that route.  This mtu value is used as the basis for the TCP maximum
-segment size.  The 'L' flag appended to the mtu value indicates that 
+segment size.  The 'L' flag appended to the mtu value indicates that
 the value is locked, and that path mtu discovery is turned off for
 that route.
 A
@@ -338,16 +348,18 @@ The first line of each screen of information contains a summary since the
 system was last rebooted.  Subsequent lines of output show values
 accumulated over the preceding interval.
 .Sh SEE ALSO
+.Xr fstat 1 ,
 .Xr nfsstat 1 ,
 .Xr ps 1 ,
+.Xr vmstat 1 ,
+.Xr inet 3 ,
 .Xr hosts 5 ,
 .Xr networks 5 ,
 .Xr protocols 5 ,
 .Xr services 5 ,
-.Xr trpt 8 ,
-.Xr trsp 8 ,
 .Xr iostat 8 ,
-.Xr vmstat 8
+.Xr trpt 8 ,
+.Xr trsp 8
 .Sh HISTORY
 The
 .Nm

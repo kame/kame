@@ -1,4 +1,4 @@
-/*	$NetBSD: ip6.c,v 1.4.2.2 2000/09/01 16:37:09 ad Exp $	*/
+/*	$NetBSD: ip6.c,v 1.9 2000/12/20 01:16:42 cgd Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Andrew Doran <ad@NetBSD.org>
@@ -29,12 +29,10 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: ip6.c,v 1.4.2.2 2000/09/01 16:37:09 ad Exp $");
+__RCSID("$NetBSD: ip6.c,v 1.9 2000/12/20 01:16:42 cgd Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/sysctl.h>
 
 #include <netinet/in.h>
@@ -42,11 +40,8 @@ __RCSID("$NetBSD: ip6.c,v 1.4.2.2 2000/09/01 16:37:09 ad Exp $");
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 
-#include <stdlib.h>
-#include <string.h>
-#include <paths.h>
-#include <nlist.h>
 #include <kvm.h>
+#include <string.h>
 
 #include "systat.h"
 #include "extern.h"
@@ -54,7 +49,7 @@ __RCSID("$NetBSD: ip6.c,v 1.4.2.2 2000/09/01 16:37:09 ad Exp $");
 #define LHD(row, str)		mvwprintw(wnd, row, 10, str)
 #define RHD(row, str)		mvwprintw(wnd, row, 45, str);
 #define SHOW(stat, row, col) \
-    mvwprintw(wnd, row, col, "%9llu", (unsigned long long)curstat.##stat)
+    mvwprintw(wnd, row, col, "%9llu", (unsigned long long)curstat.stat)
 
 enum update {
 	UPDATE_TIME,

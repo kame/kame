@@ -1,4 +1,4 @@
-/*	$NetBSD: iostat.c,v 1.15.2.1 2000/09/01 16:37:09 ad Exp $	*/
+/*	$NetBSD: iostat.c,v 1.19.4.2 2002/06/30 05:47:15 lukem Exp $	*/
 
 /*
  * Copyright (c) 1980, 1992, 1993
@@ -38,24 +38,16 @@
 #if 0
 static char sccsid[] = "@(#)iostat.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: iostat.c,v 1.15.2.1 2000/09/01 16:37:09 ad Exp $");
-#endif not lint
+__RCSID("$NetBSD: iostat.c,v 1.19.4.2 2002/06/30 05:47:15 lukem Exp $");
+#endif /* not lint */
 
 #include <sys/param.h>
-#include <sys/sched.h>
-#include <sys/dkstat.h>
-#include <sys/buf.h>
-#include <sys/time.h>
 
 #include <string.h>
-#include <stdlib.h>
-#include <nlist.h>
-#include <paths.h>
+
 #include "systat.h"
 #include "extern.h"
-
 #include "dkstats.h"
-extern struct _disk	cur;
 
 static  int linesperregion;
 static  double etime;
@@ -90,9 +82,8 @@ closeiostat(WINDOW *w)
 int
 initiostat(void)
 {
-	extern gid_t egid;
 
-	dkinit(1, egid);
+	dkinit(1);
 	dkreadstats();
 	return(1);
 }
@@ -138,7 +129,7 @@ numlabels(int row)
 	int i, col, regions, ndrives;
 
 #define COLWIDTH	14
-#define DRIVESPERLINE	((getmaxx(wnd) - INSET) / COLWIDTH)
+#define DRIVESPERLINE	((getmaxx(wnd) - 1) / COLWIDTH)
 	for (ndrives = 0, i = 0; i < dk_ndrive; i++)
 		if (cur.dk_select[i])
 			ndrives++;
@@ -156,7 +147,7 @@ numlabels(int row)
 	col = 0;
 	for (i = 0; i < dk_ndrive; i++)
 		if (cur.dk_select[i] /*&& cur.dk_bytes[i] != 0.0*/) {
-			if (col + COLWIDTH >= getmaxx(wnd) - INSET) {
+			if (col + COLWIDTH > getmaxx(wnd)) {
 				col = 0, row += linesperregion + 1;
 				if (row > getmaxy(wnd) - (linesperregion + 1))
 					break;
@@ -199,18 +190,12 @@ showiostat(void)
 		return;
 	dkswap();
 
-	etime = 0;
-	for(i = 0; i < CPUSTATES; i++) {
-		etime += cur.cp_time[i];
-	}
-	if (etime == 0.0)
-		etime = 1.0;
-	etime /= (float) hz;
+	etime = cur.cp_etime;
 	row = 1;
 
 	/*
 	 * Interrupt CPU state not calculated yet.
-	 */ 
+	 */
 	for (i = 0; i < CPUSTATES; i++)
 		stat1(row++, i);
 	if (!numbers) {
@@ -230,7 +215,7 @@ showiostat(void)
 	winsertln(wnd);
 	for (i = 0; i < dk_ndrive; i++)
 		if (cur.dk_select[i] /*&& cur.dk_bytes[i] != 0.0*/) {
-			if (col + COLWIDTH >= getmaxx(wnd)) {
+			if (col + COLWIDTH > getmaxx(wnd)) {
 				col = 0, row += linesperregion + 1;
 				if (row > getmaxy(wnd) - (linesperregion + 1))
 					break;

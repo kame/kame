@@ -1,4 +1,4 @@
-/*	$NetBSD: mbuf.c,v 1.15 1999/04/02 22:45:45 hubertf Exp $	*/
+/*	$NetBSD: mbuf.c,v 1.17 2002/03/09 23:26:51 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)mbuf.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: mbuf.c,v 1.15 1999/04/02 22:45:45 hubertf Exp $");
+__RCSID("$NetBSD: mbuf.c,v 1.17 2002/03/09 23:26:51 sommerfeld Exp $");
 #endif
 #endif /* not lint */
 
@@ -51,6 +51,7 @@ __RCSID("$NetBSD: mbuf.c,v 1.15 1999/04/02 22:45:45 hubertf Exp $");
 #include <sys/pool.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "netstat.h"
 
 #define	YES	1
@@ -58,6 +59,7 @@ typedef int bool;
 
 struct	mbstat mbstat;
 struct pool mbpool, mclpool;
+struct pool_allocator mbpa, mclpa;
 
 static struct mbtypes {
 	int	mt_type;
@@ -94,12 +96,12 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 	if (nmbtypes != 256) {
 		fprintf(stderr,
 		    "%s: unexpected change to mbstat; check source\n",
-		        __progname);
+		        getprogname());
 		return;
 	}
 	if (mbaddr == 0) {
 		fprintf(stderr, "%s: mbstat: symbol not in namelist\n",
-		    __progname);
+		    getprogname());
 		return;
 	}
 /*XXX*/
@@ -122,6 +124,15 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 	if (kread(mclpooladdr, (char *)&mclpool, sizeof (mclpool)))
 		return;
 
+	mbpooladdr = (u_long) mbpool.pr_alloc;
+	mclpooladdr = (u_long) mclpool.pr_alloc;
+
+	if (kread(mbpooladdr, (char *)&mbpa, sizeof (mbpa)))
+		return;
+
+	if (kread(mclpooladdr, (char *)&mclpa, sizeof (mclpa)))
+		return;
+
 	totmbufs = 0;
 	for (mp = mbtypes; mp->mt_name; mp++)
 		totmbufs += mbstat.m_mtypes[mp->mt_type];
@@ -142,9 +153,9 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 	printf("%lu/%lu mapped pages in use\n",
 	       (u_long)(mclpool.pr_nget - mclpool.pr_nput),
 	       ((u_long)mclpool.pr_npages * mclpool.pr_itemsperpage));
-	totmem = (mbpool.pr_npages << mbpool.pr_pageshift) +
-	    (mclpool.pr_npages << mclpool.pr_pageshift);
-	totused = (mbpool.pr_nget - mbpool.pr_nput) * mbpool.pr_size + 
+	totmem = (mbpool.pr_npages << mbpa.pa_pageshift) +
+	    (mclpool.pr_npages << mclpa.pa_pageshift);
+	totused = (mbpool.pr_nget - mbpool.pr_nput) * mbpool.pr_size +
 	    (mclpool.pr_nget - mclpool.pr_nput) * mclpool.pr_size;
 	totpct = (totmem == 0)? 0 : ((totused * 100)/totmem);
 	printf("%u Kbytes allocated to network (%d%% in use)\n",

@@ -1,4 +1,4 @@
-/*	$NetBSD: ipsec.c,v 1.4.2.1 2000/09/01 16:37:09 ad Exp $	*/
+/*	$NetBSD: ipsec.c,v 1.6 2000/12/01 02:19:44 simonb Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Andrew Doran <ad@NetBSD.org>
@@ -29,23 +29,16 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: ipsec.c,v 1.4.2.1 2000/09/01 16:37:09 ad Exp $");
+__RCSID("$NetBSD: ipsec.c,v 1.6 2000/12/01 02:19:44 simonb Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/sysctl.h>
 
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
 #include <netinet6/ipsec.h>
 
-#include <stdlib.h>
-#include <string.h>
-#include <paths.h>
-#include <nlist.h>
 #include <kvm.h>
+#include <string.h>
 
 #include "systat.h"
 #include "extern.h"

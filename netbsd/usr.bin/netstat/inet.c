@@ -1,4 +1,4 @@
-/*	$NetBSD: inet.c,v 1.39 2000/02/26 09:55:24 itojun Exp $	*/
+/*	$NetBSD: inet.c,v 1.51 2002/02/27 02:33:51 lukem Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$NetBSD: inet.c,v 1.39 2000/02/26 09:55:24 itojun Exp $");
+__RCSID("$NetBSD: inet.c,v 1.51 2002/02/27 02:33:51 lukem Exp $");
 #endif
 #endif /* not lint */
 
@@ -49,6 +49,7 @@ __RCSID("$NetBSD: inet.c,v 1.39 2000/02/26 09:55:24 itojun Exp $");
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 
+#include <net/if_arp.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -123,7 +124,7 @@ protopr(off, name)
 
 	compact = 0;
 	if (Aflag) {
-		if (!nflag)
+		if (!numeric_addr)
 			width = 18;
 		else {
 			width = 21;
@@ -170,7 +171,7 @@ protopr(off, name)
 		}
 		printf("%-5.5s %6ld %6ld%s", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc, compact ? "" : " ");
-		if (nflag) {
+		if (numeric_port) {
 			inetprint(&inpcb.inp_laddr, inpcb.inp_lport, name, 1);
 			inetprint(&inpcb.inp_faddr, inpcb.inp_fport, name, 1);
 		} else if (inpcb.inp_flags & INP_ANONPORT) {
@@ -178,8 +179,7 @@ protopr(off, name)
 			inetprint(&inpcb.inp_faddr, inpcb.inp_fport, name, 0);
 		} else {
 			inetprint(&inpcb.inp_laddr, inpcb.inp_lport, name, 0);
-			inetprint(&inpcb.inp_faddr, inpcb.inp_fport, name, 
-			    inpcb.inp_lport != inpcb.inp_fport);
+			inetprint(&inpcb.inp_faddr, inpcb.inp_fport, name, 0);
 		}
 		if (istcp) {
 			if (tcpcb.t_state < 0 || tcpcb.t_state >= TCP_NSTATES)
@@ -232,6 +232,8 @@ tcp_stats(off, name)
 	p(tcps_sndprobe, "\t\t%llu window probe packet%s\n");
 	p(tcps_sndwinup, "\t\t%llu window update packet%s\n");
 	p(tcps_sndctrl, "\t\t%llu control packet%s\n");
+	p(tcps_selfquench,
+	    "\t\t%llu send attempt%s resulted in self-quench\n");
 	p(tcps_rcvtotal, "\t%llu packet%s received\n");
 	p2(tcps_rcvackpack, tcps_rcvackbyte,
 		"\t\t%llu ack%s (for %llu byte%s)\n");
@@ -377,7 +379,7 @@ ip_stats(off, name)
 	ps(ips_badlen, "\t%llu with data length < header length\n");
 	ps(ips_badoptions, "\t%llu with bad options\n");
 	ps(ips_badvers, "\t%llu with incorrect version number\n");
-	p(ips_fragments, "\t%llu fragment%s received");
+	p(ips_fragments, "\t%llu fragment%s received\n");
 	p(ips_fragdropped, "\t%llu fragment%s dropped (dup or out of space)\n");
 	p(ips_badfrags, "\t%llu malformed fragment%s dropped\n");
 	p(ips_fragtimeout, "\t%llu fragment%s dropped after timeout\n");
@@ -397,6 +399,7 @@ ip_stats(off, name)
 	p(ips_fragmented, "\t%llu output datagram%s fragmented\n");
 	p(ips_ofragments, "\t%llu fragment%s created\n");
 	p(ips_cantfrag, "\t%llu datagram%s that can't be fragmented\n");
+	p(ips_badaddr, "\t%llu datagram%s with bad address in header\n");
 #undef ps
 #undef p
 }
@@ -408,11 +411,11 @@ static	char *icmpnames[] = {
 	"destination unreachable",
 	"source quench",
 	"routing redirect",
-	"#6",
+	"alternate host address",
 	"#7",
 	"echo",
-	"#9",
-	"#10",
+	"router advertisement",
+	"router solicitation",
 	"time exceeded",
 	"parameter problem",
 	"time stamp",
@@ -468,6 +471,7 @@ icmp_stats(off, name)
 				(unsigned long long)icmpstat.icps_inhist[i]);
 		}
 	p(icps_reflect, "\t%llu message response%s generated\n");
+	p(icps_pmtuchg, "\t%llu path MTU change%s\n");
 #undef p
 }
 
@@ -504,24 +508,77 @@ igmp_stats(off, name)
 }
 
 /*
- * Pretty print an Internet address (net address + port).
- * If the nflag was specified, use numbers instead of names.
+ * Dump the ARP statistics structure.
  */
 void
-inetprint(in, port, proto, numeric)
+arp_stats(off, name)
+	u_long off;
+	char *name;
+{
+	struct arpstat arpstat;
+
+	if (off == 0)
+		return;
+	kread(off, (char *)&arpstat, sizeof (arpstat));
+	printf("%s:\n", name);
+
+#define	ps(f, m) if (arpstat.f || sflag <= 1) \
+    printf(m, (unsigned long long)arpstat.f)
+#define	p(f, m) if (arpstat.f || sflag <= 1) \
+    printf(m, (unsigned long long)arpstat.f, plural(arpstat.f))
+
+	p(as_sndtotal, "\t%llu packet%s sent\n");
+	p(as_sndreply, "\t\t%llu reply packet%s\n");
+	p(as_sndrequest, "\t\t%llu request packet%s\n");
+
+	p(as_rcvtotal, "\t%llu packet%s received\n");
+	p(as_rcvreply, "\t\t%llu reply packet%s\n");
+	p(as_rcvrequest, "\t\t%llu valid request packet%s\n");
+	p(as_rcvmcast, "\t\t%llu broadcast/multicast packet%s\n");
+	p(as_rcvbadproto, "\t\t%llu packet%s with unknown protocol type\n");
+	p(as_rcvbadlen, "\t\t%llu packet%s with bad (short) length\n");
+	p(as_rcvzerotpa, "\t\t%llu packet%s with null target IP address\n");
+	p(as_rcvzerospa, "\t\t%llu packet%s with null source IP address\n");
+	ps(as_rcvnoint, "\t\t%llu could not be mapped to an interface\n");
+	p(as_rcvlocalsha, "\t\t%llu packet%s sourced from a local hardware "
+	    "address\n");
+	p(as_rcvbcastsha, "\t\t%llu packet%s with a broadcast "
+	    "source hardware address\n");
+	p(as_rcvlocalspa, "\t\t%llu duplicate%s for a local IP address\n");
+	p(as_rcvoverperm, "\t\t%llu attempt%s to overwrite a static entry\n");
+	p(as_rcvoverint, "\t\t%llu packet%s received on wrong interface\n");
+	p(as_rcvover, "\t\t%llu entry%s overwritten\n");
+	p(as_rcvlenchg, "\t\t%llu change%s in hardware address length\n");
+
+	p(as_dfrtotal, "\t%llu packet%s deferred pending ARP resolution\n");
+	ps(as_dfrsent, "\t\t%llu sent\n");
+	ps(as_dfrdropped, "\t\t%llu dropped\n");
+
+	p(as_allocfail, "\t%llu failure%s to allocate llinfo\n");
+
+#undef ps
+#undef p
+}
+
+/*
+ * Pretty print an Internet address (net address + port).
+ * Take numeric_addr and numeric_port into consideration.
+ */
+void
+inetprint(in, port, proto, numeric_port)
 	struct in_addr *in;
 	u_int16_t port;
 	const char *proto;
-	int numeric;
+	int numeric_port;
 {
 	struct servent *sp = 0;
 	char line[80], *cp;
 	size_t space;
 
 	(void)snprintf(line, sizeof line, "%.*s.",
-	    (Aflag && !nflag) ? 12 : 16, inetname(in));
+	    (Aflag && !numeric_addr) ? 12 : 16, inetname(in));
 	cp = strchr(line, '\0');
-	if (!numeric && port)
+	if (!numeric_port && port)
 		sp = getservbyport((int)port, proto);
 	space = sizeof line - (cp-line);
 	if (sp || port == 0)
@@ -533,7 +590,7 @@ inetprint(in, port, proto, numeric)
 
 /*
  * Construct an Internet address representation.
- * If the nflag has been supplied, give
+ * If numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
  */
 char *
@@ -547,19 +604,19 @@ inetname(inp)
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
 
-	if (first && !nflag) {
+	if (first && !numeric_addr) {
 		first = 0;
 		if (gethostname(domain, sizeof domain) == 0) {
 			domain[sizeof(domain) - 1] = '\0';
 			if ((cp = strchr(domain, '.')))
-				(void) strcpy(domain, cp + 1);
+				(void) strlcpy(domain, cp + 1, sizeof(domain));
 			else
 				domain[0] = 0;
 		} else
 			domain[0] = 0;
 	}
 	cp = 0;
-	if (!nflag && inp->s_addr != INADDR_ANY) {
+	if (!numeric_addr && inp->s_addr != INADDR_ANY) {
 		int net = inet_netof(*inp);
 		int lna = inet_lnaof(*inp);
 
@@ -609,16 +666,19 @@ tcp_dump(pcbaddr)
 	printf("TCP Protocol Control Block at 0x%08lx:\n\n", pcbaddr);
 
 	printf("Timers:\n");
-	for (i = 0; i < TCPT_NTIMERS; i++)
-		printf("\t%s: %u", tcptimers[i], tcpcb.t_timer[i]);
+	for (i = 0; i < TCPT_NTIMERS; i++) {
+		printf("\t%s: %llu", tcptimers[i],
+		    (tcpcb.t_timer[i].c_flags & CALLOUT_ACTIVE) ?
+		    (unsigned long long) tcpcb.t_timer[i].c_time : 0);
+	}
 	printf("\n\n");
 
 	if (tcpcb.t_state < 0 || tcpcb.t_state >= TCP_NSTATES)
 		printf("State: %d", tcpcb.t_state);
 	else
 		printf("State: %s", tcpstates[tcpcb.t_state]);
-	printf(", flags 0x%x, inpcb 0x%lx\n\n", tcpcb.t_flags,
-	    (u_long)tcpcb.t_inpcb);
+	printf(", flags 0x%x, inpcb 0x%lx, in6pcb 0x%lx\n\n", tcpcb.t_flags,
+	    (u_long)tcpcb.t_inpcb, (u_long)tcpcb.t_in6pcb);
 
 	printf("rxtshift %d, rxtcur %d, dupacks %d\n", tcpcb.t_rxtshift,
 	    tcpcb.t_rxtcur, tcpcb.t_dupacks);
@@ -636,9 +696,10 @@ tcp_dump(pcbaddr)
 	printf("rcv_adv %u, snd_max %u, snd_cwnd %lu, snd_ssthresh %lu\n",
 	    tcpcb.rcv_adv, tcpcb.snd_max, tcpcb.snd_cwnd, tcpcb.snd_ssthresh);
 
-	printf("idle %d, rtt %d, rtseq %u, srtt %d, rttvar %d, rttmin %d, "
-	    "max_sndwnd %lu\n\n", tcpcb.t_idle, tcpcb.t_rtt, tcpcb.t_rtseq,
-	    tcpcb.t_srtt, tcpcb.t_rttvar, tcpcb.t_rttmin, tcpcb.max_sndwnd);
+	printf("rcvtime %u, rtttime %u, rtseq %u, srtt %d, rttvar %d, "
+	    "rttmin %d, max_sndwnd %lu\n\n", tcpcb.t_rcvtime, tcpcb.t_rtttime,
+	    tcpcb.t_rtseq, tcpcb.t_srtt, tcpcb.t_rttvar, tcpcb.t_rttmin,
+	    tcpcb.max_sndwnd);
 
 	printf("oobflags %d, iobc %d, softerror %d\n\n", tcpcb.t_oobflags,
 	    tcpcb.t_iobc, tcpcb.t_softerror);

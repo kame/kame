@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.40.4.2 2000/10/18 01:32:48 tv Exp $	*/
+/*	$NetBSD: if.c,v 1.49 2001/10/06 18:48:30 bjh21 Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-__RCSID("$NetBSD: if.c,v 1.40.4.2 2000/10/18 01:32:48 tv Exp $");
+__RCSID("$NetBSD: if.c,v 1.49 2001/10/06 18:48:30 bjh21 Exp $");
 #endif
 #endif /* not lint */
 
@@ -59,6 +59,7 @@ __RCSID("$NetBSD: if.c,v 1.40.4.2 2000/10/18 01:32:48 tv Exp $");
 
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -70,10 +71,6 @@ __RCSID("$NetBSD: if.c,v 1.40.4.2 2000/10/18 01:32:48 tv Exp $");
 
 static void sidewaysintpr __P((u_int, u_long));
 static void catchalarm __P((int));
-
-#ifdef INET6
-char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-#endif
 
 /*
  * Print a description of the network interfaces.
@@ -99,9 +96,9 @@ intpr(interval, ifnetaddr, pfunc)
 	u_long ifaddraddr;
 	struct sockaddr *sa;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
-	char name[IFNAMSIZ];
-#ifdef INET6
+	char name[IFNAMSIZ + 1];	/* + 1 for `*' */
 	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
+#ifdef INET6
 #ifdef KAME_SCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
@@ -298,7 +295,8 @@ intpr(interval, ifnetaddr, pfunc)
 						    sin6.sin6_len, hbuf,
 						    sizeof(hbuf), NULL, 0,
 						    niflag) != 0) {
-							strcpy(hbuf, "??");
+							strlcpy(hbuf, "??",
+							    sizeof(hbuf));
 						}
 						cp = hbuf;
 						if (vflag)
@@ -328,7 +326,7 @@ intpr(interval, ifnetaddr, pfunc)
 				char netnum[8];
 
 				*(union ns_net *)&net = sns->sns_addr.x_net;
-				(void)sprintf(netnum, "%xH",
+				(void)snprintf(netnum, sizeof(netnum), "%xH",
 				    (u_int32_t)ntohl(net));
 				upHex(netnum);
 				printf("ns:%-10s ", netnum);
@@ -338,24 +336,26 @@ intpr(interval, ifnetaddr, pfunc)
 				break;
 #endif
 			case AF_LINK:
-				{
-				struct sockaddr_dl *sdl =
-					(struct sockaddr_dl *)sa;
-				    cp = (char *)LLADDR(sdl);
-				    if (sdl->sdl_type == IFT_FDDI
-					|| sdl->sdl_type == IFT_ETHER)
-					    hexsep = ':';
-				    n = sdl->sdl_alen;
-				}
-				m = printf("%-13.13s ", "<Link>");
-				goto hexprint;
+				printf("%-13.13s ", "<Link>");
+				if (getnameinfo(sa, sa->sa_len,
+				    hbuf, sizeof(hbuf), NULL, 0,
+				    NI_NUMERICHOST) != 0) {
+					cp = "?";
+				} else
+					cp = hbuf;
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
+				break;
+
 			default:
 				m = printf("(%d)", sa->sa_family);
 				for (cp = sa->sa_len + (char *)sa;
 					--cp > sa->sa_data && (*cp == 0);) {}
 				n = cp - sa->sa_data + 1;
 				cp = sa->sa_data;
-			hexprint:
 				while (--n >= 0)
 					m += printf(hexfmt, *cp++ & 0xff,
 						    n > 0 ? hexsep : ' ');
@@ -447,7 +447,7 @@ sidewaysintpr(interval, off)
 	}
 	if (interesting == NULL) {
 		fprintf(stderr, "%s: %s: unknown interface\n",
-		    __progname, interface);
+		    getprogname(), interface);
 		exit(1);
 	}
 	lastif = ip;

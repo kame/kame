@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.48.4.2 2001/04/05 12:42:38 he Exp $	*/
+/*	$NetBSD: route.c,v 1.59 2002/05/13 05:13:23 matt Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-__RCSID("$NetBSD: route.c,v 1.48.4.2 2001/04/05 12:42:38 he Exp $");
+__RCSID("$NetBSD: route.c,v 1.59 2002/05/13 05:13:23 matt Exp $");
 #endif
 #endif /* not lint */
 
@@ -141,9 +141,6 @@ static void p_rtentry __P((struct rtentry *));
 static void ntreestuff __P((void));
 static u_long forgemask __P((u_long));
 static void domask __P((char *, size_t, u_long, u_long));
-#ifdef INET6
-char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-#endif 
 
 /*
  * Print routing tables.
@@ -153,6 +150,7 @@ routepr(rtree)
 	u_long rtree;
 {
 	struct radix_node_head *rnh, head;
+	struct radix_node_head *rt_tables[AF_MAX+1];
 	int i;
 
 	printf("Routing tables\n");
@@ -231,9 +229,15 @@ pr_family(af)
 #define	WID_GW(af)	18	/* width of gateway column */
 #else
 /* width of destination/gateway column */
+#ifdef KAME_SCOPEID
+/* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30, strlen("/128") == 4 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (numeric_addr ? 34 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (numeric_addr ? 30 : 18) : 18)
+#else
 /* strlen("fe80::aaaa:bbbb:cccc:dddd") == 25, strlen("/128") == 4 */
-#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 29 : 18) : 18)
-#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 25 : 18) : 18)
+#define	WID_DST(af)	((af) == AF_INET6 ? (numeric_addr ? 29 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (numeric_addr ? 25 : 18) : 18)
+#endif
 #endif /* INET6 */
 
 /*
@@ -419,6 +423,8 @@ p_sockaddr(sa, mask, flags, width)
 {
 	char workbuf[128], *cplim;
 	char *cp = workbuf;
+	char *ep = workbuf + sizeof(workbuf);
+	int n;
 
 	switch(sa->sa_family) {
 	case AF_INET:
@@ -485,36 +491,11 @@ p_sockaddr(sa, mask, flags, width)
 #endif
 
 	case AF_LINK:
-	    {
-		struct sockaddr_dl *sdl = (struct sockaddr_dl *)sa;
-
-		if (sdl->sdl_nlen == 0 && sdl->sdl_alen == 0 &&
-		    sdl->sdl_slen == 0)
-			(void)snprintf(workbuf, sizeof workbuf, "link#%d",
-			    sdl->sdl_index);
-		else switch (sdl->sdl_type) {
-		case IFT_FDDI:
-		case IFT_ETHER:
-		    {
-			int i;
-			u_char *lla = (u_char *)sdl->sdl_data +
-			    sdl->sdl_nlen;
-
-			cplim = "";
-			for (i = 0; i < sdl->sdl_alen; i++, lla++) {
-				/* XXX */
-				cp += sprintf(cp, "%s%02x", cplim, *lla);
-				cplim = ":";
-			}
-			cp = workbuf;
-			break;
-		    }
-		default:
-			cp = link_ntoa(sdl);
-			break;
-		}
+		if (getnameinfo(sa, sa->sa_len, workbuf, sizeof(workbuf),
+		    NULL, 0, NI_NUMERICHOST) != 0)
+			strncpy(workbuf, "invalid", sizeof(workbuf));
+		cp = workbuf;
 		break;
-	    }
 
 	default:
 	    {
@@ -522,11 +503,24 @@ p_sockaddr(sa, mask, flags, width)
 
 		slim =  sa->sa_len + (u_char *) sa;
 		cplim = cp + sizeof(workbuf) - 6;
-		cp += sprintf(cp, "(%d)", sa->sa_family);
+		n = snprintf(cp, ep - cp, "(%d)", sa->sa_family);
+		if (n >= ep - cp)
+			n = ep - cp - 1;
+		if (n > 0)
+			cp += n;
 		while (s < slim && cp < cplim) {
-			cp += sprintf(cp, " %02x", *s++);
-			if (s < slim)
-			    cp += sprintf(cp, "%02x", *s++);
+			n = snprintf(cp, ep - cp, " %02x", *s++);
+			if (n >= ep - cp)
+				n = ep - cp - 1;
+			if (n > 0)
+				cp += n;
+			if (s < slim) {
+				n = snprintf(cp, ep - cp, "%02x", *s++);
+				if (n >= ep - cp)
+					n = ep - cp - 1;
+				if (n > 0)
+					cp += n;
+			}
 		}
 		cp = workbuf;
 	    }
@@ -534,7 +528,7 @@ p_sockaddr(sa, mask, flags, width)
 	if (width < 0 )
 		printf("%s ", cp);
 	else {
-		if (nflag)
+		if (numeric_addr)
 			printf("%-*s ", width, cp);
 		else
 			printf("%-*.*s ", width, width, cp);
@@ -633,8 +627,10 @@ p_rtentry(rt)
  			(rt->rt_rmx.rmx_locks & RTV_RTT) ? 'L' : ' ',
  			rt->rt_rmx.rmx_rttvar, 
 			(rt->rt_rmx.rmx_locks & RTV_RTTVAR) ? 'L' : ' ');
- 	}	
-
+ 		printf("\thopcount %10lu%c\n",
+ 			rt->rt_rmx.rmx_hopcount, 
+			(rt->rt_rmx.rmx_locks & RTV_HOPCOUNT) ? 'L' : ' ');
+ 	}
 }
 
 char *
@@ -652,14 +648,14 @@ routename(in)
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0) {
 			domain[sizeof(domain) - 1] = '\0';
 			if ((cp = strchr(domain, '.')))
-				(void)strcpy(domain, cp + 1);
+				(void)strlcpy(domain, cp + 1, sizeof(domain));
 			else
 				domain[0] = 0;
 		} else
 			domain[0] = 0;
 	}
 	cp = 0;
-	if (!nflag) {
+	if (!numeric_addr) {
 		hp = gethostbyaddr((char *)&in, sizeof (struct in_addr),
 			AF_INET);
 		if (hp) {
@@ -744,7 +740,7 @@ netname(in, mask)
 
 	i = ntohl(in);
 	omask = mask = ntohl(mask);
-	if (!nflag && i != INADDR_ANY) {
+	if (!numeric_addr && i != INADDR_ANY) {
 		if (mask == INADDR_ANY) {
 			switch (mask = forgemask(i)) {
 			case IN_CLASSA_NET:
@@ -818,7 +814,7 @@ netname6(sa6, mask)
 	sin6 = *sa6;
 	if (mask) {
 		masklen = 0;
-		lim = (u_char *)mask + 16;
+		lim = (u_char *)(mask + 1);
 		for (p = (u_char *)mask, q = (u_char *)&sin6.sin6_addr;
 		     p < lim;
 		     p++, q++) {
@@ -874,24 +870,22 @@ netname6(sa6, mask)
 			else
 				*q = 0;
 		}
-	}
-	else
+	} else
 		masklen = 128;
 
 	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
 		return("default");
 
-	if (illegal)
-		fprintf(stderr, "illegal prefixlen\n");
-	if (nflag)
+	if (numeric_addr)
 		flag |= NI_NUMERICHOST;
 	error = getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
 			line, sizeof(line), NULL, 0, flag);
 	if (error)
-		strcpy(line, "invalid");
+		strlcpy(line, "invalid", sizeof(line));
 
-	if (nflag)
-		sprintf(&line[strlen(line)], "/%d", masklen);
+	if (numeric_addr)
+		snprintf(&line[strlen(line)], sizeof(line) - strlen(line),
+		    "/%d", masklen);
 
 	return line;
 }
@@ -916,13 +910,13 @@ routename6(sa6)
 	sa6_local.sin6_addr = sa6->sin6_addr;
 	sa6_local.sin6_scope_id = sa6->sin6_scope_id;
 
-	if (nflag)
+	if (numeric_addr)
 		flag |= NI_NUMERICHOST;
 
 	error = getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
 			line, sizeof(line), NULL, 0, flag);
 	if (error)
-		strcpy(line, "invalid");
+		strlcpy(line, "invalid", sizeof(line));
 
 	return line;
 }
@@ -943,16 +937,21 @@ rt_stats(off)
 	}
 	kread(off, (char *)&rtstat, sizeof (rtstat));
 	printf("routing:\n");
-	printf("\t%u bad routing redirect%s\n",
-		rtstat.rts_badredirect, plural(rtstat.rts_badredirect));
-	printf("\t%u dynamically created route%s\n",
-		rtstat.rts_dynamic, plural(rtstat.rts_dynamic));
-	printf("\t%u new gateway%s due to redirects\n",
-		rtstat.rts_newgateway, plural(rtstat.rts_newgateway));
-	printf("\t%u destination%s found unreachable\n",
-		rtstat.rts_unreach, plural(rtstat.rts_unreach));
-	printf("\t%u use%s of a wildcard route\n",
-		rtstat.rts_wildcard, plural(rtstat.rts_wildcard));
+	printf("\t%llu bad routing redirect%s\n",
+		(unsigned long long)rtstat.rts_badredirect,
+		plural(rtstat.rts_badredirect));
+	printf("\t%llu dynamically created route%s\n",
+		(unsigned long long)rtstat.rts_dynamic,
+		plural(rtstat.rts_dynamic));
+	printf("\t%llu new gateway%s due to redirects\n",
+		(unsigned long long)rtstat.rts_newgateway,
+		plural(rtstat.rts_newgateway));
+	printf("\t%llu destination%s found unreachable\n",
+		(unsigned long long)rtstat.rts_unreach,
+		plural(rtstat.rts_unreach));
+	printf("\t%llu use%s of a wildcard route\n",
+		(unsigned long long)rtstat.rts_wildcard,
+		plural(rtstat.rts_wildcard));
 }
 short ns_nullh[] = {0,0,0};
 short ns_bh[] = {-1,-1,-1};

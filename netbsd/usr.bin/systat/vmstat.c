@@ -1,4 +1,4 @@
-/*	$NetBSD: vmstat.c,v 1.31.2.1 2000/09/01 16:38:18 ad Exp $	*/
+/*	$NetBSD: vmstat.c,v 1.38.2.1 2002/06/30 05:47:25 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1983, 1989, 1992, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.2 (Berkeley) 1/12/94";
 #endif
-__RCSID("$NetBSD: vmstat.c,v 1.31.2.1 2000/09/01 16:38:18 ad Exp $");
+__RCSID("$NetBSD: vmstat.c,v 1.38.2.1 2002/06/30 05:47:25 lukem Exp $");
 #endif /* not lint */
 
 /*
@@ -47,44 +47,27 @@ __RCSID("$NetBSD: vmstat.c,v 1.31.2.1 2000/09/01 16:38:18 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/dkstat.h>
-#include <sys/buf.h>
-#include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/user.h>
-#include <sys/proc.h>
 #include <sys/namei.h>
-#include <sys/sched.h>
 #include <sys/sysctl.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
-#include <ctype.h>
-#include <err.h>
-#include <nlist.h>
-#include <paths.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <utmp.h>
-#include <unistd.h>
 
 #include "systat.h"
 #include "extern.h"
+#include "dkstats.h"
 
 static struct Info {
-	u_int64_t time[CPUSTATES];
-	struct	uvmexp uvmexp;
+	struct	uvmexp_sysctl uvmexp;
 	struct	vmtotal Total;
 	struct	nchstats nchstats;
 	long	nchcount;
 	long	*intrcnt;
 } s, s1, s2, z;
-
-#include "dkstats.h"
-extern struct _disk	cur;
-
 
 #define	cnt s.Cnt
 #define oldcnt s1.Cnt
@@ -138,17 +121,15 @@ closevmstat(WINDOW *w)
 
 
 static struct nlist namelist[] = {
-#define X_TOTAL		0
-	{ "_total" },
-#define	X_NCHSTATS	1
+#define	X_NCHSTATS	0
 	{ "_nchstats" },
-#define	X_INTRNAMES	2
+#define	X_INTRNAMES	1
 	{ "_intrnames" },
-#define	X_EINTRNAMES	3
+#define	X_EINTRNAMES	2
 	{ "_eintrnames" },
-#define	X_INTRCNT	4
+#define	X_INTRCNT	3
 	{ "_intrcnt" },
-#define	X_EINTRCNT	5
+#define	X_EINTRCNT	4
 	{ "_eintrcnt" },
 	{ "" },
 };
@@ -167,7 +148,7 @@ static struct nlist namelist[] = {
 #define PROCSROW	 7	/* uses 2 rows and 20 cols */
 #define PROCSCOL	 0
 #define GENSTATROW	 7	/* uses 2 rows and 30 cols */
-#define GENSTATCOL	20
+#define GENSTATCOL	18
 #define VMSTATROW	 7	/* uses 17 rows and 12 cols */
 #define VMSTATCOL	48
 #define GRAPHROW	10	/* uses 3 rows and 51 cols */
@@ -191,7 +172,6 @@ initvmstat(void)
 	char *intrnamebuf, *cp;
 	int i;
 	static int once = 0;
-	extern gid_t egid;
 
 	if (namelist[0].n_type == 0) {
 		if (kvm_nlist(kd, namelist)) {
@@ -204,7 +184,7 @@ initvmstat(void)
 		}
 	}
 	hertz = stathz ? stathz : hz;
-	if (! dkinit(1, egid))
+	if (! dkinit(1))
 		return(0);
 	if (dk_ndrive && !once) {
 #define	allocate(e, t) \
@@ -300,7 +280,7 @@ labelvmstat(void)
 	if (LINES - 1 > VMSTATROW + 16)
 		mvprintw(VMSTATROW + 16, VMSTATCOL + 10, "pdscn");
 
-	mvprintw(GENSTATROW, GENSTATCOL, "  Csw  Trp  Sys  Int  Sof  Flt");
+	mvprintw(GENSTATROW, GENSTATCOL, " Csw   Trp   Sys  Int  Sof   Flt");
 
 	mvprintw(GRAPHROW, GRAPHCOL,
 		"    . %% Sy    . %% Us    . %% Ni    . %% In    . %% Id");
@@ -347,15 +327,11 @@ showvmstat(void)
 	int psiz, inttotal;
 	int i, l, c;
 	static int failcnt = 0;
-	
+
 	if (state == TIME)
 		dkswap();
-	etime = 0;
-	for(i = 0; i < CPUSTATES; i++) {
-		X(time);
-		etime += s.time[i];
-	}
-	if (etime < 1.0) {	/* < 5 ticks - ignore this trash */
+	etime = cur.cp_etime;
+	if ((etime * hertz) < 1.0) {	/* < 5 ticks - ignore this trash */
 		if (failcnt++ >= MAXFAIL) {
 			clear();
 			mvprintw(2, 10, "The alternate system clock has died!");
@@ -369,7 +345,6 @@ showvmstat(void)
 		return;
 	}
 	failcnt = 0;
-	etime /= hertz;
 	inttotal = 0;
 	for (i = 0; i < nintr; i++) {
 		if (s.intrcnt[i] == 0)
@@ -397,7 +372,7 @@ showvmstat(void)
 	psiz = 0;
 	f2 = 0.0;
 
-	/* 
+	/*
 	 * Last CPU state not calculated yet.
 	 */
 	for (c = 0; c < CPUSTATES; c++) {
@@ -459,12 +434,12 @@ showvmstat(void)
 	PUTRATE(uvmexp.pgswapin, PAGEROW + 3, PAGECOL + 5, 5);
 	PUTRATE(uvmexp.pgswapout, PAGEROW + 3, PAGECOL + 10, 5);
 
-	PUTRATE(uvmexp.swtch, GENSTATROW + 1, GENSTATCOL, 5);
-	PUTRATE(uvmexp.traps, GENSTATROW + 1, GENSTATCOL + 5, 5);
-	PUTRATE(uvmexp.syscalls, GENSTATROW + 1, GENSTATCOL + 10, 5);
-	PUTRATE(uvmexp.intrs, GENSTATROW + 1, GENSTATCOL + 15, 5);
-	PUTRATE(uvmexp.softs, GENSTATROW + 1, GENSTATCOL + 20, 5);
-	PUTRATE(uvmexp.faults, GENSTATROW + 1, GENSTATCOL + 25, 5);
+	PUTRATE(uvmexp.swtch, GENSTATROW + 1, GENSTATCOL, 4);
+	PUTRATE(uvmexp.traps, GENSTATROW + 1, GENSTATCOL + 4, 6);
+	PUTRATE(uvmexp.syscalls, GENSTATROW + 1, GENSTATCOL + 10, 6);
+	PUTRATE(uvmexp.intrs, GENSTATROW + 1, GENSTATCOL + 16, 5);
+	PUTRATE(uvmexp.softs, GENSTATROW + 1, GENSTATCOL + 21, 5);
+	PUTRATE(uvmexp.faults, GENSTATROW + 1, GENSTATCOL + 26, 6);
 	mvprintw(DISKROW, DISKCOL + 5, "                              ");
 	for (i = 0, c = 0; i < dk_ndrive && c < MAXDRIVES; i++)
 		if (dk_select[i]) {
@@ -542,10 +517,10 @@ cputime(int indx)
 
 	t = 0;
 	for (i = 0; i < CPUSTATES; i++)
-		t += s.time[i];
+		t += cur.cp_time[i];
 	if (t == 0.0)
 		t = 1.0;
-	return (s.time[indx] * 100.0 / t);
+	return (cur.cp_time[indx] * 100.0 / t);
 }
 
 static void
@@ -591,12 +566,11 @@ getinfo(struct Info *s, enum state st)
 	size_t size;
 
 	dkreadstats();
-	(void) fetch_cptime(s->time);
 	NREAD(X_NCHSTATS, &s->nchstats, sizeof s->nchstats);
 	NREAD(X_INTRCNT, s->intrcnt, nintr * LONG);
 	size = sizeof(s->uvmexp);
 	mib[0] = CTL_VM;
-	mib[1] = VM_UVMEXP;
+	mib[1] = VM_UVMEXP2;
 	if (sysctl(mib, 2, &s->uvmexp, &size, NULL, 0) < 0) {
 		error("can't get uvmexp: %s\n", strerror(errno));
 		memset(&s->uvmexp, 0, sizeof(s->uvmexp));
