@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.11 2000/06/17 20:29:44 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.12 2000/06/21 15:02:01 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -175,6 +175,9 @@ dummyattach(dummy)
 		ifp->if_ioctl = dummyioctl;
 		ifp->if_output = dummyoutput;
 		ifp->if_type = IFT_DUMMY;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+#endif
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
 		if_attach(ifp);
