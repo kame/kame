@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.51 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.52 2002/05/17 01:37:49 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -593,6 +593,7 @@ dhcp6_get_options(p, ep, optinfo)
 	struct dhcp6opt *np, opth;
 	int i, opt, optlen, reqopts;
 	char *cp, *val;
+	u_int8_t val8;
 	struct dhcp6_optconf *optconf;
 
 	for (; p + 1 <= ep; p = np) {
@@ -675,6 +676,11 @@ dhcp6_get_options(p, ep, optinfo)
 
 			  nextoption:
 			}
+			break;
+		case DH6OPT_PREFERENCE:
+			if (optlen != 1)
+				goto malformed;
+			optinfo->pref = (int)*(u_char *)cp;
 			break;
 		case DH6OPT_RAPID_COMMIT:
 			if (optlen != 0)
@@ -833,7 +839,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
  	(len) += sizeof(struct dhcp6opt) + (l); \
-	dprintf(LOG_DEBUG, "set DHCP option %s", dhcpoptstr((t))); \
+	dprintf(LOG_DEBUG, "%s" "set %s", FNAME, dhcpoptstr((t))); \
 } while (0)
 
 int
@@ -857,6 +863,12 @@ dhcp6_set_options(bp, ep, optinfo)
 
 	if (optinfo->rapidcommit)
 		COPY_OPTION(DH6OPT_RAPID_COMMIT, 0, NULL, p);
+
+	if (optinfo->pref != DH6OPT_PREF_UNDEF) {
+		u_int8_t p8 = (u_int8_t)optinfo->pref;
+
+		COPY_OPTION(DH6OPT_PREFERENCE, sizeof(p8), &p8, p);
+	}
 
 	if (!TAILQ_EMPTY(&optinfo->dnslist)) {
 		struct in6_addr *in6;
@@ -989,6 +1001,8 @@ dhcpoptstr(type)
 		return "server ID";
 	case DH6OPT_ORO:
 		return "option request";
+	case DH6OPT_PREFERENCE:
+		return "preference";
 	case DH6OPT_RAPID_COMMIT:
 		return "rapid commit";
 	case DH6OPT_DNS:

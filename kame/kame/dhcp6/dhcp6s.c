@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.76 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.77 2002/05/17 01:37:50 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -69,6 +69,8 @@
 #include <config.h>
 
 static int debug = 0;
+
+const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_SERVER;
 
 char *device = NULL;
 
@@ -538,6 +540,10 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	if (optinfo->clientID.duid_id)
 		roptinfo.clientID = optinfo->clientID;
 
+	/* preference (if configured) */
+	if (ifp->server_pref != DH6OPT_PREF_UNDEF)
+		roptinfo.pref = ifp->server_pref;
+
 	/* DNS server */
 	roptinfo.dnslist = dnslist;
 
@@ -609,7 +615,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	}
 
 	/*
-	 * configure necessary options based on the options in solicit.
+	 * configure necessary options based on the options in request.
 	 */
 	dhcp6_init_options(&roptinfo);
 
@@ -628,7 +634,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 * (Our current implementation has never sent a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
-		dprintf(LOG_INFO, "%s" "unexpected unicast messsage", FNAME);
+		dprintf(LOG_INFO, "%s" "unexpected unicast message", FNAME);
 
 		return -1;	/* XXX */
 #ifdef notyet
@@ -639,7 +645,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* get per-host configuration for the client, if any. */
 	if ((client_conf = find_hostconf(&optinfo->clientID))) {
-		dprintf(LOG_DEBUG, "%s" "found a host configuration for %s",
+		dprintf(LOG_DEBUG, "%s" "found a host configuration named %s",
 			FNAME, client_conf->name);
 	}
 

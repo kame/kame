@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.11 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.12 2002/05/17 01:37:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -56,9 +56,10 @@ struct dhcp6_if {
 	/* configuration parameters */
 	u_long send_flags;
 	u_long allow_flags;
-
 #define DHCIFF_INFO_ONLY 0x1
 #define DHCIFF_RAPID_COMMIT 0x2
+
+	int server_pref;	/* server preference (server only) */
 
 	struct dhcp6_optconf *send_options;
 	struct dhcp6_optconf *request_options;
@@ -89,6 +90,8 @@ struct dhcp6_ifconf {
 	/* configuration flags */
 	u_long send_flags;
 	u_long allow_flags;
+
+	int server_pref;	/* server preference (server only) */
 
 	struct dhcp6_optconf *request_options;
 	struct dhcp6_optconf *send_options;
@@ -130,12 +133,14 @@ struct dhcp6_optconf {
 struct cf_namelist {
 	struct cf_namelist *next;
 	char *name;
+	int line;		/* the line number of the config file */
 	struct cf_list *params;
 };
 
 struct cf_list {
 	struct cf_list *next;
 	int type;
+	int line;		/* the line number of the config file */
 
 	/* type dependent values: */
 	long long num;
@@ -144,9 +149,14 @@ struct cf_list {
 };
 
 enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
-      DECL_PREFIX,
+      DECL_PREFIX, DECL_PREFERENCE,
       IFPARAM_SLA_ID,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION};
+
+typedef enum {DHCP6_MODE_SERVER, DHCP6_MODE_CLIENT, DHCP6_MODE_RELAY }
+dhcp6_mode_t;
+
+extern const dhcp6_mode_t dhcp6_mode;
 
 extern struct dhcp6_if *dhcp6_if;
 extern struct dhcp6_ifconf *dhcp6_iflist;

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.12 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.13 2002/05/17 01:37:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -57,6 +57,8 @@ static struct prefix_ifconf *prefix_ifconflist0;
 static struct host_conf *host_conflist0, *host_conflist;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
+
+extern char *configfilename;
 
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
 static int add_prefix __P((struct host_conf *, struct delegated_prefix_info *));
@@ -140,9 +142,18 @@ configure_interface(iflist)
 			goto bad;
 		}
 
+		ifc->server_pref = DH6OPT_PREF_UNDEF;
+
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
 			case DECL_REQUEST:
+				if (dhcp6_mode != DHCP6_MODE_CLIENT) {
+					dprintf(LOG_INFO, "%s" "%s:%d "
+						"client-only configuration",
+						FNAME, configfilename,
+						cfl->line);
+					goto bad;
+				}
 				if (add_options(DHCPOPTCODE_REQUEST,
 						ifc, cfl->list)) {
 					goto bad;
@@ -161,12 +172,37 @@ configure_interface(iflist)
 				}
 				break;
 			case DECL_INFO_ONLY:
+				if (dhcp6_mode != DHCP6_MODE_CLIENT) {
+					dprintf(LOG_INFO, "%s" "%s:%d "
+						"client-only configuration",
+						FNAME, configfilename,
+						cfl->line);
+					goto bad;
+				}
 				ifc->send_flags |= DHCIFF_INFO_ONLY;
 				break;
+			case DECL_PREFERENCE:
+				if (dhcp6_mode != DHCP6_MODE_SERVER) {
+					dprintf(LOG_INFO, "%s" "%s:%d "
+						"server-only configuration",
+						FNAME, configfilename,
+						cfl->line);
+					goto bad;
+				}
+				ifc->server_pref = (int)cfl->num;
+				if (ifc->server_pref < 0 ||
+				    ifc->server_pref > 255) {
+					dprintf(LOG_INFO, "%s" "%s:%d "
+						"bad value: %d", FNAME,
+						configfilename, cfl->line,
+						ifc->server_pref);
+					goto bad;
+				}
+				break;
 			default:
-				dprintf(LOG_ERR, "%s"
+				dprintf(LOG_ERR, "%s" "%s:%d "
 					"invalid interface configuration",
-					FNAME);
+					FNAME, configfilename, cfl->line);
 				goto bad;
 			}
 		}
@@ -226,8 +262,9 @@ configure_prefix_interface(iflist)
 				pif->sla_id = (u_int32_t)cfl->num;
 				break;
 			default:
-				dprintf(LOG_ERR, "%s" "invalid prefix "
-					"interface configuration", FNAME);
+				dprintf(LOG_ERR, "%s" "%s:%d "
+					"invalid configuration", FNAME,
+					configfilename, cfl->line);
 				goto bad;
 			}
 		}
@@ -270,16 +307,18 @@ configure_host(hostlist)
 			switch(cfl->type) {
 			case DECL_DUID:
 				if (hconf->duid.duid_id) {
-					dprintf(LOG_ERR, "%s"
+					dprintf(LOG_ERR, "%s" "%s:%d "
 						"duplicated DUID for %s",
-						FNAME, host->name);
+						FNAME, configfilename,
+						cfl->line, host->name);
 					goto bad;
 				}
 				if ((configure_duid((char *)cfl->ptr,
 						    &hconf->duid)) != 0) {
-					dprintf(LOG_ERR, "%s"
+					dprintf(LOG_ERR, "%s" "%s:%d "
 						"failed to configure "
 						"DUID for %s", FNAME,
+						configfilename, cfl->line,
 						host->name);
 					goto bad;
 				}
@@ -289,17 +328,17 @@ configure_host(hostlist)
 				break;
 			case DECL_PREFIX:
 				if (add_prefix(hconf, cfl->ptr)) {
-					dprintf(LOG_ERR, "%s"
-						"failed to configure "
-						"prefix for %s",
+					dprintf(LOG_ERR, "%s" "failed "
+						"to configure prefix for %s",
 						FNAME, host->name);
 					goto bad;
 				}
 				break;
 			default:
-				dprintf(LOG_ERR, "%s"
+				dprintf(LOG_ERR, "%s" "%s:%d "
 					"invalid host configuration for %s"
-					FNAME, host->name);
+					FNAME, configfilename, cfl->line,
+					host->name);
 				goto bad;
 			}
 		}
@@ -457,6 +496,7 @@ configure_commit()
 			clear_options(ifp->request_options);
 			ifp->request_options = ifc->request_options;
 			ifc->send_options = NULL;
+			ifp->server_pref = ifc->server_pref;
 		}
 	}
 	clear_ifconf(dhcp6_ifconflist);

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.8 2002/05/08 15:53:17 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.9 2002/05/17 01:37:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,6 +49,7 @@ extern int cfdebug;
 		return(-1); \
 	} \
 	memset((l), 0, sizeof(*(l))); \
+	l->line = lineno; \
 	l->name = (n); \
 	l->params = (p); \
 	} while (0)
@@ -62,6 +63,7 @@ extern int cfdebug;
 		return(-1); \
 	} \
 	memset((l), 0, sizeof(*(l))); \
+	l->line = lineno; \
 	l->type = (t); \
 	l->ptr = (pp); \
 	l->list = (pl); \
@@ -77,7 +79,7 @@ static void cleanup_cflist __P((struct cf_list *));
 
 %token INTERFACE IFNAME
 %token PREFIX_INTERFACE SLA_ID DUID_ID
-%token REQUEST SEND ALLOW
+%token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
 %token RAPID_COMMIT PREFIX_DELEGATION
 %token INFO_ONLY
@@ -198,6 +200,15 @@ declaration:
 			struct cf_list *l;
 
 			MAKE_CFLIST(l, DECL_PREFIX, $2, NULL);
+
+			$$ = l;
+		}
+	|	PREFERENCE NUMBER EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DECL_PREFERENCE, NULL, NULL);
+			l->num = $2;
 
 			$$ = l;
 		}

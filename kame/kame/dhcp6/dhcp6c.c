@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.80 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.81 2002/05/17 01:37:50 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -74,6 +74,8 @@
 
 static int debug = 0;
 static int signaled = 0;
+
+const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_CLIENT;
 
 char *device = NULL;
 
@@ -850,8 +852,9 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
 		return -1;
 	} else {
-		dprintf(LOG_DEBUG, "%s" "server ID: %s", FNAME,
-			duidstr(&optinfo->serverID));
+		dprintf(LOG_DEBUG, "%s" "server ID: %s, pref=%d", FNAME,
+			duidstr(&optinfo->serverID),
+			optinfo->pref);
 	}
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
