@@ -139,6 +139,7 @@ struct inpcb {
 	TAILQ_ENTRY(inpcb) inp_tdb_next;
 	struct tdb     *inp_tdb;	/* If tdb_dst matches our dst, use */
 	int	inp_fflowinfo;          /* Foreign flowlabel & priority */
+	u_int32_t inp_flowinfo;		/* local flowinfo */
 	int	inp_csumoffset;
 	struct	icmp6_filter *inp_icmp6filt;
 };

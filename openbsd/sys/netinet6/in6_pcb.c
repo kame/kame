@@ -656,7 +656,9 @@ in6_setpeeraddr(inp, nam)
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = inp->inp_fport;
 	sin6->sin6_addr = inp->inp_faddr6;
+#if 0	/* do not throw flowinfo - see draft-itojun-ipv6-flowlabel-api-00 */
 	sin6->sin6_flowinfo = inp->inp_fflowinfo;
+#endif
 
 	return 0;
 }

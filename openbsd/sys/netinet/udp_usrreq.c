@@ -1191,6 +1191,11 @@ udp_usrreq(so, req, m, addr, control)
 			}
 			s = splsoftnet();
 			error = in6_pcbconnect(inp, addr);
+			if (inp->inp_flags & IN6P_AUTOFLOWLABEL) {
+				inp->inp_flowinfo &= ~IPV6_FLOWLABEL_MASK;
+				inp->inp_flowinfo |=
+				    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+			}
 			splx(s);
 		} else
 #endif /* INET6 */
