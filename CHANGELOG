@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2158 2002/05/22 04:34:53 itojun Exp $
+$KAME: CHANGELOG,v 1.2159 2002/05/22 10:24:29 itojun Exp $
 
 <200205>
+Wed May 22 19:23:40 JST 2002  itojun@iijlab.net
+	* kame/revlookupd: a daemon to translate DNS reverse lookup (PTR query)
+	  into ICMPv6 node information query.  internet draft for this
+	  will be issued shortly.
+
 Tue May 21 21:19:30 PDT 2002  itojun@iijlab.net
 	* openbsd: upgrade to 3.1.  NOTE: sctp does not work yet.
 
