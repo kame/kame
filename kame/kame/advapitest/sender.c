@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.26 2001/12/25 02:53:40 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.27 2002/02/05 03:05:21 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -107,7 +107,7 @@ main(argc, argv)
 		} \
 	} while (0)
 
-	while ((ch = getopt(argc, argv, "D:d:f:h:l:M:m:n:Pp:s:t:v")) != -1)
+	while ((ch = getopt(argc, argv, "D:d:f:h:l:M:mn:Pp:s:t:v")) != -1)
 		switch(ch) {
 		case 'D':
 			STICKYCHECK;
@@ -514,24 +514,32 @@ main(argc, argv)
 	freeaddrinfo(res);
 
 	if (mflag) {
-		int cc;		/* almost unused */
-		struct sockaddr_storage ss_from;
-		u_char cbuf[1024]; /* XXX: do not hardcode */
+		u_char cbuf[1024], recvbuf[1024]; /* XXX: do not hardcode */
 
-		memset(&msg, 0, sizeof(msg));
-		msg.msg_name = (caddr_t)&ss_from;
-		msg.msg_namelen = sizeof(ss_from);
-		msg.msg_control = (caddr_t)cbuf;
-		msg.msg_controllen = sizeof(cbuf);
-		msgiov.iov_base = (void *)databuf;
-		msgiov.iov_len = datalen;
-		msg.msg_iov = &msgiov;
-		msg.msg_iovlen = 1;
+		while(1) {
+			int cc;
+			struct sockaddr_storage ss_from;
 
-		if ((cc = recvmsg(s, &msg, 0)) < 0)
-			err(1, "recvmsg");
+			memset(&msg, 0, sizeof(msg));
+			memset(&cbuf, 0, sizeof(cbuf));
 
-		print_options(&msg);
+			msg.msg_name = (caddr_t)&ss_from;
+			msg.msg_namelen = sizeof(ss_from);
+			msg.msg_control = (caddr_t)cbuf;
+			msg.msg_controllen = sizeof(cbuf);
+			msgiov.iov_base = (void *)recvbuf;
+			msgiov.iov_len = sizeof(recvbuf);
+			msg.msg_iov = &msgiov;
+			msg.msg_iovlen = 1;
+
+			if ((cc = recvmsg(s, &msg, 0)) < 0)
+				err(1, "recvmsg");
+
+			printf("received %d bytes from %s\n", cc,
+			       ip6str((struct sockaddr_in6 *)&ss_from));
+
+			print_options(&msg);
+		}
 	}
 
 	exit(0);
