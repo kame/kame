@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.16 2000/02/16 04:31:54 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.17 2000/02/16 05:54:17 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -108,6 +108,7 @@ static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa
 #ifdef HAVE_SIGNING_C
 static char *oakley_getidstr __P((char *id, int len));
 #endif
+static char *getdirnamebyid __P((int identtype));
 
 int
 oakley_get_defaultlifetime()
@@ -1103,7 +1104,7 @@ oakley_validate_auth(iph1)
 				/* make public file name */
 				snprintf(path, sizeof(path), "%s/%s/%s/%s",
 					lcconf->pathinfo[LC_PATHTYPE_CERT],
-					s_ipsecdoi_ident(iph1->rmconf->identtype),
+					getdirnamebyid(iph1->rmconf->identtype),
 					idstr, CERTFILE);
 				YIPSDEBUG(DEBUG_CERT,
 					plog(logp, LOCATION, NULL,
@@ -1243,7 +1244,7 @@ oakley_getmycert(iph1)
 		/* make public file name */
 		snprintf(path, sizeof(path), "%s/%s/%s/%s",
 			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			s_ipsecdoi_ident(iph1->rmconf->identtype),
+			getdirnamebyid(iph1->rmconf->identtype),
 			idstr, CERTFILE);
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL, "filename: %s\n", path));
@@ -1267,7 +1268,7 @@ oakley_getmycert(iph1)
 	iph1->cert->v[0] = iph1->rmconf->certtype;
 
 	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get CERT:"));
-	YIPSDEBUG(DEBUG_DCERT, PVDUMP(iph1->cert));
+	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert));
 
 	error = 0;
 
@@ -1303,7 +1304,7 @@ oakley_getsign(iph1)
 		/* make private file name */
 		snprintf(path, sizeof(path), "%s/%s/%s/%s",
 			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			s_ipsecdoi_ident(iph1->rmconf->identtype),
+			getdirnamebyid(iph1->rmconf->identtype),
 			idstr, PRIVKEYFILE);
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL, "filename: %s\n", path));
@@ -1325,8 +1326,8 @@ oakley_getsign(iph1)
 		goto end;
 	}
 
-	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "SIGN computed:"));
-	YIPSDEBUG(DEBUG_DCERT, PVDUMP(iph1->sig));
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "SIGN computed:\n"));
+	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->sig));
 
 	error = 0;
 
@@ -1413,6 +1414,32 @@ oakley_savecert(iph1, gen)
 	}
 
 	return 0;
+}
+
+static char *
+getdirnamebyid(identtype)
+	int identtype;
+{
+	switch (identtype) {
+	case IPSECDOI_ID_FQDN:
+		return "FQDN";
+	case IPSECDOI_ID_USER_FQDN:
+		return "UserFQDN";
+	case IPSECDOI_ID_IPV4_ADDR:
+	case IPSECDOI_ID_IPV6_ADDR:
+		return "IPaddress";
+	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV4_ADDR_RANGE:
+	case IPSECDOI_ID_IPV6_ADDR_RANGE:
+	case IPSECDOI_ID_DER_ASN1_DN:
+	case IPSECDOI_ID_DER_ASN1_GN:
+	case IPSECDOI_ID_KEY_ID:
+	default:
+		return "misc";
+	}
+	/* NOTREACHED */
+	return NULL;
 }
 
 /*
