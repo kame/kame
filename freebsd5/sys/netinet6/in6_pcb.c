@@ -710,22 +710,6 @@ in6_pcbnotify(pcbinfo, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		}
 
 		/*
-		 * If the error designates a new path MTU for a destination
-		 * and the application (associated with this socket) wanted to
-		 * know the value, notify. Note that we notify for all
-		 * disconnected sockets if the corresponding application
-		 * wanted. This is because some UDP applications keep sending
-		 * sockets disconnected.
-		 * XXX: should we avoid to notify the value to TCP sockets?
-		 */
-		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
-		    (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) ||
-		     IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &sa6_dst->sin6_addr))) {
-			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
-					(u_int32_t *)cmdarg);
-		}
-
-		/*
 		 * Detect if we should notify the error. If no source and
 		 * destination ports are specifed, but non-zero flowinfo and
 		 * local address match, notify the error. This is the case
@@ -738,7 +722,8 @@ in6_pcbnotify(pcbinfo, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		    flowinfo == (inp->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
 		    IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, &sa6_src.sin6_addr))
 			goto do_notify;
-		else if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &sa6_dst->sin6_addr) ||
+		else if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr,
+					     &sa6_dst->sin6_addr) ||
 			 inp->inp_socket == 0 ||
 			 (lport && inp->inp_lport != lport) ||
 			 (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
@@ -825,14 +810,13 @@ in6_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 					continue;
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 					wildcard++;
-				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
+				if (!IN6_IS_ADDR_UNSPECIFIED(
+					&inp->in6p_laddr)) {
 					if (IN6_IS_ADDR_UNSPECIFIED(laddr))
 						wildcard++;
 					else if (!IN6_ARE_ADDR_EQUAL(
-							 &inp->in6p_laddr,
-							 laddr)) {
+						&inp->in6p_laddr, laddr))
 						continue;
-					}
 				} else {
 					if (!IN6_IS_ADDR_UNSPECIFIED(laddr))
 						wildcard++;
@@ -1003,7 +987,8 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 			    inp->inp_lport == lport) {
 				if (faith && (inp->inp_flags & INP_FAITH) == 0)
 					continue;
-				if (IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr))
+				if (IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr,
+						       laddr))
 					return (inp);
 				else if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 					local_wild = inp;
