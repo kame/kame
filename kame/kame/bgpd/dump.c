@@ -398,6 +398,7 @@ print_if_dump(FILE *fp)
 		fprintf(fp, "  Link-local Address: %s\n",
 			ip6str(&ife->ifi_laddr, ife->ifi_ifn->if_index));
 		fprintf(fp, "  Global Address: %s\n",
+			IN6_IS_ADDR_UNSPECIFIED(&ife->ifi_gaddr) ? "NONE" :
 			ip6str(&ife->ifi_gaddr, 0));
 		fprintf(fp, "  Routes to the interface\n" );
 		dump_if_rtable(fp, ife->ifi_rte);
