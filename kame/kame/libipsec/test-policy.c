@@ -80,10 +80,10 @@ struct req_t {
 };
 
 int test1 __P((void));
-int test1sub1 __P((struct req_t *req));
-int test1sub2 __P((char *buf, int family));
+int test1sub1 __P((struct req_t *));
+int test1sub2 __P((char *, int));
 int test2 __P((void));
-int test2sub __P((int so));
+int test2sub __P((int));
 
 int
 main(ac, av)

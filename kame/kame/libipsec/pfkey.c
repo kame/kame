@@ -44,33 +44,26 @@
 
 #define CALLOC(size, cast) (cast)calloc(1, (size))
 
-static int pfkey_send_x1 __P((int so, u_int type, u_int satype, u_int mode,
-	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi,
-	u_int32_t reqid, u_int wsize,
-	caddr_t keymat,
-	u_int e_type, u_int e_keylen, u_int a_type, u_int a_keylen,
-	u_int flags,
-	u_int32_t l_alloc, u_int32_t l_bytes,
-	u_int32_t l_addtime, u_int32_t l_usetime, u_int32_t seq));
-static int pfkey_send_x2 __P((int so, u_int type, u_int satype, u_int mode,
-	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi));
-static int pfkey_send_x3 __P((int so, u_int type, u_int satype));
-static int pfkey_send_x4 __P((int so, u_int type,
-	struct sockaddr *src, u_int prefs, struct sockaddr *dst, u_int prefd,
-	u_int proto, char *policy, int policylen, u_int32_t seq));
-static int pfkey_send_x5 __P((int so, u_int type, u_int32_t));
+static int pfkey_send_x1 __P((int, u_int, u_int, u_int, struct sockaddr *,
+	struct sockaddr *, u_int32_t, u_int32_t, u_int, caddr_t,
+	u_int, u_int, u_int, u_int, u_int, u_int32_t, u_int32_t,
+	u_int32_t, u_int32_t, u_int32_t));
+static int pfkey_send_x2 __P((int, u_int, u_int, u_int,
+	struct sockaddr *, struct sockaddr *, u_int32_t));
+static int pfkey_send_x3 __P((int, u_int, u_int));
+static int pfkey_send_x4 __P((int, u_int, struct sockaddr *, u_int,
+	struct sockaddr *, u_int, u_int, char *, int, u_int32_t));
+static int pfkey_send_x5 __P((int, u_int, u_int32_t));
 
-static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int type, u_int tlen,
-	u_int satype, u_int mode, u_int32_t reqid, u_int32_t seq, pid_t pid));
-static caddr_t pfkey_setsadbsa __P((caddr_t buf, u_int32_t spi, u_int wsize,
-	u_int auth, u_int enc, u_int32_t flags));
-static caddr_t pfkey_setsadbaddr __P((caddr_t buf, u_int exttype,
-	struct sockaddr *saddr, u_int prefixlen, u_int ul_proto));
-static caddr_t pfkey_setsadbkey(caddr_t buf, u_int type,
-	caddr_t key, u_int keylen);
-static caddr_t pfkey_setsadblifetime(caddr_t buf, u_int type,
-	u_int32_t l_alloc, u_int32_t l_bytes,
-	u_int32_t l_addtime, u_int32_t l_usetime);
+static caddr_t pfkey_setsadbmsg __P((caddr_t, u_int, u_int,
+	u_int, u_int, u_int32_t, u_int32_t, pid_t));
+static caddr_t pfkey_setsadbsa __P((caddr_t, u_int32_t, u_int,
+	u_int, u_int, u_int32_t));
+static caddr_t pfkey_setsadbaddr __P((caddr_t, u_int,
+	struct sockaddr *, u_int, u_int));
+static caddr_t pfkey_setsadbkey __P((caddr_t, u_int, caddr_t, u_int));
+static caddr_t pfkey_setsadblifetime __P((caddr_t, u_int, u_int32_t, u_int32_t,
+	u_int32_t, u_int32_t));
 
 /*
  * check key length against algorithm specified.

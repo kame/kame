@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <netdb.h>
 
 #include "ipsec_strerror.h"
 
@@ -61,10 +62,10 @@ do { \
 #define GETAF(p) \
 	(((struct sockaddr *)(p))->sa_family)
 
-static char *_str_ipaddr __P((u_int family, caddr_t addr));
-static char *_str_prefport __P((u_int family, u_int pref, u_int port));
-static char *_str_time __P((time_t t));
-static void _str_lifetime_byte __P((struct sadb_lifetime *x, char *str));
+static char *str_ipaddr __P((struct sockaddr *));
+static char *str_prefport __P((u_int, u_int, u_int));
+static char *str_time __P((time_t));
+static void str_lifetime_byte __P((struct sadb_lifetime *, char *));
 
 /*
  * Must to be re-written about following strings.
@@ -180,16 +181,14 @@ pfkey_sadump(m)
 		printf("no ADDRESS_SRC extension.\n");
 		return;
 	}
-	printf("%s ",
-		_str_ipaddr(GETAF(m_saddr + 1), _INADDRBYSA(m_saddr + 1)));
+	printf("%s ", str_ipaddr((struct sockaddr *)(m_saddr + 1)));
 
 	/* destination address */
 	if (m_daddr == NULL) {
 		printf("no ADDRESS_DST extension.\n");
 		return;
 	}
-	printf("%s ",
-		_str_ipaddr(GETAF(m_daddr + 1), _INADDRBYSA(m_daddr + 1)));
+	printf("%s ", str_ipaddr((struct sockaddr *)(m_daddr + 1)));
 
 	/* SA type */
 	if (m_sa == NULL) {
@@ -250,8 +249,8 @@ pfkey_sadump(m)
 		time_t tmp_time = time(0);
 
 		printf("\tcreated: %s",
-			_str_time(m_lftc->sadb_lifetime_addtime));
-		printf("\tcurrent: %s\n", _str_time(tmp_time));
+			str_time(m_lftc->sadb_lifetime_addtime));
+		printf("\tcurrent: %s\n", str_time(tmp_time));
 		printf("\tdiff: %lu(s)",
 			(u_long)(m_lftc->sadb_lifetime_addtime == 0 ?
 			0 : (tmp_time - m_lftc->sadb_lifetime_addtime)));
@@ -264,7 +263,7 @@ pfkey_sadump(m)
 			0 : m_lfts->sadb_lifetime_addtime));
 
 		printf("\tlast: %s",
-			_str_time(m_lftc->sadb_lifetime_usetime));
+			str_time(m_lftc->sadb_lifetime_usetime));
 		printf("\thard: %lu(s)",
 			(u_long)(m_lfth == NULL ?
 			0 : m_lfth->sadb_lifetime_usetime));
@@ -272,9 +271,9 @@ pfkey_sadump(m)
 			(u_long)(m_lfts == NULL ?
 			0 : m_lfts->sadb_lifetime_usetime));
 
-		_str_lifetime_byte(m_lftc, "current");
-		_str_lifetime_byte(m_lfth, "hard");
-		_str_lifetime_byte(m_lfts, "soft");
+		str_lifetime_byte(m_lftc, "current");
+		str_lifetime_byte(m_lfth, "hard");
+		str_lifetime_byte(m_lfts, "soft");
 		printf("\n");
 
 		printf("\tallocated: %lu",
@@ -321,8 +320,8 @@ pfkey_spdump(m)
 		return;
 	}
 	printf("%s%s ",
-		_str_ipaddr(GETAF(m_saddr + 1), _INADDRBYSA(m_saddr + 1)),
-		_str_prefport(GETAF(m_saddr + 1),
+		str_ipaddr((struct sockaddr *)(m_saddr + 1)),
+		str_prefport(GETAF(m_saddr + 1),
 		     m_saddr->sadb_address_prefixlen,
 		     _INPORTBYSA(m_saddr + 1)));
 
@@ -332,8 +331,8 @@ pfkey_spdump(m)
 		return;
 	}
 	printf("%s%s ",
-		_str_ipaddr(GETAF(m_daddr + 1), _INADDRBYSA(m_daddr + 1)),
-		_str_prefport(GETAF(m_daddr + 1),
+		str_ipaddr((struct sockaddr *)(m_daddr + 1)),
+		str_prefport(GETAF(m_daddr + 1),
 		     m_daddr->sadb_address_prefixlen,
 		     _INPORTBYSA(m_daddr + 1)));
 
@@ -377,28 +376,29 @@ pfkey_spdump(m)
  * set "ipaddress" to buffer.
  */
 static char *
-_str_ipaddr(family, addr)
-	u_int family;
-	caddr_t addr;
+str_ipaddr(sa)
+	struct sockaddr *sa;
 {
-	static char buf[128];
-	char addrbuf[128];
+	static char buf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
-	if (addr == NULL)
+	if (sa == NULL)
 		return "";
 
-	inet_ntop(family, addr, addrbuf, sizeof(addrbuf));
-
-	snprintf(buf, sizeof(buf), "%s", addrbuf);
-
-	return buf;
+	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf), NULL, 0, niflag) == 0)
+		return buf;
+	return NULL;
 }
 
 /*
  * set "/prefix[port number]" to buffer.
  */
 static char *
-_str_prefport(family, pref, port)
+str_prefport(family, pref, port)
 	u_int family, pref, port;
 {
 	static char buf[128];
@@ -424,7 +424,7 @@ _str_prefport(family, pref, port)
  * set "Mon Day Time Year" to buffer
  */
 static char *
-_str_time(t)
+str_time(t)
 	time_t t;
 {
 	static char buf[128];
@@ -444,7 +444,7 @@ _str_time(t)
 }
 
 static void
-_str_lifetime_byte(x, str)
+str_lifetime_byte(x, str)
 	struct sadb_lifetime *x;
 	char *str;
 {
