@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.20 2001/08/16 10:24:38 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.21 2001/08/16 10:32:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -219,22 +219,18 @@ void
 sendkeyshort(type)
         u_int type;
 {
-	char buf[BUFSIZ];
-	struct sadb_msg *msg = (struct sadb_msg *)buf;
-	size_t len;
+	struct sadb_msg msg;
 
-	len = sizeof(struct sadb_msg);
+	msg.sadb_msg_version = PF_KEY_V2;
+	msg.sadb_msg_type = type;
+	msg.sadb_msg_errno = 0;
+	msg.sadb_msg_satype = SADB_SATYPE_UNSPEC;
+	msg.sadb_msg_len = PFKEY_UNIT64(sizeof(msg));
+	msg.sadb_msg_reserved = 0;
+	msg.sadb_msg_seq = 0;
+	msg.sadb_msg_pid = getpid();
 
-	msg->sadb_msg_version = PF_KEY_V2;
-	msg->sadb_msg_type = type;
-	msg->sadb_msg_errno = 0;
-	msg->sadb_msg_satype = SADB_SATYPE_UNSPEC;
-	msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	msg->sadb_msg_reserved = 0;
-	msg->sadb_msg_seq = 0;
-	msg->sadb_msg_pid = getpid();
-
-	sendkeymsg(buf, len);
+	sendkeymsg((char *)&msg, sizeof(msg));
 
 	return;
 }
@@ -242,30 +238,26 @@ sendkeyshort(type)
 void
 promisc()
 {
-	char buf[BUFSIZ];
-	size_t len;
-	struct sadb_msg *msg = (struct sadb_msg *)buf;
+	struct sadb_msg msg;
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
 	int so;
 	ssize_t l;
 
-	len = sizeof(struct sadb_msg);
-
-	msg->sadb_msg_version = PF_KEY_V2;
-	msg->sadb_msg_type = SADB_X_PROMISC;
-	msg->sadb_msg_errno = 0;
-	msg->sadb_msg_satype = 1;
-	msg->sadb_msg_len = PFKEY_UNIT64(len);
-	msg->sadb_msg_reserved = 0;
-	msg->sadb_msg_seq = 0;
-	msg->sadb_msg_pid = getpid();
+	msg.sadb_msg_version = PF_KEY_V2;
+	msg.sadb_msg_type = SADB_X_PROMISC;
+	msg.sadb_msg_errno = 0;
+	msg.sadb_msg_satype = 1;
+	msg.sadb_msg_len = PFKEY_UNIT64(sizeof(msg));
+	msg.sadb_msg_reserved = 0;
+	msg.sadb_msg_seq = 0;
+	msg.sadb_msg_pid = getpid();
 
 	if ((so = socket(PF_KEY, SOCK_RAW, PF_KEY_V2)) < 0) {
 		err(1, "socket(PF_KEY)");
 		/*NOTREACHED*/
 	}
 
-	if ((l = send(so, buf, len, 0)) < 0) {
+	if ((l = send(so, &msg, sizeof(msg), 0)) < 0) {
 		err(1, "send");
 		/*NOTREACHED*/
 	}

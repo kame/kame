@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.41 2001/08/16 10:24:38 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.42 2001/08/16 10:32:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -601,6 +601,7 @@ policy_requests
 
 %%
 
+/* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
 int
 setkeymsg(buf, lenp)
 	char *buf;
