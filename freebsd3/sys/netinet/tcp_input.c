@@ -847,22 +847,9 @@ findpcb:
 			inp->inp_options = ip_srcroute();
 #ifdef IPSEC
 			/* copy old policy into new socket's */
-		    {
-			struct secpolicy *sp;
-
-			sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_in);
-			if (sp) {
-				key_freesp(inp->inp_sp_in);
-				inp->inp_sp_in = sp;
-			} else
-				printf("tcp_input: could not copy policy \"in\"\n");
-			sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_out);
-			if (sp) {
-				key_freesp(inp->inp_sp_out);
-				inp->inp_sp_out = sp;
-			} else
-				printf("tcp_input: could not copy policy \"out\"\n");
-		    }
+			if (ipsec_copy_policy(sotoinpcb(oso)->inp_sp,
+			                      inp->inp_sp))
+				printf("tcp_input: could not copy policy\n");
 #endif
 
 			tp = intotcpcb(inp);

@@ -102,12 +102,7 @@ struct inpcb {
 	struct	ip inp_ip;		/* header prototype; should have more */
 #endif
 #if 1 /*IPSEC*/
-	struct secpolicy *inp_sp_in;	
-	struct secpolicy *inp_sp_out;
-					/*
-					 * security policy. It may not be
-					 * used due to policy selection.
-					 */
+	struct inpcbpolicy *inp_sp;	/* security policy. */
 #endif
 };
 

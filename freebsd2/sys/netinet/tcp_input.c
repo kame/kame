@@ -535,15 +535,17 @@ findpcb:
 #endif
 #ifdef IPSEC
 			/* point to old policy from new socket's */
-			key_freesp(inp->inp_sp_in);
-			inp->inp_sp_in = sotoinpcb(oso)->inp_sp_in;
-			if (inp->inp_sp_in)
-				inp->inp_sp_in->refcnt++;
+			key_freesp(inp->inp_sp->sp_in);
+			inp->inp_sp->sp_in = sotoinpcb(oso)->inp_sp->sp_in;
+			if (inp->inp_sp->sp_in)
+				inp->inp_sp->sp_in->refcnt++;
 
-			key_freesp(inp->inp_sp_out);
-			inp->inp_sp_out = sotoinpcb(oso)->inp_sp_out;
-			if (inp->inp_sp_out)
-				inp->inp_sp_out->refcnt++;
+			key_freesp(inp->inp_sp->sp_out);
+			inp->inp_sp->sp_out = sotoinpcb(oso)->inp_sp->sp_out;
+			if (inp->inp_sp->sp_out)
+				inp->inp_sp->sp_out->refcnt++;
+
+			inp->inp_sp->priv = sotoinpcb(oso)->inp_sp->priv;
 #endif
 			tp = intotcpcb(inp);
 			tp->t_state = TCPS_LISTEN;
