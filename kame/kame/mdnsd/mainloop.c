@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.17 2000/05/31 11:29:57 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.18 2000/05/31 11:43:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -285,8 +285,10 @@ decode_name(bufp, len)
 	q = buf;
 	while (p - str < len && q - buf < len) {
 		/* compression is not supported yet */
-		if (*q > 63 || *q < 0)
+		if (*q > 63 || *q < 0) {
+			dprintf("(compressed name decoding not supported)\n");
 			goto fail;
+		}
 
 		if (q - buf + *q + 1 > len)
 			goto fail;
@@ -603,7 +605,7 @@ getans(s, buf, len, from)
 		goto fail;
 	od = (const char *)(ohp + 1);
 	on = decode_name(&od, qc->qlen - (od - qc->qbuf));
-	dprintf("query: %s reply: %s\n", on, n);
+	dprintf("validate reply: query=%s reply=%s\n", on, n);
 	if (!on || qc->qlen - (od - qc->qbuf) < 4)
 		goto fail;
 	if (strcmp(n, on) != 0 || memcmp(d, od, 4) != 0)
