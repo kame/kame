@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.230 2001/11/17 07:46:39 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.231 2001/11/26 08:21:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -951,6 +951,9 @@ ip6_input(m)
 			/* Count the packet in the ip address stats */
 			ia6->ia_ifa.if_ipackets++;
 			ia6->ia_ifa.if_ibytes += m->m_pkthdr.len;
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+			ia6->ia_ifa.ifa_ipackets++;
+			ia6->ia_ifa.ifa_ibytes += m->m_pkthdr.len;
 #endif
 			goto hbhcheck;
 		} else {
