@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.78 2000/04/21 10:41:33 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.79 2000/04/28 13:25:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1488,7 +1488,7 @@ icmp6_rip6_input(mp, off)
 	}
 	return IPPROTO_DONE;
 }
-#endif /*OpenBSD*/
+#endif /*HAVE_NRL_INPCB*/
 
 /*
  * Reflect the ip6 packet back to the source.
