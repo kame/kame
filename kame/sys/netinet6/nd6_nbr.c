@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.140 2004/02/10 21:42:45 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.141 2004/02/12 08:30:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -441,12 +441,13 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	if (MIP6_IS_MN && daddr6 == NULL && !dad) {
 		struct hif_softc *sc;
 		struct mip6_bu *mbu;
+		struct in6_addr taddr6_copy = *taddr; /* XXX */
 
 		/* 10.20. Returning Home */
 		for (sc = LIST_FIRST(&hif_softc_list); sc;
 		    sc = LIST_NEXT(sc, hif_entry)) {
 			mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-			    taddr6, NULL);
+			    &taddr6_copy, NULL);
 			if (mbu == NULL)
 				continue;
 			if ((mbu->mbu_flags & IP6MU_HOME) == 0)

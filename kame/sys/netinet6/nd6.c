@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.342 2004/02/11 10:40:06 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.343 2004/02/12 08:25:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -748,7 +748,7 @@ nd6_timer(ignored_arg)
 			for (hif = LIST_FIRST(&hif_softc_list); hif;
 			    hif = LIST_NEXT(hif, hif_entry)) {
 				mbu = mip6_bu_list_find_home_registration(
-				    &hif->hif_bu_list, &haddr);
+				    &hif->hif_bu_list, &haddr.sin6_addr);
 				if (mbu) {
 					mip6_bu_list_remove(&hif->hif_bu_list,
 					    mbu);
