@@ -312,7 +312,7 @@ ah_keyed_sha1_mature(sav)
 	struct ah_algorithm *algo;
 
 	if (!sav->key_auth) {
-		printf("esp_keyed_sha1_mature: no key is given.\n");
+		printf("ah_keyed_sha1_mature: no key is given.\n");
 		return 1;
 	}
 	algo = &ah_algorithms[sav->alg_auth];
@@ -433,7 +433,7 @@ ah_hmac_md5_mature(sav)
 	struct ah_algorithm *algo;
 
 	if (!sav->key_auth) {
-		printf("esp_hmac_md5_mature: no key is given.\n");
+		printf("ah_hmac_md5_mature: no key is given.\n");
 		return 1;
 	}
 	algo = &ah_algorithms[sav->alg_auth];
@@ -548,7 +548,7 @@ ah_hmac_sha1_mature(sav)
 	struct ah_algorithm *algo;
 
 	if (!sav->key_auth) {
-		printf("esp_hmac_sha1_mature: no key is given.\n");
+		printf("ah_hmac_sha1_mature: no key is given.\n");
 		return 1;
 	}
 	algo = &ah_algorithms[sav->alg_auth];
@@ -749,7 +749,7 @@ again:
 					break;
 				}
 				if (l <= 0 || hlen - i < l) {
-					printf("ah4_input: invalid IP option "
+					printf("ah4_calccksum: invalid IP option "
 						"(type=%02x len=%02x)\n",
 						p[i + IPOPT_OPTVAL],
 						p[i + IPOPT_OLEN]);
