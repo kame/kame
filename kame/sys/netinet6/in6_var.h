@@ -111,37 +111,37 @@ struct	in6_ifaddr {
  * IPv6 interface statistics, as defined in RFC2465 Ipv6IfStatsEntry (p12).
  */
 struct in6_ifstat {
-	int32_t	ifs6_in_receive;	/* # of total input datagram */
-	int32_t	ifs6_in_hdrerror;	/* # of datagrams with invalid hdr */
-	int32_t ifs6_in_toobig;		/* # of datagrams exceeded MTU */
-	int32_t	ifs6_in_noroute;	/* # of datagrams with no route */
-	int32_t ifs6_in_addrerr;	/* # of datagrams with invalid dst */
-	int32_t ifs6_in_protounknown;	/* # of datagrams with unknown proto */
+	u_int64_t ifs6_in_receive;	/* # of total input datagram */
+	u_int64_t ifs6_in_hdrerr;	/* # of datagrams with invalid hdr */
+	u_int64_t ifs6_in_toobig;	/* # of datagrams exceeded MTU */
+	u_int64_t ifs6_in_noroute;	/* # of datagrams with no route */
+	u_int64_t ifs6_in_addrerr;	/* # of datagrams with invalid dst */
+	u_int64_t ifs6_in_protounknown;	/* # of datagrams with unknown proto */
 					/* NOTE: increment on final dst if */
-	int32_t ifs6_in_truncated;	/* # of truncated datagrams */
-	int32_t ifs6_in_discard;	/* # of discarded datagrams */
+	u_int64_t ifs6_in_truncated;	/* # of truncated datagrams */
+	u_int64_t ifs6_in_discard;	/* # of discarded datagrams */
 					/* NOTE: fragment timeout is not here */
-	int32_t ifs6_in_deliver;	/* # of datagrams delivered to ULP */
+	u_int64_t ifs6_in_deliver;	/* # of datagrams delivered to ULP */
 					/* NOTE: increment on final dst if */
-	int32_t ifs6_out_forward;	/* # of datagrams forwarded */
+	u_int64_t ifs6_out_forward;	/* # of datagrams forwarded */
 					/* NOTE: increment on outgoing if */
-	int32_t ifs6_out_request;	/* # of outgoing datagrams from ULP */
+	u_int64_t ifs6_out_request;	/* # of outgoing datagrams from ULP */
 					/* NOTE: does not include forwrads */
-	int32_t ifs6_out_discard;	/* # of discarded datagrams */
-	int32_t ifs6_out_fragok;	/* # of datagrams fragmented */
-	int32_t ifs6_out_fragfail;	/* # of datagrams failed on fragment */
-	int32_t ifs6_out_fragcreat;	/* # of fragment datagrams */
+	u_int64_t ifs6_out_discard;	/* # of discarded datagrams */
+	u_int64_t ifs6_out_fragok;	/* # of datagrams fragmented */
+	u_int64_t ifs6_out_fragfail;	/* # of datagrams failed on fragment */
+	u_int64_t ifs6_out_fragcreat;	/* # of fragment datagrams */
 					/* NOTE: this is # after fragment */
-	int32_t ifs6_reass_reqd;	/* # of incoming fragmented packets */
+	u_int64_t ifs6_reass_reqd;	/* # of incoming fragmented packets */
 					/* NOTE: increment on final dst if */
-	int32_t ifs6_reass_ok;		/* # of reassembled packets */
+	u_int64_t ifs6_reass_ok;		/* # of reassembled packets */
 					/* NOTE: this is # after reass */
 					/* NOTE: increment on final dst if */
-	int32_t ifs6_reass_fail;	/* # of reass failures */
+	u_int64_t ifs6_reass_fail;	/* # of reass failures */
 					/* NOTE: may not be packet count */
 					/* NOTE: increment on final dst if */
-	int32_t ifs6_in_mcast;		/* # of inbound multicast datagrams */
-	int32_t ifs6_out_mcast;		/* # of outbound multicast datagrams */
+	u_int64_t ifs6_in_mcast;	/* # of inbound multicast datagrams */
+	u_int64_t ifs6_out_mcast;	/* # of outbound multicast datagrams */
 };
 
 struct	in6_ifreq {
@@ -154,6 +154,7 @@ struct	in6_ifreq {
 		int	ifru_metric;
 		caddr_t	ifru_data;
 		struct in6_addrlifetime ifru_lifetime;
+		struct in6_ifstat ifru_stat;
 	} ifr_ifru;
 };
 
@@ -294,6 +295,7 @@ struct	in6_rrenumreq {
 
 #define SIOCGIFALIFETIME_IN6	_IOWR('i', 81, struct in6_ifreq)
 #define SIOCSIFALIFETIME_IN6	_IOWR('i', 82, struct in6_ifreq)
+#define SIOCGIFSTAT_IN6		_IOWR('i', 83, struct in6_ifreq)
 
 #define SIOCSIFPREFIX_IN6	_IOW('i', 100, struct in6_prefixreq) /* set */
 #define SIOCGIFPREFIX_IN6	_IOWR('i', 101, struct in6_prefixreq) /* get */
@@ -320,6 +322,8 @@ struct	in6_rrenumreq {
 
 #ifdef _KERNEL
 extern struct in6_ifaddr *in6_ifaddr;
+extern struct in6_ifstat **in6_ifstat;
+extern size_t in6_ifstatmax;
 extern struct ifqueue ip6intrq;		/* IP6 packet input queue */
 extern struct in6_addr zeroin6_addr;
 extern u_char inet6ctlerrmap[];
