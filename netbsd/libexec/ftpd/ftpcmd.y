@@ -316,8 +316,6 @@ cmd
 				if (!q || *q != delim) {
 		parsefail:
 					reply(500, "Invalid argument, rejected.");
-					if (tmp)
-						free(tmp);
 					usedefault = 1;
 					goto eprt_done;
 				}
@@ -334,8 +332,6 @@ cmd
 			else {
 		protounsupp:
 				reply(522, "Unsupported protocol.");
-				if (tmp)
-					free(tmp);
 				usedefault = 1;
 				goto eprt_done;
 			}
@@ -406,8 +402,6 @@ cmd
 				if (fail)
 					goto parsefail;
 			}
-			free(tmp);
-			tmp = NULL;
 			if (pdata >= 0) {
 				(void) close(pdata);
 				pdata = -1;
@@ -416,6 +410,8 @@ cmd
 		eprt_done:;
 			if (res)
 				freeaddrinfo(res);
+			if (tmp)
+				free(tmp);
 		}
 
 	| PASV check_login CRLF
