@@ -136,7 +136,12 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	addr = (char *)sa + afd->a_off;
 
 	if (serv == NULL || servlen == 0) {
-		/* what we should do? */
+		/*
+		 * do nothing in this case.
+		 * in case you are wondering if "&&" is more correct than
+		 * "||" here: RFC2553 says that serv == NULL OR servlen == 0
+		 * means that the caller does not want the result.
+		 */
 	} else {
 		if (flags & NI_NUMERICSERV)
 			sp = NULL;
@@ -192,7 +197,12 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #endif
 	}
 	if (host == NULL || hostlen == 0) {
-		/* what should we do? */
+		/*
+		 * do nothing in this case.
+		 * in case you are wondering if "&&" is more correct than
+		 * "||" here: RFC2553 says that host == NULL OR hostlen == 0
+		 * means that the caller does not want the result.
+		 */
 	} else if (flags & NI_NUMERICHOST) {
 		/* NUMERICHOST and NAMEREQD conflicts with each other */
 		if (flags & NI_NAMEREQD)
