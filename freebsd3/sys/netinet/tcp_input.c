@@ -718,7 +718,8 @@ findpcb:
 		m->m_len  += hdroptlen;
 #endif
 		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
-		ip6_update_recvpcbopt(&inp->in6p_inputopts, &opts6);
+		if (inp->in6p_inputopts)
+			ip6_update_recvpcbopt(inp->in6p_inputopts, &opts6);
 		if (opts6.head) {
 			if (sbappendcontrol(&inp->in6p_socket->so_rcv,
 					    NULL, opts6.head)
@@ -893,8 +894,9 @@ findpcb:
 					ip6_savecontrol(inp, ip6, m,
 							&newopts,
 							&inp->in6p_inputopts);
-					ip6_update_recvpcbopt(&inp->in6p_inputopts,
-							      &newopts);
+					if (inp->in6p_inputopts)
+						ip6_update_recvpcbopt(inp->in6p_inputopts,
+								      &newopts);
 					if (newopts.head) {
 						if (sbappendcontrol(&so->so_rcv,
 								    NULL,
