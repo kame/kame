@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.31 1999/12/15 16:30:37 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.32 1999/12/22 04:23:30 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -5757,6 +5757,10 @@ key_sa_recordxfer(sav, m)
 	if (!sav->lft_c)
 		return;
 
+	/*
+	 * XXX Currently, there is a difference of bytes size
+	 * between inbound and outbound processing.
+	 */
 	sav->lft_c->sadb_lifetime_bytes += m->m_pkthdr.len;
 	/* to check bytes lifetime is done in key_timehandler(). */
 
