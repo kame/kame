@@ -760,9 +760,7 @@ stripoutput(ifp, m, dst, rt)
 	}
 #endif
 	switch (dst->sa_family) {
-
-            case AF_INET:
-
+	case AF_INET:
                 if (rt != NULL && rt->rt_gwroute != NULL)
                         rt = rt->rt_gwroute;
 
@@ -778,7 +776,7 @@ stripoutput(ifp, m, dst, rt)
                 dldst = LLADDR(SDL(rt->rt_gateway));
                 break;
 
-            case AF_LINK:
+	case AF_LINK:
 		/*bcopy(LLADDR(SDL(rt->rt_gateway)), dldst, ifp->if_addrlen);*/
 		dldst = LLADDR(SDL(dst));
 		break;
