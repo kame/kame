@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.16 2004/06/01 08:53:48 suz Exp $
+ * $KAME: mld6v2.c,v 1.17 2004/06/08 07:51:53 suz Exp $
  */
 
 /*
@@ -86,6 +86,7 @@ static struct sockaddr_in6 dst_sa;
 /*
  * this function build three type of messages : 
  *	- general queries
+ *	- group spec. query S flag set/not set
  *	- source/group spec. query S flag set
  *	- source/group spec. queries S flag not set
  *
@@ -104,7 +105,8 @@ static struct sockaddr_in6 dst_sa;
 
 int
 make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
-		struct sockaddr_in6 *dst, struct sockaddr_in6 *group, int ifindex,
+		struct sockaddr_in6 *dst, struct sockaddr_in6 *group,
+		int ifindex,
 		unsigned int delay, int datalen, int alert, int sflag,
 		int qrv, int qqic)
 {
@@ -191,8 +193,6 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
                 lstsrc = lstsrc->al_next;
             }
         }
-        if (nbsrc == 0)
-            return FALSE;
         IF_DEBUG(DEBUG_MLD) {
             if (sflag == SFLAGYES)
                 log_msg(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag SET",
