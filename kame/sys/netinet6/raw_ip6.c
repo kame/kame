@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.153 2004/04/09 08:10:33 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.154 2004/04/09 09:38:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -818,7 +818,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 		struct sockaddr_in6 *addr = mtod(nam, struct sockaddr_in6 *);
 		struct in6_addr *src = NULL;
 		struct sockaddr_in6 sin6;
-		struct in6_addr in6;
 		struct ifnet *ifp;
 
 		if (nam->m_len != sizeof(*addr)) {
