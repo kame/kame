@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.9 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.10 2001/02/09 07:20:40 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -1780,6 +1780,7 @@ _getq(q)
 		qtail(q) = NULL;
 	}
 	qlen(q)--;
+	m0->m_nextpkt = NULL;
 	return (m0); 
 }
 
@@ -1803,6 +1804,7 @@ _getq_tail(q)
 	} else
 		qtail(q) = prev;
 	qlen(q)--;
+	m->m_nextpkt = NULL;
 	return (m);
 }
 
@@ -1832,6 +1834,7 @@ _getq_random(q)
 			qtail(q) = prev;
 	}
 	qlen(q)--;
+	m->m_nextpkt = NULL;
 	return (m);
 }
 
