@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.26 2002/05/17 02:13:56 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.27 2002/05/17 02:17:58 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -146,7 +146,7 @@ struct dhcp6 {
  * We temporarily adopt values used in the service specification document
  * (20020510 version) by NTT Communications.
  * Note that we'll change the following definitions if different type values
- * are officially defined.
+ * are officially assigned.
  */
 #define DH6OPT_DNS 20
 #define DH6OPT_PREFIX_DELEGATION 25
