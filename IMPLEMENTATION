@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.213 2001/05/18 13:05:33 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.214 2001/05/18 13:11:40 itojun Exp $
 
 1. IPv6
 
@@ -98,10 +98,6 @@ RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
     * "gif" interface implements IPv[46]-over-IPv[46] tunnel in a generic way,
       and it covers "configured tunnel" described in the spec.
       See 1.5 in this document for details.
-    * path MTU discovery concern (3.2) is not implemented.  when the outer
-      header is IPv4, DF bit will always be 0.  when the outer header is IPv6,
-      you will want to set the MTU for gif* interface to 1240 or smaller.
-    * ICMP message translation is not implemented (a bit intentional).
 RFC2894: Router renumbering for IPv6
 RFC3041: Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 RFC3056: Connection of IPv6 Domains via IPv4 Clouds
