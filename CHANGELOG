@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1654 2001/04/27 01:49:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1655 2001/04/27 08:56:59 itojun Exp $
 
 <200104>
+Fri Apr 27 17:53:54 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6.c:in6_ifinit(): make it work with stf interface.
+	  initialize ia_addr before if_ioctl(SIOCSIFADDR), to meet historical
+	  practice in in_ifinit().
+	* sys/net/if_stf.c: pickup a correct outer IPv4 destination address,
+	  even if the gateway portion on the routing table is set to non-6to4
+	  address, like:
+	  # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
+	* netbsd/sbin/ifconfig/ifconfig.c: allow "deprecated" flag to be
+	  set by user.  it is useful to configure outgoing-only stf interface,
+	  like:
+	  # ifconfig stf0 inet6 2002:d2a0:5f68::1 prefixlen 16 alias deprecated 
+
 2001-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_rtrequest): stop process if
 	nd6_need_cache() is 0 and the route is not a host route (which
