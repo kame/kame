@@ -85,12 +85,12 @@ struct servtab {
 #endif
 
 /* control structure to communicate with mediator */
-struct mediatro_control_msg {
+struct mediator_control_msg {
 	int version;
 	int lifetime;
 	char serveraddr[128];
 };
-struct mediatro_control_msg mediator_msg;
+static struct mediator_control_msg mediator_msg;
 #endif 
 
 static int debug = 0;
