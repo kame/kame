@@ -115,6 +115,7 @@ void	 pmsg_common __P((struct rt_msghdr *));
 void	 pmsg_addrs __P((char *, int));
 void	 bprintf __P((FILE *, int, u_char *));
 void	 mask_addr __P((void));
+static int inet6_makenetandmask(struct sockaddr_in6 *);
 int	 getaddr __P((int, char *, struct hostent **));
 int	 rtmsg __P((int, int));
 int	 x25_makemask __P((void));
@@ -912,7 +913,7 @@ inet_makenetandmask(net, sin, bits)
 /*
  * XXX the function may need more improvement...
  */
-static void
+static int
 inet6_makenetandmask(sin6)
 	struct sockaddr_in6 *sin6;
 {
@@ -933,8 +934,10 @@ inet6_makenetandmask(sin6)
 
 	if (plen) {
 		rtm_addrs |= RTA_NETMASK;
-		prefixlen(plen);
+		return prefixlen(plen);
 	}
+
+	return -1;
 }
 #endif
 
@@ -1030,9 +1033,10 @@ getaddr(which, s, hpp)
 			su->sin6.sin6_scope_id = 0;
 		}
 #endif
-		if (which == RTA_DST)
-			inet6_makenetandmask(&su->sin6);
 		freeaddrinfo(res);
+		if (which == RTA_DST)
+			if (inet6_makenetandmask(&su->sin6) == 128)
+				return 1;
 		return 0;
 	    }
 #endif
