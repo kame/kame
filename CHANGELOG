@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1714 2001/06/08 04:55:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1715 2001/06/09 12:13:41 fujisawa Exp $
 
 <200106>
+2001-06-09  Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c (tr_icmp4MimicPayload):
+	- Correct a packet header stored in a data part of returned
+	  ICMP packet when ICMP_UNREACH returned from IPv4 network.
+	* kame/sys/netinet6/natpt_{defs.h,trans.c,tslot.c}:
+	- Remove NATPT_TRACEROUTE flag in struct _cv{}.
+	  Does not use NATPT_TRACEROUTE by this modification.
+
 Fri Jun  8 08:28:56 JST 2001  itojun@iijlab.net
 	* sys/net/if_stf.c: inject outgoing packet to bpf.  KAME PR 358
 
