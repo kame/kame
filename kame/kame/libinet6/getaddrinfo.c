@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.104 2001/04/25 00:07:34 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.105 2001/05/30 18:17:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -787,10 +787,13 @@ explore_numeric(pai, hostname, servname, res)
 			    pai->ai_family == PF_UNSPEC /*?*/) {
 				GET_AI(cur->ai_next, afd, pton);
 				GET_PORT(cur->ai_next, servname);
+				if ((pai->ai_flags & AI_CANONNAME)) {
+					GET_CANONNAME(cur->ai_next, hostname);
+				}
 				while (cur && cur->ai_next)
 					cur = cur->ai_next;
 			} else
-				ERR(EAI_FAMILY);	/*xxx*/
+				ERR(EAI_FAMILY);	/* XXX */
 		}
 		break;
 	}
