@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.16 2001/01/19 03:07:18 itojun Exp $	*/
+/*	$KAME: if.c,v 1.17 2001/01/21 15:27:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -345,7 +345,7 @@ get_next_msg(char *buf, char *lim, int ifindex, size_t *lenp, int filter)
 
 	return (char *)rtm;
 }
-#undef FILTER_MATCH(type, filter)
+#undef FILTER_MATCH
 
 struct in6_addr *
 get_addr(char *buf)
