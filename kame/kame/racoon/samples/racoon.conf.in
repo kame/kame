@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.12 2000/08/09 17:23:21 sakane Exp $
+# $KAME: racoon.conf.in,v 1.13 2000/08/31 10:24:00 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -107,7 +107,7 @@ sainfo anonymous
 	pfs_group 1;
 	lifetime time 30 sec;
 	lifetime byte 5000 KB;
-	encryption_algorithm rc5 240, 3des ;
+	encryption_algorithm 3des ;
 	authentication_algorithm hmac_sha1;
 	compression_algorithm deflate ;
 }
@@ -129,7 +129,7 @@ sainfo address ::1 icmp6 address ::1 icmp6
 	lifetime time 60 sec;
 	lifetime byte 5000 KB;
 	#identifier user_fqdn;
-	encryption_algorithm 3des, rc5, cast128, blowfish, des ;
+	encryption_algorithm 3des, cast128, blowfish, des ;
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;
 }
