@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: rtsold.8,v 1.9 2000/07/04 14:44:38 jinmei Exp $
+.\"     $Id: rtsold.8,v 1.10 2000/08/13 02:09:32 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt RTSOLD 8
@@ -39,9 +39,15 @@
 .Nm
 .Op Fl dDfm1
 .Ar interface ...
+.Nm ""
+.Op Fl dDfm1
+.Fl a
 .Nm rtsol
 .Op Fl dD
 .Ar interface ...
+.Nm rtsol
+.Op Fl dD
+.Fl a
 .\"
 .Sh DESCRIPTION
 .Nm Rtsold
@@ -121,6 +127,15 @@ will dump the current internal state into
 .\"
 .Sh OPTIONS
 .Bl -tag -width indent
+.It Fl a
+Autoprobe outgoing interface.
+.Nm
+will try to find a non-loopback, non-p2p and IPv6-capable, interface.
+If
+.Nm
+finds multiple interfaces, it will fail.
+This is because IPv6 specification talks about single interface node,
+in autoconfiguration spec.
 .\"
 .It Fl d
 Enable debugging.
