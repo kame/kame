@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.6 2000/01/04 17:03:12 jinmei Exp $
+ *  $Id: mld6.c,v 1.7 2000/01/04 17:17:21 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -101,7 +101,9 @@ static struct iovec 		rcviov[2];
 static struct sockaddr_in6 	from;
 static u_char   		rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 			   	CMSG_SPACE(sizeof(int))];
+#ifndef USE_RFC2292BIS
 u_int8_t raopt[IP6OPT_RTALERT_LEN];
+#endif 
 static char *sndcmsgbuf;
 static int ctlbuflen = 0;
 static u_short rtalert_code;
@@ -194,9 +196,11 @@ init_mld6()
     sndmh.msg_iov = sndiov;
     sndmh.msg_iovlen = 1;
     /* specifiy to insert router alert option in a hop-by-hop opt hdr. */
-    raopt[0] = IP6OPT_RTALERT;
+#ifndef USE_RFC2292BIS
+    raopt[0] = IP6OPT_ROUTER_ALERT;
     raopt[1] = IP6OPT_RTALERT_LEN - 2;
     memcpy(&raopt[2], (caddr_t) & rtalert_code, sizeof(u_short));
+#endif 
 
     /* register MLD message handler */
     if (register_input_handler(mld6_socket, mld6_read) < 0)
