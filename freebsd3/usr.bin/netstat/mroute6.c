@@ -107,7 +107,7 @@ mroute6pr(mfcaddr, mifaddr)
 
 	if (mfcaddr == 0 || mifaddr == 0) {
 		printf("No IPv6 multicast routing compiled into this"
-		       "system.\n");
+		       " system.\n");
 		return;
 	}
 
