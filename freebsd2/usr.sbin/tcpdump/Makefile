@@ -38,11 +38,13 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 # crypto support - need SSLeay
-.if exists(/usr/pkg/lib/libcrypto.a)
-CFLAGS+=-DCRYPTO=1 -DHAVE_CAST_H=1 -DHAVE_RC5_H=1 
-CFLAGS+=-I/usr/pkg/include/ssleay
-LDADD+=	-L/usr/pkg/lib -lcrypto
-DPADD+=	/usr/pkg/lib/libcrypto.a
+# make sure to have non-buggy cast128 routine with you, if you enable cast128.
+.if exists(/usr/local/lib/libcrypto.a)
+CFLAGS+=-DCRYPTO=1 -DHAVE_RC5_H=1
+#CFLAGS+=-DHAVE_CAST_H=1 
+CFLAGS+=-I/usr/local/include
+LDADD+=	-L/usr/local/lib -lcrypto
+DPADD+=	/usr/local/lib/libcrypto.a
 .endif
 
 version.c: VERSION
