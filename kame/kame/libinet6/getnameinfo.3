@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.22 2001/04/29 04:32:31 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.23 2001/06/28 05:54:50 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -184,12 +184,13 @@ flags are defined in
 The implementation allows experimental numeric IPv6 address notation with
 scope identifier.
 IPv6 link-local address will appear as string like
-.Dq Li fe80::1%ne0 ,
-if
-.Dv NI_WITHSCOPEID
-bit is enabled in
-.Ar flags
-argument.
+.Dq Li fe80::1%ne0 .
+.\" MERGE NOTE: KAME/*bsd no longer has NI_WITHSCOPEID.
+.\"if
+.\".Dv NI_WITHSCOPEID
+.\"bit is enabled in
+.\".Ar flags
+.\"argument.
 Refer to
 .Xr getaddrinfo 3
 for the notation.
