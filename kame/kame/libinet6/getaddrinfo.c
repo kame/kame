@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.151 2003/04/17 13:15:21 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.152 2003/04/17 13:41:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,7 +432,7 @@ getaddrinfo(hostname, servname, hints, res)
 	const struct explore *ex;
 	struct addrinfo *afailist[sizeof(afdl)/sizeof(afdl[0])];
 	struct addrinfo *afai_unspec;
-	int found;
+	int pass, found;
 	int numeric = 0;
 
 	/* ensure we return NULL on errors */
@@ -628,6 +628,8 @@ getaddrinfo(hostname, servname, hints, res)
 #endif
 
 globcopy:
+	pass = 1;
+copyagain:
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
@@ -650,6 +652,23 @@ globcopy:
 		    !addrconfig(afd->a_af))
 			continue;
 #endif
+
+		/*
+		 * XXX: Dirty hack.  Some passive applications only assume
+		 * a single entry returned and makes a socket for the head
+		 * entry.  In such a case, it would be safer to return
+		 * "traditional" socktypes (e.g. TCP/UDP) first.
+		 * We should, ideally, fix the applications rather than to
+		 * introduce the grotty workaround in the library, but we do
+		 * not want to break deployed apps just due to adding a new
+		 * protocol type.
+		 */
+		if ((pai->ai_flags & AI_PASSIVE)) {
+			if (pass == 1 && ex->e_protocol == IPPROTO_SCTP)
+				continue;
+			if (pass == 2 && ex->e_protocol != IPPROTO_SCTP)
+				continue;
+		}
 
 		if (pai->ai_family == PF_UNSPEC)
 			pai->ai_family = ex->e_af;
@@ -680,6 +699,8 @@ globcopy:
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
+	if (++pass <= 2)
+		goto copyagain;
 
 	/* XXX inhibit errors if we have the result */
 	if (sentinel.ai_next)
