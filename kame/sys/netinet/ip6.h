@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.27 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.28 2002/05/24 12:31:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,9 +151,6 @@ struct ip6_dest {
 #define IP6OPT_RTALERT_ACTNET	2 	/* contains an Active Networks msg */
 #define IP6OPT_MINLEN		2
 
-#define IP6OPT_BINDING_UPDATE	0xc6	/* 11 0 00110 */
-#define IP6OPT_BINDING_ACK	0x07	/* 00 0 00111 */
-#define IP6OPT_BINDING_REQ	0x08	/* 00 0 01000 */
 #define IP6OPT_HOME_ADDRESS	0xc9	/* 11 0 01001 */
 #define IP6OPT_EID		0x8a	/* 10 0 01010 */
 
@@ -213,58 +210,6 @@ struct ip6_opt_router {
 #define IP6_ALERT_RSVP	0x0100
 #define IP6_ALERT_AN	0x0200
 #endif /* LITTLE_ENDIAN */
-#endif
-
-#if 0
-/* Binding Update Option */
-struct ip6_opt_binding_update {
-	u_int8_t ip6ou_type;
-	u_int8_t ip6ou_len;
-#ifdef MIP6_DRAFT13
-	u_int8_t ip6ou_flags;
-	u_int8_t ip6ou_prefixlen;
-	u_int8_t ip6ou_seqno[2];
-#else
-	u_int8_t ip6ou_flags;
-	u_int8_t ip6ou_reserved[2];
-	u_int8_t ip6ou_seqno;
-#endif /* MIP6_DRAFT13 */
-	u_int8_t ip6ou_lifetime[4];
-	/* followed by sub-options */
-} __attribute__((__packed__));
-
-/* Binding Update Flags */
-#define IP6_BUF_ACK	0x80	/* Request a binding ack */
-#define IP6_BUF_HOME	0x40	/* Home Registration */
-#ifdef MIP6_DRAFT13
-#define IP6_BUF_ROUTER	0x20	/* Sending mobile node is a router */
-#else
-#define IP6_BUF_SINGLE	0x20	/* Update the specified address only */
-#endif /* MIP6_DRAFT13 */
-#define IP6_BUF_DAD	0x10	/* Perform Duplicate Address Detection */
-
-/* Binding Ack Option */
-struct ip6_opt_binding_ack {
-	u_int8_t ip6oa_type;
-	u_int8_t ip6oa_len;
-	u_int8_t ip6oa_status;
-#ifdef MIP6_DRAFT13
-	u_int8_t ip6oa_seqno[2];
-#else
-	u_int8_t ip6oa_reserved;
-	u_int8_t ip6oa_seqno;
-#endif /* MIP6_DRAFT13 */
-	u_int8_t ip6oa_lifetime[4];
-	u_int8_t ip6oa_refresh[4];
-	/* followed by sub-options */
-} __attribute__((__packed__));
-
-/* Binding Request Option */
-struct ip6_opt_binding_request {
-	u_int8_t ip6or_type;
-	u_int8_t ip6or_len;
-	/* followed by sub-options */
-} __attribute__((__packed__));
 #endif
 
 /* Home Address Option */
