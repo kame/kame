@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.167 2001/02/05 12:52:12 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.168 2001/02/05 14:29:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1008,7 +1008,7 @@ in6_update_ifa(ifp, ifra, ia)
 		/* lifetime consistency check */
 		lt = &ifra->ifra_lifetime;
 		if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-		    && lt->ia6t_vltime + time_second < time_second) {
+		    && lt->ia6t_vltime + time_second < time_second)
 			return EINVAL;
 	}
 	if (lt->ia6t_vltime == 0) {
