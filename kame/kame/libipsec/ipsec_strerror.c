@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_strerror.c,v 1.6 2000/05/07 05:25:03 itojun Exp $	*/
+/*	$KAME: ipsec_strerror.c,v 1.7 2000/07/30 00:45:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -39,7 +39,7 @@
 
 int __ipsec_errcode;
 
-static char *ipsec_errlist[] = {
+static const char *ipsec_errlist[] = {
 "Success",					/*EIPSEC_NO_ERROR*/
 "Not supported",				/*EIPSEC_NOT_SUPPORTED*/
 "Invalid argument",				/*EIPSEC_INVAL_ARGUMENT*/
@@ -70,7 +70,7 @@ NULL,						/*EIPSEC_SYSTEM_ERROR*/
 "Unknown error",				/*EIPSEC_MAX*/
 };
 
-char *ipsec_strerror(void)
+const char *ipsec_strerror(void)
 {
 	if (__ipsec_errcode < 0 || __ipsec_errcode > EIPSEC_MAX)
 		__ipsec_errcode = EIPSEC_MAX;
@@ -78,7 +78,7 @@ char *ipsec_strerror(void)
 	return ipsec_errlist[__ipsec_errcode];
 }
 
-void __ipsec_set_strerror(char *str)
+void __ipsec_set_strerror(const char *str)
 {
 	__ipsec_errcode = EIPSEC_SYSTEM_ERROR;
 	ipsec_errlist[EIPSEC_SYSTEM_ERROR] = str;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.34 2000/07/19 15:24:38 sumikawa Exp $	*/
+/*	$KAME: ipsec.h,v 1.35 2000/07/30 00:45:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -445,7 +445,7 @@ extern caddr_t ipsec_set_policy __P((char *, int));
 extern int ipsec_get_policylen __P((caddr_t));
 extern char *ipsec_dump_policy __P((caddr_t, char *));
 
-extern char *ipsec_strerror __P((void));
+extern const char *ipsec_strerror __P((void));
 #endif /*!_KERNEL*/
 
 #endif /*_NETINET6_IPSEC_H_*/
