@@ -1,6 +1,6 @@
 racoon FAQ
 KAME team
-$KAME: FAQ,v 1.5 2000/09/13 06:36:20 itojun Exp $
+$KAME: FAQ,v 1.6 2000/09/13 06:49:33 itojun Exp $
 
 
 Q: With what other IKE/IPsec implementation racoon is known to be interoperable?
@@ -69,3 +69,6 @@ A:
 
 	If your question is confidential, send your questions to:
 	- core@kame.net
+
+Q: Other documents to look at?
+	http://www.netbsd.org/Documentation/network/ipsec/
