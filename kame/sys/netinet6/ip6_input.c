@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.295 2002/09/25 11:41:24 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.296 2002/11/20 07:39:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,7 +231,7 @@ static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
 #ifdef NATPT
 extern int natpt_enable;
 extern int natpt_in6 __P((struct mbuf *, struct mbuf **));
-extern void ip_forward __P((struct mbuf *, int));
+extern void ip_forward __P((struct mbuf *, int, struct sockaddr_in *));
 #endif
 
 /*
@@ -903,7 +903,7 @@ ip6_input(m)
 		case IPPROTO_IP:
 			goto processpacket;
 		case IPPROTO_IPV4:
-			ip_forward(m1, 0);
+			ip_forward(m1, 0, NULL);
 			break;
 #ifdef notyet
 		/*
