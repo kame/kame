@@ -1,12 +1,13 @@
 # $FreeBSD: src/lib/libftpio/Makefile,v 1.9 2000/01/14 07:57:31 rgrimes Exp $
 
 LIB=		ftpio
-SHLIB_MAJOR=	5
-SHLIB_MINOR=	0
+#SHLIB_MAJOR=	5
+#SHLIB_MINOR=	0
 
 SRCS=		ftpio.c ftperr.c
 INCS=		ftpio.h
 CFLAGS+=	-I${.CURDIR} -Wall
+CFLAGS+=	-DINET6
 MAN3=		ftpio.3
 CLEANFILES=	ftperr.c
 
