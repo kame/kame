@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.219 2001/11/05 17:36:43 sakane Exp $	*/
+/*	$KAME: key.c,v 1.220 2001/11/05 17:38:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -872,7 +872,7 @@ key_do_allocsa_policy(sah, state)
 
 			/* set sadb_address for saidx's. */
 			m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
-				(struct sockaddr *)&d->sah->saidx.src,
+				(struct sockaddr *)&d->sah->saidx.dst,
 				FULLMASK, IPSEC_ULPROTO_ANY);
 			if (!m)
 				return NULL;
