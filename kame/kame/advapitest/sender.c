@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.7 2000/11/14 17:27:46 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.8 2000/11/21 09:09:38 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -196,7 +196,6 @@ main(argc, argv)
 	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol))
 	    < 0)
 		err(1, "socket");
-	freeaddrinfo(res);
 
 	if (mflag) {
 		int on = 1;
@@ -223,6 +222,8 @@ main(argc, argv)
 
 	if (sendmsg(s, &msg, 0) != datalen)
 		err(1, "sendmsg");
+
+	freeaddrinfo(res);
 
 	if (mflag) {
 		int cc;		/* almost unused */
