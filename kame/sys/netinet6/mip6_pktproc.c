@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.22 2002/07/16 07:30:07 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.23 2002/07/16 07:40:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1473,7 +1473,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		*((u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update))
 			= IP6MOPT_PADN;
 		*((u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update) + 1)
-			= bu_size - sizeof(struct ip6m_binding_update) - 2;
+			= bu_size - sizeof(struct ip6m_binding_update);
 	}
 
 	ip6mu->ip6mu_pproto = IPPROTO_NONE;
@@ -1529,7 +1529,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		/* nonce indices and authdata insersion. */
 		/* Nonce Indicies */
 		mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
-		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
+		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce);
 		SET_NETVAL_S(&mopt_nonce->ip6mon_home_nonce_index,
 			     mbu->mbu_home_nonce_index);
 		SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
@@ -1537,7 +1537,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 		/* Auth. data */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = sizeof(struct ip6m_opt_authdata) - 2;
+		mopt_auth->ip6moau_len = sizeof(struct ip6m_opt_authdata);
 
 		/* Calculate K_bu */
 		SHA1Init(&sha1_ctx);
