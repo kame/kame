@@ -946,7 +946,7 @@ inet_makenetandmask(net, sin)
 /*
  * XXX the function may need more improvement...
  */
-static void
+static int
 inet6_makenetandmask(sin6)
 	struct sockaddr_in6 *sin6;
 {
@@ -968,8 +968,10 @@ inet6_makenetandmask(sin6)
 
 	if (plen) {
 		rtm_addrs |= RTA_NETMASK;
-		prefixlen(plen);
+		return prefixlen(plen);
 	}
+
+	return -1;
 }
 #endif
 
