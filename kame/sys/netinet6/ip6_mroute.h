@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.15 2000/09/11 11:36:41 sumikawa Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.16 2000/12/02 16:14:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -49,13 +49,16 @@
 /*
  * Multicast Routing set/getsockopt commands.
  */
-#define MRT6_INIT		100	/* initialize forwarder */
+#ifdef _KERNEL
+#define MRT6_OINIT		100	/* initialize forwarder (omrt6msg) */
+#endif
 #define MRT6_DONE		101	/* shut down forwarder */
 #define MRT6_ADD_MIF		102	/* add multicast interface */
 #define MRT6_DEL_MIF		103	/* delete multicast interface */
 #define MRT6_ADD_MFC		104	/* insert forwarding cache entry */
 #define MRT6_DEL_MFC		105	/* delete forwarding cache entry */
 #define MRT6_PIM                107     /* enable pim code */
+#define MRT6_INIT		108	/* initialize forwarder (mrt6msg) */
 
 #if BSD >= 199103
 #define GET_TIME(t)	microtime(&t)
