@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.37 2002/05/17 22:41:02 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.38 2002/06/26 06:02:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1134,8 +1134,8 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 	register const u_char *cp;
 	register int n;
 	const u_char *eom, *erdata;
-	char *bp, **ap, **hap;
-	int type, class, buflen, ancount, qdcount;
+	char *bp, **ap, **hap, *ep;
+	int type, class, ancount, qdcount;
 	int haveanswer, had_error;
 	char tbuf[MAXDNAME];
 	const char *tname;
@@ -1200,14 +1200,14 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 	ancount = ntohs(hp->ancount);
 	qdcount = ntohs(hp->qdcount);
 	bp = hostbuf;
-	buflen = sizeof hostbuf;
+	ep = hostbuf + sizeof hostbuf;
 	cp = answer->buf;
 	BOUNDED_INCR(HFIXEDSZ);
 	if (qdcount != 1) {
 		*errp = NO_RECOVERY;
 		return (NULL);
 	}
-	n = dn_expand(answer->buf, eom, cp, bp, buflen);
+	n = dn_expand(answer->buf, eom, cp, bp, ep - bp);
 	if ((n < 0) || !(*name_ok)(bp)) {
 		*errp = NO_RECOVERY;
 		return (NULL);
@@ -1225,7 +1225,6 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 		}
 		template->h_name = bp;
 		bp += n;
-		buflen -= n;
 		/* The qname can be abbreviated, but h_name is now absolute. */
 		qname = template->h_name;
 	}
@@ -1238,7 +1237,7 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 	haveanswer = 0;
 	had_error = 0;
 	while (ancount-- > 0 && cp < eom && !had_error) {
-		n = dn_expand(answer->buf, eom, cp, bp, buflen);
+		n = dn_expand(answer->buf, eom, cp, bp, ep - bp);
 		DNS_FATAL(n >= 0);
 		DNS_FATAL((*name_ok)(bp));
 		cp += n;			/* name */
@@ -1268,15 +1267,13 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 			n = strlen(bp) + 1;	/* for the \0 */
 			DNS_FATAL(n < MAXHOSTNAMELEN);
 			bp += n;
-			buflen -= n;
 			/* Get canonical name. */
 			n = strlen(tbuf) + 1;	/* for the \0 */
-			DNS_FATAL(n <= buflen);
+			DNS_FATAL(n <= ep - bp);
 			DNS_FATAL(n < MAXHOSTNAMELEN);
 			strcpy(bp, tbuf);
 			template->h_name = bp;
 			bp += n;
-			buflen -= n;
 			continue;
 		}
 		if (qtype == T_PTR && type == T_CNAME) {
@@ -1292,21 +1289,20 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 			}
 			/* Get canonical name. */
 			n = strlen(tbuf) + 1;	/* for the \0 */
-			if (n > buflen || n >= MAXHOSTNAMELEN) {
+			if (n > ep - bp || n >= MAXHOSTNAMELEN) {
 				had_error++;
 				continue;
 			}
 			strcpy(bp, tbuf);
 			tname = bp;
 			bp += n;
-			buflen -= n;
 			continue;
 		}
 		DNS_ASSERT(type == qtype);
 		switch (type) {
 		case T_PTR:
 			DNS_ASSERT(strcasecmp(tname, bp) == 0);
-			n = dn_expand(answer->buf, eom, cp, bp, buflen);
+			n = dn_expand(answer->buf, eom, cp, bp, ep - bp);
 			DNS_FATAL(n >= 0);
 			DNS_FATAL(res_hnok(bp));
 #if MULTI_PTRS_ARE_ALIASES
@@ -1328,7 +1324,6 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 					break;
 				}
 				bp += n;
-				buflen -= n;
 			}
 			break;
 #else
@@ -1346,7 +1341,6 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 				template->h_name = bp;
 				nn = strlen(bp) + 1;	/* for the \0 */
 				bp += nn;
-				buflen -= nn;
 			}
 			bp = (char *)ALIGN(bp);
 
@@ -1361,7 +1355,6 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 #endif
 			bcopy(cp, *hap++ = bp, n);
 			bp += n;
-			buflen -= n;
 			cp += n;
 			if (cp != erdata) {
 				*errp = NO_RECOVERY;
@@ -1379,12 +1372,11 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 		*hap = NULL;
 		if (!template->h_name) {
 			n = strlen(qname) + 1;	/* for the \0 */
-			if (n > buflen || n >= MAXHOSTNAMELEN)
+			if (n > ep - bp || n >= MAXHOSTNAMELEN)
 				goto no_recovery;
 			strcpy(bp, qname);
 			template->h_name = bp;
 			bp += n;
-			buflen -= n;
 		}
 		*errp = NETDB_SUCCESS;
 		return (template);
