@@ -819,6 +819,13 @@ netinet6/ipcomp_core.c	optional ipsec
 netinet6/ipcomp_input.c	optional ipsec
 netinet6/ipcomp_output.c	optional ipsec
 netinet6/mld6.c		optional inet6
+netinet6/natpt_dispatch.c	optional inet6 natpt
+netinet6/natpt_list.c	optional inet6 natpt
+netinet6/natpt_log.c	optional inet6 natpt
+netinet6/natpt_rule.c	optional inet6 natpt
+netinet6/natpt_trans.c	optional inet6 natpt
+netinet6/natpt_tslot.c	optional inet6 natpt
+netinet6/natpt_usrreq.c	optional inet6 natpt
 netinet6/nd6.c		optional inet6
 netinet6/nd6_nbr.c	optional inet6
 netinet6/nd6_rtr.c	optional inet6
