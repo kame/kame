@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.93 2000/08/11 08:58:40 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.94 2000/08/24 04:47:55 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -399,7 +399,7 @@ isakmp_main(msg, remote, local)
 		if (check_recvedpkt(msg, iph1->rlist)) {
 			YIPSDEBUG(DEBUG_NET,
 				plog(logp, LOCATION, iph1->remote,
-					"retransmited.\n"));
+					"the packet retransmited by peer.\n"));
 			return -1;
 		}
 
@@ -487,7 +487,7 @@ isakmp_main(msg, remote, local)
 		if (check_recvedpkt(msg, iph2->rlist)) {
 			YIPSDEBUG(DEBUG_NET,
 				plog(logp, LOCATION, remote,
-					"retransmited.\n"));
+					"the packet retransmited by peer.\n"));
 			return -1;
 		}
 
