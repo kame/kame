@@ -3,6 +3,7 @@
 #
 
 SUBDIR += audio
+SUBDIR += devel
 SUBDIR += mail
 SUBDIR += lang
 SUBDIR += net
