@@ -156,11 +156,12 @@ getport(rhost, rport)
 	/*
 	 * Try connecting to the server.
 	 */
-	s = -1;
 retry:
+	s = -1;
 	refuse = trial = 0;
 	for (r = res; r; r = r->ai_next) {
 		trial++;
+retryport:
 		seteuid(euid);
 		s = rresvport_af(&lport, r->ai_family);
 		seteuid(uid);
@@ -173,15 +174,14 @@ retry:
 			errno = error;
 			if (errno == EADDRINUSE) {
 				lport--;
-				goto retry;
-			}
-			if (errno == ECONNREFUSED)
+				goto retryport;
+			} else if (errno == ECONNREFUSED)
 				refuse++;
 			continue;
 		} else
 			break;
 	}
-	if (trial == refuse && timo <= 16) {
+	if (s < 0 && trial == refuse && timo <= 16) {
 		sleep(timo);
 		timo *= 2;
 		goto retry;
