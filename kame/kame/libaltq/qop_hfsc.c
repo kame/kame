@@ -1,4 +1,4 @@
-/*	$KAME: qop_hfsc.c,v 1.9 2002/11/08 06:35:00 kjc Exp $	*/
+/*	$KAME: qop_hfsc.c,v 1.10 2003/07/10 12:08:37 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -1072,6 +1072,9 @@ hfsc_add_class(struct classinfo *clinfo)
 	struct hfsc_add_class class_add;
 	struct hfsc_classinfo *hfsc_clinfo;
 	struct hfsc_ifinfo *hfsc_ifinfo;
+#if 1
+	static u_int32_t max_qid = 1;
+#endif
 
 	/* root class is a dummy class */
 	if (clinfo->parent == NULL) {
@@ -1091,6 +1094,9 @@ hfsc_add_class(struct classinfo *clinfo)
 	class_add.service_curve = hfsc_clinfo->rsc;
 	class_add.qlimit = hfsc_clinfo->qlimit;
 	class_add.flags = hfsc_clinfo->flags;
+#if 1
+	class_add.class_handle = ++max_qid;
+#endif
 	if (ioctl(hfsc_fd, HFSC_ADD_CLASS, &class_add) < 0) {
 		clinfo->handle = HFSC_NULLCLASS_HANDLE;
 		return (QOPERR_SYSCALL);

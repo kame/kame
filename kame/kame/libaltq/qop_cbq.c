@@ -1,4 +1,4 @@
-/*	$KAME: qop_cbq.c,v 1.7 2002/05/31 06:03:35 kjc Exp $	*/
+/*	$KAME: qop_cbq.c,v 1.8 2003/07/10 12:08:37 kjc Exp $	*/
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *
@@ -996,6 +996,9 @@ cbq_add_class(struct classinfo *clinfo)
 	struct cbq_add_class class_add;
 	struct cbq_classinfo *cbq_clinfo;
 	struct cbq_ifinfo *cbq_ifinfo;
+#if 1
+	static u_int32_t max_qid = 1;
+#endif
 
 	cbq_ifinfo = clinfo->ifinfo->private;
 	cbq_clinfo = clinfo->private;
@@ -1005,6 +1008,10 @@ cbq_add_class(struct classinfo *clinfo)
 		clinfo->ifinfo->ifname, IFNAMSIZ);
 
 	class_add.cbq_class = cbq_clinfo->class_spec;
+#if 1
+	if ((class_add.cbq_class.flags & CBQCLF_CLASSMASK) == 0)
+		class_add.cbq_class_handle = ++max_qid;
+#endif
 
 	if (ioctl(cbq_fd, CBQ_ADD_CLASS, &class_add) < 0)
 		return (QOPERR_SYSCALL);
