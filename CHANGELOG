@@ -1,14 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1610 2001/03/20 13:11:52 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1611 2001/03/20 13:19:19 itojun Exp $
 
 <200103>
 2001-03-20  Shin'ichi Fujisawa  <shin@loquat.rant.net>
-	* Put IPPROTO_UDP into IPv6 header.
+	* sys/netinet6/natpt_trans.c: Put IPPROTO_UDP into IPv6 header.
 	  Because conversion of IP header part is shared with TCP, default
 	  protocol was set as TCP.
-	* Calculate UDP checksum which was converted to IPv6.
-	  I forgot to re-calculate it.
+	* sys/netinet6/natpt_trans.c: Calculate UDP checksum which was
+	  converted to IPv6.  I forgot to re-calculate it.
 
 Tue Mar 20 11:56:08 JST 2001  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: change interpretation of
