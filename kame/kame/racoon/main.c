@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.30 2001/02/26 09:47:04 jinmei Exp $	*/
+/*	$KAME: main.c,v 1.31 2001/02/27 06:08:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,6 +199,12 @@ main(ac, av)
 		pid = getpid();
 		fp = fopen(pid_file, "w");
 		if (fp) {
+			if (fchmod(fileno(fp),
+				S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
+				syslog(LOG_ERR, "%s", strerror(errno));
+				fclose(fp);
+				exit(1);
+			}
 			fprintf(fp, "%ld\n", (long)pid);
 			fclose(fp);
 		} else {
