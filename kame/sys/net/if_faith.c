@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.38 2004/05/21 08:46:15 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.39 2004/05/26 09:56:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -113,7 +113,7 @@ int faithoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
 static void faithrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void faithattach __P((void *));
 PSEUDO_SET(faithattach, if_faith);
 #else
@@ -155,7 +155,7 @@ faithattach(faith)
 		ifp->if_type = IFT_FAITH;
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
 #ifdef __NetBSD__
@@ -192,7 +192,7 @@ faithoutput(ifp, m, dst, rt)
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("faithoutput no HDR");
-#if NBPFILTER > 0 || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if NBPFILTER > 0 || defined(__FreeBSD__)
 	/* BPF write needs to be handled specially */
 	if (dst->sa_family == AF_UNSPEC) {
 		dst->sa_family = *(mtod(m, int *));
