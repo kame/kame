@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.17 2005/03/02 02:51:48 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.18 2005/03/08 09:39:17 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -223,6 +223,10 @@ mh_input_common(fd)
 	char rthdr_on = 0;
 	char adata[1024], buf[1024];
 	int i, mhlen;
+
+	/* Shisa Statistics: Mobility Headers */
+	mip6stat.mip6s_mobility++;
+
 #ifdef MIP_MN
 #define mh_input(src, dst, hoa, rtaddr, mh, mhlen)	\
 	bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
@@ -269,9 +273,15 @@ mh_input_common(fd)
 			cmsgptr->cmsg_type == IPV6_DSTOPTS) {
 			dest = (struct ip6_dest *)(CMSG_DATA(cmsgptr));
 			hoaopt = mip6_search_hoa_in_destopt((u_int8_t *)dest);
-			
+
 			if (hoaopt) {
+				/* Shisa Statistics: Home Address Option */
+				mip6stat.mip6s_hao++;
+			
 				memcpy(&hoa, hoaopt->ip6oh_addr, sizeof(hoa));
+			} else {
+				/* Shisa Statistics: unverified Home Address Option */
+				mip6stat.mip6s_unverifiedhao++;
 			}
 		}
 
@@ -281,6 +291,9 @@ mh_input_common(fd)
 
 			rthdr2 = (struct ip6_rthdr2 *)(CMSG_DATA(cmsgptr));
 			if (rthdr2->ip6r2_type == 2) { 
+				/* Shisa Statistics: Routing Header type 2 */
+				mip6stat.mip6s_rthdr2++;
+
 				memcpy(&rtaddr, (rthdr2 + 1),sizeof(struct in6_addr));
 				rthdr_on = 1;
 			}
@@ -479,6 +492,9 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_HOTI:
 #ifdef MIP_CN
+		/* Shisa Statistics: HoTI messages */
+		mip6stat.mip6s_hoti++;
+
 		/* section 9.4.1 Check Home Address Option */
 		if (hoa != NULL) 
 			return (-1);
@@ -495,6 +511,9 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 	case IP6_MH_TYPE_COTI:
 #ifdef MIP_CN
+		/* Shisa Statistics: CoTI messages */
+		mip6stat.mip6s_coti++;
+
 		/* section 9.4.2 Check Home Address Option */
 		if (hoa != NULL) 
 			return (-1);
@@ -521,6 +540,9 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	case IP6_MH_TYPE_BERROR:
 		break;
 	default:
+		/* Shisa Statistics: unknown MH type */
+		mip6stat.mip6s_unknowntype++;
+
 		send_be(src, dst, hoa, IP6_MH_BES_UNKNOWN_MH);
 		break;
 	}
@@ -547,6 +569,9 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	int retcode = -1;
 	int statuscode = IP6_MH_BAS_ACCEPTED;
 	u_int16_t bid = 0;
+
+	/* Shisa Statistics: BU messages */
+	mip6stat.mip6s_bu++;
 
 	/* 
 	 * If home address option is not present, home address
@@ -926,6 +951,11 @@ send_brr(src, dst)
         brr.ip6mhbr_hdr.ip6mh_cksum = checksum_p((uint16_t *)src, (uint16_t *)dst, 
 						 (uint16_t *)&brr, sizeof(brr), IPPROTO_MH);
 
+	/* Shisa Statistics: BRR messages */
+	/* XXX: br or brr?? */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_obr++;
+
 	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL, NULL);
 	return (error);
 }
@@ -965,6 +995,10 @@ send_hoti(bul)
 	err = sendmessage((char *)&hoti, sizeof(hoti), 0,
 	    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr, NULL, NULL);
 
+	/* Shisa Statistics: HoTI messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_ohoti++;
+
 	return (err);
 }
 
@@ -1001,6 +1035,10 @@ send_coti(bul)
 
 	err = sendmessage((char *)&coti, sizeof(coti),
 		0, &bul->bul_coa, &bul->bul_peeraddr, NULL, NULL);
+
+	/* Shisa Statistics: CoTI messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_ocoti++;
 
 	return (err);
 }
@@ -1049,6 +1087,10 @@ send_hot(hoti, dst, src)
 
 	err = sendmessage((char *)&hot, sizeof(hot), 0, src, dst, NULL, NULL);
 
+	/* Shisa Statistics: HoT messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_ohot++;
+
 	return (err);
 }
 
@@ -1092,6 +1134,10 @@ send_cot(coti, dst, src)
 			   sizeof(cot), IPPROTO_MH);
 
 	err = sendmessage((char *)&cot, sizeof(cot), 0, src, dst, NULL, NULL);
+
+	/* Shisa Statistics: CoT messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_ocot++;
 
 	return (err);
 }
@@ -1338,7 +1384,11 @@ send_bu(bul)
 	if (error == 0) {
 		time(&bul->bul_bu_lastsent);
 	}
-	
+
+	/* Shisa Statistics: BU messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_obu++;
+
 	return (error);
 }
 #endif
@@ -1510,6 +1560,10 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 	if (err == 0) {
 		mip6stat.mip6s_oba_hist[status]++;
 	}
+
+	/* Shisa Statistics: BA messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_oba++;
 	
 	return (err);
 }
@@ -1555,6 +1609,10 @@ send_be(dst, src, home, status)
 	if (err == 0) {
 		mip6stat.mip6s_obe_hist[status]++;
 	}
+
+	/* Shisa Statistics: BE messages */
+	mip6stat.mip6s_omobility++;
+	mip6stat.mip6s_obe++;
 	
 	return (err);
 }

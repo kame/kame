@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.21 2005/03/03 19:17:21 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.22 2005/03/08 09:39:17 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -122,6 +122,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_BRR:
+		/* Shisa Statistics: BRR messages */
+		mip6stat.mip6s_brr++;
+
 		hinfo = hoainfo_find_withhoa(dst);
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
@@ -137,6 +140,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		bul = bul_mcoa_get(dst, src, bid); 
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
+			/* Shisa Statistics: no related binding update entry */
+			mip6stat.mip6s_nobue++;
+
 			syslog(LOG_NOTICE,
 			    "no related binding update entry with "
 			    "this BRR.\n");
@@ -151,6 +157,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_HOT:
+		/* Shisa Statistics: HoT messages */
+		mip6stat.mip6s_hot++;
+
 		if (hoa || rtaddr)
 			break;
 		hinfo = hoainfo_find_withhoa(dst);  
@@ -167,6 +176,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		bul = bul_mcoa_get(dst, src, bid);
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
+			/* Shisa Statistics: no related binding update entry */
+			mip6stat.mip6s_nobue++;
+
 			syslog(LOG_NOTICE,
 			    "no related binding update entry with "
 			    "this HoT.\n");
@@ -181,11 +193,17 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_COT:
+		/* Shisa Statistics: CoT messages */
+		mip6stat.mip6s_cot++;
+
 		if (hoa || rtaddr)
 			break;
 		ip6mhct = (struct ip6_mh_careof_test *)mh;
 		bul = bul_get_nohoa((char *)ip6mhct->ip6mhct_cookie, dst, src);
 		if (bul == NULL) {
+			/* Shisa Statistics: no related binding update entry */
+			mip6stat.mip6s_nobue++;
+
 			syslog(LOG_NOTICE,
 			    "no related binding update entry found with "
 			    "this CoT.\n");
@@ -199,6 +217,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_BACK:
+		/* Shisa Statistics: BA messages */
+		mip6stat.mip6s_ba++;
+
 		hinfo = hoainfo_find_withhoa(dst);  
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
@@ -235,6 +256,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_BERROR:
+		/* Shisa Statistics: BE Messages */
+		mip6stat.mip6s_be++;
+
 		ip6mhbe = (struct ip6_mh_binding_error *)mh;
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&ip6mhbe->ip6mhbe_homeaddr))
@@ -258,6 +282,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		bul = bul_mcoa_get(&hinfo->hinfo_hoa, src, bid); /* XXX */
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
+			/* Shisa Statistics: no related binding update entry */
+			mip6stat.mip6s_nobue++;
+
 			syslog(LOG_NOTICE,
 			    "no related binding update entry found with "
 			    "this BE.\n");
