@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.50 2002/09/26 14:02:46 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.51 2002/09/26 16:26:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -317,7 +317,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	struct ip6_opt ip6o;
 	struct mbuf *n;
 	struct sockaddr_in6 home_sa;
-	struct ip6_opt_home_address *haopt;
+	struct ip6_opt_home_address haopt;
 	struct ip6_mobility mh;
 	int newoff, off, proto, swap;
 
@@ -358,7 +358,8 @@ dest6_mip6_hao(m, mhoff, nxt)
 		if (ip6o.ip6o_type == IP6OPT_HOME_ADDRESS)
 			break;
 	}
-	haopt = (struct ip6_opt_home_address *)(mtod(m, caddr_t) + off);
+	m_copydata(m, off, sizeof(struct ip6_opt_home_address),
+	    (caddr_t)&haopt);
 
 	swap = 0;
 	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP)
@@ -369,13 +370,20 @@ dest6_mip6_hao(m, mhoff, nxt)
 			swap = 1;
 	}
 
-	if (swap)
-		return dest6_swap_hao(ip6, ip6a, haopt);
+	if (swap) {
+		int error;
+		error = dest6_swap_hao(ip6, ip6a, &haopt);
+		if (error)
+			return (error);
+		m_copyback(m, off, sizeof(struct ip6_opt_home_address),
+		    (caddr_t)&haopt);		/* XXX */
+		return (0);
+	}
 
 	/* reject */
 	mip6stat.mip6s_unverifiedhao++;
 	home_sa = ip6a->ip6a_src;
-	home_sa.sin6_addr = *(struct in6_addr *)haopt->ip6oh_addr;
+	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
 	dest6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src, &home_sa);
 
 	return (-1);
