@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.57 2002/08/09 08:49:03 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.58 2002/08/09 15:17:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,7 +183,7 @@ esp_algorithm_lookup(idx)
 }
 
 int
-esp_max_padbonud()
+esp_max_padbound()
 {
 	int idx;
 	static int padbound = 0;
