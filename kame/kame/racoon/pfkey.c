@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.120 2001/07/10 05:59:47 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.121 2001/07/14 05:48:33 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1153,6 +1153,12 @@ pk_recvupdate(mhp)
 	
 	/* update status */
 	iph2->status = PHASE2ST_ESTABLISHED;
+
+#ifdef ENABLE_STATS
+	gettimeofday(&iph2->end, NULL);
+	syslog(LOG_ALERT, "%s(%s): %8.6f",
+		"phase2", "quick", timedelta(&iph2->start, &iph2->end));
+#endif
 
 	/* count up */
 	iph2->ph1->ph2cnt++;

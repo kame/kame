@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.82 2001/04/11 06:11:55 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.83 2001/07/14 05:48:33 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,6 +172,11 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 		return -1;
 	}
 
+#ifdef ENABLE_STATS
+    {
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	switch (dh->type) {
 	case OAKLEY_ATTR_GRP_TYPE_MODP:
 		if (eay_dh_compute(dh->prime, dh->gen1, pub, priv, pub_p, gxy) < 0) {
@@ -191,6 +196,13 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 		return -1;
 	}
 
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+		s_attr_isakmp_group(dh->type), timedelta(&start, &end));
+    }
+#endif
+
 	plog(LLV_DEBUG, LOCATION, NULL, "compute DH's shared.\n");
 	plogdump(LLV_DEBUG, (*gxy)->v, (*gxy)->l);
 
@@ -207,6 +219,10 @@ oakley_dh_generate(dh, pub, priv)
 	const struct dhgroup *dh;
 	vchar_t **pub, **priv;
 {
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	switch (dh->type) {
 	case OAKLEY_ATTR_GRP_TYPE_MODP:
 		if (eay_dh_generate(dh->prime, dh->gen1, dh->gen2, pub, priv) < 0) {
@@ -227,6 +243,11 @@ oakley_dh_generate(dh, pub, priv)
 		return -1;
 	}
 
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+		s_attr_isakmp_group(dh->type), timedelta(&start, &end));
+#endif
 	plog(LLV_DEBUG, LOCATION, NULL, "compute DH's private.\n");
 	plogdump(LLV_DEBUG, (*priv)->v, (*priv)->l);
 	plog(LLV_DEBUG, LOCATION, NULL, "compute DH's public.\n");
@@ -2594,7 +2615,19 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	plog(LLV_DEBUG, LOCATION, NULL, "with key: ");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
+#ifdef ENABLE_STATS
+    {
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	new = (cipher[iph1->approval->enctype].decrypt)(buf, iph1->key, ivdp->v);
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+		s_attr_isakmp_enc(iph1->approval->enctype),
+		timedelta(&start, &end));
+    }
+#endif
 	vfree(buf);
 	buf = NULL;
 	if (new == NULL)
@@ -2723,7 +2756,19 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	plog(LLV_DEBUG, LOCATION, NULL, "with key: ");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
+#ifdef ENABLE_STATS
+    {
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	new = (cipher[iph1->approval->enctype].encrypt)(buf, iph1->key, ivep->v);
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+		s_attr_isakmp_enc(iph1->approval->enctype),
+		timedelta(&start, &end));
+    }
+#endif
 	vfree(buf);
 	buf = NULL;
 	if (new == NULL)

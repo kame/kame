@@ -1,4 +1,4 @@
-/*	$KAME: handler.h,v 1.40 2001/04/11 05:27:23 sakane Exp $	*/
+/*	$KAME: handler.h,v 1.41 2001/07/14 05:48:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,6 +163,10 @@ struct ph1handle {
 	struct isakmp_pl_hash *pl_hash;	/* pointer to hash payload */
 
 	time_t created;			/* timestamp for establish */
+#ifdef ENABLE_STATS
+	struct timeval start;
+	struct timeval end;
+#endif
 
 	u_int32_t msgid2;		/* msgid counter for Phase 2 */
 	int ph2cnt;			/* count to negotiate phase 2. */
@@ -268,6 +272,10 @@ struct ph2handle {
 
 	struct isakmp_ivm *ivm;		/* IVs */
 
+#ifdef ENABLE_STATS
+	struct timeval start;
+	struct timeval end;
+#endif
 	struct ph1handle *ph1;	/* back pointer to isakmp status */
 
 	LIST_ENTRY(ph2handle) chain;
