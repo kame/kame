@@ -461,7 +461,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	if (error == -1)
 		exit_error("setsockopt(SO_SNDTIMEO): %s", ERRSTR);
 
-	error = connect(s_dst, sa4, sa4->sa_family);
+	error = connect(s_dst, sa4, sa4->sa_len);
 	if (error == -1)
 		exit_failure("connect: %s", ERRSTR);
 
