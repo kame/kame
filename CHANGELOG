@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1982 2001/11/15 05:19:43 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1983 2001/11/15 11:11:03 keiichi Exp $
 
 <200111>
+Thu Nov 15 20:09:26 JST 2001 keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6*
+  	- fix a binding request bug. now CN sends a binding request for
+  	  the mobile node of a expiring binding cache.
+  	- add auth sub-option handling.
+  	  currently zero-length auth sub-option (means no auth) is
+  	  sent/received with bu.
+	- stop using in6_control() for address handling.  instead,
+	  use in6_update_ifa/in6_purgeaddr.
+
 2001-11-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/kame/natptconfig/showsubs.c:
 	- Invert the source and destination address of the remote side
