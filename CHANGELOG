@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1039 2000/06/18 22:43:35 itojun Exp $
+$Id: CHANGELOG,v 1.1040 2000/06/19 06:17:42 jinmei Exp $
 
 <200006>
+2000-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): jumped to the
+	"freehdrs" label before making the header chain in order to avoid
+	possible memory leak.
+	In response to the KAME problem report sys/259.
+
 Mon Jun 19 07:41:31 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_{init,send}.c: be more backward-compatible with
 	  past behavior.  some userland code may not initialize
