@@ -241,6 +241,8 @@ looutput(ifp, m, dst, rt)
 		n->m_pkthdr.rcvif = m->m_pkthdr.rcvif;
 		n->m_pkthdr.len = m->m_pkthdr.len;
 		n->m_len = m->m_pkthdr.len;
+		n->m_pkthdr.aux = m->m_pkthdr.aux;
+		m->m_pkthdr.aux = (struct mbuf *)NULL;
 		m_freem(m);
 		m = n;
 	}
