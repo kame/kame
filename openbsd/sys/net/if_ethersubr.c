@@ -259,7 +259,6 @@ ether_output(ifp, m0, dst, rt0)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 	if ((rt = rt0) != NULL) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = rtalloc1(dst, 1)) != NULL)
@@ -607,7 +606,6 @@ ether_input(ifp, eh, m)
 		ifp->if_imcasts++;
 	}
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 
 	etype = ntohs(eh->ether_type);

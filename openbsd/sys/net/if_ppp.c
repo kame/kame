@@ -799,7 +799,6 @@ pppoutput(ifp, m0, dst, rtp)
 	}
 	(*sc->sc_start)(sc);
     }
-    ifp->if_lastchange = time;
     ifp->if_opackets++;
     ifp->if_obytes += len;
 
@@ -1469,7 +1468,6 @@ ppp_inproc(sc, m)
     splx(s);
     ifp->if_ipackets++;
     ifp->if_ibytes += ilen;
-    ifp->if_lastchange = time;
 
     if (rv)
 	(*sc->sc_ctlp)(sc);

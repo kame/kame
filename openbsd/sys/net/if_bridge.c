@@ -824,7 +824,6 @@ bridge_output(ifp, m, sa, rt)
 			}
 			sc->sc_if.if_opackets++;
 			sc->sc_if.if_obytes += len;
-			dst_if->if_lastchange = time;
 			dst_if->if_obytes += len;
 			if (mflags & M_MCAST)
 				dst_if->if_omcasts++;
@@ -859,7 +858,6 @@ sendunicast:
 	}
 	sc->sc_if.if_opackets++;
 	sc->sc_if.if_obytes += len;
-	dst_if->if_lastchange = time;
 	dst_if->if_obytes += len;
 	if (mflags & M_MCAST)
 		dst_if->if_omcasts++;
@@ -931,7 +929,6 @@ bridgeintr_frame(sc, m)
 		bpf_mtap(sc->sc_if.if_bpf, m);
 #endif
 
-	sc->sc_if.if_lastchange = time;
 	sc->sc_if.if_ipackets++;
 	sc->sc_if.if_ibytes += m->m_pkthdr.len;
 
@@ -1101,7 +1098,6 @@ bridgeintr_frame(sc, m)
 	}
 	sc->sc_if.if_opackets++;
 	sc->sc_if.if_obytes += len;
-	dst_if->if_lastchange = time;
 	dst_if->if_obytes += len;
 	if (mflags & M_MCAST)
 		dst_if->if_omcasts++;
@@ -1342,7 +1338,6 @@ bridge_broadcast(sc, ifp, eh, m)
 		sc->sc_if.if_opackets++;
 		sc->sc_if.if_obytes += len;
 		dst_if->if_obytes += len;
-		dst_if->if_lastchange = time;
 		if (mflags & M_MCAST)
 			dst_if->if_omcasts++;
 		if ((dst_if->if_flags & IFF_OACTIVE) == 0)

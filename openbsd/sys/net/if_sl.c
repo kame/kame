@@ -420,7 +420,7 @@ sloutput(ifp, m, dst, rtp)
 		struct timeval tv;
 
 		/* if output's been stalled for too long, and restart */
-		timersub(&time, &sc->sc_if.if_lastchange, &tv);
+		timersub(&time, &sc->sc_lastpacket, &tv);
 		if (tv.tv_sec > 0) {
 			sc->sc_otimeout++;
 			slstart(sc->sc_ttyp);
@@ -453,7 +453,7 @@ sloutput(ifp, m, dst, rtp)
 		return (error);
 	}
 
-	sc->sc_if.if_lastchange = time;
+	sc->sc_lastpacket = time;
 	if ((sc->sc_oqlen = sc->sc_ttyp->t_outq.c_cc) == 0)
 		slstart(sc->sc_ttyp);
 	splx(s);
@@ -570,7 +570,7 @@ slstart(tp)
 			bpf_tap(sc->sc_bpf, bpfbuf, len + SLIP_HDRLEN);
 		}
 #endif
-		sc->sc_if.if_lastchange = time;
+		sc->sc_lastpacket = time;
 
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))		/* XXX - cgd */
 		/*
@@ -852,7 +852,7 @@ slinput(c, tp)
 			goto error;
 
 		sc->sc_if.if_ipackets++;
-		sc->sc_if.if_lastchange = time;
+		sc->sc_lastpacket = time;
 		s = splimp();
 		if (IF_QFULL(&ipintrq)) {
 			IF_DROP(&ipintrq);

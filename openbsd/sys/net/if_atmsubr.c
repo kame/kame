@@ -120,7 +120,6 @@ atm_output(ifp, m0, dst, rt0)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 
 #ifdef ALTQ
 	/*
@@ -299,7 +298,6 @@ atm_input(ifp, ah, m, rxhand)
 		m_freem(m);
 		return;
 	}
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 
 	if (rxhand) {

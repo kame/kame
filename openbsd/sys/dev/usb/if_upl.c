@@ -1110,5 +1110,4 @@ upl_input(struct ifnet *ifp, struct mbuf *m)
 	splx(s);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_len;
-	ifp->if_lastchange = time;
 }

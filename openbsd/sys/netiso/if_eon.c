@@ -365,7 +365,6 @@ eonoutput(ifp, m, sdst, rt)
 	}
 #endif
 
-	ifp->if_lastchange = time;
 	ifp->if_opackets++;
 	if (rt == 0 || (el = (struct eon_llinfo *) rt->rt_llinfo) == 0) {
 		if (dst->siso_family == AF_LINK) {
@@ -495,7 +494,6 @@ eoninput(m, va_alist)
 		}
 	}
 	eonif->if_ibytes += m->m_pkthdr.len;
-	eonif->if_lastchange = time;
 	iphdr = mtod(m, struct ip *);
 	/* do a few checks for debugging */
 	if (iphdr->ip_p != IPPROTO_EON) {

@@ -343,8 +343,6 @@ tun_output(ifp, m0, dst, rt)
 		m_freem (m0);
 		return EHOSTDOWN;
 	}
-	ifp->if_lastchange = time;
-
 
 	M_PREPEND(m0, sizeof(*af), M_DONTWAIT);
 	af = mtod(m0, u_int32_t *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ppp_tty.c,v 1.7 1997/09/05 04:27:03 millert Exp $	*/
+/*	$OpenBSD: ppp_tty.c,v 1.10 2001/03/09 14:56:44 aaron Exp $	*/
 /*	$NetBSD: ppp_tty.c,v 1.12 1997/03/24 21:23:10 christos Exp $	*/
 
 /*
@@ -192,6 +192,7 @@ pppopen(dev, tp)
     if (sc->sc_relinq)
 	(*sc->sc_relinq)(sc);	/* get previous owner to relinquish the unit */
 
+    timeout_set(&sc->sc_timo, ppp_timeout, sc);
     sc->sc_ilen = 0;
     sc->sc_m = NULL;
     bzero(sc->sc_asyncmap, sizeof(sc->sc_asyncmap));
@@ -262,7 +263,7 @@ pppasyncrelinq(sc)
 	sc->sc_m = NULL;
     }
     if (sc->sc_flags & SC_TIMEOUT) {
-	untimeout(ppp_timeout, (void *) sc);
+	timeout_del(&sc->sc_timo);
 	sc->sc_flags &= ~SC_TIMEOUT;
     }
     splx(s);
@@ -537,7 +538,6 @@ pppasyncstart(sc)
 
 	    /* Calculate the FCS for the first mbuf's worth. */
 	    sc->sc_outfcs = pppfcs(PPP_INITFCS, mtod(m, u_char *), m->m_len);
-	    sc->sc_if.if_lastchange = time;
 	}
 
 	for (;;) {
@@ -670,7 +670,7 @@ pppasyncstart(sc)
      * drained the t_outq.
      */
     if (!idle && (sc->sc_flags & SC_TIMEOUT) == 0) {
-	timeout(ppp_timeout, (void *) sc, 1);
+	timeout_add(&sc->sc_timo, 1);
 	sc->sc_flags |= SC_TIMEOUT;
     }
 
@@ -776,7 +776,7 @@ pppgetm(sc)
 /*
  * tty interface receiver interrupt.
  */
-static unsigned paritytab[8] = {
+static unsigned int paritytab[8] = {
     0x96696996, 0x69969669, 0x69969669, 0x96696996,
     0x69969669, 0x96696996, 0x96696996, 0x69969669
 };
@@ -788,7 +788,7 @@ pppinput(c, tp)
 {
     register struct ppp_softc *sc;
     struct mbuf *m;
-    int ilen, s = 0;
+    int ilen, s;
 
     sc = (struct ppp_softc *) tp->t_sc;
     if (sc == NULL || tp != (struct tty *) sc->sc_devp)
@@ -1010,7 +1010,6 @@ pppinput(c, tp)
     ++m->m_len;
     *sc->sc_mp++ = c;
     sc->sc_fcs = PPP_FCS(sc->sc_fcs, c);
-    splx(s);
     return 0;
 
  flush:
@@ -1023,7 +1022,6 @@ pppinput(c, tp)
 	if (sc->sc_flags & SC_LOG_FLUSH)
 	    ppplogchar(sc, c);
     }
-    splx(s);
     return 0;
 }
 

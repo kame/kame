@@ -113,7 +113,6 @@ arc_output(ifp, m0, dst, rt0)
 	m = m0;
 	mcopy = m1 = NULL;
 
-	ifp->if_lastchange = time;
 	if ((rt = rt0)) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = rtalloc1(dst, 1)))
@@ -483,7 +482,6 @@ arc_input(ifp, m)
 
 	ah = mtod(m, struct arc_header *);
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 
 	if (arcbroadcastaddr == ah->arc_dhost) {

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.52 2001/06/14 07:53:03 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.53 2001/06/15 03:59:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,9 +352,6 @@ gif_output(ifp, m, dst, rt)
 		goto end;
 	}
 
-#ifdef __OpenBSD__
-	ifp->if_lastchange = time;	
-#endif
 	m->m_flags &= ~(M_BCAST|M_MCAST);
 	if (!(ifp->if_flags & IFF_UP) ||
 	    sc->gif_psrc == NULL || sc->gif_pdst == NULL) {
