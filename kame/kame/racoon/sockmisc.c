@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.39 2003/10/23 04:22:56 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.40 2003/11/11 16:08:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -735,7 +735,7 @@ str2saddr(host, port)
 		return NULL;
 	}
 	if (res->ai_next != NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
+		plog(LLV_WARNING, LOCATION, NULL,
 			"getaddrinfo(%s%s%s): "
 			"resolved to multiple address, "
 			"taking the first one\n",
