@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.13 2001/09/05 01:10:30 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.14 2002/04/24 08:17:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -257,7 +257,7 @@ ftp_activeconn()
 		return -1;
 	}
 	error = connect(port6, sa, sa->sa_len);
-	if (port6 == -1) {
+	if (error < 0) {
 		close(port6);
 		close(port4);
 		close(wport4);
@@ -304,7 +304,7 @@ ftp_passiveconn()
 		return -1;
 	}
 	error = connect(port4, sa, sa->sa_len);
-	if (port4 == -1) {
+	if (error < 0) {
 		close(wport6);
 		close(port4);
 		close(port6);
