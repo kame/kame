@@ -139,8 +139,6 @@ struct mbuf		*pf_reassemble(struct mbuf **, struct pf_fragment *,
 struct mbuf		*pf_fragcache(struct mbuf **, struct ip*,
 			    struct pf_fragment *, int, int, int *);
 u_int16_t		 pf_cksum_fixup(u_int16_t, u_int16_t, u_int16_t);
-int			 pf_normalize_tcp(int, struct ifnet *, struct mbuf *,
-			    int, int, void *, struct pf_pdesc *);
 int			 pf_normalize_tcpopt(struct pf_rule *, struct mbuf *,
 			    struct tcphdr *, int);
 
