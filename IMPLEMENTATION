@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.236 2001/07/21 05:52:06 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.237 2001/07/21 05:53:09 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1955,7 +1955,8 @@ DEMO:
 # ping -n -c1 10.1.0.4
 (removing only one of them)
 # route delete -inet 10.1.0.0 10.0.0.2
-(it will raise error as there are two routes with the same rt_key)
+(it will raise error, as there are two routes with the same rt_key and the
+command argument is considered ambiguous)
 # route delete -inet 10.1.0.0
 (it is not ambiguous, it works)
 # route delete -inet 10.1.0.0 10.0.0.3
