@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.378 2003/07/19 13:08:58 cedric Exp $ */
+/*	$OpenBSD: pf.c,v 1.380 2003/07/29 20:56:55 dhartmei Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -263,8 +263,13 @@ u_int16_t		 pf_get_mss(struct mbuf *, int, u_int16_t,
 			    sa_family_t);
 u_int16_t		 pf_calc_mss(struct pf_addr *, sa_family_t,
 				u_int16_t);
+void			 pf_set_rt_ifp(struct pf_state *,
+			    struct pf_addr *);
 int			 pf_check_proto_cksum(struct mbuf *, int, int,
 			    u_int8_t, sa_family_t);
+int			 pf_addr_wrap_neq(struct pf_addr_wrap *,
+			    struct pf_addr_wrap *);
+
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 struct pf_pool_limit pf_pool_limits[PF_LIMIT_MAX] =
@@ -941,33 +946,15 @@ pf_calc_skip_steps(struct pf_rulequeue *rules)
 			PF_SET_SKIP_STEPS(PF_SKIP_AF);
 		if (cur->proto != prev->proto)
 			PF_SET_SKIP_STEPS(PF_SKIP_PROTO);
-		if (cur->src.addr.type == PF_ADDR_DYNIFTL ||
-		    prev->src.addr.type == PF_ADDR_DYNIFTL ||
-		    cur->src.addr.type == PF_ADDR_TABLE ||
-		    prev->src.addr.type == PF_ADDR_TABLE ||
-		    cur->src.not != prev->src.not ||
-		    (cur->src.addr.type == PF_ADDR_NOROUTE) !=
-		    (prev->src.addr.type == PF_ADDR_NOROUTE) ||
-		    !PF_AEQ(&cur->src.addr.v.a.addr,
-		    &prev->src.addr.v.a.addr, 0) ||
-		    !PF_AEQ(&cur->src.addr.v.a.mask,
-		    &prev->src.addr.v.a.mask, 0))
+		if (cur->src.not != prev->src.not ||
+		    pf_addr_wrap_neq(&cur->src.addr, &prev->src.addr))
 			PF_SET_SKIP_STEPS(PF_SKIP_SRC_ADDR);
 		if (cur->src.port[0] != prev->src.port[0] ||
 		    cur->src.port[1] != prev->src.port[1] ||
 		    cur->src.port_op != prev->src.port_op)
 			PF_SET_SKIP_STEPS(PF_SKIP_SRC_PORT);
-		if (cur->dst.addr.type == PF_ADDR_DYNIFTL ||
-		    prev->dst.addr.type == PF_ADDR_DYNIFTL ||
-		    cur->dst.addr.type == PF_ADDR_TABLE ||
-		    prev->dst.addr.type == PF_ADDR_TABLE ||
-		    cur->dst.not != prev->dst.not ||
-		    (cur->dst.addr.type == PF_ADDR_NOROUTE) !=
-		    (prev->dst.addr.type == PF_ADDR_NOROUTE) ||
-		    !PF_AEQ(&cur->dst.addr.v.a.addr,
-		    &prev->dst.addr.v.a.addr, 0) ||
-		    !PF_AEQ(&cur->dst.addr.v.a.mask,
-		    &prev->dst.addr.v.a.mask, 0))
+		if (cur->dst.not != prev->dst.not ||
+		    pf_addr_wrap_neq(&cur->dst.addr, &prev->dst.addr))
 			PF_SET_SKIP_STEPS(PF_SKIP_DST_ADDR);
 		if (cur->dst.port[0] != prev->dst.port[0] ||
 		    cur->dst.port[1] != prev->dst.port[1] ||
@@ -979,6 +966,34 @@ pf_calc_skip_steps(struct pf_rulequeue *rules)
 	}
 	for (i = 0; i < PF_SKIP_COUNT; ++i)
 		PF_SET_SKIP_STEPS(i);
+}
+
+int
+pf_addr_wrap_neq(struct pf_addr_wrap *aw1, struct pf_addr_wrap *aw2)
+{
+	if (aw1->type != aw2->type)
+		return (1);
+	switch (aw1->type) {
+	case PF_ADDR_ADDRMASK:
+		if (PF_ANEQ(&aw1->v.a.addr, &aw2->v.a.addr, 0))
+			return (1);
+		if (PF_ANEQ(&aw1->v.a.mask, &aw2->v.a.mask, 0))
+			return (1);
+		return (0);
+	case PF_ADDR_DYNIFTL:
+		if (aw1->p.dyn->ifp != aw2->p.dyn->ifp)
+			return (1);
+		if (PF_ANEQ(&aw1->v.a.mask, &aw2->v.a.mask, 0))
+			return (1);
+		return (0);
+	case PF_ADDR_NOROUTE:
+		return (0);
+	case PF_ADDR_TABLE:
+		return (aw1->p.tbl != aw2->p.tbl);
+	default:
+		printf("invalid address type: %d\n", aw1->type);
+		return (1);
+	}
 }
 
 void
@@ -2342,6 +2357,32 @@ pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
 	return (mss);
 }
 
+void
+pf_set_rt_ifp(struct pf_state *s, struct pf_addr *saddr)
+{
+	struct pf_rule *r = s->rule.ptr;
+
+	s->rt_ifp = NULL;
+	if (!r->rt || r->rt == PF_FASTROUTE)
+		return;
+	switch (s->af) {
+#ifdef INET
+	case AF_INET:
+		pf_map_addr(AF_INET, &r->rpool, saddr,
+		    &s->rt_addr, NULL);
+		s->rt_ifp = r->rpool.cur->ifp;
+		break;
+#endif /* INET */
+#ifdef INET6
+	case AF_INET6:
+		pf_map_addr(AF_INET6, &r->rpool, saddr,
+		    &s->rt_addr, NULL);
+		s->rt_ifp = r->rpool.cur->ifp;
+		break;
+#endif /* INET6 */
+	}
+}
+
 int
 pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
     struct ifnet *ifp, struct mbuf *m, int ipoff, int off, void *h,
@@ -2620,6 +2661,7 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->timeout = PFTM_TCP_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
+		pf_set_rt_ifp(s, saddr);
 
 		if ((pd->flags & PFDESC_TCP_NORM) && pf_normalize_tcp_init(m,
 		    off, pd, th, &s->src, &s->dst)) {
@@ -2919,6 +2961,7 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->timeout = PFTM_UDP_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
+		pf_set_rt_ifp(s, saddr);
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
 #ifdef __FreeBSD__
@@ -3187,6 +3230,7 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->timeout = PFTM_ICMP_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
+		pf_set_rt_ifp(s, saddr);
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
 #ifdef __FreeBSD__
@@ -3439,6 +3483,7 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->timeout = PFTM_OTHER_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
+		pf_set_rt_ifp(s, saddr);
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			if (r->log)
@@ -4811,12 +4856,6 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 				dst->sin_addr.s_addr = naddr.v4.s_addr;
 			ifp = r->rpool.cur->ifp;
 		} else {
-			if (s->rt_ifp == NULL) {
-				pf_map_addr(AF_INET, &r->rpool,
-				    (struct pf_addr *)&ip->ip_src,
-				    &s->rt_addr, NULL);
-				s->rt_ifp = r->rpool.cur->ifp;
-			}
 			if (!PF_AZERO(&s->rt_addr, AF_INET))
 				dst->sin_addr.s_addr =
 				    s->rt_addr.v4.s_addr;
@@ -5017,12 +5056,6 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			    &naddr, AF_INET6);
 		ifp = r->rpool.cur->ifp;
 	} else {
-		if (s->rt_ifp == NULL) {
-			pf_map_addr(AF_INET6, &r->rpool,
-			    (struct pf_addr *)&ip6->ip6_src,
-			    &s->rt_addr, NULL);
-			s->rt_ifp = r->rpool.cur->ifp;
-		}
 		if (!PF_AZERO(&s->rt_addr, AF_INET6))
 			PF_ACPY((struct pf_addr *)&dst->sin6_addr,
 			    &s->rt_addr, AF_INET6);
