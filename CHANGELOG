@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2550 2004/02/23 04:04:40 itojun Exp $
+$KAME: CHANGELOG,v 1.2551 2004/02/28 10:24:55 jinmei Exp $
 
 <200402>
+2004-02-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setmoptions): explicitly
+	handle the case where a non-0 interface index points to a NULL
+	ifp in the process of IPV6_LEAVE_GROUP.
+
 Fri Feb 20 03:00:51 JST 2004  itojun@iijlab.net
 	* kame/sys/netinet6/ipsec.c: implement ipcomp tunnel mode (outbound)
 	  for IPv6.  inbound processing is not implemented yet.
