@@ -1,7 +1,11 @@
-$Id: CHANGELOG,v 1.466 2000/01/18 21:54:49 sakane Exp $
+$Id: CHANGELOG,v 1.467 2000/01/19 11:54:38 fujisawa Exp $
 
 
 <200001>
+Wed Jan 19 20:35:42 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* NAT-PT translator and its command become compilable on
+	  freebsd2, freebsd3, netbsd, and bsdos3.
+
 Wed Jan 19 06:44:02 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	  improved the way to define a certificate type.
