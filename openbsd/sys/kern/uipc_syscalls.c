@@ -205,8 +205,8 @@ sys_accept(p, v, retval)
 	fp->f_ops = &socketops;
 	fp->f_data = (caddr_t)so;
 	nam = m_get(M_WAIT, MT_SONAME);
-	(void) soaccept(so, nam);
-	if (SCARG(uap, name)) {
+	error = soaccept(so, nam);
+	if (!error && SCARG(uap, name)) {
 		if (namelen > nam->m_len)
 			namelen = nam->m_len;
 		/* SHOULD COPY OUT A CHAIN HERE */
@@ -215,6 +215,11 @@ sys_accept(p, v, retval)
 			error = copyout((caddr_t)&namelen,
 			    (caddr_t)SCARG(uap, anamelen),
 			    sizeof (*SCARG(uap, anamelen)));
+	}
+	/* if an error occured, free the file descriptor */
+	if (error) {
+		fdremove(fdp, fd);
+		ffree(fp);
 	}
 	m_freem(nam);
 	splx(s);
