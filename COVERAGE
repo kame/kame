@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.101 2001/02/23 10:04:09 itojun Exp $
+$KAME: COVERAGE,v 1.102 2001/02/25 01:36:47 itojun Exp $
 
 
 x: supported/integrated
@@ -260,6 +260,7 @@ rtsol/rtsold	x	x	x	x	x	x	x	x
 rtadvd		x	x	x	x	x	x	x	x
 rrenumd		x	-	-	x	-	-	x	x
 
+ip6fw		x	-	-	x	-	-	x	x
 faithd		x	x	x	x	x	x	x	x
 		(*1)	(*1)
     (*1) inetd support
