@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: rc.mobileip6,v 1.8 2003/09/30 12:33:32 keiichi Exp $
+# $Id: rc.mobileip6,v 1.9 2003/10/01 03:00:07 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -10,11 +10,17 @@ mobileip6_pass1() {
 	[Yy][Ee][Ss])
 		sysctl net.inet6.mip6.debug=1
 		;;
+	[Nn][Oo])
+		sysctl net.inet6.mip6.debug=0
+		;;
 	esac
 
 	case ${ipv6_mobile_security_enable} in
 	[Yy][Ee][Ss])
 		sysctl net.inet6.mip6.use_ipsec=1
+		;;
+	[Nn][Oo])
+		sysctl net.inet6.mip6.use_ipsec=0
 		;;
 	esac
 
@@ -22,7 +28,7 @@ mobileip6_pass1() {
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		echo -n ' Mobile Node:'
 
-		if [ "X${ipv6_mobile_home_prefix}" == 'X' ]; then
+		if [ -z "${ipv6_mobile_home_prefixes}" ]; then
 			break;
 		fi
 
