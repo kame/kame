@@ -20,6 +20,7 @@ post-extract:
 
 USE_GMAKE=	yes
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS+=--disable-asmopt
+# "bindir" setting is very non-standard for GNU autoconf
+CONFIGURE_ARGS+=--disable-asmopt --bindir=/bin
 
 .include "../../mk/bsd.pkg.mk"
