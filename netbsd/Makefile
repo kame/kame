@@ -30,6 +30,8 @@ afterinstall:
 		${DESTDIR}$(PREFIX)/etc/
 	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
 		${DESTDIR}$(PREFIX)/etc/
+	cp ${.CURDIR}/kame/ip6addrctl/ip6addrctl.conf.sample \
+		${DESTDIR}$(PREFIX)/etc/
 	if test -x ${PREFIX}/sbin/inet6d; then \
 		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
 			${DESTDIR}${PREFIX}/etc/inet6d.conf.sample; \
