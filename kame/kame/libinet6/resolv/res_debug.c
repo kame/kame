@@ -77,7 +77,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_debug.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
+static char rcsid[] = "$Id: res_debug.c,v 1.3 2000/03/23 08:34:45 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -106,6 +106,14 @@ static char rcsid[] = "$Id: res_debug.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
 
 extern const char *_res_opcodes[];
 extern const char *_res_resultcodes[];
+
+static const char *dewks __P((int));
+static const char *deproto __P((int));
+static const u_char *do_rrset __P((const u_char *, int, const u_char *, int,
+	int, FILE *, const char *));
+static const char *precsize_ntoa __P((u_int8_t));
+static u_int8_t precsize_aton __P((char **));
+static u_int32_t latlon2ul __P((char **, int *));
 
 /* XXX: we should use getservbyport() instead. */
 static const char *
@@ -1311,9 +1319,9 @@ loc_aton(ascii, binary)
 	cp = ascii;
 	maxcp = cp + strlen(ascii);
 
-	lltemp1 = latlon2ul(&cp, &which1);
+	lltemp1 = latlon2ul((char **)&cp, &which1);
 
-	lltemp2 = latlon2ul(&cp, &which2);
+	lltemp2 = latlon2ul((char **)&cp, &which2);
 
 	switch (which1 + which2) {
 	case 3:			/* 1 + 2, the only valid combination */
@@ -1364,7 +1372,7 @@ loc_aton(ascii, binary)
 	if (cp >= maxcp)
 		goto defaults;
 
-	siz = precsize_aton(&cp);
+	siz = precsize_aton((char **)&cp);
 	
 	while (!isspace(*cp) && (cp < maxcp))	/* if trailing garbage or m */
 		cp++;
@@ -1375,7 +1383,7 @@ loc_aton(ascii, binary)
 	if (cp >= maxcp)
 		goto defaults;
 
-	hp = precsize_aton(&cp);
+	hp = precsize_aton((char **)&cp);
 
 	while (!isspace(*cp) && (cp < maxcp))	/* if trailing garbage or m */
 		cp++;
@@ -1386,7 +1394,7 @@ loc_aton(ascii, binary)
 	if (cp >= maxcp)
 		goto defaults;
 
-	vp = precsize_aton(&cp);
+	vp = precsize_aton((char **)&cp);
 
  defaults:
 

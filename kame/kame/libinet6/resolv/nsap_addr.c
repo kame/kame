@@ -16,7 +16,7 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] = "$Id: nsap_addr.c,v 1.2 1999/10/29 03:04:28 itojun Exp $";
+static char rcsid[] = "$Id: nsap_addr.c,v 1.3 2000/03/23 08:34:45 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -28,7 +28,12 @@ static char rcsid[] = "$Id: nsap_addr.c,v 1.2 1999/10/29 03:04:28 itojun Exp $";
 #include <resolv.h>
 #include "res_config.h"
 
-#if !defined(isxdigit)	/* XXX - could be a function */
+#ifndef isxdigit	/* XXX - could be a function */
+static int isxdigit __P((register int));
+#endif
+static char xtob __P((register int));
+
+#ifndef isxdigit	/* XXX - could be a function */
 static int
 isxdigit(c)
 	register int c;

@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_comp.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_comp.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
+static char rcsid[] = "$Id: res_comp.c,v 1.3 2000/03/23 08:34:45 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -73,6 +73,7 @@ static char rcsid[] = "$Id: res_comp.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
 
 static int	dn_find __P((u_char *exp_dn, u_char *msg,
 			     u_char **dnptrs, u_char **lastdnptr));
+static int mklower __P((register int));
 
 /*
  * Expand compressed domain name 'comp_dn' to full domain name.
