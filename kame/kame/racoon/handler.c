@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.11 2000/01/11 22:29:19 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.12 2000/01/12 04:08:13 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -219,8 +219,10 @@ void
 delph1(iph1)
 	struct ph1handle *iph1;
 {
-	if (iph1->ivm)
+	if (iph1->ivm) {
 		oakley_delivm(iph1->ivm);
+		iph1->ivm = NULL;
+	}
 	if (iph1->sce)
 		SCHED_KILL(iph1->sce);
 	if (iph1->scr)
@@ -385,18 +387,30 @@ void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
-	if (iph2->id)
+	if (iph2->id) {
 		vfree(iph2->id);
-	if (iph2->id_p)
+		iph2->id = NULL;
+	}
+	if (iph2->id_p) {
 		vfree(iph2->id_p);
-	if (iph2->nonce_p)
+		iph2->id_p = NULL;
+	}
+	if (iph2->nonce_p) {
 		vfree(iph2->nonce_p);
-	if (iph2->dhpub_p)
+		iph2->nonce_p = NULL;
+	}
+	if (iph2->dhpub_p) {
 		vfree(iph2->dhpub_p);
-	if (iph2->dhgxy)
+		iph2->dhpub_p = NULL;
+	}
+	if (iph2->dhgxy) {
 		vfree(iph2->dhgxy);
-	if (iph2->ivm)
+		iph2->dhgxy = NULL;
+	}
+	if (iph2->ivm) {
 		oakley_delivm(iph2->ivm);
+		iph2->ivm = NULL;
+	}
 	if (iph2->sce)
 		SCHED_KILL(iph2->sce);
 	if (iph2->scr)
