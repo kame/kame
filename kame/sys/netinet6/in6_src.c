@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.54 2001/08/16 12:18:34 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.55 2001/08/16 14:13:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,7 +138,7 @@ int ip6_prefer_tempaddr = 0;
 } while(0)
 #define BREAK(r) do { \
 	ip6stat.ip6s_sources_rule[(r)]++; \
- 	goto out; 		/* XXX: we can't use 'continue' here */ \
+ 	goto out; 		/* XXX: we can't use 'break' here */ \
 } while(0)
 
 struct in6_addr *
