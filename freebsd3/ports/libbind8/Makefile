@@ -12,7 +12,7 @@ MASTER_SITES=	ftp://ftp.isc.org/isc/bind/src/8.2.2-P7/
 DISTFILES=	bind-src.tar.gz bind-doc.tar.gz
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	bind8-822p7-v6-20010107a.diff.gz
+PATCHFILES=	libbind-822p7-v6-20010107a.diff.gz
 PATCH_DIST_STRIP=	-p2
 
 MAINTAINER=	jinmei@kame.net
