@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.11 2000/02/28 13:01:12 itojun Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.12 2000/03/15 12:20:13 itojun Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -170,7 +170,7 @@ static	char *ip6nh[] = {
 	"#86",
 	"#87",
 	"#88",
-	"#89",	
+	"OSPF",	
 	"#80",
 	"#91",
 	"#92",
