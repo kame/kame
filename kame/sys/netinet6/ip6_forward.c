@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.54 2000/09/13 09:07:24 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.55 2000/09/13 14:18:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -529,7 +529,7 @@ ip6_forward(m, srcrt)
 #ifdef PROHIBIT_P2PREDIRECT
 		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) != 0) {
 			/*
-			 * If the incoming interface equals to the outgoing
+			 * If the incoming interface is equal to the outgoing
 			 * one, and the link attached to the interface is
 			 * point-to-point, then it will be highly probable
 			 * that a routing loop occurs. Thus, we immediately
