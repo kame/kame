@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.93 2001/08/13 20:34:40 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.94 2001/08/14 12:26:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,76 +96,6 @@ struct dhgroup dhgroup[MAXDHGROUP];
 static vchar_t oakley_prime768;
 static vchar_t oakley_prime1024;
 static vchar_t oakley_prime1536;
-
-static struct hash_algorithm hashdef[] = {
-{ "NULL",	NULL,			NULL,
-		NULL,			NULL,
-		NULL, },
-{ "md5",	eay_md5_init,		eay_md5_update,
-		eay_md5_final,		eay_md5_hashlen,
-		eay_md5_one, },
-{ "sha1",	eay_sha1_init,		eay_sha1_update,
-		eay_sha1_final,		eay_sha1_hashlen,
-		eay_sha1_one, },
-{ "*dummy*",	NULL,			NULL,
-		NULL,			NULL,
-		NULL, },
-{ "sha2_256",	eay_sha2_256_init,	eay_sha2_256_update,
-		eay_sha2_256_final,	eay_sha2_256_hashlen,
-		eay_sha1_one, },
-{ "sha2_384",	eay_sha2_384_init,	eay_sha2_384_update,
-		eay_sha2_384_final,	eay_sha2_384_hashlen,
-		eay_sha1_one, },
-{ "sha2_512",	eay_sha2_512_init,	eay_sha2_512_update,
-		eay_sha2_512_final,	eay_sha2_512_hashlen,
-		eay_sha1_one, },
-};
-
-static struct hmac_algorithm hmacdef[] = {
-{ "NULL",	NULL,			NULL,
-		NULL,			NULL, },
-{ "md5",	eay_hmacmd5_init,		eay_hmacmd5_update,
-		eay_hmacmd5_final,		eay_hmacmd5_one, },
-{ "sha1",	eay_hmacsha1_init,		eay_hmacsha1_update,
-		eay_hmacsha1_final,		eay_hmacsha1_one, },
-{ "*dummy*",	NULL,			NULL,
-		NULL,			NULL, },
-{ "sha2_256",	eay_hmacsha2_256_init,	eay_hmacsha2_256_update,
-		eay_hmacsha2_256_final,	eay_hmacsha2_256_one, },
-{ "hmac_sha2_384",	eay_hmacsha2_384_init,	eay_hmacsha2_384_update,
-		eay_hmacsha2_384_final,	eay_hmacsha2_384_one, },
-{ "hmac_sha2_512",	eay_hmacsha2_512_init,	eay_hmacsha2_512_update,
-		eay_hmacsha2_512_final,	eay_hmacsha2_512_one, },
-};
-
-static struct cipher_algorithm encdef[] = {
-{ "NULL",	NULL,			NULL,
-		NULL,			NULL, },
-{ "des",	eay_des_encrypt,	eay_des_decrypt,
-		eay_des_weakkey,	eay_des_keylen, },
-#ifdef HAVE_OPENSSL_IDEA_H
-{ "idea",	eay_idea_encrypt,	eay_idea_decrypt,
-		eay_idea_weakkey,	eay_idea_keylen, },
-#else
-{ "*dummy*",	NULL,			NULL,
-		NULL,			NULL, },
-#endif
-{ "blowfish",	eay_bf_encrypt,		eay_bf_decrypt,
-		eay_bf_weakkey,		eay_bf_keylen, },
-#ifdef HAVE_OPENSSL_RC5_H
-{ "rc5",	eay_rc5_encrypt,	eay_rc5_decrypt,
-		eay_rc5_weakkey,	eay_rc5_keylen, },
-#else
-{ "*dummy*",	NULL,			NULL,
-		NULL,			NULL, },
-#endif
-{ "3des",	eay_3des_encrypt,	eay_3des_decrypt,
-		eay_3des_weakkey,	eay_3des_keylen, },
-{ "cast",	eay_cast_decrypt,	eay_cast_decrypt,
-		eay_cast_weakkey,	eay_cast_keylen, },
-{ "aes",	eay_aes_decrypt,	eay_aes_decrypt,
-		eay_aes_weakkey,	eay_aes_keylen, },
-};
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
 #ifdef HAVE_SIGNING_C
@@ -372,11 +302,6 @@ oakley_prf(key, buf, iph1)
 	vchar_t *res = NULL;
 	int type;
 
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
-#endif
 	if (iph1->approval == NULL) {
 		/*
 		 * it's before negotiating hash algorithm.
@@ -386,22 +311,12 @@ oakley_prf(key, buf, iph1)
 	} else
 		type = iph1->approval->hashtype;
 
-	if (type > ARRAYLEN(hmacdef) && hmacdef[type].one == NULL) {
+	res = alg_oakley_hmacdef_one(type, key, buf);
+	if (res == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid hmac hash algoriym was passed.\n");
+			"invalid hmac algorithm %d.\n", type);
 		return NULL;
 	}
-	plog(LLV_DEBUG, LOCATION, NULL, "hmac hash(%s)\n",
-		hmacdef[type].name);
-	res = (hmacdef[type].one)(key, buf);
-
-#ifdef ENABLE_STATS
-	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		s_attr_isakmp_hash(iph1->approval->hashtype),
-		buf->l, timedelta(&start, &end));
-    }
-#endif
 
 	return res;
 }
@@ -417,11 +332,6 @@ oakley_hash(buf, iph1)
 	vchar_t *res = NULL;
 	int type;
 
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
-#endif
 	if (iph1->approval == NULL) {
 		/*
 		 * it's before negotiating hash algorithm.
@@ -431,22 +341,12 @@ oakley_hash(buf, iph1)
 	} else
 		type = iph1->approval->hashtype;
 
-	if (type > ARRAYLEN(hashdef) && hashdef[type].one == NULL) {
+	res = alg_oakley_hashdef_one(type, buf);
+	if (res == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid hash algoriym was passed.\n");
+			"invalid hash algoriym %d.\n", type);
 		return NULL;
 	}
-	plog(LLV_DEBUG, LOCATION, NULL, "hash(%s)\n",
-		hashdef[type].name);
-	res = (hashdef[type].one)(buf);
-
-#ifdef ENABLE_STATS
-	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		hashdef[iph1->approval->hashtype].name,
-		buf->l, timedelta(&start, &end));
-    }
-#endif
 
 	return res;
 }
@@ -705,7 +605,7 @@ oakley_compute_hashx(struct ph1handle *iph1, ...)
 	if (res == NULL)
 		return NULL;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed:\n");
 	plogdump(LLV_DEBUG, res->v, res->l);
 
 	return res;
@@ -751,7 +651,7 @@ oakley_compute_hash3(iph1, msgid, body)
 
 	error = 0;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed:\n");
 	plogdump(LLV_DEBUG, res->v, res->l);
 
 end:
@@ -807,7 +707,7 @@ oakley_compute_hash1(iph1, msgid, body)
 
 	error = 0;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed:\n");
 	plogdump(LLV_DEBUG, res->v, res->l);
 
 end:
@@ -926,7 +826,7 @@ oakley_ph1hash_common(iph1, sw)
 
 	error = 0;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed:\n");
 	plogdump(LLV_DEBUG, res->v, res->l);
 
 end:
@@ -1052,7 +952,7 @@ oakley_ph1hash_base_i(iph1, sw)
 
 	error = 0;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "HASH_I computed:");
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH_I computed:\n");
 	plogdump(LLV_DEBUG, res->v, res->l);
 
 end:
@@ -1162,7 +1062,7 @@ oakley_ph1hash_base_r(iph1, sw)
 
 	error = 0;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed:");
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH computed:\n");
 	plogdump(LLV_DEBUG, res->v, res->l);
 
 end:
@@ -2158,7 +2058,7 @@ oakley_skeyid(iph1)
 		goto end;
 	}
 
-	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID computed:\n");
 	plogdump(LLV_DEBUG, iph1->skeyid->v, iph1->skeyid->l);
 
 	error = 0;
@@ -2215,7 +2115,7 @@ oakley_skeyid_dae(iph1)
 	vfree(buf);
 	buf = NULL;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID_d computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID_d computed:\n");
 	plogdump(LLV_DEBUG, iph1->skeyid_d->v, iph1->skeyid->l);
 
 	/* SKEYID A */
@@ -2244,7 +2144,7 @@ oakley_skeyid_dae(iph1)
 	vfree(buf);
 	buf = NULL;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID_a computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID_a computed:\n");
 	plogdump(LLV_DEBUG, iph1->skeyid_a->v, iph1->skeyid_a->l);
 
 	/* SKEYID E */
@@ -2273,7 +2173,7 @@ oakley_skeyid_dae(iph1)
 	vfree(buf);
 	buf = NULL;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID_e computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "SKEYID_e computed:\n");
 	plogdump(LLV_DEBUG, iph1->skeyid_e->v, iph1->skeyid_e->l);
 
 	error = 0;
@@ -2296,22 +2196,17 @@ oakley_compute_enckey(iph1)
 	int error = -1;
 
 	/* RFC2409 p39 */
-	if (iph1->approval->enctype > ARRAYLEN(encdef))
-		goto end;
-	if (encdef[iph1->approval->enctype].weakkey == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"encryption algoritym %d isn't supported.\n",
-			iph1->approval->enctype);
-		goto end;
-	}
-	keylen = (encdef[iph1->approval->enctype].keylen)
-			(iph1->approval->encklen);
+	keylen = alg_oakley_encdef_keylen(iph1->approval->enctype,
+					iph1->approval->encklen);
 	if (keylen == -1) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"weakkey was generated.\n");
+			"invalid encryption algoritym %d, "
+			"or invalid key length %d.\n",
+			iph1->approval->enctype,
+			iph1->approval->encklen);
 		goto end;
 	}
-	iph1->key = vmalloc(keylen);
+	iph1->key = vmalloc(keylen >> 3);
 	if (iph1->key == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get key buffer\n");
@@ -2319,13 +2214,12 @@ oakley_compute_enckey(iph1)
 	}
 
 	/* set prf length */
-	if (iph1->approval->hashtype > ARRAYLEN(hashdef)) {
+	prflen = alg_oakley_hashdef_hashlen(iph1->approval->hashtype);
+	if (prflen == -1) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"hash type %d isn't supported.\n",
-			iph1->approval->hashtype);
+			"invalid hash type %d.\n", iph1->approval->hashtype);
 		goto end;
 	}
-	prflen = (hashdef[iph1->approval->hashtype].hashlen)();
 
 	/* see isakmp-oakley-08 5.3. */
 	if (iph1->key->l <= iph1->skeyid_e->l) {
@@ -2353,7 +2247,7 @@ oakley_compute_enckey(iph1)
 			"generating long key (Ka = K1 | K2 | ...)\n",
 			iph1->skeyid_e->l, iph1->key->l);
 
-		if ((buf = vmalloc(prflen)) == 0) {
+		if ((buf = vmalloc(prflen >> 3)) == 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get key buffer\n");
 			goto end;
@@ -2383,7 +2277,7 @@ oakley_compute_enckey(iph1)
 			memcpy(p, res->v, cplen);
 			p += cplen;
 
-			buf->l = prflen;	/* to cancel K1 speciality */
+			buf->l = prflen >> 3;	/* to cancel K1 speciality */
 			if (res->l != buf->l) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"internal error: res->l=%d buf->l=%d\n",
@@ -2407,17 +2301,21 @@ oakley_compute_enckey(iph1)
 	 */
 #if 0
 	/* weakkey check */
-	if (iph1->approval->enctype > ARRAYLEN(encdef))
+	if (iph1->approval->enctype > ARRAYLEN(oakley_encdef)
+	 || oakley_encdef[iph1->approval->enctype].weakkey == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"encryption algoritym %d isn't supported.\n",
+			iph1->approval->enctype);
 		goto end;
-	if (encdef[iph1->approval->enctype].weakkey == NULL
-	 && (encdef[iph1->approval->enctype].weakkey)(iph1->key)) {
+	}
+	if ((oakley_encdef[iph1->approval->enctype].weakkey)(iph1->key)) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"weakkey was generated.\n");
 		goto end;
 	}
 #endif
 
-	plog(LLV_DEBUG, LOCATION, NULL, "final encryption key computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "final encryption key computed:\n");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
 	error = 0;
@@ -2520,7 +2418,7 @@ oakley_newiv(iph1)
 
 	vfree(buf);
 
-	plog(LLV_DEBUG, LOCATION, NULL, "IV computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "IV computed:\n");
 	plogdump(LLV_DEBUG, newivm->iv->v, newivm->iv->l);
 
 	iph1->ivm = newivm;
@@ -2591,7 +2489,7 @@ oakley_newiv2(iph1, msgid)
 
 	error = 0;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "phase2 IV computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "phase2 IV computed:\n");
 	plogdump(LLV_DEBUG, newivm->iv->v, newivm->iv->l);
 
 end:
@@ -2657,32 +2555,17 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	memcpy(buf->v, pl, len);
 
 	/* do decrypt */
-	if (iph1->approval->enctype > ARRAYLEN(encdef)
-	 && encdef[iph1->approval->enctype].decrypt == NULL) {
+	new = alg_oakley_encdef_decrypt(iph1->approval->enctype,
+					buf, iph1->key, ivdp);
+	if (new == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid encryption algoriym was passed.\n");
+			"invalid encryption algoriym %d.\n",
+			iph1->approval->enctype);
 		goto end;
 	}
-
-	plog(LLV_DEBUG, LOCATION, NULL,
-		"decrypt(%s)\n",
-		encdef[iph1->approval->enctype].name);
-	plog(LLV_DEBUG, LOCATION, NULL, "with key: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "with key:\n");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
-#endif
-	new = (encdef[iph1->approval->enctype].decrypt)(buf, iph1->key, ivdp->v);
-#ifdef ENABLE_STATS
-	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		s_attr_isakmp_enc(iph1->approval->enctype),
-		buf->l, timedelta(&start, &end));
-    }
-#endif
 	vfree(buf);
 	buf = NULL;
 	if (new == NULL)
@@ -2798,32 +2681,17 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	/* do encrypt */
-	if (iph1->approval->enctype > ARRAYLEN(encdef)
-	 && encdef[iph1->approval->enctype].encrypt == NULL) {
+	new = alg_oakley_encdef_encrypt(iph1->approval->enctype,
+					buf, iph1->key, ivep);
+	if (new == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid encryption algoriym was passed.\n");
+			"invalid encryption algoriym %d.\n",
+			iph1->approval->enctype);
 		goto end;
 	}
-
-	plog(LLV_DEBUG, LOCATION, NULL,
-		"encrypt(%s).\n",
-		encdef[iph1->approval->enctype].name);
-	plog(LLV_DEBUG, LOCATION, NULL, "with key: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "with key:\n");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
-#endif
-	new = (encdef[iph1->approval->enctype].encrypt)(buf, iph1->key, ivep->v);
-#ifdef ENABLE_STATS
-	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		s_attr_isakmp_enc(iph1->approval->enctype),
-		buf->l, timedelta(&start, &end));
-    }
-#endif
 	vfree(buf);
 	buf = NULL;
 	if (new == NULL)

@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.24 2001/08/08 22:09:26 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.25 2001/08/14 12:26:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -297,26 +297,26 @@ ciphertest()
 {
 	vchar_t data;
 	vchar_t key;
-	vchar_t *res1, *res2;
-	char iv[8];
+	vchar_t *res1, *res2, *iv;
 
 	printf("\n**Test for CIPHER.**\n");
 
 	data.v = str2val("a7c3a855 a328a6d4 b1bd9c06 c5bd5c17 b8c5f657 bd8ea245 2a6726d0 ce3689f5", 16, &data.l);
 	key.v = str2val("fadc3844 61d6114e fadc3844 61d6114e fadc3844 61d6114e", 16, &key.l);
 
+	iv = vmalloc(8);
+
 	/* des */
 	printf("DES\n");
 	printf("data:\n");
 	PVDUMP(&data);
 
-	memset(iv, 0, sizeof(iv));
-	res1 = eay_des_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_des_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_des_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_des_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 
@@ -330,12 +330,12 @@ ciphertest()
 	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
-	res1 = eay_idea_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_idea_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_idea_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_idea_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 
@@ -349,12 +349,12 @@ ciphertest()
 	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
-	res1 = eay_bf_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_bf_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_bf_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_bf_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 
@@ -368,12 +368,12 @@ ciphertest()
 	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
-	res1 = eay_bf_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_bf_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_bf_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_bf_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 
@@ -387,12 +387,12 @@ ciphertest()
 	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
-	res1 = eay_3des_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_3des_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_3des_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_3des_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 
@@ -405,12 +405,12 @@ ciphertest()
 	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
-	res1 = eay_cast_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_cast_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_cast_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_cast_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 
@@ -423,12 +423,12 @@ ciphertest()
 	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
-	res1 = eay_aes_encrypt(&data, &key, (caddr_t)iv);
+	res1 = eay_aes_encrypt(&data, &key, iv);
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
-	res2 = eay_aes_decrypt(res1, &key, (caddr_t)iv);
+	res2 = eay_aes_decrypt(res1, &key, iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 

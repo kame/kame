@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.137 2001/08/13 09:24:16 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.138 2001/08/14 12:26:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -709,28 +709,16 @@ t2isakmpsa(trns, sa)
 
 	/* key length must not be specified on some algorithms */
 	if (keylen) {
-		switch (sa->enctype) {
-		case OAKLEY_ATTR_ENC_ALG_DES:
+		if (sa->enctype == OAKLEY_ATTR_ENC_ALG_DES
 #ifdef HAVE_OPENSSL_IDEA_H
-		case OAKLEY_ATTR_ENC_ALG_IDEA:
+		 || sa->enctype == OAKLEY_ATTR_ENC_ALG_IDEA
 #endif
-		case OAKLEY_ATTR_ENC_ALG_3DES:
+		 || sa->enctype == OAKLEY_ATTR_ENC_ALG_3DES) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"keylen must not be specified "
 				"for encryption algorithm %d\n",
 				sa->enctype);
-			goto err;
-		case OAKLEY_ATTR_ENC_ALG_BLOWFISH:
-#ifdef HAVE_OPENSSL_RC5_H
-		case OAKLEY_ATTR_ENC_ALG_RC5:
-#endif
-		case OAKLEY_ATTR_ENC_ALG_CAST:
-			break;
-		default:
-			plog(LLV_ERROR, LOCATION, NULL,
-				"unknown encryption algorithm %d\n",
-				sa->enctype);
-			goto err;
+			return -1;
 		}
 	}
 
@@ -1936,39 +1924,18 @@ check_attr_isakmp(trns)
 
 		switch (type) {
 		case OAKLEY_ATTR_ENC_ALG:
-			switch (lorv) {
-			case OAKLEY_ATTR_ENC_ALG_DES:
-			case OAKLEY_ATTR_ENC_ALG_3DES:
-#ifdef HAVE_OPENSSL_IDEA_H
-			case OAKLEY_ATTR_ENC_ALG_IDEA:
-#endif
-			case OAKLEY_ATTR_ENC_ALG_BLOWFISH:
-#ifdef HAVE_OPENSSL_RC5_H
-			case OAKLEY_ATTR_ENC_ALG_RC5:
-#endif
-			case OAKLEY_ATTR_ENC_ALG_CAST:
-				break;
-			default:
+			if (!alg_oakley_encdef_ok(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
-					"invalied enc algorithm=%d.\n",
+					"invalied encryption algorithm=%d.\n",
 					lorv);
 				return -1;
 			}
 			break;
 
 		case OAKLEY_ATTR_HASH_ALG:
-			switch (lorv) {
-			case OAKLEY_ATTR_HASH_ALG_MD5:
-			case OAKLEY_ATTR_HASH_ALG_SHA:
-				break;
-			case OAKLEY_ATTR_HASH_ALG_TIGER:
+			if (!alg_oakley_hashdef_ok(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
-					"hash algorithm %d isn't supported.\n",
-					lorv);
-				return -1;
-			default:
-				plog(LLV_ERROR, LOCATION, NULL,
-					"invalid hash algorithm %d.\n",
+					"invalied hash algorithm=%d.\n",
 					lorv);
 				return -1;
 			}
@@ -1996,20 +1963,7 @@ check_attr_isakmp(trns)
 			break;
 
 		case OAKLEY_ATTR_GRP_DESC:
-			switch (lorv) {
-			case OAKLEY_ATTR_GRP_DESC_MODP768:
-			case OAKLEY_ATTR_GRP_DESC_MODP1024:
-			case OAKLEY_ATTR_GRP_DESC_MODP1536:
-				break;
-			case OAKLEY_ATTR_GRP_DESC_EC2N155:
-			case OAKLEY_ATTR_GRP_DESC_EC2N185:
-				plog(LLV_ERROR, LOCATION, NULL,
-					"DH group %d isn't supported.\n",
-					lorv);
-				return -1;
-			default:
-				if (lorv >= 32768)	/*private group*/
-					break;
+			if (!alg_oakley_dhdef_ok(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid DH group %d.\n",
 					lorv);

@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.22 2001/08/13 20:34:40 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.23 2001/08/14 12:26:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,46 +62,51 @@ extern char *eay_strerror __P((void));
 extern void eay_init_error __P((void));
 
 /* DES */
-extern vchar_t *eay_des_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
-extern vchar_t *eay_des_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
+extern vchar_t *eay_des_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_des_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_des_weakkey __P((vchar_t *));
 extern int eay_des_keylen __P((int));
 
 /* IDEA */
-extern vchar_t *eay_idea_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
-extern vchar_t *eay_idea_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
+extern vchar_t *eay_idea_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_idea_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_idea_weakkey __P((vchar_t *));
 extern int eay_idea_keylen __P((int));
 
 /* blowfish */
-extern vchar_t *eay_bf_encrypt __P((vchar_t *, vchar_t *, caddr_t));
-extern vchar_t *eay_bf_decrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_bf_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_bf_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_bf_weakkey __P((vchar_t *));
 extern int eay_bf_keylen __P((int));
 
 /* RC5 */
-extern vchar_t *eay_rc5_encrypt __P((vchar_t *, vchar_t *, caddr_t));
-extern vchar_t *eay_rc5_decrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_rc5_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_rc5_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_rc5_weakkey __P((vchar_t *));
 extern int eay_rc5_keylen __P((int));
 
 /* 3DES */
-extern vchar_t *eay_3des_encrypt __P((vchar_t *, vchar_t *, caddr_t));
-extern vchar_t *eay_3des_decrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_3des_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_3des_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_3des_weakkey __P((vchar_t *));
 extern int eay_3des_keylen __P((int));
 
 /* CAST */
-extern vchar_t *eay_cast_encrypt __P((vchar_t *, vchar_t *, caddr_t));
-extern vchar_t *eay_cast_decrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_cast_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_cast_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_cast_weakkey __P((vchar_t *));
 extern int eay_cast_keylen __P((int));
 
 /* AES(RIJNDAEL) */
-extern vchar_t *eay_aes_encrypt __P((vchar_t *, vchar_t *, caddr_t));
-extern vchar_t *eay_aes_decrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_aes_encrypt __P((vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *eay_aes_decrypt __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_aes_weakkey __P((vchar_t *));
 extern int eay_aes_keylen __P((int));
+
+/* misc */
+extern int eay_null_hashlen __P((void));
+extern int eay_kpdk_hashlen __P((void));
+extern int eay_twofish_keylen __P((int));
 
 /* hash */
 /* HMAC SHA2 */

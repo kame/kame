@@ -1,4 +1,4 @@
-/*	$KAME: oakley.h,v 1.22 2001/08/13 20:34:41 sakane Exp $	*/
+/*	$KAME: oakley.h,v 1.23 2001/08/14 12:26:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,31 +240,6 @@
 	"60C980DD 98EDD3DF FFFFFFFF FFFFFFFF"
 
 #define MAXPADLWORD	20
-
-struct hmac_algorithm {
-	char *name;
-	caddr_t (*init) __P((vchar_t *));
-	void (*update) __P((caddr_t, vchar_t *));
-	vchar_t *(*final) __P((caddr_t));
-	vchar_t *(*one) __P((vchar_t *, vchar_t *));
-};
-
-struct hash_algorithm {
-	char *name;
-	caddr_t (*init) __P((void));
-	void (*update) __P((caddr_t, vchar_t *));
-	vchar_t *(*final) __P((caddr_t));
-	int (*hashlen) __P((void));
-	vchar_t *(*one) __P((vchar_t *));
-};
-
-struct cipher_algorithm {
-	char *name;
-	vchar_t *(*encrypt) __P((vchar_t *, vchar_t *, caddr_t));
-	vchar_t *(*decrypt) __P((vchar_t *, vchar_t *, caddr_t));
-	int (*weakkey) __P((vchar_t *));
-	int (*keylen) __P((int));
-};
 
 struct dhgroup {
 	int type;

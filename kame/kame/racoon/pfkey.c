@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.124 2001/08/13 10:47:23 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.125 2001/08/14 12:26:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,75 +610,35 @@ static u_int
 keylen_aalg(hashtype)
 	u_int hashtype;
 {
-	switch (hashtype) {
-	case IPSECDOI_ATTR_AUTH_HMAC_MD5:
-		return 128;
-	case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
-		return 160;
-	case IPSECDOI_ATTR_AUTH_KPDK:		/* need special care */
-		return 0;
+	int res;
 
-	/* not supported */
-	case IPSECDOI_ATTR_AUTH_DES_MAC:
-		plog(LLV_ERROR, LOCATION, NULL,
-			"Not supported hash type: %u\n", hashtype);
-		return ~0;
-
-	case 0: /* reserved */
-	default:
+	if (hashtype == 0)
 		return SADB_AALG_NONE;
 
+	res = alg_ipsec_hmacdef_hashlen(hashtype);
+	if (res == -1) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"Invalid hash type: %u\n", hashtype);
+			"invalid hmac algorithm %u.\n", hashtype);
 		return ~0;
 	}
-	/*NOTREACHED*/
+	return res;
 }
 
 /* default key length for encryption algorithm */
 static u_int
-keylen_ealg(t_id, encklen)
-	u_int t_id;
+keylen_ealg(enctype, encklen)
+	u_int enctype;
 	int encklen;
 {
-	switch (t_id) {
-	case IPSECDOI_ESP_DES_IV64:		/* sa_flags |= SADB_X_EXT_OLD */
-		return 64;
-	case IPSECDOI_ESP_DES:
-		return 64;
-	case IPSECDOI_ESP_3DES:
-		return 192;
-	case IPSECDOI_ESP_RC5:
-		return encklen ? encklen : 128;
-	case IPSECDOI_ESP_CAST:
-		return encklen ? encklen : 128;
-	case IPSECDOI_ESP_BLOWFISH:
-		return encklen ? encklen : 128;
-	case IPSECDOI_ESP_DES_IV32:	/* flags |= (SADB_X_EXT_OLD|
-							SADB_X_EXT_IV4B)*/
-		return 64;
-	case IPSECDOI_ESP_NULL:
-		return 0;
-	case IPSECDOI_ESP_RIJNDAEL:
-		return encklen ? encklen : 128;
-	case IPSECDOI_ESP_TWOFISH:
-		return encklen ? encklen : 128;
+	int res;
 
-	/* not supported */
-	case IPSECDOI_ESP_3IDEA:
-	case IPSECDOI_ESP_IDEA:
-	case IPSECDOI_ESP_RC4:
+	res = alg_ipsec_encdef_keylen(enctype, encklen);
+	if (res == -1) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"Not supported transform: %u\n", t_id);
-		return ~0;
-
-	case 0: /* reserved */
-	default:
-		plog(LLV_ERROR, LOCATION, NULL,
-			"Invalid transform id: %u\n", t_id);
+			"invalid encryption algorithm %u.\n", enctype);
 		return ~0;
 	}
-	/*NOTREACHED*/
+	return res;
 }
 
 int

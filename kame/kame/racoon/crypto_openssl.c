@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.61 2001/08/13 20:34:40 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.62 2001/08/14 12:26:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -960,8 +960,7 @@ eay_init_error()
  */
 vchar_t *
 eay_des_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	des_key_schedule ks;
@@ -975,15 +974,14 @@ eay_des_encrypt(data, key, iv)
 
 	/* decryption data */
 	des_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
-	                ks, (void *)iv, DES_ENCRYPT);
+	                ks, (void *)iv->v, DES_ENCRYPT);
 
 	return res;
 }
 
 vchar_t *
 eay_des_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	des_key_schedule ks;
@@ -997,7 +995,7 @@ eay_des_decrypt(data, key, iv)
 
 	/* decryption data */
 	des_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
-	                ks, (void *)iv, DES_DECRYPT);
+	                ks, (void *)iv->v, DES_DECRYPT);
 
 	return res;
 }
@@ -1013,9 +1011,9 @@ int
 eay_des_keylen(len)
 	int len;
 {
-	if (len != 0 && len != 8)
+	if (len != 0 && len != 64)
 		return -1;
-	return 8;
+	return 64;
 }
 
 #ifdef HAVE_OPENSSL_IDEA_H
@@ -1024,8 +1022,7 @@ eay_des_keylen(len)
  */
 vchar_t *
 eay_idea_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	IDEA_KEY_SCHEDULE ks;
@@ -1038,15 +1035,14 @@ eay_idea_encrypt(data, key, iv)
 
 	/* decryption data */
 	idea_cbc_encrypt(data->v, res->v, data->l,
-	                &ks, iv, IDEA_ENCRYPT);
+	                &ks, iv->v, IDEA_ENCRYPT);
 
 	return res;
 }
 
 vchar_t *
 eay_idea_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	IDEA_KEY_SCHEDULE ks, dks;
@@ -1060,7 +1056,7 @@ eay_idea_decrypt(data, key, iv)
 
 	/* decryption data */
 	idea_cbc_encrypt(data->v, res->v, data->l,
-	                &dks, iv, IDEA_DECRYPT);
+	                &dks, iv->v, IDEA_DECRYPT);
 
 	return res;
 }
@@ -1076,9 +1072,9 @@ int
 eay_idea_keylen(len)
 	int len;
 {
-	if (len != 0 && len != 16)
+	if (len != 0 && len != 128)
 		return -1;
-	return 16;
+	return 128;
 }
 #endif
 
@@ -1087,8 +1083,7 @@ eay_idea_keylen(len)
  */
 vchar_t *
 eay_bf_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	BF_KEY ks;
@@ -1101,15 +1096,14 @@ eay_bf_encrypt(data, key, iv)
 
 	/* decryption data */
 	BF_cbc_encrypt(data->v, res->v, data->l,
-		&ks, iv, BF_ENCRYPT);
+		&ks, iv->v, BF_ENCRYPT);
 
 	return res;
 }
 
 vchar_t *
 eay_bf_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	BF_KEY ks;
@@ -1122,7 +1116,7 @@ eay_bf_decrypt(data, key, iv)
 
 	/* decryption data */
 	BF_cbc_encrypt(data->v, res->v, data->l,
-		&ks, iv, BF_DECRYPT);
+		&ks, iv->v, BF_DECRYPT);
 
 	return res;
 }
@@ -1139,7 +1133,7 @@ eay_bf_keylen(len)
 	int len;
 {
 	if (len == 0)
-		return 56;
+		return 448;
 	if (len < 40 || len > 448)
 		return -1;
 	return len + 7 / 8;
@@ -1151,8 +1145,7 @@ eay_bf_keylen(len)
  */
 vchar_t *
 eay_rc5_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	RC5_32_KEY ks;
@@ -1166,15 +1159,14 @@ eay_rc5_encrypt(data, key, iv)
 
 	/* decryption data */
 	RC5_32_cbc_encrypt(data->v, res->v, data->l,
-		&ks, iv, RC5_ENCRYPT);
+		&ks, iv->v, RC5_ENCRYPT);
 
 	return res;
 }
 
 vchar_t *
 eay_rc5_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	RC5_32_KEY ks;
@@ -1188,7 +1180,7 @@ eay_rc5_decrypt(data, key, iv)
 
 	/* decryption data */
 	RC5_32_cbc_encrypt(data->v, res->v, data->l,
-		&ks, iv, RC5_DECRYPT);
+		&ks, iv->v, RC5_DECRYPT);
 
 	return res;
 }
@@ -1206,7 +1198,7 @@ eay_rc5_keylen(len)
 	int len;
 {
 	if (len == 0)
-		return 16;
+		return 128;
 	if (len < 40 || len > 2040)
 		return -1;
 	return len + 7 / 8;
@@ -1218,8 +1210,7 @@ eay_rc5_keylen(len)
  */
 vchar_t *
 eay_3des_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	des_key_schedule ks1, ks2, ks3;
@@ -1240,15 +1231,14 @@ eay_3des_encrypt(data, key, iv)
 
 	/* decryption data */
 	des_ede3_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
-	                ks1, ks2, ks3, (void *)iv, DES_ENCRYPT);
+	                ks1, ks2, ks3, (void *)iv->v, DES_ENCRYPT);
 
 	return res;
 }
 
 vchar_t *
 eay_3des_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	des_key_schedule ks1, ks2, ks3;
@@ -1269,7 +1259,7 @@ eay_3des_decrypt(data, key, iv)
 
 	/* decryption data */
 	des_ede3_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
-	                ks1, ks2, ks3, (void *)iv, DES_DECRYPT);
+	                ks1, ks2, ks3, (void *)iv->v, DES_DECRYPT);
 
 	return res;
 }
@@ -1290,9 +1280,9 @@ int
 eay_3des_keylen(len)
 	int len;
 {
-	if (len != 0 && len != 24)
+	if (len != 0 && len != 192)
 		return -1;
-	return 24;
+	return 192;
 }
 
 /*
@@ -1300,8 +1290,7 @@ eay_3des_keylen(len)
  */
 vchar_t *
 eay_cast_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	CAST_KEY ks;
@@ -1314,15 +1303,14 @@ eay_cast_encrypt(data, key, iv)
 
 	/* decryption data */
 	CAST_cbc_encrypt(data->v, res->v, data->l,
-	                &ks, iv, DES_ENCRYPT);
+	                &ks, iv->v, DES_ENCRYPT);
 
 	return res;
 }
 
 vchar_t *
 eay_cast_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	CAST_KEY ks;
@@ -1335,7 +1323,7 @@ eay_cast_decrypt(data, key, iv)
 
 	/* decryption data */
 	CAST_cbc_encrypt(data->v, res->v, data->l,
-	                &ks, iv, DES_DECRYPT);
+	                &ks, iv->v, DES_DECRYPT);
 
 	return res;
 }
@@ -1352,7 +1340,7 @@ eay_cast_keylen(len)
 	int len;
 {
 	if (len == 0)
-		return 16;
+		return 128;
 	if (len < 40 || len > 128)
 		return -1;
 	return len + 7 / 8;
@@ -1363,8 +1351,7 @@ eay_cast_keylen(len)
  */
 vchar_t *
 eay_aes_encrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	keyInstance k;
@@ -1380,7 +1367,7 @@ eay_aes_encrypt(data, key, iv)
 
 	/* encryption data */
 	memset(&c, 0, sizeof(c));
-	if (rijndael_cipherInit(&c, MODE_ECB, NULL) < 0)
+	if (rijndael_cipherInit(&c, MODE_ECB, iv->v) < 0)
 		return NULL;
 	if (rijndael_blockEncrypt(&c, &k, data->v, data->l << 3, res->v) < 0)
 		return NULL;
@@ -1390,8 +1377,7 @@ eay_aes_encrypt(data, key, iv)
 
 vchar_t *
 eay_aes_decrypt(data, key, iv)
-	vchar_t *data, *key;
-	caddr_t iv;
+	vchar_t *data, *key, *iv;
 {
 	vchar_t *res;
 	keyInstance k;
@@ -1407,7 +1393,7 @@ eay_aes_decrypt(data, key, iv)
 
 	/* decryption data */
 	memset(&c, 0, sizeof(c));
-	if (rijndael_cipherInit(&c, MODE_ECB, NULL) < 0)
+	if (rijndael_cipherInit(&c, MODE_ECB, iv->v) < 0)
 		return NULL;
 	if (rijndael_blockDecrypt(&c, &k, data->v, data->l << 3, res->v) < 0)
 		return NULL;
@@ -1427,6 +1413,28 @@ eay_aes_keylen(len)
 	int len;
 {
 	if (len != 128 && len != 192 && len != 256)
+		return -1;
+	return len;
+}
+
+/* for ipsec part */
+int
+eay_null_hashlen()
+{
+	return 0;
+}
+
+int
+eay_kpdk_hashlen()
+{
+	return 0;
+}
+
+int
+eay_twofish_keylen(len)
+	int len;
+{
+	if (len < 0 || len > 256)
 		return -1;
 	return len;
 }
@@ -1801,7 +1809,7 @@ eay_sha2_512_one(data)
 int
 eay_sha2_512_hashlen()
 {
-	return SHA512_DIGEST_LENGTH;
+	return SHA512_DIGEST_LENGTH << 3;
 }
 
 /*
@@ -1859,7 +1867,7 @@ eay_sha2_384_one(data)
 int
 eay_sha2_384_hashlen()
 {
-	return SHA384_DIGEST_LENGTH;
+	return SHA384_DIGEST_LENGTH << 3;
 }
 
 /*
@@ -1917,7 +1925,7 @@ eay_sha2_256_one(data)
 int
 eay_sha2_256_hashlen()
 {
-	return SHA256_DIGEST_LENGTH;
+	return SHA256_DIGEST_LENGTH << 3;
 }
 
 /*
@@ -1975,7 +1983,7 @@ eay_sha1_one(data)
 int
 eay_sha1_hashlen()
 {
-	return SHA_DIGEST_LENGTH;
+	return SHA_DIGEST_LENGTH << 3;
 }
 
 /*
@@ -2033,7 +2041,7 @@ eay_md5_one(data)
 int
 eay_md5_hashlen()
 {
-	return MD5_DIGEST_LENGTH;
+	return MD5_DIGEST_LENGTH << 3;
 }
 
 /*
