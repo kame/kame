@@ -1478,8 +1478,10 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	    }
 	}
 
-	if (notify2 != NULL)
+	if (notify2 == NULL)
 	  continue;
+
+	notify = notify2;
       }
 
       if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
@@ -1491,7 +1493,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	  continue;
 	}
 
-      if (notify2)
+      if (notify)
 #ifdef IPSEC
 	{
 	  /* See the above comment */
@@ -1504,7 +1506,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 				   NULL))
 #endif /* IPSEC */
 	    {
-	      (*notify2)(inp, errno);
+	      (*notify)(inp, errno);
 	    }
 #ifdef IPSEC
 	}

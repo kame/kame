@@ -935,8 +935,10 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 					       &faddr6))
 				in6_rtchange(inp, errno);
 
-			if (notify2 != NULL)
+			if (notify2 == NULL)
 				continue;
+
+			notify = notify2;
 		}
 
 		if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
@@ -947,8 +949,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		   (fport && inp->inp_fport != fport))
 			continue;
 
-		if (notify2)
-			(*notify2)(inp, errno);
+		if (notify)
+			(*notify)(inp, errno);
 	}
 	splx(s);
 }
