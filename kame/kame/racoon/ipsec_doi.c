@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.81 2000/06/12 09:35:06 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.82 2000/06/12 12:47:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -633,7 +633,7 @@ ipsecdoi_checkph2proposal(iph2)
 {
 	struct prop_pair **rpair = NULL, **spair = NULL;
 	struct prop_pair *p;
-	int i;
+	int i, n, num;
 	int error = -1;
 
 	/* get proposal pair of SA sent. */
@@ -652,32 +652,48 @@ ipsecdoi_checkph2proposal(iph2)
 		goto end;
 	}
 
+	/* check proposal is only one ? */
+	n = 0;
+	num = 0;
 	for (i = 0; i < MAXPROPPAIRLEN; i++) {
-		if (spair[i] == NULL)
-			continue;
-
-		if (rpair[i] == NULL) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-				"ERROR: proposal# mismatched.\n"));
-			goto end;
+		if (rpair[i]) {
+			n = i;
+			num++;
 		}
+	}
+	if (num == 0) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+			"ERROR: no proposal received.\n"));
+		goto end;
+	}
+	if (num != 1) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+			"ERROR: some proposals received.\n"));
+		goto end;
+	}
 
-		if (rpair[i]->tnext != NULL) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-				"ERROR: multi transforms replyed.\n"));
-			goto end;
-		}
+	if (spair[n] == NULL) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+			"ERROR: invalid proposal number received: %d.\n",
+			i));
+	}
+	
 
-		for (p = rpair[i]; p; p = p->next) {
-			if (cmp_aproppair(p, spair[i])) {
-				YIPSDEBUG(DEBUG_SA,
-					plog(logp, LOCATION, NULL,
-					"ERROR: no proposal mismathed.\n"));
-				goto end;
-			}
-		}
+	if (rpair[n]->tnext != NULL) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+			"ERROR: multi transforms replyed.\n"));
+		goto end;
+	}
+
+	if (cmp_aproppair(rpair[n], spair[n])) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+			"ERROR: no proposal mismathed.\n"));
+		goto end;
 	}
 
 	/* check and select a proposal. */
