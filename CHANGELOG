@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.634 2000/02/28 14:30:20 itojun Exp $
+$Id: CHANGELOG,v 1.635 2000/02/29 04:11:47 jinmei Exp $
 
 <200002>
 Mon Feb 28 23:26:03 JST 2000  itojun@iijlab.net
@@ -72,7 +72,7 @@ Sat Feb 26 20:46:03 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/in6_gif.c (in6_gif_ioctl):
 	  - prevented in[6]_gif_ioctl from making dangling pointers after
 	    freeing old ones. Without this fix, kernel would panic when we
-	    tried to gifconfig multiple times on a single gif.
+	    tried to execute gifconfig multiple times on a single gif.
 	  - call encap_detach before encap_attach().
 	    If detach was called after attach, we'd not be able to delete
 	    an existing pair of phyaddrs.
