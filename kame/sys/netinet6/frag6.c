@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.37 2002/04/26 10:25:40 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.38 2002/04/26 10:31:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -483,6 +483,8 @@ frag6_input(mp, offp, proto)
 	 * If the incoming framgent overlaps some existing fragments in
 	 * the reassembly queue, drop it, since it is dangerous to override
 	 * existing fragments from a security point of view.
+	 * We don't know which fragment is the bad guy - here we trust
+	 * fragment that came in earlier, with no real reason.
 	 */
 	if (af6->ip6af_up != (struct ip6asfrag *)q6) {
 		i = af6->ip6af_up->ip6af_off + af6->ip6af_up->ip6af_frglen
