@@ -1814,7 +1814,7 @@ in6_getaddr(s, which)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
-#if 0
+#if 0 /* in_getaddr() allows FQDN */
 	hints.ai_flags = AI_NUMERICHOST;
 #endif
 	error = getaddrinfo(s, "0", &hints, &res);
