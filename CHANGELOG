@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.8 1999/08/13 02:40:28 itojun Exp $
+$Id: CHANGELOG,v 1.9 1999/08/13 02:48:41 jinmei Exp $
 
 <199908>
+1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/bgpd: made sure to transit an optional transitive path
+	attribute even if it's unrecognized(not tested)
+
 Fri Aug 13 11:40:55 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/{ct,v6eval}: upgrade to 0.3.  from ftp.tahi.org.
 
