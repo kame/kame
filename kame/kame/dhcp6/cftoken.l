@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.10 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.11 2002/05/23 02:27:51 jinmei Exp $	*/
 
 %{
 /*
@@ -162,9 +162,9 @@ ecl		\}
 	return(NUMBER);
 }
 {slash} { DECHO; return(SLASH); }
-{semi} { DP("end sentence"); return(EOS); }
-{bcl} { DP("begin closure"); return(BCL); }
-{ecl} { DP("end closure"); return(ECL); }
+{semi} { DP("end of sentence"); return(EOS); }
+{bcl} { DP("begin of closure"); return(BCL); }
+{ecl} { DP("end of closure"); return(ECL); }
 
 	/* generic string */
 {string} {

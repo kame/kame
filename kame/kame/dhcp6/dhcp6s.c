@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.80 2002/05/22 14:16:47 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.81 2002/05/23 02:27:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -520,8 +520,10 @@ server6_recv(s)
 		    (struct sockaddr *)&from, fromlen);
 		break;
 	case DH6_RENEW:
+#if 0
 		(void)server6_react_renew(ifp, pi, dh6, &optinfo,
 		    (struct sockaddr *)&from, fromlen);
+#endif
 		break;
 	case DH6_REBIND:
 		(void)server6_react_rebind(ifp, dh6, &optinfo,
@@ -578,21 +580,29 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	 * configure necessary options based on the options in solicit.
 	 */
 	dhcp6_init_options(&roptinfo);
-	TAILQ_INIT(&ret_prefix_list);
 
 	/* server information option */
-	roptinfo.serverID = server_duid;
+	if (duidcpy(&roptinfo.serverID, &server_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto fail;
+	}
 
 	/* copy client information back (if provided) */
-	if (optinfo->clientID.duid_id)
-		roptinfo.clientID = optinfo->clientID;
+	if (optinfo->clientID.duid_id &&
+	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto fail;
+	}
 
 	/* preference (if configured) */
 	if (ifp->server_pref != DH6OPT_PREF_UNDEF)
 		roptinfo.pref = ifp->server_pref;
 
 	/* DNS server */
-	roptinfo.dns_list = dnslist;
+	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
+		dprintf(LOG_ERR, "%s" "failed to copy DNS servers", FNAME);
+		goto fail;
+	}
 
 	/*
 	 * see if we have information for requested options, and if so,
@@ -605,13 +615,11 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 		switch(opt->val_num) {
 		case DH6OPT_PREFIX_DELEGATION:
 			create_conflist(DHCP6_CONFINFO_PREFIX,
-					&optinfo->clientID, &ret_prefix_list,
-					client_conf ?
-					&client_conf->prefix_list : NULL,
-					TAILQ_EMPTY(&optinfo->prefix_list) ?
-					NULL : &optinfo->prefix_list,
-					do_binding);
-			roptinfo.prefix_list = ret_prefix_list;
+			    &optinfo->clientID, &roptinfo.prefix_list,
+			    client_conf ? &client_conf->prefix_list : NULL,
+			    TAILQ_EMPTY(&optinfo->prefix_list) ?
+			    NULL : &optinfo->prefix_list,
+			    do_binding);
 			break;
 		}
 	}
@@ -631,8 +639,12 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 
 	error = server6_send(resptype, ifp, dh6, optinfo, from, fromlen,
 			     &roptinfo);
-	dhcp6_clear_list(&ret_prefix_list);
+	dhcp6_clear_options(&roptinfo);
 	return(error);
+
+  fail:
+	dhcp6_clear_options(&roptinfo);
+	return -1;
 }
 
 static int
@@ -672,9 +684,15 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	dhcp6_init_options(&roptinfo);
 
 	/* server information option */
-	roptinfo.serverID = server_duid;
+	if (duidcpy(&roptinfo.serverID, &server_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto fail;
+	}
 	/* copy client information back */
-	roptinfo.clientID = optinfo->clientID;
+	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto fail;
+	}
 
 	/*
 	 * When the server receives a Request message via unicast from a
@@ -688,10 +706,11 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
 		dprintf(LOG_INFO, "%s" "unexpected unicast message", FNAME);
 
-		return -1;	/* XXX */
+		goto fail;	/* XXX */
 #ifdef notyet
-		return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-				    fromlen, &roptinfo));
+		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
+		    fromlen, &roptinfo);
+		goto end;
 #endif
 	}
 
@@ -708,11 +727,10 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 */
 	/* prefixes */
 	create_conflist(DHCP6_CONFINFO_PREFIX,
-			&optinfo->clientID, &roptinfo.prefix_list,
-			client_conf ?
-			&client_conf->prefix_list : NULL,
-			&optinfo->prefix_list,
-			1);
+	    &optinfo->clientID, &roptinfo.prefix_list,
+	    client_conf ? &client_conf->prefix_list : NULL,
+	    &optinfo->prefix_list,
+	    1);
 
 	/*
 	 * If the Request message contained an Option Request option, the
@@ -736,14 +754,21 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 * information to be assigned to the client.
 	 */
 	/* DNS server */
-	roptinfo.dns_list = dnslist;
+	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
+		dprintf(LOG_ERR, "%s" "failed to copy DNS servers", FNAME);
+		goto fail;
+	}
 
 	/* send a reply message. */
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
 			   &roptinfo);
 
-	dhcp6_clear_list(&roptinfo.prefix_list);
+	dhcp6_clear_options(&roptinfo);
 	return 0;
+
+  fail:
+	dhcp6_clear_options(&roptinfo);
+	return -1;
 }
 
 static int
@@ -806,10 +831,11 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
 		dprintf(LOG_INFO, "%s" "unexpected unicast message", FNAME);
 
-		return -1;	/* XXX */
+		goto fail;	/* XXX */
 #ifdef notyet
-		return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-				    fromlen, &roptinfo));
+		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
+		    fromlen, &roptinfo);
+		goto end;
 #endif
 	}
 
@@ -968,6 +994,7 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 	int fromlen;
 {
 	struct dhcp6_optinfo roptinfo;
+	int error;
 
 	/* if a server information is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
@@ -982,17 +1009,33 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 	dhcp6_init_options(&roptinfo);
 
 	/* server information option */
-	roptinfo.serverID = server_duid;
+	if (duidcpy(&roptinfo.serverID, &server_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto fail;
+	}
 
 	/* copy client information back (if provided) */
-	if (optinfo->clientID.duid_id)
-		roptinfo.clientID = optinfo->clientID;
+	if (optinfo->clientID.duid_id &&
+	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto fail;
+	}
 
 	/* DNS server */
-	roptinfo.dns_list = dnslist;
+	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
+		dprintf(LOG_ERR, "%s" "failed to copy DNS servers", FNAME);
+		goto fail;
+	}
 
-	return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-			    &roptinfo));
+	error = server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+	    &roptinfo);
+
+	dhcp6_clear_options(&roptinfo);
+	return(error);
+
+  fail:
+	dhcp6_clear_options(&roptinfo);
+	return -1;
 }
 
 static int

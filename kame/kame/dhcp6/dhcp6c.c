@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.84 2002/05/22 14:16:46 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.85 2002/05/23 02:27:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -97,7 +97,7 @@ static void client6_mainloop __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
 static struct dhcp6_serverinfo *select_server __P((struct dhcp6_if *));
-static void client6_send __P((struct dhcp6_event *, int));
+static void client6_send __P((struct dhcp6_event *));
 static int client6_recv __P((void));
 static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
@@ -388,9 +388,8 @@ client6_timo(arg)
 	ev->timeouts++;
 	if (ev->max_retrans_cnt && ev->timeouts > ev->max_retrans_cnt) {
 		dprintf(LOG_INFO, "%s" "no responses were received", FNAME);
-		dhcp6_remove_timer(&ev->timer);
-
-		exit(0);	/* XXX */
+		dhcp6_remove_event(ev);	/* XXX: should free event data? */
+		return(NULL);
 	}
 
 	switch(ev->state) {
@@ -403,7 +402,7 @@ client6_timo(arg)
 		dhcp6_set_timeoparam(ev); /* XXX */
 		/* fall through */
 	case DHCP6S_INFOREQ:
-		client6_send(ev, outsock);
+		client6_send(ev);
 		break;
 	case DHCP6S_RENEW:
 	case DHCP6S_REBIND:
@@ -414,7 +413,7 @@ client6_timo(arg)
 				client6_send_rebind(ev);
 		} else {
 			dprintf(LOG_INFO, "%s"
-			    "all information to be renewed were canceled",
+			    "all information to be updated were canceled",
 			    FNAME);
 			dhcp6_remove_event(ev);
 			return(NULL);
@@ -433,7 +432,7 @@ client6_timo(arg)
 			ev->state = DHCP6S_REQUEST;
 			dhcp6_set_timeoparam(ev);
 		}
-		client6_send(ev, outsock);
+		client6_send(ev);
 		break;
 	}
 
@@ -664,9 +663,8 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 }
 
 static void
-client6_send(ev, s)
+client6_send(ev)
 	struct dhcp6_event *ev;
-	int s;
 {
 	struct dhcp6_if *ifp;
 	char buf[BUFSIZ];
@@ -719,11 +717,20 @@ client6_send(ev, s)
 	dhcp6_init_options(&optinfo);
 
 	/* server ID */
-	if (ev->state == DHCP6S_REQUEST)
-		optinfo.serverID = ifp->current_server->optinfo.serverID;
+	if (ev->state == DHCP6S_REQUEST) {
+		if (duidcpy(&optinfo.serverID,
+			&ifp->current_server->optinfo.serverID)) {
+			dprintf(LOG_ERR, "%s" "failed to copy server ID",
+			    FNAME);
+			goto end;
+		}
+	}
 
 	/* client ID */
-	optinfo.clientID = client_duid;
+	if (duidcpy(&optinfo.clientID, &client_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto end;
+	}
 
 	/* rapid commit */
 	if (ev->state == DHCP6S_SOLICIT &&
@@ -732,14 +739,20 @@ client6_send(ev, s)
 	}
 
 	/* option request options */
-	optinfo.reqopt_list = ifp->reqopt_list;
+	if (dhcp6_copy_list(&optinfo.reqopt_list, &ifp->reqopt_list)) {
+		dprintf(LOG_ERR, "%s" "failed to copy requested options",
+		    FNAME);
+		goto end;
+	}
 
 	/* configuration information provided by the server */
 	if (ev->state == DHCP6S_REQUEST) {
 		/* do we have to check if we wanted prefixes? */
-		if (!TAILQ_EMPTY(&ifp->current_server->optinfo.prefix_list)) {
-			optinfo.prefix_list =
-				ifp->current_server->optinfo.prefix_list;
+		if (dhcp6_copy_list(&optinfo.prefix_list,
+			&ifp->current_server->optinfo.prefix_list)) {
+			dprintf(LOG_ERR, "%s" "failed to copy prefixes",
+			    FNAME);
+			goto end;
 		}
 	}
 
@@ -748,7 +761,7 @@ client6_send(ev, s)
 					(struct dhcp6opt *)(buf + sizeof(buf)),
 					&optinfo)) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
-		return;
+		goto end;
 	}
 	len += optlen;
 
@@ -761,14 +774,19 @@ client6_send(ev, s)
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
 
-	if (transmit_sa(s, (struct sockaddr *)&dst, buf, len) != 0) {
+	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf, len)
+	    != 0) {
 		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
-		return;
+		goto end;
 	}
 
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
 		dhcpmsgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&dst));
+
+  end:
+	dhcp6_clear_options(&optinfo);
+	return;
 }
 
 void
@@ -778,14 +796,11 @@ client6_send_renew(ev)
 	struct dhcp6_if *ifp;
 	struct dhcp6_eventdata *evd;
 	struct dhcp6_optinfo optinfo;
-	struct dhcp6_list renew_plist;
 	struct dhcp6_listval *dlv;
 	struct dhcp6 *dh6;
 	char buf[BUFSIZ];
 	ssize_t optlen, len;
 	struct sockaddr_in6 dst;
-
-	TAILQ_INIT(&renew_plist);
 
 	ifp = ev->ifp;
 	
@@ -807,25 +822,29 @@ client6_send_renew(ev)
 	dhcp6_init_options(&optinfo);
 
 	/* server ID */
-	optinfo.serverID = ev->serverid;
+	if (duidcpy(&optinfo.serverID, &ev->serverid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto end;
+	}
 
 	/* client ID */
-	optinfo.clientID = client_duid;
+	if (duidcpy(&optinfo.clientID, &client_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto end;
+	}
 
 	/* configuration information to be renewed */
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	     evd = TAILQ_NEXT(evd, link)) {
 		switch(evd->type) {
 		case DHCP6_DATA_PREFIX:
-			if ((dlv = malloc(sizeof(*dlv))) == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to allocate "
-					"memory for a renewal prefix", FNAME);
+			if (dhcp6_add_listval(&optinfo.prefix_list,
+			    &((struct dhcp6_siteprefix *)evd->data)->prefix,
+			    DHCP6_LISTVAL_PREFIX6) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to add a "
+				    "prefix", FNAME);
 				goto end;
 			}
-			memset(dlv, 0, sizeof(*dlv));
-			dlv->val_prefix6 =
-				((struct dhcp6_siteprefix *)evd->data)->prefix;
-			TAILQ_INSERT_TAIL(&renew_plist, dlv, link);
 			break;
 		default:
 			dprintf(LOG_ERR, "%s" "unexpected event data (d)",
@@ -833,14 +852,13 @@ client6_send_renew(ev)
 			exit(1);
 		}
 	}
-	optinfo.prefix_list = renew_plist;
 
 	/* set options in the message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
 					(struct dhcp6opt *)(buf + sizeof(buf)),
 					&optinfo)) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
-		return;
+		goto end;
 	}
 	len += optlen;
 
@@ -856,7 +874,7 @@ client6_send_renew(ev)
 	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf,
 			len) != 0) {
 		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
-		return;
+		goto end;
 	}
 
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
@@ -864,7 +882,7 @@ client6_send_renew(ev)
 		addr2str((struct sockaddr *)&dst));
 
   end:
-	dhcp6_clear_list(&renew_plist);
+	dhcp6_clear_options(&optinfo);
 	return;
 }
 
@@ -875,14 +893,11 @@ client6_send_rebind(ev)
 	struct dhcp6_if *ifp;
 	struct dhcp6_eventdata *evd;
 	struct dhcp6_optinfo optinfo;
-	struct dhcp6_list renew_plist;
 	struct dhcp6_listval *dlv;
 	struct dhcp6 *dh6;
 	char buf[BUFSIZ];
 	ssize_t optlen, len;
 	struct sockaddr_in6 dst;
-
-	TAILQ_INIT(&renew_plist);
 
 	ifp = ev->ifp;
 	
@@ -904,37 +919,38 @@ client6_send_rebind(ev)
 	dhcp6_init_options(&optinfo);
 
 	/* client ID */
-	optinfo.clientID = client_duid;
+	if (duidcpy(&optinfo.clientID, &client_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto end;
+	}
 
-	/* configuration information to be renewed */
+	/* configuration information to be rebound */
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	     evd = TAILQ_NEXT(evd, link)) {
 		switch(evd->type) {
 		case DHCP6_DATA_PREFIX:
-			if ((dlv = malloc(sizeof(*dlv))) == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to allocate "
-					"memory for a renewal prefix", FNAME);
+			if (dhcp6_add_listval(&optinfo.prefix_list,
+			    &((struct dhcp6_siteprefix *)evd->data)->prefix,
+			    DHCP6_LISTVAL_PREFIX6) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to add a "
+				    "prefix", FNAME);
 				goto end;
 			}
-			memset(dlv, 0, sizeof(*dlv));
-			dlv->val_prefix6 =
-				((struct dhcp6_siteprefix *)evd->data)->prefix;
-			TAILQ_INSERT_TAIL(&renew_plist, dlv, link);
 			break;
 		default:
-			dprintf(LOG_ERR, "%s" "unexpected event data (d)",
-				FNAME, evd->type);
+			dprintf(LOG_ERR, "%s"
+			    "unexpected event data (type %d)",
+			    FNAME, evd->type);
 			exit(1);
 		}
 	}
-	optinfo.prefix_list = renew_plist;
 
 	/* set options in the message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
 					(struct dhcp6opt *)(buf + sizeof(buf)),
 					&optinfo)) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
-		return;
+		goto end;
 	}
 	len += optlen;
 
@@ -950,7 +966,7 @@ client6_send_rebind(ev)
 	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf,
 			len) != 0) {
 		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
-		return;
+		goto end;
 	}
 
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
@@ -958,7 +974,7 @@ client6_send_rebind(ev)
 		addr2str((struct sockaddr *)&dst));
 
   end:
-	dhcp6_clear_list(&renew_plist);
+	dhcp6_clear_options(&optinfo);
 	return;
 }
 
@@ -1140,7 +1156,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		ev->state = DHCP6S_REQUEST;
 		ifp->current_server = newserver;
 
-		client6_send(ev, outsock);
+		client6_send(ev);
 
 		dhcp6_set_timeoparam(ev);
 		dhcp6_reset_timer(ev);
