@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.18 2001/10/18 08:16:47 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.19 2001/11/08 08:42:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -457,7 +457,9 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	struct ha_discov_req *hdreq;
 	struct ha_discov_rep *hdrep;
 	int hdreplen;
+#ifdef MIP6_DRAFT13
 	struct in6_addr *haddr;
+#endif /* MIP6_DRAFT13 */
 	struct in6_ifaddr *haifa;
 	struct in6_addr *halist;
 	int halistlen;
@@ -468,22 +470,28 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	/* ha_discov_req may not continuous */
 	IP6_EXTHDR_GET(hdreq, struct ha_discov_req *, m,
 		       off, sizeof(*hdreq));
+#ifdef MIP6_DRAFT13
 	haddr = &hdreq->ha_dreq_home;
+#endif /* MIP6_DRAFT13 */
 
 	/* 
 	 * find a home agent address based on the homeaddress of the
 	 * mobile node.
 	 */
     {
-	struct sockaddr_in6 haddr_sin;
+	struct sockaddr_in6 sin6;
 
-	bzero(&haddr_sin, sizeof(haddr_sin));
-	haddr_sin.sin6_len = sizeof(haddr_sin);
-	haddr_sin.sin6_family = AF_INET6;
-	haddr_sin.sin6_addr = *haddr;
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_len = sizeof(sin6);
+	sin6.sin6_family = AF_INET6;
+#ifdef MIP6_DRAFT13
+	sin6.sin6_addr = *haddr;
+#else
+	sin6.sin6_addr = ip6->ip6_dst;
+#endif /* MIP6_DRAFT13 */
 
 	haifa = (struct in6_ifaddr *)
-		ifa_ifwithnet((struct sockaddr *)&haddr_sin);
+		ifa_ifwithnet((struct sockaddr *)&sin6);
     }
 
         /* XXX TODO */
@@ -503,6 +511,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	/*
 	 * create a ha discovery reply packet
 	 */
+#ifdef MIP6_DRAFT13
 	if (IN6_IS_ADDR_UNSPECIFIED(haddr)) {
 		/*
 		 * in case that a mn has no valid home address.  the
@@ -512,6 +521,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 		 */
 		haddr = &ip6->ip6_src;
 	}
+#endif /* MIP6_DRAFT13 */
 	hdreplen = sizeof(*hdrep);
 	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr, &ip6->ip6_src,
 			       IPPROTO_ICMPV6, hdreplen + halistlen);
@@ -777,7 +787,9 @@ mip6_icmp6_ha_discov_req_output(sc)
 	hdreq->discov_req_type = ICMP6_HADISCOV_REQUEST;
 	hdreq->discov_req_code = 0;
 	hdreq->discov_req_id = htons(sc->hif_hadiscovid);
+#ifdef MIP6_DRAFT13
 	hdreq->ha_dreq_home = mpfx->mpfx_haddr;
+#endif /* MIP6_DRAFT13 */
 
 	/* calculate checksum for ICMP6 packet */
 	off = sizeof(struct ip6_hdr);

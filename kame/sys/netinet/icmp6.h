@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.61 2001/09/06 12:41:42 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.62 2001/11/08 08:42:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,7 +294,9 @@ struct ha_discov_req {          /* HA Address Discovery Request */
 	struct icmp6_hdr	ha_dreq_hdr;
 	u_int32_t		ha_dreq_reserved1;
 	u_int32_t		ha_dreq_reserved2;
+#ifdef MIP6_DRAFT13
 	struct in6_addr		ha_dreq_home;	/* MN home address */
+#endif /* MIP6_DRAFT13 */
 } __attribute__((__packed__));
 
 #define discov_req_type		ha_dreq_hdr.icmp6_type
