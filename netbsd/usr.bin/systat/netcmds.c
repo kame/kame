@@ -56,6 +56,7 @@ __RCSID("$NetBSD: netcmds.c,v 1.8 1998/07/12 05:59:00 mrg Exp $");
 #include <netinet/in_pcb.h>
 #ifdef INET6
 #include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #endif
 

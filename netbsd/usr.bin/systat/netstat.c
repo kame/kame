@@ -63,6 +63,7 @@ __RCSID("$NetBSD: netstat.c,v 1.10 1998/08/25 20:59:40 ross Exp $");
 #include <netinet/ip_var.h>
 #ifdef INET6
 #include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/tcp.h>
