@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.781 2000/04/17 14:57:17 jinmei Exp $
+$Id: CHANGELOG,v 1.782 2000/04/17 17:41:07 sakane Exp $
 
 <200003>
+Tue Apr 18 02:35:54 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- use getifaddrs to get addresses.
+	- fix to define logging level by hexa-decimal string.
+	- tiny fix to print error/warn message during parsing configuration
+	  file.
+
 2000-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/udp6_usrreq.c (udp6_output): 
 	* bsdi4/sys/netinet/udp_usrreq.c (udp6_output):
