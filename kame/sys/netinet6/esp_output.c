@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.19 2000/05/05 11:00:58 sumikawa Exp $	*/
+/*	$KAME: esp_output.c,v 1.20 2000/05/19 04:01:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -648,7 +648,7 @@ esp4_output(m, isr)
 	if (m->m_len < sizeof(struct ip)) {
 		ipseclog((LOG_DEBUG, "esp4_output: first mbuf too short\n"));
 		m_freem(m);
-		return NULL;
+		return 0;
 	}
 	ip = mtod(m, struct ip *);
 	/* XXX assumes that m->m_next points to payload */
@@ -667,7 +667,7 @@ esp6_output(m, nexthdrp, md, isr)
 	if (m->m_len < sizeof(struct ip6_hdr)) {
 		ipseclog((LOG_DEBUG, "esp6_output: first mbuf too short\n"));
 		m_freem(m);
-		return NULL;
+		return 0;
 	}
 	return esp_output(m, nexthdrp, md, isr, AF_INET6);
 }
