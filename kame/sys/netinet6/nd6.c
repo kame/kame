@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.205 2001/09/26 16:32:37 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.206 2001/09/29 12:20:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2525,11 +2525,13 @@ fill_prlist(req)
 #endif
 {
 	int error = 0, s;
-	struct in6_prefix *p = NULL, *pe = NULL;
 	struct nd_prefix *pr;
+	struct in6_prefix *p = NULL;
 #ifdef __FreeBSD__
-	char pbuf[1024]; /* XXX */
+	struct in6_prefix pfx;
+	struct sockaddr_in6 advrtr;
 #else
+	struct in6_prefix *pe = NULL;
 	size_t l;
 #endif
 
@@ -2545,26 +2547,26 @@ fill_prlist(req)
 		pe = (struct in6_prefix *)((caddr_t)oldp + *oldlenp);
 	}
 	l = 0;
+#else
+	p = &pfx;
 #endif
 
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		u_short advrtrs;
+#ifndef __FreeBSD__
 		size_t advance;
-		struct sockaddr_in6 *sin6, *s6;
+		struct sockaddr_in6 *sin6;
+#endif
+		struct sockaddr_in6 *s6;
 		struct nd_pfxrouter *pfr;
 
-#ifdef __FreeBSD__
-		p = (struct in6_prefix *)pbuf;
-		pe = (struct in6_prefix *)(pbuf + sizeof(pbuf));
-#endif
-
-		if (
 #ifndef __FreeBSD__
-		    oldp &&
+		if (oldp && p + 1 <= pe) {
 #endif
-		    p + 1 <= pe) {
 			bzero(p, sizeof(*p));
+#ifndef __FreeBSD__
 			sin6 = (struct sockaddr_in6 *)(p + 1);
+#endif
 
 			p->prefix = pr->ndpr_prefix;
 			if (in6_recoverscope(&p->prefix,
@@ -2596,48 +2598,57 @@ fill_prlist(req)
 			p->flags = pr->ndpr_stateflags;
 			p->origin = PR_ORIG_RA;
 			advrtrs = 0;
+#ifdef __FreeBSD__
+			for (pfr = pr->ndpr_advrtrs.lh_first; pfr;
+			     pfr = pfr->pfr_next)
+				advrtrs++;
+			p->advrtrs = advrtrs;
+			SYSCTL_OUT(req, p, sizeof(*p));
+#endif
 			for (pfr = pr->ndpr_advrtrs.lh_first; pfr;
 			     pfr = pfr->pfr_next) {
+#ifndef __FreeBSD__
 				if ((void *)&sin6[advrtrs + 1] > (void *)pe) {
 					advrtrs++;
 					continue;
 				}
 				s6 = &sin6[advrtrs];
+#else
+				s6 = &advrtr;
+#endif
 				bzero(s6, sizeof(*s6));
 				s6->sin6_family = AF_INET6;
-				s6->sin6_len = sizeof(*sin6);
+				s6->sin6_len = sizeof(*s6);
 				if (in6_recoverscope(s6, &pfr->router->rtaddr,
 						     pfr->router->ifp) != 0) {
 					log(LOG_ERR, "scope error in "
 					    "prefix list (%s)\n",
 					    ip6_sprintf(&pfr->router->rtaddr));
 				}
-				advrtrs++;
-			}
-			p->advrtrs = advrtrs;
-		} else { 
+#ifdef __FreeBSD__
+				SYSCTL_OUT(req, s6, sizeof(*s6));
+#endif
 #ifndef __FreeBSD__
+				advrtrs++;
+#endif
+			}
+#ifndef __FreeBSD__
+			p->advrtrs = advrtrs;
+#endif
+#ifndef __FreeBSD__
+		} else {
 			advrtrs = 0;
 			for (pfr = pr->ndpr_advrtrs.lh_first; pfr;
 			     pfr = pfr->pfr_next)
-					advrtrs++;
-#else
-			log(LOG_INFO,
-			    "fill_prlist: internal buffer too short\n");
-			error = ENOBUFS;
-			break;
-#endif
+				advrtrs++;
 		}
+#endif
 
-		advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
 #ifndef __FreeBSD__
+		advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
 		l += advance;
 		if (p)
 			p = (struct in6_prefix *)((caddr_t)p + advance);
-#else
-		error = SYSCTL_OUT(req, pbuf, advance);
-		if (error)
-			break;
 #endif
 	}
 
