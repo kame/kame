@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.38 2000/06/12 03:16:05 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.39 2000/06/12 03:28:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -914,6 +914,7 @@ serve(sd, buf, len, from)
 	int l;
 	int count;
 	int scoped;
+	const struct addrinfo *ai;
 
 	if (dflag)
 		dnsdump("serve I", buf, len, from);
@@ -1064,6 +1065,51 @@ serve(sd, buf, len, from)
 		}
 		*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
 		hp->ancount = htons(1);
+
+		/* additional records */
+		for (ai = dnsserv_ai; ai; ai = ai->ai_next) {
+			const char *addr;
+			int alen;
+			u_int16_t t;
+
+			switch (ai->ai_family) {
+			case AF_INET:
+				t = T_A;
+				addr = (char *)&((struct sockaddr_in *)ai->ai_addr)->sin_addr;
+				alen = 4;
+				break;
+			case AF_INET6:
+				t = T_AAAA;
+				addr = (char *)&((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr;
+				alen = 16;
+				break;
+			default:
+				addr = NULL;	/*fool gcc*/
+				alen = 0;	/*fool gcc*/
+				continue;
+			}
+
+			if (encode_name(&p, sizeof(replybuf) - (p - replybuf), n)
+					== NULL) {
+				goto fail;
+			}
+			if (p + 10 + alen - replybuf > sizeof(replybuf))
+				goto fail;
+			/* XXX alignment */
+			*(u_int16_t *)p = htons(t);
+			p += sizeof(u_int16_t);
+			*(u_int16_t *)p = htons(C_IN);	/*IN*/
+			p += sizeof(u_int16_t);
+			*(int32_t *)p = htonl(30);	/*TTL*/
+			p += sizeof(int32_t);
+			q = p;
+			*(u_int16_t *)p = htons(0);	/*filled later*/
+			p += sizeof(u_int16_t);
+			memcpy(p, addr, alen);
+			p += alen;
+			*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
+			hp->arcount = htons(ntohs(hp->arcount) + 1);
+		}
 
 		if (dflag)
 			dnsdump("serve D", replybuf, p - replybuf, from);

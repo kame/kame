@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.15 2000/06/04 01:09:02 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.16 2000/06/12 03:28:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -37,6 +37,7 @@ extern u_int16_t dnsid;
 extern const char *srcport;
 extern const char *dstport;
 extern const char *dnsserv;
+extern const struct addrinfo *dnsserv_ai;
 extern const char *intface;
 extern int family;
 extern const char *hostname;

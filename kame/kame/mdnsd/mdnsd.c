@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.30 2000/06/12 03:16:14 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.31 2000/06/12 03:28:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -59,6 +59,7 @@ u_int16_t dnsid;
 const char *srcport = "53";
 const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
+const struct addrinfo *dnsserv_ai = NULL;
 const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
@@ -300,7 +301,33 @@ static int
 config_dnsserv(serv)
 	const char *serv;
 {
+#if 0
+	/* XXX chokes if resolv.conf has no other name server */
+	struct addrinfo hints, *res;
+	int l;
 
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_CANONNAME;
+	if (getaddrinfo(serv, "0", &hints, &res) != 0)
+		return -1;
+
+	if (res->ai_canonname) {
+		l = strlen(serv);
+		if (strcmp(res->ai_canonname, serv) == 0)
+			;
+		else if (strlen(res->ai_canonname) == l - 1 &&
+			 strncmp(res->ai_canonname, serv, l - 1) == 0)
+			;
+		else {
+			freeaddrinfo(res);
+			return -1;
+		}
+	}
+
+	dnsserv_ai = res;
+#endif
 	return 0;
 }
 
