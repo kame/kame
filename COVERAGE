@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.39 2000/05/19 14:01:48 itojun Exp $
+$Id: COVERAGE,v 1.40 2000/06/04 09:01:06 itojun Exp $
 
 
 x: supported/integrated
@@ -94,18 +94,20 @@ getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	-	notyet	x	-
 
 getnameinfo, 2nd arg type is socklen_t
-		x	-	x	-	notyet	-	-
+		x	x	x	-	notyet	-	-
 
 ALTQ		(+)	-	-	-	notyet	-	-
 
 IPsec		(+)	x	(*1)	(*2)	notyet	(*1)	(*2)
     (*1) OpenBSD IPsec is available for IPv4 IPsec.  OpenBSD team is working
-	on OpenBSD IPsec support for IPv6 IPsec (no KAME IPsec is integrated)
+	 on OpenBSD IPsec support for IPv6 IPsec (no KAME IPsec is integrated)
     (*2) policy management code is different from post-dec99 code
 
 NAT/PT		(+)	-	-	-	notyet	-	-
 
 mobile-ip6	(+)	-	-	-	notyet	-	-
+
+IPv6 RPC	-	x	-	-	notyet	-	-
 
 resolver support for IPv6 transport
 		(+)	(*1)	-	-	notyet	-	-
@@ -123,7 +125,7 @@ ipsec socket passing to ip{6,}_output
 					+ flags			+ flags
 
 source address selection
-		latest	feb00	feb00	nov99	notyet	feb00	nov99
+		latest	may00	may00	nov99	notyet	feb00	nov99
 					+ sitelocal		+ sitelocal
 
 6to4 intface	x	x	-	gifhack	notyet	-	gifhack
