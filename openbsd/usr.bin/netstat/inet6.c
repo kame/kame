@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.14 2000/05/17 11:52:54 itojun Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.15 2000/06/11 15:15:34 jinmei Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -513,6 +513,9 @@ ip6_stats(off, name)
 			PRINT_SCOPESTAT(ip6s_sources_deprecated[i], i);
 		}
 	}
+
+	p1(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
+	p1(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
 #undef p
 #undef p1
 }
