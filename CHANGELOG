@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2481 2003/09/29 04:15:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.2482 2003/10/01 02:04:24 sakane Exp $
 
 <200309>
+Wed Oct  1 10:58:00 JST 2003 sakane@kame.net
+	* kame/kame/racoon/oakley.c:
+	The length of the Diffie-Hellman public value MUST be equal to the
+	length of the prime modulus over which the exponentiation was
+	performed, prepending zero bits to the value if necessary.
+	reported by <takagaki.keiichi@jp.panasonic.com>
+
 2003-09-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: changed the default values of the DNS
 	(recursive) server address and the DNS search path options to
