@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/02/10 04:57:38 $
+		     $Date: 2000/02/16 01:00:54 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -38,7 +38,8 @@ and the next STABLE release,
 PLATFORM DIFFERENCES
 ====================
 As we support various platforms, there are several differences between
-those platforms.  Here is a brief list of important differences:
+those platforms.  Here is a brief list of important differences.
+We hope to improve support coverage sooner.
 - ALTQ
 	ALTQ 2.1 is merged into:	KAME/FreeBSD228, KAME/FreeBSD3x,
 					KAME/NetBSD, KAME/OpenBSD
