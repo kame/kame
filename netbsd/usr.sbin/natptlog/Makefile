@@ -5,7 +5,8 @@ SRCS=	natptlog.c
 
 MAN=	natptlog.8
 
-CPPFLAGS+= -g -Wall
+CFLAGS+=-g -Wall
+CPPFLAGS+=-I${SRCDIR}/../natptconfig
 CLEANFILES+= natptlog.cat8
 
 LDADD+=	-lutil
