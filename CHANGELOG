@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1192 2000/08/13 00:46:19 itojun Exp $
+$KAME: CHANGELOG,v 1.1193 2000/08/13 02:10:39 itojun Exp $
 
-<200007>
+<200008> 
+Sun Aug 13 11:09:44 JST 2000  itojun@iijlab.net
+	* kame/rtsold/rtsold.c: add -a flag, to autoprobe interface.
+	  suggested by thorpej@netbsd.org
+
 Sun Aug 13 09:45:09 JST 2000  itojun@iijlab.net
 	* kame/route6d: repair LP64 problem.  from thorpej@netbsd.org
 
@@ -121,6 +125,7 @@ Tue Aug  1 00:20:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	failed.
 	From: FreeBSD-current
 
+<200007> 
 Mon Jul 31 23:26:19 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd4/sys/net/if_types.h: move private use IFT_xx to
 	  0xf0 for syncing FreeBSD-current.
