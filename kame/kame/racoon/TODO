@@ -1,4 +1,4 @@
-$Id: TODO,v 1.2 2000/01/09 01:31:20 itojun Exp $
+$Id: TODO,v 1.3 2000/01/09 21:45:39 sakane Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
@@ -96,33 +96,6 @@ o Scenarios
 	- Client-to-GW transport SA for secure management
 o behavior to receive multiple auth method proposals and AND proposal
 
-HOW DO I DO ?
-o ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
-  e.g. IPSECDOI_ID_DER_ASN1_DN.  Well, are these used in phase 2 ?
-o What should I do when HARD expiration has come ?
-o When node has multi address, I check only destination address on phase 2.
-	Must be check both with src and dst ?
-o replay prevention
-	limited number of session
-	limited session per peer
-	number of proposal
-	....
-o how to support multi interfaces ?
-	connect to dummy, like ping6.
-	bind multi address, like named.
-  now is former.
-o The padding for data attribute.
-o vendorid's hash algorithm
-	For aggressive mode ?.
-	In mail mode, should I use negotiated algorithm ?
-o encryption during aggressive mode.
-	when receive encrypted packet of 1st exchange from responder,
-	it can be decoded.  When we are responder, should we send encrypted ?
-o packet padding ? in particular, variable attribute.
-o What is the perpose of exchange of DH attribute on quick mode ?
-o Should I do acceptable check of phase 2 pfs group ?.
-  If initiator requests PFS, should we accept without acceptable check.
-
 and to be written many many :-p
 
 ----------------------------------------------------------------------
@@ -147,3 +120,4 @@ policy {
 	# NOTE: See above "association" directive.
 	negotiation local 172.168.1.1 ;
 }
+
