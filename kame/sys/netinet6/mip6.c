@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.69 2001/10/24 09:25:15 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.70 2001/10/26 08:48:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1098,6 +1098,13 @@ mip6_ioctl(cmd, data)
 	caddr_t data;
 {
 	struct mip6_req *mr = (struct mip6_req *)data;
+	int s;
+
+#ifdef __NetBSD__
+			s = splsoftnet();
+#else
+			s = splnet();
+#endif
 
 	switch (cmd) {
 	case SIOCENABLEMN:
@@ -1116,33 +1123,26 @@ mip6_ioctl(cmd, data)
 
 	case SIOCGBC:
 		{
-			struct mip6_bc *mbc;
-			struct mip6_rbc *mrbc = mr->mip6r_ru.mip6r_rbc;
+			struct mip6_bc *mbc, *rmbc;
 			int i;
 
+			rmbc = mr->mip6r_ru.mip6r_mbc;
 			i = 0;
-			for (mbc = LIST_FIRST(&mip6_bc_list); mbc;
+			for (mbc = LIST_FIRST(&mip6_bc_list);
+			     mbc;
 			     mbc = LIST_NEXT(mbc, mbc_entry)) {
-				mrbc->phaddr.sin6_addr = mbc->mbc_phaddr;
-				mrbc->pcoa.sin6_addr = mbc->mbc_pcoa;
-				mrbc->addr.sin6_addr = mbc->mbc_addr;
-				mrbc->flags = mbc->mbc_flags;
-#ifdef MIP6_DRAFT13
-				mrbc->prefixlen = mbc->mbc_prefixlen;
-#endif /* MIP6_DRAFT13 */
-				mrbc->seqno = mbc->mbc_seqno;
-				mrbc->lifetime = mbc->mbc_lifetime;
-				mrbc->remain = mbc->mbc_remain;
-				mrbc->state = mbc->mbc_state;
+				*rmbc = *mbc;
 				i++;
 				if (i > mr->mip6r_count)
 					break;
-				mrbc++;
+				rmbc++;
 			}
 			mr->mip6r_count = i;
 		}
 		break;
 	}
+
+	splx(s);
 
 	return (0);
 }

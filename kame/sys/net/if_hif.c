@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.9 2001/10/17 08:31:45 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.10 2001/10/26 08:48:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,22 +276,24 @@ hif_ioctl(ifp, cmd, data)
 			     hs = TAILQ_NEXT(hs, hs_entry)) {
 				ms = hs->hs_ms;
 				if (ms == NULL) {
-					return (EINVAL);
+					error = EINVAL;
+					goto hif_ioctl_done;
 				}
 				for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
 				     mspfx;
 				     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 					if (mspfx->mspfx_mpfx == NULL) {
-						return (EINVAL);
+						error = EINVAL;
+						goto hif_ioctl_done;
 					}
 					*mpfx = *mspfx->mspfx_mpfx;
 					i++;
 					if (i > ifr->ifr_count)
-						goto ghomeprefix_end;
+						goto ghomeprefix_done;
 					mpfx++;
 				}
 			}
-		ghomeprefix_end:
+		ghomeprefix_done:
 			ifr->ifr_count = i;
 		}
 		
@@ -367,6 +369,8 @@ hif_ioctl(ifp, cmd, data)
 		error = EINVAL;
 		break;
 	}
+
+ hif_ioctl_done:
 
 	splx(s);
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.25 2001/10/24 04:44:17 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.26 2001/10/26 08:48:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -47,24 +47,9 @@
 struct mip6_req {
 	u_int8_t mip6r_count;
 	union {
-		struct mip6_rbc *mip6r_rbc;
+		struct mip6_bc *mip6r_mbc;
 	} mip6r_ru;
 };
-
-struct mip6_rbc {
-	struct sockaddr_in6 phaddr;
-	struct sockaddr_in6 pcoa;
-	struct sockaddr_in6 addr;
-	u_int8_t            flags;
-#ifdef MIP6_DRAFT13
-	u_int8_t            prefixlen;
-#endif /* MIP6_DRAFT13 */
-	MIP6_SEQNO_T        seqno;
-	u_int32_t           lifetime;
-	int64_t             remain;
-	u_int8_t            state;
-};
-
 
 /* protocol constants */
 #define MIP6_HA_DEFAULT_LIFETIME   1800

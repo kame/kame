@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.4 2001/10/09 11:00:00 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.5 2001/10/26 08:48:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,34 +106,6 @@ struct hif_ifreq {
 		struct mip6_bu     *ifr_mbu;
 	} ifr_ifru;
 };
-
-#define ifrmpfx_prefix    ifr_ifru.ifr_mpfx->mpfx_prefix
-#define ifrmpfx_prefixlen ifr_ifru.ifr_mpfx->mpfx_prefixlen
-#define ifrmpfx_lifetime  ifr_ifru.ifr_mpfx->mpfx_lifetime
-#define ifrmpfx_remain    ifr_ifru.ifr_mpfx->mpfx_remain
-#define ifrmpfx_haddr     ifr_ifru.ifr_mpfx->mpfx_haddr
-
-#define ifrmha_lladdr     ifr_ifru.ifr_mha->mha_lladdr
-#define ifrmha_gaddr      ifr_ifru.ifr_mha->mha_gaddr
-#define ifrmha_flags      ifr_ifru.ifr_mha->mha_flags
-#define ifrmha_pref       ifr_ifru.ifr_mha->mha_pref
-#define ifrmha_lifetime   ifr_ifru.ifr_mha->mha_lifetime
-#define ifrmha_remain     ifr_ifru.ifr_mha->mha_remain
-
-#define ifrmbu_paddr      ifr_ifru.ifr_mbu->paddr
-#define ifrmbu_haddr      ifr_ifru.ifr_mbu->haddr
-#define ifrmbu_coa        ifr_ifru.ifr_mbu->coa
-#define ifrmbu_lifetime   ifr_ifru.ifr_mbu->lifetime
-#define ifrmbu_expire     ifr_ifru.ifr_mbu->remain
-#define ifrmbu_refresh    ifr_ifru.ifr_mbu->refresh
-#define ifrmbu_refexpire  ifr_ifru.ifr_mbu->refremain
-#define ifrmbu_acktimeout ifr_ifru.ifr_mbu->acktimeout
-#define ifrmbu_ackexpire  ifr_ifru.ifr_mbu->ackremain
-#define ifrmbu_seqno      ifr_ifru.ifr_mbu->seqno
-#define ifrmbu_flags      ifr_ifru.ifr_mbu->flags
-#define ifrmbu_reg_state  ifr_ifru.ifr_mbu->reg_state
-#define ifrmbu_state      ifr_ifru.ifr_mbu->state
-#define ifrmbu_dontsend   ifr_ifru.ifr_mbu->dontsend
 
 #ifdef _KERNEL
 

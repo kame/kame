@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.25 2001/10/24 09:25:15 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.26 2001/10/26 08:48:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -960,9 +960,6 @@ mip6_validate_bu(m, opt)
 	}
 #endif /* __OpenBSD__ */
 #endif /* IPSEC */
-#else /* MIP6_DRAFT13 */
-	/* XXX */
-	/* draft-14 requires MIP oriented authentication check. */
 #endif /* MIP6_DRAFT13 */
 
 	/* check if this packet contains an home address destopt. */
@@ -980,6 +977,14 @@ mip6_validate_bu(m, opt)
 		return (1);
 	}
 
+	/*
+	 * XXX: TODO
+	 *
+	 * draft-15 introduces a new sub-option to authenticate
+	 * binding packets.  we should check the sub-option and make
+	 * sure the packet is protected by the some authentication
+	 * mechanisms.
+	 */
 
 	/* Make sure that the length field in the BU is >= IP6OPT_BULEN. */
 	if (bu_opt->ip6ou_len < IP6OPT_BULEN) {
@@ -1816,9 +1821,6 @@ mip6_validate_ba(m, opt)
 	}
 #endif /* __OpenBSD__ */
 #endif /* IPSEC */
-#else /* MIP6_DRAFT13 */
-	/* XXX */
-	/* draft-14 requires MIP oriented authentication check. */
 #endif /* MIP6_DRAFT13 */
 
 	/* Make sure that the length field in the BA is >= IP6OPT_BALEN. */
@@ -1832,6 +1834,15 @@ mip6_validate_ba(m, opt)
 		/* silently ignore */
 		return (1);
 	}
+
+	/*
+	 * XXX: TODO
+	 *
+	 * draft-15 introduces a new sub-option to authenticate
+	 * binding packets.  we should check the sub-option and make
+	 * sure the packet is protected by the some authentication
+	 * mechanisms.
+	 */
 
 	/*
 	 * check if the seq number of the send BU == the seq number of

@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.3 2001/10/24 07:10:34 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.4 2001/10/26 08:48:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -54,7 +55,9 @@
 #include <netinet6/mip6.h>
 
 static int getaddress(char *, struct in6_addr *);
+#if 0
 static char *ip6addr_print(struct in6_addr *in6, int plen, char *);
+#endif
 static char *ip6_sprintf(const struct in6_addr *);
 
 static const char *pfx_desc[] = {
@@ -172,20 +175,21 @@ main(argc, argv)
 
 	if (smhparg && pfxarg) {
 		struct hif_ifreq *ifr;
+		struct mip6_prefix *mpfx;
 
-		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(struct mip6_prefix));
+		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*mpfx));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
-		ifr->ifr_ifru.ifr_mpfx =
-			(struct mip6_prefix *)((caddr_t)ifr 
-					    + sizeof(struct hif_ifreq));
-		getaddress(smhparg, &ifr->ifrmpfx_prefix);
-		ifr->ifrmpfx_prefixlen = atoi(pfxarg);
-		ifr->ifrmpfx_lifetime = 0xffff;
+		mpfx = (struct mip6_prefix *)((caddr_t)ifr 
+					      + sizeof(struct hif_ifreq));
+		ifr->ifr_ifru.ifr_mpfx = mpfx;
+		getaddress(smhparg, &mpfx->mpfx_prefix);
+		mpfx->mpfx_prefixlen = atoi(pfxarg);
+		mpfx->mpfx_lifetime = 0xffff;
 		if(ioctl(s, SIOCAHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
 			exit(-1);
@@ -233,25 +237,25 @@ main(argc, argv)
 
 	if(shaarg && sllarg) {
 		struct hif_ifreq *ifr;
+		struct mip6_ha *mha;
 
 		printf("set homeagent to %s (%s)\n",
 		       ifnarg, shaarg);
-		ifr = malloc(sizeof(struct hif_ifreq)
-			     + sizeof(struct mip6_ha));
+		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*mha));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
-		ifr->ifr_ifru.ifr_mha =
-			(struct mip6_ha *)((caddr_t)ifr 
-					   + sizeof(struct hif_ifreq));
-		getaddress(sllarg, &ifr->ifrmha_lladdr);
-		getaddress(shaarg, &ifr->ifrmha_gaddr);
-		ifr->ifrmha_flags = ND_RA_FLAG_HOME_AGENT;
-		ifr->ifrmha_pref = 0;
-		ifr->ifrmha_lifetime = 0xffff;
+		mha = (struct mip6_ha *)((caddr_t)ifr 
+					 + sizeof(struct hif_ifreq));
+		ifr->ifr_ifru.ifr_mha = mha;
+		getaddress(sllarg, &mha->mha_lladdr);
+		getaddress(shaarg, &mha->mha_gaddr);
+		mha->mha_flags = ND_RA_FLAG_HOME_AGENT;
+		mha->mha_pref = 0;
+		mha->mha_lifetime = 0xffff;
 		if(ioctl(s, SIOCAHOMEAGENT_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
 			exit(-1);
@@ -348,21 +352,21 @@ main(argc, argv)
 
 	if (gbc) {
 		struct mip6_req *mr;
-		struct mip6_rbc *mrbc;
+		struct mip6_bc *mbc;
 		int i;
 
 		mr = malloc(sizeof(struct mip6_req)
-			    + 10 * sizeof(struct mip6_rbc));
+			    + 10 * sizeof(struct mip6_bc));
 		if (mr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
-		bzero(mr, sizeof(*mr) + 10 * sizeof(*mrbc));
+		bzero(mr, sizeof(*mr) + 10 * sizeof(*mbc));
 
 		mr->mip6r_count = 10;
-		mrbc = (struct mip6_rbc *)((caddr_t)mr
-					   + sizeof(*mr));
-		mr->mip6r_ru.mip6r_rbc = mrbc;
+		mbc = (struct mip6_bc *)((caddr_t)mr
+					 + sizeof(*mr));
+		mr->mip6r_ru.mip6r_mbc = mbc;
 		if (ioctl(s, SIOCGBC, (caddr_t)mr) == -1) {
 			perror("ioctl");
 			exit(-1);
@@ -370,26 +374,26 @@ main(argc, argv)
 		printf(bc_desc[longdisp]);
 		for (i = 0; i < mr->mip6r_count; i++) {
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mrbc->phaddr.sin6_addr));
+			       ip6_sprintf(&mbc->mbc_phaddr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mrbc->pcoa.sin6_addr));
+			       ip6_sprintf(&mbc->mbc_pcoa));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mrbc->addr.sin6_addr));
+			       ip6_sprintf(&mbc->mbc_addr));
 			printf(
 #ifdef MIP6_DRAFT13
 			       "%7x %7u %7u %7u %7qd %7x\n",
 #else
 			       "%7x %7u %7u %7qd %7x\n",
 #endif /* MIP6_DRAFT13 */
-			       mrbc->flags,
+			       mbc->mbc_flags,
 #ifdef MIP6_DRAFT13
-			       mrbc->prefixlen,
+			       mbc->mbc_prefixlen,
 #endif /* MIP6_DRAFT13 */
-			       mrbc->seqno,
-			       mrbc->lifetime,
-			       mrbc->remain,
-			       mrbc->state);
-			mrbc++;
+			       mbc->mbc_seqno,
+			       mbc->mbc_lifetime,
+			       mbc->mbc_remain,
+			       mbc->mbc_state);
+			mbc++;
 		}
 
 	}
@@ -412,6 +416,7 @@ getaddress(char *address, struct in6_addr *in6addr)
         return 0;
 }
 
+#if 0
 static char *
 ip6addr_print(struct in6_addr *in6, int plen, char *ifname)
 {
@@ -453,6 +458,7 @@ ip6addr_print(struct in6_addr *in6, int plen, char *ifname)
     
 	return line;
 }
+#endif
 
 static char digits[] = "0123456789abcdef";
 static int ip6round = 0;
