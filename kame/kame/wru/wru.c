@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.4 2002/01/21 08:23:21 jinmei Exp $	*/
+ /*	$KAME: wru.c,v 1.5 2002/01/23 05:10:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -55,6 +55,7 @@
 #include <err.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void update_nonce __P((u_int8_t *, size_t));
 static int do_reply __P((char *, int, int, char *, struct sockaddr *,
