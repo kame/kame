@@ -1105,7 +1105,7 @@ nd6_dad_timer(ifa)
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 		free(dp, M_IP6NDP);
 		dp = NULL;
-		ifa->ifa_refcnt--;
+		IFAFREE(ifa);
 		goto done;
 	}
 
@@ -1186,7 +1186,7 @@ nd6_dad_timer(ifa)
 			TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 			free(dp, M_IP6NDP);
 			dp = NULL;
-			ifa->ifa_refcnt--;
+			IFAFREE(ifa);
 		}
 	}
 
@@ -1229,7 +1229,7 @@ nd6_dad_duplicated(ifa)
 	TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 	free(dp, M_IP6NDP);
 	dp = NULL;
-	ifa->ifa_refcnt--;
+	IFAFREE(ifa);
 }
 
 static void

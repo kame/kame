@@ -1258,6 +1258,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 		oia->ia_next = ia;
 	} else
 		in6_ifaddr = ia;
+	ia->ia_ifa.ifa_refcnt++;
 
 	/* link to if_addrlist */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -1270,6 +1271,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	if (ifp->if_addrlist.tqh_first != NULL) {
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia,
 			ifa_list);
+		ia->ia_ifa.ifa_refcnt++;
 	}
 #endif
 #if 0
@@ -1421,6 +1423,7 @@ in6_ifdel(ifp, in6)
 #else
 	TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+	IFAFREE(&ia->ia_ifa);
 
 	/* lladdr is never deleted */
 	oia = ia;

@@ -382,6 +382,8 @@ in6_ifattach(ifp, type, laddr, noloop)
 #else
 	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+	ia->ia_ifa.ifa_refcnt++;
+
 	/*
 	 * Also link into the IPv6 address chain beginning with in6_ifaddr.
 	 * kazu opposed it, but itojun & jinmei wanted.
@@ -392,6 +394,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 		oia->ia_next = ia;
 	} else
 		in6_ifaddr = ia;
+	ia->ia_ifa.ifa_refcnt++;
 
 	ia->ia_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 	ia->ia_prefixmask.sin6_family = AF_INET6;
@@ -482,11 +485,12 @@ in6_ifattach(ifp, type, laddr, noloop)
 #else
 			TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+			IFAFREE(&ia->ia_ifa);
 			if (oia)
 				oia->ia_next = ia->ia_next;
 			else
 				in6_ifaddr = ia->ia_next;
-			free(ia, M_IFADDR);
+			IFAFREE(&ia->ia_ifa);
 			return;
 		}
 	}
