@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.31 2000/09/13 04:50:25 itojun Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.32 2000/09/13 05:58:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.31 2000/09/13 04:50:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.32 2000/09/13 05:58:34 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -295,6 +295,7 @@ base_i2send(iph1, msg)
 	struct isakmp_gen *gen;
 	caddr_t p;
 	int tlen;
+	int need_cert = 0;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -373,9 +374,12 @@ base_i2send(iph1, msg)
 		if (oakley_getsign(iph1) < 0)
 			goto end;
 
+		if (iph1->cert && iph1->rmconf->send_cert)
+			need_cert = 1;
+
 		tlen += sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->sig->l;
-		if (iph1->cert != NULL)
+		if (need_cert)
 			tlen += sizeof(*gen) + iph1->cert->pl->l;
 
 		iph1->sendbuf = vmalloc(tlen);
@@ -391,12 +395,12 @@ base_i2send(iph1, msg)
 			goto end;
 
 		/* create isakmp KE payload */
-		p = set_isakmp_payload(p, iph1->dhpub, iph1->cert != NULL
+		p = set_isakmp_payload(p, iph1->dhpub, need_cert
 							? ISAKMP_NPTYPE_CERT
 							: ISAKMP_NPTYPE_SIG);
 
 		/* add CERT payload if there */
-		if (iph1->cert != NULL)
+		if (need_cert)
 			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
@@ -884,6 +888,7 @@ base_r2send(iph1, msg)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
+	int need_cert = 0;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -961,9 +966,12 @@ base_r2send(iph1, msg)
 		if (oakley_getsign(iph1) < 0)
 			goto end;
 
+		if (iph1->cert && iph1->rmconf->send_cert)
+			need_cert = 1;
+
 		tlen += sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->sig->l;
-		if (iph1->cert != NULL)
+		if (need_cert)
 			tlen += sizeof(*gen) + iph1->cert->pl->l;
 
 		iph1->sendbuf = vmalloc(tlen);
@@ -979,12 +987,12 @@ base_r2send(iph1, msg)
 			goto end;
 
 		/* create isakmp KE payload */
-		p = set_isakmp_payload(p, iph1->dhpub, iph1->cert != NULL
+		p = set_isakmp_payload(p, iph1->dhpub, need_cert
 							? ISAKMP_NPTYPE_CERT
 							: ISAKMP_NPTYPE_SIG);
 
 		/* add CERT payload if there */
-		if (iph1->cert != NULL)
+		if (need_cert)
 			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);

@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.53 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.54 2000/09/13 05:58:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.53 2000/09/13 04:50:27 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.54 2000/09/13 05:58:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1143,29 +1143,31 @@ oakley_validate_auth(iph1)
 		/* don't cache the certificate passed. */
 
 		/* check ID payload and certificate name */
-		if (oakley_check_certid(iph1) == -1)
-			return -1;
+		if (iph1->rmconf->verify_cert) {
+			if (oakley_check_certid(iph1) == -1)
+				return -1;
 
-		switch (iph1->rmconf->certtype) {
-		case ISAKMP_CERT_X509SIGN:
-			error = eay_check_x509cert(&iph1->cert_p->cert,
+			switch (iph1->rmconf->certtype) {
+			case ISAKMP_CERT_X509SIGN:
+				error = eay_check_x509cert(&iph1->cert_p->cert,
 					lcconf->pathinfo[LC_PATHTYPE_CERT]);
-			/* XXX to be checked subjectAltName */
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"no supported certtype %d\n",
-				iph1->rmconf->certtype);
-			return -1;
+				/* XXX to be checked subjectAltName */
+				break;
+			default:
+				plog(logp, LOCATION, NULL,
+					"no supported certtype %d\n",
+					iph1->rmconf->certtype);
+				return -1;
+			}
+			if (error != 0) {
+				plog(logp, LOCATION, NULL,
+					"Invalid authority of the CERT.\n");
+				return ISAKMP_NTYPE_INVALID_CERT_AUTHORITY;
+			}
+			YIPSDEBUG(DEBUG_CERT,
+				plog(logp, LOCATION, NULL,
+					"CERT validated\n"));
 		}
-		if (error != 0) {
-			plog(logp, LOCATION, NULL,
-				"Invalid authority of the CERT.\n");
-			return ISAKMP_NTYPE_INVALID_CERT_AUTHORITY;
-		}
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL,
-				"CERT validated\n"));
 
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:

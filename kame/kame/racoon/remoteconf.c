@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.13 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: remoteconf.c,v 1.14 2000/09/13 05:58:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.13 2000/09/13 04:50:28 itojun Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.14 2000/09/13 05:58:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -158,6 +158,8 @@ newrmconf()
 	new->keepalive = FALSE;
 	new->ini_contact = TRUE;
 	new->pcheck_level = PROP_CHECK_STRICT;
+	new->verify_cert = TRUE;
+	new->send_cert = TRUE;
 	new->support_mip6 = FALSE;
 	new->gen_policy = FALSE;
 	new->retry_counter = lcconf->retry_counter;

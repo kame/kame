@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.39 2000/09/13 04:50:25 itojun Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.40 2000/09/13 05:58:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.39 2000/09/13 04:50:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.40 2000/09/13 05:58:34 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -402,6 +402,7 @@ agg_i2send(iph1, msg)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
+	int need_cert = 0;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -451,8 +452,11 @@ agg_i2send(iph1, msg)
 		if (oakley_getsign(iph1) < 0)
 			goto end;
 
+		if (iph1->cert != NULL && iph1->rmconf->send_cert)
+			need_cert = 1;
+
 		tlen += sizeof(*gen) + iph1->sig->l;
-		if (iph1->cert != NULL)
+		if (need_cert)
 			tlen += sizeof(*gen) + iph1->cert->pl->l;
 
 		iph1->sendbuf = vmalloc(tlen);
@@ -463,14 +467,14 @@ agg_i2send(iph1, msg)
 		}
 
 		/* set isakmp header */
-		p = set_isakmp_header(iph1->sendbuf, iph1, iph1->cert != NULL
+		p = set_isakmp_header(iph1->sendbuf, iph1, need_cert
 							? ISAKMP_NPTYPE_CERT
 							: ISAKMP_NPTYPE_SIG);
 		if (p == NULL)
 			goto end;
 
 		/* add CERT payload if there */
-		if (iph1->cert != NULL)
+		if (need_cert)
 			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
@@ -637,6 +641,7 @@ agg_r1send(iph1, msg)
 	char *p;
 	int tlen;
 	int need_cr = 0;
+	int need_cert = 0;
 	vchar_t *cr = NULL;
 	int error = -1;
 
@@ -765,12 +770,15 @@ agg_r1send(iph1, msg)
 		if (oakley_getsign(iph1) < 0)
 			goto end;
 
+		if (iph1->cert != NULL && iph1->rmconf->send_cert)
+			need_cert = 1;
+
 		tlen += sizeof(*gen) + iph1->sa_ret->l
 			+ sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->nonce->l
 			+ sizeof(*gen) + iph1->id->l
 			+ sizeof(*gen) + iph1->sig->l;
-		if (iph1->cert != NULL)
+		if (need_cert)
 			tlen += sizeof(*gen) + iph1->cert->pl->l;
 		if (lcconf->vendorid)
 			tlen += sizeof(*gen) + lcconf->vendorid->l;
@@ -799,12 +807,12 @@ agg_r1send(iph1, msg)
 		p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
 
 		/* add ID payload */
-		p = set_isakmp_payload(p, iph1->id, iph1->cert != NULL
+		p = set_isakmp_payload(p, iph1->id, need_cert
 							? ISAKMP_NPTYPE_CERT
 							: ISAKMP_NPTYPE_SIG);
 
 		/* add CERT payload if there */
-		if (iph1->cert != NULL)
+		if (need_cert)
 			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig,

@@ -265,6 +265,8 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>certificate_type	{ YYD; return(CERTIFICATE_TYPE); }
 <S_RMTS>x509		{ YYD; yylval.num = ISAKMP_CERT_X509SIGN; return(CERT_X509); }
 <S_RMTS>peers_certfile	{ YYD; return(PEERS_CERTFILE); }
+<S_RMTS>verify_cert	{ YYD; return(VERIFY_CERT); }
+<S_RMTS>send_cert	{ YYD; return(SEND_CERT); }
 <S_RMTS>dh_group	{ YYD; return(DH_GROUP); }
 <S_RMTS>nonce_size	{ YYD; return(NONCE_SIZE); }
 <S_RMTS>generate_policy	{ YYD; return(GENERATE_POLICY); }

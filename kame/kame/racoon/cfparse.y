@@ -146,7 +146,7 @@ static int expand_isakmpspec __P((int, int, int *,
 	/* remote */
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
-%token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE
+%token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT
 %token CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
 %token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
@@ -1011,6 +1011,8 @@ remote_spec
 			vfree($2);
 		}
 		EOS
+	|	VERIFY_CERT SWITCH EOS { cur_rmconf->verify_cert = $2; }
+	|	SEND_CERT SWITCH EOS { cur_rmconf->send_cert = $2; }
 	|	IDENTIFIER IDENTIFIERTYPE EOS { cur_rmconf->identtype = $2; }
 	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
 	|	DH_GROUP

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.39 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.40 2000/09/13 05:58:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.39 2000/09/13 04:50:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.40 2000/09/13 05:58:34 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1304,6 +1304,7 @@ ident_ir3sendmx(iph1)
 	int tlen;
 	struct isakmp_gen *gen;
 	int need_cr = 0;
+	int need_cert = 0;
 	vchar_t *cr = NULL;
 	int error = -1;
 
@@ -1354,9 +1355,12 @@ ident_ir3sendmx(iph1)
 			}
 		}
 
+		if (iph1->cert != NULL && iph1->rmconf->send_cert)
+			need_cert = 1;
+
 		tlen += sizeof(*gen) + iph1->id->l
 			+ sizeof(*gen) + iph1->sig->l;
-		if (iph1->cert != NULL)
+		if (need_cert)
 			tlen += sizeof(*gen) + iph1->cert->pl->l;
 		if (need_cr)
 			tlen += sizeof(*gen) + cr->l;
@@ -1374,12 +1378,12 @@ ident_ir3sendmx(iph1)
 			goto end;
 
 		/* add ID payload */
-		p = set_isakmp_payload(p, iph1->id, iph1->cert != NULL
+		p = set_isakmp_payload(p, iph1->id, need_cert
 							? ISAKMP_NPTYPE_CERT
 							: ISAKMP_NPTYPE_SIG);
 
 		/* add CERT payload if there */
-		if (iph1->cert != NULL)
+		if (need_cert)
 			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig,
