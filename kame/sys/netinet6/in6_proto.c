@@ -90,21 +90,21 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #endif
-#if (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__)
+#if (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
 #endif
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/in6_pcb.h>
 #endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/tcp.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
@@ -128,7 +128,7 @@
 #endif
 #endif
 
-#ifndef __OpenBSD__
+#if !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
 #endif
@@ -186,6 +186,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -273,6 +274,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
+#endif /*bsdi4*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_DSTOPTS,PR_ATOMIC|PR_ADDR,
   dest6_input,	0,	 	0,		0,
   0,	  

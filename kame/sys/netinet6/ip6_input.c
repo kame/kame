@@ -100,12 +100,12 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #endif /*INET*/
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
 #endif
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
@@ -141,8 +141,11 @@
 
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
 extern struct ifnet loif;
+#endif
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+extern struct ifnet *loifp;
 #endif
 
 u_char ip6_protox[IPPROTO_MAX];
@@ -223,6 +226,9 @@ ip6_init2(dummy)
 	int i;
 #endif
 	int ret;
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+	struct ifnet *loifp = &loif;
+#endif
 
 	/* get EUI64 from somewhere */
 	ret = in6_ifattach_getifid(NULL);
@@ -232,7 +238,7 @@ ip6_init2(dummy)
 	 * assign loopback address first. 
 	 */
 #if defined(__bsdi__) || defined(__OpenBSD__)
-	in6_ifattach(&loif, IN6_IFT_LOOP, NULL, 0);
+	in6_ifattach(loifp, IN6_IFT_LOOP, NULL, 0);
 #else
 	for (i = 0; i < NLOOP; i++)
 		in6_ifattach(&loif[i], IN6_IFT_LOOP, NULL, 0);
@@ -288,6 +294,9 @@ ip6_input(m)
 	u_int32_t rtalert = ~0;
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+	struct ifnet *loifp = &loif;
+#endif
 
 #ifdef IPSEC
 	/*
@@ -312,7 +321,7 @@ ip6_input(m)
 		if (m->m_next) {
 			if (m->m_flags & M_LOOP) {
 #if defined(__bsdi__) || defined(__OpenBSD__)
-				ip6stat.ip6s_m2m[loif.if_index]++;	/*XXX*/
+				ip6stat.ip6s_m2m[loifp->if_index]++;	/*XXX*/
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
 #endif
@@ -889,7 +898,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
 {
-#ifdef __OpenBSD__
+#ifdef HAVE_NRL_INPCB
 # define in6p_flags	inp_flags
 #endif
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)

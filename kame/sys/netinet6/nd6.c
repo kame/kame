@@ -53,7 +53,9 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <net/if_atm.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -199,12 +201,18 @@ nd6_setmtu(ifp)
 		 break;
 #if defined(__FreeBSD__) || defined(__bsdi__)
 	 case IFT_FDDI:
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+		 ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
+#else
 		 ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu);
+#endif
 		 break;
 #endif
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	 case IFT_ATM:
 		 ndi->maxmtu = MIN(ATMMTU, ifp->if_mtu);
 		 break;
+#endif
 	 default:
 		 ndi->maxmtu = ifp->if_mtu;
 		 break;
@@ -886,7 +894,7 @@ nd6_resolve(ifp, rt, m, dst, desten)
 #endif /* OLDIP6OUTPUT */
 
 void
-#if defined(__bsdi__) && __bsdi__ >= 4
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
 nd6_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;
@@ -1020,8 +1028,13 @@ nd6_rtrequest(req, rt, sa)
 			}
 			if (nd6_useloopback) {
 #ifdef __bsdi__
+#if _BSDI_VERSION >= 199802
+				extern struct ifnet *loifp;
+				rt->rt_ifp = loifp;	/*XXX*/
+#else
 				extern struct ifnet loif;
 				rt->rt_ifp = &loif;	/*XXX*/
+#endif
 #endif /*__bsdi__*/
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 				rt->rt_ifp = &loif[0];	/*XXX*/
@@ -1063,7 +1076,7 @@ nd6_rtrequest(req, rt, sa)
 }
 
 void
-#if defined(__bsdi__) && __bsdi__ >= 4
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
 nd6_p2p_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;
@@ -1122,8 +1135,13 @@ nd6_p2p_rtrequest(req, rt, sa)
 		if (ifa) {
 			if (nd6_useloopback) {
 #ifdef __bsdi__
+#if _BSDI_VERSION >= 199802
+				extern struct ifnet *loifp;
+				rt->rt_ifp = loifp;	/*XXX*/
+#else
 				extern struct ifnet loif;
 				rt->rt_ifp = &loif;	/*XXX*/
+#endif
 #endif /*__bsdi__*/
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 				rt->rt_ifp = &loif[0];	/*XXX*/

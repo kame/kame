@@ -136,7 +136,7 @@ static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 #endif
 
-#ifndef __OpenBSD__
+#ifndef HAVE_NRL_INPCB
 static int icmp6_rip6_input __P((struct mbuf **, int));
 #endif
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
@@ -794,7 +794,7 @@ icmp6_input(mp, offp, proto)
 	}
 
  passit:
-#ifdef __OpenBSD__
+#ifdef HAVE_NRL_INPCB
 	rip6_input(&m, offp, IPPROTO_ICMPV6);
 #else
 	icmp6_rip6_input(&m, *offp);
@@ -1112,7 +1112,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	return(copied);
 }
 
-#ifndef __OpenBSD__
+#ifndef HAVE_NRL_INPCB
 /*
  * XXX almost dup'ed code with rip6_input.
  */
@@ -1412,7 +1412,7 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 	struct in6_addr *tgt6;
 {
 	static char buf[1024];
-#ifndef __OpenBSD__
+#if !defined(__OpenBSD__) && !defined(__bsdi__)
 	snprintf(buf, sizeof(buf), "(src=%s dst=%s tgt=%s)",
 		ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
 #else

@@ -83,6 +83,9 @@
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/kernel.h>
 #endif
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#include <machine/pcpu.h>
+#endif
 #include <sys/proc.h>
 
 #include <net/if.h>
@@ -90,16 +93,16 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #endif
 #include <netinet6/ip6.h>
 #include <netinet6/icmp6.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
-#include <netinet6/in6_pcb.h>
-#else
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
+#else
+#include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
@@ -150,8 +153,12 @@ static int ip6_insertfraghdr __P((struct mbuf *, struct mbuf *, int,
 				  struct ip6_frag **));
 static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
 extern struct ifnet loif;
+struct ifnet *loifp = &loif;
+#endif
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+extern struct ifnet *loifp;
 #endif
 
 #ifdef __NetBSD__
@@ -652,7 +659,7 @@ skip_ipsec2:;
 			}
 			else {
 #if defined(__bsdi__) || defined(__OpenBSD__)
-				ifp = &loif;
+				ifp = loifp;
 #else
 				ifp = &loif[0];
 #endif
@@ -1872,6 +1879,8 @@ ip6_pcbopts(pktopt, m, so)
 	int error = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct proc *p = sopt->sopt_p;
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+	struct proc *p = PCPU(curproc);	/* XXX */
 #else
 	struct proc *p = curproc;	/* XXX */
 #endif
@@ -1925,7 +1934,11 @@ ip6_setmoptions(optname, im6op, m)
 	struct route_in6 ro;
 	struct sockaddr_in6 *dst;
 	struct in6_multi_mship *imm;
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+	struct proc *p = PCPU(curproc);	/* XXX */
+#else
 	struct proc *p = curproc;	/* XXX */
+#endif
 
 	if (im6o == NULL) {
 		/*
@@ -2047,7 +2060,7 @@ ip6_setmoptions(optname, im6op, m)
 			 */
 			if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr)) {
 #if defined(__bsdi__) || defined(__OpenBSD__)
-				ifp = &loif;
+				ifp = loifp;
 #else
 				ifp = &loif[0];
 #endif

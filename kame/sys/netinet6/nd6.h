@@ -257,7 +257,7 @@ void nd6_free __P((struct rtentry *));
 void nd6_nud_hint __P((struct rtentry *, struct in6_addr *));
 int nd6_resolve __P((struct ifnet *, struct rtentry *,
 		     struct mbuf *, struct sockaddr *, u_char *));
-#if defined(__bsdi__) && __bsdi__ >= 4
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
 void nd6_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 void nd6_p2p_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else

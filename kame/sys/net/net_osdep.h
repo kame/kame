@@ -104,6 +104,14 @@
  *
  * - dtom()
  *	NEVER USE IT!
+ *
+ * - struct ifnet for loopback interface
+ *	BSDI3: struct ifnet loif;
+ *	BSDI4: struct ifnet *loifp;
+ *	NetBSD, OpenBSD, FreeBSD2: struct ifnet loif[NLOOP];
+ *
+ *	odd thing is that many of them refers loif as ifnet *loif,
+ *	not loif[NLOOP], from outside of if_loop.c.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
@@ -131,7 +139,7 @@ extern char *if_name __P((struct ifnet *));
 #define ovbcopy		bcopy
 #endif
 
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION > 199802)
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #define HAVE_NRL_INPCB
 #endif
 
