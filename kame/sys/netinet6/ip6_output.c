@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.439 2004/03/12 13:23:45 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.440 2004/03/16 03:18:15 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3860,7 +3860,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
 		}
 		if (imm != NULL) {
@@ -3893,7 +3894,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
 		}
 		if (imm == NULL) {
@@ -3917,7 +3919,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			                       &SIN6(&ss_grp)->sin6_addr))
 				break;
 		}
 
@@ -4020,7 +4023,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
 		}
 		if (imm == NULL) {
@@ -4084,7 +4088,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
 		}
 
@@ -4171,7 +4176,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
 		}		
 		if (imm == NULL) {
