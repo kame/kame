@@ -30,7 +30,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.h,v 1.1 2000/01/18 07:29:13 kjc Exp $
+ * $Id: altq_hfsc.h,v 1.2 2000/02/03 07:59:00 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_HFSC_H_
 #define _ALTQ_ALTQ_HFSC_H_
@@ -112,7 +112,7 @@ struct hfsc_delete_filter {
 
 struct class_stats {
 	u_int			class_id;
-	u_int			class_handle;
+	u_long			class_handle;
 	struct service_curve	rsc;
 	struct service_curve	fsc;
 

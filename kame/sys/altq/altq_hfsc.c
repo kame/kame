@@ -30,7 +30,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.c,v 1.1 2000/01/18 07:29:13 kjc Exp $
+ * $Id: altq_hfsc.c,v 1.2 2000/02/03 07:59:00 kjc Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,
@@ -141,7 +141,7 @@ static int hfsccmd_add_filter __P((struct hfsc_add_filter *));
 static int hfsccmd_delete_filter __P((struct hfsc_delete_filter *));
 static int hfsccmd_class_stats __P((struct hfsc_class_stats *));
 static void get_class_stats __P((struct class_stats *, struct hfsc_class *));
-static struct hfsc_class *clh_to_clp __P((struct hfsc_if *, u_int));
+static struct hfsc_class *clh_to_clp __P((struct hfsc_if *, u_long));
 static u_long clp_to_clh __P((struct hfsc_class *));
 
 /*
@@ -1910,7 +1910,7 @@ static void get_class_stats(sp, cl)
 static struct hfsc_class *
 clh_to_clp(hif, chandle)
 	struct hfsc_if *hif;
-	u_int chandle;
+	u_long chandle;
 {
 	struct hfsc_class *cl;
 

@@ -55,7 +55,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.c,v 1.1 2000/01/18 07:29:14 kjc Exp $
+ * $Id: altq_rio.c,v 1.2 2000/02/03 07:59:00 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -674,9 +674,10 @@ static int dscp2index(u_int8_t dscp)
  * use m_pkthdr.rcvif to pass this info.
  */
 #define RIOM_SET_PRECINDEX(m, idx)	\
-	do { (m)->m_pkthdr.rcvif = (struct ifnet *)(idx); } while (0)
-#define RIOM_GET_PRECINDEX(m)	({ int idx; idx = (int)((m)->m_pkthdr.rcvif); \
-				  (m)->m_pkthdr.rcvif = NULL; idx; })
+	do { (m)->m_pkthdr.rcvif = (struct ifnet *)((long)(idx)); } while (0)
+#define RIOM_GET_PRECINDEX(m)	\
+	({ long idx; idx = (long)((m)->m_pkthdr.rcvif); \
+	(m)->m_pkthdr.rcvif = NULL; idx; })
 #endif
 
 int rio_addq(rp, q, m, pr_hdr)
