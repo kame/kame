@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 4.x
 KAME project
-$Id: INSTALL,v 1.7 2001/04/26 18:14:26 jinmei Exp $
+$Id: INSTALL,v 1.8 2001/11/22 06:18:17 keiichi Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -85,37 +85,37 @@ D-1. Reboot with the command you like.
 
 E. Configurations, in short
 ===========================
-E-0. You should configure IPv6 programs in this snapshot instead of the 
+E-1. Check ${.CURDIR}/etc directory if there are any KAME modified startup
+     scripts.  If they exist, copy them to /etc directory.
+
+E-2. You should configure IPv6 programs in this snapshot instead of the 
      ones in original FreeBSD 4.x, because some of them do not work 
      on this snapshot.
-     See E-3 for more details.
+     See E-5 for more details.
 
-E-1. Most of configuration files are shipped with normal OS distribution,
+E-3. Most of configuration files are shipped with normal OS distribution,
      and are in located in /etc.  If you need special configuration file for
      KAME-origin daemons, configuration files need to be placed in
      /usr/local/v6/etc.  You may want to copy /usr/local/v6/etc/foo.sample into
      /usr/local/v6/etc/foo, and edit as necessary.
 
-E-2. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
+E-4. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
 	# cd /dev
 	# sh MAKEDEV.altq all
 
-E-3. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
+E-5. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      For daily use, you will need to add both of (or either of) them
      into your command search path (consult manpage for your favorite
      shell) and /etc/rc's PATH definition.
      Make sure to make them used before /usr/bin or /usr/sbin,
      otherwise you end up using OS-supplied commands, which might not
-     work as mentioned in E-0.
+     work as mentioned in E-1.
 
-     In particular, FreeBSD 4.2's ifconfig(8) has a serious bug, which
-     prevents IPv6 addresses from being configured.  Since address
-     configuration is usually done in the boot sequence, you should
-     probably add the following line to your /etc/rc.conf:
+     You should probably add the following line to your /etc/rc.conf:
 
      PATH=/usr/local/v6/sbin:/usr/local/v6/bin:${PATH}
 
-E-4. There are batch of documents installed into /usr/local/v6/man
+E-6. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  They are more recent than those
      found in /usr/share/doc/IPv6.  Please read them as necessary.
      If you wish to develop your own programs, we suggest you to read through
