@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.94 2003/01/08 08:47:23 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.95 2003/01/09 02:54:44 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1190,12 +1190,16 @@ stf_ioctl(ifp, cmd, data)
 			break;
 		}
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-		if (!IN6_IS_ADDR_STF(sc, &sin6->sin6_addr))
+		if (!IN6_IS_ADDR_STF(sc, &sin6->sin6_addr)) {
 			error = EINVAL;
+			break;
+		}
 
 		if (STF_IS_6TO4(sc) &&
-		    isrfc1918addr(GET_V4(sc, &sin6->sin6_addr)))
+		    isrfc1918addr(GET_V4(sc, &sin6->sin6_addr))) {
 			error = EINVAL;
+			break;
+		}
 
 		ifa->ifa_rtrequest = stf_rtrequest;
 		ifp->if_flags |= IFF_UP;
