@@ -13,7 +13,7 @@
 
 #define SC	((BC - 4) >> 1)
 
-#include "boxes-fst.dat"
+#include <crypto/rijndael/boxes-fst.dat>
 
 static word8 shifts[3][4][2] = {
  {
