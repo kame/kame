@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.70 2000/10/24 08:31:19 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.71 2000/11/01 11:41:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1318,7 +1318,9 @@ get_cert_fromlocal(iph1, my)
 	}
 
 	if (!cert) {
-		plog(logp, LOCATION, NULL, "ERROR: failed to get my CERT.\n");
+		plog(logp, LOCATION, NULL,
+			"ERROR: failed to get %s CERT.\n",
+			my ? "my" : "peers");
 		goto end;
 	}
 
