@@ -433,6 +433,133 @@ ip_output(m0, opt, ro, flags, imo)
 	}
 
 sendit:
+#ifdef IPSEC
+	/* get SP for this packet */
+	if (so == NULL)
+		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
+	else
+		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
+
+	if (sp == NULL) {
+		ipsecstat.out_inval++;
+		goto bad;
+	}
+
+	error = 0;
+
+	/* check policy */
+	switch (sp->policy) {
+	case IPSEC_POLICY_DISCARD:
+		/*
+		 * This packet is just discarded.
+		 */
+		ipsecstat.out_polvio++;
+		goto bad;
+
+	case IPSEC_POLICY_BYPASS:
+	case IPSEC_POLICY_NONE:
+		/* no need to do IPsec. */
+		goto skip_ipsec;
+	
+	case IPSEC_POLICY_IPSEC:
+		if (sp->req == NULL) {
+			/* acquire a policy */
+			error = key_spdacquire(sp);
+			goto bad;
+		}
+		break;
+
+	case IPSEC_POLICY_ENTRUST:
+	default:
+		printf("ip_output: Invalid policy found. %d\n", sp->policy);
+	}
+    {
+	struct ipsec_output_state state;
+	bzero(&state, sizeof(state));
+	state.m = m;
+	if (flags & IP_ROUTETOIF) {
+		state.ro = &iproute;
+		bzero(&iproute, sizeof(iproute));
+	} else
+		state.ro = ro;
+	state.dst = (struct sockaddr *)dst;
+
+	ip->ip_sum = 0;
+
+	/*
+	 * XXX
+	 * delayed checksums are not currently compatible with IPsec
+	 */
+	if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
+		in_delayed_cksum(m);
+		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
+	}
+
+	HTONS(ip->ip_len);
+	HTONS(ip->ip_off);
+
+	error = ipsec4_output(&state, sp, flags);
+
+	m = state.m;
+	if (flags & IP_ROUTETOIF) {
+		/*
+		 * if we have tunnel mode SA, we may need to ignore
+		 * IP_ROUTETOIF.
+		 */
+		if (state.ro != &iproute || state.ro->ro_rt != NULL) {
+			flags &= ~IP_ROUTETOIF;
+			ro = state.ro;
+		}
+	} else
+		ro = state.ro;
+	dst = (struct sockaddr_in *)state.dst;
+	if (error) {
+		/* mbuf is already reclaimed in ipsec4_output. */
+		m0 = NULL;
+		switch (error) {
+		case EHOSTUNREACH:
+		case ENETUNREACH:
+		case EMSGSIZE:
+		case ENOBUFS:
+		case ENOMEM:
+			break;
+		default:
+			printf("ip4_output (ipsec): error code %d\n", error);
+			/*fall through*/
+		case ENOENT:
+			/* don't show these error codes to the user */
+			error = 0;
+			break;
+		}
+		goto bad;
+	}
+    }
+
+	/* be sure to update variables that are affected by ipsec4_output() */
+	ip = mtod(m, struct ip *);
+#ifdef _IP_VHL
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+#else
+	hlen = ip->ip_hl << 2;
+#endif
+	if (ro->ro_rt == NULL) {
+		if ((flags & IP_ROUTETOIF) == 0) {
+			printf("ip_output: "
+				"can't update route after IPsec processing\n");
+			error = EHOSTUNREACH;	/*XXX*/
+			goto bad;
+		}
+	} else {
+		ia = ifatoia(ro->ro_rt->rt_ifa);
+		ifp = ro->ro_rt->rt_ifp;
+	}
+
+	/* make it flipped, again. */
+	NTOHS(ip->ip_len);
+	NTOHS(ip->ip_off);
+skip_ipsec:
+#endif /*IPSEC*/
+
 	/*
 	 * IpHack's section.
 	 * - Xlate: translate packet's addr/port (NAT).
@@ -643,133 +770,6 @@ sendit:
 	}
 
 pass:
-#ifdef IPSEC
-	/* get SP for this packet */
-	if (so == NULL)
-		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
-	else
-		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
-
-	if (sp == NULL) {
-		ipsecstat.out_inval++;
-		goto bad;
-	}
-
-	error = 0;
-
-	/* check policy */
-	switch (sp->policy) {
-	case IPSEC_POLICY_DISCARD:
-		/*
-		 * This packet is just discarded.
-		 */
-		ipsecstat.out_polvio++;
-		goto bad;
-
-	case IPSEC_POLICY_BYPASS:
-	case IPSEC_POLICY_NONE:
-		/* no need to do IPsec. */
-		goto skip_ipsec;
-	
-	case IPSEC_POLICY_IPSEC:
-		if (sp->req == NULL) {
-			/* acquire a policy */
-			error = key_spdacquire(sp);
-			goto bad;
-		}
-		break;
-
-	case IPSEC_POLICY_ENTRUST:
-	default:
-		printf("ip_output: Invalid policy found. %d\n", sp->policy);
-	}
-    {
-	struct ipsec_output_state state;
-	bzero(&state, sizeof(state));
-	state.m = m;
-	if (flags & IP_ROUTETOIF) {
-		state.ro = &iproute;
-		bzero(&iproute, sizeof(iproute));
-	} else
-		state.ro = ro;
-	state.dst = (struct sockaddr *)dst;
-
-	ip->ip_sum = 0;
-
-	/*
-	 * XXX
-	 * delayed checksums are not currently compatible with IPsec
-	 */
-	if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
-		in_delayed_cksum(m);
-		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
-	}
-
-	HTONS(ip->ip_len);
-	HTONS(ip->ip_off);
-
-	error = ipsec4_output(&state, sp, flags);
-
-	m = state.m;
-	if (flags & IP_ROUTETOIF) {
-		/*
-		 * if we have tunnel mode SA, we may need to ignore
-		 * IP_ROUTETOIF.
-		 */
-		if (state.ro != &iproute || state.ro->ro_rt != NULL) {
-			flags &= ~IP_ROUTETOIF;
-			ro = state.ro;
-		}
-	} else
-		ro = state.ro;
-	dst = (struct sockaddr_in *)state.dst;
-	if (error) {
-		/* mbuf is already reclaimed in ipsec4_output. */
-		m0 = NULL;
-		switch (error) {
-		case EHOSTUNREACH:
-		case ENETUNREACH:
-		case EMSGSIZE:
-		case ENOBUFS:
-		case ENOMEM:
-			break;
-		default:
-			printf("ip4_output (ipsec): error code %d\n", error);
-			/*fall through*/
-		case ENOENT:
-			/* don't show these error codes to the user */
-			error = 0;
-			break;
-		}
-		goto bad;
-	}
-    }
-
-	/* be sure to update variables that are affected by ipsec4_output() */
-	ip = mtod(m, struct ip *);
-#ifdef _IP_VHL
-	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
-#else
-	hlen = ip->ip_hl << 2;
-#endif
-	if (ro->ro_rt == NULL) {
-		if ((flags & IP_ROUTETOIF) == 0) {
-			printf("ip_output: "
-				"can't update route after IPsec processing\n");
-			error = EHOSTUNREACH;	/*XXX*/
-			goto bad;
-		}
-	} else {
-		ia = ifatoia(ro->ro_rt->rt_ifa);
-		ifp = ro->ro_rt->rt_ifp;
-	}
-
-	/* make it flipped, again. */
-	NTOHS(ip->ip_len);
-	NTOHS(ip->ip_off);
-skip_ipsec:
-#endif /*IPSEC*/
-
 	sw_csum = m->m_pkthdr.csum_flags | CSUM_IP;
 	m->m_pkthdr.csum_flags = sw_csum & ifp->if_hwassist;
 	sw_csum &= ~ifp->if_hwassist;
