@@ -17,16 +17,9 @@ CFLAGS=	@DEFS@ @CFLAGS@ $(CPPFLAGS)
 CPPFLAGS=@CPPFLAGS@
 LDFLAGS=@LDFLAGS@
 
-OBJS=	getaddrinfo.o getnameinfo.o ifname.o vars.o rresvport_af.o rcmd.o
-OBJS+=	rthdr.o ip6opt.o
-OBJS+=	name6.o
-OBJS+=	base64.o herror.o nsap_addr.o 
-OBJS+=	res_comp.o res_data.o res_debug.o
-OBJS+=	res_init.o res_mkquery.o res_query.o 
-OBJS+=	res_send.o
-OBJS+=	inet_pton.o inet_addr.o
-OBJS+=	bindresvport.o
+OBJS=	getaddrinfo.o getnameinfo.o ifname.o
 OBJS+=	getifaddrs.o
+OBJS+=	@V6OBJS@
 
 MAN3=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
 	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
