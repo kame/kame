@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.144 2003/04/08 03:35:36 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.145 2003/04/09 04:45:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -198,6 +198,7 @@ static const struct explore explore[] = {
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x07 },
 #endif
 	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x07 },
+	{ PF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x07 },
 	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x05 },
 #endif
 	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
@@ -206,6 +207,7 @@ static const struct explore explore[] = {
 	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x07 },
 #endif
 	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x07 },
+	{ PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x07 },
 	{ PF_INET, SOCK_RAW, ANY, NULL, 0x05 },
 	{ -1, 0, 0, NULL, 0 },
 };
@@ -1627,6 +1629,7 @@ get_port(ai, servname, matchonly)
 		return EAI_SERVICE;
 	case SOCK_DGRAM:
 	case SOCK_STREAM:
+	case SOCK_SEQPACKET:
 		allownumeric = 1;
 		break;
 	case ANY:
@@ -1649,7 +1652,10 @@ get_port(ai, servname, matchonly)
 			proto = "udp";
 			break;
 		case SOCK_STREAM:
-			proto = "tcp";
+			proto = "tcp";	/*XXX sctp?*/
+			break;
+		case SOCK_SEQPACKET:
+			proto = "sctp";
 			break;
 		default:
 			proto = NULL;
