@@ -345,24 +345,6 @@ in6_gif_ioctl(ifp, cmd, data)
 			dst = (struct sockaddr *)
 				&(((struct in6_aliasreq *)data)->ifra_dstaddr);
 
-			/* only one gif can have dst = in6addr_any */
-#define satoin6(sa) (&((struct sockaddr_in6 *)(sa))->sin6_addr)
-
-			if (IN6_IS_ADDR_UNSPECIFIED(satoin6(dst))) {
-				int i;
-				struct gif_softc *sc2;
-
-				for (i = 0, sc2 = gif; i < ngif; i++, sc2++) {
-					if (sc2 == sc) continue;
-					if (sc2->gif_pdst &&
-					    IN6_IS_ADDR_UNSPECIFIED(
-						satoin6(sc2->gif_pdst)
-								    )) {
-					    error = EADDRNOTAVAIL;
-					    goto bad;
-					}
-				}
-			}
 			bzero(&mask6, sizeof(mask6));
 			mask6.sin6_addr.s6_addr32[0] = ~0;
 			mask6.sin6_addr.s6_addr32[1] = ~0;
