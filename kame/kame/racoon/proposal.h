@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.3 2000/08/09 19:49:11 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.4 2000/08/23 06:18:44 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -140,24 +140,32 @@ struct prop_pair {
 
 /*
  * Lifetime length selection refered to the section 4.5.4 of RFC2407.  It does
- * not conform to the description of RFC completely.  There are three type of
+ * not completely conform to the description of RFC.  There are four types of
  * the behavior.  If the value of "proposal_check" in "remote" directive is;
  *     "obey"
  *         the responder obey the initiator anytime.
  *     "strict"
  *         If the responder's length is longer than the initiator's one, the
  *         responder uses the intitiator's one.  Otherwise rejects the proposal.
+ *         About PFS, this directive is same as exact.
  *     "claim"
  *         If the responder's length is longer than the initiator's one, the
  *         responder use the intitiator's one.  If the responder's length is
  *         shorter than the initiator's one, the responder uses own length
  *         AND send RESPONDER-LIFETIME notify message to a initiator in the
  *         case of lifetime.
+ *         About PFS, this directive is same as exact.
+ *     "exact"
+ *         If the initiator's length is not equal to the responder's one, the
+ *         responder rejects the proposal.
+ *         If PFS is required and if the responder's group is not equal to
+ *         the initiator's one, then the responder reject the proposal.
  * XXX should be defined the behavior of key length.
  */
 #define PROP_CHECK_OBEY		1
 #define PROP_CHECK_STRICT	2
 #define PROP_CHECK_CLAIM	3
+#define PROP_CHECK_EXACT	4
 
 struct sainfo;
 struct ph1handle;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.8 2000/08/23 01:41:03 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.9 2000/08/23 06:18:44 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -180,29 +180,41 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 	}
 	newpp->prop_no = pp1->prop_no;
 
-	/* see proposal.h about lifetime/key length selection. */
+	/* see proposal.h about lifetime/key length and PFS selection. */
 
 	/* check lifetime */
-	if (pp1->lifetime <= pp2->lifetime) {
-		/*
-		 * Processing passes here always when the initiator check
-		 * the proposal responded by the responder.
-		 */
+	switch (ph1->rmconf->pcheck_level) {
+	case PROP_CHECK_OBEY:
 		newpp->lifetime = pp1->lifetime;
-	} else
-		switch (ph1->rmconf->pcheck_level) {
-		case PROP_CHECK_OBEY:
-			newpp->lifetime = pp1->lifetime;
-			break;
-		case PROP_CHECK_STRICT:
+		newpp->lifebyte = pp1->lifebyte;
+		newpp->pfs_group = pp1->pfs_group;
+		break;
+	case PROP_CHECK_STRICT:
+		if (pp1->lifetime > pp2->lifetime) {
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
 					"ERROR: long lifetime proposed: "
 					"my:%d peer:%d\n",
 					pp2->lifetime, pp1->lifetime));
 			goto err;
-			break;
-		case PROP_CHECK_CLAIM:
+		}
+		if (pp1->lifebyte > pp2->lifebyte) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"ERROR: long lifebyte proposed: "
+					"my:%d peer:%d\n",
+					pp2->lifebyte, pp1->lifebyte));
+			goto err;
+		}
+		newpp->lifetime = pp1->lifetime;
+		newpp->lifebyte = pp1->lifebyte;
+    		goto prop_pfs_check;
+		break;
+	case PROP_CHECK_CLAIM:
+		/* lifetime */
+		if (pp1->lifetime <= pp2->lifetime) {
+			newpp->lifetime = pp1->lifetime;
+		} else {
 			newpp->lifetime = pp2->lifetime;
 			newpp->claim |= IPSECDOI_ATTR_SA_LD_TYPE_SEC;
 			YIPSDEBUG(DEBUG_SA,
@@ -210,55 +222,42 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 					"NOTICE: use own lifetime: "
 					"my:%d peer:%d\n",
 					pp2->lifetime, pp1->lifetime));
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"FATAL: invalid pcheck_level why?.\n");
-			goto err;
 		}
 
-	/* check lifebyte */
-	if (pp1->lifebyte <= pp2->lifebyte) {
-		/*
-		 * Processing passes here always when the initiator check
-		 * the proposal responded by the responder.
-		 */
-		newpp->lifebyte = pp1->lifebyte;
-	} else
-		switch (ph1->rmconf->pcheck_level) {
-		case PROP_CHECK_OBEY:
+		/* lifebyte */
+		if (pp1->lifebyte <= pp2->lifebyte) {
 			newpp->lifebyte = pp1->lifebyte;
 			break;
-		case PROP_CHECK_STRICT:
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: big lifebyte proposed: "
-					"my:%d peer:%d\n",
-					pp2->lifebyte, pp1->lifebyte));
-			goto err;
-			break;
-		case PROP_CHECK_CLAIM:
+		} else {
 			newpp->lifebyte = pp2->lifebyte;
-			newpp->claim |= IPSECDOI_ATTR_SA_LD_TYPE_KB;
+			newpp->claim |= IPSECDOI_ATTR_SA_LD_TYPE_SEC;
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
 					"NOTICE: use own lifebyte: "
 					"my:%d peer:%d\n",
-					pp2->lifetime, pp1->lifetime));
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"FATAL: invalid pcheck_level why?.\n");
-			goto err;
+					pp2->lifebyte, pp1->lifebyte));
 		}
 
-	/* check PFS */
-	switch (ph1->rmconf->pcheck_level) {
-	case PROP_CHECK_OBEY:
-		newpp->pfs_group = pp1->pfs_group;
+    		goto prop_pfs_check;
 		break;
-	case PROP_CHECK_STRICT:
-	case PROP_CHECK_CLAIM:
+	case PROP_CHECK_EXACT:
+		if (pp1->lifetime != pp2->lifetime) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"ERROR: lifetime mismatched: "
+					"my:%d peer:%d\n",
+					pp2->lifetime, pp1->lifetime));
+			goto err;
+		}
+		if (pp1->lifebyte != pp2->lifebyte) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"ERROR: lifebyte mismatched: "
+					"my:%d peer:%d\n",
+					pp2->lifebyte, pp1->lifebyte));
+			goto err;
+		}
+    prop_pfs_check:
 		if (pp1->pfs_group != pp2->pfs_group) {
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
@@ -267,6 +266,9 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 					pp2->pfs_group, pp1->pfs_group));
 			goto err;
 		}
+		newpp->lifebyte = pp1->lifebyte;
+		newpp->lifebyte = pp1->lifebyte;
+		newpp->pfs_group = pp1->pfs_group;
 		break;
 	default:
 		plog(logp, LOCATION, NULL,

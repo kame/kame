@@ -273,6 +273,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>proposal_check	{ YYD; return(PROPOSAL_CHECK); }
 <S_RMTS>obey		{ YYD; yylval.num = PROP_CHECK_OBEY; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>strict		{ YYD; yylval.num = PROP_CHECK_STRICT; return(PROPOSAL_CHECK_LEVEL); }
+<S_RMTS>exact		{ YYD; yylval.num = PROP_CHECK_EXACT; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>claim		{ YYD; yylval.num = PROP_CHECK_CLAIM; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>keepalive	{ YYD; return(KEEPALIVE); }
 <S_RMTS>lifetime	{ YYD; return(LIFETIME); }
