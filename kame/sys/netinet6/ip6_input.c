@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.240 2001/12/27 13:46:06 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.241 2001/12/27 15:37:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1613,8 +1613,6 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 # define sbcreatecontrol	so_cmsg
 #endif
 	int privileged = 0;
-	int rthdr_exist = 0;
-
 
 	if (ctl == NULL)	/* validity check */
 		return;
@@ -1823,42 +1821,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		}
 	}
 
-	/* IPV6_DSTOPTS and IPV6_RTHDR socket options */
-	if ((in6p->in6p_flags & (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) != 0) {
-		int proto, off, nxt;
-
-		/*
-		 * go through the header chain to see if a routing header is
-		 * contained in the packet. We need this information to store
-		 * destination options headers (if any) properly.
-		 * XXX: performance issue. We should record this info when
-		 * processing extension headers in incoming routine.
-		 * (todo) use m_aux? 
-		 */
-		proto = IPPROTO_IPV6;
-		off = 0;
-		nxt = -1;
-		while (1) {
-			int newoff;
-
-			newoff = ip6_nexthdr(m, off, proto, &nxt);
-			if (newoff < 0)
-				break;
-			if (newoff < off) /* invalid, check for safety */
-				break;
-			if ((proto = nxt) == IPPROTO_ROUTING) {
-				rthdr_exist = 1;
-				break;
-			}
-			off = newoff;
-		}
-	}
-
-	if ((in6p->in6p_flags &
-	     (IN6P_RTHDR | IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) != 0) {
+	if ((in6p->in6p_flags & (IN6P_RTHDR | IN6P_DSTOPTS)) != 0) {
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		int nxt = ip6->ip6_nxt, off = sizeof(struct ip6_hdr);
-		int pass_rthdr = 0; /* flag if we've passed a routing header */
 
 		/*
 		 * Search for destination options headers or routing
@@ -1919,89 +1884,46 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 			switch (nxt) {
 			case IPPROTO_DSTOPTS:
 			{
-				struct ip6_dest *prevdest1 = NULL,
-					*prevdest2 = NULL;
+				struct ip6_dest *prevdest = NULL;
 				int prevdestlen;
 
-				if ((in6p->in6p_flags &
-				     (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) == 0)
+				if (!(in6p->in6p_flags & IN6P_DSTOPTS))
 					break;
 
 				/*
 				 * We also require super-user privilege for
-				 * the option.
-				 * See the comments on IN6_HOPOPTS.
+				 * the option.  See comments on IN6_HOPOPTS.
 				 */
 				if (!privileged)
 					break;
 
-				/*
-				 * Save a dst opt header before a routing
-				 * header if the user wanted.
-				 */
-				if (rthdr_exist && pass_rthdr == 0 &&
-				    (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
-					if (prevctl && prevctl->dest1) {
-						cm = mtod(prevctl->dest1,
-							  struct cmsghdr *);
-						prevdest1 = (struct ip6_dest *)CMSG_DATA(cm);
-						prevdestlen = (prevdest1->ip6d_len + 1) << 3;
-					} else
-						prevdestlen = 0;
-
-					/*
-					 * If this is the 1st dst opt header
-					 * (that is placed before rthdr)
-					 * we enconter and this header is
-					 * not different from the previous one,
-					 * simply ignore the header.
-					 */
-					if (ctl->dest1 == NULL &&
-					    (prevdest1 &&
-					     prevdestlen == elen &&
-					     bcmp(ip6e, prevdest1, elen) == 0))
-						break;
-
-					*mp = sbcreatecontrol((caddr_t)ip6e,
-							      elen, 
-							      IPV6_RTHDRDSTOPTS,
-							      IPPROTO_IPV6);
-					if (ctl->dest1 == NULL)
-						ctl->dest1 = *mp;
-					if (*mp)
-						mp = &(*mp)->m_next;
+				if (prevctl && prevctl->dest) {
+					cm = mtod(prevctl->dest,
+						  struct cmsghdr *);
+					prevdest = (struct ip6_dest *)CMSG_DATA(cm);
+					prevdestlen =
+						(prevdest->ip6d_len + 1) << 3;
 				}
+
 				/*
-				 * Save a dst opt header after a routing
-				 * header if the user wanted.
+				 * If this is the 1st dst opt header
+				 * we enconter and this header is
+				 * not different from the previous one,
+				 * simply ignore the header.
 				 */
-				if ((rthdr_exist == 0 || pass_rthdr) &&
-				    (in6p->in6p_flags & IN6P_DSTOPTS)) {
-					if (prevctl && prevctl->dest2) {
-						cm = mtod(prevctl->dest2,
-							  struct cmsghdr *);
-						prevdest2 = (struct ip6_dest *)CMSG_DATA(cm);
-						prevdestlen = (prevdest2->ip6d_len + 1) << 3;
-					} else
-						prevdestlen = 0;
+				if (ctl->dest == NULL && prevdest &&
+				    prevdestlen == elen &&
+				    bcmp(ip6e, prevdest, elen) == 0)
+					break;
 
-					/* see the above comment */
-					if (ctl->dest2 == NULL &&
-					    (prevdest2 &&
-					     prevdestlen == elen &&
-					     bcmp(ip6e, prevdest2, elen) == 0))
-						break;
-
-					*mp = sbcreatecontrol((caddr_t)ip6e,
-							      elen,
-							      IS2292(IPV6_2292DSTOPTS, IPV6_DSTOPTS),
-							      IPPROTO_IPV6);
-					if (ctl->dest2 == NULL)
-						ctl->dest2 = *mp;
-
-					if (*mp)
-						mp = &(*mp)->m_next;
-				}
+				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
+						      IS2292(IPV6_2292DSTOPTS,
+							     IPV6_DSTOPTS),
+						      IPPROTO_IPV6);
+				if (ctl->dest == NULL)
+					ctl->dest = *mp;
+				if (*mp)
+					mp = &(*mp)->m_next;
 				break;
 			}
 			case IPPROTO_ROUTING:
@@ -2009,7 +1931,6 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				struct ip6_rthdr *prevrth = NULL;
 				int prevrhlen = 0;
 
-				pass_rthdr++;
 				if (!in6p->in6p_flags & IN6P_RTHDR)
 					break;
 
@@ -2031,8 +1952,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-				    IS2292(IPV6_2292RTHDR, IPV6_RTHDR),
-				    IPPROTO_IPV6);
+						      IS2292(IPV6_2292RTHDR,
+							     IPV6_RTHDR),
+						      IPPROTO_IPV6);
 				if (ctl->rthdr == NULL)
 					ctl->rthdr = *mp;
 				if (*mp)
@@ -2247,8 +2169,7 @@ do { \
 	PRINT1(p, hlim);
 	PRINT1(p, pktinfo);
 	PRINT1(p, hbh);
-	PRINT1(p, dest1);
-	PRINT1(p, dest2);
+	PRINT1(p, dest);
 	PRINT1(p, rthdr);
 	printf("\n");
 #undef PRINT1
@@ -2277,8 +2198,7 @@ ip6_update_recvpcbopt(old, new)
 	 */
 	old->head = NULL;
 	CLEAN_RECVOPT(old, rthdr);
-	CLEAN_RECVOPT(old, dest2);
-	CLEAN_RECVOPT(old, dest1);
+	CLEAN_RECVOPT(old, dest);
 	CLEAN_RECVOPT(old, hbh);
 	CLEAN_RECVOPT(old, pktinfo);
 	CLEAN_RECVOPT(old, hlim);
@@ -2288,8 +2208,7 @@ ip6_update_recvpcbopt(old, new)
 		MERGE_RECVOPT(new, old, hlim);
 		MERGE_RECVOPT(new, old, pktinfo);
 		MERGE_RECVOPT(new, old, hbh);
-		MERGE_RECVOPT(new, old, dest1);
-		MERGE_RECVOPT(new, old, dest2);
+		MERGE_RECVOPT(new, old, dest);
 		MERGE_RECVOPT(new, old, rthdr);
 	}
 
@@ -2302,8 +2221,7 @@ ip6_update_recvpcbopt(old, new)
 	LINK_RECVOPTS(old, hlim, mp);
 	LINK_RECVOPTS(old, pktinfo, mp);
 	LINK_RECVOPTS(old, hbh, mp);
-	LINK_RECVOPTS(old, dest1, mp);
-	LINK_RECVOPTS(old, dest2, mp);
+	LINK_RECVOPTS(old, dest, mp);
 	LINK_RECVOPTS(old, rthdr, mp);
 	*mp = NULL;
 
@@ -2336,13 +2254,9 @@ ip6_reset_rcvopt(opts, optname)
 		if (opts->hbh) m_free(opts->hbh);
 		opts->hbh = NULL;
 		break;
-	case IPV6_RECVRTHDRDSTOPTS:
-		if (opts->dest1) m_free(opts->dest1);
-		opts->dest1 = NULL;
-		break;
 	case IPV6_RECVDSTOPTS:
-		if (opts->dest2) m_free(opts->dest2);
-		opts->dest2 = NULL;
+		if (opts->dest) m_free(opts->dest);
+		opts->dest = NULL;
 		break;
 	case IPV6_RECVRTHDR:
 		if (opts->rthdr) m_free(opts->rthdr);

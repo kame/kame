@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.78 2001/12/24 18:46:22 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.79 2001/12/27 15:37:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -186,8 +186,7 @@ struct ip6_recvpktopts {
 	struct mbuf *hlim;	/* received hop limit */
 	struct mbuf *pktinfo;	/* packet information of rcv packet */
 	struct mbuf *hbh;	/* HbH options header of rcv packet */
-	struct mbuf *dest1;	/* Dest opt header of rcv packet */
-	struct mbuf *dest2; /* Dest opt header (after rthdr) of rcv packet */
+	struct mbuf *dest;	/* Dest opt header of rcv packet */
 	struct mbuf *rthdr;	/* Routing header of rcv packet */
 };
 
