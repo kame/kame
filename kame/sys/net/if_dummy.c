@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.9 2000/05/05 11:00:55 sumikawa Exp $	*/
+/*	$KAME: if_dummy.c,v 1.10 2000/06/14 14:50:59 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -109,7 +109,12 @@
 #include <netatalk/at_var.h>
 #endif NETATALK
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include "bpf.h"
+#define NBPFILTER	NBPF
+#else
 #include "bpfilter.h"
+#endif
 
 #include <net/net_osdep.h>
 
