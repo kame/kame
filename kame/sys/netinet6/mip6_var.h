@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.106 2003/09/12 12:39:22 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.107 2003/10/03 02:09:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -375,6 +375,7 @@ struct mip6stat {
 	u_quad_t mip6s_paramprobmh;	/* ICMP paramprob for MH received */
 	u_quad_t mip6s_invalidcoa;	/* Invalid Care-of address */
 	u_quad_t mip6s_invalidopt;	/* Invalid mobility options */
+	u_quad_t mip6s_circularrefered;	/* Circular reference */
 };
 
 #endif /* !_MIP6_VAR_H_ */

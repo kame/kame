@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.37 2003/10/01 12:19:33 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.38 2003/10/03 02:09:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1990,6 +1990,12 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	if (bi.mbc_lifetime > MIP6_MAX_RR_BINDING_LIFE)
 		bi.mbc_lifetime = MIP6_MAX_RR_BINDING_LIFE;
 
+	if (mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi.mbc_pcoa)) {
+		/* discard */
+		m_freem(m);
+		mip6stat.mip6s_circularrefered++;	/* XXX */
+		return (EINVAL);
+	}
 	if (!bu_safe && 
 	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
 			     &bi.mbc_phaddr, &bi.mbc_pcoa,
