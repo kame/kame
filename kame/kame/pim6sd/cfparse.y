@@ -660,6 +660,8 @@ rp_config()
 
 	/* TODO: XXX: HARDCODING!!! */
 	cand_rp_adv_message.insert_data_ptr += (4 + 18);
+	cand_rp_adv_message.message_size =
+		cand_rp_adv_message.insert_data_ptr - cand_rp_adv_message.buffer;
 
 	my_cand_rp_holdtime = 2.5 * my_cand_rp_adv_period;
 
