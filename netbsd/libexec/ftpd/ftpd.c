@@ -2065,9 +2065,9 @@ protounsupp:
 
 /*
  * 522 Protocol not supported (proto,...)
- * as we assume ctrl_addr and data_addr are the same, we do not return the
- * list of address families we support - instead, we return the address family
- * of the control connection.
+ * as we assume address family for control and data connections are the same, 
+ * we do not return the list of address families we support - instead, we 
+ * return the address family of the control connection.  
  */
 void
 epsv_protounsupp(const char *message)
