@@ -516,33 +516,33 @@ resin(s, event, arg)
 		if (s < 0) {
 			snprintf(errmsg, sizeof(errmsg),
 			    "socket: %s", strerror(errno));
-			goto epsvfail;
+			goto epsvfail1;
 		}
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_FAITH, &on,
 		    sizeof(on)) < 0) {
 			close(s);
 			snprintf(errmsg, sizeof(errmsg),
 			    "setsockopt: %s", strerror(errno));
-			goto epsvfail;
+			goto epsvfail1;
 		}
 		if (bind(s, (struct sockaddr *)&sin6, salen) < 0) {
 			close(s);
 			snprintf(errmsg, sizeof(errmsg),
 			    "bind: %s", strerror(errno));
-			goto epsvfail;
+			goto epsvfail1;
 		}
 		if (listen(s, 1) < 0) {
 			close(s);
 			snprintf(errmsg, sizeof(errmsg),
 			    "listen: %s", strerror(errno));
-			goto epsvfail;
+			goto epsvfail1;
 		}
 		salen = sizeof(sin6);
 		if (getsockname(s, (struct sockaddr *)&sin6, &salen) < 0) {
 			close(s);
 			snprintf(errmsg, sizeof(errmsg),
 			    "getsockname: %s", strerror(errno));
-			goto epsvfail;
+			goto epsvfail1;
 		}
 
 		datarelay = (struct datarelay *)malloc(sizeof(*relay));
@@ -550,7 +550,7 @@ resin(s, event, arg)
 			close(s);
 			snprintf(errmsg, sizeof(errmsg),
 			    "malloc: %s", strerror(errno));
-			goto epsvfail;
+			goto epsvfail1;
 			return;
 		}
 		memset(datarelay, 0, sizeof(*datarelay));
