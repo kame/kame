@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: defs.h,v 1.5 1999/10/27 11:40:29 jinmei Exp $
+ *  $Id: defs.h,v 1.6 1999/12/10 06:09:13 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -598,5 +598,5 @@ extern void    check_vif_state         __P((void));
 extern vifi_t  local_address           __P((struct sockaddr_in6 *src));
 extern vifi_t  find_vif_direct         __P((struct sockaddr_in6 *src));
 extern vifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
-extern struct sockaddr_in6 *max_global_address __P(());
+extern struct sockaddr_in6 *max_global_address __P((void));
 extern struct sockaddr_in6 *uv_global __P((vifi_t vifi));

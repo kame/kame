@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.3 1999/10/26 08:39:19 itojun Exp $
+ *  $Id: mld6.c,v 1.4 1999/12/10 06:09:13 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -109,6 +109,8 @@ static int ctlbuflen = 0;
 
 static void mld6_read __P((int i, fd_set * fds));
 static void accept_mld6 __P((int len));
+static void make_mld6_msg __P((int, int, struct sockaddr_in6 *,
+	struct sockaddr_in6 *, struct in6_addr *, int, int, int, int));
 
 /*
  * Open and initialize the MLD socket.
