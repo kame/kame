@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.85 2000/05/10 09:20:44 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.86 2000/05/11 00:52:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,7 +610,7 @@ icmp6_input(mp, offp, proto)
 
 		if (icmp6len == sizeof(struct icmp6_hdr) + 4)
 			mode = WRU;
-		else if (icmp6len >= sizeof(struct icmp6_nodeinfo)) /* XXX */
+		else if (icmp6len >= sizeof(struct icmp6_nodeinfo))
 			mode = FQDN;
 		else
 			goto badlen;
@@ -626,8 +626,8 @@ icmp6_input(mp, offp, proto)
 			n = m_copy(m, 0, M_COPYALL);
 			if (n)
 				n = ni6_input(n, off);
-			if (n)
-				noff = sizeof(struct ip6_hdr);
+			/* XXX meaningless if n == NULL */
+			noff = sizeof(struct ip6_hdr);
 		} else {
 			u_char *p;
 			int maxlen, maxhlen;
