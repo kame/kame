@@ -153,7 +153,7 @@ in6_pcbbind(in6p, nam)
 	struct in6pcb *head = in6p->in6p_head;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)NULL;
 	struct proc *p = curproc;		/* XXX */
-	u_short	lport = 0;
+	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 	int error;
 
@@ -300,10 +300,10 @@ in6_pcbsetport(laddr, in6p)
 {
 	struct socket *so = in6p->in6p_socket;
 	struct in6pcb *head = in6p->in6p_head;
-	u_short last_port, lport = 0;
+	u_int16_t last_port, lport = 0;
 	int wild = 0;
 	void *t;
-	u_short min, max;
+	u_int16_t min, max;
 #ifdef __NetBSD__
 	struct proc *p = curproc;		/* XXX */
 #endif
@@ -845,7 +845,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 {
 	struct in6pcb *in6p, *nin6p;
 	struct in6_addr faddr6;
-	u_short	fport = fport_arg, lport = lport_arg;
+	u_int16_t fport = fport_arg, lport = lport_arg;
 	int errno;
 	int nmatch = 0;
 	void (*notify2) __P((struct in6pcb *, int));
@@ -984,7 +984,7 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 {
 	struct in6pcb *in6p, *match = 0;
 	int matchwild = 3, wildcard;
-	u_short	fport = fport_arg, lport = lport_arg;
+	u_int16_t fport = fport_arg, lport = lport_arg;
 
 	for (in6p = head->in6p_next; in6p != head; in6p = in6p->in6p_next) {
 		if (in6p->in6p_lport != lport)
@@ -1096,7 +1096,7 @@ in6_pcblookup_connect(head, faddr6, fport_arg, laddr6, lport_arg, faith)
 	int faith;
 {
 	struct in6pcb *in6p;
-	u_short	fport = fport_arg, lport = lport_arg;
+	u_int16_t fport = fport_arg, lport = lport_arg;
 
 	for (in6p = head->in6p_next; in6p != head; in6p = in6p->in6p_next) {
 #if defined(NFAITH) && NFAITH > 0
@@ -1129,7 +1129,7 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 	int faith;
 {
 	struct in6pcb *in6p, *match;
-	u_short	lport = lport_arg;
+	u_int16_t lport = lport_arg;
 
 	match = NULL;
 	for (in6p = head->in6p_next; in6p != head; in6p = in6p->in6p_next) {
