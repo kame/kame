@@ -61,7 +61,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: pim6_proto.c,v 1.1 1999/08/08 23:30:53 itojun Exp $
+ *  $Id: pim6_proto.c,v 1.2 1999/08/13 06:24:06 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -1020,7 +1020,15 @@ receive_pim6_assert(src, pim_message, datalen)
 		    inet6_fmt(&group.sin6_addr),
 		    assert_preference, assert_metric);
  
-	mrtentry_ptr = find_route(&source, &group, MRTF_SG, CREATE);
+	if ((mrtentry_ptr = find_route(&source, &group, MRTF_SG, CREATE))
+	    == NULL) {
+		IF_DEBUG(DEBUG_PIM_ASSERT)
+			log(LOG_INFO, 0,
+			    "\tFailed to create a mrtentry src:%s grp:%s",
+			    inet6_fmt(&source.sin6_addr),
+			    inet6_fmt(&group.sin6_addr));
+		return(FALSE);
+	}
 	if(mrtentry_ptr->flags & MRTF_NEW) {
 		/* For some reason, it's possible for asserts to be processed
 		 * before the data alerts a cache miss.  Therefore, when an
