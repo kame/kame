@@ -1,0 +1,46 @@
+TODO list for synchronization with FreeBSD 3.4-RELEASE
+
+sys: done
+include:
+etc
+	mtree:
+lib
+	libutil:
+	libftpio:
+	libskey:
+libexec
+	rlogind:
+	telnetd:
+	ftpd:
+	rshd:
+	tftpd:
+ports
+	bump the major version of several shared libraries:
+
+sbin
+	ifconfig:
+	ping:
+	route:
+
+usr.bin
+	fetch:
+	rlogin:
+	tftp:
+	ftp:
+	rsh:
+	netstat:
+        telnet:
+
+usr.sbin
+	inetd:
+	lpr:
+
+MEMOs:
+	- conf/options: keyword "PTR" is still used as opt_ptr.h.
+	  we should renmame it.
+
+	- NETGRAPH has include in FreeBSD-3.4. We check whether it is
+	  friendly with KAME IPv6
+
+	- ip6fw is not synced from FreeBSD-3.2...
+
