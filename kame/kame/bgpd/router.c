@@ -92,11 +92,7 @@ find_rtp(key, base)
 	if (key->rtp_bgp->rp_mode & BGPO_IGP) { /* IBGP, compare BGP-ID */
 		if ((key->rtp_bgp->rp_id &&
 		     key->rtp_bgp->rp_id == rtp->rtp_bgp->rp_id) ||
-		    IN6_ARE_ADDR_EQUAL(&key->rtp_bgp->rp_gaddr,
-				       &rtp->rtp_bgp->rp_gaddr) ||
-		    (!IN6_IS_ADDR_UNSPECIFIED(&key->rtp_bgp->rp_laddr) &&
-		     IN6_ARE_ADDR_EQUAL(&key->rtp_bgp->rp_laddr,
-					&rtp->rtp_bgp->rp_laddr)))
+		    sa6_equal(&key->rtp_bgp->rp_addr, &rtp->rtp_bgp->rp_addr))
 			return(rtp);
 	} else {                                  /* EBGP, compare AS num */
 		if (key->rtp_bgp->rp_as == rtp->rtp_bgp->rp_as)
