@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.14 2001/01/23 15:56:05 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.15 2001/04/02 12:44:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,8 +133,9 @@ tcp6_output(t6p)
 	struct	ip6_hdr *ip6;
 	struct	tcp6hdr *th;
 	u_char	opt[MAX_TCP6OPTLEN];
-	u_int	optlen, hdrlen, exthdrlen;
+	u_int	optlen, hdrlen, exthdrlen, maxseg;
 	int	idle, sendalot;
+	int	ip6oflags;
 
 	/*
 	 * Determine length of data that should be transmitted,
@@ -232,6 +233,10 @@ again:
 		len = t6p->t_maxseg;
 		sendalot = 1;
 	}
+	/*
+	 * XXX itojun: len may be decreased later on.
+	 * the condition should be removed/modified.
+	 */
 	if (SEQ_LT(t6p->snd_nxt + len, t6p->snd_una + so->so_snd.sb_cc))
 		flags &= ~TH_FIN;
 
@@ -298,6 +303,7 @@ again:
 	 * If our state indicates that FIN should be sent
 	 * and we have not yet done so, or we're retransmitting the FIN,
 	 * then we need to send.
+	 * XXX itojun: the shortcut needs to be revisited
 	 */
 	if (flags & TH_FIN && ((t6p->t_flags & TF_SENTFIN) == 0 ||
 	    SEQ_LT(t6p->snd_nxt, t6p->snd_max)))
@@ -390,20 +396,23 @@ send:
  		optlen += TCP6OLEN_TSTAMP_APPA;
  	}
 
- 	hdrlen += optlen;
-
 #if 1 /*def already_accounted_for*/
 	/*
 	 * Adjust data length if insertion of options will
-	 * bump the packet length beyond the t_maxseg length.
+	 * bump the packet length beyond the permissible segment length.
 	 */
-	if (len > t6p->t_maxseg - optlen - exthdrlen) {
-		len = t6p->t_maxseg - optlen - exthdrlen;
+	if (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU)
+		maxseg = IPV6_MMTU - hdrlen;
+	else
+		maxseg = t6p->t_maxseg;
+	if (len > maxseg - optlen - exthdrlen) {
+		len = maxseg - optlen - exthdrlen;
 		sendalot = 1;
 		flags &= ~TH_FIN;
 	}
 #endif
 
+ 	hdrlen += optlen;
 
 #ifdef DIAGNOSTIC
  	if (max_linkhdr + hdrlen > MHLEN)
@@ -643,14 +652,13 @@ send:
 	}
 #endif /*IPSEC*/
 
-#if BSD >= 43
+	ip6oflags = 0;
+	if (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU)
+		ip6oflags |= IPV6_MINMTU;
+	ip6oflags |= (so->so_options & SO_DONTROUTE);
+
 	error = ip6_output(m, t6p->t_in6pcb->in6p_outputopts,
-			   &t6p->t_in6pcb->in6p_route,
-			   so->so_options & SO_DONTROUTE, 0, NULL);
-#else
-	error = ip6_output(m, (struct mbuf *)0, &t6p->t_in6pcb->in6p_route,
-			   so->so_options & SO_DONTROUTE, NULL);
-#endif
+			   &t6p->t_in6pcb->in6p_route, ip6oflags, 0, NULL);
 	if (error) {
 out:
 		switch (error) {

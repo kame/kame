@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.33 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.34 2001/04/02 12:44:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,6 +238,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 #endif
 	struct in6pcb *in6p = NULL;
 	struct ifnet *oifp = NULL;
+	int ip6oflags;
 
 	if (t6p) {
 		win = sbspace(&t6p->t_in6pcb->in6p_socket->so_rcv);
@@ -313,7 +314,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	m->m_pkthdr.rcvif = t6p ? (struct ifnet *)t6p->t_in6pcb->in6p_socket
 				: NULL;
 #endif /*IPSEC*/
-	return(ip6_output(m, NULL, ro, 0, NULL, NULL));
+	ip6oflags = 0;
+	if (t6p && (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU))
+		ip6oflags |= IPV6_MINMTU;
+	return(ip6_output(m, NULL, ro, ip6oflags, NULL, NULL));
 }
 
 /*
