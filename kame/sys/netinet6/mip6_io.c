@@ -1,4 +1,4 @@
-/*	$KAME: mip6_io.c,v 1.12 2001/03/29 05:34:32 itojun Exp $	*/
+/*	$KAME: mip6_io.c,v 1.13 2001/04/04 09:31:30 karino Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -693,13 +693,13 @@ struct mip6_buffer  *dh;    /* Buffer containing the IPv6 DH  */
 				panic("bcopy problem");
 #endif
 			t = htonl(*(u_int32_t *)ba->ip6oa_lifetime);
-			bcopy((caddr_t)&time, ba->ip6oa_lifetime,sizeof(time));
+			bcopy((caddr_t)&t, ba->ip6oa_lifetime,sizeof(t));
 #ifdef DIAGNOSTIC
 			if (sizeof(t) != sizeof(ba->ip6oa_refresh))
 				panic("bcopy problem");
 #endif
 			t = htonl(*(u_int32_t *)ba->ip6oa_refresh);
-			bcopy((caddr_t)&time, ba->ip6oa_refresh, sizeof(time));
+			bcopy((caddr_t)&t, ba->ip6oa_refresh, sizeof(t));
 			
 			pos = dh->buf + off;
 			dh->off += len;
