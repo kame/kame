@@ -305,7 +305,7 @@ icmp_input(m, va_alist)
 			break;
 
 		case ICMP_UNREACH_NEEDFRAG:
-#if 0 /*def INET6*/
+#if 0 /*NRL INET6*/
 			if (icp->icmp_nextmtu) {
 				extern int ipv6_trans_mtu
 				    __P((struct mbuf **, int, int));
