@@ -76,6 +76,9 @@ main(argc, argv)
 	local.sin6_port = htons(port);
 
 	on = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(SO_REUSEPORT)");
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVPKTINFO)");
