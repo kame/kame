@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/02/09 14:14:38 $
+		     $Date: 2000/02/10 04:54:55 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -42,7 +42,7 @@ PLATFORM DIFFERENCES
 As we support various platforms, there are several differences between
 those platforms.  Here is a brief list of important differences:
 - ALTQ
-	ALTQ 2.1 is merged into:	KAME/FreeBSD228, KAME/FreeBSD33,
+	ALTQ 2.1 is merged into:	KAME/FreeBSD228, KAME/FreeBSD3x,
 					KAME/NetBSD141, KAME/OpenBSD26
 	No ALTQ support in:		KAME/BSDI31, KAME/BSDI41
 - IPsec
@@ -54,8 +54,7 @@ those platforms.  Here is a brief list of important differences:
 	KAME/FreeBSD228 only at this moment.
 - Ericsson mobile-ip6
 	compilable but not tested	KAME/NetBSD, KAME/FreeBSD228,
-					KAME/BSDI4
-	no support			KAME/OpenBSD(*)
-	(*) not compilable due to duplicated include file
+					KAME/FreeBSD3x, KAME/BSDI4, KAME/BSDI3,
+					KAME/OpenBSD
 
 							<end of RELNOTES>
