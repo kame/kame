@@ -1,4 +1,4 @@
-/*	$KAME: sha2.c,v 1.2 2001/08/08 22:09:27 sakane Exp $	*/
+/*	$KAME: sha2.c,v 1.3 2001/08/09 06:22:15 itojun Exp $	*/
 
 /*
  * sha2.c
@@ -67,9 +67,7 @@
  *
  */
 
-#if defined(__bsdi__) || defined(__FreeBSD__)
 #define assert(x)
-#endif
 
 
 /*** SHA-256/384/512 Machine Architecture Definitions *****************/
