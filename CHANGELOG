@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2492 2003/10/17 04:06:05 suz Exp $
+$KAME: CHANGELOG,v 1.2493 2003/10/17 12:18:21 ono Exp $
 
 <200310>
+2003-10-17  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
+	* kame/sys/netinet/dccp_*: imported dccp code for freebsd5
+	from http://www.dccp.org
+	makes it compilable on freebsd[45]. experimental.
+
 2003-10-17 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/pim6_proto.c: sends the interface-address-list
 	option in option-24, as well as in option-65001, to catch up with
