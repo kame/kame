@@ -12,9 +12,11 @@ CFLAGS+=-DHAVE_IDEA_H=1
 CFLAGS+=-I/usr/local/include/openssl
 .elif exists(/usr/local/include/ssleay)
 CFLAGS+=-I/usr/local/include/ssleay
+.elif exists(/usr/local/ssl/include)
+CFLAGS+=-I/usr/local/ssl/include
 .endif
 
-LDADD+=	-ly -ll -L/usr/local/lib -lcrypto
+LDADD+=	-ly -ll
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
 	-L${.CURDIR}/../../../lib/libipsec/obj \
 	-L/usr/local/v6/lib -lipsec
@@ -27,6 +29,13 @@ LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 DPADD+=	-L${.CURDIR}/../../../lib/libinet6/libinet6.a \
 	-L${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
+.if exists(/usr/local/lib/libcrypto.a)
+LDADD+=	-L/usr/local/lib -lcrypto
+DPADD+=	/usr/local/lib/libcrypto.a
+.elif exists(/usr/local/ssl/lib/libcrypto.a)
+LDADD+=	-L/usr/local/ssl/lib -lcrypto
+DPADD+=	/usr/local/ssl/lib/libcrypto.a
+.endif
 
 .PATH:	${SRCDIR} ${SRCDIR}/../tcpdump
 
