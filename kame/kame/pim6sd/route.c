@@ -892,7 +892,6 @@ process_cache_miss(im)
      * When there is a cache miss, we check only the header of the packet
      * (and only it should be sent up by the kernel.)
      */
-
     group.sin6_addr = im->im6_dst;
     group.sin6_scope_id = inet6_uvif2scopeid(&group, &uvifs[im->im6_mif]);
     source.sin6_addr = mfc_source.sin6_addr = im->im6_src;
@@ -908,33 +907,25 @@ process_cache_miss(im)
      * scoped addresses
      */
 
-
     /* Don't create routing entries for the LAN scoped addresses */
 
     if (IN6_IS_ADDR_MC_NODELOCAL(&group.sin6_addr) ||/* sanity? */
     	IN6_IS_ADDR_MC_LINKLOCAL(&group.sin6_addr))
     		return;
 
-
     /* TODO: check if correct in case the source is one of my addresses */
     /*
      * If I am the DR for this source, create (S,G) and add the register_vif
      * to the oifs.
      */
-
     if ((uvifs[iif].uv_flags & VIFF_DR)
 	&& (find_vif_direct_local(&source) == iif))
     {
-
-
 	mrtentry_ptr = find_route(&source, &group, MRTF_SG, CREATE);
 	if (mrtentry_ptr == (mrtentry_t *) NULL)
 	{
 			    return;
 	}
-
-
-
 
 	mrtentry_ptr->flags &= ~MRTF_NEW;
 
@@ -963,7 +954,6 @@ process_cache_miss(im)
      * negative cache entry in the kernel (oif==NULL) to prevent too many
      * upcalls.
      */
-
     if (mrtentry_ptr->incoming == iif)
     {
 	if (!IF_ISEMPTY(&mrtentry_ptr->oifs))
@@ -1019,7 +1009,6 @@ process_cache_miss(im)
     }
 
     /* The iif doesn't match */
-
     if (mrtentry_ptr->flags & MRTF_SG)
     {
 	if (mrtentry_ptr->flags & MRTF_SPT)
