@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.14 2000/09/06 20:06:29 itojun Exp $	*/
+/*	$KAME: config.c,v 1.15 2000/09/06 20:08:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -475,6 +475,9 @@ get_prefix(struct rainfo *rai)
 			continue;
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
+		a = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+		if (IN6_IS_ADDR_LINKLOCAL(a))
+			continue;
 
 		/* allocate memory to store prefix info. */
 		if ((pp = malloc(sizeof(*pp))) == NULL) {
@@ -486,7 +489,6 @@ get_prefix(struct rainfo *rai)
 		memset(pp, 0, sizeof(*pp));
 
 		/* set prefix and its length */
-		a = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
 		memcpy(&pp->prefix, a, sizeof(*a));
 		p = (u_char *)&pp->prefix;
 		ep = (u_char *)(&pp->prefix + 1);
