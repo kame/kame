@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.17 2002/12/16 05:52:56 k-sugyou Exp $	*/
+/*	$KAME: mip6stat.c,v 1.18 2003/01/30 12:03:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -675,8 +675,8 @@ showdetail()
 	PS("unknown MH type", mip6s_unknowntype);
 	PS("not my home address", mip6s_nohif);
 	PS("no related binding update entry", mip6s_nobue);
-	PS("HoT cookie mismatch", mip6s_hotcookie);
-	PS("CoT cookie mismatch", mip6s_cotcookie);
+	PS("home init cookie mismatch", mip6s_hinitcookie);
+	PS("careof init cookie mismatch", mip6s_cinitcookie);
 	PS("unprotected binding signaling packets", mip6s_unprotected);
 	PS("BUs discarded due to bad HAO", mip6s_haopolicy);
 	PS("RR authentication failed", mip6s_rrauthfail);
