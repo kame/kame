@@ -1,4 +1,4 @@
-/*	$OpenBSD: protosw.h,v 1.3 1996/04/21 22:31:54 deraadt Exp $	*/
+/*	$OpenBSD: protosw.h,v 1.4 2000/09/25 09:41:02 provos Exp $	*/
 /*	$NetBSD: protosw.h,v 1.10 1996/04/09 20:55:32 cgd Exp $	*/
 
 /*-
@@ -112,6 +112,8 @@ struct protosw {
 #define	PR_CONNREQUIRED	0x04		/* connection required by protocol */
 #define	PR_WANTRCVD	0x08		/* want PRU_RCVD calls */
 #define	PR_RIGHTS	0x10		/* passes capabilities */
+#define	PR_ABRTACPTDIS	0x20		/* abort on accept(2) to disconnected
+					   socket */
 
 /*
  * The arguments to usrreq are:
@@ -170,6 +172,7 @@ char *prurequests[] = {
  */
 #define	PRC_IFDOWN		0	/* interface transition */
 #define	PRC_ROUTEDEAD		1	/* select new route if possible ??? */
+#define	PRC_MTUINC		2	/* increase in mtu to host */
 #define	PRC_QUENCH2		3	/* DEC congestion bit says slow down */
 #define	PRC_QUENCH		4	/* some one said to slow down */
 #define	PRC_MSGSIZE		5	/* message size forced drop */
@@ -196,7 +199,7 @@ char *prurequests[] = {
 
 #ifdef PRCREQUESTS
 char	*prcrequests[] = {
-	"IFDOWN", "ROUTEDEAD", "#2", "DEC-BIT-QUENCH2",
+	"IFDOWN", "ROUTEDEAD", "MTUINC", "DEC-BIT-QUENCH2",
 	"QUENCH", "MSGSIZE", "HOSTDEAD", "#7",
 	"NET-UNREACH", "HOST-UNREACH", "PROTO-UNREACH", "PORT-UNREACH",
 	"#12", "SRCFAIL-UNREACH", "NET-REDIRECT", "HOST-REDIRECT",

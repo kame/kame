@@ -1471,10 +1471,6 @@ spx_usrreq(so, req, m, nam, controlp)
 	 * of the peer, storing through addr.
 	 */
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 		/* FALLTHROUGH */
 
 	case PRU_PEERADDR:

@@ -351,10 +351,6 @@ tcp_usrreq(so, req, m, nam, control)
 	 * of the peer, storing through addr.
 	 */
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 #ifdef INET6
 		if (inp->inp_flags & INP_IPV6)
 			in6_setpeeraddr(inp, nam);

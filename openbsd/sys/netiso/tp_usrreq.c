@@ -567,10 +567,6 @@ tp_usrreq(so, req, m, nam, controlp)
 		break;
 
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 		(tpcb->tp_nlproto->nlp_getnetaddr) (tpcb->tp_npcb, nam, TP_FOREIGN);
 #ifdef ARGO_DEBUG
 		if (argo_debug[D_REQUEST]) {

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.92 2001/06/04 08:55:16 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.93 2001/06/04 12:55:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,6 +199,8 @@ static struct pr_usrreqs nousrreqs;
 
 #ifndef __NetBSD__
 #define PR_LISTEN	0
+#endif
+#if !defined(__NetBSD__) && !defined(__OpenBSD__)
 #define PR_ABRTACPTDIS	0
 #endif
 #ifdef __OpenBSD__

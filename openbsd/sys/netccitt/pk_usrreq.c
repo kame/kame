@@ -171,10 +171,6 @@ pk_usrreq(so, req, m, nam, control)
 		 * user.
 		 */
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 		if (lcp->lcd_craddr == NULL)
 			break;
 		bcopy((caddr_t) lcp->lcd_craddr, mtod(nam, caddr_t),

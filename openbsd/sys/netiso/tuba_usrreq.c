@@ -259,10 +259,6 @@ tuba_usrreq(so, req, m, nam, control)
 		 * of the peer, storing through addr.
 		 */
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 		bcopy((caddr_t) isop->isop_faddr, mtod(nam, caddr_t),
 		      nam->m_len = isop->isop_faddr->siso_len);
 		break;
