@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.8 2003/06/03 06:44:36 keiichi Exp $	*/
+/*	$KAME: halist.c,v 1.9 2003/07/10 12:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.8 2003/06/03 06:44:36 keiichi Exp $
+ * $Id: halist.c,v 1.9 2003/07/10 12:35:17 keiichi Exp $
  */
 
 /*
@@ -810,7 +810,8 @@ hal_pick(req_addr, hagent_addrs, src_addr, haif, count)
 {
     int naddr;
     struct hagent_entry *hap, *selfhalp = NULL;
-    struct hagent_gaddr ha_gaddr;
+    struct hagent_gaddr *ha_gaddr;
+    int found_src = 0;
 
     /* shuffle home agent entries with same preference */
     hal_shuffle(haif);
@@ -819,19 +820,22 @@ hal_pick(req_addr, hagent_addrs, src_addr, haif, count)
     if (haif->linklocal)
 	selfhalp = hal_find(haif, &((struct sockaddr_in6 *)(haif->linklocal->ifa_addr))->sin6_addr);
 
-    /* search home agent list and pick appropriate global addresses */
+    /* list all home agents in the home agent list of this interface */
     for (naddr = 0, hap = haif->halist_pref.hagent_next_pref;
 	 hap && naddr < count; hap = hap->hagent_next_pref) {
-	if (get_gaddr(hap->hagent_galist.hagent_next_gaddr, 
-		       req_addr, &ha_gaddr))
-	    continue;
-	*hagent_addrs = ha_gaddr.hagent_gaddr;
-	if (hap == selfhalp) {
-	    *src_addr = *hagent_addrs;
+	for (ha_gaddr = hap->hagent_galist.hagent_next_gaddr;
+	     (ha_gaddr != NULL) && (naddr < count);
+	     ha_gaddr = ha_gaddr->hagent_next_gaddr) {
+	    *hagent_addrs = ha_gaddr->hagent_gaddr;
+	    if (hap == selfhalp && found_src == 0) {
+		*src_addr = *hagent_addrs;
+		found_src++;
+	    }
+	    hagent_addrs ++;
+	    naddr ++;
 	}
-	hagent_addrs ++;
-	naddr ++;
     }
+
     return naddr;
 }
 
