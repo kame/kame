@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.23 2005/03/08 09:48:19 mitsuya Exp $	*/
+/*	$KAME: fsm.c,v 1.24 2005/03/11 06:44:31 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2346,7 +2346,8 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	 * registration, MR MUST de-register the binding from legacy
 	 * HA.
 	 */
-	if (bul->bul_flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER)) {
+	if ((bul->bul_flags & IP6_MH_BU_HOME) &&
+	    (bul->bul_flsgs & IP6_MH_BU_ROUTER)) {
 		if (ip6mhba->ip6mhba_flags != IP6_MH_BA_ROUTER) {
 			/* sending DHAAD again XXX */
 			if (send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa) > 0)

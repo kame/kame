@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.19 2005/03/08 09:48:19 mitsuya Exp $  */
+/*      $KAME: mh.c,v 1.20 2005/03/11 06:44:32 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -834,7 +834,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		int r = 0;
 		
 		/* when flags are incorrect,  just ignore this BU?? */
-		if ((flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER)) == 0) 
+		if (((flags & IP6_MH_BU_HOME) == 0) &&
+		    ((flags & IP6_MH_BU_ROUTER) == 0))
 			return (-1); 
 
 		/*
@@ -1440,7 +1441,8 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 
 #if defined(MIP_HA) && defined(MIP_NEMO)
 	/* When BU has R flag, BA must be returned with Rflag */
-	if ((recv_bu->ip6mhbu_flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER)))
+	if ((recv_bu->ip6mhbu_flags & IP6_MH_BU_HOME) &&
+	    (recv_bu->ip6mhbu_flags & IP6_MH_BU_ROUTER))
 		bap->ip6mhba_flags |= IP6_MH_BA_ROUTER;
 #endif /* MIP_HA && MIP_NEMO */
 
