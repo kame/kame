@@ -334,6 +334,7 @@ struct	servtab {
 #define NORM_TYPE	0
 #define MUX_TYPE	1
 #define MUXPLUS_TYPE	2
+#define FAITH_TYPE	3
 #define ISMUX(sep)	(((sep)->se_type == MUX_TYPE) || \
 			 ((sep)->se_type == MUXPLUS_TYPE))
 #define ISMUXPLUS(sep)	((sep)->se_type == MUXPLUS_TYPE)
@@ -1066,9 +1067,12 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 	    SO_RCVBUF, (char *)&sep->se_rcvbuf, sizeof(sep->se_rcvbuf)) < 0)
 		syslog(LOG_ERR, "setsockopt (SO_RCVBUF %d): %m",
 		    sep->se_rcvbuf);
+	if (sep->se_type == FAITH_TYPE && setsockopt(sep->se_fd, IPPROTO_IPV6,
+	    IPV6_FAITH, (char *)&on, sizeof(on)) < 0)
+		syslog(LOG_ERR, "setsockopt (IPV6_FAITH): %m");
 #ifdef IPSEC
-	if (ipsecsetup(sep->se_family, sep->se_fd, sep->se_policy) < 0
-	 && sep->se_policy) {
+	if (ipsecsetup(sep->se_family, sep->se_fd, sep->se_policy) < 0 &&
+	    sep->se_policy) {
 		syslog(LOG_ERR, "%s/%s: ipsec setup failed",
 		    sep->se_service, sep->se_proto);
 		(void)close(sep->se_fd);
@@ -1376,7 +1380,13 @@ more:
 	else
 		sep->se_socktype = -1;
 
-	sep->se_proto = newstr(sskip(&cp));
+	arg = sskip(&cp);
+	if (sep->se_type == NORM_TYPE &&
+	    strncmp(arg, "faith/", strlen("faith/")) == 0) {
+		arg += strlen("faith/");
+		sep->se_type = FAITH_TYPE;
+	}
+	sep->se_proto = newstr(arg);
 
 #define	MALFORMED(arg) \
 do { \
@@ -1423,7 +1433,7 @@ do { \
 	buf0 = buf1 = sz0 = sz1 = NULL;
 	if ((buf0 = strchr(sep->se_proto, ',')) != NULL) {
 		/* Not meaningful for Tcpmux services. */
-		if (sep->se_type != NORM_TYPE) {
+		if (ISMUX(sep)) {
 			syslog(LOG_ERR, "%s: can't specify buffer sizes for "
 			    "tcpmux services", sep->se_service);
 			goto more;
@@ -2060,12 +2070,14 @@ print_service(action, sep)
 		    );
 	else
 		fprintf(stderr,
-		    "%s: %s proto=%s, wait.max=%d.%d, user.group=%s.%s builtin=%lx server=%s"
+		    "%s: %s proto=%s%s, wait.max=%d.%d, user.group=%s.%s builtin=%lx server=%s"
 #ifdef IPSEC
 		    " policy=%s"
 #endif
 		    "\n",
-		    action, sep->se_service, sep->se_proto,
+		    action, sep->se_service,
+		    sep->se_type == FAITH_TYPE ? "faith/" : "",
+		    sep->se_proto,
 		    sep->se_wait, sep->se_max, sep->se_user, sep->se_group,
 		    (long)sep->se_bi, sep->se_server
 #ifdef IPSEC

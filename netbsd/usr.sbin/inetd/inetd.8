@@ -228,6 +228,14 @@ If you need to specify IPv4 or IPv6 explicitly, use something like
 .Dq tcp4
 or
 .Dq udp6 .
+If you would like to enable special support for
+.Xr faith 8 ,
+prepend a keyword
+.Dq faith
+into
+.Em protocol ,
+like
+.Dq faith/tcp6 .
 .Pp
 In addition to the protocol, the configuration file may specify the
 send and receive socket buffer sizes for the listening socket.  This
