@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.216 2002/10/28 11:25:58 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.217 2002/12/10 11:45:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1432,10 +1432,12 @@ prelist_update(new, dr, m)
 		if ((ifa6->ia6_flags & IN6_IFF_ANYCAST) != 0)
 			continue;
 
-		ifa_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr, NULL);
-		if (ifa_plen != new->ndpr_plen ||
-		    !in6_are_prefix_equal(&ifa6->ia_addr.sin6_addr,
-		    &new->ndpr_prefix.sin6_addr, ifa_plen))
+		/*
+		 * Ignore the address if it is not associated with a prefix
+		 * or is associated with a prefix that is different from this
+		 * one.  (pr is never NULL here)
+		 */
+		if (ifa6->ia6_ndpr != pr)
 			continue;
 
 		if (ia6_match == NULL) /* remember the first one */
