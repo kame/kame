@@ -1937,7 +1937,7 @@ long_passive(const char *cmd, int pf)
 /*
  * EPRT |proto|addr|port|
  */
-void
+int
 extended_port(const char *arg)
 {
 	char *tmp = NULL;
@@ -1951,7 +1951,7 @@ extended_port(const char *arg)
 
 	if (epsvall) {
 		reply(501, "EPRT disallowed after EPSV ALL");
-		return;
+		return -1;
 	}
 
 	usedefault = 0;
@@ -2046,21 +2046,29 @@ extended_port(const char *arg)
 	}
 	reply(200, "EPRT command successful.");
 
-eprt_done:;
-	if (res)
-		freeaddrinfo(res);
 	if (tmp)
 		free(tmp);
-	return;
+	if (res)
+		freeaddrinfo(res);
+	return 0;
 
 parsefail:
 	reply(500, "Invalid argument, rejected.");
 	usedefault = 1;
-	goto eprt_done;
+	if (tmp)
+		free(tmp);
+	if (res)
+		freeaddrinfo(res);
+	return -1;
+
 protounsupp:
 	epsv_protounsupp("Protocol not supported");
 	usedefault = 1;
-	goto eprt_done;
+	if (tmp)
+		free(tmp);
+	if (res)
+		freeaddrinfo(res);
+	return -1;
 }
 
 /*

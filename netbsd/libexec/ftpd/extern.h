@@ -87,7 +87,7 @@ int	af2lpsvproto __P((int));
 int	epsvproto2af __P((int));
 int	af2epsvproto __P((int));
 void	long_passive __P((const char *, int));
-void	extended_port __P((const char *));
+int	extended_port __P((const char *));
 void	epsv_protounsupp __P((const char *));
 void	perror_reply __P((int, const char *));
 void	pwd __P((void));
