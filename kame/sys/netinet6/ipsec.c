@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.53 2000/03/09 13:02:05 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.54 2000/03/22 20:08:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1363,6 +1363,9 @@ ipsec4_delete_pcbpolicy(inp)
 	if (inp == NULL)
 		panic("ipsec4_delete_pcbpolicy: NULL pointer was passed.\n");
 
+	if (inp->inp_sp == NULL)
+		return 0;
+
 	if (inp->inp_sp->sp_in != NULL) {
 		key_freesp(inp->inp_sp->sp_in);
 		inp->inp_sp->sp_in = NULL;
@@ -1458,6 +1461,9 @@ ipsec6_delete_pcbpolicy(in6p)
 	/* sanity check. */
 	if (in6p == NULL)
 		panic("ipsec6_delete_pcbpolicy: NULL pointer was passed.\n");
+
+	if (in6p->in6p_sp == NULL)
+		return 0;
 
 	if (in6p->in6p_sp->sp_in != NULL) {
 		key_freesp(in6p->in6p_sp->sp_in);
