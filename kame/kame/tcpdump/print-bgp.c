@@ -42,9 +42,6 @@
 #include <errno.h>
 #include <stdio.h>
 
-#include <netinet/ip6.h>
-
-#include "route6d.h"
 #include "interface.h"
 #include "addrtoname.h"
 
