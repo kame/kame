@@ -1,0 +1,46 @@
+*** xmcd_d/Imakefile.orig	Sat May 23 02:31:49 1998
+--- xmcd_d/Imakefile	Tue May 26 17:32:59 1998
+***************
+*** 43,49 ****
+   * #include "Motif.tmpl"
+   * #include "Motif.rules"
+   */
+! LOCAL_LIBRARIES= XmClientLibs
+  
+  
+  /**** Optional defines:  Change as you see fit. *****************************
+--- 43,49 ----
+   * #include "Motif.tmpl"
+   * #include "Motif.rules"
+   */
+! LOCAL_LIBRARIES= ${MOTIFLIB} XawClientLibs
+  
+  
+  /**** Optional defines:  Change as you see fit. *****************************
+***************
+*** 68,79 ****
+  DEFINES=
+  #endif
+  
+  
+  /*
+   * Add local include path
+   */
+  INCLUDES=-I..
+- 
+  
+  /*
+   * C Source files
+--- 68,79 ----
+  DEFINES=
+  #endif
+  
++ MANSUFFIX = 1
+  
+  /*
+   * Add local include path
+   */
+  INCLUDES=-I..
+  
+  /*
+   * C Source files
