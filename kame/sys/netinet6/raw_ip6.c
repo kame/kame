@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.156 2004/05/21 07:07:31 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.157 2004/05/26 10:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -704,11 +704,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 #ifdef HAVE_NRL_INPCB
-#ifdef __OpenBSD__
 		if ((error = in_pcballoc(so, &rawin6pcbtable)) != 0)
-#else  /* bsdi, actually. */
-		if ((error = in_pcballoc(so, &rawin6pcb)) != 0)
-#endif
 #else
 		if ((error = in6_pcballoc(so, &rawin6pcb)) != 0)
 #endif
