@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.17 2001/06/26 17:43:36 itojun Exp $
+.\"	$KAME: bindtest.1,v 1.18 2001/06/26 18:09:06 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -69,6 +69,81 @@ and shows some report to standard output.
 As RFC2553 does not define the expected behavior,
 we have no idea what the result should be.
 .Pp
+The following command line options are accepted.
+For details please see the following subsections:
+.Bl -tag -width indent
+.It Fl 1
+After successful
+.Xr bind 2
+on two sockets, try a
+.Xr connect 2
+to the first socket.
+Works only when
+.Fl t
+is specified as well.
+.It Fl 2
+Like
+.Fl 1 ,
+but try a
+.Xr connect 2
+to the second socket.
+Works only when
+.Fl t
+is specified as well.
+.It Fl 6
+Uses
+.Dv IPV6_V6ONLY
+socket option on
+.Dv AF_INET6
+sockets
+.Pq note that not many stacks implement this yet .
+.It Fl A
+Set
+.Dv SO_REUSEADDR
+socket option for all the sockets.
+.It Fl P
+Set
+.Dv SO_REUSEPORT
+socket option for all the sockets.
+.It Fl l
+With TCP test, normally
+.Nm
+will issue
+.Xr bind 2
+and
+.Xr listen 2
+for the first socket, then
+.Xr bind 2
+and
+.Xr listen 2
+for the second socket.
+With
+.Fl l ,
+.Nm
+will issue two
+.Xr bind 2
+first, then two
+.Xr listen 2
+system calls.
+Works only when
+.Fl t
+is specified as well.
+.It Fl o Ar IPv4addresss
+Specifies an additional address to test
+.Xr connect 2
+behavior.
+The address should already be assigned to the node.
+.It Fl p Ar port
+.Ar port
+specifies the TCP/UDP port number used for the test.
+The
+.Ar port
+needs to be vacant.
+The flag is mandatory.
+.It Fl s
+Summary output.
+See the following subsection for details.
+.It Fl t
 By default
 .Nm
 will use
@@ -80,29 +155,57 @@ With
 will use
 .Dv SOCK_STREAM
 socket instead.
-TCP/UDP port number must be specified with
-.Fl p Ar port .
-The
-.Ar port
-needs to be vacant.
+.It Fl v
+.Nm
+prints its version and exits without testing anything.
+.El
 .Pp
-.Fl A
-sets 
-.Dv SO_REUSEADDR
-socket option for all the sockets.
-.Fl P
-sets
-.Dv SO_REUSEPORT
-socket option for all the sockets.
-.Fl 6
-uses
-.Dv IPV6_V6ONLY
-socket option on
-.Dv AF_INET6
-sockets
-.Pq note that not many stacks implement this yet .
+.Ss The test process
+The goal of
+.Nm
+is to detect how the implementation interpteted and coded RFC2553.
+More specifically, the following items are tested:
 .Pp
-When two sockets become ready,
+.Bl -bullet
+.It
+If we issue two
+.Xr bind 2
+system calls to two sockets with the same port number,
+will it go successful, or either of/both of them fails?
+.It
+For the failure case, does the ordering of
+.Xr bind 2
+matter?
+.It
+If the two
+.Xr bind 2
+attemps go successful, which socket will get incoming traffic?
+.It
+For TCP case, does the order between
+.Xr bind 2
+and
+.Xr listen 2
+affect the behavior?
+.El
+.Pp
+The list of addresses to be tested with
+.Xr bind 2
+are as below:
+.Bl -tag -width "loopback"
+.It wildcard
+:: and 0.0.0.0
+.It loopback
+127.0.0.1 and ::1
+.It IPv4 mapped wildcard and loopback
+::ffff:0.0.0.0 and ::ffff:127.0.0.1
+.It invalid address
+::ffff:0.0.0.1 and 0.0.0.1.
+Their goal is to test common programming mistakes in the implementation.
+.El
+.Pp
+.Pp
+When two sockets become ready after
+.Xr bind 2 ,
 .Nm
 attempts to send some packets to see which socket accepts which
 packets.
@@ -110,7 +213,7 @@ For UDP cases, it tries to issue
 .Xr sendto 2
 for each address bound to each socket, and for
 the additional address if specified by the
-.Fl o 
+.Fl o
 option.
 For TCP cases, the program tries to issue
 .Xr connect 2
@@ -162,7 +265,7 @@ Normally, the program calls the two calls for the first socket, and
 then calls them for the second socket.
 This option exists because there is an operating system that behaves
 differently for both cases.
-.Pp
+.Ss Summary output
 With
 .Fl s ,
 .Nm
@@ -171,7 +274,7 @@ Here is a sample output, and the legends for summarized output.
 .Pp
 .Ds
 starting tests, socktype = SOCK_DGRAM
-        wild4   wild6   loop4   loop6   wildm   loopm   onem    one4
+wild4   wild6   loop4   loop6   wildm   loopm   onem    one4
 wild4:  x       o[---]  x       o[-2-]  ?2(49)  ?2(49)  ?2(49)  ?2(49)
 wild6:  o[---]  x       o[-2-]  x       ?2(49)  ?2(49)  ?2(49)  ?2(49)
 loop4:  x       o[1--]  x       o[12-]  ?2(49)  ?2(49)  ?2(49)  ?2(49)
@@ -264,11 +367,6 @@ Will be followed by
 .Xr errno 2
 in paren.
 .El
-.Pp
-With
-.Fl v
-.Nm
-prints its version and exits without testing anything.
 .\"
 .Sh RETURN VALUES
 .Nm
