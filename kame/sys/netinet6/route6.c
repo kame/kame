@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.43 2003/04/23 09:15:52 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.44 2003/05/09 19:33:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,10 +67,10 @@
 
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 static int ip6_rthdr2 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr2 *));
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 int
 route6_input(mp, offp, proto)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.67 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.68 2003/05/09 19:33:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -123,11 +123,13 @@ static const struct sockaddr_in6 haanyaddr_ifidnn = {
 
 static void mip6_icmp6_find_addr(struct mbuf *, int, int,
     struct sockaddr_in6 *,  struct sockaddr_in6 *);
+#ifdef MIP6_MOBILE_NODE
 static int mip6_icmp6_dhaad_rep_input(struct mbuf *, int, int);
 static int mip6_dhaad_ha_list_insert(struct hif_softc *, struct mip6_ha *);
 static int mip6_icmp6_create_haanyaddr(struct sockaddr_in6 *,
     struct mip6_prefix *);
 static int mip6_icmp6_create_linklocal(struct in6_addr *, struct in6_addr *);
+#endif
 
 int
 mip6_icmp6_input(m, off, icmp6len)
@@ -136,14 +138,16 @@ mip6_icmp6_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct ip6_hdr *ip6;
-	caddr_t origip6;
 	struct icmp6_hdr *icmp6;
+	struct mip6_bc *mbc;
+	struct sockaddr_in6 laddr, paddr;
+#ifdef MIP6_MOBILE_NODE
+	int error = 0;
+	caddr_t origip6;
 	u_int32_t pptr;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
-	struct mip6_bc *mbc;
-	struct sockaddr_in6 laddr, paddr;
-	int error = 0;
+#endif
 
 	/* header pullup/down is already done in icmp6_input(). */
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -170,6 +174,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		}
 		break;
 
+#ifdef MIP6_MOBILE_NODE
 	case ICMP6_DHAAD_REPLY:
 		if (!MIP6_IS_MN)
 			break;
@@ -181,6 +186,7 @@ mip6_icmp6_input(m, off, icmp6len)
 			return (error);
 		}
 		break;
+#endif
 
 	case ICMP6_MOBILEPREFIX_ADVERT:
 		if (!MIP6_IS_MN)
@@ -376,6 +382,7 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			&sin6peer->sin6_scope_id); /* XXX */
 }
 
+#ifdef MIP6_MOBILE_NODE
 static int
 mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	struct mbuf *m;
@@ -809,3 +816,4 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 
 	return (error);
 }
+#endif /* MIP6_MOBILE_NODE */
