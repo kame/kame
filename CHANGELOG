@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.772 2000/04/14 04:29:03 itojun Exp $
+$Id: CHANGELOG,v 1.773 2000/04/14 08:40:50 itojun Exp $
 
 <200003>
+Fri Apr 14 17:39:27 JST 2000  itojun@iijlab.net
+	* sys/net/if_gif.c: simplify gif interface attachment to ip_encap
+	  dispatcher.  add martian/ingress filters against outer source,
+	  as suggested in ngtrans-mech-05.
+
 Fri Apr 14 13:26:44 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet/tcp_input.c: use path MTU value on routing
 	  table when computing MSS, only if layer 3 supports path MTU
