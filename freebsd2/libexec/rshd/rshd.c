@@ -112,20 +112,7 @@ int	check_all;
 int	log_success;		/* If TRUE, log all successful accesses */
 int	sent_null;
 
-union sockunion {
-	struct sockinet {
-		u_char si_len;
-		u_char si_family;
-		u_short si_port;
-	} su_si;
-	struct sockaddr_in  su_sin;
-	struct sockaddr_in6 su_sin6;
-};
-#define su_len		su_si.si_len
-#define su_family	su_si.si_family
-#define su_port		su_si.si_port
-
-void	 doit __P((union sockunion *));
+void	 doit __P((struct sockaddr *));
 void	 error __P((const char *, ...));
 void	 getstr __P((char *, int, char *));
 int	 local_domain __P((char *));
@@ -146,8 +133,6 @@ Key_schedule	schedule;
 #define	OPTIONS	"alnL"
 #endif
 
-char nameinfo[INET6_ADDRSTRLEN];
-
 int
 main(argc, argv)
 	int argc;
@@ -156,7 +141,7 @@ main(argc, argv)
 	extern int __check_rhosts_file;
 	struct linger linger;
 	int ch, on = 1, fromlen;
-	union sockunion from;
+	struct sockaddr_storage from;
 
 	openlog("rshd", LOG_PID | LOG_ODELAY, LOG_DAEMON);
 
@@ -212,7 +197,7 @@ main(argc, argv)
 #endif
 #endif
 
-	fromlen = sizeof (from);  /* xxx */
+	fromlen = sizeof from;
 	if (getpeername(0, (struct sockaddr *)&from, &fromlen) < 0) {
 		syslog(LOG_ERR, "getpeername: %m");
 		exit(1);
@@ -226,7 +211,7 @@ main(argc, argv)
 	if (setsockopt(0, SOL_SOCKET, SO_LINGER, (char *)&linger,
 	    sizeof (linger)) < 0)
 		syslog(LOG_WARNING, "setsockopt (SO_LINGER): %m");
-	doit(&from);
+	doit((struct sockaddr *)&from);
 	/* NOTREACHED */
 	return(0);
 }
@@ -241,10 +226,9 @@ char	**environ;
 
 void
 doit(fromp)
-	union sockunion *fromp;
+	struct sockaddr *fromp;
 {
 	extern char *__rcmd_errstr;	/* syslog hook from libc/net/rcmd.c. */
-	struct hostent *hp;
 	struct passwd *pwd;
 	u_short port;
 	fd_set ready, readfrom;
@@ -255,8 +239,13 @@ doit(fromp)
 	char cmdbuf[NCARGS+1], locuser[16], remuser[16];
 	char remotehost[2 * MAXHOSTNAMELEN + 1];
 	char fromhost[2 * MAXHOSTNAMELEN + 1];
-	int af = fromp->su_family, alen;
-	char *addr;
+	char naddr[NI_MAXHOST];
+	char saddr[NI_MAXHOST];
+	char raddr[NI_MAXHOST];
+	int af = fromp->sa_family;
+	u_int16_t *portp;
+	struct addrinfo hints, *res, *res0;
+	int gaierror;
 #ifdef	LOGIN_CAP
 	login_cap_t *lc;
 #endif
@@ -288,24 +277,23 @@ doit(fromp)
 	  }
 	}
 #endif
-	fromp->su_port = ntohs((u_short)fromp->su_port);
 	switch (af) {
 	case AF_INET:
-		alen = sizeof(struct in_addr);
-		addr = (char *)&fromp->su_sin.sin_addr;
+		portp = &((struct sockaddr_in *)fromp)->sin_port;
 		break;
+#ifdef INET6
 	case AF_INET6:
-		alen = sizeof(struct in6_addr);		
-		addr = (char *)&fromp->su_sin6.sin6_addr;
+		portp = &((struct sockaddr_in6 *)fromp)->sin6_port;
 		break;
+#endif
 	default:
 		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
 		exit(1);
 	}
-	getnameinfo((struct sockaddr *)fromp, fromp->su_len,
-		    nameinfo, sizeof(nameinfo), NULL, 0, NI_NUMERICHOST);
-#if 0 /* xxx */
+	getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
+		    naddr, sizeof(naddr), NULL, 0, NI_NUMERICHOST);
 #ifdef IP_OPTIONS
+	if (af == AF_INET)
       {
 	u_char optbuf[BUFSIZ/3];
 	int optsize = sizeof(optbuf), ipproto, i;
@@ -320,9 +308,10 @@ doit(fromp)
 		for (i = 0; i < optsize; ) {
 			u_char c = optbuf[i];
 			if (c == IPOPT_LSRR || c == IPOPT_SSRR) {
+
 				syslog(LOG_NOTICE,
 					"connection refused from %s with IP option %s",
-					inet_ntoa(fromp->su_sin.sin_addr),
+					naddr,
 					c == IPOPT_LSRR ? "LSRR" : "SSRR");
 				exit(1);
 			}
@@ -333,17 +322,15 @@ doit(fromp)
 	}
       }
 #endif
-#endif /* 0 */ /* xxx */
 
 #ifdef	KERBEROS
 	if (!use_kerberos)
 #endif
-		if (fromp->su_port >= IPPORT_RESERVED ||
-		    fromp->su_port < IPPORT_RESERVED/2) {
+		if (ntohs(*portp) >= IPPORT_RESERVED ||
+		    ntohs(*portp) < IPPORT_RESERVED/2) {
 			syslog(LOG_NOTICE|LOG_AUTH,
 			    "connection from %s on illegal port %u",
-			    nameinfo,
-			    fromp->su_port);
+			    naddr, ntohs(*portp));
 			exit(1);
 		}
 
@@ -377,12 +364,11 @@ doit(fromp)
 			    port < IPPORT_RESERVED/2) {
 				syslog(LOG_NOTICE|LOG_AUTH,
 				    "2nd socket from %s on unreserved port %u",
-				    nameinfo,
-				    port);
+				    naddr, port);
 				exit(1);
 			}
-		fromp->su_port = htons(port);
-		if (connect(s, (struct sockaddr *)fromp, sizeof (*fromp)) < 0) {
+		*portp = htons(port);
+		if (connect(s, fromp, fromp->sa_len) < 0) {
 			syslog(LOG_INFO, "connect second port %d: %m", port);
 			exit(1);
 		}
@@ -402,56 +388,73 @@ doit(fromp)
 	dup2(f, 2);
 #endif
 	errorstr = NULL;
-	hp = gethostbyaddr(addr, alen, af);
-	if (hp) {
+	if (getnameinfo(fromp, fromp->sa_len, saddr, sizeof(saddr),
+			NULL, 0, NI_NAMEREQD) == 0) {
 		/*
 		 * If name returned by gethostbyaddr is in our domain,
 		 * attempt to verify that we haven't been fooled by someone
 		 * in a remote net; look up the name and check that this
 		 * address corresponds to the name.
 		 */
-		strncpy(fromhost, hp->h_name, sizeof(fromhost) - 1);
+		strncpy(fromhost, saddr, sizeof(fromhost) - 1);
 		fromhost[sizeof(fromhost) - 1] = 0;
 		hostname = fromhost;
 #ifdef	KERBEROS
 		if (!use_kerberos)
 #endif
-		if (check_all || local_domain(hp->h_name)) {
-			strncpy(remotehost, hp->h_name, sizeof(remotehost) - 1);
+		if (check_all || local_domain(saddr)) {
+			strncpy(remotehost, saddr, sizeof(remotehost) - 1);
 			remotehost[sizeof(remotehost) - 1] = 0;
 			errorhost = remotehost;
-			hp = gethostbyname2(remotehost, af);
-			if (hp == NULL) {
+			memset(&hints, 0, sizeof(hints));
+			hints.ai_family = fromp->sa_family;
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_flags = AI_CANONNAME;
+			gaierror = getaddrinfo(remotehost, "0", &hints, &res0);
+			if (gaierror) {
 				syslog(LOG_INFO,
 				    "couldn't look up address for %s",
 				    remotehost);
 				errorstr =
 				"Couldn't look up address for your host (%s)\n";
-				strncpy(fromhost, nameinfo, sizeof(fromhost) - 1);
+				strncpy(fromhost, naddr, sizeof(fromhost) - 1);
 				fromhost[sizeof(fromhost) - 1] = 0;
 				hostname = fromhost;
-			} else for (; ; hp->h_addr_list++) {
-				if (hp->h_addr_list[0] == NULL) {
+			} else {
+				for (res = res0; res; res = res->ai_next) {
+					if (res->ai_family != fromp->sa_family)
+						continue;
+					if (res->ai_addrlen != fromp->sa_len)
+						continue;
+					if (getnameinfo(res->ai_addr,
+						res->ai_addrlen,
+						raddr, sizeof(raddr), NULL, 0,
+						NI_NUMERICHOST) == 0
+					 && strcmp(naddr, raddr) == 0) {
+						hostname = res->ai_canonname
+							? res->ai_canonname
+							: saddr;
+						break;
+					}
+				}
+				if (res == NULL) {
 					syslog(LOG_NOTICE,
 					  "host addr %s not listed for host %s",
-					    nameinfo,
-					    hp->h_name);
+					    naddr, res0->ai_canonname
+						? res0->ai_canonname
+						: saddr);
 					errorstr =
 					    "Host address mismatch for %s\n";
-					strncpy(fromhost, nameinfo,
+					strncpy(fromhost, naddr,
 						sizeof(fromhost) - 1);
 					fromhost[sizeof(fromhost) - 1] = 0;
 					hostname = fromhost;
-					break;
 				}
-				if (!bcmp(hp->h_addr_list[0], addr, alen)) {
-					hostname = remotehost;
-					break;
-				}
+				freeaddrinfo(res0);
 			}
 		}
 	} else {
-		strncpy(fromhost, nameinfo, sizeof(fromhost) - 1);
+		strncpy(fromhost, naddr, sizeof(fromhost) - 1);
 		fromhost[sizeof(fromhost) - 1] = 0;
 		errorhost = hostname = fromhost;
 	}
@@ -549,10 +552,8 @@ doit(fromp)
 		if (errorstr ||
 		    (pwd->pw_expire && time(NULL) >= pwd->pw_expire) ||
 		    (pwd->pw_passwd != 0 && *pwd->pw_passwd != '\0' &&
-		    iruserok_af((fromp->su_family == AF_INET6)
-				? &fromp->su_sin6.sin6_addr
-				: &fromp->su_sin.sin_addr, pwd->pw_uid == 0,
-		    remuser, locuser, af) < 0)) {
+		    iruserok_sa(fromp, fromp->sa_len, pwd->pw_uid == 0,
+			    remuser, locuser) < 0)) {
 			if (__rcmd_errstr)
 				syslog(LOG_INFO|LOG_AUTH,
 			    "%s@%s as %s: permission denied (%s). cmd='%.80s'",
@@ -574,12 +575,12 @@ fail:
 		exit(1);
 	}
 #ifdef	LOGIN_CAP
-	if (lc != NULL && fromp->su_family == AF_INET) {	/*XXX*/
+	if (lc != NULL && fromp->sa_family == AF_INET) {	/*XXX*/
 		char	remote_ip[MAXHOSTNAMELEN];
 
-		strncpy(remote_ip, inet_ntoa(fromp->su_sin.sin_addr),
-			sizeof(remote_ip) - 1);
-		remote_ip[sizeof(remote_ip) - 1] = 0;
+		if (getnameinfo(fromp, fromp->sa_len, remote_ip,
+		    sizeof(remote_ip), NULL, 0, NI_NUMERICHOST) != 0)
+			strcpy(remote_ip, "<invalid>");
 		if (!auth_hostok(lc, fromhost, remote_ip)) {
 			syslog(LOG_INFO|LOG_AUTH,
 			    "%s@%s as %s: permission denied (%s). cmd='%.80s'",

@@ -141,25 +141,12 @@ int	no_delay;
 
 struct	passwd *pwd;
 
-union sockunion {
-	struct sockinet {
-		u_char si_len;
-		u_char si_family;
-		u_short si_port;
-	} su_si;
-	struct sockaddr_in  su_sin;
-	struct sockaddr_in6 su_sin6;
-};
-#define su_len		su_si.si_len
-#define su_family	su_si.si_family
-#define su_port		su_si.si_port
-
-void	doit __P((int, union sockunion *));
+void	doit __P((int, struct sockaddr *));
 int	control __P((int, char *, int));
 void	protocol __P((int, int));
 void	cleanup __P((int));
 void	fatal __P((int, char *, int));
-int	do_rlogin __P((union sockunion *));
+int	do_rlogin __P((struct sockaddr *));
 void	getstr __P((char *, int, char *));
 void	setup_term __P((int));
 void	usage __P((void));
@@ -172,7 +159,7 @@ main(argc, argv)
 	char *argv[];
 {
 	extern int __check_rhosts_file;
-	union sockunion from;
+	struct sockaddr_storage from;
 	int ch, fromlen, on;
 
 	openlog("rlogind", LOG_PID | LOG_CONS, LOG_AUTH);
@@ -232,7 +219,7 @@ main(argc, argv)
 	    setsockopt(0, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on)) < 0)
 		syslog(LOG_WARNING, "setsockopt (TCP_NODELAY): %m");
 #if defined(IPPROTO_IP) && defined(IP_TOS)
-	if (from.su_family == AF_INET) {
+	if (((struct sockaddr *)&from)->sa_family == AF_INET) {
 		on = IPTOS_LOWDELAY;
 		if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int))
 				< 0)
@@ -240,7 +227,7 @@ main(argc, argv)
 	}
 #endif
 
-	doit(0, &from);
+	doit(0, (struct sockaddr *)&from);
 	return 0;
 }
 
@@ -255,7 +242,7 @@ struct winsize win = { 0, 0, 0, 0 };
 void
 doit(f, fromp)
 	int f;
-	union sockunion *fromp;
+	struct sockaddr *fromp;
 {
 	int master, pid, on = 1;
 	int authenticated = 0;
@@ -263,6 +250,7 @@ doit(f, fromp)
 	char hostname[2 * MAXHOSTNAMELEN + 1];
 	char nameinfo[INET6_ADDRSTRLEN];
 	char c;
+	u_int16_t *portp = NULL;
 
 	alarm(60);
 	read(f, &c, 1);
@@ -275,18 +263,30 @@ doit(f, fromp)
 #endif
 
 	alarm(0);
-	err = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+	err = getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
 			  hostname, sizeof(hostname), NULL, 0, 0);
 	if (err)
-		err = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+		err = getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
 				  hostname, sizeof(hostname), NULL, 0,
 				  NI_NUMERICHOST);
-	fromp->su_port = ntohs((u_short)fromp->su_port);
+	switch (fromp->sa_family) {
+	case AF_INET:
+		portp = &((struct sockaddr_in *)fromp)->sin_port;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		portp = &((struct sockaddr_in6 *)fromp)->sin6_port;
+		break;
+#endif
+	default:
+		syslog(LOG_NOTICE, "Connection for invalid af %d",
+		       fromp->sa_family);
+		fatal(f, "Permission denied", 0);
+	}
 
-	if ((fromp->su_family != AF_INET && fromp->su_family != AF_INET6) ||
-	    fromp->su_port >= IPPORT_RESERVED ||
-	    fromp->su_port < IPPORT_RESERVED/2) {
-		err = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+	if (ntohs(*portp) >= IPPORT_RESERVED ||
+	    ntohs(*portp) < IPPORT_RESERVED/2) {
+		err = getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
 				  nameinfo, sizeof(nameinfo), NULL, 0,
 				  NI_NUMERICHOST);
 		syslog(LOG_NOTICE, "Connection from %s on illegal port",
@@ -595,11 +595,8 @@ fatal(f, msg, syserr)
 
 int
 do_rlogin(dest)
-	union sockunion *dest;
+	struct sockaddr *dest;
 {
-	int af;
-	char *addr;
-	
 	getstr(rusername, sizeof(rusername), "remuser too long");
 	getstr(lusername, sizeof(lusername), "locuser too long");
 	getstr(term+ENVSIZE, sizeof(term)-ENVSIZE, "Terminal type too long");
@@ -609,17 +606,8 @@ do_rlogin(dest)
 		return (-1);
 	/* XXX why don't we syslog() failure? */
 
-	af = dest->su_family;
-	switch (af) {
-	case AF_INET:
-		addr = (char *)&dest->su_sin.sin_addr;
-		break;
-	case AF_INET6:
-		addr = (char *)&dest->su_sin6.sin6_addr;
-		break;
-	}
-	
-	return (iruserok_af(addr, pwd->pw_uid == 0, rusername, lusername, af));
+	return (iruserok_sa(dest, dest->sa_len, pwd->pw_uid == 0, rusername,
+		lusername));
 }
 
 void
