@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.27 2001/08/29 06:11:09 sakane Exp $
+.\"	$KAME: racoon.8,v 1.28 2001/10/19 05:04:32 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -60,6 +60,14 @@ SPD
 .Pq Security Policy Database
 in the kernel usually triggers to start
 .Nm racoon .
+.Nm racoon
+usually sends informational messages, warning and error messages to
+.Xr syslogd 8
+with the priority, LOG_INFO .
+Debugging message are sent with the priority, LOG_DEBUG.
+You should configure
+.Xr syslog.conf 5
+appropriately to see these messages.
 .Bl -tag -width Ds
 .It Fl B
 Install SA(s) from the file which is specified in
