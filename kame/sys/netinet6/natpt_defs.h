@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.24 2001/10/17 07:02:48 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.25 2001/10/19 05:29:17 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -152,9 +152,17 @@ struct pAddr					/* sizeof():  40[byte]	*/
 };
 
 
+struct mAddr					/* sizeof(): 60[byte]	*/
+{
+	struct pAddr	saddr;
+	union inaddr	daddr;
+	u_short		dport;
+};
+
+
 /* Configuration slot entry						*/
 
-struct	cSlot					/* sizeof(): 100[byte]	*/
+struct	cSlot					/* sizeof(): 140[byte]	*/
 {
 	TAILQ_ENTRY(cSlot)	csl_list;
 
@@ -175,8 +183,8 @@ struct	cSlot					/* sizeof(): 100[byte]	*/
 	time_t		 lifetime;
 #define	CSLOT_INFINITE_LIFETIME	0xffffffff
 
-	struct pAddr	 local;
-	struct pAddr	 remote;
+	struct mAddr	 local;
+	struct mAddr	 remote;
 };
 
 

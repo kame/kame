@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.26 2001/10/17 07:02:49 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.27 2001/10/19 05:29:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -169,7 +169,7 @@ natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 	remote = &ats->remote;
 	remote->sa_family = AF_INET;
 	remote->in4src.s_addr = cv6->ip.ip6->ip6_dst.s6_addr32[3];
-	remote->in4dst = acs->remote.in4src;
+	remote->in4dst = acs->remote.saddr.in4src;
 	if ((cv6->ip_p == IPPROTO_TCP)
 	    || (cv6->ip_p == IPPROTO_UDP)) {
 		remote->port[0] = cv6->pyld.tcp6->th_dport;
@@ -230,10 +230,10 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 
 	remote = &ats->remote;
 #ifdef NATPT_NAT
-	if (acs->remote.sa_family == AF_INET) {
+	if (acs->remote.saddr.sa_family == AF_INET) {
 		remote->sa_family = AF_INET;
 		remote->in4src = cv4->ip.ip4->ip_dst;
-		remote->in4dst = acs->remote.in4Addr;
+		remote->in4dst = acs->remote.saddr.in4Addr;
 		if ((cv4->ip_p == IPPROTO_TCP)
 		    || (cv4->ip_p == IPPROTO_UDP)) {
 			remote->port[0] = cv4->pyld.tcp4->th_dport;
@@ -245,7 +245,7 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 #endif
 	{
 		remote->sa_family = AF_INET6;
-		remote->in6src = acs->remote.in6src;
+		remote->in6src = acs->remote.saddr.in6src;
 		remote->in6dst = natpt_prefix;
 		remote->in6dst.s6_addr32[3] = cv4->ip.ip4->ip_src.s_addr;
 		if ((cv4->ip_p == IPPROTO_TCP)
@@ -254,7 +254,7 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 			remote->port[1] = cv4->pyld.tcp4->th_sport;
 
 			if (acs->map & NATPT_COPY_DPORT)
-				remote->port[0] = acs->remote.port[1];
+				remote->port[0] = acs->remote.saddr.port[1];
 			else if (acs->map & NATPT_REMAP_SPORT)
 				natpt_remapRemote4Port(acs, remote);
 		}
@@ -266,7 +266,7 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 	ats->hvl = hvl = natpt_hashPad4(local);
 	thl = &tslhashl[hvl];
 #ifdef NATPT_NAT
-	if (acs->remote.sa_family == AF_INET)
+	if (acs->remote.saddr.sa_family == AF_INET)
 		hvr = natpt_hashPad4(remote);
 	else
 #endif
@@ -421,8 +421,8 @@ natpt_remapRemote4Port(struct cSlot *acs, struct pAddr *remote)
 	 */
 
 	cport = acs->cport;
-	sport = ntohs(acs->remote.port[0]);
-	eport = ntohs(acs->remote.port[1]);
+	sport = ntohs(acs->remote.saddr.port[0]);
+	eport = ntohs(acs->remote.saddr.port[1]);
 
 	if (cport == 0)
 		cport = sport - 1;

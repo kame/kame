@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.14 2001/09/06 09:46:05 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.15 2001/10/19 05:29:50 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -100,23 +100,23 @@ setRules(int type, struct ruletab *ruletab)
 	switch (type) {
 	case NATPT_MAP64:
 		if (ruletab->from)
-			f->local = *(ruletab->from);
+			f->local.saddr = *(ruletab->from);
 		else {
-			f->local.sa_family = AF_INET6;
-			f->local.aType = ADDR_ANY;
+			f->local.saddr.sa_family = AF_INET6;
+			f->local.saddr.aType = ADDR_ANY;
 		}
-		f->remote = *ruletab->to;
+		f->remote.saddr = *ruletab->to;
 		break;
 
 	case NATPT_MAP46:
 	case NATPT_MAP44:
 		if (ruletab->from)
-			f->local = *ruletab->from;
+			f->local.saddr = *ruletab->from;
 		else {
-			f->local.sa_family = AF_INET;
-			f->local.aType = ADDR_ANY;
+			f->local.saddr.sa_family = AF_INET;
+			f->local.saddr.aType = ADDR_ANY;
 		}
-		f->remote = *ruletab->to;
+		f->remote.saddr = *ruletab->to;
 		break;
 
 	default:
@@ -126,15 +126,15 @@ setRules(int type, struct ruletab *ruletab)
 
 	if (ruletab->sports) {
 		f->map = NATPT_REMAP_SPORT;
-		f->remote.pType = ruletab->sports[0];
-		f->remote.port[0] = ruletab->sports[1];
-		f->remote.port[1] = ruletab->sports[2];
+		f->remote.saddr.pType = ruletab->sports[0];
+		f->remote.saddr.port[0] = ruletab->sports[1];
+		f->remote.saddr.port[1] = ruletab->sports[2];
 	}
 
 	if (ruletab->dports) {
 		f->map = NATPT_COPY_DPORT;
-		f->local.port[1]  = ruletab->dports[0];
-		f->remote.port[1] = ruletab->dports[1];
+		f->local.saddr.port[1]  = ruletab->dports[0];
+		f->remote.saddr.port[1] = ruletab->dports[1];
 	}
 
 	if (ruletab->proto) {

@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.6 2001/09/11 06:43:08 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.7 2001/10/19 05:29:50 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -103,9 +103,9 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 	lmsg.lmsg_last = lmsg.lmsg_data;
 
 	concat(&lmsg, " from");
-	appendPAddr(&lmsg, &csl->local);
+	appendPAddr(&lmsg, &csl->local.saddr);
 	concat(&lmsg, " to");
-	appendPAddr(&lmsg, &csl->remote);
+	appendPAddr(&lmsg, &csl->remote.saddr);
 
 	if (csl->proto) {
 		int	found = 0;
