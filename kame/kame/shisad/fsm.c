@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.15 2005/03/01 02:01:16 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.16 2005/03/01 19:18:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -75,6 +75,7 @@ static int bul_fsm_back_register(struct binding_update_list *,
 static int bul_fsm_back_deregister(struct binding_update_list *,
     struct fsm_message *);
 static void bul_fsm_try_other_home_agent(struct binding_update_list *);
+static void bul_fsm_send_registered_event(struct binding_update_list *);
 
 /* for debuging. */
 static void dump_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *,
@@ -796,20 +797,13 @@ bul_reg_fsm(bul, event, data)
 
 			REGFSMS = MIP6_BUL_REG_FSM_STATE_BOUND;
 
-			/* process binding update lists for CN. */
-			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-				for (cnbul = LIST_FIRST(&bul->bul_hoainfo->hinfo_bul_head);
-				     cnbul;
-				     cnbul = LIST_NEXT(cnbul, bul_entry)) {
-					if ((cnbul->bul_flags & IP6_MH_BU_HOME) != 0)
-						continue;
-					if (cnbul->bul_hoainfo != bul->bul_hoainfo)
-						continue;
-					bul_kick_fsm(cnbul,
-					    MIP6_BUL_FSM_EVENT_REGISTERED,
-					    NULL);
-				}
-			}
+			/*
+			 * home registration has been completed.
+			 * notify all binding update list entries of
+			 * correspondent nodes related to this home
+			 * registration.
+			 */
+			bul_fsm_send_registered_event(bul);
 
 			break;
 
@@ -998,6 +992,14 @@ bul_reg_fsm(bul, event, data)
 			    bul->bul_lifetime << 2);
 
 			REGFSMS = MIP6_BUL_REG_FSM_STATE_BOUND;
+
+			/*
+			 * home registration has been completed.
+			 * notify all binding update list entries of
+			 * correspondent nodes related to this home
+			 * registration.
+			 */
+			bul_fsm_send_registered_event(bul);
 
 			break;
 
@@ -2603,6 +2605,28 @@ send_bu:
 
 	return;
 }
+
+static void
+bul_fsm_send_registered_event(bul)
+	struct binding_update_list *bul;
+{
+	struct binding_update_list *cnbul;
+
+	if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
+		for (cnbul = LIST_FIRST(&bul->bul_hoainfo->hinfo_bul_head);
+		     cnbul;
+		     cnbul = LIST_NEXT(cnbul, bul_entry)) {
+			if ((cnbul->bul_flags & IP6_MH_BU_HOME) != 0)
+				continue;
+			if (cnbul->bul_hoainfo != bul->bul_hoainfo)
+				continue;
+			bul_kick_fsm(cnbul,
+			    MIP6_BUL_FSM_EVENT_REGISTERED,
+			    NULL);
+		}
+	}
+}
+
 
 static int
 bul_send_unsolicited_na(bul)
