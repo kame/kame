@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.92 2000/07/18 01:26:14 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.93 2000/07/18 05:07:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -82,7 +82,7 @@ static vchar_t *get_ph1approval __P((struct ph1handle *, struct prop_pair **));
 static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *,
 	struct isakmpsa *));
 static int t2isakmpsa __P((struct isakmp_pl_t *, struct isakmpsa *));
-static int cmp_aproppair __P((struct prop_pair *, struct prop_pair *));
+static int cmp_aproppair_i __P((struct prop_pair *, struct prop_pair *));
 static struct prop_pair *get_ph2approval __P((struct ph2handle *,
 	struct prop_pair **));
 static struct prop_pair *get_ph2approvalx __P((struct ph2handle *,
@@ -691,7 +691,7 @@ ipsecdoi_checkph2proposal(iph2)
 		goto end;
 	}
 
-	if (cmp_aproppair(rpair[n], spair[n])) {
+	if (cmp_aproppair_i(rpair[n], spair[n])) {
 		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL,
 			"ERROR: proposal mismathed.\n"));
@@ -725,12 +725,13 @@ end:
  * the case of bundle or single SA, NOT multi transforms.
  * a: a proposal that is multi protocols and single transform, usually replyed.
  * b: a proposal that is multi protocols and multi transform, usually sent.
+ * NOTE: this function is for initiator.
  * OUT
  *	0: equal
  *	1: not equal
  */
 static int
-cmp_aproppair(a, b)
+cmp_aproppair_i(a, b)
 	struct prop_pair *a, *b;
 {
 	struct prop_pair *p, *q, *r;
@@ -753,16 +754,23 @@ cmp_aproppair(a, b)
 		if (p->prop->p_no != r->prop->p_no) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, NULL,
-				"NOTICE: proposal #%d mismatched, "
+				"WARNING: proposal #%d mismatched, "
 				"expected #%d.\n",
 				r->prop->p_no, p->prop->p_no));
 			/*FALLTHROUGH*/
 		}
 
-		if (p->prop->proto_id != r->prop->proto_id
-		 || p->prop->spi_size != r->prop->spi_size) {
+		if (p->prop->proto_id != r->prop->proto_id) {
 			plog(logp, LOCATION, NULL,
-				"ERROR: no suitable proposal found.\n");
+				"ERROR: proto_id mismathed: my:%d peer:%d\n",
+				r->prop->proto_id, p->prop->proto_id);
+			return -1;
+		}
+
+		if (p->prop->proto_id != r->prop->proto_id) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: invalid spi size: %d.\n",
+				p->prop->proto_id);
 			return -1;
 		}
 
@@ -775,11 +783,18 @@ cmp_aproppair(a, b)
 			/*FALLTHROUGH*/
 		}
 
-		if (p->trns->t_id != r->trns->t_id
-		 || p->trns->reserved != r->trns->reserved) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: no suitable transform found.\n");
-			return -1;
+		if (p->trns->t_id != r->trns->t_id) {
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, NULL,
+					"WARNING: transform number "
+					"has been modified.\n"));
+			/*FALLTHROUGH*/
+		}
+		if (p->trns->reserved != r->trns->reserved) {
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, NULL,
+					"WARNING: invalid reserved field.\n"));
+			/*FALLTHROUGH*/
 		}
 
 		/* compare attribute */
@@ -787,7 +802,7 @@ cmp_aproppair(a, b)
 		if (memcmp(p->trns + 1, r->trns + 1, len) != 0) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, NULL,
-				"WARNING: attribute is modified.\n"));
+				"WARNING: attribute has been modified.\n"));
 			/*FALLTHROUGH*/
 		}
 	}
