@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1977 2001/11/11 17:01:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.1978 2001/11/12 06:09:17 jinmei Exp $
 
 <200111>
 2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -15,7 +15,6 @@ $KAME: CHANGELOG,v 1.1977 2001/11/11 17:01:36 jinmei Exp $
 	default scope zone.  When the variable is non-0, the kernel will
 	try to set an appropriate zone ID for an address given from an
 	application if its scope zone is ambiguous.
-	TODO: port to openbsd.
 
 2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_setpktoption): disabled the
