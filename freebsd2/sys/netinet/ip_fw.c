@@ -208,6 +208,9 @@ ipopts_match(struct ip *ip, struct ip_fw *f)
 		if (opt == IPOPT_NOP)
 			optlen = 1;
 		else {
+			if (optlen < IPOPT_OLEN + sizeof(*cp)) {
+				return 0; /*XXX*/
+			}
 			optlen = cp[IPOPT_OLEN];
 			if (optlen <= 0 || optlen > cnt) {
 				return 0; /*XXX*/
