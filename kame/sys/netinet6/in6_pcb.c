@@ -960,11 +960,16 @@ in6_pcbrtentry(in6p)
 	ro = &in6p->in6p_route;
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 
-	if (ro->ro_rt == NULL) {
+	if (ro->ro_rt == NULL || (ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+	    dst6->sin6_family != AF_INET6) {
 		/*
 		 * No route yet, so try to acquire one.
 		 */
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+			if (ro->ro_rt) {
+				RTFREE(ro->ro_rt);
+				ro->ro_rt = (struct rtentry *)NULL;
+			}
 			bzero(dst6, sizeof(*dst6));
 			dst6->sin6_family = AF_INET6;
 			dst6->sin6_len = sizeof(struct sockaddr_in6);

@@ -829,11 +829,15 @@ in_pcbrtentry(inp)
 
 	ro = &inp->inp_route;
 
-	if (ro->ro_rt == NULL) {
+	if (ro->ro_rt == NULL || (ro->ro_rt->rt_flags & RTF_UP) == 0) {
 		/*
 		 * No route yet, so try to acquire one.
 		 */
 		if (!in_nullhost(inp->inp_faddr)) {
+			if (ro->ro_rt) {
+				RTFREE(ro->ro_rt);
+				ro->ro_rt = (struct rtentry *)NULL;
+			}
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 			ro->ro_dst.sa_family = AF_INET;
 			ro->ro_dst.sa_len = sizeof(ro->ro_dst);
