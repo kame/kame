@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.97 1999/09/05 11:58:51 itojun Exp $
+$Id: CHANGELOG,v 1.98 1999/09/05 12:00:42 itojun Exp $
 
 
 <199909>
@@ -12,6 +12,9 @@ Sun Sep  4 JST 1999  shin@kame.net
 	* sys/netinet6/in6_ifattach.c: invert "u bit" on interface id for
 	  pseudo interfaces, as suggested in RFC2373.  This was mistakingly
 	  dropped during migration to new repository.
+	  NOTE: interface id for pseudo interfaces (faith*, gif*, and alike)
+	  will change after this fix.  Please be sure to update your config
+	  file if you have explicit link-local address embedded in rc files.
 
 1999-09-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6: changed the semantics of `-a A' option. It now
