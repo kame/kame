@@ -120,7 +120,9 @@
 #include <netinet6/ip6protosw.h>
 
 /* we need it for NLOOP. */
+#ifndef __bsdi__
 #include "loop.h"
+#endif
 #include "faith.h"
 
 #include "gif.h"
@@ -141,10 +143,10 @@ struct ifqueue ip6intrq;
 
 #ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
+#endif
 int ip6_forward_srcrt;			/* XXX */
 int ip6_sourcecheck;			/* XXX */
 int ip6_sourcecheck_interval;		/* XXX */
-#endif
 
 #ifdef IPV6FIREWALL
 /* firewall hooks */
@@ -439,7 +441,7 @@ ip6_input(m)
 			       &rt6_key(ip6_forward_rt.ro_rt)->sin6_addr) &&
 #endif
 #ifdef __bsdi__
-	    ip6_foward.rt.ro_rt->rt_ifp == &loif
+	    ip6_forward_rt.ro_rt->rt_ifp == &loif
 #else
 	    ip6_forward_rt.ro_rt->rt_ifp == &loif[0]
 #endif
@@ -803,6 +805,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		privileged++;
 #endif
 
+#ifdef SO_TIMESTAMP
 	if (in6p->in6p_socket->so_options & SO_TIMESTAMP) {
 		struct timeval tv;
 
@@ -812,6 +815,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		if (*mp)
 			mp = &(*mp)->m_next;
 	}
+#endif
 	if (in6p->in6p_flags & IN6P_RECVDSTADDR) {
 		*mp = sbcreatecontrol((caddr_t) &ip6->ip6_dst,
 			sizeof(struct in6_addr), IPV6_RECVDSTADDR,
@@ -1094,3 +1098,43 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	/* NOTREACHED */
 }
 #endif /* __NetBSD__ || __OpenBSD__ */
+
+#ifdef __bsdi__
+int *ip6_sysvars[] = IPV6CTL_VARS;
+
+int
+ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
+	int	*name;
+	u_int	namelen;
+	void	*oldp;
+	size_t	*oldlenp;
+	void	*newp;
+	size_t	newlen;
+{
+	if (name[0] >= IPV6CTL_MAXID)
+		return (EOPNOTSUPP);
+
+	switch (name[0]) {
+	case IPV6CTL_STATS:
+		return sysctl_rdtrunc(oldp, oldlenp, newp, &ip6stat,
+		    sizeof(ip6stat));
+	case IPV6CTL_FORWARDING:
+#if 0
+	    {
+		int error, old;
+
+		old = ip6_forwarding;
+		error = sysctl_int_arr(ip6_sysvars, name, namelen,
+		    oldp, oldlenp, newp, newlen);
+		ip6_check_forwarding(old, ip6_forwarding);
+		return error;
+	    }
+#endif
+	case IPV6CTL_KAME_VERSION:
+		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
+	default:
+		return (sysctl_int_arr(ip6_sysvars, name, namelen,
+		    oldp, oldlenp, newp, newlen));
+	}
+}
+#endif /* __bsdi__ */

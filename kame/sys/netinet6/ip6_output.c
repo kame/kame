@@ -103,7 +103,9 @@
 #include <netkey/key_debug.h>
 #endif /* IPSEC */
 
+#ifndef __bsdi__
 #include "loop.h"
+#endif
 
 #include <net/net_osdep.h>
 

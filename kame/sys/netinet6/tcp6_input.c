@@ -195,7 +195,7 @@ do {									\
 	syn_cache_count6--;						\
 } while (0)
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__bsdi__)
 #define sb_notify(x)	((x)->sb_flags & SB_NOTIFY)
 #endif
 

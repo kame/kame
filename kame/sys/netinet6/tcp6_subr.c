@@ -124,7 +124,9 @@ extern	int tcp6_rttdflt;
 extern	int tcp6_do_rfc1323;
 #endif
 
+#ifndef __bsdi__
 extern int ip_next_mtu __P((int, int));	/*XXX netinet/ip_icmp.c */
+#endif
 
 extern struct in6pcb *tcp6_last_in6pcb;
 
@@ -736,9 +738,21 @@ tcp6_agepathmtu(in6p, rt)
 	unsigned int usable_mtu;
 	unsigned int rt_mtu = rt->rt_rmx.rmx_mtu;
 	time_t expire_at;
+#ifdef __bsdi__
+	extern unsigned int mtu_table[];
+	unsigned int *mtup;
+#endif
 
+#ifdef __bsdi__
+	for (mtup = mtu_table; *mtup; mtup++) {
+		if (mtup[1] <= rt_mtu)
+			break;
+	}
+	usable_mtu = *mtup;
+#else
 	/* Find the next higher MTU plateau */
 	usable_mtu = ip_next_mtu(rt_mtu, -1);
+#endif
 
 	/* Don't try an MTU greater than the if_mtu! */
 	if (usable_mtu > rt->rt_ifp->if_mtu)

@@ -195,4 +195,25 @@ extern int tcp6_syn_bucket_limit;
 	{ "syn_cache_interval", CTLTYPE_INT }, \
 }
 
+#define	TCP6CTL_VARS { \
+	0, \
+	&tcp6_mssdflt, \
+	&tcp6_do_rfc1323, \
+	&tcp6_keepidle, \
+	&tcp6_keepintvl, \
+	&tcp6_keepcnt, \
+	&tcp6_maxpersistidle, \
+	&tcp6_sendspace, \
+	&tcp6_recvspace, \
+	&tcp6_conntimeo, \
+	&tcp6_pmtu, \
+	&pmtu_expire, \
+	&pmtu_probe, \
+	&tcp6_43maxseg, \
+	0, \
+	&tcp6_syn_cache_limit, \
+	&tcp6_syn_bucket_limit, \
+	&tcp6_syn_cache_interval, \
+}
+
 #endif /* ! _NETINET6_TCP6_H_ */

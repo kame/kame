@@ -76,7 +76,9 @@
 #include <netinet6/nd6.h>
 #include <netinet6/icmp6.h>
 
+#ifndef __bsdi__
 #include "loop.h"
+#endif
 #ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
 #endif
@@ -857,7 +859,7 @@ nd6_resolve(ifp, rt, m, dst, desten)
 }
 
 void
-#ifdef __bsdi__
+#if defined(__bsdi__) && __bsdi__ >= 4
 nd6_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;
@@ -1031,7 +1033,7 @@ nd6_rtrequest(req, rt, sa)
 }
 
 void
-#ifdef __bsdi__
+#if defined(__bsdi__) && __bsdi__ >= 4
 nd6_p2p_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;

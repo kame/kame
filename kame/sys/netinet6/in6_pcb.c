@@ -91,7 +91,9 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 
+#ifndef __bsdi__
 #include "loop.h"
+#endif
 #ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
 #endif

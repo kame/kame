@@ -516,7 +516,7 @@ struct in6_pktinfo {
 	&ip6_log_interval, \
 	&ip6_hdrnestlimit, \
 	&ip6_dad_count, \
-	&auto_flowlabel, \
+	&ip6_auto_flowlabel, \
 	&ip6_defmcasthlim, \
 	&ip6_gif_hlim, \
 	0, \

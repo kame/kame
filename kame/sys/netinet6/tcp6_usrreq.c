@@ -708,3 +708,31 @@ tcp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	/* NOTREACHED */
 }
 #endif /* __NetBSD__ */
+
+#ifdef __bsdi__
+int *tcp6_sysvars[] = TCP6CTL_VARS;
+
+/*
+ * Sysctl for tcp6 variables.
+ */
+tcp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
+	int *name;
+	u_int namelen;
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+	if (name[0] >= TCP6CTL_MAXID)
+		return (EOPNOTSUPP);
+	switch (name[0]) {
+	case TCP6CTL_STATS:
+		return sysctl_rdtrunc(oldp, oldlenp, newp, &tcp6stat,
+		    sizeof(tcp6stat));
+
+	default:
+		return (sysctl_int_arr(tcp6_sysvars, name, namelen,
+		    oldp, oldlenp, newp, newlen));
+	}
+}
+#endif

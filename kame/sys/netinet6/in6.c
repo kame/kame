@@ -1957,7 +1957,11 @@ in6_if_up(ifp)
 	struct in6_ifaddr *ia;
 	struct sockaddr_dl *sdl;
 	int type;
+#ifdef __bsdi__
+	u_char ea[ETHER_ADDR_LEN];
+#else
 	struct ether_addr ea;
+#endif
 	int off;
 	int dad_delay;		/* delay ticks before DAD output */
 

@@ -366,9 +366,11 @@ dummyioctl(ifp, cmd, data)
 		}
 		break;
 
+#ifdef SIOCSIFMTU
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
+#endif
 
 	case SIOCSIFFLAGS:
 		break;

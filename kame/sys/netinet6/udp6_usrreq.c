@@ -287,7 +287,10 @@ udp6_input(mp, offp, proto)
 					 * only if offset is 0.
 					 */
 					if (last->in6p_flags & IN6P_CONTROLOPTS
-					 || last->in6p_socket->so_options & SO_TIMESTAMP) {
+#ifdef SO_TIMESTAMP
+					 || last->in6p_socket->so_options & SO_TIMESTAMP
+#endif
+					    ) {
 						ip6_savecontrol(last, &opts,
 								ip6, n);
 					}
@@ -339,7 +342,10 @@ udp6_input(mp, offp, proto)
 		}
 #endif /*IPSEC*/
 		if (last->in6p_flags & IN6P_CONTROLOPTS
-		 || last->in6p_socket->so_options & SO_TIMESTAMP) {
+#ifdef SO_TIMESTAMP
+		 || last->in6p_socket->so_options & SO_TIMESTAMP
+#endif
+		    ) {
 			ip6_savecontrol(last, &opts, ip6, m);
 		}
 
@@ -419,7 +425,10 @@ udp6_input(mp, offp, proto)
 	} else
 		udp_in6.sin6_scope_id = 0;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
-	 || in6p->in6p_socket->so_options & SO_TIMESTAMP) {
+#ifdef SO_TIMESTAMP
+	 || in6p->in6p_socket->so_options & SO_TIMESTAMP
+#endif
+	   ) {
 		ip6_savecontrol(in6p, &opts, ip6, m);
 	}
 

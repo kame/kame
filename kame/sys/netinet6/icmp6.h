@@ -512,7 +512,6 @@ struct icmp6stat {
 #define ICMPV6CTL_STATS		1
 #define ICMPV6CTL_REDIRACCEPT	2	/* accept/process redirects */
 #define ICMPV6CTL_REDIRTIMEOUT	3	/* redirect cache time */
-#define ICMPV6CTL_PRINTFS	4
 #define ICMPV6CTL_ERRRATELIMIT	5	/* ICMPv6 error rate limitation */
 #define ICMPV6CTL_ND6_PRUNE	6
 #define ICMPV6CTL_ND6_DELAY	8
@@ -527,7 +526,7 @@ struct icmp6stat {
 	{ 0, 0 }, \
 	{ "rediraccept", CTLTYPE_INT }, \
 	{ "redirtimeout", CTLTYPE_INT }, \
-	{ "printfs", CTLTYPE_INT }, \
+	{ 0, 0 }, \
 	{ "errratelimit", CTLTYPE_INT }, \
 	{ "nd6_prune", CTLTYPE_INT }, \
 	{ 0, 0 }, \
@@ -543,7 +542,7 @@ struct icmp6stat {
 	0, \
 	&icmp6_rediraccept,   \
 	&icmp6_redirtimeout,  \
-	__ICMP6PRINTFS, \
+	0, \
 	0, \
 	&icmp6errratelim, \
 	&nd6_prune,	\
