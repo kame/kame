@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.124 2001/06/29 04:30:18 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.125 2001/06/29 09:47:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,6 +86,7 @@ static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
 static struct nd_pfxrouter *find_pfxlist_reachable_router
 	__P((struct nd_prefix *));
+static void defrouter_delreq __P((struct nd_defrouter *, int));
 static void defrouter_addifreq __P((struct ifnet *));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
@@ -592,7 +593,7 @@ defrouter_lookup(addr, ifp)
 	return(NULL);		/* search failed */
 }
 
-void
+static void
 defrouter_delreq(dr, dofree)
 	struct nd_defrouter *dr;
 	int dofree;
