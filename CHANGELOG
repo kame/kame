@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1990 2001/11/27 07:53:26 suz Exp $
+$KAME: CHANGELOG,v 1.1991 2001/11/27 10:07:31 sakane Exp $
 
 <200111>
+Tue Nov 27 19:03:30 JST 2001 sakane@kame.net
+	* kame/sys/crypto/cast128,kame/sys/netinet6/esp_core.c:
+	fixed the cast128 calculation with a short cipher key length.
+	the memory was overridden when the key length was less than 16 bytes.
+
 Tue Nov 27 16:03:20 JST 2001 suz@sdl.hitachi.co.jp
 	* kame/kame/pim6sd/:
 	- SSM prefix definition is now based on draft-ietf-ipngwg-uni-
