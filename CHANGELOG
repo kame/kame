@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2362 2003/03/22 09:10:32 jinmei Exp $
+$KAME: CHANGELOG,v 1.2363 2003/03/25 11:08:16 suz Exp $
 
 <200303>
+
+Tue Mar 25 19:07:53 JST 2003	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6_msf.c
+	fixed a bug that MSF does not work properly when changing its mode 
+	by advanced API.
+
+	* kame/sys/netinet/in_msf.c
+	  {freebsd4,freebsd5,netbsd,openbsd}/sys/netinet/ip_output.c
+	When the gap in the IPv4 multicast membership array is removed,
+	multicast-socket-filter must be removed as well as multicast 
+	membership array.  (specific to IGMPv3 extension)
+
+	Reported by: Hitoshi Asaeda <Hitoshi.Asaeda@sophia.inria.fr>
+
 2003-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): made sure to keep
 	the current stored lifetime when it was not updated by an RA.
