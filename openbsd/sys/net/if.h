@@ -364,12 +364,14 @@ struct if_nameindex {
 	char 		*if_name;
 };
 
+#ifndef _KERNEL
 __BEGIN_DECLS
 unsigned int if_nametoindex __P((const char *));
 char 	*if_indextoname __P((unsigned int, char *));
 struct	if_nameindex *if_nameindex __P((void));
-void	if_freenameindex __P((struct if_nameindex *));
 __END_DECLS
+#define if_freenameindex(x)	free(x)
+#endif
 
 #include <net/if_arp.h>
 
