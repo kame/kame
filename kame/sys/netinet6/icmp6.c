@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.99 2000/05/22 04:18:32 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.100 2000/05/22 04:19:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1129,9 +1129,9 @@ ni6_input(m, off)
 	bcopy(&ip6->ip6_dst, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
 	/* XXX scopeid */
 	if (ifa_ifwithaddr((struct sockaddr *)&sin6))
-		printf("got unicast/anycast\n"); /*unicast/anycast, fine*/
+		; /*unicast/anycast, fine*/
 	else if (IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr))
-		printf("got multicast\n"); /*violates spec slightly, see above*/
+		; /*violates spec slightly, see above*/
 	else
 		goto bad;
 
