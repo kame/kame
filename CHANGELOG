@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2232 2002/09/15 07:32:48 suz Exp $
+$KAME: CHANGELOG,v 1.2233 2002/09/16 05:36:43 suz Exp $
 
 <200209>
+Mon Sep 16 14:30:19 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/netinet/ip_output.c, igmp.c: fixed a bug that 
+	  IGMPv3 report is not sometimes advertised when an application 
+	  stopped listening.
+
 Sun Sep 15 16:26:04 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/ip6_mroute.c: fixed a kernel crash when forwarding 
 	  an incoming PIM Register packet to outgoing interfaces.
