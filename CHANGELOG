@@ -1,7 +1,37 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2414 2003/06/19 07:57:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.2415 2003/06/24 05:53:13 itojun Exp $
 
 <200306>
+Tue Jun 24 14:52:16 JST 2003  itojun@iijlab.net
+	* sys/netinet/sctp*: sctp patch 9 from rrs@cisco.com.  (7) is disabled
+	  by default, as there's no floating point in kernel land.
+
+	1) Xiaodan Tang found an interesting bug in the netBSD code 
+	   having to do with getsockopt. Now a failed return will
+	   not generate a panic via a double mbuf mfree.
+	2) Changes to match the socket API next release including
+	   sctp_recvmsg(), sctp_connectx().
+	3) New state SCTP_UNCONFIRMED for addresses and increased
+	   HB's to unconfirmed addresses.
+	4) Major bug and panic fixes when memory gets short as we
+	   stress the number of mbufs and raise the number of associations.
+	5) A stop to handle excess associations. I can now easily get
+	   20,000 assoc up on my laptop :>
+	6) Shrinking of PCB size and assoc structure sizes.
+	7) Support for High Speed TCP draft in SCTP. Note if you
+	   don't have a processor that supports floating point in
+	   the kernel (PIII and PIV should be ok) you need to
+	   go in to sctp_structs.h and comment out the define
+	   of SCTP_HIGH_SPEED. This will move to a compile option
+	   next patch.. but for now it is hard coded :-0
+	8) Some re-entrancy issues fixed (again especially when stressing
+	   the limits of things).
+	9) Configurable compile switch to get either Mark Allmans burst
+	   limit OR Kacheong Poon's :> Default is Kacheongs... If you
+	   want to use HIGH SPEED option probably you are best NOT
+	   to use Mark's since I don't think HIGH SPEED could ever
+	   take effect...
+
 2003-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_setpktoption): deprecated
 	the IPV6_REACHCONF socket option and ancillary data item.  It was
