@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.129 2001/02/21 16:20:47 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.130 2001/02/21 16:22:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -381,15 +381,13 @@ nd6_option(ndopts)
 		return NULL;
 	}
 
-	/* if the option overruns the end of buffer, it is invalid */
-	if ((caddr_t)nd_opt + olen > (caddr_t)ndopts->nd_opts_last) {
+	ndopts->nd_opts_search = (struct nd_opt_hdr *)((caddr_t)nd_opt + olen);
+	if (ndopts->nd_opts_search > ndopts->nd_opts_last) {
+		/* option overruns the end of buffer, invalid */
 		bzero(ndopts, sizeof(*ndopts));
 		return NULL;
-	}
-
-	ndopts->nd_opts_search = (struct nd_opt_hdr *)((caddr_t)nd_opt + olen);
-	/* actually, ">" case indicates invalid option length */
-	if (ndopts->nd_opts_search >= ndopts->nd_opts_last) {
+	} else if (ndopts->nd_opts_search == ndopts->nd_opts_last) {
+		/* reached the end of options chain */
 		ndopts->nd_opts_done = 1;
 		ndopts->nd_opts_search = NULL;
 	}
