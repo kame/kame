@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.67 2000/03/05 02:38:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.68 2000/03/07 00:56:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.67 2000/03/05 02:38:25 itojun Exp $ */
+/* KAME $Id: key.c,v 1.68 2000/03/07 00:56:41 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1369,6 +1369,16 @@ key_spdadd(mhp)
 	 || xpl0->sadb_x_policy_type == IPSEC_POLICY_BYPASS) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: Invalid policy type.\n");
+#endif
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+
+	/* requests are mandatory when action is ipsec. */
+        if (xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
+	 && PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdadd: some policy requests part required.\n");
 #endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
