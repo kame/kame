@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.117 2003/09/06 02:36:48 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.118 2003/09/10 08:10:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,15 +407,15 @@ int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
-void	ip6_savecontrol __P((struct inpcb *, struct ip6_hdr *, struct mbuf *,
-			     struct ip6_recvpktopts *));
+void	ip6_savecontrol __P((struct inpcb *, struct mbuf *,
+	struct ip6_recvpktopts *));
 void	ip6_notify_pmtu __P((struct inpcb *, struct sockaddr_in6 *,
-			     u_int32_t *));
+	u_int32_t *));
 #else
-void	ip6_savecontrol __P((struct in6pcb *, struct ip6_hdr *, struct mbuf *,
-			     struct ip6_recvpktopts *));
+void	ip6_savecontrol __P((struct in6pcb *, struct mbuf *,
+	struct ip6_recvpktopts *));
 void	ip6_notify_pmtu __P((struct in6pcb *, struct sockaddr_in6 *,
-			     u_int32_t *));
+	u_int32_t *));
 #endif
 int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 

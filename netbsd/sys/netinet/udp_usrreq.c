@@ -622,15 +622,13 @@ udp6_sendup(m, off, src, so)
 
 	if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 		bzero(&opts, sizeof(opts));
-		if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS
-			  || in6p->in6p_socket->so_options & SO_TIMESTAMP)) {
-			struct ip6_hdr *ip6 = mtod(n, struct ip6_hdr *);
-			ip6_savecontrol(in6p, ip6, n, &opts);
-		}
+		if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS ||
+		    in6p->in6p_socket->so_options & SO_TIMESTAMP))
+			ip6_savecontrol(in6p, n, &opts);
 
 		m_adj(n, off);
 		if (sbappendaddr(&so->so_rcv, (struct sockaddr *)&fromsa,
-				 n, opts.head) == 0) {
+		    n, opts.head) == 0) {
 			m_freem(n);
 			if (opts.head)
 				m_freem(opts.head);

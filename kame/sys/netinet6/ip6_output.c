@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.397 2003/09/06 02:36:48 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.398 2003/09/10 08:10:55 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3115,9 +3115,8 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		op = sopt->sopt_dir;
 		optname = sopt->sopt_name;
 		optlen = sopt->sopt_valsize;
-	} else {
+	} else
 		panic("ip6_raw_ctloutput: arg soopt is NULL");
-	}
 #else
 	optlen = m ? m->m_len : 0;
 #endif /* FreeBSD >= 3 */
@@ -3424,7 +3423,9 @@ ip6_getpcbopt(pktopt, optname, mp)
 		optdatalen = sizeof(int);
 		break;
 	default:		/* should not happen */
-		printf("ip6_getpcbopt: unexpected option: %d\n", optname);
+#ifdef DIAGNOSTIC
+		panic("ip6_getpcbopt: unexpected option\n");
+#endif
 		return (ENOPROTOOPT);
 	}
 
@@ -3450,9 +3451,6 @@ ip6_clearpktopts(pktopt, optname)
 	int optname;
 {
 	int needfree;
-
-	if (pktopt == NULL)
-		return;
 
 	needfree = pktopt->needfree;
 
@@ -3517,11 +3515,6 @@ ip6_copypktopts(src, canwait)
 	int canwait;
 {
 	struct ip6_pktopts *dst;
-
-	if (src == NULL) {
-		printf("ip6_copypktopts: invalid argument\n");
-		return (NULL);
-	}
 
 	dst = malloc(sizeof(*dst), M_IP6OPT, canwait);
 	if (dst == NULL && canwait == M_NOWAIT)

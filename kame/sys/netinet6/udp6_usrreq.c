@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.114 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.115 2003/09/10 08:10:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,8 +307,7 @@ udp6_input(mp, offp, proto)
 					 || last->in6p_socket->so_options & SO_TIMESTAMP
 #endif
 					    ) {
-						ip6_savecontrol(last, ip6,
-						    n, &opts);
+						ip6_savecontrol(last, n, &opts);
 					}
 
 					m_adj(n, off + sizeof(struct udphdr));
@@ -362,7 +361,7 @@ udp6_input(mp, offp, proto)
 		 || last->in6p_socket->so_options & SO_TIMESTAMP
 #endif
 		    ) {
-			ip6_savecontrol(last, ip6, m, &opts);
+			ip6_savecontrol(last, m, &opts);
 		}
 
 		m_adj(m, off + sizeof(struct udphdr));
@@ -428,7 +427,7 @@ udp6_input(mp, offp, proto)
 	 || in6p->in6p_socket->so_options & SO_TIMESTAMP
 #endif
 	   ) {
-		ip6_savecontrol(in6p, ip6, m, &opts);
+		ip6_savecontrol(in6p, m, &opts);
 	}
 
 	m_adj(m, off + sizeof(struct udphdr));

@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.19 2003/06/24 05:36:51 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.20 2003/09/10 08:10:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -353,12 +353,12 @@ sctp6_input(mp, offp, proto)
 	    ) {
 #ifdef __FreeBSD__
 #if defined(__FreeBSD_cc_version) && __FreeBSD_cc_version >= 440000
-		ip6_savecontrol(in6p_ip, ip6, m, &opts);
+		ip6_savecontrol(in6p_ip, m, &opts);
 #else
-		ip6_savecontrol(in6p_ip, ip6, m, &opts, NULL);
+		ip6_savecontrol(in6p_ip, m, &opts, NULL);
 #endif /* __FreeBSD_cc_version */
 #else
-		ip6_savecontrol((struct in6pcb *)in6p_ip, ip6, m, &opts);
+		ip6_savecontrol((struct in6pcb *)in6p_ip, m, &opts);
 #endif
 	}
 

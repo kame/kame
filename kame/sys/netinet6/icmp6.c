@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.357 2003/08/25 05:48:30 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.358 2003/09/10 08:10:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2297,7 +2297,9 @@ icmp6_rip6_input(mp, off, src, dst)
 	struct sockaddr_in6 *src, *dst;
 {
 	struct mbuf *m = *mp;
+#ifndef PULLDOWN_TEST
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+#endif
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 fromsa;
@@ -2402,7 +2404,7 @@ icmp6_rip6_input(mp, off, src, dst)
 			if (n != NULL ||
 			    (n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
-					ip6_savecontrol(last, ip6, n, &opts);
+					ip6_savecontrol(last, n, &opts);
 				/* strip intermediate headers */
 				m_adj(n, off);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -2422,7 +2424,7 @@ icmp6_rip6_input(mp, off, src, dst)
 	}
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS)
-			ip6_savecontrol(last, ip6, m, &opts);
+			ip6_savecontrol(last, m, &opts);
 		/* strip intermediate headers */
 		m_adj(m, off);
 

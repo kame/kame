@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.140 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.141 2003/09/10 08:10:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -268,7 +268,7 @@ rip6_input(mp, offp, proto)
 #endif /* IPSEC */
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
-					ip6_savecontrol(last, ip6, n, &opts);
+					ip6_savecontrol(last, n, &opts);
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -297,7 +297,7 @@ rip6_input(mp, offp, proto)
 #endif /* IPSEC */
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS)
-			ip6_savecontrol(last, ip6, m, &opts);
+			ip6_savecontrol(last, m, &opts);
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,

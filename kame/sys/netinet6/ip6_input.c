@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.327 2003/09/09 00:42:54 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.328 2003/09/10 08:10:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1612,13 +1612,12 @@ ip6_unknown_opt(optp, m, off)
  * very first mbuf on the mbuf chain.
  */
 void
-ip6_savecontrol(in6p, ip6, m, ctl)
+ip6_savecontrol(in6p, m, ctl)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 	struct inpcb *in6p;
 #else
 	struct in6pcb *in6p;
 #endif
-	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	struct ip6_recvpktopts *ctl;
 {
@@ -1638,12 +1637,12 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 # define sbcreatecontrol	so_cmsg
 #endif
 	int privileged = 0;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
 	if (ctl == NULL)	/* validity check */
 		return;
 	bzero(ctl, sizeof(*ctl)); /* XXX is it really OK? */
 	mp = &ctl->head;
-
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
@@ -1682,9 +1681,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 
 		bcopy(&ip6->ip6_dst, &pi6.ipi6_addr, sizeof(struct in6_addr));
 		in6_clearscope(&pi6.ipi6_addr);	/* XXX */
-		pi6.ipi6_ifindex = (m && m->m_pkthdr.rcvif)
-					? m->m_pkthdr.rcvif->if_index
-					: 0;
+		pi6.ipi6_ifindex =
+		    (m && m->m_pkthdr.rcvif) ? m->m_pkthdr.rcvif->if_index : 0;
 
 		*mp = sbcreatecontrol((caddr_t) &pi6,
 		    sizeof(struct in6_pktinfo),
@@ -1708,14 +1706,14 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 
 	if ((in6p->in6p_flags & IN6P_TCLASS) != 0) {
 		u_int32_t flowinfo;
-		int v;
+		int tclass;
 
 		flowinfo = (u_int32_t)ntohl(ip6->ip6_flow & IPV6_FLOWINFO_MASK);
 		flowinfo >>= 20;
 
-		v = flowinfo & 0xff;
-		*mp = sbcreatecontrol((caddr_t) &v, sizeof(v), IPV6_TCLASS,
-		    IPPROTO_IPV6);
+		tclass = flowinfo & 0xff;
+		*mp = sbcreatecontrol((caddr_t)&tclass, sizeof(tclass),
+		    IPV6_TCLASS, IPPROTO_IPV6);
 		if (*mp) {
 			ctl->hlim = *mp;
 			mp = &(*mp)->m_next;
@@ -1728,7 +1726,11 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 	 * be some hop-by-hop options which can be returned to normal user.
 	 * See RFC 2292 section 6.
 	 */
-	if ((in6p->in6p_flags & IN6P_HOPOPTS) != 0 && privileged) {
+	if ((in6p->in6p_flags & IN6P_HOPOPTS) != 0) {
+#ifdef DIAGNOSTIC
+		if (!privileged)
+			panic("IN6P_HOPOPTS is set for unprivileged socket");
+#endif
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -1736,7 +1738,6 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 		 * just after the IPv6 header, which is assured through the
 		 * IPv6 input processing.
 		 */
-		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
 			struct ip6_hbh *hbh;
 			int hbhlen = 0;
@@ -1845,7 +1846,6 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 
 			switch (nxt) {
 			case IPPROTO_DSTOPTS:
-			{
 				if (!(in6p->in6p_flags & IN6P_DSTOPTS))
 					break;
 
@@ -1864,9 +1864,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 				if (*mp)
 					mp = &(*mp)->m_next;
 				break;
-			}
+
 			case IPPROTO_ROUTING:
-			{
 				if (!in6p->in6p_flags & IN6P_RTHDR)
 					break;
 
@@ -1878,7 +1877,7 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 				if (*mp)
 					mp = &(*mp)->m_next;
 				break;
-			}
+
 			case IPPROTO_HOPOPTS:
 			case IPPROTO_AH: /* is it possible? */
 				break;
