@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.92 2002/12/29 00:36:31 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.93 2002/12/29 00:54:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -517,6 +517,20 @@ server6_recv(s)
 	dprintf(LOG_DEBUG, "%s" "received %s from %s", FNAME,
 	    dhcp6msgstr(dh6->dh6_msgtype),
 	    addr2str((struct sockaddr *)&from));
+	/*
+	 * A server MUST discard any Solicit, Confirm, Rebind or
+	 * Information-request messages it receives with a unicast
+	 * destination address.
+	 * [dhcpv6-28 Section 15.]
+	 */
+	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr) &&
+	    (dh6->dh6_msgtype == DH6_SOLICIT ||
+	    dh6->dh6_msgtype == DH6_CONFIRM ||
+	    dh6->dh6_msgtype == DH6_REBIND ||
+	    dh6->dh6_msgtype == DH6_INFORM_REQ)) {
+		dprintf(LOG_INFO, "%s" "invalid multicast message", FNAME);
+		return (-1);
+	}
 
 	/*
 	 * parse and validate options in the request

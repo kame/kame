@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.67 2002/12/29 00:36:31 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.68 2002/12/29 00:54:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1355,12 +1355,14 @@ dhcp6msgstr(type)
 		return ("solicit");
 	case DH6_ADVERTISE:
 		return ("advertise");
+	case DH6_REQUEST:
+		return ("request");
+	case DH6_CONFIRM:
+		return ("confirm");
 	case DH6_RENEW:
 		return ("renew");
 	case DH6_REBIND:
 		return ("rebind");
-	case DH6_REQUEST:
-		return ("request");
 	case DH6_REPLY:
 		return ("reply");
 	case DH6_INFORM_REQ:

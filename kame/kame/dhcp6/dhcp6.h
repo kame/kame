@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.32 2002/07/04 15:03:19 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.33 2002/12/29 00:54:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -45,6 +45,7 @@
 #define DH6_SOLICIT	1
 #define DH6_ADVERTISE	2
 #define DH6_REQUEST	3
+#define DH6_CONFIRM	4
 #define DH6_RENEW	5
 #define DH6_REBIND	6
 #define DH6_REPLY	7
