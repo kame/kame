@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.261 2001/11/12 07:41:10 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.262 2001/11/12 11:11:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2413,7 +2413,7 @@ icmp6_reflect(m, off)
 		 * source address of the erroneous packet.
 		 */
 		bzero(&ro, sizeof(ro));
-		src = in6_selectsrc(&sa6_src, NULL, NULL, &ro, NULL, &e);
+		src = in6_selectsrc(&sa6_src, NULL, NULL, &ro, NULL, NULL, &e);
 		if (ro.ro_rt) { /* XXX: see comments in icmp6_mtudisc_update */
 			RTFREE(ro.ro_rt); /* XXX: we could use this */
 		}

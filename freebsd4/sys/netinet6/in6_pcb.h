@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2.2.3 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.h,v 1.16 2001/09/26 06:12:58 keiichi Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.17 2001/11/12 11:11:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,8 +102,8 @@ int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
 struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
-				     struct route *,
-				     struct in6_addr *, int *));
+				     struct route *, struct in6_addr *,
+				     struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 			 struct ip6_moptions *, struct route *,
 			 struct ifnet **, struct rtentry **, int));
@@ -111,8 +111,8 @@ int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
-				     struct route_in6 *,
-				     struct in6_addr *, int *));
+				     struct route_in6 *, struct in6_addr *,
+				     struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 			 struct ip6_moptions *, struct route_in6 *,
 			 struct ifnet **, struct rtentry **, int));

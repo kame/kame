@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.39 2001/11/12 05:56:24 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.40 2001/11/12 07:41:10 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -309,15 +309,17 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 			sin6->sin6_addr = in6addr_loopback;
 	}
 	{
-		/*
-		 * XXX: in6_selectsrc might replace the bound local address
-		 * with the address specified by setsockopt(IPV6_PKTINFO).
-		 * Is it the intended behavior?
-		 */
+		struct ifnet *ifp = NULL;
+
 		*plocal_addr6 = in6_selectsrc(sin6, inp->in6p_outputopts,
 					      inp->in6p_moptions,
 					      &inp->in6p_route,
-					      &inp->in6p_laddr, &error);
+					      &inp->in6p_laddr, &ifp, &error);
+		if (ifp && sin6->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(ifp, sin6)) != 0) { /* XXX */
+			return(error);
+		}
+
 		if (*plocal_addr6 == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;

@@ -519,14 +519,18 @@ in6_pcbconnect(inp, nam)
 		 */
 		in6a = in6_selectsrc(sin6, inp->inp_outputopts6,
 		    inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
-		    &error);
+		    &ifp, &error);
 		if (in6a == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			return(error);
 		}
+		if (ifp && sin6->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(ifp, sin6)) != 0) {
+			return(error);
+		}
 	}
-	if (inp->inp_route6.ro_rt)
+	if (ifp == NULL && inp->inp_route6.ro_rt)
 		ifp = inp->inp_route6.ro_rt->rt_ifp;
 
 	inp->inp_ipv6.ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);

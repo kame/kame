@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.91 2001/11/12 09:00:02 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.92 2001/11/12 11:11:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,7 +178,7 @@ static struct in6_addrpolicy *match_addrsel_policy __P((struct sockaddr_in6 *));
 } while(0)
 
 struct in6_addr *
-in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
+in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
@@ -187,6 +187,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #else
 	struct route_in6 *ro;
 #endif
+	struct ifnet **ifpp;
 	struct in6_addr *laddr;
 	int *errorp;
 {
@@ -206,6 +207,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
+	if (ifpp)
+		*ifpp = NULL;
 
 	/*
 	 * If the source address is explicitly specified by the caller,
@@ -256,6 +259,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			return(NULL);
 		}
 		pi->ipi6_addr = srcsock.sin6_addr; /* XXX: this overrides pi */
+		if (*ifpp)
+			*ifpp = ifp;
 		return(&pi->ipi6_addr);
 	}
 
@@ -575,7 +580,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		*errorp = EADDRNOTAVAIL;
 		return(NULL);
 	}
-	
+
+	if (ifpp)
+		*ifpp = ifp;
 	return(&ia->ia_addr.sin6_addr);
 }
 #undef REPLACE

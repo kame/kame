@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.46 2001/11/12 07:41:12 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.47 2001/11/12 11:11:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -290,10 +290,17 @@ udp6_output(in6p, m, addr6, control)
 		}
 
 		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
+			struct ifnet *ifp = NULL;
+
 			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
 					      in6p->in6p_moptions,
 					      &in6p->in6p_route,
-					      &in6p->in6p_laddr, &error);
+					      &in6p->in6p_laddr, &ifp, &error);
+
+			if (ifp && sin6->sin6_scope_id == 0 &&
+			    (error = scope6_setzoneid(ifp, sin6)) != 0) {
+				goto release;
+			}
 		} else {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 			struct in6_addr laddr_mapped; /* XXX ugly */

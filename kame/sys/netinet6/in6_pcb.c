@@ -415,18 +415,17 @@ in6_pcbconnect(in6p, nam)
 	} else
 #endif
 	{
-		/*
-		 * XXX: in6_selectsrc might replace the bound local address
-		 * with the address specified by setsockopt(IPV6_PKTINFO).
-		 * Is it the intended behavior?
-		 */
 		in6a = in6_selectsrc(sin6, in6p->in6p_outputopts,
 				     in6p->in6p_moptions,
 				     &in6p->in6p_route,
-				     &in6p->in6p_laddr, &error);
+				     &in6p->in6p_laddr, &ifp, &error);
 		if (in6a == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
+			return(error);
+		}
+		if (ifp && sin6->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(ifp, sin6)) != 0) { /* XXX */
 			return(error);
 		}
 	}

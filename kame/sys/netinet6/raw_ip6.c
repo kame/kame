@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.98 2001/11/12 09:00:03 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.99 2001/11/12 11:11:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -520,7 +520,6 @@ rip6_output(m, va_alist)
 	/* KAME hack: embed scopeid */
 	if ((error = in6_embedscope(dst, dstsock)) != 0)
 		goto bad;
-	ip6->ip6_dst = *dst;
 
 	/*
 	 * Source address selection.
@@ -531,14 +530,18 @@ rip6_output(m, va_alist)
 		if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
 					  in6p->in6p_moptions,
 					  &in6p->in6p_route,
-					  &in6p->in6p_laddr,
+					  &in6p->in6p_laddr, &oifp,
 					  &error)) == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			goto bad;
 		}
 		ip6->ip6_src = *in6a;
-		if (in6p->in6p_route.ro_rt) {
+		if (oifp && dstsock->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
+			goto bad;
+		}
+		if (oifp == NULL && in6p->in6p_route.ro_rt) {
 			/* what if oifp contradicts ? */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 			oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
@@ -548,6 +551,7 @@ rip6_output(m, va_alist)
 		}
 	}
 
+	ip6->ip6_dst = *dst;
 	ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	ip6->ip6_vfc  &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc  |= IPV6_VERSION;
@@ -877,10 +881,11 @@ rip6_usrreq(so, req, m, nam, control, p)
 	    }
 
 	case PRU_CONNECT:
-	    {
+	{
 		struct sockaddr_in6 *addr = mtod(nam, struct sockaddr_in6 *);
 		struct in6_addr *in6a = NULL;
 		struct sockaddr_in6 sin6;
+		struct ifnet *ifp;
 
 		if (nam->m_len != sizeof(*addr)) {
 			error = EINVAL;
@@ -910,26 +915,27 @@ rip6_usrreq(so, req, m, nam, control, p)
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&addr->sin6_addr, addr) != 0)
 			return EINVAL;
-#ifndef SCOPEDROUTING
-		addr->sin6_scope_id = 0;
-#endif
 
 		/* Source address selection. XXX: need pcblookup? */
 		in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
 				     in6p->in6p_moptions,
 				     &in6p->in6p_route,
-				     &in6p->in6p_laddr,
+				     &in6p->in6p_laddr, &ifp,
 				     &error);
 		if (in6a == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			break;
 		}
+		if (ifp && addr->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(ifp, addr)) != 0) { /* XXX */
+			break;
+		}
 		in6p->in6p_laddr = *in6a;
 		in6p->in6p_faddr = addr->sin6_addr;
 		soisconnected(so);
 		break;
-	    }
+	}
 
 	case PRU_CONNECT2:
 		error = EOPNOTSUPP;

@@ -350,13 +350,6 @@ rip6_output(m, so, dstsock, control)
 	if ((error = in6_embedscope(dst, dstsock)) != 0)
 		goto bad;
 
-	ip6->ip6_dst = *dst;
-
-	/*
-	 * Next header might not be ICMP6 but use its pseudo header anyway.
-	 */
-	ip6->ip6_dst = *dst;
-
 	/*
 	 * Source address selection.
 	 */
@@ -366,16 +359,23 @@ rip6_output(m, so, dstsock, control)
 		if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
 					  in6p->in6p_moptions,
 					  &in6p->in6p_route,
-					  &in6p->in6p_laddr,
+					  &in6p->in6p_laddr, &oifp,
 					  &error)) == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			goto bad;
 		}
 		ip6->ip6_src = *in6a;
-		if (in6p->in6p_route.ro_rt)
+
+		if (oifp && dstsock->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
+			goto bad;
+		}
+		if (oifp == NULL && in6p->in6p_route.ro_rt)
 			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
 	}
+
+	ip6->ip6_dst = *dst;
 	ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
 		(in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK);
 	ip6->ip6_vfc = (ip6->ip6_vfc & ~IPV6_VERSION_MASK) |
@@ -424,6 +424,7 @@ rip6_output(m, so, dstsock, control)
 	if (in6p->in6p_flags & IN6P_MINMTU)
 		flags |= IPV6_MINMTU;
 
+	oifp = NULL;		/* just in case */
 	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, flags,
 			   in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
@@ -617,6 +618,7 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	struct inpcb *inp = sotoinpcb(so);
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct in6_addr *in6a = NULL;
+	struct ifnet *ifp = NULL;
 	int error = 0;
 
 	if (nam->sa_len != sizeof(*addr))
@@ -635,9 +637,15 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	/* Source address selection. XXX: need pcblookup? */
 	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
 			     inp->in6p_moptions, &inp->in6p_route,
-			     &inp->in6p_laddr, &error);
+			     &inp->in6p_laddr, &ifp, &error);
 	if (in6a == NULL)
 		return (error ? error : EADDRNOTAVAIL);
+
+	/* see above */
+	if (ifp && addr->sin6_scope_id == 0 &&
+	    (error = scope6_setzoneid(ifp, addr)) != 0) { /* XXX */
+		return(error);
+	}
 	inp->in6p_laddr = *in6a;
 	inp->in6p_faddr = addr->sin6_addr;
 	soisconnected(so);
