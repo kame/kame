@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.121 2000/06/09 06:47:08 sakane Exp $	*/
+/*	$KAME: key.c,v 1.122 2000/06/10 06:39:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -328,12 +328,12 @@ do { \
  * set parameters into secasindex buffer.
  * Must allocate secasindex buffer before calling this function.
  */
-#define KEY_SETSECASIDX(p, m, s, d, idx) \
+#define KEY_SETSECASIDX(p, m, r, s, d, idx) \
 do { \
 	bzero((idx), sizeof(struct secasindex));                             \
 	(idx)->proto = (p);                                                  \
-	(idx)->mode = (m)->sadb_msg_mode;                                    \
-	(idx)->reqid = (m)->sadb_msg_reqid;                                  \
+	(idx)->mode = (m);                                                   \
+	(idx)->reqid = (r);                  ;                               \
 	bcopy((s), &(idx)->src, ((struct sockaddr *)(s))->sa_len);           \
 	bcopy((d), &(idx)->dst, ((struct sockaddr *)(d))->sa_len);           \
 } while (0)
@@ -388,13 +388,14 @@ static int key_setsaval __P((struct secasvar *, struct mbuf *,
 static int key_mature __P((struct secasvar *));
 static struct mbuf *key_setdumpsa __P((struct secasvar *, u_int8_t,
 	u_int8_t, u_int32_t, u_int32_t));
-static struct mbuf *key_setsadbmsg __P((u_int8_t, int, u_int8_t,
-	u_int32_t, pid_t, u_int8_t, u_int32_t, u_int8_t, u_int32_t));
+static struct mbuf *key_setsadbmsg __P((u_int8_t, u_int16_t, u_int8_t,
+	u_int32_t, pid_t, u_int16_t));
 static struct mbuf *key_setsadbsa __P((struct secasvar *));
 static struct mbuf *key_setsadbaddr __P((u_int16_t,
 	struct sockaddr *, u_int8_t, u_int16_t));
 static struct mbuf *key_setsadbident __P((u_int16_t, u_int16_t, caddr_t,
 	int, u_int64_t));
+static struct mbuf *key_setsadbxsa2(u_int8_t, u_int32_t);
 static struct mbuf *key_setsadbxpolicy __P((u_int16_t, u_int8_t,
 	u_int32_t));
 static void *key_newbuf __P((const void *, u_int));
@@ -2095,7 +2096,7 @@ key_spdacquire(sp)
 	}
 
 	/* create new sadb_msg to reply. */
-	m = key_setsadbmsg(SADB_X_SPDACQUIRE, 0, 0, 0, 0, 0, 0, 0, 0);
+	m = key_setsadbmsg(SADB_X_SPDACQUIRE, 0, 0, 0, 0, 0);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
@@ -2253,8 +2254,7 @@ key_setdumpsp(sp, type, seq, pid)
 {
 	struct mbuf *result = NULL, *m;
 
-	m = key_setsadbmsg(type, 0, SADB_SATYPE_UNSPEC, seq, pid,
-	    IPSEC_MODE_ANY, 0, 0, sp->refcnt);
+	m = key_setsadbmsg(type, 0, SADB_SATYPE_UNSPEC, seq, pid, sp->refcnt);
 	if (!m)
 		goto fail;
 	result = m;
@@ -3236,25 +3236,32 @@ key_setdumpsa(sav, type, satype, seq, pid)
 	int i;
 	void *p;
 	int dumporder[] = {
-		SADB_EXT_SA, SADB_EXT_LIFETIME_HARD, SADB_EXT_LIFETIME_SOFT,
+		SADB_EXT_SA, SADB_X_EXT_SA2,
+		SADB_EXT_LIFETIME_HARD, SADB_EXT_LIFETIME_SOFT,
 		SADB_EXT_LIFETIME_CURRENT, SADB_EXT_ADDRESS_SRC,
 		SADB_EXT_ADDRESS_DST, SADB_EXT_ADDRESS_PROXY, SADB_EXT_KEY_AUTH,
 		SADB_EXT_KEY_ENCRYPT, SADB_EXT_IDENTITY_SRC,
 		SADB_EXT_IDENTITY_DST, SADB_EXT_SENSITIVITY,
 	};
 
-	m = key_setsadbmsg(type, 0, satype, seq, pid, sav->sah->saidx.mode,
-	    sav->sah->saidx.reqid, 0, sav->refcnt);
+	m = key_setsadbmsg(type, 0, satype, seq, pid, sav->refcnt);
 	if (m == NULL)
 		goto fail;
 	result = m;
 
-	for (i = sizeof(dumporder)/sizeof(dumporder[0]) - 1; i >= 0; i--) {
+	for (i = SADB_EXT_MAX; i >= 0; i--) {
 		m = NULL;
 		p = NULL;
-		switch (i) {
+		switch (dumporder[i]) {
 		case SADB_EXT_SA:
 			m = key_setsadbsa(sav);
+			if (!m)
+				goto fail;
+			break;
+
+		case SADB_X_EXT_SA2:
+			m = key_setsadbxsa2(sav->sah->saidx.mode,
+					sav->sah->saidx.reqid);
 			if (!m)
 				goto fail;
 			break;
@@ -3367,16 +3374,12 @@ fail:
  * set data into sadb_msg.
  */
 static struct mbuf *
-key_setsadbmsg(type, tlen, satype, seq, pid, mode, reqid,
-		reserved1, reserved2)
+key_setsadbmsg(type, tlen, satype, seq, pid, reserved)
 	u_int8_t type, satype;
 	u_int16_t tlen;
 	u_int32_t seq;
 	pid_t pid;
-	u_int8_t mode;
-	u_int32_t reqid;
-	u_int8_t reserved1;
-	u_int32_t reserved2;
+	u_int16_t reserved;
 {
 	struct mbuf *m;
 	struct sadb_msg *p;
@@ -3406,12 +3409,9 @@ key_setsadbmsg(type, tlen, satype, seq, pid, mode, reqid,
 	p->sadb_msg_errno = 0;
 	p->sadb_msg_satype = satype;
 	p->sadb_msg_len = PFKEY_UNIT64(tlen);
-	p->sadb_msg_mode = mode;
-	p->sadb_msg_reserved1 = reserved1;
+	p->sadb_msg_reserved = reserved;
 	p->sadb_msg_seq = seq;
 	p->sadb_msg_pid = (u_int32_t)pid;
-	p->sadb_msg_reqid = reqid;
-	p->sadb_msg_reserved2 = reserved2;
 
 	return m;
 }
@@ -3523,6 +3523,40 @@ key_setsadbident(exttype, idtype, string, stringlen, id)
 	bcopy(string,
 	    mtod(m, caddr_t) + PFKEY_ALIGN8(sizeof(struct sadb_ident)),
 	    stringlen);
+
+	return m;
+}
+
+/*
+ * set data into sadb_x_sa2.
+ */
+static struct mbuf *
+key_setsadbxsa2(mode, reqid)
+	u_int8_t mode;
+	u_int32_t reqid;
+{
+	struct mbuf *m;
+	struct sadb_x_sa2 *p;
+	size_t len;
+
+	len = PFKEY_ALIGN8(sizeof(struct sadb_x_sa2));
+	m = key_alloc_mbuf(len);
+	if (!m || m->m_next) {	/*XXX*/
+		if (m)
+			m_freem(m);
+		return NULL;
+	}
+
+	p = mtod(m, struct sadb_x_sa2 *);
+
+	bzero(p, len);
+	p->sadb_x_sa2_len = PFKEY_UNIT64(len);
+	p->sadb_x_sa2_exttype = SADB_X_EXT_SA2;
+	p->sadb_x_sa2_mode = mode;
+	p->sadb_x_sa2_reserved1 = 0;
+	p->sadb_x_sa2_reserved2 = 0;
+	p->sadb_x_sa2_reserved3 = 0;
+	p->sadb_x_sa2_reqid = reqid;
 
 	return m;
 }
@@ -4340,6 +4374,8 @@ key_getspi(so, m, mhp)
 	struct secasvar *newsav;
 	u_int8_t proto;
 	u_int32_t spi;
+	u_int8_t mode;
+	u_int32_t reqid;
 	int error;
 
 	/* sanity check */
@@ -4359,6 +4395,13 @@ key_getspi(so, m, mhp)
 		printf("key_getspi: invalid message is passed.\n");
 #endif
 		return key_senderror(so, m, EINVAL);
+	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
+	} else {
+		mode = IPSEC_MODE_ANY;
+		reqid = 0;
 	}
 
 	src0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_SRC]);
@@ -4407,7 +4450,7 @@ key_getspi(so, m, mhp)
 	}
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
 
 	/* SPI allocation */
 	spi = key_do_getnewspi((struct sadb_spirange *)mhp->ext[SADB_EXT_SPIRANGE],
@@ -4618,6 +4661,8 @@ key_update(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int16_t proto;
+	u_int8_t mode;
+	u_int32_t reqid;
 	int error;
 
 	/* sanity check */
@@ -4656,6 +4701,13 @@ key_update(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
+	} else {
+		mode = IPSEC_MODE_ANY;
+		reqid = 0;
+	}
 	/* XXX boundary checking for other extensions */
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
@@ -4663,7 +4715,7 @@ key_update(so, m, mhp)
 	dst0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_DST]);
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
@@ -4819,6 +4871,8 @@ key_add(so, m, mhp)
 	struct secashead *newsah;
 	struct secasvar *newsav;
 	u_int16_t proto;
+	u_int8_t mode;
+	u_int32_t reqid;
 	int error;
 
 	/* sanity check */
@@ -4858,13 +4912,20 @@ key_add(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
+	} else {
+		mode = IPSEC_MODE_ANY;
+		reqid = 0;
+	}
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mhp->msg, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	if ((newsah = key_getsah(&saidx)) == NULL) {
@@ -5069,6 +5130,8 @@ key_delete(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int16_t proto;
+	u_int8_t mode;
+	u_int32_t reqid;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -5098,13 +5161,20 @@ key_delete(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
+	} else {
+		mode = IPSEC_MODE_ANY;
+		reqid = 0;
+	}
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_DST]);
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
@@ -5175,6 +5245,8 @@ key_get(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int16_t proto;
+	u_int8_t mode;
+	u_int32_t reqid;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -5204,13 +5276,20 @@ key_get(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
+	} else {
+		mode = IPSEC_MODE_ANY;
+		reqid = 0;
+	}
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
@@ -5504,8 +5583,7 @@ key_acquire(saidx, sp)
 #else
 	seq = (acq_seq = (acq_seq == ~0 ? 1 : ++acq_seq));
 #endif
-	m = key_setsadbmsg(SADB_ACQUIRE, 0, satype, seq, 0, saidx->mode,
-	    saidx->reqid, 0, 0);
+	m = key_setsadbmsg(SADB_ACQUIRE, 0, satype, seq, 0, 0);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
@@ -5759,6 +5837,8 @@ key_acquire2(so, m, mhp)
 	struct secasindex saidx;
 	struct secashead *sah;
 	u_int16_t proto;
+	u_int8_t mode;
+	u_int32_t reqid;
 	int error;
 
 	/* sanity check */
@@ -5831,12 +5911,19 @@ key_acquire2(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
+	} else {
+		mode = IPSEC_MODE_ANY;
+		reqid = 0;
+	}
 
 	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mhp->msg, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA index */
 	if ((sah = key_getsah(&saidx)) != NULL) {
@@ -6093,8 +6180,7 @@ key_expire(sav)
 		panic("key_expire: invalid proto is passed.\n");
 
 	/* set msg header */
-	m = key_setsadbmsg(SADB_EXPIRE, 0, satype, sav->seq, 0,
-	    sav->sah->saidx.mode, sav->sah->saidx.reqid, 0, sav->refcnt);
+	m = key_setsadbmsg(SADB_EXPIRE, 0, satype, sav->seq, 0, sav->refcnt);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
@@ -6103,6 +6189,14 @@ key_expire(sav)
 
 	/* create SA extension */
 	m = key_setsadbsa(sav);
+	if (!m) {
+		error = ENOBUFS;
+		goto fail;
+	}
+	m_cat(result, m);
+
+	/* create SA extension */
+	m = key_setsadbxsa2(sav->sah->saidx.mode, sav->sah->saidx.reqid);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
@@ -6795,6 +6889,7 @@ key_align(m, mhp)
 		case SADB_EXT_SUPPORTED_ENCRYPT:
 		case SADB_EXT_SPIRANGE:
 		case SADB_X_EXT_POLICY:
+		case SADB_X_EXT_SA2:
 			/* duplicate check */
 			/*
 			 * XXX Are there duplication payloads of either

@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.19 2000/05/23 13:58:36 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.20 2000/06/10 06:39:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,7 @@ static void kdebug_sadb_lifetime __P((struct sadb_ext *));
 static void kdebug_sadb_sa __P((struct sadb_ext *));
 static void kdebug_sadb_address __P((struct sadb_ext *));
 static void kdebug_sadb_key __P((struct sadb_ext *));
+static void kdebug_sadb_x_sa2 __P((struct sadb_ext *));
 
 #ifdef _KERNEL
 static void kdebug_secreplay __P((struct secreplay *));
@@ -96,11 +97,9 @@ kdebug_sadb(base)
 	printf("sadb_msg{ version=%u type=%u errno=%u satype=%u\n",
 	    base->sadb_msg_version, base->sadb_msg_type,
 	    base->sadb_msg_errno, base->sadb_msg_satype);
-	printf("  len=%u mode=%u seq=%u pid=%u reqid=%u\n",
-	    base->sadb_msg_len, base->sadb_msg_mode,
-	    base->sadb_msg_seq, base->sadb_msg_pid, base->sadb_msg_reqid);
-	printf("  reserved1=%u reserved2=%u\n",
-	    base->sadb_msg_reserved1, base->sadb_msg_reserved2);
+	printf("  len=%u reserved=%u seq=%u pid=%u\n",
+	    base->sadb_msg_len, base->sadb_msg_reserved,
+	    base->sadb_msg_seq, base->sadb_msg_pid);
 
 	tlen = PFKEY_UNUNIT64(base->sadb_msg_len) - sizeof(struct sadb_msg);
 	ext = (struct sadb_ext *)((caddr_t)base + sizeof(struct sadb_msg));
@@ -154,6 +153,9 @@ kdebug_sadb(base)
 			break;
 		case SADB_X_EXT_POLICY:
 			kdebug_sadb_x_policy(ext);
+			break;
+		case SADB_X_EXT_SA2:
+			kdebug_sadb_x_sa2(ext);
 			break;
 		default:
 			printf("kdebug_sadb: invalid ext_type %u was passed.\n",
@@ -384,6 +386,25 @@ kdebug_sadb_key(ext)
 	ipsec_hexdump((caddr_t)key + sizeof(struct sadb_key),
 	              key->sadb_key_bits >> 3);
 	printf(" }\n");
+	return;
+}
+
+static void
+kdebug_sadb_x_sa2(ext)
+	struct sadb_ext *ext;
+{
+	struct sadb_x_sa2 *sa2 = (struct sadb_x_sa2 *)ext;
+
+	/* sanity check */
+	if (ext == NULL)
+		panic("kdebug_sadb_x_sa2: NULL pointer was passed.\n");
+
+	printf("sadb_x_sa2{ mode=%u reqid=%u\n",
+	    sa2->sadb_x_sa2_mode, sa2->sadb_x_sa2_reqid);
+	printf("  reserved1=%u reserved2=%u reserved3=%u }\n",
+	    sa2->sadb_x_sa2_reserved1, sa2->sadb_x_sa2_reserved1,
+	    sa2->sadb_x_sa2_reserved1);
+
 	return;
 }
 

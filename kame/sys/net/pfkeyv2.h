@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.15 2000/06/08 21:28:32 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.16 2000/06/10 06:39:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,13 +82,9 @@ struct sadb_msg {
   u_int8_t sadb_msg_errno;
   u_int8_t sadb_msg_satype;
   u_int16_t sadb_msg_len;
-  u_int8_t sadb_msg_mode;	/* XXX */
-  u_int8_t sadb_msg_reserved1;
+  u_int16_t sadb_msg_reserved;
   u_int32_t sadb_msg_seq;
   u_int32_t sadb_msg_pid;
-  u_int32_t sadb_msg_reqid;	/* XXX */
-  				/* when policy mng, value is zero. */
-  u_int32_t sadb_msg_reserved2;
 };
 
 struct sadb_ext {
@@ -213,6 +209,22 @@ struct sadb_x_kmprivate {
   u_int32_t sadb_x_kmprivate_reserved;
 };
 
+/*
+ * XXX Additional SA Extension.
+ * mode: tunnel or transport
+ * reqid: to make SA unique nevertheless the address pair of SA are same.
+ *        Mainly it's for VPN.
+ */
+struct sadb_x_sa2 {
+  u_int16_t sadb_x_sa2_len;
+  u_int16_t sadb_x_sa2_exttype;
+  u_int8_t sadb_x_sa2_mode;
+  u_int8_t sadb_x_sa2_reserved1;
+  u_int16_t sadb_x_sa2_reserved2;
+  u_int32_t sadb_x_sa2_reserved3;
+  u_int32_t sadb_x_sa2_reqid;
+};
+
 /* XXX Policy Extension */
 /* sizeof(struct sadb_x_policy) == 16 */
 struct sadb_x_policy {
@@ -272,7 +284,8 @@ struct sadb_x_ipsecrequest {
 #define SADB_EXT_SPIRANGE             16
 #define SADB_X_EXT_KMPRIVATE          17
 #define SADB_X_EXT_POLICY             18
-#define SADB_EXT_MAX                  18
+#define SADB_X_EXT_SA2                19
+#define SADB_EXT_MAX                  19
 
 #define SADB_SATYPE_UNSPEC	0
 #define SADB_SATYPE_AH		2
