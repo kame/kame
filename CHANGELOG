@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1246 2000/08/31 11:04:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1247 2000/08/31 17:33:15 itojun Exp $
 
 <200008>
+Fri Sep  1 02:30:02 JST 2000  itojun@iijlab.net
+	* netbsd/lib/libinet6/getaddrinfo.c: on /etc/hosts lookup, set
+	  "official host name" (the leftmost hostname) into ai_canonname.
+	  this is to synchronize with practice in gethostby*.
+	  comment from ume.
+	* sys/crypto: repair behavior on LP64 architecture.  blowfish and
+	  des did not work at all (or behave strange), due to issues in SSLeay.
+	* kame/racoon: allow comment line in pre-shared key setting.
+
 Thu Aug 31 20:04:27 JST 2000  itojun@iijlab.net
 	* freebsd2/ports/sendmail.beta: upgrade to 8.11.0.
 
