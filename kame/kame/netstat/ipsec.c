@@ -97,6 +97,9 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #ifdef __bsdi__
 #define plural(x)	PLURAL(x)
 #endif
+/*
+ * XXX see PORTABILITY for the twist
+ */
 #ifdef __FreeBSD__
 #define LLU	"%qu"
 #define CAST	u_quad_t
