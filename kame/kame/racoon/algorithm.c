@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.26 2003/06/27 11:47:06 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.27 2003/06/27 12:02:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,7 +189,6 @@ static struct hmac_algorithm ipsec_hmacdef[] = {
 		NULL,			NULL,
 		NULL,			eay_null_hashlen,
 		NULL, },
-#if defined(WITH_SHA2)
 { "hmac_sha2_256",	algtype_hmac_sha2_256,	IPSECDOI_ATTR_SHA2_256,
 		NULL,			NULL,
 		NULL,			eay_sha2_256_hashlen,
@@ -202,7 +201,6 @@ static struct hmac_algorithm ipsec_hmacdef[] = {
 		NULL,			NULL,
 		NULL,			eay_sha2_512_hashlen,
 		NULL, },
-#endif
 };
 
 static struct misc_algorithm ipsec_compdef[] = {

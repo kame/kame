@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.74 2003/06/27 11:47:06 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.75 2003/06/27 12:02:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,9 +82,7 @@
 #ifdef HAVE_OPENSSL_SHA2_H
 #include <openssl/sha2.h>
 #else
-#if defined(WITH_SHA2)
 #include "crypto/sha2/sha2.h"
-#endif
 #endif
 
 #include "var.h"
@@ -1854,6 +1852,7 @@ eay_sha2_512_one(data)
 
 	return(res);
 }
+#endif
 
 int
 eay_sha2_512_hashlen()
@@ -1861,6 +1860,7 @@ eay_sha2_512_hashlen()
 	return SHA512_DIGEST_LENGTH << 3;
 }
 
+#if defined(WITH_SHA2)
 /*
  * SHA2-384 functions
  */
@@ -1912,6 +1912,7 @@ eay_sha2_384_one(data)
 
 	return(res);
 }
+#endif
 
 int
 eay_sha2_384_hashlen()
@@ -1919,6 +1920,7 @@ eay_sha2_384_hashlen()
 	return SHA384_DIGEST_LENGTH << 3;
 }
 
+#if defined(WITH_SHA2)
 /*
  * SHA2-256 functions
  */
@@ -1970,13 +1972,13 @@ eay_sha2_256_one(data)
 
 	return(res);
 }
+#endif
 
 int
 eay_sha2_256_hashlen()
 {
 	return SHA256_DIGEST_LENGTH << 3;
 }
-#endif	/* WITH_SHA2 */
 
 /*
  * SHA functions
