@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.24 1999/12/05 01:56:42 luoqi Exp $
-# $Id: GENERIC.v6,v 1.8 1999/12/27 09:14:43 sumikawa Exp $
+# $Id: GENERIC.v6,v 1.9 1999/12/28 05:12:08 sumikawa Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -83,8 +83,8 @@ options 	ALTQ		#alternate queueing
 #options 	PM_USE_SOCKET		# Use socket instead of ioctl.
 #options 	PMDEBUG			# Enable debug feature.
 
-# Protocol Translator
-#options	PTR
+# Network Address Translation - Protocol Translation (NAT-PT)
+#options 	NATPT
 
 options 	FFS			#Berkeley Fast Filesystem
 options 	FFS_ROOT		#FFS usable as root device [keep this!]

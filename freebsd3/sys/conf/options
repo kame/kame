@@ -280,7 +280,7 @@ PM			opt_pm.h
 PM_USE_SOCKET		opt_pm.h
 PMDEBUG			opt_pm.h
 
-PTR			opt_ptr.h
+NATPT			opt_natpt.h
 
 # Netgraph(4). Use option NETGRAPH to enable the base netgraph code.
 # Each netgraph node type can be either be compiled into the kernel

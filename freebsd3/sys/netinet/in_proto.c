@@ -67,7 +67,7 @@
 #include "opt_ipx.h"
 #include "opt_inet.h"
 #include "opt_pm.h"
-#include "opt_ptr.h"
+#include "opt_natpt.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>

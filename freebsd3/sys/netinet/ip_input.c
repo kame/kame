@@ -74,7 +74,7 @@
 #include "opt_inet.h"
 #include "opt_ipstealth.h"
 #include "opt_pm.h"
-#include "opt_ptr.h"
+#include "opt_natpt.h"
 
 #include <stddef.h>
 
