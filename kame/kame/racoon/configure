@@ -2763,7 +2763,6 @@ else
 	sysconfdir_x=`echo $sysconfdir | sed -e 's,${prefix},'"$prefix,"`
 
 fi
-echo $sysconfdir_x
 
 
 trap '' 1 2 15

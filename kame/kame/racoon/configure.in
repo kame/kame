@@ -481,7 +481,6 @@ else
 	sysconfdir_x=`echo $sysconfdir | sed -e 's,${prefix},'"$prefix,"`
 
 fi
-echo $sysconfdir_x
 AC_SUBST(sysconfdir_x)
 
 AC_OUTPUT(Makefile samples/basic.conf samples/policy.conf samples/psk.txt
