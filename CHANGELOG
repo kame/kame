@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1387 2000/11/12 06:43:09 itojun Exp $
+$KAME: CHANGELOG,v 1.1388 2000/11/12 19:32:22 sumikawa Exp $
 
 <200011>
+Mon Nov 13 04:28:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/ncftp3: upgrade to 3.0.2
+
 Sun Nov 12 15:40:29 JST 2000  itojun@iijlab.net
 	* bsdi4/libexec/ftpd/ftpd.c: update LPSV/EPSV result code to conform
 	  RFC2428.
