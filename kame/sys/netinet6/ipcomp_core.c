@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.25 2001/07/26 06:53:17 jinmei Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.26 2002/03/14 05:18:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -253,14 +253,17 @@ do { \
 			MOREBLOCK();
 		}
 
-		zerror = mode ? inflate(&zs, Z_FINISH)
+		zerror = mode ? inflate(&zs, Z_SYNC_FLUSH)
 			      : deflate(&zs, Z_FINISH);
 
 		if (zerror == Z_STREAM_END)
 			break;
-		else if (zerror == Z_OK)
-			; /* once more. */
-		else {
+		else if (zerror == Z_OK) {
+			if (mode && zs.avail_out != 0)
+				goto terminate;
+			else
+				; /* once more. */
+		} else {
 			if (zs.msg) {
 				ipseclog((LOG_ERR, "ipcomp_%scompress: "
 				    "%sflate(Z_FINISH): %s\n",
