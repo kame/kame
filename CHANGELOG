@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.826 2000/04/27 09:53:33 jinmei Exp $
+$Id: CHANGELOG,v 1.827 2000/04/27 10:00:03 jinmei Exp $
 
 <200004>
+2000-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/udp_usrreq.c: removed udp6_output() to use a
+	shared version defined in netinet6/udp6_output().
+
 2000-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4, openbsd}/sys/netinet/in_pcb.c (in_pcbnotify):
 	* openbsd/sys/netinet/in_pcb.c (in_pcbnotifyall): 
