@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.43 2003/02/19 07:21:31 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.44 2003/03/28 09:54:32 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1145,9 +1145,17 @@ hif_output(ifp, m, dst, rt)
 	mip6stat.mip6s_orevtunnel++;
 #ifdef IPV6_MINMTU
 	/* XXX */
-	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp));
+	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+			   , NULL
+#endif
+			  ));
 #else
-	return (ip6_output(m, 0, 0, 0, 0, &ifp));
+	return (ip6_output(m, 0, 0, 0, 0, &ifp
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+			   , NULL
+#endif
+			  ));
 #endif
  done:
 	m_freem(m);
