@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.254 2001/12/21 07:40:06 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.255 2001/12/21 07:44:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2975,6 +2975,9 @@ do { \
 	return(error);
 }
 
+#ifndef offsetof
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int
 ip6_raw_ctloutput(so, sopt)
@@ -2991,7 +2994,11 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 {
 	int error = 0, optval, optlen;
 	const int icmp6off = offsetof(struct icmp6_hdr, icmp6_cksum);
+#ifdef HAVE_NRL_INPCB
+	struct inpcb *inp = sotoinpcb(so);
+#else
 	struct in6pcb *in6p = sotoin6pcb(so);
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	int level, op, optname;
 	struct proc *p;
@@ -3031,7 +3038,6 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		 * for an ICMPv6 socket will fail."
 		 * The current behavior does not meet 2292bis.
 		 */
-		in6p = sotoin6pcb(so);
 		switch (op) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		case SOPT_SET:
