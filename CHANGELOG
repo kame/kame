@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1735 2001/06/20 12:50:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.1736 2001/06/20 12:53:04 jinmei Exp $
 
 <200106>
+2001-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/(several files): removed IPV6_USE_MTU related
+	parts.  It was introduced as an experimental workaround on
+	2000-11-28 (see CHANGELOG.2000), but we've found we do not need
+	this stuff through further discussion (and implementation changes
+	on the path MTU discovery procedure).
+
 2001-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_reflect): set IPV6_MINMTU to
 	avoid path MTU discovery for reflected packets.
