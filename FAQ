@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.65 2001/09/26 09:08:18 itojun Exp $
+$KAME: FAQ,v 1.66 2001/09/26 09:09:23 itojun Exp $
 
 
 GENERAL
@@ -204,11 +204,11 @@ kernel.
 	however).
 
 Q: Why do link-local addresses in the kernel structure have
-s6_addr16[1] filled?
+s6_addr[2] and s6_addr[3] filled?
 	Due to the "scoped address" design in the IPv6 spec, the
 	kernel must treat link-local addresses in a special manner.
 	Link-local address has to be memorized with the incoming
-	interface.  KAME uses s6_addr16[1] to keep the interface index
+	interface.  KAME uses s6_addr[2-3] to keep the interface index
 	(ifp->if_index) in the kernel structure.
 
 	Note that this is only for internal kernel structures.
