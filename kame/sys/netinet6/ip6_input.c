@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.277 2002/05/27 21:40:31 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.278 2002/05/28 10:24:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,7 +240,7 @@ ip6_init()
 {
 	struct ip6protosw *pr;
 	int i;
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 	struct timeval tv;
 #endif
 
@@ -276,7 +276,7 @@ ip6_init()
 	ip6_fw_init();
 #endif
 #endif
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 	/*
 	 * in many cases, random() here does NOT return random number
 	 * as initialization during bootstrap time occur in fixed order.

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.163 2002/05/27 05:49:09 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.164 2002/05/28 10:24:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,7 +219,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	MD5_CTX ctxt;
 	u_int8_t seed[16], digest[16], nullbuf[8];
 	u_int32_t val32;
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 	struct timeval tv;
 #endif
 	/*
@@ -238,7 +238,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 		int i;
 
 		for (i = 0; i < 2; i++) {
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 			microtime(&tv);
 			val32 = random() ^ tv.tv_usec;
 #else

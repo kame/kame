@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.40 2002/05/27 21:40:31 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.41 2002/05/28 10:24:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,7 +155,7 @@ MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
 void
 frag6_init()
 {
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 	struct timeval tv;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4

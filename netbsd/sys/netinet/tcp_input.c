@@ -2821,8 +2821,8 @@ syn_cache_insert(sc, tp)
 	if (syn_cache_count == 0) {
 		struct timeval tv;
 		microtime(&tv);
-		syn_hash1 = random() ^ (u_long)&sc;
-		syn_hash2 = random() ^ tv.tv_usec;
+		syn_hash1 = arc4random() ^ (u_long)&sc;
+		syn_hash2 = arc4random() ^ tv.tv_usec;
 	}
 
 	SYN_HASHALL(sc->sc_hash, &sc->sc_src.sa, &sc->sc_dst.sa);

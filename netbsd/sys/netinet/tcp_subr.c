@@ -1799,7 +1799,7 @@ tcp_new_iss(tp, len, addin)
 #if NRND > 0
 	rnd_extract_data(&tcp_iss, sizeof(tcp_iss), RND_EXTRACT_ANY);
 #else
-	tcp_iss = random();
+	tcp_iss = arc4random();
 #endif
 
 	/*
