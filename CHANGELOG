@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1864 2001/09/05 03:22:56 itojun Exp $
+$KAME: CHANGELOG,v 1.1865 2001/09/05 10:24:35 jinmei Exp $
 
 <200109>
+2001-09-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/contrib/bind/src/lib/resolv/res_send.c (res_nsend):
+	* kame/kame/libinet6/resolv/res_send.c (res_send):
+	when "insecure1" is specified, do not connect datagram sockets,
+	so that the kernel can accept responses from an "unknown" server.
+
 2001-09-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_sysctl): (bsdi4 only) made
 	net.inet[6].ip6.v6only modifiable.
