@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2589 2004/04/13 12:53:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2590 2004/04/15 01:36:22 suz Exp $
 
 <200404>
+2004-04-15  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet/icmp6.h: ICMPv6 Type number of MLDv2-Listener-
+	REPORT has been changed to the official one (=143)! 
+
 2004-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): clean-up:
 	removed the definition of the AI_V4MAPPED and AI_ALL flags (when

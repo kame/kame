@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.91 2004/03/10 13:50:07 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.92 2004/04/15 01:36:22 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -169,6 +169,7 @@ struct icmp6_hdr {
 /* The belows are not yet defined in 2292bis. They will be renamed */
 #define IND_SOLICIT			141	/* inverse neighbor solicitation */
 #define IND_ADVERT			142	/* inverse neighbor advertisement */
+#define MLDV2_LISTENER_REPORT		143	/* MLDv2 report */
 
 /* Folloing numbers are defined in the mobile-ip draft. */
 #define MIP6_HA_DISCOVERY_REQUEST	144	/* home agent address discovery request */
@@ -180,15 +181,14 @@ struct icmp6_hdr {
 #define MLD_MTRACE_RESP			200	/* mtrace resp (to sender) */
 #define MLD_MTRACE			201	/* mtrace messages */
 
-#define MLDV2_LISTENER_REPORT		206	/* MLDv2 report */
-
+/* backward compatibility for applications using old macro names */
 #ifndef _KERNEL
 #define MLD6_MTRACE_RESP	MLD_MTRACE_RESP
 #define MLD6_MTRACE		MLD_MTRACE
 #define MLD6V2_LISTENER_REPORT	MLDV2_LISTENER_REPORT
 #endif
 
-#define ICMP6_MAXTYPE			206
+#define ICMP6_MAXTYPE			201
 
 #define ICMP6_DST_UNREACH_NOROUTE	0	/* no route to destination */
 #define ICMP6_DST_UNREACH_ADMIN	 	1	/* administratively prohibited */
