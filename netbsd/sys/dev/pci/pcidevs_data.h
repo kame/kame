@@ -4,7 +4,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.113.2.1 1999/04/13 22:52:42 jonathan Exp 
+ *	NetBSD: pcidevs,v 1.113.2.2 1999/06/22 17:13:57 perry Exp 
  */
 
 /*
@@ -98,6 +98,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "3Com",
 	    "3c900B-COMBO Ethernet",
+	},
+	{
+	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C900BTPC,
+	    0,
+	    "3Com",
+	    "3c900B-TPC Ethernet",
 	},
 	{
 	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C905BTX,
