@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.85 2003/07/20 11:10:01 suz Exp $	*/
+/*	$KAME: common.c,v 1.86 2003/07/20 11:13:20 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1097,7 +1097,7 @@ dhcp6_get_options(p, ep, optinfo)
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
 				if (dhcp6_find_listval(&optinfo->dns_list,
-				    DHCP6_LISTVAL_ADDR6, &num, 0)) {
+				    DHCP6_LISTVAL_ADDR6, val, 0)) {
 					dprintf(LOG_INFO, FNAME, "duplicated "
 					    "DNS address (%s)",
 					    in6addr2str((struct in6_addr *)val,
