@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.46 2001/06/28 01:47:45 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.47 2001/06/28 01:51:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -109,7 +109,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.46 2001/06/28 01:47:45 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.47 2001/06/28 01:51:25 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -441,7 +441,7 @@ test(t1, t2)
 #ifdef IPV6_V6ONLY
 	if (a->ai_family == AF_INET6 &&
 	    setsockopt(sa, IPPROTO_IPV6, IPV6_V6ONLY, &v6only,
-		       sizeof(yes)) < 0) {
+		       sizeof(v6only)) < 0) {
 		if (!summary)
 			printf("\tfailed setsockopt(IPV6_V6ONLY, %d) "
 			       "for %s, %s\n", v6only, printres(a),
@@ -452,7 +452,7 @@ test(t1, t2)
 	}
 	if (b->ai_family == AF_INET6 &&
 	    setsockopt(sb, IPPROTO_IPV6, IPV6_V6ONLY, &v6only,
-		       sizeof(yes)) < 0) {
+		       sizeof(v6only)) < 0) {
 		if (!summary)
 			printf("\tfailed setsockopt(IPV6_V6ONLY, %d) "
 			       "for %s, %s\n", v6only, printres(b),
