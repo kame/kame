@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/05 10:02:28 $
+			$Date: 1999/10/07 00:49:27 $
 
 1. IPv6
 
@@ -79,11 +79,11 @@ RFC2553: Basic Socket Interface Extensions for IPv6
       see 1.12 in this document for details.
 RFC2675: IPv6 Jumbograms
     * See 1.7 in this document for details.
-draft-ietf-ipngwg-ipv6router-alert-04: IPv6 router alert option
+RFC2710: Multicast Listener Discovery for IPv6
+RFC2711: IPv6 router alert option
 draft-ietf-ipngwg-router-renum-08: Router renumbering for IPv6
 draft-ietf-ipngwg-icmp-namelookups-02: IPv6 Name Lookups Through ICMP
 draft-ietf-ipngwg-icmp-name-lookups-03: IPv6 Name Lookups Through ICMP
-draft-ietf-ipngwg-mld-01: Multicast Listener Discovery for IPv6
 draft-ietf-pim-ipv6-01.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
 draft-ietf-dhc-dhcpv6-14.txt: DHCPv6
