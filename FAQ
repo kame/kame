@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.31 2001/07/13 05:47:15 itojun Exp $
+$KAME: FAQ,v 1.32 2001/07/13 05:49:49 itojun Exp $
 
 
 GENERAL
@@ -8,8 +8,8 @@ Q: What is the KAME project?
 	The KAME Project is a joint effort to create single solid software set,
 	especially targeted at IPv6/IPsec.  Talented researchers from several
 	Japanese major companies joined the project.  This joint effort will
-	avoid unnecessary duplicated development in the same area, and effectively
-	provides a high quality, advanced featured package. 
+	avoid unnecessary duplicated development in the same area, and
+	effectively provides a high quality, advanced featured package. 
 
 	The project aims to revamp BSD sys/net* tree, and:
 
@@ -76,9 +76,9 @@ Q: Are there other documents/FAQ lists I may want to check?
 	- Depending on which BSD you are using, you will want to check the
 	  project webpages, like http://www.openbsd.org/,
 	  http://www.netbsd.org/, or http://www.freebsd.org/.
-	- If you are using a KAME patch kit (like weekly snap, not the integrated
-	  *BSD releases), you really need to go through all the documents
-	  shipped in tar.gz.
+	- If you are using a KAME patch kit (like weekly snap, not the
+	  integrated *BSD releases), you really need to go through all the
+	  documents shipped in tar.gz.
 	- http://www.kame.net/ has links to a set of good documents.
 	- http://www.ipv6.org/, and http://www.jp.ipv6.org/ (if you can read
 	  Japanese texts).
@@ -274,8 +274,8 @@ Q: IPv6 ping from other OSes does not seem to work.
 	addresses on multiple links.
 
 Q: How do I configure a IPv6-over-IPv4 tunnel?
-	The simplest way to do this is to configure outer IPv4 address only, by the
-	following command:
+	The simplest way to do this is to configure outer IPv4 address only, by
+	the following command:
 
 	hostA# gifconfig gif0 a.a.a.1 b.b.b.1
 
