@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.60 2001/08/11 08:58:39 jinmei Exp $
+	$KAME: README,v 1.61 2001/08/11 09:08:17 jinmei Exp $
 
 <<<Project Overview>>>
 
@@ -176,6 +176,7 @@ Current core members are:
 	 Shinsuke SUZUKI  Hitachi, Ltd.
 	  Shuichi KARINO  NEC Corporation
 	     Koji KAWANO  Matsushita Graphic Communication Systems, Inc.
+	   Noriyasu KATO  Toshiba Corporation
 	   Keiichi SHIMA  IIJ Research Laboratory
 
 Alumni of core members:
