@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.79 2000/11/29 15:55:27 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.80 2000/12/01 07:33:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,7 +219,9 @@ void
 nd6_setmtu(ifp)
 	struct ifnet *ifp;
 {
+#ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
 	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
 	u_long oldmaxmtu = ndi->maxmtu;
 	u_long oldlinkmtu = ndi->linkmtu;
