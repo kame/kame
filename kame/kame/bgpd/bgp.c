@@ -237,9 +237,10 @@ connect_try(struct rpcb *bnp)
 	     ((bnp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
 	     bnp->rp_as);
     } else {
+      syslog(LOG_NOTICE,
+	     "<%s>: <child>: connect failed for %s: %s", __FUNCTION__,
+	     bgp_peerstr(bnp), strerror(errno));
 #ifdef DEBUG
-      syslog(LOG_ERR, "<%s>: <child>: connect failed: %s", __FUNCTION__,
-	     strerror(errno));
       syslog(LOG_DEBUG, "\t\t\t by %s %s",
 	     ip6str(&bnp->rp_addr.sin6_addr, 0),
 	     (bnp->rp_mode & BGPO_IFSTATIC) ?
