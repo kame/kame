@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.14 2000/10/25 04:28:34 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.15 2000/10/25 04:30:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,7 +162,7 @@ if_getmtu(char *name)
 	}
 	freeifaddrs(ifap);
 
-#ifdef SIOCGIFMTU
+#ifdef SIOCGIFMTU		/* XXX: this ifdef may not be necessary */
 	if (mtu == 0) {
 		struct ifreq ifr;
 		int s;
