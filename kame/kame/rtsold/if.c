@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.22 2003/01/17 04:15:25 suz Exp $	*/
+/*	$KAME: if.c,v 1.23 2003/04/02 23:28:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -335,7 +335,7 @@ get_llflag(const char *name)
 		exit(1);
 	}
 	if (getifaddrs(&ifap) != 0) {
-		warnmsg(LOG_ERR, __func__, "etifaddrs: %s",
+		warnmsg(LOG_ERR, __func__, "getifaddrs: %s",
 		    strerror(errno));
 		exit(1);
 	}
