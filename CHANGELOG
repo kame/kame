@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1449 2000/12/22 13:16:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1450 2000/12/22 15:02:57 itojun Exp $
 
 <200012>
+Fri Dec 22 JST 2000
+	* traceroute6, ping6: revoke root privilege earlier.
+
 2000-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/pim6_proto.c: fixed typo in J/P message
 	handling.
