@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.9 2000/05/31 09:19:19 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.10 2000/05/31 09:24:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -86,7 +86,7 @@ main(argc, argv)
 	int i;
 	int ready4, ready6;
 
-	while ((ch = getopt(argc, argv, "46d:h:i:p:P:u:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46d:h:i:p:P:")) != EOF) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -116,12 +116,6 @@ main(argc, argv)
 			dstport = optarg;
 			mcastloop = 1;
 			break;
-		case 'u':
-			if (addserv(optarg) != 0) {
-				errx(1, "%s: failed to add it to db", optarg);
-				/*NOTREACHED*/
-			}
-			break;
 		default:
 			usage();
 			exit(1);
@@ -131,10 +125,17 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 0 || !intface) {
+	if (!intface) {
 		usage();
 		exit(1);
 		/*NOTREACHED*/
+	}
+	while (argc-- > 0) {
+		if (addserv(*argv) != 0) {
+			errx(1, "%s: failed to add it to db", *argv);
+			/*NOTREACHED*/
+		}
+		argv++;
 	}
 
 	srandom(time(NULL) ^ getpid());
@@ -201,7 +202,7 @@ usage()
 {
 	fprintf(stderr,
 "usage: mdnsd [-46D] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
-"             [-u userv] -i iface\n");
+"             -i iface [userv...]\n");
 }
 
 static int
