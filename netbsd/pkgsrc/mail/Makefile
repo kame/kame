@@ -6,6 +6,7 @@
 
     SUBDIR += fetchmail
     SUBDIR += qpopper
+    SUBDIR += sendmail.beta
     SUBDIR += sendmail6
 
 .include "../mk/bsd.pkg.subdir.mk"
