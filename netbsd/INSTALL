@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.5 1999/09/01 09:30:30 itojun Exp $
+$Id: INSTALL,v 1.6 1999/09/09 12:38:56 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -43,7 +43,7 @@ B-2. Make a kernel configuration file, and invoke "config CONFIGFILE".
 	% /usr/sbin/config CONFIGFILE
 
 B-3. Build the kernel.  The process will make kernel file named "netbsd".
-	% cd ../../compile/CONFIGFILE
+	% cd ../compile/CONFIGFILE
 	% make depend
 	% make
 
