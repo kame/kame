@@ -370,7 +370,18 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 94 */
 	cdev_notdef(),			/* 95 */
 	cdev__oci_init(NDPT,dpt),	/* 96: DPT/Adaptec RAID management */
-	cdev__oci_init(NPF,pf),		/* 97: PF packet filter */
+	cdev_notdef(),			/* 97 */
+	cdev_notdef(),			/* 98 */
+	cdev_notdef(),			/* 99 */
+	cdev_notdef(),			/* 100 */
+	cdev_notdef(),			/* 101 */
+	cdev_notdef(),			/* 102 */
+	cdev_notdef(),			/* 103 */
+	cdev_notdef(),			/* 104 */
+	cdev_notdef(),			/* 105 */
+	cdev_notdef(),			/* 106 */
+	cdev_notdef(),			/* 107 */
+	cdev__oci_init(NPF,pf),		/* 108: PF packet filter */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
