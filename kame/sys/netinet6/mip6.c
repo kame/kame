@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.79 2001/11/19 10:54:48 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.80 2001/11/26 07:17:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -610,7 +610,9 @@ mip6_haddr_config(sc, ifp)
 		switch(sc->hif_location_prev) {
 		case HIF_LOCATION_FOREIGN:
 			/* FOREIGN -> FOREIGN */
-			/* XXX */
+
+			/* XXX remove old (foreign subnet's) coa */
+			mip6_remove_addrs(ifp);
 			break;
 		case HIF_LOCATION_UNKNOWN:
 		case HIF_LOCATION_HOME:
