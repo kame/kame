@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.18 2003/01/30 06:04:55 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.19 2003/09/02 09:48:45 suz Exp $
  */
 
 /*
@@ -116,7 +116,7 @@ query_groupsV2(v)
     if ((v->uv_flags & VIFF_NOLISTENER) == 0)
     {
 	IF_DEBUG(DEBUG_MLD)
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"sending multicast listener general query V2 on : %s ",
 		v->uv_name);
 
@@ -223,14 +223,14 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     if ((vifi = find_vif_direct(src)) == NO_VIF)
     {
 	IF_DEBUG(DEBUG_MLD)
-	    log(LOG_INFO, 0, "accept_listenerv2_query: can't find a vif");
+	    log_msg(LOG_INFO, 0, "accept_listenerv2_query: can't find a vif");
 	return;
     }
     v = &uvifs[vifi];
     v->uv_in_mld_query++;
 
     if ((v->uv_mld_version & MLDv2) == 0) {
-	log(LOG_WARNING, 0,
+	log_msg(LOG_WARNING, 0,
 	    "Mif %s configured in MLDv1 received MLDv2 query (src %s),ignored",
 	    v->uv_name,sa6_fmt(src));
 	return;
@@ -253,7 +253,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     sflag = MLD_SFLAG(mldh->mld_rtval);
 
     IF_DEBUG(DEBUG_MLD)
-	log(LOG_DEBUG, 0,
+	log_msg(LOG_DEBUG, 0,
 	    "accepting multicast listener query V2 on %s: "
 	    "src %s, dst %s, grp %s\n\t     sflag : %s,robustness : %d,qqi : %d maxrd :%d",
 	    v->uv_name, sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group),
@@ -268,7 +268,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     if (inet6_lessthan(src, &v->uv_linklocal->pa_addr))
     {
 	IF_DEBUG(DEBUG_MLD) if (!inet6_equal(src, &v->uv_querier->al_addr))
-	    log(LOG_DEBUG, 0, "new querier %s (was %s) "
+	    log_msg(LOG_DEBUG, 0, "new querier %s (was %s) "
 		"on vif %d",
 		sa6_fmt(src), sa6_fmt(&v->uv_querier->al_addr), vifi);
 
@@ -302,14 +302,14 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     {
 	v->uv_mld_robustness = qrv;
 	IF_DEBUG(DEBUG_MLD)
-	    log(LOG_DEBUG, 0, "New Qrv adopted : %d",
+	    log_msg(LOG_DEBUG, 0, "New Qrv adopted : %d",
 		v->uv_mld_robustness);
     }
     if (qqi != 0)
     {
 	v->uv_mld_query_interval = qqi;
 	IF_DEBUG(DEBUG_MLD)
-	    log(LOG_DEBUG, 0, "New Qqi adopted : %d", v->uv_mld_query_interval);
+	    log_msg(LOG_DEBUG, 0, "New Qqi adopted : %d", v->uv_mld_query_interval);
     }
 
     /*
@@ -328,7 +328,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	    struct listaddr *s;
 
 	    IF_DEBUG(DEBUG_MLD)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "%s for %s from %s on vif %d, timer %d",
 		    "Group/Source-specific membership query V2",
 		    inet6_fmt(group), sa6_fmt(src), vifi, tmo);
@@ -337,13 +337,13 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	    group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
 	    IF_DEBUG(DEBUG_MLD)
-		log(LOG_DEBUG,0,"List of sources :");
+		log_msg(LOG_DEBUG,0,"List of sources :");
 	    for (i = 0; i < numsrc; i++)
 	    {
 		source_sa.sin6_addr = mldh->mld_src[i];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
-	        log(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
+	        log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
 
                /*
                 * I'm not the querier but maybe I'm still in the state Checking listener
@@ -376,7 +376,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 		    }
 
 		    IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "timer for grp %s src %s on vif %d "
 			    "set to %ld",
 			    inet6_fmt(group),
@@ -414,21 +414,21 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
     if ((vifi = find_vif_direct_local(src)) == NO_VIF) {
 	IF_DEBUG(DEBUG_MLD)
-	    log(LOG_INFO, 0, "accept_listenerV2_report : can't find a vif");
+	    log_msg(LOG_INFO, 0, "accept_listenerV2_report : can't find a vif");
 	return;
     }
 
     v = &uvifs[vifi];
 
     if ((v->uv_mld_version & MLDv2) == 0) {
-	log(LOG_WARNING, 0,
+	log_msg(LOG_WARNING, 0,
 	    "Mif %s configured in MLDv1 received MLDv2 report,ignored",
 	    v->uv_name);
 	return;
     }
 
     IF_DEBUG(DEBUG_MLD)
-	log(LOG_DEBUG, 0,
+	log_msg(LOG_DEBUG, 0,
 	    "accepting multicast listener V2 report: "
 	    "src %s,dst %s", sa6_fmt(src), inet6_fmt(dst));
 
@@ -456,7 +456,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	if (IN6_IS_ADDR_MC_LINKLOCAL(&group_sa.sin6_addr)) {
 	    /* too noisy */
 	    IF_DEBUG(DEBUG_PKT)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "accept_listenerV2_report: group(%s) has the "
 		    "link-local scope. discard",
 		    sa6_fmt(&group_sa));
@@ -515,13 +515,13 @@ accept_multicast_record(vifi, mard, src, grp)
 		source_sa.sin6_addr = mard->src[j];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 		IF_DEBUG(DEBUG_MLD)
-		    log(LOG_DEBUG, 0, "processing source %s group %s",
+		    log_msg(LOG_DEBUG, 0, "processing source %s group %s",
 			sa6_fmt(&source_sa), sa6_fmt(grp));
 
 		s = check_multicastV2_listener(v, grp, &g, &source_sa);
 		if (s != NULL) {
 		    IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0, "The Source/group already exist");
+			log_msg(LOG_DEBUG, 0, "The Source/group already exist");
 
 		    /*
 		     * delete old timers , set a timer for expiration 
@@ -548,12 +548,12 @@ accept_multicast_record(vifi, mard, src, grp)
 		     * If not found, add it to the list and update kernel cache.
 		     */
 		    IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "The source doesn't exist , trying to add it");
 
 		    s = (struct listaddr *) malloc(sizeof(struct listaddr));
 		    if (s == NULL)
-			log(LOG_ERR, 0, "ran out of memory");	/*fatal */
+			log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
 		    s->al_addr = source_sa;
 		    s->sources = NULL;
 
@@ -565,13 +565,13 @@ accept_multicast_record(vifi, mard, src, grp)
 		    if (g == NULL)
 		    {
 			IF_DEBUG(DEBUG_MLD)
-			    log(LOG_DEBUG, 0,
+			    log_msg(LOG_DEBUG, 0,
 				"The group too , trying to add it");
 
 			g = (struct listaddr *)
 			    malloc(sizeof(struct listaddr));
 			if (g == NULL)
-			    log(LOG_ERR, 0, "ran out of memory");	/*fatal */
+			    log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
 			g->al_addr = *grp;
 			g->sources = NULL;
 
@@ -600,7 +600,7 @@ accept_multicast_record(vifi, mard, src, grp)
 		     * this is protocol specific 
 		     */
 		    IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "*** notify routing daemon *** : group(%s),source(%s) should be forwarded on %s",
 			    sa6_fmt(&g->al_addr),
 			    sa6_fmt(&s->al_addr), v->uv_name);
@@ -653,7 +653,7 @@ accept_multicast_record(vifi, mard, src, grp)
 	    if (s) {
 	    	cbk=(cbk_t *)malloc(sizeof(cbk_t));
 		if (cbk == NULL)
-			log(LOG_ERR, 0, "ran out of memory");	/*fatal */
+			log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
 		g->al_rob=MLD6_ROBUSTNESS_VARIABLE;
 	    	cbk->g=g;
 	    	cbk->s=NULL;
@@ -683,7 +683,7 @@ accept_multicast_record(vifi, mard, src, grp)
 	    break;
 
 	default:
-	    log(LOG_NOTICE, 0,
+	    log_msg(LOG_NOTICE, 0,
 		"wrong multicast report type : %d",
 		mard->record_type);
 	}
@@ -712,7 +712,7 @@ strip_source_in_multicast_record(vifi, mard, src, grp)
 		break;
 
 	case BLOCK_OLD_SOURCES:
-		log(LOG_NOTICE, 0, "BLOCK record is just ignored");
+		log_msg(LOG_NOTICE, 0, "BLOCK record is just ignored");
 		break;
 
 	case MODE_IS_EXCLUDE:
@@ -736,7 +736,7 @@ strip_source_in_multicast_record(vifi, mard, src, grp)
 		break;
 
 	default:
-		log(LOG_NOTICE, 0,
+		log_msg(LOG_NOTICE, 0,
 		    "wrong multicast report type : %d", mard->record_type);
 		return;
 	}
@@ -776,7 +776,7 @@ DelVifV2(arg)
      */
 
     IF_DEBUG(DEBUG_MLD)
-	log(LOG_DEBUG, 0,
+	log_msg(LOG_DEBUG, 0,
 	    "*** notify routing daemon ***: group(%s),source(%s) has no more listeners on %s",
 	    sa6_fmt(&g->al_addr), sa6_fmt(&s->al_addr), v->uv_name);
 
@@ -844,7 +844,7 @@ SetTimerV2(vifi, g, s)
 
     cbk = (cbk_t *) malloc(sizeof(cbk_t));
     if (cbk == NULL)
- 	log(LOG_ERR, 0, "ran out of memory");	/*fatal */
+ 	log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
     cbk->mifi = vifi;
     cbk->g = g;
     cbk->s = s;
@@ -902,7 +902,7 @@ mld_shift_to_v1mode(mifi, src, grp)
 	if (g == NULL) {
 		g = (struct listaddr *) malloc(sizeof(struct listaddr));
 		if (g == NULL)
-			log(LOG_ERR, 0, "ran out of memory");	/* fatal */
+			log_msg(LOG_ERR, 0, "ran out of memory");	/* fatal */
 
 		memset(g, 0, sizeof(*g));
 		g->al_addr = *grp;
@@ -955,7 +955,7 @@ mld_shift_to_v2mode(arg)
 	struct uvif *v = &uvifs[mifi];
 	struct listaddr *g;
 
-	log(LOG_DEBUG, 0,
+	log_msg(LOG_DEBUG, 0,
 	    "shift back mode from MLDv1-compat to MLDv2 for %s on Mif %s",
 	    sa6_fmt(grp), v->uv_name);
 
@@ -964,7 +964,7 @@ mld_shift_to_v2mode(arg)
 		if (inet6_equal(&g->al_addr, grp))
 			break;
 	if (g == NULL) {
-		log(LOG_ERR, 0,
+		log_msg(LOG_ERR, 0,
 		    "tried to shift back to MLDv2 mode for %s on Mif %s,"
 		    "but there's no such group.",
 		    sa6_fmt(grp), v->uv_name);

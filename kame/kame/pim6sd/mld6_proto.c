@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.33 2003/02/05 15:29:59 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.34 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -172,20 +172,20 @@ accept_listener_query(src, dst, group, tmo)
 
 	if ((mifi = find_vif_direct(src)) == NO_VIF) {
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "accept_listener_query: can't find a mif");
 		return;
 	}
 	v = &uvifs[mifi];
 	if ((v->uv_mld_version & MLDv1) == 0) {
-		log(LOG_WARNING,0,
+		log_msg(LOG_WARNING,0,
 		    "Mif %s configured in MLDv2 received MLDv1 query (src %s)!",
 		    v->uv_name,sa6_fmt(src));
 		return;
 	}
 
 	IF_DEBUG(DEBUG_MLD)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "accepting multicast listener query on %s: "
 		    "src %s, dst %s, grp %s",
 		    v->uv_name,
@@ -204,7 +204,7 @@ accept_listener_query(src, dst, group, tmo)
 				   (v->uv_querier ? &v->uv_querier->al_addr
 				    : &v->uv_linklocal->pa_addr))) {
 			IF_DEBUG(DEBUG_MLD)
-				log(LOG_DEBUG, 0, "new querier %s (was %s) "
+				log_msg(LOG_DEBUG, 0, "new querier %s (was %s) "
 				    "on mif %d",
 				    sa6_fmt(src),
 				    v->uv_querier ?
@@ -238,7 +238,7 @@ accept_listener_query(src, dst, group, tmo)
 		register struct listaddr *g;
 
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "%s for %s from %s on mif %d, timer %d",
 			    "Group-specific membership query",
 			    inet6_fmt(group), sa6_fmt(src), mifi, tmo);
@@ -264,7 +264,7 @@ accept_listener_query(src, dst, group, tmo)
 				g->al_query = -1;
 				g->al_timerid = SetTimer(mifi, g);
 				IF_DEBUG(DEBUG_MLD)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "timer for grp %s on mif %d "
 					    "set to %ld",
 					    inet6_fmt(group),
@@ -289,7 +289,7 @@ accept_listener_report(src, dst, group)
 
 	if (IN6_IS_ADDR_MC_LINKLOCAL(group)) {
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "accept_listener_report: group(%s) has the "
 			    "link-local scope. discard", inet6_fmt(group));
 		return;
@@ -297,7 +297,7 @@ accept_listener_report(src, dst, group)
 
 	if ((mifi = find_vif_direct_local(src)) == NO_VIF) {
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "accept_listener_report: can't find a mif");
 		return;
 	}
@@ -310,14 +310,14 @@ accept_listener_report(src, dst, group)
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
 	if ((v->uv_mld_version & MLDv1) == 0) {
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "ignores MLDv1 report for %s on non-MLDv1 Mif %s",
 		    inet6_fmt(group), v->uv_name);
 		return;
 	}
 
 	IF_DEBUG(DEBUG_MLD)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "accepting multicast listener report: "
 		    "src %s,dst %s, grp %s",
 		    sa6_fmt(src),inet6_fmt(dst), inet6_fmt(group));
@@ -326,7 +326,7 @@ accept_listener_report(src, dst, group)
 
 #ifdef MLDV2_LISTENER_REPORT
 	if (v->uv_mld_version & MLDv2) {
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "shift to MLDv1 compat-mode for %s on Mif %s",
 		    inet6_fmt(group), v->uv_name);
 		mld_shift_to_v1mode(mifi, src, &group_sa);
@@ -353,7 +353,7 @@ recv_listener_report(mifi, src, grp)
 			continue;
 
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG,0, "The group already exists");
+			log_msg(LOG_DEBUG,0, "The group already exists");
 
 		g->al_reporter = *src;
 
@@ -375,12 +375,12 @@ recv_listener_report(mifi, src, grp)
 
 	/* add it to the list and update kernel cache. */
 	IF_DEBUG(DEBUG_MLD)
-		log(LOG_DEBUG,0,
+		log_msg(LOG_DEBUG,0,
 		    "The group doesn't exist , trying to add it");
 
 	g = (struct listaddr *) malloc(sizeof(struct listaddr));
 	if (g == NULL)
-		log(LOG_ERR, 0, "ran out of memory");	/* fatal */
+		log_msg(LOG_ERR, 0, "ran out of memory");	/* fatal */
 
 	g->al_addr = *grp;
 	g->sources = NULL;
@@ -412,7 +412,7 @@ accept_listener_done(src, dst, group)
 	/* sanity? */
 	if (IN6_IS_ADDR_MC_NODELOCAL(group)) {
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "accept_listener_done: address multicast node "
 			    " local(%s), ignore it...", inet6_fmt(group));
 		return;
@@ -420,7 +420,7 @@ accept_listener_done(src, dst, group)
 
 	if (IN6_IS_ADDR_MC_LINKLOCAL(group)) {
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "accept_listener_done: address multicast "
 			    "link local(%s), ignore it ...", inet6_fmt(group));
 		return;
@@ -428,7 +428,7 @@ accept_listener_done(src, dst, group)
 
 	if ((mifi = find_vif_direct_local(src)) == NO_VIF) {
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "accept_listener_done: can't find a mif");
 		return;
 	}
@@ -448,14 +448,14 @@ accept_listener_done(src, dst, group)
 	 *  Older Version Host Present Timeout seconds.
 	 */
 	if ((v->uv_mld_version & MLDv1) == 0) {
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "ignores MLDv1 done for %s on non-MLDv1 Mif %s",
 		    inet6_fmt(group), v->uv_name);
 		return;
 	}
 
 	IF_DEBUG(DEBUG_MLD)
-		log(LOG_INFO, 0,
+		log_msg(LOG_INFO, 0,
 		    "accepting listener done message: src %s, dst %s, grp %s",
 		    sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group));
 	v->uv_in_mld_done++;
@@ -486,7 +486,7 @@ recv_listener_done(mifi, src, grp, query_type)
 			continue;
 
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG, 0, "[accept_done_message] %ld\n",
+			log_msg(LOG_DEBUG, 0, "[accept_done_message] %ld\n",
 			    g->al_query);
 
 		/* still waiting for a reply to a query, ignore the done */

@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.38 2003/09/02 07:48:33 suz Exp $	*/
+/*	$KAME: vif.c,v 1.39 2003/09/02 09:48:46 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -128,7 +128,7 @@ void init_vifs()
 	udp_socket = mld6_socket;
 #else
 	if ((udp_socket = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-		log(LOG_ERR, errno, "UDP6 socket");
+		log_msg(LOG_ERR, errno, "UDP6 socket");
 #endif
 
 	/* clean all the interfaces ... */
@@ -147,24 +147,24 @@ void init_vifs()
 		v->uv_mld_llqi = MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL;
 	}
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG, 0, "Interfaces world initialized...");
+		log_msg(LOG_DEBUG, 0, "Interfaces world initialized...");
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG, 0, "Getting vifs from %s", configfilename);
+		log_msg(LOG_DEBUG, 0, "Getting vifs from %s", configfilename);
 
 	/* read config from file */
 	if (cfparse(1, 0) != 0)
-		log(LOG_ERR, 0, "fatal error in parsing the config file");
+		log_msg(LOG_ERR, 0, "fatal error in parsing the config file");
 
 	enabled_vifs = 0;
 	phys_vif = -1;
 
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG, 0, "Getting vifs from kernel");
+		log_msg(LOG_DEBUG, 0, "Getting vifs from kernel");
 	config_vifs_from_kernel();
 
 	/* IPv6 PIM needs one global unicast address (at least for now) */
 	if (max_global_address() == NULL)
-		log(LOG_ERR, 0, "There's no global address available");
+		log_msg(LOG_ERR, 0, "There's no global address available");
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 		struct phaddr *p;
@@ -175,7 +175,7 @@ void init_vifs()
 		if (v->uv_flags & VIFF_DOWN)
 			continue;
 		if (v->uv_linklocal == NULL)
-			log(LOG_ERR, 0,
+			log_msg(LOG_ERR, 0,
 			    "there is no link-local address on vif %s",
 			    v->uv_name);
 
@@ -191,14 +191,14 @@ void init_vifs()
 		}
 	}
 	if (enabled_vifs < 2)
-		log(LOG_ERR, 0, "can't forward: %s",
+		log_msg(LOG_ERR, 0, "can't forward: %s",
 		    enabled_vifs == 0 ? "no enabled vifs" :
 		     "only one enabled vif");
 
 	memset(&if_nullset, 0, sizeof(if_nullset));
 	k_init_pim(mld6_socket);	
 	IF_DEBUG(DEBUG_PIM_DETAIL)
-		log(LOG_DEBUG, 0, "Pim kernel initialization done");
+		log_msg(LOG_DEBUG, 0, "Pim kernel initialization done");
 
 
 	/* Add a dummy virtual interface to support Registers in the kernel. */
@@ -216,7 +216,7 @@ int init_reg_vif()
 	v = &uvifs[numvifs];
 	if ((numvifs + 1) == MAXMIFS) {
 	     /* Exit the program! The PIM router must have a Register vif */
-	    log(LOG_ERR, 0,
+	    log_msg(LOG_ERR, 0,
 		"cannot install the Register vif: too many interfaces");
 	    /* To make lint happy */
 	    return (FALSE);
@@ -241,7 +241,7 @@ int init_reg_vif()
 		break;
 	}
 	if (i >= numvifs) {
-		log(LOG_ERR, 0, "No physical interface enabled");
+		log_msg(LOG_ERR, 0, "No physical interface enabled");
 		return -1;
 	}
 	
@@ -258,7 +258,7 @@ int init_reg_vif()
 #endif
 
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "Interface %s (subnet %s), installed on vif #%u - rate = %d",
 		    v->uv_name,
 		    net6name(&v->uv_prefix.sin6_addr,&v->uv_subnetmask),
@@ -290,7 +290,7 @@ void start_all_vifs()
 
 			if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN)) {
 				IF_DEBUG(DEBUG_IF)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "%s is %s; vif #%u out of service",
 					    v->uv_name,
 					    v->uv_flags & VIFF_DISABLED ? "DISABLED" : "DOWN",
@@ -330,7 +330,7 @@ void start_vif (mifi_t vifi)
 
 	k_add_vif(mld6_socket,vifi,&uvifs[vifi]);
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG,0,"%s comes up ,vif #%u now in service",v->uv_name,vifi);
+		log_msg(LOG_DEBUG,0,"%s comes up ,vif #%u now in service",v->uv_name,vifi);
 
 	if (!(v->uv_flags & MIFF_REGISTER)) {
 	    /*
@@ -502,7 +502,7 @@ void stop_vif( mifi_t vifi )
 	vifs_down=TRUE;
 
 	IF_DEBUG(DEBUG_IF)
-		log( LOG_DEBUG ,0,"%s goes down , vif #%u out of service" , v->uv_name , vifi);
+		log_msg( LOG_DEBUG ,0,"%s goes down , vif #%u out of service" , v->uv_name , vifi);
 }
 
 /*
@@ -529,12 +529,12 @@ update_reg_vif( mifi_t register_vifi )
 		   &uvifs[vifi].uv_linklocal->pa_prefix); 
 	start_vif(register_vifi);
 	IF_DEBUG(DEBUG_PIM_REGISTER | DEBUG_IF)
-	    log(LOG_NOTICE, 0, "%s has come up; vif #%u now in service",
+	    log_msg(LOG_NOTICE, 0, "%s has come up; vif #%u now in service",
 		uvifs[register_vifi].uv_name, register_vifi);
 	return 0;
     }
     vifs_down = TRUE;
-    log(LOG_WARNING, 0, "Cannot start Register vif: %s",
+    log_msg(LOG_WARNING, 0, "Cannot start Register vif: %s",
 	uvifs[vifi].uv_name);
     return(-1);
 }
@@ -676,7 +676,7 @@ check_vif_state()
   
 	/* get the interface flags */
 	if( ioctl( udp_socket , SIOCGIFFLAGS , (char *)&ifr )<0 )
-	    log(LOG_ERR, errno,
+	    log_msg(LOG_ERR, errno,
         	"check_vif_state: ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 
 	if( v->uv_flags & VIFF_DOWN )
@@ -692,7 +692,7 @@ check_vif_state()
 	{
 	    if( !( ifr.ifr_flags & IFF_UP ))
 	    {
-		log( LOG_NOTICE ,0,
+		log_msg( LOG_NOTICE ,0,
 		     "%s has gone down ; vif #%u taken out of  service",
 		     v->uv_name , vifi );
 		stop_vif ( vifi );

@@ -1,4 +1,4 @@
-/*	$KAME: debug.h,v 1.12 2003/01/23 00:26:46 suz Exp $	*/
+/*	$KAME: debug.h,v 1.13 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -135,7 +135,7 @@ extern char *packet_kind        __P((u_int proto, u_int type,
                          u_int code));
 extern int  debug_kind      __P((u_int proto, u_int type,
                          u_int code));
-extern void log         __P((int, int, char *, ...))
+extern void log_msg         __P((int, int, char *, ...))
 	__attribute__((__format__(__printf__, 3, 4)));
 extern int  log_level       __P((u_int proto, u_int type,
                          u_int code));

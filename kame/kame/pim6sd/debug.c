@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.58 2003/02/05 15:30:33 suz Exp $	*/
+/*	$KAME: debug.c,v 1.59 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -348,7 +348,7 @@ dump_stat()
 
 	fp = fopen(statfilename, "w");
 	if (fp == NULL) {
-		log(LOG_WARNING, errno, "dump_stat: can't open file(%s)",
+		log_msg(LOG_WARNING, errno, "dump_stat: can't open file(%s)",
 		    statfilename);
 		return;
 	}
@@ -632,7 +632,7 @@ dump_mldgroups(fp)
  */
 #ifdef __STDC__
 void
-log(int severity, int syserr, char *format, ...)
+log_msg(int severity, int syserr, char *format, ...)
 {
     va_list         ap;
     static char     fmt[211] = "warning - ";
@@ -644,7 +644,7 @@ log(int severity, int syserr, char *format, ...)
 #else
 /* VARARGS3 */
 void
-log(severity, syserr, format, va_alist)
+log_msg(severity, syserr, format, va_alist)
     int             severity,
                     syserr;
     char           *format;

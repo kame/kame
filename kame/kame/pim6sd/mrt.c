@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.17 2003/08/15 05:59:52 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.18 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -802,7 +802,7 @@ create_srcentry(source)
     srcentry_ptr = (srcentry_t *) malloc(sizeof(srcentry_t));
     if (srcentry_ptr == (srcentry_t *) NULL)
     {
-	log(LOG_WARNING, 0, "Memory allocation error for srcentry %s",
+	log_msg(LOG_WARNING, 0, "Memory allocation error for srcentry %s",
 	    sa6_fmt(source));
 	return (srcentry_t *) NULL;
     }
@@ -828,7 +828,7 @@ create_srcentry(source)
 	srcentry_ptr->next->prev = srcentry_ptr;
 
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "create source entry, source %s", sa6_fmt(source));
+	log_msg(LOG_DEBUG, 0, "create source entry, source %s", sa6_fmt(source));
     return (srcentry_ptr);
 }
 
@@ -847,7 +847,7 @@ create_grpentry(group)
 
     if (grpentry_ptr == (grpentry_t *) NULL)
     {
-	log(LOG_WARNING, 0, "Memory allocation error for grpentry %s",
+	log_msg(LOG_WARNING, 0, "Memory allocation error for grpentry %s",
 	    sa6_fmt(group));
 	return (grpentry_t *) NULL;
     }
@@ -878,7 +878,7 @@ create_grpentry(group)
 	grpentry_ptr->next->prev = grpentry_ptr;
 
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "create group entry, group %s", sa6_fmt(group));
+	log_msg(LOG_DEBUG, 0, "create group entry, group %s", sa6_fmt(group));
     return (grpentry_ptr);
 }
 
@@ -1026,7 +1026,7 @@ alloc_mrtentry(srcentry_ptr, grpentry_ptr)
     mrtentry_ptr = (mrtentry_t *) malloc(sizeof(mrtentry_t));
     if (mrtentry_ptr == (mrtentry_t *) NULL)
     {
-	log(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
+	log_msg(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
 	return (mrtentry_t *) NULL;
     }
 
@@ -1078,7 +1078,7 @@ alloc_mrtentry(srcentry_ptr, grpentry_ptr)
     if ((mrtentry_ptr->vif_timers == (u_int16 *) NULL) ||
 	(mrtentry_ptr->vif_deletion_delay == (u_int16 *) NULL))
     {
-	log(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
+	log_msg(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
 	FREE_MRTENTRY(mrtentry_ptr);
 	return (mrtentry_t *) NULL;
     }
@@ -1133,7 +1133,7 @@ create_mrtentry(srcentry_ptr, grpentry_ptr, flags)
 	     * search_srcmrtlink() did find it! Shoudn't happen. Panic!
 	     */
 
-	    log(LOG_ERR, 0, "MRT inconsistency for src %s and grp %s\n",
+	    log_msg(LOG_ERR, 0, "MRT inconsistency for src %s and grp %s\n",
 		sa6_fmt(source), sa6_fmt(group));
 	    /* not reached but to make lint happy */
 	    return (mrtentry_t *) NULL;
@@ -1153,7 +1153,7 @@ create_mrtentry(srcentry_ptr, grpentry_ptr, flags)
 	r_new->flags |= MRTF_SG;
 
 	IF_DEBUG(DEBUG_MFC)
-	    log(LOG_DEBUG, 0, "create SG entry, source %s, group %s",
+	    log_msg(LOG_DEBUG, 0, "create SG entry, source %s, group %s",
 		sa6_fmt(source), sa6_fmt(group));
 
 	return (r_new);
@@ -1239,7 +1239,7 @@ delete_single_kernel_cache(mrtentry_ptr, kernel_cache_ptr)
     if (kernel_cache_ptr->next != (kernel_cache_t *) NULL)
 	kernel_cache_ptr->next->prev = kernel_cache_ptr->prev;
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
+	log_msg(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
 	    sa6_fmt(&kernel_cache_ptr->source),
 	    sa6_fmt(&kernel_cache_ptr->source));
     k_del_mfc(mld6_socket, &kernel_cache_ptr->source,
@@ -1292,7 +1292,7 @@ delete_single_kernel_cache_addr(mrtentry_ptr, source, group)
     if (kernel_cache_ptr->next != (kernel_cache_t *) NULL)
 	kernel_cache_ptr->next->prev = kernel_cache_ptr->prev;
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
+	log_msg(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
 	    sa6_fmt(&kernel_cache_ptr->source),
 	    sa6_fmt(&kernel_cache_ptr->group));
     k_del_mfc(mld6_socket, &kernel_cache_ptr->source,

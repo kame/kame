@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.26 2003/04/30 02:01:57 suz Exp $	*/
+/*	$KAME: route.c,v 1.27 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -199,7 +199,7 @@ set_incoming(srcentry_ptr, srctype)
 	{
 	    /* couldn't find a route */
 	    IF_DEBUG(DEBUG_PIM_MRT | DEBUG_RPF)
-		log(LOG_DEBUG, 0, "NO ROUTE found for %s", sa6_fmt(&source));
+		log_msg(LOG_DEBUG, 0, "NO ROUTE found for %s", sa6_fmt(&source));
 	    return (FALSE);
 	}
 	srcentry_ptr->incoming = rpfc.iif;
@@ -233,7 +233,7 @@ set_incoming(srcentry_ptr, srctype)
 	     */
 	    srcentry_ptr->upstream = n;
 	    IF_DEBUG(DEBUG_RPF)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "For src %s, iif is %s, next hop router is %s",
 		    sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
 		    sa6_fmt(&neighbor_addr));
@@ -251,7 +251,7 @@ set_incoming(srcentry_ptr, srctype)
 	for (pa = n->aux_addrs; pa; pa = pa->pa_next) {
 	    if (inet6_equal(&neighbor_addr, &pa->pa_addr)) {
 		IF_DEBUG(DEBUG_RPF)
-		    log(LOG_DEBUG, 0,
+		    log_msg(LOG_DEBUG, 0,
 			"For src %s, iif is %s, next hop router is %s"
 			" (aux_addr match)",
 			sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
@@ -264,7 +264,7 @@ set_incoming(srcentry_ptr, srctype)
     }
 
     /* TODO: control the number of messages! */
-    log(LOG_INFO, 0,
+    log_msg(LOG_INFO, 0,
 	"For src %s, iif is %s, next hop router is %s: NOT A PIM ROUTER",
 	sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
 	sa6_fmt(&neighbor_addr));
@@ -296,7 +296,7 @@ add_leaf(vifi, source, group)
 	     * I am not the DR on the subnet on which the report is received.
 	     * Ignore the report.
 	     */
-	    log(LOG_DEBUG, 0, "I'm not the DR on mif %d. Ignore a report.\n",
+	    log_msg(LOG_DEBUG, 0, "I'm not the DR on mif %d. Ignore a report.\n",
 		vifi);
 	    return;
     }
@@ -307,9 +307,9 @@ add_leaf(vifi, source, group)
      * the source have to be specified => mldv2_proto  
      */
     if (SSMGROUP(group)) {
-	log(LOG_DEBUG, 0, "Hmmm this is an SSM group...");
+	log_msg(LOG_DEBUG, 0, "Hmmm this is an SSM group...");
 	if (source == NULL) {
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"Sorry,the source is unspecified,will not forward");
 	    return;
 	}
@@ -322,7 +322,7 @@ add_leaf(vifi, source, group)
 	return;
 
     IF_DEBUG(DEBUG_MRT)
-	log(LOG_DEBUG, 0, "Adding vif %d for group %s", vifi, sa6_fmt(group));
+	log_msg(LOG_DEBUG, 0, "Adding vif %d for group %s", vifi, sa6_fmt(group));
 
     if (IF_ISSET(vifi, &mrtentry_ptr->leaves))
 	return;			/* Already a leaf */
@@ -381,9 +381,9 @@ delete_leaf(vifi, source, group)
      */
 
     if (SSMGROUP(group)) {
-	log(LOG_DEBUG, 0, "Hey! this is an SSM group...");
+	log_msg(LOG_DEBUG, 0, "Hey! this is an SSM group...");
 	if (source == NULL) {
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"Sorry,the source is unspecified,delete leaf wrong call");
 	    return;
 	}
@@ -923,7 +923,7 @@ process_kernel_call()
 	break;
     default:
 	IF_DEBUG(DEBUG_KERN)
-	    log(LOG_DEBUG, 0, "Unknown kernel_call code");
+	    log_msg(LOG_DEBUG, 0, "Unknown kernel_call code");
 	break;
     }
 }
@@ -964,13 +964,13 @@ process_cache_miss(im)
     if(SSMGROUP(&group))
     {
 	IF_DEBUG(DEBUG_MFC)
-		log(LOG_DEBUG,0,"SSM Cache miss src %s dst %s, iif %d",
+		log_msg(LOG_DEBUG,0,"SSM Cache miss src %s dst %s, iif %d",
 	    sa6_fmt(&source), sa6_fmt(&group), iif);
 	return;
     }
 
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "Cache miss, src %s, dst %s, iif %d",
+	log_msg(LOG_DEBUG, 0, "Cache miss, src %s, dst %s, iif %d",
 	    sa6_fmt(&source), sa6_fmt(&group), iif);
 
     /*

@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.33 2003/08/26 04:09:37 suz Exp $	*/
+/*	$KAME: rp.c,v 1.34 2003/09/02 09:48:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -171,7 +171,7 @@ init_rp6()
 
     /* no need to init RP in case of static-rp */
     if (static_rp_flag != FALSE) {
-	log(LOG_DEBUG, 0, "static-rp config");
+	log_msg(LOG_DEBUG, 0, "static-rp config");
 	return;
     }
 
@@ -179,7 +179,7 @@ init_rp6()
     if (cand_rp_ifname) {
 	sa6 = local_iface(cand_rp_ifname);
 	if (!sa6)
-	    log(LOG_WARNING, 0,
+	    log_msg(LOG_WARNING, 0,
 		"cand_rp '%s' is not configured. "
 		"take the max local address the router..", cand_rp_ifname);
 	free(cand_rp_ifname);
@@ -198,7 +198,7 @@ init_rp6()
 		(u_int8 *) malloc(4 + sizeof(pim6_encod_uni_addr_t) +
 				  255*sizeof(pim6_encod_grp_addr_t));
     if (cand_rp_adv_message.buffer == NULL)
-	log(LOG_ERR, 0, "CandRPadv Buffer allocation");
+	log_msg(LOG_ERR, 0, "CandRPadv Buffer allocation");
 
     cand_rp_adv_message.prefix_cnt_ptr = cand_rp_adv_message.buffer;
 
@@ -222,10 +222,10 @@ init_rp6()
     PUT_HOSTSHORT(my_cand_rp_holdtime, data_ptr);
     PUT_EUADDR6(my_cand_rp_address.sin6_addr,data_ptr);
     IF_DEBUG(DEBUG_PIM_CAND_RP) {
-	log(LOG_DEBUG, 0, "Local Cand-RP address is : %s",
+	log_msg(LOG_DEBUG, 0, "Local Cand-RP address is : %s",
 	    inet6_fmt(&my_cand_rp_address.sin6_addr));
-	log(LOG_DEBUG, 0, "Local Cand-RP priority is : %u",my_cand_rp_priority);
-	log(LOG_DEBUG, 0, "Local Cand-RP advertisement period is : %u sec.",
+	log_msg(LOG_DEBUG, 0, "Local Cand-RP priority is : %u",my_cand_rp_priority);
+	log_msg(LOG_DEBUG, 0, "Local Cand-RP advertisement period is : %u sec.",
 	    my_cand_rp_adv_period);
     }
 
@@ -252,7 +252,7 @@ init_bsr6()
     if (cand_bsr_ifname) {
 	sa6 = local_iface(cand_bsr_ifname);
 	if (!sa6)
-	     log(LOG_WARNING, 0, "bsr '%s' is not configured. "
+	     log_msg(LOG_WARNING, 0, "bsr '%s' is not configured. "
 	        "take the max local address the router..", cand_bsr_ifname);
 	free(cand_bsr_ifname);
     }
@@ -261,11 +261,11 @@ init_bsr6()
     my_bsr_address = *sa6;
 
     IF_DEBUG(DEBUG_PIM_BOOTSTRAP) {
-	log(LOG_DEBUG, 0, "Local BSR address: %s",
+	log_msg(LOG_DEBUG, 0, "Local BSR address: %s",
 		    inet6_fmt(&my_bsr_address.sin6_addr));
-	log(LOG_DEBUG, 0, "Local BSR priority : %u", my_bsr_priority);
-	log(LOG_DEBUG, 0, "Local BSR period is : %u sec.", my_bsr_period);
-	log(LOG_DEBUG, 0, "Local BSR hash mask length: %d", 
+	log_msg(LOG_DEBUG, 0, "Local BSR priority : %u", my_bsr_priority);
+	log_msg(LOG_DEBUG, 0, "Local BSR period is : %u sec.", my_bsr_period);
+	log_msg(LOG_DEBUG, 0, "Local BSR hash mask length: %d", 
 	    inet6_mask2plen(&my_bsr_hash_mask));
    }
 
@@ -335,7 +335,7 @@ bootstrap_initial_delay()
 
 	    diff = *curr++ - *my++;
 	    if (diff < 0)
-		log(LOG_ERR, 0, "curr_bsr < my_bsr, impossible!");
+		log_msg(LOG_ERR, 0, "curr_bsr < my_bsr, impossible!");
 	    if (diff == 0) {
 		log_of_2 -= 8;
 		continue;
@@ -1231,7 +1231,7 @@ rp_grp_match(group)
 	return (rp_grp_entry_t *) NULL;
 
     IF_DEBUG(DEBUG_PIM_CAND_RP)
-	log(LOG_DEBUG,0,"Rp_grp_match found %s for group %s",
+	log_msg(LOG_DEBUG,0,"Rp_grp_match found %s for group %s",
 	    sa6_fmt(&best_entry->rp->rpentry->address),
 	    sa6_fmt(group));
 

@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.23 2002/08/01 03:34:02 itojun Exp $	*/
+/*	$KAME: pim6.c,v 1.24 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -138,13 +138,13 @@ init_pim6()
 
 	if ( (pim6_recv_buf = malloc( RECV_BUF_SIZE)) == NULL ||
 		 (pim6_send_buf = malloc (RECV_BUF_SIZE)) == NULL)
-		log(LOG_ERR,errno,"pim6 buffer allocation");
+		log_msg(LOG_ERR,errno,"pim6 buffer allocation");
 
 	IF_DEBUG(DEBUG_KERN)
-		log(LOG_DEBUG,0,"%d octets allocated for the emit/recept buffer pim6",RECV_BUF_SIZE);
+		log_msg(LOG_DEBUG,0,"%d octets allocated for the emit/recept buffer pim6",RECV_BUF_SIZE);
 
 	if( (pim6_socket = socket(AF_INET6,SOCK_RAW,IPPROTO_PIM)) < 0 )
-		log(LOG_ERR,errno,"pim6_socket");
+		log_msg(LOG_ERR,errno,"pim6_socket");
 
 	k_set_rcvbuf(pim6_socket,SO_RECV_BUF_SIZE_MAX,SO_RECV_BUF_SIZE_MIN);
 	k_set_hlim(pim6_socket,MINHLIM);
@@ -155,37 +155,37 @@ init_pim6()
 	allpim6routers_group.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, "ff02::d",
 		      (void *)&allpim6routers_group.sin6_addr) != 1 )
-		log(LOG_ERR, 0, "inet_pton failed for ff02::d");
+		log_msg(LOG_ERR, 0, "inet_pton failed for ff02::d");
 	memset(&sockaddr6_d, 0, sizeof(sockaddr6_d));
 	sockaddr6_d.sin6_len = sizeof(sockaddr6_d);
 	sockaddr6_d.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, "ff00::",
 		      (void *)&sockaddr6_d.sin6_addr) != 1)
-		log(LOG_ERR, 0, "inet_pton failed for ff00::");
+		log_msg(LOG_ERR, 0, "inet_pton failed for ff00::");
 
 	/* 
 	 * according to draft-ietf-ipngwg-uni-based-mcast-03.txt
 	 * the SSM-prefix is ff3x::/96.
 	 */
 	if (inet_pton(AF_INET6, "fff0:ffff:ffff:ffff:ffff:ffff::", (void *) &ssmmask) != 1)
-	    log(LOG_ERR, 0, "inet_pton failed for fff0:ffff:ffff:ffff:ffff:ffff::");
+	    log_msg(LOG_ERR, 0, "inet_pton failed for fff0:ffff:ffff:ffff:ffff:ffff::");
 
 	memset(&ssmprefix, 0, sizeof(ssmprefix));
 	ssmprefix.sin6_len = sizeof(ssmprefix);
 	ssmprefix.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, "ff30::", (void *) &ssmprefix.sin6_addr) != 1)
-	    log(LOG_ERR, 0, "inet_pton failed for ff30::");
+	    log_msg(LOG_ERR, 0, "inet_pton failed for ff30::");
 
 	/* specify to tell receiving interface */
 	on = 1;
 #ifdef IPV6_RECVPKTINFO
 	if (setsockopt(pim6_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 		       sizeof(on)) < 0)
-		log(LOG_ERR, errno, "setsockopt(IPV6_RECVPKTINFO)");
+		log_msg(LOG_ERR, errno, "setsockopt(IPV6_RECVPKTINFO)");
 #else
 	if (setsockopt(pim6_socket, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0)
-		log(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
+		log_msg(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
 #endif 
 
 	/* initialize msghdr for receiving packets */
@@ -198,7 +198,7 @@ init_pim6()
 	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if (rcvcmsgbufpim == NULL &&
 	    (rcvcmsgbufpim = malloc(rcvcmsglen)) == NULL)
-		log(LOG_ERR, 0, "malloc failed");
+		log_msg(LOG_ERR, 0, "malloc failed");
 	rcvmhpim.msg_control = (caddr_t ) rcvcmsgbufpim;
 	rcvmhpim.msg_controllen = rcvcmsglen;
 
@@ -208,7 +208,7 @@ init_pim6()
 	sndcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if (sndcmsgbufpim == NULL &&
 	    (sndcmsgbufpim = malloc(sndcmsglen)) == NULL)
-		log(LOG_ERR, 0, "malloc failed");
+		log_msg(LOG_ERR, 0, "malloc failed");
 	sndmhpim.msg_control = (caddr_t)sndcmsgbufpim;
 	sndmhpim.msg_controllen = sndcmsglen;
 	cmsgp=(struct cmsghdr *)sndcmsgbufpim;
@@ -217,7 +217,7 @@ init_pim6()
 	cmsgp->cmsg_type = IPV6_PKTINFO;
 
 	if ( register_input_handler(pim6_socket, pim6_read) <0) 
-		log(LOG_ERR,0,"Registering pim6 socket");
+		log_msg(LOG_ERR,0,"Registering pim6 socket");
 
 	/* Initialize the building Join/Prune messages working area */
 	build_jp_message_pool = (build_jp_message_t *)NULL;
@@ -243,7 +243,7 @@ pim6_read(f, rfd)
 
     if (pim6_recvlen < 0) {
         if (errno != EINTR)
-            log(LOG_ERR, errno, "PIM6 recvmsg");
+            log_msg(LOG_ERR, errno, "PIM6 recvmsg");
         return;
     }
 
@@ -251,7 +251,7 @@ pim6_read(f, rfd)
     (void)sigemptyset(&block);
     (void)sigaddset(&block, SIGALRM);
     if (sigprocmask(SIG_BLOCK, &block, &oblock) < 0)
-        log(LOG_ERR, errno, "sigprocmask");
+        log_msg(LOG_ERR, errno, "sigprocmask");
 #else
     /* Use of omask taken from main() */
     omask = sigblock(sigmask(SIGALRM));
@@ -279,7 +279,7 @@ accept_pim6(pimlen)
 
     /* sanity check */
     if (pimlen < sizeof(*pim)) {
-        log(LOG_WARNING, 0,
+        log_msg(LOG_WARNING, 0,
             "data field too short (%u bytes) for PIM header, from %s",
             pimlen, sa6_fmt(src));
         return;
@@ -307,16 +307,16 @@ accept_pim6(pimlen)
     }   
 
     if(pi==NULL)
-	    log(LOG_ERR,0,"pim6_socket : unable to get destination packet");
+	    log_msg(LOG_ERR,0,"pim6_socket : unable to get destination packet");
 
     if(ifindex==0)
-	    log(LOG_ERR,0,"pim6_socket : unable to get ifindex");
+	    log_msg(LOG_ERR,0,"pim6_socket : unable to get ifindex");
 		
 #define NOSUCHDEF 
 #ifdef NOSUCHDEF   /* TODO: delete. Too noisy */
     IF_DEBUG(DEBUG_PIM_DETAIL) {
         IF_DEBUG(DEBUG_PIM) {
-            log(LOG_DEBUG, 0, "Receiving %s from %s",
+            log_msg(LOG_DEBUG, 0, "Receiving %s from %s",
                 packet_kind(IPPROTO_PIM, pim->pim_type, 0),
                 sa6_fmt(src));
         }
@@ -353,13 +353,13 @@ accept_pim6(pimlen)
          break;
      case PIM_GRAFT:
 	 pim6dstat.in_pim6_graft++;
-         log(LOG_INFO, 0, "ignore %s from %s",
+         log_msg(LOG_INFO, 0, "ignore %s from %s",
              packet_kind(IPPROTO_PIM, pim->pim_type, 0),
              sa6_fmt(src));
          break;
      case PIM_GRAFT_ACK:
 	 pim6dstat.in_pim6_graft_ack++;
-         log(LOG_INFO, 0, "ignore %s from %s",
+         log_msg(LOG_INFO, 0, "ignore %s from %s",
              packet_kind(IPPROTO_PIM, pim->pim_type, 0),
              sa6_fmt(src));
          break;
@@ -367,7 +367,7 @@ accept_pim6(pimlen)
          receive_pim6_cand_rp_adv(src, &dst, (char *)(pim), pimlen);
          break;
      default:
-         log(LOG_INFO, 0,
+         log_msg(LOG_INFO, 0,
              "ignore unknown PIM message code %u from %s",
              pim->pim_type, sa6_fmt(src));
          break;
@@ -411,7 +411,7 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 	{
 		if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr))
 		{
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "trying to send pim multicast packet "
 			    "with non linklocal src(%s), ignoring",
 			    sa6_fmt(src));
@@ -445,7 +445,7 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 		if (errno == ENETDOWN)
 			check_vif_state();
 		else {
-			log(LOG_WARNING, errno, "sendmsg from %s to %s",
+			log_msg(LOG_WARNING, errno, "sendmsg from %s to %s",
 			    sa6_fmt(src), sa6_fmt(dst));
 		}
 	}

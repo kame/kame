@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.14 2003/01/23 00:25:25 suz Exp $
+ * $KAME: mld6v2.c,v 1.15 2003/09/02 09:48:45 suz Exp $
  */
 
 /*
@@ -124,7 +124,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 
     if ((vifi = local_address(src)) == NO_VIF) {
         IF_DEBUG(DEBUG_MLD)
-            log(LOG_INFO, 0, "make_mld6v2_msg: can't find a vif");
+            log_msg(LOG_INFO, 0, "make_mld6v2_msg: can't find a vif");
         return FALSE;
     }
     v = &uvifs[vifi];
@@ -136,7 +136,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
         lstsrc = check_multicastV2_listener(v, group, &g, NULL);
         if (g == NULL) {
             IF_DEBUG(DEBUG_MLD)
-                log(LOG_WARNING, 0,
+                log_msg(LOG_WARNING, 0,
                    "trying to build group specific query without state for it");
             return FALSE;
         }
@@ -157,7 +157,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
                 if (lstsrc->al_rob <= 0)
 		    goto nextsrc;	/* the source will be deleted */
                 IF_DEBUG(DEBUG_MLD)
-                    log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
+                    log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
 
                 mhp->mld_src[nbsrc] = lstsrc->al_addr.sin6_addr;
                 nbsrc++;
@@ -187,7 +187,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 		}
 
                 IF_DEBUG(DEBUG_MLD)
-                    log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
+                    log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
                 mhp->mld_src[nbsrc] = lstsrc->al_addr.sin6_addr;
                 nbsrc++;
                 lstsrc->al_rob--;
@@ -199,10 +199,10 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
             return FALSE;
         IF_DEBUG(DEBUG_MLD) {
             if (sflag == SFLAGYES)
-                log(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag SET",
+                log_msg(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag SET",
                     sa6_fmt(group));
             if (sflag == SFLAGNO)
-                log(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag NOT SET",
+                log_msg(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag NOT SET",
                     sa6_fmt(group));
         }
         dst_sa.sin6_addr = group->sin6_addr;
@@ -245,13 +245,13 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
     {
 #ifdef USE_RFC2292BIS
 	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1)
-	    log(LOG_ERR, 0, "inet6_opt_init(0) failed");
+	    log_msg(LOG_ERR, 0, "inet6_opt_init(0) failed");
 	if ((hbhlen =
 	     inet6_opt_append(NULL, 0, hbhlen, IP6OPT_ROUTER_ALERT, 2, 2,
 			      NULL)) == -1)
-	    log(LOG_ERR, 0, "inet6_opt_append(0) failed");
+	    log_msg(LOG_ERR, 0, "inet6_opt_append(0) failed");
 	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1)
-	    log(LOG_ERR, 0, "inet6_opt_finish(0) failed");
+	    log_msg(LOG_ERR, 0, "inet6_opt_finish(0) failed");
 	ctllen += CMSG_SPACE(hbhlen);
 #else				/* old advanced API */
 	hbhlen = inet6_option_space(sizeof(raopt));
@@ -266,7 +266,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 	if (sndcmsgbuf)
 	    free(sndcmsgbuf);
 	if ((sndcmsgbuf = malloc(ctllen)) == NULL)
-	    log(LOG_ERR, 0, "make_mld6_msg: malloc failed");	/* assert */
+	    log_msg(LOG_ERR, 0, "make_mld6_msg: malloc failed");	/* assert */
 	ctlbuflen = ctllen;
     }
     /*
@@ -309,23 +309,23 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 	    hbhbuf = CMSG_DATA(cmsgp);
 
 	    if ((currentlen = inet6_opt_init(hbhbuf, hbhlen)) == -1)
-		log(LOG_ERR, 0, "inet6_opt_init(len = %d) failed", hbhlen);
+		log_msg(LOG_ERR, 0, "inet6_opt_init(len = %d) failed", hbhlen);
 	    if ((currentlen = inet6_opt_append(hbhbuf, hbhlen,
 					       currentlen,
 					       IP6OPT_ROUTER_ALERT, 2,
 					       2, &optp)) == -1)
-		log(LOG_ERR, 0,
+		log_msg(LOG_ERR, 0,
 		    "inet6_opt_append(len = %d/%d) failed", currentlen, hbhlen);
 	    (void) inet6_opt_set_val(optp, 0, &rtalert_code,
 				     sizeof(rtalert_code));
 	    if (inet6_opt_finish(hbhbuf, hbhlen, currentlen) == -1)
-		log(LOG_ERR, 0, "inet6_opt_finish(buf) failed");
+		log_msg(LOG_ERR, 0, "inet6_opt_finish(buf) failed");
 #else				/* old advanced API */
 	    if (inet6_option_init((void *) cmsgp, &cmsgp, IPV6_HOPOPTS))
-		log(LOG_ERR, 0,	/* assert */
+		log_msg(LOG_ERR, 0,	/* assert */
 		    "make_mld6_msg: inet6_option_init failed");
 	    if (inet6_option_append(cmsgp, raopt, 4, 0))
-		log(LOG_ERR, 0,	/* assert */
+		log_msg(LOG_ERR, 0,	/* assert */
 		    "make_mld6_msg: inet6_option_append failed");
 #endif
 	    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
@@ -362,7 +362,7 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 	if (errno == ENETDOWN)
 	    check_vif_state();
 	else
-	    log(log_level(IPPROTO_ICMPV6, type, 0), errno,
+	    log_msg(log_level(IPPROTO_ICMPV6, type, 0), errno,
 		"sendmsg to %s with src %s on %s",
 		sa6_fmt(dstp), src ? sa6_fmt(src) : "(unspec)",
 		ifindex2str(index));
@@ -370,7 +370,7 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 	return;
     }
     IF_DEBUG(DEBUG_PKT)
-	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
+	log_msg(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
 	    src ? sa6_fmt(src) : "unspec", sa6_fmt(dstp));
 }

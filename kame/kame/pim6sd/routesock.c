@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.19 2002/06/28 09:03:13 jinmei Exp $	*/
+/*	$KAME: routesock.c,v 1.20 2003/09/02 09:48:46 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -128,12 +128,12 @@ init_routesock()
     routing_socket = socket(PF_ROUTE, SOCK_RAW, AF_INET6);
     if (routing_socket < 0)
     {
-	log(LOG_ERR, 0, "\nRouting socket error");
+	log_msg(LOG_ERR, 0, "\nRouting socket error");
 	return -1;
     }
     if (fcntl(routing_socket, F_SETFL, O_NONBLOCK) == -1)
     {
-	log(LOG_ERR, 0, "\n Routing socket error");
+	log_msg(LOG_ERR, 0, "\n Routing socket error");
 	return -1;
     }
 #if 0
@@ -146,7 +146,7 @@ init_routesock()
 		       SO_USELOOPBACK, (char *) &off,
 		       sizeof(off)) < 0)
 	{
-	    log(LOG_ERR, 0, "\n setsockopt(SO_USELOOPBACK,0)");
+	    log_msg(LOG_ERR, 0, "\n setsockopt(SO_USELOOPBACK,0)");
 	    return -1;
 	}
     }
@@ -243,10 +243,10 @@ k_req_incoming(source, rpfp)
 	IF_DEBUG(DEBUG_RPF | DEBUG_KERN)
 	{
 	    if (errno == ESRCH)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "Writing to routing socket: no such route\n");
 	    else
-		log(LOG_DEBUG, 0, "Error writing to routing socket");
+		log_msg(LOG_DEBUG, 0, "Error writing to routing socket");
 	}
 	return (FALSE);
     }
@@ -259,7 +259,7 @@ k_req_incoming(source, rpfp)
     if (l < 0)
     {
 	IF_DEBUG(DEBUG_RPF | DEBUG_KERN)
-	    log(LOG_DEBUG, 0, "Read from routing socket failed: %s", strerror(errno));
+	    log_msg(LOG_DEBUG, 0, "Read from routing socket failed: %s", strerror(errno));
 	return (FALSE);
     }
 
@@ -298,7 +298,7 @@ getmsg(rtm, msglen, rpfinfop)
 
     sin6 = (struct sockaddr_in6 *) & so_dst;
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, "route to: %s", sa6_fmt(sin6));
+	log_msg(LOG_DEBUG, 0, "route to: %s", sa6_fmt(sin6));
     cp = ((char *) (rtm + 1));
     if (rtm->rtm_addrs)
 	for (i = 1; i; i <<= 1)
@@ -327,7 +327,7 @@ getmsg(rtm, msglen, rpfinfop)
 			 * There are some defined flags other than above 4,
 			 * but we are not interested in them.
 			 */
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "Routesock.c (getmsg) unknown flag : %d",i);
 #endif
 		}
@@ -337,7 +337,7 @@ getmsg(rtm, msglen, rpfinfop)
     if (!ifp)
     {				/* No incoming interface */
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"No incoming interface for destination %s", sa6_fmt(sin6));
 	return (FALSE);
     }
@@ -347,14 +347,14 @@ getmsg(rtm, msglen, rpfinfop)
     {
 	sin6 = (struct sockaddr_in6 *) dst;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " destination is: %s", sa6_fmt(sin6));
+	    log_msg(LOG_DEBUG, 0, " destination is: %s", sa6_fmt(sin6));
     }
 
     if (gate)
     {
 	sin6 = (struct sockaddr_in6 *) gate;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " gateway is: %s", sa6_fmt(sin6));
+	    log_msg(LOG_DEBUG, 0, " gateway is: %s", sa6_fmt(sin6));
 
     	/* RPF for static interface routes for P2P interface */
 	if (!(rtm->rtm_flags & RTF_GATEWAY)) 
@@ -362,7 +362,7 @@ getmsg(rtm, msglen, rpfinfop)
 	    mifi_t p2pif;
 
 	    IF_DEBUG(DEBUG_RPF)
-		log(LOG_DEBUG, 0, " it's a static interface route for P2P I/F");
+		log_msg(LOG_DEBUG, 0, " it's a static interface route for P2P I/F");
 
 	    /* gateway must be a local address of an interface in this case */
 	    p2pif = local_address(sin6);
@@ -376,7 +376,7 @@ getmsg(rtm, msglen, rpfinfop)
 	    	return (FALSE);
 	    *sin6 = uvifs[p2pif].uv_pim_neighbors->address;
 	    IF_DEBUG(DEBUG_RPF)
-		log(LOG_DEBUG, 0, " RPF neighbor is finally %s",
+		log_msg(LOG_DEBUG, 0, " RPF neighbor is finally %s",
 		    sa6_fmt(sin6));
 	}
 		
@@ -405,14 +405,14 @@ getmsg(rtm, msglen, rpfinfop)
 	    break;
 
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, " iif is %s", mif_name(vifi));
+	log_msg(LOG_DEBUG, 0, " iif is %s", mif_name(vifi));
 
     rpfinfop->iif = vifi;
 
     if (vifi >= numvifs)
     {
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"Invalid incoming interface for destination %s, because of invalid virtual interface",
 		sa6_fmt(sin6));
 	return (FALSE);		/* invalid iif */
@@ -442,7 +442,7 @@ k_req_incoming(source, rpfcinfo)
 
     if (ioctl(udp_socket, SIOCGETRPF, (char *) rpfcinfo) < 0)
     {
-	log(LOG_ERR, errno, "ioctl SIOCGETRPF k_req_incoming");
+	log_msg(LOG_ERR, errno, "ioctl SIOCGETRPF k_req_incoming");
 	return (FALSE);
     }
     return (TRUE);

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.34 2003/05/21 06:54:34 suz Exp $	*/
+/*	$KAME: config.c,v 1.35 2003/09/02 09:48:44 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -115,7 +115,7 @@ config_vifs_from_kernel()
 
 #ifdef HAVE_GETIFADDRS
 	if (getifaddrs(&ifap))
-		log(LOG_ERR, errno, "getifaddrs");
+		log_msg(LOG_ERR, errno, "getifaddrs");
 
 	/*
 	 * Loop through all of the interfaces.
@@ -160,12 +160,12 @@ config_vifs_from_kernel()
 		strncpy(ifr6.ifr_name, ifa->ifa_name, sizeof(ifr6.ifr_name));
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)ifa->ifa_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
+			log_msg(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
 			    sa6_fmt(&ifr6.ifr_addr));
 		}
 		else {
 			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) {
-				log(LOG_DEBUG, 0, "config_vifs_from_kernel: "
+				log_msg(LOG_DEBUG, 0, "config_vifs_from_kernel: "
 				    "%s on %s is an anycast address, ignored",
 				    sa6_fmt(&ifr6.ifr_addr), ifa->ifa_name);
 				continue;
@@ -219,7 +219,7 @@ config_vifs_from_kernel()
 		 */
 		v = find_vif(ifa->ifa_name, CREATE, default_vif_status);
 		if (v == NULL) {
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "ignored implicitly disabled interface %s",
 			     ifa->ifa_name);
 			continue;
@@ -250,7 +250,7 @@ config_vifs_from_kernel()
 			v->uv_flags |= VIFF_DISABLED;
 
 		IF_DEBUG(DEBUG_IF)
-			log(LOG_DEBUG,0,
+			log_msg(LOG_DEBUG,0,
 			    "Installing %s (%s on subnet %s) ,"
 			    "as vif #%u - rate = %d",
 			    v->uv_name, sa6_fmt(&addr),
@@ -274,7 +274,7 @@ config_vifs_from_kernel()
 		caddr_t newbuf;
 
 		if (ioctl(udp_socket,SIOCGIFCONF,(char *)&ifc) <0)
-		      log(LOG_ERR, errno, "ioctl SIOCGIFCONF");	
+		      log_msg(LOG_ERR, errno, "ioctl SIOCGIFCONF");	
 		/*
 		 * If the buffer was large enough to hold all the addresses
 		 * then break out, otherwise increase the buffer size and
@@ -296,7 +296,7 @@ config_vifs_from_kernel()
 		ifc.ifc_buf = newbuf;
 	}
 	if (ifc.ifc_buf == NULL)
-	    log(LOG_ERR, 0, "config_vifs_from_kernel: ran out of memory");
+	    log_msg(LOG_ERR, 0, "config_vifs_from_kernel: ran out of memory");
 	
 
 	ifrp = (struct ifreq *) ifc.ifc_buf;
@@ -340,7 +340,7 @@ config_vifs_from_kernel()
 		strncpy(ifr6.ifr_name,ifrp->ifr_name,sizeof(ifr6.ifr_name));
 
 		if(ioctl(udp_socket,SIOCGIFFLAGS,(char *)&ifr) <0)
-        	log(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
+        	log_msg(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 		flags = ifr.ifr_flags;
 
 #if 0
@@ -357,7 +357,7 @@ config_vifs_from_kernel()
 		 */
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 		if(ioctl(udp_socket, SIOCGIFNETMASK_IN6, (char *)&ifr6) <0)
-			log(LOG_ERR, errno, "ioctl SIOCGIFNETMASK_IN6 for %s",
+			log_msg(LOG_ERR, errno, "ioctl SIOCGIFNETMASK_IN6 for %s",
 			    sa6_fmt(&ifr6.ifr_addr));
 		memcpy(&mask,&ifr6.ifr_addr.sin6_addr,sizeof(mask));
 
@@ -368,12 +368,12 @@ config_vifs_from_kernel()
 		 */
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
+			log_msg(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
 			    sa6_fmt(&ifr6.ifr_addr));
 		}
 		else {
 			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) {
-				log(LOG_DEBUG, 0, "config_vifs_from_kernel: "
+				log_msg(LOG_DEBUG, 0, "config_vifs_from_kernel: "
 				    "%s on %s is an anycast address, ignored",
 				    sa6_fmt(&ifr6.ifr_addr),
 				    ifr.ifr_name);
@@ -414,7 +414,7 @@ config_vifs_from_kernel()
 		 */
 		v = find_vif(ifr.ifr_name, CREATE, default_vif_status);
 		if (v == NULL) {
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "ignored implicitly disabled interface %s",
 			    ifr.ifr_name);	
 			continue;
@@ -444,7 +444,7 @@ config_vifs_from_kernel()
 			v->uv_flags |= VIFF_DISABLED;
 
 		IF_DEBUG(DEBUG_IF)
-			log(LOG_DEBUG,0,
+			log_msg(LOG_DEBUG,0,
 			    "Installing %s (%s on subnet %s) ,"
 			    "as vif #%u - rate = %d",
 			    v->uv_name, sa6_fmt(&addr),
@@ -468,7 +468,7 @@ add_phaddr(struct uvif *v, struct sockaddr_in6 *addr, struct in6_addr *mask, str
 	int i;
 	
 	if ((pa = malloc(sizeof(*pa))) == NULL)
-	        log(LOG_ERR, 0, "add_phaddr: memory exhausted");
+	        log_msg(LOG_ERR, 0, "add_phaddr: memory exhausted");
 
 
 	memset(pa,0,sizeof(*pa));
@@ -485,7 +485,7 @@ add_phaddr(struct uvif *v, struct sockaddr_in6 *addr, struct in6_addr *mask, str
 
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
 		if(v->uv_linklocal) {
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "add_phaddr: found more than one link-local "
 			    "address on %s",
 			    v->uv_name);

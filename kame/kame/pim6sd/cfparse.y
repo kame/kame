@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.33 2003/08/10 17:02:41 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.34 2003/09/02 09:48:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -702,34 +702,34 @@ param_config()
 	pim_assert_timeout = asserttimo;
 
 	IF_DEBUG(DEBUG_PIM_HELLO) {
-		log(LOG_DEBUG, 0, "pim_hello_period set to: %u",
+		log_msg(LOG_DEBUG, 0, "pim_hello_period set to: %u",
 		    pim_hello_period);
-		log(LOG_DEBUG, 0, "pim_hello_holdtime set to: %u",
+		log_msg(LOG_DEBUG, 0, "pim_hello_holdtime set to: %u",
 		    pim_hello_holdtime);
 	}
 
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE) {
-		log(LOG_DEBUG,0 , "pim_join_prune_period set to: %u",
+		log_msg(LOG_DEBUG,0 , "pim_join_prune_period set to: %u",
 		    pim_join_prune_period);
-		log(LOG_DEBUG, 0, "pim_join_prune_holdtime set to: %u",
+		log_msg(LOG_DEBUG, 0, "pim_join_prune_holdtime set to: %u",
 		    pim_join_prune_holdtime);
 	}
 	IF_DEBUG(DEBUG_TIMER) {
-		log(LOG_DEBUG,0 , "timer interval set to: %u", timer_interval);
+		log_msg(LOG_DEBUG,0 , "timer interval set to: %u", timer_interval);
 	}
 	IF_DEBUG(DEBUG_PIM_TIMER) {
-		log(LOG_DEBUG,0 , "PIM data timeout set to: %u",
+		log_msg(LOG_DEBUG,0 , "PIM data timeout set to: %u",
 		    pim_data_timeout);
 	}
 	IF_DEBUG(DEBUG_PIM_REGISTER) {
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "PIM register suppression timeout set to: %u",
 		    pim_register_suppression_timeout);
-		log(LOG_DEBUG, 0, "PIM register probe time set to: %u",
+		log_msg(LOG_DEBUG, 0, "PIM register probe time set to: %u",
 		    pim_register_probe_time);
 	}
 	IF_DEBUG(DEBUG_PIM_ASSERT) {
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "PIM assert timeout set to: %u",
 		    pim_assert_timeout);
 	}
@@ -759,7 +759,7 @@ phyint_config()
 				else {
 					v->uv_local_pref = al->attru.number;
 					IF_DEBUG(DEBUG_ASSERT)
-						log(LOG_DEBUG, 0,
+						log_msg(LOG_DEBUG, 0,
 						    "default localpref for %s "
 						    "is %d",
 						    v->uv_name,
@@ -774,7 +774,7 @@ phyint_config()
 				else {
 					v->uv_metric = al->attru.number;
 					IF_DEBUG(DEBUG_ASSERT)
-						log(LOG_DEBUG, 0,
+						log_msg(LOG_DEBUG, 0,
 						    "default local metric for %s "
 						    "is %d",
 						    v->uv_name,
@@ -789,7 +789,7 @@ phyint_config()
 				else {
 					v->uv_mld_robustness = al->attru.number;
 					IF_DEBUG(DEBUG_MLD)
-						log(LOG_DEBUG, 0,
+						log_msg(LOG_DEBUG, 0,
 						    "mld robustness var. for %s "
 						    "is %d",
 						    v->uv_name,
@@ -805,7 +805,7 @@ phyint_config()
 				}
 				v->uv_mld_version = al->attru.number;
 				IF_DEBUG(DEBUG_MLD)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "mld version for %s is %s %s",
 					    v->uv_name,
 					    v->uv_mld_version & MLDv1 ? "v1" : "",
@@ -830,7 +830,7 @@ phyint_config()
 					v->uv_mld_query_interval = al->attru.number;
 
 				IF_DEBUG(DEBUG_MLD)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "mld query interval for %s "
 					    "is %d",
 					    v->uv_name,
@@ -863,7 +863,7 @@ phyint_config()
 					v->uv_mld_query_rsp_interval = al->attru.number;
 				}
 				IF_DEBUG(DEBUG_MLD)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "mld query resp. interval for %s "
 					    "is %d",
 					    v->uv_name,
@@ -896,7 +896,7 @@ phyint_config()
 					v->uv_mld_llqi = al->attru.number;
 				}
 				IF_DEBUG(DEBUG_MLD)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "mld llqi interval for %s "
 					    "is %d",
 					    v->uv_name,
@@ -1043,25 +1043,25 @@ grp_prefix_config()
 	struct attr_list *pl;
 
 	if (grp_prefix == NULL) {
-		log(LOG_DEBUG, 0, "no group_prefix was specified");
+		log_msg(LOG_DEBUG, 0, "no group_prefix was specified");
 		return 0;
 	}
 	if (cand_rp_flag != TRUE) {
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "group_prefix was specified without cand_rp(ignored)");
 		return(0);
 	}
 
 	for (pl = grp_prefix; pl; pl = pl->next) {
 		if (!IN6_IS_ADDR_MULTICAST(&pl->attru.prefix.paddr)) {
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "Config error: %s is not a multicast address(ignored)",
 			    inet6_fmt(&pl->attru.prefix.paddr));
 			continue;
 		}
 
 		if (!(~(*cand_rp_adv_message.prefix_cnt_ptr))) {
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "Too many group_prefix configured. Truncating...");
 			break;
 		}
@@ -1093,7 +1093,7 @@ regthres_config()
 	int interval = -1;
 
 	if (cand_rp_flag != TRUE) {
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "register_threshold was specified without cand_rp");
 	}
 
@@ -1207,13 +1207,13 @@ cf_post_config()
 	datathres_config();
 
 	IF_DEBUG(DEBUG_SWITCH) {
-		log(LOG_DEBUG, 0, "reg_rate_limit set to %u (bits/s)",
+		log_msg(LOG_DEBUG, 0, "reg_rate_limit set to %u (bits/s)",
 		    pim_reg_rate_bytes);
-		log(LOG_DEBUG, 0, "reg_rate_interval set to  %u s.",
+		log_msg(LOG_DEBUG, 0, "reg_rate_interval set to  %u s.",
 		    pim_reg_rate_check_interval);
-		log(LOG_DEBUG, 0, "data_rate_limit set to %u (bits/s)",
+		log_msg(LOG_DEBUG, 0, "data_rate_limit set to %u (bits/s)",
 		    pim_data_rate_bytes);
-		log(LOG_DEBUG, 0, "data_rate_interval set to %u s.",
+		log_msg(LOG_DEBUG, 0, "data_rate_interval set to %u s.",
 		    pim_data_rate_check_interval);
 	}
 

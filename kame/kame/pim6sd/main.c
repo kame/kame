@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.30 2003/02/12 04:32:23 suz Exp $	*/
+/*	$KAME: main.c,v 1.31 2003/09/02 09:48:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -389,13 +389,13 @@ usage:
 #endif				/* LOG_DAEMON */
     /* open a log file */
     if ((log_fp = fopen(logfilename, "w")) == NULL)
-	    log(LOG_ERR, errno, "fopen(%s)", logfilename);
+	    log_msg(LOG_ERR, errno, "fopen(%s)", logfilename);
     setlinebuf(log_fp);
 
     snprintf(versionstring, sizeof(versionstring),
 	"pim6sd version %s", todaysversion);
 
-    log(LOG_INFO, 0, "%s starting", versionstring);
+    log_msg(LOG_INFO, 0, "%s starting", versionstring);
 
     /*
      * TODO: XXX: use a combination of time and hostid to initialize the
@@ -557,7 +557,7 @@ usage:
 	if ((n = select(nfds, &rfds, NULL, NULL, timeout)) < 0)
 	{
 	    if (errno != EINTR)	
-		log(LOG_WARNING, errno, "select failed");
+		log_msg(LOG_WARNING, errno, "select failed");
 	    continue;
 	}
 
@@ -592,7 +592,7 @@ usage:
 	    difftime.tv_usec += curtime.tv_usec - lasttime.tv_usec;
 #ifdef TIMERDEBUG
 	    IF_DEBUG(DEBUG_TIMEOUT)
-		log(LOG_DEBUG, 0, "TIMEOUT: secs %d, diff secs %d, diff usecs %d", secs, difftime.tv_sec, difftime.tv_usec);
+		log_msg(LOG_DEBUG, 0, "TIMEOUT: secs %d, diff secs %d, diff usecs %d", secs, difftime.tv_sec, difftime.tv_usec);
 #endif
 	    while (difftime.tv_usec >= 1000000)
 	    {
@@ -609,7 +609,7 @@ usage:
 	    {
 #ifdef TIMERDEBUG
 		    IF_DEBUG(DEBUG_TIMEOUT)
-			log(LOG_DEBUG, 0, "\taging callouts: secs %d, diff secs %d, diff usecs %d", secs, difftime.tv_sec, difftime.tv_usec);
+			log_msg(LOG_DEBUG, 0, "\taging callouts: secs %d, diff secs %d, diff usecs %d", secs, difftime.tv_sec, difftime.tv_usec);
 #endif
 		    age_callout_queue(difftime.tv_sec);
 	    }
@@ -630,7 +630,7 @@ usage:
 
     }				/* Main loop */
 
-    log(LOG_NOTICE, 0, "%s exiting", versionstring);
+    log_msg(LOG_NOTICE, 0, "%s exiting", versionstring);
     cleanup();
     exit(0);
 }
@@ -746,7 +746,7 @@ restart(i)
     int             i;
 {
 
-    log(LOG_NOTICE, 0, "%s restart", versionstring);
+    log_msg(LOG_NOTICE, 0, "%s restart", versionstring);
 
     /*
      * reset all the entries
