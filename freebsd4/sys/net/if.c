@@ -1186,6 +1186,9 @@ ifioctl(so, cmd, data, p)
 	case SIOCSLIFPHYADDR:
         case SIOCSIFMEDIA:
 	case SIOCSIFGENERIC:
+#ifdef SIOCDIFGENERIC
+	case SIOCDIFGENERIC:
+#endif
 		error = suser(p);
 		if (error)
 			return (error);
