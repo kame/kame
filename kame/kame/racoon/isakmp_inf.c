@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.71 2001/08/07 14:29:50 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.72 2001/10/19 01:43:37 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1270,7 +1270,8 @@ isakmp_check_notify(gen, iph1)
 		break;
 	case ISAKMP_NTYPE_INITIAL_CONTACT:
 		plog(LLV_WARNING, LOCATION, iph1->remote,
-			"ignore INITIAL-CONTACT notification.\n");
+			"ignore INITIAL-CONTACT notification, "
+			"because it is only accepted after phase1.\n");
 		break;
 	default:
 		isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
