@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.1 2001/03/04 13:31:55 itojun Exp $	*/
+/*	$KAME: main.c,v 1.2 2001/03/04 22:38:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -264,7 +264,12 @@ send_discover(s)
 #ifndef __KAME__
 #error kame systems only
 #endif
-	snprintf(dest, sizeof(dest), "ff02::1%%%s", iface);	/*XXX*/
+	if (dflag)
+		snprintf(dest, sizeof(dest), "ff02::1%%%s", iface);	/*XXX*/
+	else {
+		/* XXX local agreement */
+		snprintf(dest, sizeof(dest), "ff02::20%%%s", iface);
+	}
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;

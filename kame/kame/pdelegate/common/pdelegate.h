@@ -1,4 +1,4 @@
-/*	$KAME: pdelegate.h,v 1.1 2001/03/04 13:31:55 itojun Exp $	*/
+/*	$KAME: pdelegate.h,v 1.2 2001/03/04 22:38:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -33,13 +33,13 @@
  * draft-haberman-ipngwg-auto-prefix-00.txt
  */
 
-#define ICMP6_PREFIX_REQUEST		200	/*XXX*/
+#define ICMP6_PREFIX_REQUEST		150	/*XXX local agreement*/
 #define ICMP6_PR_DELEGATOR_QUERY	0
 #define ICMP6_PR_INITIAL_REQUEST	1
 #define ICMP6_PR_RENEWAL_REQUEST	2
 #define ICMP6_PR_PREFIX_RETURN		3
 
-#define ICMP6_PREFIX_DELEGATION		201	/*XXX*/
+#define ICMP6_PREFIX_DELEGATION		151	/*XXX local agreement*/
 #define ICMP6_PD_PREFIX_DELEGATOR	0
 #define ICMP6_PD_AUTH_REQUIRED		1
 #define ICMP6_PD_AUTH_FAILED		2
