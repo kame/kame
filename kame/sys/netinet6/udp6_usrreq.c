@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.115 2003/09/10 08:10:55 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.116 2003/09/21 09:33:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,7 +136,7 @@ udp6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
-	struct mbuf *m = *mp;
+	struct mbuf *m = *mp, *opts = NULL;
 	struct ip6_hdr *ip6;
 	struct udphdr *uh;
 	struct in6pcb *in6p;
@@ -145,7 +145,6 @@ udp6_input(mp, offp, proto)
 	struct ip6_recvpktopts opts;
 	struct sockaddr_in6 src, dst, fromsa;
 
-	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(NFAITH) && 0 < NFAITH
@@ -313,14 +312,14 @@ udp6_input(mp, offp, proto)
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
 					    (struct sockaddr *)&fromsa,
-					    n, opts.head) == 0) {
+					    n, opts) == 0) {
 						m_freem(n);
-						if (opts.head)
-							m_freem(opts.head);
+						if (opts)
+							m_freem(opts);
 						udp6stat.udp6s_fullsock++;
 					} else
 						sorwakeup(last->in6p_socket);
-					bzero(&opts, sizeof(opts));
+					opts = NULL;
 				}
 			}
 			last = in6p;
@@ -366,7 +365,7 @@ udp6_input(mp, offp, proto)
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-		    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
+		    (struct sockaddr *)&fromsa, m, opts) == 0) {
 			udp6stat.udp6s_fullsock++;
 			goto bad;
 		}
@@ -432,7 +431,7 @@ udp6_input(mp, offp, proto)
 
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-	    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
+	    (struct sockaddr *)&fromsa, m, opts) == 0) {
 		udp6stat.udp6s_fullsock++;
 		goto bad;
 	}
@@ -441,8 +440,8 @@ udp6_input(mp, offp, proto)
 bad:
 	if (m)
 		m_freem(m);
-	if (opts.head)
-		m_freem(opts.head);
+	if (opts)
+		m_freem(opts);
 	return IPPROTO_DONE;
 }
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.329 2003/09/10 08:20:38 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.330 2003/09/21 09:33:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1605,24 +1605,22 @@ ip6_unknown_opt(optp, m, off)
  * Create the "control" list for this pcb.
  * The function will not modify mbuf chain at all.
  *
- * with KAME mbuf chain restriction:
- * The routine will be called from upper layer handlers like tcp6_input().
- * Thus the routine assumes that the caller (tcp6_input) have already
+ * with KAME mbuf chain restriction (and without mbuf pulldown):
+ * The routine will be called from upper layer handlers like udp6_input().
+ * Thus the routine assumes that the caller (udp6_input) have already
  * called IP6_EXTHDR_CHECK() and all the extension headers are located in the
  * very first mbuf on the mbuf chain.
  */
 void
-ip6_savecontrol(in6p, m, ctl)
+ip6_savecontrol(in6p, m, mp)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 	struct inpcb *in6p;
 #else
 	struct in6pcb *in6p;
 #endif
-	struct mbuf *m;
-	struct ip6_recvpktopts *ctl;
+	struct mbuf *m, **mp;
 {
 #define IS2292(x, y)	((in6p->in6p_flags & IN6P_RFC2292) ? (x) : (y))
-	struct mbuf **mp;
 #ifdef HAVE_NRL_INPCB
 # define in6p_flags	inp_flags
 #endif
@@ -1638,11 +1636,6 @@ ip6_savecontrol(in6p, m, ctl)
 #endif
 	int privileged = 0;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-
-	if (ctl == NULL)	/* validity check */
-		return;
-	bzero(ctl, sizeof(*ctl)); /* XXX is it really OK? */
-	mp = &ctl->head;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
@@ -1667,11 +1660,8 @@ ip6_savecontrol(in6p, m, ctl)
 		microtime(&tv);
 		*mp = sbcreatecontrol((caddr_t) &tv, sizeof(tv),
 		    SCM_TIMESTAMP, SOL_SOCKET);
-		if (*mp) {
-			/* always set regradless of the previous value */
-			ctl->timestamp = *mp;
+		if (*mp)
 			mp = &(*mp)->m_next;
-		}
 	}
 #endif
 
@@ -1691,10 +1681,8 @@ ip6_savecontrol(in6p, m, ctl)
 		*mp = sbcreatecontrol((caddr_t) &pi6,
 		    sizeof(struct in6_pktinfo),
 		    IS2292(IPV6_2292PKTINFO, IPV6_PKTINFO), IPPROTO_IPV6);
-		if (*mp) {
-			ctl->pktinfo = *mp;
+		if (*mp)
 			mp = &(*mp)->m_next;
-		}
 	}
 
 	if ((in6p->in6p_flags & IN6P_HOPLIMIT) != 0) {
@@ -1702,10 +1690,8 @@ ip6_savecontrol(in6p, m, ctl)
 
 		*mp = sbcreatecontrol((caddr_t) &hlim, sizeof(int),
 		    IS2292(IPV6_2292HOPLIMIT, IPV6_HOPLIMIT), IPPROTO_IPV6);
-		if (*mp) {
-			ctl->hlim = *mp;
+		if (*mp)
 			mp = &(*mp)->m_next;
-		}
 	}
 
 	if ((in6p->in6p_flags & IN6P_TCLASS) != 0) {
@@ -1718,10 +1704,8 @@ ip6_savecontrol(in6p, m, ctl)
 		tclass = flowinfo & 0xff;
 		*mp = sbcreatecontrol((caddr_t)&tclass, sizeof(tclass),
 		    IPV6_TCLASS, IPPROTO_IPV6);
-		if (*mp) {
-			ctl->hlim = *mp;
+		if (*mp)
 			mp = &(*mp)->m_next;
-		}
 	}
 
 	/*
@@ -1778,10 +1762,8 @@ ip6_savecontrol(in6p, m, ctl)
 			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
 			    IS2292(IPV6_2292HOPOPTS, IPV6_HOPOPTS),
 			    IPPROTO_IPV6);
-			if (*mp) {
-				ctl->hbh = *mp;
+			if (*mp)
 				mp = &(*mp)->m_next;
-			}
 #ifdef PULLDOWN_TEST
 			m_freem(ext);
 #endif
@@ -1863,8 +1845,6 @@ ip6_savecontrol(in6p, m, ctl)
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
 				    IS2292(IPV6_2292DSTOPTS, IPV6_DSTOPTS),
 				    IPPROTO_IPV6);
-				if (ctl->dest == NULL)
-					ctl->dest = *mp;
 				if (*mp)
 					mp = &(*mp)->m_next;
 				break;
@@ -1876,8 +1856,6 @@ ip6_savecontrol(in6p, m, ctl)
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
 				    IS2292(IPV6_2292RTHDR, IPV6_RTHDR),
 				    IPPROTO_IPV6);
-				if (ctl->rthdr == NULL)
-					ctl->rthdr = *mp;
 				if (*mp)
 					mp = &(*mp)->m_next;
 				break;

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.358 2003/09/10 08:10:54 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.359 2003/09/21 09:33:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2304,7 +2304,7 @@ icmp6_rip6_input(mp, off, src, dst)
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 fromsa;
 	struct icmp6_hdr *icmp6;
-	struct ip6_recvpktopts opts;
+	struct mbuf *opts = NULL;
 
 #ifndef PULLDOWN_TEST
 	/* this is assumed to be safe. */
@@ -2325,8 +2325,6 @@ icmp6_rip6_input(mp, off, src, dst)
 #ifndef SCOPEDROUTING
 	in6_clearscope(&fromsa.sin6_addr);
 #endif
-
-	bzero(&opts, sizeof(opts));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	LIST_FOREACH(in6p, &ripcb, inp_list)
@@ -2408,16 +2406,16 @@ icmp6_rip6_input(mp, off, src, dst)
 				/* strip intermediate headers */
 				m_adj(n, off);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
-				    (struct sockaddr *)&fromsa, n, opts.head)
+				    (struct sockaddr *)&fromsa, n, opts)
 				    == 0) {
 					/* should notify about lost packet */
 					m_freem(n);
-					if (opts.head) {
-						m_freem(opts.head);
+					if (opts) {
+						m_freem(opts);
 					}
 				} else
 					sorwakeup(last->in6p_socket);
-				bzero(&opts, sizeof(opts));
+				opts = NULL;
 			}
 		}
 		last = in6p;
@@ -2451,10 +2449,10 @@ icmp6_rip6_input(mp, off, src, dst)
 			}
 		}
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-		    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
+		    (struct sockaddr *)&fromsa, m, opts) == 0) {
 			m_freem(m);
-			if (opts.head)
-				m_freem(opts.head);
+			if (opts)
+				m_freem(opts);
 		} else
 			sorwakeup(last->in6p_socket);
 	} else {

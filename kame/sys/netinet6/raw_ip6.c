@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.141 2003/09/10 08:10:55 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.142 2003/09/21 09:33:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -179,12 +179,11 @@ rip6_input(mp, offp, proto)
 	struct	mbuf **mp;
 	int	*offp, proto;
 {
-	struct mbuf *m = *mp;
+	struct mbuf *m = *mp, *opts = NULL;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 src, dst, fromsa;
-	struct ip6_recvpktopts opts;
 
 	rip6stat.rip6s_ipackets++;
 
@@ -221,8 +220,6 @@ rip6_input(mp, offp, proto)
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-
-	bzero(&opts, sizeof(opts));
 
 #ifdef __OpenBSD__
 	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
@@ -272,14 +269,14 @@ rip6_input(mp, offp, proto)
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
-				    (struct sockaddr *)&fromsa, n, opts.head) == 0) {
+				    (struct sockaddr *)&fromsa, n, opts) == 0) {
 					m_freem(n);
-					if (opts.head)
-						m_freem(opts.head);
+					if (opts)
+						m_freem(opts);
 					rip6stat.rip6s_fullsock++;
 				} else
 					sorwakeup(last->in6p_socket);
-				bzero(&opts, sizeof(opts));
+				opts = NULL;
 			}
 		}
 		last = in6p;
@@ -301,10 +298,10 @@ rip6_input(mp, offp, proto)
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-		    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
+		    (struct sockaddr *)&fromsa, m, opts) == 0) {
 			m_freem(m);
-			if (opts.head)
-				m_freem(opts.head);
+			if (opts)
+				m_freem(opts);
 			rip6stat.rip6s_fullsock++;
 		} else
 			sorwakeup(last->in6p_socket);

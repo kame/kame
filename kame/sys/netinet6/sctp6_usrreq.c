@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.20 2003/09/10 08:10:55 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.21 2003/09/21 09:33:43 jinmei Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -182,7 +182,7 @@ sctp6_input(mp, offp, proto)
 	u_int32_t check, calc_check;
 	struct inpcb *in6p_ip;
 	struct sctp_chunkhdr *ch;
-	struct ip6_recvpktopts opts;
+	struct mbuf *opts = NULL;
 	int length, mlen, offset, iphlen;
 	u_int8_t ecn_bits;
 	struct sctp_tcb *stcb;
@@ -190,7 +190,6 @@ sctp6_input(mp, offp, proto)
 	int off = *offp;
 
 	iphlen = off;
-	bzero(&opts, sizeof(opts));
 
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct sctphdr), IPPROTO_DONE);
 
@@ -384,8 +383,8 @@ sctp6_input(mp, offp, proto)
  out_of:
 	if (m)
 		m_freem(m);
-	if (opts.head)
-		m_freem(opts.head);
+	if (opts)
+		m_freem(opts);
 	return IPPROTO_DONE;
 }
 

@@ -196,9 +196,6 @@ udp_input(m, off)
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
-#ifdef INET6
-	struct ip6_recvpktopts opts6;
-#endif 
 	int len;
 	struct ip save_ip;
 	struct sockaddr *append_sa;
@@ -211,9 +208,6 @@ udp_input(m, off)
 #endif
 
 	udpstat.udps_ipackets++;
-#ifdef INET6
-	bzero(&opts6, sizeof(opts6));
-#endif
 
 	/*
 	 * Strip IP options, if any; should skip this,
@@ -579,7 +573,7 @@ udp_input(m, off)
 
 			savedflags = inp->inp_flags;
 			inp->inp_flags &= ~INP_UNMAPPABLEOPTS;
- 			ip6_savecontrol(inp, m, &opts6);
+ 			ip6_savecontrol(inp, m, &opts);
 			inp->inp_flags = savedflags;
 		} else
 #endif
@@ -590,7 +584,6 @@ udp_input(m, off)
 	if (inp->inp_vflag & INP_IPV6) {
 		in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
 		append_sa = (struct sockaddr *)&udp_in6;
- 		opts = opts6.head;
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;
@@ -639,11 +632,7 @@ udp_append(last, ip, n, off)
 {
 	struct sockaddr *append_sa;
 	struct mbuf *opts = 0;
-#ifdef INET6
-	struct ip6_recvpktopts opts6;
 
-	bzero(&opts6, sizeof(opts6));
-#endif
 	if (last->inp_flags & INP_CONTROLOPTS ||
 	    last->inp_socket->so_options & SO_TIMESTAMP) {
 #ifdef INET6
@@ -652,7 +641,7 @@ udp_append(last, ip, n, off)
 
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
- 			ip6_savecontrol(last, n, &opts6);
+ 			ip6_savecontrol(last, n, &opts);
 			last->inp_flags = savedflags;
 		} else
 #endif
@@ -665,7 +654,6 @@ udp_append(last, ip, n, off)
 			udp_in6.uin6_init_done = 1;
 		}
 		append_sa = (struct sockaddr *)&udp_in6.uin6_sin;
- 		opts = opts6.head;
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;

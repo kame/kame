@@ -212,7 +212,6 @@ udp_input(struct mbuf *m, ...)
 #ifdef INET6
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 src_sa6, dst_sa6;
-	struct ip6_recvpktopts opts6;
 #endif /* INET6 */
 #ifdef IPSEC
 	struct m_tag *mtag;
@@ -239,9 +238,6 @@ udp_input(struct mbuf *m, ...)
 	va_end(ap);
 
 	udpstat.udps_ipackets++;
-#ifdef INET6
-	bzero(&opts6, sizeof(opts6));
-#endif 
 
 	switch (mtod(m, struct ip *)->ip_v) {
 	case 4:
@@ -494,8 +490,7 @@ udp_input(struct mbuf *m, ...)
 			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) { \
 				opts = NULL; \
 				if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) { \
-					ip6_savecontrol(inp, n, &opts6); \
-					opts = opts6.head; \
+					ip6_savecontrol(inp, n, &opts); \
 				} \
 				m_adj(n, iphlen); \
 				if (sbappendaddr(&last->so_rcv, \
@@ -507,7 +502,6 @@ udp_input(struct mbuf *m, ...)
 				} else \
 					sorwakeup(last); \
 				opts = NULL; \
-			bzero(&opts6, sizeof(opts6)); \
 			} \
 			if (!ip6_setpktaddrs(m, &src_sa6, &dst_sa6)) \
 				goto bad; /* XXX */ \
@@ -736,8 +730,7 @@ scan_ipv6:
 					opts = NULL;
 #ifdef INET6
 					if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-						ip6_savecontrol(inp, n, &opts6);
-						opts = opts6.head;
+						ip6_savecontrol(inp, n, &opts);
 					}
 #endif /* INET6 */
 					m_adj(n, iphlen);
@@ -750,9 +743,6 @@ scan_ipv6:
 					} else
 						sorwakeup(last);
 					opts = NULL;
-#ifdef INET6			/* XXX */
-					bzero(&opts6, sizeof(opts6));
-#endif 
 				}
 				/*
 				 * XXX: m_copy above removes m_aux that
@@ -799,8 +789,7 @@ inp_found:
 		opts = NULL;
 #ifdef INET6
 		if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-			ip6_savecontrol(inp, m, &opts6);
-			opts = opts6.head;
+			ip6_savecontrol(inp, m, &opts);
 		}
 #endif /* INET6 */
 		m_adj(m, iphlen);
@@ -912,10 +901,8 @@ inp_found:
 
 	opts = NULL;
 #ifdef INET6
-	if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-		ip6_savecontrol(inp, m, &opts6);
-		opts = opts6.head;
-	}
+	if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS))
+		ip6_savecontrol(inp, m, &opts);
 #endif /* INET6 */
 	if (ip && (inp->inp_flags & INP_CONTROLOPTS)) {
 		struct mbuf **mp = &opts;

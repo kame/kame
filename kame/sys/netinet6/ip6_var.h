@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.118 2003/09/10 08:10:55 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.119 2003/09/21 09:33:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -193,23 +193,6 @@ struct	ip6_pktopts {
 #define IP6PO_USECOA	0x08	/* use care of address */
 
 	int	needfree;	/* members dynamically allocated */
-};
-
-/*
- * Control options for incoming packets
- */
-
-struct ip6_recvpktopts {
-	struct mbuf *head;	/* mbuf chain of data passed to a user */
-
-#ifdef SO_TIMESTAMP
-	struct mbuf *timestamp;	/* timestamp */
-#endif
-	struct mbuf *hlim;	/* received hop limit */
-	struct mbuf *pktinfo;	/* packet information of rcv packet */
-	struct mbuf *hbh;	/* HbH options header of rcv packet */
-	struct mbuf *dest;	/* Dest opt header of rcv packet */
-	struct mbuf *rthdr;	/* Routing header of rcv packet */
 };
 
 struct	ip6stat {
@@ -408,12 +391,12 @@ int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 void	ip6_savecontrol __P((struct inpcb *, struct mbuf *,
-	struct ip6_recvpktopts *));
+	struct mbuf **));
 void	ip6_notify_pmtu __P((struct inpcb *, struct sockaddr_in6 *,
 	u_int32_t *));
 #else
 void	ip6_savecontrol __P((struct in6pcb *, struct mbuf *,
-	struct ip6_recvpktopts *));
+	struct mbuf **));
 void	ip6_notify_pmtu __P((struct in6pcb *, struct sockaddr_in6 *,
 	u_int32_t *));
 #endif
