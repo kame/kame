@@ -712,7 +712,7 @@ handler(sig)
 	break;
 
     case SIGINFO:
-	sighandled |= GOT_SIGINT;
+	sighandled |= GOT_SIGINFO;
 	break;
     }
 }
