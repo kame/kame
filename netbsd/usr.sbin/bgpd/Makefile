@@ -8,7 +8,7 @@ MAN=	bgpd.conf.5 bgpd.8
 CFLAGS+=-Wall
 CPPFLAGS+=-DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS -DHAVE_SEARCH_H=1 \
 	-I${.CURDIR}/../../kame/bgpd -I. \
-	-DHAVE_STDARG_H -DYY_NO_UNPUT -DHAVE_GETIFADDRS
+	-DHAVE_STDARG_H -DYY_NO_UNPUT -DHAVE_GETIFADDRS -DHAVE_CFPARSE_H
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lcompat
@@ -21,5 +21,7 @@ DPADD+=	${LIBY} ${LIBL}
 .PATH:	${.CURDIR}/../../kame/bgpd
 
 YFLAGS+=	-d
+
+CLEANFILES+=	cfparse.h y.tab.h
 
 .include <bsd.prog.mk>
