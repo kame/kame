@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.66 2001/06/02 00:16:31 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.67 2001/06/02 06:32:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.66 2001/06/02 00:16:31 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.67 2001/06/02 06:32:54 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1959,7 +1959,7 @@ ifrt(ifcp, again)
 	int again;
 {
 	struct ifac *ifa;
-	struct riprt *rrt, *search_rrt, *prev_rrt, *loop_rrt;
+	struct riprt *rrt = NULL, *search_rrt, *prev_rrt, *loop_rrt;
 	struct netinfo6 *np;
 	time_t t_lifetime;
 	int need_trigger = 0;
@@ -2016,7 +2016,6 @@ ifrt(ifcp, again)
 					else
 						riprt = rrt->rrt_next;
 					delroute(&rrt->rrt_info, &rrt->rrt_gw);
-					free(rrt);
 				} else {
 					/* Already have better route */
 					if (!again) {
@@ -2025,8 +2024,7 @@ ifrt(ifcp, again)
 						    inet6_n2p(&np->rip6_dest), np->rip6_plen,
 						    ifcp->ifc_name);
 					}
-					free(rrt);
-					continue;
+					goto next;
 				}
 			}
 			/* Attach the route to the list */
@@ -2036,6 +2034,7 @@ ifrt(ifcp, again)
 			rrt->rrt_next = riprt;
 			riprt = rrt;
 			addroute(rrt, &rrt->rrt_gw, ifcp);
+			rrt = NULL;
 			sendrequest(ifcp);
 			ripsend(ifcp, &ifcp->ifc_ripsin, 0);
 			need_trigger = 1;
@@ -2052,6 +2051,9 @@ ifrt(ifcp, again)
 				}
 			}
                 }
+	next:
+		if (rrt)
+			free(rrt);
 	}
 	return need_trigger;
 }
