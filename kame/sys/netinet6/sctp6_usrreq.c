@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.27 2004/01/27 02:43:18 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.28 2004/02/11 22:16:30 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -97,6 +97,8 @@
 #if defined(NFAITH) && NFAITH > 0
 #include <net/if_faith.h>
 #endif
+
+#include <net/net_osdep.h>
 
 extern struct protosw inetsw[];
 extern struct sctp_epinfo sctppcbinfo;
