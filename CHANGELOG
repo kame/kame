@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2094 2002/02/26 16:07:33 sumikawa Exp $
+$KAME: CHANGELOG,v 1.2095 2002/03/02 05:55:45 jinmei Exp $
+
+<200203>
+2002-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_redirect_output): included
+	a target link layer address option in the redirect message for an
+	on-link destination as well as for a better router.  This behavior
+	should be correct according to the specification.
 
 <200202>
 Tue Feb 26 16:05:53 2002  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
