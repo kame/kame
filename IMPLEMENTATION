@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.145 2000/08/17 01:29:04 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.146 2000/08/18 14:53:50 itojun Exp $
 
 1. IPv6
 
@@ -1563,7 +1563,6 @@ Currently supported algorithms are:
 	3DES-CBC with explicit IV (rfc2451.txt)
 	BLOWFISH CBC (rfc2451.txt)
 	CAST128 CBC (rfc2451.txt)
-	RC5 CBC (rfc2451.txt)
 	each of the above can be combined with:
 	    ESP authentication with HMAC-MD5(96bit)
 	    ESP authentication with HMAC-SHA1(96bit)

@@ -751,8 +751,8 @@ crypto/blowfish/bf_enc.c	optional ipsec
 crypto/blowfish/bf_skey.c	optional ipsec
 crypto/cast128/cast128.c	optional ipsec
 crypto/cast128/cast128_cbc.c	optional ipsec
-crypto/rc5/rc5.c		optional ipsec
-crypto/rc5/rc5_cbc.c		optional ipsec
+#crypto/rc5/rc5.c		optional ipsec
+#crypto/rc5/rc5_cbc.c		optional ipsec
 
 netinet6/mip6.c		optional mip6
 netinet6/mip6_hooks.c	optional mip6

@@ -621,8 +621,8 @@ file crypto/blowfish/bf_enc.c		ipsec & ipsec_esp
 file crypto/blowfish/bf_skey.c		ipsec & ipsec_esp
 file crypto/cast128/cast128.c		ipsec & ipsec_esp
 file crypto/cast128/cast128_cbc.c	ipsec & ipsec_esp
-file crypto/rc5/rc5.c			ipsec & ipsec_esp
-file crypto/rc5/rc5_cbc.c		ipsec & ipsec_esp
+#file crypto/rc5/rc5.c			ipsec & ipsec_esp
+#file crypto/rc5/rc5_cbc.c		ipsec & ipsec_esp
 file netinet6/ipcomp_core.c		ipsec
 file netinet6/ipcomp_input.c		ipsec
 file netinet6/ipcomp_output.c		ipsec

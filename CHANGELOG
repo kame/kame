@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1212 2000/08/18 11:43:35 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1213 2000/08/18 14:53:50 itojun Exp $
 
 <200008>
+Fri Aug 18 23:53:15 JST 2000  itojun@iijlab.net
+	* sys/crypto/rc5: drop IPsec RC5 support.
+
 Fri Aug 18 20:29:23 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* remove kame/kame/sys/netpm/*.[ch] because this code is obsolete.
 

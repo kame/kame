@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.18 2000/07/15 16:07:47 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.19 2000/08/18 14:52:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -314,7 +314,9 @@ struct sadb_x_ipsecrequest {
 #define SADB_EALG_NULL		11
 #define SADB_EALG_MAX		11
 /* private allocations - based on RFC2407 */
+#if 0
 #define SADB_X_EALG_RC5CBC	4
+#endif
 #define SADB_X_EALG_CAST128CBC	6
 #define SADB_X_EALG_BLOWFISHCBC 7
 /* private allocations should use 249-255 (RFC2407) */
