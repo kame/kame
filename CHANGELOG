@@ -1,7 +1,13 @@
-$Id: CHANGELOG,v 1.474 2000/01/22 07:59:21 jinmei Exp $
+$Id: CHANGELOG,v 1.475 2000/01/23 04:25:11 itojun Exp $
 
 
 <200001>
+Sun Jan 23 13:24:00 JST 2000  itojun@iijlab.net
+	* kame/libinet6/getaddrinfo.c: remove #ifdef FAITH (and use of
+	  environment varaible GAI).  this has been broken for a long time
+	  (means noone is using it), and this shouldn't be here.
+	  if you would like to set FAITH'ed prefix, use totd or /etc/hosts.
+
 2000-01-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_reset_rcvopt): fixed a bug
 	that a freed pointer could not be re-initialized, which might
