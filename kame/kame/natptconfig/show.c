@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.22 2002/02/01 05:50:02 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.23 2002/04/26 05:43:00 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -98,6 +98,20 @@ void		 makeTSlotLine	__P((char *, int, struct tSlot *,
 /*
  *
  */
+
+void
+showFragment()
+{
+	const char *fn = __FUNCTION__;
+
+	int	fragment;
+
+	if (getValue(NATPTCTL_FORCEFRAGMENT4, (caddr_t)&fragment) <= 0)
+		err(1, "%s(): failure on read fragment", fn);
+
+	printf("fragment: %d\n", fragment);
+}
+
 
 void
 showPrefix()

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.11 2002/02/01 07:15:31 fujisawa Exp $	*/
+/*	$KAME: main.c,v 1.12 2002/04/26 05:42:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -252,6 +252,7 @@ printSetHelp()
 void
 printShowHelp()
 {
+	printf("	show fragment (aka force_fragment4)\n");
 	printf("	show prefix\n");
 	printf("	show rules\n");
 	printf("	show xlate [\"long\"] [<interval>]\n");

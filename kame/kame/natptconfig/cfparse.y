@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.27 2002/02/01 15:05:41 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.28 2002/04/26 05:42:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -124,6 +124,7 @@ yyerror(char *msg, ...)
 %token		SDPORT
 %token		SENABLE
 %token		SFLUSH
+%token		SFRAGMENT
 %token		SFROM
 %token		SICMP
 %token		SLOG
@@ -405,6 +406,8 @@ set
 show
 		: SSHOW SQUESTION
 		    { printHelp(SSHOW, NULL); }
+		| SSHOW SFRAGMENT
+		    { showFragment(); }
 		| SSHOW SPREFIX
 		    { showPrefix(); }
 		| SSHOW SRULES opt_cui
