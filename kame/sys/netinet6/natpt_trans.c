@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.93 2002/04/17 09:10:53 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.94 2002/04/17 09:32:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1075,6 +1075,7 @@ natpt_icmp4Paramprob(struct pcv *cv4, struct pcv *cv6)
 
 	icmp6->icmp6_type = ICMP6_PARAM_PROB;
 	icmp6->icmp6_code = 0;
+	icmp6->icmp6_pptr = 6;	/* point to the IPv6 Next Header field. */
 }
 
 
