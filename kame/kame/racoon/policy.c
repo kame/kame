@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.35 2001/03/21 19:55:50 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.36 2001/03/22 23:53:16 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,9 +189,11 @@ cmpspidx(a, b)
 	 || a->ul_proto != b->ul_proto)
 		return 1;
 
-	if (cmpsaddr((struct sockaddr *)&a->src, (struct sockaddr *)&b->src))
+	if (cmpsaddrstrict((struct sockaddr *)&a->src,
+			   (struct sockaddr *)&b->src))
 		return 1;
-	if (cmpsaddr((struct sockaddr *)&a->dst, (struct sockaddr *)&b->dst))
+	if (cmpsaddrstrict((struct sockaddr *)&a->dst,
+			   (struct sockaddr *)&b->dst))
 		return 1;
 
 	return 0;

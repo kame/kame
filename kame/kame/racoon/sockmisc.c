@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.24 2001/03/22 22:36:33 itojun Exp $	*/
+/*	$KAME: sockmisc.c,v 1.25 2001/03/22 23:53:16 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -149,6 +149,61 @@ cmpsaddr(addr1, addr2)
 		port1 = ((struct sockaddr_in6 *)addr1)->sin6_port;
 		port2 = ((struct sockaddr_in6 *)addr2)->sin6_port;
 		if (!(port1 == 0 || port2 == 0 || port1 == port2))
+			return 1;
+		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
+			return 1;
+		if (((struct sockaddr_in6 *)sa1)->sin6_scope_id !=
+		    ((struct sockaddr_in6 *)sa2)->sin6_scope_id)
+			return 1;
+		break;
+#endif
+	default:
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+ * compare two sockaddr with strict match on port.
+ * OUT:	0: equal.
+ *	1: not equal.
+ */
+int
+cmpsaddrstrict(addr1, addr2)
+	struct sockaddr *addr1;
+	struct sockaddr *addr2;
+{
+	caddr_t sa1, sa2;
+	u_short port1, port2;
+
+	if (addr1 == 0 && addr2 == 0)
+		return 0;
+	if (addr1 == 0 || addr2 == 0)
+		return 1;
+
+	if (addr1->sa_len != addr2->sa_len
+	 || addr1->sa_family != addr2->sa_family)
+		return 1;
+
+	switch (addr1->sa_family) {
+	case AF_INET:
+		sa1 = (caddr_t)&((struct sockaddr_in *)addr1)->sin_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in *)addr2)->sin_addr;
+		port1 = ((struct sockaddr_in *)addr1)->sin_port;
+		port2 = ((struct sockaddr_in *)addr2)->sin_port;
+		if (port1 != port2)
+			return 1;
+		if (memcmp(sa1, sa2, sizeof(struct in_addr)) != 0)
+			return 1;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		sa1 = (caddr_t)&((struct sockaddr_in6 *)addr1)->sin6_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in6 *)addr2)->sin6_addr;
+		port1 = ((struct sockaddr_in6 *)addr1)->sin6_port;
+		port2 = ((struct sockaddr_in6 *)addr2)->sin6_port;
+		if (port1 != port2)
 			return 1;
 		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
 			return 1;
