@@ -438,8 +438,6 @@ in6_len2mask(mask, len)
 		mask->s6_addr8[i] = (0xff00 >> (len % 8)) & 0xff;
 }
 
-int	in6_interfaces;		/* number of external internet interfaces */
-
 #define ifa2ia6(ifa)	((struct in6_ifaddr *)(ifa))
 #define ia62ifa(ia6)	((struct ifaddr *)(ia6))
 
@@ -625,8 +623,6 @@ in6_control(so, cmd, data, ifp)
 			TAILQ_INSERT_TAIL(&ifp->if_addrlist,
 				(struct ifaddr *)ia, ifa_list);
 #endif
-			if ((ifp->if_flags & IFF_LOOPBACK) == 0)
-				in6_interfaces++;	/*XXX*/
 		}
 
 		if (cmd == SIOCAIFADDR_IN6) {
