@@ -872,7 +872,9 @@ icmp6_input(mp, offp, proto)
 #endif
 				/*
 				 * Data after a fragment header is meaningless
-				 * unless it is the first fragment.
+				 * unless it is the first fragment, but
+				 * we'll go to the notify label for path MTU
+				 * discovery.
 				 */
 				if (fh->ip6f_offlg & IP6F_OFF_MASK)
 					goto notify;
@@ -880,9 +882,15 @@ icmp6_input(mp, offp, proto)
 				eoff += sizeof(struct ip6_frag);
 				nxt = fh->ip6f_nxt;
 				break;
-			case IPPROTO_ESP:
-			case IPPROTO_NONE:
 			default:
+				/*
+				 * This case includes ESP and the No Next
+				 * Header. In such cases goting to the notify
+				 * label does not have any meaning
+				 * (i.e. ctlfunc will be NULL), but we go
+				 * anyway since we might have to update
+				 * path MTU information.
+				 */
 				goto notify;
 			}
 		}
