@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.18 2002/03/14 01:26:31 millert Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.21 2002/09/23 06:11:47 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -65,7 +65,8 @@ void	setroot(void);
 void	swapconf(void);
 void	dumpconf(void);
 
-static int findblkmajor(struct device *dv);
+int findblkmajor(struct device *dv);
+const char *findblkname(int maj);
 
 void (*cold_hook)(int); /* see below */
 register_t	kpsw = PSW_Q | PSW_P | PSW_C | PSW_D;
@@ -74,6 +75,8 @@ register_t	kpsw = PSW_Q | PSW_P | PSW_C | PSW_D;
  * LED blinking thing
  */
 #ifdef USELEDS
+#include <sys/dkstat.h>
+
 struct timeout heartbeat_tmo;
 void heartbeat(void *);
 extern int hz;
@@ -121,8 +124,18 @@ void
 heartbeat(v)
 	void *v;
 {
-	static u_int hbcnt = 0;
+	static u_int hbcnt = 0, ocp_total, ocp_idle;
+	int toggle, cp_mask, cp_total;
 
+	cp_total = cp_time[CP_USER] + cp_time[CP_NICE] + cp_time[CP_SYS] +
+	     cp_time[CP_INTR] + cp_time[CP_IDLE];
+	if (!cp_total)
+		cp_total = 1;
+	cp_mask = 0xf0 >> (cp_time[CP_IDLE] - ocp_idle) * 4 /
+	    (cp_total - ocp_total);
+	cp_mask &= 0xf0;
+	ocp_total = cp_total;
+	ocp_idle = cp_time[CP_IDLE];
 	/*
 	 * do this:
 	 *
@@ -130,14 +143,11 @@ heartbeat(v)
 	 *  _| |_| |_,_,_,_
 	 *   0 1 2 3 4 6 7
 	 */
-	if (hbcnt < 4) {
-		ledctl(0, 0, PALED_HEARTBEAT);
-		hbcnt++;
-		timeout_add(&heartbeat_tmo, hz / 8);
-	} else {
-		hbcnt = 0;
-		timeout_add(&heartbeat_tmo, hz / 2);
-	}
+	if (hbcnt++ < 4)
+		toggle = PALED_HEARTBEAT;
+	timeout_add(&heartbeat_tmo, hz / 8);
+	hbcnt &= 7;
+	ledctl(cp_mask, (~cp_mask & 0xf0)|PALED_NETRCV|PALED_NETSND, toggle);
 }
 #endif
 
@@ -227,7 +237,7 @@ static const struct nam2blk {
 /*static struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };*/
 #endif
 
-static int
+int
 findblkmajor(dv)
 	struct device *dv;
 {
@@ -239,6 +249,19 @@ findblkmajor(dv)
 			return (nam2blk[i].maj);
 	return (-1);
 }
+
+const char *
+findblkname(maj)
+	int maj;
+{
+	register int i;
+
+	for (i = 0; i < sizeof(nam2blk) / sizeof(nam2blk[0]); ++i)
+		if (maj == nam2blk[i].maj)
+			return (nam2blk[i].name);
+	return (NULL);
+} 
+
 
 /*
  * Attempt to find the device from which we were booted.
@@ -254,7 +277,9 @@ setroot()
 {
 	struct swdevt *swp;
 	dev_t temp, nswapdev;
+	const char *rootdevname;
 	struct device *bootdv;
+	struct device *swapdv;
 	int majdev, unit, part;
 #ifdef NFSCLIENT
 	extern char *nfsbootdevname;
@@ -297,6 +322,10 @@ setroot()
 		}
 		swdevt[0].sw_dev = nswapdev;
 		swdevt[1].sw_dev = NODEV;
+		rootdevname = findblkname(major(rootdev));
+		if (rootdevname == NULL) {
+			return;
+		}
 
 	} else {
 
@@ -323,8 +352,12 @@ setroot()
 		majdev = major(rootdev);
 		unit = DISKUNIT(rootdev);
 		part = DISKPART(rootdev);
-		printf("root on %s%c\n", bootdv->dv_xname,
-		    part + 'a');
+		printf("root on %s%c", bootdv->dv_xname,
+		    DISKPART(rootdev) + 'a');
+		if (nswapdev != NODEV)
+			printf(" swap on %s%c", swapdv->dv_xname,
+			    DISKPART(nswapdev) + 'a');
+		printf("\n");
 		break;
 #endif
 	default:
@@ -395,11 +428,9 @@ pdc_scanbus(self, ca, bus, maxmod)
 			    dp.dp_flags, PZF_BITS,
 			    dp.dp_bc[0], dp.dp_bc[1], dp.dp_bc[2],
 			    dp.dp_bc[3], dp.dp_bc[4], dp.dp_bc[5]);
-			printf("mod %x layers %x/%x/%x/%x/%x/%x\n",
-			    dp.dp_mod,
-			    dp.dp_layers[0], dp.dp_layers[1],
-			    dp.dp_layers[2], dp.dp_layers[3],
-			    dp.dp_layers[4], dp.dp_layers[5]);
+			printf("mod %x hpa %x type %x sv %x\n",
+			    dp.dp_mod, pdc_memmap.hpa,
+			    nca.ca_type.iodc_type, nca.ca_type.iodc_sv_model);
 		}
 
 		config_found_sm(self, &nca, mbprint, mbsubmatch);

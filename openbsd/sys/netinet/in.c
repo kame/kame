@@ -1,9 +1,9 @@
-/*	$OpenBSD: in.c,v 1.25 2002/04/01 02:44:08 itojun Exp $	*/
+/*	$OpenBSD: in.c,v 1.29 2002/09/11 03:15:36 itojun Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -231,7 +231,7 @@ in_control(so, cmd, data, ifp)
 	case SIOCALIFADDR:
 	case SIOCDLIFADDR:
 		if ((so->so_state & SS_PRIV) == 0)
-			return(EPERM);
+			return (EPERM);
 		/*fall through*/
 	case SIOCGLIFADDR:
 		if (!ifp)
@@ -367,6 +367,8 @@ in_control(so, cmd, data, ifp)
 
 	case SIOCSIFADDR:
 		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1);
+		if (!error)
+			dohooks(ifp->if_addrhooks, 0);
 		return error;
 
 	case SIOCSIFNETMASK:
@@ -405,6 +407,8 @@ in_control(so, cmd, data, ifp)
 		if ((ifp->if_flags & IFF_BROADCAST) &&
 		    (ifra->ifra_broadaddr.sin_family == AF_INET))
 			ia->ia_broadaddr = ifra->ifra_broadaddr;
+		if (!error)
+			dohooks(ifp->if_addrhooks, 0);
 		return (error);
 
 	case SIOCDIFADDR:
@@ -412,6 +416,7 @@ in_control(so, cmd, data, ifp)
 		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 		TAILQ_REMOVE(&in_ifaddr, ia, ia_list);
 		IFAFREE((&ia->ia_ifa));
+		dohooks(ifp->if_addrhooks, 0);
 		break;
 
 #ifdef MROUTING

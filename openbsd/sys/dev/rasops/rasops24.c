@@ -1,5 +1,5 @@
-/*	$OpenBSD: rasops24.c,v 1.2 2002/03/14 01:27:02 millert Exp $ */
-/* 	$NetBSD: rasops24.c,v 1.12 2000/04/12 14:22:29 pk Exp $	*/
+/*	$OpenBSD: rasops24.c,v 1.5 2002/07/27 22:17:49 miod Exp $	*/
+/*	$NetBSD: rasops24.c,v 1.12 2000/04/12 14:22:29 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,31 +37,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_rasops.h"
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rasops24.c,v 1.12 2000/04/12 14:22:29 pk Exp $");
-
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 
 #include <machine/endian.h>
-#include <machine/bswap.h>
 
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wsconsio.h>
 #include <dev/rasops/rasops.h>
 
-static void 	rasops24_erasecols(void *, int, int, int, long);
-static void 	rasops24_eraserows(void *, int, int, long);
-static void 	rasops24_putchar(void *, int, int, u_int, long attr);
+void 	rasops24_erasecols(void *, int, int, int, long);
+void 	rasops24_eraserows(void *, int, int, long);
+void 	rasops24_putchar(void *, int, int, u_int, long attr);
 #ifndef RASOPS_SMALL
-static void 	rasops24_putchar8(void *, int, int, u_int, long attr);
-static void 	rasops24_putchar12(void *, int, int, u_int, long attr);
-static void 	rasops24_putchar16(void *, int, int, u_int, long attr);
-static void	rasops24_makestamp(struct rasops_info *, long);
-#endif
+void 	rasops24_putchar8(void *, int, int, u_int, long attr);
+void 	rasops24_putchar12(void *, int, int, u_int, long attr);
+void 	rasops24_putchar16(void *, int, int, u_int, long attr);
+void	rasops24_makestamp(struct rasops_info *, long);
 
 /*
  * 4x1 stamp for optimized character blitting
@@ -69,6 +62,7 @@ static void	rasops24_makestamp(struct rasops_info *, long);
 static int32_t	stamp[64];
 static long	stamp_attr;
 static int	stamp_mutex;	/* XXX see note in readme */
+#endif
 
 /*
  * XXX this confuses the hell out of gcc2 (not egcs) which always insists
@@ -84,7 +78,7 @@ static int	stamp_mutex;	/* XXX see note in readme */
 #define STAMP_READ(o)		(*(int32_t *)((caddr_t)stamp + (o)))
 
 /*
- * Initalize rasops_info struct for this colordepth.
+ * Initialize rasops_info struct for this colordepth.
  */
 void
 rasops24_init(ri)
@@ -125,7 +119,7 @@ rasops24_init(ri)
  * Put a single character. This is the generic version.
  * XXX this bites - we should use masks.
  */
-static void
+void
 rasops24_putchar(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -209,7 +203,7 @@ rasops24_putchar(cookie, row, col, uc, attr)
 /*
  * Recompute the blitting stamp.
  */
-static void
+void
 rasops24_makestamp(ri, attr)
 	struct rasops_info *ri;
 	long attr;
@@ -242,9 +236,9 @@ rasops24_makestamp(ri, attr)
 #else
 		if ((ri->ri_flg & RI_BSWAP) != 0) {
 #endif
-			stamp[i+0] = bswap32(stamp[i+0]);
-			stamp[i+1] = bswap32(stamp[i+1]);
-			stamp[i+2] = bswap32(stamp[i+2]);
+			stamp[i+0] = swap32(stamp[i+0]);
+			stamp[i+1] = swap32(stamp[i+1]);
+			stamp[i+2] = swap32(stamp[i+2]);
 		}
 	}
 }
@@ -252,7 +246,7 @@ rasops24_makestamp(ri, attr)
 /*
  * Put a single character. This is for 8-pixel wide fonts.
  */
-static void
+void
 rasops24_putchar8(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -333,7 +327,7 @@ rasops24_putchar8(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is for 12-pixel wide fonts.
  */
-static void
+void
 rasops24_putchar12(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -376,7 +370,7 @@ rasops24_putchar12(cookie, row, col, uc, attr)
 	if (uc == (u_int)-1) {
 		int32_t c = stamp[0];
 		while (height--) {
-			rp[0] = rp[1] = rp[2] = rp[3] = 
+			rp[0] = rp[1] = rp[2] = rp[3] =
 			rp[4] = rp[5] = rp[6] = rp[7] = rp[8] = c;
 			DELTA(rp, ri->ri_stride, int32_t *);
 		}
@@ -421,7 +415,7 @@ rasops24_putchar12(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is for 16-pixel wide fonts.
  */
-static void
+void
 rasops24_putchar16(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -464,8 +458,8 @@ rasops24_putchar16(cookie, row, col, uc, attr)
 	if (uc == (u_int)-1) {
 		int32_t c = stamp[0];
 		while (height--) {
-			rp[0] = rp[1] = rp[2] = rp[3] = 
-			rp[4] = rp[5] = rp[6] = rp[7] = 
+			rp[0] = rp[1] = rp[2] = rp[3] =
+			rp[4] = rp[5] = rp[6] = rp[7] =
 			rp[8] = rp[9] = rp[10] = rp[11] = c;
 			DELTA(rp, ri->ri_stride, int32_t *);
 		}
@@ -505,8 +499,8 @@ rasops24_putchar16(cookie, row, col, uc, attr)
 		int32_t c = STAMP_READ(52);
 
 		DELTA(rp, -(ri->ri_stride << 1), int32_t *);
-		rp[0] = rp[1] = rp[2] = rp[3] = 
-		rp[4] = rp[5] = rp[6] = rp[7] = 
+		rp[0] = rp[1] = rp[2] = rp[3] =
+		rp[4] = rp[5] = rp[6] = rp[7] =
 		rp[8] = rp[9] = rp[10] = rp[11] = c;
 	}
 
@@ -517,7 +511,7 @@ rasops24_putchar16(cookie, row, col, uc, attr)
 /*
  * Erase rows. This is nice and easy due to alignment.
  */
-static void
+void
 rasops24_eraserows(cookie, row, num, attr)
 	void *cookie;
 	int row, num;
@@ -561,9 +555,9 @@ rasops24_eraserows(cookie, row, num, attr)
 #else
 	if ((ri->ri_flg & RI_BSWAP) != 0) {
 #endif
-		stamp[0] = bswap32(stamp[0]);
-		stamp[1] = bswap32(stamp[1]);
-		stamp[2] = bswap32(stamp[2]);
+		stamp[0] = swap32(stamp[0]);
+		stamp[1] = swap32(stamp[1]);
+		stamp[2] = swap32(stamp[2]);
 	}
 
 	/*
@@ -621,7 +615,7 @@ rasops24_eraserows(cookie, row, num, attr)
 /*
  * Erase columns.
  */
-static void
+void
 rasops24_erasecols(cookie, row, col, num, attr)
 	void *cookie;
 	int row, col, num;
@@ -674,9 +668,9 @@ rasops24_erasecols(cookie, row, col, num, attr)
 #else
 	if ((ri->ri_flg & RI_BSWAP) != 0) {
 #endif
-		stamp[0] = bswap32(stamp[0]);
-		stamp[1] = bswap32(stamp[1]);
-		stamp[2] = bswap32(stamp[2]);
+		stamp[0] = swap32(stamp[0]);
+		stamp[1] = swap32(stamp[1]);
+		stamp[2] = swap32(stamp[2]);
 	}
 
 	/*
@@ -688,7 +682,7 @@ rasops24_erasecols(cookie, row, col, num, attr)
 	 *
 	 *	aaab bbcc cddd
 	 */
-	slop = (int)rp & 3;	num -= slop;
+	slop = (long)rp & 3;	num -= slop;
 	n12 = num / 12;		num -= (n12 << 3) + (n12 << 2);
 	n4 = num >> 2;		num &= 3;
 

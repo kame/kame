@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka49.c,v 1.4 2002/03/14 01:26:48 millert Exp $	*/
+/*	$OpenBSD: ka49.c,v 1.7 2002/07/21 19:28:51 hugh Exp $	*/
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -75,6 +75,9 @@ ka49_conf()
 /* Why??? */
 { volatile int *hej = (void *)mfpr(PR_ISP); *hej = *hej; hej[-1] = hej[-1];}
 
+	/* This vector shows up during shutdown, ignore it for now. */
+	scb_vecalloc(0x0, (void *)nullop, NULL, SCB_ISTACK, NULL);
+
 	/*
 	 * Setup parameters necessary to read time from clock chip.
 	 */
@@ -149,7 +152,6 @@ ka49_cache_enable()
 	mtpr(mfpr(PR_BCEDSTS), PR_BCEDSTS);	/* Clear error bits */
 	mtpr(mfpr(PR_NESTS), PR_NESTS);		/* Clear error bits */
 
-
 	start = 0x01400000;
 	slut  = 0x01440000;
 
@@ -219,9 +221,15 @@ ka49_steal_pages()
 	ka49_cache_enable();
 }
 
+#define	KA49_CPMBX	0x38
+#define	KA49_HLT_HALT	0xcf
+#define	KA49_HLT_BOOT	0x8b
+
 static void
 ka49_halt()
 {
+	if (((u_int8_t *) clk_page)[KA49_CPMBX] != KA49_HLT_HALT)
+		((u_int8_t *) clk_page)[KA49_CPMBX] = KA49_HLT_HALT;
 	asm("halt");
 }
 
@@ -229,5 +237,7 @@ static void
 ka49_reboot(arg)
 	int arg;
 {
+	if (((u_int8_t *) clk_page)[KA49_CPMBX] != KA49_HLT_BOOT)
+		((u_int8_t *) clk_page)[KA49_CPMBX] = KA49_HLT_BOOT;
 	asm("halt");
 }

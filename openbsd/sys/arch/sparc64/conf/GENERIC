@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.57 2002/04/04 23:16:21 jason Exp $
+#	$OpenBSD: GENERIC,v 1.73 2002/09/18 04:34:41 jason Exp $
 # 	$NetBSD: GENERIC32,v 1.18 2001/07/20 00:07:12 eeh Exp $
 
 machine		sparc64
@@ -20,11 +20,15 @@ config		bsd	swap generic
 mainbus0 at root
 cpu0	at mainbus0
 
+upa0	at mainbus0
+
 # Bus types found on SPARC systems.
 
 sbus0	at mainbus0				# Ultra 1
 psycho*	at mainbus0
-pci*	at psycho?				# Ultra 5
+pci*	at psycho?				#
+schizo*	at mainbus0
+pci*	at schizo?				#
 pci*	at ppb?
 ppb*	at pci? dev ? function ?
 ebus*	at pci?
@@ -36,6 +40,7 @@ dc*	at pci? dev ? function ?
 
 # PCI SCSI
 siop*	at pci? dev ? function ?
+isp*	at pci? dev ? function ?
 scsibus* at siop?
 
 # PCI Display
@@ -43,8 +48,10 @@ vgafb*		at pci? dev ? function ?
 wsdisplay*	at vgafb?
 
 # PCI crypto
-hifn*		at pci? dev ? function ?
-ubsec*		at pci? dev ? function ?
+hifn*		at pci? dev ? function ?	# Hifn 7751/7811/7951
+#nofn*		at pci? dev ? function ?	# Hifn 7814/7851/7854
+lofn*		at pci? dev ? function ?	# Hifn 6500
+ubsec*		at pci? dev ? function ?	# Broadcom 580[125]/582[012]
 
 # PCI sound
 autri*		at pci? dev ? function ?	# Trident 4D WAVE
@@ -60,16 +67,18 @@ usb*	at ohci? flags 0x1
 # USB devices
 uhub*	at usb?
 uhub*	at uhub? port ? configuration ?
-ukbd*	at uhub?				# USB keyboard
-wskbd*	at ukbd? console ?
-ums*	at uhub? port ? configuration ?		# USB mouse
-wsmouse* at ums?
-uhid*	at uhub? port ? configuration ?		# USB generic human interface
+uhidev*	at uhub? port ? configuration ? interface ?
+ukbd*	at uhidev? reportid ?
+wskbd*	at ukbd? console ? mux 1
+ums*	at uhidev? reportid ?
+wsmouse* at ums? mux 0
+uhid*	at uhidev? reportid ?
 ugen*	at uhub? port ? configuration ?		# USB generic device
 
 #### Standard system devices -- all required for a given architecture
 
 auxio*	at ebus?
+auxio*	at sbus? slot ? offset ?
 beeper*	at ebus?
 
 # SAB82532 based serial ports
@@ -120,6 +129,8 @@ timer*	at mainbus0
 le*		at sbus? slot ? offset ?
 ledma*		at sbus? slot ? offset ?
 le*		at ledma?
+lebuffer*	at sbus? slot ? offset ?
+le*		at lebuffer?
 
 # Quad-ethernet glue device, and sub-devices
 qec*		at sbus? slot ? offset ?
@@ -177,12 +188,16 @@ uk*		at scsibus? target ? lun ?	# unknown SCSI devices
 nsphy*	at mii? phy ?				# NS and compatible PHYs
 qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
 dcphy*	at mii? phy ?				# Digital clone PHYs
+amphy*	at mii? phy ?				# AMD AM79c873 PHYs
 ukphy*	at mii? phy ?				# Unknown PHYs
 
-cgsix*		at sbus? slot ? offset ?
+bwtwo*		at sbus? slot ? offset ?	# bw2, sbus mono framebuffer
+wsdisplay*	at bwtwo?
+
+cgsix*		at sbus? slot ? offset ?	# cg6, sbus color framebuffer
 wsdisplay*	at cgsix?
 
-cgthree*	at sbus? slot ? offset ?
+cgthree*	at sbus? slot ? offset ?	# cg3, sbus color framebuffer
 wsdisplay*	at cgthree?
 
 audiocs*	at sbus? slot ? offset ?
@@ -192,6 +207,16 @@ asio*		at sbus? slot ? offset ?	# Aurora 210SJ
 com*		at asio?
 apio*		at sbus? slot ? offset ?	# Aurora 210SJ
 lpt*		at apio?
+
+stp*		at sbus? slot ? offset ?	# STP4020
+pcmcia*		at stp? socket ?
+#com*		at pcmcia? function ?		# PCMCIA modems/serial ports
+wi*		at pci? dev ? function ?	# WaveLAN IEEE 802.11DS
+wi*		at pcmcia? function ?		# WaveLAN IEEE 802.11DS
+
+creator*	at mainbus0
+creator*	at upa0
+wsdisplay*	at creator?
 
 # mouse & keyboard multiplexor pseudo-devices
 #pseudo-device	wsmux 	2

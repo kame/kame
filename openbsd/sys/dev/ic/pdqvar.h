@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdqvar.h,v 1.14 2001/11/06 19:53:18 miod Exp $	*/
+/*	$OpenBSD: pdqvar.h,v 1.16 2002/06/09 03:14:18 todd Exp $	*/
 /*	$NetBSD: pdqvar.h,v 1.11 1996/10/25 21:33:37 cgd Exp $	*/
 
 /*-
@@ -11,7 +11,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -204,8 +204,8 @@ typedef struct {
 #elif defined(__FreeBSD__)
     struct kern_devconf *sc_kdc;	/* freebsd cruft */
 #endif
-    struct arpcom sc_ac;
-#define	sc_if		sc_ac.ac_if
+    struct arpcom sc_arpcom;
+#define	sc_if		sc_arpcom.ac_if
     pdq_t *sc_pdq;
 #if !defined(__NetBSD__) && !defined(__OpenBSD__)
     pdq_bus_ioport_t sc_iobase;

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.sparc64,v 1.32 2002/04/04 23:16:21 jason Exp $
+#	$OpenBSD: files.sparc64,v 1.41 2002/07/12 10:25:02 miod Exp $
 #	$NetBSD: files.sparc64,v 1.50 2001/08/10 20:53:50 eeh Exp $
 
 # maxpartitions must be first item in files.${ARCH}
@@ -9,6 +9,11 @@ maxusers 2 8 1024
 define mainbus {}
 device mainbus: pcibus, mainbus
 attach mainbus at root
+file	arch/sparc64/dev/upa.c			upa
+
+define upa {}
+device upa
+attach upa at mainbus
 
 device pcons
 attach pcons at mainbus
@@ -21,14 +26,16 @@ file	dev/ic/hme.c			hme
 device	uperf
 file	arch/sparc64/dev/uperf.c		uperf needs-flag
 
-include "dev/sun/files.sun"
 include "dev/wscons/files.wscons"
+include "dev/rasops/files.rasops"
+include "dev/wsfont/files.wsfont"
 include "dev/sbus/files.sbus"
 include "dev/i2o/files.i2o"
 include "dev/mii/files.mii"
 include "dev/atapiscsi/files.atapiscsi"
 include "dev/ata/files.ata"
 include "dev/pckbc/files.pckbc"
+include "dev/pcmcia/files.pcmcia"
 
 # COMPAT_NETBSD
 include "compat/netbsd/files.netbsd"
@@ -37,16 +44,30 @@ file	arch/sparc64/sparc64/netbsd_machdep.c	compat_netbsd
 attach sbus at mainbus
 file	arch/sparc64/dev/sbus.c			sbus
 
+device creator: wsemuldisplaydev, rasops8, rasops16, rasops24, rasops32
+file	arch/sparc64/dev/creator.c		creator
+
+attach creator at mainbus with creator_mainbus
+file	arch/sparc64/dev/creator_mainbus.c	creator_mainbus
+
+attach creator at upa with creator_upa
+file	arch/sparc64/dev/creator_upa.c		creator_upa
+
+include "dev/pci/files.pci"
+
 device psycho: pcibus
 attach psycho at mainbus
-include "dev/pci/files.pci"
 file	arch/sparc64/dev/psycho.c		psycho
-file	arch/sparc64/dev/pci_machdep.c		psycho
+
+device schizo: pcibus
+attach schizo at mainbus
+file	arch/sparc64/dev/schizo.c		schizo
+file	arch/sparc64/dev/pci_machdep.c		psycho | schizo
 
 attach	hme at pci with hme_pci
-file	dev/pci/if_hme_pci.c		hme_pci
+file	dev/pci/if_hme_pci.c			hme_pci
 
-device vgafb: wsemuldisplaydev, wsrasteremulops, wsemul_sun
+device vgafb: wsemuldisplaydev, rasops8, rasops16, rasops24, rasops32, wsemul_sun
 attach vgafb at pci
 file	arch/sparc64/dev/vgafb.c		vgafb
 
@@ -126,11 +147,11 @@ file	arch/sparc64/dev/z8530sc.c		zs
 define zstty {}
 device zstty: tty
 attach zstty at zs
-file arch/sparc64/dev/z8530tty.c		zstty needs-flag
+file	arch/sparc64/dev/z8530tty.c		zstty needs-flag
 
 device zskbd: tty, wskbddev, sunkbd
 attach zskbd at zs
-file arch/sparc64/dev/z8530kbd.c		zskbd needs-flag
+file	arch/sparc64/dev/z8530kbd.c		zskbd needs-flag
 
 file	dev/cons.c
 file	arch/sparc64/dev/consinit.c
@@ -154,7 +175,7 @@ file	arch/sparc64/sparc64/emul.c
 file	arch/sparc64/sparc64/in_cksum.S
 file	arch/sparc64/sparc64/intr.c
 file	arch/sparc64/sparc64/kgdb_machdep.c kgdb
-# sparc/sparc/locore.s is handled specially in the makefile,
+# sparc64/sparc64/locore.s is handled specially in the makefile,
 # because it must come first in the "ld" command line.
 file	arch/sparc64/sparc64/locore2.c
 file	arch/sparc64/sparc64/machdep.c

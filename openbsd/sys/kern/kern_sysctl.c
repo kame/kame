@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.64 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.75 2002/09/01 11:35:52 art Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -63,6 +63,8 @@
 #include <sys/dkstat.h>
 #include <sys/vmmeter.h>
 #include <sys/namei.h>
+#include <sys/exec.h>
+#include <sys/mbuf.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -87,8 +89,10 @@ extern struct nchstats nchstats;
 extern int nselcoll, fscale;
 extern struct disklist_head disklist;
 extern fixpt_t ccpu;
+extern  long numvnodes;
 
 int sysctl_diskinit(int, struct proc *);
+int sysctl_proc_args(int *, u_int, void *, size_t *, struct proc *);
 
 /*
  * Lock to avoid too many processes vslocking a large amount of memory
@@ -247,13 +251,15 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	extern int stackgap_random;
 #ifdef CRYPTO
 	extern int usercrypto;
+	extern int userasymcrypto;
 	extern int cryptodevallowsoft;
 #endif
 
-	/* all sysctl names at this level are terminal */
+	/* all sysctl names at this level are terminal except a ton of them */
 	if (namelen != 1 && !(name[0] == KERN_PROC || name[0] == KERN_PROF ||
 	    name[0] == KERN_MALLOCSTATS || name[0] == KERN_TTY ||
-	    name[0] == KERN_POOL || name[0] == KERN_SYSVIPC_INFO))
+	    name[0] == KERN_POOL || name[0] == KERN_SYSVIPC_INFO ||
+	    name[0] == KERN_PROC_ARGS))
 		return (ENOTDIR);		/* overloaded */
 
 	switch (name[0]) {
@@ -273,6 +279,12 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &maxproc));
 	case KERN_MAXFILES:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &maxfiles));
+	case KERN_NFILES:
+		return (sysctl_rdint(oldp, oldlenp, newp, nfiles));
+	case KERN_TTYCOUNT:
+		return (sysctl_rdint(oldp, oldlenp, newp, tty_count));
+	case KERN_NUMVNODES:
+		return (sysctl_rdint(oldp, oldlenp, newp, numvnodes));
 	case KERN_ARGMAX:
 		return (sysctl_rdint(oldp, oldlenp, newp, ARG_MAX));
 	case KERN_NSELCOLL:
@@ -313,8 +325,14 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_vnode(oldp, oldlenp, p));
 	case KERN_PROC:
 		return (sysctl_doproc(name + 1, namelen - 1, oldp, oldlenp));
+	case KERN_PROC_ARGS:
+		return (sysctl_proc_args(name + 1, namelen - 1, oldp, oldlenp,
+		     p));
 	case KERN_FILE:
 		return (sysctl_file(oldp, oldlenp));
+	case KERN_MBSTAT:
+		return (sysctl_rdstruct(oldp, oldlenp, newp, &mbstat,
+		    sizeof(mbstat)));
 #ifdef GPROF
 	case KERN_PROF:
 		return (sysctl_doprof(name + 1, namelen - 1, oldp, oldlenp,
@@ -336,8 +354,6 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_rdint(oldp, oldlenp, newp, MAXPARTITIONS));
 	case KERN_RAWPARTITION:
 		return (sysctl_rdint(oldp, oldlenp, newp, RAW_PART));
-	case KERN_NTPTIME:
-		return (sysctl_ntptime(oldp, oldlenp));
 	case KERN_SOMAXCONN:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &somaxconn));
 	case KERN_SOMINCONN:
@@ -429,10 +445,16 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #ifdef CRYPTO
 	case KERN_USERCRYPTO:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &usercrypto));
+	case KERN_USERASYMCRYPTO:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+			    &userasymcrypto));
 	case KERN_CRYPTODEVALLOWSOFT:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 			    &cryptodevallowsoft));
 #endif
+	case KERN_SPLASSERT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &splassert_ctl));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -817,7 +839,7 @@ sysctl_file(where, sizep)
 	/*
 	 * followed by an array of file structures
 	 */
-	for (fp = filehead.lh_first; fp != 0; fp = fp->f_list.le_next) {
+	LIST_FOREACH(fp, &filehead, f_list) {
 		if (buflen < sizeof(struct file)) {
 			*sizep = where - start;
 			return (ENOMEM);
@@ -939,11 +961,9 @@ again:
  * Fill in an eproc structure for the specified process.
  */
 void
-fill_eproc(p, ep)
-	register struct proc *p;
-	register struct eproc *ep;
+fill_eproc(struct proc *p, struct eproc *ep)
 {
-	register struct tty *tp;
+	struct tty *tp;
 
 	ep->e_paddr = p;
 	ep->e_sess = p->p_pgrp->pg_session;
@@ -954,13 +974,19 @@ fill_eproc(p, ep)
 		ep->e_vm.vm_tsize = 0;
 		ep->e_vm.vm_dsize = 0;
 		ep->e_vm.vm_ssize = 0;
+		bzero(&ep->e_pstats, sizeof(ep->e_pstats));
+		ep->e_pstats_valid = 0;
 	} else {
-		register struct vmspace *vm = p->p_vmspace;
+		struct vmspace *vm = p->p_vmspace;
 
+		PHOLD(p);	/* need for pstats */
 		ep->e_vm.vm_rssize = vm_resident_count(vm);
 		ep->e_vm.vm_tsize = vm->vm_tsize;
 		ep->e_vm.vm_dsize = vm->vm_dsize;
 		ep->e_vm.vm_ssize = vm->vm_ssize;
+		ep->e_pstats = *p->p_stats;
+		ep->e_pstats_valid = 1;
+		PRELE(p);
 	}
 	if (p->p_pptr)
 		ep->e_ppid = p->p_pptr->p_pid;
@@ -987,6 +1013,206 @@ fill_eproc(p, ep)
 	strncpy(ep->e_emul, p->p_emul->e_name, EMULNAMELEN);
 	ep->e_emul[EMULNAMELEN] = '\0';
 	ep->e_maxrss = p->p_rlimit ? p->p_rlimit[RLIMIT_RSS].rlim_cur : 0;
+}
+
+int
+sysctl_proc_args(int *name, u_int namelen, void *oldp, size_t *oldlenp,
+    struct proc *cp)
+{
+	struct proc *vp;
+	pid_t pid;
+	int op;
+	struct ps_strings pss;
+	struct iovec iov;
+	struct uio uio;
+	int error;
+	size_t limit;
+	int cnt;
+	char **rargv, **vargv;		/* reader vs. victim */
+	char *rarg, *varg;
+	char *buf;
+
+	if (namelen > 2)
+		return (ENOTDIR);
+	if (namelen < 2)
+		return (EINVAL);
+
+	pid = name[0];
+	op = name[1];
+
+	switch (op) {
+	case KERN_PROC_ARGV:
+	case KERN_PROC_NARGV:
+	case KERN_PROC_ENV:
+	case KERN_PROC_NENV:
+		break;
+	default:
+		return (EOPNOTSUPP);
+	}
+
+	if ((vp = pfind(pid)) == NULL)
+		return (ESRCH);
+
+	if (P_ZOMBIE(vp) || (vp->p_flag & P_SYSTEM))
+		return (EINVAL);
+
+	/* Exiting - don't bother, it will be gone soon anyway */
+	if ((vp->p_flag & P_WEXIT))
+		return (ESRCH);
+
+	/* Execing - danger. */
+	if ((vp->p_flag & P_INEXEC))
+		return (EBUSY);
+
+	vp->p_vmspace->vm_refcnt++;	/* XXX */
+	buf = malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+
+	iov.iov_base = &pss;
+	iov.iov_len = sizeof(pss);
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;	
+	uio.uio_offset = (off_t)PS_STRINGS;
+	uio.uio_resid = sizeof(pss);
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_rw = UIO_READ;
+	uio.uio_procp = cp;
+
+	if ((error = uvm_io(&vp->p_vmspace->vm_map, &uio)) != 0)
+		goto out;
+
+	if (op == KERN_PROC_NARGV) {
+		error = sysctl_rdint(oldp, oldlenp, NULL, pss.ps_nargvstr);
+		goto out;
+	}
+	if (op == KERN_PROC_NENV) {
+		error = sysctl_rdint(oldp, oldlenp, NULL, pss.ps_nenvstr);
+		goto out;
+	}
+
+	if (op == KERN_PROC_ARGV) {
+		cnt = pss.ps_nargvstr;
+		vargv = pss.ps_argvstr;
+	} else {
+		cnt = pss.ps_nenvstr;
+		vargv = pss.ps_envstr;
+	}
+
+	/* -1 to have space for a terminating NUL */
+	limit = *oldlenp - 1;
+	*oldlenp = 0;
+
+	if (limit > 8 * PAGE_SIZE) {
+		/* Don't allow a denial of service. */
+		error = E2BIG;
+		goto out;
+	}
+
+	rargv = oldp;
+
+	/*
+	 * *oldlenp - number of bytes copied out into readers buffer.
+	 * limit - maximal number of bytes allowed into readers buffer.
+	 * rarg - pointer into readers buffer where next arg will be stored.
+	 * rargv - pointer into readers buffer where the next rarg pointer
+	 *  will be stored.
+	 * vargv - pointer into victim address space where the next argument
+	 *  will be read.
+	 */
+
+	/* space for cnt pointers and a NULL */
+	rarg = (char *)(rargv + cnt + 1);
+	*oldlenp += (cnt + 1) * sizeof(char **);
+
+	while (cnt > 0 && *oldlenp < limit) {
+		size_t len, vstrlen;
+
+		/* Write to readers argv */
+		if ((error = copyout(&rarg, rargv, sizeof(rarg))) != 0)
+			goto out;
+
+		/* read the victim argv */
+		iov.iov_base = &varg;
+		iov.iov_len = sizeof(varg);
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_offset = (off_t)(vaddr_t)vargv;
+		uio.uio_resid = sizeof(varg);
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_rw = UIO_READ;
+		uio.uio_procp = cp;
+		if ((error = uvm_io(&vp->p_vmspace->vm_map, &uio)) != 0)
+			goto out;
+
+		if (varg == NULL)
+			break;
+
+		/*
+		 * read the victim arg. We must jump through hoops to avoid
+		 * crossing a page boundary too much and returning an error.
+		 */
+more:
+		len = PAGE_SIZE - (((vaddr_t)varg) & PAGE_MASK);
+		/* leave space for the terminating NUL */
+		iov.iov_base = buf;
+		iov.iov_len = len;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_offset = (off_t)(vaddr_t)varg;
+		uio.uio_resid = len;
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_rw = UIO_READ;
+		uio.uio_procp = cp;
+		if ((error = uvm_io(&vp->p_vmspace->vm_map, &uio)) != 0)
+			goto out;
+
+		for (vstrlen = 0; vstrlen < len; vstrlen++) {
+			if (buf[vstrlen] == '\0')
+				break;
+		}
+
+		/* Don't overflow readers buffer. */
+		if (*oldlenp + vstrlen + 1 >= limit) {
+			error = ENOMEM;
+			goto out;
+		}
+
+		if ((error = copyout(buf, rarg, vstrlen)) != 0)
+			goto out;
+
+		*oldlenp += vstrlen;
+		rarg += vstrlen;
+
+		/* The string didn't end in this page? */
+		if (vstrlen == len) {
+			varg += vstrlen;
+			goto more;
+		}
+
+		/* End of string. Terminate it with a NUL */
+		buf[0] = '\0';
+		if ((error = copyout(buf, rarg, 1)) != 0)
+			goto out;
+		*oldlenp += 1;;
+		rarg += 1;
+
+		vargv++;
+		rargv++;
+		cnt--;
+	}
+
+	if (*oldlenp >= limit) {
+		error = ENOMEM;
+		goto out;
+	}
+
+	/* Write the terminating null */
+	rarg = NULL;
+	error = copyout(&rarg, rargv, sizeof(rarg));
+
+out:
+	uvmspace_free(vp->p_vmspace);
+	free(buf, M_TEMP);
+	return (error);
 }
 
 /*

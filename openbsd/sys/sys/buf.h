@@ -1,4 +1,4 @@
-/*	$OpenBSD: buf.h,v 1.39 2002/03/14 03:16:12 millert Exp $	*/
+/*	$OpenBSD: buf.h,v 1.42 2002/07/03 21:19:08 miod Exp $	*/
 /*	$NetBSD: buf.h,v 1.25 1997/04/09 21:12:17 mycroft Exp $	*/
 
 /*
@@ -93,7 +93,8 @@ struct buf {
 	void	*b_saveaddr;		/* Original b_addr for physio. */
 	daddr_t	b_lblkno;		/* Logical block number. */
 	daddr_t	b_blkno;		/* Underlying physical block number. */
-					/* Function to call upon completion. */
+					/* Function to call upon completion.
+					 * Will be called at splbio(). */
 	void	(*b_iodone)(struct buf *);
 	struct	vnode *b_vp;		/* Device vnode. */
 	int	b_dirtyoff;		/* Offset in buffer of dirty region. */
@@ -113,8 +114,6 @@ struct buf {
 #define	b_active b_bcount		/* Driver queue head: drive active. */
 #define	b_data	 b_un.b_addr		/* b_un.b_addr is not changeable. */
 #define	b_errcnt b_resid		/* Retry count while I/O in progress. */
-#define	iodone	 biodone		/* Old name for biodone. */
-#define	iowait	 biowait		/* Old name for biowait. */
 
 /*
  * These flags are kept in b_flags.
@@ -188,14 +187,14 @@ struct cluster_info {
 };
 
 #ifdef _KERNEL
-int	nbuf;			/* The number of buffer headers */
-struct	buf *buf;		/* The buffer headers. */
-char	*buffers;		/* The buffer contents. */
-int	bufpages;		/* Number of memory pages in the buffer pool. */
+__BEGIN_DECLS
+extern int nbuf;		/* The number of buffer headers */
+extern struct buf *buf;		/* The buffer headers. */
+extern char *buffers;		/* The buffer contents. */
+extern int bufpages;		/* Number of memory pages in the buffer pool. */
 
 extern struct pool bufpool;
 
-__BEGIN_DECLS
 void	allocbuf(struct buf *, int);
 void	bawrite(struct buf *);
 void	bdwrite(struct buf *);

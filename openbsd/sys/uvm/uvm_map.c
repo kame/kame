@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_map.c,v 1.45 2002/03/14 03:16:13 millert Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.52 2002/09/17 13:01:20 mpech Exp $	*/
 /*	$NetBSD: uvm_map.c,v 1.86 2000/11/27 08:40:03 chs Exp $	*/
 
 /* 
@@ -190,7 +190,7 @@ static void		uvm_map_unreference_amap(vm_map_entry_t, int);
 int			uvm_map_spacefits(vm_map_t, vaddr_t *, vsize_t, vm_map_entry_t, voff_t, vsize_t);
 
 int _uvm_tree_sanity(vm_map_t map, char *name);
-static int		uvm_rb_subtree_space(vm_map_entry_t);
+static vsize_t		uvm_rb_subtree_space(vm_map_entry_t);
 
 static __inline int
 uvm_compare(vm_map_entry_t a, vm_map_entry_t b)
@@ -214,7 +214,7 @@ RB_PROTOTYPE(uvm_tree, vm_map_entry, rb_entry, uvm_compare);
 
 RB_GENERATE(uvm_tree, vm_map_entry, rb_entry, uvm_compare);
 
-static __inline int
+static __inline vsize_t
 uvm_rb_space(vm_map_t map, vm_map_entry_t entry)
 {
 	vm_map_entry_t next;
@@ -229,7 +229,7 @@ uvm_rb_space(vm_map_t map, vm_map_entry_t entry)
 	return (space);
 }
 		
-static int
+static vsize_t
 uvm_rb_subtree_space(vm_map_entry_t entry)
 {
 	vaddr_t space, tmp;
@@ -264,9 +264,14 @@ static __inline void
 uvm_rb_insert(vm_map_t map, vm_map_entry_t entry)
 {
 	vaddr_t space = uvm_rb_space(map, entry);
+	vm_map_entry_t tmp;
 
 	entry->ownspace = entry->space = space;
-	RB_INSERT(uvm_tree, &(map)->rbhead, entry);
+	tmp = RB_INSERT(uvm_tree, &(map)->rbhead, entry);
+#ifdef DIAGNOSTIC
+	if (tmp != NULL)
+		panic("uvm_rb_insert: duplicate entry?");
+#endif
 	uvm_rb_fixup(map, entry);
 	if (entry->prev != &map->header)
 		uvm_rb_fixup(map, entry->prev);
@@ -375,9 +380,11 @@ uvm_mapent_alloc(map)
 		}
 		me->flags = UVM_MAP_STATIC;
 	} else if (map == kernel_map) {
+		splassert(IPL_NONE);
 		me = pool_get(&uvm_map_entry_kmem_pool, PR_WAITOK);
 		me->flags = UVM_MAP_KMEM;
 	} else {
+		splassert(IPL_NONE);
 		me = pool_get(&uvm_map_entry_pool, PR_WAITOK);
 		me->flags = 0;
 	}
@@ -967,7 +974,7 @@ uvm_map_lookup_entry(map, address, entry)
 		use_tree = 1;
 	}
 
-	uvm_tree_sanity(map, __FUNCTION__);
+	uvm_tree_sanity(map, __func__);
 
 	if (use_tree) {
 		vm_map_entry_t prev = &map->header;
@@ -2979,7 +2986,7 @@ uvm_map_clean(map, start, end, flags)
 				continue;
 
 			default:
-				panic("uvm_map_clean: wierd flags");
+				panic("uvm_map_clean: weird flags");
 			}
 		}
 		amap_unlock(amap);
@@ -3433,7 +3440,7 @@ uvmspace_fork(vm1)
 			 *    process is sharing the amap with another 
 			 *    process.  if we do not clear needs_copy here
 			 *    we will end up in a situation where both the
-			 *    parent and child process are refering to the
+			 *    parent and child process are referring to the
 			 *    same amap with "needs_copy" set.  if the 
 			 *    parent write-faults, the fault routine will
 			 *    clear "needs_copy" in the parent by allocating
@@ -3596,7 +3603,7 @@ uvm_map_printit(map, full, pr)
 	vm_map_entry_t entry;
 
 	(*pr)("MAP %p: [0x%lx->0x%lx]\n", map, map->min_offset,map->max_offset);
-	(*pr)("\t#ent=%d, sz=%d, ref=%d, version=%d, flags=0x%x\n",
+	(*pr)("\t#ent=%d, sz=%u, ref=%d, version=%u, flags=0x%x\n",
 	    map->nentries, map->size, map->ref_count, map->timestamp,
 	    map->flags);
 #ifdef pmap_resident_count

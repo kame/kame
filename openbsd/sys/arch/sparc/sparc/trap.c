@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.37 2002/03/26 01:00:30 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.39 2002/07/24 00:55:52 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.58 1997/09/12 08:55:01 pk Exp $ */
 
 /*
@@ -64,6 +64,9 @@
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+
+#include "systrace.h"
+#include <dev/systrace.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -858,7 +861,15 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 	if ((sfsr & SFSR_FT) == SFSR_FT_NONE)
 		goto out;	/* No fault. Why were we called? */
 
-	ftype = sfsr & SFSR_AT_STORE ? VM_PROT_WRITE : VM_PROT_READ;
+	if ((sfsr & SFSR_AT_STORE)) {
+		/* stores are never text faults. */
+		ftype = VM_PROT_WRITE;
+	} else {
+		ftype = VM_PROT_READ;
+		if ((sfsr & SFSR_AT_TEXT) || (type == T_TEXTFAULT)) {
+			ftype |= VM_PROT_EXECUTE;
+		}
+	}
 
 	/*
 	 * NOTE: the per-CPU fault status register readers (in locore)
@@ -1100,7 +1111,12 @@ syscall(code, tf, pc)
 #endif
 	rval[0] = 0;
 	rval[1] = tf->tf_out[1];
-	error = (*callp->sy_call)(p, &args, rval);
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE))
+		error = systrace_redirect(code, p, &args, rval);
+	else
+#endif
+		error = (*callp->sy_call)(p, &args, rval);
 
 	switch (error) {
 	case 0:

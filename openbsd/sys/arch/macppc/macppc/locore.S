@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.3 2002/03/21 03:02:32 drahn Exp $	*/
+/*	$OpenBSD: locore.S,v 1.7 2002/09/15 09:01:58 deraadt Exp $	*/
 /*	$NetBSD: locore.S,v 1.2 1996/10/16 19:33:09 ws Exp $	*/
 
 /*
@@ -911,7 +911,10 @@ s_trap:
 	FRAME_SETUP(tempsave)
 /* Now we can recover interrupts again: */
 	mfmsr	7
-	ori	7,7,(PSL_EE|PSL_ME|PSL_RI)
+	mfsrr1	31
+	andi.	31,31,PSL_EE	/* restore EE from previous context */
+	or	7,7,31
+	ori	7,7,(PSL_ME|PSL_RI)
 	mtmsr	7
 	isync
 /* Call C trap code: */
@@ -981,6 +984,7 @@ s_dsitrap:
 	mfdar	3
 	mfsrr1  4
 	mfdsisr	5
+	li	6, 0
 s_pte_spill:
 	bl	_C_LABEL(pte_spill_r)		/* try a spill */
 	cmpwi	0,3,0
@@ -1035,6 +1039,7 @@ s_isitrap:
 	mfsrr0	3
 	mfsrr1  4
 	li	5, 0
+	li	6, 1
 	b	s_pte_spill		/* above */
 
 /*

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.alpha,v 1.56 2002/03/23 14:14:25 deraadt Exp $
+#	$OpenBSD: files.alpha,v 1.59 2002/06/30 16:24:40 miod Exp $
 #	$NetBSD: files.alpha,v 1.32 1996/11/25 04:03:21 cgd Exp $
 #
 # alpha-specific configuration info
@@ -12,7 +12,7 @@ maxusers 2 8 64
 define	alpha_shared_intr
 file	arch/alpha/dev/shared_intr.c	alpha_shared_intr | dec_eb164 |
 					dec_kn20aa | dec_6600 | dec_550 |
-					dec_eb64plus
+					dec_1000 | dec_1000a | dec_eb64plus
 
 define	alpha_sgmap
 file	arch/alpha/dev/sgmap_common.c alpha_sgmap | dec_3000_500
@@ -60,55 +60,50 @@ include "dev/wsfont/files.wsfont"
 include "dev/wscons/files.wscons"
 
 #
-# TurboChannel Devices
+# Bus-independent support for DEC devices
+#
+include "dev/dec/files.dec"
+
+#
+# TURBOchannel Devices
 #
 
 include "dev/tc/files.tc"
+
+# TC attachment is MD
+attach	tc at tcbus
 
 device	tcasic: tcbus
 attach	tcasic at mainbus
 file	arch/alpha/tc/tcasic.c		tcasic
 file	arch/alpha/tc/tc_bus_mem.c	tcasic
+file	arch/alpha/tc/tc_dma.c		tcasic
+file	arch/alpha/tc/tc_dma_3000_300.c	tcasic & dec_3000_300
+file	arch/alpha/tc/tc_dma_3000_500.c	tcasic & dec_3000_500
+file	arch/alpha/tc/tc_sgmap.c	tcasic & dec_3000_500
 file	arch/alpha/tc/tc_3000_500.c	tcasic & dec_3000_500
 file	arch/alpha/tc/tc_3000_300.c	tcasic & dec_3000_300
 
-# the TurboChannel IOCTL ASIC
-device	ioasic { offset = -1 }
-attach	ioasic at tc
+# the TURBOchannel IOCTL ASIC
+# IOASIC device and attachment defined in sys/dev/tc/files.tc
 file	arch/alpha/tc/ioasic.c		ioasic
 
-# Color Frame buffer
+# PMAG-B CX
 device	cfb: wsemuldisplaydev, wsrasteremulops
 attach	cfb at tc
-file	arch/alpha/tc/cfb.c		cfb
+file	arch/alpha/tc/cfb.c		cfb		needs-flag
 
-# Smart Frame buffer
+# PMAGB-B HX or CXT
 device	sfb: wsemuldisplaydev, wsrasteremulops
 attach	sfb at tc
-file	arch/alpha/tc/sfb.c		sfb
+file	arch/alpha/tc/sfb.c		sfb		needs-flag
 
 # 8530 UARTs
 device	scc
 attach	scc at ioasic
 file	arch/alpha/tc/scc.c		scc		needs-count
 
-# the TCDS ASIC
-device	tcds { slot = -1 }
-attach	tcds at tc
-file	arch/alpha/tc/tcds.c		tcds		needs-count
-
-# 53C[F]90 SCSI
-device asc: scsi
-attach	asc at tcds
-file	arch/alpha/tc/asc.c		asc		needs-count
-file	arch/alpha/tc/tcds_dma.c	asc
-
-# Baseboard Lance ethernet.
-attach	le at ioasic with le_ioasic
-attach	le at tc with le_tc
-file	dev/tc/if_le_dec.c		(le_ioasic | le_tc)
-file	dev/tc/if_le_ioasic.c		le_ioasic	needs-flag #for le_iomem
-file	dev/tc/if_le_tc.c		le_tc
+# TC and baseboard ioasic Lance ethernet are in files.tc
 
 #
 # ISA Bus support
@@ -233,6 +228,8 @@ file	arch/alpha/pci/pci_eb64plus.c		dec_eb64plus
 file	arch/alpha/pci/pci_eb64plus_intr.s	dec_eb64plus
 file	arch/alpha/pci/pci_kn20aa.c		dec_kn20aa
 file	arch/alpha/pci/pci_550.c		dec_550
+file	arch/alpha/pci/pci_1000a.c		dec_1000a
+file	arch/alpha/pci/pci_1000.c		dec_1000
 file	arch/alpha/pci/pci_6600.c		dec_6600
 file	arch/alpha/pci/pci_up1000.c		api_up1000
 
@@ -288,6 +285,7 @@ file	arch/alpha/alpha/process_machdep.c
 file	arch/alpha/alpha/prom.c
 file	arch/alpha/alpha/sys_machdep.c
 file	arch/alpha/alpha/trap.c
+file	arch/alpha/alpha/fp_complete.c
 file	arch/alpha/alpha/vm_machdep.c
 file	arch/alpha/alpha/disksubr.c
 file	arch/alpha/dev/bus_dma.c
@@ -317,6 +315,7 @@ file	arch/alpha/alpha/dec_eb164.c		dec_eb164	needs-flag
 file	arch/alpha/alpha/dec_eb64plus.c		dec_eb64plus	needs-flag
 file	arch/alpha/alpha/dec_kn20aa.c		dec_kn20aa	needs-flag
 file	arch/alpha/alpha/dec_550.c		dec_550		needs-flag
+file	arch/alpha/alpha/dec_1000a.c		dec_1000 | dec_1000a	needs-flag
 file    arch/alpha/alpha/dec_6600.c             dec_6600	needs-flag
 file	arch/alpha/alpha/api_up1000.c		api_up1000	needs-flag
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.4 2002/03/21 17:37:57 drahn Exp $ */
+/*	$OpenBSD: cpu.c,v 1.10 2002/09/15 09:01:58 deraadt Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -51,6 +51,7 @@
 #define MPC750          8
 #define MPC604ev        9
 #define MPC7400         12
+#define	IBM750FX	0x7000
 #define MPC7410         0x800c
 #define MPC7450         0x8000
 #define MPC7455         0x8001
@@ -76,7 +77,7 @@ struct cfdriver cpu_cd = {
 	NULL, "cpu", DV_DULL, NULL, 0
 };
 
-void config_l2cr(void);
+void config_l2cr(int cpu);
 
 int
 cpumatch(parent, cfdata, aux)
@@ -108,47 +109,51 @@ cpuattach(parent, dev, aux)
 	cpu = pvr >> 16;
 	switch (cpu) {
 	case MPC601:
-		sprintf(cpu_model, "601");
+		snprintf(cpu_model, sizeof(cpu_model), "601");
 		break;
 	case MPC603:
-		sprintf(cpu_model, "603");
+		snprintf(cpu_model, sizeof(cpu_model), "603");
 		break;
 	case MPC604:
-		sprintf(cpu_model, "604");
+		snprintf(cpu_model, sizeof(cpu_model), "604");
 		break;
 	case MPC603e:
-		sprintf(cpu_model, "603e");
+		snprintf(cpu_model, sizeof(cpu_model), "603e");
 		break;
 	case MPC603ev:
-		sprintf(cpu_model, "603ev");
+		snprintf(cpu_model, sizeof(cpu_model), "603ev");
 		break;
 	case MPC750:
-		sprintf(cpu_model, "750");
+		snprintf(cpu_model, sizeof(cpu_model), "750");
 		break;
 	case MPC604ev:
-		sprintf(cpu_model, "604ev");
+		snprintf(cpu_model, sizeof(cpu_model), "604ev");
 		break;
 	case MPC7400:
-		sprintf(cpu_model, "7400");
+		snprintf(cpu_model, sizeof(cpu_model), "7400");
+		break;
+	case IBM750FX:
+		snprintf(cpu_model, sizeof(cpu_model), "750FX");
 		break;
 	case MPC7410:
-		sprintf(cpu_model, "7410");
+		snprintf(cpu_model, sizeof(cpu_model), "7410");
 		break;
 	case MPC7450:
-		if ((pvr & 0xf) < 3) {
-			sprintf(cpu_model, "7450");
-		} else {
-			sprintf(cpu_model, "7451");
-		}
+		if ((pvr & 0xf) < 3)
+			snprintf(cpu_model, sizeof(cpu_model), "7450");
+		 else
+			snprintf(cpu_model, sizeof(cpu_model), "7451");
 		break;
 	case MPC7455:
-		sprintf(cpu_model, "7455");
+		snprintf(cpu_model, sizeof(cpu_model), "7455");
 		break;
 	default:
-		sprintf(cpu_model, "Version %x", cpu);
+		snprintf(cpu_model, sizeof(cpu_model), "Version %x", cpu);
 		break;
 	}
-	sprintf(cpu_model + strlen(cpu_model), " (Revision %x)", pvr & 0xffff);
+	snprintf(cpu_model + strlen(cpu_model),
+	    sizeof(cpu_model) - strlen(cpu_model),
+	    " (Revision %x)", pvr & 0xffff);
 	printf(": %s", cpu_model);
 
 	/* This should only be executed on openfirmware systems... */
@@ -183,6 +188,7 @@ cpuattach(parent, dev, aux)
 	case MPC603e:
 	case MPC750:
 	case MPC7400:
+	case IBM750FX:
 	case MPC7410:
 	case MPC7450:
 	case MPC7455:
@@ -193,10 +199,9 @@ cpuattach(parent, dev, aux)
 	asm ("mtspr %0,1008" : "=r" (hid0));
 
 	/* if processor is G3 or G4, configure l2 cache */ 
-	if  ( (cpu == MPC750) || (cpu == MPC7400) 
-		|| (cpu == MPC7410))
-	{
-		config_l2cr();
+	if ( (cpu == MPC750) || (cpu == MPC7400) || (cpu == IBM750FX)
+	    || (cpu == MPC7410) || (cpu == MPC7450) || (cpu == MPC7455)) {
+		config_l2cr(cpu);
 	}
 	printf("\n");
 
@@ -244,8 +249,12 @@ u_int l2cr_config = L2CR_CONFIG;
 u_int l2cr_config = 0;
 #endif
 
+#define SPR_L3CR                0x3fa   /* .6. L3 Control Register */
+#define   L3CR_L3E                0x80000000 /*  0: L3 enable */
+#define   L3CR_L3SIZ              0x10000000 /*  3: L3 size (0=1MB, 1=2MB) */
+
 void
-config_l2cr()
+config_l2cr(int cpu)
 {
 	u_int l2cr, x;
 
@@ -275,18 +284,33 @@ config_l2cr()
 	}
 
 	if (l2cr & L2CR_L2E) {
-		switch (l2cr & L2CR_L2SIZ) {
-		case L2SIZ_256K:
-			printf(": 256KB");
-			break;
-		case L2SIZ_512K:
-			printf(": 512KB");
-			break;
-		case L2SIZ_1M:  
-			printf(": 1MB");
-			break;
-		default:
-			printf(": unknown size");
+		if (cpu == MPC7450 || cpu == MPC7455) {
+			u_int l3cr;
+
+			printf(": 256KB L2 cache");
+
+			__asm__ volatile("mfspr %0, %1" : "=r"(l3cr) :
+			    "n"(SPR_L3CR) );
+			if (l3cr & L3CR_L3E)
+				printf(", %cMB L3 cache",
+				    l3cr & L3CR_L3SIZ ? '2' : '1');
+		} else if (cpu == IBM750FX)
+			printf(": 512KB L2 cache");
+		else {
+			switch (l2cr & L2CR_L2SIZ) {
+			case L2SIZ_256K:
+				printf(": 256KB");
+				break;
+			case L2SIZ_512K:
+				printf(": 512KB");
+				break;
+			case L2SIZ_1M:  
+				printf(": 1MB");
+				break;
+			default:
+				printf(": unknown size");
+			}
+			printf(" backside cache");
 		}
 #if 0
 		switch (l2cr & L2CR_L2RAM) {
@@ -306,7 +330,6 @@ config_l2cr()
 		if (l2cr & L2CR_L2PE)
 			printf(" with parity");  
 #endif
-		printf(" backside cache");
 	} else
 		printf(": L2 cache not enabled");
 		

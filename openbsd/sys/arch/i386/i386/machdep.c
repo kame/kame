@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.204 2002/03/30 09:42:28 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.214 2002/07/31 02:30:29 mickey Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -165,16 +165,11 @@
 extern struct proc *npxproc;
 #endif
 
-#include "pc.h"
-#if (NPC > 0)
-#include <machine/pccons.h>
-#endif
-
 #include "bios.h"
 #include "com.h"
 #include "pccom.h"
 
-#if (NCOM > 0 || NPCCOM > 0)
+#if NPCCOM > 0
 #include <sys/termios.h>
 #include <dev/ic/comreg.h>
 #if NCOM > 0
@@ -320,6 +315,7 @@ int allowaperture = 0;
 void	winchip_cpu_setup(const char *, int, int);
 void	cyrix3_cpu_setup(const char *, int, int);
 void	cyrix6x86_cpu_setup(const char *, int, int);
+void	natsem6x86_cpu_setup(const char *, int, int);
 void	intel586_cpu_setup(const char *, int, int);
 void	intel686_cpu_setup(const char *, int, int);
 char *	intel686_cpu_name(int);
@@ -508,11 +504,12 @@ allocsys(v)
 			nbuf = 16;
 	}
 
-	/* Restrict to at most 70% filled kvm */
+	/* Restrict to at most 35% filled kvm */
+	/* XXX - This needs UBC... */
 	if (nbuf >
-	    (VM_MAX_KERNEL_ADDRESS-VM_MIN_KERNEL_ADDRESS) / MAXBSIZE * 7 / 10) 
+	    (VM_MAX_KERNEL_ADDRESS-VM_MIN_KERNEL_ADDRESS) / MAXBSIZE * 35 / 100) 
 		nbuf = (VM_MAX_KERNEL_ADDRESS-VM_MIN_KERNEL_ADDRESS) /
-		    MAXBSIZE * 7 / 10;
+		    MAXBSIZE * 35 / 100;
 
 	/* More buffer pages than fits into the buffers is senseless.  */
 	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
@@ -959,7 +956,7 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 				0, 0, 0, 0, 0, 0,
 				"M1 class"	/* Default */
 			},
-			cyrix6x86_cpu_setup
+			natsem6x86_cpu_setup
 		} }
 	}
 };
@@ -1041,7 +1038,7 @@ cyrix6x86_cpu_setup(cpu_device, model, step)
 	int model, step;
 {
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
-	extern int cpu_feature;
+	extern int clock_broken_latch;
 
 	switch (model) {
 	case -1: /* M1 w/o cpuid */
@@ -1061,11 +1058,23 @@ cyrix6x86_cpu_setup(cpu_device, model, step)
 
 		printf("%s: xchg bug workaround performed\n", cpu_device);
 		break;	/* fallthrough? */
-	case 4:	/* GXm */
-		/* Unset the TSC bit until calibrate_delay() gets fixed. */
+	case 4:
+		clock_broken_latch = 1;
 		cpu_feature &= ~CPUID_TSC;
 		break;
 	}
+#endif
+}
+
+void
+natsem6x86_cpu_setup(cpu_device, model, step)
+	const char *cpu_device;
+	int model, step;
+{
+#if defined(I586_CPU) || defined(I686_CPU)
+	extern int clock_broken_latch;
+
+	clock_broken_latch = 1;
 #endif
 }
 
@@ -1453,20 +1462,17 @@ sendsig(catcher, sig, mask, code, type, val)
 	int type;
 	union sigval val;
 {
-	register struct proc *p = curproc;
-	register struct trapframe *tf;
+	struct proc *p = curproc;
+	struct pmap *pmap = vm_map_pmap(&p->p_vmspace->vm_map);
+	struct trapframe *tf = p->p_md.md_regs;
 	struct sigframe *fp, frame;
 	struct sigacts *psp = p->p_sigacts;
-	int oonstack;
-	extern char sigcode[], esigcode[];
+	int oonstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
 
 	/* 
 	 * Build the argument list for the signal handler.
 	 */
 	frame.sf_signum = sig;
-
-	tf = p->p_md.md_regs;
-	oonstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
 
 	/*
 	 * Allocate space for the signal handler context.
@@ -1545,8 +1551,9 @@ sendsig(catcher, sig, mask, code, type, val)
 	__asm("movw %w0,%%fs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
 	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_eip = (int)(((char *)PS_STRINGS) - (esigcode - sigcode));
-	tf->tf_cs = GSEL(GUCODE_SEL, SEL_UPL);
+	tf->tf_eip = p->p_sigcode;
+	tf->tf_cs = pmap->pm_nxpages > 0?
+	    GSEL(GUCODE1_SEL, SEL_UPL) : GSEL(GUCODE_SEL, SEL_UPL);
 	tf->tf_eflags &= ~(PSL_T|PSL_VM|PSL_AC);
 	tf->tf_esp = (int)fp;
 	tf->tf_ss = GSEL(GUDATA_SEL, SEL_UPL);
@@ -1925,8 +1932,9 @@ setregs(p, pack, stack, retval)
 	u_long stack;
 	register_t *retval;
 {
-	register struct pcb *pcb = &p->p_addr->u_pcb;
-	register struct trapframe *tf;
+	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct pmap *pmap = vm_map_pmap(&p->p_vmspace->vm_map);
+	struct trapframe *tf = p->p_md.md_regs;
 
 #if NNPX > 0
 	/* If we were using the FPU, forget about it. */
@@ -1942,7 +1950,6 @@ setregs(p, pack, stack, retval)
 	p->p_md.md_flags &= ~MDP_USEDFPU;
 	pcb->pcb_flags = 0;
 
-	tf = p->p_md.md_regs;
 	__asm("movw %w0,%%gs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
 	__asm("movw %w0,%%fs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
 	tf->tf_es = LSEL(LUDATA_SEL, SEL_UPL);
@@ -1950,7 +1957,8 @@ setregs(p, pack, stack, retval)
 	tf->tf_ebp = 0;
 	tf->tf_ebx = (int)PS_STRINGS;
 	tf->tf_eip = pack->ep_entry;
-	tf->tf_cs = LSEL(LUCODE_SEL, SEL_UPL);
+	tf->tf_cs = pmap->pm_nxpages > 0?
+	    LSEL(LUCODE1_SEL, SEL_UPL) : LSEL(LUCODE_SEL, SEL_UPL);
 	tf->tf_eflags = PSL_USERSET;
 	tf->tf_esp = stack;
 	tf->tf_ss = LSEL(LUDATA_SEL, SEL_UPL);
@@ -2097,7 +2105,10 @@ init386(first_avail)
 	setsegment(&gdt[GDATA_SEL].sd, 0, 0xfffff, SDT_MEMRWA, SEL_KPL, 1, 1);
 	setsegment(&gdt[GLDT_SEL].sd, ldt, sizeof(ldt) - 1, SDT_SYSLDT, SEL_KPL,
 	    0, 0);
-	setsegment(&gdt[GUCODE_SEL].sd, 0, i386_btop(VM_MAXUSER_ADDRESS) - 1,
+	setsegment(&gdt[GUCODE1_SEL].sd, 0, i386_btop(VM_MAXUSER_ADDRESS) - 1,
+	    SDT_MEMERA, SEL_UPL, 1, 1);
+	setsegment(&gdt[GUCODE_SEL].sd, 0,
+	    i386_btop(VM_MAXUSER_ADDRESS - MAXSSIZ) - 1,
 	    SDT_MEMERA, SEL_UPL, 1, 1);
 	setsegment(&gdt[GUDATA_SEL].sd, 0, i386_btop(VM_MAXUSER_ADDRESS) - 1,
 	    SDT_MEMRWA, SEL_UPL, 1, 1);
@@ -2105,6 +2116,7 @@ init386(first_avail)
 	/* make ldt gates and memory segments */
 	setgate(&ldt[LSYS5CALLS_SEL].gd, &IDTVEC(osyscall), 1, SDT_SYS386CGT,
 	    SEL_UPL, GCODE_SEL);
+	ldt[LUCODE1_SEL] = gdt[GUCODE1_SEL];
 	ldt[LUCODE_SEL] = gdt[GUCODE_SEL];
 	ldt[LUDATA_SEL] = gdt[GUDATA_SEL];
 	ldt[LBSDICALLS_SEL] = ldt[LSYS5CALLS_SEL];
@@ -2182,7 +2194,7 @@ init386(first_avail)
 #endif
 	for(i = 0, im = bios_memmap; im->type != BIOS_MAP_END; im++)
 		if (im->type == BIOS_MAP_FREE) {
-			register int32_t a, e;
+			register paddr_t a, e;
 
 			a = i386_round_page(im->addr);
 			e = i386_trunc_page(im->addr + im->size);
@@ -2236,8 +2248,8 @@ init386(first_avail)
 	printf("physload: ");
 #endif
 	for (i = 0; i < ndumpmem; i++) {
-		int32_t a, e;
-		int32_t lim;
+		paddr_t a, e;
+		paddr_t lim;
 
 		a = dumpmem[i].start;
 		e = dumpmem[i].end;
@@ -2390,11 +2402,7 @@ pckbc_machdep_cnattach(kbctag, kbcslot)
 	pckbc_tag_t kbctag;
 	pckbc_slot_t kbcslot;
 {
-#if (NPC > 0) && (NPCCONSKBD > 0)
-	return (pcconskbd_cnattach(kbctag, kbcslot));
-#else
 	return (ENXIO);
-#endif
 }
 #endif
 
@@ -3390,6 +3398,16 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 
 	return (0);
 }
+
+#ifdef DIAGNOSTIC
+void
+splassert_check(int wantipl, const char *func)
+{
+	if (cpl < wantipl) {
+		splassert_fail(wantipl, cpl, func);
+	}
+}
+#endif
 
 /* If SMALL_KERNEL this results in an out of line definition of splx.  */
 SPLX_OUTLINED_BODY

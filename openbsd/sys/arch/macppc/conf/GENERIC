@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.22 2002/04/08 17:02:44 drahn Exp $g
+#	$OpenBSD: GENERIC,v 1.32 2002/09/24 19:08:14 nate Exp $g
 #
 # PPC GENERIC config file
 #
@@ -28,9 +28,6 @@ include "../../../conf/GENERIC"
 
 config		bsd	swap generic
 
-#
-#  Now the Machine specification
-#
 mainbus0	at root
 cpu*		at mainbus0
 
@@ -58,10 +55,10 @@ vgafb0		at pci? dev ? function ?	# PCI VGA graphics
 #pcscp*		at pci? dev ? function ?	# AMD Am53c974 PCscsi-PCI SCSI
 pciide*		at pci? dev ? function ?
 macobio0	at pci? dev ? function ?
-gm*		at pci? dev ? function ?	# GMAC ethernet
-gem*		at pci? disable dev ? function ?	# GMAC ethernet
+gem*		at pci? dev ? function ?	# GMAC ethernet
 hme*		at pci? dev ? function ?	# HME ethernet
 dc*		at pci? dev ? function ?	# DEC Tulip 21143 clones
+em*		at pci? dev ? function ?	# Intel Pro/1000 ethernet
 an*		at pci? dev ? function ?	# Cisco/Aironet
 wi*		at pci? dev ? function ?	# WaveLAN IEEE 802.11DS
 iop*		at pci? dev ? function ?	# I2O processor
@@ -103,10 +100,15 @@ gpio*		at gpio?			# GPIO, PMU interrupt router.
 aed*		at adb?				# ADB Event Device
 akbd*		at adb?				# ADB keyboard
 
+fwohci*		at pci? dev ? function ?	# FireWire on ohci
+#fw*		at fwbus?			# IPv4/v6 over FireWire
+fwnode*		at fwbus? idhi ? idlo ?
+#fwscsi*	at fwnode?
+
 wskbd*		at akbd? console ? mux 1
 ams*		at adb?				# ADB mouse
 wsmouse*	at ams?	mux 0
-#abtn*		at adb?				# ADB button?
+abtn*		at adb?				# ADB button?
 zsc*		at macobio?
 zstty*		at zsc? channel ?
 
@@ -127,6 +129,7 @@ scsibus*	at ioprbs?
 scsibus*	at iopsp?
 #scsibus*	at pcscp?
 scsibus*	at siop?
+#scsibus*	at fwscsi?
 
 wdc*		at macobio? flags 0x1
 wd*		at wdc? drive ? flags 0x0000
@@ -143,9 +146,10 @@ usb*		at ohci? flags 0x1
 uhub*		at usb?
 uhub*		at uhub? port ? configuration ? interface ?
 
-uhid*		at uhub? port ? configuration ?	# USB Generic HID devices
-ukbd*		at uhub? port ? configuration ?	# USB HID Keyboard devices
-ums*		at uhub? port ? configuration ?	# USB Mice
+uhidev*		at uhub? port ? configuration ? interface ?
+uhid*		at uhidev? reportid ?		# USB Generic HID devices
+ukbd*		at uhidev? reportid ?		# USB HID Keyboard devices
+ums*		at uhidev? reportid ?		# USB Mice
 wsmouse*	at ums? mux 0
 uaudio* 	at uhub? port ? configuration ? # USB Audio
 ulpt*		at uhub? port ? configuration ?	# USB Printer
@@ -158,8 +162,20 @@ umass*		at uhub? port ? configuration ? # USB Mass Storage devices
 scsibus*	at umass?
 kue*		at uhub? port ?			# Kawasaki KL5KUSB101B
 aue*		at uhub? port ?			# USB EtherNet 
-uplcom* 	at uhub? port ?            # I/O DATA USB-RSAQ2 serial adapter
-ucom*   	at uplcom? portno ?
+uplcom* 	at uhub? port ?			# I/O DATA USB-RSAQ2 serial
+ucom*		at uplcom? portno ?
+
+# CardBus bus support
+cardbus*	at cardslot?
+pcmcia*		at cardslot?
+cbb*		at pci? dev ? function ?
+cardslot*	at cbb?
+wi*		at pcmcia? function ?		# WaveLAN IEEE 802.11DS
+#dc*		at cardbus? dev ? function ?	# 21143, "tulip" clone ethernet
+#fxp*		at cardbus? dev ? function ?	# Intel PRO/100 ethernet
+#xl*		at cardbus? dev ? function ?	# 3C575/3C656 ethernet
+#rl*		at cardbus? dev ? function ?	# RealTek 81[23]9 ethernet
+#wdc*		at pcmcia? function ?
 
 wsdisplay*	at vgafb?
 wskbd*		at ukbd? console ? mux 1
@@ -171,4 +187,4 @@ ch*		at scsibus? target ? lun ?
 ss*		at scsibus? target ? lun ?
 uk*		at scsibus? target ? lun ?
 
-pseudo-device        wsmux	2	# mouse & keyboard multiplexor
+pseudo-device	wsmux	2	# mouse & keyboard multiplexor

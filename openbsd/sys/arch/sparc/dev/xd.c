@@ -1,4 +1,4 @@
-/*	$OpenBSD: xd.c,v 1.21 2002/03/14 01:26:43 millert Exp $	*/
+/*	$OpenBSD: xd.c,v 1.24 2002/06/08 18:52:45 art Exp $	*/
 /*	$NetBSD: xd.c,v 1.37 1997/07/29 09:58:16 fair Exp $	*/
 
 /*
@@ -488,7 +488,7 @@ xdcattach(parent, self, aux)
 	xdc->sc_ih.ih_fun = xdcintr;
 	xdc->sc_ih.ih_arg = xdc;
 	vmeintr_establish(ca->ca_ra.ra_intr[0].int_vec,
-			  ca->ca_ra.ra_intr[0].int_pri, &xdc->sc_ih);
+			  ca->ca_ra.ra_intr[0].int_pri, &xdc->sc_ih, IPL_BIO);
 	evcnt_attach(&xdc->sc_dev, "intr", &xdc->sc_intrcnt);
 
 
@@ -1121,7 +1121,9 @@ bad:				/* tells upper layers we have an error */
 done:				/* tells upper layers we are done with this
 				 * buf */
 	bp->b_resid = bp->b_bcount;
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 /*
  * end of {b,c}devsw functions
@@ -1521,7 +1523,7 @@ xdc_submit_iorq(xdcsc, iorqno, type)
 			return XD_ERR_AOK;	/* success */
 		case XD_SUB_WAIT:
 			while (iorq->iopb->done == 0) {
-				sleep(iorq, PRIBIO);
+				tsleep(iorq, PRIBIO, "xdiorq", 0);
 			}
 			return (iorq->errno);
 		case XD_SUB_POLL:
@@ -1553,7 +1555,7 @@ xdc_submit_iorq(xdcsc, iorqno, type)
 		return (XD_ERR_AOK);	/* success */
 	case XD_SUB_WAIT:
 		while (iorq->iopb->done == 0) {
-			sleep(iorq, PRIBIO);
+			tsleep(iorq, PRIBIO, "xdiorq", 0);
 		}
 		return (iorq->errno);
 	case XD_SUB_POLL:

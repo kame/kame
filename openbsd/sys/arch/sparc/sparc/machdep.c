@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.82 2002/03/23 13:28:34 espie Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.85 2002/08/12 16:35:40 miod Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -138,7 +138,6 @@ int	physmem;
 
 /* sysctl settable */
 int	sparc_led_blink = 0;
-int	sparc_vsyncblank = 0;
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
@@ -470,10 +469,6 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (ENOTDIR);	/* overloaded */
 
 	switch (name[0]) {
-	case CPU_VSYNCBLANK:
-		ret = sysctl_int(oldp, oldlenp, newp, newlen,
-		    &sparc_vsyncblank);
-		return (ret);
 	case CPU_LED_BLINK:
 #if (NLED > 0) || (NAUXREG > 0) || (NSCF > 0)
 		oldval = sparc_led_blink;
@@ -500,6 +495,8 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #else
 		return (EOPNOTSUPP);
 #endif
+	case CPU_CPUTYPE:
+		return (sysctl_rdint(oldp, oldlenp, newp, cputyp));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -523,8 +520,6 @@ sendsig(catcher, sig, mask, code, type, val)
 	struct trapframe *tf;
 	int caddr, oonstack, oldsp, newsp;
 	struct sigframe sf;
-	extern char sigcode[], esigcode[];
-#define	szsigcode	(esigcode - sigcode)
 #ifdef COMPAT_SUNOS
 	extern struct emul emul_sunos;
 #endif
@@ -622,7 +617,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	} else
 #endif
 	{
-		caddr = (int)PS_STRINGS - szsigcode;
+		caddr = p->p_sigcode;
 		tf->tf_global[1] = (int)catcher;
 	}
 	tf->tf_pc = caddr;

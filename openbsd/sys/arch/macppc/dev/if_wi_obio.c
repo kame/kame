@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_obio.c,v 1.4 2002/03/14 01:26:36 millert Exp $	*/
+/*	$OpenBSD: if_wi_obio.c,v 1.8 2002/09/15 09:01:58 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -77,12 +77,6 @@ void	wi_obio_attach(struct device *, struct device *, void *);
 int	wi_obio_enable(struct wi_softc *sc);
 void	wi_obio_disable(struct wi_softc *sc);
 
-
-int	wi_intr(void *);
-int	wi_attach(struct wi_softc *);
-void	wi_init(void *);
-void	wi_stop(struct wi_softc *);
-
 struct wi_obio_softc {
 	struct wi_softc sc_wi;
 	u_int keywest;
@@ -145,7 +139,7 @@ wi_obio_detach(dev, flags)
 {
 	struct wi_obio_softc *psc = (struct wi_obio_softc *)dev;
 	struct wi_softc *sc = &psc->sc_wi;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
 	/*
 	obio_io_unmap(psc->sc_pf, psc->sc_io_window);
@@ -166,7 +160,7 @@ wi_obio_activate(dev, act)
 {
 	struct wi_obio_softc *psc = (struct wi_obio_softc *)dev;
 	struct wi_softc *sc = &psc->sc_wi;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int s;
 
 	s = splnet();

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.41 2002/03/16 01:13:42 mickey Exp $	*/
+/*	$OpenBSD: trap.c,v 1.51 2002/09/23 06:11:46 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -41,6 +41,9 @@
 #include <sys/user.h>
 
 #include <net/netisr.h>
+
+#include "systrace.h"
+#include <dev/systrace.h>
 
 #include <uvm/uvm.h>
 
@@ -86,10 +89,9 @@ const char *trap_type[] = {
 };
 int trap_types = sizeof(trap_type)/sizeof(trap_type[0]);
 
-u_int32_t sir;
 int want_resched, astpending;
 
-void syscall(struct trapframe *frame, int *args);
+void syscall(struct trapframe *frame);
 
 static __inline void
 userret (struct proc *p, register_t pc, u_quad_t oticks)
@@ -127,8 +129,8 @@ trap(type, frame)
 	int type;
 	struct trapframe *frame;
 {
+	extern u_int32_t sir;
 	struct proc *p = curproc;
-	struct pcb *pcbp;
 	vaddr_t va;
 	struct vm_map *map;
 	struct vmspace *vm;
@@ -138,16 +140,18 @@ trap(type, frame)
 	u_int opcode;
 	int ret, s, si, trapnum;
 	const char *tts;
+	vm_fault_t fault = VM_FAULT_INVALID;
 
 	trapnum = type & ~T_USER;
 	opcode = frame->tf_iir;
-	if (trapnum == T_ITLBMISS || trapnum == T_ITLBMISSNA) {
+	if (trapnum == T_ITLBMISS) {
 		va = frame->tf_iioq_head;
 		space = frame->tf_iisq_head;
-		vftype = VM_PROT_READ;	/* XXX VM_PROT_EXECUTE ??? */
+		vftype = VM_PROT_EXECUTE;
 	} else {
 		va = frame->tf_ior;
 		space = frame->tf_isr;
+		/* what is the vftype for the T_ITLBMISSNA ??? XXX */
 		vftype = inst_store(opcode) ? VM_PROT_WRITE : VM_PROT_READ;
 	}
 
@@ -206,7 +210,7 @@ trap(type, frame)
 	case T_PRIV_REG:
 		/* these just can't make it to the trap() ever */
 	case T_HPMC:      case T_HPMC | T_USER:
-	case T_EMULATION: case T_EMULATION | T_USER:
+	case T_EMULATION:
 #endif
 	case T_IBREAK:
 	case T_DATALIGN:
@@ -234,7 +238,48 @@ trap(type, frame)
 		/* pass to user debugger */
 		break;
 
-	case T_EXCEPTION | T_USER:	/* co-proc assist trap */
+	case T_EXCEPTION | T_USER: {
+		extern u_int32_t fpu_enable;	/* from machdep */
+		extern paddr_t fpu_curpcb;
+		u_int32_t stat, *pex;
+		int i, flt;
+
+#ifdef DIAGNOSTIC
+		if (fpu_curpcb != frame->tf_cr30)
+			panic("trap: FPU is not owned");
+#endif
+		mfctl(CR_CCR, stat);
+		if (stat & fpu_enable)	/* net quite there yet */
+			fpu_save((vaddr_t)p->p_addr->u_pcb.pcb_fpregs);
+		/* nobody owns it anymore */
+		fpu_curpcb = 0;
+		mtctl(stat & ~fpu_enable, CR_CCR);
+
+		/* get the exceptions and mask by the enabled mask */
+		pex = (u_int32_t *)&p->p_addr->u_pcb.pcb_fpregs[0];
+		for (i = 0, pex++; i < 7 && !*pex; i++, pex++);
+		stat = HPPA_FPU_OP(*pex);
+		if (stat & HPPA_FPU_V)
+			flt = FPE_FLTINV;
+		else if (stat & HPPA_FPU_Z)
+			flt = FPE_FLTDIV;
+		else if (stat & HPPA_FPU_O)
+			flt = FPE_FLTOVF;
+		else if (stat & HPPA_FPU_U)
+			flt = FPE_FLTUND;
+		else if (stat & HPPA_FPU_I)
+			flt = FPE_FLTRES;
+		else
+			flt = 0;
+		/* still left: under/over-flow and inexact */
+		*pex = 0;
+
+		sv.sival_int = va;
+		trapsignal(p, SIGFPE, type &~ T_USER, flt, sv);
+		}
+		break;
+
+	case T_EMULATION | T_USER:	/* co-proc assist trap */
 		sv.sival_int = va;
 		trapsignal(p, SIGFPE, type &~ T_USER, FPE_FLTINV, sv);
 		break;
@@ -276,6 +321,7 @@ trap(type, frame)
 		break;
 
 	case T_DATACC:   	case T_USER | T_DATACC:
+		fault = VM_FAULT_PROTECT;
 	case T_ITLBMISS:	case T_USER | T_ITLBMISS:
 	case T_DTLBMISS:	case T_USER | T_DTLBMISS:
 	case T_ITLBMISSNA:	case T_USER | T_ITLBMISSNA:
@@ -314,8 +360,7 @@ trap(type, frame)
 			pmapdebug = 0xffffff;
 		}
 #endif
-
-		ret = uvm_fault(map, va, 0, vftype);
+		ret = uvm_fault(map, va, fault, vftype);
 
 #ifdef TRAPDEBUG
 		if (space == -1) {
@@ -345,23 +390,34 @@ trap(type, frame)
 
 		if (ret != 0) {
 			if (type & T_USER) {
+#if 0
+if (kdb_trap (type, va, frame))
+	return;
+#endif
 				sv.sival_int = frame->tf_ior;
 				trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
 			} else {
 				if (p && p->p_addr->u_pcb.pcb_onfault) {
-					pcbp = &p->p_addr->u_pcb;
+#if 0
+if (kdb_trap (type, va, frame))
+	return;
+#endif
 					frame->tf_iioq_tail = 4 +
 					    (frame->tf_iioq_head =
-						pcbp->pcb_onfault);
-					break;
-				}
+						p->p_addr->u_pcb.pcb_onfault);
+#ifdef DDB
+					frame->tf_iir = 0;
+#endif
+				} else {
 #if 0
 if (kdb_trap (type, va, frame))
 	return;
 #else
-				panic("trap: uvm_fault(%p, %x, %d, %d): %d",
-				    map, va, 0, vftype, ret);
+					panic("trap: "
+					    "uvm_fault(%p, %x, %d, %d): %d",
+					    map, va, 0, vftype, ret);
 #endif
+				}
 			}
 		}
 		break;
@@ -373,7 +429,6 @@ if (kdb_trap (type, va, frame))
 
 	case T_INTERRUPT:
 	case T_INTERRUPT|T_USER:
-		frame->tf_flags |= TFF_INTR;
 		cpu_intr(frame);
 #if 0
 if (kdb_trap (type, va, frame))
@@ -381,31 +436,38 @@ return;
 #endif
 		/* FALLTHROUGH */
 	case T_LOWERPL:
-		__asm __volatile ("ldcws 0(%1), %0"
-				  : "=r" (si) : "r" (&sir));
-		s = spl0();
+		__asm __volatile (
+		    "ldcws 0(%1), %0" : "=&r" (si) : "r" (&sir) : "memory");
 		if (si & SIR_CLOCK) {
-			splclock();
+			s = splsoftclock();
 			softclock();
-			spl0();
+			splx(s);
 		}
 
 		if (si & SIR_NET) {
 			register int ni;
 			/* use atomic "load & clear" */
-			__asm __volatile ("ldcws 0(%1), %0"
-					  : "=r" (ni) : "r" (&netisr));
-			splnet();
+			__asm __volatile (
+			    "ldcws 0(%1), %0"
+			    : "=&r" (ni) : "r" (&netisr) : "memory");
+			s = splnet();
 #define	DONETISR(m,c) if (ni & (1 << (m))) c()
 #include <net/netisr_dispatch.h>
+			splx(s);
 		}
-		splx(s);
+		break;
+
+	case T_CONDITION:
+#if 0
+if (kdb_trap (type, va, frame))
+	return;
+#endif
+		panic("trap: divide by zero in the kernel");
 		break;
 
 	case T_DPROT:
 	case T_IPROT:
 	case T_OVERFLOW:
-	case T_CONDITION:
 	case T_ILLEGAL:
 	case T_HIGHERPL:
 	case T_TAKENBR:
@@ -422,7 +484,7 @@ return;
 if (kdb_trap (type, va, frame))
 	return;
 #endif
-		panic ("trap: unimplemented \'%s\' (%d)", tts, type);
+		panic("trap: unimplemented \'%s\' (%d)", tts, type);
 	}
 
 	if (type & T_USER)
@@ -441,67 +503,133 @@ child_return(arg)
 #endif
 }
 
+
 /*
  * call actual syscall routine
- * from the low-level syscall handler:
- * - all HPPA_FRAME_NARGS syscall's arguments supposed to be copied onto
- *   our stack, this wins compared to copyin just needed amount anyway
- * - register args are copied onto stack too
  */
 void
-syscall(frame, args)
+syscall(frame)
 	struct trapframe *frame;
-	int *args;
 {
-	register struct proc *p;
+	register struct proc *p = curproc;
 	register const struct sysent *callp;
-	int nsys, code, argsize, error;
-	int rval[2];
+	int retq, nsys, code, argsize, argoff, oerror, error;
+	register_t args[8], rval[2];
 
 	uvmexp.syscalls++;
 
 	if (!USERMODE(frame->tf_iioq_head))
 		panic("syscall");
 
-	p = curproc;
 	p->p_md.md_regs = frame;
 	nsys = p->p_emul->e_nsysent;
 	callp = p->p_emul->e_sysent;
-	code = frame->tf_t1;
-	switch (code) {
+
+	argoff = 4; retq = 0;
+	switch (code = frame->tf_t1) {
 	case SYS_syscall:
-		code = *args;
-		args += 1;
+		code = frame->tf_arg0;
+		args[0] = frame->tf_arg1;
+		args[1] = frame->tf_arg2;
+		args[2] = frame->tf_arg3;
+		argoff = 3;
 		break;
 	case SYS___syscall:
 		if (callp != sysent)
 			break;
-		code = *args;
-		args += 2;
+		/*
+		 * this works, because quads get magically swapped
+		 * due to the args being layed backwards on the stack
+		 * and then copied in words
+		 */
+		code = frame->tf_arg0;
+		args[0] = frame->tf_arg2;
+		args[1] = frame->tf_arg3;
+		argoff = 2;
+		retq = 1;
+		break;
+	default:
+		args[0] = frame->tf_arg0;
+		args[1] = frame->tf_arg1;
+		args[2] = frame->tf_arg2;
+		args[3] = frame->tf_arg3;
+		break;
 	}
 
 	if (code < 0 || code >= nsys)
 		callp += p->p_emul->e_nosys;	/* bad syscall # */
 	else
 		callp += code;
-	argsize = callp->sy_argsize;
+
+	oerror = error = 0;
+	if ((argsize = callp->sy_argsize)) {
+		int i;
+
+		for (i = 0, argsize -= argoff * 4;
+		    argsize > 0; i++, argsize -= 4) {
+			error = copyin((void *)(frame->tf_sp +
+			    HPPA_FRAME_ARG(i + 4)), args + i + argoff, 4);
+
+			if (error)
+				break;
+		}
+
+		/*
+		 * coming from syscall() or __syscall we must be
+		 * having one of those w/ a 64 bit arguments,
+		 * which needs a word swap due to the order
+		 * of the arguments on the stack.
+		 * this assumes that none of 'em are called
+		 * by their normal syscall number, maybe a regress
+		 * test should be used, to whatch the behaviour.
+		 */
+		if (!error && argoff < 4) {
+			int t;
+
+			i = 0;
+			switch (code) {
+			case SYS_lseek:		retq = 0;
+			case SYS_truncate:
+			case SYS_ftruncate:	i = 2;	break;
+			case SYS_preadv:
+			case SYS_pwritev:
+			case SYS_pread:
+			case SYS_pwrite:	i = 4;	break;
+			case SYS_mmap:		i = 6;	break;
+			}
+
+			if (i) {
+				t = args[i];
+				args[i] = args[i + 1];
+				args[i + 1] = t;
+			}
+		}
+	}
 
 #ifdef SYSCALL_DEBUG
 	scdebug_call(p, code, args);
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, argsize, args);
+		ktrsyscall(p, code, callp->sy_argsize, args);
 #endif
+	if (error)
+		goto bad;
 
 	rval[0] = 0;
-	rval[1] = 0;
-	switch (error = (*callp->sy_call)(p, args, rval)) {
+	rval[1] = frame->tf_ret1;
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE))
+		oerror = error = systrace_redirect(code, p, args, rval);
+	else
+#endif
+		oerror = error = (*callp->sy_call)(p, args, rval);
+	switch (error) {
 	case 0:
 		p = curproc;			/* changes on exec() */
 		frame = p->p_md.md_regs;
 		frame->tf_ret0 = rval[0];
-		frame->tf_ret1 = rval[1];
+		frame->tf_ret1 = rval[!retq];
 		frame->tf_t1 = 0;
 		break;
 	case ERESTART:
@@ -510,19 +638,21 @@ syscall(frame, args)
 		break;
 	case EJUSTRETURN:
 		p = curproc;
+		frame = p->p_md.md_regs;
 		break;
 	default:
+	bad:
 		if (p->p_emul->e_errno)
 			error = p->p_emul->e_errno[error];
 		frame->tf_t1 = error;
 		break;
 	}
 #ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
+	scdebug_ret(p, code, oerror, rval);
 #endif
 	userret(p, frame->tf_iioq_head, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
+		ktrsysret(p, code, oerror, rval[0]);
 #endif
 }

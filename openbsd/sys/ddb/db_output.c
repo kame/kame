@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_output.c,v 1.17 2002/03/14 01:26:51 millert Exp $	*/
+/*	$OpenBSD: db_output.c,v 1.21 2002/07/10 23:38:09 art Exp $	*/
 /*	$NetBSD: db_output.c,v 1.13 1996/04/01 17:27:14 christos Exp $	*/
 
 /* 
@@ -216,4 +216,45 @@ db_end_line(space)
 {
 	if (db_output_position >= db_max_width - space)
 	    db_printf("\n");
+}
+
+char *
+db_format(char *buf, size_t bufsize, long val, int format, int alt, int width)
+{
+	const char *fmt;
+
+	if (format == DB_FORMAT_Z || db_radix == 16)
+		fmt = alt ? "-%#*lx" : "-%*lx";
+	else if (db_radix == 8)
+		fmt = alt ? "-%#*lo" : "-%*lo";
+	else
+		fmt = alt ? "-%#*lu" : "-%*lu";
+
+	/* The leading '-' is a nasty (and beautiful) idea from NetBSD */
+	if (val < 0 && format != DB_FORMAT_N)
+		val = -val;
+	else
+		fmt++;
+
+	snprintf(buf, bufsize, fmt, width, val);
+
+	return (buf);
+}
+
+void
+db_stack_dump(void)
+{
+	static int intrace;
+
+	if (intrace) {
+		printf("Faulted in traceback, aborting...\n");
+		return;
+	}
+
+	intrace = 1;
+	printf("Starting stack trace...\n");
+	db_stack_trace_print((db_expr_t)__builtin_frame_address(0), TRUE,
+	    256 /* low limit */, "", printf);
+	printf("End of stack trace.\n");
+	intrace = 0;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.29 2002/03/14 01:27:10 millert Exp $	*/
+/*	$OpenBSD: route.c,v 1.34 2002/09/11 05:38:47 itojun Exp $	*/
 /*	$NetBSD: route.c,v 1.14 1996/02/13 22:00:46 christos Exp $	*/
 
 /*
@@ -145,7 +145,7 @@ static int okaytoclone(u_int, int);
 static struct ifaddr *
 encap_findgwifa(struct sockaddr *gw)
 {
-	return TAILQ_FIRST(&encif.if_addrlist);
+	return (TAILQ_FIRST(&encif.if_addrlist));
 }
 
 #endif
@@ -155,7 +155,7 @@ rtable_init(table)
 	void **table;
 {
 	struct domain *dom;
-	for (dom = domains; dom; dom = dom->dom_next)
+	for (dom = domains; dom != NULL; dom = dom->dom_next)
 		if (dom->dom_rtattach)
 			dom->dom_rtattach(&table[dom->dom_family],
 			    dom->dom_rtoffset);
@@ -184,10 +184,10 @@ okaytoclone(flags, howstrict)
 	int howstrict;
 {
 	if (howstrict == ALL_CLONING)
-		return 1;
+		return (1);
 	if (howstrict == ONNET_CLONING && !(flags & RTF_GATEWAY))
-		return 1;
-	return 0;
+		return (1);
+	return (0);
 }
 
 struct rtentry *
@@ -359,6 +359,8 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 	u_int32_t *stat = NULL;
 	struct rt_addrinfo info;
 	struct ifaddr *ifa;
+
+	splassert(IPL_SOFTNET);
 
 	/* verify the gateway is directly reachable */
 	if ((ifa = ifa_ifwithnet(gateway)) == NULL) {
@@ -535,7 +537,7 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = gateway;
 	info.rti_info[RTAX_NETMASK] = netmask;
-	return rtrequest1(req, &info, ret_nrt);
+	return (rtrequest1(req, &info, ret_nrt));
 }
 
 /*
@@ -676,14 +678,6 @@ rtrequest1(req, info, ret_nrt)
 			 */
 			rt->rt_rmx = (*ret_nrt)->rt_rmx; /* copy metrics */
 			rt->rt_parent = *ret_nrt;	 /* Back ptr. to parent. */
-		} else if (!rt->rt_rmx.rmx_mtu &&
-		    !(rt->rt_rmx.rmx_locks & RTV_MTU)) { /* XXX */
-			if (rt->rt_gwroute) {
-				rt->rt_rmx.rmx_mtu =
-				    rt->rt_gwroute->rt_rmx.rmx_mtu;
-			} else {
-				rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
-			}
 		}
 		if (ifa->ifa_rtrequest)
 			ifa->ifa_rtrequest(req, rt, info);
@@ -741,14 +735,16 @@ rt_setgate(rt0, dst, gate)
 		 * If we switched gateways, grab the MTU from the new
 		 * gateway route if the current MTU is 0 or greater
 		 * than the MTU of gateway.
+		 * Note that, if the MTU of gateway is 0, we will reset the
+		 * MTU of the route to run PMTUD again from scratch. XXX
 		 */
 		if (rt->rt_gwroute && !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
-		    (rt->rt_rmx.rmx_mtu == 0 ||
-		     rt->rt_rmx.rmx_mtu > rt->rt_gwroute->rt_rmx.rmx_mtu)) {
+		    rt->rt_rmx.rmx_mtu &&
+		    rt->rt_rmx.rmx_mtu > rt->rt_gwroute->rt_rmx.rmx_mtu) {
 			rt->rt_rmx.rmx_mtu = rt->rt_gwroute->rt_rmx.rmx_mtu;
 		}
 	}
-	return 0;
+	return (0);
 }
 
 void
@@ -793,7 +789,7 @@ rtinit(ifa, cmd, flags)
 		if ((flags & RTF_HOST) == 0 && ifa->ifa_netmask) {
 			m = m_get(M_DONTWAIT, MT_SONAME);
 			if (m == NULL)
-				return(ENOBUFS);
+				return (ENOBUFS);
 			deldst = mtod(m, struct sockaddr *);
 			rt_maskedcopy(dst, deldst, ifa->ifa_netmask);
 			dst = deldst;
@@ -838,7 +834,6 @@ rtinit(ifa, cmd, flags)
 			IFAFREE(rt->rt_ifa);
 			rt->rt_ifa = ifa;
 			rt->rt_ifp = ifa->ifa_ifp;
-			rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;	/*XXX*/
 			ifa->ifa_refcnt++;
 			if (ifa->ifa_rtrequest)
 				ifa->ifa_rtrequest(RTM_ADD, rt, NULL);
@@ -961,7 +956,7 @@ rt_timer_count(rtq)
 	struct rttimer_queue *rtq;
 {
 
-	return rtq->rtq_count;
+	return (rtq->rtq_count);
 }
 
 void     
@@ -993,11 +988,8 @@ rt_timer_add(rt, func, queue)
 {
 	struct rttimer *r;
 	long current_time;
-	int s;
 
-	s = splclock();
 	current_time = mono_time.tv_sec;
-	splx(s);
 
 	/*
 	 * If there's already a timer with this action, destroy it before
@@ -1052,9 +1044,7 @@ rt_timer_timer(arg)
 	long current_time;
 	int s;
 
-	s = splclock();
 	current_time = mono_time.tv_sec;
-	splx(s);
 
 	s = splsoftnet();
 	for (rtq = LIST_FIRST(&rttimer_queue_head); rtq != NULL; 

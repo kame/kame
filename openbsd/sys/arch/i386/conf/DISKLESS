@@ -1,4 +1,4 @@
-#	$OpenBSD: DISKLESS,v 1.39 2002/01/27 21:07:13 mickey Exp $
+#	$OpenBSD: DISKLESS,v 1.47 2002/09/26 21:44:37 deraadt Exp $
 #	$NetBSD: DISKLESS,v 1.26 1996/05/20 18:17:16 mrg Exp $
 #
 # DISKLESS -- Generic machine setup for diskless boot.
@@ -16,7 +16,6 @@ option		GPL_MATH_EMULATE	# floating point emulation
 
 #option		VM86		# Virtual 8086 emulation
 #option		USER_LDT	# user-settable LDT; used by WINE
-option		XSERVER		# diddle with console driver
 option		APERTURE	# in-kernel aperture driver for XFree86
 
 #option		KGDB		# Remote debugger support; exclusive of DDB
@@ -37,7 +36,6 @@ option		CRYPTO		# Cryptographic framework
 maxusers	32		# estimated number of users
 option		TIMEZONE=0	# time zone to adjust RTC time by
 option		DST=0		# daylight saving time used by RTC
-option		NTP		# hooks supporting the Network Time Protocol
 
 option		DDB		# in-kernel debugger
 #option		DDB_SAFE_CONSOLE # allow break into ddb during boot
@@ -156,7 +154,6 @@ usb*	at ohci?
 
 uhub*	at usb?				# USB Hubs
 uhub*	at uhub? port ? configuration ?	# USB Hubs
-uhid*	at uhub? port ? configuration ?	# USB Generic HID devices
 umodem*	at uhub? port ? configuration ?	# USB Modems/Serial
 ucom*	at umodem?
 uvisor*	at uhub? port ? configuration ?	# Handspring Visor
@@ -165,12 +162,14 @@ uftdi*	at uhub? port ?
 ucom*	at uftdi? portno ?
 uaudio* at uhub? port ? configuration ?	# USB Audio
 ulpt*	at uhub? port ? configuration ? # USB Printers
-ukbd*	at uhub? port ? configuration ?	# USB Keyboards
-wskbd*	at ukbd? console ? mux 1
 umass*	at uhub? port ? configuration ? # USB Mass Storage devices
 scsibus* at umass?
-ums*	at uhub? port ? configuration ?	# USB Mice
+uhidev*	at uhub? port ? configuration ? interface ?
+ums*	at uhidev? reportid ?
 wsmouse* at ums? mux 0
+ukbd*	at uhidev? reportid ?
+wskbd*	at ukbd? console ? mux 1
+uhid*	at uhidev? reportid ?
 aue*	at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
 cue*	at uhub? port ?			# CATC USB-EL1201A based Ethernet
 kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based Ethernet
@@ -391,7 +390,6 @@ dc*	at cardbus? dev ? function ?		# 21143, "tulip" clone ethernet
 ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
 skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
-wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 
 # Wireless network cards
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fd.c,v 1.26 2002/03/14 01:26:42 millert Exp $	*/
+/*	$OpenBSD: fd.c,v 1.29 2002/05/29 08:28:36 art Exp $	*/
 /*	$NetBSD: fd.c,v 1.51 1997/05/24 20:16:19 pk Exp $	*/
 
 /*-
@@ -250,7 +250,7 @@ void	fd_do_eject(struct fd_softc *);
 void	fd_mountroot_hook(struct device *);
 static void fdconf(struct fdc_softc *);
 
-#if PIL_FDSOFT == 4
+#if IPL_FDSOFT == 4
 #define IE_FDSOFT	IE_L4
 #else
 #error 4
@@ -260,7 +260,7 @@ static void fdconf(struct fdc_softc *);
 #if defined(SUN4M)
 #define FD_SET_SWINTR do {		\
 	if (CPU_ISSUN4M)		\
-		raise(0, PIL_FDSOFT);	\
+		raise(0, IPL_FDSOFT);	\
 	else				\
 		ienab_bis(IE_L4);	\
 } while(0)
@@ -388,14 +388,14 @@ fdcattach(parent, self, aux)
 #ifdef FDC_C_HANDLER
 	fdc->sc_hih.ih_fun = (void *)fdchwintr;
 	fdc->sc_hih.ih_arg = fdc;
-	intr_establish(pri, &fdc->sc_hih);
+	intr_establish(pri, &fdc->sc_hih, IPL_FD);
 #else
 	fdciop = &fdc->sc_io;
 	intr_fasttrap(pri, fdchwintr);
 #endif
 	fdc->sc_sih.ih_fun = (void *)fdcswintr;
 	fdc->sc_sih.ih_arg = fdc;
-	intr_establish(PIL_FDSOFT, &fdc->sc_sih);
+	intr_establish(IPL_FDSOFT, &fdc->sc_sih, IPL_BIO);
 
 	/* Assume a 82077 */
 	fdc->sc_reg_msr = &((struct fdreg_77 *)fdc->sc_reg)->fd_msr;
@@ -446,7 +446,7 @@ fdcattach(parent, self, aux)
 
 	evcnt_attach(&fdc->sc_dev, "intr", &fdc->sc_intrcnt);
 
-	printf(" pri %d, softpri %d: chip 8207%c\n", pri, PIL_FDSOFT, code);
+	printf(" pri %d, softpri %d: chip 8207%c\n", pri, IPL_FDSOFT, code);
 
 	/*
 	 * Controller and drives are represented by one and the same
@@ -718,7 +718,9 @@ bad:
 	bp->b_flags |= B_ERROR;
 done:
 	/* Toss transfer; we're done early. */
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 
 void
@@ -1780,7 +1782,9 @@ fdformat(dev, finfo, p)
 	if (rv == EWOULDBLOCK) {
 		/* timed out */
 		rv = EIO;
+		s = splbio();
 		biodone(bp);
+		splx(s);
 	}
 	if (bp->b_flags & B_ERROR) {
 		rv = bp->b_error;

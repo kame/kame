@@ -1,4 +1,4 @@
-/*	$OpenBSD: iommu.c,v 1.16 2002/03/26 18:13:11 jason Exp $	*/
+/*	$OpenBSD: iommu.c,v 1.19 2002/08/19 20:02:30 jason Exp $	*/
 /*	$NetBSD: iommu.c,v 1.47 2002/02/08 20:03:45 eeh Exp $	*/
 
 /*
@@ -183,7 +183,7 @@ iommu_init(name, is, tsbsize, iovabase)
 	 */
 	if (is->is_sb[0] || is->is_sb[1])
 		(void)pmap_extract(pmap_kernel(), (vaddr_t)&is->is_flush[0],
-		    (paddr_t *)&is->is_flushpa);
+		    &is->is_flushpa);
 
 	/*
 	 * now actually start up the IOMMU
@@ -398,7 +398,7 @@ iommu_strbuf_flush_done(is)
 
 	if (!is->is_sb[0] && !is->is_sb[1])
 		return (0);
-				
+
 	/*
 	 * Streaming buffer flushes:
 	 * 
@@ -518,14 +518,22 @@ iommu_dvmamap_load(t, is, map, buf, buflen, p, flags)
 	if ((boundary = (map->dm_segs[0]._ds_boundary)) == 0)
 		boundary = map->_dm_boundary;
 	align = max(map->dm_segs[0]._ds_align, NBPG);
+
+	if (flags & BUS_DMA_24BIT) {
+		sgstart = max(is->is_dvmamap->ex_start, 0xff000000);
+		sgend = min(is->is_dvmamap->ex_end, 0xffffffff);
+	} else {
+		sgstart = is->is_dvmamap->ex_start;
+		sgend = is->is_dvmamap->ex_end;
+	}
 	s = splhigh();
 	/* 
 	 * If our segment size is larger than the boundary we need to 
 	 * split the transfer up int little pieces ourselves.
 	 */
-	err = extent_alloc(is->is_dvmamap, sgsize, align, 0,
-		(sgsize > boundary) ? 0 : boundary, 
-		EX_NOWAIT|EX_BOUNDZERO, (u_long *)&dvmaddr);
+	err = extent_alloc_subregion(is->is_dvmamap, sgstart, sgend,
+	    sgsize, align, 0, (sgsize > boundary) ? 0 : boundary, 
+	    EX_NOWAIT|EX_BOUNDZERO, (u_long *)&dvmaddr);
 	splx(s);
 
 #ifdef DEBUG
@@ -566,7 +574,7 @@ iommu_dvmamap_load(t, is, map, buf, buflen, p, flags)
 			map->dm_segs[seg].ds_len));
 		map->dm_segs[seg].ds_len =
 		    boundary - (sgstart & (boundary - 1));
-		if (++seg > map->_dm_segcnt) {
+		if (++seg >= map->_dm_segcnt) {
 			/* Too many segments.  Fail the operation. */
 			DPRINTF(IDB_INFO, ("iommu_dvmamap_load: "
 				"too many segments %d\n", seg));
@@ -735,15 +743,21 @@ iommu_dvmamap_load_raw(t, is, map, segs, nsegs, flags, size)
 	}
 	sgsize = round_page(sgsize);
 
+	if (flags & BUS_DMA_24BIT) {
+		sgstart = max(is->is_dvmamap->ex_start, 0xff000000);
+		sgend = min(is->is_dvmamap->ex_end, 0xffffffff);
+	} else {
+		sgstart = is->is_dvmamap->ex_start;
+		sgend = is->is_dvmamap->ex_end;
+	}
 	s = splhigh();
 	/* 
 	 * If our segment size is larger than the boundary we need to 
 	 * split the transfer up into little pieces ourselves.
 	 */
-	err = extent_alloc(is->is_dvmamap, sgsize, align, 0,
-		(sgsize > boundary) ? 0 : boundary,
-		((flags & BUS_DMA_NOWAIT) == 0 ? EX_WAITOK : EX_NOWAIT) |
-		EX_BOUNDZERO, (u_long *)&dvmaddr);
+	err = extent_alloc_subregion(is->is_dvmamap, sgstart, sgend,
+	    sgsize, align, 0, (sgsize > boundary) ? 0 : boundary, 
+	    EX_NOWAIT|EX_BOUNDZERO, (u_long *)&dvmaddr);
 	splx(s);
 
 	if (err != 0)
@@ -822,6 +836,10 @@ printf("appending offset %x pa %lx, prev %lx dva %lx prev %lx\n",
 				    (long)map->dm_segs[j].ds_addr,
 				    map->dm_segs[j].ds_len));
 			} else {
+				if (j >= map->_dm_segcnt) {
+					iommu_dvmamap_unload(t, is, map);
+					return (E2BIG);
+				}
 				map->dm_segs[j].ds_addr = sgstart;
 				map->dm_segs[j].ds_len = left;
 				DPRINTF(IDB_INFO, ("iommu_dvmamap_load_raw: "
@@ -836,12 +854,12 @@ printf("appending offset %x pa %lx, prev %lx dva %lx prev %lx\n",
 				(sgend & ~(boundary - 1))) {
 				/* Need a new segment. */
 				map->dm_segs[j].ds_len =
-					sgstart & (boundary - 1);
+				    boundary - (sgstart & (boundary - 1));
 				DPRINTF(IDB_INFO, ("iommu_dvmamap_load_raw: "
 					"seg %d start %lx size %lx\n", j,
 					(long)map->dm_segs[j].ds_addr, 
 					map->dm_segs[j].ds_len));
-				if (++j > map->_dm_segcnt) {
+				if (++j >= map->_dm_segcnt) {
 					iommu_dvmamap_unload(t, is, map);
 					return (E2BIG);
 				}
@@ -854,7 +872,7 @@ printf("appending offset %x pa %lx, prev %lx dva %lx prev %lx\n",
 				panic("iommu_dmamap_load_raw: size botch");
 
 			/* Now map a series of pages. */
-			while (dvmaddr < sgend) {
+			while (dvmaddr <= sgend) {
 				DPRINTF(IDB_BUSDMA,
 				    ("iommu_dvamap_load_raw: map %p "
 				    "loading va %lx at pa %lx\n",
@@ -909,12 +927,12 @@ printf("appending offset %x pa %lx, prev %lx dva %lx prev %lx\n",
 	map->dm_segs[i].ds_addr = sgstart;
 	while ((sgstart & ~(boundary - 1)) != (sgend & ~(boundary - 1))) {
 		/* Oops.  We crossed a boundary.  Split the xfer. */
-		map->dm_segs[i].ds_len = sgstart & (boundary - 1);
+		map->dm_segs[i].ds_len = boundary - (sgstart & (boundary - 1));
 		DPRINTF(IDB_INFO, ("iommu_dvmamap_load_raw: "
 			"seg %d start %lx size %lx\n", i,
 			(long)map->dm_segs[i].ds_addr,
 			map->dm_segs[i].ds_len));
-		if (++i > map->_dm_segcnt) {
+		if (++i >= map->_dm_segcnt) {
 			/* Too many segments.  Fail the operation. */
 			s = splhigh();
 			/* How can this fail?  And if it does what can we do? */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sunos_misc.c,v 1.37 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: sunos_misc.c,v 1.41 2002/08/23 22:21:44 art Exp $	*/
 /*	$NetBSD: sunos_misc.c,v 1.65 1996/04/22 01:44:31 christos Exp $	*/
 
 /*
@@ -436,15 +436,17 @@ sunos_sys_getdents(p, v, retval)
 
 	vp = (struct vnode *)fp->f_data;
 	/* SunOS returns ENOTDIR here, BSD would use EINVAL */
-	if (vp->v_type != VDIR)
-		return (ENOTDIR);
+	if (vp->v_type != VDIR) {
+		error = ENOTDIR;
+		goto bad;
+	}
 
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
 
-	FREF(fp);
 	error = readdir_with_callback(fp, &fp->f_offset, args.resid,
 	    sunos_readdir_callback, &args);
+bad:
 	FRELE(fp);
 	if (error)
 		return (error);
@@ -529,7 +531,6 @@ sunos_sys_setsockopt(p, v, retval)
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
 		return (error);
-	FREF(fp);
 #define	SO_DONTLINGER (~SO_LINGER)
 	if (SCARG(uap, name) == SO_DONTLINGER) {
 		m = m_get(M_WAIT, MT_SOOPTS);
@@ -537,8 +538,7 @@ sunos_sys_setsockopt(p, v, retval)
 		m->m_len = sizeof(struct linger);
 		error = (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
 		    SO_LINGER, m));
-		FRELE(fp);
-		return (error);
+		goto bad;
 	}
 	if (SCARG(uap, level) == IPPROTO_IP) {
 #define		SUNOS_IP_MULTICAST_IF		2
@@ -560,22 +560,22 @@ sunos_sys_setsockopt(p, v, retval)
 		}
 	}
 	if (SCARG(uap, valsize) > MLEN) {
-		FRELE(fp);
-		return (EINVAL);
+		error = EINVAL;
+		goto bad;
 	}
 	if (SCARG(uap, val)) {
 		m = m_get(M_WAIT, MT_SOOPTS);
 		error = copyin(SCARG(uap, val), mtod(m, caddr_t),
 		    (u_int)SCARG(uap, valsize));
 		if (error) {
-			FRELE(fp);
 			(void) m_free(m);
-			return (error);
+			goto bad;
 		}
 		m->m_len = SCARG(uap, valsize);
 	}
 	error = (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), m));
+bad:
 	FRELE(fp);
 	return (error);
 }
@@ -597,7 +597,6 @@ sunos_sys_fchroot(p, v, retval)
 	if ((error = getvnode(fdp, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	vp = (struct vnode *)fp->f_data;
-	FREF(fp);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	if (vp->v_type != VDIR)
 		error = ENOTDIR;
@@ -865,7 +864,6 @@ sunos_sys_fstatfs(p, v, retval)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	FREF(fp);
 	error = VFS_STATFS(mp, sp, p);
 	FRELE(fp);
 	if (error)
@@ -1169,10 +1167,6 @@ sunos_sys_ostime(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	/*
-	 * XXX - settime() is private to kern_time.c so we just lie.
-	 */
-#if 0
 	struct sunos_sys_ostime_args /* {
 		syscallarg(int) time;
 	} */ *uap = v;
@@ -1184,11 +1178,8 @@ sunos_sys_ostime(p, v, retval)
 
 	tv.tv_sec = SCARG(uap, time);
 	tv.tv_usec = 0;
-	settime(&tv);
-	return(0);
-#else
-	return(EPERM);
-#endif
+	error = settime(&tv);
+	return (error);
 }
 
 /*

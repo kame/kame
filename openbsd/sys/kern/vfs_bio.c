@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_bio.c,v 1.58 2002/03/14 01:27:06 millert Exp $	*/
+/*	$OpenBSD: vfs_bio.c,v 1.65 2002/06/09 04:34:12 art Exp $	*/
 /*	$NetBSD: vfs_bio.c,v 1.44 1996/06/11 11:15:36 pk Exp $	*/
 
 /*-
@@ -136,8 +136,7 @@ struct proc *cleanerproc;
 int bd_req;			/* Sleep point for cleaner daemon. */
 
 void
-bremfree(bp)
-	struct buf *bp;
+bremfree(struct buf *bp)
 {
 	struct bqueues *dp = NULL;
 
@@ -176,11 +175,11 @@ bremfree(bp)
  * Initialize buffers and hash links for buffers.
  */
 void
-bufinit()
+bufinit(void)
 {
-	register struct buf *bp;
+	struct buf *bp;
 	struct bqueues *dp;
-	register int i;
+	int i;
 	int base, residual;
 
 	pool_init(&bufpool, sizeof(struct buf), 0, 0, 0, "bufpl", NULL);
@@ -237,13 +236,9 @@ bufinit()
 }
 
 static __inline struct buf *
-bio_doread(vp, blkno, size, async)
-	struct vnode *vp;
-	daddr_t blkno;
-	int size;
-	int async;
+bio_doread(struct vnode *vp, daddr_t blkno, int size, int async)
 {
-	register struct buf *bp;
+	struct buf *bp;
 
 	bp = getblk(vp, blkno, size, 0, 0);
 
@@ -270,14 +265,10 @@ bio_doread(vp, blkno, size, async)
  * This algorithm described in Bach (p.54).
  */
 int
-bread(vp, blkno, size, cred, bpp)
-	struct vnode *vp;
-	daddr_t blkno;
-	int size;
-	struct ucred *cred;
-	struct buf **bpp;
+bread(struct vnode *vp, daddr_t blkno, int size, struct ucred *cred,
+    struct buf **bpp)
 {
-	register struct buf *bp;
+	struct buf *bp;
 
 	/* Get buffer for block. */
 	bp = *bpp = bio_doread(vp, blkno, size, 0);
@@ -291,15 +282,10 @@ bread(vp, blkno, size, cred, bpp)
  * Trivial modification to the breada algorithm presented in Bach (p.55).
  */
 int
-breadn(vp, blkno, size, rablks, rasizes, nrablks, cred, bpp)
-	struct vnode *vp;
-	daddr_t blkno; int size;
-	daddr_t rablks[]; int rasizes[];
-	int nrablks;
-	struct ucred *cred;
-	struct buf **bpp;
+breadn(struct vnode *vp, daddr_t blkno, int size, daddr_t rablks[],
+    int rasizes[], int nrablks, struct ucred *cred, struct buf **bpp)
 {
-	register struct buf *bp;
+	struct buf *bp;
 	int i;
 
 	bp = *bpp = bio_doread(vp, blkno, size, 0);
@@ -326,12 +312,8 @@ breadn(vp, blkno, size, rablks, rasizes, nrablks, cred, bpp)
  * XXX for compatibility with old file systems.
  */
 int
-breada(vp, blkno, size, rablkno, rabsize, cred, bpp)
-	struct vnode *vp;
-	daddr_t blkno; int size;
-	daddr_t rablkno; int rabsize;
-	struct ucred *cred;
-	struct buf **bpp;
+breada(struct vnode *vp, daddr_t blkno, int size, daddr_t rablkno, int rabsize,
+    struct ucred *cred, struct buf **bpp)
 {
 
 	return (breadn(vp, blkno, size, &rablkno, &rabsize, 1, cred, bpp));	
@@ -341,8 +323,7 @@ breada(vp, blkno, size, rablkno, rabsize, cred, bpp)
  * Block write.  Described in Bach (p.56)
  */
 int
-bwrite(bp)
-	struct buf *bp;
+bwrite(struct buf *bp)
 {
 	int rv, async, wasdelayed, s;
 	struct vnode *vp;
@@ -432,8 +413,7 @@ bwrite(bp)
  * Described in Leffler, et al. (pp. 208-213).
  */
 void
-bdwrite(bp)
-	struct buf *bp;
+bdwrite(struct buf *bp)
 {
 	int s;
 
@@ -469,8 +449,7 @@ bdwrite(bp)
  * Asynchronous block write; just an asynchronous bwrite().
  */
 void
-bawrite(bp)
-	struct buf *bp;
+bawrite(struct buf *bp)
 {
 
 	SET(bp->b_flags, B_ASYNC);
@@ -481,9 +460,10 @@ bawrite(bp)
  * Must be called at splbio()
  */
 void
-buf_dirty(bp)
-	struct buf *bp;
+buf_dirty(struct buf *bp)
 {
+	splassert(IPL_BIO);
+
 	if (ISSET(bp->b_flags, B_DELWRI) == 0) {
 		SET(bp->b_flags, B_DELWRI);
 		reassignbuf(bp);
@@ -494,9 +474,10 @@ buf_dirty(bp)
  * Must be called at splbio()
  */
 void
-buf_undirty(bp)
-	struct buf *bp;
+buf_undirty(struct buf *bp)
 {
+	splassert(IPL_BIO);
+
 	if (ISSET(bp->b_flags, B_DELWRI)) {
 		CLR(bp->b_flags, B_DELWRI);
 		reassignbuf(bp);
@@ -508,8 +489,7 @@ buf_undirty(bp)
  * Described in Bach (p. 46).
  */
 void
-brelse(bp)
-	struct buf *bp;
+brelse(struct buf *bp)
 {
 	struct bqueues *bufq;
 	int s;
@@ -583,8 +563,6 @@ brelse(bp)
 	/* Unlock the buffer. */
 	CLR(bp->b_flags, (B_AGE | B_ASYNC | B_BUSY | B_NOCACHE | B_DEFERRED));
 
-	/* Allow disk interrupts. */
-	splx(s);
 
 	/* Wake up syncer and cleaner processes waiting for buffers */
 	if (nobuffers) {
@@ -598,7 +576,9 @@ brelse(bp)
 		wakeup_one(&needbuffer);
 	}
 
-	/* Wake up any proceeses waiting for _this_ buffer to become free. */
+	splx(s);
+
+	/* Wake up any processes waiting for _this_ buffer to become free. */
 	if (ISSET(bp->b_flags, B_WANTED)) {
 		CLR(bp->b_flags, B_WANTED);
 		wakeup(bp);
@@ -613,16 +593,12 @@ brelse(bp)
  * wants us to.
  */
 struct buf *
-incore(vp, blkno)
-	struct vnode *vp;
-	daddr_t blkno;
+incore(struct vnode *vp, daddr_t blkno)
 {
 	struct buf *bp;
 
-	bp = BUFHASH(vp, blkno)->lh_first;
-
 	/* Search hash chain */
-	for (; bp != NULL; bp = bp->b_hash.le_next) {
+	LIST_FOREACH(bp, BUFHASH(vp, blkno), b_hash) {
 		if (bp->b_lblkno == blkno && bp->b_vp == vp &&
 		    !ISSET(bp->b_flags, B_INVAL))
 			return (bp);
@@ -640,10 +616,7 @@ incore(vp, blkno)
  * cached blocks be of the correct size.
  */
 struct buf *
-getblk(vp, blkno, size, slpflag, slptimeo)
-	register struct vnode *vp;
-	daddr_t blkno;
-	int size, slpflag, slptimeo;
+getblk(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo)
 {
 	struct bufhashhdr *bh;
 	struct buf *bp, *nbp = NULL;
@@ -661,8 +634,7 @@ getblk(vp, blkno, size, slpflag, slptimeo)
 	 */
 	bh = BUFHASH(vp, blkno);
 start:
-	bp = bh->lh_first;
-	for (; bp != NULL; bp = bp->b_hash.le_next) {
+	LIST_FOREACH(bp, BUFHASH(vp, blkno), b_hash) {
 		if (bp->b_lblkno != blkno || bp->b_vp != vp)
 			continue;
 
@@ -713,8 +685,7 @@ start:
  * Get an empty, disassociated buffer of given size.
  */
 struct buf *
-geteblk(size)
-	int size;
+geteblk(int size)
 {
 	struct buf *bp;
 
@@ -735,9 +706,7 @@ geteblk(size)
  * responsibility to fill out the buffer's additional contents.
  */
 void
-allocbuf(bp, size)
-	struct buf *bp;
-	int size;
+allocbuf(struct buf *bp, int size)
 {
 	struct buf	*nbp;
 	vsize_t		desired_size;
@@ -823,9 +792,7 @@ out:
  * or times out) and return !0.
  */
 int
-getnewbuf(slpflag, slptimeo, bpp)
-	int slpflag, slptimeo;
-	struct buf **bpp;
+getnewbuf(int slpflag, int slptimeo, struct buf **bpp)
 {
 	struct buf *bp;
 	int s, ret, error;
@@ -966,8 +933,7 @@ buf_daemon(struct proc *p)
  * When they do, extract and return the I/O's error value.
  */
 int
-biowait(bp)
-	struct buf *bp;
+biowait(struct buf *bp)
 {
 	int s;
 
@@ -1003,11 +969,14 @@ biowait(bp)
  * to do async stuff to, and doesn't want the buffer brelse()'d.
  * (for swap pager, that puts swap buffers on the free lists (!!!),
  * for the vn device, that puts malloc'd buffers on the free lists!)
+ *
+ * Must be called at splbio().
  */
 void
-biodone(bp)
-	struct buf *bp;
+biodone(struct buf *bp)
 {
+	splassert(IPL_BIO);
+
 	if (ISSET(bp->b_flags, B_DONE))
 		panic("biodone already");
 	SET(bp->b_flags, B_DONE);		/* note that it's done */

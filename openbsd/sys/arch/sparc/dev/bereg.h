@@ -1,4 +1,4 @@
-/*	$OpenBSD: bereg.h,v 1.9 2001/01/30 07:17:07 jason Exp $	*/
+/*	$OpenBSD: bereg.h,v 1.11 2002/08/08 03:32:00 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Theo de Raadt and Jason L. Wright.
@@ -206,14 +206,14 @@ struct be_cregs {
 #define BE_CR_QMASK_RXSERR	0x00000001	/* rx sbus error ack */
 
 /*
- * BE Tranceiver registers
+ * BE Transceiver registers
  */
 struct be_tregs {
-	volatile u_int32_t	tcvr_pal;	/* tranceiver pal */
+	volatile u_int32_t	tcvr_pal;	/* transceiver pal */
 	volatile u_int32_t	mgmt_pal;	/* management pal */
 };
 
-/* be_tregs.tcvr_pal: tranceiver pal */
+/* be_tregs.tcvr_pal: transceiver pal */
 #define	TCVR_PAL_SERIAL		0x00000001	/* serial mode enable */
 #define TCVR_PAL_EXTLBACK	0x00000002	/* external loopback */
 #define TCVR_PAL_MSENSE		0x00000004	/* media sense */
@@ -260,6 +260,8 @@ struct be_txd {
 #define BE_TX_RING_SIZE		32		/* power of 2, <= MAXSIZE */
 #define BE_RX_RING_SIZE		32		/* power of 2, <= MAXSIZE */
 #define BE_PKT_BUF_SZ		2048
+#define	BE_TX_HIGH_WATER	27		/* enable tx interrupt */
+#define	BE_TX_LOW_WATER		5		/* disable tx interrupt */
 
 #define	BE_TX_RING_MAXMASK	(BE_TX_RING_MAXSIZE-1)
 #define	BE_RX_RING_MAXMASK	(BE_RX_RING_MAXSIZE-1)
@@ -289,7 +291,7 @@ struct be_bufs {
 #define BE_PHY_EXTERNAL		0
 #define BE_PHY_INTERNAL		1
 
-/* Tranceiver types */
+/* Transceiver types */
 #define BE_TCVR_NONE		0
 #define BE_TCVR_INTERNAL	1
 #define BE_TCVR_EXTERNAL	2

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.18 2002/03/26 01:00:30 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.22 2002/07/24 00:48:25 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.73 2001/08/09 01:03:01 eeh Exp $ */
 
 /*
@@ -66,6 +66,9 @@
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+
+#include "systrace.h"
+#include <dev/systrace.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -887,7 +890,7 @@ kfault:
 			return;
 		}
 		if (rv == ENOMEM) {
-			printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
+			printf("UVM: pid %d (%s), uid %u killed: out of swap\n",
 			       p->p_pid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
 			       p->p_ucred->cr_uid : -1);
@@ -1012,7 +1015,7 @@ text_access_fault(tf, type, pc, sfsr)
 
 	/* Now munch on protections... */
 
-	access_type = /* VM_PROT_EXECUTE| */VM_PROT_READ;
+	access_type = VM_PROT_EXECUTE;
 	if (tstate & (PSTATE_PRIV<<TSTATE_PSTATE_SHIFT)) {
 		extern int trap_trace_dis;
 		trap_trace_dis = 1; /* Disable traptrace for printf */
@@ -1119,7 +1122,7 @@ text_access_error(tf, type, pc, sfsr, afva, afsr)
 	va = trunc_page(pc);
 
 	/* Now munch on protections... */
-	access_type = /* VM_PROT_EXECUTE| */ VM_PROT_READ;
+	access_type = VM_PROT_EXECUTE;
 	if (tstate & (PSTATE_PRIV<<TSTATE_PSTATE_SHIFT)) {
 		extern int trap_trace_dis;
 		trap_trace_dis = 1; /* Disable traptrace for printf */
@@ -1305,7 +1308,7 @@ syscall(tf, code, pc)
 		if (error)
 			goto bad;
 	} else {
-#if defined(__arch64__) && !defined(COMPAT_NETBSD32)
+#if !defined(COMPAT_NETBSD32)
 		error = EFAULT;
 		goto bad;
 #else
@@ -1334,7 +1337,6 @@ syscall(tf, code, pc)
 				*argp++ = *ap++;
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_SYSCALL)) {
-#if defined(__arch64__)
 			register_t temp[8];
 			
 			/* Need to xlate 32-bit->64-bit */
@@ -1344,23 +1346,24 @@ syscall(tf, code, pc)
 				temp[j] = args.i[j];
 			ktrsyscall(p, code,
 				   i * sizeof(register_t), (register_t *)temp);
-#else
-			ktrsyscall(p, code,
-				   callp->sy_argsize, (register_t *)args.i);
-#endif
 		}
 #endif
 		if (error) {
 			goto bad;
 		}
-#endif	/* __arch64__ && !COMPAT_NETBSD32 */
+#endif	/* !COMPAT_NETBSD32 */
 	}
 #ifdef SYSCALL_DEBUG
 	scdebug_call(p, code, (register_t *)&args);
 #endif
 	rval[0] = 0;
 	rval[1] = tf->tf_out[1];
-	error = (*callp->sy_call)(p, &args, rval);
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE))
+		error = systrace_redirect(code, p, &args, rval);
+	else
+#endif
+		error = (*callp->sy_call)(p, &args, rval);
 
 	switch (error) {
 		vaddr_t dest;

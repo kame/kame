@@ -1,4 +1,4 @@
-/*	$OpenBSD: bktr_os.c,v 1.10 2002/03/14 03:16:07 millert Exp $	*/
+/*	$OpenBSD: bktr_os.c,v 1.13 2002/07/13 16:25:36 mickey Exp $	*/
 /* $FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.20 2000/10/20 08:16:53 roger Exp $ */
 
 /*
@@ -380,12 +380,12 @@ bktr_attach( device_t dev )
         fun = fun | 1;	/* Enable writes to the sub-system vendor ID */
 
 #if defined( BKTR_430_FX_MODE )
-	if (bootverbose) printf("Using 430 FX chipset compatibilty mode\n");
+	if (bootverbose) printf("Using 430 FX chipset compatibility mode\n");
         fun = fun | 2;	/* Enable Intel 430 FX compatibility mode */
 #endif
 
 #if defined( BKTR_SIS_VIA_MODE )
-	if (bootverbose) printf("Using SiS/VIA chipset compatibilty mode\n");
+	if (bootverbose) printf("Using SiS/VIA chipset compatibility mode\n");
         fun = fun | 4;	/* Enable SiS/VIA compatibility mode (usefull for
                            OPTi chipset motherboards too */
 #endif
@@ -969,12 +969,12 @@ bktr_attach( pcici_t tag, int unit )
         fun = fun | 1;	/* Enable writes to the sub-system vendor ID */
 
 #if defined( BKTR_430_FX_MODE )
-	if (bootverbose) printf("Using 430 FX chipset compatibilty mode\n");
+	if (bootverbose) printf("Using 430 FX chipset compatibility mode\n");
         fun = fun | 2;	/* Enable Intel 430 FX compatibility mode */
 #endif
 
 #if defined( BKTR_SIS_VIA_MODE )
-	if (bootverbose) printf("Using SiS/VIA chipset compatibilty mode\n");
+	if (bootverbose) printf("Using SiS/VIA chipset compatibility mode\n");
         fun = fun | 4;	/* Enable SiS/VIA compatibility mode (usefull for
                            OPTi chipset motherboards too */
 #endif
@@ -1423,12 +1423,13 @@ bktr_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
-	bktr->ih = pci_intr_establish(pa->pa_pc, ih, IPL_VIDEO,
-				      bktr_intr, bktr
 #ifdef __OpenBSD__
-				      , bktr->bktr_dev.dv_xname
+	bktr->ih = pci_intr_establish(pa->pa_pc, ih, IPL_VIDEO,
+	    bktr_intr, bktr, bktr->bktr_dev.dv_xname);
+#else
+	bktr->ih = pci_intr_establish(pa->pa_pc, ih, IPL_VIDEO,
+	    bktr_intr, bktr);
 #endif
-	);
 	if (bktr->ih == NULL) {
 		printf("%s: couldn't establish interrupt",
 		       bktr_name(bktr));
@@ -1760,13 +1761,19 @@ bktr_get_info(void *v, struct radio_info *ri)
 
 #define	STATUSBIT_STEREO	0x10
 	ri->mute = (int)sc->audio_mute_state ? 1 : 0;
-	ri->stereo = (status & STATUSBIT_STEREO) ? 1 : 0;
 	ri->caps = RADIO_CAPS_DETECT_STEREO | RADIO_CAPS_HW_AFC;
 	ri->freq = tv->frequency * 10;
 	ri->info = (status & STATUSBIT_STEREO) ? RADIO_INFO_STEREO : 0;
 
 	/* not yet supported */
 	ri->volume = ri->rfreq = ri->lock = 0;
+
+	/*
+	 * The field ri->stereo is used to forcible switch to
+	 * mono/stereo, not as an indicator of received signal quality.
+	 * The ri->info is for that purpose.
+	 */
+	ri->stereo = 1; /* Can't switch to mono, always stereo */
 
 	return (0);
 }

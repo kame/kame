@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.93 2002/03/23 13:28:34 espie Exp $	*/
+/* $OpenBSD: machdep.c,v 1.95 2002/07/20 19:24:56 art Exp $	*/
 /*
  * Copyright (c) 1998, 1999, 2000, 2001 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -876,9 +876,6 @@ sendsig(catcher, sig, mask, code, type, val)
 	int oonstack, fsize;
 	struct sigframe sf;
 	int addr;
-	extern char sigcode[], esigcode[];
-
-#define szsigcode (esigcode - sigcode)
 
 	tf = p->p_md.md_tf;
 	oonstack = psp->ps_sigstk.ss_flags & SA_ONSTACK;
@@ -993,7 +990,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	 * Build the argument list for the signal handler.
 	 * Signal trampoline code is at base of user stack.
 	 */
-	addr = (int)PS_STRINGS - szsigcode;
+	addr = p->p_sigcode;
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
 	tf->snip = (addr & ~3) | NIP_V;
@@ -1018,7 +1015,7 @@ sendsig(catcher, sig, mask, code, type, val)
  * Return to previous pc and psl as specified by
  * context left by sendsig. Check carefully to
  * make sure that the user has not modified the
- * psl to gain improper priviledges or to cause
+ * psl to gain improper privileges or to cause
  * a machine fault.
  */
 

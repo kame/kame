@@ -1,5 +1,5 @@
-/*	$OpenBSD: umodem.c,v 1.7 2001/05/03 02:20:34 aaron Exp $ */
-/*	$NetBSD: umodem.c,v 1.40 2001/03/25 23:02:34 augustss Exp $	*/
+/*	$OpenBSD: umodem.c,v 1.12 2002/07/25 04:07:33 nate Exp $ */
+/*	$NetBSD: umodem.c,v 1.44 2002/07/11 21:14:33 augustss Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -137,7 +137,7 @@ Static void	umodem_rts(struct umodem_softc *, int);
 Static void	umodem_break(struct umodem_softc *, int);
 Static void	umodem_set_line_state(struct umodem_softc *);
 Static int	umodem_param(void *, int, struct termios *);
-Static int	umodem_ioctl(void *, int, u_long, caddr_t, int, struct proc *);
+Static int	umodem_ioctl(void *, int, u_long, caddr_t, int, usb_proc_ptr);
 Static int	umodem_open(void *, int portno);
 Static void	umodem_close(void *, int portno);
 Static void	umodem_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
@@ -234,8 +234,8 @@ USB_ATTACH(umodem)
 		goto bad;
 	}
 
-	/* 
-	 * Find the bulk endpoints. 
+	/*
+	 * Find the bulk endpoints.
 	 * Iterate over all endpoints in the data interface and take note.
 	 */
 	uca.bulkin = uca.bulkout = -1;
@@ -463,7 +463,7 @@ umodem_get_caps(usbd_device_handle dev, int *cm, int *acm)
 		return;
 	}
 	*acm = cad->bmCapabilities;
-} 
+}
 
 void
 umodem_get_status(void *addr, int portno, u_char *lsr, u_char *msr)
@@ -524,14 +524,14 @@ umodem_param(void *addr, int portno, struct termios *t)
 
 int
 umodem_ioctl(void *addr, int portno, u_long cmd, caddr_t data, int flag,
-	     struct proc *p)
+	     usb_proc_ptr p)
 {
 	struct umodem_softc *sc = addr;
 	int error = 0;
 
 	if (sc->sc_dying)
 		return (EIO);
- 
+
 	DPRINTF(("umodemioctl: cmd=0x%08lx\n", cmd));
 
 	switch (cmd) {
@@ -658,7 +658,7 @@ umodem_set_line_coding(struct umodem_softc *sc, usb_cdc_line_state_t *state)
 
 	err = usbd_do_request(sc->sc_udev, &req, state);
 	if (err) {
-		DPRINTF(("umodem_set_line_coding: failed, err=%s\n", 
+		DPRINTF(("umodem_set_line_coding: failed, err=%s\n",
 			 usbd_errstr(err)));
 		return (err);
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.13 2002/03/14 03:16:00 millert Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.18 2002/08/12 16:35:38 miod Exp $	*/
 /*	$NetBSD: cpu.h,v 1.24 1997/03/15 22:25:15 pk Exp $ */
 
 /*
@@ -52,13 +52,15 @@
  * CTL_MACHDEP definitions.
  */
 #define CPU_LED_BLINK	1	/* int: twiddle the power LED */
-#define CPU_VSYNCBLANK	2	/* int: turn off monitors in *blank */
-#define CPU_MAXID	3	/* 2 valid machdep IDs */
+ 		/*	2	   formerly int: vsyncblank */
+#define CPU_CPUTYPE	3	/* int: cpu type */
+#define CPU_MAXID	4	/* 3 valid machdep IDs */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
 	{ "led_blink", CTLTYPE_INT }, \
-	{ "vsyncblank", CTLTYPE_INT }, \
+	{ 0, 0 }, \
+	{ "cputype", CTLTYPE_INT }, \
 }
 
 #ifdef _KERNEL
@@ -95,7 +97,6 @@ typedef struct clockframe clockframe;
 extern int eintstack[];
 
 #define	CLKF_USERMODE(framep)	(((framep)->psr & PSR_PS) == 0)
-#define	CLKF_BASEPRI(framep)	(((framep)->psr & PSR_PIL) == 0)
 #define	CLKF_PC(framep)		((framep)->pc)
 #define	CLKF_INTR(framep)	((framep)->fp < (u_int)eintstack)
 
@@ -153,15 +154,18 @@ extern int	foundfpu;		/* true => we have an FPU */
  * ``not me'' or 1 (``I took care of it'').  intr_establish() inserts a
  * handler into the list.  The handler is called with its (single)
  * argument, or with a pointer to a clockframe if ih_arg is NULL.
+ * ih_ipl specifies the interrupt level that should be blocked when
+ * executing this handler.
  */
 struct intrhand {
 	int	(*ih_fun)(void *);
 	void	*ih_arg;
+	int	ih_ipl;
 	struct	intrhand *ih_next;
 };
 extern struct intrhand *intrhand[15];
-void	intr_establish(int level, struct intrhand *);
-void	vmeintr_establish(int vec, int level, struct intrhand *);
+void	intr_establish(int level, struct intrhand *, int);
+void	vmeintr_establish(int vec, int level, struct intrhand *, int);
 
 /*
  * intr_fasttrap() is a lot like intr_establish, but is used for ``fast''
@@ -209,11 +213,8 @@ void	kill_user_windows(struct proc *);
 int	rwindow_save(struct proc *);
 /* amd7930intr.s */
 void	amd7930_trap(void);
-/* cons.c */
-int	cnrom(void);
-/* zs.c */
-void zsconsole(struct tty *, int, int, int (**)(struct tty *, int));
 #ifdef KGDB
+/* zs_kgdb.c */
 void zs_kgdb_init(void);
 #endif
 /* fb.c */

@@ -1,4 +1,4 @@
-/* $OpenBSD: if_gx.c,v 1.2 2002/04/02 22:10:42 nate Exp $ */
+/* $OpenBSD: if_gx.c,v 1.7 2002/09/24 03:51:22 nate Exp $ */
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon
  * All rights reserved.
@@ -87,42 +87,30 @@ struct gx_device {
 	u_int16_t	device;
 	int		version_flags;
 	u_int32_t	version_ipg;
-	char		*name;
 };
 
 struct gx_device gx_devs[] = {
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82542,
 	    GXF_WISEMAN | GXF_FORCE_TBI | GXF_OLD_REGS,
-	    10 | 2 << 10 | 10 << 20,
-	    "Intel Gigabit Ethernet (82542)" },
+	    10 | 2 << 10 | 10 << 20 },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC_SC,
 	    GXF_LIVENGOOD | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    6 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82543GC-F)" },
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543_SC,
+	    6 | 8 << 10 | 6 << 20 },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC,
 	    GXF_LIVENGOOD | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    6 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82543GC-F)" },
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC_CU,
-	    GXF_LIVENGOOD | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    8 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82543GC-T)" },
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI_CU,
+	    8 | 8 << 10 | 6 << 20 },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI,
 	    GXF_CORDOVA | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    8 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82544EI-T)" },
+	    8 | 8 << 10 | 6 << 20 },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI_SC,
 	    GXF_CORDOVA | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    6 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82544EI-F)" },
+	    6 | 8 << 10 | 6 << 20 },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC,
 	    GXF_CORDOVA | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    8 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82544GC-T)" },
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_64,
+	    8 | 8 << 10 | 6 << 20 },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_LX,
 	    GXF_CORDOVA | GXF_DMA | GXF_ENABLE_MWI | GXF_CSUM,
-	    8 | 8 << 10 | 6 << 20,
-	    "Intel Gigabit Ethernet (82544GC-T)" },
+	    8 | 8 << 10 | 6 << 20 },
 	{ 0, 0, 0, NULL }
 };
 
@@ -200,7 +188,7 @@ gx_match(void *aux)
 	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
 	int i;
 
-	for (i = 0; gx_devs[i].name != NULL; i++) {
+	for (i = 0; i < sizeof(gx_devs) / sizeof(gx_devs[0]); i++) {
 		if ((PCI_VENDOR(pa->pa_id) == gx_devs[i].vendor) &&
 		    (PCI_PRODUCT(pa->pa_id) == gx_devs[i].device))
 			return (&gx_devs[i]);
@@ -508,10 +496,14 @@ gx_release(struct gx_softc *gx)
 #endif
 
 	for (i = 0; i < GX_RX_RING_CNT; i++)
-		bus_dmamap_destroy(gx->gx_dmatag, gx->gx_cdata.gx_rx_map[i]);
+		if (gx->gx_cdata.gx_rx_map[i])
+			bus_dmamap_destroy(gx->gx_dmatag,
+			    gx->gx_cdata.gx_rx_map[i]);
 
 	for (i = 0; i < GX_TX_RING_CNT; i++)
-		bus_dmamap_destroy(gx->gx_dmatag, gx->gx_cdata.gx_tx_map[i]);
+		if (gx->gx_cdata.gx_tx_map[i])
+			bus_dmamap_destroy(gx->gx_dmatag,
+			    gx->gx_cdata.gx_tx_map[i]);
 }
 
 void
@@ -851,7 +843,7 @@ gx_ifmedia_upd(struct ifnet *ifp)
 			return (EINVAL);
 		}
 	} else {
-		ifm = &gx->gx_media;
+		ifm = &gx->gx_mii.mii_media;
 
 		/*
 		 * 1000TX half duplex does not work.
@@ -1716,7 +1708,6 @@ gx_encap(struct gx_softc *gx, struct mbuf *m_head)
 #ifdef notyet
 	struct gx_tx_desc_ctx *tctx;
 #endif
-	struct mbuf *m;
 	bus_dmamap_t txmap;
 	int i = 0;
 	int idx, cnt, /*csumopts, */ txcontext;
@@ -1790,10 +1781,7 @@ context_done:
 	if (bus_dmamap_load_mbuf(gx->gx_dmatag, txmap, m_head, BUS_DMA_NOWAIT))
 		return(ENOBUFS);
 
-	for (m = m_head; m != NULL; m = m->m_next) {
-		if (m->m_len == 0)
-			continue;
-
+	for (i = 0; i < txmap->dm_nsegs; i++) {
 		if (cnt == GX_TX_RING_CNT) {
 			printf("%s: overflow(2): %d, %d\n", cnt,
 			       GX_TX_RING_CNT, gx->gx_dev.dv_xname);
@@ -1801,9 +1789,9 @@ context_done:
 		}
 
 		tx = (struct gx_tx_desc_data *)&gx->gx_rdata->gx_tx_ring[idx];
-		tx->tx_addr = txmap->dm_segs[i++].ds_addr;
+		tx->tx_addr = txmap->dm_segs[i].ds_addr;
 		tx->tx_status = 0;
-		tx->tx_len = m->m_len;
+		tx->tx_len = txmap->dm_segs[i].ds_len;
 #ifdef notyet
 		if (gx->arpcom.ac_if.if_hwassist) {
 			tx->tx_type = 1;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ams.c,v 1.3 2002/03/14 01:26:36 millert Exp $	*/
+/*	$OpenBSD: ams.c,v 1.6 2002/09/15 09:01:58 deraadt Exp $	*/
 /*	$NetBSD: ams.c,v 1.11 2000/12/19 03:13:40 tsubai Exp $	*/
 
 /*
@@ -544,6 +544,13 @@ ams_ioctl(v, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
+	switch (cmd) {
+	case WSMOUSEIO_GTYPE:
+		*(u_int *)data = WSMOUSE_TYPE_ADB;
+		return (0);
+	}
+
+
 	return -1;
 }
 

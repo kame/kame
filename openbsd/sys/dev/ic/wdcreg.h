@@ -1,4 +1,4 @@
-/*      $OpenBSD: wdcreg.h,v 1.4 2001/04/30 20:53:53 csapuntz Exp $     */
+/*      $OpenBSD: wdcreg.h,v 1.7 2002/06/15 10:59:06 gluk Exp $     */
 /*	$NetBSD: wdcreg.h,v 1.22 1999/03/07 14:02:54 bouyer Exp $	*/
 
 /*-
@@ -112,6 +112,15 @@
 #define WDCC_STANDBY_IMMED 0xe0	/* enter standby mode */
 #define WDCC_CHECK_PWR	0xe5	/* check power mode */
 
+#define WDCC_READ_EXT		0x24 /* read 48-bit addressing */
+#define WDCC_WRITE_EXT		0x34 /* write 48-bit addressing */
+
+#define WDCC_READMULTI_EXT	0x29 /* read multiple 48-bit addressing */
+#define WDCC_WRITEMULTI_EXT	0x39 /* write multiple 48-bit addressing */
+
+#define WDCC_READDMA_EXT	0x25 /* read 48-bit addressing with DMA */
+#define WDCC_WRITEDMA_EXT	0x35 /* write 48-bit addressing with DMA */
+
 /* Subcommands for SET_FEATURES (features register ) */
 #define WDSF_8BIT_PIO_EN	0x01 /* Enable 8bit PIO (CFA featureset) */
 #define WDSF_EN_WR_CACHE	0x02
@@ -168,17 +177,6 @@
 #define ATAPI_WRITEEXT		0x34 /* Write sectors Ext */
 #define ATAPI_SETMAXEXT		0x37 /* Set Max Address Ext */
 #define ATAPI_WRITEMULTIEXT	0x39 /* Write Multi Ext */
-
-/* SubCommands for SMART operations */
-#define ATAPI_SMART_READ	0xD0 /* SMART read data */
-#define ATAPI_SMART_AUTOSAVE	0xD2 /* SMART en-/disable attr. autosave */
-#define ATAPI_SMART_SAVE	0xD3 /* SMART save attributes */
-#define ATAPI_SMART_OFFLINE	0xD4 /* SMART execute offline immediately */
-#define ATAPI_SMART_READLOG	0xD5 /* SMART read log */
-#define ATAPI_SMART_WRITELOG	0xD6 /* SMART write log */
-#define ATAPI_SMART_DS		0xD9 /* SMART disable operations */
-#define ATAPI_SMART_EN		0xD8 /* SMART disable operations */
-#define ATAPI_SMART_STATUS	0xDA /* SMART return status */
 
 /* Bytes used by ATAPI_PACKET_COMMAND ( feature register) */
 #define ATAPI_PKT_CMD_FTRE_DMA 0x01

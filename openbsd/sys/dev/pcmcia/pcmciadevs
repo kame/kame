@@ -1,4 +1,4 @@
-	$OpenBSD: pcmciadevs,v 1.87 2002/04/06 00:58:05 mickey Exp $
+	$OpenBSD: pcmciadevs,v 1.95 2002/08/17 21:55:10 fgsch Exp $
 /* $NetBSD: pcmciadevs,v 1.13 1998/08/17 23:10:12 thorpej Exp $ */
 
 /*
@@ -37,6 +37,7 @@
  */
 
 vendor FUJITSU			0x0004	Fujitsu
+vendor NETGEAR2			0x000b	Netgear
 vendor PANASONIC		0x0032	Matsushita Electric Industrial Co.
 vendor SANDISK			0x0045	Sandisk
 vendor NEWMEDIA			0x0057	NewMedia
@@ -63,6 +64,7 @@ vendor NETGEAR			0x0149	Netgear
 vendor SIMPLETECH		0x014d	Simple Technology
 vendor SYMBOL2			0x014d	Symbol
 vendor LUCENT			0x0156	Lucent
+vendor GEMPLUS			0x0157	Gemplus
 vendor AIRONET			0x015f	Aironet Wireless Communications
 vendor ERICSSON			0x016b	Ericsson
 vendor PSION			0x016c	Psion
@@ -171,6 +173,7 @@ product DUAL NE2000		0x0100 Dual NE2000
 product ELSA MC2_IEEE		0x0001 AirLancer MC-2 IEEE
 product ELSA XI300_IEEE		0x0002 XI300 Wireless LAN
 product ELSA XI800_IEEE		0x0004 XI800 CF Wireless LAN
+product ELSA XI325_IEEE		0x0005 XI325 Wireless LAN
 
 /* EMTAC */
 product EMTAC WLAN		0x0002 EMTAC A2424i 11Mbps WLAN Card
@@ -182,6 +185,9 @@ product FARALLON SKYLINE	0x0a01 SkyLINE Wireless
 product FUJITSU SCSI600		0x0401 Fujitsu 600
 product FUJITSU LA10S		0x1003 Fujitsu CF Ethernet
 product FUJITSU LA501		0x2000 Fujitsu Towa LA501
+
+/* Gemplus */
+product GEMPLUS GPR400		0x3004 GPR400 Smartcard Reader
  
 /* Greycell */
 product GREYCELL GCS2000	0x0201 Grey Cell GCS2000 Gold II Ethernet
@@ -256,8 +262,10 @@ product NEWMEDIA2 BUSTOASTER	0x0001 NewMedia BusToaster
 /* Netgear */
 product NETGEAR FA410TXC	0x4530 Netgear FA410TXC
 product NETGEAR FA411		0x0411 Netgear FA411
+product NETGEAR2 MA401RA	0x7300 Netgear MA401RA
 
 /* Nokia */
+product NOKIA C110_WLAN		0x1110 Nokia C110/C111
 product NOKIA C020_WLAN		0x20c0 Nokia C020
 
 /* No Wires Needed */
@@ -313,7 +321,7 @@ product SMC EZCARD		0x8022 SMC EZCard
 
 /* Symbol */
 product SYMBOL  SPECTRUM24	0x0801 Spectrum24 WLAN IEEE 802.11 FHSS
-product SYMBOL2 LA4100		0x0001 Spectrum24 LA4100 Series WLAN
+product SYMBOL	LA4100		0x0001 Spectrum24 LA4100 Series WLAN
 
 /* Telecom Device */
 product TELECOMDEVICE TCD_HPC100	0x0202 Telecom Device TCD-HPC100
@@ -341,6 +349,7 @@ vendor ACCTON			-1	ACCTON
 vendor ADDTRON			-1	Addtron
 vendor AMBICOM			-1	AmbiCom
 vendor AMD			-1	AMD
+vendor AROWANA			-1	Arowana
 vendor BILLIONTON		-1	Billionton Systems Inc.
 vendor CNET			-1	CNet
 vendor DIGITAL			-1	Digital
@@ -375,6 +384,8 @@ product PLANEX FNW3600T		-1
 product PLANEX FNW3700T		-1
 product DLINK DE650		{ "D-Link", "DE-650", NULL, NULL }
 product DLINK DE660		{ "D-Link", "DE-660", NULL, NULL }
+product DLINK DE660PLUS		{ "D-Link", "DE-660+", NULL, NULL }
+product DLINK DFE670TXD         { "D-Link", "DFE-670TXD", NULL, NULL }
 product RPTI EP400		{ "RPTI&spLTD.", "EP400", "CISV100", NULL }
 product RPTI EP401		{ "RPTI", "EP401&spEthernet&spNE2000&spCompatible", NULL, NULL }
 product ACCTON EN2212		{ "ACCTON", "EN2212", NULL, NULL }
@@ -430,3 +441,4 @@ product WISECOM T210CT		{ "PCMCIA", "Ethernet&spCard", NULL, NULL }
 product WISECOM IPORT		{ "iPort", "10/100&spEthernet&spCard", NULL, NULL }
 product GEMTEK WLAN		{ "Intersil", "PRISM&sp2_5&spPCMCIA&spADAPTER", "ISL37300P", "Eval-RevA" }
 product SIMPLETECH SPECTRUM24_ALT	{ "Symbol&spTechnologies", "LA4111&spSpectrum24&spWireless&spLAN&spPC&spCard", NULL, NULL }
+product AROWANA FE		{ "PCMCIA", "Fast-Ethernet", NULL, NULL }

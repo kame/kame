@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsecvar.h,v 1.26 2002/04/08 17:49:42 jason Exp $	*/
+/*	$OpenBSD: ubsecvar.h,v 1.35 2002/09/24 18:33:26 jason Exp $	*/
 
 /*
  * Copyright (c) 2000 Theo de Raadt
@@ -65,6 +65,7 @@ struct ubsec_q2 {
 	SIMPLEQ_ENTRY(ubsec_q2)		q_next;
 	struct ubsec_dma_alloc		q_mcr;
 	struct ubsec_dma_alloc		q_ctx;
+	u_int				q_type;
 };
 
 struct ubsec_q2_rng {
@@ -72,6 +73,37 @@ struct ubsec_q2_rng {
 	struct ubsec_dma_alloc		rng_buf;
 	int				rng_used;
 };
+
+/* C = (M ^ E) mod N */
+#define	UBS_MODEXP_PAR_M	0
+#define	UBS_MODEXP_PAR_E	1
+#define	UBS_MODEXP_PAR_N	2
+struct ubsec_q2_modexp {
+	struct ubsec_q2			me_q;
+	struct cryptkop *		me_krp;
+	struct ubsec_dma_alloc		me_M;
+	struct ubsec_dma_alloc		me_E;
+	struct ubsec_dma_alloc		me_C;
+	struct ubsec_dma_alloc		me_epb;
+	int				me_modbits;
+	int				me_shiftbits;
+	int				me_normbits;
+};
+
+#define	UBS_RSAPRIV_PAR_P	0
+#define	UBS_RSAPRIV_PAR_Q	1
+#define	UBS_RSAPRIV_PAR_DP	2
+#define	UBS_RSAPRIV_PAR_DQ	3
+#define	UBS_RSAPRIV_PAR_PINV	4
+#define	UBS_RSAPRIV_PAR_MSGIN	5
+#define	UBS_RSAPRIV_PAR_MSGOUT	6
+struct ubsec_q2_rsapriv {
+	struct ubsec_q2			rpr_q;
+	struct cryptkop *		rpr_krp;
+	struct ubsec_dma_alloc		rpr_msgin;
+	struct ubsec_dma_alloc		rpr_msgout;
+};
+
 #define	UBSEC_RNG_BUFSIZ	16		/* measured in 32bit words */
 
 struct ubsec_dmachunk {
@@ -94,6 +126,9 @@ struct ubsec_dma {
 
 #define	UBS_FLAGS_KEY		0x01		/* has key accelerator */
 #define	UBS_FLAGS_LONGCTX	0x02		/* uses long ipsec ctx */
+#define	UBS_FLAGS_BIGKEY	0x04		/* 2048bit keys */
+#define	UBS_FLAGS_HWNORM	0x08		/* hardware normalization */
+#define	UBS_FLAGS_RNG		0x10		/* hardware rng */
 
 struct ubsec_q {
 	SIMPLEQ_ENTRY(ubsec_q)		q_next;
@@ -135,6 +170,7 @@ struct ubsec_softc {
 	struct ubsec_q2_rng	sc_rng;
 	struct ubsec_dma	sc_dmaa[UBS_MAX_NQUEUE];
 	struct ubsec_q		*sc_queuea[UBS_MAX_NQUEUE];
+	SIMPLEQ_HEAD(,ubsec_q2)	sc_q2free;	/* free list */
 };
 
 #define	UBSEC_QFLAGS_COPYOUTIV		0x1
@@ -159,4 +195,3 @@ struct ubsec_stats {
 	u_int32_t hst_mcrerr;
 	u_int32_t hst_nodmafree;
 };
-

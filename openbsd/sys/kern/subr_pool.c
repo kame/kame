@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_pool.c,v 1.29 2002/03/14 00:07:57 art Exp $	*/
+/*	$OpenBSD: subr_pool.c,v 1.32 2002/07/23 15:31:36 art Exp $	*/
 /*	$NetBSD: subr_pool.c,v 1.61 2001/09/26 07:14:56 chs Exp $	*/
 
 /*-
@@ -103,7 +103,7 @@ struct pool_item {
 #ifdef DIAGNOSTIC
 	int pi_magic;
 #endif
-#define	PI_MAGIC 0xdeadbeef
+#define	PI_MAGIC 0xdeafbeef
 	/* Other entries use only this list entry */
 	TAILQ_ENTRY(pool_item)	pi_list;
 };
@@ -1941,12 +1941,12 @@ pool_allocator_alloc(struct pool *org, int flags)
 			 * In other cases the hook will be run in
 			 * pool_reclaim.
 			 */
-			if (org->pr_drain_hook == NULL)
-				break;
-			(*org->pr_drain_hook)(org->pr_drain_hook_arg, flags);
-			if ((res = (*pa->pa_alloc)(org, flags)) != NULL)
-				continue;
-			break;
+			if (org->pr_drain_hook != NULL) {
+				(*org->pr_drain_hook)(org->pr_drain_hook_arg,
+				    flags);
+				if ((res = (*pa->pa_alloc)(org, flags)) != NULL)
+					return (res);
+			}
 		}
 		s = splvm();
 		simple_lock(&pa->pa_slock);
@@ -2034,14 +2034,23 @@ void *
 pool_page_alloc(struct pool *pp, int flags)
 {
 	boolean_t waitok = (flags & PR_WAITOK) ? TRUE : FALSE;
+	void *ret;
+	int s;
 
-	return ((void *)uvm_km_alloc_poolpage(waitok));
+	s = splvm();
+	ret = (void *)uvm_km_alloc_poolpage(waitok);
+	splx(s);
+	return (ret);
 }
 
 void
 pool_page_free(struct pool *pp, void *v)
 {
+	int s;
+
+	s = splvm();
 	uvm_km_free_poolpage((vaddr_t)v);
+	splx(s);
 }
 
 void *

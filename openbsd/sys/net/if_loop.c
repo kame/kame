@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_loop.c,v 1.23 2002/03/14 01:27:09 millert Exp $	*/
+/*	$OpenBSD: if_loop.c,v 1.25 2002/09/11 05:38:47 itojun Exp $	*/
 /*	$NetBSD: if_loop.c,v 1.15 1996/05/07 02:40:33 thorpej Exp $	*/
 
 /*
@@ -205,6 +205,7 @@ loopattach(n)
 		ifp->if_start = lo_altqstart;
 #endif
 		if_attachhead(ifp);
+		if_alloc_sadl(ifp);
 #if NBPFILTER > 0
 		bpfattach(&ifp->if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));
 #endif
@@ -277,7 +278,7 @@ looutput(ifp, m, dst, rt)
 
 		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
 		if (m == 0)
-			return(ENOBUFS);
+			return (ENOBUFS);
 		afp = mtod(m, int32_t *);
 		*afp = (int32_t)dst->sa_family;
 

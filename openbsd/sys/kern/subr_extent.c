@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_extent.c,v 1.21 2002/03/21 16:24:16 jason Exp $	*/
+/*	$OpenBSD: subr_extent.c,v 1.23 2002/06/28 20:45:44 jason Exp $	*/
 /*	$NetBSD: subr_extent.c,v 1.7 1996/11/21 18:46:34 cgd Exp $	*/
 
 /*-
@@ -1058,7 +1058,7 @@ extent_alloc_region_descriptor(ex, flags)
 	}
 
  alloc:
-	s = splimp();
+	s = splvm();
 	rp = pool_get(&ex_region_pl, (flags & EX_WAITOK) ? PR_WAITOK : 0);
 	splx(s);
 	if (rp != NULL)
@@ -1090,7 +1090,7 @@ extent_free_region_descriptor(ex, rp)
 				    er_link);
 				goto wake_em_up;
 			} else {
-				s = splimp();
+				s = splvm();
 				pool_put(&ex_region_pl, rp);
 				splx(s);
 			}
@@ -1111,7 +1111,7 @@ extent_free_region_descriptor(ex, rp)
 	/*
 	 * We know it's dynamically allocated if we get here.
 	 */
-	s = splimp();
+	s = splvm();
 	pool_put(&ex_region_pl, rp);
 	splx(s);
 }
@@ -1130,8 +1130,8 @@ extent_print(ex)
 	if (ex == NULL)
 		panic("extent_print: NULL extent");
 
-	db_printf("extent `%s' (0x%lx - 0x%lx), flags = 0x%x\n", ex->ex_name,
-	    ex->ex_start, ex->ex_end, ex->ex_flags);
+	db_printf("extent `%s' (0x%lx - 0x%lx), flags=%b\n", ex->ex_name,
+	    ex->ex_start, ex->ex_end, ex->ex_flags, EXF_BITS);
 
 	for (rp = ex->ex_regions.lh_first; rp != NULL;
 	    rp = rp->er_link.le_next)

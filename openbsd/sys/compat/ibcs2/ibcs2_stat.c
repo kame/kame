@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_stat.c,v 1.9 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: ibcs2_stat.c,v 1.11 2002/08/23 15:39:31 art Exp $	*/
 /*	$NetBSD: ibcs2_stat.c,v 1.5 1996/05/03 17:05:32 christos Exp $	*/
 
 /*
@@ -84,6 +84,11 @@ cvt_statfs(sp, buf, len)
 {
 	struct ibcs2_statfs ssfs;
 
+	if (len < 0)
+		return (EINVAL);
+	if (len > sizeof(ssfs))
+		len = sizeof(ssfs);
+
 	bzero(&ssfs, sizeof ssfs);
 	ssfs.f_fstyp = 0;
 	ssfs.f_bsize = sp->f_bsize;
@@ -149,7 +154,6 @@ ibcs2_sys_fstatfs(p, v, retval)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	FREF(fp);
 	error = VFS_STATFS(mp, sp, p);
 	FRELE(fp);
 	if (error)

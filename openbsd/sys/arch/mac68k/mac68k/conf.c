@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.27 2001/12/11 23:19:02 miod Exp $	*/
+/*	$OpenBSD: conf.c,v 1.30 2002/07/10 22:08:47 mickey Exp $	*/
 /*	$NetBSD: conf.c,v 1.41 1997/02/11 07:35:49 scottr Exp $	*/
 
 /*
@@ -103,7 +103,6 @@ cdev_decl(zs);
 #include "asc.h"
 cdev_decl(asc);
 #include "ksyms.h"
-cdev_decl(ksyms);
 #ifdef XFS
 #include <xfs/nxfs.h>
 cdev_decl(xfs_dev);
@@ -112,6 +111,8 @@ cdev_decl(xfs_dev);
 #include "pf.h"
 
 #include <altq/altqconf.h>
+
+#include "systrace.h"
 
 struct cdevsw	cdevsw[] =
 {
@@ -133,7 +134,7 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NCD,cd),		/* 15: SCSI CD-ROM */
 	cdev_notdef(),			/* 16 */
 	cdev_ch_init(NCH,ch),		/* 17: SCSI autochanger */
-	cdev_notdef(),			/* 18 */
+        cdev_disk_init(NRD,rd),         /* 18: ramdisk device */
 	cdev_disk_init(NVND,vnd),	/* 19: vnode disk driver */
 	cdev_disk_init(NCCD,ccd),	/* 20: concatenated disk driver */
 	cdev_fd_init(1,filedesc),	/* 21: file descriptor pseudo-device */
@@ -165,7 +166,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 47 */
 	cdev_notdef(),			/* 48 */
 	cdev_notdef(),			/* 49 */
-	cdev_notdef(),			/* 50 */
+	cdev_systrace_init(NSYSTRACE,systrace),	/* 50 system call tracing */
 #ifdef XFS
 	cdev_xfs_init(NXFS,xfs_dev),	/* 51: xfs communication device */
 #else
@@ -237,7 +238,7 @@ static int chrtoblktab[] = {
 	/* 15 */	6,
 	/* 16 */	NODEV,
 	/* 17 */	NODEV,
-	/* 18 */	NODEV,
+	/* 18 */	13,
 	/* 19 */	8,
 	/* 20 */	9,
 };

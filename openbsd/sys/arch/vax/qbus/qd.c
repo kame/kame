@@ -1,4 +1,4 @@
-/*	$OpenBSD: qd.c,v 1.3 2002/03/14 01:26:48 millert Exp $	*/
+/*	$OpenBSD: qd.c,v 1.6 2002/06/12 03:50:05 miod Exp $	*/
 /*	$NetBSD: qd.c,v 1.17 2000/01/24 02:40:29 matt Exp $	*/
 
 /*-
@@ -1690,14 +1690,16 @@ panic("qd_strategy");
 	dga->bytcnt_hi = (short) (bp->b_bcount >> 16);
        
 	while (qdflags[unit].user_dma) {
-		sleep((caddr_t)&qdflags[unit].user_dma, QDPRIOR);
+		tsleep((caddr_t)&qdflags[unit].user_dma, QDPRIOR, "qdstrat", 0);
 	}
 	splx(s);
 #ifdef notyet
 	ubarelse(uh, &QBAreg);
 #endif
 	if (!(dga->csr & DMA_ERR)) {
+		s = splbio();
 		biodone(bp);
+		splx(s);
 		return;
 	}
 
@@ -1718,7 +1720,9 @@ panic("qd_strategy");
 		DMA_SETIGNORE(DMAheader[unit]);
 		dga->csr |= DMA_IE;
 	}
+	s = splbio();
 	biodone(bp);
+	splx(s);
 } /* qd_strategy */
 
 
@@ -2920,9 +2924,6 @@ qdcnputc(dev, chr)
 		return;
 
 	blitc(0, (u_char)(chr & 0xff));
-	if ((chr & 0177) == '\n')
-		blitc(0, '\r');
-
 } /* qdputc */
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_page.c,v 1.42 2002/03/14 01:27:18 millert Exp $	*/
+/*	$OpenBSD: uvm_page.c,v 1.45 2002/09/12 12:56:16 art Exp $	*/
 /*	$NetBSD: uvm_page.c,v 1.44 2000/11/27 08:40:04 chs Exp $	*/
 
 /* 
@@ -308,6 +308,9 @@ uvm_page_init(kvm_startp, kvm_endp)
 		paddr = ptoa(vm_physmem[lcv].start);
 		for (i = 0 ; i < n ; i++, paddr += PAGE_SIZE) {
 			vm_physmem[lcv].pgs[i].phys_addr = paddr;
+#ifdef __HAVE_VM_PAGE_MD
+			VM_MDPAGE_INIT(&vm_physmem[lcv].pgs[i]);
+#endif
 			if (atop(paddr) >= vm_physmem[lcv].avail_start &&
 			    atop(paddr) <= vm_physmem[lcv].avail_end) {
 				uvmexp.npages++;
@@ -1040,7 +1043,7 @@ uvm_pagealloc_strat(obj, off, anon, flags, strat, free_list)
 		 */
 		pg->flags &= ~PG_CLEAN;
 		if (zeroit)
-			pmap_zero_page(VM_PAGE_TO_PHYS(pg));
+			pmap_zero_page(pg);
 	}
 
 	return(pg);
@@ -1337,7 +1340,7 @@ uvm_pageidlezero()
 		uvm_unlock_fpageq(s);
 
 #ifdef PMAP_PAGEIDLEZERO
-		if (PMAP_PAGEIDLEZERO(VM_PAGE_TO_PHYS(pg)) == FALSE) {
+		if (PMAP_PAGEIDLEZERO(pg) == FALSE) {
 			/*
 			 * The machine-dependent code detected some
 			 * reason for us to abort zeroing pages,
@@ -1357,7 +1360,7 @@ uvm_pageidlezero()
 		 * XXX This will toast the cache unless the pmap_zero_page()
 		 * XXX implementation does uncached access.
 		 */
-		pmap_zero_page(VM_PAGE_TO_PHYS(pg));
+		pmap_zero_page(pg);
 #endif
 		pg->flags |= PG_ZERO;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: st.c,v 1.12 2002/03/14 01:26:30 millert Exp $	*/
+/*	$OpenBSD: st.c,v 1.14 2002/06/09 05:23:26 miod Exp $	*/
 /*	$NetBSD: st.c,v 1.22 1997/04/02 22:37:38 scottr Exp $	*/
 
 /*
@@ -795,7 +795,7 @@ stfinish(sc, bp)
 	else
 		sc->sc_tab.b_actb = bp->b_actb;
 	*bp->b_actb = dp;
-	iodone(bp);
+	biodone(bp);
 	scsifree(sc->sc_dev.dv_parent, &sc->sc_sq);
 	if (sc->sc_tab.b_actf)
 		stustart(sc->sc_dev.dv_unit);
@@ -1180,7 +1180,7 @@ again:
 		if (bp->b_flags & B_DONE)
 			break;
 		bp->b_flags |= B_WANTED;
-		sleep((caddr_t)bp, PRIBIO);
+		tsleep((caddr_t)bp, PRIBIO, "stcommand", 0);
 	}
 	bp->b_flags = B_BUSY|B_READ;
 	splx(s);
@@ -1190,7 +1190,7 @@ again:
 	bp->b_blkno = 0;
 	bp->b_error = 0;
 	ststrategy(bp);
-	iowait(bp);
+	biowait(bp);
 	if (bp->b_flags & B_WANTED)
 		wakeup((caddr_t)bp);
 	bp->b_flags &= B_ERROR;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: wsksymdef.h,v 1.17 2002/04/09 19:07:14 mickey Exp $	*/
+/*	$OpenBSD: wsksymdef.h,v 1.21 2002/08/29 22:18:41 miod Exp $	*/
 /*	$NetBSD: wsksymdef.h,v 1.34.4.1 2000/07/07 09:49:54 hannken Exp $ */
 
 /*-
@@ -59,7 +59,7 @@
  * Group Ascii (ISO Latin1) character in low byte
  */
 
-#define	KS_BackSpace 		0x7f
+#define	KS_BackSpace 		0x08
 #define	KS_Tab 			0x09
 #define	KS_Linefeed 		0x0a
 #define	KS_Clear 		0x0b
@@ -545,6 +545,14 @@
 #define KS_Execute		0xf38b
 #define KS_Find			0xf38c
 #define KS_Select		0xf38d
+#define KS_Again		0xf38e
+#define KS_Props		0xf38f
+#define KS_Undo			0xf390
+#define KS_Front		0xf391
+#define KS_Copy			0xf392
+#define KS_Open			0xf393
+#define KS_Paste		0xf394
+#define KS_Cut			0xf395
 
 #define KS_Menu			0xf3c0
 #define KS_Pause		0xf3c1
@@ -640,6 +648,8 @@
 #define KB_PT			0x1100
 #define KB_UA			0x1200
 #define KB_LT			0x1300
+#define KB_LA			0x1400
+#define KB_BR			0x1500
 
 #define KB_NODEAD		0x0001
 #define KB_DECLK		0x0002	/* DEC LKnnn layout */
@@ -669,7 +679,9 @@
 	{ KB_SG,	"sg" }, \
 	{ KB_SF,	"sf" }, \
 	{ KB_PT,	"pt" }, \
-	{ KB_LT,	"lt" }
+	{ KB_LT,	"lt" }, \
+	{ KB_LA,	"la" }, \
+	{ KB_BR,	"br" }
 
 #define KB_VARTAB \
 	{ KB_NODEAD,	"nodead" }, \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: st.c,v 1.30 2002/03/14 01:27:13 millert Exp $	*/
+/*	$OpenBSD: st.c,v 1.32 2002/06/09 00:05:57 art Exp $	*/
 /*	$NetBSD: st.c,v 1.71 1997/02/21 23:03:49 thorpej Exp $	*/
 
 /*
@@ -425,7 +425,7 @@ stattach(parent, self, aux)
 
 	/*
 	 * Reset the media loaded flag, sometimes the data
-	 * aquired at boot time is not quite accurate.  This
+	 * acquired at boot time is not quite accurate.  This
 	 * will be checked again at the first open.
 	 */
 	sc_link->flags &= ~SDEV_MEDIA_LOADED;
@@ -932,8 +932,9 @@ done:
 	 * Correctly set the buf to indicate a completed xfer
 	 */
 	bp->b_resid = bp->b_bcount;
+	s = splbio();
 	biodone(bp);
-	return;
+	splx(s);
 }
 
 /*
@@ -961,6 +962,9 @@ ststart(v)
 	int flags;
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("ststart "));
+
+	splassert(IPL_BIO);
+
 	/*
 	 * See if there is a buf to do and we are not already
 	 * doing one

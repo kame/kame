@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_syscalls.c,v 1.30 2002/03/14 01:27:13 millert Exp $	*/
+/*	$OpenBSD: nfs_syscalls.c,v 1.34 2002/08/23 22:21:44 art Exp $	*/
 /*	$NetBSD: nfs_syscalls.c,v 1.19 1996/02/18 11:53:52 fvdl Exp $	*/
 
 /*
@@ -146,9 +146,6 @@ nfs_clientd(struct nfsmount *nmp, struct ucred *cred, struct nfsd_cargs *ncd,
 		    nmp->nm_authtype = ncd->ncd_authtype;
 		    nmp->nm_authlen = ncd->ncd_authlen;
 		    nmp->nm_verflen = ncd->ncd_verflen;
-#ifdef NFSKERB
-		    nmp->nm_key = ncd->ncd_key;
-#endif
 		} else
 		    nmp->nm_flag |= NFSMNT_AUTHERR;
 	    } else
@@ -180,8 +177,10 @@ nfs_clientd(struct nfsmount *nmp, struct ucred *cred, struct nfsd_cargs *ncd,
 		(nmp->nm_flag & (NFSMNT_WAITAUTH | NFSMNT_HASAUTH))) {
 		    error = tsleep((caddr_t)&nmp->nm_authstr, PSOCK | PCATCH,
 			"nqnfstimr", hz / 3);
-		    if (error == EINTR || error == ERESTART)
-			(void) dounmount(nmp->nm_mountp, MNT_FORCE, p);
+		    if (error == EINTR || error == ERESTART) {
+			if (vfs_busy(nmp->nm_mountp, LK_EXCLUSIVE, NULL, p) == 0)
+			    dounmount(nmp->nm_mountp, MNT_FORCE, p);
+		    }
 	    }
 	}
 
@@ -287,7 +286,6 @@ sys_nfssvc(p, v, retval)
 		error = getsock(p->p_fd, nfsdarg.sock, &fp);
 		if (error)
 			return (error);
-		FREF(fp);
 		/*
 		 * Get the client address for connected sockets.
 		 */
@@ -1088,7 +1086,7 @@ nfs_getauth(nmp, rep, cred, auth_str, auth_len, verf_str, verf_len, key)
 	else {
 		*auth_len = nmp->nm_authlen;
 		*verf_len = nmp->nm_verflen;
-		bcopy((caddr_t)nmp->nm_key, (caddr_t)key, sizeof (key));
+		bcopy((caddr_t)nmp->nm_key, (caddr_t)key, sizeof (NFSKERBKEY_T));
 	}
 	nmp->nm_flag &= ~NFSMNT_HASAUTH;
 	nmp->nm_flag |= NFSMNT_WAITAUTH;
@@ -1153,14 +1151,6 @@ nfs_getnickauth(nmp, cred, auth_str, auth_len, verf_str, verf_len)
 	ktvin.tv_sec = txdr_unsigned(nuidp->nu_timestamp.tv_sec);
 	ktvin.tv_usec = txdr_unsigned(nuidp->nu_timestamp.tv_usec);
 
-	/*
-	 * Now encrypt the timestamp verifier in ecb mode using the session
-	 * key.
-	 */
-#ifdef NFSKERB
-	XXX
-#endif
-
 	*verfp++ = ktvout.tv_sec;
 	*verfp++ = ktvout.tv_usec;
 	*verfp = 0;
@@ -1195,12 +1185,6 @@ nfs_savenickauth(nmp, cred, len, key, mdp, dposp, mrep)
 		ktvin.tv_usec = *tl++;
 		nick = fxdr_unsigned(u_int32_t, *tl);
 
-		/*
-		 * Decrypt the timestamp in ecb mode.
-		 */
-#ifdef NFSKERB
-		XXX
-#endif
 		ktvout.tv_sec = fxdr_unsigned(long, ktvout.tv_sec);
 		ktvout.tv_usec = fxdr_unsigned(long, ktvout.tv_usec);
 		deltasec = time.tv_sec - ktvout.tv_sec;
@@ -1226,7 +1210,7 @@ nfs_savenickauth(nmp, cred, len, key, mdp, dposp, mrep)
 			nuidp->nu_expire = time.tv_sec + NFS_KERBTTL;
 			nuidp->nu_timestamp = ktvout;
 			nuidp->nu_nickname = nick;
-			bcopy(key, nuidp->nu_key, sizeof (key));
+			bcopy(key, nuidp->nu_key, sizeof (NFSKERBKEY_T));
 			TAILQ_INSERT_TAIL(&nmp->nm_uidlruhead, nuidp,
 				nu_lru);
 			LIST_INSERT_HEAD(NMUIDHASH(nmp, cred->cr_uid),

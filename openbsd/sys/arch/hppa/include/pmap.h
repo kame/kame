@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.19 2002/03/15 21:44:18 mickey Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.23 2002/09/12 12:50:47 art Exp $	*/
 
 /*
  * Copyright (c) 2002 Michael Shalayeff
@@ -52,7 +52,7 @@ struct pmap {
 typedef struct pmap *pmap_t;
 
 #define HPPA_MAX_PID    0xfffa
-#define	HPPA_SID_MAX	0x7fff
+#define	HPPA_SID_MAX	0x7ffd
 #define HPPA_SID_KERNEL 0
 #define HPPA_PID_KERNEL 2
 
@@ -93,7 +93,11 @@ extern int pmap_hptsize;
 extern struct pdc_hwtlb pdc_hwtlb;
 #endif
 
-#define	PMAP_STEAL_MEMORY	/* we have some memory to steal */
+/*
+ * pool quickmaps
+ */
+#define	PMAP_MAP_POOLPAGE(pg)	((vaddr_t)VM_PAGE_TO_PHYS(pg))
+#define	PMAP_UNMAP_POOLPAGE(va) PHYS_TO_VM_PAGE((paddr_t)(va))
 
 /*
  * according to the parisc manual aliased va's should be
@@ -140,8 +144,7 @@ pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
 	if ((prot & VM_PROT_WRITE) == 0) {
 		if (prot & (VM_PROT_READ|VM_PROT_EXECUTE))
-			(void) pmap_changebit(pg, PTE_PROT(TLB_READ),
-			    PTE_PROT(TLB_WRITE));
+			pmap_changebit(pg, 0, PTE_PROT(TLB_WRITE));
 		else
 			pmap_page_remove(pg);
 	}

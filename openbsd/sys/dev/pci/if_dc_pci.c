@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_dc_pci.c,v 1.30 2002/04/01 18:41:47 nate Exp $	*/
+/*	$OpenBSD: if_dc_pci.c,v 1.33 2002/06/09 05:49:35 art Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -99,16 +99,13 @@ struct dc_type dc_devs[] = {
 	{ PCI_VENDOR_LITEON, PCI_PRODUCT_LITEON_PNICII },
 	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN1217 },
 	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN2242 },
+	{ PCI_VENDOR_CONEXANT, PCI_PRODUCT_CONEXANT_RS7112 },
 	{ 0, 0 }
 };
 
 int dc_pci_match(struct device *, void *, void *);
 void dc_pci_attach(struct device *, struct device *, void *);
 void dc_pci_acpi(struct device *, void *);
-
-extern void dc_eeprom_width(struct dc_softc *);
-extern void dc_read_srom(struct dc_softc *, int);
-extern void dc_parse_21143_srom(struct dc_softc *);
 
 /*
  * Probe for a 21143 or clone chip. Check the PCI vendor and device
@@ -419,6 +416,17 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_pmode = DC_PMODE_MII;
 		}
 		break;
+	case PCI_VENDOR_CONEXANT:
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_CONEXANT_RS7112) {
+			found = 1;
+			sc->dc_type = DC_TYPE_CONEXANT;
+			sc->dc_flags |= DC_TX_INTR_ALWAYS;
+			sc->dc_flags |= DC_REDUCED_MII_POLL;
+			sc->dc_pmode = DC_PMODE_MII;
+			dc_eeprom_width(sc);
+			dc_read_srom(sc, sc->dc_romwidth);
+		}
+		break;
 	}
 	if (found == 0) {
 		/* This shouldn't happen if probe has done it's job... */
@@ -483,8 +491,8 @@ void dc_pci_attach(parent, self, aux)
 		extern void myetheraddr(u_char *);
 
 		if (OF_getprop(PCITAG_NODE(pa->pa_tag), "local-mac-address",
-		    sc->arpcom.ac_enaddr, ETHER_ADDR_LEN) <= 0)
-			myetheraddr(sc->arpcom.ac_enaddr);
+		    sc->sc_arpcom.ac_enaddr, ETHER_ADDR_LEN) <= 0)
+			myetheraddr(sc->sc_arpcom.ac_enaddr);
 		sc->sc_hasmac = 1;
 	}
 #endif

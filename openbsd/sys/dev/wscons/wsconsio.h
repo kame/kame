@@ -1,4 +1,4 @@
-/* $OpenBSD: wsconsio.h,v 1.16 2002/03/31 17:34:15 jason Exp $ */
+/* $OpenBSD: wsconsio.h,v 1.22 2002/07/25 19:01:19 miod Exp $ */
 /* $NetBSD: wsconsio.h,v 1.31.2.1 2000/07/07 09:49:17 hannken Exp $ */
 
 /*
@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/ioccom.h>
 #include <dev/wscons/wsksymvar.h>
+#include <sys/pciio.h>
 
 #define	WSSCREEN_NAME_SIZE	16
 #define	WSEMUL_NAME_SIZE	16
@@ -108,7 +109,8 @@ struct wscons_event {
 #define		WSKBD_TYPE_HPC_BTN	8	/* HPC/PsPC buttons */
 #define		WSKBD_TYPE_ARCHIMEDES	9	/* Archimedes keyboard */
 #define		WSKBD_TYPE_ADB		10	/* Apple ADB keyboard */
-#define		WSKBD_TYPE_SUN		11	/* Sun Type3/4/5 */
+#define		WSKBD_TYPE_SUN		11	/* Sun Type3/4 */
+#define		WSKBD_TYPE_SUN5		12	/* Sun Type5 */
 
 /* Manipulate the keyboard bell. */
 struct wskbd_bell_data {
@@ -186,6 +188,7 @@ struct wskbd_map_data {
 #define		WSMOUSE_TYPE_TPANEL	6	/* Generic Touch Panel */
 #define		WSMOUSE_TYPE_NEXT	7	/* NeXT mouse */
 #define		WSMOUSE_TYPE_ARCHIMEDES	8	/* Archimedes mouse */
+#define		WSMOUSE_TYPE_ADB	9	/* ADB */
 
 /* Set resolution.  Not applicable to all mouse types. */
 #define	WSMOUSEIO_SRES		_IOW('W', 33, u_int)
@@ -249,6 +252,8 @@ struct wsmouse_calibcoords {
 #define		WSDISPLAY_TYPE_SB_P9100	22	/* Tadpole SPARCbook P9100 */
 #define		WSDISPLAY_TYPE_EGA	23	/* (generic) EGA */
 #define		WSDISPLAY_TYPE_DCPVR	24	/* Dreamcast PowerVR */
+#define		WSDISPLAY_TYPE_SUN24	25	/* Sun 24 bit framebuffers */
+#define		WSDISPLAY_TYPE_SUNBW	26	/* Sun black and white fb */
 
 /* Basic display information.  Not applicable to all display types. */
 struct wsdisplay_fbinfo {
@@ -377,7 +382,6 @@ struct wsdisplay_delscreendata {
 /* Display information: number of bytes per row, may be same as pixels */
 #define	WSDISPLAYIO_LINEBYTES	_IOR('W', 95, u_int)
 
-
 /* Replaced by WSMUX_{ADD,REMOVE}_DEVICE */
 struct wsdisplay_kbddata {
 	int op;
@@ -424,5 +428,7 @@ struct wsmux_device_list {
 	struct wsmux_device devices[WSMUX_MAXDEV];
 };
 #define WSMUX_LIST_DEVICES	_IOWR('W', 99, struct wsmux_device_list)
+
+#define WSDISPLAYIO_GPCIID	_IOR('W', 91, struct pcisel)
 
 #endif /* _DEV_WSCONS_WSCONSIO_H_ */

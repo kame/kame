@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_cache.c,v 1.6 2002/01/23 00:39:48 art Exp $	*/
+/*	$OpenBSD: vfs_cache.c,v 1.8 2002/07/03 21:19:08 miod Exp $	*/
 /*	$NetBSD: vfs_cache.c,v 1.13 1996/02/04 02:18:09 christos Exp $	*/
 
 /*
@@ -45,6 +45,7 @@
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/pool.h>
+#include <sys/hash.h>
 
 /*
  * Name caching works as follows:
@@ -76,6 +77,8 @@ struct	nchstats nchstats;		/* cache effectiveness statistics */
 int doingcache = 1;			/* 1 => enable the cache */
 
 struct pool nch_pool;
+
+u_long nextvnodeid;
 
 /*
  * Look for a the name in the cache. We don't do this
@@ -109,7 +112,8 @@ cache_lookup(dvp, vpp, cnp)
 		cnp->cn_flags &= ~MAKEENTRY;
 		return (0);
 	}
-	ncpp = &nchashtbl[(cnp->cn_hash ^ dvp->v_id) & nchash];
+	ncpp = &nchashtbl[
+	    hash32_buf(&dvp->v_id, sizeof(dvp->v_id), cnp->cn_hash) & nchash];
 	for (ncp = ncpp->lh_first; ncp != 0; ncp = ncp->nc_hash.le_next) {
 		if (ncp->nc_dvp == dvp &&
 		    ncp->nc_dvpid == dvp->v_id &&
@@ -217,7 +221,8 @@ cache_enter(dvp, vp, cnp)
 	ncp->nc_nlen = cnp->cn_namelen;
 	bcopy(cnp->cn_nameptr, ncp->nc_name, (unsigned)ncp->nc_nlen);
 	TAILQ_INSERT_TAIL(&nclruhead, ncp, nc_lru);
-	ncpp = &nchashtbl[(cnp->cn_hash ^ dvp->v_id) & nchash];
+	ncpp = &nchashtbl[
+	    hash32_buf(&dvp->v_id, sizeof(dvp->v_id), cnp->cn_hash) & nchash];
 	LIST_INSERT_HEAD(ncpp, ncp, nc_hash);
 }
 

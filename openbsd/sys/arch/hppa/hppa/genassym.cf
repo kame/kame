@@ -1,4 +1,4 @@
-#	$OpenBSD: genassym.cf,v 1.20 2002/03/15 21:44:18 mickey Exp $
+#	$OpenBSD: genassym.cf,v 1.22 2002/09/20 18:59:57 mickey Exp $
 
 #
 # Copyright (c) 1982, 1990, 1993
@@ -68,11 +68,6 @@ export	HPPA_BREAK_KERNEL
 export	HPPA_BREAK_GET_PSW
 export	HPPA_BREAK_SET_PSW
 
-# pte things
-#export	TLB_REF_POS
-export	TLB_GATE_PROT
-#export	TLB_DIRTY_POS
-
 # saved state fields
 struct	trapframe
 member	tf_flags
@@ -118,6 +113,7 @@ member	tf_sr5
 member	tf_sr6
 member	tf_sr7
 member	TF_CR0		tf_rctr
+member	TF_CR10		tf_ccr
 member	TF_IIOQH	tf_iioq_head
 member	TF_IIOQT	tf_iioq_tail
 member	TF_IISQH	tf_iisq_head

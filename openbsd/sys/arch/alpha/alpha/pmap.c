@@ -1,4 +1,4 @@
-/* $OpenBSD: pmap.c,v 1.33 2002/01/23 00:39:46 art Exp $ */
+/* $OpenBSD: pmap.c,v 1.36 2002/09/10 18:29:42 art Exp $ */
 /* $NetBSD: pmap.c,v 1.154 2000/12/07 22:18:55 thorpej Exp $ */
 
 /*-
@@ -570,7 +570,7 @@ int	pmap_physpage_delref(void *);
 	if (curproc != NULL && curproc->p_vmspace != NULL &&		\
 	    (pm) != pmap_kernel() &&					\
 	    (isactive_ ^ ((pm) == curproc->p_vmspace->vm_map.pmap)))	\
-		panic("PMAP_ISACTIVE, isa: %d pm: %p curpm:%p\n",	\
+		panic("PMAP_ISACTIVE, isa: %d pm: %p curpm:%p",		\
 		    isactive_, (pm), curproc->p_vmspace->vm_map.pmap);	\
 	(isactive_);							\
 })
@@ -1637,6 +1637,8 @@ pmap_protect(pmap_t pmap, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 	PMAP_LOCK(pmap);
 
 	bits = pte_prot(pmap, prot);
+	if (!pmap_pte_exec(&bits))
+		bits |= PG_FOE;
 	isactive = PMAP_ISACTIVE(pmap, cpu_id);
 
 	l1pte = pmap_l1pte(pmap, sva);
@@ -1954,6 +1956,10 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 			npte |= PG_FOR | PG_FOW | PG_FOE;
 		else if ((attrs & PGA_MODIFIED) == 0)
 			npte |= PG_FOW;
+
+		/* Always force FOE on non-exec mappings. */
+		if (!pmap_pte_exec(pte))
+			npte |= PG_FOE;
 
 		/*
 		 * Mapping was entered on PV list.
@@ -2349,8 +2355,9 @@ pmap_deactivate(struct proc *p)
  *	Note: no locking is necessary in this function.
  */
 void
-pmap_zero_page(paddr_t phys)
+pmap_zero_page(struct vm_page *pg)
 {
+	paddr_t phys = VM_PAGE_TO_PHYS(pg);
 	u_long *p0, *p1, *pend;
 
 #ifdef DEBUG
@@ -2404,8 +2411,10 @@ pmap_zero_page(paddr_t phys)
  *	Note: no locking is necessary in this function.
  */
 void
-pmap_copy_page(paddr_t src, paddr_t dst)
+pmap_copy_page(struct vm_page *srcpg, struct vm_page *dstpg)
 {
+	paddr_t src = VM_PAGE_TO_PHYS(srcpg);
+	paddr_t dst = VM_PAGE_TO_PHYS(dstpg);
 	caddr_t s, d;
 
 #ifdef DEBUG
@@ -2805,6 +2814,9 @@ pmap_changebit(paddr_t pa, u_long set, u_long mask, long cpu_id)
 					if (pv->pv_pmap->pm_cpus != 0)
 						needisync = TRUE;
 				}
+			} else {
+				/* Never clear FOE on non-exec mappings. */
+				npte |= PG_FOE;
 			}
 			PMAP_SET_PTE(pte, npte);
 			if (needisync)
@@ -2825,9 +2837,12 @@ pmap_changebit(paddr_t pa, u_long set, u_long mask, long cpu_id)
  * pmap_emulate_reference:
  *
  *	Emulate reference and/or modified bit hits.
+ *
+ *	return non-zero if this was a FOE fault and the pte is not
+ *	executable.
  */
-void
-pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int write)
+int
+pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int type)
 {
 	pt_entry_t faultoff, *pte;
 	paddr_t pa;
@@ -2838,7 +2853,7 @@ pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int write)
 #ifdef DEBUG
 	if (pmapdebug & PDB_FOLLOW)
 		printf("pmap_emulate_reference: %p, 0x%lx, %d, %d\n",
-		    p, v, user, write);
+		    p, v, user, type);
 #endif
 
 	/*
@@ -2865,6 +2880,11 @@ pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int write)
 		 * We'll unlock below where we're done with the PTE.
 		 */
 	}
+	if (!pmap_pte_exec(pte) && type == ALPHA_MMCSR_FOE) {
+		if (didlock)
+			PMAP_UNLOCK(p->p_vmspace->vm_map.pmap);
+		return (1);
+	}
 #ifdef DEBUG
 	if (pmapdebug & PDB_FOLLOW) {
 		printf("\tpte = %p, ", pte);
@@ -2880,7 +2900,7 @@ pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int write)
 	 * pmap_emulate_reference(), and the bits aren't guaranteed,
 	 * for them...
 	 */
-	if (write) {
+	if (type == ALPHA_MMCSR_FOW) {
 		if (!(*pte & (user ? PG_UWE : PG_UWE | PG_KWE)))
 			panic("pmap_emulate_reference: write but unwritable");
 		if (!(*pte & PG_FOW))
@@ -2909,7 +2929,7 @@ pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int write)
 #endif
 #ifdef DIAGNOSTIC
 	if (!PAGE_IS_MANAGED(pa))
-		panic("pmap_emulate_reference(%p, 0x%lx, %d, %d): pa 0x%lx not managed", p, v, user, write, pa);
+		panic("pmap_emulate_reference(%p, 0x%lx, %d, %d): pa 0x%lx not managed", p, v, user, type, pa);
 #endif
 
 	/*
@@ -2925,17 +2945,24 @@ pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int write)
 	PMAP_HEAD_TO_MAP_LOCK();
 	simple_lock(&pvh->pvh_slock);
 
-	if (write) {
+	if (type == ALPHA_MMCSR_FOW) {
 		pvh->pvh_attrs |= (PGA_REFERENCED|PGA_MODIFIED);
 		faultoff = PG_FOR | PG_FOW | PG_FOE;
 	} else {
 		pvh->pvh_attrs |= PGA_REFERENCED;
 		faultoff = PG_FOR | PG_FOE;
 	}
+	/*
+	 * If the page is not PG_EXEC, pmap_changebit will automagically
+	 * set PG_FOE (gross, but necessary if I don't want to change the
+	 * whole API).
+	 */
 	pmap_changebit(pa, 0, ~faultoff, cpu_id);
 
 	simple_unlock(&pvh->pvh_slock);
 	PMAP_HEAD_TO_MAP_UNLOCK();
+
+	return (0);
 }
 
 #ifdef DEBUG
@@ -3698,11 +3725,11 @@ pmap_ptpage_free(pmap_t pmap, pt_entry_t *pte, pt_entry_t **ptp)
 	 * zero it, and return the KSEG address of the page.
 	 */
 	if (ptp != NULL) {
-		pmap_zero_page(ptpa);
+		pmap_zero_page(PHYS_TO_VM_PAGE(ptpa));
 		*ptp = (pt_entry_t *)ALPHA_PHYS_TO_K0SEG(ptpa);
 	} else {
 #ifdef DEBUG
-		pmap_zero_page(ptpa);
+		pmap_zero_page(PHYS_TO_VM_PAGE(ptpa));
 #endif
 		pmap_physpage_free(ptpa);
 	}

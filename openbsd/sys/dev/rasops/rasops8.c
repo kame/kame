@@ -1,5 +1,5 @@
-/*	$OpenBSD: rasops8.c,v 1.2 2002/03/14 01:27:02 millert Exp $ */
-/* 	$NetBSD: rasops8.c,v 1.8 2000/04/12 14:22:29 pk Exp $	*/
+/*	$OpenBSD: rasops8.c,v 1.6 2002/07/27 22:17:49 miod Exp $	*/
+/*	$NetBSD: rasops8.c,v 1.8 2000/04/12 14:22:29 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,10 +37,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-//__KERNEL_RCSID(0, "$NetBSD: rasops8.c,v 1.8 2000/04/12 14:22:29 pk Exp $");
-
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -49,13 +45,12 @@
 #include <dev/wscons/wsconsio.h>
 #include <dev/rasops/rasops.h>
 
-static void 	rasops8_putchar(void *, int, int, u_int, long attr);
+void 	rasops8_putchar(void *, int, int, u_int, long attr);
 #ifndef RASOPS_SMALL
-static void 	rasops8_putchar8(void *, int, int, u_int, long attr);
-static void 	rasops8_putchar12(void *, int, int, u_int, long attr);
-static void 	rasops8_putchar16(void *, int, int, u_int, long attr);
-static void	rasops8_makestamp(struct rasops_info *ri, long);
-#endif
+void 	rasops8_putchar8(void *, int, int, u_int, long attr);
+void 	rasops8_putchar12(void *, int, int, u_int, long attr);
+void 	rasops8_putchar16(void *, int, int, u_int, long attr);
+void	rasops8_makestamp(struct rasops_info *ri, long);
 
 /*
  * 4x1 stamp for optimized character blitting
@@ -63,6 +58,7 @@ static void	rasops8_makestamp(struct rasops_info *ri, long);
 static int32_t	stamp[16];
 static long	stamp_attr;
 static int	stamp_mutex;	/* XXX see note in README */
+#endif
 
 /*
  * XXX this confuses the hell out of gcc2 (not egcs) which always insists
@@ -76,7 +72,7 @@ static int	stamp_mutex;	/* XXX see note in README */
 #define STAMP_READ(o)		(*(int32_t *)((caddr_t)stamp + (o)))
 
 /*
- * Initalize a 'rasops_info' descriptor for this depth.
+ * Initialize a 'rasops_info' descriptor for this depth.
  */
 void
 rasops8_init(ri)
@@ -104,7 +100,7 @@ rasops8_init(ri)
 /*
  * Put a single character.
  */
-static void
+void
 rasops8_putchar(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -175,7 +171,7 @@ rasops8_putchar(cookie, row, col, uc, attr)
 /*
  * Recompute the 4x1 blitting stamp.
  */
-static void
+void
 rasops8_makestamp(ri, attr)
 	struct rasops_info *ri;
 	long attr;
@@ -199,13 +195,15 @@ rasops8_makestamp(ri, attr)
 		stamp[i] |= ((i & 4 ? fg : bg) << 16);
 		stamp[i] |= ((i & 8 ? fg : bg) << 24);
 #endif
+		if (ri->ri_flg & RI_BSWAP)
+			stamp[i] = swap32(stamp[i]);
 	}
 }
 
 /*
  * Put a single character. This is for 8-pixel wide fonts.
  */
-static void
+void
 rasops8_putchar8(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -276,7 +274,7 @@ rasops8_putchar8(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is for 12-pixel wide fonts.
  */
-static void
+void
 rasops8_putchar12(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -350,7 +348,7 @@ rasops8_putchar12(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is for 16-pixel wide fonts.
  */
-static void
+void
 rasops8_putchar16(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;

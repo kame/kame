@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_cluster.c,v 1.27 2002/03/14 01:27:06 millert Exp $	*/
+/*	$OpenBSD: vfs_cluster.c,v 1.29 2002/06/14 21:34:59 todd Exp $	*/
 /*	$NetBSD: vfs_cluster.c,v 1.12 1996/04/22 01:39:05 christos Exp $	*/
 
 /*-
@@ -417,6 +417,8 @@ cluster_callback(bp)
 	caddr_t cp;
 	int error = 0;
 
+	splassert(IPL_BIO);
+
 	/*
 	 * Must propagate errors to all the components.
 	 */
@@ -686,7 +688,7 @@ redo:
 
 		/*
 		 * Get the desired block buffer (unless it is the final
-		 * sequential block whose buffer was passed in explictly
+		 * sequential block whose buffer was passed in explicitly
 		 * as last_bp).
 		 */
 		if (last_bp == NULL || start_lbn != lbn) {

@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.69 2002/03/23 13:28:33 espie Exp $ */
+/* $OpenBSD: machdep.c,v 1.77 2002/08/24 17:21:44 matthieu Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -90,6 +90,9 @@
 #include <sys/core.h>
 #include <sys/kcore.h>
 #include <machine/kcore.h>
+#ifndef NO_IEEE
+#include <machine/fpu.h>
+#endif
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
@@ -113,6 +116,9 @@
 #include <machine/rpb.h>
 #include <machine/prom.h>
 #include <machine/cpuconf.h>
+#ifndef NO_IEEE
+#include <machine/ieeefp.h>
+#endif
 
 #include <dev/pci/pcivar.h>
 
@@ -122,8 +128,6 @@
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 #endif
-
-#include "le_ioasic.h"			/* for le_iomem creation */
 
 int	cpu_dump(void);
 int	cpu_dumpsize(void);
@@ -156,6 +160,14 @@ int	bufcachepercent = BUFCACHEPERCENT;
 
 struct vm_map *exec_map = NULL;
 struct vm_map *phys_map = NULL;
+
+#ifdef APERTURE
+#ifdef INSECURE
+int allowaperture = 1;
+#else
+int allowaperture = 0;
+#endif
+#endif
 
 int	maxmem;			/* max memory per process */
 
@@ -201,6 +213,9 @@ struct platform platform;
 int	alpha_unaligned_print = 1;	/* warn about unaligned accesses */
 int	alpha_unaligned_fix = 1;	/* fix up unaligned accesses */
 int	alpha_unaligned_sigbus = 1;	/* SIGBUS on fixed-up accesses */
+#ifndef NO_IEEE
+int	alpha_fp_sync_complete = 0;	/* fp fixup if sync even without /s */
+#endif
 
 /*
  * XXX This should be dynamically sized, but we have the chicken-egg problem!
@@ -421,11 +436,7 @@ nobootinfo:
 	 * stack).
 	 */
 	kernstart = trunc_page((vaddr_t)kernel_text) - 2 * PAGE_SIZE;
-#ifdef DDB
 	kernend = (vaddr_t)round_page((vaddr_t)bootinfo.esym);
-#else
-	kernend = (vaddr_t)round_page((vaddr_t)_end);
-#endif
 
 	kernstartpfn = atop(ALPHA_K0SEG_TO_PHYS(kernstart));
 	kernendpfn = atop(ALPHA_K0SEG_TO_PHYS(kernend));
@@ -896,17 +907,17 @@ cpu_startup()
 	 */
 	printf(version);
 	identifycpu();
-	printf("total memory = %d (%dK)\n", ptoa(totalphysmem),
-	    ptoa(totalphysmem) / 1024);
-	printf("(%d reserved for PROM, ", ptoa(resvmem));
-	printf("%d used by OpenBSD)\n", ptoa(physmem));
+	printf("total memory = %ld (%ldK)\n", (long)ptoa(totalphysmem),
+	    (long)ptoa(totalphysmem) / 1024);
+	printf("(%ld reserved for PROM, ", (long)ptoa(resvmem));
+	printf("%ld used by OpenBSD)\n", (long)ptoa(physmem));
 	if (unusedmem) {
-		printf("WARNING: unused memory = %d (%dK)\n", ptoa(unusedmem),
-		    ptoa(unusedmem) / 1024);
+		printf("WARNING: unused memory = %ld (%ldK)\n",
+		    (long)ptoa(unusedmem), (long)ptoa(unusedmem) / 1024);
 	}
 	if (unknownmem) {
-		printf("WARNING: %d (%dK) of memory with unknown purpose\n",
-		    ptoa(unknownmem), ptoa(unknownmem) / 1024);
+		printf("WARNING: %ld (%ldK) of memory with unknown purpose\n",
+		    (long)ptoa(unknownmem), (long)ptoa(unknownmem) / 1024);
 	}
 
 	/*
@@ -964,8 +975,8 @@ cpu_startup()
 #if defined(DEBUG)
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail memory = %d (%dK)\n", ptoa(uvmexp.free),
-	    ptoa(uvmexp.free) / 1024);
+	printf("avail memory = %ld (%ldK)\n", (long)ptoa(uvmexp.free),
+	    (long)ptoa(uvmexp.free) / 1024);
 #if 0
 	{
 		extern u_long pmap_pages_stolen;
@@ -973,8 +984,8 @@ cpu_startup()
 		printf("stolen memory for VM structures = %d\n", pmap_pages_stolen * PAGE_SIZE);
 	}
 #endif
-	printf("using %ld buffers containing %d bytes (%dK) of memory\n",
-	    (long)nbuf, bufpages * NBPG, bufpages * (NBPG / 1024));
+	printf("using %ld buffers containing %ld bytes (%ldK) of memory\n",
+	    (long)nbuf, (long)bufpages * NBPG, (long)bufpages * (NBPG / 1024));
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
@@ -1530,7 +1541,6 @@ sendsig(catcher, sig, mask, code, type, val)
 	struct trapframe *frame;
 	struct sigacts *psp = p->p_sigacts;
 	int oonstack, fsize, rndfsize, kscsize;
-	extern char sigcode[], esigcode[];
 	siginfo_t *sip, ksi;
 
 	frame = p->p_md.md_tf;
@@ -1597,19 +1607,18 @@ sendsig(catcher, sig, mask, code, type, val)
 	ksc.sc_regs[R_SP] = alpha_pal_rdusp();
 
 	/* save the floating-point state, if necessary, then copy it. */
-	if (p == fpcurproc) {
-		alpha_pal_wrfen(1);
-		savefpstate(&p->p_addr->u_pcb.pcb_fp);
-		alpha_pal_wrfen(0);
-		fpcurproc = NULL;
-	}
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 1);
 	ksc.sc_ownedfp = p->p_md.md_flags & MDP_FPUSED;
-	bcopy(&p->p_addr->u_pcb.pcb_fp, (struct fpreg *)ksc.sc_fpregs,
+	memcpy((struct fpreg *)ksc.sc_fpregs, &p->p_addr->u_pcb.pcb_fp,
 	    sizeof(struct fpreg));
-	ksc.sc_fp_control = 0;					/* XXX ? */
-	bzero(ksc.sc_reserved, sizeof ksc.sc_reserved);		/* XXX */
-	bzero(ksc.sc_xxx, sizeof ksc.sc_xxx);			/* XXX */
-
+#ifndef NO_IEEE
+	ksc.sc_fp_control = alpha_read_fp_c(p);
+#else
+	ksc.sc_fp_control = 0;
+#endif
+	memset(ksc.sc_reserved, 0, sizeof ksc.sc_reserved);	/* XXX */
+	memset(ksc.sc_xxx, 0, sizeof ksc.sc_xxx);		/* XXX */
 
 #ifdef COMPAT_OSF1
 	/*
@@ -1636,8 +1645,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	/*
 	 * Set up the registers to return to sigcode.
 	 */
-	frame->tf_regs[FRAME_PC] =
-	    (u_int64_t)PS_STRINGS - (esigcode - sigcode);
+	frame->tf_regs[FRAME_PC] = p->p_sigcode;
 	frame->tf_regs[FRAME_A0] = sig;
 	frame->tf_regs[FRAME_A1] = (psp->ps_siginfo & sigmask(sig)) ?
 	    (u_int64_t)sip : NULL;
@@ -1662,7 +1670,7 @@ sendsig(catcher, sig, mask, code, type, val)
  * Return to previous pc and psl as specified by
  * context left by sendsig. Check carefully to
  * make sure that the user has not modified the
- * psl to gain improper priviledges or to cause
+ * psl to gain improper privileges or to cause
  * a machine fault.
  */
 /* ARGSUSED */
@@ -1713,11 +1721,14 @@ sys_sigreturn(p, v, retval)
 	alpha_pal_wrusp(ksc.sc_regs[R_SP]);
 
 	/* XXX ksc.sc_ownedfp ? */
-	if (p == fpcurproc)
-		fpcurproc = NULL;
-	bcopy((struct fpreg *)ksc.sc_fpregs, &p->p_addr->u_pcb.pcb_fp,
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 0);
+	memcpy(&p->p_addr->u_pcb.pcb_fp, (struct fpreg *)ksc.sc_fpregs,
 	    sizeof(struct fpreg));
-	/* XXX ksc.sc_fp_control ? */
+#ifndef NO_IEEE
+	p->p_addr->u_pcb.pcb_fp.fpr_cr = ksc.sc_fpcr;
+	p->p_md.md_flags = ksc.sc_fp_control & MDP_FP_C;
+#endif
 
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
@@ -1772,10 +1783,27 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case CPU_BOOTED_KERNEL:
 		return (sysctl_rdstring(oldp, oldlenp, newp,
 		    bootinfo.booted_kernel));
-
+	
 	case CPU_CHIPSET:
 		return (alpha_sysctl_chipset(name + 1, namelen - 1, oldp,
 		    oldlenp));
+
+#ifndef NO_IEEE
+	case CPU_FP_SYNC_COMPLETE:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &alpha_fp_sync_complete));
+#endif
+	case CPU_ALLOWAPERTURE:
+#ifdef APERTURE
+		if (securelevel > 0)
+                        return (sysctl_rdint(oldp, oldlenp, newp,
+				 allowaperture));
+                else
+                        return (sysctl_int(oldp, oldlenp, newp, newlen,
+                            &allowaperture));
+#else
+		return (sysctl_rdint(oldp, oldlenp, newp, 0));
+#endif
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -1812,8 +1840,6 @@ setregs(p, pack, stack, retval)
 	bzero(tfp->tf_regs, FRAME_SIZE * sizeof tfp->tf_regs[0]);
 #endif
 	bzero(&p->p_addr->u_pcb.pcb_fp, sizeof p->p_addr->u_pcb.pcb_fp);
-#define FP_RN 2 /* XXX */
-	p->p_addr->u_pcb.pcb_fp.fpr_cr = (long)FP_RN << 58;
 	alpha_pal_wrusp(stack);
 	tfp->tf_regs[FRAME_PS] = ALPHA_PSL_USERSET;
 	tfp->tf_regs[FRAME_PC] = pack->ep_entry & ~3;
@@ -1823,10 +1849,96 @@ setregs(p, pack, stack, retval)
 	tfp->tf_regs[FRAME_T12] = tfp->tf_regs[FRAME_PC];	/* a.k.a. PV */
 
 	p->p_md.md_flags &= ~MDP_FPUSED;
-	if (fpcurproc == p)
-		fpcurproc = NULL;
+#ifndef NO_IEEE
+	if (__predict_true((p->p_md.md_flags & IEEE_INHERIT) == 0)) {
+		p->p_md.md_flags &= ~MDP_FP_C;
+		p->p_addr->u_pcb.pcb_fp.fpr_cr = FPCR_DYN(FP_RN);
+	}
+#endif
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 0);
+}
 
-	retval[0] = retval[1] = 0;
+/*
+ * Release the FPU.
+ */
+void
+fpusave_cpu(struct cpu_info *ci, int save)
+{
+	struct proc *p;
+#if defined(MULTIPROCESSOR)
+	int s;
+#endif
+
+	KDASSERT(ci == curcpu());
+
+#if defined(MULTIPROCESSOR)
+	atomic_setbits_ulong(&ci->ci_flags, CPUF_FPUSAVE);
+#endif
+
+	p = ci->ci_fpcurproc;
+	if (p == NULL)
+		goto out;
+
+	if (save) {
+		alpha_pal_wrfen(1);
+		savefpstate(&p->p_addr->u_pcb.pcb_fp);
+	}
+
+	alpha_pal_wrfen(0);
+
+	p->p_addr->u_pcb.pcb_fpcpu = NULL;
+	ci->ci_fpcurproc = NULL;
+
+out:
+#if defined(MULTIPROCESSOR)
+	atomic_clearbits_ulong(&ci->ci_flags, CPUF_FPUSAVE);
+#endif
+	return;
+}
+
+/*
+ * Synchronize FP state for this process.
+ */
+void
+fpusave_proc(struct proc *p, int save)
+{
+	struct cpu_info *ci = curcpu();
+	struct cpu_info *oci;
+#if defined(MULTIPROCESSOR)
+	u_long ipi = save ? ALPHA_IPI_SYNCH_FPU : ALPHA_IPI_DISCARD_FPU;
+	int s, spincount;
+#endif
+
+	KDASSERT(p->p_addr != NULL);
+	KDASSERT(p->p_flag & P_INMEM);
+
+	oci = p->p_addr->u_pcb.pcb_fpcpu;
+	if (oci == NULL) {
+		return;
+	}
+
+#if defined(MULTIPROCESSOR)
+	if (oci == ci) {
+		KASSERT(ci->ci_fpcurproc == p);
+		fpusave_cpu(ci, save);
+		return;
+	}
+
+	KASSERT(oci->ci_fpcurproc == p);
+	alpha_send_ipi(oci->ci_cpuid, ipi);
+
+	spincount = 0;
+	while (p->p_addr->u_pcb.pcb_fpcpu != NULL) {
+		spincount++;
+		delay(1000);    /* XXX */
+		if (spincount > 10000)
+			panic("fpsave ipi didn't");
+	}
+#else
+	KASSERT(ci->ci_fpcurproc == p);
+	fpusave_cpu(ci, save);
+#endif /* MULTIPROCESSOR */
 }
 
 int

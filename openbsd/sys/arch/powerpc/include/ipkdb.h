@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipkdb.h,v 1.4 2001/09/01 15:49:05 drahn Exp $	*/
+/*	$OpenBSD: ipkdb.h,v 1.6 2002/09/15 09:01:59 deraadt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.

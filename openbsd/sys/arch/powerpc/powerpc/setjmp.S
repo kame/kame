@@ -1,4 +1,4 @@
-/*	$OpenBSD: setjmp.S,v 1.4 2001/08/21 04:00:41 drahn Exp $	*/
+/*	$OpenBSD: setjmp.S,v 1.6 2002/09/15 09:01:59 deraadt Exp $	*/
 /* kernel version of this file, does not have signal goop */
 /* int setjmp(jmp_buf env) */
 

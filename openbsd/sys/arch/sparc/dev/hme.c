@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.35 2002/03/14 01:26:43 millert Exp $	*/
+/*	$OpenBSD: hme.c,v 1.38 2002/07/17 02:46:52 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -210,7 +210,7 @@ hmeattach(parent, self, aux)
 
 	sc->sc_ih.ih_fun = hmeintr;
 	sc->sc_ih.ih_arg = sc;
-	intr_establish(ca->ca_ra.ra_intr[0].int_pri, &sc->sc_ih);
+	intr_establish(ca->ca_ra.ra_intr[0].int_pri, &sc->sc_ih, IPL_NET);
 
 	/*
 	 * Get MAC address from card if 'local-mac-address' property exists.
@@ -384,7 +384,7 @@ hmeioctl(ifp, cmd, data)
 
 	if ((error = ether_ioctl(ifp, &sc->sc_arpcom, cmd, data)) > 0) {
 		splx(s);
-		return error;
+		return (error);
 	}
 
 	switch (cmd) {
@@ -470,7 +470,7 @@ hmeioctl(ifp, cmd, data)
 		error = EINVAL;
 	}
 	splx(s);
-	return error;
+	return (error);
 }
 
 void
@@ -670,7 +670,7 @@ hme_mint(sc, why)
 {
 	printf("%s: link status changed\n", sc->sc_dev.dv_xname);
 	hme_poll_stop(sc);
-	return 1;
+	return (1);
 }
 
 /*
@@ -721,7 +721,7 @@ hme_tint(sc)
 	if (sc->sc_no_td == 0)
 		ifp->if_timer = 0;
 
-	return 1;
+	return (1);
 }
 
 int
@@ -756,7 +756,7 @@ hme_rint(sc)
 
 	sc->sc_last_rd = bix;
 
-	return 1;
+	return (1);
 }
 
 /*
@@ -767,16 +767,22 @@ hme_eint(sc, why)
 	struct hme_softc *sc;
 	u_int32_t why;
 {
-	if (why & GR_STAT_NORXD)
+	if (why & GR_STAT_NORXD) {
 		sc->sc_arpcom.ac_if.if_ierrors++;
+		why &= ~GR_STAT_NORXD;
+	}
+	if (why & GR_STAT_DTIMEXP) {
+		sc->sc_arpcom.ac_if.if_oerrors++;
+		why &= ~GR_STAT_DTIMEXP;
+	}
 
-	if (why & (GR_STAT_ALL_ERRORS & (~GR_STAT_NORXD))) {
+	if (why & GR_STAT_ALL_ERRORS) {
 		printf("%s: stat=%b, resetting.\n", sc->sc_dev.dv_xname,
 		    why, GR_STAT_BITS);
 		hmereset(sc);
 	}
 
-	return 1;
+	return (1);
 }
 
 /*
@@ -829,7 +835,7 @@ hme_put(sc, idx, m)
 		tlen += len;
 		MFREE(m, n);
 	}
-	return tlen;
+	return (tlen);
 }
 
 void
@@ -1058,7 +1064,7 @@ hme_mii_read(self, phy, reg)
 		}
 		if (!tries) {
 			printf("%s: mii_read failed\n", sc->sc_dev.dv_xname);
-			return 0;
+			return (0);
 		}
 		return (tcvr->frame & 0xffff);
 	}
@@ -1090,7 +1096,7 @@ hme_mii_read(self, phy, reg)
 	hme_tcvr_bb_readb(sc, phy);			/* ignore... */
 	hme_tcvr_bb_readb(sc, phy);			/* ignore... */
 
-	return ret;
+	return (ret);
 }
 
 int

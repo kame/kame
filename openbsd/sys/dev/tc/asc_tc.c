@@ -1,191 +1,330 @@
-/*	$OpenBSD: asc_tc.c,v 1.3 1998/05/18 00:25:09 millert Exp $	*/
-/*	$NetBSD: asc_tc.c,v 1.8 1997/10/31 06:29:59 jonathan Exp $	*/
+/* $OpenBSD: asc_tc.c,v 1.6 2002/05/02 22:56:06 miod Exp $ */
+/* $NetBSD: asc_tc.c,v 1.19 2001/11/15 09:48:19 lukem Exp $ */
 
-/*
- * Copyright 1996 The Board of Trustees of The Leland Stanford
- * Junior University. All Rights Reserved.
+/*-
+ * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * All rights reserved.
  *
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  Stanford University
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Tohru Nishimura.
  *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/device.h>
-#include <dev/tc/tcvar.h>
-#include <machine/autoconf.h>
-#include <dev/tc/ioasicvar.h>
+#include <sys/buf.h>
 
-#include <pmax/dev/device.h>	/* XXX */
-#include <pmax/dev/scsi.h>	/* XXX */
+#include <scsi/scsi_all.h>
+#include <scsi/scsiconf.h>
+#include <scsi/scsi_message.h>
 
-#include <pmax/dev/ascreg.h>	/* XXX */
+#include <machine/bus.h>
+
+#include <dev/ic/ncr53c9xreg.h>
+#include <dev/ic/ncr53c9xvar.h>
 #include <dev/tc/ascvar.h>
 
-/*XXX*/
+#include <dev/tc/tcvar.h>
 
+struct asc_tc_softc {
+	struct asc_softc asc;
 
-/*
- * Autoconfiguration data for config.
- */
-int asc_tc_match __P((struct device *, void *, void *));
-void asc_tc_attach __P((struct device *, struct device *, void *));
+	/* XXX XXX XXX */
+	caddr_t sc_base, sc_bounce, sc_target;
+};
+
+int  asc_tc_match(struct device *, void *, void *);
+void asc_tc_attach(struct device *, struct device *, void *);
 
 struct cfattach asc_tc_ca = {
-	sizeof(struct asc_softc), asc_tc_match, asc_tc_attach
+	sizeof(struct asc_tc_softc), asc_tc_match, asc_tc_attach
+};
+
+extern struct scsi_adapter asc_switch;
+extern struct scsi_device asc_dev;
+
+int	asc_dma_isintr(struct ncr53c9x_softc *);
+void	asc_tc_reset(struct ncr53c9x_softc *);
+int	asc_tc_intr(struct ncr53c9x_softc *);
+int	asc_tc_setup(struct ncr53c9x_softc *, caddr_t *,
+						size_t *, int, size_t *);
+void	asc_tc_go(struct ncr53c9x_softc *);
+void	asc_tc_stop(struct ncr53c9x_softc *);
+int	asc_dma_isactive(struct ncr53c9x_softc *);
+void	asc_clear_latched_intr(struct ncr53c9x_softc *);
+
+struct ncr53c9x_glue asc_tc_glue = {
+        asc_read_reg,
+        asc_write_reg,
+        asc_dma_isintr,
+        asc_tc_reset,
+        asc_tc_intr,
+        asc_tc_setup,
+        asc_tc_go,
+        asc_tc_stop,
+        asc_dma_isactive,
+        asc_clear_latched_intr,
 };
 
 /*
- * DMA callbacks
+ * Parameters specific to PMAZ-A TC option card.
  */
+#define PMAZ_OFFSET_53C94	0x0		/* from module base */
+#define PMAZ_OFFSET_DMAR	0x40000		/* DMA Address Register */
+#define PMAZ_OFFSET_RAM		0x80000		/* 128KB SRAM buffer */
+#define PMAZ_OFFSET_ROM		0xc0000		/* diagnostic ROM */
 
-static int
-tc_dma_start __P((struct asc_softc *asc, struct scsi_state *state,
-		  caddr_t cp, int flag, int len, int off));
+#define PMAZ_RAM_SIZE		0x20000		/* 128k (32k*32) */
+#define PER_TGT_DMA_SIZE	((PMAZ_RAM_SIZE/7) & ~(sizeof(int)-1))
 
-static void
-tc_dma_end __P((struct asc_softc *asc, struct scsi_state *state,
-		int flag));
-
+#define PMAZ_DMAR_WRITE		0x80000000	/* DMA direction bit */
+#define PMAZ_DMAR_MASK		0x1ffff		/* 17 bits, 128k */
+#define PMAZ_DMA_ADDR(x)	((unsigned long)(x) & PMAZ_DMAR_MASK)
 
 int
-asc_tc_match(parent, match, aux)
+asc_tc_match(parent, cfdata, aux)
 	struct device *parent;
-	void *match;
-	void *aux;
+	void *cfdata, *aux;
 {
-	struct tc_attach_args *t = aux;
-	void *ascaddr;
-
-	if (strncmp(t->ta_modname, "PMAZ-AA ", TC_ROM_LLEN))
-		return (0);
-
-	ascaddr = (void*)t->ta_addr;
-
-	if (tc_badaddr(ascaddr + ASC_OFFSET_53C94))
+	struct tc_attach_args *d = aux;
+	
+	if (strncmp("PMAZ-AA ", d->ta_modname, TC_ROM_LLEN))
 		return (0);
 
 	return (1);
 }
 
-
-
 void
 asc_tc_attach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
+	struct device *parent, *self;
 	void *aux;
 {
-	register struct tc_attach_args *t = aux;
-	register asc_softc_t asc = (asc_softc_t) self;
-	u_char *buff;
-	int i, speed;
+	struct tc_attach_args *ta = aux;
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)self;	
+	struct ncr53c9x_softc *sc = &asc->asc.sc_ncr53c9x;
 
-	void *ascaddr;
-	int unit;
+	/*
+	 * Set up glue for MI code early; we use some of it here.
+	 */
+	sc->sc_glue = &asc_tc_glue;
+	asc->asc.sc_bst = ta->ta_memt;
+	asc->asc.sc_dmat = ta->ta_dmat;
+	if (bus_space_map(asc->asc.sc_bst, ta->ta_addr,
+		PMAZ_OFFSET_RAM + PMAZ_RAM_SIZE, 0, &asc->asc.sc_bsh)) {
+		printf("%s: unable to map device\n", sc->sc_dev.dv_xname);
+		return;
+	}
+	asc->sc_base = (caddr_t)ta->ta_addr;	/* XXX XXX XXX */
 
-	/* Use uncached address for chip registers.  */
-	ascaddr = (void*)MIPS_PHYS_TO_KSEG1(t->ta_addr);
-	unit = asc->sc_dev.dv_unit;
+	tc_intr_establish(parent, ta->ta_cookie, IPL_BIO, ncr53c9x_intr, sc);
 	
-	/*
-	 * Initialize hw descriptor, cache some pointers
-	 */
-	asc->regs = (asc_regmap_t *)(ascaddr + ASC_OFFSET_53C94);
+	sc->sc_id = 7;
+	sc->sc_freq = (ta->ta_busspeed) ? 25000000 : 12500000;
+
+	/* gimme Mhz */
+	sc->sc_freq /= 1000000;
 
 	/*
-	 * Set up machine dependencies.
-	 * (1) how to do dma
-	 * (2) timing based on turbochannel frequency
-	 */
-
-	/*
-	 * Fall through for turbochannel option.
-	 */
-	asc->dmar = (volatile int *)(ascaddr + ASC_OFFSET_DMAR);
-	buff = (u_char *)(ascaddr + ASC_OFFSET_RAM);
-
-	/*
-	 * Statically partition the DMA buffer between targets.
-	 * This way we will eventually be able to attach/detach
-	 * drives on-fly.  And 18k/target is plenty for normal use.
+	 * XXX More of this should be in ncr53c9x_attach(), but
+	 * XXX should we really poke around the chip that much in
+	 * XXX the MI code?  Think about this more...
 	 */
 
 	/*
-	 * Give each target its own DMA buffer region.
-	 * We may want to try ping ponging buffers later.
+	 * Set up static configuration info.
 	 */
-	for (i = 0; i < ASC_NCMD; i++)
-		asc->st[i].dmaBufAddr = buff + PER_TGT_DMA_SIZE * i;
-
-	asc->dma_start = tc_dma_start;
-	asc->dma_end = tc_dma_end;
+	sc->sc_cfg1 = sc->sc_id | NCRCFG1_PARENB;
+	sc->sc_cfg2 = NCRCFG2_SCSI2;
+	sc->sc_cfg3 = 0;
+	sc->sc_rev = NCR_VARIANT_NCR53C94;
 
 	/*
-	 * Now for timing. The 3max has a 25Mhz tb whereas the 3min and
-	 * maxine are 12.5Mhz.
+	 * XXX minsync and maxxfer _should_ be set up in MI code,
+	 * XXX but it appears to have some dependency on what sort
+	 * XXX of DMA we're hooked up to, etc.
 	 */
-	printf(" (bus speed: %s MHz) ", t->ta_busspeed? "25"  : "12.5");
 
-	switch (t->ta_busspeed) {
-	case TC_SPEED_25_MHZ:
-		speed = ASC_SPEED_25_MHZ;
-		break;
+	/*
+	 * This is the value used to start sync negotiations
+	 * Note that the NCR register "SYNCTP" is programmed
+	 * in "clocks per byte", and has a minimum value of 4.
+	 * The SCSI period used in negotiation is one-fourth
+	 * of the time (in nanoseconds) needed to transfer one byte.
+	 * Since the chip's clock is given in MHz, we have the following
+	 * formula: 4 * period = (1000 / freq) * 4
+	 */
+	sc->sc_minsync = (1000 / sc->sc_freq) * 5 / 4;
 
-	default:
-		printf(" (unknown TC speed, assuming 12.5MHz) ");
-		/* FALLTHROUGH*/
-	case TC_SPEED_12_5_MHZ:
-		speed = ASC_SPEED_12_5_MHZ;
-		break;
-	};
+	sc->sc_maxxfer = 64 * 1024;
 
-	ascattach(asc, speed);
-
-	/* tie pseudo-slot to device */
-	tc_intr_establish(parent, t->ta_cookie, TC_IPL_BIO,
-			  asc_intr, asc);
+	/* Do the common parts of attachment. */
+	ncr53c9x_attach(sc, &asc_switch, &asc_dev);
 }
 
+void
+asc_tc_reset(sc)
+	struct ncr53c9x_softc *sc;
+{
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)sc;
+
+	asc->asc.sc_flags &= ~(ASC_DMAACTIVE|ASC_MAPLOADED);
+}
+
+int
+asc_tc_intr(sc)
+	struct ncr53c9x_softc *sc;
+{
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)sc;
+	int trans, resid;
+
+	resid = 0;
+	if ((asc->asc.sc_flags & ASC_ISPULLUP) == 0 &&
+	    (resid = (NCR_READ_REG(sc, NCR_FFLAG) & NCRFIFO_FF)) != 0) {
+		NCR_DMA(("asc_tc_intr: empty FIFO of %d ", resid));
+		DELAY(1);
+	}
+
+	resid += NCR_READ_REG(sc, NCR_TCL);
+	resid += NCR_READ_REG(sc, NCR_TCM) << 8;
+
+	trans = asc->asc.sc_dmasize - resid;
+
+	if (asc->asc.sc_flags & ASC_ISPULLUP)
+		memcpy(asc->sc_target, asc->sc_bounce, trans);
+	*asc->asc.sc_dmalen -= trans;
+	*asc->asc.sc_dmaaddr += trans;
+	asc->asc.sc_flags &= ~(ASC_DMAACTIVE|ASC_MAPLOADED);
+
+	return (0);
+}
+
+int
+asc_tc_setup(sc, addr, len, datain, dmasize)
+	struct ncr53c9x_softc *sc;
+	caddr_t *addr;
+	size_t *len;
+	int datain;
+	size_t *dmasize;
+{
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)sc;
+	u_int32_t tc_dmar;
+	size_t size;
+
+	asc->asc.sc_dmaaddr = addr;
+	asc->asc.sc_dmalen = len;
+	asc->asc.sc_flags = (datain) ? ASC_ISPULLUP : 0;
+
+	NCR_DMA(("asc_tc_setup: start %ld@%p, %s\n", (long)*asc->asc.sc_dmalen,
+		*asc->asc.sc_dmaaddr, datain ? "IN" : "OUT"));
+
+	size = *dmasize;
+	if (size > PER_TGT_DMA_SIZE)
+		size = PER_TGT_DMA_SIZE;
+	*dmasize = asc->asc.sc_dmasize = size;
+
+	NCR_DMA(("asc_tc_setup: dmasize = %ld\n", (long)asc->asc.sc_dmasize));
+
+	asc->sc_bounce = asc->sc_base + PMAZ_OFFSET_RAM;
+	asc->sc_bounce += PER_TGT_DMA_SIZE *
+	    sc->sc_nexus->xs->sc_link->target;
+	asc->sc_target = *addr;
+
+	if ((asc->asc.sc_flags & ASC_ISPULLUP) == 0)
+		memcpy(asc->sc_bounce, asc->sc_target, size);
+
+#if 1
+	if (asc->asc.sc_flags & ASC_ISPULLUP)
+		tc_dmar = PMAZ_DMA_ADDR(asc->sc_bounce);
+	else
+		tc_dmar = PMAZ_DMAR_WRITE | PMAZ_DMA_ADDR(asc->sc_bounce);
+	bus_space_write_4(asc->asc.sc_bst, asc->asc.sc_bsh, PMAZ_OFFSET_DMAR,
+	    tc_dmar);
+	asc->asc.sc_flags |= ASC_MAPLOADED|ASC_DMAACTIVE;
+#endif
+	return (0);
+}
+
+void
+asc_tc_go(sc)
+	struct ncr53c9x_softc *sc;
+{
+#if 0
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)sc;
+	u_int32_t tc_dmar;
+
+	if (asc->asc.sc_flags & ASC_ISPULLUP)
+		tc_dmar = PMAZ_DMA_ADDR(asc->sc_bounce);
+	else
+		tc_dmar = PMAZ_DMAR_WRITE | PMAZ_DMA_ADDR(asc->sc_bounce);
+	bus_space_write_4(asc->asc.sc_bst, asc->asc.sc_bsh, PMAZ_OFFSET_DMAR,
+	    tc_dmar);
+	asc->asc.sc_flags |= ASC_DMAACTIVE;
+#endif
+}
+
+/* NEVER CALLED BY MI 53C9x ENGINE INDEED */
+void
+asc_tc_stop(sc)
+	struct ncr53c9x_softc *sc;
+{
+#if 0
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)sc;
+
+	if (asc->asc.sc_flags & ASC_ISPULLUP)
+		memcpy(asc->sc_target, asc->sc_bounce, asc->sc_dmasize);
+	asc->asc.sc_flags &= ~ASC_DMAACTIVE;
+#endif
+}
 
 /*
- * DMA handling routines. For a turbochannel device, just set the dmar.
- * For the I/O ASIC, handle the actual DMA interface.
+ * Glue functions.
  */
-static int
-tc_dma_start(asc, state, cp, flag, len, off)
-	asc_softc_t asc;
-	State *state;
-	caddr_t cp;
-	int flag;
-	int len;
-	int off;
+int
+asc_dma_isintr(sc)
+	struct ncr53c9x_softc *sc;
 {
-
-	if (len > PER_TGT_DMA_SIZE)
-		len = PER_TGT_DMA_SIZE;
-	if (flag == ASCDMA_WRITE)
-		bcopy(cp, state->dmaBufAddr + off, len);
-	if (flag == ASCDMA_WRITE)
-		*asc->dmar = ASC_DMAR_WRITE | ASC_DMA_ADDR(state->dmaBufAddr + off);
-	else
-		*asc->dmar = ASC_DMA_ADDR(state->dmaBufAddr + off);
-	return (len);
+	return !!(NCR_READ_REG(sc, NCR_STAT) & NCRSTAT_INT);
 }
 
-static void
-tc_dma_end(asc, state, flag)
-	asc_softc_t asc;
-	State *state;
-	int flag;
+int
+asc_dma_isactive(sc)
+	struct ncr53c9x_softc *sc;
 {
-	if (flag == ASCDMA_READ)
-		bcopy(state->dmaBufAddr, state->buf, state->dmalen);
+	struct asc_tc_softc *asc = (struct asc_tc_softc *)sc;
+
+	return !!(asc->asc.sc_flags & ASC_DMAACTIVE);
+}
+
+void
+asc_clear_latched_intr(sc)
+	struct ncr53c9x_softc *sc;
+{
 }

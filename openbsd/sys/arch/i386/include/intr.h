@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.13 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: intr.h,v 1.17 2002/07/19 16:23:29 art Exp $	*/
 /*	$NetBSD: intr.h,v 1.5 1996/05/13 06:11:28 mycroft Exp $	*/
 
 /*
@@ -77,9 +77,11 @@
 #define	IPL_NET		MAKEIPL(3)	/* network */
 #define	IPL_SOFTTTY	MAKEIPL(4)	/* delayed terminal handling */
 #define	IPL_TTY		MAKEIPL(5)	/* terminal */
-#define	IPL_IMP		MAKEIPL(6)	/* memory allocation */
+#define	IPL_VM		MAKEIPL(6)	/* memory allocation */
+#define IPL_IMP		IPL_VM		/* XXX - should not be here. */
 #define	IPL_AUDIO	MAKEIPL(7)	/* audio */
 #define	IPL_CLOCK	MAKEIPL(8)	/* clock */
+#define	IPL_STATCLOCK	MAKEIPL(9)	/* statclock */
 #define	IPL_HIGH	MAKEIPL(9)	/* everything */
 
 /* Interrupt sharing types. */
@@ -110,6 +112,24 @@ static __inline int splraise(int);
 static __inline int spllower(int);
 #define SPLX_DECL void splx(int);
 static __inline void softintr(int);
+
+/* SPL asserts */
+#ifdef DIAGNOSTIC
+/*
+ * Although this function is implemented in MI code, it must be in this MD
+ * header because we don't want this header to include MI includes.
+ */
+void splassert_fail(int, int, const char *);
+extern int splassert_ctl;
+void splassert_check(int, const char *);
+#define splassert(__wantipl) do {			\
+	if (__predict_false(splassert_ctl > 0)) {	\
+		splassert_check(__wantipl, __func__);	\
+	}						\
+} while (0)
+#else
+#define splassert(wantipl) do { /* nada */ } while (0)
+#endif
 
 /*
  * Raise current interrupt priority level, and return the old one.
@@ -192,8 +212,8 @@ spllower(ncpl)
 /*
  * Miscellaneous
  */
-#define	splimp()	splraise(IPL_IMP)
-#define	splvm()		splraise(IPL_IMP)
+#define	splvm()		splraise(IPL_VM)
+#define splimp()	splvm()
 #define	splhigh()	splraise(IPL_HIGH)
 #define	spl0()		spllower(IPL_NONE)
 

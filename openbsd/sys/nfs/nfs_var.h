@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_var.h,v 1.19 2002/04/10 18:16:46 csapuntz Exp $	*/
+/*	$OpenBSD: nfs_var.h,v 1.21 2002/07/03 20:57:00 nate Exp $	*/
 /*	$NetBSD: nfs_var.h,v 1.3 1996/02/18 11:53:54 fvdl Exp $	*/
 
 /*
@@ -75,7 +75,6 @@ int nfs_boot_init(struct nfs_diskless *, struct proc *);
 
 /* nfs_node.c */
 void nfs_nhinit(void);
-u_long nfs_hash(nfsfh_t *, int);
 int nfs_nget(struct mount *, nfsfh_t *, int, struct nfsnode **);
 int nfs_inactive(void *);
 int nfs_reclaim(void *);
@@ -207,8 +206,8 @@ int nfs_reply(struct nfsreq *);
 int nfs_request(struct vnode *, struct mbuf *, int, struct proc *,
 		     struct ucred *, struct mbuf **, struct mbuf **,
 		     caddr_t *);
-int nfs_rephead(int, struct nfsrv_descript *, struct nfssvc_sock *,
-		     int, int, u_quad_t *, struct mbuf **, struct mbuf **,			     caddr_t *);
+int nfs_rephead(int, struct nfsrv_descript *, struct nfssvc_sock *, int,
+		u_quad_t *, struct mbuf **, struct mbuf **, caddr_t *);
 void nfs_timer(void *);
 int nfs_sigintr(struct nfsmount *, struct nfsreq *, struct proc *);
 int nfs_sndlock(int *, struct nfsreq *);

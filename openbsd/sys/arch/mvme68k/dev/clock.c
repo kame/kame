@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.4 2002/03/14 01:26:37 millert Exp $ */
+/*	$OpenBSD: clock.c,v 1.6 2002/04/28 14:47:50 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -74,8 +74,9 @@
  */
 
 #include <sys/param.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
+#include <sys/kernel.h>
+#include <sys/systm.h>
 
 #include <machine/psl.h>
 #include <machine/autoconf.h>
@@ -226,6 +227,7 @@ clockintr(arg)
  * Set up real-time clock; we don't have a statistics clock at
  * present.
  */
+void
 cpu_initclocks()
 {
 	register int statint, minint;
@@ -375,10 +377,13 @@ statintr(cap)
 	return (1);
 }
 
+void
 delay(us)
-	register int us;
+	int us;
 {
+#if (NPCC > 0) || (NPCCTWO > 0)
 	volatile register int c;
+#endif
 
 	switch (clockbus) {
 #if NPCC > 0
@@ -391,7 +396,7 @@ delay(us)
 		c = 2 * us;
 		while (--c > 0)
 			;
-		return (0);
+		break;
 #endif
 #if NMC > 0
 	case BUS_MC:
@@ -406,7 +411,7 @@ delay(us)
 
 		while (sys_mc->mc_t3count < us)
 			;
-		return (0);
+		break;
 #endif
 #if NPCCTWO > 0
 	case BUS_PCCTWO:
@@ -418,7 +423,7 @@ delay(us)
 		c = 4 * us;
 		while (--c > 0)
 			;
-		return (0);
+		break;
 #endif
 	}
 }

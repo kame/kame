@@ -1,4 +1,4 @@
-/*	$OpenBSD: xy.c,v 1.18 2002/03/14 01:26:43 millert Exp $	*/
+/*	$OpenBSD: xy.c,v 1.21 2002/06/08 18:52:45 art Exp $	*/
 /*	$NetBSD: xy.c,v 1.26 1997/07/19 21:43:56 pk Exp $	*/
 
 /*
@@ -431,7 +431,7 @@ xycattach(parent, self, aux)
 	xyc->sc_ih.ih_fun = xycintr;
 	xyc->sc_ih.ih_arg = xyc;
 	vmeintr_establish(ca->ca_ra.ra_intr[0].int_vec,
-			  ca->ca_ra.ra_intr[0].int_pri, &xyc->sc_ih);
+			  ca->ca_ra.ra_intr[0].int_pri, &xyc->sc_ih, IPL_BIO);
 	evcnt_attach(&xyc->sc_dev, "intr", &xyc->sc_intrcnt);
 
 
@@ -1059,7 +1059,9 @@ bad:				/* tells upper layers we have an error */
 done:				/* tells upper layers we are done with this
 				 * buf */
 	bp->b_resid = bp->b_bcount;
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 /*
  * end of {b,c}devsw functions
@@ -1372,7 +1374,7 @@ xyc_submit_iorq(xycsc, iorq, type)
 			return XY_ERR_AOK;	/* success */
 		case XY_SUB_WAIT:
 			while (iorq->iopb->done == 0) {
-				sleep(iorq, PRIBIO);
+				tsleep(iorq, PRIBIO, "xyiorq", 0);
 			}
 			return (iorq->errno);
 		case XY_SUB_POLL:		/* steal controller */
@@ -1404,7 +1406,7 @@ xyc_submit_iorq(xycsc, iorq, type)
 		return (XY_ERR_AOK);	/* success */
 	case XY_SUB_WAIT:
 		while (iorq->iopb->done == 0) {
-			sleep(iorq, PRIBIO);
+			tsleep(iorq, PRIBIO, "xyiorq", 0);
 		}
 		return (iorq->errno);
 	case XY_SUB_POLL:

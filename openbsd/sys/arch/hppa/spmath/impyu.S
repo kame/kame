@@ -1,55 +1,30 @@
-/*	$OpenBSD: impyu.S,v 1.6 2002/02/04 23:04:18 mickey Exp $	*/
-
+/*	$OpenBSD: impyu.S,v 1.8 2002/09/20 19:26:59 mickey Exp $	*/
 /*
- * Copyright 1996 1995 by Open Software Foundation, Inc.
- *              All Rights Reserved
- *
- * Permission to use, copy, modify, and distribute this software and
- * its documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appears in all copies and
- * that both the copyright notice and this permission notice appear in
- * supporting documentation.
- *
- * OSF DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE
- * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE.
- *
- * IN NO EVENT SHALL OSF BE LIABLE FOR ANY SPECIAL, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN ACTION OF CONTRACT,
- * NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
- * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */
-/*
- * pmk1.1
- */
-/*
- * (c) Copyright 1986 HEWLETT-PACKARD COMPANY
- *
- * To anyone who acknowledges that this file is provided "AS IS"
- * without any express or implied warranty:
- *     permission to use, copy, modify, and distribute this file
- * for any purpose is hereby granted without fee, provided that
- * the above copyright notice and this notice appears in all
- * copies, and that the name of Hewlett-Packard Company not be
- * used in advertising or publicity pertaining to distribution
- * of the software without specific, written prior permission.
- * Hewlett-Packard Company makes no representations about the
- * suitability of this software for any purpose.
- */
+  (c) Copyright 1986 HEWLETT-PACKARD COMPANY
+  To anyone who acknowledges that this file is provided "AS IS"
+  without any express or implied warranty:
+      permission to use, copy, modify, and distribute this file
+  for any purpose is hereby granted without fee, provided that
+  the above copyright notice and this notice appears in all
+  copies, and that the name of Hewlett-Packard Company not be
+  used in advertising or publicity pertaining to distribution
+  of the software without specific, written prior permission.
+  Hewlett-Packard Company makes no representations about the
+  suitability of this software for any purpose.
+*/
+/* @(#)impyu.s: Revision: 1.11.88.1 Date: 93/12/07 15:06:31 */
 
 #include <machine/asm.h>
 
-/****************************************************************************
- *
- *Implement an integer multiply routine for 32-bit operands and 64-bit product
- * with operand values of zero (multiplicand only) and 2**32reated specially.
- * The algorithm uses the multiplier, four bits at a time, from right to left,
- * to generate partial product.  Execution speed is more important than program
- * size in this implementation.
- *
- *****************************************************************************/
+;****************************************************************************
+;
+;Implement an integer multiply routine for 32-bit operands and 64-bit product
+; with operand values of zero (multiplicand only) and 2**32reated specially.
+; The algorithm uses the multiplier, four bits at a time, from right to left,
+; to generate partial product.  Execution speed is more important than program
+; size in this implementation.
+;
+;******************************************************************************
 ;
 ; Definitions - General registers
 ;
@@ -66,6 +41,8 @@ pc	.equ		9		; carry bit of product, = 00...01
 pm	.equ	       10		; value of -1 used in shifting
 temp	.equ		6
 
+;****************************************************************************
+	.text
 LEAF_ENTRY(impyu)
 	stws,ma		pu,4(sp)		; save registers on stack
 	stws,ma		pl,4(sp)		; save registers on stack
@@ -306,7 +283,6 @@ fini	stws		pu,0(arg2)		; save high part of result
 	ldws,mb		-4(sp),pl		; restore registers
 	bv		0(rp)			; return
 	ldws,mb		-4(sp),pu		; restore registers
-
-EXIT(impyu)
+EXIT(impu)
 
 	.end

@@ -1,5 +1,5 @@
-/*	$OpenBSD: uaudioreg.h,v 1.7 2001/05/03 02:20:33 aaron Exp $ */
-/*	$NetBSD: uaudioreg.h,v 1.7 2000/12/28 00:29:58 augustss Exp $	*/
+/*	$OpenBSD: uaudioreg.h,v 1.10 2002/07/25 04:07:32 nate Exp $ */
+/*	$NetBSD: uaudioreg.h,v 1.9 2002/07/11 21:14:27 augustss Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -63,7 +63,7 @@ typedef struct {
 	uByte		bmAttributes;
 	uWord		wMaxPacketSize;
 	uByte		bInterval;
-	/* 
+	/*
 	 * The following two entries are only used by the Audio Class.
 	 * And according to the specs the Audio Class is the only one
 	 * allowed to extend the endpoint descriptor.
@@ -98,6 +98,9 @@ struct usb_audio_streaming_endpoint_descriptor {
 	uByte		bDescriptorType;
 	uByte		bDescriptorSubtype;
 	uByte		bmAttributes;
+#define UA_SED_FREQ_CONTROL	0x01
+#define UA_SED_PITCH_CONTROL	0x02
+#define UA_SED_MAXPACKETSONLY	0x80
 	uByte		bLockDelayUnits;
 	uWord		wLockDelay;
 } UPACKED;
@@ -340,8 +343,11 @@ struct usb_audio_extension_unit_1 {
 #define UA_FMT_IEEE_FLOAT 3
 #define UA_FMT_ALAW	4
 #define UA_FMT_MULAW	5
+#define UA_FMT_MPEG	0x1001
+#define UA_FMT_AC3	0x1002
 
-#define SAMPLING_FREQ_CONTROL 0x01
+#define SAMPLING_FREQ_CONTROL	0x01
+#define PITCH_CONTROL		0x02
 
 #define FORMAT_TYPE_UNDEFINED 0
 #define FORMAT_TYPE_I 1

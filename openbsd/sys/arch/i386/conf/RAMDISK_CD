@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK_CD,v 1.57 2002/04/02 17:14:47 deraadt Exp $
+#	$OpenBSD: RAMDISK_CD,v 1.60 2002/09/24 19:08:14 nate Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -94,11 +94,12 @@ uhub*	at uhub? port ? configuration ?	# USB Hubs
 #ucom*	at uftdi? portno ?
 #uaudio* at uhub? port ? configuration ?# USB Audio
 #ulpt*	at uhub? port ? configuration ? # USB Printers
-ukbd*	at uhub? port ? configuration ?	# USB Keyboards
+uhidev*	at uhub? port ? configuration ? interface ?
+ukbd*	at uhidev? reportid ?
 wskbd*	at ukbd? console ? mux 1
 umass*	at uhub? port ? configuration ? # USB Mass Storage devices
 scsibus* at umass?
-#ums*	at uhub? port ? configuration ?	# USB Mice
+#ums*	at uhidev? reportid ?
 #wsmouse* at ums? mux 0
 #aue*	at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
 #cue*	at uhub? port ?			# CATC USB-EL1201A based Ethernet
@@ -182,6 +183,7 @@ scsibus* at iha?
 isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
 scsibus* at isp?
 aic0	at isa? port 0x340 irq 11	# Adaptec 152[02] SCSI controllers
+aic*	at isapnp?
 aic*	at pcmcia? function ?		# PCMCIA based aic SCSI controllers
 scsibus* at aic?
 #ncr*	at pci? dev ? function ?	# NCR 538XX SCSI controllers(old)
@@ -289,7 +291,7 @@ wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
 ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
 skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
-gx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
+em*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 txp*	at pci? dev ? function ?		# 3com 3CR990
 nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.34 2002/03/14 01:26:28 millert Exp $	*/
+/*	$OpenBSD: conf.c,v 1.36 2002/06/11 03:25:30 miod Exp $	*/
 /*	$NetBSD: conf.c,v 1.42 1997/01/07 11:35:03 mrg Exp $	*/
 
 /*-
@@ -41,7 +41,6 @@
 #include <sys/buf.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
-#include <sys/conf.h>
 #include <sys/vnode.h>
 #include <dev/cons.h>
 
@@ -118,6 +117,8 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
 #include <altq/altqconf.h>
 
+#include "systrace.h"
+
 struct cdevsw	cdevsw[] =
 {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -171,7 +172,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 47 */
 	cdev_notdef(),			/* 48 */
 	cdev_notdef(),			/* 49 */
-	cdev_notdef(),			/* 50 */
+	cdev_systrace_init(NSYSTRACE,systrace),	/* 50 system call tracing */
 #ifdef XFS
 	cdev_xfs_init(NXFS,xfs_dev),	/* 51: xfs communication device */
 #else

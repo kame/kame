@@ -1,4 +1,4 @@
-/*	$OpenBSD: grf_rt.c,v 1.12 2002/03/14 01:26:28 millert Exp $	*/
+/*	$OpenBSD: grf_rt.c,v 1.14 2002/08/02 16:13:07 millert Exp $	*/
 /*	$NetBSD: grf_rt.c,v 1.35 1997/07/29 17:52:09 veego Exp $	*/
 
 /*
@@ -927,7 +927,7 @@ rt_getvmode (gp, vm)
 	 * the horizontal timings are in units of longwords. Hence, I get the
 	 * pixels by multiplication with 32 and division by the depth.
 	 * The text modes, apparently marked by depth == 4, are even more
-	 * wierd.  According to a comment above, they are computed from a
+	 * weird.  According to a comment above, they are computed from a
 	 * depth==8 mode (thats for us: * 32 / 8) by applying another factor of
 	 * 4 / font width.  Reverse applying the latter formula most of the
 	 * constants cancel themselves and we are left with a nice (* font
@@ -1158,7 +1158,7 @@ rt_getcmap (gfp, cmap)
 	if (cmap->count == 0 || cmap->index >= 256)
 		return (0);
 
-	if (cmap->index + cmap->count > 256)
+	if (cmap->count > 256 - cmap->index)
 		cmap->count = 256 - cmap->index;
 
 	ba = gfp->g_regkva;
@@ -1196,7 +1196,7 @@ rt_putcmap (gfp, cmap)
 	if (cmap->count == 0 || cmap->index >= 256)
 		return 0;
 
-	if (cmap->index + cmap->count > 256)
+	if (cmap->count > 256 - cmap->index)
 		cmap->count = 256 - cmap->index;
 
 	/* first copy the colors into kernelspace */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rf_types.h,v 1.3 2000/01/07 14:50:23 peter Exp $	*/
+/*	$OpenBSD: rf_types.h,v 1.5 2002/05/22 21:22:32 tdeval Exp $	*/
 /*	$NetBSD: rf_types.h,v 1.6 1999/09/05 03:05:55 oster Exp $	*/
 /*
  * rf_types.h
@@ -62,8 +62,8 @@
  */
 
 #include <sys/types.h>
+#include <sys/limits.h>
 #include <machine/endian.h>
-#include <machine/limits.h>
 
 #if BYTE_ORDER == BIG_ENDIAN
 #define RF_IS_BIG_ENDIAN    1
@@ -220,11 +220,12 @@ typedef enum RF_AccessState_e {
 	rf_CleanupState,	/* release stripe locks, clean up */
 	rf_LastState		/* must be the last state */
 }       RF_AccessState_t;
-#define RF_MAXROW    10		/* these are arbitrary and can be modified at
+#define RF_MAXROW	10	/* these are arbitrary and can be modified at
 				 * will */
-#define RF_MAXCOL    40
-#define RF_MAXSPARE  10
-#define RF_MAXDBGV   75		/* max number of debug variables */
+#define RF_MAXCOL	40
+#define RF_MAXSPARE	10
+#define RF_MAXDBGV	75	/* max number of debug variables */
+#define RF_MAXDBGVLEN	50	/* max length of debug variables */
 
 union RF_GenericParam_u {
 	void   *p;

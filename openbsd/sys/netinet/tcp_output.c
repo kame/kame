@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.49 2002/03/08 03:49:58 provos Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.53 2002/08/28 15:43:03 pefo Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -34,11 +34,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
- * 
+ *
  * NRL grants permission for redistribution and use in source and binary
  * forms, with or without modification, of the software and documentation
  * created at NRL provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -53,7 +53,7 @@
  * 4. Neither the name of the NRL nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
  * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -65,7 +65,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * The views and conclusions contained in the software and documentation
  * are those of the authors and should not be interpreted as representing
  * official policies, either expressed or implied, of the US Naval
@@ -190,15 +190,15 @@ tcp_sack_adjust(struct tcpcb *tp)
 		return; /* No holes */
 	if (SEQ_GEQ(tp->snd_nxt, tp->rcv_lastsack))
 		return; /* We're already beyond any SACKed blocks */
-	/* 
-	 * Two cases for which we want to advance snd_nxt:  
+	/*
+	 * Two cases for which we want to advance snd_nxt:
 	 * i) snd_nxt lies between end of one hole and beginning of another
 	 * ii) snd_nxt lies between end of last hole and rcv_lastsack
 	 */
 	while (cur->next) {
 		if (SEQ_LT(tp->snd_nxt, cur->end))
 			return;
-		if (SEQ_GEQ(tp->snd_nxt, cur->next->start)) 
+		if (SEQ_GEQ(tp->snd_nxt, cur->next->start))
 			cur = cur->next;
 		else {
 			tp->snd_nxt = cur->next->start;
@@ -237,6 +237,9 @@ tcp_output(tp)
 #ifdef TCP_SIGNATURE
 	unsigned int sigoff;
 #endif /* TCP_SIGNATURE */
+#ifdef TCP_ECN
+	int needect;
+#endif
 
 #if defined(TCP_SACK) && defined(TCP_SIGNATURE) && defined(DIAGNOSTIC)
 	if (!tp->sack_disable && (tp->t_flags & TF_SIGNATURE))
@@ -282,11 +285,11 @@ again:
 	flags = tcp_outflags[tp->t_state];
 
 #ifdef TCP_SACK
-	/* 
+	/*
 	 * Send any SACK-generated retransmissions.  If we're explicitly trying
 	 * to send out new data (when sendalot is 1), bypass this function.
 	 * If we retransmit in fast recovery mode, decrement snd_cwnd, since
-	 * we're replacing a (future) new transmission with a retransmission 
+	 * we're replacing a (future) new transmission with a retransmission
 	 * now, and we previously incremented snd_cwnd in tcp_input().
 	 */
 	if (!tp->sack_disable && !sendalot) {
@@ -347,13 +350,13 @@ again:
 	len = ulmin(so->so_snd.sb_cc, win) - off;
 
 #if defined(TCP_SACK) && defined(TCP_FACK)
-	/* 
-	 * If we're in fast recovery (SEQ_GT(tp->snd_last, tp->snd_una)), and 
+	/*
+	 * If we're in fast recovery (SEQ_GT(tp->snd_last, tp->snd_una)), and
 	 * amount of outstanding data (snd_awnd) is >= snd_cwnd, then
 	 * do not send data (like zero window conditions)
 	 */
-	if (!tp->sack_disable && len && SEQ_GT(tp->snd_last, tp->snd_una) && 
-	    (tp->snd_awnd >= tp->snd_cwnd)) 
+	if (!tp->sack_disable && len && SEQ_GT(tp->snd_last, tp->snd_una) &&
+	    (tp->snd_awnd >= tp->snd_cwnd))
 		len = 0;
 #endif /* TCP_FACK */
 #ifdef TCP_SACK
@@ -425,7 +428,7 @@ again:
 	 * window, then want to send a window update to peer.
 	 */
 	if (win > 0) {
-		/* 
+		/*
 		 * "adv" is the amount we can increase the window,
 		 * taking into account that we are limited by
 		 * TCP_MAXWIN << tp->rcv_scale.
@@ -458,7 +461,7 @@ again:
 		goto send;
 #ifdef TCP_SACK
 	/*
-	 * In SACK, it is possible for tcp_output to fail to send a segment 
+	 * In SACK, it is possible for tcp_output to fail to send a segment
 	 * after the retransmission timer has been turned off.  Make sure
 	 * that the retransmission timer is set.
 	 */
@@ -545,10 +548,10 @@ send:
 			if (flags & TH_ACK)
 				tcp_mss_update(tp);
 #ifdef TCP_SACK
-			/* 
-			 * If this is the first SYN of connection (not a SYN 
-			 * ACK), include SACK_PERMIT_HDR option.  If this is a 
-			 * SYN ACK, include SACK_PERMIT_HDR option if peer has 
+			/*
+			 * If this is the first SYN of connection (not a SYN
+			 * ACK), include SACK_PERMIT_HDR option.  If this is a
+			 * SYN ACK, include SACK_PERMIT_HDR option if peer has
 			 * already done so.
 			 */
 			if (!tp->sack_disable && ((flags & TH_ACK) == 0 ||
@@ -558,7 +561,7 @@ send:
 				optlen += 4;
 			}
 #endif
-	 
+
 			if ((tp->t_flags & TF_REQ_SCALE) &&
 			    ((flags & TH_ACK) == 0 ||
 			    (tp->t_flags & TF_RCVD_SCALE))) {
@@ -571,9 +574,9 @@ send:
 			}
 		}
 	}
- 
+
 	/*
-	 * Send a timestamp and echo-reply if this is a SYN and our side 
+	 * Send a timestamp and echo-reply if this is a SYN and our side
 	 * wants to use timestamps (TF_REQ_TSTMP is set) or both our side
 	 * and our peer have sent timestamps in our SYN's.
 	 */
@@ -582,7 +585,7 @@ send:
 	    ((flags & (TH_SYN|TH_ACK)) == TH_SYN ||
 	     (tp->t_flags & TF_RCVD_TSTMP))) {
 		u_int32_t *lp = (u_int32_t *)(opt + optlen);
- 
+
 		/* Form timestamp option as shown in appendix A of RFC 1323. */
 		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
 		*lp++ = htonl(tcp_now);
@@ -608,7 +611,7 @@ send:
 
 		optlen += TCPOLEN_SIGNATURE;
 
-		/* Pad options list to the next 32 bit boundary and 
+		/* Pad options list to the next 32 bit boundary and
 		 * terminate it.
 		 */
 		*bp++ = TCPOPT_NOP;
@@ -651,7 +654,7 @@ send:
 #endif /* DIAGNOSTIC */
 
 	hdrlen += optlen;
- 
+
 	/*
 	 * Adjust data length if insertion of options will
 	 * bump the packet length beyond the t_maxopd length.
@@ -772,7 +775,7 @@ send:
 	 * window for use in delaying messages about window sizes.
 	 * If resending a FIN, be sure not to use a new sequence number.
 	 */
-	if ((flags & TH_FIN) && (tp->t_flags & TF_SENTFIN) && 
+	if ((flags & TH_FIN) && (tp->t_flags & TF_SENTFIN) &&
 	    (tp->snd_nxt == tp->snd_max))
 		tp->snd_nxt--;
 	/*
@@ -795,10 +798,10 @@ send:
 
 #ifdef TCP_SACK
 	if (sack_rxmit) {
-		/* 
-		 * If sendalot was turned on (due to option stuffing), turn it 
-		 * off. Properly set th_seq field.  Advance the ret'x pointer 
-		 * by len.  
+		/*
+		 * If sendalot was turned on (due to option stuffing), turn it
+		 * off. Properly set th_seq field.  Advance the ret'x pointer
+		 * by len.
 		 */
 		if (sendalot)
 			sendalot = 0;
@@ -815,6 +818,39 @@ send:
 		bcopy((caddr_t)opt, (caddr_t)(th + 1), optlen);
 		th->th_off = (sizeof (struct tcphdr) + optlen) >> 2;
 	}
+#ifdef TCP_ECN
+	if (tcp_do_ecn) {
+		/*
+		 * if we have received congestion experienced segs,
+		 * set ECE bit.
+		 */
+		if (tp->t_flags & TF_RCVD_CE) {
+			flags |= TH_ECE;
+			tcpstat.tcps_ecn_sndece++;
+		}
+		if (!(tp->t_flags & TF_DISABLE_ECN)) {
+			/*
+			 * if this is a SYN seg, set ECE and CWR.
+			 * set only ECE for SYN-ACK if peer supports ECN.
+			 */
+			if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
+				flags |= (TH_ECE|TH_CWR);
+			else if ((tp->t_flags & TF_ECN_PERMIT) &&
+				 (flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
+				flags |= TH_ECE;
+		}
+		/*
+		 * if we have reduced the congestion window, notify
+		 * the peer by setting CWR bit.
+		 */
+		if ((tp->t_flags & TF_ECN_PERMIT) &&
+		    (tp->t_flags & TF_SEND_CWR)) {
+			flags |= TH_CWR;
+			tp->t_flags &= ~TF_SEND_CWR;
+			tcpstat.tcps_ecn_sndcwr++;
+		}
+	}
+#endif
 	th->th_flags = flags;
 
 	/*
@@ -945,7 +981,7 @@ send:
 #ifdef INET6
 	case AF_INET6:
 		m->m_pkthdr.len = hdrlen + len;
-  		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
+		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
 			hdrlen - sizeof(struct ip6_hdr) + len);
 		break;
 #endif /* INET6 */
@@ -1038,6 +1074,23 @@ send:
 	 */
 	m->m_pkthdr.len = hdrlen + len;
 
+#ifdef TCP_ECN
+	/*
+	 * if peer is ECN capable, set the ECT bit in the IP header.
+	 * but don't set ECT for a pure ack, a retransmit or a window probe.
+	 */
+	needect = 0;
+	if (tcp_do_ecn && (tp->t_flags & TF_ECN_PERMIT)) {
+		if (len == 0 || SEQ_LT(tp->snd_nxt, tp->snd_max) ||
+		    (tp->t_force && len == 1)) {
+			/* don't set ECT */
+		} else {
+			needect = 1;
+			tcpstat.tcps_ecn_sndect++;
+		}
+	}
+#endif
+
 	switch (tp->pf) {
 	case 0:	/*default to PF_INET*/
 #ifdef INET
@@ -1049,24 +1102,32 @@ send:
 			ip->ip_len = m->m_pkthdr.len;
 			ip->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;
 			ip->ip_tos = tp->t_inpcb->inp_ip.ip_tos;
+#ifdef TCP_ECN
+			if (needect)
+				ip->ip_tos |= IPTOS_ECN_ECT0;
+#endif
 		}
 		error = ip_output(m, tp->t_inpcb->inp_options,
 			&tp->t_inpcb->inp_route,
 			(ip_mtudisc ? IP_MTUDISC : 0) |
 				  (so->so_options & SO_DONTROUTE),
-			0, tp->t_inpcb);
+			(void *)NULL, tp->t_inpcb);
 		break;
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
 		{
-			struct ip6_hdr *ipv6;
-			
-			ipv6 = mtod(m, struct ip6_hdr *);
-			ipv6->ip6_plen = m->m_pkthdr.len -
+			struct ip6_hdr *ip6;
+
+			ip6 = mtod(m, struct ip6_hdr *);
+			ip6->ip6_plen = m->m_pkthdr.len -
 				sizeof(struct ip6_hdr);
-			ipv6->ip6_nxt = IPPROTO_TCP;
-			ipv6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
+			ip6->ip6_nxt = IPPROTO_TCP;
+			ip6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
+#ifdef TCP_ECN
+			if (needect)
+				ip6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
+#endif
 		}
 		error = ip6_output(m, tp->t_inpcb->inp_outputopts6,
 			  &tp->t_inpcb->inp_route6,
@@ -1084,7 +1145,7 @@ send:
 #if defined(TCP_SACK) && defined(TCP_FACK)
 	/* Update snd_awnd to reflect the new data that was sent.  */
 	tp->snd_awnd = tcp_seq_subtract(tp->snd_max, tp->snd_fack) +
-		tp->retran_data;                
+		tp->retran_data;
 #endif /* defined(TCP_SACK) && defined(TCP_FACK) */
 
 	if (error) {

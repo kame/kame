@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.16 2002/03/26 05:29:02 mickey Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.18 2002/05/23 16:03:39 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2002 Michael Shalayeff
@@ -118,7 +118,9 @@ cpuattach(parent, self, aux)
 		/* XXX p = hppa_mod_info(HPPA_TYPE_CPU,pdc_cversion[0]); */
 	}
 
-	printf (": %s rev %d ", p? p : cpu_typename, (*cpu_desidhash)());
+	printf (": %s ", p? p : cpu_typename);
+	if (sc->sc_dev.dv_xname)
+		(*cpu_desidhash)();
 
 	if ((err = pdc_call((iodcio_t)pdc, 0, PDC_MODEL, PDC_MODEL_INFO,
 			    &pdc_model)) < 0) {
@@ -137,21 +139,18 @@ cpuattach(parent, self, aux)
 	printf("MHz, ");
 
 	if (fpu_enable) {
-		const char *name;
-		u_int ver;
+		u_int32_t ver[2];
 
 		mtctl(fpu_enable, CR_CCR);
 		__asm volatile(
+		    "fstds   %%fr0,0(%0)\n\t"
 		    "copr,0,0\n\t"
-		    "fstws   %%fr0,0(%0)"
+		    "fstds   %%fr0,0(%0)"
 		    :: "r" (&ver) : "memory");
 		mtctl(0, CR_CCR);
-		ver = HPPA_FPUVER(ver);
-		name = hppa_mod_info(HPPA_TYPE_FPU, ver >> 5);
-		if (name)
-			printf("FPU %s rev %d", name, ver & 0x1f);
-		else
-			printf("FPU v%d.%02d", ver >> 5, ver & 0x1f);
+		ver[0] = HPPA_FPUVER(ver[0]);
+		printf("FPU %s rev %d",
+		    hppa_mod_info(HPPA_TYPE_FPU, ver[0] >> 5), ver[0] & 0x1f);
 	}
 
 	/* if (pdc_model.sh)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgsix.c,v 1.19 2002/04/08 17:49:42 jason Exp $	*/
+/*	$OpenBSD: cgsix.c,v 1.33 2002/09/10 03:18:59 jason Exp $	*/
 
 /*
  * Copyright (c) 2001 Jason L. Wright (jason@thought.net)
@@ -53,159 +53,15 @@
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wscons_raster.h>
-#include <dev/rcons/raster.h>
-
-union bt_cmap {
-	u_int8_t cm_map[256][3];	/* 256 r/b/g entries */
-	u_int32_t cm_chip[256 * 3 / 4];	/* the way the chip is loaded */
-};
-
-#define	BT_ADDR		0x00		/* map address register */
-#define	BT_CMAP		0x04		/* colormap data register */
-#define	BT_CTRL		0x08		/* control register */
-#define	BT_OMAP		0x0c		/* overlay (cursor) map register */
-
-#define	BT_D4M3(x)	((((x) >> 2) << 1) + ((x) >> 2)) /* (x / 4) * 3 */
-#define	BT_D4M4(x)	((x) & ~3)			 /* (x / 4) * 4 */
-
-#define	CGSIX_ROM_OFFSET	0x000000
-#define	CGSIX_BT_OFFSET		0x200000
-#define	CGSIX_BT_SIZE		(sizeof(u_int32_t) * 4)
-#define	CGSIX_DHC_OFFSET	0x240000
-#define	CGSIX_ALT_OFFSET	0x280000
-#define	CGSIX_FHC_OFFSET	0x300000
-#define	CGSIX_FHC_SIZE		(sizeof(u_int32_t) * 1)
-#define	CGSIX_THC_OFFSET	0x301000
-#define	CGSIX_THC_SIZE		(sizeof(u_int32_t) * 640)
-#define	CGSIX_FBC_OFFSET	0x700000
-#define	CGSIX_TEC_OFFSET	0x701000
-#define	CGSIX_TEC_SIZE		(sizeof(u_int32_t) * 3)
-#define	CGSIX_VID_OFFSET	0x800000
-#define	CGSIX_VID_SIZE		(1024 * 1024)
-
-#define	CG6_FHC			0x0		/* fhc register */
-
-#define	FHC_FBID_MASK		0xff000000	/* frame buffer id */
-#define	FHC_FBID_SHIFT		24
-#define	FHC_REV_MASK		0x00f00000	/* revision */
-#define	FHC_REV_SHIFT		20
-#define	FHC_FROP_DISABLE	0x00080000	/* disable fast rasterop */
-#define	FHC_ROW_DISABLE		0x00040000	/* ??? */
-#define	FHC_SRC_DISABLE		0x00020000	/* ??? */
-#define	FHC_DST_DISABLE		0x00010000	/* disable dst cache */
-#define	FHC_RESET		0x00008000	/* ??? */
-#define	FHC_LEBO		0x00002000	/* set little endian order */
-#define	FHC_RES_MASK		0x00001800	/* resolution: */
-#define	FHC_RES_1024		0x00000000	/*  1024x768 */
-#define	FHC_RES_1152		0x00000800	/*  1152x900 */
-#define	FHC_RES_1280		0x00001000	/*  1280x1024 */
-#define	FHC_RES_1600		0x00001800	/*  1600x1200 */
-#define	FHC_CPU_MASK		0x00000600	/* cpu type: */
-#define	FHC_CPU_SPARC		0x00000000	/*  sparc */
-#define	FHC_CPU_68020		0x00000200	/*  68020 */
-#define	FHC_CPU_386		0x00000400	/*  i386 */
-#define	FHC_TEST		0x00000100	/* test window */
-#define	FHC_TESTX_MASK		0x000000f0	/* test window X */
-#define	FHC_TESTX_SHIFT		4
-#define	FHC_TESTY_MASK		0x0000000f	/* test window Y */
-#define	FHC_TESTY_SHIFT		0
-
-#define	CG6_TEC_MV		0x0		/* matrix stuff */
-#define	CG6_TEC_CLIP		0x4		/* clipping stuff */
-#define	CG6_TEC_VDC		0x8		/* ??? */
-
-#define	CG6_THC_HSYNC1		0x800		/* horizontal sync timing */
-#define	CG6_THC_HSYNC2		0x804		/* more hsync timing */
-#define	CG6_THC_HSYNC3		0x808		/* yet more hsync timing */
-#define	CG6_THC_VSYNC1		0x80c		/* vertical sync timing */
-#define	CG6_THC_VSYNC2		0x810		/* only two of these */
-#define	CG6_THC_REFRESH		0x814		/* refresh counter */
-#define	CG6_THC_MISC		0x818		/* misc control/status */
-#define	CG6_THC_CURSXY		0x8fc		/* cursor x/y, 16 bit each */
-#define	CG6_THC_CURSMASK	0x900		/* cursor mask bits */
-#define	CG6_THC_CURSBITS	0x980		/* cursor bits */
-
-/* cursor x/y position for 'off' */
-#define	THC_CURSOFF		((65536-32) | ((65536-32) << 16))
-
-#define	THC_MISC_REV_M		0x000f0000	/* chip revision */
-#define	THC_MISC_REV_S		16
-#define	THC_MISC_RESET		0x00001000	/* reset */
-#define	THC_MISC_VIDEN		0x00000400	/* video enable */
-#define	THC_MISC_SYNC		0x00000200	/* not sure what ... */
-#define	THC_MISC_VSYNC		0x00000100	/* ... these really are */
-#define	THC_MISC_SYNCEN		0x00000080	/* sync enable */
-#define	THC_MISC_CURSRES	0x00000040	/* cursor resolution */
-#define	THC_MISC_INTEN		0x00000020	/* v.retrace intr enable */
-#define	THC_MISC_INTR		0x00000010	/* intr pending/ack */
-#define	THC_MISC_CYCLS		0x0000000f	/* cycles before transfer */
-
-struct cgsix_softc {
-	struct device sc_dev;
-	struct sbusdev sc_sd;
-	bus_space_tag_t sc_bustag;
-	bus_addr_t sc_paddr;
-	bus_space_handle_t sc_bt_regs;
-	bus_space_handle_t sc_fhc_regs;
-	bus_space_handle_t sc_thc_regs;
-	bus_space_handle_t sc_tec_regs;
-	bus_space_handle_t sc_vid_regs;
-	int sc_nscreens;
-	int sc_width, sc_height, sc_depth, sc_linebytes;
-	struct rcons sc_rcons;
-	struct raster sc_raster;
-	union bt_cmap sc_cmap;
-	void *sc_ih;
-};
-
-#define	CG6_USER_FBC	0x70000000
-#define	CG6_USER_TEC	0x70001000
-#define	CG6_USER_BTREGS	0x70002000
-#define	CG6_USER_FHC	0x70004000
-#define	CG6_USER_THC	0x70005000
-#define	CG6_USER_ROM	0x70006000
-#define	CG6_USER_RAM	0x70016000
-#define	CG6_USER_DHC	0x80000000
-
-#define	THC_READ(sc,r) \
-    bus_space_read_4((sc)->sc_bustag, (sc)->sc_thc_regs, (r))
-#define	THC_WRITE(sc,r,v) \
-    bus_space_write_4((sc)->sc_bustag, (sc)->sc_thc_regs, (r), (v))
-
-#define	TEC_READ(sc,r) \
-    bus_space_read_4((sc)->sc_bustag, (sc)->sc_tec_regs, (r))
-#define	TEC_WRITE(sc,r,v) \
-    bus_space_write_4((sc)->sc_bustag, (sc)->sc_tec_regs, (r), (v))
-
-#define	FHC_READ(sc) \
-    bus_space_read_4((sc)->sc_bustag, (sc)->sc_fhc_regs, CG6_FHC)
-#define	FHC_WRITE(sc,v) \
-    bus_space_write_4((sc)->sc_bustag, (sc)->sc_fhc_regs, CG6_FHC, (v))
-
-#define	BT_WRITE(sc, reg, val) \
-    bus_space_write_4((sc)->sc_bustag, (sc)->sc_bt_regs, (reg), (val))
-#define	BT_READ(sc, reg) \
-    bus_space_read_4((sc)->sc_bustag, (sc)->sc_bt_regs, (reg))
-#define	BT_BARRIER(sc,reg,flags) \
-    bus_space_barrier((sc)->sc_bustag, (sc)->sc_bt_regs, (reg), \
-	sizeof(u_int32_t), (flags))
-
-struct wsdisplay_emulops cgsix_emulops = {
-	rcons_cursor,
-	rcons_mapchar,
-	rcons_putchar,
-	rcons_copycols,
-	rcons_erasecols,
-	rcons_copyrows,
-	rcons_eraserows,
-	rcons_alloc_attr
-};
+#include <dev/rasops/rasops.h>
+#include <dev/sbus/cgsixreg.h>
 
 struct wsscreen_descr cgsix_stdscreen = {
 	"std",
 	0, 0,	/* will be filled in -- XXX shouldn't, it's global. */
 	0,
 	0, 0,
+	WSSCREEN_UNDERLINE | WSSCREEN_HILIT |
 	WSSCREEN_REVERSE | WSSCREEN_WSCOLORS
 };
 
@@ -232,11 +88,18 @@ void cgsix_loadcmap_immediate(struct cgsix_softc *, u_int, u_int);
 void cgsix_loadcmap_deferred(struct cgsix_softc *, u_int, u_int);
 void cgsix_setcolor(struct cgsix_softc *, u_int,
     u_int8_t, u_int8_t, u_int8_t);
-void cgsix_reset(struct cgsix_softc *);
+void cgsix_reset(struct cgsix_softc *, u_int32_t);
 void cgsix_hardreset(struct cgsix_softc *);
 void cgsix_burner(void *, u_int, u_int);
 int cgsix_intr(void *);
 static int a2int(char *, int);
+void cgsix_ras_init(struct cgsix_softc *);
+void cgsix_ras_copyrows(void *, int, int, int);
+void cgsix_ras_copycols(void *, int, int, int, int);
+void cgsix_ras_erasecols(void *, int, int, int, long int);
+void cgsix_ras_eraserows(void *, int, int, long int);
+void cgsix_ras_do_cursor(struct rasops_info *);
+void cgsix_ras_updatecursor(struct rasops_info *);
 
 struct wsdisplay_accessops cgsix_accessops = {
 	cgsix_ioctl,
@@ -247,7 +110,7 @@ struct wsdisplay_accessops cgsix_accessops = {
 	NULL,	/* load_font */
 	NULL,	/* scrollback */
 	NULL,	/* getchar */
-	NULL,	/* burner */
+	cgsix_burner,
 };
 
 int	cgsixmatch(struct device *, void *, void *);
@@ -282,6 +145,7 @@ cgsixattach(parent, self, aux)
 	struct wsemuldisplaydev_attach_args waa;
 	int console, i;
 	long defattr;
+	u_int32_t fhc, rev;
 
 	sc->sc_bustag = sa->sa_bustag;
 	sc->sc_paddr = sbus_bus_addr(sa->sa_bustag, sa->sa_slot, sa->sa_offset);
@@ -292,25 +156,25 @@ cgsixattach(parent, self, aux)
 	}
 
 	/*
-	 * Map just BT, FHC, THC, and video RAM.
+	 * Map just BT, FHC, FBC, THC, and video RAM.
 	 */
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset + CGSIX_BT_OFFSET,
-	    CGSIX_BT_SIZE, BUS_SPACE_MAP_LINEAR, 0, &sc->sc_bt_regs) != 0) {
+	    CGSIX_BT_SIZE, 0, 0, &sc->sc_bt_regs) != 0) {
 		printf(": cannot map bt registers\n");
 		goto fail_bt;
 	}
 
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset + CGSIX_FHC_OFFSET,
-	    CGSIX_FHC_SIZE, BUS_SPACE_MAP_LINEAR, 0, &sc->sc_fhc_regs) != 0) {
+	    CGSIX_FHC_SIZE, 0, 0, &sc->sc_fhc_regs) != 0) {
 		printf(": cannot map fhc registers\n");
 		goto fail_fhc;
 	}
 
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset + CGSIX_THC_OFFSET,
-	    CGSIX_THC_SIZE, BUS_SPACE_MAP_LINEAR, 0, &sc->sc_thc_regs) != 0) {
+	    CGSIX_THC_SIZE, 0, 0, &sc->sc_thc_regs) != 0) {
 		printf(": cannot map thc registers\n");
 		goto fail_thc;
 	}
@@ -324,9 +188,16 @@ cgsixattach(parent, self, aux)
 
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset + CGSIX_TEC_OFFSET,
-	    CGSIX_TEC_SIZE, BUS_SPACE_MAP_LINEAR, 0, &sc->sc_tec_regs) != 0) {
+	    CGSIX_TEC_SIZE, 0, 0, &sc->sc_tec_regs) != 0) {
 		printf(": cannot map tec registers\n");
 		goto fail_tec;
+	}
+
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
+	    sa->sa_reg[0].sbr_offset + CGSIX_FBC_OFFSET,
+	    CGSIX_FBC_SIZE, 0, 0, &sc->sc_fbc_regs) != 0) {
+		printf(": cannot map fbc registers\n");
+		goto fail_fbc;
 	}
 
 	if ((sc->sc_ih = bus_intr_establish(sa->sa_bustag, sa->sa_pri,
@@ -341,7 +212,9 @@ cgsixattach(parent, self, aux)
 
 	console = cgsix_is_console(sa->sa_node);
 
-	cgsix_reset(sc);
+	fhc = FHC_READ(sc);
+	rev = (fhc & FHC_REV_MASK) >> FHC_REV_SHIFT;
+	cgsix_reset(sc, rev);
 
 	/* grab the current palette */
 	BT_WRITE(sc, BT_ADDR, 0);
@@ -360,49 +233,68 @@ cgsixattach(parent, self, aux)
 
 	sbus_establish(&sc->sc_sd, self);
 
-	sc->sc_rcons.rc_sp = &sc->sc_raster;
-	sc->sc_raster.width = sc->sc_width;
-	sc->sc_raster.height = sc->sc_height;
-	sc->sc_raster.depth = sc->sc_depth;
-	sc->sc_raster.linelongs = sc->sc_linebytes / 4;
-	sc->sc_raster.pixels = (void *)bus_space_vaddr(sc->sc_bustag,
+	sc->sc_rasops.ri_depth = sc->sc_depth;
+	sc->sc_rasops.ri_stride = sc->sc_linebytes;
+	sc->sc_rasops.ri_flg = RI_CENTER |
+	    (console ? 0 : RI_CLEAR);
+	sc->sc_rasops.ri_bits = (void *)bus_space_vaddr(sc->sc_bustag,
 	    sc->sc_vid_regs);
+	sc->sc_rasops.ri_width = sc->sc_width;
+	sc->sc_rasops.ri_height = sc->sc_height;
+	sc->sc_rasops.ri_hw = sc;
 
-	if (console == 0 ||
-	    romgetcursoraddr(&sc->sc_rcons.rc_crowp, &sc->sc_rcons.rc_ccolp)) {
-		sc->sc_rcons.rc_crow = sc->sc_rcons.rc_ccol = -1;
-		sc->sc_rcons.rc_crowp = &sc->sc_rcons.rc_crow;
-		sc->sc_rcons.rc_ccolp = &sc->sc_rcons.rc_ccol;
+	rasops_init(&sc->sc_rasops,
+	    a2int(getpropstring(optionsnode, "screen-#rows"), 34),
+	    a2int(getpropstring(optionsnode, "screen-#columns"), 80));
+	sc->sc_rasops.ri_hw = sc;
+
+	/*
+	 * Old rev. cg6 cards do not like the current acceleration code.
+	 *
+	 * Some hints from Sun point out at timing and cache problems, which
+	 * will be investigated later.
+	 */
+	if (rev < 5)
+		sc->sc_dev.dv_cfdata->cf_flags |= CG6_CFFLAG_NOACCEL;
+
+	if ((sc->sc_dev.dv_cfdata->cf_flags & CG6_CFFLAG_NOACCEL) == 0) {
+		sc->sc_rasops.ri_ops.copyrows = cgsix_ras_copyrows;
+		sc->sc_rasops.ri_ops.copycols = cgsix_ras_copycols;
+		sc->sc_rasops.ri_ops.eraserows = cgsix_ras_eraserows;
+		sc->sc_rasops.ri_ops.erasecols = cgsix_ras_erasecols;
+		sc->sc_rasops.ri_do_cursor = cgsix_ras_do_cursor;
+		cgsix_ras_init(sc);
 	}
 
-	sc->sc_rcons.rc_maxcol =
-	    a2int(getpropstring(optionsnode, "screen-#columns"), 80);
-	sc->sc_rcons.rc_maxrow =
-	    a2int(getpropstring(optionsnode, "screen-#rows"), 34);
-
-	rcons_init(&sc->sc_rcons,
-	    sc->sc_rcons.rc_maxrow, sc->sc_rcons.rc_maxcol);
-
-	cgsix_stdscreen.nrows = sc->sc_rcons.rc_maxrow;
-	cgsix_stdscreen.ncols = sc->sc_rcons.rc_maxcol;
-	cgsix_stdscreen.textops = &cgsix_emulops;
-	rcons_alloc_attr(&sc->sc_rcons, 0, 0, 0, &defattr);
+	cgsix_stdscreen.nrows = sc->sc_rasops.ri_rows;
+	cgsix_stdscreen.ncols = sc->sc_rasops.ri_cols;
+	cgsix_stdscreen.textops = &sc->sc_rasops.ri_ops;
+	sc->sc_rasops.ri_ops.alloc_attr(&sc->sc_rasops,
+	    WSCOL_BLACK, WSCOL_WHITE, WSATTR_WSCOLORS, &defattr);
 
 	printf("\n");
 
-	if (console) {
-		cgsix_setcolor(sc, WSCOL_BLACK, 0, 0, 0);
-		cgsix_setcolor(sc, 255, 255, 255, 255);
-		cgsix_setcolor(sc, WSCOL_RED, 255, 0, 0);
-		cgsix_setcolor(sc, WSCOL_GREEN, 0, 255, 0);
-		cgsix_setcolor(sc, WSCOL_BROWN, 154, 85, 46);
-		cgsix_setcolor(sc, WSCOL_BLUE, 0, 0, 255);
-		cgsix_setcolor(sc, WSCOL_MAGENTA, 255, 255, 0);
-		cgsix_setcolor(sc, WSCOL_CYAN, 0, 255, 255);
-		cgsix_setcolor(sc, WSCOL_WHITE, 255, 255, 255);
+	cgsix_setcolor(sc, WSCOL_BLACK, 0, 0, 0);
+	cgsix_setcolor(sc, 255, 0, 0, 0);
+	cgsix_setcolor(sc, WSCOL_RED, 255, 0, 0);
+	cgsix_setcolor(sc, WSCOL_GREEN, 0, 255, 0);
+	cgsix_setcolor(sc, WSCOL_BROWN, 154, 85, 46);
+	cgsix_setcolor(sc, WSCOL_BLUE, 0, 0, 255);
+	cgsix_setcolor(sc, WSCOL_MAGENTA, 255, 255, 0);
+	cgsix_setcolor(sc, WSCOL_CYAN, 0, 255, 255);
+	cgsix_setcolor(sc, WSCOL_WHITE, 255, 255, 255);
 
-		wsdisplay_cnattach(&cgsix_stdscreen, &sc->sc_rcons,
-		    *sc->sc_rcons.rc_ccolp, *sc->sc_rcons.rc_crowp, defattr);
+	if (console) {
+		if (romgetcursoraddr(&sc->sc_crowp, &sc->sc_ccolp))
+			sc->sc_crowp = sc->sc_ccolp = NULL;
+		if (sc->sc_ccolp != NULL)
+			sc->sc_rasops.ri_ccol = *sc->sc_ccolp;
+		if (sc->sc_crowp != NULL)
+			sc->sc_rasops.ri_crow = *sc->sc_crowp;
+		sc->sc_rasops.ri_updatecursor = cgsix_ras_updatecursor;
+
+		wsdisplay_cnattach(&cgsix_stdscreen, &sc->sc_rasops,
+		    sc->sc_rasops.ri_ccol, sc->sc_rasops.ri_crow, defattr);
 	}
 
 	waa.console = console;
@@ -414,6 +306,8 @@ cgsixattach(parent, self, aux)
 	return;
 
 fail_intr:
+	bus_space_unmap(sa->sa_bustag, sc->sc_fbc_regs, CGSIX_FBC_SIZE);
+fail_fbc:
 	bus_space_unmap(sa->sa_bustag, sc->sc_tec_regs, CGSIX_TEC_SIZE);
 fail_tec:
 	bus_space_unmap(sa->sa_bustag, sc->sc_vid_regs, CGSIX_VID_SIZE);
@@ -439,10 +333,18 @@ cgsix_ioctl(v, cmd, data, flags, p)
 	struct wsdisplay_cmap *cm;
 	struct wsdisplay_fbinfo *wdf;
 	int error;
+	u_int mode;
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
 		*(u_int *)data = WSDISPLAY_TYPE_UNKNOWN;
+		break;
+	case WSDISPLAYIO_SMODE:
+		mode = *(u_int *)data;
+		if (sc->sc_mode != WSDISPLAYIO_MODE_EMUL &&
+		    mode == WSDISPLAYIO_MODE_EMUL)
+			cgsix_ras_init(sc);
+		sc->sc_mode = mode;
 		break;
 	case WSDISPLAYIO_GINFO:
 		wdf = (void *)data;
@@ -497,10 +399,11 @@ cgsix_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	if (sc->sc_nscreens > 0)
 		return (ENOMEM);
 
-	*cookiep = &sc->sc_rcons;
-	*curyp = *sc->sc_rcons.rc_crowp;
-	*curxp = *sc->sc_rcons.rc_ccolp;
-	rcons_alloc_attr(&sc->sc_rcons, 0, 0, 0, attrp);
+	*cookiep = &sc->sc_rasops;
+	*curyp = 0;
+	*curxp = 0;
+	sc->sc_rasops.ri_ops.alloc_attr(&sc->sc_rasops,
+	    WSCOL_BLACK, WSCOL_WHITE, WSATTR_WSCOLORS, attrp);
 	sc->sc_nscreens++;
 	return (0);
 }
@@ -526,6 +429,12 @@ cgsix_show_screen(v, cookie, waitok, cb, cbarg)
 	return (0);
 }
 
+struct mmo {
+	off_t mo_uaddr;
+	bus_size_t mo_size;
+	bus_size_t mo_physoff;
+};
+
 paddr_t
 cgsix_mmap(v, off, prot)
 	void *v;
@@ -533,14 +442,51 @@ cgsix_mmap(v, off, prot)
 	int prot;
 {
 	struct cgsix_softc *sc = v;
+	struct mmo *mo;
+	bus_addr_t u;
+	bus_size_t sz;
 
-	if (off & PGOFSET)
+	static struct mmo mmo[] = {
+		{ CG6_USER_RAM, 0, CGSIX_VID_OFFSET },
+
+		/* do not actually know how big most of these are! */
+		{ CG6_USER_FBC, 1, CGSIX_FBC_OFFSET },
+		{ CG6_USER_TEC, 1, CGSIX_TEC_OFFSET },
+		{ CG6_USER_BTREGS, 8192 /* XXX */, CGSIX_BT_OFFSET },
+		{ CG6_USER_FHC, 1, CGSIX_FHC_OFFSET },
+		{ CG6_USER_THC, CGSIX_THC_SIZE, CGSIX_THC_OFFSET },
+		{ CG6_USER_ROM, 65536, CGSIX_ROM_OFFSET },
+		{ CG6_USER_DHC, 1, CGSIX_DHC_OFFSET },
+	};
+#define	NMMO (sizeof mmo / sizeof *mmo)
+
+	if (off & PGOFSET || off < 0)
 		return (-1);
 
-	/* Allow mapping as a dumb framebuffer from offset 0 */
-	if (off >= 0 && off < (sc->sc_linebytes * sc->sc_height))
-		return (bus_space_mmap(sc->sc_bustag, sc->sc_paddr,
-		    off + CGSIX_VID_OFFSET, prot, BUS_SPACE_MAP_LINEAR));
+	switch (sc->sc_mode) {
+	case WSDISPLAYIO_MODE_MAPPED:
+		for (mo = mmo; mo < &mmo[NMMO]; mo++) {
+			if (off < mo->mo_uaddr)
+				continue;
+			u = off - mo->mo_uaddr;
+			sz = mo->mo_size ? mo->mo_size :
+			    sc->sc_linebytes * sc->sc_height;
+			if (u < sz) {
+				return (bus_space_mmap(sc->sc_bustag,
+				    sc->sc_paddr, u + mo->mo_physoff,
+				    prot, BUS_SPACE_MAP_LINEAR));
+			}
+		}
+		break;
+
+	case WSDISPLAYIO_MODE_DUMBFB:
+		/* Allow mapping as a dumb framebuffer from offset 0 */
+		if (off >= 0 && off < (sc->sc_linebytes * sc->sc_height))
+			return (bus_space_mmap(sc->sc_bustag, sc->sc_paddr,
+			    off + CGSIX_VID_OFFSET, prot,
+			    BUS_SPACE_MAP_LINEAR));
+		break;
+	}
 
 	return (-1);
 }
@@ -574,7 +520,7 @@ cg6_bt_getcmap(bcm, rcm)
 	u_int index = rcm->index, count = rcm->count, i;
 	int error;
 
-	if (index >= 256 || index + count > 256)
+	if (index >= 256 || count > 256 - index)
 		return (EINVAL);
 	for (i = 0; i < count; i++) {
 		if ((error = copyout(&bcm->cm_map[index + i][0],
@@ -598,8 +544,7 @@ cg6_bt_putcmap(bcm, rcm)
 	u_int index = rcm->index, count = rcm->count, i;
 	int error;
 
-	if (index >= 256 || rcm->count > 256 ||
-	    (rcm->index + rcm->count) > 256)
+	if (index >= 256 || count > 256 - index)
 		return (EINVAL);
 	for (i = 0; i < count; i++) {
 		if ((error = copyin(&rcm->red[i],
@@ -665,10 +610,11 @@ cgsix_setcolor(sc, index, r, g, b)
 }
 
 void
-cgsix_reset(sc)
+cgsix_reset(sc, fhcrev)
 	struct cgsix_softc *sc;
+	u_int32_t fhcrev;
 {
-	u_int32_t fhc, rev;
+	u_int32_t fhc;
 
 	/* hide the cursor, just in case */
 	THC_WRITE(sc, CG6_THC_CURSXY, THC_CURSOFF);
@@ -677,18 +623,17 @@ cgsix_reset(sc)
 	TEC_WRITE(sc, CG6_TEC_CLIP, 0);
 	TEC_WRITE(sc, CG6_TEC_VDC, 0);
 
-	fhc = FHC_READ(sc);
-	rev = (fhc & FHC_REV_MASK) >> FHC_REV_SHIFT;
 	/* take core of hardware bugs in old revisions */
-	if (rev < 5) {
+	if (fhcrev < 5) {
 		/*
 		 * Keep current resolution; set cpu to 68020, set test
 		 * window (size 1Kx1K), and for rev 1, disable dest cache.
 		 */
+		fhc = FHC_READ(sc);
 		fhc &= FHC_RES_MASK;
 		fhc |= FHC_CPU_68020 | FHC_TEST |
 		    (11 << FHC_TESTX_SHIFT) | (11 << FHC_TESTY_SHIFT);
-		if (rev < 2)
+		if (fhcrev < 2)
 			fhc |= FHC_DST_DISABLE;
 		FHC_WRITE(sc, fhc);
 	}
@@ -796,4 +741,248 @@ cgsix_intr(vsc)
 	THC_WRITE(sc, CG6_THC_MISC, thcm);
 	cgsix_loadcmap_immediate(sc, 0, 256);
 	return (1);
+}
+
+void
+cgsix_ras_init(sc)
+	struct cgsix_softc *sc;
+{
+	u_int32_t m;
+
+	CG6_DRAIN(sc);
+	m = FBC_READ(sc, CG6_FBC_MODE);
+	m &= ~FBC_MODE_MASK;
+	m |= FBC_MODE_VAL;
+	FBC_WRITE(sc, CG6_FBC_MODE, m);
+}
+
+void
+cgsix_ras_copyrows(cookie, src, dst, n)
+	void *cookie;
+	int src, dst, n;
+{
+	struct rasops_info *ri = cookie;
+	struct cgsix_softc *sc = ri->ri_hw;
+
+	if (dst == src)
+		return;
+	if (src < 0) {
+		n += src;
+		src = 0;
+	}
+	if (src + n > ri->ri_rows)
+		n = ri->ri_rows - src;
+	if (dst < 0) {
+		n += dst;
+		dst = 0;
+	}
+	if (dst + n > ri->ri_rows)
+		n = ri->ri_rows - dst;
+	if (n <= 0)
+		return;
+	n *= ri->ri_font->fontheight;
+	src *= ri->ri_font->fontheight;
+	dst *= ri->ri_font->fontheight;
+
+	FBC_WRITE(sc, CG6_FBC_CLIP, 0);
+	FBC_WRITE(sc, CG6_FBC_S, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFX, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINX, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXX, ri->ri_width - 1);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXY, ri->ri_height - 1);
+	FBC_WRITE(sc, CG6_FBC_ALU, FBC_ALU_COPY);
+	FBC_WRITE(sc, CG6_FBC_X0, ri->ri_xorigin);
+	FBC_WRITE(sc, CG6_FBC_Y0, ri->ri_yorigin + src);
+	FBC_WRITE(sc, CG6_FBC_X1, ri->ri_xorigin + ri->ri_emuwidth - 1);
+	FBC_WRITE(sc, CG6_FBC_Y1, ri->ri_yorigin + src + n - 1);
+	FBC_WRITE(sc, CG6_FBC_X2, ri->ri_xorigin);
+	FBC_WRITE(sc, CG6_FBC_Y2, ri->ri_yorigin + dst);
+	FBC_WRITE(sc, CG6_FBC_X3, ri->ri_xorigin + ri->ri_emuwidth - 1);
+	FBC_WRITE(sc, CG6_FBC_Y3, ri->ri_yorigin + dst + n - 1);
+	CG6_BLIT_WAIT(sc);
+	CG6_DRAIN(sc);
+}
+
+void
+cgsix_ras_copycols(cookie, row, src, dst, n)
+	void *cookie;
+	int row, src, dst, n;
+{
+	struct rasops_info *ri = cookie;
+	struct cgsix_softc *sc = ri->ri_hw;
+
+	if (dst == src)
+		return;
+	if ((row < 0) || (row >= ri->ri_rows))
+		return;
+	if (src < 0) {
+		n += src;
+		src = 0;
+	}
+	if (src + n > ri->ri_cols)
+		n = ri->ri_cols - src;
+	if (dst < 0) {
+		n += dst;
+		dst = 0;
+	}
+	if (dst + n > ri->ri_cols)
+		n = ri->ri_cols - dst;
+	if (n <= 0)
+		return;
+	n *= ri->ri_font->fontwidth;
+	src *= ri->ri_font->fontwidth;
+	dst *= ri->ri_font->fontwidth;
+	row *= ri->ri_font->fontheight;
+
+	FBC_WRITE(sc, CG6_FBC_CLIP, 0);
+	FBC_WRITE(sc, CG6_FBC_S, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFX, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINX, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXX, ri->ri_width - 1);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXY, ri->ri_height - 1);
+	FBC_WRITE(sc, CG6_FBC_ALU, FBC_ALU_COPY);
+	FBC_WRITE(sc, CG6_FBC_X0, ri->ri_xorigin + src);
+	FBC_WRITE(sc, CG6_FBC_Y0, ri->ri_yorigin + row);
+	FBC_WRITE(sc, CG6_FBC_X1, ri->ri_xorigin + src + n - 1);
+	FBC_WRITE(sc, CG6_FBC_Y1,
+	    ri->ri_yorigin + row + ri->ri_font->fontheight - 1);
+	FBC_WRITE(sc, CG6_FBC_X2, ri->ri_xorigin + dst);
+	FBC_WRITE(sc, CG6_FBC_Y2, ri->ri_yorigin + row);
+	FBC_WRITE(sc, CG6_FBC_X3, ri->ri_xorigin + dst + n - 1);
+	FBC_WRITE(sc, CG6_FBC_Y3,
+	    ri->ri_yorigin + row + ri->ri_font->fontheight - 1);
+	CG6_BLIT_WAIT(sc);
+	CG6_DRAIN(sc);
+}
+
+void
+cgsix_ras_erasecols(cookie, row, col, n, attr)
+	void *cookie;
+	int row, col, n;
+	long int attr;
+{
+	struct rasops_info *ri = cookie;
+	struct cgsix_softc *sc = ri->ri_hw;
+
+	if ((row < 0) || (row >= ri->ri_rows))
+		return;
+	if (col < 0) {
+		n += col;
+		col = 0;
+	}
+	if (col + n > ri->ri_cols)
+		n = ri->ri_cols - col;
+	if (n <= 0)
+		return;
+	n *= ri->ri_font->fontwidth;
+	col *= ri->ri_font->fontwidth;
+	row *= ri->ri_font->fontheight;
+
+	FBC_WRITE(sc, CG6_FBC_CLIP, 0);
+	FBC_WRITE(sc, CG6_FBC_S, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFX, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINX, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXX, ri->ri_width - 1);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXY, ri->ri_height - 1);
+	FBC_WRITE(sc, CG6_FBC_ALU, FBC_ALU_FILL);
+	FBC_WRITE(sc, CG6_FBC_FG, ri->ri_devcmap[(attr >> 16) & 0xf]);
+	FBC_WRITE(sc, CG6_FBC_ARECTY, ri->ri_yorigin + row);
+	FBC_WRITE(sc, CG6_FBC_ARECTX, ri->ri_xorigin + col);
+	FBC_WRITE(sc, CG6_FBC_ARECTY,
+	    ri->ri_yorigin + row + ri->ri_font->fontheight - 1);
+	FBC_WRITE(sc, CG6_FBC_ARECTX, ri->ri_xorigin + col + n - 1);
+	CG6_DRAW_WAIT(sc);
+	CG6_DRAIN(sc);
+}
+
+void
+cgsix_ras_eraserows(cookie, row, n, attr)
+	void *cookie;
+	int row, n;
+	long int attr;
+{
+	struct rasops_info *ri = cookie;
+	struct cgsix_softc *sc = ri->ri_hw;
+
+	if (row < 0) {
+		n += row;
+		row = 0;
+	}
+	if (row + n > ri->ri_rows)
+		n = ri->ri_rows - row;
+	if (n <= 0)
+		return;
+
+	FBC_WRITE(sc, CG6_FBC_CLIP, 0);
+	FBC_WRITE(sc, CG6_FBC_S, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFX, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINX, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXX, ri->ri_width - 1);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXY, ri->ri_height - 1);
+	FBC_WRITE(sc, CG6_FBC_ALU, FBC_ALU_FILL);
+	FBC_WRITE(sc, CG6_FBC_FG, ri->ri_devcmap[(attr >> 16) & 0xf]);
+	if ((n == ri->ri_rows) && (ri->ri_flg & RI_FULLCLEAR)) {
+		FBC_WRITE(sc, CG6_FBC_ARECTY, 0);
+		FBC_WRITE(sc, CG6_FBC_ARECTX, 0);
+		FBC_WRITE(sc, CG6_FBC_ARECTY, ri->ri_height - 1);
+		FBC_WRITE(sc, CG6_FBC_ARECTX, ri->ri_width - 1);
+	} else {
+		row *= ri->ri_font->fontheight;
+		FBC_WRITE(sc, CG6_FBC_ARECTY, ri->ri_yorigin + row);
+		FBC_WRITE(sc, CG6_FBC_ARECTX, ri->ri_xorigin);
+		FBC_WRITE(sc, CG6_FBC_ARECTY,
+		    ri->ri_yorigin + row + (n * ri->ri_font->fontheight) - 1);
+		FBC_WRITE(sc, CG6_FBC_ARECTX,
+		    ri->ri_xorigin + ri->ri_emuwidth - 1);
+	}
+	CG6_DRAW_WAIT(sc);
+	CG6_DRAIN(sc);
+}
+
+void
+cgsix_ras_do_cursor(ri)
+	struct rasops_info *ri;
+{
+	struct cgsix_softc *sc = ri->ri_hw;
+	int row, col;
+
+	row = ri->ri_crow * ri->ri_font->fontheight;
+	col = ri->ri_ccol * ri->ri_font->fontwidth;
+	FBC_WRITE(sc, CG6_FBC_CLIP, 0);
+	FBC_WRITE(sc, CG6_FBC_S, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFX, 0);
+	FBC_WRITE(sc, CG6_FBC_OFFY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINX, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMINY, 0);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXX, ri->ri_width - 1);
+	FBC_WRITE(sc, CG6_FBC_CLIPMAXY, ri->ri_height - 1);
+	FBC_WRITE(sc, CG6_FBC_ALU, FBC_ALU_FLIP);
+	FBC_WRITE(sc, CG6_FBC_ARECTY, ri->ri_yorigin + row);
+	FBC_WRITE(sc, CG6_FBC_ARECTX, ri->ri_xorigin + col);
+	FBC_WRITE(sc, CG6_FBC_ARECTY,
+	    ri->ri_yorigin + row + ri->ri_font->fontheight - 1);
+	FBC_WRITE(sc, CG6_FBC_ARECTX,
+	    ri->ri_xorigin + col + ri->ri_font->fontwidth - 1);
+	CG6_DRAW_WAIT(sc);
+	CG6_DRAIN(sc);
+}
+
+void
+cgsix_ras_updatecursor(ri)
+	struct rasops_info *ri;
+{
+	struct cgsix_softc *sc = ri->ri_hw;
+
+	if (sc->sc_crowp != NULL)
+		*sc->sc_crowp = ri->ri_crow;
+	if (sc->sc_ccolp != NULL)
+		*sc->sc_ccolp = ri->ri_ccol;
 }

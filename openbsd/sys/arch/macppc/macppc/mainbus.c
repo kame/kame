@@ -1,4 +1,4 @@
-/*	$OpenBSD: mainbus.c,v 1.4 2002/03/14 03:15:56 millert Exp $	*/
+/*	$OpenBSD: mainbus.c,v 1.7 2002/09/15 09:01:58 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -120,9 +120,10 @@ mbattach(parent, self, aux)
 		int node;
 		for (node = OF_child(OF_peer(0)); node; node=OF_peer(node)) {
 			bzero (name, sizeof(name));
-			if (OF_getprop(node, "device_type", name, sizeof(name)) <= 0)
-			{
-				if (OF_getprop(node, "name", name, sizeof(name)) <= 0)
+			if (OF_getprop(node, "device_type", name,
+			    sizeof(name)) <= 0) {
+				if (OF_getprop(node, "name", name,
+				    sizeof(name)) <= 0)
 					printf ("name not found on node %x\n",
 					    node);
 					continue;

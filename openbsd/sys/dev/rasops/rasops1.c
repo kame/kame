@@ -1,5 +1,5 @@
-/*	$OpenBSD: rasops1.c,v 1.2 2002/03/14 01:27:02 millert Exp $ */
-/* 	$NetBSD: rasops1.c,v 1.11 2000/04/12 14:22:29 pk Exp $	*/
+/*	$OpenBSD: rasops1.c,v 1.4 2002/07/27 22:17:49 miod Exp $	*/
+/*	$NetBSD: rasops1.c,v 1.11 2000/04/12 14:22:29 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,10 +37,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-//__KERNEL_RCSID(0, "$NetBSD: rasops1.c,v 1.11 2000/04/12 14:22:29 pk Exp $");
-
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -51,17 +47,17 @@
 #include <dev/rasops/rasops.h>
 #include <dev/rasops/rasops_masks.h>
 
-static void	rasops1_copycols(void *, int, int, int, int);
-static void	rasops1_erasecols(void *, int, int, int, long);
-static void	rasops1_do_cursor(struct rasops_info *);
-static void	rasops1_putchar(void *, int, int col, u_int, long);
+void	rasops1_copycols(void *, int, int, int, int);
+void	rasops1_erasecols(void *, int, int, int, long);
+void	rasops1_do_cursor(struct rasops_info *);
+void	rasops1_putchar(void *, int, int col, u_int, long);
 #ifndef RASOPS_SMALL
-static void	rasops1_putchar8(void *, int, int col, u_int, long);
-static void	rasops1_putchar16(void *, int, int col, u_int, long);
+void	rasops1_putchar8(void *, int, int col, u_int, long);
+void	rasops1_putchar16(void *, int, int col, u_int, long);
 #endif
 
 /*
- * Initalize rasops_info struct for this colordepth.
+ * Initialize rasops_info struct for this colordepth.
  */
 void
 rasops1_init(ri)
@@ -92,7 +88,7 @@ rasops1_init(ri)
 /*
  * Paint a single character. This is the generic version, this is ugly.
  */
-static void
+void
 rasops1_putchar(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -240,7 +236,7 @@ rasops1_putchar(cookie, row, col, uc, attr)
 /*
  * Paint a single character. This is for 8-pixel wide fonts.
  */
-static void
+void
 rasops1_putchar8(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -305,7 +301,7 @@ rasops1_putchar8(cookie, row, col, uc, attr)
 /*
  * Paint a single character. This is for 16-pixel wide fonts.
  */
-static void
+void
 rasops1_putchar16(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;

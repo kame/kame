@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_vnops.c,v 1.21 2002/03/14 01:27:03 millert Exp $	*/
+/*	$OpenBSD: cd9660_vnops.c,v 1.23 2002/05/24 13:41:27 art Exp $	*/
 /*	$NetBSD: cd9660_vnops.c,v 1.42 1997/10/16 23:56:57 christos Exp $	*/
 
 /*-
@@ -320,7 +320,7 @@ cd9660_read(v)
 	struct buf *bp;
 	daddr_t lbn, rablock;
 	off_t diff;
-	int rasize, error = 0;
+	int error = 0;
 	long size, n, on;
 
 	if (uio->uio_resid == 0)
@@ -330,6 +330,8 @@ cd9660_read(v)
 	ip->i_flag |= IN_ACCESS;
 	imp = ip->i_mnt;
 	do {
+		struct cluster_info *ci = &ip->i_ci;
+
 		lbn = lblkno(imp, uio->uio_offset);
 		on = blkoff(imp, uio->uio_offset);
 		n = min((u_int)(imp->logical_block_size - on),
@@ -348,15 +350,24 @@ cd9660_read(v)
 			else
 				error = bread(vp, lbn, size, NOCRED, &bp);
 		} else {
-			if (ip->i_ci.ci_lastr + 1 == lbn &&
-			    lblktosize(imp, rablock) < ip->i_size) {
-				rasize = blksize(imp, ip, rablock);
-				error = breadn(vp, lbn, size, &rablock,
-					       &rasize, 1, NOCRED, &bp);
+#define MAX_RA 32
+			if (ci->ci_lastr + 1 == lbn) {
+				daddr_t rablks[MAX_RA];
+				int rasizes[MAX_RA];
+				int i;
+
+				for (i = 0; i < MAX_RA &&
+				    lblktosize(imp, (rablock + i)) < ip->i_size;
+				    i++) {
+					rablks[i] = rablock + i;
+					rasizes[i] = blksize(imp, ip, rablock + i);
+				}
+				error = breadn(vp, lbn, size, rablks,
+				    rasizes, i, NOCRED, &bp);
 			} else
 				error = bread(vp, lbn, size, NOCRED, &bp);
 		}
-		ip->i_ci.ci_lastr = lbn;
+		ci->ci_lastr = lbn;
 		n = min(n, size - bp->b_resid);
 		if (error) {
 			brelse(bp);
@@ -884,10 +895,11 @@ cd9660_strategy(v)
 	struct vop_strategy_args /* {
 		struct buf *a_bp;
 	} */ *ap = v;
-	register struct buf *bp = ap->a_bp;
-	register struct vnode *vp = bp->b_vp;
-	register struct iso_node *ip;
+	struct buf *bp = ap->a_bp;
+	struct vnode *vp = bp->b_vp;
+	struct iso_node *ip;
 	int error;
+	int s;
 
 	ip = VTOI(vp);
 	if (vp->v_type == VBLK || vp->v_type == VCHR)
@@ -897,14 +909,18 @@ cd9660_strategy(v)
 		if (error) {
 			bp->b_error = error;
 			bp->b_flags |= B_ERROR;
+			s = splbio();
 			biodone(bp);
+			splx(s);
 			return (error);
 		}
 		if ((long)bp->b_blkno == -1)
 			clrbuf(bp);
 	}
 	if ((long)bp->b_blkno == -1) {
+		s = splbio();
 		biodone(bp);
+		splx(s);
 		return (0);
 	}
 	vp = ip->i_devvp;

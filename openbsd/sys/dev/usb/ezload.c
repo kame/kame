@@ -1,5 +1,5 @@
-/*	$OpenBSD: ezload.c,v 1.3 2001/10/31 04:24:44 nate Exp $ */
-/*	$NetBSD: ezload.c,v 1.3 2001/07/11 04:53:48 augustss Exp $	*/
+/*	$OpenBSD: ezload.c,v 1.6 2002/07/25 04:07:32 nate Exp $ */
+/*	$NetBSD: ezload.c,v 1.5 2002/07/11 21:14:25 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -93,7 +93,7 @@ ezload_reset(usbd_device_handle dev, int reset)
 {
 	usb_device_request_t req;
 	uByte rst;
-	
+
 	DPRINTF(("ezload_reset: reset=%d\n", reset));
 
 	rst = reset ? ANCHOR_RESET : 0;
@@ -112,9 +112,9 @@ ezload_download(usbd_device_handle dev, const struct ezdata *rec)
 	const struct ezdata *ptr;
 	usbd_status err;
 	u_int len, offs;
-	
+
 	DPRINTF(("ezload_down record=%p\n", rec));
-	
+
 	for (ptr = rec; ptr->length != 0; ptr++) {
 
 #if 0
@@ -140,7 +140,7 @@ ezload_download(usbd_device_handle dev, const struct ezdata *rec)
 		if (err)
 			break;
 	}
-	
+
 	return (err);
 }
 

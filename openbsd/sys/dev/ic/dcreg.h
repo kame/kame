@@ -1,4 +1,4 @@
-/*	$OpenBSD: dcreg.h,v 1.22 2002/03/14 01:26:54 millert Exp $ */
+/*	$OpenBSD: dcreg.h,v 1.26 2002/06/11 18:28:30 aaron Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -83,6 +83,7 @@
 #define DC_TYPE_PNICII		0x9	/* 82c115 PNIC II */
 #define DC_TYPE_PNIC		0xA	/* 82c168/82c169 PNIC I */
 #define DC_TYPE_XIRCOM		0xB	/* Xircom X3201 */
+#define DC_TYPE_CONEXANT	0xC	/* Conexant LANfinity RS7112 */
 
 #define DC_IS_MACRONIX(x)			\
 	(x->dc_type == DC_TYPE_98713 ||		\
@@ -101,6 +102,7 @@
 #define DC_IS_PNICII(x)		(x->dc_type == DC_TYPE_PNICII)
 #define DC_IS_PNIC(x)		(x->dc_type == DC_TYPE_PNIC)
 #define DC_IS_XIRCOM(x)		(x->dc_type == DC_TYPE_XIRCOM)
+#define DC_IS_CONEXANT(x)	(x->dc_type == DC_TYPE_CONEXANT)
 
 /* MII/symbol mode port types */
 #define DC_PMODE_MII		0x1
@@ -467,7 +469,7 @@ struct dc_list_data {
 /* software descriptor */
 struct dc_swdesc {
 	bus_dmamap_t		sd_map;
-	struct mbuf *		sd_mbuf;
+	struct mbuf		*sd_mbuf;
 };
 
 struct dc_chain_data {
@@ -679,10 +681,19 @@ struct dc_mii_frame {
 
 /* End of PNIC specific registers */
 
+/*
+ * CONEXANT specific registers.
+ */
+
+#define DC_CONEXANT_PHYADDR	0x1
+#define DC_CONEXANT_EE_NODEADDR	0x19A
+
+/* End of CONEXANT specific register */
+
 struct dc_softc {
 	struct device		sc_dev;
 	void			*sc_ih;
-	struct arpcom		arpcom;		/* interface info */
+	struct arpcom		sc_arpcom;	/* interface info */
 	mii_data_t		sc_mii;
 	bus_space_handle_t	dc_bhandle;	/* bus space handle */
 	bus_space_tag_t		dc_btag;	/* bus space tag */
@@ -1008,6 +1019,9 @@ extern void dc_attach(struct dc_softc *);
 extern int dc_detach(struct dc_softc *);
 extern int dc_intr(void *);
 extern void dc_reset(struct dc_softc *);
+extern void dc_eeprom_width(struct dc_softc *);
+extern void dc_read_srom(struct dc_softc *, int);
+extern void dc_parse_21143_srom(struct dc_softc *);
 
 #if BYTE_ORDER == BIG_ENDIAN
 #define	DC_SP_FIELD_C(x)	((x) << 16)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.47 2002/03/22 23:29:28 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.49 2002/09/10 21:36:57 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.23 1996/03/17 01:02:29 thorpej Exp $	*/
 
 /*-
@@ -45,8 +45,8 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
-#define OpenBSD	200206		/* OpenBSD version (year & month). */
-#define OpenBSD3_1 1		/* OpenBSD 3.1 */
+#define OpenBSD	200211		/* OpenBSD version (year & month). */
+#define OpenBSD3_2 1		/* OpenBSD 3.2 */
 
 #ifndef NULL
 #ifdef 	__GNUG__
@@ -95,8 +95,8 @@
 #include <sys/signal.h>
 
 /* Machine type dependent parameters. */
+#include <sys/limits.h>
 #include <machine/param.h>
-#include <machine/limits.h>
 
 /*
  * Priorities.  Note that with 32 run queues, differences less than 4 are

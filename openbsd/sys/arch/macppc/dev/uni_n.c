@@ -1,4 +1,4 @@
-/*	$OpenBSD: uni_n.c,v 1.4 2002/03/14 03:15:55 millert Exp $	*/
+/*	$OpenBSD: uni_n.c,v 1.6 2002/09/15 09:01:58 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Dale Rahn. All rights reserved.

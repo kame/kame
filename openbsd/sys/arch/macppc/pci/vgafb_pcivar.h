@@ -1,4 +1,4 @@
-/*	$OpenBSD: vgafb_pcivar.h,v 1.2 2002/03/14 01:26:37 millert Exp $	*/
+/*	$OpenBSD: vgafb_pcivar.h,v 1.4 2002/09/15 09:01:59 deraadt Exp $	*/
 /*	$NetBSD: vga_pcivar.h,v 1.1 1996/11/19 04:38:36 cgd Exp $	*/
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_descrip.c,v 1.56 2002/03/14 01:27:04 millert Exp $	*/
+/*	$OpenBSD: kern_descrip.c,v 1.59 2002/08/23 00:56:04 pvalchev Exp $	*/
 /*	$NetBSD: kern_descrip.c,v 1.42 1996/03/30 22:24:38 christos Exp $	*/
 
 /*
@@ -285,6 +285,7 @@ restart:
 		if (new != i)
 			panic("dup2: fdalloc");
 	}
+	/* finishdup() does FRELE */
 	return (finishdup(p, fp, old, new, retval));
 }
 
@@ -511,8 +512,10 @@ finishdup(struct proc *p, struct file *fp, int old, int new, register_t *retval)
 	if (oldfp != NULL)
 		FREF(oldfp);
 
-	if (fp->f_count == LONG_MAX-2)
+	if (fp->f_count == LONG_MAX-2) {
+		FRELE(fp);
 		return (EDEADLK);
+	}
 	fdp->fd_ofiles[new] = fp;
 	fdp->fd_ofileflags[new] = fdp->fd_ofileflags[old] & ~UF_EXCLOSE;
 	fp->f_count++;
@@ -796,7 +799,7 @@ fdexpand(p)
 
 /*
  * Create a new open file structure and allocate
- * a file decriptor for the process that refers to it.
+ * a file descriptor for the process that refers to it.
  */
 int
 falloc(p, resultfp, resultfd)
@@ -1029,7 +1032,7 @@ fdfree(p)
  * Note: p may be NULL when closing a file
  * that was being passed in a message.
  *
- * The fp must have its usecount bumped and will be FILE_UNUSEd here.
+ * The fp must have its usecount bumped and will be FRELEd here.
  */
 int
 closef(struct file *fp, struct proc *p)

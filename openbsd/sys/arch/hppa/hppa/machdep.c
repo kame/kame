@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.66 2002/03/26 05:24:02 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.81 2002/09/23 17:43:20 mickey Exp $	*/
 
 /*
  * Copyright (c) 1999-2002 Michael Shalayeff
@@ -291,6 +291,7 @@ void
 hppa_init(start)
 	paddr_t start;
 {
+	struct pdc_model pdc_model PDC_ALIGNMENT;
 	extern int kernel_text;
 	vaddr_t v, v1;
 	int error, cpu_features = 0;
@@ -366,6 +367,15 @@ hppa_init(start)
 
 	/* may the scientific guessing begin */
 	cpu_features = 0;
+
+	/* identify system type */
+	if ((error = pdc_call((iodcio_t)pdc, 0, PDC_MODEL, PDC_MODEL_INFO,
+	    &pdc_model)) < 0) {
+#ifdef DEBUG
+		printf("WARNING: PDC_MODEL error %d\n", error);
+#endif
+		pdc_model.hvers = 0;
+	}
 
 	/* BTLB params */
 	if ((error = pdc_call((iodcio_t)pdc, 0, PDC_BLOCK_TLB,
@@ -448,15 +458,56 @@ hppa_init(start)
 			LDILDO(trap_ep_T_TLB_DIRTY , p->tlbdh);
 			LDILDO(trap_ep_T_DTLBMISS  , p->dtlbh);
 			LDILDO(trap_ep_T_DTLBMISSNA, p->dtlbnah);
-			if (pdc_cache.dt_conf.tc_sh) {
-				LDILDO(trap_ep_T_DTLBMISS  , p->dtlbh);
-				LDILDO(trap_ep_T_DTLBMISSNA, p->dtlbnah);
-			} else {
-				LDILDO(trap_ep_T_ITLBMISS  , p->itlbh);
-				LDILDO(trap_ep_T_ITLBMISSNA, p->itlbnah);
-			}
+			LDILDO(trap_ep_T_ITLBMISS  , p->itlbh);
+			LDILDO(trap_ep_T_ITLBMISSNA, p->itlbnah);
 #undef LDILDO
 		}
+	}
+
+	{
+		const char *p, *q;
+		char buf[32];
+		int lev, hv;
+
+		lev = 0xa + (*cpu_desidhash)();
+		hv = pdc_model.hvers >> 4;
+		if (!hv) {
+			p = "(UNKNOWN)";
+			q = lev == 0xa? "1.0" : "1.1";
+		} else {
+			p = hppa_mod_info(HPPA_TYPE_BOARD, hv);
+			if (!p) {
+				sprintf(buf, "(UNKNOWN 0x%x)", hv);
+				p = buf;
+			}
+
+			switch (pdc_model.arch_rev) {
+			default:
+			case 0:
+				q = "1.0";
+#ifdef COMPAT_HPUX
+				cpu_model_hpux = HPUX_SYSCONF_CPUPA10;
+#endif
+				break;
+			case 4:
+				q = "1.1";
+#ifdef COMPAT_HPUX
+				cpu_model_hpux = HPUX_SYSCONF_CPUPA11;
+#endif
+				/* this one is just a 100MHz pcxl */
+				if (lev == 0x10)
+					lev = 0xe;
+				break;
+			case 8:
+				q = "2.0";
+#ifdef COMPAT_HPUX
+				cpu_model_hpux = HPUX_SYSCONF_CPUPA20;
+#endif
+				break;
+			}
+		}
+
+		sprintf(cpu_model, "HP9000/%s PA-RISC %s%x", p, q, lev);
 	}
 
 	/* we hope this won't fail */
@@ -517,13 +568,13 @@ hppa_init(start)
 	v = hppa_round_page(v);
 	bzero ((void *)v1, (v - v1));
 
+	msgbufp = (struct msgbuf *)v;
+	v += hppa_round_page(MSGBUFSIZE);
+	bzero(msgbufp, MSGBUFSIZE);
+	msgbufmapped = 1;
+
 	/* sets physmem */
 	pmap_bootstrap(v);
-
-	/* alloc msgbuf */
-	if (!(msgbufp = (void *)pmap_steal_memory(MSGBUFSIZE, NULL, NULL)))
-		panic("cannot allocate msgbuf");
-	msgbufmapped = 1;
 
 	/* locate coprocessors and SFUs */
 	if ((error = pdc_call((iodcio_t)pdc, 0, PDC_COPROC, PDC_COPROC_DFLT,
@@ -539,22 +590,21 @@ hppa_init(start)
 	}
 
 	/* they say PDC_COPROC might turn fault light on */
-	pdc_call((iodcio_t)pdc, PDC_CHASSIS, PDC_CHASSIS_DISP,
+	pdc_call((iodcio_t)pdc, 0, PDC_CHASSIS, PDC_CHASSIS_DISP,
 	    PDC_OSTAT(PDC_OSTAT_RUN) | 0xCEC0);
 
 #ifdef DDB
 	ddb_init();
 #endif
+	fcacheall();
 }
 
 void
 cpu_startup()
 {
-	struct pdc_model pdc_model PDC_ALIGNMENT;
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
-	int base, residual;
-	int err, i;
+	int i, base, residual;
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
@@ -570,61 +620,21 @@ cpu_startup()
 	 */
 	printf(version);
 
-	/* identify system type */
-	if ((err = pdc_call((iodcio_t)pdc, 0, PDC_MODEL, PDC_MODEL_INFO,
-	    &pdc_model)) < 0) {
-#ifdef DEBUG
-		printf("WARNING: PDC_MODEL error %d\n", err);
-#endif
-	} else {
-		const char *p, *q;
-		i = pdc_model.hvers >> 4;
-		p = hppa_mod_info(HPPA_TYPE_BOARD, i);
-		switch (pdc_model.arch_rev) {
-		default:
-		case 0:
-			q = "1.0";
-#ifdef COMPAT_HPUX
-			cpu_model_hpux = HPUX_SYSCONF_CPUPA10;
-#endif
-			break;
-		case 4:
-			q = "1.1";
-#ifdef COMPAT_HPUX
-			cpu_model_hpux = HPUX_SYSCONF_CPUPA11;
-#endif
-			break;
-		case 8:
-			q = "2.0";
-#ifdef COMPAT_HPUX
-			cpu_model_hpux = HPUX_SYSCONF_CPUPA20;
-#endif
-			break;
-		}
-
-		if (p)
-			sprintf(cpu_model, "HP9000/%s PA-RISC %s", p, q);
-		else
-			sprintf(cpu_model, "HP9000/(UNKNOWN %x) PA-RISC %s",
-				i, q);
-		printf("%s\n", cpu_model);
-	}
-
+	printf("%s\n", cpu_model);
 	printf("real mem = %d (%d reserved for PROM, %d used by OpenBSD)\n",
 	    ctob(totalphysmem), ctob(resvmem), ctob(physmem));
 
 	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
+	if (uvm_map(kernel_map, &minaddr, round_page(size),
 	    NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE,
 	    UVM_PROT_NONE, UVM_INH_NONE, UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
-	minaddr = (vaddr_t)buffers;
+	buffers = (caddr_t)minaddr;
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
 	for (i = 0; i < nbuf; i++) {
-		vsize_t curbufsize;
 		vaddr_t curbuf;
-		struct vm_page *pg;
+		int cbpgs;
 
 		/*
 		 * First <residual> buffers get (base+1) physical pages
@@ -634,16 +644,16 @@ cpu_startup()
 		 * but has no physical memory allocated for it.
 		 */
 		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = PAGE_SIZE * ((i < residual) ? (base+1) : base);
 
-		while (curbufsize) {
+		for (cbpgs = base + (i < residual? 1 : 0); cbpgs--; ) {
+			struct vm_page *pg;
+
 			if ((pg = uvm_pagealloc(NULL, 0, NULL, 0)) == NULL)
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
 			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
 			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
 		}
 	}
 
@@ -872,7 +882,7 @@ btlb_insert(space, va, pa, lenp, prot)
 		    pa, len);
 
 	/* ensure IO space is uncached */
-	if ((pa & 0xF0000) == 0xF0000)
+	if ((pa & (HPPA_IOBEGIN >> PGSHIFT)) == (HPPA_IOBEGIN >> PGSHIFT))
 		prot |= TLB_UNCACHABLE;
 
 #ifdef BTLBDEBUG
@@ -892,36 +902,36 @@ boot(howto)
 	int howto;
 {
 	/* If system is cold, just halt. */
-	if (cold) {
+	if (cold)
 		howto |= RB_HALT;
-		goto haltsys;
+	else {
+
+		boothowto = howto | (boothowto & RB_HALT);
+
+		if (!(howto & RB_NOSYNC)) {
+			waittime = 0;
+			vfs_shutdown();
+			/*
+			 * If we've been adjusting the clock, the todr
+			 * will be out of synch; adjust it now unless
+			 * the system was sitting in ddb.
+			 */
+			if ((howto & RB_TIMEBAD) == 0)
+				resettodr();
+			else
+				printf("WARNING: not updating battery clock\n");
+		}
+
+		/* XXX probably save howto into stable storage */
+
+		splhigh();
+
+		if (howto & RB_DUMP)
+			dumpsys();
+
+		doshutdownhooks();
 	}
 
-	boothowto = howto | (boothowto & RB_HALT);
-
-	if (!(howto & RB_NOSYNC)) {
-		waittime = 0;
-		vfs_shutdown();
-		/*
-		 * If we've been adjusting the clock, the todr
-		 * will be out of synch; adjust it now unless
-		 * the system was sitting in ddb.
-		 */
-		if ((howto & RB_TIMEBAD) == 0)
-			resettodr();
-		else
-			printf("WARNING: not updating battery clock\n");
-	}
-
-	/* XXX probably save howto into stable storage */
-
-	splhigh();
-
-	if (howto & RB_DUMP)
-		dumpsys();
-
-	doshutdownhooks();
-haltsys:
 	/* in case we came on powerfail interrupt */
 	if (cold_hook)
 		(*cold_hook)(HPPA_COLD_COLD);
@@ -939,6 +949,8 @@ haltsys:
 	} else {
 		printf("rebooting...");
 		DELAY(1000000);
+		__asm __volatile(".export hppa_reset, entry\n\t"
+		    ".label hppa_reset");
 		__asm __volatile("stwas %0, 0(%1)"
 		    :: "r" (CMD_RESET), "r" (LBCAST_ADDR + iomod_command));
 	}
@@ -1079,13 +1091,7 @@ kcopy(from, to, size)
 	void *to;
 	size_t size;
 {
-	register u_int oldh = curproc->p_addr->u_pcb.pcb_onfault;
-
-	curproc->p_addr->u_pcb.pcb_onfault = (u_int)&copy_on_fault;
-	bcopy(from, to, size);
-	curproc->p_addr->u_pcb.pcb_onfault = oldh;
-
-	return 0;
+	return spcopy(HPPA_SID_KERNEL, from, HPPA_SID_KERNEL, to, size);
 }
 
 int
@@ -1153,27 +1159,34 @@ setregs(p, pack, stack, retval)
 	register_t *retval;
 {
 	register struct trapframe *tf = p->p_md.md_regs;
-	/* register struct pcb *pcb = &p->p_addr->u_pcb; */
+	register struct pcb *pcb = &p->p_addr->u_pcb;
 #ifdef DEBUG
 	/*extern int pmapdebug;*/
-	/*pmapdebug = 13;*/
-	/*
+	/*pmapdebug = 13;
 	printf("setregs(%p, %p, %x, %p), ep=%x, cr30=%x\n",
 	    p, pack, stack, retval, pack->ep_entry, tf->tf_cr30);
 	*/
 #endif
 
+	tf->tf_flags = TFF_SYS|TFF_LAST;
 	tf->tf_iioq_tail = 4 +
 	    (tf->tf_iioq_head = pack->ep_entry | HPPA_PC_PRIV_USER);
 	tf->tf_rp = 0;
 	tf->tf_arg0 = (u_long)PS_STRINGS;
 	tf->tf_arg1 = tf->tf_arg2 = 0; /* XXX dynload stuff */
 
+	/* reset any of the pending FPU exceptions */
+	pcb->pcb_fpregs[0] = HPPA_FPU_INIT;
+	pcb->pcb_fpregs[1] = 0;
+	pcb->pcb_fpregs[2] = 0;
+	pcb->pcb_fpregs[3] = 0;
+
 	/* setup terminal stack frame */
 	stack = hppa_round_page(stack);
+	tf->tf_r3 = stack;
+	suword((caddr_t)(stack), 0);
 	stack += HPPA_FRAME_SIZE;
-	suword((caddr_t)(stack - HPPA_FRAME_PSP), 0);
-	suword((caddr_t)(stack - HPPA_FRAME_CRP), 0);
+	suword((caddr_t)(stack + HPPA_FRAME_CRP), 0);
 	tf->tf_sp = stack;
 
 	retval[1] = 0;
@@ -1235,8 +1248,8 @@ sendsig(catcher, sig, mask, code, type, val)
 		sigexit(p, SIGILL);
 
 	sss += HPPA_FRAME_SIZE;
-	if (suword((caddr_t)scp + sss - HPPA_FRAME_PSP, 0) ||
-	    suword((caddr_t)scp + sss - HPPA_FRAME_CRP, 0))
+	if (suword((caddr_t)scp + sss, 0) ||
+	    suword((caddr_t)scp + sss + HPPA_FRAME_CRP, 0))
 		sigexit(p, SIGILL);
 
 #ifdef DEBUG
@@ -1250,8 +1263,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	tf->tf_arg2 = tf->tf_r3 = (register_t)scp;
 	tf->tf_arg3 = (register_t)catcher;
 	tf->tf_sp = (register_t)scp + sss;
-	tf->tf_iioq_head = HPPA_PC_PRIV_USER |
-	    ((register_t)PS_STRINGS + sizeof(struct ps_strings));
+	tf->tf_iioq_head = HPPA_PC_PRIV_USER | p->p_sigcode;
 	tf->tf_iioq_tail = tf->tf_iioq_head + 4;
 	/* disable tracing in the trapframe */
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsecreg.h,v 1.17 2002/04/08 17:49:42 jason Exp $	*/
+/*	$OpenBSD: ubsecreg.h,v 1.27 2002/09/11 22:40:31 jason Exp $	*/
 
 /*
  * Copyright (c) 2000 Theo de Raadt
@@ -70,12 +70,14 @@
 #define	BS_CTRL_BE32		0x08000000	/* big-endian, 32bit bytes */
 #define	BS_CTRL_BE64		0x04000000	/* big-endian, 64bit bytes */
 #define	BS_CTRL_DMAERR		0x02000000	/* enable intr DMA error */
-#define	BS_CTRL_RNG_M		0x01800000	/* RND mode */
+#define	BS_CTRL_RNG_M		0x01800000	/* RNG mode */
 #define	BS_CTRL_RNG_1		0x00000000	/* 1bit rn/one slow clock */
 #define	BS_CTRL_RNG_4		0x00800000	/* 1bit rn/four slow clocks */
 #define	BS_CTRL_RNG_8		0x01000000	/* 1bit rn/eight slow clocks */
 #define	BS_CTRL_RNG_16		0x01800000	/* 1bit rn/16 slow clocks */
+#define	BS_CTRL_SWNORM		0x00400000	/* 582[01], sw normalization */
 #define	BS_CTRL_FRAG_M		0x0000ffff	/* output fragment size mask */
+#define	BS_CTRL_LITTLE_ENDIAN	(BS_CTRL_BE32 | BS_CTRL_BE64)
 
 /* BS_STAT - DMA Status */
 #define	BS_STAT_MCR1_BUSY	0x80000000	/* MCR1 is busy */
@@ -84,6 +86,8 @@
 #define	BS_STAT_DMAERR		0x10000000	/* DMA error */
 #define	BS_STAT_MCR2_FULL	0x08000000	/* MCR2 is full */
 #define	BS_STAT_MCR2_DONE	0x04000000	/* MCR2 is done */
+#define	BS_STAT_MCR1_ALLEMPTY	0x02000000	/* 5821, MCR1 is empty */
+#define	BS_STAT_MCR2_ALLEMPTY	0x01000000	/* 5821, MCR2 is empty */
 
 /* BS_ERR - DMA Error Address */
 #define	BS_ERR_ADDR		0xfffffffc	/* error address mask */
@@ -170,4 +174,22 @@ struct ubsec_ctx_rngbypass {
 	volatile u_int16_t	rbp_len;	/* command length, 64 */
 	volatile u_int16_t	rbp_op;		/* rng bypass, 0x41 */
 	volatile u_int8_t	rbp_pad[60];	/* padding */
+};
+
+/* modexp: C = (M ^ E) mod N */
+struct ubsec_ctx_modexp {
+	volatile u_int16_t	me_len;		/* command length */
+	volatile u_int16_t	me_op;		/* modexp, 0x47 */
+	volatile u_int16_t	me_E_len;	/* E (bits) */
+	volatile u_int16_t	me_N_len;	/* N (bits) */
+	u_int8_t		me_N[2048/8];	/* N */
+};
+
+struct ubsec_ctx_rsapriv {
+	volatile u_int16_t	rpr_len;	/* command length */
+	volatile u_int16_t	rpr_op;		/* rsaprivate, 0x04 */
+	volatile u_int16_t	rpr_q_len;	/* q (bits) */
+	volatile u_int16_t	rpr_p_len;	/* p (bits) */
+	u_int8_t		rpr_buf[5 * 1024 / 8];	/* parameters: */
+						/* p, q, dp, dq, pinv */
 };

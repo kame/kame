@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnd.c,v 1.32 2002/03/14 01:26:52 millert Exp $	*/
+/*	$OpenBSD: vnd.c,v 1.34 2002/05/24 13:10:52 art Exp $	*/
 /*	$NetBSD: vnd.c,v 1.26 1996/03/30 23:06:11 christos Exp $	*/
 
 /*
@@ -410,7 +410,9 @@ vndstrategy(bp)
 	if ((vnd->sc_flags & VNF_INITED) == 0) {
 		bp->b_error = ENXIO;
 		bp->b_flags |= B_ERROR;
+		s = splbio();
 		biodone(bp);
+		splx(s);
 		return;
 	}
 
@@ -420,13 +422,17 @@ vndstrategy(bp)
 	if (bn < 0) {
 		bp->b_error = EINVAL;
 		bp->b_flags |= B_ERROR;
+		s = splbio();
 		biodone(bp);
+		splx(s);
 		return;
 	}
 	if (DISKPART(bp->b_dev) != RAW_PART &&
 	    bounds_check_with_label(bp, vnd->sc_dk.dk_label,
 	    vnd->sc_dk.dk_cpulabel, 1) == 0) {
+		s = splbio();
 		biodone(bp);
+		splx(s);
 		return;
 	}
 
@@ -493,7 +499,9 @@ vndstrategy(bp)
 			if (bp->b_error)
 				bp->b_flags |= B_ERROR;
 			bp->b_resid = auio.uio_resid;
+			s = splbio();
 			biodone(bp);
+			splx(s);
 
 			/* If nothing more is queued, we are done.  */
 			if (!vnd->sc_tab.b_active)
@@ -581,7 +589,9 @@ vndstrategy(bp)
 			nbp->vb_buf.b_error = error;
 			nbp->vb_buf.b_flags |= B_ERROR;
 			bp->b_resid -= (resid - sz);
+			s = splbio();
 			biodone(&nbp->vb_buf);
+			splx(s);
 			return;
 		}
 		/*
@@ -642,9 +652,9 @@ vndiodone(bp)
 	struct buf *pbp = vbp->vb_obp;
 	struct vnd_softc *vnd = &vnd_softc[vndunit(pbp->b_dev)];
 	long count;
-	int s;
 
-	s = splbio();
+	splassert(IPL_BIO);
+
 #ifdef DEBUG
 	if (vnddebug & VDB_IO)
 		printf("vndiodone(%d): vbp %p vp %p blkno %x addr %p cnt %lx\n",
@@ -678,7 +688,6 @@ vndiodone(bp)
 		else
 			vnd->sc_tab.b_active--;
 	}
-	splx(s);
 }
 
 /* ARGSUSED */

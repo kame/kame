@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshdma.c,v 1.2 2002/03/14 01:26:37 millert Exp $ */
+/*	$OpenBSD: sshdma.c,v 1.5 2002/09/17 21:54:56 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -60,8 +60,10 @@
 int   afscmatch(struct device *, void *, void *);
 void  afscattach(struct device *, struct device *, void *);
 
-int   sshintr(struct ssh_softc *);
-int   afsc_dmaintr(struct ssh_softc *);
+void  sshintr(struct ssh_softc *);
+int   afsc_dmaintr(void *);
+
+extern void sshinitialize(struct ssh_softc *);
 
 struct scsi_adapter afsc_scsiswitch = {
 	ssh_scsicmd,
@@ -90,10 +92,9 @@ afscmatch(pdp, vcf, args)
 struct device *pdp;
 void *vcf, *args;
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = args;
 
-	return (!badvaddr(ca->ca_vaddr, 4));
+	return (!badvaddr((vaddr_t)ca->ca_vaddr, 4));
 }
 
 void
@@ -134,8 +135,10 @@ void *auxp;
 /*XXX*/	else
 /*XXX*/		sc->sc_dcntl |= (3 << 6);
 
-#if defined(MVME172) || defined(MVME177)  /* No Select timouts on MC68060 */
-	if (cputyp == CPU_172 || cputyp == CPU_172)
+#if defined(MVME172) || defined(MVME177)
+	/* No Select timouts on MC68060 */
+	/* XXX 177 works better with them! */
+	if (cputyp == CPU_172 /* || cputyp == CPU_177 */)
 		sc->sc_ctest7 = SSH_CTEST7_SNOOP | SSH_CTEST7_TT1 | SSH_CTEST7_STD;
 	else
 #endif 
@@ -191,9 +194,10 @@ void *auxp;
 }
 
 int
-afsc_dmaintr(sc)
-struct ssh_softc *sc;
+afsc_dmaintr(arg)
+	void *arg;
 {
+	struct ssh_softc *sc = (struct ssh_softc *)arg;
 	ssh_regmap_p rp;
 	u_char   istat;
 

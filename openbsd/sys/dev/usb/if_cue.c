@@ -1,5 +1,5 @@
-/*	$OpenBSD: if_cue.c,v 1.11 2001/10/31 04:24:44 nate Exp $ */
-/*	$NetBSD: if_cue.c,v 1.35 2001/04/13 23:30:09 thorpej Exp $	*/
+/*	$OpenBSD: if_cue.c,v 1.17 2002/07/25 04:07:32 nate Exp $ */
+/*	$NetBSD: if_cue.c,v 1.40 2002/07/11 21:14:26 augustss Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -96,7 +96,7 @@
 #if defined(__NetBSD__)
 #include <net/if_ether.h>
 #ifdef INET
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #endif
 #endif /* defined(__NetBSD__) */
@@ -135,13 +135,13 @@ int	cuedebug = 0;
 /*
  * Various supported device vendors/products.
  */
-Static struct cue_type cue_devs[] = {
+Static struct usb_devno cue_devs[] = {
 	{ USB_VENDOR_CATC, USB_PRODUCT_CATC_NETMATE },
 	{ USB_VENDOR_CATC, USB_PRODUCT_CATC_NETMATE2 },
 	{ USB_VENDOR_SMARTBRIDGES, USB_PRODUCT_SMARTBRIDGES_SMARTLINK },
 	/* Belkin F5U111 adapter covered by NETMATE entry */
-	{ 0, 0 }
 };
+#define cue_lookup(v, p) (usb_lookup(cue_devs, v, p))
 
 USB_DECLARE_DRIVER(cue);
 
@@ -203,7 +203,7 @@ cue_csr_read_1(struct cue_softc *sc, int reg)
 		return (0);
 	}
 
-	DPRINTFN(10,("%s: cue_csr_read_1 reg=0x%x val=0x%x\n", 
+	DPRINTFN(10,("%s: cue_csr_read_1 reg=0x%x val=0x%x\n",
 		     USBDEVNAME(sc->cue_dev), reg, val));
 
 	return (val);
@@ -227,7 +227,7 @@ cue_csr_read_2(struct cue_softc *sc, int reg)
 
 	err = usbd_do_request(sc->cue_udev, &req, &val);
 
-	DPRINTFN(10,("%s: cue_csr_read_2 reg=0x%x val=0x%x\n", 
+	DPRINTFN(10,("%s: cue_csr_read_2 reg=0x%x val=0x%x\n",
 		     USBDEVNAME(sc->cue_dev), reg, UGETW(val)));
 
 	if (err) {
@@ -248,7 +248,7 @@ cue_csr_write_1(struct cue_softc *sc, int reg, int val)
 	if (sc->cue_dying)
 		return (0);
 
-	DPRINTFN(10,("%s: cue_csr_write_1 reg=0x%x val=0x%x\n", 
+	DPRINTFN(10,("%s: cue_csr_write_1 reg=0x%x val=0x%x\n",
 		     USBDEVNAME(sc->cue_dev), reg, val));
 
 	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
@@ -265,7 +265,7 @@ cue_csr_write_1(struct cue_softc *sc, int reg, int val)
 		return (-1);
 	}
 
-	DPRINTFN(20,("%s: cue_csr_write_1, after reg=0x%x val=0x%x\n", 
+	DPRINTFN(20,("%s: cue_csr_write_1, after reg=0x%x val=0x%x\n",
 		     USBDEVNAME(sc->cue_dev), reg, cue_csr_read_1(sc, reg)));
 
 	return (0);
@@ -283,7 +283,7 @@ cue_csr_write_2(struct cue_softc *sc, int reg, int aval)
 	if (sc->cue_dying)
 		return (0);
 
-	DPRINTFN(10,("%s: cue_csr_write_2 reg=0x%x val=0x%x\n", 
+	DPRINTFN(10,("%s: cue_csr_write_2 reg=0x%x val=0x%x\n",
 		     USBDEVNAME(sc->cue_dev), reg, aval));
 
 	USETW(val, aval);
@@ -388,7 +388,7 @@ cue_setmulti(struct cue_softc *sc)
 
 	ifp = GET_IFP(sc);
 
-	DPRINTFN(2,("%s: cue_setmulti if_flags=0x%x\n", 
+	DPRINTFN(2,("%s: cue_setmulti if_flags=0x%x\n",
 		    USBDEVNAME(sc->cue_dev), ifp->if_flags));
 
 	if (ifp->if_flags & IFF_PROMISC) {
@@ -417,7 +417,7 @@ allmulti:
 			goto allmulti;
 
 		h = cue_crc(enm->enm_addrlo);
-		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);		
+		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);
 		ETHER_NEXT_MULTI(step, enm);
 	}
 
@@ -429,7 +429,7 @@ allmulti:
 	 */
 	if (ifp->if_flags & IFF_BROADCAST) {
 		h = cue_crc(etherbroadcastaddr);
-		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);		
+		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);
 	}
 
 	cue_mem(sc, CUE_CMD_WRITESRAM, CUE_MCAST_TABLE_ADDR,
@@ -468,16 +468,12 @@ cue_reset(struct cue_softc *sc)
 USB_MATCH(cue)
 {
 	USB_MATCH_START(cue, uaa);
-	struct cue_type			*t;
 
 	if (uaa->iface != NULL)
 		return (UMATCH_NONE);
 
-	for (t = cue_devs; t->cue_vid != 0; t++)
-		if (uaa->vendor == t->cue_vid && uaa->product == t->cue_did)
-			return (UMATCH_VENDOR_PRODUCT);
-
-	return (UMATCH_NONE);
+	return (cue_lookup(uaa->vendor, uaa->product) != NULL ?
+		UMATCH_VENDOR_PRODUCT : UMATCH_NONE);
 }
 
 /*
@@ -562,7 +558,7 @@ USB_ATTACH(cue)
 	/*
 	 * A CATC chip was detected. Inform the world.
 	 */
-	printf("%s: Ethernet address %s\n", USBDEVNAME(sc->cue_dev),
+	printf("%s: address %s\n", USBDEVNAME(sc->cue_dev),
 	    ether_sprintf(eaddr));
 
 #if defined(__OpenBSD__)
@@ -606,7 +602,7 @@ USB_DETACH(cue)
 	struct ifnet		*ifp = GET_IFP(sc);
 	int			s;
 
-	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __FUNCTION__));
+	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __func__));
 
 	usb_uncallout(sc->cue_stat_ch, cue_tick, sc);
 	/*
@@ -629,9 +625,6 @@ USB_DETACH(cue)
 #if defined(__NetBSD__)
 #if NRND > 0
 	rnd_detach_source(&sc->rnd_source);
-#endif
-#if NBPFILTER > 0
-	bpfdetach(ifp);
 #endif
 #endif /* __NetBSD__ */
 	ether_ifdetach(ifp);
@@ -660,7 +653,7 @@ cue_activate(device_ptr_t self, enum devact act)
 {
 	struct cue_softc *sc = (struct cue_softc *)self;
 
-	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __FUNCTION__));
+	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __func__));
 
 	switch (act) {
 	case DVACT_ACTIVATE:
@@ -785,7 +778,7 @@ cue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	int			s;
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", USBDEVNAME(sc->cue_dev),
-		     __FUNCTION__, status));
+		     __func__, status));
 
 	if (sc->cue_dying)
 		return;
@@ -849,7 +842,7 @@ cue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 #endif
 
 	DPRINTFN(10,("%s: %s: deliver %d\n", USBDEVNAME(sc->cue_dev),
-		    __FUNCTION__, m->m_len));
+		    __func__, m->m_len));
 	IF_INPUT(ifp, m);
  done1:
 	splx(s);
@@ -862,7 +855,7 @@ done:
 	usbd_transfer(c->cue_xfer);
 
 	DPRINTFN(10,("%s: %s: start rx\n", USBDEVNAME(sc->cue_dev),
-		    __FUNCTION__));
+		    __func__));
 }
 
 /*
@@ -883,7 +876,7 @@ cue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	s = splnet();
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", USBDEVNAME(sc->cue_dev),
-		    __FUNCTION__, status));
+		    __func__, status));
 
 	ifp->if_timer = 0;
 	ifp->if_flags &= ~IFF_OACTIVE;
@@ -924,7 +917,7 @@ cue_tick(void *xsc)
 	if (sc->cue_dying)
 		return;
 
-	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __FUNCTION__));
+	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __func__));
 
 	/* Perform statistics update in process context. */
 	usb_add_task(sc->cue_udev, &sc->cue_tick_task);
@@ -939,7 +932,7 @@ cue_tick_task(void *xsc)
 	if (sc->cue_dying)
 		return;
 
-	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __FUNCTION__));
+	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev), __func__));
 
 	ifp = GET_IFP(sc);
 
@@ -970,7 +963,7 @@ cue_send(struct cue_softc *sc, struct mbuf *m, int idx)
 	total_len = m->m_pkthdr.len + 2;
 
 	DPRINTFN(10,("%s: %s: total_len=%d\n",
-		     USBDEVNAME(sc->cue_dev), __FUNCTION__, total_len));
+		     USBDEVNAME(sc->cue_dev), __func__, total_len));
 
 	/* The first two bytes are the frame length */
 	c->cue_buf[0] = (u_int8_t)m->m_pkthdr.len;
@@ -1004,7 +997,7 @@ cue_start(struct ifnet *ifp)
 	if (sc->cue_dying)
 		return;
 
-	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__FUNCTION__));
+	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__func__));
 
 	if (ifp->if_flags & IFF_OACTIVE)
 		return;
@@ -1048,7 +1041,7 @@ cue_init(void *xsc)
 	if (sc->cue_dying)
 		return;
 
-	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__FUNCTION__));
+	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__func__));
 
 	if (ifp->if_flags & IFF_RUNNING)
 		return;
@@ -1070,7 +1063,7 @@ cue_init(void *xsc)
 	eaddr = sc->arpcom.ac_enaddr;
 #elif defined(__NetBSD__)
 	eaddr = LLADDR(ifp->if_sadl);
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
+#endif
 	/* Set MAC address */
 	for (i = 0; i < ETHER_ADDR_LEN; i++)
 		cue_csr_write_1(sc, CUE_PAR0 - i, eaddr[i]);
@@ -1260,7 +1253,7 @@ cue_watchdog(struct ifnet *ifp)
 	usbd_status		stat;
 	int			s;
 
-	DPRINTFN(5,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__FUNCTION__));
+	DPRINTFN(5,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__func__));
 
 	if (sc->cue_dying)
 		return;
@@ -1289,7 +1282,7 @@ cue_stop(struct cue_softc *sc)
 	struct ifnet		*ifp;
 	int			i;
 
-	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__FUNCTION__));
+	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->cue_dev),__func__));
 
 	ifp = GET_IFP(sc);
 	ifp->if_timer = 0;

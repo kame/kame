@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.123 2002/04/18 05:44:35 deraadt Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.129 2002/09/10 18:29:43 art Exp $	*/
 /*	$NetBSD: pmap.c,v 1.118 1998/05/19 19:00:18 thorpej Exp $ */
 
 /*
@@ -511,7 +511,6 @@ void	pv_unlink4_4c(struct pvlist *, struct pmap *, vaddr_t);
 /* from pmap.h: */
 boolean_t	(*pmap_clear_modify_p)(struct vm_page *);
 boolean_t	(*pmap_clear_reference_p)(struct vm_page *);
-void		(*pmap_copy_page_p)(paddr_t, paddr_t);
 int		(*pmap_enter_p)(pmap_t, vaddr_t, paddr_t, vm_prot_t, int);
 boolean_t	(*pmap_extract_p)(pmap_t, vaddr_t, paddr_t *);
 boolean_t	(*pmap_is_modified_p)(struct vm_page *);
@@ -520,7 +519,8 @@ void		(*pmap_kenter_pa_p)(vaddr_t, paddr_t, vm_prot_t);
 void		(*pmap_kremove_p)(vaddr_t, vsize_t);
 void		(*pmap_page_protect_p)(struct vm_page *, vm_prot_t);
 void		(*pmap_protect_p)(pmap_t, vaddr_t, vaddr_t, vm_prot_t);
-void            (*pmap_zero_page_p)(paddr_t);
+void		(*pmap_copy_page_p)(struct vm_page *, struct vm_page *);
+void            (*pmap_zero_page_p)(struct vm_page *);
 void	       	(*pmap_changeprot_p)(pmap_t, vaddr_t, vm_prot_t, int);
 /* local: */
 void 		(*pmap_rmk_p)(struct pmap *, vaddr_t, vaddr_t, int, int);
@@ -651,6 +651,58 @@ setpte4m(va, pte)
 	ptep = getptep4m(pmap_kernel(), va);
 	tlb_flush_page(va);
 	setpgt4m(ptep, pte);
+}
+
+/*
+ * Translation table for kernel vs. PTE protection bits.
+ */
+u_int protection_codes[2][8];
+#define pte_prot4m(pm, prot) (protection_codes[pm == pmap_kernel()?0:1][prot])
+
+static void
+sparc_protection_init4m(void)
+{
+	u_int prot, *kp, *up;
+
+	kp = protection_codes[0];
+	up = protection_codes[1];
+
+	for (prot = 0; prot < 8; prot++) {
+		switch (prot) {
+		case VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE:
+			kp[prot] = PPROT_N_RWX;
+			up[prot] = PPROT_RWX_RWX;
+			break;
+		case VM_PROT_READ | VM_PROT_WRITE | VM_PROT_NONE:
+			kp[prot] = PPROT_N_RWX;
+			up[prot] = PPROT_RW_RW;
+			break;
+		case VM_PROT_READ | VM_PROT_NONE  | VM_PROT_EXECUTE:
+			kp[prot] = PPROT_N_RX;
+			up[prot] = PPROT_RX_RX;
+			break;
+		case VM_PROT_READ | VM_PROT_NONE  | VM_PROT_NONE:
+			kp[prot] = PPROT_N_RX;
+			up[prot] = PPROT_R_R;
+			break;
+		case VM_PROT_NONE | VM_PROT_WRITE | VM_PROT_EXECUTE:
+			kp[prot] = PPROT_N_RWX;
+			up[prot] = PPROT_RWX_RWX;
+			break;
+		case VM_PROT_NONE | VM_PROT_WRITE | VM_PROT_NONE:
+			kp[prot] = PPROT_N_RWX;
+			up[prot] = PPROT_RW_RW;
+			break;
+		case VM_PROT_NONE | VM_PROT_NONE  | VM_PROT_EXECUTE:
+			kp[prot] = PPROT_N_RX;
+			up[prot] = PPROT_X_X;
+			break;
+		case VM_PROT_NONE | VM_PROT_NONE  | VM_PROT_NONE:
+			kp[prot] = PPROT_N_RX;
+			up[prot] = PPROT_R_R;
+			break;
+		}
+	}
 }
 
 #endif /* 4m only */
@@ -1797,7 +1849,7 @@ ctx_free(pm)
 			newc = pm->pm_ctxnum;
 			CHANGE_CONTEXTS(oldc, newc);
 			cache_flush_context();
-			setcontext(0);
+			setcontext4(0);
 		} else {
 			CHANGE_CONTEXTS(oldc, 0);
 		}
@@ -3217,6 +3269,7 @@ pmap_bootstrap4m(void)
 	mmu_install_tables(&cpuinfo);
 
 	pmap_page_upload(avail_start);
+	sparc_protection_init4m();
 }
 
 void
@@ -4678,23 +4731,25 @@ pmap_page_protect4m(pg, prot)
  * fairly easy.
  */
 void
-pmap_protect4m(pm, sva, eva, prot)
-	struct pmap *pm;
-	vaddr_t sva, eva;
-	vm_prot_t prot;
+pmap_protect4m(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 {
 	int va, nva, vr, vs;
 	int s, ctx;
 	struct regmap *rp;
 	struct segmap *sp;
-
-	if (pm == NULL || prot & VM_PROT_WRITE)
-		return;
+	int newprot;
 
 	if ((prot & VM_PROT_READ) == 0) {
 		pmap_remove(pm, sva, eva);
 		return;
 	}
+
+	/*
+	 * Since the caller might request either a removal of PROT_EXECUTE
+	 * or PROT_WRITE, we don't attempt to guess what to do, just lower
+	 * to read-only and let the real protection be faulted in.
+	 */
+	newprot = pte_prot4m(pm, VM_PROT_READ);
 
 	write_user_windows();
 	ctx = getcontext4m();
@@ -4733,23 +4788,27 @@ pmap_protect4m(pm, sva, eva, prot)
 
 		pmap_stats.ps_npg_prot_all = (nva - va) >> PGSHIFT;
 		for (; va < nva; va += NBPG) {
-			int tpte;
+			int tpte, npte;
+
 			tpte = sp->sg_pte[VA_SUN4M_VPG(va)];
+			npte = (tpte & ~SRMMU_PROT_MASK) | newprot;
+
+			/* Only do work when needed. */
+			if (npte == tpte)
+				continue;
+
+			pmap_stats.ps_npg_prot_actual++;
 			/*
 			 * Flush cache so that any existing cache
-			 * tags are updated.  This is really only
-			 * needed for PTEs that lose PG_W.
+			 * tags are updated.
 			 */
-			if ((tpte & (PPROT_WRITE|SRMMU_PGTYPE)) ==
-			    (PPROT_WRITE|PG_SUN4M_OBMEM)) {
-				pmap_stats.ps_npg_prot_actual++;
-				if (pm->pm_ctx) {
+			if (pm->pm_ctx) {
+				if ((tpte & SRMMU_PGTYPE) == PG_SUN4M_OBMEM) {
 					cache_flush_page(va);
-					tlb_flush_page(va);
 				}
-				setpgt4m(&sp->sg_pte[VA_SUN4M_VPG(va)],
-					 tpte & ~PPROT_WRITE);
+				tlb_flush_page(va);
 			}
+			setpgt4m(&sp->sg_pte[VA_SUN4M_VPG(va)], npte);
 		}
 	}
 	simple_unlock(&pm->pm_lock);
@@ -4781,10 +4840,7 @@ pmap_changeprot4m(pm, va, prot, wired)
 	write_user_windows();	/* paranoia */
 
 	va = trunc_page(va);
-	if (pm == pmap_kernel())
-		newprot = prot & VM_PROT_WRITE ? PPROT_N_RWX : PPROT_N_RX;
-	else
-		newprot = prot & VM_PROT_WRITE ? PPROT_RWX_RWX : PPROT_RX_RX;
+	newprot = pte_prot4m(pm, prot);
 
 	pmap_stats.ps_changeprots++;
 
@@ -5238,8 +5294,7 @@ pmap_enter4m(pm, va, pa, prot, flags)
 #endif
 	pteproto |= PMAP_T2PTE_SRMMU(pa);
 
-	/* Make sure we get a pte with appropriate perms! */
-	pteproto |= SRMMU_TEPTE | PPROT_RX_RX;
+	pteproto |= SRMMU_TEPTE;
 
 	pa &= ~PMAP_TNC_SRMMU;
 	/*
@@ -5254,17 +5309,17 @@ pmap_enter4m(pm, va, pa, prot, flags)
 
 	pteproto |= (atop(pa) << SRMMU_PPNSHIFT);
 
-	if (prot & VM_PROT_WRITE)
-		pteproto |= PPROT_WRITE;
+	/* correct protections */
+	pteproto |= pte_prot4m(pm, prot);
 
 	ctx = getcontext4m();
 	if (pm == pmap_kernel())
-		ret = pmap_enk4m(pm, va, prot, flags, pv, pteproto | PPROT_S);
+		ret = pmap_enk4m(pm, va, prot, flags, pv, pteproto);
 	else
 		ret = pmap_enu4m(pm, va, prot, flags, pv, pteproto);
 #ifdef DIAGNOSTIC
 	if ((flags & PMAP_CANFAIL) == 0 && ret != 0)
-		panic("pmap_enter4_4c: can't fail, but did");
+		panic("pmap_enter4m: can't fail, but did");
 #endif
 	if (pv) {
 		if (flags & VM_PROT_WRITE)
@@ -5511,7 +5566,7 @@ pmap_kenter_pa4m(va, pa, prot)
 
 	ctx = getcontext4m();
 	pmap_enk4m(pmap_kernel(), va, prot, TRUE, pv, pteproto);
-	setcontext(ctx);
+	setcontext4m(ctx);
 }
 
 void
@@ -5865,9 +5920,9 @@ pmap_is_referenced4m(pg)
 #if defined(SUN4) || defined(SUN4C)
 
 void
-pmap_zero_page4_4c(pa)
-	paddr_t pa;
+pmap_zero_page4_4c(struct vm_page *pg)
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	caddr_t va;
 	int pte;
 	struct pvlist *pv;
@@ -5898,9 +5953,10 @@ pmap_zero_page4_4c(pa)
  * the processor.
  */
 void
-pmap_copy_page4_4c(src, dst)
-	paddr_t src, dst;
+pmap_copy_page4_4c(struct vm_page *srcpg, struct vm_page *dstpg)
 {
+	paddr_t src = VM_PAGE_TO_PHYS(srcpg);
+	paddr_t dst = VM_PAGE_TO_PHYS(dstpg);
 	caddr_t sva, dva;
 	int spte, dpte;
 	struct pvlist *pv;
@@ -5936,9 +5992,9 @@ pmap_copy_page4_4c(src, dst)
  * XXX	might be faster to use destination's context and allow cache to fill?
  */
 void
-pmap_zero_page4m(pa)
-	paddr_t pa;
+pmap_zero_page4m(struct vm_page *pg)
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	int pte;
 	struct pvlist *pv;
 	static int *ptep;
@@ -5957,8 +6013,8 @@ pmap_zero_page4m(pa)
 		pv_flushcache(pv);
 	}
 
-	pte = (SRMMU_TEPTE | PPROT_S | PPROT_WRITE |
-	       (atop(pa) << SRMMU_PPNSHIFT));
+	pte = (SRMMU_TEPTE | (atop(pa) << SRMMU_PPNSHIFT) | PPROT_N_RWX);
+
 	if (cpuinfo.flags & CPUFLG_CACHE_MANDATORY)
 		pte |= SRMMU_PG_C;
 	else
@@ -5981,9 +6037,10 @@ pmap_zero_page4m(pa)
  * the processor.
  */
 void
-pmap_copy_page4m(src, dst)
-	paddr_t src, dst;
+pmap_copy_page4m(struct vm_page *srcpg, struct vm_page *dstpg)
 {
+	paddr_t src = VM_PAGE_TO_PHYS(srcpg);
+	paddr_t dst = VM_PAGE_TO_PHYS(dstpg);
 	int spte, dpte;
 	struct pvlist *pv;
 	static int *sptep, *dptep;
@@ -5998,15 +6055,14 @@ pmap_copy_page4m(src, dst)
 	if (pv && CACHEINFO.c_vactype == VAC_WRITEBACK)
 		pv_flushcache(pv);
 
-	spte = SRMMU_TEPTE | SRMMU_PG_C | PPROT_S |
-		(atop(src) << SRMMU_PPNSHIFT);
+	spte = SRMMU_TEPTE | SRMMU_PG_C | (atop(src) << SRMMU_PPNSHIFT) |
+	    PPROT_N_RX;
 
 	pv = pvhead(atop(dst));
 	if (pv && CACHEINFO.c_vactype != VAC_NONE)
 		pv_flushcache(pv);
 
-	dpte = (SRMMU_TEPTE | PPROT_S | PPROT_WRITE |
-	       (atop(dst) << SRMMU_PPNSHIFT));
+	dpte = (SRMMU_TEPTE | (atop(dst) << SRMMU_PPNSHIFT) | PPROT_N_RWX);
 	if (cpuinfo.flags & CPUFLG_CACHE_MANDATORY)
 		dpte |= SRMMU_PG_C;
 	else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_hostap.c,v 1.12 2002/04/11 15:34:27 millert Exp $	*/
+/*	$OpenBSD: if_wi_hostap.c,v 1.20 2002/08/13 03:49:51 millert Exp $	*/
 
 /*
  * Copyright (c) 2002
@@ -70,6 +70,8 @@
 
 #include <net/if_ieee80211.h>
 
+#include <dev/rndvar.h>
+
 #include <dev/ic/if_wireg.h>
 #include <dev/ic/if_wi_ieee.h>
 #include <dev/ic/if_wivar.h>
@@ -87,8 +89,8 @@ void wihap_deauth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
     caddr_t pkt, int len);
 void wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
     caddr_t pkt, int len);
-void wihap_sta_disassoc(struct wi_softc *sc,
-    struct wihap_sta_info *sta, u_int16_t reason);
+void wihap_sta_disassoc(struct wi_softc *sc, u_int8_t sta_addr[],
+    u_int16_t reason);
 void wihap_disassoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
     caddr_t pkt, int len);
 
@@ -177,7 +179,7 @@ put_rates(caddr_t *ppkt, u_int16_t rates)
 /* wihap_init()
  *
  *	Initialize host AP data structures.  Called even if port type is
- *	not AP.
+ *	not AP.  Caller MUST raise to splimp().
  */
 void
 wihap_init(struct wi_softc *sc)
@@ -185,12 +187,12 @@ wihap_init(struct wi_softc *sc)
 	int i;
 	struct wihap_info *whi = &sc->wi_hostap_info;
 
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-		printf("wihap_init: sc=0x%x whi=0x%x\n", (int)sc, (int)whi);
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+		printf("wihap_init: sc=0x%x whi=0x%x\n", sc, whi);
 
 	bzero(whi, sizeof(struct wihap_info));
 
-	if (sc->wi_ptype != WI_PORTTYPE_AP)
+	if (sc->wi_ptype != WI_PORTTYPE_HOSTAP)
 		return;
 
 	whi->apflags = WIHAPFL_ACTIVE;
@@ -207,28 +209,28 @@ wihap_init(struct wi_softc *sc)
  *	Send a disassociation frame to a specified station.
  */
 void
-wihap_sta_disassoc(struct wi_softc *sc,
-    struct wihap_sta_info *sta, u_int16_t reason)
+wihap_sta_disassoc(struct wi_softc *sc, u_int8_t sta_addr[], u_int16_t reason)
 {
 	struct wi_80211_hdr	*resp_hdr;
 	caddr_t			pkt;
 
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-		printf("Sending disassoc to sta %s\n", ether_sprintf(sta->addr));
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+		printf("Sending disassoc to sta %s\n", ether_sprintf(sta_addr));
 
 	/* Send disassoc packet. */
-	resp_hdr = (struct wi_80211_hdr *) sc->wi_txbuf;
+	resp_hdr = (struct wi_80211_hdr *)sc->wi_txbuf;
 	bzero(resp_hdr, sizeof(struct wi_80211_hdr));
 	resp_hdr->frame_ctl = WI_FTYPE_MGMT | WI_STYPE_MGMT_DISAS;
-	pkt = sc->wi_txbuf + sizeof(struct wi_80211_hdr);
+	pkt = (caddr_t)&sc->wi_txbuf + sizeof(struct wi_80211_hdr);
 
-	bcopy(sta->addr, resp_hdr->addr1, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
+	bcopy(sta_addr, resp_hdr->addr1, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
 
 	put_hword(&pkt, reason);
 
-	wi_mgmt_xmit(sc, sc->wi_txbuf, 2 + sizeof(struct wi_80211_hdr));
+	wi_mgmt_xmit(sc, (caddr_t)&sc->wi_txbuf,
+	    2 + sizeof(struct wi_80211_hdr));
 }
 
 /* wihap_sta_deauth()
@@ -236,33 +238,34 @@ wihap_sta_disassoc(struct wi_softc *sc,
  *	Send a deauthentication message to a specified station.
  */
 void
-wihap_sta_deauth(struct wi_softc *sc, u_int8_t sta_addr[],
-    u_int16_t reason)
+wihap_sta_deauth(struct wi_softc *sc, u_int8_t sta_addr[], u_int16_t reason)
 {
 	struct wi_80211_hdr	*resp_hdr;
 	caddr_t			pkt;
 
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 		printf("Sending deauth to sta %s\n", ether_sprintf(sta_addr));
 
 	/* Send deauth packet. */
-	resp_hdr = (struct wi_80211_hdr *) sc->wi_txbuf;
+	resp_hdr = (struct wi_80211_hdr *)sc->wi_txbuf;
 	bzero(resp_hdr, sizeof(struct wi_80211_hdr));
 	resp_hdr->frame_ctl = htole16(WI_FTYPE_MGMT | WI_STYPE_MGMT_DEAUTH);
-	pkt = sc->wi_txbuf + sizeof(struct wi_80211_hdr);
+	pkt = (caddr_t)&sc->wi_txbuf + sizeof(struct wi_80211_hdr);
 
 	bcopy(sta_addr, resp_hdr->addr1, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
 
 	put_hword(&pkt, reason);
 
-	wi_mgmt_xmit(sc, sc->wi_txbuf, 2 + sizeof(struct wi_80211_hdr));
+	wi_mgmt_xmit(sc, (caddr_t)&sc->wi_txbuf,
+	    2 + sizeof(struct wi_80211_hdr));
 }
 
 /* wihap_shutdown()
  *
  *	Disassociate all stations and free up data structures.
+ *	Caller must raise to splimp().
  */
 void
 wihap_shutdown(struct wi_softc *sc)
@@ -271,12 +274,12 @@ wihap_shutdown(struct wi_softc *sc)
 	struct wihap_sta_info	*sta, *next;
 	int s;
 
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-		printf("wihap_shutdown: sc=0x%x whi=0x%x\n",
-		    (int)sc, (int)whi);
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+		printf("wihap_shutdown: sc=0x%x whi=0x%x\n", sc, whi);
 
 	if (!(whi->apflags & WIHAPFL_ACTIVE))
 		return;
+	whi->apflags = 0;
 
 	/* XXX: I read somewhere you can deauth all the stations with
 	 * a single broadcast.  Maybe try that someday.
@@ -291,7 +294,7 @@ wihap_shutdown(struct wi_softc *sc)
 		if (sc->wi_flags & WI_FLAGS_ATTACHED) {
 			/* Disassociate station. */
 			if (sta->flags & WI_SIFLAGS_ASSOC)
-				wihap_sta_disassoc(sc, sta,
+				wihap_sta_disassoc(sc, sta->addr,
 				    IEEE80211_REASON_ASSOC_LEAVE);
 			/* Deauth station. */
 			if (sta->flags & WI_SIFLAGS_AUTHEN)
@@ -300,15 +303,13 @@ wihap_shutdown(struct wi_softc *sc)
 		}
 
 		/* Delete the structure. */
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_shutdown: FREE(sta=0x%x)\n", (int)sta);
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_shutdown: FREE(sta=0x%x)\n", sta);
 		next = LIST_NEXT(sta, list);
 		FREE(sta, M_DEVBUF);
 		sta = next;
 	}
 	splx(s);
-
-	whi->apflags = 0;
 }
 
 /* sta_hash_func()
@@ -339,19 +340,20 @@ wihap_sta_timeout(void *v)
 	s = splsoftnet();
 
 	if (sta->flags & WI_SIFLAGS_ASSOC) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 			printf("wihap_timer: disassoc due to inactivity: %s\n",
 			    ether_sprintf(sta->addr));
 
 		/* Disassoc station. */
-		wihap_sta_disassoc(sc, sta, IEEE80211_REASON_ASSOC_EXPIRE);
+		wihap_sta_disassoc(sc, sta->addr,
+		    IEEE80211_REASON_ASSOC_EXPIRE);
 		sta->flags &= ~WI_SIFLAGS_ASSOC;
 
 		timeout_add(&sta->tmo, hz * whi->inactivity_time);
 
 	} else if (sta->flags & WI_SIFLAGS_AUTHEN) {
 
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 			printf("wihap_timer: deauth due to inactivity: %s\n",
 			    ether_sprintf(sta->addr));
 
@@ -382,6 +384,8 @@ wihap_sta_delete(struct wihap_sta_info *sta)
 
 	LIST_REMOVE(sta, list);
 	LIST_REMOVE(sta, hash);
+	if (sta->challenge)
+		FREE(sta->challenge, M_TEMP);
 	FREE(sta, M_DEVBUF);
 	whi->n_stations--;
 }
@@ -402,7 +406,7 @@ wihap_sta_alloc(struct wi_softc *sc, u_int8_t *addr)
 	MALLOC(sta, struct wihap_sta_info *, sizeof(struct wihap_sta_info),
 	    M_DEVBUF, M_NOWAIT);
 	if (sta == NULL)
-		return(NULL);
+		return (NULL);
 
 	bzero(sta, sizeof(struct wihap_sta_info));
 
@@ -423,7 +427,7 @@ wihap_sta_alloc(struct wi_softc *sc, u_int8_t *addr)
 	timeout_set(&sta->tmo, wihap_sta_timeout, sta);
 	timeout_add(&sta->tmo, hz * whi->inactivity_time);
 
-	return(sta);
+	return (sta);
 }
 
 /* wihap_sta_find()
@@ -441,7 +445,7 @@ wihap_sta_find(struct wihap_info *whi, u_int8_t *addr)
 		if (addr_cmp(addr, sta->addr))
 			return sta;
 
-	return(NULL);
+	return (NULL);
 }
 
 static __inline int
@@ -491,49 +495,33 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 {
 	struct wihap_info	*whi = &sc->wi_hostap_info;
 	struct wihap_sta_info	*sta;
+	int			i;
 
 	u_int16_t		algo;
 	u_int16_t		seq;
 	u_int16_t		status;
 	int			challenge_len;
-	u_int8_t		challenge[128];
+	u_int32_t		challenge[32];
 
 	struct wi_80211_hdr	*resp_hdr;
 
-	if (len<6)
+	if (len < 6)
 		return;
 
 	/* Break open packet. */
 	algo = take_hword(&pkt, &len);
 	seq = take_hword(&pkt, &len);
 	status = take_hword(&pkt, &len);
-	challenge_len=0;
+	challenge_len = 0;
 	if (len > 0 && (challenge_len = take_tlv(&pkt, &len,
-	    IEEE80211_ELEMID_CHALLENGE, challenge, sizeof(challenge)))<0)
+	    IEEE80211_ELEMID_CHALLENGE, challenge, sizeof(challenge))) < 0)
 		return;
 
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-		printf("wihap_auth_req: from station: %s\n",
-		    ether_sprintf(rxfrm->wi_addr2));
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+		printf("wihap_auth_req: station %s algo=0x%x seq=0x%x\n",
+		    ether_sprintf(rxfrm->wi_addr2), algo, seq);
 
-	switch (algo) {
-	case IEEE80211_AUTH_ALG_OPEN:
-		if (seq != 1) {
-			status = IEEE80211_STATUS_SEQUENCE;
-			goto fail;
-		}
-		challenge_len=0;
-		break;
-	case IEEE80211_AUTH_ALG_SHARED:
-		/* NOT YET */
-	default:
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_auth_req: algorithm unsupported: %d\n",
-			    algo);
-		status = IEEE80211_STATUS_ALG;
-		goto fail;
-	}
-
+	/* Find or create station info. */
 	sta = wihap_sta_find(whi, rxfrm->wi_addr2);
 	if (sta == NULL) {
 
@@ -551,7 +539,7 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 			goto fail;
 		}
 
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 			printf("wihap_auth_req: new station\n");
 
 		/* Create new station. */
@@ -562,34 +550,110 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 			goto fail;
 		}
 	}
-
-	sta->flags |= WI_SIFLAGS_AUTHEN;
 	timeout_add(&sta->tmo, hz * whi->inactivity_time);
+
+	/* Note: it's okay to leave the station info structure around
+	 * if the authen fails.  It'll be timed out eventually.
+	 */
+	switch (algo) {
+	case IEEE80211_AUTH_ALG_OPEN:
+		if (sc->wi_authtype != IEEE80211_AUTH_OPEN) {
+			seq = 2;
+			status = IEEE80211_STATUS_ALG;
+			goto fail;
+		}
+		if (seq != 1) {
+			seq = 2;
+			status = IEEE80211_STATUS_SEQUENCE;
+			goto fail;
+		}
+		challenge_len = 0;
+		seq = 2;
+		sta->flags |= WI_SIFLAGS_AUTHEN;
+		break;
+	case IEEE80211_AUTH_ALG_SHARED:
+		if (sc->wi_authtype != IEEE80211_AUTH_SHARED) {
+			seq = 2;
+			status = IEEE80211_STATUS_ALG;
+			goto fail;
+		}
+		switch (seq) {
+		case 1:
+			/* Create a challenge frame. */
+			if (!sta->challenge) {
+				MALLOC(sta->challenge, u_int32_t *, 128,
+				       M_TEMP, M_NOWAIT);
+				if (!sta->challenge)
+					return;
+			}
+			for (i = 0; i < 32; i++)
+				challenge[i] = sta->challenge[i] =
+					arc4random();
+			
+			if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+				printf("\tchallenge: 0x%x 0x%x ...\n",
+				   challenge[0], challenge[1]);
+			challenge_len = 128;
+			seq = 2;
+			break;
+		case 3:
+			if (challenge_len != 128 || !sta->challenge ||
+			    !(letoh16(rxfrm->wi_frame_ctl) & WI_FCTL_WEP)) {
+				status = IEEE80211_STATUS_CHALLENGE;
+				goto fail;
+			}
+
+			for (i=0; i<32; i++)
+				if (sta->challenge[i] != challenge[i]) {
+					status = IEEE80211_STATUS_CHALLENGE;
+					goto fail;
+				}
+
+			sta->flags |= WI_SIFLAGS_AUTHEN;
+			FREE(sta->challenge, M_TEMP);
+			sta->challenge = NULL;
+			challenge_len = 0;
+			seq = 4;
+			break;
+		default:
+			seq = 2;
+			status = IEEE80211_STATUS_SEQUENCE;
+			goto fail;
+		} /* switch (seq) */
+		break;
+	default:
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_auth_req: algorithm unsupported: 0x%x\n",
+			   algo);
+		status = IEEE80211_STATUS_ALG;
+		goto fail;
+	} /* switch (algo) */
+
 	status = IEEE80211_STATUS_SUCCESS;
 
 fail:
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 		printf("wihap_auth_req: returns status=0x%x\n", status);
 
 	/* Send response. */
-	resp_hdr = (struct wi_80211_hdr *) sc->wi_txbuf;
+	resp_hdr = (struct wi_80211_hdr *)&sc->wi_txbuf;
 	bzero(resp_hdr, sizeof(struct wi_80211_hdr));
 	resp_hdr->frame_ctl = htole16(WI_FTYPE_MGMT | WI_STYPE_MGMT_AUTH);
 	bcopy(rxfrm->wi_addr2, resp_hdr->addr1, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
 
-	pkt = &sc->wi_txbuf[sizeof(struct wi_80211_hdr)];
+	pkt = (caddr_t)&sc->wi_txbuf + sizeof(struct wi_80211_hdr);
 	put_hword(&pkt, algo);
-	put_hword(&pkt, 2);
+	put_hword(&pkt, seq);
 	put_hword(&pkt, status);
 	if (challenge_len > 0)
 		put_tlv(&pkt, IEEE80211_ELEMID_CHALLENGE,
 			challenge, challenge_len);
 
-	wi_mgmt_xmit(sc, sc->wi_txbuf,
-		     6 + sizeof(struct wi_80211_hdr) +
-		     (challenge_len>0 ? challenge_len + 2 : 0));
+	wi_mgmt_xmit(sc, (caddr_t)&sc->wi_txbuf,
+	    6 + sizeof(struct wi_80211_hdr) +
+	    (challenge_len > 0 ? challenge_len + 2 : 0));
 }
 
 
@@ -618,6 +682,17 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	/* Pull out request parameters. */
 	capinfo = take_hword(&pkt, &len);
 	lstintvl = take_hword(&pkt, &len);
+
+	if ((rxfrm->wi_frame_ctl & htole16(WI_FCTL_STYPE)) ==
+	    htole16(WI_STYPE_MGMT_REASREQ)) {
+		if (len < 6)
+			return;
+		/* Eat the MAC address of the current AP */
+		take_hword(&pkt, &len);
+		take_hword(&pkt, &len);
+		take_hword(&pkt, &len);
+	}
+
 	if ((ssid_len = take_tlv(&pkt, &len, IEEE80211_ELEMID_SSID,
 	    ssid.i_nwid, sizeof(ssid)))<0)
 		return;
@@ -626,14 +701,7 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	    rates, sizeof(rates)))<0)
 		return;
 
-	if ((rxfrm->wi_frame_ctl & htole16(WI_FCTL_STYPE)) ==
-	    htole16(WI_STYPE_MGMT_REASREQ)) {
-		/* Reassociation Request-- * Current AP.  (Ignore?) */
-		if (len < 6)
-			return;
-	}
-
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 		printf("wihap_assoc_req: from station %s\n",
 		    ether_sprintf(rxfrm->wi_addr2));
 
@@ -641,7 +709,7 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	if (sc->wi_net_name.i_len != ssid.i_len ||
 	    memcmp(sc->wi_net_name.i_nwid, ssid.i_nwid, ssid.i_len)) {
 
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 			printf("wihap_assoc_req: bad ssid: '%.*s' != '%.*s'\n",
 			    ssid.i_len, ssid.i_nwid, sc->wi_net_name.i_len,
 			    sc->wi_net_name.i_nwid);
@@ -658,6 +726,8 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 
 	/* Check supported rates against ours. */
 	if (wihap_check_rates(sta, rates, rates_len)<0) {
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_assoc_req: rates mismatch.\n");
 		status = IEEE80211_STATUS_RATES;
 		goto fail;
 	}
@@ -671,24 +741,24 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	status = IEEE80211_STATUS_CAPINFO;
 	if ((capinfo & (IEEE80211_CAPINFO_ESS | IEEE80211_CAPINFO_IBSS)) !=
 	    IEEE80211_CAPINFO_ESS) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_assoc_req: capinfo mismatch: "
-			    "client using IBSS mode\n");
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_assoc_req: capinfo: not ESS: "
+			    "capinfo=0x%x\n", capinfo);
 		goto fail;
 
 	}
 	if ((sc->wi_use_wep && !(capinfo & IEEE80211_CAPINFO_PRIVACY)) ||
 	    (!sc->wi_use_wep && (capinfo & IEEE80211_CAPINFO_PRIVACY))) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_assoc_req: capinfo mismatch: client "
-			    "%susing WEP\n", sc->wi_use_wep ? "not " : "");
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_assoc_req: WEP flag mismatch: "
+			    "capinfo=0x%x\n", capinfo);
 		goto fail;
 	}
 	if ((capinfo & (IEEE80211_CAPINFO_CF_POLLABLE |
 	    IEEE80211_CAPINFO_CF_POLLREQ)) == IEEE80211_CAPINFO_CF_POLLABLE) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_assoc_req: capinfo mismatch: "
-			    "client requested CF polling\n");
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_assoc_req: polling not supported: "
+			    "capinfo=0x%x\n", capinfo);
 		goto fail;
 	}
 
@@ -696,7 +766,7 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	asid = sta->asid;
 
 	if (sta->flags & WI_SIFLAGS_ASSOC) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 			printf("wihap_assoc_req: already assoc'ed?\n");
 	}
 
@@ -705,25 +775,25 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	status = IEEE80211_STATUS_SUCCESS;
 
 fail:
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 		printf("wihap_assoc_req: returns status=0x%x\n", status);
 
 	/* Send response. */
-	resp_hdr = (struct wi_80211_hdr *) sc->wi_txbuf;
+	resp_hdr = (struct wi_80211_hdr *)&sc->wi_txbuf;
 	bzero(resp_hdr, sizeof(struct wi_80211_hdr));
 	resp_hdr->frame_ctl = htole16(WI_FTYPE_MGMT | WI_STYPE_MGMT_ASRESP);
-	pkt = sc->wi_txbuf + sizeof(struct wi_80211_hdr);
+	pkt = (caddr_t)&sc->wi_txbuf + sizeof(struct wi_80211_hdr);
 
 	bcopy(rxfrm->wi_addr2, resp_hdr->addr1, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
-	bcopy(sc->arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr2, ETHER_ADDR_LEN);
+	bcopy(sc->sc_arpcom.ac_enaddr, resp_hdr->addr3, ETHER_ADDR_LEN);
 
 	put_hword(&pkt, capinfo);
 	put_hword(&pkt, status);
 	put_hword(&pkt, asid);
 	rates_len = put_rates(&pkt, sc->wi_supprates);
 
-	wi_mgmt_xmit(sc, sc->wi_txbuf,
+	wi_mgmt_xmit(sc, (caddr_t)&sc->wi_txbuf,
 	    8 + rates_len + sizeof(struct wi_80211_hdr));
 }
 
@@ -746,9 +816,9 @@ wihap_deauth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 
 	sta = wihap_sta_find(whi, rxfrm->wi_addr2);
 	if (sta == NULL) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_deauth_req: unknown station: 6D\n",
-			    rxfrm->wi_addr2, ":");
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_deauth_req: unknown station: %s\n",
+			    ether_sprintf(rxfrm->wi_addr2));
 	}
 	else
 		wihap_sta_delete(sta);
@@ -775,9 +845,9 @@ wihap_disassoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 
 	sta = wihap_sta_find(whi, rxfrm->wi_addr2);
 	if (sta == NULL) {
-		if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
-			printf("wihap_disassoc_req: unknown station: 6D\n",
-			    rxfrm->wi_addr2, ":");
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_disassoc_req: unknown station: %s\n",
+			    ether_sprintf(rxfrm->wi_addr2));
 	}
 	else if (!(sta->flags & WI_SIFLAGS_AUTHEN)) {
 		/*
@@ -865,7 +935,7 @@ wihap_mgmt_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 	caddr_t	pkt;
 	int	s, len;
 
-	if (sc->arpcom.ac_if.if_flags & IFF_DEBUG)
+	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 		wihap_debug_frame_type(rxfrm);
 
 	pkt = mtod(m, caddr_t) + WI_802_11_OFFSET_RAW;
@@ -925,10 +995,10 @@ wihap_sta_is_assoc(struct wihap_info *whi, u_int8_t addr[])
 	if (sta != NULL && (sta->flags & WI_SIFLAGS_ASSOC)) {
 		/* Keep it active. */
 		timeout_add(&sta->tmo, hz * whi->inactivity_time);
-		return(1);
+		return (1);
 	}
 
-	return(0);
+	return (0);
 }
 
 /* wihap_check_tx()
@@ -945,7 +1015,7 @@ wihap_check_tx(struct wihap_info *whi, u_int8_t addr[], u_int8_t *txrate)
 
 	if (addr[0] & 0x01) {
 		*txrate = 0; /* XXX: multicast rate? */
-		return(1);
+		return (1);
 	}
 
 	s = splsoftclock();
@@ -955,11 +1025,11 @@ wihap_check_tx(struct wihap_info *whi, u_int8_t addr[], u_int8_t *txrate)
 		timeout_add(&sta->tmo, hz * whi->inactivity_time);
 		*txrate = txratetable[sta->tx_curr_rate];
 		splx(s);
-		return(1);
+		return (1);
 	}
 	splx(s);
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -975,7 +1045,7 @@ wihap_check_tx(struct wihap_info *whi, u_int8_t addr[], u_int8_t *txrate)
 int
 wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 {
-	struct ifnet		*ifp = &sc->arpcom.ac_if;
+	struct ifnet		*ifp = &sc->sc_arpcom.ac_if;
 	struct wihap_info	*whi = &sc->wi_hostap_info;
 	struct wihap_sta_info	*sta;
 	int			mcast, s;
@@ -986,16 +1056,16 @@ wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 			printf("wihap_data_input: no TODS src=%s\n",
 			    ether_sprintf(rxfrm->wi_addr2));
 		m_freem(m);
-		return(1);
+		return (1);
 	}
 
 	/* Check BSSID. (Is this necessary?) */
-	if (!addr_cmp(rxfrm->wi_addr1, sc->arpcom.ac_enaddr)) {
+	if (!addr_cmp(rxfrm->wi_addr1, sc->sc_arpcom.ac_enaddr)) {
 		if (ifp->if_flags & IFF_DEBUG)
 			printf("wihap_data_input: incorrect bss: %s\n",
 			    ether_sprintf(rxfrm->wi_addr1));
 		m_freem(m);
-		return(1);
+		return (1);
 	}
 
 	s = splsoftclock();
@@ -1008,9 +1078,11 @@ wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 		if (ifp->if_flags & IFF_DEBUG)
 			printf("wihap_data_input: dropping unassoc src %s\n",
 			    ether_sprintf(rxfrm->wi_addr2));
+		wihap_sta_disassoc(sc, rxfrm->wi_addr2,
+		    IEEE80211_REASON_ASSOC_LEAVE);
 		splx(s);
 		m_freem(m);
-		return(1);
+		return (1);
 	}
 
 	timeout_add(&sta->tmo, hz * whi->inactivity_time);
@@ -1027,7 +1099,7 @@ wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 		if (mcast) {
 			m = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
 			if (m == NULL)
-				return(0);
+				return (0);
 			m->m_flags |= M_MCAST; /* XXX */
 		}
 
@@ -1067,7 +1139,7 @@ wihap_ioctl(struct wi_softc *sc, u_long command, caddr_t data)
 	struct hostap_sta	stabuf;
 	int			s, error = 0, n, flag;
 
-	if (!(sc->arpcom.ac_if.if_flags & IFF_RUNNING))
+	if (!(sc->sc_arpcom.ac_if.if_flags & IFF_RUNNING))
 		return ENODEV;
 
 	switch (command) {
@@ -1083,7 +1155,7 @@ wihap_ioctl(struct wi_softc *sc, u_long command, caddr_t data)
 		else {
 			/* Disassociate station. */
 			if (sta->flags & WI_SIFLAGS_ASSOC)
-				wihap_sta_disassoc(sc, sta,
+				wihap_sta_disassoc(sc, sta->addr,
 				    IEEE80211_REASON_ASSOC_LEAVE);
 			/* Deauth station. */
 			if (sta->flags & WI_SIFLAGS_AUTHEN)
@@ -1189,5 +1261,5 @@ wihap_ioctl(struct wi_softc *sc, u_long command, caddr_t data)
 		error = EINVAL;
 	}
 
-	return(error);
+	return (error);
 }

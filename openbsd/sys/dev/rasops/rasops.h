@@ -1,4 +1,4 @@
-/*	$OpenBSD: rasops.h,v 1.2 2002/03/14 01:27:02 millert Exp $ */
+/*	$OpenBSD: rasops.h,v 1.5 2002/08/12 02:31:01 jason Exp $ */
 /* 	$NetBSD: rasops.h,v 1.13 2000/06/13 13:36:54 ad Exp $ */
 
 /*-
@@ -39,6 +39,10 @@
 
 #ifndef _RASOPS_H_
 #define _RASOPS_H_ 1
+
+#ifdef	SMALL_KERNEL
+#define	RASOPS_SMALL
+#endif
 
 struct wsdisplay_font;
 
@@ -105,6 +109,7 @@ struct rasops_info {
 
 	/* Callbacks so we can share some code */
 	void	(*ri_do_cursor)(struct rasops_info *);
+	void	(*ri_updatecursor)(struct rasops_info *);
 };
 
 #define DELTA(p, d, cast) ((p) = (cast)((caddr_t)(p) + (d)))
@@ -124,7 +129,7 @@ struct rasops_info {
  */
 
 /*
- * Per-depth initalization functions. These should not be called outside
+ * Per-depth initialization functions. These should not be called outside
  * the rasops code.
  */
 void	rasops1_init(struct rasops_info *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: va-ppc.h,v 1.6 2001/03/29 18:52:19 drahn Exp $	*/
+/*	$OpenBSD: va-ppc.h,v 1.8 2002/09/15 09:01:59 deraadt Exp $	*/
 /* GNU C varargs support for the PowerPC with either the V.4 or Windows NT calling sequences */
 
 #ifndef _WIN32

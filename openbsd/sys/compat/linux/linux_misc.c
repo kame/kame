@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.42 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.45 2002/08/23 15:39:31 art Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*
@@ -1021,7 +1021,6 @@ linux_sys_getdents(p, v, retval)
 	args.resid = nbytes;
 	args.outp = (caddr_t)SCARG(uap, dirent);
 
-	FREF(fp);
 	if ((error = readdir_with_callback(fp, &fp->f_offset, nbytes,
 	    linux_readdir_callback, &args)) != 0)
 		goto exit;
@@ -1483,7 +1482,40 @@ linux_sys_stime(p, v, retval)
 	atv.tv_sec = tt;
 	atv.tv_usec = 0;
 
-	settime(&atv);
+	error = settime(&atv);
 
-	return 0;
+	return (error);
+}
+
+int
+linux_sys_getpid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+
+	*retval = p->p_pid;
+	return (0);
+}
+
+int
+linux_sys_getuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+
+	*retval = p->p_cred->p_ruid;
+	return (0);
+}
+
+int
+linux_sys_getgid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+
+	*retval = p->p_cred->p_rgid;
+	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: auich.c,v 1.26 2002/03/24 20:41:19 mickey Exp $	*/
+/*	$OpenBSD: auich.c,v 1.28 2002/09/17 19:10:30 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000,2001 Michael Shalayeff
@@ -207,6 +207,7 @@ static const struct auich_devtype {
 	{ PCI_PRODUCT_INTEL_82801AB_ACA, 0, "ICH0" },
 	{ PCI_PRODUCT_INTEL_82801BA_ACA, 0, "ICH2" },
 	{ PCI_PRODUCT_INTEL_82801CA_ACA, 0, "ICH3" },
+	{ PCI_PRODUCT_INTEL_82801DB_ACA, 0, "ICH4" },
 	{ PCI_PRODUCT_INTEL_82440MX_ACA, 0, "440MX" },
 };
 
@@ -345,7 +346,7 @@ auich_attach(parent, self, aux)
 	sprintf(sc->sc_audev.version, "0x%02x", PCI_REVISION(pa->pa_class));
 	strcpy(sc->sc_audev.config, sc->sc_dev.dv_xname);
 
-	printf(": %s %s\n", intrstr, sc->sc_audev.name);
+	printf(": %s, %s\n", intrstr, sc->sc_audev.name);
 
 	/* allocate dma lists */
 #define	a(a)	(void *)(((u_long)(a) + sizeof(*(a)) - 1) & ~(sizeof(*(a))-1))

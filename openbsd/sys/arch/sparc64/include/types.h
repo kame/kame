@@ -1,4 +1,4 @@
-/*	$OpenBSD: types.h,v 1.2 2002/02/18 16:19:48 jason Exp $	*/
+/*	$OpenBSD: types.h,v 1.4 2002/07/23 14:19:46 art Exp $	*/
 /*	$NetBSD: types.h,v 1.17 2001/05/12 22:42:07 kleink Exp $ */
 
 /*
@@ -60,31 +60,18 @@ typedef struct label_t {
 /* The following are unsigned to prevent annoying sign extended pointers. */
 typedef unsigned long int	register_t;
 typedef unsigned int		register32_t;
-#ifdef __arch64__
 typedef unsigned long int	register64_t;
-#else
-/* LONGLONG */
-typedef unsigned long long int	register64_t;
-#endif
 
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 typedef unsigned long int	vaddr_t;
 typedef vaddr_t			vsize_t;
-#ifdef SUN4U
-#ifdef __arch64__
 typedef unsigned long int	paddr_t;
-#else
-/* LONGLONG */
-typedef unsigned long long int	paddr_t;
-#endif /* __arch64__ */
-#else
-typedef unsigned long int	paddr_t;
-#endif /* SUN4U */
 typedef paddr_t			psize_t;
 #endif
 
 #define	__HAVE_NWSCONS
 #define	__HAVE_DEVICE_REGISTER
 #define	__HAVE_GENERIC_SOFT_INTERRUPTS
+#define __HAVE_SPLASSERT
 
 #endif	/* _MACHTYPES_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofw_machdep.c,v 1.8 2002/03/14 01:26:36 millert Exp $	*/
+/*	$OpenBSD: ofw_machdep.c,v 1.16 2002/09/15 09:01:58 deraadt Exp $	*/
 /*	$NetBSD: ofw_machdep.c,v 1.1 1996/09/30 16:34:50 ws Exp $	*/
 
 /*
@@ -50,8 +50,11 @@
 
 #include <dev/ofw/openfirm.h>
 
+#include <macppc/macppc/ofw_machdep.h>
+
 #include <ukbd.h>
 #include <akbd.h>
+#include <zstty.h>
 #include <dev/usb/ukbdvar.h>
 #include <macppc/dev/akbdvar.h>
 
@@ -120,6 +123,9 @@ ofw_vmon()
 	fwcall = &fwentry;
 }
 
+int OF_stdout;
+int OF_stdin;
+
 /* code to save and create the necessary mappings for BSD to handle
  * the vm-setup for OpenFirmware
  */
@@ -130,10 +136,6 @@ static struct {
 	vm_offset_t pa;
 	int mode;
 } ofw_mapping[256];
-
-int OF_stdout;
-int OF_stdin;
-
 int
 save_ofw_mapping()
 {
@@ -143,13 +145,13 @@ save_ofw_mapping()
 	if ((chosen = OF_finddevice("/chosen")) == -1) {
 		return 0;
 	}
-	if (OF_getprop(chosen, "stdin", &stdin, sizeof stdin) != sizeof stdin)
-	{
+
+	if (OF_getprop(chosen, "stdin", &stdin, sizeof stdin) != sizeof stdin) {
 		return 0;
 	}
 	OF_stdin = stdin;
-	if (OF_getprop(chosen, "stdout", &stdout, sizeof stdout) != sizeof stdout)
-	{
+	if (OF_getprop(chosen, "stdout", &stdout, sizeof stdout)
+	    != sizeof stdout) {
 		return 0;
 	}
 	if (stdout == 0) {
@@ -163,8 +165,9 @@ save_ofw_mapping()
 	OF_getprop(chosen, "mmu", &mmui, 4);
 	mmu = OF_instance_to_package(mmui);
 	bzero(ofw_mapping, sizeof(ofw_mapping));
-	N_mapping =
-	    OF_getprop(mmu, "translations", ofw_mapping, sizeof(ofw_mapping));
+
+	N_mapping = OF_getprop(mmu, "translations", ofw_mapping,
+	    sizeof(ofw_mapping));
 	N_mapping /= sizeof(ofw_mapping[0]);
 
 	fw = &ofw_firmware;
@@ -208,6 +211,7 @@ void ofw_do_pending_int(void);
 extern int system_type;
 
 void ofw_intr_init(void);
+
 void
 ofrootfound()
 {
@@ -224,6 +228,7 @@ ofrootfound()
 		ofw_intr_init();
 	}
 }
+
 void
 ofw_intr_establish()
 {
@@ -232,6 +237,7 @@ ofw_intr_establish()
 		ofw_intr_init();
 	}
 }
+
 void
 ofw_intr_init()
 {
@@ -262,12 +268,13 @@ ofw_intr_init()
 	imask[IPL_HIGH] = 0xffffffff;
 
 }
+
 void
 ofw_do_pending_int()
 {
 	int pcpl;
 	int emsr, dmsr;
-static int processing;
+	static int processing;
 
 	if(processing)
 		return;
@@ -332,6 +339,8 @@ bus_space_handle_t cons_display_ctl_h;
 int cons_height, cons_width, cons_linebytes, cons_depth;
 int cons_display_ofh;
 u_int32_t cons_addr;
+int cons_brightness;
+int cons_backlight_available;
 
 #include "vgafb_pci.h"
 
@@ -361,14 +370,17 @@ ofwconprobe()
 		return;
 	}
 	if (strcmp(type, "serial") == 0) {
-		/* serial console not supported, forcing to screen for now */
-		OF_stdout = OF_open("screen");
-		OF_stdin = OF_open("keyboard");
-
-		/* cross fingers that this works. */
-		of_display_console();
+#if NZSTTY > 0
+		/* zscnprobe/zscninit do all the required initialization */
 		return;
+#endif
 	}
+
+	OF_stdout = OF_open("screen");
+	OF_stdin = OF_open("keyboard");
+
+	/* cross fingers that this works. */
+	of_display_console();
 
 	return;
 }
@@ -433,7 +445,6 @@ ofw_find_keyboard()
 	int stdin_node;
 	char iname[32];
 	int len;
-	int node;
 
 	stdin_node = OF_instance_to_package(OF_stdin);
 	len = OF_getprop(stdin_node, "name", iname, 20);
@@ -444,8 +455,7 @@ ofw_find_keyboard()
 	 * detection walk the OFW tree to find keyboards and what type.
 	 */
 
-	node = OF_peer(0);
-	ofw_recurse_keyboard(node);
+	ofw_recurse_keyboard(OF_peer(0));
 
 	if (ofw_have_kbd == 0) {
 		printf("no keyboard found, hoping USB will be present\n");
@@ -482,7 +492,9 @@ of_display_console()
 	char name[32];
 	int len;
 	int stdout_node;
+	int display_node;
 	int err;
+	int backlight_control[2];
 	u_int32_t memtag, iotag;
 	struct ppc_pci_chipset pa;
 	struct {
@@ -521,20 +533,25 @@ of_display_console()
 
 	ofw_find_keyboard();
 
+	display_node = stdout_node;
 	len = OF_getprop(stdout_node, "assigned-addresses", addr, sizeof(addr));
 	if (len == -1) {
-		int node;
-		node = OF_parent(stdout_node);
-		len = OF_getprop(node, "name", name, 20);
+		display_node = OF_parent(stdout_node);
+		len = OF_getprop(display_node, "name", name, 20);
 		name[len] = 0;
 
 		printf("using parent %s:", name);
-		len = OF_getprop(node, "assigned-addresses",
+		len = OF_getprop(display_node, "assigned-addresses",
 			addr, sizeof(addr));
 		if (len < sizeof(addr[0])) {
 			panic(": no address\n");
 		}
 	}
+	len = OF_getprop(display_node, "backlight-control",
+	    backlight_control, sizeof(backlight_control));
+	if (len > 0)
+		cons_backlight_available = 1;
+
 	memtag = ofw_make_tag(NULL, pcibus(addr[0].phys_hi),
 		pcidev(addr[0].phys_hi),
 		pcifunc(addr[0].phys_hi));
@@ -547,8 +564,8 @@ of_display_console()
 	printf(": consaddr %x, ", cons_addr);
 	printf(": ioaddr %x, size %x", addr[1].phys_lo, addr[1].size_lo);
 	printf(": memtag %x, iotag %x", memtag, iotag);
-	printf(": cons_width %d cons_linebytes %d cons_height %d\n",
-		cons_width, cons_linebytes, cons_height);
+	printf(": width %d linebytes %d height %d depth %d\n",
+		cons_width, cons_linebytes, cons_height, cons_depth);
 #endif
 
 	{
@@ -579,5 +596,95 @@ of_display_console()
 		}
 #endif
 	}
+
+	of_setbrightness(DEFAULT_BRIGHTNESS);
 #endif
+}
+
+void
+of_setbrightness(brightness)
+	int brightness;
+{
+
+#if NVGAFB_PCI > 0
+	if (cons_backlight_available == 0)
+		return;
+
+	if (brightness < MIN_BRIGHTNESS)
+		brightness = MIN_BRIGHTNESS;
+	else if (brightness > MAX_BRIGHTNESS)
+		brightness = MAX_BRIGHTNESS;
+
+	cons_brightness = brightness;
+
+	/* The OF method is called "set-contrast" but affects brightness. Don't ask. */
+	OF_call_method_1("set-contrast", cons_display_ofh, 1, cons_brightness);
+
+	/* XXX this routine should also save the brightness settings in the nvram */
+#endif
+}
+
+#include <dev/cons.h>
+
+cons_decl(ofw);
+
+/*   
+ * Console support functions
+ */
+void
+ofwcnprobe(cd)
+        struct consdev *cd;
+{
+	cd->cn_pri = CN_DEAD;
+}
+
+void
+ofwcninit(cd)
+        struct consdev *cd;
+{
+}
+void
+ofwcnputc(dev, c)
+	dev_t dev;
+	int c;
+{
+	char ch = c;
+ 
+	OF_write(OF_stdout, &ch, 1);
+}
+int
+ofwcngetc(dev)
+	dev_t dev;
+{
+        unsigned char ch = '\0';
+        int l;
+
+        while ((l = OF_read(OF_stdin, &ch, 1)) != 1)
+                if (l != -2 && l != 0)
+                        return -1;
+        return ch;
+}
+
+void
+ofwcnpollc(dev, on)
+	dev_t dev;
+	int on;
+{
+}
+
+struct consdev consdev_ofw = {
+        ofwcnprobe,
+        ofwcninit,
+        ofwcngetc,
+        ofwcnputc,
+        ofwcnpollc,
+        NULL,
+};
+
+void
+ofwconsinit()
+{
+	struct consdev *cp;
+	cp = &consdev_ofw;
+	cn_tab = cp;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnode.h,v 1.49 2002/03/14 03:16:12 millert Exp $	*/
+/*	$OpenBSD: vnode.h,v 1.51 2002/07/03 21:19:08 miod Exp $	*/
 /*	$NetBSD: vnode.h,v 1.38 1996/02/29 20:59:05 cgd Exp $	*/
 
 /*
@@ -200,6 +200,14 @@ struct vattr {
  */
 #define	VNOVAL	(-1)
 
+/*
+ * Structure returned by the KERN_VNODE sysctl
+ */
+struct e_vnode {
+	struct vnode *vptr;
+	struct vnode vnode;
+};	
+
 #ifdef _KERNEL
 /*
  * Convert between vnode types and inode formats (since POSIX.1
@@ -328,7 +336,7 @@ extern struct vnodeop_desc *vnodeop_descs[];
 /*
  * Interlock for scanning list of vnodes attached to a mountpoint
  */
-struct simplelock mntvnode_slock;
+extern struct simplelock mntvnode_slock;
 
 /*
  * This macro is very helpful in defining those offsets in the vdesc struct.

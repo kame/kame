@@ -1,4 +1,4 @@
-/*      $OpenBSD: atapiscsi.c,v 1.58 2002/03/16 17:13:22 csapuntz Exp $     */
+/*      $OpenBSD: atapiscsi.c,v 1.61 2002/05/21 08:42:03 espie Exp $     */
 
 /*
  * This code is derived from code with the copyright below.
@@ -150,11 +150,12 @@ int	atapiscsi_match(struct device *, void *, void *);
 void	atapiscsi_attach(struct device *, struct device *, void *);
 int     atapi_to_scsi_sense(struct scsi_xfer *, u_int8_t);
 
+enum atapi_state { as_none, as_data, as_completed };
+
 struct atapiscsi_softc {
 	struct device  sc_dev;
 	struct  scsi_link  sc_adapterlink;
 	struct channel_softc *chp;
-	enum atapi_state { as_none, as_data, as_completed };
 	enum atapi_state protocol_phase;
 
 	int drive;
@@ -875,8 +876,8 @@ wdc_atapi_intr_command(chp, xfer, timeout, ret)
 		bcopy(sc_xfer->cmd, cmd, sc_xfer->cmdlen);
 
 	WDC_LOG_ATAPI_CMD(chp, xfer->drive, xfer->c_flags,
-	    sc_xfer->cmdlen, sc_xfer->cmd);
-
+	    cmdlen, cmd);
+	
 	for (i = 0; i < 12; i++)
 		WDCDEBUG_PRINT(("%02x ", cmd[i]), DEBUG_INTR);
 	WDCDEBUG_PRINT((": PHASE_CMDOUT\n"), DEBUG_INTR);
@@ -1355,6 +1356,12 @@ wdc_atapi_ctrl(chp, xfer, timeout, ret)
 
 			break;
 
+		case ATAPI_PIOMODE_STATE:
+			errstring = "Post-Identify";
+			if (!(chp->ch_status & (WDCS_BSY | WDCS_DRQ)))
+				trigger_timeout = 0;
+			break;
+
 		case ATAPI_PIOMODE_WAIT_STATE:
 			errstring = "PIOMODE";
 			if (chp->ch_status & (WDCS_BSY | WDCS_DRQ))
@@ -1431,8 +1438,13 @@ wdc_atapi_ctrl(chp, xfer, timeout, ret)
 		}
 
 		drvp->state = ATAPI_PIOMODE_STATE;
+		/* 
+		 * Note, we can't go directly to set PIO mode
+		 * because the drive is free to assert BSY
+		 * after the transfer
+		 */
+		break;
 	}
-		/* fall through */
 
 	case ATAPI_PIOMODE_STATE:
 piomode:

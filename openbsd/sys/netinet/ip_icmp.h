@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.h,v 1.16 2002/03/14 01:27:11 millert Exp $	*/
+/*	$OpenBSD: ip_icmp.h,v 1.18 2002/06/09 16:26:10 itojun Exp $	*/
 /*	$NetBSD: ip_icmp.h,v 1.10 1996/02/13 23:42:28 christos Exp $	*/
 
 /*
@@ -77,7 +77,7 @@ struct icmp {
 
 		/* ICMP_UNREACH_NEEDFRAG -- Path MTU Discovery (RFC1191) */
 		struct ih_pmtu {
-			  n_short ipm_void;    
+			  n_short ipm_void;
 			  n_short ipm_nextmtu;
 		} ih_pmtu;
 
@@ -209,6 +209,8 @@ struct icmp {
 	(type) == ICMP_MASKREQ || (type) == ICMP_MASKREPLY)
 
 #ifdef _KERNEL
+struct mbuf *
+	icmp_do_error(struct mbuf *, int, int, n_long, struct ifnet *);
 void	icmp_error(struct mbuf *, int, int, n_long, struct ifnet *);
 void	icmp_input(struct mbuf *, ...);
 void	icmp_init(void);

@@ -1,5 +1,5 @@
-/*	$OpenBSD: rasops2.c,v 1.2 2002/03/14 01:27:02 millert Exp $ */
-/* 	$NetBSD: rasops2.c,v 1.5 2000/04/12 14:22:29 pk Exp $	*/
+/*	$OpenBSD: rasops2.c,v 1.5 2002/07/27 22:17:49 miod Exp $	*/
+/*	$NetBSD: rasops2.c,v 1.5 2000/04/12 14:22:29 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,11 +37,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_rasops.h"
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rasops2.c,v 1.5 2000/04/12 14:22:29 pk Exp $");
-
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -52,16 +47,15 @@ __KERNEL_RCSID(0, "$NetBSD: rasops2.c,v 1.5 2000/04/12 14:22:29 pk Exp $");
 #include <dev/rasops/rasops.h>
 #include <dev/rasops/rasops_masks.h>
 
-static void	rasops2_copycols(void *, int, int, int, int);
-static void	rasops2_erasecols(void *, int, int, int, long);
-static void	rasops2_do_cursor(struct rasops_info *);
-static void	rasops2_putchar(void *, int, int col, u_int, long);
+void	rasops2_copycols(void *, int, int, int, int);
+void	rasops2_erasecols(void *, int, int, int, long);
+void	rasops2_do_cursor(struct rasops_info *);
+void	rasops2_putchar(void *, int, int col, u_int, long);
 #ifndef RASOPS_SMALL
-static void	rasops2_putchar8(void *, int, int col, u_int, long);
-static void	rasops2_putchar12(void *, int, int col, u_int, long);
-static void	rasops2_putchar16(void *, int, int col, u_int, long);
-static void	rasops2_makestamp(struct rasops_info *, long);
-#endif
+void	rasops2_putchar8(void *, int, int col, u_int, long);
+void	rasops2_putchar12(void *, int, int col, u_int, long);
+void	rasops2_putchar16(void *, int, int col, u_int, long);
+void	rasops2_makestamp(struct rasops_info *, long);
 
 /*
  * 4x1 stamp for optimized character blitting
@@ -69,6 +63,7 @@ static void	rasops2_makestamp(struct rasops_info *, long);
 static int8_t	stamp[16];
 static long	stamp_attr;
 static int	stamp_mutex;	/* XXX see note in README */
+#endif
 
 /*
  * Initialize rasops_info struct for this colordepth.
@@ -107,7 +102,7 @@ rasops2_init(ri)
 /*
  * Paint a single character. This is the generic version, this is ugly.
  */
-static void
+void
 rasops2_putchar(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -222,7 +217,7 @@ rasops2_putchar(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is the generic version.
  */
-static void
+void
 rasops2_putchar(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -237,7 +232,7 @@ rasops2_putchar(cookie, row, col, uc, attr)
 /*
  * Recompute the blitting stamp.
  */
-static void
+void
 rasops2_makestamp(ri, attr)
 	struct rasops_info *ri;
 	long attr;
@@ -259,7 +254,7 @@ rasops2_makestamp(ri, attr)
 /*
  * Put a single character. This is for 8-pixel wide fonts.
  */
-static void
+void
 rasops2_putchar8(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -329,7 +324,7 @@ rasops2_putchar8(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is for 12-pixel wide fonts.
  */
-static void
+void
 rasops2_putchar12(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;
@@ -402,7 +397,7 @@ rasops2_putchar12(cookie, row, col, uc, attr)
 /*
  * Put a single character. This is for 16-pixel wide fonts.
  */
-static void
+void
 rasops2_putchar16(cookie, row, col, uc, attr)
 	void *cookie;
 	int row, col;

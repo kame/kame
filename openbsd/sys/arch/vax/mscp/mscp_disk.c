@@ -1,4 +1,4 @@
-/*	$OpenBSD: mscp_disk.c,v 1.10 2002/03/14 01:26:48 millert Exp $	*/
+/*	$OpenBSD: mscp_disk.c,v 1.12 2002/06/12 12:29:15 hugh Exp $	*/
 /*	$NetBSD: mscp_disk.c,v 1.30 2001/11/13 07:38:28 lukem Exp $	*/
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
@@ -292,6 +292,8 @@ rastrategy(bp)
 {
 	int unit;
 	struct ra_softc *ra;
+	int s;
+
 	/*
 	 * Make sure this is a reasonable drive to use.
 	 */
@@ -332,7 +334,9 @@ rastrategy(bp)
 	return;
 
 done:
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 
 int
@@ -500,28 +504,6 @@ rasize(dev)
 
 	return ra->ra_disk.dk_label->d_partitions[DISKPART(dev)].p_size *
 	    (ra->ra_disk.dk_label->d_secsize / DEV_BSIZE);
-}
-
-int ra_getdev(adaptor, controller, unit, uname)
-    int adaptor, controller, unit;
-    char **uname;
-{
-    struct mscp_softc *mi;
-    struct ra_softc *ra;
-    int i;
-
-    for (i = 0; i < ra_cd.cd_ndevs; i++) {
-        if ((ra = ra_cd.cd_devs[i]) == 0)
-            continue;
-
-        mi = (void *)ra->ra_dev.dv_parent;
-        if (mi->mi_ctlrnr == controller && mi->mi_adapnr == adaptor &&
-            ra->ra_hwunit == unit) {
-            *uname = ra->ra_dev.dv_xname;
-            return i;
-        }
-    }
-    return -1;
 }
 
 #endif /* NRA */
@@ -699,6 +681,7 @@ rxstrategy(bp)
 {
 	int unit;
 	struct rx_softc *rx;
+	int s;
 
 	/*
 	 * Make sure this is a reasonable drive to use.
@@ -734,7 +717,9 @@ rxstrategy(bp)
 	return;
 
 done:
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 
 int
@@ -869,8 +854,11 @@ rriodone(usc, bp)
 	struct device *usc;
 	struct buf *bp;
 {
+	int s;
 
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 
 /*

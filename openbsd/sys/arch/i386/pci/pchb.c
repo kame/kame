@@ -1,4 +1,4 @@
-/*	$OpenBSD: pchb.c,v 1.29 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: pchb.c,v 1.37 2002/09/23 04:11:31 nate Exp $	*/
 /*	$NetBSD: pchb.c,v 1.6 1997/06/06 23:29:16 thorpej Exp $	*/
 
 /*
@@ -144,6 +144,14 @@ pchbmatch(parent, match, aux)
 	return (0);
 }
 
+/*
+ * The variable below is a bit vector representing the Serverworks
+ * busses that have already been attached.  Bit 0 represents bus 0 and
+ * so forth.  The initial value is 1 because we never actually want to
+ * attach bus 0 since bus 0 is the mainbus.
+ */
+u_int32_t rcc_bus_visited = 1;
+
 void
 pchbattach(parent, self, aux)
 	struct device *parent, *self;
@@ -165,11 +173,29 @@ pchbattach(parent, self, aux)
 	 */
 
 	switch (PCI_VENDOR(pa->pa_id)) {
+#ifdef PCIAGP
+	case PCI_VENDOR_ALI:
+	case PCI_VENDOR_SIS:
+	case PCI_VENDOR_VIATECH:
+		pciagp_set_pchb(pa);
+		break;
+	case PCI_VENDOR_AMD:
+		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_AMD_SC751_SC:
+		case PCI_PRODUCT_AMD_762_PCHB:
+			pciagp_set_pchb(pa);
+			break;
+		}
+		break;
+#endif
 	case PCI_VENDOR_RCC:
 		bdnum = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x44);
-
-		if (bdnum == 0)
+		if (bdnum >= (sizeof(rcc_bus_visited) * 8) ||
+		    (rcc_bus_visited & (1 << bdnum)))
 			break;
+
+		rcc_bus_visited |= 1 << bdnum;
+
 		/*
 		 * This host bridge has a second PCI bus.
 		 * Configure it.
@@ -185,6 +211,9 @@ pchbattach(parent, self, aux)
 		config_found(self, &pba, pchb_print);
 		break;
 	case PCI_VENDOR_INTEL:
+#ifdef PCIAGP
+		pciagp_set_pchb(pa);
+#endif
 		switch (PCI_PRODUCT(pa->pa_id)) {
 		case PCI_PRODUCT_INTEL_82443BX_AGP:     /* 82443BX AGP (PAC) */
 		case PCI_PRODUCT_INTEL_82443BX_NOAGP:   /* 82443BX Host-PCI (no AGP) */
@@ -276,13 +305,13 @@ pchbattach(parent, self, aux)
 				printf(": disabled CPU-PCI write posting");
 			}
 			break;
-		case PCI_PRODUCT_INTEL_82810E_MCH:
-		case PCI_PRODUCT_INTEL_82810_DC100_MCH:
 		case PCI_PRODUCT_INTEL_82810_MCH:
+		case PCI_PRODUCT_INTEL_82810_DC100_MCH:
+		case PCI_PRODUCT_INTEL_82810E_MCH:
 		case PCI_PRODUCT_INTEL_82815_DC100_HUB:
-		case PCI_PRODUCT_INTEL_82815_NOAGP_HUB:
 		case PCI_PRODUCT_INTEL_82815_NOGRAPH_HUB:
 		case PCI_PRODUCT_INTEL_82815_FULL_HUB:
+		case PCI_PRODUCT_INTEL_82815_NOAGP_HUB:
 		case PCI_PRODUCT_INTEL_82820_MCH:
 		case PCI_PRODUCT_INTEL_82840_HB:
 		case PCI_PRODUCT_INTEL_82850_HB:

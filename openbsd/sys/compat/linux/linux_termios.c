@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_termios.c,v 1.12 2002/03/14 01:26:50 millert Exp $	*/
+/*	$OpenBSD: linux_termios.c,v 1.14 2002/05/07 20:31:17 jasoni Exp $	*/
 /*	$NetBSD: linux_termios.c,v 1.3 1996/04/05 00:01:54 christos Exp $	*/
 
 /*
@@ -63,13 +63,13 @@ static int linux_spmasks[] = {
 };
 
 static void linux_termio_to_bsd_termios(struct linux_termio *,
-	struct termios *);
+    struct termios *);
 static void bsd_termios_to_linux_termio(struct termios *,
-	struct linux_termio *);
+    struct linux_termio *);
 static void linux_termios_to_bsd_termios(struct linux_termios *,
-	struct termios *);
+    struct termios *);
 static void bsd_termios_to_linux_termios(struct termios *,
-	struct linux_termios *);
+    struct linux_termios *);
 
 /*
  * Deal with termio ioctl cruft. This doesn't look very good..
@@ -457,6 +457,7 @@ linux_ioctl_termios(p, v, retval)
 	caddr_t sg;
 	int idat;
 	struct sys_ioctl_args ia;
+	char tioclinux;
 	int error = 0;
 
 	fdp = p->p_fd;
@@ -474,7 +475,8 @@ linux_ioctl_termios(p, v, retval)
                 
 	switch (com) {
 	case LINUX_TCGETS:
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts,
+		    p);
 		if (error)
 			goto out;
 		bsd_termios_to_linux_termios(&tmpbts, &tmplts);
@@ -487,7 +489,8 @@ linux_ioctl_termios(p, v, retval)
 		 * First fill in all fields, so that we keep the current
 		 * values for fields that Linux doesn't know about.
 		 */
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts,
+		    p);
 		if (error)
 			goto out;
 		error = copyin(SCARG(uap, data), &tmplts, sizeof tmplts);
@@ -508,7 +511,8 @@ linux_ioctl_termios(p, v, retval)
 		error = (*fp->f_ops->fo_ioctl)(fp, com, (caddr_t)&tmpbts, p);
 		goto out;
 	case LINUX_TCGETA:
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts,
+		    p);
 		if (error)
 			goto out;
 		bsd_termios_to_linux_termio(&tmpbts, &tmplt);
@@ -521,7 +525,8 @@ linux_ioctl_termios(p, v, retval)
 		 * First fill in all fields, so that we keep the current
 		 * values for fields that Linux doesn't know about.
 		 */
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts,
+		    p);
 		if (error)
 			goto out;
 		error = copyin(SCARG(uap, data), &tmplt, sizeof tmplt);
@@ -589,6 +594,30 @@ linux_ioctl_termios(p, v, retval)
 		}
 		error = (*fp->f_ops->fo_ioctl)(fp, TIOCSETD, (caddr_t)&idat, p);
 		goto out;
+	case LINUX_TIOCLINUX:
+		error = copyin(SCARG(uap, data), &tioclinux, sizeof tioclinux);
+		if (error != 0)
+			goto out;
+		switch (tioclinux) {
+		case LINUX_TIOCLINUX_KERNMSG:
+			/*
+			 * XXX needed to not fail for some things. Could
+			 * try to use TIOCCONS, but the char argument
+			 * specifies the VT #, not an fd.
+			 */
+			goto out;
+		case LINUX_TIOCLINUX_COPY:
+		case LINUX_TIOCLINUX_PASTE:
+		case LINUX_TIOCLINUX_UNBLANK:
+		case LINUX_TIOCLINUX_LOADLUT:
+		case LINUX_TIOCLINUX_READSHIFT:
+		case LINUX_TIOCLINUX_READMOUSE:
+		case LINUX_TIOCLINUX_VESABLANK:
+		case LINUX_TIOCLINUX_CURCONS:	/* could use VT_GETACTIVE */
+			error = EINVAL;
+			goto out;
+		}
+		break;
 	case LINUX_TIOCGWINSZ:
 		SCARG(&ia, com) = TIOCGWINSZ;
 		break;

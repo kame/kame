@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.h,v 1.10 2002/01/30 23:58:03 jason Exp $	*/
+/*	$OpenBSD: conf.h,v 1.13 2002/07/10 22:21:30 mickey Exp $	*/
 /*	$NetBSD: conf.h,v 1.9 2001/03/26 12:33:26 lukem Exp $	*/
 
 /*-
@@ -41,12 +41,7 @@
 #define mmwrite mmrw
 cdev_decl(mm);
 
-cdev_decl(crypto);
-
-cdev_decl(ksyms);
-
 cdev_decl(openprom);
-
 
 /* open, close, ioctl */
 #define cdev_openprom_init(c,n) { \
@@ -112,14 +107,6 @@ cdev_decl(sabtty);
 cdev_decl(pcons);
 
 cdev_decl(com);
-
-cdev_decl(usb);
-cdev_decl(uhid);
-cdev_decl(ugen);
-cdev_decl(ulpt);
-cdev_decl(urio);
-cdev_decl(ucom);
-cdev_decl(uscanner);
 
 cdev_decl(mtty);
 cdev_decl(mbpp);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pio.h,v 1.7 2001/09/01 15:49:05 drahn Exp $ */
+/*	$OpenBSD: pio.h,v 1.9 2002/09/15 09:01:59 deraadt Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom, Opsycon AB and RTMX Inc, USA.

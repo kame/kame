@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.245 2002/03/28 18:23:07 mickey Exp $
+#	$OpenBSD: files,v 1.257 2002/09/03 16:30:54 mickey Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -15,7 +15,7 @@ define	ifmedia
 define	mii {[phy = -1]}
 define	midibus { }
 define	midisyn
-define	radio {}
+define	radiobus {}
 
 # audio device attributes
 define	mulaw
@@ -24,6 +24,8 @@ define	auconv
 # radio device attributes
 define tea5757
 define lm700x
+define tc921x
+define pt2254a
 
 # audio and midi devices, attaches to audio hardware driver
 device	audio
@@ -46,8 +48,10 @@ define	rasops32
 define	arc
 define	atm
 define	crypto
+define	systrace
 define	ether
 define	fddi
+define	ieee1394
 define	sppp
 define	token
 
@@ -100,12 +104,13 @@ file	dev/ic/wdc.c wdc_base
 
 # Adaptec 2[789]4X, 394X, aic7770 and aic78[5678]0 SCSI controllers
 device	ahc: scsi
-file	dev/ic/aic7xxx.c	ahc
-file	dev/ic/smc93cx6.c	ahc
+file	dev/ic/aic7xxx.c		ahc
+file	dev/ic/aic7xxx_openbsd.c	ahc
+file	dev/ic/smc93cx6.c		ahc
 
 # Adaptec AIC-6[23]60 SCSI controllers
 device	aic: scsi
-file	dev/ic/aic6360.c	aic
+file	dev/ic/aic6360.c	aic & (aic_isa | aic_pcmcia | aic_isapnp)
 
 # DPT EATA SCSI controllers
 device	dpt: scsi
@@ -280,6 +285,7 @@ define	eisabus { }			# EISA attachment
 define	pcibus {[bus = -1]}		# PCI attachment
 define	tcbus { }			# TurboChannel attachment
 define	usbus { }			# USB attachment
+define	fwbus {[idhi=-1],[idlo=-1]}	# IEEE 1394 attachment
 define	pcmciabus { [controller = -1], [socket = -1]}	# PCMCIA attachment
 define	cbbus {[slot = -1]}		# CardBus attachment
 define	pcmciaslot {[slot = -1]}	# PCMCIA slot itself
@@ -294,7 +300,24 @@ file	dev/usb/ohci.c			ohci	needs-flag
 
 # radio devices, attaches to radio hardware driver
 device	radio
-attach	radio at radio
+attach	radio at radiobus
+file dev/radio.c			radio	needs-flag
+
+#
+# IEEE 1212 routines
+define	ieee1212
+file	dev/std/ieee1212.c		ieee1212
+
+#
+# SBP2 routines for IEEE 1394
+#define	sbp2
+#file	dev/ieee1394/sbp2.c		sbp2
+
+# IEEE 1394 controllers
+# (These need to be here since it will have both PCI and CardBus attachments)
+#
+device	fwlynx: fwbus
+device	fwohci: fwbus
 
 # legitimate pseudo-devices
 pseudo-device vnd: disk
@@ -323,6 +346,7 @@ pseudo-device gre: ifnet
 pseudo-device crypto: ifnet
 
 pseudo-device sequencer
+pseudo-device systrace
 
 pseudo-device ksyms
 file	dev/ksyms.c	ksyms needs-flag
@@ -330,6 +354,10 @@ file	dev/ksyms.c	ksyms needs-flag
 pseudo-device pf: ifnet
 file	net/pf.c		pf	needs-flag
 file	net/pf_norm.c		pf
+file	net/pf_ioctl.c		pf
+
+pseudo-device bio
+file	dev/bio.c	bio needs-flag
 
 # XXX machine-independent SCSI files should live somewhere here, maybe
 
@@ -373,7 +401,6 @@ file ddb/db_usrreq.c			ddb
 file ddb/db_hangman.c			ddb
 file dev/auconv.c			auconv
 file dev/audio.c			audio			needs-flag
-file dev/radio.c			radio			needs-flag
 file dev/ccd.c				ccd			needs-flag
 file dev/ic/ncr5380sbc.c		ncr5380sbc
 file dev/ic/ncr53c7xx.c			ncr53c7xx
@@ -383,10 +410,13 @@ file dev/ic/dp8390.c			dp8390nic
 file dev/ic/rtl80x9.c			rtl80x9
 file dev/ic/tea5757.c			tea5757
 file dev/ic/lm700x.c			lm700x
+file dev/ic/tc921x.c			tc921x
+file dev/ic/pt2254a.c			pt2254a
 file dev/midi.c				midi | midibus		needs-flag
 file dev/midisyn.c			midisyn
 file dev/mulaw.c			mulaw
 file dev/sequencer.c			sequencer		needs-flag
+file dev/systrace.c			systrace		needs-flag
 file dev/vnd.c				vnd			needs-flag
 file dev/rnd.c
 file dev/raidframe/rf_acctrace.c	raid			needs-flag
@@ -476,7 +506,6 @@ file kern/kern_kthread.c
 file kern/kern_ktrace.c			ktrace
 file kern/kern_lock.c
 file kern/kern_lkm.c			lkm
-file kern/kern_ntptime.c
 file kern/kern_malloc.c
 file kern/kern_malloc_debug.c		malloc_debug
 file kern/kern_physio.c
@@ -617,6 +646,7 @@ file net/slcompress.c			sl | ppp | strip
 file net/if_enc.c			enc			needs-count
 file net/if_pflog.c			pflog			needs-count
 file net/if_gre.c			gre			needs-count
+#file net/if_ieee1394subr.c		ieee1394
 file netccitt/ccitt_proto.c		ccitt
 file netccitt/hd_debug.c		hdlc
 file netccitt/hd_input.c		hdlc
@@ -638,6 +668,7 @@ file netccitt/pk_timer.c		ccitt
 file netccitt/pk_usrreq.c		ccitt
 file netinet/if_atm.c			atm
 file netinet/if_ether.c			ether
+#file netinet/if_ieee1394arp.c		ieee1394 & inet
 file netinet/in4_cksum.c		inet
 file netinet/igmp.c			inet
 file netinet/in.c			inet
@@ -852,7 +883,6 @@ file netinet6/in6_ifattach.c		inet6
 file netinet6/in6_cksum.c		inet6
 #file netinet6/in6_pcb.c		inet6
 file netinet6/in6_src.c			inet6
-file netinet6/in6_prefix.c		inet6
 file netinet6/in6_proto.c		inet6
 file netinet6/dest6.c			inet6
 file netinet6/frag6.c			inet6

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.51 2002/04/11 05:40:51 jason Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.54 2002/09/03 23:20:42 miod Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.73 1997/07/29 09:41:53 fair Exp $ */
 
 /*
@@ -245,9 +245,7 @@ bootstrap()
 	pmap_bootstrap(cpuinfo.mmu_ncontext,
 		       cpuinfo.mmu_nregion,
 		       cpuinfo.mmu_nsegment);
-#ifdef KGDB
-	zs_kgdb_init();		/* XXX */
-#endif
+	/* Moved zs_kgdb_init() to zs.c:consinit() */
 #ifdef DDB
 	db_machine_init();
 	ddb_init();
@@ -389,7 +387,7 @@ bootpath_build()
 	 * that were given after the boot command.  On SS2s, pv_v0bootargs
 	 * is NULL but *promvec->pv_v2bootargs.v2_bootargs points to
 	 * "vmunix -s" or whatever.
-	 * XXX	DO THIS BEFORE pmap_boostrap?
+	 * XXX	DO THIS BEFORE pmap_bootstrap?
 	 */
 	bzero(bootpath, sizeof(bootpath));
 	bp = bootpath;
@@ -473,7 +471,7 @@ bootpath_build()
 #elif DDB
 			Debugger();
 #else
-			printf("kernel not compiled with KGDB\n");
+			printf("kernel has no debugger\n");
 #endif
 			break;
 
@@ -892,7 +890,6 @@ cpu_configure()
 	swapconf();
 	cold = 0;
 
-
 	/*
 	 * Re-zero proc0's user area, to nullify the effect of the
 	 * stack running into it during auto-configuration.
@@ -1224,9 +1221,19 @@ mainbus_attach(parent, dev, aux)
 
 	node = ca->ca_ra.ra_node;	/* re-init root node */
 
-	if (promvec->pv_romvec_vers <= 2)
-		/* remember which frame buffer, if any, is to be /dev/fb */
-		fbnode = getpropint(node, "fb", 0);
+	if (promvec->pv_romvec_vers <= 2) {
+		/*
+		 * Revision 1 prom will always return a framebuffer device
+		 * node if a framebuffer is installed, even if console is
+		 * set to serial.
+		 */
+		if (*promvec->pv_stdout != PROMDEV_SCREEN)
+			fbnode = 0;
+		else {
+			/* remember which frame buffer is the console */
+			fbnode = getpropint(node, "fb", 0);
+		}
+	}
 
 	/* Find the "options" node */
 	node0 = firstchild(node);
@@ -1650,7 +1657,6 @@ node_has_property(node, prop)	/* returns 1 if node has given property */
 	return ((*promvec->pv_nodeops->no_proplen)(node, (caddr_t)prop) != -1);
 }
 
-#ifdef RASTERCONSOLE
 /* Pass a string to the FORTH PROM to be interpreted */
 void
 rominterpret(s)
@@ -1690,7 +1696,6 @@ romgetcursoraddr(rowp, colp)
 	rominterpret(buf);
 	return (*rowp == NULL || *colp == NULL);
 }
-#endif
 
 void
 romhalt()

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtl81x9reg.h,v 1.4 2002/03/14 01:26:55 millert Exp $	*/
+/*	$OpenBSD: rtl81x9reg.h,v 1.6 2002/06/09 03:14:18 todd Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -238,10 +238,14 @@
 #define RL_EEMODE_PROGRAM	0x80
 #define RL_EEMODE_WRITECFG	(0x80|0x40)
 
-/* 9346 EEPROM commands */
-#define RL_EECMD_WRITE		0x140
-#define RL_EECMD_READ		0x180
-#define RL_EECMD_ERASE		0x1c0
+/* 9346/9356 EEPROM commands */
+#define RL_EECMD_WRITE		0x5	/* 0101b */
+#define RL_EECMD_READ		0x6	/* 0110b */
+#define RL_EECMD_ERASE		0x7	/* 0111b */
+#define RL_EECMD_LEN		4
+
+#define RL_EEADDR_LEN0		6	/* 9346 */
+#define RL_EEADDR_LEN1		8	/* 9356 */
 
 #define RL_EE_ID		0x00
 #define RL_EE_PCI_VID		0x01
@@ -361,9 +365,10 @@ struct rl_softc {
 	bus_space_handle_t	rl_bhandle;	/* bus space handle */
 	bus_space_tag_t		rl_btag;	/* bus space tag */
 	bus_dma_tag_t		sc_dmat;
-	struct arpcom		arpcom;		/* interface info */
+	struct arpcom		sc_arpcom;		/* interface info */
 	struct mii_data		sc_mii;		/* MII information */
 	u_int8_t		rl_type;
+	void			*sc_sdhook;	/* shutdownhook */
 	int			rl_txthresh;
 	struct rl_chain_data	rl_cdata;
 	struct timeout		sc_tick_tmo;
@@ -479,4 +484,5 @@ struct rl_softc {
 #endif
 
 extern int rl_attach(struct rl_softc *);
+extern int rl_detach(struct rl_softc *);
 extern int rl_intr(void *);

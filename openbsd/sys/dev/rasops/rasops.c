@@ -1,5 +1,5 @@
-/*	$OpenBSD: rasops.c,v 1.2 2002/03/14 01:27:02 millert Exp $ */
-/*	 $NetBSD: rasops.c,v 1.35 2001/02/02 06:01:01 marcus Exp $	*/
+/*	$OpenBSD: rasops.c,v 1.8 2002/08/12 02:31:01 jason Exp $	*/
+/*	$NetBSD: rasops.c,v 1.35 2001/02/02 06:01:01 marcus Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,17 +37,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-//__KERNEL_RCSID(0, "$NetBSD: rasops.c,v 1.35 2001/02/02 06:01:01 marcus Exp $");
-
 #include "rasops_glue.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 
-/* #include <machine/bswap.h> */
 #include <machine/endian.h>
 
 #include <dev/wscons/wsdisplayvar.h>
@@ -105,16 +100,16 @@ const u_char rasops_isgray[16] = {
 };
 
 /* Generic functions */
-static void	rasops_copyrows(void *, int, int, int);
-static int	rasops_mapchar(void *, int, u_int *);
-static void	rasops_cursor(void *, int, int, int);
-static int	rasops_alloc_cattr(void *, int, int, int, long *);
-static int	rasops_alloc_mattr(void *, int, int, int, long *);
-static void	rasops_do_cursor(struct rasops_info *);
-static void	rasops_init_devcmap(struct rasops_info *);
+void	rasops_copyrows(void *, int, int, int);
+int	rasops_mapchar(void *, int, u_int *);
+void	rasops_cursor(void *, int, int, int);
+int	rasops_alloc_cattr(void *, int, int, int, long *);
+int	rasops_alloc_mattr(void *, int, int, int, long *);
+void	rasops_do_cursor(struct rasops_info *);
+void	rasops_init_devcmap(struct rasops_info *);
 
 /*
- * Initalize a 'rasops_info' descriptor.
+ * Initialize a 'rasops_info' descriptor.
  */
 int
 rasops_init(ri, wantrows, wantcols)
@@ -129,8 +124,14 @@ rasops_init(ri, wantrows, wantcols)
 
 		wsfont_init();
 
-		/* Want 8 pixel wide, don't care about aestethics */
-		if ((cookie = wsfont_find(NULL, 8, 0, 0)) <= 0)
+		if (ri->ri_width > 80*12)
+			/* High res screen, choose a big font */
+			cookie = wsfont_find(NULL, 12, 0, 0);
+		else
+			/*  lower res, choose a 8 pixel wide font */
+			cookie = wsfont_find(NULL, 8, 0, 0);
+
+		if (cookie <= 0)
 			cookie = wsfont_find(NULL, 0, 0, 0);
 
 		if (cookie <= 0) {
@@ -163,7 +164,7 @@ rasops_init(ri, wantrows, wantcols)
 
 	if (rasops_reconfig(ri, wantrows, wantcols))
 		return (-1);
- 
+
 	rasops_init_devcmap(ri);
 	return (0);
 }
@@ -181,7 +182,7 @@ rasops_reconfig(ri, wantrows, wantcols)
 	s = splhigh();
 
 	if (ri->ri_font->fontwidth > 32 || ri->ri_font->fontwidth < 4)
-		panic("rasops_init: fontwidth assumptions botched!\n");
+		panic("rasops_init: fontwidth assumptions botched!");
 
 	/* Need this to frob the setup below */
 	bpp = (ri->ri_depth == 15 ? 16 : ri->ri_depth);
@@ -234,7 +235,7 @@ rasops_reconfig(ri, wantrows, wantcols)
 	ri->ri_origbits = ri->ri_bits;
 
 	if ((ri->ri_flg & RI_CENTER) != 0) {
-		ri->ri_bits += (((ri->ri_width * bpp >> 3) - 
+		ri->ri_bits += (((ri->ri_width * bpp >> 3) -
 		    ri->ri_emustride) >> 1) & ~3;
 		ri->ri_bits += ((ri->ri_height - ri->ri_emuheight) >> 1) *
 		    ri->ri_stride;
@@ -257,6 +258,7 @@ rasops_reconfig(ri, wantrows, wantcols)
 	ri->ri_ops.eraserows = rasops_eraserows;
 	ri->ri_ops.cursor = rasops_cursor;
 	ri->ri_do_cursor = rasops_do_cursor;
+	ri->ri_updatecursor = NULL;
 
 	if (ri->ri_depth < 8 || (ri->ri_flg & RI_FORCEMONO) != 0) {
 		ri->ri_ops.alloc_attr = rasops_alloc_mattr;
@@ -318,7 +320,7 @@ rasops_reconfig(ri, wantrows, wantcols)
 /*
  * Map a character.
  */
-static int
+int
 rasops_mapchar(cookie, c, cp)
 	void *cookie;
 	int c;
@@ -330,7 +332,7 @@ rasops_mapchar(cookie, c, cp)
 
 #ifdef DIAGNOSTIC
 	if (ri->ri_font == NULL)
-		panic("rasops_mapchar: no font selected\n");
+		panic("rasops_mapchar: no font selected");
 #endif
 	if (ri->ri_font->encoding != WSDISPLAY_FONTENC_ISO) {
 
@@ -360,7 +362,7 @@ rasops_mapchar(cookie, c, cp)
 /*
  * Allocate a color attribute.
  */
-static int
+int
 rasops_alloc_cattr(cookie, fg, bg, flg, attr)
 	void *cookie;
 	int fg, bg, flg;
@@ -404,7 +406,7 @@ rasops_alloc_cattr(cookie, fg, bg, flg, attr)
 /*
  * Allocate a mono attribute.
  */
-static int
+int
 rasops_alloc_mattr(cookie, fg, bg, flg, attr)
 	void *cookie;
 	int fg, bg, flg;
@@ -431,7 +433,7 @@ rasops_alloc_mattr(cookie, fg, bg, flg, attr)
 /*
  * Copy rows.
  */
-static void
+void
 rasops_copyrows(cookie, src, dst, num)
 	void *cookie;
 	int src, dst, num;
@@ -509,7 +511,7 @@ rasops_copyrows(cookie, src, dst, num)
 /*
  * Copy columns. This is slow, and hard to optimize due to alignment,
  * and the fact that we have to copy both left->right and right->left.
- * We simply cop-out here and use bcopy(), since it handles all of
+ * We simply cop-out here and use ovbcopy(), since it handles all of
  * these cases anyway.
  */
 void
@@ -559,7 +561,7 @@ rasops_copycols(cookie, row, src, dst, num)
 	dp = ri->ri_bits + row + dst * ri->ri_xscale;
 
 	while (height--) {
-		bcopy(sp, dp, num);
+		ovbcopy(sp, dp, num);
 		dp += ri->ri_stride;
 		sp += ri->ri_stride;
 	}
@@ -568,7 +570,7 @@ rasops_copycols(cookie, row, src, dst, num)
 /*
  * Turn cursor off/on.
  */
-static void
+void
 rasops_cursor(cookie, on, row, col)
 	void *cookie;
 	int on, row, col;
@@ -596,6 +598,9 @@ rasops_cursor(cookie, on, row, col)
 	ri->ri_crow = row;
 	ri->ri_ccol = col;
 
+	if (ri->ri_updatecursor != NULL)
+		ri->ri_updatecursor(ri);
+
 	if (on) {
 		ri->ri_flg |= RI_CURSOR;
 #ifdef RASOPS_CLIPPING
@@ -609,7 +614,7 @@ rasops_cursor(cookie, on, row, col)
 /*
  * Make the device colormap
  */
-static void
+void
 rasops_init_devcmap(ri)
 	struct rasops_info *ri;
 {
@@ -693,7 +698,7 @@ rasops_unpack_attr(attr, fg, bg, underline)
 }
 
 /*
- * Erase rows. This isn't static, since 24-bpp uses it in special cases.
+ * Erase rows
  */
 void
 rasops_eraserows(cookie, row, num, attr)
@@ -768,7 +773,7 @@ rasops_eraserows(cookie, row, num, attr)
  * Actually turn the cursor on or off. This does the dirty work for
  * rasops_cursor().
  */
-static void
+void
 rasops_do_cursor(ri)
 	struct rasops_info *ri;
 {

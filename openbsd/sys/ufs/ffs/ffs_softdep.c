@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_softdep.c,v 1.37 2002/03/14 01:27:14 millert Exp $	*/
+/*	$OpenBSD: ffs_softdep.c,v 1.41 2002/07/16 22:54:42 millert Exp $	*/
 /*
  * Copyright 1998, 2000 Marshall Kirk McKusick. All Rights Reserved.
  *
@@ -39,13 +39,6 @@
  *	from: @(#)ffs_softdep.c	9.59 (McKusick) 6/21/00
  * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.86 2001/02/04 16:08:18 phk Exp $
  */
-
-/*
- * For now we want the safety net that the DIAGNOSTIC flag provide.
- */
-#ifndef DIAGNOSTIC
-#define DIAGNOSTIC
-#endif
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -101,12 +94,13 @@ const char *softdep_typenames[] = {
 	"allocindir",
 	"freefrag",
 	"freeblks",
+	"freefile",
 	"diradd",
 	"mkdir",
 	"dirrem",
 };
 #define	TYPENAME(type) \
-	((unsigned)(type) < D_LAST ? softdep_typenames[type] : "???")
+	((unsigned)(type) <= D_LAST ? softdep_typenames[type] : "???")
 /*
  * Finding the current process.
  */
@@ -928,8 +922,6 @@ softdep_flushfiles(oldmnt, flags, p)
 	 * activity can keep us busy forever, so we just fail with EBUSY.
 	 */
 	if (loopcnt == 0) {
-		if (oldmnt->mnt_flag & MNT_UNMOUNT)
-			panic("softdep_flushfiles: looping");
 		error = EBUSY;
 	}
 	return (error);
@@ -2263,7 +2255,7 @@ handle_workitem_freeblocks(freeblks)
 		if ((bn = freeblks->fb_iblks[level]) == 0)
 			continue;
 		if ((error = indir_trunc(&tip, fsbtodb(fs, bn), level,
-		    baselbns[level], &blocksreleased)) == 0)
+		    baselbns[level], &blocksreleased)) != 0)
 			allerror = error;
 		ffs_blkfree(&tip, bn, fs->fs_bsize);
 		blocksreleased += nblocks;
@@ -3206,7 +3198,9 @@ initiate_write_inodeblock(inodedep, bp)
 	struct allocdirect *adp, *lastadp;
 	struct dinode *dp;
 	struct fs *fs;
+#ifdef DIAGNOSTIC
 	ufs_lbn_t prevlbn = 0;
+#endif
 	int i, deplist;
 
 	if (inodedep->id_state & IOSTARTED)

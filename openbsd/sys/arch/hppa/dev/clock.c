@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.13 2002/03/14 01:26:31 millert Exp $	*/
+/*	$OpenBSD: clock.c,v 1.16 2002/09/15 09:45:15 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -53,6 +53,7 @@
 #endif
 
 struct timeval time;
+int cpu_clockok;
 
 void startrtclock(void);
 
@@ -65,6 +66,8 @@ cpu_initclocks()
 	/* Start the interval timer. */
 	mfctl(CR_ITMR, time_inval);
 	mtctl(time_inval + cpu_hzticks, CR_ITMR);
+
+	cpu_clockok = 1;
 }
 
 int
@@ -75,6 +78,9 @@ clock_intr (v)
 
 	/* printf ("clock int 0x%x @ 0x%x for %p\n", t,
 	   frame->tf_iioq_head, curproc); */
+
+	if (!cpu_clockok)
+		return (1);
 
 	cpu_initclocks();
 	hardclock(frame);
@@ -98,16 +104,17 @@ inittodr(t)
 	time_t t;
 {
 	struct pdc_tod tod PDC_ALIGNMENT;
-	int 	tbad = 0;
+	int 	error, tbad = 0;
 
-	if (t < 5*SECYR) {
+	if (t < 12*SECYR) {
 		printf ("WARNING: preposterous time in file system");
 		t = 6*SECYR + 186*SECDAY + SECDAY/2;
 		tbad = 1;
 	}
 
-	pdc_call((iodcio_t)PAGE0->mem_pdc, 1, PDC_TOD, PDC_TOD_READ,
-		&tod, 0, 0, 0, 0, 0);
+	if ((error = pdc_call((iodcio_t)pdc,
+	    1, PDC_TOD, PDC_TOD_READ, &tod, 0, 0, 0, 0, 0)))
+		printf("clock: failed to fetch (%d)\n", error);
 
 	time.tv_sec = tod.sec;
 	time.tv_usec = tod.usec;
@@ -132,12 +139,11 @@ inittodr(t)
 void
 resettodr()
 {
-	struct pdc_tod tod PDC_ALIGNMENT;
+	int error;
 
-	tod.sec = time.tv_sec;
-	tod.usec = time.tv_usec;
-
-	pdc_call((iodcio_t)PAGE0->mem_pdc, 1, PDC_TOD, PDC_TOD_WRITE, &tod);
+	if ((error = pdc_call((iodcio_t)pdc, 1, PDC_TOD, PDC_TOD_WRITE,
+	    time.tv_sec, time.tv_usec)))
+		printf("clock: failed to save (%d)\n");
 }
 
 void

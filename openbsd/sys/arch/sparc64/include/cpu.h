@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.10 2002/03/27 15:12:22 jason Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.15 2002/08/02 04:22:04 jason Exp $	*/
 /*	$NetBSD: cpu.h,v 1.28 2001/06/14 22:56:58 thorpej Exp $ */
 
 /*
@@ -54,13 +54,15 @@
 #define	CPU_BOOTED_KERNEL	1	/* string: booted kernel name */
 #define	CPU_LED_BLINK		2	/* int: blink leds? */
 #define	CPU_ALLOWAPERTURE	3	/* allow xf86 operations */
-#define	CPU_MAXID		4	/* number of valid machdep ids */
+#define CPU_CPUTYPE		4	/* cpu type */
+#define	CPU_MAXID		5	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES {			\
 	{ 0, 0 },				\
 	{ "booted_kernel", CTLTYPE_STRING },	\
 	{ "led_blink", CTLTYPE_INT },		\
-	{ "allowaperture", CTLTYPE_INT },		\
+	{ "allowaperture", CTLTYPE_INT },	\
+	{ "cputype", CTLTYPE_INT },		\
 }
 
 #ifdef _KERNEL
@@ -173,7 +175,6 @@ struct clockframe {
 };
 
 #define	CLKF_USERMODE(framep)	(((framep)->t.tf_tstate & TSTATE_PRIV) == 0)
-#define	CLKF_BASEPRI(framep)	(((framep)->t.tf_oldpil) == 0)
 #define	CLKF_PC(framep)		((framep)->t.tf_pc)
 #define	CLKF_INTR(framep)	((!CLKF_USERMODE(framep))&&\
 				(((framep)->t.tf_kstack < (vaddr_t)EINTSTACK)&&\
@@ -254,9 +255,6 @@ extern struct intrhand *intrlev[MAXINTNUM];
 
 void	intr_establish(int level, struct intrhand *);
 
-/* cpu.c */
-paddr_t cpu_alloc(void);
-u_int64_t cpu_init(paddr_t, int);
 /* disksubr.c */
 struct dkbad;
 int isbad(struct dkbad *bt, int, int, int);

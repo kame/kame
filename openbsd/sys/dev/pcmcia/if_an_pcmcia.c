@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_an_pcmcia.c,v 1.7 2002/03/14 01:27:00 millert Exp $	*/
+/*	$OpenBSD: if_an_pcmcia.c,v 1.10 2002/06/25 15:13:09 millert Exp $	*/
 
 /*
  * Copyright (c) 1999 Michael Shalayeff
@@ -131,8 +131,7 @@ an_pcmcia_attach(parent, self, aux)
 	sc->an_btag = psc->sc_pcioh.iot;
 	sc->an_bhandle = psc->sc_pcioh.ioh;
 
-	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET,
-	    an_intr, sc, "");
+	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, an_intr, sc, "");
 	if (sc->sc_ih == NULL)
 		printf("no irq");
 
@@ -146,7 +145,7 @@ an_pcmcia_detach(dev, flags)
 {
 	struct an_pcmcia_softc *psc = (struct an_pcmcia_softc *)dev;
 	struct an_softc *sc = (struct an_softc *)dev;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
 	if (sc->an_gone) {
 		printf ("%s: already detached\n", sc->sc_dev.dv_xname);
@@ -174,7 +173,7 @@ an_pcmcia_activate(dev, act)
 {
 	struct an_pcmcia_softc *psc = (struct an_pcmcia_softc *)dev;
 	struct an_softc *sc = &psc->sc_an;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int s;
 
 	s = splnet();

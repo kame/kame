@@ -1,4 +1,4 @@
-/*	$OpenBSD: apmvar.h,v 1.2 2001/10/03 20:06:01 drahn Exp $	*/
+/*	$OpenBSD: apmvar.h,v 1.4 2002/09/15 09:01:58 deraadt Exp $	*/
 
 /*
  *  Copyright (c) 2001 Alexander Guy

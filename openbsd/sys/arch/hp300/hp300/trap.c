@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.36 2002/03/14 01:26:31 millert Exp $	*/
+/*	$OpenBSD: trap.c,v 1.38 2002/06/23 03:03:15 deraadt Exp $	*/
 /*	$NetBSD: trap.c,v 1.57 1998/02/16 20:58:31 thorpej Exp $	*/
 
 /*
@@ -94,6 +94,9 @@
 #include <machine/cpu.h>
 #include <machine/reg.h>
 #include <machine/intr.h>
+
+#include "systrace.h"
+#include <dev/systrace.h>
 
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_pmap.h>
@@ -790,7 +793,7 @@ writeback(fp, docachepush)
 				    (vaddr_t)&vmmap[NBPG]);
 			pmap_update(pmap_kernel());
 		} else
-			printf("WARNING: pid %d(%s) uid %d: CPUSH not done\n",
+			printf("WARNING: pid %d(%s) uid %u: CPUSH not done\n",
 			       p->p_pid, p->p_comm, p->p_ucred->cr_uid);
 	} else if ((f->f_ssw & (SSW4_RW|SSW4_TTMASK)) == SSW4_TTM16) {
 		/*
@@ -1127,7 +1130,12 @@ syscall(code, frame)
 		goto bad;
 	rval[0] = 0;
 	rval[1] = frame.f_regs[D1];
-	error = (*callp->sy_call)(p, args, rval);
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE))
+		error = systrace_redirect(code, p, args, rval);
+	else
+#endif
+		error = (*callp->sy_call)(p, args, rval);
 	switch (error) {
 	case 0:
 		frame.f_regs[D0] = rval[0];

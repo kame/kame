@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.25 2002/03/14 01:26:42 millert Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.31 2002/09/15 09:01:59 deraadt Exp $	*/
 /*	$NetBSD: pmap.h,v 1.1 1996/09/30 16:34:29 ws Exp $	*/
 
 /*-
@@ -46,6 +46,7 @@ typedef u_int sr_t;
 #define	SR_TYPE		0x80000000
 #define	SR_SUKEY	0x40000000
 #define	SR_PRKEY	0x20000000
+#define SR_NOEXEC	0x10000000
 #define	SR_VSID		0x00ffffff
 /*
  * bit 
@@ -60,7 +61,6 @@ typedef u_int sr_t;
  */
 #ifndef _LOCORE
 /* V->P mapping data */
-typedef struct pmapvp pmapvp_t;
 #define VP_SR_SIZE	16
 #define VP_SR_MASK	(VP_SR_SIZE-1)
 #define VP_SR_POS 	28
@@ -84,7 +84,8 @@ void pmap_kenter_cache( vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
  */
 struct pmap {
 	sr_t pm_sr[16];		/* segments used in this pmap */
-	pmapvp_t *pm_vp[VP_SR_SIZE];	/* virtual to physical table */
+	struct pmapvp *pm_vp[VP_SR_SIZE];	/* virtual to physical table */
+	u_int32_t pm_exec[16];	/* segments used in this pmap */
 	int pm_refs;		/* ref count */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 };
@@ -116,8 +117,8 @@ boolean_t pteclrbits(paddr_t pa, u_int mask, u_int clear);
  * Really simple. 0x0->0x80000000 contain 1->1 mappings of the physical
  * memory. - XXX
  */
-#define PMAP_MAP_POOLPAGE(pa) ((vaddr_t)pa)
-#define PMAP_UNMAP_POOLPAGE(va)       ((paddr_t)va)
+#define PMAP_MAP_POOLPAGE(pg)		((vaddr_t)VM_PAGE_TO_PHYS(pg))
+#define PMAP_UNMAP_POOLPAGE(va)		PHYS_TO_VM_PAGE((paddr_t)va)
 
 void pmap_bootstrap(u_int kernelstart, u_int kernelend);
 
@@ -127,7 +128,7 @@ void pmap_release(struct pmap *);
 void pmap_real_memory(vm_offset_t *start, vm_size_t *size);
 void switchexit(struct proc *);
 
-int pte_spill_v(struct pmap *pm, u_int32_t va, u_int32_t dsisr);
+int pte_spill_v(struct pmap *pm, u_int32_t va, u_int32_t dsisr, int exec_fault);
 #define pmap_copy(dst_pmap, src_pmap, dst_addr, len, src_addr) ;
 
 #endif	/* _KERNEL */

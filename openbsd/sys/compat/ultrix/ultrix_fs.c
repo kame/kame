@@ -1,4 +1,4 @@
-/*	$OpenBSD: ultrix_fs.c,v 1.7 2002/03/14 03:16:03 millert Exp $	*/
+/*	$OpenBSD: ultrix_fs.c,v 1.11 2002/07/20 19:24:57 art Exp $	*/
 /*	$NetBSD: ultrix_fs.c,v 1.4 1996/04/07 17:23:06 jonathan Exp $	*/
 
 /*
@@ -59,7 +59,7 @@
 /*
  * Ultrix file system data structure, as modified by
  * Ultrix getmntent(). This  structure is padded to 2560 bytes, for
- * compatiblity with the size the Ultrix kernel and user apps expect.
+ * compatibility with the size the Ultrix kernel and user apps expect.
  */
 struct ultrix_fs_data {
 	u_int32_t	ufsd_flags;	/* how mounted */
@@ -244,7 +244,7 @@ ultrix_sys_getmnt(p, v, retval)
 	for (count = 0, mp = mountlist.cqh_first;
 	    mp != (void *)&mountlist && count < maxcount; mp = nmp) {
 		nmp = mp->mnt_list.cqe_next;
-		if (sfsp != NULL && (mp->mnt_flag & MNT_MLOCK) == 0) {
+		if (sfsp != NULL) {
 			struct ultrix_fs_data tem;
 			sp = &mp->mnt_stat;
 
@@ -331,13 +331,11 @@ ultrix_sys_mount(p, v, retval)
 
 	int error;
 	int otype = SCARG(uap, type);
-	extern char sigcode[], esigcode[];
 	char fsname[MFSNAMELEN];
 	char * fstype;
 	struct sys_mount_args nuap;
-
-#define	szsigcode	(esigcode - sigcode)
-	caddr_t usp = (caddr_t)ALIGN(PS_STRINGS - szsigcode - STACKGAPLEN);
+	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t usp = stackgap_alloc(&sg, 1024 /* XXX */);
 
 	bzero(&nuap, sizeof(nuap));
 	SCARG(&nuap, flags) = 0;
@@ -376,7 +374,7 @@ ultrix_sys_mount(p, v, retval)
 		struct ufs_args ua;
 
 		ua.fspec = SCARG(uap, special);
-		bzero(&ua.export, sizeof(ua.export));
+		bzero(&ua.export_info, sizeof(ua.export_info));
 		SCARG(&nuap, data) = usp;
 	
 		if ((error = copyout(&ua, SCARG(&nuap, data),

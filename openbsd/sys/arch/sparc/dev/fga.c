@@ -1,4 +1,4 @@
-/*	$OpenBSD: fga.c,v 1.8 2002/03/14 03:15:59 millert Exp $	*/
+/*	$OpenBSD: fga.c,v 1.11 2002/07/08 21:55:56 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -525,7 +525,7 @@ fga_intr_establish(sc, vec, level, ih)
 		    sizeof(struct intrhand *), M_DEVBUF, M_NOWAIT);
 		if (sc->sc_vmevec == NULL)
 			panic("fga_addirq");
-		bzero(sc->sc_vmevec, 256 * sizeof(struct intrhand));
+		bzero(sc->sc_vmevec, 256 * sizeof(struct intrhand *));
 	}
 	if (sc->sc_vmevec[vec] == NULL)
 		sc->sc_vmevec[vec] = ih;
@@ -564,37 +564,37 @@ fga_hwintr_establish(sc, sint)
 	case 1:
 		sc->sc_ih1.ih_fun = fga_hwintr1;
 		sc->sc_ih1.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih1);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih1, -1);
 		break;
 	case 2:
 		sc->sc_ih2.ih_fun = fga_hwintr2;
 		sc->sc_ih2.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih2);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih2, -1);
 		break;
 	case 3:
 		sc->sc_ih3.ih_fun = fga_hwintr3;
 		sc->sc_ih3.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih3);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih3, -1);
 		break;
 	case 4:
 		sc->sc_ih4.ih_fun = fga_hwintr4;
 		sc->sc_ih4.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih4);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih4, -1);
 		break;
 	case 5:
 		sc->sc_ih5.ih_fun = fga_hwintr5;
 		sc->sc_ih5.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih5);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih5, -1);
 		break;
 	case 6:
 		sc->sc_ih6.ih_fun = fga_hwintr6;
 		sc->sc_ih6.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih6);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih6, -1);
 		break;
 	case 7:
 		sc->sc_ih7.ih_fun = fga_hwintr7;
 		sc->sc_ih7.ih_arg = sc;
-		intr_establish(sint_to_pri[sint], &sc->sc_ih7);
+		intr_establish(sint_to_pri[sint], &sc->sc_ih7, -1);
 		break;
 	default:
 		panic("fga_sint");
@@ -610,7 +610,12 @@ fgaopen(dev, flags, mode, p)
 	int flags, mode;
 	struct proc *p;
 {
+	struct fga_softc *sc;
+
 	if (fga_cd.cd_ndevs == 0)
+		return (ENXIO);
+	sc = fga_cd.cd_devs[0];
+	if (sc == NULL)
 		return (ENXIO);
 	return (0);
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: isp_target.c,v 1.7 2001/12/14 00:20:55 mjacob Exp $ */
+/* $OpenBSD: isp_target.c,v 1.9 2002/08/17 17:42:54 mjacob Exp $ */
 /*
  * Machine and OS Independent Target Mode Code for the Qlogic SCSI/FC adapters.
  *
@@ -28,6 +28,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Bug fixes gratefully acknowledged from:
+ *	Oded Kedem <oded@kashya.com>
+ */
 /*
  * Include header file appropriate for platform we're building on.
  */
@@ -135,7 +139,7 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 #define	hdrp		unp.hp
 	} unp;
 	u_int8_t local[QENTRY_LEN];
-	int bus, type, rval = 0;
+	int bus, type, rval = 1;
 
 	type = isp_get_response_type(isp, (isphdr_t *)vptr);
 	unp.vp = vptr;
@@ -212,24 +216,11 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 		case IN_RSRC_UNAVAIL:
 			isp_prt(isp, ISP_LOGWARN, "Firmware out of ATIOs");
 			break;
-		case IN_ABORT_TASK:
-			isp_prt(isp, ISP_LOGWARN,
-			    "Abort Task from IID %d RX_ID 0x%x",
-			    inot_fcp->in_iid, seqid);
-			(void) isp_async(isp, ISPASYNC_TARGET_ACTION, &bus);
-			break;
 		case IN_PORT_LOGOUT:
-			isp_prt(isp, ISP_LOGWARN,
-			    "Port Logout for Initiator %d RX_ID 0x%x",
-			    inot_fcp->in_iid, seqid);
-			break;
+		case IN_ABORT_TASK:
 		case IN_PORT_CHANGED:
-			isp_prt(isp, ISP_LOGWARN,
-			    "Port Changed for Initiator %d RX_ID 0x%x",
-			    inot_fcp->in_iid, seqid);
-			break;
 		case IN_GLOBAL_LOGO:
-			isp_prt(isp, ISP_LOGWARN, "All ports logged out");
+			(void) isp_async(isp, ISPASYNC_TARGET_ACTION, &local);
 			break;
 		default:
 			isp_prt(isp, ISP_LOGERR,
@@ -261,7 +252,7 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 	default:
 		isp_prt(isp, ISP_LOGERR,
 		    "Unknown entry type 0x%x in isp_target_notify", type);
-		rval = -1;
+		rval = 0;
 		break;
 	}
 #undef	atiop
@@ -497,7 +488,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 	return (isp_target_put_entry(isp, &un));
 }
 
-void
+int
 isp_target_async(struct ispsoftc *isp, int bus, int event)
 {
 	tmd_event_t evt;
@@ -520,12 +511,12 @@ isp_target_async(struct ispsoftc *isp, int bus, int event)
 		 * treat them like SCSI Bus Resets, but that was just plain
 		 * wrong. Let the normal CTIO completion report what occurred.
 		 */
-                return;
+                return (0);
 
 	case ASYNC_BUS_RESET:
 	case ASYNC_TIMEOUT_RESET:
 		if (IS_FC(isp)) {
-			return;	/* we'll be getting an inotify instead */
+			return (0); /* we'll be getting an inotify instead */
 		}
 		evt.ev_bus = bus;
 		evt.ev_event = event;
@@ -553,6 +544,7 @@ isp_target_async(struct ispsoftc *isp, int bus, int event)
 	}
 	if (isp->isp_state == ISP_RUNSTATE)
 		isp_notify_ack(isp, NULL);
+	return(0);
 }
 
 
@@ -678,6 +670,7 @@ isp_notify_ack(struct ispsoftc *isp, void *arg)
 			na->na_task_flags = inp->in_task_flags;
 			na->na_seqid = inp->in_seqid;
 			na->na_flags = NAFC_RCOUNT;
+			na->na_status = inp->in_status;
 			if (inp->in_status == IN_RESET) {
 				na->na_flags |= NAFC_RST_CLRD;
 			}

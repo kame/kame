@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_resource.c,v 1.18 2002/01/25 14:54:00 art Exp $	*/
+/*	$OpenBSD: kern_resource.c,v 1.20 2002/10/02 21:56:30 nordin Exp $	*/
 /*	$NetBSD: kern_resource.c,v 1.38 1996/10/23 07:19:38 matthias Exp $	*/
 
 /*-
@@ -289,7 +289,7 @@ dosetrlimit(p, which, limp)
 			vm_prot_t prot;
 
 			if (limp->rlim_cur > alimp->rlim_cur) {
-				prot = VM_PROT_ALL;
+				prot = VM_PROT_READ|VM_PROT_WRITE;
 				size = limp->rlim_cur - alimp->rlim_cur;
 #ifdef MACHINE_STACK_GROWS_UP
 				addr = USRSTACK + alimp->rlim_cur;
@@ -324,11 +324,11 @@ sys_getrlimit(p, v, retval)
 	register_t *retval;
 {
 	register struct sys_getrlimit_args /* {
-		syscallarg(u_int) which;
+		syscallarg(int) which;
 		syscallarg(struct rlimit *) rlp;
 	} */ *uap = v;
 
-	if (SCARG(uap, which) >= RLIM_NLIMITS)
+	if (SCARG(uap, which) < 0 || SCARG(uap, which) >= RLIM_NLIMITS)
 		return (EINVAL);
 	return (copyout((caddr_t)&p->p_rlimit[SCARG(uap, which)],
 	    (caddr_t)SCARG(uap, rlp), sizeof (struct rlimit)));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec.h,v 1.14 2002/03/14 03:16:12 millert Exp $	*/
+/*	$OpenBSD: exec.h,v 1.17 2002/09/23 01:41:09 art Exp $	*/
 /*	$NetBSD: exec.h,v 1.59 1996/02/09 18:25:09 christos Exp $	*/
 
 /*-
@@ -78,17 +78,17 @@ struct ps_strings {
 #if defined(COMPAT_SUNOS) || defined(COMPAT_ULTRIX) || \
     defined(COMPAT_IBCS2) || defined(COMPAT_SVR4) || defined(COMPAT_OSF1) || \
     defined(COMPAT_LINUX) || defined(COMPAT_FREEBSD) || \
-    defined(COMPAT_HPUX)  || defined(COMPAT_NETBSD)
+    defined(COMPAT_HPUX)  || defined(COMPAT_NETBSD) || defined(__sparc64__)
 #define	STACKGAPLEN	512	/* plenty enough for now */
 #else
 #define	STACKGAPLEN	0
 #endif
 #ifdef MACHINE_STACK_GROWS_UP
 #define	STACKGAPBASE_UNALIGNED	\
-	((caddr_t)PS_STRINGS + sizeof(struct ps_strings) + (u_long)szsigcode)
+	((caddr_t)PS_STRINGS + sizeof(struct ps_strings))
 #else
 #define	STACKGAPBASE_UNALIGNED	\
-	((caddr_t)PS_STRINGS - szsigcode - STACKGAPLEN)
+	((caddr_t)PS_STRINGS - STACKGAPLEN)
 #endif
 #define	STACKGAPBASE		\
 	((caddr_t)ALIGN(STACKGAPBASE_UNALIGNED))
@@ -124,6 +124,9 @@ struct exec_vmcmd {
 	struct	vnode *ev_vp;	/* vnode pointer for the file w/the data */
 	u_long	ev_offset;	/* offset in the file for the data */
 	u_int	ev_prot;	/* protections for segment */
+	int	ev_flags;
+#define VMCMD_RELATIVE  0x0001  /* ev_addr is relative to base entry */
+#define VMCMD_BASE      0x0002  /* marks a base entry */
 };
 
 #define	EXEC_DEFAULT_VMCMD_SETSIZE	8	/* # of cmds in set to start */
@@ -193,11 +196,15 @@ int	exec_setup_stack(struct proc *, struct exec_package *);
 void	new_vmcmd(struct exec_vmcmd_set *evsp,
 		    int (*proc)(struct proc *p, struct exec_vmcmd *),
 		    u_long len, u_long addr, struct vnode *vp, u_long offset,
-		    u_int prot);
+		    u_int prot, int flags);
 #define	NEW_VMCMD(evsp,proc,len,addr,vp,offset,prot) \
-	new_vmcmd(evsp,proc,len,addr,vp,offset,prot);
+	new_vmcmd(evsp,proc,len,addr,vp,offset,prot, 0);
+#define NEW_VMCMD2(evsp,proc,len,addr,vp,offset,prot,flags) \
+	new_vmcmd(evsp,proc,len,addr,vp,offset,prot,flags)
 #else	/* DEBUG */
-#define	NEW_VMCMD(evsp,proc,len,addr,vp,offset,prot) { \
+#define NEW_VMCMD(evsp,proc,len,addr,vp,offset,prot) \
+	NEW_VMCMD2(evsp,proc,len,addr,vp,offset,prot,0)
+#define	NEW_VMCMD2(evsp,proc,len,addr,vp,offset,prot,flags) do { \
 	struct exec_vmcmd *vcp; \
 	if ((evsp)->evs_used >= (evsp)->evs_cnt) \
 		vmcmdset_extend(evsp); \
@@ -209,7 +216,9 @@ void	new_vmcmd(struct exec_vmcmd_set *evsp,
 		VREF(vp); \
 	vcp->ev_offset = (offset); \
 	vcp->ev_prot = (prot); \
-}
+	vcp->ev_flags = (flags); \
+} while (0)
+
 #endif /* DEBUG */
 
 /* Initialize an empty vmcmd set */

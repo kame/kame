@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.49 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: systm.h,v 1.52 2002/07/12 13:31:20 art Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -182,6 +182,9 @@ struct tty;
 void	ttyprintf(struct tty *, const char *, ...)
     __kprintf_attribute__((__format__(__kprintf__,2,3)));
 
+void	splassert_fail(int, int, const char *);
+extern	int splassert_ctl;
+
 void	tablefull(const char *);
 
 int	kcopy(const void *, void *, size_t);
@@ -222,12 +225,6 @@ struct clockframe;
 void	hardclock(struct clockframe *);
 void	softclock(void);
 void	statclock(struct clockframe *);
-#ifdef NTP
-void	hardupdate(long offset);
-#ifdef PPS_SYNC
-void	hardpps(struct timeval *, long);
-#endif
-#endif
 
 void	initclocks(void);
 void	inittodr(time_t);
@@ -257,19 +254,22 @@ extern struct hook_desc_head shutdownhook_list, startuphook_list;
 
 void	*hook_establish(struct hook_desc_head *, int, void (*)(void *), void *);
 void	hook_disestablish(struct hook_desc_head *, void *);
-void	dohooks(struct hook_desc_head *);
+void	dohooks(struct hook_desc_head *, int);
+
+#define HOOK_REMOVE	0x01
+#define HOOK_FREE	0x02
 
 #define startuphook_establish(fn, arg) \
 	hook_establish(&startuphook_list, 1, (fn), (arg))
 #define startuphook_disestablish(vhook) \
 	hook_disestablish(&startuphook_list, (vhook))
-#define dostartuphooks() dohooks(&startuphook_list)
+#define dostartuphooks() dohooks(&startuphook_list, HOOK_REMOVE|HOOK_FREE)
 
 #define shutdownhook_establish(fn, arg) \
 	hook_establish(&shutdownhook_list, 0, (fn), (arg))
 #define shutdownhook_disestablish(vhook) \
 	hook_disestablish(&shutdownhook_list, (vhook))
-#define doshutdownhooks() dohooks(&shutdownhook_list)
+#define doshutdownhooks() dohooks(&shutdownhook_list, HOOK_REMOVE)
 
 /*
  * Power management hooks.

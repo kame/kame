@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.42 2002/03/14 01:27:11 millert Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.44 2002/06/09 16:26:11 itojun Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -42,10 +42,10 @@
 struct sackblk {
 	tcp_seq start;		/* start seq no. of sack block */
 	tcp_seq end; 		/* end seq no. */
-};  
+};
 
 struct sackhole {
-	tcp_seq start;		/* start seq no. of hole */ 
+	tcp_seq start;		/* start seq no. of hole */
 	tcp_seq end;		/* end seq no. */
 	int	dups;		/* number of dup(s)acks for this hole */
 	tcp_seq rxmit;		/* next seq. no in hole to be retransmitted */
@@ -68,7 +68,7 @@ struct tcpcb {
 	short	t_dupacks;		/* consecutive dup acks recd */
 	u_short	t_maxseg;		/* maximum segment size */
 	char	t_force;		/* 1 if forcing out a byte */
-	u_short	t_flags;
+	u_int	t_flags;
 #define	TF_ACKNOW	0x0001		/* ack peer immediately */
 #define	TF_DELACK	0x0002		/* ack, but try to delay it */
 #define	TF_NODELAY	0x0004		/* don't delay packets to coalesce */
@@ -80,6 +80,12 @@ struct tcpcb {
 #define	TF_RCVD_TSTMP	0x0100		/* a timestamp was received in SYN */
 #define	TF_SACK_PERMIT	0x0200		/* other side said I could SACK */
 #define	TF_SIGNATURE	0x0400		/* require TCP MD5 signature */
+#ifdef TCP_ECN
+#define TF_ECN_PERMIT	0x00008000	/* other side said I could ECN */
+#define TF_RCVD_CE	0x00010000	/* send ECE in subsequent segs */
+#define TF_SEND_CWR	0x00020000	/* send CWR in next seg */
+#define TF_DISABLE_ECN	0x00040000	/* disable ECN for this connection */
+#endif
 
 	struct	mbuf *t_template;	/* skeletal packet for transmit */
 	struct	inpcb *t_inpcb;		/* back pointer to internet pcb */
@@ -107,7 +113,7 @@ struct tcpcb {
 	int retran_data;		/* amount of outstanding retx. data  */
 #endif /* TCP_FACK */
 #endif /* TCP_SACK */
-#if defined(TCP_SACK)
+#if defined(TCP_SACK) || defined(TCP_ECN)
 	tcp_seq snd_last;		/* for use in fast recovery */
 #endif
 /* receive sequence variables */
@@ -305,18 +311,30 @@ struct	tcpstat {
 	u_int64_t tcps_rcvgoodsig;	/* rcvd good TCP signatures */
 	u_int32_t tcps_inhwcsum;	/* input hardware-checksummed packets */
 	u_int32_t tcps_outhwcsum;	/* output hardware-checksummed packets */
+
+	/* ECN stats */
+	u_int32_t tcps_ecn_accepts;	/* ecn connections accepted */
+	u_int32_t tcps_ecn_rcvece;	/* # of rcvd ece */
+	u_int32_t tcps_ecn_rcvcwr;	/* # of rcvd cwr */
+	u_int32_t tcps_ecn_rcvce;	/* # of rcvd ce in ip header */
+	u_int32_t tcps_ecn_sndect;	/* # of cwr sent */
+	u_int32_t tcps_ecn_sndece;	/* # of ece sent */
+	u_int32_t tcps_ecn_sndcwr;	/* # of cwr sent */
+	u_int32_t tcps_cwr_ecn;		/* # of cwnd reduced by ecn */
+	u_int32_t tcps_cwr_frecovery;	/* # of cwnd reduced by fastrecovery */
+	u_int32_t tcps_cwr_timeout;	/* # of cwnd reduced by timeout */
 };
 
 /*
  * Names for TCP sysctl objects.
  */
-			
+
 #define	TCPCTL_RFC1323		1 /* enable/disable RFC1323 timestamps/scaling */
 #define	TCPCTL_KEEPINITTIME	2 /* TCPT_KEEP value */
 #define TCPCTL_KEEPIDLE		3 /* allow tcp_keepidle to be changed */
 #define TCPCTL_KEEPINTVL	4 /* allow tcp_keepintvl to be changed */
-#define TCPCTL_SLOWHZ		5 /* return kernel idea of PR_SLOWHZ */ 
-#define TCPCTL_BADDYNAMIC	6 /* return bad dynamic port bitmap */ 
+#define TCPCTL_SLOWHZ		5 /* return kernel idea of PR_SLOWHZ */
+#define TCPCTL_BADDYNAMIC	6 /* return bad dynamic port bitmap */
 #define	TCPCTL_RECVSPACE	7 /* receive buffer space */
 #define	TCPCTL_SENDSPACE	8 /* send buffer space */
 #define	TCPCTL_IDENT		9 /* get connection owner */
@@ -324,7 +342,8 @@ struct	tcpstat {
 #define TCPCTL_MSSDFLT	       11 /* Default maximum segment size */
 #define	TCPCTL_RSTPPSLIMIT     12 /* RST pps limit */
 #define	TCPCTL_ACK_ON_PUSH     13 /* ACK immediately on PUSH */
-#define	TCPCTL_MAXID	       14
+#define	TCPCTL_ECN	       14 /* RFC3168 ECN */
+#define	TCPCTL_MAXID	       15
 
 #define	TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -341,6 +360,7 @@ struct	tcpstat {
 	{ "mssdflt",	CTLTYPE_INT }, \
 	{ "rstppslimit",	CTLTYPE_INT }, \
 	{ "ackonpush",	CTLTYPE_INT }, \
+	{ "ecn", 	CTLTYPE_INT }, \
 }
 
 struct tcp_ident_mapping {
@@ -359,6 +379,7 @@ extern	int tcp_ack_on_push;	/* ACK immediately on PUSH */
 extern	int tcp_do_sack;	/* SACK enabled/disabled */
 extern	struct pool sackhl_pool;
 #endif
+extern	int tcp_do_ecn;		/* RFC3168 ECN enabled/disabled? */
 
 int	 tcp_attach(struct socket *);
 void	 tcp_canceltimers(struct tcpcb *);
@@ -374,7 +395,7 @@ struct tcpcb *
 struct tcpcb *
 	 tcp_drop(struct tcpcb *, int);
 void	 tcp_dooptions(struct tcpcb *, u_char *, int, struct tcphdr *,
-		int *, u_int32_t *, u_int32_t *); 
+		int *, u_int32_t *, u_int32_t *);
 void	 tcp_drain(void);
 void	 tcp_init(void);
 #if defined(INET6) && !defined(TCP6)
@@ -430,7 +451,7 @@ void	 tcp_print_holes(struct tcpcb *tp);
 #endif /* TCP_SACK */
 #if defined(TCP_SACK)
 int	 tcp_newreno(struct tcpcb *, struct tcphdr *);
-u_long	 tcp_seq_subtract(u_long, u_long ); 
+u_long	 tcp_seq_subtract(u_long, u_long );
 #endif /* TCP_SACK */
 #ifdef TCP_SIGNATURE
 int	tcp_signature_apply(caddr_t, caddr_t, unsigned int);

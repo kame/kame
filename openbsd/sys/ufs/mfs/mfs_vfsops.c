@@ -1,4 +1,4 @@
-/*	$OpenBSD: mfs_vfsops.c,v 1.19 2002/03/14 01:27:15 millert Exp $	*/
+/*	$OpenBSD: mfs_vfsops.c,v 1.22 2002/07/12 14:02:23 art Exp $	*/
 /*	$NetBSD: mfs_vfsops.c,v 1.10 1996/02/09 22:31:28 christos Exp $	*/
 
 /*
@@ -205,7 +205,8 @@ mfs_mount(mp, path, data, ndp, p)
 			fs->fs_ronly = 0;
 #ifdef EXPORTMFS
 		if (args.fspec == 0)
-			return (vfs_export(mp, &ump->um_export, &args.export));
+			return (vfs_export(mp, &ump->um_export, 
+			    &args.export_info));
 #endif
 		return (0);
 	}
@@ -257,21 +258,19 @@ mfs_start(mp, flags, p)
 	int flags;
 	struct proc *p;
 {
-	register struct vnode *vp = VFSTOUFS(mp)->um_devvp;
-	register struct mfsnode *mfsp = VTOMFS(vp);
-	register struct buf *bp;
-	register caddr_t base;
+	struct vnode *vp = VFSTOUFS(mp)->um_devvp;
+	struct mfsnode *mfsp = VTOMFS(vp);
+	struct buf *bp;
+	caddr_t base;
 	int sleepreturn = 0;
 
 	base = mfsp->mfs_baseoff;
 	while (mfsp->mfs_buflist != (struct buf *)-1) {
-#define	DOIO() \
-		while ((bp = mfsp->mfs_buflist) != NULL) {	\
-			mfsp->mfs_buflist = bp->b_actf;		\
-			mfs_doio(bp, base);			\
-			wakeup((caddr_t)bp);			\
+		while ((bp = mfsp->mfs_buflist) != NULL) {
+			mfsp->mfs_buflist = bp->b_actf;
+			mfs_doio(bp, base);
+			wakeup((caddr_t)bp);
 		}
-		DOIO();
 		/*
 		 * If a non-ignored signal is received, try to unmount.
 		 * If that fails, clear the signal (it has been "processed"),
@@ -279,7 +278,7 @@ mfs_start(mp, flags, p)
 		 * EINTR/ERESTART.
 		 */
 		if (sleepreturn != 0) {
-			if (vfs_busy(mp, LK_NOWAIT, NULL, p) ||
+			if (vfs_busy(mp, LK_EXCLUSIVE|LK_NOWAIT, NULL, p) ||
 			    dounmount(mp, 0, p))
 				CLRSIG(p, CURSIG(p));
 			sleepreturn = 0;

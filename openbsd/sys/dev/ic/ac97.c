@@ -1,4 +1,4 @@
-/*	$OpenBSD: ac97.c,v 1.30 2002/04/08 01:43:13 frantzen Exp $	*/
+/*	$OpenBSD: ac97.c,v 1.33 2002/09/17 19:12:17 mickey Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Constantine Sapuntzakis
@@ -314,6 +314,7 @@ const struct ac97_codecid {
 	{ 0x48, 0xff, 0, 0,	"AD1881A" },
 	{ 0x60, 0xff, 0, 0,	"AD1885" },
 	{ 0x61, 0xff, 0, 0,	"AD1886" },
+	{ 0x72, 0xff, 0, 0,	"AD1981A" },
 }, ac97_ak[] = {
 	{ 0x00,	0xfe, 1, 0,	"AK4540" },
 	{ 0x01,	0xfe, 1, 0,	"AK4540" },
@@ -429,7 +430,7 @@ const char * const ac97enhancement[] = {
 	"Wolfson Microelectronics 3D",
 	"Delta Integration 3D",
 	"SigmaTel 3D",
-	"Unknown 3D",
+	"KS Waves 3D",
 	"Rockwell 3D",
 	"Unknown 3D",
 	"Unknown 3D",
@@ -712,12 +713,14 @@ ac97_attach(host_if)
 	if (as->ext_id)
 		DPRINTF(("ac97: ext id %b\n", as->ext_id,
 		    AC97_EXT_AUDIO_BITS));
-	ac97_read(as, AC97_REG_EXT_AUDIO_ID, &id1);
-	if (as->ext_id & AC97_EXT_AUDIO_VRA)
-		id1 |= AC97_EXT_AUDIO_VRA;
-	if (as->ext_id & AC97_EXT_AUDIO_VRM)
-		id1 |= AC97_EXT_AUDIO_VRM;
-	ac97_write(as, AC97_REG_EXT_AUDIO_CTRL, id1);
+	if (as->ext_id & (AC97_EXT_AUDIO_VRA | AC97_EXT_AUDIO_VRM)) {
+		ac97_read(as, AC97_REG_EXT_AUDIO_CTRL, &id1);
+		if (as->ext_id & AC97_EXT_AUDIO_VRA)
+			id1 |= AC97_EXT_AUDIO_VRA;
+		if (as->ext_id & AC97_EXT_AUDIO_VRM)
+			id1 |= AC97_EXT_AUDIO_VRM;
+		ac97_write(as, AC97_REG_EXT_AUDIO_CTRL, id1);
+	}
 
 	ac97_setup_source_info(as);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fea.c,v 1.13 2002/03/14 01:26:53 millert Exp $	*/
+/*	$OpenBSD: if_fea.c,v 1.15 2002/06/09 03:14:18 todd Exp $	*/
 /*	$NetBSD: if_fea.c,v 1.9 1996/10/21 22:31:05 thorpej Exp $	*/
 
 /*-
@@ -11,7 +11,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -224,7 +224,7 @@ pdq_eisa_attach(parent, self, aux)
 		printf(": interrupting at %s\n", intrstr);
 
 	bcopy((caddr_t) sc->sc_pdq->pdq_hwaddr.lanaddr_bytes,
-	    sc->sc_ac.ac_enaddr, 6);
+	    sc->sc_arpcom.ac_enaddr, 6);
 
 	pdq_ifattach(sc, NULL);
 

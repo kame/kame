@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.41 2002/03/27 15:12:22 jason Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.47 2002/07/20 19:24:57 art Exp $	*/
 /*	$NetBSD: machdep.c,v 1.108 2001/07/24 19:30:14 eeh Exp $ */
 
 /*-
@@ -108,13 +108,6 @@
 #include <uvm/uvm.h>
 
 #include <sys/sysctl.h>
-#ifndef	ELFSIZE
-#ifdef __arch64__
-#define	ELFSIZE	64
-#else
-#define	ELFSIZE	32
-#endif
-#endif
 #include <sys/exec_elf.h>
 
 #ifdef SYSVMSG
@@ -160,6 +153,11 @@ extern vaddr_t avail_end;
 #define BUFCACHEPERCENT 5
 #endif
 
+#ifdef	BUFPAGES
+int	bufpages = BUFPAGES;
+#else
+int	bufpages = 0;
+#endif
 int	bufcachepercent = BUFCACHEPERCENT;
 
 int	physmem;
@@ -427,15 +425,10 @@ allocsys(caddr_t v)
  * Set up registers on exec.
  */
 
-#ifdef __arch64__
 #define STACK_OFFSET	BIAS
 #define CPOUTREG(l,v)	copyout(&(v), (l), sizeof(v))
 #undef CCFSZ
 #define CCFSZ	CC64FSZ
-#else
-#define STACK_OFFSET	0
-#define CPOUTREG(l,v)	copyout(&(v), (l), sizeof(v))
-#endif
 
 /* ARGSUSED */
 void
@@ -449,9 +442,7 @@ setregs(p, pack, stack, retval)
 	struct fpstate64 *fs;
 	int64_t tstate;
 	int pstate = PSTATE_USER;
-#ifdef __arch64__
 	Elf_Ehdr *eh = pack->ep_hdr;
-#endif
 
 	/* Don't allow misaligned code by default */
 	p->p_md.md_flags &= ~MDP_FIXALIGN;
@@ -463,7 +454,6 @@ setregs(p, pack, stack, retval)
 	 *	%g1: address of PS_STRINGS (used by crt0)
 	 *	%tpc,%tnpc: entry point of program
 	 */
-#ifdef __arch64__
 	/* Check what memory model is requested */
 	switch ((eh->e_flags & EF_SPARCV9_MM)) {
 	default:
@@ -480,7 +470,7 @@ setregs(p, pack, stack, retval)
 		pstate = PSTATE_MM_RMO|PSTATE_IE;
 		break;
 	}
-#endif
+
 	tstate = (ASI_PRIMARY_NO_FAULT<<TSTATE_ASI_SHIFT) |
 		((pstate)<<TSTATE_PSTATE_SHIFT) | 
 		(tf->tf_tstate & TSTATE_CWP);
@@ -526,10 +516,6 @@ struct sigframe {
 	int	sf_signo;		/* signal number */
 	int	sf_code;		/* signal code (unused) */
 	siginfo_t *sf_sip;		/* points to siginfo_t */
-#ifndef __arch64__
-	struct	sigcontext *sf_scp;	/* SunOS user addr of sigcontext */
-	int	sf_addr;		/* SunOS compat, always 0 for now */
-#endif
 	struct	sigcontext sf_sc;	/* actual sigcontext */
 	siginfo_t sf_si;
 };
@@ -612,6 +598,8 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #else
 		return (sysctl_rdint(oldp, oldlenp, newp, 0));
 #endif
+	case CPU_CPUTYPE:
+		return (sysctl_rdint(oldp, oldlenp, newp, CPU_SUN4U));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -637,8 +625,6 @@ sendsig(catcher, sig, mask, code, type, val)
 	struct rwindow *oldsp, *newsp;
 	struct sigframe sf;
 	int onstack;
-	extern char sigcode[], esigcode[];
-#define	szsigcode	(esigcode - sigcode)
 
 	tf = p->p_md.md_tf;
 	oldsp = (struct rwindow *)(u_long)(tf->tf_out[6] + STACK_OFFSET);
@@ -666,10 +652,6 @@ sendsig(catcher, sig, mask, code, type, val)
 	 */
 	sf.sf_signo = sig;
 	sf.sf_sip = NULL;
-#ifndef __arch64__
-	sf.sf_scp = 0;
-	sf.sf_addr = 0;			/* XXX */
-#endif
 
 	/*
 	 * Build the signal context to be used by sigreturn.
@@ -680,11 +662,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	sf.sf_sc.sc_sp = (long)tf->tf_out[6];
 	sf.sf_sc.sc_pc = tf->tf_pc;
 	sf.sf_sc.sc_npc = tf->tf_npc;
-#ifdef __arch64__
 	sf.sf_sc.sc_tstate = tf->tf_tstate; /* XXX */
-#else
-	sf.sf_sc.sc_psr = TSTATECCR_TO_PSR(tf->tf_tstate); /* XXX */
-#endif
 	sf.sf_sc.sc_g1 = tf->tf_global[1];
 	sf.sf_sc.sc_o0 = tf->tf_out[0];
 
@@ -730,7 +708,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	 * Arrange to continue execution at the code copied out in exec().
 	 * It needs the function to call in %g1, and a new stack pointer.
 	 */
-	addr = (vaddr_t)PS_STRINGS - szsigcode;
+	addr = p->p_sigcode;
 	tf->tf_global[1] = (vaddr_t)catcher;
 	tf->tf_pc = addr;
 	tf->tf_npc = addr + 4;
@@ -796,11 +774,7 @@ sys_sigreturn(p, v, retval)
 	}
 
 	/* take only psr ICC field */
-#ifdef __arch64__
 	tf->tf_tstate = (u_int64_t)(tf->tf_tstate & ~TSTATE_CCR) | (scp->sc_tstate & TSTATE_CCR);
-#else
-	tf->tf_tstate = (u_int64_t)(tf->tf_tstate & ~TSTATE_CCR) | PSRCC_TO_TSTATE(scp->sc_psr);
-#endif
 	tf->tf_pc = (u_int64_t)scp->sc_pc;
 	tf->tf_npc = (u_int64_t)scp->sc_npc;
 	tf->tf_global[1] = (u_int64_t)scp->sc_g1;
@@ -1635,7 +1609,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	size = round_page(size);
 
 	/*
-	 * Find a region of kernel virtual addresses that can accomodate
+	 * Find a region of kernel virtual addresses that can accommodate
 	 * our aligment requirements.
 	 */
 	oversize = size + align - PAGE_SIZE;
@@ -1859,7 +1833,7 @@ sparc_bus_unmap(t, bh, size)
 	vaddr_t endva = va + round_page(size);
 
 	int error = extent_free(io_space, va, size, EX_NOWAIT);
-	if (error) printf("sparc_bus_unmap: extent free sez %d\n", error);
+	if (error) printf("sparc_bus_unmap: extent free says %d\n", error);
 
 	pmap_remove(pmap_kernel(), va, endva);
 	return (0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.14 2002/03/14 01:26:54 millert Exp $	*/
+/*	$OpenBSD: hme.c,v 1.20 2002/09/28 02:04:44 jason Exp $	*/
 /*	$NetBSD: hme.c,v 1.21 2001/07/07 15:59:37 thorpej Exp $	*/
 
 /*-
@@ -275,7 +275,7 @@ hme_config(sc)
 			 * connector.
 			 */
 			if (child->mii_phy > 1 || child->mii_inst > 1) {
-				printf("%s: cannot accomodate MII device %s"
+				printf("%s: cannot accommodate MII device %s"
 				    " at phy %d, instance %d\n",
 				    sc->sc_dev.dv_xname,
 				    child->mii_dev.dv_xname,
@@ -378,9 +378,11 @@ hme_stop(sc)
 	for (n = 0; n < 20; n++) {
 		u_int32_t v = bus_space_read_4(t, seb, HME_SEBI_RESET);
 		if ((v & (HME_SEB_RESET_ETX | HME_SEB_RESET_ERX)) == 0)
-			return;
+			break;
 		DELAY(20);
 	}
+	if (n >= 20)
+		printf("%s: hme_stop: reset failed\n", sc->sc_dev.dv_xname);
 
 	for (n = 0; n < HME_TX_RING_SIZE; n++) {
 		if (sc->sc_txd[n].sd_loaded) {
@@ -395,8 +397,6 @@ hme_stop(sc)
 			sc->sc_txd[n].sd_mbuf = NULL;
 		}
 	}
-
-	printf("%s: hme_stop: reset failed\n", sc->sc_dev.dv_xname);
 }
 
 void
@@ -628,7 +628,7 @@ hme_start(ifp)
 {
 	struct hme_softc *sc = (struct hme_softc *)ifp->if_softc;
 	struct mbuf *m;
-	int bix;
+	int bix, cnt = 0;
 
 	if ((ifp->if_flags & (IFF_RUNNING | IFF_OACTIVE)) != IFF_RUNNING)
 		return;
@@ -657,10 +657,13 @@ hme_start(ifp)
 
 		bus_space_write_4(sc->sc_bustag, sc->sc_etx, HME_ETXI_PENDING,
 		    HME_ETX_TP_DMAWAKEUP);
+		cnt++;
 	}
 
-	sc->sc_tx_prod = bix;
-	ifp->if_timer = 5;
+	if (cnt != 0) {
+		sc->sc_tx_prod = bix;
+		ifp->if_timer = 0;
+	}
 }
 
 /*
@@ -673,13 +676,14 @@ hme_tint(sc)
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	unsigned int ri, txflags;
 	struct hme_sxd *sd;
+	int cnt = sc->sc_tx_cnt;
 
 	/* Fetch current position in the transmit ring */
 	ri = sc->sc_tx_cons;
 	sd = &sc->sc_txd[ri];
 
 	for (;;) {
-		if (sc->sc_tx_cnt <= 0)
+		if (cnt <= 0)
 			break;
 
 		txflags = HME_XD_GETFLAGS(sc->sc_pci, sc->sc_rb.rb_txd, ri);
@@ -707,16 +711,17 @@ hme_tint(sc)
 		} else
 			sd++;
 
-		--sc->sc_tx_cnt;
+		--cnt;
 	}
+
+	sc->sc_tx_cnt = cnt;
+	if (cnt == 0)
+		ifp->if_timer = 0;
 
 	/* Update ring */
 	sc->sc_tx_cons = ri;
 
 	hme_start(ifp);
-
-	if (sc->sc_tx_cnt == 0)
-		ifp->if_timer = 0;
 
 	return (1);
 }
@@ -966,10 +971,13 @@ hme_mii_statchg(dev)
 
 	/* Set the MAC Full Duplex bit appropriately */
 	v = bus_space_read_4(t, mac, HME_MACI_TXCFG);
-	if ((IFM_OPTIONS(sc->sc_mii.mii_media_active) & IFM_FDX) != 0)
+	if ((IFM_OPTIONS(sc->sc_mii.mii_media_active) & IFM_FDX) != 0) {
 		v |= HME_MAC_TXCFG_FULLDPLX;
-	else
+		sc->sc_arpcom.ac_if.if_flags |= IFF_SIMPLEX;
+	} else {
 		v &= ~HME_MAC_TXCFG_FULLDPLX;
+		sc->sc_arpcom.ac_if.if_flags &= ~IFF_SIMPLEX;
+	}
 	bus_space_write_4(t, mac, HME_MACI_TXCFG, v);
 
 	/* If an external transceiver is selected, enable its MII drivers */
@@ -1305,6 +1313,11 @@ hme_newbuf(sc, d, freeit)
 	struct mbuf *m;
 	bus_dmamap_t map;
 
+	/*
+	 * All operations should be on local variables and/or rx spare map
+	 * until we're sure everything is a success.
+	 */
+
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == NULL)
 		return (ENOBUFS);
@@ -1316,6 +1329,19 @@ hme_newbuf(sc, d, freeit)
 		return (ENOBUFS);
 	}
 
+	if (bus_dmamap_load(sc->sc_dmatag, sc->sc_rxmap_spare,
+	    mtod(m, caddr_t), MCLBYTES - HME_RX_OFFSET, NULL,
+	    BUS_DMA_NOWAIT) != 0) {
+		m_freem(m);
+		return (ENOBUFS);
+	}
+
+	/*
+	 * At this point we have a new buffer loaded into the spare map.
+	 * Just need to clear out the old mbuf/map and put the new one
+	 * in place.
+	 */
+
 	if (d->sd_loaded) {
 		bus_dmamap_sync(sc->sc_dmatag, d->sd_map,
 		    0, d->sd_map->dm_mapsize, BUS_DMASYNC_POSTREAD);
@@ -1323,21 +1349,6 @@ hme_newbuf(sc, d, freeit)
 		d->sd_loaded = 0;
 	}
 
-	if (bus_dmamap_load(sc->sc_dmatag, sc->sc_rxmap_spare,
-	    mtod(m, caddr_t), MCLBYTES - HME_RX_OFFSET, NULL,
-	    BUS_DMA_NOWAIT) != 0) {
-		if (d->sd_mbuf == NULL)
-			return (ENOBUFS);
-		m_freem(m);
-		return (ENOBUFS);
-	}
-
-	if (d->sd_loaded) {
-		bus_dmamap_sync(sc->sc_dmatag, d->sd_map, 0,
-		    d->sd_map->dm_mapsize, BUS_DMASYNC_POSTREAD);
-		bus_dmamap_unload(sc->sc_dmatag, d->sd_map);
-		d->sd_loaded = 0;
-	}
 	if ((d->sd_mbuf != NULL) && freeit) {
 		m_freem(d->sd_mbuf);
 		d->sd_mbuf = NULL;

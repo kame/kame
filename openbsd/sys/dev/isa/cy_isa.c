@@ -1,4 +1,32 @@
-/*	$OpenBSD: cy_isa.c,v 1.7 2002/03/14 01:26:56 millert Exp $	*/
+/*	$OpenBSD: cy_isa.c,v 1.9 2002/09/15 21:30:25 art Exp $	*/
+/*
+ * Copyright (c) 1996 Timo Rossi.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the author nor the names of contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * cy_isa.c
@@ -37,6 +65,7 @@ cy_isa_probe(parent, match, aux)
 	struct isa_attach_args *ia = aux;
 	bus_space_tag_t memt;
 	bus_space_handle_t memh;
+	int ret;
 
 	if (ia->ia_irq == IRQUNK) {
 		printf("cy%d error: interrupt not defined\n", card);
@@ -47,10 +76,10 @@ cy_isa_probe(parent, match, aux)
 	if (bus_space_map(memt, ia->ia_maddr, 0x2000, 0, &memh) != 0)
 		return (0);
 
-	if (cy_probe_common(card, memt, memh, CY_BUSTYPE_ISA) == 0) {
-		bus_space_unmap(memt, memh, 0x2000);
+	ret = cy_probe_common(memt, memh, CY_BUSTYPE_ISA);
+	bus_space_unmap(memt, memh, 0x2000);
+	if (ret == 0)
 		return (0);
-	}
 
 	ia->ia_iosize = 0;
 	ia->ia_msize = 0x2000;
@@ -62,5 +91,24 @@ cy_isa_attach(parent, self, aux)
         struct device *parent, *self;
         void *aux;
 {
-	cy_attach(parent, self, aux);
+	struct cy_softc *sc = (struct cy_softc *)self;
+	struct isa_attach_args *ia = aux;
+
+	sc->sc_bustype = CY_BUSTYPE_ISA;
+	sc->sc_memt = ia->ia_memt;
+
+	if (bus_space_map(ia->ia_memt, ia->ia_maddr, 0x2000, 0,
+	    &sc->sc_memh) != 0)
+		return;
+
+	sc->sc_nr_cd1400s = cy_probe_common(sc->sc_memt, sc->sc_memh,
+	    CY_BUSTYPE_ISA);
+
+	cy_attach(parent, self);
+
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq,
+	    IST_EDGE, IPL_TTY, cy_intr, sc, sc->sc_dev.dv_xname);
+
+	if (sc->sc_ih == NULL)
+		panic("cy: couldn't establish interrupt");
 }

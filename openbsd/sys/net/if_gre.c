@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_gre.c,v 1.18 2002/04/03 20:35:58 angelos Exp $ */
+/*      $OpenBSD: if_gre.c,v 1.24 2002/08/28 15:43:02 pefo Exp $ */
 /*	$NetBSD: if_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -99,8 +99,6 @@
                          before changing if state to up to find the
                          correct value */
 
-#define LINK_MASK (IFF_LINK0|IFF_LINK1|IFF_LINK2)
-
 struct gre_softc *gre = 0;
 
 int ngre = 0;
@@ -134,8 +132,8 @@ greattach(n)
 		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
 			 "gre%d", i++);
 		sc->sc_if.if_softc = sc;
-		sc->sc_if.if_type =  IFT_OTHER;
-		sc->sc_if.if_addrlen = 4;
+		sc->sc_if.if_type = IFT_OTHER;
+		sc->sc_if.if_addrlen = 0;
 		sc->sc_if.if_hdrlen = 24; /* IP + GRE */
 		sc->sc_if.if_mtu = GREMTU;
 		sc->sc_if.if_flags = IFF_POINTOPOINT|IFF_MULTICAST;
@@ -148,12 +146,14 @@ greattach(n)
 		sc->sc_if.if_opackets = 0;
 		sc->g_dst.s_addr = sc->g_src.s_addr = INADDR_ANY;
 		sc->g_proto = IPPROTO_GRE;
+		sc->sc_if.if_flags |= IFF_LINK0;
 
 		if_attach(&sc->sc_if);
+		if_alloc_sadl(&sc->sc_if);
 
 #if NBPFILTER > 0
 		bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_RAW,
-			  sizeof(u_int32_t) );
+		    sizeof(u_int32_t));
 #endif
 	}
 }
@@ -175,13 +175,21 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	struct mobile_h mob_h;
 	struct m_tag *mtag;
 
+	if ((ifp->if_flags & IFF_UP) == 0 ||
+	    sc->g_src.s_addr == INADDR_ANY || sc->g_dst.s_addr == INADDR_ANY) {
+		m_freem(m);
+		error = ENETDOWN;
+		goto end;
+	}
+
 	/* Try to limit infinite recursion through misconfiguration. */
 	for (mtag = m_tag_find(m, PACKET_TAG_GRE, NULL); mtag;
 	     mtag = m_tag_find(m, PACKET_TAG_GRE, mtag)) {
 		if (!bcmp((caddr_t)(mtag + 1), &ifp, sizeof(struct ifnet *))) {
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			return (EIO);	/* Use the same as in if_gif.c */
+			error = EIO;
+			goto end;
 		}
 	}
 
@@ -189,7 +197,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	if (mtag == NULL) {
 		IF_DROP(&ifp->if_snd);
 		m_freem(m);
-		return (ENOBUFS);
+		error = ENOBUFS;
+		goto end;
 	}
 	bcopy(&ifp, (caddr_t)(mtag + 1), sizeof(struct ifnet *));
 	m_tag_prepend(m, mtag);
@@ -203,7 +212,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		if (ip_mobile_allow == 0) {
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			return (EACCES);
+			error = EACCES;
+			goto end;
 		}
 
 		if (dst->sa_family == AF_INET) {
@@ -218,7 +228,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				m = m_pullup(m, sizeof(struct ip));
 				if (m == NULL) {
 					IF_DROP(&ifp->if_snd);
-					return (ENOBUFS);
+					error = ENOBUFS;
+					goto end;
 				} else
 					inp = mtod(m, struct ip *);
 
@@ -227,7 +238,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 					    sizeof(inp->ip_hl << 2));
 					if (m == NULL) {
 						IF_DROP(&ifp->if_snd);
-						return (ENOBUFS);
+						error = ENOBUFS;
+						goto end;
 					}
 				}
 			}
@@ -263,7 +275,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				if (m0 == NULL) {
 					IF_DROP(&ifp->if_snd);
 					m_freem(m);
-					return (ENOBUFS);
+					error = ENOBUFS;
+					goto end;
 				}
 				M_MOVE_HDR(m0, m);
 
@@ -294,13 +307,15 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		} else {  /* AF_INET */
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			return (EINVAL);
+			error = EINVAL;
+			goto end;
 		}
 	} else if (sc->g_proto == IPPROTO_GRE) {
 		if (gre_allow == 0) {
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			return (EACCES);
+			error = EACCES;
+			goto end;
 		}
 
 		switch(dst->sa_family) {
@@ -309,7 +324,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				m = m_pullup(m, sizeof(struct ip));
 				if (m == NULL) {
 					IF_DROP(&ifp->if_snd);
-					return (ENOBUFS);
+					error = ENOBUFS;
+					goto end;
 				}
 			}
 
@@ -329,20 +345,22 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		default:
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			return (EAFNOSUPPORT);
+			error = EAFNOSUPPORT;
+			goto end;
 		}
 
 		M_PREPEND(m, sizeof(struct greip), M_DONTWAIT);
 	} else {
-		error = EINVAL;
 		IF_DROP(&ifp->if_snd);
 		m_freem(m);
-		return (error);
+		error = EINVAL;
+		goto end;
 	}
 
 	if (m == NULL) {
 		IF_DROP(&ifp->if_snd);
-		return (ENOBUFS);
+		error = ENOBUFS;
+		goto end;
 	}
 
 	gh = mtod(m, struct greip *);
@@ -367,7 +385,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	ifp->if_obytes += m->m_pkthdr.len;
 
 	/* Send it off */
-	error = ip_output(m, NULL, &sc->route, 0, NULL, NULL);
+	error = ip_output(m, (void *)NULL, &sc->route, 0, (void *)NULL, (void *)NULL);
+  end:
 	if (error)
 		ifp->if_oerrors++;
 	return (error);
@@ -377,9 +396,8 @@ int
 gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 
-	struct ifaddr *ifa = (struct ifaddr *) data;
 	struct ifreq *ifr = (struct ifreq *) data;
-	struct in_ifaddr *ia = (struct in_ifaddr *) data;
+	struct if_laddrreq *lifr = (struct if_laddrreq *)data;
 	struct gre_softc *sc = ifp->if_softc;
 	int s;
 	struct sockaddr_in si;
@@ -390,53 +408,15 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	s = splimp();
 	switch(cmd) {
 	case SIOCSIFADDR:
+		ifp->if_flags |= IFF_UP;
+		break;
 	case SIOCSIFDSTADDR:
-		/*
-		 * set tunnel endpoints in case that we "only"
-		 * have ip over ip encapsulation. This allows to
-		 * set tunnel endpoints with ifconfig.
-		 */
-		if (ifa->ifa_addr->sa_family == AF_INET) {
-			sa = ifa->ifa_addr;
-			sc->g_src = (satosin(sa))->sin_addr;
-			sc->g_dst = ia->ia_dstaddr.sin_addr;
-			if ((sc->g_src.s_addr != INADDR_ANY) &&
-			    (sc->g_dst.s_addr != INADDR_ANY)) {
-				if (sc->route.ro_rt != 0) {
-					/* free old route */
-					RTFREE(sc->route.ro_rt);
-					sc->route.ro_rt = (struct rtentry *) 0;
-				}
-
-				gre_compute_route(sc);
-				if (sc->route.ro_rt == 0) {
-					sc->g_src.s_addr = INADDR_ANY;
-					sc->g_dst.s_addr = INADDR_ANY;
-					splx(s);
-					return EIO; /* Is this is good ? */
-				}
-
-				ifp->if_flags |= IFF_UP;
-			}
-		}
 		break;
 	case SIOCSIFFLAGS:
-		if ((sc->g_dst.s_addr == INADDR_ANY) ||
-		    (sc->g_src.s_addr == INADDR_ANY))
-			ifp->if_flags &= ~IFF_UP;
-
-		switch(ifr->ifr_flags & LINK_MASK) {
-			case IFF_LINK0:
-				sc->g_proto = IPPROTO_GRE;
-				ifp->if_flags |= IFF_LINK0;
-				ifp->if_flags &= ~(IFF_LINK1|IFF_LINK2);
-				break;
-			case IFF_LINK2:
-				sc->g_proto = IPPROTO_MOBILE;
-				ifp->if_flags |= IFF_LINK2;
-				ifp->if_flags &= ~(IFF_LINK0|IFF_LINK1);
-				break;
-		}
+		if ((ifr->ifr_flags & IFF_LINK0) != 0)
+			sc->g_proto = IPPROTO_GRE;
+		else
+			sc->g_proto = IPPROTO_MOBILE;
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
@@ -461,16 +441,14 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		sc->g_proto = ifr->ifr_flags;
 		switch (sc->g_proto) {
-		case IPPROTO_GRE :
+		case IPPROTO_GRE:
 			ifp->if_flags |= IFF_LINK0;
-			ifp->if_flags &= ~(IFF_LINK1|IFF_LINK2);
 			break;
-		case IPPROTO_MOBILE :
-			ifp->if_flags |= IFF_LINK2;
-			ifp->if_flags &= ~(IFF_LINK1|IFF_LINK2);
+		case IPPROTO_MOBILE:
+			ifp->if_flags &= ~IFF_LINK0;
 			break;
 		default:
-			ifp->if_flags &= ~(IFF_LINK0|IFF_LINK1|IFF_LINK2);
+			return EPROTONOSUPPORT;
 		}
 		break;
 	case GREGPROTO:
@@ -491,6 +469,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			sc->g_src = (satosin(sa))->sin_addr;
 		if (cmd == GRESADDRD )
 			sc->g_dst = (satosin(sa))->sin_addr;
+	recompute:
 		if ((sc->g_src.s_addr != INADDR_ANY) &&
 		    (sc->g_dst.s_addr != INADDR_ANY)) {
 			if (sc->route.ro_rt != 0) {
@@ -511,14 +490,57 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case GREGADDRS:
+		bzero(&si, sizeof(si));
+		si.sin_family = AF_INET;
+		si.sin_len = sizeof(struct sockaddr_in);
 		si.sin_addr.s_addr = sc->g_src.s_addr;
 		sa = sintosa(&si);
 		ifr->ifr_addr = *sa;
 		break;
 	case GREGADDRD:
+		bzero(&si, sizeof(si));
+		si.sin_family = AF_INET;
+		si.sin_len = sizeof(struct sockaddr_in);
 		si.sin_addr.s_addr = sc->g_dst.s_addr;
 		sa = sintosa(&si);
 		ifr->ifr_addr = *sa;
+		break;
+	case SIOCSLIFPHYADDR:
+		if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
+			break;
+		if (lifr->addr.ss_family != AF_INET ||
+		    lifr->dstaddr.ss_family != AF_INET) {
+			error = EAFNOSUPPORT;
+			break;
+		}
+		if (lifr->addr.ss_len != sizeof(si) ||
+		    lifr->dstaddr.ss_len != sizeof(si)) {
+			error = EINVAL;
+			break;
+		}
+		sc->g_src = (satosin((struct sockadrr *)&lifr->addr))->sin_addr;
+		sc->g_dst =
+		    (satosin((struct sockadrr *)&lifr->dstaddr))->sin_addr;
+		goto recompute;
+	case SIOCDIFPHYADDR:
+		if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
+			break;
+		sc->g_src.s_addr = INADDR_ANY;
+		sc->g_dst.s_addr = INADDR_ANY;
+		break;
+	case SIOCGLIFPHYADDR:
+		if (sc->g_src.s_addr == INADDR_ANY ||
+		    sc->g_dst.s_addr == INADDR_ANY) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+		bzero(&si, sizeof(si));
+		si.sin_family = AF_INET;
+		si.sin_len = sizeof(struct sockaddr_in);
+		si.sin_addr.s_addr = sc->g_src.s_addr;
+		memcpy(&lifr->addr, &si, sizeof(si));
+		si.sin_addr.s_addr = sc->g_dst.s_addr;
+		memcpy(&lifr->dstaddr, &si, sizeof(si));
 		break;
 	default:
 		error = EINVAL;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_misc.c,v 1.23 2002/03/14 03:16:03 millert Exp $	*/
+/*	$OpenBSD: ibcs2_misc.c,v 1.25 2002/08/23 15:39:31 art Exp $	*/
 /*	$NetBSD: ibcs2_misc.c,v 1.23 1997/01/15 01:37:49 perry Exp $	*/
 
 /*
@@ -434,7 +434,6 @@ ibcs2_sys_getdents(p, v, retval)
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 
-	FREF(fp);
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
 	error = readdir_with_callback(fp, &fp->f_offset, args.resid,
@@ -469,18 +468,22 @@ ibcs2_sys_read(p, v, retval)
 		else
 			return error;
 	}
-	if ((fp->f_flag & FREAD) == 0)
-		return (EBADF);
+	if ((fp->f_flag & FREAD) == 0) {
+		error = EBADF;
+		goto bad;
+	}
 	vp = (struct vnode *)fp->f_data;
-	if (vp->v_type != VDIR)
+	if (vp->v_type != VDIR) {
+		FRELE(fp);
 		return sys_read(p, uap, retval);
+	}
 
-	FREF(fp);
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
 
 	error = readdir_with_callback(fp, &fp->f_offset, args.resid,
 	    ibcs2_classicread_callback, &args);
+bad:
 	FRELE(fp);
 	if (error)
 		return (error);
@@ -694,7 +697,8 @@ ibcs2_sys_sysconf(p, v, retval)
 	struct ibcs2_sys_sysconf_args /* {
 		syscallarg(int) name;
 	} */ *uap = v;
-	int mib[2], value, len, error;
+	int mib[2], value, error;
+	size_t len;
 	struct sys___sysctl_args sa;
 	struct sys_getrlimit_args ga;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.c,v 1.51 2002/03/14 01:27:05 millert Exp $	*/
+/*	$OpenBSD: tty.c,v 1.55 2002/07/30 00:17:10 nordin Exp $	*/
 /*	$NetBSD: tty.c,v 1.68.4.2 1996/06/06 16:04:52 thorpej Exp $	*/
 
 /*-
@@ -59,6 +59,7 @@
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
 #include <sys/sysctl.h>
+#include <sys/pool.h>
 
 #include <sys/namei.h>
 
@@ -165,6 +166,8 @@ u_char const char_type[] = {
 struct ttylist_head ttylist;	/* TAILQ_HEAD */
 int tty_count;
 
+int64_t tk_cancc, tk_nin, tk_nout, tk_rawcc;
+
 /*
  * Initial open of tty, or (re)entry to standard tty line discipline.
  */
@@ -207,6 +210,8 @@ ttyclose(tp)
 
 	tp->t_gen++;
 	tp->t_pgrp = NULL;
+	if (tp->t_session)
+		SESSRELE(tp->t_session);
 	tp->t_session = NULL;
 	tp->t_state = 0;
 	return (0);
@@ -234,6 +239,7 @@ ttyinput(c, tp)
 	register int iflag, lflag;
 	register u_char *cc;
 	int i, error;
+	int s;
 
 	add_tty_randomness(tp->t_dev << 8 | c);
 	/*
@@ -241,12 +247,15 @@ ttyinput(c, tp)
 	 */
 	if (!ISSET(tp->t_cflag, CREAD))
 		return (0);
+
 	/*
 	 * If input is pending take it first.
 	 */
 	lflag = tp->t_lflag;
+	s = spltty();
 	if (ISSET(lflag, PENDIN))
 		ttypend(tp);
+	splx(s);
 	/*
 	 * Gather stats.
 	 */
@@ -777,7 +786,9 @@ ttioctl(tp, cmd, data, flag, p)
 	case FIONBIO:			/* set/clear non-blocking i/o */
 		break;			/* XXX: delete. */
 	case FIONREAD:			/* get # bytes to read */
+		s = spltty();
 		*(int *)data = ttnread(tp);
+		splx(s);
 		break;
 	case TIOCEXCL:			/* set exclusive use of tty */
 		s = spltty();
@@ -977,6 +988,8 @@ ttioctl(tp, cmd, data, flag, p)
 		    ((p->p_session->s_ttyvp || tp->t_session) &&
 		     (tp->t_session != p->p_session)))
 			return (EPERM);
+		if (tp->t_session)
+			SESSRELE(tp->t_session);
 		SESSHOLD(p->p_session);
 		tp->t_session = p->p_session;
 		tp->t_pgrp = p->p_pgrp;
@@ -1099,8 +1112,11 @@ filt_ttyread(struct knote *kn, long hint)
 {
 	dev_t dev = (dev_t)((u_long)kn->kn_hook);
 	struct tty *tp = (*cdevsw[major(dev)].d_tty)(dev);
+	int s;
 
+	s = spltty();
 	kn->kn_data = ttnread(tp);
+	splx(s);
 	if (!ISSET(tp->t_state, CLOCAL) && !ISSET(tp->t_state, TS_CARR_ON)) {
 		kn->kn_flags |= EV_EOF;
 		return (1);
@@ -1136,6 +1152,8 @@ ttnread(tp)
 	struct tty *tp;
 {
 	int nread;
+
+	splassert(IPL_TTY);
 
 	if (ISSET(tp->t_lflag, PENDIN))
 		ttypend(tp);
@@ -1386,11 +1404,12 @@ nullmodem(tp, flag)
  * call at spltty().
  */
 void
-ttypend(tp)
-	register struct tty *tp;
+ttypend(struct tty *tp)
 {
 	struct clist tq;
-	register int c;
+	int c;
+
+	splassert(IPL_TTY);
 
 	CLR(tp->t_lflag, PENDIN);
 	SET(tp->t_state, TS_TYPEN);
@@ -1602,10 +1621,11 @@ out:
 
 /* Call at spltty */
 void
-ttyunblock(tp)
-	struct tty *tp;
+ttyunblock(struct tty *tp)
 {
 	u_char *cc = tp->t_cc;
+
+	splassert(IPL_TTY);
 
 	if (ISSET(tp->t_state, TS_TBLOCK)) {
 		if (ISSET(tp->t_iflag, IXOFF) &&

@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82596.c,v 1.9 2002/03/14 01:26:54 millert Exp $	*/
+/*	$OpenBSD: i82596.c,v 1.12 2002/09/23 06:11:50 mickey Exp $	*/
 /*	$NetBSD: i82586.c,v 1.18 1998/08/15 04:42:42 mycroft Exp $	*/
 
 /*-
@@ -523,12 +523,6 @@ i82596_intr(v)
 	register u_int status;
 	register int off;
 
-        /*
-         * Implementation dependent interrupt handling.
-         */
-	if (sc->intrhook)
-		(sc->intrhook)(sc, IE_INTR_ENTER);
-
 	off = IE_SCB_STATUS(sc->scb);
 	PURGE(sc->bh + off, 2);
 	bus_space_barrier(sc->bt, sc->bh, off, 2, BUS_SPACE_BARRIER_READ);
@@ -548,13 +542,21 @@ loop:
 #endif
 	i82596_start_cmd(sc, status & IE_ST_WHENCE, 0, 0, 1);
 
-	if (status & (IE_ST_FR | IE_ST_RNR))
+	if (status & (IE_ST_FR | IE_ST_RNR)) {
+		if (sc->intrhook)
+			(sc->intrhook)(sc, IE_INTR_ENRCV);
+
 		if (i82596_rint(sc, status) != 0)
 			goto reset;
+	}
 
-	if (status & IE_ST_CX)
+	if (status & IE_ST_CX) {
+		if (sc->intrhook)
+			(sc->intrhook)(sc, IE_INTR_ENSND);
+
 		if (i82596_tint(sc, status) != 0)
 			goto reset;
+	}
 
 #ifdef I82596_DEBUG
 	if ((status & IE_ST_CNA) && (sc->sc_debug & IED_CNA))
@@ -998,18 +1000,20 @@ i82596_chk_rx_ring(sc)
  * operation considerably.  (Provided that it works, of course.)
  */
 static __inline__ struct mbuf *
-i82596_get(struct ie_softc *sc, struct ether_header *ehp, int head, int totlen)
+i82596_get(struct ie_softc *sc, int head, int totlen)
 {
 	struct mbuf *top, **mp, *m;
 	int off, len, resid;
 	int thisrboff, thismboff;
+	struct ether_header eh;
 
 	/*
 	 * Snarf the Ethernet header.
 	 */
-	(sc->memcopyin)(sc, ehp, IE_RBUF_ADDR(sc,head), sizeof *ehp);
+	(sc->memcopyin)(sc, &eh, IE_RBUF_ADDR(sc, head),
+	    sizeof(struct ether_header));
 
-	resid = totlen -= (thisrboff = sizeof *ehp);
+	resid = totlen;
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == 0)
@@ -1041,6 +1045,13 @@ i82596_get(struct ie_softc *sc, struct ether_header *ehp, int head, int totlen)
 			}
 			len = MCLBYTES;
 		}
+		if (mp == &top) {
+			caddr_t newdata = (caddr_t)
+			    ALIGN(m->m_data + sizeof(struct ether_header)) -
+			    sizeof(struct ether_header);
+			len -= newdata - m->m_data;
+			m->m_data = newdata;
+		}
 		m->m_len = len = min(totlen, len);
 		totlen -= len;
 		*mp = m;
@@ -1049,6 +1060,14 @@ i82596_get(struct ie_softc *sc, struct ether_header *ehp, int head, int totlen)
 
 	m = top;
 	thismboff = 0;
+
+	/*
+	 * Copy the Ethernet header into the mbuf chain.
+	 */
+	bcopy(&eh, mtod(m, caddr_t), sizeof(struct ether_header));
+	thismboff = sizeof(struct ether_header);
+	thisrboff = sizeof(struct ether_header);
+	resid -= sizeof(struct ether_header);
 
 	/*
 	 * Now we take the mbuf chain (hopefully only one mbuf most of the
@@ -1103,7 +1122,6 @@ i82596_readframe(sc, num)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct mbuf *m;
-	struct ether_header eh;
 	u_int16_t bstart, bend;
 	int pktlen;
 
@@ -1112,7 +1130,7 @@ i82596_readframe(sc, num)
 		return (1);
 	}
 
-	m = i82596_get(sc, &eh, bstart, pktlen);
+	m = i82596_get(sc, bstart, pktlen);
 	i82596_release_rbd_list(sc, bstart, bend);
 
 	if (m == 0) {
@@ -1121,38 +1139,27 @@ i82596_readframe(sc, num)
 	}
 
 #ifdef I82596_DEBUG
-	if (sc->sc_debug & IED_READFRAME)
+	if (sc->sc_debug & IED_READFRAME) {
+		struct ether_header *eh = mtod(m, struct ether_header *);
+
 		printf("%s: frame from ether %s type 0x%x len %d\n",
-		       sc->sc_dev.dv_xname,
-		       ether_sprintf(eh.ether_shost),
-		       (u_int)eh.ether_type, pktlen);
+		    sc->sc_dev.dv_xname, ether_sprintf(eh->ether_shost),
+		    (u_int)eh->ether_type, pktlen);
+	}
 #endif
 
 #if NBPFILTER > 0
-	/*
-	 * Check for a BPF filter; if so, hand it up.
-	 * Note that we have to stick an extra mbuf up front, because bpf_mtap
-	 * expects to have the ether header at the front.
-	 * It doesn't matter that this results in an ill-formatted mbuf chain,
-	 * since BPF just looks at the data.  (It doesn't try to free the mbuf,
-	 * tho' it will make a copy for tcpdump.)
-	 */
+	/* Check for a BPF filter; if so, hand it up. */
 	if (ifp->if_bpf) {
-		struct mbuf m0;
-		m0.m_len = sizeof eh;
-		m0.m_data = (caddr_t)&eh;
-		m0.m_next = m;
-
 		/* Pass it up. */
-		bpf_mtap(ifp->if_bpf, &m0);
-
+		bpf_mtap(ifp->if_bpf, m);
 	}
 #endif /* NBPFILTER > 0 */
 
 	/*
 	 * Finally pass this packet up to higher layers.
 	 */
-	ether_input(ifp, &eh, m);
+	ether_input_mbuf(ifp, m);
 	ifp->if_ipackets++;
 	return (0);
 }

@@ -1,5 +1,5 @@
-/*	$OpenBSD: openprom.c,v 1.3 2002/03/14 01:26:45 millert Exp $	*/
-/*	$NetBSD: openprom.c,v 1.2 2000/11/18 23:45:05 mrg Exp $ */
+/*	$OpenBSD: openprom.c,v 1.8 2002/07/31 18:39:22 jason Exp $	*/
+/*	$NetBSD: openprom.c,v 1.4 2002/01/10 06:21:53 briggs Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -63,7 +63,6 @@
 
 static	int lastnode;			/* speed hack */
 extern	int optionsnode;		/* node ID of ROM's options */
-extern	struct promvec *promvec;
 
 static int openpromcheckid(int, int);
 static int openpromgetstr(int, char *, char **);
@@ -74,10 +73,6 @@ openpromopen(dev, flags, mode, p)
 	int flags, mode;
 	struct proc *p;
 {
-#if defined(SUN4)
-	if (cputyp==CPU_SUN4)
-		return (ENODEV);
-#endif
 
 	return (0);
 }
@@ -98,13 +93,10 @@ openpromclose(dev, flags, mode, p)
  */
 static int
 openpromcheckid(sid, tid)
-	register int sid, tid;
+	int sid, tid;
 {
-	register struct nodeops *no;
-
-	no = promvec->pv_nodeops;
-	for (; sid != 0; sid = no->no_nextnode(sid))
-		if (sid == tid || openpromcheckid(no->no_child(sid), tid))
+	for (; sid != 0; sid = OF_peer(sid))
+		if (sid == tid || openpromcheckid(OF_child(sid), tid))
 			return (1);
 
 	return (0);
@@ -115,8 +107,8 @@ openpromgetstr(len, user, cpp)
 	int len;
 	char *user, **cpp;
 {
-	register int error;
-	register char *cp;
+	int error;
+	char *cp;
 
 	/* Reject obvious bogus requests */
 	if ((u_int)len > (8 * 1024) - 1)
@@ -226,7 +218,7 @@ openpromioctl(dev, cmd, data, flags, p)
 		error = OF_nextprop(node, name, nextprop);
 		splx(s);
 		if (error == 0) {
-			op->op_buflen = len;
+			op->op_buflen = 0;
 			error = subyte(op->op_buf, 0);
 			break;
 		}

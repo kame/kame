@@ -1,4 +1,4 @@
-/* $OpenBSD: eephy.c,v 1.5 2002/04/02 14:52:27 lebel Exp $ */
+/*	$OpenBSD: eephy.c,v 1.7 2002/05/04 11:30:06 fgsch Exp $	*/
 /*
  * Principal Author: Parag Patel
  * Copyright (c) 2001
@@ -356,9 +356,6 @@ eephy_status(struct mii_softc *sc)
 	struct mii_data *mii = sc->mii_pdata;
 	int bmsr, bmcr, esr, ssr, isr, ar, lpar;
 
-	if ((mii->mii_ifp->if_flags & IFF_UP) == 0)
-		return;
-
 	mii->mii_media_status = IFM_AVALID;
 	mii->mii_media_active = IFM_ETHER;
 
@@ -415,7 +412,7 @@ eephy_mii_phy_auto(struct mii_softc *sc, int waitfor)
 
 	if ((sc->mii_flags & MIIF_DOINGAUTO) == 0) {
 		PHY_WRITE(sc, E1000_AR, E1000_AR_10T | E1000_AR_10T_FD |
-		    E1000_AR_100TX | E1000_AR_100TX_FD | 
+		    E1000_AR_100TX | E1000_AR_100TX_FD |
 		    E1000_AR_PAUSE | E1000_AR_ASM_DIR);
 		PHY_WRITE(sc, E1000_1GCR, E1000_1GCR_1000T_FD);
 		PHY_WRITE(sc, E1000_CR,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: anvar.h,v 1.9 2002/03/25 19:48:49 mickey Exp $	*/
+/*	$OpenBSD: anvar.h,v 1.11 2002/06/09 03:14:18 todd Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -504,6 +504,7 @@ struct an_ltv_caps {
 	u_int16_t		an_softcaps;		/* 0x7C */
 	u_int16_t		an_bootblockrev;	/* 0x7E */
 	u_int16_t		an_req_hw_support;	/* 0x80 */
+	u_int16_t		an_rsvd1;		/* 0x82 */
 };
 
 /*
@@ -640,7 +641,7 @@ struct an_tx_ring_data {
 
 struct an_softc	{
 	struct device	sc_dev;
-	struct arpcom	arpcom;
+	struct arpcom	sc_arpcom;
 	struct ifmedia	an_ifmedia;
 	void		*sc_ih;
 	struct timeout	an_stat_ch;

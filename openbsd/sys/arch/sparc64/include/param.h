@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.8 2002/03/14 01:26:45 millert Exp $	*/
+/*	$OpenBSD: param.h,v 1.11 2002/06/15 17:23:31 art Exp $	*/
 /*	$NetBSD: param.h,v 1.25 2001/05/30 12:28:51 mrg Exp $ */
 
 /*
@@ -73,15 +73,9 @@
 
 #define	_MACHINE	sparc64
 #define	MACHINE		"sparc64"
-#ifdef __arch64__
 #define	_MACHINE_ARCH	sparc64
 #define	MACHINE_ARCH	"sparc64"
 #define	MID_MACHINE	MID_SPARC64
-#else
-#define	_MACHINE_ARCH	sparc
-#define	MACHINE_ARCH	"sparc"
-#define	MID_MACHINE	MID_SPARC
-#endif
 
 #ifdef _KERNEL				/* XXX */
 #ifndef _LOCORE				/* XXX */
@@ -100,13 +94,7 @@
  * (within reasonable limits). 
  *
  */
-#define ALIGNBYTES32		0x7
-#define ALIGNBYTES64		0xf
-#ifdef __arch64__
-#define	ALIGNBYTES		ALIGNBYTES64
-#else
-#define	ALIGNBYTES		ALIGNBYTES32
-#endif
+#define	ALIGNBYTES		0xf
 #define	ALIGN(p)		(((u_long)(p) + ALIGNBYTES) & ~ALIGNBYTES)
 #define ALIGN32(p)		(((u_long)(p) + ALIGNBYTES32) & ~ALIGNBYTES32)
 #define ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
@@ -127,12 +115,8 @@ extern int nbpg, pgofset, pgshift;
 #define	BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(64 * 1024)
 
-#ifdef __arch64__
 /* We get stack overflows w/8K stacks in 64-bit mode */
 #define	SSIZE		2		/* initial stack size in pages */
-#else
-#define	SSIZE		2
-#endif
 #define	USPACE		(SSIZE*8192)
 
 
@@ -252,28 +236,9 @@ extern int nbpg, pgofset, pgshift;
  */
 #ifdef _KERNEL
 #ifndef _LOCORE
-#if 0
-extern vaddr_t	dvma_base;
-extern vaddr_t	dvma_end;
-extern struct map	*dvmamap;
-/*
- * The dvma resource map is defined in page units, which are numbered 1 to N.
- * Use these macros to convert to/from virtual addresses.
- */
-#define rctov(n)		(ctob(((n)-1))+dvma_base)
-#define vtorc(v)		((btoc((v)-dvma_base))+1)
-
-extern caddr_t	kdvma_mapin(caddr_t, int, int);
-extern caddr_t	dvma_malloc(size_t, void *, int);
-extern void	dvma_free(caddr_t, size_t, void *);
-#endif
 
 extern void	delay(unsigned int);
 #define	DELAY(n)	delay(n)
-
-extern int cputyp;
-extern int cpumod;
-extern int mmumod;
 
 #endif /* _LOCORE */
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.17 2002/03/16 00:34:56 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.22 2002/10/01 21:03:30 mickey Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -52,6 +52,7 @@
 #include "cd.h"
 #include "ch.h"
 #include "ss.h"
+#include "ses.h"
 #include "uk.h"
 #if 0
 #include "fd.h"
@@ -87,22 +88,18 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
 	dev_init(c,n,tty), ttselect /* ttpoll */, dev_init(c,n,mmap) }
 
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl),(dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
-
+#include "audio.h"
 #include "pty.h"
 #include "wsdisplay.h"
 #include "wskbd.h"
 #include "wsmouse.h"
 #include "wsmux.h"
 
+#include "inet.h"
 #include "bpfilter.h"
 #include "tun.h"
 
 #include "ksyms.h"
-cdev_decl(ksyms);
 
 #include "lpt.h"
 cdev_decl(lpt);
@@ -113,6 +110,8 @@ cdev_decl(com);
 #include "pf.h"
 
 #include <altq/altqconf.h>
+
+#include "systrace.h"
 
 struct cdevsw   cdevsw[] =
 {
@@ -155,6 +154,10 @@ struct cdevsw   cdevsw[] =
 	cdev_notdef(),			/* 32 */
 #endif
 	cdev_altq_init(NALTQ,altq),	/* 33: ALTQ control interface */
+	cdev_systrace_init(NSYSTRACE,systrace),	/* 34: system call tracing */
+	cdev_audio_init(NAUDIO,audio),	/* 35: /dev/audio */
+	cdev_crypto_init(NCRYPTO,crypto), /* 36: /dev/crypto */
+	cdev_ses_init(NSES,ses),	/* 37: SCSI SES/SAF-TE */
 	cdev_lkm_dummy(),
 	cdev_lkm_dummy(),
 	cdev_lkm_dummy(),

@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.25 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: clock.c,v 1.28 2002/07/06 19:14:20 nordin Exp $	*/
 /*	$NetBSD: clock.c,v 1.39 1996/05/12 23:11:54 mycroft Exp $	*/
 
 /*-
@@ -148,8 +148,8 @@ void	rtcdrain(void *);
 u_int mc146818_read(void *, u_int);
 void mc146818_write(void *, u_int, u_int);
 
-#if defined(I586_CPU) || defined(I686_CPU)
-int pentium_mhz;
+#if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
+int pentium_mhz, clock_broken_latch;
 #endif
 
 #define	SECMIN	((unsigned)60)			/* seconds per minute */
@@ -260,16 +260,68 @@ rtcintr(arg)
 int
 gettick()
 {
-	u_char lo, hi;
 
-	/* Don't want someone screwing with the counter while we're here. */
-	disable_intr();
-	/* Select counter 0 and latch it. */
-	outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
-	lo = inb(TIMER_CNTR0);
-	hi = inb(TIMER_CNTR0);
-	enable_intr();
-	return ((hi << 8) | lo);
+#if defined(I586_CPU) || defined(I686_CPU)
+	if (clock_broken_latch) {
+		int v1, v2, v3;
+		int w1, w2, w3;
+
+		disable_intr();
+
+		v1 = inb(TIMER_CNTR0);
+		v1 |= inb(TIMER_CNTR0) << 8;
+		v2 = inb(TIMER_CNTR0);
+		v2 |= inb(TIMER_CNTR0) << 8;
+		v3 = inb(TIMER_CNTR0);
+		v3 |= inb(TIMER_CNTR0) << 8;
+
+		enable_intr();
+
+		if (v1 >= v2 && v2 >= v3 && v1 - v3 < 0x200)
+			return (v2);
+
+#define _swap_val(a, b) do { \
+	int c = a; \
+	a = b; \
+	b = c; \
+} while (0)
+
+		/* sort v1 v2 v3 */
+		if (v1 < v2)
+			_swap_val(v1, v2);
+		if (v2 < v3)
+			_swap_val(v2, v3);
+		if (v1 < v2)
+			_swap_val(v1, v2);
+
+		/* compute the middle value */
+		if (v1 - v3 < 0x200)
+			return (v2);
+		w1 = v2 - v3;
+		w2 = v3 - v1 + TIMER_DIV(hz);
+		w3 = v1 - v2;
+		if (w1 >= w2) {
+			if (w1 >= w3)
+				return (v1);
+		} else {
+			if (w2 >= w3)
+				return (v2);
+		}
+		return (v3);
+	} else
+#endif
+	{
+		u_char lo, hi;
+
+		disable_intr();
+		/* Select counter 0 and latch it. */
+		outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
+		lo = inb(TIMER_CNTR0);
+		hi = inb(TIMER_CNTR0);
+
+		enable_intr();
+		return ((hi << 8) | lo);
+	}
 }
 
 /*
@@ -398,17 +450,11 @@ void
 calibrate_cyclecounter()
 {
 	unsigned long long count, last_count;
-#ifdef NTP
-	extern long time_precision;
-#endif
 
 	__asm __volatile(".byte 0xf, 0x31" : "=A" (last_count));
 	delay(1000000);
 	__asm __volatile(".byte 0xf, 0x31" : "=A" (count));
 	pentium_mhz = ((count - last_count) + 500000) / 1000000;
-#ifdef NTP
-	time_precision = 1;	/* XXX */
-#endif
 }
 #endif
 

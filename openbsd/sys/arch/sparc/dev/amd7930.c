@@ -1,4 +1,4 @@
-/*	$OpenBSD: amd7930.c,v 1.20 2002/03/14 03:15:59 millert Exp $	*/
+/*	$OpenBSD: amd7930.c,v 1.22 2002/04/30 01:12:28 art Exp $	*/
 /*	$NetBSD: amd7930.c,v 1.37 1998/03/30 14:23:40 pk Exp $	*/
 
 /*
@@ -283,7 +283,7 @@ amd7930attach(parent, self, args)
 		return;
 	}
 	pri = ra->ra_intr[0].int_pri;
-	printf(" pri %d, softpri %d\n", pri, PIL_AUSOFT);
+	printf(" pri %d, softpri %d\n", pri, IPL_AUSOFT);
 	amd = (volatile struct amd7930 *)(ra->ra_vaddr ?
 		ra->ra_vaddr : mapiodev(ra->ra_reg, 0, sizeof (*amd)));
 
@@ -304,11 +304,11 @@ amd7930attach(parent, self, args)
 #else
 	sc->sc_hwih.ih_fun = amd7930hwintr;
 	sc->sc_hwih.ih_arg = &sc->sc_au;
-	intr_establish(pri, &sc->sc_hwih);
+	intr_establish(pri, &sc->sc_hwih, IPL_AUHARD);
 #endif
 	sc->sc_swih.ih_fun = amd7930swintr;
 	sc->sc_swih.ih_arg = sc;
-	intr_establish(PIL_AUSOFT, &sc->sc_swih);
+	intr_establish(IPL_AUSOFT, &sc->sc_swih, IPL_AUSOFT);
 
 	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
 

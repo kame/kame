@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ah.c,v 1.63 2001/06/26 06:18:58 angelos Exp $ */
+/*	$OpenBSD: ip_ah.c,v 1.70 2002/07/05 23:20:53 angelos Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -516,7 +516,7 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 		btsx = ntohl(btsx);
 
 		switch (checkreplaywindow32(btsx, 0, &(tdb->tdb_rpl),
-		    tdb->tdb_wnd, &(tdb->tdb_bitmap))) {
+		    tdb->tdb_wnd, &(tdb->tdb_bitmap), 0)) {
 		case 0: /* All's well. */
 			break;
 
@@ -535,7 +535,6 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 			    "SA %s/%08x\n", ipsp_address(tdb->tdb_dst),
 			    ntohl(tdb->tdb_spi)));
 
-			ahstat.ahs_replay++;
 			m_freem(m);
 			return ENOBUFS;
 
@@ -577,8 +576,7 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 
 	/* Notify on expiration. */
 	if (tdb->tdb_flags & TDBF_SOFT_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)
-	{
+	    tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes) {
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
 		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking. */
 	}
@@ -693,6 +691,7 @@ ah_input_cb(void *op)
 	struct cryptop *crp;
 	struct m_tag *mtag;
 	struct tdb *tdb;
+	u_int32_t btsx;
 	u_int8_t prot;
 	caddr_t ptr;
 	int s, err;
@@ -709,8 +708,8 @@ ah_input_cb(void *op)
 	s = spltdb();
 
 	tdb = gettdb(tc->tc_spi, &tc->tc_dst, tc->tc_proto);
-	FREE(tc, M_XDATA);
 	if (tdb == NULL) {
+		FREE(tc, M_XDATA);
 		ahstat.ahs_notdb++;
 		DPRINTF(("ah_input_cb(): TDB is expired while in crypto"));
 		goto baddone;
@@ -720,6 +719,8 @@ ah_input_cb(void *op)
 
 	/* Check for crypto errors. */
 	if (crp->crp_etype) {
+		FREE(tc, M_XDATA);
+
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 
@@ -739,6 +740,7 @@ ah_input_cb(void *op)
 
 	/* Shouldn't happen... */
 	if (m == NULL) {
+		FREE(tc, M_XDATA);
 		ahstat.ahs_crypto++;
 		DPRINTF(("ah_input_cb(): bogus returned buffer from "
 		    "crypto\n"));
@@ -763,6 +765,8 @@ ah_input_cb(void *op)
 
 		/* Verify authenticator. */
 		if (bcmp(ptr + skip + rplen, calc, ahx->authsize)) {
+			FREE(tc, M_XDATA);
+
 			DPRINTF(("ah_input(): authentication failed for "
 			    "packet in SA %s/%08x\n",
 			    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
@@ -781,6 +785,48 @@ ah_input_cb(void *op)
 		/* Fix the Next Protocol field. */
 		m_copydata(m, skip, sizeof(u_int8_t), &prot);
 		m_copyback(m, protoff, sizeof(u_int8_t), &prot);
+	}
+
+	FREE(tc, M_XDATA);
+
+	/* Replay window checking, if applicable. */
+	if ((tdb->tdb_wnd > 0) && (!(tdb->tdb_flags & TDBF_NOREPLAY))) {
+		m_copydata(m, skip + offsetof(struct ah, ah_rpl),
+		    sizeof(u_int32_t), (caddr_t) &btsx);
+		btsx = ntohl(btsx);
+
+		switch (checkreplaywindow32(btsx, 0, &(tdb->tdb_rpl),
+		    tdb->tdb_wnd, &(tdb->tdb_bitmap), 1)) {
+		case 0: /* All's well. */
+			break;
+
+		case 1:
+			DPRINTF(("ah_input(): replay counter wrapped for "
+			    "SA %s/%08x\n", ipsp_address(tdb->tdb_dst),
+			    ntohl(tdb->tdb_spi)));
+
+			ahstat.ahs_wrap++;
+			error = ENOBUFS;
+			goto baddone;
+
+		case 2:
+		case 3:
+			DPRINTF(("ah_input_cb(): duplicate packet received in "
+			    "SA %s/%08x\n", ipsp_address(tdb->tdb_dst),
+			    ntohl(tdb->tdb_spi)));
+
+			error = ENOBUFS;
+			goto baddone;
+
+		default:
+			DPRINTF(("ah_input_cb(): bogus value from "
+			    "checkreplaywindow32() in SA %s/%08x\n",
+			    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
+
+			ahstat.ahs_replay++;
+			error = ENOBUFS;
+			goto baddone;
+		}
 	}
 
 	/* Record the beginning of the AH header. */
@@ -898,7 +944,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 
 		hdr.af = tdb->tdb_dst.sa.sa_family;
 		hdr.spi = tdb->tdb_spi;
-		hdr.flags |= M_AUTH;
+		hdr.flags |= M_AUTH | M_AUTH_AH;
 
 		m1.m_next = m;
 		m1.m_len = ENC_HDRLEN;
@@ -993,6 +1039,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	 * Loop through mbuf chain; if we find an M_EXT mbuf with
 	 * more than one reference, replace the rest of the chain.
 	 */
+	mo = NULL;
 	mi = m;
 	while (mi != NULL &&
 	    (!(mi->m_flags & M_EXT) || !MCLISREFERENCED(mi))) {
@@ -1026,7 +1073,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		    ntohl(tdb->tdb_spi)));
 
 		m_freem(m);
-		ahstat.ahs_wrap++;
+		ahstat.ahs_hdrops++;
 		return ENOBUFS;
 	}
 
@@ -1185,9 +1232,8 @@ ah_output_cb(void *op)
 	s = spltdb();
 
 	tdb = gettdb(tc->tc_spi, &tc->tc_dst, tc->tc_proto);
-
-	FREE(tc, M_XDATA);
 	if (tdb == NULL) {
+		FREE(tc, M_XDATA);
 		ahstat.ahs_notdb++;
 		DPRINTF(("ah_output_cb(): TDB is expired while in crypto\n"));
 		goto baddone;
@@ -1203,6 +1249,7 @@ ah_output_cb(void *op)
 			return crypto_dispatch(crp);
 		}
 
+		FREE(tc, M_XDATA);
 		ahstat.ahs_noxform++;
 		DPRINTF(("ah_output_cb(): crypto error %d\n", crp->crp_etype));
 		error = crp->crp_etype;
@@ -1211,6 +1258,7 @@ ah_output_cb(void *op)
 
 	/* Shouldn't happen... */
 	if (m == NULL) {
+		FREE(tc, M_XDATA);
 		ahstat.ahs_crypto++;
 		DPRINTF(("ah_output_cb(): bogus returned buffer from "
 		    "crypto\n"));
@@ -1224,6 +1272,8 @@ ah_output_cb(void *op)
 	 */
 	if ((tdb->tdb_flags & TDBF_SKIPCRYPTO) == 0)
 		m_copyback(m, 0, skip, ptr);
+
+	FREE(tc, M_XDATA);
 
 	/* No longer needed. */
 	crypto_freereq(crp);

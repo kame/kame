@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.13 2002/04/03 17:22:41 jason Exp $	*/
+/*	$OpenBSD: locore.s,v 1.25 2002/09/10 18:29:44 art Exp $	*/
 /*	$NetBSD: locore.s,v 1.137 2001/08/13 06:10:10 jdolecek Exp $	*/
 
 /*
@@ -64,7 +64,6 @@
 #undef	FLTRACE			/* Keep history of all page faults */
 #undef	TRAPSTATS		/* Count traps */
 #undef	TRAPS_USE_IG		/* Use Interrupt Globals for all traps */
-#define	HWREF			/* Track ref/mod bits in trap handlers */
 #undef	PMAP_FPSTATE		/* Allow nesting of VIS pmap copy/zero */
 #define	NEW_FPSTATE
 #define	PMAP_PHYS_PAGE		/* Use phys ASIs for pmap copy/zero */
@@ -424,48 +423,9 @@ _C_LABEL(cpcb):	POINTER	_C_LABEL(u0)
 	.globl	romp
 romp:	POINTER	0
 
-
-/* NB:	 Do we really need the following around? */
-/*
- * _cputyp is the current cpu type, used to distinguish between
- * the many variations of different sun4* machines. It contains
- * the value CPU_SUN4, CPU_SUN4C, or CPU_SUN4M.
- */
-	.globl	_C_LABEL(cputyp)
-_C_LABEL(cputyp):
-	.word	1
-/*
- * _cpumod is the current cpu model, used to distinguish between variants
- * in the Sun4 and Sun4M families. See /sys/arch/sparc64/include/param.h
- * for possible values.
- */
-	.globl	_C_LABEL(cpumod)
-_C_LABEL(cpumod):
-	.word	1
-/*
- * _mmumod is the current mmu model, used to distinguish between the
- * various implementations of the SRMMU in the sun4m family of machines.
- * See /sys/arch/sparc64/include/param.h for possible values.
- */
-	.globl	_C_LABEL(mmumod)
-_C_LABEL(mmumod):
-	.word	0
-
 	.globl _C_LABEL(cold)
 _C_LABEL(cold):
 	.word 1
-
-/*
- * There variables are pointed to by the cpp symbols PGSHIFT, NBPG,
- * and PGOFSET.
- */
-	.globl	_C_LABEL(pgshift), _C_LABEL(nbpg), _C_LABEL(pgofset)
-_C_LABEL(pgshift):
-	.word	0
-_C_LABEL(nbpg):
-	.word	0
-_C_LABEL(pgofset):
-	.word	0
 
 	_ALIGN
 
@@ -935,11 +895,7 @@ ufast_DMMU_protection:			! 06c = fast data access MMU protection
 	inc	%g2
 	stw	%g2, [%g1+%lo(_C_LABEL(udprot))]
 #endif
-#ifdef HWREF
 	ba,a,pt	%xcc, dmmu_write_fault
-#else
-	ba,a,pt	%xcc, winfault
-#endif
 	nop
 	TA32
 	UTRAP(0x070)			! Implementation dependent traps
@@ -1175,11 +1131,7 @@ kfast_DMMU_protection:			! 06c = fast data access MMU protection
 	inc	%g2
 	stw	%g2, [%g1+%lo(_C_LABEL(kdprot))]
 #endif
-#ifdef HWREF
 	ba,a,pt	%xcc, dmmu_write_fault
-#else
-	ba,a,pt	%xcc, winfault
-#endif
 	nop
 	TA32
 	UTRAP(0x070)			! Implementation dependent traps
@@ -3120,9 +3072,6 @@ Ldatafault_internal:
 	.text
 2:
 #endif
-	!! In the EMBEDANY memory model %g4 points to the start of the data segment.
-	!! In our case we need to clear it before calling any C-code
-	clr	%g4
 
 	/*
 	 * Right now the registers have the following values:
@@ -3252,8 +3201,16 @@ instr_miss:
 1:
 	ldxa	[%g6] ASI_PHYS_CACHED, %g4
 	brgez,pn %g4, textfault
-	 or	%g4, TTE_ACCESS, %g7			! Update accessed bit
-	btst	TTE_ACCESS, %g4				! Need to update access git?
+	 nop
+
+	/* Check if it's an executable mapping. */
+	andcc	%g4, TTE_EXEC, %g0
+	bz,pn	%xcc, textfault
+	 nop
+
+
+	or	%g4, TTE_ACCESS, %g7			! Update accessed bit
+	btst	TTE_ACCESS, %g4				! Need to update access bit?
 	bne,pt	%xcc, 1f
 	 nop
 	casxa	[%g6] ASI_PHYS_CACHED, %g4, %g7		!  and store it
@@ -3364,10 +3321,6 @@ textfault:
 	wr	%g0, ASI_PRIMARY_NOFAULT, %asi		! Restore default ASI
 	flushw						! Get rid of any user windows so we don't deadlock
 	
-	!! In the EMBEDANY memory model %g4 points to the start of the data segment.
-	!! In our case we need to clear it before calling any C-code
-	clr	%g4
-
 	/* Use trap type to see what handler to call */
 	cmp	%o1, T_INST_ERROR
 	be,pn	%xcc, text_error
@@ -3430,7 +3383,7 @@ slowtrap:
 #ifdef DIAGNOSTIC
 	/* Make sure kernel stack is aligned */
 	btst	0x03, %sp		! 32-bit stack OK?
-	 and	%sp, 0x07, %g4		! 64-bit stack OK?
+	and	%sp, 0x07, %g4		! 64-bit stack OK?
 	bz,pt	%icc, 1f
 	cmp	%g4, 0x1		! Must end in 0b001
 	be,pt	%icc, 1f
@@ -3484,9 +3437,6 @@ Lslowtrap_reenter:
 	movrlz	%g1, %g0, %g1
 	CHKPT(%g2,%g3,0x24)
 	wrpr	%g0, %g1, %tl		! Revert to kernel mode
-	!! In the EMBEDANY memory model %g4 points to the start of the data segment.
-	!! In our case we need to clear it before calling any C-code
-	clr	%g4
 
 	wr	%g0, ASI_PRIMARY_NOFAULT, %asi		! Restore default ASI
 	wrpr	%g0, PSTATE_INTR, %pstate	! traps on again
@@ -3866,9 +3816,6 @@ syscall_setup:
 	stb	%g5, [%sp + CC64FSZ + STKB + TF_PIL]
 	stb	%g5, [%sp + CC64FSZ + STKB + TF_OLDPIL]
 
-	!! In the EMBEDANY memory model %g4 points to the start of the data segment.
-	!! In our case we need to clear it before calling any C-code
-	clr	%g4
 	wr	%g0, ASI_PRIMARY_NOFAULT, %asi	! Restore default ASI
 
 	call	_C_LABEL(syscall)		! syscall(&tf, code, pc)
@@ -4240,7 +4187,7 @@ _C_LABEL(sparc_interrupt):
 	stw	%g2, [%g1]
 1:
 #endif
-	INTR_SETUP(-CC64FSZ-TF_SIZE)
+	INTR_SETUP(-CC64FSZ-TF_SIZE-8)
 	! Switch to normal globals so we can save them
 	wrpr	%g0, PSTATE_KERN, %pstate
 	stx	%g1, [%sp + CC64FSZ + STKB + TF_G + ( 1*8)]
@@ -4250,13 +4197,6 @@ _C_LABEL(sparc_interrupt):
 	stx	%g5, [%sp + CC64FSZ + STKB + TF_G + ( 5*8)]
 	stx	%g6, [%sp + CC64FSZ + STKB + TF_G + ( 6*8)]
 	stx	%g7, [%sp + CC64FSZ + STKB + TF_G + ( 7*8)]
-
-	/*
-	 * In the EMBEDANY memory model %g4 points to the start of the
-	 * data segment.  In our case we need to clear it before calling
-	 * any C-code.
-	 */
-	clr	%g4
 
 	flushw			! Do not remove this insn -- causes interrupt loss
 	rd	%y, %l6
@@ -4292,7 +4232,17 @@ _C_LABEL(sparc_interrupt):
 	STULNG	%o0, [%l4]
 	sll	%l3, %l6, %l3		! Generate IRQ mask
 	
+	sethi	%hi(_C_LABEL(handled_intr_level)), %l4
+
 	wrpr	%l6, %pil
+
+	/*
+	 * Set handled_intr_level and save the old one so we can restore it
+	 * later.
+	 */
+	ld	[%l4 + %lo(_C_LABEL(handled_intr_level))], %l7
+	st	%l6, [%l4 + %lo(_C_LABEL(handled_intr_level))]
+	st	%l7, [%sp + CC64FSZ + STKB + TF_SIZE]
 
 sparc_intr_retry:
 	wr	%l3, 0, CLEAR_SOFTINT	! (don't clear possible %tick IRQ)
@@ -4460,6 +4410,11 @@ intrcmplt:
 	restore
 97:
 #endif
+
+	/* Restore old handled_intr_level */
+	sethi	%hi(_C_LABEL(handled_intr_level)), %l4
+	ld	[%sp + CC64FSZ + STKB + TF_SIZE], %l7
+	st	%l7, [%l4 + %lo(_C_LABEL(handled_intr_level))]
 
 	ldub	[%sp + CC64FSZ + STKB + TF_OLDPIL], %l3	! restore old %pil
 	wrpr	%g0, PSTATE_KERN, %pstate	! Disable interrupts
@@ -5716,37 +5671,37 @@ _C_LABEL(cpu_initialize):
 	flushw
 
 	/*
-	 * Step 7: change the trap base register, and install our TSB
-	 *
-	 * XXXX -- move this to CPUINFO_VA+32KB?
+	 * Step 7: change the trap base register, and install our TSBs
 	 */
+
+	/* Set the dmmu tsb */
 	sethi	%hi(0x1fff), %l2
-	set	_C_LABEL(tsb), %l0
+	set	_C_LABEL(tsb_dmmu), %l0
 	LDPTR	[%l0], %l0
 	set	_C_LABEL(tsbsize), %l1
 	or	%l2, %lo(0x1fff), %l2
 	ld	[%l1], %l1
 	andn	%l0, %l2, %l0			! Mask off size and split bits
 	or	%l0, %l1, %l0			! Make a TSB pointer
-!	srl	%l0, 0, %l0	! DEBUG -- make sure this is a valid pointer by zeroing the high bits
+	set	TSB, %l2
+	stxa	%l0, [%l2] ASI_DMMU		! Install data TSB pointer
+	membar	#Sync
 
-#ifdef DEBUG
-	set	1f, %o0		! Debug printf
-	srlx	%l0, 32, %o1
-	call	_C_LABEL(prom_printf)
-	 srl	%l0, 0, %o2
-	.data
-1:
-	.asciz	"Setting TSB pointer %08x %08x\r\n"
-	_ALIGN
-	.text
-#endif
 
+	/* Set the immu tsb */
+	sethi	%hi(0x1fff), %l2
+	set	_C_LABEL(tsb_immu), %l0
+	LDPTR	[%l0], %l0
+	set	_C_LABEL(tsbsize), %l1
+	or	%l2, %lo(0x1fff), %l2
+	ld	[%l1], %l1
+	andn	%l0, %l2, %l0			! Mask off size and split bits
+	or	%l0, %l1, %l0			! Make a TSB pointer
 	set	TSB, %l2
 	stxa	%l0, [%l2] ASI_IMMU		! Install insn TSB pointer
 	membar	#Sync				! We may need more membar #Sync in here
-	stxa	%l0, [%l2] ASI_DMMU		! Install data TSB pointer
-	membar	#Sync
+
+	/* Change the trap base register */
 	set	_C_LABEL(trapbase), %l1
 	call	_C_LABEL(prom_set_trap_table)	! Now we should be running 100% from our handlers
 	 mov	%l1, %o0
@@ -6008,7 +5963,7 @@ _C_LABEL(tlb_flush_ctx):
 /*
  * blast_vcache()
  *
- * Clear out all of both I$ and D$ regardless of contents
+ * Clear out all of D$ regardless of contents
  * Does not modify %o0
  *
  */
@@ -6025,7 +5980,6 @@ _C_LABEL(blast_vcache):
 	andn	%o3, PSTATE_IE, %o4			! Turn off PSTATE_IE bit
 	wrpr	%o4, 0, %pstate
 1:
-	stxa	%g0, [%o1] ASI_ICACHE_TAG
 	stxa	%g0, [%o1] ASI_DCACHE_TAG
 	brnz,pt	%o1, 1b
 	 dec	8, %o1
@@ -6034,41 +5988,10 @@ _C_LABEL(blast_vcache):
 	retl
 	 wrpr	%o3, %pstate
 
-
-/*
- * blast_icache()
- *
- * Clear out all of I$ regardless of contents
- * Does not modify %o0
- *
- */
-	.align 8
-	.globl	_C_LABEL(blast_icache)
-	.proc 1
-	FTYPE(blast_icache)
-_C_LABEL(blast_icache):
-/*
- * We turn off interrupts for the duration to prevent RED exceptions.
- */
-	rdpr	%pstate, %o3
-	set	(2*NBPG)-8, %o1
-	andn	%o3, PSTATE_IE, %o4			! Turn off PSTATE_IE bit
-	wrpr	%o4, 0, %pstate
-1:
-	stxa	%g0, [%o1] ASI_ICACHE_TAG
-	brnz,pt	%o1, 1b
-	 dec	8, %o1
-	sethi	%hi(KERNBASE), %o2
-	flush	%o2
-	retl
-	 wrpr	%o3, %pstate
-
-
-
 /*
  * dcache_flush_page(vaddr_t pa)
  *
- * Clear one page from D$ and I$.
+ * Clear one page from D$.
  *
  */
 	.align 8
@@ -6087,52 +6010,37 @@ _C_LABEL(dcache_flush_page):
 	clr	%o4
 	srl	%o1, 2, %o1	! Now we have bits <29:0> set
 	set	(2*NBPG), %o5
-	andn	%o1, 3, %o1	! Now we have bits <29:2> set
-
+	ba,pt	%icc, 1f
+	 andn	%o1, 3, %o1	! Now we have bits <29:2> set
+	
+	.align 8
 1:
 	ldxa	[%o4] ASI_DCACHE_TAG, %o3
-	dec	16, %o5
+	mov	%o4, %o0
+	deccc	16, %o5
+	bl,pn	%icc, 2f
+	
+	 inc	16, %o4
 	xor	%o3, %o2, %o3
 	andcc	%o3, %o1, %g0
-	bne,pt	%xcc, 2f
+	bne,pt	%xcc, 1b
 	 membar	#LoadStore
-	stxa	%g0, [%o4] ASI_DCACHE_TAG
-	membar	#StoreLoad
-2:
-	brnz,pt	%o5, 1b
-	 inc	16, %o4
-
-	!! Now do the I$
-	srlx	%o0, 13-8, %o2
-	mov	-1, %o1		! Generate mask for tag: bits [35..8]
-	srl	%o1, 32-35+7, %o1
-	clr	%o4
-	sll	%o1, 7, %o1	! Mask
-	set	(2*NBPG), %o5
 	
-1:
-	ldda	[%o4] ASI_ICACHE_TAG, %g0	! Tag goes in %g1
-	dec	16, %o5
-	xor	%g1, %o2, %g1
-	andcc	%g1, %o1, %g0
-	bne,pt	%xcc, 2f
-	 membar	#LoadStore
-	stxa	%g0, [%o4] ASI_ICACHE_TAG
-	membar	#StoreLoad
+	stxa	%g0, [%o0] ASI_DCACHE_TAG
+	ba,pt	%icc, 1b
+	 membar	#StoreLoad
 2:
-	brnz,pt	%o5, 1b
-	 inc	16, %o4
 
+	wr	%g0, ASI_PRIMARY_NOFAULT, %asi
 	sethi	%hi(KERNBASE), %o5
 	flush	%o5
-	membar	#Sync
 	retl
-	 nop
+	 membar	#Sync
 
 /*
  * cache_flush_virt(va, len)
  *
- * Clear everything in that va range from D$ and I$.
+ * Clear everything in that va range from D$.
  *
  */
 	.align 8
@@ -6147,7 +6055,6 @@ _C_LABEL(cache_flush_virt):
 	and	%o0, %o3, %o0
 	and	%o2, %o3, %o2
 	sub	%o2, %o1, %o4	! End < start? need to split flushes.
-	sethi	%hi((1<<13)), %o5
 	brlz,pn	%o4, 1f
 	 movrz	%o4, %o3, %o4	! If start == end we need to wrap
 
@@ -6155,9 +6062,6 @@ _C_LABEL(cache_flush_virt):
 1:
 	stxa	%g0, [%o0] ASI_DCACHE_TAG
 	dec	16, %o4
-	xor	%o5, %o0, %o3	! Second way
-	stxa	%g0, [%o0] ASI_ICACHE_TAG
-	stxa	%g0, [%o3] ASI_ICACHE_TAG
 	brgz,pt	%o4, 1b
 	 inc	16, %o0
 2:
@@ -6172,9 +6076,6 @@ _C_LABEL(cache_flush_virt):
 3:
 	stxa	%g0, [%o4] ASI_DCACHE_TAG
 	dec	16, %o1
-	xor	%o5, %o4, %g1	! Second way
-	stxa	%g0, [%o4] ASI_ICACHE_TAG
-	stxa	%g0, [%g1] ASI_ICACHE_TAG
 	brgz,pt	%o1, 3b
 	 inc	16, %o4
 
@@ -6186,7 +6087,7 @@ _C_LABEL(cache_flush_virt):
 /*
  *	cache_flush_phys(paddr_t, psize_t, int);
  *
- *	Clear a set of paddrs from the D$, I$ and if param3 is
+ *	Clear a set of paddrs from the D$ and if param3 is
  *	non-zero, E$.  (E$ is not supported yet).
  */
 
@@ -6207,9 +6108,8 @@ _C_LABEL(cache_flush_phys):
 	add	%o0, %o1, %o1	! End PA
 
 	!!
-	!! Both D$ and I$ tags match pa bits 40-13, but
-	!! they are shifted different amounts.  So we'll
-	!! generate a mask for bits 40-13.
+	!! D$ tags match pa bits 40-13.
+	!! Generate a mask for them.
 	!!
 
 	mov	-1, %o2		! Generate mask for tag: bits [40..13]
@@ -6223,12 +6123,10 @@ _C_LABEL(cache_flush_phys):
 	clr	%o4
 1:
 	ldxa	[%o4] ASI_DCACHE_TAG, %o3
-	ldda	[%o4] ASI_ICACHE_TAG, %g0	! Tag goes in %g1
 	sllx	%o3, 40-29, %o3	! Shift D$ tag into place
 	and	%o3, %o2, %o3	! Mask out trash
 	cmp	%o0, %o3
 	blt,pt	%xcc, 2f	! Too low
-	 sllx	%g1, 40-35, %g1	! Shift I$ tag into place
 	cmp	%o1, %o3
 	bgt,pt	%xcc, 2f	! Too high
 	 nop
@@ -6236,13 +6134,6 @@ _C_LABEL(cache_flush_phys):
 	membar	#LoadStore
 	stxa	%g0, [%o4] ASI_DCACHE_TAG ! Just right
 2:
-	cmp	%o0, %g1
-	blt,pt	%xcc, 3f
-	 cmp	%o1, %g1
-	bgt,pt	%icc, 3f
-	 nop
-	stxa	%g0, [%o4] ASI_ICACHE_TAG
-3:
 	membar	#StoreLoad
 	dec	16, %o5
 	brgz,pt	%o5, 1b
@@ -8161,7 +8052,7 @@ ENTRY(probeset)
 paginuse:
 	.word	0
 	.text
-ENTRY(pmap_zero_page)
+ENTRY(pmap_zero_phys)
 	!!
 	!! If we have 64-bit physical addresses (and we do now)
 	!! we need to move the pointer from %o0:%o1 to %o0
@@ -8451,7 +8342,7 @@ pmap_zero_phys:
  * We also need to blast the D$ and flush like
  * pmap_zero_page.
  */
-ENTRY(pmap_copy_page)
+ENTRY(pmap_copy_phys)
 	!!
 	!! If we have 64-bit physical addresses (and we do now)
 	!! we need to move the pointer from %o0:%o1 to %o0 and
@@ -12113,7 +12004,12 @@ _C_LABEL(proc0paddr):
 	POINTER	_C_LABEL(u0)		! KVA of proc0 uarea
 
 /* interrupt counters	XXX THESE BELONG ELSEWHERE (if anywhere) */
-	.globl	_C_LABEL(intrcnt), _C_LABEL(eintrcnt), _C_LABEL(intrnames), _C_LABEL(eintrnames)
+	.globl	_C_LABEL(intrcnt), _C_LABEL(eintrcnt)
+	.globl _C_LABEL(intrnames), _C_LABEL(eintrnames)
+	OTYPE(intrcnt)
+	OTYPE(eintrcnt)
+	OTYPE(intrnames)
+	OTYPE(eintrnames)
 _C_LABEL(intrnames):
 	.asciz	"spur"
 	.asciz	"lev1"
@@ -12138,7 +12034,6 @@ _C_LABEL(intrcnt):
 _C_LABEL(eintrcnt):
 
 	.comm	_C_LABEL(curproc), PTRSZ
-	.comm	_C_LABEL(promvec), PTRSZ
 	.comm	_C_LABEL(nwindows), 4
 
 #ifdef DEBUG

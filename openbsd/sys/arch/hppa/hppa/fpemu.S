@@ -1,4 +1,4 @@
-/*	$OpenBSD: fpemu.S,v 1.4 2001/03/29 02:18:45 mickey Exp $	*/
+/*	$OpenBSD: fpemu.S,v 1.6 2002/09/15 09:34:09 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -73,12 +73,6 @@
 	.import	__CONCAT(__CONCAT(epf,_),name), code	! \
 	.word	__CONCAT(__CONCAT(ep0,_),name),	__CONCAT(__CONCAT(ep1,_),name),	__CONCAT(__CONCAT(ep2,_),name), __CONCAT(__CONCAT(ep3,_),name), __CONCAT(__CONCAT(ep4,_),name), __CONCAT(__CONCAT(ep5,_),name), __CONCAT(__CONCAT(ep6,_),name), __CONCAT(__CONCAT(ep7,_),name), __CONCAT(__CONCAT(ep8,_),name), __CONCAT(__CONCAT(ep9,_),name), __CONCAT(__CONCAT(epa,_),name), __CONCAT(__CONCAT(epb,_),name), __CONCAT(__CONCAT(epc,_),name), __CONCAT(__CONCAT(epd,_),name), __CONCAT(__CONCAT(epe,_),name), __CONCAT(__CONCAT(epf,_),name)
 
-	.section .bss
-
-	.export	$fpemu_stack, data
-$fpemu_stack
-	.comm	NBPG
-
 	.text
 /*
  * fpu_emulate(iir)
@@ -90,7 +84,7 @@ LEAF_ENTRY(fpu_emulate)
 	comib,=	1, arg3, $fpu_cln1
 	nop
 	extru	arg0, 16, 2, r31
-	
+
 $fpu_cln1
 	/*
 	 * theoreticaly we would need to determine the fpu instruction
@@ -181,7 +175,7 @@ $fpemu0c_0_3	/* fabs */
 $fpemu0c_0_4	/* fsqrt */
 	/* quad not implemented */
 	FP_TABLE2(fsqrt,sgl,dbl,invalid,invalid)
-	
+
 $fpemu0c_0_5	/* frnd */
 	/* quad not implemented */
 	FP_TABLE2(frnd,sgl,dbl,invalid,quad)
@@ -315,6 +309,4 @@ invalid_frem
 	bv,n	0(rp)
 EXIT(fpu_emulate)
 
-
 	.end
-

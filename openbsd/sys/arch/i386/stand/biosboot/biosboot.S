@@ -1,4 +1,4 @@
-/*	$OpenBSD: biosboot.S,v 1.29 2002/02/21 18:39:46 tdeval Exp $	*/
+/*	$OpenBSD: biosboot.S,v 1.32 2002/08/28 20:15:34 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael Shalayeff, Tobias Weingartner
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  */
-	.file	"bootbios.S"
+	.file	"biosboot.S"
 
 #include <machine/asm.h>
 #include <assym.h>
@@ -39,7 +39,7 @@
 #define addr32  .byte 0x67
 #define data32  .byte 0x66
 
-#define	BLKCNT	12	/* Max without colliding with the partition table */
+#define	BLKCNT	12
 
 #define BOOTSEG		0x07c0	/* boot loaded here */
 #define BOOTSTACK	0xfffc	/* stack starts here */
@@ -335,24 +335,6 @@ _block_table:
 	.byte	0	/* nsect */
 	. = _block_table + BLKCNT*4
 
-#ifdef BEMBR
-	. = 0x1b8
-	.space	4, 0	/* NT registry offset from James C. Cortilier III */
-
-	. = DOSPARTOFF
-	.globl	_partitions
-	/* throw in a partition in case we are block0 as well */
-	/* flag, head, sec, cyl, typ, ehead, esect, ecyl, start, len */
-_partitions:
-	.byte   DOSACTIVE, 0, 1, 0, DOSPTYP_OPENBSD, 255, 255, 255
-	.long   0,50000
-	.byte   0,0,0,0,0,0,0,0
-	.long   0,0
-	.byte   0,0,0,0,0,0,0,0
-	.long   0,0
-	.byte   0,0,0,0,0,0,0,0
-	.long   0,0
-#endif
 	. = 0x200 - 2
 	/* a little signature */
 	.word	DOSMBR_SIGNATURE

@@ -1,4 +1,4 @@
-/* $OpenBSD: pfkeyv2.h,v 1.41 2001/12/18 23:07:49 deraadt Exp $ */
+/* $OpenBSD: pfkeyv2.h,v 1.43 2002/06/07 04:47:06 ho Exp $ */
 /*
  *	@(#)COPYRIGHT	1.1 (NRL) January 1998
  * 
@@ -430,5 +430,8 @@ void import_key(struct ipsecinit *, struct sadb_key *, int);
 void import_lifetime(struct tdb *, struct sadb_lifetime *, int);
 void import_credentials(struct tdb *, struct sadb_x_cred *, int);
 void import_sa(struct tdb *, struct sadb_sa *, struct ipsecinit *);
+void import_flow(struct sockaddr_encap *, struct sockaddr_encap *,
+    struct sadb_address *, struct sadb_address *, struct sadb_address *,
+    struct sadb_address *, struct sadb_protocol *, struct sadb_protocol *);
 #endif /* _KERNEL */
 #endif /* _NET_PFKEY_V2_H_ */

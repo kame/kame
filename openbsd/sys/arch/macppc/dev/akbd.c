@@ -1,4 +1,4 @@
-/*	$OpenBSD: akbd.c,v 1.9 2002/03/28 04:17:40 drahn Exp $	*/
+/*	$OpenBSD: akbd.c,v 1.14 2002/09/15 09:01:58 deraadt Exp $	*/
 /*	$NetBSD: akbd.c,v 1.13 2001/01/25 14:08:55 tsubai Exp $	*/
 
 /*
@@ -57,7 +57,6 @@
 #include <macppc/dev/akbdvar.h>
 #include <macppc/dev/amsvar.h>
 #include <macppc/dev/adb_direct.h>
-#include <macppc/dev/pm_direct.h>
 
 #include "aed.h"
 
@@ -82,8 +81,6 @@ struct cfdriver akbd_cd = {
 	NULL, "akbd", DV_DULL
 };
 
-
-extern struct cfdriver akbd_cd;
 
 int akbd_enable(void *, int);
 void akbd_set_leds(void *, int);
@@ -502,7 +499,6 @@ akbd_rawrepeat(void *v)
 
 
 static int polledkey;
-extern int adb_polling;
 
 int
 akbd_intr(event)
@@ -510,22 +506,38 @@ akbd_intr(event)
 {
 	int key, press, val;
 	int type;
+	static int shift;
 
 	struct akbd_softc *sc = akbd_cd.cd_devs[0];
 
 	key = event->u.k.key;
+
+	/*
+	 * Caps lock is weird. The key sequence generated is:
+	 * press:   down(57) [57]  (LED turns on)
+	 * release: up(127)  [255]
+	 * press:   up(127)  [255]
+	 * release: up(57)   [185] (LED turns off)
+	 */
+	if (ADBK_KEYVAL(key) == ADBK_CAPSLOCK)
+		shift = 0;
+
+	if (key == 255) {
+		if (shift == 0) {
+			key = ADBK_KEYUP(ADBK_CAPSLOCK);
+			shift = 1;
+		} else {
+			key = ADBK_KEYDOWN(ADBK_CAPSLOCK);
+			shift = 0;
+		}
+	}
+
 	press = ADBK_PRESS(key);
 	val = ADBK_KEYVAL(key);
 
 	type = press ? WSCONS_EVENT_KEY_DOWN : WSCONS_EVENT_KEY_UP;
 
 	switch (val) {
-	case ADBK_CAPSLOCK:
-		type = WSCONS_EVENT_KEY_DOWN;
-		wskbd_input(sc->sc_wskbddev, type, val);
-		type = WSCONS_EVENT_KEY_UP;
-		break;
-
 #if 0
 	/* not supported... */
 	case ADBK_KEYVAL(245):

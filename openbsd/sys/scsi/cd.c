@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd.c,v 1.60 2002/03/14 03:16:12 millert Exp $	*/
+/*	$OpenBSD: cd.c,v 1.64 2002/06/09 00:01:49 art Exp $	*/
 /*	$NetBSD: cd.c,v 1.100 1997/04/02 02:29:30 mycroft Exp $	*/
 
 /*
@@ -504,7 +504,7 @@ cdstrategy(bp)
 	struct buf *bp;
 {
 	struct cd_softc *cd;
-	int opri;
+	int s;
 
 	if ((cd = cdlookup(CDUNIT(bp->b_dev))) == NULL) {
 		bp->b_error = ENXIO;
@@ -545,7 +545,7 @@ cdstrategy(bp)
 	    (cd->flags & (CDF_WLABEL|CDF_LABELLING)) != 0) <= 0)
 		goto done;
 
-	opri = splbio();
+	s = splbio();
 
 	/*
 	 * Place it in the queue of disk activities for this disk
@@ -559,7 +559,7 @@ cdstrategy(bp)
 	cdstart(cd);
 	
 	device_unref(&cd->sc_dev);
-	splx(opri);
+	splx(s);
 	return;
 
 bad:
@@ -569,7 +569,9 @@ done:
 	 * Correctly set the buf to indicate a completed xfer
 	 */
 	bp->b_resid = bp->b_bcount;
+	s = splbio();
 	biodone(bp);
+	splx(s);
 	if (cd != NULL)
 		device_unref(&cd->sc_dev);
 }
@@ -603,6 +605,8 @@ cdstart(v)
 	struct scsi_generic *cmdp;
 	int blkno, nblks, cmdlen;
 	struct partition *p;
+
+	splassert(IPL_BIO);
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("cdstart "));
 	/*
@@ -1302,7 +1306,7 @@ cdgetdisklabel(dev, cd, lp, clp, spoofonly)
 	if (i < MAXPARTITIONS)
 		bzero(&lp->d_partitions[i], sizeof(lp->d_partitions[i]));
 
-	lp->d_npartitions = max(RAW_PART, i - 1) + 1;
+	lp->d_npartitions = max((RAW_PART + 1), i);
 
 done:
 	if (toc)

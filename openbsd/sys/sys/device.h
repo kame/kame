@@ -1,4 +1,4 @@
-/*	$OpenBSD: device.h,v 1.23 2002/03/15 01:20:04 millert Exp $	*/
+/*	$OpenBSD: device.h,v 1.25 2002/09/06 18:12:47 deraadt Exp $	*/
 /*	$NetBSD: device.h,v 1.15 1996/04/09 20:55:24 cgd Exp $	*/
 
 /*
@@ -68,7 +68,7 @@ enum devclass {
  */
 enum devact {
 	DVACT_ACTIVATE,		/* activate the device */
-	DVACT_DEACTIVATE,	/* deactivate the device */
+	DVACT_DEACTIVATE	/* deactivate the device */
 };
 
 #include <sys/lock.h>
@@ -191,7 +191,6 @@ extern struct evcntlist allevents;	/* list of all event counters */
 extern int autoconf_verbose;
 
 void config_init(void);
-void config_edit(void);
 void *config_search(cfmatch_t, struct device *, void *);
 void *config_rootsearch(cfmatch_t, char *, void *);
 struct device *config_found_sm(struct device *, void *, cfprint_t,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.42 2002/03/14 01:26:38 millert Exp $ */
+/*	$OpenBSD: trap.c,v 1.46 2002/06/23 03:03:15 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -86,15 +86,19 @@
 #include <sys/ktrace.h>
 #endif
 
-#include <machine/psl.h>
-#include <machine/trap.h>
+#include <machine/db_machdep.h>
 #include <machine/cpu.h>
+#include <machine/psl.h>
 #include <machine/reg.h>
+#include <machine/trap.h>
 
 #ifdef COMPAT_SUNOS
 #include <compat/sunos/sunos_syscall.h>
 extern struct emul emul_sunos;
 #endif
+
+#include "systrace.h"
+#include <dev/systrace.h>
 
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_pmap.h>
@@ -102,6 +106,9 @@ extern struct emul emul_sunos;
 #ifdef COMPAT_HPUX
 #include <compat/hpux/hpux.h>
 #endif
+
+int	astpending;
+int	want_resched;
 
 char  *trap_type[] = {
 	"Bus error",
@@ -162,11 +169,15 @@ int mmupid = -1;
 #endif
 
 #define NSIR	8
-void (*sir_routines[NSIR])();
+void (*sir_routines[NSIR])(void *);
 void *sir_args[NSIR];
 u_char next_sir;
 
-int  writeback(struct frame *fp, int docachepush);
+void trap(int, u_int, u_int, struct frame);
+void syscall(register_t, struct frame);
+void init_sir(void);
+void hardintr(int, int, void *);
+int writeback(struct frame *fp, int docachepush);
 
 /*
  * trap and syscall both need the following work done before returning
@@ -181,7 +192,7 @@ userret(p, fp, oticks, faultaddr, fromtrap)
 	int fromtrap;
 {
 	int sig;
-#if defined(M68040) || defined(M68060)
+#if defined(M68040)
 	int beenhere = 0;
 
 again:
@@ -226,7 +237,7 @@ again:
 			 "pid %d(%s): writeback aborted in sigreturn, pc=%x\n",
 				     p->p_pid, p->p_comm, fp->f_pc, faultaddr);
 #endif
-		} else if (sig = writeback(fp, fromtrap)) {
+		} else if ((sig = writeback(fp, fromtrap))) {
 			register union sigval sv;
 
 			beenhere = 1;
@@ -246,10 +257,11 @@ again:
  * System calls are broken out for efficiency. T_ADDRERR
  */
 /*ARGSUSED*/
+void
 trap(type, code, v, frame)
 	int type;
-	unsigned code;
-	register unsigned v;
+	u_int code;
+	register u_int v;
 	struct frame frame;
 {
 	extern char fubail[], subail[];
@@ -279,12 +291,12 @@ trap(type, code, v, frame)
 dopanic:
 		printf("trap type %d, code = %x, v = %x\n", type, code, v);
 #ifdef DDB
-		if (kdb_trap(type, &frame))
+		if (kdb_trap(type, (db_regs_t *)&frame))
 			return;
 #endif
 		regdump(&(frame.F_t), 128);
 		type &= ~T_USER;
-		if ((unsigned)type < trap_types)
+		if ((u_int)type < trap_types)
 			panic(trap_type[type]);
 		panic("trap");
 
@@ -502,7 +514,7 @@ copyfault:
 
 	case T_SSIR:		/* software interrupt */
 	case T_SSIR|T_USER:
-		while (bit = ffs(ssir)) {
+		while ((bit = ffs(ssir))) {
 			--bit;
 			ssir &= ~(1 << bit);
 			uvmexp.softs++;
@@ -603,9 +615,9 @@ copyfault:
 			 */
 			if ((caddr_t)va >= vm->vm_maxsaddr && map != kernel_map) {
 				if (rv == 0) {
-					unsigned nss;
+					u_int nss;
 
-					nss = btoc(USRSTACK-(unsigned)va);
+					nss = btoc(USRSTACK-(u_int)va);
 					if (nss > vm->vm_ssize)
 						vm->vm_ssize = nss;
 				} else if (rv == EACCES)
@@ -722,7 +734,7 @@ writeback(fp, docachepush)
 							(vm_offset_t)&vmmap[NBPG]);
 			pmap_update(pmap_kernel());
 		} else
-			printf("WARNING: pid %d(%s) uid %d: CPUSH not done\n",
+			printf("WARNING: pid %d(%s) uid %u: CPUSH not done\n",
 					 p->p_pid, p->p_comm, p->p_ucred->cr_uid);
 	} else if ((f->f_ssw & (SSW4_RW|SSW4_TTMASK)) == SSW4_TTM16) {
 		/*
@@ -757,8 +769,8 @@ writeback(fp, docachepush)
 		 * Writeback #1.
 		 * Position the "memory-aligned" data and write it out.
 		 */
-		register u_int wb1d = f->f_wb1d;
-		register int off;
+		u_int wb1d = f->f_wb1d;
+		int off;
 
 #ifdef DEBUG
 		if ((mmudebug & MDB_WBFOLLOW) || MDB_ISPID(p->p_pid))
@@ -955,6 +967,7 @@ dumpwb(num, s, a, d)
 /*
  * Process a system call.
  */
+void
 syscall(code, frame)
 	register_t code;
 	struct frame frame;
@@ -1061,7 +1074,12 @@ syscall(code, frame)
 		goto bad;
 	rval[0] = 0;
 	rval[1] = frame.f_regs[D1];
-	error = (*callp->sy_call)(p, args, rval);
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE))
+		error = systrace_redirect(code, p, args, rval);
+	else
+#endif
+		error = (*callp->sy_call)(p, args, rval);
 	switch (error) {
 	case 0:
 		frame.f_regs[D0] = rval[0];
@@ -1107,7 +1125,7 @@ bad:
  */
 u_long
 allocate_sir(proc, arg)
-	void (*proc)();
+	void (*proc)(void *);
 	void *arg;
 {
 	int bit;
@@ -1123,10 +1141,10 @@ allocate_sir(proc, arg)
 void
 init_sir()
 {
-	extern void netintr();
+	extern void netintr(void *);
 
 	sir_routines[0] = netintr;
-	sir_routines[1] = softclock;
+	sir_routines[1] = (void (*)(void *))softclock;
 	next_sir = 2;
 }
 
@@ -1137,14 +1155,15 @@ struct intrhand *intrs[256];
  * This is an EXTREMELY good candidate for rewriting in assembly!!
  */
 #ifndef INTR_ASM
-int
+void
 hardintr(pc, evec, frame)
 	int pc;
 	int evec;
 	void *frame;
 {
+	extern void straytrap(int, u_short);
 	int vec = (evec & 0xfff) >> 2;	/* XXX should be m68k macro? */
-	extern u_long intrcnt[];	/* XXX from locore */
+	/*extern u_long intrcnt[];*/	/* XXX from locore */
 	struct intrhand *ih;
 	int count = 0;
 	int r;
@@ -1158,12 +1177,14 @@ hardintr(pc, evec, frame)
 			zscnputc(0, '0' + (vec - 0x70));
 		}
 #endif
-		r = (*ih->ih_fn)(ih->ih_wantframe ? frame : ih->ih_arg, vec);
+		r = (*ih->ih_fn)(ih->ih_wantframe ? frame : ih->ih_arg);
 		if (r > 0)
 			count++;
 	}
-	if (count == 0)
-		return (straytrap(pc, evec));
+	if (count != 0)
+		return;
+
+	straytrap(pc, evec);
 }
 #endif /* !INTR_ASM */
 
@@ -1210,7 +1231,7 @@ intr_establish(vec, ih)
 	ih->ih_next = NULL;	/* just in case */
 
 	/* attach at tail */
-	if (ihx = intrs[vec]) {
+	if ((ihx = intrs[vec])) {
 		while (ihx->ih_next)
 			ihx = ihx->ih_next;
 		ihx->ih_next = ih;
@@ -1224,8 +1245,16 @@ intr_establish(vec, ih)
 #include <machine/db_machdep.h>
 #include <ddb/db_command.h>
 
+void db_prom_cmd(db_expr_t, int, db_expr_t, char *);
+void db_machine_init(void);
+
+/* ARGSUSED */
 void
-db_prom_cmd()
+db_prom_cmd(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
 {
 	doboot();
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.48 2002/03/14 19:42:54 mickey Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.59 2002/07/07 22:06:33 deraadt Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -49,7 +49,10 @@
 #include <sys/time.h>
 #include <sys/ucred.h>
 #include <sys/proc.h>
+#include <sys/resource.h>
 #endif
+
+#include <sys/resourcevar.h>	/* XXX */
 
 #include <uvm/uvm_extern.h>
 
@@ -138,8 +141,8 @@ struct ctlname {
 #define	KERN_DOMAINNAME		22	/* string: (YP) domainname */
 #define	KERN_MAXPARTITIONS	23	/* int: number of partitions/disk */
 #define	KERN_RAWPARTITION	24	/* int: raw partition number */
-#define	KERN_NTPTIME		25	/* struct: extended-precision time */
-#define	KERN_TIMEX		26	/* struct: ntp timekeeping state */
+/*define gap			25	*/
+/*define gap			26	*/
 #define	KERN_OSVERSION		27	/* string: kernel build version */
 #define	KERN_SOMAXCONN		28	/* int: listen queue maximum */
 #define	KERN_SOMINCONN		29	/* int: half-open controllable param */
@@ -167,7 +170,14 @@ struct ctlname {
 #define	KERN_SYSVIPC_INFO	51	/* struct: SysV sem/shm/msg info */
 #define KERN_USERCRYPTO		52	/* int: usercrypto */
 #define KERN_CRYPTODEVALLOWSOFT	53	/* int: cryptodevallowsoft */
-#define	KERN_MAXID		54	/* number of valid kern ids */
+#define KERN_SPLASSERT		54	/* int: splassert */
+#define KERN_PROC_ARGS		55	/* node: proc args and env */
+#define	KERN_NFILES		56	/* int: number of open files */
+#define	KERN_TTYCOUNT		57	/* int: number of tty devices */
+#define KERN_NUMVNODES		58	/* int: number of vnodes in use */
+#define	KERN_MBSTAT		59	/* struct: mbuf statistics */
+#define KERN_USERASYMCRYPTO	60	/* int: usercrypto */
+#define	KERN_MAXID		61	/* number of valid kern ids */
 
 #define	CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -195,8 +205,8 @@ struct ctlname {
 	{ "domainname", CTLTYPE_STRING }, \
 	{ "maxpartitions", CTLTYPE_INT }, \
 	{ "rawpartition", CTLTYPE_INT }, \
-	{ "ntptime", CTLTYPE_STRUCT }, \
-	{ "timex", CTLTYPE_STRUCT }, \
+	{ "gap", 0 }, \
+	{ "gap", 0 }, \
 	{ "osversion", CTLTYPE_STRING }, \
 	{ "somaxconn", CTLTYPE_INT }, \
 	{ "sominconn", CTLTYPE_INT }, \
@@ -224,6 +234,13 @@ struct ctlname {
 	{ "sysvipc_info", CTLTYPE_INT }, \
 	{ "usercrypto", CTLTYPE_INT }, \
 	{ "cryptodevallowsoft", CTLTYPE_INT }, \
+	{ "splassert", CTLTYPE_INT }, \
+	{ "procargs", CTLTYPE_NODE }, \
+	{ "nfiles", CTLTYPE_INT }, \
+	{ "ttycount", CTLTYPE_INT }, \
+	{ "numvnodes", CTLTYPE_INT }, \
+	{ "mbstat", CTLTYPE_STRUCT }, \
+	{ "userasymcrypto", CTLTYPE_INT }, \
 }
 
 /*
@@ -246,6 +263,14 @@ struct ctlname {
 #define KERN_SYSVIPC_SHM_INFO	3	/* shminfo and shmid_ds */
 
 /*
+ * KERN_PROC_ARGS subtypes
+ */
+#define KERN_PROC_ARGV		1
+#define KERN_PROC_NARGV		2
+#define KERN_PROC_ENV		3
+#define KERN_PROC_NENV		4
+
+/*
  * KERN_PROC subtype ops return arrays of augmented proc structures:
  */
 struct kinfo_proc {
@@ -256,6 +281,8 @@ struct kinfo_proc {
 		struct	pcred e_pcred;		/* process credentials */
 		struct	ucred e_ucred;		/* current credentials */
 		struct	vmspace e_vm;		/* address space */
+		struct  pstats e_pstats;	/* process stats */
+		int	e_pstats_valid;		/* pstats valid? */
 		pid_t	e_ppid;			/* parent process id */
 		pid_t	e_pgid;			/* process group id */
 		short	e_jobc;			/* job control counter */
@@ -442,7 +469,6 @@ int sysctl_iflist(int, struct walkarg *);
 int sysctl_rtable(int *, u_int, void *, size_t *, void *, size_t);
 int sysctl_clockrate(char *, size_t *);
 int sysctl_vnode(char *, size_t *, struct proc *);
-int sysctl_ntptime(char *, size_t *);
 #ifdef GPROF
 int sysctl_doprof(int *, u_int, void *, size_t *, void *, size_t);
 #endif

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.pci,v 1.131 2002/04/08 01:49:45 frantzen Exp $
+#	$OpenBSD: files.pci,v 1.143 2002/09/24 18:56:01 nate Exp $
 #	$NetBSD: files.pci,v 1.20 1996/09/24 17:47:15 christos Exp $
 #
 # Config file and device description for machine-independent PCI code.
@@ -131,9 +131,10 @@ attach	opl at yds with opl_yds
 file	dev/pci/opl_yds.c		opl_yds
 
 # Forte Media FM801
-device	fms: audio, auconv, mulaw, ac97, midibus
+device	fms: audio, auconv, mulaw, ac97, midibus, tea5757, radiobus
 attach	fms at pci
 file	dev/pci/fms.c			fms
+file	dev/pci/fmsradio.c		fms & radio
 
 # VIA VT82C686A AC'97 Audio
 device	auvia: audio, auconv, mulaw, ac97
@@ -257,7 +258,7 @@ attach	sv at pci
 file	dev/pci/sv.c			sv
 
 # Brooktree Bt848 video capture
-device	bktr: pcibus, radio
+device	bktr: pcibus, radiobus
 attach	bktr at pci
 file	dev/pci/bktr/bktr_audio.c	bktr	needs-count
 file	dev/pci/bktr/bktr_card.c	bktr
@@ -272,6 +273,12 @@ file	dev/pci/if_xl_pci.c		xl_pci
 # Intel EtherExpress PRO 10/100B
 attach	fxp at pci with fxp_pci
 file	dev/pci/if_fxp_pci.c		fxp_pci
+
+# Intel Pro/1000
+device	em: ether, ifnet, ifmedia
+attach	em at pci
+file	dev/pci/if_em.c			em
+file	dev/pci/if_em_hw.c		em
 
 # DEC/Intel 21143 and "tulip" clone ethernet
 attach	dc at pci with dc_pci
@@ -300,15 +307,25 @@ device	lofn: crypto
 attach	lofn at pci
 file	dev/pci/lofn.c			lofn
 
-# Hi/fn 7751
+# Hi/fn 7751/7811/7951
 device	hifn: crypto
 attach	hifn at pci
 file	dev/pci/hifn7751.c		hifn
+
+# Hi/fn 7814/7851/7854
+device	nofn: crypto
+attach	nofn at pci
+file	dev/pci/nofn.c			nofn
 
 # Bluesteelnet (Broadcom) 5501/5601
 device	ubsec: crypto
 attach	ubsec at pci
 file	dev/pci/ubsec.c			ubsec
+
+# Netoctave NSP2000
+device	noct: crypto
+attach	noct at pci
+file	dev/pci/noct.c			noct
 
 # Pijnenburg PCC-ISES
 device	ises: crypto
@@ -361,11 +378,6 @@ device	sk: ether, ifnet, mii, ifmedia
 attach	sk at skc
 file	dev/pci/if_sk.c			skc | sk
 
-# Intel 82452 (Pro/1000 gigabit server adapter)
-device wx: ether, ifnet, mii, ifmedia, mii_phy
-attach wx at pci
-file	dev/pci/if_wx.c			wx
-
 # PCI "universal" communication device driver, for PCI com, lpt, etc. ports
 # (see documentation in the driver for what, exactly, should be supported)
 device	puc { port = -1 }
@@ -401,15 +413,10 @@ device	pcscp: scsi, ncr53c9x
 attach	pcscp at pci
 file	dev/pci/pcscp.c			pcscp
 
-# Guillemot Maxi Radio FM 2000 Radio Card
-device	mr: radio
-attach	mr at pci
-file	dev/pci/maxiradio.c		mr
-
-# MediaForte SoundForte SF64-PCR Radio card
-device	sf4r: radio, tea5757
-attach	sf4r at pci
-file	dev/pci/sf64pcr.c		sf4r
+# Gemtek/Guillemot PCI Radio Card
+device	gtp: tea5757, radiobus
+attach	gtp at pci
+file	dev/pci/gtp.c			gtp
 
 # National Semiconductor DP83820/DP83821 based GigE
 device	nge: ether, ifnet, mii, ifmedia, mii_phy
@@ -440,3 +447,16 @@ file	dev/pci/if_stge.c		stge
 device	gx: ether, ifnet, mii, ifmedia, mii_phy
 attach	gx at pci
 file	dev/pci/if_gx.c			gx
+
+# AMD 768MPX power management controller
+device	amdpm {}
+attach	amdpm at pci
+file	dev/pci/amdpm.c			amdpm
+
+# OHCI IEEE 1394 controller
+attach	fwohci at pci with fwohci_pci
+file	dev/pci/fwohci_pci.c		fwohci_pci
+
+# IEEE 1394 TI "Lynx" controller
+attach	fwlynx at pci with fwlynx_pci
+file	dev/pci/fwlynx_pci.c		fwlynx_pci

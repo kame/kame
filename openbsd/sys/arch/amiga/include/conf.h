@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.h,v 1.14 2001/12/11 23:19:02 miod Exp $	*/
+/*	$OpenBSD: conf.h,v 1.17 2002/07/10 22:08:47 mickey Exp $	*/
 /*	$NetBSD: conf.h,v 1.4 1996/11/30 01:13:07 is Exp $	*/
 
 /*
@@ -29,6 +29,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/conf.h>
 
 cdev_decl(com);
 
@@ -62,8 +64,6 @@ cdev_decl(view);
 bdev_decl(wd);
 cdev_decl(wd);
 
-cdev_decl(ksyms);
-
 cdev_decl(joy);
 
 /* open, close, ioctl, select, mmap -- XXX should be a map device */
@@ -72,13 +72,6 @@ cdev_decl(joy);
 	(dev_type_write((*))) nullop, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,select), \
 	dev_init(c,n,mmap) }
-
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
 
 /* open, close, read, write, ioctl -- XXX should be a generic device */
 #define	cdev_par_init(c,n) { \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.7 2002/03/14 04:16:55 jason Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.12 2002/07/24 00:48:25 art Exp $	*/
 /*	$NetBSD: db_interface.c,v 1.61 2001/07/31 06:55:47 eeh Exp $ */
 
 /*
@@ -234,6 +234,7 @@ void db_dump_pcb(db_expr_t, int, db_expr_t, char *);
 void db_dump_pv(db_expr_t, int, db_expr_t, char *);
 void db_setpcb(db_expr_t, int, db_expr_t, char *);
 void db_dump_dtlb(db_expr_t, int, db_expr_t, char *);
+void db_dump_itlb(db_expr_t, int, db_expr_t, char *);
 void db_dump_dtsb(db_expr_t, int, db_expr_t, char *);
 void db_pmap_kernel(db_expr_t, int, db_expr_t, char *);
 void db_pload_cmd(db_expr_t, int, db_expr_t, char *);
@@ -427,6 +428,61 @@ db_prom_cmd(addr, have_addr, count, modif)
 	OF_enter();
 }
 
+#define CHEETAHP (((getver()>>32) & 0x1ff) >= 0x14)
+unsigned long db_get_dtlb_data(int entry), db_get_dtlb_tag(int entry),
+db_get_itlb_data(int entry), db_get_itlb_tag(int entry);
+void db_print_itlb_entry(int entry, int i, int endc);
+void db_print_dtlb_entry(int entry, int i, int endc);
+
+extern __inline__ unsigned long db_get_dtlb_data(int entry)
+{
+	unsigned long r;
+	__asm__ __volatile__("ldxa [%1] %2,%0"
+		: "=r" (r)
+		: "r" (entry <<3), "i" (ASI_DMMU_TLB_DATA));
+	return r;
+}
+extern __inline__ unsigned long db_get_dtlb_tag(int entry)
+{
+	unsigned long r;
+	__asm__ __volatile__("ldxa [%1] %2,%0"
+		: "=r" (r)
+		: "r" (entry <<3), "i" (ASI_DMMU_TLB_TAG));
+	return r;
+}
+extern __inline__ unsigned long db_get_itlb_data(int entry)
+{
+	unsigned long r;
+	__asm__ __volatile__("ldxa [%1] %2,%0"
+		: "=r" (r)
+		: "r" (entry <<3), "i" (ASI_IMMU_TLB_DATA));
+	return r;
+}
+extern __inline__ unsigned long db_get_itlb_tag(int entry)
+{
+	unsigned long r;
+	__asm__ __volatile__("ldxa [%1] %2,%0"
+		: "=r" (r)
+		: "r" (entry <<3), "i" (ASI_IMMU_TLB_TAG));
+	return r;
+}
+
+void db_print_dtlb_entry(int entry, int i, int endc)
+{
+	unsigned long tag, data;
+	tag = db_get_dtlb_tag(entry);
+	data = db_get_dtlb_data(entry);
+	db_printf("%2d:%16.16lx %16.16lx%c", i, tag, data, endc);
+}
+
+void db_print_itlb_entry(int entry, int i, int endc)
+{
+	unsigned long tag, data;
+	tag = db_get_itlb_tag(entry);
+	data = db_get_itlb_data(entry);
+	db_printf("%2d:%16.16lx %16.16lx%c", i, tag, data, endc);
+}
+
 void
 db_dump_dtlb(addr, have_addr, count, modif)
 	db_expr_t addr;
@@ -434,33 +490,70 @@ db_dump_dtlb(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	extern void print_dtlb(void);
+	/* extern void print_dtlb(void); -- locore.s; no longer used here */
 
 	if (have_addr) {
 		int i;
 		int64_t* p = (int64_t*)addr;
 		static int64_t buf[128];
 		extern void dump_dtlb(int64_t *);
-		
+	
+	if (CHEETAHP) {
+		db_printf("DTLB %ld\n", addr);
+		switch(addr)
+		{
+		case 0:
+			for (i = 0; i < 16; ++i)
+				db_print_dtlb_entry(i, i, (i&1)?'\n':' ');
+			break;
+		case 2:
+			for (i = 0; i < 512; ++i)
+				db_print_dtlb_entry(i+16384, i, (i&1)?'\n':' ');
+			break;
+		}
+	} else {
 		dump_dtlb(buf);
 		p = buf;
 		for (i=0; i<64;) {
-#ifdef __arch64__
 			db_printf("%2d:%16.16lx %16.16lx ", i++, p[0], p[1]);
 			p += 2;
 			db_printf("%2d:%16.16lx %16.16lx\n", i++, p[0], p[1]);
 			p += 2;
-#else
-			db_printf("%2d:%16.16qx %16.16qx ", i++, p[0], p[1]);
-			p += 2;
-			db_printf("%2d:%16.16qx %16.16qx\n", i++, p[0], p[1]);
-			p += 2;
-#endif
+		}
+	}
+	} else {
+printf ("Usage: mach dtlb 0,2\n");
+	}
+}
+
+void
+db_dump_itlb(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	int i;
+	if (!have_addr) {
+		db_printf("Usage: mach itlb 0,1,2\n");
+		return;
+	}
+	if (CHEETAHP) {
+		db_printf("ITLB %ld\n", addr);
+		switch(addr)
+		{
+		case 0:
+			for (i = 0; i < 16; ++i)
+				db_print_itlb_entry(i, i, (i&1)?'\n':' ');
+			break;
+		case 2:
+			for (i = 0; i < 128; ++i)
+				db_print_itlb_entry(i+16384, i, (i&1)?'\n':' ');
+			break;
 		}
 	} else {
-#ifdef DEBUG
-		print_dtlb();
-#endif
+		for (i = 0; i < 63; ++i)
+			db_print_itlb_entry(i, i, (i&1)?'\n':' ');
 	}
 }
 
@@ -657,7 +750,7 @@ db_dump_dtsb(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	extern pte_t *tsb;
+	extern pte_t *tsb_dmmu;
 	extern int tsbsize;
 #define TSBENTS (512<<tsbsize)
 	int i;
@@ -665,14 +758,14 @@ db_dump_dtsb(addr, have_addr, count, modif)
 	db_printf("TSB:\n");
 	for (i=0; i<TSBENTS; i++) {
 		db_printf("%4d:%4d:%08x %08x:%08x ", i, 
-			  (int)((tsb[i].tag&TSB_TAG_G)?-1:TSB_TAG_CTX(tsb[i].tag)),
-			  (int)((i<<13)|TSB_TAG_VA(tsb[i].tag)),
-			  (int)(tsb[i].data>>32), (int)tsb[i].data);
+			  (int)((tsb_dmmu[i].tag&TSB_TAG_G)?-1:TSB_TAG_CTX(tsb_dmmu[i].tag)),
+			  (int)((i<<13)|TSB_TAG_VA(tsb_dmmu[i].tag)),
+			  (int)(tsb_dmmu[i].data>>32), (int)tsb_dmmu[i].data);
 		i++;
 		db_printf("%4d:%4d:%08x %08x:%08x\n", i,
-			  (int)((tsb[i].tag&TSB_TAG_G)?-1:TSB_TAG_CTX(tsb[i].tag)),
-			  (int)((i<<13)|TSB_TAG_VA(tsb[i].tag)),
-			  (int)(tsb[i].data>>32), (int)tsb[i].data);
+			  (int)((tsb_dmmu[i].tag&TSB_TAG_G)?-1:TSB_TAG_CTX(tsb_dmmu[i].tag)),
+			  (int)((i<<13)|TSB_TAG_VA(tsb_dmmu[i].tag)),
+			  (int)(tsb_dmmu[i].data>>32), (int)tsb_dmmu[i].data);
 	}
 }
 
@@ -841,7 +934,7 @@ db_print_trace_entry(te, i)
 		  (int)te->tt, (unsigned long long)te->tstate, 
 		  (unsigned long long)te->tfault, (unsigned long long)te->tsp,
 		  (unsigned long long)te->tpc);
-	db_printsym((u_long)te->tpc, DB_STGY_PROC);
+	db_printsym((u_long)te->tpc, DB_STGY_PROC, db_printf);
 	db_printf(": ");
 	if ((te->tpc && !(te->tpc&0x3)) &&
 	    curproc &&
@@ -983,6 +1076,7 @@ struct db_command db_machine_command_table[] = {
 	{ "esp",	db_esp,		0,	0 },
 #endif
 	{ "fpstate",	db_dump_fpstate,0,	0 },
+	{ "itlb",	db_dump_itlb,	0,	0 },
 	{ "kmap",	db_pmap_kernel,	0,	0 },
 	{ "lock",	db_lock,	0,	0 },
 	{ "pcb",	db_dump_pcb,	0,	0 },
@@ -1027,6 +1121,14 @@ db_branch_taken(inst, pc, regs)
 
     insn.i_int = inst;
 
+    /* the fancy union just gets in the way of this: */
+    switch(inst & 0xffc00000) {
+    case 0x30400000:	/* branch always, annul, with prediction */
+	return pc + ((inst<<(32-19))>>((32-19)-2));
+    case 0x30800000:	/* branch always, annul */
+	return pc + ((inst<<(32-22))>>((32-22)-2));
+    }
+
     /*
      * if this is not an annulled conditional branch, the next pc is "npc".
      */
@@ -1067,6 +1169,14 @@ db_inst_branch(inst)
     union instr insn;
 
     insn.i_int = inst;
+
+    /* the fancy union just gets in the way of this: */
+    switch(inst & 0xffc00000) {
+    case 0x30400000:	/* branch always, annul, with prediction */
+	return TRUE;
+    case 0x30800000:	/* branch always, annul */
+	return TRUE;
+    }
 
     if (insn.i_any.i_op != IOP_OP2)
 	return FALSE;

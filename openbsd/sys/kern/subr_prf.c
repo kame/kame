@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_prf.c,v 1.40 2002/03/15 18:19:52 millert Exp $	*/
+/*	$OpenBSD: subr_prf.c,v 1.44 2002/05/20 22:16:36 art Exp $	*/
 /*	$NetBSD: subr_prf.c,v 1.45 1997/10/24 18:14:25 chuck Exp $	*/
 
 /*-
@@ -131,6 +131,11 @@ int	db_console = 0;
 #endif
 
 /*
+ * panic on spl assertion failure?
+ */
+int splassert_ctl = 0;
+
+/*
  * v_putc: routine to putc on virtual console
  *
  * the v_putc pointer can be used to redirect the console cnputc elsewhere
@@ -214,8 +219,32 @@ panic(const char *fmt, ...)
 #ifdef DDB
 	if (db_panic)
 		Debugger();
+	else
+		db_stack_dump();
 #endif
 	boot(bootopt);
+}
+
+/*
+ * We print only the function name. The file name is usually very long and
+ * would eat tons of space in the kernel.
+ */
+void
+splassert_fail(int wantipl, int haveipl, const char *func)
+{
+
+	printf("splassert: %s: want %d have %d\n", func, wantipl, haveipl);
+	switch (splassert_ctl) {
+	case 1:
+		break;
+	case 2:
+#ifdef DDB
+		db_stack_dump();
+#endif
+		break;
+	default:
+		panic("spl assertion failure in %s", func);
+	}
 }
 
 /*

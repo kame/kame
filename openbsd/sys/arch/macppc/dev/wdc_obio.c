@@ -1,4 +1,4 @@
-/*	$OpenBSD: wdc_obio.c,v 1.6 2002/03/26 16:50:12 drahn Exp $	*/
+/*	$OpenBSD: wdc_obio.c,v 1.8 2002/09/15 09:01:58 deraadt Exp $	*/
 /*	$NetBSD: wdc_obio.c,v 1.15 2001/07/25 20:26:33 bouyer Exp $	*/
 
 /*-

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.48 2002/03/25 19:41:52 niklas Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.50 2002/09/10 18:29:43 art Exp $	*/
 /*	$NetBSD: pmap.c,v 1.68 1999/06/19 19:44:09 is Exp $	*/
 
 /*-
@@ -181,8 +181,8 @@ struct kpt_stats kpt_stats;
 int debugmap = 0;
 int pmapdebug = PDB_PARANOIA;
 
-static void	pmap_check_wiring __P((char *, vaddr_t));
-static void	pmap_pvdump __P((paddr_t));
+static void	pmap_check_wiring(char *, vaddr_t);
+static void	pmap_pvdump(paddr_t);
 #endif
 
 /*
@@ -293,21 +293,21 @@ extern vaddr_t	amiga_uptbase;
 
 extern paddr_t	z2mem_start;
 
-extern vaddr_t reserve_dumppages __P((vaddr_t));
+extern vaddr_t reserve_dumppages(vaddr_t);
   
-boolean_t	pmap_testbit __P((paddr_t, int));
-void		pmap_enter_ptpage __P((pmap_t, vaddr_t)); 
-static void	pmap_ptpage_addref __P((vaddr_t));
-static int	pmap_ptpage_delref __P((vaddr_t));
-static void	pmap_changebit __P((vaddr_t, int, boolean_t));
-  struct pv_entry * pmap_alloc_pv __P((void));
-void		pmap_free_pv __P((struct pv_entry *));
-void		pmap_pinit __P((pmap_t));
-void		pmap_release __P((pmap_t));
-static void	pmap_remove_mapping __P((pmap_t, vaddr_t, pt_entry_t *, int));
+boolean_t	pmap_testbit(paddr_t, int);
+void		pmap_enter_ptpage(pmap_t, vaddr_t);
+static void	pmap_ptpage_addref(vaddr_t);
+static int	pmap_ptpage_delref(vaddr_t);
+static void	pmap_changebit(vaddr_t, int, boolean_t);
+struct pv_entry *pmap_alloc_pv(void);
+void		pmap_free_pv(struct pv_entry *);
+void		pmap_pinit(pmap_t);
+void		pmap_release(pmap_t);
+static void	pmap_remove_mapping(pmap_t, vaddr_t, pt_entry_t *, int);
 
-static void	amiga_protection_init __P((void));
-void		pmap_collect1	__P((pmap_t, paddr_t, paddr_t));
+static void	amiga_protection_init(void);
+void		pmap_collect1(pmap_t, paddr_t, paddr_t);
 
 /* pmap_remove_mapping flags */
 #define		PRM_TFLUSH	0x01
@@ -1665,9 +1665,9 @@ pmap_deactivate(p)
  *	at a time.
  */
 void
-pmap_zero_page(phys)
-	paddr_t	phys;
+pmap_zero_page(struct vm_page *pg)
 {
+	paddr_t	phys = VM_PAGE_TO_PHYS(pg);
 #ifdef DEBUG
 	if (pmapdebug & PDB_FOLLOW)
 		printf("pmap_zero_page(%lx)\n", phys);
@@ -1683,9 +1683,10 @@ pmap_zero_page(phys)
  *	time.
  */
 void
-pmap_copy_page(src, dst)
-	paddr_t	src, dst;
+pmap_copy_page(struct vm_page *srcpg, struct vm_page *dstpg)
 {
+	paddr_t src = VM_PAGE_TO_PHYS(srcpg);
+	paddr_t dst = VM_PAGE_TO_PHYS(dstpg);
 #ifdef DEBUG
 	if (pmapdebug & PDB_FOLLOW)
 		printf("pmap_copy_page(%lx, %lx)\n", src, dst);

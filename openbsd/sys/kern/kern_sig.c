@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sig.c,v 1.56 2002/03/14 01:27:04 millert Exp $	*/
+/*	$OpenBSD: kern_sig.c,v 1.61 2002/10/01 17:33:39 art Exp $	*/
 /*	$NetBSD: kern_sig.c,v 1.54 1996/04/22 01:38:32 christos Exp $	*/
 
 /*
@@ -101,6 +101,9 @@ cansignal(p, pc, q, signum)
 	if (pc->pc_ucred->cr_uid == 0)
 		return (1);		/* root can always signal */
 
+	if (p == q)
+		return (1);		/* process can always signal itself */
+
 	if (signum == SIGCONT && q->p_session == p->p_session)
 		return (1);		/* SIGCONT in session */
 
@@ -114,6 +117,7 @@ cansignal(p, pc, q, signum)
 		case SIGKILL:
 		case SIGINT:
 		case SIGTERM:
+		case SIGALRM:
 		case SIGSTOP:
 		case SIGTTIN:
 		case SIGTTOU:
@@ -772,11 +776,11 @@ psignal(p, signum)
 	if ((u_int)signum >= NSIG || signum == 0)
 		panic("psignal signal number");
 
-	KNOTE(&p->p_klist, NOTE_SIGNAL | signum);
-
 	/* Ignore signal if we are exiting */
 	if (p->p_flag & P_WEXIT)
 		return;
+
+	KNOTE(&p->p_klist, NOTE_SIGNAL | signum);
 
 	mask = sigmask(signum);
 	prop = sigprop[signum];
@@ -975,10 +979,10 @@ out:
  *		postsig(signum);
  */
 int
-issignal(p)
-	register struct proc *p;
+issignal(struct proc *p)
 {
-	register int signum, mask, prop;
+	int signum, mask, prop;
+	int s;
 
 	for (;;) {
 		mask = p->p_siglist & ~p->p_sigmask;
@@ -1004,6 +1008,7 @@ issignal(p)
 			 */
 			p->p_xstat = signum;
 
+			s = splstatclock();	/* protect mi_switch */
 			if (p->p_flag & P_FSTRACE) {
 #ifdef	PROCFS
 				/* procfs debugging */
@@ -1019,6 +1024,7 @@ issignal(p)
 				proc_stop(p);
 				mi_switch();
 			}
+			splx(s);
 
 			/*
 			 * If we are no longer being traced, or the parent
@@ -1078,7 +1084,9 @@ issignal(p)
 				if ((p->p_pptr->p_flag & P_NOCLDSTOP) == 0)
 					psignal(p->p_pptr, SIGCHLD);
 				proc_stop(p);
+				s = splstatclock();
 				mi_switch();
+				splx(s);
 				break;
 			} else if (prop & SA_IGNORE) {
 				/*
@@ -1154,6 +1162,13 @@ postsig(signum)
 	mask = sigmask(signum);
 	p->p_siglist &= ~mask;
 	action = ps->ps_sigact[signum];
+
+	if (ps->ps_sig != signum) {
+		code = 0;
+	} else {
+		code = ps->ps_code;
+	}
+
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_PSIG)) {
 		siginfo_t si;
@@ -1203,10 +1218,7 @@ postsig(signum)
 		}
 		splx(s);
 		p->p_stats->p_ru.ru_nsignals++;
-		if (ps->ps_sig != signum) {
-			code = 0;
-		} else {
-			code = ps->ps_code;
+		if (ps->ps_sig == signum) {
 			ps->ps_code = 0;
 		}
 		null_sigval.sival_ptr = 0;

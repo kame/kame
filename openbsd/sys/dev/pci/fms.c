@@ -1,4 +1,4 @@
-/*	$OpenBSD: fms.c,v 1.8 2002/03/14 03:16:06 millert Exp $ */
+/*	$OpenBSD: fms.c,v 1.12 2002/05/29 14:30:21 mickey Exp $ */
 /*	$NetBSD: fms.c,v 1.5.4.1 2000/06/30 16:27:50 simonb Exp $	*/
 
 /*-
@@ -41,6 +41,8 @@
  * Forte Media FM801 Audio Device Driver
  */
 
+#include "radio.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -63,6 +65,7 @@
 #include <dev/ic/mpuvar.h>
 #endif
 
+#include <dev/pci/fmsreg.h>
 #include <dev/pci/fmsvar.h>
 
 
@@ -155,69 +158,6 @@ int	fms_allocmem(struct fms_softc *, size_t, size_t,
 			  struct fms_dma *);
 int	fms_freemem(struct fms_softc *, struct fms_dma *);
 
-#define FM_PCM_VOLUME		0x00
-#define FM_FM_VOLUME		0x02
-#define FM_I2S_VOLUME		0x04
-#define FM_RECORD_SOURCE	0x06
-
-#define FM_PLAY_CTL		0x08
-#define  FM_PLAY_RATE_MASK		0x0f00
-#define  FM_PLAY_BUF1_LAST		0x0001
-#define  FM_PLAY_BUF2_LAST		0x0002
-#define  FM_PLAY_START			0x0020
-#define  FM_PLAY_PAUSE			0x0040
-#define  FM_PLAY_STOPNOW		0x0080
-#define  FM_PLAY_16BIT			0x4000
-#define  FM_PLAY_STEREO			0x8000
-
-#define FM_PLAY_DMALEN		0x0a
-#define FM_PLAY_DMABUF1		0x0c
-#define FM_PLAY_DMABUF2		0x10
-
-
-#define FM_REC_CTL		0x14
-#define  FM_REC_RATE_MASK		0x0f00
-#define  FM_REC_BUF1_LAST		0x0001
-#define  FM_REC_BUF2_LAST		0x0002
-#define  FM_REC_START			0x0020
-#define  FM_REC_PAUSE			0x0040
-#define  FM_REC_STOPNOW			0x0080
-#define  FM_REC_16BIT			0x4000
-#define  FM_REC_STEREO			0x8000
-
-
-#define FM_REC_DMALEN		0x16
-#define FM_REC_DMABUF1		0x18
-#define FM_REC_DMABUF2		0x1c
-
-#define FM_CODEC_CTL		0x22
-#define FM_VOLUME		0x26
-#define  FM_VOLUME_MUTE			0x8000
-
-#define FM_CODEC_CMD		0x2a
-#define  FM_CODEC_CMD_READ		0x0080
-#define  FM_CODEC_CMD_VALID		0x0100
-#define  FM_CODEC_CMD_BUSY		0x0200
-
-#define FM_CODEC_DATA		0x2c
-
-#define FM_IO_CTL		0x52
-#define FM_CARD_CTL		0x54
-
-#define FM_INTMASK		0x56
-#define  FM_INTMASK_PLAY		0x0001
-#define  FM_INTMASK_REC			0x0002
-#define  FM_INTMASK_VOL			0x0040
-#define  FM_INTMASK_MPU			0x0080
-
-#define FM_INTSTATUS		0x5a
-#define  FM_INTSTATUS_PLAY		0x0100
-#define  FM_INTSTATUS_REC		0x0200
-#define  FM_INTSTATUS_VOL		0x4000
-#define  FM_INTSTATUS_MPU		0x8000
-
-
-
 int
 fms_match(parent, match, aux)
 	struct device *parent;
@@ -243,18 +183,37 @@ fms_attach(parent, self, aux)
 	struct pci_attach_args *pa = aux;
 	struct fms_softc *sc = (struct fms_softc *) self;
 	struct audio_attach_args aa;
-	const char *intrstr = NULL;
 	pci_chipset_tag_t pc = pa->pa_pc;
 	pcitag_t pt = pa->pa_tag;
 	pci_intr_handle_t ih;
+	bus_size_t iosize;
+	const char *intrstr;
+	u_int16_t k1;
 	int i;
 	
-	u_int16_t k1;
+	if (pci_mapreg_map(pa, 0x10, PCI_MAPREG_TYPE_IO, 0, &sc->sc_iot,
+	    &sc->sc_ioh, NULL, &iosize, 0)) {
+		printf(": can't map i/o space\n");
+		return;
+	}
 	
-	printf(": Forte Media FM-801\n");
+	if (bus_space_subregion(sc->sc_iot, sc->sc_ioh, 0x30, 2,
+	    &sc->sc_mpu_ioh)) {
+		printf(": can't get mpu subregion handle\n");
+		bus_space_unmap(sc->sc_iot, sc->sc_ioh, iosize);
+		return;
+	}
+
+	if (bus_space_subregion(sc->sc_iot, sc->sc_ioh, 0x68, 4,
+	    &sc->sc_opl_ioh)) {
+		printf(": can't get opl subregion handle\n");
+		bus_space_unmap(sc->sc_iot, sc->sc_ioh, iosize);
+		return;
+	}
 	
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
+		printf(": couldn't map interrupt\n");
+		bus_space_unmap(sc->sc_iot, sc->sc_ioh, iosize);
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
@@ -262,30 +221,17 @@ fms_attach(parent, self, aux)
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_AUDIO, fms_intr, sc,
 	    sc->sc_dev.dv_xname);
 	if (sc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt",sc->sc_dev.dv_xname);
+		printf(": couldn't establish interrupt");
 		if (intrstr != NULL)
 			printf(" at %s", intrstr);
 		printf("\n");
+		bus_space_unmap(sc->sc_iot, sc->sc_ioh, iosize);
 		return;
 	}
 	
-	sc->sc_dmat = pa->pa_dmat;
-	
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
-	
-	if (pci_mapreg_map(pa, 0x10, PCI_MAPREG_TYPE_IO, 0, &sc->sc_iot,
-			   &sc->sc_ioh, &sc->sc_ioaddr, &sc->sc_iosize, 0)) {
-		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
-		return;
-	}
-	
-	if (bus_space_subregion(sc->sc_iot, sc->sc_ioh, 0x30, 2, 
-				&sc->sc_mpu_ioh))
-		panic("fms_attach: can't get mpu subregion handle");
+	printf(": %s\n", intrstr);
 
-	if (bus_space_subregion(sc->sc_iot, sc->sc_ioh, 0x68, 4,
-				&sc->sc_opl_ioh))
-		panic("fms_attach: can't get opl subregion handle");
+	sc->sc_dmat = pa->pa_dmat;
 
 	/* Disable legacy audio (SBPro compatibility) */
 	pci_conf_write(pc, pt, 0x40, 0);
@@ -311,6 +257,10 @@ fms_attach(parent, self, aux)
 	bus_space_write_2(sc->sc_iot, sc->sc_ioh, FM_INTSTATUS, 
 	    FM_INTSTATUS_PLAY | FM_INTSTATUS_REC | FM_INTSTATUS_MPU | 
 	    FM_INTSTATUS_VOL);
+
+#if NRADIO > 0
+	fmsradio_attach(sc);
+#endif /* NRADIO > 0 */
 	
 	sc->host_if.arg = sc;
 	sc->host_if.attach = fms_attach_codec;

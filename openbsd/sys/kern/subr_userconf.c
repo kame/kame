@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_userconf.c,v 1.28 2002/03/14 03:16:09 millert Exp $	*/
+/*	$OpenBSD: subr_userconf.c,v 1.31 2002/07/29 23:18:57 art Exp $	*/
 
 /*
  * Copyright (c) 1996-2001 Mats O Jansson <moj@stacken.kth.se>
@@ -505,6 +505,10 @@ userconf_change(devno)
 					;
 				lk = l = (int *)malloc(sizeof(int) * i,
 				    M_TEMP, M_NOWAIT);
+				if (lk == NULL) {
+					printf("out of memory.\n");
+					return;
+				}
 				bcopy(cd->cf_loc, l, sizeof(int) * i);
 			}
 
@@ -1055,7 +1059,7 @@ userconf_add(dev, len, unit, state)
 {
 	int i = 0, found = 0;
 	struct cfdata new;
-	int  val, max_unit, orig;
+	int  val, max_unit, star_unit, orig;
 
 	bzero(&new, sizeof(struct cfdata));
 
@@ -1108,13 +1112,13 @@ userconf_add(dev, len, unit, state)
 		/* Fix indexs in pv */
 		for (i = 0; i < pv_size; i++) {
 			if (pv[i] != -1 && pv[i] >= val)
-				pv[i] = pv[i]++;
+				pv[i]++;
 		}
 
 		/* Fix indexs in cfroots */
 		for (i = 0; i < cfroots_size; i++) {
 			if (cfroots[i] != -1 && cfroots[i] >= val)
-				cfroots[i] = cfroots[i]++;
+				cfroots[i]++;
 		}
 
 		userconf_maxdev++;
@@ -1141,9 +1145,31 @@ userconf_add(dev, len, unit, state)
 			i++;
 		}
 
-		/* For all * entries set unit number to max+1 */
-
+		/*
+		 * For all * entries set unit number to max+1, and update
+		 * cf_starunit1 if necessary.
+		 */
 		max_unit++;
+		star_unit = -1;
+
+		i = 0;
+		while (cfdata[i].cf_attach != 0) {
+			if (strlen(cfdata[i].cf_driver->cd_name) == len &&
+			    strncasecmp(dev, cfdata[i].cf_driver->cd_name,
+			    len) == 0) {
+				switch (cfdata[i].cf_fstate) {
+				case FSTATE_NOTFOUND:
+				case FSTATE_DNOTFOUND:
+					if (cfdata[i].cf_unit > star_unit)
+						star_unit = cfdata[i].cf_unit;
+					break;
+				default:
+					break;
+				}
+			}
+			i++;
+		}
+		star_unit++;
 
 		i = 0;
 		while (cfdata[i].cf_attach != 0) {
@@ -1154,6 +1180,9 @@ userconf_add(dev, len, unit, state)
 				case FSTATE_STAR:
 				case FSTATE_DSTAR:
 					cfdata[i].cf_unit = max_unit;
+					if (cfdata[i].cf_starunit1 < star_unit)
+						cfdata[i].cf_starunit1 =
+						    star_unit;
 					break;
 				default:
 					break;
@@ -1164,7 +1193,7 @@ userconf_add(dev, len, unit, state)
 		userconf_pdev(val);
 	}
 
-	/* cf_attach, cf_driver, cf_unit, cf_state, cf_loc, cf_flags,
+	/* cf_attach, cf_driver, cf_unit, cf_fstate, cf_loc, cf_flags,
 	   cf_parents, cf_locnames, cf_locnames and cf_ivstubs */
 }
 

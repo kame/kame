@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.h,v 1.52 2002/03/14 01:27:13 millert Exp $	*/
+/*	$OpenBSD: conf.h,v 1.66 2002/07/10 22:21:30 mickey Exp $	*/
 /*	$NetBSD: conf.h,v 1.33 1996/05/03 20:03:32 christos Exp $	*/
 
 /*-
@@ -203,14 +203,14 @@ extern struct cdevsw cdevsw[];
 	dev_init(c,n,tty), ttselect, (dev_type_mmap((*))) enodev, \
 	D_TTY | D_KQFILTER, ttkqfilter }
 
-/* open, close, read, ioctl, select */
+/* open, close, read, ioctl, select, nokqfilter */
 #define	cdev_mouse_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,select), \
 	(dev_type_mmap((*))) enodev }
 
-/* open, close, read, write, ioctl, select */
+/* open, close, read, write, ioctl, select, nokqfilter */
 #define	cdev_mousewr_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), \
@@ -229,14 +229,14 @@ extern struct cdevsw cdevsw[];
 	(dev_type_ioctl((*))) enodev, (dev_type_stop((*))) enodev, \
 	0, seltrue, (dev_type_mmap((*))) enodev }
 
-/* open, close, read, write, ioctl, select -- XXX should be a tty */
+/* open, close, read, write, ioctl, select, kqfilter -- XXX should be a tty */
 #define	cdev_cn_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
 	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev, \
 	D_TTY | D_KQFILTER, dev_init(c,n,kqfilter) }
 
-/* open, read, write, ioctl, select -- XXX should be a tty */
+/* open, read, write, ioctl, select, kqfilter -- XXX should be a tty */
 #define cdev_ctty_init(c,n) { \
 	dev_init(c,n,open), (dev_type_close((*))) nullop, dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) nullop, \
@@ -255,6 +255,12 @@ extern struct cdevsw cdevsw[];
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
 	0, (dev_type_select((*))) enodev, (dev_type_mmap((*))) enodev }
 
+/* open, close, read, write, ioctl */
+#define cdev_systrace_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
+	0, (dev_type_select((*))) enodev, (dev_type_mmap((*))) enodev }
+
 /* read, write */
 #define cdev_swap_init(c,n) { \
 	(dev_type_open((*))) nullop, (dev_type_close((*))) nullop, \
@@ -262,19 +268,19 @@ extern struct cdevsw cdevsw[];
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
 	(dev_type_mmap((*))) enodev }
 
-/* open, close, read, write, ioctl, tty, select */
+/* open, close, read, write, ioctl, tty, select, kqfilter */
 #define cdev_ptc_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) nullop, \
 	dev_init(c,n,tty), dev_init(c,n,select), (dev_type_mmap((*))) enodev, \
 	D_TTY | D_KQFILTER, ttkqfilter }
 
-/* open, close, read, ioctl, select -- XXX should be a generic device */
+/* open, close, read, ioctl, select, kqfilter -- XXX should be a generic device */
 #define cdev_log_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,select), \
-	(dev_type_mmap((*))) enodev }
+	(dev_type_mmap((*))) enodev, D_KQFILTER, dev_init(c,n,kqfilter) }
 
 /* open */
 #define cdev_fd_init(c,n) { \
@@ -283,11 +289,12 @@ extern struct cdevsw cdevsw[];
 	(dev_type_ioctl((*))) enodev, (dev_type_stop((*))) enodev, \
 	0, (dev_type_select((*))) enodev, (dev_type_mmap((*))) enodev }
 
-/* open, close, read, write, ioctl, select -- XXX should be generic device */
+/* open, close, read, write, ioctl, select, kqfilter -- XXX should be generic device */
 #define cdev_bpftun_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev }
+	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev, \
+	D_KQFILTER, dev_init(c,n,kqfilter) }
 
 /* open, close, ioctl */
 #define	cdev_lkm_init(c,n) { \
@@ -331,14 +338,14 @@ extern struct cdevsw cdevsw[];
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
 	dev_init(c,n,mmap) }
 
-/* open, close, read, write, ioctl */
+/* open, close, read, write, ioctl, select, kqfilter */
 #define cdev_audio_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,select), \
-	dev_init(c,n,mmap) }
+	dev_init(c,n,mmap), D_KQFILTER, dev_init(c,n,kqfilter) }
 
-/* open, close, read, write, ioctl, poll */
+/* open, close, read, write, ioctl, select, nokqfilter */
 #define cdev_midi_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), \
@@ -351,7 +358,7 @@ extern struct cdevsw cdevsw[];
 	(dev_type_ioctl((*))) enodev, (dev_type_stop((*))) nullop, \
 	0, (dev_type_select((*))) enodev, (dev_type_mmap((*))) enodev }
 
-/* open, close, read, write, ioctl, select */
+/* open, close, read, write, ioctl, select, nokqfilter */
 #define cdev_xfs_init(c, n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), \
@@ -365,21 +372,22 @@ extern struct cdevsw cdevsw[];
 	(dev_type_stop((*))) enodev, 0, seltrue, \
 	(dev_type_mmap((*))) enodev, 0 }
 
-/* open, close, read, write, ioctl, stop, tty, select, mmap */
+/* open, close, read, write, ioctl, stop, tty, select, mmap, kqfilter */
 #define	cdev_wsdisplay_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
 	dev_init(c,n,tty), ttselect, dev_init(c,n,mmap), \
 	D_KQFILTER, dev_init(c,n,kqfilter) }
 
-/* open, close, read, write, ioctl, select */
+/* open, close, read, write, ioctl, select, kqfilter */
 #define	cdev_random_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev }
+	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev, \
+	D_KQFILTER, dev_init(c,n,kqfilter) }
 void	randomattach(void);
 
-/* open, close, ioctl, select */
+/* open, close, ioctl, select, nokqfilter */
 #define	cdev_usb_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
@@ -399,25 +407,28 @@ void	randomattach(void);
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
 	(dev_type_mmap((*))) enodev }
 
-#define	cdev_usbdev_init(c,n)	cdev_random_init(c,n)
-#define	cdev_ugen_init(c,n)	cdev_random_init(c,n)
+/* open, close, read, write, ioctl, select, nokqfilter */
+#define	cdev_usbdev_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
+	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev }
 
 /* open, close, init */
-#define       cdev_pci_init(c,n) { \
+#define cdev_pci_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
 	(dev_type_mmap((*))) enodev }
 
 /* open, close, init */
-#define       cdev_iop_init(c,n) { \
+#define cdev_iop_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
 	(dev_type_mmap((*))) enodev }
 
 /* open, close, ioctl */
-#define       cdev_radio_init(c,n) { \
+#define cdev_radio_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
@@ -425,6 +436,12 @@ void	randomattach(void);
 
 /* open, close, write, ioctl */
 #define cdev_spkr_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
+	0, seltrue, (dev_type_mmap((*))) enodev }
+
+/* open, close, write, ioctl */
+#define cdev_lpt_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
 	0, seltrue, (dev_type_mmap((*))) enodev }
@@ -560,5 +577,23 @@ cdev_decl(wsmux);
 # define NSVR4_NET	0
 #endif
 cdev_decl(svr4_net);
+
+cdev_decl(ksyms);
+
+cdev_decl(crypto);
+
+cdev_decl(systrace);
+
+cdev_decl(bio);
+
+cdev_decl(gpr);
+
+cdev_decl(usb);
+cdev_decl(ugen);
+cdev_decl(uhid);
+cdev_decl(ucom);
+cdev_decl(ulpt);
+cdev_decl(uscanner);
+cdev_decl(urio);
 
 #endif

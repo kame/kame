@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_ktrace.c,v 1.27 2002/03/14 01:27:04 millert Exp $	*/
+/*	$OpenBSD: kern_ktrace.c,v 1.29 2002/06/27 02:15:52 deraadt Exp $	*/
 /*	$NetBSD: kern_ktrace.c,v 1.23 1996/02/09 18:59:36 christos Exp $	*/
 
 /*
@@ -303,7 +303,7 @@ sys_ktrace(curp, v, retval)
 		syscallarg(char *) fname;
 		syscallarg(int) ops;
 		syscallarg(int) facs;
-		syscallarg(int) pid;
+		syscallarg(pid_t) pid;
 	} */ *uap = v;
 	struct vnode *vp = NULL;
 	struct proc *p = NULL;
@@ -530,7 +530,8 @@ ktrcanset(callp, targetp)
 	    target->p_ruid == target->p_svuid &&
 	    caller->p_rgid == target->p_rgid &&	/* XXX */
 	    target->p_rgid == target->p_svgid &&
-	    (targetp->p_traceflag & KTRFAC_ROOT) == 0) ||
+	    (targetp->p_traceflag & KTRFAC_ROOT) == 0 &&
+	    !ISSET(targetp->p_flag, P_SUGID)) ||
 	    caller->pc_ucred->cr_uid == 0)
 		return (1);
 

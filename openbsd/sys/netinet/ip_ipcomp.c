@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_ipcomp.c,v 1.1 2001/07/05 12:08:52 jjbg Exp $ */
+/* $OpenBSD: ip_ipcomp.c,v 1.9 2002/09/12 10:11:39 ho Exp $ */
 
 /*
  * Copyright (c) 2001 Jean-Jacques Bernard-Gundol (jj@wabbitt.org)
@@ -98,8 +98,7 @@ ipcomp_init(tdbp, xsp, ii)
 		/* Only deflate is implemented */
 
 	default:
-		DPRINTF(
-		    ("ipcomp_init(): unsupported compression algorithm %d specified\n",
+		DPRINTF(("ipcomp_init(): unsupported compression algorithm %d specified\n",
 		    ii->ii_compalg));
 		return EINVAL;
 	}
@@ -156,8 +155,7 @@ ipcomp_input(m, tdb, skip, protoff)
 	crp = crypto_getreq(1);
 	if (crp == NULL) {
 		m_freem(m);
-		DPRINTF(
-		    ("ipcomp_input(): failed to acquire crypto descriptors\n"));
+		DPRINTF(("ipcomp_input(): failed to acquire crypto descriptors\n"));
 		ipcompstat.ipcomps_crypto++;
 		return ENOBUFS;
 	}
@@ -228,7 +226,7 @@ ipcomp_input_cb(op)
 	m = (struct mbuf *) crp->crp_buf;
 
 	s = spltdb();
-	
+
 	tdb = gettdb(tc->tc_spi, &tc->tc_dst, tc->tc_proto);
 	FREE(tc, M_XDATA);
 	if (tdb == NULL) {
@@ -267,18 +265,15 @@ ipcomp_input_cb(op)
 			return crypto_dispatch(crp);
 		}
 		ipcompstat.ipcomps_noxform++;
-		DPRINTF(
-
-		    ("ipcomp_input_cb(): crypto error %d\n", crp->crp_etype));
+		DPRINTF(("ipcomp_input_cb(): crypto error %d\n",
+		    crp->crp_etype));
 		error = crp->crp_etype;
 		goto baddone;
 	}
 	/* Shouldn't happen... */
 	if (m == NULL) {
 		ipcompstat.ipcomps_crypto++;
-		DPRINTF(
-		    ("ipcomp_input_cb(): bogus returned buffer from crypto\n")
-		    );
+		DPRINTF(("ipcomp_input_cb(): bogus returned buffer from crypto\n"));
 		error = EINVAL;
 		goto baddone;
 	}
@@ -321,9 +316,9 @@ ipcomp_input_cb(op)
 			m_adj(m1->m_next, roff + hlen - m1->m_len);
 
 			/*
-		         * The second mbuf is guaranteed not to have a
-		         * pkthdr...
-		         */
+			 * The second mbuf is guaranteed not to have a
+			 * pkthdr...
+			 */
 			m->m_pkthdr.len -= (roff + hlen - m1->m_len);
 		}
 		/* Now, let's unlink the mbuf chain for a second... */
@@ -338,9 +333,9 @@ ipcomp_input_cb(op)
 		/* Finally, let's relink */
 		m1->m_next = mo;
 	} else {
-		bcopy(mtod(m1, u_char *) + roff + hlen, 
-		      mtod(m1, u_char *) + roff,
-		      m1->m_len - (roff + hlen));
+		bcopy(mtod(m1, u_char *) + roff + hlen,
+		    mtod(m1, u_char *) + roff,
+		    m1->m_len - (roff + hlen));
 		m1->m_len -= hlen;
 		m->m_pkthdr.len -= hlen;
 	}
@@ -375,7 +370,7 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 	int             protoff;
 {
 	struct comp_algo *ipcompx = (struct comp_algo *) tdb->tdb_compalgxform;
-	int             rblen, ralen, hlen;
+	int             hlen;
 	u_int8_t        prot;
 	u_int16_t       cpi;
 	struct cryptodesc *crdc = NULL;
@@ -413,7 +408,6 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 	}
 #endif
 
-	rblen = m->m_pkthdr.len - skip;	/* Raw payload length before comp. */
 	hlen = IPCOMP_HLENGTH;
 
 	ipcompstat.ipcomps_output++;
@@ -426,9 +420,8 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 		 * Since compression is going to reduce the size, no need to
 		 * worry
 		 */
-		if (skip + hlen + ralen > IP_MAXPACKET) {
-			DPRINTF(
-			    ("ipcomp_output(): packet in IPCA %s/%08x got too big\n",
+		if (m->m_pkthdr.len + hlen > IP_MAXPACKET) {
+			DPRINTF(("ipcomp_output(): packet in IPCA %s/%08x got too big\n",
 			    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
 			m_freem(m);
 			ipcompstat.ipcomps_toobig++;
@@ -440,9 +433,8 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 #ifdef INET6
 	case AF_INET6:
 		/* Check for IPv6 maximum packet size violations */
-		if (skip + hlen + ralen > IPV6_MAXPACKET) {
-			DPRINTF(
-			    ("ipcomp_output(): packet in IPCA %s/%08x got too big\n",
+		if (m->m_pkthdr.len + hlen > IPV6_MAXPACKET) {
+			DPRINTF(("ipcomp_output(): packet in IPCA %s/%08x got too big\n",
 			    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
 			m_freem(m);
 			ipcompstat.ipcomps_toobig++;
@@ -451,9 +443,8 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 #endif /* INET6 */
 
 	default:
-		DPRINTF(
-		    ("ipcomp_output(): unknown/unsupported protocol family %d, IPCA %s/%08x\n", 
-		    tdb->tdb_dst.sa.sa_family, ipsp_address(tdb->tdb_dst), 
+		DPRINTF(("ipcomp_output(): unknown/unsupported protocol family %d, IPCA %s/%08x\n",
+		    tdb->tdb_dst.sa.sa_family, ipsp_address(tdb->tdb_dst),
 		    ntohl(tdb->tdb_spi)));
 		m_freem(m);
 		ipcompstat.ipcomps_nopf++;
@@ -480,12 +471,13 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;	/* Turn off checking */
 	}
 	/*
-         * Loop through mbuf chain; if we find an M_EXT mbuf with
-         * more than one reference, replace the rest of the chain.
-         */
+	 * Loop through mbuf chain; if we find an M_EXT mbuf with
+	 * more than one reference, replace the rest of the chain.
+	 */
+	mo = NULL;
 	mi = m;
 	while (mi != NULL &&
-	       (!(mi->m_flags & M_EXT) || !MCLISREFERENCED(mi))) {
+	    (!(mi->m_flags & M_EXT) || !MCLISREFERENCED(mi))) {
 		mo = mi;
 		mi = mi->m_next;
 	}
@@ -495,8 +487,7 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 		struct mbuf    *n = m_copym2(mi, 0, M_COPYALL, M_DONTWAIT);
 
 		if (n == NULL) {
-			DPRINTF(
-			    ("ipcomp_output(): bad mbuf chain, IPCA %s/%08x\n", 
+			DPRINTF(("ipcomp_output(): bad mbuf chain, IPCA %s/%08x\n",
 			    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
 			ipcompstat.ipcomps_hdrops++;
 			m_freem(m);
@@ -512,8 +503,7 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 	/* Inject IPCOMP header */
 	mo = m_inject(m, skip, hlen, M_DONTWAIT);
 	if (mo == NULL) {
-		DPRINTF(
-		    ("ipcomp_output(): failed to inject IPCOMP header for IPCA %s/%08x\n",
+		DPRINTF(("ipcomp_output(): failed to inject IPCOMP header for IPCA %s/%08x\n",
 		    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
 		m_freem(m);
 		ipcompstat.ipcomps_wrap++;
@@ -546,9 +536,8 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 #endif
 
 	default:
-		DPRINTF(
-		    ("ipcomp_output(): unknown/unsupported protocol family %d, IPCA %s/%08x\n", 
-		    tdb->tdb_dst.sa.sa_family, ipsp_address(tdb->tdb_dst), 
+		DPRINTF(("ipcomp_output(): unknown/unsupported protocol family %d, IPCA %s/%08x\n",
+		    tdb->tdb_dst.sa.sa_family, ipsp_address(tdb->tdb_dst),
 		    ntohl(tdb->tdb_spi)));
 		m_freem(m);
 		ipcompstat.ipcomps_nopf++;
@@ -566,9 +555,7 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 	crp = crypto_getreq(1);
 	if (crp == NULL) {
 		m_freem(m);
-		DPRINTF(
-		    ("ipcomp_output(): failed to acquire crypto descriptors\n"
-		    ));
+		DPRINTF(("ipcomp_output(): failed to acquire crypto descriptors\n"));
 		ipcompstat.ipcomps_crypto++;
 		return ENOBUFS;
 	}
@@ -585,7 +572,7 @@ ipcomp_output(m, tdb, mp, skip, protoff)
 
 	/* IPsec-specific opaque crypto info */
 	MALLOC(tc, struct tdb_crypto *, sizeof(struct tdb_crypto),
-	       M_XDATA, M_NOWAIT);
+	    M_XDATA, M_NOWAIT);
 	if (tc == NULL) {
 		m_freem(m);
 		crypto_freereq(crp);
@@ -638,13 +625,14 @@ ipcomp_output_cb(cp)
 	s = spltdb();
 
 	tdb = gettdb(tc->tc_spi, &tc->tc_dst, tc->tc_proto);
-	FREE(tc, M_XDATA);
 	if (tdb == NULL) {
+		FREE(tc, M_XDATA);
 		ipcompstat.ipcomps_notdb++;
 		DPRINTF(("ipcomp_output_cb(): TDB expired while in crypto\n"));
 		goto baddone;
 	}
-	/* Check for crypto errors */
+
+	/* Check for crypto errors. */
 	if (crp->crp_etype) {
 		/* Reset session ID */
 		if (tdb->tdb_cryptoid != 0)
@@ -654,33 +642,34 @@ ipcomp_output_cb(cp)
 			splx(s);
 			return crypto_dispatch(crp);
 		}
-		ipcompstat.ipcomps_noxform++;
-		DPRINTF(("ipcomp_output_cb(): crypto error %d\n", 
-		    crp->crp_etype));
 
+		FREE(tc, M_XDATA);
+		ipcompstat.ipcomps_noxform++;
+		DPRINTF(("ipcomp_output_cb(): crypto error %d\n",
+		    crp->crp_etype));
 		goto baddone;
-	}
+	} else
+		FREE(tc, M_XDATA);
+
 	/* Shouldn't happen... */
 	if (m == NULL) {
 		ipcompstat.ipcomps_crypto++;
-		DPRINTF(
-		    ("ipcomp_output_cb(): bogus returned buffer from crypto\n"
-		    ));
+		DPRINTF(("ipcomp_output_cb(): bogus returned buffer from "
+		    "crypto\n"));
 		error = EINVAL;
 		goto baddone;
 	}
-	/* Check sizes */
+
+	/* Check sizes. */
 	if (rlen < crp->crp_olen) {
-		/* compression was useless, we have lost time */
-		FREE(tc, M_XDATA);
+		/* Compression was useless, we have lost time. */
 		crypto_freereq(crp);
 		error = ipsp_process_done(m, tdb);
 		splx(s);
 		return error;
 	}
 
-	/* Adjust the length in the IP header */
-
+	/* Adjust the length in the IP header. */
 	switch (tdb->tdb_dst.sa.sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -697,17 +686,18 @@ ipcomp_output_cb(cp)
 #endif /* INET6 */
 
 	default:
-		DPRINTF(
-		    ("ipcomp_output(): unknown/unsupported protocol family %d, IPCA %s/%08x\n", 
-		    tdb->tdb_dst.sa.sa_family, ipsp_address(tdb->tdb_dst), 
-		    ntohl(tdb->tdb_spi)));
 		m_freem(m);
+		DPRINTF(("ipcomp_output(): unknown/unsupported protocol "
+		    "family %d, IPCA %s/%08x\n",
+		    tdb->tdb_dst.sa.sa_family, ipsp_address(tdb->tdb_dst),
+		    ntohl(tdb->tdb_spi)));
+		crypto_freereq(crp);
 		ipcompstat.ipcomps_nopf++;
 		return EPFNOSUPPORT;
 		break;
 	}
 
-	/* Release the crypto descriptor */
+	/* Release the crypto descriptor. */
 	crypto_freereq(crp);
 
 	error = ipsp_process_done(m, tdb);

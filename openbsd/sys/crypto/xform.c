@@ -1,4 +1,4 @@
-/*	$OpenBSD: xform.c,v 1.17 2002/03/05 15:59:41 markus Exp $	*/
+/*	$OpenBSD: xform.c,v 1.19 2002/08/16 22:47:25 dhartmei Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -179,17 +179,17 @@ struct auth_hash auth_hash_hmac_ripemd_160_96 = {
 };
 
 struct auth_hash auth_hash_key_md5 = {
-	CRYPTO_MD5_KPDK, "Keyed MD5", 
+	CRYPTO_MD5_KPDK, "Keyed MD5",
 	0, 16, 16, sizeof(MD5_CTX),
 	(void (*)(void *)) MD5Init, MD5Update_int,
-	(void (*)(u_int8_t *, void *)) MD5Final 
+	(void (*)(u_int8_t *, void *)) MD5Final
 };
 
 struct auth_hash auth_hash_key_sha1 = {
 	CRYPTO_SHA1_KPDK, "Keyed SHA1",
 	0, 20, 20, sizeof(SHA1_CTX),
 	(void (*)(void *)) SHA1Init, SHA1Update_int,
-	(void (*)(u_int8_t *, void *)) SHA1Final 
+	(void (*)(u_int8_t *, void *)) SHA1Final
 };
 
 struct auth_hash auth_hash_md5 = {
@@ -203,7 +203,7 @@ struct auth_hash auth_hash_sha1 = {
 	CRYPTO_SHA1, "SHA1",
 	0, 20, 20, sizeof(SHA1_CTX),
 	(void (*)(void *)) SHA1Init, SHA1Update_int,
-	(void (*)(u_int8_t *, void *)) SHA1Final 
+	(void (*)(u_int8_t *, void *)) SHA1Final
 };
 
 /* Compression instance */
@@ -317,8 +317,8 @@ cast5_decrypt(caddr_t key, u_int8_t *blk)
 void
 cast5_setkey(u_int8_t **sched, u_int8_t *key, int len)
 {
-	MALLOC(*sched, u_int8_t *, sizeof(blf_ctx), M_CRYPTO_DATA, M_WAITOK);
-	bzero(*sched, sizeof(blf_ctx));
+	MALLOC(*sched, u_int8_t *, sizeof(cast_key), M_CRYPTO_DATA, M_WAITOK);
+	bzero(*sched, sizeof(cast_key));
 	cast_setkey((cast_key *)*sched, key, len);
 }
 

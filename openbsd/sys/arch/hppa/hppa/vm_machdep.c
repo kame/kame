@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.37 2002/04/01 16:05:10 mickey Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.42 2002/09/11 15:55:58 mickey Exp $	*/
 
 /*
  * Copyright (c) 1999-2002 Michael Shalayeff
@@ -105,10 +105,10 @@ pagemove(from, to, size)
 	paddr_t pa;
 
 	while (size > 0) {
-		pmap_extract(pmap_kernel(), (vaddr_t)from, &pa);
+		if (pmap_extract(pmap_kernel(), (vaddr_t)from, &pa) == FALSE)
+			panic("pagemove");
 		pmap_kremove((vaddr_t)from, PAGE_SIZE);
-		pmap_kenter_pa((vaddr_t)to, pa,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		pmap_kenter_pa((vaddr_t)to, pa, UVM_PROT_RW);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -136,44 +136,11 @@ void
 cpu_swapout(p)
 	struct proc *p;
 {
-	extern paddr_t fpu_curpcb;
+	extern vaddr_t fpu_curpcb;
 	struct trapframe *tf = p->p_md.md_regs;
 
 	if (tf->tf_cr30 == fpu_curpcb) {
-		__asm __volatile(
-		    "fstds,ma %%fr0 , 8(%0)\n\t"
-		    "fstds,ma %%fr1 , 8(%0)\n\t"
-		    "fstds,ma %%fr2 , 8(%0)\n\t"
-		    "fstds,ma %%fr3 , 8(%0)\n\t"
-		    "fstds,ma %%fr4 , 8(%0)\n\t"
-		    "fstds,ma %%fr5 , 8(%0)\n\t"
-		    "fstds,ma %%fr6 , 8(%0)\n\t"
-		    "fstds,ma %%fr7 , 8(%0)\n\t"
-		    "fstds,ma %%fr8 , 8(%0)\n\t"
-		    "fstds,ma %%fr9 , 8(%0)\n\t"
-		    "fstds,ma %%fr10, 8(%0)\n\t"
-		    "fstds,ma %%fr11, 8(%0)\n\t"
-		    "fstds,ma %%fr12, 8(%0)\n\t"
-		    "fstds,ma %%fr13, 8(%0)\n\t"
-		    "fstds,ma %%fr14, 8(%0)\n\t"
-		    "fstds,ma %%fr15, 8(%0)\n\t"
-		    "fstds,ma %%fr16, 8(%0)\n\t"
-		    "fstds,ma %%fr17, 8(%0)\n\t"
-		    "fstds,ma %%fr18, 8(%0)\n\t"
-		    "fstds,ma %%fr19, 8(%0)\n\t"
-		    "fstds,ma %%fr20, 8(%0)\n\t"
-		    "fstds,ma %%fr21, 8(%0)\n\t"
-		    "fstds,ma %%fr22, 8(%0)\n\t"
-		    "fstds,ma %%fr23, 8(%0)\n\t"
-		    "fstds,ma %%fr24, 8(%0)\n\t"
-		    "fstds,ma %%fr25, 8(%0)\n\t"
-		    "fstds,ma %%fr26, 8(%0)\n\t"
-		    "fstds,ma %%fr27, 8(%0)\n\t"
-		    "fstds,ma %%fr28, 8(%0)\n\t"
-		    "fstds,ma %%fr29, 8(%0)\n\t"
-		    "fstds,ma %%fr30, 8(%0)\n\t"
-		    "fstds    %%fr31, 0(%0)\n\t"
-		    : "+r" (fpu_curpcb) :: "memory");
+		fpu_save(fpu_curpcb);
 		fpu_curpcb = 0;
 	}
 }
@@ -243,14 +210,14 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	/*
 	 * Build a stack frame for the cpu_switch & co.
 	 */
-	osp = sp;
-	sp += HPPA_FRAME_SIZE + 16*4; /* std frame + calee-save registers */
+	osp = sp + HPPA_FRAME_SIZE;
+	sp += 2*HPPA_FRAME_SIZE + 20*4; /* std frame + calee-save registers */
 	*HPPA_FRAME_CARG(0, sp) = tf->tf_sp;
 	*HPPA_FRAME_CARG(1, sp) = KERNMODE(func);
 	*HPPA_FRAME_CARG(2, sp) = (register_t)arg;
+	*(register_t*)(osp) = (sp - HPPA_FRAME_SIZE);
 	*(register_t*)(sp + HPPA_FRAME_PSP) = osp;
-	*(register_t*)(sp + HPPA_FRAME_CRP) =
-		(register_t)switch_trampoline;
+	*(register_t*)(osp + HPPA_FRAME_CRP) = (register_t)&switch_trampoline;
 	tf->tf_sp = sp;
 	fdcache(HPPA_SID_KERNEL, (vaddr_t)p2->p_addr, sp - (vaddr_t)p2->p_addr);
 }
@@ -262,14 +229,11 @@ cpu_exit(p)
 	extern paddr_t fpu_curpcb;	/* from locore.S */
 	struct trapframe *tf = p->p_md.md_regs;
 
-	uvmexp.swtch++;
-
-	splhigh();
-	curproc = NULL;
 	if (fpu_curpcb == tf->tf_cr30)
 		fpu_curpcb = 0;
 
-	switch_exit(p);
+	exit2(p);
+	cpu_switch(p);
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vgafbvar.h,v 1.5 2002/03/26 16:51:43 drahn Exp $	*/
+/*	$OpenBSD: vgafbvar.h,v 1.9 2002/09/15 09:01:59 deraadt Exp $	*/
 /*	$NetBSD: vgavar.h,v 1.2 1996/11/23 06:06:43 cgd Exp $	*/
 
 /*
@@ -54,19 +54,16 @@ struct vgafb_config {
 	int	(*vc_ioctl)(void *, u_long,
 		    caddr_t, int, struct proc *);
 	paddr_t	(*vc_mmap)(void *, off_t, int);
-	#if 0
-	struct raster   dc_raster;      /* raster description */
-	#endif
-	struct rcons    dc_rcons;       /* raster blitter control info */
 
-	bus_addr_t	iobase;
-	bus_size_t	iosize;
+	struct rasops_info    dc_rinfo;       /* raster display data*/
 
 	bus_addr_t	membase;
 	bus_size_t	memsize;
 
 	bus_addr_t	mmiobase;
 	bus_size_t	mmiosize;
+
+	int vc_backlight_on;
 };
 
 int	vgafb_common_probe(bus_space_tag_t, bus_space_tag_t,
@@ -90,3 +87,4 @@ int	vgafb_alloc_screen(void *v, const struct wsscreen_descr *type,
 void	vgafb_free_screen(void *v, void *cookie);
 int	vgafb_show_screen(void *v, void *cookie, int waitok,
 	    void (*cb)(void *, int, int), void *cbarg);
+void	vgafb_burn(void *v, u_int on, u_int flags);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_km.c,v 1.28 2002/03/06 22:05:31 art Exp $	*/
+/*	$OpenBSD: uvm_km.c,v 1.33 2002/09/12 12:50:47 art Exp $	*/
 /*	$NetBSD: uvm_km.c,v 1.42 2001/01/14 02:10:01 thorpej Exp $	*/
 
 /* 
@@ -111,7 +111,7 @@
  * by splvm().    each of these submaps has their own private kernel 
  * object (e.g. kmem_object, mb_object).
  *
- * note that just because a kernel object spans the entire kernel virutal
+ * note that just because a kernel object spans the entire kernel virtual
  * address space doesn't mean that it has to be mapped into the entire space.
  * large chunks of a kernel object's space go unused either because 
  * that area of kernel VM is unmapped, or there is some other type of 
@@ -134,7 +134,7 @@
  * [vm_map_max(kmem_object) - vm_map_min(kernel_map)], so the offsets
  * in those objects will typically not start at zero.
  *
- * kernel object have one other special property: when the kernel virtual
+ * kernel objects have one other special property: when the kernel virtual
  * memory mapping them is unmapped, the backing memory in the object is
  * freed right away.   this is done with the uvm_km_pgremove() function.
  * this has to be done because there is no backing store for kernel pages
@@ -228,7 +228,7 @@ uvm_km_init(start, end)
 	uvmexp.mb_object = &mb_object_store;
 
 	/*
-	 * init the map and reserve allready allocated kernel space 
+	 * init the map and reserve already allocated kernel space 
 	 * before installing.
 	 */
 
@@ -507,7 +507,7 @@ uvm_km_kmemalloc(map, obj, size, flags)
 	 */
 
 	if (__predict_false(uvm_map(map, &kva, size, obj, UVM_UNKNOWN_OFFSET,
-	      0, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
+	      0, UVM_MAPFLAG(UVM_PROT_RW, UVM_PROT_RW, UVM_INH_NONE,
 			  UVM_ADV_RANDOM, (flags & UVM_KMF_TRYLOCK))) 
 			!= KERN_SUCCESS)) {
 		UVMHIST_LOG(maphist, "<- done (no VM)",0,0,0,0);
@@ -569,10 +569,10 @@ uvm_km_kmemalloc(map, obj, size, flags)
 
 		if (UVM_OBJ_IS_INTRSAFE_OBJECT(obj)) {
 			pmap_kenter_pa(loopva, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_ALL);
+			    UVM_PROT_RW);
 		} else {
 			pmap_enter(map->pmap, loopva, VM_PAGE_TO_PHYS(pg),
-			    UVM_PROT_ALL,
+			    UVM_PROT_RW,
 			    PMAP_WIRED | VM_PROT_READ | VM_PROT_WRITE);
 		}
 		loopva += PAGE_SIZE;
@@ -855,7 +855,7 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 		} else
 			return (0);
 	}
-	va = PMAP_MAP_POOLPAGE(VM_PAGE_TO_PHYS(pg));
+	va = PMAP_MAP_POOLPAGE(pg);
 	if (__predict_false(va == 0))
 		uvm_pagefree(pg);
 	return (va);
@@ -893,10 +893,7 @@ uvm_km_free_poolpage1(map, addr)
 	vaddr_t addr;
 {
 #if defined(PMAP_UNMAP_POOLPAGE)
-	paddr_t pa;
-
-	pa = PMAP_UNMAP_POOLPAGE(addr);
-	uvm_pagefree(PHYS_TO_VM_PAGE(pa));
+	uvm_pagefree(PMAP_UNMAP_POOLPAGE(addr));
 #else
 	int s;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.41 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.43 2002/09/24 00:06:23 nordin Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -65,7 +65,6 @@
 #define clockframe intrframe
 
 #define	CLKF_USERMODE(frame)	USERMODE((frame)->if_cs, (frame)->if_eflags)
-#define	CLKF_BASEPRI(frame)	((frame)->if_ppl == 0)
 #define	CLKF_PC(frame)		((frame)->if_eip)
 #define	CLKF_INTR(frame)	(IDXSEL((frame)->if_cs) == GICODE_SEL)
 
@@ -102,23 +101,14 @@ void	delay(int);
 void	calibrate_cyclecounter(void);
 #ifndef	HZ
 extern u_quad_t pentium_base_tsc;
-#define CPU_CLOCKUPDATE(otime, ntime)					\
+#define CPU_CLOCKUPDATE()						\
 	do {								\
 		if (pentium_mhz) {					\
 			__asm __volatile("cli\n"			\
-					 "movl (%3), %%eax\n"		\
-					 "movl %%eax, (%2)\n"		\
-					 "movl 4(%3), %%eax\n"		\
-					 "movl %%eax, 4(%2)\n"		\
 					 ".byte 0xf, 0x31\n"		\
 					 "sti\n"			\
-					 "#%0 %1 %2 %3"			\
-					 : "=m" (*otime),		\
-					 "=A" (pentium_base_tsc)	\
-					 : "c" (otime), "b" (ntime));	\
-		}							\
-		else {							\
-			*(otime) = *(ntime);				\
+					 : "=A" (pentium_base_tsc)	\
+					 : );				\
 		}							\
 	} while (0)
 #endif

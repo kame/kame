@@ -1,4 +1,4 @@
-/*	$OpenBSD: errno.h,v 1.8 1999/01/07 05:34:29 deraadt Exp $	*/
+/*	$OpenBSD: errno.h,v 1.10 2002/07/01 07:58:53 pjanzen Exp $	*/
 /*	$NetBSD: errno.h,v 1.10 1996/01/20 01:33:53 jtc Exp $	*/
 
 /*
@@ -144,7 +144,7 @@ extern char *sys_errlist[];
 #ifndef _POSIX_SOURCE
 #define	EPROCLIM	67		/* Too many processes */
 #define	EUSERS		68		/* Too many users */
-#define	EDQUOT		69		/* Disc quota exceeded */
+#define	EDQUOT		69		/* Disk quota exceeded */
 
 /* Network File System */
 #define	ESTALE		70		/* Stale NFS file handle */
@@ -164,7 +164,8 @@ extern char *sys_errlist[];
 #define	EAUTH		80		/* Authentication error */
 #define	ENEEDAUTH	81		/* Need authenticator */
 #define	EIPSEC		82		/* IPsec processing failure */
-#define	ELAST		82		/* Must be equal largest errno */
+#define	ENOATTR		83		/* Attribute not found */
+#define	ELAST		83		/* Must be equal largest errno */
 #endif /* _POSIX_SOURCE */
 
 #ifdef _KERNEL

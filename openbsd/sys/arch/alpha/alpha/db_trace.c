@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.9 2002/03/14 01:26:26 millert Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.12 2002/05/18 17:55:50 art Exp $	*/
 
 /*
  * Copyright (c) 1997 Niklas Hallqvist.  All rights reserverd.
@@ -177,11 +177,12 @@ disp(x)
  *	symbols available.
  */
 void
-db_stack_trace_cmd(addr, have_addr, count, modif)
+db_stack_trace_print(addr, have_addr, count, modif, pr)
 	db_expr_t       addr;
 	int             have_addr;
 	db_expr_t       count;
 	char            *modif;
+	int		(*pr)(const char *, ...);
 {
 	u_long		*frame;
 	int		i, framesize;
@@ -196,7 +197,11 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 	if (count == -1)
 		count = 65535;
 
-	regs = have_addr ? (db_regs_t *)addr : DDB_REGS;
+	if (have_addr) {
+		(*pr)("alpha trace requires a trap frame... giving up.\n");
+		return;
+	}
+	regs = DDB_REGS;
 trapframe:
 	/* remember where various registers are stored */
 	for (i = 0; i < 31; i++)
@@ -213,7 +218,7 @@ trapframe:
 			/* Limit the search for procedure start */
 			offset = 65536;
 		}
-		db_printf("%s(", name);
+		(*pr)("%s(", name);
 
 		framesize = 0;
 		for (i = sizeof (int); i <= offset; i += sizeof (int)) {
@@ -269,11 +274,11 @@ trapframe:
 		 */
 		for (i = 0; i < 6; i++) {
 			if (i > 0)
-				db_printf(", ");
+				(*pr)(", ");
 			if (slot[16 + i])
-				db_printf("%lx", *slot[16 + i]);
+				(*pr)("%lx", *slot[16 + i]);
 			else
-				db_printf("?");
+				(*pr)("?");
 		}
 
 #if 0
@@ -283,18 +288,18 @@ trapframe:
 		 *
 		 * Print the stack frame contents.
 		 */
-		db_printf(") [%p: ", frame);
+		(*pr)(") [%p: ", frame);
 		if (framesize > 1) {
 			for (i = 0; i < framesize - 1; i++)
-				db_printf("%lx, ", frame[i]);
-			db_printf("%lx", frame[i]);
+				(*pr)("%lx, ", frame[i]);
+			(*pr)("%lx", frame[i]);
 		}
-		db_printf("] at ");
+		(*pr)("] at ");
 #else
-		db_printf(") at ");
+		(*pr)(") at ");
 #endif
-		db_printsym(pc, DB_STGY_PROC);
-		db_printf("\n");
+		db_printsym(pc, DB_STGY_PROC, pr);
+		(*pr)("\n");
 
 		/*
 		 * If we are looking at a Xent* routine we are in a trap

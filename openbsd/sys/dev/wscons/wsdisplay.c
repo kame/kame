@@ -1,4 +1,4 @@
-/* $OpenBSD: wsdisplay.c,v 1.42 2002/03/31 17:34:15 jason Exp $ */
+/* $OpenBSD: wsdisplay.c,v 1.48 2002/08/21 16:51:27 miod Exp $ */
 /* $NetBSD: wsdisplay.c,v 1.37.4.1 2000/06/30 16:27:53 simonb Exp $ */
 
 /*
@@ -109,17 +109,17 @@ struct wsscreen {
 	struct wsdisplay_softc *sc;
 
 	/* mouse console support via wsmoused(8) */
-	unsigned short mouse; 		/* mouse cursor position */
+	unsigned short mouse;		/* mouse cursor position */
 	unsigned short cursor;		/* selection cursor position (if
 					different from mouse cursor pos) */
-	unsigned short cpy_start; 	/* position of the copy start mark*/
+	unsigned short cpy_start;	/* position of the copy start mark*/
 	unsigned short cpy_end;		/* position of the copy end mark */
 	unsigned short orig_start;	/* position of the original sel. start*/
 	unsigned short orig_end;	/* position of the original sel. end */
-#define MOUSE_VISIBLE 	(1 << 0)	/* flag, the mouse cursor is visible */
-#define SEL_EXISTS 	(1 << 1)	/* flag, a selection exists */
+#define MOUSE_VISIBLE	(1 << 0)	/* flag, the mouse cursor is visible */
+#define SEL_EXISTS	(1 << 1)	/* flag, a selection exists */
 #define SEL_IN_PROGRESS (1 << 2)	/* flag, a selection is in progress */
-#define SEL_EXT_AFTER 	(1 << 3)	/* flag, selection is extended after */
+#define SEL_EXT_AFTER	(1 << 3)	/* flag, selection is extended after */
 #define BLANK_TO_EOL	(1 << 4)	/* flag, there are only blanks
 					   characters to eol */
 #define SEL_BY_CHAR	(1 << 5)	/* flag, select character by character*/
@@ -211,9 +211,6 @@ struct cfattach wsdisplay_noemul_ca = {
 	    wsdisplay_noemul_attach,
 };
 
-/* Exported tty- and cdevsw-related functions. */
-cdev_decl(wsdisplay);
-
 void wsdisplaystart(struct tty *);
 int wsdisplayparam(struct tty *, struct termios *);
 
@@ -252,7 +249,7 @@ struct consdev wsdisplay_cons = {
 };
 
 #ifndef WSDISPLAY_DEFAULTSCREENS
-# define WSDISPLAY_DEFAULTSCREENS	0
+# define WSDISPLAY_DEFAULTSCREENS	1
 #endif
 int wsdisplay_defaultscreens = WSDISPLAY_DEFAULTSCREENS;
 
@@ -1091,16 +1088,24 @@ wsdisplay_internal_ioctl(sc, scr, cmd, data, flag, p)
 				((d == WSDISPLAYIO_MODE_DUMBFB) ?
 				    SCR_DUMBFB : 0);
 
-			    /*  
-			     * wsmoused cohabitation with X-Window support 
-			     * X-Window is starting  
+			    /*
+			     * wsmoused cohabitation with X-Window support
+			     * X-Window is starting
 			     */
 			    wsmoused_release(sc);
+
+			    /* disable the burner while X is running */
+			    if (sc->sc_burnout)
+				    timeout_del(&sc->sc_burner);
 		    }
 		    else {
-			    /*  
-			     * wsmoused cohabitation with X-Window support 
-			     * X-Window is ending  
+			    /* reenable the burner after exiting from X */
+			    if (!sc->sc_burnman)
+				    wsdisplay_burn(sc, sc->sc_burnflags);
+
+			    /*
+			     * wsmoused cohabitation with X-Window support
+			     * X-Window is ending
 			     */
 
 			    wsmoused_wakeup(sc);
@@ -1740,6 +1745,7 @@ wsdisplay_switch(dev, no, waitok)
 	int s, res = 0;
 	struct wsscreen *scr;
 
+
 	if (no != WSDISPLAY_NULLSCREEN &&
 	    (no < 0 || no >= WSDISPLAY_MAXSCREEN || !sc->sc_scr[no]))
 		return (ENXIO);
@@ -1770,23 +1776,23 @@ wsdisplay_switch(dev, no, waitok)
 		sc->sc_oldscreen = sc->sc_focusidx;
 
 
-	/* 
-	 *  wsmoused cohabitation with X-Window support 
-	 * 
+	/*
+	 *  wsmoused cohabitation with X-Window support
+	 *
 	 *  Detect switch from a graphic to text console and vice-versa
 	 *  This only happen when switching from X-Window to text mode and
 	 *  switching back from text mode to X-Window.
 	 *
 	 *  scr_flags is not yet flagged with SCR_GRAPHICS when X-Window starts
 	 *  (KD_GRAPHICS ioctl happens after VT_ACTIVATE ioctl in
-	 *  xf86OpenPcvt()). Conversely, scr_flags is no longer flagged with 
+	 *  xf86OpenPcvt()). Conversely, scr_flags is no longer flagged with
 	 *  SCR_GRAPHICS when X-Window stops. In this case, the first of the
-	 *  three following 'if' statements is evaluated. 
+	 *  three following 'if' statements is evaluated.
 	 *  We handle wsmoused(8) events the WSDISPLAYIO_SMODE ioctl.
 	 *
 	 */
 
-	if (!(scr->scr_flags & SCR_GRAPHICS) && 
+	if (!(scr->scr_flags & SCR_GRAPHICS) &&
 	    (!(sc->sc_scr[no]->scr_flags & SCR_GRAPHICS))) {
 		/* switching from a text console to another text console */
 		/* XXX evaluated when the X-server starts or stops, see above */
@@ -1795,7 +1801,7 @@ wsdisplay_switch(dev, no, waitok)
 		mouse_remove(sc);
 	}
 
-	if (!(scr->scr_flags & SCR_GRAPHICS) && 
+	if (!(scr->scr_flags & SCR_GRAPHICS) &&
 	    (sc->sc_scr[no]->scr_flags & SCR_GRAPHICS)) {
 		/* switching from a text console to a graphic console */
 	
@@ -1804,7 +1810,7 @@ wsdisplay_switch(dev, no, waitok)
 		wsmoused_release(sc);
 	}
 	
-	if ((scr->scr_flags & SCR_GRAPHICS) && 
+	if ((scr->scr_flags & SCR_GRAPHICS) &&
 	    !(sc->sc_scr[no]->scr_flags & SCR_GRAPHICS)) {
 		/* switching from a graphic console to a text console */
 
@@ -2295,10 +2301,10 @@ ctrl_event(u_int type, int value, struct wsdisplay_softc *ws_sc, struct proc *p)
 	if (type == WSCONS_EVENT_WSMOUSED_SLEEP) {
 		/* sleeping until next switch to text mode */
 		ws_sc->wsmoused_sleep = 1;
-		while (ws_sc->wsmoused_sleep && error == 0) 
+		while (ws_sc->wsmoused_sleep && error == 0)
 			error = tsleep(&ws_sc->wsmoused_sleep, PPAUSE,
 			    "wsmoused_sleep", 0);
-		if (error) 
+		if (error)
 			return error;
 		else
 			return (0);
@@ -2457,7 +2463,7 @@ skip_spc_left(void)
  * Stolen from xterm sources of the Xfree project (see cvs tag below)
  * $TOG: button.c /main/76 1997/07/30 16:56:19 kaleb $
  */
-static int charClass[256] = {
+static const int charClass[256] = {
 /* NUL  SOH  STX  ETX  EOT  ENQ  ACK  BEL */
     32,   1,   1,   1,   1,   1,   1,   1,
 /*  BS   HT   NL   VT   NP   CR   SO   SI */
@@ -2603,7 +2609,7 @@ mouse_copy_start(void)
 	if (!IS_MOUSE_VISIBLE(sc->sc_focus))
 		inverse_char(MOUSE);
 
-    	CPY_START = MOUSE;
+	CPY_START = MOUSE;
 	CPY_END = MOUSE;
 	ORIG_START = CPY_START;
 	ORIG_END = CPY_END;
@@ -2867,7 +2873,7 @@ mouse_copy_extend_word(void)
 			} else {
 				old_cpy_end = CPY_END;
 				CPY_END = MOUSE + skip_char_right(MOUSE);
-			       	if (CPY_END != old_cpy_end) {
+				if (CPY_END != old_cpy_end) {
 					/* reducing selection, from the end of
 					 * next word */
 					inverse_region(CPY_END + 1,
@@ -3184,7 +3190,7 @@ wsmoused_release(struct wsdisplay_softc *sc)
 
 		/* obtain major of /dev/wsmouse{0..n} devices */
 		if (wsmouse_cd.cd_ndevs > 0) {
-			if (cdevsw[major(sc->wsmoused_dev)].d_open == 
+			if (cdevsw[major(sc->wsmoused_dev)].d_open ==
 			     wsmouseopen)
 				is_wsmouse = 1;
 		}
@@ -3192,7 +3198,7 @@ wsmoused_release(struct wsdisplay_softc *sc)
 		if (is_wsmouse && (minor(sc->wsmoused_dev) <= NWSMOUSE)) {
 			/* /dev/wsmouseX case */
 			if (minor(sc->wsmoused_dev) <= wsmouse_cd.cd_ndevs) {
-				wsms_dev = 
+				wsms_dev =
 				    wsms_dev_list[minor(sc->wsmoused_dev)];
 			}
 			else
@@ -3201,8 +3207,10 @@ wsmoused_release(struct wsdisplay_softc *sc)
 		}
 
 		/* inject event to notify wsmoused(8) to close mouse device */
-		wsmouse_input(wsms_dev, 0, 0, 0, 0, 
-		    WSMOUSE_INPUT_WSMOUSED_CLOSE);
+		if (wsms_dev != NULL) 
+			wsmouse_input(wsms_dev, 0, 0, 0, 0,
+				      WSMOUSE_INPUT_WSMOUSED_CLOSE);
+		
 	}
 #endif /* NWSMOUSE > 0 */
 }

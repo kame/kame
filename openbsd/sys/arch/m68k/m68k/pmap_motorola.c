@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_motorola.c,v 1.17 2002/03/14 01:26:35 millert Exp $ */
+/*	$OpenBSD: pmap_motorola.c,v 1.20 2002/09/10 18:29:43 art Exp $ */
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -320,12 +320,10 @@ int		 pmap_mapmulti(pmap_t, vaddr_t);
 void		 pmap_remove_mapping(pmap_t, vaddr_t, pt_entry_t *, int);
 boolean_t	 pmap_testbit(paddr_t, int);
 void		 pmap_changebit(paddr_t, int, int);
-void		 pmap_enter_ptpage(pmap_t, vaddr_t);
+int		 pmap_enter_ptpage(pmap_t, vaddr_t);
 void		 pmap_ptpage_addref(vaddr_t);
 int		 pmap_ptpage_delref(vaddr_t);
 void		 pmap_collect1(pmap_t, paddr_t, paddr_t);
-void		 pmap_pinit(pmap_t);
-void		 pmap_release(pmap_t);
 
 
 #ifdef DEBUG
@@ -596,8 +594,8 @@ pmap_alloc_pv()
 
 	if (pv_nfree == 0) {
 		pvp = (struct pv_page *)uvm_km_zalloc(kernel_map, PAGE_SIZE);
-		if (pvp == 0)
-			panic("pmap_alloc_pv: uvm_km_zalloc() failed");
+		if (pvp == NULL)
+			return NULL;
 		pvp->pvp_pgi.pgi_freelist = pv = &pvp->pvp_pv[1];
 		for (i = NPVPPG - 2; i; i--, pv++)
 			pv->pv_next = pv + 1;
@@ -760,24 +758,6 @@ pmap_create()
 
 	pmap = pool_get(&pmap_pmap_pool, PR_WAITOK);
 	bzero(pmap, sizeof(*pmap));
-	pmap_pinit(pmap);
-	return (pmap);
-}
-
-/*
- * pmap_pinit:
- *
- *	Initialize a preallocated and zeroed pmap structure.
- *
- *	Note: THIS FUNCTION SHOULD BE MOVED INTO pmap_create()!
- */
-void
-pmap_pinit(pmap)
-	struct pmap *pmap;
-{
-
-	PMAP_DPRINTF(PDB_FOLLOW|PDB_CREATE,
-	    ("pmap_pinit(%p)\n", pmap));
 
 	/*
 	 * No need to allocate page table space yet but we do need a
@@ -793,6 +773,8 @@ pmap_pinit(pmap)
 #endif
 	pmap->pm_count = 1;
 	simple_lock_init(&pmap->pm_lock);
+
+	return pmap;
 }
 
 /*
@@ -812,42 +794,19 @@ pmap_destroy(pmap)
 	count = --pmap->pm_count;
 	simple_unlock(&pmap->pm_lock);
 	if (count == 0) {
-		pmap_release(pmap);
+		if (pmap->pm_ptab) {
+			pmap_remove(pmap_kernel(), (vaddr_t)pmap->pm_ptab,
+			    (vaddr_t)pmap->pm_ptab + MACHINE_MAX_PTSIZE);
+			pmap_update(pmap_kernel());
+			uvm_km_pgremove(uvm.kernel_object,
+			    (vaddr_t)pmap->pm_ptab,
+			    (vaddr_t)pmap->pm_ptab + MACHINE_MAX_PTSIZE);
+			uvm_km_free_wakeup(pt_map, (vaddr_t)pmap->pm_ptab,
+					   MACHINE_MAX_PTSIZE);
+		}
+		KASSERT(pmap->pm_stab == Segtabzero);
 		pool_put(&pmap_pmap_pool, pmap);
 	}
-}
-
-/*
- * pmap_release:
- *
- *	Release the resources held by a pmap.
- *
- *	Note: THIS FUNCTION SHOULD BE MOVED INTO pmap_destroy().
- */
-void
-pmap_release(pmap)
-	struct pmap *pmap;
-{
-
-	PMAP_DPRINTF(PDB_FOLLOW, ("pmap_release(%p)\n", pmap));
-
-#ifdef notdef /* DIAGNOSTIC */
-	/* count would be 0 from pmap_destroy... */
-	simple_lock(&pmap->pm_lock);
-	if (pmap->pm_count != 1)
-		panic("pmap_release count");
-#endif
-
-	if (pmap->pm_ptab) {
-		pmap_remove(pmap_kernel(), (vaddr_t)pmap->pm_ptab,
-		    (vaddr_t)pmap->pm_ptab + MACHINE_MAX_PTSIZE);
-		pmap_update(pmap_kernel());
-		uvm_km_pgremove(uvm.kernel_object, (vaddr_t)pmap->pm_ptab,
-		    (vaddr_t)pmap->pm_ptab + MACHINE_MAX_PTSIZE);
-		uvm_km_free_wakeup(pt_map, (vaddr_t)pmap->pm_ptab,
-				   MACHINE_MAX_PTSIZE);
-	}
-	KASSERT(pmap->pm_stab == Segtabzero);
 }
 
 /*
@@ -1170,7 +1129,7 @@ pmap_enter(pmap, va, pa, prot, flags)
 	int flags;
 {
 	pt_entry_t *pte;
-	int npte;
+	int npte, error;
 	paddr_t opa;
 	boolean_t cacheable = TRUE;
 	boolean_t checkpv = TRUE;
@@ -1199,8 +1158,15 @@ pmap_enter(pmap, va, pa, prot, flags)
 	/*
 	 * Segment table entry not valid, we need a new PT page
 	 */
-	if (!pmap_ste_v(pmap, va))
-		pmap_enter_ptpage(pmap, va);
+	if (!pmap_ste_v(pmap, va)) {
+		error = pmap_enter_ptpage(pmap, va);
+		if (error != 0) {
+			if  (flags & PMAP_CANFAIL)
+				return (error);
+			else
+				panic("pmap_enter: out of address space");
+		}
+	}
 
 	pa = trunc_page(pa);
 	pte = pmap_pte(pmap, va);
@@ -1291,6 +1257,13 @@ pmap_enter(pmap, va, pa, prot, flags)
 					panic("pmap_enter: already in pv_tab");
 #endif
 			npv = pmap_alloc_pv();
+			if (npv == NULL) {
+				if (flags & PMAP_CANFAIL) {
+					splx(s);
+					return (ENOMEM);
+				} else
+					panic("pmap_enter: uvm_km_zalloc() failed");
+			}
 			npv->pv_va = va;
 			npv->pv_pmap = pmap;
 			npv->pv_next = pv->pv_next;
@@ -1457,7 +1430,7 @@ pmap_kenter_pa(va, pa, prot)
 {
 	struct pmap *pmap = pmap_kernel();
 	pt_entry_t *pte;
-	int s, npte;
+	int s, npte, error;
 
 	PMAP_DPRINTF(PDB_FOLLOW|PDB_ENTER,
 	    ("pmap_kenter_pa(%lx, %lx, %x)\n", va, pa, prot));
@@ -1468,7 +1441,9 @@ pmap_kenter_pa(va, pa, prot)
 
 	if (!pmap_ste_v(pmap, va)) { 
 		s = splvm();
-		pmap_enter_ptpage(pmap, va);
+		error = pmap_enter_ptpage(pmap, va);
+		if (error != 0)
+			panic("pmap_kenter_pa: out of address space");
 		splx(s);
 	}
 
@@ -1905,9 +1880,9 @@ ok:
  *	Note: WE DO NOT CURRENTLY LOCK THE TEMPORARY ADDRESSES!
  */
 void
-pmap_zero_page(phys)
-	paddr_t phys;
+pmap_zero_page(struct vm_page *pg)
 {
+	paddr_t phys = VM_PAGE_TO_PHYS(pg);
 	int npte;
 
 	PMAP_DPRINTF(PDB_FOLLOW, ("pmap_zero_page(%lx)\n", phys));
@@ -1955,9 +1930,11 @@ pmap_zero_page(phys)
  *	Note: WE DO NOT CURRENTLY LOCK THE TEMPORARY ADDRESSES!
  */
 void
-pmap_copy_page(src, dst)
-	paddr_t src, dst;
+pmap_copy_page(struct vm_page *srcpg, struct vm_page *dstpg)
 {
+	paddr_t src = VM_PAGE_TO_PHYS(srcpg);
+	paddr_t dst = VM_PAGE_TO_PHYS(dstpg);
+
 	int npte1, npte2;
 
 	PMAP_DPRINTF(PDB_FOLLOW, ("pmap_copy_page(%lx, %lx)\n", src, dst));
@@ -2605,7 +2582,7 @@ pmap_changebit(pa, set, mask)
  *	Allocate and map a PT page for the specified pmap/va pair.
  */
 /* static */
-void
+int
 pmap_enter_ptpage(pmap, va)
 	pmap_t pmap;
 	vaddr_t va;
@@ -2680,8 +2657,9 @@ pmap_enter_ptpage(pmap, va)
 			caddr_t addr;
 
 			ix = bmtol2(pmap->pm_stfree);
-			if (ix == -1)
-				panic("enter: out of address space"); /* XXX */
+			if (ix == -1) {
+				return (ENOMEM);
+			}
 			pmap->pm_stfree &= ~l2tobm(ix);
 			addr = (caddr_t)&pmap->pm_stab[ix*SG4_LEV2SIZE];
 			bzero(addr, SG4_LEV2SIZE*sizeof(st_entry_t));
@@ -2725,8 +2703,10 @@ pmap_enter_ptpage(pmap, va)
 			PMAP_DPRINTF(PDB_COLLECT,
 			    ("enter: no KPT pages, collecting...\n"));
 			pmap_collect(pmap_kernel());
-			if ((kpt = kpt_free_list) == NULL)
-				panic("pmap_enter_ptpage: can't get KPT page");
+			if ((kpt = kpt_free_list) == NULL) {
+				splx(s);
+				return (ENOMEM);
+			}
 		}
 		kpt_free_list = kpt->kpt_next;
 		kpt->kpt_next = kpt_used_list;
@@ -2864,6 +2844,7 @@ pmap_enter_ptpage(pmap, va)
 #endif
 	pmap->pm_ptpages++;
 	splx(s);
+	return (0);
 }
 
 /*

@@ -1,8 +1,8 @@
-/*	$OpenBSD: ukbdmap.c,v 1.8 2002/03/12 15:16:33 mickey Exp $ */
-/*	$NetBSD: ukbdmap.c,v 1.6 2001/04/04 05:31:57 toshii Exp $	*/
+/*	$OpenBSD: ukbdmap.c,v 1.14 2002/08/26 20:48:12 mickey Exp $ */
+/*	$NetBSD: ukbdmap.c,v 1.11 2002/07/11 21:14:31 augustss Exp $	*/
 
 /*
- * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999,2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -86,7 +86,7 @@ Static const keysym_t ukbd_keydesc_us[] = {
     KC(39), 			KS_0,		KS_parenright,
     KC(40), 			KS_Return,
     KC(41),   KS_Cmd_Debugger,	KS_Escape,
-    KC(42), 			KS_BackSpace,
+    KC(42), 			KS_Delete,
     KC(43), 			KS_Tab,
     KC(44), 			KS_space,
     KC(45), 			KS_minus,	KS_underscore,
@@ -117,7 +117,7 @@ Static const keysym_t ukbd_keydesc_us[] = {
     KC(70),			KS_Print_Screen,
     KC(71), 			KS_Hold_Screen,
     KC(72),			KS_Pause,
-    KC(73),			KS_Insert, 
+    KC(73),			KS_Insert,
     KC(74),			KS_Home,
     KC(75), KS_Cmd_ScrollBack,	KS_Prior,
     KC(76),			KS_Delete,
@@ -304,7 +304,7 @@ Static const keysym_t ukbd_keydesc_fr[] = {
     KC(39),  KS_agrave,		KS_0,		KS_at,
     KC(45),  KS_parenright,	KS_degree,	KS_bracketright,
     KC(46),  KS_equal,		KS_plus,	KS_braceright,
-    KC(47),  KS_dead_circumflex, KS_dead_diaeresis, 
+    KC(47),  KS_dead_circumflex, KS_dead_diaeresis,
     KC(48),  KS_dollar,		KS_sterling,	KS_currency,
     KC(50),  KS_asterisk,	KS_mu,
     KC(51),  KS_m,
@@ -437,13 +437,13 @@ Static const keysym_t ukbd_keydesc_sf[] = {
 
 const struct wscons_keydesc ukbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	ukbd_keydesc_us),
-	KBD_MAP(KB_US | KB_SWAPCTRLCAPS, KB_US,	ukbd_keydesc_swapctrlcaps),
+	KBD_MAP(KB_US | KB_SWAPCTRLCAPS,KB_US,	ukbd_keydesc_swapctrlcaps),
 	KBD_MAP(KB_JP,			KB_US,	ukbd_keydesc_jp),
 	KBD_MAP(KB_JP | KB_SWAPCTRLCAPS,KB_JP,	ukbd_keydesc_swapctrlcaps),
 	KBD_MAP(KB_DE,			KB_US,	ukbd_keydesc_de),
 	KBD_MAP(KB_DE | KB_NODEAD,	KB_DE,	ukbd_keydesc_de_nodead),
-	KBD_MAP(KB_FR,                  KB_US,  ukbd_keydesc_fr),
-	KBD_MAP(KB_FR | KB_SWAPCTRLCAPS, KB_FR, ukbd_keydesc_swapctrlcaps),
+	KBD_MAP(KB_FR,                  KB_US,	ukbd_keydesc_fr),
+	KBD_MAP(KB_FR | KB_SWAPCTRLCAPS,KB_FR,	ukbd_keydesc_swapctrlcaps),
 	KBD_MAP(KB_DK,			KB_US,	ukbd_keydesc_dk),
 	KBD_MAP(KB_DK | KB_NODEAD,	KB_DK,	ukbd_keydesc_dk_nodead),
 	KBD_MAP(KB_IT,			KB_US,	ukbd_keydesc_it),

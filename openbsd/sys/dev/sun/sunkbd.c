@@ -1,4 +1,4 @@
-/*	$OpenBSD: sunkbd.c,v 1.4 2002/04/08 17:49:42 jason Exp $	*/
+/*	$OpenBSD: sunkbd.c,v 1.9 2002/09/08 23:22:00 miod Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -53,6 +53,7 @@
 const keysym_t sunkbd_keydesc_us[] = {
     KC(0x01), KS_Cmd,
     KC(0x02), KS_Cmd_BrightnessDown,
+    KC(0x03),				KS_Again,
     KC(0x04), KS_Cmd_BrightnessUp,
     KC(0x05),				KS_f1,
     KC(0x06),				KS_f2,
@@ -71,8 +72,10 @@ const keysym_t sunkbd_keydesc_us[] = {
     KC(0x14),				KS_Up,
     KC(0x15),				KS_Pause,
     KC(0x16),				KS_Print_Screen,
+    KC(0x17),				KS_Hold_Screen,
     KC(0x18),				KS_Left,
-    KC(0x19),				KS_Hold_Screen,
+    KC(0x19),				KS_Props,
+    KC(0x1a),				KS_Undo,
     KC(0x1b),				KS_Down,
     KC(0x1c),				KS_Right,
     KC(0x1d),				KS_Escape,
@@ -89,12 +92,14 @@ const keysym_t sunkbd_keydesc_us[] = {
     KC(0x28),				KS_minus,	KS_underscore,
     KC(0x29),				KS_equal,	KS_plus,
     KC(0x2a),				KS_grave,	KS_asciitilde,
-    KC(0x2b),				KS_BackSpace,
+    KC(0x2b),				KS_Delete,
     KC(0x2c),				KS_Insert,
     KC(0x2d),				KS_KP_Equal,
     KC(0x2e),				KS_KP_Divide,
     KC(0x2f),				KS_KP_Multiply,
-    KC(0x32),				KS_KP_Delete,
+    KC(0x31),				KS_Front,
+    KC(0x32),				KS_KP_Delete,	KS_KP_Decimal,
+    KC(0x33),				KS_Copy,
     KC(0x34),				KS_Home,
     KC(0x35),				KS_Tab,
     KC(0x36),				KS_q,
@@ -115,6 +120,8 @@ const keysym_t sunkbd_keydesc_us[] = {
     KC(0x45),				KS_KP_Up,	KS_KP_8,
     KC(0x46),				KS_KP_Prior,	KS_KP_9,
     KC(0x47),				KS_KP_Subtract,
+    KC(0x48),				KS_Open,
+    KC(0x49),				KS_Paste,
     KC(0x4a),				KS_End,
     KC(0x4c),				KS_Control_L,
     KC(0x4d), KS_Cmd_Debugger,		KS_a,
@@ -137,6 +144,7 @@ const keysym_t sunkbd_keydesc_us[] = {
     KC(0x5e),				KS_KP_Insert,	KS_KP_0,
     KC(0x5f),				KS_Find,
     KC(0x60),				KS_Prior,
+    KC(0x61),				KS_Cut,
     KC(0x62),				KS_Num_Lock,
     KC(0x63),				KS_Shift_L,
     KC(0x64),				KS_z,
@@ -196,6 +204,35 @@ const keysym_t sunkbd_keydesc_sv_nodead[] = {
     KC(0x41),		KS_diaeresis,	KS_asciicircum,	KS_asciitilde,
 };
 
+const keysym_t sunkbd5_keydesc_sv[] = {
+
+    KC(0x0d),		KS_Mode_switch,
+    KC(0x0f),		KS_asciitilde,	KS_asciicircum, 
+    KC(0x1f),		KS_2,		KS_quotedbl,	KS_at,
+    KC(0x20),		KS_3,		KS_numbersign,	KS_sterling,
+    KC(0x21),		KS_4,		KS_currency,	KS_dollar,
+    KC(0x23),		KS_6,		KS_ampersand,
+    KC(0x24),		KS_7,		KS_slash,	KS_braceleft,
+    KC(0x25),		KS_8,		KS_parenleft,	KS_bracketleft,
+    KC(0x26),		KS_9,		KS_parenright,	KS_bracketright,
+    KC(0x27),		KS_0,		KS_equal,	KS_braceright,
+    KC(0x28),		KS_plus,	KS_question,	KS_backslash,
+    KC(0x29),		KS_dead_acute,	KS_dead_grave,
+    KC(0x2a),		KS_paragraph,	KS_onehalf,
+    KC(0x40),		KS_aring,
+    KC(0x41),		KS_dead_diaeresis,KS_dead_circumflex,KS_dead_tilde,
+    KC(0x43),		KS_Multi_key,
+    KC(0x4c),		KS_Control_L,
+    KC(0x56),		KS_odiaeresis,
+    KC(0x57),		KS_adiaeresis,
+    KC(0x58),		KS_apostrophe,	KS_asterisk,	KS_grave,
+    KC(0x6b),		KS_comma,	KS_semicolon,
+    KC(0x6c),		KS_period,	KS_colon,
+    KC(0x6d),		KS_minus,	KS_underscore,
+    KC(0x77),		KS_Caps_Lock,
+    KC(0x7c),		KS_less,	KS_greater,	KS_bar,
+};
+
 #define KBD_MAP(name, base, map) \
     { name, base, sizeof(map)/sizeof(keysym_t), map }
 
@@ -206,10 +243,26 @@ const struct wscons_keydesc sunkbd_keydesctab[] = {
 	{0, 0, 0, 0},
 };
 
+const struct wscons_keydesc sunkbd5_keydesctab[] = {
+	KBD_MAP(KB_US,			0,	sunkbd_keydesc_us),
+	KBD_MAP(KB_SV,			KB_US,	sunkbd5_keydesc_sv),
+	KBD_MAP(KB_SV | KB_NODEAD,	KB_SV,	sunkbd_keydesc_sv_nodead),
+	{0, 0, 0, 0},
+};
+
 struct wskbd_mapdata sunkbd_keymapdata = {
 	sunkbd_keydesctab,
 #ifdef SUNKBD_LAYOUT
 	SUNKBD_LAYOUT,
+#else
+	KB_US,
+#endif
+};
+
+struct wskbd_mapdata sunkbd5_keymapdata = {
+	sunkbd5_keydesctab,
+#ifdef SUNKBD5_LAYOUT
+	SUNKBD5_LAYOUT,
 #else
 	KB_US,
 #endif

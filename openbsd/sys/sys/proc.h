@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.59 2002/03/18 07:48:11 hugh Exp $	*/
+/*	$OpenBSD: proc.h,v 1.62 2002/07/20 19:24:57 art Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -77,6 +77,7 @@ struct	pgrp {
  */
 struct exec_package;
 struct ps_strings;
+struct uvm_object;
 union sigval;
 
 struct	emul {
@@ -98,6 +99,7 @@ struct	emul {
 	int	(*e_fixup)(struct proc *, struct exec_package *);
 	char	*e_sigcode;		/* Start of sigcode */
 	char	*e_esigcode;		/* End of sigcode */
+	struct uvm_object *e_sigobject;	/* shared sigcode object */
 };
 
 /*
@@ -167,6 +169,8 @@ struct	proc {
 	int	p_traceflag;		/* Kernel trace points. */
 	struct	vnode *p_tracep;	/* Trace to vnode. */
 
+	void	*p_systrace;		/* Back pointer to systrace */
+
 	int	p_siglist;		/* Signals arrived but not delivered. */
 
 	struct	vnode *p_textvp;	/* Vnode of executable. */
@@ -194,6 +198,7 @@ struct	proc {
 	char	p_comm[MAXCOMLEN+1];
 
 	struct 	pgrp *p_pgrp;	/* Pointer to process group. */
+	vaddr_t	p_sigcode;	/* user pointer to the signal code. */
 
 /* End area that is copied on creation. */
 #define	p_endcopy	p_addr
@@ -248,6 +253,7 @@ struct	proc {
 #define	P_NOCLDWAIT	0x080000	/* Let pid 1 wait for my children */
 #define	P_NOZOMBIE	0x100000	/* Pid 1 waits for me instead of dad */
 #define P_INEXEC	0x200000	/* Process is doing an exec right now */
+#define P_SYSTRACE	0x400000	/* Process system call tracing active*/
 
 /* Macro to compute the exit signal to be delivered. */
 #define P_EXITSIG(p) \
@@ -346,11 +352,12 @@ extern struct pool session_pool;	/* memory pool for sessions */
 extern struct pool pcred_pool;		/* memory pool for pcreds */
 
 #define	NQS	32			/* 32 run queues. */
-int	whichqs;			/* Bit mask summary of non-empty Q's. */
+extern int whichqs;			/* Bit mask summary of non-empty Q's. */
 struct	prochd {
 	struct	proc *ph_link;		/* Linked list of running processes. */
 	struct	proc *ph_rlink;
-} qs[NQS];
+};
+extern struct prochd qs[NQS];
 
 struct simplelock;
 

@@ -1,4 +1,4 @@
-/*      $OpenBSD: wdc.c,v 1.48 2002/03/16 17:12:09 csapuntz Exp $     */
+/*      $OpenBSD: wdc.c,v 1.52 2002/07/02 15:26:19 csapuntz Exp $     */
 /*	$NetBSD: wdc.c,v 1.68 1999/06/23 19:00:17 bouyer Exp $ */
 
 
@@ -895,18 +895,7 @@ wdcstart(chp)
 {
 	struct wdc_xfer *xfer;
 
-#ifdef WDC_DIAGNOSTIC
-	int spl1, spl2;
-
-	spl1 = splbio();
-	spl2 = splbio();
-	if (spl2 != spl1) {
-		printf("wdcstart: not at splbio()\n");
-		panic("wdcstart");
-	}
-	splx(spl2);
-	splx(spl1);
-#endif /* WDC_DIAGNOSTIC */
+	splassert(IPL_BIO);
 
 	/* is there a xfer ? */
 	if ((xfer = chp->ch_queue->sc_xfer.tqh_first) == NULL) {
@@ -1660,26 +1649,49 @@ __wdccommand_start(chp, xfer)
 	if (wdc_c->r_command != ATAPI_SOFT_RESET) {
 		if (wdcwait(chp, wdc_c->r_st_bmask | WDCS_DRQ, wdc_c->r_st_bmask,
 		    wdc_c->timeout) != 0) {
-			wdc_c->flags |= AT_TIMEOU;
-			__wdccommand_done(chp, xfer);
-			return;
+			goto timeout;
 		}
 	} else
 		DELAY(10);
 
 	wdccommand(chp, drive, wdc_c->r_command, wdc_c->r_cyl, wdc_c->r_head,
 	    wdc_c->r_sector, wdc_c->r_count, wdc_c->r_precomp);
+
+	if ((wdc_c->flags & AT_WRITE) == AT_WRITE) {
+		delay(10);
+		if (wait_for_unbusy(chp, wdc_c->timeout) != 0)
+			goto timeout;
+		
+		if ((chp->ch_status & (WDCS_DRQ | WDCS_ERR)) == WDCS_ERR) {
+			__wdccommand_done(chp, xfer);
+			return;
+		}
+
+		if (wait_for_drq(chp, wdc_c->timeout) != 0)
+			goto timeout;
+
+		wdc_output_bytes(&chp->ch_drive[drive], 
+		    wdc_c->data, wdc_c->bcount);
+	}
+
 	if ((wdc_c->flags & AT_POLL) == 0) {
 		chp->ch_flags |= WDCF_IRQ_WAIT; /* wait for interrupt */
 		timeout_add(&chp->ch_timo, wdc_c->timeout / 1000 * hz);
 		return;
 	}
+
 	/*
 	 * Polled command. Wait for drive ready or drq. Done in intr().
 	 * Wait for at last 400ns for status bit to be valid.
 	 */
 	delay(10);
 	__wdccommand_intr(chp, xfer, 0);
+	return;
+
+ timeout:
+	wdc_c->flags |= AT_TIMEOU;
+	__wdccommand_done(chp, xfer);
+	return;
 }
 
 int
@@ -1706,10 +1718,10 @@ __wdccommand_intr(chp, xfer, irq)
 	}
         if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
                 chp->wdc->irqack(chp);
-	if (wdc_c->flags & AT_READ) {
+
+	if ((wdc_c->flags & AT_READ) && (chp->ch_status & WDCS_DRQ)) {
 		wdc_input_bytes(drvp, data, bcount);
-	} else if (wdc_c->flags & AT_WRITE) {
-		wdc_output_bytes(drvp, data, bcount);
+		/* Should we wait for device to indicate idle? */
 	}
 	__wdccommand_done(chp, xfer);
 	WDCDEBUG_PRINT(("__wdccommand_intr returned\n"), DEBUG_INTR);
@@ -1789,6 +1801,43 @@ wdccommand(chp, drive, command, cylin, head, sector, count, precomp)
 	CHP_WRITE_REG(chp, wdr_cyl_lo, cylin);
 	CHP_WRITE_REG(chp, wdr_cyl_hi, cylin >> 8);
 	CHP_WRITE_REG(chp, wdr_sector, sector);
+	CHP_WRITE_REG(chp, wdr_seccnt, count);
+
+	/* Send command. */
+	CHP_WRITE_REG(chp, wdr_command, command);
+	return;
+}
+
+/*
+ * Send a 48-bit addressing command. The drive should be ready.
+ * Assumes interrupts are blocked.
+ */
+void
+wdccommandext(chp, drive, command, blkno, count)
+	struct channel_softc *chp;
+	u_int8_t drive;
+	u_int8_t command;
+	u_int64_t blkno;
+	u_int16_t count;
+{
+	WDCDEBUG_PRINT(("wdccommandext %s:%d:%d: command=0x%x blkno=%llu "
+	    "count=%d\n", chp->wdc->sc_dev.dv_xname,
+	    chp->channel, drive, command, blkno, count),
+	    DEBUG_FUNCS);
+	WDC_LOG_ATA_CMDEXT(chp, blkno >> 40, blkno >> 16, blkno >> 32,
+	    blkno >> 8, blkno >> 24, blkno, count >> 8, count, command);
+
+	/* Select drive and LBA mode. */
+	CHP_WRITE_REG(chp, wdr_sdh, (drive << 4) | WDSD_LBA);
+
+	/* Load parameters. All registers are two byte deep FIFOs. */
+	CHP_WRITE_REG(chp, wdr_lba_hi, blkno >> 40);
+	CHP_WRITE_REG(chp, wdr_lba_hi, blkno >> 16);
+	CHP_WRITE_REG(chp, wdr_lba_mi, blkno >> 32);
+	CHP_WRITE_REG(chp, wdr_lba_mi, blkno >> 8);
+	CHP_WRITE_REG(chp, wdr_lba_lo, blkno >> 24);
+	CHP_WRITE_REG(chp, wdr_lba_lo, blkno);
+	CHP_WRITE_REG(chp, wdr_seccnt, count >> 8);
 	CHP_WRITE_REG(chp, wdr_seccnt, count);
 
 	/* Send command. */
@@ -2031,6 +2080,7 @@ wdc_ioctl_strategy(bp)
 	struct wdc_ioctl *wi;
 	struct wdc_command wdc_c;
 	int error = 0;
+	int s;
 
 	wi = wdc_ioctl_find(bp);
 	if (wi == NULL) {
@@ -2115,12 +2165,16 @@ wdc_ioctl_strategy(bp)
 	}
 
 	bp->b_error = 0;
+	s = splbio();
 	biodone(bp);
+	splx(s);
 	return;
 bad:
 	bp->b_flags |= B_ERROR;
 	bp->b_error = error;
+	s = splbio();
 	biodone(bp);
+	splx(s);
 }
 
 int
