@@ -176,7 +176,7 @@ routepr(rtree)
 			} else if (af == AF_UNSPEC || af == i) {
 				pr_family(i);
 				do_rtent = 1;
-				pr_rthdr(af);
+				pr_rthdr(i);
 				p_tree(head.rnh_treetop);
 			}
 		}
