@@ -426,6 +426,9 @@ if test "x$crypto_dir" = "x"; then
 		fi
 		;;
 	esac
+else
+	LIBS="$LIBS -L${crypto_dir}/lib"
+	CFLAGS="-I${crypto_dir}/include $CFLAGS"
 fi
 if test "x$krb5_incdir" = "x"; then
 	case $host_os in
