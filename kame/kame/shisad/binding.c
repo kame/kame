@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.9 2005/03/07 23:22:59 keiichi Exp $	*/
+/*      $KAME: binding.c,v 1.10 2005/03/08 08:37:08 mitsuya Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -65,7 +65,7 @@ void bul_flush(struct mip6_hoainfo *);
 static struct binding_update_list *bul_create(struct in6_addr *,
     struct in6_addr *, u_int16_t, struct mip6_hoainfo *);
 
-static char reg_fsm_desc[] = {
+static char *reg_fsm_desc[] = {
   "IDLE",
   "RRINIT",
   "RRREDO",
@@ -76,7 +76,7 @@ static char reg_fsm_desc[] = {
   "BOUND",
   "DHAAD"
 };
-static char rr_fsm_desc[] = {
+static char *rr_fsm_desc[] = {
   "START",
   "WAITHC",
   "WAITH",
