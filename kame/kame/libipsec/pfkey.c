@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.2 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.3 $";
 #endif
 
 #include <sys/types.h>
@@ -60,12 +60,12 @@ static int pfkey_send_x2 __P((int so, u_int type, u_int satype, u_int mode,
 	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi));
 static int pfkey_send_x3 __P((int so, u_int type, u_int satype));
 
-static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int8_t type, u_int16_t tlen,
-	u_int8_t satype, u_int8_t mode, u_int32_t seq, pid_t pid));
-static caddr_t pfkey_setsadbsa __P((caddr_t buf, u_int32_t spi, u_int8_t wsize,
-	u_int8_t auth, u_int8_t enc, u_int32_t flags));
+static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int type, u_int16_t tlen,
+	u_int satype, u_int mode, u_int32_t seq, pid_t pid));
+static caddr_t pfkey_setsadbsa __P((caddr_t buf, u_int32_t spi, u_int wsize,
+	u_int auth, u_int enc, u_int32_t flags));
 static caddr_t pfkey_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
-	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
+	struct sockaddr *saddr, u_int prefixlen, u_int16_t ul_proto));
 static caddr_t pfkey_setsadbkey(caddr_t buf, u_int type,
 	caddr_t key, u_int keylen);
 static caddr_t pfkey_setsadblifetime(caddr_t buf, u_int type,
@@ -554,7 +554,7 @@ int
 pfkey_send_spdadd(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	int so;
 	struct sockaddr *src, *dst;
-	u_int8_t prefs, prefd, proto;
+	u_int prefs, prefd, proto;
 	char *policy;
 	int policylen;
 	u_int32_t seq;
@@ -627,7 +627,7 @@ int
 pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, seq)
 	int so;
 	struct sockaddr *src, *dst;
-	u_int8_t prefs, prefd, proto;
+	u_int prefs, prefd, proto;
 	u_int32_t seq;
 {
 	struct sadb_msg *newmsg;
@@ -1256,7 +1256,7 @@ pfkey_check(mhp)
 static caddr_t
 pfkey_setsadbmsg(buf, type, tlen, satype, mode, seq, pid)
 	caddr_t buf;
-	u_int8_t type, satype, mode;
+	u_int type, satype, mode;
 	u_int16_t tlen;
 	u_int32_t seq;
 	pid_t pid;
@@ -1289,7 +1289,7 @@ static caddr_t
 pfkey_setsadbsa(buf, spi, wsize, auth, enc, flags)
 	caddr_t buf;
 	u_int32_t spi, flags;
-	u_int8_t wsize, auth, enc;
+	u_int wsize, auth, enc;
 {
 	struct sadb_sa *p;
 	u_int len;
@@ -1319,7 +1319,7 @@ pfkey_setsadbaddr(buf, exttype, saddr, prefixlen, ul_proto)
 	caddr_t buf;
 	u_int16_t exttype;
 	struct sockaddr *saddr;
-	u_int8_t prefixlen;
+	u_int prefixlen;
 	u_int16_t ul_proto;
 {
 	struct sadb_address *p;

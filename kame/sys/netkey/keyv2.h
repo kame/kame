@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.2 1999/09/01 05:27:43 sakane Exp $ */
+/* $Id: keyv2.h,v 1.3 1999/09/01 16:31:49 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -391,11 +391,11 @@ int pfkey_recv_register __P((int so));
 int pfkey_send_flush __P((int so, u_int satype));
 int pfkey_send_dump __P((int so, u_int satype));
 int pfkey_send_promisc_toggle __P((int so, int flag));
-int pfkey_send_spdadd __P((int so, struct sockaddr *src, u_int8_t prefs,
-	struct sockaddr *dst, u_int8_t prefd, u_int8_t proto, caddr_t policy,
+int pfkey_send_spdadd __P((int so, struct sockaddr *src, u_int prefs,
+	struct sockaddr *dst, u_int prefd, u_int proto, caddr_t policy,
 	int policylen, u_int32_t seq));
-int pfkey_send_spddelete __P((int so, struct sockaddr *src, u_int8_t prefs,
-	struct sockaddr *dst, u_int8_t prefd, u_int8_t proto, u_int32_t seq));
+int pfkey_send_spddelete __P((int so, struct sockaddr *src, u_int prefs,
+	struct sockaddr *dst, u_int prefd, u_int proto, u_int32_t seq));
 int pfkey_send_spdflush __P((int so));
 int pfkey_send_spddump __P((int so));
 
