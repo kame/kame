@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.99 2003/05/28 08:39:53 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.100 2003/05/28 08:43:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.99 2003/05/28 08:39:53 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.100 2003/05/28 08:43:32 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -603,7 +603,7 @@ ripalarm()
 void
 init()
 {
-	int	i, error;
+	int	error;
 	const int int0 = 0, int1 = 1, int255 = 255;
 	struct	addrinfo hints, *res;
 	char	port[NI_MAXSERV];
@@ -656,16 +656,15 @@ init()
 		/*NOTREACHED*/
 	}
 
-	i = 1;
 #ifdef IPV6_RECVPKTINFO
-	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &i,
-	    sizeof(i)) < 0) {
+	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+	    &int1, sizeof(int1)) < 0) {
 		fatal("rip IPV6_RECVPKTINFO");
 		/*NOTREACHED*/
 	}
 #else  /* old adv. API */
-	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_PKTINFO, &i,
-	    sizeof(i)) < 0) {
+	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_PKTINFO,
+	    &int1, sizeof(int1)) < 0) {
 		fatal("rip IPV6_PKTINFO");
 		/*NOTREACHED*/
 	}
