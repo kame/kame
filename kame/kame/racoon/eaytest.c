@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.32 2001/09/07 01:24:55 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.33 2001/09/07 01:28:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,7 +52,6 @@
 
 u_int32_t loglevel = 4;
 
-char *capath = "/usr/local/openssl/certs";
 char *certs[] = {
 /* self signed */
 "-----BEGIN CERTIFICATE-----\n"
@@ -282,17 +281,22 @@ certtest(ac, av)
 
 	    {
 		struct stat sb;
+		char *capath;
+		if (ac > 1)
+			capath = *(av + 1);
+		else
+			capath = "/usr/local/openssl/certs";
 
 		stat(capath, &sb);
 		if (!(sb.st_mode & S_IFDIR)) {
 			printf("ERROR: %s is not directory.\n", capath);
 			return;
 		}
-	    }
 
 		error = eay_check_x509cert(&c, capath);
 		printf("cert is %s\n", error ? "invalid" : "valid");
 		printf("\n");
+	    }
 	}
 }
 
