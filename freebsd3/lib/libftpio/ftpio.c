@@ -686,7 +686,8 @@ cmd(FTP_t ftp, const char *fmt, ...)
 static int
 ftp_login_session(FTP_t ftp, char *host, char *user, char *passwd, int port, int verbose)
 {
-    struct addrinfo	hints, *res;
+    char pbuf[10];
+    struct addrinfo	hints, *res, *res0;
     int			err;
     int 		s;
     int			i;
@@ -709,32 +710,37 @@ ftp_login_session(FTP_t ftp, char *host, char *user, char *passwd, int port, int
     if (!port)
 	port = 21;
 
+    snprintf(pbuf, sizeof(pbuf), "%d", port);
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = 0;
-    err = getaddrinfo(host, NULL, &hints, &res);
+    err = getaddrinfo(host, pbuf, &hints, &res0);
     if (err) {
 	ftp->error = 0;
 	return FAILURE;
     }
 
-    ((struct sockaddr_in *) res->ai_addr)->sin_port = htons(port); /* XXX */
-    ftp->addrtype = res->ai_family;
+    s = -1;
+    for (res = res0; res; res = res->ai_next) {
+	ftp->addrtype = res->ai_family;
 
-    if ((s = socket(ftp->addrtype, SOCK_STREAM, 0)) < 0) {
-	freeaddrinfo(res);
-	ftp->error = -1;
-	return FAILURE;
+	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0)
+	    continue;
+
+	if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+	    (void)close(s);
+	    s = -1;
+	    continue;
+	}
+
+	break;
     }
-
-    if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
-	(void)close(s);
-	freeaddrinfo(res);
+    freeaddrinfo(res0);
+    if (s < 0) {
 	ftp->error = errno;
 	return FAILURE;
     }
-    freeaddrinfo(res);
 
     ftp->fd_ctrl = s;
     ftp->con_state = isopen;
