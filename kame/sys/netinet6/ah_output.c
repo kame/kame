@@ -254,8 +254,8 @@ ah4_output(m, isr)
 				m_freem(m);
 				return EINVAL;
 			}
-			sav->replay->count++;
 		}
+		sav->replay->count++;
 		/*
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.
@@ -446,8 +446,8 @@ ah6_output(m, nexthdrp, md, isr)
 				m_freem(m);
 				return EINVAL;
 			}
-			sav->replay->count++;
 		}
+		sav->replay->count++;
 		/*
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.
