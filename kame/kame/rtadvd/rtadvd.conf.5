@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.44 2002/10/02 15:34:30 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.45 2003/04/10 11:56:55 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -104,15 +104,20 @@ will use the default values.
 (num) The value for Cur Hop Limit field.
 The default value is 64.
 .It Cm \&raflags
-(num) Flags field in router advertisement message header.
+(str or num) A 8-bit flags field in router advertisement message header.
+This field can be specified either as a case-sensitive string or as an
+integer.
+A sting consists of characters each of which corresponds to a
+particular flag bit(s).
+An integer should be the logical OR of all enabled bits.
 Bit 7
 .Po
-.Li 0x80
+.Li 'm' or 0x80
 .Pc
 means Managed address configuration flag bit,
 and Bit 6
 .Po
-.Li 0x40
+.Li 'o' or 0x40
 .Pc
 means Other stateful configuration flag bit.
 Bit 4 
@@ -124,9 +129,22 @@ and Bit 3
 .Li 0x08
 .Pc
 are used to encode router preference.
-Bits 01 means high, 00 means medium, and 11 means low.
+Bits 01
+.Po
+or 'h'
+.Pc
+means high, 00 means medium, and 11
+.Po
+or 'l'
+.Pc
+means low.
 Bits 10 is reserved, and must not be specified.
-The default value of the entire flag is 0, which means no additional
+There is no character to specify the medium preference explicitly.
+The default value of the entire flag is 0
+.Po
+or a null string,
+.Pc
+which means no additional
 configuration methods, and the medium router preference.
 .It Cm \&rltime
 (num) Router lifetime field
@@ -175,18 +193,23 @@ The default value is 0.
 (num) Prefix length field.
 The default value is 64.
 .It Cm \&pinfoflags
-(num) Flags field in prefix information option.
+(str or num) A 8-bit flags field in prefix information option.
+This field can be specified either as a case-sensitive string or as an
+integer.
+A sting consists of characters each of which corresponds to a
+particular flag bit(s).
+An integer should be the logical OR of all enabled bits.
 Bit 7
 .Po
-.Li 0x80
+.Li 'l' or 0x80
 .Pc
 means On-link flag bit,
 and Bit 6
 .Po
-.Li 0x40
+.Li 'a' or 0x40
 .Pc
 means Autonomous address-configuration flag bit.
-The default value is 0xc0, i.e., both bits are set.
+The default value is "la" or 0xc0, i.e., both bits are set.
 .It Cm \&addr
 (str) The address filled into Prefix field.
 Since
@@ -296,7 +319,9 @@ is more than 0.
 (num) Prefix length field in route information option.
 The default value is 64.
 .It Cm \&rtflags
-(num) Flags field in route information option.
+(str or num) A 8-bit flags field in route information option.
+Currently only the preference values are defined.
+The notation is same as that of the raflags field.
 Bit 4
 .Po
 .Li 0x10
@@ -375,7 +400,7 @@ YOU DO NOT NEED TO HAVE IT AT ALL.
 .Bd -literal -offset
 default:\\
 	:chlim#64:raflags#0:rltime#1800:rtime#0:retrans#0:\\
-	:pinfoflags#192:vltime#2592000:pltime#604800:mtu#0:
+	:pinfoflags="la":vltime#2592000:pltime#604800:mtu#0:
 ef0:\\
 	:addrs#1:addr="3ffe:501:ffff:1000::":prefixlen#64:tc=default:
 .Ed
