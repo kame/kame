@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.335 1999/12/13 05:59:51 sumikawa Exp $
+$Id: CHANGELOG,v 1.336 1999/12/13 06:00:58 itojun Exp $
 
 <199912>
+Mon Dec 13 14:58:04 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.79.
+
 Mon Dec 13 10:49:48 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/heimdal: upgrade to 0.2f.
 	* netbsd/pkgsrc/security/heimdal: upgrade to 0.2f.
