@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.23 1999/10/07 18:08:14 itojun Exp $
+$Id: TODO,v 1.24 1999/10/07 23:43:45 itojun Exp $
 
 
 Things we can do with the current code:
@@ -32,8 +32,6 @@ Things we can't do with the current code:
   (string too long on wtmp?)
   workaround: run sshd -4, then sshd -6.  strangely enough no error will
   be raised with this configuration.
-- if you are unlucky, current ipv6 pmtud code can cause kernel crash.
-  (due to dangling pointer to clone rtentry from timeout queue)
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere

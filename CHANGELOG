@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.173 1999/10/07 17:03:30 itojun Exp $
+$Id: CHANGELOG,v 1.174 1999/10/07 23:43:44 itojun Exp $
 
 <199910>
+Fri Oct  8 08:42:12 JST 1999
+	* openbsd/sys/net/route.[ch], kame/sys/netinet6/icmp6.c:
+	  synchronize ipv6 pmtud code for openbsd with netbsd.
+	  this includes change to openbsd/sys/net/route.[ch] for
+	  route entry timer code.
+
+	  this should fix possible dangling pointer problem in previous code.
+
 Fri Oct  8 01:40:23 JST 1999  itojun@iijlab.net
 	* openbsd/ports/security/ssh: ssh 1.2.27 with IPv6 patch.
 	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.1.1.
