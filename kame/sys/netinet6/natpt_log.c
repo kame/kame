@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.8 2000/04/19 06:48:57 fujisawa Exp $	*/
+/*	$KAME: natpt_log.c,v 1.9 2001/04/04 05:22:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,14 +160,22 @@ natpt_lbuf(int type, int priorities, size_t size)
 {
     struct	mbuf	*m;
     struct	lbuf	*p;
+    int l;
 
+    if (size + sizeof(struct l_hdr) > MCLBYTES)
+	return NULL;
     MGETHDR(m, M_NOWAIT, MT_DATA);
+    if (size + sizeof(struct l_hdr) > MHLEN) {
+	MCLGET(m, M_NOWAIT);
+	if ((m->m_flags & M_EXT) == 0) {
+	    m_freem(m);
+	    m = NULL;
+	}
+    }
     if (m == NULL)
 	return (NULL);
-    if (LBFSZ < size)
-	MCLGET(m, M_NOWAIT);
 
-    m->m_pkthdr.len = m->m_len = MHLEN;
+    m->m_pkthdr.len = m->m_len = (m->m_flags & M_EXT) ? MCLBYTES : MHLEN;
     m->m_pkthdr.rcvif = NULL;
 
     p = (struct lbuf *)m->m_data;
