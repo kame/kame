@@ -3031,6 +3031,8 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 #endif
 		break;
 #endif
+	default:
+		ipsechdrsiz = 0;
 	}
 
 	/*
