@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.46 2000/10/09 09:17:10 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.47 2000/10/09 09:40:00 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -638,8 +638,7 @@ again:;
 			if (nbi->expire > time.tv_sec) {
 				printf(" %-9.9s",
 				       sec2str(nbi->expire - time.tv_sec));
-			}
-			else if (nbi->expire == 0)
+			} else if (nbi->expire == 0)
 				printf(" %-9.9s", "permanent");
 			else
 				printf(" %-9.9s", "expired");
@@ -670,8 +669,7 @@ again:;
 
 			isrouter = nbi->isrouter;
 			prbs = nbi->asked;
-		}
-		else {
+		} else {
 			warnx("failed to get neighbor information");
 			printf("  ");
 		}
@@ -747,8 +745,7 @@ ether_str(sdl)
 		cp = (u_char *)LLADDR(sdl);
 		sprintf(ebuf, "%x:%x:%x:%x:%x:%x",
 			cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
-	}
-	else {
+	} else {
 		sprintf(ebuf, "(incomplete)");
 	}
 
@@ -1074,8 +1071,7 @@ plist()
 					 default:
 						 printf(" (unreachable)\n");
 					}
-				}
-				else
+				} else
 					printf(" (no neighbor state)\n");
 			}
 			if (PR.advrtrs > DRLSTSIZ)
