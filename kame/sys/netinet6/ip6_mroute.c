@@ -617,7 +617,9 @@ add_m6if(mifcp)
 {
 	register struct mif6 *mifp;
 	struct ifnet *ifp;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct in6_ifreq ifr;
+#endif 
 	int error, s;
 #ifdef notyet
 	struct tbf *m_tbf = tbftable + mifcp->mif6c_mifi;
@@ -653,12 +655,6 @@ add_m6if(mifcp)
 		if ((ifp->if_flags & IFF_MULTICAST) == 0)
 			return EOPNOTSUPP;
 
-		/*
-		 * Enable promiscuous reception of all IPv6 multicasts
-		 * from the if
-		 */
-		ifr.ifr_addr.sin6_family = AF_INET6;
-		ifr.ifr_addr.sin6_addr = in6addr_any;
 #ifdef __NetBSD__
 		s = splsoftnet();
 #else
@@ -667,6 +663,12 @@ add_m6if(mifcp)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		error = if_allmulti(ifp, 1);
 #else
+		/*
+		 * Enable promiscuous reception of all IPv6 multicasts
+		 * from the interface.
+		 */
+		ifr.ifr_addr.sin6_family = AF_INET6;
+		ifr.ifr_addr.sin6_addr = in6addr_any;
 		error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr);
 #endif
 		splx(s);
@@ -717,7 +719,9 @@ del_m6if(mifip)
 	register struct mif6 *mifp = mif6table + *mifip;
 	register mifi_t mifi;
 	struct ifnet *ifp;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct in6_ifreq ifr;
+#endif
 	int s;
 
 	if (*mifip >= nummifs)
@@ -736,10 +740,15 @@ del_m6if(mifip)
 		 * XXX: what if there is yet IPv4 multicast daemon
 		 *      using the interface?
 		 */
+		ifp = mifp->m6_ifp;
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		if_allmulti(ifp, 0);
+#else
 		ifr.ifr_addr.sin6_family = AF_INET6;
 		ifr.ifr_addr.sin6_addr = in6addr_any;
-		ifp = mifp->m6_ifp;
 		(*ifp->if_ioctl)(ifp, SIOCDELMULTI, (caddr_t)&ifr);
+#endif 
 	}
 
 #ifdef notyet
