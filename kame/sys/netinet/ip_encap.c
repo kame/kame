@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.65 2001/08/30 08:56:17 keiichi Exp $	*/
+/*	$KAME: ip_encap.c,v 1.66 2001/09/04 06:50:06 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -382,7 +382,7 @@ encap4_input(m, va_alist)
 	}
 
 	/* for backward compatibility - messy... */
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 5)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 #elif defined(__OpenBSD__)
