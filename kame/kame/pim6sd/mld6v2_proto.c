@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.43 2004/06/14 05:34:59 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.44 2004/06/14 08:16:03 suz Exp $
  */
 
 /*
@@ -95,8 +95,7 @@ static void DelVifV2 __P((void *arg));
 
 static void accept_multicast_record(mifi_t, struct mld_group_record_hdr *,
 				    struct sockaddr_in6 *,
-				    struct sockaddr_in6 *,
-				    struct listaddr *);
+				    struct sockaddr_in6 *);
 
 /*
  * Send general group membership queries on that interface if I am querier.
@@ -462,7 +461,6 @@ accept_listenerV2_report(src, dst, report_message, datalen)
     struct mld_report_hdr *report;
     struct mld_group_record_hdr *mard;
     int             i, nummard, numsrc, totsrc;
-    struct listaddr *g = NULL;
     struct sockaddr_in6 group_sa = { sizeof(group_sa), AF_INET6 };
     char *p;
 
@@ -517,19 +515,18 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    continue;
 	}
 
-	accept_multicast_record(vifi, mard, src, &group_sa, g);
+	accept_multicast_record(vifi, mard, src, &group_sa);
     }
 }
 
 
 /* handles multicast record in normal MLDv2-mode */
 static void
-accept_multicast_record(vifi, mard, src, grp, uv_group)
+accept_multicast_record(vifi, mard, src, grp)
     mifi_t vifi;
     struct mld_group_record_hdr *mard;
     struct sockaddr_in6 *src;
     struct sockaddr_in6 *grp;
-    struct listaddr *uv_group;
 {
 	struct uvif *v = &uvifs[vifi];
 	int numsrc = ntohs(mard->numsrc);
@@ -542,16 +539,21 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	/* sanity check */
 	if (v->uv_flags & VIFF_NOLISTENER)
 	 	return;
+	if (grp == NULL)
+		return;
+
+	/* just locate group */
+	check_multicastV2_listener(v, grp, &g, NULL);
 
 	switch (mard->record_type) {
 	case CHANGE_TO_INCLUDE_MODE:
 	    if (numsrc == 0) {
-	        if (uv_group == NULL) {
+	        if (g == NULL) {
 			log_msg(LOG_DEBUG, 0,
 				"impossible to delete non-existent record");
 			return;
 		}
-		uv_group->filter_mode = MODE_IS_INCLUDE;
+		g->filter_mode = MODE_IS_INCLUDE;
 		recv_listener_done(vifi, src, grp);
 	        break;
 	    }
@@ -666,13 +668,13 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	    break;
 
 	case BLOCK_OLD_SOURCES:
-	    if (uv_group == NULL) {
+	    if (g == NULL) {
 	    	log_msg(LOG_DEBUG, 0,
 			"cannot accept BLOCK_OLD_SOURCE record"
 			"for non-existent group");
 	    	return;
 	    }
-	    if (uv_group->comp_mode == MLDv1) {
+	    if (g->comp_mode == MLDv1) {
 	    	log_msg(LOG_DEBUG, 0, "ignores BLOCK msg in MLDv1-compat-mode");
 		return;
 	    }
@@ -740,7 +742,7 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	     * source-lists in TO_EX() messages".  But pim6sd does nothing,
 	     * since it always ignores the source-list in a TO_EX message.
 	     */
-	    if (uv_group->comp_mode == MLDv1) {
+	    if (g->comp_mode == MLDv1) {
 	    	log_msg(LOG_DEBUG, 0,
 		    "ignores TO_EX source list in MLDv1-compat-mode");
 	    }
