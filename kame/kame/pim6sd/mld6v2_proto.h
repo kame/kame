@@ -48,7 +48,7 @@
 #define MLDv1	0x0001
 
 extern void query_groupsV2 __P((struct uvif * v));
-extern void SendQueryV2spec __P((void *arg));
+extern void Send_GS_QueryV2 __P((void *arg));
 extern void accept_listenerV2_query __P((struct sockaddr_in6 * src,
 					 struct in6_addr * dst,
 					 register char *query_message,

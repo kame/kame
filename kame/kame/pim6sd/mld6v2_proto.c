@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.36 2004/06/09 13:44:48 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.37 2004/06/09 14:54:23 suz Exp $
  */
 
 /*
@@ -90,6 +90,7 @@
 /*
  * Forward declarations.
  */
+static void Send_GSS_QueryV2 __P((void *arg));
 static void DelVifV2 __P((void *arg));
 
 static int SetTimerV1compat __P((mifi_t, struct listaddr * g));
@@ -129,23 +130,20 @@ query_groupsV2(v)
 	send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		    NULL, (struct sockaddr_in6 *) NULL, v->uv_ifindex,
 		    MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
-		    v->uv_mld_robustness, v->uv_mld_query_interval);
+		    v->uv_mld_robustness, v->uv_mld_query_interval, FALSE);
 	v->uv_out_mld_query++;
     }
 }
 
 /*
- * Send a group/source-specific v2 query : it only append if I am the querier
- * and interface isn't configured with nonlistener option if the source list
- * is null , it is a group-specific query
- * according to the spec : Two specific query are built and sent : the first
- * one with the S flag set contain source who has timer <=LLQI, the second
- * with S flag cleared contain source who has timer >LLQI
- * So we call send_mldv2 two times
+ * Send a group-source-specific v2 query.
+ * Two specific queries are built and sent:
+ *  1) one with S-flag ON with every source having a timer <= LLQI
+ *  2) one with S-flag OFF with every source having a timer >LLQI
+ * So we call send_mldv2() twice for different set of sources.
  */
-
-void
-SendQueryV2spec(arg)
+static void
+Send_GSS_QueryV2(arg)
     void           *arg;
 {
     cbk_t          *cbk = (cbk_t *) arg;
@@ -153,20 +151,20 @@ SendQueryV2spec(arg)
 
     if ((v->uv_flags & VIFF_QUERIER) == 0 || (v->uv_flags & VIFF_NOLISTENER)) {
 	log_msg(LOG_DEBUG, 0,
-		"don't send a GS/GSS Query due to a lack of querying right");
+		"don't send a GSS Query due to a lack of querying right");
 	return;
     }
 
     send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
-		v->uv_mld_robustness, v->uv_mld_query_interval);
+		v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
     v->uv_out_mld_query++;
 
     send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGYES,
-		v->uv_mld_robustness, v->uv_mld_query_interval);
+		v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
     v->uv_out_mld_query++;
 
     cbk->g->al_rob--;
@@ -175,14 +173,50 @@ SendQueryV2spec(arg)
      * Schedule MLD6_ROBUSTNESS_VARIABLE specific queries.
      * is received or timer expired ( XXX: The timer granularity is 1s !!)
      */
-
     if (cbk->g->al_rob > 0) {
         timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
-                       SendQueryV2spec, cbk);
-    }
-    else
+                       Send_GSS_QueryV2, cbk);
+    } else
         free(cbk);
+}
 
+/*
+ * Send a group-specific v2 query.
+ */
+void
+Send_GS_QueryV2(arg)
+    void           *arg;
+{
+    cbk_t          *cbk = (cbk_t *) arg;
+    register struct uvif *v = &uvifs[cbk->mifi];
+    int sflag = SFLAGNO;
+
+    if ((v->uv_flags & VIFF_QUERIER) == 0 || (v->uv_flags & VIFF_NOLISTENER)) {
+	log_msg(LOG_DEBUG, 0,
+		"don't send a GS Query due to a lack of querying right");
+	return;
+    }
+
+    if (cbk->g->al_timer > MLD6_LAST_LISTENER_QUERY_TIMER &&
+        cbk->g->comp_mode == MLDv2)
+    	sflag = SFLAGYES;
+
+    send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+		NULL, &cbk->g->al_addr, v->uv_ifindex,
+		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, sflag,
+		v->uv_mld_robustness, v->uv_mld_query_interval, FALSE);
+    v->uv_out_mld_query++;
+    cbk->g->al_rob--;
+
+    /*
+     * Schedule MLD6_ROBUSTNESS_VARIABLE specific queries.
+     * is received or timer expired ( XXX: The timer granularity is 1s !!)
+     */
+    if (cbk->g->al_rob > 0) {
+        timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
+                       Send_GS_QueryV2, cbk);
+    } else
+        free(cbk);
 }
 
 /*
@@ -711,7 +745,7 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	    	cbk->q_time = MLD6_LAST_LISTENER_QUERY_INTERVAL;
  	    	cbk->mifi = vifi;
 
-	    	SendQueryV2spec(cbk);
+	    	Send_GSS_QueryV2(cbk);
 	    }
 	    break;
 

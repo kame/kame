@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.18 2004/06/08 07:55:06 suz Exp $
+ * $KAME: mld6v2.c,v 1.19 2004/06/09 14:54:23 suz Exp $
  */
 
 /*
@@ -86,7 +86,7 @@ static int make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 			   struct sockaddr_in6 *dst,
 			   struct sockaddr_in6 *group, int ifindex,
 			   unsigned int delay, int datalen, int alert,
-			   int sflag, int qrv, int qqic);
+			   int sflag, int qrv, int qqic, int gss);
 
 /*
  * this function build three type of messages : 
@@ -113,7 +113,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 		struct sockaddr_in6 *dst, struct sockaddr_in6 *group,
 		int ifindex,
 		unsigned int delay, int datalen, int alert, int sflag,
-		int qrv, int qqic)
+		int qrv, int qqic, int gss)
 {
     struct mldv2_hdr *mhp = (struct mldv2_hdr *) mld6_send_buf;
     int             ctllen, hbhlen = 0;
@@ -130,6 +130,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
     dst_sa.sin6_family = AF_INET6;
     dst_sa.sin6_len = sizeof(dst_sa);
     dst_sa.sin6_addr = allnodes_group.sin6_addr;
+    sndmh.msg_name = (caddr_t) &dst_sa;
 
     if ((vifi = local_address(src)) == NO_VIF) {
         IF_DEBUG(DEBUG_MLD)
@@ -146,7 +147,11 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
                    "trying to build group specific query without state for it");
             return FALSE;
         }
+	dst_sa.sin6_addr = group->sin6_addr;
+    }
 
+    /* scan the source-list only in case of GSS query */
+    if (gss) {
         if (sflag == SFLAGNO) {
             lstsrc = g->sources;
             while (lstsrc) {
@@ -198,18 +203,18 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
                 lstsrc = lstsrc->al_next;
             }
         }
-        IF_DEBUG(DEBUG_MLD) {
-            if (sflag == SFLAGYES)
-                log_msg(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag SET",
-                    sa6_fmt(group));
-            if (sflag == SFLAGNO)
-                log_msg(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag NOT SET",
-                    sa6_fmt(group));
-        }
-        dst_sa.sin6_addr = group->sin6_addr;
+	if (nbsrc == 0) {
+		log_msg(LOG_DEBUG, 0, "No source found for this GSS Query"
+			"(%s S-flag %s)",
+			sa6_fmt(group), sflag == SFLAGYES ? "ON" : "OFF");
+		return FALSE;
+	}
     }
 
-    sndmh.msg_name = (caddr_t) & dst_sa;
+    IF_DEBUG(DEBUG_MLD) {
+	log_msg(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag %s",
+		sa6_fmt(&dst_sa), sflag == SFLAGYES ? "ON" : "OFF");
+    }
 
     /* fill the misc field */
     misc |= sflag;
@@ -325,12 +330,12 @@ void
 send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 	    struct sockaddr_in6 *dst, struct sockaddr_in6 *group, int index,
 	    unsigned int delay, int datalen, int alert, int sflag, int qrv,
-	    int qqic)
+	    int qqic, int gss)
 {
     struct sockaddr_in6 *dstp;
 
     if (make_mld6v2_msg(type, code, src, dst, group, index, delay, 
-			datalen, alert, sflag, qrv, qqic) == FALSE)
+			datalen, alert, sflag, qrv, qqic, gss) == FALSE)
 	return;
 
     dstp = (struct sockaddr_in6 *) sndmh.msg_name;

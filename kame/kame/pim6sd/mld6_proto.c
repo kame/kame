@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.37 2004/06/08 10:45:09 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.38 2004/06/09 14:54:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -527,7 +527,7 @@ recv_listener_done(mifi, src, grp)
 				    v->uv_ifindex,
 				    MLD6_QUERY_RESPONSE_INTERVAL,
 				    0, TRUE, SFLAGNO, v->uv_mld_robustness,
-				    v->uv_mld_query_interval);
+				    v->uv_mld_query_interval, FALSE);
 		} else if (v->uv_mld_version & MLDv1) 
 #endif
 		{
@@ -668,7 +668,7 @@ SetQueryTimer(g, mifi, to_expire, q_time)
 
 #ifdef MLDV2_LISTENER_REPORT
 	if (v->uv_mld_version & MLDv2) {
-		return timer_setTimer(to_expire, SendQueryV2spec, cbk);
+		return timer_setTimer(to_expire, Send_GS_QueryV2, cbk);
 	}
 #endif
 	/* either MLDv1-bit or MLDv2-bit is on in v->uv_mld_version */
