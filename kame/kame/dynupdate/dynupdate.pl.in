@@ -1,6 +1,6 @@
 #! @PERL@
 
-#	$KAME: dynupdate.pl.in,v 1.9 2001/03/15 12:10:16 itojun Exp $
+#	$KAME: dynupdate.pl.in,v 1.10 2001/03/15 12:11:25 itojun Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -81,7 +81,7 @@ while (<ADDRS>) {
 if (defined($tsigkeyfile)) {
 	$update_flags .= "-k $tsigkeyfile";
 }
-open(DOIT, "| $nsupdate $update_flags") || die;    
+open(DOIT, "| $nsupdate $update_flags >/dev/null") || die;    
 
 print DOIT "update delete $name.$domain AAAA\n";
 
