@@ -197,7 +197,7 @@ esp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
 		des_set_key((des_cblock *)secret, schedule);
 
 		p = ivoff + ivlen;
-		des_cbc_encrypt((des_cblock *)p, (des_cblock *)p,
+		des_cbc_encrypt((void *)p, (void *)p,
 			(long)(ep - p), schedule, (des_cblock *)iv,
 			DES_DECRYPT);
 		advance = ivoff - (u_char *)esp + ivlen;
@@ -274,7 +274,7 @@ esp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
 		des_set_key((des_cblock *)(secret + 16), s3);
 
 		p = ivoff + ivlen;
-		des_ede3_cbc_encrypt((des_cblock *)p, (des_cblock *)p,
+		des_ede3_cbc_encrypt((void *)p, (void *)p,
 			(long)(ep - p), s1, s2, s3, (des_cblock *)ivoff, DES_DECRYPT);
 		advance = ivoff - (u_char *)esp + ivlen;
 		break;
