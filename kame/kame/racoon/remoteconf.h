@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.6 2000/05/31 15:52:51 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.7 2000/06/05 15:24:45 sakane Exp $ */
 
 /* remote configuration */
 
@@ -98,3 +98,4 @@ extern struct etypes *check_etypeok
 
 extern struct isakmpsa *newisakmpsa __P((void));
 extern void insisakmpsa __P((struct isakmpsa *new, struct remoteconf *rmconf));
+extern const char *rm2str __P((const struct remoteconf *));

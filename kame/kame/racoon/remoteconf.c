@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.7 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.8 2000/06/05 15:24:44 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -283,3 +283,11 @@ insisakmpsa(new, rmconf)
 	return;
 }
 
+const char *
+rm2str(rmconf)
+	const struct remoteconf *rmconf;
+{
+	if (rmconf->remote->sa_family == AF_UNSPEC)
+		return "anonymous";
+	return saddr2str(rmconf->remote);
+}

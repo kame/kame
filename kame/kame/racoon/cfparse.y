@@ -1542,6 +1542,11 @@ set_isakmp_proposal(rmconf, prspec)
 	}
 
 	/* mandatory check */
+	if (p->spspec == NULL) {
+		yyerror("no remote specification found: %s.\n",
+			rm2str(rmconf));
+		return -1;
+	}
 	for (s = p->spspec; s != NULL; s = s->next) {
 		/* XXX need more to check */
 		if (s->algclass[algclass_isakmp_enc] == 0) {
