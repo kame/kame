@@ -729,8 +729,6 @@ insert:
 	 * Make header visible.
 	 */
 	ip->ip_len = next;
-	ip->ip_ttl = 0;	/* xxx */
-	ip->ip_sum = 0;
 	ip->ip_src = fp->ipq_src;
 	ip->ip_dst = fp->ipq_dst;
 	LIST_REMOVE(fp, ipq_q);
