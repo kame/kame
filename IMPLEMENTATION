@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.305 2002/05/23 01:32:25 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.306 2002/05/25 17:04:00 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2286,6 +2286,7 @@ The KAME developers basically do not make a bother about coding
 style.  However, there is still some agreement on the style, in order
 to make the distributed develoment smooth.
 
+- follow *BSD KNF where possible.  note: there are multiple KNF standards.
 - the tab character should be 8 columns wide (tabstops are at 8, 16, 24, ...
   column).  With vi, use ":set ts=8 sw=8".
   With GNU Emacs 20 and later, the easiest way is to use the "bsd" style of
