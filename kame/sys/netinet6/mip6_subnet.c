@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.6 2001/09/12 10:58:23 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.7 2001/09/17 11:04:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -360,6 +360,30 @@ mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
 
 	/* not found. */
 	return (NULL);
+}
+
+int32_t
+mip6_subnet_prefix_list_get_minimum_lifetime(mspfx_list)
+	struct mip6_subnet_prefix_list *mspfx_list;
+{
+	int32_t lifetime = 0xffff;
+	struct mip6_subnet_prefix *mspfx;
+	struct mip6_prefix *mpfx;
+
+	for (mspfx = TAILQ_FIRST(mspfx_list);
+	     mspfx;
+	     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
+		if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
+			/* must not happen.  try next. */
+			continue;
+		}
+
+		if (lifetime > mpfx->mpfx_lifetime) {
+			lifetime = mpfx->mpfx_lifetime;
+		}
+	}
+	
+	return (lifetime);
 }
 
 struct mip6_subnet_ha *
