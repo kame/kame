@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.116 2001/01/26 13:10:57 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.117 2001/01/26 13:13:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,7 +258,6 @@ void	 set_pathmtu __P((int));
 struct in6_pktinfo *get_rcvpktinfo __P((struct msghdr *));
 void	 onsignal __P((int));
 void	 retransmit __P((void));
-void	 oninfo __P((int));
 void	 onint __P((int));
 void	 pinger __P((void));
 const char *pr_addr __P((struct sockaddr *, int));
@@ -1020,7 +1019,7 @@ main(argc, argv)
 		}
 #ifdef SIGINFO
 		if (seeninfo) {
-			oninfo(SIGINFO);
+			summary();
 			seeninfo = 0;
 			continue;
 		}
@@ -2109,21 +2108,6 @@ tvsub(out, in)
 	}
 	out->tv_sec -= in->tv_sec;
 }
-
-#ifdef SIGINFO
-/*
- * oninfo --
- *	SIGINFO handler.
- */
-/* ARGSUSED */
-void
-oninfo(notused)
-	int notused;
-{
-
-	summary();
-}
-#endif
 
 /*
  * onint --
