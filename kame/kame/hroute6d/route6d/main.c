@@ -1,5 +1,5 @@
 /* 
- * $Id: main.c,v 1.1 1999/08/08 23:29:47 itojun Exp $
+ * $Id: main.c,v 1.2 1999/08/19 12:03:53 itojun Exp $
  */
 
 /*
@@ -59,7 +59,7 @@ main(int argc, char **argv)
 	struct msghdr *mh;
 	struct sockaddr_in6 rsrc, sa;
 	struct in6_addr anyaddr = IN6ADDR_ANY_INIT;
-	char ch;
+	int ch;
 
 	progname = argv[0];
         if ((prog = rindex(argv[0], '/')) == NULL)
