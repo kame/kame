@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.24 2004/11/28 10:48:38 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.25 2004/11/28 13:49:14 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -195,7 +195,10 @@ requests a SIP server domain name.
 .Ic refreshtime
 .Xc
 means an information refresh time option.
-This is particularly useful when sent with information-request messages.
+This can only be specified when sent with information-request
+messages;
+.Nm dhcp6c
+will ignore this option for other messages.
 As of this writing, the option type for this option is not officially
 assigned.
 .Nm dhcp6c

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.16 2004/11/28 10:48:39 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.17 2004/11/28 13:49:14 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -117,9 +117,9 @@ statements.
 .It Xo
 .Ic refreshtime Ar interval ;
 .Xc
-specifies the refresh time of stateless information that do not have particular
-lease duration in seconds.
-This option is particularly useful for stateless configuration by
+specifies the refresh time of stateless information that does not have
+particular lease duration in seconds.
+This option is only applicable to stateless configuration by
 information-request and reply exchanges.
 As of this writing, the option type for this option is not officially
 assigned.
