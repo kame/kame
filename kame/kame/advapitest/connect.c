@@ -1,4 +1,4 @@
-/*	$KAME: connect.c,v 1.12 2002/02/02 10:38:38 jinmei Exp $ */
+/*	$KAME: connect.c,v 1.13 2002/03/02 09:52:56 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -57,13 +57,13 @@ main(argc, argv)
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 dst;
 	char readbuf[1024], *port = DEFAULTPORT;
-	char **gate;
+	char **gate, *src;
 	struct ip6_rthdr *rthdr;
 
 	if ((gate = malloc((sizeof(char *)) * argc)) == NULL)
 		err(1, "malloc");
 
-	while((ch = getopt(argc, argv, "h:p:g:")) != -1)
+	while((ch = getopt(argc, argv, "h:p:g:s:")) != -1)
 		switch(ch) {
 		case 'g':
 			gate[ngate++] = optarg;
@@ -73,6 +73,9 @@ main(argc, argv)
 			break;
 		case 'p':
 			port = optarg;
+			break;
+		case 's':
+			src = optarg;
 			break;
 		case '?':
 		default:
@@ -102,6 +105,34 @@ main(argc, argv)
 	    setsockopt(s, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
 		       &hlim, sizeof(hlim))) {
 		err(1, "setsockopt(IPV6_UNICAST_HOPS %d)", hlim);
+	}
+	if (src) {
+		struct addrinfo shints, *sres;
+		struct in6_pktinfo pktinfo;
+
+		memset(&hints, 0, sizeof(hints));
+		shints.ai_family = PF_INET6;
+		shints.ai_socktype = SOCK_STREAM;
+		shints.ai_protocol = IPPROTO_TCP;
+		ret_ga = getaddrinfo(src, port, &shints, &sres);
+		if (ret_ga) {
+			errx(1, "getaddrinfo for %s: %s\n", src,
+			     gai_strerror(ret_ga));
+		}
+
+		memset(&pktinfo, 0, sizeof(pktinfo));
+		memcpy(&pktinfo.ipi6_addr,
+		       &((struct sockaddr_in6 *)sres->ai_addr)->sin6_addr,
+		       sizeof(pktinfo.ipi6_addr));
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &pktinfo,
+			       sizeof(pktinfo)) == 0) {	/* should fail */
+			warnx("IPV6_PKTINFO(%s) has succeeded for a "
+			      "TCP socket", src);
+		} else
+			warn("IPV6_PKTINFO(%s) failed (correct)", src);
+
+		freeaddrinfo(sres);
 	}
 
 	if (ngate > 0) {
@@ -293,6 +324,8 @@ setopthdr(optlen, hdrtype)
 void
 usage()
 {
-	fprintf(stderr, "usage: connect [-h hoplimit] [-p port] "
+	fprintf(stderr, "usage: connect [-h hoplimit] [-p port] [-s dummysrc] "
 		"[-g hop1 [-g hop2...]] addr\n");
+
+	exit(1);
 }

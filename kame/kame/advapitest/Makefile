@@ -48,8 +48,8 @@ sender: sender.o common.o
 accept: accept.o common.o
 	$(CC) $(CFLAGS) -o $@ accept.o common.o $(LDFLAGS) $(LIBS)
 
-connect: connect.o
-	$(CC) $(CFLAGS) -o $@ connect.o $(LDFLAGS) $(LIBS)
+connect: connect.o common.o
+	$(CC) $(CFLAGS) -o $@ connect.o common.o $(LDFLAGS) $(LIBS)
 
 clean:
 	/bin/rm -rf *.o $(TARGET)
