@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.7 2001/08/09 14:30:52 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.8 2001/09/05 02:33:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -94,6 +94,7 @@ static struct in6_addr haanyaddr_ifidnn =
 
 static void mip6_icmp6_find_addr __P((caddr_t, int,
 				      struct in6_addr **, struct in6_addr **));
+static int mip6_icmp6_ha_discov_req_input __P((struct mbuf *, int, int));
 static int mip6_icmp6_ha_discov_rep_input __P((struct mbuf *, int, int));
 static int mip6_icmp6_create_haanyaddr __P((struct in6_addr *,
 					    struct mip6_prefix *));
@@ -102,9 +103,9 @@ static int mip6_icmp6_create_linklocal __P((struct in6_addr *,
 
 int
 mip6_icmp6_input(m, off, icmp6len)
-     struct mbuf *m;
-     int off;
-     int icmp6len;
+	struct mbuf *m;
+	int off;
+	int icmp6len;
 {
 	struct ip6_hdr *ip6;
 	caddr_t origip6;
@@ -137,11 +138,20 @@ mip6_icmp6_input(m, off, icmp6len)
 		}
 		break;
 
+	case ICMP6_HADISCOV_REQUEST:
+		if (!MIP6_IS_HA)
+			break;
+		if (mip6_icmp6_ha_discov_req_input(m, off, icmp6len)) {
+			m_freem(m);
+		}
+		break;
+
 	case ICMP6_HADISCOV_REPLY:
 		if (!MIP6_IS_MN)
 			break;
-		if (mip6_icmp6_ha_discov_rep_input(m, off, icmp6len))
-			break;
+		if (mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)) {
+			m_freem(m);
+		}
 		break;
 
 	case ICMP6_PARAM_PROB:
@@ -202,9 +212,9 @@ mip6_icmp6_input(m, off, icmp6len)
 
 int
 mip6_icmp6_tunnel_input(m, off, icmp6len)
-     struct mbuf *m;
-     int off;
-     int icmp6len;
+	struct mbuf *m;
+	int off;
+	int icmp6len;
 {
 	struct mbuf *n;
 	struct ip6_hdr *ip6, otip6, oip6, *nip6;
@@ -233,6 +243,17 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	ip6 = mtod(m, struct ip6_hdr *);
 	plen = ip6->ip6_plen;
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
+	if (icmp6->icmp6_type >= 128) {
+		/*
+		 * this is not an icmp error message. no need to
+		 * relay.
+		 */
+		return (0);
+	} 
+	if (plen < (sizeof(*icmp6) + sizeof(otip6) + sizeof(oip6))) {
+		/* this is not an icmp against the tunneled packet. */
+		return (0);
+	}
 	/* original tunneled ip6 hdr is not guaranteed to be continuous. */
 	m_copydata(m, off + sizeof(*icmp6), sizeof(otip6), (caddr_t)&otip6);
 
@@ -246,6 +267,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	}
 
+	/* length check is already done.  we can copy immediately. */
 	m_copydata(m, off + sizeof(*icmp6) + sizeof(otip6),
 		   sizeof(oip6), (caddr_t)&oip6);
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6.ip6_dst);
@@ -311,10 +333,10 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 static void
 mip6_icmp6_find_addr(icmp6, icmp6len, laddr, paddr)
-     caddr_t icmp6; /* Pointer to beginning of icmp6 payload */
-     int icmp6len; /* Total icmp6 payload length */
-     struct in6_addr **laddr; /* Local home address */
-     struct in6_addr **paddr; /* Peer home address */
+	caddr_t icmp6; /* Pointer to beginning of icmp6 payload */
+	int icmp6len; /* Total icmp6 payload length */
+	struct in6_addr **laddr; /* Local home address */
+	struct in6_addr **paddr; /* Peer home address */
 {
 	struct ip6_opt_home_address *haddr_opt; /* Home Address option */
 	struct ip6_hdr *ip6;                    /* IPv6 header */
@@ -401,11 +423,100 @@ mip6_icmp6_find_addr(icmp6, icmp6len, laddr, paddr)
 	*paddr = pa;
 }
 
+/*
+ * dynamic homeagent discovery request input routine.
+ */
+static int
+mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
+	struct mbuf *m; /* points ip header */
+	int off;
+	int icmp6len;
+{
+	struct ifnet *rifp = m->m_pkthdr.rcvif;
+	struct ip6_hdr *ip6;
+	struct icmp6_hdr *icmp6;
+	struct ha_discov_req *hdreq;
+	struct ha_discov_rep *hdrep;
+	int hdreplen;
+	struct in6_addr *haddr;
+	struct in6_ifaddr *haifa;
+	struct in6_addr *halist;
+	int halistlen;
+	struct mbuf *n;
+
+	ip6 = mtod(m, struct ip6_hdr *);
+	/* ha_discov_req may not continuous */
+	IP6_EXTHDR_GET(hdreq, struct ha_discov_req *, m,
+		       off, sizeof(*hdreq));
+	haddr = &hdreq->ha_dreq_home;
+
+	/* 
+	 * find a home agent address based on the homeaddress of the
+	 * mobile node.
+	 */
+	haifa = in6_ifawithifp(rifp, haddr);
+
+	/* XXX TODO */
+	/* correct ha list on the home link and create a list */
+
+	/* create a home agent address list */
+	/* XXX */
+	halistlen = sizeof(struct in6_addr) * 1; /* XXX */
+	MALLOC(halist, struct in6_addr *, halistlen, M_TEMP, M_NOWAIT);
+	if (halist == NULL) {
+		m_freem(m);
+		return (ENOBUFS);
+	}
+	bcopy((caddr_t)&haifa->ia_addr.sin6_addr, (caddr_t)halist,
+	      sizeof(struct in6_addr));
+	
+	/*
+	 * create a ha discovery reply packet
+	 */
+	if (IN6_IS_ADDR_UNSPECIFIED(haddr)) {
+		/*
+		 * in case that a mn has no valid home address.  the
+		 * mobile node will send a home agent discovery from
+		 * its CoA.  use the CoA as a dest addr of the reply
+		 * message.
+		 */
+		haddr = &ip6->ip6_src;
+	}
+	hdreplen = sizeof(*hdrep);
+	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr, haddr,
+			       IPPROTO_ICMPV6, hdreplen + halistlen);
+	if (n == NULL) {
+		mip6log((LOG_ERR, "%s: mbuf allocation failed\n",
+			 __FUNCTION__));
+		/* free the input packet */
+		m_freem(m);
+		FREE(halist, M_TEMP);
+		return (ENOBUFS);
+	}
+	hdrep = (struct ha_discov_rep *)
+		((caddr_t)mtod(n, struct ip6_hdr *) + 1);
+	hdrep->discov_rep_type = ICMP6_HADISCOV_REPLY;
+	hdrep->discov_rep_code = 0;
+	hdrep->discov_rep_cksum = 0;
+	hdrep->discov_rep_id = hdreq->discov_req_id;
+	/* copy halist at the end of the hdrep packet */
+	bcopy((caddr_t)halist, (caddr_t)(hdrep + 1), halistlen);
+	FREE(halist, M_TEMP);
+
+	/* calcurate checksum */
+	hdrep->discov_rep_cksum = in6_cksum(n, IPPROTO_ICMPV6,
+					    sizeof(struct ip6_hdr),
+					    n->m_pkthdr.len
+					    - sizeof(struct ip6_hdr));
+
+	return (0);
+}
+
 static int
 mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
-     struct mbuf *m;
-     int off;
-     int icmp6len;
+	struct mbuf *m;
+	int off;
+	int icmp6len;
 {
 	struct ip6_hdr *ip6;
 	struct ha_discov_rep *hdrep;
@@ -424,8 +535,10 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 
 	/* XXX check icmp6->discov_rep_id */
 
-	/* chech if the home agent list contains sending home agent's
-	   address. */
+	/*
+	 * check if the home agent list contains sending home agent's
+	 * address.
+	 */
 	hacount = (icmp6len - sizeof(struct ha_discov_rep)) 
 		/ sizeof(struct in6_addr);
 	haaddrptr = haaddrs;
@@ -498,7 +611,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 
 int
 mip6_icmp6_ha_discov_req_output(sc)
-     struct hif_softc *sc;
+	struct hif_softc *sc;
 {
 	struct in6_addr haanyaddr;
 	struct hif_subnet *hs;
@@ -559,8 +672,8 @@ mip6_icmp6_ha_discov_req_output(sc)
 
 static int
 mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
-     struct in6_addr *haanyaddr;
-     struct mip6_prefix *mpfx;
+	struct in6_addr *haanyaddr;
+	struct mip6_prefix *mpfx;
 {
 	if (mpfx == NULL)
 		return (-1);
@@ -578,8 +691,8 @@ mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
 
 static int
 mip6_icmp6_create_linklocal(lladdr, ifid)
-     struct in6_addr *lladdr;
-     struct in6_addr *ifid;
+	struct in6_addr *lladdr;
+	struct in6_addr *ifid;
 {
 	bzero(lladdr, sizeof(struct in6_addr));
 	lladdr->s6_addr[0] = 0xfe;
@@ -593,8 +706,8 @@ mip6_icmp6_create_linklocal(lladdr, ifid)
 #if 0
 int
 mip6_tunneled_rs_output(sc, mpfx)
-     struct hif_softc *sc;
-     struct mip6_pfx *mpfx;
+	struct hif_softc *sc;
+	struct mip6_pfx *mpfx;
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;

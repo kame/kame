@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.22 2001/08/14 12:59:39 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.23 2001/09/05 02:33:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -303,7 +303,10 @@ mip6_ha_timeout(dummy)
 		}
 	
 		/* cout down HA lifetime remain. */
+#if 0
+		/* XXX.  disable timeout for now. */
 		mha->mha_remain -= MIP6_HA_TIMEOUT_INTERVAL;
+#endif
 		
 		if (mha->mha_remain < 0) {
 			/* this HA is not valid any more. */

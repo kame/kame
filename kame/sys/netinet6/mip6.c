@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.47 2001/08/14 12:59:38 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.48 2001/09/05 02:33:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1390,7 +1390,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	size = sizeof(struct mip6_buffer);
 	optbuf = (struct mip6_buffer *)malloc(size, M_TEMP, M_NOWAIT);
 	if (optbuf == NULL)
-		return (-1);
+		return (ENOMEM);
 	bzero((caddr_t)optbuf, size);
 
 	bzero(&haddr_opt, sizeof(struct ip6_opt_home_address));

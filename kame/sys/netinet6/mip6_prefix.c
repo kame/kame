@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.5 2001/08/14 12:59:39 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.6 2001/09/05 02:33:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -67,6 +67,10 @@
 
 struct mip6_prefix_list mip6_prefix_list;
 int mip6_prefix_count = 0;
+
+static void mip6_prefix_timeout __P((void *));
+static void mip6_prefix_starttimer __P((void));
+static void mip6_prefix_stoptimer __P((void));
 
 #ifdef __NetBSD__
 struct callout mip6_prefix_ch = CALLOUT_INITIALIZER;
@@ -147,6 +151,14 @@ mip6_prefix_list_insert(mpfx_list, mpfx)
 
 	LIST_INSERT_HEAD(mpfx_list, mpfx, mpfx_entry);
 
+	if (mip6_prefix_count == 0) {
+		mip6_prefix_starttimer();
+		mip6log((LOG_INFO,
+			 "%s: prefix timer started.\n",
+			 __FUNCTION__));
+	}
+	mip6_prefix_count++;
+
 	return (0);
 }
 
@@ -178,6 +190,14 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	
 	LIST_REMOVE(mpfx, mpfx_entry);
 	FREE(mpfx, M_TEMP);
+
+	mip6_prefix_count--;
+	if (mip6_prefix_count == 0) {
+		mip6log((LOG_INFO,
+			 "%s: prefix timer stopped.\n",
+			 __FUNCTION__));
+		mip6_prefix_stoptimer();
+	}
 
 	return (0);
 }
@@ -227,3 +247,48 @@ mip6_prefix_list_find_withhaddr(mpfx_list, haddr)
 	return (NULL);
 }
 
+static void
+mip6_prefix_timeout(dummy)
+	void *dummy;
+{
+	struct mip6_subnet *ms, *ms_next;
+	int s;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+	for(ms = LIST_FIRST(&mip6_subnet_list); ms; ms = ms_next) {
+		ms_next = LIST_NEXT(ms, ms_entry);
+		
+	}			    
+
+	mip6_prefix_starttimer();
+
+
+	splx(s);
+}
+
+static void
+mip6_prefix_starttimer()
+{
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_reset(&mip6_prefix_ch,
+		      MIP6_PREFIX_TIMEOUT_INTERVAL * hz,
+		      mip6_prefix_timeout, NULL);
+#else
+	timeout(mip6_prefix_timeout, (void *)0,
+		MIP6_PREFIX_TIMEOUT_INTERVAL * hz);
+#endif
+}
+
+static void
+mip6_prefix_stoptimer()
+{
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_stop(&mip6_prefix_ch);
+#else
+	untimeout(mip6_prefix_timeout, (void *)0);
+#endif
+}

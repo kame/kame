@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.3 2001/08/03 14:31:43 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.4 2001/09/05 02:33:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -50,7 +50,7 @@ struct mip6_prefix {
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
 
-#define MIP6_PFX_TIMEOUT_INTERVAL 5
+#define MIP6_PREFIX_TIMEOUT_INTERVAL 5
 
 struct mip6_ha {
 	LIST_ENTRY(mip6_ha) mha_entry;
