@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.140 2002/10/02 11:16:00 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.141 2002/10/09 17:24:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -911,7 +911,7 @@ mip6_process_hurbu(bi)
 	int error = 0;
 
 	/* find the home ifp of this homeaddress. */
-	for(pr = nd_prefix.lh_first;
+	for (pr = nd_prefix.lh_first;
 	    pr;
 	    pr = pr->ndpr_next) {
 		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
@@ -934,7 +934,7 @@ mip6_process_hurbu(bi)
 	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
 		int found = 0;
 
-		for(mbc = LIST_FIRST(&mip6_bc_list);
+		for (mbc = LIST_FIRST(&mip6_bc_list);
 		    mbc;
 		    mbc = mbc_next) {
 			mbc_next = LIST_NEXT(mbc, mbc_entry);
@@ -1034,7 +1034,7 @@ mip6_process_hurbu(bi)
 	}
 	mbc = NULL;
 	if ((bi->mbc_flags & IP6MU_LINK) != 0) {
-		for(mbc = LIST_FIRST(&mip6_bc_list);
+		for (mbc = LIST_FIRST(&mip6_bc_list);
 		    mbc;
 		    mbc = mbc_next) {
 			mbc_next = LIST_NEXT(mbc, mbc_entry);
@@ -1141,7 +1141,7 @@ mip6_process_hrbu(bi)
 	long time_second = time.tv_sec;
 #endif
 	/* find the home ifp of this homeaddress. */
-	for(pr = nd_prefix.lh_first;
+	for (pr = nd_prefix.lh_first;
 	    pr;
 	    pr = pr->ndpr_next) {
 		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
@@ -1172,7 +1172,7 @@ mip6_process_hrbu(bi)
 		     on the mobile node's home link.
 		 */
 		/* XXX really stupid to loop twice? */
-		for(pr = nd_prefix.lh_first;
+		for (pr = nd_prefix.lh_first;
 		    pr;
 		    pr = pr->ndpr_next) {
 			if (pr->ndpr_ifp != hifp) {
@@ -1279,7 +1279,7 @@ mip6_process_hrbu(bi)
 		 * address derived from all the routing prefixes on
 		 * this router.
 		 */
-		for(pr = nd_prefix.lh_first;
+		for (pr = nd_prefix.lh_first;
 		    pr;
 		    pr = pr->ndpr_next) {
 			if (!pr->ndpr_raf_onlink)
@@ -1485,7 +1485,7 @@ mip6_dad_success(ifa)
 {
 	struct  mip6_bc *mbc, *prim = NULL;
 
-	for(mbc = LIST_FIRST(&mip6_bc_list);
+	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if (mbc->mbc_dad == ifa)
@@ -1509,7 +1509,7 @@ mip6_dad_success(ifa)
 	if ((mbc->mbc_flags & IP6MU_CLONED) != 0)
 		return (0);
 	prim = mbc;
-	for(mbc = LIST_FIRST(&mip6_bc_list);
+	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if (mbc->mbc_ifp != prim->mbc_ifp ||
@@ -1561,7 +1561,7 @@ mip6_dad_error(ifa, err)
 {
 	struct  mip6_bc *mbc, *mbc_next, *my, *prim= NULL;
 
-	for(my = LIST_FIRST(&mip6_bc_list);
+	for (my = LIST_FIRST(&mip6_bc_list);
 	    my;
 	    my = LIST_NEXT(my, mbc_entry)) {
 		if (my->mbc_dad == ifa)
@@ -1574,7 +1574,7 @@ mip6_dad_error(ifa, err)
 		prim = my;
 	free(ifa, M_IFADDR);
 	my->mbc_dad = NULL;
-	for(mbc = LIST_FIRST(&mip6_bc_list);
+	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
@@ -1627,7 +1627,7 @@ struct ifnet *ifp;
 	struct mip6_bc *mbc;
 	struct in6_ifaddr *ia;
 
-	for(mbc = LIST_FIRST(&mip6_bc_list);
+	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
@@ -1864,7 +1864,7 @@ mip6_ifa_need_dad(ia)
 			break;
 	}
 #ifdef MIP6_DEBUG
-if(mbu)	mip6_bu_print(mbu);
+if (mbu)	mip6_bu_print(mbu);
 #endif
 	if ((mbu == NULL) || (mbu->mbu_lifetime <= 0))
 		need_dad = 1;

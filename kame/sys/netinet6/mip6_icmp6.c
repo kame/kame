@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.52 2002/09/18 07:54:33 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.54 2002/10/09 17:24:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -349,7 +349,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 #endif
 	otip6off = off + sizeof(*icmp6) + sizeof(*otip6);
 	nxt = otip6->ip6_nxt;
-	while(nxt != IPPROTO_IPV6) {
+	while (nxt != IPPROTO_IPV6) {
 		int off;
 
 		off = otip6off;
@@ -371,7 +371,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	oip6dst.sin6_len = sizeof(oip6dst);
 	oip6dst.sin6_family = AF_INET6;
 	oip6dst.sin6_addr = oip6.ip6_dst;
-	if(in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6dst.sin6_addr,
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6dst.sin6_addr,
 			   &oip6dst.sin6_scope_id))
 		return (0); /* XXX */
 
@@ -840,7 +840,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 
 	/* rate limitation. */
 	if (sc->hif_hadiscov_count != 0) {
-		if(sc->hif_hadiscov_lastsent + (1 << sc->hif_hadiscov_count)
+		if (sc->hif_hadiscov_lastsent + (1 << sc->hif_hadiscov_count)
 		   > time_second)
 			return (0);
 	}
@@ -899,7 +899,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 
 	/* update rate limitation factor. */
 	sc->hif_hadiscov_lastsent = time_second;
-	if(sc->hif_hadiscov_count++ > MIP6_DHAAD_RETRIES) {
+	if (sc->hif_hadiscov_count++ > MIP6_DHAAD_RETRIES) {
 		/*
 		 * XXX the spec says that the number of retires for
 		 * DHAAD request is restricted to DHAAD_RETRIES(=3).
