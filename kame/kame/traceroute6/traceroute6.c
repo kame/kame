@@ -331,7 +331,11 @@ struct in6_pktinfo *rcvpktinfo;
 struct sockaddr_in6 Src, Dst, Rcv;
 struct sockaddr_in6 *src = &Src, *dst = &Dst, *rcv = &Rcv;
 int datalen;			/* How much data */
-char rtbuf[1024];	/*XXX*/
+/* XXX: 2064 = 127(max hops in type 0 rthdr) * sizeof(ip6_hdr) + 16(margin) */
+char rtbuf[2064];
+#ifdef USE_RFC2292BIS
+struct ip6_rthdr *rth;
+#endif 
 struct cmsghdr *cmsg;
 
 char *source = 0;
@@ -379,9 +383,33 @@ main(argc, argv)
 				    "traceroute6: unknown host %s\n", optarg);
 				exit(1);
 			}
+#ifdef USE_RFC2292BIS
+			if (rth == NULL) {
+				/*
+				 * XXX: We can't detect the number of
+				 * intermediate nodes yet.
+				 */
+				if ((rth = inet6_rth_init((void *)rtbuf,
+							 sizeof(rtbuf),
+							 IPV6_RTHDR_TYPE_0,
+							 0)) == NULL) {
+					Fprintf(stderr,
+						"inet6_rth_init failed.\n");
+					exit(1);
+				}
+			}
+			if (inet6_rth_add((void *)rth,
+					  (struct in6_addr *)hp->h_addr)) {
+				Fprintf(stderr,
+					"inet6_rth_add failed for %s\n",
+					optarg);
+				exit(1);
+			}
+#else  /* old advanced API */
 			if (cmsg == NULL)
 				cmsg = inet6_rthdr_init(rtbuf, IPV6_RTHDR_TYPE_0);
 			inet6_rthdr_add(cmsg, (struct in6_addr *)hp->h_addr, IPV6_RTHDR_LOOSE);
+#endif
 			break;
 		case 'm':
 			max_hops = atoi(optarg);
@@ -577,11 +605,27 @@ main(argc, argv)
 	if (options & SO_DONTROUTE)
 		(void) setsockopt(sndsock, SOL_SOCKET, SO_DONTROUTE,
 				  (char *)&on, sizeof(on));
+#ifdef USE_RFC2292BIS
+	if (rth) {/* XXX: there is no library to finalize the header... */
+		rth->ip6r_len = rth->ip6r_segleft * 2;
+		if (setsockopt(sndsock, IPPROTO_IPV6, IPV6_RTHDR,
+			       (void *)rth, (rth->ip6r_len + 1) << 3)) {
+			Fprintf(stderr, "setsockopt(IPV6_RTHDR): %s\n",
+				strerror(errno));
+			exit(1);
+		}
+	}
+#else  /* old advanced API */
 	if (cmsg != NULL) {
 		inet6_rthdr_lasthop(cmsg, IPV6_RTHDR_LOOSE);
-		(void) setsockopt(sndsock, IPPROTO_IPV6, IPV6_PKTOPTIONS,
-				  rtbuf, cmsg->cmsg_len);
+		if (setsockopt(sndsock, IPPROTO_IPV6, IPV6_PKTOPTIONS,
+			       rtbuf, cmsg->cmsg_len) < 0) {
+			Fprintf(stderr, "setsockopt(IPV6_PKTOPTIONS): %s\n",
+				strerror(errno));
+			exit(1);
+		}
 	}
+#endif /* USE_RFC2292BIS */
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	/*
