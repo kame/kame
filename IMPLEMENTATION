@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/11 13:20:22 $
+			$Date: 1999/10/12 00:45:58 $
 
 1. IPv6
 
@@ -277,7 +277,7 @@ See 1.2 in the document for relationship between DAD and autoconfiguration.
 
 1.4.3 DHCPv6
 
-DHCPv6 itself needs more work.  We supply a tiny DHCPv6 server/client
+DHCPv6 itself needs more work.  We supply a tiny DHCPv6 server/client in
 kame/dhcp6.  However, the implementation is very premature (for example,
 this does NOT implement address lease/release), and it is not in default
 compilation tree.  If you want to experiment, compile it on your own.
