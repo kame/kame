@@ -40,6 +40,7 @@
 
 #include "ripng.h"
 
+extern struct ifinfo *ifentry;
 extern struct ripif *ripifs;	/* defined in ripng.c */
 
 char *dumpfile;
@@ -386,17 +387,22 @@ dump_exports(FILE *fp, struct rtproto *base)
 #endif
 
 static void
-print_ifrt_dump(FILE *fp)
+print_if_dump(FILE *fp)
 {
-	struct ripif *ripif = ripifs;
+	struct ifinfo *ife = ifentry;
 
-	fprintf(fp, "=== Interface routes ===\n");
-	while(ripif) {
-		fprintf(fp, " Interface: %s\n",
-			ripif->rip_ife->ifi_ifn->if_name);
-		dump_if_rtable(fp, ripif->rip_ife->ifi_rte);
+	fprintf(fp, "=== Direct Interfaces Information ===\n");
 
-		if ((ripif = ripif->rip_next) == ripifs)
+	while(ife) {
+		fprintf(fp, " Interface: %s\n", ife->ifi_ifn->if_name);
+		fprintf(fp, "  Link-local Address: %s\n",
+			ip6str(&ife->ifi_laddr, ife->ifi_ifn->if_index));
+		fprintf(fp, "  Global Address: %s\n",
+			ip6str(&ife->ifi_gaddr, 0));
+		fprintf(fp, "  Routes to the interface\n" );
+		dump_if_rtable(fp, ife->ifi_rte);
+
+		if ((ife = ife->ifi_next) == ifentry)
 			break;
 	}
 }
@@ -787,7 +793,7 @@ bgpd_dump_file()
 
 	(void)time(&tloc);
 	fprintf(fp, "\n************ bgpd dump on %s", ctime(&tloc));
-	print_ifrt_dump(fp);
+	print_if_dump(fp);
 	print_rip_dump(fp);
 	print_bgp_dump(fp);
 
