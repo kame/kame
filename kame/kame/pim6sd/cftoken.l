@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.17 2002/12/06 06:21:01 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.18 2003/02/12 04:30:50 suz Exp $	*/
 
 %{
 /*
@@ -672,6 +672,7 @@ cfparse(strict, debugonly)
 	cf_init(strict, debugonly);
 
 	if ((yyparse() || yyerrorcount) && strict) {
+		fclose(yyin);
 		if (yyerrorcount) {
 			yyerror("fatal parse failure: exiting (%d errors)",
 				yyerrorcount);
@@ -680,6 +681,7 @@ cfparse(strict, debugonly)
 		return(-1);
 	}
 
+	fclose(yyin);
 	YIPSDP(PLOG("parse successed.\n"));
 
 	return cf_post_config();
