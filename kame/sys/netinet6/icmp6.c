@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.389 2004/07/12 07:24:22 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.390 2004/07/16 07:40:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,6 +118,9 @@
 #include <netinet6/nd6.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/ip6protosw.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#include <netinet/tcp_var.h>
+#endif
 
 #ifdef __OpenBSD__ /* KAME IPSEC */
 #undef IPSEC
@@ -235,7 +238,9 @@ static int icmp6_recover_src __P((struct mbuf *));
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
 static void icmp6_redirect_timeout __P((struct rtentry *, struct rttimer *));
 #endif
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
+#endif
 
 void
 icmp6_init()
@@ -1431,7 +1436,11 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
 	u_int mtu = ntohl(icmp6->icmp6_mtu);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	struct in_conninfo inc;
+#else
 	struct rtentry *rt = NULL;
+#endif
 #ifndef SCOPEDROUTING
 	struct sockaddr_in6 dst_tmp;
 #endif
@@ -1490,23 +1499,24 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 
 	/* sin6.sin6_scope_id = XXX: should be set if DST is a scoped addr */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	bzero(&inc, sizeof(inc));
+	inc.inc_flags = 1; /* IPv6 */
+	inc.inc6_faddr = dst->sin6_addr;
+	if (mtu < tcp_maxmtu6(&inc)) {
+		tcp_hc_updatemtu(&inc, mtu);
+		icmp6stat.icp6s_pmtuchg++;
+	}
+	return;
+#else
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	rt = icmp6_mtudisc_clone((struct sockaddr *)dst);
-#else
-#ifdef __FreeBSD__
-	rt = rtalloc1((struct sockaddr *)dst, 0,
-		      RTF_CLONING 
-#if __FreeBSD_version < 502000
-		      | RTF_PRCLONING
-#endif
-		     );
-#endif
+#elif defined(__FreeBSD__)
+	rt = rtalloc1((struct sockaddr *)dst, 0, RTF_CLONING | RTF_PRCLONING);
 #endif
 
 	if (rt && (rt->rt_flags & RTF_HOST) &&
-#if defined( __FreeBSD__) && __FreeBSD_version < 502000
 	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
-#endif
 	    (rt->rt_rmx.rmx_mtu > mtu || rt->rt_rmx.rmx_mtu == 0)) {
 		if (mtu < IN6_LINKMTU(rt->rt_ifp)) {
 			icmp6stat.icp6s_pmtuchg++;
@@ -1526,11 +1536,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 		}
 	}
 	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
-		RTFREE_LOCKED(rt);
-#else
 		RTFREE(rt);
-#endif
 	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1542,6 +1548,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	     mc = LIST_NEXT(mc, mc_list))
 		(*mc->mc_func)(&dst->sin6_addr);
 #endif
+#endif /* not FreeBSD 5.2.1- */
 }
 
 /*
@@ -3607,6 +3614,7 @@ icmp6_redirect_timeout(rt, r)
 }
 #endif /* __NetBSD__ || __OpenBSD__ */
 
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 static void
 icmp6_mtudisc_timeout(rt, r)
 	struct rtentry *rt;
@@ -3615,9 +3623,7 @@ icmp6_mtudisc_timeout(rt, r)
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
 #ifdef __FreeBSD__
-#if __FreeBSD_version < 502000
 	if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
-#endif
 		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 #else /* openbsd/netbsd */
 	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
@@ -3630,6 +3636,7 @@ icmp6_mtudisc_timeout(rt, r)
 	}
 #endif
 }
+#endif /* ! FreeBSD 5.2.1- */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/sysctl.h>
