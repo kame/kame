@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.21 2000/02/23 06:13:55 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.22 2000/02/23 06:29:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -140,7 +140,7 @@ eay_get_x509cert(path)
 	int error;
 
 	/* Read private key */
-	fp = fopen (path, "r");
+	fp = fopen(path, "r");
 	if (fp == NULL)
 		return NULL;
 #if (defined(SSLVER) && SSLVER >= 0x0940)
@@ -274,7 +274,7 @@ eay_get_pkcs1privkey(path)
 	int error = -1;
 
 	/* Read private key */
-	fp = fopen (path, "r");
+	fp = fopen(path, "r");
 	if (fp == NULL)
 		return NULL;
 
@@ -328,7 +328,7 @@ eay_get_pkcs1pubkey(path)
 	int error = -1;
 
 	/* Read private key */
-	fp = fopen (path, "r");
+	fp = fopen(path, "r");
 	if (fp == NULL)
 		return NULL;
 
