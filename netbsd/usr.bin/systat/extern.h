@@ -58,6 +58,7 @@ extern int	nhosts;
 extern int	nports;
 extern int	protos;
 extern int	verbose;
+extern int	nflag;
 
 struct inpcb;
 #ifdef INET6

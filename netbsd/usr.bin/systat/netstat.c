@@ -124,7 +124,7 @@ static struct {
 } netcb;
 
 static	int aflag = 0;
-static	int nflag = 0;
+int nflag = 0;
 static	int lastrow = 1;
 
 WINDOW *

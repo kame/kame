@@ -100,13 +100,16 @@ main(argc, argv)
 
 	egid = getegid();
 	(void)setegid(getgid());
-	while ((ch = getopt(argc, argv, "M:N:w:")) != -1)
+	while ((ch = getopt(argc, argv, "M:N:nw:")) != -1)
 		switch(ch) {
 		case 'M':
 			memf = optarg;
 			break;
 		case 'N':
 			nlistf = optarg;
+			break;
+		case 'n':
+			nflag = !nflag;
 			break;
 		case 'w':
 			if ((naptime = atoi(optarg)) <= 0)
@@ -213,7 +216,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: systat [-M core] [-N system] [-w wait]\n");
+	fprintf(stderr, "usage: systat [-n] [-M core] [-N system] [-w wait]\n");
 	exit(1);
 }
 

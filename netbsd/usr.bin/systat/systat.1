@@ -41,6 +41,7 @@
 .Nd display system statistics on a crt
 .Sh SYNOPSIS
 .Nm
+.Op Fl n
 .Op Fl M Ar core
 .Op Fl N Ar system
 .Op Fl w Ar wait
@@ -92,6 +93,14 @@ Extracr the name list from
 .Ar system
 instead of the default
 .Pa /netbsd .
+.It Fl n
+Do not resolve IP addresses into string hostnames
+.Pq FQDNs
+on
+.Ic netstat .
+.It Fl w Ar wait
+See
+.Ar refresh-interval .
 .It Ar display
 The
 .Ar display
