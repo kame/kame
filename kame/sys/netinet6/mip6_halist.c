@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.8 2003/08/27 11:53:04 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.9 2003/08/28 18:56:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -362,9 +362,6 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	int16_t pref = 0;
 	u_int16_t lifetime;
 	struct mip6_ha *mha;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	if ((mha_list == NULL) ||
 	    (dr == NULL) ||

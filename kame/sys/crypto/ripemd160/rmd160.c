@@ -1,4 +1,4 @@
-/*	$KAME: rmd160.c,v 1.2 2003/07/25 09:37:55 itojun Exp $	*/
+/*	$KAME: rmd160.c,v 1.3 2003/08/28 18:56:22 t-momose Exp $	*/
 /*	$OpenBSD: rmd160.c,v 1.3 2001/09/26 21:40:13 markus Exp $	*/
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -83,6 +83,9 @@
 	} while(0)
 
 #define X(i)	x[i]
+#ifdef __NetBSD__
+#define swap32(x)	bswap32(x)
+#endif
 
 static u_char PADDING[64] = {
 	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

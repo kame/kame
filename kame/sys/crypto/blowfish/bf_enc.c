@@ -1,4 +1,4 @@
-/*	$KAME: bf_enc.c,v 1.8 2003/08/27 00:17:56 itojun Exp $	*/
+/*	$KAME: bf_enc.c,v 1.9 2003/08/28 18:56:21 t-momose Exp $	*/
 
 /* crypto/bf/bf_enc.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
@@ -78,7 +78,8 @@ BF_encrypt(data, key)
 	BF_LONG *data;
 	const BF_KEY *key;
 {
-	register BF_LONG l, r, *p, *s;
+	register BF_LONG l, r;
+	const register BF_LONG *p, *s;
 
 	p = key->P;
 	s= &key->S[0];
@@ -120,7 +121,8 @@ BF_decrypt(data, key)
 	BF_LONG *data;
 	const BF_KEY *key;
 {
-	register BF_LONG l, r, *p, *s;
+	register BF_LONG l, r;
+	const register BF_LONG *p, *s;
 
 	p = key->P;
 	s= &key->S[0];
