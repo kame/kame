@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: print-pim.c,v 1.7 96/09/26 23:36:48 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.1.1.1 1999/08/08 23:32:08 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -310,10 +310,12 @@ pimv2_print(register const u_char *bp, register u_int len)
 		ip = (struct ip *)bp;
 		switch(ip->ip_v) {
 		 case 4:	/* IPv4 */
+			printf(" ");
 			ip_print(bp, len);
 			break;
 #ifdef INET6
 		 case 6:	/* IPv6 */
+			printf(" ");
 			ip6_print(bp, len);
 			break;
 #endif
