@@ -292,6 +292,7 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 		error = ENOBUFS;
 		goto fail;
 	}
+	bzero(ep, sizeof(*ep));
 
 	ep->af = af;
 	ep->proto = proto;
