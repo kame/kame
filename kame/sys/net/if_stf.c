@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.50 2001/01/22 07:25:37 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.51 2001/01/22 07:27:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -599,9 +599,11 @@ stf_checkaddr4(sc, in, inifp)
 		rt = rtalloc1((struct sockaddr *)&sin, 0);
 #endif
 		if (!rt || rt->rt_ifp != inifp) {
+#if 0
 			log(LOG_WARNING, "%s: packet from 0x%x dropped "
 			    "due to ingress filter\n", if_name(&sc->sc_if),
 			    (u_int32_t)ntohl(sin.sin_addr.s_addr));
+#endif
 			if (rt)
 				rtfree(rt);
 			return -1;

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.49 2001/01/22 07:25:37 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.50 2001/01/22 07:27:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -503,9 +503,11 @@ gif_encapcheck4(m, off, proto, arg)
 		rt = rtalloc1((struct sockaddr *)&sin, 0);
 #endif
 		if (!rt || rt->rt_ifp != m->m_pkthdr.rcvif) {
+#if 0
 			log(LOG_WARNING, "%s: packet from 0x%x dropped "
 			    "due to ingress filter\n", if_name(&sc->gif_if),
 			    (u_int32_t)ntohl(sin.sin_addr.s_addr));
+#endif
 			if (rt)
 				rtfree(rt);
 			return 0;
