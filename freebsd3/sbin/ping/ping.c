@@ -438,27 +438,23 @@ main(argc, argv)
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	if (options & F_POLICY) {
-		int len;
 		char *buf;
-		if (policy_in) {
-			if ((len = ipsec_get_policylen(policy_in)) < 0)
+		if (policy_in != NULL) {
+			buf = ipsec_set_policy(policy_in, strlen(policy_in));
+			if (buf == NULL)
 				errx(EX_CONFIG, ipsec_strerror());
-			if ((buf = malloc(len)) == NULL)
-				err(EX_UNAVAILABLE, "malloc");
-			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
-				errx(EX_CONFIG, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0)
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
+					buf, ipsec_get_policylen(buf)) < 0)
 				err(EX_CONFIG, "ipsec policy cannot be configured");
 			free(buf);
 		}
-		if (policy_out) {
-			if ((len = ipsec_get_policylen(policy_out)) < 0)
+
+		if (policy_out != NULL) {
+			buf = ipsec_set_policy(policy_out, strlen(policy_out));
+			if (buf == NULL)
 				errx(EX_CONFIG, ipsec_strerror());
-			if ((buf = malloc(len)) == NULL)
-				err(EX_UNAVAILABLE, "malloc");
-			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
-				errx(EX_CONFIG, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0)
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
+					buf, ipsec_get_policylen(buf)) < 0)
 				err(EX_CONFIG, "ipsec policy cannot be configured");
 			free(buf);
 		}
