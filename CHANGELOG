@@ -1,10 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.312 1999/12/02 18:01:00 itojun Exp $
+$Id: CHANGELOG,v 1.313 1999/12/03 01:10:56 itojun Exp $
 
 <199912>
+Fri Dec  3 10:07:22 JST 1999  itojun@iijlab.net
+	* all-os/sbin/route/route.c: do not perform "-prefixlen 64" as defualt
+	  behavior on "-inet6".  this does not make sense, and this changes
+	  old behavior too much.  you could not do "route get -inet6 ::1"
+	  with it.
+
 Fri Dec  3 02:57:50 JST 1999  itojun@iijlab.net
-	* kame/sys/netinet6: enable KAME goto ours hack on openbsd.
+	* kame/sys/netinet6: enable KAME "goto ours" hack on openbsd.
 
 Fri Dec  3 00:44:57 JST 1999  itojun@iijlab.net
 	* netbsd/usr.sbin/syslogd: add IPv6 support.  NetBSD PR 8934 by
