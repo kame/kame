@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.15 2000/02/24 16:34:50 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.16 2000/02/25 03:15:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.15 2000/02/24 16:34:50 itojun Exp $
+ * $Id: mip6.c,v 1.16 2000/02/25 03:15:30 itojun Exp $
  *
  */
 
@@ -1154,7 +1154,7 @@ u_int8_t        next;      /* Next header following the IPv6 header */
     ip6->ip6_dst = *ip6_dst;
 
     /* Allocate memory for mbuf and copy IPv6 header to mbuf. */
-    MGETHDR(m, M_WAIT, MT_DATA);
+    MGETHDR(m, M_DONTWAIT, MT_DATA);
     if (m == NULL) {
         return NULL;
     }
@@ -1162,7 +1162,6 @@ u_int8_t        next;      /* Next header following the IPv6 header */
     m->m_len = sizeof(*ip6);
     m->m_pkthdr.len = m->m_len;
     m->m_pkthdr.rcvif = NULL;
-    m->m_flags = M_PKTHDR;
     bcopy((caddr_t)ip6, mtod(m, caddr_t), sizeof(*ip6));
     free(ip6, M_TEMP);
     return m;
