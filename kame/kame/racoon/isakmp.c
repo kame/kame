@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.147 2001/07/14 14:06:40 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.148 2001/07/14 14:13:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -641,7 +641,7 @@ ph1_main(iph1, msg)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s) %8.6f",
 		"phase1", s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
     }
@@ -650,7 +650,7 @@ ph1_main(iph1, msg)
 
 #ifdef ENABLE_STATS
 		gettimeofday(&iph1->end, NULL);
-		syslog(LOG_ALERT, "%s(%s): %8.6f",
+		syslog(LOG_NOTICE, "%s(%s): %8.6f",
 			"phase1", s_isakmp_etype(iph1->etype),
 			timedelta(&iph1->start, &iph1->end));
 #endif
@@ -773,7 +773,7 @@ quick_main(iph2, msg)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s) %8.6f",
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
@@ -852,7 +852,7 @@ isakmp_ph1begin_i(rmconf, remote)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s) %8.6f",
 		"phase1",
 		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
@@ -952,7 +952,7 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s) %8.6f",
 		"phase1",
 		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
@@ -1116,7 +1116,7 @@ isakmp_ph2begin_r(iph1, msg)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s) %8.6f",
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
@@ -1796,7 +1796,7 @@ isakmp_post_getspi(iph2)
 		return -1;
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s) %8.6f",
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));

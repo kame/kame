@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.84 2001/07/14 06:16:47 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.85 2001/07/14 14:13:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -198,7 +198,7 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
 		s_attr_isakmp_group(dh->type), timedelta(&start, &end));
     }
 #endif
@@ -245,7 +245,7 @@ oakley_dh_generate(dh, pub, priv)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
 		s_attr_isakmp_group(dh->type), timedelta(&start, &end));
 #endif
 	plog(LLV_DEBUG, LOCATION, NULL, "compute DH's private.\n");
@@ -348,7 +348,7 @@ defs:
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_hash(iph1->approval->hashtype),
 		buf->l, timedelta(&start, &end));
     }
@@ -404,7 +404,7 @@ defs:
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_hash(iph1->approval->hashtype),
 		buf->l, timedelta(&start, &end));
     }
@@ -2647,7 +2647,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	new = (cipher[iph1->approval->enctype].decrypt)(buf, iph1->key, ivdp->v);
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_enc(iph1->approval->enctype),
 		buf->l, timedelta(&start, &end));
     }
@@ -2788,7 +2788,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	new = (cipher[iph1->approval->enctype].encrypt)(buf, iph1->key, ivep->v);
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_enc(iph1->approval->enctype),
 		buf->l, timedelta(&start, &end));
     }

@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.121 2001/07/14 05:48:33 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.122 2001/07/14 14:13:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1156,7 +1156,7 @@ pk_recvupdate(mhp)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&iph2->end, NULL);
-	syslog(LOG_ALERT, "%s(%s): %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase2", "quick", timedelta(&iph2->start, &iph2->end));
 #endif
 
