@@ -1,4 +1,4 @@
-/*	$KAME: mconnect.c,v 1.2 2000/11/06 12:48:20 jinmei Exp $ */
+/*	$KAME: mconnect.c,v 1.3 2000/11/06 12:49:34 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -259,7 +259,7 @@ mconnect(ai0, errorp)
 			break;	/* already closed, nothing to do. */
 		}
 
-		free(cnext);
+		free(conn);
 	}
 
 	if (connsock == -1)
