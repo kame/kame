@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.7 2001/04/17 17:53:03 jinmei Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.8 2001/04/17 18:18:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -154,8 +154,7 @@ accept_listener_query(src, dst, group, tmo)
 
 	v = &uvifs[mifi];
 
-	if (v->uv_querier == NULL || !inet6_equal(&v->uv_querier->al_addr, src))
-	{
+	if (!inet6_equal(&v->uv_querier->al_addr, src)) {
 		/*
 		 * This might be:
 		 * - A query from a new querier, with a lower source address
@@ -173,12 +172,6 @@ accept_listener_query(src, dst, group, tmo)
 				    v->uv_querier ?
 				    inet6_fmt(&v->uv_querier->al_addr.sin6_addr) :
 				    "me", mifi);
-			if (!v->uv_querier) {
-				v->uv_querier = (struct listaddr *)
-					malloc(sizeof(struct listaddr));
-				memset(v->uv_querier, 0,
-				       sizeof(struct listaddr));
-			}
 			v->uv_flags &= ~VIFF_QUERIER;
 			v->uv_querier->al_addr = *src;
 			time(&v->uv_querier->al_ctime);
@@ -198,9 +191,9 @@ accept_listener_query(src, dst, group, tmo)
 		v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
 
 	/*
-	 * If this is a Group-Specific query which we did not source,
-	 * we must set our membership timer to [Last Member Query Count] *
-	 * the [Max Response Time] in the packet.
+	 * If this is a Group-Specific query, we must set our membership timer
+	 * to [Last Member Query Count] * the [Max Response Time] in the
+	 * packet.
 	 */
 	if (!IN6_IS_ADDR_UNSPECIFIED(group)) {
 		register struct listaddr *g;
