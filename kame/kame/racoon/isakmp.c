@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.84 2000/07/14 09:26:49 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.85 2000/07/15 04:55:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -652,6 +652,10 @@ quick_main(iph2, msg)
 		isakmp_info_send_n2(iph2, error, NULL);
 			return -1;
 	}
+
+	/* when using commit bit, status will be reached here. */
+	if (iph2->status == PHASE2ST_ADDSA)
+		return 0;
 
 	/* free resend buffer */
 	if (iph2->sendbuf == NULL) {

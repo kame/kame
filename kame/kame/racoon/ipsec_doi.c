@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.87 2000/07/14 16:10:23 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.88 2000/07/15 04:55:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -644,6 +644,8 @@ ipsecdoi_checkph2proposal(iph2)
 		goto end;
 	}
 
+	/* XXX should check the number of transform */
+
 	/* get proposal pair of SA replyed */
 	rpair = get_proppair(iph2->sa_ret, IPSECDOI_TYPE_PH2);
 	if (rpair == NULL) {
@@ -1222,16 +1224,6 @@ get_transform(prop, pair, num_p)
 				(*num_p)++;
 			}
 		}
-	}
-
-	/* check the number of transform */
-	if (num_t != prop->num_t) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: the number of transform mismatched, "
-			"haeder:%u body:%d.\n",
-			prop->num_t, num_t);
-		vfree(pbuf);
-		return -1;
 	}
 
 	vfree(pbuf);

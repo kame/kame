@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.40 2000/07/14 16:20:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.41 2000/07/15 04:55:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -88,7 +88,7 @@
 static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *));
 static int isakmp_info_recv_d __P((struct ph1handle *, vchar_t *));
 
-static void purge_spi __P((int, u_int32_t *, size_t));
+static void purge_ipsec_spi __P((struct sockaddr *, int, u_int32_t *, size_t));
 static void info_recv_initialcontact __P((struct sockaddr *));
 
 /* %%%
@@ -196,7 +196,6 @@ int
 isakmp_info_send_d1(iph1)
 	struct ph1handle *iph1;
 {
-	struct saproto *pr;
 	struct isakmp_pl_d *d;
 	vchar_t *payload = NULL;
 	int tlen;
@@ -209,7 +208,7 @@ isakmp_info_send_d1(iph1)
 
 	/* send SPIs of inbound SAs. */
 	/* XXX should send outbound SAs's ? */
-	tlen = sizeof(*d) + sizeof(pr->spi);
+	tlen = sizeof(*d) + sizeof(isakmp_index);
 	payload = vmalloc(tlen);
 	if (payload == NULL) {
 		plog(logp, LOCATION, NULL, 
@@ -797,7 +796,30 @@ isakmp_info_recv_n(iph1, msg)
 }
 
 static void
-purge_spi(proto, spi, n)
+purge_isakmp_spi(proto, spi, n)
+	int proto;
+	isakmp_index *spi;	/*network byteorder*/
+	size_t n;
+{
+	struct ph1handle *iph1;
+	size_t i;
+
+	for (i = 0; i < n; i++) {
+		iph1 = getph1byindex(&spi[i]);
+		if (iph1) {
+			plog(logp, LOCATION, NULL,
+				"proto_id %s purging spi:%s.\n",
+				s_ipsecdoi_proto(proto),
+				isakmp_pindex(&spi[i], 0));
+			remph1(iph1);
+			delph1(iph1);
+		}
+	}
+}
+
+static void
+purge_ipsec_spi(dst0, proto, spi, n)
+	struct sockaddr *dst0;
 	int proto;
 	u_int32_t *spi;	/*network byteorder*/
 	size_t n;
@@ -805,7 +827,8 @@ purge_spi(proto, spi, n)
 	vchar_t *buf = NULL;
 	struct sadb_msg *msg, *next, *end;
 	struct sadb_sa *sa;
-	struct sadb_address *src, *dst;
+	struct sockaddr *src, *dst;
+	struct ph2handle *iph2;
 	size_t i;
 	caddr_t mhp[SADB_EXT_MAX + 1];
 
@@ -834,13 +857,15 @@ purge_spi(proto, spi, n)
 			continue;
 		}
 
-		sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
-		src = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
-		dst = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
-		if (!sa || !src || !dst) {
+		sa = (struct sadb_sa *)(mhp[SADB_EXT_SA]);
+		if (!sa
+		 || !mhp[SADB_EXT_ADDRESS_SRC]
+		 || !mhp[SADB_EXT_ADDRESS_DST]) {
 			msg = next;
 			continue;
 		}
+		src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
+		dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
 
 		if (sa->sadb_sa_state != SADB_SASTATE_MATURE
 		 && sa->sadb_sa_state != SADB_SASTATE_DYING) {
@@ -849,22 +874,43 @@ purge_spi(proto, spi, n)
 		}
 
 		/* XXX n^2 algorithm, inefficient */
+
+		/* don't delete inbound SAs at the moment */
 		/* XXX should we remove SAs with opposite direction as well? */
+		if (cmpsaddrwop(dst0, dst)) {
+			msg = next;
+			continue;
+		}
+
 		for (i = 0; i < n; i++) {
 			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, NULL, "check spi: packet %u against SA %u.\n",
+				plog(logp, LOCATION, NULL,
+					"check spi: packet %u against SA %u.\n",
 					ntohl(spi[i]), ntohl(sa->sadb_sa_spi)));
-			if (spi[i] == sa->sadb_sa_spi) {
-				YIPSDEBUG(DEBUG_DMISC,
-					plog(logp, LOCATION, NULL, "purging spi=%u.\n",
-						ntohl(spi[i])));
-				pfkey_send_delete(lcconf->sock_pfkey,
-					msg->sadb_msg_satype,
-					IPSEC_MODE_ANY,
-					(struct sockaddr *)(src + 1),
-					(struct sockaddr *)(dst + 1),
-					sa->sadb_sa_spi);
+			if (spi[i] != sa->sadb_sa_spi)
+				continue;
+
+			pfkey_send_delete(lcconf->sock_pfkey,
+				msg->sadb_msg_satype,
+				IPSEC_MODE_ANY,
+				src, dst, sa->sadb_sa_spi);
+
+			/*
+			 * delete a relative phase 2 handler.
+			 * continue to process if no relative phase 2 handler
+			 * exists.
+			 */
+			iph2 = getph2bysaidx(src, dst, proto, spi[i]);
+			if (iph2) {
+				unbindph12(iph2);
+				remph2(iph2);
+				delph2(iph2);
 			}
+
+			plog(logp, LOCATION, NULL,
+				"proto_id %s purging spi:%d.\n",
+				s_ipsecdoi_proto(proto),
+				ntohl(spi[i]));
 		}
 
 		msg = next;
@@ -956,14 +1002,10 @@ isakmp_info_recv_d(iph1, msg)
 	vchar_t *msg;
 {
 	struct isakmp_pl_d *d;
-	u_int32_t *spi;
 	int tlen, num_spi;
 	vchar_t *pbuf;
 	struct isakmp_parse_t *pa, *pap;
 	int protected = 0;
-	struct ph2handle *iph2;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	/* validate the type of next payload */
 	if (!(pbuf = isakmp_parse(msg)))
@@ -998,6 +1040,15 @@ isakmp_info_recv_d(iph1, msg)
 		}
 	}
 
+	if (!protected) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: delete payload is not proteted, "
+			"ignored.\n");
+		vfree(pbuf);
+		return -1;
+	}
+
+	/* process a delete payload */
 	for (pap = pa; pap->type; pap++) {
 		if (pap->type != ISAKMP_NPTYPE_D)
 			continue;
@@ -1006,58 +1057,62 @@ isakmp_info_recv_d(iph1, msg)
 
 		if (ntohl(d->doi) != IPSEC_DOI) {
 			plog(logp, LOCATION, iph1->remote,
-				"deletion message received, "
-				"doi=%d proto_id=%d unsupported DOI.\n",
-				ntohl(d->doi), d->proto_id);
-			continue;
-		}
-		if (d->spi_size != sizeof(u_int32_t)) {
-			plog(logp, LOCATION, iph1->remote,
-				"deletion message received, "
-				"doi=%d proto_id=%d: strange spi "
-				"size %d.\n",
-				ntohl(d->doi), d->proto_id,
-				d->spi_size);
+				"delete payload with invalid doi:%d.\n",
+				ntohl(d->doi));
 			continue;
 		}
 
-		spi = (u_int32_t *)(d + 1);
-		tlen = ntohs(d->h.len) - sizeof(struct isakmp_pl_d);
 		num_spi = ntohs(d->num_spi);
+		tlen = ntohs(d->h.len) - sizeof(struct isakmp_pl_d);
 
 		if (tlen != num_spi * d->spi_size) {
 			plog(logp, LOCATION, iph1->remote,
 				"deletion payload with invalid length.\n");
 			vfree(pbuf);
-			return(-1);
+			return -1;
 		}
 
-		if (!protected) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: delete payload is not proteted, "
-				"ignored.\n");
+		switch (d->proto_id) {
+		case IPSECDOI_PROTO_ISAKMP:
+			if (d->spi_size != sizeof(isakmp_index)) {
+				plog(logp, LOCATION, iph1->remote,
+					"delete payload with strange spi "
+					"size %d(proto_id:%d)\n",
+					d->spi_size, d->proto_id);
+				continue;
+			}
+			purge_isakmp_spi(d->proto_id,
+					(isakmp_index *)(d + 1), num_spi);
+			break;
+
+		case IPSECDOI_PROTO_IPSEC_AH:
+		case IPSECDOI_PROTO_IPSEC_ESP:
+			if (d->spi_size != sizeof(u_int32_t)) {
+				plog(logp, LOCATION, iph1->remote,
+					"delete payload with strange spi "
+					"size %d(proto_id:%d)\n",
+					d->spi_size, d->proto_id);
+				continue;
+			}
+			purge_ipsec_spi(iph1->remote, d->proto_id,
+					(u_int32_t *)(d + 1), num_spi);
+			break;
+
+		default:
+			plog(logp, LOCATION, iph1->remote,
+				"deletion message received, "
+				"invalid proto_id: %d\n",
+				d->proto_id);
 			continue;
-		}
-
-		purge_spi(d->proto_id, spi, num_spi);
-
-		/* delete a relative phase 2 handler */
-		/* continue to process if no there is no phase 2 handler. */
-		iph2 = getph2bysaidx(iph1->local, iph1->remote,
-				d->proto_id, *spi);
-		if (iph2) {
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
 		}
 
 		YIPSDEBUG(DEBUG_NOTIFY, plog(logp, LOCATION, NULL,
 			"packet properly proteted, purge SPIs.\n"));
 	}
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
+	vfree(pbuf);
 
-	return(0);
+	return 0;
 }
 
 void
