@@ -1,4 +1,4 @@
-/*	$KAME: inet_addr.c,v 1.5 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: inet_addr.c,v 1.6 2005/01/13 04:12:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1990, 1993
@@ -72,7 +72,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)inet_addr.c	8.1 (Berkeley) 6/17/93";
-static char rcsid[] = "$Id: inet_addr.c,v 1.5 2001/08/20 02:32:40 itojun Exp $";
+static char rcsid[] = "$Id: inet_addr.c,v 1.6 2005/01/13 04:12:04 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #ifdef HAVE_CONFIG_H
@@ -86,10 +86,6 @@ static char rcsid[] = "$Id: inet_addr.c,v 1.5 2001/08/20 02:32:40 itojun Exp $";
 #include <arpa/inet.h>
 
 #include <ctype.h>
-
-#ifndef HAVE_U_INT8_T
-#include "bittypes.h"
-#endif 
 
 /*
  * Ascii internet address interpretation routine.

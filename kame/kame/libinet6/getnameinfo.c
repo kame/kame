@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.71 2004/09/20 23:58:53 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.72 2005/01/13 04:12:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,14 +68,6 @@
 #include <string.h>
 #include <stddef.h>
 #include <errno.h>
-
-#ifndef HAVE_PORTABLE_PROTOTYPE
-#include "cdecl_ext.h"
-#endif
-
-#ifdef NEED_ADDRINFO_H
-#include "addrinfo.h"
-#endif
 
 static const struct afd {
 	int a_af;

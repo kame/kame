@@ -1,4 +1,4 @@
-/*	$KAME: inet_pton.c,v 1.5 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: inet_pton.c,v 1.6 2005/01/13 04:12:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1996,1999 by Internet Software Consortium.
@@ -18,7 +18,7 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] = "$Id: inet_pton.c,v 1.5 2001/08/20 02:32:40 itojun Exp $";
+static char rcsid[] = "$Id: inet_pton.c,v 1.6 2005/01/13 04:12:04 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #ifdef HAVE_CONFIG_H
@@ -33,18 +33,6 @@ static char rcsid[] = "$Id: inet_pton.c,v 1.5 2001/08/20 02:32:40 itojun Exp $";
 #include <arpa/nameser.h>
 #include <string.h>
 #include <errno.h>
-
-#ifndef HAVE_PORTABLE_PROTOTYPE
-#include "cdecl_ext.h"
-#endif 
-
-#ifndef HAVE_U_INT16_T
-#include "bittypes.h"
-#endif 
-
-#if !(defined(HAVE_INADDRSZ) && defined(HAVE_IN6ADDRSZ))
-#include "addrsize.h"
-#endif 
 
 #ifndef NS_INADDRSZ
 #define NS_INADDRSZ	INADDRSZ

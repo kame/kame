@@ -1,4 +1,4 @@
-/*	$KAME: ifname.c,v 1.4 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: ifname.c,v 1.5 2005/01/13 04:12:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,10 +47,6 @@
 #define ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
-
-#ifndef HAVE_IF_NAMEINDEX
-#include "ifname.h"
-#endif
 
 unsigned int
 if_nametoindex(ifname)

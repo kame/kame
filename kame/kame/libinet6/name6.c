@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.47 2004/07/21 03:14:38 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.48 2005/01/13 04:12:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -111,30 +111,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#ifndef HAVE_PORTABLE_PROTOTYPE
-#include "cdecl_ext.h"
-#endif
-
-#ifndef HAVE_U_INT32_T
-#include "bittypes.h"
-#endif
-
-#ifndef HAVE_RES_USE_INET6
-#include "resolv6.h"
-#endif
-
-#ifndef HAVE_SOCKADDR_STORAGE
-#include "sockstorage.h"
-#endif
-
-#ifdef NEED_ADDRINFO_H
-#include "addrinfo.h"
-#endif
-
-#ifndef HAVE_RES_STATE_EXT
-#include "resolv_ext.h"
-#endif
 
 #ifndef _PATH_HOSTS
 #define	_PATH_HOSTS	"/etc/hosts"
