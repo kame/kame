@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2097 2002/03/02 16:56:14 keiichi Exp $
+$KAME: CHANGELOG,v 1.2098 2002/03/03 12:32:28 jinmei Exp $
 
 <200203>
+2002-03-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/wru: added the -z option to specify the zone of the
+	destination, particularly for the default destination, ff02::1.
+
+2002-03-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/tcp_subr.c (tcp6_ctlinput): loosened the
+	assertion check for the "inner" source.  The check was so strong
+	that it caused kernel panic when the function called from
+	ip6_output() via pfctlinput2().
+	bsdi4 KAME snap users are recommended to apply this fix.
+
 Sun Mar  3 01:51:54 JST 2002 Keiichi SHIMA <keiichi@iij.ad.jp>
 	* kame/sys/netinet6/{in6.c|mip6.c|mip_var.h|nd6_rtr.c}
 	check the CoA when p2p address (like gif) is set.  this enables
