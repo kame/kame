@@ -38,7 +38,7 @@ LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-#MAN5=	pim6sd.conf.0: notyet
+MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
 
 afterinstall:

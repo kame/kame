@@ -40,7 +40,7 @@ DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a \
 	-L${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-#MAN5=	pim6sd.conf.0: notyet
+MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
 
 afterinstall:
