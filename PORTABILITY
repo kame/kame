@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.38 2000/04/13 06:45:50 jinmei Exp $
+	$Id: PORTABILITY,v 1.39 2000/04/13 06:59:11 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -275,8 +275,8 @@ across those possibilities.
   # route add -inet6 default -interface gif0 (on FreeBSD)
   is equivalent to
   # route add -inet6 default `ifconfig gif0 | grep fe80 | awk '{print $2}'`
-  If you care about cases that gif0 has more than one interface, you
-  might have to type
+  If you care about cases that gif0 has more than one link-local address,
+  you might have to type
   # route add -inet6 default `ifconfig gif0 | grep fe80 | head -1 | awk '{print $2}'`
   Note that this kind of approach assumes that gif0 has at least one
   IPv6 link-local address. If you are not sure about this, you might
