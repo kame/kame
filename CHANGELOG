@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.567 2000/02/17 05:38:45 itojun Exp $
+$Id: CHANGELOG,v 1.568 2000/02/17 05:39:25 itojun Exp $
 
 <200002>
 Thu Feb 17 14:36:07 JST 2000  itojun@iijlab.net
-	* sys/netinet6/nd6.c: better support for proxy NDP (per NA entry,
+	* sys/netinet6/nd6.c: better support for proxy NDP (per ND entry,
 	  just like arp -s).  routing entry marked with RTF_ANNONUCE
 	  (= RTF_PROTO2) will get announced by proxy ND.  on ND table, proxy
 	  NDP entry will stay as permanent/reachable entry.
