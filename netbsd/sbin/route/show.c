@@ -98,7 +98,7 @@ static void pr_rthdr __P((void));
 static void p_rtentry __P((struct rt_msghdr *));
 static void pr_family __P((int));
 static void p_sockaddr __P((struct sockaddr *, int, int ));
-static void p_flags __P((int, char *));
+static void p_flags __P((int));
 
 /*
  * Print routing tables.
@@ -124,7 +124,7 @@ show(argc, argv)
 		exit(1);
 	}
 	if ((buf = malloc(needed)) == 0)
-		err(1, "%s", "");
+		err(1, NULL);
 	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
 		err(1, "sysctl of routing table");
 	lim  = buf + needed;
@@ -193,13 +193,13 @@ p_rtentry(rtm)
 		pr_rthdr();
 	}
 	if (rtm->rtm_addrs == RTA_DST)
-		p_sockaddr(sa, 0, 36);
+		p_sockaddr(sa, 0, WID_DST + 1 + WID_GW + 1);
 	else {
-		p_sockaddr(sa, rtm->rtm_flags, 16);
+		p_sockaddr(sa, rtm->rtm_flags, WID_DST);
 		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
-		p_sockaddr(sa, 0, 18);
+		p_sockaddr(sa, 0, WID_GW);
 	}
-	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
+	p_flags(rtm->rtm_flags & interesting);
 	putchar('\n');
 }
 
@@ -348,9 +348,8 @@ p_sockaddr(sa, flags, width)
 }
 
 static void
-p_flags(f, format)
+p_flags(f)
 	int f;
-	char *format;
 {
 	char name[33], *flags;
 	const struct bits *p = bits;
@@ -359,6 +358,6 @@ p_flags(f, format)
 		if (p->b_mask & f)
 			*flags++ = p->b_val;
 	*flags = '\0';
-	printf(format, name);
+	printf("%-6.6s ", name);
 }
 
