@@ -47,6 +47,7 @@
 
 #define nextopt nexthdr
 #define TBUFSIZ 2048
+#define MAXPKTSIZ 4096
 
 #include "testcap.h"
 
@@ -910,59 +911,116 @@ make_ndopt_unknown(char *name)
 void
 make_tcp(char *name)
 {
-    char tcpbuf[BUFSIZ];
-    struct tcphdr *th = (struct tcphdr *)pbp;
-    char val8;
-    short val16;
-    int val32;
+	char tcpbuf[MAXPKTSIZ], area[MAXPKTSIZ];
+	char *bp = area, *upper_data;
+	struct tcphdr *th = (struct tcphdr *)pbp;
+	char val8;
+	short val16;
+	int val32;
 
-    if (tgetent(tcpbuf, name) <= 0) {
-	fprintf(stderr, "v6test: unknown header %s\n", name);
-	exit(1);
-    }
+	if (tgetent(tcpbuf, name) <= 0) {
+		fprintf(stderr, "v6test: unknown header %s\n", name);
+		exit(1);
+	}
 
-    MUSTHAVE(th->th_sport, "tcp_sport", tcpbuf);
-    HTONS(th->th_sport);
-    MUSTHAVE(th->th_dport, "tcp_dport", tcpbuf);
-    HTONS(th->th_dport);
-    MAYHAVE(val32, "tcp_seq", 0, tcpbuf);
-    th->th_seq = htonl(val32);
-    MAYHAVE(val32, "tcp_ack", 0, tcpbuf);
-    th->th_ack = htonl(val32);
-    MAYHAVE(val8, "tcp_off", sizeof(struct tcphdr) >> 2, tcpbuf);
-    th->th_off = val8;
-    MAYHAVE(val8, "tcp_flags", 0, tcpbuf);
-    th->th_flags = val8;
-    MAYHAVE(val16, "tcp_win", 8192, tcpbuf);
-    th->th_win = htons(val16);
-    MAYHAVE(val16, "tcp_sum", 0, tcpbuf);
-    th->th_win = htons(val16);
-    MAYHAVE(val16, "tcp_urp", 0, tcpbuf);
-    th->th_urp = htons(val16);
+	MUSTHAVE(th->th_sport, "tcp_sport", tcpbuf);
+	HTONS(th->th_sport);
+	MUSTHAVE(th->th_dport, "tcp_dport", tcpbuf);
+	HTONS(th->th_dport);
+	MAYHAVE(val32, "tcp_seq", 0, tcpbuf);
+	th->th_seq = htonl(val32);
+	MAYHAVE(val32, "tcp_ack", 0, tcpbuf);
+	th->th_ack = htonl(val32);
+	MAYHAVE(val8, "tcp_off", sizeof(struct tcphdr) >> 2, tcpbuf);
+	th->th_off = val8;
+	MAYHAVE(val8, "tcp_flags", 0, tcpbuf);
+	th->th_flags = val8;
+	MAYHAVE(val16, "tcp_win", 8192, tcpbuf);
+	th->th_win = htons(val16);
+	MAYHAVE(val16, "tcp_sum", 0, tcpbuf);
+	th->th_win = htons(val16);
+	MAYHAVE(val16, "tcp_urp", 0, tcpbuf);
+	th->th_urp = htons(val16);
 
-    pbp += th->th_off << 2;
+	pbp += th->th_off << 2;
+
+	if ((upper_data = tgetstr("tcp_data", &bp, tcpbuf)) != NULL) {
+		int i;
+		unsigned int hexval1, hexval2;
+		size_t datalen;
+
+		datalen = strlen(upper_data);
+		if ((datalen % 2) != 0) {
+			fprintf(stderr,
+				"v6test: make_tcp: data length (%u) "
+				"is invalid\n",
+				datalen);
+			exit(1);
+		}
+		for (i = 0; i < datalen; i += 2) {
+			if (sscanf(&upper_data[i], "%1x%1x",
+				   &hexval1, &hexval2) != 2) {
+				fprintf(stderr,
+					"v6test: make_tcp: "
+					"packet data format error: %s\n",
+					upper_data);
+				exit(1);
+			}
+			*pbp = ((hexval1 << 4) + hexval2) & 0xff;
+			pbp++;
+		}
+	}
 }
 
 void
 make_udp(char *name)
 {
-    char udpbuf[BUFSIZ];
-    struct udphdr *uh = (struct udphdr *)pbp;
-    short val16;
+	char udpbuf[MAXPKTSIZ], area[MAXPKTSIZ];
+	char *bp = area, *upper_data;
+	struct udphdr *uh = (struct udphdr *)pbp;
+	short val16;
 
-    if (tgetent(udpbuf, name) <= 0) {
-	fprintf(stderr, "v6test: unknown header %s\n", name);
-	exit(1);
-    }
+	if (tgetent(udpbuf, name) <= 0) {
+		fprintf(stderr, "v6test: unknown header %s\n", name);
+		exit(1);
+	}
 
-    MUSTHAVE(uh->uh_sport, "udp_sport", udpbuf);
-    HTONS(uh->uh_sport);
-    MUSTHAVE(uh->uh_dport, "udp_dport", udpbuf);
-    HTONS(uh->uh_dport);
-    MAYHAVE(val16, "udp_len", 8, udpbuf);
-    uh->uh_ulen = htons(val16);
+	MUSTHAVE(uh->uh_sport, "udp_sport", udpbuf);
+	HTONS(uh->uh_sport);
+	MUSTHAVE(uh->uh_dport, "udp_dport", udpbuf);
+	HTONS(uh->uh_dport);
+	MAYHAVE(val16, "udp_len", 8, udpbuf);
+	uh->uh_ulen = htons(val16);
 
-    pbp += sizeof(*uh);
+	pbp += sizeof(*uh);
+
+	if ((upper_data = tgetstr("udp_data", &bp, udpbuf)) != NULL) {
+		int i;
+		unsigned int hexval1, hexval2;
+		size_t udplen;
+
+		udplen = strlen(upper_data);
+		if ((udplen % 2) != 0) {
+			fprintf(stderr,
+				"v6test: make_udp: data length (%u) is "
+				"invalid\n",
+				udplen);
+			exit(1);
+		}
+		for (i = 0; i < udplen; i += 2) {
+			if (sscanf(&upper_data[i], "%1x%1x",
+				   &hexval1, &hexval2) != 2) {
+				fprintf(stderr,
+					"v6test: make_udp: "
+					"packet data format error: %s\n",
+					upper_data);
+				exit(1);
+			}
+			*pbp = ((hexval1 << 4) + hexval2) & 0xff;
+			pbp++;
+		}
+		uh->uh_ulen = htons((udplen/2)+sizeof(*uh));
+	}
 }
 
 char *
