@@ -1,4 +1,4 @@
-/*	$KAME: admin.c,v 1.17 2000/09/22 18:20:11 itojun Exp $	*/
+/*	$KAME: admin.c,v 1.18 2000/09/22 18:35:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.17 2000/09/22 18:20:11 itojun Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.18 2000/09/22 18:35:16 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -130,10 +130,8 @@ admin_handler()
 
 	/* don't fork() because of reloading config. */
 	if (com.ac_cmd == ADMIN_RELOAD_CONF) {
-#if 0
 		/* reload does not work at all! */
 		signal_handler(SIGHUP);
-#endif
 		goto end;
 	}
 
