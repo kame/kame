@@ -1,5 +1,5 @@
 /*	$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $	*/
-/*	$KAME: bindtest.c,v 1.53 2002/01/09 06:50:18 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.54 2002/05/24 15:57:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000,2001 USAGI/WIDE Project.
@@ -131,7 +131,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.53 2002/01/09 06:50:18 jinmei Exp $"
+static char *versionstr = "$KAME: bindtest.c,v 1.54 2002/05/24 15:57:21 itojun Exp $"
 			  "\n"
 			  "$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $";
 static char *port = NULL;
@@ -713,7 +713,7 @@ sendtest(sa, sb, ai)
 			putchar('x');
 		goto done;
 	} else if (!summary)
-		printf("\tsend %d bytes to %s\n", sizeof(buf),
+		printf("\tsend %lu bytes to %s\n", (unsigned long)sizeof(buf),
 		       printres(ai));
 
 	FD_ZERO(&fdset0);
