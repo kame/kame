@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.713 2000/03/22 07:20:08 jinmei Exp $
+$Id: CHANGELOG,v 1.714 2000/03/22 07:21:28 jinmei Exp $
 
 <200003>
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/rtadvd/dump.c: supported to let rtadvd dump its
-	internal status into a file upon receipt of the SIGUSR1 signal.
+	* kame/kame/rtadvd/dump.c: supported the SIGUSR1 signal to let
+	rtadvd dump its internal status into a file upon receipt of the
+	signal.
 
 Wed Mar 22 16:12:02 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
