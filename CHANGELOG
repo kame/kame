@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2037 2002/01/07 12:42:35 kjc Exp $
+$KAME: CHANGELOG,v 1.2038 2002/01/10 12:01:10 jinmei Exp $
 
 <200201>
+2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): do not compare
+	the previous value of each option to decide if the option should
+	be passed to application.  This part has been removed from the
+	advanced API spec.
+
 2002/01/07 21:26:21 JST kjc@csl.sony.co.jp
 	add ECN (Explicit Congestion Notification) support (RFC3168).
 	the ECN implementation consists of 3 independent components:
