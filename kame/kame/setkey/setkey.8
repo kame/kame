@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.44 2001/02/21 09:31:12 sakane Exp $
+.\"	$KAME: setkey.8,v 1.45 2001/03/12 11:35:02 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -539,6 +539,12 @@ keyed-md5	128		ah: 96bit ICV (no document)
 keyed-sha1	160		ah: 96bit ICV (no document)
 		160		ah-old: 128bit ICV (no document)
 null		0 to 2048	for debugging
+hmac-sha2-256	256		ah: 96bit ICV (no document)
+		256		ah-old: 128bit ICV (no document)
+hmac-sha2-384	384		ah: 96bit ICV (no document)
+		384		ah-old: 128bit ICV (no document)
+hmac-sha2-512	512		ah: 96bit ICV (no document)
+		512		ah-old: 128bit ICV (no document)
 .Ed
 .Pp
 Followings are the list of encryption algorithms that can be used as
