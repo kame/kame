@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.48 2001/11/13 03:09:48 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.49 2001/11/19 05:34:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -456,13 +456,13 @@ udp6_output(in6p, m, addr6, control)
 #endif
 		ui->ui_pr = IPPROTO_UDP;
 		ui->ui_len = htons(plen);
-		bcopy(&faddr->s6_addr[12], &ui->ui_dst, sizeof(ui->ui_dst));
+		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
 		ui->ui_ulen = ui->ui_len;
 
 #ifdef  __NetBSD__
 		flags = (in6p->in6p_socket->so_options &
 			 (SO_DONTROUTE | SO_BROADCAST));
-		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
+		bcopy(&faddr->s6_addr[12], &ui->ui_dst, sizeof(ui->ui_dst));
 		udp6->uh_sum = in_cksum(m, hlen + plen);
 #elif (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 		flags = (in6p->inp_socket->so_options &
