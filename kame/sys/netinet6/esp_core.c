@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.33 2000/08/29 11:05:03 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.34 2000/08/29 11:22:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,6 +258,7 @@ esp_schedule(algo, sav)
 {
 	int error;
 
+	/* check for key length */
 	if (_KEYBITS(sav->key_enc) < algo->keymin ||
 	    _KEYBITS(sav->key_enc) > algo->keymax) {
 		ipseclog((LOG_ERR,
@@ -267,14 +268,25 @@ esp_schedule(algo, sav)
 		return EINVAL;
 	}
 
+	/* already allocated */
+	if (sav->sched && sav->schedlen != 0)
+		return 0;
+	/* no schedule necessary */
 	if (!algo->schedule || algo->schedlen == 0)
 		return 0;
-	if (!sav->sched || sav->schedlen != algo->schedlen)
-		panic("invalid sav->schedlen in esp_schedule");
+
+	sav->sched = malloc(algo->schedlen, M_SECA, M_DONTWAIT);
+	if (!sav->sched)
+		return ENOBUFS;
+	sav->schedlen = algo->schedlen;
+
 	error = (*algo->schedule)(algo, sav);
 	if (error) {
 		ipseclog((LOG_ERR, "esp_schedule %s: error %d\n",
 		    algo->name, error));
+		free(sav->sched, M_SECA);
+		sav->sched = NULL;
+		sav->schedlen = 0;
 	}
 	return error;
 }
