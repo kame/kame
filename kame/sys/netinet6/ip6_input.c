@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.197 2001/06/22 14:22:02 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.198 2001/06/22 14:25:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2591,7 +2591,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_RR_PRUNE:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_rr_prune);
 	case IPV6CTL_V6ONLY:
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || (defined(__NetBSD__) && defined(INET6_BINDV6ONLY))
 		return sysctl_rdint(oldp, oldlenp, newp, ip6_v6only);
 #else
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_v6only);
