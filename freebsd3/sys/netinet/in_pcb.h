@@ -272,10 +272,6 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #endif
 
  /* for KAME src sync over BSD*'s */
-#define	IN6P_RECVOPTS		INP_RECVOPTS
-#define	IN6P_RECVRETOPTS	INP_RECVRETOPTS
-#define	IN6P_RECVDSTADDR	INP_RECVDSTADDR
-#define	IN6P_HDRINCL		INP_HDRINCL
 #define	IN6P_HIGHPORT		INP_HIGHPORT
 #define	IN6P_LOWPORT		INP_LOWPORT
 #define	IN6P_ANONPORT		INP_ANONPORT
