@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.31 2002/06/14 15:32:55 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.32 2002/07/04 15:03:19 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 /*
- * draft-ietf-dhc-dhcpv6-24
+ * draft-ietf-dhc-dhcpv6-26
  */
 
 #ifndef __DHCP6_H_DEFINED
@@ -68,9 +68,9 @@
 #define REQ_TIMEOUT	250
 #define REQ_MAX_RT	30000
 #define REQ_MAX_RC	10	/* Max Request retry attempts */
-#define REN_TIMEOUT	10000	/* 10sec */
+#define REN_TIMEOUT	10000	/* 10secs */
 #define REN_MAX_RT	600000	/* 600secs */
-#define REB_TIMEOUT	10000	/* 10sec */
+#define REB_TIMEOUT	10000	/* 10secs */
 #define REB_MAX_RT	600000	/* 600secs */
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
@@ -167,14 +167,14 @@ struct dhcp6 {
 /*
  * The option type has not been assigned for the following options.
  * We temporarily adopt values used in the service specification document
- * (200206xx version) by NTT Communications.
- * Note that we'll change the following definitions if different type values
- * are officially assigned.
+ * (200206xx version) by NTT Communications as default values.
+ * Note that we'll fix the following definitions when official values are
+ * assigned.
  */
-#define DH6OPT_DNS 25
-#define DH6OPT_PREFIX_DELEGATION 30
-#define DH6OPT_PREFIX_INFORMATION 31
-#define DH6OPT_PREFIX_REQUEST 32
+#define DH6OPT_DNS CONF_DH6OPT_DNS
+#define DH6OPT_PREFIX_DELEGATION CONF_DH6OPT_PREFIX_DELEGATION
+#define DH6OPT_PREFIX_INFORMATION CONF_DH6OPT_PREFIX_INFORMATION
+#define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
 
 struct dhcp6opt {
 	u_int16_t dh6opt_type;

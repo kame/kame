@@ -140,6 +140,55 @@ case $pred_func_id in
 		;;
 esac
 
+dnl DHCP option type values not officially defined
+AC_MSG_CHECKING(for DHCP DNS option)
+AC_ARG_WITH(opt-dns,
+[  --with-opt-dns=VALUE Specify DHCP option value for DNS],
+    dhcpopt_dns="$withval", dhcpopt_dns=0)
+if test $dhcpopt_dns = 0 ; then
+	dhcpopt_dns=25
+	AC_MSG_RESULT(unspecified and using $dhcpopt_dns)
+else
+	AC_MSG_RESULT(using $dhcpopt_dns)
+fi
+AC_SUBST(dhcpopt_dns)
+
+AC_MSG_CHECKING(for DHCP prefix delegation option)
+AC_ARG_WITH(opt-pdel,
+[  --with-opt-pdel=VALUE Specify DHCP option value for prefix delegation],
+    dhcpopt_pdel="$withval", dhcpopt_pdel=0)
+if test $dhcpopt_pdel = 0 ; then
+	dhcpopt_pdel=30
+	AC_MSG_RESULT(unspecified and using $dhcpopt_pdel)
+else
+	AC_MSG_RESULT(using $dhcpopt_pdel)
+fi
+AC_SUBST(dhcpopt_pdel)
+
+AC_MSG_CHECKING(for DHCP prefix information option)
+AC_ARG_WITH(opt-pinfo,
+[  --with-opt-pinfo=VALUE Specify DHCP option value for prefix information],
+    dhcpopt_pinfo="$withval", dhcpopt_pinfo=0)
+if test $dhcpopt_pinfo = 0 ; then
+	dhcpopt_pinfo=31
+	AC_MSG_RESULT(unspecified and using $dhcpopt_pinfo)
+else
+	AC_MSG_RESULT(using $dhcpopt_pinfo)
+fi
+AC_SUBST(dhcpopt_pinfo)
+
+AC_MSG_CHECKING(for DHCP prefix request option)
+AC_ARG_WITH(opt-preq,
+[  --with-opt-preq=VALUE Specify DHCP option value for prefix request],
+    dhcpopt_preq="$withval", dhcpopt_preq=0)
+if test $dhcpopt_preq = 0 ; then
+	dhcpopt_preq=32
+	AC_MSG_RESULT(unspecified and using $dhcpopt_preq)
+else
+	AC_MSG_RESULT(using $dhcpopt_preq)
+fi
+AC_SUBST(dhcpopt_preq)
+
 AC_CHECK_HEADERS(stdarg.h)
 
 AC_OUTPUT(Makefile)

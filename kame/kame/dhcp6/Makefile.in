@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.15 2002/05/25 08:36:17 jinmei Exp $
+# $Id: Makefile.in,v 1.16 2002/07/04 15:03:19 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -19,9 +19,12 @@ bindir=	@bindir@
 sbindir=@sbindir@
 mandir=	@mandir@
 
-GENSRCS = cftoken.c cfparse.c
-CLEANFILES = $(GENSRC) lex.yy.c y.tab.c y.tab.h
+CFLAGS+= -DCONF_DH6OPT_DNS=@dhcpopt_dns@ \
+	-DCONF_DH6OPT_PREFIX_DELEGATION=@dhcpopt_pdel@ \
+	-DCONF_DH6OPT_PREFIX_INFORMATION=@dhcpopt_pinfo@ \
+	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@
 
+GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o timer.o \
 	$(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o config.o timer.o $(GENSRCS:%.c=%.o)
@@ -62,7 +65,7 @@ install::
 includes::
 
 clean::
-	/bin/rm -f *.o $(TARGET) $(CLEANFILES)
+	/bin/rm -f *.o $(TARGET) $(CLEANFILES) $(GENSRCS)
 
 distclean:: clean
 	/bin/rm -f Makefile config.cache config.log config.status .depend
