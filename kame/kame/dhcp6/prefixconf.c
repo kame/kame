@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.4 2002/05/22 14:16:47 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.5 2002/05/24 02:01:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -217,7 +217,6 @@ prefix6_update(ev, prefix_list, serverid)
 
 	/* add new prefixes */
 	for (lv = TAILQ_FIRST(prefix_list); lv; lv = TAILQ_NEXT(lv, link)) {
-
 		if (find_siteprefix6(&lv->val_prefix6) != NULL)
 			continue;
 
