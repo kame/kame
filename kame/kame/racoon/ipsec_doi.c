@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.75 2000/05/31 22:21:04 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.76 2000/06/01 06:16:00 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -131,6 +131,8 @@ static int (*check_attributes[]) __P((struct isakmp_pl_t *)) = {
 static int setph1prop __P((struct isakmpsa *props, caddr_t buf));
 static int setph1trns __P((struct isakmpsa *props, caddr_t buf));
 static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
+static vchar_t *ipsecdoi_setph2proposal0 __P((const struct ph2handle *,
+	const struct saprop *, const struct saproto *));
 
 /*%%%*/
 /*
@@ -590,7 +592,7 @@ err:
  * OUT:
  *	positive: the pointer to new buffer of SA payload.
  *		  network byte order.
- *	NULL	: error occurd.
+ *	NULL	: error occured.
  */
 int
 ipsecdoi_checkph2proposal(sa, iph2)
@@ -2176,12 +2178,7 @@ setph1attr(sa, buf)
 	return attrlen;
 }
 
-/*
- * XXX Assumes that there will be no ipsecsa struct with the same proto_id 
- * on "bundle" chain.  (i.e. single proposal payload will accompany single
- * transform payload only)
- */
-vchar_t *
+static vchar_t *
 ipsecdoi_setph2proposal0(iph2, pp, pr)
 	const struct ph2handle *iph2;
 	const struct saprop *pp;
@@ -2332,10 +2329,7 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 /*
  * create phase2 proposal from policy configuration.
  * NOT INCLUDING isakmp general header of SA payload.
- *
- * XXX the routine disagrees with other code in terms of interpretation of
- * "bundle" pointer.  we'll need to have more appropriate structure for
- * ipsecsa.
+ * This function is called by initiator only.
  */
 vchar_t *
 ipsecdoi_setph2proposal(iph2)
