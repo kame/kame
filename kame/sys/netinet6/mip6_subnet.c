@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.7 2001/09/17 11:04:44 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.8 2001/10/05 07:57:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -110,8 +110,7 @@ mip6_subnet_delete(ms)
 		return (EINVAL);
 	}
 
-	while(!TAILQ_EMPTY(&ms->ms_mspfx_list)) {
-		mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+	while ((mspfx = TAILQ_FIRST(&ms->ms_mspfx_list)) != NULL) {
 		TAILQ_REMOVE(&ms->ms_mspfx_list, mspfx, mspfx_entry);
 		error = mip6_prefix_list_remove(&mip6_prefix_list,
 						mspfx->mspfx_mpfx);
@@ -119,8 +118,7 @@ mip6_subnet_delete(ms)
 			return (error);
 		}
 	}
-	while(!TAILQ_EMPTY(&ms->ms_msha_list)) {
-		msha = TAILQ_FIRST(&ms->ms_msha_list);
+	while ((msha = TAILQ_FIRST(&ms->ms_msha_list)) != NULL) {
 		TAILQ_REMOVE(&ms->ms_msha_list, msha, msha_entry);
 		error = mip6_ha_list_remove(&mip6_ha_list, msha->msha_mha);
 		if (error) {
