@@ -456,7 +456,7 @@ udp_append(last, ip, n, off)
 		if (last->inp_vflag & INP_IPV6) {
 			int savedflags;
 
-			if (udp_ip6.uip6_init_done = 0) {
+			if (udp_ip6.uip6_init_done == 0) {
 				ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
 				udp_ip6.uip6_init_done = 1;
 			}
@@ -470,7 +470,7 @@ udp_append(last, ip, n, off)
 	}
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 	if (last->inp_vflag & INP_IPV6) {
-		if (udp_in6.uin6_init_done = 0) {
+		if (udp_in6.uin6_init_done == 0) {
 			in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
 			udp_in6.uin6_init_done = 1;
 		}
