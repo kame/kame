@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.18 2000/11/24 03:15:29 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.19 2000/11/24 03:27:11 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -45,6 +45,7 @@
 .Fd #include <sys/types.h>
 .Fd #include <sys/socket.h>
 .Fd #include <netdb.h>
+.\" on FreeBSD, 2nd arg is typed as size_t.
 .Ft int
 .Fn getnameinfo "const struct sockaddr *sa" "socklen_t salen" \
 "char *host" "size_t hostlen" "char *serv" "size_t servlen" "int flags"
@@ -179,7 +180,7 @@ These
 flags are defined in
 .Aq Pa netdb.h .
 .\"
-.Sh EXTENSION
+.Ss Extension for scoped IPv6 address
 The implementation allows experimental numeric IPv6 address notation with
 scope identifier.
 IPv6 link-local address will appear as string like
@@ -304,3 +305,10 @@ and documented in
 The current implementation is not thread-safe.
 .Pp
 The text was shamelessly copied from RFC2553.
+.Pp
+.\" the paragraph has to be commented out on *BSD merge
+On FreeBSD systems, the second argument,
+.Ar salen ,
+is typed as an
+.Fa socklen_t
+variable, due to include file dependency issue.
