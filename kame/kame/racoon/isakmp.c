@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.80 2000/07/04 13:15:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.81 2000/07/04 17:23:17 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -595,6 +595,19 @@ ph1_main(iph1, msg)
 		/* add to the schedule to expire, and seve back pointer. */
 		iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
+		/* INITIAL-CONTACT processing */
+		if (!getcontacted(iph1->remote)) {
+			/* send INITIAL-CONTACT */
+			isakmp_info_send_n1(iph1,
+					ISAKMP_NTYPE_INITIAL_CONTACT, NULL);
+			/* insert a node into contacted list. */
+			if (inscontacted(iph1->remote) == -1) {
+				plog(logp, LOCATION, iph1->remote,
+					"ERROR: failed to add contacted list.\n");
+				/* ignore */
+			}
+		}
+
 		log_ph1established(iph1);
 		YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 	}
@@ -1083,6 +1096,7 @@ isakmp_init()
 	/* initialize a isakmp status table */
 	initph1tree();
 	initph2tree();
+	initctdtree();
 
 	srandom(time(0));
 

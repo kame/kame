@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.26 2000/07/04 00:58:42 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.27 2000/07/04 17:23:16 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -57,6 +57,7 @@
 
 static LIST_HEAD(_ph1tree_, ph1handle) ph1tree;
 static LIST_HEAD(_ph2tree_, ph2handle) ph2tree;
+static LIST_HEAD(_ctdtree_, contacted) ctdtree;
 
 /*
  * functions about management of the isakmp status table
@@ -630,4 +631,49 @@ unbindph12(iph2)
 		iph2->ph1 = NULL;
 		LIST_REMOVE(iph2, ph1bind);
 	}
+}
+
+/* %%% management contacted list */
+/*
+ * search contacted list.
+ */
+struct contacted *
+getcontacted(remote)
+	struct sockaddr *remote;
+{
+	struct contacted *p;
+
+	LIST_FOREACH(p, &ctdtree, chain) {
+		if (cmpsaddr(remote, p->remote) == 0)
+			return p;
+	}
+
+	return NULL;
+}
+
+/*
+ * create new isakmp Phase 2 status record to handle isakmp in Phase2
+ */
+int
+inscontacted(remote)
+	struct sockaddr *remote;
+{
+	struct contacted *new;
+
+	/* create new iph2 */
+	new = CALLOC(sizeof(*new), struct contacted *);
+	if (new == NULL)
+		return -1;
+
+	new->remote = dupsaddr(remote);
+
+	LIST_INSERT_HEAD(&ctdtree, new, chain);
+
+	return 0;
+}
+
+void
+initctdtree()
+{
+	LIST_INIT(&ctdtree);
 }

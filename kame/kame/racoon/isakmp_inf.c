@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.34 2000/06/28 05:59:33 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.35 2000/07/04 17:23:17 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -89,6 +89,7 @@ static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *));
 static int isakmp_info_recv_d __P((struct ph1handle *, vchar_t *));
 
 static void purge_spi __P((int, u_int32_t *, size_t));
+static void info_recv_initialcontact __P((struct sockaddr *));
 
 /* %%%
  * Information Exchange
@@ -130,10 +131,9 @@ isakmp_info_recv(iph1, msg0)
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_AGG:
 		case ISAKMP_ETYPE_BASE:
-			break;
 		case ISAKMP_ETYPE_IDENT:
-			if ((iph1->side == INITIATOR && iph1->status < PHASE1ST_MSG2SENT)
-			 || (iph1->side == RESPONDER && iph1->status < PHASE1ST_MSG3SENT)) {
+			if ((iph1->side == INITIATOR && iph1->status < PHASE1ST_MSG3SENT)
+			 || (iph1->side == RESPONDER && iph1->status < PHASE1ST_MSG2SENT)) {
 				break;
 			}
 			/*FALLTHRU*/
@@ -358,7 +358,9 @@ isakmp_info_send_n1(iph1, type, data)
 	int tlen;
 	int error = 0;
 	struct isakmp_pl_n *n;
-	int spisiz = 0;		/* see below */
+	int spisiz;
+
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	/*
 	 * note on SPI size: which description is correct?  I have chosen
@@ -368,9 +370,12 @@ isakmp_info_send_n1(iph1, type, data)
 	 * Initiator/Responder cookie and SPI has no meaning, SPI size = 0.
 	 * RFC2408 3.1, first paragraph on page 40: ISAKMP SA is identified
 	 * by cookie and SPI has no meaning, 0 <= SPI size <= 16.
+	 * RFC2407 4.6.3.3, INITIAL-CONTACT is required to set to 16.
 	 */
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+	if (type == ISAKMP_NTYPE_INITIAL_CONTACT)
+		spisiz = sizeof(isakmp_index);
+	else
+		spisiz = 0;
 
 	tlen = sizeof(*n) + spisiz;
 	if (data)
@@ -390,14 +395,15 @@ isakmp_info_send_n1(iph1, type, data)
 	n->spi_size = spisiz;
 	n->type = htons(type);
 	if (spisiz)
-		memset(n + 1, 0, spisiz);	/*XXX*/
+		memcpy(n + 1, &iph1->index, sizeof(isakmp_index));
 	if (data)
 		memcpy((caddr_t)(n + 1) + spisiz, data->v, data->l);
 
-	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, 0);
+	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, iph1->flags);
 	vfree(payload);
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
+
 	return error;
 }
 
@@ -512,10 +518,6 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	iph2->ph1 = iph1;
 	iph2->side = INITIATOR;
 	iph2->status = PHASE2ST_START;
-	if ((flags & ISAKMP_FLAG_A) == 0)
-		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_E);
-	else
-		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_A);
 	iph2->msgid = isakmp_newmsgid2(iph1);
 
 	/* get IV and HASH(1) if skeyid_a was generated. */
@@ -543,6 +545,10 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		/* initialized total buffer length */
 		tlen = 0;
 	}
+	if ((flags & ISAKMP_FLAG_A) == 0)
+		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_E);
+	else
+		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_A);
 
 	YIPSDEBUG(DEBUG_NOTIFY,
 		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
@@ -686,8 +692,10 @@ isakmp_info_recv_n(iph1, msg)
 	case ISAKMP_NTYPE_CONNECTED:
 	case ISAKMP_NTYPE_RESPONDER_LIFETIME:
 	case ISAKMP_NTYPE_REPLAY_STATUS:
-	case ISAKMP_NTYPE_INITIAL_CONTACT:
 		/* do something */
+		break;
+	case ISAKMP_NTYPE_INITIAL_CONTACT:
+		info_recv_initialcontact(iph1->remote);
 		break;
 	default:
 	    {
@@ -801,6 +809,74 @@ purge_spi(proto, spi, n)
 					(struct sockaddr *)(dst + 1),
 					sa->sadb_sa_spi);
 			}
+		}
+
+		msg = next;
+	}
+
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
+}
+
+/*
+ * delete all IKE/IPSEC-SA relatived to remote address.
+ */
+static void
+info_recv_initialcontact(remote)
+	struct sockaddr *remote;
+{
+	vchar_t *buf;
+	struct sadb_msg *msg, *next, *end;
+	struct sadb_sa *sa;
+	struct sockaddr *src, *dst;
+	caddr_t mhp[SADB_EXT_MAX + 1];
+
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+
+	/* XXX to be purge IKE-SA(s) */
+
+	/* purge IPsec-SA(s) */
+	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
+	if (buf == NULL) {
+		YIPSDEBUG(DEBUG_MISC, plog(logp, LOCATION, NULL,
+			"pfkey_dump_sadb returned nothing.\n"));
+		return;
+	}
+
+	msg = (struct sadb_msg *)buf->v;
+	end = (struct sadb_msg *)(buf->v + buf->l);
+
+	while (msg < end) {
+		if ((msg->sadb_msg_len << 3) < sizeof(*msg))
+			break;
+		next = (struct sadb_msg *)((caddr_t)msg + (msg->sadb_msg_len << 3));
+		if (msg->sadb_msg_type != SADB_DUMP) {
+			msg = next;
+			continue;
+		}
+
+		if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
+			plog(logp, LOCATION, NULL, "pfkey_check (%s)\n", ipsec_strerror());
+			msg = next;
+			continue;
+		}
+
+		if (mhp[SADB_EXT_SA] == NULL
+		 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+		 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+			msg = next;
+			continue;
+		}
+		sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
+		src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
+		dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+
+		if (!cmpsaddrwop(remote, src) || !cmpsaddrwop(remote, dst)) {
+			YIPSDEBUG(DEBUG_DMISC,
+				plog(logp, LOCATION, NULL, "purging spi=%u.\n",
+						ntohl(sa->sadb_sa_spi)));
+			pfkey_send_delete(lcconf->sock_pfkey,
+				msg->sadb_msg_satype,
+				IPSEC_MODE_ANY, src, dst, sa->sadb_sa_spi);
 		}
 
 		msg = next;

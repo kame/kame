@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.23 2000/06/14 09:48:29 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.24 2000/07/04 17:23:17 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -253,6 +253,14 @@ struct ph2handle {
 	LIST_ENTRY(ph2handle) ph1bind;	/* chain to ph1handle */
 };
 
+/*
+ * for handling initial contact.
+ */
+struct contacted {
+	struct sockaddr *remote;	/* remote address to negosiate ph1 */
+	LIST_ENTRY(contacted) chain;
+};
+
 /* for parsing ISAKMP header. */
 struct isakmp_parse_t {
 	u_char type;		/* payload type of mine */
@@ -312,3 +320,7 @@ extern void initph2tree __P((void));
 
 extern void bindph12 __P((struct ph1handle *, struct ph2handle *));
 extern void unbindph12 __P((struct ph2handle *));
+
+extern struct contacted *getcontacted __P((struct sockaddr *));
+extern int inscontacted __P((struct sockaddr *));
+extern void initctdtree __P((void));
