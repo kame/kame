@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.130 2001/07/23 18:58:55 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.131 2001/07/24 06:01:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -898,38 +898,37 @@ main(argc, argv)
 		 */
 		int dummy, len = sizeof(src);
 
-		if ((dummy = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-			err(1, "UDP socket");
+		if ((dummy = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
+			err(1, "raw socket");
 
 		src.sin6_family = AF_INET6;
 		src.sin6_addr = dst.sin6_addr;
-		src.sin6_port = ntohs(DUMMY_PORT);
 		src.sin6_scope_id = dst.sin6_scope_id;
 
 #ifdef USE_RFC2292BIS
 		if (pktinfo &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTINFO,
 		    (void *)pktinfo, sizeof(*pktinfo)))
-			err(1, "UDP setsockopt(IPV6_PKTINFO)");
+			err(1, "dummy setsockopt(IPV6_PKTINFO)");
 
 		if (hoplimit != -1 &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_HOPLIMIT,
 		    (void *)&hoplimit, sizeof(hoplimit)))
-			err(1, "UDP setsockopt(IPV6_HOPLIMIT)");
+			err(1, "dummy setsockopt(IPV6_HOPLIMIT)");
 
 		if (rthdr &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_RTHDR,
 		    (void *)rthdr, (rthdr->ip6r_len + 1) << 3))
-			err(1, "UDP setsockopt(IPV6_RTHDR)");
+			err(1, "dummy setsockopt(IPV6_RTHDR)");
 #else  /* old advanced API */
 		if (smsghdr.msg_control &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTOPTIONS,
 		    (void *)smsghdr.msg_control, smsghdr.msg_controllen))
-			err(1, "UDP setsockopt(IPV6_PKTOPTIONS)");
+			err(1, "dummy setsockopt(IPV6_PKTOPTIONS)");
 #endif
 
 		if (connect(dummy, (struct sockaddr *)&src, len) < 0)
-			err(1, "UDP connect");
+			err(1, "dummy connect");
 
 		if (getsockname(dummy, (struct sockaddr *)&src, &len) < 0)
 			err(1, "getsockname");
