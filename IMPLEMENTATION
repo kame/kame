@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.162 2000/09/22 05:01:17 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.163 2000/09/25 15:31:31 itojun Exp $
 
 1. IPv6
 
@@ -1687,6 +1687,11 @@ list just for reference purposes.
 Here are (some of) platforms we have tested IPComp/IKE interoperability
 in the past, in no particular order.
 	IRE, SSH (both IPv4/IPv6), NetLock
+
+VPNC (vpnc.org) provides IPsec conformance tests, using KAME and OpenBSD
+IPsec/IKE implementations.  Their test results are available at
+http://www.vpnc.org/conformance.html, and it may give you more idea
+about which implementation interoperates with KAME IPsec/IKE implementation.
 
 5. ALTQ
 
