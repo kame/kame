@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.195 1999/10/19 04:50:49 sakane Exp $
+$Id: CHANGELOG,v 1.196 1999/10/20 01:58:23 jinmei Exp $
 
 <199910>
+1999-10-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_lookup): use rt->rt_ifa->ifa_ifp
+	instead of rt->rt_ifp for validation of the interface. This change
+	would solve a problem that `ndp -an' barks at a neighbor cache
+	entry for the node's own address.
+
 Tue Oct 19 13:43:27 JST 1999  sakane@ydc.co.jp
 	* kame/sys/netinet,netinet6,netkey:
 	- Save uid who created socket, and decision socket based policy
