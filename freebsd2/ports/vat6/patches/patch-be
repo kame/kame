@@ -1,0 +1,11 @@
+--- configure.in-	Thu Apr 15 22:27:12 1999
++++ configure.in	Thu Apr 15 22:26:57 1999
+@@ -22,7 +22,7 @@
+ 		echo "'$d' is not a directory"
+ 		exit 1
+ 	fi
+-	V_LIB_GSM=$d/lib/libgsm.a
++	V_LIB_GSM=$prefix/lib/libgsm.a
+ 	if test ! -r $V_LIB_GSM ; then
+ 		echo "can't find libgsm.a in $d/lib"
+ 		exit 1

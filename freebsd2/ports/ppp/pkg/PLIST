@@ -1,0 +1,16 @@
+include/alias.h
+lib/libalias.a
+lib/libalias_p.a
+lib/libalias.so.3.0
+man/man3/libalias.3.gz
+sbin/ppp
+man/man8/ppp.8.gz
+man/man8/ppp-j.8.gz
+sbin/pppctl
+man/man8/pppctl.8.gz
+share/examples/ppp/chap-auth
+share/examples/ppp/login-auth
+share/examples/ppp/ppp.conf.sample
+share/examples/ppp/ppp.linkup.sample
+share/examples/ppp/ppp.linkdown.sample
+share/examples/ppp/ppp.secret.sample

@@ -1,0 +1,8 @@
+	--- Mediator ---
+		DNS a littel-intelligent Forwarder Package
+	(aka "dcsk" by Jun-ichiro itojun Itoh<itojun@itojun.org>)
+
+Mediator is a DNS relay resolver daemon for mobile nodes.
+
+Unfortunately redistribution of the package itself is restricted at this
+moment.

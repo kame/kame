@@ -1,0 +1,43 @@
+--- man/reftex.texi.orig	Wed Apr  7 08:21:21 1999
++++ man/reftex.texi	Thu Aug  5 17:43:51 1999
+@@ -2,10 +2,10 @@
+ @c %**start of header
+ @setfilename ../info/reftex
+ @settitle RefTeX User Manual
+-@dircategory Editors
++@dircategory The Emacs editor and associated tools
+ @direntry
+-* reftex: (reftex).	Support for LaTeX labels, references, and citations
+-                          with Emacs.
++* reftex: (reftex).		Support for LaTeX labels, references,
++				 and citations with Emacs.
+ @end direntry
+ @synindex ky cp
+ @syncodeindex vr cp
+@@ -1917,7 +1917,7 @@
+ 
+ AUCTeX is without doubt the best major mode for editing TeX and LaTeX
+ files with Emacs.  AUCTeX is part of the XEmacs distribution.  It is
+-also available from the @uref{http://www.sunsite.auc.dk/auctex/,AUCTeX
++also available from the @file{http://www.sunsite.auc.dk/auctex/,AUCTeX
+ distribution site}.
+ 
+ @menu
+@@ -2283,7 +2283,7 @@
+ 
+ If you find a bug in @b{Ref@TeX{}} or its documentation, or if you want
+ to contribute code or ideas, please
+-@uref{mailto:@value{MAINTAINER-EMAIL},contact the maintainer}.  Remember
++@file{mailto:@value{MAINTAINER-EMAIL},contact the maintainer}.  Remember
+ to provide all necessary information such as version numbers of Emacs
+ and @b{Ref@TeX{}}, and the relevant part of your configuration in
+ @file{.emacs}.  When reporting a bug which throws an exception, please
+@@ -2297,7 +2297,7 @@
+ 
+ Users of earlier Emacs distributions (including Emacs 19) can get a
+ @b{Ref@TeX{}} distribution from the
+-@uref{http://www.strw.leidenuniv.nl/~dominik/Tools/,maintainers
++@file{http://www.strw.leidenuniv.nl/~dominik/Tools/,maintainers
+ webpage}.@refill
+ 
+ Thanks to the people on the Net who have used @b{Ref@TeX{}} and helped

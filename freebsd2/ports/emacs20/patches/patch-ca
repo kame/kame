@@ -1,0 +1,22 @@
+--- src/Makefile.in.orig	Sun Aug  2 09:29:21 1998
++++ src/Makefile.in	Wed Nov 11 21:26:37 1998
+@@ -126,6 +126,10 @@
+ #define LIBS_MACHINE
+ #endif
+ 
++#ifndef LIBS_XPG
++#define LIBS_XPG
++#endif
++
+ #ifndef LIB_MATH
+ # ifdef LISP_FLOAT_TYPE
+ #  define LIB_MATH -lm
+@@ -787,7 +791,7 @@
+    duplicated symbols.  If the standard libraries were compiled
+    with GCC, we might need gnulib again after them.  */
+ LIBES = $(LOADLIBES) $(LDLIBS) $(LIBX) LIBS_SYSTEM LIBS_MACHINE LIBS_TERMCAP \
+-   LIBS_DEBUG $(GNULIB_VAR) LIB_MATH LIB_STANDARD $(GNULIB_VAR)
++   LIBS_XPG LIBS_DEBUG $(GNULIB_VAR) LIB_MATH LIB_STANDARD $(GNULIB_VAR)
+ 
+ /* Enable recompilation of certain other files depending on system type.  */
+ 

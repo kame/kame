@@ -1,0 +1,5 @@
+represent PTRs of IPv6 addresses for wrinting a reverse DNS domain
+
+e.g.
+  % rev_v6_address 1::1
+  1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.1.

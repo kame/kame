@@ -1,0 +1,68 @@
+#
+#	$Id: Config,v 1.1.1.1 1999/08/09 01:37:01 itojun Exp $
+#	Configuration for FreeBSD 2.2.8 + KAME
+#
+
+bindir	@PREFIX@/bin
+sbindir	@PREFIX@/sbin
+mandir	@PREFIX@/man
+mantype	bsd44
+
+signal_h	/usr/include/sys/signal.h
+
+cc	cc
+
+cwflags -W -Wall -Wno-unused -Wno-comment -Wno-implicit -Wnested-externs -Wshadow -Wpointer-arith -Wcast-qual -Wcast-align -Wwrite-strings -Waggregate-return -Wmissing-prototypes -Winline
+cflags  -pipe -g -O
+
+#ldflags -lkvm -L/usr/contrib/isode/lib -lisnmp -lisode
+ldflags -lkvm -L/usr/local/v6/lib -linet6 -lc
+
+lex	lex
+lflags	-p -Cfe
+yacc	yacc
+yflags	-d -v
+
+mkdep	mkdep -flag -MM
+
+options GDCCORENAME=""core.%s""
+options	INCLUDE_UNISTD INCLUDE_PATHS GID_T=gid_t
+options	POSIX_SIGNALS HAVE_WAITPID
+options	VARIABLE_MASKS SOCKET_LENGTHS SOCKADDR_DL INCLUDE_IF_DL
+options	KRT_RTREAD_KINFO KRT_IFREAD_KINFO KRT_RT_SOCK USE_SYSCTL
+options KRT_LLADDR_NONE KRT_SYMBOLS_SYSCTL KVM_TYPE_BSD44 KSYM_VERSION=VRS_SYM
+options KRT_SOCKET_TYPE="PF_ROUTE, SOCK_RAW, AF_UNSPEC"
+options GDC_RESOURCE
+#options	RT_N_MULTIPATH=4
+#options YYDEBUG TEST_ASMATCH TIME_ASMATCH
+# > (Max Port 194 + Bgp_Peer + ospf + kernal + aggregate + etc) / 32 
+# (256 bits) = 8
+options RTBIT_SIZE=4
+options INET6
+options BGP4MP_BADNET_IGNORE
+options BGP_ROUTE_SELECT
+options NORMALLIZE_RIPNG_ROUTE
+options RT_FLASH_DEBUG
+#options USE_ZLIB
+options HAVE_RCVDSTADDR
+options IPV6_NETINET6
+# for debug options
+options BGP_FLASH_DEBUG
+
+path_dump	/var/tmp/%s_dump
+path_dumpdir	/var/tmp
+path_pid	/var/run/%s.pid
+path_version	/var/run/%s.version
+path_unix	/kernel
+
+protocols	bgp bgp4mp icmp rip ripng icmpv6
+#protocols	bgp bgp4mp icmp rip ripng icmpv6 pimv6
+#protocols	bgp icmp rip ospf rdisc bgp4mp
+
+gdc_group	wheel
+
+#isode_snmpi	/usr/contrib/isode/bin/snmpi
+
+#isode_mosy	/usr/contrib/isode/bin/mosy
+
+#isode_snmp_include	/usr/contrib/isode/include/snmp

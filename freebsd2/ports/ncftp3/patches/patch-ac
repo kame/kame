@@ -1,0 +1,14 @@
+--- libncftp/open.c.orig	Mon Nov 17 16:30:07 1997
++++ libncftp/open.c	Sat Dec 13 17:15:42 1997
+@@ -806,6 +806,11 @@
+ 	SOCKSinit("libncftp");
+ 	lip->socksInit = 1;
+ #endif
++
++#if defined(__FreeBSD__) || defined(__NetBSD__)
++	setlocale(LC_ALL, "");
++#endif
++
+ 	return (kNoErr);
+ }	/* FTPInitLibrary */
+ 

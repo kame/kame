@@ -1,0 +1,45 @@
+*** src/config.in-dist	Wed Aug  4 21:36:34 1999
+--- src/config.in	Wed Aug  4 21:40:18 1999
+***************
+*** 142,147 ****
+--- 142,148 ----
+  #undef HAVE_LIBDNET
+  #undef HAVE_LIBPTHREADS
+  #undef HAVE_LIBRESOLV
++ #undef HAVE_LIBINET6
+  #undef HAVE_LIBXMU
+  #undef HAVE_LIBNCURSES
+  #undef HAVE_LIBINTL
+*** src/Makefile.in-dist	Wed Aug  4 21:36:34 1999
+--- src/Makefile.in	Wed Aug  4 21:47:42 1999
+***************
+*** 130,135 ****
+--- 130,141 ----
+  #define LIBS_XPG
+  #endif
+  
++ #ifdef HAVE_LIBINET6
++ #define LIBS_INET6 -linet6
++ #else
++ #define LIBS_INET6
++ #endif
++ 
+  #ifndef LIB_MATH
+  # ifdef LISP_FLOAT_TYPE
+  #  define LIB_MATH -lm
+***************
+*** 791,797 ****
+     duplicated symbols.  If the standard libraries were compiled
+     with GCC, we might need gnulib again after them.  */
+  LIBES = $(LOADLIBES) $(LDLIBS) $(LIBX) LIBS_SYSTEM LIBS_MACHINE LIBS_TERMCAP \
+!    LIBS_XPG LIBS_DEBUG $(GNULIB_VAR) LIB_MATH LIB_STANDARD $(GNULIB_VAR)
+  
+  /* Enable recompilation of certain other files depending on system type.  */
+  
+--- 797,803 ----
+     duplicated symbols.  If the standard libraries were compiled
+     with GCC, we might need gnulib again after them.  */
+  LIBES = $(LOADLIBES) $(LDLIBS) $(LIBX) LIBS_SYSTEM LIBS_MACHINE LIBS_TERMCAP \
+!    LIBS_XPG LIBS_INET6 LIBS_DEBUG $(GNULIB_VAR) LIB_MATH LIB_STANDARD $(GNULIB_VAR)
+  
+  /* Enable recompilation of certain other files depending on system type.  */

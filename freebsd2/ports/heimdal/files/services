@@ -1,0 +1,11 @@
+kerberos-sec	 88/tcp			# Kerberos (v5)
+kerberos-sec	 88/udp	# krb5		# Kerberos (v5)
+kerberos	 88/tcp	# krb5		# Kerberos (v5)
+kerberos	 88/udp	# krb5		# Kerberos (v5)
+kerberos-adm	749/tcp			# Kerberos administration (v5)
+kerberos-adm	749/udp			# Kerberos administration (v5)
+kerberos-iv	750/udp	kdc		# Kerberos (v4)
+kerberos-iv	750/tcp	kdc		# Kerberos (v4)
+kerberos_master 751/tcp			# Kerberos `kadmin' (v4)
+kerberos_master 751/udp			# Kerberos `kadmin' (v4)
+krb_prop	754/tcp	krb5_prop	# kerberos/v5 server propagation

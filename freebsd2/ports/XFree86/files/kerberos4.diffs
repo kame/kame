@@ -1,0 +1,221 @@
+diff -udr ../xc.ORIG/config/cf/Imake.tmpl ./config/cf/Imake.tmpl
+--- ../xc.ORIG/config/cf/Imake.tmpl	Wed May 21 15:49:24 1997
++++ ./config/cf/Imake.tmpl	Sat Aug 23 14:22:54 1997
+@@ -270,6 +270,9 @@
+ #ifndef HasKrb5
+ #define HasKrb5			NO      /* if you have Kerberos V5 */
+ #endif
++#ifndef HasKrb4
++#define HasKrb4			NO      /* if you have Kerberos V4 */
++#endif
+ #ifndef HasLatex
+ #define HasLatex		YES
+ #endif
+@@ -308,6 +311,19 @@
+ #undef Krb5Libraries
+ #define Krb5Libraries /**/
+ #endif
++#if HasKrb4
++#ifndef Krb4Includes
++#define Krb4Includes /**/
++#endif
++#ifndef Krb4Libraries
++#define Krb4Libraries -lkrb -ldes
++#endif
++#else
++#undef Krb4Includes
++#define Krb4Includes /**/
++#undef Krb4Libraries
++#define Krb4Libraries /**/
++#endif
+ #ifndef UseGnuMalloc
+ #define UseGnuMalloc		NO
+ #endif
+@@ -1122,7 +1138,7 @@
+       STD_DEFINES = StandardDefines $(PROJECT_DEFINES)
+  EXTRA_LOAD_FLAGS = ExtraLoadFlags
+   EXTRA_LDOPTIONS = ExtraLoadOptions
+-  EXTRA_LIBRARIES = MallocLibraries ExtraLibraries Krb5Libraries
++  EXTRA_LIBRARIES = MallocLibraries ExtraLibraries Krb5Libraries Krb4Libraries
+              TAGS = TagsCmd
+ #if ConstructMFLAGS
+            MFLAGS = -$(MAKEFLAGS)
+diff -udr ../xc.ORIG/config/cf/README ./config/cf/README
+--- ../xc.ORIG/config/cf/README	Wed May 21 15:02:13 1997
++++ ./config/cf/README	Sat Aug 23 14:22:54 1997
+@@ -66,6 +66,7 @@
+ 	HasGcc2ForCplusplus	use gcc 2 for C++ programs?
+ 	HasGnuMake		use the GNU make program?
+ 	HasKrb5			system has Kerberos version 5 support?
++	HasKrb4			system has Kerberos version 4 support?
+ 	HasLargeTmp		boolean for system has /tmp space
+ 	HasLatex		system has LaTeX document preparation software
+ 	HasNdbm			boolean for system has ndbm routines
+@@ -96,6 +97,8 @@
+ 	InstallCmd		command to install files
+ 	Krb5Includes		where to include Kerberos header files from
+ 	Krb5Libraries		where to load Kerberos libraries from
++	Krb4Includes		where to include Kerberos header files from
++	Krb4Libraries		where to load Kerberos libraries from
+ 	LdCmd			command to run loader
+ 	LdCombineFlags		flags for incremental loading
+ 	LexCmd			command to run lex
+diff -udr ../xc.ORIG/config/cf/X11.tmpl ./config/cf/X11.tmpl
+--- ../xc.ORIG/config/cf/X11.tmpl	Wed May 21 15:02:13 1997
++++ ./config/cf/X11.tmpl	Sat Aug 23 14:23:50 1997
+@@ -560,6 +560,13 @@
+ #else
+ #define Krb5Defines /**/
+ #endif
++#if HasKrb4
++#ifndef Krb4Defines
++#define Krb4Defines -DK4AUTH -DBIND_HACK
++#endif
++#else
++#define Krb4Defines /**/
++#endif
+ #ifndef ServerExtraDefines
+ #define ServerExtraDefines /* -DPIXPRIV */
+ #endif
+diff -udr ../xc.ORIG/programs/xdm/Imakefile ./programs/xdm/Imakefile
+--- ../xc.ORIG/programs/xdm/Imakefile	Sat Aug 23 14:12:29 1997
++++ ./programs/xdm/Imakefile	Sat Aug 23 14:23:51 1997
+@@ -48,10 +48,17 @@
+ #endif
+ 
+ #if HasKrb5
+-KRB5_DEFINES = Krb5Defines
+-KRB5_INCLUDE = Krb5Includes
+-KRB5OBJS = krb5auth.o
+-KRB5SRCS = krb5auth.c
++KRB_DEFINES = Krb5Defines
++KRB_INCLUDE = Krb5Includes
++KRBOBJS = krb5auth.o
++KRBSRCS = krb5auth.c
++#endif
++
++#if HasKrb4
++KRB_DEFINES = Krb4Defines
++KRB_INCLUDE = Krb4Includes
++KRBOBJS = krb4auth.o
++KRBSRCS = krb4auth.c
+ #endif
+ 
+ #if SharedLibXdmGreet
+@@ -130,7 +137,7 @@
+    XDMCONFIGDIR = XdmConfigurationSubdirectory
+         SUBDIRS = $(GREET_DIR) $(XDMCONFIGDIR)
+ 
+-INCLUDES = $(KRB5_INCLUDE)
++INCLUDES = $(KRB_INCLUDE)
+ DEPLIBS = $(DEPXMULIB) $(DEPXTOOLLIB) $(DEPXLIB) $(DEPXAUTHLIB) $(DEPXDMCPLIB)
+ LOCAL_LIBRARIES = $(XMULIB) $(XTOOLLIB) $(XLIB) $(XAUTHLIB) $(XDMCPLIB) $(RPCLIB) $(DLLIBRARY)
+ 
+@@ -139,13 +146,13 @@
+ 		  session.c socket.c streams.c util.c xdmcp.c \
+ 		  mitauth.c \
+ 		  genauth.c access.c choose.c \
+-		  $(XDMAUTHSRCS) $(RPCSRCS) $(KRB5SRCS) $(GREETSRCS)
++		  $(XDMAUTHSRCS) $(RPCSRCS) $(KRBSRCS) $(GREETSRCS)
+           OBJS1 = auth.o daemon.o server.o dpylist.o dm.o error.o file.o \
+ 		  netaddr.o reset.o resource.o protodpy.o policy.o \
+ 		  session.o socket.o streams.o util.o xdmcp.o \
+ 		  mitauth.o \
+ 		  genauth.o access.o choose.o \
+-		  $(XDMAUTHOBJS) $(RPCOBJS) $(KRB5OBJS) $(GREETOBJS)
++		  $(XDMAUTHOBJS) $(RPCOBJS) $(KRBOBJS) $(GREETOBJS)
+           SRCS2 = xdmshell.c 
+           OBJS2 = xdmshell.o 
+ #if BuildChooser
+@@ -183,7 +190,7 @@
+    CONN_DEFINES = ConnectionFlags
+         DEFINES = -DBINDIR=\"$(BINDIR)\" -DXDMDIR=\"$(XDMDIR)\" \
+ 		$(SIGNAL_DEFINES) \
+-		$(XDMAUTH_DEFINES) $(RPC_DEFINES) $(KRB5_DEFINES) \
++		$(XDMAUTH_DEFINES) $(RPC_DEFINES) $(KRB_DEFINES) \
+ 		$(PWD_DEFINES) $(CONN_DEFINES) \
+ 		$(GREET_DEFINES) $(FRAGILE_DEFINES) \
+ 		-DOSMAJORVERSION=$(OSMAJORVERSION) \
+diff -udr ../xc.ORIG/programs/xdm/dm.h ./programs/xdm/dm.h
+--- ../xc.ORIG/programs/xdm/dm.h	Mon Dec  9 11:57:14 1996
++++ ./programs/xdm/dm.h	Sat Aug 23 14:23:51 1997
+@@ -261,8 +261,12 @@
+ 	Boolean		allow_null_passwd; /* allow null password on login */
+ };
+ 
++#ifdef CSRG_BASED
++#include <sys/param.h>
++#endif
++
+ /* setgroups is not covered by POSIX, arg type varies */
+-#if defined(SYSV) || defined(SVR4) || defined(__osf__) || defined(linux)
++#if defined(SYSV) || defined(SVR4) || defined(__osf__) || defined(linux) || (defined(BSD) && (BSD >= 199306))
+ #define GID_T gid_t
+ #else
+ #define GID_T int
+diff -udr ../xc.ORIG/programs/xdm/session.c ./programs/xdm/session.c
+--- ../xc.ORIG/programs/xdm/session.c	Sat Aug 23 14:12:29 1997
++++ ./programs/xdm/session.c	Sat Aug 23 14:23:51 1997
+@@ -56,6 +56,10 @@
+ # include <krb5/krb5.h>
+ #endif
+ 
++#ifdef K4AUTH
++#include "krb4auth.h"
++#endif
++
+ #ifndef GREET_USER_STATIC
+ #include <dlfcn.h>
+ #ifndef RTLD_NOW
+@@ -489,6 +493,28 @@
+ 	    }
+ 	}
+ #endif /* K5AUTH */
++#ifdef K4AUTH
++	/* do like "kdestroy" program */
++        {
++	    char *tkfile;
++	    int result;
++
++	    tkfile = Krb4GetTKFile(verify.uid);
++	    if (tkfile) {
++		result = unlink(tkfile);
++		if (result < 0) {
++		    if (errno == ENOENT)
++			Debug ("No Kerberos ticket cache file to destroy\n");
++		    else
++			LogError("unable to remove ticket file \"%s\": %s",
++				 tkfile, strerror(errno));
++		} else
++		    Debug ("Kerberos ticket cache destroyed\n");
++
++		free(tkfile);
++	    }
++	}
++#endif /* K4AUTH */
+     }
+     Debug ("Display %s exiting with status %d\n", d->name, status);
+     exit (status);
+@@ -673,6 +699,22 @@
+ 	    }
+ 	}
+ #endif /* K5AUTH */
++#ifdef K4AUTH
++	/* do like "kinit" program */
++	{
++	    char *tkfile;
++
++	    if (verify->uid) {		/* don't get tickets for root */
++		tkfile = Krb4GetTKFile(verify->uid);
++		if (tkfile) {
++		    if (Krb4GetCred(name, passwd, tkfile) == 0)
++			verify->userEnviron =
++			    setEnv(verify->userEnviron, "KRBTKFILE", tkfile);
++		    free(tkfile);
++		}	
++	    }
++	}
++#endif /* K4AUTH */
+ 	bzero(passwd, strlen(passwd));
+ 	SetUserAuthorization (d, verify);
+ 	home = getEnv (verify->userEnviron, "HOME");

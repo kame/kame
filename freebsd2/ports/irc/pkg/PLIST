@@ -1,0 +1,9 @@
+bin/irc
+lib/ircd/ircd.m4
+lib/ircd/example.conf
+sbin/ircd
+sbin/iauth
+sbin/chkconf
+sbin/ircd-mkpasswd
+sbin/ircdwatch
+etc/rc.d/ircd.sh
