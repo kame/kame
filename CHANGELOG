@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.740 2000/04/02 15:10:51 itojun Exp $
+$Id: CHANGELOG,v 1.741 2000/04/03 00:54:57 itojun Exp $
 
 <200003>
+Mon Apr  3 09:52:23 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: upgrade to 2000/3/27 weekly
+	  snapshot.
+
 Sun Apr  2 22:05:03 JST 2000  itojun@iijlab.net
 	* totd pkgsrc/ports (openbsd, netbsd, freebsd[23]): upgrade to 1.1p4.
 
