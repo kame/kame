@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.52 2000/07/07 03:51:09 itojun Exp $
+	$KAME: PORTABILITY,v 1.53 2000/07/30 15:29:22 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
