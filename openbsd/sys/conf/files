@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.114 1999/04/08 05:21:34 niklas Exp $
+#	$OpenBSD: files,v 1.129 1999/09/19 06:52:08 csapuntz Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -33,6 +33,7 @@ define	atm
 define	ether
 define	fddi
 define	crypto
+define	sppp
 
 # "Chipset" attributes.  These are the machine-independent portions
 # of device drivers.
@@ -46,6 +47,13 @@ define	rtl80x9		# RealTek 8019/8029 NE2000-compatible
 # a wscons output device; used later, but needs to be near the top for
 # common file (e.g. vga) definitions.
 define  wsconsdev {[console = -1]}
+
+define  wdc_base
+define  ata {[channel = -1], [drive = -1]}
+define  atapi {[channel = -1]}
+# Common code for ESDI/IDE/etc. controllers
+device  wdc: ata, atapi, wdc_base
+file    dev/ic/wdc.c wdc_base
 
 # "Chipset" drivers.  These are the bus-independent routines which
 # contain the cfdrivers.  Attachments are provided by files.<bus>
@@ -86,6 +94,11 @@ file	dev/ic/elink3.c		ep
 # WaveLan
 # device wlp: ether, ifnet
 
+# RangeLAN2
+device	rln: ether, ifnet
+file	dev/ic/rln.c		rln
+file	dev/ic/rlnsubr.c	rln
+
 # LANCE and PCnet Ethernet controllers
 device	le: ether, ifnet, ifmedia
 file	dev/ic/am7990.c		le
@@ -99,6 +112,10 @@ file	dev/ic/smc91cxx.c	sm
 device	ne: ether, ifnet, dp8390nic, ifmedia
 file	dev/ic/ne2000.c		ne
 
+# Intel i82596/i82586 Ethernet Controller
+device	ie: ether, ifnet, ifmedia
+file	dev/ic/i82596.c		ie & (ie_pci | ie_eisa | ie_gsc)
+
 # 8250/16[45]50-based "com" ports
 device	com: tty
 file	dev/ic/com.c		com & (com_isa | com_commulti | com_pcmcia | com_pica | com_algor | com_gsc) needs-flag
@@ -107,6 +124,10 @@ file	dev/ic/com.c		com & (com_isa | com_commulti | com_pcmcia | com_pica | com_a
 device	opl: midibus, midisyn
 file	dev/ic/opl.c			opl
 file	dev/ic/oplinstrs.c		opl
+
+# AC-97 CODECs
+define  ac97
+file    dev/ic/ac97.c			ac97
 
 # Cyclades Cyclom multiport serial cards
 device	cy: tty
@@ -134,6 +155,15 @@ define	eisabus { }			# EISA attachment
 define	pcibus {[bus = -1]}		# PCI attachment
 define	pcmciabus { }			# PCMCIA attachment
 define	tcbus { }			# TurboChannel attachment
+define	usbus { }			# USB attachment
+
+# UHCI USB controller
+device	uhci: usbus
+file	dev/usb/uhci.c			uhci	needs-flag
+
+# OHCI USB controller
+device	ohci: usbus
+file	dev/usb/ohci.c			ohci	needs-flag
 
 # legitimate pseudo-devices
 pseudo-device vnd: disk
@@ -152,8 +182,9 @@ pseudo-device strip: ifnet
 pseudo-device random
 pseudo-device enc: ifnet
 pseudo-device bridge: ifnet, ether
-pseudo-device gif: ifnet
+pseudo-device sppp: ifnet
 pseudo-device faith: ifnet
+pseudo-device gif: ifnet
 pseudo-device dummy: ifnet
 
 pseudo-device sequencer
@@ -261,7 +292,6 @@ file dev/raidframe/rf_sstf.c		raid			needs-flag
 file dev/raidframe/rf_states.c		raid			needs-flag
 file dev/raidframe/rf_stripelocks.c	raid			needs-flag
 file dev/raidframe/rf_strutils.c        raid                    needs-flag
-file dev/raidframe/rf_sys.c             raid                    needs-flag
 file dev/raidframe/rf_threadstuff.c     raid                    needs-flag
 file dev/raidframe/rf_utils.c           raid                    needs-flag
 file isofs/cd9660/cd9660_bmap.c		cd9660
@@ -275,6 +305,7 @@ file kern/exec_aout.c
 file kern/exec_conf.c
 file kern/exec_ecoff.c
 file kern/exec_elf.c
+file kern/exec_elf64.c
 file kern/exec_script.c
 file kern/exec_subr.c
 file kern/init_main.c
@@ -386,6 +417,7 @@ file net/if_arcsubr.c			arc			needs-flag
 file net/if_atmsubr.c			atm			needs-flag
 file net/if_ethersubr.c			ether | fddi		needs-flag
 file net/if_fddisubr.c			fddi
+file net/if_spppsubr.c			sppp
 file net/if_loop.c			loop			needs-count
 file net/if_media.c			ifmedia
 file net/if_sl.c			sl			needs-count
@@ -403,7 +435,7 @@ file net/raw_usrreq.c
 file net/route.c
 file net/rtsock.c
 file net/slcompress.c			sl | ppp | strip
-file net/if_enc.c			enc | (inet & ipsec)
+file net/if_enc.c			inet & ipsec
 file netccitt/ccitt_proto.c		ccitt
 file netccitt/hd_debug.c		hdlc
 file netccitt/hd_input.c		hdlc
@@ -450,10 +482,11 @@ file netinet/ip_state.c			ipfilter
 file netinet/ip_proxy.c			ipfilter
 file netinet/ip_auth.c			ipfilter
 file netinet/ip_log.c			ipfilter
-file netinet/ip_ipsp.c			inet & ipsec
-file netinet/ip_ip4.c			inet & ipsec
+file netinet/ip_ipsp.c			inet & (ipsec | tcp_signature)
+file netinet/ip_ip4.c			inet & (ipsec | mrouting)
 file netinet/ip_ah.c			inet & ipsec
 file netinet/ip_esp.c			inet & ipsec
+file netinet/ip_xform.c			inet & ipsec
 file netinet/ip_esp_old.c		inet & ipsec
 file netinet/ip_esp_new.c		inet & ipsec
 file netinet/ip_ah_old.c		inet & ipsec
@@ -573,14 +606,19 @@ file ufs/ext2fs/ext2fs_readwrite.c	ext2fs
 file ufs/ext2fs/ext2fs_subr.c		ext2fs
 file ufs/ext2fs/ext2fs_vfsops.c		ext2fs
 file ufs/ext2fs/ext2fs_vnops.c		ext2fs
-file xfs/xfs_common.c			xfs
+file xfs/xfs_common-bsd.c		xfs
 file xfs/xfs_deb.c			xfs
-file xfs/xfs_dev.c			xfs
+file xfs/xfs_dev-bsd.c			xfs
+file xfs/xfs_dev-common.c		xfs
 file xfs/xfs_message.c			xfs
-file xfs/xfs_node.c			xfs
-file xfs/xfs_syscalls.c
-file xfs/xfs_vfsops.c			xfs
-file xfs/xfs_vnodeops.c			xfs
+file xfs/xfs_node-bsd.c			xfs
+file xfs/xfs_syscalls-common.c		xfs
+file xfs/xfs_vfsops-bsd.c		xfs
+file xfs/xfs_vfsops-common.c		xfs
+file xfs/xfs_vfsops-openbsd.c		xfs
+file xfs/xfs_vnodeops-bsd.c		xfs
+file xfs/xfs_vnodeops-common.c		xfs
+file xfs/xfs_syscalls-dummy.c		!xfs
 file vm/device_pager.c			!uvm & devpager
 file vm/swap_pager.c			!uvm & swappager
 file vm/vm_fault.c			!uvm
@@ -675,6 +713,6 @@ file netinet6/nd6_rtr.c			inet6
 #file netinet6/udp6_usrreq.c		inet6
 
 # ... PF_KEY
-file net/pfkey.c			key | ipsec
-file net/pfkeyv2.c			key | ipsec
-file net/pfkeyv2_parsemessage.c		key | ipsec
+file net/pfkey.c			key | ipsec | tcp_signature
+file net/pfkeyv2.c			key | ipsec | tcp_signature
+file net/pfkeyv2_parsemessage.c		key | ipsec | tcp_signature

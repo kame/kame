@@ -1,34 +1,5 @@
-/*	$OpenBSD: socket.h,v 1.28 1999/02/25 03:31:34 deraadt Exp $	*/
+/*	$OpenBSD: socket.h,v 1.29 1999/06/06 23:19:08 deraadt Exp $	*/
 /*	$NetBSD: socket.h,v 1.14 1996/02/09 18:25:36 christos Exp $	*/
-
-/*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the project nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
 
 /*
  * Copyright (c) 1982, 1985, 1986, 1988, 1993, 1994
@@ -171,6 +142,18 @@ struct sockaddr {
 };
 
 /*
+ * Sockaddr type which can hold any sockaddr type available
+ * in the system.
+ */
+struct sockaddr_storage {
+	u_int8_t    ss_len;		/* total length */
+	sa_family_t ss_family;		/* address family */
+	u_char	    __ss_pad1[6];	/* align to quad */
+	u_int64_t   __ss_pad2;		/* force alignment for stupid compilers */
+	u_char      __ss_pad3[240];	/* pad to a total of 256 bytes */
+};
+
+/*
  * Structure used by kernel to pass protocol
  * information in raw sockets.
  */
@@ -178,25 +161,6 @@ struct sockproto {
 	u_short	sp_family;		/* address family */
 	u_short	sp_protocol;		/* protocol */
 };
-
-#if 1
-/*
- * RFC 2553: protocol-independent placeholder for socket addresses
- */
-#define _SS_MAXSIZE	128
-#define _SS_ALIGNSIZE	(sizeof(int64_t))
-#define _SS_PAD1SIZE	(_SS_ALIGNSIZE - sizeof(u_char) * 2)
-#define _SS_PAD2SIZE	(_SS_MAXSIZE - sizeof(u_char) * 2 - \
-				_SS_PAD1SIZE - _SS_ALIGNSIZE)
-
-struct sockaddr_storage {
-	u_char	__ss_len;	/* address length */
-	u_char	__ss_family;	/* address family */
-	char	__ss_pad1[_SS_PAD1SIZE];
-	int64_t	__ss_align;	/* force desired structure storage alignment */
-	char	__ss_pad2[_SS_PAD2SIZE];
-};
-#endif
 
 /*
  * Protocol families, same as address families for now.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_syscalls.c,v 1.19 1999/02/15 21:28:23 millert Exp $	*/
+/*	$OpenBSD: uipc_syscalls.c,v 1.28 1999/07/13 15:17:51 provos Exp $	*/
 /*	$NetBSD: uipc_syscalls.c,v 1.19 1996/02/09 19:00:48 christos Exp $	*/
 
 /*
@@ -85,7 +85,7 @@ sys_socket(p, v, retval)
 	error = socreate(SCARG(uap, domain), &so, SCARG(uap, type),
 			 SCARG(uap, protocol));
 	if (error) {
-		fdp->fd_ofiles[fd] = 0;
+		fdremove(fdp, fd);
 		ffree(fp);
 	} else {
 		fp->f_data = (caddr_t)so;
@@ -324,13 +324,14 @@ sys_socketpair(p, v, retval)
 	}
 	error = copyout((caddr_t)sv, (caddr_t)SCARG(uap, rsv),
 	    2 * sizeof (int));
-	return (error);
+	if (error == 0)
+		return (error);
 free4:
 	ffree(fp2);
-	fdp->fd_ofiles[sv[1]] = 0;
+	fdremove(fdp, sv[1]);
 free3:
 	ffree(fp1);
-	fdp->fd_ofiles[sv[0]] = 0;
+	fdremove(fdp, sv[0]);
 free2:
 	(void)soclose(so2);
 free1:
@@ -826,8 +827,8 @@ sys_getsockopt(p, v, retval)
 		syscallarg(socklen_t *) avalsize;
 	} */ *uap = v;
 	struct file *fp;
-	struct mbuf *m = NULL, *m0;
-	socklen_t op, i, valsize;
+	struct mbuf *m = NULL;
+	socklen_t valsize;
 	int error;
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
@@ -842,29 +843,49 @@ sys_getsockopt(p, v, retval)
 	if ((error = sogetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), &m)) == 0 && SCARG(uap, val) && valsize &&
 	    m != NULL) {
-		op = 0;
-		while (m && !error && op < valsize) {
-			i = min(m->m_len, (valsize - op));
-			error = copyout(mtod(m, caddr_t), SCARG(uap, val), i);
-			op += i;
-			SCARG(uap, val) = ((u_int8_t *)SCARG(uap, val)) + i;
-			m0 = m;
-			MFREE(m0, m);
-		}
-		valsize = op;
+		if (valsize > m->m_len)
+			valsize = m->m_len;
+		error = copyout(mtod(m, caddr_t), SCARG(uap, val), valsize);
 		if (error == 0)
-			error = copyout(&valsize,
-					SCARG(uap, avalsize), sizeof(valsize));
+			error = copyout((caddr_t)&valsize,
+			    (caddr_t)SCARG(uap, avalsize), sizeof (valsize));
 	}
 	if (m != NULL)
 		(void) m_free(m);
 	return (error);
 }
 
-#ifdef OLD_PIPE
-/* ARGSUSED */
 int
 sys_pipe(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	register struct sys_pipe_args /* {
+		syscallarg(int *) fdp;
+	} */ *uap = v;
+	int error, fds[2];
+	register_t rval[2];
+
+	if ((error = sys_opipe(p, v, rval)) == -1)
+		return (error);
+	
+	fds[0] = rval[0];
+	fds[1] = rval[1];
+	error = copyout((caddr_t)fds, (caddr_t)SCARG(uap, fdp),
+	    2 * sizeof (int));
+	if (error) {
+		fdrelease(p, retval[0]);
+		fdrelease(p, retval[1]);
+	}
+	return (error);
+}
+
+#ifdef OLD_PIPE
+
+/* ARGSUSED */
+int
+sys_opipe(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
@@ -897,10 +918,10 @@ sys_pipe(p, v, retval)
 	return (0);
 free4:
 	ffree(wf);
-	fdp->fd_ofiles[retval[1]] = 0;
+	fdremove(fdp, retval[1]);
 free3:
 	ffree(rf);
-	fdp->fd_ofiles[retval[0]] = 0;
+	fdremove(fdp, retval[0]);
 free2:
 	(void)soclose(wso);
 free1:

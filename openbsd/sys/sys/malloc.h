@@ -1,4 +1,4 @@
-/*	$OpenBSD: malloc.h,v 1.21 1999/02/26 01:57:58 art Exp $	*/
+/*	$OpenBSD: malloc.h,v 1.24 1999/08/09 03:47:56 fgsch Exp $	*/
 /*	$NetBSD: malloc.h,v 1.39 1998/07/12 19:52:01 augustss Exp $	*/
 
 /*
@@ -38,10 +38,6 @@
 
 #ifndef _SYS_MALLOC_H_
 #define	_SYS_MALLOC_H_
-
-#ifndef NO_KMEMSTATS
-#define KMEMSTATS
-#endif
 
 /*
  * flags to malloc
@@ -126,6 +122,7 @@
 #define	M_ADOSFSBITMAP	71	/* adosfs bitmap */
 #define	M_EXT2FSNODE	72	/* EXT2FS vnode private part */
 #define	M_PFIL		73	/* packer filter */
+#define	M_PFKEY		74	/* pfkey data */
 #define	M_TDB		75	/* Transforms database */
 #define	M_XDATA		76	/* IPsec data */
 #define M_VFS           77      /* VFS file systems */
@@ -159,14 +156,19 @@
 #define M_UVMAOBJ	99	/* UVM aobj and realted */
 #define M_POOL		100	/* Pool memory */
 
-/* KAME IPv6 */
-#define	M_IP6OPT	125	/* IPv6 options */
-#define	M_IP6NDP	126	/* IPv6 Neighbour Discovery */
-#define	M_IP6RR		127	/* IPv6 Router Renumbering Prefix */
-#define	M_RR_ADDR	128	/* IPv6 Router Renumbering Ifid */
+#define	M_USB		101	/* USB general */
+#define	M_USBDEV	102	/* USB device driver */
+#define	M_USBHC		103	/* USB host controller */
+  
 
-#define	M_TEMP		129	/* misc temporary data buffers */
-#define M_LAST          130     /* Must be last type + 1 */
+/* KAME IPv6 */
+#define	M_IP6OPT	123	/* IPv6 options */
+#define	M_IP6NDP	124	/* IPv6 Neighbour Discovery */
+#define	M_IP6RR		125	/* IPv6 Router Renumbering Prefix */
+#define	M_RR_ADDR	126	/* IPv6 Router Renumbering Ifid */
+
+#define	M_TEMP		127	/* misc temporary data buffers */
+#define M_LAST          128     /* Must be last type + 1 */
 
 
 #define	INITKMEMNAMES { \
@@ -244,7 +246,7 @@
 	"adosfs bitmap", /* 71 M_ADOSFSBITMAP */ \
 	"EXT2FS node",	/* 72 M_EXT2FSNODE */ \
 	"pfil",		/* 73 M_PFIL */ \
-	NULL, \
+	"pfkey data",   /* 74 M_PFKEY */ \
 	"tdb",		/* 75 M_TDB */ \
 	"xform_data",	/* 76 M_XDATA */ \
 	"vfs",          /* 77 M_VFS */ \
@@ -268,20 +270,22 @@
 	"Sec Assoc",	/* 95 M_SECA */ \
 	"IPv6 if info",	/* 96 M_I6IFP */ \
 	"RaidFrame data", /* 97 M_RAIDFRAME */ \
-	"UVM amap",	/* 93 M_UVMAMAP */ \
-	"UVM aobj",	/* 94 M_UVMAOBJ */ \
-	"pool",		/* 95 M_POOL */ \
-	NULL, \
-	NULL, NULL, NULL, NULL, NULL, \
-	NULL, NULL, NULL, NULL, NULL, \
-	NULL, NULL, NULL, NULL, NULL, \
-	NULL, NULL, NULL, NULL, NULL, \
+	"UVM amap",	/* 98 M_UVMAMAP */ \
+	"UVM aobj",	/* 99 M_UVMAOBJ */ \
+	"pool",		/* 100 M_POOL */ \
+	"USB",		/* 101 M_USB */ \
+	"USB device",	/* 102 M_USBDEV */ \
+	"USB HC",	/* 103 M_USBHC */ \
 	NULL, NULL, NULL, \
-	"ip6_options",	/* 125 M_IP6OPT */ \
-	"NDP",		/* 126 M_IP6NDP */ \
-	"ip6rr",	/* 127 M_IP6RR */ \
-	"rp_addr",	/* 128 M_RR_ADDR */ \
-	"temp",		/* 129 M_TEMP */ \
+	NULL, NULL, NULL, NULL, NULL, \
+	NULL, NULL, NULL, NULL, NULL, \
+	NULL, NULL, NULL, NULL, NULL, \
+	NULL, \
+	"ip6_options",	/* 123 M_IP6OPT */ \
+	"NDP",		/* 124 M_IP6NDP */ \
+	"ip6rr",	/* 125 M_IP6RR */ \
+	"rp_addr",	/* 126 M_RR_ADDR */ \
+	"temp",		/* 127 M_TEMP */ \
 }
 
 struct kmemstats {
