@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.92 2003/11/09 14:44:08 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.93 2003/11/11 15:34:43 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,7 +146,6 @@ in_gif_output(ifp, family, m)
 	struct xformsw xfs;
 	int error;
 	int hlen, poff;
-	u_int16_t plen;
 	struct mbuf *mp;
 
 	if (sin_src == NULL || sin_dst == NULL ||
