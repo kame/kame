@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.8 2005/02/17 10:17:21 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.9 2005/02/28 01:35:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -398,9 +398,7 @@ mipsock_recv_mdinfo(miphdr)
 	struct mip_msghdr *miphdr;
 {
 	struct mipm_md_info *mdinfo;
-	struct sockaddr *sin;
-	struct sockaddr_in6 sin6;
-	struct in6_addr *hoa, *coa, *acoa;
+	struct in6_addr hoa, coa, acoa;
 	int err = 0;
 	u_int16_t bid = 0;
 	
@@ -409,27 +407,27 @@ mipsock_recv_mdinfo(miphdr)
 	mdinfo = (struct mipm_md_info *)miphdr;
 
 	/* Get HoA (if ifindex is specified, HoA could be :: */
-	sin = MIPD_HOA(mdinfo); 
-	if (sin->sa_family != AF_INET6)
+	if (MIPD_HOA(mdinfo)->sa_family != AF_INET6)
 		return (0);
-	hoa = &((struct sockaddr_in6 *)sin)->sin6_addr;
+	memcpy(&hoa, &((struct sockaddr_in6 *)MIPD_HOA(mdinfo))->sin6_addr,
+	       sizeof(struct in6_addr));
 
 	/* Get CoA */
 	if (MIPD_COA(mdinfo)->sa_family != AF_INET6)
 		return (0);
-	memcpy(&sin6, MIPD_COA(mdinfo), sizeof(sin6));
-	coa = &sin6.sin6_addr;
+	memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr,
+	       sizeof(struct in6_addr));
 
 	/* If new CoA is not global, ignore */
-	if (IN6_IS_ADDR_LINKLOCAL(coa)
-	    || IN6_IS_ADDR_MULTICAST(coa)
-	    || IN6_IS_ADDR_LOOPBACK(coa)
-	    || IN6_IS_ADDR_V4MAPPED(coa)
-	    || IN6_IS_ADDR_UNSPECIFIED(coa))
+	if (IN6_IS_ADDR_LINKLOCAL(&coa)
+	    || IN6_IS_ADDR_MULTICAST(&coa)
+	    || IN6_IS_ADDR_LOOPBACK(&coa)
+	    || IN6_IS_ADDR_V4MAPPED(&coa)
+	    || IN6_IS_ADDR_UNSPECIFIED(&coa))
 		return (EINVAL);
 
 	if (debug) 
-		syslog(LOG_INFO, "new coa is %s", ip6_sprintf(coa));
+		syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
 
 #ifdef MIP_MCOA
 	bid = mdinfo->mipm_md_bid;
@@ -439,21 +437,20 @@ mipsock_recv_mdinfo(miphdr)
 	case MIPM_MD_REREG:
 		/* XXX do we need MIPM_MD_INDEX?! */
 		if (mdinfo->mipm_md_hint == MIPM_MD_INDEX)
-			err = mipsock_md_update_bul_byifindex(mdinfo->mipm_md_ifindex, coa);
+			err = mipsock_md_update_bul_byifindex(mdinfo->mipm_md_ifindex, &coa);
 		else if (mdinfo->mipm_md_hint == MIPM_MD_ADDR)
-			err = bul_update_by_mipsock_w_hoa(hoa, coa, bid);
+			err = bul_update_by_mipsock_w_hoa(&hoa, &coa, bid);
 		break;
 	case MIPM_MD_DEREGHOME:
-		err = mipsock_md_dereg_bul(hoa, coa, mdinfo->mipm_md_ifindex);
+		err = mipsock_md_dereg_bul(&hoa, &coa, mdinfo->mipm_md_ifindex);
 		break;
 	case MIPM_MD_DEREGFOREIGN:
 		/* Get CoA to send de-reg BU */
-		sin = MIPD_COA2(mdinfo); 
-		if (sin->sa_family != AF_INET6)
+		if (MIPD_COA2(mdinfo)->sa_family != AF_INET6)
 			return (0);
-		acoa = &((struct sockaddr_in6 *)sin)->sin6_addr;
+		memcpy(&acoa, &((struct sockaddr_in6 *)MIPD_COA2(mdinfo))->sin6_addr, sizeof(struct in6_addr));
 
-		err = mipsock_md_dereg_bul_fl(hoa, coa, acoa, 
+		err = mipsock_md_dereg_bul_fl(&hoa, &coa, &acoa, 
 					      mdinfo->mipm_md_ifindex, bid);
 		break;
 	default:
