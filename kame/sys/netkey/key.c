@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.238 2002/05/28 10:44:53 itojun Exp $	*/
+/*	$KAME: key.c,v 1.239 2002/05/30 05:47:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -853,7 +853,7 @@ key_do_allocsa_policy(sah, state)
 		 * permanent.
 		 */
 		if (d->lft_c->sadb_lifetime_addtime != 0) {
-			struct mbuf *m, *result;
+			struct mbuf *m, *result = NULL;
 
 			key_sa_chgstate(d, SADB_SASTATE_DEAD);
 
@@ -901,7 +901,12 @@ key_do_allocsa_policy(sah, state)
 			if (key_sendup_mbuf(NULL, result,
 					KEY_SENDUP_REGISTERED))
 				goto msgfail;
+
+			result = NULL;
+
 		 msgfail:
+			if (result != NULL)
+				m_freem(result);
 			key_freesav(d);
 		}
 	}
