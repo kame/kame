@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.28 2000/10/10 06:18:04 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.29 2001/05/22 05:55:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -605,7 +605,10 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		ifinfo->timer.tv_usec = interval % MILLION;
 		break;
 	case IFS_PROBE:
-		ifinfo->timer.tv_sec = RTR_SOLICITATION_INTERVAL;
+		if (ifinfo->probes < MAX_RTR_SOLICITATIONS)
+			ifinfo->timer.tv_sec = RTR_SOLICITATION_INTERVAL;
+		else
+			ifinfo->timer.tv_sec = MAX_RTR_SOLICITATION_DELAY;
 		break;
 	default:
 		warnmsg(LOG_ERR, __FUNCTION__,
