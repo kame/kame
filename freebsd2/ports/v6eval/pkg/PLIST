@@ -16,10 +16,12 @@ bin/ping6.rmt
 bin/reboot.rmt
 bin/reboot_async.rmt
 bin/route.rmt
+bin/rtadvd.rmt
 etc/tn.def.sample
 etc/nut.def.sample
 include/std.def
 include/stdaddr.def
+include/stdconst.def
 include/stdpacket.def
 doc/00README
 doc/00README.v6eval
@@ -59,6 +61,7 @@ man/man1/pktsend.1.gz
 @dirrm man/mann
 @dirrm man
 @cwd /usr/local
+@dirrm v6eval
 lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalTool/.packlist
 lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalCommon/.packlist
 lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalRemote/.packlist
