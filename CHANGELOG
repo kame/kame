@@ -1,5 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2448 2003/07/31 10:25:19 keiichi Exp $
+$KAME: CHANGELOG,v 1.2449 2003/07/31 22:48:52 jinmei Exp $
+
+<200308>
+2003-08-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: implemented various clarifications and some new
+	features:
+	- supported DNS name and NTP servers options
+	- dhcp6s now uses the server/relay port to send a relay-rely
+	  message
+	- dhcp6s now ignores a rebind message when it cannot find a
+	  binding, according to prefix-delegation-04
+	- dhcp6relay now accepts relay-reply messages on the socket
+	  listening on the server/relay port
 
 <200307>
 Thu Jul 31 19:19:48 JST 2003	keiichi@iij.ad.jp
