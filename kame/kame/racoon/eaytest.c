@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.43 2004/04/08 09:15:10 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.44 2004/06/16 11:26:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,6 +62,7 @@
 u_int32_t loglevel = 4;
 
 /* prototype */
+void plog __P((int, const char *, struct sockaddr *, const char *, ...));
 
 void rsatest __P((int, char **));
 #if 0
@@ -79,6 +80,16 @@ void md5test __P((int, char **));
 void dhtest __P((int, char **));
 void bntest __P((int, char **));
 void Usage __P((void));
+
+void
+plog(int pri, const char *func, struct sockaddr *sa, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+}
 
 /* test */
 

@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.84 2004/04/07 01:12:46 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.85 2004/06/16 11:26:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,6 +333,7 @@ cb_check_cert(ok, ctx)
 		case X509_V_ERR_INVALID_CA:
 		case X509_V_ERR_PATH_LENGTH_EXCEEDED:
 		case X509_V_ERR_INVALID_PURPOSE:
+		case X509_V_ERR_UNABLE_TO_GET_CRL:
 #endif
 			ok = 1;
 			log_tag = LLV_WARNING;
@@ -340,21 +341,12 @@ cb_check_cert(ok, ctx)
 		default:
 			log_tag = LLV_ERROR;
 		}
-#ifndef EAYDEBUG
 		plog(log_tag, LOCATION, NULL,
 			"%s(%d) at depth:%d SubjectName:%s\n",
 			X509_verify_cert_error_string(ctx->error),
 			ctx->error,
 			ctx->error_depth,
 			buf);
-#else
-		printf("%d: %s(%d) at depth:%d SubjectName:%s\n",
-			log_tag,
-			X509_verify_cert_error_string(ctx->error),
-			ctx->error,
-			ctx->error_depth,
-			buf);
-#endif
 	}
 	ERR_clear_error();
 
@@ -393,11 +385,7 @@ eay_get_x509asn1subjectname(cert)
 
    end:
 	if (error) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
-#else
-		printf("%s\n", eay_strerror());
-#endif
 		if (name) {
 			vfree(name);
 			name = NULL;
@@ -451,10 +439,8 @@ eay_get_x509subjectaltname(cert, altname, type, pos)
 
 	/* make sure if the data is terminated by '\0'. */
 	if (gen->d.ia5->data[gen->d.ia5->length] != '\0') {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 			"data is not terminated by '\0'.");
-#endif
 		hexdump(gen->d.ia5->data, gen->d.ia5->length + 1);
 		goto end;
 	}
@@ -475,11 +461,7 @@ eay_get_x509subjectaltname(cert, altname, type, pos)
 			racoon_free(*altname);
 			*altname = NULL;
 		}
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
-#else
-		printf("%s\n", eay_strerror());
-#endif
 	}
 	if (x509)
 		X509_free(x509);
@@ -531,11 +513,7 @@ eay_get_x509text(cert)
 			racoon_free(text);
 			text = NULL;
 		}
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
-#else
-		printf("%s\n", eay_strerror());
-#endif
 	}
 	if (bio)
 		BIO_free(bio);
@@ -667,18 +645,14 @@ eay_check_x509sign(source, sig, cert)
 
 	x509 = d2i_X509(NULL, &bp, cert->l);
 	if (x509 == NULL) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
-#endif
 		return -1;
 	}
 
 	evp = X509_get_pubkey(x509);
 	if (!evp) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 		    "X509_get_pubkey: %s\n", eay_strerror());
-#endif
 		return -1;
 	}
 
@@ -895,18 +869,14 @@ eay_rsa_verify(src, sig, evp)
 	len = RSA_size(evp->pkey.rsa);
 	xbuf = vmalloc(len);
 	if (xbuf == NULL) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
-#endif
 		EVP_PKEY_free(evp);
 		return -1;
 	}
 
 	len = RSA_public_decrypt(sig->l, sig->v, xbuf->v, evp->pkey.rsa, pad);
-#ifndef EAYDEBUG
 	if (len == 0 || len != src->l)
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
-#endif
 	EVP_PKEY_free(evp);
 	if (len == 0 || len != src->l) {
 		vfree(xbuf);
@@ -1594,12 +1564,8 @@ eay_hmacsha2_512_final(c)
 	(void)racoon_free(c);
 
 	if (SHA512_DIGEST_LENGTH != res->l) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 			"hmac sha2_512 length mismatch %d.\n", res->l);
-#else
-		printf("hmac sha2_512 length mismatch %d.\n", res->l);
-#endif
 		vfree(res);
 		return NULL;
 	}
@@ -1654,12 +1620,8 @@ eay_hmacsha2_384_final(c)
 	(void)racoon_free(c);
 
 	if (SHA384_DIGEST_LENGTH != res->l) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 			"hmac sha2_384 length mismatch %d.\n", res->l);
-#else
-		printf("hmac sha2_384 length mismatch %d.\n", res->l);
-#endif
 		vfree(res);
 		return NULL;
 	}
@@ -1714,12 +1676,8 @@ eay_hmacsha2_256_final(c)
 	(void)racoon_free(c);
 
 	if (SHA256_DIGEST_LENGTH != res->l) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 			"hmac sha2_256 length mismatch %d.\n", res->l);
-#else
-		printf("hmac sha2_256 length mismatch %d.\n", res->l);
-#endif
 		vfree(res);
 		return NULL;
 	}
@@ -1775,12 +1733,8 @@ eay_hmacsha1_final(c)
 	(void)racoon_free(c);
 
 	if (SHA_DIGEST_LENGTH != res->l) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 			"hmac sha1 length mismatch %d.\n", res->l);
-#else
-		printf("hmac sha1 length mismatch %d.\n", res->l);
-#endif
 		vfree(res);
 		return NULL;
 	}
@@ -1835,12 +1789,8 @@ eay_hmacmd5_final(c)
 	(void)racoon_free(c);
 
 	if (MD5_DIGEST_LENGTH != res->l) {
-#ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL,
 			"hmac md5 length mismatch %d.\n", res->l);
-#else
-		printf("hmac md5 length mismatch %d.\n", res->l);
-#endif
 		vfree(res);
 		return NULL;
 	}
