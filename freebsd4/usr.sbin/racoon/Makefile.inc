@@ -7,24 +7,9 @@ CFLAGS+=-DYY_NO_UNPUT
 CFLAGS+=-I${.CURDIR}/../../../kame/libipsec
 YFLAGS+=-d
 
-.if exists(/usr/local/ssl/include/openssl/pem.h) || exists(/usr/local/include/openssl/pem.h) || exists(/usr/include/openssl/pem.h)
 CFLAGS+=-DHAVE_OPENSSL_PEM_H=1
-.endif
-.if exists(/usr/local/ssl/include/openssl/x509.h) || exists(/usr/local/include/openssl/x509.h) || exists(/usr/include/openssl/x509.h)
 CFLAGS+=-DHAVE_OPENSSL_X509_H=1
-.endif
-
-.if exists(/usr/local/ssl/include/openssl/opensslv.h) || exists(/usr/local/include/openssl/opensslv.h) || exists(/usr/include/openssl/opensslv.h)
 CFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
-.endif
-
-.if exists(/usr/local/include/openssl)
-CFLAGS+=-I/usr/local/include
-.elif exists(/usr/local/ssl/include/openssl)
-CFLAGS+=-I/usr/local/ssl/include
-.elif exists(/usr/include/openssl)
-CFLAGS+=-I/usr/include
-.endif
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
@@ -35,16 +20,8 @@ DPADD+=	${.OBJDIR}/../../../lib/libipsec/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
 DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
-.if exists(/usr/local/lib/libcrypto.a)
-LDADD+= -L/usr/local/lib -lcrypto
-DPADD+= /usr/local/lib/libcrypto.a
-.elif exists(/usr/local/ssl/lib/libcrypto.a)
-LDADD+= -L/usr/local/ssl/lib -lcrypto
-DPADD+= /usr/local/ssl/lib/libcrypto.a
-.elif exists(/usr/lib/libcrypto.a)
-LDADD+= -lcrypto
+LDADD+= -L/usr/lib -lcrypto
 DPADD+= /usr/lib/libcrypto.a
-.endif
 # for USA resident
 .if exists(/usr/local/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
 LDADD+=	-L/usr/local/lib -lRSAglue -lrsaref
