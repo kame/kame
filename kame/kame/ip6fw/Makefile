@@ -6,11 +6,11 @@ BINDIR=	${PREFIX}/sbin
 
 PROG=   ip6fw
 
-LDADD+=	-L${.CURDIR}/../../src/libinet6 \
-	-L${.CURDIR}/../../src/libinet6/obj \
+LDADD+=	-L${.CURDIR}/../libinet6 \
+	-L${.CURDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
-DPADD+=	-L${.CURDIR}/../../src/libinet6/libinet6.a \
-	-L${.CURDIR}/../../src/libinet6/obj/libinet6.a \
+DPADD+=	-L${.CURDIR}/../libinet6/libinet6.a \
+	-L${.CURDIR}/../libinet6/obj/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
 
 .if (${OPSYS} != "NetBSD")

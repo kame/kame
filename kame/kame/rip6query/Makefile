@@ -13,10 +13,10 @@ CPPFLAGS+=	-DINET6 -I${.CURDIR}/../route6d
 .else
 CFLAGS+=	-DINET6 -I${.CURDIR}/../route6d
 .endif
-LDADD+=	-L${.OBJDIR}/../../src/libinet6 -L${.OBJDIR}/../../src/libinet6/obj \
+LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
-DPADD+= ${.OBJDIR}/../../src/libinet6/libinet6.a \
-	${.OBJDIR}/../../src/libinet6/obj/libinet6.a \
+DPADD+= ${.OBJDIR}/../libinet6/libinet6.a \
+	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
