@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.21 1999/12/09 12:30:30 kazu Exp $
+	$Id: PORTABILITY,v 1.22 1999/12/12 10:24:20 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -96,6 +96,7 @@ across those possibilities.
 	#define foobar (x, y) \
 	do { \
 		/*something*/ \
+		/*something*/ \
 	} while (0)
   Without this wrapper nasty mistakes can happen.
 
@@ -166,7 +167,8 @@ across those possibilities.
   your code compile on non-FreeBSD3 systems.
   Avoid xx_FOREACH(), which is only available in FreeBSD3.  Just use
 	for (x = xx_FIRST(); x; x = xx_NEXT(x))
-  and do not try to do #ifdef (FreeBSD3).  More #ifdef introduces more bugs.
+  and do not try to make #if section for FreeBSD3.  More #if introduces
+  more bugs.
 
 - It is better to avoid insque() and rmque(), they are from old VAX days
   and some platform now tries to avoid these.
@@ -189,4 +191,15 @@ across those possibilities.
   into __ss_len, or (2) never touch __ss_len.  cast to sockaddr * and use
   sa_len.
 
-- For portability in networking code, look at kame/sys/net/net_osdep.h.
+- Never, never touch the __u6_addr{,8,16,32} member in struct in6_addr
+  directly.  Symbols starting with "__" are NOT supposed to be used.
+
+- RFC2553 defines only s6_addr[16] (array of u_int8_t) as member of struct
+  in6_addr.  KAME strictly follows RFC2553, and does not provide any
+  extensions like s6_addr{8,16,32} to the userland.  For maximum portability
+  across IPv6 platforms, only s6_addr should be used.
+  In the future, we may provide s6_addr{8,16,32} to the userland when updates
+  to RFC2553 defines them.  They are, in fact, very convenient and we would
+  like to see them defined in standard document.
+
+- For portability in kernel networking code, look at kame/sys/net/net_osdep.h.
