@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.15 2001/05/22 06:04:17 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.16 2001/09/19 04:48:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,12 +75,11 @@
 extern int rssock;
 static int ifsock;
 
-static int get_llflag __P((const char *name));
+static int get_llflag __P((const char *));
 #ifndef HAVE_GETIFADDRS
 static unsigned int if_maxindex __P((void));
 #endif
-static void get_rtaddrs __P((int addrs, struct sockaddr *sa,
-			     struct sockaddr **rti_info));
+static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 
 int
 ifinit()

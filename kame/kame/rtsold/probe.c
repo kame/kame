@@ -1,4 +1,4 @@
-/*	$KAME: probe.c,v 1.10 2000/08/13 06:14:59 itojun Exp $	*/
+/*	$KAME: probe.c,v 1.11 2001/09/19 04:48:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -59,7 +59,7 @@
 static struct msghdr sndmhdr;
 static struct iovec sndiov[2];
 static int probesock;
-static void sendprobe __P((struct in6_addr *addr, int ifindex));
+static void sendprobe __P((struct in6_addr *, int));
 
 
 int
