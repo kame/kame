@@ -2219,7 +2219,8 @@ tn(argc, argv)
     int argc;
     char *argv[];
 {
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res, *res0;
+    char *cause = "telnet: unknown";
     int error;
 #if	defined(IP_OPTIONS) && defined(IPPROTO_IP)
     char *srp = 0;
@@ -2308,23 +2309,23 @@ tn(argc, argv)
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = 0;
-    error = getaddrinfo(hostname, portp, &hints, &res);
+    error = getaddrinfo(hostname, portp, &hints, &res0);
     if (!error) {
 	/*numeric*/
-	freeaddrinfo(res);
+	freeaddrinfo(res0);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
-	error = getaddrinfo(hostname, portp, &hints, &res);
+	error = getaddrinfo(hostname, portp, &hints, &res0);
     } else {
 	/*non-numeric*/
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
-	error = getaddrinfo(hostname, portp, &hints, &res);
+	error = getaddrinfo(hostname, portp, &hints, &res0);
     }
     if (error) {
       fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
@@ -2332,34 +2333,43 @@ tn(argc, argv)
       return 0;
     }
 
-    if (res->ai_canonname)
-      (void) strcpy(_hostname, res->ai_canonname);
+    if (res0->ai_canonname)
+      (void) strcpy(_hostname, res0->ai_canonname);
     hostname = _hostname;
 
-    do {
+    net = -1;
+    for (res = res0; res; res = res->ai_next) {
 	printf("Trying %s...\n", sockaddr_ntop(res->ai_addr));
 	net = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	setuid(getuid());
 	if (net < 0) {
-	    perror("telnet: socket");
-	    return 0;
+	    cause = "telnet: socket";
+	    continue;
 	}
 
 	if (debug && SetSockOpt(net, SOL_SOCKET, SO_DEBUG, 1) < 0) {
-		perror("setsockopt (SO_DEBUG)");
+	    perror("setsockopt (SO_DEBUG)");
 	}
 	if (hostp[0] == '@' || hostp[0] == '!') {
-	    if ((srlen = sourceroute(res, hostp, &srp, &proto, &opt)) < 0)
+	    if ((srlen = sourceroute(res, hostp, &srp, &proto, &opt)) < 0) {
+		(void) NetClose(net);
+		net = -1;
 		continue;
+	    }
 	    if (srp && setsockopt(net, proto, opt, srp, srlen) < 0)
 		perror("setsockopt (source route)");
 	}
 
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-        if (setpolicy(net, res, ipsec_policy_in) < 0)
-                return 0;
-        if (setpolicy(net, res, ipsec_policy_out) < 0)
-                return 0;
+        if (setpolicy(net, res, ipsec_policy_in) < 0) {
+	    (void) NetClose(net);
+	    net = -1;
+	    continue;
+	}
+        if (setpolicy(net, res, ipsec_policy_out) < 0) {
+	    (void) NetClose(net);
+	    net = -1;
+	    continue;
+	}
 #endif
 
 	if (connect(net, res->ai_addr, res->ai_addrlen) < 0) {
@@ -2370,18 +2380,26 @@ tn(argc, argv)
 						sockaddr_ntop(res->ai_addr));
 		errno = oerrno;
 		perror((char *)0);
-		res = res->ai_next;
-		(void) NetClose(net);
-		continue;
 	    }
-	    perror("telnet: Unable to connect to remote host");
-	    return 0;
+	    cause = "telnet: Unable to connect to remote host";
+	    (void) NetClose(net);
+	    net = -1;
+	    continue;
 	}
+
 	connected++;
 #if	defined(AUTHENTICATION)
 	auth_encrypt_connect(connected);
 #endif	/* defined(AUTHENTICATION) */
-    } while (connected == 0);
+	break;
+    }
+    freeaddrinfo(res0);
+    setuid(getuid());
+    if (net < 0 || connected == 0) {
+	perror(cause);
+	return 0;
+    }
+
     cmdrc(hostp, hostname);
     if (autologin && user == NULL) {
 	struct passwd *pw;
