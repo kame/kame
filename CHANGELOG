@@ -1,9 +1,15 @@
-$Id: CHANGELOG,v 1.517 2000/02/03 17:10:37 itojun Exp $
+$Id: CHANGELOG,v 1.518 2000/02/04 14:39:12 itojun Exp $
 
 <200002>
+Fri Feb  4 23:36:26 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: improve in6_ifdetach() for cleaning
+	  up structures that depend on struct ifnet/ifaddr.  should be
+	  made more elegant...
+
 Fri Feb  4 02:09:41 JST 2000  itojun@iijlab.net
 	* sys/netinet6/frag6.c: be LP64 environment friendly.  do not reuse
 	  ip6 header portion on reassembly.
+	  notified by NetBSD PR 9340 from iwamoto@sat.t.u-tokyo.ac.jp.
 
 Fri Feb  4 01:20:15 JST 2000  itojun@iijlab.net
 	* netbsd/sys/dev/ic/smc91cxx.c: fix promisc mode for sm* interface.
