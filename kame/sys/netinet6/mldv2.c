@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.8 2004/03/10 09:24:29 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.9 2004/03/16 00:00:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -139,6 +139,7 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet/in_pcb.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
@@ -775,7 +776,7 @@ mld_fasttimeo()
 		--in6m->in6m_timer;
 		if (in6m->in6m_timer > 0) {
 			mld_group_timers_are_running = 1;
-			goto state_changetimer;
+			goto state_change_timer;
 		}
 
 		/* Current-State Record timer */
