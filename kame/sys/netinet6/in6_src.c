@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.7 2000/03/22 16:02:58 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.8 2000/03/23 01:12:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -392,6 +392,7 @@ in6_selecthlim(in6p, ifp)
 #undef in6p_hops
 #endif
 
+#ifndef __OpenBSD__
 /*
  * Find an empty port and set it to the specified PCB.
  */
@@ -489,3 +490,4 @@ in6_pcbsetport(laddr, in6p)
 #undef in6p_flags
 #undef IN6PLOOKUP_WILDCARD
 #endif
+#endif /*!OpenBSD*/
