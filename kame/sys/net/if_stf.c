@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.56 2001/04/27 09:38:32 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.57 2001/04/27 09:46:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -280,6 +280,10 @@ stf_encapcheck(m, off, proto, arg)
 		return 0;
 
 	if ((sc->sc_if.if_flags & IFF_UP) == 0)
+		return 0;
+
+	/* IFF_LINK0 means "no decapsulation" */
+	if ((sc->sc_if.if_flags & IFF_LINK0) != 0)
 		return 0;
 
 	if (proto != IPPROTO_IPV6)
