@@ -680,17 +680,25 @@ timer(i)
 static void
 cleanup()
 {
+    vifi_t vifi;
+    struct uvif *v;
+
+    /* inform all neighbors that I'm going to die */
+    for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
+	if ((v->uv_flags & (VIFF_DOWN|VIFF_DISABLED|MIFF_REGISTER)) == 0)
+	    send_pim6_hello(v, 0);
+    }
 
     /*
      * TODO: XXX (not in the spec): if I am the BSR, somehow inform the other
      * routers I am going down and need to elect another BSR? (probably by
      * sending a the Cand-RP-set with my_priority=LOWEST?)
      * 
-     */ 
-	
-     k_stop_pim(mld6_socket);
-}
+     */
+    ;
 
+    k_stop_pim(mld6_socket);
+}
 
 /*
  * Signal handler.  Take note of the fact that the signal arrived so that the
