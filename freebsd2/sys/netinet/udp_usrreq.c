@@ -418,6 +418,9 @@ udp_ctlinput(cmd, sa, vip)
 	register struct ip *ip = vip;
 	register struct udphdr *uh;
 
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
+		return;
 	if (!PRC_IS_REDIRECT(cmd) &&
 	    ((unsigned)cmd >= PRC_NCMDS || inetctlerrmap[cmd] == 0))
 		return;

@@ -497,6 +497,9 @@ tcp_ctlinput(cmd, sa, vip)
 	register struct tcphdr *th;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
+		return;
 	if (cmd == PRC_QUENCH)
 		notify = tcp_quench;
 #if 1
