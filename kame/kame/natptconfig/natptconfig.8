@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.15 2002/02/04 07:47:38 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.16 2002/02/04 08:02:22 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -75,6 +75,11 @@ The first form
 .Pq with Fl f
 takes directives from the specified configuration file.  The second
 form is to give single directive directly from the command line.
+.\"
+.Sh RETURN VALUES
+.Nm
+returns non ZERO value when detects error of syntax.  Actually, return
+value is number of error which natptconfig detected.
 .\"
 .Sh DIRECTIVES
 Keywords and special characters that the parser expects exactly are
