@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.298 2002/09/05 08:09:36 suz Exp $	*/
+/*	$KAME: in6.c,v 1.299 2002/09/06 05:43:15 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3143,13 +3143,11 @@ in6_delmulti(in6m)
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
-	struct ifreq ifr;
 #endif
 	struct ifmultiaddr *ifma = in6m->in6m_ifma;
 	int	s = splnet();
 	
 #ifdef MLDV2
-	bzero(&ifr, sizeof(ifr));
 	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
 		*error = EINVAL;
 		splx(s);
@@ -3158,21 +3156,11 @@ in6_delmulti(in6m)
 	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
 		if (--ifma->ifma_refcount == 0) {
 
-			/*
-			 * Unlink from list.
-			 */
 			ifma->ifma_protospec = 0;
 			LIST_REMOVE(in6m, in6m_entry);
-			/*
-			 * Notify the network driver to update its multicast
-			 * reception filter.
-			 */
-			bcopy(&in6m->in6m_sa, &ifr.ifr_addr, in6m->in6m_sa.sin6_len);
-			(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp, SIOCDELMULTI,
-						    (caddr_t)&ifr);
 			free(in6m, M_IPMADDR);
-			if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		}
+		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		splx(s);
 		return;
 	}
