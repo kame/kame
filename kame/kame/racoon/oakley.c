@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.69 2000/10/23 12:09:20 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.70 2000/10/24 08:31:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1635,7 +1635,7 @@ oakley_savecert(iph1, gen)
 		return -1;
 	}
 
-	/* XXX choice the 1th cert, igore after the cert. */ 
+	/* XXX choice the 1th cert, ignore after the cert. */ 
 	if (*c) {
 		plog(logp, LOCATION, NULL,
 			"NOTICE: ignore the cert.\n");
