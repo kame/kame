@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.113 2002/06/04 05:20:27 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.114 2002/06/10 20:01:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,7 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __func__,
 		s_attr_isakmp_group(dh->type), dh->prime->l << 3,
 		timedelta(&start, &end));
 #endif
@@ -249,7 +249,7 @@ oakley_dh_generate(dh, pub, priv)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __func__,
 		s_attr_isakmp_group(dh->type), dh->prime->l << 3,
 		timedelta(&start, &end));
 #endif
@@ -1398,7 +1398,7 @@ oakley_validate_auth(iph1)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
+	syslog(LOG_NOTICE, "%s(%s): %8.6f", __func__,
 		s_oakley_attr_method(iph1->approval->authmethod),
 		timedelta(&start, &end));
 #endif
