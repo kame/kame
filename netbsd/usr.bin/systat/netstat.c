@@ -500,7 +500,7 @@ shownetstat()
 				break;
 #ifdef INET6
 			case AF_INET6:
-				inet6print(&p->ni_faddr6, p->ni_lport,
+				inet6print(&p->ni_faddr6, p->ni_fport,
 					p->ni_proto);
 				break;
 #endif
