@@ -512,13 +512,17 @@ tcp6_input(mp, offp, proto)
 	 * better place to put this in?
 	 */
 	if (m->m_flags & M_ANYCAST6) {
-		if (m->m_len >= sizeof(struct ip6_hdr)) {
-			struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-			icmp6_error(m, ICMP6_DST_UNREACH,
-				ICMP6_DST_UNREACH_ADDR,
-				(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
-		} else
-			m_freem(m);
+		struct ip6_hdr *ip6;
+		if (m->m_len < sizeof(struct ip6_hdr)) {
+			if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == NULL) {
+				tcpstat.tcps_rcvshort++;
+				return IPPROTO_DONE;
+			}
+		}
+		ip6 = mtod(m, struct ip6_hdr *);
+		icmp6_error(m, ICMP6_DST_UNREACH,
+			ICMP6_DST_UNREACH_ADDR,
+			(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
 		return IPPROTO_DONE;
 	}
 
@@ -711,7 +715,7 @@ tcp_input(m, va_alist)
 			th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
 		}
 		optlen = off - sizeof (struct tcphdr);
-		optp = mtod(m, caddr_t) + toff + sizeof (struct tcphdr);
+		optp = (caddr_t)(th + 1);
 		/* 
 		 * Do quick retrieval of timestamp options ("options
 		 * prediction?").  If timestamp is the only option and it's
