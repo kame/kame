@@ -93,6 +93,7 @@ char	buf[PKTSIZE];
 char	ackbuf[PKTSIZE];
 struct	sockaddr_storage from;
 int	fromlen;
+struct	sockaddr_storage client;	/* valid peer port number */
 
 /*
  * Null-terminated directory prefix list for absolute pathname requests and
@@ -117,6 +118,7 @@ static void tftp __P((struct tftphdr *, int));
 static const char *errtomsg __P((int));
 static void nak __P((int));
 static char *verifyhost __P((struct sockaddr *));
+static int cmpport __P((struct sockaddr *, struct sockaddr *));
 static void usage __P((void));
 void timer __P((int));
 void sendfile __P((struct formats *));
@@ -158,7 +160,6 @@ main(argc, argv)
 	int ch, on;
 	int fd = 0;
 	struct sockaddr_storage me;
-	int len;
 	char *tgtuser, *tgtgroup, *ep;
 	uid_t curuid, tgtuid;
 	gid_t curgid, tgtgid;
@@ -344,29 +345,6 @@ main(argc, argv)
 		}
 	}
 
-	/*
-	 * remember what address this was sent to, so we can respond on the
-	 * same interface
-	 */
-	len = sizeof(me);
-	if (getsockname(fd, (struct sockaddr *)&me, &len) == 0) {
-		switch (me.ss_family) {
-		case AF_INET:
-			((struct sockaddr_in *)&me)->sin_port = 0;
-			break;
-		case AF_INET6:
-			((struct sockaddr_in6 *)&me)->sin6_port = 0;
-			break;
-		default:
-			/* unsupported */
-			break;
-		}
-	} else {
-		memset(&me, 0, sizeof(me));
-		me.ss_family = from.ss_family;
-		me.ss_len = from.ss_len;
-	}
-
 	alarm(0);
 	close(fd);
 	close(1);
@@ -375,14 +353,22 @@ main(argc, argv)
 		syslog(LOG_ERR, "socket: %m");
 		exit(1);
 	}
+	/*
+	 * allocate port number for my side.
+	 * we shouldn't bind(2) nor connect(2) with explicit address.  if we
+	 * do, we would unintentionally fix IP address pairs.
+	 */
+	memset(&me, 0, sizeof(me));
+	me.ss_family = from.ss_family;
+	me.ss_len = from.ss_len;
 	if (bind(peer, (struct sockaddr *)&me, me.ss_len) < 0) {
 		syslog(LOG_ERR, "bind: %m");
 		exit(1);
 	}
-	if (connect(peer, (struct sockaddr *)&from, from.ss_len) < 0) {
-		syslog(LOG_ERR, "connect: %m");
-		exit(1);
-	}
+	/*
+	 * keep peer's port number, for future validation
+	 */
+	client = from;
 	tp = (struct tftphdr *)buf;
 	tp->th_opcode = ntohs(tp->th_opcode);
 	if (tp->th_opcode == RRQ || tp->th_opcode == WRQ)
@@ -610,17 +596,25 @@ sendfile(pf)
 		(void)setjmp(timeoutbuf);
 
 send_data:
-		if (send(peer, dp, size + 4, 0) != size + 4) {
+		if (sendto(peer, dp, size + 4, 0, (struct sockaddr *)&from,
+		    fromlen) != size + 4) {
 			syslog(LOG_ERR, "tftpd: write: %m");
 			goto abort;
 		}
 		read_ahead(file, pf->f_convert);
 		for ( ; ; ) {
 			alarm(rexmtval);        /* read the ack */
-			n = recv(peer, ackbuf, sizeof (ackbuf), 0);
+			fromlen = sizeof(from);
+			n = recvfrom(peer, ackbuf, sizeof (ackbuf), 0,
+			    (struct sockaddr *)&from, &fromlen);
 			alarm(0);
 			if (n < 0) {
 				syslog(LOG_ERR, "tftpd: read: %m");
+				goto abort;
+			}
+			if (!cmpport((struct sockaddr *)&from,
+			    (struct sockaddr *)&client)) {
+				syslog(LOG_ERR, "tftpd: client port mismatch");
 				goto abort;
 			}
 			ap->th_opcode = ntohs((u_short)ap->th_opcode);
@@ -675,17 +669,25 @@ recvfile(pf)
 		block++;
 		(void) setjmp(timeoutbuf);
 send_ack:
-		if (send(peer, ackbuf, 4, 0) != 4) {
+		if (sendto(peer, ackbuf, 4, 0, (struct sockaddr *)&from,
+		    fromlen) != 4) {
 			syslog(LOG_ERR, "tftpd: write: %m");
 			goto abort;
 		}
 		write_behind(file, pf->f_convert);
 		for ( ; ; ) {
 			alarm(rexmtval);
-			n = recv(peer, dp, PKTSIZE, 0);
+			fromlen = sizeof(from);
+			n = recvfrom(peer, dp, PKTSIZE, 0,
+			    (struct sockaddr *)&from, &fromlen);
 			alarm(0);
 			if (n < 0) {            /* really? */
 				syslog(LOG_ERR, "tftpd: read: %m");
+				goto abort;
+			}
+			if (!cmpport((struct sockaddr *)&from,
+			    (struct sockaddr *)&client)) {
+				syslog(LOG_ERR, "tftpd: client port mismatch");
 				goto abort;
 			}
 			dp->th_opcode = ntohs((u_short)dp->th_opcode);
@@ -715,16 +717,25 @@ send_ack:
 
 	ap->th_opcode = htons((u_short)ACK);    /* send the "final" ack */
 	ap->th_block = htons((u_short)(block));
-	(void) send(peer, ackbuf, 4, 0);
+	(void) sendto(peer, ackbuf, 4, 0, (struct sockaddr *)&from, fromlen);
 
 	signal(SIGALRM, justquit);      /* just quit on timeout */
 	alarm(rexmtval);
-	n = recv(peer, buf, sizeof (buf), 0); /* normally times out and quits */
+	fromlen = sizeof(from);
+	/* normally times out and quits */
+	n = recvfrom(peer, buf, sizeof (buf), 0, (struct sockaddr *)&from,
+	    &fromlen);
 	alarm(0);
+	if (!cmpport((struct sockaddr *)&from, (struct sockaddr *)&client)) {
+		syslog(LOG_ERR, "tftpd: client port mismatch");
+		goto abort;
+	}
 	if (n >= 4 &&                   /* if read some data */
 	    dp->th_opcode == DATA &&    /* and got a data block */
 	    block == dp->th_block) {	/* then my last ack was lost */
-		(void) send(peer, ackbuf, 4, 0);     /* resend final ack */
+		/* resend final ack */
+		(void) sendto(peer, ackbuf, 4, 0, (struct sockaddr *)&from,
+		    fromlen);
 	}
 abort:
 	return;
@@ -801,7 +812,8 @@ nak(error)
 	}
 	length = strlen(tp->th_msg);
 	msglen = &tp->th_msg[length + 1] - buf;
-	if (send(peer, buf, msglen, 0) != msglen)
+	if (sendto(peer, buf, msglen, 0, (struct sockaddr *)&from,
+	    fromlen) != msglen)
 		syslog(LOG_ERR, "nak: %m");
 }
 
@@ -820,4 +832,21 @@ verifyhost(fromp)
 #endif
 	}
 	return hbuf;
+}
+
+static int
+cmpport(sa, sb)
+	struct sockaddr *sa;
+	struct sockaddr *sb;
+{
+	char a[NI_MAXSERV], b[NI_MAXSERV];
+
+	if (getnameinfo(sa, sa->sa_len, NULL, 0, a, sizeof(a), NI_NUMERICSERV))
+		return 0;
+	if (getnameinfo(sb, sb->sa_len, NULL, 0, b, sizeof(b), NI_NUMERICSERV))
+		return 0;
+	if (strcmp(a, b) != 0)
+		return 0;
+
+	return 1;
 }
