@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/30 02:17:08 $
+			$Date: 1999/11/03 03:33:39 $
 
 1. IPv6
 
@@ -75,7 +75,7 @@ RFC2553: Basic Socket Interface Extensions for IPv6
       socket (3.8) are,
 	- supported on KAME/FreeBSD3x,
 	- supported on KAME/NetBSD,
-	- supported on KAME/OpenBSD,
+	- supported on KAME/OpenBSD and KAME/BSDI4,
 	- not supported on KAME/FreeBSD228 and KAME/BSDI3.
       see 1.12 in this document for details.
 RFC2675: IPv6 Jumbograms
@@ -531,7 +531,7 @@ different between them.  To summarize:
   and kernel compile configuration.
   (you can't enable only one of them: they come together)
 - KAME/NetBSD supports both.  This is always enabled.
-- KAME/OpenBSD supports both.  This is always enabled.
+- KAME/OpenBSD and KAME/BSDI4 supports both.  This is always enabled.
 
 The following sections will give you the details, and how you can
 configure the behavior.
@@ -656,10 +656,10 @@ while KAME/FreeBSD3x uses merged inpcb structure.
 Supports for IPv4 mapped address/special AF_INET6 wildcard bind are
 enabled by default.  At this moment there is no way to disable it.
 
-1.12.5 KAME/OpenBSD
+1.12.5 KAME/OpenBSD and KAME/BSDI4
 
-KAME/OpenBSD uses OpenBSD-based TCP/UDP stack and inpcb source code, which
-was derived from NRL IPv6/IPsec stack.  I guess it supports IPv4 mapped
+KAME/OpenBSD and KAME/BSDI4 use NRL-based TCP/UDP stack and inpcb source code,
+which was derived from NRL IPv6/IPsec stack.  I guess it supports IPv4 mapped
 address and speical AF_INET6 wildcard bind.  The implementation is, again,
 different from other KAME/*BSDs.
 Note that NRL inpcb layer has different behavior than KAME implementation,
@@ -867,6 +867,8 @@ IPsec is mainly organized by three components.
 Note that KAME/OpenBSD does NOT include support for KAME IPsec code,
 as OpenBSD team has their home-brew IPsec stack and they have no plan
 to replace it.  IPv6 support for IPsec is, therefore, lacking on KAME/OpenBSD.
+KAME/BSDI4 lacks IPsec at this moment (both NRL and KAME).  In the near
+future we will be adding KAME IPSec code support into KAME/BSDI4.
 
 4.1 Policy Management
 
