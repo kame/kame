@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfctl.c,v 1.186 2003/08/21 19:12:08 frantzen Exp $ */
+/*	$OpenBSD: pfctl.c,v 1.188 2003/08/29 21:47:36 cedric Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -1588,9 +1588,13 @@ main(int argc, char *argv[])
 		rulesopt = NULL;
 	}
 
-	if (rulesopt != NULL)
+	if (rulesopt != NULL) {
 		if (pfctl_rules(dev, rulesopt, opts, anchorname, rulesetname))
 			error = 1;
+		else if (!(opts & PF_OPT_NOACTION) &&
+		    (loadopt & PFCTL_FLAG_TABLE))
+			warn_namespace_collision(NULL);
+	}
 
 	if (opts & PF_OPT_ENABLE)
 		if (pfctl_enable(dev, opts))
