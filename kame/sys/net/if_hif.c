@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.47 2003/04/23 09:15:49 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.48 2003/07/07 11:39:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,7 +157,6 @@ static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
 
 struct sockaddr_in6 hif_coa;
 struct hif_softc_list hif_softc_list;
-struct hif_coa_list hif_coa_list;
 
 #ifdef __FreeBSD__
 void hifattach __P((void *));
@@ -181,7 +180,6 @@ hifattach(dummy)
 	int i;
 
 	TAILQ_INIT(&hif_softc_list);
-	TAILQ_INIT(&hif_coa_list);
 
 	bzero(&hif_coa, sizeof(hif_coa));
 	hif_coa.sin6_len = sizeof(hif_coa);
@@ -602,133 +600,6 @@ hif_subnet_list_find_withhaaddr(hs_list, haaddr)
 
 	/* not found. */
 	return (NULL);
-}
-
-struct hif_coa *
-hif_coa_create(ifp)
-     struct ifnet *ifp;
-{
-	struct hif_coa *hcoa;
-
-	if (ifp == NULL) {
-		mip6log((LOG_ERR, "%s:%d: NULL ifp\n",
-			 __FILE__, __LINE__));
-		return (NULL);
-	}
-
-	hcoa = malloc(sizeof(struct hif_coa), M_TEMP, M_NOWAIT);
-	if (hcoa == NULL) {
-		mip6log((LOG_ERR, "%s:%d: memory allocation failure\n",
-			 __FILE__, __LINE__));
-	}
-
-	if (hcoa) {
-		hcoa->hcoa_ifp = ifp;
-	}
-
-	return (hcoa);
-}
-
-struct in6_ifaddr *
-hif_coa_get_ifaddr(hcoa)
-     struct hif_coa *hcoa;
-{
-	struct ifaddr *ia;
-	struct in6_ifaddr *ia6, *match;
-
-	if (hcoa == NULL)
-		return (NULL);
-	if (hcoa->hcoa_ifp == NULL)
-		return (NULL);
-
-	match = NULL;
-#if defined(__OpenBSD__) || defined(__NetBSD__)
-	for (ia = hcoa->hcoa_ifp->if_addrlist.tqh_first;
-	     ia;
-	     ia = ia->ifa_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	for (ia = hcoa->hcoa_ifp->if_addrhead.tqh_first;
-	     ia;
-	     ia = ia->ifa_link.tqe_next)
-#else
-	for (ia = hcoa->hcoa_ifp->if_addrlist; ia; ia = ia->ifa_next)
-#endif
-	{
-		if (ia->ifa_addr->sa_family != AF_INET6)
-			continue;
-		ia6 = (struct in6_ifaddr *)ia;
-
-		if (ia6->ia6_flags &
-		    (IN6_IFF_ANYCAST
-		     /* | IN6_IFF_TENTATIVE */
-		     | IN6_IFF_DETACHED
-		     | IN6_IFF_DUPLICATED
-		     | IN6_IFF_DEPRECATED))
-			continue;
-		/*
-		 * XXX site-local care-of address not supported
-		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr)
-		    || IN6_IS_ADDR_LOOPBACK(&ia6->ia_addr.sin6_addr)
-		    || IN6_IS_ADDR_LINKLOCAL(&ia6->ia_addr.sin6_addr)
-		    || IN6_IS_ADDR_SITELOCAL(&ia6->ia_addr.sin6_addr))
-			continue;
-
-		/* found */
-		match = ia6;
-		break;
-	}
-
-	return (match);
-}
-
-int
-hif_coa_list_insert(hcoa_list, hcoa)
-     struct hif_coa_list *hcoa_list;
-     struct hif_coa *hcoa;
-{
-	struct hif_coa *tmp, *tmp_next;
-	int found;
-
-	if (hcoa == NULL)
-		return (-1);
-
-	found = 0;
-	for (tmp = TAILQ_FIRST(hcoa_list);
-	     tmp;
-	     tmp = tmp_next) {
-		tmp_next = TAILQ_NEXT(tmp, hcoa_entry);
-
-		if (tmp->hcoa_ifp == hcoa->hcoa_ifp) {
-			TAILQ_REMOVE(hcoa_list, tmp, hcoa_entry);
-			TAILQ_INSERT_HEAD(hcoa_list, tmp, hcoa_entry);
-			found = 1;
-		}
-	}
-	if (found == 0) {
-		TAILQ_INSERT_HEAD(hcoa_list, hcoa, hcoa_entry);
-	}
-
-	return (0);
-}
-
-struct hif_coa *
-hif_coa_list_find_withifp(hcoa_list, ifp)
-     struct hif_coa_list *hcoa_list;
-     struct ifnet *ifp;
-{
-	struct hif_coa *hcoa;
-
-	if (ifp == NULL)
-		return (NULL);
-
-	for (hcoa = TAILQ_FIRST(hcoa_list); hcoa;
-	     hcoa = TAILQ_NEXT(hcoa, hcoa_entry)) {
-		if (hcoa && (hcoa->hcoa_ifp == ifp))
-			break;
-	}
-
-	return (hcoa);
 }
 
 static int

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.14 2002/11/01 10:10:08 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.15 2003/07/07 11:39:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -124,13 +124,6 @@ struct hif_softc {
 };
 TAILQ_HEAD(hif_softc_list, hif_softc);
 
-struct hif_coa {
-	TAILQ_ENTRY(hif_coa) hcoa_entry;
-	struct ifnet         *hcoa_ifp;
-};
-TAILQ_HEAD(hif_coa_list, hif_coa);
-
-
 #ifdef _KERNEL
 
 extern struct sockaddr_in6 hif_coa;
@@ -147,16 +140,6 @@ int hif_output				__P((struct ifnet *, struct mbuf *,
 					     struct rtentry *));
 void hif_save_location __P((void));
 void hif_restore_location __P((void));
-
-/* XXX hif_coa management. this is bad design. re-consider. */
-struct hif_coa *hif_coa_create		__P((struct ifnet *));
-struct in6_ifaddr *hif_coa_get_ifaddr	__P((struct hif_coa *));
-
-int hif_coa_list_insert			__P((struct hif_coa_list *,
-					     struct hif_coa *));
-struct hif_coa *hif_coa_list_find_withifp
-					__P((struct hif_coa_list *,
-					     struct ifnet *));
 
 /* hif_subnet management. */
 struct hif_subnet *hif_subnet_create	__P((struct mip6_subnet *));
