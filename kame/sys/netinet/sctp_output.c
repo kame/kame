@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.39 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.40 2004/04/09 10:31:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -2076,8 +2076,8 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 		sin6 = &tmp;
 
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-			return (EINVAL);
+		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+			return (error);
 		if (tcb != NULL) {
 			if ((tcb->asoc.ecn_allowed) && ecn_ok) {
 				/* Enable ECN */
