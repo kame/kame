@@ -75,6 +75,7 @@
 #include <sys/protosw.h>
 
 #include <net/if.h>
+#include <net/route.h>
 
 #include <netinet/in.h>
 
