@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.790 2000/04/18 11:28:25 itojun Exp $
+$Id: CHANGELOG,v 1.791 2000/04/18 12:46:04 jinmei Exp $
 
 <200004>
+2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): added scope boundary
+	check.
+
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scope6config/scope6config.c: added to configure and
 	view the scope zone identifiers of a particular interface.
