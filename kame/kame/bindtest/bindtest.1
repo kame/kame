@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.23 2001/06/30 03:47:56 itojun Exp $
+.\"	$KAME: bindtest.1,v 1.24 2001/07/02 17:22:25 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -275,12 +275,12 @@ generates summarized output instead of verbose output.
 Here is a sample output, and the legends for summarized output.
 .Pp
 .Ds
-starting tests, socktype = SOCK_DGRAM
+starting tests, socktype = SOCK_DGRAM, SO_REUSEADDR, V6ONLY
         wild4   wild6   loop4   loop6   wildm   loopm   onem    one4
-wild4:  x       o[---]  x       o[-2-]  ?2(49)  ?2(49)  ?2(49)  ?2(49)
-wild6:  o[---]  x       o[-2-]  x       ?2(49)  ?2(49)  ?2(49)  ?2(49)
-loop4:  x       o[1--]  x       o[12-]  ?2(49)  ?2(49)  ?2(49)  ?2(49)
-loop6:  o[1--]  x       o[12-]  x       ?2(49)  ?2(49)  ?2(49)  ?2(49)
+wild4:  x       o[--1x] o[-21x] o[-21x] ?2(49)  ?2(49)  ?2(49)  ?2(49)
+wild6:  o[--2x] x       o[-20x] o[-20x] ?2(49)  ?2(49)  ?2(49)  ?2(49)
+loop4:  o[1-2x] o[1-0x] x       o[120x] ?2(49)  ?2(49)  ?2(49)  ?2(49)
+loop6:  o[1-2x] o[1-0x] o[120x] x       ?2(49)  ?2(49)  ?2(49)  ?2(49)
 wildm:  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
 loopm:  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
 onem:   ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
@@ -302,14 +302,24 @@ attempt was successful after the first
 .Xr bind 2 .
 .Dq o
 is followed by three letters enclosed in square brackets.
-First letter shows the test result after
+The first letter shows the test result after
 .Xr sendto 2
 to the first socket address
 .Pq listed on the topmost row .
-Second letter shows the test result after
+The second letter shows the test result after
 .Xr sendto 2
 to the second socket address
 .Pq listed on the leftmost column .
+The third letter shows the test result after
+.Xr sendto 2
+to the IPv4 additional address, when specified by the
+.Fl o
+option, through an AF_INET socket.
+The fourth letter shows the test result after
+.Xr sendto 2
+to the additional IPv4 address, when specified by the
+.Fl o
+option, through an AF_INET6 socket using IPv4-mapped IPv6 address.
 .Bl -tag -width "xxxx"
 .It -
 The address is wildcard
@@ -328,6 +338,16 @@ The second socket received the packet.
 .It b
 Both sockets received the packet.  This result is not supposed to
 happen, but exists just in case.
+.It x
+The attempt of
+.Xr sendto 2
+failed.
+UDP cases only.
+.It c
+The attempt of
+.Xr connect 2
+failed.
+TCP cases only.
 .El
 .Pp
 The meaning of the result table is the same for TCP cases, whereas
