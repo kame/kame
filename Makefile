@@ -108,4 +108,7 @@ copyright.c: COPYRIGHT
 	sed -e 's,^, * ,' -e 's, *$$,,' < COPYRIGHT; \
 	echo ' */') > ${.TARGET}
 
+IMPLEMENTATION.toc: IMPLEMENTATION
+	sed -e '/^[0-9][0-9\.]* [a-zA-Z]/!d' -e 's/^/	/' IMPLEMENTATION
+
 .include "Makefile.inc"
