@@ -392,6 +392,7 @@ ip_stats(off, name)
 	p(ips_fragmented, "\t%lu output datagram%s fragmented\n");
 	p(ips_ofragments, "\t%lu fragment%s created\n");
 	p(ips_cantfrag, "\t%lu datagram%s that can't be fragmented\n");
+	p(ips_nogif, "\t%lu tunneling packet%s that can't find gif\n");
 #undef ps
 #undef p
 }
