@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.31 2001/01/17 04:12:53 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.32 2001/01/31 09:31:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,6 +35,10 @@
 /*
  * OS dependencies:
  *
+ * - ifa_ifwithaf()
+ *   bsdi[34], netbsd, and openbsd define it in sys/net/if.c
+ *   freebsd (all versions) does not have it.
+ *  
  * - struct rt_addrinfo
  *   bsdi4, netbsd 1.5R and beyond: rti_addrs, rti_info[], rti_flags, rti_ifa,
  *	rti_ifp, and rti_rtm.
