@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.111 2001/12/31 20:13:40 thorpej Exp $	*/
+/*	$KAME: cfparse.y,v 1.112 2002/02/21 14:47:38 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -549,25 +549,12 @@ sainfo_spec
 		algorithms EOS
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
-			/*XXX to be deleted */
-			if ($2 == IDTYPE_ASN1DN) {
-				yyerror("id type forbidden: %d", $2);
-				return -1;
-			}
-			cur_sainfo->idvtype = $2;
+			yyerror("it's deprecated to specify a identifier in phase 2");
 		}
 		EOS
 	|	MY_IDENTIFIER IDENTIFIERTYPE QUOTEDSTRING
 		{
-			if ($2 == IDTYPE_ASN1DN) {
-				yyerror("id type forbidden: %d", $2);
-				return -1;
-			}
-			if (set_identifier(&cur_sainfo->idv, $2, $3) != 0) {
-				yyerror("failed to set identifer.\n");
-				return -1;
-			}
-			cur_sainfo->idvtype = $2;
+			yyerror("it's deprecated to specify a identifier in phase 2");
 		}
 		EOS
 	;
