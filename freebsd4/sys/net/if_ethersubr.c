@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.33 2003/04/28 15:45:53 archie Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.36 2004/03/03 12:35:16 ru Exp $
  */
 
 #include "opt_atalk.h"
@@ -423,7 +423,7 @@ no_bridge:
 		if (ether_ipfw_chk(&m, ifp, &rule, eh, 0) == 0) {
 			if (m) {
 				m_freem(m);
-				return ENOBUFS;	/* pkt dropped */
+				return EACCES;	/* pkt dropped */
 			} else
 				return 0;	/* consumed e.g. in a pipe */
 		}
@@ -571,9 +571,7 @@ ether_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 		}
 		m->m_pkthdr.rcvif = ifp;
 		eh = mtod(m, struct ether_header *);
-		m->m_data += sizeof(struct ether_header);
-		m->m_len -= sizeof(struct ether_header);
-		m->m_pkthdr.len = m->m_len;
+		m_adj(m, sizeof(*eh));
 	}
 
 	/* Check for a BPF tap */
@@ -607,9 +605,7 @@ ether_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 			return;
 		}
 		if (bif != BDG_LOCAL) {
-			struct mbuf *oldm = m ;
-
-			save_eh = *eh ; /* because it might change */
+			save_eh = *eh; /* because it might change */
 			m = bdg_forward_ptr(m, eh, bif); /* needs forwarding */
 			/*
 			 * Do not continue if bdg_forward_ptr() processed our
@@ -823,7 +819,7 @@ post_stats:
 		    case LLC_UI:
 			if (l->llc_ssap != LLC_SNAP_LSAP)
 			    goto dropanyway;
-	
+
 			if (Bcmp(&(l->llc_snap_org_code)[0], at_org_code,
 				   sizeof(at_org_code)) == 0 &&
 			     ntohs(l->llc_snap_ether_type) == ETHERTYPE_AT) {
@@ -840,7 +836,7 @@ post_stats:
 			    aarpinput(IFP2AC(ifp), m); /* XXX */
 			    return;
 			}
-		
+
 		    default:
 			goto dropanyway;
 		    }

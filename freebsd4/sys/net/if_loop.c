@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.8 2003/06/01 01:46:11 silby Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.9 2004/02/08 08:40:24 silby Exp $
  */
 
 /*
@@ -141,7 +141,6 @@ looutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	register struct rtentry *rt;
 {
-	struct mbuf *n;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput no HDR");
@@ -150,26 +149,6 @@ looutput(ifp, m, dst, rt)
 		m_freem(m);
 		return (rt->rt_flags & RTF_BLACKHOLE ? 0 :
 		        rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
-	}
-	/*
-	 * KAME requires that the packet to be contiguous on the
-	 * mbuf.  We need to make that sure.
-	 * this kind of code should be avoided.
-	 *
-	 * XXX: KAME may no longer need contiguous packets.  Once
-	 * that has been verified, the following code _should_ be
-	 * removed.
-	 */
-	if (m && m->m_next != NULL) {
-
-		n = m_defrag(m, M_DONTWAIT);
-
-		if (n == NULL) {
-			m_freem(m);
-			return (ENOBUFS);
-		} else {
-			m = n;
-		}
 	}
 
 	ifp->if_opackets++;

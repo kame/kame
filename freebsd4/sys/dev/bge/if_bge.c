@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.28 2003/09/26 16:02:04 ps Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.32.2.1 2004/05/06 01:55:21 jdp Exp $
  */
 
 /*
@@ -96,6 +96,7 @@
 
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
+#include <machine/atomic.h>     /* for atomic_readandclear_32 */
 #include <machine/clock.h>      /* for DELAY */
 #include <machine/bus_memio.h>
 #include <machine/bus.h>
@@ -120,7 +121,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.28 2003/09/26 16:02:04 ps Exp $";
+  "$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.32.2.1 2004/05/06 01:55:21 jdp Exp $";
 #endif
 
 /*
@@ -160,10 +161,18 @@ static struct bge_type bge_devs[] = {
 		"Broadcom BCM5705M Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5782,
 		"Broadcom BCM5782 Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5788,
+		"Broadcom BCM5788 Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5901,
+		"Broadcom BCM5901 Fast Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5901A2,
+		"Broadcom BCM5901A2 Fast Ethernet" },
 	{ SK_VENDORID, SK_DEVICEID_ALTIMA,
 		"SysKonnect Gigabit Ethernet" },
 	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC1000,
 		"Altima AC1000 Gigabit Ethernet" },
+	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC1002,
+		"Altima AC1002 Gigabit Ethernet" },
 	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC9100,
 		"Altima AC9100 Gigabit Ethernet" },
 	{ 0, 0, NULL }
@@ -1630,6 +1639,8 @@ bge_probe(dev)
 			    "%s, ASIC rev. %#04x", t->bge_name,
 			    pci_read_config(dev, BGE_PCI_MISC_CTL, 4) >> 16);
 			device_set_desc_copy(dev, descbuf);
+			if (pci_get_subvendor(dev) == DELL_VENDORID)
+				sc->bge_no_3_led = 1;
 			free(descbuf, M_TEMP);
 			return(0);
 		}
@@ -2003,6 +2014,10 @@ bge_reset(sc)
 	pci_write_config(dev, BGE_PCI_CMD, command, 4);
 	bge_writereg_ind(sc, BGE_MISC_CFG, (65 << 1));
 
+	/* Enable memory arbiter. */
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+		CSR_WRITE_4(sc, BGE_MARB_MODE, BGE_MARBMODE_ENABLE);
+
 	/*
 	 * Prevent PXE restart: write a magic number to the
 	 * general communications memory at 0xB50.
@@ -2039,10 +2054,6 @@ bge_reset(sc)
 			break;
 		DELAY(10);
 	}
-
-	/* Enable memory arbiter. */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
-		CSR_WRITE_4(sc, BGE_MARB_MODE, BGE_MARBMODE_ENABLE);
 
 	/* Fix up byte swapping */
 	CSR_WRITE_4(sc, BGE_MODE_CTL, BGE_MODECTL_BYTESWAP_NONFRAME|
@@ -2223,11 +2234,14 @@ bge_intr(xsc)
 {
 	struct bge_softc *sc;
 	struct ifnet *ifp;
+	u_int32_t statusword;
 	u_int32_t status;
 
 
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
+	statusword =
+	    atomic_readandclear_32(&sc->bge_rdata->bge_status_block.bge_status);
 
 #ifdef notdef
 	/* Avoid this for now -- checking this register is expensive. */
@@ -2242,7 +2256,7 @@ bge_intr(xsc)
 	 * Process link state changes.
 	 * Grrr. The link status word in the status block does
 	 * not work correctly on the BCM5700 rev AX and BX chips,
-	 * according to all avaibable information. Hence, we have
+	 * according to all available information. Hence, we have
 	 * to enable MII interrupts in order to properly obtain
 	 * async link changes. Unfortunately, this also means that
 	 * we have to read the MAC status register to detect link
@@ -2264,13 +2278,7 @@ bge_intr(xsc)
 			    BRGPHY_INTRS);
 		}
 	} else {
-		if ((sc->bge_rdata->bge_status_block.bge_status &
-		    BGE_STATFLAG_UPDATED) &&
-		    (sc->bge_rdata->bge_status_block.bge_status &
-		    BGE_STATFLAG_LINKSTATE_CHANGED)) {
-			sc->bge_rdata->bge_status_block.bge_status &=
-			    ~(BGE_STATFLAG_UPDATED|
-			    BGE_STATFLAG_LINKSTATE_CHANGED);
+		if (statusword & BGE_STATFLAG_LINKSTATE_CHANGED) {
 			/*
 			 * Sometimes PCS encoding errors are detected in
 			 * TBI mode (on fiber NICs), and for some reason

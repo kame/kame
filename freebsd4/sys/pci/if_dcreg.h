@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.23 2003/08/27 13:40:36 mbr Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.25 2003/12/22 07:29:32 sanpei Exp $
  */
 
 /*
@@ -839,6 +839,8 @@ struct dc_softc {
  */
 #define DC_DEVICEID_AL981	0x0981
 #define DC_DEVICEID_AN985	0x0985
+#define DC_DEVICEID_ADM9511	0x9511 
+#define DC_DEVICEID_ADM9513	0x9513 
 
 
 /*
@@ -1061,9 +1063,17 @@ struct dc_eblock_hdr {
 struct dc_eblock_sia {
 	struct dc_eblock_hdr	dc_sia_hdr;
 	u_int8_t		dc_sia_code;
-	u_int8_t		dc_sia_mediaspec[6]; /* CSR13, CSR14, CSR15 */
-	u_int8_t		dc_sia_gpio_ctl[2];
-	u_int8_t		dc_sia_gpio_dat[2];
+	union {
+		struct dc_sia_ext { /* if (dc_sia_code & DC_SIA_CODE_EXT) */
+			u_int8_t dc_sia_mediaspec[6]; /* CSR13, CSR14, CSR15 */
+			u_int8_t dc_sia_gpio_ctl[2];
+			u_int8_t dc_sia_gpio_dat[2];
+		} dc_sia_ext;
+		struct dc_sia_noext { 
+			u_int8_t dc_sia_gpio_ctl[2];
+			u_int8_t dc_sia_gpio_dat[2];
+		} dc_sia_noext;
+	} dc_un;
 };
 
 #define DC_SIA_CODE_10BT	0x00

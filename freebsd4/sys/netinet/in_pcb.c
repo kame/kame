@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.26 2003/01/24 05:11:33 sam Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.27.2.1 2004/04/24 23:03:14 nectar Exp $
  */
 
 /*
@@ -132,6 +132,9 @@ int	ipport_lastauto  = IPPORT_USERRESERVED;		/* 5000 */
 int	ipport_hifirstauto = IPPORT_HIFIRSTAUTO;	/* 49152 */
 int	ipport_hilastauto  = IPPORT_HILASTAUTO;		/* 65535 */
 
+/* Shall we allocate ephemeral ports in random order? */
+int	ipport_randomized = 1;
+
 #define RANGECHK(var, min, max) \
 	if ((var) < (min)) { (var) = (min); } \
 	else if ((var) > (max)) { (var) = (max); }
@@ -168,6 +171,8 @@ SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, hifirst, CTLTYPE_INT|CTLFLAG_RW,
 	   &ipport_hifirstauto, 0, &sysctl_net_ipport_check, "I", "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, hilast, CTLTYPE_INT|CTLFLAG_RW,
 	   &ipport_hilastauto, 0, &sysctl_net_ipport_check, "I", "");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomized, CTLFLAG_RW,
+	   &ipport_randomized, 0, "");
 
 /*
  * in_pcb.c: manage the Protocol Control Blocks.
@@ -362,6 +367,9 @@ in_pcbbind(inp, nam, p)
 			/*
 			 * counting down
 			 */
+			if (ipport_randomized)
+				*lastport = first -
+					    (arc4random() % (first - last));
 			count = first - last;
 
 			do {
@@ -379,6 +387,9 @@ in_pcbbind(inp, nam, p)
 			/*
 			 * counting up
 			 */
+			if (ipport_randomized)
+				*lastport = first +
+					    (arc4random() % (last - first));
 			count = last - first;
 
 			do {
@@ -460,11 +471,11 @@ in_pcbladdr(inp, nam, plocal_sin)
 		 * destination, in case of sharing the cache with IPv6.
 		 */
 		ro = &inp->inp_route;
-		if (ro->ro_rt &&
-		    (ro->ro_dst.sa_family != AF_INET ||
-		     satosin(&ro->ro_dst)->sin_addr.s_addr !=
-		     sin->sin_addr.s_addr ||
-		     inp->inp_socket->so_options & SO_DONTROUTE)) {
+		if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+		    ro->ro_dst.sa_family != AF_INET ||
+		    satosin(&ro->ro_dst)->sin_addr.s_addr !=
+		    sin->sin_addr.s_addr ||
+		    inp->inp_socket->so_options & SO_DONTROUTE)) {
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = (struct rtentry *)0;
 		}

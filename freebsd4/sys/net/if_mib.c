@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_mib.c,v 1.8.2.1 2000/08/03 00:09:34 ps Exp $
+ * $FreeBSD: src/sys/net/if_mib.c,v 1.8.2.1.16.1 2004/05/04 13:34:30 cperciva Exp $
  */
 
 #include <sys/param.h>
@@ -80,7 +80,8 @@ sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
 	if (namelen != 2)
 		return EINVAL;
 
-	if (name[0] <= 0 || name[0] >= if_indexlim || !ifindex2ifnet[name[0]])
+	if (name[0] <= 0 || name[0] >= if_indexlim || !ifindex2ifnet[name[0]] ||
+	    ifnet_addrs[name[0] - 1] == NULL)
 		return ENOENT;
 
 	ifp = ifnet_addrs[name[0] - 1]->ifa_ifp;

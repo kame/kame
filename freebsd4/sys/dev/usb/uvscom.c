@@ -1,3 +1,4 @@
+/*	$NetBSD: usb/uvscom.c,v 1.1 2002/03/19 15:08:42 augustss Exp $	*/
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
  * All rights reserved.
@@ -23,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/uvscom.c,v 1.9.2.7 2003/07/21 12:19:22 akiyama Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.9.2.10 2004/04/16 18:12:58 julian Exp $");
 
 /*
  * uvscom: SUNTAC Slipper U VS-10U driver.
@@ -39,19 +42,23 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/bus.h>
-#include <sys/ioccom.h>
 #include <sys/fcntl.h>
 #include <sys/conf.h>
 #include <sys/tty.h>
 #include <sys/file.h>
+#if defined(__FreeBSD__)
+#include <sys/bus.h>
+#include <sys/ioccom.h>
 #if __FreeBSD_version >= 500014
 #include <sys/selinfo.h>
 #else
 #include <sys/select.h>
 #endif
+#else
+#include <sys/ioctl.h>
+#include <sys/device.h>
+#endif
 #include <sys/proc.h>
-#include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/sysctl.h>
 
@@ -71,7 +78,7 @@ static int	uvscomdebug = 0;
 SYSCTL_INT(_hw_usb_uvscom, OID_AUTO, debug, CTLFLAG_RW,
 	   &uvscomdebug, 0, "uvscom debug level");
 
-#define DPRINTFN(n, x)  do { \
+#define DPRINTFN(n, x) do { \
 				if (uvscomdebug > (n)) \
 					logprintf x; \
 			} while (0)
@@ -85,7 +92,9 @@ SYSCTL_INT(_hw_usb_uvscom, OID_AUTO, debug, CTLFLAG_RW,
 #define	UVSCOM_CONFIG_INDEX	0
 #define	UVSCOM_IFACE_INDEX	0
 
+#ifndef UVSCOM_INTR_INTERVAL
 #define UVSCOM_INTR_INTERVAL	100	/* mS */
+#endif
 
 #define UVSCOM_UNIT_WAIT	5
 
@@ -214,9 +223,8 @@ static const struct usb_devno uvscom_devs [] = {
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_IS96U },
 	/* SUNTAC U-Cable type P1 */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_PS64P1 },
-	/* SUNTAC Slipper U  */
+	/* SUNTAC Slipper U */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_VS10U },
-	{ 0, 0 }
 };
 #define uvscom_lookup(v, p) usb_lookup(uvscom_devs, v, p)
 
@@ -244,6 +252,7 @@ MODULE_DEPEND(uvscom, ucom, UCOM_MINVER, UCOM_PREFVER, UCOM_MAXVER);
 MODULE_VERSION(uvscom, UVSCOM_MODVER);
 
 static int	uvscomobufsiz = UVSCOM_DEFAULT_OPKTSIZE;
+static int	uvscominterval = UVSCOM_INTR_INTERVAL;
 
 static int
 sysctl_hw_usb_uvscom_opktsize(SYSCTL_HANDLER_ARGS)
@@ -262,9 +271,29 @@ sysctl_hw_usb_uvscom_opktsize(SYSCTL_HANDLER_ARGS)
 	return (err);
 }
 
+static int
+sysctl_hw_usb_uvscom_interval(SYSCTL_HANDLER_ARGS)
+{
+	int err, val;
+
+	val = uvscominterval;
+	err = sysctl_handle_int(oidp, &val, sizeof(val), req);
+	if (err != 0 || req->newptr == NULL)
+		return (err);
+	if (0 < val && val <= 1000)
+		uvscominterval = val;
+	else
+		err = EINVAL;
+
+	return (err);
+}
+
 SYSCTL_PROC(_hw_usb_uvscom, OID_AUTO, opktsize, CTLTYPE_INT | CTLFLAG_RW,
 	    0, sizeof(int), sysctl_hw_usb_uvscom_opktsize,
 	    "I", "uvscom output packet size");
+SYSCTL_PROC(_hw_usb_uvscom, OID_AUTO, interval, CTLTYPE_INT | CTLFLAG_RW,
+	    0, sizeof(int), sysctl_hw_usb_uvscom_interval,
+	    "I", "uvscom interrpt pipe interval");
 
 USB_MATCH(uvscom)
 {
@@ -309,7 +338,7 @@ USB_ATTACH(uvscom)
 
 	DPRINTF(("uvscom attach: sc = %p\n", sc));
 
-	/* initialize endpoints */ 
+	/* initialize endpoints */
 	ucom->sc_bulkin_no = ucom->sc_bulkout_no = -1;
 	sc->sc_intr_number = -1;
 	sc->sc_intr_pipe = NULL;
@@ -332,7 +361,7 @@ USB_ATTACH(uvscom)
 	}
 
 	/* get the common interface */
-	err = usbd_device2interface_handle(dev, UVSCOM_IFACE_INDEX, 
+	err = usbd_device2interface_handle(dev, UVSCOM_IFACE_INDEX,
 					   &ucom->sc_iface);
 	if (err) {
 		printf("%s: failed to get interface, err=%s\n",
@@ -362,7 +391,7 @@ USB_ATTACH(uvscom)
 			   UE_GET_XFERTYPE(ed->bmAttributes) == UE_INTERRUPT) {
 			sc->sc_intr_number = ed->bEndpointAddress;
 			sc->sc_isize = UGETW(ed->wMaxPacketSize);
-		} 
+		}
 	}
 
 	if (ucom->sc_bulkin_no == -1) {
@@ -449,9 +478,9 @@ uvscom_readstat(struct uvscom_softc *sc)
 	req.bRequest = UVSCOM_READ_STATUS;
 	USETW(req.wValue, 0);
 	USETW(req.wIndex, 0);
-	USETW(req.wLength, 2); 
+	USETW(req.wLength, 2);
 
-	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, &r); 
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, &r);
 	if (err) {
 		printf("%s: uvscom_readstat: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -476,9 +505,9 @@ uvscom_shutdown(struct uvscom_softc *sc)
 	req.bRequest = UVSCOM_SHUTDOWN;
 	USETW(req.wValue, 0);
 	USETW(req.wIndex, 0);
-	USETW(req.wLength, 0); 
+	USETW(req.wLength, 0);
 
-	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL); 
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL);
 	if (err) {
 		printf("%s: uvscom_shutdown: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -517,9 +546,9 @@ uvscom_set_line(struct uvscom_softc *sc, uint16_t line)
 	req.bRequest = UVSCOM_LINE_CTL;
 	USETW(req.wValue, line);
 	USETW(req.wIndex, 0);
-	USETW(req.wLength, 0); 
+	USETW(req.wLength, 0);
 
-	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL); 
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL);
 	if (err) {
 		printf("%s: uvscom_set_line: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -685,7 +714,7 @@ uvscom_param(void *addr, int portno, struct termios *t)
 	default:
 		return (EIO);
 	}
-		
+
 	if (ISSET(t->c_cflag, CSTOPB))
 		SET(ls, UVSCOM_STOP_BIT_2);
 	else
@@ -735,11 +764,14 @@ uvscom_open(void *addr, int portno)
 	struct uvscom_softc *sc = addr;
 	int err;
 	int i;
-	
+
 	if (sc->sc_ucom.sc_dying)
-		return (EIO);
+		return (ENXIO);
 
 	DPRINTF(("uvscom_open: sc = %p\n", sc));
+
+	/* change output packet size */
+	sc->sc_ucom.sc_obufsize = uvscomobufsiz;
 
 	if (sc->sc_intr_number != -1 && sc->sc_intr_pipe == NULL) {
 		DPRINTF(("uvscom_open: open interrupt pipe.\n"));
@@ -750,7 +782,7 @@ uvscom_open(void *addr, int portno)
 		if (err) {
 			DPRINTF(("%s: uvscom_open: readstat faild\n",
 				 USBDEVNAME(sc->sc_ucom.sc_dev)));
-			return (EIO);
+			return (ENXIO);
 		}
 
 		sc->sc_intr_buf = malloc(sc->sc_isize, M_USBDEV, M_WAITOK);
@@ -762,12 +794,12 @@ uvscom_open(void *addr, int portno)
 					  sc->sc_intr_buf,
 					  sc->sc_isize,
 					  uvscom_intr,
-					  UVSCOM_INTR_INTERVAL);
+					  uvscominterval);
 		if (err) {
 			printf("%s: cannot open interrupt pipe (addr %d)\n",
 				 USBDEVNAME(sc->sc_ucom.sc_dev),
 				 sc->sc_intr_number);
-			return (EIO);
+			return (ENXIO);
 		}
 	} else {
 		DPRINTF(("uvscom_open: did not open interrupt pipe.\n"));
@@ -784,14 +816,14 @@ uvscom_open(void *addr, int portno)
 		if (i == 0) {
 			DPRINTF(("%s: unit is not ready\n",
 				 USBDEVNAME(sc->sc_ucom.sc_dev)));
-			return (EIO);
+			return (ENXIO);
 		}
 
 		/* check PC card was inserted */
 		if (ISSET(sc->sc_usr, UVSCOM_NOCARD)) {
 			DPRINTF(("%s: no card\n",
 				 USBDEVNAME(sc->sc_ucom.sc_dev)));
-			return (EIO);
+			return (ENXIO);
 		}
 	}
 
@@ -799,7 +831,7 @@ uvscom_open(void *addr, int portno)
 }
 
 Static void
-uvscom_close(void *addr, int portno) 
+uvscom_close(void *addr, int portno)
 {
 	struct uvscom_softc *sc = addr;
 	int err;

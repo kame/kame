@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.23 2003/08/24 08:24:38 hsu Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.25 2004/03/22 23:59:54 ps Exp $
  */
 
 #include "opt_inet.h"
@@ -223,6 +223,10 @@ solisten(so, backlog, p)
 #endif /* SCTP */
 	
 	s = splnet();
+	if (so->so_state & (SS_ISCONNECTED | SS_ISCONNECTING)) {
+		splx(s);
+		return (EINVAL);
+	}
 #ifdef SCTP
 	oldopt = so->so_options;
 	oldqlimit = so->so_qlimit;
@@ -778,6 +782,8 @@ restart:
 			error = EWOULDBLOCK;
 			goto release;
 		}
+		SBLASTRECORDCHK(&so->so_rcv);
+		SBLASTMBUFCHK(&so->so_rcv);
 		sbunlock(&so->so_rcv);
 		error = sbwait(&so->so_rcv);
 		splx(s);
@@ -788,6 +794,8 @@ restart:
 dontblock:
 	if (uio->uio_procp)
 		uio->uio_procp->p_stats->p_ru.ru_msgrcv++;
+	SBLASTRECORDCHK(&so->so_rcv);
+	SBLASTMBUFCHK(&so->so_rcv);
 	nextrecord = m->m_nextpkt;
 	if (pr->pr_flags & PR_ADDR) {
 		KASSERT(m->m_type == MT_SONAME, ("receive 1a"));
@@ -851,12 +859,32 @@ dontblock:
 		}
 	}
 	if (m) {
-		if ((flags & MSG_PEEK) == 0)
+		if ((flags & MSG_PEEK) == 0) {
 			m->m_nextpkt = nextrecord;
+			/*
+			 * If nextrecord == NULL (this is a single chain),
+			 * then sb_lastrecord may not be valid here if m
+			 * was changed earlier.
+			 */
+			if (nextrecord == NULL) {
+				KASSERT(so->so_rcv.sb_mb == m,
+					("receive tailq 1"));
+				so->so_rcv.sb_lastrecord = m;
+			}
+		}
 		type = m->m_type;
 		if (type == MT_OOBDATA)
 			flags |= MSG_OOB;
+	} else {
+		if ((flags & MSG_PEEK) == 0) {
+			KASSERT(so->so_rcv.sb_mb == m,("receive tailq 2"));
+			so->so_rcv.sb_mb = nextrecord;
+			SB_EMPTY_FIXUP(&so->so_rcv);
+		}
 	}
+	SBLASTRECORDCHK(&so->so_rcv);
+	SBLASTMBUFCHK(&so->so_rcv);
+
 	moff = 0;
 	offset = 0;
 	while (m && uio->uio_resid > 0 && error == 0) {
@@ -883,6 +911,8 @@ dontblock:
 		 * block interrupts again.
 		 */
 		if (mp == 0) {
+			SBLASTRECORDCHK(&so->so_rcv);
+			SBLASTMBUFCHK(&so->so_rcv);
 			splx(s);
 			error = uiomove(mtod(m, caddr_t) + moff, (int)len, uio);
 			s = splnet();
@@ -911,8 +941,16 @@ dontblock:
 				} else {
 					so->so_rcv.sb_mb = m = m_free(m);
 				}
-				if (m)
+				if (m) {
 					m->m_nextpkt = nextrecord;
+					if (nextrecord == NULL)
+						so->so_rcv.sb_lastrecord = m;
+				} else {
+					so->so_rcv.sb_mb = nextrecord;
+					SB_EMPTY_FIXUP(&so->so_rcv);
+				}
+				SBLASTRECORDCHK(&so->so_rcv);
+				SBLASTMBUFCHK(&so->so_rcv);
 			}
 		} else {
 			if (flags & MSG_PEEK)
@@ -959,6 +997,8 @@ dontblock:
 			 */
 			if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
 				(*pr->pr_usrreqs->pru_rcvd)(so, flags);
+			SBLASTRECORDCHK(&so->so_rcv);
+			SBLASTMBUFCHK(&so->so_rcv);
 			error = sbwait(&so->so_rcv);
 			if (error) {
 				sbunlock(&so->so_rcv);
@@ -977,8 +1017,21 @@ dontblock:
 			(void) sbdroprecord(&so->so_rcv);
 	}
 	if ((flags & MSG_PEEK) == 0) {
-		if (m == 0)
+		if (m == 0) {
+			/*
+			 * First part is an inline SB_EMPTY_FIXUP().  Second
+			 * part makes sure sb_lastrecord is up-to-date if
+			 * there is still data in the socket buffer.
+			 */
 			so->so_rcv.sb_mb = nextrecord;
+			if (so->so_rcv.sb_mb == NULL) {
+				so->so_rcv.sb_mbtail = NULL;
+				so->so_rcv.sb_lastrecord = NULL;
+			} else if (nextrecord->m_nextpkt == NULL)
+				so->so_rcv.sb_lastrecord = nextrecord;
+		}
+		SBLASTRECORDCHK(&so->so_rcv);
+		SBLASTMBUFCHK(&so->so_rcv);
 		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
 			(*pr->pr_usrreqs->pru_rcvd)(so, flags);
 	}

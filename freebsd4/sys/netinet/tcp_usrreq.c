@@ -31,10 +31,11 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.17 2002/10/11 11:46:44 ume Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.21.2.1 2004/04/24 04:52:38 truckman Exp $
  */
 
 #include "opt_ipsec.h"
+#include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_tcpdebug.h"
 
@@ -203,6 +204,10 @@ tcp_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	 * to them.
 	 */
 	sinp = (struct sockaddr_in *)nam;
+	if (nam->sa_len != sizeof (*sinp)) {
+		error = EINVAL;
+		goto out;
+	}
 	if (sinp->sin_family == AF_INET &&
 	    IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
 		error = EAFNOSUPPORT;
@@ -232,6 +237,10 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	 * to them.
 	 */
 	sin6p = (struct sockaddr_in6 *)nam;
+	if (nam->sa_len != sizeof (*sin6p)) {
+		error = EINVAL;
+		goto out;
+	}
 	if (sin6p->sin6_family == AF_INET6 &&
 	    IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
 		error = EAFNOSUPPORT;
@@ -322,6 +331,10 @@ tcp_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	 * Must disallow TCP ``connections'' to multicast addresses.
 	 */
 	sinp = (struct sockaddr_in *)nam;
+	if (nam->sa_len != sizeof (*sinp)) {
+		error = EINVAL;
+		goto out;
+	}
 	if (sinp->sin_family == AF_INET
 	    && IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
 		error = EAFNOSUPPORT;
@@ -352,6 +365,10 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	 * Must disallow TCP ``connections'' to multicast addresses.
 	 */
 	sin6p = (struct sockaddr_in6 *)nam;
+	if (nam->sa_len != sizeof (*sin6p)) {
+		error = EINVAL;
+		goto out;
+	}
 	if (sin6p->sin6_family == AF_INET6
 	    && IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
 		error = EAFNOSUPPORT;
@@ -546,8 +563,8 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		}
 		m_freem(control);	/* empty control, just free it */
 	}
-	if(!(flags & PRUS_OOB)) {
-		sbappend(&so->so_snd, m);
+	if (!(flags & PRUS_OOB)) {
+		sbappendstream(&so->so_snd, m);
 		if (nam && tp->t_state < TCPS_SYN_SENT) {
 			/*
 			 * Do implied connect if not yet connected,
@@ -596,7 +613,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		 * of data past the urgent section.
 		 * Otherwise, snd_up should be one lower.
 		 */
-		sbappend(&so->so_snd, m);
+		sbappendstream(&so->so_snd, m);
 		if (nam && tp->t_state < TCPS_SYN_SENT) {
 			/*
 			 * Do implied connect if not yet connected,
@@ -914,6 +931,22 @@ tcp_ctloutput(so, sopt)
 	switch (sopt->sopt_dir) {
 	case SOPT_SET:
 		switch (sopt->sopt_name) {
+#ifdef TCP_SIGNATURE
+		case TCP_MD5SIG:
+			error = sooptcopyin(sopt, &optval, sizeof optval,
+					    sizeof optval);
+			if (error)
+				break;
+
+			if (optval > 0) {
+				tp->t_flags |= TF_SIGNATURE;
+				/* tp->t_md5spi = optval; */
+			} else {
+				tp->t_flags &= ~TF_SIGNATURE;
+				/* tp->t_md5spi = 0; */
+			}
+			break;
+#endif /* TCP_SIGNATURE */
 		case TCP_NODELAY:
 		case TCP_NOOPT:
 			error = sooptcopyin(sopt, &optval, sizeof optval,
@@ -973,6 +1006,11 @@ tcp_ctloutput(so, sopt)
 
 	case SOPT_GET:
 		switch (sopt->sopt_name) {
+#ifdef TCP_SIGNATURE
+		case TCP_MD5SIG:
+			optval = (tp->t_flags & TF_SIGNATURE) ? 1 : 0;
+			break;
+#endif
 		case TCP_NODELAY:
 			optval = tp->t_flags & TF_NODELAY;
 			break;

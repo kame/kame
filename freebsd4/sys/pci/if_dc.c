@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.50 2003/08/27 13:40:35 mbr Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.55 2003/12/22 07:29:32 sanpei Exp $
  */
 
 /*
@@ -134,7 +134,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.50 2003/08/27 13:40:35 mbr Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.55 2003/12/22 07:29:32 sanpei Exp $";
 #endif
 
 /*
@@ -155,6 +155,10 @@ static struct dc_type dc_devs[] = {
 		"ADMtek AL981 10/100BaseTX" },
 	{ DC_VENDORID_ADMTEK, DC_DEVICEID_AN985,
 		"ADMtek AN985 10/100BaseTX" },
+	{ DC_VENDORID_ADMTEK, DC_DEVICEID_ADM9511,
+		"ADMtek ADM9511 10/100BaseTX" },
+	{ DC_VENDORID_ADMTEK, DC_DEVICEID_ADM9513,
+		"ADMtek ADM9513 10/100BaseTX" },
 	{ DC_VENDORID_ASIX, DC_DEVICEID_AX88140A,
 		"ASIX AX88140A 10/100BaseTX" },
 	{ DC_VENDORID_ASIX, DC_DEVICEID_AX88140A,
@@ -200,7 +204,7 @@ static int dc_resume		__P((device_t));
 static void dc_acpi		__P((device_t));
 static struct dc_type *dc_devtype	__P((device_t));
 static int dc_newbuf		__P((struct dc_softc *, int, struct mbuf *));
-static int dc_encap		__P((struct dc_softc *, struct mbuf *,
+static int dc_encap		__P((struct dc_softc *, struct mbuf **,
 					u_int32_t *));
 static void dc_pnic_rx_bug_war	__P((struct dc_softc *, int));
 static int dc_rx_resync		__P((struct dc_softc *));
@@ -1628,20 +1632,35 @@ static void dc_decode_leaf_sia(sc, l)
 
 	m = malloc(sizeof(struct dc_mediainfo), M_DEVBUF, M_NOWAIT);
 	bzero(m, sizeof(struct dc_mediainfo));
-	if (l->dc_sia_code == DC_SIA_CODE_10BT)
+	switch (l->dc_sia_code & ~DC_SIA_CODE_EXT) {
+	case DC_SIA_CODE_10BT:
 		m->dc_media = IFM_10_T;
-
-	if (l->dc_sia_code == DC_SIA_CODE_10BT_FDX)
+		break;
+	case DC_SIA_CODE_10BT_FDX:
 		m->dc_media = IFM_10_T|IFM_FDX;
-
-	if (l->dc_sia_code == DC_SIA_CODE_10B2)
+		break;
+	case DC_SIA_CODE_10B2:
 		m->dc_media = IFM_10_2;
-
-	if (l->dc_sia_code == DC_SIA_CODE_10B5)
+		break;
+	case DC_SIA_CODE_10B5:
 		m->dc_media = IFM_10_5;
+		break;
+	}
 
-	m->dc_gp_len = 2;
-	m->dc_gp_ptr = (u_int8_t *)&l->dc_sia_gpio_ctl;
+	/*
+	 * We need to ignore CSR13, CSR14, CSR15 for SIA mode.
+	 * Things apparently already work for cards that do
+	 * supply Media Specific Data.
+	 */
+	if (l->dc_sia_code & DC_SIA_CODE_EXT) {
+		m->dc_gp_len = 2;
+		m->dc_gp_ptr = 
+		    (u_int8_t *)&l->dc_un.dc_sia_ext.dc_sia_gpio_ctl;
+	} else {
+		m->dc_gp_len = 2;
+		m->dc_gp_ptr = 
+		    (u_int8_t *)&l->dc_un.dc_sia_noext.dc_sia_gpio_ctl;
+	}
 
 	m->dc_next = sc->dc_mi;
 	sc->dc_mi = m;
@@ -1902,7 +1921,7 @@ static int dc_attach(dev)
 		sc->dc_flags |= DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_TX_ADMTEK_WAR;
 		sc->dc_pmode = DC_PMODE_MII;
-		dc_read_srom(sc, sc->dc_romwidth);
+		/* Don't read SROM for - auto-loaded on reset */
 		break;
 	case DC_DEVICEID_98713:
 	case DC_DEVICEID_98713_CP:
@@ -2025,9 +2044,8 @@ static int dc_attach(dev)
 		break;
 	case DC_TYPE_AL981:
 	case DC_TYPE_AN985:
-		bcopy(&sc->dc_srom[DC_AL_EE_NODEADDR], (caddr_t)&eaddr,
-		    ETHER_ADDR_LEN);
-		dc_read_eeprom(sc, (caddr_t)&eaddr, DC_AL_EE_NODEADDR, 3, 0);
+		*(u_int32_t *)(&eaddr[0]) = CSR_READ_4(sc, DC_AL_PAR0);
+		*(u_int16_t *)(&eaddr[4]) = CSR_READ_4(sc, DC_AL_PAR1);
 		break;
 	case DC_TYPE_CONEXANT:
 		bcopy(sc->dc_srom + DC_CONEXANT_EE_NODEADDR, &eaddr, 6);
@@ -2979,7 +2997,7 @@ static void dc_intr(arg)
  */
 static int dc_encap(sc, m_head, txidx)
 	struct dc_softc		*sc;
-	struct mbuf		*m_head;
+	struct mbuf		**m_head;
 	u_int32_t		*txidx;
 {
 	struct dc_desc		*f = NULL;
@@ -2999,15 +3017,15 @@ static int dc_encap(sc, m_head, txidx)
 	 * do not use up the entire list, even if they would fit.
 	 */
 
-	for (m = m_head; m != NULL; m = m->m_next)
+	for (m = *m_head; m != NULL; m = m->m_next)
 		chainlen++;
 
 	if ((chainlen > DC_TX_LIST_CNT / 4) ||
 	    ((DC_TX_LIST_CNT - (chainlen + sc->dc_cdata.dc_tx_cnt)) < 6)) {
-		m = m_defrag(m_head, M_DONTWAIT);
+		m = m_defrag(*m_head, M_DONTWAIT);
 		if (m == NULL)
 			return (ENOBUFS);
-		m_head = m;
+		*m_head = m;
 	}
        
 	/*
@@ -3015,10 +3033,10 @@ static int dc_encap(sc, m_head, txidx)
 	 * the fragment pointers. Stop when we run out
  	 * of fragments or hit the end of the mbuf chain.
 	 */
-	m = m_head;
+	m = *m_head;
 	cur = frag = *txidx;
 
-	for (m = m_head; m != NULL; m = m->m_next) {
+	for (m = *m_head; m != NULL; m = m->m_next) {
 		if (m->m_len != 0) {
 			if (sc->dc_flags & DC_TX_ADMTEK_WAR) {
 				if (*txidx != sc->dc_cdata.dc_tx_prod &&
@@ -3047,7 +3065,7 @@ static int dc_encap(sc, m_head, txidx)
 		return(ENOBUFS);
 
 	sc->dc_cdata.dc_tx_cnt += cnt;
-	sc->dc_cdata.dc_tx_chain[cur] = m_head;
+	sc->dc_cdata.dc_tx_chain[cur] = *m_head;
 	sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_LASTFRAG;
 	if (sc->dc_flags & DC_TX_INTR_FIRSTFRAG)
 		sc->dc_ldata->dc_tx_list[*txidx].dc_ctl |= DC_TXCTL_FINT;
@@ -3110,7 +3128,7 @@ static void dc_start(ifp)
 		} else
 			coalesced = 0;
 
-		if (dc_encap(sc, m_head, &idx)) {
+		if (dc_encap(sc, &m_head, &idx)) {
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}

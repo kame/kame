@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.19 2003/08/30 17:51:08 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.21 2004/04/05 07:31:18 ru Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.19 2003/08/30 17:51:08 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.21 2004/04/05 07:31:18 ru Exp $";
 #endif
 
 /*
@@ -1210,6 +1210,8 @@ static void rl_txeof(sc)
 	 * frames that have been uploaded.
 	 */
 	do {
+		if (RL_LAST_TXMBUF(sc) == NULL)
+			break;
 		txstat = CSR_READ_4(sc, RL_LAST_TXSTAT(sc));
 		if (!(txstat & (RL_TXSTAT_TX_OK|
 		    RL_TXSTAT_TX_UNDERRUN|RL_TXSTAT_TXABRT)))
@@ -1217,10 +1219,8 @@ static void rl_txeof(sc)
 
 		ifp->if_collisions += (txstat & RL_TXSTAT_COLLCNT) >> 24;
 
-		if (RL_LAST_TXMBUF(sc) != NULL) {
-			m_freem(RL_LAST_TXMBUF(sc));
-			RL_LAST_TXMBUF(sc) = NULL;
-		}
+		m_freem(RL_LAST_TXMBUF(sc));
+		RL_LAST_TXMBUF(sc) = NULL;
 		if (txstat & RL_TXSTAT_TX_OK)
 			ifp->if_opackets++;
 		else {
@@ -1245,8 +1245,10 @@ static void rl_txeof(sc)
 		ifp->if_flags &= ~IFF_OACTIVE;
 	} while (sc->rl_cdata.last_tx != sc->rl_cdata.cur_tx);
 
-	ifp->if_timer =
-	    (sc->rl_cdata.last_tx == sc->rl_cdata.cur_tx) ? 0 : 5;
+	if (RL_LAST_TXMBUF(sc) == NULL)
+		ifp->if_timer = 0;
+	else if (ifp->if_timer == 0)
+		ifp->if_timer = 5;
 
 	return;
 }
@@ -1281,7 +1283,7 @@ rl_poll (struct ifnet *ifp, enum poll_cmd cmd, int count)
 	struct rl_softc *sc = ifp->if_softc;
 
 	if (cmd == POLL_DEREGISTER) { /* final call, enable interrupts */
-		CSR_WRITE_4(sc, RL_IMR, RL_INTRS);
+		CSR_WRITE_2(sc, RL_IMR, RL_INTRS);
 		return;
 	}
 
@@ -1550,7 +1552,7 @@ static void rl_init(xsc)
 
 #ifdef DEVICE_POLLING
 	/*
-	 * Only enable interrupts if we are polling, keep them off otherwise.
+	 * Disable interrupts if we are polling.
 	 */
 	if (ifp->if_ipending & IFF_POLLING)
 		CSR_WRITE_2(sc, RL_IMR, 0);

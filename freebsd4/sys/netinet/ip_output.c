@@ -62,7 +62,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.41 2003/09/13 05:52:47 silby Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.44 2004/04/07 10:01:39 ru Exp $
  */
 
 #define _IP_VHL
@@ -417,18 +417,6 @@ ip_output(struct mbuf *m0, struct mbuf *opt, struct route *ro,
 				ip->ip_src = IA_SIN(ia)->sin_addr;
 		}
 
-		if (ip_mrouter && (flags & IP_FORWARDING) == 0) {
-			/*
-			 * XXX
-			 * delayed checksums are not currently
-			 * compatible with IP multicast routing
-			 */
-			if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
-				in_delayed_cksum(m);
-				m->m_pkthdr.csum_flags &=
-					~CSUM_DELAY_DATA;
-			}
-		}
 		IN_LOOKUP_MULTI(pkt_dst, ifp, inm);
 		if (inm != NULL &&
 		   (imo == NULL || imo->imo_multicast_loop)) {
@@ -569,6 +557,7 @@ sendit:
 
 	case IPSEC_POLICY_BYPASS:
 	case IPSEC_POLICY_NONE:
+	case IPSEC_POLICY_TCP:
 		/* no need to do IPsec. */
 		goto skip_ipsec;
 	
@@ -2771,6 +2760,14 @@ ip_mloopback(ifp, m, dst, hlen)
 	if (copym != NULL && (copym->m_flags & M_EXT || copym->m_len < hlen))
 		copym = m_pullup(copym, hlen);
 	if (copym != NULL) {
+		/* If needed, compute the checksum and mark it as valid. */
+		if (copym->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
+			in_delayed_cksum(copym);
+			copym->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
+			copym->m_pkthdr.csum_flags |=
+			    CSUM_DATA_VALID | CSUM_PSEUDO_HDR;
+			copym->m_pkthdr.csum_data = 0xffff;
+		}
 		/*
 		 * We don't bother to fragment if the IP length is greater
 		 * than the interface's MTU.  Can this possibly matter?
@@ -2807,12 +2804,6 @@ ip_mloopback(ifp, m, dst, hlen)
 		copym->m_pkthdr.rcvif = ifp;
 		ip_input(copym);
 #else
-		/* if the checksum hasn't been computed, mark it as valid */
-		if (copym->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
-			copym->m_pkthdr.csum_flags |=
-			    CSUM_DATA_VALID | CSUM_PSEUDO_HDR;
-			copym->m_pkthdr.csum_data = 0xffff;
-		}
 		if_simloop(ifp, copym, dst->sin_family, 0);
 #endif
 	}

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.18 2003/06/25 21:23:58 silby Exp $
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.19 2004/02/28 00:43:31 tegge Exp $
  */
 
 #include "opt_compat.h"
@@ -1122,7 +1122,7 @@ fdfree(p)
 			i = 0;
 			fpp = fdp->fd_ofiles;
 			for (i = 0, fpp = fdp->fd_ofiles;
-			     i < fdp->fd_lastfile;
+			     i <= fdp->fd_lastfile;
 			     i++, fpp++) {
 				if (*fpp == NULL ||
 				    (*fpp)->f_type != DTYPE_VNODE)

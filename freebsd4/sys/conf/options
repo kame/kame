@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.191.2.58 2003/08/24 08:24:37 hsu Exp $
+# $FreeBSD: src/sys/conf/options,v 1.191.2.64 2004/04/19 06:02:17 njl Exp $
 #
 #        On the handling of kernel options
 #
@@ -72,6 +72,9 @@ AHD_REG_PRETTY_PRINT	opt_aic79xx.h	# Print register bitfields in debug
 
 ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
 					# mapped I/O
+
+TWA_DEBUG		opt_twa.h
+TWA_FLASH_FIRMWARE	opt_twa.h
 
 # options for ACPI support
 ACPI_DEBUG		opt_acpi.h
@@ -211,8 +214,6 @@ SCSI_NO_OP_STRINGS	opt_scsi.h
 # Options used only in cam/scsi/scsi_cd.c
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
 CHANGER_MAX_BUSY_SECONDS	opt_cd.h
-
-DA_OLD_QUIRKS		opt_da.h
 
 # Options used only in cam/scsi/scsi_sa.c.
 SA_IO_TIMEOUT		opt_sa.h
@@ -356,6 +357,7 @@ DCCP_TFRC		opt_dccp.h
 #
 SLIP_IFF_OPTS		opt_slip.h
 TCPDEBUG
+TCP_SIGNATURE		opt_inet.h
 TCP_DROP_SYNFIN		opt_tcp_input.h
 TCP_ECN			opt_global.h
 XBONEHACK
@@ -542,7 +544,9 @@ UKBD_DEBUG		opt_usb.h
 ULPT_DEBUG		opt_usb.h
 UMASS_DEBUG		opt_usb.h
 UMS_DEBUG		opt_usb.h
+UPLCOM_INTR_INTERVAL	opt_uplcom.h
 UVSCOM_DEFAULT_OPKTSIZE	opt_uvscom.h
+UVSCOM_INTR_INTERVAL	opt_uvscom.h
 
 # Vinum options
 VINUMDEBUG		opt_vinum.h
@@ -560,6 +564,8 @@ PCFCLOCK_MAX_RETRIES	opt_pcfclock.h
 # Polling device handling
 DEVICE_POLLING		opt_global.h
 
+SOCKBUF_DEBUG		opt_global.h
+
 # options for ubsec driver
 UBSEC_DEBUG		opt_ubsec.h
 UBSEC_RNDTEST		opt_ubsec.h
@@ -574,3 +580,9 @@ HIFN_NO_RNG		opt_hifn.h
 SAFE_DEBUG		opt_safe.h
 SAFE_RNDTEST		opt_safe.h
 SAFE_NO_RNG		opt_safe.h
+
+# dcons options
+DCONS_BUF_SIZE		opt_dcons.h
+DCONS_POLL_HZ		opt_dcons.h
+DCONS_FORCE_CONSOLE	opt_dcons.h
+DCONS_FORCE_GDB		opt_dcons.h

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip.h	8.2 (Berkeley) 6/1/94
- * $FreeBSD: src/sys/netinet/ip.h,v 1.17 1999/12/22 19:13:20 shin Exp $
+ * $FreeBSD: src/sys/netinet/ip.h,v 1.17.2.2 2004/02/16 14:41:46 bms Exp $
  */
 
 #ifndef _NETINET_IP_H_
@@ -196,4 +196,16 @@ struct	ip_timestamp {
 
 #define	IP_MSS		576		/* default maximum segment size */
 
+/*
+ * This is the real IPv4 pseudo header, used for computing the TCP and UDP
+ * checksums. For the Internet checksum, struct ipovly can be used instead.
+ * For stronger checksums, the real thing must be used.
+ */
+struct ippseudo {
+	struct	in_addr	ippseudo_src;	/* source internet address */
+	struct	in_addr	ippseudo_dst;	/* destination internet address */
+	u_char		ippseudo_pad;	/* pad, must be zero */
+	u_char		ippseudo_p;	/* protocol */
+	u_short		ippseudo_len;	/* protocol length */
+};
 #endif

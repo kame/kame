@@ -31,10 +31,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.38 2003/05/21 04:46:41 cjc Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.41 2004/03/22 23:59:55 ps Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
+#include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_tcpdebug.h"
@@ -330,7 +331,7 @@ present:
 		if (so->so_state & SS_CANTRCVMORE)
 			m_freem(q->tqe_m);
 		else
-			sbappend(&so->so_rcv, q->tqe_m);
+			sbappendstream(&so->so_rcv, q->tqe_m);
 		free(q, M_TSEGQ);
 		tcp_reass_qsize--;
 		q = nq;
@@ -1097,7 +1098,7 @@ after_listen:
 				m_freem(m);
 			} else {
 				m_adj(m, drop_hdrlen);	/* delayed header drop */
-				sbappend(&so->so_rcv, m);
+				sbappendstream(&so->so_rcv, m);
 			}
 			sorwakeup(so);
 			if (DELAY_ACK(tp)) {
@@ -2183,7 +2184,7 @@ dodata:							/* XXX */
 			if (so->so_state & SS_CANTRCVMORE)
 				m_freem(m);
 			else
-				sbappend(&so->so_rcv, m);
+				sbappendstream(&so->so_rcv, m);
 			sorwakeup(so);
 		} else {
 			thflags = tcp_reass(tp, th, &tlen, m);
@@ -2463,6 +2464,19 @@ tcp_dooptions(to, cp, cnt, is_syn)
 			    (char *)&to->to_ccecho, sizeof(to->to_ccecho));
 			to->to_ccecho = ntohl(to->to_ccecho);
 			break;
+#ifdef TCP_SIGNATURE
+		/*
+		 * XXX In order to reply to a host which has set the
+		 * TCP_SIGNATURE option in its initial SYN, we have to
+		 * record the fact that the option was observed here
+		 * for the syncache code to perform the correct response.
+		 */
+		case TCPOPT_SIGNATURE:
+			if (optlen != TCPOLEN_SIGNATURE)
+				continue;
+			to->to_flags |= (TOF_SIGNATURE | TOF_SIGLEN);
+			break;
+#endif
 		default:
 			continue;
 		}
