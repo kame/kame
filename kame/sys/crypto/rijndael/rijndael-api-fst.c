@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.10 2001/05/27 09:34:18 itojun Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.11 2001/06/22 19:25:14 itojun Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -18,6 +18,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #ifdef _KERNEL
+#include <sys/time.h>
 #include <sys/systm.h>
 #else
 #include <string.h>
