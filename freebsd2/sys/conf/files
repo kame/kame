@@ -523,3 +523,9 @@ crypto/cast128/cast128.c	optional ipsec_esp
 crypto/cast128/cast128_cbc.c	optional ipsec_esp
 crypto/rc5/rc5.c		optional ipsec_esp
 crypto/rc5/rc5_cbc.c		optional ipsec_esp
+netinet6/mip6.c		optional mip6
+netinet6/mip6_hooks.c	optional mip6
+netinet6/mip6_io.c	optional mip6
+netinet6/mip6_mn.c	optional mip6_mn
+netinet6/mip6_md.c	optional mip6_mn
+netinet6/mip6_ha.c	optional mip6_ha

@@ -928,3 +928,7 @@ static struct domain routedomain =
       routesw, &routesw[sizeof(routesw)/sizeof(routesw[0])] };
 
 DOMAIN_SET(route);
+
+#ifdef MIP6
+#include <net/rtsock_mip.c>
+#endif
