@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.19 2000/01/31 16:50:00 sumikawa Exp $
+# $Id: Makefile,v 1.20 2000/01/31 16:57:25 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -50,6 +50,7 @@ SUBDIR+=	sendmail6
 SUBDIR+=	sendmail.beta
 SUBDIR+=	socks5
 SUBDIR+=	socks64
+SUBDIR+=	solidpop3d
 SUBDIR+=	squid11
 SUBDIR+=	ssh
 SUBDIR+=	tcp_wrapper
