@@ -67,6 +67,11 @@
 #define	_SYS_SOCKET_H_
 
 /*
+ * needed for CMSG_ALIGN
+ */
+#include <machine/param.h>
+
+/*
  * Definitions related to sockets: types, address families, options.
  */
 
@@ -344,18 +349,25 @@ struct cmsghdr {
 };
 
 /* given pointer to struct cmsghdr, return pointer to data */
-#define	CMSG_DATA(cmsg)		((u_char *)((cmsg) + 1))
+#define	CMSG_DATA(cmsg)	\
+	((u_char *)(cmsg) + CMSG_ALIGN(sizeof(struct cmsghdr)))
 
 /*
  * Alignment requirement for CMSG struct manipulation.
- * This is different from ALIGN() defined in ARCH/include/param.h.
- * XXX think again carefully about architecture dependencies.
+ *
+ * XXX
+ * This is still a little bit questionable from two points:
+ * (1) It is not future adaptable.  If old binaries and new kernel uses
+ * different definition for ALIGNBYTES, old binaries will choke.
+ * (2) Also, it may not be correct to add dependency from sys/socket.h to
+ * machine/param.h.
  */
-#define CMSG_ALIGN(n)		(((n) + 3) & ~3)
+#define CMSG_ALIGN(n)	(((n) + ALIGNBYTES) & ~ALIGNBYTES)
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	(((caddr_t)(cmsg) + (cmsg)->cmsg_len + sizeof(struct cmsghdr) > \
+	(((caddr_t)(cmsg) + CMSG_ALIGN((cmsg)->cmsg_len) + \
+			    CMSG_ALIGN(sizeof(struct cmsghdr) > \
 	    (mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
 	    (struct cmsghdr *)((caddr_t)(cmsg) + CMSG_ALIGN((cmsg)->cmsg_len)))
