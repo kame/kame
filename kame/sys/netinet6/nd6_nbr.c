@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.29 2000/02/26 08:20:58 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.30 2000/03/01 12:16:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,10 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
+
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif
 
 #include <net/net_osdep.h>
 
@@ -498,6 +502,10 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	nd_ns->nd_ns_cksum
 		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
 
+#ifdef IPSEC
+	/* Don't lookup socket */
+	ipsec_setsocket(m, NULL);
+#endif
 	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, &outif);
 	if (outif) {
 		icmp6_ifstat_inc(outif, ifs6_out_msg);
@@ -922,6 +930,10 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	nd_na->nd_na_cksum =
 		in6_cksum(m, IPPROTO_ICMPV6, sizeof(struct ip6_hdr), icmp6len);
 
+#ifdef IPSEC
+	/* Don't lookup socket */
+	ipsec_setsocket(m, NULL);
+#endif
 	ip6_output(m, NULL, NULL, 0, &im6o, &outif);
 	if (outif) {
 		icmp6_ifstat_inc(outif, ifs6_out_msg);

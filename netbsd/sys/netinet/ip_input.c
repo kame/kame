@@ -1419,6 +1419,7 @@ ip_forward(m, srcrt)
 	}
 
 #ifdef IPSEC
+	/* Don't lookup socket in forwading case */
 	ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,

@@ -1680,6 +1680,7 @@ tbf_send_packet(vifp, m)
 	if (vifp->v_flags & VIFF_TUNNEL) {
 		/* If tunnel options */
 #ifdef IPSEC
+		/* Don't lookup socket in forwading case */
 		ipsec_setsocket(m, NULL);
 #endif
 		ip_output(m, (struct mbuf *)0, &vifp->v_route,
@@ -1696,6 +1697,7 @@ tbf_send_packet(vifp, m)
 #endif
 
 #ifdef IPSEC
+		/* Don't lookup socket in forwading case */
 		ipsec_setsocket(m, NULL);
 #endif
 		error = ip_output(m, (struct mbuf *)0, (struct route *)0,
