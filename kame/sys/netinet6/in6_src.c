@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.4 2000/02/22 14:04:20 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.5 2000/03/11 10:07:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__
 #include "opt_ipsec.h"
 #endif
 
@@ -90,11 +90,13 @@
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
-#if 0
+#if !(defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+
+#include <net/net_osdep.h>
 
 #ifndef __bsdi__
 #include "loop.h"
@@ -269,13 +271,17 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
 						     ->ro_dst, 0, 0UL);
-#endif /*__FreeBSD__*/
-#if defined(__bsdi__) || defined(__NetBSD__)
+#else
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
 						     ->ro_dst, 0);
-#endif /*__bsdi__*/
-			} else
+#endif /*__FreeBSD__*/
+			} else {
+#ifdef __bsdi__  /* bsdi needs rtcalloc to make a host route */
+				rtcalloc((struct route *)ro);
+#else
 				rtalloc((struct route *)ro);
+#endif
+			}
 		}
 
 		/*
@@ -322,20 +328,28 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 /*
  * Default hop limit selection. The precedence is as follows:
- * 1. Hoplimit valued specified via ioctl.
+ * 1. Hoplimit value specified via ioctl.
  * 2. (If the outgoing interface is detected) the current
  *     hop limit of the interface specified by router advertisement.
  * 3. The system default hoplimit.
 */
+#ifdef HAVE_NRL_INPCB
+#define in6pcb		inpcb
+#define in6p_hops	inp_hops	
+#endif
 int
-in6_selecthlim(inp, ifp)
-	struct inpcb *inp;
+in6_selecthlim(in6p, ifp)
+	struct in6pcb *in6p;
 	struct ifnet *ifp;
 {
-	if (inp && inp->inp_hops >= 0)
-		return(inp->inp_hops);
+	if (in6p && in6p->in6p_hops >= 0)
+		return(in6p->in6p_hops);
 	else if (ifp)
 		return(nd_ifinfo[ifp->if_index].chlim);
 	else
 		return(ip6_defhlim);
 }
+#ifdef HAVE_NRL_INPCB
+#undef in6pcb
+#undef in6p_hops
+#endif

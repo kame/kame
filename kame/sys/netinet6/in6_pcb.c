@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.34 2000/02/22 14:04:18 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.35 2000/03/02 06:32:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -504,6 +504,7 @@ in6_pcbconnect(in6p, nam)
 	return(0);
 }
 
+#ifndef __NetBSD__
 /*
  * Return an IPv6 address, which is the most appropriate for given
  * destination and user specified options.
@@ -741,6 +742,7 @@ in6_selecthlim(in6p, ifp)
 	else
 		return(ip6_defhlim);
 }
+#endif
 
 void
 in6_pcbdisconnect(in6p)
