@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.57 2000/04/07 13:25:38 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.58 2000/04/11 08:46:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2568,8 +2568,6 @@ ipsec4_output(state, sp, flags)
 				goto bad;
 			}
 
-			ip = mtod(state->m, struct ip *);
-
 			state->m = ipsec4_splithdr(state->m);
 			if (!state->m) {
 				splx(s);
@@ -2929,8 +2927,6 @@ ipsec6_output_tunnel(state, sp, flags)
 				error = EAFNOSUPPORT;
 				goto bad;
 			}
-
-			ip6 = mtod(state->m, struct ip6_hdr *);
 
 			state->m = ipsec6_splithdr(state->m);
 			if (!state->m) {
