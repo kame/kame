@@ -593,7 +593,7 @@ oboe_alloc_taskfile(struct oboe_softc *sc)
 	int i;
 	/* XXX */
 	uint32_t addr = (uint32_t)malloc(OBOE_TASK_BUF_LEN, M_DEVBUF, M_WAITOK);
-	if (addr == NULL) {
+	if (addr == 0) {
 		goto bad;
 	}
 	addr &= ~(sizeof (struct OboeTaskFile) - 1);
