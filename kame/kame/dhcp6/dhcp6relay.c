@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.41 2003/07/16 16:01:20 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.42 2003/07/20 11:23:06 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -524,6 +524,7 @@ relay6_recv(s, fromclient)
 	rmh.msg_control = (caddr_t)rmsgctlbuf;
 	rmh.msg_controllen = rmsgctllen;
 
+	rmh.msg_name = &from;
 	rmh.msg_namelen = sizeof (from);
 
 	if ((len = recvmsg(s, &rmh, 0)) < 0) {
