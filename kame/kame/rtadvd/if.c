@@ -120,6 +120,8 @@ if_nametosdl(char *name)
 			if ((sa = rti_info[RTAX_IFP]) != NULL) {
 				if (sa->sa_family == AF_LINK) {
 					sdl = (struct sockaddr_dl *)sa;
+					if (strlen(name) != sdl->sdl_nlen)
+						continue; /* not same len */
 					if (strncmp(&sdl->sdl_data[0],
 						    name,
 						    sdl->sdl_nlen) == 0) {
