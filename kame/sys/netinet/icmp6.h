@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.70 2002/05/26 23:07:52 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.71 2002/05/27 04:18:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -811,7 +811,8 @@ void	icmp6_mtudisc_callback_register __P((void (*)(struct in6_addr *)));
 /* XXX: is this the right place for these macros? */
 #define icmp6_ifstat_inc(ifp, tag) \
 do {								\
-	((struct in6_ifextra *)((ifp)->if_afdata[AF_INET6]))->icmp6_ifstat->tag++; \
+	if (ifp)						\
+		((struct in6_ifextra *)((ifp)->if_afdata[AF_INET6]))->icmp6_ifstat->tag++; \
 } while (0)
 
 #define icmp6_ifoutstat_inc(ifp, type, code) \
