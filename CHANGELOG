@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2672 2004/10/21 01:54:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.2673 2004/10/26 06:46:05 keiichi Exp $
 
 <200410>
+Tue Oct 26 15:42:56 JST 2004	keiichi@iij.ad.jp
+	* kame/sys/netinet6/icmp6.c: fixed a freebsd5 kernel crash due to a
+	LOR caused by ICMPv6 redirect.
+
 2004-10-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (in6_ifadd): made sure that the
 	"new" address does not happen to have been configured already.
