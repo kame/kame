@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.25 2000/09/21 22:13:04 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.26 2000/09/21 22:15:10 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -226,6 +226,15 @@ vs Intel (Packet Protect Pro/100S)
 	    3des, md5, transport, no pfs
 	- a lot of SA were installed, because kame doesn't delete old SA
 	  until it expires.
+
+vs Intel
+	phase 1: main
+	    rsasig, 3des-cbc, sha1, DH group 2
+		entrust, subjectaltname = ipaddress
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-sha1, transport mode, PFS 2
+	Notes:
+	- 64k ping does not work.  freebsd problem ? it's not relative ipsec.
 
 vs NetLock
 	phase 1: main
