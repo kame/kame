@@ -69,8 +69,6 @@ static const char rcsid[] =
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 #ifdef DCCP
-#undef SEQ_LT
-#undef SEQ_GT
 #include <netinet/dccp.h>
 #include <sys/callout.h>
 #define DCCPSTATES
