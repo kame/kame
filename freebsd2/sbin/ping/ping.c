@@ -377,6 +377,7 @@ main(argc, argv)
 	bzero((char *)&whereto, sizeof(struct sockaddr));
 	to = (struct sockaddr_in *)&whereto;
 	to->sin_family = AF_INET;
+	to->sin_len = sizeof(struct sockaddr_in);
 	if (inet_aton(target, &to->sin_addr) != 0) {
 		hostname = target;
 	} else {
