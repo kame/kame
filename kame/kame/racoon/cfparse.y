@@ -926,7 +926,7 @@ newspspec()
 		return NULL;
 	}
 
-	new->encklen = ALG_DEFAULT_KEYLEN;
+	new->encklen = 0;	/*XXX*/
 
 	return new;
 }
