@@ -1,0 +1,11 @@
+--- Makefile.in-	Fri Aug 20 08:33:20 1999
++++ Makefile.in	Fri Aug 20 08:33:25 1999
+@@ -24,7 +24,7 @@
+ CFLAGS=	@CFLAGS@ @DEFS@ @OPTFLAGS@ -g $(INCLUDEPATH)
+ 
+ YACC=	@YACC@
+-YACCFLAGS=	-d
++YFLAGS=	-d
+ 
+ #LIBDMALLOC=	-L/usr/local/lib -ldmalloc
+ 

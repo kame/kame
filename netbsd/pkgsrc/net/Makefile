@@ -10,6 +10,7 @@
     SUBDIR += irc
     SUBDIR += mrt
     SUBDIR += ncftp3
+    SUBDIR += newbie
     SUBDIR += rsync
     SUBDIR += socks64
     SUBDIR += tcptrace
