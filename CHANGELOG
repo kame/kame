@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1123 2000/07/12 08:45:56 jinmei Exp $
+$Id: CHANGELOG,v 1.1124 2000/07/12 13:16:26 jinmei Exp $
 
 <200006>
+2000-07-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/net/route.h: redefined the route structure so that it
+	can support protcols that have large socket address (e.g. IPv6).
+	Currently, this is enabled only with the NEW_STRUCT_ROUTE kernel
+	compilation option, but will be default once stabilized.
+	* many files mainly under the netinet and netinet6 directories
+	were also modified with this change.
+
 2000-07-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_ifloop_request): 
 	do not force rtrequest() to return an rtentry when executing the
