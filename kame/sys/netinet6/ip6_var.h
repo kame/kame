@@ -198,6 +198,8 @@ struct	ip6stat {
 	u_quad_t ip6s_nogif;		/* no match gif found */
 	u_quad_t ip6s_toomanyhdr;	/* discarded due to too many headers */
 	/* XXX the following two items are not really AF_INET6 thing */
+	u_quad_t ip6s_exthdrget;	/* # of calls to IP6_EXTHDR_GET */
+	u_quad_t ip6s_exthdrget0;	/* # of calls to IP6_EXTHDR_GET0 */
 	u_quad_t ip6s_pulldown;		/* # of calls to m_pulldown */
 	u_quad_t ip6s_pulldown_copy;	/* # of mbuf copies in m_pulldown */
 	u_quad_t ip6s_pulldown_alloc;	/* # of mbuf allocs in m_pulldown */

@@ -364,28 +364,38 @@ do {									\
 do {									\
 	struct mbuf *t;							\
 	int tmp;							\
-	t = m_pulldown((m), (off), (len), &tmp);			\
-	if (t) {							\
-		if (t->m_len < tmp + (len))				\
-			panic("m_pulldown malfunction");		\
-		(val) = (typ)(mtod(t, caddr_t) + tmp);			\
-	} else {							\
-		(val) = (typ)NULL;					\
-		(m) = NULL;						\
+	ip6stat.ip6s_exthdrget++;					\
+	if ((m)->m_len >= (off) + (len))				\
+		(val) = (typ)(mtod((m), caddr_t) + (off));		\
+	else {								\
+		t = m_pulldown((m), (off), (len), &tmp);		\
+		if (t) {						\
+			if (t->m_len < tmp + (len))			\
+				panic("m_pulldown malfunction");	\
+			(val) = (typ)(mtod(t, caddr_t) + tmp);		\
+		} else {						\
+			(val) = (typ)NULL;				\
+			(m) = NULL;					\
+		}							\
 	}								\
 } while (0)
 
 #define IP6_EXTHDR_GET0(val, typ, m, off, len) \
 do {									\
 	struct mbuf *t;							\
-	t = m_pulldown((m), (off), (len), NULL);			\
-	if (t) {							\
-		if (t->m_len < (len))					\
-			panic("m_pulldown malfunction");		\
-		(val) = (typ)mtod(t, caddr_t);				\
-	} else {							\
-		(val) = (typ)NULL;					\
-		(m) = NULL;						\
+	ip6stat.ip6s_exthdrget0++;					\
+	if ((off) == 0)							\
+		(val) = (typ)mtod(m, caddr_t);				\
+	else {								\
+		t = m_pulldown((m), (off), (len), NULL);		\
+		if (t) {						\
+			if (t->m_len < (len))				\
+				panic("m_pulldown malfunction");	\
+			(val) = (typ)mtod(t, caddr_t);			\
+		} else {						\
+			(val) = (typ)NULL;				\
+			(m) = NULL;					\
+		}							\
 	}								\
 } while (0)
 
