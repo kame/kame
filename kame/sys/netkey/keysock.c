@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.5 2000/01/16 18:06:57 sumikawa Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.6 2000/01/16 18:21:36 sumikawa Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -109,6 +109,7 @@ static int key_sendup0 __P((struct rawcb *, struct mbuf *, int));
 
 struct pfkeystat pfkeystat;
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 /*
  * key_usrreq()
  * derived from net/rtsock.c:route_usrreq()
@@ -220,6 +221,7 @@ key_usrreq(so, req, m, nam, control, p)
 	splx(s);
 	return(error);
 }
+#endif /* other than FreeBSD >= 3 */
 
 /*
  * key_output()
@@ -733,10 +735,16 @@ extern struct domain keydomain;
 struct protosw keysw[] = {
 { SOCK_RAW,	&keydomain,	PF_KEY_V2,	PR_ATOMIC|PR_ADDR,
   0,		key_output,	raw_ctlinput,	0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
   key_usrreq,
+#endif
   raw_init,	0,		0,		0,
 #if defined(__bsdi__) || defined(__NetBSD__)
   key_sysctl,
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &key_usrreqs
 #endif
 }
 };

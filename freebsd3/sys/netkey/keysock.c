@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.5 2000/01/16 18:06:57 sumikawa Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.6 2000/01/16 18:21:38 sumikawa Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -108,6 +108,120 @@ static int key_sendup0 __P((struct rawcb *, struct mbuf *, int));
 #endif
 
 struct pfkeystat pfkeystat;
+
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+/*
+ * key_usrreq()
+ * derived from net/rtsock.c:route_usrreq()
+ */
+#ifndef __NetBSD__
+int
+key_usrreq(so, req, m, nam, control)
+	register struct socket *so;
+	int req;
+	struct mbuf *m, *nam, *control;
+#else
+int
+key_usrreq(so, req, m, nam, control, p)
+	register struct socket *so;
+	int req;
+	struct mbuf *m, *nam, *control;
+	struct proc *p;
+#endif /*__NetBSD__*/
+{
+	register int error = 0;
+	register struct keycb *kp = (struct keycb *)sotorawcb(so);
+	int s;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+	if (req == PRU_ATTACH) {
+		MALLOC(kp, struct keycb *, sizeof(*kp), M_PCB, M_WAITOK);
+		so->so_pcb = (caddr_t)kp;
+		if (so->so_pcb)
+			bzero(so->so_pcb, sizeof(*kp));
+	}
+	if (req == PRU_DETACH && kp) {
+		int af = kp->kp_raw.rcb_proto.sp_protocol;
+		if (af == PF_KEY) /* XXX: AF_KEY */
+			key_cb.key_count--;
+		key_cb.any_count--;
+
+		key_freereg(so);
+	}
+
+#ifndef __NetBSD__
+	error = raw_usrreq(so, req, m, nam, control);
+#else
+	error = raw_usrreq(so, req, m, nam, control, p);
+#endif
+	m = control = NULL;	/* reclaimed in raw_usrreq */
+	kp = (struct keycb *)sotorawcb(so);
+	if (req == PRU_ATTACH && kp) {
+		int af = kp->kp_raw.rcb_proto.sp_protocol;
+		if (error) {
+#ifdef IPSEC_DEBUG
+			printf("key_usrreq: key_usrreq results %d\n", error);
+#endif
+			pfkeystat.sockerr++;
+			free((caddr_t)kp, M_PCB);
+			so->so_pcb = (caddr_t) 0;
+			splx(s);
+			return(error);
+		}
+
+		kp->kp_promisc = kp->kp_registered = 0;
+
+		if (af == PF_KEY) /* XXX: AF_KEY */
+			key_cb.key_count++;
+		key_cb.any_count++;
+#ifndef __bsdi__
+		kp->kp_raw.rcb_laddr = &key_src;
+		kp->kp_raw.rcb_faddr = &key_dst;
+#else
+		/*
+		 * XXX rcb_faddr must be dynamically allocated, otherwise
+		 * raw_disconnect() will be angry.
+		 */
+	    {
+		struct mbuf *m, *n;
+		MGET(m, M_WAITOK, MT_DATA);
+		if (!m) {
+			error = ENOBUFS;
+			pfkeystat.in_nomem++;
+			free((caddr_t)kp, M_PCB);
+			so->so_pcb = (caddr_t) 0;
+			splx(s);
+			return(error);
+		}
+		MGET(n, M_WAITOK, MT_DATA);
+		if (!n) {
+			error = ENOBUFS;
+			m_freem(m);
+			pfkeystat.in_nomem++;
+			free((caddr_t)kp, M_PCB);
+			so->so_pcb = (caddr_t) 0;
+			splx(s);
+			return(error);
+		}
+		m->m_len = sizeof(key_src);
+		kp->kp_raw.rcb_laddr = mtod(m, struct sockaddr *);
+		bcopy(&key_src, kp->kp_raw.rcb_laddr, sizeof(key_src));
+		n->m_len = sizeof(key_dst);
+		kp->kp_raw.rcb_faddr = mtod(n, struct sockaddr *);
+		bcopy(&key_dst, kp->kp_raw.rcb_faddr, sizeof(key_dst));
+	    }
+#endif
+		soisconnected(so);
+		so->so_options |= SO_USELOOPBACK;
+	}
+	splx(s);
+	return(error);
+}
+#endif /* other than FreeBSD >= 3 */
 
 /*
  * key_attach()
@@ -706,9 +820,17 @@ extern struct domain keydomain;
 struct protosw keysw[] = {
 { SOCK_RAW,	&keydomain,	PF_KEY_V2,	PR_ATOMIC|PR_ADDR,
   0,		key_output,	raw_ctlinput,	0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
+#else
+  key_usrreq,
+#endif
   raw_init,	0,		0,		0,
+#if defined(__bsdi__) || defined(__NetBSD__)
+  key_sysctl,
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
   &key_usrreqs
+#endif
 }
 };
 
