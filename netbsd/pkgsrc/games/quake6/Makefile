@@ -12,6 +12,8 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=	itojun@kame.net
 HOMEPAGE=	http://www.viagenie.qc.ca/en/ipv6-quake.shtml
 
+DEPENDS=	quakedata-*:../../games/quakedata
+
 WRKSRC=		${WRKDIR}/quakeforge
 
 post-extract:
