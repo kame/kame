@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1093 2000/07/04 09:37:26 sakane Exp $
+$Id: CHANGELOG,v 1.1094 2000/07/04 10:05:52 jinmei Exp $
 
 <200006>
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): completely obsoleted
+	SIOCSIFADDR_IN6, SIOCSIFDSTADDR_IN6, and SIOCSIFNETMASK_IN6.
+	We are quite confident there is no application that used these
+	commands, but if one exists, please let us know.
+
 Tue Jul  4 18:33:20 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	don't delete phase 1/2 handler if some internal error occurs.
