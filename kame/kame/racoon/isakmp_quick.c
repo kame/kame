@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.25 2000/04/24 20:01:15 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.26 2000/04/24 21:06:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -488,10 +488,6 @@ quick_i2recv(iph2, msg0)
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_STATUS6;
 
-	plog(logp, LOCATION, iph2->ph1->remote,
-		"get SA values for IPsec, %s.\n",
-	        isakmp_pindex(&iph2->ph1->index, iph2->msgid));
-
 	error = 0;
 
 end:
@@ -620,10 +616,6 @@ quick_i2send(iph2, msg0)
 	}
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
-
-	plog(logp, LOCATION, iph2->ph1->remote,
-		"get SA values for IPsec, %s.\n",
-	        isakmp_pindex(&iph2->ph1->index, iph2->msgid));
 
 	error = 0;
 
@@ -765,10 +757,6 @@ quick_i3recv(iph2, msg0)
 	}
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
-
-	plog(logp, LOCATION, iph2->ph1->remote,
-		"get SA values for IPsec, %s.\n",
-	        isakmp_pindex(&iph2->ph1->index, iph2->msgid));
 
 	error = 0;
 
@@ -1528,10 +1516,6 @@ quick_r3prep(iph2, msg0)
 	}
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
-
-	plog(logp, LOCATION, iph2->ph1->remote,
-		"get SA values for IPsec, %s.\n",
-	        isakmp_pindex(&iph2->ph1->index, iph2->msgid));
 
 	error = 0;
 
