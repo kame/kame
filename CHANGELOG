@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1139 2000/07/19 13:26:26 itojun Exp $
+$Id: CHANGELOG,v 1.1140 2000/07/19 16:54:21 sumikawa Exp $
 
 <200006>
+Thu Jul 20 01:52:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/{libpcap,tcpdump}: use 7/17 weekly snap.
+	* freebsd3/ports/mtr: use latest IPv6 patch.
+
 Wed Jul 19 22:22:47 JST 2000  itojun@iiljab.net
 	* kame/rtsold/rtsol.c, kame/rtadvd/rtadvd.c: ip6_var.h requires
 	  sys/queue.h.
