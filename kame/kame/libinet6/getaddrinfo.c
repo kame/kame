@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.179 2004/04/21 03:27:27 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.180 2004/04/21 07:16:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -701,7 +701,6 @@ globcopy:
 					(void)reorder(&sentinel);
 			}
 			*res = sentinel.ai_next;
-			error = 0;
 		} else
 			error = EAI_FAIL;
 	}
