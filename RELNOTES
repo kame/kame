@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.67 2000/11/22 08:23:41 itojun Exp $
+	$KAME: RELNOTES,v 1.68 2001/02/03 06:50:01 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -28,6 +28,10 @@ abnormal program termination and other things:
   kernel API the binary uses.
   Example: *BSD-origin netstat will not work with KAME kernel, as it touches
 	kmem and we changed the size of inpcb between *BSD and KAME kernel.
+  Example: FreeBSD 4.2-RELEASE uses spec non-conformant numbers for PF_KEY
+	API (sys/net/pfkeyv2.h).  KAME/freebsd4 uses spec-conformant numbers,
+	so freeBSD 4.2-RELEASE setkey(8) will choke on KAME/freebsd4 kernel
+	(and vice versa).
 
 The caveat does not apply to KAME code merged into *BSD - merged code
 will maintain the backward compatibility policy decided by *BSD team.
