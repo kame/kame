@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.195 2001/02/23 00:11:21 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.196 2001/02/26 09:29:05 itojun Exp $
 
 1. IPv6
 
@@ -915,7 +915,7 @@ Wildcard AF_INET6 socket grabs IPv4 connection if and only if the following
 conditions are satisfied:
 - there's no AF_INET socket that matches the IPv4 connection
 - the AF_INET6 socket is configured to accept IPv4 traffic, i.e.
-  getsockopt(IPV6_BINDV6ONLY) returns 0.
+  getsockopt(IPV6_V6ONLY) returns 0.
 
 (XXX need checking)
 
@@ -944,9 +944,9 @@ The platform can be configured to support IPv4 mapped address/special AF_INET6
 wildcard bind (disabled by default).  Kernel behavior can be summarized as
 follows:
 - default: special support code will be compiled in, but is disabled by
-  default.  It can be controlled by sysctl (net.inet6.ip6.bindv6only),
-  or setsockopt(IPV6_BINDV6ONLY).
-- add "INET6_BINDV6ONLY": No special support code for AF_INET6 wildcard socket
+  default.  It can be controlled by sysctl (net.inet6.ip6.v6only),
+  or setsockopt(IPV6_V6ONLY).
+- add "INET6_V6ONLY": No special support code for AF_INET6 wildcard socket
   will be compiled in.  AF_INET6 sockets and AF_INET sockets are totally
   separate.  The behavior is similar to what described in 1.12.1.
 
@@ -960,7 +960,7 @@ Wildcard AF_INET6 socket grabs IPv4 connection if and only if the following
 conditions are satisfied:
 - there's no AF_INET socket that matches the IPv4 connection
 - the AF_INET6 socket is configured to accept IPv4 traffic, i.e.
-  getsockopt(IPV6_BINDV6ONLY) returns 0.
+  getsockopt(IPV6_V6ONLY) returns 0.
 
 You cannot bind(2) with IPv4 mapped address.  This is a workaround for port
 number duplicate and other twists.
