@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.97 2000/05/08 08:02:08 itojun Exp $	*/
+/*	$KAME: key.c,v 1.98 2000/05/08 16:52:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5844,11 +5844,15 @@ key_register(so, m, mhp)
 	if (!n)
 		return key_senderror(so, m, ENOBUFS);
 
-	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t));
+	n->m_pkthdr.len = n->m_len = len;
+	n->m_next = NULL;
+	off = 0;
+
+	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t) + off);
 	newmsg = mtod(n, struct sadb_msg *);
 	newmsg->sadb_msg_errno = 0;
 	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
-	off = PFKEY_ALIGN8(sizeof(struct sadb_msg));
+	off += PFKEY_ALIGN8(sizeof(struct sadb_msg));
 
 	/* for authentication algorithm */
 	if (alen) {
