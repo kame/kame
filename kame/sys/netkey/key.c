@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.293 2003/07/02 00:10:24 itojun Exp $	*/
+/*	$KAME: key.c,v 1.294 2003/07/03 05:01:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1324,7 +1324,6 @@ key_newsp(id)
 	newsp->id = newid;
 	newsp->refcnt = 1;
 	newsp->req = NULL;
-	TAILQ_INSERT_TAIL(&sptailq, newsp, tailq);
 
 	return newsp;
 }
