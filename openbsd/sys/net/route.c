@@ -1095,13 +1095,21 @@ rt_draincache()
 	for (r = TAILQ_FIRST(&rt_cache_timeout_q->rtq_head); r; r = r_next) {
 		r_next = TAILQ_NEXT(r, rtt_next);
 
-		if (r->rtt_rt->rt_refcnt == 0) {
+		if (r->rtt_rt->rt_refcnt <= 0) {
+			LIST_REMOVE(r, rtt_link);
+			TAILQ_REMOVE(&rt_cache_timeout_q->rtq_head,
+				     r, rtt_next);
 			/*
 			 * we expect RTTIMER_CALLOUT calls rtrequest(DELETE),
 			 * which will remove the associated route and unlink
 			 * the timer entry.
 			 */
 			RTTIMER_CALLOUT(r);
+			free(r, M_RTABLE);
+			if (rt_cache_timeout_q->rtq_count > 0)
+				rt_cache_timeout_q->rtq_count--;
+			else
+				printf("rt_draincache: rtq_count reached 0\n");
 		}
 	}
 	splx(s);
