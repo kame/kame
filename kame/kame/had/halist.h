@@ -1,4 +1,4 @@
-/*	$KAME: halist.h,v 1.3 2002/01/22 16:32:40 karino Exp $	*/
+/*	$KAME: halist.h,v 1.4 2002/11/05 05:13:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.h,v 1.3 2002/01/22 16:32:40 karino Exp $
+ * $Id: halist.h,v 1.4 2002/11/05 05:13:58 k-sugyou Exp $
  */
 
 /*
@@ -65,6 +65,56 @@
 
 /*
  * home agent liast structures
+ */
+/*
+ * haifinfo_tab{}	home agent list for each interfaces
+ * hagent_ifa_pair{}	global/ayncast addresses for interface
+ *
+ * hagent_entry{}	home agent (for ra)
+ * hagent_gaddr{}	global addresses for a home agent
+ *			 (home subnet prefix)
+ *
+ * halist_expire_head	home agent list
+ *			 (sorted by remaining home agent lifetime)
+ * gaddr_expire_head	global addresses list
+ *			 (sorted by remaining valid lifetime)
+ *
+ *
+ * haifinfo_tab{}
+ * +---------------+
+ * | +---------------+
+ * | | +--------------+
+ * | | | halist_pref  |
+ * | | |  +------------------+   hagent_entry{}
+ * | | |  | hagent_next_pref-|-->+------------------+   hagent_entry{}
+ * | | |  | ...              |   | hagent_next_pref-|-->+------------------+
+ * | | |  +------------------+<--|-hagent_prev_pref |   | hagent_next_pref-|--->NULL
+ * | | | ifindex      |          | ...              |<--|-hagent_prev_pref |
+ * +-| | *linklocal   |          +------------------+   | ...              |
+ *   +-| haif_gavec   |               |                 +------------------+
+ *     +---|----------+               |
+ *         V hagent_ifa_pair{}        V hagent_gaddr{}
+ *         +--------+                 +-------------------+
+ *         |*global |-+               | hagent_next_gaddr-|-->NULL
+ *         |*anycast| |               | ...               |
+ *         +--------+ |               +-------------------+
+ *          +---------+
+ *
+ * halist_expire_head
+ *  +--------------------+    hagent_entry{}
+ *  | hagent_next_expire-|-->+--------------------+
+ *  | ...                |   | hagent_next_expire-|--> NULL
+ *  +--------------------+<--|-hagent_prev_expire |
+ *                           | ...                |
+ *                           +--------------------+
+ *
+ * gaddr_expire_head
+ *  +--------------------+    hagent_gaddr{}
+ *  | hagent_next_expire |-->+-------------------+
+ *  | ...                |   | hagent_next_gaddr-|-->NULL
+ *  +--------------------+<--|-hagent_prev_gaddr |
+ *                           | ...               |
+ *                           +-------------------+
  */
 
 /* global addresses for a home agent */
