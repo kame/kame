@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.254 2002/01/17 14:36:04 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.255 2002/01/17 15:01:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -467,6 +467,8 @@ ip6_input(m)
 	u_int32_t rtalert = ~0;
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
+	struct sockaddr_in6 sa6_src, sa6_dst;
+	int64_t srczone, dstzone;
 #if 0
 	struct mbuf *mhist;	/* onion peeling history */
 	caddr_t hist;
@@ -670,13 +672,6 @@ ip6_input(m)
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
 		goto bad;
 	}
-	if ((IN6_IS_ADDR_LOOPBACK(&ip6->ip6_src) ||
-	     IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) &&
-	    (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
-		ip6stat.ip6s_badscope++;
-		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
-		goto bad;
-	}
 	if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) &&
 	    !(m->m_flags & M_LOOP)) {
 		/*
@@ -745,6 +740,33 @@ ip6_input(m)
 		}
 	}
 #endif
+
+	/*
+	 * construct source and destination address structures with
+	 * disambiguating their scope zones (if there is ambiguity).
+	 * XXX: sin6_family and sin6_len will NOT be referred to, but we fill
+	 * in these fields just in case.
+	 */
+	if ((srczone = in6_addr2zoneid(m->m_pkthdr.rcvif,
+				       &ip6->ip6_src)) < 0 ||
+	    (dstzone = in6_addr2zoneid(m->m_pkthdr.rcvif,
+				       &ip6->ip6_dst)) < 0) {
+		/*
+		 * Note that these generic checks cover cases that src or
+		 * dst are the loopback address and the receiving interface
+		 * is not loopback.
+		 */
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+	bzero(&sa6_src, sizeof(sa6_src));
+	bzero(&sa6_dst, sizeof(sa6_dst));
+	sa6_src.sin6_family = sa6_dst.sin6_family = AF_INET6;
+	sa6_src.sin6_len = sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
+	sa6_src.sin6_addr = ip6->ip6_src;
+	sa6_src.sin6_scope_id = srczone; /* srczone should be in 32bit here */
+	sa6_dst.sin6_addr = ip6->ip6_dst;
+	sa6_dst.sin6_scope_id = dstzone; /* dstzone should be in 32bit here */
 
 	/*
 	 * Embed interface ID as the zone ID for interface-local and
