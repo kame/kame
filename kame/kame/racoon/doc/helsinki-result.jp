@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.31 2001/08/16 06:51:39 itojun Exp $
+$KAME: helsinki-result.jp,v 1.32 2001/08/16 07:57:44 itojun Exp $
 
 
 generic
@@ -26,7 +26,7 @@ generic
 	思って検索すべき。exactly right!!
 
 	phase 2で、ipsec enc modeがついていなかったときの取り扱い
-	(transport modeと思ってよいのではないか)。(多分修正済)
+	(transport modeと思ってよいのではないか)。(修正済)
 
 	長いKEYMATの計算のとき、必要鍵長の計算にbugあり (修正済)
 
@@ -379,6 +379,12 @@ draft-shacham-ippcp-rfc2393bis-08.txt
 >2001-08-15 16:42:28: ERROR: proposal.c:497:cmpsatrns(): authtype mismatched: my:1 peer:2
 >2001-08-15 16:42:28: ERROR: proposal.c:365:cmpsaprop_alloc(): IPComp SPI size promoted from 16bit to 32bit
 >2001-08-15 16:42:28: ERROR: proposal.c:378:cmpsaprop_alloc(): encmode mismatched: my:2 peer:0			<-----
+
+	Thu Aug 16 16:49:08 JST 2001
+	IPv4, IPComp + ESP, transport mode
+	phase 1 3DES + SHA1, group 5, lifetime = 10min
+	phase 2 3DES + SHA1 + deflate, group 5, lifetime = 2min
+	再挑戦。修正確認。
 
 
 netopia
