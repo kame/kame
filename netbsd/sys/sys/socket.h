@@ -1,4 +1,4 @@
-/*	$NetBSD: socket.h,v 1.43 1999/02/11 20:33:26 cjs Exp $	*/
+/*	$NetBSD: socket.h,v 1.55.2.1 2000/10/09 02:41:28 toshii Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,21 +68,16 @@
 #define	_SYS_SOCKET_H_
 
 /*
- * needed for __CMSG_ALIGN
- */
-#include <machine/param.h>
-
-/*
  * Definitions related to sockets: types, address families, options.
  */
 
 /*
  * Data types.
  */
-/* in both sys/socket.h and netdb.h */
-#ifndef __SOCKLEN_T_DEFINED
-typedef	unsigned int	socklen_t;
-#define __SOCKLEN_T_DEFINED
+#include <sys/ansi.h>
+#ifndef socklen_t
+typedef __socklen_t	socklen_t;
+#define socklen_t	socklen_t
 #endif
 
 /*
@@ -214,6 +209,7 @@ struct sockproto {
 #define _SS_PAD2SIZE	(_SS_MAXSIZE - sizeof(u_char) * 2 - \
 				_SS_PAD1SIZE - _SS_ALIGNSIZE)
 
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
 struct sockaddr_storage {
 	u_char	ss_len;		/* address length */
 	u_char	ss_family;	/* address family */
@@ -221,7 +217,8 @@ struct sockaddr_storage {
 	int64_t	__ss_align;	/* force desired structure storage alignment */
 	char	__ss_pad2[_SS_PAD2SIZE];
 };
-#endif
+#endif /* !_XOPEN_SOURCE || ... */
+#endif /* 1 */
 
 /*
  * Protocol families, same as address families for now.
@@ -230,7 +227,6 @@ struct sockaddr_storage {
 #define	PF_LOCAL	AF_LOCAL
 #define	PF_UNIX		PF_LOCAL	/* backward compatibility */
 #define	PF_INET		AF_INET
-#define	PF_INET6	AF_INET6
 #define	PF_IMPLINK	AF_IMPLINK
 #define	PF_PUP		AF_PUP
 #define	PF_CHAOS	AF_CHAOS
@@ -346,13 +342,15 @@ struct sockcred {
  */
 #define NET_RT_DUMP	1		/* dump; may limit to a.f. */
 #define NET_RT_FLAGS	2		/* by flags, e.g. RESOLVING */
-#define NET_RT_IFLIST	3		/* survey interface list */
-#define	NET_RT_MAXID	4
+#define NET_RT_OIFLIST	3		/* old NET_RT_IFLIST (pre 1.5) */
+#define NET_RT_IFLIST	4		/* survey interface list */
+#define	NET_RT_MAXID	5
 
 #define CTL_NET_RT_NAMES { \
 	{ 0, 0 }, \
 	{ "dump", CTLTYPE_STRUCT }, \
 	{ "flags", CTLTYPE_STRUCT }, \
+	{ 0, 0 }, \
 	{ "iflist", CTLTYPE_STRUCT }, \
 }
 #endif /* !_XOPEN_SOURCE */
@@ -407,15 +405,14 @@ struct cmsghdr {
 
 /*
  * Alignment requirement for CMSG struct manipulation.
- *
- * XXX
- * This is still a little bit questionable from two points:
- * (1) It is not future adaptable.  If old binaries and new kernel uses
- * different definition for ALIGNBYTES, old binaries will choke.
- * (2) Also, it may not be correct to add dependency from sys/socket.h to
- * machine/param.h.
+ * This basically behaves the same as ALIGN() ARCH/include/param.h.
+ * We declare it separately for two reasons:
+ * (1) avoid dependency between machine/param.h, and (2) to sync with kernel's
+ * idea of ALIGNBYTES at runtime.
+ * without (2), we can't guarantee binary compatibility in case of future
+ * changes in ALIGNBYTES.
  */
-#define __CMSG_ALIGN(n)	(((n) + ALIGNBYTES) & ~ALIGNBYTES)
+#define __CMSG_ALIGN(n)	(((n) + __cmsg_alignbytes()) & ~__cmsg_alignbytes())
 #ifdef _KERNEL
 #define CMSG_ALIGN(n)	__CMSG_ALIGN(n)
 #endif
@@ -469,9 +466,13 @@ struct omsghdr {
 };
 #endif
 
-#ifndef	_KERNEL
-
 #include <sys/cdefs.h>
+
+__BEGIN_DECLS
+int	__cmsg_alignbytes __P((void));
+__END_DECLS
+
+#ifndef	_KERNEL
 
 __BEGIN_DECLS
 int	accept __P((int, struct sockaddr *, socklen_t *));
@@ -498,8 +499,6 @@ __END_DECLS
 #ifdef COMPAT_OLDSOCK
 #define MSG_COMPAT	0x8000
 #endif
-
-void	pfctlinput __P((int, struct sockaddr *));
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_SOCKET_H_ */

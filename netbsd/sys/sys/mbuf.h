@@ -1,4 +1,4 @@
-/*	$NetBSD: mbuf.h,v 1.42 1999/02/27 18:20:37 sommerfe Exp $	*/
+/*	$NetBSD: mbuf.h,v 1.49.4.2 2000/08/30 06:23:08 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1999 The NetBSD Foundation, Inc.
@@ -92,11 +92,12 @@
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 
-#if 1
+/*
+ * NOTE: MINCLSIZE is changed to MHLEN + 1, to avoid allocating chained
+ * non-external mbufs in the driver.  This has no impact on performance
+ * seen from the packet statistics, and avoid header pullups in network code.
+ */
 #define	MINCLSIZE	(MHLEN+MLEN+1)	/* smallest amount to put in cluster */
-#else
-#define	MINCLSIZE	(MHLEN+1)	/* smallest amount to put in cluster */
-#endif
 #define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
 
 /*
@@ -230,7 +231,7 @@ struct mbuf {
  * are guaranteed to return successfully.
  */
 #define	MGET(m, how, type) do { \
-	MBUFLOCK((m) = pool_get(&mbpool, (how) == M_WAIT ? PR_WAITOK : 0);); \
+	MBUFLOCK((m) = pool_get(&mbpool, (how) == M_WAIT ? PR_WAITOK|PR_LIMITFAIL : 0);); \
 	if (m) { \
 		MBUFLOCK(mbstat.m_mtypes[type]++;); \
 		(m)->m_type = (type); \
@@ -243,7 +244,7 @@ struct mbuf {
 } while (0)
 
 #define	MGETHDR(m, how, type) do { \
-	MBUFLOCK((m) = pool_get(&mbpool, (how) == M_WAIT ? PR_WAITOK : 0);); \
+	MBUFLOCK((m) = pool_get(&mbpool, (how) == M_WAIT ? PR_WAITOK|PR_LIMITFAIL : 0);); \
 	if (m) { \
 		MBUFLOCK(mbstat.m_mtypes[type]++;); \
 		(m)->m_type = (type); \
@@ -315,7 +316,8 @@ struct mbuf {
 #define	MCLGET(m, how) do { \
 	MBUFLOCK( \
 		(m)->m_ext.ext_buf = \
-		    pool_get(&mclpool, (how) == M_WAIT ? PR_WAITOK : 0); \
+		    pool_get(&mclpool, (how) == M_WAIT ? \
+			(PR_WAITOK|PR_LIMITFAIL) : 0); \
 		if ((m)->m_ext.ext_buf == NULL) { \
 			m_reclaim((how)); \
 			(m)->m_ext.ext_buf = \
@@ -492,6 +494,15 @@ do {									\
 #define	M_SETCTX(m, c)		((void) ((m)->m_pkthdr.rcvif = (void *) (c)))
 
 /*
+ * pkthdr.aux type tags.
+ */
+struct mauxtag {
+	int af;
+	int type;
+	void* p;
+};
+
+/*
  * Mbuf statistics.
  * For statistics related to mbuf and cluster allocations, see also the
  * pool headers (mbpool and mclpool).
@@ -522,24 +533,39 @@ struct mbstat {
 };
 
 /*
- * pkthdr.aux type tags.
+ * Mbuf sysctl variables.
  */
-struct mauxtag {
-	int af;
-	int type;
-	void* p;
-};
+#define	MBUF_MSIZE		1	/* int: mbuf base size */
+#define	MBUF_MCLBYTES		2	/* int: mbuf cluster size */
+#define	MBUF_NMBCLUSTERS	3	/* int: limit on the # of clusters */
+#define	MBUF_MBLOWAT		4	/* int: mbuf low water mark */
+#define	MBUF_MCLLOWAT		5	/* int: mbuf cluster low water mark */
+#define	MBUF_MAXID		6	/* number of valid MBUF ids */
+
+#define	CTL_MBUF_NAMES { \
+	{ 0, 0 }, \
+	{ "msize", CTLTYPE_INT }, \
+	{ "mclbytes", CTLTYPE_INT }, \
+	{ "nmbclusters", CTLTYPE_INT }, \
+	{ "mblowat", CTLTYPE_INT }, \
+	{ "mcllowat", CTLTYPE_INT }, \
+}
 
 #ifdef	_KERNEL
+/* always use m_pulldown codepath for KAME IPv6/IPsec */
+#define PULLDOWN_TEST
+
 extern struct mbstat mbstat;
-extern int	nmbclusters;
-extern int	nmbufs;
-extern struct mbuf *mmbfree;
+extern int	nmbclusters;		/* limit on the # of clusters */
+extern int	mblowat;		/* mbuf low water mark */
+extern int	mcllowat;		/* mbuf cluster low water mark */
 extern int	max_linkhdr;		/* largest link-level header */
 extern int	max_protohdr;		/* largest protocol header */
 extern int	max_hdr;		/* largest link+protocol header */
 extern int	max_datalen;		/* MHLEN - max_hdr */
-extern int	mbtypes[];		/* XXX */
+extern const int msize;			/* mbuf base size */
+extern const int mclbytes;		/* mbuf cluster size */
+extern const int mbtypes[];		/* XXX */
 extern struct pool mbpool;
 extern struct pool mclpool;
 
@@ -547,6 +573,7 @@ struct	mbuf *m_copym __P((struct mbuf *, int, int, int));
 struct	mbuf *m_copypacket __P((struct mbuf *, int));
 struct	mbuf *m_devget __P((char *, int, int, struct ifnet *,
 			    void (*copy)(const void *, void *, size_t)));
+struct	mbuf *m_dup __P((struct mbuf *, int, int, int));
 struct	mbuf *m_free __P((struct mbuf *));
 struct	mbuf *m_get __P((int, int));
 struct	mbuf *m_getclr __P((int, int));
@@ -573,15 +600,15 @@ struct mbuf *m_aux_find __P((struct mbuf *, int, int));
 void m_aux_delete __P((struct mbuf *, struct mbuf *));
 
 #ifdef MBTYPES
-int mbtypes[] = {				/* XXX */
-	M_FREE,		/* MT_FREE	0	   should be on free list */
-	M_MBUF,		/* MT_DATA	1	   dynamic (data) allocation */
-	M_MBUF,		/* MT_HEADER	2	   packet header */
-	M_MBUF,		/* MT_SONAME	3	   socket name */
-	M_SOOPTS,	/* MT_SOOPTS	4	   socket options */
-	M_FTABLE,	/* MT_FTABLE	5	   fragment reassembly header */
-	M_MBUF,		/* MT_CONTROL	6	   extra-data protocol message */
-	M_MBUF,		/* MT_OOBDATA	7	   expedited data  */
+const int mbtypes[] = {				/* XXX */
+	M_FREE,		/* MT_FREE	0	should be on free list */
+	M_MBUF,		/* MT_DATA	1	dynamic (data) allocation */
+	M_MBUF,		/* MT_HEADER	2	packet header */
+	M_MBUF,		/* MT_SONAME	3	socket name */
+	M_SOOPTS,	/* MT_SOOPTS	4	socket options */
+	M_FTABLE,	/* MT_FTABLE	5	fragment reassembly header */
+	M_MBUF,		/* MT_CONTROL	6	extra-data protocol message */
+	M_MBUF,		/* MT_OOBDATA	7	expedited data  */
 };
 #endif /* MBTYPES */
 #endif /* _KERNEL */

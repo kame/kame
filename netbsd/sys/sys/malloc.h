@@ -1,4 +1,4 @@
-/*	$NetBSD: malloc.h,v 1.44 1999/01/14 22:38:41 thorpej Exp $	*/
+/*	$NetBSD: malloc.h,v 1.51.2.1 2000/06/24 23:53:09 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1987, 1993
@@ -41,7 +41,13 @@
 #if defined(_KERNEL) && !defined(_LKM)
 #include "opt_kmemstats.h"
 #include "opt_malloclog.h"
+#include "opt_lockdebug.h"
 #endif
+
+/*
+ * XXX
+ */
+#define splmem splimp
 
 /*
  * flags to malloc
@@ -131,26 +137,44 @@
 #define M_VMSWAP	76	/* VM swap structures */
 #define M_VMPAGE	77	/* VM page structures */
 #define M_VMPBUCKET	78	/* VM page buckets */
+/*
+ * Why are 79-81 empty?
+ */
 #define M_UVMAMAP	82	/* UVM amap and related structs */
 #define M_UVMAOBJ	83	/* UVM aobj and related structs */
 #define	M_TEMP		84	/* misc temporary data buffers */
 #define	M_DMAMAP	85	/* bus_dma(9) structures */
 #define	M_IPFLOW	86	/* IP flow entries */
 #define	M_USB		87	/* USB general */
-#define	M_USBDEV	88	/* USB permanent */
+#define	M_USBDEV	88	/* USB device driver */
 #define	M_POOL		89	/* memory pool structs */
 #define	M_CODA		90	/* Coda file system structures and tables. */
 #define	M_FILECOREMNT	91	/* Filcore FS mount structures */
 #define	M_FILECORENODE	92	/* Filcore FS vnode private part */
 #define	M_RAIDFRAME	93	/* RAIDframe structures */
-#define	M_SECA		94	/* security associations, key management */
-#define	M_IP6OPT	95	/* IPv6 options */
-#define	M_IP6NDP	96	/* IPv6 Neighbour Discovery */
-#define	M_IP6RR		97	/* IPv6 Router Renumbering Prefix */
-#define	M_RR_ADDR	98	/* IPv6 Router Renumbering Ifid */
-#define	M_PM		99	/* Packet Management by SuMiRe */
-#define	M_NATPT		100	/* Network Address Translation - Protocol Translation */
-#define	M_LAST		101	/* Must be last type + 1 */
+#define M_USBHC		94	/* USB host controller */
+#define	M_SECA		95	/* security associations, key management */
+#define	M_IP6OPT	96	/* IPv6 options */
+#define	M_IP6NDP	97	/* IPv6 Neighbour Discovery */
+#define	M_NTFS		98	/* Windows NT file system structures */
+#define M_PAGEDEP	99	/* File page dependencies */
+#define M_INODEDEP	100	/* Inode dependencies */
+#define M_NEWBLK	101	/* New block allocation */
+#define M_BMSAFEMAP	102	/* Block or frag allocated from cyl group map */
+#define M_ALLOCDIRECT	103	/* Block or frag dependency for an inode */
+#define M_INDIRDEP	104	/* Indirect block dependencies */
+#define M_ALLOCINDIR	105	/* Block dependency for an indirect block */
+#define M_FREEFRAG	106	/* Previously used frag for an inode */
+#define M_FREEBLKS	107	/* Blocks freed from an inode */
+#define M_FREEFILE	108	/* Inode deallocated */
+#define M_DIRADD	109	/* New directory entry */
+#define M_MKDIR		110	/* New directory */
+#define M_DIRREM	111 	/* Directory entry deleted */
+#define	M_IP6RR		112	/* IPv6 Router Renumbering Prefix */
+#define	M_RR_ADDR	113	/* IPv6 Router Renumbering Ifid */
+#define M_SOFTINTR	114	/* Softinterrupt structures */
+#define	M_NATPT		115	/* Network Address Translation - Protocol Translation */
+#define M_LAST		116	/* Must be last type + 1 */
 
 #define	INITKMEMNAMES { \
 	"free",		/* 0 M_FREE */ \
@@ -247,14 +271,29 @@
 	"filecore mount", /* 91 M_FILECOREMNT */ \
 	"filecore node", /* 92 M_FILECORENODE */ \
 	"RAIDframe",	/* 93 M_RAIDFRAME */ \
-	"key mgmt",	/* 94 M_SECA */ \
-	"ip6_options",	/* 95 M_IP6OPT */ \
-	"NDP",		/* 96 M_IP6NDP */ \
-	"ip6rr",	/* 97 M_IP6RR */ \
-	"rp_addr",	/* 98 M_RR_ADDR */ \
-	"pm",		/* 99 M_PM */ \
-	"natpt",	/* 100 M_NATPT */ \
-	NULL,		/* 101 */ \
+	"USB HC",	/* 94 M_USBHC */ \
+	"key mgmt",	/* 95 M_SECA */ \
+	"ip6_options",	/* 96 M_IP6OPT */ \
+	"NDP",		/* 97 M_IP6NDP */ \
+	"NTFS",		/* 98 M_NTFS */ \
+	"pagedep",	/* 99 M_PAGEDEP */ \
+	"inodedep",	/* 100 M_INODEDEP */ \
+	"newblk",	/* 101 M_NEWBLK */ \
+	"bmsafemap",	/* 102 M_BMSAFEMAP */ \
+	"allocdirect",	/* 103 M_ALLOCDIRECT */ \
+	"indirdep",	/* 104 M_INDIRDEP */ \
+	"allocindir",	/* 105 M_ALLOCINDIR */ \
+	"freefrag",	/* 106 M_FREEFRAG */ \
+	"freeblks",	/* 107 M_FREEBLKS */ \
+	"freefile",	/* 108 M_FREEFILE */ \
+	"diradd",	/* 109 M_DIRADD */ \
+	"mkdir",	/* 110 M_MKDIR */ \
+	"dirrem",	/* 111 M_DIRREM */ \
+	"ip6rr",	/* 112 M_IP6RR */ \
+	"rp_addr",	/* 113 M_RR_ADDR */ \
+	"softintr",	/* 114 M_SOFTINTR */ \
+	"natpt",	/* 115 M_NATPT */ \
+	NULL,		/* 116 */ \
 }
 
 struct kmemstats {
@@ -336,13 +375,13 @@ struct kmembuckets {
  */
 #define	kmemxtob(alloc)	(kmembase + (alloc) * NBPG)
 #define	btokmemx(addr)	(((caddr_t)(addr) - kmembase) / NBPG)
-#define	btokup(addr)	(&kmemusage[((caddr_t)(addr) - kmembase) >> CLSHIFT])
+#define	btokup(addr)	(&kmemusage[((caddr_t)(addr) - kmembase) >> PGSHIFT])
 
 /*
  * Macro versions for the usual cases of malloc/free
  */
 #if defined(KMEMSTATS) || defined(DIAGNOSTIC) || defined(_LKM) || \
-    defined(MALLOCLOG)
+    defined(MALLOCLOG) || defined(LOCKDEBUG)
 #define	MALLOC(space, cast, size, type, flags) \
 	(space) = (cast)malloc((u_long)(size), type, flags)
 #define	FREE(addr, type) free((caddr_t)(addr), type)
@@ -350,7 +389,7 @@ struct kmembuckets {
 #else /* do not collect statistics */
 #define	MALLOC(space, cast, size, type, flags) do { \
 	register struct kmembuckets *kbp = &bucket[BUCKETINDX(size)]; \
-	long s = splimp(); \
+	long s = splmem(); \
 	if (kbp->kb_next == NULL) { \
 		(space) = (cast)malloc((u_long)(size), type, flags); \
 	} else { \
@@ -363,7 +402,7 @@ struct kmembuckets {
 #define	FREE(addr, type) do { \
 	register struct kmembuckets *kbp; \
 	register struct kmemusage *kup = btokup(addr); \
-	long s = splimp(); \
+	long s = splmem(); \
 	if (1 << kup->ku_indx > MAXALLOCSAVE) { \
 		free((caddr_t)(addr), type); \
 	} else { \

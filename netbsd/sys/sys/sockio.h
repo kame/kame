@@ -1,4 +1,4 @@
-/*	$NetBSD: sockio.h,v 1.8 1998/09/06 17:52:01 christos Exp $	*/
+/*	$NetBSD: sockio.h,v 1.11 2000/05/13 07:55:05 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993, 1994
@@ -86,10 +86,10 @@
 #define	SIOCSIFMEDIA	_IOWR('i', 53, struct ifreq)	/* set net media */
 #define	SIOCGIFMEDIA	_IOWR('i', 54, struct ifmediareq) /* get net media */
 
-#define SIOCSIFPHYADDR   _IOW('i', 70, struct ifaliasreq) /* set gif addres */
+#define SIOCSIFPHYADDR	 _IOW('i', 70, struct ifaliasreq) /* set gif addres */
 #define	SIOCGIFPSRCADDR	_IOWR('i', 71, struct ifreq)	/* get gif psrc addr */
 #define	SIOCGIFPDSTADDR	_IOWR('i', 72, struct ifreq)	/* get gif pdst addr */
-#define	SIOCDIFPHYADDR	 _IOW('i', 73, struct ifreq)	/* delete gif addrs */
+#define SIOCDIFPHYADDR	 _IOW('i', 73, struct ifreq)	/* delete gif addrs */
 #define	SIOCSLIFPHYADDR	 _IOW('i', 74, struct if_laddrreq) /* set gif addrs */
 #define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
 
@@ -98,5 +98,7 @@
 #define	SIOCSIFASYNCMAP  _IOW('i', 125, struct ifreq)	/* set ppp asyncmap */
 #define	SIOCGIFASYNCMAP _IOWR('i', 124, struct ifreq)	/* get ppp asyncmap */
 #define SIOCSDRVSPEC     _IOW('i', 123, struct ifdrv)   /* set driver-specific
+							   parameters */
+#define SIOCGDRVSPEC    _IOWR('i', 123, struct ifdrv)   /* get driver-specific
 							   parameters */
 #endif /* !_SYS_SOCKIO_H_ */
