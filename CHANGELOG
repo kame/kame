@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2129 2002/04/22 08:29:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2130 2002/04/22 08:29:48 jinmei Exp $
 
 <200204>
 2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): if there has been no NS
-	for the neighbor after entering the INCOMPLETE state, send the
+	for a neighbor after entering the INCOMPLETE state, send the
 	first solicitation in nd6_output(), regardless of the timer value.
 	This change will improve the response time to the first NS.
 
