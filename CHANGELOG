@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.866 2000/05/12 18:31:14 jinmei Exp $
+$Id: CHANGELOG,v 1.867 2000/05/13 06:14:46 jinmei Exp $
 
 <200005>
+2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {bsdi4,openbsd}/sys/netinet6/in6_pcb.c (in6_setsockaddr): move
+	the embedded link ID of a link-local address to the sin6_scope_id
+	field in order to conceal the embedding hack from users.
+
 2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported the latest draft (dhcpv6-15).
 	Note that this version is not compatible with the previous one,
