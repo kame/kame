@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.41 2001/06/02 17:53:23 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.42 2001/06/02 17:59:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -429,7 +429,6 @@ getconfig(intface)
 	}
 
 	/* route information */
-
 	MAYHAVE(val, "routes", 0);
 	if (val < 0 || val > 0xffffffff) {
 		syslog(LOG_ERR,
@@ -477,9 +476,9 @@ getconfig(intface)
 		makeentry(entbuf, i, "rtltime", added);
 		/*
 		 * XXX: since default value of route lifetime is not defined in
-		 * draft-draves-route-selection-01.txt, I took the default 
-		 * value of valid lifetime of prefix as its default.
-		 * It need be much considered.
+		 * draft-ietf-ipngwg-router-selection-00.txt.
+		 * I took the default value of valid lifetime of prefix as its
+		 * default.  It need be much considered.
 		 */
 		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
 		if (val64 < 0 || val64 > 0xffffffff) {
@@ -508,7 +507,8 @@ getconfig(intface)
 #if 0
 		/*
 		 * XXX: currently there's no restriction in route information
-		 * prefix according to draft-draves-route-selection-01.txt,
+		 * prefix according to
+		 * draft-ietf-ipngwg-router-selection-00.txt.
 		 * however I think the similar restriction be necessary.
 		 */
 		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
