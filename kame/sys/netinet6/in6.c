@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.126 2001/01/18 14:38:33 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.127 2001/01/20 18:23:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -873,7 +873,7 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef USE_FIXED_P2P_PLEN
 	/*
 	 * Prefix length of P2P I/F non-linklocal prefix should be 
-	 * 128 to prevent unnecessary ND query. 
+	 * 128 to prevent unnecessary ND queries. 
 	 * So it is overwritten regardless of the given prefixlen.
 	 */
 	if (ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK) && 
