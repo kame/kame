@@ -113,7 +113,8 @@ data_doaccept(parent, event, arg)
 	    s1, sizeof(s1), NI_NUMERICHOST | NI_NUMERICSERV);
 	getnameinfo((struct sockaddr *)&relayto, relaytolen, h2, sizeof(h2),
 	    s2, sizeof(s2), NI_NUMERICHOST | NI_NUMERICSERV);
-	logmsg(LOG_INFO, "relaying [%s]:%s -> [%s]:%s", h1, s1, h2, s2);
+	logmsg(LOG_INFO, "relaying [%s]:%s -> [%s]:%s, service ftpdata",
+	    h1, s1, h2, s2);
 
 	/* XXX this shouldn't happen, but the symptom happens on freebsd45 */
 	if (IN6_IS_ADDR_V4MAPPED(&from.sin6_addr)) {
