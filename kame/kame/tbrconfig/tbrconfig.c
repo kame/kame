@@ -1,4 +1,4 @@
-/*	$KAME: tbrconfig.c,v 1.3 2001/05/08 04:36:39 itojun Exp $	*/
+/*	$KAME: tbrconfig.c,v 1.4 2001/10/26 04:57:59 kjc Exp $	*/
 /*
  * Copyright (C) 2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -202,10 +202,10 @@ list_all(void)
 static u_long
 atobps(const char *s)
 {
-	u_long bandwidth;
+	double bandwidth;
 	char *cp;
 			
-	bandwidth = strtoul(s, &cp, 0);
+	bandwidth = strtod(s, &cp);
 	if (cp != NULL) {
 		if (*cp == 'K' || *cp == 'k')
 			bandwidth *= 1000;
@@ -214,16 +214,18 @@ atobps(const char *s)
 		else if (*cp == 'G' || *cp == 'g')
 			bandwidth *= 1000000000;
 	}
-	return (bandwidth);
+	if (bandwidth < 0)
+		bandwidth = 0;
+	return ((u_long)bandwidth);
 }
 
 static u_long
 atobytes(const char *s)
 {
-	u_long bytes;
+	double bytes;
 	char *cp;
 			
-	bytes = strtoul(s, &cp, 0);
+	bytes = strtod(s, &cp);
 	if (cp != NULL) {
 		if (*cp == 'K' || *cp == 'k')
 			bytes *= 1024;
@@ -232,7 +234,9 @@ atobytes(const char *s)
 		else if (*cp == 'G' || *cp == 'g')
 			bytes *= 1024 * 1024 * 1024;
 	}
-	return (bytes);
+	if (bytes < 0)
+		bytes = 0;
+	return ((u_long)bytes);
 }
 
 /*
