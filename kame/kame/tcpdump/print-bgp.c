@@ -99,6 +99,12 @@ struct bgp_attr {
 #define BGPTYPE_LOCAL_PREF		5
 #define BGPTYPE_ATOMIC_AGGREGATE	6
 #define BGPTYPE_AGGREGATOR		7
+#define	BGPTYPE_COMMUNITIES		8	/* RFC1997 */
+#define	BGPTYPE_ORIGINATOR_ID		9	/* RFC1998 */
+#define	BGPTYPE_CLUSTER_LIST		10	/* RFC1998 */
+#define	BGPTYPE_DPA			11	/* work in progress */
+#define	BGPTYPE_ADVERTISERS		12	/* RFC1863 */
+#define	BGPTYPE_RCID_PATH		13	/* RFC1863 */
 #define BGPTYPE_MP_REACH_NLRI		14	/* RFC2283 */
 #define BGPTYPE_MP_UNREACH_NLRI		15	/* RFC2283 */
 
@@ -307,8 +313,16 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 			printf(" invalid len");
 			break;
 		}
-		for (i = 0; i < len; i += 2)
-			printf(" %u", ntohs(*(u_int16_t *)&p[i]));
+		while (p < dat + len) {
+			printf(" ");
+			printf("%s", (p[0] == 1) ? "{" : "");
+			for (i = 0; i < p[1]; i += 2) {
+				printf("%s%u", i == 0 ? "" : " ",
+					ntohs(*(u_int16_t *)&p[2 + i]));
+			}
+			printf("%s", (p[0] == 1) ? "}" : "");
+			p += 2 + p[1] * 2;
+		}
 		break;
 	case BGPTYPE_NEXT_HOP:
 		if (len != 4)
@@ -501,14 +515,6 @@ bgp_update_print(const u_char *dat, int length)
 			bgp_attr_print(&bgpa, &p[i + aoff], alen);
 			newline = 1;
 
-#if 0
-	    default:
-		proto_tree_add_text(subtree2, p - pd + i + aoff, alen,
-			"Unknown (%d bytes)", alen);
-		break;
-	    }
-#endif
-
 			/* ( */
 			printf(")");	
 
@@ -520,6 +526,22 @@ bgp_update_print(const u_char *dat, int length)
 	}
 	p += 2 + len;
 
+	if (len && dat + length > p)
+		printf("\n\t\t");
+	if (dat + length > p) {
+		printf("(NLRI:");	/* ) */
+		while (dat + length > p) {
+			char buf[256];
+			i = decode_prefix4(p, buf, sizeof(buf));
+			printf(" %s", buf);
+			if (i < 0)
+				break;
+			p += i;
+		}
+
+		/* ( */
+		printf(")");
+	}
 }
 
 static void
