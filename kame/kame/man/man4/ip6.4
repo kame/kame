@@ -1,4 +1,4 @@
-.\"	$KAME: ip6.4,v 1.9 2000/04/14 09:09:50 itojun Exp $
+.\"	$KAME: ip6.4,v 1.10 2000/04/17 08:26:17 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -704,6 +704,8 @@ The
 .Dv IPV6_NEXTHOP
 object/option is not fully implemented as of writing this.
 .Pp
-The manpage is based on RFC2292, however, the current implementation is
-based on draft-ietf-ipngwg-2292bis-01.txt.
-There are many semantic changes.
+The manpage is based on RFC2553 and RFC2292, however,
+the current implementation is based on RFC2553 and
+draft-ietf-ipngwg-2292bis-01.txt.
+There are many semantic changes between RFC2292 and 2292bis.
+Refer to the internet draft if you wish to use the IPv6 advanced API.
