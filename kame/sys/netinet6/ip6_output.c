@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.382 2003/07/01 02:56:04 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.383 2003/07/01 02:56:54 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2490,8 +2490,10 @@ do { \
 				m->m_len = sopt->sopt_valsize;
 				error = sooptcopyin(sopt, mtod(m, char *),
 						    m->m_len, m->m_len);
-				if (error)
+				if (error) {
+					(void)m_free(m);
 					break;
+				}
 				error =	ip6_setmoptions(sopt->sopt_name,
 							&in6p->in6p_moptions,
 							m);
