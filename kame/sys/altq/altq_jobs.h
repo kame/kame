@@ -1,4 +1,5 @@
-/*	$Id: altq_jobs.h,v 1.2 2002/10/25 05:06:50 kjc Exp $	*/
+/*	$KAME: altq_jobs.h,v 1.3 2002/10/25 06:13:09 kjc Exp $	*/
+/*	$Id: altq_jobs.h,v 1.3 2002/10/25 06:13:09 kjc Exp $	*/
 /*
  * Copyright (c) 2001, Rector and Visitors of the University of 
  * Virginia.
