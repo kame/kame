@@ -21,7 +21,11 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#ifdef __OpenBSD__
 #include <sys/limits.h>
+#else
+#include <limits.h>
+#endif
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -549,8 +553,10 @@ print_cbq_opts(const struct pf_altq *a)
 			printf(" cleardscp");
 		if (opts->flags & CBQCLF_FLOWVALVE)
 			printf(" flowvalve");
+#ifdef __OpenBSD__
 		if (opts->flags & CBQCLF_BORROW)
 			printf(" borrow");
+#endif
 		if (opts->flags & CBQCLF_WRR)
 			printf(" wrr");
 		if (opts->flags & CBQCLF_EFFICIENT)

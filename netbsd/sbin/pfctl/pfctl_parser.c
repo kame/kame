@@ -50,6 +50,9 @@
 #include <errno.h>
 #include <err.h>
 #include <ifaddrs.h>
+#ifdef __NetBSD__
+#include <limits.h>
+#endif
 
 #include "pfctl_parser.h"
 #include "pfctl.h"
@@ -74,7 +77,9 @@ static const struct icmptypeent icmp_type[] = {
 	{ "unreach",	ICMP_UNREACH },
 	{ "squench",	ICMP_SOURCEQUENCH },
 	{ "redir",	ICMP_REDIRECT },
+#ifdef __OpenBSD__
 	{ "althost",	ICMP_ALTHOSTADDR },
+#endif
 	{ "routeradv",	ICMP_ROUTERADVERT },
 	{ "routersol",	ICMP_ROUTERSOLICIT },
 	{ "timex",	ICMP_TIMXCEED },
@@ -85,6 +90,7 @@ static const struct icmptypeent icmp_type[] = {
 	{ "inforep",	ICMP_IREQREPLY },
 	{ "maskreq",	ICMP_MASKREQ },
 	{ "maskrep",	ICMP_MASKREPLY },
+#ifdef __OpenBSD__
 	{ "trace",	ICMP_TRACEROUTE },
 	{ "dataconv",	ICMP_DATACONVERR },
 	{ "mobredir",	ICMP_MOBILE_REDIRECT },
@@ -94,6 +100,7 @@ static const struct icmptypeent icmp_type[] = {
 	{ "mobregrep",	ICMP_MOBILE_REGREPLY },
 	{ "skip",	ICMP_SKIP },
 	{ "photuris",	ICMP_PHOTURIS }
+#endif
 };
 
 static const struct icmptypeent icmp6_type[] = {
@@ -139,23 +146,29 @@ static const struct icmpcodeent icmp_code[] = {
 	{ "host-prohib",	ICMP_UNREACH,	ICMP_UNREACH_HOST_PROHIB },
 	{ "net-tos",		ICMP_UNREACH,	ICMP_UNREACH_TOSNET },
 	{ "host-tos",		ICMP_UNREACH,	ICMP_UNREACH_TOSHOST },
+#ifdef __OpenBSD__
 	{ "filter-prohib",	ICMP_UNREACH,	ICMP_UNREACH_FILTER_PROHIB },
 	{ "host-preced",	ICMP_UNREACH,	ICMP_UNREACH_HOST_PRECEDENCE },
 	{ "cutoff-preced",	ICMP_UNREACH,	ICMP_UNREACH_PRECEDENCE_CUTOFF },
+#endif
 	{ "redir-net",		ICMP_REDIRECT,	ICMP_REDIRECT_NET },
 	{ "redir-host",		ICMP_REDIRECT,	ICMP_REDIRECT_HOST },
 	{ "redir-tos-net",	ICMP_REDIRECT,	ICMP_REDIRECT_TOSNET },
 	{ "redir-tos-host",	ICMP_REDIRECT,	ICMP_REDIRECT_TOSHOST },
+#ifdef __OpenBSD__
 	{ "normal-adv",		ICMP_ROUTERADVERT, ICMP_ROUTERADVERT_NORMAL },
 	{ "common-adv",		ICMP_ROUTERADVERT, ICMP_ROUTERADVERT_NOROUTE_COMMON },
+#endif
 	{ "transit",		ICMP_TIMXCEED,	ICMP_TIMXCEED_INTRANS },
 	{ "reassemb",		ICMP_TIMXCEED,	ICMP_TIMXCEED_REASS },
+#ifdef __OpenBSD__
 	{ "badhead",		ICMP_PARAMPROB,	ICMP_PARAMPROB_ERRATPTR },
 	{ "optmiss",		ICMP_PARAMPROB,	ICMP_PARAMPROB_OPTABSENT },
 	{ "badlen",		ICMP_PARAMPROB,	ICMP_PARAMPROB_LENGTH },
 	{ "unknown-ind",	ICMP_PHOTURIS,	ICMP_PHOTURIS_UNKNOWN_INDEX },
 	{ "auth-fail",		ICMP_PHOTURIS,	ICMP_PHOTURIS_AUTH_FAILED },
 	{ "decrypt-fail",	ICMP_PHOTURIS,	ICMP_PHOTURIS_DECRYPT_FAILED }
+#endif
 };
 
 static const struct icmpcodeent icmp6_code[] = {
