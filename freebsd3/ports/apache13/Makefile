@@ -7,7 +7,7 @@
 
 PORTNAME=	apache
 PORTVERSION=	1.3.12
-CATEGORIES=	www
+CATEGORIES=	www ipv6
 MASTER_SITES=   http://www.apache.org/dist/ \
 		ftp://ftp.ccs.neu.edu/net/mirrors/ftp.apache.org/apache/dist/ \
 		ftp://ftp.rge.com/pub/infosystems/apache/dist/ \
@@ -26,7 +26,7 @@ MASTER_SITES=   http://www.apache.org/dist/ \
 DISTNAME=	${PORTNAME}_${PORTVERSION}
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	apache-1.3.12-v6-20000518.diff.gz
+PATCHFILES=	apache-1.3.12-v6-20000815.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
