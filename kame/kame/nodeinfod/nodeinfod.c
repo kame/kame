@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.19 2001/10/24 06:55:01 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.20 2001/10/24 07:32:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -74,6 +74,7 @@ static int ni6_input_code0 __P((struct sockaddr *, socklen_t, const char *,
 static int ni6_input __P((struct sockaddr *, socklen_t, const char *, ssize_t));
 static ssize_t ni6_nametodns __P((const char *, char *, char *, ssize_t, int));
 static int ni6_dnsmatch __P((const char *, int, const char *, int));
+static int findsubjif __P((char *, size_t, struct sockaddr *, socklen_t));
 static ssize_t ni6_addrs __P((struct icmp6_nodeinfo *, char *, char *,
 	ssize_t, struct sockaddr *, socklen_t, const char *, int));
 static int ismyaddr __P((struct sockaddr *, socklen_t));
@@ -462,9 +463,12 @@ ni6_input(from, fromlen, buf, l)
 	int replylen = sizeof(struct icmp6_nodeinfo);
 	struct ni_reply_fqdn *fqdn;
 	struct sockaddr_in6 sin6; /* double meaning; ip6_dst and subjectaddr */
+	struct sockaddr_in sin;
 	int oldfqdn = 0;	/* if 1, return pascal string (03 draft) */
 	const char *subj = NULL;
 	ssize_t tlen;
+	char ifnamebuf[IF_NAMESIZE];
+	const char *ifname = NULL;
 
 	if (debug)
 		warnx("ni6_input");
@@ -557,23 +561,22 @@ ni6_input(from, fromlen, buf, l)
 			sin6.sin6_len = sizeof(struct sockaddr_in6);
 			memcpy(&sin6.sin6_addr, ni6 + 1,
 			    sizeof(sin6.sin6_addr));
-			if (from->sa_family == AF_INET6)
-				sin6.sin6_scope_id =
-				    ((struct sockaddr_in6 *)from)->sin6_scope_id;
-			subj = (const char *)&sin6;
-			if (ismyaddr((struct sockaddr *)&sin6, sizeof(sin6)) ||
-			    IN6_IS_ADDR_MULTICAST(&sin6.sin6_addr))
-				break;
+			if (!ismyaddr((struct sockaddr *)&sin6, sizeof(sin6)) &&
+			    !IN6_IS_ADDR_MULTICAST(&sin6.sin6_addr)) {
+				/*
+				 * proxy case - if we are going to do something
+				 * about this case, be really careful about
+				 * scope issues.
+				 */
+				goto bad;
+			}
 
-			/*
-			 * XXX if we are to allow other cases, we should really
-			 * be careful about scope here.
-			 * basically, we should disallow queries toward IPv6
-			 * destination X with subject Y, if scope(X) > scope(Y).
-			 * if we allow scope(X) > scope(Y), it will result in
-			 * information leakage across scope boundary.
-			 */
-			goto bad;
+			if (findsubjif(ifnamebuf, sizeof(ifnamebuf),
+			    (struct sockaddr *)&sin6, sin6.sin6_len) == 0)
+				ifname = ifnamebuf;
+			else
+				ifname = NULL;
+			break;
 
 		case ICMP6_NI_SUBJ_FQDN:
 			/*
@@ -597,6 +600,30 @@ ni6_input(from, fromlen, buf, l)
 			break;
 
 		case ICMP6_NI_SUBJ_IPV4:	/* XXX: to be implemented? */
+			if (subjlen != sizeof(sin.sin_addr))
+				goto bad;
+
+			/*
+			 * Validate Subject address.
+			 */
+			memset(&sin, 0, sizeof(sin));
+			sin.sin_family = AF_INET;
+			sin.sin_len = sizeof(struct sockaddr_in);
+			memcpy(&sin.sin_addr, ni6 + 1, sizeof(sin.sin_addr));
+			if (!ismyaddr((struct sockaddr *)&sin, sizeof(sin))) {
+				/*
+				 * proxy case
+				 */
+				goto bad;
+			}
+
+			if (findsubjif(ifnamebuf, sizeof(ifnamebuf),
+			    (struct sockaddr *)&sin, sin.sin_len) == 0)
+				ifname = ifnamebuf;
+			else
+				ifname = NULL;
+			break;
+
 		default:
 			goto bad;
 		}
@@ -633,7 +660,7 @@ ni6_input(from, fromlen, buf, l)
 			goto bad;
 		memcpy(replybuf, buf, l);
 		nni6 = (struct icmp6_nodeinfo *)replybuf;
-		replylen = ni6_addrs(nni6, NULL, NULL, 0, from, fromlen, subj,
+		replylen = ni6_addrs(nni6, NULL, NULL, 0, from, fromlen, ifname,
 		    (qtype == NI_QTYPE_NODEADDR) ? AF_INET6 : AF_INET);
 		/* XXX: will truncate pkt later */
 		if (replylen > sizeof(replybuf))
@@ -698,7 +725,7 @@ ni6_input(from, fromlen, buf, l)
 		replylen = sizeof(struct icmp6_nodeinfo);
 		lenlim = sizeof(replybuf);
 		copied = ni6_addrs(nni6, (char *)(nni6 + 1), replybuf,
-		    sizeof(replybuf), from, fromlen, subj,
+		    sizeof(replybuf), from, fromlen, ifname,
 		    (qtype == NI_QTYPE_NODEADDR) ? AF_INET6 : AF_INET);
 		replylen = sizeof(struct icmp6_nodeinfo) + copied;
 		break;
@@ -871,22 +898,46 @@ ni6_dnsmatch(a, alen, b, blen)
 		return 0;
 }
 
+static int
+findsubjif(buf, buflen, sa, salen)
+	char *buf;
+	size_t buflen;
+	struct sockaddr *sa;
+	socklen_t salen;
+{
+	struct ifaddrs *ifap, *ifa;
+
+	if (getifaddrs(&ifap) < 0)
+		return -1;
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family == sa->sa_family &&
+		    ifa->ifa_addr->sa_len == salen &&
+		    memcmp(ifa->ifa_addr, sa, salen) == 0) {
+			strlcpy(buf, ifa->ifa_name, buflen);
+			freeifaddrs(ifap);
+			return 0;
+		}
+	}
+
+	freeifaddrs(ifap);
+	return -1;
+}
+
 static ssize_t
-ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
+ni6_addrs(ni6, p, buf, buflen, sa, salen, ifname, af)
 	struct icmp6_nodeinfo *ni6;
 	char *p;
 	char *buf;
 	ssize_t buflen;
 	struct sockaddr *sa;
 	socklen_t salen;
-	const char *subj;
+	const char *ifname;
 	int af;
 {
-	const struct sockaddr_in6 *subj_ip6 = NULL; /* XXX pedant */
 	int addrs, copied;
-	int niflags = ni6->ni_flags;
+	u_int16_t niflags = ni6->ni_flags;
 	struct ifaddrs *ifap, *ifa;
-	const char *ifname = NULL;
 	char *cp, *ep;
 	int32_t ltime;
 	struct in6_addr *in6;
@@ -908,33 +959,22 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
 	if (getifaddrs(&ifap) < 0)
 		return -1;
 
-	if ((niflags & NI_NODEADDR_FLAG_ALL) == 0) {
+	if ((niflags & NI_NODEADDR_FLAG_ALL) != 0)
+		ifname = NULL;
+	else {
 		switch (ni6->ni_code) {
 		case ICMP6_NI_SUBJ_IPV6:
-			if (subj == NULL) /* must be impossible... */
-				goto fail;
-			subj_ip6 = (const struct sockaddr_in6 *)subj;
-
-			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-				if (ifa->ifa_addr->sa_family == subj_ip6->sin6_family &&
-				    ifa->ifa_addr->sa_len == subj_ip6->sin6_len &&
-				    memcmp(ifa->ifa_addr, subj_ip6, subj_ip6->sin6_len) == 0) {
-					ifname = ifa->ifa_name;
-					break;
-				}
-			}
+		case ICMP6_NI_SUBJ_IPV4:
+			/* use the ifname given */
 			break;
 		case ICMP6_NI_SUBJ_FQDN:
 			/* there's no concept of "interface" in hostname */
 			ifname = NULL;
 			break;
-		case ICMP6_NI_SUBJ_IPV4:
-			goto fail; /* not yet */
 		default:
 			goto fail;
 		}
-	} else
-		ifname = NULL;
+	}
 
 	copied = addrs = 0;
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
