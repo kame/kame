@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.119 2002/03/01 10:26:54 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.120 2002/03/02 15:51:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -145,6 +145,7 @@ static int mip6_prefix_list_update_sub __P((struct hif_softc *,
 					    struct sockaddr_in6 *,
 					    struct nd_prefix *,
 					    struct nd_defrouter *));
+static int mip6_register_current_location __P((void));
 static int mip6_haddr_config __P((struct hif_softc *));
 static int mip6_attach_haddrs __P((struct hif_softc *));
 static int mip6_detach_haddrs __P((struct hif_softc *));
@@ -676,14 +677,39 @@ mip6_haddr_config(sc)
 }
 
 /*
- * mip6_process_movement() is called when CoA has changed.  therefore,
- * we can call mip6_home_registration() in any case because we must
- * have moved from somewhere to somewhere.
+ * mip6_process_movement() is called (1) after prefix onlink checking
+ * has finished and (2) p2p address is configured by calling
+ * in6_control().  if the CoA has changed, call
+ * mip6_register_current_location() to make a home registration.
  */
 int
 mip6_process_movement(void)
 {
+	int error = 0;
+	int coa_changed = 0;
+
+	hif_save_location();
+	coa_changed = mip6_select_coa2();
+	if (coa_changed == 1)
+		error = mip6_process_pfxlist_status_change(&hif_coa);
+	if (coa_changed == 1)
+		error = mip6_register_current_location();
+	else
+		hif_restore_location();
+
+	return (error);
+}
+
+/*
+ * mip6_register_current_location() is called only when CoA has
+ * changed.  therefore, we can call mip6_home_registration() in any
+ * case because we must have moved from somewhere to somewhere.
+ */
+static int
+mip6_register_current_location(void)
+{
 	struct hif_softc *sc;
+	int error = 0;
 
 	for (sc = TAILQ_FIRST(&hif_softc_list);
 	     sc;
@@ -694,7 +720,7 @@ mip6_process_movement(void)
 			 * we moved to home.  unregister our home
 			 * address.
 			 */
-			mip6_home_registration(sc);
+			error = mip6_home_registration(sc);
 			break;
 
 		case HIF_LOCATION_FOREIGN:
@@ -703,7 +729,7 @@ mip6_process_movement(void)
 			 * CoA to our home agent.
 			 */
 			/* XXX: TODO register to the old subnet's AR. */
-			mip6_home_registration(sc);
+			error = mip6_home_registration(sc);
 			break;
 
 		case HIF_LOCATION_UNKNOWN:
@@ -711,7 +737,7 @@ mip6_process_movement(void)
 		}
 	}
 
-	return (0);
+	return (error);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.267 2002/02/26 03:28:05 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.268 2002/03/02 15:51:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -810,8 +810,18 @@ in6_control(so, cmd, data, ifp)
 		pr0.ndpr_ifp = ifp;
 		pr0.ndpr_plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr,
 					     NULL);
-		if (pr0.ndpr_plen == 128)
+		if (pr0.ndpr_plen == 128) {
+#ifdef MIP6
+			if (MIP6_IS_MN)
+				if (mip6_process_movement()) {
+					mip6log((LOG_WARNING,
+						 "%s:%d: mip6_process_movement failed.\n",
+						 __FILE__, __LINE__));
+					/* ignore this error... */
+				}
+#endif
 			break;	/* we don't need to install a host route. */
+		}
 		pr0.ndpr_prefix = ifra->ifra_addr;
 		pr0.ndpr_mask = ifra->ifra_prefixmask.sin6_addr;
 		/* apply the mask for safety. */

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.195 2002/02/27 01:34:34 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.196 2002/03/02 15:51:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1771,18 +1771,13 @@ pfxlist_onlink_check()
 	}
 
 #ifdef MIP6
-	if (MIP6_IS_MN) {
-		int coa_changed = 0;
-
-		hif_save_location();
-		coa_changed = mip6_select_coa2();
-		if (coa_changed == 1)
-			(void)mip6_process_pfxlist_status_change(&hif_coa);
-		if (coa_changed == 1)
-			mip6_process_movement();
-		else
-			hif_restore_location();
-	}
+	if (MIP6_IS_MN)
+		if (mip6_process_movement()) {
+			mip6log((LOG_WARNING,
+				 "%s:%d: mip6_process_movement failed.\n",
+				 __FILE__, __LINE__));
+			/* ignore this error... */
+		}
 #endif /* MIP6 */
 }
 
