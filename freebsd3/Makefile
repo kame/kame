@@ -31,7 +31,8 @@ beforeinstall:
 afterinstall:
 	cp kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
 	cp kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
-	if test -x $(PREFIX)/sbin/inet6d; then \
+	if test -x $(PREFIX)/sbin/inet6d || test -x $(PREFIX)/sbin/inet46d; \
+	then \
 		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi
 	cp kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
