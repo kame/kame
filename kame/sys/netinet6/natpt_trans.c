@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.72 2001/12/18 02:23:44 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.73 2001/12/21 10:28:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -640,8 +640,17 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 	/*
 	 * Start translation
 	 */
-	m4->m_data += sizeof(struct ip6_hdr) - sizeof(struct ip);
-	m4->m_pkthdr.len = m4->m_len = sizeof(struct ip) + cv6->plen;
+	{
+		int	diff;
+
+		diff = sizeof(struct ip6_hdr) - sizeof(struct ip);
+		if (cv6->fh) {
+			diff += sizeof(struct ip6_frag);
+		}
+		m4->m_data += diff;
+		m4->m_len  -= diff;
+		m4->m_pkthdr.len -= diff;
+	}
 
 	cv4->m = m4;
 	cv4->plen = cv6->plen;
@@ -2433,6 +2442,15 @@ void
 natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 {
 	struct ip6_hdr	*ip6 = cv6->ip.ip6;
+	struct ip6_frag  fh6;
+
+	/*
+	 * There is a case pointing the same area with ip6 and ip4, we
+	 * need to save the fragment header if exists.
+	 */
+	if (cv6->fh) {
+		fh6 = *cv6->fh;
+	}
 
 #ifdef _IP_VHL
 	ip4->ip_vhl = IP_MAKE_VHL(IPVERSION, (sizeof(struct ip) >> 2));
@@ -2452,18 +2470,18 @@ natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 		: ip6->ip6_nxt;
 
 	if (cv6->fh) {
-		u_int16_t	offlg = ntohs(cv6->fh->ip6f_offlg);
+		u_int16_t	offlg = ntohs(fh6.ip6f_offlg);
 
 		ip4->ip_len = ntohs(ip6->ip6_plen) - sizeof(struct ip6_frag)
 			+ sizeof(struct ip);
-		ip4->ip_id = cv6->fh->ip6f_ident & 0xffff;
+		ip4->ip_id = fh6.ip6f_ident & 0xffff;
 
 		ip4->ip_off = (offlg & 0xfff8) >> 3;
 		if (offlg & 0x0001)
 			ip4->ip_off |= IP_MF;
-		ip4->ip_p = (cv6->fh->ip6f_nxt == IPPROTO_ICMPV6)
+		ip4->ip_p = (fh6.ip6f_nxt == IPPROTO_ICMPV6)
 			? IPPROTO_ICMP
-			: cv6->fh->ip6f_nxt;
+			: fh6.ip6f_nxt;
 	}
 }
 
