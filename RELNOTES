@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 11:08:59 $
+		     $Date: 1999/10/08 05:54:31 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -31,6 +31,13 @@ and the next STABLE release,
 - freebsd[23]/usr.bin/fetch does not properly handle IPv6 passive mode (EPSV).
 - When IPsec header is present, TCP MSS computation violates specification
   (no interoperability nor performance problem is experienced, though).
+- fxp interface may not work due to some timing confilict with DAD procedure
+  on freebsd3 machine.
+  Currently, following workaround is known.
+   -rewrite sys/pci/if_fxp.c like FreeBSD228 based one, or,
+   -add /etc/start_if.fxpX for each of fxp0, fxp1... and do following in
+    those files,
+     ifconfig fxpX up 
 
 PLATFORM DIFFERENCES
 ====================
