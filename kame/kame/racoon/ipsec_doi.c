@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.105 2000/09/20 01:02:55 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.106 2000/09/21 06:07:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.105 2000/09/20 01:02:55 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.106 2000/09/21 06:07:55 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2536,6 +2536,7 @@ setph2proposal0(iph2, pp, pr)
 	size_t trnsoff;
 	caddr_t x0, x;
 	u_int8_t *np_t; /* pointer next trns type in previous header */
+	u_int8_t *spi;
 
 	p = vmalloc(sizeof(*prop) + sizeof(pr->spi));
 	if (p == NULL)
@@ -2548,11 +2549,29 @@ setph2proposal0(iph2, pp, pr)
 	prop->proto_id = pr->proto_id;
 	prop->num_t = 1;
 
-	prop->spi_size = sizeof(pr->spi);
-	memcpy(prop + 1, &pr->spi, sizeof(pr->spi));
+	spi = (u_int8_t *)&pr->spi;
+	switch (pr->proto_id) {
+	case IPSECDOI_PROTO_IPCOMP:
+		/*
+		 * draft-shacham-ippcp-rfc2393bis-05.txt:
+		 * construct 16bit SPI (CPI).
+		 * XXX we may need to provide a configuration option to
+		 * generate 32bit SPI.  otherwise we cannot interoeprate
+		 * with nodes that uses 32bit SPI, in case we are initiator.
+		 */
+		prop->spi_size = sizeof(u_int16_t);
+		spi += sizeof(pr->spi) - sizeof(u_int16_t);
+		p->l -= sizeof(pr->spi);
+		p->l += sizeof(u_int16_t);
+		break;
+	default:
+		prop->spi_size = sizeof(pr->spi);
+		break;
+	}
+	memcpy(prop + 1, spi, prop->spi_size);
 
 	/* create transform */
-	trnsoff = sizeof(*prop) + sizeof(pr->spi);
+	trnsoff = sizeof(*prop) + prop->spi_size;
 	np_t = NULL;
 
 	for (tr = pr->head; tr; tr = tr->next) {

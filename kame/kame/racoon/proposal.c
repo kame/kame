@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.20 2000/09/20 01:03:18 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.21 2000/09/21 06:07:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.20 2000/09/20 01:03:18 itojun Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.21 2000/09/21 06:07:55 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -178,6 +178,7 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 	struct satrns *tr1, *tr2, *newtr;
 	const int ordermatters = 0;
 	int npr1, npr2;
+	int spisizematch;
 
 	newpp = newsaprop();
 	if (newpp == NULL) {
@@ -340,7 +341,29 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 					pr2->proto_id, pr1->proto_id));
 			goto err;
 		}
-		if (pr1->spisize != pr2->spisize) {
+		spisizematch = 0;
+		if (pr1->spisize == pr2->spisize)
+			spisizematch = 1;
+		else if (pr1->proto_id == IPSECDOI_PROTO_IPCOMP) {
+			/*
+			 * draft-shacham-ippcp-rfc2393bis-05.txt:
+			 * need to accept 16bit and 32bit SPI (CPI) for IPComp.
+			 */
+			if (pr1->spisize == sizeof(u_int16_t) &&
+			    pr2->spisize == sizeof(u_int32_t)) {
+				spisizematch = 1;
+			} else if (pr1->spisize == sizeof(u_int16_t) &&
+				 pr2->spisize == sizeof(u_int32_t)) {
+				spisizematch = 1;
+			}
+			if (spisizematch) {
+				YIPSDEBUG(DEBUG_SA,
+					plog(logp, LOCATION, NULL,
+					    "IPComp SPI size promoted "
+					    "from 16bit to 32bit\n"));
+			}
+		}
+		if (!spisizematch) {
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
 					"spisize mismatched: "
@@ -607,6 +630,7 @@ aproppair2saprop(p0)
 	struct saprop *newpp;
 	struct saproto *newpr;
 	struct satrns *newtr;
+	u_int8_t *spi;
 
 	if (p0 == NULL)
 		return NULL;
@@ -639,9 +663,17 @@ aproppair2saprop(p0)
 			goto err;
 		}
 
+		/*
+		 * XXX SPI bits are left-filled, for use with IPComp.
+		 * we should be switching to variable-length spi field...
+		 */
 		newpr->proto_id = p->prop->proto_id;
 		newpr->spisize = p->prop->spi_size;
-		memcpy(&newpr->spi, p->prop + 1, p->prop->spi_size);
+		memset(&newpr->spi, 0, sizeof(newpr->spi));
+		spi = (u_int8_t *)&newpr->spi;
+		spi += sizeof(newpr->spi);
+		spi -= p->prop->spi_size;
+		memcpy(spi, p->prop + 1, p->prop->spi_size);
 		newpr->reqid_in = 0;
 		newpr->reqid_out = 0;
 
