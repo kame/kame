@@ -819,15 +819,6 @@ findpcb:
 #ifdef INET6
 			case AF_INET6:
 				sa6_copy_addr(&dst_sa6, &inp->in6p_lsa);
-				
-				/*inp->inp_options = ip6_srcroute();*/ /* soon. */
-				/*
-				 * still need to tweak outbound options
-				 * processing to include this mbuf in
-				 * the right place and put the correct
-				 * NextHdr values in the right places.
-				 * XXX  rja
-				 */
 				break;
 #endif /* INET6 */
 			case AF_INET:
