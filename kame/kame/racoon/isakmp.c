@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.132 2001/03/15 10:34:35 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.133 2001/03/21 20:27:27 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -685,7 +685,7 @@ quick_main(iph2, msg)
 			"failed to pre-process packet.\n");
 		if (error == ISAKMP_INTERNAL_ERROR)
 			return 0;
-		isakmp_info_send_n2(iph2, error, NULL);
+		isakmp_info_send_n1(iph2->ph1, error, NULL);
 		return -1;
 	}
 
@@ -975,7 +975,7 @@ isakmp_ph2begin_r(iph1, msg)
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"failed to pre-process packet.\n");
 		if (error != ISAKMP_INTERNAL_ERROR)
-			isakmp_info_send_n2(iph2, error, NULL);
+			isakmp_info_send_n1(iph2->ph1, error, NULL);
 		/*
 		 * release handler because it's wrong that ph2handle is kept
 		 * after failed to check message for responder's.
