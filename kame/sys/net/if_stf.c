@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.8 2000/03/11 09:34:01 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.9 2000/03/11 13:10:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -178,7 +178,7 @@ stfattach(dummy)
 		bzero(sc, sizeof(*sc));
 
 		p = encap_attach_func(AF_INET, IPPROTO_IPV6, stf_encapcheck,
-		    &in_stf_protosw, &sc);
+		    &in_stf_protosw, sc);
 		if (p == NULL)
 			continue;
 
@@ -221,6 +221,8 @@ stf_encapcheck(m, off, proto, arg)
 	struct in_addr a, b;
 
 	sc = (struct stf_softc *)arg;
+	if (sc == NULL)
+		return 0;
 
 	if (proto != IPPROTO_IPV6)
 		return 0;
@@ -272,6 +274,8 @@ stf_getsrcifa6(ifp)
 	for (ia = ifp->if_addrlist.tqh_first;
 	     ia;
 	     ia = ia->ifa_list.tqe_next) {
+		if (ia->ifa_addr == NULL)
+			continue;
 		if (ia->ifa_addr->sa_family != AF_INET6)
 			continue;
 		sin6 = (struct sockaddr_in6 *)ia->ifa_addr;
@@ -437,17 +441,29 @@ in_stf_input(m, va_alist)
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/* reject packets with 6to4(multicast) inner destination */
-	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst) &&
-	    IN_MULTICAST(GET_V4(&ip6->ip6_dst)->s_addr)) {
-		m_freem(m);
-		return;
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst)) {
+		/*
+		 * reject packets with the following inner destinations:
+		 * 6to4(multicast) 6to4(0.0.0.0) 6to4(255.255.255.255)
+		 */
+		if (IN_MULTICAST(GET_V4(&ip6->ip6_dst)->s_addr) ||
+		    GET_V4(&ip6->ip6_dst)->s_addr == INADDR_ANY ||
+		    GET_V4(&ip6->ip6_dst)->s_addr == INADDR_BROADCAST) {
+			m_freem(m);
+			return;
+		}
 	}
-	/* reject packets with 6to4(0.0.0.0) inner destination */
-	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst) &&
-	    GET_V4(&ip6->ip6_dst)->s_addr == INADDR_ANY) {
-		m_freem(m);
-		return;
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_src)) {
+		/*
+		 * reject packets with the following inner source:
+		 * 6to4(multicast) 6to4(0.0.0.0) 6to4(255.255.255.255)
+		 */
+		if (IN_MULTICAST(GET_V4(&ip6->ip6_src)->s_addr) ||
+		    GET_V4(&ip6->ip6_src)->s_addr == INADDR_ANY ||
+		    GET_V4(&ip6->ip6_src)->s_addr == INADDR_BROADCAST) {
+			m_freem(m);
+			return;
+		}
 	}
 
 	itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
