@@ -1,0 +1,5 @@
+$NetBSD$
+
+MD5 (sendmail.8.9.3.tar.gz) = efedacfbce84a71d1cfb0e617b84596e
+MD5 (sendmail893+3.2W.patch.gz) = 77e2183c40e304a2b1410a5bb041cd46
+MD5 (sendmail.893+W3.2.kame-ipsec.19990521.diff.gz) = 63767c1f6a5953bb203d3e31e1952d8d
