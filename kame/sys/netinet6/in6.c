@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.118 2000/12/05 01:40:07 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.119 2000/12/05 15:57:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1170,7 +1170,9 @@ in6_purgeif(ifp)
 		in6_purgeaddr(ifa, ifp);
 	}
 
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	in6_ifdetach(ifp);
+#endif
 }
 
 /*
