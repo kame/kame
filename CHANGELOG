@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1097 2000/07/04 13:34:29 itojun Exp $
+$Id: CHANGELOG,v 1.1098 2000/07/04 17:25:05 sakane Exp $
 
 <200006>
+Wed Jul  5 02:25:11 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Implemented INITIAL-CONTACT.
+	This message is sent by single notify message after phase 1 established
+	immediately.  It means the message is not included last exchange on
+	phase 1.  So it can be sent by responder on aggressive/base mode.
+	If there is no remote address in contacted list, racoon sends the
+	message to peer.  If the message is received, racoon deletes all
+	IPsec-SAs relatived to peer's address.  It takes place both initiator
+	and responder side.
+
 Tue Jul  4 21:36:16 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Racoon usually runs in background.  If you specify -F option, you make
