@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2511 2003/12/08 15:14:06 jinmei Exp $
+$KAME: CHANGELOG,v 1.2512 2003/12/10 04:19:57 itojun Exp $
 
 <200312>
+Tue Dec  9 12:14:41 JST 2003  itojun@iijlab.net
+	* sys/net*: do not use if_index as the upper limit of interface
+	  index, as interfaces are dynamically created/removed on many *BSD
+	  and if_index is no longer the upper limit.  instead, use the
+	  following construct:
+		if (0 < x && x < if_indexlim && ifindex2ifnet[x])
+			/* interface exists */
+		else
+			/* interface does not exist */
+
 2003-12-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.h: cleaned-up the mif6 structure by
 	removing unused members.  Note: netstat will have to be rebuilt
