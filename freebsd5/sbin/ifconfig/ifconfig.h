@@ -31,7 +31,7 @@
  *
  * so there!
  *
- * $FreeBSD: src/sbin/ifconfig/ifconfig.h,v 1.9 2002/10/23 22:50:04 rwatson Exp $
+ * $FreeBSD: src/sbin/ifconfig/ifconfig.h,v 1.10 2003/04/28 16:37:38 sam Exp $
  */
 
 extern struct ifreq ifr;
@@ -42,6 +42,7 @@ extern int supmedia;
 struct afswtch;
 
 extern void setmedia(const char *, int, int, const struct afswtch *rafp);
+extern void setmediamode(const char *, int, int, const struct afswtch *rafp);
 extern void setmediaopt(const char *, int, int, const struct afswtch *rafp);
 extern void unsetmediaopt(const char *, int, int, const struct afswtch *rafp);
 extern void media_status(int s, struct rt_addrinfo *);

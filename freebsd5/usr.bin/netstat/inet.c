@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.55 2002/09/05 17:06:51 dwmalone Exp $";
+  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.58 2003/04/02 20:14:44 mdodd Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -641,7 +641,7 @@ icmp_stats(u_long off __unused, const char *name, int af1 __unused)
 
 	p(icps_error, "\t%lu call%s to icmp_error\n");
 	p(icps_oldicmp,
-	    "\t%lu error%s not generated 'cuz old message was icmp\n");
+	    "\t%lu error%s not generated in response to an icmp message\n");
 	for (first = 1, i = 0; i < ICMP_MAXTYPE + 1; i++)
 		if (icmpstat.icps_outhist[i] != 0) {
 			if (first) {
