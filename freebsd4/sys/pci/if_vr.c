@@ -1330,7 +1330,7 @@ static void vr_start(ifp)
 	start_tx = sc->vr_cdata.vr_tx_free;
 
 	while(sc->vr_cdata.vr_tx_free->vr_mbuf == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1340,16 +1340,18 @@ static void vr_start(ifp)
 
 		/* Pack the data into the descriptor. */
 		if (vr_encap(sc, cur_tx, m_head)) {
-			ifp->if_flags |= IFF_OACTIVE;
+			if (ALTQ_IS_ENABLED(&ifp->if_snd)) {
+				m_freem(m_head);
+			} else {
+				IF_PREPEND(&ifp->if_snd, m_head);
+				ifp->if_flags |= IFF_OACTIVE;
+			}
 			cur_tx = NULL;
 			break;
 		}
 
 		if (cur_tx != start_tx)
 			VR_TXOWN(cur_tx) = VR_TXSTAT_OWN;
-
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
