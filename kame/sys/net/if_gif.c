@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.44 2001/02/21 00:16:12 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.45 2001/02/21 05:19:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -344,6 +344,7 @@ gif_output(ifp, m, dst, rt)
 		error = gif_eon_encap(&m);
 		if (error)
 			goto end;
+		break;
 #endif
 	default:
 		break;
@@ -366,11 +367,13 @@ gif_output(ifp, m, dst, rt)
 	default:
 		m_freem(m);		
 		error = ENETDOWN;
+		goto end;
 	}
 
   end:
 	called = 0;		/* reset recursion counter */
-	if (error) ifp->if_oerrors++;
+	if (error)
+		ifp->if_oerrors++;
 	return error;
 }
 
