@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2628 2004/06/14 05:42:19 suz Exp $
+$KAME: CHANGELOG,v 1.2629 2004/06/16 02:29:43 jinmei Exp $
 
 <200406>
+2004-06-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_update_ifa): do not attempt to join
+	multicast groups or to perform DAD when an existing address is
+	modified.  This change will avoid unnecessary memory
+	consumption in this case.
+
 2004-06-14  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/{mld6,mld6v2}_proto.[ch]
 	- changed MLDv1-compatible-mode behavior as is stated in RFC3810
