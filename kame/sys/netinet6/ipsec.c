@@ -2173,6 +2173,11 @@ ipsec_chkreplay(seq, sav)
 	}
 }
 
+/*
+ * check replay counter whether to update or not.
+ * OUT:	0:	OK
+ *	1:	NG
+ */
 int
 ipsec_updatereplay(seq, sav)
 	u_int32_t seq;
@@ -2199,7 +2204,7 @@ ipsec_updatereplay(seq, sav)
 
 	/* sequence number of 0 is invalid */
 	if (seq == 0)
-		return 0;
+		return 1;
 
 	/* first time */
 	if (replay->count == 0) {
@@ -2233,13 +2238,13 @@ ipsec_updatereplay(seq, sav)
 
 		/* over range to check, i.e. too old or wrapped */
 		if (diff >= wsizeb)
-			return 0;
+			return 1;
 
 		fr = frlast - diff / 8;
 
 		/* this packet already seen ? */
 		if ((replay->bitmap)[fr] & (1 << (diff % 8)))
-			return 0;
+			return 1;
 
 		/* mark as seen */
 		(replay->bitmap)[fr] |= (1 << (diff % 8));
@@ -2255,7 +2260,7 @@ ok:
 
 		/* don't increment, no more packets accepted */
 		if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0)
-			return 0;
+			return 1;
 
 		log(LOG_AUTH, "replay counter made %d cycle. %s\n",
 			replay->overflow,
@@ -2264,7 +2269,7 @@ ok:
 
 	replay->count++;
 
-	return 1;
+	return 0;
 }
 
 /*
