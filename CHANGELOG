@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1133 2000/07/16 05:35:26 itojun Exp $
+$Id: CHANGELOG,v 1.1134 2000/07/16 07:47:27 itojun Exp $
 
 <200006>
+Sun Jul 16 16:44:24 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_forward.c: enable IPSEC_IPV6FWD case by default.
+	  (actually, previous default behavior was wrong as it transmits
+	  forwarded packets in clear, even though the policy asks for
+	  encryption)
+
 Sun Jul 16 14:32:58 JST 2000  itojun@iijlab.net
 	* kame/ping6: 
 	  - check duplicated replies for node information query (*)
