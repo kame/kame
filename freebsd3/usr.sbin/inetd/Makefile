@@ -2,8 +2,9 @@
 #	$Id: Makefile,v 1.5.2.2 1999/05/07 06:50:28 markm Exp $
 
 PROG=	inet46d
-MAN8=	inet46d.8
-MLINKS=	inet46d.8 inet46d.conf.5
+SRCS=	inetd.c
+MAN8=	inetd.8
+MLINKS=	inetd.8 inet46d.8
 COPTS+=	-Wall -DLOGIN_CAP -DLIBWRAP
 COPTS+=	-DIPSEC
 #COPTS+=	-DSANITY_CHECK
