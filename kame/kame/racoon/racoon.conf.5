@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.50 2000/09/22 17:47:23 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.51 2000/09/22 18:03:12 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -41,12 +41,15 @@
 .Nm
 is the configuration file for the
 .Xr racoon 8
-ISAKMP daemon,
-negotiating security association for myself and IPsec.
-This is consists of a sequence of directives and statements like C code.
-Each directives are composed by a tag and a enclosed by '{' and '}'
-in which some statements are composed of tokens separated by white space,
-which can be any combination of blanks, tabs.
+ISAKMP daemon.
+.Xr racoon 8
+negotiates security association for itself (ISAKMP SA)
+and for kernel IPsec (IPsec SA).
+The file consists of a sequence of directives and statements.
+Each directives are composed by a tag, and statements enclosed by
+.Ql {
+and
+.Ql } .
 Lines beginning with
 .Ql #
 are comments.
@@ -61,7 +64,11 @@ Parameters are specified with
 font.
 Parameters shown in
 square brackets
-.Pq `[' and `]'
+.Po
+.Ql \*(lB
+and
+.Ql \*(rB
+.Pc
 are used to show optional keywords and parameters.
 Note that
 you have to pay attention to describing
@@ -70,7 +77,9 @@ number.
 The
 .Ar port
 number always are enclosed by
-.Pq `[' and `]' .
+.Ql \*(lB
+and
+.Ql \*(rB .
 They are not optional keyword.
 If it is possible to omit
 .Ar port
@@ -78,35 +87,44 @@ number,
 the expression becomes
 .Bq Ic Bq Ar port .
 The vertical bar
-.Pq Sq \*(Ba
+.Pq Ql \*(Ba
 is used to indicate
 between a choice of optional parameters.
 Parentheses
-.Pq `(' and `)'
+.Po
+.Ql \*(lP
+and
+.Ql \*(rP
+.Pc
 are used to group keywords and parameters when necessary.
 Major parameters are listed below.
 .Pp
 .Bl -tag -width addressx -compact
 .It Ar number
 means hexa-decimal or decimal number.
-The former is expressed with '0x'.
+The former is expressed with
+.Ql 0x .
 .It Ar string
 .It Ar path
 .It Ar file
 means any string enclosed
-.Sq \&"
+.Ql \&"
 .Pq double quote .
 .It Ar address
 means IPv6 and IPv4 address.
 .It Ar port
 means TCP/UDP port number.
 The port number always are enclosed by
-.Pq `[' and `]' .
-.It timeunit
+.Ql \*(lB
+and
+.Ql \*(rB .
+.It Ar timeunit
 is one of following:
-sec, secs, second, seconds, min, mins, minute, minutes, hour, hours.
-.It byteunit
-is one of following: B, byte, bytes, KB, MB, TB.
+.Ic sec , secs , second , seconds , min , mins , minute , minutes ,
+.Ic hour , hours .
+.It Ar byteunit
+is one of following:
+.Ic B , byte , bytes , KB , MB , TB .
 .El
 .\"
 .Ss Path Specification
@@ -135,7 +153,8 @@ must be owned by the user ID running
 .Pq usually privileged user ,
 and must not be accessible by others.
 .It Ic path certificate Ar path ;
-racoon will search this directory if the certificate or certificate request
+.Xr racoon 8
+will search this directory if the certificate or certificate request
 is received.
 .El
 .\"
@@ -256,7 +275,8 @@ means a file name of secret key.
 .\"
 .It Ic peers_certfile Ar certfile ;
 When the peer don't send any certificate,
-racoon can use this certificate as peer's.
+.Xr racoon 8
+can use this certificate as peer's.
 .\"
 .It Ic send_cert (on \(ba off) ;
 If you don't want to send any certificate in some reasons, you may set off.
