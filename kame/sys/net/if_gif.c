@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.19 2000/04/19 04:11:07 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.20 2000/04/19 05:34:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,8 +108,8 @@ extern struct ip6protosw in6_gif_protosw;
 /*
  * gif global variable definitions
  */
-int ngif = NGIF;		/* number of interfaces */
-struct gif_softc *gif = 0;
+static int ngif;		/* number of interfaces */
+static struct gif_softc *gif = 0;
 
 #ifndef MAX_GIF_NEST
 /*
@@ -135,6 +135,11 @@ gifattach(dummy)
 	register struct gif_softc *sc;
 	register int i;
 
+#ifdef __NetBSD__
+	ngif = dummy;
+#else
+	ngif = NGIF;
+#endif
 	gif = sc = malloc (ngif * sizeof(struct gif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
