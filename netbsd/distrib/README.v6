@@ -1,5 +1,5 @@
 Building IPv6-ready boot floppy
-$Id: README.v6,v 1.1 1999/11/05 17:26:44 itojun Exp $
+$Id: README.v6,v 1.2 1999/11/06 01:55:17 itojun Exp $
 
 
 NOTE: this document may not be correct!
@@ -7,8 +7,7 @@ NOTE: this document may not be correct!
 1. Be sure to have full source code tree in /usr/src.
 2. place KAME tree into /usr/src/kame (You will have, say,
    /usr/src/kame/netbsd/sys in this configuration)
-3. copy /usr/src/kame/netbsd/distrib/i386/floppies/INSTALL.v6 into
-   /usr/src/kame/netbsd/sys/arch/i386/conf.
-4. build INSTALL.v6 kernel under /usr/src/kame/netbsd/sys.
-5. chdir to /usr/src/kame/distrib/i386/floppies
-6. tap "make".
+3. build INSTALL.v6 kernel under /usr/src/kame/netbsd/sys.  INSTALL.v6
+   can be found in /usr/src/kame/netbsd/sys/arch/i386/conf.
+4. chdir to /usr/src/kame/distrib/i386/floppies
+5. tap "make".
