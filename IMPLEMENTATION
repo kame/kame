@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/28 23:36:16 $
+			$Date: 2000/05/30 02:06:51 $
 
 1. IPv6
 
@@ -122,6 +122,7 @@ http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
       we do not include "stf" interface into GENERIC.v6 compilation.
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
+    * See section 12.6 and 14 for more details.
 
 1.2 Neighbor Discovery
 
@@ -913,6 +914,32 @@ KAME/FreeBSD228 (see 1.12.1 for more detail).
 KAME/OpenBSD does not support connection initiation to IPv4 mapped address
 (like ::ffff:10.1.1.1).
 
+1.12.6 More issues
+
+The meaning of IPv4 mapped address is defined locally in a node.  It seems
+that there are people using IPv4 mapped address in native IPv6 header - namely
+SIIT.  The lack of concrete agreement adds many mess to IPv6 API.
+Here we would like to summarize couple of items we came to notice.
+- By enabling kernel support for IPv4 mapped address (outgoing direction),
+  servers on the kernel can be hosed by IPv6 native packet that has IPv4
+  mapped address in IPv6 header source.  If we had concrete agreement,
+  we could have just rejected such packets.
+  http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
+  talks more about this scenario.
+- If a protocol on top of IPv4 is defined differently with IPv6, we will get
+  very tricky situation.  FTP protocol is a good example.
+  FTP client needs to behave differently on nodes that interprets IPv4 mapped
+  address as "an IPv6 address that embeds IPv4 address", and on nodes that
+  interpret IPv4 mapped address as a native IPv6 address.
+  In the former case, if a user gives IPv4 mapped address to ftp(1), ftp(1)
+  needs to handle it as IPv4 address, and use PASV/PORT FTP subcommands to
+  talk with the peer.  In the latter case, ftp(1) needs to handle it as
+  native IPv6 address, and use EPSV/EPRT (or LPSV/LPRT) FTP subcommadns to
+  talk with the peer.  The only way to solve this issue is to have additional
+  getsockopt to get the "real" peername/sockname.  In the former case the
+  getsockopt would return an AF_INET address.  In the latter case the
+  getsockopt would return an AF_INET6 address.
+
 1.13 sockaddr_storage
 
 When RFC2553 was about to be finalized, there was discussion on how struct
@@ -954,19 +981,35 @@ dealing with it is to:
 
 1.14 Invalid addresses on the wire
 
-IPv6 specifications reserve IPv6 address range that are used internally
-in IPv6 nodes (not on the wire).  They are:
-- IPv4 mapped address (like ::ffff:10.1.1.1)
-- IPv4 compatible address (like ::10.1.1.1)
-They are defined and used to ease IPv4-to-IPv6 transition.  However,
-if they mistakingly appear on the wire, they can confuse IPv6 implementations.
-It is also possible to use the above addresses as tools to attack IPv6 hosts,
-to bypass certain security checks (like using source address of
+Some of IPv6 transition technologies embed IPv4 address into IPv6 address.
+These specifications themselves are fine, however, there can be certain
+set of attacks enabled by these specifications.  Recent speicifcation
+documents covers up those issues, however, there are already-published RFCs
+that does not have protection against those (like using source address of
 ::ffff:127.0.0.1 to bypass "reject packet from remote" filter).
 
+To name a few, these address ranges can be used to hose an IPv6 implementation,
+or bypass security controls:
+- IPv4 mapped address that embeds unspecified/multicast/loopback/broadcast
+  IPv4 address (if they are in IPv6 native packet header, they are malicious)
+	::ffff:0.0.0.0/104	::ffff:127.0.0.0/104
+	::ffff:224.0.0.0/100	::ffff:255.0.0.0/104 
+- 6to4 prefix generated from unspecified/multicast/loopback/broadcast/private
+  IPv4 address
+	2002:0000::/24		2002:7f00::/24		2002:e000::/24
+	2002:ff00::/24		2002:0a00::/24		2002:ac10::/28	
+	2002:c0a8::/32
+
+Also, since KAME does not support RFC1933 auto tunnels, seeing IPv4 compatible
+is very rare.  You should take caution if you see those on the wire.
+
 KAME code is carefully written to avoid such incidents.  More specifically,
-KAME kernel will reject packets if the above addresses are used in IPv6
-source/dstination address, or IPv6 routing header.
+KAME kernel will reject packets with certain source/dstination address in IPv6
+base header, or IPv6 routing header.  Also, KAME default configuration file
+is written carefully, to avoid those attacks.
+
+http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
+talks about more about this.
 
 1.15 Node's required addresses
 
