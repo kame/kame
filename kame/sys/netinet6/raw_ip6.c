@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.89 2001/07/26 06:59:09 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.90 2001/07/26 08:48:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -517,19 +517,15 @@ rip6_output(m, va_alist)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/*
-	 * Next header might not be ICMP6 but use its pseudo header anyway.
-	 */
-	ip6->ip6_dst = *dst;
-
 	/* KAME hack: embed scopeid */
 	origoptp = in6p->in6p_outputopts;
 	in6p->in6p_outputopts = optp;
-	if (in6_embedscope(&ip6->ip6_dst, dstsock, in6p, &oifp) != 0) {
+	if (in6_embedscope(dst, dstsock, in6p, &oifp) != 0) {
 		error = EINVAL;
 		goto bad;
 	}
 	in6p->in6p_outputopts = origoptp;
+	ip6->ip6_dst = *dst;
 
 	/*
 	 * Source address selection.
