@@ -67,7 +67,7 @@
 #endif
 #include <netinet/in_var.h>
 #include <netinet/icmp6.h>
-#define _KERNEL	
+#define _KERNEL
 /* defined _KERNEL only to define IGMP_v?_ROUTER and MLD_V?_ROUTER */
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
