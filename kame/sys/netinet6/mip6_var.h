@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.8 2001/10/17 07:26:17 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.9 2001/10/22 09:25:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -114,7 +114,7 @@ struct mip6_bu {
 #define MIP6_BU_STATE_WAITSENT 0x01
 #define MIP6_BU_STATE_WAITACK  0x02
 
-#define MIP6_BU_TIMEOUT_INTERVAL 3
+#define MIP6_BU_TIMEOUT_INTERVAL 1
 
 struct mip6_bc {
 	LIST_ENTRY(mip6_bc)   mbc_entry;
@@ -149,7 +149,7 @@ struct mip6_bc {
 
 LIST_HEAD(mip6_bc_list, mip6_bc);
 
-#define MIP6_BC_TIMEOUT_INTERVAL 3
+#define MIP6_BC_TIMEOUT_INTERVAL 1
 
 /* Macro for modulo 2^^8 comparison */
 #define MIP6_LEQ(a,b)   ((int8_t)((a)-(b)) <= 0)
