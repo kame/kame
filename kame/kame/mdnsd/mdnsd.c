@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.40 2001/07/26 14:08:19 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.41 2001/07/26 14:14:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -238,7 +238,6 @@ main(argc, argv)
 			break;
 		case AF_INET:
 			ready4++;
-#if 0
 			if (join(sd->s, sd->af, MDNS_GROUP4) < 0) {
 				err(1, "join");
 				/*NOTREACHED*/
@@ -247,7 +246,6 @@ main(argc, argv)
 				errx(1, "setif");
 				/*NOTREACHED*/
 			}
-#endif
 			break;
 		}
 
@@ -502,6 +500,8 @@ setif(s, af, iface)
 				continue;
 			if ((ifa->ifa_flags & IFF_UP) == 0)
 				continue;
+			if (ifa->ifa_addr->sa_family != AF_INET)
+				continue;
 
 			break;
 		}
@@ -629,7 +629,7 @@ ismyaddr(sa)
 	scope[0] = 0;
 	loscope = if_nametoindex("lo0");	/*XXX*/
 #ifdef __KAME__
-	if (sa->sa_family == AF_INET6) {
+	if (((struct sockaddr *)&ss[0])->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 
 		sin6 = (struct sockaddr_in6 *)&ss[0];
@@ -642,7 +642,8 @@ ismyaddr(sa)
 	}
 #endif
 	h1[0] = h2[0] = '\0';
-	if (getnameinfo((struct sockaddr *)&ss[0], sa->sa_len, h1, sizeof(h1),
+	if (getnameinfo((struct sockaddr *)&ss[0],
+	    ((struct sockaddr *)&ss[0])->sa_len, h1, sizeof(h1),
 	    p, sizeof(p), niflag) != 0)
 		return 0;
 #if 1	/*just for experiment - to run two servers on a single node*/
@@ -663,7 +664,7 @@ ismyaddr(sa)
 		memcpy(&ss[1], ifa->ifa_addr, ifa->ifa_addr->sa_len);
 		scope[1] = 0;
 #ifdef __KAME__
-		if (ifa->ifa_addr->sa_family == AF_INET6) {
+		if (((struct sockaddr *)&ss[1])->sa_family == AF_INET6) {
 			struct sockaddr_in6 *sin6;
 
 			sin6 = (struct sockaddr_in6 *)&ss[1];
@@ -676,8 +677,8 @@ ismyaddr(sa)
 		}
 #endif
 		if (getnameinfo((struct sockaddr *)&ss[1],
-		    ifa->ifa_addr->sa_len,
-		    h2, sizeof(h2), NULL, 0, niflag) != 0)
+		    ((struct sockaddr *)&ss[1])->sa_len, h2, sizeof(h2),
+		    NULL, 0, niflag) != 0)
 			continue;
 		if (strcmp(h1, h2) != 0)
 			continue;
