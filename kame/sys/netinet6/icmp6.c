@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.197 2001/02/09 21:39:31 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.198 2001/02/11 04:51:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,7 +569,7 @@ icmp6_input(mp, offp, proto)
 #endif /* MIP6 */
 	
 	switch (icmp6->icmp6_type) {
-		
+
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
 		switch (code) {
