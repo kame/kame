@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.41 2001/01/03 03:37:58 itojun Exp $
+.\"	$KAME: setkey.8,v 1.42 2001/01/04 07:03:22 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -452,6 +452,8 @@ is to be one of the following:
 .Li default , use , require
 or
 .Li unique .
+If the SA is not available in every level, the kernel will request
+getting SA to the key exchange daemon.
 .Li default
 means the kernel consults to the system wide default against protocol you
 specified, e.g.
