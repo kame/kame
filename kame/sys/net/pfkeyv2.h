@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.30 2003/06/27 05:36:19 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.31 2003/06/27 06:45:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -261,6 +261,7 @@ struct sadb_x_tag {
   u_int16_t sadb_x_tag_len;
   u_int16_t sadb_x_tag_exttype;
   char sadb_x_tag_name[16];
+  u_int32_t sadb_x_tag_reserved;
 };
 
 #define SADB_EXT_RESERVED             0
@@ -283,7 +284,7 @@ struct sadb_x_tag {
 #define SADB_X_EXT_KMPRIVATE          17
 #define SADB_X_EXT_POLICY             18
 #define SADB_X_EXT_SA2                19
-#define SADB_X_EXT_TAG                19
+#define SADB_X_EXT_TAG                20
 #define SADB_EXT_MAX                  20
 
 #define SADB_SATYPE_UNSPEC	0
