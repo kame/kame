@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.190 1999/10/17 17:11:25 jinmei Exp $
+$Id: CHANGELOG,v 1.191 1999/10/18 04:45:22 itojun Exp $
 
 <199910>
+Mon Oct 18 13:43:40 JST 1999  itojun@iijlab.net
+	* kame/tcpdump/print-bgp.c: decode BGP packets.  BGP data that crosses
+	  packet boundary will not be decoded (it does not reassemble TCP
+	  segments).
+
 1999-10-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd: added various improvements and changes
 	including:
