@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/16 07:28:32 $
+			$Date: 2000/01/17 05:40:11 $
 
 1. IPv6
 
@@ -943,12 +943,13 @@ Here is a list of OpenBSD 2.x drivers and its conditions:
 	---		---		---		---
 	(Ethernet)
 	le sbus/sparc	ok		ok		yes
-	fxp pci/i386	NG(*)
+	fxp pci/i386	?(*)
 	ne pci/i386	ok		ok		yes
 	ne pcmcia/i386	ok		ok		yes
 
 (*) There seem to be some problem in driver, with multicast filter
 configuration.  This happens with certain revision of chipset on the card.
+Should be fixed by now but still not sure.
 
 2.6 BSD/OS 4.x
 
