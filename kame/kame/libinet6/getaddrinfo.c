@@ -798,7 +798,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	const struct afd *afd;
 	struct addrinfo *cur;
 	int error;
-	char *cp, *hostname2 = NULL, *scope;
+	char *cp, *hostname2 = NULL, *scope, *addr;
 	struct sockaddr_in6 *sin6;
 
 	/*
@@ -815,6 +815,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	if (cp == NULL)
 		return explore_numeric(pai, hostname, servname, res);
 
+#if 1
 	/*
 	 * Handle special case of <scope id><delimiter><scoped_address>
 	 */
@@ -824,9 +825,21 @@ explore_numeric_scope(pai, hostname, servname, res)
 	/* terminate at the delimiter */
 	hostname2[cp - hostname] = '\0';
 	scope = hostname2;
-	cp++;
+	addr = cp + 1;
+#else
+	/*
+	 * Handle special case of <scoped_address><delimiter><scope id>
+	 */
+	hostname2 = strdup(hostname);
+	if (hostname2 == NULL)
+		return EAI_MEMORY;
+	/* terminate at the delimiter */
+	hostname2[cp - hostname] = '\0';
+	addr = hostname2;
+	scope = cp + 1;
+#endif
 
-	error = explore_numeric(pai, cp, servname, res);
+	error = explore_numeric(pai, addr, servname, res);
 	if (error == 0) {
 		int scopeid;
 
