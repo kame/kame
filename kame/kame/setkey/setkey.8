@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.42 2001/01/04 07:03:22 sakane Exp $
+.\"	$KAME: setkey.8,v 1.43 2001/02/16 23:48:46 thorpej Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -141,6 +141,13 @@ Show an SAD entry.
 .Li ;
 .Xc
 Remove an SAD entry.
+.\"
+.It Xo
+.Li deleteall
+.Ar src Ar dst Ar protocol
+.Li ;
+.Xc
+Remove all SAD entries that match the specification.
 .\"
 .It Xo
 .Li flush

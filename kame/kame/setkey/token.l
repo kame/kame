@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.17 2000/10/29 12:35:21 itojun Exp $	*/
+/*	$KAME: token.l,v 1.18 2001/02/16 23:48:46 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -124,6 +124,7 @@ hostname	{name}(({dot}{name})+{dot}?)?
 
 add		{ PREPROC; return(ADD); }
 delete		{ PREPROC; return(DELETE); }
+deleteall	{ PREPROC; return(DELETEALL); }
 get		{ PREPROC; return(GET); }
 flush		{ PREPROC; return(FLUSH); }
 dump		{ PREPROC; return(DUMP); }
