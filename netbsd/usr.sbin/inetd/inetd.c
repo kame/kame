@@ -1320,6 +1320,7 @@ getconfigent()
 	char *hostdelim;
 #ifdef IPSEC
 	char *policy = NULL;
+	char *dummy;
 #endif
 
 more:
@@ -1335,7 +1336,7 @@ more:
 					free(policy);
 				policy = NULL;
 			} else {
-				dummy = ipsec_get_policylen(p, strlen(p));
+				dummy = ipsec_set_policy(p, strlen(p));
 				if (dummy != NULL) {
 					free(dummy);
 					if (policy)
