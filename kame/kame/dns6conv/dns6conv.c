@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.4 2001/01/13 12:53:12 jinmei Exp $ */
+/*	$KAME: dns6conv.c,v 1.5 2001/01/13 16:41:21 jinmei Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -46,6 +46,7 @@ static enum {a6, bitlabel, nibble} fmttype;
 static struct sockaddr_in6 *cut __P((const struct sockaddr_in6 *, int, int));
 static char *cut_bitlabel __P((const struct in6_addr *, int, int));
 static void print_bitstring __P((const char *, int));
+static void print_nibble __P((const char *, int));
 static void usage __P((void));
 
 int
@@ -54,7 +55,7 @@ main(argc, argv)
 	char *argv[];
 {
 	char *addr;
-	const char *fmtstr = NULL;
+	const char *fmtstr = NULL, *ap;
 	int ch, beg, end, error;
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 *bin6;
@@ -126,16 +127,17 @@ main(argc, argv)
 		printf("%s\n", hostbuf);
 		break;
 	case bitlabel:
-	{
-		const char *ap;
-
 		ap = cut_bitlabel(&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
 				  beg, end);
 		print_bitstring(ap, end - beg);
 		break;
-	}
 	case nibble:
-		warnx("format type not supported yet.");
+		if ((beg % 4) != 0 || (end % 4) != 0)
+			errx(1, "beginbit(%d) or endbit(%d) is invalid "
+			     "for the nibble format", beg, end);
+		ap = cut_bitlabel(&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+				  beg, end);
+		print_nibble(ap, end - beg);
 		break;
 	}
 
@@ -229,6 +231,29 @@ print_bitstring(cp, blen)
 	dn += sprintf(dn, "/%d", blen);
 
 	printf("%s\n", pbuf);
+
+	return;
+}
+
+static void
+print_nibble(cp0, blen)
+	const char *cp0;
+	int blen;
+{
+	int pbyte = blen / 8;
+	const char *cp = cp0 + pbyte;
+
+	if ((blen % 8) != 0) {
+		printf("%1x.", (*cp & 0xf0) / 16);
+		blen -= 4;
+	}
+
+	for (; blen > 0; blen -= 8) {
+		cp--;
+		printf("%1x.%1x.", *cp & 0x0f, ((*cp) & 0xf0) / 16);
+	}
+
+	printf("\n");
 
 	return;
 }
