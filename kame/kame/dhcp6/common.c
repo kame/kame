@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.47 2002/05/09 13:01:07 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.48 2002/05/09 13:07:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -756,7 +756,7 @@ get_delegated_prefixes(p, ep, optinfo)
 			memset(dp, 0, sizeof(*dp));
 			dp->prefix.addr = pi.dh6_pi_paddr;
 			dp->prefix.plen = pi.dh6_pi_plen;
-			dp->prefix.plen = pi.dh6_pi_duration;
+			dp->prefix.duration = pi.dh6_pi_duration;
 
 			TAILQ_INSERT_TAIL(&optinfo->prefix, dp, link);
 		}
