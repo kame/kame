@@ -19,6 +19,7 @@ sub dig {
 	local($curdir, $src, $dst) = @_;
 	local(@all);
 	local(%exclude);
+	local(%linkdir);
 
 	print "start: $curdir, $src, $dst\n";
 
@@ -28,11 +29,15 @@ sub dig {
 
 	if (-f "$dst/.prepare") {
 		%exclude = ();
+		%linkdir = ();
 		open(IN, "< $dst/.prepare");
 		while (<IN>) {
 			s/\n$//;
 			if (/^exclude\s+(\S+)$/) {
 				$exclude{$1}++;
+			}
+			if (/^linkdir\s+(\S+)$/) {
+				$linkdir{$1}++;
 			}
 		}
 		close(IN);
@@ -50,9 +55,10 @@ sub dig {
 			print "exclude $dst/$i\n" if $debug;
 			next;
 		}
-		if (-d "$curdir/$i") {
+
+		if (-d "$curdir/$i" && !$linkdir{$i}) {
 			&dig("$curdir/$i", "../$src/$i", "$dst/$i");
-		} elsif (-f "$curdir/$i") {
+		} else {
 			if (! -d "$dst") {
 				print "mkdir -p $dst\n" if $debug;
 				system "mkdir -p $dst";
