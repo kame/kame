@@ -1110,17 +1110,21 @@ in6_status(s, info)
 	printf("prefixlen %d", prefix(&sin->sin6_addr,
 		sizeof(struct in6_addr)));
 
-	if (flags6 & IN6_IFF_ANYCAST)
+	if ((flags6 & IN6_IFF_ANYCAST) != 0)
 		printf(" anycast");
-	if (flags6 & IN6_IFF_TENTATIVE)
+	if ((flags6 & IN6_IFF_TENTATIVE) != 0)
 		printf(" tentative");
-	if (flags6 & IN6_IFF_DUPLICATED)
+	if ((flags6 & IN6_IFF_DUPLICATED) != 0)
 		printf(" duplicated");
-	if (flags6 & IN6_IFF_DETACHED)
+	if ((flags6 & IN6_IFF_DETACHED) != 0)
 		printf(" detached");
-	if (flags6 & IN6_IFF_DEPRECATED)
+	if ((flags6 & IN6_IFF_DEPRECATED) != 0)
 		printf(" deprecated");
-
+	if ((flags6 & IN6_IFF_AUTOCONF) != 0)
+		printf(" autoconf");
+	if ((flags6 & IN6_IFF_TEMPORARY) != 0)
+		printf(" temporary");
+	
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);
 
