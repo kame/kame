@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.105 2003/06/28 03:13:36 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.106 2003/07/05 00:02:56 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -238,7 +238,7 @@ All of the modes are acceptable.
 The first exchange mode is what racoon uses when it is the initiator.
 .\"
 .It Ic doi Ic ipsec_doi ;
-means to use IPsec-DOI as specified RFC 2407.
+means to use IPsec DOI as specified RFC 2407.
 You can omit this statement.
 .\"
 .It Ic situation Ic identity_only ;
@@ -302,7 +302,7 @@ specifies a certificate specification.
 .Ar certspec
 is one of followings:
 .Bl -tag -width Ds -compact
-.It Ic x509 Ar certfile Ar privkeyfile;
+.It Ic x509 Ar certfile Ar privkeyfile ;
 .Ar certfile
 means a file name of certificate.
 .Ar privkeyfile
@@ -444,7 +444,7 @@ is one of following:
 for oakley.
 For other transforms, this statement should not be used.
 .\"
-.It Ic hash_algorithm Ar algorithm;
+.It Ic hash_algorithm Ar algorithm ;
 define the hash algorithm used for the phase 1 negotiation.
 This directive must be defined.
 .Ar algorithm
@@ -565,7 +565,7 @@ will compute the actual phase 2 proposals by computing
 the permutation of the specified algorithms,
 and then combining them with the security protocol specified by the SPD.
 For example, if
-.Ic des, 3des, hmac_md5,
+.Ic des , 3des , hmac_md5 ,
 and
 .Ic hmac_sha1
 are specified as algorithms, we have four combinations for use with ESP,
