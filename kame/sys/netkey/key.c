@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.169 2000/10/07 11:59:12 itojun Exp $	*/
+/*	$KAME: key.c,v 1.170 2000/10/07 12:03:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2877,7 +2877,6 @@ key_setsaval(sav, m, mhp)
 
 		/* initialize */
 		key_randomfill(sav->iv, sav->ivlen);
-		break;
 #endif
 		break;
 	case SADB_SATYPE_AH:
