@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.79 2000/11/30 16:37:51 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.80 2000/12/02 16:00:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -652,6 +652,14 @@ udp6_usrreq(so, req, m, addr6, control)
 				   , p
 #endif
 				   ));
+
+#ifdef __NetBSD__
+	if (req == PRU_PURGEIF) {
+		in6_purgeif((struct ifnet *)control);
+		in6_pcbpurgeif(&udb6, (struct ifnet *)control);
+		return (0);
+	}
+#endif
 
 	if (in6p == NULL && req != PRU_ATTACH) {
 		error = EINVAL;
