@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.51 2004/09/10 03:50:24 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.52 2004/12/25 09:35:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -962,7 +962,7 @@ set_proposal_from_policy(iph2, sp_main, sp_sub)
 
 			if (memcmp(iph2->dst, paddr, iph2->dst->sa_len)){
 				plog(LLV_ERROR, LOCATION, NULL,
-					"not supported nested SA.");
+					"not supported nested SA.\n");
 				goto err;
 			}
 		}
