@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.h,v 1.12 2001/09/19 06:59:41 sakane Exp $	*/
+/*	$KAME: rtsold.h,v 1.13 2001/11/13 10:31:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,7 @@ struct ifinfo {
 
 	struct sockaddr_dl *sdl; /* link-layer address */
 	char ifname[IF_NAMESIZE]; /* interface name */
+	u_int32_t linkid;	/* link ID of this interface */
 	int active;		/* interface status */
 	int probeinterval;	/* interval of probe timer(if necessary) */
 	int probetimer;		/* rest of probe timer */
@@ -82,12 +83,12 @@ extern int getinet6sysctl __P((int code));
 
 /* rtsol.c */
 extern int sockopen __P((void));
-extern void sendpacket __P((struct ifinfo *ifinfo));
+extern void sendpacket __P((struct ifinfo *));
 extern void rtsol_input __P((int s));
 
 /* probe.c */
 extern int probe_init __P((void));
-extern void defrouter_probe __P((int ifindex));
+extern void defrouter_probe __P((struct ifinfo *));
 
 /* dump.c */
 extern void rtsold_dump_file __P((char *));

@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.43 2001/11/08 09:57:58 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.44 2001/11/13 10:31:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -331,6 +331,15 @@ ifconfig(char *ifname)
 	if (make_packet(ifinfo))
 		goto bad;
 
+	/* set link ID of this interface. */
+#ifdef HAVE_SCOPELIB
+	if (inet_zoneid(AF_INET6, 2, ifname, &ifinfo->linkid))
+		goto bad;
+#else
+	/* XXX: assume interface IDs as link IDs */
+	ifinfo->linkid = ifinfo->sdl->sdl_index;
+#endif
+
 	/*
 	 * check if the interface is available.
 	 * also check if SIOCGIFMEDIA ioctl is OK on the interface.
@@ -522,7 +531,7 @@ rtsol_check_timer()
 				}
 
 				if (probe && mobile_node)
-					defrouter_probe(ifinfo->sdl->sdl_index);
+					defrouter_probe(ifinfo);
 				break;
 			}
 			case IFS_DELAY:

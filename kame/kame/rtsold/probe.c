@@ -1,4 +1,4 @@
-/*	$KAME: probe.c,v 1.12 2001/11/13 09:50:15 jinmei Exp $	*/
+/*	$KAME: probe.c,v 1.13 2001/11/13 10:31:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -40,6 +40,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif /* __FreeBSD__ >= 3 */
+#include <net/if_dl.h>
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
@@ -59,7 +60,7 @@
 static struct msghdr sndmhdr;
 static struct iovec sndiov[2];
 static int probesock;
-static void sendprobe __P((struct in6_addr *, int));
+static void sendprobe __P((struct in6_addr *, struct ifinfo *));
 
 
 int
@@ -100,10 +101,11 @@ probe_init()
  * Probe if each router in the default router list is still alive. 
  */
 void
-defrouter_probe(int ifindex)
+defrouter_probe(struct ifinfo *ifinfo)
 {
 	struct in6_drlist dr;
 	int s, i;
+	int ifindex = ifinfo->sdl->sdl_index;
 	u_char ntopbuf[INET6_ADDRSTRLEN];
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
@@ -124,14 +126,13 @@ defrouter_probe(int ifindex)
 			if (!IN6_IS_ADDR_LINKLOCAL(&dr.defrouter[i].rtaddr)) {
 				warnmsg(LOG_ERR, __FUNCTION__,
 					"default router list contains a "
-					"non-linklocal address(%s)",
+					"non-link-local address(%s)",
 				       inet_ntop(AF_INET6,
 						 &dr.defrouter[i].rtaddr,
 						 ntopbuf, INET6_ADDRSTRLEN));
 				continue; /* ignore the address */
 			}
-			sendprobe(&dr.defrouter[i].rtaddr,
-				  dr.defrouter[i].if_index);
+			sendprobe(&dr.defrouter[i].rtaddr, ifinfo);
 		}
 	}
 
@@ -141,17 +142,19 @@ defrouter_probe(int ifindex)
 }
 
 static void
-sendprobe(struct in6_addr *addr, int ifindex)
+sendprobe(struct in6_addr *addr, struct ifinfo *ifinfo)
 {
 	struct sockaddr_in6 sa6_probe;
 	struct in6_pktinfo *pi;
 	struct cmsghdr *cm;
-	u_char ntopbuf[INET6_ADDRSTRLEN], ifnamebuf[IFNAMSIZ];;
+	u_char ntopbuf[INET6_ADDRSTRLEN], ifnamebuf[IFNAMSIZ];
+	u_int32_t ifindex = ifinfo->sdl->sdl_index;
 
 	memset(&sa6_probe, 0, sizeof(sa6_probe));
 	sa6_probe.sin6_family = AF_INET6;
 	sa6_probe.sin6_len = sizeof(sa6_probe);
 	sa6_probe.sin6_addr = *addr;
+	sa6_probe.sin6_scope_id = ifinfo->linkid;
 
 	sndmhdr.msg_name = (caddr_t)&sa6_probe;
 	sndmhdr.msg_iov[0].iov_base = NULL;
