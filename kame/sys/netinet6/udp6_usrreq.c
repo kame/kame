@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.102 2002/02/02 08:47:18 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.103 2002/02/02 08:48:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -320,7 +320,7 @@ udp6_input(mp, offp, proto)
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
-							(struct sockaddr *)&udp_in6,
+							(struct sockaddr *)&fromsa,
 							n, opts.head) == 0) {
 						m_freem(n);
 						if (opts.head)
@@ -381,7 +381,7 @@ udp6_input(mp, offp, proto)
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&udp_in6,
+				(struct sockaddr *)&fromsa,
 				m, opts.head) == 0) {
 			udp6stat.udp6s_fullsock++;
 			goto bad;
