@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.65 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.66 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -37,7 +37,7 @@
  *
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -67,7 +67,7 @@
 #include <sys/sysctl.h>
 #endif
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -142,7 +142,7 @@
 struct mip6_bc_list mip6_bc_list;
 #ifdef __NetBSD__
 struct callout mip6_bc_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 struct callout mip6_bc_ch;
 #elif defined(__OpenBSD__)
 struct timeout mip6_bc_ch;
@@ -164,7 +164,7 @@ u_int16_t nonce_index;		/* the idx value pointed by nonce_head */
 mip6_nonce_t *nonce_head;	/* Current position of nonce on the array mip6_nonce */
 #ifdef __NetBSD__
 struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 struct callout mip6_nonce_upd_ch;
 #elif defined(__OpenBSD__)
 struct timeout mip6_nonce_upd_ch;
@@ -244,7 +244,7 @@ mip6_init()
 	callout_init(&mip6_nonce_upd_ch, NULL);
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&mip6_nonce_upd_ch);
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
@@ -741,7 +741,7 @@ mip6_bc_init()
 {
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
         callout_init(&mip6_bc_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
         callout_init(&mip6_bc_ch);
 #endif
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
@@ -758,7 +758,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	struct ifnet *ifp;
 {
 	struct mip6_bc *mbc;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -785,7 +785,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	mbc->mbc_refcnt = 0;
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&mbc->mbc_timer_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&mbc->mbc_timer_ch);
 #elif defined(__OpenBSD__)
 	timeout_set(&mbc->mbc_timer_ch, mip6_mbc_timer, NULL);
@@ -829,7 +829,7 @@ mip6_bc_settimer(mbc, t)
 	if (t != 0) {
 		tick = t * hz;
 		if (t < 0) {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_stop(&mbc->mbc_timer_ch);
 #elif defined(__OpenBSD__)
 			timeout_del(&mbc->mbc_timer_ch);
@@ -837,7 +837,7 @@ mip6_bc_settimer(mbc, t)
 			untimeout(mip6_bc_timer, mbc;)
 #endif
 		} else {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&mbc->mbc_timer_ch, tick,
 			    mip6_bc_timer, mbc);
 #elif defined(__OpenBSD__)
@@ -1229,7 +1229,7 @@ u_int
 mip6_brr_time(mbc)
 	struct mip6_bc *mbc;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -1260,7 +1260,7 @@ mip6_bc_timer(arg)
 	int s;
 	u_int brrtime;
 	struct mip6_bc *mbc = arg;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -1351,7 +1351,7 @@ mip6_update_nonce_nodekey(ignored_arg)
 #else
 	s = splnet();
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
 #elif defined(__OpenBSD__)

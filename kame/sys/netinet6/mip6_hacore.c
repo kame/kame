@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.29 2004/05/21 07:07:31 itojun Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.30 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -37,7 +37,7 @@
  *
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
@@ -99,7 +99,7 @@ mip6_process_hrbu(bi)
 	struct mip6_bc *prim_mbc = NULL;
 	u_int32_t prlifetime = 0;
 	int busy = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 

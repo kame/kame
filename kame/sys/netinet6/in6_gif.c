@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.110 2004/05/27 05:05:10 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.111 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -45,14 +45,14 @@
 #include <sys/mbuf.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/queue.h>
 #include <sys/syslog.h>
 #include <sys/protosw.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 
@@ -98,13 +98,13 @@ extern struct domain inet6domain;
 struct ip6protosw in6_gif_protosw =
 { SOCK_RAW,	&inet6domain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
   in6_gif_input, rip6_output,	in6_gif_ctlinput, rip6_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   0,
 #else
   rip6_usrreq,
 #endif
   0,            0,              0,              0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   &rip6_usrreqs
 #endif
 };
@@ -246,7 +246,7 @@ in6_gif_output(ifp, family, m)
 	struct ip6_hdr *ip6;
 	int proto, error;
 	u_int8_t itos, otos;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 
@@ -333,7 +333,7 @@ in6_gif_output(ifp, family, m)
 	ip6->ip6_flow &= ~htonl(0xff << 20);
 	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	microtime(&mono_time);
 #endif
 	/*

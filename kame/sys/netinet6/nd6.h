@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.110 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.111 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,7 +38,7 @@
 #endif
 
 #include <sys/queue.h>
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -56,7 +56,7 @@ struct	llinfo_nd6 {
 	int	ln_byhint;	/* # of times we made it reachable by UL hint */
 
 	long	ln_ntick;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	struct callout ln_timer_ch;
 #elif defined(__OpenBSD__)
 	struct timeout ln_timer_ch;
@@ -348,7 +348,7 @@ extern int nd6_debug;
 
 #define nd6log(x)	do { if (nd6_debug) log x; } while (/*CONSTCOND*/ 0)
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 extern struct callout nd6_timer_ch;
 #elif defined(__OpenBSD__)
 extern struct timeout nd6_timer_ch;

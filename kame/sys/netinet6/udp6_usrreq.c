@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.123 2004/05/26 07:41:32 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.124 2004/06/02 05:53:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -582,7 +582,7 @@ extern	int udp6_sendspace;
 extern	int udp6_recvspace;
 
 int
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 udp6_usrreq(so, req, m, addr6, control, p)
 	struct socket *so;
 	int req;
@@ -612,7 +612,7 @@ udp6_usrreq(so, req, m, addr6, control)
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)addr6,
 		    (struct ifnet *)control
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 				   , p
 #endif
 				   ));

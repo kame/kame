@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.31 2004/04/27 11:45:06 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.32 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >=3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_mrouting.h"
 #endif
@@ -96,7 +96,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/mld6_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <net/net_osdep.h>

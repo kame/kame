@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.221 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.222 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,7 +33,7 @@
  * IPsec controller part.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -60,7 +60,7 @@
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/sysctl.h>
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/proc.h>
 #endif
 
@@ -295,7 +295,7 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 	int dir;
 {
 	struct secpolicyindex spidx;
-#if defined(__FreeBSD__) && __FreeBSD__ > 2
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 
 	microtime(&mono_time);
@@ -1333,12 +1333,8 @@ ipsec_init_pcbpolicy(so, pcb_sp)
 		new->priv = 1;
 	else
 		new->priv = 0;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-#if __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 	if (so->so_cred != 0 && so->so_cred->cr_uid == 0)
-#else
-	if (so->so_cred != 0 && so->so_cred->pc_ucred->cr_uid == 0)
-#endif
 		new->priv = 1;
 	else
 		new->priv = 0;
@@ -1544,7 +1540,7 @@ ipsec_get_policy(sp, mp)
 		return ENOBUFS;
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	(*mp)->m_type = MT_DATA;
 #else
 	(*mp)->m_type = MT_SOOPTS;
@@ -3883,7 +3879,7 @@ ipsec_copypkt(m)
 			 * references to the cluster.
 			 * XXX: is this approach effective?
 			 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			if (!M_WRITABLE(n))
 #else
 			if (M_READONLY(n))

@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.89 2004/05/25 01:17:40 suz Exp $	*/
+/*	$KAME: esp_input.c,v 1.90 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,7 +123,7 @@ esp4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 {
 	struct ip *ip;
 	struct esp *esp;
@@ -142,14 +142,14 @@ esp4_input(m, va_alist)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_list ap;
 	int off;
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	va_start(ap, m);
 	off = va_arg(ap, int);
 	(void)va_arg(ap, int);		/* ignore value, advance ap */
 	va_end(ap);
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 
 	/* sanity check for alignment. */
 	if (off % 4 != 0 || m->m_pkthdr.len % 4 != 0) {

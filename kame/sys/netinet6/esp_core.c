@@ -1,5 +1,5 @@
 /*	$NetBSD: esp_core.c,v 1.33 2003/08/27 00:08:31 thorpej Exp $	*/
-/*	$KAME: esp_core.c,v 1.66 2003/09/05 08:46:35 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.67 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -47,7 +47,7 @@
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.346 2004/06/01 02:21:13 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.347 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,7 +256,7 @@ ip6_init()
 	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq, 0);
 #elif (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq);
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#elif defined(__FreeBSD__)
 	register_netisr(NETISR_IPV6, ip6intr);
 #endif
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
@@ -299,7 +299,7 @@ ip6_init2(dummy)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&nd6_timer_ch, 0);
 	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&nd6_timer_ch);
 	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -317,7 +317,7 @@ ip6_init2(dummy)
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_temp_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&in6_tmpaddrtimer_ch);
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -

@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.50 2004/02/19 17:56:28 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.51 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -43,7 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
@@ -53,7 +53,7 @@
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>

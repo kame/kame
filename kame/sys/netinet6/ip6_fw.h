@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.h,v 1.11 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: ip6_fw.h,v 1.12 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -222,7 +222,7 @@ typedef	int ip6_fw_chk_t __P((struct ip6_hdr**, struct ifnet*, struct mbuf**));
 typedef	int ip6_fw_ctl_t __P((int, struct mbuf**));
 extern	ip6_fw_chk_t *ip6_fw_chk_ptr;
 extern	ip6_fw_ctl_t *ip6_fw_ctl_ptr;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 extern	int ip6_fw_enable;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.35 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.36 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -33,7 +33,7 @@
  * RFC2393 IP payload compression protocol (IPComp).
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -43,7 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
@@ -52,7 +52,7 @@
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>
@@ -105,7 +105,7 @@ ipcomp4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 {
 	struct mbuf *md;
 	struct ip *ip;
@@ -247,7 +247,7 @@ ipcomp4_input(m, va_alist)
 			ipsecstat.in_polvio++;
 			goto fail;
 		}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		(*inetsw[ip_protox[nxt]].pr_input)(m, off);
 #else
 		(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);

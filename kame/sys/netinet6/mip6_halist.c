@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.12 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.13 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -48,7 +48,7 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -56,7 +56,7 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 #include <sys/limits.h>
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 #include <machine/limits.h>
 #endif
 
@@ -139,7 +139,7 @@ mip6_ha_create(addr, flags, pref, lifetime)
 	mha->mha_pref = pref;
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&mha->mha_timer_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&mha->mha_timer_ch);
 #elif defined(__OpenBSD__)
 	timeout_set(&mha->mha_timer_ch, mip6_ha_timer, mha);
@@ -200,7 +200,7 @@ mip6_ha_settimer(mha, tick)
 	if (tick < 0) {
 		mha->mha_timeout = 0;
 		mha->mha_ntick = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_stop(&mha->mha_timer_ch);
 #elif defined(__OpenBSD__)
 		timeout_del(&mha->mha_timer_ch);
@@ -211,7 +211,7 @@ mip6_ha_settimer(mha, tick)
 		mha->mha_timeout = mono_time.tv_sec + tick / hz;
 		if (tick > INT_MAX) {
 			mha->mha_ntick = tick - INT_MAX;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&mha->mha_timer_ch, INT_MAX,
 			    mip6_ha_timer, mha);
 #elif defined(__OpenBSD__)
@@ -221,7 +221,7 @@ mip6_ha_settimer(mha, tick)
 #endif
 		} else {
 			mha->mha_ntick = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&mha->mha_timer_ch, tick,
 			    mip6_ha_timer, mha);
 #elif defined(__OpenBSD__)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.32 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.33 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -48,7 +48,7 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -56,7 +56,7 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 #include <sys/limits.h>
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 #include <machine/limits.h>
 #endif
 
@@ -122,7 +122,7 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	LIST_INIT(&mpfx->mpfx_ha_list);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&mpfx->mpfx_timer_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&mpfx->mpfx_timer_ch);
 #elif defined(__OpenBSD__)
 	timeout_set(&mpfx->mpfx_timer_ch, mip6_prefix_timer, mpfx);
@@ -257,7 +257,7 @@ mip6_prefix_settimer(mpfx, tick)
 	if (tick < 0) {
 		mpfx->mpfx_timeout = 0;
 		mpfx->mpfx_ntick = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_stop(&mpfx->mpfx_timer_ch);
 #elif defined(__OpenBSD__)
 		timeout_del(&mpfx->mpfx_timer_ch);
@@ -268,7 +268,7 @@ mip6_prefix_settimer(mpfx, tick)
 		mpfx->mpfx_timeout = mono_time.tv_sec + tick / hz;
 		if (tick > INT_MAX) {
 			mpfx->mpfx_ntick = tick - INT_MAX;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&mpfx->mpfx_timer_ch, INT_MAX,
 			    mip6_prefix_timer, mpfx);
 #elif defined(__OpenBSD__)
@@ -278,7 +278,7 @@ mip6_prefix_settimer(mpfx, tick)
 #endif
 		} else {
 			mpfx->mpfx_ntick = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&mpfx->mpfx_timer_ch, tick,
 			    mip6_prefix_timer, mpfx);
 #elif defined(__OpenBSD__)

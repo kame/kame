@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.145 2004/05/26 09:41:05 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.146 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -963,18 +963,10 @@ in6_selecthlim(in6p, ifp)
 #undef in6p_hops
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+#ifdef __NetBSD__
 /*
  * Find an empty port and set it to the specified PCB.
  */
-#ifdef HAVE_NRL_INPCB	/* XXX: I really hate such ugly macros...(jinmei) */
-#define in6pcb		inpcb
-#define in6p_socket	inp_socket
-#define in6p_lport	inp_lport
-#define in6p_head	inp_head
-#define in6p_flags	inp_flags
-#define IN6PLOOKUP_WILDCARD INPLOOKUP_WILDCARD
-#endif
 int
 in6_pcbsetport(laddr, in6p, p)
 	struct in6_addr *laddr;
@@ -995,13 +987,8 @@ in6_pcbsetport(laddr, in6p, p)
 		wild = IN6PLOOKUP_WILDCARD;
 
 	if (in6p->in6p_flags & IN6P_LOWPORT) {
-#ifdef __NetBSD__
 #ifndef IPNOPRIVPORTS
 		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
-			return (EACCES);
-#endif
-#else
-		if ((so->so_state & SS_PRIV) == 0)
 			return (EACCES);
 #endif
 		min = ip6_lowportmin;
@@ -1021,11 +1008,6 @@ in6_pcbsetport(laddr, in6p, p)
 	for (;;) {
 		lport = htons(head->in6p_lport);
 		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
-#ifdef HAVE_NRL_INPCB
-#ifdef INPLOOKUP_WILDCARD6
-			wild &= ~INPLOOKUP_WILDCARD6;
-#endif
-#endif
 #if 0
 			t = in_pcblookup_bind(&tcbtable,
 			    (struct in_addr *)&laddr->s6_addr32[3], lport);
@@ -1033,18 +1015,8 @@ in6_pcbsetport(laddr, in6p, p)
 			t = NULL;
 #endif
 		} else {
-#ifdef HAVE_NRL_INPCB
-#ifdef INPLOOKUP_WILDCARD4
-			wild &= ~INPLOOKUP_WILDCARD4;
-#endif
-			/* XXX: ugly cast... */
-			t = in_pcblookup(head, (struct in_addr *)&zeroin6_addr,
-			    0, (struct in_addr *)laddr, lport,
-			    wild | INPLOOKUP_IPV6);
-#else
 			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr, lport,
 			    wild);
-#endif
 		}
 		if (t == 0)
 			break;
@@ -1060,17 +1032,9 @@ in6_pcbsetport(laddr, in6p, p)
 	in6p->in6p_lport = lport;
 	return (0);		/* success */
 }
-#ifdef HAVE_NRL_INPCB
-#undef in6pcb
-#undef in6p_socket
-#undef in6p_lport
-#undef in6p_head
-#undef in6p_flags
-#undef IN6PLOOKUP_WILDCARD
 #endif
-#endif /* !FreeBSD3 && !OpenBSD*/
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 /*
  * XXX: this is borrowed from in6_pcbbind(). If possible, we should
  * share this function by all *bsd*...
@@ -1101,7 +1065,7 @@ in6_pcbsetport(laddr, inp, p)
 		last  = ipport_hilastauto;
 		lastport = &pcbinfo->lasthi;
 	} else if (inp->inp_flags & INP_LOWPORT) {
-#if __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		if (p && (error = suser(p)))
 #else
 		if (p && (error = suser(p->p_ucred, &p->p_acflag)))
@@ -1330,7 +1294,7 @@ struct walkarg {
 };
 #endif
 
-#ifndef __FreeBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 int
 in6_src_sysctl(oldp, oldlenp, newp, newlen)
 	void *oldp;
@@ -1377,12 +1341,8 @@ in6_src_sysctl(oldp, oldlenp, newp, newlen)
 
 	return (error);
 }
-#else  /* !FreeBSD */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-static int in6_src_sysctl(SYSCTL_HANDLER_ARGS);
 #else
-static int in6_src_sysctl SYSCTL_HANDLER_ARGS;
-#endif /* FreeBSD4 */
+static int in6_src_sysctl(SYSCTL_HANDLER_ARGS);
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_inet6_ip6);
 #endif
@@ -1390,11 +1350,7 @@ SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_ADDRCTLPOLICY, addrctlpolicy,
 	CTLFLAG_RD, in6_src_sysctl, "");
 
 static int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 in6_src_sysctl(SYSCTL_HANDLER_ARGS)
-#else
-in6_src_sysctl SYSCTL_HANDLER_ARGS
-#endif
 {
 	struct walkarg w;
 

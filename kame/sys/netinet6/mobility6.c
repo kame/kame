@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.34 2004/05/26 07:41:32 itojun Exp $	*/
+/*	$KAME: mobility6.c,v 1.35 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -88,7 +88,7 @@
 
 #if defined (__OpenBSD__)
 extern struct inpcbtable rawin6pcbtable;
-#elif !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif !defined(__FreeBSD__)
 extern struct in6pcb rawin6pcb;
 #else
 extern struct inpcbhead ripcb;
@@ -395,7 +395,7 @@ mobility6_rip6_input(mp, off)
 		return (IPPROTO_DONE);
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	LIST_FOREACH(in6p, &ripcb, inp_list)
 #elif defined(__OpenBSD__)
 	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
@@ -406,7 +406,7 @@ mobility6_rip6_input(mp, off)
 	     in6p != &rawin6pcb; in6p = in6p->in6p_next)
 #endif
 	{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		if ((in6p->inp_vflag & INP_IPV6) == 0)
 			continue;
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.89 2004/05/25 01:17:40 suz Exp $	*/
+/*	$KAME: ah_input.c,v 1.90 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,7 +132,7 @@ ah4_input(m, va_alist)
 #if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
 #endif
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	int off, proto;
 	va_list ap;
 #endif

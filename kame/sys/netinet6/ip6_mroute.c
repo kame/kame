@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.127 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.128 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -88,7 +88,7 @@
  * before calls to socket_send().  see sys/netinet6/dest6.c for details.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -105,12 +105,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/domain.h>
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
@@ -121,7 +121,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
@@ -145,11 +145,11 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 static MALLOC_DEFINE(M_MRTABLE, "mf6c", "multicast forwarding cache entry");
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #define M_READONLY(x)	(!M_WRITABLE(x))
 #endif
 
@@ -157,7 +157,7 @@ static int ip6_mdq __P((struct mbuf *, struct ifnet *, struct mf6c *));
 static void phyint_send __P((struct ip6_hdr *, struct mif6 *, struct mbuf *));
 
 static int set_pim6 __P((int *));
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 static int get_pim6 __P((struct mbuf *));
 #endif
 static int socket_send __P((struct socket *, struct mbuf *,
@@ -298,7 +298,7 @@ static int del_m6fc __P((struct mf6cctl *));
 
 #ifdef __NetBSD__
 static struct callout expire_upcalls_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 static struct callout expire_upcalls_ch;
 #elif defined(__OpenBSD__)
 static struct timeout expire_upcalls_ch;
@@ -307,7 +307,7 @@ static struct timeout expire_upcalls_ch;
 /*
  * Handle MRT setsockopt commands to modify the multicast routing tables.
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int
 ip6_mrouter_set(so, sopt)
 	struct socket *so;
@@ -423,7 +423,7 @@ ip6_mrouter_set(cmd, so, m)
 /*
  * Handle MRT getsockopt commands
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int
 ip6_mrouter_get(so, sopt)
 	struct socket *so;
@@ -537,7 +537,7 @@ get_mif6_cnt(req)
 	return (0);
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >=3)
+#ifndef __FreeBSD__
 /*
  * Get PIM processiong global
  */
@@ -601,7 +601,7 @@ ip6_mrouter_init(so, v, cmd)
 
 	pim6 = 0;/* used for stubbing out/in pim stuff */
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 #elif defined(__OpenBSD__)
@@ -675,7 +675,7 @@ ip6_mrouter_done()
 
 	pim6 = 0; /* used to stub out/in pim specific code */
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_stop(&expire_upcalls_ch);
 #elif defined(__OpenBSD__)
 	timeout_del(&expire_upcalls_ch);
@@ -776,7 +776,7 @@ add_m6if(mifcp)
 {
 	struct mif6 *mifp;
 	struct ifnet *ifp;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	struct in6_ifreq ifr;
 #endif
 	int error, s;
@@ -836,7 +836,7 @@ add_m6if(mifcp)
 		if ((ifp->if_flags & IFF_MULTICAST) == 0)
 			return (EOPNOTSUPP);
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 		error = if_allmulti(ifp, 1);
 #else
 		/*
@@ -898,7 +898,7 @@ del_m6if(mifip)
 	struct mif6 *mifp = mif6table + *mifip;
 	mifi_t mifi;
 	struct ifnet *ifp;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	struct in6_ifreq ifr;
 #endif
 	int s;
@@ -929,7 +929,7 @@ del_m6if(mifip)
 		 */
 		ifp = mifp->m6_ifp;
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 		if_allmulti(ifp, 0);
 #else
 		ifr.ifr_addr.sin6_family = AF_INET6;
@@ -1214,7 +1214,7 @@ ip6_mforward(ip6, ifp, m)
 	struct mbuf *mm;
 	int s;
 	mifi_t mifi;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -1532,7 +1532,7 @@ expire_upcalls(unused)
 		}
 	}
 	splx(s);
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 #elif defined(__OpenBSD__)
@@ -2151,7 +2151,7 @@ pim6_input(mp, offp, proto)
 		}
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #if (__FreeBSD_version >= 410000)
 		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
 		    dst.sin6_family, NULL);

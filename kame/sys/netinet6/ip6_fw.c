@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.35 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.36 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -49,12 +49,10 @@
  */
 
 #ifdef __FreeBSD__
-#if __FreeBSD__ < 4 || !defined(KLD_MODULE)
+#ifndef KLD_MODULE
 #include "opt_ip6fw.h"
-#if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#endif
 #endif
 #endif
 
@@ -72,7 +70,7 @@
 #include <sys/queue.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/socketvar.h>
 #endif
 #include <sys/syslog.h>
@@ -107,7 +105,7 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 MALLOC_DEFINE(M_IP6FW, "Ip6Fw/Ip6Acct", "Ip6Fw/Ip6Acct chain's");
 #else
 #ifndef M_IP6FW
@@ -133,11 +131,11 @@ static int fw6_verbose_limit = 0;
 LIST_HEAD (ip6_fw_head, ip6_fw_chain) ip6_fw_chain;
 
 #ifdef SYSCTL_NODE
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 SYSCTL_DECL(_net_inet6_ip6);
 #endif
 SYSCTL_NODE(_net_inet6_ip6, OID_AUTO, fw, CTLFLAG_RW, 0, "Firewall");
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, enable, CTLFLAG_RW,
 	&ip6_fw_enable, 0, "Enable ip6fw");
 #endif
@@ -177,7 +175,7 @@ static char err_prefix[] = "ip6_fw_ctl:";
  * Returns 1 if the port is matched by the vector, 0 otherwise
  */
 static
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 __inline
 #else
 inline
@@ -347,7 +345,7 @@ ip6opts_match(struct ip6_hdr **pip6, struct ip6_fw *f, struct mbuf **m,
 }
 
 static
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 __inline
 #else
 inline
@@ -736,7 +734,7 @@ got_match:
 		/* Update statistics */
 		f->fw_pcnt += 1;
 		f->fw_bcnt += ntohs(ip6->ip6_plen);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		f->timestamp = time_second;
 #else
 		f->timestamp = time.tv_sec;
@@ -1148,7 +1146,7 @@ ip6_fw_ctl(int stage, struct mbuf **mm)
 
 	if (stage == IPV6_FW_GET) {
 		struct ip6_fw_chain *fcp = ip6_fw_chain.lh_first;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		*mm = m = m_get(M_WAIT, MT_DATA); /* XXX */
 #else
 		*mm = m = m_get(M_WAIT, MT_SOOPTS);
@@ -1165,7 +1163,7 @@ ip6_fw_ctl(int stage, struct mbuf **mm)
 		for (; fcp; fcp = fcp->chain.le_next) {
 			bcopy(fcp->rule, m->m_data, sizeof *(fcp->rule));
 			m->m_len = sizeof *(fcp->rule);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			m->m_next = m_get(M_WAIT, MT_DATA); /* XXX */
 #else
 			m->m_next = m_get(M_WAIT, MT_SOOPTS);
@@ -1309,7 +1307,7 @@ ip6_fw_init(void)
 #endif
 }
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 static ip6_fw_chk_t *old_chk_ptr;
 static ip6_fw_ctl_t *old_ctl_ptr;
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.32 2004/05/26 07:41:32 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.33 2004/06/02 05:53:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -34,7 +34,7 @@
 #ifndef __OpenBSD__
 #include "opt_inet.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
@@ -103,7 +103,7 @@
 extern struct protosw inetsw[];
 extern struct sctp_epinfo sctppcbinfo;
 
-#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(HAVE_NRL_INPCB) || defined(__FreeBSD__)
 #ifndef in6pcb
 #define in6pcb		inpcb
 #endif
@@ -220,7 +220,7 @@ sctp6_input(mp, offp, proto)
 #endif
 #else
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	if (faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)) {
 		/* XXX send icmp6 host/port unreach? */
 		m_freem(m);

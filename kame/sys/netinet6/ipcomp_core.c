@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.27 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.28 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -33,7 +33,7 @@
  * RFC2393 IP payload compression protocol (IPComp).
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -50,7 +50,7 @@
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>

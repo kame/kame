@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.50 2004/05/21 07:07:31 itojun Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.51 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -37,7 +37,7 @@
  *
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
@@ -93,7 +93,7 @@ struct mip6_unuse_hoa_list mip6_unuse_hoa;
 struct mip6_preferred_ifnames mip6_preferred_ifnames;
 #ifdef __NetBSD__
 struct callout mip6_bu_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 struct callout mip6_bu_ch;
 #elif defined(__OpenBSD__)
 struct timeout mip6_bu_ch;
@@ -225,9 +225,10 @@ mip6_mobile_node_stop(void)
 void
 mip6_bu_init(void)
 {
+
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&mip6_bu_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&mip6_bu_ch);
 #endif
 }
@@ -1022,7 +1023,7 @@ mip6_detach_haddrs(sc)
 	struct in6_ifaddr *ia6;
 	int error = 0;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	for (ia = TAILQ_FIRST(&hif_ifp->if_addrhead);
 	     ia;
 	     ia = ia_next)
@@ -1032,7 +1033,7 @@ mip6_detach_haddrs(sc)
 	     ia = ia_next)
 #endif
 	{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		ia_next = TAILQ_NEXT(ia, ifa_link);
 #else
 		ia_next = ia->ifa_list.tqe_next;
@@ -1177,7 +1178,7 @@ mip6_remove_haddrs(sc, ifp)
 	struct mip6_prefix *mpfx;
 	int error = 0;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	for (ia = TAILQ_FIRST(&ifp->if_addrhead);
 	     ia;
 	     ia = ia_next)
@@ -1187,7 +1188,7 @@ mip6_remove_haddrs(sc, ifp)
 	     ia = ia_next)
 #endif
 	{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		ia_next = TAILQ_NEXT(ia, ifa_link);
 #else
 		ia_next = ia->ifa_list.tqe_next;
@@ -1445,7 +1446,7 @@ mip6_route_optimize(m)
 	} else {
 #if 0
 		int32_t coa_lifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		long time_second = time.tv_sec;
 #endif
 		/*
@@ -1488,7 +1489,7 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 {
 	struct mip6_bu *mbu;
 	u_int32_t coa_lifetime, cookie;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -1792,7 +1793,7 @@ mip6_home_registration2(mbu)
 	struct mip6_prefix *mpfx;
 	int32_t coa_lifetime, prefix_lifetime;
 	int error;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifndef __FreeBSD__
 	struct timeval mono_time;
 #endif
 
@@ -1800,7 +1801,7 @@ mip6_home_registration2(mbu)
 	if (mbu == NULL)
 		return (EINVAL);
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifndef __FreeBSD__
 	mono_time.tv_sec = time_second;
 #endif
 
@@ -1923,7 +1924,7 @@ mip6_bu_list_notify_binding_change(sc, home)
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu, *mbu_next;
 	int32_t coa_lifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -2039,7 +2040,7 @@ mip6_coa_get_lifetime(coa)
 {
 	struct in6_ifaddr *ia;
 	int64_t lifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -2293,7 +2294,7 @@ mip6_bu_send_cbu(mbu)
 static void
 mip6_bu_starttimer()
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&mip6_bu_ch,
 		      MIP6_BU_TIMEOUT_INTERVAL * hz,
 		      mip6_bu_timeout, NULL);
@@ -2310,7 +2311,7 @@ mip6_bu_starttimer()
 static void
 mip6_bu_stoptimer()
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_stop(&mip6_bu_ch);
 #elif defined(__OpenBSD__)
 	timeout_del(&mip6_bu_ch);
@@ -2326,11 +2327,11 @@ mip6_bu_timeout(arg)
 	int s;
 	struct hif_softc *sc;
 	int error = 0;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	mono_time.tv_sec = time_second;
 #endif
 
@@ -2870,7 +2871,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
 	u_int32_t lifetime, refresh;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 	int error = 0;
@@ -3597,7 +3598,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct mip6_prefix *mpfx;
 	int need_rr = 0, ignore_co_nonce = 0;
 	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 	*pktopt_mobility = NULL;
@@ -3858,7 +3859,7 @@ mip6_bdt_create(sc, paddr)
 	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST);
 	if (ifa == NULL) {
 		/* XXX: freebsd does not have ifa_ifwithaf */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first;

@@ -1,4 +1,4 @@
-/*	$KAME: ah_aesxcbcmac.c,v 1.6 2003/07/22 02:30:54 itojun Exp $	*/
+/*	$KAME: ah_aesxcbcmac.c,v 1.7 2004/06/02 05:53:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -33,7 +33,7 @@
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/syslog.h>

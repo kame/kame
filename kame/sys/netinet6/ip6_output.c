@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.450 2004/05/26 09:41:05 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.451 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2021,7 +2021,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 				error = ip6_pcbopts(&in6p->in6p_outputopts,
 						    m, so);
-#endif /* FreeBSD >= 3 */
+#endif
 				break;
 			}
 
@@ -2637,7 +2637,7 @@ do { \
 				error = ENOPROTOOPT;
 				break;
 			}
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 			if (m)
 				(void)m_free(m);
 #endif
@@ -2724,7 +2724,7 @@ do { \
 					break;
 
 				case IPV6_V6ONLY:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 					optval = OPTBIT(IN6P_IPV6_V6ONLY);
 #else
 					optval = (ip6_v6only != 0); /* XXX */
@@ -2977,7 +2977,7 @@ do { \
 
 				if (ip6_fw_ctl_ptr == NULL)
 			        {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 					if (m)
 						(void)m_free(m);
 #endif
@@ -3002,7 +3002,7 @@ do { \
 		}
 	} else {		/* level != IPPROTO_IPV6 */
 		error = EINVAL;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		if (op == PRCO_SETOPT && *mp)
 			(void)m_free(*mp);
 #endif
@@ -3053,7 +3053,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 #endif
 
 	if (level != IPPROTO_IPV6) {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		if (op == PRCO_SETOPT && *mp)
 			(void)m_free(*mp);
 #endif
@@ -3129,7 +3129,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		break;
 	}
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	if (op == PRCO_SETOPT && m)
 		(void)m_free(m);
 #endif
@@ -3194,7 +3194,7 @@ ip6_pcbopts(pktopt, m, so)
 	}
 
 	/*  set options specified by user. */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	if (p && !suser(p))
 		priv = 1;
 #elif defined(__OpenBSD__)
@@ -3272,7 +3272,7 @@ ip6_getpcbopt(pktopt, optname, mp)
 	int deftclass = 0, on;
 	int defminmtu = IP6PO_MINMTU_MCASTONLY;
 	int defpreftemp = IP6PO_TEMPADDR_SYSTEM;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	struct mbuf *m;
 #endif
 
@@ -4792,7 +4792,7 @@ ip6_mloopback(ifp, m, dst)
 	in6_clearscope(&ip6->ip6_dst);
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #if (__FreeBSD_version >= 410000)
 	(void)if_simloop(ifp, copym, dst->sin6_family, NULL);
 #else

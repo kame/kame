@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.91 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.92 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -37,7 +37,7 @@
  *
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -572,7 +572,7 @@ mip6_icmp6_dhaad_req_output(sc)
 	struct mip6_dhaad_req *hdreq;
 	u_int32_t icmp6len, off;
 	int error;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.27 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.28 2004/06/02 05:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_mip6.h"
 #endif
@@ -98,7 +98,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 {
 	u_int8_t *mbu_pri_fsm_state;
 	int error;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 	struct ip6_mh_binding_request *ip6mr;
@@ -111,7 +111,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 	if (mbu == NULL)
 		return (EINVAL);
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	mono_time.tv_sec = time_second;
 #endif
 
@@ -1465,7 +1465,7 @@ mip6_bu_pri_fsm_home_registration(mbu)
 {
 	struct mip6_ha *mha;
 	int error;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 
@@ -1473,7 +1473,7 @@ mip6_bu_pri_fsm_home_registration(mbu)
 	if (mbu == NULL)
 		return (EINVAL);
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	microtime(&mono_time);
 #endif
 
@@ -1512,7 +1512,7 @@ mip6_bu_sec_fsm(mbu, event, data)
 {
 	u_int8_t *mbu_sec_fsm_state;
 	int error;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 	struct ip6_mh_home_test *ip6mh;
@@ -1523,7 +1523,7 @@ mip6_bu_sec_fsm(mbu, event, data)
 		return (EINVAL);
 
 	mbu_sec_fsm_state = &mbu->mbu_sec_fsm_state;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	mono_time.tv_sec = time_second;
 #endif
 

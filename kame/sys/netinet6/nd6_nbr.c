@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.148 2004/05/26 07:41:32 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.149 2004/06/02 05:53:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -49,12 +49,12 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -1194,7 +1194,7 @@ struct dadq {
 	int dad_ns_ocount;	/* NS sent so far */
 	int dad_ns_icount;
 	int dad_na_icount;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	struct callout dad_timer_ch;
 #elif defined(__OpenBSD__)
 	struct timeout dad_timer_ch;
@@ -1223,7 +1223,7 @@ nd6_dad_starttimer(dp, ticks)
 	int ticks;
 {
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&dp->dad_timer_ch, ticks,
 	    (void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa);
 #elif defined(__OpenBSD__)
@@ -1241,7 +1241,7 @@ nd6_dad_stoptimer(dp)
 	struct dadq *dp;
 {
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_stop(&dp->dad_timer_ch);
 #elif defined(__OpenBSD__)
 	timeout_del(&dp->dad_timer_ch);
@@ -1321,7 +1321,7 @@ nd6_dad_start(ifa, tick)
 	bzero(dp, sizeof(*dp));
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&dp->dad_timer_ch, 0);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_init(&dp->dad_timer_ch);
 #elif defined(__OpenBSD__)
 	bzero(&dp->dad_timer_ch, sizeof(dp->dad_timer_ch));

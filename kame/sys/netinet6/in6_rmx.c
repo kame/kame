@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.20 2004/05/20 08:15:54 suz Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.21 2004/06/02 05:53:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,7 +85,7 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <netinet/ip_var.h>
 #endif
 #include <netinet/in_var.h>
@@ -96,7 +96,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <netinet6/tcp6.h>
 #include <netinet6/tcp6_seq.h>
 #include <netinet6/tcp6_timer.h>
@@ -108,7 +108,7 @@
 #include <netinet/tcp_var.h>
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #define tcp_sendspace tcp6_sendspace
 #define tcp_recvspace tcp6_recvspace
 #define time_second time.tv_sec
