@@ -138,11 +138,13 @@ int main(argc, argv)
 {
 	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ];
 	struct	ifnet	*ifp, *nifp, ifnet;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #ifndef __NetBSD__
 	struct	arpcom	arpcom;
 #else
 	struct ethercom ec;
 	struct sockaddr_dl sdl;
+#endif
 #endif
 	const char *kernel = NULL;
 
@@ -378,7 +380,7 @@ in6_multientry(mc)
 	struct in6_multi multi;
 
 	KREAD(mc, &multi, struct in6_multi);
-	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_addr));
+	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa.sin6_addr));
 	printf(" refcnt %u\n", multi.in6m_refcount);
 	return(multi.in6m_entry.le_next);
 }
