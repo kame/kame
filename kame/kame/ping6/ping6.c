@@ -1803,6 +1803,9 @@ usage()
 {
 	(void)fprintf(stderr,
 "usage: ping6 [-dfnqvwW"
+#ifdef IPV6_REACHCONF
+		      "R"
+#endif
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 		      "] [-P policy"
