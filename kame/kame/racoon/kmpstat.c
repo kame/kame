@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.13 2000/06/08 21:28:33 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.14 2000/06/14 09:49:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -699,6 +699,7 @@ dump_isakmp_sa(buf, len)
 	struct ph1dump *pd;
 	struct tm *tm;
 	char tbuf[56];
+	caddr_t p = NULL;
 
 /* isakmp status header */
 /* short header;
@@ -708,16 +709,16 @@ char *header1 =
 "Destination            Cookies                           Created";
 
 /* semi long header;
- 1234567890123456789012 0000000000000000:0000000000000000 00 X 00 X X 0000-00-00 00:00:00 1234567890123456789012 
+ 1234567890123456789012 0000000000000000:0000000000000000 00 X 00 X 0000-00-00 00:00:00 000000
 */
 char *header2 = 
-"Destination            Cookies                           ST S V  E U Created             Source";
+"Destination            Cookies                           ST S  V E Created             Phase2";
 
 /* long header;
- 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000000000000000:0000000000000000 00 X 00 X X 0000-00-00 00:00:00 0000:0000:0000:0000:0000:0000:0000:0000.00000 
+ 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000000000000000:0000000000000000 00 X 00 X 0000-00-00 00:00:00 000000
 */
 char *header3 =
-"Destination                                   Cookies                           ST S V  E U Created             Source";
+"Source                                        Destination                                   Cookies                           ST S  V E Created             Phase2";
 
 /* phase status header */
 /* short format;
@@ -747,41 +748,8 @@ char *header3 =
 	pd = (struct ph1dump *)buf;
 
 	while (len-- > 0) {
-	    {
-		char *p = NULL;
-
-		GETNAMEINFO((struct sockaddr *)&pd->remote, _addr1_, _addr2_);
-		switch (long_format) {
-		case 0:
-		case 1:
-			p = fixed_addr(_addr1_, _addr2_, 22);
-			break;
-		case 2:
-		default:
-			p = fixed_addr(_addr1_, _addr2_, 45);
-			break;
-		}
-		printf("%s ", p);
-	    }
-
-		printf("%s ", pindex_isakmp(&pd->index));
-
-		if (long_format >= 1) {
-			printf("%2d %c %x ",
-				pd->status,
-				pd->side == INITIATOR ? 'I' : 'R',
-				pd->version);
-			if (ARRAYLEN(estr) > pd->etype)
-				printf("%s ", estr[pd->etype]);
-		}
-
-		tm = localtime(&pd->created);
-		strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
-		printf("%s ", tbuf);
-
-		if (long_format >= 1) {
-			char *p = NULL;
-
+		/* source address */
+		if (long_format >= 2) {
 			GETNAMEINFO((struct sockaddr *)&pd->local, _addr1_, _addr2_);
 			switch (long_format) {
 			case 0:
@@ -796,6 +764,41 @@ char *header3 =
 			}
 			printf("%s ", p);
 		}
+
+		/* destination address */
+		GETNAMEINFO((struct sockaddr *)&pd->remote, _addr1_, _addr2_);
+		switch (long_format) {
+		case 0:
+		case 1:
+			p = fixed_addr(_addr1_, _addr2_, 22);
+			break;
+		case 2:
+		default:
+			p = fixed_addr(_addr1_, _addr2_, 45);
+			break;
+		}
+		printf("%s ", p);
+
+		printf("%s ", pindex_isakmp(&pd->index));
+
+		/* statuc, side and version */
+		if (long_format >= 1) {
+			printf("%2d %c %2x ",
+				pd->status,
+				pd->side == INITIATOR ? 'I' : 'R',
+				pd->version);
+			if (ARRAYLEN(estr) > pd->etype)
+				printf("%s ", estr[pd->etype]);
+		}
+
+		/* created date */
+		tm = localtime(&pd->created);
+		strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
+		printf("%s ", tbuf);
+
+		/* counter of phase 2 */
+		if (long_format >= 1)
+			printf("%6d ", pd->ph2cnt);
 
 		printf("\n");
 
