@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.19 1999/10/28 06:50:58 sakane Exp $ */
+/* KAME $Id: key.c,v 1.20 1999/10/28 11:54:32 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -432,12 +432,15 @@ key_checkrequest(isr)
 	 * We don't allocate new SA if the state of SA in the holder is
 	 * SADB_SASTATE_MATURE, and if this is newer one.
 	 */
-	if (isr->sav != NULL
-	 && isr->sav != (struct secasvar *)LIST_FIRST(&isr->sav->sah->savtree[SADB_SASTATE_MATURE])) {
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP checkrequest calls free SA:%p\n",
-				isr->sav));
-		key_freesav(isr->sav);
+	if (isr->sav != NULL) {
+		if (isr->sav->sah != NULL
+		 && isr->sav != (struct secasvar *)LIST_FIRST(
+			    &isr->sav->sah->savtree[SADB_SASTATE_MATURE])) {
+			KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+				printf("DP checkrequest calls free SA:%p\n",
+					isr->sav));
+			key_freesav(isr->sav);
+		}
 		isr->sav = NULL;
 	}
 
@@ -1764,6 +1767,8 @@ key_delsav(sav)
 	if (sav->misc3 != NULL)
 		KFREE(sav->misc3);
 #endif
+
+	sav->sah = NULL;
 
 	KFREE(sav);
 
