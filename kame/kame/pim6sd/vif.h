@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.26 2004/06/01 08:42:19 suz Exp $	*/
+/*	$KAME: vif.h,v 1.27 2004/06/08 10:45:09 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -138,7 +138,6 @@ struct listaddr {
 	u_long al_timer;
 	time_t al_ctime; /* entry creation time */
 
-	/* filter_mode is not used in PIM-SSM, because it is always INCLUDE */
 	u_int16 filter_mode; /* filter mode for mldv2 */
 	u_int16 comp_mode; /* compatibility mode */
 	union {

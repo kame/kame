@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.36 2004/06/08 10:36:14 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.37 2004/06/08 10:45:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -392,6 +392,8 @@ recv_listener_report(mifi, src, grp, mld_version)
 	g->al_timerid = SetTimer(mifi, g);
 	g->al_next = v->uv_groups;
 	g->comp_mode = mld_version;
+	if (g->comp_mode == MLDv2)
+		g->filter_mode = MODE_IS_EXCLUDE;
 	v->uv_groups = g;
 	time(&g->al_ctime);
 

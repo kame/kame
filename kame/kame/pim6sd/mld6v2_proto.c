@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.34 2004/06/08 10:36:14 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.35 2004/06/08 10:45:09 suz Exp $
  */
 
 /*
@@ -75,7 +75,7 @@
  /* MLDv2 implementation
   *   - MODE_IS_INCLUDE, ALLOW_NEW_SOURCES, BLOCK_OLD_SOURCES,
   *	    (S,G) is handled
-  *   - MODE_IS_EXCLUDE
+  *   - MODE_IS_EXCLUDE, CHANGE_TO_EXCLUDE
   *	    just regarded as MLDv1 join
   *   - CHANGE_TO_INCLUDE:
   *	    regarded as (S,G)
@@ -97,7 +97,8 @@ static int DeleteTimerV1compat __P((int));
 
 static void accept_multicast_record(mifi_t, struct mld_group_record_hdr *,
 				    struct sockaddr_in6 *,
-				    struct sockaddr_in6 *);
+				    struct sockaddr_in6 *,
+				    struct listaddr *);
 static void strip_source_in_multicast_record(mifi_t,
 					     struct mld_group_record_hdr *,
 					     struct sockaddr_in6 *,
@@ -332,6 +333,45 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     group_sa.sin6_addr = *group;
     group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
+    /* 
+     * group-specific query:
+     * Filter Timer should be lowered to [Last Listener Query Interval].
+     */
+    if (numsrc == 0) {
+	IF_DEBUG(DEBUG_MLD)
+		log_msg(LOG_DEBUG, 0, "Group-Specific-Query");
+
+	for (g = v->uv_groups; g != NULL; g = g->al_next) {
+		if (inet6_equal(&group_sa, &g->al_addr))
+			break;
+	}
+	if (g == NULL) {
+		log_msg(LOG_DEBUG, 0, "do nothing due to a lack of a "
+			"correspoding group record");
+		return;
+	}
+
+	/* setup a timeout to remove the multicast record */
+	if (timer_leftTimer(g->al_timerid) >
+            (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE)) {
+	    timer_clearTimer(g->al_timerid);
+	    SET_TIMER(g->al_timer,
+	    	MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE);
+	    g->al_timerid = SetTimer(vifi, g);
+	}
+
+	IF_DEBUG(DEBUG_MLD)
+	    log_msg(LOG_DEBUG, 0,
+		"timer for grp %s on vif %d set to %ld",
+		inet6_fmt(group), vifi, g->al_timer);
+	return;
+    }
+
+    /* 
+     * group-source-specific query:
+     * for each sources in the Specific Query
+     * message, lower our membership timer to [Last Listener Query Interval]
+     */
     IF_DEBUG(DEBUG_MLD)
 	log_msg(LOG_DEBUG, 0, "List of sources :");
     for (i = 0; i < numsrc; i++) {
@@ -340,11 +380,6 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 
         log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
 
-	/*
-	 * I'm not the querier but maybe I'm still in the state Checking
-	 * listener for this Group/Source we verify this with the 
-	 * al_checklist var
-	 */
 	/*
 	 * Section 7.6.1 draft-vida-mld-v2-08.txt : When a router 
 	 * receive a query with clear router Side Processing flag,
@@ -454,7 +489,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 			break;
 	}
 	if (g == NULL) {
-		accept_multicast_record(vifi, mard, src, &group_sa);
+		accept_multicast_record(vifi, mard, src, &group_sa, NULL);
 		continue;
 	}
 
@@ -465,7 +500,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		break;
 	case MLDv2:
 	default:
-		accept_multicast_record(vifi, mard, src, &group_sa);
+		accept_multicast_record(vifi, mard, src, &group_sa, g);
 		break;
 	}
     }
@@ -474,11 +509,12 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
 /* handles multicast record in normal MLDv2-mode */
 static void
-accept_multicast_record(vifi, mard, src, grp)
+accept_multicast_record(vifi, mard, src, grp, uv_group)
     mifi_t vifi;
     struct mld_group_record_hdr *mard;
     struct sockaddr_in6 *src;
     struct sockaddr_in6 *grp;
+    struct listaddr *uv_group;
 {
 	struct uvif *v = &uvifs[vifi];
 	int numsrc = ntohs(mard->numsrc);
@@ -488,9 +524,32 @@ accept_multicast_record(vifi, mard, src, grp)
     	struct listaddr *g = NULL;
 	cbk_t *cbk;
 
+	/* sanity check */
+	if (v->uv_flags & VIFF_NOLISTENER)
+	 	return;
+
+	switch (mard->record_type) {
+	case ALLOW_NEW_SOURCES:
+	case BLOCK_OLD_SOURCES:
+	    if (uv_group == NULL) {
+	    	log_msg(LOG_DEBUG, 0,
+			"cannot accept source-list-change-record"
+			"for non-existent record");
+	    	return;
+	    }
+	default:
+	    ;	/* do nothing */
+	}
+
 	switch (mard->record_type) {
 	case CHANGE_TO_INCLUDE_MODE:
 	    if (numsrc == 0) {
+	        if (uv_group == NULL) {
+			log_msg(LOG_DEBUG, 0,
+				"impossible to delete non-existent record");
+			return;
+		}
+		uv_group->filter_mode = MODE_IS_INCLUDE;
 		recv_listener_done(vifi, src, grp);
 	        break;
 	    }
@@ -565,6 +624,7 @@ accept_multicast_record(vifi, mard, src, grp)
 			g->al_addr = *grp;
 			g->sources = NULL;
 			g->comp_mode = MLDv2;
+			g->filter_mode = MODE_IS_INCLUDE;
 
 			g->al_next = v->uv_groups;
 			v->uv_groups = g;
@@ -605,12 +665,11 @@ accept_multicast_record(vifi, mard, src, grp)
 
 	case BLOCK_OLD_SOURCES:
 	    /*
-	     * Routers in Non-Querier state MUST ignore BLOCK_OLD_SOURCES
-	     * message like RFC2710?  assume yes.
+	     * Unlike RFC2710 section 4 p.7 (Routers in Non-Querier state 
+	     * MUST ignore Done messages), MLDv2 non-querier should 
+	     * accept BLOCK_OLD_SOURCES message to support fast-leave
+	     * (although it's not explcitly mentioned).
 	     */
-	    if (!(v->uv_flags & VIFF_QUERIER) || v->uv_flags & VIFF_NOLISTENER)
-		break;
-
 	    for (j = 0; j < numsrc; j++) {
 		/*
 		 * Look for the src/group 
@@ -671,6 +730,7 @@ accept_multicast_record(vifi, mard, src, grp)
 	    log_msg(LOG_NOTICE, 0,
 		"wrong multicast report type : %d",
 		mard->record_type);
+	    break;
 	}
 }
 
@@ -697,7 +757,7 @@ strip_source_in_multicast_record(vifi, mard, src, grp)
 			/* do nothing due to a lack of additional sources */
 			log_msg(LOG_DEBUG, 0,
 			    "ignore ALLOW_NEW_SOURCES "
-			    "without additional sources");
+			    "due a lack of additional sources");
 			break;
 		}
 		goto regard_as_report;
