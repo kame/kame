@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.4 2000/01/16 16:00:27 sumikawa Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.5 2000/01/16 18:06:57 sumikawa Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -49,7 +49,9 @@
 #include <sys/sysctl.h>
 #endif
 #include <sys/mbuf.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
+#endif
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/domain.h>
@@ -106,20 +108,6 @@ static int key_sendup0 __P((struct rawcb *, struct mbuf *, int));
 #endif
 
 struct pfkeystat pfkeystat;
-
-/*
- * key_abort()
- * derived from net/rtsock.c:rts_abort()
- */
-static int
-key_abort(struct socket *so)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_abort(so);
-	splx(s);
-	return error;
-}
 
 /*
  * key_attach()
@@ -205,139 +193,6 @@ key_attach(struct socket *so, int proto, struct proc *p)
 	splx(s);
 	return 0;
 }
-
-/*
- * key_bind()
- * derived from net/rtsock.c:rts_bind()
- */
-static int
-key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_bind(so, nam, p); /* xxx just EINVAL */
-	splx(s);
-	return error;
-}
-
-/*
- * key_connect()
- * derived from net/rtsock.c:rts_connect()
- */
-static int
-key_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_connect(so, nam, p); /* XXX just EINVAL */
-	splx(s);
-	return error;
-}
-
-/*
- * key_detach()
- * derived from net/rtsock.c:rts_detach()
- */
-static int
-key_detach(struct socket *so)
-{
-	struct keycb *kp = (struct keycb *)sotorawcb(so);
-	int s, error;
-
-	s = splnet();
-	if (kp != 0) {
-		if (kp->kp_raw.rcb_proto.sp_protocol
-		    == PF_KEY) /* XXX: AF_KEY */
-			key_cb.key_count--;
-		key_cb.any_count--;
-
-		key_freereg(so);
-	}
-	error = raw_usrreqs.pru_detach(so);
-	splx(s);
-	return error;
-}
-
-/*
- * key_disconnect()
- * derived from net/rtsock.c:key_disconnect()
- */
-static int
-key_disconnect(struct socket *so)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_disconnect(so);
-	splx(s);
-	return error;
-}
-
-/*
- * key_peeraddr()
- * derived from net/rtsock.c:rts_peeraddr()
- */
-static int
-key_peeraddr(struct socket *so, struct sockaddr **nam)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_peeraddr(so, nam);
-	splx(s);
-	return error;
-}
-
-/*
- * key_send()
- * derived from net/rtsock.c:rts_send()
- */
-static int
-key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
-	 struct mbuf *control, struct proc *p)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_send(so, flags, m, nam, control, p);
-	splx(s);
-	return error;
-}
-
-/*
- * key_shutdown()
- * derived from net/rtsock.c:rts_shutdown()
- */
-static int
-key_shutdown(struct socket *so)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_shutdown(so);
-	splx(s);
-	return error;
-}
-
-/*
- * key_sockaddr()
- * derived from net/rtsock.c:rts_sockaddr()
- */
-static int
-key_sockaddr(struct socket *so, struct sockaddr **nam)
-{
-	int s, error;
-	s = splnet();
-	error = raw_usrreqs.pru_sockaddr(so, nam);
-	splx(s);
-	return error;
-}
-
-struct pr_usrreqs key_usrreqs = {
-	key_abort, pru_accept_notsupp, key_attach, key_bind,
-	key_connect,
-	pru_connect2_notsupp, pru_control_notsupp, key_detach,
-	key_disconnect, pru_listen_notsupp, key_peeraddr,
-	pru_rcvd_notsupp,
-	pru_rcvoob_notsupp, key_send, pru_sense_null, key_shutdown,
-	key_sockaddr, sosend, soreceive, sopoll
-};
 
 /*
  * key_output()
@@ -431,6 +286,7 @@ key_output(m, va_alist)
 #endif
 	if ((len = key_parse(&msg, so, &target)) == 0) {
 		/* discard. i.e. no need to reply. */
+		/* msg has been freed at key_parse() */
 		error = 0;
 		splx(s);
 		goto end;
@@ -612,7 +468,13 @@ key_sendup_mbuf(so, m, target)
 		pfkeystat.in_msgtype[msg->sadb_msg_type]++;
 	}
 
+#ifdef __NetBSD__
+	for (rp = rawcb.lh_first; rp; rp = rp->rcb_list.le_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	LIST_FOREACH(rp, &rawcb_list, list)
+#else
+	for (rp = rawcb.rcb_next; rp != &rawcb; rp = rp->rcb_next)
+#endif
 	{
 		if (rp->rcb_proto.sp_family != PF_KEY)
 			continue;
@@ -680,6 +542,155 @@ key_sendup_mbuf(so, m, target)
 	m = NULL;
 	return error;
 }
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+/*
+ * key_abort()
+ * derived from net/rtsock.c:rts_abort()
+ */
+static int
+key_abort(struct socket *so)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_abort(so);
+	splx(s);
+	return error;
+}
+
+/*
+ * key_bind()
+ * derived from net/rtsock.c:rts_bind()
+ */
+static int
+key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_bind(so, nam, p); /* xxx just EINVAL */
+	splx(s);
+	return error;
+}
+
+/*
+ * key_connect()
+ * derived from net/rtsock.c:rts_connect()
+ */
+static int
+key_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_connect(so, nam, p); /* XXX just EINVAL */
+	splx(s);
+	return error;
+}
+
+/*
+ * key_detach()
+ * derived from net/rtsock.c:rts_detach()
+ */
+static int
+key_detach(struct socket *so)
+{
+	struct keycb *kp = (struct keycb *)sotorawcb(so);
+	int s, error;
+
+	s = splnet();
+	if (kp != 0) {
+		if (kp->kp_raw.rcb_proto.sp_protocol
+		    == PF_KEY) /* XXX: AF_KEY */
+			key_cb.key_count--;
+		key_cb.any_count--;
+
+		key_freereg(so);
+	}
+	error = raw_usrreqs.pru_detach(so);
+	splx(s);
+	return error;
+}
+
+/*
+ * key_disconnect()
+ * derived from net/rtsock.c:key_disconnect()
+ */
+static int
+key_disconnect(struct socket *so)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_disconnect(so);
+	splx(s);
+	return error;
+}
+
+/*
+ * key_peeraddr()
+ * derived from net/rtsock.c:rts_peeraddr()
+ */
+static int
+key_peeraddr(struct socket *so, struct sockaddr **nam)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_peeraddr(so, nam);
+	splx(s);
+	return error;
+}
+
+/*
+ * key_send()
+ * derived from net/rtsock.c:rts_send()
+ */
+static int
+key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
+	 struct mbuf *control, struct proc *p)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_send(so, flags, m, nam, control, p);
+	splx(s);
+	return error;
+}
+
+/*
+ * key_shutdown()
+ * derived from net/rtsock.c:rts_shutdown()
+ */
+static int
+key_shutdown(struct socket *so)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_shutdown(so);
+	splx(s);
+	return error;
+}
+
+/*
+ * key_sockaddr()
+ * derived from net/rtsock.c:rts_sockaddr()
+ */
+static int
+key_sockaddr(struct socket *so, struct sockaddr **nam)
+{
+	int s, error;
+	s = splnet();
+	error = raw_usrreqs.pru_sockaddr(so, nam);
+	splx(s);
+	return error;
+}
+
+struct pr_usrreqs key_usrreqs = {
+	key_abort, pru_accept_notsupp, key_attach, key_bind,
+	key_connect,
+	pru_connect2_notsupp, pru_control_notsupp, key_detach,
+	key_disconnect, pru_listen_notsupp, key_peeraddr,
+	pru_rcvd_notsupp,
+	pru_rcvoob_notsupp, key_send, pru_sense_null, key_shutdown,
+	key_sockaddr, sosend, soreceive, sopoll
+};
+#endif /* __FreeBSD__ >= 3 */
 
 #ifdef __FreeBSD__
 /* sysctl */
