@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.100 2004/07/05 03:10:13 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.101 2004/07/05 06:28:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,12 @@
 
 #ifndef _NETINET6_IN6_VAR_H_
 #define _NETINET6_IN6_VAR_H_
+
+#ifdef __OpenBSD__
+#include <sys/timeout.h>
+#else
+#include <sys/callout.h>
+#endif
 
 /*
  * Interface address, Internet version.  One of these structures
