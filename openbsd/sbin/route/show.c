@@ -1,4 +1,4 @@
-/*	$OpenBSD: show.c,v 1.9 1999/09/22 05:10:04 deraadt Exp $	*/
+/*	$OpenBSD: show.c,v 1.16 2000/01/14 19:59:17 deraadt Exp $	*/
 /*	$NetBSD: show.c,v 1.1 1996/11/15 18:01:41 gwr Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: show.c,v 1.9 1999/09/22 05:10:04 deraadt Exp $";
+static char *rcsid = "$OpenBSD: show.c,v 1.16 2000/01/14 19:59:17 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -86,6 +86,7 @@ static const struct bits bits[] = {
 	{ RTF_GATEWAY,	'G' },
 	{ RTF_HOST,	'H' },
 	{ RTF_REJECT,	'R' },
+	{ RTF_BLACKHOLE, 'B' },
 	{ RTF_DYNAMIC,	'D' },
 	{ RTF_MODIFIED,	'M' },
 	{ RTF_DONE,	'd' }, /* Completed -- for routing messages only */
@@ -181,7 +182,7 @@ p_rtentry(rtm)
 	static int masks_done, banner_printed;
 #endif
 	static int old_af;
-	int af = 0, interesting = RTF_UP | RTF_GATEWAY | RTF_HOST;
+	int af = 0, interesting = RTF_UP | RTF_GATEWAY | RTF_HOST | RTF_MASK;
 
 #ifdef notdef
 	/* for the moment, netmasks are skipped over */
@@ -226,9 +227,11 @@ p_rtentry(rtm)
 void                  
 pr_encaphdr()             
 {
-        printf("%-31s %-5s %-31s %-5s %-5s %-26s\n",
-            "Source address/netmask", "Port", "Destination address/netmask",
-            "Port", "Proto", "SA(Address/SPI/Proto)");
+/*
+        printf("%-40s %-15s %s\n",
+               "Source/Destination Networks", "Protocol/Ports",
+               "SA(Address/SPI/Proto)");
+*/
 }
 
 /*
@@ -244,6 +247,11 @@ pr_family(af)
 	case AF_INET:
 		afname = "Internet";
 		break;
+#ifdef INET6
+	case AF_INET6:
+		afname = "Internet6";
+		break;
+#endif /* INET6 */
 	case AF_NS:
 		afname = "XNS";
 		break;
@@ -323,6 +331,21 @@ p_sockaddr(sa, flags, width)
 		break;
 	    }
 
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)sa;
+
+		cp = IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) ? "default" :
+			((flags & RTF_HOST) ?
+			routename(sa) :	netname(sa));
+		/* make sure numeric address is not truncated */
+		if (strchr(cp, ':') != NULL && strlen(cp) > width)
+			width = strlen(cp);
+		break;
+	    }
+#endif /* INET6 */
+
 	case AF_NS:
 		cp = ns_print((struct sockaddr_ns *)sa);
 		break;
@@ -372,30 +395,66 @@ encap_print(rtm)
         register struct rt_msghdr *rtm;
 {
         struct sockaddr_encap *sen1 = (struct sockaddr_encap *)(rtm + 1);
-        struct sockaddr_encap *sen3 = (struct sockaddr_encap *)
-				      ((u_char *)sen1 + sizeof(*sen1));
-	struct sockaddr_encap *sen2 = (struct sockaddr_encap *)
-				      ((u_char *)sen3 + sizeof(*sen1));
-        u_char buffer[32];
-        int i;
+	struct protoent *prnt = NULL;
+        struct sockaddr_encap *sen3;
+	struct sockaddr_encap *sen2;
 
-        bzero(buffer, 32);
-        strncpy(buffer, inet_ntoa(sen1->sen_ip_src), 15);
-        i = strlen(buffer);
-        strncpy(buffer + i, "/", 1);
-        i++;
-        strncpy(buffer + i, inet_ntoa(sen2->sen_ip_src), 15);
+        u_char buffer[40];
 
-        printf("%-31s %-5u ", buffer, sen1->sen_sport);
+        bzero(buffer, sizeof(buffer));
 
-        bzero(buffer, 32);
-        strncpy(buffer, inet_ntoa(sen1->sen_ip_dst), 15);
-        i = strlen(buffer);
-        strncpy(buffer + i, "/", 1);
-        i++;
-        strncpy(buffer + i, inet_ntoa(sen2->sen_ip_dst), 15);
+	sen3 = (struct sockaddr_encap *) (ROUNDUP(sen1->sen_len) +
+					  (char *)sen1);
+	sen2 = (struct sockaddr_encap *) (ROUNDUP(sen3->sen_len) +
+					  (char *)sen3);
 
-        printf("%-31s %-5u %-5u ", buffer, sen1->sen_dport, sen1->sen_proto);
-        printf("%s/%08x/%-lu\n", inet_ntoa(sen3->sen_ipsp_dst),
-               ntohl(sen3->sen_ipsp_spi), sen3->sen_ipsp_sproto);
+	if (sen1->sen_type == SENT_IP4) {
+		inet_ntop(AF_INET, &sen1->sen_ip_src, buffer, sizeof(buffer));
+        	printf("%s/", buffer);
+		inet_ntop(AF_INET, &sen2->sen_ip_src, buffer, sizeof(buffer));
+        	printf("%s:%u -> ", buffer, ntohs(sen1->sen_sport));
+		inet_ntop(AF_INET, &sen1->sen_ip_dst, buffer, sizeof(buffer));
+        	printf("%s/", buffer);
+		inet_ntop(AF_INET, &sen2->sen_ip_dst, buffer, sizeof(buffer));
+        	printf("%s:%u ", buffer, ntohs(sen1->sen_dport));
+
+		if (sen1->sen_proto) {
+			prnt = getprotobynumber(sen1->sen_proto);
+			if (prnt)
+				printf("(%s) ", prnt->p_name);
+			else
+				printf("(%u) ", sen1->sen_proto);
+		}
+		else
+			printf("(all) ");
+	}
+
+#ifdef INET6
+	if (sen1->sen_type == SENT_IP6) {
+		inet_ntop(AF_INET6, &sen1->sen_ip6_src, buffer, sizeof(buffer));
+        	printf("%s:%d ->", buffer, ntohs(sen1->sen_ip6_sport));
+		inet_ntop(AF_INET6, &sen1->sen_ip6_dst, buffer, sizeof(buffer));
+        	printf("%s:%d ", buffer, ntohs(sen1->sen_ip6_dport));
+
+		if (sen1->sen_ip6_proto) {
+			prnt = getprotobynumber(sen1->sen_ip6_proto);
+			if (prnt)
+				printf("(%s) ", prnt->p_name);
+			else
+				printf("(%u) ", sen1->sen_ip6_proto);
+		}
+		else
+			printf("(all) ");
+	}
+
+	if (sen3->sen_type == SENT_IPSP6)
+		printf("%s/%08x/%-lu\n",
+		       inet_ntop(AF_INET6, &sen3->sen_ipsp6_dst, buffer,
+		       sizeof(buffer)),
+		       ntohl(sen3->sen_ipsp6_spi), sen3->sen_ipsp6_sproto);
+#endif /* INET6 */
+
+	if (sen3->sen_type == SENT_IPSP)
+		printf("%s/%08x/%-lu\n", inet_ntoa(sen3->sen_ipsp_dst),
+		       ntohl(sen3->sen_ipsp_spi), sen3->sen_ipsp_sproto);
 }
