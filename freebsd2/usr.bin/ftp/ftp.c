@@ -1229,14 +1229,14 @@ initconn()
 				}
 
 				error = 0;
-				data_addr.su_sin6.sin6_addr.s6_addr32[0] =
-					htonl(pack4(h, 0));
-				data_addr.su_sin6.sin6_addr.s6_addr32[1] =
-					htonl(pack4(h, 4));
-				data_addr.su_sin6.sin6_addr.s6_addr32[2] =
-					htonl(pack4(h, 8));
-				data_addr.su_sin6.sin6_addr.s6_addr32[3] =
-					htonl(pack4(h, 12));
+			    {
+				u_int32_t *p32;
+				p32 = (u_int32_t *)&data_addr.su_sin6.sin6_addr;
+				p32[0] = htonl(pack4(h, 0));
+				p32[1] = htonl(pack4(h, 4));
+				p32[2] = htonl(pack4(h, 8));
+				p32[3] = htonl(pack4(h, 12));
+			    }
 				break;
 			default:
 				error = 1;
