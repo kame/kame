@@ -1,0 +1,15 @@
+# PAM module for SSH
+# $FreeBSD: ports/security/openssh/files/pam_ssh_Makefile,v 1.1 1999/11/29 07:09:44 green Exp $
+.PATH:		${.CURDIR}/..
+
+LIB=		pam_ssh
+DESTDIR=
+SHLIB_NAME=	pam_ssh.so
+SRCS=		log-client.c pam_ssh.c
+CFLAGS+=	-Wall
+DPADD+=		${LIBCRYPTO} ${LIBDES} ${LIBUTIL} ${LIBZ} ${LIBGCC_PIC}
+LDADD+=		${CRYPTOLIBS} -lutil -lz -lgcc_pic
+INTERNALLIB=	yes
+INTERNALSTATICLIB=yes
+
+.include <bsd.lib.mk>
