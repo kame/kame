@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.98 2001/08/16 06:06:57 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.99 2001/08/16 06:17:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,7 @@ static int oakley_check_certid __P((struct ph1handle *iph1));
 static int check_typeofcertname __P((int, int));
 static cert_t *save_certbuf __P((struct isakmp_gen *));
 #endif
-static int oakley_padlen __P((int));
+static int oakley_padlen __P((int, int));
 
 int
 oakley_get_defaultlifetime()
@@ -1718,8 +1718,13 @@ oakley_check_certid(iph1)
 			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 		error = memcmp(id_b + 1, altname, idlen);
+		if (error) {
+			plog(LLV_ERROR, LOCATION, NULL, "ID mismatched.\n");
+			racoon_free(altname);
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		}
 		racoon_free(altname);
-		return error == 0 ? 0 : ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		return 0;
 	}
 	default:
 		plog(LLV_ERROR, LOCATION, NULL,
@@ -2460,7 +2465,15 @@ oakley_newiv(iph1)
 	}
 
 	/* adjust length of iv */
-	newivm->iv->l = CBC_BLOCKLEN;
+	newivm->iv->l = alg_oakley_encdef_blocklen(iph1->approval->enctype);
+	if (newivm->iv->l == -1) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid encryption algoriym %d.\n",
+			iph1->approval->enctype);
+		vfree(buf);
+		oakley_delivm(newivm);
+		return -1;
+	}
 
 	/* create buffer to save iv */
 	if ((newivm->ive = vdup(newivm->iv)) == NULL) {
@@ -2534,7 +2547,13 @@ oakley_newiv2(iph1, msgid)
 		goto end;
 
 	/* adjust length of iv */
-	newivm->iv->l = CBC_BLOCKLEN;
+	newivm->iv->l = alg_oakley_encdef_blocklen(iph1->approval->enctype);
+	if (newivm->iv->l == -1) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid encryption algoriym %d.\n",
+			iph1->approval->enctype);
+		goto end;
+	}
 
 	/* create buffer to save new iv */
 	if ((newivm->ive = vdup(newivm->iv)) == NULL) {
@@ -2584,16 +2603,25 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	char *pl;
 	int len;
 	u_int8_t padlen;
+	int blen;
 	int error = -1;
 
 	plog(LLV_DEBUG, LOCATION, NULL, "begin decryption.\n");
 
+	blen = alg_oakley_encdef_blocklen(iph1->approval->enctype);
+	if (blen == -1) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid encryption algoriym %d.\n",
+			iph1->approval->enctype);
+		goto end;
+	}
+
 	/* save IV for next, but not sync. */
 	memset(ivep->v, 0, ivep->l);
-	memcpy(ivep->v, (caddr_t)&msg->v[msg->l - CBC_BLOCKLEN], CBC_BLOCKLEN);
+	memcpy(ivep->v, (caddr_t)&msg->v[msg->l - blen], blen);
 
 	plog(LLV_DEBUG, LOCATION, NULL,
-		"IV was saved for next processing: ");
+		"IV was saved for next processing:\n");
 	plogdump(LLV_DEBUG, ivep->v, ivep->l);
 
 	pl = msg->v + sizeof(struct isakmp);
@@ -2614,8 +2642,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 					buf, iph1->key, ivdp);
 	if (new == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid encryption algoriym %d.\n",
-			iph1->approval->enctype);
+			"decryption %d failed.\n", iph1->approval->enctype);
 		goto end;
 	}
 	plog(LLV_DEBUG, LOCATION, NULL, "with key:\n");
@@ -2699,15 +2726,25 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	char *pl;
 	int len;
 	u_int padlen;
+	int blen;
 	int error = -1;
 
 	plog(LLV_DEBUG, LOCATION, NULL, "begin encryption.\n");
+
+	/* set cbc block length */
+	blen = alg_oakley_encdef_blocklen(iph1->approval->enctype);
+	if (blen == -1) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid encryption algoriym %d.\n",
+			iph1->approval->enctype);
+		goto end;
+	}
 
 	pl = msg->v + sizeof(struct isakmp);
 	len = msg->l - sizeof(struct isakmp);
 
 	/* add padding */
-	padlen = oakley_padlen(len);
+	padlen = oakley_padlen(len, blen);
 	plog(LLV_DEBUG, LOCATION, NULL, "pad length = %u\n", padlen);
 
 	/* create buffer */
@@ -2740,8 +2777,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 					buf, iph1->key, ivep);
 	if (new == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid encryption algoriym %d.\n",
-			iph1->approval->enctype);
+			"encryption %d failed.\n", iph1->approval->enctype);
 		goto end;
 	}
 	plog(LLV_DEBUG, LOCATION, NULL, "with key:\n");
@@ -2752,14 +2788,14 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	if (new == NULL)
 		goto end;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "encrypted payload by IV: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "encrypted payload by IV:\n");
 	plogdump(LLV_DEBUG, ivep->v, ivep->l);
 
 	/* save IV for next */
 	memset(ivp->v, 0, ivp->l);
-	memcpy(ivp->v, (caddr_t)&new->v[new->l - CBC_BLOCKLEN], CBC_BLOCKLEN);
+	memcpy(ivp->v, (caddr_t)&new->v[new->l - blen], blen);
 
-	plog(LLV_DEBUG, LOCATION, NULL, "save IV for next: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "save IV for next:\n");
 	plogdump(LLV_DEBUG, ivp->v, ivp->l);
 
 	/* create new buffer */
@@ -2791,13 +2827,12 @@ end:
 
 /* culculate padding length */
 static int
-oakley_padlen(len)
-	int len;
+oakley_padlen(len, base)
+	int len, base;
 {
 	int padlen;
-	int base = CBC_BLOCKLEN;
 
-	padlen = 8 - len % 8;
+	padlen = base - len % base;
 
 	if (lcconf->pad_randomlen)
 		padlen += ((random() % (lcconf->pad_maxsize + 1) + 1) * base);

@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.18 2001/08/14 14:55:27 sakane Exp $	*/
+/*	$KAME: algorithm.h,v 1.19 2001/08/16 06:17:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,7 @@ struct enc_algorithm {
 	char *name;
 	int type;
 	int doi;
+	int blocklen;
 	vchar_t *(*encrypt) __P((vchar_t *, vchar_t *, vchar_t *));
 	vchar_t *(*decrypt) __P((vchar_t *, vchar_t *, vchar_t *));
 	int (*weakkey) __P((vchar_t *));
@@ -165,6 +166,7 @@ extern vchar_t *alg_oakley_hmacdef_one __P((int, vchar_t *, vchar_t *));
 extern int alg_oakley_encdef_ok __P((int));
 extern int alg_oakley_encdef_doi __P((int));
 extern int alg_oakley_encdef_keylen __P((int, int));
+extern int alg_oakley_encdef_blocklen __P((int));
 extern vchar_t *alg_oakley_encdef_decrypt __P((int, vchar_t *, vchar_t *, vchar_t *));
 extern vchar_t *alg_oakley_encdef_encrypt __P((int, vchar_t *, vchar_t *, vchar_t *));
 

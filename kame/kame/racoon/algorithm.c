@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.19 2001/08/14 14:55:26 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.20 2001/08/16 06:17:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,75 +95,75 @@ static struct hmac_algorithm oakley_hmacdef[] = {
 };
 
 static struct enc_algorithm oakley_encdef[] = {
-{ "des",	algtype_des,		OAKLEY_ATTR_ENC_ALG_DES,
+{ "des",	algtype_des,		OAKLEY_ATTR_ENC_ALG_DES,	8,
 		eay_des_encrypt,	eay_des_decrypt,
 		eay_des_weakkey,	eay_des_keylen, },
 #ifdef HAVE_OPENSSL_IDEA_H
-{ "idea",	algtype_idea,		OAKLEY_ATTR_ENC_ALG_IDEA,
+{ "idea",	algtype_idea,		OAKLEY_ATTR_ENC_ALG_IDEA,	8,
 		eay_idea_encrypt,	eay_idea_decrypt,
 		eay_idea_weakkey,	eay_idea_keylen, },
 #endif
-{ "blowfish",	algtype_blowfish,	OAKLEY_ATTR_ENC_ALG_BLOWFISH,
+{ "blowfish",	algtype_blowfish,	OAKLEY_ATTR_ENC_ALG_BLOWFISH,	8,
 		eay_bf_encrypt,		eay_bf_decrypt,
 		eay_bf_weakkey,		eay_bf_keylen, },
 #ifdef HAVE_OPENSSL_RC5_H
-{ "rc5",	algtype_rc5,		OAKLEY_ATTR_ENC_ALG_RC5,
+{ "rc5",	algtype_rc5,		OAKLEY_ATTR_ENC_ALG_RC5,	8,
 		eay_rc5_encrypt,	eay_rc5_decrypt,
 		eay_rc5_weakkey,	eay_rc5_keylen, },
 #endif
-{ "3des",	algtype_3des,		OAKLEY_ATTR_ENC_ALG_3DES,
+{ "3des",	algtype_3des,		OAKLEY_ATTR_ENC_ALG_3DES,	8,
 		eay_3des_encrypt,	eay_3des_decrypt,
 		eay_3des_weakkey,	eay_3des_keylen, },
-{ "cast",	algtype_cast128,	OAKLEY_ATTR_ENC_ALG_CAST,
-		eay_cast_decrypt,	eay_cast_decrypt,
+{ "cast",	algtype_cast128,	OAKLEY_ATTR_ENC_ALG_CAST,	8,
+		eay_cast_encrypt,	eay_cast_decrypt,
 		eay_cast_weakkey,	eay_cast_keylen, },
-{ "aes",	algtype_rijndael,	OAKLEY_ATTR_ENC_ALG_AES,
-		eay_aes_decrypt,	eay_aes_decrypt,
+{ "aes",	algtype_rijndael,	OAKLEY_ATTR_ENC_ALG_AES,	16,
+		eay_aes_encrypt,	eay_aes_decrypt,
 		eay_aes_weakkey,	eay_aes_keylen, },
 };
 
 static struct enc_algorithm ipsec_encdef[] = {
-{ "des-iv64",	algtype_des_iv64,	IPSECDOI_ESP_DES_IV64,
+{ "des-iv64",	algtype_des_iv64,	IPSECDOI_ESP_DES_IV64,		8,
 		NULL,			NULL,
 		NULL,			eay_des_keylen, },
-{ "des",	algtype_des,		IPSECDOI_ESP_DES,
+{ "des",	algtype_des,		IPSECDOI_ESP_DES,		8,
 		NULL,			NULL,
 		NULL,			eay_des_keylen, },
-{ "3des",	algtype_3des,		IPSECDOI_ESP_3DES,
+{ "3des",	algtype_3des,		IPSECDOI_ESP_3DES,		8,
 		NULL,			NULL,
 		NULL,			eay_3des_keylen, },
 #ifdef HAVE_OPENSSL_RC5_H
-{ "rc5",	algtype_rc5,		IPSECDOI_ESP_RC5,
+{ "rc5",	algtype_rc5,		IPSECDOI_ESP_RC5,		8,
 		NULL,			NULL,
 		NULL,			eay_rc5_keylen, },
 #endif
-{ "cast",	algtype_cast128,	IPSECDOI_ESP_CAST,
+{ "cast",	algtype_cast128,	IPSECDOI_ESP_CAST,		8,
 		NULL,			NULL,
 		NULL,			eay_cast_keylen, },
-{ "blowfish",	algtype_blowfish,	IPSECDOI_ESP_BLOWFISH,
+{ "blowfish",	algtype_blowfish,	IPSECDOI_ESP_BLOWFISH,		8,
 		NULL,			NULL,
 		NULL,			eay_bf_keylen, },
-{ "des-iv32",	algtype_des_iv32,	IPSECDOI_ESP_DES_IV32,
+{ "des-iv32",	algtype_des_iv32,	IPSECDOI_ESP_DES_IV32,		8,
 		NULL,			NULL,
 		NULL,			eay_des_keylen, },
-{ "null",	algtype_null_enc,	IPSECDOI_ESP_NULL,
+{ "null",	algtype_null_enc,	IPSECDOI_ESP_NULL,		8,
 		NULL,			NULL,
 		NULL,			eay_3des_keylen, },
-{ "rijndael",	algtype_rijndael,	IPSECDOI_ESP_RIJNDAEL,
+{ "rijndael",	algtype_rijndael,	IPSECDOI_ESP_RIJNDAEL,		16,
 		NULL,			NULL,
 		NULL,			eay_aes_keylen, },
-{ "twofish",	algtype_twofish,	IPSECDOI_ESP_TWOFISH,
+{ "twofish",	algtype_twofish,	IPSECDOI_ESP_TWOFISH,		16,
 		NULL,			NULL,
 		NULL,			eay_twofish_keylen, },
 #ifdef HAVE_OPENSSL_IDEA_H
-{ "3idea",	algtype_3idea,		IPSECDOI_ESP_3IDEA,
+{ "3idea",	algtype_3idea,		IPSECDOI_ESP_3IDEA,		8,
 		NULL,			NULL,
 		NULL,			NULL, },
-{ "idea",	algtype_idea,		IPSECDOI_ESP_IDEA,
+{ "idea",	algtype_idea,		IPSECDOI_ESP_IDEA,		8,
 		NULL,			NULL,
 		NULL,			NULL, },
 #endif
-{ "rc4",	algtype_rc4,		IPSECDOI_ESP_RC4,
+{ "rc4",	algtype_rc4,		IPSECDOI_ESP_RC4,		8,
 		NULL,			NULL,
 		NULL,			NULL, },
 };
@@ -422,6 +422,19 @@ alg_oakley_encdef_keylen(doi, len)
 		return -1;
 
 	return (f->keylen)(len);
+}
+
+int
+alg_oakley_encdef_blocklen(doi)
+	int doi;
+{
+	struct enc_algorithm *f;
+
+	f = alg_oakley_encdef(doi);
+	if (f == NULL)
+		return -1;
+
+	return f->blocklen;
 }
 
 vchar_t *
