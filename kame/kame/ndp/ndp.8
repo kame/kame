@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ndp.8,v 1.6 2000/03/07 20:10:15 itojun Exp $
+.\"     $Id: ndp.8,v 1.7 2000/03/16 07:44:31 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt NDP 8
@@ -61,6 +61,7 @@
 .Nm ndp
 .Fl i
 .Ar interface
+.Op flags...
 .Nm ndp
 .Fl p
 .Nm ndp
@@ -113,7 +114,25 @@ If a special keyword
 is specified, the current default interface will be deleted from the kernel.
 .It Fl i
 .Ar interface
-view ND information for specified interface.
+.Op Ar flags...
+View ND information for the specified interface.
+If additional arguments
+.Ar flags
+are given,
+.Nm
+sets or clears the specified flags for the interface.
+Possible flags are as follows. All of the flags can begin with the
+special character
+.Ql - ,
+which means the flag should be cleared.
+.\"
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic nud
+.Xc
+turn on or off NUD (Neighbor Unreachability Detection) on the
+interface. NUD is usually turned on by default.
+.El
 .It Fl l
 Do not truncate numeric IPv6 address.
 .It Fl n
