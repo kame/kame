@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.9 2001/10/19 08:28:41 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.10 2001/10/22 04:09:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -68,7 +68,7 @@ static int ni6_input __P((struct sockaddr *, socklen_t, const char *, ssize_t));
 static ssize_t ni6_nametodns __P((const char *, char *, char *, ssize_t, int));
 static int ni6_dnsmatch __P((const char *, int, const char *, int));
 static ssize_t ni6_addrs __P((struct icmp6_nodeinfo *, char *, char *,
-	ssize_t, struct sockaddr *, socklen_t, const char *));
+	ssize_t, struct sockaddr *, socklen_t, const char *, int));
 static int ismyaddr __P((struct sockaddr *, socklen_t));
 static int getflags6 __P((const char *, const struct sockaddr *, socklen_t));
 static time_t getlifetime __P((const char *, const struct sockaddr *, socklen_t));
@@ -126,9 +126,7 @@ main(argc, argv)
 	func[NI_QTYPE_FQDN] = ni6_input;
 	func[NI_QTYPE_DNSNAME] = ni6_input;
 	func[NI_QTYPE_NODEADDR] = ni6_input;
-#if 0
 	func[NI_QTYPE_IPV4ADDR] = ni6_input;
-#endif
 
 	sockinit();
 	joingroups(hostname);
@@ -501,6 +499,7 @@ ni6_input(from, fromlen, buf, l)
 		/* FALLTHROUGH */
 	case NI_QTYPE_FQDN:
 	case NI_QTYPE_NODEADDR:
+	case NI_QTYPE_IPV4ADDR:
 		switch (ni6->ni_code) {
 		case ICMP6_NI_SUBJ_IPV6:
 #if ICMP6_NI_SUBJ_IPV6 != 0
@@ -595,6 +594,7 @@ ni6_input(from, fromlen, buf, l)
 			goto bad;
 		break;
 	case NI_QTYPE_NODEADDR:
+	case NI_QTYPE_IPV4ADDR:
 		if ((mode & 2) == 0)
 			goto bad;
 		break;
@@ -612,11 +612,13 @@ ni6_input(from, fromlen, buf, l)
 		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
 		break;
 	case NI_QTYPE_NODEADDR:
+	case NI_QTYPE_IPV4ADDR:
 		if (l > sizeof(replybuf))
 			goto bad;
 		memcpy(replybuf, buf, l);
 		nni6 = (struct icmp6_nodeinfo *)replybuf;
-		replylen = ni6_addrs(nni6, NULL, NULL, 0, from, fromlen, subj);
+		replylen = ni6_addrs(nni6, NULL, NULL, 0, from, fromlen, subj,
+		    (qtype == NI_QTYPE_NODEADDR) ? AF_INET6 : AF_INET);
 		/* XXX: will truncate pkt later */
 		if (replylen > sizeof(replybuf))
 			replylen = sizeof(replybuf);
@@ -672,6 +674,7 @@ ni6_input(from, fromlen, buf, l)
 		replylen += tlen;
 		break;
 	case NI_QTYPE_NODEADDR:
+	case NI_QTYPE_IPV4ADDR:
 	{
 		int lenlim, copied;
 
@@ -679,7 +682,8 @@ ni6_input(from, fromlen, buf, l)
 		replylen = sizeof(struct icmp6_nodeinfo);
 		lenlim = sizeof(replybuf);
 		copied = ni6_addrs(nni6, (char *)(nni6 + 1), replybuf,
-		    sizeof(replybuf), from, fromlen, subj);
+		    sizeof(replybuf), from, fromlen, subj,
+		    (qtype == NI_QTYPE_NODEADDR) ? AF_INET6 : AF_INET);
 		replylen = sizeof(struct icmp6_nodeinfo) + copied;
 		break;
 	}
@@ -852,7 +856,7 @@ ni6_dnsmatch(a, alen, b, blen)
 }
 
 static ssize_t
-ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
+ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
 	struct icmp6_nodeinfo *ni6;
 	char *p;
 	char *buf;
@@ -860,6 +864,7 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 	struct sockaddr *sa;
 	socklen_t salen;
 	const char *subj;
+	int af;
 {
 	const struct sockaddr_in6 *subj_ip6 = NULL; /* XXX pedant */
 	int addrs, copied;
@@ -869,8 +874,11 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 	char *cp, *ep;
 	int32_t ltime;
 	struct in6_addr *in6;
+	struct in_addr *in;
 	int flags6;
 	time_t expire;
+	u_int8_t *ap;
+	size_t alen;
 
 	if (debug)
 		warnx("ni6_addrs");
@@ -912,7 +920,7 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 
 	copied = addrs = 0;
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr->sa_family != AF_INET6)
+		if (ifa->ifa_addr->sa_family != af)
 			continue;
 
 		if ((niflags & NI_NODEADDR_FLAG_ALL) == 0 &&
@@ -932,41 +940,54 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 		 */
 
 		/* What do we have to do about ::1? */
-		in6 = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
-		if (IN6_IS_ADDR_MULTICAST(in6))
-			continue; /* should not be possible */
-		else if (IN6_IS_ADDR_LINKLOCAL(in6)) {
-			if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL) == 0)
-				continue;
-		} else if (IN6_IS_ADDR_SITELOCAL(in6)) {
-			if ((niflags & NI_NODEADDR_FLAG_SITELOCAL) == 0)
-				continue;
-		} else {
-			if ((niflags & NI_NODEADDR_FLAG_GLOBAL) == 0)
-				continue;
-		}
+		switch (af) {
+		case AF_INET6:
+			in6 = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+			if (IN6_IS_ADDR_MULTICAST(in6))
+				continue; /* should not be possible */
+			else if (IN6_IS_ADDR_LINKLOCAL(in6)) {
+				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL) == 0)
+					continue;
+			} else if (IN6_IS_ADDR_SITELOCAL(in6)) {
+				if ((niflags & NI_NODEADDR_FLAG_SITELOCAL) == 0)
+					continue;
+			} else {
+				if ((niflags & NI_NODEADDR_FLAG_GLOBAL) == 0)
+					continue;
+			}
 
-		flags6 = getflags6(ifa->ifa_name, ifa->ifa_addr,
-		    ifa->ifa_addr->sa_len);
-		if (flags6 < 0)
-			continue;
+			flags6 = getflags6(ifa->ifa_name, ifa->ifa_addr,
+			    ifa->ifa_addr->sa_len);
+			if (flags6 < 0)
+				continue;
 
-		/*
-		 * check if anycast is okay.
-		 * XXX: just experimental. not in the spec.
-		 */
-		if ((flags6 & IN6_IFF_ANYCAST) != 0 &&
-		    (niflags & NI_NODEADDR_FLAG_ANYCAST) == 0)
-			continue; /* we need only unicast addresses */
+			/*
+			 * check if anycast is okay.
+			 * XXX: just experimental. not in the spec.
+			 */
+			if ((flags6 & IN6_IFF_ANYCAST) != 0 &&
+			    (niflags & NI_NODEADDR_FLAG_ANYCAST) == 0)
+				continue; /* we need only unicast addresses */
 #ifdef IN6_IFF_TEMPORARY
-		if ((flags6 & IN6_IFF_TEMPORARY) != 0 && (mode & 4) == 0)
-			continue;
+			if ((flags6 & IN6_IFF_TEMPORARY) != 0 &&
+			    (mode & 4) == 0)
+				continue;
 #endif
+
+			ap = (u_int8_t *)in6;
+			alen = sizeof(*in6);
+
+			break;
+		case AF_INET:
+			in = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+			ap = (u_int8_t *)in;
+			alen = sizeof(*in);
+			break;
+		}
 
 		/* now we can copy the address */
 		if (p && ep) {
-			if (p + sizeof(struct in6_addr) + sizeof(int32_t)
-			    > ep) {
+			if (p + alen + sizeof(int32_t) > ep) {
 				/*
 				 * We give up much more copy.
 				 * Set the truncate flag and return.
@@ -1006,15 +1027,16 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 			cp += sizeof(ltime);
 
 			/* copy the address itself */
-			memcpy(cp, in6, sizeof(*in6));
+			memcpy(cp, ap, alen);
 			/* XXX: KAME link-local hack; remove ifindex */
-			if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)cp)) {
+			if (af == AF_INET6 &&
+			    IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)cp)) {
 				((struct in6_addr *)cp)->s6_addr[2] = 0;
 				((struct in6_addr *)cp)->s6_addr[3] = 0;
 			}
-			cp += sizeof(struct in6_addr);
+			cp += alen;
 			
-			copied += (sizeof(struct in6_addr) + sizeof(int32_t));
+			copied += (alen + sizeof(int32_t));
 			addrs++;
 		}
 	}
