@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.22 2002/05/29 09:36:07 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.23 2002/05/29 09:40:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -52,6 +52,7 @@
 #include <syslog.h>
 #include <string.h>
 #include <errno.h>
+#include <netdb.h>
 
 #include "rtadvd.h"
 #include "timer.h"
@@ -82,17 +83,25 @@ static char *
 ether_str(sdl)
 	struct sockaddr_dl *sdl;
 {
-	static char ebuf[32];
+	static char hbuf[NI_MAXHOST];
+#if !(defined(__NetBSD__) && __NetBSD_Version__ >= 106000000)
 	u_char *cp;
+#endif
 
-	if (sdl->sdl_alen && sdl->sdl_alen > 5) {
+	if (sdl->sdl_alen) {
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 106000000
+		if (getnameinfo((struct sockaddr *)sdl, sdl->sdl_len,
+		    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
+			snprintf(hbuf, sizeof(hbuf), "<invalid>");
+#else
 		cp = (u_char *)LLADDR(sdl);
-		snprintf(ebuf, sizeof ebuf, "%x:%x:%x:%x:%x:%x",
+		snprintf(ebuf, sizeof(ebuf), "%x:%x:%x:%x:%x:%x",
 			cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
+#endif
 	} else
-		snprintf(ebuf, sizeof ebuf, "NONE");
+		snprintf(hbuf, sizeof(hbuf), "NONE");
 
-	return(ebuf);
+	return(hbuf);
 }
 
 static void

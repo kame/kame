@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.86 2002/05/26 01:16:10 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.87 2002/05/29 09:39:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -793,18 +793,25 @@ static char *
 ether_str(sdl)
 	struct sockaddr_dl *sdl;
 {
-	static char ebuf[32];
+	static char hbuf[NI_MAXHOST];
+#if !(defined(__NetBSD__) && __NetBSD_Version__ >= 106000000)
 	u_char *cp;
+#endif
 
 	if (sdl->sdl_alen) {
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 106000000
+		if (getnameinfo((struct sockaddr *)sdl, sdl->sdl_len,
+		    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
+			snprintf(hbuf, sizeof(hbuf), "<invalid>");
+#else
 		cp = (u_char *)LLADDR(sdl);
 		snprintf(ebuf, sizeof(ebuf), "%x:%x:%x:%x:%x:%x",
 			cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
-	} else {
-		snprintf(ebuf, sizeof(ebuf), "(incomplete)");
-	}
+#endif
+	} else
+		snprintf(hbuf, sizeof(hbuf), "(incomplete)");
 
-	return(ebuf);
+	return(hbuf);
 }
 
 int
