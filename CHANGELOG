@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.920 2000/05/22 22:41:26 sakane Exp $
+$Id: CHANGELOG,v 1.921 2000/05/23 12:50:55 sakane Exp $
 
 <200005>
+Tue May 23 21:51:00 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	fix to get local address to be used by sending address.  It was
+	enbugged when some macro was removed.
+
 Tue May 23 07:41:08 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	don't bark when the life duration of attribute in SA payload is
