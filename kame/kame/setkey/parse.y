@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.8 1999/11/04 00:34:17 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.9 1999/11/16 19:26:45 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -356,7 +356,7 @@ extension_spec
 	;
 
 extension
-	:	F_EXT EXTENSION { p_ext |= $1.num; }
+	:	F_EXT EXTENSION { p_ext |= $2.num; }
 	|	F_MODE MODE { p_mode = $2.num; }
 	|	F_MODE ANY { p_mode = IPSEC_MODE_ANY; }
 	|	F_REQID DECSTRING { p_reqid = $2.num; }
