@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1004 2000/06/13 02:47:21 jinmei Exp $
+$Id: CHANGELOG,v 1.1005 2000/06/13 03:36:04 itojun Exp $
 
 <200006>
 2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -29,6 +29,10 @@ Mon Jun 12 14:53:22 JST 2000 sakane@ydc.co.jp
 	Add to handle CR payload on main/aggressive mode.
 	No Certificate Authority field is included to CR payload at the moment.
 	Becuase any certificate authority are accepted without any check.
+
+Mon Jun 12 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: transmit SADB_X_SA2 from kernel to userland
+	  on SADB_ADD and SADB_UPDATE.  without it latest racoon does not work.
 
 Mon Jun 12 12:34:02 JST 2000  itojun@iijlab.net
 	* libinet6/getnameinfo.c: use EAI_xx for error code.  rfc2553bis
