@@ -7,7 +7,7 @@ MAN=	bgpd.conf.5 bgpd.8
 
 CFLAGS+=-Wall
 CPPFLAGS+=-DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS -DHAVE_SEARCH_H=1 -I. \
-	-DHAVE_STDARG_H -DYY_NO_UNPUT
+	-DHAVE_STDARG_H -DYY_NO_UNPUT -DHAVE_GETIFADDRS
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lcompat
