@@ -1582,11 +1582,12 @@ nd6_output(ifp, m0, dst, rt0)
 		if ((rt->rt_flags & RTF_UP) == 0) {
 #ifdef __FreeBSD__
 			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst, 1, 0UL)) !=
-				NULL) {
+				NULL)
 #else
 			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst, 1)) !=
-				NULL) {
+				NULL)
 #endif 
+			{
 				rt->rt_refcnt--;
 				if (rt->rt_ifp != ifp)
 					return nd6_output(ifp, m0, dst, rt); /* XXX: loop care? */
