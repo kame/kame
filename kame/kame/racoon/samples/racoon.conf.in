@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.13 2000/08/31 10:24:00 sakane Exp $
+# $KAME: racoon.conf.in,v 1.14 2000/08/31 10:56:15 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -8,8 +8,8 @@ path include "@sysconfdir_x@/racoon" ;
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
 
-# racoon will search this directory if the certificate or certificate request
-# is received.
+# racoon will look for certificate file in the directory,
+# if the certificate/certificate request payload is received.
 path certificate "@sysconfdir_x@/cert" ;
 
 # personal information.
