@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.358 2003/02/07 10:17:09 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.359 2003/02/13 17:50:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1046,6 +1046,16 @@ skip_ipsec2:;
 		error = ipsec6_output_tunnel(&state, sp, flags);
 
 		m = state.m;
+		/*
+		 * since ipsec6_output_tunnel() may update address
+		 * information of mbuf, we must update src_sa and
+		 * dst_sa here.
+		 */
+		if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+			printf("ip6_output: can't find src/dst addresses\n");
+			error = EIO;	/* XXX */
+			goto bad;
+		}
 #ifdef NEW_STRUCT_ROUTE
 		ro = state.ro;
 #else
