@@ -313,7 +313,7 @@ if test "$ipseclib" != "none"; then
 fi
 
 AC_MSG_CHECKING(if --with-libpfkey option is specified)
-AC_ARG_WITH(libpfkey, [  --with-libpfkey=DIR     specify libpfkey],
+AC_ARG_WITH(libpfkey, [  --with-libpfkey=DIR     specify libpfkey.a dir],
 	[libpfkey_dir=$withval], [libpfkey_dir=no])
 AC_MSG_RESULT(${libpfkey_dir})
 if test "$libpfkey_dir" != "no"; then
@@ -321,6 +321,25 @@ if test "$libpfkey_dir" != "no"; then
 		RACOON_PATH_LIBS(pfkey_send_spdsetidx, pfkey)
 	else
 		RACOON_PATH_LIBS(pfkey_send_spdsetidx, pfkey, $libpfkey_dir)
+	fi
+fi
+
+AC_MSG_CHECKING(if --with-liblwres option is specified)
+AC_ARG_WITH(liblwres, [  --with-lwres=DIR        specify liblwres path (like /usr/pkg)],
+	[liblwres_dir=$withval], [liblwres_dir=no])
+AC_MSG_RESULT(${liblwres_dir})
+if test "$liblwres_dir" != "no"; then
+	if test -d "$liblwres_dir/lib" -a -d "$liblwres_dir/lib"; then
+		if test "x$liblwres_dir" = "x"; then
+			RACOON_PATH_LIBS(lwres_getrrsetbyname, lwres)
+		else
+			RACOON_PATH_LIBS(lwres_getrrsetbyname, lwres, "$liblwres_dir/lib")
+		fi
+		CFLAGS="$CFLAGS -I$liblwres_dir/include"
+		AC_DEFINE(HAVE_LWRES)
+	else
+		echo "FATAL: $liblwres_dir/lib or $liblwres_dir/include not found"
+		exit 1
 	fi
 fi
 
