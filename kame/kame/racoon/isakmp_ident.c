@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.57 2001/10/05 02:47:07 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.58 2001/11/26 16:41:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -592,8 +592,7 @@ ident_i4recv(iph1, msg0)
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
 
 	/* verify identifier */
-	error = ipsecdoi_checkid1(iph1);
-	if (error != 0) {
+	if (ipsecdoi_checkid1(iph1) != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid ID payload.\n");
 		goto end;
@@ -1173,8 +1172,7 @@ ident_r3recv(iph1, msg0)
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
 
 	/* verify identifier */
-	error = ipsecdoi_checkid1(iph1);
-	if (error != 0) {
+	if (ipsecdoi_checkid1(iph1) != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid ID payload.\n");
 		goto end;
