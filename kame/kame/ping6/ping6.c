@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.156 2002/05/30 21:29:57 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.157 2002/05/30 21:32:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1650,7 +1650,7 @@ pr_pack(buf, cc, mhdr)
 					comma++;
 					break;
 				case ICMP6_NI_UNKNOWN:
-					(void)printf("unknwon qtype");
+					(void)printf("unknown qtype");
 					comma++;
 					break;
 				}
