@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.47 2000/03/29 07:37:22 sumikawa Exp $	*/
+/*	$KAME: in6_proto.c,v 1.48 2000/03/30 09:11:08 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,6 +113,9 @@
 #include <netinet/tcp_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+# if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#include <netinet6/tcp6_var.h>
+# endif
 #else
 #if defined(__NetBSD__) && !defined(TCP6)
 #include <netinet/tcp.h>
