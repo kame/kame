@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.77 2002/05/08 10:36:16 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.78 2002/05/09 13:41:06 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -101,6 +101,9 @@ static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 static void tvfix __P((struct timeval *));
 static void reset_timer __P((struct dhcp6_if *));
 static void set_timeoparam __P((struct dhcp6_if *));
+
+extern int add_ifprefix __P((struct delegated_prefix_info *,
+			     struct prefix_ifconf *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -734,6 +737,8 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	char *cp;
 	char buf[BUFSIZ];
 	struct duid reply_duid;
+	struct delegated_prefix *p;
+	struct prefix_ifconf *pif;
 
 	/*
 	 * The ``transaction-ID'' field value MUST match the value we
@@ -774,6 +779,14 @@ client6_recvreply(ifp, dh6, len, optinfo)
 			dprintf(LOG_DEBUG, "nameserver[%d] %s", i,
 				inet_ntop(AF_INET6, &d->addr,
 					  buf, sizeof(buf)));
+		}
+	}
+
+	for (p = TAILQ_FIRST(&optinfo->prefix); p; p = TAILQ_NEXT(p, link)) {
+		for (pif = prefix_ifconflist; pif; pif = pif->next) {
+			if (strcmp(pif->ifname, ifp->ifname)) {
+				(void)add_ifprefix(&p->prefix, pif);
+			}
 		}
 	}
 

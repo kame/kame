@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.9 2002/05/09 01:54:28 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.10 2002/05/09 13:41:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -89,6 +89,7 @@ struct prefix_ifconf {
 	char ifid[16];		/* Interface ID, up to 128bits */
 };
 #define IFID_LEN_DEFAULT 64
+#define SLA_LEN_DEFAULT 16
 
 /* per-host configuration */
 struct host_conf {
@@ -131,6 +132,7 @@ enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION};
 
 extern struct dhcp6_ifconf *dhcp6_iflist;
+extern struct prefix_ifconf *prefix_ifconflist;
 
 extern void ifinit __P((char *));
 extern int configure_interface __P((struct cf_namelist *));
