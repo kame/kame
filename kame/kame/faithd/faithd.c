@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.42 2001/10/23 04:03:23 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.43 2001/11/09 02:34:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -294,9 +294,13 @@ daemon_main(int argc, char **argv)
 			exit_stderr("too many arguments");
 
 		serverpath = malloc(strlen(argv[NUMPRG]) + 1);
+		if (!serverpath)
+			exit_stderr("not enough core");
 		strcpy(serverpath, argv[NUMPRG]);
 		for (i = 0; i < serverargc; i++) {
 			serverarg[i] = malloc(strlen(argv[i + NUMARG]) + 1);
+			if (!serverarg[i])
+				exit_stderr("not enough core");
 			strcpy(serverarg[i], argv[i + NUMARG]);
 		}
 		serverarg[i] = NULL;
