@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.86 2001/01/05 16:47:20 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.87 2001/01/05 17:26:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -439,6 +439,12 @@ getaddrinfo(hostname, servname, hints, res)
 		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 			pai->ai_protocol = ex->e_protocol;
 
+		/*
+		 * if the servname does not match socktype/protocol, ignore it.
+		 */
+		if (get_portmatch(pai, servname) != 0)
+			continue;
+
 		if (hostname == NULL) {
 			/*
 			 * filter out AFs that are not supported by the kernel
@@ -848,12 +854,6 @@ explore_numeric(pai, hostname, servname, res)
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
 
-	/*
-	 * if the servname does not match socktype/protocol, ignore it.
-	 */
-	if (get_portmatch(pai, servname) != 0)
-		return 0;
-
 	afd = find_afd(pai->ai_family);
 	if (afd == NULL)
 		return 0;
@@ -915,12 +915,6 @@ explore_numeric_scope(pai, hostname, servname, res)
 	int error;
 	char *cp, *hostname2 = NULL, *scope, *addr;
 	struct sockaddr_in6 *sin6;
-
-	/*
-	 * if the servname does not match socktype/protocol, ignore it.
-	 */
-	if (get_portmatch(pai, servname) != 0)
-		return 0;
 
 	afd = find_afd(pai->ai_family);
 	if (afd == NULL)
