@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.29 2000/06/12 02:27:30 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.30 2000/06/12 03:16:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -59,7 +59,6 @@ u_int16_t dnsid;
 const char *srcport = "53";
 const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
-struct addrinfo *dnsserv_ai = NULL;
 const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
@@ -291,6 +290,7 @@ main(argc, argv)
 static void
 usage()
 {
+
 	fprintf(stderr,
 "usage: mdnsd [-46Dflm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
 "             -i iface [userv...]\n");
