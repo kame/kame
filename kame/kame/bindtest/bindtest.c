@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.36 2001/06/25 05:35:37 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.37 2001/06/25 05:54:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -69,7 +69,6 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <errno.h>
-#include <err.h>
 #include <fcntl.h>
 
 #include <netinet/in.h>
@@ -106,7 +105,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.36 2001/06/25 05:35:37 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.37 2001/06/25 05:54:07 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -140,14 +139,16 @@ main(argc, argv)
 			break;
 		case '6':
 #ifndef IPV6_V6ONLY
-			errx(1, "IPV6_V6ONLY is not supported");
+			fprintf(stderr, "IPV6_V6ONLY is not supported\n");
+			exit(1);
 #endif
 			v6only = 1;
 			break;
 		case 'A':
 			reuseaddr = 1;
 #ifndef SO_REUSEADDR
-			errx(1, "SO_REUSEADDR is not supported");
+			fprintf(stderr, "SO_REUSEADDR is not supported\n");
+			exit(1);
 #endif
 			break;
 		case 'l':
@@ -156,7 +157,8 @@ main(argc, argv)
 		case 'P':
 			reuseport = 1;
 #ifndef SO_REUSEPORT
-			errx(1, "SO_REUSEPORT is not supported");
+			fprintf(stderr, "SO_REUSEPORT is not supported\n");
+			exit(1);
 #endif
 			break;
 		case 'o':
@@ -199,25 +201,33 @@ main(argc, argv)
 	for (testi = testitems; testi->name; testi++) {
 		testi->res = getres(testi->family, testi->host, port,
 				    AI_PASSIVE);
-		if (!testi->res)
-			errx(1, "getaddrinfo failed");
+		if (!testi->res) {
+			fprintf(stderr, "getaddrinfo failed\n");
+			exit(1);
+		}
 	}
 
 	if (otheraddr != NULL) {
 		if ((oai = getres(AF_INET, otheraddr, port, 0)) == NULL) {
 			if ((oai6 = getres(AF_INET6, otheraddr, port, 0))
-			    == NULL)
-				errx(1, "getaddrinfo failed");
+			    == NULL) {
+				fprintf(stderr, "getaddrinfo failed\n");
+				exit(1);
+			}
 		} else if (socktype == SOCK_DGRAM) {
 			if (strlen("::ffff:") + strlen(otheraddr) + 1 >
-			    sizeof(otheraddr6))
-				errx(1, "too long hostname %s",
+			    sizeof(otheraddr6)) {
+				fprintf(stderr, "too long hostname %s",
 				     otheraddr);
+				exit(1);
+			}
 			strcpy(otheraddr6, "::ffff:");
 			strcat(otheraddr6, otheraddr);
 			if ((oai6 = getres(AF_INET6, otheraddr6, port, 0))
-			    == NULL)
-				errx(1, "getaddrinfo failed");
+			    == NULL) {
+				fprintf(stderr, "getaddrinfo failed\n");
+				exit(1);
+			}
 		}
 	}
 
@@ -264,7 +274,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: bindtest [-6APlstv] [-1|-2] [-o IPv4address] -p port\n");
+		"usage: bindtest [-[1|2]6APlstv] [-o IPv4address] -p port\n");
 }
 
 static void
@@ -272,8 +282,10 @@ printversion()
 {
 	char *ver, *beg, *end;
 
-	if ((ver = strdup(versionstr)) == NULL)
-		errx(1, "strdup failed");
+	if ((ver = strdup(versionstr)) == NULL) {
+		fprintf(stderr, "strdup failed\n");
+		exit(1);
+	}
 
 	if ((beg = strchr(ver, ':')) == NULL)
 		beg = ver;
