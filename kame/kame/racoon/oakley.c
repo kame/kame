@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.101 2001/08/17 10:49:24 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.102 2001/08/17 13:24:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1187,7 +1187,7 @@ oakley_validate_auth(iph1)
 			return ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE;
 		}
 		if (my_hash == NULL)
-			return -1;
+			return ISAKMP_INTERNAL_ERROR;
 
 		result = memcmp(my_hash->v, r_hash, my_hash->l);
 		vfree(my_hash);
@@ -1228,14 +1228,14 @@ oakley_validate_auth(iph1)
 				plog(LLV_ERROR, LOCATION, NULL,
 					"no peer's CERT payload found "
 					"even though CR sent.\n");
-				return -1;
+				return ISAKMP_INTERNAL_ERROR;
 			}
 			break;
 		case ISAKMP_GETCERT_LOCALFILE:
 			if (iph1->rmconf->peerscertfile == NULL) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"no peer's CERT file found.\n");
-				return -1;
+				return ISAKMP_INTERNAL_ERROR;
 			}
 
 			/* don't use cached cert */
@@ -1246,14 +1246,14 @@ oakley_validate_auth(iph1)
 
 			error = get_cert_fromlocal(iph1, 0);
 			if (error)
-				return -1;
+				return ISAKMP_INTERNAL_ERROR;
 			break;
 		case ISAKMP_GETCERT_DNS:
 			if (iph1->rmconf->peerscertfile != NULL) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"why peer's CERT file is defined "
 					"though getcert method is dns ?\n");
-				return -1;
+				return ISAKMP_INTERNAL_ERROR;
 			}
 
 			/* don't use cached cert */
@@ -1266,14 +1266,14 @@ oakley_validate_auth(iph1)
 			if (iph1->cert_p == NULL) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"no CERT RR found.\n");
-				return -1;
+				return ISAKMP_INTERNAL_ERROR;
 			}
 			break;
 		default:
 			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid getcert_mothod: %d\n",
 				iph1->rmconf->getcert_method);
-			return -1;
+			return ISAKMP_INTERNAL_ERROR;
 		}
 
 		/* compare ID payload and certificate name */
@@ -1294,7 +1294,7 @@ oakley_validate_auth(iph1)
 				plog(LLV_ERROR, LOCATION, NULL,
 					"no supported certtype %d\n",
 					iph1->rmconf->certtype);
-				return -1;
+				return ISAKMP_INTERNAL_ERROR;
 			}
 			if (error != 0) {
 				plog(LLV_ERROR, LOCATION, NULL,
@@ -1323,7 +1323,7 @@ oakley_validate_auth(iph1)
 			return ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE;
 		}
 		if (my_hash == NULL)
-			return -1;
+			return ISAKMP_INTERNAL_ERROR;
 
 		/* check signature */
 		switch (iph1->rmconf->certtype) {
@@ -1338,7 +1338,7 @@ oakley_validate_auth(iph1)
 				"no supported certtype %d\n",
 				iph1->rmconf->certtype);
 			vfree(my_hash);
-			return -1;
+			return ISAKMP_INTERNAL_ERROR;
 		}
 
 		vfree(my_hash);
@@ -1398,12 +1398,12 @@ oakley_validate_auth(iph1)
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"not supported authmethod type %s\n",
 			s_oakley_attr_method(iph1->approval->authmethod));
-		return -1;
+		return ISAKMP_INTERNAL_ERROR;
 	default:
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid authmethod %d why ?\n",
 			iph1->approval->authmethod);
-		return -1;
+		return ISAKMP_INTERNAL_ERROR;
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
@@ -1609,7 +1609,12 @@ oakley_check_certid(iph1)
 		}
 		error = memcmp(id_b + 1, name->v, idlen);
 		vfree(name);
-		return error == 0 ? 0 : ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		if (error != 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"ID mismatched with subjectAltName.\n");
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		}
+		return 0;
 	case IPSECDOI_ID_IPV4_ADDR:
 	case IPSECDOI_ID_IPV6_ADDR:
 	{
@@ -1674,7 +1679,12 @@ oakley_check_certid(iph1)
 		error = memcmp(id_b + 1, a, idlen);
 		freeaddrinfo(res);
 		vfree(name);
-		return error == 0 ? 0 : ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		if (error != 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"ID mismatched with subjectAltName.\n");
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		}
+		return 0;
 	}
 	case IPSECDOI_ID_FQDN:
 	case IPSECDOI_ID_USER_FQDN:
