@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.56 2002/05/21 06:29:44 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.57 2002/05/30 04:25:53 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -571,15 +571,17 @@ natpt_setValue(caddr_t addr)
 int
 natpt_getValue(caddr_t addr)
 {
+	int			 ctlNum;
 	caddr_t			 caddr;
 	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
-	if ((mbox->flags < 0) || (mbox->flags >= NATPTCTL_NULL))
+	ctlNum = mbox->flags;
+	if ((ctlNum < 0) || (ctlNum >= NATPTCTL_NULL))
 		return (0);
-	if ((caddr = natptctl_vars[mbox->flags]) == NULL)
+	if ((caddr = natptctl_vars[ctlNum]) == NULL)
 		return (0);
 
-	switch (natptctl_names[mbox->flags].ctl_type) {
+	switch (natptctl_names[ctlNum].ctl_type) {
 	case NATPTCTL_INT:
 		mbox->m_uint = *(int *)caddr;
 		break;
