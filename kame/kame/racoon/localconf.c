@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.19 2000/08/31 14:39:06 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.20 2000/08/31 15:03:47 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -204,7 +204,7 @@ getpsk(str, len)
 		if (*p == '\0')
 			continue;	/* no 2nd parameter */
 		*p = '\0';
-		/* search the fist of 2nd string. */
+		/* search the 1st of 2nd string. */
 		while (isspace(*++p))
 			;
 		if (*p == '\0')
