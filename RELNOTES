@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/19 02:49:22 $
+		     $Date: 2000/04/19 03:11:18 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -21,7 +21,7 @@ obey the backward compatibility policy decided by *BSD team.
 
 KNOWN BUGS/TWISTS
 =================
-All the following problems will be fixed in near-future SNAP releases,
+Most of the following problems will be fixed in near-future SNAP releases,
 and the next STABLE release,
 
 - "faithd" sometimes fail to relay rsh/rlogin connection properly.  Some part
@@ -51,6 +51,11 @@ and the next STABLE release,
   (2) ancillary data: due to RFC2292 and X/Open change in CMSG_xx
   You may experience some trouble running non-KAME binaries (like those
   shipped with stock *BSD) on top of KAME kernel.
-- with KAME/NetBSD, ipip pseudo interface does not work at all.
+- With KAME/NetBSD, ipip pseudo interface does not work at all.
+- In the past we have shipped IPv6-ready tcpdump/libpcap with KAME kit.
+  To make a single effort in tcpdump.org, we have removed the compilation tree
+  (*bsd*/usr.sbin/tcpdump and *bsd*/lib/libpcap).  If you want IPv6-ready
+  tcpdump/libpcap, download them from tcpdump.org.  We supply ports/pkgsrc
+  for easier installation on kame/freebsd[23] and kame/netbsd.
 
 							<end of RELNOTES>
