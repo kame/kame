@@ -656,7 +656,9 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct in6_addr *in6a = NULL;
 	int error = 0;
+#ifdef ENABLE_DEFAULT_SCOPE
 	struct sockaddr_in6 tmp;
+#endif
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
@@ -667,8 +669,8 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 #ifdef ENABLE_DEFAULT_SCOPE
 	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
 		/* avoid overwrites */
-		tmp = *sin6;
-		sin6 = &tmp;
+		tmp = *addr;
+		addr = &tmp;
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
 #endif
