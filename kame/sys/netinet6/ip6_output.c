@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.464 2005/01/20 03:33:10 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.465 2005/01/20 09:14:05 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -422,12 +422,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 
 #ifdef MIP6
 	/* Find binding cache entry */
-#ifndef MIP6_MCOA
-	mbc = mip6_bce_get(&ip6->ip6_dst, &ip6->ip6_src);
-#else
-	/* XXX need policy to determine bid */
+	/* XXX need policy to determine bid for MCOA*/
 	mbc = mip6_bce_get(&ip6->ip6_dst, &ip6->ip6_src, NULL, 0); 
-#endif /* MIP6_MCOA */
 	/*
 	 * If a node has a corresponding binding cache, put a Type 2
 	 * Routing Header to directly deliver the packet.  Except, a
@@ -453,11 +449,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	 * destination with a Home Address Option.  Except a caller
 	 * didn't specify a Home Address Option explicitly.
 	 */
-#ifndef MIP6_MCOA
-	mbul = mip6_bul_get(&ip6->ip6_src, &ip6->ip6_dst);
-#else /* !MIP6_MCOA */
 	mbul = mip6_bul_get(&ip6->ip6_src, &ip6->ip6_dst, 0/* XXX */);
-#endif /* !MIP6_MCOA */
 	/* 
 	 * Route Optimization: appending a HoA option. 
 	 */

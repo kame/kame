@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.206 2004/12/09 02:19:09 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.207 2005/01/20 09:14:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -111,28 +111,16 @@ extern struct ip6protosw mip6_tunnel_protosw;
 static int mip6_rr_hint_pps_count = 0;
 static struct timeval mip6_rr_hint_ppslim_last;
 
-#ifndef MIP6_MCOA
-static struct mip6_bul_internal *mip6_bul_create(const struct in6_addr *,
-    const struct in6_addr *, const struct in6_addr *, u_int16_t, u_int8_t,
-    struct mip_softc *);
-#else
 static struct mip6_bul_internal *mip6_bul_create(const struct in6_addr *,
     const struct in6_addr *, const struct in6_addr *, u_int16_t, u_int8_t,
     struct mip_softc *, u_int16_t);
-#endif /* MIP6_MCOA */
 int mip6_bul_encapcheck(const struct mbuf *, int, int, void *arg);
 #endif /* NMIP > 0 */
 int mip6_rev_encapcheck(const struct mbuf *, int, int, void *arg);
 
-#ifndef MIP6_MCOA
-static struct mip6_bc_internal *mip6_bce_new_entry(struct in6_addr *,
-    struct in6_addr *, struct in6_addr *, struct ifaddr *, u_int16_t);
-#else
 static struct mip6_bc_internal *mip6_bce_new_entry(struct in6_addr *,
     struct in6_addr *, struct in6_addr *, struct ifaddr *, u_int16_t,
     u_int16_t);
-#endif /* MIP6_MCOA */
-
 static void mip6_bc_list_insert(struct mip6_bc_internal *);
 static void mip6_bc_list_remove(struct mip6_bc_internal *);
 
@@ -284,11 +272,7 @@ mip6_input(mp, offp, proto)
 		 * registration, make sure the packet is protected by
 		 * IPsec.
 		 */
-#ifndef MIP6_MCOA 
-		mbul = mip6_bul_get(&ip6->ip6_src, &ip6->ip6_dst);
-#else
 		mbul = mip6_bul_get(&ip6->ip6_src, &ip6->ip6_dst, 0 /* XXX */);
-#endif /* MIP6_MCOA */
 		if (mbul != NULL
 		    && (mbul->mbul_flags & IP6_MH_BU_HOME) != 0
 		    && mip6ctl_use_ipsec) {
@@ -363,7 +347,7 @@ mip6_tunnel_input(mp, offp, proto)
 		bul = mip6_bul_get_home_agent(&dst);
 		if (bul == NULL)
 			goto dontstartrr;
-		cnbul = mip6_bul_get(&dst, &src);
+		cnbul = mip6_bul_get(&dst, &src, 0);
 		if (cnbul != NULL)
 			goto dontstartrr;
 
@@ -409,17 +393,11 @@ mip6_tunnel_input(mp, offp, proto)
 }
 
 struct mip6_bc_internal *
-#ifndef MIP6_MCOA
-mip6_bce_get(hoa, cnaddr)
-	struct in6_addr *hoa;
-	struct in6_addr *cnaddr;
-#else
 mip6_bce_get(hoa, cnaddr, coa, bid)
 	struct in6_addr *hoa;
 	struct in6_addr *cnaddr;
 	struct in6_addr *coa;
 	u_int16_t bid;
-#endif /* MIP6_MCOA */
 {
 	struct mip6_bc_internal *mbc;
 	int hash = MIP6_BC_HASH_ID(hoa, cnaddr);
@@ -442,17 +420,10 @@ mip6_bce_get(hoa, cnaddr, coa, bid)
 }
 
 static struct mip6_bc_internal *
-#ifndef MIP6_MCOA
-mip6_bce_new_entry(cnaddr, hoa, coa, ifa, flags)
-	struct in6_addr *cnaddr, *hoa, *coa;
-	struct ifaddr *ifa;
-	u_int16_t flags;
-#else
 mip6_bce_new_entry(cnaddr, hoa, coa, ifa, flags, bid)
 	struct in6_addr *cnaddr, *hoa, *coa;
 	struct ifaddr *ifa;
 	u_int16_t flags, bid;
-#endif /* MIP6_MCOA */
 {
 	struct mip6_bc_internal *mbc = NULL;
 
@@ -489,15 +460,9 @@ mip6_bc_list_insert(mbc)
 }
 
 int
-#ifndef MIP6_MCOA
-mip6_bce_update(cnaddr, hoa, coa, flags)
-	struct sockaddr_in6 *cnaddr, *hoa, *coa;
-	u_int16_t flags;
-#else
 mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 	struct sockaddr_in6 *cnaddr, *hoa, *coa;
 	u_int16_t flags, bid;
-#endif /* MIP6_MCOA */
 {
 	int s;
 	int error = 0;
@@ -519,13 +484,8 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 	s = splnet();
 #endif
 
-#ifndef MIP6_MCOA
-	bce = mip6_bce_get((struct in6_addr *)(&hoa->sin6_addr),
-	    (struct in6_addr *)(&cnaddr->sin6_addr));
-#else
 	bce = mip6_bce_get((struct in6_addr *)(&hoa->sin6_addr),
 	    (struct in6_addr *)(&cnaddr->sin6_addr), NULL, bid);
-#endif /* MIP6_MCOA */
 	if (bce) {
 		bce->mbc_coa = coa->sin6_addr;
 		goto bc_update_ipsecdb;
@@ -533,13 +493,8 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 
 	/* there is no existing bc entry.  create a new one. */
 	ifa = ifa_ifwithaddr((struct sockaddr *)cnaddr);
-#ifndef MIP6_MCOA
-	bce = mip6_bce_new_entry(&cnaddr->sin6_addr, &hoa->sin6_addr,
-	    &coa->sin6_addr, ifa, flags);
-#else
 	bce = mip6_bce_new_entry(&cnaddr->sin6_addr, &hoa->sin6_addr,
 	    &coa->sin6_addr, ifa, flags, bid);
-#endif /* MIP6_MCOA */
 	if (bce == NULL) {
 		error = ENOMEM;
 		goto done;
@@ -625,25 +580,15 @@ mip6_bc_list_remove(mbc)
 }
 
 int
-#ifndef MIP6_MCOA
-mip6_bce_remove(cnaddr, hoa, coa, flags)
-	struct sockaddr_in6 *cnaddr, *hoa, *coa;
-	u_int16_t flags;
-#else
 mip6_bce_remove(cnaddr, hoa, coa, flags, bid)
 	struct sockaddr_in6 *cnaddr, *hoa, *coa;
 	u_int16_t flags, bid;
-#endif /* MIP6_MCOA */
 {
 	int s;
 	int error = 0;
 	struct mip6_bc_internal *mbc;
 	
-#ifndef MIP6_MCOA
-	mbc = mip6_bce_get(&hoa->sin6_addr, &cnaddr->sin6_addr);
-#else
 	mbc = mip6_bce_get(&hoa->sin6_addr, &cnaddr->sin6_addr, NULL, bid);
-#endif
 	if (!mbc)
 		return (0);
 
@@ -685,7 +630,7 @@ mip6_bce_remove(cnaddr, hoa, coa, flags, bid)
 }
 
 void
-mip6_bce_remove_all ()
+mip6_bce_remove_all (void)
 {
 	struct mip6_bc_internal *mbc, *mbcn = NULL;
 	int s;
@@ -756,20 +701,12 @@ mip6_ifa_ifwithin6addr(in6, mipsc)
 }
 
 static struct mip6_bul_internal *
-#ifndef MIP6_MCOA
-mip6_bul_create(peeraddr, hoa, coa, flags, state, sc)
-	const struct in6_addr *peeraddr, *hoa, *coa;
-	u_int16_t flags;
-	u_int8_t state;
-	struct mip_softc *sc;
-#else
 mip6_bul_create(peeraddr, hoa, coa, flags, state, sc, bid)
 	const struct in6_addr *peeraddr, *hoa, *coa;
 	u_int16_t flags;
 	u_int8_t state;
 	struct mip_softc *sc;
 	u_int16_t bid;
-#endif
 {
 	struct mip6_bul_internal *mbul;
 
@@ -794,20 +731,12 @@ mip6_bul_create(peeraddr, hoa, coa, flags, state, sc, bid)
 }
 
 int
-#ifndef MIP6_MCOA
-mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state)
-	const struct in6_addr *peeraddr, *hoa, *coa;
-	u_short hoa_ifindex;
-	u_int16_t flags;
-	u_int8_t state;
-#else
 mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	const struct in6_addr *peeraddr, *hoa, *coa;
 	u_short hoa_ifindex;
 	u_int16_t flags;
 	u_int8_t state;
 	u_int16_t bid;
-#endif /* MIP6_MCOA */
 {
 	int error = 0;
 	struct in6_ifaddr *ia6_hoa;
@@ -844,22 +773,13 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	 * first. Then, the requested bul will be added right after
 	 * this deletion.  
 	 */
-#ifndef MIP6_MCOA
-	mbul = mip6_bul_get(hoa, peeraddr);
-#else
 	mbul = mip6_bul_get(hoa, peeraddr, bid);
-#endif /* MIP6_MCOA */
 	if (mbul) 
 		mip6_bul_remove(mbul);
 
 	/* binding update list is created here */
-#ifndef MIP6_MCOA
-	mbul = mip6_bul_create(peeraddr, hoa, coa, flags, state,
-	    (struct mip_softc *)ia6_hoa->ia_ifp);
-#else
 	mbul = mip6_bul_create(peeraddr, hoa, coa, flags, state,
 	    (struct mip_softc *)ia6_hoa->ia_ifp, bid);
-#endif /* MIP6_MCOA */
 	if (mbul == NULL)
 		return (-1);
 	LIST_INSERT_HEAD(&ia6_hoa->ia6_mbul_list, mbul, mbul_entry);
@@ -989,14 +909,9 @@ mip6_bul_remove_all()
 }
 
 struct mip6_bul_internal *
-#ifndef MIP6_MCOA
-mip6_bul_get(src, dst)
-	const struct in6_addr *src, *dst;
-#else  
 mip6_bul_get(src, dst, bid)
 	const struct in6_addr *src, *dst;
 	u_int16_t bid;
-#endif /* MIP6_MCOA */
 {
 	struct in6_ifaddr *ia6_src;
 	struct mip6_bul_internal *mbul;
@@ -1007,7 +922,6 @@ mip6_bul_get(src, dst, bid)
 	
 	for (mbul = LIST_FIRST(&ia6_src->ia6_mbul_list); mbul;
 	     mbul = LIST_NEXT(mbul, mbul_entry)) {
-
 #ifdef MIP6_MCOA
 		if (bid && (bid =! mbul->mbul_bid))
 			continue;

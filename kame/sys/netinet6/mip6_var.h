@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.118 2004/12/09 02:19:22 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.119 2005/01/20 09:14:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -154,38 +154,23 @@ extern int mip6ctl_use_ipsec;
 
 /* function prototypes. */
 /* correspondent node functions. */
-#ifndef MIP6_MCOA
-int mip6_bce_update(struct sockaddr_in6 *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int16_t);
-struct mip6_bc_internal *mip6_bce_get(struct in6_addr *, struct in6_addr *);
-int mip6_bce_remove(struct sockaddr_in6 *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int16_t);
-void mip6_bce_remove_all(void);
-#else
 int mip6_bce_update(struct sockaddr_in6 *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t);
 struct mip6_bc_internal *mip6_bce_get(struct in6_addr *, struct in6_addr *,
     struct in6_addr *, u_int16_t);
 int mip6_bce_remove(struct sockaddr_in6 *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t);
-#endif /* MIP6_MCOA */
+void mip6_bce_remove_all (void);
 struct ip6_rthdr2 *mip6_create_rthdr2(struct in6_addr *);
 
 /* home agent functions. */
 int mip6_bc_proxy_control(struct in6_addr *, struct in6_addr *, int);
 
 /* mobile node functions. */
-#ifndef MIP6_MCOA
-int mip6_bul_add(const struct in6_addr *, const struct in6_addr *,
-    const struct in6_addr *, u_short, u_int16_t, u_int8_t);
-struct mip6_bul_internal *mip6_bul_get(const struct in6_addr *,
-    const struct in6_addr *);
-#else
 int mip6_bul_add(const struct in6_addr *, const struct in6_addr *,
     const struct in6_addr *, u_short, u_int16_t, u_int8_t, u_int16_t);
 struct mip6_bul_internal *mip6_bul_get(const struct in6_addr *,
     const struct in6_addr *, u_int16_t);
-#endif /* MIP6_MCOA */
 void mip6_bul_remove(struct mip6_bul_internal *);
 void mip6_bul_remove_all(void);
 struct mip6_bul_internal *mip6_bul_get_home_agent(const struct in6_addr *);

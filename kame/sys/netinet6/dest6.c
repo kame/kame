@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.68 2004/12/09 02:19:01 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.69 2005/01/20 09:14:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -170,11 +170,7 @@ dest6_input(mp, offp, proto)
 
 			/* check whether this HAO is 'verified'. */
 			if (
-#ifndef MIP6_MCOA
-				(bce = mip6_bce_get(&home, &ip6->ip6_dst))
-#else
 				(bce = mip6_bce_get(&home, &ip6->ip6_dst, &ip6->ip6_src, 0))
-#endif /* MIP6_MCOA */
 				&& IN6_ARE_ADDR_EQUAL(&bce->mbc_coa, &ip6->ip6_src)) {
 				/*
 				 * we have a corresponding binding

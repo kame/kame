@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.368 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.369 2005/01/20 09:14:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2315,7 +2315,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 				goto dontstartrr;
 			if (IN6_IS_ADDR_LINKLOCAL(&in6_dst))
 				goto dontstartrr;
-			cnbul = mip6_bul_get(&in6_src, &in6_dst);
+			cnbul = mip6_bul_get(&in6_src, &in6_dst, 0);
 			if (cnbul != NULL)
 				goto dontstartrr;
 

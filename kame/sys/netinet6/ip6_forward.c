@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.146 2005/01/17 07:37:09 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.147 2005/01/20 09:14:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -394,12 +394,8 @@ ip6_forward(m, srcrt)
 	 * which we are acting as a home agent for.
 	 */
 
-#ifndef MIP6_MCOA
-	bce = mip6_bce_get(&ip6->ip6_dst, NULL);
-#else
-	/* XXX need some policy to determine bid */
+	/* XXX need some policy to determine bid for MCOA*/
 	bce = mip6_bce_get(&ip6->ip6_dst, NULL, NULL, 0); 
-#endif /* MIP6_MCOA */
 	if (bce &&
 	     (bce->mbc_flags & IP6_MH_BU_HOME) &&
 	     (bce->mbc_encap != NULL)) {
