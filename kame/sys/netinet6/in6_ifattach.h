@@ -31,7 +31,6 @@
 #define _NETINET6_IN6_IFATTACH_H_
 
 #ifdef _KERNEL
-extern struct in6_addr **in6_iflladdr;
 extern int found_first_ifid;
 
 int in6_ifattach_getifid __P((struct ifnet *));
