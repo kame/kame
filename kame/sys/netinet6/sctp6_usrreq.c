@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.26 2004/01/26 03:30:45 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.27 2004/01/27 02:43:18 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1723,7 +1723,8 @@ sctp6_usrreq(so, req, m, nam, control)
 		error = 0;
 		break;
 	default:
-	};
+		break;
+	}
 	splx(s);
 	return (error);
 }
