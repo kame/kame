@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.405 2003/08/09 14:56:48 cedric Exp $	*/
+/*	$OpenBSD: parse.y,v 1.408 2003/08/20 16:27:36 henning Exp $	*/
 
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -727,6 +727,10 @@ scrub_opt	: NODF	{
 				yyerror("max-mss cannot be respecified");
 				YYERROR;
 			}
+			if ($2 > 65535) {
+				yyerror("illegal max-mss value %d", $2);
+				YYERROR;
+			}
 			scrub_opts.marker |= SOM_MAXMSS;
 			scrub_opts.maxmss = $2;
 		}
@@ -997,8 +1001,10 @@ queuespec	: QUEUE STRING interface queue_opts qassign {
 			a.qlimit = $4.qlimit;
 			a.scheduler = $4.scheduler.qtype;
 			if (expand_queue(&a, $3, $5, $4.queue_bwspec,
-			    &$4.scheduler))
+			    &$4.scheduler)) {
+				yyerror("errors in queue definition");
 				YYERROR;
+			}
 		}
 		;
 
@@ -3579,6 +3585,12 @@ expand_queue(struct pf_altq *a, struct node_if *interfaces,
 						errs++;
 
 				for (nq = nqueues; nq != NULL; nq = nq->next) {
+					if (!strcmp(a->qname, nq->queue)) {
+						yyerror("queue cannot have "
+						    "itself as child");
+						errs++;
+						continue;
+					}
 					n = calloc(1,
 					    sizeof(struct node_queue));
 					if (n == NULL)
