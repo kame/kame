@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.75 2000/09/12 07:15:41 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.76 2000/09/12 07:17:31 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -665,7 +665,7 @@ keylen_ealg(t_id, encklen)
 	case IPSECDOI_ESP_RIJNDAEL:
 		return encklen ? encklen : 128;
 #endif
-#ifdef IPSECDOI_ESP_TWOFISH:
+#ifdef IPSECDOI_ESP_TWOFISH
 	case IPSECDOI_ESP_TWOFISH:
 		return encklen ? encklen : 128;
 #endif
