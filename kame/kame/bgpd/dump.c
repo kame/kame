@@ -730,8 +730,8 @@ print_bgp_dump(FILE *fp)
 	}
 	/* show established peer first */
 	while(bnp) {
-		if (bnp->rp_state == BGPSTATE_ESTABLISHED)
-			show_bgp_peer(fp, bnp, "  "); {
+		if (bnp->rp_state == BGPSTATE_ESTABLISHED) {
+			show_bgp_peer(fp, bnp, "  ");
 			fputc('\n', fp);
 		}
 
