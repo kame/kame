@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.195 2001/02/08 15:35:31 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.196 2001/02/08 17:33:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3060,7 +3060,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 #undef in6p_icmp6filt
 #endif
 
-#if !defined(HAVE_RATECHECK) || !defined(HAVE_PPSRATECHECK)
+#ifndef HAVE_PPSRATECHECK
 #ifndef timersub
 #define	timersub(tvp, uvp, vvp)						\
 	do {								\
