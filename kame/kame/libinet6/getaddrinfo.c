@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.206 2004/12/07 14:10:57 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.207 2004/12/07 14:12:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -377,8 +377,8 @@ pthread_mutex_t __getaddrinfo_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 #define THREAD_UNLOCK() \
 	if (__isthreaded) _pthread_mutex_unlock(&__getaddrinfo_thread_lock);
 #else
-#define THREAD_LOCK
-#define THREAD_UNLOCK
+#define THREAD_LOCK()
+#define THREAD_UNLOCK()
 #endif
 
 /* XXX macros that make external reference is BAD. */
