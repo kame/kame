@@ -182,6 +182,8 @@ connect_try(struct rpcb *bnp)
 	(pktinfo = (struct in6_pktinfo *)malloc(sizeof(*pktinfo))) == NULL)
       fatalx("<connect_try>: malloc");
 
+    memset(pktinfo, 0, sizeof(struct in6_pktinfo));
+
     pktinfo->ipi6_ifindex = bnp->rp_ife->ifi_ifn->if_index;
     if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,
 		   (void *)pktinfo, sizeof(*pktinfo)) < 0)
