@@ -388,8 +388,6 @@ rip6_output(m, so, dstsock, control)
 	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
 		goto bad;
 	}
-	if (oifp == NULL && in6p->in6p_route.ro_rt)
-		oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
 
 	/* fill in the rest of the IPv6 header fields */
 	ip6->ip6_dst = *dst;
