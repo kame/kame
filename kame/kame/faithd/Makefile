@@ -18,7 +18,7 @@
 
 BINDIR=	${PREFIX}/sbin
 PROG=	faithd
-SRCS=	faithd.c tcp.c ftp.c rsh.c
+SRCS=	faithd.c tcp.c ftp.c rsh.c prefix.c
 
 #CFLAGS+= -DFAITH4
 
