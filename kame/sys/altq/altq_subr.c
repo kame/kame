@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.13 2002/05/20 09:27:54 itojun Exp $	*/
+/*	$KAME: altq_subr.c,v 1.14 2002/08/03 08:24:01 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -1527,7 +1527,7 @@ init_machclk(void)
 #endif
 #elif defined(__NetBSD__)
 	machclk_freq = (u_int32_t)cpu_tsc_freq;
-#elif defined(__OpenBSD__)
+#elif defined(__OpenBSD__) && (defined(I586_CPU) || defined(I686_CPU))
 	machclk_freq = pentium_mhz * 1000000;
 #endif
 #elif defined(__alpha__)
