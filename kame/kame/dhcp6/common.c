@@ -54,6 +54,23 @@
 #include <dhcp6.h>
 #include <common.h>
 
+static unsigned int if_maxindex __P((void));
+
+static unsigned int
+if_maxindex()
+{
+	struct if_nameindex *p, *p0;
+	unsigned int max = 0;
+
+	p0 = if_nameindex();
+	for (p = p0; p && p->if_index && p->if_name; p++) {
+		if (max < p->if_index)
+			max = p->if_index;
+	}
+	if_freenameindex(p0);
+	return max;
+}
+
 int
 getifaddr(addr, ifnam, prefix, plen)
 	struct in6_addr *addr;
@@ -69,7 +86,7 @@ getifaddr(addr, ifnam, prefix, plen)
 	struct sockaddr_in6 sin6;
 	int error;
 
-#if 0
+#if 1
 	maxif = if_maxindex() + 1;
 #else
 	maxif = 1;
