@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.34 2000/10/01 12:37:18 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.35 2000/10/18 21:28:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -594,6 +594,62 @@ fail:
 		m_freem(m);
 	return;
 }
+
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/*1.5H*/
+/* assumes that ip header and ah header are contiguous on mbuf */
+void *
+ah4_ctlinput(cmd, sa, v)
+	int cmd;
+	struct sockaddr *sa;
+	void *v;
+{
+	struct ip *ip = v;
+	struct ah *ah;
+	struct icmp *icp;
+	struct secasvar *sav;
+
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
+		return NULL;
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return NULL;
+	if (cmd == PRC_MSGSIZE && ip_mtudisc && ip && ip->ip_v == 4) {
+		/*
+		 * Check to see if we have a valid SA corresponding to
+		 * the address in the ICMP message payload.
+		 */
+		ah = (struct ah *)((caddr_t)ip + (ip->ip_hl << 2));
+		if ((sav = key_allocsa(AF_INET,
+				       (caddr_t) &ip->ip_src,
+				       (caddr_t) &ip->ip_dst,
+				       IPPROTO_AH, ah->ah_spi)) == NULL)
+			return NULL;
+		if (sav->state != SADB_SASTATE_MATURE &&
+		    sav->state != SADB_SASTATE_DYING) {
+			key_freesav(sav);
+			return NULL;
+		}
+
+		/* XXX Further validation? */
+
+		key_freesav(sav);
+
+		/*
+		 * Now that we've validated that we are actually communicating
+		 * with the host indicated in the ICMP message, locate the
+		 * ICMP header, recalculate the new MTU, and create the
+		 * corresponding routing entry.
+		 */
+		icp = (struct icmp *)((caddr_t)ip -
+		    offsetof(struct icmp, icmp_ip));
+		icmp_mtudisc(icp, ip->ip_dst);
+
+		return NULL;
+	}
+
+	return NULL;
+}
+#endif /* NetBSD 1.5H or later */
 #endif /* INET */
 
 #ifdef INET6
@@ -991,5 +1047,103 @@ fail:
 	if (m)
 		m_freem(m);
 	return IPPROTO_DONE;
+}
+
+void
+ah6_ctlinput(cmd, sa, d)
+	int cmd;
+	struct sockaddr *sa;
+	void *d;
+{
+	const struct newah *ahp;
+	struct newah ah;
+	struct secasvar *sav;
+	struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
+	struct in6_addr finaldst;
+	struct in6_addr s;
+
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+
+		/* translate addresses into internal form */
+		memcpy(&finaldst, ip6cp->ip6c_finaldst, sizeof(finaldst));
+		if (IN6_IS_ADDR_LINKLOCAL(&finaldst)) {
+			finaldst.s6_addr16[1] =
+			    htons(m->m_pkthdr.rcvif->if_index);
+		}
+		memcpy(&s, &ip6->ip6_src, sizeof(s));
+		if (IN6_IS_ADDR_LINKLOCAL(&s))
+			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+	} else {
+		m = NULL;
+		ip6 = NULL;
+	}
+
+	if (ip6) {
+		/*
+		 * XXX: We assume that when ip6 is non NULL,
+		 * M and OFF are valid.
+		 */
+
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(ah))
+			return;
+
+		if (m->m_len < off + sizeof(ah)) {
+			/*
+			 * this should be rare case,
+			 * so we compromise on this copy...
+			 */
+			m_copydata(m, off, sizeof(ah), (caddr_t)&ah);
+			ahp = &ah;
+		} else
+			ahp = (struct newah *)(mtod(m, caddr_t) + off);
+
+		if (cmd == PRC_MSGSIZE) {
+			/*
+			 * Check to see if we have a valid SA corresponding to
+			 * the address in the ICMP message payload.
+			 */
+			sav = key_allocsa(AF_INET6, (caddr_t)&s,
+			    (caddr_t)&finaldst, IPPROTO_AH, ahp->ah_spi);
+			if (sav == NULL)
+				return;
+			if (sav->state != SADB_SASTATE_MATURE &&
+			    sav->state != SADB_SASTATE_DYING) {
+				key_freesav(sav);
+				return;
+			}
+
+			/* XXX Further validation? */
+
+			key_freesav(sav);
+
+			/*
+			 * Now that we've validated that we are actually
+			 * communicating with the host indicated in the ICMPv6
+			 * message, recalculate the new MTU, and create the
+			 * corresponding routing entry.
+			 */
+			icmp6_mtudisc_update((struct ip6ctlparam *)d);
+
+			return;
+		}
+
+		/* we normally notify single pcb here */
+	} else {
+		/* we normally notify any pcb here */
+	}
 }
 #endif /* INET6 */

@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.15 2000/09/20 18:15:22 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.16 2000/10/18 21:28:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,10 +102,16 @@ extern int esp4_output __P((struct mbuf *, struct ipsecrequest *));
 extern void esp4_input __P((struct mbuf *, ...));
 extern size_t esp_hdrsiz __P((struct ipsecrequest *));
 
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/*1.5H*/
+extern void *esp4_ctlinput __P((int, struct sockaddr *, void *));
+#endif
+
 #ifdef INET6
 extern int esp6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
 extern int esp6_input __P((struct mbuf **, int *, int));
+
+extern void esp6_ctlinput __P((int, struct sockaddr *, void *));
 #endif /* INET6 */
 
 extern int esp_schedule __P((const struct esp_algorithm *, struct secasvar *));
