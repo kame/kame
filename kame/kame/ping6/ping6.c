@@ -249,10 +249,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	extern int optind;
-	extern char *optarg;
-#endif
 	struct itimerval itimer;
 	struct sockaddr_in6 from;
 	struct timeval timeout;
