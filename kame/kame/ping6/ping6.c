@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.138 2001/09/18 02:33:08 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.139 2001/10/26 01:43:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -295,7 +295,7 @@ main(argc, argv)
 	struct addrinfo hints;
 	fd_set *fdmaskp;
 	int fdmasks;
-	register int cc, i;
+	int cc, i;
 	int ch, fromlen, hold, packlen, preload, optval, ret_ga;
 	u_char *datap, *packet;
 	char *e, *target, *ifname = NULL;
@@ -2092,7 +2092,7 @@ get_pathmtu(mhdr)
  */
 void
 tvsub(out, in)
-	register struct timeval *out, *in;
+	struct timeval *out, *in;
 {
 	if ((out->tv_usec -= in->tv_usec) < 0) {
 		--out->tv_sec;
@@ -2550,7 +2550,7 @@ void
 fill(bp, patp)
 	char *bp, *patp;
 {
-	register int ii, jj, kk;
+	int ii, jj, kk;
 	int pat[16];
 	char *cp;
 
