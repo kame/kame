@@ -527,7 +527,7 @@ server6_react_solicit(buf, siz, rcvpi)
 					dprintf((stderr,
 						 "react_solicit: can't find "
 						 "server address for relay %s\n",
-						 in6addr2str(&dh6a->dh6adv_relayaddr,
+						 in6addr2str(&dh6s->dh6sol_relayaddr,
 							     0)));
 					return(-1);
 				}
