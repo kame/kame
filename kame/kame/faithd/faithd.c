@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.23 2000/07/10 01:50:23 jinmei Exp $	*/
+/*	$KAME: faithd.c,v 1.24 2000/07/28 06:02:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -729,7 +729,7 @@ exit_error(const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	fprintf(stderr, "%s\n", buf);
+	syslog(LOG_ERR, "%s", buf);
 	exit(EXIT_FAILURE);
 }
 
