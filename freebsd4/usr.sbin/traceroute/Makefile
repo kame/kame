@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/traceroute
 
 PROG=	traceroute
-SRCS=	traceroute.c ifaddrlist.c savestr.c version.c
+SRCS=	traceroute.c ifaddrlist.c version.c
 
 BINOWN=	root
 BINGRP=	bin
