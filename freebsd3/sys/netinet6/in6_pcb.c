@@ -678,9 +678,7 @@ in6_selecthlim(in6p, ifp)
 	struct in6pcb *in6p;
 	struct ifnet *ifp;
 {
-	if (in6p->in6p_ip6_hlim)
-		return(in6p->in6p_ip6_hlim);
-	else if (in6p->in6p_hops >= 0)
+	if (in6p->in6p_hops >= 0)
 		return(in6p->in6p_hops);
 	else if (ifp)
 		return(nd_ifinfo[ifp->if_index].chlim);

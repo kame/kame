@@ -861,6 +861,17 @@ send:
 	 */
 #ifdef INET6
 	if (isipv6) {
+		/* 
+		 * we separately set hoplimit for every segment, since the
+		 * user might want to change the value via setsockopt.
+		 * Also, desired default hop limit might be changed via
+		 * Neighbor Discovery. 
+		 */ 
+		ip6->ip6_hlim = in6_selecthlim(tp->t_inpcb, 
+					       tp->t_inpcb->in6p_route.ro_rt ? 
+					       tp->t_inpcb->in6p_route.ro_rt->rt_ifp 
+					       : NULL); 
+
 		/* TODO: IPv6 IP6TOS_ECT bit on */
 #ifdef IPSEC
 		m->m_pkthdr.rcvif = (struct ifnet *)so;
