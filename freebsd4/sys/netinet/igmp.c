@@ -1484,7 +1484,6 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	}
 	inm->inm_state = IGMP_OTHERMEMBER;
 	inm->inm_timer = 0;
-        ip_output(m, router_alert, &igmprt, 0, &imo, NULL);
 
 	return 0;
 }
