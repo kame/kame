@@ -1,6 +1,11 @@
-$Id: CHANGELOG,v 1.479 2000/01/25 08:22:27 itojun Exp $
+$Id: CHANGELOG,v 1.480 2000/01/25 11:31:23 itojun Exp $
 
 <200001>
+Tue Jan 25 20:30:32 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet6/ipcomp_core.c: don't attach Adler32 checksum
+	  to compressed data.  see ipsec wg mailing list (Jan 2000) for
+	  details.
+
 Tue Jan 25 17:21:15 JST 2000  itojun@iijlab.net
 	* kame/libinet6/rcmd.c: make rcmd() behavior to IPv4-only, for safety
 	  (see 2292bis for reasons).  implement rcmd_af().
