@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.862 2000/05/09 13:35:24 itojun Exp $
+$Id: CHANGELOG,v 1.863 2000/05/09 17:09:28 itojun Exp $
 
 <200005>
+Wed May 10 02:07:33 JST 2000  itojun@iijlab.net
+	* sbin/ping6: correct outbound NI query packet with -aw.
+	  we should have attached Subject data, which was defined in
+	  04 draft. (we are now in 05)
+	* sys/netinet6/icmp6.c: improve inbound NI query packet validation.
+
 Tue May  9 22:11:56 JST 2000  itojun@iijlab.net
 	* all platforms: correct NetBSD Security Advisory 2000-002, problem (2).
 	  this applies to all BSD-based operating systems.  Kernel upgrade
