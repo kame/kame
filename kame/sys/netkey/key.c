@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.57 2000/01/17 12:07:43 itojun Exp $ */
+/* KAME $Id: key.c,v 1.58 2000/01/17 13:01:03 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1781,7 +1781,7 @@ key_delsah(sah)
 	struct secasvar *sav, *nextsav;
 	u_int stateidx, state;
 	int s;
-	int zonbie = 0;
+	int zombie = 0;
 
 	/* sanity check */
 	if (sah == NULL)
@@ -1807,7 +1807,7 @@ key_delsah(sah)
 
 			if (sav->refcnt > 0) {
 				/* give up to delete this sa */
-				zonbie++;
+				zombie++;
 				continue;
 			}
 
@@ -1823,7 +1823,7 @@ key_delsah(sah)
 	}
 
 	/* don't delete sah only if there are savs. */
-	if (zonbie) {
+	if (zombie) {
 		splx(s);
 		return;
 	}

@@ -41,7 +41,7 @@
 #include <netkey/key_var.h>
 
 /* Security Assocciation Index */
-/* NOTE: Encure to be same address family */
+/* NOTE: Ensure to be same address family */
 struct secasindex {
 	struct sockaddr_storage src;	/* srouce address for SA */
 	struct sockaddr_storage dst;	/* destination address for SA */
