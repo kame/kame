@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_init.c	8.1 (Berkeley) 6/7/93";
-static char rcsid[] = "$Id: res_init.c,v 1.6 2000/04/26 02:56:26 itojun Exp $";
+static char rcsid[] = "$Id: res_init.c,v 1.7 2000/06/15 00:07:22 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -173,9 +173,6 @@ res_init()
 #ifndef RFC1535
 	int dots;
 #endif
-#ifdef INET6
-	struct sockaddr_in6 *sin6;
-#endif /* INET6 */
 
 	/*
 	 * These three fields used to be statically initialized.  This made
@@ -210,17 +207,6 @@ res_init()
 	if (!_res.id)
 		_res.id = res_randomid();
 
-#ifdef INET6
-	sin6 = (struct sockaddr_in6 *)&_res_ext.nsaddr;
-#ifdef USELOOPBACK
-	sin6->sin6_addr = in6addr_loopback;
-#else
-	sin6->sin6_addr = in6addr_any;
-#endif
-	sin6->sin6_family = AF_INET6;
-	sin6->sin6_port = htons(NAMESERVER_PORT);
-	sin6->sin6_len = sizeof(*sin6);
-#else /* INET6 */
 #ifdef USELOOPBACK
 	_res.nsaddr.sin_addr = inet_makeaddr(IN_LOOPBACKNET, 1);
 #else
@@ -228,7 +214,10 @@ res_init()
 #endif
 	_res.nsaddr.sin_family = AF_INET;
 	_res.nsaddr.sin_port = htons(NAMESERVER_PORT);
-#endif /* INET6 */
+#ifdef INET6
+	if (sizeof(_res_ext.nsaddr) >= _res.nsaddr.sin_len)
+		memcpy(&_res_ext.nsaddr, &_res.nsaddr, _res.nsaddr.sin_len);
+#endif
 	_res.nscount = 1;
 	_res.ndots = 1;
 	_res.pfcode = 0;
