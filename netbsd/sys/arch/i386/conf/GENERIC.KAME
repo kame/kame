@@ -9,7 +9,7 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 
 #options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
-#options 	SCTP		# adds SCTP stack to kernel - requires INET6
+options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
@@ -58,5 +58,5 @@ pseudo-device 	pf			# PF packet filter
 pseudo-device 	ist	1		# ISATAP
 
 # Datagram Congestion Control Protocol
-#options 	DCCP
+options 	DCCP
 #options 	DCCP_TFRC
