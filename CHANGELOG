@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1280 2000/09/18 21:03:32 itojun Exp $
+$KAME: CHANGELOG,v 1.1281 2000/09/18 22:45:41 itojun Exp $
 
 <200009>
+Tue Sep 19 07:43:42 JST 2000  itojun@iijlab.net
+	* freebsd[234], bsdi[34] tcp code: repair IPsec header size prediction
+	  (which avoids fragmentation on IPsec'ed TCP packet).
+	  was broken by Sep 19 00:59:30 change.
+
 Tue Sep 19 06:01:33 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: repair IPsec blowfish-cbc (BF_encrypt takes
 	  host endian value!).  Aug28 commit log was wrong.  blowfish-cbc has
