@@ -957,25 +957,8 @@ setgate(argc, argv)
 		else if (argc == 2 && strcasecmp(argv[1], "off") == 0)
 			gatemode = 0;
 		else {
-			if (argc == 3) {
-#if 0
-				char *ep;
-				long port;
-
-				port = strtol(argv[2], &ep, 10);
-				if (port < 0 || port > MAX_IN_PORT_T ||
-				    *ep != '\0') {
-					fprintf(ttyout,
-					    "%s: bad gateport value.\n",
-					    argv[2]);
-					code = -1;
-					return;
-				}
-				gateport = htons(port);
-#else
+			if (argc == 3)
 				gateport = strdup(argv[2]);
-#endif
-			}
 			strncpy(gsbuf, argv[1], sizeof(gsbuf) - 1);
 			gsbuf[sizeof(gsbuf) - 1] = '\0';
 			gateserver = gsbuf;
