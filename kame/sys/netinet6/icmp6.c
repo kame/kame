@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.170 2000/12/08 23:28:02 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.171 2000/12/09 00:07:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,6 +161,10 @@ LIST_HEAD(, icmp6_mtudisc_callback) icmp6_mtudisc_callbacks =
 
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
+
+/* XXX do these values make any sense? */
+int icmp6_mtudisc_hiwat = 1280;
+int icmp6_mtudisc_lowat = 256;
 #endif
 
 static void icmp6_errcount __P((struct icmp6errstat *, int, int));
@@ -1188,6 +1192,7 @@ icmp6_mtudisc_update(ip6cp, validated)
 	int validated;
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+	unsigned long rtcount;
 	struct icmp6_mtudisc_callback *mc;
 #endif
 	struct in6_addr *dst = ip6cp->ip6c_finaldst;
@@ -1204,11 +1209,28 @@ icmp6_mtudisc_update(ip6cp, validated)
 #endif
 #endif
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	/*
-	 * XXX should allow non-validated cases if memory is plenty
+	 * allow non-validated cases if memory is plenty, to make traffic
+	 * from non-connected pcb happy.
 	 */
+	rtcount = rt_timer_count(icmp6_mtudisc_timeout_q);
+	if (validated) {
+		if (rtcount > icmp6_mtudisc_hiwat)
+			return;
+		else if (rtcount > icmp6_mtudisc_lowat) {
+			/*
+			 * XXX nuke a victim, install the new one.
+			 */
+		}
+	} else {
+		if (rtcount > icmp6_mtudisc_lowat)
+			return;
+	}
+#else
 	if (!validated)
 		return;
+#endif
 
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = PF_INET6;
@@ -3265,6 +3287,12 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_ND6_MAXNUDHINT:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&nd6_maxnudhint);
+	case ICMPV6CTL_MTUDISC_HIWAT:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				&icmp6_mtudisc_hiwat);
+	case ICMPV6CTL_MTUDISC_LOWAT:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				&icmp6_mtudisc_lowat);
 	default:
 		return ENOPROTOOPT;
 	}
