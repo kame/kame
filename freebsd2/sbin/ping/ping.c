@@ -350,7 +350,7 @@ main(argc, argv)
 			else if (!strncmp("out", optarg, 3))
 				policy_out = strdup(optarg);
 			else
-				usage();
+				errx(EX_CONFIG, "invalid security policy");
 			break;
 #else
 		case 'A':
@@ -438,7 +438,7 @@ main(argc, argv)
 				errx(EX_CONFIG, ipsec_strerror());
 			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN,
 					buf, len) < 0)
-				warn(EX_CONFIG, NULL);
+				warn(NULL);
 			free(buf);
 		}
 		if (policy_out != NULL) {
@@ -450,7 +450,7 @@ main(argc, argv)
 				errx(EX_CONFIG, ipsec_strerror());
 			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT,
 					buf, len) < 0)
-				warn(EX_CONFIG, NULL);
+				warn(NULL);
 			free(buf);
 		}
 	}

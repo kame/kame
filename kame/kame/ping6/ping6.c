@@ -384,7 +384,7 @@ main(argc, argv)
 			else if (!strncmp("out", optarg, 3))
 				policy_out = strdup(optarg);
 			else
-				usage();
+				errx(1, "invalid security policy");
 			break;
 #else
 		case 'A':
