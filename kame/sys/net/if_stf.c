@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.46 2000/12/03 00:39:27 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.47 2001/01/17 04:10:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -767,12 +767,15 @@ in_stf_input(m, va_alist)
 
 /* ARGSUSED */
 static void
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+stf_rtrequest(cmd, rt, info)
+	int cmd;
+	struct rtentry *rt;
+	struct rt_addrinfo *info;
+#else
 stf_rtrequest(cmd, rt, sa)
 	int cmd;
 	struct rtentry *rt;
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-	struct rt_addrinfo *sa;
-#else
 	struct sockaddr *sa;
 #endif
 {
