@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.126 2000/06/12 05:19:18 itojun Exp $	*/
+/*	$KAME: key.c,v 1.127 2000/06/12 07:01:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,6 +102,13 @@
 #include <netinet6/ipcomp.h>
 
 #include <machine/stdarg.h>
+
+#ifdef __NetBSD__
+#include "rnd.h"
+#if NRND > 0
+#include <sys/rnd.h>
+#endif
+#endif
 
 #include <net/net_osdep.h>
 
@@ -414,6 +421,8 @@ static int key_cmpspidx_withmask
 	__P((struct secpolicyindex *, struct secpolicyindex *));
 static int key_sockaddrcmp __P((struct sockaddr *, struct sockaddr *, int));
 static int key_bbcmp __P((caddr_t, caddr_t, u_int));
+static void key_srandom __P((void));
+static u_long key_random __P((void));
 static u_int16_t key_satype2proto __P((u_int8_t));
 static u_int8_t key_proto2satype __P((u_int16_t));
 
@@ -4278,24 +4287,52 @@ key_timehandler(void)
 /*
  * to initialize a seed for random()
  */
-void
+static void
 key_srandom()
 {
 	struct timeval tv;
 #ifdef __bsdi__
 	extern long randseed; /* it's defined at i386/i386/random.s */
 #endif /* __bsdi__ */
+#ifdef __NetBSD__
+	int i;
+#endif
 
 	microtime(&tv);
 
 #ifdef __FreeBSD__
 	srandom(tv.tv_usec);
-#endif /* __FreeBSD__ */
-#ifdef __bsdi__
+#elif defined(__bsdi__)
 	randseed = tv.tv_usec;
-#endif /* __bsdi__ */
+#elif defined(__NetBSD__)
+	for (i = (int)((tv.tv_sec ^ tv.tv_usec) & 0x3ff); i > 0; i--)
+		(void)random();
+#endif
 
 	return;
+}
+
+/*
+ * to initialize a seed for random()
+ */
+static u_long
+key_random()
+{
+	u_long value;
+#if defined(__NetBSD__) && NRND > 0
+	int l;
+#endif
+
+#if defined(__NetBSD__) && NRND > 0
+	/* assumes that random number pool has enough entropy */
+	l = rnd_extract_data(&value, sizeof(value), RND_EXTRACT_GOOD);
+	if (l != sizeof(value))
+		value = random();
+#else
+	value = random();
+#endif
+
+	return value;
 }
 
 /*
@@ -4617,7 +4654,7 @@ key_do_getnewspi(spirange, saidx)
 		/* when requesting to allocate spi ranged */
 		while (count--) {
 			/* generate pseudo-random SPI value ranged. */
-			newspi = min + (random() % ( max - min + 1 ));
+			newspi = min + (key_random() % (max - min + 1));
 
 			if (key_checkspidup(saidx, newspi) == NULL)
 				break;
