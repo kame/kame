@@ -1,4 +1,4 @@
-/*	$KAME: connect.c,v 1.8 2000/09/27 02:53:14 jinmei Exp $ */
+/*	$KAME: connect.c,v 1.9 2001/03/29 03:41:39 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -52,6 +52,7 @@ main(argc, argv)
 {
 	int ch, ret_ga, hlim = -1;
 	struct addrinfo hints, *res;
+	struct sockaddr_in6 dst;
 	char readbuf[1024], *port = DEFAULTPORT;
 
 	while((ch = getopt(argc, argv, "h:p:")) != -1)
@@ -81,7 +82,6 @@ main(argc, argv)
 
 	if ((s = socket(res->ai_family, res->ai_socktype, 0)) < 0)
 		err(1, "socket");
-	freeaddrinfo(res);
 
 	if (hlim > 0 &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &hlim, sizeof(hlim))) {
@@ -90,6 +90,8 @@ main(argc, argv)
 
 	if (connect(s, res->ai_addr, res->ai_addrlen) < 0)
 		err(1, "connect");
+	memcpy(&dst, res->ai_addr, sizeof(dst));
+	freeaddrinfo(res);
 
 	printf("connect OK\n");
 
@@ -129,8 +131,7 @@ main(argc, argv)
 				       IPV6_RTHDR_TYPE_0, hops);
 			
 			for (i = 0; i < hops; i++) {
-				if (inet6_rth_add(rthdr, /* xxx v6 depend... */
-						  &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr)) {
+				if (inet6_rth_add(rthdr, &dst.sin6_addr)) {
 					warnx("inet6_rth_add failed");
 					free(rthdr);
 					goto sendbuf;
@@ -148,7 +149,7 @@ main(argc, argv)
 		if (write(s, readbuf, strlen(readbuf)) < 0)
 			warn("write");
 	}
-	
+
 	exit(0);
 }
 
