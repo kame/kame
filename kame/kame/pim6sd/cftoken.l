@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.13 2002/06/19 17:05:36 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.14 2002/06/19 23:46:51 itojun Exp $	*/
 
 %{
 /*
@@ -44,7 +44,7 @@
 #include "vmbuf.h"
 #include "debug.h"
 #include "cfparse-defs.h"
-#ifdef __NetBSD__
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 106000000	/*XXX*/
 #include "cfparse.h"
 #else
 #include "y.tab.h"
