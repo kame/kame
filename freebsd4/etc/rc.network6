@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/etc/rc.network6,v 1.5.2.23 2002/07/24 18:25:42 ume Exp $
+# $FreeBSD: src/etc/rc.network6,v 1.5.2.24 2003/08/15 09:19:01 ume Exp $
 #
 
 # Note that almost all of the user-configurable behavior is not in this
@@ -319,7 +319,7 @@ network6_interface_setup() {
 		sysctl net.inet6.ip6.accept_rtadv=1
 		set ${rtsol_interfaces}
 		ifconfig $1 up
-		rtsol $1
+		rtsol ${rtsol_flags} $1
 	fi
 
 	for i in $interfaces; do

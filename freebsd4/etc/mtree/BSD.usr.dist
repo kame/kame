@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.40 2003/02/14 22:38:14 nectar Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.44 2003/08/21 17:34:43 mtm Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -445,6 +445,8 @@
             ..
             af_ZA.ISO8859-15
             ..
+            am_ET.UTF-8
+            ..
             bg_BG.CP1251
             ..
             cs_CZ.ISO8859-2
@@ -581,6 +583,8 @@
             ..
             ro_RO.ISO8859-2
             ..
+            ru_RU.CP1251
+            ..
             ru_RU.CP866
             ..
             ru_RU.ISO8859-5
@@ -638,8 +642,6 @@
                 i386
                 ..
             ..
-            catn
-            ..
             en.ISO8859-1    uname=root
                 cat1
                 ..
@@ -671,8 +673,6 @@
                     i386
                     ..
                 ..
-                catn
-                ..
             ..
             ja              uname=root
                 cat1
@@ -693,8 +693,6 @@
                 ..
                 cat9
                 ..
-                catn
-                ..
 /set uname=root
                 man1
                 ..
@@ -713,8 +711,6 @@
                 man8
                 ..
                 man9
-                ..
-                mann
                 ..
             ..
             man1
@@ -747,8 +743,6 @@
                 i386
                 ..
             ..
-            mann
-            ..
         ..
         me
         ..
@@ -766,6 +760,8 @@
             af_ZA.ISO8859-1
             ..
             af_ZA.ISO8859-15
+            ..
+            am_ET.UTF-8
             ..
             bg_BG.CP1251
             ..
@@ -900,6 +896,8 @@
             pt_PT.ISO8859-15
             ..
             ro_RO.ISO8859-2
+            ..
+            ru_RU.CP1251
             ..
             ru_RU.CP866
             ..
