@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.89 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.90 2003/07/31 23:25:58 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1256,6 +1256,7 @@ dnsdecode(sp, ep, buf, bufsiz)
 
 	cp = *sp;
 	*buf = '\0';
+	i = 0;			/* XXX: appease gcc */
 
 	if (cp >= ep)
 		return (NULL);
