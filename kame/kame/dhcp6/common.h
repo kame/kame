@@ -27,13 +27,19 @@
  * SUCH DAMAGE.
  */
 
+#define IN6_IFF_INVALID (IN6_IFF_ANYCAST|IN6_IFF_TENTATIVE|\
+		IN6_IFF_DUPLICATED|IN6_IFF_DETACHED)
+
 extern char *device;
 
 /* common.c */
-extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *, int));
+extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *,
+			  int, int, int));
 extern int transmit_sa __P((int, struct sockaddr *, int, char *, size_t));
 extern int transmit __P((int, char *, char *, int, char *, size_t));
 extern long random_between __P((long, long));
 extern char *addr2str __P((struct sockaddr *));
 extern char *in6addr2str __P((struct in6_addr *, int));
 extern char *getdev __P((struct sockaddr_in6 *));
+extern int in6_addrscopebyif __P((struct in6_addr *, char *));
+extern int in6_scope __P((struct in6_addr *));

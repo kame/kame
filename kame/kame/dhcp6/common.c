@@ -44,6 +44,7 @@
 #endif
 #include <net/if.h>
 #include <netinet/in.h>
+#include <netinet6/in6_var.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -62,6 +63,7 @@
 #include <common.h>
 
 static unsigned int if_maxindex __P((void));
+static int in6_matchflags __P((struct in6_addr *, char *, int));
 
 static unsigned int
 if_maxindex()
@@ -79,16 +81,18 @@ if_maxindex()
 }
 
 int
-getifaddr(addr, ifnam, prefix, plen)
+getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 	struct in6_addr *addr;
 	char *ifnam;
 	struct in6_addr *prefix;
 	int plen;
+	int strong;		/* if strong host model is required or not */
+	int ignoreflags;
 {
 #ifdef USE_GETIFADDRS
 	struct ifaddrs *ifap, *ifa;
 	struct sockaddr_in6 sin6;
-	int error;
+	int error = -1;
 
 	if (getifaddrs(&ifap) != 0) {
 		err(1, "getifaddr: getifaddrs");
@@ -96,12 +100,25 @@ getifaddr(addr, ifnam, prefix, plen)
 	}
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		if (strcmp(ifnam, ifa->ifa_name) != 0)
+		int s1, s2;
+
+		if (strong && strcmp(ifnam, ifa->ifa_name) != 0)
 			continue;
+
+		/* in any case, ignore interfaces in different scope zones. */
+		if ((s1 = in6_addrscopebyif(addr, ifnam)) < 0 ||
+		    (s2 = in6_addrscopebyif(addr, ifa->ifa_name)) < 0 ||
+		     s1 != s2)
+			continue;
+
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		if (ifa->ifa_addr->sa_len > sizeof(sin6))
 			continue;
+
+		if (in6_matchflags(addr, ifnam, ignoreflags))
+			continue;
+
 		memcpy(&sin6, ifa->ifa_addr, ifa->ifa_addr->sa_len);
 		if (plen % 8 == 0) {
 			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
@@ -128,7 +145,7 @@ getifaddr(addr, ifnam, prefix, plen)
 	}
 
 	freeifaddrs(ifap);
-	return error;
+	return(error);
 #else
 	int s;
 	unsigned int maxif;
@@ -169,8 +186,18 @@ getifaddr(addr, ifnam, prefix, plen)
 	     ifr < ifr_end;
 	     ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
 				    + ifr->ifr_addr.sa_len)) {
-		if (strcmp(ifnam, ifr->ifr_name) != 0)
+		if (strong && strcmp(ifnam, ifr->ifr_name) != 0)
 			continue;
+
+		/* in any case, ignore interfaces in different scope zones. */
+		if ((s1 = in6_addrscopebyif(addr, ifnam)) < 0 ||
+		    (s2 = in6_addrscopebyif(addr, ifa->ifa_name)) < 0 ||
+		     s1 != s2)
+			continue;
+
+		if (in6_matchflags(addr, ifnam, ignoreflags))
+			continue;
+
 		if (ifr->ifr_addr.sa_family != AF_INET6)
 			continue;
 		if (ifr->ifr_addr.sa_len > sizeof(sin6))
@@ -203,6 +230,28 @@ getifaddr(addr, ifnam, prefix, plen)
 	close(s);
 	return error;
 #endif
+}
+
+int
+in6_addrscopebyif(addr, ifnam)
+	struct in6_addr *addr;
+	char *ifnam;
+{
+	u_int ifindex; 
+
+	if ((ifindex = if_nametoindex(ifnam)) == 0)
+		return(-1);
+
+	if (IN6_IS_ADDR_LINKLOCAL(addr) || IN6_IS_ADDR_MC_LINKLOCAL(addr))
+		return(ifindex);
+
+	if (IN6_IS_ADDR_SITELOCAL(addr) || IN6_IS_ADDR_MC_SITELOCAL(addr))
+		return(1);	/* XXX */
+
+	if (IN6_IS_ADDR_MC_ORGLOCAL(addr))
+		return(1);	/* XXX */
+
+	return(1);		/* treat it as global */
 }
 
 /* XXX: this code assumes getifaddrs(3) */
@@ -338,4 +387,72 @@ in6addr2str(in6, scopeid)
 	sa6.sin6_scope_id = scopeid;
 
 	return(addr2str((struct sockaddr *)&sa6));
+}
+
+/* return IPv6 address scope type. caller assumes that smaller is narrower. */
+int
+in6_scope(addr)
+	struct in6_addr *addr;
+{
+	int scope;
+
+	if (addr->s6_addr[0] == 0xfe) {
+		scope = addr->s6_addr[1] & 0xc0;
+
+		switch (scope) {
+		case 0x80:
+			return 2; /* link-local */
+			break;
+		case 0xc0:
+			return 5; /* site-local */
+			break;
+		default:
+			return 14; /* global: just in case */
+			break;
+		}
+	}
+
+	/* multicast scope. just return the scope field */
+	if (addr->s6_addr[0] == 0xff)
+		return(addr->s6_addr[1] & 0x0f);
+
+	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
+		if (addr->s6_addr[15] == 1) /* loopback */
+			return 1;
+		if (addr->s6_addr[15] == 0) /* unspecified */
+			return 0; /* XXX: good value? */
+	}
+
+	return 14;		/* global */
+}
+
+static int
+in6_matchflags(addr, ifnam, flags)
+	struct in6_addr *addr;
+	char *ifnam;
+	int flags;
+{
+	int s;
+	struct in6_ifreq ifr6;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		warn("in6_matchflags: socket(DGRAM6)");
+		return(-1);
+	}
+	memset(&ifr6, 0, sizeof(ifr6));
+	strncpy(ifr6.ifr_name, ifnam, sizeof(ifr6.ifr_name));
+	ifr6.ifr_addr.sin6_family = AF_INET6;
+	ifr6.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
+	ifr6.ifr_addr.sin6_addr = *addr;
+	/* XXX: sin6_scope_id?? */
+
+	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6)"); /* assert? */
+		close(s);
+		return(-1);
+	}
+
+	close(s);
+
+	return(ifr6.ifr_ifru.ifru_flags6 & flags);
 }

@@ -32,6 +32,7 @@
 #include <sys/sockio.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
+#include <sys/uio.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
@@ -42,7 +43,12 @@
 #  include <time.h>
 # endif
 #endif
+
+#include <net/if.h>
+
 #include <netinet/in.h>
+#include <netinet6/in6_var.h>
+
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,18 +84,27 @@ char *dnsdom = NULL;
 
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
+
+static struct msghdr rmh, smh;
+static char rdatabuf[BUFSIZ];
+static int rmsgctllen;
+static char *rmsgctlbuf;
+
 struct servtab *servtab;
 
-static struct sockaddr_storage ss_from;
+static struct in6_addr link_local_prefix, site_local_prefix, global_prefix;
+#define LINK_LOCAL_PLEN 10
+#define SITE_LOCAL_PLEN 10
+#define GLOBAL_PLEN 3
 
 static void usage __P((void));
 static void mainloop __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
-static ssize_t server6_recv __P((int, char *, size_t));
-static void server6_react __P((int, char *, size_t));
-static int server6_react_solicit __P((int, char *, size_t));
-static int server6_react_request __P((int, char *, size_t));
+static ssize_t server6_recv __P((int, struct in6_pktinfo *));
+static void server6_react __P((size_t, struct in6_pktinfo *));
+static int server6_react_solicit __P((char *, size_t, struct in6_pktinfo *));
+static int server6_react_request __P((char *, size_t, struct in6_pktinfo *));
 
 int
 main(argc, argv)
@@ -186,12 +201,41 @@ server6_init()
 	struct addrinfo *res, *res2;
 	int error;
 	int ifidx;
+	int on = 1;
 	struct ipv6_mreq mreq6;
+	static struct iovec iov[2];
+	struct cmsghdr *cm;
 
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
 		errx(1, "invalid interface %s", device);
 
+	/* initialize constant variables */
+	if (inet_pton(AF_INET6, "fe80::", &link_local_prefix) != 1) {
+		errx(1, "inet_pton failed for fec0::");
+		/* NOTREACHED */
+	}
+	if (inet_pton(AF_INET6, "fec0::", &site_local_prefix) != 1) {
+		errx(1, "inet_pton failed for fec0::");
+		/* NOTREACHED */
+	}
+	if (inet_pton(AF_INET6, "2000::", &global_prefix) != 1) {
+		errx(1, "inet_pton failed");
+		/* NOTREACHED */
+	}
+
+	/* initialize send/receive buffer */
+	iov[0].iov_base = (caddr_t)rdatabuf;
+	iov[0].iov_len = sizeof(rdatabuf);
+	rmh.msg_iov = iov;
+	rmh.msg_iovlen = 1;
+	rmsgctllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	if ((rmsgctlbuf = (char *)malloc(rmsgctllen)) == NULL) {
+		errx(1, "memory allocation failed");
+		/* NOTREACHED */
+	}
+
+	/* initiilize socket */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -206,6 +250,10 @@ server6_init()
 	if (insock < 0) {
 		err(1, "socket(insock)");
 		/* NOTREACHED */
+	}
+	if (setsockopt(insock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(IPV6_RECVPKTINFO)");
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(insock)");
@@ -289,8 +337,8 @@ server6_mainloop()
 {
 	int ret;
 	fd_set r;
-	char abuf[BUFSIZ];
 	ssize_t l;
+	struct in6_pktinfo rcvpktinfo;
 
 	while (1) {
 		FD_ZERO(&r);
@@ -305,48 +353,77 @@ server6_mainloop()
 			break;
 		}
 		if (FD_ISSET(insock, &r)) {
-			l = server6_recv(insock, abuf, sizeof(abuf));
-			server6_react(1, abuf, l);	/*XXX*/
+			if ((l = server6_recv(insock, &rcvpktinfo)) > 0)
+				server6_react(l, &rcvpktinfo);
 		}
 	}
 }
 
 static ssize_t
-server6_recv(s, buf, siz)
+server6_recv(s, rcvpi)
 	int s;
-	char *buf;
-	size_t siz;
+	struct in6_pktinfo *rcvpi;
 {
 	ssize_t len;
-	socklen_t fromlen;
+	struct sockaddr_storage from;
+	struct in6_pktinfo *pi = NULL;
+	struct cmsghdr *cm;
 
-	fromlen = sizeof(ss_from);
-	if ((len = recvfrom(s, buf, siz, 0,
-			(struct sockaddr *)&ss_from, &fromlen)) < 0) {
-		err(1, "recvfrom(inbound)");
-		/* NOTREACHED */
+	rmh.msg_control = (caddr_t)rmsgctlbuf;
+	rmh.msg_controllen = rmsgctllen;
+	rmh.msg_name = (caddr_t)&from;
+	rmh.msg_namelen = sizeof(from);
+
+	if ((len = recvmsg(s, &rmh, 0)) < 0) {
+		warn("recvmsg"); /* should assert? */
+		return(-1);
 	}
+	dprintf((stderr, "server6_recv: from %s, size %d\n",
+		 addr2str((struct sockaddr *)&from), len)); 
+
+
+	/* get optional information as ancillary data (if available) */
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&rmh); cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(&rmh, cm)) {
+		if (cm->cmsg_level != IPPROTO_IPV6)
+			continue;
+
+		switch(cm->cmsg_type) {
+		case IPV6_PKTINFO:
+			pi = (struct in6_pktinfo *)CMSG_DATA(cm);
+			break;
+		}
+	}
+	if (rcvpi) {
+		if (pi == NULL) {
+			warnx("server6_recv: we need rcvif but we couldn't");
+			return(-1);
+		}
+
+		*rcvpi = *pi;
+	}
+
 	return len;
 }
 
 static void
-server6_react(agent, buf, siz)
-	int agent;	/* 0: via relay, 1: direct */
-	char *buf;
+server6_react(siz, rcvpi)
 	size_t siz;
+	struct in6_pktinfo *rcvpi; /* incoming interface */
 {
 	union dhcp6 *dh6;
 
-	dh6 = (union dhcp6 *)buf;
+	dh6 = (union dhcp6 *)rdatabuf;
 	dprintf((stderr, "msgtype=%d\n", dh6->dh6_msgtype));
+
 	switch (dh6->dh6_msgtype) {
 	case DH6_SOLICIT:
-		server6_react_solicit(agent, buf, siz);
+		server6_react_solicit(rdatabuf, siz, rcvpi);
 		break;
 	case DH6_ADVERT:
 		break;
 	case DH6_REQUEST:
-		server6_react_request(agent, buf, siz);
+		server6_react_request(rdatabuf, siz, rcvpi);
 		break;
 	case DH6_REPLY:
 	case DH6_RELEASE:
@@ -357,63 +434,131 @@ server6_react(agent, buf, siz)
 	}
 }
 
-/* 6.1. Receiving DHCP Solicit Messages */
-/* 6.2. Sending DHCP Advertise Messages */
+/* 10.5.1. Receipt of Solicit messages */
+/* 10.5.2. Creation and sending of Advertise messages */
 static int
-server6_react_solicit(agent, buf, siz)
-	int agent;	/* 0: via relay, 1: direct */
+server6_react_solicit(buf, siz, rcvpi)
 	char *buf;
 	size_t siz;
+	struct in6_pktinfo *rcvpi;
 {
 	struct dhcp6_solicit *dh6s;
 	struct dhcp6_advert *dh6a;
-	char sbuf[BUFSIZ];
+	char sbuf[BUFSIZ], ifnam[IF_NAMESIZE];
 	ssize_t len;
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
-	struct in6_addr myaddr, target;
-	int hlim;
+	struct in6_addr servaddr, target;
+	int hlim, agent;
 
 	dprintf((stderr, "react_solicit\n"));
 
+	if (if_indextoname(rcvpi->ipi6_ifindex, ifnam) == NULL) {
+		/* it should be impossible, so we might have to assert here */
+		dprintf((stderr, "if_nametoindex failed for ID %d",
+			 rcvpi->ipi6_ifindex));
+		return(-1);
+	}
+
 	if (siz < sizeof(*dh6s)) {
 		dprintf((stderr, "react_solicit: short packet\n"));
-		return -1;
+		return(-1);
 	}
 	dh6s = (struct dhcp6_solicit *)buf;
 
-	if (!agent) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&dh6s->dh6sol_relayaddr)
-		 || IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_relayaddr)) {
-			dprintf((stderr, "react_solicit: invalid relayaddr "
-				"to server addr\n"));
-			return -1;
+	/* 10.1. Solicit Message Validation */
+	if (!IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_cliaddr)) {
+		dprintf((stderr,
+			 "react_solicit: invalid cliaddr: %s\n",
+			 in6addr2str(&dh6s->dh6sol_cliaddr, 0)));
+		return(-1);
+	}
+
+	agent = !IN6_IS_ADDR_UNSPECIFIED(&dh6s->dh6sol_relayaddr);
+	if (agent) {
+		int plen = (dh6s->dh6sol_plen_id >> 1) & 0x7f;
+
+		if (plen == 0) {
+			dprintf((stderr,
+				 "react_solicit: 0 prefix length is not "
+				"allowed when relayed\n", plen));
+			return(-1);
 		}
-	} else {
-		if (dh6s->dh6sol_prefixsiz != 0) {
-			dprintf((stderr, "react_solicit: invalid prefixsiz %d "
-				"(must be zero)\n", dh6s->dh6sol_prefixsiz));
-			return -1;
+
+		if (IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_relayaddr) ||
+		    IN6_IS_ADDR_LOOPBACK(&dh6s->dh6sol_relayaddr)) {
+			dprintf((stderr,
+				 "react_solicit: bad relay address %s",
+				 in6addr2str(&dh6s->dh6sol_relayaddr, 0)));
+			return(-1);
+		}
+		/*
+		 * If the relay address has a larger scope than the scope of
+		 * the solicitation's destination, the responded advertise
+		 * message might be able to break a scope boundary.
+		 */
+		if (in6_scope(&dh6s->dh6sol_relayaddr) >
+		    in6_scope(&rcvpi->ipi6_addr)) {
+			dprintf((stderr,
+				 "react_solicit: bad relay address %s with dst %s",
+				 in6addr2str(&dh6s->dh6sol_relayaddr, 0),
+				 in6addr2str(&rcvpi->ipi6_addr, 0)));
+			return(-1);
 		}
 	}
-	if (!IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_cliaddr)) {
-		dprintf((stderr, "react_solicit: invalid cliaddr\n"));
-		return -1;
+
+	if (agent) {		/* relay address is specified */
+		/*
+		 * The ``relay-address'' field MUST contain an address of
+		 * sufficient scope that is reachable by the server.
+		 * Otherwise, the solicitation must be discarded.
+		 */
+		if (IN6_IS_ADDR_SITELOCAL(&dh6s->dh6sol_relayaddr)) {
+			if (getifaddr(&servaddr, ifnam, &site_local_prefix,
+				      SITE_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
+				if (getifaddr(&servaddr, ifnam, &global_prefix,
+					      GLOBAL_PLEN, 0, IN6_IFF_INVALID)
+				    != 0) {
+					dprintf((stderr,
+						 "react_solicit: can't find "
+						 "server address for relay %s",
+						 in6addr2str(&dh6a->dh6adv_relayaddr,
+							     0)));
+					return(-1);
+				}
+			}
+		}
+	} else {
+		if (getifaddr(&servaddr, ifnam, &link_local_prefix,
+			      LINK_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
+			dprintf((stderr,
+				 "react_solicit: can't find link-local on %s",
+				 ifnam));
+			/*
+			 * This situation should fairely serious.
+			 * Should we assert here?
+			 */
+			return(-1);
+		}
 	}
 
 #if 0
 	if ((dh6s->dh6sol_flags & DH6SOL_CLOSE) != 0)
 		server6_flush(&dh6s->dh6sol_cliaddr, NULL);
 #endif
-
-	/* build new client-agent binding if not present */
-
-	if (!agent) {
-		usleep(1000 * random_between(SERVER_MIN_ADV_DELAY,
-			SERVER_MAX_ADV_DELAY));
+	if ((dh6s->dh6sol_flags & DH6SOL_PREFIX) != 0) {
+		dprintf((stderr,
+			 "react_solicit: P bit is set, but not implemented"));
+		/* proceed anyway */
 	}
 
+	/*
+	 * Build new client-agent binding if not present
+	 * XXX: not implemented yet.
+	 */
+
+	/* prepare advertise message */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -425,117 +570,183 @@ server6_react_solicit(agent, buf, siz)
 	}
 	memcpy(&dst, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
+	if (agent) {
+		dst.sin6_addr = dh6s->dh6sol_relayaddr;
+		hlim = 0;
+	} else {
+		dst.sin6_addr = dh6s->dh6sol_cliaddr;
+		dst.sin6_scope_id = rcvpi->ipi6_ifindex;
+		hlim = 1;
+	}
 
 	dh6a = (struct dhcp6_advert *)sbuf;
 	len = sizeof(*dh6a);
 	memset(dh6a, 0, sizeof(*dh6a));
 	dh6a->dh6adv_msgtype = DH6_ADVERT;
+	/* Copy soclit-ID. XXX: note that it's a 9bit field... */
+	memcpy(&dh6a->dh6adv_rsv_id, &dh6s->dh6sol_plen_id, 2);
+	dh6a->dh6adv_rsv_id &= 0x01;
 	memcpy(&dh6a->dh6adv_cliaddr, &dh6s->dh6sol_cliaddr,
 		sizeof(dh6s->dh6sol_cliaddr));
-	if (!IN6_IS_ADDR_UNSPECIFIED(&dh6s->dh6sol_relayaddr)) {
-		memcpy(&dh6a->dh6adv_relayaddr, &dh6s->dh6sol_relayaddr,
-			sizeof(dh6s->dh6sol_relayaddr));
-		dst.sin6_addr = dh6a->dh6adv_relayaddr;
-		if (inet_pton(AF_INET6, "2000::", &target) != 1) {
-			errx(1, "inet_pton failed");
-			/* NOTREACHED */
-		}
-		if (getifaddr(&myaddr, device, &target, 3) != 0) {
-			if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
-				errx(1, "inet_pton failed");
-				/* NOTREACHED */
-			}
-			if (getifaddr(&myaddr, device, &target, 10) != 0) {
-				errx(1, "no matching address on %s", device);
-				/* NOTREACHED */
-			}
-		}
-		hlim = 0;
-	} else {
-		dst.sin6_addr = dh6s->dh6sol_cliaddr;
-		dst.sin6_scope_id = if_nametoindex(device);
-		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
-			errx(1, "inet_pton failed");
-			/* NOTREACHED */
-		}
-		if (getifaddr(&myaddr, device, &target, 10) != 0) {
-			errx(1, "no matching address on %s", device);
-			/* NOTREACHED */
-		}
-		hlim = 1;
-	}
+	/* copy the relay address (regardless of its value) */
+	memcpy(&dh6a->dh6adv_relayaddr, &dh6s->dh6sol_relayaddr,
+	       sizeof(dh6s->dh6sol_relayaddr));
+
 #ifdef __KAME__
-	if (IN6_IS_ADDR_LINKLOCAL(&myaddr))
-		myaddr.s6_addr[2] = myaddr.s6_addr[3] = 0;
+	if (IN6_IS_ADDR_LINKLOCAL(&servaddr))
+		servaddr.s6_addr[2] = servaddr.s6_addr[3] = 0;
 #endif
-	memcpy(&dh6a->dh6adv_serveraddr, &myaddr, sizeof(myaddr));
-	dh6a->dh6adv_flags = DH6ADV_SERVPRESENT;
-	dh6a->dh6adv_pref = 255;	/*XXX*/
+	memcpy(&dh6a->dh6adv_serveraddr, &servaddr, sizeof(servaddr));
+	dh6a->dh6adv_pref = DEFAULT_SERVER_PREFERENCE;
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
-		err(1, "transmit to %s failed",
-		    addr2str((struct sockaddr *)&dst));
-		/* NOTREACHED */
+		/* XXX: can we believe errno has a valid value? */
+		warn("transmit to %s failed",
+		     addr2str((struct sockaddr *)&dst));
+		return(-1);
 	}
+	return(0);
 }
 
-/* 6.3. DHCP Request and Reply Message Processing */
+/* 11.6.1. Receipt of Request messages */
+/* 11.6.3. Creation and sending of Reply messages */
 static int
-server6_react_request(agent, buf, siz)
-	int agent;	/* 0: via relay, 1: direct */
+server6_react_request(buf, siz, rcvpi)
 	char *buf;
 	size_t siz;
+	struct in6_pktinfo *rcvpi;
 {
 	struct dhcp6_request *dh6r;
 	struct dhcp6_reply *dh6p;
-	char sbuf[BUFSIZ];
+	char sbuf[BUFSIZ], ifnam[IF_NAMESIZE];
 	ssize_t len;
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
 	struct in6_addr *servaddr = NULL;
 	struct in6_addr myaddr, target;
-	int hlim;
 	struct dhcp6_opt *opt;
 	char *ext;
 	time_t t;
 	struct tm *tm;
 	struct dhcp6e extbuf;
+	int agent;
 
 	dprintf((stderr, "react_request\n"));
 
+	if (if_indextoname(rcvpi->ipi6_ifindex, ifnam) == NULL) {
+		/* it should be impossible, so we might have to assert here */
+		dprintf((stderr, "if_nametoindex failed for ID %d",
+			 rcvpi->ipi6_ifindex));
+		return(-1);
+	}
 	if (siz < sizeof(*dh6r)) {
 		dprintf((stderr, "react_request: short packet\n"));
-		return -1;
+		return(-1);
 	}
 	dh6r = (struct dhcp6_request *)buf;
 
-	if (!agent) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&dh6r->dh6req_relayaddr)
-		 || IN6_IS_ADDR_LINKLOCAL(&dh6r->dh6req_relayaddr)) {
-			dprintf((stderr, "react_request: invalid relayaddr "
-				"to server addr\n"));
-			return -1;
-		}
-	}
+	/* 11.1. Request Message Validation */
+
+	/*
+	 * ``client's link-local address'' field MUST contain a valid link-local
+	 * address.
+	 */
 	if (!IN6_IS_ADDR_LINKLOCAL(&dh6r->dh6req_cliaddr)) {
-		dprintf((stderr, "react_request: invalid cliaddr\n"));
-		return -1;
-	}
-	if ((dh6r->dh6req_flags & DH6REQ_SERVPRESENT) != 0) {
-		if (siz < sizeof(*dh6r) + sizeof(struct in6_addr)) {
-			dprintf((stderr, "react_request: short packet\n"));
-			return -1;
-		}
-		servaddr = (struct in6_addr *)(dh6r + 1);
+		dprintf((stderr,
+			 "react_request: invalid cliaddr: %s\n",
+			 in6addr2str(&dh6r->dh6req_cliaddr, 0)));
+		return(-1);
 	}
 
-#if 0
-	if ((dh6s->dh6sol_flags & DH6SOL_CLOSE) != 0)
-		server6_flush(&dh6s->dh6sol_cliaddr, NULL);
-#endif
+	/*
+	 * The ``server-address'' field value MUST match one of the
+	 * server's addresses.
+	 */
+	if (getifaddr(&dh6r->dh6req_serveraddr, ifnam, &target, 128,
+		      0, 0) != 0) {
+		warnx("server6_react_request: server-address %s does not match",
+		      in6addr2str(&dh6r->dh6req_serveraddr,
+				  in6_addrscopebyif(&dh6r->dh6req_serveraddr,
+						    ifnam)));
+		return(-1);
+	}
+
+	/*
+	 * If the ``relay-address'' field is not the zero address, then that
+	 * field's value MUST contain an address of sufficient scope as to be
+	 * reachable by the server.
+	 */
+	if ((agent = !IN6_IS_ADDR_UNSPECIFIED(&dh6r->dh6req_relayaddr)) != 0) {
+		if (IN6_IS_ADDR_LINKLOCAL(&dh6r->dh6req_relayaddr) ||
+		    IN6_IS_ADDR_LOOPBACK(&dh6r->dh6req_relayaddr)) {
+			dprintf((stderr,
+				 "react_request: bad relay address %s",
+				 in6addr2str(&dh6r->dh6req_relayaddr, 0)));
+			return(-1);
+		}
+
+		/*
+		 * If the relay address has a larger scope than the scope of
+		 * the request's destination, the responded response
+		 * message might be able to break a scope boundary.
+		 */
+		if (in6_scope(&dh6r->dh6req_relayaddr) >
+		    in6_scope(&rcvpi->ipi6_addr)) {
+			dprintf((stderr,
+				 "react_request: bad relay address %s with dst %s",
+				 in6addr2str(&dh6r->dh6req_relayaddr, 0),
+				 in6addr2str(&rcvpi->ipi6_addr, 0)));
+			return(-1);
+		}
+
+		/* If we have a global address, there's no problem. */
+		if (getifaddr(&myaddr, ifnam, &global_prefix,
+			      GLOBAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
+			if (!IN6_IS_ADDR_SITELOCAL(&dh6r->dh6req_relayaddr)) {
+				dprintf((stderr,
+					 "react_request: relay has a too large scope: %s",
+					 in6addr2str(&dh6r->dh6req_relayaddr, 0)));
+				return(-1);
+			}
+			/* relay is site-local, so site-local is OK as well */
+			if (getifaddr(&myaddr, ifnam, &site_local_prefix,
+				      SITE_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
+				dprintf((stderr,
+					 "react_request: relay has a too large scope: %s",
+					 in6addr2str(&dh6r->dh6req_relayaddr, 0)));
+				return(-1);
+			}
+		}
+	}
+
+	/*
+	 * If the client has set the ``C'' bit, the server MUST release all
+	 * releasable resources currently associated with the client's binding
+	 * that do not appear in the ``extensions'' field.
+	 */
+	if ((dh6r->dh6req_flags & DH6REQ_CLOSE) != 0) {
+		dprintf((stderr, "react_request: C bit is set, but ignore it"));
+		/* proceed anyway */
+	}
+
+	/*
+	 * If the client has set the ``R'' bit, the server MUST delete any
+	 * transaction-ID cache entries it is maintaining for this client, if
+	 * the server implements such a cache.
+	 */
+	if ((dh6r->dh6req_flags & DH6REQ_REBOOT) != 0) {
+		dprintf((stderr,
+			 "react_request: C bit is set, but we have no cache"));
+	}
+
+	/*
+	 * The ``extensions'' field contains an authentication extension,
+	 * and the server cannot successfully authenticate the client.
+	 */
 
 	/* build new client-agent binding if not present */
+	/* not implemented yet */
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
@@ -552,37 +763,31 @@ server6_react_request(agent, buf, siz)
 	dh6p = (struct dhcp6_reply *)sbuf;
 	len = sizeof(*dh6p);
 	memset(dh6p, 0, sizeof(*dh6p));
-	dh6p->dh6rep_msgtype = DH6_REPLY;
-	if ((dh6r->dh6req_flags & DH6REQ_SERVPRESENT) != 0) {
-		dst.sin6_addr = dh6r->dh6req_relayaddr;
-		if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
-			errx(1, "inet_pton failed");
-			/* NOTREACHED */
-		}
-		if (getifaddr(&myaddr, device, &target, 10) != 0) {
-			if (inet_pton(AF_INET6, "2000::", &target) != 1) {
-				errx(1, "inet_pton failed");
-				/* NOTREACHED */
-			}
-			if (getifaddr(&myaddr, device, &target, 3) != 0) {
-				errx(1, "no matching address on %s", device);
-				/* NOTREACHED */
-			}
-		}
-		hlim = 64;
-	} else {
-		dst.sin6_addr = ((struct sockaddr_in6 *)&ss_from)->sin6_addr;
-		hlim = 64;	/* XXX */
-	}
-#ifdef __KAME__
-	if (IN6_IS_ADDR_LINKLOCAL(&myaddr))
-		myaddr.s6_addr[2] = myaddr.s6_addr[3] = 0;
-#endif
-	dh6p->dh6rep_xid = dh6r->dh6req_xid;
-
-	/* attach extensions */
 	ext = (char *)(dh6p + 1);
+	dh6p->dh6rep_msgtype = DH6_REPLY;
+	dh6p->dh6rep_xid = dh6r->dh6req_xid;
+	dh6p->dh6rep_cliaddr = dh6r->dh6req_cliaddr;
+	if (agent) {
+		memcpy(dh6p + 1, &dh6r->dh6req_relayaddr,
+		       sizeof(struct in6_addr));
+		dh6p->dh6rep_flagandstat |= DH6REP_RELAYPRESENT;
 
+		len += sizeof(struct in6_addr);
+		ext += sizeof(struct in6_addr);
+
+		dst.sin6_addr = dh6r->dh6req_relayaddr;
+		dst.sin6_scope_id = in6_addrscopebyif(&dh6r->dh6req_relayaddr,
+						      ifnam);
+	}
+	else {
+		dst.sin6_addr = dh6r->dh6req_cliaddr;
+		dst.sin6_scope_id = in6_addrscopebyif(&dh6r->dh6req_cliaddr,
+						      ifnam);
+	}
+
+	/*
+	 * attach extensions.
+	 */
 	/* DNS server */
 	opt = dhcp6opttab_byname("Domain Name Server");
 	if (opt && dnsserv) {
@@ -649,7 +854,7 @@ server6_react_request(agent, buf, siz)
 		}
 	}
 
-	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
+	if (transmit_sa(outsock, (struct sockaddr *)&dst, 0, sbuf, len) != 0) {
 		err(1, "transmit to %s failed",
 		    addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -35,6 +35,8 @@
 
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
+
+#include <netinet6/in6_var.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -77,7 +79,7 @@ struct prefix_list {
 };
 TAILQ_HEAD(, prefix_list) global_prefixes; /* list of non-link-local prefixes */
 static char *global_strings[] = {
-	"2000::/3", "fec0::/10",
+	"fec0::/10", "2000::/3",
 };
 
 static void usage __P((void));
@@ -503,6 +505,7 @@ relay6_react_solicit(buf, siz, dev)
 	struct prefix_list *p;
 	static struct iovec iov[2];
 	struct in6_addr myaddr;
+	int plen;
 
 	dprintf((stderr, "relay6_react_solicit\n"));
 
@@ -513,11 +516,6 @@ relay6_react_solicit(buf, siz, dev)
 	dh6s = (struct dhcp6_solicit *)buf;
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_cliaddr)) {
-		/*
-		 * draft-ietf-dhc-dhcpv6-14 does not say how to deal with
-		 * such cases, but we don't believe we should forward
-		 * such bogus solicitations.
-		 */
 		warnx("relay6_react_solicit: client address (%s) is not "
 		      "link-local\n", in6addr2str(&dh6s->dh6sol_cliaddr, 0));
 		return;
@@ -534,16 +532,12 @@ relay6_react_solicit(buf, siz, dev)
 		      "the Unspecified address (ignored)",
 		      in6addr2str(&dh6s->dh6sol_relayaddr, 0));
 	}
-	if (dh6s->dh6sol_prefixsiz) {
-		warnx("relay6_react_solicit: prefix size (%d) is not zero",
-		      dh6s->dh6sol_prefixsiz);
-	}
 
 	/* find a non-link-local address and fill in the relay address field */
 	memset(&myaddr, 0, sizeof(myaddr));
 	for (p = TAILQ_FIRST(&global_prefixes); p; p = TAILQ_NEXT(p, plink)) {
 		if (getifaddr(&myaddr, dev, &p->paddr.sin6_addr,
-			      p->plen) == 0) /* found */
+			      p->plen, 0, IN6_IFF_INVALID) == 0) /* found */
 			break;
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&myaddr)) {
@@ -552,6 +546,14 @@ relay6_react_solicit(buf, siz, dev)
 		return;
 	}
 	dh6s->dh6sol_relayaddr = myaddr;
+	/*
+	 * Also places the number of bits of that make up the subnet prefix
+	 * for this address in the ``prefix-len'' field of the Solicit.
+	 * XXX: we blindly assume the length is 64 for now...
+	 */
+	plen = 64;		/* XXX */
+	dh6s->dh6sol_plen_id &= 0x01; /* clear prefix-len for safety */
+	dh6s->dh6sol_plen_id |= ((plen & 0xff) << 1);
 
 	/* set the source address and the outgoing interface */
 	memset(spktinfo, 0, sizeof(*spktinfo));
@@ -598,15 +600,9 @@ relay6_react_advert(buf, siz, dev)
 	sa6_relay.sin6_family = AF_INET6;
 	sa6_relay.sin6_len = sizeof(sa6_relay);
 	sa6_relay.sin6_addr = dh6a->dh6adv_relayaddr;
-#ifdef notyet
-	/* if we seriously considered scope issues, we'd need this */
-	sa6_relay.sin6_scope_id = if_name2scopeid(dev);
-#endif
+	sa6_relay.sin6_scope_id = in6_addrscopebyif(&dh6a->dh6adv_relayaddr,
+						    dev);
 
-	/*
-	 * draft-ietf-dhc-dhcpv6-14 does not require this check, but it'd
-	 * be better to add the check.
-	 */
 	if (!IN6_IS_ADDR_LINKLOCAL(&dh6a->dh6adv_cliaddr)) {
 		warnx("relay6_react_advert: client address (%s) is not "
 		      "link-local", in6addr2str(&dh6a->dh6adv_cliaddr, 0));

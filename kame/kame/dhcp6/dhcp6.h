@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * draft-ietf-dhc-dhcpv6-14
+ * draft-ietf-dhc-dhcpv6-15
  */
 
 #ifndef __DHCP6_H_DEFINED
@@ -54,7 +54,9 @@
 /* Predefined addresses */
 #define DH6ADDR_ALLAGENT	"ff02::1:2"
 #define DH6ADDR_ALLSERVER	"ff05::1:3"
+#ifdef obsolete
 #define DH6ADDR_ALLRELAY	"ff05::1:4"
+#endif 
 #define DH6PORT_DOWNSTREAM	"546"
 #define DH6PORT_UPSTREAM	"547"
 
@@ -73,26 +75,37 @@
 #define MIN_SOLICIT_DELAY	1	/* sec */
 #define MAX_SOLICIT_DELAY	5	/* sec */
 #define XID_TIMEOUT		600	/* sec */
+#define MIN_CLIENT_XID		1024
+#define MAX_CLIENT_XID		65535
+#define MIN_SERVER_XID		0
+#define MAX_SERVER_XID		1023
+
+/* Default values from the specification */
+#define DEFAULT_SERVER_PREFERENCE	0	/* lowest preference */
 
 /* DHCP6 base packet format */
 struct dhcp6_solicit {
 	u_int8_t dh6sol_msgtype;		/* DH6_SOLICIT */
 	u_int8_t dh6sol_flags;
 #define DH6SOL_CLOSE	0x80
-	u_int8_t dh6sol_pad;
+#define DH6SOL_PREFIX	0x40
+	/* XXX: solicit-ID is a 9-bit field...ugly! */
+#define DH6SOL_SOLICIT_ID_MASK 0x1fff
+	u_int16_t dh6sol_plen_id; /* prefix-len and solict-ID */
+#ifdef old			/* dhcpv6-14 and before */
 	u_int8_t dh6sol_prefixsiz;	/* prefix-size */
+	u_int8_t dh6sol_id;	/* solict-ID */
+#endif 
 	struct in6_addr dh6sol_cliaddr;	/* client's lladdr */
 	struct in6_addr dh6sol_relayaddr; /* relay agent's lladdr */
 } __attribute__ ((packed));
 
-/* NOTE: dhcpv6-12 and dhcpv6-13+n are not compatible at all */
 struct dhcp6_advert {
 	u_int8_t dh6adv_msgtype;		/* DH6_ADVERT */
-	u_int8_t dh6adv_flags;
-#define DH6ADV_SERVPRESENT	0x80
-	u_int8_t dh6adv_pad;
+	u_int8_t dh6adv_rsv_id;	/* reserved and uppermost bit of ID */
+	u_int8_t dh6adv_solcit_id; /* lower 8 bits of solicit-ID */
 	u_int8_t dh6adv_pref;
-	struct in6_addr dh6adv_cliaddr;	/* client's lladdr */
+	struct in6_addr dh6adv_cliaddr;	/* client's link-local addr */
 	struct in6_addr dh6adv_relayaddr; /* relay agent's (non-ll) addr */
 	struct in6_addr dh6adv_serveraddr; /* server's addr */
 	/* extensions */
@@ -102,33 +115,33 @@ struct dhcp6_request {
 	u_int8_t dh6req_msgtype;		/* DH6_REQUEST */
 	u_int8_t dh6req_flags;
 #define DH6REQ_CLOSE		0x80
-#define DH6REQ_SERVPRESENT	0x40
-#define DH6REQ_REBOOT		0x20
+#define DH6REQ_REBOOT		0x40
 	u_int16_t dh6req_xid;		/* transaction-ID */
 	struct in6_addr dh6req_cliaddr;	/* client's lladdr */
 	struct in6_addr dh6req_relayaddr; /* relay agent's (non-ll) addr */
-	/* struct in6_addr dh6req_serveraddr; optional: server's addr */
+	struct in6_addr dh6req_serveraddr; /* server's addr */
 	/* extensions */
 } __attribute__ ((packed));
 
 struct dhcp6_reply {
 	u_int8_t dh6rep_msgtype;		/* DH6_REPLY */
 	u_int8_t dh6rep_flagandstat;
-#define DH6REP_CLIPRESENT	0x80
+#define DH6REP_RELAYPRESENT	0x80
 #define DH6REP_STATMASK		0x7f
 	u_int16_t dh6rep_xid;		/* transaction-ID */
-	/* struct in6_addr dh6rep_cliaddr;	optional: client's lladdr */
+	struct in6_addr dh6rep_cliaddr;	/* client's lladdr */
+	/* struct in6_addr dh6rep_relayaddr; optional: relay address */
 	/* extensions */
 } __attribute__ ((packed));
 
 struct dhcp6_release {
 	u_int8_t dh6rel_msgtype;		/* DH6_RELEASE */
 	u_int8_t dh6rel_flags;
-#define DH6REL_DIRECT	0x80
+#define DH6REL_RELAYPRESENT	0x80
 	u_int16_t dh6rel_xid;		/* transaction-ID */
 	struct in6_addr dh6rel_cliaddr;	/* client's lladdr */
-	struct in6_addr dh6rel_relayaddr; /* relay agent's (non-ll) addr */
-	struct in6_addr dh6rel_reladdr; /* server's addr to be released */
+	struct in6_addr dh6rel_serveraddr; /* server's address */
+	struct in6_addr dh6rel_xaddr; /* address of relay or client */
 	/* extensions */
 } __attribute__ ((packed));
 
