@@ -225,6 +225,7 @@ struct uvif {
 	/* occurrences of timeouts */
 	u_quad_t uv_pim6_nbr_timo;
 	u_quad_t uv_listener_timo;
+	u_quad_t uv_querier_timo;
 	u_quad_t uv_outif_timo;	/* outgoing interfaces timers */
 };
 

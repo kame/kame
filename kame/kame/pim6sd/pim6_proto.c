@@ -320,8 +320,6 @@ receive_pim6_hello(src, pim_message, datalen)
 		}
 	    }
 	    v->uv_flags &= ~VIFF_DR;
-	    v->uv_flags &= ~VIFF_QUERIER;
-		
 	}
     }
 
@@ -379,7 +377,6 @@ delete_pim6_nbr(nbr_delete)
 	     * the local address is the winner.
 	     */
 	    v->uv_flags |= VIFF_DR;
-   	    v->uv_flags |= VIFF_QUERIER; 
     }
 
     /* Update the source entries */
