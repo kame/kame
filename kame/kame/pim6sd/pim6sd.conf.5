@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: pim6sd.conf.5,v 1.5 1999/11/11 22:46:25 jinmei Exp $
+.\"	$Id: pim6sd.conf.5,v 1.6 1999/11/17 16:34:55 jinmei Exp $
 .\"
 .Dd Oct 6, 1999
 .Dt PIM6SD.CONF 5
@@ -87,6 +87,17 @@ and
 .Ic all .
 .\"
 .It Xo
+.Ic reverselookup (yes \(ba no);
+.Xc
+Specifies if a hostname for an IPv6 address should be resolved
+on logging.
+.Ic yes
+means a hostname should be resolved, and
+.Ic no
+means should not.
+By default, a hostname is not resolved.
+.\"
+.It Xo
 .Ic phyint Ar interface
 .Op disable
 .Ic ;
@@ -105,10 +116,19 @@ and
 .Ic phyint Ar interface
 .Op preference Ar preference
 .Op metric Ar metric
+.Op nolistener
 .Ic ;
 .Xc
 Specifies the preference and/or metric values when sending a PIM
 assert message on the interface.
+If another optional parameter
+.Ic nolistener
+is specified,
+.Nm pim6sd
+will not send any MLD packets on the interface.
+This option is usually meaningless but will be useful when
+MLD messages are noisy (e.g. when debugging) and there is surely no
+listner on the interface.
 .\"
 .It Xo
 .Ic default_source_preference Ar preference;
@@ -144,8 +164,8 @@ the holdtime will be
 .Ar period
 *
 .Ar coef .
-The default values of the period and the timer are 30 and 105,
-respectively.
+The default values of the period and the coefficient are 30 and 3.5,
+respectively. The default holdtime is 105 seconds as a result.
 .\"
 .It Xo
 .Ic join_prune_period Ar period Ar coef;
@@ -158,8 +178,8 @@ the holdtime will be
 .Ar period
 *
 .Ar coef .
-The default values of the period and the timer are 60 and 210,
-respectively.
+The default values of the period and the coefficient are 60 and 3.5,
+respectively. Consequently, the default holdtime is 210 seconds.
 .\"
 .It Xo
 .Ic data_timeout Ar timer;
@@ -215,6 +235,9 @@ An optional parameter
 .Ic time
 specifies the interval of two succeeding advertisements in seconds.
 Its default value is 60.
+2.5 *
+.Ar time
+will be set to Candidate-RP-Advertisement messages.
 Another optional parameter
 .Ic priority
 specifies the priority of the RP.
