@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.300 2002/09/23 13:12:51 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.301 2002/10/08 09:25:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2432,7 +2432,7 @@ nd6_drain()
 	s = splnet();
 #endif
 
-	for (ln = llinfo_nd6.ln_next; ln; ln = nln) {
+	for (ln = llinfo_nd6.ln_next; ln && ln != &llinfo_nd6; ln = nln) {
 		nln = ln->ln_next;
 
 		mold = ln->ln_hold;
