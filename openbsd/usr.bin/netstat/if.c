@@ -176,15 +176,23 @@ intpr(interval, ifnetaddr)
 				 */
 				in = inet_makeaddr(ifaddr.in.ia_subnet,
 					INADDR_ANY);
-				printf("%-11.11s ", netname(in.s_addr,
-				    ifaddr.in.ia_subnetmask));
+				cp = netname(in.s_addr,
+			    	    ifaddr.in.ia_subnetmask);
 #else
-				printf("%-11.11s ",
-				    netname(ifaddr.in.ia_subnet,
-				    ifaddr.in.ia_subnetmask));
+				cp = netname(ifaddr.in.ia_subnet,
+				    ifaddr.in.ia_subnetmask);
 #endif
-				printf("%-17.17s ",
-				    routename(sin->sin_addr.s_addr));
+				if (vflag)
+					n = strlen(cp) < 11 ? 11 : strlen(cp);
+				else
+					n = 11;
+				printf("%-*.*s ", n, n, cp);
+				cp = routename(sin->sin_addr.s_addr);
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
 
 				if (aflag) {
 					u_long multiaddr;
@@ -203,6 +211,18 @@ intpr(interval, ifnetaddr)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
+#ifdef KAME_SCOPEID
+				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+					sin6->sin6_scope_id =
+						ntohs(*(u_int16_t *)
+						  &sin6->sin6_addr.s6_addr[2]);
+					/* too little width */
+					if (!vflag)
+						sin6->sin6_scope_id = 0;
+					sin6->sin6_addr.s6_addr[2] = 0;
+					sin6->sin6_addr.s6_addr[3] = 0;
+				}
+#endif
 				cp = netname6(&ifaddr.in6.ia_addr,
 					&ifaddr.in6.ia_prefixmask.sin6_addr);
 				if (vflag)
