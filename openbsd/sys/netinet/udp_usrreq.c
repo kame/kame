@@ -628,7 +628,7 @@ udp_saveopt(p, size, type)
 		return ((struct mbuf *) NULL);
 	cp = (struct cmsghdr *) mtod(m, struct cmsghdr *);
 	bcopy(p, CMSG_DATA(cp), size);
-	size += sizeof(*cp);
+	size = CMSG_LEN(size);
 	m->m_len = size;
 	cp->cmsg_len = size;
 	cp->cmsg_level = IPPROTO_IP;
