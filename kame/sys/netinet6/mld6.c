@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.59 2002/09/06 10:27:55 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.60 2002/09/19 03:15:58 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1402,6 +1402,10 @@ mld_record_queried_source(in6m, mld, mldlen)
 		}
 
 		LIST_FOREACH(curias, in6mm_src->i6ms_cur->head, i6as_list) {
+			/* sanity check */
+			if (curias->i6as_addr.sin6_family != src.sin6_family)
+				continue;
+
 			if (SS_CMP(&curias->i6as_addr, <, &src))
 				continue;
 

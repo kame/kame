@@ -1238,6 +1238,10 @@ igmp_record_queried_source(inm, igmp, igmplen)
 	    }
 
 	    LIST_FOREACH(curias, inm->inm_source->ims_cur->head, ias_list) {
+		/* sanity check */
+		if (curias->ias_addr.sin_family != sin.sin_family)
+		    continue;
+
 		if (SS_CMP(&curias->ias_addr, <, &sin))
 		    continue;
 
