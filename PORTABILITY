@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.9 1999/09/16 08:46:34 itojun Exp $
+$Id: PORTABILITY,v 1.10 1999/09/26 07:07:43 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -71,6 +71,14 @@ across those possibilities.
 		/*something*/ \
 	} while (0)
   Without this wrapper nasty mistakes can happen.
+
+- Compiler options needs to be configured differently into Makefile.
+  For NetBSD and OpenBSD, CFLAGS and CPPFLAGS are defined separately:
+	CPPFLAGS+=-I/usr/local/include
+	CFLAGS+=-g
+  For FreeBSD and BSDI, there's no distinction.
+	CFLAGS+=-I/usr/local/include
+	CFLAGS+=-g
 
 - On manpage installation.
   for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
