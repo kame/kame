@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.126 2001/09/21 05:12:52 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.127 2001/09/21 05:14:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -854,6 +854,7 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	if (m == NULL || error == NULL)
 		panic("ipsec6_getpolicybyaddr: NULL pointer was passed.\n");
 
+	/* get a policy entry matched with the packet */
     {
 	struct secpolicyindex spidx;
 
