@@ -154,8 +154,10 @@ bpf_open(char *iface)
 	}
 	fprintf(stderr, "outgoing interface is %s\n", iface);
 #else
-	if (iface == NULL)
+	if (iface == NULL) {
 		fprintf(stderr, "interface must be specified\n");
+		exit(1);
+	}
 #endif 
 	strcpy(ifr.ifr_name, iface);
 	if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
