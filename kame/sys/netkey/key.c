@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.239 2002/05/30 05:47:09 sakane Exp $	*/
+/*	$KAME: key.c,v 1.240 2002/05/30 05:48:52 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -858,7 +858,8 @@ key_do_allocsa_policy(sah, state)
 			key_sa_chgstate(d, SADB_SASTATE_DEAD);
 
 			m = key_setsadbmsg(SADB_DELETE, 0,
-			    d->sah->saidx.proto, 0, 0, d->refcnt - 1);
+			    key_proto2satype(d->sah->saidx.proto),
+			    0, 0, d->refcnt - 1);
 			if (!m)
 				goto msgfail;
 			result = m;
