@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.133 2000/11/15 04:35:11 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.134 2000/11/17 19:57:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1892,7 +1892,8 @@ ip6_notify_pmtu(in6p, dst, mtu)
 				     IPV6_PATHMTU, IPPROTO_IPV6)) == NULL)
 		return;
 
-	if (sbappendaddr(&so->so_rcv, dst, NULL, m_mtu) == 0) {
+	if (sbappendaddr(&so->so_rcv, (struct sockaddr *)dst, NULL, m_mtu)
+	    == 0) {
 		m_freem(m_mtu);
 		/* XXX: should count statistics */
 	} else
