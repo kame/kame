@@ -601,7 +601,7 @@ tcp_input(struct mbuf *m, ...)
 			return;
 		}
 		optlen = off - sizeof(struct tcphdr);
-		optp = mtod(m, u_int8_t *) + toff + sizeof(struct tcphdr);
+		optp = (u_int8_t *)(th + 1);
 		/*
 		 * Do quick retrieval of timestamp options ("options
 		 * prediction?").  If timestamp is the only option and it's
