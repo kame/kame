@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2221 2002/08/30 21:24:50 suz Exp $
+$KAME: CHANGELOG,v 1.2222 2002/08/30 21:25:21 suz Exp $
 
 <200208>
 Sat Aug 31 06:20:11 JST 2002	suz@crl.hitachi.co.jp
@@ -32,7 +32,7 @@ Fri Aug  9 17:45:30 JST 2002  itojun@iijlab.net
 Mon Aug  5 15:12:34 JST 2002	suz@crl.hitachi.co.jp
 	* kame/kame/ifmcstat: displays IGMPv2 and v3 multicast info
 
-Fri Aug  2 17:18:54 JST 2002  k-sugyou@kame.ney
+Fri Aug  2 17:18:54 JST 2002  k-sugyou@kame.net
 	* sys/netinet6/dest6.c: disable home address destination option
 	  in default KAME(support MIP6 kernel only)
 
