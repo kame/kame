@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.164 2001/02/04 08:47:25 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.165 2001/02/04 08:48:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2544,15 +2544,15 @@ in6_ifawithscope(oifp, dst)
 			 *
 			 * The precise decision table is as follows:
 			 * dscopecmp bscopecmp matchcmp  bI oI | replace?
-			 *       N/A     equal     N/A    Y  N |       No (1)
-			 *       N/A     equal     N/A    N  Y |      Yes (2)
-			 *       N/A     equal   larger    N/A |      Yes (3)
-			 *       N/A     equal  !larger    N/A |       No (4)
-			 *    larger    larger      N/A    N/A |       No (5)
-			 *    larger   smaller      N/A    N/A |      Yes (6)
-			 *   smaller    larger      N/A    N/A |      Yes (7)
-			 *   smaller   smaller      N/A    N/A |       No (8)
-			 *     equal   smaller      N/A    N/A |      Yes (9)
+			 *       N/A     equal     N/A    Y  N |   No (1)
+			 *       N/A     equal     N/A    N  Y |  Yes (2)
+			 *       N/A     equal   larger    N/A |  Yes (3)
+			 *       N/A     equal  !larger    N/A |   No (4)
+			 *    larger    larger      N/A    N/A |   No (5)
+			 *    larger   smaller      N/A    N/A |  Yes (6)
+			 *   smaller    larger      N/A    N/A |  Yes (7)
+			 *   smaller   smaller      N/A    N/A |   No (8)
+			 *     equal   smaller      N/A    N/A |  Yes (9)
 			 *     equal    larger       (already done at A above)
 			 */
 			dscopecmp = IN6_ARE_SCOPE_CMP(src_scope, dst_scope);
