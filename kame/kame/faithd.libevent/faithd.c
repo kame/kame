@@ -37,6 +37,13 @@
 #include <err.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <errno.h>
+#include <signal.h>
+#ifdef __STDC__
+#include <stdarg.h>
+#else
+#include <varargs.h>
+#endif
 #include "event.h"
 #include "prefix.h"
 
@@ -55,11 +62,14 @@ struct relay {
 };
 
 static char *configfile = NULL;
+static int foreground = 0;
 
 #define MAXSOCK	100
 
 int main __P((int, char **));
 static void usage __P((void));
+static void logmsg __P((int, const char *, ...));
+static void sighandler __P((int));
 static void doaccept __P((int, short, void *));
 static void outbound __P((int, short, void *));
 static void inbound __P((int, short, void *));
@@ -77,7 +87,6 @@ main(argc, argv)
 	int error;
 	int i;
 	const int yes = 1;
-	int foreground = 0;
 
 	while ((ch = getopt(argc, argv, "Df:")) != -1) {
 		switch (ch) {
@@ -153,6 +162,8 @@ main(argc, argv)
 			/*NOTREACHED*/
 		}
 
+	signal(SIGPIPE, sighandler);
+
 	event_init();
 	for (i = 0; i < smax; i++) {
 		event_set(&event[i], s[i], EV_READ, doaccept, &event[i]);
@@ -165,6 +176,39 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: faithd [-D] [-f configfile] port...\n");
+}
+
+#ifdef __STD__
+static void
+logmsg(level, msg, ...)
+	int level;
+	const char *msg;
+#else
+static void
+logmsg(int level, const char *msg, ...)
+#endif
+{
+	va_list ap;
+
+#ifdef __STDC__
+	va_start(ap, msg);
+#else
+	va_start(ap);
+#endif
+	if (foreground) {
+		vfprintf(stderr, msg, ap);
+		fprintf(stderr, "\n");
+	} else
+		vsyslog(level, msg, ap);
+	va_end(ap);
+}
+
+static void
+sighandler(sig)
+	int sig;
+{
+
+	logmsg(LOG_WARNING, "got signal %d", sig);
 }
 
 static void
@@ -220,7 +264,7 @@ doaccept(parent, event, arg)
 	    NI_NUMERICHOST);
 	getnameinfo((struct sockaddr *)&relayto, relaytolen, h2, sizeof(h2),
 	    sbuf, sizeof(sbuf), NI_NUMERICHOST);
-	syslog(LOG_INFO, "relaying %s -> %s, service %s", h1, h2, sbuf);
+	logmsg(LOG_INFO, "relaying %s -> %s, service %s", h1, h2, sbuf);
 
 	conf = config_match((struct sockaddr *)&from,
 	    (struct sockaddr *)&relayto);
@@ -282,9 +326,10 @@ outbound(s, event, arg)
 
 	if (r->len > 0) {
 		l = write(w->s, r->buf, r->len);
-		if (l < 0)
-			exit(1);
-		else if (l == 0) {
+		if (l < 0) {
+			logmsg(LOG_ERR, "write fail, errno=%d", errno);
+			event_add(&w->outbound, NULL);
+		} else if (l == 0) {
 			shutdown(w->s, SHUT_WR);
 			shutdown(r->s, SHUT_RD);
 			r->shutdown++;
@@ -324,9 +369,10 @@ inbound(s, event, arg)
 	}
 
 	l = read(r->s, r->buf, sizeof(r->buf));
-	if (l < 0)
-		exit(1);
-	else if (l == 0) {
+	if (l < 0) {
+		logmsg(LOG_ERR, "read fail, errno=%d", errno);
+		event_add(&r->inbound, NULL);
+	} else if (l == 0) {
 		shutdown(r->s, SHUT_RD);
 		shutdown(w->s, SHUT_WR);
 		r->shutdown++;
