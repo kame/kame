@@ -387,13 +387,14 @@ struct route_in6 {
 #define IPV6_LEAVE_GROUP	13 /* ip6_mreq; leave a group membership */
 #define IPV6_PORTRANGE		14 /* int; range to choose for unspec port */
 #define ICMP6_FILTER		18 /* icmp6_filter; icmp6 filter */
-#define IPV6_PKTINFO		19 /* bool; send/rcv if, src/dst addr */
-#define IPV6_HOPLIMIT		20 /* bool; hop limit */
-#define IPV6_NEXTHOP		21 /* bool; next hop addr */
-#define IPV6_HOPOPTS		22 /* bool; hop-by-hop option */
-#define IPV6_DSTOPTS		23 /* bool; destination option */
-#define IPV6_RTHDR		24 /* bool; routing header */
+#define IPV6_PKTINFO		19 /* in6_pktinfo; send if, src addr */
+#define IPV6_HOPLIMIT		20 /* int; send hop limit */
+#define IPV6_NEXTHOP		21 /* sockaddr; next hop addr */
+#define IPV6_HOPOPTS		22 /* ip6_hbh; send hop-by-hop option */
+#define IPV6_DSTOPTS		23 /* ip6_dest; send dst option befor rthdr */
+#define IPV6_RTHDR		24 /* ip6_rthdr; send routing header */
 #define IPV6_PKTOPTIONS		25 /* buf/cmsghdr; set/get IPv6 options */
+				   /* obsoleted by 2292bis */
 #define IPV6_CHECKSUM		26 /* int; checksum offset for raw socket */
 #define IPV6_BINDV6ONLY		27 /* bool; only bind INET6 at null bind */
 
@@ -409,6 +410,16 @@ struct route_in6 {
 #define IPV6_FW_ZERO		33 /* clear single/all firewall counter(s) */
 #define IPV6_FW_GET		34 /* get entire firewall rule chain */
 #endif
+
+/* new socket options introduced in RFC2292bis */
+#define IPV6_RTHDRDSTOPTS	35 /* ip6_dest; send dst option after rthdr */
+
+#define IPV6_RECVPKTINFO	36 /* bool; recv if, dst addr */
+#define IPV6_RECVHOPLIMIT	37 /* bool; recv hop limit */
+#define IPV6_RECVRTHDR		38 /* bool; send routing header */
+#define IPV6_RECVHOPOPTS	39 /* bool; recv hop-by-hop option */
+#define IPV6_RECVDSTOPTS	40 /* bool; recv dst option befor rthdr */
+#define IPV6_RECVRTHDRDSTOPTS	41 /* bool; recv dst option after rthdr */
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
 #define IPV6_RTHDR_STRICT    1 /* this hop must be a neighbor. XXX old spec */

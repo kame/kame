@@ -138,13 +138,18 @@ struct ip6_dest {
 #define IP6OPT_PAD1		0x00	/* 00 0 00000 */
 #define IP6OPT_PADN		0x01	/* 00 0 00001 */
 #define IP6OPT_JUMBO		0xC2	/* 11 0 00010 = 194 */
-#define IP6OPT_JUMBO_LEN	6
 #define IP6OPT_RTALERT		0x05	/* 00 0 00101 */
 #define IP6OPT_RTALERT_LEN	4
 #define IP6OPT_RTALERT_MLD	0	/* Datagram contains an MLD message */
 #define IP6OPT_RTALERT_RSVP	1	/* Datagram contains an RSVP message */
 #define IP6OPT_RTALERT_ACTNET	2 	/* contains an Active Networks msg */
 #define IP6OPT_MINLEN		2
+
+#define IP6OPT_BINDING_UPDATE	0xc6 /* 11 0 00110 */
+#define IP6OPT_BINDING_ACK	0x07 /* 00 0 00111 */
+#define IP6OPT_BINDING_REQ	0x08 /* 00 0 01000 */
+#define IP6OPT_HOME_ADDRESS	0xc9 /* 11 0 01001 */
+#define IP6OPT_EID		0x8a /* 10 0 01010 */
 
 #define IP6OPT_TYPE(o)		((o) & 0xC0)
 #define IP6OPT_TYPE_SKIP	0x00
@@ -153,6 +158,100 @@ struct ip6_dest {
 #define IP6OPT_TYPE_ICMP	0xC0
 
 #define IP6OPT_MUTABLE		0x20
+
+/* IPv6 options: common part */
+struct ip6_opt {
+	u_int8_t ip6o_type;
+	u_int8_t ip6o_len;
+};
+
+/* Jumbo Payload Option */
+struct ip6_opt_jumbo {
+	u_int8_t ip6oj_type;
+	u_int8_t ip6oj_len;
+	u_int8_t ip6oj_jumbo_len[4];
+};
+#define IP6OPT_JUMBO_LEN 6
+
+/* NSAP Address Option */
+struct ip6_opt_nsap {
+	u_int8_t ip6on_type;
+	u_int8_t ip6on_len;
+	u_int8_t ip6on_src_nsap_len;
+	u_int8_t ip6on_dst_nsap_len;
+	/* followed by source NSAP */
+	/* followed by destination NSAP */
+};
+
+/* Tunnel Limit Option */
+struct ip6_opt_tunnel {
+	u_int8_t ip6ot_type;
+	u_int8_t ip6ot_len;
+	u_int8_t ip6ot_encap_limit;
+};
+
+/* Router Alert Option */
+struct ip6_opt_router {
+	u_int8_t ip6or_type;
+	u_int8_t ip6or_len;
+	u_int8_t ip6or_value[2];
+};
+/* Router alert values (in network byte order) */
+#if BYTE_ORDER == BIG_ENDIAN
+#define IP6_ALERT_MLD	0x0000
+#define IP6_ALERT_RSVP	0x0001
+#define IP6_ALERT_AN	0x0002
+#else
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define IP6_ALERT_MLD	0x0000
+#define IP6_ALERT_RSVP	0x0100
+#define IP6_ALERT_AN	0x0200
+#endif /* LITTLE_ENDIAN */
+#endif
+
+/* Binding Update Option */
+struct ip6_opt_binding_update {
+	u_int8_t ip6ou_type;
+	u_int8_t ip6ou_len;
+	u_int8_t ip6ou_flags;
+	u_int8_t ip6ou_prefixlen;
+	u_int8_t ip6ou_seqno[2];
+	u_int8_t ip6ou_lifetime[4];
+	u_int8_t ip6ou_coa[16];/* Optional based on flags */
+	/* followed by sub-options */
+};
+
+/* Binding Update Flags */
+#define IP6_BUF_ACK	0x80	/* Request a binding ack */
+#define IP6_BUF_HOME	0x40	/* Home Registration */
+#define IP6_BUF_COA	0x20	/* Care-of-address present in option */
+#define IP6_BUF_ROUTER	0x10	/* Sending mobile node is a router */
+
+/* Binding Ack Option */
+struct ip6_opt_binding_ack {
+	u_int8_t ip6oa_type;
+	u_int8_t ip6oa_len;
+	u_int8_t ip6oa_status;
+	u_int8_t ip6oa_seqno[2];
+	u_int8_t ip6oa_lifetime[4];
+	u_int8_t ip6oa_refresh[4];
+	/* followed by sub-options */
+};
+
+/* Binding Request Option */
+struct ip6_opt_binding_request {
+	u_int8_t ip6or_type;
+	u_int8_t ip6or_len;
+	/* followed by sub-options */
+};
+
+/* Home Address Option */
+struct ip6_opt_home_address {
+    u_int8_t ip6oh_type;
+    u_int8_t ip6oh_len;
+    u_int8_t ip6oh_addr[16];/* Home Address */
+      /* followed by sub-options */
+};
 
 /* Routing header */
 struct ip6_rthdr {
