@@ -3302,6 +3302,9 @@ key_setsaval(sav, m, mhp)
 		switch (mhp->msg->sadb_msg_satype) {
 		case SADB_SATYPE_AH:
 		case SADB_SATYPE_ESP:
+#ifdef TCP_SIGNATURE
+		case SADB_X_SATYPE_TCPSIGNATURE:
+#endif
 			if (len == PFKEY_ALIGN8(sizeof(struct sadb_key)) &&
 			    sav->alg_auth != SADB_X_AALG_NULL)
 				error = EINVAL;
@@ -3357,6 +3360,9 @@ key_setsaval(sav, m, mhp)
 			sav->key_enc = NULL;	/*just in case*/
 			break;
 		case SADB_SATYPE_AH:
+#ifdef TCP_SIGNATURE
+		case SADB_X_SATYPE_TCPSIGNATURE:
+#endif
 		default:
 			error = EINVAL;
 			break;
@@ -3391,6 +3397,9 @@ key_setsaval(sav, m, mhp)
 		break;
 	case SADB_SATYPE_AH:
 	case SADB_X_SATYPE_IPCOMP:
+#ifdef TCP_SIGNATURE
+	case SADB_X_SATYPE_TCPSIGNATURE:
+#endif
 		break;
 	default:
 		ipseclog((LOG_DEBUG, "key_setsaval: invalid SA type.\n"));
@@ -3589,6 +3598,26 @@ key_mature(sav)
 		checkmask = 4;
 		mustmask = 4;
 		break;
+#ifdef TCP_SIGNATURE
+	case IPPROTO_TCP:
+		if (sav->alg_auth != SADB_X_AALG_TCP_MD5) {
+			ipseclog((LOG_DEBUG, "key_mature: unsupported authentication algorithm %u\n",
+			    sav->alg_auth));
+			return (EINVAL);
+		}
+		if (sav->alg_enc != SADB_EALG_NONE) {
+			ipseclog((LOG_DEBUG, "%s : protocol and algorithm "
+			    "mismated.\n", __func__));
+			return(EINVAL);
+		}
+		if (sav->spi != htonl(0x1000)) {
+			ipseclog((LOG_DEBUG, "key_mature: SPI must be TCP_SIG_SPI (0x1000)\n"));
+			return (EINVAL);
+		}
+		checkmask = 2;
+		mustmask = 2;
+		break;
+#endif
 	default:
 		ipseclog((LOG_DEBUG, "key_mature: Invalid satype.\n"));
 		return EPROTONOSUPPORT;
@@ -4908,7 +4937,10 @@ key_satype2proto(satype)
 		return IPPROTO_ESP;
 	case SADB_X_SATYPE_IPCOMP:
 		return IPPROTO_IPCOMP;
-		break;
+#ifdef TCP_SIGNATURE
+	case SADB_X_SATYPE_TCPSIGNATURE:
+		return IPPROTO_TCP;
+#endif
 	default:
 		return 0;
 	}
@@ -4931,7 +4963,10 @@ key_proto2satype(proto)
 		return SADB_SATYPE_ESP;
 	case IPPROTO_IPCOMP:
 		return SADB_X_SATYPE_IPCOMP;
-		break;
+#ifdef TCP_SIGNATURE
+	case IPPROTO_TCP:
+		return SADB_X_SATYPE_TCPSIGNATURE;
+#endif
 	default:
 		return 0;
 	}
@@ -7466,6 +7501,9 @@ key_parse(m, so)
 	case SADB_SATYPE_AH:
 	case SADB_SATYPE_ESP:
 	case SADB_X_SATYPE_IPCOMP:
+#ifdef TCP_SIGNATURE
+	case SADB_X_SATYPE_TCPSIGNATURE:
+#endif
 		switch (msg->sadb_msg_type) {
 		case SADB_X_SPDADD:
 		case SADB_X_SPDDELETE:

@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.61 2004/05/25 01:16:03 suz Exp $	*/
+/*	$KAME: ah_core.c,v 1.62 2004/12/01 07:48:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,6 +206,12 @@ static const struct ah_algorithm ah_algorithms[] = {
 		"aes-xcbc-mac",
 		ah_aes_xcbc_mac_init, ah_aes_xcbc_mac_loop,
 		ah_aes_xcbc_mac_result, },
+#ifdef TCP_SIGNATURE
+	{ ah_sumsiz_1216, ah_none_mature, 1, 80,
+		"TCP-MD5",
+		ah_none_init, ah_none_loop,
+		ah_none_result, },
+#endif
 };
 
 const struct ah_algorithm *
@@ -234,6 +240,10 @@ ah_algorithm_lookup(idx)
 		return &ah_algorithms[8];
 	case SADB_X_AALG_AES_XCBC_MAC:
 		return &ah_algorithms[9];
+#ifdef TCP_SIGNATURE
+	case SADB_X_AALG_TCP_MD5:
+		return &ah_algorithms[10];
+#endif
 	default:
 		return NULL;
 	}

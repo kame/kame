@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2692 2004/12/01 05:07:44 suz Exp $
+$KAME: CHANGELOG,v 1.2693 2004/12/01 07:48:23 suz Exp $
 
 <200411>
+2004-12-01 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* freebsd5/sys/netinet/tcp_subr.c,
+	  kame/sys/netinet6/ah_core.c,
+	  kame/sys/netkey/{key.[ch],keydb.h}:
+	supports TCP-MD5(IPv4) on FreeBSD5.
+
 2004-12-01 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/man/man4/ist.4, kame/sys/net/if_ist.[ch],
 	  kame/sys/netinet6/{in6.h, in6_ifattach.c, ip6_input.c},

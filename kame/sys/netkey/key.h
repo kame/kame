@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.34 2004/05/26 07:51:29 itojun Exp $	*/
+/*	$KAME: key.h,v 1.35 2004/12/01 07:48:24 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,6 +49,7 @@ struct sockaddr;
 struct socket;
 struct sadb_msg;
 struct sadb_x_policy;
+union sockaddr_union;
 
 extern struct secpolicy *key_allocsp __P((u_int16_t, struct secpolicyindex *,
 	u_int));
@@ -83,6 +84,17 @@ extern int key_checktunnelsanity __P((struct secasvar *, u_int,
 extern void key_sa_recordxfer __P((struct secasvar *, struct mbuf *));
 extern void key_sa_routechange __P((struct sockaddr *));
 extern void key_sa_stir_iv __P((struct secasvar *));
+
+/* to keep compatibility with FAST_IPSEC */
+#ifdef TCP_SIGNATURE
+#define	KEY_ALLOCSA(dst, proto, spi)	\
+	key_allocsa(((struct sockaddr *)(dst))->sa_family,\
+		    (caddr_t)&(((struct sockaddr_in *)(dst))->sin_addr),\
+		    (caddr_t)&(((struct sockaddr_in *)(dst))->sin_addr),\
+		    proto, spi)
+#define	KEY_FREESAV(psav)	\
+	key_freesav(*psav)
+#endif
 
 #if defined(MIP6) && !defined(MIP6_NOHAIPSEC)
 int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,
