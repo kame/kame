@@ -544,8 +544,8 @@ print_status(struct pf_status *s)
 	printf("%-27s %14s %16s\n", "State Table", "Total", "Rate");
 	printf("  %-25s %14u %14s\n", "current entries", s->states, "");
 	for (i = 0; i < FCNT_MAX; i++) {
-		printf("  %-25s %14lld ", pf_fcounters[i],
-			    s->fcounters[i]);
+		printf("  %-25s %14llu", pf_fcounters[i],
+			    (unsigned long long)s->fcounters[i]);
 		if (runtime > 0)
 			printf("%14.1f/s\n",
 			    (double)s->fcounters[i] / (double)runtime);
@@ -554,8 +554,8 @@ print_status(struct pf_status *s)
 	}
 	printf("Counters\n");
 	for (i = 0; i < PFRES_MAX; i++) {
-		printf("  %-25s %14lld ", pf_reasons[i],
-		    s->counters[i]);
+		printf("  %-25s %14llu ", pf_reasons[i],
+		    (unsigned long long)s->counters[i]);
 		if (runtime > 0)
 			printf("%14.1f/s\n",
 			    (double)s->counters[i] / (double)runtime);
