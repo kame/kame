@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.87 2001/10/19 08:50:27 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.88 2002/01/28 14:30:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1081,6 +1081,13 @@ gif_set_tunnel(ifp, src, dst)
 #endif
 #ifdef INET6
 	case AF_INET6:
+		/* Check validity of the scope zone ID of the addresses. */
+		if ((error = scope6_check_id((struct sockaddr_in6 *)sc->gif_psrc,
+					     0)) != 0 ||
+		    (error = scope6_check_id((struct sockaddr_in6 *)sc->gif_pdst,
+					     0)) != 0) {
+			break;
+		}
 		error = in6_gif_attach(sc);
 		break;
 #endif
