@@ -40,7 +40,7 @@ MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		inet6_rthdr_space.3 inet6_rthdr_segments.3 \
 		inet6_rthdr_space.3 inet6_rthdr_getaddr.3 \
 		inet6_rthdr_space.3 inet6_rthdr_getflags.3 \
-		bindresvport.3 bindresvport_af.3
+		bindresvport.3 bindresvport_sa.3
 
 .PATH:	${SRCDIR} ${SRCDIR}/resolv
 
