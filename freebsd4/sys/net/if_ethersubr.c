@@ -223,11 +223,16 @@ ether_output(ifp, m, dst, rt0)
 #endif
 #ifdef INET6
 	case AF_INET6:
+#ifdef OLDIP6OUTPUT
+		if (!nd6_resolve(&ac->ac_if, rt, m, dst, (u_char *)edst))
+			return(0);	/* if not yet resolves */
+#else
 		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
 			/* this must be impossible, so we bark */
 			printf("nd6_storelladdr failed\n");
 			return(0);
 		}
+#endif /* OLDIP6OUTPUT */
 		off = m->m_pkthdr.len - m->m_len;
 		type = htons(ETHERTYPE_IPV6);
 		break;
