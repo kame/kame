@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.57 2000/11/24 06:15:30 itojun Exp $
+	$KAME: PORTABILITY,v 1.58 2001/02/01 09:13:48 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -354,3 +354,8 @@ across those possibilities.
   Usenix 1999, by Todd C. Miller, Theo de Raadt.
 	http://www.openbsd.org/papers/strlcpy-paper.ps
 	http://www.openbsd.org/papers/strlcpy-slides.ps
+
+- strptime.
+	freebsd4 and netbsd have it in libc.
+	bsdi4 does not have it.
+	others?
