@@ -1,4 +1,4 @@
-/*	$NetBSD: extern.h,v 1.7.2.1 1999/09/26 13:35:10 he Exp $	*/
+/*	$NetBSD: extern.h,v 1.22.2.2 2000/10/18 01:32:51 tv Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -39,8 +39,11 @@
 #include <fcntl.h>
 #include <kvm.h>
 
-extern struct	cmdtab *curcmd;
-extern struct	cmdtab cmdtab[];
+#define ADJINETCTR(c, o, n, e)	(c.e = n.e - o.e)
+
+extern struct	command global_commands[];
+extern struct	mode *curmode;
+extern struct	mode modes[];
 extern struct	text *xtext;
 extern WINDOW	*wnd;
 extern char	**dr_name;
@@ -59,73 +62,156 @@ extern int	nports;
 extern int	protos;
 extern int	verbose;
 extern int	nflag;
+extern char	*memf;
 
 struct inpcb;
 #ifdef INET6
 struct in6pcb;
 #endif
 
-int	 checkhost __P((struct inpcb *));
-int	 checkport __P((struct inpcb *));
+int	 checkhost(struct inpcb *);
+int	 checkport(struct inpcb *);
 #ifdef INET6
-int	 checkhost6 __P((struct in6pcb *));
-int	 checkport6 __P((struct in6pcb *));
+int	 checkhost6(struct in6pcb *);
+int	 checkport6(struct in6pcb *);
 #endif
-void	 closeiostat __P((WINDOW *));
-void	 closekre __P((WINDOW *));
-void	 closembufs __P((WINDOW *));
-void	 closenetstat __P((WINDOW *));
-void	 closepigs __P((WINDOW *));
-void	 closeswap __P((WINDOW *));
-int	 cmdiostat __P((char *, char *));
-int	 cmdkre __P((char *, char *));
-int	 cmdnetstat __P((char *, char *));
-struct	 cmdtab *lookup __P((char *));
-void	 command __P((char *));
-void	 die __P((int));
-void	 display __P((int));
-int	 dkinit __P((int, gid_t));
-int	 dkcmd __P((char *, char *));
-void	 error __P((const char *fmt, ...));
-void	 fetchiostat __P((void));
-void	 fetchkre __P((void));
-void	 fetchmbufs __P((void));
-void	 fetchnetstat __P((void));
-void	 fetchpigs __P((void));
-void	 fetchswap __P((void));
-int	 initiostat __P((void));
-int	 initkre __P((void));
-int	 initmbufs __P((void));
-int	 initnetstat __P((void));
-int	 initpigs __P((void));
-int	 initswap __P((void));
-int	 keyboard __P((void)) __attribute__((__noreturn__));
-ssize_t	 kvm_ckread __P((void *, void *, size_t));
-void	 labeliostat __P((void));
-void	 labelkre __P((void));
-void	 labelmbufs __P((void));
-void	 labelnetstat __P((void));
-void	 labelpigs __P((void));
-void	 labelps __P((void));
-void	 labels __P((void));
-void	 labelswap __P((void));
-void	 load __P((void));
-int	 netcmd __P((char *, char *));
-void	 nlisterr __P((struct nlist []));
-WINDOW	*openiostat __P((void));
-WINDOW	*openkre __P((void));
-WINDOW	*openmbufs __P((void));
-WINDOW	*opennetstat __P((void));
-WINDOW	*openpigs __P((void));
-WINDOW	*openswap __P((void));
-int	 prefix __P((char *, char *));
-void	 redraw __P((int));
-void	 showiostat __P((void));
-void	 showkre __P((void));
-void	 showmbufs __P((void));
-void	 shownetstat __P((void));
-void	 showpigs __P((void));
-void	 showswap __P((void));
-void	 showps __P((void));
-void	 status __P((void));
-void	 suspend __P((int));
+void	 closebufcache(WINDOW *);
+void	 closeicmp(WINDOW *);
+void	 closeiostat(WINDOW *);
+void	 closeip(WINDOW *);
+void	 closevmstat(WINDOW *);
+void	 closembufs(WINDOW *);
+void	 closenetstat(WINDOW *);
+void	 closepigs(WINDOW *);
+void	 closeswap(WINDOW *);
+void	 closetcp(WINDOW *);
+void	 command(char *);
+void	 die(int);
+void	 disks_add(char *);
+void	 disks_delete(char *);
+void	 disks_drives(char *);
+void	 display(int);
+int	 dkinit(int, gid_t);
+void	 error(const char *, ...)
+     __attribute__((__format__(__printf__, 1, 2)));
+void	 fetchbufcache(void);
+void	 fetchicmp(void);
+void	 fetchiostat(void);
+void	 fetchip(void);
+void	 fetchvmstat(void);
+void	 fetchmbufs(void);
+void	 fetchnetstat(void);
+void	 fetchpigs(void);
+void	 fetchswap(void);
+void	 fetchtcp(void);
+int	 fetch_cptime(u_int64_t *);
+void	 global_help(char *);
+void	 global_interval(char *);
+void	 global_load(char *);
+void	 global_quit(char *);
+void	 global_stop(char *);
+void	 icmp_boot(char *);
+void	 icmp_run(char *);
+void	 icmp_time(char *);
+void	 icmp_zero(char *);
+int	 initbufcache(void);
+int	 initicmp(void);
+int	 initiostat(void);
+int	 initip(void);
+int	 initvmstat(void);
+int	 initmbufs(void);
+int	 initnetstat(void);
+int	 initpigs(void);
+int	 initswap(void);
+int	 inittcp(void);
+void	 iostat_bars(char *);
+void	 iostat_numbers(char *);
+void	 iostat_secs(char *);
+void	 ip_boot(char *);
+void	 ip_run(char *);
+void	 ip_time(char *);
+void	 ip_zero(char *);
+int	 keyboard(void) __attribute__((__noreturn__));
+ssize_t	 kvm_ckread(void *, void *, size_t);
+void	 labelbufcache(void);
+void	 labelicmp(void);
+void	 labeliostat(void);
+void	 labelip(void);
+void	 labelvmstat(void);
+void	 labelmbufs(void);
+void	 labelnetstat(void);
+void	 labelpigs(void);
+void	 labelps(void);
+void	 labels(void);
+void	 labelswap(void);
+void	 labeltcp(void);
+void	 labeltcpsyn(void);
+void	 netstat_all(char *);
+void	 netstat_display(char *);
+void	 netstat_ignore(char *);
+void	 netstat_names(char *);
+void	 netstat_numbers(char *);
+void	 netstat_reset(char *);
+void	 netstat_show(char *);
+void	 netstat_tcp(char *);
+void	 netstat_udp(char *);
+void	 nlisterr(struct nlist []);
+WINDOW	*openbufcache(void);
+WINDOW	*openicmp(void);
+WINDOW	*openiostat(void);
+WINDOW	*openip(void);
+WINDOW	*openvmstat(void);
+WINDOW	*openmbufs(void);
+WINDOW	*opennetstat(void);
+WINDOW	*openpigs(void);
+WINDOW	*openswap(void);
+WINDOW	*opentcp(void);
+void	 ps_user(char *);
+void	 redraw(int);
+void	 showbufcache(void);
+void	 showicmp(void);
+void	 showiostat(void);
+void	 showip(void);
+void	 showvmstat(void);
+void	 showmbufs(void);
+void	 shownetstat(void);
+void	 showpigs(void);
+void	 showps(void);
+void	 showswap(void);
+void	 showtcp(void);
+void	 showtcpsyn(void);
+void	 status(void);
+void	 tcp_boot(char *);
+void	 tcp_run(char *);
+void	 tcp_time(char *);
+void	 tcp_zero(char *);
+void	 vmstat_boot(char *);
+void	 vmstat_run(char *);
+void	 vmstat_time(char *);
+void	 vmstat_zero(char *);
+
+#ifdef INET6
+void	 closeip6(WINDOW *);
+void	 fetchip6(void);
+int	 initip6(void);
+void	 labelip6(void);
+WINDOW	*openip6(void);
+void	 showip6(void);
+void	 ip6_boot(char *);
+void	 ip6_run(char *);
+void	 ip6_time(char *);
+void	 ip6_zero(char *);
+#endif
+
+#ifdef IPSEC
+void	 closeipsec(WINDOW *);
+void	 fetchipsec(void);
+int	 initipsec(void);
+void	 labelipsec(void);
+WINDOW	*openipsec(void);
+void	 showipsec(void);
+void	 ipsec_boot(char *);
+void	 ipsec_run(char *);
+void	 ipsec_time(char *);
+void	 ipsec_zero(char *);
+#endif

@@ -40,6 +40,7 @@ __RCSID("$NetBSD: ip6.c,v 1.4.2.2 2000/09/01 16:37:09 ad Exp $");
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip6.h>
+#include <net/route.h>
 #include <netinet6/ip6_var.h>
 
 #include <stdlib.h>
