@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.61 2003/08/19 12:52:34 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.62 2003/08/19 21:20:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -48,6 +48,9 @@
 #include <libutil.h>
 #endif
 
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -58,9 +61,6 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <termios.h>
-#ifdef HAVE_POLL_H
-#include <poll.h>
-#endif
 
 #include <net/if_types.h>
 #ifdef IFT_FAITH

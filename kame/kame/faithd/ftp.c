@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.22 2003/08/19 12:52:34 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.23 2003/08/19 21:20:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -40,11 +40,11 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <errno.h>
-#include <ctype.h>
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
+#include <errno.h>
+#include <ctype.h>
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
