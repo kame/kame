@@ -15,7 +15,4 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-# KAME scopeid hack
-#CPPFLAGS+=-DKAME_SCOPEID
-
 .include <bsd.prog.mk>

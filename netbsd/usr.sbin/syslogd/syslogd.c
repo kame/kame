@@ -929,7 +929,7 @@ cvthname(f)
 {
 	int error;
 	char *p;
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	const int niflag = NI_DGRAM | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_DGRAM;
