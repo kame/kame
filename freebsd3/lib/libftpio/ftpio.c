@@ -899,15 +899,23 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
 	*fp = fdopen(s, mode);
     }
     else {
-	int fd,portrange;
+	int fd,portrange,level,optname;
 
-#ifdef IP_PORTRANGE
-	portrange = IP_PORTRANGE_HIGH;
-	if (setsockopt(s, IPPROTO_IP, IP_PORTRANGE, (char *)
-	    &portrange, sizeof(portrange)) < 0) {
+#if defined(IP_PORTRANGE) || defined(IPV6_PORTRANGE)
+	if (ftp->addrtype == AF_INET6) {
+		portrange = IPV6_PORTRANGE_HIGH;
+		level = IPPROTO_IPV6;
+		optname = IPV6_PORTRANGE;
+	} else {
+		portrange = IP_PORTRANGE_HIGH;
+		level = IPPROTO_IP;
+		optname = IP_PORTRANGE;
+	}
+	if (setsockopt(s, level, optname, (char *)
+		       &portrange, sizeof(portrange)) < 0) {
 		close(s);   
 		return FAILURE;
-       };
+	}
 #endif
 
 	i = sizeof sin;
