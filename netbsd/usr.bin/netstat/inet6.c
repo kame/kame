@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.16 1999/12/14 17:41:58 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.17 2000/01/13 16:15:45 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -58,6 +58,7 @@ __RCSID("$Id: inet6.c,v 1.16 1999/12/14 17:41:58 itojun Exp $");
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #endif
+#include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
