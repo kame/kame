@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.48 2001/02/02 13:37:39 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.49 2001/02/04 05:25:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,7 +188,10 @@ main(argc, argv)
 			 break;
 #endif
 		 case 'R':
-			 accept_rr = 1;
+			 fprintf(stderr, "rtadvd: "
+				 "the -R option is currently ignored.\n");
+			 /* accept_rr = 1; */
+			 /* run anyway... */
 			 break;
 		 case 's':
 			 sflag = 1;
