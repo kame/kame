@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.22 2002/01/13 14:22:31 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.23 2002/01/29 14:11:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -76,7 +76,7 @@ setPrefix(struct addrinfo *prefix)
 	bzero(&mBox, sizeof(struct natpt_msgBox));
 	mBox.m_in6addr = SIN6(prefix->ai_addr)->sin6_addr;
 
-	if (soctl(sfd, SIOCSETPREFIX, &mBox) < 0)
+	if (soctl(sfd, NATPT_SETPREFIX, &mBox) < 0)
 		soctlFailure(fn);
 
 	freeaddrinfo(prefix);
@@ -177,7 +177,7 @@ setRules(int type, struct ruletab *ruletab)
 	}
 
 	f->lifetime = CSLOT_INFINITE_LIFETIME;
-	if (soctl(sfd, SIOCSETRULES, &mBox) < 0)
+	if (soctl(sfd, NATPT_SETRULES, &mBox) < 0)
 		soctlFailure(fn);
 }
 
@@ -192,7 +192,7 @@ flushRules(int all)
 	bzero(&mBox, sizeof(struct natpt_msgBox));
 	mBox.flags = NATPT_FLUSHALL;
 
-	if (soctl(sfd, SIOCFLUSHRULE, &mBox) < 0)
+	if (soctl(sfd, NATPT_FLUSHRULE, &mBox) < 0)
 		soctlFailure(fn);
 }
 
@@ -204,12 +204,12 @@ setOnOff(int flag)
 
 	switch (flag) {
 	case SENABLE:
-		if (soctl(sfd, SIOCENBTRANS) < 0)
+		if (soctl(sfd, NATPT_ENBTRANS) < 0)
 			soctlFailure(fn);
 		break;
 
 	case SDISABLE:
-		if (soctl(sfd, SIOCDSBTRANS) < 0)
+		if (soctl(sfd, NATPT_DSBTRANS) < 0)
 			soctlFailure(fn);
 		break;
 	}
@@ -231,7 +231,7 @@ setValue(char *name, int val)
 		if (strncasecmp(ctlnames[idx].ctl_name, name, strlen(name)) == 0) {
 			mBox.flags = idx;
 			mBox.m_uint = val;
-			if (soctl(sfd, SIOCSETVALUE, &mBox) < 0)
+			if (soctl(sfd, NATPT_SETVALUE, &mBox) < 0)
 				soctlFailure(fn);
 			return;
 		}
@@ -251,7 +251,7 @@ getValue(int ctlName, caddr_t val)
 
 	bzero(&mBox, sizeof(struct natpt_msgBox));
 	mBox.flags = ctlName;
-	if (soctl(sfd, SIOCGETVALUE, &mBox) < 0) {
+	if (soctl(sfd, NATPT_GETVALUE, &mBox) < 0) {
 		soctlFailure(fn);
 		return (0);
 	}
@@ -293,7 +293,7 @@ testLog(char *str)
 	mBox.size = slen;
 	mBox.freight = freight;
 
-	if (soctl(sfd, SIOCTESTLOG, &mBox) < 0)
+	if (soctl(sfd, NATPT_TESTLOG, &mBox) < 0)
 		soctlFailure(fn);
 }
 
@@ -303,7 +303,7 @@ debugBreak()
 {
 	const char *fn = __FUNCTION__;
 
-	if (soctl(sfd, SIOCBREAK) < 0)
+	if (soctl(sfd, NATPT_BREAK) < 0)
 		soctlFailure(fn);
 }
 

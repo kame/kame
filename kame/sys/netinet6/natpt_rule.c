@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.38 2002/01/13 06:11:07 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.39 2002/01/29 14:10:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -426,11 +426,11 @@ natpt_setOnOff(int cmd)
 	natpt_logMsg(LOG_INFO, "%s():", fn);
 
 	switch (cmd) {
-	case SIOCENBTRANS:
+	case NATPT_ENBTRANS:
 		natpt_enable = TRUE;
 		break;
 
-	case SIOCDSBTRANS:
+	case NATPT_DSBTRANS:
 		natpt_enable = FALSE;
 		break;
 	}

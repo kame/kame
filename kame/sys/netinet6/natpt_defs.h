@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.35 2002/01/17 02:45:06 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.36 2002/01/29 14:10:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -62,7 +62,7 @@
 
 
 /*
- *	SIOC(GET|SET)VALUE related definitions.
+ *	NATPT_(GET|SET)VALUE related definitions.
  */
 
 /* I assign semantics to each bit, but even numerical value may be good. */

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.12 2002/01/13 06:27:07 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.13 2002/01/29 14:10:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -35,21 +35,21 @@
 /*	_IOW()		copy in	 parameters					*/
 /*	_IOWR()		copy in/out parameters					*/
 
-#define	SIOCSETIF	_IOW ('n',   0, struct natpt_msgBox)	/* Set interface side	*/
-#define SIOCGETIF	_IOWR('n',   1, struct natpt_msgBox)	/* Get interface sidde	*/
-#define	SIOCENBTRANS	_IOW ('n',   2, struct natpt_msgBox)	/* Enable  translation	*/
-#define SIOCDSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
-#define	SIOCSETRULES	_IOW ('n',   4, struct natpt_msgBox)	/* Set rules		*/
-#define	SIOCGETRULE	_IOWR('n',   5, struct natpt_msgBox)	/* Get rule		*/
-#define SIOCFLUSHRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
-#define	SIOCSETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
-#define	SIOCGETPREFIX	_IOWR('n',   9, struct natpt_msgBox)	/* Get prefix		*/
-#define	SIOCSETVALUE	_IOW ('n',  10, struct natpt_msgBox)	/* Set value		*/
-#define	SIOCGETVALUE	_IOWR('n',  11, struct natpt_msgBox)	/* Get value		*/
+#define	NATPT_SETIF	_IOW ('n',   0, struct natpt_msgBox)	/* Set interface side	*/
+#define NATPT_GETIF	_IOWR('n',   1, struct natpt_msgBox)	/* Get interface sidde	*/
+#define	NATPT_ENBTRANS	_IOW ('n',   2, struct natpt_msgBox)	/* Enable  translation	*/
+#define NATPT_DSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
+#define	NATPT_SETRULES	_IOW ('n',   4, struct natpt_msgBox)	/* Set rules		*/
+#define	NATPT_GETRULE	_IOWR('n',   5, struct natpt_msgBox)	/* Get rule		*/
+#define NATPT_FLUSHRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
+#define	NATPT_SETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
+#define	NATPT_GETPREFIX	_IOWR('n',   9, struct natpt_msgBox)	/* Get prefix		*/
+#define	NATPT_SETVALUE	_IOW ('n',  10, struct natpt_msgBox)	/* Set value		*/
+#define	NATPT_GETVALUE	_IOWR('n',  11, struct natpt_msgBox)	/* Get value		*/
 
-#define	SIOCTESTLOG	_IOW ('n',  12, struct natpt_msgBox)	/* Test log		*/
+#define	NATPT_TESTLOG	_IOW ('n',  12, struct natpt_msgBox)	/* Test log		*/
 
-#define SIOCBREAK	_IO  ('n', 255)				/* stop			*/
+#define NATPT_BREAK	_IO  ('n', 255)				/* stop			*/
 
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.19 2002/01/13 06:27:07 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.20 2002/01/29 14:10:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -317,29 +317,29 @@ int
 natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
 {
 	switch (cmd) {
-	case SIOCSETPREFIX:
+	case NATPT_SETPREFIX:
 		return (natpt_setPrefix(data));
 
-	case SIOCSETRULES:
+	case NATPT_SETRULES:
 		return (natpt_setRules(data));
 
-	case SIOCFLUSHRULE:
+	case NATPT_FLUSHRULE:
 		return (natpt_flushRules(data));
 
-	case SIOCENBTRANS:
-	case SIOCDSBTRANS:
+	case NATPT_ENBTRANS:
+	case NATPT_DSBTRANS:
 		return (natpt_setOnOff(cmd));
 
-	case SIOCSETVALUE:
+	case NATPT_SETVALUE:
 		return (natpt_setValue(data));
 
-	case SIOCGETVALUE:
+	case NATPT_GETVALUE:
 		return (natpt_getValue(data));
 
-	case SIOCTESTLOG:
+	case NATPT_TESTLOG:
 		return (natpt_testLog(data));
 
-	case SIOCBREAK:
+	case NATPT_BREAK:
 		return (natpt_break());
 
 	default:
