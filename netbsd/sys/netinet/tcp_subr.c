@@ -1152,10 +1152,6 @@ tcp6_ctlinput(cmd, sa, d)
 	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
-	struct {
-		u_int16_t th_sport;
-		u_int16_t th_dport;
-	} *thp;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -1194,15 +1190,11 @@ tcp6_ctlinput(cmd, sa, d)
 		 */
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(*thp))
+		if (m->m_pkthdr.len < off + sizeof(th))
 			return;
 
 		bzero(&th, sizeof(th));
-#ifdef DIAGNOSTIC
-		if (sizeof(*thp) > sizeof(th))
-			panic("assumption failed in tcp6_ctlinput");
-#endif
-		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
+		m_copydata(m, off, sizeof(th), (caddr_t)&th);
 
 		if (cmd == PRC_MSGSIZE) {
 			/*

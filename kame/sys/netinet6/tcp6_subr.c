@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.31 2000/11/30 16:49:48 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.32 2000/12/02 07:46:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -562,10 +562,6 @@ tcp6_ctlinput(cmd, sa, d)
 	struct ip6_hdr *ip6;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	int off;
-	struct tcp_portonly {
-		u_int16_t th_sport;
-		u_int16_t th_dport;
-	} *thp;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -609,23 +605,22 @@ tcp6_ctlinput(cmd, sa, d)
 			ip6_tmp.ip6_dst.s6_addr16[1] =
 				htons(m->m_pkthdr.rcvif->if_index);
 
-		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(*thp))
+		if (m->m_pkthdr.len < off + sizeof(th))
 			return;
 
 		bzero(&th, sizeof(th));
-		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
+		m_copydata(m, off, sizeof(th), (caddr_t)&th);
 
-		nmatch = in6_pcbnotify(&tcb6, sa, th.th_dport, sa6_src,
-				       th.th_sport, cmd, NULL, notify);
+		nmatch = in6_pcbnotify(&tcb6, sa, th.th_dport,
+		    (struct sockaddr *)sa6_src, th.th_sport, cmd, NULL, notify);
 		if (nmatch == 0 && syn_cache_count6 &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
 		     inet6ctlerrmap[cmd] == EHOSTDOWN))
-			syn_cache_unreach6(&ip6_tmp, thp);
+			syn_cache_unreach6(&ip6_tmp, &th);
 	} else {
-		(void) in6_pcbnotify(&tcb6, sa, 0, sa6_src, 0, cmd, NULL,
-				     notify);
+		(void) in6_pcbnotify(&tcb6, sa, 0, (struct sockaddr *)sa6_src,
+		    0, cmd, NULL, notify);
 	}
 }
 
