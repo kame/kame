@@ -520,11 +520,6 @@ in_pcbdetach(inp)
 	struct inpcbinfo *ipi = inp->inp_pcbinfo;
 
 #ifdef IPSEC
-	if (so->so_pcb) {
-		KEYDEBUG(KEYDEBUG_KEY_STAMP,
-			printf("DP call free SO=%p from in_pcbdetach\n", so));
-		key_freeso(so);
-	}
 	ipsec4_delete_pcbpolicy(inp);
 #endif /*IPSEC*/
 	inp->inp_gencnt = ++ipi->ipi_gencnt;
