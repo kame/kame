@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.644 2000/03/01 17:02:36 itojun Exp $
+$Id: CHANGELOG,v 1.645 2000/03/02 03:17:20 jinmei Exp $
 
 <200003>
+2000-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ifmcstat/ifmcstat.c (ifname): corrected invalid access
+	to kernel internal pointers in !(nbsd||obsd) cases.
+
 Thu Mar  2 02:01:48 JST 2000  itojun@iijlab.net
 	* sys/netinet6/mip6*.c: bring in update from ericsson for mobile-ip6.
 
