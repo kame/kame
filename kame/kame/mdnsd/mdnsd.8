@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.45 2001/07/31 04:39:16 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.46 2001/07/31 04:40:42 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -212,7 +212,8 @@ DNS queries will be sent to unicast servers, if the DNS name is outside of
 # mdnsd -6 -i wi0 3ffe:501:4819::42
 .Ed
 .Pp
-Here are the sequence of events happen on multicast name resolution:
+Here is the sequence of events which would happen
+on a multicast name resolution:
 .Bl -bullet
 .It
 An application on node A queries AAAA record of
