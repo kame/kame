@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.32 2003/05/19 09:46:50 keiichi Exp $	*/
+/*	$KAME: dump.c,v 1.33 2003/10/10 11:45:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -152,7 +152,7 @@ if_dump()
 #ifdef MIP6
 		fprintf(fp, "  DefaultLifetime: %d sec, "
 		    "MaxAdvInterval: %d usec, MinAdvInterval: %d usec\n",
-		    rai->lifetime, rai->maxuinterval, rai->minuinterval);
+		    rai->lifetime, rai->maxminterval, rai->minminterval);
 #else
 		fprintf(fp, "  DefaultLifetime: %d, MaxAdvInterval: %d, "
 		    "MinAdvInterval: %d\n", rai->lifetime, rai->maxinterval,
