@@ -1453,8 +1453,9 @@ in6_alias(creq)
 	sin6 = (struct sockaddr_in6 *)&creq->ifr_addr;
 
 	in6_fillscopeid(sin6);
-	getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
-		hbuf, sizeof(hbuf), NULL, 0, niflag);
+	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
+			hbuf, sizeof(hbuf), NULL, 0, niflag))
+		strncpy(hbuf, "", sizeof(hbuf));	/* some message? */
 	printf("\tinet6 %s", hbuf);
 
 	if (flags & IFF_POINTOPOINT) {
@@ -1470,8 +1471,10 @@ in6_alias(creq)
 		}
 		sin6 = (struct sockaddr_in6 *)&ifr6.ifr_addr;
 		in6_fillscopeid(sin6);
-		getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
-			hbuf, sizeof(hbuf), NULL, 0, niflag);
+		hbuf[0] = '\0';
+		if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
+				hbuf, sizeof(hbuf), NULL, 0, niflag))
+			strncpy(hbuf, "", sizeof(hbuf)); /* some message? */
 		printf(" -> %s", hbuf);
 	}
 
