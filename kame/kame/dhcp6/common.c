@@ -268,3 +268,36 @@ random_between(x, y)
 		ratio = ratio / 2;
 	return x + (y - x) * (ratio - 1) / random() & (ratio - 1);
 }
+
+char *
+addr2str(sa)
+	struct sockaddr *sa;
+{
+	static char addrbuf[8][MAXHOSTNAMELEN];
+	static int round = 0;
+	char *cp;
+
+	round = (round + 1) & 7;
+	cp = addrbuf[round];
+
+	getnameinfo(sa, sa->sa_len, cp, MAXHOSTNAMELEN, NULL, 0,
+		    NI_NUMERICHOST|NI_WITHSCOPEID);
+
+	return(cp);
+}
+
+char *
+in6addr2str(in6, scopeid)
+	struct in6_addr *in6;
+	int scopeid;
+{
+	struct sockaddr_in6 sa6;
+
+	memset(&sa6, 0, sizeof(sa6));
+	sa6.sin6_family = AF_INET6;
+	sa6.sin6_len = sizeof(sa6);
+	sa6.sin6_addr = *in6;
+	sa6.sin6_scope_id = scopeid;
+
+	return(addr2str((struct sockaddr *)&sa6));
+}

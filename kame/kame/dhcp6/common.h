@@ -36,3 +36,5 @@ extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *, int));
 extern int transmit_sa __P((int, struct sockaddr *, int, char *, size_t));
 extern int transmit __P((int, char *, char *, int, char *, size_t));
 extern long random_between __P((long, long));
+extern char * addr2str __P((struct sockaddr *));
+extern char * in6addr2str __P((struct in6_addr *, int));
