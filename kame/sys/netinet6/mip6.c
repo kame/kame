@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.4 2000/02/08 04:03:53 itojun Exp $
+ * $Id: mip6.c,v 1.5 2000/02/09 13:39:27 itojun Exp $
  *
  */
 
@@ -2606,6 +2606,7 @@ mip6_ioctl(so, cmd, data, ifp)
 #if defined(MIP6_DEBUG)
 void mip6_debug(char *fmt, ...)
 {
+#ifndef __bsdi__
     va_list ap;
     
     if (!mip6_debug_is_enabled)
@@ -2614,6 +2615,7 @@ void mip6_debug(char *fmt, ...)
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+#endif
 }
 
 
