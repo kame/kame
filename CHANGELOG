@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1160 2000/07/27 13:44:25 itojun Exp $
+$KAME: CHANGELOG,v 1.1161 2000/07/28 03:50:30 itojun Exp $
 
 <200007>
+Fri Jul 28 12:46:55 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_output.c: add missing call to tcp6_quench().
+	* GENERIC.v6 config file for all *BSD:
+	  enable NEW_STRUCT_ROUTE and FAKE_LOOPBACK_IF for torture-testing,
+	  which will be enabled by default soon.
+
 Thu Jul 27 22:40:51 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_forward.c: do not forward packets with unspecified
 	  IPv6 source.  this is not on the documents, but it seems to have got
