@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.94 2000/08/09 17:23:20 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.95 2000/08/23 13:21:38 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2430,7 +2430,6 @@ setph1attr(sa, buf)
 		}
 	}
 
-#ifndef INTEROP_NEC
 	if (sa->lifebyte) {
 		attrlen += sizeof(struct isakmp_data)
 			+ sizeof(struct isakmp_data);
@@ -2449,7 +2448,7 @@ setph1attr(sa, buf)
 			}
 		}
 	}
-#endif
+
 	if (sa->enctype) {
 		attrlen += sizeof(struct isakmp_data);
 		if (buf)
