@@ -1043,11 +1043,7 @@ cvthname(f)
 {
 	int error;
 	char *p;
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_DGRAM | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_DGRAM;
-#endif
 	static char host[NI_MAXHOST], ip[NI_MAXHOST];
 
 	error = getnameinfo((struct sockaddr*)f, ((struct sockaddr*)f)->sa_len,

@@ -2319,11 +2319,7 @@ sockaddr_ntop(sa)
     struct sockaddr *sa;
 {
     static char addrbuf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-    const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
     const int niflags = NI_NUMERICHOST;
-#endif
 
     if (getnameinfo(sa, sa->sa_len, addrbuf, sizeof(addrbuf),
 	    NULL, 0, niflags) == 0)

@@ -277,11 +277,7 @@ int	options;
 int	timingout;
 struct	servent *sp;
 char	*curdom;
-#ifdef NI_WITHSCOPEID
-const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
 const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
 
 #ifndef OPEN_MAX
 #define OPEN_MAX	64

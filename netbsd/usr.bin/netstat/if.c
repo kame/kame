@@ -98,11 +98,7 @@ intpr(interval, ifnetaddr, pfunc)
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
 	char name[IFNAMSIZ + 1];	/* + 1 for `*' */
 	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST;
-#endif
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");

@@ -804,11 +804,7 @@ netname6(sa6, mask)
 	u_char *p, *q;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0;
-#ifdef NI_WITHSCOPEID
-	int flag = NI_WITHSCOPEID;
-#else
 	int flag = 0;
-#endif
 	int error;
 	struct sockaddr_in6 sin6;
 
@@ -896,11 +892,7 @@ routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
 	static char line[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	int flag = NI_WITHSCOPEID;
-#else
 	int flag = 0;
-#endif
 	/* use local variable for safety */
 	struct sockaddr_in6 sa6_local;
 	int error;
