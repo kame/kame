@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1501 2001/01/23 09:11:31 itojun Exp $
+$KAME: CHANGELOG,v 1.1502 2001/01/23 11:48:22 jinmei Exp $
 
 <200101>
+2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_update_ifa, in6_ifscrub):
+	considered cases where multiple addresses with a same single
+	prefix are assigned on multiple interfaces.  For example, you can
+	configure
+	# ifconfig ne0 3ffe:ffff::1111 alias
+	# ifconfig ne1 3ffe:ffff::aaaa alias
+	then both two addresses can be assigned on ne0 and ne1, resp., and
+	the corresponding interface route 3ffe:ffff::/64 goes to the
+	interface ne0 (i.e. 1st cofirgured one wins).  If you then delete
+	the address on ne0, the interface route switches the associated
+	interface to ne1.
+	(we do not recommend users such a configuration, though).
+
 Tue Jan 23 18:09:08 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: declare ip6aux structure, which is used
 	  to pass around information about the packet, across header processing
