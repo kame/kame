@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.74 2003/02/24 11:29:10 ono Exp $	*/
+/*	$KAME: config.c,v 1.75 2003/04/02 09:55:05 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -698,6 +698,7 @@ get_prefix(struct rainfo *rai)
 		pp->routeraddr = routeraddr;
 #endif
 		pp->origin = PREFIX_FROM_KERNEL;
+		pp->rainfo = rai;
 
 		/* link into chain */
 		insque(pp, &rai->prefix);
