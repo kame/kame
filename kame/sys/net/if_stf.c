@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.23 2000/03/12 17:23:08 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.24 2000/03/12 23:25:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -490,11 +490,22 @@ stf_checkaddr6(in6, ifp)
 	struct in6_addr *in6;
 	struct ifnet *ifp;	/* incoming interface */
 {
-	/* for now, we only check 6to4 addresses */
-	if (!IN6_IS_ADDR_6TO4(in6))
-		return 0;
+	/*
+	 * check 6to4 addresses
+	 */
+	if (IN6_IS_ADDR_6TO4(in6))
+		return stf_checkaddr4(GET_V4(in6), ifp);
 
-	return stf_checkaddr4(GET_V4(in6), ifp);
+	/*
+	 * reject anything that look suspicious.  the test is implemented
+	 * in ip6_input too, but we check here as well to
+	 * (1) reject bad packets earlier, and
+	 * (2) to be safe against future ip6_input change.
+	 */
+	if (IN6_IS_ADDR_V4COMPAT(in6) || IN6_IS_ADDR_V4MAPPED(in6))
+		return -1;
+
+	return 0;
 }
 
 void
