@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_norm.c,v 1.72 2003/08/21 19:12:08 frantzen Exp $ */
+/*	$OpenBSD: pf_norm.c,v 1.74 2003/08/22 21:50:34 david Exp $ */
 
 /*
  * Copyright 2001 Niels Provos <provos@citi.umich.edu>
@@ -634,7 +634,7 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 
 			off += precut;
 			max -= precut;
-			/* Update the previous frag to encompas this one */
+			/* Update the previous frag to encompass this one */
 			frp->fr_end = max;
 
 			if (!drop) {
@@ -749,7 +749,7 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 		}
 
 
-		/* Need to glue together two seperate fragment descriptors */
+		/* Need to glue together two separate fragment descriptors */
 		if (merge) {
 			if (cur && fra->fr_off <= cur->fr_end) {
 				/* Need to merge in a previous 'cur' */
@@ -1039,7 +1039,7 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
  bad:
 	DPFPRINTF(("dropping bad fragment\n"));
 
-	/* Free assoicated fragments */
+	/* Free associated fragments */
 	if (frag != NULL)
 		pf_free_fragment(frag);
 
@@ -1382,7 +1382,7 @@ pf_normalize_tcp_init(struct mbuf *m, int off, struct pf_pdesc *pd,
 		hlen = (th->th_off << 2) - sizeof(struct tcphdr);
 		while (hlen >= TCPOLEN_TIMESTAMP) {
 			switch (*opt) {
-			case TCPOPT_EOL:	/* FALLTHROUH */
+			case TCPOPT_EOL:	/* FALLTHROUGH */
 			case TCPOPT_NOP:
 				opt++;
 				hlen--;
@@ -1467,7 +1467,7 @@ pf_normalize_tcp_stateful(struct mbuf *m, int off, struct pf_pdesc *pd,
 		hlen = (th->th_off << 2) - sizeof(struct tcphdr);
 		while (hlen >= TCPOLEN_TIMESTAMP) {
 			switch (*opt) {
-			case TCPOPT_EOL:	/* FALLTHROUH */
+			case TCPOPT_EOL:	/* FALLTHROUGH */
 			case TCPOPT_NOP:
 				opt++;
 				hlen--;
