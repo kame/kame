@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1674 2001/05/17 03:52:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1675 2001/05/17 13:56:36 jinmei Exp $
 
 <200105>
+2001-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/frag6.c (frag6_input): plugged memory leak in
+	overlapping fragments cases.
+	Suggested by hitachi guys via sumikawa@kame.net.
+
 Thu May 17 12:50:40 JST 2001  itojun@iijlab.net
 	* sys/netinet6: remove OLDIP6OUTPUT codepath.  notified from sumikawa
 	  (i remember i said i would do this, a long time ago)
