@@ -354,11 +354,8 @@ rip6_output(m, va_alist)
 #if 0				/* ip6_plen will be filled in ip6_output. */
 	ip6->ip6_plen  = htons((u_short)plen);
 #endif
-	ip6->ip6_nxt   = in6p->in6p_ip6_nxt;
-	if (oifp)
-		ip6->ip6_hlim = nd_ifinfo[oifp->if_index].chlim;
-	else
-		ip6->ip6_hlim = in6p->in6p_ip6_hlim;
+	ip6->ip6_nxt = in6p->in6p_ip6_nxt;
+	ip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
 	    in6p->in6p_cksum != -1) {
@@ -489,27 +486,32 @@ rip6_attach(struct socket *so, int proto, struct proc *p)
 	if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return error;
 
+	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
+		error = soreserve(so, rip_sendspace, rip_recvspace);
+		if (error)
+			return error;
+	}
 	s = splnet();
 	error = in_pcballoc(so, &ripcbinfo, p);
 	splx(s);
 	if (error)
 		return error;
-	error = soreserve(so, rip_sendspace, rip_recvspace);
-	if (error)
-		return error;
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV6;
 	inp->in6p_ip6_nxt = (long)proto;
-	inp->in6p_ip6_hlim = ip6_defhlim;
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;
 #ifdef IPSEC
 	error = ipsec_init_policy(&inp->in6p_sp_in);
-	if (error)
+	if (error) {
+		in6_pcbdetach(inp);
 		return error;
+	}
 	error = ipsec_init_policy(&inp->in6p_sp_out);
-	if (error)
+	if (error) {
+		in6_pcbdetach(inp);
 		return error;
+	}
 #endif /*IPSEC*/
 	MALLOC(inp->in6p_icmp6filt, struct icmp6_filter *,
 	       sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);

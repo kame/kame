@@ -466,12 +466,14 @@ rip_attach(struct socket *so, int proto, struct proc *p)
 	if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return error;
 
+	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
+		error = soreserve(so, rip_sendspace, rip_recvspace);
+		if (error)
+			return error;
+	}
 	s = splnet();
 	error = in_pcballoc(so, &ripcbinfo, p);
 	splx(s);
-	if (error)
-		return error;
-	error = soreserve(so, rip_sendspace, rip_recvspace);
 	if (error)
 		return error;
 	inp = (struct inpcb *)so->so_pcb;
@@ -479,11 +481,15 @@ rip_attach(struct socket *so, int proto, struct proc *p)
 	inp->inp_ip_p = proto;
 #ifdef IPSEC
 	error = ipsec_init_policy(&inp->inp_sp_in);
-	if (error)
+	if (error) {
+		in_pcbdetach(inp);
 		return error;
+	}
 	error = ipsec_init_policy(&inp->inp_sp_out);
-	if (error)
+	if (error) {
+		in_pcbdetach(inp);
 		return error;
+	}
 #endif /*IPSEC*/
 	return 0;
 }

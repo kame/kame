@@ -983,11 +983,23 @@ tcp_attach(so, p)
 		return (error);
 	inp = sotoinpcb(so);
 #ifdef IPSEC
-	if ((error = ipsec_init_policy(&inp->inp_sp_in)) != 0) {
+	error = ipsec_init_policy(&inp->inp_sp_in);
+	if (error) {
+#ifdef INET6
+		if (isipv6)
+			in6_pcbdetach(inp);
+		else
+#endif /* INET6 */
 		in_pcbdetach(inp);
 		return (error);
 	}
-	if ((error = ipsec_init_policy(&inp->inp_sp_out)) != 0) {
+	error = ipsec_init_policy(&inp->inp_sp_out);
+	if (error) {
+#ifdef INET6
+		if (isipv6)
+			in6_pcbdetach(inp);
+		else
+#endif /* INET6 */
 		in_pcbdetach(inp);
 		return (error);
 	}

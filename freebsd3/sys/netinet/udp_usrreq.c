@@ -749,24 +749,30 @@ udp_attach(struct socket *so, int proto, struct proc *p)
 	if (inp != 0)
 		return EINVAL;
 
+	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
+		error = soreserve(so, udp_sendspace, udp_recvspace);
+		if (error)
+			return error;
+	}
 	s = splnet();
 	error = in_pcballoc(so, &udbinfo, p);
 	splx(s);
 	if (error)
 		return error;
-	error = soreserve(so, udp_sendspace, udp_recvspace);
-	if (error)
-		return error;
+
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_ttl = ip_defttl;
 #ifdef IPSEC
 	error = ipsec_init_policy(&inp->inp_sp_in);
-	if (error)
+	if (error) {
+		in_pcbdetach(inp);
 		return error;
+	}
 	error = ipsec_init_policy(&inp->inp_sp_out);
-	if (error)
+	if (error) {
 		return error;
+	}
 #endif /*IPSEC*/
 	return 0;
 }

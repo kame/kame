@@ -624,7 +624,10 @@ udp6_output(in6p, m, addr6, control, p)
 	ip6->ip6_plen	= htons((u_short)plen);
 #endif
 	ip6->ip6_nxt	= IPPROTO_UDP;
-	ip6->ip6_hlim	= in6p->in6p_ip6_hlim; /* XXX */
+	ip6->ip6_hlim   = in6_selecthlim(in6p,
+					 in6p->in6p_route.ro_rt ?
+					 in6p->in6p_route.ro_rt->rt_ifp :
+					 NULL);
 	ip6->ip6_src	= in6p->in6p_laddr;
 	ip6->ip6_dst	= in6p->in6p_faddr;
 
@@ -691,26 +694,31 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	if (inp != 0)
 		return EINVAL;
 
+	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
+		error = soreserve(so, udp_sendspace, udp_recvspace);
+		if (error)
+			return error;
+	}
 	s = splnet();
 	error = in_pcballoc(so, &udbinfo, p);
 	splx(s);
 	if (error)
 		return error;
-	error = soreserve(so, udp_sendspace, udp_recvspace);
-	if (error)
-		return error;
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV6;
-	inp->in6p_ip6_hlim = ip6_defhlim;
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;	/* just to be sure */
 #ifdef IPSEC
 	error = ipsec_init_policy(&inp->in6p_sp_in);
-	if (error)
+	if (error) {
+		in6_pcbdetach(inp);
 		return error;
+	}
 	error = ipsec_init_policy(&inp->in6p_sp_out);
-	if (error)
+	if (error) {
+		in6_pcbdetach(inp);
 		return error;
+	}
 #endif /*IPSEC*/
 	return 0;
 }

@@ -397,7 +397,7 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 		m->m_pkthdr.rcvif = (struct ifnet *) 0;
  		ip6->ip6_plen = htons((u_short)tlen);
 		ip6->ip6_nxt = IPPROTO_TCP;
-		ip6->ip6_hlim = ip6_defhlim;
+		ip6->ip6_hlim = tp->t_inpcb->in6p_ip6_hlim;
 		nth->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(struct ip6_hdr), tlen);
 		ip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;

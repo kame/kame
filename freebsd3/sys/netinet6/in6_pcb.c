@@ -398,19 +398,7 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (inp->in6p_route.ro_rt)
 		ifp = inp->in6p_route.ro_rt->rt_ifp;
 
-	/*
-	 * Default hop limit selection. If a hoplimit was specified via ioctl,
-	 * use it. Else if the outgoing interface is detected and the current
-	 * hop limit of the interface was specified by router advertisement,
-	 * use the value.
-	 * Otherwise, use the system default hoplimit.
-	 */
-	if (inp->in6p_hops >= 0)
-		inp->in6p_ip6_hlim = (u_int8_t)inp->in6p_hops;
-	else if (ifp)
-		inp->in6p_ip6_hlim = nd_ifinfo[ifp->if_index].chlim;
-	else
-		inp->in6p_ip6_hlim = ip6_defhlim;
+	inp->in6p_ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);
 
 	return(0);
 }
@@ -578,10 +566,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	}
 
 	/*
-	 * XXX How should we use sin6_scope_id???
-	 */
-
-	/*
 	 * If the next hop address for the packet is specified
 	 * by caller, use an address associated with the route
 	 * to the next hop.
@@ -679,6 +663,29 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 	*errorp = EADDRNOTAVAIL;
 	return(0);
+}
+
+/*
+ * Default hop limit selection. The precedence is as follows:
+ * 1. The hop limit field of the template header.
+ * 2. Hoplimit valued specified via ioctl.
+ * 3. (If the outgoing interface is detected) the current
+ *     hop limit of the interface specified by router advertisement.
+ * 4. The system default hoplimit.
+*/
+int
+in6_selecthlim(in6p, ifp)
+	struct in6pcb *in6p;
+	struct ifnet *ifp;
+{
+	if (in6p->in6p_ip6_hlim)
+		return(in6p->in6p_ip6_hlim);
+	else if (in6p->in6p_hops >= 0)
+		return(in6p->in6p_hops);
+	else if (ifp)
+		return(nd_ifinfo[ifp->if_index].chlim);
+	else
+		return(ip6_defhlim);
 }
 
 void

@@ -861,10 +861,6 @@ send:
 	 */
 #ifdef INET6
 	if (isipv6) {
-		ip6->ip6_vfc = /* tp->t_inpcb->inp_oflowinfo | */ IPV6_VERSION;
-		ip6->ip6_plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
-		ip6->ip6_nxt = IPPROTO_TCP;
-		ip6->ip6_hlim = tp->t_inpcb->in6p_ip6_hlim;
 		/* TODO: IPv6 IP6TOS_ECT bit on */
 #ifdef IPSEC
 		m->m_pkthdr.rcvif = (struct ifnet *)so;

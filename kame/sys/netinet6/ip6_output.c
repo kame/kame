@@ -1316,11 +1316,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 							/*in6p->inp_hops = optval; XXX*/
 #else
 							in6p->in6p_hops = optval;
-#if defined(MAPPED_ADDR_ENABLED)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-							in6p->inp_ip_ttl = optval;
-#endif
-#endif
 #endif
 						}
 						break;
