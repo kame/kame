@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.26 2002/07/23 13:23:23 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.27 2002/07/24 08:53:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -174,9 +174,9 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 }
 
 int
-mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
+mip6_ip6mh_create(pktopt_mobility, dst, src, cookie)
 	struct ip6_mobility **pktopt_mobility;
-	struct sockaddr_in6 *src, *dst;
+	struct sockaddr_in6 *dst, *src;
 	u_int32_t cookie;
 {
 	struct ip6m_home_test *ip6mh;
@@ -203,8 +203,8 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htonl(nonce_index);
 	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
-	mip6_create_cookie(&dst->sin6_addr,
-			   &home_nodekey, &home_nonce, &ip6mh->ip6mh_cookie);
+	mip6_create_cookie(&src->sin6_addr,
+			   &home_nodekey, &home_nonce, ip6mh->ip6mh_cookie);
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -281,9 +281,9 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 }
 
 int
-mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
+mip6_ip6mc_create(pktopt_mobility, dst, src, cookie)
 	struct ip6_mobility **pktopt_mobility;
-	struct sockaddr_in6 *src, *dst;
+	struct sockaddr_in6 *dst, *src;
 	u_int32_t cookie;
 {
 	struct ip6m_careof_test *ip6mc;
@@ -312,7 +312,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
 	mip6_create_cookie(&dst->sin6_addr,
 			   &careof_nodekey, &careof_nonce,
-			   &ip6mc->ip6mc_cookie);
+			   ip6mc->ip6mc_cookie);
 	
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
@@ -1387,6 +1387,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int bu_size, nonce_size, auth_size;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
+	struct sockaddr_in6 *busrc_sa;
 	SHA1_CTX sha1_ctx;
 	HMAC_CTX hmac_ctx;
 	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
@@ -1551,20 +1552,25 @@ printf("MN: Care-of Cookie: %*D\n", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mb
 #endif
 		/* Calculate K_bu */
 		SHA1Init(&sha1_ctx);
-		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_home_cookie,
+		SHA1Update(&sha1_ctx, (caddr_t)mbu->mbu_home_cookie,
 			   sizeof(mbu->mbu_home_cookie));
-		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_careof_cookie,
+		SHA1Update(&sha1_ctx, (caddr_t)mbu->mbu_careof_cookie,
 			   sizeof(mbu->mbu_careof_cookie));
 		SHA1Final(key_bu, &sha1_ctx);
 #if RR_DBG
 printf("MN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
 #endif
 
+		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)
+			busrc_sa = &mbu->mbu_haddr;
+		else
+			busrc_sa = &mbu->mbu_coa;
+
 		/* Calculate authenticator (5.5.6) */
 		/* MAC_Kbu(coa, | cn | BU) */
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-		hmac_loop(&hmac_ctx, (u_int8_t *)&mbu->mbu_coa.sin6_addr,
-			  sizeof(mbu->mbu_coa.sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)&busrc_sa->sin6_addr,
+			  sizeof(busrc_sa->sin6_addr));
 #if RR_DBG
 printf("MN: Auth: %*D\n", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_addr, ":");
 #endif
@@ -1572,12 +1578,18 @@ printf("MN: Auth: %*D\n", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_add
 			  sizeof(dst->sin6_addr));
 #if RR_DBG
 printf("MN: Auth: %*D\n", sizeof(dst->sin6_addr), &dst->sin6_addr, ":");
+#endif
 		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
+#if RR_DBG
 printf("MN: Auth: %*D\n", bu_size + nonce_size, ip6mu, ":");
 #endif
 		/* Eliminate authdata mobility option to calculate authdata 
 		   But it should be included padding area */
 		if (auth_size > AUTH_SIZE) {
+			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE)
+			    = IP6MOPT_PADN;
+			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE + 1)
+			    = auth_size - AUTH_SIZE;
 			hmac_loop(&hmac_ctx,
 				  (u_int8_t *)ip6mu + bu_size + nonce_size
 				  + AUTH_SIZE, auth_size - AUTH_SIZE);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.145 2002/07/23 13:23:23 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.146 2002/07/24 08:53:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -199,7 +199,9 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 #ifdef MIP6_DRAFT17
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
+#if 0
 static void mip6_update_nonce_nodekey(void);
+#endif
 #endif /* MIP6_DRAFT17 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -2536,6 +2538,7 @@ mip6_create_nodekey(nodekey)
 		((u_long *)nodekey)[i] = random();
 }
 
+#if 0
 /* This function should be called periodically */
 static void
 mip6_update_nonce_nodekey()
@@ -2547,6 +2550,7 @@ mip6_update_nonce_nodekey()
 	mip6_create_nonce(nonce_head);
 	mip6_create_nodekey(mip6_nodekey + (nonce_head - mip6_nonce));
 }
+#endif
 
 int
 mip6_get_nonce(index, nonce)
@@ -2650,22 +2654,22 @@ printf("CN: Careof Nodekey: %*D\n", sizeof(coa_nodekey), &coa_nodekey, ":");
 
 	/* Calculate home cookie */
 	mip6_create_cookie(&ip6mu->ip6mu_addr,
-			   &home_nodekey, &home_nonce, &home_cookie);
+			   &home_nodekey, &home_nonce, home_cookie);
 #if RR_DBG
 printf("CN: Home Cookie: %*D\n", sizeof(home_cookie), (u_int8_t *)&home_cookie, ":");
 #endif
 
 	/* Calculate care-of cookie */
 	mip6_create_cookie(&ip6->ip6_src, 
-			   &coa_nodekey, &careof_nonce, &careof_cookie);
+			   &coa_nodekey, &careof_nonce, careof_cookie);
 #if RR_DBG
 printf("CN: Care-of Cookie: %*D\n", sizeof(careof_cookie), (u_int8_t *)&careof_cookie, ":");
 #endif
 
 	/* Calculate K_bu */
 	SHA1Init(&sha1_ctx);
-	SHA1Update(&sha1_ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
-	SHA1Update(&sha1_ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
+	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(home_cookie));
+	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(careof_cookie));
 	SHA1Final(key_bu, &sha1_ctx);
 #if RR_DBG
 printf("CN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
@@ -2699,6 +2703,7 @@ printf("CN: Auth: %*D\n", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu
 printf("CN: Auth: %*D\n", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len, ":");
 #endif
 	}
+	bzero(authdata, sizeof(authdata));
 	hmac_result(&hmac_ctx, authdata);
 #if RR_DBG
 printf("CN: Auth Data: %*D\n", sizeof(authdata), authdata, ":");

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.109 2002/06/26 02:33:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.110 2002/07/24 08:53:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -494,6 +494,9 @@ mip6_bu_list_notify_binding_change(sc)
 		} else {
 			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
+		if (mip6_config.mcfg_bu_maxlifetime > 0 &&
+		    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
+			mbu->mbu_lifetime = mip6_config.mcfg_bu_maxlifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		/* sanity check for overflow */
 		if (mbu->mbu_expire < time_second)
@@ -2611,7 +2614,6 @@ mip6_route_optimize(m)
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
 	struct hif_softc *sc;
-	int32_t coa_lifetime;
 	int error = 0;
 
 	if (!MIP6_IS_MN) {
@@ -2696,6 +2698,8 @@ mip6_route_optimize(m)
 		}
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	} else {
+#if 0
+		int32_t coa_lifetime;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		long time_second = time.tv_sec;
 #endif
@@ -2711,6 +2715,9 @@ mip6_route_optimize(m)
 		} else {
 			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
+		if (mip6_config.mcfg_bu_maxlifetime > 0 &&
+		    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
+			mbu->mbu_lifetime = mip6_config.mcfg_bu_maxlifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		/* sanity check for overflow */
 		if (mbu->mbu_expire < time_second)
@@ -2720,6 +2727,7 @@ mip6_route_optimize(m)
 		/* sanity check for overflow */
 		if (mbu->mbu_refexpire < time_second)
 			mbu->mbu_refexpire = 0x7fffffff;
+#endif
 	}
 	mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_RO_DESIRED, NULL);
 
