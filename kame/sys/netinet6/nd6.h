@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.89 2002/05/27 04:21:27 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.90 2002/05/28 11:27:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,7 +237,7 @@ struct	in6_ndifreq {
 #define DEF_TEMP_PREFERRED_LIFETIME	86400	/* 1 day */
 #define TEMPADDR_REGEN_ADVANCE		5	/* sec */
 #define MAX_TEMP_DESYNC_FACTOR		600	/* 10 min */
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 #define ND_COMPUTE_RTIME(x) \
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (random() & \
 		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)

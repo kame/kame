@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.4 2000/03/25 07:23:54 sumikawa Exp $	*/
+/*	$KAME: mld6_var.h,v 1.5 2002/05/28 11:27:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -34,7 +34,7 @@
 
 #ifdef _KERNEL
 
-#ifndef __OpenBSD__
+#ifdef __bsdi__
 #define MLD6_RANDOM_DELAY(X) (random() % (X) + 1)
 #else
 #define MLD6_RANDOM_DELAY(X) (arc4random() % (X) + 1)
