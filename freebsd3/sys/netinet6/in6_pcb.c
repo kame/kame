@@ -933,7 +933,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 					       &faddr6))
 				in6_rtchange(inp, errno);
 
-			if (notify2 == in6_rtchange)
+			if (notify == in6_rtchange)
 				continue; /* there's nothing to do any more */
 		}
 
