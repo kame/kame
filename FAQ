@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.64 2001/09/26 09:01:59 itojun Exp $
+$KAME: FAQ,v 1.65 2001/09/26 09:08:18 itojun Exp $
 
 
 GENERAL
@@ -117,7 +117,7 @@ Q: How portable the KAME stack is?  Is it possible to port it to embedded
 	time to port it to VxWorks or any other operating systems, so if you
 	want to do it you need to port it on your own.
 
-	We have heard of Win95/98 port of KAME IPsec stack in the past.
+	We have heard of an Win95/98 port of KAME IPsec stack in the past.
 	Also it is apparent that some of the vendor routers are using KAME
 	stack on top of VxWorks.
 
