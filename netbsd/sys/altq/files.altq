@@ -4,6 +4,7 @@ defflag	opt_altq_enabled.h	ALTQ
 defflag opt_altq.h		ALTQ_CBQ ALTQ_WFQ ALTQ_FIFOQ ALTQ_RED ALTQ_BLUE
 				ALTQ_FLOWVALVE ALTQ_RIO ALTQ_LOCALQ ALTQ_HFSC
 				ALTQ_CDNR ALTQ_PRIQ ALTQ_NOPCC ALTQ_DEBUG
+				ALTQ_JOBS
 
 file	altq/altq_conf.c	altq
 file	altq/altq_afmap.c	altq
@@ -12,6 +13,7 @@ file	altq/altq_cbq.c		altq
 file	altq/altq_cdnr.c	altq
 file	altq/altq_fifoq.c	altq
 file	altq/altq_hfsc.c	altq
+file	altq/altq_jobs.c	altq
 file	altq/altq_localq.c	altq
 file	altq/altq_priq.c	altq
 file	altq/altq_red.c		altq

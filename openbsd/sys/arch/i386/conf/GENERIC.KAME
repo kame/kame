@@ -24,6 +24,7 @@ options 	ALTQ_RED	#random early detection
 options 	ALTQ_RIO	#triple red for diffserv (needs RED)
 #options 	ALTQ_LOCALQ	#local use
 options 	ALTQ_HFSC	#hierarchical fair service curve
+options 	ALTQ_JOBS	#joint buffer management and scheduling
 #options 	ALTQ_IPSEC	#check ipsec in IPv4
 options 	ALTQ_CDNR	#diffserv traffic conditioner
 #options 	ALTQ_BLUE	#blue by wu-chang feng
