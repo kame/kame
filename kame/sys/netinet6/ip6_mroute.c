@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.128 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.129 2004/08/11 10:20:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1834,10 +1834,11 @@ phyint_send(ip6, mifp, m)
 	linkmtu = IN6_LINKMTU(ifp);
 	if (mb_copy->m_pkthdr.len <= linkmtu || linkmtu < IPV6_MMTU) {
 		/*
-		 * We just call if_output instead of nd6_output here, since
-		 * we need no ND for a multicast forwarded packet...right?
+		 * We could call if_output directly here, but we use
+		 * nd6_output on purpose to see if IPv6 operation is allowed
+		 * on the interface.
 		 */
-		error = (*ifp->if_output)(ifp, mb_copy,
+		error = nd6_output(ifp, ifp, mb_copy,
 		    (struct sockaddr *)&dst6, NULL);
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)

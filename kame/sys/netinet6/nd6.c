@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.362 2004/07/26 07:47:05 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.363 2004/08/11 10:20:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2369,6 +2369,12 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	return (0);
 
   sendpkt:
+	/* discard the packet if IPv6 operation is disabled on the interface */
+	if ((ND_IFINFO(ifp)->flags & ND6_IFF_IFDISABLED)) {
+		error = ENETDOWN; /* better error? */
+		goto bad;
+	}
+
 #if !defined(__OpenBSD__) && defined(IPSEC)
 	/* clean ipsec history once it goes out of the node */
 	ipsec_delaux(m);

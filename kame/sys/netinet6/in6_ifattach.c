@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.198 2004/07/05 03:10:13 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.199 2004/08/11 10:20:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -363,8 +363,8 @@ generate_tmp_ifid(seed0, seed1, ret)
  * Get interface identifier for the specified interface.
  * XXX assumes single sockaddr_dl (AF_LINK address) per an interface
  */
-static int
-get_hw_ifid(ifp, in6)
+int
+in6_get_hw_ifid(ifp, in6)
 	struct ifnet *ifp;
 	struct in6_addr *in6;	/* upper 64bits are preserved */
 {
@@ -517,14 +517,14 @@ get_ifid(ifp0, altifp, in6)
 	struct ifnet *ifp;
 
 	/* first, try to get it from the interface itself */
-	if (get_hw_ifid(ifp0, in6) == 0) {
+	if (in6_get_hw_ifid(ifp0, in6) == 0) {
 		nd6log((LOG_DEBUG, "%s: got interface identifier from itself\n",
 		    if_name(ifp0)));
 		goto success;
 	}
 
 	/* try secondary EUI64 source. this basically is for ATM PVC */
-	if (altifp && get_hw_ifid(altifp, in6) == 0) {
+	if (altifp && in6_get_hw_ifid(altifp, in6) == 0) {
 		nd6log((LOG_DEBUG, "%s: got interface identifier from %s\n",
 		    if_name(ifp0), if_name(altifp)));
 		goto success;
@@ -534,7 +534,7 @@ get_ifid(ifp0, altifp, in6)
 	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next) {
 		if (ifp == ifp0)
 			continue;
-		if (get_hw_ifid(ifp, in6) != 0)
+		if (in6_get_hw_ifid(ifp, in6) != 0)
 			continue;
 
 		/*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.347 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.348 2004/08/11 10:20:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -359,6 +359,11 @@ ip6intr()
 		splx(s);
 		if (m == 0)
 			return;
+		/* drop the packet if IPv6 operation is disabled on the IF */
+		if ((ND_IFINFO(m->m_pkthdr.rcvif)->flags & ND6_IFF_IFDISABLED)) {
+			m_freem(m);
+			return;
+		}
 		ip6_input(m);
 	}
 }
