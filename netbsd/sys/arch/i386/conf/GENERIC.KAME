@@ -9,7 +9,6 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 
 # these options will become the default behavior soon.
 options 	NEW_STRUCT_ROUTE
-#options 	USE_FIXED_P2P_PLEN
 
 # IPv6 firewall
 #options 	IPV6FIREWALL

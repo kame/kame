@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: GENERIC.v6,v 1.28 2000/10/18 09:15:00 kjc Exp $
+#	$Id: GENERIC.v6,v 1.29 2001/01/28 06:17:43 suz Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -40,7 +40,6 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 options 	NEW_STRUCT_ROUTE	#MANDATORY
-#options 	USE_FIXED_P2P_PLEN
 
 # IPv6 firewall
 options 	"IPV6FIREWALL"
