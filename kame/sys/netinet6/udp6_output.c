@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.38 2001/09/05 02:52:06 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.39 2001/09/05 02:52:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -268,7 +268,7 @@ udp6_output(in6p, m, addr6, control)
 			    && !IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)) {
 				/*
 				 * when remote addr is an IPv4-mapped address, 
-				 * local addr should not be an IPv6 address;
+				 * local addr should not be an IPv6 address,
 				 * since you cannot determine how to map IPv6 
 				 * source address to IPv4.
 				 */
