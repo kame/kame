@@ -375,9 +375,10 @@ tcp_respond(tp, template, m, ack, seq, flags)
 	th->th_off = sizeof (struct tcphdr) >> 2;
 	th->th_flags = flags;
 	if (tp)
-		th->th_win = htons((u_int16_t) (win >> tp->rcv_scale));
-	else
-		th->th_win = htons((u_int16_t)win);
+		win >>= tp->rcv_scale;
+	if (win > TCP_MAXWIN)
+		win = TCP_MAXWIN;
+	th->th_win = htons((u_int16_t)win);
 	th->th_urp = 0;
 
 #ifdef INET6

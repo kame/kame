@@ -299,8 +299,11 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 #endif /* INET6 */
 
 	if (tp) {
-		if (!(flags & TH_RST))
+		if (!(flags & TH_RST)) {
 			win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
+			if (win > (long)TCP6_MAXWIN << tp->rcv_scale)
+				win = (long)TCP6_MAXWIN << tp->rcv_scale;
+		}
 #ifdef INET6
 		if (isipv6)
 			ro6 = &tp->t_inpcb->in6p_route;
