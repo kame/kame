@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_rule.c,v 1.4 2000/02/18 11:25:05 fujisawa Exp $
+ *	$Id: natpt_rule.c,v 1.5 2000/02/18 18:09:07 itojun Exp $
  */
 
 #include <sys/errno.h>
@@ -74,8 +74,8 @@ extern	struct in6_addr	 faith_prefixmask;
 extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
 
-extern	void	in4_len2mask(struct in_addr *, int len);
-extern	void	in6_len2mask(struct in6_addr *, int len);
+extern	void	in4_len2mask __P((struct in_addr *, int));
+extern	void	in6_len2mask __P((struct in6_addr *, int));
 
 
 /*
