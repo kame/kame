@@ -508,7 +508,7 @@ getsrc(dst)
 {
 	int s;
 	static struct sockaddr_storage ss;
-	u_int sslen;
+	int sslen;
 
 	s = socket(dst->sa_family, SOCK_DGRAM, 0);
 	if (s < 0)
