@@ -831,11 +831,11 @@ udp6_ctlinput(cmd, sa, d)
 			 */
 		}
 
-		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6,
+		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)sa6,
 		     uh.uh_dport, (struct sockaddr *)sa6_src,
 		     uh.uh_sport, cmd, cmdarg, notify);
 	} else {
-		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6, 0,
+		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)sa6, 0,
 		     (struct sockaddr *)&sa6_any, 0, cmd, cmdarg, notify);
 	}
 }
