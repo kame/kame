@@ -1,6 +1,6 @@
 racoon FAQ
 KAME team
-$KAME: FAQ,v 1.6 2000/09/13 06:49:33 itojun Exp $
+$KAME: FAQ,v 1.7 2000/09/23 15:08:46 itojun Exp $
 
 
 Q: With what other IKE/IPsec implementation racoon is known to be interoperable?
@@ -45,6 +45,31 @@ A: (KAME-patched platforms)
 		% env LIBS=-L../../../bsdi4/lib/libpfkey ./configure \
 		    --with-libpfkey
 		% make
+
+Q: Describe me the options to "configure".
+
+A:
+	--enable-debug:
+		Enable debugging options.
+	--enable-yydebug:
+		Enable yacc/lex tracing.
+	--enable-pedant:
+		Use strict compilation options (-Wall -Werror).
+	--with-adminport: (INSECURE)
+		Lets racoon to listen to racoon admin port, which is to
+		be contacted by kmpstat(8).  This one still needs more work
+		(it lacks authentication, and is insecure), and is disabled
+		by default.  If you need kmpstat(8) for your experiment,
+		you may turn this on, but make sure to use use it only in
+		testbed network environment (not the reallife network).
+	--with-efence: (for debug only)
+		Use ElectricFence library, which helps us debug dynamic
+		memory allocation mistakes.
+	--with-gc: (experimental)
+		Use Bohem-GC garbage collector.
+		Make sure you compile all the binaries, including libipsec/
+		whatever, with "GC_malloc" and "GC_free" instead of "malloc"
+		and "free" (cc -Dmalloc=GC_malloc -Dfree=GC_free").
 
 Q: How can I get help?
 
