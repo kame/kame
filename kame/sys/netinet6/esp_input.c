@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.20 2000/02/24 12:07:17 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.21 2000/02/26 11:26:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -760,7 +760,7 @@ noreplaycheck:
 			 */
 			struct mbuf *n;
 
-			n = m_split(m, sizeof(*ip6), M_DONTWAIT);
+			n = m_split(m, off, M_DONTWAIT);
 			if (n == NULL) {
 				/* m is retained by m_split */
 				goto bad;
