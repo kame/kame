@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.266 1999/11/15 12:38:20 jinmei Exp $
+$Id: CHANGELOG,v 1.267 1999/11/16 09:17:27 jinmei Exp $
 
 <199911>
+1999-11-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/dump.c (dump_if_rtable): was added to dump
+	more information about each inteface including local addresses.
+	print_ifrt_dump() was removed according to this change.
+
 1999-11-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/sys/netinet/tcp_subr.c (tcp_newtcpcb): always
 	initialize inp_ip_ttl in tcp_newtcpcb() in order to avoid
