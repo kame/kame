@@ -10,7 +10,7 @@ DPADD+=	${LIBL} ${LIBY}
 CLEANFILES+=	y.tab.c y.tab.h key_test.o keytest
 YFLAGS+=-d
 
-SCRIPTS=	scriptdump
+#SCRIPTS=	scriptdump
 
 all: ${PROG} scriptdump
 
