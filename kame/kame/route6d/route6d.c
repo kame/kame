@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.50 2001/01/22 11:58:38 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.51 2001/01/22 12:04:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.50 2001/01/22 11:58:38 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.51 2001/01/22 12:04:03 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2414,6 +2414,9 @@ do { \
 	IFFLAG("POINTOPOINT", IFF_POINTOPOINT);
 #ifdef IFF_NOTRAILERS
 	IFFLAG("NOTRAILERS", IFF_NOTRAILERS);
+#endif
+#ifdef IFF_SMART
+	IFFLAG("SMART", IFF_SMART);
 #endif
 	IFFLAG("RUNNING", IFF_RUNNING);
 	IFFLAG("NOARP", IFF_NOARP);
