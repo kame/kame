@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.159 2001/10/02 03:51:44 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.160 2001/10/11 01:39:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,7 +457,7 @@ isakmp_main(msg, remote, local)
 			iph1 = getph1byindex0(index);
 			if (iph1 == NULL) {
 				plog(LLV_ERROR, LOCATION, remote,
-					"unknown Informationnal "
+					"unknown Informational "
 					"exchange received.\n");
 				return -1;
 			}
