@@ -26,9 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vendorid.h,v 1.2 2000/05/24 09:39:18 sakane Exp $ */
+/* YIPS @(#)$Id: vendorid.h,v 1.3 2000/05/24 09:56:53 sakane Exp $ */
 
 #define VENDORID	"KAME/racoon"
 
 vchar_t *set_vendorid __P((void));
-int check_vendorid __P((struct isakmp_gen *, struct sockaddr *));
+int check_vendorid __P((struct isakmp_gen *));

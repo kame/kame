@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.27 2000/05/24 09:52:18 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.28 2000/05/24 09:56:52 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -211,7 +211,7 @@ ident_i2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			(void)check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -348,7 +348,7 @@ ident_i3recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			(void)check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
@@ -523,7 +523,7 @@ ident_i4recv(iph1, msg0)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			(void)check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_N:
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -676,7 +676,7 @@ ident_r1recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			(void)check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr);
 			break;
 		default:
 			/*
@@ -834,7 +834,7 @@ ident_r2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			(void)check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
@@ -1012,7 +1012,7 @@ ident_r3recv(iph1, msg0)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			(void)check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_N:
 			YIPSDEBUG(DEBUG_NOTIFY,

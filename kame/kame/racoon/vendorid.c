@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vendorid.c,v 1.2 2000/05/24 09:52:18 sakane Exp $ */
+/* YIPS @(#)$Id: vendorid.c,v 1.3 2000/05/24 09:56:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -70,9 +70,8 @@ set_vendorid()
 }
 
 int
-check_vendorid(gen, from)
+check_vendorid(gen)
 	struct isakmp_gen *gen;		/* points to Vendor ID payload */
-	struct sockaddr *from;
 {
 	vchar_t *vidhash = lcconf->vendorid;
 
@@ -87,12 +86,14 @@ check_vendorid(gen, from)
 	if (vidhash->l == ntohs(gen->len) - sizeof(*gen)
 	 && memcmp(vidhash->v, gen + 1, vidhash->l) == 0) {
 		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, from,
+			plog(logp, LOCATION, NULL,
 				"Vendor ID matched.\n"));
-		;
-	} else
-		plog(logp, LOCATION, from,
-			"Vendor ID mismatch.\n");
+		return -1;
+	}
+
+	YIPSDEBUG(DEBUG_SA,
+		plog(logp, LOCATION, NULL,
+			"Vendor ID mismatch.\n"));
 
 	return 0;
 }
