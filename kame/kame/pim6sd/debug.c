@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.49 2001/12/18 03:10:42 jinmei Exp $	*/
+/*	$KAME: debug.c,v 1.50 2002/04/03 02:47:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -76,6 +76,7 @@
 #include "vif.h"
 #include "rp.h"
 #include "inet6.h"
+#include "mld6.h"
 
 #ifdef __STDC__
 #include <stdarg.h>

@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.9 2002/03/29 13:34:50 jinmei Exp $
+ * $KAME: mld6v2.c,v 1.10 2002/04/03 02:47:04 itojun Exp $
  */
 
 /*
@@ -68,6 +68,8 @@
 #include "mld6v2_proto.h"
 #include "callout.h"
 #include "timer.h"
+
+#ifdef MLDV2_LISTENER_REPORT
 
 #ifndef USE_RFC2292BIS
 extern u_int8_t raopt[IP6OPT_RTALERT_LEN];
@@ -488,3 +490,4 @@ decodeafloat(unsigned int nbr,unsigned int sizeexp,unsigned int sizemant)
 	onebit <<= sizemant;
 	return (mant|onebit)<<(exp+3);
 }
+#endif

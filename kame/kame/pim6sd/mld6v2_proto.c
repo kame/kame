@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.9 2002/02/04 06:07:50 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.10 2002/04/03 02:47:04 itojun Exp $
  */
 
 /*
@@ -70,6 +70,7 @@
 #include "callout.h"
 #include "pim6.h"
 
+#ifdef MLDV2_LISTENER_REPORT
 
  /* MLDv2 implementation on SSM range i.e only MODE_IS_INCLUDE,
   * ALLOW_NEW_SOURCES,BLOCK_OLD_SOURCES Multicast address record
@@ -789,3 +790,4 @@ check_multicastV2_listener(v, group, g, source)
 
     return NULL;	/* group not found, source not found */
 }
+#endif

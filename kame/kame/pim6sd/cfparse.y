@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.18 2001/08/09 08:46:56 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.19 2002/04/03 02:47:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -710,6 +710,7 @@ phyint_config()
 				}
 				break;
 			case IFA_QUERY_INT:
+#ifdef MLDV2_LISTENER_REPORT
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the QQIC field */
 
@@ -720,6 +721,7 @@ phyint_config()
 						yywarn("unrepresentable query int. value %.0f, corrected to %d",
 							al->attru.number,realnbr);
 				}
+#endif
 
 				if(v->uv_mld_version == MLDv2) 
 					v->uv_mld_query_interval = realnbr;
@@ -734,6 +736,7 @@ phyint_config()
 					    v->uv_mld_query_interval);
 				break;
 			case IFA_QUERY_INT_RESP:
+#ifdef MLDV2_LISTENER_REPORT
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the MAX RESP CODE field */
 				/* if this is mld version 1 we have to verify if this */
@@ -745,6 +748,7 @@ phyint_config()
 						yywarn("unrepresentable query resp. value %.0f, corrected to %d",
 							al->attru.number,realnbr);
 				}
+#endif
 
 				if(v->uv_mld_version == MLDv2 ) 
 					v->uv_mld_query_rsp_interval = realnbr;
@@ -766,6 +770,7 @@ phyint_config()
 					    v->uv_mld_query_rsp_interval);
 				break;
 			case IFA_LLQI:
+#ifdef MLDV2_LISTENER_REPORT
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the MAX RESP CODE field */
 				/* if this is mld version 1 we have to verify if this */
@@ -777,6 +782,7 @@ phyint_config()
 						yywarn("unrepresentable llqi value %.0f, corrected to %d",
 							al->attru.number,realnbr);
 				}
+#endif
 
 				if(v->uv_mld_version == MLDv2 ) 
 					v->uv_mld_llqi = realnbr;

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.h,v 1.10 2001/11/27 07:19:16 suz Exp $	*/
+/*	$KAME: mld6.h,v 1.11 2002/04/03 02:47:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -67,5 +67,21 @@ void init_mld6 __P((void));
 void send_mld6 __P((int type, int code, struct sockaddr_in6 *src,
 		    struct sockaddr_in6 *dst, struct in6_addr *group,
 		    int index, int delay, int datalen, int alert));
+
+/* portability with older KAME headers */
+#ifndef MLD_LISTENER_QUERY
+#define MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
+#define MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
+#define MLD_LISTENER_DONE	MLD6_LISTENER_DONE
+#define MLD_MTRACE_RESP		MLD6_MTRACE_RESP
+#define MLD_MTRACE		MLD6_MTRACE
+#define mld_hdr		mld6_hdr
+#define mld_type	mld6_type
+#define mld_code	mld6_code
+#define mld_cksum	mld6_cksum
+#define mld_maxdelay	mld6_maxdelay
+#define mld_reserved	mld6_reserved
+#define mld_addr	mld6_addr
+#endif
 
 #endif

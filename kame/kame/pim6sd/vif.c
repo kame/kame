@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.23 2001/11/30 02:26:14 suz Exp $	*/
+/*	$KAME: vif.c,v 1.24 2002/04/03 02:47:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -364,9 +364,11 @@ void start_vif (mifi_t vifi)
 	    case MLDv1:
 		query_groups(v);
 		break;
+#ifdef MLD6V2_LISTENER_REPORT
 	    case MLDv2:
 		query_groupsV2(v);
 		break;
+#endif
 	    default:
 		break;
 	    }

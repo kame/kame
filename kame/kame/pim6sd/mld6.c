@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.40 2002/03/29 13:34:50 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.41 2002/04/03 02:47:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -102,6 +102,7 @@
 #include "mld6v2_proto.h"
 #include "route.h"
 #include "trace.h"
+#include "mld6.h"
 
 /*
  * Exported variables.
@@ -196,8 +197,10 @@ init_mld6()
     ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_QUERY, &filt);
     ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_REPORT, &filt);
     ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_REDUCTION, &filt);
+#ifdef MLD_MTRACE_RESP
     ICMP6_FILTER_SETPASS(MLD_MTRACE_RESP, &filt);
     ICMP6_FILTER_SETPASS(MLD_MTRACE, &filt);
+#endif
 #ifdef MLD6V2_LISTENER_REPORT
     ICMP6_FILTER_SETPASS(MLD6V2_LISTENER_REPORT,&filt);
 #endif
@@ -361,11 +364,13 @@ int recvlen;
 #endif				/* NOSUCHDEF */
 
 	/* for an mtrace message, we don't need strict checks */
+#ifdef MLD_MTRACE
 	if (mldh->mld_type == MLD_MTRACE) {
 		accept_mtrace(src, dst, group, ifindex, (char *)(mldh + 1),
 			      mldh->mld_code, recvlen - sizeof(struct mld_hdr));
 		return;
 	}
+#endif
 
 	/* hop limit check */
 	if (*hlimp != 1)
@@ -408,8 +413,10 @@ int recvlen;
 		if (recvlen == 24)
 			accept_listener_query(src, dst, group,
 					      ntohs(mldh->mld_maxdelay));
+#ifdef MLD6V2_LISTENER_REPORT
 		if (recvlen >= 28)
 			accept_listenerV2_query(src, dst, (char *)(mldh), recvlen);
+#endif
 		return;
 
 	case MLD_LISTENER_REPORT:
@@ -451,10 +458,12 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
     dst_sa.sin6_len = sizeof(dst_sa);
 
     switch(type) {
+#ifdef MLD_MTRACE
     case MLD_MTRACE:
     case MLD_MTRACE_RESP:
 	sndmh.msg_name = (caddr_t)dst;
 	break;
+#endif
     default:
 	if (IN6_IS_ADDR_UNSPECIFIED(group))
 	    dst_sa.sin6_addr = allnodes_group.sin6_addr;
