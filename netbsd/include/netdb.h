@@ -167,7 +167,7 @@ struct	protoent {
  */
 #if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
 struct addrinfo {
-	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */
+	int	ai_flags;	/* AI_xxx */
 	int	ai_family;	/* PF_xxx */
 	int	ai_socktype;	/* SOCK_xxx */
 	int	ai_protocol;	/* 0 or IPPROTO_xxx for IPv4 and IPv6 */
@@ -229,7 +229,7 @@ struct addrinfo {
 #define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
 #define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
 #define	AI_NUMERICSERV	0x00000008 /* prevent service name resolution */
-/* valid flags for addrinfo */
+/* valid flags for addrinfo (not a standard def, apps should not use it) */
 #define	AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV)
 #endif
