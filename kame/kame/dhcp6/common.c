@@ -113,8 +113,8 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 			continue;
 
 		/* in any case, ignore interfaces in different scope zones. */
-		if ((s1 = in6_addrscopebyif(addr, ifnam)) < 0 ||
-		    (s2 = in6_addrscopebyif(addr, ifa->ifa_name)) < 0 ||
+		if ((s1 = in6_addrscopebyif(prefix, ifnam)) < 0 ||
+		    (s2 = in6_addrscopebyif(prefix, ifa->ifa_name)) < 0 ||
 		     s1 != s2)
 			continue;
 
@@ -203,23 +203,28 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 	     ifr < ifr_end;
 	     ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
 				    + ifr->ifr_addr.sa_len)) {
+		int s1, s2;
+
 		if (strong && strcmp(ifnam, ifr->ifr_name) != 0)
 			continue;
 
 		/* in any case, ignore interfaces in different scope zones. */
-		if ((s1 = in6_addrscopebyif(addr, ifnam)) < 0 ||
-		    (s2 = in6_addrscopebyif(addr, ifa->ifa_name)) < 0 ||
+		if ((s1 = in6_addrscopebyif(prefix, ifnam)) < 0 ||
+		    (s2 = in6_addrscopebyif(prefix, ifr->ifr_name)) < 0 ||
 		     s1 != s2)
-			continue;
-
-		if (in6_matchflags(addr, ifr->ifr_name, ignoreflags))
 			continue;
 
 		if (ifr->ifr_addr.sa_family != AF_INET6)
 			continue;
 		if (ifr->ifr_addr.sa_len > sizeof(sin6))
 			continue;
+
+		if (in6_matchflags(&ifr->ifr_addr, ifr->ifr_name, ignoreflags))
+			continue;
+
 		memcpy(&sin6, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
+
+
 #ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr)) {
 			sin6.sin6_addr.s6_addr[2] = 0;
