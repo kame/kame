@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/10/07 01:01:47 $
+			$Date: 1999/10/07 03:01:09 $
 
 <<<Project Overview>>>
 
@@ -17,7 +17,10 @@ provides high quality and advanced featured package.
 KAME is originally called "Hydrangea" which was developed by v6
 working group, WIDE Project.  We are merging codes, which each company
 in Japan has developed, into "Hydrangea".  To identify the joint
-effort, we changed the name from "Hydrangea" to "KAME".
+effort, we changed the name from "Hydrangea" to "KAME". 
+
+KAME software has been merged into NetBSD-current.  It will also be
+merged into BSD/OS, FreeBSD, and OpenBSD(IPv6 stuff only).
 
 "KAME" officially indicates a short word of <Ka>rigo<me> where our office
 locates.  But it, in fact, stands for turtle in Japanese.
