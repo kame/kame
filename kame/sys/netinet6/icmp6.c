@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.88 2000/05/11 00:58:53 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.89 2000/05/15 06:34:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -150,7 +150,8 @@ static void icmp6_mtudisc_update __P((struct in6_addr *, struct icmp6_hdr *,
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
-static struct mbuf * ni6_input __P((struct mbuf *, int));
+static struct mbuf *ni6_input __P((struct mbuf *, int));
+static struct mbuf *ni6_nametodns __P((const char *, int, int));
 static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
 			  struct ifnet **));
 static int ni6_store_addrs __P((struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
@@ -1064,7 +1065,6 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * - FQDN Subject name handling (drop it if it's not for me)
  * - IPv4 Subject address handling support missing
  * - Proxy reply (answer even if it's not for me)
- * - FQDN reply is not an DNS format, but pascal string (03 draft)
  * - "Supported Qtypes" support missing
  */
 #ifdef __FreeBSD__
@@ -1088,6 +1088,7 @@ ni6_input(m, off)
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
 	struct sockaddr_in6 sin6;
 	struct ip6_hdr *ip6;
+	int oldfqdn = 0;	/* if 1, return pascal string (03 draft) */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
@@ -1146,8 +1147,8 @@ ni6_input(m, off)
 		goto bad;	/* xxx: to be implemented */
 		break;
 	case NI_QTYPE_FQDN:
-		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_name) +
-			hostnamelen;
+		/* XXX will append a mbuf */
+		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
 		break;
 	case NI_QTYPE_NODEADDR:
 		addrs = ni6_addrs(ni6, m, &ifp);
@@ -1165,8 +1166,9 @@ ni6_input(m, off)
 		 * maybe we should obsolete older versions.
 		 */
 		qtype = NI_QTYPE_FQDN;
-		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_name) +
-			hostnamelen;
+		/* XXX will append a mbuf */
+		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
+		oldfqdn++;
 		break;
 	}
 
@@ -1190,8 +1192,10 @@ ni6_input(m, off)
 			 * backward compatibility - try to accept 03 draft
 			 * format, where no Subject is present.
 			 */
-			if (subjlen == 0)
+			if (subjlen == 0) {
+				oldfqdn++;
 				break;
+			}
 
 			if (subjlen != sizeof(sin6.sin6_addr))
 				goto bad;
@@ -1240,12 +1244,13 @@ ni6_input(m, off)
 	}
 	M_COPY_PKTHDR(n, m); /* just for recvif */
 	if (replylen > MHLEN) {
-		if (replylen > MCLBYTES)
+		if (replylen > MCLBYTES) {
 			 /*
 			  * XXX: should we try to allocate more? But MCLBYTES is
 			  * probably much larger than IPV6_MMTU...
 			  */
 			goto bad;
+		}
 		MCLGET(n, M_DONTWAIT);
 		if ((n->m_flags & M_EXT) == 0) {
 			goto bad;
@@ -1267,19 +1272,18 @@ ni6_input(m, off)
 		goto bad;	/* xxx: to be implemented */
 		break;
 	case NI_QTYPE_FQDN:
-		if (hostnamelen > 255) { /* XXX: rare case, but may happen */
-			printf("ni6_input: "
-				"hostname length(%d) is too large for reply\n",
-				(int)hostnamelen);
-			goto bad;
-		}
 		fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
 						sizeof(struct ip6_hdr) +
 						sizeof(struct icmp6_nodeinfo));
 		nni6->ni_flags = 0; /* XXX: meaningless TTL */
 		fqdn->ni_fqdn_ttl = 0;	/* ditto. */
-		fqdn->ni_fqdn_namelen = hostnamelen;
-		bcopy(hostname, &fqdn->ni_fqdn_name[0], hostnamelen);
+		n->m_next = ni6_nametodns(hostname, hostnamelen, oldfqdn);
+		if (n->m_next == NULL)
+			goto bad;
+		/* XXX we assume that n->m_next is not a chain */
+		if (n->m_next->m_next != NULL)
+			goto bad;
+		n->m_pkthdr.len += n->m_next->m_len;
 		break;
 	case NI_QTYPE_NODEADDR:
 	{
@@ -1313,6 +1317,78 @@ ni6_input(m, off)
 	return(NULL);
 }
 #undef hostnamelen
+
+/*
+ * make a mbuf with DNS-encoded string.  no compression support.
+ */
+static struct mbuf *
+ni6_nametodns(name, namelen, old)
+	const char *name;
+	int namelen;
+	int old;	/* return pascal string if non-zero */
+{
+	struct mbuf *m;
+	char *cp, *ep;
+	const char *p, *q;
+	int i, len;
+	struct ni_reply_fqdn *fqdn;
+
+	if (old)
+		len = namelen + 1;
+	else
+		len = MCLBYTES;
+
+	/* because MAXHOSTNAMELEN is usually 256, we use cluster mbuf */
+	MGET(m, M_DONTWAIT, MT_DATA);
+	if (m && len > MLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0)
+			goto fail;
+	}
+	if (!m)
+		goto fail;
+	m->m_next = NULL;
+
+	if (old) {
+		m->m_len = len;
+		*mtod(m, char *) = namelen;
+		bcopy(name, mtod(m, char *) + 1, namelen);
+	} else {
+		m->m_len = 0;
+		cp = mtod(m, char *);
+		ep = mtod(m, char *) + M_TRAILINGSPACE(m);
+
+		p = name;
+		while (cp < ep && p < name + namelen) {
+			i = 0;
+			for (q = p; q < name + namelen && *q && *q != '.'; q++)
+				i++;
+			/* result does not fit into mbuf */
+			if (cp + i + 1 >= ep)
+				goto fail;
+			/* DNS label length restriction, RFC1035 page 8 */
+			if (i >= 64)
+				goto fail;
+			*cp++ = i;
+			bcopy(p, cp, i);
+			cp += i;
+			p = q;
+			if (p < name + namelen && *p == '.')
+				p++;
+		}
+		/* "\0" as termination */
+		if (cp + 1 >= ep)
+			goto fail;
+		*cp++ = '\0';
+		m->m_len = cp - mtod(m, char *);
+	}
+	return m;
+
+ fail:
+	if (m)
+		m_freem(m);
+	return NULL;
+}
 
 /*
  * calculate the number of addresses to be returned in the node info reply.
