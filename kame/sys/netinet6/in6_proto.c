@@ -71,7 +71,7 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__)
 #include <sys/socketvar.h>
 #endif
 #include <sys/protosw.h>
@@ -79,9 +79,7 @@
 #include <sys/domain.h>
 #include <sys/mbuf.h>
 #ifdef __FreeBSD__
-# if __FreeBSD__ >= 3
-# include <sys/systm.h>
-# endif
+#include <sys/systm.h>
 #include <sys/sysctl.h>
 #endif
 
