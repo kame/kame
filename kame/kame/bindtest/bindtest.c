@@ -1,7 +1,8 @@
-/*	$KAME: bindtest.c,v 1.51 2001/11/09 09:34:33 itojun Exp $	*/
+/*	$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $	*/
+/*	$KAME: bindtest.c,v 1.52 2001/11/26 07:25:47 jinmei Exp $	*/
 
 /*
- * Copyright (C) 2000 USAGI/WIDE Project.
+ * Copyright (C) 2000,2001 USAGI/WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -72,11 +73,25 @@
 #include <fcntl.h>
 
 #include <netinet/in.h>
+#include <net/if.h>
 
 /* portability */
 #if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 #define socklen_t	int
 #endif
+
+#ifdef _USAGI
+#ifndef IPV6_V6ONLY
+#define IPV6_V6ONLY	26
+#endif
+#endif
+
+#ifndef IF_NAMESIZE
+#define IF_NAMESIZE	IFNAMSIZ
+#endif
+
+char mcast4_host[INET_ADDRSTRLEN] = "224.0.0.1";
+char mcast6_host[INET6_ADDRSTRLEN+1+IF_NAMESIZE] = "ff02::1";
 
 static struct testitem{
 	const char *name;
@@ -92,6 +107,8 @@ static struct testitem{
 	{ "loopm",	AF_INET6,	"::ffff:127.0.0.1",	NULL },
 	{ "onem",	AF_INET6,	"::ffff:0.0.0.1",	NULL },
 	{ "one4",	AF_INET,	"0.0.0.1",		NULL },
+	{ "mcast6",	AF_INET6,	mcast6_host,		NULL },
+	{ "mcast4",	AF_INET,	mcast4_host,		NULL },
 	{ NULL,		0,		NULL,			NULL }
 };
 
@@ -114,7 +131,9 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.51 2001/11/09 09:34:33 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.52 2001/11/26 07:25:47 jinmei Exp $"
+			  "\n"
+			  "$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $";
 static char *port = NULL;
 static char *otheraddr = NULL;
 static char *bcastaddr = NULL;
@@ -138,7 +157,7 @@ main(argc, argv)
 	struct testitem *testi, *testj;
 	char otheraddr6[NI_MAXHOST], bcastaddr6[NI_MAXHOST];;
 
-	while ((ch = getopt(argc, argv, "126Ab:lo:Pp:stv")) != -1) {
+	while ((ch = getopt(argc, argv, "126Ab:lm:M:o:Pp:stvV")) != -1) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;
@@ -166,6 +185,14 @@ main(argc, argv)
 		case 'l':
 			delayedlisten = 1;
 			break;
+		case 'm':
+			strncpy(mcast4_host, optarg, sizeof(mcast4_host));
+			mcast4_host[sizeof(mcast4_host)-1] = '\0';
+			break;
+		case 'M':
+			strncpy(mcast6_host, optarg, sizeof(mcast6_host));
+			mcast6_host[sizeof(mcast6_host)-1] = '\0';
+			break;
 		case 'P':
 			reuseport = 1;
 #ifndef SO_REUSEPORT
@@ -191,6 +218,9 @@ main(argc, argv)
 			break;
 		case 'v':
 			printversion();
+			exit(0);
+		case 'V':
+			printf("%s\n", versionstr);
 			exit(0);
 		default:
 			usage();
@@ -235,6 +265,18 @@ main(argc, argv)
 		if (!testi->res) {
 			fprintf(stderr, "getaddrinfo failed\n");
 			exit(1);
+		}
+		if (strncmp(testi->name, "mcast", 5) == 0) {
+			switch(testi->family) {
+			case AF_INET6:
+				if (!IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)testi->res->ai_addr)->sin6_addr))
+					fprintf(stderr, "non-multicast address for %s\n", testi->name);
+				break;
+			case AF_INET:
+				if (!IN_MULTICAST(ntohl(((struct sockaddr_in *)testi->res->ai_addr)->sin_addr.s_addr)))
+					fprintf(stderr, "non-multicast address for %s\n", testi->name);
+				break;
+			}
 		}
 	}
 
@@ -319,8 +361,10 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: bindtest [-126APlstv] "
-		"[-b IPv4 broadcast addr] [-o IPv4address] -p port\n");
+	fprintf(stderr, "usage: bindtest [-126APlstvV] "
+		"[-b IPv4 broadcast addr] [-o IPv4address] "
+		"[-m IPv4 multicast addr] [-M IPv6 multicast addr] "
+		"-p port\n");
 }
 
 static void
@@ -356,6 +400,8 @@ getres(af, host, port, flags)
 	hints.ai_socktype = socktype;
 	hints.ai_flags = flags;
 	error = getaddrinfo(host, port, &hints, &res);
+	if (error)
+		res = NULL;
 	return res;
 }
 
