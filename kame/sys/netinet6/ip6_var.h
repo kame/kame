@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.112 2003/06/28 03:56:15 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.113 2003/07/08 07:17:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -452,7 +452,7 @@ int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-int	ip6_raw_ctloutput __P((struct socket *, struct sockopt *sopt));
+int	ip6_raw_ctloutput __P((struct socket *, struct sockopt *));
 #else
 int	ip6_raw_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
@@ -475,10 +475,10 @@ void	frag6_slowtimo __P((void));
 void	frag6_drain __P((void));
 
 void	rip6_init __P((void));
-int	rip6_input __P((struct mbuf **mp, int *offp, int proto));
+int	rip6_input __P((struct mbuf **, int *, int));
 void	rip6_ctlinput __P((int, struct sockaddr *, void *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-int	rip6_ctloutput __P((struct socket *so, struct sockopt *sopt));
+int	rip6_ctloutput __P((struct socket *, struct sockopt *));
 #else
 int	rip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif

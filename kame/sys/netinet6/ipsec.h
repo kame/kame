@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.66 2003/06/29 07:00:53 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.67 2003/07/08 07:19:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,13 +407,12 @@ struct inpcb;
 #ifdef INET6
 struct in6pcb;
 #endif
-extern int ipsec_init_pcbpolicy __P((struct socket *so, struct inpcbpolicy **));
+extern int ipsec_init_pcbpolicy __P((struct socket *, struct inpcbpolicy **));
 extern int ipsec_copy_pcbpolicy
 	__P((struct inpcbpolicy *, struct inpcbpolicy *));
 extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *, int));
 
-extern int ipsec4_set_policy __P((struct inpcb *inp, int optname,
-	caddr_t request, size_t len, int priv));
+extern int ipsec4_set_policy __P((struct inpcb *, int, caddr_t, size_t, int));
 extern int ipsec4_get_policy __P((struct inpcb *inpcb, caddr_t request,
 	size_t len, struct mbuf **mp));
 extern int ipsec4_delete_pcbpolicy __P((struct inpcb *));
@@ -424,17 +423,15 @@ extern int ipsec4_in_reject __P((struct mbuf *, struct inpcb *));
 extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
-extern int ipsec6_set_policy __P((struct inpcb *inp, int optname,
-	caddr_t request, size_t len, int priv));
-extern int ipsec6_get_policy
-	__P((struct inpcb *inp, caddr_t request, size_t len, struct mbuf **mp));
+extern int ipsec6_set_policy __P((struct inpcb *, int, caddr_t, size_t, int));
+extern int ipsec6_get_policy __P((struct inpcb *, caddr_t, size_t,
+	    struct mbuf **));
 extern int ipsec6_in_reject __P((struct mbuf *, struct inpcb *));
 #else
 extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
-extern int ipsec6_set_policy __P((struct in6pcb *in6p, int optname,
-	caddr_t request, size_t len, int priv));
-extern int ipsec6_get_policy __P((struct in6pcb *in6p, caddr_t request,
-	size_t len, struct mbuf **mp));
+extern int ipsec6_set_policy __P((struct in6pcb *, int, caddr_t, size_t, int));
+extern int ipsec6_get_policy __P((struct in6pcb *, caddr_t, size_t,
+	    struct mbuf **));
 extern int ipsec6_in_reject __P((struct mbuf *, struct in6pcb *));
 #endif
 #endif /* INET6 */
