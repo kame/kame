@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.4 2002/05/24 07:40:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -155,8 +155,8 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	TAILQ_REMOVE(&head->so_comp, newso, so_list);
 #else
 
-#ifdef __NetBSD__
-	newso = head->so_q.tqh_first;
+#if defined( __NetBSD__) || defined(__OpenBSD__)
+	newso = TAILQ_FIRST(&head->so_q);
 #else
 	newso = head->so_q;
 #endif

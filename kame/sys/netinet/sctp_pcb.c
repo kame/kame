@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.4 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.5 2002/05/24 07:40:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1690,10 +1690,10 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 	struct socket *so;
 	struct rtentry *rt;
 	int s;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	sctp_timer_stop(SCTP_TIMER_TYPE_NEWCOOKIE, ep, NULL, NULL);
 	so  = ep->sctp_socket;
@@ -2422,10 +2422,10 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	int s;
 
 	/* first, lets purge the  entry from the hash table. */
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	if(ep->sctp_tcb_at_block == (void *)tasoc){
 		ep->error_on_block = ECONNRESET;
@@ -3214,7 +3214,23 @@ sctp_pcb_init()
 	sctppcbinfo.hashtblsize = hashtblsize;
 
 	/* init the zones */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__OpenBSD__)
+	pool_init(&sctppcbinfo.ipi_zone_ep, sizeof(struct sctp_inpcb),
+		  0, 0, 0, "sctp_ep",NULL);
+
+	pool_init(&sctppcbinfo.ipi_zone_asoc, sizeof(struct sctp_tcb),
+		  0, 0, 0, "sctp_asoc",NULL);
+
+	pool_init(&sctppcbinfo.ipi_zone_laddr, sizeof(struct sctp_laddr),
+		  0, 0, 0, "sctp_laddr",NULL);
+
+	pool_init(&sctppcbinfo.ipi_zone_raddr, sizeof(struct sctp_nets),
+		  0, 0, 0, "sctp_raddr", NULL);
+
+	pool_init(&sctppcbinfo.ipi_zone_chunk, sizeof(struct sctp_tmit_chunk),
+		  0, 0, 0,"sctp_chunk", NULL);
+#endif
+#if defined(__NetBSD__) 
 	pool_init(&sctppcbinfo.ipi_zone_ep, sizeof(struct sctp_inpcb),
 		  0, 0, 0, "sctp_ep", 0, NULL, NULL, M_PCB);
 
@@ -3842,7 +3858,7 @@ callout_reset(struct callout *c, int to_ticks, void (*ftn)(void *), void *arg)
 		to_ticks = 1;
 
 	c->c_arg = arg;
-	c->c_flags |= (CALLOUT_ACTIVE | CALLOUT_PENDING);
+	c->c_flags = (CALLOUT_ACTIVE | CALLOUT_PENDING);
 	c->c_func = ftn;
 	c->c_time = ticks + to_ticks;
 	TAILQ_INSERT_TAIL(&sctppcbinfo.callqueue, c, tqe);
@@ -3877,44 +3893,42 @@ sctp_fasttim(void)
 	struct calloutlist locallist;
 	int inited = 0;
 	int s;
-
-#ifdef __FreeBSD__
-	s = splnet();
-#else
-	s = splsoftnet();
-#endif
+	s = splhigh();
 	/* run through and subtract and mark all callouts */
 	c = TAILQ_FIRST(&sctppcbinfo.callqueue);
 	while (c) {
 		n = TAILQ_NEXT(c, tqe);
-		c->c_time -= SCTP_TICKS_PER_FASTTIMO;
-		if (c->c_time <= 0) {
+		if (c->c_time <= ticks) {
 			c->c_flags |= CALLOUT_FIRED;
 			c->c_time = 0;
+			TAILQ_REMOVE(&sctppcbinfo.callqueue, c, tqe);
+			if (inited == 0) {
+				TAILQ_INIT(&locallist);
+				inited = 1;
+			}
+			/* move off of main list */
+			TAILQ_INSERT_TAIL(&locallist, c, tqe);
 		}
-		TAILQ_REMOVE(&sctppcbinfo.callqueue, c, tqe);
-		if (inited == 0) {
-			TAILQ_INIT(&locallist);
-			inited = 1;
-		}
-		/* move off of main list */
-		TAILQ_INSERT_TAIL(&locallist, c, tqe);
 		c = n;
 	}
 	/* Now all the ones on the locallist must be called */
-	c = TAILQ_FIRST(&locallist);
-	while (c) {
-		/* remove it */
-		TAILQ_REMOVE(&locallist, c, tqe);
-		/* now validate that it did not get canceled */
-		if (c->c_flags & CALLOUT_FIRED) {
-			c->c_flags &= ~(CALLOUT_ACTIVE | CALLOUT_PENDING |
-					CALLOUT_FIRED);
-			(*c->c_func)(c->c_arg);
-		}
+	if(inited){
 		c = TAILQ_FIRST(&locallist);
+		while (c) {
+			/* remove it */
+			TAILQ_REMOVE(&locallist, c, tqe);
+			/* now validate that it did not get canceled */
+			if (c->c_flags & CALLOUT_FIRED) {
+				c->c_flags &= ~CALLOUT_PENDING;
+				splx(s);
+				(*c->c_func)(c->c_arg);
+				s = splhigh();
+			}
+			c = TAILQ_FIRST(&locallist);
+		}
 	}
 	splx(s);
 }
 
 #endif /* _SCTP_NEEDS_CALLOUT_ */
+

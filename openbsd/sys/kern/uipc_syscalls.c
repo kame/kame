@@ -54,7 +54,9 @@
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
-
+#ifdef SCTP
+#include <netinet/sctp_peeloff.h>
+#endif
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
@@ -895,7 +897,10 @@ sys_getsockopt(p, v, retval)
 	struct file *fp;
 	struct mbuf *m = NULL;
 	socklen_t valsize;
+	struct mbuf *msav = NULL;
+	unsigned int used_my_mbuf;
 	int error;
+	used_my_mbuf = 0;
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
 		return (error);
@@ -907,15 +912,64 @@ sys_getsockopt(p, v, retval)
 			goto out;
 	} else
 		valsize = 0;
+	if (valsize > MCLBYTES) {
+		/*
+		 * Restrict us down to a cluster size, thats
+		 * all we can pass either way...
+		 */
+		valsize = MCLBYTES;
+	}
+	if (SCARG(uap, val)) {
+		/*
+		 * SCTP wants to get some information
+		 * from the getopt call.. to lookup an
+		 * association. The alternative is to
+		 * add special in/out syscalls which seems
+		 * a large waste :>
+		 */
+		m = m_get(M_WAIT, MT_SOOPTS);
+		if (valsize > MLEN) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				return (ENOBUFS);
+			}
+		}
+		error = copyin(SCARG(uap, val),
+		mtod(m, caddr_t),valsize);
+		if (error) {
+			(void) m_free(m);
+			goto out;
+		}
+		m->m_len = valsize;
+		msav = m;
+		used_my_mbuf = 0;
+	}
 	if ((error = sogetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), &m)) == 0 && SCARG(uap, val) && valsize &&
 	    m != NULL) {
+  	        if (m == msav) {
+			used_my_mbuf = 1;
+		}
 		if (valsize > m->m_len)
 			valsize = m->m_len;
 		error = copyout(mtod(m, caddr_t), SCARG(uap, val), valsize);
 		if (error == 0)
 			error = copyout((caddr_t)&valsize,
 			    (caddr_t)SCARG(uap, avalsize), sizeof (valsize));
+	}
+	/* Check to see if the caller used my mbuf or
+	 * not. SCTP will reuse what I pass in. Where has
+	 * other protocols will ignore the passed mbuf and
+	 * replace it with one they allocate.
+	 */
+	if ((used_my_mbuf == 0) && msav) {
+		/*
+		 * If what was returned is different than
+		 * what was sent in, we need to free
+		 * what was sent in.
+		 */
+		m_free(msav);
 	}
 out:
 	FRELE(fp);

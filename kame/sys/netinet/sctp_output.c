@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.4 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.5 2002/05/24 07:40:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -1941,7 +1941,11 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		}
 #endif
 		ret = ip_output(m, inp->ip_inp.inp.inp_options,
-				rtp, o_flgs, inp->ip_inp.inp.inp_moptions);
+				rtp, o_flgs, inp->ip_inp.inp.inp_moptions
+#if defined(__OpenBSD__) && defined(IPSEC)
+				,(struct inpcb *)NULL
+#endif
+);
 
 		sctp_pegs[SCTP_DATAGRAMS_SENT]++;
 #ifdef SCTP_DEBUG
@@ -5848,10 +5852,10 @@ sctp_output(inp, m, addr, control, p)
 	t_inp = inp;
 	/*  struct route ro;*/
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	queue_only = 0;
 	ip_inp = (struct inpcb *)inp;

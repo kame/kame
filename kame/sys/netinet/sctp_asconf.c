@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.3 2002/05/24 07:40:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -683,6 +683,7 @@ sctp_handle_asconf(struct mbuf *m, int offset, struct sctp_asconf_chunk *cp,
 	}
 	/* param_length is already validated in process_control... */
 	offset += ntohs(p_addr->ph.param_length);   /* skip lookup addr */
+	asconf_length -= ntohs(p_addr->ph.param_length);
 
 	/* get pointer to first asconf param in ASCONF */
 	aph = (struct sctp_asconf_paramhdr *)sctp_m_getptr(m, offset, sizeof(struct sctp_asconf_paramhdr), (uint8_t *)&aparam_buf);
@@ -1322,13 +1323,21 @@ sctp_handle_asconf_ack(struct mbuf *m, int offset,
 	serial_num = ntohl(cp->serial_number);
 
 	/*
+	 * NOTE: we may want to handle this differently- currently, we
+	 * will abort when we get an ack for the expected serial number + 1
+	 * (eg. we didn't send it), process an ack normally if it is the
+	 * expected serial number, and re-send the previous ack for *ALL*
+	 * other serial numbers
+	 */
+
+	/*
 	 * if the serial number is the next expected, but I didn't send it,
 	 * abort the assoc, since someone probably just hijacked us...
 	 */
-	/* FIX - need to define an error code in the draft? */
 	if (serial_num == (assoc->asconf_seq_out + 1)) {
 		sctp_abort_an_association(stcb->sctp_ep, stcb,
-					  SCTP_ERROR_NO_ERROR, NULL);
+					  SCTP_ERROR_ILLEGAL_ASCONF_ACK,
+					  NULL);
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
 			printf("handle_asconf_ack: got unexpected next serial number! Aborting assoc!\n");
@@ -1794,10 +1803,10 @@ sctp_addr_mgmt_ep(struct sctp_inpcb *ep, struct ifaddr *ifa, uint16_t type) {
 		}
 	}
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	/* process for all associations for this endpoint */
 	LIST_FOREACH(tcb, &ep->sctp_asoc_list, sctp_tcblist) {
@@ -1823,10 +1832,10 @@ sctp_addr_mgmt_restrict_ep(struct sctp_inpcb *ep, struct ifaddr *ifa) {
 		return;
 	}
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	/* process for all associations for this endpoint */
 	LIST_FOREACH(tcb, &ep->sctp_asoc_list, sctp_tcblist) {
@@ -2237,15 +2246,15 @@ sctp_compose_asconf(struct sctp_tcb *stcb) {
 				lookup->ph.param_type = htons(SCTP_IPV6_ADDRESS);
 				p_size = sizeof(struct sctp_ipv6addr_param);
 				addr_size = sizeof(struct in6_addr);
-				addr_ptr = (caddr_t)&((struct sockaddr_in *)
-					found_addr)->sin_addr;
+				addr_ptr = (caddr_t)&((struct sockaddr_in6 *)
+					found_addr)->sin6_addr;
 			} else {
 				/* copy IPv4 address */
 				lookup->ph.param_type = htons(SCTP_IPV4_ADDRESS);
 				p_size = sizeof(struct sctp_ipv4addr_param);
 				addr_size = sizeof(struct in_addr);
-				addr_ptr = (caddr_t)&((struct sockaddr_in6 *)
-					found_addr)->sin6_addr;
+				addr_ptr = (caddr_t)&((struct sockaddr_in *)
+					found_addr)->sin_addr;
 			}
 			lookup->ph.param_length = htons(SCTP_SIZE32(p_size));
 			memcpy(lookup->addr, addr_ptr, addr_size);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.3 2002/05/24 07:40:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -2463,6 +2463,12 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 #endif /* SCTP_DEBUG */
 		if ((chk_length < sizeof(struct sctp_chunkhdr)) ||
 		    (*length < chk_length)) {
+#ifdef SCTP_DEBUG
+			if (sctp_debug_on & SCTP_DEBUG_INPUT3) {
+				printf("sctp_process_control: length issue *length:%u < chk_length:%u\n", *length, 
+				       chk_length);
+			}
+#endif /* SCTP_DEBUG */
 			*length = 0;
 			return(NULL);
 		}
@@ -3210,7 +3216,7 @@ sctp_input(m, va_alist)
 	/*
 	 * common chunk processing
 	 */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 	length = ip->ip_len - sizeof(struct sctphdr);
 #else
 	length = ip->ip_len - (sizeof(struct sctphdr) + (ip->ip_hl << 2));
@@ -3218,10 +3224,10 @@ sctp_input(m, va_alist)
 	offset -= sizeof(struct sctp_chunkhdr);
 	
 	ecn_bits = ip->ip_tos;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	if (sctp_common_input_processing(inp, stcb, netp, sh, ch, m, iphlen,
 					 offset, length, ecn_bits)) {

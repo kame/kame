@@ -1,4 +1,4 @@
-/*	$KAME: sctp.h,v 1.4 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp.h,v 1.5 2002/05/24 07:40:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_H_
@@ -169,6 +169,7 @@ struct sctp_paramhdr {
 #define SCTP_ERROR_DELETE_LAST_ADDR	0x000c
 #define SCTP_ERROR_RESOURCE_SHORTAGE	0x000d
 #define SCTP_ERROR_DELETE_SOURCE_ADDR	0x000e
+#define SCTP_ERROR_ILLEGAL_ASCONF_ACK	0x000f
 
 /*
  * error cause parameters (user visisble)
