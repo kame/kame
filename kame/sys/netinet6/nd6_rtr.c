@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.89 2001/02/03 18:25:55 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.90 2001/02/03 18:33:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,11 +98,7 @@ extern int nd6_recalc_reachtm_interval;
 struct ifnet *nd6_defifp;
 int nd6_defifindex;
 
-#ifdef IPV6TMPADDR
-int ip6_use_tempaddr = IPV6TMPADDR;
-#else
 int ip6_use_tempaddr = 0;
-#endif
 
 int ip6_desync_factor;
 u_int32_t ip6_temp_preferred_lifetime = DEF_TEMP_PREFERRED_LIFETIME;
