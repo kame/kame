@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.87 2001/08/06 08:13:43 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.88 2001/08/06 08:31:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1244,7 +1244,7 @@ oakley_validate_auth(iph1)
 				return -1;
 			}
 
-			/* don't cache cert */
+			/* don't use cached cert */
 			if (iph1->cert_p != NULL) {
 				oakley_delcert(iph1->cert_p);
 				iph1->cert_p = NULL;
@@ -1262,7 +1262,7 @@ oakley_validate_auth(iph1)
 				return -1;
 			}
 
-			/* don't cache cert */
+			/* don't use cached cert */
 			if (iph1->cert_p != NULL) {
 				oakley_delcert(iph1->cert_p);
 				iph1->cert_p = NULL;
