@@ -3,7 +3,7 @@
 # Date created:			25 June 1997
 # Whom:				Carey Jones <mcj@acquiesce.org>
 #
-# $Id: Makefile,v 1.1 1999/08/10 09:14:29 itojun Exp $
+# $Id: Makefile,v 1.2 1999/10/08 02:39:26 itojun Exp $
 #
 
 DISTNAME=	mpg123-0.59r
@@ -14,7 +14,7 @@ MASTER_SITES=	http://www-ti.informatik.uni-tuebingen.de/~hippm/mpg123/ \
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	mpg123-059r-v6-19990727.diff.gz
+PATCHFILES=	mpg123-059r-v6-19991007a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
