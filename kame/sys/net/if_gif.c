@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.24 2000/05/05 11:00:55 sumikawa Exp $	*/
+/*	$KAME: if_gif.c,v 1.25 2000/05/16 16:13:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -362,8 +362,7 @@ gif_input(m, af, gifp)
 		return;
 	}
 
-	if (m->m_pkthdr.rcvif)
-		m->m_pkthdr.rcvif = gifp;
+	m->m_pkthdr.rcvif = gifp;
 	
 #if NBPFILTER > 0
 	if (gifp->if_bpf) {
