@@ -1125,7 +1125,11 @@ dontblock:
 	SBLASTRECORDCHK(&so->so_rcv);
 	SBLASTMBUFCHK(&so->so_rcv);
 	nextrecord = m->m_nextpkt;
-	if (pr->pr_flags & PR_ADDR) {
+	if (pr->pr_flags & PR_ADDR
+#ifdef SCTP
+	    || (pr->pr_flags & PR_ADDR_OPT && m->m_type == MT_SONAME)
+#endif
+	) {
 		KASSERT(m->m_type == MT_SONAME,
 		    ("m->m_type == %d", m->m_type));
 		orig_resid = 0;
@@ -1141,27 +1145,7 @@ dontblock:
 			sockbuf_pushsync(&so->so_rcv, nextrecord);
 		}
 	}
-#ifdef SCTP
-	if (pr->pr_flags & PR_ADDR_OPT) {
-		/*
-		 * For SCTP we may be getting a
-		 * whole message OR a partial delivery.
-		 */
-		if (m->m_type == MT_SONAME) {
-			orig_resid = 0;
-			if (psa)
-				*psa = dup_sockaddr(mtod(m, struct sockaddr *),
-				    mp0 == 0);
-			if (flags & MSG_PEEK) {
-				m = m->m_next;
-			} else {
-				sbfree(&so->so_rcv, m);
-				so->so_rcv.sb_mb = m_free(m);
-				m = so->so_rcv.sb_mb;
-			}
-		}
-	}
-#endif /* SCTP */
+
 	/*
 	 * Process one or more MT_CONTROL mbufs present before any data mbufs
 	 * in the first mbuf chain on the socket buffer.  If MSG_PEEK, we

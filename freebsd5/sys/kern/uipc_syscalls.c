@@ -2102,9 +2102,7 @@ sctp_peeloff(td, uap)
 				     */
 {
 #ifdef SCTP
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	struct filedesc *fdp = td->p_fd;
-#endif
+	struct filedesc *fdp;
 	struct file *lfp = NULL;
 	struct file *nfp = NULL;
 	int error, s;
@@ -2113,13 +2111,16 @@ sctp_peeloff(td, uap)
 	int fd;
 	short fflag;		/* type must match fp->f_flag */
 
+	fdp = td->td_proc->p_fd;
 	error = copyin((caddr_t)uap->name, &assoc_id, sizeof (assoc_id));
 	if (error) {
 		return(error);
 	}
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	error = holdsock(fdp, uap->sd, &lfp);
 	if (error)
 		return (error);
+#endif
 	s = splnet();
 	head = (struct socket *)lfp->f_data;
 	error = sctp_can_peel_off(head, assoc_id);
@@ -2134,7 +2135,7 @@ sctp_peeloff(td, uap)
 	 */
 
 	fflag = lfp->f_flag;
-	error = falloc(p, &nfp, &fd);
+	error = falloc(td, &nfp, &fd);
 	if (error) {
 		/*
 		 * Probably ran out of file descriptors. Put the
@@ -2146,7 +2147,7 @@ sctp_peeloff(td, uap)
 		goto done;
 	}
 	fhold(nfp);
-	p->p_retval[0] = fd;
+	td->td_retval[0] = fd;
 
 	so = sctp_get_peeloff(head, assoc_id, &error);
 	if (so == NULL) {
@@ -2156,11 +2157,11 @@ sctp_peeloff(td, uap)
 		 */
 		goto noconnection;
 	}
-	so->so_state &= ~SS_COMP;
+	so->so_qstate &= ~SQ_COMP;
 	so->so_state &= ~SS_NOFDREF;
 	so->so_head = NULL;
 	if (head->so_sigio != NULL)
-		fsetown(fgetown(head->so_sigio), &so->so_sigio);
+		fsetown(fgetown(&head->so_sigio), &so->so_sigio);
 
 	nfp->f_data = (caddr_t)so;
 	nfp->f_flag = fflag;
@@ -2175,7 +2176,7 @@ sctp_peeloff(td, uap)
 	if (error) {
 		if (fdp->fd_ofiles[fd] == nfp) {
 			fdp->fd_ofiles[fd] = NULL;
-			fdrop(nfp, p);
+			fdrop(nfp, td);
 		}
 	}
 	splx(s);
@@ -2185,8 +2186,8 @@ sctp_peeloff(td, uap)
 	 */
  done:
 	if (nfp != NULL)
-		fdrop(nfp, p);
-	fdrop(lfp, p);
+		fdrop(nfp, td);
+	fdrop(lfp, td);
 	return (error);
 #else
 	return(EOPNOTSUPP);

@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2733 2005/03/07 20:38:35 sakane Exp $
+$KAME: CHANGELOG,v 1.2734 2005/03/08 15:23:51 suz Exp $
 
 <200503>
+2005-03-08  SUZUKI, Shinsuke <suz@kame.net>
+	* freebsd5/sys/kern/uipc_socket.c, freebsd5/sys/kern/uipc_syscalls.c,
+	  freebsd5/kern/socket.h
+	  makes SCTP compilable on FreeBSD5
+
 Tue Mar  8 05:31:52 JST 2005
 	* kame/kame/racoon/isakmp.c:
 	one of buffer overrun problem was fixed.  from ipsec-tools team.
