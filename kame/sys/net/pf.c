@@ -34,6 +34,11 @@
  *
  */
 
+#ifdef __FreeBSD__
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#include "opt_altq.h"
+#endif
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
 #include "opt_altq.h"
@@ -418,15 +423,27 @@ pf_insert_state(struct pf_state *state)
 			    state->af);
 			printf("\n");
 		}
+#ifdef __FreeBSD__
+		free(keya, M_PF);
+#else
 		pool_put(&pf_tree_pl, keya);
+#endif
 		return (-1);
 	}
 
+#ifdef __FreeBSD__
+	keyb = malloc(sizeof(struct pf_tree_node), M_PF, M_NOWAIT);
+#else
 	keyb = pool_get(&pf_tree_pl, PR_NOWAIT);
+#endif
 	if (keyb == NULL) {
 		/* Need to pull out the other state */
 		RB_REMOVE(pf_state_tree, &tree_lan_ext, keya);
+#ifdef __FreeBSD__
+		free(keya, M_PF);
+#else
 		pool_put(&pf_tree_pl, keya);
+#endif
 		return (-1);
 	}
 	keyb->state = state;
@@ -452,8 +469,13 @@ pf_insert_state(struct pf_state *state)
 			printf("\n");
 		}
 		RB_REMOVE(pf_state_tree, &tree_lan_ext, keya);
+#ifdef __FreeBSD__
+		free(keya, M_PF);
+		free(keyb, M_PF);
+#else
 		pool_put(&pf_tree_pl, keya);
 		pool_put(&pf_tree_pl, keyb);
+#endif
 		return (-1);
 	}
 
@@ -497,8 +519,13 @@ pf_state_expires(const struct pf_state *state)
 	u_int32_t	states;
 
 	/* handle all PFTM_* > PFTM_MAX here */
-	if (state->timeout == PFTM_PURGE)
+	if (state->timeout == PFTM_PURGE) {
+#ifdef __FreeBSD__
+		return (time_second);
+#else
 		return (time.tv_sec);
+#endif
+	}
 	if (state->timeout == PFTM_UNTIL_PACKET)
 		return (0);
 	KASSERT(state->timeout < PFTM_MAX);
@@ -518,8 +545,13 @@ pf_state_expires(const struct pf_state *state)
 		if (states < end)
 			return (state->expire + timeout * (end - states) /
 			    (end - start));
-		else
+		else {
+#ifdef __FreeBSD__
+			return (time_second);
+#else
 			return (time.tv_sec);
+#endif
+		}
 	}
 	return (state->expire + timeout);
 }
@@ -533,7 +565,12 @@ pf_purge_expired_states(void)
 	for (cur = RB_MIN(pf_state_tree, &tree_ext_gwy); cur; cur = next) {
 		next = RB_NEXT(pf_state_tree, &tree_ext_gwy, cur);
 
-		if (pf_state_expires(cur->state) <= time.tv_sec) {
+#ifdef __FreeBSD__
+		if (pf_state_expires(cur->state) <= time_second)
+#else
+		if (pf_state_expires(cur->state) <= time.tv_sec)
+#endif
+		{
 			if (cur->state->src.state == PF_TCPS_PROXY_DST)
 				pf_send_tcp(cur->state->rule.ptr,
 				    cur->state->af,
@@ -577,9 +614,15 @@ pf_purge_expired_states(void)
 					pf_rm_rule(NULL,
 					    cur->state->anchor.ptr);
 			pf_normalize_tcp_cleanup(cur->state);
+#ifdef __FreeBSD__
+			free(cur->state, M_PF);
+			free(cur, M_PF);
+			free(peer, M_PF);
+#else
 			pool_put(&pf_state_pl, cur->state);
 			pool_put(&pf_tree_pl, cur);
 			pool_put(&pf_tree_pl, peer);
+#endif
 			pf_status.fcounters[FCNT_STATE_REMOVALS]++;
 			pf_status.states--;
 		}
@@ -619,13 +662,21 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 {
 	if (aw->type != PF_ADDR_DYNIFTL)
 		return (0);
+#ifdef __FreeBSD__
+	aw->p.dyn = malloc(sizeof(struct pf_addr_dyn), M_PF, M_NOWAIT);
+#else
 	aw->p.dyn = pool_get(&pf_addr_pl, PR_NOWAIT);
+#endif
 	if (aw->p.dyn == NULL)
 		return (1);
 	bcopy(aw->v.ifname, aw->p.dyn->ifname, sizeof(aw->p.dyn->ifname));
 	aw->p.dyn->ifp = ifunit(aw->p.dyn->ifname);
 	if (aw->p.dyn->ifp == NULL) {
+#ifdef __FreeBSD__
+		free(aw->p.dyn, M_PF);
+#else
 		pool_put(&pf_addr_pl, aw->p.dyn);
+#endif
 		aw->p.dyn = NULL;
 		return (1);
 	}
@@ -637,7 +688,11 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 	    aw->p.dyn->ifp->if_addrhooks, 1,
 	    pf_dynaddr_update, aw->p.dyn);
 	if (aw->p.dyn->hook_cookie == NULL) {
+#ifdef __FreeBSD__
+		free(aw->p.dyn, M_PF);
+#else
 		pool_put(&pf_addr_pl, aw->p.dyn);
+#endif
 		aw->p.dyn = NULL;
 		return (1);
 	}
@@ -701,7 +756,11 @@ pf_dynaddr_remove(struct pf_addr_wrap *aw)
 	hook_disestablish(aw->p.dyn->ifp->if_addrhooks,
 	    aw->p.dyn->hook_cookie);
 #endif
+#ifdef __FreeBSD__
+	free(aw->p.dyn, M_PF);
+#else
 	pool_put(&pf_addr_pl, aw->p.dyn);
+#endif
 	aw->p.dyn = NULL;
 }
 
@@ -2452,8 +2511,13 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->dst.seqdiff = 0;	/* Defer random generation */
 		s->src.state = TCPS_SYN_SENT;
 		s->dst.state = TCPS_CLOSED;
+#ifdef __FreeBSD__
+		s->creation = time_second;
+		s->expire = time_second;
+#else
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
+#endif
 		s->timeout = PFTM_TCP_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
@@ -2461,20 +2525,32 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		if ((pd->flags & PFDESC_TCP_NORM) && pf_normalize_tcp_init(m,
 		    off, pd, th, &s->src, &s->dst)) {
 			REASON_SET(&reason, PFRES_MEMORY);
+#ifdef __FreeBSD__
+			free(s, M_PF);
+#else
 			pool_put(&pf_state_pl, s);
+#endif
 			return (PF_DROP);
 		}
 		if ((pd->flags & PFDESC_TCP_NORM) && s->src.scrub &&
 		    pf_normalize_tcp_stateful(m, off, pd, &reason, th, &s->src,
 		    &s->dst, &rewrite)) {
 			pf_normalize_tcp_cleanup(s);
+#ifdef __FreeBSD__
+			free(s, M_PF);
+#else
 			pool_put(&pf_state_pl, s);
+#endif
 			return (PF_DROP);
 		}
 		if (pf_insert_state(s)) {
 			pf_normalize_tcp_cleanup(s);
 			REASON_SET(&reason, PFRES_MEMORY);
+#ifdef __FreeBSD__
+			free(s, M_PF);
+#else
 			pool_put(&pf_state_pl, s);
+#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -2723,14 +2799,23 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->dst.seqdiff = 0;
 		s->dst.max_win = 0;
 		s->dst.state = PFUDPS_NO_TRAFFIC;
+#ifdef __FreeBSD__
+		s->creation = time_second;
+		s->expire = time_second;
+#else
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
+#endif
 		s->timeout = PFTM_UDP_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
+#ifdef __FreeBSD__
+			free(s, M_PF);
+#else
 			pool_put(&pf_state_pl, s);
+#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -2972,14 +3057,23 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->dst.seqdiff = 0;
 		s->dst.max_win = 0;
 		s->dst.state = 0;
+#ifdef __FreeBSD__
+		s->creation = time_second;
+		s->expire = time_second;
+#else
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
+#endif
 		s->timeout = PFTM_ICMP_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
+#ifdef __FreeBSD__
+			free(s, M_PF);
+#else
 			pool_put(&pf_state_pl, s);
+#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -3204,8 +3298,13 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->dst.seqdiff = 0;
 		s->dst.max_win = 0;
 		s->dst.state = PFOTHERS_NO_TRAFFIC;
+#ifdef __FreeBSD__
+		s->creation = time_second;
+		s->expire = time_second;
+#else
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
+#endif
 		s->timeout = PFTM_OTHER_FIRST_PACKET;
 		s->packets[0] = 1;
 		s->bytes[0] = pd->tot_len;
@@ -3214,7 +3313,11 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 			if (r->log)
 				PFLOG_PACKET(ifp, h, m, af, direction, reason,
 				    r, a, ruleset);
+#ifdef __FreeBSD__
+			free(s, M_PF);
+#else
 			pool_put(&pf_state_pl, s);
+#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -3561,7 +3664,11 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 			src->state = dst->state = TCPS_TIME_WAIT;
 
 		/* update expire time */
+#ifdef __FreeBSD__
+		(*state)->expire = time_second;
+#else
 		(*state)->expire = time.tv_sec;
+#endif
 		if (src->state >= TCPS_FIN_WAIT_2 &&
 		    dst->state >= TCPS_FIN_WAIT_2)
 			(*state)->timeout = PFTM_TCP_CLOSED;
@@ -3759,7 +3866,11 @@ pf_test_state_udp(struct pf_state **state, int direction, struct ifnet *ifp,
 		dst->state = PFUDPS_MULTIPLE;
 
 	/* update expire time */
+#ifdef __FreeBSD__
+	(*state)->expire = time_second;
+#else
 	(*state)->expire = time.tv_sec;
+#endif
 	if (src->state == PFUDPS_MULTIPLE && dst->state == PFUDPS_MULTIPLE)
 		(*state)->timeout = PFTM_UDP_MULTIPLE;
 	else
@@ -3850,7 +3961,11 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 		dirndx = (direction == (*state)->direction) ? 0 : 1;
 		(*state)->packets[dirndx]++;
 		(*state)->bytes[dirndx] += pd->tot_len;
+#ifdef __FreeBSD__
+		(*state)->expire = time_second;
+#else
 		(*state)->expire = time.tv_sec;
+#endif
 		(*state)->timeout = PFTM_ICMP_ERROR_REPLY;
 
 		/* translate source/destination address, if needed */
@@ -4353,7 +4468,11 @@ pf_test_state_other(struct pf_state **state, int direction, struct ifnet *ifp,
 		dst->state = PFOTHERS_MULTIPLE;
 
 	/* update expire time */
+#ifdef __FreeBSD__
+	(*state)->expire = time_second;
+#else
 	(*state)->expire = time.tv_sec;
+#endif
 	if (src->state == PFOTHERS_MULTIPLE && dst->state == PFOTHERS_MULTIPLE)
 		(*state)->timeout = PFTM_OTHER_MULTIPLE;
 	else
