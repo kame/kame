@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.127 1999/09/21 20:15:14 itojun Exp $
+$Id: CHANGELOG,v 1.128 1999/09/22 05:50:26 sumikawa Exp $
 
 
 <199909>
+Wed Sep 22 14:43:20 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/sys: upgraded base version to FreeBSD 3.3-RELEASE.
+	  TODO: tcp_getcred() and udp_getcred() need more work to support
+	  IPv6 socket.
+
 Wed Sep 22 JST 1999  itojun@iijlab.net
 	* openbsd: bunch of fixes and merges for KAME/openbsd.
 	  basic operations are IPv6 ready but still needs more work.

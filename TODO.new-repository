@@ -1,6 +1,6 @@
 TODOs for new repository
 KAME project
-$Id: TODO.new-repository,v 1.5 1999/08/20 12:49:26 itojun Exp $
+$Id: TODO.new-repository,v 1.6 1999/09/22 05:50:27 sumikawa Exp $
 
 
 kernel part:
@@ -17,7 +17,7 @@ kernel part:
 	KAME/NetBSD is okay
 - fix tcp code in each of operating system to support both AFs
 	KAME/NetBSD is okay
-	KAME/FreeBSD32 is okay
+	KAME/FreeBSD33 is okay
 	(they are totally different, so we need to sync)
 
 userland part:

@@ -1,6 +1,6 @@
-Installation procedure - FreeBSD 3.2
+Installation procedure - FreeBSD 3.3
 KAME project
-$Id: INSTALL,v 1.7 1999/09/02 10:56:41 shin Exp $
+$Id: INSTALL,v 1.8 1999/09/22 05:50:30 sumikawa Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -110,9 +110,9 @@ F. PAO3 issues
 Many of FreeBSD32 users install PAO3 PCMCIA support code.  If you would like
 to use both PAO3 and KAME, you'll need to apply PAO3 patches onto KAME tree.
 However, there are tricky things:
-- KAME code is based on FreeBSD 3.2-RELEASE, and it has several ALTQ
+- KAME code is based on FreeBSD 3.3-RELEASE, and it has several ALTQ
   related patch in driver code.
-- PAO code is based on FreeBSD 3.2-STABLE on some specific date,
+- PAO code is based on FreeBSD 3.3-STABLE on some specific date,
   and it has bunch of driver fixes.
 As both parties try to modify driver code, and they use different codebase
 as starting point, there can be conflicts during patch operation.
