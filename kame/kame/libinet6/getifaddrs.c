@@ -22,6 +22,10 @@
  *
  *	BSDI getifaddrs.c,v 2.11 1999/03/15 20:57:20 jch Exp
  */
+/*
+ * NOTE: SIOCGIFCONF case is not LP64 friendly.  it also does not perform
+ * try-and-error for region size.
+ */
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
