@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.h,v 1.1 2000/03/06 04:39:07 itojun Exp $	*/
+/*	$KAME: if_stf.h,v 1.2 2000/03/10 14:02:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,6 +32,6 @@
 #ifndef _NET_IF_STF_H_
 #define _NET_IF_STF_H_
 
-int in6_stf_input __P((struct mbuf **, int *, int));
+void in_stf_input __P((struct mbuf *, ...));
 
 #endif /* _NET_IF_STF_H_ */

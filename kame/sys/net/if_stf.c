@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.3 2000/03/06 07:26:54 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.4 2000/03/10 14:02:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -31,6 +31,10 @@
 
 /*
  * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt
+ *
+ * Section 6 in 03 draft looks impractical, as we cannot transmit IPv6 packet
+ * to "all PIM routers multicast" address (ff02::d) on 6to4 pseudo link.
+ * Therefore, we have removed IFF_MULTICAST from the interface.
  */
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -68,10 +72,11 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_gif.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6protosw.h>
 #include <netinet/ip_ecn.h>
 
 #include <netinet/ip_encap.h>
+
+#include <machine/stdarg.h>
 
 #include <net/net_osdep.h>
 
@@ -114,7 +119,7 @@ extern int ip_gif_ttl;	/*XXX*/
 static int ip_gif_ttl = 40;	/*XXX*/
 #endif
 
-extern struct ip6protosw in6_stf_protosw;
+extern struct protosw in_stf_protosw;
 
 #ifdef __FreeBSD__
 void stfattach __P((void *));
@@ -153,8 +158,8 @@ stfattach(dummy)
 		sc = &stf[i];
 		bzero(sc, sizeof(*sc));
 
-		p = encap_attach_func(AF_INET6, IPPROTO_IPV6, stf_encapcheck,
-			(struct protosw *)&in6_stf_protosw, &sc);
+		p = encap_attach_func(AF_INET, IPPROTO_IPV6, stf_encapcheck,
+		    &in_stf_protosw, &sc);
 		if (p == NULL)
 			continue;
 
@@ -337,12 +342,15 @@ stf_output(ifp, m, dst, rt)
 #endif
 }
 
-int
-in6_stf_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+void
+#if __STDC__
+in_stf_input(struct mbuf *m, ...)
+#else
+in_stf_input(m, va_alist)
+	register struct mbuf *m;
+#endif
 {
-	struct mbuf *m = *mp;
+	int off, proto;
 	struct stf_softc *sc;
 	struct ip *ip;
 	struct ip6_hdr *ip6;
@@ -350,10 +358,16 @@ in6_stf_input(mp, offp, proto)
 	int s, isr;
 	struct ifqueue *ifq = NULL;
 	struct ifnet *ifp;
+	va_list ap;
+
+	va_start(ap, m);
+	off = va_arg(ap, int);
+	proto = va_arg(ap, int);
+	va_end(ap);
 
 	if (proto != IPPROTO_IPV6) {
 		m_freem(m);
-		return IPPROTO_DONE;
+		return;
 	}
 
 	ip = mtod(m, struct ip *);
@@ -362,20 +376,24 @@ in6_stf_input(mp, offp, proto)
 
 	if (sc == NULL || (sc->sc_if.if_flags & IFF_UP) == 0) {
 		m_freem(m);
-		return IPPROTO_DONE;
+		return;
 	}
 
 	ifp = &sc->sc_if;
 
-	/* XXX more validation */
+	/* reject packets with multicast outer destination */
+	if (IN_MULTICAST(ip->ip_dst.s_addr)) {
+		m_freem(m);
+		return;
+	}
 
 	otos = ip->ip_tos;
-	m_adj(m, *offp);
+	m_adj(m, off);
 
 	if (m->m_len < sizeof(*ip6)) {
 		m = m_pullup(m, sizeof(*ip6));
 		if (!m)
-			return IPPROTO_DONE;
+			return;
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 	itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
@@ -424,15 +442,13 @@ in6_stf_input(mp, offp, proto)
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);
 		splx(s);
-		return IPPROTO_DONE;
+		return;
 	}
 	IF_ENQUEUE(ifq, m);
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	splx(s);
-
-	return IPPROTO_DONE;
 }
 
 /* ARGSUSED */
