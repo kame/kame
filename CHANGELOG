@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.555 2000/02/12 07:49:50 itojun Exp $
+$Id: CHANGELOG,v 1.556 2000/02/12 19:27:31 itojun Exp $
 
 <200002>
+Sun Feb 13 04:26:17 JST 2000  itojun@iijlab.net
+	* libinet6/get{addr,name}info.c: based on most recent discussion,
+	  flip the order for extended scoped address notation again
+	  (now fe80::1%de0).
+
 Sat Feb 12 16:49:15 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.3.
 
