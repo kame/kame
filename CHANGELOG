@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.135 1999/09/25 05:18:42 jinmei Exp $
+$Id: CHANGELOG,v 1.136 1999/09/25 05:22:15 itojun Exp $
 
 
 <199909>
@@ -60,7 +60,7 @@ Wed Sep 22 JST 1999  itojun@iijlab.net
 1999-09-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* openbsd/sys/dev/ic/elink3.c (epget): prevented the input routine
 	from deviding two (small) mbufs; the new routine always stores an
-	incoming packet either in a single mbuf or in a chain of mubf
+	incoming packet either in a single mbuf or in a chain of mbuf
 	clusters.
 
 Mon Sep 20 17:38:03 JST 1999  itojun@iijlab.net
