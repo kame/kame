@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1691 2001/05/26 15:25:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1692 2001/05/27 15:27:10 itojun Exp $
 
 <200105>
+Mon May 28 00:24:45 JST 2001  itojun@iijlab.net
+	* sys/netinet6/raw_ip6.c: declare struct rip6stat.  gather statistics
+	  on SOCK_RAW sockets (except for icmp6 sockets) for debugging aid.
+	  req'ed by yasu.
+
 Sat May 26 23:40:50 JST 2001 sakane@ydc.co.jp
 	* freebsd4/sys/netinet6/raw_ip6.c:
 	Fixed IPV6_USE_MIN_MTU behavior in rip6_output().
