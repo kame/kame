@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.184 2001/03/23 08:08:47 itojun Exp $	*/
+/*	$KAME: key.c,v 1.185 2001/05/01 16:58:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -589,7 +589,6 @@ key_gettunnel(osrc, odst, isrc, idst)
 	struct sockaddr *os, *od, *is, *id;
 	struct secpolicyindex spidx;
 
-	r1 = r2 = NULL;
 #ifdef __NetBSD__
 	s = splsoftnet();	/*called from softclock()*/
 #else
@@ -599,6 +598,7 @@ key_gettunnel(osrc, odst, isrc, idst)
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
 
+		r1 = r2 = NULL;
 		for (p = sp->req; p; p = p->next) {
 			if (p->saidx.mode != IPSEC_MODE_TUNNEL)
 				continue;
