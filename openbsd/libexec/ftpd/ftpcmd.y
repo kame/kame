@@ -1,4 +1,4 @@
-/*	$OpenBSD: ftpcmd.y,v 1.17 1999/10/08 14:40:35 deraadt Exp $	*/
+/*	$OpenBSD: ftpcmd.y,v 1.20 2000/04/29 14:03:02 deraadt Exp $	*/
 /*	$NetBSD: ftpcmd.y,v 1.7 1996/04/08 19:03:11 jtc Exp $	*/
 
 /*
@@ -47,7 +47,7 @@
 #if 0
 static char sccsid[] = "@(#)ftpcmd.y	8.3 (Berkeley) 4/6/94";
 #else
-static char rcsid[] = "$OpenBSD: ftpcmd.y,v 1.17 1999/10/08 14:40:35 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: ftpcmd.y,v 1.20 2000/04/29 14:03:02 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -303,11 +303,11 @@ cmd
 			if (getaddrinfo(result[1], result[2], &hints, &res))
 				goto parsefail;
 			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
-			if (his_addr.su_family == AF_INET6
-			 && data_dest.su_family == AF_INET6) {
+			if (his_addr.su_family == AF_INET6 &&
+			    data_dest.su_family == AF_INET6) {
 				/* XXX more sanity checks! */
 				data_dest.su_sin6.sin6_scope_id =
-					his_addr.su_sin6.sin6_scope_id;
+				    his_addr.su_sin6.sin6_scope_id;
 			}
 			free(tmp);
 			tmp = NULL;
@@ -439,7 +439,7 @@ cmd
 	| RETR check_login SP pathname CRLF
 		{
 			if ($2 && $4 != NULL)
-				retrieve((char *) 0, $4);
+				retrieve(NULL, $4);
 			if ($4 != NULL)
 				free($4);
 		}
@@ -506,7 +506,7 @@ cmd
 				if (fromname) {
 					renamecmd(fromname, $4);
 					free(fromname);
-					fromname = (char *) 0;
+					fromname = NULL;
 				} else {
 					reply(503, 
 					  "Bad sequence of commands.");
@@ -533,7 +533,7 @@ cmd
 		}
 	| HELP CRLF
 		{
-			help(cmdtab, (char *) 0);
+			help(cmdtab, NULL);
 		}
 	| HELP SP STRING CRLF
 		{
@@ -546,7 +546,7 @@ cmd
 				if (*cp)
 					help(sitetab, cp);
 				else
-					help(sitetab, (char *) 0);
+					help(sitetab, NULL);
 			} else
 				help(cmdtab, $3);
 
@@ -583,7 +583,7 @@ cmd
 		}
 	| SITE SP HELP CRLF
 		{
-			help(sitetab, (char *) 0);
+			help(sitetab, NULL);
 		}
 	| SITE SP HELP SP STRING CRLF
 		{
@@ -740,7 +740,7 @@ rcmd
 			restart_point = (off_t) 0;
 			if ($2 && $4) {
 				fromname = renamefrom($4);
-				if (fromname == (char *) 0 && $4) {
+				if (fromname == NULL && $4) {
 					free($4);
 				}
 			} else {
@@ -752,7 +752,7 @@ rcmd
 	| REST check_login SP byte_size CRLF
 		{
 			if ($2) {
-			    fromname = (char *) 0;
+			    fromname = NULL;
 			    restart_point = $4;	/* XXX $4 is only "int" */
 			    reply(350, "Restarting at %qd. %s", restart_point,
 			       "Send STORE or RETRIEVE to initiate transfer.");
@@ -866,7 +866,7 @@ host_long_port6
 				if (his_addr.su_family == AF_INET6) {
 					/* XXX more sanity checks! */
 					data_dest.su_sin6.sin6_scope_id =
-						his_addr.su_sin6.sin6_scope_id;
+					    his_addr.su_sin6.sin6_scope_id;
 				}
 
 				$$ = 0;
@@ -1268,7 +1268,7 @@ yylex()
 				*cp = '\0';
 			}
 #ifdef HASSETPROCTITLE
-			if (strncasecmp(cbuf, "PASS", 4) != NULL) {
+			if (strncasecmp(cbuf, "PASS", 4) != 0) {
 				if ((cp = strpbrk(cbuf, "\n"))) {
 					c = *cp;
 					*cp = '\0';
