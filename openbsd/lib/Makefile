@@ -1,4 +1,4 @@
-SUBDIR+=libinet6
+SUBDIR+=libinet6 libsctp
 .if ${MACHINE_ARCH} == "i386"
 SUBDIR+=libaltq
 .endif
