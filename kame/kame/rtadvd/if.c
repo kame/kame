@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.12 2000/08/31 16:35:29 itojun Exp $	*/
+/*	$KAME: if.c,v 1.13 2000/09/06 20:06:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -409,7 +409,6 @@ get_prefixlen(char *buf)
 {
 	struct rt_msghdr *rtm = (struct rt_msghdr *)buf;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
-	int masklen;
 	u_char *p, *lim;
 	
 	sa = (struct sockaddr *)(rtm + 1);
@@ -418,6 +417,14 @@ get_prefixlen(char *buf)
 
 	p = (u_char *)(&SIN6(sa)->sin6_addr);
 	lim = (u_char *)sa + sa->sa_len;
+	return prefixlen(p, lim);
+}
+
+int
+prefixlen(u_char *p, u_char *lim)
+{
+	int masklen;
+
 	for (masklen = 0; p < lim; p++) {
 		switch (*p) {
 		case 0xff:

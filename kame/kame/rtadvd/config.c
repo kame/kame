@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.13 2000/09/06 19:53:03 itojun Exp $	*/
+/*	$KAME: config.c,v 1.14 2000/09/06 20:06:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -61,6 +61,7 @@
 #include <search.h>
 #endif
 #include <unistd.h>
+#include <ifaddrs.h>
 
 #include "rtadvd.h"
 #include "advcap.h"
@@ -382,6 +383,7 @@ getconfig(intface)
 static void
 get_prefix(struct rainfo *rai)
 {
+#if 0
 	size_t len;
 	u_char *buf, *lim, *next;
 	u_char ntopbuf[INET6_ADDRSTRLEN];
@@ -432,7 +434,7 @@ get_prefix(struct rainfo *rai)
 		syslog(LOG_DEBUG,
 		       "<%s> add %s/%d to prefix list on %s",
 		       __FUNCTION__,
-		       inet_ntop(AF_INET6, a, ntopbuf, INET6_ADDRSTRLEN),
+		       inet_ntop(AF_INET6, a, ntopbuf, sizeof(ntopbuf)),
 		       pp->prefixlen, rai->ifname);
 
 		/* set other fields with protocol defaults */
@@ -455,6 +457,79 @@ get_prefix(struct rainfo *rai)
 	}
 
 	free(buf);
+#else
+	struct ifaddrs *ifap, *ifa;
+	struct prefix *pp;
+	struct in6_addr *a;
+	u_char *p, *ep, *m, *lim;
+	u_char ntopbuf[INET6_ADDRSTRLEN];
+
+	if (getifaddrs(&ifap) < 0) {
+		syslog(LOG_ERR,
+		       "<%s> can't get interface addresses",
+		       __FUNCTION__);
+		exit(1);
+	}
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strcmp(ifa->ifa_name, rai->ifname) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		/* allocate memory to store prefix info. */
+		if ((pp = malloc(sizeof(*pp))) == NULL) {
+			syslog(LOG_ERR,
+			       "<%s> can't get allocate buffer for prefix",
+			       __FUNCTION__);
+			exit(1);
+		}
+		memset(pp, 0, sizeof(*pp));
+
+		/* set prefix and its length */
+		a = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+		memcpy(&pp->prefix, a, sizeof(*a));
+		p = (u_char *)&pp->prefix;
+		ep = (u_char *)(&pp->prefix + 1);
+		m = (u_char *)&((struct sockaddr_in6 *)ifa->ifa_netmask)->sin6_addr;
+		lim = (u_char *)(ifa->ifa_netmask) + ifa->ifa_netmask->sa_len;
+		if ((pp->prefixlen = prefixlen(m, lim)) < 0) {
+			syslog(LOG_ERR,
+			       "<%s> failed to get prefixlen "
+			       "or prefix is invalid",
+			       __FUNCTION__);
+			exit(1);
+		}
+
+		/* sweep bits outside of prefixlen */
+		while (m < lim)
+			*p++ &= *m++;
+		while (p < ep)
+			*p++ = 0x00;
+
+	        if (!inet_ntop(AF_INET6, a, ntopbuf, sizeof(ntopbuf))) {
+			syslog(LOG_ERR, "<%s> inet_ntop failed", __FUNCTION__);
+			exit(1);
+		}
+		syslog(LOG_DEBUG,
+		       "<%s> add %s/%d to prefix list on %s",
+		       __FUNCTION__, ntopbuf, pp->prefixlen, rai->ifname);
+
+		/* set other fields with protocol defaults */
+		pp->validlifetime = DEF_ADVVALIDLIFETIME;
+		pp->preflifetime = DEF_ADVPREFERREDLIFETIME;
+		pp->onlinkflg = 1;
+		pp->autoconfflg = 1;
+		pp->origin = PREFIX_FROM_KERNEL;
+
+		/* link into chain */
+		insque(pp, &rai->prefix);
+
+		/* counter increment */
+		rai->pfxs++;
+	}
+
+	freeifaddrs(ifap);
+#endif
 }
 
 static void
