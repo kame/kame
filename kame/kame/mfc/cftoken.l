@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.1 2001/07/11 08:36:59 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.2 2002/09/15 08:16:53 suz Exp $	*/
 
 %{
 /*
@@ -31,7 +31,11 @@
  */
 
 #include "mfc.h"
+#ifdef __FreeBSD__
+#include "cfparse.h"
+#else
 #include "y.tab.h"
+#endif
 
 int lineno = 1;
 

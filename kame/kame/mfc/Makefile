@@ -61,6 +61,6 @@ DPADD+= ${.OBJDIR}/../libinet6/libinet6.a \
 .endif
 
 clean:
-	-rm -f $(PROG) *.o *.core y.tab.h y.output
+	-rm -f $(PROG) *.o *.core y.tab.h y.output cfparse.h
 
 .include <bsd.prog.mk>
