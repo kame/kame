@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.353 2003/09/09 11:22:42 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.354 2003/09/16 23:46:24 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1877,7 +1877,7 @@ Currently supported algorithms are:
 	HMAC SHA2-384 with 96bit crypto checksum (no document)
 	HMAC SHA2-512 with 96bit crypto checksum (no document)
 	HMAC RIPEMD160 with 96bit crypto checksum (RFC2857)
-	AES XCBC MAC with 96bit crypto checksum (draft-ietf-ipsec-ciph-aes-xcbc-mac-04.txt)
+	AES XCBC MAC with 96bit crypto checksum (RFC3566)
     new IPsec ESP
 	null encryption (rfc2410.txt)
 	DES-CBC with derived IV
