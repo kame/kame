@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.10 2001/07/27 08:25:49 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.11 2001/07/27 08:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -97,7 +97,6 @@ void secattach __P((int));
 
 int sec_maxunit = -1;
 
-/* should probably synchronize with NetBSD if_clone API */
 struct ifchain {
 	struct ifnet *ifp;
 	LIST_ENTRY(ifchain) chain;
