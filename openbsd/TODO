@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.14 1999/10/05 12:40:50 itojun Exp $
+$Id: TODO,v 1.15 1999/10/05 14:25:43 itojun Exp $
 
 
 Things we can do with the current code:
@@ -26,6 +26,7 @@ Things we can't do with the current code:
 	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
 	we need to wrap KAME shared ipsec code by "#ifndef __OpenBSD__".
 - enable KAME "goto ours" hack (check routing table code)
+- ip6_output() does not consult /128 routes, and will not obey icmp6 redir.
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
