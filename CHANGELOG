@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1092 2000/07/04 06:01:11 jinmei Exp $
+$Id: CHANGELOG,v 1.1093 2000/07/04 09:37:26 sakane Exp $
 
 <200006>
+Tue Jul  4 18:33:20 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	don't delete phase 1/2 handler if some internal error occurs.
+
 2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_is_ifloop_auto): removed an `ifdef'
 	part for openbsd, which made the function always return 0.
