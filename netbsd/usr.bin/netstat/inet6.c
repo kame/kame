@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.34 2000/06/12 00:44:57 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.35 2000/06/12 00:47:15 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -1163,7 +1163,7 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %llu\n", icmp6names[i],
 				(unsigned long long)icmp6stat.icp6s_inhist[i]);
 		}
-	printf("\tHistgram of error messages to be generated:\n");
+	printf("\tHistogram of error messages to be generated:\n");
 	p_5(icp6s_odst_unreach_noroute, "\t\t%llu no route\n");
 	p_5(icp6s_odst_unreach_admin, "\t\t%llu administratively prohibited\n");
 	p_5(icp6s_odst_unreach_beyondscope, "\t\t%llu beyond scope\n");
