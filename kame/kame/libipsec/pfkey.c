@@ -27,10 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.13 $";
-#endif
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
