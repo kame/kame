@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.4 1999/09/14 03:44:15 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.5 1999/10/25 14:52:20 sakane Exp $ */
 
 #ifdef _KERNEL
 # ifndef KERNEL
@@ -356,7 +356,7 @@ kdebug_sadb_key(ext)
 	if (ext == NULL)
 		panic("kdebug_sadb_key: NULL pointer was passed.\n");
 
-	printf("sadb_key{ bits=%u reserved=%u }\n",
+	printf("sadb_key{ bits=%u reserved=%u\n",
 	    key->sadb_key_bits, key->sadb_key_reserved);
 	printf("  key=");
 
@@ -537,6 +537,7 @@ kdebug_secasv(sav)
 	if (sav->key_enc != NULL)
 		kdebug_sadb_key((struct sadb_ext *)sav->key_enc);
 	if (sav->iv != NULL) {
+		printf("  iv=");
 		ipsec_hexdump(sav->iv, sav->ivlen ? sav->ivlen : 8);
 		printf("\n");
 	}
