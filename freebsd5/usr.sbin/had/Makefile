@@ -1,10 +1,10 @@
 #
-# $Id: Makefile,v 1.2 2003/02/24 09:52:06 suz Exp $
+# $Id: Makefile,v 1.3 2003/04/16 02:11:13 suz Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/had
 
 PROG=	had
-SRCS=	haadisc.c halist.c timestamp.c
+SRCS=	haadisc.c halist.c timestamp.c mpa.c
 
 CFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 
