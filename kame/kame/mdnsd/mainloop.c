@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.60 2001/06/23 01:54:22 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.61 2001/06/23 01:56:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1165,6 +1165,9 @@ getans_icmp6(buf, len, from)
 	if (!n) {
 		int nl, i;
 
+		/*
+		 * older KAME code uses non-DNS name encoding (len + name)
+		 */
 		if (d[0] != len - (d - buf) - 1)
 			return -1;
 		nl = len - (d - buf) - 1;
@@ -1531,6 +1534,10 @@ relay_icmp6(sd, buf, len, from)
 		hints.ai_family = PF_INET6;
 		hints.ai_socktype = SOCK_RAW;
 		hints.ai_protocol = IPPROTO_ICMPV6;
+		/*
+		 * it should be NI group address, however, most of *BSD
+		 * releases do not join NI group at this moment.
+		 */
 		if (getaddrinfo("ff02::1", NULL, &hints, &res))
 			return -1;
 
