@@ -588,6 +588,7 @@ netipx/ipx_usrreq.c	optional ipx
 netipx/spx_debug.c	optional ipx
 netipx/spx_usrreq.c	optional ipx
 netkey/key.c		optional ipsec
+netkey/keydb.c		optional ipsec
 netkey/key_debug.c	optional ipsec
 netkey/keysock.c	optional ipsec
 netnatm/natm.c		optional natm
