@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.37 2000/10/19 00:37:50 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.38 2000/10/23 04:09:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -43,14 +43,18 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <sys/malloc.h>
+#endif
 #include <sys/mbuf.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <sys/kernel.h>
+#endif
 #include <sys/syslog.h>
 
 #include <net/if.h>
