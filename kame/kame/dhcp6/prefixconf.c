@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.22 2003/03/14 11:06:28 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.23 2003/07/31 22:24:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -136,7 +136,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	/*
 	 * A client discards any addresses for which the preferred
          * lifetime is greater than the valid lifetime.
-	 * [dhcpv6-interop-00, Section 9] 
+	 * [RFC3315 22.6] 
 	 */
 	if (pinfo->vltime != DHCP6_DURATITION_INFINITE &&
 	    (pinfo->pltime == DHCP6_DURATITION_INFINITE ||

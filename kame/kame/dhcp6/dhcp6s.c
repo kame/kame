@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.105 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.106 2003/07/31 22:24:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -581,7 +581,7 @@ server6_recv(s)
 	 * A server MUST discard any Solicit, Confirm, Rebind or
 	 * Information-request messages it receives with a unicast
 	 * destination address.
-	 * [dhcpv6-28 Section 15.]
+	 * [RFC3315 Section 15.]
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr) &&
 	    (dh6->dh6_msgtype == DH6_SOLICIT ||
@@ -812,7 +812,8 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 
 	/*
 	 * Servers MUST discard any Solicit messages that do not include a
-	 * Client Identifier option. [dhcpv6-28 Section 15.2]
+	 * Client Identifier option.
+	 * [RFC3315 Section 15.2]
 	 */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, FNAME, "no client ID option");
@@ -922,7 +923,7 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 		 * server has been configured to respond with committed address
 		 * assignments and other resources, responds to the Solicit
 		 * with a Reply message.
-		 * [dhcpv6-28 Section 17.2.1]
+		 * [RFC3315 Section 17.2.1]
 		 */
 		roptinfo.rapidcommit = 1;
 		resptype = DH6_REPLY;
@@ -952,7 +953,7 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
 
-	/* message validation according to Section 15.4 of dhcpv6-28 */
+	/* message validation according to Section 15.4 of RFC3315 */
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
@@ -993,7 +994,7 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	 * containing a Status Code option with value UseMulticast, a Server
 	 * Identifier option containing the server's DUID, the Client
 	 * Identifier option from the client message and no other options.
-	 * [dhcpv6-28 18.2.1]
+	 * [RFC3315 18.2.1]
 	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
@@ -1056,7 +1057,7 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 			    client_conf, 1) == 0) {
 				/*
 				 * We could not find any prefixes for the IA.
-				 * dhcpv6-28 specifies to include NoAddrAvail
+				 * RFC3315 specifies to include NoAddrAvail
 				 * for the IA in the address configuration
 				 * case (Section 18.2.1).  We follow the same
 				 * logic for prefix delegation as well.
@@ -1081,7 +1082,7 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	 * server MUST include options in the Reply message for any options in
 	 * the Option Request option the server is configured to return to the
 	 * client.
-	 * [dhcpv6-26 18.2.1]
+	 * [RFC3315 18.2.1]
 	 * Note: our current implementation always includes all information
 	 * that we can provide.  So we do not have to check the option request
 	 * options.
@@ -1129,7 +1130,7 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
 
-	/* message validation according to Section 15.6 of dhcpv6-28 */
+	/* message validation according to Section 15.6 of RFC3315 */
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
@@ -1170,7 +1171,7 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	 * containing a status code option with value UseMulticast, a Server
 	 * Identifier option containing the server's DUID, the Client
 	 * Identifier option from the client message and no other options.
-	 * [dhcpv6-28 18.2.3]
+	 * [RFC3315 18.2.3]
 	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
@@ -1232,7 +1233,7 @@ react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
 
-	/* message validation according to Section 15.7 of dhcpv6-28 */
+	/* message validation according to Section 15.7 of RFC3315 */
 
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
@@ -1320,7 +1321,7 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_listval *iapd;
 	u_int16_t stcode;
 
-	/* message validation according to Section 15.9 of dhcpv6-28 */
+	/* message validation according to Section 15.9 of RFC3315 */
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
@@ -1361,7 +1362,7 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	 * containing a Status Code option with value UseMulticast, a Server
 	 * Identifier option containing the server's DUID, the Client
 	 * Identifier option from the client message and no other options.
-	 * [dhcpv6-28 18.2.6]
+	 * [RFC3315 18.2.6]
 	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
@@ -1393,7 +1394,7 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	/*
 	 * After all the addresses have been processed, the server generates a
 	 * Reply message and includes a Status Code option with value Success.
-	 * [dhcpv6-28 Section 18.2.6]
+	 * [RFC3315 Section 18.2.6]
 	 */
 	stcode = DH6OPT_STCODE_SUCCESS;
 	if (dhcp6_add_listval(&roptinfo.stcode_list,
@@ -1439,7 +1440,8 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 		 * Status Code option set to NoBinding in the Reply
 		 * message.
 		 * [dhcpv6-opt-prefix-delegation-01 Section 11.2]
-		 * See also: [dhcpv6-28 Section 18.2.3, 18.2.4]
+		 * See also: [RFC3315 Section 18.2.3, 18.2.4]
+		 * XXXXXX: need to be revisited.
 		 *
 		 * Additional note: according to the spec author, the behavior
 		 * should be different between renew and rebind.  For the case
@@ -1553,7 +1555,7 @@ release_binding_ia(iapd, retlist, optinfo)
 		 * server to those IAs, the server deletes the addresses from
 		 * the IAs and makes the addresses available for assignment to
 		 * other clients.
-		 * [dhcpv6-28 Section 18.2.6]
+		 * [RFC3315 Section 18.2.6]
 		 * (Though we do not support address assignment, we apply the
 		 * same logic to prefixes)
 		 */
@@ -1603,7 +1605,7 @@ react_informreq(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	/*
 	 * An IA option is not allowed to appear in an Information-request
 	 * message.  Such a message SHOULD be discarded.
-	 * [dhcpv6-28 Section 15]
+	 * [RFC3315 Section 15]
 	 */
 	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
 		dprintf(LOG_INFO, FNAME,

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.17 2003/07/20 11:10:00 suz Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.18 2003/07/31 22:24:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -109,7 +109,7 @@ update_ia(iatype, ialist, ifp, serverid)
 		 * both T1 and T2 are greater than 0, the client discards the
 		 * IA_NA option and processes the remainder of the message as
 		 * though the server had not included the invalid IA_NA option.
-		 * [dhcpv6-interop-00, Section 2]
+		 * [RFC3315 22.4]
 		 * We apply the same rule to IA_PD as well.
 		 */
 		if (iav->val_ia.t2 != 0 && iav->val_ia.t1 > iav->val_ia.t2) {
@@ -147,13 +147,12 @@ update_ia(iatype, ialist, ifp, serverid)
 				    ia->state == IAS_REBIND) &&
 				    siav->val_num16 == DH6OPT_STCODE_NOBINDING) {
 					/*
-					 * When the client receives a NoBinding
-					 * status in an IA from the server
-					 * in response to a Renew message or
-					 * a Rebind message, the client sends
-					 * a Request to reestablish an IA with
-					 * the server.
-					 * [dhcpv6-28 Section 18.1.8]
+					 * For each IA in the original Renew or
+					 * Rebind message, the client
+					 * sends a Request message if the IA
+					 * contained a Status Code option
+					 * with the NoBinding status.
+					 * [RFC3315 18.1.8]
 					 * XXX: what about the PD case?
 					 */
 					dprintf(LOG_INFO, FNAME,
@@ -360,7 +359,7 @@ release_all_ia(ifp)
 			 * The client MUST stop using all of the addresses
 			 * being released as soon as the client begins the
 			 * Release message exchange process.
-			 * [dhcpv6-28 Section 18.1.6]
+			 * [RFC3315 Section 18.1.6]
 			 */
 			remove_ia(ia);
 		}

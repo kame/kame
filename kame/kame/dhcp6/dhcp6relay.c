@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.44 2003/07/31 21:41:54 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.45 2003/07/31 22:24:23 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -728,7 +728,7 @@ relay_to_server(dh6, len, from, ifname, ifid)
 		 * If the hop-count in the message is greater than or equal to
 		 * HOP_COUNT_LIMIT, the relay agent discards the received
 		 * message.
-		 * [dhcpv6-28 Section 20.1.2]
+		 * [RFC3315 Section 20.1.2]
 		 */
 		if (dh6relay0->dh6relay_hcnt >= DHCP6_RELAY_HOP_COUNT_LIMIT) {
 			dprintf(LOG_INFO, FNAME, "too many relay forwardings");

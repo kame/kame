@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.87 2003/07/31 21:44:10 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.88 2003/07/31 22:24:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2003,7 +2003,7 @@ dhcp6_reset_timer(ev)
 		 * The first Solicit message from the client on the interface
 		 * MUST be delayed by a random amount of time between
 		 * 0 and SOL_MAX_DELAY.
-		 * [dhcpv6-28 17.1.2]
+		 * [RFC3315 17.1.2]
 		 */
 		ev->retrans = (random() % (SOL_MAX_DELAY));
 		break;
@@ -2013,7 +2013,7 @@ dhcp6_reset_timer(ev)
 			 * The first RT MUST be selected to be strictly
 			 * greater than IRT by choosing RAND to be strictly
 			 * greater than 0.
-			 * [dhcpv6-28 17.1.2]
+			 * [RFC3315 17.1.2]
 			 */
 			r = (double)((random() % 1000) + 1) / 10000;
 			n = ev->init_retrans + r * ev->init_retrans;

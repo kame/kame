@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.119 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.120 2003/07/31 22:24:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -541,7 +541,7 @@ client6_timo(arg)
 	/*
 	 * Unless MRC is zero, the message exchange fails once the client has
 	 * transmitted the message MRC times.
-	 * [dhcpv6-28 14.]
+	 * [RFC3315 14.]
 	 */
 	if (ev->max_retrans_cnt && ev->timeouts >= ev->max_retrans_cnt) {
 		dprintf(LOG_INFO, FNAME, "no responses were received");
@@ -790,7 +790,7 @@ select_server(ev)
 	struct dhcp6_serverinfo *s;
 
 	/*
-	 * pick the best server according to dhcpv6-28 Section 17.1.3
+	 * pick the best server according to RFC3315 Section 17.1.3.
 	 * XXX: we currently just choose the one that is active and has the
 	 * highest preference.
 	 */
@@ -870,7 +870,7 @@ client6_send(ev)
 		 * each new message it sends.
 		 *
 		 * A client MUST leave the transaction-ID unchanged in
-		 * retransmissions of a message. [dhcpv6-28 15.1]
+		 * retransmissions of a message. [RFC3315 15.1]
 		 */
 #ifdef HAVE_ARC4RANDOM
 		ev->xid = arc4random() & DH6_XIDMASK;
@@ -928,7 +928,7 @@ client6_send(ev)
 		 * The client uses the value 0xffff to represent any elapsed
 		 * time values greater than the largest time value that can be
 		 * represented in the Elapsed Time option.
-		 * [dhcpv6-interop-00, Section 12]
+		 * [RFC3315 22.9.]
 		 */
 		if (tv_diff.tv_sec >= (MAX_ELAPSED_TIME / 100) + 1) {
 			/*
@@ -984,7 +984,7 @@ client6_send(ev)
 	 * describes how IPv6 is carried over a specific type of link (for link
 	 * types that do not support multicast), a client sends DHCP messages
 	 * to the All_DHCP_Relay_Agents_and_Servers.
-	 * [dhcpv6-28 Section 13.]
+	 * [RFC3315 Section 13.]
 	 */
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
@@ -1135,7 +1135,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		return (-1);
 	}
 
-	/* packet validation based on Section 15.3 of dhcpv6-28. */
+	/* packet validation based on Section 15.3 of RFC3315. */
 	if (optinfo0->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
@@ -1178,7 +1178,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	/*
 	 * The client MUST ignore any Advertise message that includes a Status
 	 * Code option containing the value NoAddrsAvail.
-	 * [dhcpv6-28, Section 17.1.3].
+	 * [RFC3315 Section 17.1.3].
 	 * XXX: we should not follow this when we do not need addresses!!
 	 */
 	;
@@ -1190,7 +1190,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		 * Advertise message.  The server should be configured not to
 		 * allow the Rapid Commit option.
 		 * We process the message as if we expected the Advertise.
-		 * [dhcpv6-28 Section 17.1.3]
+		 * [RFC3315 Section 17.1.3]
 		 */
 		dprintf(LOG_INFO, FNAME, "unexpected advertise");
 		/* proceed anyway */
@@ -1232,7 +1232,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		 * If the client receives an Advertise message that includes a
 		 * Preference option with a preference value of 255, the client
 		 * immediately begins a client-initiated message exchange.
-		 * [dhcpv6-28, Section 17.1.2]
+		 * [RFC3315 Section 17.1.2]
 		 */
 		ev->current_server = newserver;
 		if (duidcpy(&ev->serverid,
@@ -1352,7 +1352,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	 * the client discards any Reply messages it receives that do not
 	 * include a Rapid Commit option.
 	 * (should we keep the server otherwise?)
-	 * [dhcpv6-28 Section 17.1.4]
+	 * [RFC3315 Section 17.1.4]
 	 */
 	if (state == DHCP6S_SOLICIT &&
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT) &&
@@ -1364,7 +1364,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	/*
 	 * The client MAY choose to report any status code or message from the
 	 * status code option in the Reply message.
-	 * [dhcpv6-28 Section 18.1.8]
+	 * [RFC3315 Section 18.1.8]
 	 */
 	for (lv = TAILQ_FIRST(&optinfo->stcode_list); lv;
 	     lv = TAILQ_NEXT(lv, link)) {
@@ -1425,7 +1425,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		 * to a Release message, the client considers the Release event
 		 * completed, regardless of the Status Code option(s) returned
 		 * by the server.
-		 * [dhcpv6-28 Section 18.1.8]
+		 * [RFC3315 Section 18.1.8]
 		 */
 		check_exit();
 	}
