@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1406 2000/11/28 08:40:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.1407 2000/11/29 12:51:03 jinmei Exp $
 
 <200011>
+2000-11-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/mld6.c (init_mld6): allow multicasted packet
+	sent to the MLD6 socket to be loop-backed by default. We can do
+	this since we don't have to handle DMVRP messages via the MLD6
+	socket.
+	(based on a question from <toshiaki.nakatsu@fujixerox.co.jp>.)
+
 2000-11-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c ({get, set}_pathmtu): newly added to
 	support application-level path MTU discovery. If the -m option is
