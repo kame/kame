@@ -679,6 +679,7 @@ in6_ifdetach(ifp)
 #endif 
 	struct rtentry *rt;
 	short rtflags;
+	struct sockaddr_in6 sin6;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
@@ -739,5 +740,22 @@ in6_ifdetach(ifp)
 		}
 
 		free(ia, M_IFADDR);
+	}
+
+	/* remove route to link-local allnodes multicast (ff02::1) */
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_addr = in6addr_linklocal_allnodes;
+	sin6.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+#ifndef __FreeBSD__
+	if ((rt = rtalloc1((struct sockaddr *)&sin6, 0)) != NULL)
+#else
+	if ((rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL)) != NULL)
+#endif
+	{
+		rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
+			rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
+		rtfree(rt);
 	}
 }
