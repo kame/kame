@@ -347,6 +347,7 @@ options 	TCP_ECN		# ECN support in TCP
 #pseudo-device	atm
 #pseudo-device	dummy	1
 #pseudo-device	stf
+#pseudo-device	ist	1
 
 # Mobile IPv6
 #options 	MIP6			# required for all node types
