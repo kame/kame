@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1499 2001/01/23 08:51:11 jinmei Exp $
+$KAME: CHANGELOG,v 1.1500 2001/01/23 08:52:43 jinmei Exp $
 
 <200101>
+2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/net/if_gif.c (gif_ioctl): set IFF_RUNNING upon sucess
+	of the SIOCSIFPHYADDR ioctl (and its variations).  This is
+	necessary to perform DAD on a gif interface.
+
 2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_ifinit): clarified on installation
 	of interface direct routes;
