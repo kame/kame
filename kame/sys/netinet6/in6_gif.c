@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.76 2001/10/23 12:25:08 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.77 2001/10/23 12:42:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,9 @@
 
 static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 	struct ifnet *));
+#ifndef __OpenBSD__
+static int in6_gif_rtcachetime = 300; /* XXX see in_gif.c */
+#endif
 
 extern struct domain inet6domain;
 struct ip6protosw in6_gif_protosw =
@@ -240,6 +243,9 @@ in6_gif_output(ifp, family, m)
 	struct ip6_hdr *ip6;
 	int proto;
 	u_int8_t itos, otos;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second;
+#endif
 
 	if (sin6_src == NULL || sin6_dst == NULL ||
 	    sin6_src->sin6_family != AF_INET6 ||
@@ -324,9 +330,13 @@ in6_gif_output(ifp, family, m)
 	ip6->ip6_flow &= ~ntohl(0xff00000);
 	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 
-	if (dst->sin6_family != sin6_dst->sin6_family ||
-	     !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr)) {
-		/* cache route doesn't match */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	time_second = time.tv_sec;
+#endif
+	if (sc->rtcache_expire == 0 || time_second >= sc->rtcache_expire ||
+	    dst->sin6_family != sin6_dst->sin6_family ||
+	    !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr)) {
+		/* cache route doesn't match or it has expired */
 		bzero(dst, sizeof(*dst));
 		dst->sin6_family = sin6_dst->sin6_family;
 		dst->sin6_len = sizeof(struct sockaddr_in6);
@@ -355,6 +365,8 @@ in6_gif_output(ifp, family, m)
 			m_freem(m);
 			return ENETUNREACH;	/* XXX */
 		}
+
+		sc->rtcache_expire = time_second + in6_gif_rtcachetime;
 	}
 	
 #ifdef IPV6_MINMTU
