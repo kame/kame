@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.10 2000/11/24 11:33:52 itojun Exp $
+.\"	$KAME: bindtest.1,v 1.11 2001/06/25 06:42:37 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -27,7 +27,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd October 6, 1999
+.Dd June 25, 2001
 .Dt BINDTEST 1
 .Os KAME
 .\"
@@ -37,7 +37,8 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl APst
+.Op Fl 126APlstv
+.Op Fl o Ar IPv4address
 .Fl p Ar port
 .\"
 .Sh DESCRIPTION
@@ -93,6 +94,41 @@ socket option for all the sockets.
 sets
 .Dv SO_REUSEPORT
 socket option for all the sockets.
+.Fl 6
+uses
+.Dv IPV6_V6ONLY
+socket option on
+.Dv AF_INET6
+sockets
+.Pq note that not many stacks implement this yet .
+.Pp
+With
+.Fl 1 ,
+.Fl 2 ,
+or
+.Fl o Ar IPv4address ,
+.Nm
+attempts to issue
+.Xr connect 2
+after two sockets become ready.
+.Fl 1
+and
+.Fl 2
+lets
+.Nm
+.Xr connect 2
+to the address
+.Nm
+have used for
+.Xr bind 2 .
+With
+.Fl o ,
+.Nm
+connects to the address specified by the extra argument,
+.Ar IPv4address .
+The options are meaningful only when
+.Fl t
+is specified.
 .Pp
 With
 .Fl s ,
@@ -136,6 +172,11 @@ failed for the first set.
 failed for the second set, with some error other than
 .Dv EADDRINUSE .
 .El
+.Pp
+With
+.Fl v
+.Nm
+prints its version and exits without testing anything.
 .\"
 .Sh RETURN VALUES
 .Nm
