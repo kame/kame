@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2068 2002/02/02 12:40:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2069 2002/02/02 12:48:28 jinmei Exp $
 
 <200202>
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/udp6_usrreq.c (udp6_ctlinput):
+	* openbsd/sys/netinet/udp_usrreq.c (udp6_ctlinput):
+	* bsdi4/sys/netinet/udp_usrreq.c (udp6_ctlinput):
+	corrected arguments to ip6_pcbnotify().
+
 2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/tcp_subr.c (tcp_respond): correctly reset
 	returned IPv6 header.  This is essential when the original packet
