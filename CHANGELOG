@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.41 1999/08/20 00:43:56 itojun Exp $
+$Id: CHANGELOG,v 1.42 1999/08/20 06:29:29 itojun Exp $
 
 <199908>
+Fri Aug 20 15:26:59 JST 1999  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_input.c: tentative fix to dangling pointer
+	  problem in syn cache.  may need updates.
+
 Fri Aug 20 09:11:20 JST 1999  itojun@iijlab.net
 	* freebsd[23]/ports/apache13, netbsd/pkgsrc/www/apache13:
 	* freebsd[23]/ports/bind8, netbsd/pkgsrc/www/bind8:
