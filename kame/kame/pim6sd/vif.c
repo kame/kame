@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.34 2003/02/12 04:50:08 suz Exp $	*/
+/*	$KAME: vif.c,v 1.35 2003/02/12 10:09:17 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -105,6 +105,8 @@ void start_vif __P((mifi_t vifi));
 void stop_vif __P((mifi_t vivi));
 int update_reg_vif __P((mifi_t register_vifi));
 
+extern void add_phaddr __P((struct uvif *, struct sockaddr_in6 *,
+		           struct in6_addr *, struct sockaddr_in6 *));
 extern int cfparse __P((int, int));
 
 void init_vifs()
@@ -226,11 +228,12 @@ int init_reg_vif()
 
 	reg_vif_num = numvifs;
 
-	/* Use the address of the first available physical interface to
-	 * create the register vif.
- 	 */
 
-	for (i = 0; i < numvifs; i++) {
+	/* 
+	 * copy the address of the first available physical interface to
+	 * create the register vif.
+	 */
+	for (i =0 ; i < numvifs ; i++) {
 		if (uvifs[i].uv_flags & (VIFF_DOWN | VIFF_DISABLED | MIFF_REGISTER))
 			continue;
 		break;
@@ -239,9 +242,11 @@ int init_reg_vif()
 		log(LOG_ERR, 0, "No physical interface enabled");
 		return -1;
 	}
-
 	
-	memcpy(v, &uvifs[i], sizeof(*v));
+	add_phaddr(v, &uvifs[i].uv_linklocal->pa_addr,
+		   &uvifs[i].uv_linklocal->pa_subnetmask,
+		   &uvifs[i].uv_linklocal->pa_prefix); 
+	v->uv_ifindex = uvifs[i].uv_ifindex;
 	strncpy(v->uv_name, "register_mif0", IFNAMSIZ);
 	v->uv_flags = MIFF_REGISTER;
 	v->uv_mld_version = MLDv1;
@@ -273,7 +278,7 @@ void start_all_vifs()
 	/* Start first the NON-REGISTER vifs */
 	for (action = 0; ; action = MIFF_REGISTER) {
 		for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
-        		/* 
+			/*
 			 * If starting non-registers but the vif is a register
 			 * or if starting registers, but the interface is not
 			 * a register, then just continue.
@@ -395,7 +400,7 @@ void stop_vif( mifi_t vifi )
 	/*
 	 * TODO: make sure that the kernel viftable is
 	 * consistent with the daemon table
- 	 */
+	 */
 
 	v=&uvifs[vifi];
 	if( !( v->uv_flags&MIFF_REGISTER ) )
@@ -517,8 +522,9 @@ update_reg_vif( mifi_t register_vifi )
 	    continue;
         /* Found. Stop the bogus Register vif first */
 	stop_vif(register_vifi);
-	uvifs[register_vifi].uv_linklocal->pa_addr =
-	    uvifs[vifi].uv_linklocal->pa_addr;
+	add_phaddr(v, &uvifs[vifi].uv_linklocal->pa_addr,
+		   &uvifs[vifi].uv_linklocal->pa_subnetmask,
+		   &uvifs[vifi].uv_linklocal->pa_prefix); 
 	start_vif(register_vifi);
 	IF_DEBUG(DEBUG_PIM_REGISTER | DEBUG_IF)
 	    log(LOG_NOTICE, 0, "%s has come up; vif #%u now in service",
@@ -879,9 +885,9 @@ stop_all_vifs()
     struct uvif *v;
  
     for (vifi = 0, v=uvifs; vifi < numvifs; ++vifi, ++v) {
-	if (!(v->uv_flags &  VIFF_DOWN)) {
-	    stop_vif(vifi);
-	}
+	if (v->uv_flags & (VIFF_DOWN | VIFF_DISABLED))
+		continue;
+	stop_vif(vifi);
     }
 }
 
