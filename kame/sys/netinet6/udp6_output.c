@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.16 2000/11/05 15:20:28 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.17 2000/11/05 15:22:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,11 +132,7 @@
 #define in6p_flags	inp_flags
 #define in6p_moptions	inp_moptions6
 #define in6p_route	inp_route6
-#ifdef __OpenBSD__
-#define in6p_flowinfo	inp_fflowinfo
-#else
 #define in6p_flowinfo	inp_flowinfo
-#endif
 #define udp6stat	udpstat
 #define udp6s_opackets	udps_opackets
 #endif
