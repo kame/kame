@@ -44,7 +44,9 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#ifndef __FreeBSD__
 #include <util.h>
+#endif
 
 #define DEF_SNAPLEN 116		/* default plus allow for larger header of pflog */
 #define PCAP_TO_MS 500		/* pcap read timeout (ms) */
@@ -122,7 +124,10 @@ logmsg(int pri, const char *message, ...)
 	va_end(ap);
 }
 
-__dead void
+#ifndef __FreeBSD__
+__dead
+#endif
+void
 usage(void)
 {
 	fprintf(stderr, "usage: pflogd [-D] [-d delay] [-f filename] ");
@@ -322,7 +327,9 @@ main(int argc, char **argv)
 			logmsg(LOG_WARNING, "Failed to become daemon: %s",
 			    strerror(errno));
 		}
+#ifndef __FreeBSD__
 		pidfile(NULL);
+#endif
 	}
 
 	(void)umask(S_IRWXG | S_IRWXO);
