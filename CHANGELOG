@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2322 2003/01/27 15:50:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.2323 2003/01/29 12:29:34 t-momose Exp $
 
 <200301>
+2003-01-29  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+
+	* kame/kame/sys/netinet6/mip6.c, mip6_var.h, mip6_pktpro.c:
+	supports returning binding ack. status of expired nonce index when
+	the nonces indicated in a binding update are already expired.
+
 2003-01-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: added some minor bug fixes and clarifications:
 	- let the event structure to have IA for solicit and request so
