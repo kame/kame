@@ -1,11 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1335 2000/10/15 10:25:06 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1336 2000/10/15 11:16:28 sumikawa Exp $
 
 <200010>
 Sun Oct 15 19:18:45 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/squid11: use latest IPv6 patch.
 	* freebsd3/ports/lftp: upgrade to 2.3.4.
+	* freebsd3/ports/sendmail: sendmail 8.11 now is official version
+	so I combine sendmail6 and sendmail.beta into new port 'sendmail'.
 
 Sun Oct 15 17:49:15 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}, freebsd[23]/ports/{libpcap,tcpdump}:
