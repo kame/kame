@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_qop.h,v 1.1 2000/01/18 07:29:03 kjc Exp $
+ * $Id: altq_qop.h,v 1.2 2000/03/03 09:26:16 kjc Exp $
  */
 #ifndef _ALTQ_QOP_H_
 #define _ALTQ_QOP_H_
@@ -254,9 +254,8 @@ extern int	line_no;	/* current line number in config file */
 #endif /* !RSVPD */
 
 #ifdef INET6
-#ifndef s6_addr32
-#define s6_addr32 __u6_addr.__u6_addr32
-#endif
+/* a macro to handle v6 address in 32-bit fields */
+#define IN6ADDR32(a, i)	(*(u_int32_t *)(&(a)->s6_addr[(i)<<2]))
 #endif
 
 #endif /* _ALTQ_QOP_H_ */

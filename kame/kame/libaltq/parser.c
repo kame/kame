@@ -1,4 +1,4 @@
-/* $Id: parser.c,v 1.2 2000/02/02 06:39:37 kjc Exp $ */
+/* $Id: parser.c,v 1.3 2000/03/03 09:26:17 kjc Exp $ */
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -989,10 +989,10 @@ get_ip6addr(char **cpp, struct in6_addr *addr, struct in6_addr *mask)
 		if (len > 0)
 			*cp = (0xff << (8 - len)) & 0xff;
 
-		addr->s6_addr32[0] &= mask->s6_addr32[0];
-		addr->s6_addr32[1] &= mask->s6_addr32[1];
-		addr->s6_addr32[2] &= mask->s6_addr32[2];
-		addr->s6_addr32[3] &= mask->s6_addr32[3];
+		IN6ADDR32(addr, 0) &= IN6ADDR32(mask, 0);
+		IN6ADDR32(addr, 1) &= IN6ADDR32(mask, 1);
+		IN6ADDR32(addr, 2) &= IN6ADDR32(mask, 2);
+		IN6ADDR32(addr, 3) &= IN6ADDR32(mask, 3);
 	}
 	else
 		/* full mask */

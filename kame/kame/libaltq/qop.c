@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop.c,v 1.3 2000/03/02 11:54:43 kjc Exp $
+ * $Id: qop.c,v 1.4 2000/03/03 09:26:17 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -1123,20 +1123,20 @@ filt_disjoint(struct flow_filter *front, struct flow_filter *back)
 		if (!IN6_IS_ADDR_UNSPECIFIED(&front6->ff_flow6.fi6_src) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_src)) {
 			for (i=0; i<4; i++) {
-				mask = front6->ff_mask6.mask6_src.s6_addr32[i]
-					& back6->ff_mask6.mask6_src.s6_addr32[i];
-				if ((front6->ff_flow6.fi6_src.s6_addr32[i] & mask) !=
-				    (back6->ff_flow6.fi6_src.s6_addr32[i] & mask))
+				mask = IN6ADDR32(&front6->ff_mask6.mask6_src, i)
+					& IN6ADDR32(&back6->ff_mask6.mask6_src, i);
+				if ((IN6ADDR32(&front6->ff_flow6.fi6_src, i) & mask) !=
+				    (IN6ADDR32(&back6->ff_flow6.fi6_src, i) & mask))
 					return (1);
 			}
 		}
 		if (!IN6_IS_ADDR_UNSPECIFIED(&front6->ff_flow6.fi6_dst) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_dst)) {
 			for (i=0; i<4; i++) {
-				mask = front6->ff_mask6.mask6_dst.s6_addr32[i]
-					& back6->ff_mask6.mask6_dst.s6_addr32[i];
-				if ((front6->ff_flow6.fi6_dst.s6_addr32[i] & mask) !=
-				    (back6->ff_flow6.fi6_dst.s6_addr32[i] & mask))
+				mask = IN6ADDR32(&front6->ff_mask6.mask6_dst, i)
+					& IN6ADDR32(&back6->ff_mask6.mask6_dst, i);
+				if ((IN6ADDR32(&front6->ff_flow6.fi6_dst, i) & mask) !=
+				    (IN6ADDR32(&back6->ff_flow6.fi6_dst, i) & mask))
 				return (1);
 			}
 		}
@@ -1236,8 +1236,8 @@ filt_subset(struct flow_filter *front, struct flow_filter *back)
 		}
 		else if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_src))
 			for (i=0; i<4; i++)
-				if (~front6->ff_mask6.mask6_src.s6_addr32[i] &
-				    back6->ff_mask6.mask6_src.s6_addr32[i])
+				if (~IN6ADDR32(&front6->ff_mask6.mask6_src, i) &
+				    IN6ADDR32(&back6->ff_mask6.mask6_src, i))
 					return (0);
 		if (IN6_IS_ADDR_UNSPECIFIED(&front6->ff_flow6.fi6_dst)) {
 			if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_dst))
@@ -1245,8 +1245,8 @@ filt_subset(struct flow_filter *front, struct flow_filter *back)
 		}
 		else if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_dst))
 			for (i=0; i<4; i++)
-				if (~front6->ff_mask6.mask6_dst.s6_addr32[i] &
-				    back6->ff_mask6.mask6_dst.s6_addr32[i])
+				if (~IN6ADDR32(&front6->ff_mask6.mask6_dst, i) &
+				    IN6ADDR32(&back6->ff_mask6.mask6_dst, i))
 					return (0);
 
 		if (~front6->ff_mask6.mask6_tclass &
