@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.160 2003/05/23 06:24:31 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.161 2003/05/23 06:49:17 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,7 +100,7 @@ static struct prop_pair *get_ph2approvalx __P((struct ph2handle *,
 static void free_proppair0 __P((struct prop_pair *));
 
 static int get_transform
-	__P((struct isakmp_pl_p *, struct prop_pair **, int *));
+	__P((struct isakmp_pl_p *, struct prop_pair **, int *, int));
 static u_int32_t ipsecdoi_set_ld __P((vchar_t *));
 
 static int check_doi __P((u_int32_t));
@@ -1163,6 +1163,14 @@ get_proppair(sa, mode)
 			vfree(pbuf);
 			return NULL;
 		}
+		if (mode == IPSECDOI_TYPE_PH1
+		 && pa != (struct isakmp_parse_t *)pbuf->v) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"Only a single proposal payload is allowed "
+				"during phase 1 processing.\n");
+			vfree(pbuf);
+			return NULL;
+		}
 
 		prop = (struct isakmp_pl_p *)pa->ptr;
 		proplen = pa->len;
@@ -1192,7 +1200,7 @@ get_proppair(sa, mode)
 			continue;
 
 		/* get transform */
-		if (get_transform(prop, pair, &num_p) < 0) {
+		if (get_transform(prop, pair, &num_p, mode) < 0) {
 			vfree(pbuf);
 			return NULL;
 		}
@@ -1269,10 +1277,11 @@ get_proppair(sa, mode)
  *	0	: No valid transform found.
  */
 static int
-get_transform(prop, pair, num_p)
+get_transform(prop, pair, num_p, mode)
 	struct isakmp_pl_p *prop;
 	struct prop_pair **pair;
 	int *num_p;
+	int mode;
 {
 	int tlen; /* total length of all transform in a proposal */
 	caddr_t bp;
@@ -1302,6 +1311,13 @@ get_transform(prop, pair, num_p)
 		if (pa->type != ISAKMP_NPTYPE_T) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"Invalid payload type=%u\n", pa->type);
+			break;
+		}
+		if (mode == IPSECDOI_TYPE_PH1
+		 && pa != (struct isakmp_parse_t *)pbuf->v) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"Only a single transform payload is allowed "
+				"during phase 1 processing.\n");
 			break;
 		}
 
@@ -2222,8 +2238,7 @@ ahmismatch:
 	 && trns->t_id == IPSECDOI_ESP_NULL
 	 && !attrseen[IPSECDOI_ATTR_AUTH]) {
 		plog(LLV_ERROR, LOCATION, NULL,
-		    "attr AUTH must be present "
-		    "for ESP NULL encryption.\n");
+		    "attr AUTH must be present for ESP NULL encryption.\n");
 		return -1;
 	}
 
@@ -2656,12 +2671,13 @@ setph2proposal0(iph2, pp, pr)
 			 * with no authentication transform.
 			 */
 			if (tr->trns_id == IPSECDOI_ESP_NULL &&
-			    tr->authtype == IPSECDOI_ATTR_AUTH_NONE)
+			    tr->authtype == IPSECDOI_ATTR_AUTH_NONE) {
 				plog(LLV_ERROR, LOCATION, NULL,
 				    "attr AUTH must be present "
 				    "for ESP NULL encryption.\n");
 				vfree(p);
 				return NULL;
+			}
 			break;
 		}
 
