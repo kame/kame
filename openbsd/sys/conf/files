@@ -367,6 +367,7 @@ file	net/pf.c		pf	needs-flag
 file	net/pf_norm.c		pf
 file	net/pf_ioctl.c		pf
 file	net/pf_table.c		pf
+file	net/pf_osfp.c		pf
 pseudo-device pflog: ifnet
 file	net/if_pflog.c		pflog	needs-flag
 pseudo-device pfsync: ifnet
