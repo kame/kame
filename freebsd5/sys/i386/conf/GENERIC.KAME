@@ -342,8 +342,8 @@ device		ist	1	# ISATAP
 #device		mip	1
 
 device		pf
-device		pflog
-device		pfsync
+#device		pflog
+#device		pfsync
 
 # Datagram Congestion Control Protocol
 #options	DCCP
