@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.2 2003/07/08 06:51:28 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.3 2003/07/08 08:11:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -322,7 +322,7 @@ int
 mip6_process_hurbu(bi)
 	struct mip6_bc *bi;
 {
-	struct mip6_bc *llmbc, *mbc, *mbc_next;
+	struct mip6_bc *llmbc, *mbc;
 	struct nd_prefix *pr;
 	struct ifnet *hifp = NULL;
 	int error = 0;
@@ -730,7 +730,7 @@ int
 mip6_dad_success(ifa)
 	struct ifaddr *ifa;
 {
-	struct  mip6_bc *mbc, *prim = NULL;
+	struct  mip6_bc *mbc = NULL;
 
 	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
@@ -744,51 +744,27 @@ mip6_dad_success(ifa)
 	FREE(ifa, M_IFADDR);
 	mbc->mbc_dad = NULL;
 	mbc->mbc_state &= ~MIP6_BC_STATE_DAD_WAIT;
+
 	/* create encapsulation entry */
-	mip6_tunnel_control(MIP6_TUNNEL_ADD,
-			    mbc,
-			    mip6_bc_encapcheck,
-			    &mbc->mbc_encap);
+	mip6_tunnel_control(MIP6_TUNNEL_ADD, mbc, mip6_bc_encapcheck,
+	    &mbc->mbc_encap);
 
 	/* add rtable for proxy ND */
 	mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_ADD);
 
+	/* if this entry has been cloned by L=1 flag, just return. */
 	if ((mbc->mbc_flags & IP6MU_CLONED) != 0)
 		return (0);
-	prim = mbc;
-	for (mbc = LIST_FIRST(&mip6_bc_list);
-	    mbc;
-	    mbc = LIST_NEXT(mbc, mbc_entry)) {
-		if (mbc->mbc_ifp != prim->mbc_ifp ||
-		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
-			continue;
-		if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-					 &prim->mbc_phaddr.sin6_addr,
-					 64))
-			continue;
 
-		/* XXX check */
-		if ((mbc->mbc_flags & IP6MU_CLONED) == 0)
-			continue;
+	/* return a binding ack. */
+	if (mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr, &mbc->mbc_pcoa,
+	    IP6MA_STATUS_ACCEPTED, mbc->mbc_seqno, mbc->mbc_lifetime,
+	    mbc->mbc_lifetime / 2 /* XXX */, NULL)) {
 		mip6log((LOG_ERR,
-			 "%s:%d: waiting for DAD %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
-	}
-
-	/* return BA */
-	if (mip6_bc_send_ba(&prim->mbc_addr, &prim->mbc_phaddr,
-			    &prim->mbc_pcoa,
-			    IP6MA_STATUS_ACCEPTED,
-			    prim->mbc_seqno,
-			    prim->mbc_lifetime,
-			    prim->mbc_lifetime / 2 /* XXX */, NULL)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: sending BA to %s(%s) failed. "
-			 "send it later.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&prim->mbc_phaddr.sin6_addr),
-			 ip6_sprintf(&prim->mbc_pcoa.sin6_addr)));
+		    "%s:%d: sending BA to %s(%s) failed. send it later.\n",
+		    __FILE__, __LINE__,
+		    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr),
+		    ip6_sprintf(&mbc->mbc_pcoa.sin6_addr)));
 	}
 
 	return (0);
@@ -806,62 +782,73 @@ mip6_dad_error(ifa, err)
 	struct ifaddr *ifa;
 	int err;
 {
-	struct  mip6_bc *mbc, *mbc_next, *my, *prim= NULL;
+	struct mip6_bc *mbc = NULL, *llmbc = NULL;
+	struct mip6_bc *tmpmbc = NULL, *tmpmbc_next = NULL;
+	int error;
 
-	for (my = LIST_FIRST(&mip6_bc_list);
-	    my;
-	    my = LIST_NEXT(my, mbc_entry)) {
-		if (my->mbc_dad == ifa)
-			break;
-	}
-	if (!my)
-		return (ENOENT);
-
-	if ((my->mbc_flags & IP6MU_CLONED) == 0)
-		prim = my;
-	FREE(ifa, M_IFADDR);
-	my->mbc_dad = NULL;
 	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
-	    mbc = mbc_next) {
-		mbc_next = LIST_NEXT(mbc, mbc_entry);
-		if (my == mbc)
-			continue;
-		if (mbc->mbc_ifp != my->mbc_ifp ||
-		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
-			continue;
-		if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-					 &my->mbc_phaddr.sin6_addr,
-					 64))
-			continue;
-		mip6_dad_stop(mbc);
-		if ((mbc->mbc_flags & IP6MU_CLONED) == 0) {
-			prim = mbc;
-			continue;
-		}
-		mbc->mbc_state &= ~MIP6_BC_STATE_DAD_WAIT;
-		mip6_bc_list_remove(&mip6_bc_list, mbc);
+	    mbc = LIST_NEXT(mbc, mbc_entry)) {
+		if (mbc->mbc_dad == ifa)
+			break;
 	}
-	if (prim != my) {
-		mip6_bc_list_remove(&mip6_bc_list, my);
+	if (!mbc)
+		return (ENOENT);
+
+	FREE(ifa, M_IFADDR);
+	mbc->mbc_dad = NULL;
+
+	if ((mbc->mbc_flags & IP6MU_CLONED) != 0) {
+		llmbc = mbc;
+		for (tmpmbc = LIST_FIRST(&mip6_bc_list);
+		    tmpmbc;
+		    tmpmbc = tmpmbc_next) {
+			tmpmbc_next = LIST_NEXT(tmpmbc, mbc_entry);
+			if (tmpmbc->mbc_llmbc == llmbc) {
+				tmpmbc->mbc_llmbc = NULL;
+				llmbc->mbc_refcnt--; /* just for safety. */
+			}
+		}
+
+		/* no need to send an ack. */
+		return (0);
+	} else {
+		llmbc = mbc->mbc_llmbc;
+		if (llmbc) {
+			llmbc->mbc_refcnt--;
+			if (llmbc->mbc_refcnt == 0) {
+				if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+					mip6_dad_stop(llmbc);
+				} else {
+					if (mip6_bc_proxy_control(&llmbc->mbc_phaddr,
+					    &llmbc->mbc_addr, RTM_DELETE)) {
+						/* XXX */
+					}
+				}
+				error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: can't remove BC.\n",
+					    __FILE__, __LINE__));
+					/* what should I do? */
+				}
+			}
+		}
 	}
 
-	if (prim == NULL)
-		return (ENOENT);	/* XXX or panic */
-	if ((prim->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0) {
-		/* already successful DAD */
-		mip6log((LOG_ERR,
-			 "%s:%d: already sucessful DAD %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&prim->mbc_phaddr.sin6_addr)));
-	}
-	/* return BA */
-	mip6_bc_send_ba(&prim->mbc_addr, &prim->mbc_phaddr,
-			&prim->mbc_pcoa,
+	/* return a binding ack. */
+	mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
+			&mbc->mbc_pcoa,
 			err,
-			prim->mbc_seqno,
+			mbc->mbc_seqno,
 			0, 0, NULL);
-	mip6_bc_list_remove(&mip6_bc_list, prim);
+	error = mip6_bc_list_remove(&mip6_bc_list, mbc);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: can't remove BC.\n",
+		    __FILE__, __LINE__));
+		/* what should I do? */
+	}
 
 	return (0);
 }
