@@ -1,4 +1,4 @@
-$Id: TODO,v 1.24 2000/09/21 20:15:36 sakane Exp $
+$Id: TODO,v 1.25 2000/09/22 06:11:35 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -11,7 +11,6 @@ o split log file based on client.  printf-like config directive, i.e.
 o fix flag for logging
 o IPComp SA with wellknown CPI in CPI field.  how to handle it?
   if wellknown CPI is used in IKE negotiation, we will end up installing it.
-o fix delete payload for IPComp SA.  use 2 byte SPI.
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
