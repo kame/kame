@@ -29,7 +29,7 @@
 //# SUCH DAMAGE.
 //#
 //#	$SuMiRe: misc.c,v 1.11 1998/09/17 01:14:55 shin Exp $
-//#	$Id: misc.c,v 1.1 1999/08/08 23:31:08 itojun Exp $
+//#	$Id: misc.c,v 1.2 2000/02/29 00:59:58 itojun Exp $
 //#
 //#------------------------------------------------------------------------
 */
@@ -42,7 +42,6 @@
 #include <kvm.h>
 
 #include <sys/param.h>
-#include <sys/errno.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -54,6 +53,9 @@
 
 #include <arpa/inet.h>
 
+#include <errno.h>
+#include <ifaddrs.h>
+
 #if defined(KAME)
 #include "pm_insns.h"
 #include "pm_defs.h"
@@ -64,10 +66,6 @@
 #include <netpm/pm_defs.h>
 #include <netpm/pm_ioctl.h>
 #include <netpm/pm_list.h>
-#endif
-
-#if defined(__bsdi__)
-#include <ifaddrs.h>
 #endif
 
 #include "defs.h"
@@ -125,23 +123,6 @@ int		sendMsg			__P((struct _msgBox *, int, int));
 #include <netinet/in.h>
 
 #define	ROUNDUP(x)	roundup(x, sizeof(void *))
-
-	int	 getifaddrs	__P((struct ifaddrs **));
-
-struct	ifaddrs
-{
-    struct  ifaddrs	*ifa_next;
-    char		*ifa_name;
-    u_int		 ifa_flags;
-    struct  sockaddr	*ifa_addr;
-    struct  sockaddr	*ifa_netmask;
-    struct  sockaddr	*ifa_dstaddr;
-    void		*ifa_data;
-};
-
-#ifndef ifa_broadaddr
-#define	ifa_broadaddr	ifa_dstaddr
-#endif
 
 #endif
 
@@ -1592,123 +1573,6 @@ _masktobits(u_long mask)
 //#------------------------------------------------------------------------
 */
 
-#if defined(__FreeBSD__) && defined(NET_RT_IFLIST)
-
-int
-getifaddrs(struct ifaddrs **pif)
-{
-    int			 mib[6];
-    size_t		 needed;
-    char		*buf, *lim, *next;
-    struct rt_msghdr	*rtm;
-    struct ifaddrs	*ifa, *ifc, *ift, *cif;
-
-    ifa = ifc = ift = cif = NULL;
-
-    mib[0] = CTL_NET;
-    mib[1] = PF_ROUTE;
-    mib[2] = 0;
-    mib[3] = 0;
-    mib[4] = NET_RT_IFLIST;
-    mib[5] = 0;
-
-    if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0)
-	perror("sysctl"), exit(errno);
-
-    if ((buf = malloc(needed)) == NULL)
-	perror("malloc"), exit(errno);
-
-    if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
-	perror("sysctl"), exit(errno);
-
-    lim = buf + needed;
-    for (next = buf; next < lim; next += rtm->rtm_msglen)
-    {
-	rtm = (struct rt_msghdr *)next;
-	if (rtm->rtm_version != RTM_VERSION)
-	    continue;
-
-	switch (rtm->rtm_type)
-	{
-	  case RTM_IFINFO:
-	    {
-		struct if_msghdr	*ifm;
-		struct sockaddr_dl	*dl;
-
-		ifm =  (struct if_msghdr *)rtm;
-		if (ifm->ifm_addrs & RTA_IFP)
-		{
-		    dl = (struct sockaddr_dl *)(ifm+1);
-
-		    ifc = (struct ifaddrs *)calloc(1, sizeof(struct ifaddrs));
-		    ifc->ifa_name = calloc(1, ROUNDUP(dl->sdl_nlen + 1));
-		    bcopy(dl->sdl_data, ifc->ifa_name, dl->sdl_nlen);
-		    ifc->ifa_flags = (int)ifm->ifm_flags;
-
-		    if (ifa == NULL)	ifa = ifc;
-		    if (ift == NULL)	ift = ifc;
-		    else		ift->ifa_next = ifc, ift = ifc;
-		    cif = ifc;
-		}
-	    }
-	    break;
-
-	  case RTM_NEWADDR:
-	    {
-		int			 bits;
-		struct ifa_msghdr	*ifam;
-		struct sockaddr		*sa;
-
-		ifc = (struct ifaddrs *)calloc(1, sizeof(struct ifaddrs));
-		ifc->ifa_name  = cif->ifa_name;
-		ifc->ifa_flags = cif->ifa_flags;
-
-		if (ifa == NULL)	ifa = ifc;
-		if (ift == NULL)	ift = ifc;
-		else		ift->ifa_next = ifc, ift = ifc;
-
-		ifam = (struct ifa_msghdr *)rtm;
-		sa = (struct sockaddr *)(ifam+1);
-
-		for (bits = 1; bits <= 0x80; bits <<= 1)
-		{
-		    if ((ifam->ifam_addrs & bits) == 0)
-			continue;
-		    
-		    switch (bits)
-		    {
-		      case RTA_NETMASK:
-			ifc->ifa_netmask = sa;
-			break;
-
-		      case RTA_IFA:
-			ifc->ifa_addr = sa;
-			break;
-
-		      case RTA_BRD:
-			ifc->ifa_broadaddr = sa;
-			break;
-		    }
-		    sa = (struct sockaddr *)((char *)sa + ROUNDUP(sa->sa_len));
-		}
-	    }
-	    break;
-	}
-    }
-    *pif = ifa;
-    return (0);
-}
-
-#endif
-
-
-/*
-//##
-//#------------------------------------------------------------------------
-//#
-//#------------------------------------------------------------------------
-*/
-
 void
 debugProbe(char *msg)
 {
@@ -1834,11 +1698,6 @@ init_misc()
 	}
     }
 
-#if (_BSDI_VERSION >= 199701) || defined(__FreeBSD__)
     if (getifaddrs(&ifaddrs) < 0)
 	perror("getifaddrs");
-#else
-    if (getifaddrs(&ifaddrs, &nip) < 0)
-	perror("getifaddrs");
-#endif
 }
