@@ -1,12 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1657 2001/04/27 15:10:40 itojun Exp $
+$KAME: CHANGELOG,v 1.1658 2001/04/27 16:25:51 itojun Exp $
 
 <200104>
 Sat Apr 28 00:09:10 JST 2001  itojun@iijlab.net
 	* sys/netinet6/nd6.c (freebsd): repair backward binary compatibility
 	  breakage for SIOCGIFINFO_IN6.
 	  see changelog on Sat Feb 17 01:51:43 JST 2001.
+	  if you are on freebsd systems please make sure to recompile
+	  /usr/local/v6/sbin/ndp with the new header files.
+	  /usr/sbin/ndp should work fine with the latest kernel.
 
 Fri Apr 27 17:53:54 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6.c:in6_ifinit(): make it work with stf interface.
