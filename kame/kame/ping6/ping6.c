@@ -130,6 +130,12 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <netinet6/ipsec.h>
 #endif
 
+#ifdef __NetBSD__
+#include <md5.h>
+#else
+#include "md5.h"
+#endif
+
 #define MAXPACKETLEN	131072
 #define	IP6LEN		40
 #define ICMP6ECHOLEN	8	/* icmp echo header len excluding time */
@@ -172,6 +178,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #endif
 #define F_HOSTNAME	0x10000
 #define F_FQDNOLD	0x20000
+#define F_NIGROUP	0x40000
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -243,6 +250,7 @@ void	 pr_retip __P((struct ip6_hdr *, u_char *));
 void	 summary __P((void));
 void	 tvsub __P((struct timeval *, struct timeval *));
 int	 setpolicy __P((int, char *));
+char	*nigroup __P((char *));
 void	 usage __P((void));
 
 int
@@ -279,14 +287,15 @@ main(argc, argv)
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 #ifndef IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:np:qRS:s:vwW")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:vwW")) != EOF)
 #else
 #ifdef IPSEC_POLICY_IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:np:qRS:s:vwWP:")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:vwWP:")) != EOF)
 #else
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:np:qRS:s:vwWAE")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:vwWAE")) != EOF)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
+	{
 		switch(ch) {
 		 case 'a':
 		 {
@@ -320,6 +329,7 @@ main(argc, argv)
 					 break;
 				 default:
 					 usage();
+					 /*NOTREACHED*/
 				 }
 			 }
 			 break;
@@ -384,6 +394,9 @@ main(argc, argv)
 		case 'n':
 			options |= F_NUMERIC;
 			break;
+		case 'N':
+			options |= F_NIGROUP;
+			break;
 		case 'p':		/* fill buffer with user pattern */
 			options |= F_PINGFILLED;
 			fill((char *)datap, optarg);
@@ -445,12 +458,16 @@ main(argc, argv)
 #endif /*IPSEC*/
 		default:
 			usage();
+			/*NOTREACHED*/
 		}
+	}
 	argc -= optind;
 	argv += optind;
 
-	if (argc < 1)
+	if (argc < 1) {
 		usage();
+		/*NOTREACHED*/
+	}
 
 	if (argc > 1) {
 #ifdef USE_SIN6_SCOPE_ID
@@ -460,7 +477,14 @@ main(argc, argv)
 #endif
 	}
 
-	target = argv[argc - 1];
+	if (options & F_NIGROUP) {
+		target = nigroup(argv[argc - 1]);
+		if (target == NULL) {
+			usage();
+			/*NOTREACHED*/
+		}
+	} else
+		target = argv[argc - 1];
 
 	/* getaddrinfo */
 	bzero(&hints, sizeof(struct addrinfo));
@@ -1878,11 +1902,48 @@ setpolicy(so, policy)
 #endif
 #endif
 
+char *
+nigroup(name)
+	char *name;
+{
+	char *p;
+	MD5_CTX ctxt;
+	u_int8_t digest[16];
+	char l;
+	char hbuf[NI_MAXHOST];
+	struct in6_addr in6;
+
+	p = name;
+	while (p && *p && *p != '.')
+		p++;
+	if (p - name > 63)
+		return NULL;	/*label too long*/
+	l = p - name;
+
+	/* generate 8 bytes of pseudo-random value. */
+	bzero(&ctxt, sizeof(ctxt));
+	MD5Init(&ctxt);
+	MD5Update(&ctxt, &l, sizeof(l));
+	MD5Update(&ctxt, name, p - name);
+	MD5Final(digest, &ctxt);
+
+	bzero(&in6, sizeof(in6));
+	in6.s6_addr[0] = 0xff;
+	in6.s6_addr[1] = 0x02;
+	in6.s6_addr[11] = 0x02;
+	bcopy(digest, &in6.s6_addr[12], 4);
+
+	if (inet_ntop(AF_INET6, &in6, hbuf, sizeof(hbuf)) == NULL)
+		return NULL;
+
+	return strdup(hbuf);
+}
+
 void
 usage()
 {
 	(void)fprintf(stderr,
-"usage: ping6 [-dfnqvwW"
+"usage: ping6 [-dfnNqvwW"
 #ifdef IPV6_REACHCONF
 		      "R"
 #endif

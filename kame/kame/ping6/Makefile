@@ -18,15 +18,16 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	ping6
+SRCS=	ping6.c md5.c
 .if (${OPSYS} != "NetBSD")
 MAN8=	ping6.8
 .else
 MAN=	ping6.8
 .endif
 
-BINOWN  = root
-BINGRP  = bin
-BINMODE = 4555
+BINOWN=	root
+BINGRP=	bin
+BINMODE=4555
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+= -Wall
