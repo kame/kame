@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.43 2000/08/10 01:02:40 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.44 2000/08/24 04:50:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1168,13 +1168,30 @@ oakley_validate_auth(iph1)
 			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
 		}
 
-		/* to be checked signer of certificate */
-
 		/* don't cache the certificate passed. */
 
+#if 0
+		switch (iph1->rmconf->certtype) {
+		case ISAKMP_CERT_X509SIGN:
+			/* XXX to be checked subjectAltName */
+			error = eay_check_x509cert(iph1->cert_p,
+					lcconf->pathinfo[LC_PATHTYPE_CERT]);
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"no supported certtype %d\n",
+				iph1->rmconf->certtype);
+			return -1;
+		}
+		if (error != 0) {
+			plog(logp, LOCATION, NULL,
+				"Invalid certificate authority.\n");
+			return ISAKMP_NTYPE_INVALID_CERT_AUTHORITY;
+		}
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
-				"Certificate Authenticated\n"));
+				"certificate authenticated\n"));
+#endif
 
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:
@@ -1210,10 +1227,13 @@ oakley_validate_auth(iph1)
 
 		vfree(my_hash);
 		if (error != 0) {
-			plog(logp, LOCATION, NULL, "SIG mismatch.\n");
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid signature.\n");
 			return ISAKMP_NTYPE_INVALID_SIGNATURE;
 		}
-		plog(logp, LOCATION, NULL, "Signature authenticated\n");
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL,
+				"signature authenticated\n"));
 	    }
 		break;
 #endif
