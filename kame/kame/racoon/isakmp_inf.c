@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.46 2000/07/26 03:50:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.47 2000/08/09 18:01:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -696,6 +696,52 @@ err:
 	remph2(iph2);
 	delph2(iph2);
 	goto end;
+}
+
+/*
+ * add a notify payload to buffer by reallocating buffer.
+ * If buf == NULL, the function only create a notify payload.
+ */
+vchar_t *
+isakmp_add_pl_n(buf0, pr, type, data)
+	vchar_t *buf0;
+	struct saproto *pr;
+	int type;
+	vchar_t *data;
+{
+	vchar_t *buf = NULL;
+	caddr_t *payload;
+	struct isakmp_pl_n *n;
+	int tlen;
+	int error = 0;
+
+	/* XXX must be get proper spi */
+	tlen = sizeof(*n) + pr->spisize;
+	if (data)
+		tlen += data->l;
+	if (buf0)
+		buf = vrealloc(buf0, buf0->l + tlen);
+	else
+		buf = vmalloc(tlen);
+	if (!buf) {
+		plog(logp, LOCATION, NULL,
+			"failed to get a payload buffer.\n");
+		return NULL;
+	}
+
+	n = (struct isakmp_pl_n *)(buf->v + (buf0 ? buf0->l : 0));
+	n->h.np = ISAKMP_NPTYPE_NONE;
+	n->h.len = htons(tlen);
+	n->doi = htonl(IPSEC_DOI);		/* IPSEC DOI (1) */
+	n->proto_id = pr->proto_id;		/* IPSEC AH/ESP/whatever*/
+	n->spi_size = pr->spisize;
+	n->type = htons(type);
+	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(pr->spi);	/* XXX */
+	if (data) {
+		memcpy((caddr_t)(n + 1) + pr->spisize, &pr->spi, pr->spisize);
+	}
+
+	return buf;
 }
 
 /*

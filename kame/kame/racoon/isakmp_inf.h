@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.h,v 1.8 2000/07/14 11:22:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.h,v 1.9 2000/08/09 18:01:24 sakane Exp $ */
 
 struct sadb_msg;
 extern int isakmp_info_recv __P((struct ph1handle *, vchar_t *));
@@ -38,5 +38,8 @@ extern int isakmp_info_send_n1 __P((struct ph1handle *, int, vchar_t *));
 extern int isakmp_info_send_n2 __P((struct ph2handle *, int, vchar_t *));
 extern int isakmp_info_send_common __P((struct ph1handle *,
 	vchar_t *, u_int32_t, int));
+
+extern vchar_t * isakmp_add_pl_n __P((vchar_t *, struct saproto *,
+	int, vchar_t *));
 
 extern void isakmp_check_notify __P((struct isakmp_gen *, struct ph1handle *));
