@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.1 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.2 2003/01/06 04:01:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -67,12 +67,15 @@ struct ia {
 	struct dhcp6_if *ifp;	/* DHCP interface */
 	struct duid serverid;	/* the server ID that provided this IA */
 
+	/* control information shared with each particular config routines */
 	struct iactl *ctl;
 };
 static TAILQ_HEAD(, ia) ia_listhead;
 
 static void callback __P((struct ia *));
 static void remove_ia __P((struct ia *));
+static struct ia *get_ia __P((iatype_t, struct dhcp6_if *,
+    struct dhcp6_listval *, struct duid *));
 static struct ia *find_ia __P((iatype_t, u_int32_t));
 static struct dhcp6_timer *ia_timo __P((void *));
 
@@ -108,37 +111,15 @@ update_ia(iatype, ialist, ifp, serverid)
 		if ((iac = find_iaconf(iatype, iav->val_ia.iaid)) == NULL)
 			continue;
 
-		/* locate or make the local IA */
-		if ((ia = find_ia(iatype, iav->val_ia.iaid)) == NULL) {
-			if ((ia = malloc(sizeof(*ia))) == NULL) {
-				dprintf(LOG_NOTICE, "%s" "memory allocation "
-				    "failed", FNAME);
-				return;	/* XXX */
-			}
-			memset(ia, 0, sizeof(*ia));
-			ia->iatype = iatype;
-			ia->iaid = iav->val_ia.iaid;
-			ia->state = IAS_ACTIVE;
-
-			TAILQ_INSERT_TAIL(&ia_listhead, ia, link);
-		}
-
-		/* update IA parameters */
-		ia->t1 = iav->val_ia.t1;
-		ia->t2 = iav->val_ia.t2;
-		if (ia->t1 > ia->t2) {
+		/* validate parameters */
+		if (iav->val_ia.t1 > iav->val_ia.t2) {
 			dprintf(LOG_INFO, "%s" "invalid IA: T1(%lu) > T2(%lu)",
-			    FNAME, ia->t1, ia->t2);
+			    FNAME, iav->val_ia.t1, iav->val_ia.t2);
 			continue; /* XXX: or should we try to recover? */
 		}
-		ia->ifp = ifp;
-		if (duidcpy(&newserver, serverid)) {
-			dprintf(LOG_NOTICE, "%s" "failed to copy server ID",
-			    FNAME);
-			continue;
-   		}
-		duidfree(&ia->serverid);
-		ia->serverid = newserver;
+
+		/* locate or make the local IA */
+		ia = get_ia(iatype, ifp, iav, serverid);
 
 		/* update IA configuration information */
 		for (siav = TAILQ_FIRST(&iav->sublist); siav;
@@ -280,6 +261,8 @@ remove_ia(ia)
 	    iastr(ia->iatype), ia->iaid);
 
 	TAILQ_REMOVE(&ia_listhead, ia, link);
+
+	duidfree(&ia->serverid);
 
 	if (ia->timer)
 		dhcp6_remove_timer(&ia->timer);
@@ -430,7 +413,53 @@ ia_timo(arg)
 	return (NULL);
 }
 
-struct ia *
+static struct ia *
+get_ia(type, ifp, iaparam, serverid)
+	iatype_t type;
+	struct dhcp6_if *ifp;
+	struct dhcp6_listval *iaparam;
+	struct duid *serverid;
+{
+	struct ia *ia;
+	struct duid newserver;
+	int create = 0;
+
+	if (duidcpy(&newserver, serverid)) {
+		dprintf(LOG_NOTICE, "%s" "failed to copy server ID",
+		    FNAME);
+		return (NULL);
+	}
+
+	if ((ia = find_ia(type, iaparam->val_ia.iaid)) == NULL) {
+		if ((ia = malloc(sizeof(*ia))) == NULL) {
+			dprintf(LOG_NOTICE, "%s" "memory allocation failed"
+			    FNAME);
+			duidfree(&newserver); /* XXX */
+			return (NULL);
+		}
+		memset(ia, 0, sizeof(*ia));
+		ia->iatype = type;
+		ia->iaid = iaparam->val_ia.iaid;
+		ia->state = IAS_ACTIVE;
+
+		TAILQ_INSERT_TAIL(&ia_listhead, ia, link);
+
+		create = 1;
+	} else
+		duidfree(&ia->serverid);
+
+	ia->t1 = iaparam->val_ia.t1;
+	ia->t2 = iaparam->val_ia.t2;
+	ia->ifp = ifp;
+	ia->serverid = newserver;
+
+	dprintf(LOG_DEBUG, "%s" "%s an IA: %s-%lu", FNAME,
+	    create ? "make" : "update", iastr(type), ia->iaid);
+
+	return (ia);
+}
+
+static struct ia *
 find_ia(type, iaid)
 	iatype_t type;
 	u_int32_t iaid;
