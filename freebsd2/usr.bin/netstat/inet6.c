@@ -1081,13 +1081,13 @@ pim6_stats(off, name)
 
 #define	p(f, m) if (pim6stat.f || sflag <= 1) \
     printf(m, pim6stat.f, plural(pim6stat.f))
-	p(pim6s_rcv_total, "\t%u message%s received\n");
-	p(pim6s_rcv_tooshort, "\t%u message%s received with too few bytes\n");
-	p(pim6s_rcv_badsum, "\t%u message%s received with bad checksum\n");
-	p(pim6s_rcv_badversion, "\t%u message%s received with bad version\n");
-	p(pim6s_rcv_registers, "\t%u register%s received\n");
-	p(pim6s_rcv_badregisters, "\t%u bad register%s received\n");
-	p(pim6s_snd_registers, "\t%u register%s sent\n");
+	p(pim6s_rcv_total, "\t%qu message%s received\n");
+	p(pim6s_rcv_tooshort, "\t%qu message%s received with too few bytes\n");
+	p(pim6s_rcv_badsum, "\t%qu message%s received with bad checksum\n");
+	p(pim6s_rcv_badversion, "\t%qu message%s received with bad version\n");
+	p(pim6s_rcv_registers, "\t%qu register%s received\n");
+	p(pim6s_rcv_badregisters, "\t%qu bad register%s received\n");
+	p(pim6s_snd_registers, "\t%qu register%s sent\n");
 #undef p
 }
 
