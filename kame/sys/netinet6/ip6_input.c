@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.239 2001/12/24 10:48:19 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.240 2001/12/27 13:46:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1723,7 +1723,6 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		}
 	}
 
-	/* draft-itojun-ipv6-tclass-api-01 */
 	if ((in6p->in6p_flags & IN6P_TCLASS) != 0) {
 		u_int32_t flowinfo;
 		int oflowinfo = -1;
