@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.13 2000/02/28 13:33:19 itojun Exp $
+.\"     $Id: ping6.8,v 1.14 2000/03/15 12:49:44 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -44,6 +44,7 @@ packets to network hosts
 .Op Fl a Ar addrtype
 .Op Fl b Ar bufsiz
 .Op Fl c Ar count
+.Op Fl H
 .Op Fl h Ar hoplimit
 .Op Fl I Ar interface
 .Op Fl i Ar wait
@@ -128,6 +129,11 @@ Only the super-user may use this option.
 .Bf -emphasis
 This can be very hard on a network and should be used with caution.
 .Ef
+.It Fl H
+Specifies to try reverse-lookup of IPv6 addresses.
+The
+.Nm
+command does not try reverse-lookup unless the option is specified.
 .It Fl h Ar hoplimit
 Set the IPv6 hoplimit.
 .It Fl I Ar interface
