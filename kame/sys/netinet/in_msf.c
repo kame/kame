@@ -3413,7 +3413,7 @@ merge_msf_list:
 			splx(s);
 			return ENOBUFS;
 		}
-		bcopy(&msfsrc->src, &newsrc->src, msfsrc->src.ss_len);
+		bcopy(ss, &newsrc->src, ss->ss_len);
 		newsrc->refcount = 2;
 		LIST_INSERT_BEFORE(msfsrc, newsrc, list);
 		break;
@@ -3429,7 +3429,7 @@ merge_msf_list:
 			splx(s);
 			return ENOBUFS;
 		}
-		bcopy(ss->src, &newsrc->src, ss->ss_len);
+		bcopy(ss, &newsrc->src, ss->ss_len);
 		newsrc->refcount = 2;
 		LIST_INSERT_AFTER(lastp, newsrc, list);
 	}
