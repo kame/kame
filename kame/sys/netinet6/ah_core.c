@@ -917,7 +917,8 @@ again:
 		bcopy(p, &ip6copy, sizeof(struct ip6_hdr));
 		/* RFC2402 */
 		ip6copy.ip6_flow = 0;
-		ip6copy.ip6_vfc = IPV6_VERSION;
+		ip6copy.ip6_vfc &= ~IPV6_VERSION_MASK;
+		ip6copy.ip6_vfc |= IPV6_VERSION;
 		ip6copy.ip6_hlim = 0;
 		if (IN6_IS_ADDR_LINKLOCAL(&ip6copy.ip6_src))
 			ip6copy.ip6_src.s6_addr16[1] = 0x0000;

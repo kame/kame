@@ -345,7 +345,8 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* fill neighbor solicitation packet */
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow = 0;
-	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
 	/* ip6->ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
@@ -770,7 +771,8 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	/* fill neighbor advertisement packet */
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow = 0;
-	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
 	if (IN6_IS_ADDR_UNSPECIFIED(daddr6)) {

@@ -3375,7 +3375,8 @@ syn_cache_respond(sc, m)
 		break;
 #ifdef INET6
 	case AF_INET6:
-		ip6->ip6_vfc = IPV6_VERSION;
+		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+		ip6->ip6_vfc |= IPV6_VERSION;
 		ip6->ip6_plen = htons(tlen - hlen);
 		/* ip6_hlim will be initialized afterwards */
 		/* XXX flowlabel? */

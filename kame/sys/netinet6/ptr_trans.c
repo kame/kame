@@ -28,7 +28,7 @@
 //# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 //# SUCH DAMAGE.
 //#
-//#	$Id: ptr_trans.c,v 1.1 1999/08/12 12:41:13 shin Exp $
+//#	$Id: ptr_trans.c,v 1.2 1999/12/15 06:33:35 itojun Exp $
 //#
 //#------------------------------------------------------------------------
 */
@@ -172,7 +172,8 @@ translatingICMPv4(struct _cv *cv4, struct ipaddr *src, struct ipaddr *dst)
     icmp6 = cv6._payload._icmp6;;
 
     ip6->ip6_flow = 0;
-    ip6->ip6_vfc  = IPV6_VERSION;
+    ip6->ip6_vfc  &= ~IPV6_VERSION_MASK;
+    ip6->ip6_vfc  |= IPV6_VERSION;
     ip6->ip6_plen = 0;						/* XXX */
     ip6->ip6_nxt  = IPPROTO_ICMPV6;
     ip6->ip6_hlim = ip4->ip_ttl -1;
@@ -394,7 +395,8 @@ translatingTCPv4(struct _cv *cv4, struct ipaddr *src, struct ipaddr *dst)
 
     ip4 = mtod(cv4->m, struct ip *);
     ip6->ip6_flow = 0;
-    ip6->ip6_vfc  = IPV6_VERSION;
+    ip6->ip6_vfc  &= ~IPV6_VERSION_MASK;
+    ip6->ip6_vfc  |= IPV6_VERSION;
     ip6->ip6_plen = htons(cv4->plen);
     ip6->ip6_nxt  = IPPROTO_TCP;
     ip6->ip6_hlim = ip4->ip_ttl -1;

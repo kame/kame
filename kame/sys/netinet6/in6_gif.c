@@ -143,7 +143,8 @@ in6_gif_output(ifp, family, m, rt)
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow	= 0;
-	ip6->ip6_vfc	= IPV6_VERSION;
+	ip6->ip6_vfc	&= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc	|= IPV6_VERSION;
 	ip6->ip6_plen	= htons((u_short)m->m_pkthdr.len);
 	ip6->ip6_nxt	= proto;
 	ip6->ip6_hlim	= ip6_gif_hlim;

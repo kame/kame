@@ -1458,7 +1458,8 @@ icmp6_reflect(m, off)
 	ip6->ip6_src = *src;
 
 	ip6->ip6_flow = 0;
-	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	if (m->m_pkthdr.rcvif) {
 		/* XXX: This may not be the outgoing interface */
@@ -1793,7 +1794,8 @@ icmp6_redirect_output(m0, rt)
 	/* ip6 */
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow = 0;
-	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
 	/* ip6->ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
