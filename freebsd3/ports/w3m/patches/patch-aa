@@ -1,5 +1,5 @@
---- config.h.orig	Fri Jan 28 17:48:51 2000
-+++ config.h	Sat Mar 25 10:47:28 2000
+--- config.h.orig	Wed Jun 14 19:49:48 2000
++++ config.h	Fri Jul  7 18:59:48 2000
 @@ -69,20 +69,16 @@
  /**********************************************************/
  #ifdef makefile_parameter
