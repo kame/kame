@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.205 2001/07/24 07:45:54 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.206 2001/07/24 08:26:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1094,20 +1094,6 @@ in6_update_ifa(ifp, ifra, ia)
 	 * Beyond this point, we should call in6_purgeaddr upon an error,
 	 * not just go to unlink. 
 	 */
-
-#if 0				/* disable this mechanism for now */
-	/* update prefix list */
-	if (hostIsNew &&
-	    (ifra->ifra_flags & IN6_IFF_NOPFX) == 0) { /* XXX */
-		int iilen;
-
-		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) - plen;
-		if ((error = in6_prefix_add_ifid(iilen, ia)) != 0) {
-			in6_purgeaddr((struct ifaddr *)ia);
-			return(error);
-		}
-	}
-#endif
 
 	if ((ifp->if_flags & IFF_MULTICAST) != 0) {
 		struct sockaddr_in6 mltaddr, mltmask;
