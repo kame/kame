@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.8 2001/09/02 19:32:28 fujisawa Exp $	*/
+/*	$KAME: main.c,v 1.9 2002/01/13 12:51:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -242,7 +242,7 @@ void
 printShowHelp()
 {
 	printf("	show prefix\n");
-	printf("	show rule\n");
+	printf("	show rules\n");
 	printf("	show xlate [\"long\"] [<interval>]\n");
 	printf("	show variables\n");
 	printf("	show mapping\n");
