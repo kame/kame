@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1621 2001/03/23 07:52:39 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1622 2001/03/25 09:12:10 itojun Exp $
 
 <200103>
+Sun Mar 25 18:11:24 JST 2001  itojun@iijlab.net
+	* sys/netinet6/{ip6_mroute,in6_prefix}.c: add missing splx.
+	  From: csapuntz@play-doh.stanford.edu (Constantine Sapuntzakis)
+
 2001-03-23  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.[ch]
 	- Change MALLOC type M_TEMP to M_NATPT.
