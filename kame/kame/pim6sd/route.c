@@ -216,15 +216,15 @@ set_incoming(srcentry_ptr, srctype)
      * in big trouble ;-). 
      * Yes but the neighbors are link-local and the rp is global ipv6..
      */
-/* WARNING WARNING WARNING WARNING */
-/* If the router is directly connected to the RP and the RP is the BSR , the next hop is
- * the globally reachable addresse of the RP : NOT link local neighbor but
- * a ipv6 global neighbor... 
- * the upstream router is the globally reachable router...
- *
- */
-/* WARNING WARNING WARNING WARNING */
 
+    /* WARNING WARNING WARNING WARNING */
+    /*
+     * If the router is directly connected to the RP and the RP is the BSR,
+     * the next hop is the globally reachable address of the RP:
+     * NOT link-local neighbor but an IPv6 global neighbor... 
+     * the upstream router is the globally reachable router...
+     */
+    /* WARNING WARNING WARNING WARNING */
     v = &uvifs[srcentry_ptr->incoming];
     if (inet6_equal(&source,&neighbor_addr))
     {
