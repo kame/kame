@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.13 2002/05/16 05:55:48 jinmei Exp $
+# $Id: Makefile.in,v 1.14 2002/05/22 12:42:41 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -24,7 +24,7 @@ CLEANFILES = $(GENSRC) lex.yy.c y.tab.c y.tab.h
 
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o timer.o \
 	$(GENSRCS:%.c=%.o)
-SERVOBJS=	dhcp6s.o common.o config.o $(GENSRCS:%.c=%.o)
+SERVOBJS=	dhcp6s.o common.o config.o timer.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o
 
 all:	$(TARGET) 

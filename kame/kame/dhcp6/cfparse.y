@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.10 2002/05/17 07:26:32 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.11 2002/05/22 12:42:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -37,6 +37,7 @@
 
 #include "dhcp6.h"
 #include "config.h"
+#include "common.h"
 
 extern int lineno;
 extern int cfdebug;

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.9 2002/05/17 01:37:49 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.10 2002/05/22 12:42:41 jinmei Exp $	*/
 
 %{
 /*
@@ -45,6 +45,7 @@
 #endif
 
 #include "dhcp6.h"
+#include "config.h"
 #include "common.h"
 #include "y.tab.h"
 

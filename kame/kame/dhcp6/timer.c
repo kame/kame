@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.1 2002/05/16 06:04:08 jinmei Exp $	*/
+/*	$KAME: timer.c,v 1.2 2002/05/22 12:42:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -43,6 +43,7 @@
 #include <search.h>
 #endif
 #include "dhcp6.h"
+#include "config.h"
 #include "common.h"
 #include "timer.h"
 

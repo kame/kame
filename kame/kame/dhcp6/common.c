@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.53 2002/05/17 07:26:32 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.54 2002/05/22 12:42:41 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -72,8 +72,9 @@
 #endif
 
 #include <dhcp6.h>
-#include <common.h>
 #include <config.h>
+#include <common.h>
+#include <timer.h>
 
 int foreground;
 int debug_thresh;
@@ -134,6 +135,115 @@ dhcp6_count_list(head)
 		i++;
 
 	return i;
+}
+
+struct dhcp6_listval *
+dhcp6_find_listval(head, val, type)
+	struct dhcp6_list *head;
+	void *val;
+	dhcp6_listval_type_t type;
+{
+	struct dhcp6_listval *lv;
+
+	for (lv = TAILQ_FIRST(head); lv; lv = TAILQ_NEXT(lv, link)) {
+		switch(type) {
+		case DHCP6_LISTVAL_NUM:
+			if (lv->val_num == *(int *)val)
+				return(lv);
+			break;
+		case DHCP6_LISTVAL_ADDR6:
+			if (IN6_ARE_ADDR_EQUAL(&lv->val_addr6,
+				(struct in6_addr *)val)) {
+				return(lv);
+			}
+			break;
+		case DHCP6_LISTVAL_PREFIX6:
+			if (IN6_ARE_ADDR_EQUAL(&lv->val_prefix6.addr,
+				&((struct dhcp6_prefix *)val)->addr) &&
+			    lv->val_prefix6.plen ==
+			    ((struct dhcp6_prefix *)val)->plen) {
+				return(lv);
+			}
+			break;
+		}
+	}
+
+	return(NULL);
+}
+
+struct dhcp6_listval *
+dhcp6_add_listval(head, val, type)
+	struct dhcp6_list *head;
+	void *val;
+	dhcp6_listval_type_t type;
+{
+	struct dhcp6_listval *lv;
+
+	if ((lv = malloc(sizeof(*lv))) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to allocate memory for list "
+		    "entry", FNAME);
+		return(NULL);
+	}
+	memset(lv, 0, sizeof(*lv));
+
+	switch(type) {
+	case DHCP6_LISTVAL_NUM:
+		lv->val_num = *(int *)val;
+		break;
+	case DHCP6_LISTVAL_ADDR6:
+		lv->val_addr6 = *(struct in6_addr *)val;
+		break;
+	case DHCP6_LISTVAL_PREFIX6:
+		lv->val_prefix6 = *(struct dhcp6_prefix *)val;
+		break;
+	default:
+		dprintf(LOG_ERR, "%s" "unexpected list value type (%d)",
+		    FNAME, type);
+		exit(1);
+	}
+
+	TAILQ_INSERT_TAIL(head, lv, link);
+
+	return(lv);
+}
+
+struct dhcp6_event *
+dhcp6_create_event(ifp, state)
+	struct dhcp6_if *ifp;
+	int state;
+{
+	struct dhcp6_event *ev;
+
+	if ((ev = malloc(sizeof(*ev))) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to allocate memory for an event",
+			FNAME);
+		return(NULL);
+	}
+	ev->ifp = ifp;
+	ev->state = state;
+	TAILQ_INIT(&ev->data_list);
+
+	return(ev);
+}
+
+void
+dhcp6_remove_event(ev)
+	struct dhcp6_event *ev;
+{
+	dprintf(LOG_DEBUG, "%s" "removing an event on %s, state=%d", FNAME,
+		ev->ifp->ifname, ev->state);
+
+	if (!TAILQ_EMPTY(&ev->data_list)) {
+		dprintf(LOG_ERR, "%s" "assumption failure: "
+			"event data list is not empty", FNAME);
+		exit(1);
+	}
+
+	if (ev->timer)
+		dhcp6_remove_timer(&ev->timer);
+	TAILQ_REMOVE(&ev->ifp->event_list, ev, link);
+
+	free(ev);
 }
 
 #if 0
@@ -601,6 +711,7 @@ dhcp6_init_options(optinfo)
 	optinfo->pref = DH6OPT_PREF_UNDEF;
 
 	TAILQ_INIT(&optinfo->reqopt_list);
+	TAILQ_INIT(&optinfo->stcode_list);
 	TAILQ_INIT(&optinfo->dns_list);
 	TAILQ_INIT(&optinfo->prefix_list);
 }
@@ -613,7 +724,11 @@ dhcp6_clear_options(optinfo)
 	struct dnslist *d, *dn;
 	struct delegated_prefix *p, *pn;
 
+	duidfree(&optinfo->clientID);
+	duidfree(&optinfo->serverID);
+
 	dhcp6_clear_list(&optinfo->reqopt_list);
+	dhcp6_clear_list(&optinfo->stcode_list);
 	dhcp6_clear_list(&optinfo->dns_list);
 	dhcp6_clear_list(&optinfo->prefix_list);
 
@@ -631,6 +746,8 @@ dhcp6_copy_options(src, dst)
 	dst->rapidcommit = src->rapidcommit;
 
 	if (dhcp6_copy_list(&dst->reqopt_list, &src->reqopt_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->stcode_list, &src->stcode_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->dns_list, &src->dns_list))
 		goto fail;
@@ -652,11 +769,14 @@ dhcp6_get_options(p, ep, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6opt *np, opth;
-	int i, opt, optlen, reqopts;
+	struct dhcp6_listval *lv;
+	int i, opt, optlen, reqopts, num;
 	char *cp, *val;
-	u_int8_t val8;
+	u_int16_t val16;
 
 	for (; p + 1 <= ep; p = np) {
+		struct duid duid0;
+
 		/*
 		 * get the option header.  XXX: since there is no guarantee
 		 * about the header alignment, we need to make a local copy.
@@ -681,18 +801,43 @@ dhcp6_get_options(p, ep, optinfo)
 		case DH6OPT_CLIENTID:
 			if (optlen == 0)
 				goto malformed;
-			optinfo->clientID.duid_len = optlen;
-			optinfo->clientID.duid_id = cp;
-			dprintf(LOG_DEBUG, "  DUID: %s",
-				duidstr(&optinfo->clientID));
+			duid0.duid_len = optlen;
+			duid0.duid_id = cp;
+			dprintf(LOG_DEBUG, "  DUID: %s", duidstr(&duid0));
+			if (duidcpy(&optinfo->clientID, &duid0)) {
+				dprintf(LOG_ERR, "%s" "failed to copy DUID",
+					FNAME);
+				goto fail;
+			}
 			break;
 		case DH6OPT_SERVERID:
 			if (optlen == 0)
 				goto malformed;
-			optinfo->serverID.duid_len = optlen;
-			optinfo->serverID.duid_id = cp;
-			dprintf(LOG_DEBUG, "  DUID: %s",
-				duidstr(&optinfo->serverID));
+			duid0.duid_len = optlen;
+			duid0.duid_id = cp;
+			dprintf(LOG_DEBUG, "  DUID: %s", duidstr(&duid0));
+			if (duidcpy(&optinfo->serverID, &duid0)) {
+				dprintf(LOG_ERR, "%s" "failed to copy DUID",
+					FNAME);
+				goto fail;
+			}
+			break;
+		case DH6OPT_STATUS_CODE:
+			if (optlen < sizeof(u_int16_t))
+				goto malformed;
+			memcpy(&val16, cp, sizeof(val16));
+			num = ntohs(val16);
+			dprintf(LOG_DEBUG, "  status code: %d", num);
+
+			/* need to check duplication? */
+
+			if (dhcp6_add_listval(&optinfo->stcode_list,
+				&num, DHCP6_LISTVAL_NUM) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to copy "
+				    "status code", FNAME);
+				goto fail;
+			}
+
 			break;
 		case DH6OPT_ORO:
 			if ((optlen % 2) != 0 || optlen == 0)
@@ -704,34 +849,25 @@ dhcp6_get_options(p, ep, optinfo)
 				u_int16_t opttype;
 
 				memcpy(&opttype, val, sizeof(u_int16_t));
-				opttype = ntohs(opttype);
+				num = ntohs(opttype);
 
-				/* duplication check */
-				for (opt = TAILQ_FIRST(&optinfo->reqopt_list);
-				     opt; opt = TAILQ_NEXT(opt, link)) {
-					if (opt->val_num == opttype) {
-						dprintf(LOG_INFO,
-							"dhcp6_get_options: "
-							"duplicated option "
-							"type (%s)",
-							dhcpoptstr(opttype));
-					}
+				dprintf(LOG_DEBUG, "  requested option: %s",
+					dhcpoptstr(num));
+
+				if (dhcp6_find_listval(&optinfo->reqopt_list,
+					&num, DHCP6_LISTVAL_NUM)) {
+					dprintf(LOG_INFO, "%s" "duplicated "
+					    "option type (%s)", FNAME,
+					    dhcpoptstr(opttype));
 					goto nextoption;
 				}
-				if ((opt = malloc(sizeof(*opt))) == NULL) {
-					dprintf(LOG_NOTICE, "%s"
-						"memory allocation failed "
-						"during parse options", FNAME);
+
+				if (dhcp6_add_listval(&optinfo->reqopt_list,
+					&num, DHCP6_LISTVAL_NUM) == NULL) {
+					dprintf(LOG_ERR, "%s" "failed to copy "
+					    "requested option", FNAME);
 					goto fail;
 				}
-				memset(opt, 0, sizeof(*opt));
-				opt->val_num = opttype;
-				dprintf(LOG_DEBUG, "  requested option: %s",
-					dhcpoptstr(opttype));
-
-				TAILQ_INSERT_TAIL(&optinfo->reqopt_list,
-						  opt, link);
-
 			  nextoption:
 			}
 			break;
@@ -750,18 +886,22 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
-				struct dhcp6_listval *dlv;
+				if (dhcp6_find_listval(&optinfo->dns_list,
+					&num, DHCP6_LISTVAL_ADDR6)) {
+					dprintf(LOG_INFO, "%s" "duplicated "
+					    "DNS address (%s)", FNAME,
+					    in6addr2str((struct in6_addr *)val,
+						0));
+					goto nextdns;
+				}
 
-				if ((dlv = malloc(sizeof *dlv)) == NULL) {
-					dprintf(LOG_ERR, "memory allocation"
-						"failed during parse options");
+				if (dhcp6_add_listval(&optinfo->dns_list,
+					val, DHCP6_LISTVAL_ADDR6) == NULL) {
+					dprintf(LOG_ERR, "%s" "failed to copy "
+					    "DNS address", FNAME);
 					goto fail;
 				}
-				memset(dlv, 0, sizeof(*dlv));
-				memcpy(&dlv->val_addr6, val,
-				       sizeof(struct in6_addr));
-				TAILQ_INSERT_TAIL(&optinfo->dns_list,
-						  dlv, link);
+			  nextdns:
 			}
 			break;
 		case DH6OPT_PREFIX_DELEGATION:
@@ -794,6 +934,7 @@ get_delegated_prefixes(p, ep, optinfo)
 	char *np, *cp;
 	struct dhcp6opt opth;
 	struct dhcp6_prefix_info pi;
+	struct dhcp6_prefix prefix;
 	struct dhcp6_listval *dp;
 	int optlen, opt;
 
@@ -831,46 +972,39 @@ get_delegated_prefixes(p, ep, optinfo)
 			/* clear padding bits in the prefix address */
 			prefix6_mask(&pi.dh6_pi_paddr, pi.dh6_pi_plen);
 
-			/* duplication check */
-			for (dp = TAILQ_FIRST(&optinfo->prefix_list); dp;
-			     dp = TAILQ_NEXT(dp, link)) {
-				if (pi.dh6_pi_plen == dp->val_prefix6.plen &&
-				    IN6_ARE_ADDR_EQUAL(&pi.dh6_pi_paddr,
-						       &dp->val_prefix6.addr)) {
-					dprintf(LOG_INFO,
-						"get_delegated_prefixes: "
-						"duplicated prefix: %s/%d",
-						in6addr2str(&pi.dh6_pi_paddr,
-							    0),
-						pi.dh6_pi_plen);
-					goto nextoption;
-				}
-			}
+			/* copy the information into internal format */
+			memset(&prefix, 0, sizeof(prefix));
+			prefix.addr = pi.dh6_pi_paddr;
+			prefix.plen = pi.dh6_pi_plen;
+			prefix.duration = ntohl(pi.dh6_pi_duration);
 
-			pi.dh6_pi_duration = ntohl(pi.dh6_pi_duration);
-			if (pi.dh6_pi_duration != DHCP6_DURATITION_INFINITE) {
+			if (prefix.duration != DHCP6_DURATITION_INFINITE) {
 				dprintf(LOG_DEBUG, "  prefix information: "
-					"%s/%d duration %ld",
-					in6addr2str(&pi.dh6_pi_paddr, 0),
-					pi.dh6_pi_plen, pi.dh6_pi_duration);
+				    "%s/%d duration %ld",
+				    in6addr2str(&prefix.addr, 0),
+				    prefix.plen, prefix.duration);
 			} else {
 				dprintf(LOG_DEBUG, "  prefix information: "
-					"%s/%d duration infinity",
-					in6addr2str(&pi.dh6_pi_paddr, 0),
-					pi.dh6_pi_plen);
+				    "%s/%d duration infinity",
+				    in6addr2str(&prefix.addr, 0),
+				    prefix.plen);
 			}
 
-			if ((dp = malloc(sizeof(*dp))) == NULL) {
-				dprintf(LOG_ERR, "memory allocation failed"
-					"during parse prefix options");
+			if (dhcp6_find_listval(&optinfo->prefix_list,
+				&prefix, DHCP6_LISTVAL_PREFIX6)) {
+				dprintf(LOG_INFO, "%s" "duplicated "
+				    "prefix (%s/%d)", FNAME,
+				    in6addr2str(&prefix.addr, 0),
+				    prefix.plen);
+				goto nextoption;
+			}
+
+			if (dhcp6_add_listval(&optinfo->prefix_list, &prefix,
+				DHCP6_LISTVAL_PREFIX6) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to copy a "
+				    "prefix", FNAME);
 				goto fail;
 			}
-			memset(dp, 0, sizeof(*dp));
-			dp->val_prefix6.addr = pi.dh6_pi_paddr;
-			dp->val_prefix6.plen = pi.dh6_pi_plen;
-			dp->val_prefix6.duration = pi.dh6_pi_duration;
-
-			TAILQ_INSERT_TAIL(&optinfo->prefix_list, dp, link);
 		}
 
 	  nextoption:
@@ -907,6 +1041,7 @@ dhcp6_set_options(bp, ep, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6opt *p = bp, opth;
+	struct dhcp6_listval *stcode;
 	int len = 0, optlen;
 	char *tmpbuf = NULL;
 
@@ -929,25 +1064,12 @@ dhcp6_set_options(bp, ep, optinfo)
 		COPY_OPTION(DH6OPT_PREFERENCE, sizeof(p8), &p8, p);
 	}
 
-	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
-		struct in6_addr *in6;
-		struct dhcp6_listval *d;
+	for (stcode = TAILQ_FIRST(&optinfo->stcode_list); stcode;
+	     stcode = TAILQ_NEXT(stcode, link)) {
+		u_int16_t code;
 
-		tmpbuf = NULL;
-		optlen = dhcp6_count_list(&optinfo->dns_list) *
-			sizeof(struct in6_addr);
-		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR,
-				"memory allocation failed for DNS options");
-			goto fail;
-		}
-		in6 = (struct in6_addr *)tmpbuf;
-		for (d = TAILQ_FIRST(&optinfo->dns_list); d;
-		     d = TAILQ_NEXT(d, link), in6++) {
-			memcpy(in6, &d->val_addr6, sizeof(*in6));
-		}
-		COPY_OPTION(DH6OPT_DNS, optlen, tmpbuf, p);
-		free(tmpbuf);
+		code = htons(stcode->val_num);
+		COPY_OPTION(DH6OPT_STATUS_CODE, sizeof(code), &code, p);
 	}
 
 	if (!TAILQ_EMPTY(&optinfo->reqopt_list)) {
@@ -968,6 +1090,27 @@ dhcp6_set_options(bp, ep, optinfo)
 			*valp = htons((u_int16_t)opt->val_num);
 		}
 		COPY_OPTION(DH6OPT_ORO, optlen, tmpbuf, p);
+		free(tmpbuf);
+	}
+
+	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
+		struct in6_addr *in6;
+		struct dhcp6_listval *d;
+
+		tmpbuf = NULL;
+		optlen = dhcp6_count_list(&optinfo->dns_list) *
+			sizeof(struct in6_addr);
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR,
+				"memory allocation failed for DNS options");
+			goto fail;
+		}
+		in6 = (struct in6_addr *)tmpbuf;
+		for (d = TAILQ_FIRST(&optinfo->dns_list); d;
+		     d = TAILQ_NEXT(d, link), in6++) {
+			memcpy(in6, &d->val_addr6, sizeof(*in6));
+		}
+		COPY_OPTION(DH6OPT_DNS, optlen, tmpbuf, p);
 		free(tmpbuf);
 	}
 
@@ -1013,6 +1156,122 @@ dhcp6_set_options(bp, ep, optinfo)
 }
 #undef COPY_OPTION
 
+void
+dhcp6_set_timeoparam(ev)
+	struct dhcp6_event *ev;
+{
+	ev->retrans = 0;
+	ev->init_retrans = 0;
+	ev->max_retrans_cnt = 0;
+	ev->max_retrans_dur = 0;
+	ev->max_retrans_time = 0;
+
+	switch(ev->state) {
+	case DHCP6S_SOLICIT:
+		ev->init_retrans = SOL_TIMEOUT;
+		ev->max_retrans_time = SOL_MAX_RT;
+		break;
+	case DHCP6S_INFOREQ:
+		ev->init_retrans = INF_TIMEOUT;
+		ev->max_retrans_time = INF_MAX_RT;
+		break;
+	case DHCP6S_REQUEST:
+		ev->init_retrans = REQ_TIMEOUT;
+		ev->max_retrans_time = REQ_MAX_RT;
+		ev->max_retrans_cnt = REQ_MAX_RC;
+		break;
+	case DHCP6S_RENEW:
+		ev->init_retrans = REN_TIMEOUT;
+		ev->max_retrans_time = REN_MAX_RT;
+		break;
+	default:
+		dprintf(LOG_INFO, "%s" "unexpected state %d on %s",
+			FNAME, ev->state, ev->ifp->ifname);
+		break;
+	}
+}
+
+void
+dhcp6_reset_timer(ev)
+	struct dhcp6_event *ev;
+{
+	double n, r;
+	char *statestr;
+	struct timeval interval;
+
+	switch(ev->state) {
+	case DHCP6S_INIT:
+		/*
+		 * The first Solicit message from the client on the interface
+		 * MUST be delayed by a random amount of time between
+		 * MIN_SOL_DELAY and MAX_SOL_DELAY.
+		 * [dhcpv6-24 17.1.2]
+		 */
+		ev->retrans = (random() % (MAX_SOL_DELAY - MIN_SOL_DELAY)) +
+			MIN_SOL_DELAY;
+		break;
+	default:
+		if (ev->state == DHCP6S_SOLICIT && ev->timeouts == 0) {
+			/*
+			 * The first RT MUST be selected to be strictly
+			 * greater than IRT by choosing RAND to be strictly
+			 * greater than 0.
+			 * [dhcpv6-24 17.1.2]
+			 * Note: since RAND is between -0.1 and +0.1, RT is
+			 * always greater than IRT, regardless of the value
+			 * of RAND.  However, the authors of the draft chose
+			 * to leave the spec as is.
+			 */
+			r = (double)(random() % 1000) / 10000;
+			n = 2 * ev->init_retrans + r * ev->init_retrans;
+		} else {
+			r = (double)((random() % 2000) - 1000) / 10000;
+
+			if (ev->timeouts == 0) {
+				n = 2 * ev->init_retrans +
+					r * ev->init_retrans;
+			} else
+				n = 2 * ev->retrans + r * ev->retrans;
+		}
+		if (ev->max_retrans_time && n > ev->max_retrans_time)
+			n = ev->max_retrans_time + r * ev->max_retrans_time;
+		ev->retrans = (long)n;
+		break;
+	}
+
+	switch(ev->state) {
+	case DHCP6S_INIT:
+		statestr = "INIT";
+		break;
+	case DHCP6S_SOLICIT:
+		statestr = "SOLICIT";
+		break;
+	case DHCP6S_INFOREQ:
+		statestr = "INFOREQ";
+		break;
+	case DHCP6S_REQUEST:
+		statestr = "REQUEST";
+		break;
+	case DHCP6S_RENEW:
+		statestr = "RENEW";
+		break;
+	case DHCP6S_IDLE:
+		statestr = "IDLE";
+		break;
+	default:
+		statestr = "???"; /* XXX */
+		break;
+	}
+
+	interval.tv_sec = (ev->retrans * 1000) / 1000000;
+	interval.tv_usec = (ev->retrans * 1000) % 1000000;
+	dhcp6_set_timer(&interval, ev->timer);
+
+	dprintf(LOG_DEBUG, "%s" "reset timer for %s, "
+		"state=%s, timeo=%d, retrans=%d", FNAME,
+		ev->ifp->ifname, statestr, ev->timeouts, ev->retrans);
+}
+
 int
 duidcpy(dd, ds)
 	struct duid *dd, *ds;
@@ -1037,6 +1296,14 @@ duidcmp(d1, d2)
 		return(-1);
 }
 
+void
+duidfree(duid)
+	struct duid *duid;
+{
+	if (duid->duid_id)
+		free(duid->duid_id);
+}
+
 char *
 dhcpoptstr(type)
 	int type;
@@ -1055,6 +1322,8 @@ dhcpoptstr(type)
 		return "option request";
 	case DH6OPT_PREFERENCE:
 		return "preference";
+	case DH6OPT_STATUS_CODE:
+		return "status code";
 	case DH6OPT_RAPID_COMMIT:
 		return "rapid commit";
 	case DH6OPT_DNS:
@@ -1083,6 +1352,8 @@ dhcpmsgstr(type)
 		return "solicit";
 	case DH6_ADVERTISE:
 		return "advertise";
+	case DH6_RENEW:
+		return "renew";
 	case DH6_REQUEST:
 		return "request";
 	case DH6_REPLY:
@@ -1151,8 +1422,18 @@ dprintf(int level, const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(logbuf, sizeof(logbuf), fmt, ap);
 
-	if (foreground && debug_thresh >= level)
-		fprintf(stderr, "%s\n", logbuf);
-	else
+	if (foreground && debug_thresh >= level) {
+		time_t now;
+		struct tm *tm_now;
+
+		if ((now = time(NULL)) < 0)
+			exit(1); /* XXX */
+		tm_now = localtime(&now);
+		fprintf(stderr, "%04d/%02d/%02d %02d:%02d:%02d %s\n",
+			tm_now->tm_year + 1900, tm_now->tm_mon,
+			tm_now->tm_mday,
+			tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec,
+			logbuf);
+	} else
 		syslog(level, "%s", logbuf);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.82 2002/05/17 07:26:32 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.83 2002/05/22 12:42:41 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -68,9 +68,10 @@
 #include <ifaddrs.h>
 
 #include <dhcp6.h>
-#include <common.h>
 #include <config.h>
+#include <common.h>
 #include <timer.h>
+#include <prefixconf.h>
 
 static int debug = 0;
 static int signaled = 0;
@@ -95,9 +96,8 @@ static void client6_init __P((void));
 static void client6_mainloop __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
-static struct dhcp6_timer *client6_timo __P((void *));
 static struct dhcp6_serverinfo *select_server __P((struct dhcp6_if *));
-static void client6_send __P((struct dhcp6_if *, int));
+static void client6_send __P((struct dhcp6_event *, int));
 static int client6_recv __P((void));
 static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
@@ -105,13 +105,13 @@ static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
 				  ssize_t, struct dhcp6_optinfo *));
 static void client6_sleep __P((void));
 void client6_hup __P((int));
+static struct dhcp6_event *find_event_withid __P((struct dhcp6_if *,
+						  u_int32_t));
 static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
-static void reset_timer __P((struct dhcp6_if *));
-static void set_timeoparam __P((struct dhcp6_if *));
 
-extern int add_ifprefix __P((struct dhcp6_prefix *,
-			     struct prefix_ifconf *));
+struct dhcp6_timer *client6_timo __P((void *));
+void client6_send_renew __P((struct dhcp6_event *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -126,6 +126,7 @@ main(argc, argv)
 	char *progname;
 	FILE *pidfp;
 	struct dhcp6_if *ifp;
+	struct dhcp6_event *ev;
 
 	srandom(time(NULL) & getpid());
 
@@ -183,8 +184,21 @@ main(argc, argv)
 
 	client6_init();
 
-	for (ifp = dhcp6_if; ifp; ifp = ifp->next)
-		reset_timer(ifp);
+	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
+		/* create an event for the initial delay */
+		if ((ev = dhcp6_create_event(ifp, DHCP6S_INIT)) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to create an event",
+				FNAME);
+			exit(1);
+		}
+		TAILQ_INSERT_TAIL(&ifp->event_list, ev, link);
+		if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to add a timer for %s",
+				FNAME, ifp->ifname);
+			exit(1);
+		}
+		dhcp6_reset_timer(ev);
+	}
 
 	client6_mainloop();
 	exit(0);
@@ -206,6 +220,7 @@ client6_init()
 	static struct sockaddr_in6 sa6_allagent_storage;
 	int error, on = 1;
 	struct dhcp6_if *ifp;
+	struct dhcp6_event *ev;
 	int ifidx;
 
 	ifidx = if_nametoindex(device);
@@ -328,11 +343,9 @@ client6_init()
 			FNAME, device);
 		exit(1);
 	}
-	if ((ifp->timer = dhcp6_add_timer(client6_timo, ifp)) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to add timer for %s",
-			FNAME, device);
-		exit(1);
-	}
+	ifp->outsock = outsock;
+
+	prefix6_init();
 }
 
 static void
@@ -363,31 +376,36 @@ client6_mainloop()
 	}
 }
 
-static struct dhcp6_timer *
+struct dhcp6_timer *
 client6_timo(arg)
 	void *arg;
 {
-	struct dhcp6_if *ifp = (struct dhcp6_if *)arg;
+	struct dhcp6_event *ev = (struct dhcp6_event *)arg;
+	struct dhcp6_if *ifp;
 
-	ifp->timeouts++;
-	if (ifp->max_retrans_cnt && ifp->timeouts > ifp->max_retrans_cnt) {
+	ifp = ev->ifp;
+	ev->timeouts++;
+	if (ev->max_retrans_cnt && ev->timeouts > ev->max_retrans_cnt) {
 		dprintf(LOG_INFO, "%s" "no responses were received", FNAME);
-		dhcp6_remove_timer(&ifp->timer);
+		dhcp6_remove_timer(&ev->timer);
 
 		exit(0);	/* XXX */
 	}
 
-	switch(ifp->state) {
+	switch(ev->state) {
 	case DHCP6S_INIT:
-		ifp->timeouts = 0; /* indicate to generate a new XID. */
+		ev->timeouts = 0; /* indicate to generate a new XID. */
 		if ((ifp->send_flags & DHCIFF_INFO_ONLY))
-			ifp->state = DHCP6S_INFOREQ;
+			ev->state = DHCP6S_INFOREQ;
 		else
-			ifp->state = DHCP6S_SOLICIT;
-		set_timeoparam(ifp); /* XXX */
+			ev->state = DHCP6S_SOLICIT;
+		dhcp6_set_timeoparam(ev); /* XXX */
 		/* fall through */
 	case DHCP6S_INFOREQ:
-		client6_send(ifp, outsock);
+		client6_send(ev, outsock);
+		break;
+	case DHCP6S_RENEW:
+		client6_send_renew(ev);
 		break;
 	case DHCP6S_SOLICIT:
 		if (ifp->servers) {
@@ -398,17 +416,17 @@ client6_timo(arg)
 					FNAME);
 				exit(1); /* XXX */
 			}
-			ifp->timeouts = 0;
-			ifp->state = DHCP6S_REQUEST;
-			set_timeoparam(ifp);
+			ev->timeouts = 0;
+			ev->state = DHCP6S_REQUEST;
+			dhcp6_set_timeoparam(ev);
 		}
-		client6_send(ifp, outsock);
+		client6_send(ev, outsock);
 		break;
 	}
 
-	reset_timer(ifp);
+	dhcp6_reset_timer(ev);
 
-	return(ifp->timer);
+	return(ev->timer);
 }
 
 static struct dhcp6_serverinfo *
@@ -627,16 +645,17 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 		if (addrs & (1 << i)) {
 			rti_info[i] = sa;
 			NEXT_SA(sa);
-		}
-		else
+		} else
 			rti_info[i] = NULL;
 	}
 }
 
 static void
-client6_send(ifp, s)
-	struct dhcp6_if *ifp;
+client6_send(ev, s)
+	struct dhcp6_event *ev;
+	int s;
 {
+	struct dhcp6_if *ifp;
 	char buf[BUFSIZ];
 	struct sockaddr_in6 dst;
 	int error;
@@ -645,10 +664,12 @@ client6_send(ifp, s)
 	struct dhcp6_optinfo optinfo;
 	ssize_t optlen, len;
 
+	ifp = ev->ifp;
+
 	dh6 = (struct dhcp6 *)buf;
 	memset(dh6, 0, sizeof(*dh6));
 
-	switch(ifp->state) {
+	switch(ev->state) {
 	case DHCP6S_SOLICIT:
 		dh6->dh6_msgtype = DH6_SOLICIT;
 		break;
@@ -662,18 +683,21 @@ client6_send(ifp, s)
 	case DHCP6S_INFOREQ:
 		dh6->dh6_msgtype = DH6_INFORM_REQ;
 		break;
+	default:
+		dprintf(LOG_ERR, "%s" "unexpected state");
+		exit(1);	/* XXX */
 	}
-	if (ifp->timeouts == 0) {
+	if (ev->timeouts == 0) {
 		/*
 		 * A client MUST leave the transaction-ID unchanged in
 		 * retransmissions of a message. [dhcpv6-24 15.1]
 		 */
-		ifp->xid = random() & DH6_XIDMASK;
+		ev->xid = random() & DH6_XIDMASK;
 		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
-			FNAME, ifp->xid);
+			FNAME, ev->xid);
 	}
 	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
-	dh6->dh6_xid |= htonl(ifp->xid);
+	dh6->dh6_xid |= htonl(ev->xid);
 	len = sizeof(*dh6);
 
 	/*
@@ -682,14 +706,14 @@ client6_send(ifp, s)
 	dhcp6_init_options(&optinfo);
 
 	/* server ID */
-	if (ifp->state == DHCP6S_REQUEST)
+	if (ev->state == DHCP6S_REQUEST)
 		optinfo.serverID = ifp->current_server->optinfo.serverID;
 
 	/* client ID */
 	optinfo.clientID = client_duid;
 
 	/* rapid commit */
-	if (ifp->state == DHCP6S_SOLICIT &&
+	if (ev->state == DHCP6S_SOLICIT &&
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		optinfo.rapidcommit = 1;
 	}
@@ -698,7 +722,7 @@ client6_send(ifp, s)
 	optinfo.reqopt_list = ifp->reqopt_list;
 
 	/* configuration information provided by the server */
-	if (ifp->state == DHCP6S_REQUEST) {
+	if (ev->state == DHCP6S_REQUEST) {
 		/* do we have to check if we wanted prefixes? */
 		if (!TAILQ_EMPTY(&ifp->current_server->optinfo.prefix_list)) {
 			optinfo.prefix_list =
@@ -732,6 +756,103 @@ client6_send(ifp, s)
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
 		dhcpmsgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&dst));
+}
+
+void
+client6_send_renew(ev)
+	struct dhcp6_event *ev;
+{
+	struct dhcp6_if *ifp;
+	struct dhcp6_eventdata *evd;
+	struct dhcp6_optinfo optinfo;
+	struct dhcp6_list renew_plist;
+	struct dhcp6_listval *dlv;
+	struct dhcp6 *dh6;
+	char buf[BUFSIZ];
+	ssize_t optlen, len;
+	struct sockaddr_in6 dst;
+
+	TAILQ_INIT(&renew_plist);
+
+	ifp = ev->ifp;
+	
+	dh6 = (struct dhcp6 *)buf;
+	memset(dh6, 0, sizeof(*dh6));
+	dh6->dh6_msgtype = DH6_RENEW;
+	if (ev->timeouts == 0) {
+		ev->xid = random() & DH6_XIDMASK;
+		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
+			FNAME, ev->xid);
+	}
+	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
+	dh6->dh6_xid |= htonl(ev->xid);
+	len = sizeof(*dh6);
+
+	/*
+	 * construct options
+	 */
+	dhcp6_init_options(&optinfo);
+
+	/* server ID */
+	optinfo.serverID = ifp->current_server->optinfo.serverID;
+
+	/* client ID */
+	optinfo.clientID = client_duid;
+
+	/* configuration information to be renewed */
+	for (evd = TAILQ_FIRST(&ev->data_list); evd;
+	     evd = TAILQ_NEXT(evd, link)) {
+		switch(evd->type) {
+		case DHCP6_DATA_PREFIX:
+			if ((dlv = malloc(sizeof(*dlv))) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to allocate "
+					"memory for a renewal prefix", FNAME);
+				goto end;
+			}
+			memset(dlv, 0, sizeof(*dlv));
+			dlv->val_prefix6 =
+				((struct dhcp6_siteprefix *)evd->data)->prefix;
+			TAILQ_INSERT_TAIL(&renew_plist, dlv, link);
+			break;
+		default:
+			dprintf(LOG_ERR, "%s" "unexpected event data (d)",
+				FNAME, evd->type);
+			exit(1);
+		}
+	}
+	optinfo.prefix_list = renew_plist;
+
+	/* set options in the message */
+	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+					(struct dhcp6opt *)(buf + sizeof(buf)),
+					&optinfo)) < 0) {
+		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
+		return;
+	}
+	len += optlen;
+
+	/*
+	 * Unless otherwise specified, a client sends DHCP messages to the
+	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
+	 * [dhcpv6-24 Section 13.]
+	 * Our current implementation always follows the case.
+	 */
+	dst = *sa6_allagent;
+	dst.sin6_scope_id = ifp->linkid;
+
+	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf,
+			len) != 0) {
+		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
+		return;
+	}
+
+	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
+		dhcpmsgstr(dh6->dh6_msgtype),
+		addr2str((struct sockaddr *)&dst));
+
+  end:
+	dhcp6_clear_list(&renew_plist);
+	return;
 }
 
 static int
@@ -806,39 +927,16 @@ client6_recv()
 	}
 
 	switch(dh6->dh6_msgtype) {
-	case DH6_SOLICIT:
-		dprintf(LOG_INFO, "%s" "received a solicit from %s", FNAME,
-			addr2str((struct sockaddr *)&from));
-		goto end;
 	case DH6_ADVERTISE:
-		if (ifp->state != DHCP6S_SOLICIT ||
-		    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
-			dprintf(LOG_INFO, "%s" "unexpected advertise", FNAME);
-			goto end;
-		}
-		client6_recvadvert(ifp, dh6, len, &optinfo);
+		(void)client6_recvadvert(ifp, dh6, len, &optinfo);
 		break;
 	case DH6_REPLY:
-		/*
-		 * we only expect reply messages when we've sent an
-		 * information-request message or sent a solicit message
-		 * with a rapid commit option.
-		 */
-		if (ifp->state == DHCP6S_INFOREQ ||
-		    ifp->state == DHCP6S_REQUEST ||
-		    (ifp->state == DHCP6S_SOLICIT &&
-		     (ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
-			if (client6_recvreply(ifp, dh6, len, &optinfo))
-				goto end; /* bad reply.  keep listening. */
-
-			ifp->state == DHCP6S_IDLE;
-			dhcp6_remove_timer(&ifp->timer);
-			dprintf(LOG_INFO, "%s" "got an expected reply, "
-				"sleeping.", FNAME);
-		} else {
-			dprintf(LOG_INFO, "%s" "unexpected reply", FNAME);
-			goto end;
-		}
+		(void)client6_recvreply(ifp, dh6, len, &optinfo);
+		break;
+	default:
+		dprintf(LOG_INFO, "%s" "received an unexpected message (%s) "
+			"from %s", FNAME, dhcpmsgstr(dh6->dh6_msgtype),
+			addr2str((struct sockaddr *)&from));
 		break;
 	}
 
@@ -856,6 +954,20 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 {
 	struct dhcp6_serverinfo *newserver, *s, **sp;
 	struct dhcp6_optinfo optinfo;
+	struct dhcp6_event *ev;
+
+	/* find the corresponding event based on the received xid */
+	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
+	if (ev == NULL) {
+		dprintf(LOG_INFO, "%s" "XID mismatch", FNAME);
+		return -1;
+	}
+
+	if (ev->state != DHCP6S_SOLICIT ||
+	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
+		dprintf(LOG_INFO, "%s" "unexpected advertise", FNAME);
+		return -1;
+	}
 
 	/* packet validation based on Section 15.3 of dhcpv6-24. */
 	if (optinfo0->serverID.duid_len == 0) {
@@ -872,10 +984,6 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 	if (duidcmp(&optinfo0->clientID, &client_duid)) {
 		dprintf(LOG_INFO, "%s" "client DUID mismatch", FNAME);
-		return -1;
-	}
-	if (ifp->xid != (ntohl(dh6->dh6_xid) & DH6_XIDMASK)) {
-		dprintf(LOG_INFO, "%s" "XID mismatch", FNAME);
 		return -1;
 	}
 
@@ -921,14 +1029,14 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 
 	/* if the server has an extremely high preference, just use it. */
 	if (newserver->pref == DH6OPT_PREF_MAX) {
-		ifp->timeouts = 0;
-		ifp->state = DHCP6S_REQUEST;
+		ev->timeouts = 0;
+		ev->state = DHCP6S_REQUEST;
 		ifp->current_server = newserver;
 
-		client6_send(ifp, outsock);
+		client6_send(ev, outsock);
 
-		set_timeoparam(ifp);
-		reset_timer(ifp);
+		dhcp6_set_timeoparam(ev);
+		dhcp6_reset_timer(ev);
 	} else if (ifp->servers->next == NULL) {
 		struct timeval *rest, elapsed, tv_rt, tv_irt, timo;
 
@@ -938,11 +1046,11 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		 * XXX: we did not want to do such "low level" timer
 		 *      calculation here.
 		 */
-		rest = dhcp6_timer_rest(ifp->timer);
-		tv_rt.tv_sec = (ifp->retrans * 1000) / 1000000;
-		tv_rt.tv_usec = (ifp->retrans * 1000) % 1000000;
-		tv_irt.tv_sec = (ifp->init_retrans * 1000) / 1000000;
-		tv_irt.tv_usec = (ifp->init_retrans * 1000) % 1000000;
+		rest = dhcp6_timer_rest(ev->timer);
+		tv_rt.tv_sec = (ev->retrans * 1000) / 1000000;
+		tv_rt.tv_usec = (ev->retrans * 1000) % 1000000;
+		tv_irt.tv_sec = (ev->init_retrans * 1000) / 1000000;
+		tv_irt.tv_usec = (ev->init_retrans * 1000) % 1000000;
 		timeval_sub(&tv_rt, rest, &elapsed);
 		if (TIMEVAL_LEQ(elapsed, tv_irt))
 			timeval_sub(&tv_irt, &elapsed, &timo);
@@ -953,7 +1061,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 			FNAME, ifp->ifname,
 			(int)timo.tv_sec, (int)timo.tv_usec);
 
-		dhcp6_set_timer(&timo, ifp->timer);
+		dhcp6_set_timer(&timo, ev->timer);
 	}
 
 	return 0;
@@ -982,14 +1090,21 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6_listval *p;
-	struct prefix_ifconf *pif;
+	struct dhcp6_event *ev;
 
-	/*
-	 * The ``transaction-ID'' field value MUST match the value we
-	 * used in our original message.
-	 */
-	if (ifp->xid != (ntohl(dh6->dh6_xid) & DH6_XIDMASK)) {
+	/* find the corresponding event based on the received xid */
+	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
+	if (ev == NULL) {
 		dprintf(LOG_INFO, "%s" "XID mismatch", FNAME);
+		return -1;
+	}
+
+	if (ev->state != DHCP6S_INFOREQ &&
+	    ev->state != DHCP6S_REQUEST &&
+	    ev->state != DHCP6S_RENEW &&
+	    (ev->state != DHCP6S_SOLICIT ||
+	     !(ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
+		dprintf(LOG_INFO, "%s" "unexpected reply", FNAME);
 		return -1;
 	}
 
@@ -1022,107 +1137,39 @@ client6_recvreply(ifp, dh6, len, optinfo)
 				FNAME, i, in6addr2str(&d->val_addr6, 0));
 		}
 	}
-	
-	for (p = TAILQ_FIRST(&optinfo->prefix_list); p;
-	     p = TAILQ_NEXT(p, link)) {
-		for (pif = prefix_ifconflist; pif; pif = pif->next) {
-			if (strcmp(pif->ifname, ifp->ifname)) {
-				(void)add_ifprefix(&p->val_prefix6, pif);
-			}
+
+	if (ev->state == DHCP6S_RENEW) {
+		/*
+		 * Update configuration information to be renewed.
+		 * Note that the returned list is empty, in which case
+		 * the waiting information should be removed.
+		 */
+		prefix6_update(ev, &optinfo->prefix_list);
+	} else {
+		for (p = TAILQ_FIRST(&optinfo->prefix_list); p;
+		     p = TAILQ_NEXT(p, link)) {
+			prefix6_add(ifp, &p->val_prefix6);
 		}
 	}
+
+	dhcp6_remove_event(ev);
+	dprintf(LOG_INFO, "%s" "got an expected reply, sleeping.", FNAME);
 
 	return 0;
 }
 
-static void
-set_timeoparam(ifp)
+static struct dhcp6_event *
+find_event_withid(ifp, xid)
 	struct dhcp6_if *ifp;
+	u_int32_t xid;
 {
-	ifp->retrans = 0;
-	ifp->init_retrans = 0;
-	ifp->max_retrans_cnt = 0;
-	ifp->max_retrans_dur = 0;
-	ifp->max_retrans_time = 0;
+	struct dhcp6_event *ev;
 
-	switch(ifp->state) {
-	case DHCP6S_SOLICIT:
-		ifp->init_retrans = SOL_TIMEOUT;
-		ifp->max_retrans_time = SOL_MAX_RT;
-		break;
-	case DHCP6S_INFOREQ:
-		ifp->init_retrans = INF_TIMEOUT;
-		ifp->max_retrans_time = INF_MAX_RT;
-		break;
-	case DHCP6S_REQUEST:
-		ifp->init_retrans = REQ_TIMEOUT;
-		ifp->max_retrans_time = REQ_MAX_RT;
-		ifp->max_retrans_cnt = REQ_MAX_RC;
-		break;
-	default:
-		dprintf(LOG_INFO, "%s" "unexpected state %d on %s",
-			FNAME, ifp->state, ifp->ifname);
-		break;
-	}
-}
-
-static void
-reset_timer(ifp)
-	struct dhcp6_if *ifp;
-{
-	double n, r;
-	char *statestr;
-	struct timeval interval;
-
-	switch(ifp->state) {
-	case DHCP6S_INIT:
-		ifp->retrans = (random() % (MAX_SOL_DELAY - MIN_SOL_DELAY)) +
-			MIN_SOL_DELAY;
-		break;
-	default:
-		r = (double)((random() % 2000) - 1000) / 10000;
-
-		if (ifp->timeouts == 0) {
-			/* XXX: is this really necessary? */
-			n = 2 * ifp->init_retrans + r * ifp->init_retrans;
-		} else {
-			n = 2 * ifp->retrans + r * ifp->retrans;
-			if (ifp->max_retrans_time &&
-			    n > ifp->max_retrans_time) {
-				n = ifp->max_retrans_time +
-					r * ifp->max_retrans_time;
-			}
-		}
-		ifp->retrans = (long)n;
-		break;
+	for (ev = TAILQ_FIRST(&ifp->event_list); ev;
+	     ev = TAILQ_NEXT(ev, link)) {
+		if (ev->xid == xid)
+			return(ev);
 	}
 
-	switch(ifp->state) {
-	case DHCP6S_INIT:
-		statestr = "INIT";
-		break;
-	case DHCP6S_SOLICIT:
-		statestr = "SOLICIT";
-		break;
-	case DHCP6S_INFOREQ:
-		statestr = "INFOREQ";
-		break;
-	case DHCP6S_REQUEST:
-		statestr = "REQUEST";
-		break;
-	case DHCP6S_IDLE:
-		statestr = "IDLE";
-		break;
-	default:
-		statestr = "???"; /* XXX */
-		break;
-	}
-
-	interval.tv_sec = (ifp->retrans * 1000) / 1000000;
-	interval.tv_usec = (ifp->retrans * 1000) % 1000000;
-	dhcp6_set_timer(&interval, ifp->timer);
-
-	dprintf(LOG_DEBUG, "%s" "reset timer for %s, "
-		"state=%s, timeo=%d, retrans=%d", FNAME,
-		ifp->ifname, statestr, ifp->timeouts, ifp->retrans);
+	return(NULL);
 }

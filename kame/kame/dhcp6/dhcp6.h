@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.28 2002/05/17 07:26:32 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.29 2002/05/22 12:42:41 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -45,6 +45,7 @@
 #define DH6_SOLICIT	1
 #define DH6_ADVERTISE	2
 #define DH6_REQUEST	3
+#define DH6_RENEW	5
 #define DH6_REPLY	7
 #define DH6_INFORM_REQ	11
 
@@ -66,6 +67,8 @@
 #define REQ_TIMEOUT	250
 #define REQ_MAX_RT	30000
 #define REQ_MAX_RC	10	/* Max Request retry attempts */
+#define REN_TIMEOUT	10000	/* 10sec */
+#define REN_MAX_RT	600000	/* 600secs */
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
 
@@ -98,6 +101,9 @@ struct dhcp6_listval {
 #define val_prefix6 uv.uv_prefix6
 TAILQ_HEAD(dhcp6_list, dhcp6_listval);
 
+typedef enum { DHCP6_LISTVAL_NUM, DHCP6_LISTVAL_ADDR6,
+	       DHCP6_LISTVAL_PREFIX6 } dhcp6_listval_type_t;
+
 struct dhcp6_optinfo {
 	struct duid clientID;	/* DUID */
 	struct duid serverID;	/* DUID */
@@ -106,6 +112,7 @@ struct dhcp6_optinfo {
 	int pref;		/* server preference */
 
 	struct dhcp6_list reqopt_list; /*  options in option request */
+	struct dhcp6_list stcode_list; /* status code */
 	struct dhcp6_list dns_list; /* DNS server list */
 	struct dhcp6_list prefix_list; /* prefix list */
 };
@@ -138,6 +145,14 @@ struct dhcp6 {
 #define DH6OPT_AUTH 11
 #define DH6OPT_UNICAST 12
 #define DH6OPT_STATUS_CODE 13
+#  define DH6OPT_STCODE_SUCCESS 0
+#  define DH6OPT_STCODE_UNSPECFAIL 1
+#  define DH6OPT_STCODE_AUTHFAILED 2
+#  define DH6OPT_STCODE_ADDRUNAVAIL 3
+#  define DH6OPT_STCODE_NOBINDING 4
+#  define DH6OPT_STCODE_CONFNOMATCH 5
+#  define DH6OPT_STCODE_NOTONLINK 6
+#  define DH6OPT_STCODE_USEMULTICAST 7
 #define DH6OPT_RAPID_COMMIT 14
 #define DH6OPT_USER_CLASS 15
 #define DH6OPT_VENDOR_CLASS 16

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.13 2002/05/17 07:26:32 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.14 2002/05/22 12:42:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -33,20 +33,13 @@
 struct dhcp6_if {
 	struct dhcp6_if *next;
 
+	int outsock;
+
 	/* timer for the interface */
 	struct dhcp6_timer *timer;
 
-	/* internal status */
-	int state;
-	u_int32_t xid;		/* current transaction ID */
-
-	/* internal timer parameters */
-	long retrans;
-	long init_retrans;
-	long max_retrans_cnt;
-	long max_retrans_time;
-	long max_retrans_dur;
-	int timeouts;		/* number of timeouts */
+	/* event queue */
+	TAILQ_HEAD(, dhcp6_event) event_list;	
 
 	/* static parameters of the interface */
 	char *ifname;
@@ -68,6 +61,36 @@ struct dhcp6_if {
 	struct dhcp6_serverinfo *servers;
 };
 
+struct dhcp6_event {
+	TAILQ_ENTRY(dhcp6_event) link;
+
+	struct dhcp6_if *ifp;
+	struct dhcp6_timer *timer;
+
+	/* internal timer parameters */
+	long retrans;
+	long init_retrans;
+	long max_retrans_cnt;
+	long max_retrans_time;
+	long max_retrans_dur;
+	int timeouts;		/* number of timeouts */
+
+	u_int32_t xid;		/* current transaction ID */
+	int state;
+
+	TAILQ_HEAD(, dhcp6_eventdata) data_list;
+};
+
+typedef enum { DHCP6_DATA_PREFIX } dhcp6_eventdata_t;
+
+struct dhcp6_eventdata {
+	TAILQ_ENTRY(dhcp6_eventdata) link;
+
+	struct dhcp6_event *event;
+	dhcp6_eventdata_t type;
+	void *data;
+};
+
 struct dhcp6_serverinfo {
 	struct dhcp6_serverinfo *next;
 
@@ -81,7 +104,7 @@ struct dhcp6_serverinfo {
 
 /* client status code */
 enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_REQUEST,
-      DHCP6S_IDLE};
+      DHCP6S_RENEW, DHCP6S_IDLE};
       
 struct dhcp6_ifconf {
 	struct dhcp6_ifconf *next;
@@ -121,6 +144,9 @@ struct host_conf {
 	struct duid duid;	/* DUID for the host */
 	/* delegated prefixes for the host: */
 	struct dhcp6_list prefix_list;
+
+	/* bindings of delegated prefixes */
+	struct dhcp6_list prefix_binding_list;
 };
 
 /* DHCP option information */

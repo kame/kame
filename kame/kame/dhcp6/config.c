@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.14 2002/05/17 07:26:32 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.15 2002/05/22 12:42:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -43,8 +43,8 @@
 #include <ifaddrs.h>
 
 #include <dhcp6.h>
-#include <common.h>
 #include <config.h>
+#include <common.h>
 
 extern int errno;
 
@@ -87,8 +87,8 @@ ifinit(ifname)
 	}
 	memset(ifp, 0, sizeof(*ifp));
 
-	ifp->state = DHCP6S_INIT;
-	
+	TAILQ_INIT(&ifp->event_list);
+
 	if ((ifp->ifname = strdup(ifname)) == NULL) {
 		dprintf(LOG_ERR, "%s" "failed to copy ifname", FNAME);
 		goto die;
@@ -295,6 +295,7 @@ configure_host(hostlist)
 		}
 		memset(hconf, 0, sizeof(*hconf));
 		TAILQ_INIT(&hconf->prefix_list);
+		TAILQ_INIT(&hconf->prefix_binding_list);
 		hconf->next = host_conflist0;
 		host_conflist0 = hconf;
 
