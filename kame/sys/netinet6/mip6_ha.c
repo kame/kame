@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.7 2000/02/26 18:08:39 itojun Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.8 2000/03/18 03:05:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_ha.c,v 1.7 2000/02/26 18:08:39 itojun Exp $
+ * $Id: mip6_ha.c,v 1.8 2000/03/18 03:05:40 itojun Exp $
  *
  */
 
@@ -43,7 +43,6 @@
 #include "opt_inet.h"
 #endif
 
-#ifdef MIP6_HA
 /*
  * Mobile IPv6 Home Agent
  */
@@ -1184,5 +1183,3 @@ int mip6_enable_func_ha(u_long cmd, caddr_t data)
     }
     return retval;
 }
-
-#endif /* MIP6_HA */

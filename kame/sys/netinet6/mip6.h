@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.7 2000/02/26 18:08:38 itojun Exp $	*/
+/*	$KAME: mip6.h,v 1.8 2000/03/18 03:05:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- *  $Id: mip6.h,v 1.7 2000/02/26 18:08:38 itojun Exp $
+ *  $Id: mip6.h,v 1.8 2000/03/18 03:05:39 itojun Exp $
  */
 
 
@@ -68,12 +68,6 @@ struct ifnet;
    algorithm used by MIPv6. */
 #define MIP6_ROUTE_NET     0x01
 #define MIP6_ROUTE_HOST    0x02
-
-
-/* Information about which module that has been compiled into the kernel or
-   loaded as a module. */
-#define MIP6_MN_MODULE    0x01
-#define MIP6_HA_MODULE    0x02
 
 
 /* Type of node calling mip6_tunnel */
@@ -181,7 +175,7 @@ struct ifnet;
 
 
 /* Macro for modulo 2^^16 comparison */
-#define MIP6_LT(a,b)   ((int16_t)((a)-(b)) < 0)
+#define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
 
 
 /* Macros started with MIP6_ADDR is Mobile IPv6 local */
@@ -569,6 +563,7 @@ extern int      mip6_max_lost_advints; /* No. lost Adv before start of NUD */
 extern int      mip6_nd6_delay;
 extern int      mip6_nd6_umaxtries;
 
+
 /* External declaration of function prototypes (mip6_io.c) */
 extern int mip6_new_packet
 	__P((struct mbuf *));
@@ -589,22 +584,16 @@ extern void mip6_dest_offset
 extern int mip6_add_ha
 	__P((struct ip6_dest **, int *, struct in6_addr *, struct in6_addr *));
 extern int mip6_add_bu
-	__P((struct ip6_dest **, int *, struct mip6_opt_bu *, struct mip6_subbuf *));
+	__P((struct ip6_dest **, int *, struct mip6_opt_bu *,
+	     struct mip6_subbuf *));
 extern int mip6_add_ba
-	__P((struct ip6_dest **, int *, struct mip6_opt_ba *, struct mip6_subbuf *));
+	__P((struct ip6_dest **, int *, struct mip6_opt_ba *,
+	     struct mip6_subbuf *));
 extern int mip6_add_br
-	__P((struct ip6_dest **, int *, struct mip6_opt_br *, struct mip6_subbuf *));
+	__P((struct ip6_dest **, int *, struct mip6_opt_br *,
+	     struct mip6_subbuf *));
 extern int mip6_store_subopt
 	__P((struct mip6_subbuf **, caddr_t));
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *,
-                      struct proc *));
-#else
-extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *));
-#endif
-#ifdef MIP6_DEBUG
-void mip6_debug __P((char *, ...));
-#endif
 
 
 /* External declaration of function prototypes (mip6.c) */
@@ -622,7 +611,7 @@ extern void mip6_ha2srcaddr
 	__P((struct mbuf *));
 extern int mip6_send_ba
 	__P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
-        struct mip6_subbuf *, u_int8_t, u_int16_t, u_int32_t));
+	     struct mip6_subbuf *, u_int8_t, u_int16_t, u_int32_t));
 extern void mip6_send_na
 	__P((struct mip6_na *));
 extern struct mbuf *mip6_create_ip6hdr
@@ -640,7 +629,8 @@ extern int mip6_addr_on_link
 extern u_int32_t mip6_min_lifetime
 	__P((struct in6_addr *, int));
 extern void mip6_build_in6addr
-	__P((struct in6_addr *, struct in6_addr *, const struct in6_addr *, int));
+	__P((struct in6_addr *, struct in6_addr *, const struct in6_addr *,
+	     int));
 extern void mip6_build_ha_anycast
 	__P((struct in6_addr *, const struct in6_addr *, int));
 extern int mip6_add_ifaddr
@@ -652,7 +642,7 @@ extern int mip6_tunnel_input
 extern int mip6_tunnel
 	__P((struct in6_addr *, struct in6_addr *, int, int, void *));
 extern int mip6_proxy
-	__P((struct in6_addr*, struct in6_addr*));
+	__P((struct in6_addr*, struct in6_addr*, int));
 extern struct mip6_bc *mip6_bc_find
 	__P((struct in6_addr *));
 extern struct mip6_bc *mip6_bc_create
@@ -660,12 +650,12 @@ extern struct mip6_bc *mip6_bc_create
         u_int8_t, u_int8_t, u_int16_t));
 extern void mip6_bc_update
 	__P((struct mip6_bc *, struct in6_addr *, u_int32_t, u_int8_t,
-        u_int8_t, u_int8_t, u_int16_t, struct bc_info, time_t));
-extern struct mip6_bc *mip6_bc_delete
-	__P((struct mip6_bc *));
+	     u_int8_t, u_int8_t, u_int16_t, struct bc_info, time_t));
+extern int mip6_bc_delete
+	__P((struct mip6_bc *, struct mip6_bc **));
 extern struct mip6_na *mip6_na_create
 	__P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
-        u_int8_t, u_long, int));
+	     u_int8_t, u_long, int));
 extern struct mip6_na *mip6_na_delete
 	__P((struct mip6_na *));
 extern struct mip6_prefix *mip6_prefix_find
@@ -680,6 +670,18 @@ extern void mip6_timer_bc
 	__P((void *));
 extern void mip6_timer_prefix
 	__P((void *));
+
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *,
+			   struct proc *));
+#else
+extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *));
+#endif
+
+#ifdef MIP6_DEBUG
+void mip6_debug __P((char *, ...));
+#endif
+
 extern void mip6_enable_debug
 	__P((int));
 extern int mip6_write_config_data
@@ -723,7 +725,8 @@ extern void mip6_mn_init
 extern void mip6_mn_exit
 	__P((void));
 extern void mip6_new_defrtr
-	__P((int, struct nd_prefix *, struct nd_prefix *, struct nd_defrouter *));
+	__P((int, struct nd_prefix *, struct nd_prefix *,
+	     struct nd_defrouter *));
 extern int  mip6_rec_ba
 	__P((struct mbuf *, int));
 extern int  mip6_rec_br
@@ -742,14 +745,15 @@ extern void mip6_send_bu2fn
 extern void mip6_update_cns
 	__P((struct in6_addr *, struct in6_addr *, u_int8_t, u_int32_t));
 extern void mip6_queue_bu
-	__P((struct mip6_bul *, struct in6_addr *, struct in6_addr *, u_int8_t,
-        u_int32_t));
+	__P((struct mip6_bul *, struct in6_addr *, struct in6_addr *,
+	     u_int8_t, u_int32_t));
 extern struct mip6_opt_bu *mip6_create_bu
 	__P((u_int8_t, int, int, u_int16_t, u_int32_t));
 extern void mip6_stop_bu
 	__P((struct in6_addr *));
 extern int mip6_ba_error
-	__P((struct in6_addr *, struct in6_addr *, struct in6_addr *, u_int8_t));
+	__P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
+	     u_int8_t));
 extern u_int32_t mip6_prefix_lifetime
 	__P((struct in6_addr *));
 extern struct mip6_retrans * mip6_create_retrans
@@ -760,19 +764,19 @@ extern struct mip6_bul *mip6_bul_find
 	__P((struct in6_addr *, struct in6_addr *));
 extern struct mip6_bul *mip6_bul_create
 	__P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
-        u_int32_t, u_int8_t));
+	     u_int32_t, u_int8_t));
 extern struct mip6_bul *mip6_bul_delete
 	__P((struct mip6_bul *));
 extern struct mip6_esm *mip6_esm_find
 	__P((struct in6_addr *));
 extern struct mip6_esm *mip6_esm_create
-	__P((struct ifnet *, struct in6_addr        *, struct in6_addr *,
-	struct in6_addr *, u_int8_t, int, enum esm_type, u_int16_t));
+	__P((struct ifnet *, struct in6_addr *, struct in6_addr *,
+	     struct in6_addr *, u_int8_t, int, enum esm_type, u_int16_t));
 extern struct mip6_esm *mip6_esm_delete
 	__P((struct mip6_esm *));
 extern int mip6_outq_create
-	__P((void *, struct mip6_subbuf *, struct in6_addr *, struct in6_addr *,
-        enum send_state));
+	__P((void *, struct mip6_subbuf *, struct in6_addr *,
+	     struct in6_addr *, enum send_state));
 extern struct mip6_output *mip6_outq_delete
 	__P((struct mip6_output *));
 extern void mip6_outq_flush
@@ -842,7 +846,7 @@ extern void mip6_enable_hooks
 extern void mip6_disable_hooks
 	__P((int));
 extern int mip6_attach
-	__P((void));
+	__P((int));
 extern int mip6_release
 	__P((void));
 

@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.5 2000/02/14 10:04:50 itojun Exp $
+ * $Id: mip6config.c,v 1.6 2000/03/18 03:05:45 itojun Exp $
  *
  */
 
@@ -55,6 +55,7 @@
 #include <err.h>
 #include "mip6config.h"
 
+static int mip6_module;
 static int startmip6;
 static int s;
 
@@ -206,6 +207,7 @@ set_homeaddr(char *homeaddr, u_long command)
     input.prefix_len = plen;
     strcpy(input.if_name, interface);
 
+    mip6_module = MIP6_MN_MODULE;
     startmip6 = 1;
 
     if ((retval = upd_kernel(command, (void *)&input)) > 0) {
@@ -299,8 +301,10 @@ set_enable(char *enable, u_long command)
     else
         input.value = 0;
 
-    if (command == SIOCSAUTOCONFIG_MIP6)
-        startmip6 = 1;
+    if (command == SIOCSAUTOCONFIG_MIP6) {
+	    mip6_module = MIP6_MN_MODULE;
+	    startmip6 = 1;
+    }
 
     if ((retval = upd_kernel(command, (void *)&input)) > 0) {
         /* error */
@@ -340,6 +344,7 @@ set_enable_ha(char *value, u_long command)
     printf("set_enable_ha: %s, command: %lu\n", value, command);
 #endif /* DEBUG */
 
+    mip6_module = MIP6_HA_MODULE;
     startmip6 = 1;
 
     return 0;
@@ -369,12 +374,16 @@ struct config_tmpl config_mip6[] = {
 static void
 mip6_init(void)
 {
-    int retval;
-    if ((retval = upd_kernel(SIOCSATTACH_MIP6, NULL)) > 0) {
-        print_err(retval);
-	warnx("cannot initialize \"mip6\" module.\n");
-	exit(1);
-    }
+	struct mip6_input_data input;
+	int retval;
+
+	input.value = mip6_module;
+
+	if ((retval = upd_kernel(SIOCSATTACH_MIP6, &input)) > 0) {
+		print_err(retval);
+		warnx("cannot initialize \"mip6\" module.\n");
+		exit(1);
+	}
 }
 
 static int
@@ -487,6 +496,7 @@ main(int argc, char *argv[])
 	    break;
 	case 'g':
 	    enable_ha = (void *)1;
+	    mip6_module = MIP6_HA_MODULE;
 	    startmip6 = 1;
 	    break;
 	case 'x':

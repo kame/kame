@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.10 2000/03/01 16:59:51 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.11 2000/03/18 03:05:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.10 2000/03/01 16:59:51 itojun Exp $
+ * $Id: mip6_mn.c,v 1.11 2000/03/18 03:05:42 itojun Exp $
  *
  */
 
@@ -43,7 +43,6 @@
 #include "opt_inet.h"
 #endif
 
-#ifdef MIP6_MN
 /*
  * Mobile IPv6 Mobile Nodes
  */
@@ -1203,7 +1202,9 @@ struct mip6_subbuf   *subbuf;
 			    __FUNCTION__);
 			return 0;
 		}
+		bulp->seqno += 1;
 		bu_opt = bulp->state->bu_opt;
+		bu_opt->seqno = bulp->seqno;
 		bu_subopt = bulp->state->bu_subopt;
 	} else if (data != NULL) {
 		mip6_clear_retrans(bulp);
@@ -1265,7 +1266,7 @@ struct mip6_subbuf   *subbuf;
 		free(pktopt->ip6po_dest2, M_TEMP);
 		free(pktopt, M_TEMP);
 		mip6_config.enable_outq = 1;
-		log(LOG_INFO,
+		log(LOG_ERR,
 		    "%s: ip6_output function failed to send BU, error = %d\n",
 		    __FUNCTION__, error);
 		return error;
@@ -1428,12 +1429,11 @@ u_int8_t          prefix_len;  /* Prefix length for Home Address */
 u_int32_t         lifetime;    /* Lifetime for BU registration */
 {
 	struct mip6_bul  *bulp;    /* Entry in the Binding Update List */
-
+	
 	/* Try to find existing entry in the BUL. Home address must match. */
 	for (bulp = mip6_bulq; bulp;) {
 		if (IN6_ARE_ADDR_EQUAL(home_addr, &bulp->bind_addr) &&
 		    !IN6_ARE_ADDR_EQUAL(coa, &bulp->coa)) {
-
 			/* Queue a BU for transmission to the node. */
 			mip6_queue_bu(bulp, home_addr, coa,
 				      prefix_len, lifetime);
@@ -2479,6 +2479,9 @@ mip6_outq_flush()
 				free(pktopt, M_TEMP);
 				mip6_config.enable_outq = 1;
 				outp = outp->next;
+				log(LOG_ERR,
+				    "%s: ip6_output function failed, "
+				    "error = %d\n", __FUNCTION__, error);
 				continue;
 			}
 			mip6_config.enable_outq = 1;
@@ -2621,6 +2624,9 @@ void  *arg;  /* Not used */
 				free(pktopt, M_TEMP);
 				mip6_config.enable_outq = 1;
 				outp = outp->next;
+				log(LOG_ERR,
+				    "%s: ip6_output function failed, "
+				    "error = %d\n", __FUNCTION__, error);
 				continue;
 			}
 			mip6_config.enable_outq = 1;
@@ -2770,6 +2776,7 @@ void  *arg;   /* Not used */
 					/* This is a BUL entry for the HA */
 					bulp->state->bu_opt->lifetime =
 						bulp->lifetime;
+					bulp->state->bu_opt->seqno++;
 					if (mip6_send_bu(bulp, NULL, NULL)
 					    != 0)
 						break;
@@ -2792,6 +2799,7 @@ void  *arg;   /* Not used */
 						mip6_clear_retrans(bulp);
 					} else {
 						bulp->state->bu_opt->lifetime = bulp->lifetime;
+						bulp->state->bu_opt->seqno++;
 						if (mip6_send_bu(bulp, NULL, NULL) != 0)
 							break;
 						
@@ -3077,5 +3085,3 @@ int mip6_enable_func_mn(u_long cmd, caddr_t data)
 	}
 	return retval;
 }
-
-#endif /* MIP6_MN */

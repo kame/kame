@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.28 2000/03/02 07:11:02 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.29 2000/03/18 03:05:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1255,7 +1255,13 @@ nd6_detach_prefix(pr)
 	else
 		ia6 = in6ifa_ifpwithaddr(pr->ndpr_ifp, &pr->ndpr_addr);
 	if (ia6)
+#ifdef MIP6
+		if (mip6_get_home_prefix_hook)
+			if (pr != (*mip6_get_home_prefix_hook)())
+				ia6->ia6_flags |= IN6_IFF_DETACHED;
+#else
 		ia6->ia6_flags |= IN6_IFF_DETACHED;
+#endif
 }
 
 static void

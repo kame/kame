@@ -1,4 +1,4 @@
-/*	$KAME: mip6_common.h,v 1.7 2000/03/01 16:59:51 itojun Exp $	*/
+/*	$KAME: mip6_common.h,v 1.8 2000/03/18 03:05:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,7 @@
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- *  $Id: mip6_common.h,v 1.7 2000/03/01 16:59:51 itojun Exp $
+ *  $Id: mip6_common.h,v 1.8 2000/03/18 03:05:39 itojun Exp $
  */
 
 
@@ -92,7 +92,7 @@
  * SIOCSEAGERMD_MIP6        Enable eager Movement Detection
  *                          <mip6config -e>
  */
-#define SIOCSDEBUG_MIP6          _IOWR('M', 1, int)
+#define SIOCSDEBUG_MIP6          _IOWR('M', 1, struct mip6_input_data)
 #define SIOCSBCFLUSH_MIP6        _IOWR('M', 2, int)
 #define SIOCSDEFCONFIG_MIP6      _IOWR('M', 3, int)
 #define SIOCSBRUPDATE_MIP6       _IOWR('M', 4, u_int8_t)
@@ -119,10 +119,19 @@
 #define SIOCSATTACH_MIP6         _IOWR('M', 23, struct mip6_input_data)
 #define SIOCSRELEASE_MIP6        _IOWR('M', 24, struct mip6_input_data)
 
-/*
- * Code below taken from common.h
- */
 
+/* 
+ * Information about which module that has been compiled into the kernel or
+ * loaded as a module.
+ */
+#define MIP6_MN_MODULE    0x01
+#define MIP6_HA_MODULE    0x02
+
+
+/*
+ * Generic message to pass configuration parameters from mip6config to
+ * kernel.
+ */
 struct mip6_input_data {
 	char             if_name[IFNAMSIZ]; /* Interface name */
 	u_int8_t         prefix_len;        /* Prefix length for address */

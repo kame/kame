@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.84 2000/03/11 13:27:37 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.85 2000/03/18 03:05:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -228,6 +228,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	}								\
     }
 	
+	bzero(&exthdrs, sizeof(exthdrs));
+	
 #ifdef MIP6
 	/*
 	 * Mobile IPv6
@@ -242,7 +244,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	}
 #endif /* MIP6 */
 
-	bzero(&exthdrs, sizeof(exthdrs));
 	if (opt) {
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.5 2000/03/11 10:07:06 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.6 2000/03/18 03:05:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,6 +64,11 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
+/* for MIP6 */
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#include "opt_inet.h"
+#endif
+
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
 #endif
@@ -103,6 +108,13 @@
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
+#endif
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#include <netinet6/mip6_common.h>
+
+extern struct nd_prefix *(*mip6_get_home_prefix_hook) __P((void));
 #endif
 
 /*
@@ -249,6 +261,32 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			return(&satosin6(&ia6->ia_addr)->sin6_addr);
 		}
 	}
+
+#ifdef MIP6
+	/*
+	 * This is needed to assure that the Home Address is used for
+	 * outgoing packets when not at home. We can't choose any other
+	 * address if we want to keep connections up during movement.
+	 */
+	if (mip6_get_home_prefix_hook) {	/* Only Mobile Node */
+		struct nd_prefix *pr;
+		if ((pr = (*mip6_get_home_prefix_hook)()) && 
+		    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr)) {
+			if (in6_addrscope(dst) == 
+			    in6_addrscope(&pr->ndpr_addr)) {
+#ifdef MIP6_DEBUG
+				/* Noisy but useful */
+				mip6_debug("%s: Local address %s is chosen "
+					   "for pcb to dest %s.\n",
+					   __FUNCTION__,
+					   ip6_sprintf(&pr->ndpr_addr),
+					   ip6_sprintf(dst));
+#endif
+				return(&pr->ndpr_addr);
+			}
+		}
+	}
+#endif /* MIP6 */
 
 	/*
 	 * If route is known or can be allocated now,

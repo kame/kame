@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.19 2000/03/01 16:59:50 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.20 2000/03/18 03:05:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -34,8 +34,9 @@
  * All rights reserved.
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
+ *         Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.19 2000/03/01 16:59:50 itojun Exp $
+ * $Id: mip6.c,v 1.20 2000/03/18 03:05:38 itojun Exp $
  *
  */
 
@@ -119,7 +120,7 @@ struct mip6_config  mip6_config;      /* Config parameters for MIPv6 */
 struct mip6_link_list  *mip6_llq = NULL;  /* List of links receiving RA's */
 
 
-
+#if 0  /* Phasing out MIP6_HA and MIP6_MN */
 #ifdef MIP6_HA
 u_int8_t mip6_module = MIP6_HA_MODULE;  /* Info about loaded modules (HA) */
 #elif defined(MIP6_MN)
@@ -127,7 +128,9 @@ u_int8_t mip6_module = MIP6_MN_MODULE;  /* Info about loaded modules (MN) */
 #else
 u_int8_t mip6_module = 0;               /* Info about loaded modules (CN) */
 #endif
-
+#else /* 0 */
+u_int8_t mip6_module = 0;               /* Info about loaded modules (CN) */
+#endif /* 0 */
 
 extern struct ip6protosw mip6_tunnel_protosw;
 
@@ -213,14 +216,6 @@ mip6_init(void)
 	mip6_enable_hooks(MIP6_GENERIC_HOOKS);
 	mip6_enable_hooks(MIP6_CONFIG_HOOKS);
 
-#ifdef MIP6_HA
-	mip6_ha_init();
-#endif
-
-#ifdef MIP6_MN
-	mip6_mn_init();
-#endif
-
 	mip6_init_done = 1;
 	printf("%s: MIP6 initialized\n", __FUNCTION__);
 }
@@ -238,7 +233,7 @@ void
 mip6_exit()
 {
 	struct mip6_na     *nap, *nap_tmp;
-	struct mip6_bc     *bcp;
+	struct mip6_bc     *bcp, *bcp_nxt;
 	struct mip6_prefix *prefix;
 	int                 s;
 
@@ -262,8 +257,10 @@ mip6_exit()
 	}
 	mip6_naq = NULL;
 
-	for (bcp = mip6_bcq; bcp;)
-		bcp = mip6_bc_delete(bcp);
+	for (bcp = mip6_bcq; bcp;) {
+		mip6_bc_delete(bcp, &bcp_nxt);
+		bcp = bcp_nxt;
+	}
 	mip6_bcq = NULL;
 
 	for (prefix = mip6_pq; prefix;)
@@ -334,7 +331,6 @@ int         off;    /* Offset (bytes) from beginning of mbuf to start of
 		}
 	}
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))
 	if (MIP6_IS_MN_ACTIVE) {
 		if (mip6_inp->optflag & MIP6_DSTOPT_BA) {
 			if (mip6_rec_ba_hook)
@@ -348,9 +344,7 @@ int         off;    /* Offset (bytes) from beginning of mbuf to start of
 			}
 		}
 	}
-#endif
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))
 	if (MIP6_IS_MN_ACTIVE) {
 		if (mip6_inp->optflag & MIP6_DSTOPT_BR) {
 			if (mip6_rec_br_hook)
@@ -364,7 +358,6 @@ int         off;    /* Offset (bytes) from beginning of mbuf to start of
 			}
 		}
 	}
-#endif
 
 	if (mip6_inp->optflag & MIP6_DSTOPT_HA)
 		mip6_ha2srcaddr(m_in);
@@ -396,12 +389,13 @@ mip6_icmp6_input(m, off)
 struct mbuf *m;     /* Mbuf containing the entire IPv6 packet */
 int          off;   /* Offset from start of mbuf to icmp6 message */
 {
-	struct ip6_hdr          *ip6;      /* IPv6 header */
-	struct ip6_hdr          *ip6_icmp; /* IPv6 header in icmpv6 packet */
-	struct icmp6_hdr        *icmp6;    /* ICMP6 header */
-	struct mip6_bc          *bcp;      /* Binding Cache list entry */
-	struct nd_router_advert *ra;       /* Router Advertisement */
-	u_int8_t    *err_ptr;              /* Octet offset for error */
+	struct ip6_hdr           *ip6;      /* IPv6 header */
+	struct ip6_hdr           *ip6_icmp; /* IPv6 header in icmpv6 packet */
+	struct icmp6_hdr         *icmp6;    /* ICMP6 header */
+	struct mip6_bc           *bcp;      /* Binding Cache list entry */
+	struct mip6_bc           *bcp_nxt;  /* Binding Cache list entry */
+	struct nd_router_advert  *ra;       /* Router Advertisement */
+	u_int8_t    *err_ptr;               /* Octet offset for error */
 	int          icmp6len, err_off, res = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -423,7 +417,7 @@ int          off;   /* Offset from start of mbuf to icmp6 message */
 		/* Remove BC entry if present */
 		bcp = mip6_bc_find(&ip6_icmp->ip6_dst);
 		if (bcp && !bcp->hr_flag)
-			mip6_bc_delete(bcp);
+			mip6_bc_delete(bcp, &bcp_nxt);
 		break;
 
 	case ICMP6_PARAM_PROB:
@@ -446,12 +440,10 @@ int          off;   /* Offset from start of mbuf to icmp6 message */
 					sizeof(struct icmp6_hdr) +
 					err_off);
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))
 		if (MIP6_IS_MN_ACTIVE && (*err_ptr == IP6OPT_BINDING_UPDATE)) {
 			if (mip6_stop_bu_hook)
 				(*mip6_stop_bu_hook)(&ip6_icmp->ip6_dst);
 		}
-#endif
 
 		if (*err_ptr == IP6OPT_HOME_ADDRESS) {
 			log(LOG_ERR,
@@ -505,11 +497,10 @@ mip6_rec_bu(m_in, off)
 struct mbuf *m_in;  /* Mbuf containing the entire IPv6 packet */
 int          off;   /* Offset from start of mbuf to start of dest option */
 {
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))
 	struct in6_addr        *src_addr;   /* Src addr for HA sending BU */
 	struct mip6_subopt_hal *hal;        /* Home Agents List sub-option */
-#endif
 	struct mip6_bc         *bcp;        /* Binding Cache list entry */
+	struct mip6_bc         *bcp_nxt;
 	struct in6_addr        *coa;        /* COA of the MN sending the BU */
 	struct mip6_subbuf     *subbuf;     /* Buffer containing sub-options */
 	struct in6_addr         ll_allnode; /* Link local all nodes address */
@@ -569,10 +560,10 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 	send_na = 0;
 	bcp = mip6_bc_find(&mip6_inp->ha_opt->home_addr);
 	if (bcp != NULL) {
-		if (MIP6_LT(mip6_inp->bu_opt->seqno, bcp->seqno)) {
+		if (MIP6_LEQ(mip6_inp->bu_opt->seqno, bcp->seqno)) {
 			ip6stat.ip6s_badoptions++;
 			log(LOG_INFO,
-			    "%s: Received sequence number (%d) less then "
+			    "%s: Received sequence number (%d) <= "
 			    "current (%d) in BU from host %s\n",
 			    __FUNCTION__, mip6_inp->bu_opt->seqno,
 			    bcp->seqno, ip6_sprintf(coa));
@@ -627,7 +618,6 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 #endif
 
 	/* Shall Dynamic Home Agent Address Discovery be performed? */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))
 	src_addr = NULL;
 	hal = NULL;
 
@@ -657,7 +647,6 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 			return error;
 		}
 	}
-#endif /* MIP6_HA */
 
 	/* Check if BU includes Unique Identifier sub-option is present. */
 	/* XXX Code have to be added. */
@@ -749,7 +738,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 			if (error)
 				return IPPROTO_DONE;
 			error = mip6_proxy(&bcp->home_addr,
-					   &mip6_inp->ip6_dst);
+					   &mip6_inp->ip6_dst, RTM_ADD);
 			if (error) {
 #ifdef MIP6_DEBUG
 				mip6_debug("%s: set proxy error = %d\n",
@@ -832,9 +821,11 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 				return error;
 			}
 
-			/* The HA shall stop acting as a proxy for the MN.
-			   Delete BC entry and existing tunnel to the MN. */
-			mip6_bc_delete(bcp);
+			/* The HA should delete BC entry, remove tunnel and
+			   stop acting as a proxy for the MN. */
+			error = mip6_bc_delete(bcp, &bcp_nxt);
+			if (error)
+				return IPPROTO_DONE;
 
 			/* Send a BA to the MN if the A-bit is set. */
 			if (mip6_inp->bu_opt->flags & MIP6_BU_AFLAG) {
@@ -849,8 +840,11 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 		} else {
 			/* The H-bit is NOT set. Request the CN to delete
 			   the binding. */
-			if (bcp != NULL)
-				mip6_bc_delete(bcp);
+			if (bcp != NULL) {
+				error = mip6_bc_delete(bcp, &bcp_nxt);
+				if (error)
+					return IPPROTO_DONE;
+			}
 
 			if (mip6_inp->bu_opt->flags & MIP6_BU_AFLAG) {
 				error = mip6_send_ba(
@@ -970,6 +964,9 @@ u_int32_t            lifetime; /* Proposed lifetime in the BU */
 		free(opt->ip6po_dest2, M_TEMP);
 		free(ba_opt, M_TEMP);
 		mip6_config.enable_outq = 1;
+		log(LOG_ERR,
+		    "%s: ip6_output function failed to send BA, error = %d\n",
+		    __FUNCTION__, error);
 		return error;
 	}
 	mip6_config.enable_outq = 1;
@@ -1818,8 +1815,10 @@ mip6_add_ifaddr(struct in6_addr *addr,
 /*
  ******************************************************************************
  * Function:    mip6_tunnel_output
- * Description:
- * Ret value:   <>0 if failure. It's up to the caller to free the mbuf chain.
+ * Description: Encapsulates packet in an outer header which is determined
+ *		of the Binding Cache entry provided. Note that packet is
+ *		(currently) not sent here, but should be sent by the caller.
+ * Ret value:   != 0 if failure. It's up to the caller to free the mbuf chain.
  ******************************************************************************
  */
 int
@@ -2051,17 +2050,15 @@ void             *entry;     /* BC or ESM depending on start variable */
 /*
  ******************************************************************************
  * Function:    mip6_proxy
- * Description:
+ * Description: Set or delete address to act proxy for.
  * Ret value:   Standard error codes.
  ******************************************************************************
  */
 int
 mip6_proxy(struct in6_addr* addr,
-	   struct in6_addr* local)
+	   struct in6_addr* local,
+	   int cmd)
 {
-/*
- * XXXYYY Only ADD at this moment! /Mattias
- */
 	struct sockaddr_in6	mask /* = {sizeof(mask), AF_INET6 }*/;
 	struct sockaddr_in6	sa6;
 	struct sockaddr_dl	*sdl;
@@ -2070,6 +2067,29 @@ mip6_proxy(struct in6_addr* addr,
 	int			flags, error;
         struct rtentry		*nrt;
 
+	if (cmd == RTM_DELETE) {
+		struct rtentry *rt;
+
+		bzero(&sa6, sizeof(sa6));
+		sa6.sin6_family = AF_INET6;
+		sa6.sin6_len = sizeof(sa6);
+		sa6.sin6_addr = *addr;
+
+#ifdef __FreeBSD__
+		rt = rtalloc1((struct sockaddr *)&sa6, 1, 0UL);
+#else
+		rt = rtalloc1((struct sockaddr *)&sa6, 1);
+#endif
+		if (rt == NULL)
+			return EHOSTUNREACH;
+
+		error = rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
+				  rt_mask(rt), 0, (struct rtentry **)0);
+		rt->rt_refcnt--;
+		rt = NULL;
+		return error;
+	}
+		
 	/* Create sa6 */
 	bzero(&sa6, sizeof(sa6));
 	sa6.sin6_family = AF_INET6;
@@ -2327,56 +2347,74 @@ time_t           lasttime;    /* The time at which a BR was last sent */
  ******************************************************************************
  * Function:    mip6_bc_delete
  * Description: Delete an entry in the Binding Cache list.
- * Ret value:   Pointer to next entry in list or NULL if last entry removed.
+ * Ret value:   Error code
+ *              Pointer to next entry in list or NULL if last entry removed.
  ******************************************************************************
  */
-struct mip6_bc *
-mip6_bc_delete(bcp_del)
-struct mip6_bc *bcp_del;  /* Pointer to BC entry to delete */
+int
+mip6_bc_delete(bcp_del, bcp_nxt)
+struct mip6_bc  *bcp_del;  /* Pointer to BC entry to delete */
+struct mip6_bc **bcp_nxt;  /* Returns next entry in the list */
 {
-	struct mip6_bc       *bcp;       /* Current entry in the BC list */
-	struct mip6_bc       *bcp_prev;  /* Previous entry in the BC list */
-	struct mip6_bc       *bcp_next;  /* Next entry in the BC list */
-	int    s;
+	struct mip6_bc  *bcp;       /* Current entry in the BC list */
+	struct mip6_bc  *bcp_prev;  /* Previous entry in the BC list */
+	struct mip6_bc  *bcp_next;  /* Next entry in the BC list */
+	int              s, error = 0;
 
 	s = splnet();
 	bcp_prev = NULL;
 	bcp_next = NULL;
 	for (bcp = mip6_bcq; bcp; bcp = bcp->next) {
 		bcp_next = bcp->next;
-		if (bcp == bcp_del) {
-			if (bcp_prev == NULL)
-				mip6_bcq = bcp->next;
-			else
-				bcp_prev->next = bcp->next;
+		if (bcp != bcp_del) {
+			bcp_prev = bcp;
+			continue;
+		}
+		
+		/* Make sure that the list pointers are correct. */
+		if (bcp_prev == NULL)
+			mip6_bcq = bcp->next;
+		else
+			bcp_prev->next = bcp->next;
 
-			/* The Home Agent shall stop acting as a proxy for
-			   the MN. Delete the existing tunnel to the MN. */
+		if (bcp->hr_flag) {	
+			/* The HA should stop acting as a proxy for the MN. */
+			error = mip6_proxy(&bcp->home_addr, NULL, RTM_DELETE);
+			if (error) {
+#ifdef MIP6_DEBUG
+				mip6_debug("%s: delete proxy error = %d\n",
+					   __FUNCTION__, error);
+#endif
+				*bcp_nxt = bcp_next;
+				return error;
+			}
+
+			/* Delete the existing tunnel to the MN. */
 			mip6_tunnel(NULL, NULL, MIP6_TUNNEL_DEL, MIP6_NODE_HA,
 				    (void *)bcp);
+		}
 
 #ifdef MIP6_DEBUG
-			mip6_debug("\nBinding Cache Entry deleted (0x%x)\n",
-				   bcp);
+		mip6_debug("\nBinding Cache Entry deleted (0x%x)\n", bcp);
 #endif
-			free(bcp, M_TEMP);
+		free(bcp, M_TEMP);
 
-			/* Remove the timer if the BC queue is empty */
-			if (mip6_bcq == NULL) {
+		/* Remove the timer if the BC queue is empty */
+		if (mip6_bcq == NULL) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				untimeout(mip6_timer_bc, (void *)NULL,
-					  mip6_timer_bc_handle);
-				callout_handle_init(&mip6_timer_bc_handle);
+			untimeout(mip6_timer_bc, (void *)NULL,
+				  mip6_timer_bc_handle);
+			callout_handle_init(&mip6_timer_bc_handle);
 #else
-				untimeout(mip6_timer_bc, (void *)NULL);
+			untimeout(mip6_timer_bc, (void *)NULL);
 #endif
-			}
-			break;
 		}
-		bcp_prev = bcp;
+		break;
 	}
 	splx(s);
-	return bcp_next;
+	
+	*bcp_nxt = bcp_next;
+	return error;
 }
 
 
@@ -2437,7 +2475,6 @@ int              use_link_opt;  /* Include Target link layer address option or
 	/* The interface that shall be used may not be assumed to be the
 	   interface of the incoming packet, but must be the interface stated
 	   in the prefix that matches the home address. */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))
 	if (MIP6_IS_HA_ACTIVE) {
 		for (llp = mip6_llq; llp; llp = llp->next) {
 			for (halp = llp->ha_list; halp; halp = halp->next) {
@@ -2463,9 +2500,7 @@ int              use_link_opt;  /* Include Target link layer address option or
 		}
 		nap->ifp = llp->ifp;
 	}
-#endif /* MIP6_HA */
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))
 	if (MIP6_IS_MN_ACTIVE) {
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 			if (!pr->ndpr_stateflags.onlink)
@@ -2483,7 +2518,6 @@ int              use_link_opt;  /* Include Target link layer address option or
 		}
 		nap->ifp = pr->ndpr_ifp;
 	}
-#endif
 
 	/* Add the new na entry first to the list. */
 	s = splnet();
@@ -2764,16 +2798,18 @@ void
 mip6_timer_bc(arg)
 void  *arg;  /* Not used */
 {
-	struct mip6_bc  *bcp;   /* Current entry in the BC list */
+	struct mip6_bc  *bcp;      /* Current entry in the BC list */
+	struct mip6_bc  *bcp_nxt;  /* Next BC list entry */
 	int              s;
 
 	/* Go through the entire list of Binding Cache entries. */
 	s = splnet();
 	for (bcp = mip6_bcq; bcp;) {
 		bcp->lifetime -= 1;
-		if (bcp->lifetime == 0)
-			bcp = mip6_bc_delete(bcp);
-		else
+		if (bcp->lifetime == 0) {
+			mip6_bc_delete(bcp, &bcp_nxt);
+			bcp = bcp_nxt;
+		} else
 			bcp = bcp->next;
 	}
 	splx(s);
@@ -2869,14 +2905,6 @@ struct ifnet   *ifp;
 
 	res = 0;
 	switch (cmd) {
-	case SIOCSDEBUG_MIP6:
-#ifdef MIP6_DEBUG
-		mip6_enable_debug(*(int *)data);
-#else
-		printf("No Mobile IPv6 debug information available!\n");
-#endif
-		return res;
-
 	case SIOCSBCFLUSH_MIP6:
 	case SIOCSDEFCONFIG_MIP6:
 		res = mip6_clear_config_data(cmd, data);
@@ -2886,13 +2914,46 @@ struct ifnet   *ifp;
 		res = mip6_write_config_data(cmd, data);
 		return res;
 
+	case SIOCSHAPREF_MIP6:
+		/* Note: this one can be run before attach. */
+		if (mip6_write_config_data_ha_hook)
+			res = (*mip6_write_config_data_ha_hook)
+				(cmd, data);
+		break;
+
+	case SIOCACOADDR_MIP6:
+	case SIOCAHOMEADDR_MIP6:
+	case SIOCSBULIFETIME_MIP6:
+	case SIOCSHRLIFETIME_MIP6:
+	case SIOCDCOADDR_MIP6:
+		/* Note: these can be run before attach. */
+		if (mip6_write_config_data_mn_hook)
+			res = (*mip6_write_config_data_mn_hook)
+				(cmd, data);
+		break;
+
+	case SIOCSDEBUG_MIP6:
 	case SIOCSENABLEBR_MIP6:
+	case SIOCSATTACH_MIP6:
 		res = mip6_enable_func(cmd, data);
 		return res;
 
-	case SIOCSATTACH_MIP6:
-		mip6_attach();
-		return res;
+	case SIOCSFWDSLUNICAST_MIP6:
+	case SIOCSFWDSLMULTICAST_MIP6:
+		/* Note: these can be run before attach. */
+		if (mip6_enable_func_ha_hook)
+			res = (*mip6_enable_func_ha_hook)(cmd, data);
+		break;
+
+	case SIOCSPROMMODE_MIP6:
+	case SIOCSBU2CN_MIP6:
+	case SIOCSREVTUNNEL_MIP6:
+	case SIOCSAUTOCONFIG_MIP6:
+	case SIOCSEAGERMD_MIP6:
+		/* Note: these can be run before attach. */
+		if (mip6_enable_func_mn_hook)
+			res = (*mip6_enable_func_mn_hook)(cmd, data);
+		break;
 
 	case SIOCSRELEASE_MIP6:
 		mip6_release();
@@ -2903,7 +2964,6 @@ struct ifnet   *ifp;
 		break;
 	}
 
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))
 	if (MIP6_IS_HA_ACTIVE) {
 		res = 0;
 		switch (cmd) {
@@ -2912,26 +2972,13 @@ struct ifnet   *ifp;
 				res = (*mip6_clear_config_data_ha_hook)
 					(cmd, data);
 			break;
-		case SIOCSHAPREF_MIP6:
-			if (mip6_write_config_data_ha_hook)
-				res = (*mip6_write_config_data_ha_hook)
-					(cmd, data);
-			break;
-
-		case SIOCSFWDSLUNICAST_MIP6:
-		case SIOCSFWDSLMULTICAST_MIP6:
-			if (mip6_enable_func_ha_hook)
-				res = (*mip6_enable_func_ha_hook)(cmd, data);
-			break;
 
 		default:
 			res = EOPNOTSUPP;
 			break;
 		}
 	}
-#endif
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))
 	if (MIP6_IS_MN_ACTIVE) {
 		res = 0;
 		switch (cmd) {
@@ -2942,34 +2989,15 @@ struct ifnet   *ifp;
 				res = (*mip6_clear_config_data_mn_hook)
 					(cmd, data);
 			break;
-		case SIOCACOADDR_MIP6:
-		case SIOCAHOMEADDR_MIP6:
-		case SIOCSBULIFETIME_MIP6:
-		case SIOCSHRLIFETIME_MIP6:
-		case SIOCDCOADDR_MIP6:
-			if (mip6_write_config_data_mn_hook)
-				res = (*mip6_write_config_data_mn_hook)
-					(cmd, data);
-			break;
-
-		case SIOCSPROMMODE_MIP6:
-		case SIOCSBU2CN_MIP6:
-		case SIOCSREVTUNNEL_MIP6:
-		case SIOCSAUTOCONFIG_MIP6:
-		case SIOCSEAGERMD_MIP6:
-			if (mip6_enable_func_mn_hook)
-				res = (*mip6_enable_func_mn_hook)(cmd, data);
-			break;
 
 		default:
 			res = EOPNOTSUPP;
 			break;
 		}
 	}
-#endif
 	if (res) {
 #ifdef MIP6_DEBUG
-		printf("%s: unknown command: %d\n", __FUNCTION__, (int)cmd);
+		printf("%s: unknown command: %lu\n", __FUNCTION__, (u_long)cmd);
 #endif
 	}
 	return res;
@@ -3044,19 +3072,18 @@ int mip6_write_config_data(u_long cmd, caddr_t data)
  */
 int mip6_clear_config_data(u_long cmd, caddr_t data)
 {
-	int retval = 0;
-	int s;
-	struct mip6_bc          *bcp;
+	int             s, retval = 0;
+	struct mip6_bc *bcp, *bcp_nxt;
 
 	s = splnet();
 	switch (cmd) {
 	case SIOCSBCFLUSH_MIP6:
 		for (bcp = mip6_bcq; bcp;) {
-			if(!bcp->hr_flag)
-				bcp = mip6_bc_delete(bcp);
-			else {
+			if(!bcp->hr_flag) {
+				mip6_bc_delete(bcp, &bcp_nxt);
+				bcp = bcp_nxt;
+			} else
 				bcp = bcp->next;
-			}
 		}
 		break;
 
@@ -3083,11 +3110,27 @@ int mip6_clear_config_data(u_long cmd, caddr_t data)
  */
 int mip6_enable_func(u_long cmd, caddr_t data)
 {
+	int enable;
 	int retval = 0;
 
+	enable = ((struct mip6_input_data *)data)->value;
+
 	switch (cmd) {
+	case SIOCSDEBUG_MIP6:
+#ifdef MIP6_DEBUG
+		mip6_enable_debug(enable);
+#else
+		printf("No Mobile IPv6 debug information available!\n");
+#endif
+		break;
+
 	case SIOCSENABLEBR_MIP6:
-		mip6_config.enable_br = *(u_int8_t *)data;
+		mip6_config.enable_br = enable;
+		break;
+
+	case SIOCSATTACH_MIP6:
+		printf("%s: attach %d\n", __FUNCTION__, enable); /* RM */
+		retval = mip6_attach(enable);
 		break;
 	}
 	return retval;

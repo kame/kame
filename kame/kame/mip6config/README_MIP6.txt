@@ -42,9 +42,9 @@
         - mip6_hooks.c   (Used when MIP6 option is activated)
         - mip6.h         (Used when MIP6 option is activated)
         - mip6_common.h  (Used when MIP6 option is activated)
-        - mip6_mn.c      (Used when MIP6_MN option is activated)
-        - mip6_md.c      (Used when MIP6_MN option is activated)
-        - mip6_ha.c      (Used when MIP6_HA option is activated)
+        - mip6_mn.c      (Used when MIP6 option is activated)
+        - mip6_md.c      (Used when MIP6 option is activated)
+        - mip6_ha.c      (Used when MIP6 option is activated)
         
 2.2     New and Modified Applications
 
@@ -115,7 +115,7 @@
 
 3.1     Configuration of the kernel
 
-        There exist five options in the kernel configuration file that are
+        There exist three options in the kernel configuration file that are
         used for Mobile IPv6.
 
         options MIP6          Correspondent Node part is activated. This
@@ -126,20 +126,15 @@
                               code will be loaded as modules. Note that the
                               modules are not compiled by enabling this; only
                               support for later loading is enabled.
-        options MIP6_HA       Enables Home Agent functionality statically in
-                              the kernel.
-        options MIP6_MN       Enables Mobile Node functionality statically in
-                              the kernel.
+			      XXX Note: Currently not available!
 
         The following combinations of the options are possible.
 
                          Static Compilation              As Module
                       Mobile Node   Home Agent   Mobile Node   Home Agent
-        MIP6                X           X              X           X
+        MIP6                X           X                           
         MIP6_DEBUG          X           X              X           X
         MIP6_MODULES                                   X           X
-        MIP6_HA                         X                          X
-        MIP6_MN             X                          X
 
         It is not possible to have the Mobile Node and Home Agent code
         active at the same time.
@@ -156,8 +151,8 @@
 
         The Home Agent must enable routing functionality, i.e. set forwarding
         of IPv6 packets. In addition to this the Router Advertisements sent by
-         the router daemon must be modified. This is done by changing the
-         variables in the /usr/local/v6/etc/rtadvd.conf file.
+        the Router Advertisement daemon must be modified. This is done by
+        changing the variables in the /usr/local/v6/etc/rtadvd.conf file.
         
         The following parameters should be added:
         hatime#100    # Home Agent lifetime
@@ -175,6 +170,10 @@
                 Discovery's default minimum value, according to the Mobile
                 IPv6 specifications. A lower value will give a faster handoff 
                 and consequently a higher value will give a slower handoff.
+
+        The Router Advertisement daemon must be started including Mobile IPv6
+        flag:
+            ``rtadvd -m <interfaces>''
 
         The Home Agent code can be activated by: 
             ``mip6config -g''

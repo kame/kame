@@ -1,4 +1,4 @@
-/*	$KAME: mip6_io.c,v 1.5 2000/02/26 18:08:39 itojun Exp $	*/
+/*	$KAME: mip6_io.c,v 1.6 2000/03/18 03:05:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_io.c,v 1.5 2000/02/26 18:08:39 itojun Exp $
+ * $Id: mip6_io.c,v 1.6 2000/03/18 03:05:41 itojun Exp $
  *
  */
 
@@ -62,6 +62,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_common.h>
 
 
 void (*mip6_icmp6_output_hook)(struct mbuf *) = 0;
@@ -516,12 +517,14 @@ mip6_output(m, pktopt)
 struct mbuf          *m;       /* Includes IPv6 header */
 struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
 {
-    struct ip6_pktopts  *opt;       /* Packet Extension headers (local) */
-    struct mip6_output  *outp;      /* Ptr to mip6 output element */
-    struct mip6_esm     *esp;       /* Ptr to entry in event state list */
-    struct ip6_hdr      *ip6;       /* IPv6 header */
-    struct mip6_bc      *bc_entry;  /* Binding Cache list entry */
-    struct in6_addr     *dst_addr;  /* Original dst address for the packet */
+    struct ip6_pktopts  *opt;      /* Packet Extension headers (local) */
+    struct mip6_output  *outp;     /* Ptr to mip6 output element */
+    struct mip6_esm     *esp;      /* Ptr to entry in event state list */
+    struct ip6_hdr      *ip6;      /* IPv6 header */
+    struct mip6_bc      *bcp;      /* Binding Cache list entry */
+    struct mip6_bul     *bulp;
+    struct mip6_bul     *bulp_hr;    
+    struct in6_addr     *dst_addr; /* Original dst address for the packet */
     int       error;    /* Error code from function call */
     int       off;      /* Offset from start of Destination Header in bytes */
     u_int8_t  opttype;  /* Option type */
@@ -531,31 +534,29 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
 
     /* We have to maintain a list of all prefixes announced by the
        rtadvd deamon (for on-link determination). */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))
     if (MIP6_IS_HA_ACTIVE) {
         if (ip6->ip6_nxt == IPPROTO_ICMPV6)
             if (mip6_icmp6_output_hook) (*mip6_icmp6_output_hook)(m);
     }
-#endif
 
     /* If a COA for the destination address exist, i.e a BC entry is found,
        then add a Routing Header and change the destination address to the
        MN's COA. */
     dst_addr = &ip6->ip6_dst;
-    bc_entry = mip6_bc_find(&ip6->ip6_dst);
-    if (bc_entry != NULL) {
-        dst_addr = &bc_entry->home_addr;
-        if ((error = mip6_add_rh(&opt, bc_entry)) != 0)
+    bcp = mip6_bc_find(&ip6->ip6_dst);
+    if (bcp != NULL) {
+        dst_addr = &bcp->home_addr;
+        if ((error = mip6_add_rh(&opt, bcp)) != 0)
             return error;
     }
 
     /* If this is a MN and the source address is one of the home addresses
        for the MN then a Home Address option must be inserted. */
     esp = NULL;
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))
     if (MIP6_IS_MN_ACTIVE) {
         if (mip6_esm_find_hook)
             esp = (*mip6_esm_find_hook)(&ip6->ip6_src);
+	
         if ((esp != NULL) && (esp->state >= MIP6_STATE_DEREG)) {
             if (opt == NULL) {
                 opt = (struct ip6_pktopts *)
@@ -570,9 +571,24 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
             if ((error = mip6_add_ha(&opt->ip6po_dest2,
                                      &off, &ip6->ip6_src, &esp->coa)) != 0)
                 return error;
+
+	    /* If the MN initiate the traffic it should add a BU option
+	       to the packet if no BUL entry exist and there is a BUL
+	       "home registration" entry. */
+	    bulp = mip6_bul_find(dst_addr, &esp->home_addr);
+	    bulp_hr = mip6_bul_find(NULL, &esp->home_addr);
+	    if ((bulp == NULL) && (bulp_hr != NULL)) {
+		    /* Create BUL entry and BU option. */
+		    bulp = mip6_bul_create(dst_addr, &esp->home_addr,
+					   &esp->coa,
+					   bulp_hr->lifetime, 0);
+		    if (bulp == NULL)
+			    return ENOBUFS;
+		    mip6_queue_bu(bulp, &esp->home_addr, &esp->coa, 0,
+				  bulp_hr->lifetime);
+	    }
         }
     }
-#endif
 
     /* BU, BR and BA should not be sent to link-local, loop-back and
        multicast addresses. */
@@ -667,9 +683,9 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
  ******************************************************************************
  */
 int
-mip6_add_rh(opt, bc_entry)
-struct ip6_pktopts  **opt;      /* Packet Ext headers, options and data */
-struct mip6_bc      *bc_entry;  /* Binding Cache list entry */
+mip6_add_rh(opt, bcp)
+struct ip6_pktopts  **opt;  /* Packet Ext headers, options and data */
+struct mip6_bc       *bcp;  /* Binding Cache list entry */
 {
     struct ip6_pktopts *opt_local;  /* Pkt Ext headers, options & data */
     struct ip6_rthdr0  *rthdr0;     /* Routing header type 0 */
@@ -678,7 +694,7 @@ struct mip6_bc      *bc_entry;  /* Binding Cache list entry */
     int                 ii, len, new_len, idx;
 
     /* A Multicast address must not appear in a Routing Header. */
-    if (IN6_IS_ADDR_MULTICAST(&bc_entry->coa))
+    if (IN6_IS_ADDR_MULTICAST(&bcp->coa))
         return 0;
 
     opt_local = *opt;
@@ -692,13 +708,13 @@ struct mip6_bc      *bc_entry;  /* Binding Cache list entry */
         opt_local->ip6po_hlim = -1;  /* -1 means to use default hop limit */
 
         opt_local->ip6po_rhinfo.ip6po_rhi_rthdr =
-            mip6_create_rh(&bc_entry->coa, IPPROTO_IP);
+            mip6_create_rh(&bcp->coa, IPPROTO_IP);
         if(opt_local->ip6po_rhinfo.ip6po_rhi_rthdr == NULL)
             return ENOBUFS;
     } else if (opt_local->ip6po_rhinfo.ip6po_rhi_rthdr == NULL) {
         /* Packet extension header allocated but no RH present, add one. */
         opt_local->ip6po_rhinfo.ip6po_rhi_rthdr =
-            mip6_create_rh(&bc_entry->coa, IPPROTO_IP);
+            mip6_create_rh(&bcp->coa, IPPROTO_IP);
         if(opt_local->ip6po_rhinfo.ip6po_rhi_rthdr == NULL)
             return ENOBUFS;
     } else {
@@ -741,7 +757,7 @@ struct mip6_bc      *bc_entry;  /* Binding Cache list entry */
                 opt_local->ip6po_rhinfo.ip6po_rhi_rthdr;
             ptr = (caddr_t)rthdr0 + sizeof(struct ip6_rthdr0);
             ip6rt_addr = (struct in6_addr *)ptr;
-            if (IN6_ARE_ADDR_EQUAL(&bc_entry->coa, ip6rt_addr + idx))
+            if (IN6_ARE_ADDR_EQUAL(&bcp->coa, ip6rt_addr + idx))
                 return 0;
         }
 
@@ -753,7 +769,7 @@ struct mip6_bc      *bc_entry;  /* Binding Cache list entry */
 
         bcopy((caddr_t)opt_local->ip6po_rhinfo.ip6po_rhi_rthdr,
               (caddr_t)rthdr0, (len + 1) * 8);
-        bcopy((caddr_t)&bc_entry->coa, (caddr_t)rthdr0 + (len + 1) * 8,
+        bcopy((caddr_t)&bcp->coa, (caddr_t)rthdr0 + (len + 1) * 8,
               sizeof(struct in6_addr));
         rthdr0->ip6r0_len = new_len;
         rthdr0->ip6r0_segleft = new_len / 2;
@@ -983,6 +999,7 @@ struct mip6_subbuf  *subopt;  /* BU sub-option data (NULL if not present) */
     int              tmp16;    /* Temporary converting of 2-byte */
     int              tmp32;    /* Temporary converting of 4-byte */
     int              len;      /* Length of allocated memory */
+    int after, before;
 
     /* Verify input */
     if (optbu == NULL)
@@ -1056,10 +1073,17 @@ struct mip6_subbuf  *subopt;  /* BU sub-option data (NULL if not present) */
     tmp32 = htonl(optbu->lifetime);
     bcopy((caddr_t)&tmp32, (caddr_t)dest + *off, sizeof(optbu->lifetime));
     *off += sizeof(optbu->lifetime);
-
+    
     /* If sub-options are present, add them as well. */
     optlen = optbu->len;
     if (subopt) {
+	/* Align the Destination Header to 8-byte before sub-options
+	   are added. */
+	before = *off;
+	mip6_align(dest, off);
+	after = *off;
+	optlen += after - before;
+	
         bcopy((caddr_t)subopt->buffer, (caddr_t)dest + *off, subopt->len);
         *off += subopt->len;
         optlen += subopt->len;
@@ -1110,6 +1134,7 @@ struct mip6_subbuf  *subopt;   /* BA sub-option data (NULL if not present) */
     int             tmp16;      /* Temporary converting of 2-byte */
     int             tmp32;      /* Temporary converting of 4-byte */
     int             len;        /* Length of allocated memory */
+    int after, before;
 
     /* Verify input */
     if (optba == NULL)
@@ -1184,6 +1209,13 @@ struct mip6_subbuf  *subopt;   /* BA sub-option data (NULL if not present) */
     /* If sub-options are present, add them as well. */
     optlen = IP6OPT_BALEN;
     if (subopt) {
+	/* Align the Destination Header to 8-byte before sub-options
+	   are added. */
+	before = *off;
+	mip6_align(dest, off);
+	after = *off;
+	optlen += after - before;
+	
         bcopy((caddr_t)subopt->buffer, (caddr_t)dest + *off, subopt->len);
         *off += subopt->len;
         optlen += subopt->len;
@@ -1231,6 +1263,7 @@ struct mip6_subbuf  *subopt;   /* BR sub-option data (NULL if not present) */
     int             rest;       /* Rest of modulo division */
     int             optlen;     /* Length of BR option incl sub-options */
     int             len;        /* Length of allocated memory */
+    int after, before;
 
     /* Verify input */
     if (optbr == NULL)
@@ -1284,6 +1317,13 @@ struct mip6_subbuf  *subopt;   /* BR sub-option data (NULL if not present) */
     /* If sub-options are present, add them as well. */
     optlen = IP6OPT_BRLEN;
     if (subopt) {
+	/* Align the Destination Header to 8-byte before sub-options
+	   are added. */
+	before = *off;
+	mip6_align(dest, off);
+	after = *off;
+	optlen += after - before;
+	
         bcopy((caddr_t)subopt->buffer, (caddr_t)dest + *off, subopt->len);
         *off += subopt->len;
         optlen += subopt->len;
@@ -1356,7 +1396,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
 
             /* Compensate for the alignment requirement. */
             rest =  buf->len % 2;
-            if (rest) {
+            if (rest == 1) {
                 bcopy(&pad1, (caddr_t)buf->buffer + buf->len, 1);
                 buf->len += 1;
             }

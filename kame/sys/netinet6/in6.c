@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.61 2000/03/17 15:57:28 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.62 2000/03/18 03:05:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,7 +111,7 @@
 
 #include <net/net_osdep.h>
 
-#ifdef MIP6 /* FIX THIS && defined(MIP6_MN) */
+#ifdef MIP6
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_common.h>
 
@@ -2279,6 +2279,7 @@ in6_ifawithifp(ifp, dst)
 
 	dep[0] = dep[1] = NULL;
 
+#if 0
 #ifdef MIP6
 	/*
 	 * This is needed to assure that the Home Address is used for
@@ -2304,6 +2305,7 @@ in6_ifawithifp(ifp, dst)
 		}
 	}
 #endif /* MIP6 */
+#endif /* 0 */
 
 	/*
 	 * We first look for addresses in the same scope.

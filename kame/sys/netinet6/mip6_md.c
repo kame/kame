@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.12 2000/03/01 16:59:51 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.13 2000/03/18 03:05:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.12 2000/03/01 16:59:51 itojun Exp $
+ * $Id: mip6_md.c,v 1.13 2000/03/18 03:05:41 itojun Exp $
  *
  */
 
@@ -43,7 +43,6 @@
 #include "opt_inet.h"
 #endif
 
-#ifdef MIP6_MN
 /*
  * Mobile IPv6 Movement Detection for Mobile Nodes
  */
@@ -635,6 +634,10 @@ mip6_select_defrtr()
 	 * cloned from the previous primary prefix. This does not happen when
 	 * we keep the same prefix but change default router.
 	 */
+#ifdef MIP6_DEBUG
+	mip6_debug("mip6_primary_prefix = %s\n", mip6_primary_prefix ? ip6_sprintf(&mip6_primary_prefix->ndpr_prefix.sin6_addr) : "NULL");
+	mip6_debug("pr                  = %s\n", pr ? ip6_sprintf(&pr->ndpr_prefix.sin6_addr) : "NULL");
+#endif
 	if (mip6_primary_prefix && (pr != mip6_primary_prefix)) {
 		register struct llinfo_nd6 *ln;
 
@@ -668,9 +671,14 @@ mip6_select_defrtr()
 				continue;
 			}
 
+#ifdef MIP6_DEBUG
+			mip6_debug("Checking neighbor %s\n", dst ? ip6_sprintf(&dst->sin6_addr) : "NULL");
+#endif
 			if (in6_are_prefix_equal(&dst->sin6_addr, 
-						 &pr->ndpr_prefix.sin6_addr, 
-						 pr->ndpr_plen)) {
+						 &mip6_primary_prefix->
+						 ndpr_prefix.sin6_addr, 
+						 mip6_primary_prefix->
+						 ndpr_plen)) {
 
 			/* Fake an INCOMPLETE neighbor that we're giving up */
 				struct mbuf *m = ln->ln_hold;
@@ -712,6 +720,71 @@ mip6_select_defrtr()
 					   rt->rt_refcnt);
 #endif
 				nd6_free(rt);
+			}
+			ln = next;
+			/*
+			 * XXX Also remove the link-local addresses which
+			 * aren't ours?
+			 */
+		}
+
+		ln = llinfo_nd6.ln_next;
+		while (ln && ln != &llinfo_nd6) {
+			struct rtentry *rt;
+			struct ifnet *ifp;
+			struct sockaddr_dl *sdl;
+			struct sockaddr_in6 *dst;
+			struct llinfo_nd6 *next = ln->ln_next;
+
+			if ((rt = ln->ln_rt) == NULL) {
+				ln = next;
+				continue;
+			}
+			if ((ifp = rt->rt_ifp) == NULL) {
+				ln = next;
+				continue;
+			}
+			dst = (struct sockaddr_in6 *)rt_key(rt);
+			/* sanity check */
+			if (!rt)
+				panic("rt=0 in %s(ln=%p)\n", __FUNCTION__, ln);
+			if (!dst)
+				panic("dst=0 in %s(ln=%p)\n", __FUNCTION__, ln);
+
+			/* Skip if the address belongs to us */
+			if (ln->ln_expire == 0) {
+				ln = next;
+				continue;
+			}
+
+#ifdef MIP6_DEBUG
+			mip6_debug("Checking neighbor %s round 2\n", dst ? ip6_sprintf(&dst->sin6_addr) : "NULL");
+#endif
+			if (in6_are_prefix_equal(&dst->sin6_addr, 
+						 &mip6_primary_prefix->
+						 ndpr_prefix.sin6_addr, 
+						 mip6_primary_prefix->
+						 ndpr_plen)) {
+
+#ifdef MIP6_DEBUG
+				mip6_debug("Deleting Neighbor %s round 2.\n",
+					   ip6_sprintf(&(satosin6(
+						   rt_key(rt))->sin6_addr)));
+#endif
+
+#ifdef MIP6_DEBUG
+				mip6_debug("Ref count = %d, now RTM_DELETE\n",
+					   rt->rt_refcnt);
+#endif
+				if (rt && rt->rt_gateway &&
+				    rt->rt_gateway->sa_family == AF_LINK) {
+					sdl = (struct sockaddr_dl *)rt->
+						rt_gateway;
+					rtrequest(RTM_DELETE, rt_key(rt),
+						  (struct sockaddr *)0,
+						  rt_mask(rt), 0,
+						  (struct rtentry **)0);
+				}
 			}
 			ln = next;
 			/*
@@ -1220,5 +1293,3 @@ mip6_md_exit()
 #endif
 	}
 }
-
-#endif /* MIP6_MN */
