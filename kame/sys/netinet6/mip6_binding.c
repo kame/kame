@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.13 2001/09/17 12:42:39 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.14 2001/09/20 07:12:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2556,7 +2556,6 @@ mip6_route_optimize(m)
 #else
 			LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
 #endif
-			/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
 		} else {
 			mbu->mbu_coa = hif_coa;
 			coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
