@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.13 2000/04/26 06:30:42 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.14 2000/04/26 08:01:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,6 +125,10 @@
  *		#else
  *		#include "bpfilter.h"
  *		#endif
+ *
+ * - protosw for IPv4 (sys/netinet)
+ *	FreeBSD4: struct ipprotosw in netinet/ipprotosw.h
+ *	others: struct protosw in sys/protosw.h
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
