@@ -492,15 +492,12 @@ addroute(rte, gw, ife)
 
 	errno = 0;
         if ((wlen = write(rtsock, buf, len)) == len) {
-#ifdef DEBUG
-	  syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s tag=%d%s, succeed",
-		 __FUNCTION__,
-		 inet_ntop(AF_INET6, &np->rip6_dest, in6txt, INET6_ADDRSTRLEN),
-		 np->rip6_plen,
-		 inet_ntop(AF_INET6, gw,            gw6txt, INET6_ADDRSTRLEN),
- 		 ntohs(np->rip6_tag),
- 		 rte->rt_flags & RTF_IGP_EGP_SYNC ? "(sync)":"");
-#endif
+	  IFLOG(LOG_ROUTE)
+	    syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s tag=%d%s, succeed",
+		   __FUNCTION__,
+		   ip6str(&np->rip6_dest, 0), np->rip6_plen,
+		   ip6str((struct in6_addr *)gw, 0), ntohs(np->rip6_tag),
+		   rte->rt_flags & RTF_IGP_EGP_SYNC ? "(sync)":"");
 	  aggr_ckconf(rte);
 	  return 0;
 	} else {
@@ -604,16 +601,13 @@ delroute(rte, gw)
 
 	errno = 0;
         if (write(rtsock, buf, len) == len) {
-#ifdef DEBUG
-	  syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s tag=%d%s, succeed",
-		 __FUNCTION__,
-		 inet_ntop(AF_INET6, &rp->rip6_dest, in6txt, INET6_ADDRSTRLEN),
-		 rp->rip6_plen,
-		 gw ? inet_ntop(AF_INET6, gw, gw6txt, INET6_ADDRSTRLEN) :
-		 "NULL",
- 		 ntohs(rp->rip6_tag),
- 		 rte->rt_flags & RTF_IGP_EGP_SYNC ? "(sync)":"");
-#endif
+	  IFLOG(LOG_ROUTE)
+	    syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s tag=%d%s, succeed",
+		   __FUNCTION__,
+		   ip6str(&rp->rip6_dest, 0), rp->rip6_plen,
+		   gw ? ip6str(gw, 0) : "NULL",
+		   ntohs(rp->rip6_tag),
+		   rte->rt_flags & RTF_IGP_EGP_SYNC ? "(sync)":"");
 	  AGGR_DECLEM(rte);
 	  return 0;
 	} else {
@@ -715,13 +709,12 @@ chroute(rte, gw, ife)
         rtm->rtm_msglen = len;
 
         if ((wlen = write(rtsock, buf, len)) == len) {
-#ifdef DEBUG
-	  syslog(LOG_DEBUG, "<chroute>: %s/%d gw=%s met=%d, succeed",
-		 inet_ntop(AF_INET6, &np->rip6_dest, in6txt, INET6_ADDRSTRLEN),
-		 np->rip6_plen,
-		 inet_ntop(AF_INET6, gw,            gw6txt, INET6_ADDRSTRLEN),
-		 rtm->rtm_rmx.rmx_hopcount);
-#endif
+	  IFLOG(LOG_ROUTE)
+	    syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s met=%d, succeed",
+		   __FUNCTION__,
+		   ip6str(&np->rip6_dest, 0), np->rip6_plen,
+		   ip6str((struct in6_addr *)gw, 0),
+		   rtm->rtm_rmx.rmx_hopcount);
 	} else {
 	  syslog(LOG_ERR,
 		 "<chroute>: %s/%d gw=%s met=%lu, failed: %s",
@@ -750,8 +743,8 @@ struct rt_entry *
 igp_enable_rte(rte)
      struct rt_entry *rte;
 {
-  struct ifinfo   *ife;
-  struct rt_entry **adj_ribs_in;
+  struct ifinfo   *ife = NULL;
+  struct rt_entry **adj_ribs_in = NULL;
   struct rt_entry *crte;  /* copied */
 
   switch(rte->rt_proto.rtp_type) {
@@ -803,21 +796,6 @@ rte_remove(key, base)
 {
   struct rt_entry *rte;
 
-#ifdef DEBUG2
-  char    in6txt[INET6_ADDRSTRLEN];
-  char    gw6txt[INET6_ADDRSTRLEN];
-  memset(in6txt, 0, INET6_ADDRSTRLEN);
-  memset(gw6txt, 0, INET6_ADDRSTRLEN);
-#define RTE_LOG_REMOVE \
-  syslog(LOG_DEBUG, "<rte_remove>: %s/%d gw=%s, removed",\
-	 inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,\
-		   in6txt, INET6_ADDRSTRLEN),\
-	 rte->rt_ripinfo.rip6_plen,\
-	 inet_ntop(AF_INET6, &rte->rt_gw, gw6txt, INET6_ADDRSTRLEN))
-#else
-#define RTE_LOG_REMOVE
-#endif
-
   if (key == NULL)
     return base;
 
@@ -830,7 +808,12 @@ rte_remove(key, base)
       fatalx("<rte_remove>: rt_proto.rtp_type corrupt");
 
     if (key == rte) {
-	    RTE_LOG_REMOVE;
+	    IFLOG(LOG_ROUTE)
+		    syslog(LOG_DEBUG,
+			   "<%s>: %s/%d gw=%s, removed", __FUNCTION__,
+			   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+			   rte->rt_ripinfo.rip6_plen,
+			   ip6str(&rte->rt_gw, 0));
 	    free_aspath(rte->rt_aspath); /* argument validation will be in free_aspath */
 
 	    if (rte == base) {
@@ -840,9 +823,6 @@ rte_remove(key, base)
 			     * There is no other RTE in the list.
 			     * just free the etnry.
 			     */
-#ifdef DEBUG2
-			    syslog(LOG_DEBUG, "<%s>: solo", __FUNCTION__);
-#endif
 			    free(rte);
 			    return(NULL);
 		    }
@@ -859,9 +839,8 @@ rte_remove(key, base)
 	    return base;
     }
     if ((rte = rte->rt_next) == base) {
-#ifdef DEBUG2
-      syslog(LOG_DEBUG, "<%s>: Not found", __FUNCTION__);
-#endif
+      IFLOG(LOG_ROUTE)
+	syslog(LOG_DEBUG, "<%s>: Not found", __FUNCTION__);
       return base;
     }
   }
@@ -934,7 +913,18 @@ restrict_check(head, addr, plen)
 	return(NULL);
 }
 
-/* return 1 if filtered. Otherwise return 0 */
+/*
+ * check incoming route.
+ * 1. If we specify to restrict rotes to the default, ignore all
+ *    non default routes.
+ * 2. If we specify the restiction list, ignore the route unless it
+ *    matches at least one entry of the list.
+ * 3. If we filter or generate the default route on the interface,
+ *    ignore incoming defaults.
+ * 4. If we specify the filter list, ignore the route that matches
+ *    at least one entry of the list.
+ * Return value: 1 if filtered. Otherwise return 0
+ */
 int
 input_filter_check(filters, sitelocal_ok, prefix)
 	struct filterset *filters;
@@ -944,12 +934,13 @@ input_filter_check(filters, sitelocal_ok, prefix)
 	/* 1st step: restrict to the default */
 	if ((filters->deffilterflags & DEFAULT_RESTRICTIN) &&
 	    (prefix->rip6_plen || !IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest))) {
-		syslog(LOG_DEBUG,
-		       "<%s>: route %s/%d was filtered because "
-		       "it is not the default route",
-		       __FUNCTION__,
-		       ip6str(&prefix->rip6_dest, 0),
-		       prefix->rip6_plen);
+		IFLOG(LOG_FILTER)
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d was filtered because "
+			       "it is not the default route",
+			       __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen);
 		filters->input_restrected++;
 		return(1);
 	}
@@ -961,19 +952,24 @@ input_filter_check(filters, sitelocal_ok, prefix)
 		if ((filter = restrict_check(filters->restrictin,
 					     &prefix->rip6_dest, prefix->rip6_plen))
 		    != NULL) {
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d matched a restriction(%s/%d)",
-			       __FUNCTION__, ip6str(&prefix->rip6_dest, 0),
-			       prefix->rip6_plen,
-			       ip6str(&filter->filtinfo_addr, 0),
-			       filter->filtinfo_plen);
+			IFLOG(LOG_FILTER)
+				syslog(LOG_DEBUG,
+				       "<%s>: route %s/%d matched a "
+				       "restriction(%s/%d)",
+				       __FUNCTION__,
+				       ip6str(&prefix->rip6_dest, 0),
+				       prefix->rip6_plen,
+				       ip6str(&filter->filtinfo_addr, 0),
+				       filter->filtinfo_plen);
 		}
 		else {
-			syslog(LOG_DEBUG,
-			       "<%s> : route %s/%d was filtered by restriction",
-			       __FUNCTION__,
-			       ip6str(&prefix->rip6_dest, 0),
-			       prefix->rip6_plen);
+			IFLOG(LOG_FILTER)
+				syslog(LOG_DEBUG,
+				       "<%s> : route %s/%d was filtered "
+				       "by restriction",
+				       __FUNCTION__,
+				       ip6str(&prefix->rip6_dest, 0),
+				       prefix->rip6_plen);
 			filters->input_restrected++; 
 			return(1);
 		}
@@ -983,10 +979,12 @@ input_filter_check(filters, sitelocal_ok, prefix)
 	if ((prefix->rip6_plen == 0 &&       /* "default" route */
 	     IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest)) &&
 	    (filters->deffilterflags & DEFAULT_FILTERIN)) {
-		syslog(LOG_DEBUG, "<%s>: Default route was ignored", __FUNCTION__);
+		IFLOG(LOG_FILTER)
+			syslog(LOG_DEBUG, "<%s>: Default route was ignored",
+			       __FUNCTION__);
 		return(1);
 	}
-
+	
 	/* 4th step: generic filter */
 	if (filters->filterin) {
 		struct filtinfo *filter;
@@ -994,12 +992,15 @@ input_filter_check(filters, sitelocal_ok, prefix)
 		if ((filter = filter_check(filters->filterin,
 					   &prefix->rip6_dest, prefix->rip6_plen))
 		    != NULL) {
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d was filtered by the filter "
-			       "%s/%d", __FUNCTION__,
-			       ip6str(&prefix->rip6_dest, 0), prefix->rip6_plen,
-			       ip6str(&filter->filtinfo_addr, 0),
-			       filter->filtinfo_plen);
+			IFLOG(LOG_FILTER)
+				syslog(LOG_DEBUG,
+				       "<%s>: route %s/%d was filtered by "
+				       "the filter %s/%d",
+				       __FUNCTION__,
+				       ip6str(&prefix->rip6_dest, 0),
+				       prefix->rip6_plen,
+				       ip6str(&filter->filtinfo_addr, 0),
+				       filter->filtinfo_plen);
 			return(1);
 		}
 	}
@@ -1018,12 +1019,13 @@ output_filter_check(filters, sitelocal_ok, prefix)
 	if ((filters->deffilterflags & DEFAULT_RESTRICTOUT) &&
 	    (prefix->rip6_plen ||
 	     !IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest))) {
-		syslog(LOG_DEBUG,
-		       "<%s>: route %s/%d was filtered because "
-		       "it is not the default route",
-		       __FUNCTION__,
-		       ip6str(&prefix->rip6_dest, 0),
-		       prefix->rip6_plen);
+		IFLOG(LOG_FILTER)
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d was filtered because "
+			       "it is not the default route",
+			       __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen);
 		filters->output_restrected++;
 		return(1);
 	}
@@ -1035,21 +1037,24 @@ output_filter_check(filters, sitelocal_ok, prefix)
 		if ((filter = restrict_check(filters->restrictout,
 					    &prefix->rip6_dest,
 					    prefix->rip6_plen)) != NULL) {
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d matched a "
-			       "restriction(%s/%d)",
-			       __FUNCTION__,
-			       ip6str(&prefix->rip6_dest, 0),
-			       prefix->rip6_plen,
-			       ip6str(&filter->filtinfo_addr, 0),
-			       filter->filtinfo_plen);
+			IFLOG(LOG_FILTER)
+				syslog(LOG_DEBUG,
+				       "<%s>: route %s/%d matched a "
+				       "restriction(%s/%d)",
+				       __FUNCTION__,
+				       ip6str(&prefix->rip6_dest, 0),
+				       prefix->rip6_plen,
+				       ip6str(&filter->filtinfo_addr, 0),
+				       filter->filtinfo_plen);
 		}
 		else {
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d was filtered by restriction",
-			       __FUNCTION__,
-			       ip6str(&prefix->rip6_dest, 0),
-			       prefix->rip6_plen);
+			IFLOG(LOG_FILTER)
+				syslog(LOG_DEBUG,
+				       "<%s>: route %s/%d was filtered "
+				       "by restriction",
+				       __FUNCTION__,
+				       ip6str(&prefix->rip6_dest, 0),
+				       prefix->rip6_plen);
 
 			filters->output_restrected++;
 			return(1);
@@ -1060,17 +1065,20 @@ output_filter_check(filters, sitelocal_ok, prefix)
 	if ((prefix->rip6_plen == 0 &&
 	     IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest)) &&
 	    (filters->deffilterflags & DEFAULT_FILTEROUT)) {
-		syslog(LOG_DEBUG, "<%s>: Default route was ignored",
-		       __FUNCTION__);
+		IFLOG(LOG_FILTER)
+			syslog(LOG_DEBUG, "<%s>: Default route was ignored",
+			       __FUNCTION__);
 		filters->filtered_outdef++;
 		return(1);
 	}
 
 	/* 4th step: filter site-local */
 	if (!sitelocal_ok && IN6_IS_ADDR_SITELOCAL(&prefix->rip6_dest)) {
-		syslog(LOG_DEBUG, "<%s>: site-local prefix(%s/%d) was ignored",
-		       __FUNCTION__, ip6str(&prefix->rip6_dest, 0),
-		       prefix->rip6_plen);
+		IFLOG(LOG_FILTER)
+			syslog(LOG_DEBUG,
+			       "<%s>: site-local prefix(%s/%d) was ignored",
+			       __FUNCTION__, ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen);
 		return(1);
 	}
 
@@ -1081,14 +1089,15 @@ output_filter_check(filters, sitelocal_ok, prefix)
 		if ((filter = filter_check(filters->filterout,
 					  &prefix->rip6_dest,
 					  prefix->rip6_plen)) != NULL) {
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d was filtered by the "
-			       "filter %s/%d",
-			       __FUNCTION__,
-			       ip6str(&prefix->rip6_dest, 0),
-			       prefix->rip6_plen,
-			       ip6str(&filter->filtinfo_addr, 0),
-			       filter->filtinfo_plen);
+			IFLOG(LOG_FILTER)
+				syslog(LOG_DEBUG,
+				       "<%s>: route %s/%d was filtered by the "
+				       "filter %s/%d",
+				       __FUNCTION__,
+				       ip6str(&prefix->rip6_dest, 0),
+				       prefix->rip6_plen,
+				       ip6str(&filter->filtinfo_addr, 0),
+				       filter->filtinfo_plen);
 			return(1);
 		}
 	}

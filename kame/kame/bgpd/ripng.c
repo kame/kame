@@ -358,14 +358,7 @@ rip_input()
   struct in6_pktinfo  spktinfo;           /* sending source I/F   */
   int                *rhoplimit;          /* Adv. API */
 
-  char                in6txt[INET6_ADDRSTRLEN];
   char                ifname[IFNAMSIZ];
-#ifdef DEBUG_RIP
-  char                myin6txt[INET6_ADDRSTRLEN];
-
-  memset(in6txt,    0, INET6_ADDRSTRLEN);
-  memset(myin6txt,  0, INET6_ADDRSTRLEN);
-#endif
 
   memset(&fsock,    0, sizeof(struct sockaddr_in6)); /* sender's addr/port */
   memset(ripbuf,    0, RIPNG_BUFSIZ);
@@ -437,12 +430,10 @@ rip_input()
   }
 #endif /* ADVANCEDAPI */
 
-#ifdef DEBUG_RIP
-  syslog(LOG_DEBUG, "RIPng RECV from %s+%d (%s)",
-	 inet_ntop(AF_INET6, &fsock.sin6_addr, in6txt, INET6_ADDRSTRLEN),
-	 ntohs(fsock.sin6_port),
-	 if_indextoname(rpktinfo->ipi6_ifindex, ifname));
-#endif
+  IFLOG(LOG_RIP)
+	  syslog(LOG_DEBUG, "RIPng RECV from %s+%d (%s)",
+		 ip6str2(&fsock), ntohs(fsock.sin6_port),
+		 if_indextoname(rpktinfo->ipi6_ifindex, ifname));
 
   /* Received I/F */
   if ((ripif = find_rip_by_index((u_int)rpktinfo->ipi6_ifindex)) == NULL) {
@@ -474,10 +465,10 @@ rip_input()
 
   case RIPNGCMD_REQUEST:
     ripif->rip_requestrcvd++;
-#ifdef DEBUG_RIP
-    syslog(LOG_DEBUG, "RIPng RECV cmd=%s, length=%d, nn=%d",
-	   rip_msgstr[rp->riph_cmd], len, nn);
-#endif
+    IFLOG(LOG_RIP)
+	    syslog(LOG_DEBUG, "RIPng RECV cmd=%s, length=%d, nn=%d",
+		   rip_msgstr[rp->riph_cmd], len, nn);
+
     if (ripif->rip_mode & IFS_NORIPOUT)
       return;
 
@@ -531,25 +522,22 @@ rip_input()
 
     ripif->rip_responsercvd++;
     if (ntohs(fsock.sin6_port) != RIPNG_PORT) {
-#ifdef DEBUG_RIP
-      syslog(LOG_DEBUG,
-	     "<rip_input>: Response from non RIPng port: %s+%d on %s",
-	     inet_ntop(AF_INET6, &fsock.sin6_addr, in6txt, INET6_ADDRSTRLEN),
-	     ntohs(fsock.sin6_port),
-	     if_indextoname(rpktinfo->ipi6_ifindex, ifname));
-#endif
+      IFLOG(LOG_RIP)
+	syslog(LOG_DEBUG,
+	       "<rip_input>: Response from non RIPng port: %s+%d on %s",
+	       ip6str2(&fsock), ntohs(fsock.sin6_port),
+	       if_indextoname(rpktinfo->ipi6_ifindex, ifname));
       return; /* The Response must be ignored
 		 if it is not from the RIPng port. [rfc2080] */
     }
 
 
     if (!IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr)) {
-#ifdef DEBUG_RIP
-      syslog(LOG_ERR,
-	     "<rip_input>: Response from non-linklocal addr: %s on %s",
-	     inet_ntop(AF_INET6, &fsock.sin6_addr, in6txt, INET6_ADDRSTRLEN),
-	     if_indextoname(rpktinfo->ipi6_ifindex, ifname));
-#endif
+      IFLOG(LOG_RIP)
+	syslog(LOG_ERR,
+	       "<rip_input>: Response from non-linklocal addr: %s on %s",
+	       ip6str2(&fsock),
+	       if_indextoname(rpktinfo->ipi6_ifindex, ifname));
       return;  /* Ignore response msg from non-link-local address [rfc2080] */
     }
 
@@ -559,11 +547,6 @@ rip_input()
     while(ife) {
       if (ife->ifi_ifn->if_index == rpktinfo->ipi6_ifindex &&
 	  IN6_ARE_ADDR_EQUAL(&ife->ifi_laddr, &fsock.sin6_addr)) {
-#if 0
-	syslog(LOG_DEBUG, "<rip_input>: Response from own addr: %s",
-	       inet_ntop(AF_INET6, &fsock.sin6_addr,
-			 in6txt, INET6_ADDRSTRLEN));
-#endif	
 	return;
       }
       if ((ife = ife->ifi_next) == ifentry)
@@ -577,27 +560,28 @@ rip_input()
 
     if (rhoplimit != NULL && *rhoplimit != RIPNG_HOPLIMIT &&
 	rpktinfo != NULL && IN6_IS_ADDR_MULTICAST(&rpktinfo->ipi6_addr)) {
-      syslog(LOG_ERR,
-	     "<rip_input>: Response from non-neighbor: %s on %s, hoplimit=%d",
-	     inet_ntop(AF_INET6, &fsock.sin6_addr, in6txt, INET6_ADDRSTRLEN),
-	     if_indextoname(rpktinfo->ipi6_ifindex, ifname),
-	     *rhoplimit);
-
+      IFLOG(LOG_RIP)
+	syslog(LOG_ERR,
+	       "<%s>: Response from non-neighbor: %s on %s, hoplimit=%d",
+	       __FUNCTION__,
+	       ip6str2(&fsock), if_indextoname(rpktinfo->ipi6_ifindex, ifname),
+	       *rhoplimit);
       return;
     }
 
 #endif
 
-#ifdef DEBUG_RIP
-    syslog(LOG_DEBUG,
-	   "RIPng RECV cmd=%s, length=%d, nn=%d",
-	   rip_msgstr[rp->riph_cmd], len, nn);
-#endif
+    IFLOG(LOG_RIP)
+      syslog(LOG_DEBUG,
+	     "RIPng RECV cmd=%s, length=%d, nn=%d",
+	     rip_msgstr[rp->riph_cmd], len, nn);
+
     nn = rip_process_response(ripif, nn);
-#ifdef DEBUG_RIP
-    syslog(LOG_DEBUG,
-	   "<rip_input>: rip_process_response() returned. (nn=%d)", nn);
-#endif
+
+    IFLOG(LOG_RIP)
+      syslog(LOG_DEBUG,
+	     "<rip_input>: rip_process_response() returned. (nn=%d)", nn);
+
     break;
 
   default:
@@ -713,18 +697,15 @@ rip_process_response(ripif, nn)
   task            *lifetime,  *garbage;       /*  may be registered          */
   byte             lifeyes,    garbageyes;
   char             in6txt[INET6_ADDRSTRLEN];
-
-#if defined(DEBUG_RIP) || defined(DEBUG)
   char *ifname = ripif->rip_ife->ifi_ifn->if_name; /* for debugging use */
-#endif
 
   extern struct ifinfo    *ifentry;
   extern task             *taskhead;
   extern byte              bgpyes;
   extern struct rt_entry  *aggregations;
-#ifdef DEBUG_RIP
-  syslog(LOG_DEBUG, "<rip_process_response>: invoked, nn=%d", nn);
-#endif
+
+  IFLOG(LOG_RIP)
+    syslog(LOG_DEBUG, "<rip_process_response>: invoked, nn=%d", nn);
 
   memset(in6txt, 0, INET6_ADDRSTRLEN);
 
@@ -745,12 +726,10 @@ rip_process_response(ripif, nn)
     struct rt_entry *orte = NULL;   /* old RTE            */
     uprte = NULL;
 
-#ifdef DEBUG_RIP
-    syslog(LOG_DEBUG, "RIPng RECV\t%d\t%s/%d (%d) on %s",
-	   i,
-	   inet_ntop(AF_INET6, &np->rip6_dest, in6txt, INET6_ADDRSTRLEN),
-	   np->rip6_plen, np->rip6_metric, ifname);
-#endif
+    IFLOG(LOG_RIP)
+      syslog(LOG_DEBUG, "RIPng RECV\t%d\t%s/%d (%d) on %s",
+	     i, ip6str(&np->rip6_dest, 0),
+	     np->rip6_plen, np->rip6_metric, ifname);
 
     if (np->rip6_metric == RIPNG_METRIC_NEXTHOP) { /* "nexthop" address */
       if (IN6_IS_ADDR_LINKLOCAL(&np->rip6_dest))
@@ -769,110 +748,16 @@ rip_process_response(ripif, nn)
     }
     /*
      * Check route filter and restriction.
-     * 1. If we specify to restrict rotes to the default, ignore all
-     *    non default routes.
-     * 2. If we specify the restiction list, ignore the route unless it
-     *    matches at least one entry of the list.
-     * 3. If we filter or generate the default route on the interface,
-     *    ignore incoming defaults.
-     * 4. If we specify the filter list, ignore the route that matches
-     *    at least one entry of the list.
      */
-
-#ifdef old
-    /* 1st step: restrict to the default */
-    if ((ripif->rip_mode & IFS_DEFAULT_RESTRICTIN) &&
-	(np->rip6_plen || !IN6_IS_ADDR_UNSPECIFIED(&np->rip6_dest))) {
-#ifdef DEBUG_RIP
-		syslog(LOG_DEBUG,
-		       "<%s>: route %s/%d on %s was filtered because "
-		       "it is not the default route",
-		       __FUNCTION__,
-		       inet_ntop(AF_INET6, &np->rip6_dest, in6txt,
-				 INET6_ADDRSTRLEN),
-		       np->rip6_plen, ifname);
-#endif
-		ripif->rip_input_restrected++;
-		continue;		/* ignore */
+    if (input_filter_check(&ripif->rip_filterset, rip_use_sitelocal, np)) {
+      IFLOG(LOG_RIP)
+	syslog(LOG_DEBUG,
+	       "<%s>: incoming route %s/%d on %s was filtered",
+	       __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
+	       ripif->rip_ife->ifi_ifn->if_name);
+	
+      continue;
     }
-
-    /* 2nd step: generic restriction */
-    if (ripif->rip_restrictin) {
-	    struct filtinfo *filter;
-
-	    if ((filter = restrict_check(ripif->rip_restrictin,
-					&np->rip6_dest, np->rip6_plen)) != NULL) {
-#ifdef DEBUG_RIP
-		    char filt6txt[INET6_ADDRSTRLEN];
-
-		    syslog(LOG_DEBUG,
-			   "<%s>: route %s/%d on %s matched a restriction(%s/%d)",
-			   __FUNCTION__,
-			   inet_ntop(AF_INET6, &np->rip6_dest, in6txt,
-				     INET6_ADDRSTRLEN),
-			   np->rip6_plen, ifname, 
-			   inet_ntop(AF_INET6, &filter->filtinfo_addr, filt6txt,
-				     INET6_ADDRSTRLEN),
-			   filter->filtinfo_plen);
-#endif
-	    }
-	    else {
-#ifdef DEBUG_RIP
-		    syslog(LOG_DEBUG,
-			   "<%s> : route %s/%d on %s was filtered by restriction",
-			   __FUNCTION__,
-			   inet_ntop(AF_INET6, &np->rip6_dest, in6txt,
-				     INET6_ADDRSTRLEN),
-			   np->rip6_plen, ifname);
-#endif
-		    ripif->rip_input_restrected++; 
-		    continue;	/* ignore */
-	    }
-    }
-
-    /* 3rd step: filter default */
-    if ((np->rip6_plen == 0 &&       /* "default" route */
-	 IN6_IS_ADDR_UNSPECIFIED(&np->rip6_dest)) &&
-	(ripif->rip_mode & IFS_DEFAULT_FILTERIN ||
-	 ripif->rip_mode & IFS_DEFAULTORIGINATE)) {
-#ifdef DEBUG_RIP
-      syslog(LOG_DEBUG, "<%s>: Default route on %s was ignored",
-	     __FUNCTION__, ifname);
-#endif 
-      continue;  /* ignore */
-    }
-
-    /* 4th step: generic filter */
-    if (ripif->rip_filterin) {
-	    struct filtinfo *filter;
-
-	    if ((filter = filter_check(ripif->rip_filterin,
-				      &np->rip6_dest, np->rip6_plen)) != NULL) {
-#ifdef DEBUG_RIP
-		    char filt6txt[INET6_ADDRSTRLEN];
-
-		    syslog(LOG_DEBUG,
-			   "<%s>: route %s/%d on %s was filtered "
-			   "by the filter %s/%d",
-			   __FUNCTION__,
-			   inet_ntop(AF_INET6, &np->rip6_dest, in6txt,
-				     INET6_ADDRSTRLEN),
-			   np->rip6_plen, ifname,
-			   inet_ntop(AF_INET6, &filter->filtinfo_addr, filt6txt,
-				     INET6_ADDRSTRLEN),
-			   filter->filtinfo_plen);
-#endif 
-		    continue;		/* ignore */
-	    }
-    }
-
-    if (!rip_use_sitelocal && IN6_IS_ADDR_SITELOCAL(&np->rip6_dest)) {
-	    syslog(LOG_NOTICE,
-		   "<%s>: site-local prefix(%s/%d) on %s(discard)",
-		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
-		   ripif->rip_ife->ifi_ifn->if_name);
-    }
-#endif
 
     if (np->rip6_metric == 0 ||
 	np->rip6_metric > RIPNG_METRIC_UNREACHABLE) { 
@@ -888,13 +773,11 @@ rip_process_response(ripif, nn)
 		    np->rip6_metric += ripif->rip_metricin;
 		    if (np->rip6_metric > RIPNG_METRIC_UNREACHABLE)
 			    np->rip6_metric = RIPNG_METRIC_UNREACHABLE;
-#ifdef DEBUG_RIP
-		    syslog(LOG_DEBUG, "RIPng METRIC ADD\t%d\t%s/%d (%d) on %s",
-			   i,
-			   inet_ntop(AF_INET6, &np->rip6_dest,
-				     in6txt, INET6_ADDRSTRLEN),
-			   np->rip6_plen, np->rip6_metric, ifname);
-#endif
+		    IFLOG(LOG_RIP)
+		      syslog(LOG_DEBUG,
+			     "RIPng METRIC ADD\t%d\t%s/%d (%d) on %s",
+			     i, ip6str(&np->rip6_dest, 0),
+			     np->rip6_plen, np->rip6_metric, ifname);
 	    }
     }
 
@@ -947,14 +830,12 @@ rip_process_response(ripif, nn)
 	break;
     }
     if (orte != NULL) {  /* I/F direct route (most preferable) */
-#ifdef DEBUG_RIP
-      syslog(LOG_DEBUG,
-	     "<%s>: I/F direct route(%s/%d on %s) cannot overwritten",
-	     __FUNCTION__,
-	     inet_ntop(AF_INET6, &orte->rt_ripinfo.rip6_dest,
-		       in6txt, INET6_ADDRSTRLEN),
-	     orte->rt_ripinfo.rip6_plen, ifname);
-#endif
+      IFLOG(LOG_RIP)
+	syslog(LOG_DEBUG,
+	       "<%s>: I/F direct route(%s/%d on %s) cannot overwritten",
+	       __FUNCTION__,
+	       ip6str(&orte->rt_ripinfo.rip6_dest, 0),
+	       orte->rt_ripinfo.rip6_plen, ifname);
       free(rte);
       continue;  /* to next rte */
     }
@@ -962,14 +843,11 @@ rip_process_response(ripif, nn)
 
     /**  check aggregate routes  **/
     if (find_rte(rte, aggregations)) {
-#ifdef DEBUG_RIP
-      syslog(LOG_DEBUG,
-	     "<%s>: aggregate route %s/%d on %s cannot overwritten",
-	     __FUNCTION__,
-	     inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest, in6txt,
-		       INET6_ADDRSTRLEN),
-	     rte->rt_ripinfo.rip6_plen, ifname);
-#endif
+      IFLOG(LOG_RIP)
+	syslog(LOG_DEBUG,
+	       "<%s>: aggregate route %s/%d on %s cannot overwritten",
+	       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+	       rte->rt_ripinfo.rip6_plen, ifname);
       free(rte);
       continue;  /* to next rte */
     }
@@ -989,13 +867,10 @@ rip_process_response(ripif, nn)
 	    (orte = find_rte(rte, obnp->rp_adj_ribs_in))) {
 
 	  if (rte->rt_ripinfo.rip6_tag == 0) {   /* purely internal */
-#ifdef DEBUG
-	    syslog(LOG_DEBUG, "<%s>: %s/%d on %s is purely internal.",
-		   __FUNCTION__,
-		   inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
-			     in6txt, INET6_ADDRSTRLEN),
-		   rte->rt_ripinfo.rip6_plen, ifname);
-#endif
+	    IFLOG(LOG_RIP)
+	      syslog(LOG_DEBUG, "<%s>: %s/%d on %s is purely internal.",
+		     __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		     rte->rt_ripinfo.rip6_plen, ifname);
 	    bgp_disable_rte(orte); /* XXX: do not have to propagate? */
 	  }
 	  else {
@@ -1006,14 +881,11 @@ rip_process_response(ripif, nn)
 	      rte->rt_flags  &=  ~RTF_UP;
 
 	      if (!(orte->rt_flags & RTF_IGP_EGP_SYNC)) {
-#ifdef DEBUG
-		syslog(LOG_DEBUG, "<%s>: synchronized...%s/%d on %s, tag=%d",
-		       __FUNCTION__,
-		       inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
-				 in6txt, INET6_ADDRSTRLEN),
-		       rte->rt_ripinfo.rip6_plen, ifname,
-		       ntohs(rte->rt_ripinfo.rip6_tag));
-#endif
+		IFLOG(LOG_RIP)
+		  syslog(LOG_DEBUG, "<%s>: synchronized...%s/%d on %s, tag=%d",
+			 __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+			 rte->rt_ripinfo.rip6_plen, ifname,
+			 ntohs(rte->rt_ripinfo.rip6_tag));
 		orte->rt_flags |=   RTF_IGP_EGP_SYNC;
 		/* don't touch RTF_UP, for backup-route */
 		srte = orte;
@@ -1031,14 +903,11 @@ rip_process_response(ripif, nn)
 	    (orte = find_rte(rte, obnp->rp_adj_ribs_in))) {
 
 	  if (rte->rt_ripinfo.rip6_tag == 0) {   /* purely internal */
-#ifdef DEBUG
-	    syslog(LOG_DEBUG, "<%s>: %s/%d on %s is purely internal.",
-		   __FUNCTION__,
-		   inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
-			     in6txt, INET6_ADDRSTRLEN),
-		   rte->rt_ripinfo.rip6_plen, ifname,
-		   ntohs(rte->rt_ripinfo.rip6_tag));
-#endif
+	    IFLOG(LOG_RIP)
+	      syslog(LOG_DEBUG, "<%s>: %s/%d on %s is purely internal.",
+		     __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		     rte->rt_ripinfo.rip6_plen, ifname,
+		     ntohs(rte->rt_ripinfo.rip6_tag));
 	    bgp_disable_rte(orte);
 	  } else {
 
@@ -1056,9 +925,8 @@ rip_process_response(ripif, nn)
 		       aspath2cost(orte->rt_aspath))     ||
 		      (ntohl(srte->rt_aspath->asp_med) <
 		       ntohl(orte->rt_aspath->asp_med))))) {
-#ifdef DEBUG
-		  syslog(LOG_DEBUG, "<%s>: tag differ.", __FUNCTION__);
-#endif
+		  IFLOG(LOG_RIP)
+		    syslog(LOG_DEBUG, "<%s>: tag differ.", __FUNCTION__);
 		  bgp_disable_rte(orte); /* XXX: do not have to propagate? */
 		} else {
 		  /* don't touch srte's RTF_UP. No need. */
@@ -1076,9 +944,8 @@ rip_process_response(ripif, nn)
 
       if (obnp == NULL) {
 	free(rte);
-#ifdef DEBUG
-	syslog(LOG_DEBUG, "<%s>: skip", __FUNCTION__);
-#endif
+	IFLOG(LOG_RIP)
+	  syslog(LOG_DEBUG, "<%s>: skip", __FUNCTION__);
 	continue;   /* to next rte */
       }
     }
@@ -1149,16 +1016,13 @@ rip_process_response(ripif, nn)
 
 	  if (rte->rt_ripinfo.rip6_metric != orte->rt_ripinfo.rip6_metric) {
 	    /**  Metric Change  **/
-#ifdef DEBUG
-	    syslog(LOG_DEBUG,
-		   "<%s>: metric for %s/%d on %s changes from %d to %d",
-		   __FUNCTION__,
-		   inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
-			     in6txt, INET6_ADDRSTRLEN),
-		   rte->rt_ripinfo.rip6_plen, ifname,
-		   orte->rt_ripinfo.rip6_metric,
-		   rte->rt_ripinfo.rip6_metric);
-#endif
+	    IFLOG(LOG_RIP)
+	      syslog(LOG_DEBUG,
+		     "<%s>: metric for %s/%d on %s changes from %d to %d",
+		     __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		     rte->rt_ripinfo.rip6_plen, ifname,
+		     orte->rt_ripinfo.rip6_metric,
+		     rte->rt_ripinfo.rip6_metric);
 	    ALTER_RTE;
 	    break; /* while(oripif) */
 	  }
@@ -1184,17 +1048,15 @@ rip_process_response(ripif, nn)
 	    break; /* while(oripif) */
 
 	  } else {
-#ifdef DEBUG
-	    syslog(LOG_DEBUG, "<%s>: nexthop for %s/%d changes "
-		   "from %s to %s on %d",
-		   __FUNCTION__,
-		   inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
-			     in6txt, INET6_ADDRSTRLEN),
-		   rte->rt_ripinfo.rip6_plen,
-		   ip6str(&orte->rt_gw, oripif->rip_ife->ifi_ifn->if_index),
-		   ip6str(&rte->rt_gw, ripif->rip_ife->ifi_ifn->if_index),
-		   ifname);
-#endif
+	    IFLOG(LOG_RIP)
+	      syslog(LOG_DEBUG, "<%s>: nexthop for %s/%d changes "
+		     "from %s to %s on %d",
+		     __FUNCTION__,
+		     ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		     rte->rt_ripinfo.rip6_plen,
+		     ip6str(&orte->rt_gw, oripif->rip_ife->ifi_ifn->if_index),
+		     ip6str(&rte->rt_gw, ripif->rip_ife->ifi_ifn->if_index),
+		     ifname);
 	    ALTER_RTE;
 	    break;
 	  }
@@ -1211,9 +1073,8 @@ rip_process_response(ripif, nn)
 
     if (oripif == NULL) {
       free(rte);
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "<%s>: skip", __FUNCTION__);
-#endif
+      IFLOG(LOG_RIP)
+	syslog(LOG_DEBUG, "<%s>: skip", __FUNCTION__);
       continue;   /* to next rte */
     }
 
@@ -1282,10 +1143,8 @@ rip_process_response(ripif, nn)
     free(garbage);
   }
 
-
-#ifdef DEBUG_RIP
-  syslog(LOG_DEBUG, "<rip_process_response>: done, i=%d", i);
-#endif
+  IFLOG(LOG_RIP)
+    syslog(LOG_DEBUG, "<rip_process_response>: done, i=%d", i);
 
   return (unn + dnn);
 }
@@ -1312,16 +1171,9 @@ rip_sendmsg(sin, pktinfo, len)
   struct cmsghdr     *ch;                 /* Adv. API */
   int                 shoplimit;          /* Adv. API */
   char                ifname[IFNAMSIZ];
-
-#ifdef DEBUG_RIP
   struct riphdr      *rp;    /* RIPng header   */
-  char                in6txt[INET6_ADDRSTRLEN];
-  char              myin6txt[INET6_ADDRSTRLEN];
 
-  memset(  in6txt, 0, INET6_ADDRSTRLEN);
-  memset(myin6txt, 0, INET6_ADDRSTRLEN);
   memset(  ifname, 0, IFNAMSIZ);
-#endif
 
   memset(cmsg,  0,
 	 CMSG_SPACE(sizeof(struct in6_pktinfo)) +
@@ -1376,18 +1228,16 @@ rip_sendmsg(sin, pktinfo, len)
     return(-1);
   }
 
-#ifdef DEBUG_RIP
-  rp = (struct riphdr *)rippkt;    /* RIPng header   */
-  syslog(LOG_DEBUG,
-	 "RIPng SEND cmd %s, length %d", rip_msgstr[rp->riph_cmd], len);
-  syslog(LOG_DEBUG,
-	 "RIPng SEND %s+%d -> %s+%d (%s)",
-	 inet_ntop(AF_INET6, &pktinfo->ipi6_addr, myin6txt, INET6_ADDRSTRLEN),
-	 RIPNG_PORT,
-	 inet_ntop(AF_INET6, &sin->sin6_addr, in6txt, INET6_ADDRSTRLEN),
-	 ntohs(sin->sin6_port),
-	 if_indextoname(pktinfo->ipi6_ifindex, ifname));
-#endif
+  IFLOG(LOG_RIP) {
+    rp = (struct riphdr *)rippkt;    /* RIPng header   */
+    syslog(LOG_DEBUG,
+	   "RIPng SEND cmd %s, length %d", rip_msgstr[rp->riph_cmd], len);
+    syslog(LOG_DEBUG,
+	   "RIPng SEND %s+%d -> %s+%d (%s)",
+	   ip6str(&pktinfo->ipi6_addr, 0), RIPNG_PORT, ip6str2(sin),
+	   ntohs(sin->sin6_port),
+	   if_indextoname(pktinfo->ipi6_ifindex, ifname));
+  }
 
   return(0);
   /* End of rip_sendmsg */
@@ -1409,10 +1259,6 @@ rip_make_dump(ripif)
   struct ripinfo6 *np;   /* RIPng RTE, nibbing to "ripbuf"  */
   struct rtproto  *rtp, artp;
   struct rt_entry *rte, *base, *agg;
-#ifdef DEBUG_RIP
-  char                in6txt[INET6_ADDRSTRLEN];
-#endif
-
   int nn = 0;
   np  = (struct ripinfo6 *)(ripbuf + sizeof(struct riphdr));
 
@@ -1421,11 +1267,10 @@ rip_make_dump(ripif)
     np->rip6_metric = 1;
     np++;
     nn++;
-#ifdef DEBUG_RIP
-    syslog(LOG_DEBUG, "RIPng DUMP\t%d\tdefault(originated) on %s",
-	   nn,
-	   ripif->rip_ife->ifi_ifn->if_name);
-#endif 
+    IFLOG(LOG_RIP)
+      syslog(LOG_DEBUG, "RIPng DUMP\t%d\tdefault(originated) on %s",
+	     nn,
+	     ripif->rip_ife->ifi_ifn->if_name);
   }
 
   memset(&artp, 0, sizeof(artp));
@@ -1473,11 +1318,11 @@ rip_make_dump(ripif)
 	  if ((ripif->rip_mode & IFS_DEFAULTORIGINATE) &&
 	      IN6_IS_ADDR_UNSPECIFIED(&agg->rt_ripinfo.rip6_dest) &&
 	      agg->rt_ripinfo.rip6_plen == 0) {
-#ifdef DEBUG_RIP
-		  syslog(LOG_DEBUG,
-			 "<%s>: ignore default route when originating",
-			 __FUNCTION__);
-#endif
+	    IFLOG(LOG_RIP)
+	      syslog(LOG_DEBUG,
+		     "<%s>: ignore default route when originating",
+		     __FUNCTION__);
+
 		  goto nextroute;
 	  }
 	  memcpy(np, &agg->rt_ripinfo, sizeof(struct ripinfo6));
@@ -1494,23 +1339,21 @@ rip_make_dump(ripif)
 	  if ((ripif->rip_mode & IFS_DEFAULTORIGINATE) &&
 	      IN6_IS_ADDR_UNSPECIFIED(&rte->rt_ripinfo.rip6_dest) &&
 	      rte->rt_ripinfo.rip6_plen == 0) {
-#ifdef DEBUG_RIP
-		  syslog(LOG_DEBUG,
-			 "<%s>: ignore default route when originating",
-			 __FUNCTION__);
-#endif
+	    IFLOG(LOG_RIP)
+	      syslog(LOG_DEBUG,
+		     "<%s>: ignore default route when originating",
+		     __FUNCTION__);
 		  goto nextroute;
 	  }
 
 	  memcpy(np, &rte->rt_ripinfo, sizeof(struct ripinfo6));
 	  np->rip6_metric = MIN(np->rip6_metric+1, RIPNG_METRIC_UNREACHABLE);
-#ifdef DEBUG_RIP
-	  syslog(LOG_DEBUG, "RIPng DUMP\t%d\t%s/%d (%d) on %s",
-		 nn,
-		 inet_ntop(AF_INET6, &np->rip6_dest, in6txt, INET6_ADDRSTRLEN),
-		 np->rip6_plen, np->rip6_metric,
-		 ripif->rip_ife->ifi_ifn->if_name);
-#endif
+	  IFLOG(LOG_RIP)
+	    syslog(LOG_DEBUG, "RIPng DUMP\t%d\t%s/%d (%d) on %s",
+		   nn, ip6str(&np->rip6_dest, 0),
+		   np->rip6_plen, np->rip6_metric,
+		   ripif->rip_ife->ifi_ifn->if_name);
+
 	  np++;  /* nibbing */ 
 	  nn++;  /* count   */
 	}
@@ -1565,11 +1408,10 @@ rip_make_data(rte, ripif, ripmode)
       if ((ripmode & IFS_DEFAULTORIGINATE) &&
 	  IN6_IS_ADDR_UNSPECIFIED(&agg->rt_ripinfo.rip6_dest) &&
 	  agg->rt_ripinfo.rip6_plen) {
-#ifdef DEBUG_RIP
-	      syslog(LOG_DEBUG,
-		       "<%s>: ignore default route when originating",
-		       __FUNCTION__);
-#endif
+	IFLOG(LOG_RIP)
+	  syslog(LOG_DEBUG,
+		 "<%s>: ignore default route when originating",
+		 __FUNCTION__);
 	      goto nextroute;
       }
 
@@ -1592,11 +1434,11 @@ rip_make_data(rte, ripif, ripmode)
       if ((ripmode & IFS_DEFAULTORIGINATE) &&
 	  IN6_IS_ADDR_UNSPECIFIED(&r->rt_ripinfo.rip6_dest) &&
 	  r->rt_ripinfo.rip6_plen) {
-#ifdef DEBUG_RIP
-	      syslog(LOG_DEBUG,
-		       "<%s>: ignore default route when originating",
-		       __FUNCTION__);
-#endif
+	IFLOG(LOG_RIP)
+	  syslog(LOG_DEBUG,
+		 "<%s>: ignore default route when originating",
+		 __FUNCTION__);
+
 	      goto nextroute;
       }
       memcpy(np, &r->rt_ripinfo, sizeof(struct ripinfo6));
@@ -1657,10 +1499,9 @@ rip_disable_rte(rte)
 {
   struct rt_entry *crte;  /* to be copied */
 
+  IFLOG(LOG_RIP)
+    syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
-#endif
   if (delroute(rte, &rte->rt_gw) != 0) {
     syslog(LOG_ERR, "<%s>: route couldn't be deleted.", __FUNCTION__);
     return NULL;
@@ -1695,9 +1536,8 @@ rip_erase_rte(rte)
   if (rte->rt_proto.rtp_type != RTPROTO_RIP)
     fatalx("<rip_erase_rte>: BUG !");
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
-#endif
+  IFLOG(LOG_RIP)
+    syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
 
   if (delroute(rte, &rte->rt_gw) != 0)
     syslog(LOG_ERR, "<%s>: route couldn't be deleted.", __FUNCTION__);
@@ -1827,9 +1667,9 @@ rip_life_expired() {
 
       rte->rt_riptime = garbage;   garbageyes = 1;
       rte->rt_ripinfo.rip6_metric = RIPNG_METRIC_UNREACHABLE;
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "<%s>: calling rip_disable_rte()...", __FUNCTION__);
-#endif
+      IFLOG(LOG_RIP)
+	syslog(LOG_DEBUG, "<%s>: calling rip_disable_rte()...", __FUNCTION__);
+
       dwnrte = rip_disable_rte(rte); /* copied */
       if (dwnrte) {
 	dwnrte->rt_next = dwnrte->rt_prev = dwnrte;
@@ -1870,10 +1710,8 @@ rip_garbage_expired() {
 
   extern task     *taskhead;
 
-
-#ifdef DEBUG_RIP
-  syslog(LOG_DEBUG, "<rip_garbage_expired>: invoked.");
-#endif
+  IFLOG(LOG_RIP)
+    syslog(LOG_DEBUG, "<rip_garbage_expired>: invoked.");
 
   ripif = taskhead->tsk_rip;
 
@@ -1896,11 +1734,8 @@ rip_garbage_expired() {
 
   taskhead = task_remove(taskhead);
 
-
-#ifdef DEBUG_RIP
-  syslog(LOG_DEBUG, "<rip_garbage_expired>: done.");
-#endif
-
+  IFLOG(LOG_RIP)
+    syslog(LOG_DEBUG, "<rip_garbage_expired>: done.");
 }
 
 /*
@@ -1920,14 +1755,13 @@ rip_output_filter(struct ripif *ripif, struct ripinfo6 *ripinfo)
 	struct filterset *f = &ripif->rip_filterset;
 
 	if (output_filter_check(f, rip_use_sitelocal, ripinfo)) {
-#ifdef DEBUG_RIP
-		syslog(LOG_DEBUG,
-		       "<%s>: output route %s/%d on %s was filtered"
-		       __FUNCTION__,
-		       ip6str(&ripinfo->rip6_dest, 0),
-		       ripinfo->rip6_plen,
-		       ripif->rip_ife->ifi_ifn->if_name);
-#endif
+		IFLOG(LOG_RIP)
+			syslog(LOG_DEBUG,
+			       "<%s>: output route %s/%d on %s was filtered"
+			       __FUNCTION__,
+			       ip6str(&ripinfo->rip6_dest, 0),
+			       ripinfo->rip6_plen,
+			       ripif->rip_ife->ifi_ifn->if_name);
 		return(1);
 	}
 	return(0);

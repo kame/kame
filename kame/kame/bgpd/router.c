@@ -127,14 +127,9 @@ propagate(rte)
   extern byte      bgpyes;
   extern byte      ripyes;
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<%s>: Invoked.", __FUNCTION__);
-#endif
-
   if (rte == NULL) {
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<%s>: Nothing to do.", __FUNCTION__);
-#endif
+    IFLOG(LOG_BGPROUTE)
+      syslog(LOG_DEBUG, "<%s>: Nothing to do.", __FUNCTION__);
     return;
   }
 
@@ -228,13 +223,7 @@ propagate(rte)
 	break;
     }
   }
-
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<%s>: executed.", __FUNCTION__);
-#endif
-  
 }
-
 
 /*
  *   redistribute()
@@ -249,17 +238,12 @@ redistribute(rte)
 
   extern byte     bgpyes;
   extern byte     ripyes;
-
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<%s>: invoked.", __FUNCTION__);
-#endif
  
   if (rte)
     srcrtp = &rte->rt_proto;
   else {
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<%s>: Nothing to do.", __FUNCTION__);
-#endif
+    IFLOG(LOG_BGPROUTE)
+      syslog(LOG_DEBUG, "<%s>: Nothing to do.", __FUNCTION__);
     return;
   }
 
@@ -338,10 +322,5 @@ redistribute(rte)
     }
     free_bgpcb_list(disthead);
   }
-
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<%s>: executed.", __FUNCTION__);
-#endif
-
 }
 

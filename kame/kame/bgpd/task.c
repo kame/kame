@@ -47,10 +47,7 @@ char *task_timerstr[] = {
 
 
 extern task *taskhead;
-
-#ifdef DEBUG_TIMER
 static void dump_timer();
-#endif 
 
 #define TIMER_MINIMUM_USEC 100000 /* 100msec */
 
@@ -109,12 +106,11 @@ task_timer_update(argtask)
 
 
   if (setitimer(ITIMER_REAL, &itimer, NULL) == 0) {
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<task_timer_update>: %s (%d.%d sec) set",
-	   task_timerstr[taskhead->tsk_timename],
-	   taskhead->tsk_timeval.tv_sec,
-	   taskhead->tsk_timeval.tv_usec);
-#endif
+    IFLOG(LOG_TIMER)
+      syslog(LOG_DEBUG, "<task_timer_update>: %s (%d.%d sec) set",
+	     task_timerstr[taskhead->tsk_timename],
+	     taskhead->tsk_timeval.tv_sec,
+	     taskhead->tsk_timeval.tv_usec);
   } else {
     fatalx("<task_timer_update>: setitimer");
   }
@@ -194,9 +190,8 @@ task_timer_sync()
 		 "expire: %lu:%lu, tasktime: %lu:%lu",
 		 itimer.it_value.tv_sec, itimer.it_value.tv_usec,
 		 taskhead->tsk_timeval.tv_sec, taskhead->tsk_timeval.tv_usec);
-#ifdef DEBUG_TIMER
-	  dump_timer();
-#endif 
+	  IFLOG(LOG_TIMER)
+	    dump_timer();
   }
 
   tsk = taskhead;
@@ -230,7 +225,6 @@ sub_timeval(tv1, tv2)
   return (tt2 - tt1);
 }
 
-#ifdef DEBUG_TIMER
 static void
 dump_timer()
 {
@@ -280,4 +274,3 @@ dump_timer()
 
 	syslog(LOG_NOTICE, "<%s>: %s", __FUNCTION__, logbuf);
 }
-#endif 
