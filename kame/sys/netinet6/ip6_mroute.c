@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.119 2003/12/10 09:08:49 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.120 2003/12/10 09:23:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -973,6 +973,11 @@ add_m6fc(mfccp)
 	u_short nstl;
 	int s;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	MF6CFIND(mfccp->mf6cc_origin.sin6_addr,
 		 mfccp->mf6cc_mcastgrp.sin6_addr, rt);
 
@@ -986,11 +991,6 @@ add_m6fc(mfccp)
 			    mfccp->mf6cc_parent);
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		s = splsoftnet();
-#else
-		s = splnet();
-#endif
 		rt->mf6c_parent = mfccp->mf6cc_parent;
 		rt->mf6c_ifset = mfccp->mf6cc_ifset;
 		splx(s);
@@ -1000,11 +1000,6 @@ add_m6fc(mfccp)
 	/*
 	 * Find the entry for which the upcall was made and update
 	 */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
 	hash = MF6CHASH(mfccp->mf6cc_origin.sin6_addr,
 			mfccp->mf6cc_mcastgrp.sin6_addr);
 	for (rt = mf6ctable[hash], nstl = 0; rt; rt = rt->mf6c_next) {
