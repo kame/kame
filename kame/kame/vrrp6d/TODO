@@ -1,5 +1,0 @@
-#	$KAME: TODO,v 1.2 2002/07/10 04:54:15 itojun Exp $
-
-* Cryptographic Authentification Data
-* Possiblity to set netmask for VIP address(es)
-* Add more configuration parameters in the configuration file

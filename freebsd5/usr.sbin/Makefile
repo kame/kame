@@ -7,6 +7,5 @@ SUBDIR+=ifmcstat
 SUBDIR+=mip6control had mip6stat
 SUBDIR+=ip6addrctl
 #SUBDIR+=natptconfig natptlog
-SUBDIR+=vrrp6d
 
 .include <bsd.subdir.mk>

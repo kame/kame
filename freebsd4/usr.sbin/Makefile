@@ -7,7 +7,6 @@ SUBDIR+=racoon
 SUBDIR+=mip6control had mip6stat
 SUBDIR+=ip6addrctl
 SUBDIR+=natptconfig natptlog
-SUBDIR+=vrrp6d
 SUBDIR+=dhcp6
 
 .include <bsd.subdir.mk>
