@@ -47,6 +47,7 @@
 #include <ifaddrs.h>
 
 static int scopeconfig __P((const char *, u_int32_t, u_int32_t, u_int32_t));
+static int print_default __P((void));
 
 int
 main(argc, argv)
@@ -81,13 +82,17 @@ main(argc, argv)
 	if ((aflag && argc != 0) || (!aflag && argc != 1)) {
 		fprintf(stderr,
 			"usage: scope6config [-l linkid] [-s siteid] "
-			"[-o orgid] ifname\n");
+			"[-o orgid] default\n");
+		fprintf(stderr,
+			"       scope6config default\n");
 		fprintf(stderr,
 			"       scope6config -a\n");
 		exit(1);
 	}
 
-	if (!aflag)
+	if (strcasecmp(argv[0], "default") == 0)
+		error = print_default();
+	else if (!aflag)
 		error = scopeconfig(argv[0], linkid, siteid, orgid);
 	else {
 		const char *prev;
@@ -140,6 +145,30 @@ scopeconfig(name, linkid, siteid, orgid)
 		err(1, "ioctl(SIOCGSCOPE6)");
 
 	printf("%s:", name);
+	for (i = 0; i < 16; i++)
+		printf("%s %d", i ? "," : "", ifreq.ifr_ifru.ifru_scope_id[i]);
+
+	putchar('\n');
+
+	return 0;
+}
+
+static int
+print_default()
+{
+	struct in6_ifreq ifreq;
+	int s, i;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+		err(1, "socket");
+
+	memset(&ifreq, 0, sizeof(ifreq));
+	strncpy(ifreq.ifr_name, "lo0", sizeof(ifreq.ifr_name));	/* lo0 is dummy */
+
+	if (ioctl(s, SIOCGSCOPE6DEF, (caddr_t)&ifreq) < 0)
+		err(1, "ioctl(SIOCGSCOPE6DEF)");
+
+	printf("default:");
 	for (i = 0; i < 16; i++)
 		printf("%s %d", i ? "," : "", ifreq.ifr_ifru.ifru_scope_id[i]);
 
