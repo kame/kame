@@ -698,8 +698,8 @@ key_sockaddr(struct socket *so, struct sockaddr **nam)
 }
 
 struct pr_usrreqs key_usrreqs = {
-	key_abort, pru_accept_notsupp, 
-	key_attach, 
+	key_abort, pru_accept_notsupp,
+	key_attach,
 	key_bind,
 	key_connect,
 	pru_connect2_notsupp, pru_control_notsupp, key_detach,
