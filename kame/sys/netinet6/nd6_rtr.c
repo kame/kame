@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.140 2001/07/21 09:43:51 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.141 2001/07/21 10:15:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -743,13 +743,13 @@ defrouter_delreq(dr)
 
 /*
  * Default Router Selection according to Section 6.3.6 of RFC 2461:
- * 1) If the Default Router List is empty, assume that all
- *    destinations are on-link.
- * 2) Routers that are reachable or probably reachable should be
+ * 1) Routers that are reachable or probably reachable should be
  *    preferred.
- * 3) When no routers on the list are known to be reachable or
+ * 2) When no routers on the list are known to be reachable or
  *    probably reachable, routers SHOULD be selected in a round-robin
  *    fashion.
+ * 3) If the Default Router List is empty, assume that all
+ *    destinations are on-link.
  *
  * We assume nd_defrouter is sorted by router preference value.
  */
@@ -800,7 +800,8 @@ defrouter_select()
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			/*
-			 * if it is the fresh default router, or it has the
+			 * The router looks reachable.
+			 * If it is the fresh default router, or it has the
 			 * same preference as the previously instaled one,
 			 * we install it.
 			 */
