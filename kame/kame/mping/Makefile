@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.3 2000/12/05 09:08:54 itojun Exp $
+#	$KAME: Makefile,v 1.4 2001/03/12 04:57:10 itojun Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -51,6 +51,7 @@ CFLAGS+=-g
 
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L/usr/local/v6/lib -linet6
+DPADD+=	/usr/local/v6/lib/libinet6.a
 .endif
 
 MAN=	mpsend.8 mprecv.8
