@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.1 2000/05/21 05:30:15 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.2 2000/05/30 15:55:35 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -38,7 +38,9 @@
 .Nm
 .Op Fl 46
 .Op Fl d Ar dnsserv
-.Op Fl p Ar port
+.Op Fl h Ar hostname
+.Op Fl p Ar inport
+.Op Fl P Ar outport
 .Fl i Ar intface
 .\"
 .Sh DESCRIPTION
@@ -55,13 +57,11 @@ will forward the reply to the original querier.
 .Nm
 will also reply to multicast DNS queries from other nodes.
 .Pp
-.Fl 4
-and
-.Fl 6
-controls the address family to use for DNS transport.
-.Pp
-With
-.Fl d ,
+.Bl -tag -width Ds
+.It Fl 4
+.It Fl 6
+Controls the address family to use for DNS transport.
+.It Fl d Ar dnsserv
 .Nm
 will advertise DNS server
 .Ar dnsserv
@@ -74,9 +74,25 @@ must be a fully qualified canonical DNS name.
 must not point to CNAME record.
 Also, it must carry terminating period, like
 .Dq Li ns.ietf.org. .
-.Pp
+.It Fl h Ar hostname
+Specify local hostname that
+.Nm
+will serve against unicast/multicast queries.
+If ommitted, result from
+.Xr gethostname 3
+will be used.
+.It Fl i Ar intface
+Specify multicast interface.
+The flag is mandatory.
+.It Fl p Ar inport
 .Fl p
 lets you change the listening UDP port.
+.It Fl P Ar outport
+.Fl P
+lets you change the outgoing UDP port, used for multicast queries.
+.Fl P
+is for debugging purposes only.
+.El
 .\"
 .Sh SEE ALSO
 .Rs

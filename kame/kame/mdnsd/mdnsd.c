@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.4 2000/05/21 06:34:01 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.5 2000/05/30 15:55:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -45,12 +45,17 @@
 
 #include "mdnsd.h"
 
+u_int16_t dnsid;
+const char *srcport = "53";
+const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
 const char *intface = NULL;
 int insock;
 int af = AF_INET;
 static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
+static int mcasthops = 1;
+static int mcastloop = 0;
 
 static void usage __P((void));
 static int getsock __P((int, const char *, int, int));
@@ -66,9 +71,8 @@ main(argc, argv)
 	char **argv;
 {
 	int ch;
-	const char *port = MDNS_PORT;
 
-	while ((ch = getopt(argc, argv, "46d:i:p:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46d:h:i:p:P:")) != EOF) {
 		switch (ch) {
 		case '4':
 			af = AF_INET;
@@ -83,11 +87,18 @@ main(argc, argv)
 			}
 			dnsserv = optarg;
 			break;
+		case 'h':
+			hostname = optarg;
+			break;
 		case 'i':
 			intface = optarg;
 			break;
 		case 'p':
-			port = optarg;
+			srcport = optarg;
+			break;
+		case 'P':
+			dstport = optarg;
+			mcastloop = 1;
 			break;
 		default:
 			usage();
@@ -104,7 +115,10 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	insock = getsock(af, port, SOCK_DGRAM, AI_PASSIVE);
+	srandom(time(NULL) ^ getpid());
+	dnsid = random() & 0xffff;
+
+	insock = getsock(af, srcport, SOCK_DGRAM, AI_PASSIVE);
 	if (insock < 0) {
 		err(1, "getsock");
 		/*NOTREACHED*/
@@ -122,11 +136,14 @@ main(argc, argv)
 		}
 	}
 
-	if (gethostname(hostnamebuf, sizeof(hostnamebuf)) != 0) {
-		err(1, "gethostname");
-		/*NOTREACHED*/
+	if (!hostname) {
+		if (gethostname(hostnamebuf, sizeof(hostnamebuf)) != 0) {
+			err(1, "gethostname");
+			/*NOTREACHED*/
+		}
+		hostname = hostnamebuf;
 	}
-	hostname = hostnamebuf;
+	printf("hostname=%s\n", hostname);
 
 	mainloop();
 	exit(0);
@@ -135,7 +152,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: mdnsd [-46] [-d server] [-p port] -i iface\n");
+	fprintf(stderr, "usage: mdnsd [-46] [-d server] [-h hostname] [-p srcport] [-P dstport] -i iface\n");
 }
 
 /* XXX todo: multiple sockets */
@@ -176,6 +193,21 @@ getsock0(ai)
 	if (bind(s, ai->ai_addr, ai->ai_addrlen) < 0) {
 		close(s);
 		return -1;
+	}
+
+	switch (ai->ai_family) {
+	case AF_INET6:
+		(void)setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+		    &mcasthops, sizeof(mcasthops));
+		(void)setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
+		    &mcastloop, sizeof(mcastloop));
+		break;
+	case AF_INET:
+		(void)setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL,
+		    &mcasthops, sizeof(mcasthops));
+		(void)setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP,
+		    &mcastloop, sizeof(mcastloop));
+		break;
 	}
 
 	return s;
@@ -329,49 +361,82 @@ int
 ismyaddr(sa)
 	const struct sockaddr *sa;
 {
-	struct sockaddr_storage ss;
+	struct sockaddr_storage ss[2];
+	u_int32_t scope[2], loscope;
 	struct ifaddrs *ifap, *ifa;
 	int ret;
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char p[NI_MAXSERV];
 #ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_NUMERICHOST;
 #endif
 
-	if (sa->sa_len > sizeof(ss))
-		return 0;
-	if (getnameinfo(sa, sa->sa_len, h1, sizeof(h1), NULL, 0, niflag) != 0)
-		return 0;
-	if (getifaddrs(&ifap) != 0)
+	if (sa->sa_len > sizeof(ss[0]))
 		return 0;
 
-	memcpy(&ss, sa, sa->sa_len);
-	sa = (struct sockaddr *)&ss;
+	memcpy(&ss[0], sa, sa->sa_len);
+	scope[0] = 0;
+	loscope = if_nametoindex("lo0");	/*XXX*/
 #ifdef __KAME__
 	if (sa->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 
-		sin6 = (struct sockaddr_in6 *)sin6;
-		if (sin6->sin6_scope_id &&
-		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
-		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))) {
-			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
-			    htons(sin6->sin6_scope_id);
+		sin6 = (struct sockaddr_in6 *)&ss[0];
+		if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr)) {
+			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] = 0;
+			scope[0] = sin6->sin6_scope_id;
 			sin6->sin6_scope_id = 0;
 		}
 	}
 #endif
+	h1[0] = h2[0] = '\0';
+	if (getnameinfo((struct sockaddr *)&ss[0], ss[0].ss_len, h1, sizeof(h1),
+	    p, sizeof(p), niflag | NI_NUMERICSERV) != 0)
+		return 0;
+#if 1	/*just for experiment - to run two servers on a single node*/
+	if (strcmp(p, dstport) == 0)
+		return 0;
+#endif
+
+	if (getifaddrs(&ifap) != 0)
+		return 0;
 	ret = 0;
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != sa->sa_family)
 			continue;
-		if (ifa->ifa_addr->sa_len != sa->sa_len)
+		if (ifa->ifa_addr->sa_len != sa->sa_len ||
+		    ifa->ifa_addr->sa_len > sizeof(ss[1])) {
 			continue;
-		if (getnameinfo(ifa->ifa_addr, ifa->ifa_addr->sa_len,
+		}
+		memcpy(&ss[1], ifa->ifa_addr, ifa->ifa_addr->sa_len);
+		scope[1] = 0;
+#ifdef __KAME__
+		if (ifa->ifa_addr->sa_family == AF_INET6) {
+			struct sockaddr_in6 *sin6;
+
+			sin6 = (struct sockaddr_in6 *)&ss[1];
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+			    IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr)) {
+				scope[1] = ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+				sin6->sin6_addr.s6_addr[2] = 0;
+				sin6->sin6_addr.s6_addr[3] = 0;
+			}
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&ss[1], ss[1].ss_len,
 		    h2, sizeof(h2), NULL, 0, niflag) != 0)
 			continue;
 		if (strcmp(h1, h2) != 0)
+			continue;
+		/*
+		 * due to traditional BSD loopback packet handling,
+		 * it is possible to get packet from loopback interface
+		 * instead of real interface.
+		 */
+		if (scope[0] != scope[1] && scope[0] != loscope)
 			continue;
 
 		ret = 1;

@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.5 2000/05/21 06:34:01 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.6 2000/05/30 15:55:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -47,11 +48,33 @@
 
 #include "mdnsd.h"
 
+struct qcache {
+	LIST_ENTRY(qcache) link;
+	struct sockaddr_storage from;
+	char *qbuf;	/* original query packet */
+	int qlen;
+	u_int16_t id;	/* id on relayed query - net endian */
+};
+
+struct acache {
+	LIST_ENTRY(acache) link;
+};
+
+static LIST_HEAD(, qcache) qcache;
+#if 0
+static LIST_HEAD(, acache) acache;
+#endif
+
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
-static int hexdump __P((const char *, int, const struct sockaddr *));
+static int hexdump __P((const char *, const char *, int,
+	const struct sockaddr *));
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
 	int, int, int *));
+static const struct sockaddr *getsa __P((const char *, const char *, int));
+static struct qcache *newqcache __P((const struct sockaddr *, char *, int));
+static void delqcache __P((struct qcache *));
+static int getans __P((char *, int, struct sockaddr *));
 static int relay __P((char *, int, struct sockaddr *));
 static int serve __P((char *, int, struct sockaddr *));
 
@@ -78,16 +101,22 @@ mainloop()
 
 		if (ismyaddr((struct sockaddr *)&from)) {
 			/*
-			 * if we have the answer, send it back.
-			 * otherwise, relay lookup request from local node.
+			 * if we are the authoritative server, send answer
+			 * back directly.
+			 * otherwise, relay lookup request from local node
+			 * to multicast-capable servers.
 			 */
-			if (serve(buf, l, (struct sockaddr *)&from) != 0) {
-				/* relay lookup request from local node */
+			if (serve(buf, l, (struct sockaddr *)&from) != 0)
 				relay(buf, l, (struct sockaddr *)&from);
-			}
 		} else {
-			/* look at cache, return something */
-			serve(buf, l, (struct sockaddr *)&from);
+			/*
+			 * if got a query from remote, try to transmit answer.
+			 * if we got a reply to our multicast query, fill
+			 * it into our local answer cache and send the reply
+			 * to the originator.
+			 */
+			if (serve(buf, l, (struct sockaddr *)&from) != 0)
+				getans(buf, l, (struct sockaddr *)&from);
 		}
 	}
 }
@@ -184,7 +213,8 @@ fail:
 }
 
 static int
-hexdump(buf, len, from)
+hexdump(title, buf, len, from)
+	const char *title;
 	const char *buf;
 	int len;
 	const struct sockaddr *from;
@@ -199,6 +229,8 @@ hexdump(buf, len, from)
 	HEADER *hp;
 	const char *d, *n;
 	int count;
+
+	printf("===\n%s\n", title);
 
 	if (getnameinfo(from, from->sa_len, hbuf, sizeof(hbuf),
 	    pbuf, sizeof(pbuf), niflags) != 0) {
@@ -401,14 +433,166 @@ fail:
 	return -1;
 }
 
+static const struct sockaddr *
+getsa(host, port, socktype)
+	const char *host;
+	const char *port;
+	int socktype;
+{
+	static struct sockaddr_storage ss;
+	struct addrinfo hints, *res;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = socktype;
+	if (getaddrinfo(host, port, &hints, &res) != 0)
+		return NULL;
+	if (res->ai_addrlen > sizeof(ss)) {
+		freeaddrinfo(res);
+		return NULL;
+	}
+	memcpy(&ss, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+	return (const struct sockaddr *)&ss;
+}
+
+static struct qcache *
+newqcache(from, buf, len)
+	const struct sockaddr *from;
+	char *buf;
+	int len;
+{
+	struct qcache *qc;
+
+	if (from->sa_len > sizeof(qc->from))
+		return NULL;
+
+	qc = (struct qcache *)malloc(sizeof(*qc));
+	if (qc == NULL)
+		return NULL;
+	memset(qc, 0, sizeof(*qc));
+	qc->qbuf = (char *)malloc(len);
+	if (qc->qbuf == NULL) {
+		free(qc);
+		return NULL;
+	}
+
+	memcpy(&qc->from, from, from->sa_len);
+	memcpy(qc->qbuf, buf, len);
+	qc->qlen = len;
+
+	LIST_INSERT_HEAD(&qcache, qc, link);
+	return qc;
+}
+
+static void
+delqcache(qc)
+	struct qcache *qc;
+{
+	LIST_REMOVE(qc, link);
+	if (qc->qbuf)
+		free(qc->qbuf);
+	free(qc);
+}
+
+static int
+getans(buf, len, from)
+	char *buf;
+	int len;
+	struct sockaddr *from;
+{
+	HEADER *hp;
+	struct qcache *qc;
+
+	hp = (HEADER *)buf;
+
+	hexdump("getans I", buf, len, from);
+
+	/* we handle successful replies only  XXX negative cache */
+	if (hp->qr != 1 || hp->rcode != NOERROR)
+		return -1;
+
+	for (qc = LIST_FIRST(&qcache); qc; qc = LIST_NEXT(qc, link)) {
+		if (hp->id == qc->id)
+			break;
+	}
+	if (!qc)
+		return -1;
+
+	/* XXX validate reply against original query */
+	hp->id = ((HEADER *)qc->qbuf)->id;
+	hp->rd = 0;
+	hexdump("getans O", buf, len, (struct sockaddr *)&qc->from);
+	if (sendto(insock, buf, len, 0, (struct sockaddr *)&qc->from,
+	    qc->from.ss_len) != len) {
+		delqcache(qc);
+		return -1;
+	}
+	delqcache(qc);
+	return 0;
+#if 0
+	if (hp->qr == 0 && hp->opcode == QUERY) {
+		/* query, no recurse - multicast it */
+		qc = newqcache(from, buf, len);
+
+		/* never ask for recursion */
+		hp->rd = 0;
+
+		qc->id = hp->id = htons(dnsid);
+		dnsid = (dnsid + 1) % 0x10000;
+
+		sa = getsa(MDNS_GROUP6, dstport, SOCK_DGRAM);
+		if (!sa) {
+			delqcache(qc);
+			return -1;
+		}
+		hexdump("relay O", buf, len, sa);
+		if (sendto(insock, buf, len, 0, sa, sa->sa_len) != len) {
+			delqcache(qc);
+			return -1;
+		}
+		return 0;
+	} else
+		return -1;
+#endif
+}
+
 static int
 relay(buf, len, from)
 	char *buf;
 	int len;
 	struct sockaddr *from;
 {
-	hexdump(buf, len, from);
-	return 0;
+	const struct sockaddr *sa;
+	HEADER *hp;
+	struct qcache *qc;
+
+	hp = (HEADER *)buf;
+
+	hexdump("relay I", buf, len, from);
+	if (hp->qr == 0 && hp->opcode == QUERY) {
+		/* query, no recurse - multicast it */
+		qc = newqcache(from, buf, len);
+
+		/* never ask for recursion */
+		hp->rd = 0;
+
+		qc->id = hp->id = htons(dnsid);
+		dnsid = (dnsid + 1) % 0x10000;
+
+		sa = getsa(MDNS_GROUP6, dstport, SOCK_DGRAM);
+		if (!sa) {
+			delqcache(qc);
+			return -1;
+		}
+		hexdump("relay O", buf, len, sa);
+		if (sendto(insock, buf, len, 0, sa, sa->sa_len) != len) {
+			delqcache(qc);
+			return -1;
+		}
+		return 0;
+	} else
+		return -1;
 }
 
 /*
@@ -430,7 +614,7 @@ serve(buf, len, from)
 	int l;
 	int count;
 
-	hexdump(buf, len, from);
+	hexdump("serve I", buf, len, from);
 
 	/* we handle queries only */
 	hp = (HEADER *)buf;
@@ -449,12 +633,10 @@ serve(buf, len, from)
 	if (class != C_IN)
 		goto fail;
 
-	/* validate hostname for forward query  XXX reverse query*/
-	printf("%s %s %u %u\n", hostname, n, type, class);
 	if (strcmp(hostname, n) == 0 ||
 	    (strlen(hostname) + 1 == strlen(n) &&
 	     strncmp(hostname, n, strlen(hostname)) == 0)) {
-		/* advertise my name */
+		/* hostname for forward query - advertise my addresses */
 		memcpy(replybuf, buf, d - buf);
 		hp = (HEADER *)replybuf;
 		p = replybuf + (d - buf);
@@ -466,12 +648,12 @@ serve(buf, len, from)
 		count = 0;
 		l = encode_myaddrs(n, type, class, replybuf, d - buf,
 		    sizeof(replybuf), &count);
-		if (l < 0)
+		if (l <= 0)
 			goto fail;
 		p += l;
 		hp->ancount = htons(count);
 
-		hexdump(replybuf, p - replybuf, from);
+		hexdump("serve O", replybuf, p - replybuf, from);
 
 		sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
 
@@ -482,7 +664,7 @@ serve(buf, len, from)
 		return 0;
 	} else if (type == T_SRV && dnsserv &&
 		   strcmp("_dns._udp.lcl.", n) == 0) {
-		/* advert DNS server */
+		/* DNS server query - advert DNS server */
 		memcpy(replybuf, buf, d - buf);
 		hp = (HEADER *)replybuf;
 		p = replybuf + (d - buf);
@@ -519,7 +701,7 @@ serve(buf, len, from)
 		*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
 		hp->ancount = htons(1);
 
-		hexdump(replybuf, p - replybuf, from);
+		hexdump("serve D", replybuf, p - replybuf, from);
 
 		sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
 
