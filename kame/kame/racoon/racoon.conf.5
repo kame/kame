@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.56 2000/10/12 00:42:17 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.57 2000/10/12 09:10:42 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -256,16 +256,16 @@ can be used as
 .Ar idtype .
 Each usage are the following.
 .Bl -tag -width Ds -compact
-.It Ic identifier Ic address Bq Ar address ;
+.It Ic my_identifier Ic address Bq Ar address ;
 defines the type of IP address.
 It is default if you don't specify the identifier.
-.It Ic identifier Ic user_fqdn Ar string ;
+.It Ic my_identifier Ic user_fqdn Ar string ;
 defines the type of USER_FQDN.
-.It Ic identifier Ic fqdn Ar string ;
+.It Ic my_identifier Ic fqdn Ar string ;
 defines the type of FQDN.
-.It Ic identifier Ic keyid Ar file ;
+.It Ic my_identifier Ic keyid Ar file ;
 defines the type of KEY_ID.
-.It Ic identifier Ic asn1dn Bq Ar string ;
+.It Ic my_identifier Ic asn1dn Bq Ar string ;
 defines the type of ASN.1 distinguished name.  If
 .Ar string
 is omitted,
@@ -464,8 +464,20 @@ See
 directive.
 .\"
 .It Ic identifier Ar idtype ;
-specifies ID type to use phase 2 negotiation.
-the type of address is used as default.
+is obsoleted.  Instead use
+.Ic my_identifier
+directives.
+.\"
+.It Ic my_identifier Ar idtype ... ;
+specifies ID type to use phase 2 negociation.
+The type of address is used as default.
+See
+.Ic my_identifier
+directive in
+.Ic remote
+for its usage.  It is always for initiator, not responder. 
+.Xr racoon
+as responder can handle only IP address type.
 .El
 .\"
 .Pp
