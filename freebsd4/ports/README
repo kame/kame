@@ -1,4 +1,4 @@
-$KAME: README,v 1.34 2003/07/17 07:42:08 sumikawa Exp $
+$KAME: README,v 1.35 2004/08/19 15:14:17 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -12,16 +12,16 @@ kernel/application from different versions. You need to use
 ports-current at your own risk and you may require some knowledge to
 mix them.
 
-ports merging status at $Date: 2003/07/17 07:42:08 $
+ports merging status at $Date: 2004/08/19 15:14:17 $
 
 KAME/FreeBSD3	ports-current
 -----------------------------
-XFree86		not yet
-apache13		merged as www/apache13+ipv6
-bind8		no plan. recomend to use net/bind9
-bind9		merged as net/bind9
+XFree86		Both XFree86 and xorg supports IPv6
+apache13	merged as www/apache13+ipv6
+bind8		merged as dns/bind84
+bind9		merged as dns/bind9
 ct		merged as net/ct
-echoping		merged as net/echoping
+echoping	merged as net/echoping
 emacs20		merged as editror/emacs20, editror/emacs20+dl
 fetchmail	merged as mail/fetchmail
 fwtk6		not yet
@@ -34,7 +34,7 @@ inn		not yet
 ipv6socket_scrub	merged as net/ipv6socket_scrub
 irc		merged as irc/irc
 irssi		merged as irc/irssi
-ja-mnews		merged as japanese/mnews
+ja-mnews	merged as japanese/mnews
 ja-w3m		merged as japanese/w3m
 ja-w3m-ssl	merged as japanese/w3m-ssl
 leafnode+	not yet
@@ -42,15 +42,16 @@ lftp		merged as ftp/lftp
 libident6	not yet
 libpcap		merged in original distribution
 lynx		merged as www/lynx
-mediator		no plan to merge(license issue)
+mediator	no plan to merge(license issue)
 mmosaic		not yet
-mod_perl		no plan. recomend to use www/apache2
+mod_perl	no plan. recomend to use www/apache2
 mozilla		merged as www/mozilla
 mpg123		merged as audio/mpg123
 mrt		merged as net/mrt
 mtr		merged as net/mtr
 ncftp3		merged as ftp/ncftp3
-netcat		recommend to use net/obnc(OpenBSD netcat)
+netcat		merged as net/netcat
+                but recommend to use net/obnc(OpenBSD netcat)
 netperf		merged as benchmarks/netperf
 netris		merged as games/netris
 newbie		no plan
@@ -58,7 +59,7 @@ openssh		merged in original distribution
 p5-Socket6	merged as net/p5-Socket6
 pchar		merged as net/pchar
 pfs		not yet
-pident6d		not yet
+pident6d	not yet
 popper		merged as mail/qpopper
 postfix		merged as mail/postfix-current
 ppp		merged in original distribution
@@ -71,18 +72,18 @@ rev_v6_address	not yet
 rsync		merged as net/rsync
 ruby		merged as lang/ruby
 sdr		not yet(maybe)
-sendmail		merged in original distribution
+sendmail	merged in original distribution
 socks5		not yet
 socks64		not yet
 solidpop3d	merged as mail/solidpop3d
-squid11		not yet(based version in KAME ports is old)
+squid11		not yet(based version in KAME ports is too old)
 ssh		merged as security/ssh
 tcp_wrapper	merged in original distribution
 tcpd		not yet
 tcpdump		merged in original distribution
-tcptrace		not yet
+tcptrace	not yet
 totd		merged as net/totd
-ucd-snmp		merged as net/ucd-snmp
+ucd-snmp	merged as net/ucd-snmp
 v6eval		net/v6eval
 v6tun		not yet
 vat6		not yet(maybe)
@@ -93,9 +94,9 @@ w3m-ssl		merged as www/w3m-ssl
 wbd		not yet(maybe)
 wget		merged as ftp/wget
 wu-ftpd		merged as ftp/wu-ftpd+ipv6
-wwwoffle		merged as www/wwwoffle
+wwwoffle	merged as www/wwwoffle
 wyvern		merged as www/wyvern
-xemacs21		not yet
-xmms		not yet
+xemacs21	not yet
+xmms		merged as multimedia/xmms
 xtris		merged as games/xtris
 zebra		merged as net/zebra
