@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.18 2001/10/11 12:58:21 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.19 2001/10/16 10:23:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2222,7 +2222,7 @@ mip6_bu_encapcheck(m, off, proto, arg)
 	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
 	struct in6_addr *encap_src, *encap_dst;
-	struct in6_addr *haaddr, *myaddr;
+	struct in6_addr *haaddr, *myaddr, *mycoa;
 
 	if (mbu == NULL) {
 		return (0);
@@ -2241,17 +2241,23 @@ mip6_bu_encapcheck(m, off, proto, arg)
 	encap_dst = &ip6->ip6_dst;
 	haaddr = &mbu->mbu_paddr;
 	myaddr = &mbu->mbu_haddr;
+	mycoa = &mbu->mbu_coa;
 
-	/* check ha addr */
-	if (!IN6_ARE_ADDR_EQUAL(encap_src, haaddr)) {
+	/*
+	 * check wether this packet is from the correct sender (that
+	 * is, our home agent) to the CoA the mobile node has
+	 * registered before.
+	 */
+	if (!IN6_ARE_ADDR_EQUAL(encap_src, haaddr) ||
+	    !IN6_ARE_ADDR_EQUAL(encap_dst, mycoa)) {
 		return (0);
 	}
 
-	/* check mn ifid */
-	if (!((encap_dst->s6_addr32[2] == myaddr->s6_addr32[2])
-	      && (encap_dst->s6_addr32[3] == myaddr->s6_addr32[3]))) {
-		return (0);
-	}
+	/*
+	 * XXX: should we compare the ifid of the inner dstaddr of the
+	 * incoming packet and the ifid of the mobile node's?  these
+	 * check will be done in the ip6_input and later.
+	 */
 
 	/* check mn prefix */
 	for (hs = TAILQ_FIRST(hs_list_home); hs;
@@ -2391,7 +2397,7 @@ mip6_tunnel_input(mp, offp, proto)
 
 	return (IPPROTO_DONE);
 
-  bad:
+ bad:
 	m_freem(m);
 	return (IPPROTO_DONE);
 }
