@@ -18,7 +18,7 @@ DPADD+= ${.CURDIR}/../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libpcap/libcap.a \
 	/usr/local/v6/lib/libpcap.a
 
-#CFLAGS += -DDEFAUT_IF="ep0"
+#CPPFLAGS += -DDEFAUT_IF="ep0"
 CONFS = ext.conf ndp.conf synloop.conf
 PREFIX?= /usr/local/v6
 CONFDIR= $(PREFIX)/share/v6test

@@ -22,7 +22,7 @@ DPADD+=	${LIBL} ${LIBY}
 MAN=	rrenumd.8 rrenumd.conf.5
 
 .if defined(YACCDEBUG)
-CFLAGS+= -DYYDEBUG
+CPPFLAGS+= -DYYDEBUG
 YFLAGS+= -t -v
 .endif
 

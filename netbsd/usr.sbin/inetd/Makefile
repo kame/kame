@@ -18,8 +18,8 @@ DPADD+=	${.CURDIR}/../../lib/libwrap/libwrap.a \
 # This is necessary due to be friendly with past API changes... DAMN.
 CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
 
-CFLAGS+=-DINET6
-CFLAGS+=-I${.CURDIR}/../../lib/libipsec
+CPPFLAGS+=-DINET6
+CPPFLAGS+=-I${.CURDIR}/../../lib/libipsec
 LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
@@ -32,7 +32,7 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 
 SRCDIR=	${.CURDIR}/../../kame/inetd
 .PATH:	${SRCDIR}
-CFLAGS+=-DIPSEC
+CPPFLAGS+=-DIPSEC
 SRCS+=	ipsec.c
 CPPFLAGS+=-I${SRCDIR}
 
