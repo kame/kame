@@ -1673,7 +1673,7 @@ statcmd()
 	if (data != -1)
 		printf("     Data connection open\r\n");
 	else if (pdata != -1) {
-		printf("     in Passive mode");
+		printf("     in Passive mode\r\n");
 		su = (union sockunion *)&pasv_addr;
 		ispassive++;
 		goto printaddr;
@@ -1723,8 +1723,8 @@ printaddr:
 				printf("211- LPRT ");
 			printf("(%d,%d", af, alen);
 			for (i = 0; i < alen; i++)
-				printf("%d,", UC(a[alen]));
-			printf("%d,%d,%d)\r\n", 2, UC(p[0]), UC(p[1]));
+				printf(",%d", UC(a[i]));
+			printf(",%d,%d,%d)\r\n", 2, UC(p[0]), UC(p[1]));
 #undef UC
 		}
 	    }
@@ -1751,9 +1751,9 @@ epsvonly:;
 					hbuf, sizeof(hbuf), pbuf, sizeof(pbuf),
 					NI_NUMERICHOST) == 0) {
 				if (ispassive)
-					printf("211 - EPSV ");
+					printf("211- EPSV ");
 				else
-					printf("211 - EPRT ");
+					printf("211- EPRT ");
 				printf("(|%d|%s|%s|)\r\n",
 					af, hbuf, pbuf);
 			}
