@@ -1,6 +1,9 @@
-$Id: CHANGELOG,v 1.482 2000/01/25 19:57:41 sumikawa Exp $
+$Id: CHANGELOG,v 1.483 2000/01/25 21:13:04 sumikawa Exp $
 
 <200001>
+Wed Jan 26 06:12:38 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/irssi: upgrade to 0.7.23.
+
 Wed Jan 26 03:33:41 JST 2000  itojun@iijlab.net
 	* {netbsd/pkgsrc/net,freebsd[23]/ports}/{libpcap,tcpdump}:
 	  famous packet capturing tool, from tcpdump.org codebase.  it
