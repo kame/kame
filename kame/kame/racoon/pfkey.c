@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.42 2000/06/07 08:33:54 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.43 2000/06/08 03:37:06 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1089,11 +1089,10 @@ pk_recvupdate(mhp)
     {
 	char *xsrc = strdup(saddrwop2str(iph2->src));
 	plog(logp, LOCATION, NULL,
-		"established IPsec-SAs %s/%s/%s-%s spi:%ld\n",
+		"IPsec-SA established %s-%s %s/%s spi:%ld\n",
+		xsrc, saddrwop2str(iph2->dst),
 		s_pfkey_satype(msg->sadb_msg_satype),
 		s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
-		xsrc,
-		saddrwop2str(iph2->dst),
 		ntohl(sa->sadb_sa_spi));
 	free(xsrc);
     }
@@ -1269,16 +1268,16 @@ pk_recvexpire(mhp)
 
 	SCHED_KILL(iph2->sce);
 
-	YIPSDEBUG(DEBUG_STAMP,
-		char *xsrc = strdup(saddrwop2str(src));
-		plog(logp, LOCATION, NULL,
-			"expire IPsec SA %s/%s/%s->%s spi:%ld\n",
-			s_pfkey_satype(msg->sadb_msg_satype),
-			s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
-			saddrwop2str(iph2->src),
-			saddrwop2str(iph2->dst),
-			ntohl(sa->sadb_sa_spi));
-		free(xsrc));
+    {
+	char *xsrc = strdup(saddrwop2str(iph2->src));
+	plog(logp, LOCATION, NULL,
+		"IPsec-SA expired %s-%s %s/%s spi:%ld\n",
+		xsrc, saddrwop2str(iph2->dst),
+		s_pfkey_satype(msg->sadb_msg_satype),
+		s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
+		ntohl(sa->sadb_sa_spi));
+	free(xsrc);
+    }
 
 	iph2->status = PHASE2ST_EXPIRED;
 

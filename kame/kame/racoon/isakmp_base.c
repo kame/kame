@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.21 2000/05/30 01:05:20 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.22 2000/06/08 03:37:06 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -449,10 +449,7 @@ base_i3recv(iph1, msg)
 	/* add to the schedule to expire, and seve back pointer. */
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
-	plog(logp, LOCATION, NULL,
-		"established ISAKMP-SA to %s spi:%s.\n",
-		saddr2str(iph1->remote),
-		isakmp_pindex(&iph1->index, 0));
+	log_ph1established(iph1);
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
@@ -828,10 +825,7 @@ base_r2send(iph1, msg)
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
 
-	plog(logp, LOCATION, NULL,
-		"established ISAKMP-SA to %s spi:%s.\n",
-		saddr2str(iph1->remote),
-		isakmp_pindex(&iph1->index, 0));
+	log_ph1established(iph1);
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.28 2000/05/30 01:05:20 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.29 2000/06/08 03:37:06 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -463,10 +463,7 @@ agg_i2send(iph1, msg)
 #endif
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
-	plog(logp, LOCATION, NULL,
-		"established ISAKMP-SA to %s spi:%s.\n",
-		saddr2str(iph1->remote),
-		isakmp_pindex(&iph1->index, 0));
+	log_ph1established(iph1);
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
@@ -928,10 +925,7 @@ agg_r2send(iph1, msg)
 
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
-	plog(logp, LOCATION, NULL,
-		"established ISAKMP-SA to %s spi:%s.\n",
-		saddr2str(iph1->remote),
-		isakmp_pindex(&iph1->index, 0));
+	log_ph1established(iph1);
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.62 2000/06/07 08:33:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.63 2000/06/08 03:37:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1028,10 +1028,10 @@ err:
 /*
  * make strings containing i_cookie + r_cookie + msgid
  */
-u_char *
+const char *
 isakmp_pindex(index, msgid)
-	isakmp_index *index;
-	u_int32_t msgid;
+	const isakmp_index *index;
+	const u_int32_t msgid;
 {
 	static char buf[64];
 	u_char *p;
@@ -1045,15 +1045,18 @@ isakmp_pindex(index, msgid)
 		snprintf((char *)&buf[j], sizeof(buf) - j, "%02x", p[i]);
 		j += 2;
 		switch (i) {
-		case 7: case 15:
+		case 7:
 			buf[j++] = ':';
 		}
 	}
 
-	/* copy msgid */
-	snprintf((char *)&buf[j], sizeof(buf) - j, "%08x", ntohs(msgid));
+	if (msgid == 0)
+		return buf;
 
-	return(buf);
+	/* copy msgid */
+	snprintf((char *)&buf[j], sizeof(buf) - j, ":%08x", ntohs(msgid));
+
+	return buf;
 }
 
 /* open ISAKMP sockets. */
@@ -1294,10 +1297,17 @@ void
 isakmp_ph1expire(iph1)
 	struct ph1handle *iph1;
 {
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"expire phase1 sa %s\n",
-			isakmp_pindex(&iph1->index, iph1->msgid)));
+	char *src, *dst;
+
+	src = strdup(saddr2str(iph1->local));
+	dst = strdup(saddr2str(iph1->remote));
+	plog(logp, LOCATION, NULL,
+		"ISAKMP-SA expired %s-%s spi:%s\n",
+		src, dst,
+		isakmp_pindex(&iph1->index, 0));
+	free(src);
+	free(dst);
+
 	SCHED_INIT(iph1->sce);
 
 	iph1->status = PHASE1ST_EXPIRED;
@@ -1312,6 +1322,8 @@ void
 isakmp_ph1delete(iph1)
 	struct ph1handle *iph1;
 {
+	char *src, *dst;
+
 	SCHED_INIT(iph1->sce);
 
 	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
@@ -1321,10 +1333,15 @@ isakmp_ph1delete(iph1)
 
 	/* don't re-negosiation when the phase 1 SA expires. */
 
+	src = strdup(saddr2str(iph1->local));
+	dst = strdup(saddr2str(iph1->remote));
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL,
-			"delete phase1 sa %s\n",
-			isakmp_pindex(&iph1->index, iph1->msgid)));
+			"ISAKMP-SA deleted %s-%s spi:%s\n",
+			src, dst,
+			isakmp_pindex(&iph1->index, 0)));
+	free(src);
+	free(dst);
 
 	remph1(iph1);
 	delph1(iph1);
@@ -1342,12 +1359,18 @@ void
 isakmp_ph2expire(iph2)
 	struct ph2handle *iph2;
 {
+	char *src, *dst;
+
+	SCHED_INIT(iph2->sce);
+
+	src = strdup(saddrwop2str(iph2->src));
+	dst = strdup(saddrwop2str(iph2->dst));
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL,
-			"expire phase2 sa %s->%s\n",
-			saddrwop2str(iph2->src),
-			saddrwop2str(iph2->dst)));
-	SCHED_INIT(iph2->sce);
+			"phase2 sa expired %s-%s\n",
+			src, dst));
+	free(src);
+	free(dst);
 
 	iph2->sce = sched_new(10, isakmp_ph2delete, iph2);
 
@@ -1359,13 +1382,18 @@ void
 isakmp_ph2delete(iph2)
 	struct ph2handle *iph2;
 {
+	char *src, *dst;
+
 	SCHED_INIT(iph2->sce);
 
+	src = strdup(saddrwop2str(iph2->src));
+	dst = strdup(saddrwop2str(iph2->dst));
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL,
-			"delete phase2 sa %s->%s\n",
-			saddrwop2str(iph2->src),
-			saddrwop2str(iph2->dst)));
+			"phase2 sa deleted %s-%s\n",
+			src, dst));
+	free(src);
+	free(dst);
 
 	unbindph12(iph2);
 	remph2(iph2);
@@ -1994,3 +2022,22 @@ nostate2(iph2, msg)
 			iph2->status));
 	return -1;
 }
+
+void
+log_ph1established(iph1)
+	const struct ph1handle *iph1;
+{
+	char *src, *dst;
+
+	src = strdup(saddr2str(iph1->local));
+	dst = strdup(saddr2str(iph1->remote));
+	plog(logp, LOCATION, NULL,
+		"ISAKMP-SA established %s-%s spi:%s\n",
+		src, dst,
+		isakmp_pindex(&iph1->index, 0));
+	free(src);
+	free(dst);
+
+	return;
+}
+
