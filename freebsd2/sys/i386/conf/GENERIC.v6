@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: GENERIC.v6,v 1.9 1999/10/07 12:18:57 sakane Exp $
+#	$Id: GENERIC.v6,v 1.10 1999/10/28 05:44:46 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -245,5 +245,5 @@ options         SYSVSHM
 pseudo-device	bpfilter 16
 #pseudo-device	atm
 pseudo-device	gif	4
-pseudo-device	dummy	1
+#pseudo-device	dummy	1
 #pseudo-device	faith	1
