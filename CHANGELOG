@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.997 2000/06/11 23:53:33 itojun Exp $
+$Id: CHANGELOG,v 1.998 2000/06/12 03:41:06 itojun Exp $
 
 <200006>
+Mon Jun 12 12:34:02 JST 2000  itojun@iijlab.net
+	* libinet6/getnameinfo.c: use EAI_xx for error code.  rfc2553bis
+	  suggests it.
+
 Mon Jun 12 08:51:25 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: correct prefix length match on destination address.
 	  the code used source prefix len on comparision by mistake.
