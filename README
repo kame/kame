@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.72 2004/12/21 06:33:57 jinmei Exp $
+	$KAME: README,v 1.73 2004/12/21 06:34:35 jinmei Exp $
 
 <<<Project Overview>>>
 
@@ -193,8 +193,8 @@ Current core members are:
 	 Tsuyoshi MOMOSE  NEC Corporation
 	  Ken'ichi KUDOU  Fujitsu Limited
 	  Keisuke UEHARA  Keio University
-	  Ryuji Wakikawa  Keio University
-	 Koshiro Mitsuya  Keio University
+	  Ryuji WAKIKAWA  Keio University
+	 Koshiro MITSUYA  Keio University
 
 Alumni of core members:
          Yoshinobu INOUE  Fujitsu Limited
