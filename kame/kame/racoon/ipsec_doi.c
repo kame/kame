@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.44 2000/01/27 06:45:39 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.45 2000/02/02 07:37:37 sumikawa Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3317,12 +3317,12 @@ ipsecdoi_setid1(iph1)
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL,
-			"use ID type of %s\n", s_ipsecdoi_ident(id_b.type));
+			"use ID type of %s\n", s_ipsecdoi_ident(id_b.type)));
 	return 0;
 
 err:
 	plog(logp, LOCATION, NULL,
-		"failed get my ID\n"));
+		"failed get my ID\n");
 	return -1;
 }
 
