@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.13 2000/06/09 00:24:54 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.14 2000/06/13 10:31:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,8 +239,10 @@ udp6_output(in6p, m, addr6, control)
 		fport = sin6->sin6_port; /* allow 0 port */
 
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
-			return EINVAL;
+		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0) {
+			error = EINVAL;
+			goto release;
+		}
 
 		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
 			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
