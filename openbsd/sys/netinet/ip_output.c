@@ -765,8 +765,10 @@ sendit:
 	}
 
 	error = ip_fragment(m, ifp, mtu);
-	if (error == EMSGSIZE)
+	if (error) {
+		m = NULL;
 		goto bad;
+	}
 
 	for (; m; m = m0) {
 		m0 = m->m_nextpkt;
@@ -802,6 +804,9 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 	int len, hlen, off;
 	int mhlen, firstlen;
 	struct mbuf **mnext;
+	int fragments = 0;
+	int s;
+	int error = 0;
 
 	ip = mtod(m, struct ip *);
 	hlen = ip->ip_hl << 2;
@@ -832,7 +837,8 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
 		if (m == 0) {
 			ipstat.ips_odropped++;
-			return (ENOBUFS);
+			error = ENOBUFS;
+			goto sendorfree;
 		}
 		*mnext = m;
 		mnext = &m->m_nextpkt;
@@ -858,7 +864,8 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 		m->m_next = m_copy(m0, off, len);
 		if (m->m_next == 0) {
 			ipstat.ips_odropped++;
-			return (ENOBUFS);	/* ??? */
+			error = ENOBUFS;	/* ??? */
+			goto sendorfree;
 		}
 		m->m_pkthdr.len = mhlen + len;
 		m->m_pkthdr.rcvif = (struct ifnet *)0;
@@ -872,6 +879,7 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 			mhip->ip_sum = in_cksum(m, mhlen);
 		}
 		ipstat.ips_ofragments++;
+		fragments++;
 	}
 	/*
 	 * Update first fragment by trimming what's been copied out
@@ -890,8 +898,28 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(m, hlen);
 	}
+sendorfree:
+	/*
+	 * If there is no room for all the fragments, don't queue
+	 * any of them.
+	 */
+	s = splnet();
+	if (ifp->if_snd.ifq_maxlen - ifp->if_snd.ifq_len < fragments &&
+	    error == 0) {
+		error = ENOBUFS;
+		ipstat.ips_odropped++;
+		IFQ_INC_DROPS(&ifp->if_snd);
+	}
+	splx(s);
+	if (error) {
+		for (m = m0; m; m = m0) {
+			m0 = m->m_nextpkt;
+			m->m_nextpkt = NULL;
+			m_freem(m);
+		}
+	}
 
-	return (0);
+	return (error);
 }
 
 /*
