@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.74 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.75 2001/01/30 14:28:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1517,7 +1517,7 @@ nd6_prefix_onlink(pr)
 		pr->ndpr_stateflags |= NDPRF_ONLINK;
 	else {
 		log(LOG_ERR, "nd6_prefix_onlink: failed to add route for a"
-		    " prefix (%s/%d) on %s, gw=%s, mask=%s, flags=%x "
+		    " prefix (%s/%d) on %s, gw=%s, mask=%s, flags=%lx "
 		    "errno = %d\n",
 		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 		    pr->ndpr_plen, if_name(ifp),
@@ -1592,7 +1592,7 @@ nd6_prefix_offlink(pr)
 					    "to %s (errno = %d)\n",
 					    ip6_sprintf(&opr->ndpr_prefix.sin6_addr),
 					    opr->ndpr_plen, if_name(ifp),
-					    if_name(opr->ndpr_ifp));
+					    if_name(opr->ndpr_ifp), e);
 				}
 			}
 		}
