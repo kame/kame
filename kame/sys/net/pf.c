@@ -2559,7 +2559,6 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			s->ext.port = th->th_dport;
 			if (nat != NULL) {
 				PF_ACPY(&s->lan.addr, &baddr, af);
-				s->lan.addr = baddr;
 				s->lan.port = bport;
 			} else {
 				PF_ACPY(&s->lan.addr, &s->gwy.addr, af);
