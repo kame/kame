@@ -3,6 +3,3 @@
 
 BINDIR?=	/usr/local/v6/bin
 MANDIR=	/usr/local/v6/man
-
-# due to some misterious reasons, -linet6 needs -static in NetBSD.
-LDADD+=	-static
