@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.152 2001/02/02 15:36:33 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.153 2001/02/05 08:40:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1138,11 +1138,14 @@ skip_ipsec2:;
 	 * (RFC 2460, section 4.)
 	 */
 	if (exthdrs.ip6e_hbh) {
-		struct ip6_hbh *hbh = mtod(exthdrs.ip6e_hbh,
-					   struct ip6_hbh *);
+		struct ip6_hbh *hbh = mtod(exthdrs.ip6e_hbh, struct ip6_hbh *);
 		u_int32_t dummy1; /* XXX unused */
 		u_int32_t dummy2; /* XXX unused */
 
+#ifdef DIAGNOSTIC
+		if ((hbh->ip6h_len + 1) << 3 > exthdrs.ip6e_hbh->m_len)
+			panic("ip6e_hbh is not continuous");
+#endif
 		/*
 		 *  XXX: if we have to send an ICMPv6 error to the sender,
 		 *       we need the M_LOOP flag since icmp6_error() expects
