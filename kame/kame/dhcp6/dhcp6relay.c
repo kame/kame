@@ -309,30 +309,6 @@ relay6_init()
 	freeaddrinfo(res2);
 
 	/*
-	 * All DHCP relays MUST join the site-local All-DHCP-Relays
-	 * multicast group at the address FF05:0:0:0:0:0:1:4.
-	 * [draft-ietf-dhc-dhcpv6-14]
-	 * XXX: the spec does not specify how to use the group, but
-	 * join it anyway.
-	 */
-	hints.ai_flags = 0;
-	error = getaddrinfo(DH6ADDR_ALLRELAY, 0, &hints, &res2);
-	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
-	}
-	memset(&mreq6, 0, sizeof(mreq6));
-	mreq6.ipv6mr_interface = ifidx;
-	memcpy(&mreq6.ipv6mr_multiaddr,
-		&((struct sockaddr_in6 *)res2->ai_addr)->sin6_addr,
-		sizeof(mreq6.ipv6mr_multiaddr));
-	if (setsockopt(csock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-			&mreq6, sizeof(mreq6))) {
-		err(1, "setsockopt(csock, IPV6_JOIN_GROUP)");
-	}
-	freeaddrinfo(res2);
-
-	/*
 	 * Setup a socket to communicate with servers.
 	 */
 	hints.ai_flags = AI_PASSIVE;
