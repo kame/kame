@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.106 2000/05/12 15:43:27 itojun Exp $	*/
+/*	$KAME: key.c,v 1.107 2000/05/12 23:52:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5252,6 +5252,11 @@ key_getcomb_ah()
 
 	m = NULL;
 	for (i = 1; i < SADB_AALG_MAX; i++) {
+#if 1
+		/* we prefer HMAC algorithms, not old algorithms */
+		if (i != SADB_AALG_SHA1HMAC && i != SADB_AALG_MD5HMAC)
+			continue;
+#endif
 		algo = &ah_algorithms[i];
 
 		if (algo->keymax < ipsec_ah_keymin)
