@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.56 2002/06/29 07:47:06 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.57 2002/08/09 08:49:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -319,7 +319,6 @@ void	usage __P((void));
 
 int rcvsock;			/* receive (icmp) socket file descriptor */
 int sndsock;			/* send (udp) socket file descriptor */
-struct timezone tz;		/* leftover */
 
 struct msghdr rcvmhdr;
 struct iovec rcviov[2];
@@ -831,12 +830,11 @@ main(argc, argv)
 		for (probe = 0; probe < nprobes; ++probe) {
 			int cc;
 			struct timeval t1, t2;
-			struct timezone tz;
 
-			(void) gettimeofday(&t1, &tz);
+			(void) gettimeofday(&t1, NULL);
 			send_probe(++seq, hops);
 			while ((cc = wait_for_reply(rcvsock, &rcvmhdr))) {
-				(void) gettimeofday(&t2, &tz);
+				(void) gettimeofday(&t2, NULL);
 				if ((i = packet_ok(&rcvmhdr, cc, seq))) {
 					if (! IN6_ARE_ADDR_EQUAL(&Rcv.sin6_addr,
 					    &lastaddr)) {
@@ -962,7 +960,7 @@ send_probe(seq, hops)
 
 	op->seq = seq;
 	op->hops = hops;
-	(void) gettimeofday(&op->tv, &tz);
+	(void) gettimeofday(&op->tv, NULL);
 
 	i = sendto(sndsock, (char *)outpacket, datalen , 0,
 	    (struct sockaddr *)&Dst, Dst.sin6_len);
