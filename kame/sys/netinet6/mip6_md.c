@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.23 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.24 2001/01/23 16:45:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -60,6 +60,7 @@
 #include <sys/kernel.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
