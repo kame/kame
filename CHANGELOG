@@ -1,11 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.4 1999/08/11 12:20:29 itojun Exp $
+$Id: CHANGELOG,v 1.5 1999/08/11 14:36:15 itojun Exp $
 
 <199908>
 Wed Aug 11 21:18:08 JST 1999  itojun@iijlab.net
 	* netbsd/lib/libwrap: libwrap that handles IPv6 correctly.
-	  can't write IPv6 address in /etc/hosts.{allow,deny} yet.
+	  IPv6 address should be wrapped in square bracket to avoid
+	  confusion about colon, like this:
+		telnetd: [::1/128] [3ffe::/ffff::] 127.0.0.1
 
 Tue Aug  9 JST 1999  itojun@iijlab.net
 	* repository reorganization: NetBSD and FreeBSD228 uses
