@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.55 2003/08/27 11:53:04 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.56 2003/09/04 13:00:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,7 +123,7 @@ usage()
 	(void)fprintf(stderr,
 		      "usage: %s [-i ifname] [-abcghlmnw]"
 		      " [-H home_prefix -P prefixlen]"
-		      " [-A homeagent_global_addr] [-L homeagent_linklocal_addr]"
+		      " [-A homeagent_global_addr]"
 		      " [-u address#port] [-v address#port]"
 		      " [-S 0|1] [-D 0|1]\n",
 		      __progname);
@@ -173,7 +173,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:O:A:aL:bcC:u:v:wD:S:T:I:F:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:O:A:abcC:u:v:wD:S:T:I:F:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
