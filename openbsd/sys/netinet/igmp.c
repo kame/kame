@@ -544,7 +544,7 @@ igmp_sendpkt(inm, type, addr)
 #endif
 	/*
 	 * Request loopback of the report if we are acting as a multicast
-	 * router, so that the process-level routing demon can hear it.
+	 * router, so that the process-level routing daemon can hear it.
 	 */
 #ifdef MROUTING
 	imo.imo_multicast_loop = (ip_mrouter != NULL);
