@@ -133,14 +133,9 @@ if test "$dmalloc_dir" != "no"; then
 	fi
 fi
 
-AC_MSG_CHECKING(if you have KAME tcpdump in $srcdir/../tcpdump)
-if test -f "$srcdir/../tcpdump/print-isakmp.c"; then
-	LIBOBJS="$LIBOBJS print-isakmp.o"
-	AC_DEFINE(HAVE_PRINT_ISAKMP_C)
-	AC_MSG_RESULT(yes)
-else
-	AC_MSG_RESULT(no)
-fi
+LIBOBJS="$LIBOBJS print-isakmp.o"
+AC_DEFINE(HAVE_PRINT_ISAKMP_C)
+CPPFLAGS="$CPPFLAGS -I$srcdir"
 
 AC_MSG_CHECKING(if __func__ is available)
 AC_TRY_COMPILE(dnl

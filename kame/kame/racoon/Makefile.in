@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.40 2003/08/19 09:09:15 itojun Exp $
+#	$KAME: Makefile.in,v 1.41 2004/04/12 08:52:28 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -56,10 +56,6 @@ crypto_openssl_test.o: crypto_openssl.c
 	$(CC) $(CFLAGS) -DEAYDEBUG -o crypto_openssl_test.o -c crypto_openssl.c
 misc_noplog.o: misc.c
 	$(CC) -DNOUSE_PLOG -o misc_noplog.o -c misc.c
-
-# extra
-print-isakmp.o:	$(srcdir)/../tcpdump/print-isakmp.c
-	$(CC) $(CFLAGS) -c $(srcdir)/../tcpdump/$*.c
 
 # missing/*.c
 strdup.o:	$(srcdir)/missing/strdup.c
