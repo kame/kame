@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.21 2000/05/24 02:55:36 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.22 2000/05/24 06:14:49 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -86,7 +86,7 @@ getsp_r(spidx)
 	struct secpolicy *p;
 
 	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
-		if (!cmpspidx_wild(&p->spidx, spidx))
+		if (!cmpspidx_wild(spidx, &p->spidx))
 			return p;
 	}
 
@@ -151,7 +151,7 @@ getsp_r(spidx, iph2)
 		plog(logp, LOCATION, NULL, "looks to be transport mode\n"););
 
 	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
-		if (!cmpspidx_wild(&p->spidx, spidx))
+		if (!cmpspidx_wild(spidx, &p->spidx))
 			return p;
 	}
 
@@ -175,6 +175,7 @@ getspbyspid(spid)
 
 /*
  * compare policyindex.
+ * a: subject b: db
  * OUT:	0:	equal
  *	1:	not equal
  */
@@ -203,6 +204,7 @@ cmpspidx(a, b)
 /*
  * compare policyindex, with wildcard address/protocol match.
  * "a" (first argument) can contain wildcard things.
+ * a: subject b: db
  * OUT:	0:	equal
  *	1:	not equal
  */
