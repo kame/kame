@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.33 2005/01/25 07:35:43 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.34 2005/01/25 08:20:06 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -129,8 +129,8 @@
 #include <netinet/sctp_indata.h>	/* for sctp_deliver_data() */
 #define NUMBER_OF_MTU_SIZES 18
 
-#ifdef SCTP_DEBUG
 #include <netinet/sctp_callout.h>	/* for callout_active() */
+#ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
 #endif
 
