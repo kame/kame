@@ -658,7 +658,9 @@ AC_CHECK_FUNCS(getifaddrs)
 dnl defines package version
 AC_MSG_CHECKING(if --with-pkgversion option is specified)
 AC_ARG_WITH(pkgversion, [  --with-pkgversion=VERSION   specify package version],
-	[CPPFLAGS="$CPPFLAGS -DRACOON_PKG_VERSION=\"\\\"$withval\\\"\""],
-	[pkgversion=no])
+	[AC_MSG_RESULT($withval)
+	CPPFLAGS="$CPPFLAGS -DRACOON_PKG_VERSION=\"\\\"$withval\\\"\""],
+	[AC_MSG_RESULT(no)
+	pkgversion=no])
 
 AC_OUTPUT(Makefile samples/psk.txt samples/racoon.conf)

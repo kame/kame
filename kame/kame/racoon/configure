@@ -4265,9 +4265,11 @@ echo "configure:4265: checking if --with-pkgversion option is specified" >&5
 # Check whether --with-pkgversion or --without-pkgversion was given.
 if test "${with_pkgversion+set}" = set; then
   withval="$with_pkgversion"
-  CPPFLAGS="$CPPFLAGS -DRACOON_PKG_VERSION=\"\\\"$withval\\\"\""
+  echo "$ac_t""$withval" 1>&6
+	CPPFLAGS="$CPPFLAGS -DRACOON_PKG_VERSION=\"\\\"$withval\\\"\""
 else
-  pkgversion=no
+  echo "$ac_t""no" 1>&6
+	pkgversion=no
 fi
 
 
