@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.7 2005/03/02 19:42:42 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.8 2005/03/02 20:46:32 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -60,7 +60,6 @@
 #define NEMO_OPTNUM_MCOA 5
 #define NEMO_OPTNUM 4
 
-
 #include "callout.h"
 #include "shisad.h"
 
@@ -74,7 +73,6 @@ struct nemo_if {
 };
 LIST_HEAD(nemo_if_head, nemo_if) nemo_ifhead;
 
-/* This info is retrieved from prefix_table */
 struct nemo_mnpt {
 	LIST_ENTRY(nemo_mnpt) nemo_mnptentry;
 	struct in6_addr hoa;
@@ -103,7 +101,7 @@ static void set_static_tun(char *);
 static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr *, 
 					      struct in6_addr *, u_int16_t);
 static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *, u_int16_t);
-
+static void nemo_dump();
 
 void
 nemo_usage() {
@@ -205,7 +203,7 @@ main (argc, argv)
 	}
 
 	if (if_number < pt_number) {
-		syslog(LOG_ERR, "Please create %d of nemo interfaces\n", pt_number);	
+		syslog(LOG_ERR, "Create %d of nemo interfaces\n", pt_number);	
 		exit(0);
 	} 
 	
@@ -217,6 +215,9 @@ main (argc, argv)
 	signal(SIGHUP, nemo_terminate);
 	signal(SIGKILL, nemo_terminate);
 	signal(SIGINT, nemo_terminate);
+
+	if (debug)
+		nemo_dump();
 
 	if (!foreground) {
 		if (daemon(0, 0) < 0) {
@@ -282,12 +283,14 @@ ha_parse_ptconf(filename)
                         }
                 }
 
+#if 0
                 if (debug) {
                         for (i = 0; i < NEMO_OPTNUM; i ++) { 
 				if (option[i])
                                 	syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
 			}
                 }
+#endif
 
 		pt = malloc(sizeof(*pt));
 		if (pt == NULL)
@@ -375,12 +378,14 @@ mr_parse_ptconf(filename)
                         }
                 }
 
+#if 0
                 if (debug) {
                         for (i = 0; i < (multiplecoa)?NEMO_OPTNUM:NEMO_OPTNUM_MCOA; i ++) {
 				if (option[i])
 						syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
 			}
 		}
+#endif
 
 		pt = malloc(sizeof(*pt));
 		if (pt == NULL)
@@ -485,11 +490,13 @@ set_nemo_ifinfo() {
         }
         free(buf); 
 
+#if 0
 	if (debug) {
 		LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
 			syslog(LOG_INFO, "%s\n", nif->ifname);
 		}
 	}
+#endif
 
 	return (0);
 };
@@ -548,12 +555,14 @@ set_static_tun(filename)
 			}
 		} 
 		
+#if 0
 		if (debug) {
 			syslog(LOG_INFO, "Static Tunnel Information\n");
 			for (i = 0; i < NEMO_TUNOPTNUM; i ++) 
 				if (option[i])
 					syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
 		} 
+#endif
 		
 		nif = find_nemo_if_from_name(option[0]);
 		if (nif == NULL) {
@@ -979,4 +988,35 @@ nemo_terminate(dummy)
 	}
 
 	exit(-1);
+}
+
+
+static void
+nemo_dump() {
+	static struct nemo_if *nif;
+	int i = 1;
+
+	syslog(LOG_INFO, "mode = %s\n", 
+	       (mode==MODE_HA)? "Home Agent" : "Mobile Router");
+	syslog(LOG_INFO, "debug  = %s\n", (debug)? "on" : "off");
+	syslog(LOG_INFO, "DNS    = %s\n", (numerichost)? "off" : "on");
+	syslog(LOG_INFO, "MCoA   = %s\n", (multiplecoa)? "on" : "off");
+	syslog(LOG_INFO, "Static = %s\n", (staticmode)? "on" : "off");
+
+	LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
+		syslog(LOG_INFO, "ifname: %s\n", nif->ifname);
+		if (multiplecoa)
+			syslog(LOG_INFO, "bid: %d\n", nif->bid);
+		if (staticmode) 
+			syslog(LOG_INFO, "hoa: %s\n", ip6_sprintf(&nif->hoa));
+	}
+
+	LIST_FOREACH(npt, &nemo_mnpthead, nemo_mnptentry) {
+		syslog(LOG_INFO, "Prefix Table no. %d\n", i);
+		syslog(LOG_INFO, "prefix: %s/%d\n", 
+		       ip6_sprintf(&npt->nemo_prefix), npt->nemo_prefixlen);
+		syslog(LOG_INFO, "hoa: %s\n", ip6_sprintf(&npt->hoa));
+		if (multiplecoa)
+			syslog(LOG_INFO, "bid: %d\n", npt->bid);
+	}
 }
