@@ -1,0 +1,11 @@
+--- common/os.h-	Tue Dec  7 16:47:11 1999
++++ common/os.h	Tue Dec  7 16:48:01 1999
+@@ -721,7 +721,7 @@
+ 
+ # if defined(linux) || defined(__NetBSD__) || defined(__FreeBSD__)
+ #  ifndef s6_laddr
+-#   define s6_laddr        s6_addr32
++#   define s6_laddr        __u6_addr.__u6_addr32
+ #  endif
+ # endif
+ 
