@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.38 2000/08/15 07:42:04 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.39 2000/08/17 00:44:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -320,7 +320,7 @@ int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	ip6_forward __P((struct mbuf *, int));
 
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
-#ifdef NEW_STRUCT_ROUTE
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route *,
 			int,
