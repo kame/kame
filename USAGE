@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/03/12 00:20:33 $
+		     $Date: 2000/04/14 08:35:28 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -91,7 +91,7 @@ ndp command about its usage)
 
 # ndp -p
 3ffe:501:808:1::/64 if=de0
-  flags=LA, vltime=2592000, pltime=604800, expire=Never
+  flags=LA, vltime=2592000, pltime=604800, expire=Never, origin=RR
   No advertising router
 
 The "prefix" command also has node internal prefix renumbering
@@ -119,10 +119,10 @@ de1: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
         media: 100baseTX status: active
 # ndp -p
 3ffe:501:808:1::/64 if=de0
-  flags=LA, vltime=2592000, pltime=604800, expire=Never
+  flags=LA, vltime=2592000, pltime=604800, expire=Never, origin=RR
   No advertising router
 3ffe:501:808:2::/64 if=de1
-  flags=LA, vltime=2592000, pltime=604800, expire=Never
+  flags=LA, vltime=2592000, pltime=604800, expire=Never, origin=RR
   No advertising router
 
 Then do as follows:
@@ -148,32 +148,32 @@ de1: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
         media: 100baseTX status: active
 # ndp -p
 3ffe:501:4819:1::/64 if=de0
-  flags=LA, vltime=2592000, pltime=604800, expire=Never
+  flags=LA, vltime=2592000, pltime=604800, expire=Never, origin=RR
   No advertising router
 3ffe:501:4819:2::/64 if=de1
-  flags=LA, vltime=2592000, pltime=604800, expire=Never
+  flags=LA, vltime=2592000, pltime=604800, expire=Never, origin=RR
   No advertising router
 
 See also "/usr/local/v6/etc/rc.net6".
 
 <<<route>>>
 
-If there is a router announcing Router Advertisement on the subnet,
-you need not to add a default route for your host by yourself.
+If there is a router announcing Router Advertisement on a subnet,
+you need not to add a default route for your host by hand.
 (Please refer to "sysctl" section to accept Router Advertisement.)
 
-If you want to add a default route manually, do as follows:
+If you want to add a default route manually, do like:
 
-# route add -inet6 default fe80:2::200:a2ff:fe0e:7543
+# route add -inet6 default fe80::200:a2ff:fe0e:7543%ed0
 
 "default" means ::/0.  In other cases, if "prefixlen" is omitted, 64
 is assumed for "prefixlen" to get along with the aggregatable address.
 
-Note that, in IPv6, link-local address should be used as gateway
-("fe80:2::200:a2ff:fe0e:7543" in the above).  If you use global addresses,
-icmp6 redirect may not work properly.  Also note that we use special form
-of link-local address as gateway.  see chapter 1.3 in IMPLEMENTATION for
-more detail.
+Note that, in IPv6, a link-local address should be used as gateway
+("fe80::200:a2ff:fe0e:7543%ed0" in the above). If you use global addresses,
+ICMPv6 redirect will not work properly.  Also note that we use special form
+of link-local address as gateway. See Section 1.3 of IMPLEMENTATION for
+more details.
 For ease of configuration we recommend you to avoid static routes and run
 a routing daemon (route6d for example) instead.
 
@@ -184,7 +184,7 @@ for its argument.
 
 % ping6 -I ed0 ff02::1
 
-PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1
+PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1%ed0
 56 bytes from fe80::5254:ff:feda:cb7d%lo0, icmp_seq=0 hlim=64 time=0.25 ms
 56 bytes from fe80::2a0:c9ff:fe84:ed6c%ed0, icmp_seq=0 hlim=64 time=1.333 ms(DUP!)
 56 bytes from fe80::5254:ff:feda:d161%ed0, icmp_seq=0 hlim=64 time=1.459 ms(DUP!)
@@ -199,11 +199,11 @@ resolved by DNS.  Specify the "-w" option to "ping6".
 
 % ping6 -I ed0 -w ff02::1
 
-64 bytes from fe80::5254:ff:feda:cb7d: fto.kame.net
-67 bytes from fe80::5254:ff:feda:d161: banana.kame.net
-69 bytes from fe80::2a0:c9ff:fe84:ebd9: paradise.kame.net
-66 bytes from fe80::260:8ff:fe8b:447f: taroh.kame.net
-66 bytes from fe80::2a0:c9ff:fe84:ed6c: ayame.kame.net
+64 bytes from fe80::5254:ff:feda:cb7d%lo0: fto.kame.net
+67 bytes from fe80::5254:ff:feda:d161%ed0: banana.kame.net
+69 bytes from fe80::2a0:c9ff:fe84:ebd9%ed0: paradise.kame.net
+66 bytes from fe80::260:8ff:fe8b:447f%ed0: taroh.kame.net
+66 bytes from fe80::2a0:c9ff:fe84:ed6c%ed0: ayame.kame.net
 	
 <<<traceroute6>>>
 
@@ -245,11 +245,11 @@ To display the prefix list.
 
 % ndp -p
 3ffe:501:4819:2000::/64 if=ed0
-  flags=LA, vltime=2592000, pltime=604800, expire=29d23h59m58s
+  flags=LA, vltime=2592000, pltime=604800, expire=29d23h59m58s, origin=RA
   advertised by
-    fe80::5254:ff:fedc:5217
-    fe80::260:97ff:fec2:80bf
-    fe80::200:eff:fe49:f929
+    fe80::5254:ff:fedc:5217%ed0 (reachable)
+    fe80::260:97ff:fec2:80bf%ed0 (reachable)
+    fe80::200:eff:fe49:f929%ed0 (no neighbor state)
 
 To display the default router list.
 
@@ -349,7 +349,7 @@ http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
 before configuring it.
 
 "stf" interface enables you to perform 6to4 IPv6-over-IPv4 encapsulation,
-as documented in draft-ietf-ngtrans-6to4-03.txt.  See stf(4) for details.
+as documented in draft-ietf-ngtrans-6to4-04.txt.  See stf(4) for details.
 
 <<<inetd/inet6d>>>
 
