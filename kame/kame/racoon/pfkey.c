@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.67 2000/07/18 00:39:24 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.68 2000/07/18 01:17:30 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1367,11 +1367,15 @@ pk_recvacquire(mhp)
 
 	/* set end addresses of SA */
 	iph2[n]->dst = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
-	if (iph2[n]->dst == NULL)
+	if (iph2[n]->dst == NULL) {
+		delph2(iph2[n]);
 		return -1;
+	}
 	iph2[n]->src = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]));
-	if (iph2[n]->src == NULL)
+	if (iph2[n]->src == NULL) {
+		delph2(iph2[n]);
 		return -1;
+	}
 
 	YIPSDEBUG(DEBUG_NOTIFY,
 		plog(logp, LOCATION, NULL,
