@@ -1,9 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.105 1999/09/09 12:27:50 jinmei Exp $
+$Id: CHANGELOG,v 1.106 1999/09/11 04:52:35 itojun Exp $
 
 
 <199909>
+Sat Sep 11 13:51:25 JST 1999  itojun@iijlab.net
+	* kame/tcpdump: add support for dhcp6.
+
 1999-09-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtsold/rtsol.c (sendpacket): not call warnmsg even if
 	sendmsg fails (unless the error is a serious one). This change is
