@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.62 2001/08/17 06:21:57 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.63 2001/08/17 06:28:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -439,9 +439,9 @@ extension
 	|	F_REQID DECSTRING { p_reqid = $2; }
 	|	F_REPLAY DECSTRING
 		{
-			if (p_ext & SADB_X_EXT_OLD) {
-				yyerror("replay prevention "
-				        "only use on new spec.");
+			if ((p_ext & SADB_X_EXT_OLD) != 0) {
+				yyerror("replay prevention cannot be used with "
+				    "ah/esp-old.");
 				return -1;
 			}
 			p_replay = $2;
@@ -547,14 +547,11 @@ ipaddropt
 ipaddr
 	:	STRING
 		{
-			struct addrinfo *res;
-
-			res = parse_addr($1.buf, NULL);
-			if (res == NULL) {
+			$$ = parse_addr($1.buf, NULL);
+			if ($$ == NULL) {
 				/* yyerror already called by parse_addr */
 				return -1;
 			}
-			$$ = res;
 		}
 	;
 
