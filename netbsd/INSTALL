@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.8 1999/10/03 01:28:59 itojun Exp $
+$Id: INSTALL,v 1.9 1999/12/13 01:03:30 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -34,6 +34,9 @@ B. Kernel build
 ===============
 Consult NetBSD documentations for more detail.
 
+B-0. It is assumed that you are in platform-specific directory (kame/netbsd).
+     If you are not, chdir to there.
+
 B-1. Go down to sys/arch/ARCH/conf.
 	% cd sys/arch/ARCH/conf
 
@@ -53,6 +56,9 @@ B-4. Copy the kernel file to root directory, as root.
 
 C. Userland build
 =================
+C-0. It is assumed that you are in platform-specific directory (kame/netbsd).
+     If you are not, chdir to there.
+
 C-1. Invoke "make includes" as root.  This will populate KAME-ready include
      files into /usr/include.
 	# make includes

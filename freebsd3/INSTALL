@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 3.3
 KAME project
-$Id: INSTALL,v 1.9 1999/10/06 06:52:01 k-sugyou Exp $
+$Id: INSTALL,v 1.10 1999/12/13 01:03:29 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -33,6 +33,9 @@ B. Kernel build
 ===============
 Consult FreeBSD documentations for more detail.
 
+B-0. It is assumed that you are in platform-specific directory (kame/freebsd3).
+     If you are not, chdir to there.
+
 B-1. Go down to sys/i386/conf.
 	% cd sys/i386/conf
 
@@ -52,6 +55,9 @@ B-4. Install the kernel file to root directory, as root.
 
 C. Userland build
 =================
+C-0. It is assumed that you are in platform-specific directory (kame/freebsd3).
+     If you are not, chdir to there.
+
 C-1. Invoke "make includes" as normal user, then "make install-includes"
      as root.  This will populate KAME-ready include files into /usr/include.
 	% make includes

@@ -1,6 +1,6 @@
 Installation procedure - OpenBSD
 KAME project
-$Id: INSTALL,v 1.3 1999/10/03 01:29:00 itojun Exp $
+$Id: INSTALL,v 1.4 1999/12/13 01:03:32 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -32,7 +32,10 @@ A-2. Backup /usr/include directory, if you want an untouched tree to be
 
 B. Kernel build
 ===============
-Consult NetBSD documentations for more detail.
+Consult OpenBSD documentations for more detail.
+
+B-0. It is assumed that you are in platform-specific directory (kame/openbsd).
+     If you are not, chdir to there.
 
 B-1. Go down to sys/arch/ARCH/conf.
 	% cd sys/arch/ARCH/conf
@@ -53,6 +56,9 @@ B-4. Copy the kernel file to root directory, as root.
 
 C. Userland build
 =================
+C-0. It is assumed that you are in platform-specific directory (kame/openbsd).
+     If you are not, chdir to there.
+
 C-1. Invoke "make includes" as root.  This will populate KAME-ready include
      files into /usr/include.
 	# make includes
