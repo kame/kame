@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.4 2000/06/19 07:44:59 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.5 2000/07/18 01:19:41 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -188,10 +188,30 @@ cmpsaprop_alloc(pp1, pp2)
 	pr2 = pp2->head;
 
 	while (pr1 && pr2) {
-		if (pr1->proto_id != pr2->proto_id
-		 || pr1->spisize != pr2->spisize
-		 || pr1->encmode != pr2->encmode)
+		if (pr1->proto_id != pr2->proto_id) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"proto_id mismatched: "
+					"my:%d peer:%d\n",
+					pr2->proto_id, pr1->proto_id));
 			goto err;
+		}
+		if (pr1->spisize != pr2->spisize) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"spisize mismatched: "
+					"my:%d peer:%d\n",
+					pr2->spisize, pr1->spisize));
+			goto err;
+		}
+		if (pr1->encmode != pr2->encmode) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"encmode mismatched: "
+					"my:%d peer:%d\n",
+					pr2->encmode, pr1->encmode));
+			goto err;
+		}
 
 		for (tr1 = pr1->head; tr1; tr1 = tr1->next) {
 			for (t2 = pr2->head; t2; t2 = t2->next) {
@@ -272,14 +292,31 @@ cmpsaprop(pp1, pp2)
 	return 0;
 }
 
-/* take a single match between satrns.  0 if equal. */
+/*
+ * take a single match between satrns.  0 if equal.
+ * tr1: peer's
+ * tr2: my.
+ */
 int
 cmpsatrns(tr1, tr2)
 	const struct satrns *tr1, *tr2;
 {
-	if (tr1->trns_id != tr2->trns_id
-	 || tr1->authtype != tr2->authtype)
+	if (tr1->trns_id != tr2->trns_id) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+				"trns_id mismatched: "
+				"my:%d peer:%d\n",
+				tr1->trns_id, tr2->trns_id));
 		return 1;
+	}
+	if (tr1->authtype != tr2->authtype) {
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+				"authtype mismatched: "
+				"my:%d peer:%d\n",
+				tr1->authtype, tr2->authtype));
+		return 1;
+	}
 
 	if (tr1->encklen > tr2->encklen) {
 		plog(logp, LOCATION, NULL,
