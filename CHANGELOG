@@ -1,8 +1,8 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1574 2001/03/01 09:34:57 itojun Exp $
+$KAME: CHANGELOG,v 1.1575 2001/03/01 09:49:53 itojun Exp $
 
-<200102>
+<200103>
 Thu Mar  1 18:28:48 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_input.c, sys/netinet6/ip6_input.c (except openbsd):
 	  enforce inbound policy match on all final protocol headers.
@@ -10,6 +10,7 @@ Thu Mar  1 18:28:48 JST 2001  itojun@iijlab.net
 	  basically the fix is for transport mode case.
 	  XXX ipsec policy engine still needs a great amount of updates.
 
+<200102>
 Wed Feb 28 23:26:26 JST 2001  itojun@iijlab.net
 	* sys/netinet6/esp_output.c: support random length padding in ESP,
 	  to avoid traffic analysis on short packets.  by setting
