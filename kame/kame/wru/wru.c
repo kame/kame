@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.11 2003/05/16 19:51:10 itojun Exp $	*/
+ /*	$KAME: wru.c,v 1.12 2003/05/17 18:12:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -622,7 +622,7 @@ pr_nodeaddr(ni, nilen)
 
 		if (inet_ntop(AF_INET6, cp, ntop_buf, sizeof(ntop_buf)) ==
 		    NULL) {
-			strncpy(ntop_buf, "?", sizeof(ntop_buf));
+			strlcpy(ntop_buf, "?", sizeof(ntop_buf));
 		}
 		printf("  %s", ntop_buf);
 		if (withttl) {

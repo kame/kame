@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.66 2003/05/15 14:38:56 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.67 2003/05/17 18:16:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -410,7 +410,7 @@ ifconfig(char *ifname)
 	memset(ifinfo, 0, sizeof(*ifinfo));
 	ifinfo->sdl = sdl;
 
-	strncpy(ifinfo->ifname, ifname, sizeof(ifinfo->ifname));
+	strlcpy(ifinfo->ifname, ifname, sizeof(ifinfo->ifname));
 
 #ifdef ISATAP
 	if (is_6to4(ifinfo)) {

@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.20 2003/05/16 19:47:18 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.21 2003/05/17 18:13:36 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -1371,8 +1371,7 @@ inetname(struct in_addr in)
 		first = 0;
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
 		    (cp = strchr(domain, '.')) != NULL) {
-			(void)strncpy(domain, cp + 1, sizeof(domain) - 1);
-			domain[sizeof(domain) - 1] = '\0';
+			(void)strlcpy(domain, cp + 1, sizeof(domain));
 		} else
 			domain[0] = '\0';
 	}
@@ -1382,8 +1381,7 @@ inetname(struct in_addr in)
 			if ((cp = strchr(hp->h_name, '.')) != NULL &&
 			    strcmp(cp + 1, domain) == 0)
 				*cp = '\0';
-			(void)strncpy(line, hp->h_name, sizeof(line) - 1);
-			line[sizeof(line) - 1] = '\0';
+			(void)strlcpy(line, hp->h_name, sizeof(line));
 			return (line);
 		}
 	}

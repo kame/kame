@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.12 2000/06/14 15:24:01 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.13 2003/05/17 18:25:38 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -562,8 +562,8 @@ hostalias(name)
 				break;
 			for (cp2 = cp1 + 1; *cp2 && !isspace(*cp2); ++cp2)
 				;
-			abuf[sizeof(abuf) - 1] = *cp2 = '\0';
-			strncpy(abuf, cp1, sizeof(abuf) - 1);
+			*cp2 = '\0';
+			strlcpy(abuf, cp1, sizeof(abuf));
 			fclose(fp);
 			return (abuf);
 		}

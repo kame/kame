@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_init.c	8.1 (Berkeley) 6/7/93";
-static char rcsid[] = "$Id: res_init.c,v 1.13 2003/05/07 01:24:53 itojun Exp $";
+static char rcsid[] = "$Id: res_init.c,v 1.14 2003/05/17 18:25:38 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -229,7 +229,7 @@ res_init()
 
 	/* Allow user to override the local domain definition */
 	if ((cp = getenv("LOCALDOMAIN")) != NULL) {
-		(void)strncpy(_res.defdname, cp, sizeof(_res.defdname) - 1);
+		(void)strlcpy(_res.defdname, cp, sizeof(_res.defdname));
 		haveenv++;
 
 		/*
@@ -289,7 +289,7 @@ res_init()
 			    cp++;
 		    if ((*cp == '\0') || (*cp == '\n'))
 			    continue;
-		    strncpy(_res.defdname, cp, sizeof(_res.defdname) - 1);
+		    strlcpy(_res.defdname, cp, sizeof(_res.defdname));
 		    if ((cp = strpbrk(_res.defdname, " \t\n")) != NULL)
 			    *cp = '\0';
 		    havesearch = 0;
@@ -304,7 +304,7 @@ res_init()
 			    cp++;
 		    if ((*cp == '\0') || (*cp == '\n'))
 			    continue;
-		    strncpy(_res.defdname, cp, sizeof(_res.defdname) - 1);
+		    strlcpy(_res.defdname, cp, sizeof(_res.defdname));
 		    if ((cp = strchr(_res.defdname, '\n')) != NULL)
 			    *cp = '\0';
 		    /*
@@ -680,10 +680,9 @@ netinfo_res_init(haveenv, havesearch)
 		    /* get the default domain name */
 		    status = ni_lookupprop(domain, &dir, "domain", &nl);
 		    if (status == NI_OK && nl.ni_namelist_len > 0) {
-			(void)strncpy(_res.defdname,
+			(void)strlcpy(_res.defdname,
 				      nl.ni_namelist_val[0],
-				      sizeof(_res.defdname) - 1);
-			_res.defdname[sizeof(_res.defdname) - 1] = '\0';
+				      sizeof(_res.defdname));
 			ni_namelist_free(&nl);
 			*havesearch = 0;
 		    }
@@ -691,10 +690,9 @@ netinfo_res_init(haveenv, havesearch)
 		    /* get search list */
 		    status = ni_lookupprop(domain, &dir, "search", &nl);
 		    if (status == NI_OK && nl.ni_namelist_len > 0) {
-			(void)strncpy(_res.defdname,
+			(void)strlcpy(_res.defdname,
 				      nl.ni_namelist_val[0],
-				      sizeof(_res.defdname) - 1);
-			_res.defdname[sizeof(_res.defdname) - 1] = '\0';
+				      sizeof(_res.defdname));
 			/* copy  */
 			for (n = 0;
 			     n < nl.ni_namelist_len && n < MAXDNSRCH;

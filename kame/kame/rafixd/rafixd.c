@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.4 2003/03/14 11:58:54 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.5 2003/05/17 18:18:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -246,8 +246,7 @@ add_interface(ifname)
 		return (-1);
 	}
 	memset(ifp, 0, sizeof(*ifp));
-	strncpy(ifp->ifname, ifname, sizeof(ifp->ifname));
-	ifp->ifname[sizeof(ifp->ifname) - 1] = '\0'; /* for safety */
+	strlcpy(ifp->ifname, ifname, sizeof(ifp->ifname));
 	ifp->ifindex = index;
 
 	ifp->next = iflist;

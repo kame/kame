@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.95 2003/02/28 10:43:12 k-sugyou Exp $	*/
+/*	$KAME: mainloop.c,v 1.96 2003/05/17 18:21:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -513,7 +513,7 @@ recv_icmp6(sd)
 
 	if (getnameinfo(from, fromlen, hbuf, sizeof(hbuf),
 	    NULL, 0, niflags))
-		strncpy(hbuf, "?", sizeof(hbuf));
+		strlcpy(hbuf, "?", sizeof(hbuf));
 
 	if (sizeof(*icmp6) > l) {
 		if (dflag)
@@ -750,8 +750,8 @@ dnsdump(title, buf, len, from, fromlen)
 
 	if (getnameinfo(from, fromlen, hbuf, sizeof(hbuf),
 	    pbuf, sizeof(pbuf), niflags) != 0) {
-		strncpy(hbuf, "?", sizeof(hbuf));
-		strncpy(pbuf, "?", sizeof(pbuf));
+		strlcpy(hbuf, "?", sizeof(hbuf));
+		strlcpy(pbuf, "?", sizeof(pbuf));
 	}
 
 	printf("host %s port %s myaddr %d\n", hbuf, pbuf,
