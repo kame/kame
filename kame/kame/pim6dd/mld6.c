@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.10 2000/01/27 11:51:32 jinmei Exp $
+ *  $Id: mld6.c,v 1.11 2000/02/03 06:39:50 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -421,11 +421,12 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 		log(LOG_ERR, 0, "inet6_opt_append(0) failed");
 	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1)
 		log(LOG_ERR, 0, "inet6_opt_finish(0) failed");
-	hbhlen = CMSG_SPACE(hbhlen);
+	ctllen += CMSG_SPACE(hbhlen);
 #else  /* old advanced API */
 	hbhlen = inet6_option_space(sizeof(raopt));
-#endif
 	ctllen += hbhlen;
+#endif
+	
     }
     /* extend ancillary data space (if necessary) */
     if (ctlbuflen < ctllen) {
