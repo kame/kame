@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.26 2003/08/07 10:37:30 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.27 2003/11/02 23:04:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,7 +288,7 @@ mobility6_send_be(src, dst, status, home)
 	if (mobility6_be_ratelimit(dst, home, status))
 		return (0); /* rate limited. */
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
 	if (m == NULL)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.44 2003/10/31 12:19:41 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.45 2003/11/02 23:04:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1016,7 +1016,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	struct ip6_rthdr *pktopt_rthdr;
 	int error = 0;
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
 	if (m == NULL) {
@@ -1102,7 +1102,7 @@ mip6_bc_send_brr(mbc)
 	struct ip6_pktopts opt;
 	int error;
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(&mbc->mbc_addr, &mbc->mbc_phaddr, IPPROTO_NONE,
 	    0);
@@ -1853,7 +1853,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 		}
 	}
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(&dst_sa, &src_sa, IPPROTO_NONE, 0);
 	if (m == NULL) {
@@ -1950,7 +1950,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 		}
 	}
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(&dst_sa, &src_sa, IPPROTO_NONE, 0);
 	if (m == NULL) {

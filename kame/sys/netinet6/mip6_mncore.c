@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.40 2003/10/31 12:19:41 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.41 2003/11/02 23:04:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2135,7 +2135,7 @@ mip6_bu_send_hoti(mbu)
 	struct ip6_pktopts opt;
 	int error = 0;
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
 	    IPPROTO_NONE, 0);
@@ -2183,7 +2183,7 @@ mip6_bu_send_coti(mbu)
 	struct ip6_pktopts opt;
 	int error = 0;
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 	opt.ip6po_flags |= IP6PO_USECOA;
 
 	m = mip6_create_ip6hdr(&mbu->mbu_coa, &mbu->mbu_paddr,
@@ -2273,7 +2273,7 @@ mip6_bu_send_bu(mbu)
 	}
 
 	/* initialize packet options structure. */
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	/* create a binding update mobility header. */
 	error = mip6_ip6mu_create(&opt.ip6po_mobility, &mbu->mbu_haddr,
@@ -2326,7 +2326,7 @@ mip6_bu_send_cbu(mbu)
 	if (mbu == NULL)
 		return (EINVAL);
 
-	init_ip6pktopts(&opt);
+	ip6_initpktopts(&opt);
 
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr, IPPROTO_NONE, 0);
 	if (m == NULL) {

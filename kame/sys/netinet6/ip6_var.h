@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.119 2003/09/21 09:33:42 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.120 2003/11/02 23:04:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -442,9 +442,9 @@ int	ip6_raw_ctloutput __P((struct socket *, struct sockopt *));
 #else
 int	ip6_raw_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
-void	init_ip6pktopts __P((struct ip6_pktopts *));
-int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *,
-			       struct ip6_pktopts *, int, int, int));
+void	ip6_initpktopts __P((struct ip6_pktopts *));
+int	ip6_setpktopts __P((struct mbuf *, struct ip6_pktopts *,
+    struct ip6_pktopts *, int, int, int));
 void	ip6_clearpktopts __P((struct ip6_pktopts *, int));
 struct ip6_pktopts *ip6_copypktopts __P((struct ip6_pktopts *, int));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */

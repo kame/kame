@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.86 2003/09/09 00:42:54 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.87 2003/11/02 23:04:02 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -295,7 +295,7 @@ mld6_init()
 	all_v2routers_linklocal = &all_v2routers_linklocal0;
 #endif
 
-	init_ip6pktopts(&ip6_opts);
+	ip6_initpktopts(&ip6_opts);
 	ip6_opts.ip6po_hbh = hbh;
 
 	Head6 = NULL;

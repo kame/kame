@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.131 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.132 2003/11/02 23:04:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -574,7 +574,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 #endif /* MIP6 */
 
 #ifdef MIP6
-			init_ip6pktopts(&opts);
+			ip6_initpktopts(&opts);
 			opts.ip6po_flags |= IP6PO_USECOA;
 #endif /* MIP6 */
 			bcopy(&dst_sa, &ro.ro_dst, sizeof(dst_sa));
@@ -1101,7 +1101,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	 * Select a source whose scope is the same as that of the dest.
 	 */
 #ifdef MIP6
-	init_ip6pktopts(&opts);
+	ip6_initpktopts(&opts);
 	opts.ip6po_flags |= IP6PO_USECOA;
 #endif /* MIP6 */
 	bcopy(&dst_sa, &ro.ro_dst, sizeof(dst_sa));
