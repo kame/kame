@@ -97,7 +97,7 @@ static int __icheckhost __P((const void *, const char *, int, int));
 #endif
 static int __icheckhost_sa __P((const struct sockaddr *, int, const char *));
 
-char paddr[INET6_ADDRSTRLEN];
+char paddr[NI_MAXHOST];
 
 int
 rcmd(ahost, rport, locuser, remuser, cmd, fd2p)

@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.3 2000/02/28 08:39:06 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -127,7 +127,7 @@ static int af = 0;		/* address family of socket */
 			__fp_nquery(query, size, stdout);\
 		} else {}
 #ifdef INET6
-static char abuf[INET6_ADDRSTRLEN];
+static char abuf[NI_MAXHOST];
 static char pbuf[32];
 #endif /* INET6 */
     static void
