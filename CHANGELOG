@@ -1,9 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2579 2004/04/02 08:22:29 suz Exp $
+$KAME: CHANGELOG,v 1.2580 2004/04/02 08:38:11 sakane Exp $
 
 <200404>
 
 <200403>
+Fri Apr  2 17:35:45 JST 2004 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	fixed that a memory leak happend in the case that the compile
+	option, IPSEC_DOSEQCHECK was defined and called key_update().
+
+Fri Apr  2 16:27:00 JST 2004 sakane@kame.net
+	* kame/kame/tcpdump/print-isakmp.c:
+	fixed that there was a possibility tcpdump(8) fell into infinite loop. 
+	and the problem was at print-isakmp.c, so racoon also fell into it
+	when the debug option was used.
+
 2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* netbsd/sys/netinet/udp_usrreq.c
 	code cleanup: uses a per-socket/interface MSF-check functions 
