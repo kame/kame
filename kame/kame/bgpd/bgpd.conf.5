@@ -1,0 +1,506 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: bgpd.conf.5,v 1.1.1.1 1999/08/08 23:29:12 itojun Exp $
+.\"
+.Dd May 17, 1998
+.Dt BGPD.CONF 5
+.Os KAME
+.\"
+.Sh NAME
+.Nm bgpd.conf
+.Nd bgpd configuration file
+.\"
+.Sh SYNOPSIS
+.Pa /usr/local/v6/etc/bgpd.conf
+.\"
+.Sh DESCRIPTION
+The bgpd config file consists of a sequence of statements terminated
+by a semi-colon (`;').
+Statements are composed of tokens
+separated by white space, which can be any combination of blanks, tabs
+and newlines.
+This structure simplifies identification of
+the parts of the configuration associated with each other and with
+specific protocols.
+Lines beginning with
+.Ql #
+are comments.
+.\"
+.Sh Meta Syntax
+Keywords and special characters that the parser expects exactly are
+displayed using the
+.Ic bold
+font.
+Parameters are specifying with
+.Ar underline .
+Parameters shown in
+square brackets (`[' and `]') are used to show optional
+keywords and parameters.
+The vertical bar (`|') is used to indicate
+between a choice of optional parameters.
+Parentheses (`(' and
+`)') are used to group keywords and parameters when necessary.
+.\"
+.Sh Interface specification
+There are some statements that may or have to specify interface.
+Interfaces are specified in the form of "name unit", such as
+.Ar lo0
+and
+.Ar ep1.
+.\"
+.Sh Specifying Dump File
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic dumpfile Ar filename;
+.Xc
+Specifies the name of the dump file
+(see
+.Xr bgpd 8 ) .
+.El
+.\"
+.Sh The BGP Related Statements
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic autonomoussystem Ar as_number;
+.Xc
+Sets the autonomous system number of this router to be autonomous
+system.
+This statement is required if BGP is in use.
+The AS number is assigned by the Network Information Center (NIC).
+.\"
+.It Ic routerid Ar router_id;
+Sets the router identifier for use by the BGP and OSPF protocols.
+The default is the address of the first interface encountered by
+bgpd except the loopback address(127.0.0.1).
+.\"
+.It Ic IamRouteReflector;
+Specifies to act as a route reflector.
+.\"
+.It Ic holdtime Ar seconds;
+Specifies the BGP holdtime value to use when negotiating the
+connection with this peer, in seconds.
+According to BGP, if bgpd does not receive a keepalive, update, or notification message
+within the period specified in the Hold Time field of
+the BGP Open message, then the BGP connection will be closed.
+The value must be either 0 (no keepalives will be sent)
+or at least 3.
+The default value is 240 according to the RFC 1771.
+.\"
+.It Xo
+.Ic bgp (yes \(ba no) { Ar substatements
+.Ic };
+.Xc
+Enables or disables BGP.
+By default BGP is disabled.
+The following two substatements can be appeared in the
+.Ic bgp
+statement.
+.\"
+.It Ic group type external peeras Ar remote_as_number {
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic peer Ar host
+.Op Ic interface Ar interface
+.Op Ic preference Ar preference
+.Op Ic prepend Op Ar iteration
+.Op Ic no synchronization
+.Op Ic lcladdr Ar localaddress
+.Ic ;
+.Ic };
+.Xc
+.El
+.Pp
+Specifies the IPv6 address and AS number of an individual EBGP peer.
+The interface on which the peer exists may also be specified.
+Interface
+specification may be necessary when the peer address is a link-local
+address.
+If the optional keyword
+.Ic preference
+is specified followed by a number, bgpd uses the value as the value of
+local preference when advertising reachable routes from the peer via
+IBGP.
+Currently, the value can only be specified per peer base.
+If the optional keyword
+.Ic prepend
+is specified, bgpd adds its AS number to the as path when advertising
+reachable routes to other EBGP peers.
+This keywords takes an optional argument, which specifies number of iteration
+of the addition.
+If the argument is omitted, bgpd treats it as 1.
+Note that
+.Ic prepend 1
+makes each advertised AS path longer than usual.
+Typically, this keywords does not have to be set.
+If the optional keyword
+.Ic no synchronization
+is specified, bgpd will export each EBGP route to the peer without waiting
+for synchronization with RIPng for the route.
+The optional keyword
+.Ic lcladdr
+specifies the local(source) IPv6 address to connect the peer.
+If the node has multiple IPv6 addresses that can be used as the source address,
+the keyword should be specified.
+.\"
+.It Xo
+.Ic group type internal
+.Op Ic routerid Ar router_id
+.Ic { Ar substatements
+.Ic };
+.Xc
+Specifies a set of IBGP peers.
+The BGP identifier of the peer can be specified with the keyword
+.Ic routerid,
+but bgpd doesn't use the value for any significant purpose, e.g. authentication.
+Substatements include information of
+individual peers.
+Possible substatement is as follows.
+.\"
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic (peer \(ba client) Ar host
+.Op Ic interface Ar interface
+.Op Ic no synchronization
+.Op Ic nexthopself
+.Op Ic lcladdr Ar localaddress
+.Ic ;
+.Xc
+Specifies the IPv6 address of an individual IBGP peer.
+If the peer is specified with the keyword
+.Ic client,
+bgpd will treat it as a route reflector client.
+Otherwise, the peer
+will be treated as a normal IBGP peer.
+The interface on which the peer exists may also be specified.
+Interface
+specification may be necessary when the peer address is a link-local
+address.
+If the optional keyword
+.Ic no synchronization
+is specified and bgpd act as a route reflector for the peer,
+it will reflect each IBGP route without waiting for synchronization with
+RIPng for the route.
+If the optional keyword
+.Ic nexthopself
+is specified, bgpd puts its own address to the next hop field of
+an MP_REACH_NLRI attributes when advertising a new route to the peer.
+.Ic lcladdr
+can also be specified for an IBGP peer.
+The semantics of the keyrword is same as an EBGP peer.
+.El
+.\"
+.\"
+.It Xo
+.Ic export proto bgp as Ar as_number
+.Ic { Ar export_list
+.Ic };
+.Xc
+Controls exportation to EBGP.
+.Ar as_number,
+the autonomous system number of the EBGP peer, must be specified.
+The peer AS has to be defined by a
+.Ic group type external peeras
+substatement of the
+.Ic bgp
+statement somewhere before the
+.Ic export
+statement.
+The
+.Ar as_number
+may not be the AS number to which the bgpd itself belongs.
+.Pp
+The export list specifies export based on the origin of a route and
+the syntax varies depending on the source.
+Followings are the possible elements of the list.
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic proto direct interface Ar interface
+.Ic {all;};
+.Xc
+Routes to directly attached interfaces.
+.\"
+.It Xo
+.Ic proto bgp as Ar as_number
+.Ic {all;};
+.Xc
+Routes advertised by the EBGP peer specified by the
+.Ar as_number .
+.\"
+.It Xo
+.Ic proto rip {all;};
+.Xc
+Routes advertised via RIPng.
+.\"
+.It Xo
+.Ic proto ibgp {all;};
+.Xc
+Routes advertised via IBGP.
+.El
+.El
+.Sh The RIPng Related Statements
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic rip (yes \(ba no) { Ar substatements
+.Ic };
+.Xc
+Enables or disables RIPng.
+By default RIPng is disabled.
+Possible substatements are as follows.
+.\"
+.It Xo
+.Ic interface Ar interface attributes
+.Ic ;
+.Xc
+Controls various attributes of sending or receiving RIP on specific
+interfaces.
+Multiple attributes can be specified in a single
+.Ic rip
+statement.
+.Pp
+The followings are the list of attributes.
+.Bl -tag -width Ds -compact
+.It Ic noripin
+Specifies that RIP packets received via the specified interface will
+be ignored.
+The default is to listen to RIP packets on all
+non-loopback interfaces.
+.\"
+.It Ic noripout
+Specifies that no RIP packets will be sent on the specified
+interfaces.
+The default is to send RIP on all interfaces.
+.\"
+.It Ic default originate
+Specifies to advertise the RIPng default route with metric 1 on the interface.
+If this attribute is specified, the incoming default route on the interface
+will be ignored.
+.\"
+.It Ic filterin Ar prefix
+Specifies incoming route filtering. If an incoming route on the interface
+matches the specified prefix, it will be ignored and will not be
+installed in the kernel.
+.Pp
+The prefixes are specified in the form of
+.Ql address/prefix_length,
+such as
+.Ar 3ffe:509::/32
+and
+.Ar 3ffe:501:100f::/48.
+The special string 
+.Ar default
+can also be specified as a prefix, which means the default route.
+Note that the semantics of
+.Ar default
+is different from the semantics of
+.Ar ::/0 .
+The former is to specify to filter the default route(exact match),
+but the latter is to specify to filter all routes that match
+.Ar ::/0 ,
+that is, filter all incoming routes.
+.\"
+.It Ic restrictin Ar prefix
+Specifies incoming route restriction.
+An incoming route on the interface will be ignored unless it matches
+.Ar prefix .
+If this attribute is specified for more than one prefix,
+an incoming route will be required to match at least one prefix of them.
+As for the
+.Ic filterin
+attribute, the special string
+.Ar default
+can be specified as a prefix, which means that all non default routes
+will be ignored on the interface.
+.\"
+.It Ic filterout Ar prefix
+Specifies outgoing route filtering. If an outgoing route on the interface
+matches the specified prefix, it will not be advertised.
+The special string
+.Ar default
+can also be specified for this attribute, which means that the default route
+will not be advertised on the interface. Note that the semantics of
+.Ic filterout Ar ::/0
+is different from the semantics of
+.Ic filterout Ar default .
+The former means that all routes that match the prefix
+.Ar ::/0
+will not be advertised on the interface. Consequently, it has the same meaning
+of
+.Ic noripout .
+.\"
+.It Ic restrictout Ar prefix
+Specifies outgoing route restriction.
+An outgoing route on the interface will not be advertised unless it
+matches
+.Ar prefix .
+If this attribute is specified for more than one prefix,
+an outgoing route will be required to match at least one prefix of
+them.
+If the special string
+.Ar default
+is specified as a prefix, it means that only the default route will be
+advertised on the interface.
+.\"
+.It Ic metricin Ar metric
+Specifies metric which is added to any incoming RIPng routes
+before route calculation. Its value must be no less than 1 and
+no greater than 16.
+.El
+.El
+.\"
+.Sh The Route Aggregation Statements
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic aggregate Ar prefix
+.Ic { Ar substatements
+.Ic };
+.Xc
+.Pp
+Specifies route aggregation.
+Routes that match the specified prefix
+will be advertised in the aggregated form.
+That is, only the specified
+prefix will be advertised instead of each specific prefix.
+.Pp
+There are two type of substatements that can be appeared in an
+.Ic aggregate
+statement. One is specification of interfaces on which aggregated
+routes are advertised, and the other is to describe routes that
+should not be aggregated.
+.Pp
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic proto direct interface Ar interface
+.Ic {all;};
+.Xc
+The
+.Ar substatement
+specifies interfaces to advertise aggregated route.
+By default, bgpd doesn't advertise aggregated routes on any interface
+even if there is an
+.Ic aggregate
+statement. To advertise aggregated routes, you should explicitly
+specify the interface by this
+.Ar substatement .
+.It Xo
+.Ic explicit { Ar prefix_1; prefix_2; ..., prefix_N;
+.Ic };
+.Xc
+Exception to the aggregation can be specified as a list.
+Prefixes in the list will be advertised even if they match the prefix
+specified in the
+.Ic aggregate
+statement.
+.Pp
+In this list, each prefix is specified in the same form of the
+.Ic filterin
+statement.
+.El
+.El
+.\"
+.Sh EXAMPLE
+.Bd -literal -offset
+#AS number, which is mandatory for BGP4+
+autonomoussystem 2500;
+
+#RIPng settings
+rip yes {
+	# It's better to add an appropriate cost for the interface
+	# since the serial line is slow
+	interface ntwo0 metricin 5;
+
+	# Typical setting for stab organizations;
+	#   advertise the default route only
+	#   listen to their prefix only
+	interface gif0 default originate
+			restrictout default
+			restrictin 3ffe:505::/32;
+
+	# Stop RIPng; EBGP only for the interface(see below)
+	interface gif1 noripin noripout;
+};
+
+# Aggregation settings for upriver routers of RIPng
+aggregate 3ffe:501:400::/40 {
+	proto direct interface ntwo1 {all;};
+	proto direct interface gif3 {all;};
+	proto direct interface gif4 {all;};
+};
+
+# Aggregate setting for an EBGP peer
+aggregate 3ffe:500::/24 {
+	proto direct interface gif1 {all;};
+};
+
+# BGP4+ settings
+bgp yes {
+	# IBGP peer:
+	# `no synchronization' means to advertise routes from IBGP w/o sync
+	# with RIPng
+	# specify the local address since we have multiple global addresses.
+	group type internal {
+		peer 3ffe:501:0:ffff:2a0:24ff:fe48:7a3c no synchronization
+		  lcladdr 3ffe:501:0:401:200:e8ff:fed5:8923;
+	};
+
+	# EBGP peer(global address)
+	group type external peeras 65500 {
+		peer 3ffe:ff00::1;
+	};
+
+	# EBGP peer(link-local address)
+	# in this case, the interface must be specified.
+	group type external peeras 65501 {
+		peer fe80::2a0:24ff:fe66:1350 interface pvc0;
+	};
+};
+
+# export list
+export proto bgp as 65500 {
+	proto rip {all;};
+	proto ibgp {all;};
+	proto bgp as 65501 {all;};
+};
+
+export proto bgp as 65501 {
+	proto direct interface de0 {all;};
+};
+.Ed
+.\"
+.Sh SEE ALSO
+.Xr bgpd 8
+.\"
+.Sh HISTORY
+The
+.Nm
+configuration file was first appeared in Toshiba IPv6 protocol stack
+kit.
+Older name was bgp6d.conf, but was renamed to be consistent with
+the name of the command(bgpd).
+.Pp
+Some part of this document was derived from the GateDaemon(gated)
+manual document.

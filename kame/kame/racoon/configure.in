@@ -1,0 +1,411 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(admin.c)
+
+dnl Checks for programs.
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_LEX
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+
+AC_SUBST(OPTFLAG)
+OPTFLAG="-O"
+AC_MSG_CHECKING(if --enable-debug option is specified)
+AC_ARG_ENABLE(debug, [  --enable-debug          build a debug version],
+	[OPTFLAG="-g $OPTFLAG"; enable_debug=yes], [enable_debug=no])
+AC_MSG_RESULT($enable_debug)
+
+AC_MSG_CHECKING(if --enable-yydebug option is specified)
+AC_ARG_ENABLE(yydebug, [  --enable-yydebug        build a yydebug version],
+	[AC_DEFINE(YYDEBUG)
+	enable_yydebug=yes], [enable_yydebug=no])
+AC_MSG_RESULT($enable_yydebug)
+
+OPTFLAG="-Wall $OPTFLAG"
+AC_MSG_CHECKING(if --enable-pedant option is specified)
+AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compiler options],
+	[OPTFLAG="-Werror $OPTFLAG"; enable_pedant=yes],
+	[enable_pedant=no])
+AC_MSG_RESULT($enable_pedant)
+
+AC_MSG_CHECKING(if you have KAME tcpdump in $srcdir/../tcpdump)
+if test -f "$srcdir/../tcpdump/print-isakmp.c"; then
+	LIBOBJS="$LIBOBJS print-isakmp.o"
+	AC_DEFINE(HAVE_PRINT_ISAKMP_C)
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
+
+OPTFLAG="-DYIPS_DEBUG $OPTFLAG"
+
+AC_MSG_CHECKING(if __FUNCTION__ is available)
+AC_TRY_COMPILE(dnl
+[#include <stdio.h>
+], [char *x = __FUNCTION__;],
+	[AC_DEFINE(HAVE_FUNCTION_MACRO)
+	AC_MSG_RESULT(yes)],
+	[AC_MSG_RESULT(no)])
+
+dnl Checks for libraries.
+AC_MSG_CHECKING(if --with-ssleay option is specified)
+AC_ARG_WITH(ssleay, [  --with-ssleay=DIR       specify SSLeay directory],
+	[crypto_dir=$withval])
+AC_MSG_RESULT(${crypto_dir-"default"})
+
+AC_MSG_CHECKING(for libcrypto)
+for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
+	ssleay_lib=no
+	ssleay_include=no
+	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
+		ssleay_lib="$dir/lib"
+	fi
+	if test -d $dir/include -a -f $dir/include/md5.h; then
+		ssleay_include="-I$dir/include"
+	else
+		if test -d $dir/include/ssleay -a -f $dir/include/ssleay/md5.h; then
+			ssleay_include="-I$dir/include/ssleay"
+		elif test -d $dir/include/openssl -a -f $dir/include/openssl/md5.h; then
+			ssleay_include="-I$dir/include -I$dir/include/openssl"
+		fi
+	fi
+	if test "$ssleay_lib" != "no" -a "$ssleay_include" != "no"; then
+		LIBS="-L$ssleay_lib $LIBS"
+		CFLAGS="$ssleay_include $CFLAGS"
+		break;
+	fi
+done
+AC_TRY_COMPILE(dnl
+[#include <sys/types.h>
+#include <stdio.h>
+#include <bn.h>
+#include <dh.h>
+#include <md5.h>
+#include <sha.h>
+#include <des.h>], [], [], [dnl
+	echo
+	echo "Fatal: crypto library and headers not found."
+	echo Specify proper directory by using --with-ssleay.
+	if test `uname -s` = FreeBSD; then
+		echo Use ports/security/SSLeay to install SSLeay, or visit
+	elif test `uname -s` = NetBSD; then
+		echo Use pkgsrc/security/SSLeay to install SSLeay, or visit
+	else
+		echo -n "Visit "
+	fi
+	echo ftp://psych.psy.uq.oz.au/pub/Crypto/SSL/, or visit
+	echo http://www.openssl.org/
+	exit 1])
+AC_MSG_RESULT("$ssleay_lib and $ssleay_include")
+
+dnl AC_MSG_CHECKING(for libssl)
+AC_CHECK_LIB(ssl, ssl_ok, [dnl
+	echo
+	echo "Warning: OpenSSL 0.9.1c has some problem in bignum library."
+	echo "	consult http://www.openssl.org/ for workarounds."
+	echo
+	], [], -lcrypto)
+
+dnl AC_MSG_CHECKING(SSLeay version number)
+dnl ssleay_version=`$ssleay_lib/../bin/ssleay version`
+dnl AC_MSG_RESULT($ssleay_version)
+
+AC_CHECK_LIB(crypto, des_cbc_encrypt)
+AC_CHECK_LIB(l, yywrap)
+AC_CHECK_LIB(y, yyerror)
+
+dnl PF_KEYv2 support check
+AC_MSG_CHECKING(for PF_KEYv2 support)
+AC_CACHE_VAL(ac_cv_pfkey, [dnl
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/pfkeyv2.h>],
+        [int x = PF_KEY, y = PF_KEY_V2;],
+        [ac_cv_pfkey="yes"], [ac_cv_pfkey="no"])])
+AC_MSG_RESULT($ac_cv_pfkey)
+if test "$ac_cv_pfkey" = yes; then
+        OPTFLAG="-DHAVE_PFKEYV2 $OPTFLAG"
+fi
+
+AC_MSG_CHECKING([whether to enable ipv6])
+AC_ARG_ENABLE(ipv6,
+[  --enable-ipv6           Enable ipv6 (with ipv4) support
+  --disable-ipv6          Disable ipv6 support],
+[ case "$enableval" in
+  no)
+       AC_MSG_RESULT(no)
+       ipv6=no
+       ;;
+  *)   AC_MSG_RESULT(yes)
+       AC_DEFINE(INET6)
+       ipv6=yes
+       ;;
+  esac ],
+
+  AC_TRY_RUN([ /* AF_INET6 avalable check */
+#include <sys/types.h>
+#include <sys/socket.h>
+main()
+{
+  exit(0);
+ if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
+   exit(1);
+ else
+   exit(0);
+}
+],
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(ENABLE_IPV6)
+  ipv6=yes,
+  AC_MSG_RESULT(no)
+  ipv6=no,
+  AC_MSG_RESULT(no)
+  ipv6=no
+))
+
+ipv6type=unknown
+ipv6lib=none
+ipseclib=none
+ipv6trylibc=no
+
+if test "$ipv6" = "yes"; then
+	AC_MSG_CHECKING([ipv6 stack type])
+	for i in inria kame linux toshiba v6d zeta; do
+		case $i in
+		inria)
+			dnl http://www.kame.net/
+			AC_EGREP_CPP(yes, [dnl
+#include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+yes
+#endif],
+				[ipv6type=$i;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		kame)
+			dnl http://www.kame.net/
+			AC_EGREP_CPP(yes, [dnl
+#include <netinet/in.h>
+#ifdef __KAME__
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipseclib=ipsec;
+				ipv6libdir=/usr/local/v6/lib;
+				ipv6trylibc=yes
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		linux)
+			dnl http://www.v6.linux.or.jp/
+			if test -d /usr/inet6; then
+				ipv6type=$i
+				ipv6lib=inet6
+				ipseclib=ipsec
+				ipv6libdir=/usr/inet6/lib
+				CFLAGS="-DINET6 -I/usr/inet6/include $CFLAGS"
+			fi
+			;;
+		toshiba)
+			AC_EGREP_CPP(yes, [dnl
+#include <sys/param.h>
+#ifdef _TOSHIBA_INET6
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipseclib=ipsec;
+				ipv6libdir=/usr/local/v6/lib;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		v6d)
+			AC_EGREP_CPP(yes, [dnl
+#include </usr/local/v6/include/sys/v6config.h>
+#ifdef __V6D__
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=v6;
+				ipseclib=ipsec;
+				ipv6libdir=/usr/local/v6/lib;
+				CFLAGS="-I/usr/local/v6/include $CFLAGS"])
+			;;
+		zeta)
+			AC_EGREP_CPP(yes, [dnl
+#include <sys/param.h>
+#ifdef _ZETA_MINAMI_INET6
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipseclib=ipsec;
+				ipv6libdir=/usr/local/v6/lib;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		esac
+		if test "$ipv6type" != "unknown"; then
+			break
+		fi
+	done
+	AC_MSG_RESULT($ipv6type)
+fi
+
+if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
+	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipseclib.a; then
+		LIBS="$LIBS -L$ipv6libdir -l$ipseclib"
+	else
+		echo "Fatal: no $ipseclib library found.  "
+		echo "cannot continue.  You need to fetch lib$ipv6lib.a "
+		echo "from appropriate ipv6 kit and compile beforehand."
+		exit 1
+	fi
+	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipv6lib.a; then
+		echo "using lib$ipv6lib for getaddrinfo"
+		LIBS="$LIBS -L$ipv6libdir -l$ipv6lib"
+	else
+		if test "$ipv6trylibc" = "yes"; then
+			echo 'using libc for getaddrinfo'
+		else
+			echo "Fatal: no $ipv6lib library found.  "
+			echo "cannot continue.  You need to fetch lib$ipv6lib.a "
+			echo "from appropriate ipv6 kit and compile beforehand."
+			exit 1
+		fi
+	fi
+fi
+
+if test "$ipv6" = "yes"; then
+	AC_MSG_CHECKING(for advanced API support)
+	AC_CACHE_VAL(racoon_cv_advapi, [dnl
+	AC_TRY_COMPILE([#define INET6
+#include <sys/types.h>
+#include <netinet/in.h>],
+		[struct in6_pktinfo a;],
+		[racoon_cv_advapi="yes"], [racoon_cv_advapi="no"])])
+	AC_MSG_RESULT($racoon_cv_advapi)
+	if test "$racoon_cv_advapi" = yes; then
+		AC_DEFINE(ADVAPI)
+	fi
+fi
+
+AC_MSG_CHECKING(getaddrinfo bug)
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <netdb.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+main()
+{
+  int passive, gaierr, inet4 = 0, inet6 = 0;
+  struct addrinfo hints, *ai, *aitop;
+  char straddr[INET6_ADDRSTRLEN], strport[16];
+
+  for (passive = 0; passive <= 1; passive++) {
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = passive ? AI_PASSIVE : 0;
+    hints.ai_socktype = SOCK_STREAM;
+    if ((gaierr = getaddrinfo(NULL, "54321", &hints, &aitop)) != 0) {
+      (void)gai_strerror(gaierr);
+      goto bad;
+    }
+    for (ai = aitop; ai; ai = ai->ai_next) {
+      if (ai->ai_addr == NULL ||
+          ai->ai_addrlen == 0 ||
+          getnameinfo(ai->ai_addr, ai->ai_addrlen,
+                      straddr, sizeof(straddr), strport, sizeof(strport),
+                      NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
+        goto bad;
+      }
+      if (strcmp(strport, "54321") != 0) {
+        goto bad;
+      }
+      switch (ai->ai_family) {
+      case AF_INET:
+        if (passive) {
+          if (strcmp(straddr, "0.0.0.0") != 0) {
+            goto bad;
+          }
+        } else {
+          if (strcmp(straddr, "127.0.0.1") != 0) {
+            goto bad;
+          }
+        }
+        inet4++;
+        break;
+      case AF_INET6:
+        if (passive) {
+          if (strcmp(straddr, "::") != 0) {
+            goto bad;
+          }
+        } else {
+          if (strcmp(straddr, "::1") != 0) {
+            goto bad;
+          }
+        }
+        inet6++;
+        break;
+      case AF_UNSPEC:
+        goto bad;
+        break;
+      default:
+        /* another family support? */
+        break;
+      }
+    }
+  }
+
+  if (inet6 != 2 || inet4 != 2)
+    goto bad;
+
+  if (aitop)
+    freeaddrinfo(aitop);
+  exit(0);
+
+ bad:
+  if (aitop)
+    freeaddrinfo(aitop);
+  exit(1);
+}
+],
+AC_MSG_RESULT(good)
+buggygetaddrinfo=no,
+AC_MSG_RESULT(buggy)
+buggygetaddrinfo=yes,
+AC_MSG_RESULT(buggy)
+buggygetaddrinfo=yes)
+
+if test "$buggygetaddrinfo" = "yes"; then
+	if test "$ipv6" = "yes"; then
+		echo 'Fatal: You must get working getaddrinfo() function.'
+		echo '       or you can specify "--disable-ipv6"'.
+		exit 1
+	else
+		CFLAGS="$CFLAGS -I./missing"
+	fi
+fi
+AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+
+dnl Checks for library functions.
+AC_FUNC_MEMCMP
+AC_TYPE_SIGNAL
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS(gettimeofday select socket strerror strtol strtoul)
+AC_REPLACE_FUNCS(strdup)
+
+AC_OUTPUT(Makefile)

@@ -1,0 +1,129 @@
+				- v6test -
+
+v6testとは：
+	bpfを使って色んなIPv6のパケットを生成、送信するプログラムです。
+
+	termcapライクなエントリを書くことによって送出するパケットを好
+	き勝手に作れます(eg. 100個のdestination optionのついたパケット)
+
+動作確認システム：
+	以下のシステムで動作確認が行なわれています。
+
+	Hydrangea(BSD/OS, FreeBSD)
+	NR60
+	globe
+	cond
+
+	それ以外のプラットホームでも、RFC2292(advanced API)をちゃんと
+	サポートしてれば動きます。
+
+インストール：
+	./configure
+	make
+
+	いまのとこ、make installはありません。v6test.confファイルがカ
+	レントディレクトリにないと動かないからです。
+
+使い方：
+	v6test [-s src_address]  entry [entry entry ...]
+	       [-d dst_address]
+	       [-i interface]
+	       [-f conffile]
+
+	例えば、
+	v6test ping
+	とすると、ff02::1に対してicmp echoが出ます。
+
+	いまのところ、カレントディレクトリからv6test.confを読み込んで
+	きてエントリを検索します。ディレクトリ間違わないように注意してね。
+
+	-s, -dを使うことによって、設定ファイルをいじらなくても始点、終
+	点アドレスを変えることができます
+
+	-iオプションで送信インターフェイスを変更できます。デフォルトは
+	ep0です(Makefileで変更可)．
+
+	-fオプションでコンフィギュレーションファイルを指定できます。
+	デフォルトは ./v6test.conf です。
+	
+	entryは複数指定できます。時間待ちエントリもあるので、
+	Aのパケットを送信後、0.5秒まって、Bを送出とかもできます
+
+	詳しくはconf読んで推理してください。申し訳ない。
+
+CONF:
+	confファイルは以下の2種類があります。
+	conf-jpディレクトリの下に置いてます．
+
+	1. ext.conf 
+		拡張ヘッダに関する嫌がらせ
+	2. ndp.conf
+		近隣探索に関するかゆいところ
+
+TODO：
+	o 詳しいドキュメント書き(日、英)
+	o 親切なconfファイル(期待される結果とか、refとか)
+	o 受信部もつくって、target addressを指定するだけで、山程のテスト
+	  を実行して、点数がでる。
+	o libpcapベースにして、nitなんかも使えるようにする
+	o -f foo.conf option
+		-> 19980519 done by jinmei
+	o さあて、どこにconfファイルをおこうかねえ。多少は検索する？
+	o IP(v4,v6)パケットのネスト(トンネリング)
+	o getconfig.c をきれいに書き直す(冗長な変数削除とか、バッファ溢
+	  れの考慮とか…)
+	o 大きなパケットをフラグメントに分割して送る機能
+
+COPYRIGHT:
+
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *    This product includes software developed by WIDE Project and
+ *    its contributors.
+ * 4. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+スタッフ:
+	メイン・プログラマー
+		sumikawa@kame.net
+		jinmei@kame.net
+
+	移植した人
+		masaki@minami.org
+
+	ぱっちくれた人
+		k-sugyou@ccs.mt.nec.co.jp
+		nabeken@ebina.hitachi.co.jp
+
+	autoconf強化推進委員会
+		itojun@itojun.org
+
+	すぺしゃる・さんくす
+		onoe@sm.sony.co.jp
+		tomy@sfc.wide.ad.jp

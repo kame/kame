@@ -1,0 +1,120 @@
+Message-Id: <19970908133306N.jinmei@backyard.wide.toshiba.co.jp>
+Sender: owner-v6@wide.ad.jp
+Subject: (v6 3) v6test result
+From: JINMEI Tatuya / 神明達哉 <jinmei@backyard.wide.toshiba.co.jp>
+To: v6@wide.ad.jp
+Date: Mon, 08 Sep 1997 13:33:06 +0900
+Reply-To: v6@wide.ad.jp
+Mime-Version: 1.0
+Content-Type: Text/Plain; charset=iso-2022-jp
+Content-Transfer-Encoding: 7bit
+X-Mailer: Mew version 1.90 on Emacs 20.0  / Mule 3.0 (MOMIJINOGA)
+X-Dispatcher: imput version 970826
+Lines: 103
+X-Distribute: distribute [version 2.1 (Alpha) patchlevel=6]
+X-Sequence: v6 3
+X-UIDL: aae50f675e017bffb20634e5819198a0
+
+合宿中にやった v6 testの結果です。とりあえず、僕に振られたbase spec +
+ICMPv6 の分(+α)です。漢字が多くてすみません。
+
+・テスト項目
+1. extension header in general
+	1-1 unknown extension header
+	1-2 たくさんの ext header
+2. Hop by Hop
+	2-1 IPv6 header の直後じゃない hop by hop
+	2-2 65,535 以下の Jumbo
+	2-3 Jumbo なのに payload len != 0
+	2-4 Jumbo なのに Fragment header
+3. Routing
+	3-1a unknown type(segment left = 1)
+	3-1b unknown type(segment left = 0)
+	3-2 24 より多い hop
+	3-3 24 より多い Segments Left
+	3-4 Multicast as a hop
+	3-5 Loopback as a hop
+	3-6 自分自身の(リンクローカル)アドレスが２つ続けて含まれている場合
+	3-7 2個以上のルーティングヘッダがあったら?
+4. Fragment 
+	4-1 60 以内に全部揃わない場合(最初のフラグメントのみ)
+	4-2 60 以内に全部揃わない場合(2番目のフラグメントのみ)
+	4-3 M = 1 なのに 8 バイトの倍数じゃない場合
+	4-4 reserved field が0でない場合
+	4-5 length と offset が 65,535 を越えている場合
+	- un-fragmentable な部分がそれぞれ異なる場合(TBD)
+	- Frag header の next header がそれぞれ異なる場合(TBD)
+	- reassemble不能な大量のfragmentが届いた場合(TBD)
+5. No Next Header
+	(- destination ではどうするべき？)
+	5-1 NNH にあとにゴミがある場合(ゴミの定義は?)
+
+ICMPv6(RFC1885)
+6. Msg Processing
+	6-1 unknown error type
+	6-2 unknown informational type
+	6-3 UDP header のない UDP port unreach
+	6-4 ICMPv6 error に ICMPv6 errorを返しはしないか？
+	6-5 フラグメントヘッダの後にICMPv6 errorがある場合は？
+	(- rate-limiting はテストできる？)
+* Echo
+	- path MTU より大きな reply を返さないか
+	  -> この仕様は変更になりそうなのでテストしませんでした。
+
+その他(おまけのテスト)
+	7-1 たくさんの(unknown)NDオプション
+	7-2 Option len = 0のNDパケット
+	7-3 IPv6 payload len = 0のパケット
+	7-4 ::1へのecho request
+
+・参加実装
+Hydrangea(kazu)、日立(sumikawa)、南、富士通(LR, note)、東芝
+
+・結果
+    Hy 東 富 南 日 LR	凡例
+1-1 × ○ ○ × △ ○	○:正しいICMPerror △:ptrがヘン ×:反応なし
+1-2 × ○ 死 × 死 ○	○:正しく処理 ×:同上 死:落ちた(以下この記号は同じ)
+2-1 × ○ ○ × ○ ○	○:正しいICMPerror ×:反応なし
+2-2 × ○ ○ × ○ ○	○:正しいICMPerror ×:反応なし
+2-3 × ○ ○ × ○ ○	○:正しいICMPerror ×:反応なし
+2-4 × ○ UO × TB UO	○:param prob UO:unknown option TB:Too big ×反応なし
+3-1a死 ○ ○ × ？ ○	○:正しいICMPerror ？:何かヘン(忘れましたごめんなさい)
+3-1b死 ○ ○ × ？ ○	○:accept ？:何かヘン(忘れましたごめんなさい)
+3-2 死 ○ ○    ？ ○   ○:正しいICMPerror ？:何かヘン(忘れましたごめんなさい)
+3-3 死 ○ ○    ？ ○   ○:正しいICMPerror ？:何かヘン(忘れましたごめんなさい)
+3-4 死 捨 捨    捨 捨   捨:応答なし(たぶん中で捨ててる)
+3-5 死 LB LB    LB LB   LB: ::1でリプライ
+3-6 死 ○ NR	死 NR   ○:accept NR:No routerを返す
+3-7 死 ○ NR    ○ NR   同上
+4-1 捨 ○ ○    ○ ○   ○:time exceeded 捨:反応なし
+4-2 ○ ○ ○    ○ ○	○:反応なし
+4-3 ○ ○ ○    ○ ○	○:parameter problem
+4-4 ○ ○ ○    ○ ○	○:0のときと同様に正しく処理
+4-5 ○ ○ ○    ○ ○	○:parameter problem
+5-1 ○ ○ ○    ○ ○	○:反応なし
+6-1 捨 捨 捨    捨 死	捨:反応なし
+6-2 捨 捨 捨    捨	捨:反応なし
+6-3 捨 捨 捨    捨 捨	捨:反応なし
+6-4 捨 捨 ER    ER ER	捨:反応なし ER:エラーを返す
+6-5 捨 ER ER    ER ER	捨:反応なし ER:エラーを返す
+7-1    ○ ○    ○ ○	○:正しく処理
+7-2    捨 返    捨 返	捨:反応なし 返:無視して処理
+7-3    捨 捨    捨 捨	捨:反応なし
+7-4 捨 返 返    返 返	捨:反応なし 返: ::1をソースとしてリプライ
+
+空欄: テストせず
+
+・補足事項
+テスト内容の詳細(実際にどんなパケットを送ったか、など)については上記で
+ははっきりしない部分もあるかと思いますが、項目が多いので略記で許してく
+ださい。個々のテスト項目について、詳しく知りたい場合には質問メールをお
+願いします。
+
+○や×は、テスト項目とスペックを照しあわせて決めましたが、実装のポリシー
+との関係などから、×がついていても間違いとはいえなかったり、○であって
+も正しいとはいえなかったりする場合もあると思います。もし曖昧な部分があ
+るようでしたら改めて議論しましょう。
+
+				神明 達哉 (jinmei@backyard.wide.toshiba.co.jp)
+				株式会社 東芝  研究開発センター
+				情報・通信システム研究所 研究第一担当

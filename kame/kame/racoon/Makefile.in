@@ -1,0 +1,70 @@
+# YIPS $Id: Makefile.in,v 1.1.1.1 1999/08/08 23:31:18 itojun Exp $
+
+@SET_MAKE@
+srcdir=	@srcdir@
+VPATH=	@srcdir@
+CC=	@CC@
+LDFLAGS=@LDFLAGS@
+CPPFLAGS=	@CPPFLAGS@
+OPTFLAG=@OPTFLAG@
+CFLAGS=	@CFLAGS@ @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len
+LIBS=	@LIBS@
+YFLAGS+=-d
+
+prefix=	@prefix@
+bindir=	@bindir@
+mandir=	@mandir@
+exec_prefix=	@exec_prefix@
+INSTALL=@INSTALL@
+
+PROG=	racoon kmpstat eaytest
+#PROG+=	pfkey
+OBJS=	handler.o isakmp.o isakmp_inf.o ipsec_doi.o pfkey.o main.o \
+	post_com.o schedule.o session.o crypto.o cfparse.o cftoken.o \
+	admin.o misc.o vmbuf.o \
+	@LIBOBJS@
+
+all: $(PROG)
+
+racoon: $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+kmpstat: kmpstat.o misc.o vmbuf.o
+	$(CC) $(LDFLAGS) -o $@ kmpstat.o misc.o vmbuf.o $(LIBS)
+
+pfkey: dummy.o
+	$(CC) $(LDFLAGS) -o $@ dummy.o
+
+eaytest: eaytest.o crypto.o 
+	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto.o misc.o vmbuf.o $(LIBS)
+
+# extra
+print-isakmp.o:	$(srcdir)/../tcpdump/print-isakmp.c
+	$(CC) $(CFLAGS) -c $(srcdir)/../tcpdump/$*.c
+
+# missing/*.c
+strdup.o:	$(srcdir)/missing/strdup.c
+	$(CC) $(CFLAGS) -c $(srcdir)/missing/$*.c
+getaddrinfo.o:	$(srcdir)/missing/getaddrinfo.c
+	$(CC) $(CFLAGS) -c $(srcdir)/missing/$*.c
+getnameinfo.o:	$(srcdir)/missing/getnameinfo.c
+	$(CC) $(CFLAGS) -c $(srcdir)/missing/$*.c
+
+.c.o:
+	$(CC) $(CFLAGS) -c $<
+
+tag:
+	ctags -dtw $(srcdir)/*.[chly]
+
+install:
+	$(INSTALL) -s -o bin -g bin -m 555 racoon $(prefix)/sbin
+	$(INSTALL) -o bin -g bin -m 444 racoon.8 $(mandir)/man8
+
+clean:
+	-rm -f $(PROG) *.o *.core y.tab.h
+
+distclean: clean
+	-rm -f Makefile config.cache config.status config.log
+
+depend:
+	mkdep ${CFLAGS:M-[ID]*} $(srcdir)/*.c

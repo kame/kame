@@ -1,0 +1,138 @@
+.\" Copyright (C) 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: dtcps.8,v 1.1.1.1 1999/08/08 23:29:23 itojun Exp $
+.\"
+.Dd Apr 28, 1999
+.Dt DTCPS 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm dtcps
+.Nd Dynamic Tunnel Configuration Protocol daemon
+.\"
+.Sh SYNOPSIS
+.Nm dtcps
+.Op Fl dD
+.Op Fl p Ar port
+.Op Ar prefix
+.\"
+.Sh DESCRIPTION
+.Nm
+implements Dynamic Tunnel Configuration Protocol
+.Pq DTCP for short
+proposed by Trumpet.
+This listens to IPv4 TCP port 20200
+.Po
+or port specified by
+.Ar port
+.Pc ,
+for DTCP client connections.
+.Pp
+.Nm
+will use APOP password database file
+.Pq Pa pop.auth
+as password database.
+.Pp
+Clients requesting tunnel typed
+.Dq Dv tunnelonly
+will get simple IPv6-over-IPv4 tunnel.
+No global address will be assigned to the configured tunnel link.
+It is up to administrators to assign global IPv6 address to the client host,
+or to the client network.
+Static assignment by hand
+or use of router advertisement packet should do the trick.
+Use of router renumbering protocol may be a candidate.
+.Pp
+If
+.Ar prefix
+argument is specified,
+.Nm
+will accept tunnel request for
+.Dq Dv host
+tunnel type.
+The tunnel type needs a pair of temporary global IPv6 address for the
+configured tunnel link, like
+.Dv 3ffe:ffff:ffff:ffff::5
+and
+.Dv 3ffe:ffff:ffff:ffff::6 .
+The address pair will be assigned from specified
+.Ar prefix .
+Prefixlen for the temporary global address will be 126,
+and it will be computed by using interface number of tunnel interface.
+.Pp
+.Fl D
+prevents
+.Nm
+from daemonizing on invocation.
+.Pp
+.Fl d
+puts
+.Nm
+into debug mode.
+.\"
+.Sh RETURN VALUES
+.Nm
+will exit with positive value on errors.
+.\"
+.Sh SEE ALSO
+.Xr daemon 3 ,
+.Xr gif 4 ,
+.Xr dtcpc 8 ,
+.Xr gifconfig 8 ,
+.Xr popauth 8
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+KAME kernel has some trouble handling
+.Dv /126
+addresses used in tunnel type
+.Dq Dv host .
+To avoid trouble, do not specify
+.Ar prefix
+on the argument, to disallow tunnel requests for tunnel type
+.Dq Dv host .
+This should be fixed soon.
+.Pp
+DTCP needs to keep TCP connection between server and client.
+Therefore, maximum number of client served by single
+.Nm
+will be bounded by the maximum number of filehandle allowed to a process
+.Pq 100 or so .
+.Pp
+.Nm
+invokes several external commands, like
+.Xr logger 1 ,
+.Xr ifconfig 8
+and
+.Xr gifconfig 8 .
+Command search path must be configured properly before invoking
+.Nm dtcps .

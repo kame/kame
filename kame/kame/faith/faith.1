@@ -1,0 +1,95 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: faith.1,v 1.1.1.1 1999/08/08 23:29:26 itojun Exp $
+.\"
+.Dd May 17, 1998
+.Dt FAITH 1
+.Os KAME
+.Sh NAME
+.Nm faith
+.Nd
+set an IPv6 prefix to be used by the FAITH kernel
+.Sh SYNOPSIS
+.Nm faith
+.Op Fl de
+.Op Fl p Ar prefix
+.Op Fl i Ar interface
+.Sh DESCRIPTION
+NOTE:
+.Nm
+is a backward compatibility wrapper for FAITH IPv4-v6 TCP relaying service.
+One should migrate to new user interface
+.Po
+using
+.Xr route 8
+command
+.Pc
+for more flexibility and configurability.
+.Pp
+.Nm
+controls FAITH IPv4-v6 TCP relaying service support code in the kernel.
+The kernel mechanism will work cooperatively with
+.Xr faithd 8 .
+.Nm
+command is designed to be invoked at host/router
+that runs FAITH daemon,
+.Xr faithd 8 ,
+which provides TCP relaying service to other hosts.
+.Pp
+.Fl d
+and
+.Fl e
+will disable and enable the FAITH kernel code, respectively.
+If enabled, the kernel tosses up TCP segments whose destination matches the 
+.Ar prefix.
+.Pp
+If 
+.Fl p Ar prefix
+is given, the specified
+.Ar prefix
+is set to the kernel as address translation prefix.
+.Pp
+If
+.Fl i Ar interface
+is given,
+.Ar interface
+will be used for FAITH translation.
+.Ar interface
+must be FAITH pseudo interface, i.e.
+.Dv faith[0-9] .
+.Sh RETURN VALUES
+.Nm Faith
+exits with 0 on success, and non-zero on errors.
+.Sh SEE ALSO
+.Xr faithd 8
+.Sh HISTORY
+The
+.Nm
+command first appeared in KAME IPv6 protocol stack kit.
+.\" .Sh BUGS
+.\" (to be written)

@@ -1,0 +1,149 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: hroute6d.8,v 1.1.1.1 1999/08/08 23:29:46 itojun Exp $
+.\"
+.Dd March 25, 1997
+.Dt HROUTE6D 8
+.Os KAME
+.Sh NAME
+.Nm hroute6d
+.Nd network routing daemon for IPv6 networks
+.Sh SYNOPSIS
+.Nm hroute6d
+.Sh DESCRIPTION
+.Nm Hroute6d
+is invoked at boot time to manage the network routing tables.
+The routing daemon is a variant of routing daemon for IPv4 
+networks and uses a variant of the Xerox NS Routing Information 
+Protocol in maintaining up to date kernel routing table entries.
+It reads the configuration information from a configuration file
+(see
+.Xr hroute6d.conf 5 ).
+.Pp
+.Nm hroute6d
+listens on the
+.Xr udp 4
+socket for the routing information packets.  If the host is an
+internetwork router, it periodically supplies copies
+of its routing tables to any directly connected hosts
+and networks. The daemon can be administrated by a utility
+.Xr rip6admin 8 .
+Another utility 
+.Xr rip6query 8
+can be used to get all or some routes known by a RIPng router.
+.Pp
+When
+.Nm hroute6d
+is started, it uses the
+.Xr sysctl 3
+to find those
+directly connected interfaces configured with IPv6 addresses into the
+system and marked ``up'' (the loopback interface
+is ignored).
+.Nm Hroute6d
+then transmits a 
+.Em request
+packet on each interface (using a multicast packet if
+the interface supports it) and enters a loop, listening
+for
+.Em request
+and
+.Em response
+packets from other hosts.
+.Pp
+When a
+.Em request
+packet is received, 
+.Nm hroute6d
+formulates a reply based on the information maintained in its
+internal tables.  The
+.Em response
+packet generated contains a list of known routes, each marked
+with a ``hop count'' metric (a count of 16, or greater, is
+considered ``infinite'').  The metric associated with each
+route returned provides a metric
+.Em relative to the sender .
+.Pp
+.Em Response
+packets received by
+.Nm hroute6d
+are used to update the routing tables if one of the following
+conditions is satisfied:
+.Bl -enum
+.It
+No routing table entry exists for the destination network
+or host, and the metric indicates the destination is ``reachable''
+(i.e. the hop count is not infinite).
+.It
+The source host of the packet is the same as the router in the
+existing routing table entry.  That is, updated information is
+being received from the very internetwork router through which
+packets for the destination are being routed.
+.It
+The existing entry in the routing table has not been updated for
+some time (defined to be 90 seconds) and the route is at least
+as cost effective as the current route.
+.It
+The new route describes a shorter route to the destination than
+the one currently stored in the routing tables; the metric of
+the new route is compared against the one stored in the table
+to decide this.
+.El
+.Pp
+When an update is applied,
+.Nm hroute6d
+records the change in its internal tables and updates the kernel
+routing table.
+The change is reflected in the next
+.Em response
+packet sent.
+.Pp
+In addition to processing incoming packets,
+.Nm hroute6d
+also periodically checks the routing table entries.
+If an entry has not been updated for 3 minutes, the entry's metric
+is set to infinity and marked for deletion.  Deletions are delayed
+an additional 120 seconds to insure the invalidation is propagated
+throughout the local internet.
+.Pp
+Hosts acting as internetwork routers gratuitously supply their
+routing tables every 30 (+/- 15) seconds to all directly connected hosts
+and networks.
+The response is sent to the all router multicast address on attached interfaces.
+If no response is received on an interface, another route may be chosen
+to route around the interface, or the route may be dropped if no alternative
+is available.
+.Sh FILES
+.Bl -tag -width /usr/local/v6/etc/hroute6d.conf -compact
+.It Pa /usr/local/v6/etc/hroute6d.conf
+for configuration file
+.El
+.Sh SEE ALSO
+.Xr rip6admin 8 ,
+.Xr rip6query 8 ,
+.Xr routed 8

@@ -1,0 +1,105 @@
+.\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Jul 29, 1999
+.Dt MCASTSEND 1
+.Os KAME
+.\"
+.Sh NAME
+.Nm mcastsend
+.Nd send multicast packets
+.\"
+.Sh SYNOPSIS
+.Nm mcastsend
+.Op Fl l Ar hop_limit
+.Op Fl i Ar interface
+.Op Fl s Ar scope
+.Op Fl h
+.Ar address
+.Ar port
+.Op Ar file
+.\"
+.Sh DESCRIPTION
+The 
+.Nm
+utility reads from standard input,
+and sending them to the multicast
+.Ar address
+you specified.
+Also you must specify UDP
+.Ar port
+number or service name
+.Pq Xr services 5 .
+If you specify the
+.Ar file ,
+.Nm
+will read from it.
+.Pp
+The options are as follows:
+.Bl -tag -width Fl
+.It Fl l Ar hop_limit
+Specify the number of hop limit.
+By default, it depends on the system wide value,
+net.inet6.ip6.defmcasthlim.
+.It Fl i Ar interface
+Specify the interface name to use sending packets.
+By default, kernel will decide. 
+.It Fl s Ar scope
+Specify the hint in order to decision of source IP address to send packets.
+By default, global scope is applied.
+If you don't specify
+.Ar interface ,
+.Nm
+ignores this option.
+.Ar scope
+takes one of the following numeric:
+
+.Bl -tag -width "14 " -compact
+.It 1	node local
+.It 2	link local
+.It 5	site local
+.It 14	global
+.El
+.It Fl h
+Show this help message.
+.El
+.\"
+.Sh RETURN VALUES
+.Nm
+will exit with positive value on errors.
+.\"
+.Sh SEE ALSO
+.Xr mcastread 1
+.Xr sysctl 8
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+IPv4 is not supported.

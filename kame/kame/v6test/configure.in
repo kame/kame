@@ -1,0 +1,93 @@
+AC_INIT(v6test.c)
+
+AC_CANONICAL_HOST
+AC_PROG_CPP
+
+AC_SUBST(OPTFLAGS)
+AC_SUBST(LIBFLAGS)
+
+v6type=unknown
+
+AC_CHECK_TYPE(uint8_t, u_int8_t)
+AC_CHECK_TYPE(uint16_t, u_int16_t)
+AC_CHECK_TYPE(uint32_t, u_int32_t)
+dnl Guess from defs
+AC_MSG_CHECKING(for v6 stack type from defines)
+if test "$v6type" = "unknown"; then
+	AC_EGREP_CPP(yes,
+	[#include <sys/param.h>
+	#ifdef _HITACHI_INET6
+	yes
+	#endif
+	], [v6type=hitachi])
+fi
+if test "$v6type" = "unknown"; then
+	AC_EGREP_CPP(yes,
+	[#include <sys/param.h>
+	#ifdef _TOSHIBA_INET6
+	yes
+	#endif
+	], [v6type=toshiba])
+fi
+if test "$v6type" = "unknown"; then
+	AC_EGREP_CPP(yes,
+	[#include <sys/param.h>
+	#ifdef _ZETA_MINAMI_INET6
+	yes
+	#endif
+	], [v6type=zeta])
+fi
+AC_MSG_RESULT($v6type)
+
+dnl Guess from os type
+if test "$v6type" = "unknown"; then
+	AC_MSG_CHECKING(for v6 stack type from OS/files)
+	case "$host_os" in
+	bsdi*|freebsd2*|netbsd*)
+		if test -f /usr/include/netinet6/in6_ifattach.h; then
+			v6type=kame
+		fi
+	esac
+	AC_MSG_RESULT($v6type)
+fi
+
+case "$v6type" in
+unknown)
+		echo "could not guess the v6 stack type. use local include files" ;
+		OPTFLAGS="-I./include $OPTFLAGS" ;;
+*)
+		echo "$v6type seems to support RFC2292(adv-api)." ;;
+esac
+
+AC_MSG_CHECKING(if the stack needs -DINET6)
+AC_CACHE_VAL(ts1_cv_ipv6, [dnl
+AC_TRY_COMPILE([#define INET6
+#include <sys/types.h>
+#include <netinet/in.h>],
+        [int x = IPPROTO_IPV6; struct in6_addr a;],
+        [ts1_cv_ipv6="yes"], [ts1_cv_ipv6="no"])])
+AC_CACHE_VAL(ts2_cv_ipv6, [dnl
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <netinet/in.h>],
+        [int x = IPPROTO_IPV6; struct in6_addr a;],
+        [ts2_cv_ipv6="yes"], [ts2_cv_ipv6="no"])])
+if test "$ts1_cv_ipv6" = yes -a "$ts2_cv_ipv6" = no; then
+        OPTFLAGS="-DINET6 $OPTFLAGS"
+	AC_MSG_RESULT("you need '-DINET6'")
+else
+	AC_MSG_RESULT("no")
+fi
+
+AC_MSG_CHECKING(for libresolv)
+AC_CACHE_VAL(ts_cv_ntop, [dnl
+AC_TRY_LINK([#include <sys/types.h>
+#include <sys/socket.h>],
+	[char *a, *b; inet_ntop(AF_INET6, a, b)],
+	[ts_cv_ntop="yes"], [ts_cv_ntop="no"])])
+AC_MSG_RESULT($ts_cv_ntop)
+if test "$ts_cv_ntop" = no; then
+	LIBFLAGS="-lresolv $LIBFLAGS"
+fi
+
+AC_OUTPUT(Makefile)

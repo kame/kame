@@ -1,0 +1,103 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: v6test.1,v 1.1.1.1 1999/08/08 23:32:45 itojun Exp $
+.\"
+.Dd May 17, 1998
+.Dt V6TEST 1
+.Os KAME
+.\"
+.Sh NAME
+.Nm v6test
+.Nd send IPv6 test packets
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Fl s Ar src
+.Op Fl d Ar dst
+.Op Fl i Ar interface
+.Op Fl f Ar configfile
+.Ar entry ...
+.\"
+.Sh DESCRIPTION
+.Nm V6test
+generates IPv6 packet described in
+.Ar configfile .
+This is usually used for debugging the behavior of kernel against
+ill-formatted packets.
+.Bl -tag -width Ds
+.It Fl s Ar src
+Source IPv6 address for the test packet.
+The option lets you override the description in configuration file.
+.It Fl d Ar dst
+Destination IPv6 address for the test packet.
+The option lets you override the description in configuration file.
+.It Fl i Ar interface
+Send the generated IPv6 packet to
+.Ar interface .
+Default is
+.Li ep0 .
+Interfaces with
+.Xr bpf 4
+encapsulation type
+.Dv DLT_EN10MB
+and
+.Dv DLT_NULL
+are supported.
+.It Fl f Ar configfile
+Specify alternate location to configuration file.
+Default is
+.Pa v6test.conf
+in the current directory.
+.It Ar entry
+Specify configuration file entry.
+You can specify multiple entries, to send contiguous test packets.
+.El
+.\"
+.Sh RETURN VALUES
+.Nm V6test
+exits with 0 on success, and non-zero on errors.
+.\"
+.Sh FILES
+.Bl -tag -width ./v6test.conf -compact
+.It Pa ./v6test.conf
+The default configuration file.
+.El
+.\"
+.Sh SEE ALSO
+.Xr bpf 4 ,
+.Xr tcpdump 8
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE Hydrangea IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+Man page for
+.Xr v6test.conf 5
+has to be written.

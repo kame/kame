@@ -1,0 +1,119 @@
+.\" Copyright (C) 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: dtcpc.8,v 1.1.1.1 1999/08/08 23:29:23 itojun Exp $
+.\"
+.Dd Apr 28, 1999
+.Dt DTCPC 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm dtcpc
+.Nd Dynamic Tunnel Configuration Protocol client
+.\"
+.Sh SYNOPSIS
+.Nm dtcpc
+.Op Fl d
+.Op Fl i Ar if
+.Op Fl p Ar port
+.Op Fl t Ar tuntype
+.Op Fl u Ar user
+.Ar server
+.\"
+.Sh DESCRIPTION
+.Nm
+implements Dynamic Tunnel Configuration Protocol
+.Pq DTCP for short
+proposed by Trumpet.
+.Nm
+will first ask the DTCP password to the user.
+Then, the program will try to connect DTCP server on
+.Ar server ,
+to IPv4 TCP port 20200
+.Po
+or port specified by
+.Ar port
+.Pc ,
+login as DTCP client, and maintain IPv6 over IPv4 tunnel connection.
+.Pp
+The spec defines several kind of tunnel requests.
+.Nm
+will request tunnel typed
+.Ar tuntype
+to the DTCP server.
+The default value for
+.Ar tuntype
+is
+.Dq Dv tunnelonly .
+For tunnel types, please refer to
+.Xr dtcps 8 .
+.Pp
+By default,
+.Nm
+will use
+.Dv gif0
+as tunnelling device.
+This can be altered by using
+.Fl i .
+.Pp
+.Fl u
+is needed when DTCP user account is different from
+the login name on the host.
+.Pp
+.Fl d
+puts
+.Nm
+to debug mode.
+.\"
+.Sh RETURN VALUES
+.Nm
+will exit with positive value on errors.
+.\"
+.Sh SEE ALSO
+.Xr gif 4 ,
+.Xr dtcps 8 ,
+.Xr gifconfig 8
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+KAME kernel has some trouble handling
+.Dv /126
+addresses.
+To avoid trouble, please do not use
+.Dq Fl t Dv host
+for the moment.
+This should be fixed soon.
+.Pp
+.Nm
+will not work if you are behind a NAT box
+.Po
+This is a protocol feature, not a bug
+.Pc .

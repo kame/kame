@@ -1,0 +1,590 @@
+#! /usr/local/bin/perl
+#
+# Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. Neither the name of the project nor the names of its contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+#	$SuMiRe: pmlog,v 1.5 1998/09/17 01:15:04 shin Exp $
+#	$Id: pmlog,v 1.1.1.1 1999/08/08 23:31:10 itojun Exp $
+#
+
+sub Usage
+{
+    my ($BN) = $0;
+
+    $BN =~ s/^(.*)\/([^\/]*)$/$2/;
+
+    print STDOUT "Usage: $BN [options]\n";
+    print STDOUT "  Where options are\n";
+    print STDOUT "    -help          : Print this message.\n";
+    print STDOUT "    -priorities    : Print log priorities.\n";
+    print STDOUT "    -t syslog      : Print timestamp as syslog format.\n";
+    print STDOUT "                     ie. Dec 11 05:13:25 (or  05:13:25:778391)\n";
+    print STDOUT "    -t unformat    : Print timestamp as unformatted.\n";
+    print STDOUT "                     ie. 881785558.860582\n";
+    print STDOUT "    -bd            : Run as daemon mode (not available).\n";
+
+    exit (0);
+}
+
+
+sub Priorities
+{
+    print "These priorities are predefined.\n";
+    foreach (@L_priorities)
+    {
+	print "\t${$_}[0]\t${$_}[1]\n";
+    }
+
+    exit (0);
+}
+
+
+#
+#
+#
+
+use	Getopt::Std;
+use	Socket;
+use	Carp;
+
+*OUT       = *STDOUT;
+
+$logDevice   = "/dev/pmlog";
+$logFileStem = "";
+$pidFile     = "/var/run/pmlog.pid";
+
+$SZLHDR    = 20;			# sizeof(struct l_hdr);
+@L_priorities =
+(
+    ['EMERG',	'system is unusable'],
+    ['ALERT',	'action must be taken immediately'],
+    ['CRIT',	'critical conditions'],
+    ['ERR',	'error conditions'],
+    ['WARNING',	'warning conditions'],
+    ['NOTICE',	'normal but significant condition'],
+    ['INFO',	'informational'],
+    ['DEBUG',	'debug-level messages'],
+);
+
+
+#
+#
+#
+
+{
+    my ($logbuf, $readbuf) = ("", "");
+    my ($timeleft, $nfound, $nread);
+    my (@l_hdr);
+
+    parseOptions();
+
+    $SIG{'HUP'} = 'sighup';
+    $SIG{'INT'} = 'sigint';
+
+    if ($opt_s eq "socket")
+    {
+	socket(LOG, PF_INET, SOCK_RAW, $IPPROTO_PM)	|| croak("socket: $!");
+    }
+    else
+    {
+	open(LOG, $logDevice)			|| croak("Open failure on $logDevice");
+    }
+    openPidFile();
+
+    vec($rmask, fileno(LOG), 1) = 1;
+    while (1)
+    {
+	($nfound, $timeleft) = select($rmask, undef, undef, undef);
+	if ($nfound)
+	{
+	    $readbuf = "";
+	    $nread = sysread(LOG, $readbuf, 2048);
+	    $logbuf .= $readbuf;
+
+	    do
+	    {
+		@l_hdr  = unpack("vvVVV", substr($logbuf, 4, $SZLHDR));
+		$clog   = substr($logbuf, 0, $SZLHDR+$l_hdr[2]);
+		$logbuf = substr($logbuf, $SZLHDR+$l_hdr[2]);
+
+	      SWITCH:
+		{
+		    ($l_hdr[0] == 0) &&	do { printLogMsg($clog); last SWITCH; };
+		    ($l_hdr[0] == 1) &&	do { printLogIP ($clog); last SWITCH; };
+		    ($l_hdr[0] == 2) &&	do { printLogATT($clog); last SWITCH; };
+		    ($l_hdr[0] == 3) &&	do { printLogRoute($clog); last SWITCH; };
+					do { printLogUnknown($clog); last SWITCH; };
+		}
+	    } while ($logbuf ne "");
+	}
+    }
+}
+
+
+sub parseOptions
+{
+    getopts("b:dh:o:p:s:t")			|| croak("Getopt filure");
+
+    if (defined($opt_h))
+    {
+	if ($opt_h eq "elp")			{ Usage(); }
+	else					{ Usage(); }
+    }
+
+    if (defined($opt_o))
+    {
+	$logFileStem = $opt_o;
+	openLogFile($opt_o);
+    }
+
+    if (defined($opt_p))
+    {
+	if ($opt_p eq "riorities")		{ Priorities(); }
+	else					{ Usage(); }
+    }
+
+    if (defined($opt_s))
+    {
+	if ($opt_s eq "ocket")			{ $opt_s = "socket"; }
+	else					{ Usage(); }
+
+	$IPPROTO_PM = 101;
+    }
+
+    if (defined($opt_t))
+    {
+	if ($opt_t eq "yslog")			{ $opt_t = "syslog"; }
+	elsif ($opt_t eq "nformat")		{ $opt_t = "unformat"; }
+	else					{ Usage(); }
+    }
+}
+
+
+sub printLogMsg
+{
+    my ($clog) = @_;
+
+    printLogHeader($clog);
+    printf(OUT "%s\n", substr($clog, $SZLHDR));
+}
+
+
+sub printLogIP
+{
+    my ($clog) = @_;
+    my (@ip);
+
+    printLogHeader($clog);
+
+    $clog = substr($clog, $SZLHDR);
+    @ip = unpack("C20", substr($clog, 0, 20));
+    if (($ip[0] >> 4) != 4)
+    {
+	printf(OUT "%d: Bad IP version", $ip[0]);
+	printf(OUT "\n\t\t");
+#	return;
+    }
+
+    if ($ip[9] == 1)
+    {
+	printf(OUT "%s > %s: ", inet_ntoa(@ip[12..15]), inet_ntoa(@ip[16..19]));
+    }
+    elsif (($ip[9] == 6) || ($ip[9] == 17))
+    {
+	my ($ip_hl, $tcpudp, @tcpudp);
+
+	$ip_hl = (($ip[0] & 0x0f) << 2);
+	$tcpudp = substr($clog, $ip_hl);
+	@tcpudp = unpack("C8", $tcpudp);
+	printf(OUT "%s.%d > %s.%d: ",
+	       inet_ntoa(@ip[12..15]), ($tcpudp[0] << 8) + $tcpudp[1],
+	       inet_ntoa(@ip[16..19]), ($tcpudp[2] << 8) + $tcpudp[3]);
+    }
+
+    printf(OUT "id: %d ", ($ip[4] << 8) + $ip[5]);
+
+  SWITCH:
+    {
+	($ip[9] ==  1) && do { printICMP($clog); last SWITCH; };
+	($ip[9] ==  6) && do { printTCP ($clog); last SWITCH; };
+	($ip[9] == 17) && do { printUDP ($clog); last SWITCH; };
+    }
+
+    # @ip[6..7] holds ip->ip_off, and Network byte order
+    if ($ip[7] & 0x60)
+    {
+	printf(OUT "(");
+	printf(OUT "D")				if ($ip[7] & 0x40);
+	printf(OUT "M")				if ($ip[7] & 0x20);
+	printf(OUT "F) ");
+    }
+
+    printf(OUT "[ttl 1] ")			if ($ip[8] == 1);
+
+    printf(OUT "\n");
+}
+
+
+sub printICMP
+{
+    my ($clog) = @_;
+    my (@ip, $ip_hl, $payload);
+    my (@icmp, $icmp);
+
+    printf(OUT "icmp: ");
+
+    @ip = unpack("C20", substr($clog, 0, 20));
+    $ip_hl = (($ip[0] & 0x0f) << 2);
+    $payload = substr($clog, $ip_hl);
+    @icmp = unpack("C8", $payload);
+  SWITCH:
+    {
+	($icmp[0] ==  0) && do { printf(OUT "echo reply");	last SWITCH; };
+	($icmp[0] ==  8) && do { printf(OUT "echo request");	last SWITCH; };
+	($icmp[0] == 11) && do { printf(OUT "time exceeded ");
+				 printf(OUT "in transit")	if ($icmp[1] == 0);
+				 printf(OUT "in reass")		if ($icmp[1] == 1);
+								last SWITCH; };
+	($icmp[0] ==  3) && do { printICMPunreach($payload);	last SWITCH; };
+    }
+
+    printf(OUT " ");
+}
+
+
+sub printICMPunreach
+{
+    my ($ICMPmsg) = @_;
+    my (@icmp);
+
+    @icmp = unpack("C*", $ICMPmsg);
+  SWITCH:
+    {
+	($icmp[1] == 3) && do { printICMPPortUnreach($ICMPmsg);	last SWITCH; };
+    }
+}
+
+
+sub printICMPPortUnreach
+{
+    my ($ICMPmsg) = @_;
+    my (@icmp);
+
+    @icmp = unpack("C*", $ICMPmsg);
+    printf(OUT "%s ", inet_ntoa(@icmp[8+16..8+19]));
+    printf(OUT "%s ", $icmp[8+9] == 6 ? "tcp" : $icmp[8+9] == 17 ? "udp" : "unk");
+    printf(OUT "port ");
+    printf(OUT "%d ", ($icmp[8+23] << 8) + $icmp[8+22]);
+    printf(OUT "unreachable");
+}
+
+
+sub printTCP
+{
+    my ($clog) = @_;
+    my ($ip_hl, $payload);
+    my (@ip, @tcp);
+
+    printf(OUT "tcp: ");
+
+    @ip = unpack("C20", substr($clog, 0, 20));
+    $ip_hl = (($ip[0] & 0x0f) << 2);
+    $payload = substr($clog, $ip_hl);
+    @tcp = unpack("C20", $payload);
+
+    if ($tcp[13] == 0)
+    {
+	printf(OUT ".");
+    }
+    else
+    {
+	printf(OUT "U")			if ($tcp[13] & 0x20);
+	printf(OUT "A")			if ($tcp[13] & 0x10);
+	printf(OUT "P")			if ($tcp[13] & 0x08);
+	printf(OUT "R")			if ($tcp[13] & 0x04);
+	printf(OUT "S")			if ($tcp[13] & 0x02);
+	printf(OUT "F")			if ($tcp[13] & 0x01);
+    }
+    printf(OUT " ");
+
+    printf(OUT "seq %lu ", assembleULong(@tcp[ 4.. 7]));
+    printf(OUT "ack %lu ", assembleULong(@tcp[ 8..11]));
+    printf(OUT "win %u ",  assembleUShort(@tcp[14..15]));
+}
+
+
+sub printUDP
+{
+    my ($clog) = @_;
+
+    printf(OUT "udp: ");
+}
+
+
+sub printLogATT
+{
+    my ($clog) = @_;
+    my (@stub, @att, @state);
+
+    printLogHeader($clog);
+    printf(OUT "[att]");
+
+    $clog  = substr($clog, $SZLHDR);
+    @stub  = unpack("I2", $clog);
+    @att   = unpack("C44", substr($clog,  8, 44));
+    @state = unpack("C20", substr($clog, 52, 20));
+
+    printf(OUT "%s%08x ",
+	   ("+", "-", "\@", "#", "\$")[$stub[0]],
+	   $stub[1]);
+
+    printf(OUT "%s ",
+	   ($att[1] == 1) ? "icmp"
+	   : ($att[1] == 6) ? "tcp "
+	   : ($att[1] == 17) ? "udp "
+	   : "unk ");
+
+    printf(OUT "%s:%d ", inet_ntoa(@att[ 8..11]), (($att[2]<<8)+$att[3]));
+    printf(OUT "%s:%d ", inet_ntoa(@att[12..15]), (($att[4]<<8)+$att[5]));
+    printf(OUT "%s:%d ", inet_ntoa(@att[16..19]), (($att[6]<<8)+$att[7]));
+
+    printf(OUT "\n");
+}
+
+
+sub printLogRoute
+{
+    my ($clog) = @_;
+    my ($ip_p, $via);
+    my (@fwd, @sport, @dport, @src, @dst);
+
+    printLogHeader($clog);
+    printf(OUT "[route] ");
+
+    $clog  = substr($clog, $SZLHDR);
+    @fwd   = unpack("C44", substr($clog,  0, 44));
+    $ip_p  = unpack("s",   substr($clog,  2,  2));
+    @sport = unpack("v2",  substr($clog,  4,  4));
+    @dport = unpack("v2",  substr($clog,  8,  4));
+    @src   = unpack("N3",  substr($clog, 12, 12));
+    @dst   = unpack("N3",  substr($clog, 24, 12));
+    $via   = unpack("N",   substr($clog, 36,  4));
+
+  SWITCH:
+    {
+	($ip_p == 0)  && do { printf(OUT "any");	last SWITCH; };
+	($ip_p == 1)  && do { printf(OUT "icmp");	last SWITCH; };
+	($ip_p == 4)  && do { printf(OUT "ipip");	last SWITCH; };
+	($ip_p == 6)  && do { printf(OUT "tcp");	last SWITCH; };
+	($ip_p == 17) && do { printf(OUT "udp");	last SWITCH; };
+			 do { printf(OUT "%d", $ip_p);	last SWITCH; };
+    }
+    printf(OUT " ");
+
+    printf(OUT "from ");
+    if ($src[0] == 0)	{ printf(OUT "any"); }
+    else		{ printf(OUT "%s", inet_ntoa(@fwd[12..15])); }
+    if ($sport[0] != 0)
+    {
+	printf(OUT " ");
+	printf(OUT "port %d", htons($sport[0]));
+    }
+    printf(OUT " ");
+
+    printf(OUT "to ");
+    if ($dst[0] == 0)	{ printf(OUT "any"); }
+    else		{ printf(OUT "%s", inet_ntoa(@fwd[24..27])); }
+    if ($dport[0] != 0)
+    {
+	printf(OUT " ");
+	printf(OUT "port %d", htons($dport[0]));
+    }
+    printf(OUT " ");
+
+    printf(OUT "via %s", inet_ntoa(@fwd[36..39]));
+
+    printf(OUT "\n");
+}
+
+
+sub printLogUnknown
+{
+    my ($clog) = @_;
+
+    printLogHeader($clog);
+    printf(OUT "[unknown]");
+
+    printf(OUT "\n");
+}
+
+
+#
+#
+#
+
+sub assembleULong
+{
+    my (@byte) = @_;
+    my ($rv);
+
+    $rv = ((((($byte[0] << 8) + $byte[1]) << 8) + $byte[2]) << 8) + $byte[3];
+    return ($rv);
+}
+
+
+sub assembleUShort
+{
+    my ($byte) = @_;
+    my ($rv);
+
+    $rv = ($byte[0] << 8) + $byte[1];
+    return ($rv);
+}
+
+
+sub printLogHeader
+{
+    my ($clog) = @_;
+    my ($l_hdr, @ltime, $mnam);
+
+    @l_hdr = unpack("vvVVV", substr($clog, 4));
+    @ltime = localtime($l_hdr[3]);
+    $mnam  = (Jan, Feb, Mar, Apr, May, Jun,
+	      Jul, Aug, Sep, Oct, Nov, Dec)[$ltime[4]];
+
+  SWITCH:
+    {
+	($opt_t eq "syslog") && do
+	{
+	    printf(OUT "%s %02d %02d:%02d:%02d %s ",
+		   $mnam, $ltime[3], $ltime[2], $ltime[1], $ltime[0],
+		   ${$L_priorities[$l_hdr[1]]}[0]);
+	    last SWITCH;
+	};
+
+	($opt_t eq "unformat") && do
+	{
+	    printf(OUT "%d.%06d",  $l_hdr[3], $l_hdr[4]);
+	    last SWITCH;
+	};
+
+	do
+	{
+	    printf(OUT "%02d:%02d:%02d.%06d ",
+		   $ltime[2], $ltime[1], $ltime[0],
+		   $l_hdr[4]);
+	    last SWITCH;
+	};
+    }
+}
+
+
+sub inet_ntoa
+{
+    my (@byte) = @_;
+    my ($rv);
+
+    $rv = sprintf("%s.%s.%s.%s", $byte[0], $byte[1], $byte[2], $byte[3]);
+    return ($rv);
+}
+
+
+sub htons
+{
+    my ($short) = @_;
+    my ($rv);
+    my (@byte);
+
+    $byte[0] = ($short & 0xff00) >> 8;
+    $byte[1] = ($short & 0x00ff);
+    $rv = ($byte[1] << 8) + $byte[0];
+    return ($rv);
+}
+
+
+#
+#
+#
+
+sub openPidFile
+{
+    open(PID, "> $pidFile")			|| warn("Open failure on pid file");
+    printf(PID "%d\n", $$);
+    close(PID);
+}
+
+
+sub openLogFile
+{
+    my ($stem) = @_;
+    my (@ltime, $mnam);
+    my ($logfile);
+
+    @ltime = localtime(time);
+    $mnam  = (Jan, Feb, Mar, Apr, May, Jun,
+	      Jul, Aug, Sep, Oct, Nov, Dec)[$ltime[4]];
+
+    $logfile  = "$stem.$ltime[5]$mnam$ltime[3].$ltime[2]$ltime[1]";
+
+    $logfile = 	sprintf("%s.%02d%s%02d.%02d%02d",
+			$stem, $ltime[5], $mnam, $ltime[3], $ltime[2], $ltime[1]);
+
+    open(OUT, "> $logfile")			|| croak("Open failure on $logfile");
+}
+
+
+sub sighup
+{
+    local ($sig) = @_;
+    my (@ltime, $mnam);
+    my ($logfile);
+
+    close(OUT);
+
+    @ltime = localtime(time);
+    $mnam  = (Jan, Feb, Mar, Apr, May, Jun,
+	      Jul, Aug, Sep, Oct, Nov, Dec)[$ltime[4]];
+
+    $logfile = 	sprintf("%s.%02d%s%02d.%02d%02d",
+			$logFileStem, $ltime[5], $mnam, $ltime[3], $ltime[2], $ltime[1]);
+
+    open(OUT, "> $logfile")			|| croak("Open failure on $logfile");
+}
+
+
+sub sigint
+{
+    local ($sig) = @_;
+
+    print("\nCaught a SIG$sig -- quitting.\n");
+    exit (0);
+}
+
+
+# Local Variables:
+# mode: cperl
+# End:

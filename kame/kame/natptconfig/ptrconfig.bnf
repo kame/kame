@@ -1,0 +1,112 @@
+/*
+//##
+//#------------------------------------------------------------------------
+//# Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+//# All rights reserved.
+//# 
+//# Redistribution and use in source and binary forms, with or without
+//# modification, are permitted provided that the following conditions
+//# are met:
+//# 1. Redistributions of source code must retain the above copyright
+//#    notice, this list of conditions and the following disclaimer.
+//# 2. Redistributions in binary form must reproduce the above copyright
+//#    notice, this list of conditions and the following disclaimer in the
+//#    documentation and/or other materials provided with the distribution.
+//# 3. Neither the name of the project nor the names of its contributors
+//#    may be used to endorse or promote products derived from this software
+//#    without specific prior written permission.
+//# 
+//# THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+//# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+//# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+//# ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+//# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+//# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+//# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+//# SUCH DAMAGE.
+//#
+//#	$Id: ptrconfig.bnf,v 1.1.1.1 1999/08/08 23:31:16 itojun Exp $
+//#
+//#------------------------------------------------------------------------
+*/
+
+/* Top level definitions							*/
+
+      <statement> ::= <comment>
+		    | <interface>
+		    | <rule>
+		    | <show>
+		    | <switch>
+		    | <break>
+
+
+/* Comment definition								*/
+
+        <comment> ::= SCOMMENT
+
+
+/* Interface definitions							*/
+
+      <interface> ::= "interface" <netdevice> <in_ex>
+
+          <in_ex> ::= "internal"
+		    | "external"
+
+
+/* Set faith/NATPT prefix to the kernel						*/
+
+         <prefix> ::= "prefix" IPV6ADDR
+		    | "prefix" IPV6ADDR "/" DECIMAL
+
+
+/* Tranlation rule definitions							*/
+
+           <rule> ::= "map" "from" <ipaddr> <opt_port> "to"   <ipaddr> <opt_port>
+		    | "map" "to"   <ipaddr> <opt_port> "from" <ipaddr> <opt_port>
+		    | "map" "flush" <opt_type>
+
+
+/* Show definitions								*/
+
+           <show> ::= "show" "interface" <opt_netdevice>
+		    | "show" "static"
+		    | "show" "dynamic"
+		    | "show" "xlate" <opt_decimal>
+
+
+/* Translation on/off switch definition						*/
+
+          <swich> ::= "map" "enable"
+		    | "map" "disable"
+
+
+/* Stop at breakpoint if possible						*/
+         <break> ::= "break"
+
+
+/* Miscellaneous definitions							*/
+
+  <opt_netdevice> ::= eps
+		    | <netdevice>
+
+      <netdevice> ::= STRING
+		    | NAME
+
+         <ipaddr> ::= <ipv4addr>
+		    | <ipv6addr>
+
+       <ipv4addr> ::= IPV4ADDR
+
+       <ipv6addr> ::= IPV6ADDR
+
+       <opt_port> ::= eps
+
+       <opt_type> ::= eps
+		    | "static"
+		    | "dynamic"
+
+    <opt_decimal> ::= eps
+		    | DECIMAL

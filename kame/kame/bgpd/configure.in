@@ -1,0 +1,102 @@
+AC_INIT(bgp.c)
+
+AC_CANONICAL_HOST
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_INSTALL
+
+AC_SUBST(OPTFLAGS)
+dnl AC_SUBST(LDFLAGS)
+AC_SUBST(LDCC)
+
+AC_CHECK_PROG(bgp_cv_shlicc, shlicc2, shlicc2, $CC)
+if test "$bgp_cv_shlicc" \!= "shlicc2"; then
+	AC_CHECK_PROG(bgp_cv_shlicc, shlicc, shlicc, $CC)
+fi
+LDCC=$bgp_cv_shlicc
+
+AC_MSG_CHECKING(if --enable-debug option is specified)
+AC_ARG_ENABLE(debug, [  --enable-debug          build debug version])
+if test "$enable_debug" = "yes"; then
+	AC_DEFINE(DEBUG_BGP)
+fi
+AC_MSG_RESULT(${enable_debug-no})
+
+AC_MSG_CHECKING(for inet6 library)
+bgp_cv_lib6_dir="no"
+for bgp_lib6_dir in /usr/local/v6/lib $srcdir/../libinet6; do
+	if test -d $bgp_lib6_dir -a -f $bgp_lib6_dir/libinet6.a; then
+		bgp_cv_lib6_dir=$bgp_lib6_dir;
+		LDFLAGS="-L$bgp_lib6_dir $LDFLAGS"
+	fi
+done
+AC_MSG_RESULT($bgp_cv_lib6_dir)
+AC_CHECK_LIB(inet6, if_nameindex, [LDFLAGS="-linet6 $LDFLAGS"], [dnl
+	echo Fatal: no inet6 library found. cannot continue;
+	echo You need to fetch libinet6.a from kit and compile beforehand.
+	exit 1])
+
+dnl guess implementation type
+v6type=unknown
+AC_MSG_CHECKING(for v6 stack type from defines)
+if test "$v6type" = "unknown"; then
+	AC_EGREP_CPP(yes,
+	[#include <sys/param.h>
+	#ifdef _TOSHIBA_INET6
+	yes
+	#endif
+	], [v6type=toshiba])
+fi
+if test "$v6type" = "unknown"; then
+	AC_EGREP_CPP(yes,
+	[#include <sys/param.h>
+	#ifdef _ZETA_MINAMI_INET6
+	yes
+	#endif
+	], [v6type=globe])
+fi
+
+AC_MSG_RESULT($v6type)
+if test "$v6type" = "toshiba"; then
+	OPTFLAGS="-DTOSHIBA_INET6 $OPTFLAGS"
+fi
+
+dnl IPv6 support check
+AC_MSG_CHECKING(for ipv6 support)
+AC_CACHE_VAL(bgp_cv_ipv6, [dnl
+AC_TRY_COMPILE([#define INET6
+#include <sys/types.h>
+#include <netinet/in.h>],
+        [int x = IPPROTO_IPV6; struct in6_addr a;],
+        [bgp_cv_ipv6="yes"], [bgp_cv_ipv6="no"])])
+AC_MSG_RESULT($bgp_cv_ipv6)
+if test "$bgp_cv_ipv6" = yes; then
+        OPTFLAGS="-DINET6 $OPTFLAGS"
+fi
+
+AC_MSG_CHECKING(for advanced API support)
+AC_CACHE_VAL(bgp_cv_advapi, [dnl
+AC_TRY_COMPILE([#define INET6
+#include <sys/types.h>
+#include <netinet/in.h>],
+	[struct in6_pktinfo a;],
+	[bgp_cv_advapi="yes"], [bgp_cv_advapi="no"])])
+AC_MSG_RESULT($bgp_cv_advapi)
+if test "$bgp_cv_advapi" = yes; then
+	OPTFLAGS="-DADVANCEDAPI $OPTFLAGS"
+fi
+
+AC_MSG_CHECKING(for inet_ntop support)
+AC_CACHE_VAL(bgp_cv_ntop, [dnl
+AC_TRY_LINK([#include <sys/types.h>
+#include <sys/socket.h>],
+        [char *a, *b; inet_ntop(AF_INET, a, b)],
+        [bgp_cv_ntop="yes"], [bgp_cv_ntop="no"])])
+AC_MSG_RESULT($bgp_cv_ntop)
+if test "$bgp_cv_ntop" = no; then
+        LDFLAGS="-lresolv $LDFLAGS"
+fi
+
+AC_CHECK_HEADERS(search.h)
+
+AC_OUTPUT(Makefile)

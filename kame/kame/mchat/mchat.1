@@ -1,0 +1,184 @@
+.\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Autumn 3, 1999
+.Dt MCHAT 1
+.Os KAME
+.\"
+.Sh NAME
+.Nm mchat
+.Nd tiny multicast chat client
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Fl dD
+.Op Fl i Ar interface
+.Op Fl l Ar hoplimit
+.Op Fl P Ar policy
+.Ar address
+.Ar port
+.\" .Op Ar file
+.\"
+.Sh DESCRIPTION
+The 
+.Nm
+is a tiny multicast chat program.
+.Nm
+uses single multicast group, specified in
+.Ar address ,
+as communication channel among clients.
+No server is necessary.
+If you would like to communicate with remote end, you need to have
+multicast reachability between your location and other participants.
+.Pp
+Lines starting with
+.Dq Li /
+will be recognized as commands.
+The following commands are recognized:
+.Bl -tag -width indent
+.It Li /who
+Query members on the chat channel.
+Since the command relies upon replies from peers, there can be
+.Dq hidden
+listeners on the channel.
+.Li /w
+can be used as well.
+.It Li /secret Ar address Ar message
+Send secret
+.Ar message
+to
+.Ar address
+by unicast channel.
+The traffic will be sent by unicast, and will not be visible to other people.
+.Li /s
+can be used as well.
+.It Li /name Op Ar name
+Configure your name for the chat channel.
+If
+.Ar name
+is omitted, it will be re-initialized to the result of 
+.Xr getlogin 2 .
+.It Li /help
+Shows command help
+.Pq Li /h for short .
+.It Li /quit
+Terminate
+.Nm
+.Pq Li /q for short .
+.El
+.Pp
+If you type any string
+.Pq that does not start with Dq Li / ,
+that will be sent to multicast address
+.Ar address ,
+UDP port
+.Ar port
+with minimal encoding.
+String typed by peers will be shown onto your tty.
+.Pp
+.Nm
+is able to transmit secret message to only one of the participants,
+by using
+.Dq Li secret
+command, described above.
+.Li secret
+command uses UDP port next to
+.Ar port
+.Pq port + 1 .
+Secret message can be encrypted by using IPsec,
+if you configure IPsec and/or key exchange program properly.
+.Pp
+The following command line options are recognized:
+.Bl -tag -width indent
+.It Fl d
+Turns on debugging mode
+.Pq currently has no effect .
+.It Fl D
+.Nm
+usually uses
+.Xr curses 3
+for rendering screen, where possible.
+.Fl D
+forces
+.Nm
+to use dumb terminal mode
+.Pq no curses .
+.It Fl i Ar interface
+Specifies outgoing network interface for multicast packets.
+.It Fl l Ar hoplimit
+Specifies hoplimit
+.Pq or time-to-live for IPv4
+for multicast packets.
+.It Fl P Ar policy
+Specifies IPsec policy string to be used for unicast packets.
+Refer to
+.Xr ipsec_set_policy 3
+on how to specify policy string.
+.El
+.\"
+.Sh EXAMPLES
+Lines starting with
+.Dq Li >>
+are messages from
+.Nm
+program itself.
+.Bd -literal
+% mchat -i ne2 ff02::1 8999
+>> itojun joined
+/w
+>> itojun@lychee.itojun.org (3ffe:501:808:fff0:200:86ff:fe05:80fa)
+>> masa@anago.fumi.net (3ffe:501:808:fff0:200:86ff:fe31:c5c7)
+hi
+[itojun] hi
+[masa] hi welcome back!
+/s 3ffe:501:808:fff0:200:86ff:fe31:c5c7 this is a secret message
+>> making secret message to 3ffe:501:808:fff0:200:86ff:fe31:c5c7
+.Ed
+.\"
+.Sh RETURN VALUES
+.Nm
+will exit with positive value on errors.
+.\"
+.\" .Sh SEE ALSO
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+IPv4 is not supported at this moment.
+.Pp
+Multicast group and UDP port number should officially be allocated.
+.Pp
+Security consideration:
+multicast channel is subject to wiretap,
+as there is no encryption provided for the channel.
+Unicast channel can be encrypted for secrecy but it needs proper
+configuration of IPsec.
+.Pp
+Multilingual encodings needs to be supported.

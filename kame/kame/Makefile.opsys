@@ -1,0 +1,8 @@
+# Get the architecture
+ARCH!= uname -m
+
+# Get the operationg system type
+OPSYS!= uname -s
+
+# Get the operationg system version
+OPREL!= uname -r
