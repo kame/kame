@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.33 2000/09/19 06:49:30 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.34 2000/09/21 15:18:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.33 2000/09/19 06:49:30 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.34 2000/09/21 15:18:25 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -539,7 +539,7 @@ base_i3recv(iph1, msg)
 	/* set encryption flag */
 	iph1->flags |= ISAKMP_FLAG_E;
 
-	iph1->status = PHASE1ST_ESTABLISHED;
+	iph1->status = PHASE1ST_MSG3RECEIVED;
 
 	error = 0;
 
@@ -556,6 +556,33 @@ end:
 		VPTRINIT(iph1->sig_p);
 	}
 
+	return error;
+}
+
+/*
+ * status update and establish isakmp sa.
+ */
+int
+base_i3send(iph1, msg)
+	struct ph1handle *iph1;
+	vchar_t *msg;
+{
+	int error = -1;
+
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+
+	/* validity check */
+	if (iph1->status != PHASE1ST_MSG3RECEIVED) {
+		plog(logp, LOCATION, NULL,
+			"status mismatched %d.\n", iph1->status);
+		goto end;
+	}
+
+	iph1->status = PHASE1ST_ESTABLISHED;
+
+	error = 0;
+
+end:
 	return error;
 }
 

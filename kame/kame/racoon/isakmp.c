@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.102 2000/09/21 03:46:31 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.103 2000/09/21 15:18:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.102 2000/09/21 03:46:31 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.103 2000/09/21 15:18:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -112,7 +112,7 @@ static int (*ph1exchange[][2][PHASE1ST_MAX])
  /* Base exchange */
  {
   { nostate1, base_i1send, nostate1, base_i2recv, base_i2send,
-    base_i3recv, nostate1, nostate1, nostate1, nostate1, },
+    base_i3recv, base_i3send, nostate1, nostate1, nostate1, },
   { nostate1, base_r1recv, base_r1send, base_r2recv, base_r2send,
     nostate1, nostate1, nostate1, nostate1, nostate1, },
  },
@@ -1659,7 +1659,7 @@ isakmp_chkph1there(iph2)
 
 	iph1 = getph1byaddr(iph2->dst);
 
-	/* XXX Even if ph1 as responder is there, should we start
+	/* XXX Even if ph1 as responder is there, should we not start
 	 * phase 2 negotiation ? */
 	if (iph1 != NULL
 	 && iph1->status == PHASE1ST_ESTABLISHED) {

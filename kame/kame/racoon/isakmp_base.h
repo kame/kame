@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.h,v 1.4 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_base.h,v 1.5 2000/09/21 15:18:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,12 +28,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.h,v 1.4 2000/09/13 04:50:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_base.h,v 1.5 2000/09/21 15:18:25 sakane Exp $ */
 
 extern int base_i1send __P((struct ph1handle *, vchar_t *));
 extern int base_i2recv __P((struct ph1handle *, vchar_t *));
 extern int base_i2send __P((struct ph1handle *, vchar_t *));
 extern int base_i3recv __P((struct ph1handle *, vchar_t *));
+extern int base_i3send __P((struct ph1handle *, vchar_t *));
 
 extern int base_r1recv __P((struct ph1handle *, vchar_t *));
 extern int base_r1send __P((struct ph1handle *, vchar_t *));
