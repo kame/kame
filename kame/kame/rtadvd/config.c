@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.23 2000/11/11 06:57:22 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.24 2000/12/22 08:42:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -71,6 +72,7 @@
 
 static void makeentry __P((char *, int, char *, int));
 static void get_prefix __P((struct rainfo *));
+static getinet6sysctl __P((int));
 
 extern struct rainfo *ralist;
 
@@ -85,6 +87,7 @@ getconfig(intface)
 	char buf[BUFSIZ];
 	char *bp = buf;
 	char *addr;
+	static int forwarding = -1;
 
 #define MUSTHAVE(var, cap)	\
     do {								\
@@ -114,6 +117,12 @@ getconfig(intface)
 	tmp = (struct rainfo *)malloc(sizeof(*ralist));
 	memset(tmp, 0, sizeof(*tmp));
 	tmp->prefix.next = tmp->prefix.prev = &tmp->prefix;
+
+	/* check if we are allowed to forward packets (if not determined) */
+	if (forwarding < 0) {
+		if ((forwarding = getinet6sysctl(IPV6CTL_FORWARDING)) < 0)
+			exit(1);
+	}
 
 	/* get interface information */
 	if (agetflag("nolladdr"))
@@ -178,6 +187,13 @@ getconfig(intface)
 		       " between %d and %d",
 		       __FUNCTION__, intface,
 		       tmp->maxinterval, MAXROUTERLIFETIME);
+		exit(1);
+	}
+	if (val && forwarding == 0) {
+		syslog(LOG_WARNING,
+		       "<%s> non zero router lifetime is specified for %s, "
+		       "which must not be allowed for hosts.",
+		       __FUNCTION__, intface);
 		exit(1);
 	}
 	tmp->lifetime = val & 0xffff;
@@ -868,4 +884,24 @@ make_packet(struct rainfo *rainfo)
 	}
 
 	return;
+}
+
+static int
+getinet6sysctl(int code)
+{
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, 0 };
+	int value;
+	size_t size;
+
+	mib[3] = code;
+	size = sizeof(value);
+	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), &value, &size, NULL, 0)
+	    < 0) {
+		syslog(LOG_ERR, "<%s>: failed to get ip6 sysctl(%d): %s",
+		       __FUNCTION__, code,
+		       strerror(errno));
+		return(-1);
+	}
+	else
+		return(value);
 }
