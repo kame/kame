@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.14 2002/09/19 01:08:46 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.15 2002/10/11 14:08:37 suz Exp $
  */
 
 /*
@@ -503,7 +503,6 @@ accept_listenerV2_report(src, dst, report_message, datalen)
                         s->al_checklist = MORETHANLLQI;
                     else
                         s->al_checklist = FALSE;
-
 		}
 		else
 		    /*
@@ -568,8 +567,8 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 			    sa6_fmt(&g->al_addr),
 			    sa6_fmt(&s->al_addr), v->uv_name);
 
-		    add_leaf(vifi, &source_sa, &group_sa);
 		}
+		add_leaf(vifi, &source_sa, &group_sa);
 
 	    }
 	    break;
