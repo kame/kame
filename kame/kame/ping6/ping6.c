@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.72 2000/08/13 20:12:48 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.73 2000/08/13 20:13:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1739,7 +1739,6 @@ onint(notused)
 void
 summary()
 {
-	register int i;
 
 	(void)printf("\n--- %s ping6 statistics ---\n", hostname);
 	(void)printf("%ld packets transmitted, ", ntransmitted);
