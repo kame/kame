@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.11 2000/01/12 20:57:27 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.12 2000/01/12 23:02:57 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -600,7 +600,7 @@ ident_i4send(iph1, msg)
 	iph1->status = PHASE1ST_ESTABLISHED;
 
 	/* save created date. */
-	iph1->created = time(NULL);
+	(void)time(&iph1->created);
 
 	/* add to the schedule to expire, and seve back pointer. */
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);

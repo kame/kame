@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.10 2000/01/12 20:57:27 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.11 2000/01/12 23:02:56 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -796,7 +796,7 @@ agg_r2send(iph1, msg)
 	iph1->status = PHASE1ST_ESTABLISHED;
 
 	/* save created date. */
-	iph1->created = time(NULL);
+	(void)time(&iph1->created);
 
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
