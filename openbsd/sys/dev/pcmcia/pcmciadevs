@@ -1,4 +1,4 @@
-	$OpenBSD: pcmciadevs,v 1.35 2000/04/24 15:20:26 fgsch Exp $
+	$OpenBSD: pcmciadevs,v 1.44 2000/10/27 07:53:35 aaron Exp $
 /* $NetBSD: pcmciadevs,v 1.13 1998/08/17 23:10:12 thorpej Exp $ */
 
 /*
@@ -60,14 +60,17 @@ vendor SIMPLETECH		0x014d	Simple Technology
 vendor SYMBOL			0x014d	Symbol
 vendor LUCENT			0x0156	Lucent
 vendor AIRONET			0x015f	Aironet Wireless Communications
+vendor PSION			0x016c	Psion
 vendor COMPAQ2			0x0183	Compaq
 vendor KINGSTON			0x0186	Kingston
 vendor DAYNA			0x0194	Dayna
 vendor RAYTHEON			0x01a6	Raytheon
 vendor BAY			0x01eb	Bay Networks
 vendor IODATA			0x01bf	I-O DATA
+vendor FARALLON			0x0200	Farallon Communications
 vendor NOKIA			0x023d	Nokia Communications
 vendor BREEZECOM		0x0a02	BreezeCOM
+vendor NEWMEDIA2		0x10cd	NewMedia
 vendor LASAT			0x3401	Lasat
 vendor LEXARMEDIA		0x4e01	Lexar Media
 vendor DUAL			0x890f	Dual
@@ -77,6 +80,7 @@ vendor CONTEC			0xc001	Contec
 vendor COREGA			0xc00f	Corega K.K.
 vendor ALLIEDTELESIS		0xc00f	Allied Telesis K.K.
 vendor HAGIWARASYSCOM		0xc012	Hagiwara SYS-COM
+vendor RATOC			0xc015	RATOC System Inc.
 
 /*
  * List of known products.  Grouped by vendor.
@@ -85,19 +89,19 @@ vendor HAGIWARASYSCOM		0xc012	Hagiwara SYS-COM
 product 3COM 3CXM056BNW		0x002f 3Com/NoteWorthy 3CXM056-BNW
 product 3COM 3CXEM556B		0x003d 3Com 3CXEM556B-INT
 product 3COM 3CXEM556		0x0035 3Com 3CXEM556
-product 3COM 3CCFEM556BI	0x0556 3Com/Megahertz 3CCFEM556BI
+product 3COM 3CCFEM556BI	0x0556 3Com 3CCFEM556BI
 product 3COM 3C562		0x0562 3Com 3c562
 product 3COM 3C589		0x0589 3Com 3c589
-product 3COM 3C574		0x0574 3Com 3c574-TX
-product 3COM 3C1		0x0cf1 3Com/Megahertz 3C1 10Mbps LAN CF+ Card
+product 3COM 3C574		0x0574 3Com 3c574
+product 3COM 3C1		0x0cf1 3Com 3C1
 
 /* Adaptec */
 product ADAPTEC APA1460_1	0x0001 Adaptec APA-1460/A
 product ADAPTEC APA1460_2	0x0002 Adaptec APA-1460/B
 
 /* Aironet */
-product AIRONET PC4500		0x0005 Aironet PC4500 Wireless LAN Adapter
-product AIRONET PC4800		0x0007 Aironet PC4800 Wireless LAN Adapter
+product AIRONET PC4500		0x0005 Aironet PC4500
+product AIRONET PC4800		0x0007 Aironet PC4800
 
 /* Allied Telesis K.K. */
 product ALLIEDTELESIS LA_PCM	0x0002 Allied Telesis LA-PCM
@@ -108,7 +112,7 @@ product BAY SURFER_PRO		0x0806 AirSurfer Pro
 product BAY STACK_660		0x0807 BayStack 660
 
 /* BreezeCOM */
-product BREEZECOM BREEZENET	0x0102 BreezeCOM BreezeNET IEEE 802.11 FHSS
+product BREEZECOM BREEZENET	0x0102 BreezeCOM BreezeNET
 
 /* Contec C-NET(PC) */
 product CONTEC CNETPC		0x0000 Contec C-NET(PC)C
@@ -127,9 +131,12 @@ product DIGITAL MOBILE_MEDIA_CDROM 0x0d00 Digital Mobile Media CD-ROM
 /* Dual */
 product DUAL NE2000		0x0100 Dual NE2000
 
+/* Farallon Communications */
+product FARALLON SKYLINE	0x0a01 SkyLINE Wireless
+
 /* Fujitsu */
 product FUJITSU SCSI600		0x0401 Fujitsu 600
-product FUJITSU LA10S		0x1003 Fujitsu Compact Flash Ethernet
+product FUJITSU LA10S		0x1003 Fujitsu CF Ethernet
 product FUJITSU LA501		0x2000 Fujitsu Towa LA501
 
 /* IBM */
@@ -184,19 +191,27 @@ product MOTOROLA MONTANA_336	0x0505 Motorola Montana 33.6
 
 /* NewMedia */
 product NEWMEDIA BASICS		0x0019 NewMedia BASICS
+product NEWMEDIA LANSURFER	0x0021 NewMedia LANSurfer
+product NEWMEDIA LIVEWIRE	0x1004 NewMedia LiveWire Ethernet LAN Adapter
 product NEWMEDIA MULTIMEDIA	0x100b NewMedia Multimedia
 product NEWMEDIA BUSTOASTER	0xc102 NewMedia BusToaster
+product NEWMEDIA WAVJAMMER	0xe005 NewMedia .WAVjammer
+product NEWMEDIA2 BUSTOASTER	0x0001 NewMedia BusToaster
 
 /* Nokia Products */
 product NOKIA C020_WLAN		0x20c0 Nokia C020
 
 /* Panasonic */
-product PANASONIC KXLC002	0x0304 Panasonic 4X CD-ROM Interface Card
-product PANASONIC KXLC003	0x0504 Panasonic 8X CD-ROM Interface Card
+product PANASONIC KXLC002	0x0304 Panasonic 4X CD-ROM Interface
+product PANASONIC KXLC003	0x0504 Panasonic 8X CD-ROM Interface
+product PANASONIC KME		0x2604 Panasonic CD-R/RW Interface
 
 /* Proxim */
 product PROXIM ROAMABOUT_2400FH	0x1058 Digital RoamAbout 2400FH
 product PROXIM RANGELAN2_7401	0x1158 Proxim RangeLAN2 7401
+
+/* Psion */
+product PSION GOLDCARD		0x0020 Psion Goldcard
 
 /* Quatech */
 product QUATECH DSP_225		0x0008 Quatech Dual Serial Port
@@ -204,8 +219,11 @@ product QUATECH DSP_225		0x0008 Quatech Dual Serial Port
 /* Raylink/WebGear */
 product RAYTHEON WLAN		0x0000 WLAN Adapter
 
+/* RATOC System Inc. */
+product RATOC REX_R280		0x0001 RATOC REX-R280
+
 /* Sandisk */
-product SANDISK SDCFB		0x0401 Sandisk CompactFlash Card
+product SANDISK SDCFB		0x0401 Sandisk CompactFlash
 
 /* Simple Technology */
 product SIMPLETECH COMMUNICATOR288 0x0100 Simple Technology 28.8 Communicator

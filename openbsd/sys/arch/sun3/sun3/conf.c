@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.24 2000/03/02 23:02:14 todd Exp $	*/
+/*	$OpenBSD: conf.c,v 1.27 2000/09/26 14:03:55 art Exp $	*/
 /*	$NetBSD: conf.c,v 1.51 1996/11/04 16:16:09 gwr Exp $	*/
 
 /*-
@@ -50,13 +50,19 @@
 int	ttselect	__P((dev_t, int, struct proc *));
 
 #include "bpfilter.h"
+#include "bwtwo.h"
 #include "ccd.h"
 #include "cd.h"
+#include "cgtwo.h"
+#include "cgfour.h"
+#include "ch.h"
 #include "kbd.h"
+#include "ksyms.h"
 #include "ms.h"
 #include "pty.h"
 #include "rd.h"
 #include "sd.h"
+#include "ses.h"
 #include "ss.h"
 #include "st.h"
 #include "tun.h"
@@ -69,7 +75,6 @@ int	ttselect	__P((dev_t, int, struct proc *));
 #include <xfs/nxfs.h>
 cdev_decl(xfs_dev);
 #endif
-#include "ksyms.h"
 
 struct bdevsw	bdevsw[] =
 {
@@ -97,6 +102,12 @@ struct bdevsw	bdevsw[] =
 	bdev_notdef(),			/* 21: Sun vd_unused */
 	bdev_notdef(),			/* 22: Sun IPI disks... */
 	bdev_notdef(),			/* 23: Sun IPI disks... */
+	bdev_lkm_dummy(),		/* 24 */
+	bdev_lkm_dummy(),		/* 25 */
+	bdev_lkm_dummy(),		/* 26 */
+	bdev_lkm_dummy(),		/* 27 */
+	bdev_lkm_dummy(),		/* 28 */
+	bdev_lkm_dummy(),		/* 29 */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
@@ -182,6 +193,15 @@ struct cdevsw	cdevsw[] =
 	cdev_uk_init(NUK,uk),		/* 73: unknown SCSI */
 	cdev_ss_init(NSS,ss),           /* 74: SCSI scanner */
 	cdev_gen_ipf(NIPF,ipl),		/* 75: ip filter log */
+	cdev_lkm_init(NLKM,lkm),	/* 76: loadable module driver */
+	cdev_lkm_dummy(),		/* 77 */
+	cdev_lkm_dummy(),		/* 78 */
+	cdev_lkm_dummy(),		/* 79 */
+	cdev_lkm_dummy(),		/* 80 */
+	cdev_lkm_dummy(),		/* 81 */
+	cdev_lkm_dummy(),		/* 82 */
+	cdev_ch_init(NCH,ch),		/* 83: SCSI autochanger */
+	cdev_ses_init(NSES,ses),	/* 84: SCSI SES or SAF-TE device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -218,6 +238,12 @@ iszerodev(dev)
 {
 
 	return (major(dev) == mem_no && minor(dev) == 12);
+}
+
+dev_t
+getnulldev()
+{
+	return makedev(mem_no, 2);
 }
 
 static int chrtoblktbl[] = {
@@ -265,8 +291,8 @@ static int chrtoblktbl[] = {
 	/* 39 */	NODEV,
 	/* 40 */	NODEV,
 	/* 41 */	NODEV,
-	/* 42 */	NODEV,
-	/* 43 */	10,
+	/* 42 */	10,
+	/* 43 */	NODEV,
 	/* 44 */	NODEV,
 	/* 45 */	NODEV,
 	/* 46 */	NODEV,

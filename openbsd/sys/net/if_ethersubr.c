@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.35 2000/04/26 19:03:11 chris Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.39 2000/10/18 16:16:33 jason Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 
 /*
@@ -148,9 +148,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netatalk/at.h>
 #include <netatalk/at_var.h>
 #include <netatalk/at_extern.h>
-
-#define llc_snap_org_code llc_un.type_snap.org_code
-#define llc_snap_ether_type llc_un.type_snap.ether_type
 
 extern u_char	at_org_code[ 3 ];
 extern u_char	aarp_org_code[ 3 ];
@@ -381,9 +378,9 @@ ether_output(ifp, m0, dst, rt0)
 			 */
 			llc.llc_dsap = llc.llc_ssap = LLC_SNAP_LSAP;
 			llc.llc_control = LLC_UI;
-			bcopy(at_org_code, llc.llc_snap_org_code,
+			bcopy(at_org_code, llc.llc_snap.org_code,
 				sizeof(at_org_code));
-			llc.llc_snap_ether_type = htons( ETHERTYPE_AT );
+			llc.llc_snap.ether_type = htons( ETHERTYPE_AT );
 			bcopy(&llc, mtod(m, caddr_t), AT_LLC_SIZE);
 			etype = htons(m->m_pkthdr.len);
 		} else {
@@ -573,16 +570,6 @@ ether_input(ifp, eh, m)
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
 
-	etype = ntohs(eh->ether_type);
-
-#if NVLAN > 0
-	if (etype == vlan_proto) {
-		if (vlan_input(eh, m) < 0)
-			ifp->if_data.ifi_noproto++;
-		return;
-       }
-#endif /* NVLAN > 0 */
-
 #if NBRIDGE > 0
 	/*
 	 * Tap the packet off here for a bridge, if configured and
@@ -595,6 +582,7 @@ ether_input(ifp, eh, m)
 		if (m == NULL)
 			return;
 		/* The bridge has determined it's for us. */
+		ifp = m->m_pkthdr.rcvif;
 		goto decapsulate;
 	}
 #endif
@@ -612,6 +600,17 @@ ether_input(ifp, eh, m)
 	}
 
 decapsulate:
+
+	etype = ntohs(eh->ether_type);
+
+#if NVLAN > 0
+	if (etype == vlan_proto) {
+		if (vlan_input(eh, m) < 0)
+			ifp->if_data.ifi_noproto++;
+		return;
+       }
+#endif /* NVLAN > 0 */
+
 	switch (etype) {
 #ifdef INET
 	case ETHERTYPE_IP:
@@ -682,9 +681,9 @@ decapsulate:
 			 */
 			if (l->llc_control == LLC_UI &&
 			    l->llc_ssap == LLC_SNAP_LSAP &&
-			    Bcmp(&(l->llc_snap_org_code)[0],
+			    Bcmp(&(l->llc_snap.org_code)[0],
 			    at_org_code, sizeof(at_org_code)) == 0 &&
-			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AT) {
+			    ntohs(l->llc_snap.ether_type) == ETHERTYPE_AT) {
 				inq = &atintrq2;
 				m_adj(m, AT_LLC_SIZE);
 				schednetisr(NETISR_ATALK);
@@ -693,9 +692,9 @@ decapsulate:
 
 			if (l->llc_control == LLC_UI &&
 			    l->llc_ssap == LLC_SNAP_LSAP &&
-			    Bcmp(&(l->llc_snap_org_code)[0],
+			    Bcmp(&(l->llc_snap.org_code)[0],
 			    aarp_org_code, sizeof(aarp_org_code)) == 0 &&
-			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AARP) {
+			    ntohs(l->llc_snap.ether_type) == ETHERTYPE_AARP) {
 				m_adj(m, AT_LLC_SIZE);
 				/* XXX Really this should use netisr too */
 				aarpinput((struct arpcom *)ifp, m);
@@ -848,6 +847,19 @@ ether_ifattach(ifp)
 	register struct ifaddr *ifa;
 	register struct sockaddr_dl *sdl;
 
+	/*
+	 * Any interface which provides a MAC address which is obviously
+	 * invalid gets whacked, so that users will notice.
+	 */
+	if (ETHER_IS_MULTICAST(((struct arpcom *)ifp)->ac_enaddr)) {
+		((struct arpcom *)ifp)->ac_enaddr[0] = 0x00;
+		((struct arpcom *)ifp)->ac_enaddr[1] = 0xfe;
+		((struct arpcom *)ifp)->ac_enaddr[2] = 0xe1;
+		((struct arpcom *)ifp)->ac_enaddr[3] = 0xba;
+		((struct arpcom *)ifp)->ac_enaddr[4] = 0xd0;
+		((struct arpcom *)ifp)->ac_enaddr[5] = (u_char)arc4random();
+	}
+		
 	ifp->if_type = IFT_ETHER;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 14;

@@ -31,19 +31,11 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.15 2000/01/07 23:08:18 gibbs Exp $
- * $OpenBSD: aic7xxxvar.h,v 1.11 2000/03/22 02:48:47 smurph Exp $
+ * $OpenBSD: aic7xxxvar.h,v 1.13 2000/07/03 22:18:36 smurph Exp $
  */
 
 #ifndef _AIC7XXXVAR_H_
 #define _AIC7XXXVAR_H_
-
-#ifndef MAX
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
-#endif
-
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
 
 #ifndef FALSE
 #define FALSE 0
@@ -350,6 +342,7 @@ struct tmode_tstate {
 	u_int16_t		 ultraenb;	/* Using ultra sync rate  */
 	u_int16_t	 	 discenable;	/* Disconnection allowed  */
 	u_int16_t		 tagenable;	/* Tagged Queuing allowed */
+	u_int16_t		 tagdisable;	/* Tagged Queuing NOT allowed */
 };
 
 #define ALL_TARGETS -1
@@ -503,7 +496,11 @@ struct ahc_softc {
 	
 	int			queue_blocked;
 	u_int16_t		devqueue_blocked[16];
+#define AHC_NEG_PENDING		0x01
+#define AHC_NEG_SDTRDONE	0x02
+#define AHC_NEG_WDTRDONE	0x04
 	u_int8_t		inited_targets[16];
+	u_int8_t		inited_channels[2];
 
 	/*
 	 * SCBs that have been send to the controller

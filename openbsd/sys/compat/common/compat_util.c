@@ -1,4 +1,4 @@
-/* 	$OpenBSD: compat_util.c,v 1.5 1996/12/08 14:25:46 niklas Exp $	*/
+/* 	$OpenBSD: compat_util.c,v 1.8 2000/10/16 20:10:50 jasoni Exp $	*/
 /* 	$NetBSD: compat_util.c,v 1.4 1996/03/14 19:31:45 christos Exp $	*/
 
 /*
@@ -152,7 +152,14 @@ emul_find(p, sgp, prefix, path, pbuf, cflag)
 	else {
 		sz = &ptr[len] - buf;
 		*pbuf = stackgap_alloc(sgp, sz + 1);
-		error = copyout(buf, *pbuf, sz);
+		if (*pbuf == NULL) {
+			error = ENAMETOOLONG;
+			goto bad;
+		}
+		if ((error = copyout(buf, *pbuf, sz)) != 0) {
+			*pbuf = path;
+			goto bad;
+		}
 		free(buf, M_TEMP);
 	}
 
@@ -168,4 +175,56 @@ bad2:
 bad:
 	free(buf, M_TEMP);
 	return error;
+}
+
+/*
+ * Translate one set of flags to another, based on the entries in
+ * the given table.  If 'leftover' is specified, it is filled in
+ * with any flags which could not be translated.
+ */
+unsigned long
+emul_flags_translate(tab, in, leftover)
+	const struct emul_flags_xtab *tab;
+	unsigned long in;
+	unsigned long *leftover;
+{
+        unsigned long out;
+                 
+        for (out = 0; tab->omask != 0; tab++) {
+                if ((in & tab->omask) == tab->oval) {
+                        in &= ~tab->omask;
+                        out |= tab->nval;
+                }
+        }               
+        if (leftover != NULL)
+                *leftover = in;
+        return (out);
+}
+
+caddr_t  
+stackgap_init(e) 
+        struct emul *e;
+{
+#define szsigcode ((caddr_t)(e->e_esigcode - e->e_sigcode))
+        return STACKGAPBASE;
+#undef szsigcode
+}
+ 
+void *          
+stackgap_alloc(sgp, sz)
+        caddr_t *sgp;
+        size_t sz;
+{
+	void *n = (void *) *sgp;
+	caddr_t nsgp;
+	struct proc *p = curproc;		/* XXX */
+	struct emul *e = p->p_emul;
+	int sigsize = e->e_esigcode - e->e_sigcode;
+	
+	sz = ALIGN(sz);
+	nsgp = *sgp + sz;
+	if (nsgp > ((caddr_t)PS_STRINGS - sigsize))
+		return NULL;
+	*sgp = nsgp;
+	return n;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uhci.c,v 1.12 2000/04/14 22:50:25 aaron Exp $	*/
+/*	$OpenBSD: uhci.c,v 1.14 2000/09/06 22:42:10 rahnds Exp $	*/
 /*	$NetBSD: uhci.c,v 1.110 2000/04/14 14:11:36 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/uhci.c,v 1.33 1999/11/17 22:33:41 n_hibma Exp $	*/
 
@@ -7,7 +7,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -101,20 +101,6 @@ int uhcidebug = 0;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
-#endif
-
-/*
- * The UHCI controller is little endian, so on big endian machines
- * the data strored in memory needs to be swapped.
- */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-#if BYTE_ORDER == BIG_ENDIAN
-#define htole32(x) (bswap32(x))
-#define le32toh(x) (bswap32(x))
-#else
-#define htole32(x) (x)
-#define le32toh(x) (x)
-#endif
 #endif
 
 struct uhci_pipe {
@@ -1037,6 +1023,12 @@ uhci_intr(arg)
 		uhci_dumpregs(sc);
 	}
 #endif
+
+	if (sc->sc_suspend != PWR_RESUME) {
+		printf("%s: interrupt while not operating ignored\n",
+		       USBDEVNAME(sc->sc_bus.bdev));
+		return (0);
+	}
 
 	status = UREAD2(sc, UHCI_STS);
 	if (status == 0)	/* The interrupt was not for us. */
@@ -2551,7 +2543,7 @@ uhci_add_intr(sc, sqh)
 	vf->bandwidth++;
 }
 
-/* Remove interrupt QH, called with vflock. */
+/* Remove interrupt QH. */
 void
 uhci_remove_intr(sc, sqh)
 	uhci_softc_t *sc;
@@ -3112,12 +3104,15 @@ uhci_root_ctrl_start(xfer)
 				    index, UREAD2(sc, port)));
 			sc->sc_isreset = 1;
 			break;
+		case UHF_PORT_POWER:
+			/* Pretend we turned on power */
+			err = USBD_NORMAL_COMPLETION;
+			goto ret;
 		case UHF_C_PORT_CONNECTION:
 		case UHF_C_PORT_ENABLE:
 		case UHF_C_PORT_OVER_CURRENT:
 		case UHF_PORT_CONNECTION:
 		case UHF_PORT_OVER_CURRENT:
-		case UHF_PORT_POWER:
 		case UHF_PORT_LOW_SPEED:
 		case UHF_C_PORT_SUSPEND:
 		case UHF_C_PORT_RESET:

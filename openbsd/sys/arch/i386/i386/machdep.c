@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.131 2000/04/24 18:56:56 niklas Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.137 2000/10/27 00:16:14 mickey Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -170,8 +170,6 @@ extern struct proc *npxproc;
 
 #include "bios.h"
 
-#define	MIN(a,b) (((a)<(b))?(a):(b))
-
 /*
  * The following defines are for the code in setup_buffers that tries to
  * ensure that enough ISA DMAable memory is still left after the buffercache
@@ -323,7 +321,7 @@ cpu_startup()
 		    VM_PROT_READ|VM_PROT_WRITE);
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
-	printf(version);
+	printf("%s", version);
 	startrtclock();
 	
 	identifycpu();
@@ -429,6 +427,7 @@ cpu_startup()
 	    ((caddr_t)pcb->pcb_iomap - (caddr_t)&pcb->pcb_tss) << 16;
 	for (x = 0; x < sizeof(pcb->pcb_iomap) / 4; x++)
 		pcb->pcb_iomap[x] = 0xffffffff;
+	pcb->pcb_iomap_pad = 0xff;
 
 	pcb->pcb_ldt_sel = GSEL(GLDT_SEL, SEL_KPL);
 	pcb->pcb_cr0 = rcr0();
@@ -491,8 +490,8 @@ allocsys(v)
 		if (physmem < btoc(2 * 1024 * 1024))
 			bufpages = physmem / (10 * CLSIZE);
 		else
-			bufpages = (btoc(2 * 1024 * 1024) + physmem) /
-			    ((100/BUFCACHEPERCENT) * CLSIZE);
+			bufpages = (btoc(2 * 1024 * 1024) + physmem) *
+			    BUFCACHEPERCENT / (100 * CLSIZE);
 	}
 	if (nbuf == 0) {
 		nbuf = bufpages;
@@ -588,7 +587,7 @@ setup_buffers(maxaddr)
 	if (!ALLOC_PGS(CHUNKSZ, ISADMA_LIMIT, saved_pgs)) {
 		/*
 		 * Then, grab as much ISA DMAable memory as possible
-		 * for the buffer * cache as it is nice to not need to
+		 * for the buffer cache as it is nice to not need to
 		 * bounce all buffer I/O.
 		 */
 		for (left = bufpages; left > 0; left -= chunk) {
@@ -899,6 +898,9 @@ winchip_cpu_setup(cpu_device, model, step)
 	switch (model) {
 	case 4: /* WinChip C6 */
 		cpu_feature &= ~CPUID_TSC;
+		/* Disable RDTSC instruction from user-level. */
+		lcr4(rcr4() | CR4_TSD);
+
 		printf("%s: broken TSC disabled\n", cpu_device);
 		break;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.6 1999/11/26 17:58:17 mickey Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.8 2000/08/15 20:38:24 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -116,8 +116,7 @@ cpuattach(parent, self, aux)
 		/* XXX p = hppa_mod_info(HPPA_TYPE_CPU,pdc_cversion[0]); */
 	}
 
-	printf (": %s v%d.%d, ", p? p : "PA7000",
-		pdc_cpuid.revision >> 4, pdc_cpuid.revision & 0xf);
+	printf (": %s rev %d, ", p? p : cpu_typename, (*cpu_desidhash)());
 
 	if ((err = pdc_call((iodcio_t)pdc, 0, PDC_MODEL, PDC_MODEL_INFO,
 			    &pdc_model)) < 0) {
@@ -160,6 +159,7 @@ cpuattach(parent, self, aux)
 
 	printf("\n");
 
+	/* sanity against luser amongst config editors */
 	if (ca->ca_irq == 31) {
 		sc->sc_ih = cpu_intr_establish(IPL_CLOCK, ca->ca_irq,
 					       clock_intr, NULL /*trapframe*/,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.25 2000/03/21 04:53:13 angelos Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.35 2000/10/13 17:58:36 itojun Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -79,11 +79,17 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/ip6_var.h>
 #include <netinet6/tcpipv6.h>
 #include <sys/domain.h>
+#include <netinet6/in6_var.h>
+#include <netinet6/ip6protosw.h>
 #endif /* INET6 */
 
 #ifdef TCP_SIGNATURE
 #include <sys/md5k.h>
 #endif /* TCP_SIGNATURE */
+
+#ifndef offsetof
+#define offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
 
 /* patchable/settable parameters for tcp */
 int	tcp_mssdflt = TCP_MSS;
@@ -120,6 +126,8 @@ int	tcbhashsize = TCBHASHSIZE;
 #ifdef INET6
 extern int ip6_defhlim;
 #endif /* INET6 */
+
+struct tcpstat tcpstat;		/* tcp statistics */
 
 /*
  * Tcp initialization
@@ -402,7 +410,8 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		th->th_sum = in_cksum(m, tlen);
 		((struct ip *)ti)->ip_len = tlen;
 		((struct ip *)ti)->ip_ttl = ip_defttl;
-		ip_output(m, NULL, ro, 0, NULL, tp ? tp->t_inpcb : NULL);
+		ip_output(m, NULL, ro, ip_mtudisc ? IP_MTUDISC : 0, NULL,
+			  tp ? tp->t_inpcb : NULL);
 	}
 }
 
@@ -422,8 +431,9 @@ tcp_newtcpcb(inp)
 		return ((struct tcpcb *)0);
 	bzero((char *) tp, sizeof(struct tcpcb));
 	LIST_INIT(&tp->segq);
-	tp->t_maxseg = tp->t_maxopd = tcp_mssdflt;
-
+	tp->t_maxseg = tcp_mssdflt;
+	tp->t_maxopd = 0;
+  
 #ifdef TCP_SACK
 	tp->sack_disable = tcp_do_sack ? 0 : 1;
 #endif
@@ -442,15 +452,11 @@ tcp_newtcpcb(inp)
 	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 #ifdef INET6
-	/*
-	 * If we want to use tp->pf for a quick-n-easy way to determine
-	 * the outbound dgram type, we cannot make this decision
-	 * until a connection is established!  Bzero() sets pf to zero, and
-	 * that's the way we want it, unless, of course, it's an AF_INET
-	 * socket...
-	 */
+	/* we disallow IPv4 mapped address completely. */
 	if ((inp->inp_flags & INP_IPV6) == 0)
-		tp->pf = PF_INET;  /* If AF_INET socket, we can't do v6 from it. */
+		tp->pf = PF_INET;
+	else
+		tp->pf = PF_INET6;
 #else
 	tp->pf = PF_INET;
 #endif
@@ -663,6 +669,19 @@ tcp_drain()
 }
 
 /*
+ * Compute proper scaling value for receiver window from buffer space 
+ */
+
+void
+tcp_rscale(struct tcpcb *tp, u_long hiwat)
+{
+	tp->request_r_scale = 0;
+	while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
+	       TCP_MAXWIN << tp->request_r_scale < hiwat)
+		tp->request_r_scale++;
+}
+
+/*
  * Notify a tcp user of an asynchronous error;
  * store error as soft error, but wake up user
  * (for now, won't do anything until can select for soft error).
@@ -703,7 +722,76 @@ tcp6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	(void)tcp_ctlinput(cmd, sa, NULL);	/*XXX*/
+	register struct tcphdr *thp;
+	struct tcphdr th;
+	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
+	struct sockaddr_in6 sa6;
+	struct mbuf *m;
+	struct ip6_hdr *ip6;
+	int off;
+	
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+	if (cmd == PRC_QUENCH)
+		notify = tcp_quench;
+	else if (cmd == PRC_MSGSIZE)
+		notify = tcp_mtudisc;
+	else if (!PRC_IS_REDIRECT(cmd) &&
+		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+	}
+
+	/* translate addresses into internal form */
+	sa6 = *(struct sockaddr_in6 *)sa;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
+		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+	if (ip6) {
+		/*
+		 * XXX: We assume that when IPV6 is non NULL,
+		 * M and OFF are valid.
+		 */
+		struct ip6_hdr ip6_tmp;
+
+		/* translate addresses into internal form */
+		ip6_tmp = *ip6;
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_src))
+			ip6_tmp.ip6_src.s6_addr16[1] =
+				htons(m->m_pkthdr.rcvif->if_index);
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_dst))
+			ip6_tmp.ip6_dst.s6_addr16[1] =
+				htons(m->m_pkthdr.rcvif->if_index);
+
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(th))
+			return;
+
+		if (m->m_len < off + sizeof(th)) {
+			/*
+			 * this should be rare case,
+			 * so we compromise on this copy...
+			 */
+			m_copydata(m, off, sizeof(th), (caddr_t)&th);
+			thp = &th;
+		} else
+			thp = (struct tcphdr *)(mtod(m, caddr_t) + off);
+		(void)in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,
+				    thp->th_dport, &ip6_tmp.ip6_src,
+				    thp->th_sport, cmd, notify);
+	} else {
+		(void)in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6, 0,
+				    &zeroin6_addr, 0, cmd, notify);
+	}
 }
 #endif
 
@@ -719,6 +807,9 @@ tcp_ctlinput(cmd, sa, v)
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 	int errno;
 
+	if (sa->sa_family != AF_INET)
+		return NULL;
+
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return NULL;
 	errno = inetctlerrmap[cmd];
@@ -726,37 +817,38 @@ tcp_ctlinput(cmd, sa, v)
 		notify = tcp_quench;
 	else if (PRC_IS_REDIRECT(cmd))
 		notify = in_rtchange, ip = 0;
+	else if (cmd == PRC_MSGSIZE && ip_mtudisc) {
+		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
+		/*
+		 * Verify that the packet in the icmp payload refers
+		 * to an existing TCP connection.
+		 */
+		if (in_pcblookup(&tcbtable,
+				 &ip->ip_dst, th->th_dport,
+				 &ip->ip_src, th->th_sport,
+				 INPLOOKUP_WILDCARD)) {
+			struct icmp *icp;
+			icp = (struct icmp *)((caddr_t)ip -
+					      offsetof(struct icmp, icmp_ip));
+
+			/* Calculate new mtu and create corresponding route */
+			icmp_mtudisc(icp);
+		}
+		notify = tcp_mtudisc, ip = 0;
+	} else if (cmd == PRC_MTUINC)
+		notify = tcp_mtudisc_increase, ip = 0;
 	else if (cmd == PRC_HOSTDEAD)
 		ip = 0;
 	else if (errno == 0)
 		return NULL;
 
-#ifdef INET6
-	if (sa->sa_family == AF_INET6) {
-		if (ip) {
-			struct ip6_hdr *ipv6 = (struct ip6_hdr *)ip;
-
-			th = (struct tcphdr *)(ipv6 + 1);
-#if 0 /*XXX*/
-			in6_pcbnotify(&tcbtable, sa, th->th_dport,
-			    &ipv6->ip6_src, th->th_sport, cmd, notify);
-#endif
-		} else {
-#if 0 /*XXX*/
-			in6_pcbnotify(&tcbtable, sa, 0,
-			    (struct in6_addr *)&in6addr_any, 0, cmd, notify);
-#endif
-		}
+	if (ip) {
+		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
+		in_pcbnotify(&tcbtable, sa, th->th_dport, ip->ip_src,
+			     th->th_sport, errno, notify);
 	} else
-#endif /* INET6 */
-	{
-		if (ip) {
-			th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-			in_pcbnotify(&tcbtable, sa, th->th_dport, ip->ip_src,
-			    th->th_sport, errno, notify);
-		} else
-			in_pcbnotifyall(&tcbtable, sa, errno, notify);
-	}
+		in_pcbnotifyall(&tcbtable, sa, errno, notify);
+
 	return NULL;
 }
 
@@ -773,6 +865,64 @@ tcp_quench(inp, errno)
 
 	if (tp)
 		tp->snd_cwnd = tp->t_maxseg;
+}
+
+/*
+ * On receipt of path MTU corrections, flush old route and replace it
+ * with the new one.  Retransmit all unacknowledged packets, to ensure
+ * that all packets will be received.
+ */
+void
+tcp_mtudisc(inp, errno)
+	struct inpcb *inp;
+	int errno;
+{
+	struct tcpcb *tp = intotcpcb(inp);
+	struct rtentry *rt = in_pcbrtentry(inp);
+
+	if (tp != 0) {
+		if (rt != 0) {
+			/*
+			 * If this was not a host route, remove and realloc.
+			 */
+			if ((rt->rt_flags & RTF_HOST) == 0) {
+				in_rtchange(inp, errno);
+				if ((rt = in_pcbrtentry(inp)) == 0)
+					return;
+			}
+
+			if (rt->rt_rmx.rmx_mtu != 0) {
+				/* also takes care of congestion window */
+				tcp_mss(tp, -1);
+			}
+		}
+
+		/*
+		 * Resend unacknowledged packets.
+		 */
+		tp->snd_nxt = tp->snd_una;
+		tcp_output(tp);
+	}
+}
+
+void
+tcp_mtudisc_increase(inp, errno)
+	struct inpcb *inp;
+	int errno;
+{
+	struct tcpcb *tp = intotcpcb(inp);
+	struct rtentry *rt = in_pcbrtentry(inp);
+
+	if (tp != 0 && rt != 0) {
+		/*
+		 * If this was a host route, remove and realloc.
+		 */
+		if (rt->rt_flags & RTF_HOST)
+			in_rtchange(inp, errno);
+		
+		/* also takes care of congestion window */
+		tcp_mss(tp, -1);
+	}
 }
 
 #ifdef TCP_SIGNATURE

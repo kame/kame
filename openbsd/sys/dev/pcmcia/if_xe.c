@@ -1,7 +1,7 @@
-/*	$OpenBSD: if_xe.c,v 1.14 2000/04/24 21:15:33 niklas Exp $	*/
+/*	$OpenBSD: if_xe.c,v 1.17 2000/10/16 17:08:08 aaron Exp $	*/
 
 /*
- * Copyright (c) 1999 Niklas Hallqvist, C Stone, Job de Haas
+ * Copyright (c) 1999 Niklas Hallqvist, Brandon Creighton, Job de Haas
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -408,7 +408,8 @@ xe_pcmcia_attach(parent, self, aux)
 	    xe_mediastatus);
 	DPRINTF(XED_MII | XED_CONFIG,
 	    ("bmsr %x\n", xe_mdi_read(&sc->sc_dev, 0, 1)));
-	mii_phy_probe(self, &sc->sc_mii, 0xffffffff);
+	mii_attach(self, &sc->sc_mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,
+	    0);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL)
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER | IFM_AUTO, 0,
 		    NULL);
@@ -462,12 +463,10 @@ xe_pcmcia_detach(dev, flags)
 	struct xe_pcmcia_softc *psc = (struct xe_pcmcia_softc *)dev;
 	struct xe_softc *sc = &psc->sc_xe;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	struct mii_softc *msc;
 	int rv = 0;
 
-	for (msc = LIST_FIRST(&sc->sc_mii.mii_phys); msc;
-	    msc = LIST_FIRST(&sc->sc_mii.mii_phys))
-		rv |= mii_detach(msc, flags);
+	mii_detach(&sc->sc_mii, MII_PHY_ANY, MII_OFFSET_ANY);
+	ifmedia_delete_instance(&sc->sc_mii.mii_media, IFM_INST_ANY);
 
 	pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
 	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
@@ -1138,6 +1137,7 @@ xe_start(ifp)
 	if (len < ETHER_MIN_LEN - ETHER_CRC_LEN)
 		pad = ETHER_MIN_LEN - ETHER_CRC_LEN - len;
 
+	PAGE(sc, 0);
 	space = bus_space_read_2(bst, bsh, offset + TSO0) & 0x7fff;
 	if (len + pad + 2 > space) {
 		DPRINTF(XED_FIFO,
@@ -1159,7 +1159,6 @@ xe_start(ifp)
 	 */
 	s = splhigh();
 
-	PAGE(sc, 0);
 	bus_space_write_2(bst, bsh, offset + TSO2, (u_int16_t)len + pad + 2);
 	bus_space_write_2(bst, bsh, offset + EDP, (u_int16_t)len + pad);
 	for (m = m0; m; ) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.5 2000/03/31 04:16:34 rahnds Exp $ */
+/*	$OpenBSD: intr.h,v 1.7 2000/07/07 13:22:42 rahnds Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom, Opsycon AB and RTMX Inc, USA.
@@ -137,7 +137,8 @@ set_sint(pending)
 #define splclock()	splraise(SPL_CLOCK|SINT_MASK)
 #define splimp()	splraise(imask[IPL_IMP])
 #define splstatclock()	splhigh()
-#define	splsoftclock()	spllower(SINT_CLOCK)
+#define	spllowersoftclock()	spllower(SINT_CLOCK)
+#define	splsoftclock()	splraise(SINT_CLOCK)
 #define	splsoftnet()	splraise(SINT_NET)
 #define	splsofttty()	splraise(SINT_TTY)
 
@@ -161,6 +162,9 @@ struct intrhand {
 	int     ih_irq;
 	char    *ih_what;
 };
+extern int ppc_configed_intr_cnt;
+#define MAX_PRECONF_INTR 16
+extern struct intrhand ppc_configed_intr[MAX_PRECONF_INTR];
 
 #endif /* _LOCORE */
 

@@ -1685,7 +1685,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_rw = rw;
 	uio.uio_resid = wanted;
-	uio.uio_procp = NULL;
+	uio.uio_procp = curproc;
 
 	/*
 	 * do the I/O!  (XXX: curproc?)
@@ -1734,7 +1734,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 		if (wanted && got == 0) {
 			result = EIO;		/* XXX: error? */
 		} else if (got < PAGE_SIZE * npages && rw == UIO_READ) {
-			bzero((void *) (kva + got),
+			memset((void *) (kva + got), 0,
 			      (npages << PAGE_SHIFT) - got);
 		}
 	}

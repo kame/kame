@@ -1,4 +1,4 @@
-/*	$OpenBSD: si.c,v 1.9 1999/01/11 05:12:02 millert Exp $	*/
+/*	$OpenBSD: si.c,v 1.13 2000/09/21 21:25:16 miod Exp $	*/
 /*	$NetBSD: si.c,v 1.31 1996/11/20 18:56:59 gwr Exp $	*/
 
 /*-
@@ -95,19 +95,17 @@
 #include <machine/obio.h>
 #include <machine/dvma.h>
 
+#ifndef DDB
+#define Debugger()
+#endif
+
 #define DEBUG XXX
 
 #include <dev/ic/ncr5380reg.h>
 #include <dev/ic/ncr5380var.h>
 
-#include "sireg.h"
-#include "sivar.h"
-
-/*
- * Transfers smaller than this are done using PIO
- * (on assumption they're not worth DMA overhead)
- */
-#define	MIN_DMA_LEN 128
+#include <sun3/dev/sireg.h>
+#include <sun3/dev/sivar.h>
 
 int si_debug = 0;
 #ifdef	DEBUG
@@ -179,6 +177,7 @@ si_attach(sc)
 	ncr_sc->sc_link.adapter_target = 7;
 	ncr_sc->sc_link.adapter = &si_ops;
 	ncr_sc->sc_link.device = &si_dev;
+	ncr_sc->sc_link.openings = 4;
 
 #ifdef	DEBUG
 	if (si_debug)
@@ -277,6 +276,8 @@ si_intr(void *arg)
 			}
 		}
 #endif
+		/* claim the interrupt anyways */
+		claimed = 1;
 	}
 
 	return (claimed);
@@ -365,8 +366,10 @@ si_dma_alloc(ncr_sc)
 	 * XXX - Should just segment these...
 	 */
 	if (xlen > MAX_DMA_LEN) {
+#ifdef DEBUG
 		printf("si_dma_alloc: excessive xlen=0x%x\n", xlen);
 		Debugger();
+#endif
 		ncr_sc->sc_datalen = xlen = MAX_DMA_LEN;
 	}
 

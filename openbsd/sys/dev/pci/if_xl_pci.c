@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_xl_pci.c,v 1.2 2000/04/18 03:52:36 jason Exp $	*/
+/*	$OpenBSD: if_xl_pci.c,v 1.7 2000/10/14 15:44:21 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -86,10 +86,19 @@
  */
 #define XL_USEIOSPACE
 
+#define XL_PCI_FUNCMEM		0x0018
+#define XL_PCI_INTR		0x0004
+#define XL_PCI_INTRACK		0x8000
+
 #include <dev/ic/xlreg.h>
 
-int xl_pci_match __P((struct device *, void *, void *));
-void xl_pci_attach __P((struct device *, struct device *, void *));
+int xl_pci_match	__P((struct device *, void *, void *));
+void xl_pci_attach	__P((struct device *, struct device *, void *));
+void xl_pci_intr_ack	__P((struct xl_softc *));
+
+struct cfattach xl_pci_ca = {
+	sizeof(struct xl_softc), xl_pci_match, xl_pci_attach,
+};
 
 int
 xl_pci_match(parent, match, aux)
@@ -120,6 +129,9 @@ xl_pci_match(parent, match, aux)
 	case PCI_PRODUCT_3COM_3C980CTX:
 	case PCI_PRODUCT_3COM_3C905CTX:
 	case PCI_PRODUCT_3COM_3C450:
+	case PCI_PRODUCT_3COM_3C555:
+	case PCI_PRODUCT_3COM_3C556:
+	case PCI_PRODUCT_3COM_3C556B:
 		return (1);
 	}
 					
@@ -141,6 +153,28 @@ xl_pci_attach(parent, self, aux)
 	u_int32_t command;
 
 	sc->xl_unit = sc->sc_dev.dv_unit;
+
+	sc->xl_flags = 0;
+
+	/* set flags required for 3Com MiniPCI adapters */
+	switch (PCI_PRODUCT(pa->pa_id)) {
+	case TC_DEVICEID_HURRICANE_555:
+		sc->xl_flags |= XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_8BITROM;
+		break;
+	case TC_DEVICEID_HURRICANE_556:
+		sc->xl_flags |= XL_FLAG_FUNCREG | XL_FLAG_PHYOK |
+		    XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_WEIRDRESET;
+		sc->xl_flags |= XL_FLAG_INVERT_LED_PWR|XL_FLAG_INVERT_MII_PWR;
+		sc->xl_flags |= XL_FLAG_8BITROM;
+		break;
+	case TC_DEVICEID_HURRICANE_556B:
+		sc->xl_flags |= XL_FLAG_FUNCREG | XL_FLAG_PHYOK |
+		    XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_WEIRDRESET;
+		sc->xl_flags |= XL_FLAG_INVERT_LED_PWR|XL_FLAG_INVERT_MII_PWR;
+		break;
+	default:
+		break;
+	}
 
 	/*
 	 * If this is a 3c905B, we have to check one extra thing.
@@ -230,6 +264,21 @@ xl_pci_attach(parent, self, aux)
 	sc->xl_btag = pa->pa_memt;
 #endif
 
+	if (sc->xl_flags & XL_FLAG_FUNCREG) {
+		if (pci_mem_find(pc, pa->pa_tag, XL_PCI_FUNCMEM, &iobase,
+		    &iosize, NULL)) {
+			printf(": can't find func space\n");
+			return;
+		}
+		if (bus_space_map(pa->pa_memt, iobase, iosize, 0,
+		    &sc->xl_funch)) {
+			printf(": can't map func space\n");
+			return;
+		}
+		sc->xl_funct = pa->pa_memt;
+		sc->intr_ack = xl_pci_intr_ack;
+	}
+
 	/*
 	 * Allocate our interrupt.
 	 */
@@ -253,6 +302,11 @@ xl_pci_attach(parent, self, aux)
 	xl_attach(sc);
 }
 
-struct cfattach xl_pci_ca = {
-	sizeof(struct xl_softc), xl_pci_match, xl_pci_attach,
-};
+
+void            
+xl_pci_intr_ack(sc)
+	struct xl_softc *sc;
+{
+	bus_space_write_4(sc->xl_funct, sc->xl_funch, XL_PCI_INTR,
+	    XL_PCI_INTRACK);
+}

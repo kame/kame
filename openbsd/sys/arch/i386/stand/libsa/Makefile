@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.36 1999/08/25 00:54:19 mickey Exp $
+#	$OpenBSD: Makefile,v 1.38 2000/10/25 17:12:07 mickey Exp $
 
 .include "${.CURDIR}/../Makefile.inc"
 
@@ -16,7 +16,7 @@ SRCS+=	machdep.c dev_i386.c exec_i386.c cmd_i386.c
 SRCS+=	unixdev.c unixsys.S nullfs.c memprobe.c
 CLEANFILES+=	gidt.o debug_i386.o alloca.o \
 	biosdev.o bioscons.o gateA20.o apmprobe.o \
-	memprobe.o diskprobe.o pciprobe.o smpprobe.o \
+	memprobe.o diskprobe.o smpprobe.o \
 	time.o
 .else
 SRCS+=	gidt.S debug_i386.S alloca.S \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.24 2000/04/19 09:58:20 art Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.28 2000/08/03 14:36:36 mickey Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*-
@@ -81,7 +81,7 @@ scheduler_start()
 	/*
 	 * We avoid polluting the global namespace by keeping the scheduler
 	 * timeouts static in this function.
-	 * We setup the timeouts here and kick rundrobin and schedcpu once to
+	 * We setup the timeouts here and kick roundrobin and schedcpu once to
 	 * make them do their job.
 	 */
 
@@ -101,19 +101,20 @@ roundrobin(arg)
 	void *arg;
 {
 	struct timeout *to = (struct timeout *)arg;
+	struct proc *p = curproc;
 	int s;
 
-	if (curproc != NULL) {
+	if (p != NULL) {
 		s = splstatclock();
-		if (curproc->p_schedflags & PSCHED_SEENRR) {
+		if (p->p_schedflags & PSCHED_SEENRR) {
 			/*
 			 * The process has already been through a roundrobin
 			 * without switching and may be hogging the CPU.
 			 * Indicate that the process should yield.
 			 */
-			curproc->p_schedflags |= PSCHED_SHOULDYIELD;
+			p->p_schedflags |= PSCHED_SHOULDYIELD;
 		} else {
-			curproc->p_schedflags |= PSCHED_SEENRR;
+			p->p_schedflags |= PSCHED_SEENRR;
 		}
 		splx(s);
 	}
@@ -566,10 +567,10 @@ unsleep(p)
  */
 void
 wakeup(ident)
-	register void *ident;
+	void *ident;
 {
-	register struct slpque *qp;
-	register struct proc *p, **q;
+	struct slpque *qp;
+	struct proc *p, **q;
 	int s;
 
 	s = splhigh();
@@ -591,18 +592,21 @@ restart:
 					updatepri(p);
 				p->p_slptime = 0;
 				p->p_stat = SRUN;
-				if (p->p_flag & P_INMEM)
-					setrunqueue(p);
+
 				/*
 				 * Since curpriority is a user priority,
 				 * p->p_priority is always better than
 				 * curpriority.
 				 */
-				if ((p->p_flag & P_INMEM) == 0)
-					wakeup((caddr_t)&proc0);
-				else
+
+				if ((p->p_flag & P_INMEM) != 0) {
+					setrunqueue(p);
 					need_resched();
+				} else {
+					wakeup((caddr_t)&proc0);
+				}
 				/* END INLINE EXPANSION */
+
 				goto restart;
 			}
 		} else
@@ -754,6 +758,7 @@ setrunnable(p)
 	case 0:
 	case SRUN:
 	case SZOMB:
+	case SDEAD:
 	default:
 		panic("setrunnable");
 	case SSTOP:
@@ -810,7 +815,7 @@ resetpriority(p)
  * queue will not change.  The cpu usage estimator ramps up quite quickly
  * when the process is running (linearly), and decays away exponentially, at
  * a rate which is proportionally slower when the system is busy.  The basic
- * principal is that the system will 90% forget that the process used a lot
+ * principle is that the system will 90% forget that the process used a lot
  * of CPU time in 5 * loadav seconds.  This causes the system to favor
  * processes which haven't run much recently, and to round-robin among other
  * processes.

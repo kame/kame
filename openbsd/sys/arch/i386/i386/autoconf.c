@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.31 2000/03/26 22:38:32 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.33 2000/08/17 20:15:39 mickey Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.20 1996/05/03 19:41:56 christos Exp $	*/
 
 /*-
@@ -61,8 +61,6 @@
 #include <machine/cpu.h>
 #include <machine/biosvar.h>
 
-#include <i386/pci/pcibios.h>
-
 #include <dev/cons.h>
 
 void rootconf __P((void));
@@ -86,14 +84,6 @@ configure()
 {
 
 	startrtclock();
-
-#ifdef BIOS32
-	bios32_init();
-#endif
-
-#ifdef PCIBIOS
-	pcibios_init();
-#endif
 
 	if (config_rootfound("mainbus", NULL) == NULL)
 		panic("configure: mainbus not configured");
@@ -378,7 +368,9 @@ noask:
 	}
 
 doswap:
+#ifndef DISKLESS
 	mountroot = dk_mountroot;
+#endif
 	swdevt[0].sw_dev = argdev = dumpdev =
 	    makedev(major(rootdev), minor(rootdev) + 1);
 	/* swap size and dumplo set during autoconfigure */

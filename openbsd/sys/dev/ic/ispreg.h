@@ -1,10 +1,9 @@
-/*	$OpenBSD: ispreg.h,v 1.7 2000/02/20 21:22:41 mjacob Exp $ */
+/*	$OpenBSD: ispreg.h,v 1.9 2000/10/16 01:02:01 mjacob Exp $ */
 /*
  * Machine Independent (well, as best as possible) register
  * definitions for Qlogic ISP SCSI adapters.
  *
- * Copyright (c) 1997, 1998, 1999 by Matthew Jacob
- * NASA/Ames Research Center
+ * Copyright (c) 1997, 1998, 1999, 2000 by Matthew Jacob
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -13,10 +12,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice immediately at the beginning of the file, without modification,
  *    this list of conditions, and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
+ * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
@@ -78,6 +74,9 @@
 /* Bless me! Chip designers have putzed it again! */
 #define	ISP1080_DMA_REGS_OFF		0x60
 #define	DMA_REGS_OFF			0x00	/* same as BIU block */
+
+#define	SBUS_REGSIZE			0x450
+#define	PCI_REGSIZE			0x100
 
 /*
  * NB:	The *_BLOCK definitions have no specific hardware meaning.
@@ -225,6 +224,9 @@
 #define	INT_PENDING(isp, isr)	(IS_FC(isp)? \
 	((isr & BIU2100_ISR_RISC_INT) != 0) : ((isr & BIU_ISR_RISC_INT) != 0))
 
+#define	INT_PENDING_MASK(isp)	\
+	(IS_FC(isp)? BIU2100_ISR_RISC_INT: BIU_ISR_RISC_INT)
+
 /* BUS SEMAPHORE REGISTER */
 #define	BIU_SEMA_STATUS		0x0002	/* Semaphore Status Bit */
 #define	BIU_SEMA_LOCK  		0x0001	/* Semaphore Lock Bit */
@@ -337,10 +339,15 @@
 #define	OUTMAILBOX6	(MBOX_BLOCK+0xC)
 #define	OUTMAILBOX7	(MBOX_BLOCK+0xE)
 
-#define	OMBOX_OFFN(n)	(MBOX_BLOCK + (n * 2))
+#define	MBOX_OFF(n)	(MBOX_BLOCK + ((n) << 1))
 #define	NMBOX(isp)	\
 	(((((isp)->isp_type & ISP_HA_SCSI) >= ISP_HA_SCSI_1040A) || \
 	 ((isp)->isp_type & ISP_HA_FC))? 8 : 6)
+#define	NMBOX_BMASK(isp)	\
+	(((((isp)->isp_type & ISP_HA_SCSI) >= ISP_HA_SCSI_1040A) || \
+	 ((isp)->isp_type & ISP_HA_FC))? 0xff : 0x3f)
+
+#define	MAX_MAILBOX	8
 
 /*
  * SXP Block Register Offsets
@@ -699,26 +706,26 @@
 
 /* Offset 5 */
 /*
-	uint8_t bios_configuration_mode     :2;
-	uint8_t bios_disable                :1;
-	uint8_t selectable_scsi_boot_enable :1;
-	uint8_t cd_rom_boot_enable          :1;
-	uint8_t disable_loading_risc_code   :1;
-	uint8_t enable_64bit_addressing     :1;
-	uint8_t unused_7                    :1;
+	u_int8_t bios_configuration_mode     :2;
+	u_int8_t bios_disable                :1;
+	u_int8_t selectable_scsi_boot_enable :1;
+	u_int8_t cd_rom_boot_enable          :1;
+	u_int8_t disable_loading_risc_code   :1;
+	u_int8_t enable_64bit_addressing     :1;
+	u_int8_t unused_7                    :1;
  */
 
 /* Offsets 6, 7 */
 /*
-        uint8_t boot_lun_number    :5;
-        uint8_t scsi_bus_number    :1;
-        uint8_t unused_6           :1;
-        uint8_t unused_7           :1;
-        uint8_t boot_target_number :4;
-        uint8_t unused_12          :1;
-        uint8_t unused_13          :1;
-        uint8_t unused_14          :1;
-        uint8_t unused_15          :1;
+        u_int8_t boot_lun_number    :5;
+        u_int8_t scsi_bus_number    :1;
+        u_int8_t unused_6           :1;
+        u_int8_t unused_7           :1;
+        u_int8_t boot_target_number :4;
+        u_int8_t unused_12          :1;
+        u_int8_t unused_13          :1;
+        u_int8_t unused_14          :1;
+        u_int8_t unused_15          :1;
  */
 
 #define	ISP1080_NVRAM_HBA_ENABLE(c)			ISPBSMX(c, 16, 3, 0x01)
@@ -887,7 +894,7 @@
 #define	ISP2100_NVRAM_RETRY_COUNT(c)		(c)[16]
 #define	ISP2100_NVRAM_RETRY_DELAY(c)		(c)[17]
 
-#define	ISP2100_NVRAM_NODE_NAME(c)	(\
+#define	ISP2100_NVRAM_PORT_NAME(c)	(\
 		(((u_int64_t)(c)[18]) << 56) | \
 		(((u_int64_t)(c)[19]) << 48) | \
 		(((u_int64_t)(c)[20]) << 40) | \
@@ -896,7 +903,18 @@
 		(((u_int64_t)(c)[23]) << 16) | \
 		(((u_int64_t)(c)[24]) <<  8) | \
 		(((u_int64_t)(c)[25]) <<  0))
+
 #define	ISP2100_NVRAM_HARDLOOPID(c)		(c)[26]
+
+#define	ISP2100_NVRAM_NODE_NAME(c)	(\
+		(((u_int64_t)(c)[30]) << 56) | \
+		(((u_int64_t)(c)[31]) << 48) | \
+		(((u_int64_t)(c)[32]) << 40) | \
+		(((u_int64_t)(c)[33]) << 32) | \
+		(((u_int64_t)(c)[34]) << 24) | \
+		(((u_int64_t)(c)[35]) << 16) | \
+		(((u_int64_t)(c)[36]) <<  8) | \
+		(((u_int64_t)(c)[37]) <<  0))
 
 #define	ISP2100_NVRAM_HBA_OPTIONS(c)		(c)[70]
 #define	ISP2100_NVRAM_HBA_DISABLE(c)		ISPBSMX(c, 70, 0, 0x01)

@@ -1,4 +1,4 @@
-	$OpenBSD: syscalls.master,v 1.26 1999/10/07 17:23:53 brad Exp $
+	$OpenBSD: syscalls.master,v 1.30 2000/08/23 19:31:35 fgsch Exp $
 ;	$NetBSD: syscalls.master,v 1.17 1996/02/10 17:12:51 christos Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
@@ -245,7 +245,7 @@
 146	UNIMPL		yield
 147	UNIMPL		lwp_sema_wait
 148	UNIMPL		lwp_sema_post
-149	UNIMPL
+149	UNIMPL		lwp_sema_trywait
 150	UNIMPL
 151	UNIMPL
 152	UNIMPL		modctl
@@ -318,14 +318,20 @@
 206	UNIMPL		schedctl
 207	UNIMPL		pset
 208	UNIMPL
-209	UNIMPL
+209	UNIMPL		resolvepath
 210	UNIMPL		signotifywait
 211	UNIMPL		lwp_sigredirect
 212	UNIMPL		lwp_alarm
-213	UNIMPL		getdents64
-214	UNIMPL		mmap64
-215	UNIMPL		stat64
-216	UNIMPL		lstat64
+213	STD		{ int svr4_sys_getdents64(int fd, \
+			    struct svr4_dirent64 *dp, \
+			    int nbytes); }
+214 	STD		{ int svr4_sys_mmap64(svr4_caddr_t addr, \
+			    svr4_size_t len, int prot, int flags, int fd, \
+			    svr4_off64_t pos); }
+215	STD		{ int svr4_sys_stat64(const char *path, \
+			    struct svr4_stat64 *sb); }
+216	STD		{ int svr4_sys_lstat64(const char *path, \
+			    struct svr4_stat64 *sb); }
 217	STD		{ int svr4_sys_fstat64(int fd, \
 			    struct svr4_stat64 *sb); }
 218	UNIMPL		statvfs64
@@ -333,9 +339,11 @@
                             struct svr4_statvfs64 *fs); }
 220	UNIMPL		setrlimit64
 221	UNIMPL		getrlimit64
-222	UNIMPL		pread64
-223	UNIMPL		pwrite64
-224	UNIMPL		creat64
+222	STD		{ ssize_t svr4_sys_pread64(int fd, void *buf, \
+			    size_t nbyte, svr4_off64_t off); }
+223	STD		{ ssize_t svr4_sys_pwrite64(int fd, const void *buf, \
+			    size_t nbyte, svr4_off64_t off); }
+224 	STD		{ int svr4_sys_creat64(char *path, int mode); }
 225	STD		{ int svr4_sys_open64(char *path, int flags, \
 			    int mode); }
 226	UNIMPL		rpcsys

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_var.h,v 1.10 2000/02/07 04:48:42 assar Exp $	*/
+/*	$OpenBSD: nfs_var.h,v 1.12 2000/06/30 01:06:02 art Exp $	*/
 /*	$NetBSD: nfs_var.h,v 1.3 1996/02/18 11:53:54 fvdl Exp $	*/
 
 /*
@@ -273,7 +273,6 @@ int nfsm_disct __P((struct mbuf **, caddr_t *, int, int, caddr_t *));
 int nfs_adv __P((struct mbuf **, caddr_t *, int, int));
 int nfsm_strtmbuf __P((struct mbuf **, char **, char *, long));
 int nfs_vfs_init __P((struct vfsconf *));
-void nfs_init __P((void));
 int nfs_loadattrcache __P((struct vnode **, struct mbuf **, caddr_t *,
 			   struct vattr *));
 int nfs_getattrcache __P((struct vnode *, struct vattr *));
@@ -305,6 +304,8 @@ void nfsrv_zapsock __P((struct nfssvc_sock *));
 void nfsrv_slpderef __P((struct nfssvc_sock *));
 void nfsrv_init __P((int));
 int nfssvc_iod __P((struct proc *));
+void start_nfsio __P((void *));
+void nfs_getset_niothreads __P((int));
 int nfs_getauth __P((struct nfsmount *, struct nfsreq *, struct ucred *,
 		     char **, int *, char *, int *, NFSKERBKEY_T));
 int nfs_getnickauth __P((struct nfsmount *, struct ucred *, char **, int *,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.12 1999/09/14 11:41:18 kstailey Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.15 2000/06/08 22:25:17 niklas Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.21 1996/11/13 21:13:15 cgd Exp $	*/
 
 /*
@@ -31,6 +31,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -116,8 +117,6 @@ cpu_exit(p)
 	if (p == fpcurproc)
 		fpcurproc = NULL;
 
-	vmspace_free(p->p_vmspace);
-
 	(void) splhigh();
 	switch_exit(p);
 	/* NOTREACHED */
@@ -157,7 +156,7 @@ cpu_fork(p1, p2, stack, stacksize)
 #else
 	p2->p_md.md_pcbpaddr = (void *)vtophys((vm_offset_t)&up->u_pcb);
 	printf("process %d pcbpaddr = 0x%lx, pmap = %p\n",
-	    p2->p_pid, p2->p_md.md_pcbpaddr, &p2->p_vmspace->vm_pmap);
+	    p2->p_pid, p2->p_md.md_pcbpaddr,&p2->p_vmspace->vm_map.pmap);
 #endif
 
 	/*

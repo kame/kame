@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.32 2000/01/17 06:51:58 mickey Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.35 2000/08/15 20:22:10 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2000 Michael Shalayeff
@@ -181,8 +181,6 @@ int pmapdebug = 0
 #endif
 
 vaddr_t	virtual_steal, virtual_avail, virtual_end;
-
-long equiv_end = 0;
 
 struct pmap	kernel_pmap_store;
 pmap_t		kernel_pmap;
@@ -728,6 +726,7 @@ pmap_bootstrap(vstart, vend)
 	*vstart = hppa_round_page(addr + (totalphysmem - physmem) *
 				  (sizeof(struct pv_entry) * maxproc / 8 +
 				   sizeof(struct vm_page)));
+	/* XXX PCXS needs two separate inserts in separate btlbs */
 	if (btlb_insert(kernel_pmap->pmap_space, 0, 0, vstart,
 			kernel_pmap->pmap_pid |
 			pmap_prot(kernel_pmap, VM_PROT_ALL)) < 0)
@@ -1607,18 +1606,6 @@ pmap_kremove(va, size)
 	vsize_t size;
 {
 	pmap_remove(kernel_pmap, va, va + size);
-}
-
-int
-kvtop(va)
-	caddr_t va;
-{
-	if ((vaddr_t)va < virtual_avail)
-		return (int)va;
-	else if ((vaddr_t)va >= HPPA_IOBEGIN)
-		return (int)va;
-	else
-		return (int)pmap_extract(pmap_kernel(), (vaddr_t)va);
 }
 
 #if defined(PMAPDEBUG) && defined(DDB)

@@ -1,5 +1,5 @@
 /*	$OpenBSD$	*/
-/*	$NetBSD: if_ray.c,v 1.19 2000/04/22 22:36:14 thorpej Exp $	*/
+/*	$NetBSD: if_ray.c,v 1.21 2000/07/05 02:35:54 onoe Exp $	*/
 
 /*
  * Copyright (c) 2000 Christian E. Hopps
@@ -51,18 +51,21 @@
  *	Given the nature of the buggy build 4 firmware there may be problems.
  */
 
-#ifdef __NetBSD__
-#include "opt_inet.h"
-#endif
+/* Authentication added by Steve Weiss <srw@alum.mit.edu> based on advice
+ * received by Corey Thomas, author of the Linux driver for this device.
+ * Authentication currently limited to adhoc networks, and was added to
+ * support a requirement of the newest windows drivers, so that 
+ * interoperability the windows will remain possible. 
+ *
+ * Tested with Win98 using Aviator 2.4 Pro cards, firmware 5.63, 
+ * but no access points for infrastructure.    (July 13, 2000 -srw)
+ */
+
 #include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
-#include <sys/callout.h>
-#elif defined(__OpenBSD__)
 #include <sys/timeout.h>
-#endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -73,9 +76,6 @@
 
 #include <net/if.h>
 #include <net/if_dl.h>
-#ifdef __NetBSD__
-#include <net/if_ether.h>
-#endif
 #include <net/if_media.h>
 #include <net/if_llc.h>
 
@@ -84,11 +84,7 @@
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
-#ifdef __NetBSD__
-#include <netinet/if_inarp.h>
-#elif defined(__OpenBSD__)
 #include <netinet/if_ether.h>
-#endif
 #endif
 
 #include <net/if_ieee80211.h>	/* here, since ETHER_ADDR_LEN is in netinet */
@@ -126,7 +122,7 @@
 
 #define RAY_USE_AMEM 0
 
-/* #define	RAY_DEBUG */
+/*#define	RAY_DEBUG*/
 
 #ifndef	RAY_PID_COUNTRY_CODE_DEFAULT
 #define	RAY_PID_COUNTRY_CODE_DEFAULT	RAY_PID_COUNTRY_CODE_USA
@@ -179,11 +175,7 @@
 
 struct ray_softc {
 	struct device	sc_dev;
-#ifdef __NetBSD__
-	struct ethercom	sc_ec;
-#elif defined(__OpenBSD__)
 	struct arpcom sc_ec;
-#endif
 	struct ifmedia	sc_media;
 
 	struct pcmcia_function		*sc_pf;
@@ -196,16 +188,11 @@ struct ray_softc {
 	void				*sc_ih;
 	void				*sc_sdhook;
 	void				*sc_pwrhook;
-	int				sc_resumeinit;
+	int				sc_flags;
+#define	RAY_FLAGS_RESUMEINIT	0x01
+#define	RAY_FLAGS_ATTACHED	0x02
 	int				sc_resetloop;
 
-#ifdef __NetBSD__
-	struct callout			sc_check_ccs_ch;
-	struct callout			sc_check_scheduled_ch;
-	struct callout			sc_reset_resetloop_ch;
-	struct callout			sc_disable_ch;
-	struct callout			sc_start_join_timo_ch;
-#elif defined(__OpenBSD__)
 	struct timeout			sc_check_ccs_ch;
 	struct timeout			sc_check_scheduled_ch;
 	struct timeout			sc_reset_resetloop_ch;
@@ -213,7 +200,6 @@ struct ray_softc {
 	struct timeout			sc_start_join_timo_ch;
 #define	callout_stop	timeout_del
 #define	callout_reset(t,n,f,a)	timeout_add((t), (n))
-#endif
 
 	struct ray_ecf_startup		sc_ecf_startup;
 	struct ray_startup_params_head	sc_startup;
@@ -226,8 +212,9 @@ struct ray_softc {
 	u_int		sc_txfree;	/* a free count for efficiency */
 
 	u_int8_t	sc_bssid[ETHER_ADDR_LEN];	/* current net values */
-	u_int8_t	sc_cnwid[IEEE80211_NWID_LEN];	/* last nwid */
-	u_int8_t	sc_dnwid[IEEE80211_NWID_LEN];	/* desired nwid */
+	u_int8_t	sc_authid[ETHER_ADDR_LEN];	/* id of authenticating station */
+	struct ieee80211_nwid	sc_cnwid;	/* last nwid */
+	struct ieee80211_nwid	sc_dnwid;	/* desired nwid */
 	u_int8_t	sc_omode;	/* old operating mode SC_MODE_xx */
 	u_int8_t	sc_mode;	/* current operating mode SC_MODE_xx */
 	u_int8_t	sc_countrycode;	/* current country code */
@@ -236,7 +223,7 @@ struct ray_softc {
 	bus_size_t	sc_txpad;	/* tib size plus "phy" size */
 	u_int8_t	sc_deftxrate;	/* default transfer rate */
 	u_int8_t	sc_encrypt;
-
+	u_int8_t	sc_authstate;	/* authentication state */
 
 	int		sc_promisc;	/* current set value */
 	int		sc_running;	/* things we are doing */
@@ -267,13 +254,9 @@ struct ray_softc {
 #define	sc_startup_5	sc_u.u_params_5
 #define	sc_version	sc_ecf_startup.e_fw_build_string
 #define	sc_tibsize	sc_ecf_startup.e_tib_size
-#ifdef __NetBSD__
-#define	sc_if		sc_ec.ec_if
-#elif defined(__OpenBSD__)
 #define	sc_if		sc_ec.ac_if
 #define	ec_multicnt	ac_multicnt
 #define	memmove		memcpy		/* XXX */
-#endif
 #define	sc_xname	sc_dev.dv_xname
 
 /* modes of operation */
@@ -313,7 +296,17 @@ typedef	void (*ray_cmd_func_t)(struct ray_softc *);
 #define	SC_BUILD_5	0x5
 #define	SC_BUILD_4	0x55
 
+/* values for sc_authstate */
+#define RAY_AUTH_UNAUTH (0)
+#define RAY_AUTH_WAITING (1)
+#define RAY_AUTH_AUTH (2)
+#define RAY_AUTH_NEEDED (3)
 
+#define OPEN_AUTH_REQUEST (1)
+#define OPEN_AUTH_RESPONSE (2)
+#define BROADCAST_DEAUTH (0xc0)
+
+/* prototypes */
 int ray_alloc_ccs __P((struct ray_softc *, bus_size_t *, u_int, u_int));
 bus_size_t ray_fill_in_tx_ccs __P((struct ray_softc *, size_t, u_int, u_int));
 void ray_attach __P((struct device *, struct device *, void *));
@@ -346,9 +339,11 @@ void ray_media_status __P((struct ifnet *, struct ifmediareq *));
 void ray_power __P((int, void *));
 ray_cmd_func_t ray_rccs_intr __P((struct ray_softc *, bus_size_t));
 void ray_recv __P((struct ray_softc *, bus_size_t));
+void ray_recv_auth __P((struct ray_softc *,struct ieee80211_frame*));
 void ray_report_params __P((struct ray_softc *));
 void ray_reset __P((struct ray_softc *));
 void ray_reset_resetloop __P((void *));
+int ray_send_auth __P((struct ray_softc *, u_int8_t *, u_int8_t));
 void ray_set_pending __P((struct ray_softc *, u_int));
 void ray_shutdown __P((void *));
 int ray_simple_cmd __P((struct ray_softc *, u_int, u_int));
@@ -370,26 +365,21 @@ int ray_user_report_params __P((struct ray_softc *,
 int ray_user_update_params __P((struct ray_softc *,
     struct ray_param_req *));
 
-#ifdef __NetBSD__
-void ray_write_region __P((struct ray_softc *,bus_size_t,void *,size_t));
-void ray_read_region __P((struct ray_softc *, bus_size_t,void *,size_t));
-#elif defined(__OpenBSD__)
 #define	ray_read_region(sc,off,p,c) \
 	bus_space_read_region_1((sc)->sc_memt, (sc)->sc_memh, (off), (p), (c))
 #define	ray_write_region(sc,off,p,c) \
 	bus_space_write_region_1((sc)->sc_memt, (sc)->sc_memh, (off), (p), (c))
-#endif
 
 #ifdef RAY_DO_SIGLEV
 void ray_update_siglev __P((struct ray_softc *, u_int8_t *, u_int8_t));
 #endif
 
 #ifdef RAY_DEBUG
-int ray_debug = 1;
-int ray_debug_xmit_sum = 1;
-int ray_debug_dump_desc = 1;
-int ray_debug_dump_rx = 1;
-int ray_debug_dump_tx = 1;
+int ray_debug = 0;
+int ray_debug_xmit_sum = 0;
+int ray_debug_dump_desc = 0;
+int ray_debug_dump_rx = 0;
+int ray_debug_dump_tx = 0;
 struct timeval rtv, tv1, tv2, *ttp, *ltp;
 #define	RAY_DPRINTF(x)	do { if (ray_debug) {	\
 	struct timeval *tmp;			\
@@ -506,11 +496,9 @@ static const ray_cmd_func_t ray_subcmdtab[] = {
 };
 static const int ray_nsubcmdtab = sizeof(ray_subcmdtab) / sizeof(*ray_subcmdtab);
 
-#ifdef __OpenBSD__
 struct cfdriver ray_cd = {
 	NULL, "ray", DV_IFNET
 };
-#endif
 
 /* autoconf information */
 struct cfattach ray_ca = {
@@ -554,9 +542,6 @@ ray_attach(parent, self, aux)
 	struct ray_softc *sc;
 	struct ifnet *ifp;
 	bus_addr_t memoff;
-#ifdef __NetBSD__
-	char devinfo[256];
-#endif
 
 	pa = aux;
 	sc = (struct ray_softc *)self;
@@ -567,13 +552,7 @@ ray_attach(parent, self, aux)
 	sc->sc_awindow = -1;
 #endif
 
-#ifdef __NetBSD__
-	/* Print out what we are */
-	pcmcia_devinfo(&pa->pf->sc->card, 0, devinfo, sizeof devinfo);
-	printf(": %s\n", devinfo);
-#elif defined(__OpenBSD__)
 	printf("\n");
-#endif
 
 	/* enable the card */
 	pcmcia_function_init(sc->sc_pf, sc->sc_pf->cfe_head.sqh_first);
@@ -640,32 +619,30 @@ ray_attach(parent, self, aux)
 	/*
 	 * set the parameters that will survive stop/init
 	 */
-	memset(sc->sc_cnwid, 0, sizeof(sc->sc_cnwid));
-	memset(sc->sc_dnwid, 0, sizeof(sc->sc_dnwid));
-	strncpy(sc->sc_dnwid, RAY_DEF_NWID, sizeof(sc->sc_dnwid));
-	strncpy(sc->sc_cnwid, RAY_DEF_NWID, sizeof(sc->sc_dnwid));
+	memset(&sc->sc_dnwid, 0, sizeof(sc->sc_dnwid));
+	sc->sc_dnwid.i_len = strlen(RAY_DEF_NWID);
+	if (sc->sc_dnwid.i_len > IEEE80211_NWID_LEN)
+		sc->sc_dnwid.i_len = IEEE80211_NWID_LEN;
+	if (sc->sc_dnwid.i_len > 0)
+		memcpy(sc->sc_dnwid.i_nwid, RAY_DEF_NWID, sc->sc_dnwid.i_len);
+	memcpy(&sc->sc_cnwid, &sc->sc_dnwid, sizeof(sc->sc_cnwid));
 	sc->sc_omode = sc->sc_mode = RAY_MODE_DEFAULT;
-	sc->sc_countrycode = sc->sc_dcountrycode = RAY_PID_COUNTRY_CODE_DEFAULT;
-	sc->sc_resumeinit = 0;
+	sc->sc_countrycode = sc->sc_dcountrycode =
+	    RAY_PID_COUNTRY_CODE_DEFAULT;
+	sc->sc_flags &= ~RAY_FLAGS_RESUMEINIT;
 
-#ifdef __NetBSD__
-	callout_init(&sc->sc_check_ccs_ch);
-	callout_init(&sc->sc_check_scheduled_ch);
-	callout_init(&sc->sc_reset_resetloop_ch);
-	callout_init(&sc->sc_disable_ch);
-	callout_init(&sc->sc_start_join_timo_ch);
-#elif defined(__OpenBSD__)
 	timeout_set(&sc->sc_check_ccs_ch, ray_check_ccs, sc);
 	timeout_set(&sc->sc_check_scheduled_ch, ray_check_scheduled, sc);
 	timeout_set(&sc->sc_reset_resetloop_ch, ray_reset_resetloop, sc);
 	timeout_set(&sc->sc_disable_ch, (void (*)(void *))ray_disable, sc);
 	timeout_set(&sc->sc_start_join_timo_ch, ray_start_join_timo, sc);
-#endif
+
 	/*
 	 * attach the interface
 	 */
 	/* The version isn't the most accurate way, but it's easy. */
-	printf("%s: firmware version %d\n", sc->sc_dev.dv_xname,sc->sc_version);
+	printf("%s: firmware version %d\n", sc->sc_dev.dv_xname,
+	    sc->sc_version);
 	if (sc->sc_version != SC_BUILD_4)
 		printf("%s: supported rates %0x:%0x:%0x:%0x:%0x:%0x:%0x:%0x\n",
 		    sc->sc_xname, ep->e_rates[0], ep->e_rates[1],
@@ -681,12 +658,9 @@ ray_attach(parent, self, aux)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST;
 	if_attach(ifp);
-#ifdef __NetBSD__
-	ether_ifattach(ifp, ep->e_station_addr);
-#elif defined(__OpenBSD__)
 	memcpy(&sc->sc_ec.ac_enaddr, ep->e_station_addr, ETHER_ADDR_LEN);
 	ether_ifattach(ifp);
-#endif
+
 	/* need enough space for ieee80211_header + (snap or e2) */
 	ifp->if_hdrlen =
 	    sizeof(struct ieee80211_frame) + sizeof(struct ether_header);
@@ -708,6 +682,8 @@ ray_attach(parent, self, aux)
 	sc->sc_sdhook = shutdownhook_establish(ray_shutdown, sc);
 	sc->sc_pwrhook = powerhook_establish(ray_power, sc);
 
+	/* The attach is successful. */
+	sc->sc_flags |= RAY_FLAGS_ATTACHED;
 	return;
 fail:
 	/* disable the card */
@@ -734,29 +710,30 @@ ray_activate(dev, act)
 	struct ray_softc *sc = (struct ray_softc *)dev;
 	struct ifnet *ifp = &sc->sc_if;
 	int s;
-	int rv = 0;
 
 	RAY_DPRINTF(("%s: activate\n", sc->sc_xname));
 
 	s = splnet();
 	switch (act) {
 	case DVACT_ACTIVATE:
-		rv = EOPNOTSUPP;
+		pcmcia_function_enable(sc->sc_pf);
+		printf("%s:", sc->sc_dev.dv_xname);
+		ray_enable(sc);
+		printf("\n");
 		break;
 
 	case DVACT_DEACTIVATE:
 		if (ifp->if_flags & IFF_RUNNING)
 			ray_disable(sc);
-#ifdef __NetBSD__
-		if_deactivate(ifp);
-#elif defined(__OpenBSD__)
-		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
+		if (sc->sc_ih) {
+			pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
+			sc->sc_ih = NULL;
+		}
 		pcmcia_function_disable(sc->sc_pf);
-#endif
 		break;
 	}
 	splx(s);
-	return (rv);
+	return (0);
 }
 
 int
@@ -770,6 +747,10 @@ ray_detach(self, flags)
 	sc = (struct ray_softc *)self;
 	ifp = &sc->sc_if;
 	RAY_DPRINTF(("%s: detach\n", sc->sc_xname));
+
+	/* Succeed now if there is no work to do. */
+	if ((sc->sc_flags & RAY_FLAGS_ATTACHED) == 0)
+	    return (0);
 
 	if (ifp->if_flags & IFF_RUNNING)
 		ray_disable(sc);
@@ -788,9 +769,6 @@ ray_detach(self, flags)
 
 	ifmedia_delete_instance(&sc->sc_media, IFM_INST_ANY);
 
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);
 	powerhook_disestablish(sc->sc_pwrhook);
@@ -841,7 +819,7 @@ ray_disable(sc)
 
 	if (sc->sc_ih)
 		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
-	sc->sc_ih = 0;
+	sc->sc_ih = NULL;
 }
 
 /*
@@ -877,7 +855,8 @@ ray_init(sc)
 	sc->sc_running = 0;
 	sc->sc_txfree = RAY_CCS_NTX;
 	sc->sc_checkcounters = 0;
-	sc->sc_resumeinit = 0;
+	sc->sc_flags &= RAY_FLAGS_RESUMEINIT;
+	sc->sc_authstate = RAY_AUTH_UNAUTH;
 
 	/* get startup results */
 	ep = &sc->sc_ecf_startup;
@@ -999,13 +978,13 @@ ray_power(why, arg)
 	sc = arg;
 	switch (why) {
 	case PWR_RESUME:
-		if (sc->sc_resumeinit)
+		if ((sc->sc_flags & RAY_FLAGS_RESUMEINIT))
 			ray_init(sc);
 		break;
 	case PWR_SUSPEND:
 		if ((sc->sc_if.if_flags & IFF_RUNNING)) {
 			ray_stop(sc);
-			sc->sc_resumeinit = 1;
+			sc->sc_flags |= RAY_FLAGS_RESUMEINIT;
 		}
 		break;
 	case PWR_STANDBY:
@@ -1031,12 +1010,12 @@ ray_ioctl(ifp, cmd, data)
 	u_long cmd;
 	caddr_t data;
 {
-	u_int8_t nwid[IEEE80211_NWID_LEN];
+	struct ieee80211_nwid nwid;
 	struct ray_param_req pr;
 	struct ray_softc *sc;
 	struct ifreq *ifr;
 	struct ifaddr *ifa;
-	int error, error2, s;
+	int error, error2, s, i;
 
 	sc = ifp->if_softc;
 	error = 0;
@@ -1048,12 +1027,10 @@ ray_ioctl(ifp, cmd, data)
 	RAY_DPRINTF(("%s: ioctl: cmd 0x%lx data 0x%lx\n", ifp->if_xname,
 	    cmd, (long)data));
 
-#ifdef __OpenBSD__
 	if ((error = ether_ioctl(ifp, &sc->sc_ec, cmd, data)) > 0) {
 		splx(s);
 		return error;
 	}
-#endif
 
 	switch (cmd) {
 	case SIOCSIFADDR:
@@ -1066,11 +1043,7 @@ ray_ioctl(ifp, cmd, data)
 		switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
 		case AF_INET:
-#ifdef __NetBSD__
-			arp_ifinit(&sc->sc_if, ifa);
-#elif defined(__OpenBSD__)
 			arp_ifinit(&sc->sc_ec, ifa);
-#endif
 			break;
 #endif
 		default:
@@ -1138,24 +1111,31 @@ ray_ioctl(ifp, cmd, data)
 		error = error2 ? error2 : error;
 		break;
 	case SIOCS80211NWID:
-		RAY_DPRINTF(("%s: ioctl: cmd SIOCSNWID\n", ifp->if_xname));
+		RAY_DPRINTF(("%s: ioctl: cmd SIOCS80211NWID\n", ifp->if_xname));
 		/*
 		 * if later people overwrite thats ok -- the latest version
 		 * will always get start/joined even if it was set by
 		 * a previous command
 		 */
-		if ((error = copyin(ifr->ifr_data, nwid, sizeof(nwid))))
+		if ((error = copyin(ifr->ifr_data, &nwid, sizeof(nwid))))
 			break;
-		if (!memcmp(sc->sc_dnwid, nwid, sizeof(nwid)))
+		if (nwid.i_len > IEEE80211_NWID_LEN) {
+			error = EINVAL;
 			break;
-		memcpy(sc->sc_dnwid, nwid, sizeof(nwid));
+		}
+		/* clear trailing garbages */
+		for (i = nwid.i_len; i < IEEE80211_NWID_LEN; i++)
+			nwid.i_nwid[i] = 0;
+		if (!memcmp(&sc->sc_dnwid, &nwid, sizeof(nwid)))
+			break;
+		memcpy(&sc->sc_dnwid, &nwid, sizeof(nwid));
 		if (ifp->if_flags & IFF_RUNNING)
 			ray_start_join_net(sc);
 		break;
 	case SIOCG80211NWID:
-		RAY_DPRINTF(("%s: ioctl: cmd SIOCHNWID\n", ifp->if_xname));
-		error = copyout(sc->sc_cnwid, ifr->ifr_data,
-		    IEEE80211_NWID_LEN);
+		RAY_DPRINTF(("%s: ioctl: cmd SIOCG80211NWID\n", ifp->if_xname));
+		error = copyout(&sc->sc_cnwid, ifr->ifr_data,
+		    sizeof(sc->sc_cnwid));
 		break;
 #ifdef RAY_DO_SIGLEV
 		error = copyout(sc->sc_siglevs, ifr->ifr_data,
@@ -1253,11 +1233,15 @@ ray_intr_start(sc)
 
 	ray_cmd_cancel(sc, SCP_IFSTART);
 
-	if ((ifp->if_flags & IFF_RUNNING) == 0 || !sc->sc_havenet)
+	if ((ifp->if_flags & IFF_RUNNING) == 0 || !sc->sc_havenet) {
+		RAY_DPRINTF(("%s: nonet.\n",ifp->if_xname));
 		return;
+	}
 
-	if (ifp->if_snd.ifq_len == 0)
+	if (ifp->if_snd.ifq_len == 0) {
+		RAY_DPRINTF(("%s: nothing to send.\n",ifp->if_xname));
 		return;
+	}
 
 	firsti = i = previ = RAY_CCS_LINK_NULL;
 	hinti = RAY_CCS_TX_FIRST;
@@ -1267,20 +1251,31 @@ ray_intr_start(sc)
 		return;
 	}
 
+	/* check to see if we need to authenticate before sending packets */
+	if (sc->sc_authstate == RAY_AUTH_NEEDED) {
+		RAY_DPRINTF(("%s: Sending auth request.\n",ifp->if_xname));
+		sc->sc_authstate= RAY_AUTH_WAITING;
+		ray_send_auth(sc,sc->sc_authid,OPEN_AUTH_REQUEST);
+		return;
+	}
+
 	pcount = 0;
 	for (;;) {
 		/* if we have no descriptors be done */
 		if (i == RAY_CCS_LINK_NULL) {
 			i = ray_find_free_tx_ccs(sc, hinti);
 			if (i == RAY_CCS_LINK_NULL) {
+				RAY_DPRINTF(("%s: no descriptors.\n",ifp->if_xname));
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
 		}
 
 		IF_DEQUEUE(&ifp->if_snd, m0);
-		if (!m0)
+		if (!m0) {
+			RAY_DPRINTF(("%s: dry queue.\n", ifp->if_xname));
 			break;
+		}
 		RAY_DPRINTF(("%s: gotmbuf 0x%lx\n", ifp->if_xname, (long)m0));
 		pktlen = m0->m_pkthdr.len;
 		if (pktlen > ETHER_MAX_LEN - ETHER_CRC_LEN) {
@@ -1441,7 +1436,7 @@ ray_intr_start(sc)
 }
 
 /*
- * recevice a packet from the card
+ * receive a packet from the card
  */
 void
 ray_recv(sc, ccs)
@@ -1491,8 +1486,7 @@ ray_recv(sc, ccs)
 	    (u_long)pktlen, nofrag));
 	RAY_DPRINTF_XMIT(("%s: received packet: len %lu\n", sc->sc_xname,
 	    (u_long)pktlen));
-	if (pktlen > MCLBYTES
-	    || pktlen < (sizeof(*frame) + sizeof(struct llc))) {
+	if (pktlen > MCLBYTES || pktlen < (sizeof(*frame)) ) {
 		RAY_DPRINTF(("%s: PKTLEN TOO BIG OR TOO SMALL\n",
 		    sc->sc_xname));
 		ifp->if_ierrors++;
@@ -1587,7 +1581,7 @@ done:
 	if (ray_debug && ray_debug_dump_rx)
 		ray_dump_mbuf(sc, m);
 #endif
-	/* receivce the packet */
+	/* receive the packet */
 	frame = mtod(m, struct ieee80211_frame *);
 	fc0 = frame->i_fc[0]
 	   & (IEEE80211_FC0_VERSION_MASK|IEEE80211_FC0_TYPE_MASK);
@@ -1597,9 +1591,42 @@ done:
 		m_freem(m);
 		return;
 	}
-	if ((fc0 & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) {
-		RAY_DPRINTF(("%s: pkt not type data fc0 0x%x\n",
-		    sc->sc_xname, fc0));
+	if ((fc0 & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_MGT) {
+		switch (frame->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) {
+		case IEEE80211_FC0_SUBTYPE_BEACON: 
+			break; /* ignore beacon silently */
+		case IEEE80211_FC0_SUBTYPE_AUTH:
+			ray_recv_auth(sc,frame);
+			break;
+		case IEEE80211_FC0_SUBTYPE_DEAUTH:
+			sc->sc_authstate= RAY_AUTH_UNAUTH;
+			break;
+		default:
+			RAY_DPRINTF(("%s: mgt packet not supported\n",sc->sc_xname));
+#ifdef RAY_DEBUG
+                        hexdump((const u_int8_t*)frame, pktlen, 16,4,0);
+#endif
+			RAY_DPRINTF(("\n"));
+			break; }
+		m_freem(m);
+		return;
+
+	} else if ((fc0 & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) {
+		RAY_DPRINTF(("%s: pkt not type data fc0 0x%x fc1 0x%x\n", 
+		sc->sc_xname, frame->i_fc[0], frame->i_fc[1]));
+#ifdef RAY_DEBUG
+		hexdump((const u_int8_t*)frame, pktlen, 16,4,0);
+#endif
+		RAY_DPRINTF(("\n"));
+		
+		m_freem(m);
+		return;
+	}
+
+	if (pktlen < sizeof(struct ieee80211_frame) + sizeof(struct llc))
+	{
+		RAY_DPRINTF(("%s: pkt not big enough to contain llc (%d)\n",
+			sc->sc_xname, pktlen));
 		m_freem(m);
 		return;
 	}
@@ -1659,14 +1686,83 @@ done:
 #endif
 	/* XXX doesn't appear to be included m->m_flags |= M_HASFCS; */
 	ifp->if_ipackets++;
-#ifdef __NetBSD__
-	(*ifp->if_input)(ifp, m);
-#elif defined(__OpenBSD__)
 	m_adj(m, sizeof(struct ether_header));
 	ether_input(ifp, eh, m);
-#endif
 }
 
+/* receive an auth packet
+ *
+ */
+
+void
+ray_recv_auth(sc, frame)
+	struct ray_softc *sc;
+	struct ieee80211_frame *frame;
+{	
+	/* todo: deal with timers: del_timer(&local->timer); */
+	u_int8_t *var= (u_int8_t*)(frame+1);
+	
+	/* if we are trying to get authenticated */
+	if (sc->sc_mode == SC_MODE_ADHOC) {
+		RAY_DPRINTF(("%s: recv auth. packet dump:\n",sc->sc_xname));
+#ifdef RAY_DEBUG
+		hexdump((u_int8_t*)frame, sizeof(*frame)+6, 16,4,0);
+#endif
+		RAY_DPRINTF(("\n"));
+
+        	if (var[2] == OPEN_AUTH_REQUEST) {
+			RAY_DPRINTF(("%s: Sending authentication response.\n",sc->sc_xname));
+			if (!ray_send_auth(sc,frame->i_addr2,OPEN_AUTH_RESPONSE)) {
+                        	sc->sc_authstate= RAY_AUTH_NEEDED;
+                        	memcpy(sc->sc_authid, frame->i_addr2, ETHER_ADDR_LEN);
+			}
+		}
+		else if (var[2] == OPEN_AUTH_RESPONSE) {
+			RAY_DPRINTF(("%s: Authenticated!\n",sc->sc_xname));
+			sc->sc_authstate= RAY_AUTH_AUTH;
+		}
+	}
+}
+
+/* ray_send_auth
+ *
+ * dest: where to send auth packet
+ * auth_type: whether to send an REQUEST or a RESPONSE 
+ */
+int
+ray_send_auth(sc, dest, auth_type)
+	struct ray_softc *sc;
+	u_int8_t *dest;
+	u_int8_t auth_type;
+{
+	u_int8_t packet[sizeof(struct ieee80211_frame) + 6];
+	bus_size_t bufp;
+	struct ieee80211_frame *frame= (struct ieee80211_frame*)packet;
+	int ccsindex= RAY_CCS_LINK_NULL;
+	ccsindex= ray_find_free_tx_ccs(sc,RAY_CCS_TX_FIRST);
+	if (ccsindex == RAY_CCS_LINK_NULL) {
+		RAY_DPRINTF(("%x: send authenticate - No free tx ccs\n"));
+		return -1;
+	}
+	bufp= ray_fill_in_tx_ccs(sc,sizeof(packet),ccsindex,RAY_CCS_LINK_NULL);
+	frame= (struct ieee80211_frame*) packet;
+	frame->i_fc[0]= IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_SUBTYPE_AUTH;
+	frame->i_fc[1]= 0;
+	memcpy(frame->i_addr1,dest,ETHER_ADDR_LEN);
+	memcpy(frame->i_addr2,sc->sc_ecf_startup.e_station_addr,ETHER_ADDR_LEN);
+	memcpy(frame->i_addr3,sc->sc_bssid,ETHER_ADDR_LEN);
+	memset(frame+1,0,6);
+	((u_int8_t*)(frame+1))[2]= auth_type;
+
+	ray_write_region(sc,bufp,packet,sizeof(packet));
+
+	SRAM_WRITE_1(sc, RAY_SCB_CCSI, ccsindex);
+	RAY_ECF_START_CMD(sc);
+
+	RAY_DPRINTF_XMIT(("%s: sent auth packet: len %lu\n", sc->sc_xname,
+	    (u_long)sizeof(packet)));
+	return 0;
+}
 
 /*
  * scan for free buffers
@@ -1955,7 +2051,7 @@ ray_ccs_done(sc, ccs)
 		sc->sc_if.if_flags &= ~IFF_OACTIVE;
 
 		sc->sc_omode = sc->sc_mode;
-		memcpy(sc->sc_cnwid, sc->sc_dnwid, sizeof(sc->sc_cnwid));
+		memcpy(&sc->sc_cnwid, &sc->sc_dnwid, sizeof(sc->sc_cnwid));
 
 		rcmd = ray_start_join_net;
 		break;
@@ -2521,7 +2617,8 @@ ray_download_params(sc)
 		memset(sp4, 0, sizeof(*sp4));
 	else
 		memset(sp5, 0, sizeof(*sp5));
-	memcpy(sp->sp_ssid, sc->sc_dnwid, sizeof(sp->sp_ssid));
+	/* XXX: Raylink firmware doesn't have length field for ssid */
+	memcpy(sp->sp_ssid, sc->sc_dnwid.i_nwid, sizeof(sp->sp_ssid));
 	sp->sp_scan_mode = 0x1;
 	memcpy(sp->sp_mac_addr, sc->sc_ecf_startup.e_station_addr,
 	    ETHER_ADDR_LEN);
@@ -2715,14 +2812,14 @@ ray_start_join_net(sc)
 		return;
 	sc->sc_startccs = ccs;
 	sc->sc_startcmd = cmd;
-	if (!memcmp(sc->sc_cnwid, sc->sc_dnwid, sizeof(sc->sc_cnwid))
+	if (!memcmp(&sc->sc_cnwid, &sc->sc_dnwid, sizeof(sc->sc_cnwid))
 	    && sc->sc_omode == sc->sc_mode)
 		SRAM_WRITE_FIELD_1(sc, ccs, ray_cmd_net, c_upd_param, 0);
 	else {
 		sc->sc_havenet = 0;
 		memset(&np, 0, sizeof(np));
 		np.p_net_type = sc->sc_mode;
-		memcpy(np.p_ssid, sc->sc_dnwid, sizeof(np.p_ssid));
+		memcpy(np.p_ssid, sc->sc_dnwid.i_nwid, sizeof(np.p_ssid));
 		ray_write_region(sc, RAY_HOST_TO_ECF_BASE, &np, sizeof(np));
 		SRAM_WRITE_FIELD_1(sc, ccs, ray_cmd_net, c_upd_param, 1);
 	}
@@ -2758,6 +2855,7 @@ ray_start_join_net_done(sc, cmd, ccs, stat)
 	bus_size_t ccs;
 	u_int stat;
 {
+	int i;
 	struct ray_net_params np;
 
 	callout_stop(&sc->sc_start_join_timo_ch);
@@ -2778,13 +2876,14 @@ ray_start_join_net_done(sc, cmd, ccs, stat)
 			return (0);
 
 		/* see if our nwid is up to date */
-		if (!memcmp(sc->sc_cnwid, sc->sc_dnwid, sizeof(sc->sc_cnwid))
+		if (!memcmp(&sc->sc_cnwid, &sc->sc_dnwid, sizeof(sc->sc_cnwid))
 		    && sc->sc_omode == sc->sc_mode)
 			SRAM_WRITE_FIELD_1(sc,ccs, ray_cmd_net, c_upd_param, 0);
 		else {
 			memset(&np, 0, sizeof(np));
 			np.p_net_type = sc->sc_mode;
-			memcpy(np.p_ssid, sc->sc_dnwid, sizeof(np.p_ssid));
+			memcpy(np.p_ssid, sc->sc_dnwid.i_nwid,
+			    sizeof(np.p_ssid));
 			ray_write_region(sc, RAY_HOST_TO_ECF_BASE, &np,
 			    sizeof(np));
 			SRAM_WRITE_FIELD_1(sc,ccs, ray_cmd_net, c_upd_param, 1);
@@ -2820,13 +2919,19 @@ ray_start_join_net_done(sc, cmd, ccs, stat)
 
 	if (SRAM_READ_FIELD_1(sc, ccs, ray_cmd_net, c_upd_param)) {
 		ray_read_region(sc, RAY_HOST_TO_ECF_BASE, &np, sizeof(np));
-		memcpy(sc->sc_cnwid, np.p_ssid, sizeof(sc->sc_cnwid));
+		/* XXX: Raylink firmware doesn't have length field for ssid */
+		for (i = 0; i < sizeof(np.p_ssid); i++) {
+			if (np.p_ssid[i] == '\0')
+				break;
+		}
+		sc->sc_cnwid.i_len = i;
+		memcpy(sc->sc_cnwid.i_nwid, np.p_ssid, sizeof(sc->sc_cnwid));
 		sc->sc_omode = sc->sc_mode;
 		if (np.p_net_type != sc->sc_mode)
 			return (ray_start_join_net);
 	}
 	RAY_DPRINTF(("%s: net start/join nwid %.32s bssid %s inited %d\n",
-	    sc->sc_xname, sc->sc_cnwid, ether_sprintf(sc->sc_bssid),
+	    sc->sc_xname, sc->sc_cnwid.i_nwid, ether_sprintf(sc->sc_bssid),
 		SRAM_READ_FIELD_1(sc, ccs, ray_cmd_net, c_inited)));
 
 	/* network is now active */
@@ -2912,11 +3017,7 @@ ray_update_mcast(sc)
 	bus_size_t ccs;
 	struct ether_multistep step;
 	struct ether_multi *enm;
-#ifdef __NetBSD__
-	struct ethercom *ec;
-#elif defined(__OpenBSD__)
 	struct arpcom *ec;
-#endif
 	bus_size_t bufp;
 	int count;
 
@@ -3287,7 +3388,7 @@ ray_dump_mbuf(sc, m)
 #endif	/* RAY_DEBUG */
 
 #ifdef RAY_DO_SIGLEV
-static void
+void
 ray_update_siglev(sc, src, siglev)
 	struct ray_softc *sc;
 	u_int8_t *src;

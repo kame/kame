@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.18 2000/04/27 01:10:11 bjc Exp $ */
+/*	$OpenBSD: conf.c,v 1.22 2000/10/31 02:30:57 hugh Exp $ */
 /*	$NetBSD: conf.c,v 1.44 1999/10/27 16:38:54 ragge Exp $	*/
 
 /*-
@@ -75,6 +75,7 @@ bdev_decl(mu);
 #define NCTU	0
 #endif
 bdev_decl(ctu);
+#include "rd.h"
 
 #include "ra.h"
 bdev_decl(ra);
@@ -147,11 +148,11 @@ struct bdevsw	bdevsw[] =
 	bdev_notdef(),			/* 16: was: KDB50/RA?? */
 	bdev_disk_init(NCCD,ccd),	/* 17: concatenated disk driver */
 	bdev_disk_init(NVND,vnd),	/* 18: vnode disk driver */
-	bdev_disk_init(NHD,hd),	/* 19: VS3100 ST506 disk */
+	bdev_disk_init(NHD,hd),		/* 19: VS3100 ST506 disk */
 	bdev_disk_init(NSD,sd),		/* 20: SCSI disk */
 	bdev_tape_init(NST,st),		/* 21: SCSI tape */
 	bdev_disk_init(NCD,cd),		/* 22: SCSI CD-ROM */
-	bdev_notdef(),		/* 23: was: memory disk driver */
+	bdev_disk_init(NRD,rd),		/* 23: ram disk driver */
 	bdev_disk_init(NRY,ry),		/* 24: VS3100 floppy */
 	bdev_disk_init(NRAID,raid),	/* 25: RAIDframe disk driver */
 };
@@ -168,6 +169,7 @@ struct bdevmajtpl {
 	{ BDEV_KDB,	16 },
 	{ BDEV_RD,	19 },
 	{ BDEV_SD,	20 },
+	{ BDEV_SDN,	20 },
 	{ BDEV_ST,	21 },
 	
 	/* some things need these network devices, do not change them */
@@ -192,6 +194,7 @@ int	bdevtomaj (bdev)
 		if(bdev == bd->bdev || bd->bdev == -1)
 			return bd->maj;
 	}
+	return bd != NULL ? bd->maj : NULL;
 }
 
 /*
@@ -224,7 +227,7 @@ struct	consdev constab[]={
 #else
 #define NGEN	0
 #endif
-#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49
+#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49 || VAX53
 	cons_init(dz),	/* DZ11-like serial console on VAXstations */
 #endif
 #if VAX650 || VAX630
@@ -322,6 +325,8 @@ cdev_decl(hd);
 cdev_decl(ry);
 cdev_decl(sd);
 cdev_decl(st);
+
+cdev_decl(rd);
 
 #include "ct.h"
 cdev_decl(ct);
@@ -421,6 +426,8 @@ cdev_decl(ss);
 #include "uk.h"
 cdev_decl(uk);
 
+bdev_decl(rd);
+
 #ifdef XFS
 #include <xfs/nxfs.h>
 cdev_decl(xfs_dev);
@@ -491,11 +498,11 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NVND,vnd),	/* 55: vnode disk driver */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 56: berkeley packet filter */
 	cdev_bpftun_init(NTUN,tun),	/* 57: tunnel filter */
-	cdev_disk_init(NHD,hd),	/* 58: HDC9224/RD?? */
+	cdev_disk_init(NHD,hd),		/* 58: HDC9224/RD?? */
 	cdev_disk_init(NSD,sd),		/* 59: SCSI disk */
 	cdev_tape_init(NST,st),		/* 60: SCSI tape */
 	cdev_disk_init(NCD,cd),		/* 61: SCSI CD-ROM */
-	cdev_notdef(),				/* 62: was: memory disk driver */
+	cdev_disk_init(NRD,rd),		/* 62: memory disk driver */
 	cdev_ch_init(NCH,ch),		/* 63: SCSI autochanger */
 	cdev_scanner_init(NSS,ss),	/* 64: SCSI scanner */
 	cdev_uk_init(NUK,uk),		/* 65: SCSI unknown */
@@ -660,3 +667,8 @@ iszerodev(dev)
 	return (major(dev) == 3 && minor(dev) == 12);
 }
 
+dev_t
+getnulldev()
+{
+	return makedev(3, 2);
+}

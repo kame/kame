@@ -1,7 +1,7 @@
-/*	$OpenBSD: gdt_pci.c,v 1.3 2000/03/01 22:38:51 niklas Exp $	*/
+/*	$OpenBSD: gdt_pci.c,v 1.8 2000/09/19 08:43:37 niklas Exp $	*/
 
 /*
- * Copyright (c) 1999 Niklas Hallqvist.  All rights reserved.
+ * Copyright (c) 1999, 2000 Niklas Hallqvist.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -151,56 +151,17 @@ struct cfattach gdt_pci_ca = {
 int
 gdt_pci_probe(parent, match, aux)
         struct device *parent;
-        void *match, *aux; 
-{       
+        void *match, *aux;
+{
         struct pci_attach_args *pa = aux;
 
-	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_VORTEX)
-		switch (PCI_PRODUCT(pa->pa_id)) {
-		case PCI_PRODUCT_VORTEX_GDT_60x0:
-		case PCI_PRODUCT_VORTEX_GDT_6000B:
-		case PCI_PRODUCT_VORTEX_GDT_6x10:
-		case PCI_PRODUCT_VORTEX_GDT_6x20:
-		case PCI_PRODUCT_VORTEX_GDT_6530:
-		case PCI_PRODUCT_VORTEX_GDT_6550:
-		case PCI_PRODUCT_VORTEX_GDT_6x17:
-		case PCI_PRODUCT_VORTEX_GDT_6x27:
-		case PCI_PRODUCT_VORTEX_GDT_6537:
-		case PCI_PRODUCT_VORTEX_GDT_6557:
-		case PCI_PRODUCT_VORTEX_GDT_6x15:
-		case PCI_PRODUCT_VORTEX_GDT_6x25:
-		case PCI_PRODUCT_VORTEX_GDT_6535:
-		case PCI_PRODUCT_VORTEX_GDT_6555:
-		case PCI_PRODUCT_VORTEX_GDT_6x17RP:
-		case PCI_PRODUCT_VORTEX_GDT_6x27RP:
-		case PCI_PRODUCT_VORTEX_GDT_6537RP:
-		case PCI_PRODUCT_VORTEX_GDT_6557RP:
-		case PCI_PRODUCT_VORTEX_GDT_6x11RP:
-		case PCI_PRODUCT_VORTEX_GDT_6x21RP:
-		case PCI_PRODUCT_VORTEX_GDT_6x17RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x27RD:
-		case PCI_PRODUCT_VORTEX_GDT_6537RD:
-		case PCI_PRODUCT_VORTEX_GDT_6557RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x11RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x21RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x18RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x28RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x38RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x58RD:
-		case PCI_PRODUCT_VORTEX_GDT_7x18RN:
-		case PCI_PRODUCT_VORTEX_GDT_7x28RN:
-		case PCI_PRODUCT_VORTEX_GDT_7x38RN:
-		case PCI_PRODUCT_VORTEX_GDT_7x58RN:
-		case PCI_PRODUCT_VORTEX_GDT_6x19RD:
-		case PCI_PRODUCT_VORTEX_GDT_6x29RD:
-		case PCI_PRODUCT_VORTEX_GDT_7x19RN:
-		case PCI_PRODUCT_VORTEX_GDT_7x29RN:
-			return (1);
-		}
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_VORTEX &&
+	    PCI_PRODUCT(pa->pa_id) >= 0x100 && PCI_PRODUCT(pa->pa_id) <= 0x2ff)
+		return (1);
 	return (0);
 }
 
-void    
+void
 gdt_pci_attach(parent, self, aux)
         struct device *parent, *self;
         void *aux;
@@ -224,6 +185,7 @@ gdt_pci_attach(parent, self, aux)
 
 	printf(": ");
 
+	gdt->sc_class = 0;
 	prod = PCI_PRODUCT(pa->pa_id);
 	switch (prod) {
 	case PCI_PRODUCT_VORTEX_GDT_60x0:
@@ -262,6 +224,7 @@ gdt_pci_attach(parent, self, aux)
 	case PCI_PRODUCT_VORTEX_GDT_6x28RD:
 	case PCI_PRODUCT_VORTEX_GDT_6x38RD:
 	case PCI_PRODUCT_VORTEX_GDT_6x58RD:
+	case PCI_PRODUCT_VORTEX_GDT_6518RS:
 	case PCI_PRODUCT_VORTEX_GDT_7x18RN:
 	case PCI_PRODUCT_VORTEX_GDT_7x28RN:
 	case PCI_PRODUCT_VORTEX_GDT_7x38RN:
@@ -272,15 +235,26 @@ gdt_pci_attach(parent, self, aux)
 	case PCI_PRODUCT_VORTEX_GDT_7x29RN:
 		gdt->sc_class = GDT_MPR;
 	}
+
+	/* If we don't recognize it, determine class heuristically.  */
+	if (gdt->sc_class == 0)
+		gdt->sc_class = prod < 0x100 ? GDT_PCINEW : GDT_MPR;
+
 	if (prod >= GDT_PCI_PRODUCT_FC)
 		gdt->sc_class |= GDT_FC;
 
 	if (pci_mapreg_map(pa,
 	    GDT_CLASS(gdt) == GDT_PCINEW ? GDT_PCINEW_DPMEM : GDT_PCI_DPMEM,
-	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT_1M, 0, &dpmemt,
+	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0, &dpmemt,
 	    &dpmemh, &dpmembase, &dpmemsize)) {
-		printf("cannot map DPMEM\n");
-		goto bail_out;
+		if (pci_mapreg_map(pa,
+		    GDT_CLASS(gdt) == GDT_PCINEW ? GDT_PCINEW_DPMEM :
+		    GDT_PCI_DPMEM,
+		    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT_1M, 0,
+		    &dpmemt,&dpmemh, &dpmembase, &dpmemsize)) {
+			printf("cannot map DPMEM\n");
+			goto bail_out;
+		}
 	}
 	status |= DPMEM_MAPPED;
 	gdt->sc_dpmemt = dpmemt;
@@ -350,7 +324,7 @@ gdt_pci_attach(parent, self, aux)
 
 		ha->type = GDT_PCI;
 		ha->ic_all_size = sizeof(dp6_ptr->u);
-        
+
 		/* special command to controller BIOS */
 		gdth_writel(0x00, &dp6_ptr->u.ic.S_Info[0]);
 		gdth_writel(0x00, &dp6_ptr->u.ic.S_Info[1]);
@@ -395,7 +369,7 @@ gdt_pci_attach(parent, self, aux)
 		/* disable board interrupts, deinit services */
 		outb(0x00,PTR2USHORT(&ha->plx->control1));
 		outb(0xff,PTR2USHORT(&ha->plx->edoor_reg));
-        
+
 		gdth_writeb(0x00, &dp6c_ptr->u.ic.S_Status);
 		gdth_writeb(0x00, &dp6c_ptr->u.ic.Cmd_Index);
 
@@ -431,7 +405,7 @@ gdt_pci_attach(parent, self, aux)
 		gdth_writel(0x01, &dp6c_ptr->u.ic.S_Info[2]);
 		gdth_writel(0x00, &dp6c_ptr->u.ic.S_Info[3]);
 		gdth_writeb(0xfe, &dp6c_ptr->u.ic.S_Cmd_Indx);
-        
+
 		outb(1,PTR2USHORT(&ha->plx->ldoor_reg));
 
 		retries = INIT_RETRIES;

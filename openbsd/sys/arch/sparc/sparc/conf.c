@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.24 2000/02/21 08:16:36 mjacob Exp $	*/
+/*	$OpenBSD: conf.c,v 1.26 2000/09/26 14:03:55 art Exp $	*/
 /*	$NetBSD: conf.c,v 1.40 1996/04/11 19:20:03 thorpej Exp $ */
 
 /*
@@ -72,6 +72,7 @@
 #include "rd.h"
 
 #include "zs.h"
+#include "kbd.h"
 #include "fdc.h"		/* has NFDC and NFD; see files.sparc */
 #include "bwtwo.h"
 #include "cgtwo.h"
@@ -158,7 +159,11 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 26 */
 	cdev_fb_init(NBWTWO,bwtwo),	/* 27: /dev/bwtwo */
 	cdev_notdef(),			/* 28 */
+#if	NKBD > 0
 	cdev_gen_init(1,kbd),		/* 29: /dev/kbd */
+#else
+	cdev_notdef(),			/* 29 */
+#endif
 	cdev_notdef(),			/* 30 */
 	cdev_fb_init(NCGTWO,cgtwo),	/* 31: /dev/cgtwo */
 	cdev_notdef(),			/* 32: should be /dev/gpone */
@@ -292,6 +297,12 @@ iszerodev(dev)
 	dev_t dev;
 {
 	return (major(dev) == mem_no && minor(dev) == 12);
+}
+
+dev_t
+getnulldev()
+{
+	return makedev(mem_no, 2);
 }
 
 static int chrtoblktbl[] = {

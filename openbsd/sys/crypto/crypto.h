@@ -41,7 +41,8 @@
 #define BLOWFISH_BLOCK_LEN      8
 #define SKIPJACK_BLOCK_LEN      8
 #define CAST128_BLOCK_LEN       8
-#define EALG_MAX_BLOCK_LEN      8  /* Keep this updated */
+#define RIJNDAEL128_BLOCK_LEN  16
+#define EALG_MAX_BLOCK_LEN     16  /* Keep this updated */
 
 /* Maximum hash algorithm result length */
 #define AALG_MAX_RESULT_LEN     20 /* Keep this updated */
@@ -56,8 +57,10 @@
 #define CRYPTO_RIPEMD160_HMAC96 8
 #define CRYPTO_MD5_KPDK         9
 #define CRYPTO_SHA1_KPDK        10
+#define CRYPTO_RIJNDAEL128_CBC  11 /* 128 bit blocksize */
+#define CRYPTO_AES_CBC          11 /* 128 bit blocksize -- the same as above */
 
-#define CRYPTO_ALGORITHM_MAX    10 /* Keep this updated */
+#define CRYPTO_ALGORITHM_MAX    11 /* Keep this updated */
 
 /* Standard initialization structure beginning */
 struct cryptoini
@@ -116,10 +119,7 @@ struct cryptop
 
     caddr_t            crp_buf;   /* Data to be processed */
 
-    caddr_t            crp_opaque1;/* Opaque pointer, passed along */
-    caddr_t            crp_opaque2;/* Opaque pointer, passed along */
-    caddr_t            crp_opaque3;/* Opaque pointer, passed along */
-    caddr_t            crp_opaque4;/* Opaque pointer, passed along */
+    caddr_t            crp_opaque;/* Opaque pointer, passed along */
 
     struct cryptodesc *crp_desc;  /* Linked list of processing descriptors */
 
@@ -158,6 +158,9 @@ extern int crypto_register(u_int32_t, int,
     int (*)(struct cryptop *));
 extern int crypto_unregister(u_int32_t, int);
 extern int32_t crypto_get_driverid(void);
+extern void crypto_thread(void);
+extern int crypto_invoke(struct cryptop *);
+extern void crypto_done(struct cryptop *);
 
 struct mbuf;
 int	mbuf2pages(struct mbuf *, int *, long *, int *, int, int *);

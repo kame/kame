@@ -1,4 +1,4 @@
-/*	$OpenBSD: an.c,v 1.2 2000/04/06 04:01:49 mickey Exp $	*/
+/*	$OpenBSD: an.c,v 1.9 2000/06/20 20:35:14 todd Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -97,6 +97,7 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/timeout.h>
 #ifdef ANCACHE
@@ -244,6 +245,9 @@ an_attach(sc)
 
 	sc->an_tx_rate = 0;
 	bzero((char *)&sc->an_stats, sizeof(sc->an_stats));
+#ifdef ANCACHE
+	sc->an_sigitems = sc->an_nextitem = 0;
+#endif
 
 	/*
 	 * Call MI attach routines.
@@ -342,16 +346,11 @@ an_rxeof(sc)
 
 	ifp->if_ipackets++;
 
+#if NBPFILTER > 0
 	/* Handle BPF listeners. */
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf)
 		BPF_MTAP(ifp, m);
-		if (ifp->if_flags & IFF_PROMISC &&
-		    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		    ETHER_ADDR_LEN) && (eh->ether_dhost[0] & 1) == 0)) {
-			m_freem(m);
-			return;
-		}
-	}
+#endif
 
 	/* Receive packet. */
 	m_adj(m, sizeof(struct ether_header));
@@ -555,7 +554,8 @@ an_cmd(sc, cmd, val)
  * most reliable method I've found to really kick the NIC in the
  * head and force it to reboot correctly.
  */
-void an_reset(sc)
+void
+an_reset(sc)
 	struct an_softc		*sc;
 {
 	if (sc->an_gone)
@@ -578,7 +578,8 @@ void an_reset(sc)
 /*
  * Read an LTV record from the NIC.
  */
-int an_read_record(sc, ltv)
+int
+an_read_record(sc, ltv)
 	struct an_softc		*sc;
 	struct an_ltv_gen	*ltv;
 {
@@ -625,7 +626,8 @@ int an_read_record(sc, ltv)
 /*
  * Same as read, except we inject data instead of reading it.
  */
-int an_write_record(sc, ltv)
+int
+an_write_record(sc, ltv)
 	struct an_softc		*sc;
 	struct an_ltv_gen	*ltv;
 {
@@ -650,7 +652,8 @@ int an_write_record(sc, ltv)
 	return(0);
 }
 
-int an_seek(sc, id, off, chan)
+int
+an_seek(sc, id, off, chan)
 	struct an_softc		*sc;
 	int			id, off, chan;
 {
@@ -686,7 +689,8 @@ int an_seek(sc, id, off, chan)
 	return(0);
 }
 
-int an_read_data(sc, id, off, buf, len)
+int
+an_read_data(sc, id, off, buf, len)
 	struct an_softc		*sc;
 	int			id, off;
 	caddr_t			buf;
@@ -713,7 +717,8 @@ int an_read_data(sc, id, off, buf, len)
 	return(0);
 }
 
-int an_write_data(sc, id, off, buf, len)
+int
+an_write_data(sc, id, off, buf, len)
 	struct an_softc		*sc;
 	int			id, off;
 	caddr_t			buf;
@@ -744,7 +749,8 @@ int an_write_data(sc, id, off, buf, len)
  * Allocate a region of memory inside the NIC and zero
  * it out.
  */
-int an_alloc_nicmem(sc, len, id)
+int
+an_alloc_nicmem(sc, len, id)
 	struct an_softc		*sc;
 	int			len;
 	int			*id;
@@ -797,7 +803,7 @@ an_setdef(sc, areq)
 	case AN_RID_GENCONFIG:
 		cfg = (struct an_ltv_genconfig *)areq;
 
-		ifa = ifnet_addrs[ifp->if_index - 1];
+		ifa = ifnet_addrs[ifp->if_index];
 		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 		bcopy((char *)&cfg->an_macaddr, (char *)&sc->arpcom.ac_enaddr,
 		    ETHER_ADDR_LEN);
@@ -838,7 +844,8 @@ an_setdef(sc, areq)
  * so in order to turn on RX monitor mode, we have to turn the MAC
  * off first.
  */
-void an_promisc(sc, promisc)
+void
+an_promisc(sc, promisc)
 	struct an_softc		*sc;
 	int			promisc;
 {
@@ -870,7 +877,8 @@ void an_promisc(sc, promisc)
 	return;
 }
 
-int an_ioctl(ifp, command, data)
+int
+an_ioctl(ifp, command, data)
 	struct ifnet		*ifp;
 	u_long			command;
 	caddr_t			data;
@@ -879,6 +887,7 @@ int an_ioctl(ifp, command, data)
 	struct an_softc		*sc;
 	struct an_req		areq;
 	struct ifreq		*ifr;
+	struct proc		*p = curproc;
 	struct ifaddr		*ifa = (struct ifaddr *)data;
 
 	s = splimp();
@@ -886,8 +895,10 @@ int an_ioctl(ifp, command, data)
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
 
-	if (sc->an_gone)
+	if (sc->an_gone) {
+		splx(s);
 		return(ENODEV);
+	}
 
 	if ((error = ether_ioctl(ifp, &sc->arpcom, command, data)) > 0) {
 		splx(s);
@@ -919,8 +930,8 @@ int an_ioctl(ifp, command, data)
 			    !(ifp->if_flags & IFF_PROMISC) &&
 			    sc->an_if_flags & IFF_PROMISC) {
 				an_promisc(sc, 0);
-			} else
-				an_init(sc);
+			}
+			an_init(sc);
 		} else {
 			if (ifp->if_flags & IFF_RUNNING)
 				an_stop(sc);
@@ -939,6 +950,9 @@ int an_ioctl(ifp, command, data)
 			break;
 #ifdef ANCACHE
 		if (areq.an_type == AN_RID_ZERO_CACHE) {
+			error = suser(p->p_ucred, &p->p_acflag);
+			if (error)
+				break;
 			sc->an_sigitems = sc->an_nextitem = 0;
 			break;
 		} else if (areq.an_type == AN_RID_READ_CACHE) {
@@ -960,6 +974,9 @@ int an_ioctl(ifp, command, data)
 		error = copyout(&areq, ifr->ifr_data, sizeof(areq));
 		break;
 	case SIOCSAIRONET:
+		error = suser(p->p_ucred, &p->p_acflag);
+		if (error)
+			break;
 		error = copyin(ifr->ifr_data, &areq, sizeof(areq));
 		if (error)
 			break;
@@ -1092,7 +1109,8 @@ an_init(sc)
 	return;
 }
 
-void an_start(ifp)
+void
+an_start(ifp)
 	struct ifnet		*ifp;
 {
 	struct an_softc		*sc;
@@ -1154,8 +1172,10 @@ void an_start(ifp)
 		 * If there's a BPF listner, bounce a copy of
 		 * this frame to him.
 		 */
+#if NBPFILTER > 0
 		if (ifp->if_bpf)
 			BPF_MTAP(ifp, m0);
+#endif
 
 		m_freem(m0);
 		m0 = NULL;
@@ -1180,7 +1200,8 @@ void an_start(ifp)
 	return;
 }
 
-void an_stop(sc)
+void
+an_stop(sc)
 	struct an_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -1205,7 +1226,8 @@ void an_stop(sc)
 	return;
 }
 
-void an_watchdog(ifp)
+void
+an_watchdog(ifp)
 	struct ifnet		*ifp;
 {
 	struct an_softc		*sc;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.52 2000/03/23 16:54:44 art Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.55 2000/06/18 03:07:48 angelos Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -105,10 +105,6 @@
 extern void nfs_init __P((void));
 #endif
 
-#ifndef MIN
-#define MIN(a,b)	(((a)<(b))?(a):(b))
-#endif
-
 char	copyright[] =
 "Copyright (c) 1982, 1986, 1989, 1991, 1993\n"
 "\tThe Regents of the University of California.  All rights reserved.\n"
@@ -140,6 +136,8 @@ void	check_console __P((struct proc *));
 void	start_init __P((void *));
 void	start_pagedaemon __P((void *));
 void	start_update __P((void *));
+void	start_reaper __P((void *));
+void    start_crypto __P((void *));
 
 #ifdef cpu_set_init_frame
 void *initframep;				/* XXX should go away */
@@ -433,12 +431,22 @@ main(framep)
 	if (kthread_create(start_pagedaemon, NULL, NULL, "pagedaemon"))
 		panic("fork pagedaemon");
 
-	/* Create process 3, the update daemon kernel thread. */
+	/* Create process 3, the reaper daemon kernel thread. */
+	if (kthread_create(start_reaper, NULL, NULL, "reaper"))
+		panic("fork reaper");
+
+	/* Create process 4, the update daemon kernel thread. */
 	if (kthread_create(start_update, NULL, NULL, "update")) {
 #ifdef DIAGNOSTIC
 		panic("fork update");
 #endif
 	}
+
+#ifdef CRYPTO
+	/* Create process 5, the crypto kernel thread. */
+	if (kthread_create(start_crypto, NULL, NULL, "crypto"))
+	        panic("crypto thread");
+#endif /* CRYPTO */
 
 	/* Create any other deferred kernel threads. */
 	kthread_run_deferred_queue();
@@ -657,3 +665,21 @@ start_update(arg)
 	sched_sync(curproc);
 	/* NOTREACHED */
 }
+
+void
+start_reaper(arg)
+	void *arg;
+{
+	reaper();
+	/* NOTREACHED */
+}
+
+#ifdef CRYPTO
+void
+start_crypto(arg)
+        void *arg;
+{
+        crypto_thread();
+        /* NOTREACHED */
+}
+#endif /* CRYPTO */

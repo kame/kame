@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.c,v 1.20 2000/03/17 22:05:57 art Exp $	*/
+/*	$OpenBSD: if_ether.c,v 1.22 2000/06/22 19:05:51 art Exp $	*/
 /*	$NetBSD: if_ether.c,v 1.31 1996/05/11 12:59:58 mycroft Exp $	*/
 
 /*
@@ -85,7 +85,7 @@ int	arpt_down = 20;		/* once declared down, don't send for 20 secs */
 static	void arprequest
 	    __P((struct arpcom *, u_int32_t *, u_int32_t *, u_int8_t *));
 static	void arptfree __P((struct llinfo_arp *));
-static	void arptimer __P((void *));
+void arptimer __P((void *));
 static	struct llinfo_arp *arplookup __P((u_int32_t, int, int));
 static	void in_arpinput __P((struct mbuf *));
 
@@ -116,15 +116,16 @@ static int db_show_radix_node __P((struct radix_node *, void *));
  * Timeout routine.  Age arp_tab entries periodically.
  */
 /* ARGSUSED */
-static void
+void
 arptimer(arg)
 	void *arg;
 {
+	struct timeout *to = (struct timeout *)arg;
 	int s;
-	register struct llinfo_arp *la, *nla;
+	struct llinfo_arp *la, *nla;
 
 	s = splsoftnet();
-	timeout(arptimer, NULL, arpt_prune * hz);
+	timeout_add(to, arpt_prune * hz);
 	for (la = llinfo_arp.lh_first; la != 0; la = nla) {
 		register struct rtentry *rt = la->la_rt;
 
@@ -149,6 +150,8 @@ arp_rtrequest(req, rt, sa)
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 
 	if (!arpinit_done) {
+		static struct timeout arptimer_to;
+
 		arpinit_done = 1;
 		/*
 		 * We generate expiration times from time.tv_sec
@@ -157,7 +160,9 @@ arp_rtrequest(req, rt, sa)
 		if (time.tv_sec == 0) {
 			time.tv_sec++;
 		}
-		timeout(arptimer, (caddr_t)0, hz);
+
+		timeout_set(&arptimer_to, arptimer, &arptimer_to);
+		timeout_add(&arptimer_to, hz);
 	}
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;

@@ -43,6 +43,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/vnode.h>
 #include <sys/buf.h>
@@ -437,8 +438,8 @@ cpu_exit(p)
 		}
 		free((void *)fs, M_SUBPROC);
 	}
-	vmspace_free(p->p_vmspace);
-	switchexit(kernel_map, p->p_addr, USPACE);
+
+	switchexit(p);
 	/* NOTREACHED */
 }
 

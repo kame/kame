@@ -75,4 +75,7 @@ u_int32_t Blowfish_stream2word __P((const u_int8_t *, u_int16_t ,
 
 void blf_ecb_encrypt __P((blf_ctx *, u_int8_t *, u_int32_t));
 void blf_ecb_decrypt __P((blf_ctx *, u_int8_t *, u_int32_t));
+
+void blf_cbc_encrypt __P((blf_ctx *, u_int8_t *, u_int8_t *, u_int32_t));
+void blf_cbc_decrypt __P((blf_ctx *, u_int8_t *, u_int8_t *, u_int32_t));
 #endif

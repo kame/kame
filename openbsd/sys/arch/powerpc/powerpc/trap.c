@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.17 2000/03/20 07:05:53 rahnds Exp $	*/
+/*	$OpenBSD: trap.c,v 1.20 2000/09/06 22:48:13 rahnds Exp $	*/
 /*	$NetBSD: trap.c,v 1.3 1996/10/13 03:31:37 christos Exp $	*/
 
 /*
@@ -33,6 +33,7 @@
  */
 #include <sys/param.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/reboot.h>
 #include <sys/syscall.h>
 #include <sys/systm.h>
@@ -331,11 +332,14 @@ syscall_bad:
 		enable_fpu(p);
 		break;
 
+	case EXC_ALI|EXC_USER:
+		/* alignment exception, kill process */
+		trapsignal(p, SIGSEGV, VM_PROT_EXECUTE, SEGV_MAPERR, sv);
+		break;
+
 	default:
 	
 brain_damage:
-		printf("trap type %x at %x lr %x\n",
-			type, frame->srr0, frame->lr);
 /*
 mpc_print_pci_stat();
 */
@@ -344,7 +348,8 @@ mpc_print_pci_stat();
 		/* set up registers */
 		db_save_regs(frame);
 #endif
-		panic("trap");
+		panic ("trap type %x at %x lr %x\n",
+			type, frame->srr0, frame->lr);
 
 
 	case EXC_PGM|EXC_USER:
@@ -397,7 +402,7 @@ for (i = 0; i < errnum; i++) {
 		db_save_regs(frame);
 		db_trap(T_BREAKPOINT);
 #else
-		panic("trap");
+		panic("trap EXC_PGM");
 #endif
 		break;
 

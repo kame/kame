@@ -46,6 +46,11 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/systm.h>
+#ifdef UVM
+#include <vm/vm.h>
+#include <vm/vm_kern.h>
+#include <uvm/uvm.h>
+#endif
 
 #include <machine/autoconf.h>
 #include <machine/intr.h>
@@ -53,12 +58,12 @@
 #include <machine/pio.h>
 #include <powerpc/mac/openpicreg.h>
 
-#define ICU_LEN 64
+#define ICU_LEN 128
 #define LEGAL_IRQ(x) ((x >= 0) && (x < ICU_LEN))
 
 static int intrtype[ICU_LEN], intrmask[ICU_LEN], intrlevel[ICU_LEN];
 static struct intrhand *intrhand[ICU_LEN] = { 0 };
-static int hwirq[ICU_LEN], virq[64];
+static int hwirq[ICU_LEN], virq[ICU_LEN];
 unsigned int imen /* = 0xffffffff */; /* XXX */
 static int virq_max = 0;
 
@@ -140,6 +145,7 @@ vaddr_t openpic_base;
 void * openpic_intr_establish( void * lcv, int irq, int type, int level,
 	int (*ih_fun) __P((void *)), void *ih_arg, char *name);
 void openpic_intr_disestablish( void *lcp, void *arg);
+void openpic_collect_preconf_intr();
 
 void
 openpic_attach(parent, self, aux)
@@ -156,7 +162,7 @@ openpic_attach(parent, self, aux)
 	openpic_base = (vaddr_t) mapiodev (ca->ca_baseaddr +
 			ca->ca_reg[0], 0x22000);
 
-	printf("version %x", openpic_read(OPENPIC_VENDOR_ID));
+	printf(": version 0x%x", openpic_read(OPENPIC_VENDOR_ID));
 
 	openpic_init();
 
@@ -166,13 +172,35 @@ openpic_attach(parent, self, aux)
 	mac_intr_establish_func  = openpic_intr_establish;
 	mac_intr_disestablish_func  = openpic_intr_disestablish;
 	install_extint(ext_intr_openpic);
+	
+#if 1
+	openpic_collect_preconf_intr();
+#endif
 
 #if 1
 	mac_intr_establish(parent, 0x37, IST_LEVEL,
 		IPL_HIGH, prog_switch, 0x37, "prog button");
 #endif
+	ppc_intr_enable(1);
 
 	printf("\n");
+}
+void
+openpic_collect_preconf_intr()
+{
+	int i;
+	for (i = 0; i < ppc_configed_intr_cnt; i++) {
+#ifdef DEBUG
+		printf("\n\t%s irq %d level %d fun %x arg %x",
+		    ppc_configed_intr[i].ih_what, ppc_configed_intr[i].ih_irq,
+		    ppc_configed_intr[i].ih_level, ppc_configed_intr[i].ih_fun,
+		    ppc_configed_intr[i].ih_arg);
+#endif
+		openpic_intr_establish(NULL, ppc_configed_intr[i].ih_irq,
+		    IST_LEVEL, ppc_configed_intr[i].ih_level,
+		    ppc_configed_intr[i].ih_fun, ppc_configed_intr[i].ih_arg,
+		    ppc_configed_intr[i].ih_what);
+	}
 }
 
 static int
@@ -414,7 +442,7 @@ mapirq(irq)
 {
 	int v;
 
-	if (irq < 0 || irq >= 64)
+	if (irq < 0 || irq >= ICU_LEN)
 		panic("invalid irq");
 	virq_max++;
 	v = virq_max;

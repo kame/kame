@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sm_pcmcia.c,v 1.12 2000/04/24 19:43:36 niklas Exp $	*/
+/*	$OpenBSD: if_sm_pcmcia.c,v 1.14 2000/08/04 15:51:02 aaron Exp $	*/
 /*	$NetBSD: if_sm_pcmcia.c,v 1.11 1998/08/15 20:47:32 thorpej Exp $  */
 
 /*-
@@ -117,11 +117,13 @@ struct sm_pcmcia_product {
 } sm_pcmcia_prod[] = {
 	{ PCMCIA_VENDOR_MEGAHERTZ2,	PCMCIA_PRODUCT_MEGAHERTZ2_XJACK,
 	  0 },
-
+	{ PCMCIA_VENDOR_MEGAHERTZ2,	PCMCIA_PRODUCT_MEGAHERTZ2_XJEM1144,
+	  0 },
 	{ PCMCIA_VENDOR_NEWMEDIA,	PCMCIA_PRODUCT_NEWMEDIA_BASICS,
 	  0 },
-
 	{ PCMCIA_VENDOR_SMC,		PCMCIA_PRODUCT_SMC_8020,
+	  0 },
+	{ PCMCIA_VENDOR_PSION,		PCMCIA_PRODUCT_PSION_GOLDCARD,
 	  0 }
 };
 
@@ -340,7 +342,8 @@ sm_pcmcia_lannid_ciscallback(tuple, arg)
 	u_int8_t *myla = arg;
 	int i;
 
-	if (tuple->code == PCMCIA_CISTPL_FUNCE) {
+	if (tuple->code == PCMCIA_CISTPL_FUNCE || tuple->code ==
+	    PCMCIA_CISTPL_SPCL) {
 		/* subcode, length */
 		if (tuple->length < 2)
 			return (0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4231.c,v 1.3 1999/08/06 01:29:13 jason Exp $	*/
+/*	$OpenBSD: cs4231.c,v 1.5 2000/09/18 16:57:34 brad Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -746,6 +746,7 @@ cs4231_commit_settings(addr)
 	while (tries-- && regs->idr == CS_IAR_INIT);
 	if (tries == 0) {
 		printf("%s: timeout committing fspb\n", sc->sc_dev.dv_xname);
+		splx(s);
 		return (0);
 	}
 
@@ -757,6 +758,7 @@ cs4231_commit_settings(addr)
 	while (tries-- && regs->idr == CS_IAR_INIT);
 	if (tries == 0) {
 		printf("%s: timeout committing cdf\n", sc->sc_dev.dv_xname);
+		splx(s);
 		return (0);
 	}
 
@@ -1276,9 +1278,9 @@ cs4231_query_devinfo(addr, dip)
 	mute:
 		strcpy(dip->label.name, AudioNmute);
 		dip->un.e.num_mem = 2;
-		strcpy(dip->un.e.member[0].label.name, AudioNoff);
+		strcpy(dip->un.e.member[0].label.name, AudioNon);
 		dip->un.e.member[0].ord = 0;
-		strcpy(dip->un.e.member[1].label.name, AudioNon);
+		strcpy(dip->un.e.member[1].label.name, AudioNoff);
 		dip->un.e.member[1].ord = 1;
 		break;
 	case CSAUDIO_REC_LVL:		/* record level */

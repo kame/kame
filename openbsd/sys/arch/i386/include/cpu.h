@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.29 2000/01/29 04:27:48 mickey Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.31 2000/08/02 14:09:59 deraadt Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -54,7 +54,6 @@
  * referenced in generic code
  */
 #define	cpu_swapin(p)			/* nothing */
-#define	cpu_wait(p)			/* nothing */
 
 /*
  * Arguments to hardclock, softclock and statclock
@@ -101,6 +100,7 @@ void	delay __P((int));
  * High resolution clock support (Pentium only)
  */
 void	calibrate_cyclecounter __P((void));
+#ifndef	HZ
 extern u_quad_t pentium_base_tsc;
 #define CPU_CLOCKUPDATE(otime, ntime)					\
 	do {								\
@@ -121,6 +121,7 @@ extern u_quad_t pentium_base_tsc;
 			*(otime) = *(ntime);				\
 		}							\
 	} while (0)
+#endif
 #endif
 void	delay __P((int));
 

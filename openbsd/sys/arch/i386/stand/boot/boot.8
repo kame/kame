@@ -1,6 +1,6 @@
-.\"	$OpenBSD: boot.8,v 1.16 1999/09/23 04:12:08 alex Exp $
+.\"	$OpenBSD: boot.8,v 1.19 2000/08/07 20:30:34 mickey Exp $
 .\"
-.\" Copyright (c) 1997-1999 Michael Shalayeff
+.\" Copyright (c) 1997-2000 Michael Shalayeff
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -147,7 +147,7 @@ Issues machine-dependent commands. These are defined for i386 architecture:
 Prints list of hard disks installed on your system including:
 BIOS device number, and the BIOS geometry.
 .It Nm memory
-If used without any arguments this commad will print out
+If used without any arguments this command will print out
 the memory configuration as determined through BIOS routines.
 Otherwise the arguments would specify the expressions to modify the
 memory configuration. The expression would have a form of:
@@ -159,6 +159,27 @@ Meaning to add(+) or exempt(-) the specified by the
 amount of memory at the location specified by the
 .Ar <address>
 argument.
+Both size and base address could be specified as octal,
+decimal, or hexadecimal numbers, as accepted by the
+.Xr stroul 3
+routine.
+Memory segments are not required to be adjucent to each other,
+the only requirement is that there is real physical memory under
+the range added.
+For example:
+.Bd -unfilled -offset indent
+machine mem +0x2000000@0x1000000
+.Ed
+.Pp
+would add 32M of memory right after first 16M.
+The other usefull command would be to winthdraw some range
+of memory form OS usage (as might be wrongfully reported as
+usefull by BIOS):
+.Bd -unfilled -offset indent
+machine mem -0x100000@0xf00000
+.Ed
+.Pp
+which effectively excludes 15-16M range from the map of usefull memory.
 .It Nm regs
 Prints contents of processor registers if compiled with
 .Em DEBUG .
@@ -184,7 +205,7 @@ Variables include:
 .Pp
 .Bl -tag -compact -width boothow
 .It Nm addr
-Address at wich to load the kernel.
+Address at which to load the kernel.
 .It Nm howto
 Options to pass to the loaded kernel.
 .It Nm debug
@@ -192,9 +213,9 @@ Debug flag if
 .Nm
 was compiled with DEBUG defined.
 .It Nm device
-Boot device name (ie fd0a, sd0a).
+Boot device name (ie: fd0a, sd0a).
 .It Nm tty
-Active console device name.
+Active console device name (ie: com0, com1, pc0)
 .It Nm image
 File name containing the kernel image.
 .El

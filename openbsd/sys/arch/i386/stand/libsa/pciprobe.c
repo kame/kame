@@ -1,4 +1,4 @@
-/*	$OpenBSD: pciprobe.c,v 1.3 1999/08/25 00:54:19 mickey Exp $	*/
+/*	$OpenBSD: pciprobe.c,v 1.5 2000/10/25 17:12:07 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner

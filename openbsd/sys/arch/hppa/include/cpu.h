@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.14 2000/03/23 20:25:41 mickey Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.19 2000/08/15 19:50:42 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -72,7 +72,15 @@
 enum hppa_cpu_type {
 	hpcx, hpcxs, hpcxt, hpcxta, hpcxl, hpcxl2, hpcxu, hpcxu2, hpcxw
 };
+extern enum hppa_cpu_type cpu_type;
+extern const char *cpu_typename;
 #endif
+
+/*
+ * COPR/SFUs
+ */
+#define	HPPA_FPUS	0xc0
+#define	HPPA_PMSFUS	0x20	/* ??? */
 
 /*
  * Exported definitions unique to hp700/PA-RISC cpu support.
@@ -83,6 +91,10 @@ enum hppa_cpu_type {
  * referenced in generic code
  */
 #undef	COPY_SIGCODE		/* copy sigcode above user stack in exec */
+
+#define	HPPA_PGALIAS	0x00100000
+#define	HPPA_PGAMASK	0xfff00000
+#define	HPPA_PGAOFF	0x000fffff
 
 #define	HPPA_IOSPACE	0xf0000000
 #define	HPPA_IOBCAST	0xfffc0000
@@ -108,18 +120,33 @@ enum hppa_cpu_type {
 
 #ifndef _LOCORE
 #ifdef _KERNEL
+#define MD_CACHE_FLUSH 0
+#define MD_CACHE_PURGE 1
+#define MD_CACHE_CTL(a,s,t)	\
+	(((t)? pdcache : fdcache) (HPPA_SID_KERNEL,(vaddr_t)(a),(s)))
+
 #define DELAY(x) delay(x)
+
+static __inline long
+kvtop (const caddr_t va)
+{
+	long ret;
+	__asm __volatile ("lpa %%r0(%1), %0" : "=r" (ret) : "r" (va));
+	return ret;
+}
+
+extern int (*cpu_desidhash) __P((void));
+
 void	delay __P((u_int us));
 void	hppa_init __P((paddr_t start));
 void	trap __P((int type, struct trapframe *frame));
-int	kvtop __P((const caddr_t va));
 int	dma_cachectl __P((caddr_t p, int size));
 int	spcopy __P((pa_space_t ssp, const void *src,
 		    pa_space_t dsp, void *dst, size_t size));
 int	spstrcpy __P((pa_space_t ssp, const void *src,
 		      pa_space_t dsp, void *dst, size_t size, size_t *rsize));
 int	copy_on_fault __P((void));
-void child_return __P((struct proc *p));
+void	child_return __P((struct proc *p));
 void	switch_trampoline __P((void));
 void	switch_exit __P((struct proc *p));
 int	cpu_dumpsize __P((void));

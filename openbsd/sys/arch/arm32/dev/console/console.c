@@ -45,6 +45,7 @@
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/device.h>
 #include <sys/time.h>
 #include <sys/systm.h>
@@ -709,7 +710,7 @@ physconstart(tp)
 
 	if (cl->c_cc) {
 		tp->t_state |= TS_TIMEOUT;
-		timeout(ttrstrt, tp, 1);
+		timeout_add(&tp->t_rstrt_to, 1);
 	}
 
 	if (cl->c_cc <= tp->t_lowat) {

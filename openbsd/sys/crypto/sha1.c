@@ -56,11 +56,12 @@ typedef union {
 } CHAR64LONG16;
 CHAR64LONG16* block;
 #ifdef SHA1HANDSOFF
-static unsigned char workspace[64];
-    block = (CHAR64LONG16*)workspace;
+    static unsigned char workspace[64];
+
+    block = (CHAR64LONG16 *)workspace;
     bcopy(buffer, block, 64);
 #else
-    block = (CHAR64LONG16*)buffer;
+    block = (CHAR64LONG16 *)buffer;
 #endif
     /* Copy context->state[] to working vars */
     a = state[0];
@@ -102,7 +103,7 @@ static unsigned char workspace[64];
 
 /* SHA1Init - Initialize new context */
 
-void SHA1Init(SHA1_CTX* context)
+void SHA1Init(SHA1_CTX *context)
 {
     /* SHA1 initialization constants */
     context->state[0] = 0x67452301;
@@ -116,7 +117,7 @@ void SHA1Init(SHA1_CTX* context)
 
 /* Run your data through this. */
 
-void SHA1Update(SHA1_CTX* context, unsigned char* data, unsigned int len)
+void SHA1Update(SHA1_CTX *context, unsigned char *data, unsigned int len)
 {
 unsigned int i;
 unsigned int j;
@@ -139,7 +140,7 @@ unsigned int j;
 
 /* Add padding and return the message digest. */
 
-void SHA1Final(unsigned char digest[20], SHA1_CTX* context)
+void SHA1Final(unsigned char digest[20], SHA1_CTX *context)
 {
 unsigned int i;
 unsigned char finalcount[8];

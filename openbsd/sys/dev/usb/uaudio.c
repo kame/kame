@@ -1,4 +1,4 @@
-/*	$OpenBSD: uaudio.c,v 1.4 2000/03/30 16:19:33 aaron Exp $ */
+/*	$OpenBSD: uaudio.c,v 1.6 2000/07/04 11:44:22 fgsch Exp $ */
 /*	$NetBSD: uaudio.c,v 1.23 2000/03/29 18:24:53 augustss Exp $	*/
 
 /*
@@ -6,7 +6,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -388,11 +388,8 @@ USB_ATTACH(uaudio)
 	sc->sc_chan.sc = sc;
 
 	DPRINTF(("uaudio_attach: doing audio_attach_mi\n"));
-#if defined(__OpenBSD__)
-	audio_attach_mi(&uaudio_hw_if, sc, &sc->sc_dev);
-#else
+
 	sc->sc_audiodev = audio_attach_mi(&uaudio_hw_if, sc, &sc->sc_dev);
-#endif
 
 	usbd_add_drv_event(USB_EVENT_DRIVER_ATTACH, sc->sc_udev,
 			   USBDEV(sc->sc_dev));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_generic.c,v 1.24 2000/04/20 06:32:00 deraadt Exp $	*/
+/*	$OpenBSD: sys_generic.c,v 1.27 2000/09/27 16:13:46 mickey Exp $	*/
 /*	$NetBSD: sys_generic.c,v 1.24 1996/03/29 00:25:32 cgd Exp $	*/
 
 /*
@@ -225,8 +225,7 @@ dofilereadv(p, fd, fp, iovp, iovcnt, offset, retval)
 			error = EINVAL;
 			goto out;
 		}
-		MALLOC(iov, struct iovec *, iovlen, M_IOV, M_WAITOK);
-		needfree = iov;
+		iov = needfree = malloc(iovlen, M_IOV, M_WAITOK);
 	} else if ((u_int)iovcnt > 0) {
 		iov = aiov;
 		needfree = NULL;
@@ -262,7 +261,7 @@ dofilereadv(p, fd, fp, iovp, iovcnt, offset, retval)
 	 * if tracing, save a copy of iovec
 	 */
 	if (KTRPOINT(p, KTR_GENIO))  {
-		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
+		ktriov = malloc(iovlen, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
 	}
 #endif
@@ -278,13 +277,13 @@ dofilereadv(p, fd, fp, iovp, iovcnt, offset, retval)
 		if (error == 0) 
 			ktrgenio(p->p_tracep, fd, UIO_READ, ktriov, cnt,
 			    error);
-		FREE(ktriov, M_TEMP);
+		free(ktriov, M_TEMP);
 	}
 #endif
 	*retval = cnt;
  done:
 	if (needfree)
-		FREE(needfree, M_IOV);
+		free(needfree, M_IOV);
  out:
 #if notyet
 	FILE_UNUSE(fp, p);
@@ -450,8 +449,7 @@ dofilewritev(p, fd, fp, iovp, iovcnt, offset, retval)
 	if ((u_int)iovcnt > UIO_SMALLIOV) {
 		if ((u_int)iovcnt > IOV_MAX)
 			return (EINVAL);
-		MALLOC(iov, struct iovec *, iovlen, M_IOV, M_WAITOK);
-		needfree = iov;
+		iov = needfree = malloc(iovlen, M_IOV, M_WAITOK);
 	} else if ((u_int)iovcnt > 0) {
 		iov = aiov;
 		needfree = NULL;
@@ -487,7 +485,7 @@ dofilewritev(p, fd, fp, iovp, iovcnt, offset, retval)
 	 * if tracing, save a copy of iovec
 	 */
 	if (KTRPOINT(p, KTR_GENIO))  {
-		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
+		ktriov = malloc(iovlen, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
 	}
 #endif
@@ -506,13 +504,13 @@ dofilewritev(p, fd, fp, iovp, iovcnt, offset, retval)
 		if (error == 0) 
 			ktrgenio(p->p_tracep, fd, UIO_WRITE, ktriov, cnt,
 			    error);
-		FREE(ktriov, M_TEMP);
+		free(ktriov, M_TEMP);
 	}
 #endif
 	*retval = cnt;
  done:
 	if (needfree)
-		FREE(needfree, M_IOV);
+		free(needfree, M_IOV);
  out:
 #if notyet
 	FILE_UNUSE(fp, p);
@@ -734,12 +732,6 @@ sys_select(p, v, retval)
 		}
 		s = splclock();
 		timeradd(&atv, &time, &atv);
-		timo = hzto(&atv);
-		/*
-		 * Avoid inadvertently sleeping forever.
-		 */
-		if (timo == 0)
-			timo = 1;
 		splx(s);
 	} else
 		timo = 0;
@@ -749,13 +741,15 @@ retry:
 	error = selscan(p, pibits[0], pobits[0], SCARG(uap, nd), retval);
 	if (error || *retval)
 		goto done;
-	s = splhigh();
-	/* this should be timercmp(&time, &atv, >=) */
-	if (SCARG(uap, tv) && (time.tv_sec > atv.tv_sec ||
-	    (time.tv_sec == atv.tv_sec && time.tv_usec >= atv.tv_usec))) {
-		splx(s);
-		goto done;
+	if (SCARG(uap, tv)) {
+		/*
+		 * We have to recalculate the timeout on every retry.
+		 */
+		timo = hzto(&atv);
+		if (timo <= 0)
+			goto done;
 	}
+	s = splhigh();
 	if ((p->p_flag & P_SELECT) == 0 || nselcoll != ncoll) {
 		splx(s);
 		goto retry;
@@ -993,12 +987,6 @@ sys_poll(p, v, retval)
 		}
 		s = splclock();
 		timeradd(&atv, &time, &atv);
-		timo = hzto(&atv);
-		/*
-		 * Avoid inadvertently sleeping forever.
-		 */
-		if (timo == 0)
-			timo = 1;
 		splx(s);
 	} else
 		timo = 0;
@@ -1009,11 +997,15 @@ retry:
 	pollscan(p, pl, SCARG(uap, nfds), retval);
 	if (*retval)
 		goto done;
-	s = splhigh();
-	if (timo && timercmp(&time, &atv, >=)) {
-		splx(s);
-		goto done;
+	if (msec != -1) {
+		/*
+		 * We have to recalculate the timeout on every retry.
+		 */
+		timo = hzto(&atv);
+		if (timo <= 0)
+			goto done;
 	}
+	s = splhigh();
 	if ((p->p_flag & P_SELECT) == 0 || nselcoll != ncoll) {
 		splx(s);
 		goto retry;
@@ -1038,3 +1030,4 @@ bad:
 		free((char *) pl, M_TEMP);
 	return (error);
 }
+

@@ -1,4 +1,4 @@
-/*	$OpenBSD: usb_port.h,v 1.14 2000/04/15 17:36:28 jakob Exp $ */
+/*	$OpenBSD: usb_port.h,v 1.18 2000/09/06 22:42:10 rahnds Exp $ */
 /*	$NetBSD: usb_port.h,v 1.28 2000/03/30 08:53:31 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.21 1999/11/17 22:33:47 n_hibma Exp $	*/
 
@@ -7,7 +7,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,7 +65,10 @@
 #define CUE_DEBUG 1
 #define KUE_DEBUG 1
 #define UMASS_DEBUG 1
-#define UVISOR_DEBUG 1
+#define UPL_DEBUG 1
+#define UZCOM_DEBUG 1
+#define URIO_DEBUG 1
+#define UFTDI_DEBUG 1
 #define Static
 #else
 #define Static static
@@ -93,6 +96,8 @@ typedef struct callout usb_callout_t;
 
 #define usb_kthread_create1	kthread_create1
 #define usb_kthread_create	kthread_create
+
+typedef int usb_malloc_type;
 
 #define Ether_ifattach ether_ifattach
 #define IF_INPUT(ifp, m) (*(ifp)->if_input)((ifp), (m))
@@ -185,6 +190,10 @@ __CONCAT(dname,_detach)(self, flags) \
 #define KUE_DEBUG 1
 #define UMASS_DEBUG 1
 #define UVISOR_DEBUG 1
+#define UPL_DEBUG 1
+#define UZCOM_DEBUG 1
+#define URIO_DEBUG 1
+#define UFTDI_DEBUG 1
 #endif
 
 #define Static
@@ -211,13 +220,26 @@ __CONCAT(dname,_detach)(self, flags) \
 #define	memcpy(d, s, l)		bcopy((s),(d),(l))
 #define	memset(d, v, l)		bzero((d),(l))
 #define bswap32(x)		swap32(x)
+#define bswap16(x)		swap16(x)
+
+/*
+ * The UHCI/OHCI controllers are little endian, so on big endian machines
+ * the data strored in memory needs to be swapped.
+ */
+
+#if defined(letoh32)
+#define le32toh(x) letoh32(x)
+#define le16toh(x) letoh16(x)
+#endif
+
 #define usb_kthread_create1	kthread_create
 #define usb_kthread_create	kthread_create_deferred
 
 #define	config_pending_incr()
 #define	config_pending_decr()
 
-#define mii_attach(x1,x2,x3,x4,x5,x6) mii_phy_probe(x1,x2,x3)
+typedef int usb_malloc_type;
+
 #define Ether_ifattach(ifp, eaddr) ether_ifattach(ifp)
 #define if_deactivate(x)
 #define IF_INPUT(ifp, m) do {						\
@@ -378,6 +400,8 @@ typedef struct callout_handle usb_callout_t;
 #define powerhook_establish(fn, sc) (fn)
 #define powerhook_disestablish(hdl)
 #define PWR_RESUME 0
+
+typedef struct malloc_type *usb_malloc_type;
 
 #define USB_DECLARE_DRIVER_INIT(dname, init) \
 Static device_probe_t __CONCAT(dname,_match); \

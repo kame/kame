@@ -1,4 +1,4 @@
-#	$OpenBSD: files.i386,v 1.64 2000/04/08 05:50:49 aaron Exp $
+#	$OpenBSD: files.i386,v 1.71 2000/09/01 05:46:01 aaron Exp $
 #	$NetBSD: files.i386,v 1.73 1996/05/07 00:58:36 thorpej Exp $
 #
 # new style config file for i386 architecture
@@ -15,6 +15,7 @@ file	arch/i386/i386/autoconf.c
 file	arch/i386/i386/conf.c
 file	arch/i386/i386/db_disasm.c	ddb
 file	arch/i386/i386/db_interface.c	ddb
+file	arch/i386/i386/db_memrw.c	ddb
 file	arch/i386/i386/db_trace.c	ddb
 file	arch/i386/i386/db_magic.s	ddb
 file	arch/i386/i386/disksubr.c	disk
@@ -85,14 +86,6 @@ file	arch/i386/i386/mainbus.c	mainbus
 include "../../../dev/pci/files.pci"
 file	arch/i386/pci/pci_machdep.c	pci
 file	arch/i386/pci/pci_compat.c	pci	# XXX compatibility
-file	arch/i386/pci/pcibios.c		pcibios
-file	arch/i386/pci/pci_intr_fixup.c	pcibios & pcibios_intr_fixup
-file	arch/i386/pci/piix.c		pcibios & pcibios_intr_fixup
-file	arch/i386/pci/opti82c558.c	pcibios & pcibios_intr_fixup
-file	arch/i386/pci/opti82c700.c	pcibios & pcibios_intr_fixup
-file	arch/i386/pci/sis85c503.c	pcibios & pcibios_intr_fixup
-file	arch/i386/pci/via82c586.c	pcibios & pcibios_intr_fixup
-file	arch/i386/pci/pci_bus_fixup.c	pcibios & pcibios_bus_fixup
 file	arch/i386/pci/pciide_machdep.c	pciide
 file	arch/i386/pci/pcic_pci_machdep.c	pcic_pci
 
@@ -138,7 +131,7 @@ define pckbd { [irq = -1], [port = -1] }
 device	pccom: tty
 attach	pccom at isa with pccom_isa
 attach	pccom at commulti with pccom_commulti
-file	arch/i386/isa/pccom.c		pccom & (pccom_isa | pccom_isapnp | pccom_commulti | pccom_pcmcia | pccom_puc) needs-flag
+file	arch/i386/isa/pccom.c		pccom & (pccom_isa | pccom_isapnp | pccom_commulti | pccom_pcmcia | pccom_cardbus | pccom_puc) needs-flag
 
 # PC console support a la "pccons"
 device	pc: tty, pckbd
@@ -151,6 +144,7 @@ attach	vt at isa
 file	arch/i386/isa/pcvt/pcvt_drv.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_ext.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_kbd.c	vt needs-flag
+file	arch/i386/isa/pcvt/pcvt_mouse.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_out.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_sup.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_vtf.c	vt needs-flag
@@ -244,16 +238,26 @@ file	arch/i386/i386/freebsd_machdep.c	compat_freebsd
 # OSS audio driver compatibility
 include "../../../compat/ossaudio/files.ossaudio"
 
-device bios {}
-attach bios at mainbus
+device	bios {}
+attach	bios at mainbus
 file	arch/i386/i386/bios.c		bios needs-count
 
-device apm
-attach apm at bios
+device	apm
+attach	apm at bios
 file	arch/i386/i386/apm.c		apm needs-count
 file	arch/i386/i386/apmcall.S	apm
 
-file	arch/i386/i386/bios32.c		bios32
+device	pcibios
+attach	pcibios at bios
+file	arch/i386/pci/pcibios.c		pcibios needs-count
+file	arch/i386/pci/pci_intr_fixup.c	pcibios
+file	arch/i386/pci/pci_bus_fixup.c	pcibios
+file	arch/i386/pci/pci_addr_fixup.c	pcibios
+file	arch/i386/pci/opti82c558.c	pcibios
+file	arch/i386/pci/opti82c700.c	pcibios
+file	arch/i386/pci/piix.c		pcibios
+file	arch/i386/pci/sis85c503.c	pcibios
+file	arch/i386/pci/via82c586.c	pcibios
 
 #
 # CARDBUS
@@ -278,8 +282,8 @@ attach	pcic at isa with pcic_isa
 file	dev/isa/i82365_isa.c		pcic_isa
 
 # PCIC pcmcia controller on PCI bus.
-#attach	pcic at pci with pcic_pci
-#file	dev/pci/i82365_pci.c		pcic_pci
+attach	pcic at pci with pcic_pci
+file	dev/pci/i82365_pci.c		pcic_pci
 
 # PCIC pcmcia controller on PnP board
 #attach	pcic at isapnp with pcic_isapnp
@@ -287,6 +291,12 @@ file	dev/isa/i82365_isa.c		pcic_isa
 
 # Code common to ISA and ISAPnP attachments
 file	dev/isa/i82365_isasubr.c	pcic_isa | pcic_isapnp
+
+# Databook TCIC/2 pcmcia/isa bridge
+device	tcic: pcmciabus
+file	dev/ic/tcic2.c			tcic
+attach	tcic at isa with tcic_isa
+file	dev/isa/tcic2_isa.c		tcic_isa
 
 #
 # Machine-independent PUC drivers
@@ -305,6 +315,9 @@ include "dev/pcmcia/files.pcmcia"
 
 # i386-specific PCMCIA drivers
 attach	pccom at pcmcia with pccom_pcmcia
+
+# i386-specific Cardbus drivers
+attach	pccom at cardbus with pccom_cardbus
 
 #
 # Machine-independent USB drivers

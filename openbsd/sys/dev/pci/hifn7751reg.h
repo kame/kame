@@ -1,4 +1,4 @@
-/*	$OpenBSD: hifn7751reg.h,v 1.14 2000/04/11 13:49:34 jason Exp $	*/
+/*	$OpenBSD: hifn7751reg.h,v 1.16 2000/10/26 00:41:26 jason Exp $	*/
 
 /*
  * Invertex AEON / Hi/fn 7751 driver
@@ -133,6 +133,7 @@ struct hifn_session {
 struct hifn_softc {
 	struct device	sc_dv;		/* generic device */
 	void *		sc_ih;		/* interrupt handler cookie */
+	u_int32_t	sc_dmaier;
 	u_int32_t	sc_drammodel;	/* 1=dram, 0=sram */
 
 	bus_space_handle_t	sc_sh0, sc_sh1;
@@ -349,10 +350,10 @@ struct hifn_softc {
  * Structure to help build up the command data structure.
  */
 typedef struct hifn_base_command {
-	u_int16_t masks;
-	u_int16_t session_num;
-	u_int16_t total_source_count;
-	u_int16_t total_dest_count;
+	volatile u_int16_t masks;
+	volatile u_int16_t session_num;
+	volatile u_int16_t total_source_count;
+	volatile u_int16_t total_dest_count;
 } hifn_base_command_t;
 
 #define HIFN_BASE_CMD_MAC		(0x1 << 10)
@@ -363,9 +364,9 @@ typedef struct hifn_base_command {
  * Structure to help build up the command data structure.
  */
 typedef struct hifn_crypt_command {
-	u_int16_t masks;
-	u_int16_t header_skip;
-	u_int32_t source_count;
+	volatile u_int16_t masks;
+	volatile u_int16_t header_skip;
+	volatile u_int32_t source_count;
 } hifn_crypt_command_t;
 
 #define HIFN_CRYPT_CMD_ALG_MASK		(0x3 << 0)
@@ -379,9 +380,9 @@ typedef struct hifn_crypt_command {
  * Structure to help build up the command data structure.
  */
 typedef struct hifn_mac_command {
-	u_int16_t masks;
-	u_int16_t header_skip;
-	u_int32_t source_count;
+	volatile u_int16_t masks;
+	volatile u_int16_t header_skip;
+	volatile u_int32_t source_count;
 } hifn_mac_command_t;
 
 #define HIFN_MAC_CMD_ALG_MD5		(0x1 << 0)
@@ -396,20 +397,6 @@ typedef struct hifn_mac_command {
  */
 #define HIFN_MAC_CMD_POS_IPSEC		(0x2 << 8)
 #define HIFN_MAC_CMD_NEW_KEY		(0x1 << 11)
-
-/*
- * Structure with all fields necessary to write the command buffer.
- * We build it up while interrupts are on, then use it to write out
- * the command buffer quickly while interrupts are off.
- */
-typedef struct hifn_command_buf_data {
-	hifn_base_command_t base_cmd;
-	hifn_mac_command_t mac_cmd;
-	hifn_crypt_command_t crypt_cmd;
-	const u_int8_t *mac;
-	const u_int8_t *ck;
-	const u_int8_t *iv;
-} hifn_command_buf_data_t;
 
 /*
  * The poll frequency and poll scalar defines are unshifted values used

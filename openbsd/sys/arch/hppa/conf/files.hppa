@@ -1,4 +1,4 @@
-#	$OpenBSD: files.hppa,v 1.23 2000/04/18 19:52:10 mickey Exp $
+#	$OpenBSD: files.hppa,v 1.26 2000/06/07 00:41:23 mickey Exp $
 #
 # hppa-specific configuration info
 
@@ -10,8 +10,12 @@ maxusers 2 8 64
 # 
 # "workstation console" routines
 #
+include "dev/wscons/files.wscons"
 
-#include "dev/wscons/files.wscons"
+#
+# Media Independent Interface (mii)
+#
+include "dev/mii/files.mii"
 
 #
 # Machine-independent SCSI drivers
@@ -44,7 +48,8 @@ include "dev/eisa/files.eisa"
 include "dev/pci/files.pci"
 
 #
-# General System Connect Bus
+# Gonzo System Connect Bus
+#	(GSC, GSC-1X, GSC+, GSC-1.5X, GSC-2X)
 #
 define	gscbus	{ }
 
@@ -97,9 +102,8 @@ device	dino: pcibus
 attach	dino at mainbus
 file	arch/hppa/dev/dino.c		dino
 
-device	sti # : wsemuldisplaydev
-attach	sti at mainbus
-file	arch/hppa/dev/sti.c		sti needs-flag
+attach	sti at mainbus with sti_sgc
+file	arch/hppa/dev/sti_sgc.c		sti_sgc
 
 ###
 

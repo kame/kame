@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxpvar.h,v 1.2 2000/04/26 19:12:08 chris Exp $	*/
+/*	$OpenBSD: fxpvar.h,v 1.4 2000/09/17 17:08:16 aaron Exp $	*/
 /*	$NetBSD: if_fxpvar.h,v 1.1 1997/06/05 02:01:58 thorpej Exp $	*/
 
 /*                  
@@ -55,6 +55,7 @@ struct fxp_softc {
 	int need_mcsetup;		/* multicast filter needs programming */
 	struct fxp_cb_tx *cbl_last;	/* last active TxCB in list */
 	struct fxp_stats *fxp_stats;	/* Pointer to interface stats */
+	struct timeout stats_update_to; /* Pointer to timeout structure */
 	int rx_idle_secs;		/* # of seconds RX has been idle */
 	struct fxp_cb_tx *cbl_base;	/* base of TxCB list */
 	struct fxp_cb_mcs *mcsp;	/* Pointer to mcast setup descriptor */
@@ -64,6 +65,8 @@ struct fxp_softc {
 	int phy_10Mbps_only;		/* PHY is 10Mbps-only device */
 	int eeprom_size;		/* size of serial EEPROM */
 	int not_82557;			/* yes if we are 82558/82559 */
+	void *sc_sdhook;		/* shutdownhook */
+	void *sc_powerhook;		/* powerhook */
 };
 
 /* Macros to ease CSR access. */
@@ -82,3 +85,4 @@ struct fxp_softc {
 
 extern int fxp_intr __P((void *));
 extern int fxp_attach_common __P((struct fxp_softc *, u_int8_t *, const char *));
+extern int fxp_detach __P((struct fxp_softc *));

@@ -1,7 +1,11 @@
-#	$OpenBSD: Makefile,v 1.24 1999/07/08 20:11:53 deraadt Exp $
+#	$OpenBSD: Makefile,v 1.29 2000/10/19 17:14:01 fgsch Exp $
 
 .include "${.CURDIR}/../Makefile.inc"
 
+MAN=	boot.8
+MLINKS=	boot.8 boot.conf.8
+
+.if ${MACHINE} == "i386"
 PROG=	boot
 LD?=	ld
 SIZE?=	size
@@ -17,9 +21,6 @@ SRCS=	srt0.S
 .endif
 
 SRCS+=	boot.c cmd.c vars.c bootarg.c conf.c
-MAN=	boot.8
-MANSUBDIR=/i386
-MLINKS=	boot.8 boot.conf.8
 S	=${.CURDIR}/../../../..
 SADIR=	${.CURDIR}/..
 
@@ -32,9 +33,14 @@ ${PROG}: $(OBJS) $(DPADD)
 	$(LD) $(LDFLAGS) -o $(PROG) $(OBJS) $(LDADD)
 	@$(SIZE) $(PROG)
 
+.else
+NOPROG=
+.endif
+
 .include <bsd.prog.mk>
 
 CPPFLAGS+=-DBOOTMAGIC=$(BOOTMAGIC) ${DEBUGFLAGS}
 CFLAGS+=$(SACFLAGS)
 #AFLAGS+=-Wa,-R
 # AFLAGS+=-Wa,-a
+

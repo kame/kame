@@ -1,5 +1,5 @@
-/*	$OpenBSD: wscons_rinit.c,v 1.6 1997/11/06 12:26:59 niklas Exp $ */
-/*	$NetBSD: wscons_rinit.c,v 1.3 1996/11/13 21:13:42 cgd Exp $ */
+/* $OpenBSD: wscons_rinit.c,v 1.8 2000/09/06 01:39:16 rahnds Exp $ */
+/* $NetBSD: wscons_rinit.c,v 1.2 1998/05/14 20:49:56 drochner Exp $ */
 
 /*
  * Copyright (c) 1991, 1993
@@ -51,6 +51,7 @@
 
 #include <dev/rcons/raster.h>
 #include <dev/wscons/wscons_raster.h>
+
 #include <dev/wscons/wscons_rfont.h>
 
 void	rcons_initfont __P((struct rcons *, struct raster_font *));
@@ -103,13 +104,30 @@ rcons_init(rc, mrow, mcol)
 	struct raster *rp = rc->rc_sp;
 	int i;
 
-	rcons_initfont(rc, &CONSOLE_FONT);
+	/* force decent minimums */
+	if (mrow < 25) {
+		mrow = 25;
+	}
+	if (mcol < 80) {
+		mcol = 80;
+	}
+	rcons_initfont(rc, &gallant19);
 
 	i = rp->height / rc->rc_font->height;
 	rc->rc_maxrow = min(i, mrow);
 
 	i = rp->width / rc->rc_font->width;
 	rc->rc_maxcol = min(i, mcol);
+	if ( rc->rc_maxcol < 80 ) {
+		/* font too big, try smaller font */
+		rcons_initfont(rc, &fontdata8x16);
+
+		i = rp->height / rc->rc_font->height;
+		rc->rc_maxrow = min(i, mrow);
+
+		i = rp->width / rc->rc_font->width;
+		rc->rc_maxcol = min(i, mcol);
+	}
 
 	/* Center emulator screen (but align x origin to 32 bits) */
 	rc->rc_xorigin =
@@ -127,7 +145,6 @@ rcons_init(rc, mrow, mcol)
 			rc->rc_raswidth = i;
 	}
 
-	rc->rc_ras_blank = RAS_CLEAR;
 	rc->rc_bits = 0;
 
 	/* If cursor position given, assume it's there and drawn. */

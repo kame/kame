@@ -1,4 +1,4 @@
-/*	$OpenBSD: ncr53c9xvar.h,v 1.5 1998/09/02 06:09:28 deraadt Exp $	*/
+/*	$OpenBSD: ncr53c9xvar.h,v 1.7 2000/07/21 11:20:34 art Exp $	*/
 /*	$NetBSD: ncr53c9xvar.h,v 1.13 1998/05/26 23:17:34 thorpej Exp $	*/
 
 /*-
@@ -67,6 +67,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/timeout.h>
+
 /* Set this to 1 for normal debug, or 2 for per-target tracing. */
 #define NCR53C9X_DEBUG		1
 
@@ -87,7 +89,8 @@
 #define	NCR_VARIANT_ESP406		5
 #define	NCR_VARIANT_FAS408		6
 #define	NCR_VARIANT_FAS216		7
-#define	NCR_VARIANT_MAX			8
+#define	NCR_VARIANT_AM53C974		8
+#define	NCR_VARIANT_MAX			9
 
 /*
  * ECB. Holds additional information for each SCSI command Comments: We
@@ -108,6 +111,7 @@ struct ncr53c9x_ecb {
 #define	ECB_RESET		0x80
 #define	ECB_TENTATIVE_DONE	0x100
 	int timeout;
+	struct timeout to;
 
 	struct {
 		u_char	id;			/* Selection Id msg */
@@ -242,6 +246,9 @@ struct ncr53c9x_softc {
 	u_char	sc_cfg1;			/* Config 1 */
 	u_char	sc_cfg2;			/* Config 2, not ESP100 */
 	u_char	sc_cfg3;			/* Config 3, only ESP200 */
+	u_char	sc_cfg3_fscsi;			/* Chip specific FSCSI bit */
+	u_char	sc_cfg4;			/* Config 4 */
+	u_char	sc_cfg5;			/* Config 5 */
 	u_char	sc_ccf;				/* Clock Conversion */
 	u_char	sc_timeout;
 
@@ -256,19 +263,19 @@ struct ncr53c9x_softc {
 				      ready_list,
 				      nexus_list;
 
-	struct ncr53c9x_ecb *sc_nexus;		/* current command */
-	struct ncr53c9x_ecb sc_ecb[3*8];		/* three per target */
+	struct ncr53c9x_ecb *sc_nexus;		/* Current command */
+	struct ncr53c9x_ecb sc_ecb[3*8];	/* Three per target */
 	struct ncr53c9x_tinfo sc_tinfo[8];
 
 	/* Data about the current nexus (updated for every cmd switch) */
-	caddr_t	sc_dp;				/* Current data pointer */
-	ssize_t	sc_dleft;			/* Data left to transfer */
+	caddr_t	sc_dp;		/* Current data pointer */
+	ssize_t	sc_dleft;	/* Data left to transfer */
 
 	/* Adapter state */
-	int	sc_phase;		/* Copy of what bus phase we are in */
-	int	sc_prevphase;		/* Copy of what bus phase we were in */
-	u_char	sc_state;		/* State applicable to the adapter */
-	u_char	sc_flags;
+	int	sc_phase;	/* Copy of what bus phase we are in */
+	int	sc_prevphase;	/* Copy of what bus phase we were in */
+	u_char	sc_state;	/* State applicable to the adapter */
+	u_char	sc_flags;	/* See below */
 	u_char	sc_selid;
 	u_char	sc_lastcmd;
 
@@ -286,13 +293,13 @@ struct ncr53c9x_softc {
 	caddr_t	sc_cmdp;	/* Command pointer (for DMAed commands) */
 	size_t	sc_cmdlen;	/* Size of command in transit */
 
-	/* hardware/openprom stuff */
-	int sc_freq;				/* Freq in MHz */
-	int sc_id;				/* our scsi id */
-	int sc_rev;				/* esp revision */
-	int sc_features;			/* chip features */
-	int sc_minsync;				/* minimum sync period / 4 */
-	int sc_maxxfer;				/* maximum transfer size */
+	/* Hardware attributes */
+	int sc_freq;		/* SCSI bus frequency in MHz */
+	int sc_id;		/* Our SCSI id */
+	int sc_rev;		/* Chip revision */
+	int sc_features;	/* Chip features */
+	int sc_minsync;		/* Minimum sync period / 4 */
+	int sc_maxxfer;		/* Maximum transfer size */
 };
 
 /* values for sc_state */
@@ -393,6 +400,7 @@ void	ncr53c9x_attach __P((struct ncr53c9x_softc *,
 	    struct scsi_adapter *, struct scsi_device *));
 int	ncr53c9x_scsi_cmd __P((struct scsi_xfer *));
 void	ncr53c9x_reset __P((struct ncr53c9x_softc *));
-int	ncr53c9x_intr __P((struct ncr53c9x_softc *));
+int	ncr53c9x_intr __P((void *));
+void	ncr53c9x_init __P((struct ncr53c9x_softc *, int));
 
 extern	int ncr53c9x_dmaselect;

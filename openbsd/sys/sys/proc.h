@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.30 2000/04/19 09:58:19 art Exp $	*/
+/*	$OpenBSD: proc.h,v 1.32 2000/07/07 15:57:01 art Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -214,6 +214,9 @@ struct	proc {
 #define	SSLEEP	3		/* Sleeping on an address. */
 #define	SSTOP	4		/* Process debugging or suspension. */
 #define	SZOMB	5		/* Awaiting collection by parent. */
+#define SDEAD	6		/* Process is almost a zombie. */
+
+#define P_ZOMBIE(p)	((p)->p_stat == SZOMB || (p)->p_stat == SDEAD)
 
 /* These flags are kept in p_flag. */
 #define	P_ADVLOCK	0x000001	/* Proc may hold a POSIX adv. lock. */
@@ -308,6 +311,7 @@ struct	pcred {
 #define FORK_CLEANFILES	0x00000020
 #define FORK_NOZOMBIE	0x00000040
 #define FORK_SHAREVM	0x00000080
+#define FORK_VMNOSTACK	0x00000100
 
 #define	PIDHASH(pid)	(&pidhashtbl[(pid) & pidhash])
 extern LIST_HEAD(pidhashhead, proc) *pidhashtbl;
@@ -325,6 +329,10 @@ extern int randompid;			/* fork() should create random pid's */
 LIST_HEAD(proclist, proc);
 extern struct proclist allproc;		/* List of all processes. */
 extern struct proclist zombproc;	/* List of zombie processes. */
+
+extern struct proclist deadproc;	/* List of dead processes. */
+extern struct simplelock deadproc_slock;
+
 struct proc *initproc;			/* Process slots for init, pager. */
 
 #define	NQS	32			/* 32 run queues. */
@@ -360,7 +368,9 @@ void	swapin __P((struct proc *));
 int	tsleep __P((void *chan, int pri, char *wmesg, int timo));
 void	unsleep __P((struct proc *));
 void	wakeup __P((void *chan));
+void	reaper __P((void));
 void	exit1 __P((struct proc *, int));
+void	exit2 __P((struct proc *));
 int	fork1 __P((struct proc *, int, void *, size_t, register_t *));
 void	kmeminit __P((void));
 void	rqinit __P((void));

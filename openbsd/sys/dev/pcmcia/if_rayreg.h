@@ -1,5 +1,5 @@
 /*	$OpenBSD$	*/
-/*	$NetBSD: if_rayreg.h,v 1.2 2000/02/27 20:40:43 augustss Exp $	*/
+/*	$NetBSD: if_rayreg.h,v 1.3 2000/08/10 11:48:46 ad Exp $	*/
 
 /* 
  * Copyright (c) 2000 Christian E. Hopps

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_dc_pci.c,v 1.3 2000/04/26 13:58:28 mickey Exp $	*/
+/*	$OpenBSD: if_dc_pci.c,v 1.10 2000/10/30 18:20:18 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -87,13 +87,15 @@ struct dc_type dc_devs[] = {
 	{ PCI_VENDOR_DAVICOM, PCI_PRODUCT_DAVICOM_DM9100 },
 	{ PCI_VENDOR_DAVICOM, PCI_PRODUCT_DAVICOM_DM9102 },
 	{ PCI_VENDOR_ADMTEK, PCI_PRODUCT_ADMTEK_AL981 },
-	{ PCI_VENDOR_ADMTEK, PCI_PRODUCT_ADMTEK_AN985 },
+	{ PCI_VENDOR_ADMTEK, PCI_PRODUCT_ADMTEK_AN983 },
 	{ PCI_VENDOR_ASIX, PCI_PRODUCT_ASIX_AX88140A },
 	{ PCI_VENDOR_MACRONIX, PCI_PRODUCT_MACRONIX_MX98713 },
 	{ PCI_VENDOR_MACRONIX, PCI_PRODUCT_MACRONIX_MX98715 },
+	{ PCI_VENDOR_MACRONIX, PCI_PRODUCT_MACRONIX_MX98727 },
 	{ PCI_VENDOR_COMPEX, PCI_PRODUCT_COMPEX_98713 },
 	{ PCI_VENDOR_LITEON, PCI_PRODUCT_LITEON_PNIC },
 	{ PCI_VENDOR_LITEON, PCI_PRODUCT_LITEON_PNICII },
+	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN1217 },
 	{ 0, 0 }
 };
 
@@ -267,9 +269,15 @@ void dc_pci_attach(parent, self, aux)
 		    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DAVICOM_DM9102) {
 			found = 1;
 			sc->dc_type = DC_TYPE_DM9102;
-			sc->dc_flags |= DC_TX_COALESCE|DC_TX_USE_TX_INTR;
-			sc->dc_flags |= DC_REDUCED_MII_POLL;
+			sc->dc_flags |= DC_TX_COALESCE|DC_TX_INTR_ALWAYS;
+			sc->dc_flags |= DC_REDUCED_MII_POLL|DC_TX_STORENFWD;
 			sc->dc_pmode = DC_PMODE_MII;
+
+			/* Increase the latency timer value. */
+			command = pci_conf_read(pc, pa->pa_tag, DC_PCI_CFLT);
+			command &= 0xFFFF00FF;
+			command |= 0x00008000;
+			pci_conf_write(pc, pa->pa_tag, DC_PCI_CFLT, command);
 		}
 		break;
 	case PCI_VENDOR_ADMTEK:
@@ -280,29 +288,43 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_flags |= DC_TX_ADMTEK_WAR;
 			sc->dc_pmode = DC_PMODE_MII;
 		}
-		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ADMTEK_AN985) {
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ADMTEK_AN983) {
 			found = 1;
-			sc->dc_type = DC_TYPE_AN985;
+			sc->dc_type = DC_TYPE_AN983;
 			sc->dc_flags |= DC_TX_USE_TX_INTR;
 			sc->dc_flags |= DC_TX_ADMTEK_WAR;
 			sc->dc_pmode = DC_PMODE_MII;
 		}
 		break;
 	case PCI_VENDOR_MACRONIX:
+	case PCI_VENDOR_ACCTON:
 		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_MACRONIX_MX98713) {
 			found = 1;
 			if (revision < DC_REVISION_98713A) {
 				sc->dc_type = DC_TYPE_98713;
-				sc->dc_flags |= DC_REDUCED_MII_POLL;
 			}
-			if (revision >= DC_REVISION_98713A)
+			if (revision >= DC_REVISION_98713A) {
 				sc->dc_type = DC_TYPE_98713A;
+				sc->dc_flags |= DC_21143_NWAY;
+			}
+			sc->dc_flags |= DC_REDUCED_MII_POLL;
 			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
 		}
-		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_MACRONIX_MX98715) {
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_MACRONIX_MX98715 ||
+		    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ACCTON_EN1217) {
+			found = 1;
+			if (revision >= DC_REVISION_98715AEC_C &&
+			    revision < DC_REVISION_98725)
+				sc->dc_flags |= DC_128BIT_HASH;
+			sc->dc_type = DC_TYPE_987x5;
+			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
+			sc->dc_flags |= DC_REDUCED_MII_POLL|DC_21143_NWAY;
+		}
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_MACRONIX_MX98727) {
 			found = 1;
 			sc->dc_type = DC_TYPE_987x5;
 			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
+			sc->dc_flags |= DC_REDUCED_MII_POLL|DC_21143_NWAY;
 		}
 		break;
 	case PCI_VENDOR_COMPEX:
@@ -322,6 +344,8 @@ void dc_pci_attach(parent, self, aux)
 			found = 1;
 			sc->dc_type = DC_TYPE_PNICII;
 			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
+			sc->dc_flags |= DC_REDUCED_MII_POLL|DC_21143_NWAY;
+			sc->dc_flags |= DC_128BIT_HASH;
 		}
 		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_LITEON_PNIC) {
 			found = 1;
@@ -369,6 +393,23 @@ void dc_pci_attach(parent, self, aux)
 	}
 
 	/*
+	 * If we discover later (in dc_attach_common()) that we have an
+	 * MII with no PHY, we need to have the 21143 drive the LEDs.
+	 * Except there are some systems like the NEC VersaPro NoteBook PC
+	 * which have no LEDs, and twiddling these bits has adverse effects
+	 * on them. (I.e. you suddenly can't get a link.)
+	 *
+	 * If mii_attach() returns an error, we leave the DC_TULIP_LEDS
+	 * bit set, else we clear it. Since our dc(4) driver is split into
+	 * bus-dependent and bus-independent parts, we must do set this bit
+	 * here while we are able to do PCI configuration reads.
+	 */
+	if (DC_IS_INTEL(sc)) {
+		if (pci_conf_read(pc, pa->pa_tag, DC_PCI_CSID) != 0x80281033)
+			sc->dc_flags |= DC_TULIP_LEDS;
+	}
+
+	/*
 	 * Try to learn something about the supported media.
 	 * We know that ASIX and ADMtek and Davicom devices
 	 * will *always* be using MII media, so that's a no-brainer.
@@ -387,8 +428,10 @@ void dc_pci_attach(parent, self, aux)
 		DELAY(10000);
 		if (media & DC_CWUC_MII_ABILITY)
 			sc->dc_pmode = DC_PMODE_MII;
-		if (media & DC_CWUC_SYM_ABILITY)
+		if (media & DC_CWUC_SYM_ABILITY) {
 			sc->dc_pmode = DC_PMODE_SYM;
+			sc->dc_flags |= DC_21143_NWAY;
+		}
 		/*
 		 * If none of the bits are set, then this NIC
 		 * isn't meant to support 'wake up LAN' mode.

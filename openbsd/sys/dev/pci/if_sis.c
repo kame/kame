@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sis.c,v 1.3 2000/02/15 02:28:14 jason Exp $ */
+/*	$OpenBSD: if_sis.c,v 1.7 2000/10/16 17:08:08 aaron Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -30,12 +30,15 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.13 1999/09/25 17:29:01 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.21 2000/08/22 23:26:51 wpaul Exp $
  */
 
 /*
  * SiS 900/SiS 7016 fast ethernet PCI NIC driver. Datasheets are
  * available from http://www.sis.com.tw.
+ *
+ * This driver also supports the NatSemi DP83815. Datasheets are
+ * available from http://www.national.com.
  *
  * Written by Bill Paul <wpaul@ee.columbia.edu>
  * Electrical Engineering Department
@@ -120,6 +123,7 @@ void sis_watchdog	__P((struct ifnet *));
 int sis_ifmedia_upd	__P((struct ifnet *));
 void sis_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
 
+u_int16_t sis_reverse	__P((u_int16_t));
 void sis_delay		__P((struct sis_softc *));
 void sis_eeprom_idle	__P((struct sis_softc *));
 void sis_eeprom_putbyte	__P((struct sis_softc *, int));
@@ -130,8 +134,9 @@ int sis_miibus_readreg	__P((struct device *, int, int));
 void sis_miibus_writereg	__P((struct device *, int, int, int));
 void sis_miibus_statchg	__P((struct device *));
 
-void sis_setmulti	__P((struct sis_softc *));
-u_int32_t sis_calchash	__P((caddr_t));
+void sis_setmulti_sis	__P((struct sis_softc *));
+void sis_setmulti_ns	__P((struct sis_softc *));
+u_int32_t sis_crc	__P((struct sis_softc *, caddr_t));
 void sis_reset		__P((struct sis_softc *));
 int sis_list_rx_init	__P((struct sis_softc *));
 int sis_list_tx_init	__P((struct sis_softc *));
@@ -149,6 +154,21 @@ int sis_list_tx_init	__P((struct sis_softc *));
 
 #define SIO_CLR(x)					\
 	CSR_WRITE_4(sc, SIS_EECTL, CSR_READ_4(sc, SIS_EECTL) & ~x)
+
+/*
+ * Routine to reverse the bits in a word. Stolen almost
+ * verbatim from /usr/games/fortune.
+ */
+u_int16_t sis_reverse(n)
+	u_int16_t		n;
+{
+	n = ((n >>  1) & 0x5555) | ((n <<  1) & 0xaaaa);
+	n = ((n >>  2) & 0x3333) | ((n <<  2) & 0xcccc);
+	n = ((n >>  4) & 0x0f0f) | ((n <<  4) & 0xf0f0);
+	n = ((n >>  8) & 0x00ff) | ((n <<  8) & 0xff00);
+
+	return(n);
+}
 
 void sis_delay(sc)
 	struct sis_softc	*sc;
@@ -233,9 +253,9 @@ void sis_eeprom_getword(sc, addr, dest)
 
 	/* Enter EEPROM access mode. */
 	sis_delay(sc);
-	SIO_SET(SIS_EECTL_CSEL);
+	SIO_CLR(SIS_EECTL_CLK);
 	sis_delay(sc);
-	SIO_SET(SIS_EECTL_CLK);
+	SIO_SET(SIS_EECTL_CSEL);
 	sis_delay(sc);
 
 	/*
@@ -294,7 +314,26 @@ int sis_miibus_readreg(self, phy, reg)
 	int			phy, reg;
 {
 	struct sis_softc	*sc = (struct sis_softc *)self;
-	int			i, val;
+	int			i, val = 0;
+
+	if (sc->sis_type == SIS_TYPE_83815) {
+		if (phy != 0)
+			return(0);
+		/*
+		 * The NatSemi chip can take a while after
+		 * a reset to come ready, during which the BMSR
+		 * returns a value of 0. This is *never* supposed
+		 * to happen: some of the BMSR bits are meant to
+		 * be hardwired in the on position, and this can
+		 * confuse the miibus code a bit during the probe
+		 * and attach phase. So we make an effort to check
+		 * for this condition and wait for it to clear.
+		 */
+		if (!CSR_READ_4(sc, NS_BMSR))
+			DELAY(1000);
+		val = CSR_READ_4(sc, NS_BMCR + (reg * 4));
+		return(val);
+	}
 
 	if (sc->sis_type == SIS_TYPE_900 && phy != 0)
 		return(0);
@@ -327,6 +366,13 @@ void sis_miibus_writereg(self, phy, reg, data)
 	struct sis_softc	*sc = (struct sis_softc *)self;
 	int			i;
 
+	if (sc->sis_type == SIS_TYPE_83815) {
+		if (phy != 0)
+			return;
+		CSR_WRITE_4(sc, NS_BMCR + (reg * 4), data);
+		return;
+	}
+
 	if (sc->sis_type == SIS_TYPE_900 && phy != 0)
 		return;
 
@@ -349,24 +395,14 @@ void sis_miibus_statchg(self)
 	struct device		*self;
 {
 	struct sis_softc	*sc = (struct sis_softc *)self;
-	struct mii_data		*mii;
 
-	mii = &sc->sc_mii;
-
-	if ((mii->mii_media_active & IFM_GMASK) == IFM_FDX) {
-		SIS_SETBIT(sc, SIS_TX_CFG,
-		    (SIS_TXCFG_IGN_HBEAT|SIS_TXCFG_IGN_CARR));
-		SIS_SETBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_TXPKTS);
-	} else {
-		SIS_CLRBIT(sc, SIS_TX_CFG,
-		    (SIS_TXCFG_IGN_HBEAT|SIS_TXCFG_IGN_CARR));
-		SIS_CLRBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_TXPKTS);
-	}
+	sis_init(sc);
 
 	return;
 }
 
-u_int32_t sis_calchash(addr)
+u_int32_t sis_crc(sc, addr)
+	struct sis_softc	*sc;
 	caddr_t			addr;
 {
 	u_int32_t		crc, carry; 
@@ -387,11 +423,69 @@ u_int32_t sis_calchash(addr)
 		}
 	}
 
-	/* return the filter bit position */
+	/*
+	 * return the filter bit position
+	 *
+	 * The NatSemi chip has a 512-bit filter, which is
+	 * different than the SiS, so we special-case it.
+	 */
+	if (sc->sis_type == SIS_TYPE_83815)
+		return((crc >> 23) & 0x1FF);
+
 	return((crc >> 25) & 0x0000007F);
 }
 
-void sis_setmulti(sc)
+void sis_setmulti_ns(sc)
+	struct sis_softc	*sc;
+{
+        struct ifnet            *ifp;
+        struct arpcom           *ac = &sc->arpcom;
+        struct ether_multi      *enm;
+        struct ether_multistep  step;
+	u_int32_t		h = 0, i, filtsave;
+	int			bit, index;
+
+	ifp = &sc->arpcom.ac_if;
+
+	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
+		SIS_CLRBIT(sc, SIS_RXFILT_CTL, NS_RXFILTCTL_MCHASH);
+		SIS_SETBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ALLMULTI);
+		return;
+	}
+
+	/*
+	 * We have to explicitly enable the multicast hash table
+	 * on the NatSemi chip if we want to use it, which we do.
+	 */
+	SIS_SETBIT(sc, SIS_RXFILT_CTL, NS_RXFILTCTL_MCHASH);
+	SIS_CLRBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ALLMULTI);
+
+	filtsave = CSR_READ_4(sc, SIS_RXFILT_CTL);
+
+	/* first, zot all the existing hash bits */
+	for (i = 0; i < 32; i++) {
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_FMEM_LO + (i*2));
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA, 0);
+	}
+
+        ETHER_FIRST_MULTI(step, ac, enm);
+        while (enm != NULL) {
+		h = sis_crc(sc, enm->enm_addrlo);
+		index = h >> 3;
+		bit = h & 0x1F;
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_FMEM_LO + index);
+		if (bit > 0xF)
+			bit -= 0x10;
+		SIS_SETBIT(sc, SIS_RXFILT_DATA, (1 << bit));
+		ETHER_NEXT_MULTI(step, enm);
+	}
+
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL, filtsave);
+
+	return;
+}
+
+void sis_setmulti_sis(sc)
 	struct sis_softc	*sc;
 {
 	struct ifnet		*ifp;
@@ -420,7 +514,7 @@ void sis_setmulti(sc)
 	/* now program new ones */
 	ETHER_FIRST_MULTI(step, ac, enm);
 	while (enm != NULL) {
-		h = sis_calchash(enm->enm_addrlo);
+		h = sis_crc(sc, enm->enm_addrlo);
 		CSR_WRITE_4(sc, SIS_RXFILT_CTL, (4 + (h >> 4)) << 16);
 		SIS_SETBIT(sc, SIS_RXFILT_DATA, (1 << (h & 0xF)));
 		ETHER_NEXT_MULTI(step, enm);
@@ -462,13 +556,16 @@ int sis_probe(parent, match, aux)
 {
 	struct pci_attach_args	*pa = (struct pci_attach_args *)aux;
 
-	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_SIS)
+	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_SIS &&
+	    PCI_VENDOR(pa->pa_id) != PCI_VENDOR_NS)
 		return(0);
 
 	switch (PCI_PRODUCT(pa->pa_id)) {
 	case PCI_PRODUCT_SIS_900:
 		return(1);
 	case PCI_PRODUCT_SIS_7016:
+		return(1);
+	case PCI_PRODUCT_NS_DP83815:
 		return(1);
 	}
 
@@ -497,7 +594,20 @@ void sis_attach(parent, self, aux)
 
 	s = splimp();
 	sc->sis_unit = sc->sc_dev.dv_unit;
-	sc->sis_type = SIS_TYPE_900;
+
+	switch (PCI_PRODUCT(pa->pa_id)) {
+	case PCI_PRODUCT_SIS_900:
+		sc->sis_type = SIS_TYPE_900;
+		break;
+	case PCI_PRODUCT_SIS_7016:
+		sc->sis_type = SIS_TYPE_7016;
+		break;
+	case PCI_PRODUCT_NS_DP83815:
+		sc->sis_type = SIS_TYPE_83815;
+		break;
+	default:
+		break;
+	}
 
 	/*
 	 * Handle power management nonsense.
@@ -590,10 +700,51 @@ void sis_attach(parent, self, aux)
 	/*
 	 * Get station address from the EEPROM.
 	 */
-	sis_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr, SIS_EE_NODEADDR,3,0);
+	switch (PCI_VENDOR(pa->pa_id)) {
+	case PCI_VENDOR_NS:
+		/*
+		 * Reading the MAC address out of the EEPROM on
+		 * the NatSemi chip takes a bit more work than
+		 * you'd expect. The address spans 4 16-bit words,
+		 * with the first word containing only a single bit.
+		 * You have to shift everything over one bit to
+		 * get it aligned properly. Also, the bits are
+		 * stored backwards (the LSB is really the MSB,
+		 * and so on) so you have to reverse them in order
+		 * to get the MAC address into the form we want.
+		 * Why? Who the hell knows.
+		 */
+		{
+			u_int16_t		tmp[4];
+
+			sis_read_eeprom(sc, (caddr_t)&tmp, NS_EE_NODEADDR,4,0);
+
+			/* Shift everything over one bit. */
+			tmp[3] = tmp[3] >> 1;
+			tmp[3] |= tmp[2] << 15;
+			tmp[2] = tmp[2] >> 1;
+			tmp[2] |= tmp[1] << 15;
+			tmp[1] = tmp[1] >> 1;
+			tmp[1] |= tmp[0] << 15;
+
+			/* Now reverse all the bits. */
+			tmp[3] = sis_reverse(tmp[3]);
+			tmp[2] = sis_reverse(tmp[2]);
+			tmp[1] = sis_reverse(tmp[1]);
+
+			bcopy((char *)&tmp[1], sc->arpcom.ac_enaddr,
+			    ETHER_ADDR_LEN);
+		}
+		break;
+	case PCI_VENDOR_SIS:
+	default:
+		sis_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
+		    SIS_EE_NODEADDR, 3, 0);
+		break;
+	}
 
 	printf(" address %s\n", ether_sprintf(sc->arpcom.ac_enaddr));
-
+        
 	sc->sis_ldata_ptr = malloc(sizeof(struct sis_list_data) + 8,
 				M_DEVBUF, M_NOWAIT);
 	if (sc->sis_ldata_ptr == NULL) {
@@ -621,7 +772,8 @@ void sis_attach(parent, self, aux)
 	sc->sc_mii.mii_writereg = sis_miibus_writereg;
 	sc->sc_mii.mii_statchg = sis_miibus_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, sis_ifmedia_upd,sis_ifmedia_sts);
-	mii_phy_probe(self, &sc->sc_mii, 0xffffffff);
+	mii_attach(self, &sc->sc_mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,
+	    0);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
@@ -905,12 +1057,24 @@ void sis_tick(xsc)
 {
 	struct sis_softc	*sc = (struct sis_softc *)xsc;
 	struct mii_data		*mii;
+	struct ifnet		*ifp;
 	int			s;
 
 	s = splimp();
 
+	ifp = &sc->arpcom.ac_if;
+
 	mii = &sc->sc_mii;
 	mii_tick(mii);
+
+	if (!sc->sis_link) {
+		mii_pollstat(mii);
+		if (mii->mii_media_status & IFM_ACTIVE &&
+		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
+			sc->sis_link++;
+			if (ifp->if_snd.ifq_head != NULL)
+				sis_start(ifp);
+	}
 	timeout(sis_tick, sc, hz);
 
 	splx(s);
@@ -947,12 +1111,14 @@ int sis_intr(arg)
 
 		claimed = 1;
 
-		if ((status & SIS_ISR_TX_OK) ||
+		if ((status & SIS_ISR_TX_DESC_OK) ||
 		    (status & SIS_ISR_TX_ERR) ||
+		    (status & SIS_ISR_TX_OK) ||
 		    (status & SIS_ISR_TX_IDLE))
 			sis_txeof(sc);
 
-		if (status & SIS_ISR_RX_OK)
+		if ((status & SIS_ISR_RX_DESC_OK) ||
+		    (status & SIS_ISR_RX_OK))
 			sis_rxeof(sc);
 
 		if ((status & SIS_ISR_RX_ERR) ||
@@ -1040,6 +1206,9 @@ void sis_start(ifp)
 
 	sc = ifp->if_softc;
 
+	if (!sc->sis_link)
+		return;
+
 	idx = sc->sis_cdata.sis_tx_prod;
 
 	if (ifp->if_flags & IFF_OACTIVE)
@@ -1096,15 +1265,27 @@ void sis_init(xsc)
 	mii = &sc->sc_mii;
 
 	/* Set MAC address */
-	CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR0);
-	CSR_WRITE_4(sc, SIS_RXFILT_DATA,
-	    ((u_int16_t *)sc->arpcom.ac_enaddr)[0]);
-	CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR1);
-	CSR_WRITE_4(sc, SIS_RXFILT_DATA,
-	    ((u_int16_t *)sc->arpcom.ac_enaddr)[1]);
-	CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR2);
-	CSR_WRITE_4(sc, SIS_RXFILT_DATA,
-	    ((u_int16_t *)sc->arpcom.ac_enaddr)[2]);
+	if (sc->sis_type == SIS_TYPE_83815) {
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_PAR0);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA,
+		    ((u_int16_t *)sc->arpcom.ac_enaddr)[0]);
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_PAR1);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA,
+		    ((u_int16_t *)sc->arpcom.ac_enaddr)[1]);
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_PAR2);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA,
+		    ((u_int16_t *)sc->arpcom.ac_enaddr)[2]);
+	} else {
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR0);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA,
+		    ((u_int16_t *)sc->arpcom.ac_enaddr)[0]);
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR1);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA,
+		    ((u_int16_t *)sc->arpcom.ac_enaddr)[1]);
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR2);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA,
+		    ((u_int16_t *)sc->arpcom.ac_enaddr)[2]);
+	}
 
 	/* Init circular RX list. */
 	if (sis_list_rx_init(sc) == ENOBUFS) {
@@ -1119,6 +1300,17 @@ void sis_init(xsc)
 	 * Init tx descriptors.
 	 */
 	sis_list_tx_init(sc);
+
+	/*
+	 * For the NatSemi chip, we have to explicitly enable the
+	 * reception of ARP frames, as well as turn on the 'perfect
+	 * match' filter where we store the station address, otherwise
+	 * we won't receive unicasts meant for this host.
+	 */
+	if (sc->sis_type == SIS_TYPE_83815) {
+		SIS_SETBIT(sc, SIS_RXFILT_CTL, NS_RXFILTCTL_ARP);
+		SIS_SETBIT(sc, SIS_RXFILT_CTL, NS_RXFILTCTL_PERFECT);
+	}
 
 	 /* If we want promiscuous mode, set the allframes bit. */
 	if (ifp->if_flags & IFF_PROMISC) {
@@ -1139,7 +1331,10 @@ void sis_init(xsc)
 	/*
 	 * Load the multicast filter.
 	 */
-	sis_setmulti(sc);
+	if (sc->sis_type == SIS_TYPE_83815)
+		sis_setmulti_ns(sc);
+	else
+		sis_setmulti_sis(sc);
 
 	/* Turn the receive filter on */
 	SIS_SETBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ENABLE);
@@ -1154,8 +1349,23 @@ void sis_init(xsc)
 
 	/* Set RX configuration */
 	CSR_WRITE_4(sc, SIS_RX_CFG, SIS_RXCFG);
+
 	/* Set TX configuration */
-	CSR_WRITE_4(sc, SIS_TX_CFG, SIS_TXCFG);
+	if (IFM_SUBTYPE(mii->mii_media_active) == IFM_10_T)
+		CSR_WRITE_4(sc, SIS_TX_CFG, SIS_TXCFG_10);
+	else
+		CSR_WRITE_4(sc, SIS_TX_CFG, SIS_TXCFG_100);
+
+	/* Set full/half duplex mode. */
+	if ((mii->mii_media_active & IFM_GMASK) == IFM_FDX) {
+		SIS_SETBIT(sc, SIS_TX_CFG,
+		    (SIS_TXCFG_IGN_HBEAT|SIS_TXCFG_IGN_CARR));
+		SIS_SETBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_TXPKTS);
+	} else {
+		SIS_CLRBIT(sc, SIS_TX_CFG,
+		    (SIS_TXCFG_IGN_HBEAT|SIS_TXCFG_IGN_CARR));
+		SIS_CLRBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_TXPKTS);
+	}
 
 	/*
 	 * Enable interrupts.
@@ -1167,7 +1377,24 @@ void sis_init(xsc)
 	SIS_CLRBIT(sc, SIS_CSR, SIS_CSR_TX_DISABLE|SIS_CSR_RX_DISABLE);
 	SIS_SETBIT(sc, SIS_CSR, SIS_CSR_RX_ENABLE);
 
+#ifdef notdef
 	mii_mediachg(mii);
+#endif
+
+	/*
+	 * Page 75 of the DP83815 manual recommends the
+	 * following register settings "for optimum
+	 * performance." Note however that at least three
+	 * of the registers are listed as "reserved" in
+	 * the register map, so who knows what they do.
+	 */
+	if (sc->sis_type == SIS_TYPE_83815) {
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0x0001);
+		CSR_WRITE_4(sc, NS_PHY_CR, 0x189C);
+		CSR_WRITE_4(sc, NS_PHY_TDATA, 0x0000);
+		CSR_WRITE_4(sc, NS_PHY_DSPCFG, 0x5040);
+		CSR_WRITE_4(sc, NS_PHY_SDCFG, 0x008C);
+	}
 
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
@@ -1186,11 +1413,19 @@ int sis_ifmedia_upd(ifp)
 	struct ifnet		*ifp;
 {
 	struct sis_softc	*sc;
+	struct mii_data		*mii;
 
 	sc = ifp->if_softc;
 
-	if (ifp->if_flags & IFF_UP)
-		sis_init(sc);
+	mii = &sc->sc_mii;
+	sc->sis_link = 0;
+	if (mii->mii_instance) {
+		struct mii_softc	*miisc;
+		for (miisc = LIST_FIRST(&mii->mii_phys); miisc != NULL;
+		    miisc = LIST_NEXT(miisc, mii_list))
+			mii_phy_reset(miisc);
+	}
+	mii_mediachg(mii);
 
 	return(0);
 }
@@ -1266,7 +1501,10 @@ int sis_ioctl(ifp, command, data)
 			 * Multicast list has changed; set the hardware
 			 * filter accordingly.
 			 */
-			sis_setmulti(sc);
+			if (sc->sis_type == SIS_TYPE_83815)
+				sis_setmulti_ns(sc);
+			else
+				sis_setmulti_sis(sc);
 			error = 0;
 		}
 		break;
@@ -1325,6 +1563,8 @@ void sis_stop(sc)
 	DELAY(1000);
 	CSR_WRITE_4(sc, SIS_TX_LISTPTR, 0);
 	CSR_WRITE_4(sc, SIS_RX_LISTPTR, 0);
+
+	sc->sis_link = 0;
 
 	/*
 	 * Free data in the RX lists.

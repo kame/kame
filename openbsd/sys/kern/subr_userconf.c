@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_userconf.c,v 1.19 2000/01/08 23:23:37 d Exp $	*/
+/*	$OpenBSD: subr_userconf.c,v 1.22 2000/08/08 21:42:40 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996 Mats O Jansson <moj@stacken.kth.se>
@@ -293,7 +293,7 @@ userconf_pdev(devno)
 		ln++;
 		userconf_pnum(*l++);
 	}
-	printf("\n");
+	printf(" flags 0x%x\n", cd->cf_flags);
 }
 
 int
@@ -499,6 +499,8 @@ userconf_change(devno)
 				ln++;
 				l++;
 			}
+			userconf_modify("flags", &cd->cf_flags);
+			userconf_hist_int(cd->cf_flags);
 
 			if (share) {
 				if (bcmp(cd->cf_loc, lk, sizeof(int) * i))
@@ -589,7 +591,7 @@ userconf_enable(devno)
 			printf(" already");
 		} else {
 			/* XXX add cmd 'e' <devno> eoc */
-			userconf_hist_cmd('d');
+			userconf_hist_cmd('e');
 			userconf_hist_int(devno);
 			userconf_hist_eoc();
 		}
@@ -1228,13 +1230,11 @@ userconf_parse(cmd)
 void
 user_config()
 {
-	char prompt[] = "UKC> ";
-
 	userconf_init();
 	printf("User Kernel Config\n");
 
 	while (1) {
-		printf(prompt);
+		printf("UKC> ");
 		if (getsn(userconf_cmdbuf, sizeof(userconf_cmdbuf)) > 0 &&
 		    userconf_parse(userconf_cmdbuf))
 			break;

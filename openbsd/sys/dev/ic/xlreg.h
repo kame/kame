@@ -1,4 +1,4 @@
-/*	$OpenBSD: xlreg.h,v 1.2 2000/04/18 14:32:49 aaron Exp $	*/
+/*	$OpenBSD: xlreg.h,v 1.7 2000/10/19 16:33:52 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -31,11 +31,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: if_xlreg.h,v 1.17 1999/05/30 18:09:17 wpaul Exp $
+ *	$FreeBSD: if_xlreg.h,v 1.26 2000/08/28 20:40:03 wpaul Exp $
  */
-
-#define XL_BUS_PCI	0x00
-#define XL_BUS_CARDBUS	0x01
 
 #define XL_EE_READ	0x0080	/* read, 5 bit address */
 #define XL_EE_WRITE	0x0040	/* write, 5 bit address */
@@ -257,6 +254,7 @@
  * Window 3 (fifo management)
  */
 #define XL_W3_INTERNAL_CFG	0x00
+#define XL_W3_MAX_PKT_SIZE	0x04		/* 3C905B only */
 #define XL_W3_RESET_OPT		0x08
 #define XL_W3_FREE_TX		0x0C
 #define XL_W3_FREE_RX		0x0A
@@ -553,6 +551,14 @@ struct xl_mii_frame {
 #define XL_TYPE_905B	1
 #define XL_TYPE_90X	2
 
+#define XL_FLAG_FUNCREG			0x0001
+#define XL_FLAG_PHYOK			0x0002
+#define XL_FLAG_EEPROM_OFFSET_30	0x0004
+#define XL_FLAG_WEIRDRESET		0x0008
+#define XL_FLAG_8BITROM			0x0010
+#define XL_FLAG_INVERT_LED_PWR		0x0020
+#define XL_FLAG_INVERT_MII_PWR		0x0040
+
 struct xl_softc {
 	struct device		sc_dev;		/* generic device structure */
 	void *			xl_intrhand;	/* interrupt handler cookie */
@@ -572,12 +578,13 @@ struct xl_softc {
 	u_int16_t		xl_caps;
 	u_int8_t		xl_stats_no_timeout;
 	u_int16_t		xl_tx_thresh;
-	u_int8_t		xl_bustype;	/* i.e., PCI or CardBus? */
 	int			xl_if_flags;
 	caddr_t			xl_ldata_ptr;
 	struct xl_list_data	*xl_ldata;
 	struct xl_chain_data	xl_cdata;
+	int			xl_flags;
 	void (*intr_ack)	__P((struct xl_softc *));
+	void *			sc_sdhook;
 };
 
 #define xl_rx_goodframes(x) \
@@ -631,9 +638,12 @@ struct xl_stats {
 #define	TC_VENDORID		0x10B7
 
 /*
- * 3Com chip device IDs.
+ * 3Com PCI chip device IDs.
  */
 #define TC_DEVICEID_TORNADO_HOMECONNECT		0x4500
+#define TC_DEVICEID_HURRICANE_555		0x5055
+#define TC_DEVICEID_HURRICANE_556		0x6055
+#define TC_DEVICEID_HURRICANE_556B		0x6056
 #define	TC_DEVICEID_BOOMERANG_10BT		0x9000
 #define TC_DEVICEID_BOOMERANG_10BT_COMBO	0x9001
 #define TC_DEVICEID_BOOMERANG_10_100BT		0x9050
@@ -650,9 +660,23 @@ struct xl_stats {
 #define TC_DEVICEID_HURRICANE_10_100BT_SERV	0x9800
 #define TC_DEVICEID_TORNADO_10_100BT_SERV	0x9805
 #define TC_DEVICEID_HURRICANE_SOHO100TX		0x7646
-#define TC_DEVICEID_3CCFE575_CARDBUS		0x5057
-#define TC_DEVICEID_3CCFE575BT_CARDBUS		0x5157
-#define TC_DEVICEID_3CCFE575CT_CARDBUS		0x5257
+
+/*
+ * 3Com CardBus chip device IDs.
+ *
+ * The third character of the model number indicates either a dongle ('C')
+ * or X-Jack ('X') connector. Presumably, "FE" means "Fast Ethernet", and
+ * the 'M' indicates a NIC/modem combo card.
+ */
+#define TC_DEVICEID_3C575_CARDBUS		0x5057
+#define TC_DEVICEID_3CCFE575BT_CARDBUS		0x5157	/* also 3CXFE575BT */
+#define TC_DEVICEID_3CCFE575CT_CARDBUS		0x5257	/* also 3CXFE575CT */
+#define TC_DEVICEID_3CCFEM656_CARDBUS		0x6560	/* also 3CXFEM656 */
+#define TC_DEVICEID_3CCFEM656B_CARDBUS		0x6562
+#define TC_DEVICEID_3CCFEM656C_CARDBUS		0x6564	/* also 3CXFEM656C */
+
+#define XL_CARDBUS_INTR				0x0004
+#define XL_CARDBUS_INTR_ACK			0x8000
 
 /*
  * PCI low memory base and low I/O base register, and
@@ -702,3 +726,4 @@ struct xl_stats {
 
 extern int xl_intr __P((void *));
 extern void xl_attach __P((struct xl_softc *));
+extern int xl_detach __P((struct xl_softc *));

@@ -129,7 +129,7 @@ timeout_add(new, to_ticks)
 
 	/* If this timeout was already on a queue we remove it. */
 	if (new->to_flags & TIMEOUT_ONQUEUE)
-		TAILQ_REMOVE(&timeout_todo, to, to_list);
+		TAILQ_REMOVE(&timeout_todo, new, to_list);
 	else
 		new->to_flags |= TIMEOUT_ONQUEUE;
 	/* Initialize the time here, it won't change. */

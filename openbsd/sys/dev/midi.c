@@ -1,4 +1,4 @@
-/*	$OpenBSD: midi.c,v 1.3 2000/01/03 19:38:13 fgsch Exp $	*/
+/*	$OpenBSD: midi.c,v 1.5 2000/06/26 22:43:21 art Exp $	*/
 /*	$NetBSD: midi.c,v 1.10 1998/12/20 14:26:44 drochner Exp $	*/
 
 /*
@@ -170,6 +170,7 @@ midi_attach(sc, parent)
 	sc->sc_dev = parent;
 	sc->hw_if->getinfo(sc->hw_hdl, &mi);
 	sc->props = mi.props;
+	timeout_set(&sc->timeo, midi_timeout, sc);
 	printf(": <%s>\n", mi.name);
 }
 
@@ -527,7 +528,7 @@ midi_start_output(sc, intr)
 		psignal(sc->async, SIGIO);
 	if (mb->used > 0) {
 		if (!(sc->props & MIDI_PROP_OUT_INTR))
-			timeout(midi_timeout, sc, midi_wait);
+			timeout_add(&sc->timeo, midi_wait);
 	} else
 		sc->pbus = 0;
 	splx(s);
@@ -746,7 +747,7 @@ midi_getinfo(dev, mi)
 
 int	midiprint __P((void *, const char *));
 
-void
+struct device *
 midi_attach_mi(mhwp, hdlp, dev)
 	struct midi_hw_if *mhwp;
 	void *hdlp;
@@ -757,13 +758,13 @@ midi_attach_mi(mhwp, hdlp, dev)
 #ifdef DIAGNOSTIC
 	if (mhwp == NULL) {
 		printf("midi_attach_mi: NULL\n");
-		return;
+		return 0;
 	}
 #endif
 	arg.type = AUDIODEV_TYPE_MIDI;
 	arg.hwif = mhwp;
 	arg.hdl = hdlp;
-	(void)config_found(dev, &arg, midiprint);
+	return config_found(dev, &arg, midiprint);
 }
 
 int

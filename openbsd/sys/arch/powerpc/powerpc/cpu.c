@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.2 1999/07/05 20:21:10 rahnds Exp $ */
+/*	$OpenBSD: cpu.c,v 1.5 2000/10/20 15:18:27 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -79,8 +79,8 @@ cpuattach(parent, dev, aux)
 {
 	int cpu, pvr;
 	char name[32];
-
-	printf(": ");
+	int qhandle, phandle;
+	unsigned int clock_freq = 0;
 
 	__asm__ ("mfpvr %0" : "=r"(pvr));
 	cpu = pvr >> 16;
@@ -109,6 +109,9 @@ cpuattach(parent, dev, aux)
 	case 9:
 		sprintf(cpu_model, "604ev");
 		break;
+	case 12:
+		sprintf(cpu_model, "7400(G4)");
+		break;
 	case 20:
 		sprintf(cpu_model, "620");
 		break;
@@ -117,7 +120,35 @@ cpuattach(parent, dev, aux)
 		break;
 	}
 	sprintf(cpu_model + strlen(cpu_model), " (Revision %x)", pvr & 0xffff);
-	printf(" %s", cpu_model);
+	printf(": %s", cpu_model);
+
+	/* This should only be executed on openfirmware systems... */
+
+	for (qhandle = OF_peer(0); qhandle; qhandle = phandle) {
+                if (OF_getprop(qhandle, "device_type", name, sizeof name) >= 0
+                    && !strcmp(name, "cpu")
+                    && OF_getprop(qhandle, "clock-frequency",
+                                  &clock_freq , sizeof clock_freq ) >= 0)
+		{
+			break;
+		}
+                if (phandle = OF_child(qhandle))
+                        continue;
+                while (qhandle) {
+                        if (phandle = OF_peer(qhandle))
+                                break;
+                        qhandle = OF_parent(qhandle);
+                }
+	}
+
+	if (clock_freq != 0) {
+		/* Openfirmware  stores clock in HZ, not Mhz */
+		clock_freq /= 1000000;
+		printf(": %d Mhz", clock_freq);
+
+	}
 	printf("\n");
+
+
 }
 

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.5 1999/09/11 21:41:31 mickey Exp $
+#	$OpenBSD: Makefile,v 1.7 2000/05/29 08:17:34 deraadt Exp $
 
 FONTS	= 	vt220l.814 vt220h.814 vt220l.808 vt220h.808 \
 		vt220l.816 vt220h.816 vt220l.810 vt220h.810 \

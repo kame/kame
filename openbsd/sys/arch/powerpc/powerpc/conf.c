@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.14 1999/11/09 00:20:42 rahnds Exp $ */
+/*	$OpenBSD: conf.c,v 1.18 2000/10/01 00:23:26 rahnds Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -58,6 +58,8 @@ bdev_decl(rd);
 bdev_decl(vnd);
 #include "ccd.h"
 bdev_decl(ccd);
+#include "raid.h"
+bdev_decl(raid);
 
 struct bdevsw bdevsw[] = {
 	bdev_disk_init(NWD,wd),		/* 0: ST506/ESDI/IDE disk */
@@ -79,6 +81,7 @@ struct bdevsw bdevsw[] = {
 	bdev_disk_init(NCCD,ccd),	/* 16 concatenated disk driver*/
 	bdev_disk_init(NRD,rd),		/* 17 ram disk driver*/
 	bdev_notdef(),                  /* 18 unknown*/
+	bdev_disk_init(NRAID,raid),	/* 19: RAIDframe disk driver */
 };
 int nblkdev = sizeof bdevsw / sizeof bdevsw[0];
 
@@ -110,13 +113,13 @@ cdev_decl(ofrtc);
 cdev_decl(kbd);
 cdev_decl(ms);
 
-#define cdev_wscons_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttselect /* ttpoll */, dev_init(c,n,mmap), D_TTY }
+#include "wsdisplay.h"
+#include "wskbd.h"
+#include "wsmouse.h"
 
-#include "wscons.h"
-cdev_decl(wscons);
+cdev_decl(wsdisplay);
+cdev_decl(wskbd);
+cdev_decl(wsmouse);
 
 #include <sd.h>
 #include <st.h>
@@ -129,6 +132,8 @@ cdev_decl(cd);
 cdev_decl(vnd);
 cdev_decl(ccd);
 cdev_decl(rd);  
+#include "raid.h"
+cdev_decl(raid);
 
 #include <wd.h>
 cdev_decl(wd);
@@ -162,6 +167,21 @@ cdev_decl(lkm);
 #endif  
 #include "ksyms.h"
 cdev_decl(ksyms);
+#include "usb.h"
+cdev_decl(usb);
+#include "uhid.h"
+cdev_decl(uhid);
+#include "ugen.h"
+cdev_decl(ugen);
+#include "ulpt.h"
+cdev_decl(ulpt);
+#include "urio.h"
+cdev_decl(urio);
+#include "ucom.h"
+cdev_decl(ucom);
+
+#include "wsmux.h"
+cdev_decl(wsmux);
 
 
 struct cdevsw cdevsw[] = {
@@ -190,12 +210,12 @@ struct cdevsw cdevsw[] = {
         cdev_bpftun_init(NBPFILTER,bpf),/* 22: berkeley packet filter */
         cdev_bpftun_init(NTUN,tun),     /* 23: network tunnel */
         cdev_lkm_init(NLKM,lkm),        /* 24: loadable module driver */
-	cdev_wscons_init(NWSCONS,wscons), /* 25: workstation console */     
+        cdev_notdef(),                  /* 25 */
         cdev_notdef(),                  /* 26 */
         cdev_notdef(),                  /* 27 */
         cdev_notdef(),                  /* 28 */
-        cdev_mouse_init(NWSCONS,kbd),   /* 29 /dev/kbd XX */
-        cdev_mouse_init(NWSCONS,ms),    /* 30 /dev/mouse XXX */
+        cdev_notdef(),                  /* 29 */
+        cdev_notdef(),                  /* 30 */
         cdev_notdef(),                  /* 31 */
         cdev_notdef(),                  /* 32 */
         cdev_lkm_dummy(),               /* 33 */
@@ -221,7 +241,29 @@ struct cdevsw cdevsw[] = {
 #else
         cdev_notdef(),                  /* 51 */
 #endif
-	/* If adding devs, don't forget to expand 'chrtoblktbl' below! */
+        cdev_notdef(),                  /* 52 */ 
+        cdev_notdef(),                  /* 53 */ 
+	cdev_disk_init(NRAID,raid),	/* 54: RAIDframe disk driver */
+        cdev_notdef(),                  /* 55 */ 
+	/* The following slots are reserved for isdn4bsd. */
+	cdev_notdef(),			/* 56: i4b main device */
+	cdev_notdef(),			/* 57: i4b control device */
+	cdev_notdef(),			/* 58: i4b raw b-channel access */
+	cdev_notdef(),			/* 59: i4b trace device */
+	cdev_notdef(),			/* 60: i4b phone device */
+	/* End of reserved slots for isdn4bsd. */
+	cdev_usb_init(NUSB,usb),	/* 61: USB controller */
+	cdev_usbdev_init(NUHID,uhid),	/* 62: USB generic HID */
+	cdev_ugen_init(NUGEN,ugen),	/* 63: USB generic driver */
+	cdev_ulpt_init(NULPT,ulpt), 	/* 64: USB printers */
+	cdev_usbdev_init(NURIO,urio),	/* 65: USB Diamond Rio 500 */
+	cdev_tty_init(NUCOM,ucom),	/* 66: USB tty */
+	cdev_wsdisplay_init(NWSDISPLAY,	/* 67: frame buffers, etc. */
+		wsdisplay),
+	cdev_mouse_init(NWSKBD, wskbd),	/* 68: keyboards */
+	cdev_mouse_init(NWSMOUSE,	/* 69: mice */
+		wsmouse),
+	cdev_mouse_init(NWSMUX, wsmux),	/* 70: ws multiplexor */
 };
 int nchrdev = sizeof cdevsw / sizeof cdevsw[0];
 
@@ -251,6 +293,12 @@ iszerodev(dev)
 	dev_t dev;
 {
 	return major(dev) == mem_no && minor(dev) == 12;
+}
+
+dev_t
+getnulldev()
+{
+	return makedev(mem_no, 2);
 }
 
 static int chrtoblktbl[] = {
@@ -312,6 +360,7 @@ blktochr(dev)
 }
 
 #include <dev/cons.h>
+#include <vgafb_pci.h>
 
 cons_decl(com);
 cons_decl(ofc);

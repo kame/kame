@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.41 2000/05/02 02:58:53 rahnds Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.50 2000/10/27 00:16:17 mickey Exp $	*/
 /*	$NetBSD: machdep.c,v 1.4 1996/10/16 19:33:11 ws Exp $	*/
 
 /*
@@ -43,6 +43,7 @@
 #include <sys/mount.h>
 #include <sys/msgbuf.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/reboot.h>
 #include <sys/syscallargs.h>
 #include <sys/syslog.h>
@@ -71,6 +72,7 @@
 #include <machine/autoconf.h>
 #include <machine/bus.h>
 #include <machine/pio.h>
+#include "adb.h"
 
 /*
  * Global variables used here and there
@@ -137,7 +139,7 @@ struct extent *devio_ex;
 static int devio_malloc_safe = 0;
 
 /* HACK - XXX */
-int segment8_mapped = 0;
+int segment8_a_mapped = 0;
 
 extern int OF_stdout;
 extern int where;
@@ -197,9 +199,13 @@ where = 3;
 	battable[0].batu = BATU(0x00000000);
 
 #if 1
-	battable[1].batl = BATL(0x80000000, BAT_I);
-	battable[1].batu = BATU(0x80000000);
-	segment8_mapped = 1;
+	battable[0x8].batl = BATL(0x80000000, BAT_I);
+	battable[0x8].batu = BATU(0x80000000);
+	battable[0x9].batl = BATL(0x90000000, BAT_I);
+	battable[0x9].batu = BATU(0x90000000);
+	battable[0xa].batl = BATL(0xa0000000, BAT_I);
+	battable[0xa].batu = BATU(0xa0000000);
+	segment8_a_mapped = 1;
 #if 0
 	if(system_type == POWER4e) {
 		/* Map ISA I/O */
@@ -223,7 +229,7 @@ where = 3;
 	__asm__ volatile ("mtdbatl 0,%0; mtdbatu 0,%1"
 		      :: "r"(battable[0].batl), "r"(battable[0].batu));
 
-#if 1
+#if 0
 	__asm__ volatile ("mtdbatl 1,%0; mtdbatu 1,%1"
 		      :: "r"(battable[1].batl), "r"(battable[1].batu));
 	__asm__ volatile ("sync;isync");
@@ -328,9 +334,15 @@ where = 3;
 			case 'd':
 				boothowto |= RB_KDB;
 				break;
+			case 'c':
+				boothowto |= RB_CONFIG;
+				break;
 			}
 		}
 	}			
+#if 0
+	ddb_init((int)(esym - (&_end)), &_end, esym);
+#endif
 
 	/*
 	 * Set up extents for pci mappings
@@ -354,16 +366,23 @@ where = 3;
 		(caddr_t)devio_ex_storage, sizeof(devio_ex_storage),
 		EX_NOCOALESCE|EX_NOWAIT);
 
-	ofwconprobe();
-
 	/*
 	 * Now we can set up the console as mapping is enabled.
          */
 	consinit();
-
-#if 0
-	dump_avail();
+	/* while using openfirmware, run userconfig */
+	if (boothowto & RB_CONFIG) {
+#ifdef BOOT_CONFIG
+		user_config();
+#else
+		printf("kernel does not support -c; continuing..\n");
 #endif
+	}
+	/*
+	 * Replace with real console.
+	 */
+	ofwconprobe();
+
 #if NIPKDB > 0
 	/*
 	 * Now trap to IPKDB
@@ -585,7 +604,7 @@ allocsys(v)
 	 * Decide on buffer space to use.
 	 */
 	if (bufpages == 0)
-		bufpages = (physmem / ((100 / BUFCACHEPERCENT) / CLSIZE));
+		bufpages = physmem * BUFCACHEPERCENT / (100 * CLSIZE);
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -715,7 +734,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	tf->lr = (int)catcher;
 	tf->fixreg[3] = (int)sig;
 	tf->fixreg[4] = (psp->ps_siginfo & sigmask(sig)) ? (int)&fp->sf_si : NULL;
-	tf->fixreg[5] = (int)&frame.sf_sc;
+	tf->fixreg[5] = (int)&fp->sf_sc;
 	tf->srr0 = (int)(((char *)PS_STRINGS)
 			 - (p->p_emul->e_esigcode - p->p_emul->e_sigcode));
 
@@ -880,6 +899,14 @@ boot(howto)
 	splhigh();
 	if (howto & RB_HALT) {
 		doshutdownhooks();
+		if ((howto & RB_POWERDOWN) == RB_POWERDOWN) {
+#if NADB > 0
+			delay(1000000);
+			adb_poweroff();
+			printf("WARNING: powerdown failed!\n");
+#endif
+		}
+
 		printf("halted\n\n");
 		(fw->exit)();
 	}
@@ -887,25 +914,11 @@ boot(howto)
 		dumpsys();
 	doshutdownhooks();
 	printf("rebooting\n\n");
-#if 0
-	if (what && *what) {
-		if (strlen(what) > sizeof str - 5)
-			printf("boot string too large, ignored\n");
-		else {
-			strcpy(str, what);
-			ap1 = ap = str + strlen(str);
-			*ap++ = ' ';
-		}
-	}
-	*ap++ = '-';
-	if (howto & RB_SINGLE)
-		*ap++ = 's';
-	if (howto & RB_KDB)
-		*ap++ = 'd';
-	*ap++ = 0;
-	if (ap[-2] == '-')
-		*ap1 = 0;
+
+#if NADB > 0
+	adb_restart();  /* not return */
 #endif
+
 	OF_exit();
 	(fw->boot)(str);
 	printf("boot failed, spinning\n");
@@ -997,19 +1010,35 @@ systype(char *name)
  */
 #include <dev/pci/pcivar.h>
 typedef void     *(intr_establish_t) __P((void *, pci_intr_handle_t,
-            int, int (*func)(void *), void *, char *));
+            int, int, int (*func)(void *), void *, char *));
 typedef void     (intr_disestablish_t) __P((void *, void *));
 
+int ppc_configed_intr_cnt = 0;
+struct intrhand ppc_configed_intr[MAX_PRECONF_INTR];
+
 void *
-ppc_intr_establish(lcv, ih, level, func, arg, name)
+ppc_intr_establish(lcv, ih, type, level, func, arg, name)
 	void *lcv;
 	pci_intr_handle_t ih;
+	int type;
 	int level;
 	int (*func) __P((void *));
 	void *arg;
 	char *name;
 {
-	panic("ppc_intr_establish called before interrupt controller configured: driver %s", name);
+	if (ppc_configed_intr_cnt < MAX_PRECONF_INTR) {
+		ppc_configed_intr[ppc_configed_intr_cnt].ih_fun = func;
+		ppc_configed_intr[ppc_configed_intr_cnt].ih_arg = arg;
+		ppc_configed_intr[ppc_configed_intr_cnt].ih_level = level;
+		ppc_configed_intr[ppc_configed_intr_cnt].ih_irq = ih;
+		ppc_configed_intr[ppc_configed_intr_cnt].ih_what = name;
+		ppc_configed_intr_cnt++;
+	} else {
+		panic("ppc_intr_establish called before interrupt controller"
+			" configured: driver %s too many interrupts\n", name);
+	}
+	/* disestablish is going to be tricky to supported for these :-) */
+	return (void *)ppc_configed_intr_cnt;
 }
 
 intr_establish_t *intr_establish_func = ppc_intr_establish;;
@@ -1029,21 +1058,24 @@ ppc_intr_setup(intr_establish_t *establish, intr_disestablish_t *disestablish)
  * so it is faster
  */
 void
-ppc_intr_enable(void)
+ppc_intr_enable(int enable)
 {
 	u_int32_t emsr, dmsr;
-	__asm__ volatile("mfmsr %0" : "=r"(emsr));
-	dmsr = emsr | PSL_EE;
-	__asm__ volatile("mtmsr %0" :: "r"(dmsr));
+	if (enable != 0)  {
+		__asm__ volatile("mfmsr %0" : "=r"(emsr));
+		dmsr = emsr | PSL_EE;
+		__asm__ volatile("mtmsr %0" :: "r"(dmsr));
+	}
 }
 
-void
+int
 ppc_intr_disable(void)
 {
 	u_int32_t emsr, dmsr;
 	__asm__ volatile("mfmsr %0" : "=r"(emsr));
 	dmsr = emsr & ~PSL_EE;
 	__asm__ volatile("mtmsr %0" :: "r"(dmsr));
+	return (emsr & PSL_EE);
 }
 
 /* BUS functions */
@@ -1066,6 +1098,12 @@ bus_space_map(t, bpa, size, cacheable, bshp)
 		(ppc_malloc_ok ? EX_MALLOCOK : 0))))
 	{
 		return error;
+	}
+	if ((bpa >= 0x80000000) && ((bpa+size) < 0xb0000000)) {
+		if (segment8_a_mapped) {
+			*bshp = bpa;
+			return 0;
+		}
 	}
 	if (error  = bus_mem_add_mapping(bpa, size, cacheable, bshp)) {
 		if (extent_free(devio_ex, bpa, size, EX_NOWAIT | 
@@ -1177,9 +1215,8 @@ mapiodev(pa, len)
 	spa = trunc_page(pa);
 	off = pa - spa;
 	size = round_page(off+len);
-	if ((pa >= 0x80000000) && ((pa+len) < 0x90000000)) {
-		extern int segment8_mapped;
-		if (segment8_mapped) {
+	if ((pa >= 0x80000000) && ((pa+len) < 0xb0000000)) {
+		if (segment8_a_mapped) {
 			return (void *)pa;
 		}
 	}

@@ -1,4 +1,5 @@
-/*	$OpenBSD: vm_machdep.c,v 1.7 1999/09/03 18:01:18 art Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.11 2000/06/08 22:25:20 niklas Exp $	*/
+
 /*
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
@@ -44,6 +45,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -113,7 +115,7 @@ cpu_fork(p1, p2, stack, stacksize)
 	 */
 	p2->p_addr->u_pcb = p1->p_addr->u_pcb;
 	/* cache segtab for ULTBMiss() */
-	p2->p_addr->u_pcb.pcb_segtab = (void *)p2->p_vmspace->vm_pmap.pm_segtab;
+	p2->p_addr->u_pcb.pcb_segtab = (void *)p2->p_vmspace->vm_map.pmap->pm_segtab;
 
 #ifdef notyet
 	/*
@@ -128,7 +130,7 @@ cpu_fork(p1, p2, stack, stacksize)
 	 * is started, to resume here, returning nonzero from setjmp.
 	 */
 #ifdef DIAGNOSTIC
-	if (p1 != curproc)
+	if (p1 != curproc && p1 != &proc0)
 		panic("cpu_fork: curproc");
 #endif
 	if (copykstack(up)) {
@@ -182,10 +184,8 @@ cpu_exit(p)
 	if (machFPCurProcPtr == p)
 		machFPCurProcPtr = (struct proc *)0;
 
-	vmspace_free(p->p_vmspace);
-
 	(void) splhigh();
-	kmem_free(kernel_map, (vm_offset_t)p->p_addr, ctob(UPAGES));
+	exit2(p);		/* XXX - probably very wrong */
 	switch_exit();
 	/* NOTREACHED */
 }

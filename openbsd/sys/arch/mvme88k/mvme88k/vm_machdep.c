@@ -1,4 +1,5 @@
-/*	$OpenBSD: vm_machdep.c,v 1.11 1999/09/27 19:13:24 smurph Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.14 2000/06/08 22:25:21 niklas Exp $	*/
+
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -42,12 +43,12 @@
  *	from: Utah $Hdr: vm_machdep.c 1.21 91/04/06$
  *	from: @(#)vm_machdep.c	7.10 (Berkeley) 5/7/91
  *	vm_machdep.c,v 1.3 1993/07/07 07:09:32 cgd Exp
- *	$Id: vm_machdep.c,v 1.11 1999/09/27 19:13:24 smurph Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/map.h>
 #include <sys/buf.h>
@@ -104,7 +105,7 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize)
 	/*XXX these may not be necessary nivas */
 	save_u_area(p2, p2->p_addr);
 #ifdef notneeded 
-	PMAP_ACTIVATE(&p2->p_vmspace->vm_pmap, &p2->p_addr->u_pcb, cpu);
+	PMAP_ACTIVATE(p2->p_vmspace->vm_map.pmap, &p2->p_addr->u_pcb, cpu);
 #endif /* notneeded */
 
 	/*
@@ -175,10 +176,9 @@ void
 cpu_exit(struct proc *p)
 {
 	extern volatile void switch_exit();
-	vmspace_free(p->p_vmspace);
 
 	(void) splimp();
-	kmem_free(kernel_map, (vm_offset_t)p->p_addr, ctob(UPAGES));
+	exit2(p);		/* XXX - can't be right! */
 	switch_exit(p);
 	/* NOTREACHED */
 }

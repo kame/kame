@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcvt_hdr.h,v 1.35 2000/03/30 21:02:08 aaron Exp $	*/
+/*	$OpenBSD: pcvt_hdr.h,v 1.42 2000/10/26 22:53:31 aaron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -79,6 +79,7 @@
 #include <sys/conf.h>
 #include <sys/ioctl.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/fcntl.h>
 #include <sys/user.h>
 #include <sys/tty.h>
@@ -702,6 +703,32 @@ typedef struct video_state {
 	unsigned vt_status;		/* state of the vt */
 					/*  becoming active */
 	int	kbd_state;		/* keyboard raw or translated */
+	
+	unsigned short mouse; 		/* mouse cursor position */
+	unsigned short cursor;		/* selection cursor position ( if 
+					different from mouse cursor pos) */
+	unsigned short cpy_start; 	/* position of the copy start mark*/
+	unsigned short cpy_end;		/* position of the copy end mark */
+	unsigned short orig_start;	/* position of the original sel. start*/
+	unsigned short orig_end;	/* position of the original sel. end */
+#define MOUSE_VISIBLE 	(1 << 0)	/* flag, the mouse cursor is visible */
+#define SEL_EXISTS 	(1 << 1)	/* flag, a selection exists */
+#define SEL_IN_PROGRESS (1 << 2)	/* flag, a selection is in progress */
+#define SEL_EXT_AFTER 	(1 << 3)	/* flag, selection is extended after */
+#define BLANK_TO_EOL	(1 << 4)	/* flag, there are only blanks
+					   characters to eol */
+#define SEL_BY_CHAR	(1 << 5)	/* flag, select character by character*/
+#define SEL_BY_WORD	(1 << 6)	/* flag, select word by word */
+#define SEL_BY_LINE	(1 << 7)	/* flag, select line by line */
+#define IS_MOUSE_VISIBLE(vsp) ((vsp)->mouse_flags & MOUSE_VISIBLE)
+#define IS_SEL_EXISTS(vsp) ((vsp)->mouse_flags & SEL_EXISTS)
+#define IS_SEL_IN_PROGRESS(vsp) ((vsp)->mouse_flags & SEL_IN_PROGRESS)
+#define IS_SEL_EXT_AFTER(vsp) ((vsp)->mouse_flags & SEL_EXT_AFTER)
+#define IS_BLANK_TO_EOL(vsp) ((vsp)->mouse_flags & BLANK_TO_EOL)
+#define IS_SEL_BY_CHAR(vsp) ((vsp)->mouse_flags & SEL_BY_CHAR)
+#define IS_SEL_BY_WORD(vsp) ((vsp)->mouse_flags & SEL_BY_WORD)
+#define IS_SEL_BY_LINE(vsp) ((vsp)->mouse_flags & SEL_BY_LINE)
+	unsigned char mouse_flags;	/* flags, status of the mouse */
 } video_state;
 
 EXTERN video_state vs[PCVT_NSCREENS];	/* parameters for screens */
@@ -993,6 +1020,7 @@ void	set_2ndcharset ( void );
 void	set_charset ( struct video_state *svsp, int curvgacs );
 void	set_screen_size ( struct video_state *svsp, int size );
 void	reallocate_scrollbuffer ( struct video_state *svsp, int pages );
+void	reallocate_copybuffer ( struct video_state *svsp );
 u_char *sgetc ( int noblock );
 void	sixel_vga ( struct sixels *charsixel, u_char *charvga );
 void	sput ( u_char *s, U_char attrib, int len, int page );
@@ -1111,5 +1139,17 @@ static __inline void vt_selattr(struct video_state *svsp)
 				/* keyboard controller                    */
 #define PCVT_KBD_DELAY()	delay(7)
 #endif /* PCVT_PORTIO_DELAY */
+
+/* mouse console support prototype */
+
+char *Copybuffer; /* buffer that contains mouse selections */
+unsigned int Copybuffer_size;
+char Paste_avail; /* flag, to indicate whether a selection is in the
+			 Copy buffer */
+
+int mouse_ioctl(Dev_t, u_long, caddr_t, int, struct proc *);
+void remove_selection(void);
+void mouse_hide(void);
+void scrollback_mouse(int);
 
 /*---------------------------------- E O F ----------------------------------*/

@@ -1,8 +1,8 @@
-/* $OpenBSD: isp_target.c,v 1.1 2000/02/20 21:22:40 mjacob Exp $ */
+/* $OpenBSD: isp_target.c,v 1.3 2000/10/16 01:02:00 mjacob Exp $ */
 /*
  * Machine and OS Independent Target Mode Code for the Qlogic SCSI/FC adapters.
  *
- * Copyright (c) 1999 by Matthew Jacob
+ * Copyright (c) 1999, 2000 by Matthew Jacob
  * All rights reserved.
  * mjacob@feral.com
  *
@@ -12,10 +12,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice immediately at the beginning of the file, without modification,
  *    this list of conditions, and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
+ * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
@@ -49,7 +46,10 @@
 #endif
 
 #ifdef	ISP_TARGET_MODE
-int isp_tdebug = 0;
+static char *atiocope =
+    "ATIO returned for lun %d because it was in the middle of Bus Device Reset";
+static char *atior =
+    "ATIO returned for lun %d from initiator %d because a Bus Reset occurred";
 
 static void isp_got_msg __P((struct ispsoftc *, int, in_entry_t *));
 static void isp_got_msg_fc __P((struct ispsoftc *, int, in_fcentry_t *));
@@ -179,8 +179,8 @@ isp_target_notify(isp, vptr, optrp)
 				inotp->in_iid &= ~0x80;
 			}
 		}
-		ITDEBUG(2, ("isp_target_notify: Immediate Notify, "
-		    "status=0x%x seqid=0x%x\n", status, seqid));
+		isp_prt(isp, ISP_LOGTDEBUG1,
+		    "Immediate Notify, status=0x%x seqid=0x%x", status, seqid);
 		switch (status) {
 		case IN_RESET:
 			(void) isp_async(isp, ISPASYNC_BUS_RESET, &bus);
@@ -194,26 +194,29 @@ isp_target_notify(isp, vptr, optrp)
 			}
 			break;
 		case IN_RSRC_UNAVAIL:
-			PRINTF("%s: Firmware out of ATIOs\n", isp->isp_name);
+			isp_prt(isp, ISP_LOGWARN, "Firmware out of ATIOs");
 			break;
 		case IN_ABORT_TASK:
-			PRINTF("%s: Abort Task for Initiator %d RX_ID 0x%x\n",
-			    isp->isp_name, inot_fcp->in_iid, seqid);
+			isp_prt(isp, ISP_LOGWARN,
+			    "Abort Task for Initiator %d RX_ID 0x%x",
+			    inot_fcp->in_iid, seqid);
 			break;
 		case IN_PORT_LOGOUT:
-			PRINTF("%s: Port Logout for Initiator %d RX_ID 0x%x\n",
-			    isp->isp_name, inot_fcp->in_iid, seqid);
+			isp_prt(isp, ISP_LOGWARN,
+			    "Port Logout for Initiator %d RX_ID 0x%x",
+			    inot_fcp->in_iid, seqid);
 			break;
 		case IN_PORT_CHANGED:
-			PRINTF("%s: Port Changed for Initiator %d RX_ID 0x%x\n",
-			    isp->isp_name, inot_fcp->in_iid, seqid);
+			isp_prt(isp, ISP_LOGWARN,
+			    "Port Changed for Initiator %d RX_ID 0x%x",
+			    inot_fcp->in_iid, seqid);
 			break;
 		case IN_GLOBAL_LOGO:
-			PRINTF("%s: All ports logged out\n", isp->isp_name);
+			isp_prt(isp, ISP_LOGWARN, "All ports logged out");
 			break;
 		default:
-			PRINTF("%s: bad status (0x%x) in isp_target_notify\n",
-			    isp->isp_name, status);
+			isp_prt(isp, ISP_LOGERR,
+			    "bad status (0x%x) in isp_target_notify", status);
 			break;
 		}
 		isp_notify_ack(isp, vptr);
@@ -225,18 +228,19 @@ isp_target_notify(isp, vptr, optrp)
 		 * Immediate Notify entry for some asynchronous event.
 		 */
 		if (IS_FC(isp)) {
-			ITDEBUG(2, ("%s: Notify Ack status=0x%x seqid 0x%x\n",
-			    isp->isp_name, nack_fcp->na_status,
-			    nack_fcp->na_seqid));
+			isp_prt(isp, ISP_LOGTDEBUG1,
+			    "Notify Ack status=0x%x seqid 0x%x",
+			    nack_fcp->na_status, nack_fcp->na_seqid);
 		} else {
-			ITDEBUG(2, ("%s: Notify Ack event 0x%x status=0x%x "
-			    "seqid 0x%x\n", isp->isp_name, nackp->na_event,
-			    nackp->na_status, nackp->na_seqid));
+			isp_prt(isp, ISP_LOGTDEBUG1,
+			    "Notify Ack event 0x%x status=0x%x seqid 0x%x",
+			    nackp->na_event, nackp->na_status, nackp->na_seqid);
 		}
 		break;
 	default:
-		PRINTF("%s: Unknown entry type 0x%x in isp_target_notify",
-		    isp->isp_name, hdrp->rqs_entry_type);
+		isp_prt(isp, ISP_LOGERR,
+		    "Unknown entry type 0x%x in isp_target_notify",
+		    hdrp->rqs_entry_type);
 		rval = -1;
 		break;
 	}
@@ -285,7 +289,7 @@ isp_lun_cmd(isp, cmd, bus, tgt, lun, opaque)
 	el.le_in_count = DFLT_INOTIFY;
 	if (cmd == RQSTYPE_ENABLE_LUN) {
 		if (IS_SCSI(isp)) {
-			el.le_flags = LUN_TQAE;
+			el.le_flags = LUN_TQAE|LUN_DISAD;
 			el.le_cdb6len = 12;
 			el.le_cdb7len = 12;
 		}
@@ -305,15 +309,13 @@ isp_lun_cmd(isp, cmd, bus, tgt, lun, opaque)
 	if (IS_SCSI(isp)) {
 		el.le_tgt = tgt;
 		el.le_lun = lun;
-#ifndef	ISP2100_SCCLUN
-	} else {
+	} else if (isp->isp_maxluns <= 16) {
 		el.le_lun = lun;
-#endif
 	}
 
 	if (isp_getrqentry(isp, &iptr, &optr, &outp)) {
-		PRINTF("%s: Request Queue Overflow in isp_lun_cmd\n",
-		    isp->isp_name);
+		isp_prt(isp, ISP_LOGWARN,
+		    "Request Queue Overflow in isp_lun_cmd");
 		return (-1);
 	}
 	ISP_SWIZ_ENABLE_LUN(isp, outp, &el);
@@ -333,8 +335,8 @@ isp_target_put_entry(isp, ap)
 	u_int8_t etype = ((isphdr_t *) ap)->rqs_entry_type;
 
 	if (isp_getrqentry(isp, &iptr, &optr, &outp)) {
-		PRINTF("%s: Request Queue Overflow in isp_target_put_entry "
-		    "for type 0x%x\n", isp->isp_name, etype);
+		isp_prt(isp, ISP_LOGWARN,
+		    "Request Queue Overflow in isp_target_put_entry");
 		return (-1);
 	}
 	switch (etype) {
@@ -351,8 +353,8 @@ isp_target_put_entry(isp, ap)
 		ISP_SWIZ_CTIO2(isp, outp, ap);
 		break;
 	default:
-		PRINTF("%s: Unknown type 0x%x in isp_put_entry\n",
-		    isp->isp_name, etype);
+		isp_prt(isp, ISP_LOGERR,
+		    "Unknown type 0x%x in isp_put_entry", etype);
 		return (-1);
 	}
 
@@ -380,11 +382,11 @@ isp_target_put_atio(isp, iid, tgt, lun, ttype, tval)
 	if (IS_FC(isp)) {
 		atun._atio2.at_header.rqs_entry_type = RQSTYPE_ATIO2;
 		atun._atio2.at_header.rqs_entry_count = 1;
-#ifdef ISP2100_SCCLUN
-		atun._atio2.at_scclun = (uint16_t) lun;
-#else
-		atun._atio2.at_lun = (uint8_t) lun;
-#endif
+		if (isp->isp_maxluns > 16) {
+			atun._atio2.at_scclun = (u_int16_t) lun;
+		} else {
+			atun._atio2.at_lun = (u_int8_t) lun;
+		}
 		atun._atio2.at_status = CT_OK;
 	} else {
 		atun._atio.at_header.rqs_entry_type = RQSTYPE_ATIO;
@@ -436,9 +438,9 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int32_t hdl)
 		cto->ct_header.rqs_entry_type = RQSTYPE_CTIO2;
 		cto->ct_header.rqs_entry_count = 1;
 		cto->ct_iid = aep->at_iid;
-#ifndef	ISP2100_SCCLUN
-		cto->ct_lun = aep->at_lun;
-#endif
+		if (isp->isp_maxluns <= 16) {
+			cto->ct_lun = aep->at_lun;
+		}
 		cto->ct_rxid = aep->at_rxid;
 		cto->rsp.m1.ct_scsi_status = sts & 0xff;
 		cto->ct_flags = CT2_SENDSTATUS | CT2_NO_DATA | CT2_FLAG_MODE1;
@@ -520,22 +522,21 @@ isp_target_async(isp, bus, event)
 		 */
 		MEMZERO(&msg, sizeof msg);
 		if (IS_FC(isp)) {
-			msg.nt_iid =
-			    ((fcparam *)isp->isp_param)->isp_loopid;
+			msg.nt_iid = FCPARAM(isp)->isp_loopid;
 		} else {
-			msg.nt_iid =
-			    ((sdparam *)isp->isp_param)->isp_initiator_id;
+			msg.nt_iid = SDPARAM(isp)->isp_initiator_id;
 		}
 		msg.nt_bus = bus;
 		msg.nt_msg[0] = MSG_BUS_DEV_RESET;
 		(void) isp_async(isp, ISPASYNC_TARGET_MESSAGE, &msg);
 		break;
 	default:
-		PRINTF("%s: isp_target_async: unknown event 0x%x\n",
-		    isp->isp_name, event);
+		isp_prt(isp, ISP_LOGERR,
+		    "isp_target_async: unknown event 0x%x", event);
 		break;
 	}
-	isp_notify_ack(isp, NULL);
+	if (isp->isp_state == ISP_RUNSTATE)
+		isp_notify_ack(isp, NULL);
 }
 
 
@@ -568,8 +569,8 @@ isp_got_msg(isp, bus, inp)
 		MEMCPY(msg.nt_msg, inp->in_msg, IN_MSGLEN);
 		(void) isp_async(isp, ISPASYNC_TARGET_MESSAGE, &msg);
 	} else {
-		PRINTF("%s: unknown immediate notify status 0x%x\n",
-		    isp->isp_name, inp->in_status);
+		isp_prt(isp, ISP_LOGERR,
+		    "unknown immediate notify status 0x%x", inp->in_status);
 	}
 }
 
@@ -582,12 +583,12 @@ isp_got_msg_fc(isp, bus, inp)
 	int bus;
 	in_fcentry_t *inp;
 {
-	static char *f1 = "%s: %s from iid %d lun %d seq 0x%x\n";
+	static char *f1 = "%s from iid %d lun %d seq 0x%x";
 	static char *f2 = 
-	    "%s: unknown %s 0x%x lun %d iid %d task flags 0x%x seq 0x%x\n";
+	    "unknown %s 0x%x lun %d iid %d task flags 0x%x seq 0x%x\n";
 
 	if (inp->in_status != IN_MSG_RECEIVED) {
-		PRINTF(f2, isp->isp_name, "immediate notify status",
+		isp_prt(isp, ISP_LOGINFO, f2, "immediate notify status",
 		    inp->in_status, inp->in_lun, inp->in_iid,
 		    inp->in_task_flags,  inp->in_seqid);
 	} else {
@@ -596,36 +597,36 @@ isp_got_msg_fc(isp, bus, inp)
 		MEMZERO(&msg, sizeof (msg));
 		msg.nt_bus = bus;
 		msg.nt_iid = inp->in_iid;
-#ifdef	ISP2100_SCCLUN
-		msg.nt_lun = inp->in_scclun;
-#else
-		msg.nt_lun = inp->in_lun;
-#endif
+		if (isp->isp_maxluns > 16) {
+			msg.nt_lun = inp->in_scclun;
+		} else {
+			msg.nt_lun = inp->in_lun;
+		}
 		msg.nt_tagval = inp->in_seqid;
 
 		if (inp->in_task_flags & TASK_FLAGS_ABORT_TASK) {
-			PRINTF(f1, isp->isp_name, "ABORT TASK",
+			isp_prt(isp, ISP_LOGINFO, f1, "ABORT TASK",
 			    inp->in_iid, inp->in_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_ABORT_TAG;
 		} else if (inp->in_task_flags & TASK_FLAGS_CLEAR_TASK_SET) {
-			PRINTF(f1, isp->isp_name, "CLEAR TASK SET",
+			isp_prt(isp, ISP_LOGINFO, f1, "CLEAR TASK SET",
 			    inp->in_iid, inp->in_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_CLEAR_QUEUE;
 		} else if (inp->in_task_flags & TASK_FLAGS_TARGET_RESET) {
-			PRINTF(f1, isp->isp_name, "TARGET RESET",
+			isp_prt(isp, ISP_LOGINFO, f1, "TARGET RESET",
 			    inp->in_iid, inp->in_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_BUS_DEV_RESET;
 		} else if (inp->in_task_flags & TASK_FLAGS_CLEAR_ACA) {
-			PRINTF(f1, isp->isp_name, "CLEAR ACA",
+			isp_prt(isp, ISP_LOGINFO, f1, "CLEAR ACA",
 			    inp->in_iid, inp->in_lun, inp->in_seqid);
 			/* ???? */
 			msg.nt_msg[0] = MSG_REL_RECOVERY;
 		} else if (inp->in_task_flags & TASK_FLAGS_TERMINATE_TASK) {
-			PRINTF(f1, isp->isp_name, "TERMINATE TASK",
+			isp_prt(isp, ISP_LOGINFO, f1, "TERMINATE TASK",
 			    inp->in_iid, inp->in_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_TERM_IO_PROC;
 		} else {
-			PRINTF(f2, isp->isp_name, "task flag",
+			isp_prt(isp, ISP_LOGWARN, f2, "task flag",
 			    inp->in_status, inp->in_lun, inp->in_iid,
 			    inp->in_task_flags,  inp->in_seqid);
 		}
@@ -645,8 +646,8 @@ isp_notify_ack(isp, arg)
 	void *outp;
 
 	if (isp_getrqentry(isp, &iptr, &optr, &outp)) {
-		PRINTF("%s: Request Queue Overflow For isp_notify_ack\n",
-		    isp->isp_name);
+		isp_prt(isp, ISP_LOGWARN,
+		    "Request Queue Overflow For isp_notify_ack");
 		return;
 	}
 
@@ -658,11 +659,11 @@ isp_notify_ack(isp, arg)
 			in_fcentry_t *inp = arg;
 			MEMCPY(storage, arg, sizeof (isphdr_t));
 			na->na_iid = inp->in_iid;
-#ifdef	ISP2100_SCCLUN
-			na->na_lun = inp->in_scclun;
-#else
-			na->na_lun = inp->in_lun;
-#endif
+			if (isp->isp_maxluns > 16) {
+				na->na_lun = inp->in_scclun;
+			} else {
+				na->na_lun = inp->in_lun;
+			}
 			na->na_task_flags = inp->in_task_flags;
 			na->na_seqid = inp->in_seqid;
 			na->na_flags = NAFC_RCOUNT;
@@ -672,6 +673,8 @@ isp_notify_ack(isp, arg)
 		} else {
 			na->na_flags = NAFC_RST_CLRD;
 		}
+		na->na_header.rqs_entry_type = RQSTYPE_NOTIFY_ACK;
+		na->na_header.rqs_entry_count = 1;
 		ISP_SWIZ_NOT_ACK_FC(isp, outp, na);
 	} else {
 		na_entry_t *na = (na_entry_t *) storage;
@@ -683,11 +686,13 @@ isp_notify_ack(isp, arg)
 			na->na_tgt = inp->in_tgt;
 			na->na_seqid = inp->in_seqid;
 			if (inp->in_status == IN_RESET) {
-				na->na_flags = NA_RST_CLRD;
+				na->na_event = NA_RST_CLRD;
 			}
 		} else {
-			na->na_flags = NA_RST_CLRD;
+			na->na_event = NA_RST_CLRD;
 		}
+		na->na_header.rqs_entry_type = RQSTYPE_NOTIFY_ACK;
+		na->na_header.rqs_entry_count = 1;
 		ISP_SWIZ_NOT_ACK(isp, outp, na);
 	}
 	ISP_TDQE(isp, "isp_notify_ack", (int) optr, storage);
@@ -718,8 +723,8 @@ isp_handle_atio(isp, aep)
 		/*
 		 * ATIO rejected by the firmware due to disabled lun.
 		 */
-		PRINTF("%s: rejected ATIO for disabled lun %d\n",
-		    isp->isp_name, lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "rejected ATIO for disabled lun %d", lun);
 		break;
 	case AT_NOCAP:
 		/*
@@ -727,8 +732,9 @@ isp_handle_atio(isp, aep)
 		 * We sent an ATIO that overflowed the firmware's
 		 * command resource count.
 		 */
-		PRINTF("%s: rejected ATIO for lun %d because of command count"
-		    " overflow\n", isp->isp_name, lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "rejected ATIO for lun %d because of command count"
+		    " overflow", lun);
 		break;
 
 	case AT_BDR_MSG:
@@ -741,9 +747,7 @@ isp_handle_atio(isp, aep)
 		 * not increment it. Therefore we should never get
 		 * this status here.
 		 */
-		PRINTF("%s: ATIO returned for lun %d because it was in the "
-		    " middle of coping with a Bus Device Reset\n",
-		    isp->isp_name, lun);
+		isp_prt(isp, ISP_LOGERR, atiocope, lun);
 		break;
 
 	case AT_CDB:		/* Got a CDB */
@@ -763,15 +767,14 @@ isp_handle_atio(isp, aep)
 		 * Ignore it because the async event will clear things
 		 * up for us.
 		 */
-		PRINTF("%s: ATIO returned for lun %d from initiator %d because"
-		    " a Bus Reset occurred\n", isp->isp_name, lun,
-		    aep->at_iid);
+		isp_prt(isp, ISP_LOGWARN, atior, lun, aep->at_iid);
 		break;
 
 
 	default:
-		PRINTF("%s: Unknown ATIO status 0x%x from initiator %d for lun"
-		    " %d\n", isp->isp_name, aep->at_status, aep->at_iid, lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "Unknown ATIO status 0x%x from initiator %d for lun %d",
+		    aep->at_status, aep->at_iid, lun);
 		(void) isp_target_put_atio(isp, aep->at_iid, aep->at_tgt,
 		    lun, aep->at_tag_type, aep->at_tag_val);
 		break;
@@ -784,11 +787,13 @@ isp_handle_atio2(isp, aep)
 	at2_entry_t *aep;
 {
 	int lun;
-#ifdef	ISP2100_SCCLUN
-	lun = aep->at_scclun;
-#else
-	lun = aep->at_lun;
-#endif
+
+	if (isp->isp_maxluns > 16) {
+		lun = aep->at_scclun;
+	} else {
+		lun = aep->at_lun;
+	}
+
 	/*
 	 * The firmware status (except for the QLTM_SVALID bit) indicates
 	 * why this ATIO was sent to us.
@@ -806,8 +811,8 @@ isp_handle_atio2(isp, aep)
 		/*
 		 * ATIO rejected by the firmware due to disabled lun.
 		 */
-		PRINTF("%s: rejected ATIO2 for disabled lun %d\n",
-		    isp->isp_name, lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "rejected ATIO2 for disabled lun %d", lun);
 		break;
 	case AT_NOCAP:
 		/*
@@ -815,8 +820,8 @@ isp_handle_atio2(isp, aep)
 		 * We sent an ATIO that overflowed the firmware's
 		 * command resource count.
 		 */
-		PRINTF("%s: rejected ATIO2 for lun %d because of command count"
-		    " overflow\n", isp->isp_name, lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "rejected ATIO2 for lun %d- command count overflow", lun);
 		break;
 
 	case AT_BDR_MSG:
@@ -829,9 +834,7 @@ isp_handle_atio2(isp, aep)
 		 * not increment it. Therefore we should never get
 		 * this status here.
 		 */
-		PRINTF("%s: ATIO2 returned for lun %d because it was in the "
-		    " middle of coping with a Bus Device Reset\n",
-		    isp->isp_name, lun);
+		isp_prt(isp, ISP_LOGERR, atiocope, lun);
 		break;
 
 	case AT_CDB:		/* Got a CDB */
@@ -850,15 +853,14 @@ isp_handle_atio2(isp, aep)
 		 * Ignore it because the async event will clear things
 		 * up for us.
 		 */
-		PRINTF("%s: ATIO2 returned for lun %d from initiator %d because"
-		    " a Bus Reset occurred\n", isp->isp_name, lun,
-		    aep->at_iid);
+		isp_prt(isp, ISP_LOGERR, atior, lun, aep->at_iid);
 		break;
 
 
 	default:
-		PRINTF("%s: Unknown ATIO2 status 0x%x from initiator %d for lun"
-		    " %d\n", isp->isp_name, aep->at_status, aep->at_iid, lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "Unknown ATIO2 status 0x%x from initiator %d for lun %d",
+		    aep->at_status, aep->at_iid, lun);
 		(void) isp_target_put_atio(isp, aep->at_iid, 0, lun, 0, 0);
 		break;
 	}
@@ -869,16 +871,16 @@ isp_handle_ctio(isp, ct)
 	struct ispsoftc *isp;
 	ct_entry_t *ct;
 {
-	ISP_SCSI_XFER_T *xs;
-	int pl = 0;
+	XS_T *xs;
+	int pl = ISP_LOGTDEBUG2;
 	char *fmsg = NULL;
 
 	if (ct->ct_reserved) {
 		xs = isp_find_xs(isp, ct->ct_reserved);
 		if (xs == NULL)
-			pl = 0;
+			pl = ISP_LOGALL;
 	} else {
-		pl = 2;
+		pl = ISP_LOGTDEBUG1;
 		xs = NULL;
 	}
 
@@ -892,12 +894,14 @@ isp_handle_ctio(isp, ct)
 		 * 	We sent status & command complete.
 		 */
 
-		if ((ct->ct_flags & CT_DATAMASK) == CT_NO_DATA) {
+		if (ct->ct_flags & CT_SENDSTATUS) {
+			break;
+		} else if ((ct->ct_flags & CT_DATAMASK) == CT_NO_DATA) {
 			/*
 			 * Nothing to do in this case.
 			 */
-			IDPRINTF(pl, ("%s: CTIO- initiator disconnected OK\n",
-			    isp->isp_name));
+			isp_prt(isp, pl, "CTIO- iid %d disconnected OK",
+			    ct->ct_iid);
 			return;
 		}
 		break;
@@ -927,7 +931,7 @@ isp_handle_ctio(isp, ct)
 		if (fmsg == NULL)
 			fmsg = "ABORT TASK sent by Initiator";
 
-		PRINTF("%s: CTIO destroyed by %s\n", isp->isp_name, fmsg);
+		isp_prt(isp, ISP_LOGWARN, "CTIO destroyed by %s", fmsg);
 		break;
 
 	case CT_INVAL:
@@ -935,8 +939,9 @@ isp_handle_ctio(isp, ct)
 		 * CTIO rejected by the firmware due to disabled lun.
 		 * "Cannot Happen".
 		 */
-		PRINTF("%s: Firmware rejected CTIO for disabled lun %d\n",
-		    isp->isp_name, ct->ct_lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "Firmware rejected CTIO for disabled lun %d",
+		    ct->ct_lun);
 		break;
 
 	case CT_NOPATH:
@@ -946,8 +951,9 @@ isp_handle_ctio(isp, ct)
 		 * we tried to access the bus while a non-disconnecting
 		 * command is in process.
 		 */
-		PRINTF("%s: Firmware rejected CTIO for bad nexus %d/%d/%d\n",
-		    isp->isp_name, ct->ct_iid, ct->ct_tgt, ct->ct_lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "Firmware rejected CTIO for bad nexus %d/%d/%d",
+		    ct->ct_iid, ct->ct_tgt, ct->ct_lun);
 		break;
 
 	case CT_RSELTMO:
@@ -956,7 +962,7 @@ isp_handle_ctio(isp, ct)
 	case CT_TIMEOUT:
 		if (fmsg == NULL)
 			fmsg = "Command";
-		PRINTF("%s: Firmware timed out on %s\n", isp->isp_name, fmsg);
+		isp_prt(isp, ISP_LOGERR, "Firmware timed out on %s", fmsg);
 		break;
 
 	case CT_ERR:
@@ -974,7 +980,7 @@ isp_handle_ctio(isp, ct)
 		if (fmsg == NULL)
 			fmsg = "unacknowledged Immediate Notify pending";
 
-		PRINTF("%s: CTIO returned by f/w- %s\n", isp->isp_name, fmsg);
+		isp_prt(isp, ISP_LOGERR, "CTIO returned by f/w- %s", fmsg);
 #if	0
 			if (status & SENSEVALID) {
 				bcopy((caddr_t) (cep + CTIO_SENSE_OFFSET),
@@ -985,7 +991,7 @@ isp_handle_ctio(isp, ct)
 #endif
 		break;
 	default:
-		PRINTF("%s: Unknown CTIO status 0x%x\n", isp->isp_name,
+		isp_prt(isp, ISP_LOGERR, "Unknown CTIO status 0x%x",
 		    ct->ct_status & ~QLTM_SVALID);
 		break;
 	}
@@ -1000,19 +1006,16 @@ isp_handle_ctio(isp, ct)
 		 */
 		if (ct->ct_reserved == 0) {
 			if ((ct->ct_flags & CT_SENDSTATUS) == 0) {
-				IDPRINTF(pl,
-				    ("%s: intermediate CTIO completed ok\n",
-				    isp->isp_name));
+				isp_prt(isp, pl,
+				    "intermediate CTIO completed ok");
 			} else {
-				IDPRINTF(pl,
-				    ("%s: unmonitored CTIO completed ok\n",
-				    isp->isp_name));
+				isp_prt(isp, pl,
+				    "unmonitored CTIO completed ok");
 			}
 		} else {
-			IDPRINTF(pl,
-			    ("%s: NO xs for CTIO (handle 0x%x) status 0x%x\n",
-			    isp->isp_name, ct->ct_reserved,
-			    ct->ct_status & ~QLTM_SVALID));
+			isp_prt(isp, pl,
+			    "NO xs for CTIO (handle 0x%x) status 0x%x",
+			    ct->ct_reserved, ct->ct_status & ~QLTM_SVALID);
 		}
 	} else {
 		if (ct->ct_flags & CT_SENDSTATUS) {
@@ -1024,15 +1027,13 @@ isp_handle_ctio(isp, ct)
 			 * only there can we do the appropriate command
 			 * complete thread synchronization.
 			 */
-			IDPRINTF(pl,
-			    ("%s: status CTIO complete\n", isp->isp_name));
+			isp_prt(isp, pl, "status CTIO complete");
 		} else {
 			/*
 			 * Final CTIO completed. Release DMA resources and
 			 * notify platform dependent layers.
 			 */
-			IDPRINTF(pl,
-			    ("%s: data CTIO complete\n", isp->isp_name));
+			isp_prt(isp, pl, "data CTIO complete");
 			ISP_DMAFREE(isp, xs, ct->ct_reserved);
 		}
 		(void) isp_async(isp, ISPASYNC_TARGET_ACTION, ct);
@@ -1047,16 +1048,16 @@ isp_handle_ctio2(isp, ct)
 	struct ispsoftc *isp;
 	ct2_entry_t *ct;
 {
-	ISP_SCSI_XFER_T *xs;
-	int pl = 3;
+	XS_T *xs;
+	int pl = ISP_LOGTDEBUG2;
 	char *fmsg = NULL;
 
 	if (ct->ct_reserved) {
 		xs = isp_find_xs(isp, ct->ct_reserved);
 		if (xs == NULL)
-			pl = 0;
+			pl = ISP_LOGALL;
 	} else {
-		pl = 2;
+		pl = ISP_LOGTDEBUG1;
 		xs = NULL;
 	}
 
@@ -1096,14 +1097,14 @@ isp_handle_ctio2(isp, ct)
 		if (fmsg == NULL)
 			fmsg = "ABORT TASK sent by Initiator";
 
-		PRINTF("%s: CTIO2 destroyed by %s\n", isp->isp_name, fmsg);
+		isp_prt(isp, ISP_LOGERR, "CTIO2 destroyed by %s", fmsg);
 		break;
 
 	case CT_INVAL:
 		/*
 		 * CTIO rejected by the firmware - invalid data direction.
 		 */
-		PRINTF("%s: CTIO2 had wrong data directiond\n", isp->isp_name);
+		isp_prt(isp, ISP_LOGERR, "CTIO2 had wrong data directiond");
 		break;
 
 	case CT_NOPATH:
@@ -1113,8 +1114,9 @@ isp_handle_ctio2(isp, ct)
 		 * we tried to access the bus while a non-disconnecting
 		 * command is in process.
 		 */
-		PRINTF("%s: Firmware rejected CTIO2 for bad nexus %d->%d\n",
-		    isp->isp_name, ct->ct_iid, ct->ct_lun);
+		isp_prt(isp, ISP_LOGERR,
+		    "Firmware rejected CTIO2 for bad nexus %d->%d",
+		    ct->ct_iid, ct->ct_lun);
 		break;
 
 	case CT_RSELTMO:
@@ -1123,7 +1125,7 @@ isp_handle_ctio2(isp, ct)
 	case CT_TIMEOUT:
 		if (fmsg == NULL)
 			fmsg = "Command";
-		PRINTF("%s: Firmware timed out on %s\n", isp->isp_name, fmsg);
+		isp_prt(isp, ISP_LOGERR, "Firmware timed out on %s", fmsg);
 		break;
 
 	case CT_ERR:
@@ -1148,7 +1150,7 @@ isp_handle_ctio2(isp, ct)
 		if (fmsg == NULL)
 			fmsg = "unacknowledged Immediate Notify pending";
 
-		PRINTF("%s: CTIO returned by f/w- %s\n", isp->isp_name, fmsg);
+		isp_prt(isp, ISP_LOGERR, "CTIO returned by f/w- %s", fmsg);
 #if	0
 			if (status & SENSEVALID) {
 				bcopy((caddr_t) (cep + CTIO_SENSE_OFFSET),
@@ -1164,13 +1166,13 @@ isp_handle_ctio2(isp, ct)
 		 * CTIO rejected by the firmware because an invalid RX_ID.
 		 * Just print a message.
 		 */
-		PRINTF("%s: CTIO2 completed with Invalid RX_ID 0x%x\n",
-		    isp->isp_name, ct->ct_rxid);
+		isp_prt(isp, ISP_LOGERR,
+		    "CTIO2 completed with Invalid RX_ID 0x%x", ct->ct_rxid);
 		break;
 
 	default:
-		IDPRINTF(pl, ("%s: Unknown CTIO status 0x%x\n", isp->isp_name,
-		    ct->ct_status & ~QLTM_SVALID));
+		isp_prt(isp, ISP_LOGERR, "Unknown CTIO status 0x%x",
+		    ct->ct_status & ~QLTM_SVALID);
 		break;
 	}
 
@@ -1184,19 +1186,16 @@ isp_handle_ctio2(isp, ct)
 		 */
 		if (ct->ct_reserved == 0) {
 			if ((ct->ct_flags & CT_SENDSTATUS) == 0) {
-				IDPRINTF(pl,
-				    ("%s: intermediate CTIO completed ok\n",
-				    isp->isp_name));
+				isp_prt(isp, pl,
+				    "intermediate CTIO completed ok");
 			} else {
-				IDPRINTF(pl,
-				    ("%s: unmonitored CTIO completed ok\n",
-				    isp->isp_name));
+				isp_prt(isp, pl,
+				    "unmonitored CTIO completed ok");
 			}
 		} else {
-			IDPRINTF(pl,
-			    ("%s: NO xs for CTIO (handle 0x%x) status 0x%x\n",
-			    isp->isp_name, ct->ct_reserved,
-			    ct->ct_status & ~QLTM_SVALID));
+			isp_prt(isp, pl,
+			    "NO xs for CTIO (handle 0x%x) status 0x%x",
+			    ct->ct_reserved, ct->ct_status & ~QLTM_SVALID);
 		}
 	} else {
 		if (ct->ct_flags & CT_SENDSTATUS) {
@@ -1208,15 +1207,13 @@ isp_handle_ctio2(isp, ct)
 			 * only there can we do the appropriate command
 			 * complete thread synchronization.
 			 */
-			IDPRINTF(pl,
-			    ("%s: status CTIO complete\n", isp->isp_name));
+			isp_prt(isp, pl, "status CTIO complete");
 		} else {
 			/*
 			 * Final CTIO completed. Release DMA resources and
 			 * notify platform dependent layers.
 			 */
-			IDPRINTF(pl,
-			    ("%s: data CTIO complete\n", isp->isp_name));
+			isp_prt(isp, pl, "data CTIO complete");
 			ISP_DMAFREE(isp, xs, ct->ct_reserved);
 		}
 		(void) isp_async(isp, ISPASYNC_TARGET_ACTION, ct);

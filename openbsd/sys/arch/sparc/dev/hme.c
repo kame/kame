@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.21 1999/12/10 03:03:56 jason Exp $	*/
+/*	$OpenBSD: hme.c,v 1.23 2000/06/18 17:42:18 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -281,7 +281,7 @@ hmestart(ifp)
 
 	for (;;) {
 		IF_DEQUEUE(&ifp->if_snd, m);
-		if (m == 0)
+		if (m == NULL)
 			break;
 #if NBPFILTER > 0
 		/*
@@ -440,12 +440,6 @@ hmeioctl(ifp, cmd, data)
 			hmestop(sc);
 			hmeinit(sc);
 		}
-#ifdef IEDEBUG   
-		if (ifp->if_flags & IFF_DEBUG)
-			sc->sc_debug = IED_ALL;
-		else
-			sc->sc_debug = 0;
-#endif
 		break;
 
 	case SIOCADDMULTI:
@@ -768,7 +762,10 @@ hme_eint(sc, why)
 	struct hme_softc *sc;
 	u_int32_t why;
 {
-	if (why & GR_STAT_ALL_ERRORS) {
+	if (why & GR_STAT_NORXD)
+		sc->sc_arpcom.ac_if.if_ierrors++;
+
+	if (why & (GR_STAT_ALL_ERRORS & (~GR_STAT_NORXD))) {
 		printf("%s: stat=%b, resetting.\n", sc->sc_dev.dv_xname,
 		    why, GR_STAT_BITS);
 		hmereset(sc);

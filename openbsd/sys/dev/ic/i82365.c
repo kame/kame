@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365.c,v 1.13 2000/04/19 07:52:45 fgsch Exp $	*/
+/*	$OpenBSD: i82365.c,v 1.17 2000/09/05 05:06:58 fgsch Exp $	*/
 /*	$NetBSD: i82365.c,v 1.10 1998/06/09 07:36:55 thorpej Exp $	*/
 
 /*
@@ -99,7 +99,7 @@ void	pcic_chip_do_io_map __P((struct pcic_handle *, int));
 
 void	pcic_create_event_thread __P((void *));
 void	pcic_event_thread __P((void *));
-
+void	pcic_event_process __P((struct pcic_handle *, struct pcic_event *));
 void	pcic_queue_event __P((struct pcic_handle *, int));
 
 void	pcic_wait_ready __P((struct pcic_handle *));
@@ -434,70 +434,7 @@ pcic_event_thread(arg)
 			(void) tsleep((caddr_t)pcic_event_thread, PWAIT,
 			    "pcicss", hz/4);
 		}
-		s = splhigh();
-		SIMPLEQ_REMOVE_HEAD(&h->events, pe, pe_q);
-		splx(s);
-
-		switch (pe->pe_type) {
-		case PCIC_EVENT_INSERTION:
-			s = splhigh();
-			while (1) {
-				struct pcic_event *pe1, *pe2;
-
-				if ((pe1 = SIMPLEQ_FIRST(&h->events)) == NULL)
-					break;
-				if (pe1->pe_type != PCIC_EVENT_REMOVAL)
-					break;
-				if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
-					break;
-				if (pe2->pe_type == PCIC_EVENT_INSERTION) {
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe1,
-					    pe_q);
-					free(pe1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe2,
-					    pe_q);
-					free(pe2, M_TEMP);
-				}
-			}
-			splx(s);
-				
-			DPRINTF(("%s: insertion event\n",
-			    h->ph_parent->dv_xname));
-			pcic_attach_card(h);
-			break;
-
-		case PCIC_EVENT_REMOVAL:
-			s = splhigh();
-			while (1) {
-				struct pcic_event *pe1, *pe2;
-
-				if ((pe1 = SIMPLEQ_FIRST(&h->events)) == NULL)
-					break;
-				if (pe1->pe_type != PCIC_EVENT_INSERTION)
-					break;
-				if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
-					break;
-				if (pe2->pe_type == PCIC_EVENT_REMOVAL) {
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe1,
-					    pe_q);
-					free(pe1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe2,
-					    pe_q);
-					free(pe2, M_TEMP);
-				}
-			}
-			splx(s);
-
-			DPRINTF(("%s: removal event\n",
-			    h->ph_parent->dv_xname));
-			pcic_detach_card(h, DETACH_FORCE);
-			break;
-
-		default:
-			panic("pcic_event_thread: unknown event %d",
-			    pe->pe_type);
-		}
-		free(pe, M_TEMP);
+		pcic_event_process(h, pe);
 	}
 
 	h->event_thread = NULL;
@@ -506,6 +443,72 @@ pcic_event_thread(arg)
 	wakeup(sc);
 
 	kthread_exit(0);
+}
+
+void
+pcic_event_process(h, pe)
+	struct pcic_handle *h;
+	struct pcic_event *pe;
+{
+	int s;
+
+	s = splhigh();
+	SIMPLEQ_REMOVE_HEAD(&h->events, pe, pe_q);
+	splx(s);
+
+	switch (pe->pe_type) {
+	case PCIC_EVENT_INSERTION:
+		s = splhigh();
+		while (1) {
+			struct pcic_event *pe1, *pe2;
+
+			if ((pe1 = SIMPLEQ_FIRST(&h->events)) == NULL)
+				break;
+			if (pe1->pe_type != PCIC_EVENT_REMOVAL)
+				break;
+			if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
+				break;
+			if (pe2->pe_type == PCIC_EVENT_INSERTION) {
+				SIMPLEQ_REMOVE_HEAD(&h->events, pe1, pe_q);
+				free(pe1, M_TEMP);
+				SIMPLEQ_REMOVE_HEAD(&h->events, pe2, pe_q);
+				free(pe2, M_TEMP);
+			}
+		}
+		splx(s);
+				
+		DPRINTF(("%s: insertion event\n", h->ph_parent->dv_xname));
+		pcic_attach_card(h);
+		break;
+
+	case PCIC_EVENT_REMOVAL:
+		s = splhigh();
+		while (1) {
+			struct pcic_event *pe1, *pe2;
+
+			if ((pe1 = SIMPLEQ_FIRST(&h->events)) == NULL)
+				break;
+			if (pe1->pe_type != PCIC_EVENT_INSERTION)
+				break;
+			if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
+				break;
+			if (pe2->pe_type == PCIC_EVENT_REMOVAL) {
+				SIMPLEQ_REMOVE_HEAD(&h->events, pe1, pe_q);
+				free(pe1, M_TEMP);
+				SIMPLEQ_REMOVE_HEAD(&h->events, pe2, pe_q);
+				free(pe2, M_TEMP);
+			}
+		}
+		splx(s);
+
+		DPRINTF(("%s: removal event\n", h->ph_parent->dv_xname));
+		pcic_detach_card(h, DETACH_FORCE);
+		break;
+
+	default:
+		panic("pcic_event_thread: unknown event %d", pe->pe_type);
+	}
+	free(pe, M_TEMP);
 }
 
 void
@@ -664,6 +667,28 @@ pcic_intr(arg)
 	return (ret ? 1 : 0);
 }
 
+void
+pcic_poll_intr(arg)
+	void *arg;
+{
+	struct pcic_softc *sc = arg;
+	int i, s;
+
+	/*
+	 * Since we're polling, we aren't in interrupt context, so block any
+	 * actual interrupts coming from the pcic.
+	 */
+	s = spltty();
+
+	for (i = 0; i < PCIC_NSLOTS; i++)
+		if (sc->handle[i].flags & PCIC_FLAG_SOCKETP)
+			pcic_intr_socket(&sc->handle[i]);
+
+	timeout_add(&sc->poll_timeout, hz / 2);
+
+	splx(s);
+}
+
 int
 pcic_intr_socket(h)
 	struct pcic_handle *h;
@@ -755,7 +780,6 @@ pcic_attach_card(h)
 		panic("pcic_attach_card: already attached");
 
 	/* call the MI attach function */
-
 	pcmcia_card_attach(h->pcmcia);
 
 	h->flags |= PCIC_FLAG_CARDP;
@@ -781,15 +805,50 @@ void
 pcic_deactivate_card(h)
 	struct pcic_handle *h;
 {
+	struct device *dev = (struct device *)h->pcmcia;
 
-	/* call the MI deactivate function */
-	pcmcia_card_deactivate(h->pcmcia);
+	/*
+	 * At suspend, apm deactivates any connected cards. If we've woken up
+	 * to find a previously-connected device missing, and we're detaching
+	 * it, we don't want to deactivate it again.
+	 */
+	if (dev->dv_flags & DVF_ACTIVE)
+		pcmcia_card_deactivate(h->pcmcia);
 
 	/* power down the socket */
 	pcic_write(h, PCIC_PWRCTL, 0);
 
 	/* reset the socket */
 	pcic_write(h, PCIC_INTR, 0);
+}
+
+/*
+ * The pcic_power() function must execute BEFORE the pcmcia_power() hooks.
+ * During suspend, a card may have been ejected. If so, we must detach it
+ * completely before pcmcia_power() tries to activate it. Attempting to
+ * activate a card that isn't there is bad news.
+ */
+void
+pcic_power(why, arg)
+	int why;
+	void *arg;
+{
+	struct pcic_handle *h = (struct pcic_handle *)arg;
+	struct pcic_softc *sc = (struct pcic_softc *)h->ph_parent;
+	struct pcic_event *pe;
+
+	if (why != PWR_RESUME) {
+		if (timeout_pending(&sc->poll_timeout))
+			timeout_del(&sc->poll_timeout);
+	}
+	else {
+		pcic_intr_socket(h);
+
+		while ((pe = SIMPLEQ_FIRST(&h->events)))
+			pcic_event_process(h, pe);
+
+		timeout_add(&sc->poll_timeout, hz / 2);
+	}
 }
 
 int 
@@ -809,13 +868,15 @@ pcic_chip_mem_alloc(pch, size, pcmhp)
 
 	/* convert size to PCIC pages */
 	sizepg = (size + (PCIC_MEM_ALIGN - 1)) / PCIC_MEM_ALIGN;
+	if (sizepg > PCIC_MAX_MEM_PAGES)
+		return (1);
 
 	mask = (1 << sizepg) - 1;
 
 	addr = 0;		/* XXX gcc -Wuninitialized */
 	mhandle = 0;		/* XXX gcc -Wuninitialized */
 
-	for (i = 0; i < (PCIC_MEM_PAGES + 1 - sizepg); i++) {
+	for (i = 0; i <= PCIC_MAX_MEM_PAGES - sizepg; i++) {
 		if ((sc->subregionmask & (mask << i)) == (mask << i)) {
 			if (bus_space_subregion(sc->memt, sc->memh,
 			    i * PCIC_MEM_PAGESIZE,
@@ -824,24 +885,21 @@ pcic_chip_mem_alloc(pch, size, pcmhp)
 			mhandle = mask << i;
 			addr = sc->membase + (i * PCIC_MEM_PAGESIZE);
 			sc->subregionmask &= ~(mhandle);
-			break;
+			pcmhp->memt = sc->memt;
+			pcmhp->memh = memh;
+			pcmhp->addr = addr;
+			pcmhp->size = size;
+			pcmhp->mhandle = mhandle;
+			pcmhp->realsize = sizepg * PCIC_MEM_PAGESIZE;
+	
+			DPRINTF(("pcic_chip_mem_alloc bus addr 0x%lx+0x%lx\n",
+			    (u_long) addr, (u_long) size));
+
+			return (0);
 		}
 	}
 
-	if (i == (PCIC_MEM_PAGES + 1 - size))
-		return (1);
-
-	DPRINTF(("pcic_chip_mem_alloc bus addr 0x%lx+0x%lx\n", (u_long) addr,
-		 (u_long) size));
-
-	pcmhp->memt = sc->memt;
-	pcmhp->memh = memh;
-	pcmhp->addr = addr;
-	pcmhp->size = size;
-	pcmhp->mhandle = mhandle;
-	pcmhp->realsize = sizepg * PCIC_MEM_PAGESIZE;
-
-	return (0);
+	return (1);
 }
 
 void 

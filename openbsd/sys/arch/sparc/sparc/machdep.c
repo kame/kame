@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.48 2000/03/23 09:59:56 art Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.51 2000/10/27 00:16:20 mickey Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -141,6 +141,7 @@ int	physmem;
 
 /* sysctl settable */
 int	sparc_led_blink = 0;
+int	sparc_vsyncblank = 0;
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
@@ -431,7 +432,7 @@ allocsys(v)
 	 * Allocate 1/2 as many swap buffer headers as file i/o buffers.
 	 */
 	if (bufpages == 0)
-		bufpages = (physmem / ((100/BUFCACHEPERCENT) / CLSIZE));
+		bufpages = physmem * BUFCACHEPERCENT / (100 * CLSIZE);
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -545,14 +546,19 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	struct proc *p;
 {
 #if (NAUXREG > 0) || (NLED > 0)
-	int ret, oldval;
+	int oldval;
 #endif
+	int ret;
 
 	/* all sysctl names are this level are terminal */
 	if (namelen != 1)
 		return (ENOTDIR);	/* overloaded */
 
 	switch (name[0]) {
+	case CPU_VSYNCBLANK:
+		ret = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &sparc_vsyncblank);
+		return (ret);
 	case CPU_LED_BLINK:
 #if (NLED > 0) || (NAUXREG > 0) || (NSCF > 0)
 		oldval = sparc_led_blink;

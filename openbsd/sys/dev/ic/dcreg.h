@@ -1,4 +1,4 @@
-/*	$OpenBSD: dcreg.h,v 1.3 2000/04/26 13:58:28 mickey Exp $ */
+/*	$OpenBSD: dcreg.h,v 1.9 2000/10/26 20:50:43 aaron Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.3 2000/01/19 19:03:08 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.11 2000/09/07 18:51:04 wpaul Exp $
  */
 
 /*
@@ -54,6 +54,7 @@
 #define DC_SIARESET		0x68	/* SIA connectivity */
 #define DC_10BTCTRL		0x70	/* SIA transmit and receive */
 #define DC_WATCHDOG		0x78	/* SIA and general purpose port */
+#define DC_SIAGP		0x78	/* SIA and general purpose port (X3201) */
 
 /*
  * There are two general 'types' of MX chips that we need to be
@@ -73,10 +74,11 @@
 #define DC_TYPE_21143		0x4	/* Intel 21143 */
 #define DC_TYPE_ASIX		0x5	/* ASIX AX88140A/AX88141 */
 #define DC_TYPE_AL981		0x6	/* ADMtek AL981 Comet */
-#define DC_TYPE_AN985		0x7	/* ADMtek AN985 Centaur */
+#define DC_TYPE_AN983		0x7	/* ADMtek AN983 Centaur */
 #define DC_TYPE_DM9102		0x8	/* Davicom DM9102 */
 #define DC_TYPE_PNICII		0x9	/* 82c115 PNIC II */
 #define DC_TYPE_PNIC		0xA	/* 82c168/82c169 PNIC I */
+#define DC_TYPE_XIRCOM		0xB	/* Xircom X3201 */
 
 #define DC_IS_MACRONIX(x)			\
 	(x->dc_type == DC_TYPE_98713 ||		\
@@ -85,15 +87,16 @@
 
 #define DC_IS_ADMTEK(x)				\
 	(x->dc_type == DC_TYPE_AL981 ||		\
-	 x->dc_type == DC_TYPE_AN985)
+	 x->dc_type == DC_TYPE_AN983)
 
 #define DC_IS_INTEL(x)		(x->dc_type == DC_TYPE_21143)
 #define DC_IS_ASIX(x)		(x->dc_type == DC_TYPE_ASIX)
 #define DC_IS_COMET(x)		(x->dc_type == DC_TYPE_AL981)
-#define DC_IS_CENTAUR(x)	(x->dc_type == DC_TYPE_AN985)
+#define DC_IS_CENTAUR(x)	(x->dc_type == DC_TYPE_AN983)
 #define DC_IS_DAVICOM(x)	(x->dc_type == DC_TYPE_DM9102)
 #define DC_IS_PNICII(x)		(x->dc_type == DC_TYPE_PNICII)
 #define DC_IS_PNIC(x)		(x->dc_type == DC_TYPE_PNIC)
+#define DC_IS_XIRCOM(x)		(x->dc_type == DC_TYPE_XIRCOM)
 
 /* MII/symbol mode port types */
 #define DC_PMODE_MII		0x1
@@ -343,6 +346,29 @@
 #define DC_WDOG_RXWDOGDIS	0x00000010
 #define DC_WDOG_RXWDOGCLK	0x00000020
 #define DC_WDOG_MUSTBEZERO	0x00000100
+#define DC_WDOG_AUIBNC		0x00100000
+#define DC_WDOG_ACTIVITY	0x00200000
+#define DC_WDOG_LINK		0x00800000
+#define DC_WDOG_CTLWREN		0x08000000
+
+/*
+ * SIA and General Purpose Port register (X3201)
+ */
+#define DC_SIAGP_RXMATCH       0x40000000
+#define DC_SIAGP_INT1          0x20000000
+#define DC_SIAGP_INT0          0x10000000
+#define DC_SIAGP_WRITE_EN      0x08000000
+#define DC_SIAGP_RXMATCH_EN    0x04000000
+#define DC_SIAGP_INT1_EN       0x02000000
+#define DC_SIAGP_INT0_EN       0x01000000
+#define DC_SIAGP_LED3          0x00800000
+#define DC_SIAGP_LED2          0x00400000
+#define DC_SIAGP_LED1          0x00200000
+#define DC_SIAGP_LED0          0x00100000
+#define DC_SIAGP_MD_GP3_OUTPUT 0x00080000
+#define DC_SIAGP_MD_GP2_OUTPUT 0x00040000
+#define DC_SIAGP_MD_GP1_OUTPUT 0x00020000
+#define DC_SIAGP_MD_GP0_OUTPUT 0x00010000   
 
 /*
  * Size of a setup frame.
@@ -472,8 +498,8 @@ struct dc_mii_frame {
  */
 
 /*
- * ADMtek specific registers and constants for the AL981 and AN985.
- * The AN985 doesn't use the magic PHY registers.
+ * ADMtek specific registers and constants for the AL981 and AN983.
+ * The AN983 doesn't use the magic PHY registers.
  */
 #define DC_AL_PAR0		0xA4	/* station address */
 #define DC_AL_PAR1		0xA8	/* station address */
@@ -648,6 +674,7 @@ struct dc_softc {
 	u_int8_t		dc_pmode;
 	u_int8_t		dc_link;
 	u_int8_t		dc_cachesize;
+	int			dc_romwidth;
 	int			dc_pnic_rx_bug_save;
 	unsigned char		*dc_pnic_rx_buf;
 	int			dc_if_flags;
@@ -659,6 +686,7 @@ struct dc_softc {
 	struct dc_chain_data	dc_cdata;
 	u_int32_t		dc_csid;
 	u_int			dc_revision;
+	struct timeout		dc_tick_tmo;
 };
 
 #define DC_TX_POLL		0x00000001
@@ -672,6 +700,10 @@ struct dc_softc {
 #define DC_TX_STORENFWD		0x00000100
 #define DC_REDUCED_MII_POLL	0x00000200
 #define DC_TX_INTR_ALWAYS	0x00000400
+#define DC_21143_NWAY		0x00000800
+#define DC_128BIT_HASH		0x00001000
+#define DC_64BIT_HASH		0x00002000
+#define DC_TULIP_LEDS		0x00004000
 
 /*
  * register space access macros
@@ -693,6 +725,7 @@ struct dc_softc {
 #define DC_REVISION_98713	0x00
 #define DC_REVISION_98713A	0x10
 #define DC_REVISION_98715	0x20
+#define DC_REVISION_98715AEC_C	0x25
 #define DC_REVISION_98725	0x30
 
 /*

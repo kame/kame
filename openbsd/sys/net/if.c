@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.31 2000/05/05 07:58:15 itojun Exp $	*/
+/*	$OpenBSD: if.c,v 1.38 2000/10/07 03:43:16 itojun Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -100,6 +100,7 @@
 #include <netinet/in.h>
 #endif
 #include <netinet6/in6_ifattach.h>
+#include <netinet6/in6_var.h>
 #endif
 
 #ifdef IPFILTER
@@ -118,9 +119,10 @@
 
 void	if_attachsetup __P((struct ifnet *));
 int	if_detach_rtdelete __P((struct radix_node *, void *));
+int	if_mark_ignore __P((struct radix_node *, void *));
+int	if_mark_unignore __P((struct radix_node *, void *));
 
 int	ifqmaxlen = IFQ_MAXLEN;
-void	if_slowtimo __P((void *arg));
 
 #ifdef INET6
 /*
@@ -139,12 +141,16 @@ extern void nd6_setmtu __P((struct ifnet *));
 void
 ifinit()
 {
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
+	static struct timeout if_slowtim;
 
 	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
 		if (ifp->if_snd.ifq_maxlen == 0)
 			ifp->if_snd.ifq_maxlen = ifqmaxlen;
-	if_slowtimo(NULL);
+
+	timeout_set(&if_slowtim, if_slowtimo, &if_slowtim);
+
+	if_slowtimo(&if_slowtim);
 }
 
 int if_index = 0;
@@ -278,6 +284,34 @@ if_detach_rtdelete(rn, vifp)
 	 * XXX There should be no need to check for rt_ifa belonging to this
 	 * interface, because then rt_ifp is set, right?
 	 */
+
+	return (0);
+}
+
+int
+if_mark_ignore(rn, vifp)
+	struct radix_node *rn;
+	void *vifp;
+{
+	struct ifnet *ifp = vifp;
+	struct rtentry *rt = (struct rtentry *)rn;
+
+	if (rt->rt_ifp == ifp)
+		rn->rn_flags |= RNF_IGNORE;
+
+	return (0);
+}
+
+int
+if_mark_unignore(rn, vifp)
+	struct radix_node *rn;
+	void *vifp;
+{
+	struct ifnet *ifp = vifp;
+	struct rtentry *rt = (struct rtentry *)rn;
+
+	if (rt->rt_ifp == ifp)
+		rn->rn_flags &= ~RNF_IGNORE;
 
 	return (0);
 }
@@ -544,12 +578,24 @@ if_down(ifp)
 	register struct ifnet *ifp;
 {
 	register struct ifaddr *ifa;
+	struct radix_node_head *rnh;
+	int i;
 
 	ifp->if_flags &= ~IFF_UP;
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next)
 		pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
 	if_qflush(&ifp->if_snd);
 	rt_ifmsg(ifp);
+
+	/*
+	 * Find and mark as ignore all routes which are using this interface.
+	 * XXX Factor out into a route.c function?
+	 */
+	for (i = 1; i <= AF_MAX; i++) {
+		rnh = rt_tables[i];
+		if (rnh)
+			(*rnh->rnh_walktree)(rnh, if_mark_ignore, ifp);
+	}
 }
 
 /*
@@ -564,6 +610,8 @@ if_up(ifp)
 #ifdef notyet
 	register struct ifaddr *ifa;
 #endif
+	struct radix_node_head *rnh;
+	int i;
 
 	ifp->if_flags |= IFF_UP;
 #ifdef notyet
@@ -576,6 +624,16 @@ if_up(ifp)
 #ifdef INET6
 	in6_if_up(ifp);
 #endif
+
+	/*
+	 * Find and unignore all routes which are using this interface.
+	 * XXX Factor out into a route.c function?
+	 */
+	for (i = 1; i <= AF_MAX; i++) {
+		rnh = rt_tables[i];
+		if (rnh)
+			(*rnh->rnh_walktree)(rnh, if_mark_unignore, ifp);
+	}
 }
 
 /*
@@ -606,7 +664,8 @@ void
 if_slowtimo(arg)
 	void *arg;
 {
-	register struct ifnet *ifp;
+	struct timeout *to = (struct timeout *)arg;
+	struct ifnet *ifp;
 	int s = splimp();
 
 	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next) {
@@ -616,7 +675,7 @@ if_slowtimo(arg)
 			(*ifp->if_watchdog)(ifp);
 	}
 	splx(s);
-	timeout(if_slowtimo, NULL, hz / IFNET_SLOWHZ);
+	timeout_add(to, hz / IFNET_SLOWHZ);
 }
 
 /*
@@ -728,12 +787,18 @@ ifioctl(so, cmd, data, p)
 		break;
 	}
 
+	case SIOCSIFPHYADDR:
+#ifdef INET6
+	case SIOCSIFPHYADDR_IN6:
+#endif
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMEDIA:
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 			return (error);
 		/* FALLTHROUGH */
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 	case SIOCGIFMEDIA:
 		if (ifp->if_ioctl == 0)
 			return (EOPNOTSUPP);
@@ -785,9 +850,8 @@ ifioctl(so, cmd, data, p)
 			cmd = SIOCGIFNETMASK;
 		}
 		error = ((*so->so_proto->pr_usrreq)(so, PRU_CONTROL,
-						    (struct mbuf *) cmd,
-						    (struct mbuf *) data,
-						    (struct mbuf *) ifp));
+		    (struct mbuf *) cmd, (struct mbuf *) data,
+		    (struct mbuf *) ifp));
 		switch (ocmd) {
 
 		case OSIOCGIFADDR:

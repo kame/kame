@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.26 1999/07/30 19:41:29 deraadt Exp $	*/
+/*	$OpenBSD: conf.c,v 1.29 2000/10/12 19:36:51 espie Exp $	*/
 /*	$NetBSD: conf.c,v 1.42 1997/01/07 11:35:03 mrg Exp $	*/
 
 /*-
@@ -95,6 +95,7 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #include "ser.h"
 #include "msc.h"
 #include "ite.h"
+#include "joy.h"
 #include "kbd.h"
 #include "ms.h"
 #include "view.h"
@@ -107,6 +108,14 @@ dev_decl(filedesc,open);
 #include "uk.h"
 #include "audio.h"
 cdev_decl(audio);
+
+/* open, close, read */
+#define cdev_joy_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	(dev_type_write((*)))enodev, (dev_type_ioctl((*)))enodev, \
+	(dev_type_stop((*)))enodev, 0, seltrue, \
+	(dev_type_mmap((*)))enodev }
+
 
 struct cdevsw	cdevsw[] =
 {
@@ -153,7 +162,7 @@ struct cdevsw	cdevsw[] =
 	cdev_ch_init(NCH,ch),		/* 40: SCSI autochanger */
 	cdev_disk_init(NRD,rd),		/* 41: RAM disk */
 	cdev_ksyms_init(NKSYMS,ksyms),	/* 42: Kernel symbols device */
-	cdev_notdef(),			/* 43 */
+	cdev_joy_init(NJOY,joy),	/* 43: Joystick */
 	cdev_notdef(),			/* 44 */
 	cdev_notdef(),			/* 45 */
 	cdev_notdef(),			/* 46 */
@@ -224,6 +233,12 @@ iszerodev(dev)
 {
 
 	return (major(dev) == mem_no && minor(dev) == 12);
+}
+
+dev_t
+getnulldev()
+{
+	return makedev(mem_no, 2);
 }
 
 static int chrtoblktab[] = {

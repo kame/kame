@@ -1,4 +1,4 @@
-/*	$OpenBSD: sun3_startup.c,v 1.12 2000/04/30 15:30:29 miod Exp $	*/
+/*	$OpenBSD: sun3_startup.c,v 1.14 2000/06/29 02:25:30 miod Exp $	*/
 /*	$NetBSD: sun3_startup.c,v 1.55 1996/11/20 18:57:38 gwr Exp $	*/
 
 /*-
@@ -61,6 +61,8 @@
 #include "vector.h"
 #include "interreg.h"
 
+#include "ksyms.h"
+
 /* This is defined in locore.s */
 extern char kernel_text[];
 
@@ -111,7 +113,9 @@ static void sun3_mode_normal __P((void));
 static void sun3_mon_init __P((vm_offset_t sva, vm_offset_t eva, int keep));
 static void sun3_monitor_hooks __P((void));
 static void sun3_context_equiv __P((void));
+#if (defined(DDB) || NKSYMS > 0) && !defined(SYMTAB_SPACE)
 static void sun3_save_symtab __P((struct exec *kehp));
+#endif
 static void sun3_verify_hardware __P((void));
 static void sun3_vm_init __P((struct exec *kehp));
 static void tracedump __P((int));
@@ -825,6 +829,12 @@ sun3_monitor_hooks()
 			switch (*p) {
 			case 'a':
 				boothowto |= RB_ASKNAME;
+				break;
+			case 'b':
+				boothowto |= RB_HALT;
+				break;
+			case 'c':
+				boothowto |= RB_CONFIG;
 				break;
 			case 's':
 				boothowto |= RB_SINGLE;

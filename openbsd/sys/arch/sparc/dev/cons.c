@@ -1,4 +1,4 @@
-/*	$OpenBSD: cons.c,v 1.6 1997/08/08 08:24:56 downsj Exp $	*/
+/*	$OpenBSD: cons.c,v 1.9 2000/07/06 15:42:48 ho Exp $	*/
 /*	$NetBSD: cons.c,v 1.30 1997/07/07 23:30:23 pk Exp $	*/
 
 /*
@@ -76,6 +76,7 @@
 #endif
 
 #include "zs.h"
+#include "kbd.h"
 
 struct	tty *constty = 0;	/* virtual console output device */
 struct	tty *fbconstty = 0;	/* tty structure for frame buffer console */
@@ -235,13 +236,14 @@ setup_console:
 		zsconsole(tp, 1, 0, NULL);
 		break;
 #endif
-
+#if	NKBD > 0
 	case PROMDEV_KBD:
 		/*
 		 * Tell the keyboard driver to direct ASCII input here.
 		 */
 		kbd_ascii(tp);
 		break;
+#endif
 
 	default:
 		rom_console_input = 1;
@@ -463,19 +465,21 @@ cnstart(tp)
 	} else
 		putc.v1 = promvec->pv_putchar;
 	while (tp->t_outq.c_cc) {
+		int ss;
+
 		c = getc(&tp->t_outq);
 		/*
 		 * *%&!*& ROM monitor console putchar is not reentrant!
 		 * splhigh/tty around it so as not to run so long with
 		 * clock interrupts blocked.
 		 */
-		(void) splhigh();
+		ss = splhigh();
 		if (v > 2) {
 			unsigned char c0 = c & 0177;
 			(*putc.v3)(fd, &c0, 1);
 		} else
 			(*putc.v1)(c & 0177);
-		(void) spltty();
+		splx(ss);
 	}
 	if (tp->t_state & TS_ASLEEP) {		/* can't happen? */
 		tp->t_state &= ~TS_ASLEEP;
@@ -523,8 +527,11 @@ cnfbstart(tp)
 	}
 	if (tp->t_outq.c_cc) {
 		tp->t_state |= TS_BUSY;
+		/*
+		 * XXX - this is just too ugly.
+		 */
 		if (s == 0) {
-			(void) splsoftclock();
+			(void) spllowersoftclock();
 			cnfbdma((void *)tp);
 		} else
 			timeout(cnfbdma, tp, 1);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365var.h,v 1.7 2000/04/19 07:27:43 fgsch Exp $	*/
+/*	$OpenBSD: i82365var.h,v 1.10 2000/09/05 05:06:58 fgsch Exp $	*/
 /*	$NetBSD: i82365var.h,v 1.4 1998/05/23 18:32:29 matt Exp $	*/
 
 /*
@@ -31,6 +31,7 @@
  */
 
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #include <dev/pcmcia/pcmciareg.h>
 #include <dev/pcmcia/pcmciachip.h>
@@ -122,6 +123,7 @@ struct pcic_softc {
 
 	/* this needs to be large enough to hold PCIC_MEM_PAGES bits */
 	int	subregionmask;
+#define PCIC_MAX_MEM_PAGES	(8 * sizeof(int))
 
 	/* used by memory window mapping functions */
 	bus_addr_t membase;
@@ -140,6 +142,10 @@ struct pcic_softc {
 	int	irq;
 	void	*ih;
 
+	/* used by socket event polling */
+	struct timeout poll_timeout;
+	int poll_established;
+
 	struct pcic_handle handle[PCIC_NSLOTS];
 };
 
@@ -150,6 +156,7 @@ int	pcic_vendor __P((struct pcic_handle *));
 void	pcic_attach __P((struct pcic_softc *));
 void	pcic_attach_sockets __P((struct pcic_softc *));
 int	pcic_intr __P((void *arg));
+void	pcic_poll_intr __P((void *arg));
 
 int	pcic_chip_mem_alloc __P((pcmcia_chipset_handle_t, bus_size_t,
 	    struct pcmcia_mem_handle *));
@@ -169,6 +176,8 @@ void	pcic_chip_io_unmap __P((pcmcia_chipset_handle_t, int));
 
 void	pcic_chip_socket_enable __P((pcmcia_chipset_handle_t));
 void	pcic_chip_socket_disable __P((pcmcia_chipset_handle_t));
+
+void	pcic_power __P((int, void *));
 
 #define pcic_read(h, idx) \
 	(*(h)->ph_read)((h), (idx))

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.pci,v 1.73 2000/04/27 02:19:41 millert Exp $
+#	$OpenBSD: files.pci,v 1.85 2000/10/17 15:47:12 jason Exp $
 #	$NetBSD: files.pci,v 1.20 1996/09/24 17:47:15 christos Exp $
 #
 # Config file and device description for machine-independent PCI code.
@@ -14,11 +14,25 @@ file	dev/pci/pci_subr.c		pci
 
 # Generic VGA
 attach	vga at pci with vga_pci
-file	dev/pci/vga_pci.c		vga_pci	needs-flag
+file	dev/pci/vga_pci.c		vga_pci		needs-flag
 
-# Generic VGA Framebuffer version
-attach	vgafb at pci with vgafb_pci
-file	dev/pci/vgafb_pci.c		vgafb_pci	needs-flag
+device	tga: wsemuldisplaydev, wsrasteremulops
+attach	tga at pci
+file	dev/pci/tga.c			tga		needs-flag
+file	dev/pci/tga_conf.c		tga
+file	dev/ic/bt463.c			tga
+file	dev/ic/bt485.c			tga
+
+# Cypress 82c693 hyperCache(tm) Stand-Alone PCI Peripheral Controller
+# with USB.  This is a combo chip:
+#
+#       PCI-ISA bridge
+#       PCI IDE controller
+#       OHCI USB controller
+#
+# There are some common subroutines that each function needs.
+define	cy82c693
+file	dev/pci/cy82c693.c		cy82c693
 
 # Adaptec 3940, 2940, and aic78[5678]0 SCSI controllers
 # device declaration in sys/conf/files
@@ -49,6 +63,10 @@ file	dev/ic/adwmcode.c		adw_pci
 attach	bha at pci with bha_pci
 file	dev/pci/bha_pci.c		bha_pci
 
+# 3ware 5x000/6x000 RAID controllers
+attach	twe at pci with twe_pci
+file	dev/pci/twe_pci.c		twe_pci
+
 # Ensoniq AudioPCI S5016, 1371
 device	eap: audio, auconv, mulaw, ac97
 attach	eap at pci
@@ -61,6 +79,26 @@ file	dev/pci/eso.c			eso
 
 attach	opl at eso with opl_eso
 file	dev/pci/opl_eso.c		opl_eso
+
+# Intel 810/820/440MX ICH AC'97
+device	ich: audio, auconv, mulaw, ac97
+attach	ich at pci
+file	dev/pci/ich.c			ich
+
+# CS4280 CrystalClear Audio
+device	clcs: audio, auconv, mulaw, ac97
+attach	clcs at pci
+file	dev/pci/cs4280.c		clcs
+
+# Forte Media FM801
+device	fms: audio, auconv, mulaw, ac97, midibus
+attach	fms at pci
+file	dev/pci/fms.c			fms
+
+# VIA VT82C686A AC'97 Audio
+device	auvia: audio, auconv, mulaw, ac97
+attach	auvia at pci
+file	dev/pci/auvia.c			auvia
 
 # ICP Vortex GDT PCI RAID controllers
 # device declaration in sys/conf/files
@@ -109,7 +147,7 @@ attach	neo at pci
 file	dev/pci/neo.c		        neo
 
 # PCI IDE controllers
-device	pciide {[channel = -1]}: wdc_base, ata, atapi
+device	pciide {[channel = -1]}: cy82c693, wdc_base, ata, atapi
 attach	pciide at pci
 file	dev/pci/pciide.c		pciide
 
@@ -173,7 +211,7 @@ attach	dc at pci with dc_pci
 file	dev/pci/if_dc_pci.c		dc_pci
 
 # SMC EPIC, 83c170
-device	tx: ether, ifnet, ifmedia
+device	tx: ether, ifnet, mii, ifmedia
 attach	tx at pci
 file	dev/pci/if_tx.c			tx
 
@@ -191,8 +229,13 @@ device	hifn: crypto
 attach	hifn at pci
 file	dev/pci/hifn7751.c		hifn
 
+# Bluesteelnet (Broadcom) 5501/5601
+device	ubsec: crypto
+attach	ubsec at pci
+file	dev/pci/ubsec.c			ubsec
+
 # Winbond W89C840F ethernet
-device	wb: ether, ifnet, mii, ifmedia
+device	wb: ether, ifnet, mii, ifmedia, mii_phy
 attach	wb at pci
 file	dev/pci/if_wb.c			wb
 
@@ -233,7 +276,7 @@ file	dev/pci/pccbb.c			cbb
 # SysKonnect 984x gigabit ethernet
 device	skc {}
 attach	skc at pci
-device	sk: ether, ifnet, ifmedia
+device	sk: ether, ifnet, mii, ifmedia
 attach	sk at skc
 file	dev/pci/if_sk.c			skc | sk
 

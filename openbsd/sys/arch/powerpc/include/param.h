@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.9 2000/02/22 19:27:57 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.11 2000/09/14 18:26:52 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.1 1996/09/30 16:34:28 ws Exp $	*/
 
 /*-
@@ -88,7 +88,7 @@
 #endif
 #endif
 
-#define MSGBUFSIZE	NBPG
+#define MSGBUFSIZE	(NBPG*2)
 
 /*
  * Size of kernel malloc arena in CLBYTES-sized logical pages.
@@ -138,8 +138,11 @@
 /*
  * Some system constants
  */
+/* do not define HTABENTS, allow system size to determine # entries */
+#if 0
 #ifndef	HTABENTS
 #define	HTABENTS	1024	/* Number of hashslots in HTAB */
+#endif
 #endif
 #ifndef	NPMAPS
 #define	NPMAPS		32768	/* Number of pmaps in system */

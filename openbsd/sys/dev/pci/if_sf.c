@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sf.c,v 1.6 2000/03/01 22:49:57 aaron Exp $ */
+/*	$OpenBSD: if_sf.c,v 1.8 2000/10/16 17:08:08 aaron Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sf.c,v 1.18 1999/12/05 20:02:44 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sf.c,v 1.23 2000/07/14 19:11:02 wpaul Exp $
  */
 
 /*
@@ -749,7 +749,8 @@ void sf_attach(parent, self, aux)
 	sc->sc_mii.mii_writereg = sf_miibus_writereg;
 	sc->sc_mii.mii_statchg = sf_miibus_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, sf_ifmedia_upd, sf_ifmedia_sts);
-	mii_phy_probe(self, &sc->sc_mii, 0xffffffff);
+	mii_attach(self, &sc->sc_mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,
+	    0);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
@@ -1094,6 +1095,11 @@ void sf_init(xsc)
 	} else {
 		SF_CLRBIT(sc, SF_RXFILT, SF_RXFILT_BROAD);
 	}
+
+	/*
+	 * Load the multicast filter.
+	 */
+	sf_setmulti(sc);
 
 	/* Init the completion queue indexes */
 	csr_write_4(sc, SF_CQ_CONSIDX, 0);

@@ -45,6 +45,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -186,10 +187,8 @@ void cpu_exit(p)
 	if (machFPCurProcPtr == p)
 		machFPCurProcPtr = (struct proc *)0;
 
-	vmspace_free(p->p_vmspace);
-
 	(void) splhigh();
-	kmem_free(kernel_map, (vm_offset_t)p->p_addr, ctob(UPAGES));
+	exit2(p);		/* XXX - probably very wrong. */
 	switch_exit();
 	/* NOTREACHED */
 }

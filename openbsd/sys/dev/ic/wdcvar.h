@@ -1,4 +1,4 @@
-/*      $OpenBSD: wdcvar.h,v 1.8 2000/04/10 07:06:15 csapuntz Exp $     */
+/*      $OpenBSD: wdcvar.h,v 1.12 2000/10/27 20:29:28 csapuntz Exp $     */
 /*	$NetBSD: wdcvar.h,v 1.17 1999/04/11 20:50:29 bouyer Exp $	*/
 
 /*-
@@ -37,6 +37,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/timeout.h>
+
 #define	WAITTIME    (10 * hz)    /* time to wait for a completion */
 	/* this is a lot for hard drives, but not for cdroms */
 
@@ -45,6 +47,9 @@ struct channel_queue {  /* per channel queue (may be shared) */
 };
 
 struct channel_softc_vtbl;
+
+
+#define WDC_OPTION_PROBE_VERBOSE   0x10000
 
 struct channel_softc { /* Per channel data */
 	struct channel_softc_vtbl  *_vtbl;
@@ -66,6 +71,7 @@ struct channel_softc { /* Per channel data */
 #define WDCF_ACTIVE   0x01	/* channel is active */
 #define WDCF_IRQ_WAIT 0x10	/* controller is waiting for irq */
 #define WDCF_ONESLAVE 0x20      /* slave-only channel */
+#define WDCF_VERBOSE_PROBE 0x40 /* verbose probe */
 	u_int8_t ch_status;         /* copy of status register */
 	u_int8_t ch_error;          /* copy of error register */
 	/* per-drive infos */
@@ -76,6 +82,7 @@ struct channel_softc { /* Per channel data */
 	 * are not independants
 	 */
 	struct channel_queue *ch_queue;
+	struct timeout ch_timo;
 };
 
 /*
@@ -240,7 +247,7 @@ void  wdcrestart __P((void*));
 int   wdcreset	__P((struct channel_softc *, int));
 #define VERBOSE 1 
 #define SILENT 0 /* wdcreset will not print errors */
-int   wdcwait __P((struct channel_softc *, int, int, int));
+int   wdc_wait_for_status __P((struct channel_softc *, int, int, int));
 void  wdcbit_bucket __P((struct channel_softc *, int));
 
 void  wdccommand __P((struct channel_softc *, u_int8_t, u_int8_t, u_int16_t,
@@ -254,11 +261,13 @@ void	wdc_delref __P((struct channel_softc *));
 /*	
  * ST506 spec says that if READY or SEEKCMPLT go off, then the read or write
  * command is aborted.
- */   
+ */
+#define wdcwait(chp, status, mask, timeout) ((wdc_wait_for_status((chp), (status), (mask), (timeout)) >= 0) ? 0 : -1)
 #define wait_for_drq(chp, timeout) wdcwait((chp), WDCS_DRQ, WDCS_DRQ, (timeout))
 #define wait_for_unbusy(chp, timeout)	wdcwait((chp), 0, 0, (timeout))
 #define wait_for_ready(chp, timeout) wdcwait((chp), WDCS_DRDY, \
 	WDCS_DRDY, (timeout))
+
 /* ATA/ATAPI specs says a device can take 31s to reset */
 #define WDC_RESET_WAIT 31000
 

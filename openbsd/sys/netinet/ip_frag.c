@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_frag.c,v 1.17 2000/03/13 23:40:18 kjell Exp $	*/
+/*	$OpenBSD: ip_frag.c,v 1.19 2000/09/07 19:45:04 art Exp $	*/
 
 /*
  * Copyright (C) 1993-1998 by Darren Reed.
@@ -9,7 +9,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_frag.c	1.11 3/24/96 (C) 1993-1995 Darren Reed";
-static const char rcsid[] = "@(#)$IPFilter: ip_frag.c,v 2.4.2.4 1999/11/28 04:52:10 darrenr Exp $";
+static const char rcsid[] = "@(#)$IPFilter: ip_frag.c,v 2.4.2.5 2000/06/06 15:50:48 darrenr Exp $";
 #endif
 
 #if defined(KERNEL) && !defined(_KERNEL)
@@ -83,9 +83,13 @@ static const char rcsid[] = "@(#)$IPFilter: ip_frag.c,v 2.4.2.4 1999/11/28 04:52
 #  ifndef IPFILTER_LKM
 #   include <sys/libkern.h>
 #   include <sys/systm.h>
-# endif
+#  endif
 extern struct callout_handle ipfr_slowtimer_ch;
 # endif
+#endif
+#ifdef __OpenBSD__
+#include <sys/timeout.h>
+extern struct timeout ipfr_slowtimer_to;
 #endif
 
 
@@ -138,6 +142,9 @@ ipfr_t *table[];
 {
 	ipfr_t	**fp, *fra, frag;
 	u_int	idx;
+
+	if (ipfr_inuse >= IPFT_SIZE)
+		return NULL;
 
 	frag.ipfr_p = ip->ip_p;
 	idx = ip->ip_p;
@@ -511,6 +518,8 @@ int ipfr_slowtimer()
 #  ifndef linux
 #   if (__FreeBSD_version >= 300000)
 	ipfr_slowtimer_ch = timeout(ipfr_slowtimer, NULL, hz/2);
+#   elif defined(__OpenBSD__)
+	timeout_add(&ipfr_slowtimer_to, hz/2);
 #   else
 	timeout(ipfr_slowtimer, NULL, hz/2);
 #   endif

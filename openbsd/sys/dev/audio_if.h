@@ -1,4 +1,4 @@
-/*	$OpenBSD: audio_if.h,v 1.9 1999/07/23 13:18:04 niklas Exp $	*/
+/*	$OpenBSD: audio_if.h,v 1.11 2000/07/19 09:04:37 csapuntz Exp $	*/
 /*	$NetBSD: audio_if.h,v 1.24 1998/01/10 14:07:25 tv Exp $	*/
 
 /*
@@ -112,9 +112,11 @@ struct audio_hw_if {
 	int	(*query_devinfo)__P((void *, mixer_devinfo_t *));
 	
 	/* Allocate/free memory for the ring buffer. Usually malloc/free. */
-	void	*(*allocm)__P((void *, unsigned long, int, int));
+	/* The _old interfaces have been deprecated and will not be
+	   called in newer kernels if the new interfaces are present */
+	void	*(*allocm_old)__P((void *, unsigned long, int, int));
 	void	(*freem)__P((void *, void *, int));
-	unsigned long (*round_buffersize)__P((void *, unsigned long));
+	unsigned long (*round_buffersize_old)__P((void *, unsigned long));
 	int	(*mappage)__P((void *, void *, int, int));
 
 	int 	(*get_props)__P((void *)); /* device properties */
@@ -123,6 +125,9 @@ struct audio_hw_if {
 		    void (*)(void *), void *, struct audio_params *));
 	int	(*trigger_input)__P((void *, void *, void *, int,
 		    void (*)(void *), void *, struct audio_params *));
+
+	void	*(*allocm)__P((void *, int, size_t, int, int));
+	size_t  (*round_buffersize)__P((void *, int, size_t));
 };
 
 struct audio_attach_args {
@@ -136,8 +141,9 @@ struct audio_attach_args {
 #define AUDIODEV_TYPE_MPU	3
 
 /* Attach the MI driver(s) to the MD driver. */
-void	audio_attach_mi __P((struct audio_hw_if *, void *, struct device *));
-int	audioprint __P((void *, const char *));
+struct device *audio_attach_mi __P((struct audio_hw_if *, void *, 
+				    struct device *));
+int	       audioprint __P((void *, const char *));
 
 /* Device identity flags */
 #define SOUND_DEVICE		0

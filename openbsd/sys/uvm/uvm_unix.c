@@ -76,48 +76,46 @@ sys_obreak(p, v, retval)
 	struct sys_obreak_args /* {
 		syscallarg(char *) nsize;
 	} */ *uap = v;
-	register struct vmspace *vm = p->p_vmspace;
+	struct vmspace *vm = p->p_vmspace;
 	vaddr_t new, old;
 	int rv;
-	register int diff;
+	long diff;
 
 	old = (vaddr_t)vm->vm_daddr;
 	new = round_page(SCARG(uap, nsize));
-	if ((int)(new - old) > p->p_rlimit[RLIMIT_DATA].rlim_cur)
+	if ((new - old) > p->p_rlimit[RLIMIT_DATA].rlim_cur)
 		return(ENOMEM);
 
-	old = round_page(old + ctob(vm->vm_dsize));
+	old = round_page(old + ptoa(vm->vm_dsize));
 	diff = new - old;
+
+	if (diff == 0)
+		return (0);
 
 	/*
 	 * grow or shrink?
 	 */
-
 	if (diff > 0) {
-
 		rv = uvm_map(&vm->vm_map, &old, diff, NULL, UVM_UNKNOWN_OFFSET,
 		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 		    UVM_ADV_NORMAL, UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
-		    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW)); 
-
-		if (rv != KERN_SUCCESS) {
-			uprintf("sbrk: grow failed, return = %d\n", rv);
-			return(ENOMEM);
+		    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
+		if (rv == KERN_SUCCESS) {
+			vm->vm_dsize += atop(diff);
+			return (0);
 		}
-		vm->vm_dsize += btoc(diff);
-
-	} else if (diff < 0) {
-
-		diff = -diff;
-		rv = uvm_deallocate(&vm->vm_map, new, diff);
-		if (rv != KERN_SUCCESS) {
-			uprintf("sbrk: shrink failed, return = %d\n", rv);
-			return(ENOMEM);
+	} else {
+		rv = uvm_deallocate(&vm->vm_map, new, -diff);
+		if (rv == KERN_SUCCESS) {
+			vm->vm_dsize -= atop(-diff);
+			return (0);
 		}
-		vm->vm_dsize -= btoc(diff);
-
 	}
-	return(0);
+
+	uprintf("sbrk: %s %ld failed, return = %d\n",
+		diff > 0 ? "grow" : "shrink",
+		(long)(diff > 0 ? diff : -diff), rv);
+	return(ENOMEM);
 }
 
 /*

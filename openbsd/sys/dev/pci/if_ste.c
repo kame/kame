@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ste.c,v 1.6 2000/02/15 02:28:15 jason Exp $ */
+/*	$OpenBSD: if_ste.c,v 1.8 2000/10/16 17:08:08 aaron Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -996,7 +996,8 @@ void ste_attach(parent, self, aux)
 	sc->sc_mii.mii_writereg = ste_miibus_writereg;
 	sc->sc_mii.mii_statchg = ste_miibus_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, ste_ifmedia_upd,ste_ifmedia_sts);
-	mii_phy_probe(self, &sc->sc_mii, 0xffffffff);
+	mii_attach(self, &sc->sc_mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,
+	    0);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
@@ -1101,6 +1102,7 @@ void ste_init_tx_list(sc)
 	cd = &sc->ste_cdata;
 	ld = sc->ste_ldata;
 	for (i = 0; i < STE_TX_LIST_CNT; i++) {
+		cd->ste_tx_chain[i].ste_ptr = &ld->ste_tx_list[i];
 		cd->ste_tx_chain[i].ste_phys = vtophys(&ld->ste_tx_list[i]);
 		if (i == (STE_TX_LIST_CNT - 1))
 			cd->ste_tx_chain[i].ste_next =

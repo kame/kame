@@ -1,4 +1,4 @@
-/*	$OpenBSD: zs.c,v 1.22 1999/09/20 02:49:25 deraadt Exp $	*/
+/*	$OpenBSD: zs.c,v 1.26 2000/07/14 20:27:37 deraadt Exp $	*/
 /*	$NetBSD: zs.c,v 1.49 1997/08/31 21:26:37 pk Exp $ */
 
 /*
@@ -55,6 +55,7 @@
  * This driver knows far too much about chip to usage mappings.
  */
 #include "zs.h"
+#include "kbd.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -251,8 +252,12 @@ zsmatch(parent, vcf, aux)
 	if (strcmp(cf->cf_driver->cd_name, ra->ra_name))
 		return (0);
 	if ((ca->ca_bustype == BUS_MAIN && !CPU_ISSUN4) ||
-	    (ca->ca_bustype == BUS_OBIO && CPU_ISSUN4M))
-		return (getpropint(ra->ra_node, "slave", -2) == cf->cf_unit);
+	    (ca->ca_bustype == BUS_OBIO && CPU_ISSUN4M)) {
+		if (getpropint(ra->ra_node, "slave", -2) == cf->cf_unit &&
+		    findzs(cf->cf_unit))
+			return (1);
+		return (0);
+	}
 	ra->ra_len = NBPG;
 	return (probeget(ra->ra_vaddr, 1) != -1);
 }
@@ -333,7 +338,9 @@ zsattach(parent, dev, aux)
 		 */
 		tp->t_ispeed = tp->t_ospeed = cs->cs_speed;
 		tp->t_cflag = CS8;
+#if	NKBD > 0
 		kbd_serial(tp, zsiopen, zsiclose);
+#endif
 		cs->cs_conk = 1;		/* do L1-A processing */
 		ringsize = 128;
 	} else {
@@ -466,18 +473,13 @@ static void
 zscnputc(c)
 	int c;
 {
-	register volatile struct zschan *zc = zs_conschan;
-	register int s;
+	volatile struct zschan *zc = zs_conschan;
+	int s;
 
 	if (c == '\n')
 		zscnputc('\r');
-	/*
-	 * Must block output interrupts (i.e., raise to >= splzs) without
-	 * lowering current ipl.  Need a better way.
-	 */
-	s = splhigh();
-	if (CPU_ISSUN4C && s <= (12 << 8)) /* XXX */
-		(void) splzs();
+
+	s = splzs();
 	while ((zc->zc_csr & ZSRR0_TX_READY) == 0)
 		ZS_DELAY();
 	/*
@@ -870,10 +872,10 @@ int
 zshard(intrarg)
 	void *intrarg;
 {
-	register struct zs_chanstate *a;
+	struct zs_chanstate *a;
 #define	b (a + 1)
-	register volatile struct zschan *zc;
-	register int rr3, intflags = 0, v, i, ringmask;
+	volatile struct zschan *zc;
+	int rr3, intflags = 0, v, i, ringmask;
 
 #define ZSHARD_NEED_SOFTINTR	1
 #define ZSHARD_WAS_SERVICED	2
@@ -882,6 +884,8 @@ zshard(intrarg)
 	for (a = zslist; a != NULL; a = b->cs_next) {
 		ringmask = a->cs_ringmask;
 		rr3 = ZS_READ(a->cs_zc, 3);
+		if (rr3)
+			intflags |= ZSHARD_WAS_SERVICED;
 		if (rr3 & (ZSRR3_IP_A_RX|ZSRR3_IP_A_TX|ZSRR3_IP_A_STAT)) {
 			intflags |= (ZSHARD_CHIP_GOTINTR|ZSHARD_WAS_SERVICED);
 			zc = a->cs_zc;
@@ -926,6 +930,10 @@ zshard(intrarg)
 #undef b
 
 	if (intflags & ZSHARD_NEED_SOFTINTR) {
+#if 0		/*
+		 * seems to break things and will not work when spl* are
+		 * converted to be only raising.
+		 */
 		if (CPU_ISSUN4COR4M) {
 			/* XXX -- but this will go away when zshard moves to locore.s */
 			struct clockframe *p = intrarg;
@@ -940,6 +948,7 @@ zshard(intrarg)
 				return (zssoft(intrarg));
 			}
 		}
+#endif
 
 #if defined(SUN4M)
 		if (CPU_ISSUN4M)
@@ -948,7 +957,7 @@ zshard(intrarg)
 #endif
 		ienab_bis(IE_ZSSOFT);
 	}
-	return (intflags & ZSHARD_WAS_SERVICED);
+	return (intflags & ZSHARD_WAS_SERVICED) ? 1 : 0 /* -1 XXX */;
 }
 
 static int
@@ -1196,7 +1205,11 @@ again:
 				 * bstreams	XXX gag choke
 				 */
 				if (unit == ZS_KBD)
+#if	NKBD > 0
 					kbd_rint(cc);
+#else
+					;
+#endif
 				else if (unit == ZS_MOUSE)
 					ms_rint(cc);
 				else
@@ -1408,7 +1421,7 @@ zsstart(tp)
 	register struct tty *tp;
 {
 	register struct zs_chanstate *cs;
-	register int s, nch;
+	register int s, ss, nch;
 	int unit = DEVUNIT(tp->t_dev);
 	struct zs_softc *sc = zs_cd.cd_devs[unit >> 1];
 
@@ -1434,12 +1447,12 @@ zsstart(tp)
 	}
 
 	nch = ndqb(&tp->t_outq, 0);	/* XXX */
+	ss = splzs();
 	if (nch) {
 		register char *p = tp->t_outq.c_cf;
 
 		/* mark busy, enable tx done interrupts, & send first byte */
 		tp->t_state |= TS_BUSY;
-		(void) splzs();
 		cs->cs_preg[1] |= ZSWR1_TIE;
 		cs->cs_creg[1] |= ZSWR1_TIE;
 		ZS_WRITE(cs->cs_zc, 1, cs->cs_creg[1]);
@@ -1452,11 +1465,11 @@ zsstart(tp)
 		 * Nothing to send, turn off transmit done interrupts.
 		 * This is useful if something is doing polled output.
 		 */
-		(void) splzs();
 		cs->cs_preg[1] &= ~ZSWR1_TIE;
 		cs->cs_creg[1] &= ~ZSWR1_TIE;
 		ZS_WRITE(cs->cs_zc, 1, cs->cs_creg[1]);
 	}
+	splx(ss);
 out:
 	splx(s);
 }

@@ -29,7 +29,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #define SADB_X_ADDFLOW     12
 #define SADB_X_DELFLOW     13
 #define SADB_X_GRPSPIS     14
-#define SADB_X_BINDSA      15
+#define SADB_X_ASKPOLICY   15
 #define SADB_MAX           15
 
 struct sadb_msg {
@@ -155,14 +155,19 @@ struct sadb_protocol {
   uint16_t sadb_protocol_len;
   uint16_t sadb_protocol_exttype;
   uint8_t  sadb_protocol_proto;
-  uint8_t  sadb_protocol_reserved1;
+  uint8_t  sadb_protocol_direction;
   uint16_t sadb_protocol_reserved2;
 };
-    
+
+struct sadb_policy {
+  uint16_t  sadb_policy_len;
+  uint16_t  sadb_policy_exttype;
+  u_int32_t sadb_policy_seq;
+};
+
 #define SADB_GETSPROTO(x) ( (x) == SADB_SATYPE_AH ? IPPROTO_AH :\
                                 (x) == SADB_SATYPE_ESP ? IPPROTO_ESP :\
-                                    (x) == SADB_X_SATYPE_BYPASS ? IPPROTO_IP :\
-                                      IPPROTO_IPIP )
+                                                         IPPROTO_IPIP )
 
 #define SADB_EXT_RESERVED             0
 #define SADB_EXT_SA                   1
@@ -183,11 +188,13 @@ struct sadb_protocol {
 #define SADB_X_EXT_SRC_MASK           16
 #define SADB_X_EXT_DST_MASK           17
 #define SADB_X_EXT_PROTOCOL           18
-#define SADB_X_EXT_SA2                19
+#define SADB_X_EXT_FLOW_TYPE          19
 #define SADB_X_EXT_SRC_FLOW           20
 #define SADB_X_EXT_DST_FLOW           21
-#define SADB_X_EXT_DST2               22
-#define SADB_EXT_MAX                  22
+#define SADB_X_EXT_SA2                22
+#define SADB_X_EXT_DST2               23
+#define SADB_X_EXT_POLICY             24
+#define SADB_EXT_MAX                  24
 
 /* Fix pfkeyv2.c struct pfkeyv2_socket if SATYPE_MAX > 31 */
 #define SADB_SATYPE_UNSPEC		 0
@@ -199,8 +206,7 @@ struct sadb_protocol {
 #define SADB_SATYPE_MIP			 6
 #define SADB_X_SATYPE_IPIP		 7
 #define SADB_X_SATYPE_TCPSIGNATURE	 8
-#define SADB_X_SATYPE_BYPASS		 9
-#define SADB_SATYPE_MAX			 9
+#define SADB_SATYPE_MAX			 8
 
 #define SADB_SASTATE_LARVAL   0
 #define SADB_SASTATE_MATURE   1
@@ -224,14 +230,13 @@ struct sadb_protocol {
 #define SADB_X_EALG_BLF       3
 #define SADB_X_EALG_CAST      4
 #define SADB_X_EALG_SKIPJACK  5
-#define SADB_EALG_MAX         5
+#define SADB_X_EALG_AES       6
+#define SADB_EALG_MAX         6
 
 #define SADB_SAFLAGS_PFS         	0x001    /* perfect forward secrecy */
 #define SADB_X_SAFLAGS_HALFIV    	0x002    /* Used for ESP-old */
 #define SADB_X_SAFLAGS_TUNNEL	 	0x004    /* Force tunneling */
 #define SADB_X_SAFLAGS_CHAINDEL  	0x008    /* Delete whole SA chain */
-#define SADB_X_SAFLAGS_REPLACEFLOW	0x020    /* Replace existing flow */
-#define SADB_X_SAFLAGS_INGRESS_FLOW     0x040    /* Ingress ACL entry */
 #define SADB_X_SAFLAGS_RANDOMPADDING    0x080    /* Random ESP padding */
 #define SADB_X_SAFLAGS_NOREPLAY         0x100    /* No replay counter */
 
@@ -260,6 +265,15 @@ struct sadb_protocol {
 #define PFKEYV2_SENDMESSAGE_UNICAST    1
 #define PFKEYV2_SENDMESSAGE_REGISTERED 2
 #define PFKEYV2_SENDMESSAGE_BROADCAST  3
+
+#define FLOW_X_TYPE_USE                1
+#define FLOW_X_TYPE_ACQUIRE            2
+#define FLOW_X_TYPE_REQUIRE            3
+#define FLOW_X_TYPE_BYPASS             4
+#define FLOW_X_TYPE_DENY               5
+#define FLOW_X_TYPE_DONTACQ            6
+
+#define OPENBSD_IPSEC_API_VERSION      1
 
 #ifdef _KERNEL
 struct tdb;
@@ -293,7 +307,9 @@ int pfkeyv2_init(void);
 int pfkeyv2_cleanup(void);
 int pfkeyv2_parsemessage(void *, int, void **);
 int pfkeyv2_expire(struct tdb *, u_int16_t);
-int pfkeyv2_acquire(struct tdb *, int);
+int pfkeyv2_acquire(struct ipsec_policy *, union sockaddr_union *,
+                    union sockaddr_union *, u_int32_t *,
+		    struct sockaddr_encap *);
 
 int pfkey_register(struct pfkey_version *version);
 int pfkey_unregister(struct pfkey_version *version);

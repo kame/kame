@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_output.c,v 1.68 2000/05/04 20:15:38 niklas Exp $	*/
+/*	$OpenBSD: ip_output.c,v 1.83 2000/10/25 22:40:40 aaron Exp $	*/
 /*	$NetBSD: ip_output.c,v 1.28 1996/02/13 23:43:07 christos Exp $	*/
 
 /*
@@ -72,6 +72,7 @@
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
 #include <net/pfkeyv2.h>
+#include <net/if_enc.h>
 
 #ifdef ENCDEBUG
 #define DPRINTF(x)    do { if (encdebug) printf x ; } while (0)
@@ -85,6 +86,9 @@
 
 extern u_int8_t get_sa_require  __P((struct inpcb *));
 
+extern int ipsec_auth_default_level;
+extern int ipsec_esp_trans_default_level;
+extern int ipsec_esp_network_default_level;
 #endif /* IPSEC */
 
 static struct mbuf *ip_insertoptions __P((struct mbuf *, struct mbuf *, int *));
@@ -92,12 +96,6 @@ static void ip_mloopback
 	__P((struct ifnet *, struct mbuf *, struct sockaddr_in *));
 #if defined(IPFILTER) || defined(IPFILTER_LKM)
 int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **));
-#endif
-
-#ifdef IPSEC
-extern int ipsec_auth_default_level;
-extern int ipsec_esp_trans_default_level;
-extern int ipsec_esp_network_default_level;
 #endif
 
 /*
@@ -128,15 +126,14 @@ ip_output(m0, va_alist)
 	int flags;
 	struct ip_moptions *imo;
 	va_list ap;
+	u_int8_t sproto = 0, donerouting = 0;
 #ifdef IPSEC
-	union sockaddr_union sunion;
-	struct inpcb *inp;
+	union sockaddr_union sdst;
+	u_int32_t sspi;
 
-	struct route_enc re0, *re = &re0;
-	struct sockaddr_encap *ddst, *gw;
-	u_int8_t sa_require, sa_have = 0;
+	struct inpcb *inp;
+	struct tdb *tdb;
 	int s;
-	struct tdb *tdb, tdb2;
 #endif /* IPSEC */
 
 	va_start(ap, m0);
@@ -146,6 +143,8 @@ ip_output(m0, va_alist)
 	imo = va_arg(ap, struct ip_moptions *);
 #ifdef IPSEC
 	inp = va_arg(ap, struct inpcb *);
+	if (inp && (inp->inp_flags & INP_IPV6) != 0)
+		panic("ip_output: IPv6 pcb is passed");
 #endif /* IPSEC */
 	va_end(ap);
 
@@ -157,7 +156,9 @@ ip_output(m0, va_alist)
 		m = ip_insertoptions(m, opt, &len);
 		hlen = len;
 	}
+
 	ip = mtod(m, struct ip *);
+
 	/*
 	 * Fill in IP header.
 	 */
@@ -172,66 +173,249 @@ ip_output(m0, va_alist)
 		hlen = ip->ip_hl << 2;
 	}
 
+#ifdef IPSEC
+	s = splnet();
+
 	/*
-	 * Route packet.
+	 * If the higher-level protocol has cached the SA to use, we
+	 * can avoid the routing lookup if the source address is zero.
 	 */
-	if (ro == 0) {
-		ro = &iproute;
-		bzero((caddr_t)ro, sizeof (*ro));
+	if (inp != NULL && inp->inp_tdb != NULL &&
+	    ip->ip_src.s_addr == INADDR_ANY &&
+	    tdb->tdb_src.sa.sa_family == AF_INET &&
+	    tdb->tdb_src.sin.sin_addr.s_addr != INADDR_ANY) {
+	        ip->ip_src.s_addr = tdb->tdb_src.sin.sin_addr.s_addr;
+		splx(s);
+		goto skip_routing;
 	}
-	dst = satosin(&ro->ro_dst);
+
+	splx(s);
+#endif /* IPSEC */
+
 	/*
-	 * If there is a cached route,
-	 * check that it is to the same destination
-	 * and is still up.  If not, free it and try again.
+	 * If we're missing the IP source address, do a route lookup. We'll
+	 * remember this result, in case we don't need to do any IPsec
+	 * processing on the packet. We need the source address so we can
+	 * do an SPD lookup in IPsec; for most packets, the source address
+	 * is set at a higher level protocol. ICMPs and other packets
+	 * though (e.g., traceroute) have a source address of zeroes.
 	 */
-	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	    dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = (struct rtentry *)0;
-	}
-	if (ro->ro_rt == 0) {
-		dst->sin_family = AF_INET;
-		dst->sin_len = sizeof(*dst);
-		dst->sin_addr = ip->ip_dst;
-	}
-	/*
-	 * If routing to interface only,
-	 * short circuit routing lookup.
-	 */
-	if (flags & IP_ROUTETOIF) {
-		if ((ia = ifatoia(ifa_ifwithdstaddr(sintosa(dst)))) == 0 &&
-		    (ia = ifatoia(ifa_ifwithnet(sintosa(dst)))) == 0) {
-			ipstat.ips_noroute++;
-			error = ENETUNREACH;
-			goto bad;
+	if (ip->ip_src.s_addr == INADDR_ANY) {
+	        donerouting = 1;
+
+	        if (ro == 0) {
+		        ro = &iproute;
+			bzero((caddr_t)ro, sizeof (*ro));
 		}
-		ifp = ia->ia_ifp;
-		ip->ip_ttl = 1;
-	} else {
-		if (ro->ro_rt == 0)
-			rtalloc(ro);
+
+		dst = satosin(&ro->ro_dst);
+
+		/*
+		 * If there is a cached route, check that it is to the same
+		 * destination and is still up.  If not, free it and try again.
+		 */
+		if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+				  dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
+		        RTFREE(ro->ro_rt);
+			ro->ro_rt = (struct rtentry *)0;
+		}
+
 		if (ro->ro_rt == 0) {
-			ipstat.ips_noroute++;
-			error = EHOSTUNREACH;
-			goto bad;
+		        dst->sin_family = AF_INET;
+			dst->sin_len = sizeof(*dst);
+			dst->sin_addr = ip->ip_dst;
 		}
-		ia = ifatoia(ro->ro_rt->rt_ifa);
-		ifp = ro->ro_rt->rt_ifp;
-		ro->ro_rt->rt_use++;
-		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
-			dst = satosin(ro->ro_rt->rt_gateway);
+
+		/*
+		 * If routing to interface only, short-circuit routing lookup.
+		 */
+		if (flags & IP_ROUTETOIF) {
+		        if ((ia = ifatoia(ifa_ifwithdstaddr(sintosa(dst)))) == 0 &&
+			    (ia = ifatoia(ifa_ifwithnet(sintosa(dst)))) == 0) {
+			    ipstat.ips_noroute++;
+			    error = ENETUNREACH;
+			    goto bad;
+			}
+
+			ifp = ia->ia_ifp;
+			ip->ip_ttl = 1;
+		} else {
+		        if (ro->ro_rt == 0)
+			        rtalloc(ro);
+
+			if (ro->ro_rt == 0) {
+			        ipstat.ips_noroute++;
+				error = EHOSTUNREACH;
+				goto bad;
+			}
+
+			ia = ifatoia(ro->ro_rt->rt_ifa);
+			ifp = ro->ro_rt->rt_ifp;
+			ro->ro_rt->rt_use++;
+
+			if (ro->ro_rt->rt_flags & RTF_GATEWAY)
+			        dst = satosin(ro->ro_rt->rt_gateway);
+		}
+
+		/* Set the source IP address */
+                if (!IN_MULTICAST(ip->ip_dst.s_addr))
+		        ip->ip_src = ia->ia_addr.sin_addr;
 	}
+
+#ifdef IPSEC
+ skip_routing:
+
+	/* Disallow nested IPsec for now */
+	if (flags & IP_ENCAPSULATED)
+	  goto done_spd;
+
+	/*
+	 * splnet is chosen over spltdb because we are not allowed to
+	 * lower the level, and udp_output calls us in splnet().
+	 */
+	s = splnet();
+
+	/*
+	 * Check if there was an outgoing SA bound to the flow
+	 * from a transport protocol.
+	 */
+	if (inp && inp->inp_tdb &&
+	    inp->inp_tdb->tdb_dst.sa.sa_family == AF_INET &&
+	    !bcmp(&inp->inp_tdb->tdb_dst.sin.sin_addr,
+		  &ip->ip_dst, sizeof(ip->ip_dst)))
+	        tdb = inp->inp_tdb;
+	else
+	        tdb = ipsp_spd_lookup(m, AF_INET, hlen, &error,
+				      IPSP_DIRECTION_OUT, NULL, inp);
+
+	if (tdb == NULL) {
+	        splx(s);
+
+		if (error == 0) {
+		        /*
+			 * No IPsec processing required, we'll just send the
+			 * packet out.
+			 */
+		        sproto = 0;
+
+			/* Fall through to routing/multicast handling */
+		} else {
+		        /*
+			 * -EINVAL is used to indicate that the packet should
+			 * be silently dropped, typically because we've asked
+			 * key management for an SA.
+			 */
+		        if (error == -EINVAL) /* Should silently drop packet */
+			  error = 0;
+
+			m_freem(m);
+			goto done;
+		}
+	} else {
+	        /* We need to do IPsec */
+	        bcopy(&tdb->tdb_dst, &sdst, sizeof(sdst));
+		sspi = tdb->tdb_spi;
+		sproto = tdb->tdb_sproto;
+
+		/*
+		 * If the socket has set the bypass flags and SA
+		 * destination matches the IP destination, skip
+		 * IPsec. This allows IKE packets to travel through
+		 * IPsec tunnels.
+		 */
+		if ((inp != NULL) &&
+		    (inp->inp_seclevel[SL_AUTH] == IPSEC_LEVEL_BYPASS) &&
+		    (inp->inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_BYPASS) &&
+		    (inp->inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_BYPASS)
+		    && (sdst.sa.sa_family == AF_INET) &&
+		    (sdst.sin.sin_addr.s_addr == ip->ip_dst.s_addr)) {
+		        splx(s);
+			sproto = 0; /* mark as no-IPsec-needed */
+			goto done_spd;
+		}
+
+		/* If it's not a multicast packet, try to fast-path */
+		if (!IN_MULTICAST(ip->ip_dst.s_addr)) {
+			goto sendit;
+		}
+	}
+
+	/* Fall through to the routing/multicast handling code */
+ done_spd:
+#endif /* IPSEC */
+
+	if (donerouting == 0) {
+	        if (ro == 0) {
+		        ro = &iproute;
+			bzero((caddr_t)ro, sizeof (*ro));
+		}
+
+		dst = satosin(&ro->ro_dst);
+
+		/*
+		 * If there is a cached route, check that it is to the same
+		 * destination and is still up.  If not, free it and try again.
+		 */
+		if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+				  dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
+		        RTFREE(ro->ro_rt);
+			ro->ro_rt = (struct rtentry *)0;
+		}
+
+		if (ro->ro_rt == 0) {
+		        dst->sin_family = AF_INET;
+			dst->sin_len = sizeof(*dst);
+			dst->sin_addr = ip->ip_dst;
+		}
+
+		/*
+		 * If routing to interface only, short-circuit routing lookup.
+		 */
+		if (flags & IP_ROUTETOIF) {
+		        if ((ia = ifatoia(ifa_ifwithdstaddr(sintosa(dst)))) == 0 &&
+			    (ia = ifatoia(ifa_ifwithnet(sintosa(dst)))) == 0) {
+			    ipstat.ips_noroute++;
+			    error = ENETUNREACH;
+			    goto bad;
+			}
+
+			ifp = ia->ia_ifp;
+			ip->ip_ttl = 1;
+		} else {
+		        if (ro->ro_rt == 0)
+			        rtalloc(ro);
+
+			if (ro->ro_rt == 0) {
+			        ipstat.ips_noroute++;
+				error = EHOSTUNREACH;
+				goto bad;
+			}
+
+			ia = ifatoia(ro->ro_rt->rt_ifa);
+			ifp = ro->ro_rt->rt_ifp;
+			ro->ro_rt->rt_use++;
+
+			if (ro->ro_rt->rt_flags & RTF_GATEWAY)
+			        dst = satosin(ro->ro_rt->rt_gateway);
+		}
+
+		/* Set the source IP address */
+		if (ip->ip_src.s_addr == INADDR_ANY)
+			ip->ip_src = ia->ia_addr.sin_addr;
+	}
+
 	if (IN_MULTICAST(ip->ip_dst.s_addr)) {
 		struct in_multi *inm;
 
 		m->m_flags |= M_MCAST;
+
 		/*
 		 * IP destination address is multicast.  Make sure "dst"
 		 * still points to the address in "ro".  (It may have been
 		 * changed to point to a gateway address, above.)
 		 */
 		dst = satosin(&ro->ro_dst);
+
 		/*
 		 * See if the caller provided any multicast options
 		 */
@@ -241,14 +425,18 @@ ip_output(m0, va_alist)
 				ifp = imo->imo_multicast_ifp;
 		} else
 			ip->ip_ttl = IP_DEFAULT_MULTICAST_TTL;
+
 		/*
-		 * Confirm that the outgoing interface supports multicast.
+		 * Confirm that the outgoing interface supports multicast,
+		 * but only if the packet actually is going out on that
+		 * interface (i.e., no IPsec is applied).
 		 */
-		if ((ifp->if_flags & IFF_MULTICAST) == 0) {
+		if (((ifp->if_flags & IFF_MULTICAST) == 0) && (sproto == 0)) {
 			ipstat.ips_noroute++;
 			error = ENETUNREACH;
 			goto bad;
 		}
+
 		/*
 		 * If source address not specified yet, use address
 		 * of outgoing interface.
@@ -256,7 +444,9 @@ ip_output(m0, va_alist)
 		if (ip->ip_src.s_addr == INADDR_ANY) {
 			register struct in_ifaddr *ia;
 
-			for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next)
+			for (ia = in_ifaddr.tqh_first;
+			     ia;
+			     ia = ia->ia_list.tqe_next)
 				if (ia->ia_ifp == ifp) {
 					ip->ip_src = ia->ia_addr.sin_addr;
 					break;
@@ -312,20 +502,13 @@ ip_output(m0, va_alist)
 
 		goto sendit;
 	}
-#ifndef notdef
+
 	/*
-	 * If source address not specified yet, use address
-	 * of outgoing interface.
+	 * Look for broadcast address and and verify user is allowed to send
+	 * such a packet; if the packet is going in an IPsec tunnel, skip
+	 * this check.
 	 */
-	if (ip->ip_src.s_addr == INADDR_ANY)
-		ip->ip_src = ia->ia_addr.sin_addr;
-#endif
-	/*
-	 * Look for broadcast address and
-	 * and verify user is allowed to send
-	 * such a packet.
-	 */
-	if (in_broadcast(dst->sin_addr, ifp)) {
+	if ((sproto == 0) && (in_broadcast(dst->sin_addr, ifp))) {
 		if ((ifp->if_flags & IFF_BROADCAST) == 0) {
 			error = EADDRNOTAVAIL;
 			goto bad;
@@ -334,7 +517,8 @@ ip_output(m0, va_alist)
 			error = EACCES;
 			goto bad;
 		}
-		/* don't allow broadcast messages to be fragmented */
+
+		/* Don't allow broadcast messages to be fragmented */
 		if ((u_int16_t)ip->ip_len > ifp->if_mtu) {
 			error = EMSGSIZE;
 			goto bad;
@@ -344,352 +528,63 @@ ip_output(m0, va_alist)
 		m->m_flags &= ~M_BCAST;
 
 sendit:
+        /*
+         * If we're doing Path MTU discovery, we need to set DF unless
+         * the route's MTU is locked.
+	 */
+	if ((flags & IP_MTUDISC) && ro && ro->ro_rt &&
+	    (ro->ro_rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+		ip->ip_off |= IP_DF;
+		
 #ifdef IPSEC
 	/*
 	 * Check if the packet needs encapsulation.
 	 */
-	if (!(flags & IP_ENCAPSULATED) &&
-	    (inp == NULL || 
-	     inp->inp_seclevel[SL_AUTH] != IPSEC_LEVEL_BYPASS ||
-	     inp->inp_seclevel[SL_ESP_TRANS] != IPSEC_LEVEL_BYPASS ||
-	     inp->inp_seclevel[SL_ESP_NETWORK] != IPSEC_LEVEL_BYPASS)) {
-		if (inp == NULL)
-			sa_require = get_sa_require(inp);
-		else
-			sa_require = inp->inp_secrequire;
+	if (sproto != 0) {
+	        s = splnet();
 
-		bzero((caddr_t) re, sizeof(*re));
-
-		/*
-		 * splnet is chosen over spltdb because we are not allowed to
-		 * lower the level, and udp_output calls us in splnet().
-		 */
-		s = splnet();
-
-		/*
-		 * Check if there was an outgoing SA bound to the flow
-		 * from a transport protocol.
-		 */
-		if (inp && inp->inp_tdb &&
-		    (inp->inp_tdb->tdb_dst.sin.sin_addr.s_addr == INADDR_ANY ||
-		     !bcmp(&inp->inp_tdb->tdb_dst.sin.sin_addr,
-			   &ip->ip_dst, sizeof(ip->ip_dst)))) {
-			tdb = inp->inp_tdb;
-			goto have_tdb;
-		}
-
-		/*
-		 * If there are no flows in place, there's no point
-		 * continuing with the SPD lookup.
-		 */
-		if (!ipsec_in_use) {
-			splx(s);
-			goto no_encap;
-		}
-
-		/*
-		 * Do an SPD lookup -- this code should probably be moved
-		 * to a separate function.
-		 */
-		ddst = (struct sockaddr_encap *) &re->re_dst;
-		ddst->sen_family = PF_KEY;
-		ddst->sen_len = SENT_IP4_LEN;
-		ddst->sen_type = SENT_IP4;
-		ddst->sen_ip_src = ip->ip_src;
-		ddst->sen_ip_dst = ip->ip_dst;
-		ddst->sen_proto = ip->ip_p;
-
-		/* If TCP/UDP, extract the port numbers to use in the lookup */
-		switch (ip->ip_p) {
-		case IPPROTO_UDP:
-		case IPPROTO_TCP:
+#if defined(IPFILTER) || defined(IPFILTER_LKM)
+		if (fr_checkp) {
 		    /*
-		     * Luckily, the offset of the src/dst ports in both the UDP
-		     * and TCP headers is the same (first two 16-bit values
-		     * in the respective headers), so we can just copy them.
+		     * Ok, it's time for a simple round-trip to the IPF/NAT
+		     * code with the enc# interface
 		     */
-		    m_copydata(m, hlen, sizeof(u_int16_t),
-			       (caddr_t) &ddst->sen_sport);
-		    m_copydata(m, hlen + sizeof(u_int16_t), sizeof(u_int16_t),
-			       (caddr_t) &ddst->sen_dport);
-		    break;
-
-		default:
-			ddst->sen_sport = 0;
-			ddst->sen_dport = 0;
-		}
-
-		/* Actual SPD lookup */
-		rtalloc((struct route *) re);
-		if (re->re_rt == NULL) {
-			splx(s);
-			goto no_encap;
-		}
-
-		gw = (struct sockaddr_encap *) (re->re_rt->rt_gateway);
-
-		/* Sanity check */
-		if (gw == NULL || ((gw->sen_type != SENT_IPSP) &&
-				   (gw->sen_type != SENT_IPSP6))) {
-			splx(s);
-		        DPRINTF(("ip_output(): no gw or gw data not IPSP\n"));
-
-			if (re->re_rt)
-				RTFREE(re->re_rt);
+		    struct mbuf *m0 = m;
+		    void *ifp = tdb->tdb_interface ?
+				(void *)tdb->tdb_interface :
+				      (void *)&encif[0].sc_if;
+		    if ((*fr_checkp)(ip, hlen, ifp, 1, &m0)) {
 			error = EHOSTUNREACH;
-			m_freem(m);
+			splx(s);
 			goto done;
-		}
-
-		/*
-		 * There might be a specific route, that tells us to avoid
-		 * doing IPsec; this is useful for specific routes that we
-		 * don't want to have IPsec applied on, like the key
-		 * management ports.
-		 */
-
-		if ((gw != NULL) && (gw->sen_ipsp_sproto == 0) &&
-		    (gw->sen_ipsp_spi == 0)) {
-		    if ((gw->sen_family == AF_INET) &&
-			(gw->sen_ipsp_dst.s_addr == 0)) {
-			splx(s);
-			goto no_encap;
-		    }
-
-#ifdef INET6
-		    if ((gw->sen_family == AF_INET6) &&
-			IN6_IS_ADDR_UNSPECIFIED(&gw->sen_ipsp6_dst)) {
-			splx(s);
-			goto no_encap;
-		    }
-#endif /* INET6 */
-		}
-
-		/*
-		 * At this point we have an IPSP "gateway" (tunnel) spec.
-		 * Use the destination of the tunnel and the SPI to
-		 * look up the necessary Tunnel Control Block. Look it up,
-		 * and then pass it, along with the packet and the gw,
-		 * to the appropriate transformation.
-		 */
-		bzero(&sunion, sizeof(sunion));
-
-		if (gw->sen_type == SENT_IPSP) {
-		    sunion.sin.sin_family = AF_INET;
-		    sunion.sin.sin_len = sizeof(struct sockaddr_in);
-		    sunion.sin.sin_addr = gw->sen_ipsp_dst;
-		}
-#ifdef INET6
-		if (gw->sen_type == SENT_IPSP6) {
-		    sunion.sin6.sin6_family = AF_INET6;
-		    sunion.sin6.sin6_len = sizeof(struct sockaddr_in6);
-		    sunion.sin6.sin6_addr = gw->sen_ipsp6_dst;
-		}
-#endif /* INET6 */
-
-		/* Lookup in the TDB table */
-		tdb = (struct tdb *) gettdb(gw->sen_ipsp_spi, &sunion,
-					    gw->sen_ipsp_sproto);
-
-		/* Bypass the SA acquisition if that is what we want. */
-		if (tdb && tdb->tdb_satype == SADB_X_SATYPE_BYPASS)
-		{
-		    splx(s);
-		    goto no_encap;
-		}
-
-		/* 
-		 * For VPNs a route with a reserved SPI is used to
-		 * indicate the need for an SA when none is established.
-		 */
-		if (((ntohl(gw->sen_ipsp_spi) == SPI_LOCAL_USE) &&
-		     (gw->sen_type == SENT_IPSP)) ||
-		    ((ntohl(gw->sen_ipsp6_spi) == SPI_LOCAL_USE) &&
-		     (gw->sen_type == SENT_IPSP6))) {
-		    if (tdb == NULL) {
-			/* We will just use system defaults. */
-			tdb = &tdb2;
-			bzero(&tdb2, sizeof(tdb2));
-
-			/* Default entry is for ESP */
-			sa_require = NOTIFY_SATYPE_CONF | NOTIFY_SATYPE_AUTH;
-			tdb2.tdb_satype = SADB_SATYPE_ESP;
 		    } else {
-			if (tdb->tdb_authalgxform)
-			  sa_require = NOTIFY_SATYPE_AUTH;
-			if (tdb->tdb_encalgxform)
-			  sa_require |= NOTIFY_SATYPE_CONF;
-			if (tdb->tdb_flags & TDBF_TUNNELING)
-			  sa_require |= NOTIFY_SATYPE_TUNNEL;
+			ip = mtod(m = m0, struct ip *);
+			hlen = ip->ip_hl << 2;
 		    }
-
-		    /* Check whether Perfect Forward Secrect is required */
-		    if (ipsec_require_pfs)
-		      tdb->tdb_flags |= TDBF_PFS;
-		    else
-		      tdb->tdb_flags &= ~TDBF_PFS;
-
-		    /* Initialize expirations */
-		    if (ipsec_soft_allocations > 0) 
-		      tdb->tdb_soft_allocations = ipsec_soft_allocations;
-		    else
-		      tdb->tdb_soft_allocations = 0;
-
-		    if (ipsec_exp_allocations > 0)
-		      tdb->tdb_exp_allocations = ipsec_exp_allocations;
-		    else
-		      tdb->tdb_exp_allocations = 0;
-
-		    if (ipsec_soft_bytes > 0)
-		      tdb->tdb_soft_bytes = ipsec_soft_bytes;
-		    else
-		      tdb->tdb_soft_bytes = 0;
-
-		    if (ipsec_exp_bytes > 0)
-		      tdb->tdb_exp_bytes = ipsec_exp_bytes;
-		    else
-		      tdb->tdb_exp_bytes = 0;
-
-		    if (ipsec_soft_timeout > 0)
-		      tdb->tdb_soft_timeout = ipsec_soft_timeout;
-		    else
-		      tdb->tdb_soft_timeout = 0;
-
-		    if (ipsec_exp_timeout > 0)
-		      tdb->tdb_exp_timeout = ipsec_exp_timeout;
-		    else
-		      tdb->tdb_exp_timeout = 0;
-
-		    if (ipsec_soft_first_use > 0)
-		      tdb->tdb_soft_first_use = ipsec_soft_first_use;
-		    else
-		      tdb->tdb_soft_first_use = 0;
-
-		    if (ipsec_exp_first_use > 0)
-		      tdb->tdb_exp_first_use = ipsec_exp_first_use;
-		    else
-		      tdb->tdb_exp_first_use = 0;
-
-		    /* 
-		     * If we don't have an existing desired encryption
-		     * algorithm, use the default.
-		     */
-		    if ((tdb->tdb_encalgxform == NULL) &&
-			(tdb->tdb_satype & NOTIFY_SATYPE_CONF))
-		    {
-			if (!strncasecmp(ipsec_def_enc, "des", sizeof("des")))
-			  tdb->tdb_encalgxform = &enc_xform_des;
-			else
-			  if (!strncasecmp(ipsec_def_enc, "3des",
-					   sizeof("3des")))
-			    tdb->tdb_encalgxform = &enc_xform_3des;
-			  else
-			    if (!strncasecmp(ipsec_def_enc, "blowfish",
-					     sizeof("blowfish")))
-			      tdb->tdb_encalgxform = &enc_xform_blf;
-			    else
-			      if (!strncasecmp(ipsec_def_enc, "cast128",
-					       sizeof("cast128")))
-				tdb->tdb_encalgxform = &enc_xform_cast5;
-			      else
-				if (!strncasecmp(ipsec_def_enc, "skipjack",
-						 sizeof("skipjack")))
-				  tdb->tdb_encalgxform = &enc_xform_skipjack;
-		    }
-
-		    /*
-		     * If we don't have an existing desired authentication
-		     * algorithm, use the default.
-		     */
-		    if ((tdb->tdb_authalgxform == NULL) && 
-			(tdb->tdb_satype & NOTIFY_SATYPE_AUTH))
-		    {
-			if (!strncasecmp(ipsec_def_auth, "hmac-md5",
-					 sizeof("hmac-md5")))
-			  tdb->tdb_authalgxform = &auth_hash_hmac_md5_96;
-			else
-			  if (!strncasecmp(ipsec_def_auth, "hmac-sha1",
-					   sizeof("hmac-sha1")))
-			    tdb->tdb_authalgxform = &auth_hash_hmac_sha1_96;
-			  else
-			    if (!strncasecmp(ipsec_def_auth, "hmac-ripemd160",
-					     sizeof("hmac_ripemd160")))
-			      tdb->tdb_authalgxform = 
-						 &auth_hash_hmac_ripemd_160_96;
-		    }
-
-		    /* XXX Initialize src_id/dst_id */
-
-		    /* PF_KEYv2 notification message */
-		    if ((error = pfkeyv2_acquire(tdb, 0)) != 0)
-		    {
-			splx(s);
-			return error;
-		    }
-
-		    splx(s);
-
-		    /* 
-		     * When sa_require is set, the packet will be dropped
-		     * at no_encap.
-		     */
-		    goto no_encap;
-		}
-
-	     have_tdb:
-
+  	        }
+#endif /* IPFILTER */
+		
+		tdb = gettdb(sspi, &sdst, sproto);
 		if (tdb == NULL) {
-			splx(s);
-			if (gw->sen_type == SENT_IPSP)
-			        DPRINTF(("ip_output(): non-existant TDB for SA %s/%08x/%u\n", inet_ntoa4(gw->sen_ipsp_dst), ntohl(gw->sen_ipsp_spi), gw->sen_ipsp_sproto));
-
-#ifdef INET6
-			if (gw->sen_type == SENT_IPSP6)
-			        DPRINTF(("ip_output(): non-existant TDB for SA %s/%08x/%u\n", inet6_ntoa4(gw->sen_ipsp6_dst), ntohl(gw->sen_ipsp6_spi), gw->sen_ipsp6_sproto));
-#endif /* INET6 */	  
-
 			error = EHOSTUNREACH;
 			m_freem(m);
 			goto done;
-		}
-
-		/* We don't need this anymore */
-		if (re->re_rt) {
-			RTFREE(re->re_rt);
-			re->re_rt = NULL;
 		}
 
 		/* Massage the IP header for use by the IPsec code */
 		ip->ip_len = htons((u_short) ip->ip_len);
 		ip->ip_off = htons((u_short) ip->ip_off);
-		ip->ip_sum = 0;
 
 		/*
-		 * Now we check if this tdb has all the transforms which
-		 * are required by the socket or our default policy.
+		 * Clear these -- they'll be set in the recursive invocation
+		 * as needed.
 		 */
-		SPI_CHAIN_ATTRIB(sa_have, tdb_onext, tdb);
-		if (sa_require & ~sa_have) {
-		        splx(s);
-			goto no_encap;
-		}
+		m->m_flags &= ~(M_MCAST | M_BCAST);
 
 		/* Callee frees mbuf */
 		error = ipsp_process_packet(m, tdb, AF_INET, 0);
 		splx(s);
 		return error;  /* Nothing more to be done */
-
-no_encap:
-		/* This is for possible future use, don't move or delete */
-		if (re->re_rt)
-			RTFREE(re->re_rt);
-
-		/* No IPSec processing though it was required, drop packet */
-		if (sa_require) {
-			error = EHOSTUNREACH;
-			m_freem(m);
-			goto done;
-		}
 	}
 #endif /* IPSEC */
 
@@ -722,16 +617,6 @@ no_encap:
 	 * Too large for interface; fragment if possible.
 	 * Must be able to put at least 8 bytes per fragment.
 	 */
-#if 0
-	/*
-	 * If IPsec packet is too big for the interface, try fragment it.
-	 * XXX This really is a quickhack.  May be inappropriate.
-	 * XXX fails if somebody is sending AH'ed packet, with:
-	 *	sizeof(packet without AH) < mtu < sizeof(packet with AH)
-	 */
-	if (sab && ip->ip_p != IPPROTO_AH && (flags & IP_FORWARDING) == 0)
-		ip->ip_off &= ~IP_DF;
-#endif /*IPSEC*/
 	if (ip->ip_off & IP_DF) {
 		error = EMSGSIZE;
 		ipstat.ips_cantfrag++;
@@ -896,8 +781,16 @@ ip_optcopy(ip, jp)
 			*dp++ = IPOPT_NOP;
 			optlen = 1;
 			continue;
-		} else
-			optlen = cp[IPOPT_OLEN];
+		}
+#ifdef DIAGNOSTIC
+		if (cnt < IPOPT_OLEN + sizeof(*cp))
+			panic("malformed IPv4 option passed to ip_optcopy");
+#endif
+		optlen = cp[IPOPT_OLEN];
+#ifdef DIAGNOSTIC
+		if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt)
+			panic("malformed IPv4 option passed to ip_optcopy");
+#endif
 		/* bogus lengths should have been caught by ip_dooptions */
 		if (optlen > cnt)
 			optlen = cnt;
@@ -926,9 +819,6 @@ ip_ctloutput(op, so, level, optname, mp)
 	register int optval = 0;
 #ifdef IPSEC
 	struct proc *p = curproc; /* XXX */
-	struct tdb *tdb;
-	struct tdb_ident *tdbip, tdbi;
-	int s;
 #endif
 	int error = 0;
 
@@ -1026,26 +916,6 @@ ip_ctloutput(op, so, level, optname, mp)
 				}
 			}
 			break;
-		case IPSEC_OUTSA:
-#ifndef IPSEC
-			error = EINVAL;
-#else
-			s = spltdb();
-			if (m == 0 || m->m_len != sizeof(struct tdb_ident)) {
-				error = EINVAL;
-			} else {
-				tdbip = mtod(m, struct tdb_ident *);
-				tdb = gettdb(tdbip->spi, &tdbip->dst,
-				    tdbip->proto);
-				if (tdb == NULL)
-					error = ESRCH;
-				else
-					tdb_add_inp(tdb, inp);
-			}
-			splx(s);
-#endif /* IPSEC */
-			break;
-
 		case IP_AUTH_LEVEL:
 		case IP_ESP_TRANS_LEVEL:
 		case IP_ESP_NETWORK_LEVEL:
@@ -1056,7 +926,7 @@ ip_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 				break;
 			}
-			optval = *mtod(m, u_char *);
+			optval = *mtod(m, int *);
 
 			if (optval < IPSEC_LEVEL_BYPASS || 
 			    optval > IPSEC_LEVEL_UNIQUE) {
@@ -1174,44 +1044,26 @@ ip_ctloutput(op, so, level, optname, mp)
 			*mtod(m, int *) = optval;
 			break;
 
-		case IPSEC_OUTSA:
-#ifndef IPSEC
-			error = EINVAL;
-#else
-			s = spltdb();
-			if (inp->inp_tdb == NULL) {
-				error = ENOENT;
-			} else {
-				tdbi.spi = inp->inp_tdb->tdb_spi;
-				tdbi.dst = inp->inp_tdb->tdb_dst;
-				tdbi.proto = inp->inp_tdb->tdb_sproto;
-				*mp = m = m_get(M_WAIT, MT_SOOPTS);
-				m->m_len = sizeof(tdbi);
-				bcopy((caddr_t)&tdbi, mtod(m, caddr_t),
-				    (unsigned)m->m_len);
-			}
-			splx(s);
-#endif /* IPSEC */
-			break;
-
 		case IP_AUTH_LEVEL:
 		case IP_ESP_TRANS_LEVEL:
 		case IP_ESP_NETWORK_LEVEL:
 #ifndef IPSEC
+			m->m_len = sizeof(int);
 			*mtod(m, int *) = IPSEC_LEVEL_NONE;
 #else
+			m->m_len = sizeof(int);
 			switch (optname) {
 			case IP_AUTH_LEVEL:
-				    optval = inp->inp_seclevel[SL_AUTH];
-				    break;
+				optval = inp->inp_seclevel[SL_AUTH];
+				break;
 
 			case IP_ESP_TRANS_LEVEL:
-				    optval = inp->inp_seclevel[SL_ESP_TRANS];
-				    break;
+				optval = inp->inp_seclevel[SL_ESP_TRANS];
+				break;
 
 			case IP_ESP_NETWORK_LEVEL:
-				    optval = inp->inp_seclevel[SL_ESP_NETWORK];
-				    break;
+				optval = inp->inp_seclevel[SL_ESP_NETWORK];
+				break;
 			}
 			*mtod(m, int *) = optval;
 #endif
@@ -1281,8 +1133,10 @@ ip_pcbopts(pcbopt, m)
 		if (opt == IPOPT_NOP)
 			optlen = 1;
 		else {
+			if (cnt < IPOPT_OLEN + sizeof(*cp))
+				goto bad;
 			optlen = cp[IPOPT_OLEN];
-			if (optlen <= IPOPT_OLEN || optlen > cnt)
+			if (optlen < IPOPT_OLEN  + sizeof(*cp) || optlen > cnt)
 				goto bad;
 		}
 		switch (opt) {

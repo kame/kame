@@ -1,4 +1,4 @@
-/*	$OpenBSD: dc.c,v 1.1 2000/04/18 19:35:30 jason Exp $	*/
+/*	$OpenBSD: dc.c,v 1.19 2000/10/30 18:20:14 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,21 +31,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.8 2000/03/09 19:28:19 rwatson Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.22 2000/09/07 18:51:04 wpaul Exp $
  */
 
 /*
  * DEC "tulip" clone ethernet driver. Supports the DEC/Intel 21143
  * series chips and several workalikes including the following:
  *
- * Macronix 98713/98715/98725 PMAC (www.macronix.com)
+ * Macronix 98713/98715/98725/98727/98732 PMAC (www.macronix.com)
  * Macronix/Lite-On 82c115 PNIC II (www.macronix.com)
  * Lite-On 82c168/82c169 PNIC (www.litecom.com)
  * ASIX Electronics AX88140A (www.asix.com.tw)
  * ASIX Electronics AX88141 (www.asix.com.tw)
  * ADMtek AL981 (www.admtek.com.tw)
- * ADMtek AN985 (www.admtek.com.tw)
- * Davicom DM9100, DM9102 (www.davicom8.com)
+ * ADMtek AN983 (www.admtek.com.tw)
+ * Davicom DM9100, DM9102, DM9102A (www.davicom8.com)
+ * Accton EN1217 (www.accton.com)
+ * Xircom X3201 (www.xircom.com)
  *
  * Datasheets for the 21143 are available at developer.intel.com.
  * Datasheets for the clone parts can be found at their respective sites.
@@ -109,6 +111,7 @@
  */
 
 #include "bpfilter.h"
+#include "vlan.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -120,6 +123,7 @@
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -139,8 +143,8 @@
 #include <net/bpf.h>
 #endif
 
-#include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
+#include <vm/vm.h>		/* for vtophys */
+#include <vm/pmap.h>		/* for vtophys */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -174,6 +178,7 @@ int dc_ifmedia_upd	__P((struct ifnet *));
 void dc_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
 
 void dc_delay		__P((struct dc_softc *));
+void dc_eeprom_width	__P((struct dc_softc *));
 void dc_eeprom_idle	__P((struct dc_softc *));
 void dc_eeprom_putbyte	__P((struct dc_softc *, int));
 void dc_eeprom_getword	__P((struct dc_softc *, int, u_int16_t *));
@@ -196,6 +201,7 @@ u_int32_t dc_crc_be	__P((caddr_t));
 void dc_setfilt_21143	__P((struct dc_softc *));
 void dc_setfilt_asix	__P((struct dc_softc *));
 void dc_setfilt_admtek	__P((struct dc_softc *));
+void dc_setfilt_xircom	__P((struct dc_softc *));
 
 void dc_setfilt		__P((struct dc_softc *));
 
@@ -219,6 +225,70 @@ void dc_delay(sc)
 
 	for (idx = (300 / 33) + 1; idx > 0; idx--)
 		CSR_READ_4(sc, DC_BUSCTL);
+}
+
+void dc_eeprom_width(sc)
+	struct dc_softc		*sc;
+{
+	int i;
+
+	/* Force EEPROM to idle state. */
+	dc_eeprom_idle(sc);
+
+	/* Enter EEPROM access mode. */
+	CSR_WRITE_4(sc, DC_SIO, DC_SIO_EESEL);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_ROMCTL_READ);
+	dc_delay(sc);
+	DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CS);
+	dc_delay(sc);
+
+	for (i = 3; i--;) {
+		if (6 & (1 << i))
+			DC_SETBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		else
+			DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		dc_delay(sc);
+		DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+		DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+	}
+
+	for (i = 1; i <= 12; i++) {
+		DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+		if (!(CSR_READ_4(sc, DC_SIO) & DC_SIO_EE_DATAOUT)) {
+			DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+			dc_delay(sc);
+			break;
+		}
+		DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+	}
+
+	/* Turn off EEPROM access mode. */
+	dc_eeprom_idle(sc);
+
+	if (i < 4 || i > 12)
+		sc->dc_romwidth = 6;
+	else
+		sc->dc_romwidth = i;
+
+	/* Enter EEPROM access mode. */
+	CSR_WRITE_4(sc, DC_SIO, DC_SIO_EESEL);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_ROMCTL_READ);
+	dc_delay(sc);
+	DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CS);
+	dc_delay(sc);
+
+	/* Turn off EEPROM access mode. */
+	dc_eeprom_idle(sc);
 }
 
 void dc_eeprom_idle(sc)
@@ -260,21 +330,25 @@ void dc_eeprom_putbyte(sc, addr)
 {
 	register int		d, i;
 
-	/*
-	 * The AN985 has a 93C66 EEPROM on it instead of
-	 * a 93C46. It uses a different bit sequence for
-	 * specifying the "read" opcode.
-	 */
-	if (DC_IS_CENTAUR(sc))
-		d = addr | (DC_EECMD_READ << 2);
-	else
-		d = addr | DC_EECMD_READ;
+	d = DC_EECMD_READ >> 6;
+
+	for (i = 3; i--; ) {
+		if (d & (1 << i))
+			DC_SETBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		else
+			DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		dc_delay(sc);
+		DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+		DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+	}
 
 	/*
 	 * Feed in each bit and strobe the clock.
 	 */
-	for (i = 0x400; i; i >>= 1) {
-		if (d & i) {
+	for (i = sc->dc_romwidth; i--;) {
+		if (addr & (1 << i)) {
 			SIO_SET(DC_SIO_EE_DATAIN);
 		} else {
 			SIO_CLR(DC_SIO_EE_DATAIN);
@@ -586,10 +660,10 @@ int dc_miibus_readreg(self, phy, reg)
 	bzero((char *)&frame, sizeof(frame));
 
 	/*
-	 * Note: both the AL981 and AN985 have internal PHYs,
+	 * Note: both the AL981 and AN983 have internal PHYs,
 	 * however the AL981 provides direct access to the PHY
-	 * registers while the AN985 uses a serial MII interface.
-	 * The AN985's MII interface is also buggy in that you
+	 * registers while the AN983 uses a serial MII interface.
+	 * The AN983's MII interface is also buggy in that you
 	 * can read from any MII address (0 to 31), but only address 1
 	 * behaves normally. To deal with both cases, we pretend
 	 * that the PHY is at MII address 1.
@@ -778,8 +852,9 @@ void dc_miibus_statchg(self)
 }
 
 #define DC_POLY		0xEDB88320
-#define DC_BITS		9
-#define DC_BITS_PNIC_II	7
+#define DC_BITS_512	9
+#define DC_BITS_128	7
+#define DC_BITS_64	6
 
 u_int32_t dc_crc_le(sc, addr)
 	struct dc_softc		*sc;
@@ -795,11 +870,27 @@ u_int32_t dc_crc_le(sc, addr)
 			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? DC_POLY : 0);
 	}
 
-	/* The hash table on the PNIC II is only 128 bits wide. */
-	if (DC_IS_PNICII(sc))
-		return (crc & ((1 << DC_BITS_PNIC_II) - 1));
+	/*
+	 * The hash table on the PNIC II and the MX98715AEC-C/D/E
+	 * chips is only 128 bits wide.
+	 */
+	if (sc->dc_flags & DC_128BIT_HASH)
+		return (crc & ((1 << DC_BITS_128) - 1));
 
-	return (crc & ((1 << DC_BITS) - 1));
+	/* The hash table on the MX98715BEC is only 64 bits wide. */
+	if (sc->dc_flags & DC_64BIT_HASH)
+		return (crc & ((1 << DC_BITS_64) - 1));
+
+	/* Xircom's hash filtering table is different (read: weird) */
+	/* Xircom uses the LEAST significant bits */
+	if (DC_IS_XIRCOM(sc)) {
+		if ((crc & 0x180) == 0x180)
+			return (crc & 0x0F) + (crc	& 0x70)*3 + (14 << 4);
+		else
+			return (crc & 0x1F) + ((crc>>1) & 0xF0)*3 + (12 << 4);
+	}
+
+	return (crc & ((1 << DC_BITS_512) - 1));
 }
 
 /*
@@ -977,12 +1068,12 @@ void dc_setfilt_asix(sc)
 
 	ifp = &sc->arpcom.ac_if;
 
-        /* Init our MAC address */
-        CSR_WRITE_4(sc, DC_AX_FILTIDX, DC_AX_FILTIDX_PAR0);
-        CSR_WRITE_4(sc, DC_AX_FILTDATA,
+	/* Init our MAC address */
+	CSR_WRITE_4(sc, DC_AX_FILTIDX, DC_AX_FILTIDX_PAR0);
+	CSR_WRITE_4(sc, DC_AX_FILTDATA,
 	    *(u_int32_t *)(&sc->arpcom.ac_enaddr[0]));
-        CSR_WRITE_4(sc, DC_AX_FILTIDX, DC_AX_FILTIDX_PAR1);
-        CSR_WRITE_4(sc, DC_AX_FILTDATA,
+	CSR_WRITE_4(sc, DC_AX_FILTIDX, DC_AX_FILTIDX_PAR1);
+	CSR_WRITE_4(sc, DC_AX_FILTDATA,
 	    *(u_int32_t *)(&sc->arpcom.ac_enaddr[4]));
 
 	/* If we want promiscuous mode, set the allframes bit. */
@@ -1037,6 +1128,78 @@ void dc_setfilt_asix(sc)
 	return;
 }
 
+void dc_setfilt_xircom(sc)
+	struct dc_softc		*sc;
+{
+	struct dc_desc		*sframe;
+	struct arpcom		*ac = &sc->arpcom;
+	struct ether_multi	*enm;
+	struct ether_multistep	step;
+	u_int32_t		h, *sp;
+	struct ifnet		*ifp;
+	int			i;
+
+	ifp = &sc->arpcom.ac_if;
+	DC_CLRBIT(sc, DC_NETCFG, (DC_NETCFG_TX_ON|DC_NETCFG_RX_ON));
+
+	i = sc->dc_cdata.dc_tx_prod;
+	DC_INC(sc->dc_cdata.dc_tx_prod, DC_TX_LIST_CNT);
+	sc->dc_cdata.dc_tx_cnt++;
+	sframe = &sc->dc_ldata->dc_tx_list[i];
+	sp = (u_int32_t *)&sc->dc_cdata.dc_sbuf;
+	bzero((char *)sp, DC_SFRAME_LEN);
+
+	sframe->dc_data = vtophys(&sc->dc_cdata.dc_sbuf);
+	sframe->dc_ctl = DC_SFRAME_LEN | DC_TXCTL_SETUP | DC_TXCTL_TLINK |
+	    DC_FILTER_HASHPERF | DC_TXCTL_FINT;
+
+	sc->dc_cdata.dc_tx_chain[i] = (struct mbuf *)&sc->dc_cdata.dc_sbuf;
+
+	/* If we want promiscuous mode, set the allframes bit. */
+	if (ifp->if_flags & IFF_PROMISC)
+		DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_RX_PROMISC);
+	else
+		DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_RX_PROMISC);
+
+	if (ifp->if_flags & IFF_ALLMULTI)
+		DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_RX_ALLMULTI);
+	else
+		DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_RX_ALLMULTI);
+
+	/* now program new ones */
+	ETHER_FIRST_MULTI(step, ac, enm);
+	while (enm != NULL) {
+		h = dc_crc_le(sc, enm->enm_addrlo);
+		sp[h >> 4] |= 1 << (h & 0xF);
+		ETHER_NEXT_MULTI(step, enm);
+	}
+
+	if (ifp->if_flags & IFF_BROADCAST) {
+		h = dc_crc_le(sc, (caddr_t)&etherbroadcastaddr);
+		sp[h >> 4] |= 1 << (h & 0xF);
+	}
+
+	/* Set our MAC address */
+	sp[0] = ((u_int16_t *)sc->arpcom.ac_enaddr)[0];
+	sp[1] = ((u_int16_t *)sc->arpcom.ac_enaddr)[1];
+	sp[2] = ((u_int16_t *)sc->arpcom.ac_enaddr)[2];      
+
+	DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_TX_ON);
+	DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_RX_ON);
+	ifp->if_flags |= IFF_RUNNING;
+	sframe->dc_status = DC_TXSTAT_OWN;
+	CSR_WRITE_4(sc, DC_TXSTART, 0xFFFFFFFF);
+
+	/*
+	 * wait some time...
+	 */
+	DELAY(1000);
+
+	ifp->if_timer = 5;
+
+	return;
+}
+
 void dc_setfilt(sc)
 	struct dc_softc		*sc;
 {
@@ -1049,6 +1212,9 @@ void dc_setfilt(sc)
 
 	if (DC_IS_ADMTEK(sc))
 		dc_setfilt_admtek(sc);
+
+	if (DC_IS_XIRCOM(sc))
+		dc_setfilt_xircom(sc);
 
 	return;
 }
@@ -1090,7 +1256,17 @@ void dc_setcfg(sc, media)
 		DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_SPEEDSEL);
 		DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_HEARTBEAT);
 		if (sc->dc_pmode == DC_PMODE_MII) {
-			DC_SETBIT(sc, DC_WATCHDOG, DC_WDOG_JABBERDIS);
+			int watchdogreg;
+
+			if (DC_IS_INTEL(sc)) {
+			/* there's a write enable bit here that reads as 1 */
+				watchdogreg = CSR_READ_4(sc, DC_WATCHDOG);
+				watchdogreg &= ~DC_WDOG_CTLWREN;
+				watchdogreg |= DC_WDOG_JABBERDIS;
+				CSR_WRITE_4(sc, DC_WATCHDOG, watchdogreg);
+			} else {
+				DC_SETBIT(sc, DC_WATCHDOG, DC_WDOG_JABBERDIS);
+			}
 			DC_CLRBIT(sc, DC_NETCFG, (DC_NETCFG_PCS|
 			    DC_NETCFG_PORTSEL|DC_NETCFG_SCRAMBLER));
 			if (sc->dc_type == DC_TYPE_98713)
@@ -1105,8 +1281,9 @@ void dc_setcfg(sc, media)
 				DC_PN_GPIO_SETBIT(sc, DC_PN_GPIO_100TX_LOOP);
 				DC_SETBIT(sc, DC_PN_NWAY, DC_PN_NWAY_SPEEDSEL);
 			}
-			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL|
-			    DC_NETCFG_PCS|DC_NETCFG_SCRAMBLER);
+			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL);
+			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PCS);
+			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_SCRAMBLER);
 		}
 	}
 
@@ -1114,7 +1291,17 @@ void dc_setcfg(sc, media)
 		DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_SPEEDSEL);
 		DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_HEARTBEAT);
 		if (sc->dc_pmode == DC_PMODE_MII) {
-			DC_SETBIT(sc, DC_WATCHDOG, DC_WDOG_JABBERDIS);
+			int watchdogreg;
+
+			if (DC_IS_INTEL(sc)) {
+			/* there's a write enable bit here that reads as 1 */
+				watchdogreg = CSR_READ_4(sc, DC_WATCHDOG);
+				watchdogreg &= ~DC_WDOG_CTLWREN;
+				watchdogreg |= DC_WDOG_JABBERDIS;
+				CSR_WRITE_4(sc, DC_WATCHDOG, watchdogreg);
+			} else {
+				DC_SETBIT(sc, DC_WATCHDOG, DC_WDOG_JABBERDIS);
+			}
 			DC_CLRBIT(sc, DC_NETCFG, (DC_NETCFG_PCS|
 			    DC_NETCFG_PORTSEL|DC_NETCFG_SCRAMBLER));
 			if (sc->dc_type == DC_TYPE_98713)
@@ -1129,8 +1316,8 @@ void dc_setcfg(sc, media)
 				DC_CLRBIT(sc, DC_PN_NWAY, DC_PN_NWAY_SPEEDSEL);
 			}
 			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL);
+			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_PCS);
 			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_SCRAMBLER);
-			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PCS);
 		}
 	}
 
@@ -1177,7 +1364,8 @@ void dc_reset(sc)
 			break;
 	}
 
-	if (DC_IS_ASIX(sc) || DC_IS_ADMTEK(sc)) {
+	if (DC_IS_ASIX(sc) || DC_IS_ADMTEK(sc) || DC_IS_XIRCOM(sc) ||
+	    DC_IS_INTEL(sc)) {
 		DELAY(10000);
 		DC_CLRBIT(sc, DC_BUSCTL, DC_BUSCTL_RESET);
 		i = 0;
@@ -1202,7 +1390,7 @@ void dc_reset(sc)
 	 if (DC_IS_INTEL(sc))
 		DC_SETBIT(sc, DC_SIARESET, DC_SIA_RESET);
 
-        return;
+	return;
 }
 
 /*
@@ -1213,7 +1401,10 @@ void dc_attach_common(sc)
 	struct dc_softc *sc;
 {
 	struct ifnet		*ifp;
-	int			mac_offset;
+	int			error = 0, mac_offset;
+
+	if (!DC_IS_XIRCOM(sc))
+		dc_eeprom_width(sc);
 
 	/*
 	 * Get station address from the EEPROM.
@@ -1238,9 +1429,11 @@ void dc_attach_common(sc)
 		    DC_EE_NODEADDR, 3, 0);
 		break;
 	case DC_TYPE_AL981:
-	case DC_TYPE_AN985:
+	case DC_TYPE_AN983:
 		dc_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
 		    DC_AL_EE_NODEADDR, 3, 0);
+		break;
+	case DC_TYPE_XIRCOM:
 		break;
 	default:
 		dc_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
@@ -1280,8 +1473,11 @@ void dc_attach_common(sc)
 	sc->sc_mii.mii_writereg = dc_miibus_writereg;
 	sc->sc_mii.mii_statchg = dc_miibus_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, dc_ifmedia_upd, dc_ifmedia_sts);
-	mii_phy_probe(&sc->sc_dev, &sc->sc_mii, 0xffffffff);
+	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
+	    MII_OFFSET_ANY, 0);
+
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
+		error = ENXIO;
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
 	} else
@@ -1290,21 +1486,37 @@ void dc_attach_common(sc)
 	if (DC_IS_DAVICOM(sc) && sc->dc_revision >= DC_REVISION_DM9102A)
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_HPNA_1,0,NULL);
 
-	/* if (error && DC_IS_INTEL(sc)) {
-		sc->dc_pmode = DC_PMODE_SYM;
-		mii_phy_probe(dev, &sc->dc_miibus,
-		    dc_ifmedia_upd, dc_ifmedia_sts);
-		error = 0;
+	if (DC_IS_INTEL(sc)) {
+		if (error) {
+			sc->dc_pmode = DC_PMODE_SYM;
+			sc->dc_flags |= DC_21143_NWAY;
+			mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff,
+			    MII_PHY_ANY, MII_OFFSET_ANY, 0);
+			error = 0;
+		} else {
+			/* we have a PHY, so we must clear this bit */
+			sc->dc_flags &= ~DC_TULIP_LEDS;
+		}
 	}
 
 	if (error) {
 		printf("dc%d: MII without any PHY!\n", sc->dc_unit);
-		bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
-		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
 		error = ENXIO;
 		goto fail;
-	} */
+	}
+
+	if (DC_IS_XIRCOM(sc)) {
+		/*
+		 * setup General Purpose Port mode and data so the tulip
+		 * can talk to the MII.
+		 */
+		CSR_WRITE_4(sc, DC_SIAGP, DC_SIAGP_WRITE_EN | DC_SIAGP_INT1_EN |
+		    DC_SIAGP_MD_GP2_OUTPUT | DC_SIAGP_MD_GP0_OUTPUT);
+		DELAY(10);
+		CSR_WRITE_4(sc, DC_SIAGP, DC_SIAGP_INT1_EN |
+		    DC_SIAGP_MD_GP2_OUTPUT | DC_SIAGP_MD_GP0_OUTPUT);
+		DELAY(10);
+	}
 
 	/*
 	 * Call MI attach routines.
@@ -1592,9 +1804,9 @@ int dc_rx_resync(sc)
 void dc_rxeof(sc)
 	struct dc_softc		*sc;
 {
-        struct ether_header	*eh;
-        struct mbuf		*m;
-        struct ifnet		*ifp;
+	struct ether_header	*eh;
+	struct mbuf		*m;
+	struct ifnet		*ifp;
 	struct dc_desc		*cur_rx;
 	int			i, total_len = 0;
 	u_int32_t		rxstat;
@@ -1632,7 +1844,17 @@ void dc_rxeof(sc)
 		 * it should simply get re-used next time this descriptor
 	 	 * comes up in the ring.
 		 */
-		if (rxstat & DC_RXSTAT_RXERR) {
+		if (rxstat & DC_RXSTAT_RXERR
+#if NVLAN > 0
+		/*
+		 * If VLANs are enabled, allow frames up to 4 bytes
+		 * longer than the MTU. This should really check if
+		 * the giant packet has a vlan tag
+		 */
+		 && ((rxstat & (DC_RXSTAT_GIANT|DC_RXSTAT_LASTFRAG)) == 0
+		 && total_len <= ifp->if_mtu + 4) 
+#endif
+		    ) {
 			ifp->if_ierrors++;
 			if (rxstat & DC_RXSTAT_COLLSEEN)
 				ifp->if_collisions++;
@@ -1732,11 +1954,23 @@ void dc_txeof(sc)
 			continue;
 		}
 
-		if (/*sc->dc_type == DC_TYPE_21143 &&*/
-		    sc->dc_pmode == DC_PMODE_MII &&
-		    ((txstat & 0xFFFF) & ~(DC_TXSTAT_ERRSUM|
-		    DC_TXSTAT_NOCARRIER|DC_TXSTAT_CARRLOST)))
-			txstat &= ~DC_TXSTAT_ERRSUM;
+		if (DC_IS_XIRCOM(sc)) {
+			/*
+			 * XXX: Why does my Xircom taunt me so?
+			 * For some reason it likes setting the CARRLOST flag
+			 * even when the carrier is there. wtf?! */
+			if (/*sc->dc_type == DC_TYPE_21143 &&*/
+			    sc->dc_pmode == DC_PMODE_MII &&
+			    ((txstat & 0xFFFF) & ~(DC_TXSTAT_ERRSUM|
+			    DC_TXSTAT_NOCARRIER)))
+				txstat &= ~DC_TXSTAT_ERRSUM;
+		} else {
+			if (/*sc->dc_type == DC_TYPE_21143 &&*/
+			    sc->dc_pmode == DC_PMODE_MII &&
+		    	    ((txstat & 0xFFFF) & ~(DC_TXSTAT_ERRSUM|
+		    	    DC_TXSTAT_NOCARRIER|DC_TXSTAT_CARRLOST)))
+				txstat &= ~DC_TXSTAT_ERRSUM;
+		}
 
 		if (txstat & DC_TXSTAT_ERRSUM) {
 			ifp->if_oerrors++;
@@ -1784,16 +2018,27 @@ void dc_tick(xsc)
 	mii = &sc->sc_mii;
 
 	if (sc->dc_flags & DC_REDUCED_MII_POLL) {
-		r = CSR_READ_4(sc, DC_ISR);
-		if (DC_IS_INTEL(sc)) {
-			if (r & DC_ISR_LINKFAIL) 
+		if (sc->dc_flags & DC_21143_NWAY) {
+			r = CSR_READ_4(sc, DC_10BTSTAT);
+			if (IFM_SUBTYPE(mii->mii_media_active) ==
+			    IFM_100_TX && (r & DC_TSTAT_LS100)) {
 				sc->dc_link = 0;
+				mii_mediachg(mii);
+			}
+			if (IFM_SUBTYPE(mii->mii_media_active) ==
+			    IFM_10_T && (r & DC_TSTAT_LS10)) {
+				sc->dc_link = 0;
+				mii_mediachg(mii);
+			}
 			if (sc->dc_link == 0)
 				mii_tick(mii);
 		} else {
+			r = CSR_READ_4(sc, DC_ISR);
 			if ((r & DC_ISR_RX_STATE) == DC_RXSTATE_WAIT &&
-			    sc->dc_cdata.dc_tx_prod == 0)
+			    sc->dc_cdata.dc_tx_cnt == 0 && !DC_IS_ASIX(sc))
 				mii_tick(mii);
+			if (!(mii->mii_media_status & IFM_ACTIVE))
+				sc->dc_link = 0;
 		}
 	} else
 		mii_tick(mii);
@@ -1827,7 +2072,10 @@ void dc_tick(xsc)
 		}
 	}
 
-	timeout(dc_tick, sc, hz);
+	if (sc->dc_flags & DC_21143_NWAY && !sc->dc_link)
+		timeout_add(&sc->dc_tick_tmo, hz / 10);
+	else
+		timeout_add(&sc->dc_tick_tmo, hz);
 
 	splx(s);
 
@@ -1855,7 +2103,8 @@ int dc_intr(arg)
 	/* Disable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, 0x00000000);
 
-	while((status = CSR_READ_4(sc, DC_ISR)) & DC_INTRS) {
+	while(((status = CSR_READ_4(sc, DC_ISR)) & DC_INTRS) &&
+	    status != 0xFFFFFFFF) {
 
 		claimed = 1;
 
@@ -2007,7 +2256,7 @@ int dc_coal(sc, m_head)
 	struct dc_softc		*sc;
 	struct mbuf		**m_head;
 {
-        struct mbuf		*m_new, *m;
+	struct mbuf		*m_new, *m;
 
 	m = *m_head;
 	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
@@ -2175,6 +2424,15 @@ void dc_init(xsc)
 			DC_SETBIT(sc, DC_MX_MAGICPACKET, DC_MX_MAGIC_98715);
 	}
 
+	if (DC_IS_XIRCOM(sc)) {
+		CSR_WRITE_4(sc, DC_SIAGP, DC_SIAGP_WRITE_EN | DC_SIAGP_INT1_EN |
+		    DC_SIAGP_MD_GP2_OUTPUT | DC_SIAGP_MD_GP0_OUTPUT);
+		DELAY(10);
+		CSR_WRITE_4(sc, DC_SIAGP, DC_SIAGP_INT1_EN |
+		    DC_SIAGP_MD_GP2_OUTPUT | DC_SIAGP_MD_GP0_OUTPUT);
+		DELAY(10);
+	}
+
 	DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_TX_THRESH);
 	DC_SETBIT(sc, DC_NETCFG, DC_TXTHRESH_72BYTES);
 
@@ -2208,6 +2466,17 @@ void dc_init(xsc)
 	DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_TX_ON);
 
 	/*
+	 * If this is an Intel 21143 and we're not using the
+	 * MII port, program the LED control pins so we get
+	 * link and activity indications.
+	 */
+	if (sc->dc_flags & DC_TULIP_LEDS) {
+		CSR_WRITE_4(sc, DC_WATCHDOG,
+		    DC_WDOG_CTLWREN|DC_WDOG_LINK|DC_WDOG_ACTIVITY);
+		CSR_WRITE_4(sc, DC_WATCHDOG, 0);
+	}
+
+	/*
 	 * Load the RX/multicast filter. We do this sort of late
 	 * because the filter programming scheme on the 21143 and
 	 * some clones requires DMAing a setup frame via the TX
@@ -2227,7 +2496,16 @@ void dc_init(xsc)
 
 	(void)splx(s);
 
-	timeout(dc_tick, sc, hz);
+	timeout_set(&sc->dc_tick_tmo, dc_tick, sc);
+
+	if (IFM_SUBTYPE(mii->mii_media.ifm_media) == IFM_HPNA_1)
+		sc->dc_link = 1;
+	else {
+		if (sc->dc_flags & DC_21143_NWAY)
+			timeout_add(&sc->dc_tick_tmo, hz / 10);
+		else
+			timeout_add(&sc->dc_tick_tmo, hz);
+	}
 
 	return;
 }
@@ -2400,7 +2678,7 @@ void dc_stop(sc)
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_timer = 0;
 
-	untimeout(dc_tick, sc);
+	timeout_del(&sc->dc_tick_tmo);
 
 	DC_CLRBIT(sc, DC_NETCFG, (DC_NETCFG_RX_ON|DC_NETCFG_TX_ON));
 	CSR_WRITE_4(sc, DC_IMR, 0x00000000);

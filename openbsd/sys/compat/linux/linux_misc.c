@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.27 2000/04/12 04:22:40 jasoni Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.33 2000/09/10 07:04:20 jasoni Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*
@@ -102,8 +102,8 @@ bsd_to_linux_wstat(status)
 }
 
 /*
- * waitpid(2). Passed on to the NetBSD call, surrounded by code to
- * reserve some space for a NetBSD-style wait status, and converting
+ * waitpid(2). Passed on to the OpenBSD call, surrounded by code to
+ * reserve some space for a OpenBSD-style wait status, and converting
  * it to what Linux wants.
  */
 int
@@ -214,7 +214,7 @@ linux_sys_setresgid(p, v, retval)
 	sgid = SCARG(uap, sgid);
 
 	/*
-	 * Note: These checks are a little different than the NetBSD
+	 * Note: These checks are a little different than the OpenBSD
 	 * setregid(2) call performs.  This precisely follows the
 	 * behavior of the Linux kernel.
 	 */
@@ -241,7 +241,7 @@ linux_sys_setresgid(p, v, retval)
 
 	/*
 	 * Now assign the real, effective, and saved GIDs.
-	 * Note that Linux, unlike NetBSD in setregid(2), does not
+	 * Note that Linux, unlike OpenBSD in setregid(2), does not
 	 * set the saved UID in this call unless the user specifies
 	 * it.
 	 */
@@ -314,7 +314,7 @@ linux_sys_break(p, v, retval)
 
 /*
  * Linux brk(2). The check if the new address is >= the old one is
- * done in the kernel in Linux. NetBSD does it in the library.
+ * done in the kernel in Linux. OpenBSD does it in the library.
  */
 int
 linux_sys_brk(p, v, retval)
@@ -494,7 +494,7 @@ linux_sys_fstatfs(p, v, retval)
 /*
  * uname(). Just copy the info from the various strings stored in the
  * kernel, and put it in the Linux utsname structure. That structure
- * is almost the same as the NetBSD one, only it has fields 65 characters
+ * is almost the same as the OpenBSD one, only it has fields 65 characters
  * long, and an extra domainname field.
  */
 int
@@ -625,7 +625,7 @@ linux_sys_mmap(p, v, retval)
 		lmap.lm_prot |= VM_PROT_READ;
  	SCARG(&cma,prot) = lmap.lm_prot;
 	SCARG(&cma,flags) = flags;
-	SCARG(&cma,fd) = lmap.lm_fd;
+	SCARG(&cma,fd) = flags & MAP_ANON ? -1 : lmap.lm_fd;
 	SCARG(&cma,pad) = 0;
 	SCARG(&cma,pos) = lmap.lm_pos;
 
@@ -725,7 +725,7 @@ linux_sys_times(p, v, retval)
 }
 
 /*
- * NetBSD passes fd[0] in retval[0], and fd[1] in retval[1].
+ * OpenBSD passes fd[0] in retval[0], and fd[1] in retval[1].
  * Linux directly passes the pointer.
  */
 int
@@ -771,7 +771,7 @@ linux_sys_pipe(p, v, retval)
 }
 
 /*
- * Alarm. This is a libc call which uses setitimer(2) in NetBSD.
+ * Alarm. This is a libc call which uses setitimer(2) in OpenBSD.
  * Fiddle with the timers to make it work.
  */
 int
@@ -785,13 +785,15 @@ linux_sys_alarm(p, v, retval)
 	} */ *uap = v;
 	int s;
 	struct itimerval *itp, it;
+	int timo;
 
 	itp = &p->p_realtimer;
 	s = splclock();
 	/*
 	 * Clear any pending timer alarms.
 	 */
-	untimeout(realitexpire, p);
+
+	timeout_del(&p->p_realit_to);
 	timerclear(&itp->it_interval);
 	if (timerisset(&itp->it_value) &&
 	    timercmp(&itp->it_value, &time, >))
@@ -824,8 +826,11 @@ linux_sys_alarm(p, v, retval)
 	}
 
 	if (timerisset(&it.it_value)) {
+		timo = hzto(&it.it_value);
+		if (timo <= 0)
+			timo = 1;
 		timeradd(&it.it_value, &time, &it.it_value);
-		timeout(realitexpire, p, hzto(&it.it_value));
+		timeout_add(&p->p_realit_to, timo);
 	}
 	p->p_realtimer = it;
 	splx(s);
@@ -854,6 +859,7 @@ linux_sys_utime(p, v, retval)
 	struct linux_utimbuf lut;
 
 	sg = stackgap_init(p->p_emul);
+	tvp = (struct timeval *) stackgap_alloc(&sg, sizeof(tv));
 	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&ua, path) = SCARG(uap, path);
@@ -864,7 +870,6 @@ linux_sys_utime(p, v, retval)
 		tv[0].tv_usec = tv[1].tv_usec = 0;
 		tv[0].tv_sec = lut.l_actime;
 		tv[1].tv_sec = lut.l_modtime;
-		tvp = (struct timeval *) stackgap_alloc(&sg, sizeof(tv));
 		if ((error = copyout(tv, tvp, sizeof tv)))
 			return error;
 		SCARG(&ua, tptr) = tvp;
@@ -1358,7 +1363,7 @@ linux_sys_setresuid(p, v, retval)
 	suid = SCARG(uap, suid);
 
 	/*
-	 * Note: These checks are a little different than the NetBSD
+	 * Note: These checks are a little different than the OpenBSD
 	 * setreuid(2) call performs.  This precisely follows the
 	 * behavior of the Linux kernel.
 	 */
@@ -1385,7 +1390,7 @@ linux_sys_setresuid(p, v, retval)
 
 	/*
 	 * Now assign the new real, effective, and saved UIDs.
-	 * Note that Linux, unlike NetBSD in setreuid(2), does not
+	 * Note that Linux, unlike OpenBSD in setreuid(2), does not
 	 * set the saved UID in this call unless the user specifies
 	 * it.
 	 */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.40 2000/04/09 17:43:02 angelos Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.51 2000/10/13 17:58:37 itojun Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -77,8 +77,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #ifdef IPSEC
 #include <netinet/ip_ipsp.h>
-
-extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #endif
 
 #include <machine/stdarg.h>
@@ -95,6 +93,8 @@ extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 
 extern int ip6_defhlim;
 #endif /* INET6 */
+
+#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
 
 /*
  * UDP protocol implementation.
@@ -174,7 +174,13 @@ udp_input(m, va_alist)
 	struct ip6_hdr *ipv6;
 #endif /* INET6 */
 #ifdef IPSEC
-	struct tdb  *tdb = NULL;
+	struct tdb_ident *tdbi;
+	struct tdb *tdb;
+	int error, s;
+
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
+	if (tdbi == (void *) PI_MAGIC)
+	        tdbi = NULL;
 #endif /* IPSEC */
 
 	va_start(ap, m);
@@ -182,18 +188,6 @@ udp_input(m, va_alist)
 	va_end(ap);
 
 	udpstat.udps_ipackets++;
-
-#ifdef IPSEC
-	/* Save the last SA which was used to process the mbuf */
-	if ((m->m_flags & (M_CONF|M_AUTH)) && m->m_pkthdr.tdbi) {
-		struct tdb_ident *tdbi = m->m_pkthdr.tdbi;
-		/* XXX gettdb() should really be called at spltdb().      */
-		/* XXX this is splsoftnet(), currently they are the same. */
-		tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
-		free(m->m_pkthdr.tdbi, M_TEMP);
-		m->m_pkthdr.tdbi = NULL;
-	}
-#endif /* IPSEC */
 
 	switch (mtod(m, struct ip *)->ip_v) {
 	case 4:
@@ -237,6 +231,10 @@ udp_input(m, va_alist)
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup2(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 #ifdef INET6
@@ -305,6 +303,10 @@ udp_input(m, va_alist)
 		if ((uh->uh_sum = in_cksum(m, len + sizeof (struct ip))) != 0) {
 			udpstat.udps_badsum++;
 			m_freem(m);
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 	} else
@@ -330,24 +332,20 @@ udp_input(m, va_alist)
 		srcsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		srcsa.sin6.sin6_family = AF_INET6;
 		srcsa.sin6.sin6_port = uh->uh_sport;
+#if 0 /*XXX inbound flowinfo */
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ipv6->ip6_flow;
-		srcsa.sin6.sin6_addr = ipv6->ip6_src;
-		if (IN6_IS_SCOPE_LINKLOCAL(&srcsa.sin6.sin6_addr))
-			srcsa.sin6.sin6_addr.s6_addr16[1] = 0;
-		if (m->m_pkthdr.rcvif) {
-			if (IN6_IS_SCOPE_LINKLOCAL(&srcsa.sin6.sin6_addr)) {
-				srcsa.sin6.sin6_scope_id =
-					m->m_pkthdr.rcvif->if_index;
-			} else
-				srcsa.sin6.sin6_scope_id = 0;
-		} else
-			srcsa.sin6.sin6_scope_id = 0;
+#endif
+		/* KAME hack: recover scopeid */
+		(void)in6_recoverscope(&srcsa.sin6, &ipv6->ip6_src,
+		    m->m_pkthdr.rcvif);
 
 		bzero(&dstsa, sizeof(struct sockaddr_in6));
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
-		dstsa.sin6.sin6_addr = ipv6->ip6_dst;
+		/* KAME hack: recover scopeid */
+		(void)in6_recoverscope(&dstsa.sin6, &ipv6->ip6_dst,
+		    m->m_pkthdr.rcvif);
 		break;
 #endif /* INET6 */
 	}
@@ -482,6 +480,10 @@ udp_input(m, va_alist)
 			goto bad;
 		}
 		sorwakeup(last);
+#ifdef IPSEC
+		if (tdbi)
+		        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 		return;
 	}
 	/*
@@ -526,31 +528,37 @@ udp_input(m, va_alist)
 				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT,
 					0, 0);
 			}
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 	}
 
 #ifdef IPSEC
-	/* Check if this socket requires security for incoming packets */
-	if ((inp->inp_seclevel[SL_AUTH] >= IPSEC_LEVEL_REQUIRE &&
-	     !(m->m_flags & M_AUTH)) ||
-	    (inp->inp_seclevel[SL_ESP_TRANS] >= IPSEC_LEVEL_REQUIRE &&
-	     !(m->m_flags & M_CONF))) {
-#ifdef notyet
-#ifdef INET6
-		if (ipv6)
-			ipv6_icmp_error(m, ICMPV6_BLAH, ICMPV6_BLAH, 0);
-		else
-#endif /* INET6 */
-		icmp_error(m, ICMP_BLAH, ICMP_BLAH, 0, 0);
-		m = NULL;
-#endif /* notyet */
-		udpstat.udps_nosec++;
+#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
+	if (tdbi == (void *) PI_MAGIC)
+	        tdbi = NULL;
+
+        s = splnet();
+        if (tdbi == NULL)
+                tdb = NULL;
+        else
+	        tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
+
+	ipsp_spd_lookup(m, srcsa.sa.sa_family, iphlen, &error,
+			IPSP_DIRECTION_IN, tdb, inp);
+        splx(s);
+
+	if (tdbi)
+	        free(tdbi, M_TEMP);
+	tdbi = NULL;
+
+	/* Error or otherwise drop-packet indication */
+	if (error)
 		goto bad;
-	}
-	/* Use tdb_bind_out for this inp's outbound communication */
-	if (tdb)
-		tdb_add_inp(tdb, inp);
 #endif /*IPSEC */
 
 	opts = NULL;
@@ -594,6 +602,10 @@ udp_input(m, va_alist)
 	sorwakeup(inp->inp_socket);
 	return;
 bad:
+#ifdef IPSEC
+	if (tdbi)
+	        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 	m_freem(m);
 	if (opts)
 		m_freem(opts);
@@ -681,7 +693,7 @@ udp_ctlinput(cmd, sa, v)
 	void *v;
 {
 	register struct ip *ip = v;
-	register struct udphdr *uh;
+	register struct udphdr *uhp;
 	extern int inetctlerrmap[];
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	int errno;
@@ -700,12 +712,14 @@ udp_ctlinput(cmd, sa, v)
 #ifdef INET6
 	if (sa->sa_family == AF_INET6) {
 		if (ip) {
-			struct ip6_hdr *ipv6 = (struct ip6_hdr *)ip;
+			struct ip6_hdr *ip6 = (struct ip6_hdr *)ip;
 		
-			uh = (struct udphdr *)((caddr_t)ipv6 + sizeof(struct ip6_hdr));
+			/* XXX we assume that the mbuf is sane enough */
+
+			uhp = (struct udphdr *)((caddr_t)ip6 + sizeof(*ip6));
 #if 0 /*XXX*/
-			in6_pcbnotify(&udbtable, sa, uh->uh_dport,
-			    &(ipv6->ip6_src), uh->uh_sport, cmd, udp_notify);
+			in6_pcbnotify(&udbtable, sa, uhp->uh_dport,
+			    &(ip6->ip6_src), uhp->uh_sport, cmd, udp_notify);
 #endif
 		} else {
 #if 0 /*XXX*/
@@ -716,9 +730,9 @@ udp_ctlinput(cmd, sa, v)
 	} else
 #endif /* INET6 */
 	if (ip) {
-		uh = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-		in_pcbnotify(&udbtable, sa, uh->uh_dport, ip->ip_src,
-		    uh->uh_sport, errno, notify);
+		uhp = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
+		in_pcbnotify(&udbtable, sa, uhp->uh_dport, ip->ip_src,
+		    uhp->uh_sport, errno, notify);
 	} else
 		in_pcbnotifyall(&udbtable, sa, errno, notify);
 	return NULL;
@@ -755,8 +769,7 @@ udp_output(m, va_alist)
 	va_end(ap);
 
 #ifdef INET6
-	v6packet = ((inp->inp_flags & INP_IPV6) &&
-		    !(inp->inp_flags & INP_IPV6_MAPPED));
+	v6packet = (inp->inp_flags & INP_IPV6);
 #endif
 
 #ifdef INET6
@@ -777,8 +790,7 @@ udp_output(m, va_alist)
 
 	        /*
 		 * Save current PCB flags because they may change during
-		 * temporary connection, particularly the INP_IPV6_UNDEC
-		 * flag.
+		 * temporary connection.
 		 */
                 pcbflags = inp->inp_flags;
 
@@ -859,55 +871,28 @@ udp_output(m, va_alist)
 		struct udphdr *uh = (struct udphdr *)(mtod(m, caddr_t) +
 		    sizeof(struct ip6_hdr));
 		int payload = sizeof(struct ip6_hdr);
-		struct in6_addr *faddr;
 		struct in6_addr *laddr;
 		struct ifnet *oifp = NULL;
+		struct sockaddr_in6 tmp;
 
 		ipv6->ip6_flow = htonl(0x60000000) |
 		    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff)); 
 	  
 		ipv6->ip6_nxt = IPPROTO_UDP;
-		ipv6->ip6_dst = inp->inp_faddr6;
-		/*
-		 * If the scope of the destination is link-local,
-		 * embed the interface
-		 * index in the address.
-		 *
-		 * XXX advanced-api value overrides sin6_scope_id 
-		 */
-		faddr = &ipv6->ip6_dst;
-		if (IN6_IS_ADDR_LINKLOCAL(faddr) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(faddr)) {
-			struct ip6_pktopts *optp = inp->inp_outputopts6;
-			struct in6_pktinfo *pi = NULL;
-			struct ip6_moptions *mopt = NULL;
-
-			/*
-			 * XXX Boundary check is assumed to be already done in
-			 * ip6_setpktoptions().
-			 */
-			if (optp && (pi = optp->ip6po_pktinfo) &&
-			    pi->ipi6_ifindex) {
-				faddr->s6_addr16[1] = htons(pi->ipi6_ifindex);
-				oifp = ifindex2ifnet[pi->ipi6_ifindex];
-			}
-			else if (IN6_IS_ADDR_MULTICAST(faddr) &&
-				 (mopt = inp->inp_moptions6) &&
-				 mopt->im6o_multicast_ifp) {
-				oifp = mopt->im6o_multicast_ifp;
-				faddr->s6_addr16[1] = oifp->if_index;
-			} else if (sin6 && sin6->sin6_scope_id) {
-				/* boundary check */
-				if (sin6->sin6_scope_id < 0 
-				    || if_index < sin6->sin6_scope_id) {
-					error = ENXIO;  /* XXX EINVAL? */
-					goto release;
-				}
-				/* XXX */
-				faddr->s6_addr16[1] =
-					htons(sin6->sin6_scope_id & 0xffff);
-			}
+		if (sin6)
+			tmp = *sin6;
+		else {
+			bzero(&tmp, sizeof(tmp));
+			tmp.sin6_family = AF_INET6;
+			tmp.sin6_len = sizeof(struct sockaddr_in6);
+			tmp.sin6_addr = inp->inp_faddr6;
 		}
+		/* KAME hack: embed scopeid */
+		if (in6_embedscope(&ipv6->ip6_dst, &tmp, inp, &oifp) != 0) {
+			error = EINVAL;
+			goto release;
+		}
+
 		ipv6->ip6_hlim = in6_selecthlim(inp, oifp);
 		if (sin6) {	/*XXX*/
 			laddr = in6_selectsrc(sin6, inp->inp_outputopts6,
@@ -940,8 +925,7 @@ udp_output(m, va_alist)
 
 		error = ip6_output(m, inp->inp_outputopts6, &inp->inp_route6, 
 		    inp->inp_socket->so_options & SO_DONTROUTE,
-		    (inp->inp_flags & INP_IPV6_MCAST)?inp->inp_moptions6:NULL,
-		    NULL);
+		    inp->inp_moptions6, NULL);
 	} else
 #endif /* INET6 */
 	{
@@ -987,20 +971,10 @@ udp_output(m, va_alist)
 		}
 
 		udpstat.udps_opackets++;
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6_MCAST) {
-			error = ip_output(m, inp->inp_options, &inp->inp_route,
-				inp->inp_socket->so_options &
-				(SO_DONTROUTE | SO_BROADCAST),
-				NULL, NULL, inp->inp_socket);
-		} else
-#endif /* INET6 */
-		{
-			error = ip_output(m, inp->inp_options, &inp->inp_route,
-				inp->inp_socket->so_options &
-				(SO_DONTROUTE | SO_BROADCAST),
-		    		inp->inp_moptions, inp, NULL);
-		}
+		error = ip_output(m, inp->inp_options, &inp->inp_route,
+			inp->inp_socket->so_options &
+			(SO_DONTROUTE | SO_BROADCAST),
+			inp->inp_moptions, inp, NULL);
 	}
 
 bail:
@@ -1168,10 +1142,12 @@ udp_usrreq(so, req, m, addr, control)
 			}
 		} else
 #endif /* INET6 */
+		{
 			if (inp->inp_faddr.s_addr == INADDR_ANY) {
 				error = ENOTCONN;
 				break;
 			}
+		}
 
 		s = splsoftnet();
 		in_pcbdisconnect(inp);
@@ -1192,11 +1168,16 @@ udp_usrreq(so, req, m, addr, control)
 
 	case PRU_SEND:
 #ifdef IPSEC
-		error = check_ipsec_policy(inp,0);
-		if (error)
-			return (error);
+	    /* XXX Find IPsec TDB */
 #endif
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			return (udp6_output(inp, m, addr, control));
+		else
+			return (udp_output(m, inp, addr, control));
+#else
 		return (udp_output(m, inp, addr, control));
+#endif
 
 	case PRU_ABORT:
 		soisdisconnected(so);

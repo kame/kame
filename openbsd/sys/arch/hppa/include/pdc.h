@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdc.h,v 1.12 2000/04/18 20:16:21 mickey Exp $	*/
+/*	$OpenBSD: pdc.h,v 1.14 2000/06/07 17:27:41 mickey Exp $	*/
 
 /*
  * Copyright (c) 1990 mt Xinu, Inc.  All rights reserved.
@@ -362,13 +362,20 @@ struct pdc_cache {	/* PDC_CACHE */
 	u_int	filler[2];
 };
 
+struct pdc_spidb {	/* PDC_CACHE, PDC_CACHE_GETSPIDB */
+	u_int	spidR1   : 4;
+	u_int	spidbits : 12;
+	u_int	spidR2   : 16;
+	u_int	filler[31];
+};
+
 struct pdc_cst {
 	u_int	cstR1  : 16;
 	u_int	cst    :  3;
 	u_int	cstR2  : 13;
 };
 
-struct pdc_coherence {	/* PDC_CACHE_SETCS */
+struct pdc_coherence {	/* PDC_CACHE, PDC_CACHE_SETCS */
 	struct pdc_cst	ia;
 #define	ia_cst ia.cst
 	struct pdc_cst	da;
@@ -389,7 +396,10 @@ struct pdc_hpa {	/* PDC_HPA */
 struct pdc_coproc {	/* PDC_COPROC */
 	u_int	ccr_enable;	/* same format as CCR (CR 10) */
 	u_int	ccr_present;	/* which co-proc's are present (bitset) */
-	u_int	filler2[30];
+	u_int	pad[15];
+	u_int	fpu_model;
+	u_int	fpu_revision;
+	u_int	filler2[13];
 };
 
 struct pdc_tod {	/* PDC_TOD, PDC_TOD_READ */

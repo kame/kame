@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty_subr.c,v 1.6 1996/10/07 19:55:27 deraadt Exp $	*/
+/*	$OpenBSD: tty_subr.c,v 1.9 2000/09/27 16:13:46 mickey Exp $	*/
 /*	$NetBSD: tty_subr.c,v 1.13 1996/02/09 19:00:43 christos Exp $	*/
 
 /*
@@ -93,15 +93,15 @@ clalloc(clp, size, quot)
 	int quot;
 {
 
-	MALLOC(clp->c_cs, u_char *, size, M_TTYS, M_WAITOK);
+	clp->c_cs = malloc(size, M_TTYS, M_WAITOK);
 	if (!clp->c_cs)
 		return (-1);
 	bzero(clp->c_cs, size);
 
 	if (quot) {
-		MALLOC(clp->c_cq, u_char *, QMEM(size), M_TTYS, M_WAITOK);
+		clp->c_cq = malloc(QMEM(size), M_TTYS, M_WAITOK);
 		if (!clp->c_cq) {
-			FREE(clp->c_cs, M_TTYS);
+			free(clp->c_cs, M_TTYS);
 			clp->c_cs = NULL;
 			return (-1);
 		}
@@ -120,10 +120,14 @@ void
 clfree(clp)
 	struct clist *clp;
 {
-	if(clp->c_cs)
-		FREE(clp->c_cs, M_TTYS);
-	if(clp->c_cq)
-		FREE(clp->c_cq, M_TTYS);
+	if (clp->c_cs) {
+		bzero(clp->c_cs, clp->c_cn);
+		free(clp->c_cs, M_TTYS);
+	}
+	if (clp->c_cq) {
+		bzero(clp->c_cq, QMEM(clp->c_cn));
+		free(clp->c_cq, M_TTYS);
+	}
 	clp->c_cs = clp->c_cq = (u_char *)0;
 }
 
@@ -298,7 +302,7 @@ putc(c, clp)
 #if defined(DIAGNOSTIC) || 1
 			printf("putc: required clalloc\n");
 #endif
-			if(clalloc(clp, 1024, 1)) {
+			if (clalloc(clp, 1024, 1)) {
 out:
 				splx(s);
 				return -1;
@@ -345,7 +349,7 @@ clrbits(cp, off, len)
 	register int i;
 	u_char mask;
 
-	if(len==1) {
+	if (len==1) {
 		clrbit(cp, off);
 		return;
 	}
@@ -396,7 +400,7 @@ b_to_q(cp, count, clp)
 #if defined(DIAGNOSTIC) || 1
 			printf("b_to_q: required clalloc\n");
 #endif
-			if(clalloc(clp, 1024, 1))
+			if (clalloc(clp, 1024, 1))
 				goto out;
 		}
 		clp->c_cf = clp->c_cl = clp->c_cs;
@@ -493,7 +497,7 @@ firstc(clp, c)
 		return NULL;
 	cp = clp->c_cf;
 	*c = *cp & 0xff;
-	if(clp->c_cq) {
+	if (clp->c_cq) {
 #ifdef QBITS
 		if (isset(clp->c_cq, cp - clp->c_cs))
 			*c |= TTY_QUOTE;

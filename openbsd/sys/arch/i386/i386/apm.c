@@ -1,4 +1,4 @@
-/*	$OpenBSD: apm.c,v 1.37 2000/04/21 16:29:58 mickey Exp $	*/
+/*	$OpenBSD: apm.c,v 1.41 2000/10/18 16:53:01 deraadt Exp $	*/
 
 /*-
  * Copyright (c) 1998-2000 Michael Shalayeff. All rights reserved.
@@ -142,7 +142,9 @@ int apm_op_inprog;
 u_int apm_flags;
 u_char apm_majver;
 u_char apm_minver;
-int apm_dobusy;
+int apm_dobusy = 1;
+int apm_doidle = 1;
+
 struct {
 	u_int32_t entry;
 	u_int16_t seg;
@@ -160,7 +162,7 @@ int apmcall __P((u_int, u_int, struct apmregs *));
 void apm_power_print __P((struct apm_softc *, struct apmregs *));
 void apm_handle_event __P((struct apm_softc *, struct apmregs *));
 void apm_set_ver __P((struct apm_softc *));
-void apm_periodic_check __P((struct apm_softc *));
+int apm_periodic_check __P((struct apm_softc *));
 void apm_thread_create __P((void *v));
 void apm_thread __P((void *));
 void apm_disconnect __P((struct apm_softc *));
@@ -231,6 +233,7 @@ apm_perror(str, regs)
 	printf("apm0: APM %s: %s (%d)\n", str,
 	    apm_err_translate(APM_ERR_CODE(regs)),
 	    APM_ERR_CODE(regs));
+	delay(1000000);
 
 	apmerrors++;
 }
@@ -301,7 +304,7 @@ apm_power_print (sc, regs)
 			if (BATT_FLAGS(regs) & APM_BATT_FLAG_CHARGING)
 				printf(", charging");
 			if (BATT_REM_VALID(regs))
-				printf(", estimated %d:%02d minutes",
+				printf(", estimated %d:%02d hours",
 				    BATT_REMAINING(regs) / 60,
 				    BATT_REMAINING(regs) % 60);
 		}
@@ -502,11 +505,12 @@ apm_handle_event(sc, regs)
 	}
 }
 
-void
+int
 apm_periodic_check(sc)
 	struct apm_softc *sc;
 {
 	struct apmregs regs;
+	int ret = 0;
 
 	if (apm_op_inprog)
 		apm_set_powstate(APM_DEV_ALLDEVS, APM_LASTREQ_INPROG);
@@ -516,7 +520,10 @@ apm_periodic_check(sc)
 
 	/* i think some bioses actually combine the error codes */
 	if (!(APM_ERR_CODE(&regs) & APM_ERR_NOEVENTS))
-		apm_perror("get event", &regs);
+		apm_perror("periodic get event", &regs);
+
+	if (apm_error || APM_ERR_CODE(&regs) == APM_ERR_NOTCONN)
+		ret = -1;
 
 	if (apm_suspends /*|| (apm_battlow && apm_userstandbys)*/) {
 		apm_op_inprog = 0;
@@ -530,6 +537,7 @@ apm_periodic_check(sc)
 
 	if (apm_resumes)
 		apm_resumes--;
+	return (ret);
 }
 
 void
@@ -600,13 +608,11 @@ apm_set_powstate(dev, state)
 	return 0;
 }
 
-int apmidleon = 1;
-
 void
 apm_cpu_busy()
 {
 	struct apmregs regs;
-	if (!apm_cd.cd_ndevs || !apmidleon)
+	if (!apm_cd.cd_ndevs || !apm_doidle)
 		return;
 	bzero(&regs, sizeof(regs));
 	if ((apm_flags & APM_IDLE_SLOWS) &&
@@ -615,7 +621,6 @@ apm_cpu_busy()
 #ifdef DIAGNOSTIC
 		apm_perror("set CPU busy", &regs);
 #endif
-		apmidleon = 0;
 	}
 }
 
@@ -623,7 +628,7 @@ void
 apm_cpu_idle()
 {
 	struct apmregs regs;
-	if (!apm_cd.cd_ndevs || !apmidleon)
+	if (!apm_cd.cd_ndevs || !apm_doidle)
 		return;
 
 	bzero(&regs, sizeof(regs));
@@ -632,7 +637,6 @@ apm_cpu_idle()
 #ifdef DIAGNOSTIC
 		apm_perror("set CPU idle", &regs);
 #endif
-		apmidleon = 0;
 	}
 }
 
@@ -679,9 +683,7 @@ apm_set_ver(self)
 	}
 	printf(": Power Management spec V%d.%d", apm_majver, apm_minver);
 	if (apm_flags & APM_IDLE_SLOWS) {
-		/* not relevant much */
 		DPRINTF((" (slowidle)"));
-		apm_dobusy = 1;
 	} else
 		apm_dobusy = 0;
 #ifdef DIAGNOSTIC
@@ -706,7 +708,7 @@ apm_disconnect(sc)
 	if (apmcall(APM_DISCONNECT, APM_DEV_APM_BIOS, &regs))
 		apm_perror("disconnect failed", &regs);
 	else
-		printf("APM disconnected\n");
+		printf("%s: disconnected\n", sc->sc_dev.dv_xname);
 }
 
 int
@@ -767,10 +769,11 @@ apmattach(parent, self, aux)
 	u_int cbase, clen, l;
 	bus_space_handle_t ch16, ch32, dh;
 
+	apm_flags = ap->apm_detail;
 	/*
 	 * set up GDT descriptors for APM
 	 */
-	if (ap->apm_detail & APM_32BIT_SUPPORTED) {
+	if (apm_flags & APM_32BIT_SUPPORTED) {
 
 		/* truncate segments' limits to a page */
 		ap->apm_code_len -= (ap->apm_code32_base +
@@ -780,7 +783,16 @@ apmattach(parent, self, aux)
 		ap->apm_data_len -= (ap->apm_data_base +
 		    ap->apm_data_len + 1) & 0xfff;
 
-		apm_flags = ap->apm_detail;
+		/* adjust version */
+		if ((sc->sc_dev.dv_cfdata->cf_flags & APM_VERMASK) &&
+		    (apm_flags & APM_VERMASK) !=
+		    (sc->sc_dev.dv_cfdata->cf_flags & APM_VERMASK))
+			apm_flags = (apm_flags & ~APM_VERMASK) |
+			    (sc->sc_dev.dv_cfdata->cf_flags & APM_VERMASK);
+		if (sc->sc_dev.dv_cfdata->cf_flags & APM_NOCLI) {
+			extern int apm_cli; /* from apmcall.S */
+			apm_cli = 0;
+		}
 		apm_ep.seg = GSEL(GAPM32CODE_SEL,SEL_KPL);
 		apm_ep.entry = ap->apm_entry;
 		cbase = min(ap->apm_code32_base, ap->apm_code16_base);
@@ -827,7 +839,7 @@ apmattach(parent, self, aux)
 		    ap->apm_entry, apm_ep.seg, ap->apm_entry+ch32,
 		    sc->sc_dev.dv_xname));
 
-		if (ap->apm_detail & APM_BIOS_PM_DISABLED)
+		if (apm_flags & APM_BIOS_PM_DISABLED)
 			apm_powmgt_enable(1);
 		/*
 		 * Engage cooperative power mgt (we get to do it)
@@ -846,9 +858,11 @@ apmattach(parent, self, aux)
 
 		lockinit(&sc->sc_lock, PWAIT, "apmlk", 0, 0);
 
-		apm_periodic_check(sc);
-
-		kthread_create_deferred(apm_thread_create, sc);
+		if (apm_periodic_check(sc) == -1) {
+			apm_disconnect(sc);
+			apm_dobusy = apm_doidle = 0;
+		} else
+			kthread_create_deferred(apm_thread_create, sc);
 	} else {
 		dynamic_gdt[GAPM32CODE_SEL] = dynamic_gdt[GNULL_SEL];
 		dynamic_gdt[GAPM16CODE_SEL] = dynamic_gdt[GNULL_SEL];
@@ -877,7 +891,7 @@ apm_thread(v)
 
 	for (;;) {
 		APM_LOCK(sc);
-		apm_periodic_check(sc);
+		(void) apm_periodic_check(sc);
 		APM_UNLOCK(sc);
 		tsleep(&lbolt, PWAIT, "apmev", 0);
 	}

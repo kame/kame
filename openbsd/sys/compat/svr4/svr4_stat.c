@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_stat.c,v 1.17 1999/10/07 16:14:28 brad Exp $	 */
+/*	$OpenBSD: svr4_stat.c,v 1.19 2000/09/07 17:52:24 ericj Exp $	 */
 /*	$NetBSD: svr4_stat.c,v 1.21 1996/04/22 01:16:07 christos Exp $	 */
 
 /*
@@ -170,10 +170,10 @@ svr4_sys_stat(p, v, retval)
 	int			error;
 
 	caddr_t sg = stackgap_init(p->p_emul);
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 
 
 	if ((error = sys_stat(p, &cup, retval)) != 0)
@@ -215,10 +215,10 @@ svr4_sys_lstat(p, v, retval)
 	int			error;
 
 	caddr_t sg = stackgap_init(p->p_emul);
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 
 	if ((error = sys_lstat(p, &cup, retval)) != 0)
 		return error;
@@ -292,10 +292,10 @@ svr4_sys_xstat(p, v, retval)
 	int			error;
 
 	caddr_t sg = stackgap_init(p->p_emul);
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 
 	if ((error = sys_stat(p, &cup, retval)) != 0)
 		return error;
@@ -327,10 +327,10 @@ svr4_sys_lxstat(p, v, retval)
 	int			error;
 
 	caddr_t sg = stackgap_init(p->p_emul);
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
 
 	if ((error = sys_lstat(p, &cup, retval)) != 0)
 		return error;
@@ -373,6 +373,76 @@ svr4_sys_fxstat(p, v, retval)
 		return error;
 
 	bsd_to_svr4_xstat(&st, &svr4_st);
+
+	if ((error = copyout(&svr4_st, SCARG(uap, sb), sizeof svr4_st)) != 0)
+		return error;
+
+	return 0;
+}
+
+
+int
+svr4_sys_stat64(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct svr4_sys_stat64_args *uap = v;
+	struct stat		st;
+	struct svr4_stat64	svr4_st;
+	struct sys_stat_args	cup;
+	int			error;
+
+	caddr_t sg = stackgap_init(p->p_emul);
+
+	SCARG(&cup, path) = SCARG(uap, path);
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
+
+	if ((error = sys_stat(p, &cup, retval)) != 0)
+		return error;
+
+	if ((error = copyin(SCARG(&cup, ub), &st, sizeof st)) != 0)
+		return error;
+
+	bsd_to_svr4_stat64(&st, &svr4_st);
+
+	if (S_ISSOCK(st.st_mode))
+		(void) svr4_add_socket(p, SCARG(uap, path), &st);
+
+	if ((error = copyout(&svr4_st, SCARG(uap, sb), sizeof svr4_st)) != 0)
+		return error;
+
+	return 0;
+}
+
+
+int
+svr4_sys_lstat64(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct svr4_sys_lstat64_args *uap = v;
+	struct stat		st;
+	struct svr4_stat64	svr4_st;
+	struct sys_lstat_args	cup;
+	int			error;
+
+	caddr_t sg = stackgap_init(p->p_emul);
+
+	SCARG(&cup, path) = SCARG(uap, path);
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(struct stat));
+
+	if ((error = sys_lstat(p, &cup, retval)) != 0)
+		return error;
+
+	if ((error = copyin(SCARG(&cup, ub), &st, sizeof st)) != 0)
+		return error;
+
+	bsd_to_svr4_stat64(&st, &svr4_st);
+
+	if (S_ISSOCK(st.st_mode))
+		(void) svr4_add_socket(p, SCARG(uap, path), &st);
 
 	if ((error = copyout(&svr4_st, SCARG(uap, sb), sizeof svr4_st)) != 0)
 		return error;
@@ -641,6 +711,7 @@ svr4_sys_utime(p, v, retval)
 	int error;
 	caddr_t sg = stackgap_init(p->p_emul);
 
+	SCARG(&ap, tptr) = stackgap_alloc(&sg, sizeof(tbuf));
 	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&ap, path) = SCARG(uap, path);
 	if (SCARG(uap, ubuf) != NULL) {
@@ -650,7 +721,6 @@ svr4_sys_utime(p, v, retval)
 		tbuf[0].tv_usec = 0;
 		tbuf[1].tv_sec = ub.modtime;
 		tbuf[1].tv_usec = 0;
-		SCARG(&ap, tptr) = stackgap_alloc(&sg, sizeof(tbuf));
 		error = copyout(tbuf, (struct timeval *)SCARG(&ap, tptr), sizeof(tbuf));
 		if (error)
 			return error;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcvt_out.c,v 1.21 2000/04/09 20:21:30 aaron Exp $	*/
+/*	$OpenBSD: pcvt_out.c,v 1.29 2000/10/16 03:38:28 aaron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -153,7 +153,6 @@ sput (u_char *s, U_char kernel, int len, int page)
 	else
 		reset_screen_saver = 1;		/* do it asynchronously	*/
 #endif /* PCVT_SCREENSAVER */
-
     }
 
     attrib = kernel ? kern_attr : svsp->c_attr;
@@ -216,12 +215,9 @@ sput (u_char *s, U_char kernel, int len, int page)
 			}
 			if(svsp->lnm) {
 				svsp->cur_offset -= svsp->col;
-				svsp->cur_offset += svsp->maxcol;
 				svsp->col = 0;
 			}
-			else {
-				svsp->cur_offset += svsp->maxcol;
-			}
+			svsp->cur_offset += svsp->maxcol;
 			check_scroll(svsp);
 			break;
 
@@ -1035,6 +1031,7 @@ vt_coldinit(void)
 		svsp->scrr_beg = 0;		/* scrolling region begin row*/
 		svsp->scrr_len = svsp->screen_rows; /* scrolling region length*/
 		svsp->scrr_end = svsp->scrr_len - 1;/* scrolling region end */
+		svsp->mouse_flags = 0;		/* mouse flags */
 
 		if(nscr == 0)
 		{
@@ -1271,6 +1268,19 @@ vt_coldmalloc(void)
 		printf("pcvt: scrollback memory malloc failed\n");
 	}
 
+        /* 
+	 * Copy buffer must be 1 character wider than the screen because we
+	 * need to write '\r' characters in the buffer (carriage return
+	 */
+	
+	Copybuffer_size = (vs[0].maxcol + 1) * vs[0].screen_rows;
+	if ((Copybuffer = (char *)malloc(Copybuffer_size, M_DEVBUF, M_WAITOK))
+	     == NULL)
+	{
+		printf("pcvt: copy memory malloc failed\n");
+		Copybuffer_size = 0;
+	}
+
 	for(nscr = 0; nscr < PCVT_NSCREENS; nscr++)
 	{
 		if((vs[nscr].Memory =
@@ -1304,7 +1314,8 @@ check_scroll(struct video_state *svsp)
 	{
 		/* we write within scroll region */
 
-		if(svsp->cur_offset >= ((svsp->scrr_end + 1) * svsp->maxcol))
+		if (svsp->row == svsp->scrr_end || (svsp->cur_offset >=
+		    svsp->screen_rows * svsp->maxcol))
 		{
 			/* the following piece of code has to be protected */
 			/* from trying to switch to another virtual screen */
@@ -1398,6 +1409,7 @@ vt_col(struct video_state *svsp, int cols)
 
 	}
 	reallocate_scrollbuffer(svsp, scrollback_pages);
+	reallocate_copybuffer(svsp);
 	return(1);
 }
 

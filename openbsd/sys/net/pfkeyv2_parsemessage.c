@@ -27,6 +27,7 @@ you didn't get a copy, you may request one from <license@inner.net>.
 #include <sys/proc.h>
 #include <net/route.h>
 #include <netinet/in.h>
+#include <netinet/ip_ipsp.h>
 #include <net/pfkeyv2.h>
 
 #define BITMAP_SA                      (1 << SADB_EXT_SA)
@@ -52,10 +53,12 @@ you didn't get a copy, you may request one from <license@inner.net>.
 #define BITMAP_X_SRC_MASK              (1 << SADB_X_EXT_SRC_MASK)
 #define BITMAP_X_DST_MASK              (1 << SADB_X_EXT_DST_MASK)
 #define BITMAP_X_PROTOCOL              (1 << SADB_X_EXT_PROTOCOL)
-#define BITMAP_X_SA2                   (1 << SADB_X_EXT_SA2)
 #define BITMAP_X_SRC_FLOW              (1 << SADB_X_EXT_SRC_FLOW)
 #define BITMAP_X_DST_FLOW              (1 << SADB_X_EXT_DST_FLOW)
+#define BITMAP_X_FLOW_TYPE             (1 << SADB_X_EXT_FLOW_TYPE)
+#define BITMAP_X_SA2                   (1 << SADB_X_EXT_SA2)
 #define BITMAP_X_DST2                  (1 << SADB_X_EXT_DST2)
+#define BITMAP_X_POLICY                (1 << SADB_X_EXT_POLICY)
 
 uint32_t sadb_exts_allowed_in[SADB_MAX+1] =
 {
@@ -84,13 +87,13 @@ uint32_t sadb_exts_allowed_in[SADB_MAX+1] =
   /* X_PROMISC */
   0,
   /* X_ADDFLOW */
-  BITMAP_ADDRESS_SRC | BITMAP_ADDRESS_DST | BITMAP_SA | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW,
+  BITMAP_ADDRESS_SRC | BITMAP_ADDRESS_DST | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE | BITMAP_IDENTITY_SRC | BITMAP_IDENTITY_DST,
   /* X_DELFLOW */
-  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_SA | BITMAP_ADDRESS_DST,
+  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE,
   /* X_GRPSPIS */
   BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL,
-  /* X_BINDSA */
-  BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL
+  /* X_ASKPOLICY */
+  BITMAP_X_POLICY,
 };
 
 uint32_t sadb_exts_required_in[SADB_MAX+1] =
@@ -120,13 +123,13 @@ uint32_t sadb_exts_required_in[SADB_MAX+1] =
   /* X_PROMISC */
   0,
   /* X_ADDFLOW */
-  BITMAP_ADDRESS_DST | BITMAP_SA | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW,
+  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE,
   /* X_DELFLOW */
-  BITMAP_SA | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW,
+  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE,
   /* X_GRPSPIS */
   BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL,
-  /* X_BINDSA */
-  BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL
+  /* X_ASKPOLICY */
+  BITMAP_X_POLICY,
 };
 
 uint32_t sadb_exts_allowed_out[SADB_MAX+1] =
@@ -156,13 +159,13 @@ uint32_t sadb_exts_allowed_out[SADB_MAX+1] =
   /* X_PROMISC */
   0,
   /* X_ADDFLOW */
-  BITMAP_ADDRESS_SRC | BITMAP_ADDRESS_DST | BITMAP_SA | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW,
+  BITMAP_ADDRESS_SRC | BITMAP_ADDRESS_DST | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE | BITMAP_IDENTITY_SRC | BITMAP_IDENTITY_DST,
   /* X_DELFLOW */
-  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_SA | BITMAP_ADDRESS_DST,
+  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_PROTOCOL | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE,
   /* X_GRPSPIS */
   BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL,
-  /* X_BINDSA */
-  BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL
+  /* X_ASKPOLICY */
+  BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_FLOW_TYPE | BITMAP_X_POLICY,
 };
 
 uint32_t sadb_exts_required_out[SADB_MAX+1] =
@@ -192,13 +195,13 @@ uint32_t sadb_exts_required_out[SADB_MAX+1] =
   /* X_PROMISC */
   0,
   /* X_ADDFLOW */
-  BITMAP_ADDRESS_DST | BITMAP_SA | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW,
+  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE,
   /* X_DELFLOW */
-  BITMAP_SA | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW,
+  BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_FLOW_TYPE,
   /* X_GRPSPIS */
   BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL,
-  /* X_BINDSA */
-  BITMAP_SA | BITMAP_X_SA2 | BITMAP_X_DST2 | BITMAP_ADDRESS_DST | BITMAP_X_PROTOCOL
+  /* X_REPPOLICY */
+  BITMAP_X_SRC_FLOW | BITMAP_X_DST_FLOW | BITMAP_X_SRC_MASK | BITMAP_X_DST_MASK | BITMAP_X_FLOW_TYPE,
 };
 
 int pfkeyv2_parsemessage(void *, int, void **);
@@ -274,8 +277,8 @@ pfkeyv2_parsemessage(void *p, int len, void **headers)
     seen |= (1 << sadb_ext->sadb_ext_type);
 
     switch (sadb_ext->sadb_ext_type) {
-      case SADB_X_EXT_SA2:
       case SADB_EXT_SA:
+      case SADB_X_EXT_SA2:
 	{
 	  struct sadb_sa *sadb_sa = (struct sadb_sa *)p;
 
@@ -299,8 +302,13 @@ pfkeyv2_parsemessage(void *p, int len, void **headers)
 	}
 	break;
       case SADB_X_EXT_PROTOCOL:
+      case SADB_X_EXT_FLOW_TYPE:
 	if (i != sizeof(struct sadb_protocol))
 	    return EINVAL;
+	break;
+      case SADB_X_EXT_POLICY:
+        if (i != sizeof(struct sadb_policy))
+	  return EINVAL;
 	break;
       case SADB_EXT_LIFETIME_CURRENT:
       case SADB_EXT_LIFETIME_HARD:
@@ -312,11 +320,11 @@ pfkeyv2_parsemessage(void *p, int len, void **headers)
 	break;
       case SADB_EXT_ADDRESS_SRC:
       case SADB_EXT_ADDRESS_DST:
-      case SADB_X_EXT_DST2:
       case SADB_X_EXT_SRC_MASK:
       case SADB_X_EXT_DST_MASK:
       case SADB_X_EXT_SRC_FLOW:
       case SADB_X_EXT_DST_FLOW:
+      case SADB_X_EXT_DST2:
       case SADB_EXT_ADDRESS_PROXY:
 	{
 	  struct sadb_address *sadb_address = (struct sadb_address *)p;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.26 1999/12/21 17:49:28 provos Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.33 2000/10/14 01:04:11 itojun Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -134,7 +134,8 @@ struct tcpcb {
 					 * for slow start exponential to
 					 * linear switch
 					 */
-	u_int	t_maxopd;		/* mss plus options */
+	u_short	t_maxopd;		/* mss plus options */
+	u_short	t_peermss;		/* peer's maximum segment size */
 
 /*
  * transmit timing stuff.  See below for scale of srtt and rttvar.
@@ -288,7 +289,8 @@ struct	tcpstat {
 #define	TCPCTL_IDENT		9 /* get connection owner */
 #define	TCPCTL_SACK	       10 /* selective acknowledgement, rfc 2018 */
 #define TCPCTL_MSSDFLT	       11 /* Default maximum segment size */
-#define	TCPCTL_MAXID	       12
+#define	TCPCTL_RSTPPSLIMIT     12 /* RST pps limit */
+#define	TCPCTL_MAXID	       13
 
 #define	TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -300,19 +302,20 @@ struct	tcpstat {
 	{ "baddynamic", CTLTYPE_STRUCT }, \
 	{ "recvspace",	CTLTYPE_INT }, \
 	{ "sendspace",	CTLTYPE_INT }, \
-	{ "ident", CTLTYPE_STRUCT }, \
+	{ "ident", 	CTLTYPE_STRUCT }, \
 	{ "sack",	CTLTYPE_INT }, \
 	{ "mssdflt",	CTLTYPE_INT }, \
+	{ "rstppslimit",	CTLTYPE_INT }, \
 }
 
 struct tcp_ident_mapping {
-	struct sockaddr faddr, laddr;
+	struct sockaddr_storage faddr, laddr;
 	int euid, ruid;
 };
 
 #ifdef _KERNEL
 struct	inpcbtable tcbtable;	/* head of queue of active tcpcb's */
-struct	tcpstat tcpstat;	/* tcp statistics */
+extern	struct tcpstat tcpstat;	/* tcp statistics */
 u_int32_t tcp_now;		/* for RFC 1323 timestamps */
 extern	int tcp_do_rfc1323;	/* enabled/disabled? */
 extern	int tcp_mssdflt;	/* default maximum segment size */
@@ -342,7 +345,10 @@ void	 tcp_init __P((void));
 int	 tcp6_input __P((struct mbuf **, int *, int));
 #endif
 void	 tcp_input __P((struct mbuf *, ...));
-int	 tcp_mss __P((struct tcpcb *, u_int));
+int	 tcp_mss __P((struct tcpcb *, int));
+void	 tcp_mss_update __P((struct tcpcb *));
+void	 tcp_mtudisc __P((struct inpcb *, int));
+void	 tcp_mtudisc_increase __P((struct inpcb *, int));
 struct tcpcb *
 	 tcp_newtcpcb __P((struct inpcb *));
 void	 tcp_notify __P((struct inpcb *, int));
@@ -350,6 +356,7 @@ int	 tcp_output __P((struct tcpcb *));
 void	 tcp_pulloutofband __P((struct socket *, u_int, struct mbuf *, int));
 void	 tcp_quench __P((struct inpcb *, int));
 int	 tcp_reass __P((struct tcpcb *, struct tcphdr *, struct mbuf *, int *));
+void	 tcp_rscale __P((struct tcpcb *, u_long));
 void	 tcp_respond __P((struct tcpcb *, caddr_t, struct mbuf *, tcp_seq,
 		tcp_seq, int));
 void	 tcp_setpersist __P((struct tcpcb *));

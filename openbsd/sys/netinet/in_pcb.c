@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.42 2000/04/27 09:23:21 itojun Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.48 2000/10/11 09:14:10 itojun Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -78,8 +78,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #ifdef IPSEC
 #include <netinet/ip_ipsp.h>
-
-extern int	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #endif
 
 #if 0 /*KAME IPSEC*/
@@ -368,6 +366,8 @@ in_pcbconnect(v, nam)
 #ifdef INET6
 	if (sotopf(inp->inp_socket) == PF_INET6)
 		return (in6_pcbconnect(inp, nam));
+	if ((inp->inp_flags & INP_IPV6) != 0)
+		panic("IPv6 pcb passed into in_pcbconnect");
 #endif /* INET6 */
 
 	if (nam->m_len != sizeof (*sin))
@@ -452,13 +452,7 @@ in_pcbconnect(v, nam)
 		 * address of that interface as our source address.
 		 */
 		if (IN_MULTICAST(sin->sin_addr.s_addr) &&
-#ifdef INET6
-		    inp->inp_moptions != NULL &&
-		    !(inp->inp_flags & INP_IPV6_MCAST))
-#else
-		    inp->inp_moptions != NULL)
-#endif
-		{
+		    inp->inp_moptions != NULL) {
 			struct ip_moptions *imo;
 			struct ifnet *ifp;
 
@@ -499,7 +493,8 @@ in_pcbconnect(v, nam)
 	inp->inp_fport = sin->sin_port;
 	in_pcbrehash(inp);
 #ifdef IPSEC
-	return (check_ipsec_policy(inp, 0));
+        /* XXX Find IPsec TDB */
+        return (0);
 #else
 	return (0);
 #endif
@@ -511,14 +506,16 @@ in_pcbdisconnect(v)
 {
 	struct inpcb *inp = v;
 
+	switch (sotopf(inp->inp_socket)) {
 #ifdef INET6
-	if (sotopf(inp->inp_socket) == PF_INET6) {
+	case PF_INET6:
 		inp->inp_faddr6 = in6addr_any;
-		/* Disconnected AF_INET6 sockets cannot be "v4-mapped" */
-		inp->inp_flags &= ~INP_IPV6_MAPPED;
-	} else
+		break;
 #endif
+	case PF_INET:
 		inp->inp_faddr.s_addr = INADDR_ANY;
+		break;
+	}
 
 	inp->inp_fport = 0;
 	in_pcbrehash(inp);
@@ -859,6 +856,49 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 	return (match);
 }
 
+struct rtentry *
+in_pcbrtentry(inp)
+	struct inpcb *inp;
+{
+	struct route *ro;
+
+	ro = &inp->inp_route;
+
+	/*
+	 * No route yet, so try to acquire one.
+	 */
+	if (ro->ro_rt == NULL) {
+#ifdef INET6
+		bzero(ro, sizeof(struct route_in6));
+#else
+		bzero(ro, sizeof(struct route));
+#endif
+
+		switch(sotopf(inp->inp_socket)) {
+#ifdef INET6
+		case PF_INET6:
+			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
+				break;
+			ro->ro_dst.sa_family = AF_INET6;
+			ro->ro_dst.sa_len = sizeof(struct sockaddr_in6);
+			((struct sockaddr_in6 *) &ro->ro_dst)->sin6_addr =
+			    inp->inp_faddr6;
+			rtalloc(ro);
+			break;
+#endif /* INET6 */
+		case PF_INET:
+			if (inp->inp_faddr.s_addr == INADDR_ANY)
+				break;
+			ro->ro_dst.sa_family = AF_INET;
+			ro->ro_dst.sa_len = sizeof(ro->ro_dst);
+			satosin(&ro->ro_dst)->sin_addr = inp->inp_faddr;
+			rtalloc(ro);
+			break;
+		}
+	}
+	return (ro->ro_rt);
+}
+
 struct sockaddr_in *
 in_selectsrc(sin, ro, soopts, mopts, errorp)
 	struct sockaddr_in *sin;
@@ -926,14 +966,7 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	 * interface has been set as a multicast option, use the
 	 * address of that interface as our source address.
 	 */
-	if (IN_MULTICAST(sin->sin_addr.s_addr) &&
-#if 0 /*def INET6*/
-	    mopts != NULL &&
-	    !(inp->inp_flags & INP_IPV6_MCAST))
-#else
-	    mopts != NULL)
-#endif
-	{
+	if (IN_MULTICAST(sin->sin_addr.s_addr) && mopts != NULL) {
 		struct ip_moptions *imo;
 		struct ifnet *ifp;
 

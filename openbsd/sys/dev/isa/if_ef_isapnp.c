@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ef_isapnp.c,v 1.5 1999/12/02 20:55:06 jason Exp $	*/
+/*	$OpenBSD: if_ef_isapnp.c,v 1.8 2000/10/16 17:08:07 aaron Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -115,31 +115,31 @@ struct ef_softc {
 #define	EF_MII_DATA		0x02		/* data bit */
 #define	EF_MII_DIR		0x04		/* direction */
 
-int ef_isapnp_match __P((struct device *, void *, void *));
-void ef_isapnp_attach __P((struct device *, struct device *, void *));
+int ef_isapnp_match	__P((struct device *, void *, void *));
+void ef_isapnp_attach	__P((struct device *, struct device *, void *));
 
-void efstart __P((struct ifnet *));
-int efioctl __P((struct ifnet *, u_long, caddr_t));
-void efwatchdog __P((struct ifnet *));
-void efreset __P((struct ef_softc *));
-void efstop __P((struct ef_softc *));
-void efsetmulti __P((struct ef_softc *));
-int efbusyeeprom __P((struct ef_softc *));
-int efintr __P((void *));
-void efinit __P((struct ef_softc *));
-void efcompletecmd __P((struct ef_softc *, u_int, u_int));
-void eftxstat __P((struct ef_softc *));
-void efread __P((struct ef_softc *));
-struct mbuf *efget __P((struct ef_softc *, int totlen));
+void efstart		__P((struct ifnet *));
+int efioctl		__P((struct ifnet *, u_long, caddr_t));
+void efwatchdog		__P((struct ifnet *));
+void efreset		__P((struct ef_softc *));
+void efstop		__P((struct ef_softc *));
+void efsetmulti		__P((struct ef_softc *));
+int efbusyeeprom	__P((struct ef_softc *));
+int efintr		__P((void *));
+void efinit		__P((struct ef_softc *));
+void efcompletecmd	__P((struct ef_softc *, u_int, u_int));
+void eftxstat		__P((struct ef_softc *));
+void efread		__P((struct ef_softc *));
+struct mbuf *efget	__P((struct ef_softc *, int totlen));
 
-void ef_miibus_writereg __P((struct device *, int, int, int));
-void ef_miibus_statchg __P((struct device *));
-int ef_miibus_readreg __P((struct device *, int, int));
-void ef_mii_writeb __P((struct ef_softc *, int));
-void ef_mii_sync __P((struct ef_softc *));
-int ef_ifmedia_upd __P((struct ifnet *));
-void ef_ifmedia_sts __P((struct ifnet *, struct ifmediareq *));
-void ef_tick __P((void *));
+void ef_miibus_writereg	__P((struct device *, int, int, int));
+void ef_miibus_statchg	__P((struct device *));
+int ef_miibus_readreg	__P((struct device *, int, int));
+void ef_mii_writeb	__P((struct ef_softc *, int));
+void ef_mii_sync	__P((struct ef_softc *));
+int ef_ifmedia_upd	__P((struct ifnet *));
+void ef_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
+void ef_tick		__P((void *));
 
 struct cfdriver ef_cd = {
 	NULL, "ef", DV_IFNET
@@ -220,7 +220,8 @@ ef_isapnp_attach(parent, self, aux)
 	sc->sc_mii.mii_writereg = ef_miibus_writereg;
 	sc->sc_mii.mii_statchg = ef_miibus_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, ef_ifmedia_upd, ef_ifmedia_sts);
-	mii_phy_probe(self, &sc->sc_mii, 0xffffffff);
+	mii_attach(self, &sc->sc_mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,
+	    0);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
@@ -353,7 +354,7 @@ efioctl(ifp, cmd, data)
 	struct ifreq *ifr = (struct ifreq *)data;
 	int s, error = 0;
 
-	s = splnet();
+	s = splimp();
 
 	if ((error = ether_ioctl(ifp, &sc->sc_arpcom, cmd, data)) > 0) {
 		splx(s);
@@ -374,6 +375,7 @@ efioctl(ifp, cmd, data)
 			efinit(sc);
 			break;
 		}
+		break;
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii.mii_media, cmd);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.25 1999/01/20 12:04:01 niklas Exp $	*/
+/*	$OpenBSD: locore.s,v 1.29 2000/06/05 11:02:55 art Exp $	*/
 /*	$NetBSD: locore.s,v 1.89 1997/07/17 16:22:54 is Exp $	*/
 
 /*
@@ -465,7 +465,11 @@ _trace:
 
 _spurintr:
 	addql	#1,_intrcnt+0
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
 	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei
 
 #ifdef DRACO
@@ -493,7 +497,11 @@ _DraCoLev2intr:
 
 Ldraciaend:
 	moveml	sp@+,#0x0303
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
 	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei
 
 /* XXX on the DraCo rev. 4 or later, lev 1 is vectored here. */
@@ -527,7 +535,11 @@ Ldrclockretry:
 	clrb	a0@(9)		| reset timer irq
 
 	moveml	sp@+,#0x0303
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
 	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei
 
 /* XXX on the DraCo, lev 1, 3, 4, 5 and 6 are vectored here by initcpu() */
@@ -544,7 +556,11 @@ Ldrintrcommon:
 	jbsr	_intrhand		| handle interrupt
 	addql	#4,sp			| pop SR
 	moveml	sp@+,#0x0303
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
 	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei
 #endif
 	
@@ -559,7 +575,11 @@ _lev5intr:
 #endif
 	moveml	sp@+,d0/d1/a0/a1
 	addql	#1,_intrcnt+20
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
 	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei
 
 _lev1intr:
@@ -579,7 +599,11 @@ Lintrcommon:
 	jbsr	_intrhand		| handle interrupt
 	addql	#4,sp			| pop SR
 	moveml	sp@+,d0-d1/a0-a1
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
 	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei
 
 | Both IPL_REMAP_1 and IPL_REMAP_2 are experimental interruptsystems from
@@ -665,7 +689,11 @@ Lskipciab:
 | other ciab interrupts?
 Llev6done:
 	moveml	sp@+,d0-d1/a0-a1	| restore scratch regs
-	addql	#1,_cnt+V_INTR		| chalk up another interrupt
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
+	addql	#1,_cnt+V_INTR
+#endif
 	jra	rei			| all done [can we do rte here?]
 Lchkexter:
 | check to see if EXTER request is really set?
@@ -720,7 +748,11 @@ Lexter:
 	addql	#8,sp
 	addql	#1,_intrcnt+24		| add another exter interrupt
 	moveml	sp@+,d0-d1/a0-a1	| restore scratch regs
-	addql	#1,_cnt+V_INTR		| chalk up another interrupt
+#ifdef UVM
+	addql	#1,_uvmexp+UVMEXP_INTRS
+#else
+	addql	#1,_cnt+V_INTR
+#endif
 	jra	Lastchk			| all done [can we do rte here?]
 #endif
 	
@@ -1157,7 +1189,7 @@ ENTRY(qsetjmp)
 	rts
 #endif
 	
-	.globl	_whichqs,_qs,_cnt,_panic
+	.globl	_whichqs,_qs,_panic
 	.globl	_curproc
 	.comm	_want_resched,4
 
@@ -1191,12 +1223,10 @@ ENTRY(switch_exit)
 	movl	#nullpcb,_curpcb	| save state into garbage pcb
 	lea	tmpstk,sp		| goto a tmp stack
 
-	/* Free old process's user area. */
-	movl	#USPACE,sp@-		| size of u-area
-	movl	a0@(P_ADDR),sp@-	| address u-area of process
-	movl	_kernel_map,sp@-	| map it was allocated in
-	jbsr	_kmem_free		| deallocate it
-	lea	sp@(12),sp		| pop args
+        /* Schedule the vmspace and stack to be freed. */
+	movl    a0,sp@-                 | exit2(p)
+	jbsr    _C_LABEL(exit2)
+	lea     sp@(4),sp               | pop args
 
 	jra	_cpu_switch
 
@@ -1342,52 +1372,18 @@ Lswnofpsave:
 	movl	a1,_curpcb
 	movb	a1@(PCB_FLAGS+1),pcbflag | copy of pcb_flags low byte
 
-	/* see if pmap_activate needs to be called; should remove this */
-	movl	a0@(P_VMSPACE),a0	| vmspace = p->p_vmspace
-#ifdef DIAGNOSTIC
-	tstl	a0			| map == VM_MAP_NULL?
-	jeq	Lbadsw			| panic
-#endif
-	movl	a0@(VM_PMAP),a0		| pmap = vmspace->vm_map.pmap
-	tstl	a0@(PM_STCHG)		| pmap->st_changed?
-	jeq	Lswnochg		| no, skip
-	pea	a1@			| push pcb (at p_addr)
-	pea	a0@			| push pmap
-	jbsr	_pmap_activate		| pmap_activate(pmap, pcb)
-	addql	#8,sp
+	/*
+	 * Activate process's address space.
+	 * XXX Should remember the last USTP value loaded, and call this
+	 * XXX only if it has changed.
+	 */
+	pea	a0@			| push proc
+	jbsr	_pmap_activate		| pmap_activate(p)
+	addql	#4,sp
 	movl	_curpcb,a1		| restore p_addr
-Lswnochg:
+
 	lea	tmpstk,sp		| now goto a tmp stack for NMI
-	cmpl	#MMU_68040,_mmutype
-	jeq	Lres2
-	movl	#CACHE_CLR,d0
-	movc	d0,cacr			| invalidate cache(s)
-	pflusha				| flush entire TLB
-	jra	Lres3
-Lres2:
-	.word	0xf518			| pflusha (68040)
-|	movl	#CACHE40_ON,d0
-|	movc	d0,cacr			| invalidate cache(s)
-#ifdef M68060
-	btst	#7,_machineid+3
-	jeq	Lres3
-	movc	cacr,d2
-	orl	#IC60_CUBC,d2		| clear user branch cache entries
-	movc	d2,cacr
-#endif
-Lres3:
-	movl	a1@(PCB_USTP),d0	| get USTP
-	moveq	#PGSHIFT,d1
-	lsll	d1,d0			| convert to addr
-	cmpl	#MMU_68040,_mmutype
-	jeq	Lres4
-	lea	_protorp,a0		| CRP prototype
-	movl	d0,a0@(4)		| stash USTP
-	pmove	a0@,crp			| load new user root pointer
-	jra	Lres5
-Lres4:
-	.word	0x4e7b,0x0806	| movc d0,URP
-Lres5:
+
 	movl	a1@(PCB_CMAP2),_CMAP2	| reload tmp map
 	moveml	a1@(PCB_REGS),#0xFCFC	| and registers
 	movl	a1@(PCB_USP),a0
@@ -1849,10 +1845,11 @@ ENTRY(loadustp)
 #endif
 	cmpl	#MMU_68040,_mmutype
 	jeq	Lldustp040
+	pflusha				| flush entire TLB
 	lea	_protorp,a0		| CRP prototype
 	movl	d0,a0@(4)		| stash USTP
 	pmove	a0@,crp			| load root pointer
-	movl	#DC_CLEAR,d0
+	movl	#CACHE_CLR,d0
 	movc	d0,cacr			| invalidate on-chip d-cache
 	rts				|   since pmove flushes TLB
 #ifdef M68060
@@ -1862,6 +1859,7 @@ Lldustp060:
 	movc	d1,cacr
 #endif
 Lldustp040:
+	.word	0xf518
 	.word	0x4e7b,0x0806		| movec d0,URP
 	rts
 

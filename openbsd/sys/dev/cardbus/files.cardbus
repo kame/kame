@@ -1,4 +1,4 @@
-#	$OpenBSD: files.cardbus,v 1.1 2000/04/08 05:50:52 aaron Exp $
+#	$OpenBSD: files.cardbus,v 1.4 2000/10/26 20:50:44 aaron Exp $
 #	$NetBSD: files.cardbus,v 1.8 2000/01/26 06:37:24 thorpej Exp $
 #
 # files.cardbus
@@ -15,6 +15,10 @@ file	dev/cardbus/cardbus_map.c	cardbus
 file	dev/cardbus/cardbus_exrom.c	cardbus
 file	dev/cardbus/rbus.c		cardbus
 
+# Com ports
+attach	com at cardbus with com_cardbus
+file	dev/cardbus/com_cardbus.c		com_cardbus | pccom_cardbus
+
 #
 # 3Com 3C575TX, 3C575BTX, and 3C575CTX
 #
@@ -22,10 +26,16 @@ attach	xl at cardbus with xl_cardbus
 file	dev/cardbus/if_xl_cardbus.c		xl_cardbus
 
 #
-# Intel PRO/100 8255x based CardBus cards.
+# Tulip clone based CardBus cards
 #
-#attach	fxp at cardbus with fxp_cardbus
-#file	dev/cardbus/if_fxp_cardbus.c		fxp_cardbus
+attach	dc at cardbus with dc_cardbus
+file	dev/cardbus/if_dc_cardbus.c		dc_cardbus
+
+#
+# Intel PRO/100 8255x based CardBus cards
+#
+attach	fxp at cardbus with fxp_cardbus
+file	dev/cardbus/if_fxp_cardbus.c		fxp_cardbus
 
 #
 #

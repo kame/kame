@@ -1,4 +1,4 @@
-/*	$OpenBSD: rnd.c,v 1.38 2000/04/18 15:11:28 hugh Exp $	*/
+/*	$OpenBSD: rnd.c,v 1.45 2000/10/22 01:08:52 mickey Exp $	*/
 
 /*
  * random.c -- A strong random number generator
@@ -791,16 +791,11 @@ dequeue_randomness(v)
 		rnd_event_free = rep;
 		splx(s);
 
-		/* Prevent overflow */
-		if ((random_state.entropy_count + nbits) > POOLBITS &&
-		    arc4random_state.cnt > 253)
-			arc4_stir();
-
 		add_entropy_words(&val, 1);
 		add_entropy_words(&time, 1);
 
-		random_state.entropy_count += nbits;
 		rndstats.rnd_total += nbits;
+		random_state.entropy_count += nbits;
 		if (random_state.entropy_count > POOLBITS)
 			random_state.entropy_count = POOLBITS;
 
@@ -1042,45 +1037,65 @@ randomioctl(dev, cmd, data, flag, p)
 	int	flag;
 	struct proc *p;
 {
-	int	ret = 0;
+	int	s, ret = 0;
 	u_int	cnt;
 
 	add_timer_randomness((u_long)p ^ (u_long)data ^ cmd);
 
 	switch (cmd) {
+	case FIOASYNC:
+		/* rnd has no async flag in softc so this is really a no-op. */
+		break;
+
+	case FIONBIO:
+		/* Handled in the upper FS layer. */
+		break;
+
 	case RNDGETENTCNT:
-		ret = copyout(&random_state.entropy_count, data,
-		    sizeof(random_state.entropy_count));
+		s = splhigh();
+		*(u_int *)data = random_state.entropy_count;
+		splx(s);
 		break;
 	case RNDADDTOENTCNT:
 		if (suser(p->p_ucred, &p->p_acflag) != 0)
 			ret = EPERM;
 		else {
-			copyin(&cnt, data, sizeof(cnt));
+			cnt = *(u_int *)data;
+			s = splhigh();
 			random_state.entropy_count += cnt;
 			if (random_state.entropy_count > POOLBITS)
 				random_state.entropy_count = POOLBITS;
+			splx(s);
 		}
 		break;
 	case RNDZAPENTCNT:
 		if (suser(p->p_ucred, &p->p_acflag) != 0)
 			ret = EPERM;
-		else
+		else {
+			s = splhigh();
 			random_state.entropy_count = 0;
+			splx(s);
+		}
 		break;
 	case RNDSTIRARC4:
 		if (suser(p->p_ucred, &p->p_acflag) != 0)
 			ret = EPERM;
 		else if (random_state.entropy_count < 64)
 			ret = EAGAIN;
-		else
+		else {
+			s = splhigh();
 			arc4random_initialized = 0;
+			splx(s);
+		}
 		break;
 	case RNDCLRSTATS:
 		if (suser(p->p_ucred, &p->p_acflag) != 0)
 			ret = EPERM;
-		else
+		else {
+			s = splhigh();
 			bzero(&rndstats, sizeof(rndstats));
+			splx(s);
+		}
 		break;
 	default:
 		ret = EINVAL;

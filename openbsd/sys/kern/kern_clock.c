@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_clock.c,v 1.23 2000/03/23 11:20:45 art Exp $	*/
+/*	$OpenBSD: kern_clock.c,v 1.27 2000/08/23 20:36:18 art Exp $	*/
 /*	$NetBSD: kern_clock.c,v 1.34 1996/06/09 04:51:03 briggs Exp $	*/
 
 /*-
@@ -55,6 +55,7 @@
 #include <sys/sched.h>
 
 #include <machine/cpu.h>
+#include <machine/limits.h>
 
 #ifdef GPROF
 #include <sys/gmon.h>
@@ -352,7 +353,7 @@ hardclock(frame)
 	register struct clockframe *frame;
 {
 	register struct proc *p;
-	register int delta, needsoft;
+	register int delta;
 	extern int tickdelta;
 	extern long timedelta;
 #ifdef NTP
@@ -360,11 +361,6 @@ hardclock(frame)
 	struct timeval newtime;
 	register int ltemp;
 #endif
-
-	/*
-	 * Update real-time timeout queue.
-	 */
-	needsoft = timeout_hardclock_update();
 
 	p = curproc;
 	if (p) {
@@ -672,16 +668,17 @@ hardclock(frame)
 #endif /* NTP */
 
 	/*
+	 * Update real-time timeout queue.
 	 * Process callouts at a very low cpu priority, so we don't keep the
 	 * relatively high clock interrupt priority any longer than necessary.
 	 */
-	if (needsoft) {
+	if (timeout_hardclock_update()) {
 		if (CLKF_BASEPRI(frame)) {
 			/*
 			 * Save the overhead of a software interrupt;
 			 * it will happen as soon as we return, so do it now.
 			 */
-			(void)splsoftclock();
+			(void)spllowersoftclock();
 			softclock();
 		} else
 			setsoftclock();
@@ -696,34 +693,51 @@ int
 hzto(tv)
 	struct timeval *tv;
 {
-	register long ticks, sec;
+	unsigned long ticks;
+	long sec, usec;
 	int s;
 
 	/*
-	 * If number of microseconds will fit in 32 bit arithmetic,
-	 * then compute number of microseconds to time and scale to
-	 * ticks.  Otherwise just compute number of hz in time, rounding
-	 * times greater than representible to maximum value.  (We must
-	 * compute in microseconds, because hz can be greater than 1000,
-	 * and thus tick can be less than one millisecond).
+	 * If the number of usecs in the whole seconds part of the time
+	 * difference fits in a long, then the total number of usecs will
+	 * fit in an unsigned long.  Compute the total and convert it to
+	 * ticks, rounding up and adding 1 to allow for the current tick
+	 * to expire.  Rounding also depends on unsigned long arithmetic
+	 * to avoid overflow.
 	 *
-	 * Delta times less than 14 hours can be computed ``exactly''.
-	 * (Note that if hz would yeild a non-integral number of us per
-	 * tick, i.e. tickfix is nonzero, timouts can be a tick longer
-	 * than they should be.)  Maximum value for any timeout in 10ms
-	 * ticks is 250 days.
+	 * Otherwise, if the number of ticks in the whole seconds part of
+	 * the time difference fits in a long, then convert the parts to
+	 * ticks separately and add, using similar rounding methods and
+	 * overflow avoidance.  This method would work in the previous
+	 * case but it is slightly slower and assumes that hz is integral.
+	 *
+	 * Otherwise, round the time difference down to the maximum
+	 * representable value.
+	 *
+	 * If ints have 32 bits, then the maximum value for any timeout in
+	 * 10ms ticks is 248 days.
 	 */
 	s = splhigh();
 	sec = tv->tv_sec - time.tv_sec;
-	if (sec <= 0x7fffffff / 1000000 - 1)
-		ticks = ((tv->tv_sec - time.tv_sec) * 1000000 +
-			(tv->tv_usec - time.tv_usec)) / tick;
-	else if (sec <= 0x7fffffff / hz)
-		ticks = sec * hz;
-	else
-		ticks = 0x7fffffff;
+	usec = tv->tv_usec - time.tv_usec;
 	splx(s);
-	return (ticks);
+	if (usec < 0) {
+		sec--;
+		usec += 1000000;
+	}
+	if (sec < 0 || (sec == 0 && usec <= 0)) {
+		ticks = 0;
+	} else if (sec <= LONG_MAX / 1000000)
+		ticks = (sec * 1000000 + (unsigned long)usec + (tick - 1))
+		    / tick + 1;
+	else if (sec <= LONG_MAX / hz)
+		ticks = sec * hz
+		    + ((unsigned long)usec + (tick - 1)) / tick + 1;
+	else
+		ticks = LONG_MAX;
+	if (ticks > INT_MAX)
+		ticks = INT_MAX;
+	return ((int)ticks);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.16 2000/01/25 12:55:04 mickey Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.18 2000/06/08 22:25:19 niklas Exp $	*/
 
 /*
  * Copyright (c) 1999-2000 Michael Shalayeff
@@ -35,6 +35,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -285,8 +286,6 @@ cpu_exit(p)
 	if (fpu_curpcb == (paddr_t)&p->p_addr->u_pcb)
 		fpu_curpcb = 0;
 
-	uvmspace_free(p->p_vmspace);
-
 	switch_exit(p);
 }
 
@@ -294,7 +293,6 @@ void
 cpu_wait(p)
 	struct proc *p;
 {
-	uvm_km_free(kernel_map, (vaddr_t)p->p_addr, USPACE);
 }
 
 /*

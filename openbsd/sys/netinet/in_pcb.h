@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.h,v 1.23 2000/04/27 15:41:06 millert Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.29 2000/10/11 09:14:11 itojun Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
@@ -168,12 +168,6 @@ struct inpcbtable {
  * protocol at PRU_BIND, PRU_LISTEN, PRU_CONNECT, etc, or by in_pcb*().
  */
 #define	INP_IPV6	0x100	/* sotopf(inp->inp_socket) == PF_INET6 */
-#define	INP_IPV6_UNDEC	0x200	/* PCB is PF_INET6, but listens for V4/V6 */
-#define	INP_IPV6_MAPPED	0x400	/* PF_INET6 PCB which is connected to
-				 * an IPv4 host, or is bound to
-				 * an IPv4 address (specified with
-				 * the mapped form of v6 addresses) */
-#define INP_IPV6_MCAST	0x800	/* Set if inp_moptions points to ipv6 ones */
 
 #if 1	/*KAME*/
 /*
@@ -260,6 +254,8 @@ void	 in_setsockaddr __P((struct inpcb *, struct mbuf *));
 int	 in_baddynamic __P((u_int16_t, u_int16_t));
 extern struct sockaddr_in *in_selectsrc __P((struct sockaddr_in *,
 	struct route *, int, struct ip_moptions *, int *));
+struct rtentry *
+	in_pcbrtentry __P((struct inpcb *));
 
 /* INET6 stuff */
 int	in6_pcbnotify __P((struct inpcbtable *, struct sockaddr *,
@@ -271,4 +267,9 @@ struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct route_in6 *,
 				     struct in6_addr *, int *));
 int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
+int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *));
+int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
+	struct inpcb *, struct ifnet **));
+int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
+	struct ifnet *));
 #endif

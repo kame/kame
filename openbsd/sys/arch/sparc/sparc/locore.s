@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.37 2000/02/27 05:25:01 deraadt Exp $	*/
+/*	$OpenBSD: locore.s,v 1.39 2000/06/07 15:43:24 art Exp $	*/
 /*	$NetBSD: locore.s,v 1.73 1997/09/13 20:36:48 pk Exp $	*/
 
 /*
@@ -4317,9 +4317,7 @@ ENTRY(write_user_windows)
  * and note that the `last loaded process' is nonexistent.
  */
 ENTRY(switchexit)
-	mov	%o0, %g2		! save the
-	mov	%o1, %g3		! ... three parameters
-	mov	%o2, %g4		! ... to kmem_free
+	mov	%o0, %g2		! save proc for exit2() call
 
 	/*
 	 * Change pcb to idle u. area, i.e., set %sp to top of stack
@@ -4341,14 +4339,8 @@ ENTRY(switchexit)
 	SET_SP_REDZONE(%l6, %l5)
 #endif
 	wr	%g0, PSR_S|PSR_ET, %psr	! and then enable traps
-	mov	%g2, %o0		! now ready to call kmem_free
-	mov	%g3, %o1
-#if defined(UVM)
-	call	_uvm_km_free
-#else
-	call	_kmem_free
-#endif
-	 mov	%g4, %o2
+	call    _exit2			! exit2(p)
+	 mov    %g2, %o0
 
 	/*
 	 * Now fall through to `the last switch'.  %g6 was set to
@@ -4641,7 +4633,7 @@ Lsw_load:
 	 * zero so it is safe to have interrupts going here.)
 	 */
 	ld	[%g3 + P_VMSPACE], %o3	! vm = p->p_vmspace;
-	ld	[%o3 + VM_PMAP], %o3	! pm = vm->vm_map.vm_pmap;
+	ld	[%o3 + VM_PMAP], %o3	! pm = vm->vm_map.pmap;
 	ld	[%o3 + PMAP_CTX], %o0	! if (pm->pm_ctx != NULL)
 	tst	%o0
 	bnz,a	Lsw_havectx		!	goto havecontext;
@@ -4668,7 +4660,7 @@ Lsw_havectx:
 #if defined(SUN4) || defined(SUN4C)
 	set	AC_CONTEXT, %o1
 	retl
-	 stba	%o0, [%o1] ASI_CONTROL	! setcontext(vm->vm_pmap.pm_ctxnum);
+	 stba	%o0, [%o1] ASI_CONTROL	! setcontext(vm->vm_map.pmap->pm_ctxnum);
 #endif
 1:
 #if defined(SUN4M)
@@ -4684,7 +4676,7 @@ Lsw_havectx:
 
 	set	SRMMU_CXR, %o1
 	jmp	%g7 + 8		! (retl, but we saved the ret address in g7)
-	 sta	%o0, [%o1] ASI_SRMMU	! setcontext(vm->vm_pmap.pm_ctxnum);
+	 sta	%o0, [%o1] ASI_SRMMU	! setcontext(vm->vm_map.pmap->pm_ctxnum);
 #endif
 
 Lsw_sameproc:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ohci.c,v 1.11 2000/04/01 19:11:35 aaron Exp $ */
+/*	$OpenBSD: ohci.c,v 1.14 2000/09/06 22:42:10 rahnds Exp $ */
 /*	$NetBSD: ohci.c,v 1.85 2000/04/01 09:27:35 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.22 1999/11/17 22:33:40 n_hibma Exp $	*/
 
@@ -7,7 +7,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -96,20 +96,6 @@ int ohcidebug = 0;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
-#endif
-
-/*
- * The OHCI controller is little endian, so on big endian machines
- * the data strored in memory needs to be swapped.
- */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-#if BYTE_ORDER == BIG_ENDIAN
-#define htole32(x) (bswap32(x))
-#define le32toh(x) (bswap32(x))
-#else
-#define htole32(x) (x)
-#define le32toh(x) (x)
-#endif
 #endif
 
 struct ohci_pipe;
@@ -1435,6 +1421,7 @@ ohci_rhsc(sc, xfer)
 	m = min(sc->sc_noport, xfer->length * 8 - 1);
 	memset(p, 0, xfer->length);
 	for (i = 1; i <= m; i++) {
+		/* Pick out CHANGE bits from the status reg. */
 		if (OREAD4(sc, OHCI_RH_PORT_STATUS(i)) >> 16)
 			p[i/8] |= 1 << (i%8);
 	}
@@ -1881,6 +1868,9 @@ ohci_open(pipe)
 	DPRINTFN(1, ("ohci_open: pipe=%p, addr=%d, endpt=%d (%d)\n",
 		     pipe, addr, ed->bEndpointAddress, sc->sc_addr));
 
+	std = NULL;
+	sed = NULL;
+
 	if (addr == sc->sc_addr) {
 		switch (ed->bEndpointAddress) {
 		case USB_CONTROL_ENDPOINT:
@@ -1959,9 +1949,11 @@ ohci_open(pipe)
 	return (USBD_NORMAL_COMPLETION);
 
  bad:
-	ohci_free_std(sc, std);
+	if (std != NULL)
+		ohci_free_std(sc, std);
  bad1:
-	ohci_free_sed(sc, sed);
+	if (sed != NULL)
+		ohci_free_sed(sc, sed);
  bad0:
 	return (USBD_NOMEM);
 	
@@ -2353,6 +2345,7 @@ ohci_root_ctrl_start(xfer)
 			OWRITE4(sc, port, UPS_OVERCURRENT_INDICATOR);
 			break;
 		case UHF_PORT_POWER:
+			/* Yes, writing to the LOW_SPEED bit clears power. */
 			OWRITE4(sc, port, UPS_LOW_SPEED);
 			break;
 		case UHF_C_PORT_CONNECTION:

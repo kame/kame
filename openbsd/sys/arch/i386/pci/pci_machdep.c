@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_machdep.c,v 1.15 2000/03/05 19:07:44 mickey Exp $	*/
+/*	$OpenBSD: pci_machdep.c,v 1.17 2000/10/25 19:13:12 mickey Exp $	*/
 /*	$NetBSD: pci_machdep.c,v 1.28 1997/06/06 23:29:17 thorpej Exp $	*/
 
 /*-
@@ -97,6 +97,7 @@
 #include "bios.h"
 #if NBIOS > 0
 #include <machine/biosvar.h>
+extern bios_pciinfo_t *bios_pciinfo;
 #endif
 
 #include <i386/isa/icu.h>

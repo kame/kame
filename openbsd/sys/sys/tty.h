@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.h,v 1.4 1996/06/10 07:31:41 deraadt Exp $	*/
+/*	$OpenBSD: tty.h,v 1.6 2000/08/13 03:38:45 ericj Exp $	*/
 /*	$NetBSD: tty.h,v 1.30.4.1 1996/06/02 09:08:13 mrg Exp $	*/
 
 /*-
@@ -44,6 +44,7 @@
 #include <sys/termios.h>
 #include <sys/select.h>		/* For struct selinfo. */
 #include <sys/queue.h>
+#include <sys/timeout.h>
 
 #ifndef REAL_CLISTS
 /*
@@ -112,6 +113,7 @@ struct tty {
 	short	t_hiwat;		/* High water mark. */
 	short	t_lowat;		/* Low water mark. */
 	short	t_gen;			/* Generation number. */
+	struct timeout t_rstrt_to;	/* restart timeout */
 };
 
 #define	t_cc		t_termios.c_cc
@@ -265,7 +267,7 @@ int	clalloc __P((struct clist *, int, int));
 void	clfree __P((struct clist *));
 
 #if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_SVR4) || \
-    defined(COMPAT_FREEBSD)
+    defined(COMPAT_FREEBSD) || defined(COMPAT_OSF1)
 # define COMPAT_OLDTTY
 int 	ttcompat __P((struct tty *, u_long, caddr_t, int, struct proc *));
 #endif

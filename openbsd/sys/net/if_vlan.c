@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vlan.c,v 1.3 2000/04/27 00:00:24 chris Exp $ */
+/*	$OpenBSD: if_vlan.c,v 1.6 2000/10/18 15:55:48 chris Exp $ */
 /*
  * Copyright 1998 Massachusetts Institute of Technology
  *
@@ -263,6 +263,9 @@ vlan_start(struct ifnet *ifp)
 			m_freem(m);
 			continue;
 		}
+		p->if_obytes += m->m_pkthdr.len;
+		if (m->m_flags & M_MCAST)
+			p->if_omcasts++;
 		IF_ENQUEUE(&p->if_snd, m);
 		if ((p->if_flags & IFF_OACTIVE) == 0) {
 			p->if_start(p);
@@ -326,12 +329,13 @@ vlan_input(eh, m)
 {
 	int i;
 	struct ifvlan *ifv;
+	u_int tag;
+
+	tag = EVL_VLANOFTAG(ntohs(*mtod(m, u_int16_t *)));
 
 	for (i = 0; i < NVLAN; i++) {
 		ifv = &ifv_softc[i];
-		if (m->m_pkthdr.rcvif == ifv->ifv_p
-		    && (EVL_VLANOFTAG(ntohs(*mtod(m, u_int16_t *)))
-			== ifv->ifv_tag))
+		if (m->m_pkthdr.rcvif == ifv->ifv_p && tag == ifv->ifv_tag)
 			break;
 	}
 
@@ -473,16 +477,20 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCSIFADDR:
-		ifp->if_flags |= IFF_UP;
+		if (ifv->ifv_p != NULL) {
+			ifp->if_flags |= IFF_UP;
 
-		switch (ifa->ifa_addr->sa_family) {
+			switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
-		case AF_INET:
-			arp_ifinit(&ifv->ifv_ac, ifa);
-			break;
+			case AF_INET:
+				arp_ifinit(&ifv->ifv_ac, ifa);
+				break;
 #endif
-		default:
-			break;
+			default:
+				break;
+			}
+		} else {
+			error = EINVAL;
 		}
 		break;
 
@@ -521,6 +529,10 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_flags &= ~(IFF_UP|IFF_RUNNING);
 			break;
 		}
+		if (vlr.vlr_tag != EVL_VLANOFTAG(vlr.vlr_tag)) {
+			error = EINVAL;		 /* check for valid tag */
+			break;
+		}
 		pr = ifunit(vlr.vlr_parent);
 		if (pr == 0) {
 			error = ENOENT;
@@ -556,7 +568,11 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		error = vlan_setmulti(ifp);
+		if (ifv->ifv_p != NULL) {
+			error = vlan_setmulti(ifp);
+		} else {
+			error = EINVAL;
+		}
 		break;
 	default:
 		error = EINVAL;

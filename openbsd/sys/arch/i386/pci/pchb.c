@@ -1,4 +1,4 @@
-/*	$OpenBSD: pchb.c,v 1.14 2000/05/05 00:26:28 deraadt Exp $	*/
+/*	$OpenBSD: pchb.c,v 1.23 2000/10/23 20:07:30 deraadt Exp $	*/
 /*	$NetBSD: pchb.c,v 1.6 1997/06/06 23:29:16 thorpej Exp $	*/
 
 /*
@@ -92,7 +92,7 @@
 #define PCISET_INTEL_PCI_BUS_NUMBER(reg)	(((reg) >> 16) & 0xff)
 
 #define PCISET_INTEL_SDRAMC_REG	0x76
-#define PCISET_INTEL_SDRAMC_IPDLT	(1 << 8)  
+#define PCISET_INTEL_SDRAMC_IPDLT	(1 << 8)
 
 /* XXX should be in dev/ic/i82424{reg.var}.h */
 #define I82424_CPU_BCTL_REG		0x53
@@ -173,7 +173,6 @@ pchbattach(parent, self, aux)
 		 * This host bridge has a second PCI bus.
 		 * Configure it.
 		 */
-		printf("\n");
 		neednl = 0;
 		pba.pba_busname = "pci";
 		pba.pba_iot = pa->pa_iot;
@@ -181,6 +180,7 @@ pchbattach(parent, self, aux)
 		pba.pba_dmat = pa->pa_dmat;
 		pba.pba_bus = bdnum;
 		pba.pba_pc = pa->pa_pc;
+		printf("\n");
 		config_found(self, &pba, pchb_print);
 		break;
 	case PCI_VENDOR_INTEL:
@@ -225,6 +225,7 @@ pchbattach(parent, self, aux)
 				pba.pba_dmat = pa->pa_dmat;
 				pba.pba_bus = pbnum;
 				pba.pba_pc = pa->pa_pc;
+				printf("\n");
 				config_found(self, &pba, pchb_print);
 				break;
 			}
@@ -260,6 +261,7 @@ pchbattach(parent, self, aux)
 				pba.pba_dmat = pa->pa_dmat;
 				pba.pba_bus = pbnum;
 				pba.pba_pc = pa->pa_pc;
+				printf("\n");
 				config_found(self, &pba, pchb_print);
 			}
 			break;
@@ -274,6 +276,14 @@ pchbattach(parent, self, aux)
 			}
 			break;
 		case PCI_PRODUCT_INTEL_82810E_MCH:
+		case PCI_PRODUCT_INTEL_82810_DC100_MCH:
+		case PCI_PRODUCT_INTEL_82810_MCH:
+		case PCI_PRODUCT_INTEL_82815_DC100_HUB:
+		case PCI_PRODUCT_INTEL_82815_NOAGP_HUB:
+		case PCI_PRODUCT_INTEL_82815_NOGRAPH_HUB:
+		case PCI_PRODUCT_INTEL_82815_FULL_HUB:
+		case PCI_PRODUCT_INTEL_82820_MCH:
+		case PCI_PRODUCT_INTEL_82840_HB:
 			sc->bt = pa->pa_memt;
 			if (bus_space_map(sc->bt, I82802_IOBASE, I82802_IOSIZE,
 			    0, &sc->bh) < 0)
@@ -304,11 +314,29 @@ pchbattach(parent, self, aux)
 				    && (r = bus_space_read_1(sc->bt, sc->bh,
 					I82802_RNG_DATA)) != 0
 				    /*&& runfipstest()>=0*/) {
-					printf (": RNG(%x)", r);
+					struct timeval tv1, tv2;
 
-					sc->i = 4;
+					/* benchmark the RNG */
+					microtime(&tv1);
+					for (i = 8 * 1024; i--; ) {
+						while(!(bus_space_read_1(sc->bt,
+						    sc->bh, I82802_RNG_RNGST) &
+						    I82802_RNG_RNGST_DATAV));
+						(void)bus_space_read_1(sc->bt,
+						    sc->bh, I82802_RNG_DATA);
+					}
+					microtime(&tv2);
+
+					timersub(&tv2, &tv1, &tv1);
+					if (tv1.tv_sec)
+						tv1.tv_usec +=
+						    1000000 * tv1.tv_sec;
+					printf(": rng active, %dKb/sec",
+					    8 * 1000000 / tv1.tv_usec);
+
 					timeout_set(&sc->sc_tmo, pchb_rnd, sc);
-					timeout_add(&sc->sc_tmo, 1);
+					sc->i = 4;
+					pchb_rnd(sc);
 				}
 			}
 			break;
@@ -333,27 +361,29 @@ pchb_print(aux, pnp)
 	return (UNCONF);
 }
 
-
+/*
+ * Should do FIPS testing as per:
+ *	http://csrc.nist.gov/fips/fips1401.htm
+ */
 void
 pchb_rnd(v)
 	void *v;
 {
 	struct pchb_softc *sc = v;
-	int s, ret = -1;
+	int s, ret;
 
 	s = splhigh();
-	if (bus_space_read_1(sc->bt, sc->bh, I82802_RNG_RNGST) &
-	    I82802_RNG_RNGST_DATAV)
-		ret = bus_space_read_1(sc->bt, sc->bh, I82802_RNG_DATA);
-	splx(s);
+	while (!(bus_space_read_1(sc->bt, sc->bh, I82802_RNG_RNGST) &
+	    I82802_RNG_RNGST_DATAV));
+	ret = bus_space_read_1(sc->bt, sc->bh, I82802_RNG_DATA);
 
-	if (ret >= 0) {
-		if (sc->i--)
-			sc->ax = (sc->ax << 8) + ret;
-		else {
-			sc->i = 4;
-			add_true_randomness(sc->ax);
-		}
+	if (sc->i--) {
+		sc->ax = (sc->ax << 8) | ret;
+		splx(s);
+	} else {
+		sc->i = 4;
+		splx(s);
+		add_true_randomness(sc->ax);
 	}
 	timeout_add(&sc->sc_tmo, 1);
 }

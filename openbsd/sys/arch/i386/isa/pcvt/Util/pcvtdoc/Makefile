@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.3 1999/07/14 13:34:59 millert Exp $
+#	$OpenBSD: Makefile,v 1.5 2000/05/25 21:54:52 deraadt Exp $
 
 MAN4=		pcvt.${MAN4EXT}
 MANSUBDIR=	/i386

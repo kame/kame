@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_nat.c,v 1.31 2000/05/10 20:40:53 deraadt Exp $	*/
+/*	$OpenBSD: ip_nat.c,v 1.35 2000/08/10 15:43:20 kjell Exp $	*/
 
 /*
  * Copyright (C) 1995-1998 by Darren Reed.
@@ -11,7 +11,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_nat.c	1.11 6/5/96 (C) 1995 Darren Reed";
-static const char rcsid[] = "@(#)$IPFilter: ip_nat.c,v 2.2.2.15 2000/04/25 16:21:13 darrenr Exp $";
+static const char rcsid[] = "@(#)$IPFilter: ip_nat.c,v 2.2.2.21 2000/08/08 16:00:33 darrenr Exp $";
 #endif
 
 #if defined(__FreeBSD__) && defined(KERNEL) && !defined(_KERNEL)
@@ -326,11 +326,17 @@ int mode;
 	{
 #ifdef  IPFILTER_LOG
 	case SIOCIPFFB :
+	{
+		int tmp;
+
 		if (!(mode & FWRITE))
 			error = EPERM;
-		else
-			*(int *)data = ipflog_clear(IPL_LOGNAT);
+		else {
+			tmp = ipflog_clear(IPL_LOGNAT);
+			IWCOPY((char *)&tmp, (char *)data, sizeof(tmp));
+		}
 		break;
+	}
 #endif
 	case SIOCADNAT :
 		if (!(mode & FWRITE)) {
@@ -404,7 +410,7 @@ int mode;
 		 * mapping range.  In all cases, the range is inclusive of
 		 * the start and ending IP addresses.
 		 * If to a CIDR address, lose 2: broadcast + network address
-		 *                               (so subtract 1)
+		 *			         (so subtract 1)
 		 * If to a range, add one.
 		 * If to a single IP address, set to 1.
 		 */
@@ -608,9 +614,9 @@ void
 nat_ifdetach(ifp)
 	struct ifnet *ifp;
 {
-	ipnat_t *n, **np;
+	ipnat_t *n, **np = &nat_list;
 
-	for (np = &nat_list; (n = *np) != NULL; np = &n->in_next) {
+	while ((n = *np)) {
 		*np = n->in_next;
 		if (!n->in_use) {
 			if (n->in_apr)
@@ -621,7 +627,6 @@ nat_ifdetach(ifp)
 			n->in_flags |= IPN_DELETE;
 			n->in_next = NULL;
 		}
-		n = NULL;
 	}
 }
 
@@ -800,7 +805,7 @@ int direction;
 					port += MAPBLK_MINPORT;
 					port = htons(port);
 				}
-			} else if (!np->in_nip &&
+			} else if (!np->in_outip &&
 				   (np->in_outmsk == 0xffffffff)) {
 				/*
 				 * 0/32 - use the interface's IP address.
@@ -811,7 +816,7 @@ int direction;
 					return NULL;
 				}
 				in.s_addr = ntohl(in.s_addr);
-			} else if (!np->in_nip && !np->in_outmsk) {
+			} else if (!np->in_outip && !np->in_outmsk) {
 				/*
 				 * 0/0 - use the original source address/port.
 				 */
@@ -1022,11 +1027,13 @@ nat_t *nat_icmpinlookup(ip, fin)
 ip_t *ip;
 fr_info_t *fin;
 {
-	icmphdr_t *icmp;
 	tcphdr_t *tcp = NULL;
+	icmphdr_t *icmp;
 	ip_t *oip;
-	int flags = 0, type;
+	int flags = 0, type, minlen;
 
+	if ((fin->fin_fi.fi_fl & FI_SHORT) || (ip->ip_off & IP_OFFMASK))
+		return NULL;
 	icmp = (icmphdr_t *)fin->fin_dp;
 	/*
 	 * Does it at least have the return (basic) IP header ?
@@ -1045,13 +1052,43 @@ fr_info_t *fin;
 		return NULL;
 
 	oip = (ip_t *)((char *)fin->fin_dp + 8);
-	if (ip->ip_len < ICMPERR_MAXPKTLEN + ((oip->ip_hl - 5) << 2))
+	minlen = (oip->ip_hl << 2);
+	if (ip->ip_len < ICMPERR_MINPKTLEN + minlen)
 		return NULL;
+	/*
+	 * Is the buffer big enough for all of it ?  It's the size of the IP
+	 * header claimed in the encapsulated part which is of concern.  It
+	 * may be too big to be in this buffer but not so big that it's
+	 * outside the ICMP packet, leading to TCP deref's causing problems.
+	 * This is possible because we don't know how big oip_hl is when we
+	 * do the pullup early in fr_check() and thus can't gaurantee it is
+	 * all here now.
+	 */
+#ifdef  _KERNEL
+	{
+	mb_t *m;
+
+# if SOLARIS
+	m = fin->fin_qfm;
+	if ((char *)oip + fin->fin_dlen - ICMPERR_ICMPHLEN > (char *)m->b_wptr)
+		return NULL;
+# else
+	m = *(mb_t **)fin->fin_mp;
+	if ((char *)oip + fin->fin_dlen - ICMPERR_ICMPHLEN >
+	    (char *)ip + m->m_len)
+		return NULL;
+# endif
+	}
+#endif
+
 	if (oip->ip_p == IPPROTO_TCP)
 		flags = IPN_TCP;
 	else if (oip->ip_p == IPPROTO_UDP)
 		flags = IPN_UDP;
 	if (flags & IPN_TCPUDP) {
+		minlen += 8;		/* + 64bits of data to get ports */
+		if (ip->ip_len < ICMPERR_MINPKTLEN + minlen)
+			return NULL;
 		tcp = (tcphdr_t *)((char *)oip + (oip->ip_hl << 2));
 		return nat_inlookup(fin->fin_ifp, flags, (u_int)oip->ip_p,
 				    oip->ip_dst, oip->ip_src,
@@ -1130,7 +1167,10 @@ u_int *nflags;
 	if ((flags & IPN_TCPUDP) != 0) {
 		tcphdr_t *tcp;
 
-		/* XXX - what if this is bogus hl and we go off the end ? */
+		/*
+		 * XXX - what if this is bogus hl and we go off the end ?
+		 * In this case, nat_icmpinlookup() will have returned NULL.
+		 */
 		tcp = (tcphdr_t *)((((char *)oip) + (oip->ip_hl << 2)));
 
 		if (nat->nat_dir == NAT_OUTBOUND) {
@@ -1461,6 +1501,7 @@ maskloop:
 			} else if (ip->ip_p == IPPROTO_ICMP) {
 				nat->nat_age = fr_defnaticmpage;
 			}
+
 			if (csump) {
 				if (nat->nat_dir == NAT_OUTBOUND)
 					fix_outcksum(csump, nat->nat_sumd[1],

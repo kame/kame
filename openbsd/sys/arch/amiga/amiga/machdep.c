@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.38 2000/04/11 02:44:23 pjanzen Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.41 2000/05/28 02:23:30 art Exp $	*/
 /*	$NetBSD: machdep.c,v 1.95 1997/08/27 18:31:17 is Exp $	*/
 
 /*
@@ -85,6 +85,10 @@
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 
+#if defined(UVM)
+#include <uvm/uvm_extern.h>
+#endif
+
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
@@ -111,10 +115,6 @@
 
 #include <net/if.h>
 
-/* vm_map_t buffer_map; */
-extern vm_offset_t avail_end;
-extern vm_offset_t avail_start;
-
 /* prototypes */
 void identifycpu __P((void));
 vm_offset_t reserve_dumppages __P((vm_offset_t));
@@ -137,6 +137,12 @@ void fdintr __P((int));
  */
 u_int16_t amiga_ttyspl = PSL_S|PSL_IPL4;
 
+#if defined(UVM)
+vm_map_t exec_map = NULL;
+vm_map_t mb_map = NULL;
+vm_map_t phys_map = NULL;
+#endif
+
 /*
  * Declare these as initialized data so we can patch them.
  */
@@ -151,6 +157,9 @@ int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
+
+paddr_t	msgbufpa;
+
 int	maxmem;			/* max memory per process */
 int	physmem = MAXMEM;	/* max supported memory, changes to actual */
 /*
@@ -310,13 +319,6 @@ cpu_startup()
 #endif
 	vm_offset_t minaddr, maxaddr;
 	vm_size_t size = 0;
-#if defined(MACHINE_NONCONTIG) && defined(DEBUG)
-	extern struct {
-		vm_offset_t start;
-		vm_offset_t end;
-		int first_page;
-	} phys_segs[16];
-#endif
 
 	/*
 	 * Initialize error message buffer (at end of core).
@@ -324,10 +326,16 @@ cpu_startup()
 #ifdef DEBUG
 	pmapdebug = 0;
 #endif
-	/* avail_end was pre-decremented in pmap_bootstrap to compensate */
+	/*
+	 * pmap_bootstrap has positioned this at the end of kernel
+	 * memory segment - map and initialize it now.
+	 */
+	/*
+	 * XXX - shouldn't this be msgbufp + i * PAGE_SIZE?
+	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp, 
-		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
+		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp,
+		    msgbufpa + i * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, TRUE,
 		    VM_PROT_READ|VM_PROT_WRITE);
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
@@ -403,14 +411,21 @@ again:
 		if (nswbuf > 256)
 			nswbuf = 256;		/* sanity */
 	}
+#if !defined(UVM)
 	valloc(swbuf, struct buf, nswbuf);
+#endif
 	valloc(buf, struct buf, nbuf);
 	/*
 	 * End of first pass, size has been calculated so allocate memory
 	 */
 	if (firstaddr == 0) {
 		size = (vm_size_t)(v - firstaddr);
+#if defined(UVM)
+		firstaddr = (caddr_t) uvm_km_zalloc(kernel_map,
+						    round_page(size));
+#else
 		firstaddr = (caddr_t) kmem_alloc(kernel_map, round_page(size));
+#endif
 		if (firstaddr == 0)
 			panic("startup: no room for tables");
 		goto again;
@@ -426,12 +441,21 @@ again:
 	 * in that they usually occupy more virtual memory than physical.
 	 */
 	size = MAXBSIZE * nbuf;
+#if defined(UVM)
+	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
+		    NULL, UVM_UNKNOWN_OFFSET,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+		panic("startup: cannot allocate buffers");
+	minaddr = (vaddr_t) buffers;
+#else
 	buffer_map = kmem_suballoc(kernel_map, (vm_offset_t *)&buffers,
 				   &maxaddr, size, TRUE);
 	minaddr = (vm_offset_t)buffers;
 	if (vm_map_find(buffer_map, vm_object_allocate(size), (vm_offset_t)0,
 			&minaddr, size, FALSE) != KERN_SUCCESS)
 		panic("startup: cannot allocate buffers");
+#endif
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
 		/* don't want to alloc more physical mem than needed */
 		bufpages = btoc(MAXBSIZE) * nbuf;
@@ -439,6 +463,36 @@ again:
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
 	for (i = 0; i < nbuf; i++) {
+#if defined(UVM)
+		vsize_t curbufsize;
+		vaddr_t curbuf;
+		struct vm_page *pg;
+
+		/*
+		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
+		 * that MAXBSIZE space, we allocate and map (base+1) pages
+		 * for the first "residual" buffers, and then we allocate
+		 * "base" pages for the rest.
+		 */
+		curbuf = (vm_offset_t) buffers + (i * MAXBSIZE);
+		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+
+		while (curbufsize) {
+			pg = uvm_pagealloc(NULL, 0, NULL, 0);
+			if (pg == NULL)
+				panic("cpu_startup: not enough memory for "
+				      "buffer cache");
+#if defined(PMAP_NEW)
+			pmap_kenter_pgs(curbuf, &pg, 1);
+#else
+			pmap_enter(kernel_map->pmap, curbuf,
+				   VM_PAGE_TO_PHYS(pg), VM_PROT_ALL, TRUE,
+				   VM_PROT_READ|VM_PROT_WRITE);
+#endif
+			curbuf += PAGE_SIZE;
+			curbufsize -= PAGE_SIZE;
+		}
+#else
 		vm_size_t curbufsize;
 		vm_offset_t curbuf;
 
@@ -453,20 +507,31 @@ again:
 		curbufsize = CLBYTES * (i < residual ? base+1 : base);
 		vm_map_pageable(buffer_map, curbuf, curbuf+curbufsize, FALSE);
 		vm_map_simplify(buffer_map, curbuf);
+#endif
 	}
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
+#if defined(UVM)
+	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+				   16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+#else
 	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr, 16 * NCARGS,
 	    TRUE);
+#endif
 
 	/*
 	 * Allocate a submap for physio
 	 */
+#if defined(UVM)
+	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+				   VM_PHYS_SIZE, 0, FALSE, NULL);
+#else
 	phys_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr, VM_PHYS_SIZE,
 	    TRUE);
+#endif
 
 	/*
 	 * Finally, allocate mbuf pool.  Since mclrefcnt is an off-size
@@ -475,8 +540,13 @@ again:
 	mclrefcnt = (char *)malloc(NMBCLUSTERS + CLBYTES / MCLBYTES, M_MBUF,
 	    M_NOWAIT);
 	bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
+#if defined(UVM)
+	mb_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&mbutl, &maxaddr,
+				 VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
+#else
 	mb_map = kmem_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
 	    VM_MBUF_SIZE, FALSE);
+#endif
 
 	/*
 	 * Initialize timeouts
@@ -486,8 +556,12 @@ again:
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
+#if defined(UVM)
+	printf("avail mem = %ld (%ld pages)\n", ptoa(uvmexp.free), uvmexp.free);
+#else
 	printf("avail mem = %ld (%ld pages)\n", ptoa(cnt.v_free_count),
 	    ptoa(cnt.v_free_count)/NBPG);
+#endif
 	printf("using %d buffers containing %d bytes of memory\n", nbuf,
 	    bufpages * CLBYTES);
 	
@@ -499,14 +573,6 @@ again:
 			printf("memory segment %d at %x size %x\n", i,
 			    memlist->m_seg[i].ms_start, 
 			    memlist->m_seg[i].ms_size);
-#if defined(MACHINE_NONCONTIG) && defined(DEBUG)
-	printf("Physical memory segments:\n");
-	for (i = 0; i < memlist->m_nseg && phys_segs[i].start; ++i)
-		printf("Physical segment %d at %08lx size %ld offset %d\n", i,
-		    phys_segs[i].start,
-		    (phys_segs[i].end - phys_segs[i].start) / NBPG,
-		    phys_segs[i].first_page);
-#endif
 
 #ifdef DEBUG_KERNEL_START
 	printf("calling initcpu...\n");
@@ -1636,14 +1702,22 @@ intrhand(sr)
 #ifdef REALLYDEBUG
 				printf("calling netintr\n");
 #endif
+#if defined(UVM)
+				uvmexp.softs++;
+#else
 				cnt.v_soft++;
+#endif
 				netintr();
 			}
 			if (ssir_active & SIR_CLOCK) {
 #ifdef REALLYDEBUG
 				printf("calling softclock\n");
 #endif
+#if defined(UVM)
+				uvmexp.softs++;
+#else
 				cnt.v_soft++;
+#endif
 				/* XXXX softclock(&frame.f_stackadj); */
 				softclock();
 			}
@@ -1651,7 +1725,11 @@ intrhand(sr)
 #ifdef REALLYDEBUG
 				printf("calling softcallbacks\n");
 #endif
+#if defined(UVM)
+				uvmexp.softs++;
+#else
 				cnt.v_soft++;
+#endif
 				call_sicallbacks();
 			}
 		}

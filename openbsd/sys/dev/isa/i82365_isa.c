@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365_isa.c,v 1.9 1999/08/11 12:02:07 niklas Exp $	*/
+/*	$OpenBSD: i82365_isa.c,v 1.12 2000/07/03 02:59:24 aaron Exp $	*/
 /*	$NetBSD: i82365_isa.c,v 1.11 1998/06/09 07:25:00 thorpej Exp $	*/
 
 /*
@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/extent.h>
 #include <sys/malloc.h>
@@ -208,7 +209,7 @@ pcic_isa_attach(parent, self, aux)
 	sc->irq = irq;
 
 	if (irq) {
-		printf("%s: irq %d\n", sc->dev.dv_xname, irq);
+		printf("%s: irq %d, ", sc->dev.dv_xname, irq);
 
 		/* Set up the pcic to interrupt on card detect. */
 		for (i = 0; i < PCIC_NSLOTS; i++) {
@@ -217,8 +218,16 @@ pcic_isa_attach(parent, self, aux)
 				pcic_write(h, PCIC_CSC_INTR,
 				    (sc->irq << PCIC_CSC_INTR_IRQ_SHIFT) |
 				    PCIC_CSC_INTR_CD_ENABLE);
+				powerhook_establish(pcic_power, h);
 			}
 		}
 	} else
-		printf("%s: no irq\n", sc->dev.dv_xname);
+		printf("%s: no irq, ", sc->dev.dv_xname);
+
+	printf("polling enabled\n", sc->dev.dv_xname);
+	if (sc->poll_established == 0) {
+		timeout_set(&sc->poll_timeout, pcic_poll_intr, sc);
+		timeout_add(&sc->poll_timeout, hz / 2);
+		sc->poll_established = 1;
+	}
 }

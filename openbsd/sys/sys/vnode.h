@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnode.h,v 1.23 2000/04/19 08:34:51 csapuntz Exp $	*/
+/*	$OpenBSD: vnode.h,v 1.25 2000/06/17 17:16:05 provos Exp $	*/
 /*	$NetBSD: vnode.h,v 1.38 1996/02/29 20:59:05 cgd Exp $	*/
 
 /*
@@ -68,7 +68,7 @@ enum vtype	{ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO, VBAD };
 enum vtagtype	{
 	VT_NON, VT_UFS, VT_NFS, VT_MFS, VT_MSDOSFS, VT_LFS, VT_LOFS, VT_FDESC,
 	VT_PORTAL, VT_NULL, VT_UMAP, VT_KERNFS, VT_PROCFS, VT_AFS, VT_ISOFS,
-	VT_UNION, VT_ADOSFS, VT_EXT2FS, VT_NCPFS, VT_VFS, VT_XFS
+	VT_UNION, VT_ADOSFS, VT_EXT2FS, VT_NCPFS, VT_VFS, VT_XFS, VT_TCFS
 };
 
 /*
@@ -90,8 +90,8 @@ struct vnode {
 	struct uvm_vnode v_uvm;			/* uvm data */
 #endif
 	u_long	v_flag;				/* vnode flags (see below) */
-	short	v_usecount;			/* reference count of users */
-	short	v_writecount;			/* reference count of writers */
+	int	v_usecount;			/* reference count of users */
+	int	v_writecount;			/* reference count of writers */
 	long	v_holdcnt;			/* page & buffer references */
 	daddr_t	v_lastr;			/* last read (read-ahead) */
 	u_long	v_id;				/* capability identifier */

@@ -1,4 +1,4 @@
-#	$OpenBSD: ALPHA,v 1.13 1999/01/08 03:16:15 niklas Exp $
+#	$OpenBSD: ALPHA,v 1.15 2000/09/09 01:46:15 ericj Exp $
 #	$NetBSD: ALPHA,v 1.30 1996/12/03 17:25:27 cgd Exp $
 #
 # Alpha kernel with all the options you'd want, and more.
@@ -88,6 +88,7 @@ options		FIX_UNALIGNED_VAX_FP	# fix unaligned VAX FP loads & stores
 options		PCIVERBOSE		# recognize "unknown" PCI devices
 options		TCVERBOSE		# recognize "unknown" TC devices
 
+options		WSEMUL_VT100		# wscons VT100 emulation
 config		bsd	swap generic
 #config		bsd	root on sd0 swap on sd0
 #config		bsd	root nfs swap nfs
@@ -108,8 +109,8 @@ le*	at	ioasic? offset ?
 scc0	at	ioasic? offset ?
 scc1	at	ioasic? offset ?
 tcds0	at	tc? slot ? offset ?
-esp0	at	tcds? slot ?
-esp1	at	tcds? slot ?
+asc0	at	tcds? slot ?
+asc1	at	tcds? slot ?
 cfb*	at	tc? slot ? offset ?
 sfb*	at	tc? slot ? offset ?
 le*	at	tc? slot ? offset ?
@@ -160,7 +161,7 @@ vga*	at	isa?				# ISA (EISA: XXX) VGA
 fea*	at	eisa? slot ?			# DEC DEFEA FDDI cards
 
 # SCSI bus support
-scsibus* at	esp?
+scsibus* at	asc?
 scsibus* at	ncr?
 
 # SCSI devices
@@ -172,10 +173,10 @@ st*	at	scsibus? target ? lun ?		# SCSI tape drives
 uk*	at	scsibus? target ? lun ?		# SCSI unknown
 
 # Workstation Console attachments
-wscons*	at	cfb?
-wscons*	at	vga?
-wscons*	at	sfb?
-wscons*	at	tga?
+#wsdisplay*	at	cfb?
+wsdisplay*	at	vga?
+#wsdisplay*	at	sfb?
+wsdisplay*	at	tga?
 
 pseudo-device	bpfilter	16
 pseudo-device	loop

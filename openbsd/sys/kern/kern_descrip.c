@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_descrip.c,v 1.20 2000/04/01 23:29:25 provos Exp $	*/
+/*	$OpenBSD: kern_descrip.c,v 1.22 2000/09/27 16:13:46 mickey Exp $	*/
 /*	$NetBSD: kern_descrip.c,v 1.42 1996/03/30 22:24:38 christos Exp $	*/
 
 /*
@@ -646,14 +646,9 @@ fdalloc(p, want, result)
 		else
 			nfiles = 2 * fdp->fd_nfiles;
 		nfiles = min(lim, nfiles);
-		MALLOC(newofile, struct file **, nfiles * OFILESIZE,
-		    M_FILEDESC, M_WAITOK);
+		newofile = malloc(nfiles * OFILESIZE, M_FILEDESC, M_WAITOK);
 		newofileflags = (char *) &newofile[nfiles];
 
-		MALLOC(newhimap, u_int *, NDHISLOTS(nfiles) * sizeof(u_int),
-		       M_FILEDESC, M_WAITOK);
-		MALLOC(newlomap, u_int *, NDLOSLOTS(nfiles) * sizeof(u_int),
-		       M_FILEDESC, M_WAITOK);
 		/*
 		 * Copy the existing ofile and ofileflags arrays
 		 * and zero the new portion of each array.
@@ -665,27 +660,35 @@ fdalloc(p, want, result)
 			(i = sizeof(char) * fdp->fd_nfiles));
 		bzero(newofileflags + i, nfiles * sizeof(char) - i);
 
-		bcopy(fdp->fd_himap, newhimap,
-		      (i = NDHISLOTS(fdp->fd_nfiles) * sizeof(u_int)));
-		bzero((char *)newhimap + i,
-		      NDHISLOTS(nfiles) * sizeof(u_int) - i);
-
-		bcopy(fdp->fd_lomap, newlomap,
-		      (i = NDLOSLOTS(fdp->fd_nfiles) * sizeof(u_int)));
-		bzero((char *)newlomap + i,
-		      NDLOSLOTS(nfiles) * sizeof(u_int) - i);
-
 		if (fdp->fd_nfiles > NDFILE)
-			FREE(fdp->fd_ofiles, M_FILEDESC);
-		if (NDHISLOTS(fdp->fd_nfiles) > NDHISLOTS(NDFILE)) {
-			FREE(fdp->fd_himap, M_FILEDESC);
-			FREE(fdp->fd_lomap, M_FILEDESC);
+			free(fdp->fd_ofiles, M_FILEDESC);
+
+		if (NDHISLOTS(nfiles) > NDHISLOTS(fdp->fd_nfiles)) {
+			newhimap = malloc(NDHISLOTS(nfiles) * sizeof(u_int),
+			       M_FILEDESC, M_WAITOK);
+			newlomap = malloc( NDLOSLOTS(nfiles) * sizeof(u_int),
+			       M_FILEDESC, M_WAITOK);
+
+			bcopy(fdp->fd_himap, newhimap,
+			      (i = NDHISLOTS(fdp->fd_nfiles) * sizeof(u_int)));
+			bzero((char *)newhimap + i,
+			      NDHISLOTS(nfiles) * sizeof(u_int) - i);
+
+			bcopy(fdp->fd_lomap, newlomap,
+			      (i = NDLOSLOTS(fdp->fd_nfiles) * sizeof(u_int)));
+			bzero((char *)newlomap + i,
+			      NDLOSLOTS(nfiles) * sizeof(u_int) - i);
+
+			if (NDHISLOTS(fdp->fd_nfiles) > NDHISLOTS(NDFILE)) {
+				free(fdp->fd_himap, M_FILEDESC);
+				free(fdp->fd_lomap, M_FILEDESC);
+			}
+			fdp->fd_himap = newhimap;
+			fdp->fd_lomap = newlomap;
 		}
 		fdp->fd_ofiles = newofile;
 		fdp->fd_ofileflags = newofileflags;
 		fdp->fd_nfiles = nfiles;
-		fdp->fd_himap = newhimap;
-		fdp->fd_lomap = newlomap;
 		fdexpand++;
 	}
 }
@@ -859,8 +862,7 @@ fdcopy(p)
 		i = newfdp->fd_nfiles;
 		while (i >= 2 * NDEXTENT && i > newfdp->fd_lastfile * 2)
 			i /= 2;
-		MALLOC(newfdp->fd_ofiles, struct file **, i * OFILESIZE,
-		    M_FILEDESC, M_WAITOK);
+		newfdp->fd_ofiles = malloc(i * OFILESIZE, M_FILEDESC, M_WAITOK);
 		newfdp->fd_ofileflags = (char *) &newfdp->fd_ofiles[i];
 	}
 	if (NDHISLOTS(i) <= NDHISLOTS(NDFILE)) {
@@ -869,9 +871,9 @@ fdcopy(p)
 		newfdp->fd_lomap =
 			((struct filedesc0 *) newfdp)->fd_dlomap;
 	} else {
-		MALLOC(newfdp->fd_himap, u_int *, NDHISLOTS(i) * sizeof(u_int),
+		newfdp->fd_himap = malloc(NDHISLOTS(i) * sizeof(u_int),
 		       M_FILEDESC, M_WAITOK);
-		MALLOC(newfdp->fd_lomap, u_int *, NDLOSLOTS(i) * sizeof(u_int),
+		newfdp->fd_lomap = malloc(NDLOSLOTS(i) * sizeof(u_int),
 		       M_FILEDESC, M_WAITOK);
 	}
 	newfdp->fd_nfiles = i;
@@ -918,10 +920,10 @@ fdfree(p)
 	}
 	p->p_fd = NULL;
 	if (fdp->fd_nfiles > NDFILE)
-		FREE(fdp->fd_ofiles, M_FILEDESC);
+		free(fdp->fd_ofiles, M_FILEDESC);
 	if (NDHISLOTS(fdp->fd_nfiles) > NDHISLOTS(NDFILE)) {
-		FREE(fdp->fd_himap, M_FILEDESC);
-		FREE(fdp->fd_lomap, M_FILEDESC);
+		free(fdp->fd_himap, M_FILEDESC);
+		free(fdp->fd_lomap, M_FILEDESC);
 	}
 	vrele(fdp->fd_cdir);
 	if (fdp->fd_rdir)

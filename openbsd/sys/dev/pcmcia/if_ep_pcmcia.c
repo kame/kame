@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ep_pcmcia.c,v 1.23 2000/04/24 19:43:35 niklas Exp $	*/
+/*	$OpenBSD: if_ep_pcmcia.c,v 1.26 2000/09/15 22:28:52 aaron Exp $	*/
 /*	$NetBSD: if_ep_pcmcia.c,v 1.16 1998/08/17 23:20:40 thorpej Exp $  */
 
 /*-
@@ -107,6 +107,9 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 
+#include <dev/mii/mii.h>
+#include <dev/mii/miivar.h>
+
 #include <dev/ic/elink3var.h>
 #include <dev/ic/elink3reg.h>
 
@@ -161,13 +164,11 @@ struct ep_pcmcia_product {
 	{ PCMCIA_PRODUCT_3COM_3C1,	EP_CHIPSET_3C509,
 	  0,				0 },
 
-#ifdef notyet
-	{ PCMCIA_PRODUCT_3COM_3CCFEM556BI, EP_CHIPSET_BOOMERANG,
+	{ PCMCIA_PRODUCT_3COM_3CCFEM556BI, EP_CHIPSET_ROADRUNNER,
 	  EP_FLAGS_MII,			0 },
 
-	{ PCMCIA_PRODUCT_3COM_3C574,	EP_CHIPSET_BOOMERANG,
+	{ PCMCIA_PRODUCT_3COM_3C574,	EP_CHIPSET_ROADRUNNER,
 	  EP_FLAGS_MII,			0 }
-#endif
 };
 
 struct ep_pcmcia_product *ep_pcmcia_lookup __P((struct pcmcia_attach_args *));
@@ -362,6 +363,8 @@ ep_pcmcia_attach(parent, self, aux)
 	if (epp == NULL)
 		panic("ep_pcmcia_attach: impossible");
 
+	sc->ep_flags = epp->epp_flags;
+
 #ifdef notyet
 	sc->enable = ep_pcmcia_enable;
 	sc->disable = ep_pcmcia_disable;
@@ -388,18 +391,16 @@ ep_pcmcia_detach(dev, flags)
 	struct device *dev;
 	int flags;
 {
+	int rv;
 	struct ep_pcmcia_softc *psc = (struct ep_pcmcia_softc *)dev;
-	struct ep_softc *sc = &psc->sc_ep;
-	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	int rv = 0;
+
+	if ((rv = ep_detach(dev)) != 0)
+		return (rv);
 
 	pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
 	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
 
-	ether_ifdetach(ifp);
-	if_detach(ifp);
-
-	return (rv);
+	return (0);
 }
 
 int

@@ -1,4 +1,4 @@
-/*      $OpenBSD: eap.c,v 1.8 1999/12/13 06:43:01 csapuntz Exp $ */
+/*      $OpenBSD: eap.c,v 1.10 2000/08/16 14:13:13 kevlo Exp $ */
 /*	$NetBSD: eap.c,v 1.25 1999/02/18 07:59:30 mycroft Exp $	*/
 
 /*
@@ -48,7 +48,7 @@
  * Data sheets can be found at 
  * http://www.ensoniq.com/multimedia/semi_html/html/es1370.zip
  * and
- * http://206.214.38.151/pdf/4531.pdf
+ * http://www.akm.com/pdf/4531.pdf
  *
  * Added Creative Ensoniq support: ES1371 + AC97 = hack city.
  * -- Ezra Story <ezy@panix.com>
@@ -771,9 +771,11 @@ eap_attach(parent, self, aux)
 	pcireg_t csr;
 	mixer_ctrl_t ctl;
 	int i;
+	int revision;
 
 	sc->sc_1371 = 
 	    !(PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ENSONIQ_AUDIOPCI);
+	revision = PCI_REVISION(pa->pa_class);
 
 	/* Map I/O register */
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
@@ -856,7 +858,11 @@ eap_attach(parent, self, aux)
                 EWRITE4(sc, EAP_ICSC, 0);
                 EWRITE4(sc, E1371_LEGACY, 0);
 
-		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ENSONIQ_CT5880) {
+		/* It seems that revision 7 and greater of the AUDIOPCI 97
+		   are actually CT5880 */
+		if ((PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ENSONIQ_CT5880) ||
+		    ((PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ENSONIQ_AUDIOPCI97)
+			&& (revision >= 7))) {
 			EWRITE4(sc, EAP_ICSS, CT5880_AC97_RESET);
 
 			delay(20000);

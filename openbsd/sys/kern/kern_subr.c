@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_subr.c,v 1.12 2000/04/19 09:58:20 art Exp $	*/
+/*	$OpenBSD: kern_subr.c,v 1.16 2000/09/07 19:21:30 art Exp $	*/
 /*	$NetBSD: kern_subr.c,v 1.15 1996/04/09 17:21:56 ragge Exp $	*/
 
 /*
@@ -262,12 +262,13 @@ doshutdownhooks()
  */
 
 struct powerhook_desc {
-	LIST_ENTRY(powerhook_desc) sfd_list;
+	CIRCLEQ_ENTRY(powerhook_desc) sfd_list;
 	void	(*sfd_fn) __P((int, void *));
 	void	*sfd_arg;
 };
 
-LIST_HEAD(, powerhook_desc) powerhook_list;
+CIRCLEQ_HEAD(, powerhook_desc) powerhook_list =
+	CIRCLEQ_HEAD_INITIALIZER(powerhook_list);
 
 void *
 powerhook_establish(fn, arg)
@@ -283,7 +284,7 @@ powerhook_establish(fn, arg)
 
 	ndp->sfd_fn = fn;
 	ndp->sfd_arg = arg;
-	LIST_INSERT_HEAD(&powerhook_list, ndp, sfd_list);
+	CIRCLEQ_INSERT_HEAD(&powerhook_list, ndp, sfd_list);
 
 	return (ndp);
 }
@@ -295,15 +296,15 @@ powerhook_disestablish(vhook)
 #ifdef DIAGNOSTIC
 	struct powerhook_desc *dp;
 
-	for (dp = powerhook_list.lh_first; dp != NULL;
-	    dp = dp->sfd_list.le_next)
+	CIRCLEQ_FOREACH(dp, &powerhook_list, sfd_list)
                 if (dp == vhook)
 			break;
 	if (dp == NULL)
 		panic("powerhook_disestablish: hook not established");
 #endif
 
-	LIST_REMOVE((struct powerhook_desc *)vhook, sfd_list);
+	CIRCLEQ_REMOVE(&powerhook_list, (struct powerhook_desc *)vhook,
+		sfd_list);
 	free(vhook, M_DEVBUF);
 }
 
@@ -315,10 +316,17 @@ dopowerhooks(why)
 	int why;
 {
 	struct powerhook_desc *dp;
+	int s;
 
-	for (dp = LIST_FIRST(&powerhook_list); 
-	     dp != NULL; 
-	     dp = LIST_NEXT(dp, sfd_list)) {
-		(*dp->sfd_fn)(why, dp->sfd_arg);
+	s = splhigh();
+	if (why == PWR_RESUME) {
+		CIRCLEQ_FOREACH_REVERSE(dp, &powerhook_list, sfd_list) {
+			(*dp->sfd_fn)(why, dp->sfd_arg);
+		}
+	} else {
+		CIRCLEQ_FOREACH(dp, &powerhook_list, sfd_list) {
+			(*dp->sfd_fn)(why, dp->sfd_arg);
+		}
 	}
+	splx(s);
 }

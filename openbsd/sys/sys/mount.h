@@ -1,4 +1,4 @@
-/*	$OpenBSD: mount.h,v 1.35 2000/03/24 19:07:48 millert Exp $	*/
+/*	$OpenBSD: mount.h,v 1.37 2000/06/17 17:16:04 provos Exp $	*/
 /*	$NetBSD: mount.h,v 1.48 1996/02/18 11:55:47 fvdl Exp $	*/
 
 /*
@@ -317,6 +317,7 @@ struct ostatfs {
 #define	MOUNT_EXT2FS	"ext2fs"	/* Second Extended Filesystem */
 #define	MOUNT_NCPFS	"ncpfs"		/* NetWare Network File System */
 #define	MOUNT_XFS	"xfs"		/* xfs */
+#define	MOUNT_TCFS	"tcfs"		/* tcfs */
 
 /*
  * Structure per mounted file system.  Each mounted file system has an
@@ -402,7 +403,7 @@ struct mount {
  * Second level identifier specifies which filesystem. Second level
  * identifier VFS_GENERIC returns information about all filesystems.
  */
-#define	VFS_GENERIC		0	/* generic filesystem information */
+#define	VFS_GENERIC	0	/* generic filesystem information */
 /*
  * Third level identifiers for VFS_GENERIC are given below; third
  * level identifiers for specific filesystems are given in their
@@ -411,6 +412,13 @@ struct mount {
 #define VFS_MAXTYPENUM	1	/* int: highest defined filesystem type */
 #define VFS_CONF	2	/* struct: vfsconf for filesystem given
 				   as next argument */
+#define	VFSGEN_MAXID	3	/* max number of vfs.generic ids */
+
+#define	CTL_VFSGENCTL_NAMES { \
+	{ 0, 0 }, \
+	{ "maxtypenum", CTLTYPE_INT }, \
+	{ "conf", CTLTYPE_NODE } \
+}
 
 /*
  * Filesystem configuration information. One of these exists for each
