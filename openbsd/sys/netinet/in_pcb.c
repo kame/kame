@@ -514,6 +514,8 @@ in_pcbdisconnect(v)
 #ifdef INET6
 	case PF_INET6:
 		inp->inp_faddr6 = in6addr_any;
+		/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+		inp->inp_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 		break;
 #endif
 	case PF_INET:

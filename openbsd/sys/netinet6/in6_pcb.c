@@ -270,10 +270,12 @@ in6_pcbbind(inp, nam)
 		}
 		inp->inp_laddr6 = sin6->sin6_addr;
 
+#if 0
 		if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 			inp->inp_ipv6.ip6_flow = htonl(0x60000000) |
 			    (sin6->sin6_flowinfo & htonl(0x0fffffff));
 		}
+#endif
 	}
 
 	if (lport == 0) {
@@ -506,11 +508,11 @@ in6_pcbconnect(inp, nam)
 	}
 	inp->inp_faddr6 = sin6->sin6_addr;
 	inp->inp_fport = sin6->sin6_port;
-	/*
-	 * xxx kazu flowlabel is necessary for connect?
-	 * but if this line is missing, the garbage value remains.
-	 */
-	inp->inp_ipv6.ip6_flow = sin6->sin6_flowinfo;
+	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	inp->inp_flowinfo &= ~IPV6_FLOWLABEL_MASK;
+	if (inp->inp_flags & IN6P_AUTOFLOWLABEL)
+		inp->inp_flowinfo |=
+		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	in_pcbrehash(inp);
 	return(0);
 }
