@@ -1,3 +1,5 @@
+/*	$KAME: getnameinfo.c,v 1.35 2000/04/26 14:48:22 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.

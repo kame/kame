@@ -1,4 +1,5 @@
 /*	$NetBSD: getaddrinfo.c,v 1.37 2000/04/03 01:12:26 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.12 2000/04/26 14:49:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
