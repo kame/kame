@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.378 2004/03/10 10:25:13 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.379 2004/03/24 06:47:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3306,6 +3306,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 {
 	int error = 0;
 	int optlen;
+	struct icmp6_filter *p;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct inpcb *inp = sotoinpcb(so);
 	int level, op, optname;
@@ -3336,11 +3337,8 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	case PRCO_SETOPT:
 		switch (optname) {
 		case ICMP6_FILTER:
-		    {
-			struct icmp6_filter *p;
-
 			if (optlen != sizeof(*p)) {
-				error = EMSGSIZE;
+				error = EINVAL;
 				break;
 			}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -3361,7 +3359,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			error = 0;
 #endif
 			break;
-		    }
 
 		default:
 			error = ENOPROTOOPT;
@@ -3376,7 +3373,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	case PRCO_GETOPT:
 		switch (optname) {
 		case ICMP6_FILTER:
-		    {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			if (inp->in6p_icmp6filt == NULL) {
 				error = EINVAL;
@@ -3385,7 +3381,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			error = sooptcopyout(sopt, inp->in6p_icmp6filt,
 				sizeof(struct icmp6_filter));
 #else
-			struct icmp6_filter *p;
 
 			if (!in6p->in6p_icmp6filt) {
 				error = EINVAL;
@@ -3399,7 +3394,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			error = 0;
 #endif
 			break;
-		    }
 
 		default:
 			error = ENOPROTOOPT;
