@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2480 2003/09/29 03:11:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.2481 2003/09/29 04:15:46 jinmei Exp $
 
 <200309>
+2003-09-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: changed the default values of the DNS
+	(recursive) server address and the DNS search path options to
+	those officially assigned by IANA.  Though these values are still
+	configurable by autoconf to provide interoperability with old
+	implementations, it is recommended to use the standard values
+	whenever possible.
+	Note: the latest clients and servers built with the default
+	configuration are not interoperable with older KAME snaps in terms
+	of these options.
+
 2003-09-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/setkey/setkey.c (sysctldump): disabled this function
 	when KEYCTL_DUMPSA is undefined.  This change fixes the output
