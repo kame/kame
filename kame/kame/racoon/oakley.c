@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.83 2001/07/14 05:48:33 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.84 2001/07/14 06:16:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -321,6 +321,11 @@ oakley_prf(key, buf, iph1)
 		goto defs;
 	}
 
+#ifdef ENABLE_STATS
+    {
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	switch (iph1->approval->dh_group) {
 	default:
 		switch (iph1->approval->hashtype) {
@@ -341,6 +346,13 @@ defs:
 			break;
 		}
 	}
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
+		s_attr_isakmp_hash(iph1->approval->hashtype),
+		buf->l, timedelta(&start, &end));
+    }
+#endif
 
 	return res;
 }
@@ -363,6 +375,11 @@ oakley_hash(buf, iph1)
 		goto defs;
 	}
 
+#ifdef ENABLE_STATS
+    {
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	switch (iph1->approval->dh_group) {
 	default:
 		switch (iph1->approval->hashtype) {
@@ -385,6 +402,13 @@ defs:
 			break;
 		}
 	}
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
+		s_attr_isakmp_hash(iph1->approval->hashtype),
+		buf->l, timedelta(&start, &end));
+    }
+#endif
 
 	return res;
 }
@@ -2623,9 +2647,9 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	new = (cipher[iph1->approval->enctype].decrypt)(buf, iph1->key, ivdp->v);
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_enc(iph1->approval->enctype),
-		timedelta(&start, &end));
+		buf->l, timedelta(&start, &end));
     }
 #endif
 	vfree(buf);
@@ -2764,9 +2788,9 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	new = (cipher[iph1->approval->enctype].encrypt)(buf, iph1->key, ivep->v);
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%s): %8.6f", __FUNCTION__,
+	syslog(LOG_ALERT, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_enc(iph1->approval->enctype),
-		timedelta(&start, &end));
+		buf->l, timedelta(&start, &end));
     }
 #endif
 	vfree(buf);
