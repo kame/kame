@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2098 2002/03/03 12:32:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.2099 2002/03/10 11:00:33 jinmei Exp $
 
 <200203>
+2002-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c:
+	- made sure to attach packet addresses to every mbuf even after
+	  m_copy().
+	- added a supplement function m_copy_withpktaddrs() for this
+	  purpose.
+	Thanks to: "Konstantin KABASSANOV" <Konstantin.Kabassanov@lip6.fr>
+	for finding the problem and testing patches.
+
 2002-03-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/wru: added the -z option to specify the zone of the
 	destination, particularly for the default destination, ff02::1.
