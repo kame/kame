@@ -14,8 +14,8 @@ MASTER_SITE_SUBDIR=	Apache
 
 MAINTAINER=	sumikawa@kame.net
 
-BUILD_DEPENDS=	${LOCALBASE}/sbin/apxs:${PORTSDIR}/www/apache13
-RUN_DEPENDS=	${LOCALBASE}/sbin/apxs:${PORTSDIR}/www/apache13
+BUILD_DEPENDS=	${LOCALBASE}/sbin/apxs:../apache13
+RUN_DEPENDS=	${LOCALBASE}/sbin/apxs:../apache13
 
 USE_PERL5=	YES
 
