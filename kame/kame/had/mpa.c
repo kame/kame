@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.1 2003/04/11 11:21:39 t-momose Exp $	*/
+/*	$KAME: mpa.c,v 1.2 2003/04/23 10:03:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.1 2003/04/11 11:21:39 t-momose Exp $
+ * $Id: mpa.c,v 1.2 2003/04/23 10:03:34 keiichi Exp $
  */
 
 #include <sys/param.h>
@@ -64,6 +64,7 @@
 
 #include <kvm.h>
 #include <nlist.h>
+#include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <fcntl.h>
 #include <limits.h>
