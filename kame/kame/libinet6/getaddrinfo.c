@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.201 2004/11/30 10:23:12 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.202 2004/12/03 12:53:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -733,7 +733,6 @@ init(ac, flags)
 	struct addrconfig *ac;
 	int flags;
 {
-	int error;
 	int s;
 	struct ifaddrs *ifap0, *ifap;
 	struct sockaddr_in6 *sa6;
@@ -1708,8 +1707,6 @@ addrconfig(af, ac)
 	int af;
 	struct addrconfig *ac;
 {
-	int s;
-
 	switch (af) {
 	case AF_INET:
 		return (ac->inet_config);
@@ -4261,13 +4258,13 @@ _dns_getaddrinfo(pai, hostname, res, ac)
 	buf = malloc(sizeof(*buf));
 	if (!buf) {
 		h_errno = NETDB_INTERNAL;
-		return NULL;
+		return (EAI_SYSTEM);
 	}
 	buf2 = malloc(sizeof(*buf2));
 	if (!buf2) {
 		free(buf);
 		h_errno = NETDB_INTERNAL;
-		return NULL;
+		return (EAI_SYSTEM);
 	}
 
 	switch (pai->ai_family) {
@@ -4589,7 +4586,7 @@ res_queryN(name, target)
 		anslen = t->anslen;
 #ifdef DEBUG
 		if (_res.options & RES_DEBUG) {
-			printf(";; res_query(%s, %d, %d)\n",
+			printf(";; res_queryN(%s, %d, %d)\n",
 			    name, class, type);
 		}
 #endif
@@ -4599,7 +4596,7 @@ res_queryN(name, target)
 		if (n <= 0) {
 #ifdef DEBUG
 			if (_res.options & RES_DEBUG)
-				printf(";; res_query: mkquery failed\n");
+				printf(";; res_queryN: mkquery failed\n");
 #endif
 			h_errno = NO_RECOVERY;
 			return (n);
