@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.1 1999/08/10 00:13:15 itojun Exp $
+ * $Id: ip6fw.c,v 1.2 1999/08/10 00:19:15 itojun Exp $
  *
  */
 
@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -43,7 +44,7 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_fw.h>
-#include <netinet6/tcp6.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 
 int 		lineno = -1;
@@ -439,7 +440,7 @@ list(ac, av)
 			rulenum = strtoul(*av++, &endptr, 10);
 			if (*endptr) {
 				exitval = 1;
-				warn("invalid rule number: %s", av - 1);
+				warn("invalid rule number: %s", av[-1]);
 				continue;
 			}
 			seen = 0;
