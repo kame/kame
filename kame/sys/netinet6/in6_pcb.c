@@ -970,6 +970,17 @@ in6_pcbrtentry(in6p)
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)NULL;
 	}
+#ifdef __NetBSD__
+	if (ro->ro_rt == (struct rtentry *)NULL &&
+	    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_fsa.sin6_addr)) {
+		bzero(dst, sizeof(*dst));
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(struct sockaddr_in);
+		bcopy(&in6p->in6p_faddr.s6_addr32[3], &dst->sin_addr,
+		    sizeof(dst->sin_addr));
+		rtalloc((struct route *)ro);
+	} else
+#endif
 	if (ro->ro_rt == (struct rtentry *)NULL &&
 	    !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 		bzero(dst6, sizeof(*dst6));
@@ -981,17 +992,6 @@ in6_pcbrtentry(in6p)
 #endif
 		rtalloc((struct route *)ro);
 	}
-#ifdef __NetBSD__
-	else if (ro->ro_rt == (struct rtentry *)NULL &&
-	    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_fsa.sin6_addr)) {
-		bzero(dst, sizeof(*dst));
-		dst->sin_family = AF_INET;
-		dst->sin_len = sizeof(struct sockaddr_in);
-		bcopy(&in6p->in6p_faddr.s6_addr32[3], &dst->sin_addr,
-		    sizeof(dst->sin_addr));
-		rtalloc((struct route *)ro);
-	}
-#endif
 	return (ro->ro_rt);
 }
 
