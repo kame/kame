@@ -1,4 +1,4 @@
-/*	$KAME: halist.h,v 1.5 2003/02/18 09:57:07 t-momose Exp $	*/
+/*	$KAME: halist.h,v 1.6 2003/02/28 07:08:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.h,v 1.5 2003/02/18 09:57:07 t-momose Exp $
+ * $Id: halist.h,v 1.6 2003/02/28 07:08:06 t-momose Exp $
  */
 
 /*
@@ -181,6 +181,7 @@ void haif_prefix_add __P((struct hagent_ifinfo *, struct in6_addr *, u_int8_t));
 struct hagent_ifinfo *haif_find __P((int));
 struct hagent_ifinfo *haif_findwithanycast __P((struct in6_addr *, int *));
 struct hagent_ifinfo *haif_findwithunicast __P((struct in6_addr *, int *));
+struct hagent_ifinfo *haif_findwithhomeaddr __P((struct in6_addr *, int *));
 struct hagent_entry *hal_find __P((struct hagent_ifinfo *, struct in6_addr *));
 void haif_prefix_update __P((struct hagent_ifinfo *, struct in6_addr *,
 			     u_int8_t, u_int32_t));

@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.8 2003/02/20 04:31:20 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.9 2003/02/28 07:08:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.8 2003/02/20 04:31:20 t-momose Exp $
+ * $Id: haadisc.c,v 1.9 2003/02/28 07:08:06 t-momose Exp $
  */
 
 /*
@@ -170,8 +170,10 @@ static int reg_coa_pick __P((struct sockin6_addr_list *));
 static int pi_pick __P((struct in6_addr *, struct nd_opt_prefix_info *, struct hagent_ifinfo *, int));
 static int ha_pick __P((struct in6_addr *, struct in6_addr *, struct hagent_ifinfo *));
 static int prefix_dup_check __P((struct nd_opt_prefix_info *, struct hagent_gaddr *, int));
-static int kread __P((u_long addr, void *buf, int size));
 static int get_bc_list __P((struct mip6_bc_list *));
+static void examine_mpaexp_bc(void);
+static int kread __P((u_long addr, void *buf, int size));
+static int kwrite __P((u_long addr, void *buf, int size));
 
 struct nlist nl[] = {
 #define N_MIP6_BC_LIST      0
@@ -207,6 +209,10 @@ kvm_t *kvmd = NULL;
 
 #define KREAD(addr, buf, type) \
         kread((u_long)addr, (void *)buf, sizeof(type))
+#define KWRITE(addr, buf, type) \
+        kwrite((u_long)addr, (void *)buf, sizeof(type))
+#define min(a, b)	(((a) > (b)) ? (b) : (a))
+#define abs(a)		(((a) > 0) ? (a) : (-a))
 
 void
 usage()
@@ -230,6 +236,7 @@ main(argc, argv)
 {
     int ch, i;
     int daemonmode = 1;
+    int mpa = 0;
 
     fd_set fdset;
     int maxfd = 0;
@@ -252,13 +259,16 @@ main(argc, argv)
 
     openlog(__progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
-    while ((ch = getopt(argc, argv, "Df")) != -1) {
+    while ((ch = getopt(argc, argv, "Dfp")) != -1) {
 	switch (ch) {
 	case 'D':
 	    dump = 1;
 	    break;
 	case 'f':
 	    daemonmode = 0;
+	    break;
+	case 'p':
+	    mpa = 1;
 	    break;
 	default:
 	    usage();
@@ -327,7 +337,7 @@ main(argc, argv)
     timeout.tv_usec = 0;
     timeout.tv_sec = 1;
 
-    if ((kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, kvm_err)) == NULL) {
+    if ((kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDWR, kvm_err)) == NULL) {
         fprintf(stderr, "(%s)\n", kvm_err);
     }
     
@@ -357,6 +367,10 @@ main(argc, argv)
 	DPRINT("<x:main:select returned>\n");
 	if (FD_ISSET(sock, &select_fd)) {
 	    icmp6_recv();
+	}
+
+	if (mpa && (i == 0)) {
+	    examine_mpaexp_bc();
 	}
     }
     kvm_close(kvmd);
@@ -1057,10 +1071,13 @@ mpi_solicit_input(pi, coaddr, mps)
     int ifga_index = -1;
     struct hagent_ifinfo *haif;
     struct in6_addr ha_addr;
-    struct in6_addr hoaddr;
+    struct sockaddr_in6 hoaddr;
     struct in6_addr src;
     int error;
-    
+   
+    bzero(&hoaddr, sizeof(hoaddr)); 
+    hoaddr.sin6_family = AF_INET6;
+    hoaddr.sin6_len = sizeof(struct sockaddr_in6);
     ha_addr = pi->ipi6_addr;
     /* determine home link by global address */
     haif = haif_findwithunicast(&pi->ipi6_addr, &ifga_index);
@@ -1072,19 +1089,19 @@ mpi_solicit_input(pi, coaddr, mps)
 	
     /* Pick Home Agent Address */
     /* 1. pick Home Address by using registerd Care-of Address */
-    error = reg_hoa_pick(&coaddr->sin6_addr, &hoaddr);
+    error = reg_hoa_pick(&coaddr->sin6_addr, &hoaddr.sin6_addr);
     if (error) {
         bcopy(&ha_addr, &src, sizeof(struct in6_addr));
     } else {
         /* Home Address is found */
         /* 2. pick Home Agent address which registers Home Address */
         /* -- search the HA address whose prefix is same as HoA */
-        if (ha_pick(&hoaddr, &src, haif)) {
+        if (ha_pick(&hoaddr.sin6_addr, &src, haif)) {
             /* if HA is not found, copy the default address */
             bcopy(&ha_addr, &src, sizeof (struct in6_addr));
         }
     }
-    mpi_advert_output(coaddr, &src, haif, mps->mp_sol_id);
+    mpi_advert_output(&hoaddr, &src, haif, mps->mp_sol_id);
 err:
 }
 
@@ -1092,8 +1109,8 @@ err:
  * Send Mobile Prefix Advertisement message
  */
 void
-mpi_advert_output(coaddr, src, haif, id)
-    struct sockaddr_in6 *coaddr;
+mpi_advert_output(dst, src, haif, id)
+    struct sockaddr_in6 *dst;	/* home addr of destination MN */
     struct in6_addr *src;
     struct hagent_ifinfo *haif;
     u_int16_t id;
@@ -1133,8 +1150,8 @@ mpi_advert_output(coaddr, src, haif, id)
 
     map->mp_adv_cksum = 0;
     map->mp_adv_id = id;
-    sndmhdr.msg_name = (caddr_t)coaddr;
-    sndmhdr.msg_namelen = coaddr->sin6_len;
+    sndmhdr.msg_name = (caddr_t)dst;
+    sndmhdr.msg_namelen = dst->sin6_len;
     sndmhdr.msg_iov[0].iov_base = (caddr_t)buf;
     sndmhdr.msg_iov[0].iov_len = len;
 
@@ -1403,6 +1420,66 @@ err:
     return -1;
 }
 
+/*	This function should be reconsidered */
+static void
+examine_mpaexp_bc()
+{
+    int index;
+    time_t time_second;
+    int32_t max_sched_delay;
+    u_int32_t rand_adv_delay;
+    struct in6_addr *hagent_addr;
+    struct hagent_ifinfo *haif;
+    struct hagent_entry *hal;
+    struct hagent_gaddr *galp;
+    struct mip6_bc *mbc, mip6_bc;
+    struct mip6_bc_list mip6_bc_list;
+    
+    if (get_bc_list(&mip6_bc_list))
+	return;
+    if (time(&time_second) == -1)
+	return;
+    
+    for (mbc = LIST_FIRST(&mip6_bc_list);
+         mbc;
+         mbc = LIST_NEXT(&mip6_bc, mbc_entry)) {
+        if (KREAD(mbc, &mip6_bc, mip6_bc))
+            return;
+        if ((mip6_bc.mbc_flags & IP6MU_HOME) == 0)
+	    continue;
+
+	if (mip6_bc.mbc_mpa_exp > time_second)
+	    continue;
+
+    	if ((haif = haif_findwithhomeaddr(&mip6_bc.mbc_phaddr.sin6_addr, &index)) == NULL)
+	    continue;
+
+	hagent_addr = &((struct sockaddr_in6 *)(haif->haif_gavec[index].global->ifa_addr))->sin6_addr;
+
+	for (hal = &haif->halist_pref; hal; hal = hal->hagent_next_pref) {
+	    for (galp = hal->hagent_galist.hagent_next_gaddr;
+		 galp; galp = galp->hagent_next_gaddr) {
+		if (IN6_ARE_ADDR_EQUAL(&(galp->hagent_gaddr), hagent_addr))
+		    break;
+	    }
+	    if (galp)
+		break;
+	}
+	if (!galp)
+	    return;
+
+	/* Sending MPA */
+        mpi_advert_output(&mip6_bc.mbc_phaddr, hagent_addr, haif, 0);
+
+	/* Update mpa expiration time */
+	/* XXX ; These constants should be custamized  */
+	max_sched_delay = min(MIP6_MAX_MOB_PFX_ADV_INTERVAL, galp->hagent_pltime);
+	rand_adv_delay = MIP6_MIN_MOB_PFX_ADV_INTERVAL
+			 + (random() % abs(max_sched_delay - MIP6_MAX_MOB_PFX_ADV_INTERVAL));
+	mip6_bc.mbc_mpa_exp = time_second + rand_adv_delay;
+	KWRITE(&mbc->mbc_mpa_exp, mip6_bc.mbc_mpa_exp, mip6_bc.mbc_mpa_exp);
+    }
+}
 
 int
 kread(addr, buf, size)
@@ -1411,6 +1488,20 @@ kread(addr, buf, size)
     int size;
 {
     if (kvm_read(kvmd, addr, buf, size) != size) {
+        fprintf(stderr, "%s\n", kvm_geterr(kvmd));
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+kwrite(addr, buf, size)
+    u_long addr;
+    void *buf;
+    int size;
+{
+    if (kvm_write(kvmd, addr, buf, size) != size) {
         fprintf(stderr, "%s\n", kvm_geterr(kvmd));
         return -1;
     }

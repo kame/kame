@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.5 2003/02/20 04:31:20 t-momose Exp $	*/
+/*	$KAME: halist.c,v 1.6 2003/02/28 07:08:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.5 2003/02/20 04:31:20 t-momose Exp $
+ * $Id: halist.c,v 1.6 2003/02/28 07:08:06 t-momose Exp $
  */
 
 /*
@@ -934,6 +934,29 @@ haif_findwithunicast(ha_addr, index)
 	        IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)(ifap->ifa_addr))->sin6_addr,
 				   ha_addr))
 		{
+		    *index = j;
+		    return &haifinfo_tab[i];
+		}
+	}
+    }
+    return NULL;
+}
+
+struct hagent_ifinfo *
+haif_findwithhomeaddr(hoa_addr, index)
+    struct in6_addr *hoa_addr;
+    int *index;
+{
+    int i, j;
+    struct ifaddrs *ifap;
+
+    for (i = 0; i < ifnum; ++i) {
+	for (j = 0; j < haifinfo_tab[i].gavec_used; ++j) {
+	    ifap = haifinfo_tab[i].haif_gavec[j].global;
+	    /* find the information on interface unicast address */
+	    if (IN6_ARE_ADDR_MASKEQUAL(*hoa_addr, 
+				       ((struct sockaddr_in6 *)(ifap->ifa_netmask))->sin6_addr,
+				       ((struct sockaddr_in6 *)(ifap->ifa_addr))->sin6_addr)) {
 		    *index = j;
 		    return &haifinfo_tab[i];
 		}

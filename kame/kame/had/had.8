@@ -1,4 +1,4 @@
-.\"	$KAME: had.8,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $
+.\"	$KAME: had.8,v 1.2 2003/02/28 07:08:06 t-momose Exp $
 .\"
 .\" Copyright (C) 2001 WIDE Project.
 .\" All rights reserved.
@@ -27,7 +27,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: had.8,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $
+.\"	$Id: had.8,v 1.2 2003/02/28 07:08:06 t-momose Exp $
 .\"
 .\" Copyright (C) 2000 NEC Corporation. All rights reserved.
 .\"
@@ -64,7 +64,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm had
-.Op Fl Df
+.Op Fl Dfp
 .Ar interface ...
 .\"
 .Sh DESCRIPTION
@@ -92,6 +92,8 @@ In foreground mode,
 warning messages are generated to standard error
 instead of
 .Xr syslog 3 .
+.It Fl p
+Send unsolcited Mobile Prefix Advertisement to the addresses of all of Binding cache entries periodically.
 .El
 .\"
 .Sh FILES
