@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.202 2001/03/01 16:15:52 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.203 2001/03/08 00:17:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3176,7 +3176,6 @@ icmp6_mtudisc_clone(dst)
 		    RTF_GATEWAY | RTF_HOST | RTF_DYNAMIC, &nrt);
 		if (error) {
 			rtfree(rt);
-			rtfree(nrt);
 			return NULL;
 		}
 		nrt->rt_rmx = rt->rt_rmx;
