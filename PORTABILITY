@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.59 2001/05/08 00:09:19 itojun Exp $
+	$KAME: PORTABILITY,v 1.60 2001/05/08 05:54:14 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -330,8 +330,8 @@ across those possibilities.
   between KAME-based systems and openbsd systems.  take caution if you plan to
   use it.
 
-- getopt(3) returns -1 on openbsd, and EOF on other platforms.  This was due
-  to POSIX changes (POSIX.2 uses -1 and is more recent).
+- getopt(3) returns -1 on openbsd/netbsd, and EOF on other platforms.  This was
+  due to POSIX changes (POSIX.2 uses -1 and is more recent).
   Since EOF is usually defined to be -1, it is not a major issue.
 
 - SECURITY: Never use printf-like functions (including syslog, setproctitle
