@@ -6,15 +6,15 @@
 #
 
 PORTNAME=	mnews
-PORTVERSION=	1.22
+PORTVERSION=	1.22.pl4
 PKGNAMEPREFIX=	ja-
-CATEGORIES=	japanese news
-MASTER_SITES=	ftp://ftp.leo.chubu.ac.jp/pub/network/mnews/
-DISTNAME=	mnews122
+CATEGORIES=	japanese news ipv6
+MASTER_SITES=	ftp://ftp.leo.chubu.ac.jp/.mnews-beta/
+DISTNAME=	mnews122PL4
 
-MAINTAINER=	seiken@ARGV.AC
+MAINTAINER=	sumikawa@kame.net
 
-WRKSRC=		${WRKDIR}/mnews-1.22/build
+WRKSRC=		${WRKDIR}/mnews-1.22PL4/build
 #.ifdef (USE_INET6)
 MAKE_ENV	= USE_INET6=1
 #.endif
