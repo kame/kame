@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.110 2000/08/15 01:57:10 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.111 2000/08/15 02:24:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2189,6 +2189,7 @@ sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
 	/* clear all statistics */
 	for (i = 0; i < IP6_PERFORM_LOGSIZE; i++) {
 		ip6_performance_log[i] = 0;
+		ip6_performance_log2[i] = 0;
 	}
 	ip6_logentry = 0;
 
