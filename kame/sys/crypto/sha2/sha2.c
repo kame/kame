@@ -1,4 +1,4 @@
-/*	$KAME: sha2.c,v 1.8 2001/11/08 01:07:52 itojun Exp $	*/
+/*	$KAME: sha2.c,v 1.9 2003/07/20 00:28:38 itojun Exp $	*/
 
 /*
  * sha2.c
@@ -1044,4 +1044,3 @@ char* SHA384_Data(const sha2_byte* data, size_t len, char digest[SHA384_DIGEST_S
 	SHA384_Update(&context, data, len);
 	return SHA384_End(&context, digest);
 }
-

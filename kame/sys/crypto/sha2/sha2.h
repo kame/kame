@@ -1,4 +1,4 @@
-/*	$KAME: sha2.h,v 1.3 2001/03/12 08:27:48 itojun Exp $	*/
+/*	$KAME: sha2.h,v 1.4 2003/07/20 00:28:38 itojun Exp $	*/
 
 /*
  * sha2.h
@@ -137,4 +137,3 @@ char* SHA512_Data __P((const u_int8_t*, size_t, char[SHA512_DIGEST_STRING_LENGTH
 #endif /* __cplusplus */
 
 #endif /* __SHA2_H__ */
-
