@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.251 2001/12/21 04:34:37 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.252 2001/12/21 06:26:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1881,6 +1881,17 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 #ifdef HAVE_NRL_INPCB
 	struct inpcb *inp = sotoinpcb(so);
+#define in6p inp
+#define in6p_socket inp_socket
+#define in6p_inputopts inp_inputopts6
+#define in6p_outputopts inp_outputopts6
+#define in6p_hops inp_hops
+#define in6p_lport inp_lport
+#define in6p_laddr inp_laddr6
+#define in6p_faddr inp_faddr6
+#define in6p_moptions inp_moptions6
+#define in6p_flags inp_flags
+#define in6p_route inp_route
 #else
 	struct in6pcb *in6p = sotoin6pcb(so);
 #endif
@@ -1900,18 +1911,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	privileged = (p == 0 || suser(p)) ? 0 : 1;
 #else
-#ifdef HAVE_NRL_INPCB
-	privileged = (inp->inp_socket->so_state & SS_PRIV);
-#else
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
 #endif
-#endif
-
-#if defined(HAVE_NRL_INPCB)
-	rcvopts = inp->inp_inputopts6;
-#else
 	rcvopts = in6p->in6p_inputopts;
-#endif
 
 	if (level == IPPROTO_IPV6) {
 		switch (op) {
@@ -1940,13 +1942,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 						    m, so, sopt);
 				m_freem(m); /* XXX */
 #else
-#ifdef HAVE_NRL_INPCB
-				error = ip6_pcbopts(&inp->inp_outputopts6,
-						    m, so);
-#else
 				error = ip6_pcbopts(&in6p->in6p_outputopts,
 						    m, so);
-#endif /* HAVE_NRL_INPCB */
 #endif /* FreeBSD >= 3 */
 				break;
 			}
@@ -2006,36 +2003,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 						error = EINVAL;
 					else {
 						/* -1 = kernel default */
-#ifdef HAVE_NRL_INPCB
-						inp->inp_hops = optval;
-#else
 						in6p->in6p_hops = optval;
-
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 						if ((in6p->in6p_vflag &
 						     INP_IPV4) != 0)
 							in6p->inp_ip_ttl = optval;
 #endif
-#endif
 					}
 					break;
-#ifdef HAVE_NRL_INPCB
-#define OPTSET(bit) \
-do { \
-	if (optval) \
-		inp->inp_flags |= (bit); \
-	else \
-		inp->inp_flags &= ~(bit); \
-} while (0)
-#define OPTSET2292(bit) \
-do { \
-	inp->inp_flags |= IN6P_RFC2292; \
-	if (optval) \
-		inp->inp_flags |= (bit); \
-	else \
-		inp->inp_flags &= ~(bit); \
-} while (0)
-#else /* HAVE_NRL_INPCB */
 #define OPTSET(bit) \
 do { \
 	if (optval) \
@@ -2051,12 +2026,7 @@ do { \
 	else \
 		in6p->in6p_flags &= ~(bit); \
 } while (0)
-#endif /* HAVE_NRL_INPCB */
-#ifdef HAVE_NRL_INPCB
-#define OPTBIT(bit) (inp->inp_flags & (bit) ? 1 : 0)
-#else
 #define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
-#endif
 
 				case IPV6_RECVPKTINFO:
 					/* cannot mix with RFC2292 */
@@ -2149,11 +2119,7 @@ do { \
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				case IPV6_CHECKSUM:
-#ifdef HAVE_NRL_INPCB
-					inp->in6p_cksum = optval;
-#else
 					in6p->in6p_cksum = optval;
-#endif
 					break;
 #endif
 
@@ -2175,13 +2141,8 @@ do { \
 					 * available only prior to bind(2).
 					 * see ipng mailing list, Jun 22 2001.
 					 */
-#ifdef HAVE_NRL_INPCB
-					if (inp->inp_lport ||
-					    !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-#else
 					if (in6p->in6p_lport ||
 					    !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
-#endif
 					{
 						error = EINVAL;
 						break;
@@ -2235,11 +2196,7 @@ do { \
 #else
 				tclass = *mtod(m, u_int8_t *);
 #endif
-#ifdef HAVE_NRL_INPCB
-				optp = &inp->inp_outputopts6;
-#else
 				optp = &in6p->in6p_outputopts;
-#endif
 				error = ip6_pcbopt(optname,
 						   (u_char *)&tclass,
 						   sizeof(tclass),
@@ -2264,11 +2221,7 @@ do { \
 #endif
 				{
 					struct ip6_pktopts **optp;
-#ifdef HAVE_NRL_INPCB
-					optp = &inp->inp_outputopts6;
-#else
 					optp = &in6p->in6p_outputopts;
-#endif
 					error = ip6_pcbopt(optname,
 							   (u_char *)&optval,
 							   sizeof(optval),
@@ -2366,13 +2319,7 @@ do { \
 					optlen = 0;
 				}
 #endif
-
-#ifdef HAVE_NRL_INPCB
-				optp = &inp->inp_outputopts6;
-#else
 				optp = &in6p->in6p_outputopts;
-#endif
-
 				error = ip6_pcbopt(optname,
 						   optbuf, optlen,
 						   optp, privileged);
@@ -2407,16 +2354,12 @@ do { \
 				(void)m_free(m);
 			    }
 #else
-#ifdef HAVE_NRL_INPCB
 				error =	ip6_setmoptions(optname,
-					&inp->inp_moptions6, m);
+							&in6p->in6p_moptions,
+							m);
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
-				if (inp->inp_moptions6 != NULL)
-					inp->inp_flags |= INP_IPV6_MCAST; /* XXX */
-#endif
-#else
-				error =	ip6_setmoptions(optname,
-					&in6p->in6p_moptions, m);
+				if (in6p->in6p_moptions != NULL)
+					in6p->in6p_flags |= INP_IPV6_MCAST; /* XXX */
 #endif
 #endif
 				break;
@@ -2432,10 +2375,6 @@ do { \
 				optval = *mtod(m, int *);
 #endif
 
-#ifdef HAVE_NRL_INPCB
-# define in6p		inp
-# define in6p_flags	inp_flags
-#endif
 				switch (optval) {
 				case IPV6_PORTRANGE_DEFAULT:
 					in6p->in6p_flags &= ~(IN6P_LOWPORT);
@@ -2456,10 +2395,6 @@ do { \
 					error = EINVAL;
 					break;
 				}
-#ifdef HAVE_NRL_INPCB
-# undef in6p
-# undef in6p_flags
-#endif
 				break;
 #endif
 
@@ -2565,13 +2500,8 @@ do { \
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
-#ifdef HAVE_NRL_INPCB
-				error = ipsec6_set_policy(inp, optname, req,
-							  len, privileged);
-#else
 				error = ipsec6_set_policy(in6p, optname, req,
 							  len, privileged);
-#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				m_freem(m);
 #endif
@@ -2643,14 +2573,6 @@ do { \
 						m_freem(m);
 				} else
 					sopt->sopt_valsize = 0;
-#elif defined(HAVE_NRL_INPCB)
-				if (inp->inp_options) {
-					*mp = m_copym(inp->inp_options, 0,
-						      M_COPYALL, M_WAIT);
-				} else {
-					*mp = m_get(M_WAIT, MT_SOOPTS);
-					(*mp)->m_len = 0;
-				}
 #else
 				if (in6p->in6p_inputopts &&
 				    in6p->in6p_inputopts->head) {
@@ -2693,11 +2615,7 @@ do { \
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
-#ifdef HAVE_NRL_INPCB
-					optval = inp->inp_hops;
-#else
 					optval = in6p->in6p_hops;
-#endif
 					break;
 
 				case IPV6_RECVPKTINFO:
@@ -2722,11 +2640,7 @@ do { \
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				case IPV6_CHECKSUM:
-#ifdef HAVE_NRL_INPCB
-					optval = inp->in6p_cksum;
-#else
 					optval = in6p->in6p_cksum;
-#endif
 					break;
 #endif
 
@@ -2754,11 +2668,7 @@ do { \
 				case IPV6_PORTRANGE:
 				    {
 					int flags;
-#ifdef HAVE_NRL_INPCB
-					flags = inp->inp_flags;
-#else
 					flags = in6p->in6p_flags;
-#endif
 					if (flags & IN6P_HIGHPORT)
 						optval = IPV6_PORTRANGE_HIGH;
 					else if (flags & IN6P_LOWPORT)
@@ -2771,15 +2681,11 @@ do { \
 				case IPV6_RECVTCLASS:
 					optval = OPTBIT(IN6P_TCLASS);
 					break;
+
 				case IPV6_AUTOFLOWLABEL:
 					optval = OPTBIT(IN6P_AUTOFLOWLABEL);
 					break;
-#ifdef HAVE_NRL_INPCB
-#define in6p inp
-#define in6p_outputopts inp_outputopts6
-#define in6p_route inp_route6
-#define in6p_faddr inp_faddr6
-#endif
+
 				case IPV6_TCLASS:
 				case IPV6_DONTFRAG:
 					error = ip6_getpcbopt(in6p->in6p_outputopts,
@@ -2944,8 +2850,6 @@ do { \
 						mtod(m, char *), m->m_len);
 				m_freem(m);
 			    }
-#elif defined(HAVE_NRL_INPCB)
-				error = ip6_getmoptions(optname, inp->inp_moptions6, mp);
 #else
 				error = ip6_getmoptions(optname, in6p->in6p_moptions, mp);
 #endif
@@ -3025,11 +2929,7 @@ do { \
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
-#ifdef HAVE_NRL_INPCB
-				error = ipsec6_get_policy(inp, req, len, mp);
-#else
 				error = ipsec6_get_policy(in6p, req, len, mp);
-#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /* XXX */
@@ -3081,6 +2981,20 @@ do { \
 #endif
 	}
 	return(error);
+
+#ifdef HAVE_NRL_INPCB
+#undef in6p
+#undef in6p_socket
+#undef in6p_inputopts
+#undef in6p_outputopts
+#undef in6p_hops
+#undef in6p_lport
+#undef in6p_laddr
+#undef in6p_faddr
+#undef in6p_moptions
+#undef in6p_flags
+#undef in6p_route
+#endif
 }
 
 /*
