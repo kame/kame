@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.64 2001/06/23 03:07:48 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.65 2001/06/23 03:11:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1468,6 +1468,7 @@ relay_icmp6(sd, buf, len, from)
 	struct addrinfo hints, *res;
 	int error;
 	char icmp6buf[RECVBUFSIZ];
+	u_int16_t qtype, qclass;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1479,8 +1480,9 @@ relay_icmp6(sd, buf, len, from)
 		free((char *)n);
 		return -1;
 	}
-	if (ntohs(*(u_int16_t *)&d[0]) != T_AAAA ||
-	    ntohs(*(u_int16_t *)&d[2]) != C_IN) {
+	qtype = ntohs(*(u_int16_t *)&d[0]);
+	qclass = ntohs(*(u_int16_t *)&d[2]);
+	if (!(qtype == T_AAAA && qclass == C_IN)) {
 		/* LINTED const cast */
 		free((char *)n);
 		return -1;
