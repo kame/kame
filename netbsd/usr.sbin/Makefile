@@ -8,6 +8,7 @@ SUBDIR+=natptconfig natptd natptlog
 SUBDIR+=pvcsif pvctxctl
 SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
+SUBDIR+=racoon
 
 #SUBDIR+=mip6config mip6stat
 
