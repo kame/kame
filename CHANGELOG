@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2394 2003/05/09 04:16:33 suz Exp $
+$KAME: CHANGELOG,v 1.2395 2003/05/09 05:22:26 suz Exp $
 
 <200305>
+Fri May  9 14:19:07 JST 2003	suz@crl.hitachi.co.jp
+	* kame/pim6[sd]d: moved the default location of the configuration file
+	  from /usr/local/v6/etc/... to /etc/...,  for the convenience of
+	  ports/pkgsrc maintenance.
+
+	  People using pim6[sd]d MUST move their pim6[sd]d configuration file 
+	  to /etc.
+
 Fri May  9 13:09:00 JST 2003	suz@crl.hitachi.co.jp
 	* kame/pim6sd/cfparse.y: fixed a bug that cand_bsr or cand_rp 
 	configuration is regarded as a syntax error (introduced by 
