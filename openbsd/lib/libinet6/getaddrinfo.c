@@ -1,5 +1,5 @@
 /*	$OpenBSD: getaddrinfo.c,v 1.23 2000/05/15 10:49:55 itojun Exp $	*/
-/*	$KAME: getaddrinfo.c,v 1.35 2001/01/05 16:00:14 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.36 2001/01/05 16:35:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -309,12 +309,10 @@ getaddrinfo(hostname, servname, hints, res)
 	struct addrinfo sentinel;
 	struct addrinfo *cur;
 	int error = 0;
-	struct addrinfo ai;
-	struct addrinfo ai0;
+	struct addrinfo ai, ai0, *afai;
 	struct addrinfo *pai;
 	const struct afd *afd;
 	const struct explore *ex;
-	struct addrinfo *afai[sizeof(afdl)/sizeof(afdl[0])];
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -470,22 +468,35 @@ getaddrinfo(hostname, servname, hints, res)
 
 	/*
 	 * hostname as alphabetical name.
-	 * we would like to prefer AF_INET6 than AF_INET, so we'll make a
+	 * first, try to query DNS for all possible address families.
+	 */
+	*pai = ai0;
+	error = explore_fqdn(pai, hostname, servname, &afai);
+	if (error) {
+		/* in this case, afai must be NULL. */
+		goto free;
+	}
+
+	/*
+	 * we would like to prefer AF_INET6 than AF_INET, so we'll make an
 	 * outer loop by AFs.
 	 */
-
-	/* first, try to query DNS */
-	memset(afai, 0, sizeof(afai));
-	*pai = ai0;
-	error = explore_fqdn(pai, hostname, servname, &afai[0]);
-	if (error)
-		goto free;
-
-	for (afd = afdl; afd->a_af; afd++) {
+	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
-		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
+		if (pai->ai_family == PF_UNSPEC)
+			pai->ai_family = ex->e_af;
+
+		if (!MATCH_FAMILY(pai->ai_family, ex->e_af, WILD_AF(ex)))
 			continue;
+		if (!MATCH(pai->ai_socktype, ex->e_socktype,
+			   WILD_SOCKTYPE(ex))) {
+			continue;
+		}
+		if (!MATCH(pai->ai_protocol, ex->e_protocol,
+			   WILD_PROTOCOL(ex))) {
+			continue;
+		}
 
 #ifdef AI_ADDRCONFIG
 		/*
@@ -493,43 +504,31 @@ getaddrinfo(hostname, servname, hints, res)
 		 * expected to return the address family or not.
 		 */
 		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
-		    !addrconfig(afd->a_af))
+		    !addrconfig(pai->ai_family))
 			continue;
 #endif
 
-		for (ex = explore; ex->e_af >= 0; ex++) {
-			*pai = ai0;
+		if (pai->ai_family == PF_UNSPEC)
+			pai->ai_family = ex->e_af;
+		if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
+			pai->ai_socktype = ex->e_socktype;
+		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
+			pai->ai_protocol = ex->e_protocol;
 
-			if (pai->ai_family == PF_UNSPEC)
-				pai->ai_family = afd->a_af;
+		/*
+		 * if the servname does not match socktype/protocol, ignore it.
+		 */
+		if (get_portmatch(pai, servname) != 0)
+			continue;
 
-			if (!MATCH_FAMILY(pai->ai_family, ex->e_af,
-			    WILD_AF(ex)))
-				continue;
-			if (!MATCH(pai->ai_socktype, ex->e_socktype,
-			    WILD_SOCKTYPE(ex))) {
-				continue;
-			}
-			if (!MATCH(pai->ai_protocol, ex->e_protocol,
-			    WILD_PROTOCOL(ex))) {
-				continue;
-			}
+		error = explore_copy(pai, afai, &cur->ai_next);
 
-			if (pai->ai_family == PF_UNSPEC)
-				pai->ai_family = ex->e_af;
-			if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
-				pai->ai_socktype = ex->e_socktype;
-			if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
-				pai->ai_protocol = ex->e_protocol;
-
-			error = explore_copy(pai, afai[0], &cur->ai_next);
-
-			while (cur && cur->ai_next)
-				cur = cur->ai_next;
-		}
+		while (cur && cur->ai_next)
+			cur = cur->ai_next;
 	}
 
-	freeaddrinfo(afai[0]);
+	if (afai != NULL)
+		freeaddrinfo(afai);
 
 	/* XXX */
 	if (sentinel.ai_next)
@@ -539,14 +538,14 @@ getaddrinfo(hostname, servname, hints, res)
 		goto free;
 	if (error == 0) {
 		if (sentinel.ai_next) {
- good:
+good:
 			*res = sentinel.ai_next;
 			return SUCCESS;
 		} else
 			error = EAI_FAIL;
 	}
- free:
- bad:
+free:
+bad:
 	if (sentinel.ai_next)
 		freeaddrinfo(sentinel.ai_next);
 	*res = NULL;
@@ -1117,7 +1116,7 @@ ip6_str2scopeid(scope, sin6)
 		goto trynumeric;	/* global */
 
 	/* try to convert to a numeric id as a last resort */
-  trynumeric:
+trynumeric:
 	scopeid = (int)strtoul(scope, &ep, 10);
 	if (*ep == '\0')
 		return scopeid;
@@ -1422,7 +1421,7 @@ _gethtent(name, pai)
 
 	if (!hostf && !(hostf = fopen(_PATH_HOSTS, "r" )))
 		return (NULL);
- again:
+again:
 	if (!(p = fgets(hostbuf, sizeof hostbuf, hostf)))
 		return (NULL);
 	if (*p == '#')

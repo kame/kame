@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.84 2001/01/05 16:23:26 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.85 2001/01/05 16:35:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -560,14 +560,14 @@ getaddrinfo(hostname, servname, hints, res)
 		goto free;
 	if (error == 0) {
 		if (sentinel.ai_next) {
- good:
+good:
 			*res = sentinel.ai_next;
 			return SUCCESS;
 		} else
 			error = EAI_FAIL;
 	}
- free:
- bad:
+free:
+bad:
 	if (sentinel.ai_next)
 		freeaddrinfo(sentinel.ai_next);
 	*res = NULL;
@@ -1220,7 +1220,7 @@ ip6_str2scopeid(scope, sin6)
 		goto trynumeric;	/* global */
 
 	/* try to convert to a numeric id as a last resort */
-  trynumeric:
+trynumeric:
 	scopeid = (int)strtoul(scope, &ep, 10);
 	if (*ep == '\0')
 		return scopeid;
