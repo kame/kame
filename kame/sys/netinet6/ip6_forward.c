@@ -27,8 +27,9 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __FreeBSD__
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include "opt_ip6fw.h"
+#include "opt_inet.h"
 #endif
 
 #include <sys/param.h>

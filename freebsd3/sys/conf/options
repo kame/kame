@@ -235,6 +235,7 @@ INET6			opt_inet.h
 IPSEC			opt_inet.h
 IPSEC_ESP		opt_inet.h
 IPSEC_DEBUG		opt_inet.h
+IPSEC_IPV6FWD		opt_inet.h
 MAPPED_ADDR_ENABLED	opt_inet.h
 IPDIVERT
 DUMMYNET		opt_ipdn.h
