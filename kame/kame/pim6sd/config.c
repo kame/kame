@@ -797,7 +797,7 @@ parse_group_prefix(char *s)
 
 	w=strtok(w,"/");
 	
-	if ( inet_pton(AF_INET6,w,(void *)&group_addr) <1 )
+	if ( inet_pton(AF_INET6,w,(void *)&group_addr) != 1 )
 	{
 		log(LOG_WARNING, 0,
 		    "Config error in %s : Bad ddress formatt.Ignoring..",

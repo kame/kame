@@ -141,13 +141,13 @@ void init_pim6()
 	allpim6routers_group.sin6_len = sizeof(allpim6routers_group);
 	allpim6routers_group.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, "ff02::d",
-		      (void *)&allpim6routers_group.sin6_addr) < 1 )
+		      (void *)&allpim6routers_group.sin6_addr) != 1 )
 		log(LOG_ERR, 0, "inet_pton failed for ff02::d");
 	memset(&sockaddr6_d, 0, sizeof(sockaddr6_d));
 	sockaddr6_d.sin6_len = sizeof(sockaddr6_d);
 	sockaddr6_d.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, "ff00::",
-		      (void *)&sockaddr6_d.sin6_addr) < 1)
+		      (void *)&sockaddr6_d.sin6_addr) != 1)
 		log(LOG_ERR, 0, "inet_pton failed for ff00::");
 
 	/* specify to tell receiving interface */

@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.2 1999/09/12 17:00:08 jinmei Exp $
+ *  $Id: mld6.c,v 1.3 1999/10/26 08:39:19 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -139,7 +139,7 @@ init_mld6()
     /* address initialization */
     allnodes_group.sin6_addr = in6addr_linklocal_allnodes;
     if (inet_pton(AF_INET6, "ff02::2",
-		  (void *) &allrouters_group.sin6_addr) < 1)
+		  (void *) &allrouters_group.sin6_addr) != 1)
 	log(LOG_ERR, 0, "inet_pton failed for ff02::2");
 
     /* filter all non-MLD ICMP messages */

@@ -434,7 +434,7 @@ getprefix(const char *prefix, int which)
 	sin->sin6_len = sizeof(*sin);
 	sin->sin6_family = AF_INET6;
 
-        if (inet_pton(AF_INET6, prefix, &sin->sin6_addr) <= 0)
+        if (inet_pton(AF_INET6, prefix, &sin->sin6_addr) != 1)
 		errx(1, "%s: bad value", prefix);
 }
 

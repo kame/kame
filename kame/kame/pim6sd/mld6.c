@@ -156,7 +156,7 @@ init_mld6()
     /* address initialization */
     allnodes_group.sin6_addr = in6addr_linklocal_allnodes;
     if (inet_pton(AF_INET6, "ff02::2",
-		  (void *) &allrouters_group.sin6_addr) < 1)
+		  (void *) &allrouters_group.sin6_addr) != 1)
 	log(LOG_ERR, 0, "inet_pton failed for ff02::2");
 
     /* filter all non-MLD ICMP messages */
