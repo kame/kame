@@ -1,4 +1,4 @@
-$Id: question,v 1.14 2000/09/19 21:00:24 itojun Exp $
+$Id: question,v 1.15 2000/09/20 14:54:01 sakane Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -382,6 +382,13 @@ Q: subjectAltName and ID
 		IDがDN以外 -> subjectAltName
 	win2KのCAにsubjectaltnameを設定してサインしてもらう方法がわからない。
 	sshはWEBから subjectaltnameを入れられる。
+
+Q: IP address of subjectAltName and of real entity.
+	There are two subjectAltName, email and IP address, in the certificate.
+	ID payload includes USER-FQDN, and same to email address of
+	subjectAltName.
+	If IP address of subjectAltName is different from the real entity's
+	IP address.  What should we do ?
 
 Q: commit bit
 	who will set the commit bit?  when?
