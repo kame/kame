@@ -1,0 +1,11 @@
+--- lib/krb5/addr_families.c.orig	Sun Nov 29 16:39:59 1998
++++ lib/krb5/addr_families.c	Tue Aug 24 02:06:36 1999
+@@ -159,7 +159,7 @@
+ #ifdef IN6_EXTRACT_V4ADDR
+ #define IN6_ADDR_V6_TO_V4(x) (&IN6_EXTRACT_V4ADDR(x))
+ #else
+-#define IN6_ADDR_V6_TO_V4(x) ((struct in_addr *)&(x)->s6_addr32[3])
++#define IN6_ADDR_V6_TO_V4(x) ((struct in_addr *)&(x)->s6_addr[12])
+ #endif
+ #endif
+ 	memcpy (buf, IN6_ADDR_V6_TO_V4(&sin6->sin6_addr), 4);
