@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.75 2000/11/30 16:32:25 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.76 2000/12/01 05:35:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -559,7 +559,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 
 	sa6_dst = (struct sockaddr_in6 *)dst;
 	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr))
-		return;
+		return 0;
 
 	/*
 	 * note that src can be NULL when we get notify by local fragmentation.
