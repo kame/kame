@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.39 2000/09/19 18:29:04 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.40 2000/09/21 20:12:51 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.39 2000/09/19 18:29:04 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.40 2000/09/21 20:12:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -373,15 +373,15 @@ eay_setgentype(name, type)
 	int *type;
 {
 	/* XXX It's needed effective code */
-	if(!name_cmp(name, "email")) {
+	if(!memcmp(name, "email", strlen("email"))) {
 		*type = GENT_EMAIL;
-	} else if(!name_cmp(name, "URI")) {
+	} else if(!memcmp(name, "URI", strlen("URI"))) {
 		*type = GENT_URI;
-	} else if(!name_cmp(name, "DNS")) {
+	} else if(!memcmp(name, "DNS", strlen("DNS"))) {
 		*type = GENT_DNS;
-	} else if(!name_cmp(name, "RID")) {
+	} else if(!memcmp(name, "RID", strlen("RID"))) {
 		*type = GENT_RID;
-	} else if(!name_cmp(name, "IP")) {
+	} else if(!memcmp(name, "IP", strlen("IP"))) {
 		*type = GENT_IPADD;
 	} else {
 		*type = GENT_OTHERNAME;
