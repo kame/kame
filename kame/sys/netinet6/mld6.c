@@ -193,7 +193,7 @@ mld6_input(m, off)
 	int off;
 {
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct mld6_hdr *mldh = (struct mld6_hdr *)(mtod(m, caddr_t) + off);
+	struct mld6_hdr *mldh;
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct in6_multi *in6m;
 	struct in6_ifaddr *ia;
@@ -212,8 +212,20 @@ mld6_input(m, off)
 		 * specify to discard the packet from a non link-local
 		 * source address. But we believe it's expected to do so.
 		 */
+		m_freem(m);
 		return;
 	}
+
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(*mldh),);
+	mldh = (struct mld6_hdr *)(mtod(m, caddr_t) + off);
+#else
+	IP6_EXTHDR_GET(mldh, struct mld6_hdr *, m, off, sizeof(*mldh));
+	if (mldh == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return;
+	}
+#endif
 
 	/*
 	 * In the MLD6 specification, there are 3 states and a flag.
@@ -348,6 +360,8 @@ mld6_input(m, off)
 		log(LOG_ERR, "mld6_input: illegal type(%d)", mldh->mld6_type);
 		break;
 	}
+
+	m_freem(m);
 }
 
 void

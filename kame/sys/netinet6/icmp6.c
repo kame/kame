@@ -590,8 +590,13 @@ icmp6_input(mp, offp, proto)
 			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldquery);
 		else
 			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldreport);
-		IP6_EXTHDR_CHECK(m, off, icmp6len, IPPROTO_DONE);
-		mld6_input(m, off);
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
+			/* give up local */
+			mld6_input(m, off);
+			m = NULL;
+			goto freeit;
+		}
+		mld6_input(n, off);
 		/* m stays. */
 		break;
 
