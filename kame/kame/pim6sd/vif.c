@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.19 2001/11/27 07:02:52 suz Exp $	*/
+/*	$KAME: vif.c,v 1.20 2001/11/27 07:19:16 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -337,6 +337,14 @@ void start_vif (mifi_t vifi)
 	     * on the multicast router.this allow receiving mld6 messages too.
 	     */
 	    k_join(mld6_socket, &allrouters_group.sin6_addr, v->uv_ifindex);
+
+	    /*
+	     * Join the All-MLDv2-routers multicast group on the interface
+	     * if it is configured so.
+	     */
+	    if (v->uv_mld_version == MLDv2)
+		k_join(mld6_socket, &allmldv2routers_group.sin6_addr,
+		       v->uv_ifindex);
 
 	    /*
 	     * Until neighbors are discovered, assume responsibility for sending

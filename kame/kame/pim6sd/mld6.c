@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.35 2001/08/09 10:33:02 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.36 2001/11/27 07:19:15 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -112,6 +112,7 @@ char *mld6_send_buf;		/* output packet buffer */
 int mld6_socket;		/* socket for all network I/O */
 struct sockaddr_in6 allrouters_group = {sizeof(struct sockaddr_in6), AF_INET6};
 struct sockaddr_in6 allnodes_group = {sizeof(struct sockaddr_in6), AF_INET6};
+struct sockaddr_in6 allmldv2routers_group = {sizeof(struct sockaddr_in6), AF_INET6};
 
 /* Externals */
 
@@ -186,6 +187,9 @@ init_mld6()
     if (inet_pton(AF_INET6, "ff02::2",
 		  (void *) &allrouters_group.sin6_addr) != 1)
 	log(LOG_ERR, 0, "inet_pton failed for ff02::2");
+    if (inet_pton(AF_INET6, "ff02::16",
+		  (void *) &allmldv2routers_group.sin6_addr) != 1)
+	log(LOG_ERR, 0, "inet_pton failed for ff02::16");
 
     /* filter all non-MLD ICMP messages */
     ICMP6_FILTER_SETBLOCKALL(&filt);

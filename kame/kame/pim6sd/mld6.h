@@ -1,4 +1,4 @@
-/*	$KAME: mld6.h,v 1.9 2001/07/11 09:13:26 suz Exp $	*/
+/*	$KAME: mld6.h,v 1.10 2001/11/27 07:19:16 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -60,6 +60,7 @@ extern int mld6_socket;
 extern char *mld6_recv_buf;
 extern struct sockaddr_in6 allrouters_group;
 extern struct sockaddr_in6 allnodes_group;
+extern struct sockaddr_in6 allmldv2routers_group;
 extern char *mld6_send_buf;
 
 void init_mld6 __P((void));
