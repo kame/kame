@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.39 2000/07/14 11:22:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.40 2000/07/14 16:20:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -263,7 +263,12 @@ isakmp_info_send_d2(iph2)
 	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
 
 		/* send SPIs of inbound SAs. */
-		/* XXX should send outbound SAs's ? */
+		/*
+		 * XXX should I send outbound SAs's ?
+		 * I send inbound SAs's SPI only at the moment because I can't
+		 * decode any more if peer send encoded packet without aware of
+		 * deletion of SA.  Outbound SAs don't come under the situation.
+		 */
 		tlen = sizeof(*d) + sizeof(pr->spi);
 		payload = vmalloc(tlen);
 		if (payload == NULL) {
