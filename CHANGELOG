@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1032 2000/06/17 20:37:29 itojun Exp $
+$Id: CHANGELOG,v 1.1033 2000/06/18 06:25:56 jinmei Exp $
 
 <200006>
+2000-06-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd[34]/sys/netinet6/udp6_usrreq.c (udp6_attach): 
+	initialized inp_ip_ttl in udp6_attach for mapped addresses.
+	in response to a report from Hideaki YOSHIFUJI
+	<yoshfuji@ecei.tohoku.ac.jp> (KAME-snap 2738)
+
 2000-06-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {netbsd, openbsd}/usr.bin/netstat/inet6.c (icmp6_stats): 
 	printed number of icmp6 error messages not sent due to rate
