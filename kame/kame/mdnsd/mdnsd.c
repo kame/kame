@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.20 2000/05/31 16:51:08 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.21 2000/05/31 16:56:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -537,6 +537,7 @@ addserv(n, ttl, comment)
 		break;
 	default:
 		flags = 0;
+		multicast = 0;
 		break;
 	}
 	ns = newnsdb(res->ai_addr, comment);
