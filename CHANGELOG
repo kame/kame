@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1439 2000/12/15 14:25:10 sakane Exp $
+$KAME: CHANGELOG,v 1.1440 2000/12/17 16:46:23 sumikawa Exp $
 
 <200012>
+Mon Dec 18 01:41:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/usr.sbin/{syslogd, lpr}, freebsd4/usr.bin/logger: sync
+	  with FreeBSD-current.
+	* freebsd3/ports/qpopper: upgrade to 3.1.2
+
 Fri Dec 15 23:24:58 JST 2000 sakane@ydc.co.jp
 	* racoon:
 	racoon uses syslog() if both the logging file and -F option are not
