@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.86 2004/02/12 15:38:30 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.87 2004/04/08 13:40:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -684,7 +684,6 @@ ah6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src_sa, dst_sa;
 	struct ah *ah;
 	u_int32_t spi;
 	const struct ah_algorithm *algo;
@@ -938,8 +937,8 @@ ah6_input(mp, offp, proto)
 			ipsec6stat.in_inval++;
 			goto fail;
 		}
-		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)&src_sa,
-					   (caddr_t)&dst_sa)) {
+		if (!key_checktunnelsanity(sav, AF_INET6,
+		    (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst)) {
 			ipseclog((LOG_NOTICE, "ipsec tunnel address mismatch "
 			    "in IPv6 AH input: %s %s\n",
 			    ipsec6_logpacketstr(ip6, spi),
