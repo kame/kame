@@ -65,7 +65,7 @@
 #define DEFAULT_SOLICIT_HOPCOUNT	4
 #define SERVER_MIN_ADV_DELAY	100	/* msec */
 #define SERVER_MAX_ADV_DELAY	1000	/* msec */
-#define REPLY_MSG_TIMEOUT	2	/* sec */
+#define REPLY_MSG_TIMEOUT	250	/* msec */
 #define REQUEST_MSG_MIN_RETRANS	10	/* retransmissions */
 #define RECONF_MSG_MIN_RETRANS	10	/* retransmissions */
 #define RECONF_MSG_RETRANS_INTERVAL	12	/* sec */

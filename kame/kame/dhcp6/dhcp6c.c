@@ -122,7 +122,7 @@ static struct in6_addr current_cliaddr;
 
 /* behavior constant */
 #define SOLICIT_RETRY	2
-#define REQUEST_RETRY	2
+#define REQUEST_RETRY	10
 
 static void usage __P((void));
 static void mainloop __P((void));
@@ -484,7 +484,7 @@ client6_getreply(p)
 			break;
 		default:
 			if (client6_recvreply(insock, p) <0)
-				return(-1);
+				continue;
 			return(0);
 		}
 	}
@@ -722,15 +722,18 @@ client6_recvreply(s, serv)
 		/* NOTREACHED */
 	}
 
+	if (len < 1) {		/* we need at least 1 byte to check type */
+		dprintf((stderr, "relay6_react: short packet\n"));
+		return(-1);
+	}
+
+	dh6r = (struct dhcp6_reply *)rbuf;
+	if (dh6r->dh6rep_msgtype != DH6_REPLY)
+		return(-1);	/* should be siletly discarded */
+
 	if (len < sizeof(*dh6r)) {
 		dprintf((stderr, "client6_recvreply: short packet (len=%d)\n",
 			 len));
-		return(-1);
-	}
-	dh6r = (struct dhcp6_reply *)rbuf;
-	if (dh6r->dh6rep_msgtype != DH6_REPLY) {
-		dprintf((stderr, "client6_recvreply: bad message type(%d)\n",
-			 dh6r->dh6rep_msgtype));
 		return(-1);
 	}
 

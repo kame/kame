@@ -503,11 +503,11 @@ server6_react_solicit(buf, siz, rcvpi)
 			return(-1);
 		}
 		/*
-		 * If the relay address has a larger scope than the scope of
-		 * the solicitation's destination, the responded advertise
-		 * message might be able to break a scope boundary.
+		 * If the relay address has a smaller scope than the scope of
+		 * the solicitation's destination, the solicitation message
+		 * message might have broken a scope boundary.
 		 */
-		if (in6_scope(&dh6s->dh6sol_relayaddr) >
+		if (in6_scope(&dh6s->dh6sol_relayaddr) <
 		    in6_scope(&rcvpi->ipi6_addr)) {
 			dprintf((stderr,
 				 "react_solicit: bad relay address %s with dst %s\n",
@@ -538,6 +538,13 @@ server6_react_solicit(buf, siz, rcvpi)
 				}
 			}
 		}
+		else if (getifaddr(&servaddr, ifnam, &global_prefix,
+			      GLOBAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
+			dprintf((stderr,
+				 "react_solicit: can't find global on %s\n",
+				 ifnam));
+			return(-1);
+		}
 	} else {
 		if (getifaddr(&servaddr, ifnam, &link_local_prefix,
 			      LINK_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
@@ -545,7 +552,7 @@ server6_react_solicit(buf, siz, rcvpi)
 				 "react_solicit: can't find link-local on %s\n",
 				 ifnam));
 			/*
-			 * This situation should fairely serious.
+			 * This situation should be fairely serious.
 			 * Should we assert here?
 			 */
 			return(-1);
