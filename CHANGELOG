@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2246 2002/10/09 18:06:20 itojun Exp $
+$KAME: CHANGELOG,v 1.2247 2002/10/11 14:27:55 suz Exp $
 
 <200210>
+Fri Oct 11 23:26:35 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/vif.[ch], mld6_proto.[ch]: implements MLDv1 Startup
+	  Query as in RFC2710 section 7.6-7.7.
+
 Thu Oct 10 02:59:43 JST 2002  itojun@iijlab.net
 	* sys/netinet/sctp*: new kit from randall.  fixes to TCP model support
 	  and such.
