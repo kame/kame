@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.201 2002/06/07 03:03:50 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.202 2002/06/07 03:26:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -448,13 +448,15 @@ nd6_ra_input(m, off, icmp6len)
 	 * MTU
 	 */
 	if (ndopts.nd_opts_mtu && ndopts.nd_opts_mtu->nd_opt_mtu_len == 1) {
-		u_int32_t mtu = ntohl(ndopts.nd_opts_mtu->nd_opt_mtu_mtu);
+		u_long mtu;
 		u_long maxmtu;
+
+		mtu = (u_long)ntohl(ndopts.nd_opts_mtu->nd_opt_mtu_mtu);
 
 		/* lower bound */
 		if (mtu < IPV6_MMTU) {
 			nd6log((LOG_INFO, "nd6_ra_input: bogus mtu option "
-			    "mtu=%d sent from %s, ignoring\n",
+			    "mtu=%lu sent from %s, ignoring\n",
 			    mtu, ip6_sprintf(&ip6->ip6_src)));
 			goto skip;
 		}
@@ -470,7 +472,7 @@ nd6_ra_input(m, off, icmp6len)
 				in6_setmaxmtu();
 		} else {
 			nd6log((LOG_INFO, "nd6_ra_input: bogus mtu "
-			    "mtu=%d sent from %s; "
+			    "mtu=%lu sent from %s; "
 			    "exceeds maxmtu %lu, ignoring\n",
 			    mtu, ip6_sprintf(&ip6->ip6_src), maxmtu));
 		}
