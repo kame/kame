@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.19 2001/01/22 02:20:40 itojun Exp $
+.\"	$KAME: faithd.8,v 1.20 2001/01/22 02:23:40 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -394,10 +394,14 @@ and other IP-address based authentication, for connections relayed by
 .Nm
 .Pq and any other TCP relaying services .
 .Pp
+Administrators are advised to limit accesses to
 .Nm
-itself does not implement access controls, as
-it intends to implement transparent TCP relay services.
-Administrators are advised to filter packets based on IPv6 address.
+using
+.Pa faithd.conf ,
+or by using IPv6 packet filters.
+It is to protect
+.Nm
+service from malicious parties and avoid theft of service/bandwidth.
 IPv6 destination address can be limited by
 carefully configuring routing entries that points to
 .Xr faith 4 ,
