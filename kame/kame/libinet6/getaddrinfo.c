@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.177 2004/04/18 14:53:43 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.178 2004/04/21 03:15:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -551,9 +551,23 @@ getaddrinfo(hostname, servname, hints, res)
 				continue;
 			error = explore_null(pai, servname,
 			    &afailist[afd - afdl]);
-		} else
+
+			/*
+			 * Errors from explore_null should be unexpected and
+			 * be caught to avoid returning an incomplete result.
+			 */
+			if (error != 0)
+				goto bad;
+		} else {
 			error = explore_numeric_scope(pai, hostname, servname,
 			    &afailist[afd - afdl]);
+
+			/*
+			 * explore_numeric_scope returns an error for address
+			 * families that do not match that of hostname.
+			 * Thus we should not catch the error at this moment. 
+			 */
+		}
 
 		if (!error && afailist[afd - afdl])
 			found++;
@@ -659,6 +673,8 @@ globcopy:
 			continue;
 
 		error = explore_copy(pai, afai, &cur->ai_next);
+		if (error != 0)
+			goto bad;
 
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
