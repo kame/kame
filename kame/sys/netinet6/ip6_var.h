@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.90 2002/04/19 07:30:00 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.91 2002/04/25 11:05:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,7 @@ struct	ip6asfrag {
 	u_int16_t	ip6af_mff;	/* more fragment bit in frag off */
 };
 
-#define IP6_REASS_MBUF(ip6af) (*(struct mbuf **)&((ip6af)->ip6af_m))
+#define IP6_REASS_MBUF(ip6af) ((ip6af)->ip6af_m)
 
 struct	ip6_moptions {
 	struct	ifnet *im6o_multicast_ifp; /* ifp for outgoing multicasts */
