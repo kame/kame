@@ -1,13 +1,13 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.65 2001/11/16 06:15:39 itojun Exp $
+	$KAME: README,v 1.66 2001/11/16 06:16:57 itojun Exp $
 
 <<<Project Overview>>>
 
 "KAME Project" is a joint effort to create single solid software set,
 especially targeted at IPv6/IPsec.  Talented researchers from Fujitsu
 Limited, Hitachi, Ltd., IIJ Research Laboratory, NEC Corporation,
-Toshiba Corporation and Yokogawa Electric Corporation
+Toshiba Corporation, YDC Corporation and Yokogawa Electric Corporation
 joined the project.  This joint effort will avoid unnecessary duplicated
 development in the same area, and effectively provides high quality and
 advanced featured packages.
