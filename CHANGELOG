@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1969 2001/11/06 11:24:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.1970 2001/11/07 03:32:03 keiichi Exp $
 
 <200111>
+Wed Nov  7 12:30:49 JST 2001 keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_var.h,mip6_binding.c
+        - add ifnet info to the binding cache structure 
+          to distinguish one bc on the home link from the other bcs
+          which has a same interface identifier on the other link.
+          (need to recompile mip6control)
+
 2001-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_purge): corrected purging the
 	default router list in nd6_purge(), so that both two loops would
