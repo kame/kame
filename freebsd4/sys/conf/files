@@ -1148,6 +1148,9 @@ dev/usb/uscanner.c	optional uscanner
 dev/usb/if_aue.c	optional aue
 dev/usb/if_cue.c	optional cue
 dev/usb/if_kue.c	optional kue
+dev/usb/ucom.c		optional ucom
+dev/usb/uplcom.c	optional uplcom ucom
+dev/usb/uvscom.c	optional uvscom ucom
 isa_if.o		optional isa					\
 	dependency	"isa_if.c isa_if.h"				\
 	compile-with	"${NORMAL_C}"					\
