@@ -434,7 +434,12 @@ in6_prefix_add_llifid(int iilen, struct in6_ifaddr *ia)
 	/* XXX: init dummy so */
 	bzero(&so, sizeof(so));
 	/* insert into list */
-	LIST_FOREACH(rpp, &rr_prefix, rp_entry) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	LIST_FOREACH(rpp, &rr_prefix, rp_entry)
+#else
+	for (rpp = LIST_FIRST(&rr_prefix); rpp; rpp = LIST_NEXT(rpp, rp_entry))
+#endif
+	{
 		s = splnet();
 		LIST_INSERT_HEAD(&rpp->rp_addrhead, rap, ra_entry);
 		splx(s);
@@ -546,7 +551,7 @@ in6_prefix_remove_ifid(int iilen, struct in6_ifaddr *ia)
 		splx(s);
 		free(rap, M_RR_ADDR);
 	}
-	if (LIST_EMPTY(&ifpr2rp(ia->ia6_ifpr)->rp_addrhead))
+	if (LIST_FIRST(&rr_prefix) == NULL)
 		rp_remove(ifpr2rp(ia->ia6_ifpr));
 }
 
@@ -1130,7 +1135,14 @@ in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 			free_rp_entries(&rp_tmp);
 			break;
 		}
-		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
+		for (ifa = ifp->if_addrlist.tqh_first;
+		     ifa;
+		     ifa = ifa->ifa_list.tqe_next)
+#endif
+		{
 			if (ifa->ifa_addr == NULL)
 				continue;	/* just for safety */
 			if (ifa->ifa_addr->sa_family != AF_INET6)
