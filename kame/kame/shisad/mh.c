@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.7 2005/01/12 11:02:37 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.8 2005/01/22 12:56:55 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1149,10 +1149,6 @@ send_bu(bul)
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
 		struct ip6_mh_opt_altcoa *acoa_opt;
 		
-		/*
-		pad = mhopt_calculatepad(IP6_MHOPT_ALTCOA, buflen);
-		mhopt_add_pads((bufp + buflen), pad);
-		*/
 		pad = MIP6_PADLEN(buflen, 8, 6);
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
@@ -1168,10 +1164,6 @@ send_bu(bul)
 #ifdef MIP_MCOA 
 	/* Adding Binding Unique Identifier Option */
 	if (bul->bul_bid) {
-		/* 
-		pad = mhopt_calculatepad(IP6_MHOPT_BID, buflen);
-		mhopt_add_pads((bufp + buflen), pad);
-		*/
 		pad = MIP6_PADLEN(buflen, 2, 0);
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
@@ -1458,8 +1450,6 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 		}
 
 		/* Add authentication suboption if security flag is enable */
-/*		pad = mhopt_calculatepad(IP6_MHOPT_BAUTH, buflen);*/
-/*		mhopt_add_pads((bufp + buflen), pad);*/
 		pad = MIP6_PADLEN(buflen, 8, 2);	/* 8n+2 */
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
@@ -1483,7 +1473,8 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 		bap->ip6mhba_hdr.ip6mh_len = (buflen >> 3) - 1;
 		bap->ip6mhba_hdr.ip6mh_cksum = 0;
 
-		authenticator = (mip6_authenticator_t *)(bufp + (buflen - MIP6_AUTHENTICATOR_SIZE - pad));
+		authenticator = (mip6_authenticator_t *)
+			(bufp + (buflen - MIP6_AUTHENTICATOR_SIZE - pad));
 		mip6_calculate_authenticator(kbm_p,
 					     (acoa) ? acoa : coa,
 					     src, 

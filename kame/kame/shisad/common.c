@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.4 2005/01/12 11:02:37 t-momose Exp $  */
+/*      $KAME: common.c,v 1.5 2005/01/22 12:56:55 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -76,9 +76,8 @@ static const struct in6_addr haanyaddr_ifidnn = {
 	   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
 };
 
-
 #ifdef MIP_MN
-static struct sockaddr_dl *get_sockdl_from_ifindex(struct sockaddr_dl *, u_int16_t);
+//static struct sockaddr_dl *get_sockdl_from_ifindex(struct sockaddr_dl *, u_int16_t);
 #endif
 
 #ifndef MIP_CN
@@ -669,7 +668,6 @@ icmp6_input_common(fd)
 		mip6stat.mip6s_dhreq++;
 		dhreq = (struct mip6_dhaad_req *)msg.msg_iov[0].iov_base;
 		error = send_haadrep(&from.sin6_addr, &dst, dhreq, receivedifindex);
-
 		break;
 		
 	case MIP6_PREFIX_SOLICIT: 
@@ -901,7 +899,7 @@ in6_mask2len(mask, lim0)
 }
 
 
-
+#if 0
 #ifdef MIP_MN
 int
 send_na_home(hoa, ifindex)
@@ -1053,6 +1051,7 @@ get_sockdl_from_ifindex(sdl, ifindex)
 	return (NULL);
 }
 #endif /* MIP_MN */
+#endif
 
 #if defined(MIP_CN) || defined(MIP_HA)
 int
@@ -1673,6 +1672,8 @@ command_show_stat(s)
 			write(s, buff, strlen(buff));
 		}
 	}
+	PS("DHAAD request", mip6stat.mip6s_dhreq);
+	PS("DHAAD reply", mip6stat.mip6s_dhreply);
 	PS("Home Address Option", mip6stat.mip6s_hao);
 	PS("unverified Home Address Option", mip6stat.mip6s_unverifiedhao);
 	PS("Routing Header type 2", mip6stat.mip6s_rthdr2);
@@ -1722,6 +1723,8 @@ command_show_stat(s)
 			write(s, buff, strlen(buff));
 		}
 	}
+	PS("DHAAD request", mip6stat.mip6s_odhreq);
+	PS("DHAAD reply", mip6stat.mip6s_odhreply);
 	PS("Home Address Option", mip6stat.mip6s_ohao);
 	PS("Routing Header type 2", mip6stat.mip6s_orthdr2);
 	PS("reverse tunneled output", mip6stat.mip6s_orevtunnel);

@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.3 2004/12/27 10:50:33 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.4 2005/01/22 12:56:55 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -392,13 +392,10 @@ void create_keygentoken(struct in6_addr *, struct mip6_nonces_info *,
 
 /* binding.c */
 struct binding_update_list *bul_get(struct in6_addr *, struct in6_addr *);
-#ifndef MIP_MCOA
-struct binding_update_list *bul_insert(struct mip6_hoainfo *,  struct in6_addr *,
-    struct in6_addr *, u_int16_t);
-#else /* MIP_MCOA */
-struct binding_update_list *bul_mcoa_get(struct in6_addr *, struct in6_addr *, u_int16_t);
 struct binding_update_list *bul_insert(struct mip6_hoainfo *,  struct in6_addr *,
     struct in6_addr *, u_int16_t, u_int16_t);
+#ifdef MIP_MCOA
+struct binding_update_list *bul_mcoa_get(struct in6_addr *, struct in6_addr *, u_int16_t);
 #endif /* MIP_MCOA */
 void bul_remove(struct binding_update_list *);
 struct binding_update_list *bul_get_nohoa(char *, struct in6_addr *, struct in6_addr *);
@@ -465,12 +462,8 @@ void command_show_stat(int);
 /* mnd.c */
 int mipsock_bul_request(struct binding_update_list *, u_char);
 int mipsock_recv_mdinfo(struct mip_msghdr *);
-#ifndef MIP_MCOA
-int bul_update_by_mipsock_w_hoa(struct in6_addr *, struct in6_addr *);
-#else
 int bul_update_by_mipsock_w_hoa(struct in6_addr *, struct in6_addr *, 
 				u_int16_t);
-#endif /* MIP_MCOA */
 int mipsock_md_update_bul_byifindex(u_int16_t, struct in6_addr *);
 int mipsock_md_dereg_bul(struct in6_addr *, struct in6_addr *, u_int16_t);
 int send_haadreq(struct mip6_hoainfo *, int, struct in6_addr *);

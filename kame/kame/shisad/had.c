@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.3 2005/01/12 03:23:33 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.4 2005/01/22 12:56:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -695,7 +695,6 @@ command_flush(s, arg)
 		sprintf(msg, "Available options are:\n");
                 sprintf(msg + strlen(msg), "\tbc (Binding Cache)\n\tstat (Statistics)\n\thal (Home Agent List)\n");
 		write(s, msg, strlen(msg));
-
 	}
 }
 
@@ -784,7 +783,7 @@ send_mpa(dst, mps_id, ifindex)
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 		perror ("sendmsg icmp6 @haadreply");
 	else
-		mip6stat.mip6s_odhreply++;
+		mip6stat.mip6s_ompa++;
 
 	return (errno);
 }
@@ -793,5 +792,6 @@ send_mpa(dst, mps_id, ifindex)
 int
 filling_pi(struct nd_opt_prefix_info *pi)
 {
+	/* XXX */
 	return (0);
 }

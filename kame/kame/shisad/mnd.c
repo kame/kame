@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.3 2005/01/12 03:23:33 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.4 2005/01/22 12:56:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -85,12 +85,13 @@ static int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
 static void command_show_status(int, char *);
 static void command_flush(int, char *);
 static void command_show_hal(int);
+static void show_current_config(int);
 
 struct command_table command_table[] = {
 #ifndef MIP_NEMO
-	{"show", command_show_status, "Show stat, bul, hal, kbul, noro"},
+	{"show", command_show_status, "Show stat, bul, hal, kbul, noro, config"},
 #else
-	{"show", command_show_status, "Show stat, bul, hal, kbul, noro, pt"},
+	{"show", command_show_status, "Show stat, bul, hal, kbul, noro, config, pt"},
 #endif /* MIP_NEMO */
 	{"flush", command_flush, "Flush stat, bul, hal, noro"},
 };
@@ -101,19 +102,20 @@ static int mipsock_recv_rr_hint(struct mip_msghdr *);
 static void mnd_init_homeprefix(u_int16_t, struct mip6_hpfx_list *);
 static struct mip6_mipif *mnd_add_mipif(char *);
 static void terminate(int);
-#ifndef MIP_MCOA
-static int mipsock_md_dereg_bul_fl(struct in6_addr *, struct in6_addr *, 
-    struct in6_addr *, u_int16_t);
-#else
 static int mipsock_md_dereg_bul_fl(struct in6_addr *, struct in6_addr *, 
     struct in6_addr *, u_int16_t, u_int16_t);
-#endif /* !MIP_MCOA */
 
 static int add_hal_by_commandline_xxx(char *);
 
 static void noro_show(int);
 static void noro_init(void);
 static void noro_sync(void);
+
+#ifdef MIP_NEMO
+#define NODETYPE MIP6_NODETYPE_MOBILE_ROUTER
+#else /* MIP_NEMO */
+#define NODETYPE MIP6_NODETYPE_MOBILE_NODE
+#endif /* MIP_NEMO */
 
 
 void
@@ -145,8 +147,11 @@ main(argc, argv)
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
 	char *homeagent = NULL;
+	char *argopts = "c:dna:il:";
 #ifdef MIP_NEMO
 	char *nemofile = NULL;
+
+	argopts = "c:dna:il:f:";
 #endif /* MIP_NEMO */
 
 	if (argc < 2) {
@@ -154,12 +159,7 @@ main(argc, argv)
 		exit(-1);
 	}
 
-#ifdef MIP_NEMO
-        while ((ch = getopt(argc, argv, "c:dna:if:")) != -1)
-#else
-        while ((ch = getopt(argc, argv, "c:dna:il:")) != -1) 
-#endif
-	{
+        while ((ch = getopt(argc, argv, argopts)) != -1) {
                 switch (ch) {
 		case 'c':
 			conffile = optarg;
@@ -178,7 +178,7 @@ main(argc, argv)
 			break;
 		case 'l':
 			if (atoi(optarg) > 0)
-				default_lifetime = atoi(optarg);
+				default_lifetime = atoi(optarg) / 4;
 			break;
 #ifdef MIP_NEMO
 		case 'f':
@@ -255,24 +255,14 @@ main(argc, argv)
 	/* let's insert NULL binding update list to each binding update list */
 	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
-#ifndef MIP_NEMO
-#ifndef MIP_MCOA 
-		bul = bul_insert(hoainfo, NULL, NULL,
-		    (IP6_MH_BU_HOME|IP6_MH_BU_ACK));
-#else
-		bul = bul_insert(hoainfo, NULL, NULL, 
-		    (IP6_MH_BU_HOME|IP6_MH_BU_ACK|IP6_MH_BU_MCOA), 0);
-#endif /* !MIP_MCOA */
-#else /* !MIP_NEMO */
-#ifndef MIP_MCOA
-		bul = bul_insert(hoainfo, NULL, NULL, 
-		    (IP6_MH_BU_HOME|IP6_MH_BU_ACK|IP6_MH_BU_ROUTER));
-#else
-		/* XXX how should bid be handled here ... */ 
-		bul = bul_insert(hoainfo, NULL, NULL, 
-		    (IP6_MH_BU_HOME|IP6_MH_BU_ACK|IP6_MH_BU_ROUTER|IP6_MH_BU_MCOA), 0);
-#endif /* !MIP_MCOA */
-#endif /* !MIP_NEMO */
+		bul = bul_insert(hoainfo, NULL, NULL, IP6_MH_BU_HOME|IP6_MH_BU_ACK
+#ifdef MIP_NEMO
+				 | IP6_MH_BU_ROUTER
+#endif
+#ifdef MIP_MCOA 
+				 | IP6_MH_BU_MCOA
+#endif
+				 , 0);
 		if (bul == NULL) {
 			syslog(LOG_ERR,
 			    "cannot insert bul, something wrong\n");
@@ -289,11 +279,7 @@ main(argc, argv)
 	new_fd_list(icmp6sock, POLLIN, icmp6_input_common);
 
 	/* notify a kernel to behave as a mobile node. */
-#ifndef MIP_NEMO
-	mipsock_nodetype_request(MIP6_NODETYPE_MOBILE_NODE, 1);
-#else
-	mipsock_nodetype_request(MIP6_NODETYPE_MOBILE_ROUTER, 1);
-#endif
+	mipsock_nodetype_request(NODETYPE, 1);
 
 	/* register signal handlers. */
 	signal(SIGTERM, terminate);
@@ -401,7 +387,8 @@ mipsock_recv_mdinfo(miphdr)
 	struct sockaddr *sin;
 	struct in6_addr *hoa, *coa, *acoa;
 	int err = 0;
-
+	u_int16_t bid = 0;
+	
 	syslog(LOG_INFO, "mipsock_recv_mdinfo\n");
 
 	mdinfo = (struct mipm_md_info *)miphdr;
@@ -429,6 +416,9 @@ mipsock_recv_mdinfo(miphdr)
 	if (debug) 
 		syslog(LOG_INFO, "new coa is %s", ip6_sprintf(coa));
 
+#ifdef MIP_MCOA
+	bid = mdinfo->mipm_md_bid;
+#endif /* MIP_MCOA */
 	/* Update bul according to md_hint */
 	switch (mdinfo->mipm_md_command) {
 	case MIPM_MD_REREG:
@@ -436,11 +426,7 @@ mipsock_recv_mdinfo(miphdr)
 		if (mdinfo->mipm_md_hint == MIPM_MD_INDEX)
 			err = mipsock_md_update_bul_byifindex(mdinfo->mipm_md_ifindex, coa);
 		else if (mdinfo->mipm_md_hint == MIPM_MD_ADDR)
-#ifndef MIP_MCOA
-			err = bul_update_by_mipsock_w_hoa(hoa, coa);
-#else
-			err = bul_update_by_mipsock_w_hoa(hoa, coa, mdinfo->mipm_md_bid);
-#endif /* MIP_MCOA */
+			err = bul_update_by_mipsock_w_hoa(hoa, coa, bid);
 		break;
 	case MIPM_MD_DEREGHOME:
 		err = mipsock_md_dereg_bul(hoa, coa, mdinfo->mipm_md_ifindex);
@@ -452,12 +438,8 @@ mipsock_recv_mdinfo(miphdr)
 			return (0);
 		acoa = &((struct sockaddr_in6 *)sin)->sin6_addr;
 
-#ifndef MIP_MCOA
-		err = mipsock_md_dereg_bul_fl(hoa, coa, acoa, mdinfo->mipm_md_ifindex);
-#else 
 		err = mipsock_md_dereg_bul_fl(hoa, coa, acoa, 
-					      mdinfo->mipm_md_ifindex, mdinfo->mipm_md_bid);
-#endif /* !MIP_MCOA */
+					      mdinfo->mipm_md_ifindex, bid);
 		break;
 	default:
 		syslog(LOG_ERR, "unsupported md_info command %d\n",
@@ -571,21 +553,13 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 	}
 
 	return (0);
-
 }
 
 /* DE-REGISTRATION from FL  */
-#ifndef MIP_MCOA
-static int
-mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex)
-	struct in6_addr *hoa, *oldcoa, *newcoa;
-	u_int16_t ifindex;
-#else
 static int
 mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 	struct in6_addr *hoa, *oldcoa, *newcoa;
 	u_int16_t ifindex, bid;
-#endif /* !MIP_MCOA */
 {
 	struct mip6_hoainfo *hoainfo;
 	struct binding_update_list *bul, *bul_next;
@@ -593,7 +567,6 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 	struct binding_update_list *mbul = NULL;
 #endif /* MIP_MCOA */
 	char ifname[IFNAMSIZ];
-
 
 	hoainfo = hoainfo_find_withhoa(hoa);
 	if (hoainfo == NULL)
@@ -665,14 +638,9 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 
 /* re-registration. */
 int 
-#ifndef MIP_MCOA
-bul_update_by_mipsock_w_hoa(hoa, coa)
-	struct in6_addr *hoa, *coa;
-#else
 bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 	struct in6_addr *hoa, *coa;
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 {
 	struct ifaddrs *ifa, *ifap;
 	struct sockaddr *sa;
@@ -836,13 +804,8 @@ mipsock_recv_rr_hint(miphdr)
 		if (bulhome == NULL)
 			return (-1);
 
-#ifndef MIP_MCOA
-		bul = bul_insert(hoainfo, fsmmsg.fsmm_src, 
-				 &bulhome->bul_coa, 0);
-#else
 		bul = bul_insert(hoainfo, fsmmsg.fsmm_src, 
 				 &bulhome->bul_coa, 0, 0);
-#endif /* MIP_MCOA */
 		if (bul == NULL)
 			return (-1);
 		bul->bul_lifetime = bulhome->bul_lifetime; /* XXX */
@@ -1270,11 +1233,7 @@ terminate(dummy)
 	struct mip_msghdr mipmsg;
 
 	/* stop acting as a mobile node. */
-#ifndef MIP_NEMO
-	mipsock_nodetype_request(MIP6_NODETYPE_MOBILE_NODE, 0);
-#else
-	mipsock_nodetype_request(MIP6_NODETYPE_MOBILE_ROUTER, 0);
-#endif
+	mipsock_nodetype_request(NODETYPE, 0);
 
 	/* flush all bul registered in a kernel. */
 	memset(&mipmsg, 0, sizeof(struct mip_msghdr));
@@ -1458,7 +1417,6 @@ command_show_status(s, arg)
 	int s;
 	char *arg;
 {
-
 	char msg[1024];
 
 	if (strcmp(arg, "bul") == 0) {
@@ -1490,6 +1448,8 @@ command_show_status(s, arg)
 		write(s, msg, strlen(msg));
 
 		noro_show(s);
+	} else if (strcmp(arg, "config") == 0) {
+		show_current_config(s);
 	}
 #ifdef MIP_NEMO
 	else if (strcmp(arg, "pt") == 0) {
@@ -1539,4 +1499,15 @@ command_flush(s, arg)
 		write(s, msg, strlen(msg));
 
 	}
+}
+
+static void
+show_current_config(s)
+	int s;
+{
+	char msg[1024];
+	
+	sprintf(msg, "Binding Update Lifetime for Home registration: %d(s)\n",
+		default_lifetime * 4);
+	write(s, msg, strlen(msg));
 }

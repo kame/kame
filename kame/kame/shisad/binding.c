@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.3 2004/12/28 07:50:45 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.4 2005/01/22 12:56:54 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -509,37 +509,26 @@ hoainfo_get_withdhaadid (id)
  * functions for bul structure 
  */
 struct binding_update_list *
-#ifndef MIP_MCOA
-bul_insert(hoainfo, peeraddr, coa, flags)
-	struct mip6_hoainfo *hoainfo;
-        struct in6_addr *peeraddr;
-        struct in6_addr *coa;
-        u_int16_t flags;
-#else
 bul_insert(hoainfo, peeraddr, coa, flags, bid)
 	struct mip6_hoainfo *hoainfo;
         struct in6_addr *peeraddr;
         struct in6_addr *coa;
         u_int16_t flags, bid;
-#endif /* MIP_MCOA */
 {
 
 	struct binding_update_list *bul;
-#ifdef MIP_MCOA
-	struct binding_update_list *bul2;
-#endif /* MIP_MCOA */
 
 	if (hoainfo == NULL)
 		return (NULL);
 	
         bul = bul_get(&hoainfo->hinfo_hoa, peeraddr);
         if (bul != NULL) {
-#ifndef MIP_MCOA
-		return (bul);
-#else
 		if (bid == 0) 
 			return (bul);
+#ifdef MIP_MCOA
 		else {
+			struct binding_update_list *bul2;
+
 			/* if primary bul is active and bul matched with bid is also active */
 			bul2 = bul_mcoa_get(&hoainfo->hinfo_hoa, peeraddr, bid);
 			if (bul2)
@@ -566,6 +555,8 @@ bul_insert(hoainfo, peeraddr, coa, flags, bid)
 
 #ifdef MIP_MCOA
 	if (bid) {
+		struct binding_update_list *bul2;
+
 		bul2 = bul_create(peeraddr, coa, flags, hoainfo);
 		if (bul2 == NULL)
 			return (NULL);

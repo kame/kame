@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.6 2005/01/12 11:02:37 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.7 2005/01/22 12:56:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-/*#include <stdio.h>*/
 #include <stdlib.h>
 #include <string.h>
 
@@ -53,17 +52,13 @@
 #define _KERNEL
 #include <netinet/ip6mh.h>
 #undef _KERNEL
-#include <netinet6/mip6_var.h>
-
-#include <arpa/inet.h>
 
 #include "callout.h"
 #include "shisad.h"
+#include "stat.h"
 #include "fsm.h"
 
 int initial_bindack_timeout_first_reg = 2; /* the spec says more than 1.5 */
-
-extern struct mip6stat mip6stat;
 
 static int bul_reg_fsm(struct binding_update_list *, int,
     struct fsm_message *);
