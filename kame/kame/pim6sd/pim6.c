@@ -247,33 +247,32 @@ accept_pim6(pimlen)
     }
     pim = (struct pim *)rcvmhpim.msg_iov[0].iov_base;
 
-	/* extract vital information via Advanced API */
-	for(cm = (struct cmsghdr *)CMSG_FIRSTHDR(&rcvmhpim);
-		cm;
-		cm =(struct cmsghdr *)CMSG_NXTHDR(&rcvmhpim , cm ))
-	{
+    /* extract vital information via Advanced API */
+    for(cm = (struct cmsghdr *)CMSG_FIRSTHDR(&rcvmhpim);
+	cm;
+	cm =(struct cmsghdr *)CMSG_NXTHDR(&rcvmhpim , cm ))
+    {
 
-		if( cm->cmsg_level == IPPROTO_IPV6 &&
-			cm->cmsg_type == IPV6_PKTINFO &&
-			cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
-		{
-			pi=(struct in6_pktinfo *)(CMSG_DATA(cm));
-			dst.sin6_addr=pi->ipi6_addr;
-			ifindex = pi->ipi6_ifindex;
-			if (IN6_IS_ADDR_LINKLOCAL(&dst.sin6_addr))
-				dst.sin6_scope_id = ifindex;
-			else
-				dst.sin6_scope_id = 0;
-		}
-	}   
+	    if( cm->cmsg_level == IPPROTO_IPV6 &&
+		cm->cmsg_type == IPV6_PKTINFO &&
+		cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
+	    {
+		    pi=(struct in6_pktinfo *)(CMSG_DATA(cm));
+		    dst.sin6_addr=pi->ipi6_addr;
+		    ifindex = pi->ipi6_ifindex;
+		    if (IN6_IS_ADDR_LINKLOCAL(&dst.sin6_addr))
+			    dst.sin6_scope_id = ifindex;
+		    else
+			    dst.sin6_scope_id = 0;
+	    }
+    }   
 
-	if(pi==NULL)
-		log(LOG_ERR,0,"pim6_socket : unable to get destination packet");
+    if(pi==NULL)
+	    log(LOG_ERR,0,"pim6_socket : unable to get destination packet");
 
-	if(ifindex==0)
-		log(LOG_ERR,0,"pim6_socket : unable to get ifindex");
+    if(ifindex==0)
+	    log(LOG_ERR,0,"pim6_socket : unable to get ifindex");
 		
-
 #define NOSUCHDEF 
 #ifdef NOSUCHDEF   /* TODO: delete. Too noisy */
     IF_DEBUG(DEBUG_PIM_DETAIL) {

@@ -166,9 +166,6 @@ struct listaddr {
  * the RP.
  * (Note: all addresses, subnet numbers and masks are kept in NETWORK order.)
  */
-
-
-
 struct uvif {
 	u_int uv_flags;		
 	u_char uv_metric;		/* VIFF_ flags defined below            */
@@ -202,6 +199,15 @@ struct uvif {
 	struct pim_nbr_entry *uv_pim_neighbors;	/* list of PIM nbr routers */
 
 	void *config_attr;	/* temporary buffer while parsing config */
+
+	/* the followings are to collect statistics */
+	u_quad_t uv_in_pim6_hello;
+	u_quad_t uv_in_pim6_join_prune;
+	u_quad_t uv_bootsrap;
+	u_quad_t uv_assert;
+	u_quad_t uv_graft;	/* for dense mode only */
+	u_quad_t uv_graft_ack;	/* for dense mode only  */
+	u_quad_t uv_rp_adv;
 };
 
 struct phaddr {
