@@ -58,7 +58,7 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__NetBSD__)
 #include <machine/cpu.h>
 #endif
 
