@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.91 2002/02/02 07:06:11 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.92 2002/02/03 08:09:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,8 +88,8 @@
 
 #include <net/net_osdep.h>
 
-static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
-	struct ifnet *));
+static int gif_validate6 __P((const struct mbuf *, struct gif_softc *,
+			      struct ifnet *));
 static int in6_gif_rtcachettl = 300; /* XXX see in_gif.c */
 
 int	ip6_gif_hlim = GIF_HLIM;
@@ -404,7 +404,8 @@ int in6_gif_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 #ifndef USE_ENCAPCHECK
-	if (!gif_validate6(ip6, (struct gif_softc *)gifp, m->m_pkthdr.rcvif)) {
+	if (!gif_validate6((const struct mbuf *)m, (struct gif_softc *)gifp,
+			   m->m_pkthdr.rcvif)) {
 		m_freem(m);
 		ip6stat.ip6s_nogif++;
 		return IPPROTO_DONE;
@@ -484,19 +485,21 @@ int in6_gif_input(mp, offp, proto)
  * validate outer address.
  */
 static int
-gif_validate6(ip6, sc, ifp)
-	const struct ip6_hdr *ip6;
+gif_validate6(m, sc, ifp)
+	const struct mbuf *m;
 	struct gif_softc *sc;
 	struct ifnet *ifp;
 {
-	struct sockaddr_in6 *src, *dst;
+	struct sockaddr_in6 *gsrc, *gdst, *psrc, *pdst;
 
-	src = (struct sockaddr_in6 *)sc->gif_psrc;
-	dst = (struct sockaddr_in6 *)sc->gif_pdst;
+	if (ip6_getpktaddrs((struct mbuf *)m, &psrc, &pdst))
+		return 0;
+
+	gsrc = (struct sockaddr_in6 *)sc->gif_psrc;
+	gdst = (struct sockaddr_in6 *)sc->gif_pdst;
 
 	/* check for address match */
-	if (!IN6_ARE_ADDR_EQUAL(&src->sin6_addr, &ip6->ip6_dst) ||
-	    !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6->ip6_src))
+	if (!SA6_ARE_ADDR_EQUAL(gsrc, psrc) || !SA6_ARE_ADDR_EQUAL(gdst, pdst))
 		return 0;
 
 	/* martian filters on outer source - done in ip6_input */
@@ -509,7 +512,10 @@ gif_validate6(ip6, sc, ifp)
 		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
-		sin6.sin6_addr = ip6->ip6_src;
+		sa6_copy_addr(psrc, &sin6);
+#ifndef SCOPEDROUTING
+		sin6.sin6_scope_id = 0; /* XXX */
+#endif
 		/* XXX scopeid */
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
@@ -543,18 +549,16 @@ gif_encapcheck6(m, off, proto, arg)
 	int proto;
 	void *arg;
 {
-	struct ip6_hdr ip6;
 	struct gif_softc *sc;
 	struct ifnet *ifp;
 
 	/* sanity check done in caller */
 	sc = (struct gif_softc *)arg;
 
-	/* LINTED const cast */
-	m_copydata((struct mbuf *)m, 0, sizeof(ip6), (caddr_t)&ip6);
+	/* XXX is there a case that m_flags does not have M_PKTHDR? */
 	ifp = ((m->m_flags & M_PKTHDR) != 0) ? m->m_pkthdr.rcvif : NULL;
 
-	return gif_validate6(&ip6, sc, ifp);
+	return gif_validate6(m, sc, ifp);
 }
 
 int
