@@ -82,6 +82,7 @@ struct	pkthdr {
 	int	len;			/* total packet length */
 	void	*tdbi;			/* pointer to struct tdb_ident */
 					/* XXX - pull in ip_ipsp.h */ 
+	void	*aux;			/* extra data buffer; ip6/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
