@@ -22,6 +22,7 @@ static struct addrinfo *wild4, *wild6;
 static struct addrinfo *specific4, *specific6;
 static struct addrinfo *one4, *one6;
 static char *port = NULL;
+static int socktype = SOCK_DGRAM;
 
 int
 main(argc, argv)
@@ -32,10 +33,13 @@ main(argc, argv)
 	extern int optind;
 	extern char *optarg;
 
-	while ((ch = getopt(argc, argv, "p:")) != EOF) {
+	while ((ch = getopt(argc, argv, "p:t")) != EOF) {
 		switch (ch) {
 		case 'p':
 			port = strdup(optarg);
+			break;
+		case 't':
+			socktype = SOCK_STREAM;
 			break;
 		default:
 			usage();
@@ -60,6 +64,8 @@ main(argc, argv)
 	one4 = getres(AF_INET, "0.0.0.1", port);
 	one6 = getres(AF_INET6, "::1", port);
 
+	printf("starting tests, socktype = %s\n",
+		socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM");
 #define TESTIT(x, y)	test(#x " then " #y, (x), (y));
 	TESTIT(wild4, wild6);
 	TESTIT(wild6, wild4);
@@ -82,7 +88,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: bindtest -p port\n");
+	fprintf(stderr, "usage: bindtest [-t] -p port\n");
 }
 
 static struct addrinfo *
@@ -96,7 +102,7 @@ getres(af, host, port)
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = socktype;
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(host, port, &hints, &res);
 	return res;
@@ -123,33 +129,33 @@ test(title, a, b)
 {
 	int sa = -1, sb = -1;
 
-	fprintf(stderr, "%s\n", title);
+	printf("%s\n", title);
 
-	fprintf(stderr, "\tallocating socket for %s\n", printres(a));
+	printf("\tallocating socket for %s\n", printres(a));
 	sa = socket(a->ai_family, a->ai_socktype, a->ai_protocol);
 	if (sa < 0) {
-		fprintf(stderr, "\tfailed socket for %s, %s\n",
+		printf("\tfailed socket for %s, %s\n",
 			printres(a), strerror(errno));
 		goto fail;
 	}
-	fprintf(stderr, "\tallocating socket for %s\n", printres(b));
+	printf("\tallocating socket for %s\n", printres(b));
 	sb = socket(b->ai_family, b->ai_socktype, b->ai_protocol);
 	if (sb < 0) {
-		fprintf(stderr, "\tfailed socket for %s, %s\n",
+		printf("\tfailed socket for %s, %s\n",
 			printres(b), strerror(errno));
 		goto fail;
 	}
 
-	fprintf(stderr, "\tbind socket for %s\n", printres(a));
+	printf("\tbind socket for %s\n", printres(a));
 	if (bind(sa, a->ai_addr, a->ai_addrlen) < 0) {
-		fprintf(stderr, "\tfailed bind for %s, %s\n",
+		printf("\tfailed bind for %s, %s\n",
 			printres(a), strerror(errno));
 		goto fail;
 	}
 
-	fprintf(stderr, "\tbind socket for %s\n", printres(b));
+	printf("\tbind socket for %s\n", printres(b));
 	if (bind(sb, b->ai_addr, b->ai_addrlen) < 0) {
-		fprintf(stderr, "\tfailed bind for %s, %s\n",
+		printf("\tfailed bind for %s, %s\n",
 			printres(b), strerror(errno));
 		goto fail;
 	}
