@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.16 2005/02/18 00:22:32 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.17 2005/03/02 02:51:48 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -616,6 +616,18 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		mip6_authenticator_t authenticator;
 		struct mip6_nonces_info *home_nonces, *careof_nonces;
 
+/* 9.5.1
+   If the Home Registration (H) bit is set, the Nonce Indices mobility
+   option MUST NOT be present.
+		:
+   Packets carrying Binding Updates that fail to satisfy all of these
+   tests for any reason other than insufficiency of the Sequence Number,
+   registration type change, or expired nonce index values, MUST be
+   silently discarded.
+ */
+		if (!homeagent_mode && (flags & IP6_MH_BU_HOME))
+			return (-1);
+		
 		home_nonces =
 			get_nonces(ntohs(mopt.opt_nonce->ip6moni_home_nonce));
 		if (home_nonces == NULL) {
@@ -758,7 +770,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			statuscode = IP6_MH_BAS_NOT_HOME_SUBNET;
 			goto sendba;
 		}
-#endif /* MIP_NEMO */
+#endif /* !MIP_NEMO */
 		/* Home Agent does not process BU w/RR protection */ 
 		if (mopt.opt_nonce) 
 			return (-1);
@@ -793,7 +805,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (mopt.opt_nonce)
 		return (-1);
 
-#if defined(MIP_HA) && defined(MIP_NEMO)
+#ifdef MIP_NEMO
 	/* Mobile Network Prefix Verfication */
 	if (mopt.opt_prefix_count > 0) {
 		struct nemo_hptable *hpt;
@@ -832,10 +844,10 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			}
 		}
 	}
-#endif 
+#endif /* MIP_NEMO */
 
 
-#endif /* MIP_CN */
+#endif /* MIP_HA */
 
 	/* Requesitng to delete binding (de-registration) */
 	if (lifetime == 0 
@@ -2000,7 +2012,6 @@ send_mps(hpfx)
         to.sin6_port = 0;
         to.sin6_scope_id = 0;
         to.sin6_len = sizeof (struct sockaddr_in6);
-
 
         msg.msg_name = (void *)&to;
         msg.msg_namelen = sizeof(struct sockaddr_in6);
