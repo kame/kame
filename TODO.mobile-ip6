@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.30 2002/12/06 06:35:25 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.31 2002/12/12 10:23:37 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -21,10 +21,13 @@ KAME project
 	- Sending a binding update with A=1 to correspondent nodes.
 	- Sending a binding update with S=0.
 	- Sending/receiving the binding refresh request message.
+	- Regenerating a new IID when a DAD for a CoA failed.
 	- Multicast
 
+- misc.
+	- mip6-ha-ipsec
+	- racoon
 
 <<Usage>>
 
-We will write a newsletter which describes the configuration of Mobile
-IPv6.  Please see it.
+See the KAME newsletter "KAME Mobile IPv6 How To" for detail.

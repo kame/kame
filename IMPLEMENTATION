@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.320 2002/11/20 03:38:32 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.321 2002/12/12 10:23:37 keiichi Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -215,7 +215,7 @@ draft-ietf-ipngwg-rfc2292bis-08.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
-draft-ietf-mobileip-ipv6-14.txt: Mobility Support in IPv6
+draft-ietf-mobileip-ipv6-19.txt: Mobility Support in IPv6
     * See section 6.
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
@@ -2144,20 +2144,23 @@ compile ALTQ-ready kernel for other archititectures, take the following steps:
 
 With the latest Mobile IPv6 draft, no requirements for IPv6 nodes to
 be a correspondent node.  So, basically all IPv6 nodes can
-communicates with any mobile node using reverse tunneling from a
-mobilenode to a home agent.
+communicates with any mobile node using reverse tunneling from the
+mobile node to its home agent.
 
 In addition, KAME is developping more Mobile IPv6 code for all
 correspondent/mobile/home agent.
 
-6.2 KAME node as home agent/mobile node
+6.2 KAME node as a home agent/mobile node
 
-Currently, the draft-18 based Mobile IPv6 code is under developping.
+Currently, the draft-19 based Mobile IPv6 code is under developping.
+For more detail, please look into TODO.mobile-ip6 and the latest
+KAME newsletter about the KAME Mobile IPv6.
 
 6.3 Old Mobile IPv6 code
 
 The very old Mobile IPv6 code contributed from the Ericsson can be
-found at the following URL. It doesn't work with the current KAME.
+found at the following URL. These codes are for refernce purpose only.
+They don't work with the current KAME.
 
 	ftp://ftp.kame.net/kame/contrib/mip6/ericsson/
 
