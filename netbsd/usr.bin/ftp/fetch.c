@@ -594,11 +594,11 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 					goto cleanup_fetch_url;
 				}
 
-				if (strchr(phost, ':') != NULL &&
-				    strchr(phost, '%') != NULL) {
+				if (strchr(host, ':') != NULL &&
+				    strchr(host, '%') != NULL) {
 					warnx(
 "Scoped address notation `%s' disallowed via web proxy",
-					    phost);
+					    host);
 					FREEPTR(phost);
 					FREEPTR(pport);
 					FREEPTR(ppath);
