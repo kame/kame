@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.37 2000/04/26 15:58:03 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.38 2000/04/26 15:58:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -392,7 +392,7 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	int flags;
 {
 	unsigned int ifindex = (unsigned int)sa6->sin6_scope_id;
-	struct in6_addr *a6 = &sa6->sin6_addr;
+	const struct in6_addr *a6 = &sa6->sin6_addr;
 
 #ifdef notyet
 	if (flags & NI_NUMERICSCOPE) {
