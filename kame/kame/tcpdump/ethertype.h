@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: ethertype.h,v 1.6 96/07/14 18:21:49 leres Exp $ (LBL)
+ * @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/ethertype.h,v 1.1.1.1 1999/08/08 23:31:56 itojun Exp $ (LBL)
  */
 
 /* Types missing from some systems */
@@ -70,6 +70,9 @@
 #endif
 #ifndef ETHERTYPE_AARP
 #define ETHERTYPE_AARP		0x80f3
+#endif
+#ifndef ETHERTYPE_VLAN
+#define ETHERTYPE_VLAN		0x8100
 #endif
 #ifndef	ETHERTYPE_LOOPBACK
 #define	ETHERTYPE_LOOPBACK	0x9000
