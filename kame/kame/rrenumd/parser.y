@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.8 2000/11/08 03:03:34 jinmei Exp $	*/
+/*	$KAME: parser.y,v 1.9 2003/02/07 09:07:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,6 +58,9 @@ struct config_is_set {
 struct dst_list *dl_head;
 struct payload_list *pl_head, ple_cur;
 u_int retry;
+#ifndef LINE_MAX
+#define LINE_MAX 2048	/* XXX ToDo: fetch user.line_max via sysctl */
+#endif
 char errbuf[LINE_MAX];
 
 extern int lineno;
