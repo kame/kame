@@ -670,7 +670,7 @@ bgp_process_update(struct rpcb *bnp)
   int               aggregated;  /* logical                               */
   u_int32_t         originatorid;/* [rfc1966]          (net-order)        */
   struct clstrlist *cll;         /* [rfc1966]                             */
-  struct optatr *optatr;	 /* list of unrecognized attributes */
+  struct optatr *optatr = NULL;	 /* list of unrecognized attributes */
   u_int8_t          nhnalen;     /* Next Hop Network Addresses Length (+) */
   struct in6_addr   gnhaddr;     /* "nexthop" address                 (+) */
   struct in6_addr   lnhaddr;     /* "nexthop" address                 (+) */
@@ -1428,9 +1428,10 @@ bgp_process_update(struct rpcb *bnp)
 	  (bnp->rp_inpkt[k] & PA_FLAG_TRANS)) {
 #ifdef DEBUG_BGP
 	syslog(LOG_DEBUG,
-	       "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d");
-	optatr = add_optatr(optatr, &bnp->rp_inpkt[k], atrlen);
+	       "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d",
+	       __FUNCTION__, bnp->rp_inpkt[k + 1], atrdatalen);
 #endif 
+	optatr = add_optatr(optatr, &bnp->rp_inpkt[k], atrlen);
       }
 
       /* optional non-transitive attributes the Partial bit must be
