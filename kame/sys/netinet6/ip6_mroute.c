@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.16 2000/03/25 07:23:47 sumikawa Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.17 2000/04/18 12:36:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1440,6 +1440,20 @@ ip6_mdq(m, ifp, rt)
 	 */
 	for (mifp = mif6table, mifi = 0; mifi < nummifs; mifp++, mifi++)
 		if (IF_ISSET(mifi, &rt->mf6c_ifset)) {
+			/*
+			 * check if the outgoing packet is going to break
+			 * a scope boundary.
+			 */
+			if (in6_addr2scopeid(ifp, &ip6->ip6_dst) !=
+			    in6_addr2scopeid(mif6table[mifi].m6_ifp,
+					     &ip6->ip6_dst) ||
+			    in6_addr2scopeid(ifp, &ip6->ip6_src) !=
+			    in6_addr2scopeid(mif6table[mifi].m6_ifp,
+					     &ip6->ip6_dst)) {
+				ip6stat.ip6s_badscope++;
+				continue;
+			}
+
 			mifp->m6_pkt_out++;
 			mifp->m6_bytes_out += plen;
 			MC6_SEND(ip6, mifp, m);

@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.2 2000/04/18 08:54:33 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.3 2000/04/18 12:36:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -40,6 +40,7 @@
 
 #include <netinet/in.h>
 
+#include <netinet6/in6_var.h>
 #include <netinet6/scope6_var.h>
 
 struct scope6_id {
@@ -145,4 +146,94 @@ scope6_get(ifp, idlist)
 	      sizeof(scope6_ids[ifp->if_index].s6id_list));
 
 	return(0);
+}
+
+
+/*
+ * Get a scope of the address. Node-local, link-local, site-local or global.
+ */
+int
+in6_addrscope (addr)
+struct in6_addr *addr;
+{
+	int scope;
+
+	if (addr->s6_addr8[0] == 0xfe) {
+		scope = addr->s6_addr8[1] & 0xc0;
+
+		switch (scope) {
+		case 0x80:
+			return IPV6_ADDR_SCOPE_LINKLOCAL;
+			break;
+		case 0xc0:
+			return IPV6_ADDR_SCOPE_SITELOCAL;
+			break;
+		default:
+			return IPV6_ADDR_SCOPE_GLOBAL; /* just in case */
+			break;
+		}
+	}
+
+
+	if (addr->s6_addr8[0] == 0xff) {
+		scope = addr->s6_addr8[1] & 0x0f;
+
+		/*
+		 * due to other scope such as reserved,
+		 * return scope doesn't work.
+		 */
+		switch (scope) {
+		case IPV6_ADDR_SCOPE_NODELOCAL:
+			return IPV6_ADDR_SCOPE_NODELOCAL;
+			break;
+		case IPV6_ADDR_SCOPE_LINKLOCAL:
+			return IPV6_ADDR_SCOPE_LINKLOCAL;
+			break;
+		case IPV6_ADDR_SCOPE_SITELOCAL:
+			return IPV6_ADDR_SCOPE_SITELOCAL;
+			break;
+		default:
+			return IPV6_ADDR_SCOPE_GLOBAL;
+			break;
+		}
+	}
+
+	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
+		if (addr->s6_addr8[15] == 1) /* loopback */
+			return IPV6_ADDR_SCOPE_NODELOCAL;
+		if (addr->s6_addr8[15] == 0) /* unspecified */
+			return IPV6_ADDR_SCOPE_LINKLOCAL;
+	}
+
+	return IPV6_ADDR_SCOPE_GLOBAL;
+}
+
+int
+in6_addr2scopeid(ifp, addr)
+	struct ifnet *ifp;	/* must not be NULL */
+	struct in6_addr *addr;	/* must not be NULL */
+{
+	int scope = in6_addrscope(addr);
+
+	if (scope6_ids == NULL)	/* paranoid? */
+		return(0);	/* XXX */
+
+#define SID scope6_ids[ifp->if_index]
+	switch(scope) {
+	case IPV6_ADDR_SCOPE_NODELOCAL:
+		return(-1);	/* XXX: is this an appropriate value? */
+
+	case IPV6_ADDR_SCOPE_LINKLOCAL:
+		return(SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL]);
+
+	case IPV6_ADDR_SCOPE_SITELOCAL:
+		return(SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL]);
+
+	case IPV6_ADDR_SCOPE_ORGLOCAL:
+		return(SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL]);
+
+	default:
+		return(0);	/* XXX: treat as global. */
+	}
+#undef SID
 }
