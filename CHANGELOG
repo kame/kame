@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1385 2000/11/10 02:46:41 sakane Exp $
+$KAME: CHANGELOG,v 1.1386 2000/11/11 07:06:09 jinmei Exp $
 
 <200011>
+2000-11-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd: introduced some improvements and new features
+	mainly for auto router renumbering (RR):
+	- joined all-routers site-local multicast group when RR is enabled,
+	  and made the receiving interface configurable via a new command
+	  line option "-M".
+	- fixed many bugs in handling RR messages.
+	- supported lifetimes that decrement in real time, and will expire
+	  at a specified time in the future. 3 new parameters for
+	  rtadvd.conf were introduced to handle such lifetimes. See
+	  rtadvd.conf(5).
+
 Thu Nov  9 20:14:00 JST 2000 sakane@ydc.co.jp
 	* racoon:
 	check the address is suitable or not before using them when grabing
