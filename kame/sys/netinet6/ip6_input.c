@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.180 2001/02/26 08:02:45 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.181 2001/02/26 08:04:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2703,6 +2703,9 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			return(EINVAL);
 		}
 		return(error);
+	case IPV6CTL_V6ONLY:
+		/* XXX for bsdi4, should be made modifiable */
+		return sysctl_rdint(oldp, oldlenp, newp, ip6_v6only);
 	default:
 		return (sysctl_int_arr(ip6_sysvars, name, namelen,
 				       oldp, oldlenp, newp, newlen));
