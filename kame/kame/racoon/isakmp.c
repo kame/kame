@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.120 2001/01/10 16:27:34 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.121 2001/01/11 04:38:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1292,7 +1292,7 @@ isakmp_send(iph1, buf)
 	struct myaddrs *p, *lastresort = NULL;
 	int i;
 
-	sa = iph1->remote;
+	sa = iph1->local;
 
 	/* send to responder */
 	for (p = lcconf->myaddrs; p; p = p->next) {
