@@ -80,14 +80,6 @@ struct device {
 
 #define DV_IFNET 1
 
-struct cfdriver {
-  int zero;
-  char *name;
-  int one;
-  int cd_ndevs;
-  void *cd_devs[NEN];
-};
-
 #endif
 
 #if 1 /* for ATM_PVCEXT */
