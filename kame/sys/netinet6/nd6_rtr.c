@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.182 2001/11/06 08:14:16 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.183 2001/11/13 04:54:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -924,8 +924,7 @@ defrouter_select()
 	 * or when the new one has a really higher preference value.
 	 */
 	if (!selected_dr) {
-		if (!installed_dr ||
-		    installed_dr == TAILQ_LAST(&nd_defrouter, nd_drhead))
+		if (!installed_dr || !TAILQ_NEXT(installed_dr, dr_entry))
 			selected_dr = TAILQ_FIRST(&nd_defrouter);
 		else
  			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
