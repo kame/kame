@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.45 2002/01/11 02:29:31 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.46 2002/03/26 02:58:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -320,7 +320,7 @@ ifconfig(char *ifname)
 	}
 	if (find_ifinfo(sdl->sdl_index)) {
 		warnmsg(LOG_ERR, __FUNCTION__,
-			"interface %s was already cofigured", ifname);
+			"interface %s was already configured", ifname);
 		free(sdl);
 		return(-1);
 	}
