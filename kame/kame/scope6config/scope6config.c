@@ -41,18 +41,26 @@
 #include <stdio.h>
 #include <err.h>
 #include <unistd.h>
+#include <ifaddrs.h>
+
+static int scopeconfig __P((const char *, u_int32_t, u_int32_t, u_int32_t));
 
 int
 main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int i, s, ch;
-	struct in6_ifreq ifreq;
+	int ch;
 	u_int32_t linkid = 0, siteid = 0, orgid = 0;
+	int aflag = 0;
+	int error;
+	struct ifaddrs *ifap, *ifa;
 
-	while ((ch = getopt(argc, argv, "l:s:o:")) != -1) {
+	while ((ch = getopt(argc, argv, "al:s:o:")) != -1) {
 		switch(ch) {
+		case 'a':
+			aflag++;
+			break;
 		case 'l':
 			linkid = atoi(optarg);
 			break;
@@ -67,18 +75,55 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc < 1) {
+	if ((aflag && argc != 0) || (!aflag && argc != 1)) {
 		fprintf(stderr,
 			"usage: scope6config [-l linkid] [-s siteid] "
 			"[-o orgid] ifname\n");
+		fprintf(stderr,
+			"       scope6config -a\n");
 		exit(1);
 	}
+
+	if (!aflag)
+		error = scopeconfig(argv[0], linkid, siteid, orgid);
+	else {
+		const char *prev;
+
+		if (getifaddrs(&ifap) != 0) {
+			err(1, "getifaddrs");
+			/*NOTREACHED*/
+		}
+
+		prev = NULL;
+		error = 0;
+		for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+			if (prev && strcmp(prev, ifa->ifa_name) == 0)
+				continue;
+			error = scopeconfig(ifa->ifa_name, 0, 0, 0);
+			if (error)
+				break;
+			prev = ifa->ifa_name;
+		}
+		freeifaddrs(ifap);
+	}
+	exit(error);
+}
+
+static int
+scopeconfig(name, linkid, siteid, orgid)
+	const char *name;
+	u_int32_t linkid;
+	u_int32_t siteid;
+	u_int32_t orgid;
+{
+	struct in6_ifreq ifreq;
+	int i, s;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 
 	memset(&ifreq, 0, sizeof(ifreq));
-	strncpy(ifreq.ifr_name, argv[0], sizeof(ifreq.ifr_name));
+	strncpy(ifreq.ifr_name, name, sizeof(ifreq.ifr_name));
 
 	if (linkid || siteid || orgid) {
 		ifreq.ifr_ifru.ifru_scope_id[2] = linkid;
@@ -91,10 +136,11 @@ main(argc, argv)
 	if (ioctl(s, SIOCGSCOPE6, (caddr_t)&ifreq) < 0)
 		err(1, "ioctl(SIOCGSCOPE6)");
 
+	printf("%s:", name);
 	for (i = 0; i < 16; i++)
-		printf("%d, ", ifreq.ifr_ifru.ifru_scope_id[i]);
+		printf("%s %d", i ? "," : "", ifreq.ifr_ifru.ifru_scope_id[i]);
 
 	putchar('\n');
 
-	exit(0);
+	return 0;
 }
