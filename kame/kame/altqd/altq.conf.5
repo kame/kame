@@ -1,4 +1,4 @@
-.\"	$KAME: altq.conf.5,v 1.7 2000/11/09 02:50:45 itojun Exp $
+.\"	$KAME: altq.conf.5,v 1.8 2001/04/09 16:26:28 thorpej Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -11,7 +11,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 
+.\"
 .\" THIS SOFTWARE IS PROVIDED BY SONY CSL AND CONTRIBUTORS ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 .\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -40,13 +40,13 @@ disciplines.  Comments start with a # and extend to the end of the line.
 .Pp
 The
 .Xr altqd 8
-program reads 
+program reads
 .Pa /etc/altq.conf
 at startup and sets up queueing disciplines.
 BLUE, CBQ (Class-Based Queueing), FIFOQ (First-In First-Out Queue),
 HFSC (Hierarchical Fair Service Curve), PRIQ (Priority Queueing),
 RED (Random Early Detection), RIO (RED with IN/OUT),
-WFQ (Weighted Fair Queueing), 
+WFQ (Weighted Fair Queueing),
 and CDNR (Diffserv Traffic Conditioner) can be configured in this file.
 .Pp
 .Sh Interface Commands
@@ -59,7 +59,7 @@ and CDNR (Diffserv Traffic Conditioner) can be configured in this file.
 .Op Ar discipline-specific-options
 .El
 .Pp
-The 
+The
 .Sy interface
 command specifies a network interface to be under control of ALTQ.
 One interface specification is provided for each network interface
@@ -70,11 +70,11 @@ multiple interface specifications.
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
-specifies the interface bandwidth in bits per second.  
+specifies the interface bandwidth in bits per second.
 This is the maximum rate that the queueing discipline will allow on this
 interface.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 When
 .Sy tbrsize
 is omitted, the system automatically sets the bucket size
@@ -92,7 +92,7 @@ Type of a queueing discipline.  It must be either
 .Sy red ,
 .Sy rio ,
 or
-.Sy wfq.
+.Sy wfq .
 If the interface has only traffic conditioners and no queueing
 discipline, sched_type can be omitted.
 .El
@@ -110,7 +110,7 @@ discipline, sched_type can be omitted.
 .Op Ar discipline-specific-options
 .El
 .Pp
-The 
+The
 .Sy class
 command specifies a packet scheduling class for CBQ, HFSC, or PRIQ.
 A class specifier must be provided for each packet scheduling class.
@@ -121,7 +121,7 @@ in interface specification.
 .It Em if_name
 Interface name. Must correspond to name in interface specification.
 .It Em class_name
-Arbitrary name for this class.  Must be unique for this interface.  
+Arbitrary name for this class.  Must be unique for this interface.
 .It Em parent_name
 The name of the parent class for this class (for CBQ or HFSC).
 Parent class must have been previously defined.
@@ -151,12 +151,12 @@ Clear diffserv codepoint in the IP header.
 .Ar filter_values
 .El
 .Pp
-The 
+The
 .Sy filter
 command specifies a filter to classify packets into
 a scheduling class.
 A filter specifier determines any statically-defined packet
-classification rules.  
+classification rules.
 .Bl -tag -width 10n -offset indent
 .It Em if_name
 Name of a network interface (e.g., fxp0).
@@ -172,27 +172,27 @@ from a filter with a larger ruleno.  Default is 0.
 .Em filter_value
 should be in the following format:
 .Bl -tag -width filter -offset indent
-.It filter_values:
+.It filter_values :
 .Ad dst_addr Op Cm netmask Ar mask
 .Ar dport
 .Ad src_addr Op Cm netmask Ar mask
 .Ar sport
 .Ar proto
 .Oo
-.Sy tos 
-.Ar value 
+.Sy tos
+.Ar value
 .Op Cm tosmask Ar value
 .Oc
 .Op Cm gpi Ar value
 .El
 .Pp
-Here 
+Here
 .Ad dst_addr
 and
 .Ad src_addr
 are dotted-decimal addresses of
 the destination and the source respectively.  An address may be
-followed by 
+followed by
 .Sy netmask
 keyword.
 .Em dport
@@ -204,7 +204,7 @@ is a protocol number defined for IP packets (e.g. 6 for TCP).
 .Sy tos
 keyword can be used to specify the type of service field value.
 .Sy gpi
-keyword can be used to specify the Security Parameter Index value for 
+keyword can be used to specify the Security Parameter Index value for
 IPSec.
 .Pp
 When filter value 0 is used, it is taken as a wildcard.
@@ -217,13 +217,13 @@ When filter value 0 is used, it is taken as a wildcard.
 .Ar filter6_values
 .El
 .Pp
-The 
+The
 .Sy filter6
-command is for IPv6. 
+command is for IPv6.
 .Em filter6_value
 should be in the following format:
 .Bl -tag -width filter6 -offset indent
-.It filter6_values:
+.It filter6_values :
 .Ad dst_addr[/prefix_len]
 .Ar dport
 .Ad src_addr[/prefix_len]
@@ -232,19 +232,19 @@ should be in the following format:
 .Op Cm flowlabel Ar value
 .Oo
 .Sy tclass
-.Ar value 
+.Ar value
 .Op Cm tclassmask Ar value
 .Oc
 .Op Cm gpi Ar value
 .El
 .Pp
-Here 
+Here
 .Ad dst_addr
 and
 .Ad src_addr
 are IPv6 addresses of the destination and the source respectively.
-An address may be followed by an optional 
-.Sy address prefix length.
+An address may be followed by an optional
+.Sy address prefix length .
 .Em dport
 and
 .Em sport
@@ -263,10 +263,10 @@ When filter value 0 is used, it is taken as a wildcard.
 .Pp
 .Sh CBQ Commands
 CBQ (Class Based Queueing) achieves both partitioning and sharing of
-link bandwidth  by hierarchically structured classes.  
+link bandwidth  by hierarchically structured classes.
 Each class has its own queue and is assigned its share of bandwidth.
 A child class can borrow bandwidth from its parent class as long as
-excess bandwidth is available. 
+excess bandwidth is available.
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -280,27 +280,27 @@ excess bandwidth is available.
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
-specifies the interface bandwidth in bits per second.  
+specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
 must be either
 .Sy cbq ,
 .Sy cbq-wrr
-(weighted-round robin) or 
+(weighted-round robin) or
 .Sy cbq-prr
 (packet-by-packet round robin).
 .Sy cbq
-is equivalent to 
-.Sy cbq-wrr.
+is equivalent to
+.Sy cbq-wrr .
 .It Sy efficient
 Enables CBQ's link efficiency mode.  This means that
 the scheduler will send a packet from the first overlimit
 class it encounters of all classes of the link-sharing
-structure when all classes are overlimit.  
+structure when all classes are overlimit.
 This will also cause the scheduler to use greater than it's assigned
 bandwidth, if the link is capable of more than the assigned bandwidth.
-By default, this mode is turned off.  By adding the keyword 
+By default, this mode is turned off.  By adding the keyword
 .Sy efficient
 to the interface specification line, enables this mode.
 .El
@@ -331,7 +331,7 @@ to the interface specification line, enables this mode.
 .Op Cm cleardscp
 .El
 .Pp
-The 
+The
 .Sy class
 command specifies a CBQ class.
 The classes are organized as a hierarchy, and every class, except
@@ -345,11 +345,11 @@ for a CBQ class.
 Interface name. Must correspond to name in interface specification.
 .It Em class_name
 Arbitrary name for this class.  Must be unique within the class
-hierarchy for this interface.  The name 
+hierarchy for this interface.  The name
 .Sy ctl_class
 is a reserved class name.
 .It Em parent_name
-The name of the parent class for this class or 
+The name of the parent class for this class or
 .Sy NULL
 if this is the root class.  Parent class must have been previously defined.
 .It Sy admission
@@ -358,11 +358,11 @@ The type of admission control and QoS type.
 is controlled load service for
 .Em RSVP ,
 otherwise, it should be
-.Sy none.
-The default is 
-.Sy none.
+.Sy none .
+The default is
+.Sy none .
 .It Sy priority
-High numbers are higher priority.  Max value is 7 and Min value is 0. 
+High numbers are higher priority.  Max value is 7 and Min value is 0.
 Default is 1.
 .It Sy pbandwidth
 The percentage of the interface bandwidth allocated to this class.
@@ -370,8 +370,8 @@ Generally should add up to 100 percent at each level of the class
 hierarchy, although other amounts can be specified for purposes of
 experimentation.
 .It Sy exactbandwidth
-Specify the bandwidth in bits-per-second instead of 
-.Sy pbandwidth.
+Specify the bandwidth in bits-per-second instead of
+.Sy pbandwidth .
 Note that the bandwidth allocation of CBQ is not so precise but this
 is just a way to pass a parameter to CBQ; the user is supposed to know
 the detailed internals of CBQ.
@@ -381,7 +381,7 @@ is a preferred way to specify the bandwidth of a class.
 The class can borrow bandwidth from its parent class when this class
 is overlimit.
 If this keyword is not present, then no borrowing is done, and the
-packet is delayed or dropped when the class is overlimit. 
+packet is delayed or dropped when the class is overlimit.
 .It Sy default
 Specify the default class.  When this keyword is present, all packets
 that do not match some classification criteria are assigned to this
@@ -390,7 +390,7 @@ default class.
 .It Sy control
 Specify the control class.  When this keyword is present, the predefined
 control class packets (RSVP, IGMP, and ICMP) are assigned to this
-class.  
+class.
 Note that when the control class is not specified by the time the
 default class is created, one is automatically created with default
 parameters.  Thus, if the control class is specified, it must be
@@ -399,7 +399,7 @@ Must be exactly one class on each interface defined as the
 control class.
 .It Sy maxburst
 The maximum burst of back-to-back packets allowed in this class.
-Default is 16 but the default value is automatically reduced to 4 when 
+Default is 16 but the default value is automatically reduced to 4 when
 the class bandwidth is small (about less than 1Mbps).
 .It Sy minburst
 The minimum burst is used to obtain the steady state burst size.  It's
@@ -413,7 +413,7 @@ If not specified, the default max queue size (30 packets) is used.
 The average packet size in bytes to be used in CBQ over-/under-limit
 computations.  Default value is MTU of the interface.
 .It Sy maxpacketsize
-The maxium packet size in bytes for the class.  
+The maxium packet size in bytes for the class.
 Default value is MTU of the interface.
 .It Sy red
 enables RED on this class queue.
@@ -436,7 +436,7 @@ HFSC has 2 independent scheduling mechanisms.
 Real-time scheduling is used to guarantee the delay and the
 bandwidth allocation at the same time.
 Hierarchical link-sharing is used to distribute the excess
-bandwidth.  
+bandwidth.
 When dequeueing a packet, HFSC always tries real-time scheduling
 first.  If no packet is eligible for real-time scheduling,
 link-sharing scheduling is performed.
@@ -453,9 +453,9 @@ HFSC does not use class hierarchy for real-time scheduling.
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
-specifies the interface bandwidth in bits per second.  
+specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
 must be
 .Sy hfsc
@@ -481,7 +481,7 @@ for HFSC.
 .Op Cm cleardscp
 .El
 .Pp
-The 
+The
 .Sy class
 command specifies a HFSC class.
 The classes are organized as a hierarchy, and every class, except
@@ -491,11 +491,11 @@ Each HFSC class has 2 service curves, the real-time service curve and
 the link-sharing service curve.  Service curves are specified by
 .Bq Em type m1 d m2
 \&.
-.Em type 
+.Em type
 should be either
 .Sy sc, rt
 or
-.Sy ls.
+.Sy ls .
 .Sy sc
 (service curve) is used to set the same values to both service curves.
 .Sy rt
@@ -507,7 +507,7 @@ is the slope of the first segment specified in bits-per-second.
 .Em d
 is the x-projection of the intersection point of the 2 segments
 specified in milli-second.
-.Em m2 
+.Em m2
 is the slope of the second segment specified in bits-per-second.
 .Bl -tag -width 8n -offset indent
 .It Em sched_type
@@ -518,7 +518,7 @@ for a HFSC class.
 Interface name. Must correspond to name in interface specification.
 .It Em class_name
 Arbitrary name for this class.  Must be unique within the class
-hierarchy for this interface.  The name 
+hierarchy for this interface.  The name
 .Sy root
 is a reserved class name for the root class.  The root class for the
 interface is automatically created by the
@@ -535,9 +535,9 @@ The type of admission control and QoS type.
 is controlled load service for
 .Em RSVP ,
 otherwise, it should be
-.Sy none.
-The default is 
-.Sy none.
+.Sy none .
+The default is
+.Sy none .
 .It Sy pshare
 Percent of the link share.  This specifies a linear link-sharing
 service curve as a fraction of the link bandwidth.
@@ -551,7 +551,7 @@ that do not match some classification criteria are assigned to this
 class.  Must be exactly one class on each interface defined as the
 default class.
 .It Sy qlimit
-The maxium queue size in number of packets.  
+The maxium queue size in number of packets.
 Default value is 50.
 .It Sy red
 enables RED on this class queue.
@@ -579,9 +579,9 @@ Up to 16 priorities can be used with PRIQ.
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
-specifies the interface bandwidth in bits per second.  
+specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
 must be
 .Sy priq
@@ -604,7 +604,7 @@ for PRIQ.
 .Pp
 .Bl -tag -width 8n -offset indent
 .It Em sched_type
-must be 
+must be
 .Sy priq
 for a PRIQ class.
 .It Em if_name
@@ -614,17 +614,17 @@ Arbitrary name for this class.  Must be unique for this interface.
 .It Em parent_name
 Parent class must be ``NULL'' for PRIQ.
 .It Sy priority
-High numbers are higher priority. 
-Max value is 15 and Min value is 0.  Default is 0. 
+High numbers are higher priority.
+Max value is 15 and Min value is 0.  Default is 0.
 A higher priority class is always served first in PRIQ.
-Priority must be unique for the interface. 
+Priority must be unique for the interface.
 .It Sy default
 Specify the default class.  When this keyword is present, all packets
 that do not match some classification criteria are assigned to this
 class.  Must be exactly one class on each interface defined as the
 default class.
 .It Sy qlimit
-The maxium queue size in number of packets.  
+The maxium queue size in number of packets.
 Default value is 50.
 .It Sy red
 enables RED on this class queue.
@@ -640,7 +640,7 @@ clears diffserv codepoint in the IP header.
 WFQ (Weighted Fair Queueing) implements a weighted-round robin
 scheduler for a set of queue.
 A weight can be assigned to each queue to give a
-different proportion of the link capacity. 
+different proportion of the link capacity.
 A hash function is used to map a flow to one of a set of queues, and
 thus, it is possible for two different flows to be mapped into the same
 queue.
@@ -661,7 +661,7 @@ specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
 specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
 must be
 .Sy wfq
@@ -671,7 +671,7 @@ The number of queues in WFQ.  Default value is 256.
 .It Sy qsize
 The size of each queue in number of bytes.  Default value is 64K bytes.
 .It Sy hash
-Type of hash policy to select a queue.  
+Type of hash policy to select a queue.
 .Sy dstaddr
 specifies a hashing policy by IP destination address.
 .Sy full
@@ -702,20 +702,20 @@ specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
 specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
-must be 
+must be
 .Sy fifoq
 for FIFOQ.
 .It Sy qlimit
-The maxium queue size in number of packets.  
+The maxium queue size in number of packets.
 Default value is 50.
 .El
 .Pp
 .Sh RED Commands
 RED (Random Early Detection) is an implicit congestion notification
 mechanism that exercises packet dropping or packet marking
-stochastically according to the average queue length.   
+stochastically according to the average queue length.
 RED can be viewed as a buffer management mechanism
 and can be integrated into other packet scheduling schemes.
 .Bl -tag -width red -offset indent
@@ -733,7 +733,7 @@ and
 .Em max_th
 are the minimum and the maximum threshold values.
 .Em inv_pmax
-is the inverse (reciprocal) of the maximum drop probability.  
+is the inverse (reciprocal) of the maximum drop probability.
 For example, 10 means the maximum drop probability of 1/10.
 .Bl -tag -width interface -offset indent
 .It Nm interface
@@ -757,16 +757,16 @@ specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
 specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
 must be
 .Sy red
 for RED.
 .It Sy qlimit
-The maxium queue size in number of packets.  
+The maxium queue size in number of packets.
 Default value is 60.
 .It Sy packetsize
-The average packet size in number of bytes.  This parameter is used to 
+The average packet size in number of bytes.  This parameter is used to
 calibrate the idle period.  Default value is 1000.
 .It Sy weight
 The inverse of the weight of EWMA (exponentially weighted moving average).
@@ -784,16 +784,16 @@ enables flowvalve.
 .Pp
 .Sh RIO Commands
 ALTQ/RIO has 3 drop precedence levels defined for the Assured
-Forwarding of DiffServ (RFC2597). 
+Forwarding of DiffServ (RFC2597).
 Since adaptive flows are likely to stay under
 the medium drop precedence level under congestion, the medium drop
-precedence would protect adaptive flows from unadaptive flows. 
+precedence would protect adaptive flows from unadaptive flows.
 .Pp
 The original RIO has 2 sets of RED parameters; one for in-profile
 packets and the other for out-of-profile packets.
 At the ingress of the network, profile meters tag packets as IN
 or OUT based on contracted profiles for customers.
-Inside the network, IN packets receive preferential treatment by 
+Inside the network, IN packets receive preferential treatment by
 the RIO dropper.
 It is possible to provision the network not to drop IN packets
 at all by providing enough capacity for the total volume of IN
@@ -846,16 +846,16 @@ specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
 specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
-must be 
+must be
 .Sy rio
 for RIO.
 .It Sy qlimit
-The maxium queue size in number of packets.  
+The maxium queue size in number of packets.
 Default value is 60.
 .It Sy packetsize
-The average packet size in number of bytes.  This parameter is used to 
+The average packet size in number of bytes.  This parameter is used to
 calibrate the idle period.  Default value is 1000.
 .It Sy weight
 The inverse of the weight of EWMA (exponentially weighted moving average).
@@ -901,13 +901,13 @@ specifies the name of a network interface (e.g., fxp0).
 .It Sy bandwidth
 specifies the interface bandwidth in bits per second.
 .It Sy tbrsize
-specifies the bucket size of a token bucket regulator in bytes.  
+specifies the bucket size of a token bucket regulator in bytes.
 .It Em sched_type
-must be 
+must be
 .Sy blue
 for BLUE.
 .It Sy qlimit
-The maxium queue size in number of packets.  
+The maxium queue size in number of packets.
 Default value is 60.
 .It Sy packetsize
 The average packet size in number of bytes.  Default value is 1000.
@@ -921,7 +921,7 @@ enables ECN.
 .Pp
 .Sh CDNR Commands
 The
-.Sy conditioner 
+.Sy conditioner
 command specifies a diffserv traffic conditioner.  A traffic
 conditioner is not a queueing discipline but a component to meter,
 mark or drop incoming packets according to some rules.
@@ -955,7 +955,7 @@ Interface name. Must correspond to name in interface specification.
 Arbitrary name for this conditioner.  Must be unique for this
 interface.
 .It Em action
-Action of the conditioner.  
+Action of the conditioner.
 .El
 .Pp
 An action can be a recursively defined action. The following actions
@@ -988,7 +988,7 @@ packet is allowed to go through.
 .Pp
 .Bl -tag -width tbmeter -offset indent
 .It Nm tbmeter
-.Ar rate depth 
+.Ar rate depth
 .Aq in_action
 .Aq out_action
 .Pp
@@ -1004,7 +1004,7 @@ Otherwise, tbmeter takes out_action.
 .Pp
 .Bl -tag -width trtcm -offset indent
 .It Nm trtcm
-.Ar cmtd_rate cmtd_depth peak_rate peak_depth 
+.Ar cmtd_rate cmtd_depth peak_rate peak_depth
 .Aq green_action
 .Aq yellow_action
 .Aq red_action
@@ -1026,7 +1026,7 @@ yellow or red but can not be blue.  Default is color-blind.
 .Pp
 .Bl -tag -width tswtcm -offset indent
 .It Nm tswtcm
-.Ar cmtd_rate peak_rate avg_interval 
+.Ar cmtd_rate peak_rate avg_interval
 .Aq green_action
 .Aq yellow_action
 .Aq red_action
@@ -1062,7 +1062,7 @@ CBQ Example:
 interface vx0 bandwidth 10M cbq
 #
 class cbq vx0 root_class NULL priority 0 pbandwidth 100
-class cbq vx0 def_class root_class borrow pbandwidth 95 default 
+class cbq vx0 def_class root_class borrow pbandwidth 95 default
 class cbq vx0 tcp_class def_class borrow pbandwidth  40
         filter vx0 tcp_class 0 0 0 0 6
 class cbq vx0 csl_class tcp_class pbandwidth  10   red
@@ -1087,25 +1087,25 @@ class hfsc pvc0 def_class root pshare 10 default
 #    CMU:       45%             15Mbps
 #    PITT:      45%             15Mbps
 #
-class hfsc pvc0 cmu  root pshare 45 grate 15M 
-class hfsc pvc0 pitt root pshare 45 grate 15M 
+class hfsc pvc0 cmu  root pshare 45 grate 15M
+class hfsc pvc0 pitt root pshare 45 grate 15M
 #
 # CMU      bandwidth share    guaranteed rate
 #    CS:        20%             10Mbps
 #    other:     20%              5Mbps
 #
-class hfsc pvc0 cmu_other cmu  pshare 20 grate 10M 
+class hfsc pvc0 cmu_other cmu  pshare 20 grate 10M
         filter pvc0 cmu_other   0 0 128.2.0.0   netmask 0xffff0000 0 0
-class hfsc pvc0 cmu_cs    cmu  pshare 20 grate  5M 
+class hfsc pvc0 cmu_cs    cmu  pshare 20 grate  5M
         filter pvc0 cmu_cs      0 0 128.2.242.0 netmask 0xffffff00 0 0
 #
 # PITT     bandwidth share    guaranteed rate
 #    CS:        20%             10Mbps
 #    other:     20%              5Mbps
 #
-class hfsc pvc0 pitt_other pitt  pshare 20 grate 10M 
+class hfsc pvc0 pitt_other pitt  pshare 20 grate 10M
         filter pvc0 pitt_other  0 0 136.142.0.0  netmask 0xffff0000 0 0
-class hfsc pvc0 pitt_cs    pitt  pshare 20 grate  5M 
+class hfsc pvc0 pitt_cs    pitt  pshare 20 grate  5M
         filter pvc0 pitt_cs     0 0 136.142.79.0 netmask 0xffffff00 0 0
 
 

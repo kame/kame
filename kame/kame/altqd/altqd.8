@@ -1,4 +1,4 @@
-.\"	$KAME: altqd.8,v 1.3 2000/11/09 02:52:43 itojun Exp $
+.\"	$KAME: altqd.8,v 1.4 2001/04/09 16:26:28 thorpej Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -11,7 +11,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 
+.\"
 .\" THIS SOFTWARE IS PROVIDED BY SONY CSL AND CONTRIBUTORS ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 .\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -30,20 +30,20 @@
 .Nm altqd
 .Nd ALTQ daemon
 .Sh SYNOPSIS
-.Nm altqd 
+.Nm altqd
 .Op Fl f Ar conf_file
 .Op Fl dvD
 .Sh DESCRIPTION
 .Nm
 is a daemon program that reads a configuration file and then sets up
 the ALTQ state of network interfaces.  After configuring the ALTQ
-state, 
+state,
 .Nm
 will detach and become a daemon.
 
-The signal SIGINT or SIGTERM will shutdown 
+The signal SIGINT or SIGTERM will shutdown
 .Nm
-, and the signal SIGHUP will restart 
+, and the signal SIGHUP will restart
 .Nm
 \&.
 .Pp
@@ -51,28 +51,28 @@ The following options are available:
 .Bl -tag -width Fl -offset indent
 .It Fl f
 Specify a configuration file to read instead of the default.  The
-default file is 
+default file is
 .Pa /etc/altq.conf
 \&.
 .It Fl d
-Debug mode. 
+Debug mode.
 .Nm
 does not detach and goes into the command mode.
 .It Fl v
-Print debugging information.  This option implies 
+Print debugging information.  This option implies
 .Fl d
 \&.
 .It Fl D
-Dummy mode.  
+Dummy mode.
 .Nm
 does not issue altq system calls.
 .El
 
 .Sh COMMANDS
-When 
+When
 .Fl d
-option is provided, 
-.Nm 
+option is provided,
+.Nm
 goes into the command mode after reading the configuration file and
 setting up the ALTQ state.  Each command is a single line, starting
 with the command verb.
@@ -86,16 +86,16 @@ Exit.
 .It Sy altq reload
 reload the configuration file and reinitialize ALTQ.
 .It Sy altq Em iface_name Op enable|disable
-Enables or disables ALTQ on the interface named 
-.Em iface_name.
-When 
+Enables or disables ALTQ on the interface named
+.Em iface_name .
+When
 .Nm
 enters the command mode, ALTQ is enabled on all the
 interfaces listed in the configuration file.
 .El
 
 .Sh FILES
-.Pa /etc/altq.conf , 
+.Pa /etc/altq.conf ,
 .Pa /var/run/altqd.pid
 .Pa /var/run/altq_quip
 .Sh SEE ALSO
