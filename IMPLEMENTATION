@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.383 2005/01/30 03:13:04 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.384 2005/02/10 08:27:26 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -322,10 +322,7 @@ such cases DAD may fail, because the DAD engine sees inbound NS packet
 duplicate.  In this case, drivers should be corrected to honor
 IFF_SIMPLEX behavior.  For example, you may need to check source MAC
 address on an inbound packet, and reject it if it is from the node
-itself.  You may also want to look at #if condition marked
-"heuristics" in sys/netinet6/nd6_nbr.c:nd6_dad_timer() as workaround
-(note that the code fragment in "heuristics" section is not spec
-compliant).
+itself.
 
 Neighbor Discovery specification (RFC2461) does not talk about neighbor
 cache handling in the following cases:
