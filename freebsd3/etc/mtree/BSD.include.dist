@@ -1,0 +1,70 @@
+#	$Id: BSD.include.dist,v 1.24 1998/12/13 04:38:28 dillon Exp $
+#
+
+/set type=dir uname=root gname=wheel mode=0755
+.
+    arpa
+    ..
+    cam
+        scsi
+        ..
+    ..
+    g++
+        std
+        ..
+    ..
+    isofs
+        cd9660
+        ..
+    ..
+    machine
+    ..
+    msdosfs
+    ..
+    net
+    ..
+    netatalk
+    ..
+    netatm
+    ..
+    netinet
+    ..
+    netipx
+    ..
+    netkey
+    ..
+    netns
+    ..
+    nfs
+    ..
+    objc
+    ..
+    pccard
+    ..
+    posix4
+    ..
+    protocols
+    ..
+    readline
+    ..
+    rpc
+    ..
+    rpcsvc
+    ..
+    security
+    ..
+    ss
+    ..
+    sys
+    ..
+    ufs
+        ffs
+        ..
+        mfs
+        ..
+        ufs
+        ..
+    ..
+    vm
+    ..
+..
