@@ -577,7 +577,7 @@ ether_input(ifp, eh, m)
 				    sdl->sdl_family == AF_LINK)
 					break;
 
-			if (sdl && memcmp(LLADDR(sdl), eh->ether_shost,
+			if (sdl && bcmp(LLADDR(sdl), eh->ether_shost,
 			    ETHER_ADDR_LEN) == 0) {
 				m_freem(m);
 				return;
