@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2109 2002/03/29 13:38:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2110 2002/03/31 17:21:30 jinmei Exp $
 
 <200203>
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd4, netbsd, openbsd}/sys/net/route.c: added an ability to
+	manage the number of route entries that can be regarded as cache,
+	in order to prevent local/remote DoS.  This is a preliminary and
+	experimental support, which will need more work.  The same
+	function for bsdi will be committed next week.
+
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.c: ported routing entry timer from
+	NetBSD (which was originally derived from BSD/OS).
+
 2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/mld6v2.c (make_mld6v2_msg):
 	* kame/kame/pim6sd/mld6.c (make_mld6_msg):
