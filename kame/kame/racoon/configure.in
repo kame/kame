@@ -23,7 +23,7 @@ AC_ARG_ENABLE(yydebug, [  --enable-yydebug        build a yydebug version],
 	enable_yydebug=yes], [enable_yydebug=no])
 AC_MSG_RESULT($enable_yydebug)
 
-OPTFLAG="-Wall $OPTFLAG"
+OPTFLAG="-Wall -Wmissing-prototypes -Wmissing-declarations $OPTFLAG"
 AC_MSG_CHECKING(if --enable-pedant option is specified)
 AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compiler options],
 	[OPTFLAG="-Werror $OPTFLAG"; enable_pedant=yes],

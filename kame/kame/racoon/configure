@@ -1096,7 +1096,7 @@ fi
 
 echo "$ac_t""$enable_yydebug" 1>&6
 
-OPTFLAG="-Wall $OPTFLAG"
+OPTFLAG="-Wall -Wmissing-prototypes -Wmissing-declarations $OPTFLAG"
 echo $ac_n "checking if --enable-pedant option is specified""... $ac_c" 1>&6
 echo "configure:1102: checking if --enable-pedant option is specified" >&5
 # Check whether --enable-pedant or --disable-pedant was given.
