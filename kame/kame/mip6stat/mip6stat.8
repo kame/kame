@@ -1,0 +1,88 @@
+.\"
+.\"     $Id: mip6stat.8,v 1.1 2000/02/07 17:27:10 itojun Exp $
+.\"
+.Dd Nov 22, 1999
+.Dt MIP6STAT 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm mip6stat
+.Nd Show Mobile IPv6 configuration
+.\"
+.Sh SYNOPSIS
+.Nm mip6stat
+.Fl a
+.Op Fl ln
+.Nm mip6stat
+.Fl A
+.Nm mip6stat
+.Fl c
+.Op Fl ln
+.Nm mip6stat
+.Fl C
+.Nm mip6stat
+.Fl f
+.Op Fl ln
+.Nm mip6stat
+.Fl F
+.Nm mip6stat
+.Fl m
+.Op Fl ln
+.Nm mip6stat
+.Fl M
+.Nm mip6stat
+.Fl p
+.Op Fl l
+.Nm mip6stat
+.Fl P
+.Nm mip6stat
+.Fl u
+.Op Fl ln
+.Nm mip6stat
+.Fl U
+.Nm mip6stat
+.Fl h
+.Sh DESCRIPTION
+The
+.Nm
+command displays or clears the contents of various Mobile
+IPv6-related data structures. Some commands may require
+superuser privileges.
+.\"
+.Ss OPTIONS
+.Bl -tag -width Ds
+.It Fl h
+Show a simple usage information.
+.It Fl a
+Print home agent list.
+.It Fl A
+Clear home agent list.
+.It Fl c
+Print binding cache.
+.It Fl C
+Clear binding cache.
+.It Fl f
+Print static address list.
+.It Fl F
+Clear static address list.
+.It Fl m
+Print home address.
+.It Fl M
+Clear home address.
+.It Fl p
+Print configuration.
+.It Fl P
+Restore default configuration.
+.It Fl u
+Print binding update list.
+.It Fl U
+Clear binding update list.
+.It Fl n
+Show network addresses as numbers. This option
+may be used with any of the display formats.
+.It Fl l
+Show more infomation. This option
+may be used with any of the display formats.
+.El
+.Sh AUTHOR
+Magnus Braathen <magnus.braathen@era.ericsson.se>

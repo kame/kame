@@ -11,4 +11,6 @@ SUBDIR+=altqd
 .endif
 #SUBDIR+=inet6d
 
+SUBDIR+=mip6config mip6stat
+
 .include <bsd.subdir.mk>

@@ -1,0 +1,16 @@
+debug
+#homeaddr trent_lnc1_300/64@lnc1%bach_xl0
+#coaddr 3ffe:200:8:333:210:5aff:fe2d:535f/64@lnc1
+#enable_ha
+#bu_lifetime 3600
+#br_update 50
+autoconfig
+#ha_pref 100
+#hr_lifetime 3600
+#fwd_sl_unicast
+#fwd_sl_multicast
+#prom_mode
+#bu_to_cn
+#rev_tunnel
+#enable_br
+#eager_md

@@ -1,0 +1,156 @@
+.\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: mip6config.8,v 1.1 2000/02/07 17:27:07 itojun Exp $
+.\"
+.Dd Nov 22, 1999
+.Dt MIP6CONFIG 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm mip6config
+.Nd Configure the Mobile IPv6 kernel module
+.\"
+.Sh SYNOPSIS
+.Nm mip6config
+.Fl H Ar home_address/plen@if%ha_addr
+.Op Fl F Ar foreign_address/plen@if
+.Op Fl b Ar bu_lifetime
+.Op Fl w Ar br_time
+.Op Fl l Ar hr_lifetime
+.Op Fl depqrt Ar 0/1
+.Nm mip6config
+.Fl a
+.Op Fl F Ar foreign_address/plen@if
+.Op Fl b Ar bu_lifetime
+.Op Fl w Ar br_time
+.Op Fl l Ar hr_lifetime
+.Op Fl Ar depqrt Ar 0/1
+.Nm mip6config
+.Fl g
+.Op Fl w Ar br_time
+.Op Fl y Ar ha_pref
+.Op Fl l Ar hr_lifetime
+.Op Fl mqu Ar 0/1
+.Nm mip6config
+.Fl x
+.Nm mip6config
+.Fl f Ar filename
+.Nm mip6config
+.Op Fl F Ar foreign_address/plen@if
+.Op Fl b Ar bu_lifetime
+.Op Fl w Ar br_time
+.Op Fl y Ar ha_pref
+.Op Fl l Ar hr_lifetime
+.Op Fl dempqrtu Ar 0/1
+.Nm mip6config
+.Fl E Ar address
+.\"
+.Sh DESCRIPTION
+The Mobile IPv6 implementation has been integrated as part of the FreeBSD 
+kernel. It consists of three different parts: The correspondent node, which 
+is mandatory, must always be included for an IPv6 node to claim "IPv6 
+compliance" The home agent part is optional and required if a router is 
+acting as a home agent at the home network. The mobile node part is optional 
+and is required by a host (router or host) to be able to move between 
+different sub-networks while maintaining transport and higher layer 
+connections. A node may not act as mobile node and home agent simultaneously.
+.Pp
+There are two different ways of including the mobile IPv6 software in the
+kernel. The first alternative is to add it during compilation. The 
+correspondent node part must always be included and the optional parts can
+be included if desired. The second alternative is to add the correspondent node
+part at compilation time and add the optional parts as modules during 
+runtime.
+.Pp
+The
+.Nm
+command is used for configuration of the mobile IPv6 code. Depending on which 
+part of the code that has been loaded in the kernel, different options will 
+be enabled/disabled.
+.\"
+.Ss USAGE
+The
+.Fl a
+option is for autoconfiguration 
+.\"
+.Ss OPTIONS
+.Bl -tag -width Ds
+.It Fl E Ar address
+Remove a foreign address.
+.It Fl F Ar foreign_address/plen@if
+Manually assign a foreign address.
+.It Fl H Ar home_address/plen@if%ha_addr
+Manually assign a home address and a home agent.
+.It Fl a
+Enable auto configuration of the home address.
+.It Fl b Ar bu_lifetime
+Set the binding update lifetime.
+.It Fl d Ar 0/1
+Disable/Enable debug messages.
+.It Fl e Ar 0/1
+Disable/Enable eager Movement Detection.
+.It Fl f Ar filename
+Read configuration from file.
+.It Fl g
+Enable Home Agent functionality.
+.It Fl h
+Show a simple usage information.
+.It Fl l Ar hr_lifetime
+Set the home registration lifetime.
+.It Fl m Ar 0/1
+Disable/Enable forwarding of Site local Multicast dest addresses.
+.It Fl p Ar 0/1
+Disable/Enable link layer promiscuous mode.
+.It Fl q Ar 0/1
+Disable/Enable sending binding requests to the mobile node.
+.It Fl r Ar 0/1
+Disable/Enable sending binding updates to a correspondent node (Route optimisation).
+.It Fl t Ar 0/1
+Disable/Enable tunneling of packets from the nobile node to a correspondent node via the home agent
+.It Fl u Ar 0/1
+Disable/Enable forwarding of Site local Unicast dest addresses
+.It Fl w Ar br_time
+Set the binding request time.
+.It Fl x
+De-activate Mobile Node/Home Agent functionality (exit).
+.El
+.Sh EXAMPLES
+This section contains some simple examples.
+.Pp
+To load and activate the Mobile IPv6 functionality, type
+.Bd -literal -offset indent
+# kldload ./mip6.ko
+# mip6config <...>
+.Ed
+.Pp
+To deactivate the module and unload it from the kernel, type
+.Bd -literal -offset indent
+# kldunload -n mip6
+.Ed
+.Sh AUTHOR
+Magnus Braathen <magnus.braathen@era.ericsson.se>

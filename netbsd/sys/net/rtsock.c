@@ -978,3 +978,7 @@ struct protosw routesw[] = {
 struct domain routedomain =
     { PF_ROUTE, "route", route_init, 0, 0,
       routesw, &routesw[sizeof(routesw)/sizeof(routesw[0])] };
+
+#ifdef MIP6
+#include <net/rtsock_mip.c>
+#endif
