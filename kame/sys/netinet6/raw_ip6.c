@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.33 2000/06/13 11:40:15 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.34 2000/06/21 08:07:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -372,39 +372,10 @@ rip6_output(m, va_alist)
 	 */
 	ip6->ip6_dst = *dst;
 
-	/*
-	 * If the scope of the destination is link-local, embed the interface
-	 * index in the address.
-	 *
-	 * XXX advanced-api value overrides sin6_scope_id
-	 */
-	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst)) {
-		struct in6_pktinfo *pi;
-
-		/*
-		 * XXX Boundary check is assumed to be already done in
-		 * ip6_setpktoptions().
-		 */
-		if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
-			ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
-			oifp = ifindex2ifnet[pi->ipi6_ifindex];
-		}
-		else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
-			 in6p->in6p_moptions &&
-			 in6p->in6p_moptions->im6o_multicast_ifp) {
-			oifp = in6p->in6p_moptions->im6o_multicast_ifp;
-			ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
-		} else if (dstsock->sin6_scope_id) {
-			/* boundary check */
-			if (dstsock->sin6_scope_id < 0
-			 || if_index < dstsock->sin6_scope_id) {
-				error = ENXIO;  /* XXX EINVAL? */
-				goto bad;
-			}
-			ip6->ip6_dst.s6_addr16[1]
-				= htons(dstsock->sin6_scope_id & 0xffff);/*XXX*/
-		}
+	/* KAME hack: embed scopeid */
+	if (in6_embedscope(&ip6->ip6_dst, dstsock, in6p, &oifp) != 0) {
+		error = EINVAL;
+		goto bad;
 	}
 
 	/*
