@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.105 2003/10/15 22:56:26 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.106 2003/10/31 08:45:32 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -841,9 +841,15 @@ add_m6if(mifcp)
 #ifdef MRT6DEBUG
 	if (mrt6debug)
 		log(LOG_DEBUG,
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		    "add_mif #%d, phyint %s\n",
+		    mifcp->mif6c_mifi,
+		    ifp->if_xname);
+#else
 		    "add_mif #%d, phyint %s%d\n",
 		    mifcp->mif6c_mifi,
 		    ifp->if_name, ifp->if_unit);
+#endif
 #endif
 
 	return (0);
