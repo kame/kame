@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.215 1999/10/26 08:33:47 sumikawa Exp $
+$Id: CHANGELOG,v 1.216 1999/10/26 08:55:09 itojun Exp $
 
 <199910>
+Tue Oct 26 17:52:12 JST 1999  itojun@iijlab.net
+	* (bunch of source code): fix inet_pton() error check.  we need to
+	  check if the return value equals to 1, or not equal to 1.
+	  "<= 0" or "!= 0" does not really make sense.
+
 Tue Oct 26 17:30:43 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/vat6: Tcl initialization patch.
 	  Submitted by: Kenjiro Cho <kjc@csl.sony.co.jp> (kame-snap 1471)
