@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.25 2001/10/25 06:20:42 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.26 2001/11/16 05:42:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -298,7 +298,7 @@ nigroup(name)
 			*q = tolower(*q);
 	}
 
-	/* generate 8 bytes of pseudo-random value. */
+	/* generate 4 bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
 	c = l & 0xff;
