@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.16 2000/11/30 03:36:40 jinmei Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.17 2000/11/30 08:22:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,8 @@ struct ip6ctlparam {
 	struct icmp6_hdr *ip6c_icmp6;	/* icmp6 header of target packet */
 	struct ip6_hdr *ip6c_ip6;	/* ip6 header of target packet */
 	int ip6c_off;			/* offset of the target proto header */
+	struct sockaddr_in6 *ip6c_src;	/* srcaddr w/ additional info */
+	struct sockaddr_in6 *ip6c_dst;	/* (final) dstaddr w/ additional info */
 	struct in6_addr *ip6c_finaldst;	/* final destination address */
 	void *ip6c_cmdarg;		/* control command dependent data */
 };

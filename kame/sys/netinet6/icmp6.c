@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.161 2000/11/30 08:16:05 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.162 2000/11/30 08:22:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -940,7 +940,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 {
 	struct icmp6_hdr *icmp6;
 	u_int32_t notifymtu;
-	struct sockaddr_in6 icmp6src;
+	struct sockaddr_in6 icmp6dst;
 
 	if (icmp6len < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
 		icmp6stat.icp6s_tooshort++;
@@ -959,10 +959,10 @@ icmp6_notify_error(m, off, icmp6len, code)
 		return(-1);
 	}
 #endif
-	bzero(&icmp6src, sizeof(icmp6src));
-	icmp6src.sin6_len = sizeof(struct sockaddr_in6);
-	icmp6src.sin6_family = AF_INET6;
-	icmp6src.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
+	bzero(&icmp6dst, sizeof(icmp6dst));
+	icmp6dst.sin6_len = sizeof(struct sockaddr_in6);
+	icmp6dst.sin6_family = AF_INET6;
+	icmp6dst.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
 
 	/* Detect the upper level protocol */
 	{
@@ -1132,7 +1132,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
-			(void) (*ctlfunc)(code, (struct sockaddr *)&icmp6src,
+			(void) (*ctlfunc)(code, (struct sockaddr *)&icmp6dst,
 					  &ip6cp);
 		}
 	}

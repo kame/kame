@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.40 2000/11/30 05:38:51 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.41 2000/11/30 08:22:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1065,11 +1065,10 @@ esp6_ctlinput(cmd, sa, d)
 			 * corresponding routing entry.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d);
-
-			return;
 		}
 
 		/* we normally notify single pcb here */
+		/* pfctlinput2(cmd, ); */
 	} else {
 		/* we normally notify any pcb here */
 	}
