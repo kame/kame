@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1305 2000/10/01 03:44:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.1306 2000/10/02 04:24:30 jinmei Exp $
 
 <200010>
+2000-10-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sbin/ifconfig/ifconfig.c (main): set ND6_INFINITE_LIFETIME
+	to ia6t_[pv]ltime as the default values, so that manually
+	configured IPv6 addresses have infinite lifetime.
+
 2000-10-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/timer.c: fixed a bug that missed necessary
 	braces.
