@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.140 2002/08/27 08:50:41 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.141 2002/10/01 13:19:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2979,6 +2979,10 @@ static int res_querydomainN __P((const char *, const char *,
 static struct addrinfo *_dns_getaddrinfo __P((const char *,
 	const struct addrinfo *));
 
+#ifdef __OpenBSD__
+_THREAD_PRIVATE_MUTEX(getaddrinfo_explore_fqdn);
+#endif
+
 /*
  * FQDN hostname, DNS lookup
  */
@@ -2995,13 +2999,21 @@ explore_fqdn(pai, hostname, servname, res)
 	char lookups[MAXDNSLUS];
 	int i;
 
+#ifdef __OpenBSD__
+	_THREAD_PRIVATE_MUTEX_LOCK(getaddrinfo_explore_fqdn);
+#endif
+
 	result = NULL;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
 	 */
-	if (get_portmatch(pai, servname) != 0)
+	if (get_portmatch(pai, servname) != 0) {
+#ifdef __OpenBSD__
+		_THREAD_PRIVATE_MUTEX_UNLOCK(getaddrinfo_explore_fqdn);
+#endif
 		return 0;
+	}
 
 	if ((_res.options & RES_INIT) == 0 && res_init() == -1)
 		strncpy(lookups, "f", sizeof lookups);
@@ -3032,6 +3044,9 @@ explore_fqdn(pai, hostname, servname, res)
 			/* canonname should already be filled. */
 		}
 		*res = result;
+#ifdef __OpenBSD__
+		_THREAD_PRIVATE_MUTEX_UNLOCK(getaddrinfo_explore_fqdn);
+#endif
 		return 0;
 	} else {
 		/* translate error code */
@@ -3063,6 +3078,9 @@ explore_fqdn(pai, hostname, servname, res)
 free:
 	if (result)
 		freeaddrinfo(result);
+#ifdef __OpenBSD__
+	_THREAD_PRIVATE_MUTEX_UNLOCK(getaddrinfo_explore_fqdn);
+#endif
 	return error;
 }
 
