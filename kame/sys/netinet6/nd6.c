@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.112 2001/02/08 09:15:32 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.113 2001/02/08 10:32:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -466,7 +466,6 @@ nd6_timer(ignored_arg)
 	struct ifnet *ifp;
 	struct in6_ifaddr *ia6, *nia6;
 	struct in6_addrlifetime *lt6;
-	int freed = 0;
 	
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -491,7 +490,6 @@ nd6_timer(ignored_arg)
 	timeout(nd6_timer, (caddr_t)0, nd6_prune * hz);
 #endif
 
-  nbrloop:
 	ln = llinfo_nd6.ln_next;
 	/* XXX BSD/OS separates this code -- itojun */
 	while (ln && ln != &llinfo_nd6) {
@@ -500,8 +498,6 @@ nd6_timer(ignored_arg)
 		struct llinfo_nd6 *next = ln->ln_next;
 		/* XXX: used for the DELAY case only: */
 		struct nd_ifinfo *ndi = NULL;
-
-		freed = 0;
 
 		if ((rt = ln->ln_rt) == NULL) {
 			ln = next;
@@ -553,8 +549,7 @@ nd6_timer(ignored_arg)
 						    ICMP6_DST_UNREACH_ADDR, 0);
 					ln->ln_hold = NULL;
 				}
-				nd6_free(rt);
-				freed = 1;
+				next = nd6_free(rt);
 			}
 			break;
 		case ND6_LLINFO_REACHABLE:
@@ -566,10 +561,8 @@ nd6_timer(ignored_arg)
 
 		case ND6_LLINFO_STALE:
 			/* Garbage Collection(RFC 2461 5.3) */
-			if (ln->ln_expire) {
-				nd6_free(rt);
-				freed = 1;
-			}
+			if (ln->ln_expire)
+				next = nd6_free(rt);
 			break;
 
 		case ND6_LLINFO_DELAY:
@@ -594,34 +587,11 @@ nd6_timer(ignored_arg)
 					nd_ifinfo[ifp->if_index].retrans / 1000;
 				nd6_ns_output(ifp, &dst->sin6_addr,
 					       &dst->sin6_addr, ln, 0);
-			} else {
-				nd6_free(rt);
-				freed = 1;
-			}
+			} else
+				next = nd6_free(rt);
 			break;
 		}
 		ln = next;
-
-		if (freed && next != &llinfo_nd6) {
-			struct llinfo_nd6 *lnn;
-			int found = 0;
-
-			for (lnn = llinfo_nd6.ln_next; lnn != &llinfo_nd6;
-			     lnn = lnn->ln_next) {
-				if (lnn == next) {
-					found = 1;
-					break;
-				}
-			}
-
-			if (found == 0) {
-				nd6log((LOG_DEBUG,
-					"nd6_timer: inconsistency in the "
-					"neighbor cache list (%p not found)\n",
-					next));
-				goto nbrloop; /* restart */
-			}
-		}
 	}
 	
 	/* expire default router list */
@@ -884,7 +854,7 @@ nd6_purge(ifp)
 		    rt->rt_gateway->sa_family == AF_LINK) {
 			sdl = (struct sockaddr_dl *)rt->rt_gateway;
 			if (sdl->sdl_index == ifp->if_index)
-				nd6_free(rt);
+				nln = nd6_free(rt);
 		}
 		ln = nln;
 	}
@@ -1050,11 +1020,11 @@ nd6_is_addr_neighbor(addr, ifp)
 /*
  * Free an nd6 llinfo entry.
  */
-void
+struct llinfo_nd6 *
 nd6_free(rt)
 	struct rtentry *rt;
 {
-	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo;
+	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo, *next;
 	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
 
@@ -1112,12 +1082,22 @@ nd6_free(rt)
 	}
 
 	/*
+	 * Before deleting the entry, remember the next entry as the
+	 * return value.  We need this because pfxlist_onlink_check() above
+	 * might have freed other entries (particularly the old next entry) as
+	 * a side effect (XXX). 
+	 */
+	next = ln->ln_next;
+
+	/*
 	 * Detach the route from the routing tree and the list of neighbor
 	 * caches, and disable the route entry not to be used in already
 	 * cached routes.
 	 */
 	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
 		  rt_mask(rt), 0, (struct rtentry **)0);
+
+	return(next);
 }
 
 /*

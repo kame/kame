@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.26 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: mip6_md.c,v 1.27 2001/02/08 10:32:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -777,7 +777,7 @@ mip6_select_defrtr(prhint, drhint)
 				mip6_debug("Ref count = %d, now RTM_DELETE\n",
 					   rt->rt_refcnt);
 #endif
-				nd6_free(rt);
+				next = nd6_free(rt);
 			}
 			ln = next;
 			/*
