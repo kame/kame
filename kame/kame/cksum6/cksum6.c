@@ -65,6 +65,7 @@ main(argc, argv)
 			break;
 		case 'd':
 			debug++;
+			break;
 		}
 	}
 	argc -= optind;
