@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)gethostbyname.3	8.4 (Berkeley) 5/25/95
-.\"     $Id: inet6_option_space.3,v 1.1 1999/12/10 03:34:07 itojun Exp $
+.\"     $Id: inet6_option_space.3,v 1.2 1999/12/10 04:46:16 itojun Exp $
 .\"
 .Dd December 10, 1999
 .Dt INET6_OPTION_SPACE 3
@@ -61,6 +61,15 @@
 .Fn inet6_option_find "const struct cmsghdr *cmsg" "u_int8_t **tptrp" "int type"
 .\"
 .Sh DESCRIPTION
+.\"
+Building and parsing the Hop-by-Hop and Destination options is
+complicated due to alignment constranints, padding and
+ancillary data manipulation.
+RFC2292 defines a set of functions to help the application.
+The function prototypes for
+these functions are all in the
+.Aq Li netinet/in.h
+header.
 .\"
 .Ss inet6_option_space
 .Fn inet6_option_space
@@ -408,6 +417,9 @@ setting
 to non 
 .Dv NULL
 value.
+.\"
+.Sh EXAMPLES
+RFC2292 gives comprehensive examples in chapter 6.
 .\"
 .Sh SEE ALSO
 .Rs
