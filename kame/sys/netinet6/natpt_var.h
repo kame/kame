@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.15 2001/09/02 19:06:27 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.16 2001/09/11 07:57:31 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -62,6 +62,7 @@ struct mbuf	*natpt_lbuf		__P((int, int, size_t));
 struct cSlot	*natpt_lookForRule4	__P((struct pcv *));
 struct cSlot	*natpt_lookForRule6	__P((struct pcv *));
 int		 natpt_setRules		__P((caddr_t));
+int		 natpt_prependRule	__P((struct cSlot *));
 int		 natpt_flushRules	__P((caddr_t));
 int		 natpt_setOnOff		__P((int));
 void		 natpt_init_rule	__P((void));

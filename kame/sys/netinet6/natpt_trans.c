@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.44 2001/09/05 02:25:02 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.45 2001/09/11 07:57:31 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -157,6 +157,7 @@ struct mbuf	*natpt_translateUDPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv6To4	__P((struct pcv *, struct pAddr *,
 						     struct pcv *));
 void		 natpt_translatePYLD6To4	__P((struct pcv *));
+void		 natpt_watchUDP6		__P((struct pcv *));
 
 /* IPv4 -> IPv6 */
 struct mbuf	*natpt_translateICMPv4To6	__P((struct pcv *, struct pAddr *));
@@ -582,6 +583,7 @@ natpt_translateUDPv6To4(struct pcv *cv6, struct pAddr *pad)
 
 	cv4.ip_p = IPPROTO_UDP;
 	cv4.ip.ip4->ip_p = IPPROTO_UDP;
+	natpt_watchUDP6(&cv4);
 	natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_UDP, cv6, &cv4);
 	return (m4);
 }
@@ -662,6 +664,36 @@ natpt_translatePYLD6To4(struct pcv *cv4)
 			ts->seq[0] = th4->th_seq;
 			ts->ack[0] = th4->th_ack;
 		}
+	}
+}
+
+
+void
+natpt_watchUDP6(struct pcv *cv4)
+{
+	struct cSlot	*cst;
+
+	if (cv4->fromto == NATPT_TO)
+		return ;
+
+	if (htons(cv4->pyld.udp->uh_dport) == TFTP) {
+		MALLOC(cst, struct cSlot *, sizeof(struct cSlot), M_NATPT, M_NOWAIT);
+		bzero(cst, sizeof(struct cSlot));
+		cst->proto = NATPT_UDP;
+		cst->map   = NATPT_COPY_DPORT;
+		cst->lifetime = 32;
+
+		cst->local.sa_family = AF_INET;
+		cst->local.in4Addr = cv4->ats->remote.in4src;
+		cst->local.port[1] = cv4->ats->remote.port[1];
+		cst->local.aType   = ADDR_SINGLE;
+
+		cst->remote.sa_family = AF_INET6;
+		cst->remote.in6Addr = cv4->ats->local.in6src;
+		cst->remote.port[1] = cv4->ats->local.port[0];
+		cst->remote.aType   = ADDR_SINGLE;
+
+		natpt_prependRule(cst);
 	}
 }
 

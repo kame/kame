@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.24 2001/09/11 07:20:42 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.25 2001/09/11 07:57:31 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -57,6 +57,8 @@
 #include <netinet6/natpt_var.h>
 
 
+time_t			cSlotTimer;
+int			csl_expire;
 TAILQ_HEAD(,cSlot)	csl_head;
 
 #ifdef __FreeBSD__
@@ -70,6 +72,7 @@ MALLOC_DECLARE(M_NATPT);
 
 static int	 natpt_matchIn4addr	__P((struct pcv *, struct pAddr *));
 static int	 natpt_matchIn6addr	__P((struct pcv *, struct pAddr *));
+void		 natpt_expireCSlot	__P((void *));
 
 
 /*
@@ -328,11 +331,31 @@ natpt_setRules(caddr_t addr)
 
 
 int
+natpt_prependRule(struct cSlot *cst)
+{
+	int	 	 s;
+	struct timeval	 atv;
+
+	microtime(&atv);
+	cst->tstamp = atv.tv_sec;
+	natpt_log(LOG_CSLOT, LOG_DEBUG, (void *)cst, sizeof(struct cSlot));
+
+	s = splnet();
+	TAILQ_INSERT_HEAD(&csl_head, cst, csl_list);
+	splx(s);
+
+	if (csl_expire == 0)
+		timeout(natpt_expireCSlot, (caddr_t)0, cSlotTimer);
+
+	return (0);
+}
+
+
+int
 natpt_flushRules(caddr_t addr)
 {
 	int			 s;
 	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-
 	struct cSlot		*csl, *csln;
 
 	s = splnet();
@@ -348,6 +371,38 @@ natpt_flushRules(caddr_t addr)
 	splx(s);
 
 	return (0);
+}
+
+
+void
+natpt_expireCSlot(void *ignored_arg)
+{
+	int		 s;
+	int		 c = 0;
+	struct timeval	 atv;
+	struct cSlot	 *csl, *csln;
+
+	microtime(&atv);
+	s = splnet();
+	csl_expire++;
+	csl = TAILQ_FIRST(&csl_head);
+	while (csl) {
+		csln = TAILQ_NEXT(csl, csl_list);
+		if (csl->lifetime != CSLOT_INFINITE_LIFETIME) {
+			c++;
+			if (atv.tv_sec - csl->tstamp >= csl->lifetime) {
+				TAILQ_REMOVE(&csl_head, csl, csl_list);
+				FREE(csl, M_NATPT);
+			}
+		}
+		csl = csln;
+	}
+
+	if (c == 0)
+		csl_expire = 0;
+	else
+		timeout(natpt_expireCSlot, (caddr_t)0, cSlotTimer);
+	splx(s);
 }
 
 
@@ -379,5 +434,7 @@ natpt_setOnOff(int cmd)
 void
 natpt_init_rule()
 {
+	cSlotTimer = 64;
+	csl_expire = 0;
 	TAILQ_INIT(&csl_head);
 }
