@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.25 2000/06/18 04:51:44 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.26 2000/06/18 06:31:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -670,7 +670,7 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 			ifp = ifindex2ifnet[pi->ipi6_ifindex];
 			in6->s6_addr16[1] = htons(pi->ipi6_ifindex);
 		} else if (in6p && IN6_IS_ADDR_MULTICAST(in6) &&
-			   in6p->in6p_moptions
+			   in6p->in6p_moptions &&
 			   in6p->in6p_moptions->im6o_multicast_ifp) {
 			ifp = in6p->in6p_moptions->im6o_multicast_ifp;
 			in6->s6_addr16[1] = htons(ifp->if_index);
