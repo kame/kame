@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.156 2001/06/29 09:42:19 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.157 2001/06/29 15:31:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -812,7 +812,7 @@ nd6_purge(ifp)
 	struct ifnet *ifp;
 {
 	struct llinfo_nd6 *ln, *nln;
-	struct nd_defrouter *dr, *ndr, drany;
+	struct nd_defrouter *dr, *ndr;
 	struct nd_prefix *pr, *npr;
 
 	/* Nuke default router list entries toward ifp */
@@ -1460,7 +1460,7 @@ nd6_ioctl(cmd, data, ifp)
 	struct in6_ndireq *ndi = (struct in6_ndireq *)data;
 	struct in6_nbrinfo *nbi = (struct in6_nbrinfo *)data;
 	struct in6_ndifreq *ndif = (struct in6_ndifreq *)data;
-	struct nd_defrouter *dr, any;
+	struct nd_defrouter *dr;
 	struct nd_prefix *pr;
 	struct rtentry *rt;
 	int i = 0, error = 0;
