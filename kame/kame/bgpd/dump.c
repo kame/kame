@@ -470,7 +470,7 @@ print_rip_dump(FILE *fp)
 			break;
 	}
 	fprintf(fp, "  Last dump: %s", ctime(&last_rip_dump));
-	fprintf(fp, "    (%s before\n)", sec2str(tloc_now - last_rip_dump));
+	fprintf(fp, "    (%s before)\n", sec2str(tloc_now - last_rip_dump));
 
 	fprintf(fp, "\n=== RIPng per interface information ===\n");
 	while(ripif) {
