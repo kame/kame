@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.22 2001/02/15 17:45:50 itojun Exp $
+.\"	$KAME: faithd.8,v 1.23 2001/02/15 17:49:38 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -336,7 +336,7 @@ Syntax may vary depending upon your operating system.
 .Bd -literal -offset
 telnet  stream  faith/tcp6  nowait  root  faithd  telnetd
 ftp     stream  faith/tcp6  nowait  root  faithd  ftpd -l
-ssh     stream  faith/tcp6  nowait  root  faithd  /usr/pkg/bin/sshd -i
+ssh     stream  faith/tcp6  nowait  root  faithd  /usr/pkg/sbin/sshd -i
 .Ed
 .Pp
 .Xr inetd 8
