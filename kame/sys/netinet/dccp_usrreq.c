@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.49 2005/02/10 09:42:55 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.50 2005/02/12 08:32:31 suz Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -136,6 +136,10 @@
 
 #ifdef __FreeBSD__
 #include <machine/in_cksum.h>
+#endif
+
+#ifdef __NetBSD__
+#include <machine/stdarg.h>
 #endif
 
 #ifdef __OpenBSD__
