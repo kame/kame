@@ -72,6 +72,7 @@ ah/transport/::1-::2 esp/tunnel/::3-::4/use ah/transport/::5-::6/require
 ah/transport/::1-::2 esp/tunnel/::3-::4/use ah/transport/::5-::6/require
 ah/transport/::1-::2 esp/tunnel/::3-::4/use ah/transport/::5-::6/require
 ",
+"out ipsec esp/transport/fec0::10-fec0::11/use",
 };
 
 int test(char *buf, int family);

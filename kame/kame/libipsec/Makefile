@@ -67,6 +67,11 @@ afterinstall:
 	ln $(MANDIR)3/ipsec_set_policy.3 $(MANDIR)3/ipsec_dump_policy.3
 .endif
 
+.if (${OPSYS} == "FreeBSD")
+SRCS+= y.tab.h
+y.tab.h:	policy_parse.y
+.endif
+
 .if (${OPSYS} == "NetBSD")
 MKPIC=no
 .endif
