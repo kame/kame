@@ -160,8 +160,9 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 				flags |= NI_NUMERICHOST;
 			break;
 		default:
-			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 				flags |= NI_NUMERICHOST;
+			}
 			else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
 				flags |= NI_NUMERICHOST;
 			break;
@@ -182,6 +183,26 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		if (strlen(numaddr) > hostlen)
 			return ENI_MEMORY;
 		strcpy(host, numaddr);
+#ifdef INET6
+		if (afd->a_af == AF_INET6 &&
+		    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
+		     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
+		    ((struct sockaddr_in6 *)sa)->sin6_scope_id) {
+#ifndef ALWAYS_WITHSCOPE
+			if (flags & NI_WITHSCOPEID)
+#endif /* !ALWAYS_WITHSCOPE */
+			{
+				char *ep = strchr(host, '\0');
+				unsigned int ifindex =
+					((struct sockaddr_in6 *)sa)->sin6_scope_id;
+
+				*ep = SCOPE_DELIMITER;
+				if ((if_indextoname(ifindex, ep + 1)) == NULL)
+					/* XXX what should we do? */
+					strncpy(ep + 1, "???", 3);
+			}
+		}
+#endif /* INET6 */
 	} else {
 #ifdef USE_GETIPNODEBY
 		hp = getipnodebyaddr(addr, afd->a_addrlen, afd->a_af, &h_error);

@@ -80,6 +80,7 @@ struct sockinet {
 	u_char	si_len;
 	u_char	si_family;
 	u_short	si_port;
+	u_int32_t si_scope_id;
 };
 
 static struct afd {
@@ -441,6 +442,53 @@ getaddrinfo(hostname, servname, hints, res)
 				goto good;
 			} else 
 				ERR(EAI_FAMILY);	/*xxx*/
+		}
+
+		/*
+		 * Handle special case of <scoped_address><delimiter><scope id>
+		 */
+		switch(afdl[i].a_af) {
+#ifdef INET6
+		 /*
+		  * currently this is the only AF that supports scoped
+		  * addresses
+		  */
+		 case AF_INET6:
+		 {
+			 char *cp, *hostname2;
+
+ 			 if ((cp = strchr(hostname, SCOPE_DELIMITER))) {
+				 if ((hostname2 = strdup(hostname)) == NULL) {
+					 error = EAI_MEMORY;
+					 goto free;
+				 }
+				 /* terminate at the delimiter */
+				 hostname2[cp - hostname] = '\0';
+				 if (inet_pton(AF_INET6, hostname2, pton)) {
+					 if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)pton) ||
+					     IN6_IS_ADDR_MC_LINKLOCAL((struct in6_addr *)pton)) {
+						 char *ifname = cp + 1;
+						 u_int32_t ifindex;
+
+						 /* try to resolve interface */
+						 ifindex = if_nametoindex(ifname);
+						 if (ifindex == 0)
+							 goto freetmphost;
+
+						 /* we need it any more */
+						 free(hostname2);
+						 GET_AI(top, &afdl[i],
+							pton, port);
+						 ((struct sockaddr_in6 *)top->ai_addr)->sin6_scope_id = ifindex;
+						 goto good;
+					 }
+				 }
+			   freetmphost:
+				 free(hostname2);
+			 }
+			 break;
+		 }
+#endif 
 		}
 	}
 
