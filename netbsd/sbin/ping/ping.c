@@ -256,7 +256,8 @@ main(int argc, char *argv[])
 #endif
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-	char *policy = NULL;
+	char *policy_in = NULL;
+	char *policy_out = NULL;
 #endif
 #endif
   
@@ -378,7 +379,12 @@ main(int argc, char *argv[])
 #ifdef IPSEC_POLICY_IPSEC
 		case 'E':
 			pingflags |= F_POLICY;
-			policy = strdup(optarg);
+			if (!strncmp("in", optarg, 2))
+				policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3))
+				policy_out = strdup(optarg);
+			else
+				usage();
 			break;
 #else
 		case 'A':
@@ -540,15 +546,32 @@ main(int argc, char *argv[])
 	int len;
 	char *buf;
 	if (pingflags & F_POLICY) {
-		if ((len = ipsec_get_policylen(policy)) < 0)
-			errx(1, ipsec_strerror());
-		if ((buf = malloc(len)) == NULL)
-			err(1, "malloc");
-		if ((len = ipsec_set_policy(buf, len, policy)) < 0)
-			errx(1, ipsec_strerror());
-		if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0)
-			err(1, "ipsec policy cannot be configured");
-		free(buf);
+		if (policy_in != NULL) {
+			if ((len = ipsec_get_policylen(policy_in)) < 0)
+				errx(1, ipsec_strerror());
+			if ((buf = malloc(len)) == NULL)
+				err(1, "malloc");
+			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
+				errx(1, ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN,
+					buf, len) < 0) {
+				err(1, "ipsec policy cannot be configured");
+			}
+			free(buf);
+		}
+		if (policy_out != NULL) {
+			if ((len = ipsec_get_policylen(policy_out)) < 0)
+				errx(1, ipsec_strerror());
+			if ((buf = malloc(len)) == NULL)
+				err(1, "malloc");
+			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
+				errx(1, ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN,
+					buf, len) < 0) {
+				err(1, "ipsec policy cannot be configured");
+			}
+			free(buf);
+		}
 	}
 	if ((len = ipsec_get_policylen("bypass")) < 0)
 		errx(1, ipsec_strerror());
@@ -556,7 +579,7 @@ main(int argc, char *argv[])
 		err(1, "malloc");
 	if ((len = ipsec_set_policy(buf, len, "bypass")) < 0)
 		errx(1, ipsec_strerror());
-	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
+	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
 #if 0
 		warnx("ipsec is not configured");
 #else
