@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.2 2000/05/21 03:20:04 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.3 2000/05/21 03:53:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -50,6 +50,8 @@
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
 static int hexdump __P((const char *, int, const struct sockaddr *));
+static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
+	int, int, int *));
 static int relay __P((char *, int, struct sockaddr *));
 static int serve __P((char *, int, struct sockaddr *));
 
@@ -227,6 +229,8 @@ hexdump(buf, len, from)
 
 		/* print questions section */
 		count = ntohs(hp->qdcount);
+		if (count)
+			printf("question section:\n");
 		while (count--) {
 			if (d - buf > len)
 				break;
@@ -240,19 +244,42 @@ hexdump(buf, len, from)
 			    ntohs(*(u_int16_t *)&d[0]),
 			    ntohs(*(u_int16_t *)&d[2]));
 			d += 4;
+			/* LINTED const cast */
+			free((char *)n);
+		}
+
+		/* print answers section */
+		count = ntohs(hp->ancount);
+		if (count)
+			printf("answers section:\n");
+		while (count--) {
+			if (d - buf > len)
+				break;
+			n = decode_name(&d, len - (d - buf));
+			if (!n)
+				break;
+			if (d - buf + 10 > len)
+				break;
+			if (d - buf + 10 + ntohs(*(u_int16_t *)&d[8]) > len)
+				break;
+			printf("%s", n);
+			printf(" qtype %u qclass %u",
+			    ntohs(*(u_int16_t *)&d[0]),
+			    ntohs(*(u_int16_t *)&d[2]));
+			printf(" ttl %d rdlen %u ",
+			    (int32_t)ntohl(*(u_int32_t *)&d[4]),
+			    ntohs(*(u_int16_t *)&d[8]));
+			for (i = 0; i < ntohs(*(u_int16_t *)&d[8]); i++) {
+				printf("%02x", d[10 + i] & 0xff);
+			}
+			d += 10 + ntohs(*(u_int16_t *)&d[8]);
+			printf("\n");
+
+			/* LINTED const cast */
+			free((char *)n);
 		}
 	}
 
-	return 0;
-}
-
-static int
-relay(buf, len, from)
-	char *buf;
-	int len;
-	struct sockaddr *from;
-{
-	hexdump(buf, len, from);
 	return 0;
 }
 
@@ -273,6 +300,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 	u_int16_t ntype, nclass;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
+	struct in6_addr in6;
 
 	p = replybuf + off;
 	*naddrs = 0;
@@ -319,12 +347,23 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 				continue;
 #if 1
 			/* XXX be careful about scope issue! */
-			if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr) ||
-			    IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+			if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))
 				continue;
 #endif
-			alen = sizeof(sin6->sin6_addr);
-			abuf = (char *)&sin6->sin6_addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+				in6 = sin6->sin6_addr;
+				if (*(u_int16_t *)&in6.s6_addr[2])
+					in6.s6_addr[2] = in6.s6_addr[3] = 0;
+				alen = sizeof(in6);
+				abuf = (char *)&in6;
+#if 1
+				/* XXX be careful about scope issue! */
+				continue;
+#endif
+			} else {
+				alen = sizeof(sin6->sin6_addr);
+				abuf = (char *)&sin6->sin6_addr;
+			}
 			ntype = T_AAAA;
 			nclass = C_IN;
 			break;
@@ -358,6 +397,16 @@ fail:
 	if (ifap)
 		freeifaddrs(ifap);
 	return -1;
+}
+
+static int
+relay(buf, len, from)
+	char *buf;
+	int len;
+	struct sockaddr *from;
+{
+	hexdump(buf, len, from);
+	return 0;
 }
 
 static int
