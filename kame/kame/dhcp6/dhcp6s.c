@@ -84,7 +84,6 @@ static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
 static char *rmsgctlbuf;
 
-static struct in6_addr link_local_prefix, site_local_prefix, global_prefix;
 #define LINK_LOCAL_PLEN 10
 #define SITE_LOCAL_PLEN 10
 #define GLOBAL_PLEN 3
@@ -187,20 +186,6 @@ server6_init()
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
 		errx(1, "invalid interface %s", device);
-
-	/* initialize constant variables */
-	if (inet_pton(AF_INET6, "fe80::", &link_local_prefix) != 1) {
-		errx(1, "inet_pton failed for fec0::");
-		/* NOTREACHED */
-	}
-	if (inet_pton(AF_INET6, "fec0::", &site_local_prefix) != 1) {
-		errx(1, "inet_pton failed for fec0::");
-		/* NOTREACHED */
-	}
-	if (inet_pton(AF_INET6, "2000::", &global_prefix) != 1) {
-		errx(1, "inet_pton failed");
-		/* NOTREACHED */
-	}
 
 	/* initialize send/receive buffer */
 	iov[0].iov_base = (caddr_t)rdatabuf;
