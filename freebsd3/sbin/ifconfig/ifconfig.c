@@ -163,7 +163,7 @@ c_func	setifflags, setifmetric, setifmtu;
 #define	NEXTARG		0xffffff
 
 const
-struct	cmd {
+static struct	cmd {
 	const	char *c_name;
 	int	c_parameter;		/* NEXTARG means next argv */
 	void	(*c_func) __P((const char *, int, int, const struct afswtch *afp));
