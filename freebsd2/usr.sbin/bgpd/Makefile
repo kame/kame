@@ -9,6 +9,7 @@ MAN8=	bgpd.8
 
 CFLAGS+=-I${.OBJDIR} -I${.CURDIR}/../../kame/bgpd
 CFLAGS+=-DHAVE_STDARG_H -DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS -DYY_NO_UNPUT
+CFLAGS+=-DHAVE_GETIFADDRS
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lcompat
