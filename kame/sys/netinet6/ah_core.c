@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.24 2000/02/22 14:04:14 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.25 2000/03/09 00:42:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -677,7 +677,9 @@ ah4_calccksum(m0, ahdat, algo, sav)
 	int tlen;
 	u_char sumbuf[AH_MAXSUMSIZE];
 	int error = 0;
+	int ahseen;
 
+	ahseen = 0;
 	hdrtype = -1;	/*dummy, it is called IPPROTO_IP*/
 
 	m = m0;
@@ -786,14 +788,19 @@ again:
 
 		/* key data region. */
 		siz = (*algo->sumsiz)(sav);
-		bzero(&dummy[0], sizeof(dummy));
-		while (sizeof(dummy) <= siz) {
-			(algo->update)(&algos, dummy, sizeof(dummy));
-			siz -= sizeof(dummy);
+		if (ahseen)
+			(algo->update)(&algos, p + hdrsiz, siz);
+		else {
+			bzero(&dummy[0], sizeof(dummy));
+			while (sizeof(dummy) <= siz) {
+				(algo->update)(&algos, dummy, sizeof(dummy));
+				siz -= sizeof(dummy);
+			}
+			/* can't happen, but just in case */
+			if (siz)
+				(algo->update)(&algos, dummy, siz);
 		}
-		/* can't happen, but just in case */
-		if (siz)
-			(algo->update)(&algos, dummy, siz);
+		ahseen++;
 
 		/* padding region, just in case */
 		siz = (((struct ah *)p)->ah_len << 2) - (*algo->sumsiz)(sav);
@@ -891,7 +898,9 @@ ah6_calccksum(m0, ahdat, algo, sav)
 	int error = 0;
 	u_char sumbuf[AH_MAXSUMSIZE];
 	int nest;
+	int ahseen;
 
+	ahseen = 0;
 	hdrtype = -1;	/*dummy, it is called IPPROTO_IPV6 */
 
 	m = m0;
@@ -946,14 +955,19 @@ again:
 
 		/* key data region. */
 		siz = (*algo->sumsiz)(sav);
-		bzero(&dummy[0], 4);
-		while (4 <= siz) {
-			(algo->update)(&algos, dummy, 4);
-			siz -= 4;
+		if (ahseen)
+			(algo->update)(&algos, p + hdrsiz, siz);
+		else {
+			bzero(&dummy[0], sizeof(dummy));
+			while (sizeof(dummy) <= siz) {
+				(algo->update)(&algos, dummy, sizeof(dummy));
+				siz -= sizeof(dummy);
+			}
+			/* can't happen, but just in case */
+			if (siz)	
+				(algo->update)(&algos, dummy, siz);
 		}
-		/* can't happen, but just in case */
-		if (siz)	
-			(algo->update)(&algos, dummy, siz);
+		ahseen++;
 
 		/* padding region, just in case */
 		siz = (((struct ah *)p)->ah_len << 2) - (*algo->sumsiz)(sav);
