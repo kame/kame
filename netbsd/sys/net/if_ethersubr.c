@@ -859,9 +859,6 @@ ether_addmulti(ifr, ec)
 			 */
 			bcopy(ether_ip6multicast_min, addrlo, ETHER_ADDR_LEN);
 			bcopy(ether_ip6multicast_max, addrhi, ETHER_ADDR_LEN);
-#if 0
-			set_allmulti = 1;
-#endif
 		} else {
 			ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, addrlo);
 			bcopy(addrlo, addrhi, ETHER_ADDR_LEN);
