@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.54 2000/04/13 16:19:47 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.55 2000/04/16 14:08:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1791,7 +1791,6 @@ fail:
 		 * If the icmp is a redirect to a better router, always set the
 		 * is_router flag. Otherwise, if the entry is newly created,
 		 * clear the flag. [RFC 2461, sec 8.3]
-		 *
 		 */
 		if (code == ND_REDIRECT_ROUTER)
 			ln->ln_router = 1;
