@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.312 2002/07/28 01:31:42 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.313 2002/09/06 02:50:51 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -255,6 +255,13 @@ draft-itojun-ipv6-transition-abuse-01.txt:
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
 draft-troan-dhcpv6-opt-prefix-delegation-01.txt: IPv6 Prefix Options for DHCPv6
+draft-vida-mld-v2-03.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
+    * works only on kame/freebsd4 and kame/netbsd.
+    * Multicast Source Filter works only for UDP packets.
+draft-ietf-idmr-msf-api-03.txt: Socket Interface Extensions for Multicast Source Filters
+    * IPv4 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
+    * IPv6 works for kame/freebsd4 and kame/netbsd.
+
 
 1.2 Neighbor Discovery
 
