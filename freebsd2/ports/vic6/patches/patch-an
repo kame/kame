@@ -1,0 +1,11 @@
+--- Makefile.in.orig	Thu Nov 20 06:03:49 1997
++++ Makefile.in	Fri Aug 13 04:00:14 1999
+@@ -303,7 +303,7 @@
+ 	 chown bin @prefix@/bin/vic
+ 	 chgrp bin @prefix@/bin/vic
+ 	 chmod 555 @prefix@/bin/vic
+-	 cp vic.1 @prefix@/man/vic.1
++	 cp vic.1 @prefix@/man/man1/vic.1
+ 	 cp histtolut @prefix@/bin/histtolut
+ 	 chown bin @prefix@/bin/histtolut
+ 	 chgrp bin @prefix@/bin/histtolut
