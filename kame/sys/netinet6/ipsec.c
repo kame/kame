@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.155 2002/06/16 15:32:30 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.156 2002/06/21 23:14:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3622,7 +3622,7 @@ ipsec_findaux(m)
 
 	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
 #ifdef DIAGNOSTIC
-	if (n && n->m_len < sizeof(struct socket *))
+	if (n && n->m_len < sizeof(struct ipsecaux))
 		panic("invalid ipsec m_aux");
 #endif
 	return n;
