@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.106 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.107 2004/03/12 12:07:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -427,7 +427,7 @@ int nd6_ioctl __P((u_long, caddr_t, struct ifnet *));
 struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct in6_addr *,
 	char *, int, int, int));
 int nd6_output __P((struct ifnet *, struct ifnet *, struct mbuf *,
-	struct in6_addr *, struct rtentry *));
+	struct sockaddr_in6 *, struct rtentry *));
 int nd6_need_cache __P((struct ifnet *));
 int nd6_storelladdr __P((struct ifnet *, struct rtentry *, struct mbuf *,
 	struct sockaddr *, u_char *));

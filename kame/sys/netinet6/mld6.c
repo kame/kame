@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.96 2004/03/10 09:10:38 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.97 2004/03/12 12:07:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -390,8 +390,8 @@ mld_input(m, off)
 		if (ifp->if_flags & IFF_LOOPBACK)
 			break;
 
-		if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-		    !IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr) &&
+		    !IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr))
 			break;	/* print error or log stat? */
 
 		all_sa = *all_nodes_linklocal;
@@ -454,8 +454,8 @@ mld_input(m, off)
 			    IPV6_ADDR_SCOPE_LINKLOCAL)
 				continue;
 
-			if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-			    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr,
+			if (!IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr) &&
+			    !IN6_ARE_ADDR_EQUAL(&mc_sa.sin6_addr,
 			    &in6m->in6m_addr))
 				continue;
 
@@ -485,7 +485,7 @@ mld_input(m, off)
 		if (m->m_flags & M_LOOP) /* XXX: grotty flag, but efficient */
 			break;
 
-		if (!IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
+		if (!IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr))
 			break;
 
 		/*

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.146 2004/02/19 17:56:28 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.147 2004/03/12 12:07:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -939,7 +939,7 @@ nd6_na_input(m, off, icmp6len)
 		mbc = mip6_temp_deleted_proxy(ln->ln_hold);
 #endif
 		nd6_output(ifp, ifp, ln->ln_hold,
-		    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr, rt);
+		    (struct sockaddr_in6 *)rt_key(rt), rt);
 		ln->ln_hold = NULL;
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
 		/* restore the temporally deleted proxy nd entry 

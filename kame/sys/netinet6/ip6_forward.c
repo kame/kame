@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.136 2004/03/10 09:32:42 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.137 2004/03/12 12:07:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -802,7 +802,7 @@ ip6_forward(m, srcrt)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 
-	error = nd6_output(rt->rt_ifp, origifp, m, &dst->sin6_addr, rt);
+	error = nd6_output(rt->rt_ifp, origifp, m, dst, rt);
 	if (error) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);
 		ip6stat.ip6s_cantforward++;

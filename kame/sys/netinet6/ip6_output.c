@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.437 2004/03/12 11:26:10 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.438 2004/03/12 12:07:21 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1460,7 +1460,7 @@ skip_ipsec2:;
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
 #endif
-		error = nd6_output(ifp, origifp, m, &dst->sin6_addr, rt);
+		error = nd6_output(ifp, origifp, m, dst, rt);
 		goto done;
 	}
 
@@ -1627,8 +1627,7 @@ sendorfree:
 			/* clean ipsec history once it goes out of the node */
 			ipsec_delaux(m);
 #endif
-			error = nd6_output(ifp, origifp, m,
-			    &dst->sin6_addr, rt);
+			error = nd6_output(ifp, origifp, m, dst, rt);
 		} else
 			m_freem(m);
 	}

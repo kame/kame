@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.347 2004/02/14 08:00:20 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.348 2004/03/12 12:07:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2019,8 +2019,7 @@ fail:
 				 * set the 2nd argument as the 1st one.
 				 */
 				nd6_output(ifp, ifp, ln->ln_hold,
-				    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
-				    rt);
+				    (struct sockaddr_in6 *)rt_key(rt), rt);
 				ln->ln_hold = NULL;
 			}
 		} else if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
@@ -2164,10 +2163,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	struct ifnet *ifp;
 	struct ifnet *origifp;
 	struct mbuf *m0;
-	struct in6_addr *dst;
+	struct sockaddr_in6 *dst;
 	struct rtentry *rt0;
 {
-	struct sockaddr_in6 dstsock;
 	struct mbuf *m = m0;
 	struct rtentry *rt = rt0;
 	struct in6_addr *gw6 = NULL;
@@ -2181,21 +2179,17 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	struct ip6_hdr *ip6;
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 
-	bzero(&dstsock, sizeof(dstsock));
-	dstsock.sin6_family = AF_INET6;
-	dstsock.sin6_len = sizeof(struct sockaddr_in6);
-	dstsock.sin6_addr = *dst;
 
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	ip6 = mtod(m0, struct ip6_hdr *);
 	sc = hif_list_find_withhaddr(&ip6->ip6_src);
 	if (sc && sc->hif_location == HIF_LOCATION_FOREIGN) {
 		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,
-		    (struct sockaddr *)&dstsock, rt));
+		    (struct sockaddr *)dst, rt));
 	}
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 
-	if (IN6_IS_ADDR_MULTICAST(dst))
+	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr))
 		goto sendpkt;
 
 	if (nd6_need_cache(ifp) == 0)
@@ -2217,8 +2211,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 				rt->rt_refcnt--;
 				if (rt->rt_ifp != ifp) {
 					/* XXX: loop care? */
-					return nd6_output(ifp, origifp, m0,
-					    dst, rt);
+					return (nd6_output(ifp, origifp, m0,
+					    dst, rt));
 				}
 			} else
 				senderr(EHOSTUNREACH);
@@ -2292,8 +2286,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		 * the condition below is not very efficient.  But we believe
 		 * it is tolerable, because this should be a rare case.
 		 */
-		if (nd6_is_addr_neighbor(dst, ifp) &&
-		    (rt = nd6_lookup(dst, 1, ifp)) != NULL)
+		if (nd6_is_addr_neighbor(&dst->sin6_addr, ifp) &&
+		    (rt = nd6_lookup(&dst->sin6_addr, 1, ifp)) != NULL)
 			ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	}
 	if (!ln || !rt) {
@@ -2301,7 +2295,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		    !(ND_IFINFO(ifp)->flags & ND6_IFF_PERFORMNUD)) {
 			log(LOG_DEBUG,
 			    "nd6_output: can't allocate llinfo for %s "
-			    "(ln=%p, rt=%p)\n", ip6_sprintf(dst), ln, rt);
+			    "(ln=%p, rt=%p)\n", ip6_sprintf(&dst->sin6_addr),
+			    ln, rt);
 			senderr(EIO);	/* XXX: good error? */
 		}
 
@@ -2354,7 +2349,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		ln->ln_asked++;
 		nd6_llinfo_settimer(ln,
 		    (long)ND_IFINFO(ifp)->retrans * hz / 1000);
-		nd6_ns_output(ifp, NULL, dst, ln, 0);
+		nd6_ns_output(ifp, NULL, &dst->sin6_addr, ln, 0);
 	}
 	return (0);
 
@@ -2383,7 +2378,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		}
 #endif /* IPSEC */
 		return ((*ifp->if_output)(origifp, m,
-		    (struct sockaddr *)&dstsock, rt));
+		    (struct sockaddr *)dst, rt));
 	}
 #if defined(__OpenBSD__) && defined(IPSEC)
 	if (mtag != NULL &&
@@ -2394,7 +2389,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		goto bad;
 	}
 #endif /* IPSEC */
-	return ((*ifp->if_output)(ifp, m, (struct sockaddr *)&dstsock, rt));
+	return ((*ifp->if_output)(ifp, m, (struct sockaddr *)dst, rt));
 
   bad:
 	if (m)
