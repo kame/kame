@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.386 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.387 2005/01/17 07:13:41 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -179,6 +179,10 @@
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
+
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#include <net/pfil.h>
+#endif
 
 #ifdef __FreeBSD__
 MALLOC_DEFINE(M_IPMADDR, "in6_multi", "internet multicast address");
@@ -909,6 +913,11 @@ in6_control(so, cmd, data, ifp, p)
 		if (error == 0 && ia)
 			EVENTHANDLER_INVOKE(ifaddr_event, ifp);
 #endif
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+		(void)pfil_run_hooks(&if_pfil, (struct mbuf **)SIOCAIFADDR_IN6,
+		    ifp, PFIL_IFADDR);
+#endif
+
 		break;
 	}
 
@@ -932,6 +941,10 @@ in6_control(so, cmd, data, ifp, p)
 			prelist_remove(pr);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 503000
 		EVENTHANDLER_INVOKE(ifaddr_event, ifp);
+#endif
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+		(void)pfil_run_hooks(&if_pfil, (struct mbuf **)SIOCAIFADDR_IN6,
+		    ifp, PFIL_IFADDR);
 #endif
 		break;
 	}

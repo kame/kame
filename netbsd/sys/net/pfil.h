@@ -120,4 +120,9 @@ pfil_hook_get(int dir, struct pfil_head *ph)
 #define PFIL_HOOKS
 #endif /* NIPFILTER */
 
+#ifdef _KERNEL
+/* in sys/net/if.c */
+extern struct pfil_head if_pfil; /* packet filtering hook for interfaces */
+#endif
+
 #endif /* _NET_PFIL_H_ */
