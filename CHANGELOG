@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1410 2000/12/01 05:42:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.1411 2000/12/01 05:44:59 jinmei Exp $
 
 <200012>
+2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): called pfctlinput2
+	when fragmenting the packet, in order to tell applications the
+	proper MTU of the outgoing interface for a particular destinaion.
+	The code would be more conformant to rfc2292bis with this change.
+
 2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (pfctlinput2): was newly added to
 	allow the ctlinput mechanism to have additional
