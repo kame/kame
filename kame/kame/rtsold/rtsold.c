@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.62 2003/04/11 13:40:52 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.63 2003/04/11 13:48:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,9 +101,7 @@ int main __P((int, char **));
 static int mobile_node = 0;
 static int do_dump;
 static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurable */
-#if !((defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__))
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
-#endif
 
 #if 0
 static int ifreconfig __P((char *));
