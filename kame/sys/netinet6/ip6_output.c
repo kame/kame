@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.424 2004/02/10 12:02:41 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.425 2004/02/11 10:25:51 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1285,14 +1285,12 @@ skip_ipsec2:;
 		}
 	}
 
-#ifndef SCOPEDROUTING
 	/*
 	 * clear embedded scope identifiers if necessary.
 	 * in6_clearscope will touch the addresses only when necessary.
 	 */
 	in6_clearscope(&ip6->ip6_src);
 	in6_clearscope(&ip6->ip6_dst);
-#endif
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*

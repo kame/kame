@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.48 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.49 2004/02/11 10:25:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -437,6 +437,7 @@ ip6_rthdr2(m, ip6, rh2)
 	 */
 	tmpaddr = *nextaddr;
 	*nextaddr = ip6->ip6_dst;
+	in6_clearscope(nextaddr);
 	ip6->ip6_dst = tmpaddr;
 	ip6_forward(m, 1);
 
