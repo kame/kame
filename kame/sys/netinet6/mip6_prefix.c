@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.3 2001/08/03 14:22:30 itojun Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.4 2001/08/07 07:55:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -144,7 +144,8 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 		return (EINVAL);
 	}
 
-	LIST_FOREACH(ms, &mip6_subnet_list, ms_entry) {
+	for (ms = LIST_FIRST(&mip6_subnet_list); ms;
+	     ms = LIST_NEXT(ms, ms_entry)) {
 		mspfx = mip6_subnet_prefix_list_find_withmpfx(&ms->ms_mspfx_list,
 							      mpfx);
 		if (mspfx) {
@@ -173,7 +174,8 @@ mip6_prefix_list_find(tmpmpfx)
 		return (NULL);
 	}
 
-	LIST_FOREACH(mpfx, &mip6_prefix_list, mpfx_entry) {
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
 		if (in6_are_prefix_equal(&tmpmpfx->mpfx_prefix,
 					 &mpfx->mpfx_prefix,
 					 tmpmpfx->mpfx_prefixlen)
@@ -194,7 +196,8 @@ mip6_prefix_list_find_withhaddr(mpfx_list, haddr)
 {
 	struct mip6_prefix *mpfx;
 
-	LIST_FOREACH(mpfx, &mip6_prefix_list, mpfx_entry) {
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(haddr,
 				       &mpfx->mpfx_haddr)) {
 			/* found. */

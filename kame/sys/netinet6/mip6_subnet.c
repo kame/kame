@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.3 2001/08/03 14:22:30 itojun Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.4 2001/08/07 07:55:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -123,8 +123,10 @@ mip6_subnet_delete(ms)
 	}
 
 	/* remove all hif_subnet that point this mip6_subnet. */
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
-		TAILQ_FOREACH(hs, &sc->hif_hs_list_home, hs_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home); hs;
+		     hs = TAILQ_NEXT(hs, hs_entry)) {
 			if (hs->hs_ms == ms) {
 				error = hif_subnet_list_remove(&sc->hif_hs_list_home,
 							       hs);
@@ -135,7 +137,8 @@ mip6_subnet_delete(ms)
 				}
 			}
 		}
-		TAILQ_FOREACH(hs, &sc->hif_hs_list_foreign, hs_entry) {
+		for (hs = TAILQ_FIRST(&sc->hif_hs_list_foreign); hs;
+		     hs = TAILQ_NEXT(hs, hs_entry)) {
 			if (hs->hs_ms == ms) {
 				error = hif_subnet_list_remove(&sc->hif_hs_list_home,
 							       hs);
@@ -199,7 +202,8 @@ mip6_subnet_list_find_withprefix(ms_list, prefix, prefixlen)
 		return (NULL);
 	}
 
-	LIST_FOREACH(ms, &mip6_subnet_list, ms_entry) {
+	for (ms = LIST_FIRST(&mip6_subnet_list); ms;
+	     ms = LIST_NEXT(ms, ms_entry)) {
 		mspfx = mip6_subnet_prefix_list_find_withprefix(&ms->ms_mspfx_list,
 								prefix,
 								prefixlen);
@@ -224,7 +228,8 @@ mip6_subnet_list_find_withhaaddr(ms_list, haaddr)
 		return (NULL);
 	}
 
-	LIST_FOREACH(ms, &mip6_subnet_list, ms_entry) {
+	for (ms = LIST_FIRST(&mip6_subnet_list); ms;
+	     ms = LIST_NEXT(ms, ms_entry)) {
 		msha = mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
 							   haaddr);
 		if (msha) {
@@ -303,7 +308,8 @@ mip6_subnet_prefix_list_find_withmpfx(mspfx_list, mpfx)
 		return (NULL);
 	}
 
-	TAILQ_FOREACH(mspfx, mspfx_list, mspfx_entry) {
+	for (mspfx = TAILQ_FIRST(mspfx_list); mspfx;
+	     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 		if (mspfx->mspfx_mpfx == mpfx) {
 			/* found. */
 			return (mspfx);
@@ -328,7 +334,8 @@ mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
 	 * (which is a member of mip6_subnet_prefix as a pointer) if
 	 * it contains specified prefix or not.
 	 */
-	TAILQ_FOREACH(mspfx, mspfx_list, mspfx_entry) {
+	for (mspfx = TAILQ_FIRST(mspfx_list); mspfx;
+	     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 		if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
@@ -394,7 +401,8 @@ mip6_subnet_ha_list_find_preferable(msha_list)
 	struct mip6_subnet_ha *msha;
 	struct mip6_ha *mha;
 
-	TAILQ_FOREACH(msha, msha_list, msha_entry) {
+	for (msha = TAILQ_FIRST(msha_list); msha;
+	     msha = TAILQ_NEXT(msha, msha_entry)) {
 		mha = msha->msha_mha;
 		if (mha == NULL) {
 			/* must not happen. */
@@ -421,7 +429,8 @@ mip6_subnet_ha_list_find_withmha(msha_list, mha)
 		return (NULL);
 	}
 
-	TAILQ_FOREACH(msha, msha_list, msha_entry) {
+	for (msha = TAILQ_FIRST(msha_list); msha;
+	     msha = TAILQ_NEXT(msha, msha_entry)) {
 		if (msha->msha_mha == mha) {
 			/* found. */
 			return (msha);
@@ -445,7 +454,8 @@ mip6_subnet_ha_list_find_withhaaddr(msha_list, haaddr)
 	 * member of mip6_subnet_ha as a pointer) if it contains
 	 * specified haaddr or not.
 	 */
-	TAILQ_FOREACH(msha, msha_list, msha_entry) {
+	for (msha = TAILQ_FIRST(msha_list); msha;
+	     msha = TAILQ_NEXT(msha, msha_entry)) {
 		if ((mha = msha->msha_mha) == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,

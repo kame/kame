@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.4 2001/08/03 14:31:42 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.5 2001/08/07 07:55:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -162,7 +162,8 @@ mip6_icmp6_input(m, off, icmp6len)
 			 * we shold avoid further sending of BU to that node.
 			 * (draft-13 10.14)
 			 */
-			TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
 				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 								  paddr);
 				if (mbu)
@@ -375,7 +376,8 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	}
 
 	/* register to the new home agent. */
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		if (sc->hif_location == HIF_LOCATION_HOME)
 			continue;
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.44 2001/08/03 14:31:42 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.45 2001/08/07 07:55:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -153,7 +153,7 @@ mip6_init()
  */
 int
 mip6_process_defrouter_change(dr)
-     struct nd_defrouter *dr;
+	struct nd_defrouter *dr;
 {
 	int error = 0;
 #ifdef MD_WITH_DEFROUTER_CHANGE
@@ -180,9 +180,13 @@ mip6_process_defrouter_change(dr)
 	 */
 	mip6_dr = dr;
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		sc->hif_prevloc = sc->hif_location;
-		LIST_FOREACH(mpfx, &sc->hif_pfx_list, mpfx_entry) {
+		for (mpfx = LIST_FIRST(&sc->hif_pfx_list);
+		     mpfx;
+		     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
 			for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 				if (pr->ndpr_raf_onlink
 				    && mip6_pfx_list_find_withndpr(&sc->hif_pfx_list, pr, MIP6_MPFX_IS_HOME)) {
@@ -201,7 +205,8 @@ mip6_process_defrouter_change(dr)
 		goto process_defrouter_change_done;
 	}
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		if (mip6_process_movement(sc, coa_changed)) {
 			error = -1;
 			goto process_defrouter_change_done;
@@ -228,7 +233,8 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 	int coa_changed;
 	int error = 0;
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		sc->hif_location_prev = sc->hif_location;
 		sc->hif_hs_prev = sc->hif_hs_current;
 		error = mip6_determine_location_withndpr(sc, saddr, ndpr, dr);
@@ -249,7 +255,8 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 		goto process_ndpr_done;
 	}
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		if (mip6_process_movement(sc, coa_changed)) {
 			error = -1;
 			goto process_ndpr_done;
@@ -798,11 +805,13 @@ mip6_remove_haddrs(sc, ifp)
 			continue;
 		ia6 = (struct in6_ifaddr *)ia;
 
-		TAILQ_FOREACH(hs, &sc->hif_hs_list_home, hs_entry) {
+		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home); hs;
+		     hs = TAILQ_NEXT(hs, hs_entry)) {
 			if ((ms = hs->hs_ms) == NULL) {
 				return (EINVAL);
 			}
-			TAILQ_FOREACH(mspfx, &ms->ms_mspfx_list, mspfx_entry) {
+			for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list); mspfx;
+			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 				if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
 					return (EINVAL);
 				}
@@ -881,11 +890,13 @@ mip6_add_haddrs(sc, ifp)
 		return (EINVAL);
 	}
 
-	TAILQ_FOREACH(hs, &sc->hif_hs_list_home, hs_entry) {
+	for (hs = TAILQ_FIRST(&sc->hif_hs_list_home); hs;
+	     hs = TAILQ_NEXT(hs, hs_entry)) {
 		if ((ms = hs->hs_ms) == NULL) {
 			return (EINVAL);
 		}
-		TAILQ_FOREACH(mspfx, &ms->ms_mspfx_list, mspfx_entry) {
+		for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list); mspfx;
+		     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 			if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
 				return (EINVAL);
 			}
@@ -1004,7 +1015,8 @@ mip6_ioctl(cmd, data)
 			int i;
 
 			i = 0;
-			LIST_FOREACH(mbc, &mip6_bc_list, mbc_entry) {
+			for (mbc = LIST_FIRST(&mip6_bc_list); mbc;
+			     mbc = LIST_NEXT(mbc, mbc_entry)) {
 				mrbc->phaddr.sin6_addr = mbc->mbc_phaddr;
 				mrbc->pcoa.sin6_addr = mbc->mbc_pcoa;
 				mrbc->addr.sin6_addr = mbc->mbc_addr;

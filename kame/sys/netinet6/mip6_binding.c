@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.5 2001/08/03 14:31:42 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.6 2001/08/07 07:55:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -146,7 +146,8 @@ mip6_bu_list_find_withpaddr(bu_list, paddr)
 {
 	struct mip6_bu *mbu;
 
-	LIST_FOREACH(mbu, bu_list, mbu_entry) {
+	for (mbu = LIST_FIRST(bu_list); mbu;
+	     mbu = LIST_NEXT(mbu, mbu_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_paddr, paddr))
 			break;
 	}
@@ -160,7 +161,8 @@ mip6_bu_list_find_withhaddr(bu_list, haddr)
 {
 	struct mip6_bu *mbu;
 
-	LIST_FOREACH(mbu, bu_list, mbu_entry) {
+	for (mbu = LIST_FIRST(bu_list); mbu;
+	     mbu = LIST_NEXT(mbu, mbu_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, haddr))
 			break;
 	}
@@ -385,7 +387,8 @@ mip6_bu_starttimer()
 	struct hif_softc *sc;
 
 	if (mip6_bu_timer_running == 0) {
-		TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+		for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+		     sc = TAILQ_NEXT(sc, hif_entry)) {
 			if (LIST_EMPTY(&sc->hif_bu_list))
 				continue;
 
@@ -438,7 +441,8 @@ mip6_bu_timeout(arg)
 #endif
 	mip6_bu_restarttimer();
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		struct mip6_bu *mbu, *mbu_entry;
 
 		for (mbu = LIST_FIRST(&sc->hif_bu_list);
@@ -582,7 +586,8 @@ mip6_bu_list_remove(mbu_list, mbu)
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		if (!LIST_EMPTY(&sc->hif_bu_list))
 			empty = 0;
 	}
@@ -1388,7 +1393,8 @@ mip6_ifa_need_dad(ia)
 	struct mip6_bu *mbu = NULL;
 	int need_dad = 0;
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		mbu = mip6_bu_list_find_withhaddr(&sc->hif_bu_list,
 						  &ia->ia_addr.sin6_addr);
 		if (mbu != NULL)
@@ -1781,7 +1787,8 @@ mip6_bc_list_find_withphaddr(mbc_list, haddr)
 {
 	struct mip6_bc *mbc;
 
-	LIST_FOREACH(mbc, mbc_list, mbc_entry) {
+	for (mbc = LIST_FIRST(mbc_list); mbc;
+	     mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(&mbc->mbc_phaddr, haddr))
 			break;
 	}
@@ -1802,7 +1809,8 @@ mip6_bc_timeout(arg)
 	s = splnet();
 #endif
 
-	LIST_FOREACH(mbc, &mip6_bc_list, mbc_entry) {
+	for (mbc = LIST_FIRST(&mip6_bc_list); mbc;
+	     mbc = LIST_NEXT(mbc, mbc_entry)) {
 		mbc->mbc_remain -= MIP6_BC_TIMEOUT_INTERVAL;
 
 		/* expiration check */
@@ -1932,12 +1940,14 @@ mip6_bu_encapcheck(m, off, proto, arg)
 	}
 
 	/* check mn prefix */
-	TAILQ_FOREACH(hs, hs_list_home, hs_entry) {
+	for (hs = TAILQ_FIRST(hs_list_home); hs;
+	     hs = TAILQ_NEXT(hs, hs_entry)) {
 		if ((ms = hs->hs_ms) == NULL) {
 			/* must not happen. */
 			continue;
 		}
-		TAILQ_FOREACH(mspfx, &ms->ms_mspfx_list, mspfx_entry) {
+		for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list); mspfx;
+		     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 			if ((mpfx = mspfx->mspfx_mpfx) == NULL)	{
 				/* must not happen. */
 				continue;
@@ -1952,12 +1962,14 @@ mip6_bu_encapcheck(m, off, proto, arg)
 			goto match;
 		}
 	}
-	TAILQ_FOREACH(hs, hs_list_foreign, hs_entry) {
+	for (hs = TAILQ_FIRST(hs_list_foreign); hs;
+	     hs = TAILQ_NEXT(hs, hs_entry)) {
 		if ((ms = hs->hs_ms) == NULL) {
 			/* must not happen. */
 			continue;
 		}
-		TAILQ_FOREACH(mspfx, &ms->ms_mspfx_list, mspfx_entry) {
+		for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list); mspfx;
+		     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 			if ((mpfx = mspfx->mspfx_mpfx) == NULL)	{
 				/* must not happen. */
 				continue;
@@ -2203,7 +2215,8 @@ mip6_route_optimize(m)
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		/*
 		 * search all BUs including peer address.
 		 */
