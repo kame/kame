@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.22 2000/05/24 06:14:49 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.23 2000/05/24 10:15:04 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -203,8 +203,7 @@ cmpspidx(a, b)
 
 /*
  * compare policyindex, with wildcard address/protocol match.
- * "a" (first argument) can contain wildcard things.
- * a: subject b: db
+ * a: subject b: db, can contain wildcard things.
  * OUT:	0:	equal
  *	1:	not equal
  */
@@ -218,40 +217,42 @@ cmpspidx_wild(a, b)
 		plog(logp, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
 		plog(logp, LOCATION, NULL, "db: %p: %s\n", b, spidx2str(b)););
 
-	if (!(a->dir == IPSEC_DIR_ANY || a->dir == b->dir))
+	if (!(b->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;
 	if (!(a->ul_proto == IPSEC_PROTO_ANY || b->ul_proto == IPSEC_PROTO_ANY || a->ul_proto == b->ul_proto))
 		return 1;
 
+	/* compare src address */
 	if (sizeof(sa1) < a->src.ss_len || sizeof(sa2) < b->src.ss_len) {
 		plog(logp, LOCATION, NULL, "unexpected error\n");
 		exit(1);
 	}
 	mask_sockaddr((struct sockaddr *)&sa1, (struct sockaddr *)&a->src,
-		a->prefs);
+		b->prefs);
 	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->src,
-		a->prefs);
+		b->prefs);
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			a, a->prefs, saddr2str((struct sockaddr *)&sa1));
+			a, b->prefs, saddr2str((struct sockaddr *)&sa1));
 		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			b, a->prefs, saddr2str((struct sockaddr *)&sa2)););
+			b, b->prefs, saddr2str((struct sockaddr *)&sa2)););
 	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 
+	/* compare dst address */
 	if (sizeof(sa1) < a->dst.ss_len || sizeof(sa2) < b->dst.ss_len) {
 		plog(logp, LOCATION, NULL, "unexpected error\n");
 		exit(1);
 	}
 	mask_sockaddr((struct sockaddr *)&sa1, (struct sockaddr *)&a->dst,
-		a->prefd);
+		b->prefd);
 	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->dst,
-		a->prefd);
+		b->prefd);
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			a, a->prefd, saddr2str((struct sockaddr *)&sa1));
+			a, b->prefd, saddr2str((struct sockaddr *)&sa1));
 		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			b, a->prefd, saddr2str((struct sockaddr *)&sa2)););
+			b, b->prefd, saddr2str((struct sockaddr *)&sa2)););
 	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 

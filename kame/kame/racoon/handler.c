@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.20 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.21 2000/05/24 10:15:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -255,7 +255,7 @@ getph2byspidx(spidx)
 		 */
 		if (p->spidx == NULL)
 			continue;
-		if (cmpspidx(p->spidx, spidx) == 0)
+		if (cmpspidx(spidx, p->spidx) == 0)
 			return p;
 	}
 
