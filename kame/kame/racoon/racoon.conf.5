@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.71 2001/01/25 15:11:01 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.72 2001/01/26 06:18:33 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -43,7 +43,7 @@ is the configuration file for the
 .Xr racoon 8
 ISAKMP daemon.
 .Xr racoon 8
-negotiates security association for itself (ISAKMP SA)
+negotiates security associations for itself (ISAKMP SA)
 and for kernel IPsec (IPsec SA).
 The file consists of a sequence of directives and statements.
 Each directive is composed by a tag, and statements are enclosed by
@@ -88,7 +88,7 @@ the expression becomes
 The vertical bar
 .Pq Ql \*(Ba
 is used to indicate
-between a choice of optional parameters.
+a choice between optional parameters.
 Parentheses
 .Po
 .Ql \*(lP
@@ -152,7 +152,7 @@ other configuration files can be included.
 is obsolete.
 It must be defined at each
 .Ic remote
-directives.
+directive.
 .\"
 .Ss Timer Specification
 .Bl -tag -width Ds -compact
@@ -165,16 +165,16 @@ the maximum number of retries to send.
 The default is 5.
 .It Ic interval Ar number Ar timeunit ;
 the interval to resend, in seconds.
-The default timer is 10 seconds.
+The default time is 10 seconds.
 .It Ic persend Ar number ;
 the number of packets per send.
 The default is 1.
 .It Ic phase1 Ar number Ar timeunit ;
 the maximum time it should take to complete phase 1.
-The default timer is 15 seconds.
+The default time is 15 seconds.
 .It Ic phase2 Ar number Ar timeunit ;
 the maximum time it should take to complete phase 2.
-The default timer is 10 seconds.
+The default time is 10 seconds.
 .El
 .El
 .\"
@@ -185,14 +185,14 @@ If no
 .Ar listen
 directive is specified,
 .Xr racoon 8
-will listen on all available interface addresses.
+will listen on all of the available interface addresses.
 The following is the list of valid statements:
 .Pp
 .Bl -tag -width Ds -compact
 .\" How do I express bold brackets; `[' and `]' .
 .\" Is the "Bq Ic [ Ar port ] ;" buggy ?
 .It Ic isakmp Ar address Bq Bq Ar port ;
-If it is specified,
+If this is specified,
 .Xr racoon 8
 will only listen on
 .Ar address .
@@ -203,7 +203,7 @@ You can provide more than one address definition.
 .\".Xr kmpstat 8 .
 .\"The default port is 61225.
 .It Ic strict_address ;
-require all addresses for ISAKMP must be bound.
+require that all addresses for ISAKMP must be bound.
 This statement will be ignored if you do not specify any addresses.
 .El
 .El
@@ -217,23 +217,30 @@ This statement will be ignored if you do not specify any addresses.
 .Xc
 specifies the parameters for IKE phase 1 for each remote node.
 The default port is 500.
+If 
+.Ic anonymous
+is specified, the statements apply to all peers which do not match 
+any other
+.Ic remote
+directive.
+.Pp
 The following are valid statements.
 .Pp
 .Bl -tag -width Ds -compact
 .\"
 .It Ic exchange_mode ( main \*(Ba aggressive \*(Ba base ) ;
-defined the exchange mode of phase 1 when racoon initiates.
+defines the exchange mode for phase 1 when racoon is the initiator.
 Also it means the acceptable exchange mode when racoon is responder.
 They can be lined with single comma as the separator.
 All of the modes are acceptable.
-The only first exchange mode means racoon uses it when initiating.
+The first exchange mode is what racoon uses when it is the initiator.
 .\"
 .It Ic doi Ic ipsec_doi ;
-means to use IPSEC-DOI specified RFC 2407.
+means to use IPSEC-DOI as specified RFC 2407.
 You can omit this statement.
 .\"
 .It Ic situation Ic identity_only ;
-means to use SIT_IDENTITY_ONLY specified RFC 2407.
+means to use SIT_IDENTITY_ONLY as specified RFC 2407.
 You can omit this statement.
 .\"
 .It Ic identifier Ar idtype ;
@@ -250,16 +257,16 @@ can be used as an
 they are used like:
 .Bl -tag -width Ds -compact
 .It Ic my_identifier Ic address Bq Ar address ;
-defines the type of IP address.
-This is the default if you do not specify an identifier to use.
+the type is the IP address.
+This is the default type if you do not specify an identifier to use.
 .It Ic my_identifier Ic user_fqdn Ar string ;
-defines the type of USER_FQDN.
+the type is a USER_FQDN (user fully-qualified domain name).
 .It Ic my_identifier Ic fqdn Ar string ;
-defines the type of FQDN.
+the type is a FQDN (fully-qualified domain name).
 .It Ic my_identifier Ic keyid Ar file ;
-defines the type of KEY_ID.
+the type is a KEY_ID.
 .It Ic my_identifier Ic asn1dn Bq Ar string ;
-defines the type of ASN.1 distinguished name.
+the type is an ASN.1 distinguished name.
 If
 .Ar string
 is omitted,
@@ -268,8 +275,7 @@ will get DN from the certificate.
 .El 
 .\"
 .It Ic peers_identifier Ar idtype ... ;
-specifies the peer's identifier like
-it is specified with
+specifies the peer's identifier as it is specified with
 .Ic my_identifier .
 If it is not defined then
 .Xr racoon 8
@@ -295,21 +301,22 @@ When the peer does not send a certificate,
 can use this certificate as the peer's certificate.
 .\"
 .It Ic send_cert (on \(ba off) ;
-If you do not want to send any certificate for some reason, set this to off.
+If you do not want to send a certificate for some reason, set this to off.
 The default is on.
 .\"
 .It Ic send_cr (on \(ba off) ;
-If you do not want to send any certificate request for some reason, set this to off.
+If you do not want to send a certificate request for some reason, set this to off.
 The default is on.
 .\"
 .It Ic verify_cert (on \(ba off) ;
-If you do not want to verify the certificate for some reason, set this to off.
+If you do not want to verify the remote peer's certificate for some reason,
+set this to off.
 The default is on.
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
 define a lifetime of a certain time or certain number of bytes
-which are to be proposed in the phase 1 negotiations.
+which will be proposed in the phase 1 negotiations.
 Any proposal will be accepted, and the attribute(s) will be not proposed to
 the peer if you do not specify it(them).
 They can be individually specified in each proposal.
@@ -441,7 +448,9 @@ and policies in the kernel.
 .Ic { Ar statements Ic }
 .Xc
 defines the parameters of the IKE phase 2 (IPSec-SA establishment).
-.Ar source_id destination_id
+.Ar source_id
+and
+.Ar destination_id
 are constructed like:
 .Pp
 .Ic address Ar address
@@ -604,9 +613,9 @@ are interpreted as a secret key.
 Lines start with
 .Ql #
 are ignored.
-Key start with
+Keys which start with
 .Ql 0x
-means hexa-decimal string.
+are hexa-decimal strings.
 Note that the file must be owned by the user ID running
 .Xr racoon 8
 .Pq usually privileged user ,
@@ -653,6 +662,7 @@ foo.kame.net    hoge
 .Sh SEE ALSO
 .\".Xr kmpstat 8 ,
 .Xr racoon 8
+.Xr setkey 8
 .\"
 .Sh HISTORY
 The
