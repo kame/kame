@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.108 2001/12/07 07:12:06 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.109 2001/12/21 06:43:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -656,9 +656,9 @@ rip6_ctloutput(op, so, level, optname, mp)
 			 * checksum offset, permit "no change" values to
 			 * help existing apps.
 			 *
-			 * XXX 2292bis-02 says: "An attempt to set IPV6_CHECKSUM
-			 * for an ICMPv6 socket will fail"  the current behavior
-			 * does not meet 2292bis-02.
+			 * XXX 2292bis says: "An attempt to set IPV6_CHECKSUM
+			 * for an ICMPv6 socket will fail."
+			 * The current behavior does not meet 2292bis.
 			 */
 			in6p = sotoin6pcb(so);
 			error = 0;
