@@ -1033,7 +1033,6 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		if (*mp)
 			mp = &(*mp)->m_next;
 	}
-	/* IN6P_NEXTHOP - for outgoing packet only */
 
 	/*
 	 * IPV6_HOPOPTS socket option. We require super-user privilege
