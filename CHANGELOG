@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1090 2000/07/04 04:27:42 sakane Exp $
+$Id: CHANGELOG,v 1.1091 2000/07/04 05:54:27 jinmei Exp $
 
 <200006>
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_unlink_ifa): newly added to release
+	various links for in6_ifaddr when deleting an address.
+	This function is also called from in6_control(), in order to
+	prevent the kernel from keeping a garbage structure on failure of
+	address addition.
+
 Tue Jul  4 13:26:56 JST 2000 sakane@ydc.co.jp
 	* kame/sys/key.c:
 	A patch from <Francis.Dupont@enst-bretagne.fr> applied.
