@@ -390,7 +390,7 @@ rip6_output(m, va_alist)
 	}
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;
+	ipsc_setsocket(m, so);
 #endif /*IPSEC*/
 
 	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions,

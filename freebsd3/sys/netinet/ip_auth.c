@@ -377,9 +377,6 @@ fr_authioctlloop:
 #  if SOLARIS
 			error = fr_qout(fr_auth[i].fra_q, m);
 #  else /* SOLARIS */
-#ifdef IPSEC
-			m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL);
 #  endif /* SOLARIS */
 			if (error)

@@ -1921,9 +1921,6 @@ tbf_send_packet(vifp, m)
 
     if (vifp->v_flags & VIFF_TUNNEL) {
 	/* If tunnel options */
-#ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 	ip_output(m, (struct mbuf *)0, &vifp->v_route,
 		  IP_FORWARDING, (struct ip_moptions *)0);
     } else {
@@ -1938,9 +1935,6 @@ tbf_send_packet(vifp, m)
 	 * should get rejected because they appear to come from
 	 * the loopback interface, thus preventing looping.
 	 */
-#ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ro,
 			  IP_FORWARDING, &imo);
 

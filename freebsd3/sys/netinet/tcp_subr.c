@@ -433,8 +433,7 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 			  nth, 0);
 #endif
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = tp ? (struct ifnet *)tp->t_inpcb->inp_socket
-		: NULL;
+	ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL);
 #endif /*IPSEC*/
 #ifdef INET6
 	if (isipv6) {

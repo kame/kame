@@ -835,7 +835,7 @@ send:
 
 		/* TODO: IPv6 IP6TOS_ECT bit on */
 #ifdef IPSEC
-		m->m_pkthdr.rcvif = (struct ifnet *)so;
+		ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,
@@ -875,7 +875,7 @@ send:
 #endif
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;
+	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,

@@ -511,9 +511,6 @@ igmp_sendpkt(inm, type, addr)
 	 * XXX
 	 * Do we have to worry about reentrancy here?  Don't think so.
 	 */
-#ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
         ip_output(m, router_alert, &igmprt, 0, &imo);
 
         ++igmpstat.igps_snd_reports;

@@ -850,10 +850,6 @@ struct tcpiphdr *ti;
 	ip->ip_ttl = ip_defttl;
 # endif
 
-#ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
-#endif
-
 # if defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)
 	bzero((char *)&ro, sizeof(ro));
 	err = ip_output(m, (struct mbuf *)0, &ro, 0, 0);

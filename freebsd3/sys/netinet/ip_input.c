@@ -1587,7 +1587,7 @@ ip_forward(m, srcrt)
 	    {
 		mcopy = m_copy(m, 0, imin((int)ip->ip_len, 64));
 #ifdef IPSEC
-		m->m_pkthdr.rcvif = NULL;
+		ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 		error = ip_output(m, (struct mbuf *)0, ipfw_rt,
 				  IP_FORWARDING | IP_PROTOCOLROUTE , 0);
@@ -1655,7 +1655,7 @@ ip_forward(m, srcrt)
 	}
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
+	ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt, 
 			  IP_FORWARDING, 0);
