@@ -3,7 +3,7 @@
 # Date created:         26 Jul 1999
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/09 01:37:05 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/12 07:47:42 itojun Exp $
 #
 
 DISTNAME=	irc2.10.2p1
@@ -14,6 +14,8 @@ EXTRACT_SUFX=	.tgz
 
 MAINTAINER=	sumikawa@kame.net
 
+BROKEN=		"uses non-standard struct field"
+
 GNU_CONFIGURE=  yes
 CONFIGURE_ARGS= --enable-ip6 --without-ncurses
 
@@ -22,6 +24,8 @@ MAN5=		iauth.conf.5
 MAN8=		ircd.8 iauth.8 ircdwatch.8
 
 STARTUP_SCRIPT=	${PREFIX}/etc/rc.d/ircd.sh
+
+MACHINE_ARCH=	i386
 
 do-build:
 	@(cd ${WRKSRC}/${MACHINE_ARCH}-unknown-freebsd${OSREL}; ${SETENV} ${MAKE_ENV} ${MAKE} ${MAKE_FLAGS} ${MAKEFILE} ${MAKE_ARGS} ${ALL_TARGET})
