@@ -524,6 +524,8 @@ tcp_input(m, off0)
 	 * Because ip6_savecontrol() is going to parse the mbuf to
 	 * search for data to be passed up to user-land, it wants mbuf
 	 * parameters to be unchanged.
+	 * XXX: the call of ip6_savecontrol() has been obsoleted based on
+	 * latest version of the advanced API (20020110).
 	 */
 	drop_hdrlen = off0 + off;
 
@@ -833,15 +835,6 @@ findpcb:
   				/*
  				 * Inherit socket options from the listening
   				 * socket.
- 				 * Note that in6p_inputopts are not (even
- 				 * should not be) copied, since it stores
-				 * previously received options and is used to
- 				 * detect if each new option is different than
- 				 * the previous one and hence should be passed
- 				 * to a user.
- 				 * If we copied in6p_inputopts, a user would
- 				 * not be able to receive options just after
- 				 * calling the accept system call.
  				 */
 				inp->inp_flags |=
 					oinp->inp_flags & INP_CONTROLOPTS;
@@ -869,30 +862,6 @@ findpcb:
 				tp->request_r_scale++;
 		}
 	}
-
-#ifdef INET6
-	/* save packet options if user wanted */
-	if (isipv6 && (inp->in6p_flags & INP_CONTROLOPTS) != 0) {
-		struct ip6_recvpktopts opts6;
-
-		/*
-		 * Temporarily re-adjusting the mbuf before ip6_savecontrol(),
-		 * which is necessary for FreeBSD only due to difference from
-		 * other BSD stacks.
-		 * XXX: we'll soon make a more natural fix after getting a
-		 *      consensus.
-		 */
-		ip6_savecontrol(inp, ip6, m, &opts6);
-		if (inp->in6p_inputopts)
-			ip6_update_recvpcbopt(inp->in6p_inputopts, &opts6);
-		if (opts6.head) {
-			if (sbappendcontrol(&inp->in6p_socket->so_rcv,
-					    NULL, opts6.head)
-			    == 0)
-				m_freem(opts6.head);
-		}
-	}
-#endif /* INET6 */
 
 	/*
 	 * Segment received on connection.
