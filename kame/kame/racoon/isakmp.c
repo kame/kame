@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.144 2001/07/10 06:06:02 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.145 2001/07/10 06:48:30 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -548,8 +548,9 @@ isakmp_main(msg, remote, local)
 
 	case ISAKMP_ETYPE_NONE:
 	default:
-		plog(LLV_ERROR, LOCATION, remote,
-			"Invalid exchange type %d.\n", isakmp->etype);
+		plog(LLV_ERROR, LOCATION, NULL,
+			"Invalid exchange type %d from %s.\n",
+			isakmp->etype, saddr2str(remote));
 		return -1;
 	}
 
