@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1815 2001/07/25 09:24:26 suz Exp $
+$KAME: CHANGELOG,v 1.1816 2001/07/25 12:25:52 jinmei Exp $
 
 <200107>
 Wed Jul 25 18:15:37 JST 2001	suz@sdl.hitachi.co.jp
@@ -1465,15 +1465,15 @@ Tue Feb 13 18:42:17 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 2001-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach): skipped
 	assignment of link-local addresses when interfaces become up,
-	if ip6_auto_linklocal is 0 (its default is 1).  By setting 0 to
-	this variable and manually configuring link-local addresses, you
+	if ip6_auto_linklocal is 0 (its default is 1).  By setting this
+	variable to 0 and manually configuring link-local addresses, you
 	can use well-known interface identifiers for servers/router/etc.
 	This variable can be configured via sysctl
 	net.inet6.ip6.auto_linklocal or by the IP6_AUTO_LINKLOCAL kernel
 	compilation option.  If you configure the variable via sysctl, you
-	should be sure that all interfaces are NOT up.
-	Note that the variable effects all interfaces.  When you set 0 to
-	the variable, you should configure link-local addresses for all
+	should be sure that no interfaces has been up.
+	Note that the variable effects all interfaces.  When you set the
+	variable to 0, you should configure link-local addresses for all
 	interfaces that you might want to use.
 	
 Fri Feb  9 00:51:01 JST 2001  itojun@iijlab.net
