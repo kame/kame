@@ -134,6 +134,7 @@ struct ipsecrequest {
 #define	IPSEC_LEVEL_DEFAULT	0	/* reference to system default */
 #define	IPSEC_LEVEL_USE		1	/* use SA if present. */
 #define	IPSEC_LEVEL_REQUIRE	2	/* require SA. */
+#define	IPSEC_LEVEL_UNIQUE	3	/* unique SA. */
 
 #define IPSEC_REPLAYWSIZE  32
 
