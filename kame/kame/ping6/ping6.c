@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.162 2002/10/25 02:18:32 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.163 2002/10/25 02:19:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,7 +406,7 @@ main(argc, argv)
 			e = NULL;
 			lsockbufsize = strtoul(optarg, &e, 10);
 			sockbufsize = lsockbufsize;
-			if (errno || !*optarg || !e || *e ||
+			if (errno || !*optarg || *e ||
 			    sockbufsize != lsockbufsize)
 				errx(1, "invalid socket buffer size");
 #else
