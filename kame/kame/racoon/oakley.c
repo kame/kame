@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.3 2000/01/12 16:45:21 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.4 2000/01/12 17:23:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1223,11 +1223,20 @@ oakley_compute_skeyids(iph1)
 	switch(iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		/* SKEYID = prf(pre-shared-key, Ni_b | Nr_b) */
-		iph1->authstr = getpsk(iph1->remote);
+		if (iph1->etype != ISAKMP_ETYPE_IDENT)
+			iph1->authstr = getpsk(iph1->id_p);
 		if (iph1->authstr == NULL) {
-			plog(logp, LOCATION, iph1->remote,
-				"couldn't find pskey.\n");
-			goto end;
+			/*
+			 * If main mode or If failed to get psk by ID,
+			 * we try to get it by remote IP address.
+			 * It's may be nonsense.
+			 */
+			iph1->authstr = getpskbyaddr(iph1->remote);
+			if (iph1->authstr == NULL) {
+				plog(logp, LOCATION, iph1->remote,
+					"couldn't find pskey.\n");
+				goto end;
+			}
 		}
 		YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "psk found: "));
 		YIPSDEBUG(DEBUG_KEY, PVDUMP(iph1->authstr));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.24 2000/01/12 16:45:21 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.25 2000/01/12 17:23:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2896,36 +2896,44 @@ ipsecdoi_checkid1(iph1)
 
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
 
-	if (id_b->type != IPSECDOI_ID_IPV4_ADDR
-	 && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
-		plog(logp, LOCATION, NULL,
-			"wrong ID payload type %u.\n", id_b->type);
-		goto err;
-	}
+	/*
+	 * In main mode, only type of specific address can be used.
+	 * XXX Other types are not allowed, aren't they ?
+	 */
+	if (iph1->etype == ISAKMP_ETYPE_IDENT) {
+		if (id_b->type != IPSECDOI_ID_IPV4_ADDR
+		 && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
+			plog(logp, LOCATION, NULL,
+				"wrong ID payload type %u.\n", id_b->type);
+			goto err;
+		}
 
-	if (id_b->proto_id == 0 && ntohs(id_b->port) == 0)
-		return 0;
-	if (id_b->proto_id == IPPROTO_UDP) {
-		if (ntohs(id_b->port) == _INPORTBYSA(iph1->remote))
+		if (id_b->proto_id == 0 && ntohs(id_b->port) == 0)
 			return 0;
+		if (id_b->proto_id == IPPROTO_UDP) {
+			if (ntohs(id_b->port) == _INPORTBYSA(iph1->remote))
+				return 0;
 #if 1
-		/* allow hardcoded "500" for now */
-		if (ntohs(id_b->port) == 500)
-			return 0;
+			/* allow hardcoded "500" for now */
+			if (ntohs(id_b->port) == 500)
+				return 0;
 #endif
-	}
+		}
 
 #if 0
-	plog(logp, LOCATION, NULL,
-		"wrong ID payload (proto, port) = (%u, %u).\n",
-		id_b->proto_id, ntohs(id_b->port));
-	return -1;
+		plog(logp, LOCATION, NULL,
+			"wrong ID payload (proto, port) = (%u, %u).\n",
+			id_b->proto_id, ntohs(id_b->port));
+		return -1;
 #else
-	plog(logp, LOCATION, NULL,
-		"wrong ID payload (proto, port) = (%u, %u), okay for now.\n",
-		id_b->proto_id, ntohs(id_b->port));
-	return 0;
+		plog(logp, LOCATION, NULL,
+			"wrong ID payload (proto, port) = (%u, %u), "
+			"okay for now.\n",
+			id_b->proto_id, ntohs(id_b->port));
+		return 0;
 #endif
+	}
+	return 0;
 err:
 	return -1;
 }
@@ -2941,6 +2949,7 @@ ipsecdoi_setid1(iph1)
 {
 	vchar_t *ret = NULL;
 	struct ipsecdoi_id_b id_b;
+	int lctype;
 	vchar_t *ident = NULL, idtmp;
 
 	/* init */
@@ -2948,15 +2957,16 @@ ipsecdoi_setid1(iph1)
 	id_b.proto_id = 0;
 	id_b.port = 0;
 
-	switch (iph1->rmconf->identtype) {
+	lctype = doi2idtype(iph1->rmconf->identtype);
+	switch (lctype) {
 	case IPSECDOI_ID_FQDN:
-		ident = lcconf->ident[iph1->rmconf->identtype];
+		ident = lcconf->ident[lctype];
 		break;
 	case IPSECDOI_ID_USER_FQDN:
-		ident = lcconf->ident[iph1->rmconf->identtype];
+		ident = lcconf->ident[lctype];
 		break;
 	case IPSECDOI_ID_KEY_ID:
-		ident = lcconf->ident[iph1->rmconf->identtype];
+		ident = lcconf->ident[lctype];
 		break;
 	default:
 		ident = NULL;

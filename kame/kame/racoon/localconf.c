@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.2 2000/01/10 22:38:39 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.3 2000/01/12 17:23:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -109,14 +109,82 @@ initlcconf()
 }
 
 vchar_t *
-getpsk(remote)
+getpsk(id0)
+	vchar_t *id0;
+{
+	FILE *fp;
+	char *id;
+	char buf[1024];	/* XXX how is variable length ? */
+	char *p, *q;
+	vchar_t *key = NULL;
+	int len;
+
+	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
+	if (fp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to open pre_share_key file %s\n",
+			lcconf->pathinfo[LC_PATHTYPE_PSK]);
+		return NULL;
+	}
+
+	id = CALLOC(1 + id0->l, char *);
+	if (id == NULL) {
+		plog(logp, LOCATION, NULL,
+			"calloc (%s)\n", strerror(errno)); 
+		goto end;
+	}
+	memcpy(id, id0->v, id0->l);
+	id[id0->l] = '\0';
+
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		/* search the end of 1st string. */
+		for (p = buf; *p != '\0' && !isspace(*p); p++)
+			;
+		if (*p == '\0')
+			continue;	/* no 2nd parameter */
+		*p = '\0';
+		/* search the fist of 2nd string. */
+		while (isspace(*++p))
+			;
+		if (*p == '\0')
+			continue;	/* no 2nd parameter */
+		p--;
+		if (strcmp(id, buf) == 0) {
+			p++;
+			len = 0;
+			for (q = p; *q != '\0' && *q != '\n'; q++)
+				len++;
+			*q = '\0';
+			key = vmalloc(len);
+			if (key == NULL) {
+				plog(logp, LOCATION, NULL,
+					"failed to allocate key buffer.\n");
+				goto end;
+			}
+			memcpy(key->v, p, key->l);
+			goto end;
+		}
+	}
+
+end:
+	if (id)
+		free(id);
+	fclose(fp);
+	return key;
+}
+
+/*
+ * get PSK by address.
+ */
+vchar_t *
+getpskbyaddr(remote)
 	struct sockaddr *remote;
 {
 	FILE *fp;
 	char addr[NI_MAXHOST], port[NI_MAXSERV];
 	char buf[1024];	/* XXX how is variable length ? */
 	char *p, *q;
-	vchar_t *key;
+	vchar_t *key = NULL;
 	int len;
 
 	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
@@ -143,7 +211,6 @@ getpsk(remote)
 			continue;	/* no 2nd parameter */
 		p--;
 		if (strcmp(buf, addr) == 0) {
-			fclose(fp);
 			p++;
 			len = 0;
 			for (q = p; *q != '\0' && *q != '\n'; q++)
@@ -153,15 +220,45 @@ getpsk(remote)
 			if (key == NULL) {
 				plog(logp, LOCATION, NULL,
 					"failed to allocate key buffer.\n");
-				return NULL;
+				goto end;
 			}
 			memcpy(key->v, p, key->l);
-			return key;
+			goto end;
 		}
 	}
-	fclose(fp);
 
-	return NULL;
+end:
+	fclose(fp);
+	return key;
+}
+
+static int lc_doi2idtype[] = {
+	-1,
+	-1,
+	LC_IDENTTYPE_FQDN,
+	LC_IDENTTYPE_USERFQDN,
+	-1,
+	-1,
+	-1,
+	-1,
+	-1,
+	-1,
+	-1,
+	LC_IDENTTYPE_KEYID,
+};
+
+/*
+ * convert DOI value to idtype
+ * OUT	-1   : NG
+ *	other: converted.
+ */
+int
+doi2idtype(idtype)
+	int idtype;
+{
+	if (ARRAYLEN(lc_doi2idtype) > idtype)
+		return lc_doi2idtype[idtype];
+	return -1;
 }
 
 static int lc_idtype2doi[] = {
