@@ -363,9 +363,10 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		struct sockaddr_in sin;
 
 		if (!ip6_mapped_addr_on ||
-		    (inp->inp_flags & IN6P_IPV6_V6ONLY))
-			return(EINVAL);
-
+		    (inp->inp_flags & IN6P_IPV6_V6ONLY)) {
+			error = EINVAL;
+			goto out;
+		}
 		in6_sin6_2_sin(&sin, sin6p);
 		inp->inp_vflag |= INP_IPV4;
 		inp->inp_vflag &= ~INP_IPV6;
