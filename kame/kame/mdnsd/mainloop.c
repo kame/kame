@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.65 2001/06/23 03:11:33 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.66 2001/06/27 21:16:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1333,7 +1333,7 @@ relay_dns(sd, buf, len, from)
 	if (ntohs(hp->qdcount) == 1 && ntohs(hp->ancount) == 0 &&
 	    ntohs(hp->nscount) == 0) {
 		edns0len = decode_edns0(hp, &d, len - (d - buf));
-		if (edns0len > rbuflen) {
+		if (edns0len > 0 && edns0len > rbuflen) {
 			if (dflag)
 				printf("EDNS0: %d\n", edns0len);
 			rbuflen = edns0len;
@@ -1493,7 +1493,7 @@ relay_icmp6(sd, buf, len, from)
 	if (ntohs(hp->qdcount) == 1 && ntohs(hp->ancount) == 0 &&
 	    ntohs(hp->nscount) == 0) {
 		edns0len = decode_edns0(hp, &d, len - (d - buf));
-		if (edns0len > rbuflen) {
+		if (edns0len > 0 && edns0len > rbuflen) {
 			if (dflag)
 				printf("EDNS0: %d\n", edns0len);
 			rbuflen = edns0len;
@@ -1645,7 +1645,7 @@ serve(sd, buf, len, from)
 	if (ntohs(hp->ancount) == 0 && ntohs(hp->nscount) == 0) {
 		int edns0len;
 		edns0len = decode_edns0(hp, &d, len - (d - buf));
-		if (edns0len > rbuflen) {
+		if (edns0len > 0 && edns0len > rbuflen) {
 			if (dflag)
 				printf("EDNS0: %d\n", edns0len);
 			rbuflen = edns0len;
