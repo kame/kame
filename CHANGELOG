@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.181 1999/10/10 06:45:13 itojun Exp $
+$Id: CHANGELOG,v 1.182 1999/10/10 15:40:11 itojun Exp $
 
 <199910>
+Mon Oct 11 00:40:52 JST 1999  itojun@iijlab.net
+	* freebsd2/ports/fwtk6: use latest IPv6 patch.
+	  From: Hajimu UMEMOTO <ume@mahoroba.org>
+
 Sun Oct 10 15:44:07 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/{icmp6.c,tcp6_subr.c,udp6_usrreq.c},
 	  openbsd/sys/netinet/{tcp_subr.c,udp_usrreq.c},
