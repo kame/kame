@@ -340,10 +340,11 @@ struct ip6_rthdr *rth;
 #endif 
 struct cmsghdr *cmsg;
 
-char *source;
+char *source = 0;
 char *hostname;
 
 int nprobes = 3;
+int first_hop = 1;
 int max_hops = 30;
 u_short ident;
 u_short port = 32768+666;	/* start udp dest port # for probe packets */
@@ -409,13 +410,18 @@ main(argc, argv)
 
 	seq = 0;
 	
-	while ((ch = getopt(argc, argv, "dlm:np:q:rs:w:vg:")) != EOF)
+	while ((ch = getopt(argc, argv, "df:g:lm:np:q:rs:w:v")) != EOF)
 		switch(ch) {
 		case 'd':
 			options |= SO_DEBUG;
 			break;
-		case 'l':
-			lflag++;
+		case 'f':
+			first_hop = atoi(optarg);
+			if (first_hop > max_hops) {
+				Fprintf(stderr,
+				    "traceroute6: min hoplimit must be <= %d.\n", max_hops);
+				exit(1);
+			}
 			break;
 		case 'g':
 			hp = getipnodebyname(optarg, AF_INET6, 0, &h_errno);
@@ -453,11 +459,14 @@ main(argc, argv)
 #endif
 			freehostent(hp);
 			break;
+		case 'l':
+			lflag++;
+			break;
 		case 'm':
 			max_hops = atoi(optarg);
-			if (max_hops <= 1) {
+			if (max_hops < first_hop) {
 				Fprintf(stderr,
-				    "traceroute6: max hoplimit must be >1.\n");
+				    "traceroute6: max hoplimit must be >= %d.\n", first_hop);
 				exit(1);
 			}
 			break;
@@ -774,10 +783,13 @@ main(argc, argv)
 		max_hops, datalen);
 	(void) fflush(stderr);
 
+	if (first_hop > 1)
+		Printf("Skipping %d intermediate hops\n", first_hop - 1);
+
 	/*
 	 * Main loop
 	 */
-	for (hops = 1; hops <= max_hops; ++hops) {
+	for (hops = first_hop; hops <= max_hops; ++hops) {
 		struct in6_addr lastaddr;
 		int got_there = 0;
 		int unreachable = 0;
@@ -1265,7 +1277,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-"usage: traceroute6 [-dlnrv] [-m max_hops] [-p port#] [-q nqueries]\n\t\
-[-s src_addr] [-g gateway] [-w wait] host [data size]\n");
+"usage: traceroute6 [-dlnrv] [-f first_hop] [-m max_hops] [-p port#] \n"
+"       [-q nqueries] [-s src_addr] [-g gateway] [-w wait] host [data size]\n");
 	exit(1);
 }
