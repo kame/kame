@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.27 2003/11/25 03:51:25 jinmei Exp $
+# $Id: Makefile.in,v 1.28 2003/11/25 03:52:05 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -24,7 +24,6 @@ CFLAGS+= @DHCPOPT_DNS@ @DH6OPT_DNSNAME@ \
 	-DCONF_DH6OPT_PREFIX_DELEGATION=@dhcpopt_pdel@ \
 	-DCONF_DH6OPT_PREFIX_INFORMATION=@dhcpopt_pinfo@ \
 	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@ \
-	-DCONF_DH6OPT_STCODE_NOPREFIXAVAIL=@dhcpstcode_no_prefix@ \
 	-DCONF_DH6OPT_NTP=@dhcpopt_ntp@ \
 
 GENSRCS=cfparse.c cftoken.c
