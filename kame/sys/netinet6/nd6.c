@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.213 2001/10/25 07:25:42 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.214 2001/10/25 10:01:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1056,6 +1056,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	struct ifnet *ifp;
 {
 	struct nd_prefix *pr;
+	struct rtentry *rt;
 	int i;
 
 #define IFADDR6(a) ((((struct in6_ifaddr *)(a))->ia_addr).sin6_addr)
@@ -1076,6 +1077,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * it should be a neighbor.
 	 */
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+
 		if (pr->ndpr_ifp != ifp)
 			continue;
 
@@ -1096,7 +1098,8 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * Even if the address matches none of our addresses, it might be
 	 * in the neighbor cache.
 	 */
-	if (nd6_lookup(&addr->sin6_addr, 0, ifp))
+	if ((rt = nd6_lookup(&addr->sin6_addr, 0, ifp)) != NULL &&
+	    rt->rt_llinfo != NULL)
 		return(1);
 
 	return(0);
@@ -1290,7 +1293,7 @@ nd6_rtrequest(req, rt, sa)
 	long time_second = time.tv_sec;
 #endif
 
-	if (rt->rt_flags & RTF_GATEWAY)
+	if ((rt->rt_flags & RTF_GATEWAY))
 		return;
 
 	if (nd6_need_cache(ifp) == 0 && (rt->rt_flags & RTF_HOST) == 0) {
@@ -1301,6 +1304,26 @@ nd6_rtrequest(req, rt, sa)
 		 * Moreover, the RTF_LLINFO flag which would be set below
 		 * would annoy the ndp(8) command.
 		 */
+		return;
+	}
+
+	if (req == RTM_RESOLVE &&
+	    !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp)) {
+		/*
+		 * FreeBSD and BSD/OS often make a cloned host route based
+		 * on a less-specific route (e.g. the default route).
+		 * If the less specific route does not have a "gateway"
+		 * (this is the case when the route just goes to a p2p
+		 * interface), we'll mistakenly make a neighbor cache for
+		 * the host route, and will see strange neighbor solicitation
+		 * for the corresponding destination.  In order to avoid the
+		 * confusion, we check if the destination of the route is
+		 * a neighbor in terms of neighbor discovery, and stop the
+		 * process if not.  Additionally, we remove the LLINFO flag
+		 * so that ndp(8) will not try to get the neighbor information
+		 * of the destination.
+		 */
+		rt->rt_flags &= ~RTF_LLINFO;
 		return;
 	}
 
@@ -1337,7 +1360,7 @@ nd6_rtrequest(req, rt, sa)
 				ln->ln_expire = 1;
 			}
 #endif
-			if (rt->rt_flags & RTF_CLONING)
+			if ((rt->rt_flags & RTF_CLONING))
 				break;
 		}
 		/*
@@ -1760,12 +1783,12 @@ nd6_ioctl(cmd, data, ifp)
 #else
 		s = splnet();
 #endif
-		if ((rt = nd6_lookup(&nb_addr, 0, ifp)) == NULL) {
+		if ((rt = nd6_lookup(&nb_addr, 0, ifp)) == NULL ||
+		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL) {
 			error = EINVAL;
 			splx(s);
 			break;
 		}
-		ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 		nbi->state = ln->ln_state;
 		nbi->asked = ln->ln_asked;
 		nbi->isrouter = ln->ln_router;
@@ -2115,9 +2138,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			/*
 			 * We skip link-layer address resolution and NUD
 			 * if the gateway is not a neighbor from ND point
-			 * of view, regardless the value of the
-			 * nd_ifinfo.flags.
-			 * The second condition is a bit tricky: we skip
+			 * of view, regardless of the value of nd_ifinfo.flags.
+			 * The second condition is a bit tricky; we skip
 			 * if the gateway is our own address, which is
 			 * sometimes used to install a route to a p2p link.
 			 */
