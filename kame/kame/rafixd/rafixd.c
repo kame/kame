@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.6 2003/07/14 12:09:00 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.7 2004/07/06 10:19:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -361,6 +361,7 @@ match_prefix(paddr, plen)
 		return (pent);
 
 	  nextprefix:
+		;
 	}
 
 	return (NULL);
