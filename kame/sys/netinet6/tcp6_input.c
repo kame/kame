@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.22 2000/03/25 07:24:00 sumikawa Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.23 2000/04/12 04:12:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -619,8 +619,6 @@ findpcb:
 
 	so = in6p->in6p_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
-		struct ip6_recvpktopts newopts;
-
 		if (so->so_options & SO_DEBUG) {
 			ostate = t6p->t_state;
 			ip6_save = *ip6;
