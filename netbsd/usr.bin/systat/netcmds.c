@@ -54,6 +54,10 @@ __RCSID("$NetBSD: netcmds.c,v 1.8 1998/07/12 05:59:00 mrg Exp $");
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
+#ifdef INET6
+#include <netinet/ip6.h>
+#include <netinet6/in6_pcb.h>
+#endif
 
 #include <arpa/inet.h>
 
@@ -67,7 +71,7 @@ __RCSID("$NetBSD: netcmds.c,v 1.8 1998/07/12 05:59:00 mrg Exp $");
 #define	streq(a,b)	(strcmp(a,b)==0)
 
 static	struct hitem {
-	struct	in_addr addr;
+	struct	sockaddr_storage addr;
 	int	onoff;
 } *hosts;
 
@@ -78,7 +82,8 @@ static void selectproto __P((char *));
 static void showprotos __P((void));
 static int selectport __P((long, int));
 static void showports __P((void));
-static int selecthost __P((struct in_addr *, int));
+static int addrcmp __P((struct sockaddr *, struct sockaddr *));
+static int selecthost __P((struct sockaddr *, int));
 static void showhosts __P((void));
 
 int
@@ -129,8 +134,7 @@ changeitems(args, onoff)
 {
 	char *cp;
 	struct servent *sp;
-	struct hostent *hp;
-	struct in_addr in;
+	struct addrinfo hints, *res0, *res;
 
 	cp = strchr(args, '\n');
 	if (cp)
@@ -151,15 +155,17 @@ changeitems(args, onoff)
 			selectport(sp->s_port, onoff);
 			continue;
 		}
-		if (inet_aton(args, &in) == 0) {
-			hp = gethostbyname(args);
-			if (hp == 0) {
-				error("%s: unknown host or port", args);
-				continue;
-			}
-			memcpy(&in, hp->h_addr, hp->h_length);
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = PF_UNSPEC;
+		hints.ai_socktype = SOCK_DGRAM;
+		if (getaddrinfo(args, "0", &hints, &res0) != 0) {
+			error("%s: unknown host or port", args);
+			continue;
 		}
-		selecthost(&in, onoff);
+		for (res = res0; res; res = res->ai_next)
+			selecthost(res->ai_addr, onoff);
+		freeaddrinfo(res0);
 	}
 }
 
@@ -235,6 +241,21 @@ checkport(inp)
 	return (1);
 }
 
+#ifdef INET6
+int
+checkport6(in6p)
+	struct in6pcb *in6p;
+{
+	struct pitem *p;
+
+	if (ports)
+	for (p = ports; p < ports+nports; p++)
+		if (p->port == in6p->in6p_lport || p->port == in6p->in6p_fport)
+			return (p->onoff);
+	return (1);
+}
+#endif
+
 static void
 showports()
 {
@@ -254,13 +275,43 @@ showports()
 }
 
 static int
-selecthost(in, onoff)
-	struct in_addr *in;
+addrcmp(sa1, sa2)
+	struct sockaddr *sa1;
+	struct sockaddr *sa2;
+{
+	if (sa1->sa_family != sa2->sa_family)
+		return 0;
+	if (sa1->sa_len != sa2->sa_len)
+		return 0;
+	switch (sa1->sa_family) {
+	case AF_INET:
+		if (((struct sockaddr_in *)sa1)->sin_addr.s_addr ==
+				((struct sockaddr_in *)sa2)->sin_addr.s_addr)
+			return 1;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		if (IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)sa1)->sin6_addr,
+				&((struct sockaddr_in6 *)sa2)->sin6_addr))
+			return 1;
+		break;
+#endif
+	default:
+		if (memcmp(sa1, sa2, sa1->sa_len) == 0)
+			return 1;
+		break;
+	}
+	return 0;
+}
+
+static int
+selecthost(sa, onoff)
+	struct sockaddr *sa;
 	int onoff;
 {
 	struct hitem *p;
 
-	if (in == 0) {
+	if (sa == 0) {
 		if (hosts == 0)
 			return (0);
 		free((char *)hosts), hosts = 0;
@@ -268,7 +319,7 @@ selecthost(in, onoff)
 		return (1);
 	}
 	for (p = hosts; p < hosts+nhosts; p++)
-		if (p->addr.s_addr == in->s_addr) {
+		if (addrcmp(sa, (struct sockaddr *)&p->addr)) {
 			p->onoff = onoff;
 			return (0);
 		}
@@ -277,7 +328,7 @@ selecthost(in, onoff)
 	else
 		hosts = (struct hitem *)realloc(hosts, (nhosts+1)*sizeof (*p));
 	p = &hosts[nhosts++];
-	p->addr = *in;
+	memcpy(&p->addr, sa, sa->sa_len);
 	p->onoff = onoff;
 	return (1);
 }
@@ -287,25 +338,61 @@ checkhost(inp)
 	struct inpcb *inp;
 {
 	struct hitem *p;
+	struct sockaddr_in *sin;
 
 	if (hosts)
-		for (p = hosts; p < hosts+nhosts; p++)
-			if (p->addr.s_addr == inp->inp_laddr.s_addr ||
-			    p->addr.s_addr == inp->inp_faddr.s_addr)
+		for (p = hosts; p < hosts+nhosts; p++) {
+			if (((struct sockaddr *)&p->addr)->sa_family != AF_INET)
+				continue;
+			sin = (struct sockaddr_in *)&p->addr;
+			if (sin->sin_addr.s_addr == inp->inp_laddr.s_addr ||
+			    sin->sin_addr.s_addr == inp->inp_faddr.s_addr)
 				return (p->onoff);
+		}
 	return (1);
 }
+
+#ifdef INET6
+int
+checkhost6(in6p)
+	struct in6pcb *in6p;
+{
+	struct hitem *p;
+	struct sockaddr_in6 *sin6;
+
+	if (hosts)
+		for (p = hosts; p < hosts+nhosts; p++) {
+			if (((struct sockaddr *)&p->addr)->sa_family != AF_INET6)
+				continue;
+			sin6 = (struct sockaddr_in6 *)&p->addr;
+			if (IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &in6p->in6p_laddr) ||
+			    IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &in6p->in6p_faddr))
+				return (p->onoff);
+		}
+	return (1);
+}
+#endif
 
 static void
 showhosts()
 {
 	struct hitem *p;
-	struct hostent *hp;
+	char hbuf[NI_MAXHOST];
+	struct sockaddr *sa;
+	int flags;
 
+#if 0
+	flags = nflag ? NI_NUMERICHOST : 0;
+#else
+	flags = 0;
+#endif
 	for (p = hosts; p < hosts+nhosts; p++) {
-		hp = gethostbyaddr((char *)&p->addr, sizeof (p->addr), AF_INET);
+		sa = (struct sockaddr *)&p->addr;
+		if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), NULL, 0,
+				flags) != 0)
+			strcpy(hbuf, "(invalid)");
 		if (!p->onoff)
 			addch('!');
-		printw("%s ", hp ? hp->h_name : inet_ntoa(p->addr));
+		printw("%s ", hbuf);
 	}
 }

@@ -60,9 +60,16 @@ extern int	protos;
 extern int	verbose;
 
 struct inpcb;
+#ifdef INET6
+struct in6pcb;
+#endif
 
 int	 checkhost __P((struct inpcb *));
 int	 checkport __P((struct inpcb *));
+#ifdef INET6
+int	 checkhost6 __P((struct in6pcb *));
+int	 checkport6 __P((struct in6pcb *));
+#endif
 void	 closeiostat __P((WINDOW *));
 void	 closekre __P((WINDOW *));
 void	 closembufs __P((WINDOW *));
