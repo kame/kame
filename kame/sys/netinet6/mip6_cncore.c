@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.50 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.51 2003/12/08 10:16:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2252,7 +2252,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			}
 		} else {
 			if (mbc == NULL || (mbc->mbc_flags & IP6MU_CLONED)) {
-				bi.mbc_status = IP6_MH_BAS_NOT_HOME_AGENT;
+				bi.mbc_status = IP6_MH_BAS_NOT_HA;
 				bi.mbc_send_ba = 1;
 				goto send_ba;
 			}

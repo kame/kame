@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.29 2003/12/05 01:35:18 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.30 2003/12/08 10:16:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -371,7 +371,7 @@ mobility6_rip6_input(mp, off)
 #ifndef PULLDOWN_TEST
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 #endif
-	struct ip6_mobility *mh;
+	struct ip6_mh *mh;
 	struct sockaddr_in6 fromsa;
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
@@ -384,9 +384,9 @@ mobility6_rip6_input(mp, off)
 
 #ifndef PULLDOWN_TEST
 	/* this is assumed to be safe. */
-	mh = (struct ip6_mobility *)((caddr_t)ip6 + off);
+	mh = (struct ip6_mh *)((caddr_t)ip6 + off);
 #else
-	IP6_EXTHDR_GET(mh, struct ip6_mobility *, m, off, sizeof(*mh));
+	IP6_EXTHDR_GET(mh, struct ip6_mh *, m, off, sizeof(*mh));
 	if (mh == NULL) {
 		/* m is already reclaimed */
 		return (IPPROTO_DONE);

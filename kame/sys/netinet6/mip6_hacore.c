@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.18 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.19 2003/12/08 10:16:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -159,7 +159,7 @@ mip6_process_hrbu(bi)
 	/* adjust lifetime */
 	if (bi->mbc_lifetime > prlifetime) {
 		bi->mbc_lifetime = prlifetime;
-		bi->mbc_status = IP6_MH_BAS_PRFX_DISC;
+		bi->mbc_status = IP6_MH_BAS_PRFX_DISCOV;
 	}
 
 	/*

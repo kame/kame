@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.365 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.366 2003/12/08 10:16:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -811,14 +811,14 @@ icmp6_input(mp, offp, proto)
 
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	case MIP6_HA_DISCOVERY_REQUEST:
-		if (icmp6len < sizeof(struct dhaad_req))
+		if (icmp6len < sizeof(struct mip6_dhaad_req))
 			goto badlen;
 		if (code != 0)
 			goto badcode;
 		break;
 
 	case MIP6_PREFIX_SOLICIT:
-		if (icmp6len < sizeof(struct mobile_prefix_solicit))
+		if (icmp6len < sizeof(struct mip6_prefix_solicit))
 			goto badlen;
 		if (code != 0)
 			goto badcode;

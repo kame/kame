@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.133 2003/12/05 01:35:18 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.134 2003/12/08 10:16:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1361,7 +1361,7 @@ nd6_dad_start(ifa, tick)
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
-		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
+		mip6_dad_error(ifa, IP6_MH_BAS_INSUFFICIENT);
 #endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}
