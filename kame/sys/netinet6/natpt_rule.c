@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.13 2001/02/05 06:44:02 jinmei Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.14 2001/02/05 06:47:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,7 +78,7 @@ extern	void	in6_len2mask	__P((struct in6_addr *, int));
 extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
 extern	void	setMTU		__P((void));
 
-static	void	in4_len2mask	__P((struct in_addr *, int));
+static	void	natpt_in4_len2mask	__P((struct in_addr *, int));
 /*
  *
  */
