@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.75 2002/02/14 07:30:23 sakane Exp $	*/
+/*	$KAME: if_stf.c,v 1.76 2002/02/20 06:26:09 kjc Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -974,10 +974,11 @@ in_stf_input(m, va_alist)
 	}
 
 	itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
-	if ((ifp->if_flags & IFF_LINK1) != 0)
-		ip_ecn_egress(ECN_ALLOWED, &otos, &itos);
-	else
-		ip_ecn_egress(ECN_NOCARE, &otos, &itos);
+	if (ip_ecn_egress((ifp->if_flags & IFF_LINK1) ?
+			  ECN_ALLOWED : ECN_NOCARE, &otos, &itos) == 0) {
+		m_freem(m);
+		return;
+	}
 	ip6->ip6_flow &= ~htonl(0xff << 20);
 	ip6->ip6_flow |= htonl((u_int32_t)itos << 20);
 
