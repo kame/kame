@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.111 2000/06/04 12:46:13 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.112 2000/06/18 01:50:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1707,45 +1707,45 @@ ip6_ctloutput(op, so, level, optname, mp)
 				break;
 
 #ifndef __bsdi__
-		case IPV6_PORTRANGE:
+			case IPV6_PORTRANGE:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-			error = sooptcopyin(sopt, &optval, sizeof optval,
-					    sizeof optval);
-			if (error)
-				break;
+				error = sooptcopyin(sopt, &optval,
+				    sizeof optval, sizeof optval);
+				if (error)
+					break;
 #else
-			optval = *mtod(m, int *);
+				optval = *mtod(m, int *);
 #endif
 
 #ifdef HAVE_NRL_INPCB
 # define in6p		inp
 # define in6p_flags	inp_flags
 #endif
-			switch (optval) {
-			case IPV6_PORTRANGE_DEFAULT:
-				in6p->in6p_flags &= ~(IN6P_LOWPORT);
-				in6p->in6p_flags &= ~(IN6P_HIGHPORT);
-				break;
+				switch (optval) {
+				case IPV6_PORTRANGE_DEFAULT:
+					in6p->in6p_flags &= ~(IN6P_LOWPORT);
+					in6p->in6p_flags &= ~(IN6P_HIGHPORT);
+					break;
 
-			case IPV6_PORTRANGE_HIGH:
-				in6p->in6p_flags &= ~(IN6P_LOWPORT);
-				in6p->in6p_flags |= IN6P_HIGHPORT;
-				break;
+				case IPV6_PORTRANGE_HIGH:
+					in6p->in6p_flags &= ~(IN6P_LOWPORT);
+					in6p->in6p_flags |= IN6P_HIGHPORT;
+					break;
 
-			case IPV6_PORTRANGE_LOW:
-				in6p->in6p_flags &= ~(IN6P_HIGHPORT);
-				in6p->in6p_flags |= IN6P_LOWPORT;
-				break;
+				case IPV6_PORTRANGE_LOW:
+					in6p->in6p_flags &= ~(IN6P_HIGHPORT);
+					in6p->in6p_flags |= IN6P_LOWPORT;
+					break;
 
-			default:
-				error = EINVAL;
-				break;
-			}
+				default:
+					error = EINVAL;
+					break;
+				}
 #ifdef HAVE_NRL_INPCB
 # undef in6p
 # undef in6p_flags
 #endif
-			break;
+				break;
 #endif
 
 #ifdef IPSEC
