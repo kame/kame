@@ -673,6 +673,7 @@ in_pcbnotify(table, dst, fport_arg, laddr, lport_arg, errno, notify)
 	/*
 	 * See in6_pcbnotify() for IPv6 codepath.  By the time this
 	 * gets called, the addresses passed are either definitely IPv4 or
+	 * IPv6; *_pcbnotify() never gets called with v4-mapped v6 addresses.
 	 */
 #endif /* INET6 */
 
@@ -719,6 +720,7 @@ in_pcbnotifyall(table, dst, errno, notify)
 	/*
 	 * See in6_pcbnotify() for IPv6 codepath.  By the time this
 	 * gets called, the addresses passed are either definitely IPv4 or
+	 * IPv6; *_pcbnotify() never gets called with v4-mapped v6 addresses.
 	 */
 #endif /* INET6 */
 
