@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.45 2002/08/05 11:49:18 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.46 2002/08/06 01:23:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -286,9 +286,9 @@ struct encaptab;
 
 extern struct mip6_config mip6_config;
 extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
-#ifdef MIP6_DRAFT17
+#ifdef MIP6_DRAFT18
 extern u_int16_t nonce_index;		/* Current noce index */
-#endif /* MIP6_DRAFT17 */
+#endif /* MIP6_DRAFT18 */
 
 void mip6_init __P((void));
 
@@ -567,7 +567,7 @@ struct ifaddr *mip6_dad_find		__P((struct in6_addr *, struct ifnet *));
 void mip6_ha_print __P((struct mip6_ha *));
 
 int mip6_setpktaddrs __P((struct mbuf *));
-#ifdef MIP6_DRAFT17
+#ifdef MIP6_DRAFT18
 int mip6_get_nonce __P((int, mip6_nonce_t *));
 int mip6_get_nodekey __P((int, mip6_nodekey_t *));
 int mip6_is_valid_bu (struct ip6_hdr *, struct ip6m_binding_update *,
@@ -579,7 +579,7 @@ void mip6_create_cookie __P((struct in6_addr *,
 			     mip6_nodekey_t *, mip6_nonce_t *,
 			     void *));
 void mip6_calculate_kbu(mip6_home_cookie_t *, mip6_careof_cookie_t *, u_int8_t *);
-#endif /* MIP6_DRAFT17 */
+#endif /* MIP6_DRAFT18 */
 
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.152 2002/08/05 11:49:17 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.153 2002/08/06 01:23:16 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -52,7 +52,7 @@
 #error "you cannot specify both MIP6_ALLOW_COA_FALLBACK and MIP6_BDT"
 #endif
 
-#if defined(MIP6) && !defined(MIP6_DRAFT17)
+#if defined(MIP6) && !defined(MIP6_DRAFT18)
 #error "MIP6 is not released yet"
 #endif
 
@@ -128,19 +128,19 @@
 #endif /* !MIP6CONFIG_USE_AUTHDATA */
 
 #ifndef MIP6_CONFIG_BC_LIFETIME_LIMIT
-#define MIP6_CONFIG_BC_LIFETIME_LIMIT 30
+#define MIP6_CONFIG_BC_LIFETIME_LIMIT 420
 #endif /* !MIP6_CONFIG_BC_LIFETIME_LIMIT */
 
 #ifndef MIP6_CONFIG_HRBC_LIFETIME_LIMIT
-#define MIP6_CONFIG_HRBC_LIFETIME_LIMIT 30
+#define MIP6_CONFIG_HRBC_LIFETIME_LIMIT 420
 #endif /* !MIP6_CONFIG_HRBC_LIFETIME_LIMIT */
 
 #ifndef MIP6_CONFIG_BU_MAXLIFETIME
-#define MIP6_CONFIG_BU_MAXLIFETIME 30
+#define MIP6_CONFIG_BU_MAXLIFETIME 420
 #endif /* !MIP6_CONFIG_BU_MAXLIFETIME */
 
 #ifndef MIP6_CONFIG_HRBU_MAXLIFETIME
-#define MIP6_CONFIG_HRBU_MAXLIFETIME 30
+#define MIP6_CONFIG_HRBU_MAXLIFETIME 420
 #endif /* !MIP6_CONFIG_HRBU_MAXLIFETIME */
 
 #if 1 /* #ifndef MIP6_CONFIG_BU_USE_SINGLE */
@@ -173,7 +173,7 @@ struct callout mip6_pfx_ch;
 #endif
 int mip6_pfx_timer_running = 0;
 
-#ifdef MIP6_DRAFT17
+#ifdef MIP6_DRAFT18
 mip6_nonce_t mip6_nonce[MIP6_NONCE_HISTORY];
 mip6_nodekey_t mip6_nodekey[MIP6_NONCE_HISTORY];	/* this is described as 'Kcn' in the spec */
 u_int16_t nonce_index;		/* the idx value pointed by nonce_head */
@@ -183,7 +183,7 @@ struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_nonce_upd_ch;
 #endif
-#endif /* MIP6_DRAFT17 */
+#endif /* MIP6_DRAFT18 */
 
 static int mip6_prefix_list_update_sub __P((struct hif_softc *,
 					    struct sockaddr_in6 *,
@@ -205,11 +205,11 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 					  struct sockaddr_in6 *,
 					  struct sockaddr_in6 *,
 					  struct hif_softc *));
-#ifdef MIP6_DRAFT17
+#ifdef MIP6_DRAFT18
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
 static void mip6_update_nonce_nodekey(void *);
-#endif /* MIP6_DRAFT17 */
+#endif /* MIP6_DRAFT18 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 struct ipsecrequest *mip6_getipsecrequest __P((struct sockaddr_in6 *,
@@ -247,7 +247,7 @@ mip6_init()
 	LIST_INIT(&mip6_subnet_list);
 	LIST_INIT(&mip6_unuse_hoa);
 
-#ifdef MIP6_DRAFT17
+#ifdef MIP6_DRAFT18
 	/* Initialize nonce, key, and something else for CN */
 	nonce_head = mip6_nonce;
 	nonce_index = 0;
@@ -263,7 +263,7 @@ mip6_init()
 	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
 		hz * NONCE_UPDATE_PERIOD);
 #endif
-#endif /* MIP6_DRAFT17 */
+#endif /* MIP6_DRAFT18 */
 }
 
 /*
@@ -2536,7 +2536,7 @@ mip6_setpktaddrs(m)
 	return(0);
 }
 
-#ifdef MIP6_DRAFT17
+#ifdef MIP6_DRAFT18
 static void
 mip6_create_nonce(nonce)
 	mip6_nonce_t *nonce;
@@ -2857,4 +2857,4 @@ mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
 	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
 	SHA1Final(key_bu, &sha1_ctx);
 }
-#endif /* MIP6_DRAFT17 */
+#endif /* MIP6_DRAFT18 */
