@@ -344,3 +344,84 @@ ok:
 		*offp = off;
 	return n;
 }
+
+/*
+ * pkthdr.aux chain manipulation.
+ * we don't allow clusters at this moment. 
+ */
+struct mbuf *
+m_aux_add(m, af, type)
+	struct mbuf *m;
+	int af, type;
+{
+	struct mbuf *n;
+	struct mauxtag *t;
+
+	if ((m->m_flags & M_PKTHDR) == 0)
+		return NULL;
+
+	n = m_aux_find(m, af, type);
+	if (n)
+		return n;
+
+	MGET(n, M_DONTWAIT, m->m_type);
+	if (n == NULL)
+		return NULL;
+
+	t = mtod(n, struct mauxtag *);
+	t->af = af;
+	t->type = type;
+	n->m_data += sizeof(struct mauxtag);
+	n->m_len = 0;
+	n->m_next = m->m_pkthdr.aux;
+	m->m_pkthdr.aux = n;
+	return n;
+}
+
+struct mbuf *
+m_aux_find(m, af, type)
+	struct mbuf *m;
+	int af, type;
+{
+	struct mbuf *n;
+	struct mauxtag *t;
+
+	if ((m->m_flags & M_PKTHDR) == 0)
+		return NULL;
+
+	for (n = m->m_pkthdr.aux; n; n = n->m_next) {
+		t = (struct mauxtag *)n->m_dat;
+		if (t->af == af && t->type == type)
+			return n;
+	}
+	return NULL;
+}
+
+void
+m_aux_delete(m, victim)
+	struct mbuf *m;
+	struct mbuf *victim;
+{
+	struct mbuf *n, *prev, *next;
+	struct mauxtag *t;
+
+	if ((m->m_flags & M_PKTHDR) == 0)
+		return;
+
+	prev = NULL;
+	n = m->m_pkthdr.aux;
+	while (n) {
+		t = (struct mauxtag *)n->m_dat;
+		next = n->m_next;
+		if (n == victim) {
+			if (prev)
+				prev->m_next = n->m_next;
+			else
+				m->m_pkthdr.aux = n->m_next;
+			n->m_next = NULL;
+			m_free(n);
+		} else
+			prev = n;
+		n = next;
+	}
+}

@@ -306,8 +306,19 @@ in_gif_input(m, va_alist)
 		}
 	}
 #else
+#if 0
 	gifp = (struct ifnet *)m->m_pkthdr.aux;
 	m->m_pkthdr.aux = NULL;
+#else
+    {
+	struct mbuf *n;
+	n = m_aux_find(m, AF_INET, IPPROTO_IPV4);
+	if (n) {
+		gifp = *mtod(n, struct ifnet **);
+		m_aux_delete(m, n);
+	}
+    }
+#endif
 #endif
 
 	if (gifp == NULL) {

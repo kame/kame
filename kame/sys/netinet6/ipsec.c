@@ -3364,16 +3364,28 @@ ipsec_setsocket(m, so)
 	struct mbuf *m;
 	struct socket *so;
 {
-	if ((m->m_flags & M_PKTHDR) != 0)
-		m->m_pkthdr.aux = (void *)so;
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
+	if (so && !n)
+		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
+	if (n) {
+		if (so)
+			*mtod(n, struct socket **) = so;
+		else
+			m_aux_delete(m, n);
+	}
 }
 
 struct socket *
 ipsec_getsocket(m)
 	struct mbuf *m;
 {
-	if ((m->m_flags & M_PKTHDR) != 0)
-		return (struct socket *)m->m_pkthdr.aux;
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
+	if (n)
+		return *mtod(n, struct socket **);
 	else
 		return NULL;
 }

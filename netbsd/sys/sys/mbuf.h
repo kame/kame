@@ -119,8 +119,8 @@ struct m_hdr {
 /* record/packet header in first mbuf of chain; valid if M_PKTHDR set */
 struct	pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
-	void	*aux;			/* extra data buffer; ipsec/others */
 	int	len;			/* total packet length */
+	struct mbuf *aux;		/* extra data buffer; ipsec/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
@@ -501,6 +501,14 @@ struct mbstat {
 	u_short	m_mtypes[256];	/* type specific mbuf allocations */
 };
 
+/*
+ * pkthdr.aux type tags.
+ */
+struct mauxtag {
+	int af;
+	int type;
+};
+
 #ifdef	_KERNEL
 extern struct mbstat mbstat;
 extern int	nmbclusters;
@@ -536,6 +544,10 @@ void	m_copydata __P((struct mbuf *,int,int,caddr_t));
 void	m_freem __P((struct mbuf *));
 void	m_reclaim __P((int));
 void	mbinit __P((void));
+
+struct mbuf *m_aux_add __P((struct mbuf *, int, int));
+struct mbuf *m_aux_find __P((struct mbuf *, int, int));
+void m_aux_delete __P((struct mbuf *, struct mbuf *));
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */

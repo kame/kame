@@ -154,7 +154,14 @@ encap4_input(m, va_alist)
 
 		/* found a match */
 		if (ep->psw && ep->psw->pr_input) {
+#if 0
 			m->m_pkthdr.aux = ep->arg;	/*XXX*/
+#else
+			struct mbuf *n;
+			n = m_aux_add(m, AF_INET, IPPROTO_IPV4);
+			if (n)
+				*mtod(n, void **) = ep->arg;
+#endif
 			(*ep->psw->pr_input)(m, off, proto);
 		} else
 			m_freem(m);
@@ -215,7 +222,14 @@ encap6_input(mp, offp, proto)
 		/* found a match */
 		psw = (struct ip6protosw *)ep->psw;
 		if (psw && psw->pr_input) {
+#if 0
 			m->m_pkthdr.aux = ep->arg;	/*XXX*/
+#else
+			struct mbuf *n;
+			n = m_aux_add(m, AF_INET, IPPROTO_IPV6);
+			if (n)
+				*mtod(n, void **) = ep->arg;
+#endif
 			return (*psw->pr_input)(mp, offp, proto);
 		} else {
 			m_freem(m);
