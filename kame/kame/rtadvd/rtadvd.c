@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.74 2002/09/08 01:25:17 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.75 2002/09/24 13:58:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,6 +56,9 @@
 #include <syslog.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>
+#endif
+#ifdef HAVE_POLL_H
+#include <poll.h>
 #endif
 
 #include "rtadvd.h"
@@ -169,9 +172,13 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
+#ifdef HAVE_POLL_H
+	struct pollfd set[2];
+#else
 	fd_set *fdsetp, *selectfdp;
 	int fdmasks;
 	int maxfd = 0;
+#endif
 	struct timeval *timeout;
 	int i, ch;
 	int fflag = 0, logopt;
@@ -291,6 +298,16 @@ main(argc, argv)
 #endif
 #endif
 
+#ifdef HAVE_POLL_H
+	set[0].fd = sock;
+	set[0].events = POLLIN;
+	if (sflag == 0) {
+		rtsock_open();
+		set[1].fd = rtsock;
+		set[1].events = POLLIN;
+	} else
+		set[1].fd = -1;
+#else
 	maxfd = sock;
 	if (sflag == 0) {
 		rtsock_open();
@@ -312,12 +329,15 @@ main(argc, argv)
 	FD_SET(sock, fdsetp);
 	if (rtsock >= 0)
 		FD_SET(rtsock, fdsetp);
+#endif
 
 	signal(SIGTERM, set_die);
 	signal(SIGUSR1, rtadvd_set_dump_file);
 
 	while (1) {
+#ifndef HAVE_POLL_H
 		memcpy(selectfdp, fdsetp, fdmasks); /* reinitialize */
+#endif
 
 		if (do_dump) {	/* SIGUSR1 */
 			do_dump = 0;
@@ -344,8 +364,14 @@ main(argc, argv)
 			    __func__);
 		}
 
+#ifdef HAVE_POLL_H
+		if ((i = poll(set, 2, timeout ? (timeout->tv_sec * 1000 +
+		    timeout->tv_usec / 1000) : INFTIM)) < 0)
+#else
 		if ((i = select(maxfd + 1, selectfdp, NULL, NULL,
-		    timeout)) < 0) {
+		    timeout)) < 0)
+#endif
+		{
 			/* EINTR would occur upon SIGUSR1 for status dump */
 			if (errno != EINTR)
 				syslog(LOG_ERR, "<%s> select: %s",
@@ -354,9 +380,17 @@ main(argc, argv)
 		}
 		if (i == 0)	/* timeout */
 			continue;
+#ifdef HAVE_POLL_H
+		if (rtsock != -1 && set[1].revents & POLLIN)
+#else
 		if (rtsock != -1 && FD_ISSET(rtsock, selectfdp))
+#endif
 			rtmsg_input();
+#ifdef HAVE_POLL_H
+		if (set[0].revents & POLLIN)
+#else
 		if (FD_ISSET(sock, selectfdp))
+#endif
 			rtadvd_input();
 	}
 	exit(0);		/* NOTREACHED */
