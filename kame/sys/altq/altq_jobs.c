@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.5 2002/11/08 06:23:00 kjc Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.6 2003/02/08 18:24:16 kjc Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -108,9 +108,6 @@ static struct mbuf *jobs_getq(struct jobs_class *);
 static struct mbuf *jobs_pollq(struct jobs_class *);
 static void jobs_purgeq(struct jobs_class *);
 
-int jobsopen(dev_t, int, int, struct proc *);
-int jobsclose(dev_t, int, int, struct proc *);
-int jobsioctl(dev_t, ioctlcmd_t, caddr_t, int, struct proc *);
 static int jobscmd_if_attach(struct jobs_attach *);
 static int jobscmd_if_detach(struct jobs_interface *);
 static int jobscmd_add_class(struct jobs_add_class *);
@@ -136,6 +133,8 @@ static int64_t* update_error(struct jobs_if *);
 static int min_rates_adc(struct jobs_if *);
 static int64_t proj_delay(struct jobs_if *, int);
 static int pick_dropped_rlc(struct jobs_if *);
+
+altqdev_decl(jobs);
 
 /* jif_list keeps all jobs_if's allocated. */
 static struct jobs_if *jif_list = NULL;
@@ -1859,7 +1858,11 @@ int
 jobsopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	if (machclk_freq == 0)
 		init_machclk();
@@ -1876,7 +1879,11 @@ int
 jobsclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct jobs_if *jif;
 	int err, error = 0;
@@ -1902,7 +1909,11 @@ jobsioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct jobs_if *jif;
 	struct jobs_interface *ifacep;

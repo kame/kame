@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.6 2002/11/29 07:48:33 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.7 2003/02/08 18:24:16 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -76,9 +76,6 @@ static struct mbuf *priq_getq(struct priq_class *);
 static struct mbuf *priq_pollq(struct priq_class *);
 static void priq_purgeq(struct priq_class *);
 
-int priqopen(dev_t, int, int, struct proc *);
-int priqclose(dev_t, int, int, struct proc *);
-int priqioctl(dev_t, ioctlcmd_t, caddr_t, int, struct proc *);
 static int priqcmd_if_attach(struct priq_interface *);
 static int priqcmd_if_detach(struct priq_interface *);
 static int priqcmd_add_class(struct priq_add_class *);
@@ -90,6 +87,8 @@ static int priqcmd_class_stats(struct priq_class_stats *);
 static void get_class_stats(struct class_stats *, struct priq_class *);
 static struct priq_class *clh_to_clp(struct priq_if *, u_long);
 static u_long clp_to_clh(struct priq_class *);
+
+altqdev_decl(priq);
 
 /* pif_list keeps all priq_if's allocated. */
 static struct priq_if *pif_list = NULL;
@@ -504,7 +503,11 @@ int
 priqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	/* everything will be done when the queueing scheme is attached. */
 	return 0;
@@ -514,7 +517,11 @@ int
 priqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct priq_if *pif;
 	int err, error = 0;
@@ -540,7 +547,11 @@ priqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct priq_if *pif;
 	struct priq_interface *ifacep;

@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.18 2002/12/05 11:16:28 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.19 2003/02/08 18:24:16 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -135,9 +135,6 @@ static u_int64_t rtsc_x2y(struct runtime_sc *, u_int64_t);
 static void rtsc_min(struct runtime_sc *, struct internal_sc *,
 		     u_int64_t, u_int64_t);
 
-int hfscopen(dev_t, int, int, struct proc *);
-int hfscclose(dev_t, int, int, struct proc *);
-int hfscioctl(dev_t, ioctlcmd_t, caddr_t, int, struct proc *);
 static int hfsccmd_if_attach(struct hfsc_attach *);
 static int hfsccmd_if_detach(struct hfsc_interface *);
 static int hfsccmd_add_class(struct hfsc_add_class *);
@@ -149,6 +146,8 @@ static int hfsccmd_class_stats(struct hfsc_class_stats *);
 static void get_class_stats(struct class_stats *, struct hfsc_class *);
 static struct hfsc_class *clh_to_clp(struct hfsc_if *, u_long);
 static u_long clp_to_clh(struct hfsc_class *);
+
+altqdev_decl(hfsc);
 
 /*
  * macros
@@ -1609,7 +1608,11 @@ int
 hfscopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	if (machclk_freq == 0)
 		init_machclk();
@@ -1627,7 +1630,11 @@ int
 hfscclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct hfsc_if *hif;
 	int err, error = 0;
@@ -1653,7 +1660,11 @@ hfscioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct hfsc_if *hif;
 	struct hfsc_interface *ifacep;

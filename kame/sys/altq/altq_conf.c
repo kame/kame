@@ -1,7 +1,7 @@
-/*	$KAME: altq_conf.c,v 1.18 2003/02/07 10:17:07 suz Exp $	*/
+/*	$KAME: altq_conf.c,v 1.19 2003/02/08 18:24:16 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2002
+ * Copyright (C) 1997-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -94,7 +94,7 @@ altqdev_decl(jobs);
  * altq minor device (discipline) table
  */
 static struct altqsw altqsw[] = {				/* minor */
-	{"noq",	noopen,		noclose,	noioctl},  /* 0 (reserved) */
+	{"altq", noopen,	noclose,	noioctl},  /* 0 (reserved) */
 #ifdef ALTQ_CBQ
 	{"cbq",	cbqopen,	cbqclose,	cbqioctl},	/* 1 */
 #else
@@ -358,7 +358,7 @@ altq_drvinit(unused)
 	}
 }
 
-#else /* FreeBSD 4.x */
+#else /* FreeBSD 4.x or 5.x */
 
 static void
 altq_drvinit(unused)
@@ -366,17 +366,29 @@ altq_drvinit(unused)
 {
 	int unit;
 
+#if (__FreeBSD_version > 500000)
+#if 0
+	mtx_init(&altq_mtx, "altq global lock", MTX_DEF);
+#endif
+#endif
 	cdevsw_add(&altq_cdevsw);
 	altq_devsw_installed = 1;
 	printf("altq: major number is %d\n", CDEV_MAJOR);
 
 	/* create minor devices */
-	for (unit = 0; unit < naltqsw; unit++)
+	for (unit = 0; unit < naltqsw; unit++) {
+#if (__FreeBSD_version > 500000)
+		if (unit == 0 || altqsw[unit].d_open != noopen)
+			make_dev(&altq_cdevsw, unit, UID_ROOT, GID_WHEEL, 0644,
+				 "altq/%s", altqsw[unit].d_name);
+#else
 		make_dev(&altq_cdevsw, unit, 0, 0, 0644,
 			 altqsw[unit].d_name);
+#endif
+	}
 }
 
-#endif /* FreeBSD 4.x */
+#endif /* FreeBSD 4.x or 5.x */
 
 SYSINIT(altqdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,altq_drvinit,NULL)
 
@@ -436,6 +448,10 @@ altq_module_register(mdata)
 		return (EBUSY);
 	altqsw[type] = *mdata->altqsw;	/* set discipline functions */
 	altq_modules[type] = mdata;	/* save module data pointer */
+#if (__FreeBSD_version > 500000)
+	make_dev(&altq_cdevsw, type, UID_ROOT, GID_WHEEL, 0644,
+		 "altq/%s", altqsw[type].d_name);
+#endif
 	return (0);
 }
 
@@ -451,6 +467,9 @@ altq_module_deregister(mdata)
 		return (EINVAL);
 	if (altq_modules[type]->ref > 0)
 		return (EBUSY);
+#if (__FreeBSD_version > 500000)
+	destroy_dev(makedev(CDEV_MAJOR, type));
+#endif
 	altqsw[type] = noqdisc;
 	altq_modules[type] = NULL;
 	return (0);

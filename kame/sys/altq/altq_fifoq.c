@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.c,v 1.10 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.11 2003/02/08 18:24:16 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -78,7 +78,11 @@ int
 fifoqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	/* everything will be done when the queueing scheme is attached. */
 	return 0;
@@ -99,7 +103,11 @@ int
 fifoqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	fifoq_state_t *q;
 	int err, error = 0;
@@ -120,7 +128,11 @@ fifoqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	fifoq_state_t *q;
 	struct fifoq_interface *ifacep;

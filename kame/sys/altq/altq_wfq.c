@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.10 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.11 2003/02/08 18:24:17 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -639,7 +639,11 @@ int
 wfqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	return 0;
 }
@@ -648,7 +652,11 @@ int
 wfqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct ifnet *ifp;
 	struct wfq_interface iface;
@@ -680,7 +688,11 @@ wfqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int	error = 0;
 	int 	s;

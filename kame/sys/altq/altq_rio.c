@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.14 2003/01/07 07:33:38 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.15 2003/02/08 18:24:17 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -193,7 +193,11 @@ int
 rioopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	/* everything will be done when the queueing scheme is attached. */
 	return 0;
@@ -203,7 +207,11 @@ int
 rioclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	rio_queue_t *rqp;
 	int err, error = 0;
@@ -224,7 +232,11 @@ rioioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	rio_queue_t *rqp;
 	struct rio_interface *ifacep;

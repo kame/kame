@@ -1,4 +1,4 @@
-/*	$KAME: altq_localq.c,v 1.5 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_localq.c,v 1.6 2003/02/08 18:24:16 kjc Exp $	*/
 /*
  * a skeleton file for implementing a new queueing discipline.
  * this file is in the public domain.
@@ -29,7 +29,11 @@ int
 localqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	/* everything will be done when the queueing scheme is attached. */
 	return 0;
@@ -39,7 +43,11 @@ int
 localqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int error = 0;
 
@@ -52,7 +60,11 @@ localqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int error = 0;
 

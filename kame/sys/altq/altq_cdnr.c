@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.c,v 1.11 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.12 2003/02/08 18:24:16 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999-2002
@@ -72,10 +72,6 @@ int altq_cdnr_enabled = 0;
 /* cdnr_list keeps all cdnr's allocated. */
 static LIST_HEAD(, top_cdnr) tcb_list;
 
-int cdnropen(dev_t, int, int, struct proc *);
-int cdnrclose(dev_t, int, int, struct proc *);
-int cdnrioctl(dev_t, ioctlcmd_t, caddr_t, int, struct proc *);
-
 static int altq_cdnr_input(struct mbuf *, int);
 static struct top_cdnr *tcb_lookup(char *ifname);
 static struct cdnr_block *cdnr_handle2cb(u_long);
@@ -124,6 +120,8 @@ static int cdnrcmd_tcm_stats(struct cdnr_tcm_stats *);
 static int cdnrcmd_add_tswtcm(struct cdnr_add_tswtcm *);
 static int cdnrcmd_modify_tswtcm(struct cdnr_modify_tswtcm *);
 static int cdnrcmd_get_stats(struct cdnr_get_stats *);
+
+altqdev_decl(cdnr);
 
 /*
  * top level input function called from ip_input.
@@ -1197,7 +1195,11 @@ int
 cdnropen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	if (machclk_freq == 0)
 		init_machclk();
@@ -1215,7 +1217,11 @@ int
 cdnrclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct top_cdnr *top;
 	int err, error = 0;
@@ -1237,7 +1243,11 @@ cdnrioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct top_cdnr *top;
 	struct cdnr_interface *ifacep;

@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.c,v 1.11 2002/11/29 04:36:22 kjc Exp $	*/
+/*	$KAME: altq_blue.c,v 1.12 2003/02/08 18:24:16 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -125,7 +125,11 @@ int
 blueopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	/* everything will be done when the queueing scheme is attached. */
 	return 0;
@@ -135,7 +139,11 @@ int
 blueclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	blue_queue_t *rqp;
 	int err, error = 0;
@@ -156,7 +164,11 @@ blueioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	blue_queue_t *rqp;
 	struct blue_interface *ifacep;

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.13 2003/01/07 07:33:38 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.14 2003/02/08 18:24:16 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -807,7 +807,11 @@ int
 cbqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	return (0);
 }
@@ -816,7 +820,11 @@ int
 cbqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct ifnet *ifp;
 	struct cbq_interface iface;
@@ -844,7 +852,11 @@ cbqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (__FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int	error = 0;
 
