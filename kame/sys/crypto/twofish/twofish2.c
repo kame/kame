@@ -255,7 +255,7 @@ static int ParseHexDword(int bits,CONST char *srcTxt,DWORD *d,char *dstTxt)
 	v.d[0]=1;
 	if (v.b[0 ^ ADDR_XOR] != 1)
 		return BAD_ENDIAN;		/* make sure compile-time definitions are ok */
-	v.d[0]= (BYTE)~0LU;
+	v.d[0]= (DWORD)~0LU;
 	v.d[0] >>= 17;
 	if (v.d[0] != 0x7FFF)
 		return BAD_DWORD_SIZE;
