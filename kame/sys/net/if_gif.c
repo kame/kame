@@ -340,7 +340,7 @@ gif_input(m, af, gifp)
 	return;
 }
 	
-
+/* XXX how should we handle IPv6 scope on SIOC[GS]IFPHYADDR? */
 int
 gif_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
@@ -424,7 +424,11 @@ gif_ioctl(ifp, cmd, data)
 				struct gif_softc *sc2;
 
 			  	for (i = 0, sc2 = gif; i < ngif; i++, sc2++) {
-					if (sc2 == sc) continue;
+					if (sc2 == sc)
+						continue;
+					if (sc2->gif_pdst->sa_family !=
+					    dst->sa_family)
+						continue;
 					if (sc2->gif_pdst &&
 					    satosaddr(sc2->gif_pdst)
 						== INADDR_ANY) {
@@ -451,7 +455,11 @@ gif_ioctl(ifp, cmd, data)
 				struct gif_softc *sc2;
 
 			  	for (i = 0, sc2 = gif; i < ngif; i++, sc2++) {
-					if (sc2 == sc) continue;
+					if (sc2 == sc)
+						continue;
+					if (sc2->gif_pdst->sa_family !=
+					    dst->sa_family)
+						continue;
 					if (sc2->gif_pdst &&
 					    IN6_IS_ADDR_UNSPECIFIED(
 						satoin6(sc2->gif_pdst)
