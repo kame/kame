@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.14 2000/03/12 17:23:08 itojun Exp $
+.\"     $KAME: stf.4,v 1.15 2000/03/28 23:15:26 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -129,15 +129,15 @@ interface for the IPv4 address derived from the inner source,
 packet will be dropped
 .Pq similar to ingress filters .
 .It
-The same set of rules are appplied to inner IPv6 address,
-if 6to4 addresses are used.
+The same set of rules are appplied against the IPv4 address embedded into
+inner IPv6 address, if the IPv6 address matches 6to4 prefix.
 .El
 .Pp
 You may also want to reject encapsulated IPv6 packets with
 suspicious 6to4 addresses, like
 .Li 2002:7f00::/24.
-You may also want to check if inner IPv6 address and outer IPv4 address
-make sense, based on local network topology,
+You may also want to run normal ingress filter against inner IPv6 address
+and outer IPv4 address, to avoid spoofing.
 .\"
 .Sh EXAMPLES
 Note that
