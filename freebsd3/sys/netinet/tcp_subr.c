@@ -926,10 +926,10 @@ tcp6_ctlinput(cmd, sa, d)
 {
 	struct tcphdr th;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
-	struct sockaddr_in6 sa6;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	struct ip6ctlparam *ip6cp = NULL;
+	struct sockaddr_in6 *sa6_src = NULL;
 	int off = 0;
 	struct tcp_portonly {
 		u_int16_t th_sport;
@@ -954,36 +954,11 @@ tcp6_ctlinput(cmd, sa, d)
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
+		sa6_src = ip6cp->ip6c_src;
 	} else {
 		m = NULL;
 		ip6 = NULL;
-	}
-
-	if (ip6cp && ip6cp->ip6c_finaldst) {
-		bzero(&sa6, sizeof(sa6));
-		sa6.sin6_family = AF_INET6;
-		sa6.sin6_len = sizeof(sa6);
-		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
-		/* XXX: assuming M is valid in this case */
-		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-						     ip6cp->ip6c_finaldst);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("tcp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
-	} else {
-		/* XXX: translate addresses into internal form */
-		sa6 = *(struct sockaddr_in6 *)sa;
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("tcp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
+		sa6_src = &sa6_any;
 	}
 
 	if (ip6) {
@@ -1000,25 +975,10 @@ tcp6_ctlinput(cmd, sa, d)
 		bzero(&th, sizeof(th));
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 
-		bzero(&sa6_src, sizeof(sa6_src));
-		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6_src);
-		sa6_src.sin6_addr = ip6->ip6_src;
-		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							 &ip6->ip6_src);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
-			/* should be impossbile */
-			printf("tcp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
-
-		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, th.th_dport,
-			      &sa6_src.sin6_addr, th.th_sport, cmd,
-			      NULL, notify);
+		in6_pcbnotify(&tcb, sa, th.th_dport, ip6cp->ip6c_src,
+			      th.th_sport, cmd, NULL, notify);
 	} else
-		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, 0, &zeroin6_addr,
+		in6_pcbnotify(&tcb, sa, 0, (struct sockaddr *)sa6_src,
 			      0, cmd, NULL, notify);
 }
 #endif /* INET6 */
