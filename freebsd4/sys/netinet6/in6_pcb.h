@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2.2.3 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.h,v 1.19 2002/02/03 10:32:43 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.20 2002/02/27 14:46:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,7 @@ struct	inpcb *
 				u_int, struct sockaddr_in6 *,
 				u_int, int, struct ifnet *));
 void	in6_pcbnotify __P((struct inpcbhead *, struct sockaddr *,
-			   u_int, struct sockaddr *, u_int, int, void *,
+			   u_int, const struct sockaddr *, u_int, int, void *,
 			   void (*)(struct inpcb *, int)));
 void	in6_rtchange __P((struct inpcb *, int));
 int	in6_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
