@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2062 2002/01/26 06:14:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.2063 2002/01/28 05:09:53 itojun Exp $
 
 <200201>
+Mon Jan 28 14:09:21 JST 2002  itojun@iijlab.net
+	* bsdi4: upgrade base version to BSD/OS 4.3.
+
 2002-01-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): handled
 	getsockopt(IPV6_RTHDR) correctly.
