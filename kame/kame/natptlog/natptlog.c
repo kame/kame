@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.11 2000/06/29 01:29:10 itojun Exp $
+ *	$Id: natptlog.c,v 1.12 2000/10/17 06:15:04 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -522,8 +522,8 @@ hexdump16(int priority, char *buffer, int len)
     int		 i, j;
     int		 offh, offc;
     int		 nbytes;
-    char	*dbyte;
-    char	 Wow[128];
+    u_char	*dbyte;
+    u_char	 Wow[128];
 
     dbyte = buffer;
     memset(Wow, ' ', sizeof(Wow));
