@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1087 2000/07/04 01:26:22 sakane Exp $
+$Id: CHANGELOG,v 1.1088 2000/07/04 02:39:15 jinmei Exp $
 
 <200006>
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/main.c (main_listen_accept): set the receiving
+	interface when accepting an on-link bgp connection.
+	* kame/kame/bgpd/bgp.c (bgp_process_open): detected a proper peer
+	for an incoming IBGP open message with link-local address.
+	These changes enabled an IBGP peer using link-local addresses.
+	Suggested by: Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
 Tue Jul  4 10:25:13 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	- Process to send a delete notify message only when phase 2 has
