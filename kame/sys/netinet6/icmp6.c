@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.190 2001/02/07 07:14:54 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.191 2001/02/07 08:07:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2632,11 +2632,13 @@ icmp6_redirect_input(m, off)
 	key_sa_routechange((struct sockaddr *)&sdst);
 #endif
     }
+
+ freeit:
+	m_freem(m);
 	return;
 
  bad:
 	icmp6stat.icp6s_badredirect++;
- freeit:
 	m_freem(m);
 }
 
