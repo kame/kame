@@ -22,8 +22,7 @@ INCLUDE IMPLEMENTATION SPECIFIC INFORMATION.
 	Standard include files
 */
 
-#include	<stdio.h>
-#include	"platform.h"			/* platform-specific defines */
+#include	<crypto/twofish/platform.h>			/* platform-specific defines */
 
 /*	Defines:
 		Add any additional defines you need

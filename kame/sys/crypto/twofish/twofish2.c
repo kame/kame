@@ -20,11 +20,18 @@
 		*	Tab size is set to 4 characters in this file
 
 ***************************************************************************/
-#include	"aes.h"
-#include	"table.h"
+#include	<sys/cdefs.h>
+#include	<sys/param.h>
+#include	<sys/types.h>
+#include	<machine/endian.h>
 
-#include	<memory.h>
-#include	<assert.h>
+#include	<crypto/twofish/aes.h>
+#include	<crypto/twofish/table.h>
+
+int ParseHexDword __P((int, CONST char *, DWORD *, char *));
+DWORD RS_MDS_Encode __P((DWORD, DWORD));
+void BuildMDS __P((void));
+void ReverseRoundSubkeys __P((keyInstance *, BYTE));
 
 #if   defined(min_key)  && !defined(MIN_KEY)
 #define	MIN_KEY		1			/* toupper() */
@@ -519,6 +526,8 @@ void ReverseRoundSubkeys(keyInstance *key,BYTE newDir)
 		{ Xor32(dst,src,i  ); Xor32(dst,src,i+1); Xor32(dst,src,i+2); Xor32(dst,src,i+3); }	\
 	}
 #else						/* do it as a function call */
+void Xor256 __P((void *, void *, BYTE));
+
 void Xor256(void *dst,void *src,BYTE b)
 	{
 	register DWORD	x=b*0x01010101u;	/* replicate byte to all four bytes */

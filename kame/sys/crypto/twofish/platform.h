@@ -56,50 +56,19 @@
 #define	ROL(x,n) (((x) << ((n) & 0x1F)) | ((x) >> (32-((n) & 0x1F))))
 #define	ROR(x,n) (((x) >> ((n) & 0x1F)) | ((x) << (32-((n) & 0x1F))))
 
-#ifdef _MSC_VER							/* optimize rotates in Microsoft C */
-#include	<stdlib.h>					/* get prototypes for rotation functions */
-#undef	ROL
-#undef	ROR
-#pragma intrinsic(_lrotl,_lrotr)		/* use intrinsic compiler rotations */
-#define	ROL(x,n)	_lrotl(x,n)			
-#define	ROR(x,n)	_lrotr(x,n)
+/* XXX the following decl should be expanded */
+#define BYTE	u_int8_t
+#define DWORD	u_int32_t
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define LittleEndian		1
+#endif
+#if BYTE_ORDER == BIG_ENDIAN
+#define LittleEndian		0
 #endif
 
-#ifndef _M_IX86
-#ifdef	__BORLANDC__
-#define	_M_IX86					300		/* make sure this is defined for Intel CPUs */
-#endif
-#endif
-
-typedef		unsigned char BYTE;			/*  8-bit unsigned quantity */
-
-#include	<limits.h>					/* get size limit definitions */
-#if   UINT_MAX  == 0xFFFFFFFF			/* "auto-select" a 32-bit definition */
-typedef		unsigned int  DWORD;
-#elif ULONG_MAX == 0xFFFFFFFF
-typedef		unsigned long DWORD;
-#elif USHRT_MAX == 0xFFFFFFFF
-typedef		unsigned short DWORD;
-#else
-#error !! Need a 32-bit DWORD definition (PLATFORM.H) !!
-#endif
-
-
-#if defined(_M_IX86)					/* settings for the Intel x86 family */
-#define		LittleEndian		1		/* x86 is little-endian */
-#define		ALIGN32				0		/* x86 can do misaligned accesses */
-#endif
-
-#if defined(_68K_)						/* example settings for 68K family */
-#define		LittleEndian		0		/* 68K is big-endian */
-#define		ALIGN32				1		/* 68K can't do misaligned accesses */
-#endif
-
-#if defined(_MY_AES_PLATFORM_)			/* template for other platforms */
-#define		LittleEndian		?
-#define		ALIGN32				?
-#endif
-
+/* XXX should use ALIGNBYTES, however, we cannot do that at runtime */
+#define ALIGN32		0
 
 /* Compile-time sanity checks: make sure that some platform was defined! */
 #ifndef LittleEndian
