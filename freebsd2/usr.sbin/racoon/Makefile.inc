@@ -13,6 +13,12 @@ CFLAGS+=-DHAVE_RC5_H=1
 .if exists(/usr/local/include/idea.h) || exists(/usr/local/ssl/include/idea.h) || exists(/usr/local/ssl/include/openssl/idea.h)
 CFLAGS+=-DHAVE_IDEA_H=1
 .endif
+.if exists(/usr/local/include/cversion.h) || exists(/usr/local/ssl/include/cversion.h) || exists(/usr/local/ssl/include/openssl/cversion.h)
+CFLAGS+=-DHAVE_CVERSION_H=1
+.endif
+.if exists(/usr/local/include/opensslv.h) || exists(/usr/local/ssl/include/opensslv.h) || exists(/usr/local/ssl/include/openssl/opensslv.h)
+CFLAGS+=-DHAVE_OPENSSLV_H=1
+.endif
 .if exists(/usr/local/include/openssl)
 CFLAGS+=-I/usr/local/include/openssl
 .elif exists(/usr/local/include/ssleay)
