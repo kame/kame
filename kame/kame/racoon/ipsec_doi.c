@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.50 2000/02/11 08:20:42 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.51 2000/02/16 05:55:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3226,14 +3226,16 @@ ipsecdoi_checkid1(iph1)
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
 
 	/*
-	 * In main mode, only type of specific address can be used.
-	 * XXX Other types are not allowed, aren't they ?
+	 * In main mode with pre-shared key, only type of specific address
+	 * can be used.
 	 */
-	if (iph1->etype == ISAKMP_ETYPE_IDENT) {
-		if (id_b->type != IPSECDOI_ID_IPV4_ADDR
+	if (iph1->etype == ISAKMP_ETYPE_IDENT
+	 && iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
+		 if (id_b->type != IPSECDOI_ID_IPV4_ADDR
 		 && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
 			plog(logp, LOCATION, NULL,
-				"wrong ID payload type %u.\n", id_b->type);
+				"Expecting IP address type in main mode, "
+				"but %s.\n", s_ipsecdoi_ident(id_b->type));
 			goto err;
 		}
 
