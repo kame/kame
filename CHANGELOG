@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.765 2000/04/12 13:11:54 sumikawa Exp $
+$Id: CHANGELOG,v 1.766 2000/04/12 13:43:42 itojun Exp $
 
 <200003>
 Wed Apr 12 22:11:02 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd[23]/ports/ncftp3: upgrade to 3.0.1.
+	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp3: upgrade to 3.0.1.
 
 2000-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6[cs].c: tiny fixes to decrease compilation
