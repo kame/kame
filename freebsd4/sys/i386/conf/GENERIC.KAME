@@ -31,7 +31,8 @@ cpu		I686_CPU
 ident		GENERIC
 maxusers	0
 
-#makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
+makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
+options		DDB
 
 options 	MATH_EMULATE		#Support for x87 emulation
 options 	INET			#InterNETworking
@@ -343,6 +344,9 @@ options 	TCP_ECN		# ECN support in TCP
 #pseudo-device	stf
 
 # Mobile IPv6
+#options 	MIP6			# required for all node types
+#options	MIP6_HOME_AGENT		# required for a home agent
+#options	MIP6_MOBILE_NODE	# required for a mobile node
+#pseudo-device	hif	1		# required for a mobile node
+#options	MIP6_HAIPSEC		# ha-ipsec draft support
 #options 	MIP6_DEBUG
-#options 	MIP6
-#pseudo-device	hif	1
