@@ -1,6 +1,6 @@
 Installation procedure - grabbing tree via anoncvs
 KAME project
-$Id: INSTALL.anoncvs,v 1.6 2000/01/02 13:07:23 itojun Exp $
+$Id: INSTALL.anoncvs,v 1.7 2000/02/14 12:11:39 itojun Exp $
 
 
 NOTE: The following description applies only to KAME SNAP kits.
@@ -19,7 +19,7 @@ Here's how you can checkout the latest tree:
 A-1. Install CVS onto your client.
 
 A-2. Logon to KAME anonymous CVS.
-	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame login
+	% cvs -d :pserver:anoncvs@anoncvs.kame.net:/cvsroot/kame login
      Password is "anoncvs" (doublequote is not the part of password).
 
      The password will be cached into ~/.cvspass, so you need to login only
@@ -27,12 +27,12 @@ A-2. Logon to KAME anonymous CVS.
 
 A-3. Checkout the tree (replace $somewhere with your working directory).
 	% cd $somewhere
-	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame co -P kame
+	% cvs -d :pserver:anoncvs@anoncvs.kame.net:/cvsroot/kame co -P kame
 
      If you are interested in some specific platform only, alternatively
      you can do the following, but not recommended:
 	% cd $somewhere
-	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame co -P \
+	% cvs -d :pserver:anoncvs@anoncvs.kame.net:/cvsroot/kame co -P \
 		kame/Makefile kame/Makefile.inc
 	% cd kame
 	% make TARGET=netbsd tree
