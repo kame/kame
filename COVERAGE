@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.38 2000/05/15 11:48:48 itojun Exp $
+$Id: COVERAGE,v 1.39 2000/05/19 14:01:48 itojun Exp $
 
 
 x: supported/integrated
@@ -71,6 +71,14 @@ NUD on p2p	x	x	x	-	notyet	x	-
 NUD on p2p only if real neighbor
 		x	x	x	-	notyet	(*1)	-
      (*1) temporary workaround (no NUD on p2p by default)
+
+icmp6 beyondscope
+		x	x	x	-	notyet	(*1)	-
+    (*1) supports it, but has bug in link-local address check.
+
+old/new mrt6msg (old: overlay with ip6 header, new: with MLD6 header)
+		new	(*1)	(*1)	old	notyet	old	old
+    (*1) supports both new/old mrt6msg, to provide binary backward compat
 
 CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	ALIGN	ALIGN
 		(*1)		(*1)	(*2)		(*1)	(*2)
