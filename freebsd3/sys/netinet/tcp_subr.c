@@ -1138,9 +1138,12 @@ tcp_rtlookup6(inp)
 	if (rt == NULL || !(rt->rt_flags & RTF_UP)) {
 		/* No route yet, so try to acquire one */
 		if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
-			ro6->ro_dst.sin6_family = AF_INET6;
-			ro6->ro_dst.sin6_len = sizeof(ro6->ro_dst);
-			ro6->ro_dst.sin6_addr = inp->in6p_faddr;
+			struct sockaddr_in6 *dst6;
+
+			dst6 = (struct sockaddr_in6 *)&ro6->ro_dst;
+			dst6->sin6_family = AF_INET6;
+			dst6->sin6_len = sizeof(ro6->ro_dst);
+			dst6->sin6_addr = inp->in6p_faddr;
 			rtalloc((struct route *)ro6);
 			rt = ro6->ro_rt;
 		}
