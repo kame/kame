@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.41 2002/02/03 09:00:45 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.42 2002/02/19 13:45:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,6 +267,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		src6 = &t6p->t_in6pcb->in6p_lsa;
 		dst6 = &t6p->t_in6pcb->in6p_fsa;
 	} else {
+		if (ip6_getpktaddrs(m, &src6, &dst6)) {
+			m_freem(m); /* XXX: should not happen */
+			return(EINVAL);	/* XXX */
+		}
 		m_freem(m->m_next);
 		m->m_next = 0;
 		m->m_data = (caddr_t)ip6;
