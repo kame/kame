@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.c,v 1.112 2004/03/21 01:46:42 tedu Exp $	*/
+/*	$OpenBSD: sysctl.c,v 1.115 2004/08/08 19:04:25 deraadt Exp $	*/
 /*	$NetBSD: sysctl.c,v 1.9 1995/09/30 07:12:50 thorpej Exp $	*/
 
 /*
@@ -40,7 +40,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)sysctl.c	8.5 (Berkeley) 5/9/95";
 #else
-static const char rcsid[] = "$OpenBSD: sysctl.c,v 1.112 2004/03/21 01:46:42 tedu Exp $";
+static const char rcsid[] = "$OpenBSD: sysctl.c,v 1.115 2004/08/08 19:04:25 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -131,6 +131,7 @@ struct ctlname ttyname[] = CTL_KERN_TTY_NAMES;
 struct ctlname semname[] = CTL_KERN_SEMINFO_NAMES;
 struct ctlname shmname[] = CTL_KERN_SHMINFO_NAMES;
 struct ctlname watchdogname[] = CTL_KERN_WATCHDOG_NAMES;
+struct ctlname tcname[] = CTL_KERN_TIMECOUNTER_NAMES;
 struct ctlname *vfsname;
 #ifdef CTL_MACHDEP_NAMES
 struct ctlname machdepname[] = CTL_MACHDEP_NAMES;
@@ -207,6 +208,7 @@ int sysctl_malloc(char *, char **, int *, int, int *);
 int sysctl_seminfo(char *, char **, int *, int, int *);
 int sysctl_shminfo(char *, char **, int *, int, int *);
 int sysctl_watchdog(char *, char **, int *, int, int *);
+int sysctl_tc(char *, char **, int *, int, int *);
 int sysctl_sensors(char *, char **, int *, int, int *);
 int sysctl_emul(char *, char *, int);
 #ifdef CPU_CHIPSET
@@ -434,6 +436,12 @@ parse(char *string, int flags)
 			if (len < 0)
 				return;
 			break;
+		case KERN_TIMECOUNTER:
+			len = sysctl_tc(string, &bufp, mib, flags,
+			    &type);
+			if (len < 0)
+				return;
+			break;
 		case KERN_EMUL:
 			sysctl_emul(string, newval, flags);
 			return;
@@ -512,9 +520,9 @@ parse(char *string, int flags)
 				return;
 
 			if ((mib[2] == IPPROTO_TCP &&
-			     mib[3] == TCPCTL_BADDYNAMIC) ||
+			    mib[3] == TCPCTL_BADDYNAMIC) ||
 			    (mib[2] == IPPROTO_UDP &&
-			     mib[3] == UDPCTL_BADDYNAMIC)) {
+			    mib[3] == UDPCTL_BADDYNAMIC)) {
 
 				special |= BADDYNAMIC;
 
@@ -780,9 +788,9 @@ parse(char *string, int flags)
 		if (!nflag)
 			(void)printf("%s%s", string, equ);
 		(void)printf("bootdev = 0x%x, "
-			     "cylinders = %u, heads = %u, sectors = %u\n",
-			     pdi->bsd_dev, pdi->bios_cylinders,
-			     pdi->bios_heads, pdi->bios_sectors);
+		    "cylinders = %u, heads = %u, sectors = %u\n",
+		    pdi->bsd_dev, pdi->bios_cylinders,
+		    pdi->bios_heads, pdi->bios_sectors);
 		return;
 	}
 	if (special & BIOSDEV) {
@@ -1417,6 +1425,7 @@ struct list ttylist = { ttyname, KERN_TTY_MAXID };
 struct list semlist = { semname, KERN_SEMINFO_MAXID };
 struct list shmlist = { shmname, KERN_SHMINFO_MAXID };
 struct list watchdoglist = { watchdogname, KERN_WATCHDOG_MAXID };
+struct list tclist = { tcname, KERN_TIMECOUNTER_MAXID };
 
 /*
  * handle vfs namei cache statistics
@@ -1645,9 +1654,9 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 		ptr = strstr(buf, name);
  tryagain:
 		if (ptr == NULL) {
-		       warnx("fourth level name %s in %s is invalid", name,
-			     string);
-		       return (-1);
+			warnx("fourth level name %s in %s is invalid", name,
+			    string);
+			return (-1);
 		}
 		if ((*(ptr + strlen(name)) != ',') &&
 		    (*(ptr + strlen(name)) != '\0')) {
@@ -1975,6 +1984,26 @@ sysctl_watchdog(char *string, char **bufpp, int mib[], int flags,
 }
 
 /*
+ * Handle timecounter support
+ */
+int
+sysctl_tc(char *string, char **bufpp, int mib[], int flags,
+    int *typep)
+{
+	int indx;
+
+	if (*bufpp == NULL) {
+		listall(string, &tclist);
+		return (-1);
+	}
+	if ((indx = findname(string, "third", bufpp, &tclist)) == -1)
+		return (-1);
+	mib[2] = indx;
+	*typep = tclist.list[indx].ctl_type;
+	return (3);
+}
+
+/*
  * Handle hardware monitoring sensors support
  */
 int
@@ -2002,7 +2031,10 @@ sysctl_sensors(char *string, char **bufpp, int mib[], int flags, int *typep)
 	return (3);
 }
 
-char	**emul_names;
+struct emulname {
+	char *name;
+	int index;
+} *emul_names;
 int	emul_num, nemuls;
 int	emul_init(void);
 
@@ -2033,9 +2065,12 @@ sysctl_emul(char *string, char *newval, int flags)
 		else
 			printf("%snemuls%s%d\n", head, equ, nemuls);
 		for (i = 0; i < emul_num; i++) {
-			if (emul_names[i] == NULL)
+			if (emul_names[i].name == NULL)
+				break;
+			if (i > 0 && strcmp(emul_names[i].name,
+			    emul_names[i-1].name) == 0)
 				continue;
-			mib[2] = i + 1;
+			mib[2] = emul_names[i].index;
 			len = sizeof(int);
 			if (sysctl(mib, 4, &enabled, &len, NULL, 0) == -1) {
 				warn("%s", string);
@@ -2044,8 +2079,8 @@ sysctl_emul(char *string, char *newval, int flags)
 			if (nflag)
 				printf("%d\n", enabled);
 			else
-				printf("%s%s%s%d\n", head, emul_names[i], equ,
-				    enabled);
+				printf("%s%s%s%d\n", head, emul_names[i].name,
+				    equ, enabled);
 		}
 		return (0);
 	}
@@ -2063,21 +2098,18 @@ sysctl_emul(char *string, char *newval, int flags)
 			printf("%snemuls = %d\n", head, nemuls);
 		return (0);
 	}
+	print = 1;
 	for (i = 0; i < emul_num; i++) {
-		print = 1;
-		if (!emul_names[i]) {
-			print = 0;
-			if (strcmp(target, emul_names[i-1]))
-				continue;
-		} else if (strcmp(target, emul_names[i]))
+		if (!emul_names[i].name || (strcmp(target, emul_names[i].name)))
 			continue;
 		found = 1;
-		mib[2] = i + 1;
+		mib[2] = emul_names[i].index;
 		len = sizeof(int);
 		if (newval) {
 			enabled = atoi(newval);
 			if (sysctl(mib, 4, &old, &len, &enabled, len) == -1) {
 				warn("%s", string);
+				print = 0;
 				continue;
 			}
 			if (print) {
@@ -2100,6 +2132,7 @@ sysctl_emul(char *string, char *newval, int flags)
 					    enabled);
 			}
 		}
+		print = 0;
 	}
 	if (!found)
 		warnx("third level name %s in kern.emul is invalid",
@@ -2107,6 +2140,18 @@ sysctl_emul(char *string, char *newval, int flags)
 	return (0);
 
 
+}
+
+int
+emulcmp(const void *m, const void *n)
+{
+	const struct emulname *a = m, *b = n;
+
+	if (!a || !a->name)
+		return 1;
+	if (!b || !b->name)
+		return -1;
+	return (strcmp(a->name, b->name));
 }
 
 int
@@ -2128,26 +2173,31 @@ emul_init(void)
 	if (sysctl(mib, 3, &emul_num, &len, NULL, 0) == -1)
 		return (-1);
 
-	emul_names = calloc(emul_num, sizeof(char *));
+	emul_names = calloc(emul_num, sizeof(*emul_names));
 	if (emul_names == NULL)
 		return (-1);
 
 	nemuls = emul_num;
 	for (i = 0; i < emul_num; i++) {
-		mib[2] = i + 1;
+		emul_names[i].index = mib[2] = i + 1;
 		mib[3] = KERN_EMUL_NAME;
 		len = sizeof(string);
 		if (sysctl(mib, 4, string, &len, NULL, 0) == -1)
-			break;
-		if (i > 0 && emul_names[i - 1] &&
-		    strcmp(string, emul_names[i - 1]) == 0) {
-			nemuls--;
 			continue;
-		}
-		emul_names[i] = strdup(string);
-		if (emul_names[i] == NULL) {
+		if (strcmp(string, "native") == 0)
+			continue;
+		emul_names[i].name = strdup(string);
+		if (emul_names[i].name == NULL) {
 			free(emul_names);
 			return (-1);
+		}
+	}
+	qsort(emul_names, nemuls, sizeof(*emul_names), emulcmp);
+	for (i = 0; i < emul_num; i++) {
+		if (!emul_names[i].name || (i > 0 &&
+		    strcmp(emul_names[i].name, emul_names[i - 1].name) == 0)) {
+
+			nemuls--;
 		}
 	}
 	return (0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.84 2004/03/13 22:02:13 deraadt Exp $	*/
+/*	$OpenBSD: inet.c,v 1.88 2004/09/09 10:30:23 otto Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -34,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static const char *rcsid = "$OpenBSD: inet.c,v 1.84 2004/03/13 22:02:13 deraadt Exp $";
+static const char *rcsid = "$OpenBSD: inet.c,v 1.88 2004/09/09 10:30:23 otto Exp $";
 #endif
 #endif /* not lint */
 
@@ -225,7 +225,6 @@ protopr0(u_long off, char *name, int af)
 			else
 				printf(" %s", tcpstates[tcpcb.t_state]);
 		} else if (israw) {
-			struct protoent *pe = NULL;
 			u_int8_t proto;
 #ifdef INET6
 			if (inpcb.inp_flags & INP_IPV6)
@@ -233,12 +232,7 @@ protopr0(u_long off, char *name, int af)
 			else
 #endif
 				proto = inpcb.inp_ip.ip_p;
-			if (!nflag)
-				pe = getprotobynumber(proto);
-			if (pe)
-				printf(" %s", pe->p_name);
-			else
-				printf(" %u", proto);
+			printf(" %u", proto);
 		}
 		putchar('\n');
 	}
@@ -285,6 +279,7 @@ tcp_stats(u_long off, char *name)
 	p2(tcps_rcvackpack, tcps_rcvackbyte, "\t\t%u ack%s (for %qd byte%s)\n");
 	p(tcps_rcvdupack, "\t\t%u duplicate ack%s\n");
 	p(tcps_rcvacktoomuch, "\t\t%u ack%s for unsent data\n");
+	p(tcps_rcvacktooold, "\t\t%u ack%s for old data\n");
 	p2(tcps_rcvpack, tcps_rcvbyte,
 	    "\t\t%u packet%s (%qu byte%s) received in-sequence\n");
 	p2(tcps_rcvduppack, tcps_rcvdupbyte,
@@ -894,21 +889,18 @@ carp_stats(u_long off, char *name)
 #define p2(f, m) if (carpstat.f || sflag <= 1) \
 	printf(m, carpstat.f)
 
-	p(carps_ipackets, "\t%lu packet%s received (IPv4)\n");
-	p(carps_ipackets6, "\t%lu packet%s received (IPv6)\n");
-	p(carps_badif, "\t\t%lu packet%s discarded for bad interface\n");
-	p(carps_hdrops, "\t\t%lu packet%s shorter than header\n");
-	p(carps_badsum, "\t\t%lu discarded for bad checksum%s\n");
-	p(carps_badver,	"\t\t%lu discarded packet%s with a bad version\n");
-	p2(carps_badlen, "\t\t%lu discarded because packet too short\n");
-	p2(carps_badauth, "\t\t%lu discarded for bad authentication\n");
-	p2(carps_badvhid, "\t\t%lu discarded for bad vhid\n");
-	p2(carps_badaddrs, "\t\t%lu discarded because of a bad address list\n");
-	p(carps_opackets, "\t%lu packet%s sent (IPv4)\n");
-	p(carps_opackets6, "\t%lu packet%s sent (IPv6)\n");
-#if notyet
-	p(carps_ostates, "\t\t%s state update%s sent\n");
-#endif
+	p(carps_ipackets, "\t%llu packet%s received (IPv4)\n");
+	p(carps_ipackets6, "\t%llu packet%s received (IPv6)\n");
+	p(carps_badif, "\t\t%llu packet%s discarded for bad interface\n");
+	p(carps_hdrops, "\t\t%llu packet%s shorter than header\n");
+	p(carps_badsum, "\t\t%llu discarded for bad checksum%s\n");
+	p(carps_badver,	"\t\t%llu discarded packet%s with a bad version\n");
+	p2(carps_badlen, "\t\t%llu discarded because packet too short\n");
+	p2(carps_badauth, "\t\t%llu discarded for bad authentication\n");
+	p2(carps_badvhid, "\t\t%llu discarded for bad vhid\n");
+	p2(carps_badaddrs, "\t\t%llu discarded because of a bad address list\n");
+	p(carps_opackets, "\t%llu packet%s sent (IPv4)\n");
+	p(carps_opackets6, "\t%llu packet%s sent (IPv6)\n");
 #undef p
 #undef p2
 }
@@ -931,20 +923,22 @@ pfsync_stats(u_long off, char *name)
 #define p2(f, m) if (pfsyncstat.f || sflag <= 1) \
 	printf(m, pfsyncstat.f)
 
-	p(pfsyncs_ipackets, "\t%lu packet%s received (IPv4)\n");
-	p(pfsyncs_ipackets6, "\t%lu packet%s received (IPv6)\n");
-	p(pfsyncs_badif, "\t\t%lu packet%s discarded for bad interface\n");
-	p(pfsyncs_badttl, "\t\t%lu packet%s discarded for bad ttl\n");
-	p(pfsyncs_hdrops, "\t\t%lu packet%s shorter than header\n");
-	p(pfsyncs_badver,	"\t\t%lu discarded packet%s with a bad version\n");
-	p(pfsyncs_badact,	"\t\t%lu discarded packet%s with a bad action\n");
-	p2(pfsyncs_badlen, "\t\t%lu discarded because packet too short\n");
-	p2(pfsyncs_badauth, "\t\t%lu discarded for bad authentication\n");
-	p(pfsyncs_badstate, "\t%lu failed state lookup/insert%s\n");
-	p(pfsyncs_opackets, "\t%lu packet%s sent (IPv4)\n");
-	p(pfsyncs_opackets6, "\t%lu packet%s sent (IPv6)\n");
-	p2(pfsyncs_onomem, "\t\t%lu send failed due to mbuf memory error\n");
-	p2(pfsyncs_oerrors, "\t\t%lu send error\n");
+	p(pfsyncs_ipackets, "\t%llu packet%s received (IPv4)\n");
+	p(pfsyncs_ipackets6, "\t%llu packet%s received (IPv6)\n");
+	p(pfsyncs_badif, "\t\t%llu packet%s discarded for bad interface\n");
+	p(pfsyncs_badttl, "\t\t%llu packet%s discarded for bad ttl\n");
+	p(pfsyncs_hdrops, "\t\t%llu packet%s shorter than header\n");
+	p(pfsyncs_badver, "\t\t%llu packet%s discarded for bad version\n");
+	p(pfsyncs_badauth, "\t\t%llu packet%s discarded for bad HMAC\n");
+	p(pfsyncs_badact,"\t\t%llu packet%s discarded for bad action\n");
+	p(pfsyncs_badlen, "\t\t%llu packet%s discarded for short packet\n");
+	p(pfsyncs_badval, "\t\t%llu state%s discarded for bad values\n");
+	p(pfsyncs_stale, "\t\t%llu stale state%s\n");
+	p(pfsyncs_badstate, "\t\t%llu failed state lookup/insert%s\n");
+	p(pfsyncs_opackets, "\t%llu packet%s sent (IPv4)\n");
+	p(pfsyncs_opackets6, "\t%llu packet%s sent (IPv6)\n");
+	p2(pfsyncs_onomem, "\t\t%llu send failed due to mbuf memory error\n");
+	p2(pfsyncs_oerrors, "\t\t%llu send error\n");
 #undef p
 #undef p2
 }

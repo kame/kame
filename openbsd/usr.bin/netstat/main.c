@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.44 2004/03/13 22:02:13 deraadt Exp $	*/
+/*	$OpenBSD: main.c,v 1.49 2004/06/29 08:18:20 henning Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -40,7 +40,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.44 2004/03/13 22:02:13 deraadt Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.49 2004/06/29 08:18:20 henning Exp $";
 #endif
 #endif /* not lint */
 
@@ -99,7 +99,7 @@ struct nlist nl[] = {
 	{ "_clnp_stat"},
 #define	IN_NOTUSED	16
 	{ "_tp_inpcb" },
-#define	ISO_TP		17
+#define	ISO_NOTUSED	16
 	{ "_tp_refinfo" },
 #define	N_TPSTAT	18
 	{ "_tp_stat" },
@@ -261,19 +261,6 @@ struct protox nsprotox[] = {
 	  0,		0 }
 };
 
-struct protox isoprotox[] = {
-	{ ISO_TP,	N_TPSTAT,	1,	iso_protopr,
-	  tp_stats,	"tp" },
-	{ N_CLTP,	N_CLTPSTAT,	1,	iso_protopr,
-	  cltp_stats,	"cltp" },
-	{ -1,		N_CLNPSTAT,	1,	 0,
-	  clnp_stats,	"clnp"},
-	{ -1,		N_ESISSTAT,	1,	 0,
-	  esis_stats,	"esis"},
-	{ -1,		-1,		0,	0,
-	  0,		0 }
-};
-
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
 	  ddp_stats,	"ddp" },
@@ -283,11 +270,11 @@ struct protox atalkprotox[] = {
 
 #ifndef INET6
 struct protox *protoprotox[] = {
-	protox, ipxprotox, nsprotox, isoprotox, atalkprotox, NULL
+	protox, ipxprotox, nsprotox, atalkprotox, NULL
 };
 #else
 struct protox *protoprotox[] = {
-	protox, ip6protox, ipxprotox, nsprotox, isoprotox, atalkprotox, NULL
+	protox, ip6protox, ipxprotox, nsprotox, atalkprotox, NULL
 };
 #endif
 
@@ -311,7 +298,7 @@ main(int argc, char *argv[])
 
 	af = AF_UNSPEC;
 
-	while ((ch = getopt(argc, argv, "Aabdf:gI:ilM:mN:np:qrstuvw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:gI:ilM:mN:np:qrSstuvw:")) != -1)
 		switch (ch) {
 		case 'A':
 			Aflag = 1;
@@ -338,8 +325,6 @@ main(int argc, char *argv[])
 				af = AF_IPX;
 			else if (strcmp(optarg, "ns") == 0)
 				af = AF_NS;
-			else if (strcmp(optarg, "iso") == 0)
-				af = AF_ISO;
 			else if (strcmp(optarg, "encap") == 0)
 				af = PF_KEY;
 			else if (strcmp(optarg, "atalk") == 0)
@@ -390,6 +375,9 @@ main(int argc, char *argv[])
 			break;
 		case 'r':
 			rflag = 1;
+			break;
+		case 'S':
+			Sflag = 1;
 			break;
 		case 's':
 			++sflag;
@@ -463,11 +451,7 @@ main(int argc, char *argv[])
 		exit(0);
 	}
 	if (pflag) {
-		if (tp->pr_stats)
-			(*tp->pr_stats)(nl[tp->pr_sindex].n_value,
-				tp->pr_name);
-		else
-			printf("%s: no stats routine\n", tp->pr_name);
+		printproto(tp, tp->pr_name);
 		exit(0);
 	}
 	/*
@@ -537,9 +521,6 @@ main(int argc, char *argv[])
 			printproto(tp, tp->pr_name);
 	if (af == AF_NS || af == AF_UNSPEC)
 		for (tp = nsprotox; tp->pr_name; tp++)
-			printproto(tp, tp->pr_name);
-	if (af == AF_ISO || af == AF_UNSPEC)
-		for (tp = isoprotox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
 	if ((af == AF_UNIX || af == AF_UNSPEC) && !sflag)
 		unixpr(nl[N_UNIXSW].n_value);
@@ -650,11 +631,11 @@ usage(void)
 	(void)fprintf(stderr,
 "usage: %s [-Aan] [-f address_family] [-M core] [-N system]\n", __progname);
 	(void)fprintf(stderr,
-"       %s [-bdgilmnqrstu] [-f address_family] [-M core] [-N system]\n", __progname);
+"       %s [-bdgilmnqrSstu] [-f address_family] [-M core] [-N system]\n", __progname);
 	(void)fprintf(stderr,
 "       %s [-bdn] [-I interface] [-M core] [-N system] [-w wait]\n", __progname);
 	(void)fprintf(stderr,
-"       %s [-M core] [-N system] [-p protocol]\n", __progname);
+"       %s [-s] [-M core] [-N system] [-p protocol]\n", __progname);
 	(void)fprintf(stderr,
 "       %s [-a] [-f address_family] [-i | -I interface]\n", __progname);
 	exit(1);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.28 2003/12/17 20:58:39 jmc Exp $	*/
+/*	$OpenBSD: main.c,v 1.30 2004/04/26 19:22:30 itojun Exp $	*/
 /*	$NetBSD: main.c,v 1.8 1996/05/10 23:16:36 thorpej Exp $	*/
 
 /*-
@@ -40,7 +40,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
-static char rcsid[] = "$OpenBSD: main.c,v 1.28 2003/12/17 20:58:39 jmc Exp $";
+static char rcsid[] = "$OpenBSD: main.c,v 1.30 2004/04/26 19:22:30 itojun Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -70,6 +70,7 @@ double	avenrun[3];
 int	col;
 int	naptime = 5;
 int	verbose = 1;		/* to report kvm read errs */
+int	nflag = 0;
 int	hz, stathz;
 char    c;
 char    *namp;
@@ -96,8 +97,11 @@ main(int argc, char *argv[])
 	setegid(getgid());
 	setgid(getgid());
 
-	while ((ch = getopt(argc, argv, "w:")) != -1)
+	while ((ch = getopt(argc, argv, "nw:")) != -1)
 		switch (ch) {
+		case 'n':
+			nflag = 1;
+			break;
 		case 'w':
 			if ((naptime = atoi(optarg)) <= 0)
 				errx(1, "interval <= 0.");
@@ -133,6 +137,8 @@ main(int argc, char *argv[])
 	siginterrupt(SIGQUIT, 1);
 	signal(SIGTERM, sigdie);
 	siginterrupt(SIGTERM, 1);
+	signal(SIGTSTP, sigtstp);
+	siginterrupt(SIGTSTP, 1);
 
 	/*
 	 * Initialize display.  Load average appears in a one line
@@ -193,7 +199,7 @@ gethz(void)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: systat [-w wait] [display] [refresh-interval]\n");
+	fprintf(stderr, "usage: systat [-n] [-w wait] [display] [refresh-interval]\n");
 	exit(1);
 }
 
@@ -269,12 +275,18 @@ load(void)
 volatile sig_atomic_t gotdie;
 volatile sig_atomic_t gotdisplay;
 volatile sig_atomic_t gotwinch;
+volatile sig_atomic_t gottstp;
 
 void
-sigdie(signo)
-	int signo;
+sigdie(int signo)
 {
 	gotdie = 1;
+}
+
+void
+sigtstp(int signo)
+{
+	gottstp = 1;
 }
 
 void

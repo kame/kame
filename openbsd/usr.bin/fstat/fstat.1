@@ -1,4 +1,4 @@
-.\"	$OpenBSD: fstat.1,v 1.28 2004/01/21 19:25:33 deraadt Exp $
+.\"	$OpenBSD: fstat.1,v 1.31 2004/07/13 23:36:56 jmc Exp $
 .\"
 .\" Copyright (c) 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -64,7 +64,7 @@ directory
 .Pa /usr/src
 resides, type
 .Pp
-.Li # fstat -f /usr/src
+.Dl # fstat -f /usr/src
 .It Fl M Ar core
 Extract values associated with the name list from the specified core
 instead of the running kernel.
@@ -113,8 +113,7 @@ The process ID.
 .It Li FD
 The file number in the per-process open file table or one of the following
 special names:
-.Pp
-.Bd -literal -offset indent -compact
+.Bd -literal -offset indent
 text	\- pure text inode
 wd 	\- current working directory
 root	\- root inode
@@ -260,12 +259,20 @@ device private data.
 .Xr systat 1 ,
 .Xr iostat 8 ,
 .Xr pstat 8 ,
+.Xr tcpdrop 8 ,
 .Xr vmstat 8
 .Sh HISTORY
 The
 .Nm
 command appeared in
 .Bx 4.3 tahoe .
+.Sh CAVEATS
+Sockets in use by the kernel, such as those opened by
+.Xr nfsd 8 ,
+will not be seen by
+.Nm ,
+even though they appear in
+.Xr netstat 1 .
 .Sh BUGS
 Since
 .Nm
