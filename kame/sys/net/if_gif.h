@@ -56,6 +56,7 @@ struct gif_softc {
 	} gifsc_gifscr;
 	int		gif_flags;
 	void		*encap_cookie;
+	short		gif_oflags;	/* copy of ifp->if_flags */
 };
 
 #define gif_ro gifsc_gifscr.gifscr_ro

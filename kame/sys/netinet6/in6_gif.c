@@ -334,10 +334,50 @@ in6_gif_ioctl(ifp, cmd, data)
 	int error = 0, size;
 	struct sockaddr *sa, *dst, *src;
 	void *p;
-	struct sockaddr_in6 mask6;
-	struct sockaddr *mask;
+	struct sockaddr_in6 smask6, dmask6;
 		
 	switch (cmd) {
+	case SIOCSIFFLAGS:
+		/*
+		 * whenever we change our idea about multi-destination mode
+		 * we need to update encap attachment.
+		 */
+		if (((ifp->if_flags ^ sc->gif_oflags) & IFF_LINK0) == 0)
+			break;
+		if (sc->gif_psrc == NULL || sc->gif_pdst == NULL ||
+		    sc->gif_psrc->sa_family != sc->gif_pdst->sa_family)
+			break;
+		bzero(&smask6, sizeof(smask6));
+		smask6.sin6_addr.s6_addr32[0] = ~0;
+		smask6.sin6_addr.s6_addr32[1] = ~0;
+		smask6.sin6_addr.s6_addr32[2] = ~0;
+		smask6.sin6_addr.s6_addr32[3] = ~0;
+#if 0	/* we'll need to do this soon */
+		smask6.sin6_scope_id = ~0;
+#endif
+		dmask6 = smask6;
+		if ((ifp->if_flags & IFF_LINK0) == 0 &&
+		    IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)dst)->sin6_addr)) {
+			bzero(&dmask6, sizeof(dmask6));
+#if 0	/* we'll need to do this soon */
+			dmask6.sin6_scope_id = ~0;
+#endif
+		}
+		p = encap_attach(sc->gif_psrc->sa_family, -1, sc->gif_psrc,
+			(struct sockaddr *)&smask6, sc->gif_pdst,
+			(struct sockaddr *)&dmask6,
+			(struct protosw *)&in6_gif_protosw, &sc->gif_if);
+		if (p == NULL) {
+			error = EINVAL;
+			goto bad;
+		}
+		if (sc->encap_cookie != NULL)
+			(void)encap_detach(sc->encap_cookie);
+		sc->encap_cookie = p;
+		sc->gif_oflags = ifp->if_flags;
+
+		break;
+
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
@@ -349,15 +389,22 @@ in6_gif_ioctl(ifp, cmd, data)
 			dst = (struct sockaddr *)
 				&(((struct in6_aliasreq *)data)->ifra_dstaddr);
 
-			bzero(&mask6, sizeof(mask6));
-			mask6.sin6_addr.s6_addr32[0] = ~0;
-			mask6.sin6_addr.s6_addr32[1] = ~0;
-			mask6.sin6_addr.s6_addr32[2] = ~0;
-			mask6.sin6_addr.s6_addr32[3] = ~0;
+			bzero(&smask6, sizeof(smask6));
+			smask6.sin6_addr.s6_addr32[0] = ~0;
+			smask6.sin6_addr.s6_addr32[1] = ~0;
+			smask6.sin6_addr.s6_addr32[2] = ~0;
+			smask6.sin6_addr.s6_addr32[3] = ~0;
 #if 0	/* we'll need to do this soon */
-			mask6.sin6_scope_id = ~0;
+			smask6.sin6_scope_id = ~0;
 #endif
-			mask = (struct sockaddr *)&mask6;
+			dmask6 = smask6;
+			if ((ifp->if_flags & IFF_LINK0) == 0 &&
+			    IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)dst)->sin6_addr)) {
+				bzero(&dmask6, sizeof(dmask6));
+#if 0	/* we'll need to do this soon */
+				dmask6.sin6_scope_id = ~0;
+#endif
+			}
 			size = sizeof(struct sockaddr_in6);
 			break;
 #endif /* INET6 */
@@ -371,9 +418,10 @@ in6_gif_ioctl(ifp, cmd, data)
 		if (sc->gif_pdst != NULL)
 			free((caddr_t)sc->gif_pdst, M_IFADDR);
 
-		p = encap_attach(ifr->ifr_addr.sa_family, -1, src, mask,
-			dst, mask, (struct protosw *)&in6_gif_protosw,
-			&sc->gif_if);
+		p = encap_attach(ifr->ifr_addr.sa_family, -1, src,
+			(struct sockaddr *)&smask6, dst,
+			(struct sockaddr *)&dmask6,
+			(struct protosw *)&in6_gif_protosw, &sc->gif_if);
 		if (p == NULL) {
 			error = EINVAL;
 			goto bad;
@@ -381,6 +429,7 @@ in6_gif_ioctl(ifp, cmd, data)
 		if (sc->encap_cookie != NULL)
 			(void)encap_detach(sc->encap_cookie);
 		sc->encap_cookie = p;
+		sc->gif_oflags = ifp->if_flags;
 
 		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
 		bzero((caddr_t)sa, size);

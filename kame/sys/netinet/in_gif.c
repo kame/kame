@@ -394,10 +394,42 @@ in_gif_ioctl(ifp, cmd, data)
 	int error = 0, size;
 	struct sockaddr *sa, *dst, *src;
 	void *p;
-	struct sockaddr_in mask4;
-	struct sockaddr *mask;
+	struct sockaddr_in smask4, dmask4;
 		
 	switch (cmd) {
+	case SIOCSIFFLAGS:
+		/*
+		 * whenever we change our idea about multi-destination mode
+		 * we need to update encap attachment.
+		 */
+		if (((ifp->if_flags ^ sc->gif_oflags) & IFF_LINK0) == 0)
+			break;
+		if (sc->gif_psrc == NULL || sc->gif_pdst == NULL ||
+		    sc->gif_psrc->sa_family != sc->gif_pdst->sa_family)
+			break;
+		bzero(&smask4, sizeof(smask4));
+		smask4.sin_addr.s_addr = ~0;
+		dmask4 = smask4;
+		if ((ifp->if_flags & IFF_LINK0) != 0 &&
+		    ((struct sockaddr_in *)dst)->sin_addr.s_addr ==
+				INADDR_ANY) {
+			bzero(&dmask4, sizeof(dmask4));
+		}
+		p = encap_attach(sc->gif_psrc->sa_family, -1, sc->gif_psrc,
+			(struct sockaddr *)&smask4, sc->gif_pdst,
+			(struct sockaddr *)&dmask4,
+			(struct protosw *)&in_gif_protosw, &sc->gif_if);
+		if (p == NULL) {
+			error = EINVAL;
+			goto bad;
+		}
+		if (sc->encap_cookie != NULL)
+			(void)encap_detach(sc->encap_cookie);
+		sc->encap_cookie = p;
+		sc->gif_oflags = ifp->if_flags;
+
+		break;
+
 #ifdef INET
 	case SIOCSIFPHYADDR:
 #endif
@@ -409,9 +441,14 @@ in_gif_ioctl(ifp, cmd, data)
 			dst = (struct sockaddr *)
 				&(((struct in_aliasreq *)data)->ifra_dstaddr);
 
-			bzero(&mask4, sizeof(mask4));
-			mask4.sin_addr.s_addr = ~0;
-			mask = (struct sockaddr *)&mask4;
+			bzero(&smask4, sizeof(smask4));
+			smask4.sin_addr.s_addr = ~0;
+			dmask4 = smask4;
+			if ((ifp->if_flags & IFF_LINK0) != 0 &&
+			    ((struct sockaddr_in *)dst)->sin_addr.s_addr ==
+					INADDR_ANY) {
+				bzero(&dmask4, sizeof(dmask4));
+			}
 			size = sizeof(struct sockaddr_in);
 			break;
 #endif /* INET */
@@ -425,9 +462,10 @@ in_gif_ioctl(ifp, cmd, data)
 		if (sc->gif_pdst != NULL)
 			free((caddr_t)sc->gif_pdst, M_IFADDR);
 
-		p = encap_attach(ifr->ifr_addr.sa_family, -1, src, mask,
-			dst, mask, (struct protosw *)&in_gif_protosw,
-			&sc->gif_if);
+		p = encap_attach(ifr->ifr_addr.sa_family, -1, src,
+			(struct sockaddr *)&smask4, dst,
+			(struct sockaddr *)&dmask4,
+			(struct protosw *)&in_gif_protosw, &sc->gif_if);
 		if (p == NULL) {
 			error = EINVAL;
 			goto bad;
@@ -435,6 +473,7 @@ in_gif_ioctl(ifp, cmd, data)
 		if (sc->encap_cookie)
 			(void)encap_detach(sc->encap_cookie);
 		sc->encap_cookie = p;
+		sc->gif_oflags = ifp->if_flags;
 
 		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
 		bzero((caddr_t)sa, size);

@@ -511,6 +511,22 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSIFFLAGS:
+		if (sc->gif_psrc == NULL)
+			break;
+		switch (sc->gif_psrc->sa_family) {
+#ifdef INET
+		case AF_INET:
+			return in_gif_ioctl(ifp, cmd, data);
+#endif /* INET */
+#ifdef INET6
+		case AF_INET6:
+			return in6_gif_ioctl(ifp, cmd, data);
+#endif /* INET6 */
+		default:
+			error = EPROTOTYPE;
+			goto bad;
+			break;
+		}
 		break;
 
 	default:
