@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1565 2001/02/21 16:46:24 itojun Exp $
+$KAME: CHANGELOG,v 1.1566 2001/02/22 01:08:50 sakane Exp $
 
 <200102>
+Thu Feb 22 10:08:27 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	fixed to check the outbound policy when the responder received the
+	1st packet in phase 2.  the tunnel mode and the transport specified
+	the pair of IP addresses of the end of the SA had failed.
+
 Thu Feb 22 01:59:01 JST 2001  itojun@iijlab.net
 	* sys/netinet6/{dest6,nd6}.c: make variable length header parsing
 	  pickier.
