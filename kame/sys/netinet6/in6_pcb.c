@@ -131,6 +131,9 @@ in6_pcballoc(so, head)
 	in6p->in6p_socket = so;
 	in6p->in6p_hops = -1;	/* use kernel default */
 	in6p->in6p_icmp6filt = NULL;
+	in6p->in6p_fsa.sin6_family = in6p->in6p_lsa.sin6_family = AF_INET6;
+	in6p->in6p_fsa.sin6_len =
+		in6p->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
 	/* XXX: we should allocate inputopts only when we need it. */
 	MALLOC(in6p->in6p_inputopts, struct ip6_recvpktopts *,
 	       sizeof(struct ip6_recvpktopts), M_IP6OPT, M_NOWAIT);

@@ -84,10 +84,18 @@ struct	in6pcb {
 					/* pointers to other pcb's */
 	struct	in6pcb *in6p_head;	/* pointer back to chain of
 					   in6pcb's for this protocol */
+	struct	sockaddr_in6 in6p_fsa; /* foreign socket address */
+	struct	sockaddr_in6 in6p_lsa; /* local socket address */
+#define in6p_faddr in6p_fsa.sin6_addr
+#define in6p_fport in6p_fsa.sin6_port
+#define in6p_laddr in6p_lsa.sin6_addr
+#define in6p_lport in6p_lsa.sin6_port
+#if 0
 	struct	in6_addr in6p_faddr;	/* foreign host table entry */
 	u_int16_t in6p_fport;		/* foreign port */
 	struct	in6_addr in6p_laddr;	/* local host table entry */
 	u_int16_t in6p_lport;		/* local port */
+#endif
 	u_int32_t in6p_flowinfo;	/* priority and flowlabel */
 	struct	socket *in6p_socket;	/* back pointer to socket */
 	caddr_t	in6p_ppcb;		/* pointer to per-protocol pcb */
