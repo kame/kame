@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.42 2001/01/15 03:50:54 inoue Exp $	*/
+/*	$KAME: route6d.c,v 1.43 2001/01/15 03:53:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.42 2001/01/15 03:50:54 inoue Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.43 2001/01/15 03:53:36 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1157,7 +1157,7 @@ riprecv()
 				need_trigger = 1;
 			} else if (nq->rip6_metric == np->rip6_metric &&
 				   np->rip6_metric < HOPCNT_INFINITY6) {
-				if ( rrt->rrt_index == ifcp->ifc_index &&
+				if (rrt->rrt_index == ifcp->ifc_index &&
 				   IN6_ARE_ADDR_EQUAL(&nh, &rrt->rrt_gw)) { 
 					/* same metric, same route from same gw */
 					rrt->rrt_t = t;
@@ -1410,7 +1410,7 @@ ifconfig()
 		}
 		buf = newbuf;
 	}
-	for (i = 0; i < ifconf.ifc_len; ) {
+	for (i = 0; i < ifconf.ifc_len; /*nothing*/) {
 		ifrp = (struct ifreq *)(buf + i);
 		if (ifrp->ifr_addr.sa_family != AF_INET6)
 			goto skip;
@@ -2034,7 +2034,7 @@ ifrt(ifcp, again)
 			if (search_rrt != NULL) {
 				if (search_rrt->rrt_info.rip6_metric >
 				    rrt->rrt_info.rip6_metric) {
-					if ( prev_rrt )
+					if (prev_rrt)
 						prev_rrt->rrt_next = rrt->rrt_next;
 					else
 						riprt = rrt->rrt_next;
@@ -3074,17 +3074,17 @@ rtsearch(np, prev_rrt)
 {
 	struct	riprt	*rrt;
 
-	if ( prev_rrt )
+	if (prev_rrt)
 		*prev_rrt = NULL;
 	for (rrt = riprt; rrt; rrt = rrt->rrt_next) {
 		if (rrt->rrt_info.rip6_plen == np->rip6_plen &&
 		    IN6_ARE_ADDR_EQUAL(&rrt->rrt_info.rip6_dest,
 				       &np->rip6_dest))
 			return rrt;
-		if ( prev_rrt )
+		if (prev_rrt)
 			*prev_rrt = rrt;
 	}
-	if ( prev_rrt )
+	if (prev_rrt)
 		*prev_rrt = NULL;
 	return 0;
 }
@@ -3223,7 +3223,7 @@ ripsuptrig()
 
 	double r = rand();
 	t  = (int)(RIP_TRIG_INT6_MIN + 
-		(RIP_TRIG_INT6_MAX - RIP_TRIG_INT6_MIN) * (r / RAND_MAX ));
+		(RIP_TRIG_INT6_MAX - RIP_TRIG_INT6_MIN) * (r / RAND_MAX));
 	sup_trig_update = time(NULL) + t;
 	return t;
 }
