@@ -520,6 +520,7 @@ struct mbstat {
 struct mauxtag {
 	int af;
 	int type;
+	void* p;
 };
 
 #ifdef	_KERNEL

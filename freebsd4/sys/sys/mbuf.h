@@ -541,6 +541,7 @@ union mcluster {
 struct mauxtag {
 	int	af;
 	int	type;
+	void*	p;
 };
 
 #ifdef _KERNEL

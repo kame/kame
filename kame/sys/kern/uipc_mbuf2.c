@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.20 2000/08/28 02:44:40 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.21 2000/11/08 14:12:33 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -361,6 +361,7 @@ m_aux_add(m, af, type)
 		return NULL;
 
 	t = mtod(n, struct mauxtag *);
+	bzero(t, sizeof(*t));
 	t->af = af;
 	t->type = type;
 	n->m_data += sizeof(struct mauxtag);
