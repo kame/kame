@@ -1,4 +1,4 @@
-/*	$KAME: blowfish.h,v 1.6 2000/08/31 06:03:48 itojun Exp $	*/
+/*	$KAME: blowfish.h,v 1.7 2000/08/31 06:21:55 itojun Exp $	*/
 
 /* crypto/bf/blowfish.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -68,10 +68,7 @@ extern "C" {
 #define BF_ENCRYPT	1
 #define BF_DECRYPT	0
 
-/* If you make this 'unsigned int' the pointer variants will work on
- * the Alpha, otherwise they will not.  Strangly using the '8 byte'
- * BF_LONG and the default 'non-pointer' inner loop is the best configuration
- * for the Alpha */
+/* must be 32bit quantity */
 #define BF_LONG u_int32_t
 
 #define BF_ROUNDS	16
