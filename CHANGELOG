@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.102 1999/09/08 11:11:17 itojun Exp $
+$Id: CHANGELOG,v 1.103 1999/09/08 12:46:36 sakane Exp $
 
 
 <199909>
@@ -41,6 +41,17 @@ Tue Sep  7 16:42:41 JST 1999  itojun@iijlab.net
 	* kame/libipsec: allow "setkey -D" on IPComp SA.
 	* kame/tcpdump/print-ripng.c: format ripng information better
 	  if -v is specified (but it eats more lines on screen).
+
+Tue Sep  7 13:09:06 JST 1999 sakane@kame.net
+	* kame/kame/sys/netinet6:
+	Implemented IPv6 forwarding with IPsec slightly.
+	It's enable if you define IPSEC_IPV6FWD option in kernel
+	configuration file.
+	XXX ICMPv6 for IPsec tunnel should be considered.
+
+Tue Sep  7 10:09:53 JST 1999 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	Fixed kernel crash when you set SP by spdadd command of setkey.
 
 Sun Sep  5 04:00:08 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ports/ucd-snmp:
