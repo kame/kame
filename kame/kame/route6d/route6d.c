@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.94 2002/10/26 20:08:55 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.95 2003/01/06 21:39:19 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.94 2002/10/26 20:08:55 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.95 2003/01/06 21:39:19 sumikawa Exp $";
 #endif
 
 #include <stdio.h>
@@ -88,7 +88,7 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.94 2002/10/26 20:08:55 itojun Exp $
 #ifdef	DEBUG
 #define	INIT_INTERVAL6	6
 #else
-#define	INIT_INTERVAL6	10	/* Wait to submit a initial riprequest */
+#define	INIT_INTERVAL6	10	/* Wait to submit an initial riprequest */
 #endif
 
 /* alignment constraint for routing socket */
@@ -1843,7 +1843,7 @@ rt_del(sdst, sgw, smask)
 		 * fresh list.
 		 */
 		struct riprt *longest;
-		trace(1, "\t%s is a interface route, guessing prefixlen\n",
+		trace(1, "\t%s is an interface route, guessing prefixlen\n",
 			inet6_n2p(dst));
 		longest = NULL;
 		for (rrt = riprt; rrt; rrt = rrt->rrt_next) {
