@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.21 2002/06/07 02:40:03 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.22 2002/06/07 08:01:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -179,7 +179,8 @@ makeCUI64Line(struct logmsg *lmsg, struct cSlot *csl)
 {
 	/* In case v6->v4, assume NAPT-PT or One-on-one translation	*/
 	if ((csl->remote.Port[0])
-	    || (csl->proto & NATPT_ICMPV6)) {
+	    || ((csl->proto & NATPT_ICMPV6)
+		&& (((struct mAddr *)&csl->local)->saddr.aType != ADDR_SINGLE))) {
 		/* in case NAPT-PT	*/
 		concat(lmsg, "masquerade");
 		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->remote);
