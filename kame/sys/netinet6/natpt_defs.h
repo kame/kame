@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.19 2001/09/02 19:06:23 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.20 2001/09/06 05:50:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -166,6 +166,9 @@ struct	cSlot					/* sizeof(): 100[byte]	*/
 	u_short		 cport;		/* current port, with host byte order	*/
 
 	time_t		 tstamp;
+	time_t		 lifetime;
+#define	CSLOT_INFINITE_LIFETIME	0xffffffff
+
 	struct pAddr	 local;
 	struct pAddr	 remote;
 };

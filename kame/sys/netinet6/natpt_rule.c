@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.20 2001/09/02 19:06:26 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.21 2001/09/06 05:50:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -263,6 +263,7 @@ int
 natpt_setRules(caddr_t addr)
 {
 	int			 s;
+	struct timeval		 atv;
 	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
 	struct cSlot		*cst;
 	struct pAddr		*from = NULL;
@@ -292,6 +293,8 @@ natpt_setRules(caddr_t addr)
 		}
 	}
 
+	microtime(&atv);
+	cst->tstamp = atv.tv_sec;
 	natpt_log(LOG_CSLOT, LOG_DEBUG, (void *)cst, sizeof(struct cSlot));
 
 	s = splnet();
