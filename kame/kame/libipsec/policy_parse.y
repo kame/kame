@@ -1,4 +1,4 @@
-/*	$KAME: policy_parse.y,v 1.19 2003/11/23 08:34:16 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.20 2003/11/23 09:10:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -295,7 +295,7 @@ init_x_policy()
 
 	if (pbuf) {
 		free(pbuf);
-		tlen = ;
+		tlen = 0;
 	}
 	pbuf = malloc(sizeof(struct sadb_x_policy));
 	if (pbuf == NULL) {
