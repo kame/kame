@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2493 2003/10/17 12:18:21 ono Exp $
+$KAME: CHANGELOG,v 1.2494 2003/10/21 06:58:02 jinmei Exp $
 
 <200310>
 2003-10-17  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
@@ -44,7 +44,7 @@ Thu Oct  2 16:48:43 JST 2003  itojun@iijlab.net
 
 Wed Oct  1 22:01:59 JST 2003  itojun@iijlab.net
 	* kame/sys/netinet6/icmp6.c:
-	when MIP6 route optimizaion is being perfomed, the address in
+	when MIP6 route optimizaion is being performed, the address in
 	RTHDR2 of the payload of ICMPv6 packet too big message
 	must be considerred as a final destination of path MTU.
 
