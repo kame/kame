@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.110 2000/06/04 12:54:56 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.111 2000/06/11 17:24:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,7 @@ static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 #endif
 
+static void icmp6_errcount __P((struct icmp6errstat *, int, int));
 #ifndef HAVE_NRL_INPCB
 static int icmp6_rip6_input __P((struct mbuf **, int));
 #endif
@@ -185,6 +186,64 @@ icmp6_init()
 #endif
 }
 
+static void
+icmp6_errcount(stat, type, code)
+	struct icmp6errstat *stat;
+	int type, code;
+{
+	switch(type) {
+	case ICMP6_DST_UNREACH:
+		switch (code) {
+		case ICMP6_DST_UNREACH_NOROUTE:
+			stat->icp6errs_dst_unreach_noroute++;
+			return;
+		case ICMP6_DST_UNREACH_ADMIN:
+			stat->icp6errs_dst_unreach_admin++;
+			return;
+		case ICMP6_DST_UNREACH_BEYONDSCOPE:
+			stat->icp6errs_dst_unreach_beyondscope++;
+			return;
+		case ICMP6_DST_UNREACH_ADDR:
+			stat->icp6errs_dst_unreach_addr++;
+			return;
+		case ICMP6_DST_UNREACH_NOPORT:
+			stat->icp6errs_dst_unreach_noport++;
+			return;
+		}
+		break;
+	case ICMP6_PACKET_TOO_BIG:
+		stat->icp6errs_packet_too_big++;
+		return;
+	case ICMP6_TIME_EXCEEDED:
+		switch(code) {
+		case ICMP6_TIME_EXCEED_TRANSIT:
+			stat->icp6errs_time_exceed_transit++;
+			return;
+		case ICMP6_TIME_EXCEED_REASSEMBLY:
+			stat->icp6errs_time_exceed_reassembly++;
+			return;
+		}
+		break;
+	case ICMP6_PARAM_PROB:
+		switch(code) {
+		case ICMP6_PARAMPROB_HEADER:
+			stat->icp6errs_paramprob_header++;
+			return;
+		case ICMP6_PARAMPROB_NEXTHEADER:
+			stat->icp6errs_paramprob_nextheader++;
+			return;
+		case ICMP6_PARAMPROB_OPTION:
+			stat->icp6errs_paramprob_option++;
+			return;
+		}
+		break;
+	case ND_REDIRECT:
+		stat->icp6errs_redirect++;
+		break;
+	}
+	stat->icp6errs_unknown++;
+}
+
 /*
  * Generate an error packet of type error in response to bad IP6 packet.
  */
@@ -200,6 +259,9 @@ icmp6_error(m, type, code, param)
 	int nxt;
 
 	icmp6stat.icp6s_error++;
+
+	/* count per-type-code statistics */
+	icmp6_errcount(&icmp6stat.icp6s_outerrhist, type, code);
 
 #ifdef M_DECRYPTED	/*not openbsd*/
 	if (m->m_flags & M_DECRYPTED) {
@@ -2277,6 +2339,8 @@ icmp6_redirect_output(m0, rt)
 	u_char *p;
 	struct ifnet *outif = NULL;
 	struct sockaddr_in6 src_sa;
+
+	icmp6_errcount(&icmp6stat.icp6s_outerrhist, ND_REDIRECT, 0);
 
 	/* if we are not router, we don't send icmp6 redirect */
 	if (!ip6_forwarding || ip6_accept_rtadv)
