@@ -739,7 +739,6 @@ skip_ipsec2:;
 	if (ifpp)
 		*ifpp = ifp;
 
-
 	/*
 	 * Determine path MTU.
 	 */

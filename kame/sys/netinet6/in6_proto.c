@@ -182,17 +182,22 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
-#ifndef __OpenBSD__
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
  0, 0,
+#elif defined(__OpenBSD__)
+ udp6_usrreq,	0,
 #else
- udp6_usrreq, udp6_init,
+ udp6_usrreq,	udp6_init,
 #endif
   0,		0,		0,
 #ifndef __FreeBSD__
+#ifdef __OpenBSD__
+  udp_sysctl,
+#else
   udp6_sysctl,
+#endif
 #else
 # if __FreeBSD__ >= 3
   &udp6_usrreqs,
@@ -217,6 +222,8 @@ struct ip6protosw inet6sw[] = {
   tcp6_input,	0,		tcp6_ctlinput,	tcp_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
+#elif defined(__OpenBSD__)
+  tcp6_usrreq,
 #else
   tcp_usrreq,
 #endif
@@ -234,7 +241,6 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif
-#endif /*OpenBSD*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC | PR_ADDR,
   rip6_input,	rip6_output,	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

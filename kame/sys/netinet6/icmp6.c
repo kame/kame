@@ -789,9 +789,7 @@ icmp6_input(mp, offp, proto)
 
  passit:
 #ifdef __OpenBSD__
-#if 0
 	rip6_input(&m, offp, IPPROTO_ICMPV6);
-#endif
 #else
 	icmp6_rip6_input(&m, *offp);
 #endif
@@ -1930,16 +1928,16 @@ icmp6_ctloutput(op, so, level, optname, mp)
 				optlen);
 #elif defined(__OpenBSD__)
 			p = mtod(m, struct icmp6_filter *);
-			if (!p) {
+			if (!p || !inp->inp_icmp6filt) {
 				error = EINVAL;
 				break;
 			}
-			bcopy(p, &inp->inp_icmp6filt,
+			bcopy(p, inp->inp_icmp6filt,
 				sizeof(struct icmp6_filter));
 			error = 0;
 #else
 			p = mtod(m, struct icmp6_filter *);
-			if (!p) {
+			if (!p || !in6p->in6p_icmp6filt) {
 				error = EINVAL;
 				break;
 			}
@@ -1971,11 +1969,11 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			struct icmp6_filter *p;
 
 			p = mtod(m, struct icmp6_filter *);
-			if (!p) {
+			if (!p || !inp->inp_icmp6filt) {
 				error = EINVAL;
 				break;
 			}
-			bcopy(&inp->inp_icmp6filt, p,
+			bcopy(inp->inp_icmp6filt, p,
 				sizeof(struct icmp6_filter));
 			error = 0;
 #else

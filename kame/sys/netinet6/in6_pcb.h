@@ -66,9 +66,6 @@
 #define _NETINET6_IN6_PCB_H_
 
 #include <sys/queue.h>
-#if 1 /*IPSEC*/
-#include <netinet6/ipsec.h>
-#endif
 
 /*
  * Common structure pcb for internet protocol implementation.
@@ -78,6 +75,7 @@
  * control block.
  */
 struct icmp6_filter;
+struct secpolicy;
 
 struct	in6pcb {
 	struct	in6pcb *in6p_next, *in6p_prev;
