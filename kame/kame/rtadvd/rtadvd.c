@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.34 2000/10/08 07:01:50 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.35 2000/10/08 07:03:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,7 +337,7 @@ rtmsg_input()
 	struct in6_addr *addr;
 	char addrbuf[INET6_ADDRSTRLEN];
 
-	n = read(rtsock, msg, 2048);
+	n = read(rtsock, msg, sizeof(msg));
 	if (dflag > 1) {
 		syslog(LOG_DEBUG,
 		       "<%s> received a routing message "
