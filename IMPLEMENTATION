@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.384 2005/02/10 08:27:26 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.385 2005/03/17 08:29:18 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -703,7 +703,7 @@ in RA has no special effect to the stateful autoconfiguration
 procedure in the DHCPv6 client program.  It is possible to invoke
 DHCPv6 for "other" information configuration when receiving an RA with
 the "Otherconfig" flag being set through a knob for router
-solicitation daemon.  Nevertheless, this is also consider
+solicitation daemon.  Nevertheless, this is also considered to be
 experimental, and the IETF is now working on clarifying this part of
 the specification.  The implementation behavior may also change in the
 future accordingly.
