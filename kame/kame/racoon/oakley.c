@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.34 2000/05/31 19:46:05 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.35 2000/05/31 20:01:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1143,49 +1143,6 @@ oakley_validate_auth(iph1)
 						"filename: %s\n", path));
 				cert = eay_get_x509cert(path);
 				break;
-			case ISAKMP_CERT_PKCS7:
-			{
-				FILE *fp;
-				int len;
-
-				/* make public file name */
-				snprintf(path, sizeof(path), "%s/%s",
-					lcconf->pathinfo[LC_PATHTYPE_CERT],
-					iph1->rmconf->peerscertfile);
-				YIPSDEBUG(DEBUG_CERT,
-					plog(logp, LOCATION, NULL,
-						"filename: %s\n", path));
-
-				len = getfsize(path);
-				if (len == -1) {
-					plog(logp, LOCATION, NULL,
-						"failed to get file size: %s\n", path);
-					return -1;
-				}
-				cert = vmalloc(len);
-				if (cert == NULL) {
-					plog(logp, LOCATION, NULL,
-						"failed to get auth buffer\n");
-					return -1;
-				}
-				fp = fopen(path, "r");
-				if (fp == NULL) {
-					plog(logp, LOCATION, NULL,
-						"%s fopen (%s)\n",
-						path, strerror(errno));
-				}
-				len = fread(cert->v, 1, cert->l, fp);
-				fclose(fp);
-				if (len != cert->l) {
-					plog(logp, LOCATION, NULL,
-						"failed to read file: %s\n", path);
-					vfree(cert);
-					return -1;
-				}
-				/* XXX should be checked whether PKCS7 or not. */
-				/* So they should be into crypto_openssl.c */
-			}
-				break;
 			default:
 				plog(logp, LOCATION, NULL,
 					"not supported certtype %d\n",
@@ -1245,11 +1202,6 @@ oakley_validate_auth(iph1)
 		switch (iph1->rmconf->certtype) {
 		case ISAKMP_CERT_X509SIGN:
 			error = eay_check_x509sign(my_hash,
-					iph1->sig_p,
-					iph1->cert_p);
-			break;
-		case ISAKMP_CERT_PKCS7:
-			error = eay_check_pkcs7sign(my_hash,
 					iph1->sig_p,
 					iph1->cert_p);
 			break;
