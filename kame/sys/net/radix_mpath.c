@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.5 2001/07/20 21:43:51 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.6 2001/07/21 01:23:07 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -165,7 +165,9 @@ rtalloc_mpath(ro, hash)
 	/* beyond here, we use rn as the master copy */
 	rn0 = rn = (struct radix_node *)ro->ro_rt;
 	n = rn_mpath_count(rn0);
-	hash %= n;	/* XXX is the hash policy good enough?  cf RFC2991 */
+
+	/* gw selection by Modulo-N Hash (RFC2991) XXX need improvement? */
+	hash %= n;
 	while (hash-- > 0 && rn) {
 		/* stay within the multipath routes */
 		if (rn->rn_dupedkey && rn->rn_mask != rn->rn_dupedkey->rn_mask)
