@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.2 2003/05/06 07:00:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -130,9 +130,11 @@ static void mip6_bu_timeout(void *);
 static caddr_t mip6_add_opt2dh(caddr_t, struct mip6_buffer *);
 static void mip6_align_destopt(struct mip6_buffer *);
 
+#if 0 /* mip6_bdt_xxx are not used any more. */
 /* bi-directional tunneling proccessing. */
 static int mip6_bdt_create(struct hif_softc *, struct sockaddr_in6 *);
 static int mip6_bdt_delete(struct sockaddr_in6 *);
+#endif /* 0 */
 
 void
 mip6_mn_init(void)
@@ -1561,9 +1563,11 @@ mip6_bu_list_remove(mbu_list, mbu)
 		return (EINVAL);
 	}
 
+#if 0 /* mip6_bdt_xxx are not used any more. */
 	if ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0) {
 		mip6_bdt_delete(&mbu->mbu_paddr);
 	}
+#endif /* 0 */
 
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
@@ -3654,6 +3658,7 @@ mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICA
 	return (0);
 }
 
+#if 0 /* mip6_bdt_xxx are not used any more. */
 static int
 mip6_bdt_create(sc, paddr)
 	struct hif_softc *sc;
@@ -3754,6 +3759,7 @@ mip6_bdt_delete(paddr)
 
 	return (error);
 }
+#endif /* 0 */
 
 #ifdef MIP6_DEBUG
 void
