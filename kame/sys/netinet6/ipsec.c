@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.50 2000/02/28 10:59:32 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.51 2000/03/01 11:52:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3337,9 +3337,6 @@ ipsec_copypkt(m)
 	return(NULL);
 }
 
-/*
- * XXX will allocate aux mbufs and put the socket information there.
- */
 void
 ipsec_setsocket(m, so)
 	struct mbuf *m;
