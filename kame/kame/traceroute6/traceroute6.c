@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.52 2002/06/09 02:40:06 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.53 2002/06/09 02:45:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1290,7 +1290,7 @@ inetname(sa)
 	if (first && !nflag) {
 		first = 0;
 		if (gethostname(domain, sizeof(domain)) == 0 &&
-		    (cp = index(domain, '.')))
+		    (cp = strchr(domain, '.')))
 			(void) strlcpy(domain, cp + 1, sizeof(domain));
 		else
 			domain[0] = 0;
@@ -1299,7 +1299,7 @@ inetname(sa)
 	if (!nflag) {
 		if (getnameinfo(sa, sa->sa_len, line, sizeof(line), NULL, 0,
 		    NI_NAMEREQD) == 0) {
-			if ((cp = index(line, '.')) &&
+			if ((cp = strchr(line, '.')) &&
 			    !strcmp(cp + 1, domain))
 				*cp = 0;
 			cp = line;

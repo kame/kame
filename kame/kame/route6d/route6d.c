@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.85 2002/06/07 16:39:41 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.86 2002/06/09 02:46:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.85 2002/06/07 16:39:41 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.86 2002/06/09 02:46:16 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -3033,11 +3033,11 @@ filterconfig()
 			iflp = ap;
 			goto ifonly;
 		}
-		if ((p = index(ap, ',')) != NULL) {
+		if ((p = strchr(ap, ',')) != NULL) {
 			*p++ = '\0';
 			iflp = p;
 		}
-		if ((p = index(ap, '/')) == NULL) {
+		if ((p = strchr(ap, '/')) == NULL) {
 			fatal("no prefixlen specified for '%s'", ap);
 			/*NOTREACHED*/
 		}
@@ -3058,7 +3058,7 @@ ifonly:
 		/* parse the interface listing portion */
 		while (iflp) {
 			ifname = iflp;
-			if ((iflp = index(iflp, ',')) != NULL)
+			if ((iflp = strchr(iflp, ',')) != NULL)
 				*iflp++ = '\0';
 			ifcp = ifc_find(ifname);
 			if (ifcp == NULL) {
