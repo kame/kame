@@ -8,6 +8,9 @@ SRCS+=	print-isakmp.c
 CPPFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 	-DHAVE_PRINT_ISAKMP_C=1 
 
+# for debugging malloc/free
+#LDADD+=-L/usr/pkg/lib -lefence
+
 MAN=	racoon.8 racoon.conf.5
 
 .include <bsd.prog.mk>
