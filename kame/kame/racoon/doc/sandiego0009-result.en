@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.8 2000/09/19 16:00:39 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.9 2000/09/19 17:40:02 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -74,6 +74,9 @@ vs SSH (IPv6)
 	  ssh does not assume it
 	  (fixed/racoon can do both behavior, not sure if which side is more
 	  common)
+	- no SADB_ACQUIRE on ipcomp SPD (fixed by making SADB_ACQUIRE processing
+	  violate RFC2367 a little)
+	- rekey is working fine.
 
 vs RapidStreem (CONTINUE)
 	phase 1: responder, main
@@ -96,4 +99,3 @@ vs HITACHI
 		3des, hmac-md5, tunnel mode, lifetime 300
 	Notes:
 	- rekeying is fine.
-
