@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1300 2000/09/25 23:02:16 itojun Exp $
+$KAME: CHANGELOG,v 1.1301 2000/09/26 08:44:18 itojun Exp $
 
 <200009>
+Tue Sep 26 17:40:30 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: attach sadb_comb for IPComp SADB_ACQUIRE message.
+	  the use of sadb_comb is not on RFC2367; it was discussed in
+	  pf_key mailing list and is one of the candidate behavior under
+	  current header file declaration.
+
 Tue Sep 26 07:56:17 JST 2000  itojun@iijlab.net
 	* libinet6/getnameinfo.c: off-by-1 error in string length valildation.
 	  From: Pavel Kankovsky <peak@argo.troja.mff.cuni.cz>
