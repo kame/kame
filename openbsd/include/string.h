@@ -1,4 +1,4 @@
-/*	$OpenBSD: string.h,v 1.7 2002/02/16 21:27:17 millert Exp $	*/
+/*	$OpenBSD: string.h,v 1.9 2002/11/21 20:42:39 marc Exp $	*/
 /*	$NetBSD: string.h,v 1.6 1994/10/26 00:56:30 cgd Exp $	*/
 
 /*-
@@ -49,7 +49,7 @@ typedef	_BSD_SIZE_T_	size_t;
 #ifdef 	__GNUG__
 #define	NULL	__null
 #else
-#define	NULL	0
+#define	NULL	0L
 #endif
 #endif
 
@@ -68,6 +68,7 @@ int	 strcoll(const char *, const char *);
 char	*strcpy(char *, const char *);
 size_t	 strcspn(const char *, const char *);
 char	*strerror(int);
+int	 strerror_r(int, char *, size_t);
 size_t	 strlen(const char *);
 char	*strncat(char *, const char *, size_t);
 int	 strncmp(const char *, const char *, size_t);

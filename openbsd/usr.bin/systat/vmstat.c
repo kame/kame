@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmstat.c,v 1.36 2002/06/19 08:45:52 deraadt Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.38 2003/02/28 21:29:07 jason Exp $	*/
 /*	$NetBSD: vmstat.c,v 1.5 1996/05/10 23:16:40 thorpej Exp $	*/
 
 /*-
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.2 (Berkeley) 1/12/94";
 #endif
-static char rcsid[] = "$OpenBSD: vmstat.c,v 1.36 2002/06/19 08:45:52 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: vmstat.c,v 1.38 2003/02/28 21:29:07 jason Exp $";
 #endif /* not lint */
 
 /*
@@ -82,7 +82,7 @@ static struct Info {
 	struct	vmtotal Total;
 	struct	nchstats nchstats;
 	long	nchcount;
-	long	*intrcnt;
+	int	*intrcnt;
 } s, s1, s2, z;
 
 #include "dkstats.h"
@@ -233,7 +233,7 @@ initkre(void)
 		}
 #else
 		nintr = (namelist[X_EINTRCNT].n_value -
-		    namelist[X_INTRCNT].n_value) / sizeof (long);
+		    namelist[X_INTRCNT].n_value) / sizeof (int);
 		intrloc = calloc(nintr, sizeof (long));
 		intrname = calloc(nintr, sizeof (long));
 		intrnamebuf = malloc(namelist[X_EINTRNAMES].n_value -
@@ -333,8 +333,8 @@ labelkre(void)
 	mvprintw(DISKROW + 2, DISKCOL, "xfers");
 	mvprintw(DISKROW + 3, DISKCOL, "Kbyte");
 	mvprintw(DISKROW + 4, DISKCOL, "  sec");
-	for (i = 0, j = 0; i < dk_ndrive && j < DRIVESPACE; i++)
-		if (dk_select[i] && (j + strlen(dr_name[i])) < DRIVESPACE) {
+	for (i = 0, j = 0; i < cur.dk_ndrive && j < DRIVESPACE; i++)
+		if (cur.dk_select[i] && (j + strlen(dr_name[i])) < DRIVESPACE) {
 			l = MAX(4, strlen(dr_name[i]));
 			mvprintw(DISKROW, DISKCOL + 5 + j,
 			    " %*s", l, dr_name[i]);
@@ -499,8 +499,8 @@ showkre(void)
 	PUTRATE(uvmexp.softs, GENSTATROW + 1, GENSTATCOL + 24, 6);
 	PUTRATE(uvmexp.faults, GENSTATROW + 1, GENSTATCOL + 30, 5);
 	mvprintw(DISKROW, DISKCOL + 5, "                              ");
-	for (i = 0, c = 0; i < dk_ndrive && c < DRIVESPACE; i++)
-		if (dk_select[i] && (c + strlen(dr_name[i])) < DRIVESPACE) {
+	for (i = 0, c = 0; i < cur.dk_ndrive && c < DRIVESPACE; i++)
+		if (cur.dk_select[i] && (c + strlen(dr_name[i])) < DRIVESPACE) {
 			l = MAX(4, strlen(dr_name[i]));
 			mvprintw(DISKROW, DISKCOL + 5 + c,
 			    " %*s", l, dr_name[i]);
@@ -648,7 +648,7 @@ getinfo(struct Info *s, enum state st)
 		}
 	}
 #else
-	NREAD(X_INTRCNT, s->intrcnt, nintr * sizeof(long));
+	NREAD(X_INTRCNT, s->intrcnt, nintr * sizeof(int));
 #endif
 	size = sizeof(s->time);
 	if (sysctl(cp_time_mib, 2, &s->time, &size, NULL, 0) < 0) {
@@ -679,7 +679,7 @@ static void
 allocinfo(struct Info *s)
 {
 
-	s->intrcnt = (long *) malloc(nintr * sizeof(long));
+	s->intrcnt = (int *) malloc(nintr * sizeof(int));
 	if (s->intrcnt == NULL)
 		errx(2, "out of memory");
 }
@@ -687,7 +687,7 @@ allocinfo(struct Info *s)
 static void
 copyinfo(struct Info *from, struct Info *to)
 {
-	long *intrcnt;
+	int *intrcnt;
 
 	intrcnt = to->intrcnt;
 	*to = *from;

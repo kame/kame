@@ -1,4 +1,4 @@
-/*	$OpenBSD: stdio.h,v 1.22 2002/02/19 19:39:36 millert Exp $	*/
+/*	$OpenBSD: stdio.h,v 1.25 2002/12/30 21:36:06 millert Exp $	*/
 /*	$NetBSD: stdio.h,v 1.18 1996/04/25 18:29:21 jtc Exp $	*/
 
 /*-
@@ -63,7 +63,7 @@ typedef	_BSD_OFF_T_	off_t;
 #ifdef 	__GNUG__
 #define	NULL	__null
 #else
-#define	NULL	0
+#define	NULL	0L
 #endif
 #endif
 
@@ -175,6 +175,7 @@ __END_DECLS
 #define	_IONBF	2		/* setvbuf should set unbuffered */
 
 #define	BUFSIZ	1024		/* size of buffer used by setbuf */
+
 #define	EOF	(-1)
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: stdlib.h,v 1.20 2002/06/29 00:20:11 millert Exp $	*/
+/*	$OpenBSD: stdlib.h,v 1.24 2002/12/03 20:24:29 millert Exp $	*/
 /*	$NetBSD: stdlib.h,v 1.25 1995/12/27 21:19:08 jtc Exp $	*/
 
 /*-
@@ -79,7 +79,7 @@ typedef struct {
 #ifdef 	__GNUG__
 #define NULL	__null
 #else
-#define	NULL	0
+#define	NULL	0L
 #endif
 #endif
 
@@ -108,12 +108,16 @@ int	 atexit(void (*)(void));
 double	 atof(const char *);
 int	 atoi(const char *);
 long	 atol(const char *);
+long long atoll(const char *);
 void	*bsearch(const void *, const void *, size_t, size_t,
 	    int (*)(const void *, const void *));
 void	*calloc(size_t, size_t);
 div_t	 div(int, int);
+char	*ecvt(double, int, int *, int *);
 __dead void	 exit(int);
+char	*fcvt(double, int, int *, int *);
 void	 free(void *);
+char	*gcvt(double, int, char *);
 char	*getenv(const char *);
 long	 labs(long);
 ldiv_t	 ldiv(long, long);
@@ -169,6 +173,8 @@ char	*l64a(long);
 
 void	 cfree(void *);
 
+#ifndef _GETOPT_DEFINED_
+#define _GETOPT_DEFINED_
 int	 getopt(int, char * const *, const char *);
 extern	 char *optarg;			/* getopt(3) external variables */
 extern	 int opterr;
@@ -177,6 +183,7 @@ extern	 int optopt;
 extern	 int optreset;
 int	 getsubopt(char **, char * const *, char **);
 extern	 char *suboptarg;		/* getsubopt(3) external variable */
+#endif /* _GETOPT_DEFINED_ */
 
 int	 heapsort(void *, size_t, size_t, int (*)(const void *, const void *));
 int	 mergesort(void *, size_t, size_t, int (*)(const void *, const void *));
