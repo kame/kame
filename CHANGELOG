@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1086 2000/07/03 23:46:00 itojun Exp $
+$Id: CHANGELOG,v 1.1087 2000/07/04 01:26:22 sakane Exp $
 
 <200006>
+Tue Jul  4 10:25:13 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- Process to send a delete notify message only when phase 2 has
+	  been established.
+	- added "dead" flag to a schedule.  It is used to mark a schedule
+	  already dead.  don't delete a schedule at multiple place.
+
 Tue Jul  4 08:44:11 JST 2000  itojun@iijlab.net
 	* netbsd/usr.sbin/inetd: remove duplicated ipsec initialization code
 	  (used on SIGHUP).
