@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.30 2001/05/21 13:48:23 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.31 2001/05/21 16:39:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -281,6 +281,13 @@ udp6_output(in6p, m, addr6, control)
 					      &in6p->in6p_route,
 					      &in6p->in6p_laddr, &error);
 		} else {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+			/*
+			 * XXX: freebsd4 does not have in_selectsrc, but
+			 * we can omit the whole part because freebsd4 calls
+			 * udp_output() directory in this case, and thus we'll
+			 * never see this path.
+			 */
 			if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 				struct sockaddr_in *sinp, sin_dst;
 
@@ -304,7 +311,9 @@ udp6_output(in6p, m, addr6, control)
 				      &laddr_mapped.s6_addr[12],
 				      sizeof(sinp->sin_addr));
 				laddr = &laddr_mapped;
-			} else {
+			} else
+#endif /* !(freebsd3 and later) */
+			{
 				laddr = &in6p->in6p_laddr;	/* XXX */
 			}
 		}
