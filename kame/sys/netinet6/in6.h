@@ -555,10 +555,13 @@ struct	in6_ifaddr *in6_ifawithscope __P((struct ifnet *, struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
 #ifdef MAPPED_ADDR_ENABLED
+struct sockaddr;
+
 void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
 			    struct sockaddr_in6 *sin6));
 void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
 				 struct sockaddr_in6 *sin6));
+void	in6_sin_2_v4mapsin6_in_sock __P((struct sockaddr **nam));
 #endif /* MAPPED_ADDR_ENABLED */
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))

@@ -48,6 +48,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/malloc.h>
+#endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -84,7 +87,9 @@ static int ip6_mdq __P((struct mbuf *, struct ifnet *, struct mf6c *));
 static void phyint_send __P((struct ip6_hdr *, struct mif6 *, struct mbuf *));
 
 static int set_pim6 __P((int *));
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 static int get_pim6 __P((struct mbuf *));
+#endif
 static int socket_send __P((struct socket *, struct mbuf *,
 			    struct sockaddr_in6 *));
 static int register_send __P((struct ip6_hdr *, struct mif6 *,
@@ -227,6 +232,54 @@ static int del_m6fc __P((struct mf6cctl *));
 /*
  * Handle MRT setsockopt commands to modify the multicast routing tables.
  */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int
+ip6_mrouter_set(so, sopt)
+	struct socket *so;
+	struct sockopt *sopt;
+{
+	int	error = 0;
+	struct mbuf *m;
+
+	if (so != ip6_mrouter && sopt->sopt_name != MRT6_INIT)
+		return (EACCES);
+
+	if (error = soopt_getm(sopt, &m)) /* XXX */
+		return (error);
+	if (error = soopt_mcopyin(sopt, m)) /* XXX */
+		return (error);
+
+	switch (sopt->sopt_name) {
+	 case MRT6_INIT:
+		 error = ip6_mrouter_init(so, m);
+		 break;
+	 case MRT6_DONE:
+		 error = ip6_mrouter_done();
+		 break;
+	 case MRT6_ADD_MIF:
+		 error = add_m6if(mtod(m, struct mif6ctl *));
+		 break;
+	 case MRT6_DEL_MIF:
+		 error = del_m6if(mtod(m, mifi_t *));
+		 break;
+	 case MRT6_ADD_MFC:
+		 error = add_m6fc(mtod(m, struct mf6cctl *));
+		 break;
+	 case MRT6_DEL_MFC:
+		 error = del_m6fc(mtod(m, struct mf6cctl *));
+		 break;
+	 case MRT6_PIM:
+		 error = set_pim6(mtod(m, int *));
+		 break;
+	 default:
+		 error = EOPNOTSUPP;
+		 break;
+	}
+
+	(void)m_freem(m);
+	return(error);
+}
+#else
 int
 ip6_mrouter_set(cmd, so, m)
 	int cmd;
@@ -247,10 +300,29 @@ ip6_mrouter_set(cmd, so, m)
 	 default:            return EOPNOTSUPP;
 	}
 }
+#endif
 
 /*
  * Handle MRT getsockopt commands
  */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int
+ip6_mrouter_get(so, sopt)
+	struct socket *so;
+	struct sockopt *sopt;
+{
+	int error = 0;
+
+	if (so != ip6_mrouter) return EACCES;
+
+	switch (sopt->sopt_name) {
+		case MRT6_PIM:
+			error = sooptcopyout(sopt, &pim6, sizeof(pim6));
+			break;
+	}
+	return (error);
+}
+#else
 int
 ip6_mrouter_get(cmd, so, m)
 	int cmd;
@@ -270,6 +342,7 @@ ip6_mrouter_get(cmd, so, m)
 		 return EOPNOTSUPP;
 	}
 }
+#endif
 
 /*
  * Handle ioctl commands to obtain information from the cache
@@ -345,6 +418,7 @@ get_mif6_cnt(req)
 	return 0;
 }
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >=3)
 /*
  * Get PIM processiong global
  */
@@ -360,6 +434,7 @@ get_pim6(m)
 
 	return 0;
 }
+#endif
 
 static int
 set_pim6(i)

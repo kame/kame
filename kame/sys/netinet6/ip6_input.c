@@ -792,7 +792,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__)
 	struct proc *p = curproc;	/* XXX */
 #endif
 #ifdef __bsdi__
@@ -801,8 +801,11 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	int privileged;
 
 	privileged = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
+		privileged++;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	if (in6p->in6p_socket->so_uid == 0)
 		privileged++;
 #else
 	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)

@@ -1850,7 +1850,11 @@ icmp6_ctloutput(op, so, level, optname, mp)
 				break;
 			}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-			error = sooptcopyin(sopt, &inp->inp_filter, optlen,
+			if (inp->in6p_icmp6filt == NULL) {
+				error = EINVAL;
+				break;
+			}
+			error = sooptcopyin(sopt, inp->in6p_icmp6filt, optlen,
 				optlen);
 #else
 			p = mtod(m, struct icmp6_filter *);
@@ -1860,8 +1864,8 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			}
 			bcopy(p, in6p->in6p_icmp6filt,
 				sizeof(struct icmp6_filter));
-#endif
 			error = 0;
+#endif
 			break;
 		    }
 
@@ -1869,10 +1873,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			error = ENOPROTOOPT;
 			break;
 		}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		if (m)
-			(void)m_free(m);
-#endif
 		break;
 
 	case PRCO_GETOPT:
@@ -1880,7 +1880,11 @@ icmp6_ctloutput(op, so, level, optname, mp)
 		case ICMP6_FILTER:
 		    {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-			error = sooptcopyout(sopt, &inp->inp_filter,
+			if (inp->in6p_icmp6filt == NULL) {
+				error = EINVAL;
+				break;
+			}
+			error = sooptcopyout(sopt, inp->in6p_icmp6filt,
 				sizeof(struct icmp6_filter));
 #else
 			struct icmp6_filter *p;
@@ -1892,8 +1896,8 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			}
 			bcopy(in6p->in6p_icmp6filt, p,
 				sizeof(struct icmp6_filter));
-#endif
 			error = 0;
+#endif
 			break;
 		    }
 
