@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.34 2001/01/28 09:03:51 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.35 2001/01/28 09:05:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,7 +258,8 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
-#define ND_OPT_ADV_INTERVAL		7
+#define ND_OPT_ADV_INTERVAL		7	/* KAME local, MIP6 - compat */
+#define ND_OPT_ADVINTERVAL		7	/* 2292bis-02 */
 #define ND_OPT_HA_INFORMATION		8	/* KAME local, MIP6 - compat */
 #define ND_OPT_HOMEAGENT_INFO		8	/* 2292bis-02 */
 
