@@ -1409,7 +1409,8 @@ rt_add_cache(rt, func)
 	 * check if we already have a cache timer entry associated to the
 	 * route.
 	 */
-	while ((r = LIST_FIRST(&rt->rt_timer)) != NULL) {
+	for (r = LIST_FIRST(&rt->rt_timer); r != NULL;
+	     r = LIST_NEXT(r, rtt_link)) {
 		if (r->rtt_queue == rt_cache_timeout_q)
 			return;	/* we already have one.  do nothing. */
 	}
