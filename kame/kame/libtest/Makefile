@@ -4,7 +4,7 @@
 
 PROG=	libtest
 
-.if (${OPSYS} == "BSD/OS")
+.if ${OPSYS} == "BSD/OS" && (${OPREL} == "3.0" || ${OPREL} == "3.0.1" || ${OPREL} == "3.1")
 CC=	shlicc2
 LDCC=	${CC}
 .endif
