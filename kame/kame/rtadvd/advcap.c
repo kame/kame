@@ -1,4 +1,4 @@
-/*	$KAME: advcap.c,v 1.8 2002/05/29 10:01:43 itojun Exp $	*/
+/*	$KAME: advcap.c,v 1.9 2002/05/29 14:28:35 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -119,8 +119,8 @@ int
 getent(bp, name, cp)
 	char *bp, *name, *cp;
 {
-	register int c;
-	register int i = 0, cnt = 0;
+	int c;
+	int i = 0, cnt = 0;
 	char ibuf[BUFSIZ];
 	int tf;
 
@@ -188,7 +188,7 @@ getent(bp, name, cp)
 int
 tnchktc()
 {
-	register char *p, *q;
+	char *p, *q;
 	char tcname[16];	/* name of similar terminal */
 	char tcbuf[BUFSIZ];
 	char *holdtbuf = tbuf;
@@ -238,7 +238,7 @@ int
 tnamatch(np)
 	char *np;
 {
-	register char *Np, *Bp;
+	char *Np, *Bp;
 
 	Bp = tbuf;
 	if (*Bp == '#')
@@ -263,7 +263,7 @@ tnamatch(np)
  */
 static char *
 tskip(bp)
-	register char *bp;
+	char *bp;
 {
 	int dquote;
 
@@ -310,9 +310,9 @@ int64_t
 tgetnum(id)
 	char *id;
 {
-	register int64_t i;
-	register int base;
-	register char *bp = tbuf;
+	int64_t i;
+	int base;
+	char *bp = tbuf;
 
 	for (;;) {
 		bp = tskip(bp);
@@ -346,7 +346,7 @@ int
 tgetflag(id)
 	char *id;
 {
-	register char *bp = tbuf;
+	char *bp = tbuf;
 
 	for (;;) {
 		bp = tskip(bp);
@@ -374,7 +374,7 @@ char *
 tgetstr(id, area)
 	char *id, **area;
 {
-	register char *bp = tbuf;
+	char *bp = tbuf;
 
 	for (;;) {
 		bp = tskip(bp);
@@ -398,12 +398,12 @@ tgetstr(id, area)
  */
 static char *
 tdecode(str, area)
-	register char *str;
+	char *str;
 	char **area;
 {
-	register char *cp;
-	register int c;
-	register char *dp;
+	char *cp;
+	int c;
+	char *dp;
 	int i;
 	char term;
 
