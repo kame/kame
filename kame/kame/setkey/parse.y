@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.59 2001/08/17 06:15:31 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.60 2001/08/17 06:17:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -91,7 +91,7 @@ extern void yyerror __P((const char *));
 	struct addrinfo *res;
 }
 
-%token EOT
+%token EOT SLASH BLCL ELCL
 %token ADD GET DELETE DELETEALL FLUSH DUMP
 %token PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
@@ -609,6 +609,7 @@ upper_spec
 					return -1;
 				}
 			}
+			endprotoent();
 		}
 	;
 
