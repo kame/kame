@@ -56,6 +56,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
+#include <sys/domain.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/proc.h>
