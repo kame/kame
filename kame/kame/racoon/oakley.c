@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.106 2001/10/30 13:53:26 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.107 2001/12/12 18:23:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,6 +99,7 @@ struct dhgroup dh_modp1536;
 struct dhgroup dh_modp2048;
 struct dhgroup dh_modp3072;
 struct dhgroup dh_modp4096;
+struct dhgroup dh_modp6144;
 struct dhgroup dh_modp8192;
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
@@ -132,6 +133,8 @@ oakley_dhinit()
 		OAKLEY_ATTR_GRP_DESC_MODP3072, OAKLEY_ATTR_GRP_TYPE_MODP);
 	INITDHVAL(dh_modp4096, OAKLEY_PRIME_MODP4096,
 		OAKLEY_ATTR_GRP_DESC_MODP4096, OAKLEY_ATTR_GRP_TYPE_MODP);
+	INITDHVAL(dh_modp6144, OAKLEY_PRIME_MODP6144,
+		OAKLEY_ATTR_GRP_DESC_MODP6144, OAKLEY_ATTR_GRP_TYPE_MODP);
 	INITDHVAL(dh_modp8192, OAKLEY_PRIME_MODP8192,
 		OAKLEY_ATTR_GRP_DESC_MODP8192, OAKLEY_ATTR_GRP_TYPE_MODP);
 

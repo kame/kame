@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.150 2001/11/20 12:46:23 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.151 2001/12/12 18:23:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2546,6 +2546,7 @@ setph1attr(sa, buf)
 	case OAKLEY_ATTR_GRP_DESC_MODP2048:
 	case OAKLEY_ATTR_GRP_DESC_MODP3072:
 	case OAKLEY_ATTR_GRP_DESC_MODP4096:
+	case OAKLEY_ATTR_GRP_DESC_MODP6144:
 	case OAKLEY_ATTR_GRP_DESC_MODP8192:
 		/* don't attach group type for known groups */
 		attrlen += sizeof(struct isakmp_data);

@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.21 2001/10/05 02:42:55 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.22 2001/12/12 18:23:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,6 +227,8 @@ static struct dh_algorithm oakley_dhdef[] = {
 		&dh_modp3072, },
 { "modp4096",	algtype_modp4096,	OAKLEY_ATTR_GRP_DESC_MODP4096,
 		&dh_modp4096, },
+{ "modp6144",	algtype_modp6144,	OAKLEY_ATTR_GRP_DESC_MODP6144,
+		&dh_modp6144, },
 { "modp8192",	algtype_modp8192,	OAKLEY_ATTR_GRP_DESC_MODP8192,
 		&dh_modp8192, },
 };

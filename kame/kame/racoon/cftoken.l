@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.66 2001/12/07 03:35:14 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.67 2001/12/12 18:23:41 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -315,6 +315,7 @@ ec2n185		{ YYD; yylval.num = algtype_ec2n185;	return(ALGORITHMTYPE); }
 modp2048	{ YYD; yylval.num = algtype_modp2048;	return(ALGORITHMTYPE); }
 modp3072	{ YYD; yylval.num = algtype_modp3072;	return(ALGORITHMTYPE); }
 modp4096	{ YYD; yylval.num = algtype_modp4096;	return(ALGORITHMTYPE); }
+modp6144	{ YYD; yylval.num = algtype_modp6144;	return(ALGORITHMTYPE); }
 modp8192	{ YYD; yylval.num = algtype_modp8192;	return(ALGORITHMTYPE); }
 pre_shared_key	{ YYD; yylval.num = algtype_psk;	return(ALGORITHMTYPE); }
 rsasig		{ YYD; yylval.num = algtype_rsasig;	return(ALGORITHMTYPE); }

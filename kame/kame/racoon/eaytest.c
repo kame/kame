@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.38 2001/11/16 04:12:59 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.39 2001/12/12 18:23:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -808,6 +808,7 @@ dhtest(ac, av)
 		{ "modp2048",	OAKLEY_PRIME_MODP2048, },
 		{ "modp3072",	OAKLEY_PRIME_MODP3072, },
 		{ "modp4096",	OAKLEY_PRIME_MODP4096, },
+		{ "modp6144",	OAKLEY_PRIME_MODP6144, },
 		{ "modp8192",	OAKLEY_PRIME_MODP8192, },
 	};
 	vchar_t p1, *pub1, *priv1, *gxy1;
