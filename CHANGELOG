@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.427 2000/01/10 08:36:02 jinmei Exp $
+$Id: CHANGELOG,v 1.428 2000/01/10 09:09:38 jinmei Exp $
 
 <200001>
+2000-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_pcbopt): made the
+	IPV6_NEXTHOP socket option removal by specifying the option
+	with 0 length according to the following mail:
+	Message-ID: <Roam.SIMC.2.0.6.947118462.12265.nordmark@jurassic>
+	From: Erik Nordmark <Erik.Nordmark@eng.sun.com>
+	Date: Wed, 5 Jan 2000 16:27:42 -0800 (PST)
+
 2000-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd[23]/sbin/route/route.c (getaddr): corrected a bug in
 	examining interface flags for the RTA_GATEWAY case in getaddr();
