@@ -12,7 +12,7 @@ INCS=	icmp6.h icmp_var.h if_atm.h if_ether.h if_inarp.h \
 	tcpip.h udp.h udp_var.h
 INCS+=	in_msf.h
 INCS+=	sctp.h sctp_uio.h sctp_var.h
-INCS+=	dccp.h dccp6_var.h dccp_cc_sw.h dccp_tcplike.h \
+INCS+=	dccp.h dccp_cc_sw.h dccp_tcplike.h \
 	dccp_tfrc.h dccp_tfrc_lookup.h dccp_tfrc_print.h  \
 	dccp_var.h
 
