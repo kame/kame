@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.43 2005/01/25 07:35:43 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.44 2005/01/26 03:42:51 suz Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -3992,7 +3992,7 @@ sctp_usrreq(so, req, m, nam, control)
 }
 #endif
 
-//#if defined(__NetBSD__) || defined(__OpenBSD__)
+/* #if defined(__NetBSD__) || defined(__OpenBSD__) */
 #if __OpenBSD__
 /*
  * Sysctl for sctp variables.
