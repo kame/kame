@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.10 2000/05/16 16:26:30 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.11 2000/06/29 01:29:10 itojun Exp $
  */
 
 #include <stdio.h>
@@ -616,7 +616,7 @@ log(int priority, char *fmt, ...)
     vsprintf(Wow, fmt, ap);
 
     if (isOn(logsyslog))
-	syslog(priority, Wow);
+	syslog(priority, "%s", Wow);
 
     if (isOn(logstderr))
     {

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.6 2000/06/04 13:46:04 fujisawa Exp $
+ *	$Id: main.c,v 1.7 2000/06/29 01:29:10 itojun Exp $
  */
 
 #include <stdio.h>
@@ -447,7 +447,7 @@ log(int priority, char *fmt, ...)
     vsprintf(Wow, fmt, ap);
 
     if (isOn(logsyslog))
-	syslog(priority, Wow);
+	syslog(priority, "%s", Wow);
 
     if (isOn(logstderr))
     {
