@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.190 2003/06/27 04:53:04 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.191 2003/06/27 05:44:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,10 +114,13 @@
 #endif
 #include <net/net_osdep.h>
 
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include "pf.h"
-
+#endif
 #if NPF > 0
 #include <net/pfvar.h>
+#else
+#define NPF 0
 #endif
 
 #ifdef HAVE_NRL_INPCB
@@ -223,7 +226,9 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ESP_RANDPAD,
 #endif /* __FreeBSD__ */
 #endif /* INET6 */
 
+#if NPF > 0
 static struct pf_tag *ipsec_get_tag __P((struct mbuf *));
+#endif
 static struct secpolicy *ipsec_checkpcbcache __P((struct mbuf *,
 	struct inpcbpolicy *, int));
 static int ipsec_fillpcbcache __P((struct inpcbpolicy *, struct mbuf *,
@@ -436,6 +441,7 @@ ipsec_invalpcbcacheall()
 	return 0;
 }
 
+#if NPF > 0
 static struct pf_tag *
 ipsec_get_tag(m)
 	struct mbuf *m;
@@ -447,6 +453,7 @@ ipsec_get_tag(m)
 	else
 		return (NULL);
 }
+#endif
 
 /*
  * For OUTBOUND packet having a socket. Searching SPD for packet,
@@ -667,7 +674,11 @@ ipsec4_getpolicybytag(m, dir, error)
 	struct pf_tag *t;
 	struct secpolicy *sp = NULL;
 
+#if NPF > 0
 	t = ipsec_get_tag(m);
+#else
+	t = 0;
+#endif
 	if (!t) {
 		*error = ENOENT;
 		return NULL;
@@ -906,7 +917,11 @@ ipsec6_getpolicybytag(m, dir, error)
 	struct pf_tag *t;
 	struct secpolicy *sp = NULL;
 
+#if NPF > 0
 	t = ipsec_get_tag(m);
+#else
+	t = 0;
+#endif
 	if (!t) {
 		*error = ENOENT;
 		return NULL;
