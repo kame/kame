@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.556 2000/02/12 19:27:31 itojun Exp $
+$Id: CHANGELOG,v 1.557 2000/02/12 19:37:45 itojun Exp $
 
 <200002>
 Sun Feb 13 04:26:17 JST 2000  itojun@iijlab.net
@@ -18,7 +18,7 @@ Fri Feb 11 15:06:19 JST 2000  itojun@iijlab.net
 
 Fri Feb 11 02:42:16 JST 2000  itojun@iijlab.net
 	* sys/netinet/ip_encap.c: revisit input logic for tunnelled packets.
-	  split outer address match logic in in{,6}_gif_input() into
+	  move outer address match logic from in{,6}_gif_input() to
 	  encap[46]_input(), so that other guys (like mobile-ip6, 6to4,
 	  6over4, whatever) can match packets based on not only by proto #,
 	  but also by src/dst with masks.
