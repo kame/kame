@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.65 2000/08/09 13:29:14 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.66 2000/08/09 14:34:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1731,22 +1731,6 @@ summary()
 		(void)fflush(stdout);
 	}
 }
-
-#ifdef notdef
-static char *ttab[] = {
-	"Echo Reply",		/* ip + seq + udata */
-	"Dest Unreachable",	/* net, host, proto, port, frag, sr + IP */
-	"Source Quench",	/* IP */
-	"Redirect",		/* redirect type, gateway, + IP  */
-	"Echo",
-	"Time Exceeded",	/* transit, frag reassem + IP */
-	"Parameter Problem",	/* pointer + IP */
-	"Timestamp",		/* id + seq + three timestamps */
-	"Timestamp Reply",	/* " */
-	"Info Request",		/* id + sq */
-	"Info Reply"		/* " */
-};
-#endif
 
 /*subject type*/
 static char *niqcode[] = {
