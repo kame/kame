@@ -90,7 +90,7 @@ static void TIMEVAL_ADD __P((struct timeval *a, struct timeval *b,
 static void TIMEVAL_SUB __P((struct timeval *a, struct timeval *b,
 			     struct timeval *result));
 
-static void rtsold_set_dump_file __P(());
+static void rtsold_set_dump_file __P((void));
 static void usage __P((char *progname));
 
 int
