@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.179 2001/03/15 06:51:41 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.180 2001/03/15 08:29:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -201,23 +201,26 @@ static void in6h_delhash __P((struct in6hash *));
 static void
 in6_ifloop_request(int cmd, struct ifaddr *ifa)
 {
-	struct sockaddr_in6 lo_sa;
 	struct sockaddr_in6 all1_sa;
 	struct rtentry *nrt = NULL;
 	int e;
 	
-	bzero(&lo_sa, sizeof(lo_sa));
 	bzero(&all1_sa, sizeof(all1_sa));
-	lo_sa.sin6_family = AF_INET6;
-	lo_sa.sin6_len = sizeof(struct sockaddr_in6);
-	all1_sa = lo_sa;
-	lo_sa.sin6_addr = in6addr_loopback;
+	all1_sa.sin6_family = AF_INET6;
+	all1_sa.sin6_len = sizeof(struct sockaddr_in6);
 	all1_sa.sin6_addr = in6mask128;
-	
-	e = rtrequest(cmd, ifa->ifa_addr,
-		      (struct sockaddr *)&lo_sa,
+
+	/*
+	 * We specify the address itself as the gateway, and set the
+	 * RTF_LLINFO flag, so that the corresponding host route would have
+	 * the flag, and thus applications that assume traditional behavior
+	 * would be happy.  Note that we assume the caller of the function
+	 * (probably implicitly) set nd6_rtrequest() to ifa->ifa_rtrequest,
+	 * which changes the outgoing interface to the loopback interface.
+	 */
+	e = rtrequest(cmd, ifa->ifa_addr, ifa->ifa_addr,
 		      (struct sockaddr *)&all1_sa,
-		      RTF_UP|RTF_HOST, &nrt);
+		      RTF_UP|RTF_HOST|RTF_LLINFO, &nrt);
 	if (e != 0) {
 		log(LOG_ERR, "in6_ifloop_request: "
 		    "%s operation failed for %s (errno=%d)\n",
@@ -1896,8 +1899,11 @@ in6_ifinit(ifp, ia, sin6, newhost)
 	}
 
 	/* Add ownaddr as loopback rtentry, if necessary(ex. on p2p link). */
-	if (newhost)
+	if (newhost) {
+		/* set the rtrequest function to create llinfo */
+		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 		in6_ifaddloop(&(ia->ia_ifa));
+	}
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (ifp->if_flags & IFF_MULTICAST)

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.105 2001/03/06 09:16:20 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.106 2001/03/15 08:29:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1622,8 +1622,10 @@ nd6_prefix_onlink(pr)
 		return(0);
 	}
 
-	ifa->ifa_rtrequest = nd6_rtrequest;
-
+	/*
+	 * in6_ifinit() sets nd6_rtrequest to ifa_rtrequest for all ifaddrs.
+	 * ifa->ifa_rtrequest = nd6_rtrequest;
+	 */
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_len = sizeof(mask6);
 	mask6.sin6_addr = pr->ndpr_mask;
