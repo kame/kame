@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.59 2001/02/07 06:17:30 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.60 2001/02/07 06:21:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,7 +294,6 @@ rip6_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
 	struct ip6ctlparam *ip6cp = NULL;
@@ -336,6 +335,7 @@ rip6_ctlinput(cmd, sa, d)
 
 #ifdef __NetBSD__ /*defined(__NetBSD__) || defined(__OpenBSD__)*/
 	if (ip6 && cmd == PRC_MSGSIZE) {
+		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 		int valid = 0;
 #ifdef __NetBSD__
 		struct in6pcb *in6p;
