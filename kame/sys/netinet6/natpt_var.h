@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.33 2002/08/14 06:19:21 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.34 2002/08/16 02:38:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -57,7 +57,7 @@ int		 natpt_break		__P((void));
 
 
 /*  natpt_log.c */
-void		 natpt_logTSlot		__P((int, struct tSlot *, char));
+void		 natpt_logTSlot		__P((int, struct tSlot *, char, int));
 void		 natpt_logMsg		__P((int, char *, ...));
 void		 natpt_logMBuf		__P((int, struct mbuf *, ...));
 void		 natpt_logIp4		__P((int, struct ip *, ...));

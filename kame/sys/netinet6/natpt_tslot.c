@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.63 2002/08/14 06:19:21 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.64 2002/08/16 02:38:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -923,7 +923,8 @@ natpt_appendTSlot(struct tSlot *ats)
 	TAILQ_INSERT_TAIL(&thr->tslhead, ats, tsl_hashr);
 	splx(s);
 
-	natpt_logTSlot(LOG_INFO, ats, '+');
+	tSlotEntryUsed++;
+	natpt_logTSlot(LOG_INFO, ats, '+', tSlotEntryUsed);
 }
 
 
@@ -1012,7 +1013,8 @@ natpt_removeTSlotEntry(struct tSlot *ats)
 	TAILQ_REMOVE(&tslhashr[ats->hvr].tslhead, ats, tsl_hashr);
 	splx(s);
 
-	natpt_logTSlot(LOG_INFO, ats, '-');
+	tSlotEntryUsed--;
+	natpt_logTSlot(LOG_INFO, ats, '-', tSlotEntryUsed);
 
 	FREE(ats, M_NATPT);
 }

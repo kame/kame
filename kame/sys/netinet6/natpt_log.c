@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.16 2002/08/09 11:27:10 fujisawa Exp $	*/
+/*	$KAME: natpt_log.c,v 1.17 2002/08/16 02:38:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -250,7 +250,7 @@ natpt_lbuf(int type, int priorities, size_t size)
  */
 
 void
-natpt_logTSlot(int priorities, struct tSlot *tsl, char dir)
+natpt_logTSlot(int priorities, struct tSlot *tsl, char dir, int num)
 {
 	int		 wl, rv;
 	u_char		*pr;
@@ -263,7 +263,7 @@ natpt_logTSlot(int priorities, struct tSlot *tsl, char dir)
 	wl = SZWOW;
 	wp = wow;
 
-	rv = snprintf(wp, wl, "%ctSlot=%p", dir, tsl);
+	rv = snprintf(wp, wl, "%ctSlot=%p, nSlots=%d", dir, tsl, num);
 	wp += rv;
 	wl -= rv;
 
