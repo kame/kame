@@ -502,7 +502,7 @@ print_rip_dump(FILE *fp)
 			ripif->rip_responsercvd, ripif->rip_responsesent,
 			ripif->rip_respfail);
 		fprintf(fp, "  Requests: in/out/fail: %qu/%qu/%qu\n",
-			ripif->rip_requestsent, ripif->rip_requestrcvd,
+			ripif->rip_requestrcvd, ripif->rip_requestsent,
 			ripif->rip_reqsentfail);
 
 		/* RIPng routing table */
