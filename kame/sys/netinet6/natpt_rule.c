@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.32 2001/10/29 07:28:28 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.33 2001/10/31 08:06:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -70,8 +70,8 @@ MALLOC_DECLARE(M_NATPT);
  *
  */
 
-static int	 natpt_matchIn4addr	__P((struct pcv *, struct mAddr *));
-static int	 natpt_matchIn6addr	__P((struct pcv *, struct mAddr *));
+static int	 natpt_matchIn4addr	__P((struct pcv *, struct cSlot *, struct mAddr *));
+static int	 natpt_matchIn6addr	__P((struct pcv *, struct cSlot *, struct mAddr *));
 void		 natpt_expireCSlot	__P((void *));
 
 
@@ -106,7 +106,7 @@ natpt_lookForRule6(struct pcv *cv6)
 				continue;
 		}
 
-		if (natpt_matchIn6addr(cv6, &csl->local) != 0) {
+		if (natpt_matchIn6addr(cv6, csl, &csl->local) != 0) {
 			if (isDump(D_MATCHINGRULE6))
 				natpt_logIp6(LOG_DEBUG, cv6->ip.ip6, "%s():", fn);
 			cv6->fromto = NATPT_FROM;
@@ -146,7 +146,7 @@ natpt_lookForRule4(struct pcv *cv4)
 				continue;
 		}
 
-		if (natpt_matchIn4addr(cv4, &csl->local) != 0) {
+		if (natpt_matchIn4addr(cv4, csl, &csl->local) != 0) {
 			if (isDump(D_MATCHINGRULE4))
 				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 			cv4->fromto = NATPT_FROM;
@@ -171,7 +171,7 @@ natpt_lookForRule4(struct pcv *cv4)
 
 
 static int
-natpt_matchIn6addr(struct pcv *cv6, struct mAddr *from)
+natpt_matchIn6addr(struct pcv *cv6, struct cSlot *csl, struct mAddr *from)
 {
 	struct in6_addr	*in6from = &cv6->ip.ip6->ip6_src;
 	struct in6_addr	 match;
@@ -204,16 +204,17 @@ natpt_matchIn6addr(struct pcv *cv6, struct mAddr *from)
 	    && (cv6->ip_p != IPPROTO_TCP))
 		return (1);
 
-	if ((from->dport == 0)
-	    || (cv6->pyld.tcp6->th_dport == from->dport))
-		return (1);
+	if (csl->map & NATPT_REDIRECT_PORT) {
+		if (cv6->pyld.tcp6->th_dport != from->dport)
+			return (0);
+	}
 
-	return (0);
+	return (1);
 }
 
 
 static int
-natpt_matchIn4addr(struct pcv *cv4, struct mAddr *from)
+natpt_matchIn4addr(struct pcv *cv4, struct cSlot *csl, struct mAddr *from)
 {
 	struct in_addr	in4from = cv4->ip.ip4->ip_src;
 	struct in_addr	in4masked;
@@ -243,15 +244,24 @@ natpt_matchIn4addr(struct pcv *cv4, struct mAddr *from)
 		return (0);
 	}
 
+	/* check redirect destination address */
+	if (csl->map & NATPT_REDIRECT_ADDR) {
+		struct in_addr	 in4to = cv4->ip.ip4->ip_dst;
+
+		if (in4to.s_addr != from->daddr.in4.s_addr)
+			return (0);
+	}
+
 	if ((cv4->ip_p != IPPROTO_UDP)
 	    && (cv4->ip_p != IPPROTO_TCP))
 		return (1);
 
-	if ((from->dport == 0)
-	    || (cv4->pyld.tcp4->th_dport == from->dport))
-		return (1);
+	if (csl->map & NATPT_REDIRECT_PORT) {
+		if (cv4->pyld.tcp4->th_dport != from->dport)
+			return (0);
+	}
 
-	return (0);
+	return (1);
 }
 
 

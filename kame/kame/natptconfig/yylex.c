@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.11 2001/10/27 10:00:57 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.12 2001/10/31 08:07:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -50,6 +50,7 @@ struct
 	char	*tokenstring;
 }	keyTable[] =
 {
+	{ "any4",	SANY4,		"SANY4",	},
 	{ "any6",	SANY6,		"SANY6",	},
 	{ "bidir",	SBIDIR,		"SBIDIR",	},
 	{ "break",	SBREAK,		"SBREAK",	},

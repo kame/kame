@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.15 2001/10/27 10:00:57 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.16 2001/10/31 08:07:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -147,6 +147,8 @@ yyerror(char *msg, ...)
 %token		SIPV6ADDR
 
 
+%type	<Ainfo>	daddr4
+%type	<Ainfo>	daddr6
 %type	<Int>	dport
 %type	<pAddr>	ipv4addrs
 %type	<pAddr>	ipv6addrs
@@ -279,15 +281,22 @@ rules
 		    }
 
 		/* IPv4 -> IPv6 */
-		| map SFROM SANY4     daddr4       STO daddr6       opt_proto
-		| map SFROM SANY4     daddr4 dport STO daddr6 dport opt_proto
+		| map SFROM           daddr4       STO daddr6       opt_proto
+		    {
+			ruletab.fdaddr = $3;
+			ruletab.tdaddr = $5;
+			ruletab.proto  = $6;
+			setRules(NATPT_MAP46, &ruletab);
+		    }
+
+		| map SFROM           daddr4 dport STO daddr6 dport opt_proto
 		| map SFROM ipv4addrs daddr4       STO daddr6       opt_proto
 		| map SFROM ipv4addrs daddr4 dport STO daddr6 dport opt_proto
 		| map SFROM ipv4addrs        dport STO daddr6 dport opt_proto
 
 		/* IPv4 -> IPv4 */
-		| map SFROM SANY4     daddr4       STO daddr4       opt_proto
-		| map SFROM SANY4     daddr4 dport STO daddr4 dport opt_proto
+		| map SFROM           daddr4       STO daddr4       opt_proto
+		| map SFROM           daddr4 dport STO daddr4 dport opt_proto
 		| map SFROM ipv4addrs daddr4       STO daddr4       opt_proto
 		| map SFROM ipv4addrs daddr4 dport STO daddr4 dport opt_proto
 		| map SFROM ipv4addrs        dport STO daddr4 dport opt_proto
@@ -435,10 +444,12 @@ opt_decimal
 
 daddr4
 		: SDADDR ipv4addr
+		    { $$ = $2; }
 		;
 
 daddr6
 		: SDADDR ipv6addr
+		    { $$ = $2; }
 		;
 
 dport

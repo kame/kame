@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.19 2001/10/29 02:36:48 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.20 2001/10/31 08:07:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -105,7 +105,9 @@ setRules(int type, struct ruletab *ruletab)
 			f->Local.sa_family = AF_INET6;
 			f->Local.aType = ADDR_ANY;
 		}
-		f->Remote = *ruletab->to;
+
+		if (ruletab->to)
+			f->Remote = *(ruletab->to);
 		break;
 
 	case NATPT_MAP46:
@@ -116,7 +118,15 @@ setRules(int type, struct ruletab *ruletab)
 			f->Local.sa_family = AF_INET;
 			f->Local.aType = ADDR_ANY;
 		}
-		f->Remote = *ruletab->to;
+
+		if (ruletab->to)
+			f->Remote = *(ruletab->to);
+		else {
+			f->Remote.sa_family = AF_INET;
+			f->Remote.aType = ADDR_ANY;
+			if (type == NATPT_MAP46)
+				f->Remote.sa_family = AF_INET6;
+		}
 		break;
 
 	default:
@@ -124,15 +134,36 @@ setRules(int type, struct ruletab *ruletab)
 		break;
 	}
 
+	if (ruletab->fdaddr) {
+		f->map |= NATPT_REDIRECT_ADDR;
+		if (ruletab->fdaddr->ai_family == AF_INET) {
+			f->local.daddr.in4
+				= ((struct sockaddr_in *)ruletab->fdaddr->ai_addr)->sin_addr;
+		} else {
+			f->local.daddr.in6
+				= ((struct sockaddr_in6 *)ruletab->fdaddr->ai_addr)->sin6_addr;
+		}
+	}
+
+	if (ruletab->tdaddr) {
+		if (ruletab->tdaddr->ai_family == AF_INET) {
+			f->remote.daddr.in4
+				= ((struct sockaddr_in *)ruletab->tdaddr->ai_addr)->sin_addr;
+		} else {
+			f->remote.daddr.in6
+				= ((struct sockaddr_in6 *)ruletab->tdaddr->ai_addr)->sin6_addr;
+		}
+	}
+
 	if (ruletab->sports) {
-		f->map = NATPT_REMAP_SPORT;
+		f->map |= NATPT_REMAP_SPORT;
 		f->Remote.pType = ruletab->sports[0];
 		f->Remote.port[0] = ruletab->sports[1];
 		f->Remote.port[1] = ruletab->sports[2];
 	}
 
 	if (ruletab->dports) {
-		f->map = NATPT_REDIRECT_PORT;
+		f->map |= NATPT_REDIRECT_PORT;
 		f->local.dport = ruletab->dports[0];
 		f->remote.dport = ruletab->dports[1];
 	}

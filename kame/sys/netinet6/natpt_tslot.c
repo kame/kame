@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.31 2001/10/29 02:36:17 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.32 2001/10/31 08:06:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -257,6 +257,8 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 	{
 		remote->sa_family = AF_INET6;
 		remote->in6src = acs->Remote.in6src;
+		if (acs->map & NATPT_REDIRECT_ADDR)
+			remote->in6src = acs->remote.daddr.in6;
 		remote->in6dst = natpt_prefix;
 		remote->in6dst.s6_addr32[3] = cv4->ip.ip4->ip_src.s_addr;
 		if ((cv4->ip_p == IPPROTO_TCP)
@@ -266,7 +268,7 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 
 			if (acs->map & NATPT_REDIRECT_PORT)
 				remote->port[0] = acs->remote.dport;
-			else if (acs->map & NATPT_REMAP_SPORT)
+			if (acs->map & NATPT_REMAP_SPORT)
 				natpt_remapRemote4Port(acs, remote);
 		}
 	}

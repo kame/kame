@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.9 2001/10/27 10:00:57 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.10 2001/10/31 08:07:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -71,9 +71,9 @@ extern char	*tcpstates[];
  */
 
 void	 makeCSlotLine		__P((char *, int, struct cSlot *));
-void	 appendPAddr		__P((struct logmsg *, struct mAddr *));
-void	 appendPAddr4		__P((struct logmsg *, struct mAddr *));
-void	 appendPAddr6		__P((struct logmsg *, struct mAddr *));
+void	 appendPAddr		__P((struct logmsg *, struct cSlot *, struct mAddr *));
+void	 appendPAddr4		__P((struct logmsg *, struct cSlot *, struct mAddr *));
+void	 appendPAddr6		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPort		__P((struct logmsg *, struct mAddr *));
 void	 makeTSlotLine		__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
@@ -103,9 +103,9 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 	lmsg.lmsg_last = lmsg.lmsg_data;
 
 	concat(&lmsg, " from");
-	appendPAddr(&lmsg, &csl->local);
+	appendPAddr(&lmsg, csl, &csl->local);
 	concat(&lmsg, " to");
-	appendPAddr(&lmsg, &csl->remote);
+	appendPAddr(&lmsg, csl, &csl->remote);
 
 	if (csl->proto) {
 		int	found = 0;
@@ -147,25 +147,25 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 
 
 void
-appendPAddr(struct logmsg *lmsg, struct mAddr *mpad)
+appendPAddr(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 {
 	if (mpad->saddr.sa_family == AF_INET)
-		appendPAddr4(lmsg, mpad);
+		appendPAddr4(lmsg, csl, mpad);
 	else
-		appendPAddr6(lmsg, mpad);
+		appendPAddr6(lmsg, csl, mpad);
 }
 
 
 void
-appendPAddr4(struct logmsg *lmsg, struct mAddr *mpad)
+appendPAddr4(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 {
 	char	Wow[128];
 
-	if (mpad->saddr.aType == ADDR_ANY)
-		concat(lmsg, " any4");
-	else
+	if (mpad->saddr.aType != ADDR_ANY)
 		concat(lmsg, " %s",
 		       inet_ntop(AF_INET, &mpad->saddr.in4Addr, Wow, sizeof(Wow)));
+	else if ((csl->map & NATPT_REDIRECT_ADDR) == 0)
+		concat(lmsg, " any4");
 
 	if (mpad->saddr.prefix != 0)
 		concat(lmsg, "/%d", mpad->saddr.prefix);
@@ -174,25 +174,35 @@ appendPAddr4(struct logmsg *lmsg, struct mAddr *mpad)
 		       inet_ntop(AF_INET, &mpad->saddr.in4RangeEnd, Wow, sizeof(Wow)));
 
 	appendPort(lmsg, mpad);
+
+	if (csl->map & NATPT_REDIRECT_ADDR) {
+		concat(lmsg, " daddr %s",
+		       inet_ntop(AF_INET, &mpad->daddr, Wow, sizeof(Wow)));
+	}
 }
 
 
 void
-appendPAddr6(struct logmsg *lmsg, struct mAddr *mpad)
+appendPAddr6(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 {
 	struct in6_addr	in6addr = IN6ADDR_ANY_INIT;
 	char		Wow[128];
 
-	if (IN6_ARE_ADDR_EQUAL(&mpad->saddr.in6Addr, &in6addr))
-		concat(lmsg, " any6");
-	else
+	if (!IN6_ARE_ADDR_EQUAL(&mpad->saddr.in6Addr, &in6addr))
 		concat(lmsg, " %s",
 		       inet_ntop(AF_INET6, &mpad->saddr.in6Addr, Wow, sizeof(Wow)));
+	else if ((csl->map & NATPT_REDIRECT_ADDR) == 0)
+		concat(lmsg, " any6");
 
 	if (mpad->saddr.prefix != 0)
 		concat(lmsg, "/%d", mpad->saddr.prefix);
 
 	appendPort(lmsg, mpad);
+
+	if (csl->map & NATPT_REDIRECT_ADDR) {
+		concat(lmsg, " daddr %s",
+		       inet_ntop(AF_INET6, &mpad->daddr, Wow, sizeof(Wow)));
+	}
 }
 
 
