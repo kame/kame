@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.38 2000/06/08 08:59:56 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.39 2000/06/08 16:02:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -358,7 +358,7 @@ quick_i2recv(iph2, msg0)
 	 * parse the payloads.
 	 * copy non-HASH payloads into hbuf, so that we can validate HASH.
 	 */
-	iph2->sa = NULL;
+	iph2->sa_ret = NULL;
 	f_id = 0;	/* flag to use checking ID */
 	tlen = 0;	/* count payload length except of HASH payload. */
 	for (; pa->type; pa++) {

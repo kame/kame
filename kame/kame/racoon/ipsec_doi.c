@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.79 2000/06/08 06:43:51 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.80 2000/06/08 16:02:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -636,7 +636,7 @@ ipsecdoi_checkph2proposal(iph2)
 	int error = -1;
 
 	/* get proposal pair of SA sent. */
-	spair = get_proppair(iph2->sa_ret, IPSECDOI_TYPE_PH2);
+	spair = get_proppair(iph2->sa, IPSECDOI_TYPE_PH2);
 	if (spair == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to get prop pair.\n");
