@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.56 2002/05/23 02:27:51 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.57 2002/05/23 02:37:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -571,20 +571,21 @@ get_duid(idfile, duid)
 	char tmpbuf[256];	/* DUID should be no more than 256 bytes */
 
 	if ((fp = fopen(idfile, "r")) == NULL && errno != ENOENT)
-		dprintf(LOG_NOTICE, "get_duid: failed to open DUID file:");
+		dprintf(LOG_NOTICE, "%s" "failed to open DUID file: %s",
+		    FNAME, idfile);
 
 	if (fp) {
 		/* decode length */
 		if (fread(&len, sizeof(len), 1, fp) != 1) {
-			dprintf(LOG_ERR, "get_duid: DUID file corrupted");
+			dprintf(LOG_ERR, "%s" "DUID file corrupted", FNAME);
 			goto fail;
 		}
 	} else {
 		int l;
 
 		if ((l = gethwid(tmpbuf, sizeof(tmpbuf), NULL, &hwtype)) < 0) {
-			dprintf(LOG_INFO,
-				"get_duid: failed to get a hardware address");
+			dprintf(LOG_INFO, "%s"
+			    "failed to get a hardware address", FNAME);
 			goto fail;
 		}
 		len = l + sizeof(struct dhcp6_duid_type1);
@@ -592,19 +593,21 @@ get_duid(idfile, duid)
 
 	memset(duid, 0, sizeof(*duid));
 	duid->duid_len = len;
-	if ((duid->duid_id = (char *)malloc(len)) == NULL)
-		err(1, "get_duid: failed to allocate memory");
+	if ((duid->duid_id = (char *)malloc(len)) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to allocate memory", FNAME);
+		goto fail;
+	}
 
 	/* copy (and fill) the ID */
 	if (fp) {
 		if (fread(duid->duid_id, len, 1, fp) != 1) {
-			dprintf(LOG_ERR, "get_duid: DUID file corrupted");
+			dprintf(LOG_ERR, "%s" "DUID file corrupted", FNAME);
 			goto fail;
 		}
 
-		dprintf(LOG_DEBUG,
-			"get_duid: extracted an existing DUID from %s: %s",
-			idfile, duidstr(duid));
+		dprintf(LOG_DEBUG, "%s"
+		    "extracted an existing DUID from %s: %s", FNAME,
+		    idfile, duidstr(duid));
 	} else {
 		u_int64_t t64;
 
@@ -616,27 +619,27 @@ get_duid(idfile, duid)
 		dp->dh6duid1_time = htonl((u_long)(t64 & 0xffffffff));
 		memcpy((void *)(dp + 1), tmpbuf, (len - sizeof(*dp)));
 
-		dprintf(LOG_DEBUG, "get_duid: generated a new DUID: %s",
+		dprintf(LOG_DEBUG, "%s" "generated a new DUID: %s", FNAME,
 			duidstr(duid));
 	}
 
 	/* save the (new) ID to the file for next time */
 	if (!fp) {
 		if ((fp = fopen(idfile, "w+")) == NULL) {
-			dprintf(LOG_ERR,
-				"get_duid: failed to open DUID file for save");
+			dprintf(LOG_ERR, "%s"
+			    "failed to open DUID file for save", FNAME);
 			goto fail;
 		}
 		if ((fwrite(&len, sizeof(len), 1, fp)) != 1) {
-			dprintf(LOG_ERR, "get_duid: failed to save DUID");
+			dprintf(LOG_ERR, "%s" "failed to save DUID", FNAME);
 			goto fail;
 		}
 		if ((fwrite(duid->duid_id, len, 1, fp)) != 1) {
-			dprintf(LOG_ERR, "get_duid: failed to save DUID");
+			dprintf(LOG_ERR, "%s" "failed to save DUID", FNAME);
 			goto fail;
 		}
 
-		dprintf(LOG_DEBUG, "get_duid: saved generated DUID to %s",
+		dprintf(LOG_DEBUG, "%s" "saved generated DUID to %s", FNAME,
 			idfile);
 	}
 
@@ -691,8 +694,8 @@ gethwid(buf, len, ifname, hwtypep)
 		default:
 			continue; /* XXX */
 		}
-		dprintf(LOG_DEBUG, "gethwid: found an interface %s for DUID",
-			ifa->ifa_name);
+		dprintf(LOG_DEBUG, "%s" "found an interface %s for DUID",
+			FNAME, ifa->ifa_name);
 		memcpy(buf, LLADDR(sdl), sdl->sdl_alen);
 		l = sdl->sdl_alen; /* sdl will soon be freed */
 		freeifaddrs(ifap);
@@ -790,12 +793,13 @@ dhcp6_get_options(p, ep, optinfo)
 		cp = (char *)(p + 1);
 		np = (struct dhcp6opt *)(cp + optlen);
 
-		dprintf(LOG_DEBUG, "get DHCP option %s, len %d",
-			dhcpoptstr(opt), optlen);
+		dprintf(LOG_DEBUG, "%s" "get DHCP option %s, len %d",
+		    FNAME, dhcpoptstr(opt), optlen);
 
 		/* option length field overrun */
 		if (np > ep) {
-			dprintf(LOG_INFO, "malformed DHCP options");
+			dprintf(LOG_INFO,
+			    "%s" "malformed DHCP options", FNAME);
 			return -1;
 		}
 
@@ -912,8 +916,9 @@ dhcp6_get_options(p, ep, optinfo)
 			break;
 		default:
 			/* no option specific behavior */
-			dprintf(LOG_INFO, "unknown or unexpected DHCP6 option "
-				"%s, len %d", dhcpoptstr(opt), optlen);
+			dprintf(LOG_INFO, "%s"
+			    "unknown or unexpected DHCP6 option %s, len %d",
+			    FNAME, dhcpoptstr(opt), optlen);
 			break;
 		}
 	}
@@ -921,8 +926,8 @@ dhcp6_get_options(p, ep, optinfo)
 	return(0);
 
   malformed:
-	dprintf(LOG_INFO, "malformed DHCP option: type %d, len %d",
-		opt, optlen);
+	dprintf(LOG_INFO, "%s" "malformed DHCP option: type %d, len %d",
+	    FNAME, opt, optlen);
   fail:
 	dhcp6_clear_options(optinfo);
 	return(-1);
@@ -952,8 +957,8 @@ get_delegated_prefixes(p, ep, optinfo)
 			"len %d", dhcpoptstr(opt), optlen);
 
 		if (np > ep) {
-			dprintf(LOG_INFO, "get_delegated_prefixes: "
-				"malformed DHCP options");
+			dprintf(LOG_INFO, "%s" "malformed DHCP options",
+			    FNAME);
 			return -1;
 		}
 
@@ -965,9 +970,8 @@ get_delegated_prefixes(p, ep, optinfo)
 			memcpy(&pi, p, sizeof(pi));
 
 			if (pi.dh6_pi_plen > 128) {
-				dprintf(LOG_INFO, "get_delegated_prefixes: "
-					"invalid prefix length "
-					"(%d)", pi.dh6_pi_plen);
+				dprintf(LOG_INFO, "%s" "invalid prefix length "
+				    "(%d)", FNAME, pi.dh6_pi_plen);
 				goto malformed;
 			}
 
@@ -1024,7 +1028,7 @@ get_delegated_prefixes(p, ep, optinfo)
 
 #define COPY_OPTION(t, l, v, p) do { \
 	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
-		dprintf(LOG_INFO, "option buffer short for %s", dhcpoptstr((t))); \
+		dprintf(LOG_INFO, "%s" "option buffer short for %s", FNAME, dhcpoptstr((t))); \
 		goto fail; \
 	} \
 	opth.dh6opt_type = htons((t)); \
@@ -1082,8 +1086,8 @@ dhcp6_set_options(bp, ep, optinfo)
 		optlen = dhcp6_count_list(&optinfo->reqopt_list) *
 			sizeof(u_int16_t);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR,
-				"memory allocation failed for options");
+			dprintf(LOG_ERR, "%s"
+			    "memory allocation failed for options", FNAME);
 			goto fail;
 		}
 		valp = (u_int16_t *)tmpbuf;
@@ -1103,8 +1107,8 @@ dhcp6_set_options(bp, ep, optinfo)
 		optlen = dhcp6_count_list(&optinfo->dns_list) *
 			sizeof(struct in6_addr);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR,
-				"memory allocation failed for DNS options");
+			dprintf(LOG_ERR, "%s"
+			    "memory allocation failed for DNS options", FNAME);
 			goto fail;
 		}
 		in6 = (struct in6_addr *)tmpbuf;
