@@ -153,7 +153,9 @@ get_socket(ai0, ifname, srclist, valid)
 	char *emsg = NULL;
 	char hbuf[1024];
 	int ifindex = if_nametoindex(ifname);
+#ifdef MCAST_JOIN_SOURCE_GROUP
 	int error;
+#endif
 
 	for (ai = ai0; ai; ai = ai->ai_next) {
 		if (getnameinfo(ai->ai_addr, ai->ai_addrlen, hbuf, sizeof(hbuf),
