@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.112 2000/06/18 01:50:39 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.113 2000/06/19 05:49:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,7 +272,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 
 	if (sp == NULL) {
 		ipsec6stat.out_inval++;
-		goto bad;
+		goto freehdrs;
 	}
 
 	error = 0;
@@ -284,7 +284,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 * This packet is just discarded.
 		 */
 		ipsec6stat.out_polvio++;
-		goto bad;
+		goto freehdrs;
 
 	case IPSEC_POLICY_BYPASS:
 	case IPSEC_POLICY_NONE:
@@ -296,7 +296,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (sp->req == NULL) {
 			/* acquire a policy */
 			error = key_spdacquire(sp);
-			goto bad;
+			goto freehdrs;
 		}
 		needipsec = 1;
 		break;
