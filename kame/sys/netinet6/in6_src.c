@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.17 2000/06/04 17:01:34 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.18 2000/06/04 17:17:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,13 @@ in6_pcbsetport(laddr, inp, p)
 		last  = ipport_hilastauto;
 		lastport = &pcbinfo->lasthi;
 	} else if (inp->inp_flags & INP_LOWPORT) {
-		if (p && (error = suser(p->p_ucred, &p->p_acflag)))
+		if (p &&
+#if __FreeBSD__ >= 4
+		    (error = suser(p))
+#else
+		    (error = suser(p->p_ucred, &p->p_acflag))
+#endif
+			)
 			return error;
 		first = ipport_lowfirstauto;	/* 1023 */
 		last  = ipport_lowlastauto;	/* 600 */
