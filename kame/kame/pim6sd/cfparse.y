@@ -418,6 +418,10 @@ param_statement:
 		{
 			set_param(granularity, $2, "granularity");
 		}
+	|	DATATIME NUMBER EOS
+		{
+			set_param(datatimo, $2, "data_timeout");
+		}
 	|	REGSUPTIME NUMBER EOS
 		{
 			set_param(regsuptimo, $2, "register_suppression_timeout");
@@ -546,7 +550,25 @@ param_config()
 		log(LOG_DEBUG, 0, "pim_join_prune_holdtime set to: %u",
 		    pim_join_prune_holdtime);
 	}
-
+	IF_DEBUG(DEBUG_TIMER) {
+		log(LOG_DEBUG,0 , "timer interval set to: %u", timer_interval);
+	}
+	IF_DEBUG(DEBUG_PIM_TIMER) {
+		log(LOG_DEBUG,0 , "PIM data timeout set to: %u",
+		    pim_data_timeout);
+	}
+	IF_DEBUG(DEBUG_PIM_REGISTER) {
+		log(LOG_DEBUG, 0,
+		    "PIM register suppression timeout set to: %u",
+		    pim_register_suppression_timeout);
+		log(LOG_DEBUG, 0, "PIM register probe time set to: %u",
+		    pim_register_probe_time);
+	}
+	IF_DEBUG(DEBUG_PIM_ASSERT) {
+		log(LOG_DEBUG, 0,
+		    "PIM assert timeout set to: %u",
+		    pim_assert_timeout);
+	}
 	return(0);
 }
 
