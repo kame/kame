@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.7 2002/11/05 03:48:31 itojun Exp $	*/
+/* $KAME: in_msf.h,v 1.8 2003/04/28 06:38:02 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -231,13 +231,7 @@ struct in_multi_source {
 	    ((ntohl(SIN_ADDR(x)) & 0xffffff00) == 0xe0000000) :		\
 	 ((struct sockaddr *)(x))->sa_family == AF_INET6 ?		\
 	    ((IPV6_ADDR_MC_SCOPE(SIN6_ADDR(x)) < IPV6_ADDR_SCOPE_LINKLOCAL) || \
-	     (SIN6_ADDR16(x, 0) == 0xff02 && \
-	      SIN6_ADDR16(x, 2) == 0 && \
-	      SIN6_ADDR16(x, 3) == 0 && \
-	      SIN6_ADDR16(x, 4) == 0 && \
-	      SIN6_ADDR16(x, 5) == 0 && \
-	      SIN6_ADDR16(x, 6) == 0 && \
-	      SIN6_ADDR16(x, 7) == 1) \
+	     (IN6_ARE_ADDR_EQUAL(SIN6_ADDR(x), &in6addr_linklocal_allnodes)) \
 	  ) : 0)
 
 #define SS_CMP(a, op, b) \

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.313 2003/04/24 12:47:42 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.314 2003/04/28 06:38:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -732,27 +732,14 @@ ip6_input(m)
 	sa6_src.sin6_len = sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
 	sa6_src.sin6_addr = ip6->ip6_src;
 	sa6_src.sin6_scope_id = srczone;
-	if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src)) {
-		/* XXX: should not happen */
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
 	sa6_dst.sin6_addr = ip6->ip6_dst;
 	sa6_dst.sin6_scope_id = dstzone;
-	if (in6_embedscope(&sa6_dst.sin6_addr, &sa6_dst)) { /* XXX */
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
-
-	/* attach the addresses to the packet for later use */
-	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst))
-		goto bad;
 
 	/*
 	 * Multicast check
 	 */
 	if (IN6_IS_ADDR_MULTICAST(&sa6_dst.sin6_addr)) {
-	  	struct	in6_multi *in6m = 0;
+	  	struct in6_multi *in6m = 0;
 #ifdef MLDV2
 		struct in6_multi_source *in6ms;
 		struct in6_addr_source *i6as;
@@ -818,8 +805,21 @@ ip6_input(m)
 		}
 	matched:
 		deliverifp = m->m_pkthdr.rcvif;
-		goto hbhcheck;
 	}
+
+	/* embed scope to let them match with the addresses in routing table */
+	if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src) ||
+	    in6_embedscope(&sa6_dst.sin6_addr, &sa6_dst)) { /* XXX */
+		/* XXX: should not happen */
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+	/* XXX: really necessary to embed scope here? */
+	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst))
+		goto bad;
+
+	if (deliverifp)		/* if the multicast packet has to be received */
+		goto hbhcheck;
 
 	/*
 	 *  Unicast check

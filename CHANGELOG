@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2389 2003/04/23 09:30:55 keiichi Exp $
+$KAME: CHANGELOG,v 1.2390 2003/04/28 06:38:03 suz Exp $
 
 <200304>
+Mon Apr 28 14:46:47 JST 2003	suz@crl.hitachi.co.jp
+	* kame/sys/netinet/in_msf.h, kame/sys/netinet6/{in6.c, in6_ifattach.c,
+	  ip6_input.c , ip6_output.c, mld6.c, nd6.c} 
+	  - answers to MLD query for link-local multicast group address.
+	   (stopped embedding the ifindex of group address in struct in6_multi)
+
+	   Reported by: Kentaro Ohara <Kentarou.Oohara@jp.yokogawa.com> 
+	   (users@jp.ipv6.org #3055)
+
 Wed Apr 23 18:22:53 JST 2003	keiichi@iij.ad.jp
 	* mip6 related part restructuring.
 	codes are divided into three parts based on node types.

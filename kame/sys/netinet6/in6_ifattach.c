@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.178 2003/01/20 13:39:46 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.179 2003/04/28 06:38:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,8 +842,7 @@ in6_nigroup(ifp, name, namelen, sa6)
 	sa6->sin6_addr.s6_addr8[11] = 2;
 	bcopy(digest, &sa6->sin6_addr.s6_addr32[3],
 	    sizeof(sa6->sin6_addr.s6_addr32[3]));
-	if (in6_addr2zoneid(ifp, &sa6->sin6_addr, &sa6->sin6_scope_id) ||
-	    in6_embedscope(&sa6->sin6_addr, sa6)) { /* XXX */
+	if (in6_addr2zoneid(ifp, &sa6->sin6_addr, &sa6->sin6_scope_id)) {
 		return -1; /* XXX: should not fail */
 	}
 

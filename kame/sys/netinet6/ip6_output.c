@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.365 2003/04/23 09:15:50 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.366 2003/04/28 06:38:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1197,6 +1197,7 @@ skip_ipsec2:;
 		m->m_flags &= ~(M_BCAST | M_MCAST); /* just in case */
 	} else {
 		struct	in6_multi *in6m;
+		struct	sockaddr_in6 dst0; /* XXX dst_sa w/o embedded scope */
 
 		m->m_flags = (m->m_flags & ~M_BCAST) | M_MCAST;
 
@@ -1211,7 +1212,9 @@ skip_ipsec2:;
 			error = ENETUNREACH;
 			goto bad;
 		}
-		IN6_LOOKUP_MULTI(&dst_sa, ifp, in6m);
+		dst0 = dst_sa;
+		in6_clearscope(&dst0.sin6_addr);
+		IN6_LOOKUP_MULTI(&dst0, ifp, in6m);
 		if (in6m != NULL &&
 		   (im6o == NULL || im6o->im6o_multicast_loop)) {
 			/*
@@ -1219,7 +1222,7 @@ skip_ipsec2:;
 			 * on the outgoing interface, and the caller did not
 			 * forbid loopback, loop back a copy.
 			 */
-			ip6_mloopback(ifp, m, dst);
+			ip6_mloopback(ifp, m, &dst0);
 		} else {
 			/*
 			 * If we are acting as a multicast router, perform
@@ -3767,7 +3770,6 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
-		in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
 
 		/*
 		 * See if the membership already exists.
@@ -3853,7 +3855,6 @@ ip6_setmoptions(optname, im6op, m)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
 		} else {
 			/*
 			 * The API spec says as follows:

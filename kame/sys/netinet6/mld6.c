@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.80 2003/04/09 10:08:29 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.81 2003/04/28 06:38:04 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -388,8 +388,7 @@ mld6_start_listening(in6m)
 	 */
 	all_sa = *all_nodes_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
-	    &all_sa.sin6_scope_id) ||
-	    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
+	    &all_sa.sin6_scope_id)) {
 		/* XXX: this should not happen! */
 		in6m->in6m_timer = 0;
 		in6m->in6m_state = MLD_OTHERLISTENER;
@@ -438,23 +437,16 @@ mld6_stop_listening(in6m)
 
 	all_sa = *all_nodes_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
-	    &all_sa.sin6_scope_id) ||
-	    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
+	    &all_sa.sin6_scope_id)) {
 		/* XXX: this should not happen! */
 		return;
 	}
-	/* XXX: necessary when mrouting */
 	allrouter_sa = *all_routers_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &allrouter_sa.sin6_addr,
 	    &allrouter_sa.sin6_scope_id)) {
 		/* XXX impossible */
 		return;
 	}
-	if (in6_embedscope(&allrouter_sa.sin6_addr, &allrouter_sa)) {
-		/* XXX impossible */
-		return;
-	}
-
 	if (in6m->in6m_state == MLD_IREPORTEDLAST &&
 	    !SA6_ARE_ADDR_EQUAL(&in6m->in6m_sa, &all_sa) &&
 	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) >
@@ -524,8 +516,7 @@ mld6_input(m, off)
 	mc_sa.sin6_family = AF_INET6;
 	mc_sa.sin6_len = sizeof(mc_sa);
 	mc_sa.sin6_addr = mldh->mld_addr;
-	if (in6_addr2zoneid(ifp, &mc_sa.sin6_addr, &mc_sa.sin6_scope_id) ||
-	    in6_embedscope(&mc_sa.sin6_addr, &mc_sa)) {
+	if (in6_addr2zoneid(ifp, &mc_sa.sin6_addr, &mc_sa.sin6_scope_id)) {
 		/* XXX: this should not happen! */
 		m_freem(m);
 		return;
@@ -564,8 +555,7 @@ mld6_input(m, off)
 
 		all_sa = *all_nodes_linklocal;
 		if (in6_addr2zoneid(ifp, &all_sa.sin6_addr,
-		    &all_sa.sin6_scope_id) ||
-		    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
+		    &all_sa.sin6_scope_id)) {
 			/* XXX: this should not happen! */
 			break;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.338 2003/04/23 09:15:49 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.339 2003/04/28 06:38:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1250,7 +1250,6 @@ in6_update_ifa(ifp, ifra, ia)
 				    "in6_addr2zoneid failed\n");
 				goto cleanup;
 			}
-			in6_embedscope(&llsol.sin6_addr, &llsol); /* XXX */
 			imm = in6_joingroup(ifp, &llsol, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
@@ -1280,7 +1279,8 @@ in6_update_ifa(ifp, ifra, ia)
 		    &mltaddr.sin6_scope_id)) {
 			goto cleanup; /* XXX: should not fail */
 		}
-		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
+		/* necessary to fake unicast routing table */
+		in6_embedscope(&mltaddr.sin6_addr, &mltaddr);
 #ifndef SCOPEDROUTING		/* XXX */
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
@@ -1338,6 +1338,7 @@ in6_update_ifa(ifp, ifra, ia)
 #ifndef SCOPEDROUTING
 		mltaddr.sin6_scope_id = zoneid;	/* XXX */
 #endif
+		in6_clearscope(&mltaddr.sin6_addr);
 		imm = in6_joingroup(ifp, &mltaddr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
@@ -1383,7 +1384,8 @@ in6_update_ifa(ifp, ifra, ia)
 		    &mltaddr.sin6_scope_id)) {
 			goto cleanup; /* XXX: should not fail */
 		}
-		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
+		/* necessary to fake unicast routing table */
+		in6_embedscope(&mltaddr.sin6_addr, &mltaddr);
 #ifndef SCOPEDROUTING		/* XXX */
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
@@ -1432,6 +1434,7 @@ in6_update_ifa(ifp, ifra, ia)
 #ifndef SCOPEDROUTING
 		mltaddr.sin6_scope_id = zoneid;	/* XXX */
 #endif
+		in6_clearscope(&mltaddr.sin6_addr);
 		imm = in6_joingroup(ifp, &mltaddr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.314 2003/04/23 09:15:52 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.315 2003/04/28 06:38:04 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1450,8 +1450,6 @@ nd6_rtrequest(req, rt, sa)
 				    &llsol.sin6_scope_id);
 				if (error)
 					break;
-				in6_embedscope(&llsol.sin6_addr,
-					       &llsol); /* XXX */
 #ifdef MLDV2
 				if (in6_addmulti(&llsol, ifp, &error, 0, NULL, MCAST_EXCLUDE, 0) == NULL)
 #else
@@ -1492,8 +1490,6 @@ nd6_rtrequest(req, rt, sa)
 			llsol.sin6_addr.s6_addr8[12] = 0xff;
 			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
 			    &llsol.sin6_scope_id) == 0) {
-				in6_embedscope(&llsol.sin6_addr,
-					       &llsol); /* XXX */
 				IN6_LOOKUP_MULTI(&llsol, ifp, in6m);
 				if (in6m) {
 #ifdef MLDV2
