@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.3 1999/09/12 11:45:13 itojun Exp $
+# $Id: Makefile.in,v 1.4 1999/09/12 11:46:54 itojun Exp $
 #
 
 srcdir=	@srcdir@
@@ -11,9 +11,12 @@ CC=	@CC@
 TARGET=	dhcp6c dhcp6s
 
 INSTALL=@INSTALL@
+INSTALL_PROGRAM=@INSTALL_PROGRAM@
+INSTALL_DATA=@INSTALL_DATA@
 prefix=	@prefix@
 exec_prefix=	@exec_prefix@
 bindir=	@bindir@
+sbindir=@sbindir@
 mandir=	@mandir@
 
 CLIENTOBJS=	dhcp6c.o common.o dhcp6opt.o
@@ -32,7 +35,9 @@ $(srcdir)/ianaopts.h: gentab.pl bootp-dhcp-parameters
 	expand bootp-dhcp-parameters | perl gentab.pl > ianaopts.h
 
 install::
-	$(INSTALL) -s -o bin -g bin $(TARGET) $(bindir)
+	$(INSTALL_PROGRAM) -s -o bin -g bin $(TARGET) $(sbindir)
+	$(INSTALL_DATA) -o bin -g bin dhcp6c.8 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin dhcp6s.8 $(mandir)/man8
 
 includes::
 
