@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.62 2003/12/05 01:35:16 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.63 2004/01/19 07:12:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,7 +90,7 @@ dest6_input(mp, offp, proto)
 	u_int8_t *opt;
 #ifdef MIP6
 	struct m_tag *n;
-	struct sockaddr_in6 src_sa, home_sa;
+	struct sockaddr_in6 src_sa, dst_sa, home_sa;
 	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_hdr *ip6;
@@ -162,7 +162,7 @@ dest6_input(mp, offp, proto)
 
 			/* XXX check header ordering */
 
-			if (ip6_getpktaddrs(m, &src_sa, NULL)) {
+			if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 				/* must not happen. */
 				goto bad;
 			}
@@ -177,13 +177,14 @@ dest6_input(mp, offp, proto)
 			/*
 			 * reject invalid home-addresses
 			 */
-			/* XXX linklocal-address is not supported */
 			if (IN6_IS_ADDR_MULTICAST(&home_sa.sin6_addr) ||
 			    IN6_IS_ADDR_LINKLOCAL(&home_sa.sin6_addr) ||
 			    IN6_IS_ADDR_V4MAPPED(&home_sa.sin6_addr)  ||
 			    IN6_IS_ADDR_UNSPECIFIED(&home_sa.sin6_addr) ||
 			    IN6_IS_ADDR_LOOPBACK(&home_sa.sin6_addr)) {
 				ip6stat.ip6s_badscope++;
+				(void)mobility6_send_be(&dst_sa, &src_sa,
+				    IP6_MH_BES_UNKNOWN_HAO, &home_sa);
 				goto bad;
 			}
 
