@@ -59,9 +59,17 @@ main(ac, av)
 	if (data == NULL)
 		return -1;
 
+#ifndef HAVE_ARC4RANDOM
+	srandom(time(NULL));
+#endif
 	for (i = 0; i < n; i++) {
-		for (j = 0; j < datalen; j++)
+		for (j = 0; j < datalen; j++) {
+#ifndef HAVE_ARC4RANDOM
+			data->v[j] = random() & 0xff;
+#else
 			data->v[j] = arc4random() & 0xff;
+#endif
+		}
 
 		res = mdx((const vchar_t *)data, k);
 		if (res == NULL)
