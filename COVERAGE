@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.55 2000/07/04 16:42:54 itojun Exp $
+$KAME: COVERAGE,v 1.56 2000/07/06 13:42:40 itojun Exp $
 
 
 x: supported/integrated
@@ -43,6 +43,10 @@ KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 KAME IPv6 as of	latest	early	early	early	notyet	late	early
 			jun00	jun00	jul00		may00	nov99
 
+KAME IPsec as of
+		latest	12jun00	-	early	notyet	-	early
+					jul00			nov99
+
 IPv4 IPsec	KAME	KAME	openbsd	KAME	notyet	openbsd	KAME
 
 IPv6 IPsec	KAME	KAME	openbsd	KAME	notyet	-	KAME
@@ -50,15 +54,11 @@ IPv6 IPsec	KAME	KAME	openbsd	KAME	notyet	-	KAME
     (*1) no extension header support yet (fragment header is supported),
 	hardware acceleration is available.
 
-KAME IPsec as of
-		latest	12jun00	-	early	notyet	-	early
-					jul00			nov99
-
 TCP/UDP		see IMPLEMENTATION for details
 
 advanced API	2292bis	2292	2292	2292	notyet	2292	2292
 
-getifaddrs	x	x	x	-	notyet	x	-
+getifaddrs	x	x	x	x	notyet	x	-
 
 icmp6 nodeinfo	05	05	05	05	notyet	05-	05-
 			(*1)	(*1)	(*1)		(*1)	(*1)
@@ -75,7 +75,7 @@ NUD on p2p	x	x	x	x	notyet	x	-
   (ndp -i)
 
 NUD on p2p only if real neighbor
-		x	x	x	-	notyet	(*1)	-
+		x	x	x	x	notyet	(*1)	-
      (*1) temporary workaround (no NUD on p2p by default)
 
 icmp6 beyondscope
@@ -100,22 +100,18 @@ getaddrinfo obeys configured resolv order
 		(+)	x	x	x	notyet	x	-
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
-		-	-	-	?	notyet	-	?
+		-	-	-	x	notyet	-	?
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
-		x	x	x	-	notyet	x	-
+		x	x	x	x	notyet	x	-
 
 getnameinfo, 2nd arg type is socklen_t
 		x	x	x	-	notyet	-	-
 
 getnameinfo uses EAI_xx as return value (2553bis)
-		x	x	x	-	notyet	x	-
+		x	x	x	x	notyet	x	-
 
 ALTQ		(+)	-	-	-	notyet	-	-
-
-IPsec		(+)	x	(*1)	x	notyet	(*1)	(*2)
-    (*1) OpenBSD IPsec is available for IPv4 IPsec.  OpenBSD team is working
-	 on OpenBSD IPsec support for IPv6 IPsec (no KAME IPsec is integrated)
 
 NAT/PT		(+)	-	-	-	notyet	-	-
 
@@ -126,7 +122,7 @@ IPv6 RPC	-	x	-	-	notyet	-	-
 IPv6 NFS	-	x	-	-	notyet	-	-
 
 resolver support for IPv6 transport
-		(+)	(*1)	-	?	notyet	-	-
+		(+)	(*1)	-	x	notyet	-	-
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
@@ -134,7 +130,7 @@ scoped addr in /etc/hosts (getaddrinfo)
 		(+)	x	x	x	notyet	x	-
 
 scoped addr in /etc/resolv.conf "nameserver" line
-		(+)	x	-	-	notyet	-	-
+		(+)	x	-	x	notyet	-	-
 
 ipsec socket passing to ip{6,}_output
 		aux	aux	-	aux	notyet	-	rcvif
