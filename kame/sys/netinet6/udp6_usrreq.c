@@ -507,11 +507,6 @@ udp6_ctlinput(cmd, sa, d)
 	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
 
-#if 0
-	if (cmd == PRC_IFNEWADDR)
-		in6_mrejoin(&udb6);
-	else
-#endif
 	if (!PRC_IS_REDIRECT(cmd) &&
 	    ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
 		return;
@@ -529,7 +524,7 @@ udp6_ctlinput(cmd, sa, d)
 
 	/* translate addresses into internal form */
 	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
 		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 	if (ip6) {
