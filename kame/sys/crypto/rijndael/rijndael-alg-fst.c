@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-alg-fst.c,v 1.8 2001/06/19 08:48:43 itojun Exp $	*/
+/*	$KAME: rijndael-alg-fst.c,v 1.9 2001/06/19 15:21:05 itojun Exp $	*/
 
 /*
  * rijndael-alg-fst.c   v2.3   April '2000
@@ -316,43 +316,43 @@ int rijndaelDecrypt(word8 in[16], word8 out[16], word8 rk[MAXROUNDS+1][4][4], in
     *((word32*)temp[2]) = *((word32*)(a+ 8)) ^ *((word32*)rk[ROUNDS][2]);
     *((word32*)temp[3]) = *((word32*)(a+12)) ^ *((word32*)rk[ROUNDS][3]);
 
-    *((word32*)(b   )) = *((word32*)T5[temp[0][0]])
-           ^ *((word32*)T6[temp[3][1]])
-           ^ *((word32*)T7[temp[2][2]]) 
-           ^ *((word32*)T8[temp[1][3]]);
-	*((word32*)(b+ 4)) = *((word32*)T5[temp[1][0]])
-           ^ *((word32*)T6[temp[0][1]])
-           ^ *((word32*)T7[temp[3][2]]) 
-           ^ *((word32*)T8[temp[2][3]]);
-	*((word32*)(b+ 8)) = *((word32*)T5[temp[2][0]])
-           ^ *((word32*)T6[temp[1][1]])
-           ^ *((word32*)T7[temp[0][2]]) 
-           ^ *((word32*)T8[temp[3][3]]);
-	*((word32*)(b+12)) = *((word32*)T5[temp[3][0]])
-           ^ *((word32*)T6[temp[2][1]])
-           ^ *((word32*)T7[temp[1][2]]) 
-           ^ *((word32*)T8[temp[0][3]]);
+    *((word32*)(b   )) = *((const word32*)T5[temp[0][0]])
+           ^ *((const word32*)T6[temp[3][1]])
+           ^ *((const word32*)T7[temp[2][2]]) 
+           ^ *((const word32*)T8[temp[1][3]]);
+	*((word32*)(b+ 4)) = *((const word32*)T5[temp[1][0]])
+           ^ *((const word32*)T6[temp[0][1]])
+           ^ *((const word32*)T7[temp[3][2]]) 
+           ^ *((const word32*)T8[temp[2][3]]);
+	*((word32*)(b+ 8)) = *((const word32*)T5[temp[2][0]])
+           ^ *((const word32*)T6[temp[1][1]])
+           ^ *((const word32*)T7[temp[0][2]]) 
+           ^ *((const word32*)T8[temp[3][3]]);
+	*((word32*)(b+12)) = *((const word32*)T5[temp[3][0]])
+           ^ *((const word32*)T6[temp[2][1]])
+           ^ *((const word32*)T7[temp[1][2]]) 
+           ^ *((const word32*)T8[temp[0][3]]);
 	for (r = ROUNDS-1; r > 1; r--) {
 		*((word32*)temp[0]) = *((word32*)(b   )) ^ *((word32*)rk[r][0]);
 		*((word32*)temp[1]) = *((word32*)(b+ 4)) ^ *((word32*)rk[r][1]);
 		*((word32*)temp[2]) = *((word32*)(b+ 8)) ^ *((word32*)rk[r][2]);
 		*((word32*)temp[3]) = *((word32*)(b+12)) ^ *((word32*)rk[r][3]);
-		*((word32*)(b   )) = *((word32*)T5[temp[0][0]])
-           ^ *((word32*)T6[temp[3][1]])
-           ^ *((word32*)T7[temp[2][2]]) 
-           ^ *((word32*)T8[temp[1][3]]);
-		*((word32*)(b+ 4)) = *((word32*)T5[temp[1][0]])
-           ^ *((word32*)T6[temp[0][1]])
-           ^ *((word32*)T7[temp[3][2]]) 
-           ^ *((word32*)T8[temp[2][3]]);
-		*((word32*)(b+ 8)) = *((word32*)T5[temp[2][0]])
-           ^ *((word32*)T6[temp[1][1]])
-           ^ *((word32*)T7[temp[0][2]]) 
-           ^ *((word32*)T8[temp[3][3]]);
-		*((word32*)(b+12)) = *((word32*)T5[temp[3][0]])
-           ^ *((word32*)T6[temp[2][1]])
-           ^ *((word32*)T7[temp[1][2]]) 
-           ^ *((word32*)T8[temp[0][3]]);
+		*((word32*)(b   )) = *((const word32*)T5[temp[0][0]])
+		   ^ *((const word32*)T6[temp[3][1]])
+		   ^ *((const word32*)T7[temp[2][2]]) 
+		   ^ *((const word32*)T8[temp[1][3]]);
+		*((word32*)(b+ 4)) = *((const word32*)T5[temp[1][0]])
+		   ^ *((const word32*)T6[temp[0][1]])
+		   ^ *((const word32*)T7[temp[3][2]]) 
+		   ^ *((const word32*)T8[temp[2][3]]);
+		*((word32*)(b+ 8)) = *((const word32*)T5[temp[2][0]])
+		   ^ *((const word32*)T6[temp[1][1]])
+		   ^ *((const word32*)T7[temp[0][2]]) 
+		   ^ *((const word32*)T8[temp[3][3]]);
+		*((word32*)(b+12)) = *((const word32*)T5[temp[3][0]])
+		   ^ *((const word32*)T6[temp[2][1]])
+		   ^ *((const word32*)T7[temp[1][2]]) 
+		   ^ *((const word32*)T8[temp[0][3]]);
 	}
 	/* last round is special */   
 	*((word32*)temp[0]) = *((word32*)(b   )) ^ *((word32*)rk[1][0]);
