@@ -665,6 +665,7 @@ rtrequest1(req, info, ret_nrt)
 			senderr(ENOBUFS);
 		Bzero(rt, sizeof(*rt));
 		rt->rt_flags = RTF_UP | flags;
+		LIST_INIT(&rt->rt_timer);
 		/*
 		 * Add the gateway. Possibly re-malloc-ing the storage for it
 		 * also add the rt_gwroute if possible.
