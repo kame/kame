@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.55 2002/09/23 10:04:31 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.56 2002/09/25 13:18:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -242,7 +242,7 @@ struct mip6_config {
 
 /* packet options used by the mip6 packet output processing routine. */
 struct mip6_pktopts {
-	struct ip6_rthdr *mip6po_rthdr;
+	struct ip6_rthdr *mip6po_rthdr2;
 	struct ip6_dest *mip6po_haddr;
 	struct ip6_dest *mip6po_dest2;
 	struct ip6_mobility *mip6po_mobility;

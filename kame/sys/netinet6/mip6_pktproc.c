@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.53 2002/09/24 07:20:28 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.54 2002/09/25 13:18:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1290,18 +1290,15 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	}
 
 	/*
-	 * a rthdr must be added when sending back a binding ack to
-	 * the mobilenode.  otherwise, the binding ack never reach to
-	 * the mobilenode.  for example, the case that an error occurs
-	 * when the first home registration.
+	 * when sending a binding ack, we use rthdr2 except when
+	 * we are on the home link.
 	 */
-	if (!SA6_ARE_ADDR_EQUAL(dst, dstcoa) &&
-	    mip6_bc_list_find_withphaddr(&mip6_bc_list, dst) == NULL) {
+	if (!SA6_ARE_ADDR_EQUAL(dst, dstcoa)) {
 		error = mip6_rthdr_create(&pktopt_rthdr, dstcoa, NULL);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s:%d: ba rthdr creation error (%d)\n",
-				 __FILE__, __LINE__, error));
+			    "%s:%d: ba rthdr creation error (%d)\n",
+			    __FILE__, __LINE__, error));
 			m_freem(m);
 			goto free_ip6pktopts;
 		}

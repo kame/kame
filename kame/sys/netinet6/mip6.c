@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.169 2002/09/18 11:17:18 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.170 2002/09/25 13:18:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1648,7 +1648,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct mip6_bu *mbu;
 	int s, error = 0, need_hao = 0;
 
-	mip6opt->mip6po_rthdr = NULL;
+	mip6opt->mip6po_rthdr2 = NULL;
 	mip6opt->mip6po_haddr = NULL;
 	mip6opt->mip6po_dest2 = NULL;
 	mip6opt->mip6po_mobility = NULL;
@@ -1686,35 +1686,24 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
 
 	/*
+	 * create rthdr2 only if the caller of ip6_output() doesn't
+	 * specify rthdr2 adready.
+	 */
+	if ((opt != NULL) &&
+	    (opt->ip6po_rthdr2 != NULL))
+		goto skip_rthdr2;
+
+	/*
 	 * add the routing header for the route optimization if there
 	 * exists a valid binding cache entry for this destination
 	 * node.
 	 */
-	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst, opt);
+	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr2, dst, opt);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: rthdr creation failed.\n",
 			 __FILE__, __LINE__));
 		goto bad;
-	}
-
-	if ((opt != NULL) &&
-	    (opt->ip6po_rthdr != NULL) &&
-	    (mip6opt->mip6po_rthdr != NULL)) {
-		/*
-		 * if the upper layer specify something special
-		 * routing header by using ip6_pktopts, we replace it
-		 * with the merged routing header that includes the
-		 * original (the upper-layer specified) routing header
-		 * and our routing header for the route optimization.
-		 */
-		free(opt->ip6po_rthdr, M_IP6OPT);
-		if (opt->ip6po_route.ro_rt) {
-			RTFREE(opt->ip6po_route.ro_rt);
-			opt->ip6po_route.ro_rt = NULL;
-		}
-		opt->ip6po_rthdr = mip6opt->mip6po_rthdr;
-		mip6opt->mip6po_rthdr = NULL;
 	}
  skip_rthdr2:
 
@@ -2012,8 +2001,8 @@ void
 mip6_destopt_discard(mip6opt)
 	struct mip6_pktopts *mip6opt;
 {
-	if (mip6opt->mip6po_rthdr)
-		free(mip6opt->mip6po_rthdr, M_IP6OPT);
+	if (mip6opt->mip6po_rthdr2)
+		free(mip6opt->mip6po_rthdr2, M_IP6OPT);
 
 	if (mip6opt->mip6po_haddr)
 		free(mip6opt->mip6po_haddr, M_IP6OPT);

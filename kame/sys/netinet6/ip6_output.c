@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.335 2002/09/25 11:41:24 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.336 2002/09/25 13:18:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -405,7 +405,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			goto freehdrs;
 
 		if ((exthdrs.ip6e_rthdr2 == NULL)
-		    && (mip6opt.mip6po_rthdr != NULL)) {
+		    && (mip6opt.mip6po_rthdr2 != NULL)) {
 			/*
 			 * if a type 2 routing header is not specified
 			 * when ip6_output() is called and
@@ -413,7 +413,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			 * routing header for route optimization,
 			 * insert it.
 			 */
-			MAKE_EXTHDR(mip6opt.mip6po_rthdr, &exthdrs.ip6e_rthdr2);
+			MAKE_EXTHDR(mip6opt.mip6po_rthdr2, &exthdrs.ip6e_rthdr2);
 			/*
 			 * if a routing header exists dest1 must be
 			 * inserted if it exists.
