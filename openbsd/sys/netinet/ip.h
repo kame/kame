@@ -124,6 +124,7 @@ struct ip {
 #define	IPOPT_LSRR		131		/* loose source route */
 #define	IPOPT_SATID		136		/* satnet id */
 #define	IPOPT_SSRR		137		/* strict source route */
+#define	IPOPT_RA		148		/* Router Alert */
 
 /*
  * Offsets to fields in options other than EOL and NOP.

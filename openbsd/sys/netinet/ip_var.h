@@ -2,6 +2,43 @@
 /*	$NetBSD: ip_var.h,v 1.16 1996/02/13 23:43:20 christos Exp $	*/
 
 /*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -105,6 +142,26 @@ struct ipoption {
 };
 
 /*
+ * Socket argument of multicast source filters.
+ */
+LIST_HEAD(msf_head, sock_msf_source);
+
+struct sock_msf_source {
+	struct	  sockaddr_storage src;	/* source address */
+	LIST_ENTRY(sock_msf_source) list; /* list of source addresses */
+	u_int	refcount;		/* reference count of the source */
+};
+
+struct sock_msf {
+/*	u_int32_t msf_mode;		 * source filter mode */
+	u_int	  msf_grpjoin;		/* number of (*,G) join requests */
+	struct	  msf_head *msf_head;	/* head of joined source list chain */
+	struct	  msf_head *msf_blkhead;/* head of muted source list chain */
+	u_int16_t msf_numsrc;		/* no. of joined src on this socket */
+	u_int16_t msf_blknumsrc;	/* no. of muted src on this socket */
+};
+
+/*
  * Structure attached to inpcb.ip_moptions and
  * passed to ip_output when IP multicast options are in use.
  */
@@ -115,6 +172,7 @@ struct ip_moptions {
 	u_int8_t  imo_multicast_loop;	/* 1 => hear sends if a member */
 	u_int16_t imo_num_memberships;	/* no. memberships this socket */
 	struct	  in_multi *imo_membership[IP_MAX_MEMBERSHIPS];
+	struct	  sock_msf *imo_msf[IP_MAX_MEMBERSHIPS];
 };
 
 struct	ipstat {
@@ -166,6 +224,8 @@ int	  ip_defttl;			/* default IP ttl */
 int   ip_mtudisc;		/* mtu discovery */
 u_int ip_mtudisc_timeout;	/* seconds to timeout mtu discovery */
 struct rttimer_queue *ip_mtudisc_timeout_q;
+extern int   igmpmaxsrcfilter;		/* maximum num. of msf per interface */
+extern int   igmpsomaxsrc;		/* maximum num. of msf per socket */
 extern struct pool ipqent_pool;
 
 int	 ip_ctloutput(int, struct socket *, int, int, struct mbuf **);
@@ -203,5 +263,11 @@ void	 rip_input(struct mbuf *, ...);
 int	 rip_output(struct mbuf *, ...);
 int	 rip_usrreq(struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *);
+
+struct ifnet *
+	 ip_multicast_if(struct in_addr *, int *);
+int	 ip_check_router_alert(struct ip *);
+int	 ip_getmopt_msflist(struct sock_msf *, u_int16_t *,
+			    struct sockaddr_storage **, u_int *);
 #endif /* _KERNEL */
 #endif /* _NETINET_IP_VAR_H_ */

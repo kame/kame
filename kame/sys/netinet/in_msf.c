@@ -35,8 +35,10 @@
  * Developed by Hitoshi Asaeda, INRIA, February 2002.
  */
 
+#ifndef __OpenBSD__
 #include "opt_inet.h"
 #include "opt_mrouting.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -50,6 +52,7 @@
 #endif
 
 #include <net/if.h>
+#include <net/route.h>
 
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -2287,7 +2290,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 			sin = SIN(&ss_src[j]);
 			SIN_ADDR(sin) = htonl(ias->ias_addr.s_addr);
 			sin->sin_family = AF_INET;
-			sin->sin_len = sizeof(struct sockaddr_storage);
+			sin->sin_len = ss_src[j].ss_len;
 		}
 		in_free_msf_source_list(iasl->head);
 		FREE(iasl->head, M_MSFILTER);
@@ -2866,7 +2869,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 			sin = SIN(&ss_src[j]);
 			SIN_ADDR(sin) = htonl(ias->ias_addr.s_addr);
 			sin->sin_family = AF_INET;
-			sin->sin_len = sizeof(struct sockaddr_storage);
+			sin->sin_len = ss_src[j].ss_len;
 		}
 		in_free_msf_source_list(iasl->head);
 		FREE(iasl->head, M_MSFILTER);
@@ -3355,7 +3358,7 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 					return ENOBUFS;
 				}
 				SIN(&newsrc->src)->sin_family = AF_INET;
-				SIN(&newsrc->src)->sin_len = sizeof(newsrc->src);
+				SIN(&newsrc->src)->sin_len = newsrc->src.ss_len;
 				SIN_ADDR(&newsrc->src) = src_h;
 				newsrc->refcount = 2;
 				LIST_INSERT_BEFORE(msfsrc, newsrc, list);
@@ -3374,7 +3377,7 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 				return ENOBUFS;
 			}
 			SIN(&newsrc->src)->sin_family = AF_INET;
-			SIN(&newsrc->src)->sin_len = sizeof(newsrc->src);
+			SIN(&newsrc->src)->sin_len = newsrc->src.ss_len;
 			SIN_ADDR(&newsrc->src) = src_h;
 			newsrc->refcount = 2;
 			if (mode == MCAST_INCLUDE && LIST_EMPTY(msf->msf_head)) {

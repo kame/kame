@@ -72,6 +72,7 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.79 2002/02/16 21:27:38 millert Exp 
 #include <netinet/ip_ah.h>
 #include <netinet/ip_esp.h>
 #include <netinet/icmp_var.h>
+#include <netinet/igmp_var.h>
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
@@ -1210,6 +1211,7 @@ sysctl_swpenc(string, bufpp, mib, flags, typep)
 struct ctlname inetname[] = CTL_IPPROTO_NAMES;
 struct ctlname ipname[] = IPCTL_NAMES;
 struct ctlname icmpname[] = ICMPCTL_NAMES;
+struct ctlname igmpname[] = IGMPCTL_NAMES;
 struct ctlname ipipname[] = IPIPCTL_NAMES;
 struct ctlname tcpname[] = TCPCTL_NAMES;
 struct ctlname udpname[] = UDPCTL_NAMES;
@@ -1223,7 +1225,7 @@ struct list inetlist = { inetname, IPPROTO_MAXID };
 struct list inetvars[] = {
 	{ ipname, IPCTL_MAXID },	/* ip */
 	{ icmpname, ICMPCTL_MAXID },	/* icmp */
-	{ 0, 0 },			/* igmp */
+	{ igmpname, IGMPCTL_MAXID },	/* igmp */
 	{ 0, 0 },			/* ggmp */
 	{ ipipname, IPIPCTL_MAXID },	/* ipencap */
 	{ 0, 0 },

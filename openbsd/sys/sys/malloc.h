@@ -163,7 +163,8 @@
 #define	M_IP6RR		125	/* IPv6 Router Renumbering Prefix */
 #define	M_RR_ADDR	126	/* IPv6 Router Renumbering Ifid */
 #define	M_TEMP		127	/* misc temporary data buffers */
-#define M_LAST          128     /* Must be last type + 1 */
+#define	M_MSFILTER	128	/* Multiast Source Filters */
+#define M_LAST          129     /* Must be last type + 1 */
 
 
 #define	INITKMEMNAMES { \
@@ -278,6 +279,7 @@
 	"ip6rr",	/* 125 M_IP6RR */ \
 	"rp_addr",	/* 126 M_RR_ADDR */ \
 	"temp",		/* 127 M_TEMP */ \
+	"msfilter",	/* 128 M_MSFILTER */ \
 }
 
 struct kmemstats {

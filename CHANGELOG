@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2220 2002/08/23 22:19:04 jinmei Exp $
+$KAME: CHANGELOG,v 1.2221 2002/08/30 21:24:50 suz Exp $
 
 <200208>
+Sat Aug 31 06:20:11 JST 2002	suz@crl.hitachi.co.jp
+	* openbsd/sys, openbsd/sbin/sysctl, openbsd/usr.bin/netstat,
+	  kame/sys/netinet/in_msf.[ch]:
+	 ported NetBSD IGMPv3 implementation into OpenBSD.
+
 2002-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {freebsd4, netbsd}/sys/net/route.h (RTUSE, RTREUSE, RTRELEASE):
 	avoided overriding invalid memory space by these macros when the
