@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.43 2002/04/08 06:35:13 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.44 2002/04/08 09:16:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -65,6 +65,8 @@
 #include <net/net_osdep.h>
 
 #include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
