@@ -875,23 +875,13 @@ findpcb:
 		{
 			++tcpstat.tcps_noport;
 			if (tcp_log_refused && (tiflags & TH_SYN)) {
-#ifndef INET6
 				char src[4*sizeof "123"];
 				char dst[4*sizeof "123"];
-#else
-				char src[INET6_ADDRSTRLEN];
-				char dst[INET6_ADDRSTRLEN];
-#endif
+
 				if (ip) {
 					strcpy(src, inet_ntoa(ip->ip_src));
 					strcpy(dst, inet_ntoa(ip->ip_dst));
 				}
-#ifdef INET6
-				else if (ip6) {
-					strcpy(src, ip6_sprintf(&ip6->ip6_src));
-					strcpy(dst, ip6_sprintf(&ip6->ip6_dst));
-				}
-#endif
 				else {
 					strcpy(src, "(unknown)");
 					strcpy(dst, "(unknown)");
@@ -936,6 +926,23 @@ findpcb:
 		}
 		if (in6p == NULL) {
 			++tcpstat.tcps_noport;
+			if (tcp_log_refused && (tiflags & TH_SYN)) {
+				char src[INET6_ADDRSTRLEN];
+				char dst[INET6_ADDRSTRLEN];
+
+				if (ip6) {
+					strcpy(src, ip6_sprintf(&ip6->ip6_src));
+					strcpy(dst, ip6_sprintf(&ip6->ip6_dst));
+				}
+				else {
+					strcpy(src, "(unknown v6)");
+					strcpy(dst, "(unknown v6)");
+				}
+				log(LOG_INFO,
+				    "Connection attempt to TCP [%s]:%d from [%s]:%d\n",
+				    dst, ntohs(th->th_dport),
+				    src, ntohs(th->th_sport));
+			}
 			TCP_FIELDS_TO_HOST(th);
 			goto dropwithreset_ratelim;
 		}
