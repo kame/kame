@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.14 2000/07/17 10:11:29 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.15 2000/07/28 03:34:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -560,13 +560,13 @@ newsaddr(len)
 {
 	struct sockaddr *new;
 
-	new = CALLOC(sizeof(*new), struct sockaddr *);
+	new = CALLOC(len, struct sockaddr *);
 	if (new == NULL)
 		plog(logp, LOCATION, NULL,
 			"%s\n", strerror(errno)); 
 
 	/* initial */
-	new->sa_len = sizeof(*new);
+	new->sa_len = len;
 
 	return new;
 }
