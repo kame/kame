@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.100 2002/11/11 18:25:25 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.101 2002/12/17 10:32:18 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -376,7 +376,8 @@ in6_gif_output(ifp, family, m)
 #endif	/* __OpenBSD__ */
 }
 
-int in6_gif_input(mp, offp, proto)
+int
+in6_gif_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
