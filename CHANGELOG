@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.435 2000/01/14 03:17:31 itojun Exp $
+$Id: CHANGELOG,v 1.436 2000/01/14 04:56:04 sumikawa Exp $
 
 <200001>
+Fri Jan 14 13:55:19 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/fetchmail: Upgrade to 5.2.3 and sync with
+	  FreeBSD-current.
+
 Fri Jan 14 12:15:27 JST 2000  itojun@iijlab.net
 	* kame/libinet6/rcmd.c: avoid passing dangling pointer to **ahost.
 	  we copy the value (ai_canonname, or hp->h_name) to static buffer
@@ -14,8 +18,8 @@ Fri Jan 14 02:16:16 JST 2000  itojun@itojun.org
 	  get IPv4 address on the interface it runs on.
 
 Wed Jan 12 17:21:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* Upgrade to 1.4.3 and sync with FreeBSD-current. No extra IPv6
-	  patch is necessary anymore.
+	* freebsd3/ports/ruby: Upgrade to 1.4.3 and sync with
+	  FreeBSD-cuurent. No extra IPv6 patch is necessary anymore.
 
 Wed Jan 12 15:40:05 JST 2000  itojun@iijlab.net
 	* {bsdi3,netbsd}/usr.sbin/inetd: allow multiple IPsec policy
