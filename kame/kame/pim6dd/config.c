@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.8 2001/06/25 04:54:12 itojun Exp $	*/
+/*	$KAME: config.c,v 1.9 2002/06/21 13:55:04 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -51,7 +51,8 @@
 static char *next_word  __P((char **));
 static int parse_phyint __P((char *s));
 static void add_phaddr  __P((struct uvif *v, struct sockaddr_in6 *addr,
-			     struct in6_addr *mask));
+			     struct in6_addr *mask,
+			     struct sockaddr_in6 *rmt_addr));
 static mifi_t ifname2mifi __P((char *ifname));
 static int wordToOption __P((char *));
 static int parse_filter __P((char *s));
@@ -69,7 +70,7 @@ config_vifs_from_kernel()
 {
     register struct uvif *v;
     register vifi_t vifi;
-    struct sockaddr_in6 addr;
+    struct sockaddr_in6 addr, rmt_addr, *rmt;
     struct in6_addr mask, prefix;
     short flags;
 #ifdef HAVE_GETIFADDRS
@@ -105,6 +106,15 @@ config_vifs_from_kernel()
 	if ((flags & (IFF_LOOPBACK | IFF_MULTICAST)) != IFF_MULTICAST)
 	    continue;
 
+	/* Get remote address only in case of P2P I/F */
+	if (ifa->ifa_dstaddr != NULL && (flags & IFF_POINTOPOINT)) {
+		memcpy(&rmt_addr, ifa->ifa_dstaddr, sizeof(rmt_addr));
+		rmt = &rmt_addr;
+	} else {
+		memset(&rmt_addr, 0, sizeof(rmt_addr));
+		rmt = NULL;
+	}
+
 	/*
 	 * Get netmask of the address.
 	 */
@@ -124,6 +134,21 @@ config_vifs_from_kernel()
 		addr.sin6_addr.s6_addr[3] = 0;
 #endif
 	}
+	if (rmt && IN6_IS_ADDR_LINKLOCAL(&rmt->sin6_addr))
+	{
+		rmt->sin6_scope_id = if_nametoindex(ifa->ifa_name);
+#ifdef __KAME__
+		/*
+		 * Hack for KAME kernel.
+		 * Set sin6_scope_id field of a link local address and clear
+		 * the index embedded in the address.
+		 */
+		/* clear interface index */
+		rmt->sin6_addr.s6_addr[2] = 0;
+		rmt->sin6_addr.s6_addr[3] = 0;
+#endif
+	}
+
 
 	/*
 	 * If the address is connected to the same subnet as one already
@@ -132,7 +157,7 @@ config_vifs_from_kernel()
 	 */
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 	    if (strcmp(v->uv_name, ifa->ifa_name) == 0) {
-		    add_phaddr(v, &addr, &mask);
+		    add_phaddr(v, &addr, &mask, rmt);
 		    break;
 	    }
 	}
@@ -178,7 +203,7 @@ config_vifs_from_kernel()
 	v->uv_pim_neighbors	= (struct pim_nbr_entry *)NULL;
 	v->uv_local_pref        = default_source_preference;
 	v->uv_local_metric      = default_source_metric;
-	add_phaddr(v, &addr, &mask);
+	add_phaddr(v, &addr, &mask, rmt);
 	
 	if (flags & IFF_POINTOPOINT)
 	    v->uv_flags |= (VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
@@ -305,7 +330,7 @@ config_vifs_from_kernel()
 	 */
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 	    if (strcmp(v->uv_name, ifr.ifr_name) == 0) {
-		    add_phaddr(v, &addr, &mask);
+		    add_phaddr(v, &addr, &mask, rmt);
 		    break;
 	    }
 	}
@@ -351,7 +376,7 @@ config_vifs_from_kernel()
 	v->uv_pim_neighbors	= (struct pim_nbr_entry *)NULL;
 	v->uv_local_pref        = default_source_preference;
 	v->uv_local_metric      = default_source_metric;
-	add_phaddr(v, &addr, &mask);
+	add_phaddr(v, &addr, &mask, rmt);
 	
 	if (flags & IFF_POINTOPOINT)
 	    v->uv_flags |= (VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
@@ -373,10 +398,11 @@ config_vifs_from_kernel()
 }
 
 static void
-add_phaddr(v, addr, mask)
+add_phaddr(v, addr, mask, rmt)
 	struct uvif *v;
 	struct sockaddr_in6 *addr;
 	struct in6_addr *mask;
+	struct sockaddr_in6 *rmt;
 {
 	struct phaddr *pa;
 	int i;
@@ -387,6 +413,8 @@ add_phaddr(v, addr, mask)
 	memset(pa, 0, sizeof(*pa));
 	pa->pa_addr = *addr;
 	pa->pa_subnetmask = *mask;
+	if (rmt)
+		pa->pa_rmt_addr= *rmt;
 
 	/*
 	 * install the prefix of the address derived from the address

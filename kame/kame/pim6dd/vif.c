@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.7 2001/06/25 04:54:14 itojun Exp $	*/
+/*	$KAME: vif.c,v 1.8 2002/06/21 13:55:04 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -468,6 +468,10 @@ find_vif_direct(src)
 	for (p = v->uv_addrs; p; p = p->pa_next) {
 		if (inet6_equal(src, &p->pa_addr))
 			return(NO_VIF);
+
+		if (v->uv_flags & VIFF_POINT_TO_POINT)
+			if (inet6_equal(src, &p->pa_rmt_addr))
+				return(vifi);
 		if (inet6_match_prefix(src, &p->pa_prefix, &p->pa_subnetmask))
 			return(vifi);
 	}
@@ -520,7 +524,11 @@ find_vif_direct_local(src)
 	for (p = v->uv_addrs; p; p = p->pa_next) {
 		if (inet6_equal(src, &p->pa_addr) ||
 		    inet6_match_prefix(src, &p->pa_prefix, &p->pa_subnetmask))
-		return(vifi);
+			return(vifi);
+
+		if (v->uv_flags & VIFF_POINT_TO_POINT)
+			if (inet6_equal(src, &p->pa_rmt_addr))
+				return(vifi);
 	}
     }
     return (NO_VIF);
