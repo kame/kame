@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.274 2003/06/26 05:55:53 itojun Exp $	*/
+/*	$KAME: key.c,v 1.275 2003/06/27 04:32:48 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -507,7 +507,7 @@ static struct mbuf *key_alloc_mbuf __P((int));
 struct callout key_timehandler_ch;
 #endif
 
-#if defined(MIP6) && defined(MIP6_HAIPSEC)
+#if defined(MIP6) && defined(MIP6_HAIPSEC) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
 static struct secpolicy *key_mip6_find_sp(int,
     const struct sockaddr_in6 *, const struct sockaddr_in6 *);
 #endif
@@ -7745,6 +7745,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct ipsecrequest *isr;
 	struct secashead *sa;
 	struct secasindex *sahint;
+	struct mbuf *m;
 
 	/* update inbound data. */
 	sp = key_mip6_find_sp(IPSEC_DIR_INBOUND, &sa6_any, haddr);
@@ -7787,6 +7788,12 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	/* update a tunnel endpoint of a mobile node side. */
 	*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
 
+	/* announce the update */
+	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 0, 0);
+	if (m == NULL)
+		return (-1);
+	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
+
 	/* update outbound data. */
 	sp = key_mip6_find_sp(IPSEC_DIR_OUTBOUND, haddr, &sa6_any);
 	if (sp == NULL)
@@ -7824,6 +7831,11 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	/* update a tunnel endpoint of a mobile node side. */
 	*(struct sockaddr_in6 *)(&sahint->src) = *ncoa;
 	
+	/* announce the update */
+	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 1, 0);
+	if (m == NULL)
+		return (-1);
+	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
 	return (0);
 }
 
@@ -7838,6 +7850,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct ipsecrequest *isr;
 	struct secashead *sa;
 	struct secasindex *sahint;
+	struct mbuf *m;
 
 	/* update inbound data. */
 	sp = key_mip6_find_sp(IPSEC_DIR_INBOUND, haddr, &sa6_any);
@@ -7875,6 +7888,12 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	}
 	/* update a tunnel endpoint of a mobile node side. */
 	*(struct sockaddr_in6 *)(&sahint->src) = *ncoa;
+
+	/* announce the update */
+	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 0, 0);
+	if (m == NULL)
+		return (-1);
+	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
 
 	/* update outbound data. */
 	sp = key_mip6_find_sp(IPSEC_DIR_OUTBOUND, &sa6_any, haddr);
@@ -7917,6 +7936,12 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	/* update a tunnel endpoint of a mobile node side. */
 	*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
 	
+	/* announce the update */
+	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 1, 0);
+	if (m == NULL)
+		return (-1);
+	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
+
 	return (0);
 }
 
