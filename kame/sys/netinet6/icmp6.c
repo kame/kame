@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.290 2002/04/06 11:37:46 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.291 2002/04/08 08:14:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1437,6 +1437,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 
 	if (rt && (rt->rt_flags & RTF_HOST) &&
+	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
 	    mtu >= IPV6_MMTU &&	/* this is actually ensured already */
 	    mtu < rt->rt_ifp->if_mtu && mtu < rt->rt_rmx.rmx_mtu) {
 		icmp6stat.icp6s_pmtuchg++;
@@ -3616,7 +3617,8 @@ icmp6_mtudisc_timeout(rt, r)
 		 * we do not have to check the RTV_MTU flag, which should
 		 * always be off for IPv6.
 		 */
-		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
+		if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+			rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
 	}
 }
 
