@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.37 2001/11/10 08:52:26 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.38 2001/11/10 09:42:30 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -280,7 +280,6 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	struct in6_addr **plocal_addr6;
 {
 	register struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
-	struct ifnet *ifp = NULL;
 	int error = 0;
 
 	if (nam->sa_len != sizeof (*sin6))
@@ -296,7 +295,7 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	}
 #ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, &ifp) != 0)
+	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
 		return EINVAL;
 	sin6->sin6_scope_id = 0;
 #endif
@@ -330,9 +329,6 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		 * and exit to caller, that will do the lookup.
 		 */
 	}
-
-	if (inp->in6p_route.ro_rt)
-		ifp = inp->in6p_route.ro_rt->rt_ifp;
 
 	return(0);
 }
