@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.2 2001/01/24 02:18:16 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.3 2001/01/24 02:22:01 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -157,6 +157,11 @@
 /* HUGE amount of kernel printf! */
 #undef RADIX_ART_TRACE
 
+/* statistics - need entries in rtstat */
+#ifdef __NetBSD__
+#undef RADIX_ART_STAT
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -254,7 +259,7 @@ art_newtable()
 		t->art_bitlen = ART_BITLEN;
 #endif
 	}
-#ifdef __NetBSD__
+#ifdef RADIX_ART_STAT
 	rtstat.rts_art_alloc++;
 	rtstat.rts_art_table++;
 #endif
@@ -271,7 +276,7 @@ art_deltable(t)
 #else
 	free(t, M_RTABLE);
 #endif
-#ifdef __NetBSD__
+#ifdef RADIX_ART_STAT
 	rtstat.rts_art_free++;
 	rtstat.rts_art_table--;
 #endif
@@ -831,7 +836,7 @@ rn_art_lookup(v_arg, m_arg, head)
 #endif
 
 	p = (u_int8_t *)v_arg;
-#ifdef __NetBSD__
+#ifdef RADIX_ART_STAT
 	rtstat.rts_art_lookups++;
 #endif
 	rn1 = art_lookup(p + head->rnh_treetop->rn_off, prefixlen,
@@ -844,11 +849,11 @@ rn_art_lookup(v_arg, m_arg, head)
 	rn2 = rn_lookup(v_arg, m_arg, head);
 #ifdef RADIX_ART_TEST
 	if (rn1 == &invalid_node) {
-#ifdef __NetBSD__
+#ifdef RADIX_ART_STAT
 		rtstat.rts_art_invalid++;
 #endif
 		if (rn2) {
-#ifdef __NetBSD__
+#ifdef RADIX_ART_STAT
 			rtstat.rts_art_mismatch++;
 #endif
 			art_printaddr((u_int8_t *)v_arg + head->rnh_treetop->rn_off,
@@ -857,7 +862,7 @@ rn_art_lookup(v_arg, m_arg, head)
 			printf("art=invalid, radix=%p\n", rn2);
 		}
 	} else if (rn1 != rn2) {
-#ifdef __NetBSD__
+#ifdef RADIX_ART_STAT
 		rtstat.rts_art_mismatch++;
 #endif
 		art_printaddr((u_int8_t *)v_arg + head->rnh_treetop->rn_off,
