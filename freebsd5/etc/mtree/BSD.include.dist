@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.63.2.1 2003/01/05 08:52:42 simokawa Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.66 2003/03/05 19:21:23 peter Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -69,6 +69,8 @@
         ext
         ..
     ..
+    geom
+    ..
     isc
     ..
     isofs
@@ -114,8 +116,6 @@
     netnatm
     ..
     netncp
-    ..
-    netns
     ..
     netsmb
     ..
