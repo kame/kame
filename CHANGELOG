@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.873 2000/05/14 14:36:28 itojun Exp $
+$Id: CHANGELOG,v 1.874 2000/05/14 17:37:11 sumikawa Exp $
 
 <200005>
+Mon May 15 02:35:41 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/{libpcap,tcpdump}: use tcpdump.org 2000/5/8
+	  weekly snap
+
 Sun May 14 JST 2000  itojun@iijlab.net
 	* sys/netkey: completely rewrite message management, to avoid possible
 	  buffer overrun with corrupted pfkey data stream.  since only root
