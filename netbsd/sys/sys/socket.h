@@ -206,8 +206,8 @@ struct sockproto {
 				_SS_PAD1SIZE - _SS_ALIGNSIZE)
 
 struct sockaddr_storage {
-	u_char	__ss_len;	/* address length */
-	u_char	__ss_family;	/* address family */
+	u_char	ss_len;		/* address length */
+	u_char	ss_family;	/* address family */
 	char	__ss_pad1[_SS_PAD1SIZE];
 	int64_t	__ss_align;	/* force desired structure storage alignment */
 	char	__ss_pad2[_SS_PAD2SIZE];
