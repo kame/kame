@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.378 2004/11/28 12:03:04 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.379 2004/12/09 10:35:39 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -245,7 +245,7 @@ draft-ietf-ipv6-scoping-arch-02.txt:
     * some part of the documentation (especially about the routing
       model) is not supported yet.
     * zone indices that contain scope types have not been supported yet.
-draft-ietf-ipngwg-temp-addresses-v2-00.txt:
+draft-ietf-ipv6-privacy-addrs-v2-01.txt:
 	Privacy Extensions for Stateless Address Autoconfiguration in IPv6
     * a revised version of RFC 3041.
 draft-ietf-pim-sm-v2-new-09.txt
