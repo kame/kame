@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.94 2004/03/18 04:59:18 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.95 2004/03/18 05:14:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -711,6 +711,28 @@ do {						\
 } while (/*CONSTCOND*/ 0)
 
 #endif /* not FreeBSD3 */
+
+/*
+ * Macros for looking up the in6_multi_mship record for a given IP6 multicast
+ * address on a given interface. If no matching record is found, "imm"
+ * returns NULL.
+ */
+#define IN6_LOOKUP_MSHIP(addr, ifp, imop, imm)				\
+/* struct in6_addr addr; */						\
+/* struct ifnet *ifp; */						\
+/* struct ip6_moptions *imop */						\
+/* struct in6_multi_mship *imm; */					\
+do {									\
+	for ((imm) = (imop)->im6o_memberships.lh_first;			\
+	     (imm) != NULL; (imm) = (imm)->i6mm_chain.le_next) {	\
+		if ((imm)->i6mm_maddr->in6m_ifp != (ifp))		\
+		    	continue;					\
+		if (!IN6_ARE_ADDR_EQUAL(&(imm)->i6mm_maddr->in6m_addr,	\
+		    &(addr)))						\
+			continue;					\
+		break;							\
+	}								\
+} while (/*CONSTCOND*/ 0)
 
 struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *, int *));
 void	in6_delmulti __P((struct in6_multi *));

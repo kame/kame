@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.23 2004/02/06 10:34:24 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.24 2004/03/18 05:14:46 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2060,6 +2060,8 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		return EPFNOSUPPORT;
 
 	sa_grp = (struct sockaddr *) &grpf->gf_group;
+	if (sa_grp->sa_family != AF_INET6)
+		return EPFNOSUPPORT;
 	if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR(sa_grp)))
 		return EINVAL;
 	if (grpf->gf_numsrc != 0 && IN6_IS_LOCAL_GROUP(SIN6_ADDR(sa_grp)))
@@ -2123,19 +2125,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		ipcbp->in6p_moptions = imop;
 	}
 
-	/*
-	 * Find the membership in the membership array.
-	 */
-	for (imm = imop->im6o_memberships.lh_first;
-	     imm != NULL; imm = imm->i6mm_chain.le_next) {
-		/* sanity check */
-		if (sa_grp->sa_family != AF_INET6)
-			continue;
-
-		if (imm->i6mm_maddr->in6m_ifp == ifp &&
-		    SS_CMP(&imm->i6mm_maddr, ==, &SIN6(sa_grp)->sin6_addr))
-			break;
-	}
+	IN6_LOOKUP_MSHIP(SIN6(sa_grp)->sin6_addr, ifp, imop, imm);
 	if (imm != NULL) {
 		msf = imm->i6mm_msf;
 		if (grpf->gf_fmode == MCAST_EXCLUDE &&
@@ -2561,20 +2551,7 @@ sock6_getmopt_srcfilter(sop, grpfp)
 	if (!IN6_IS_ADDR_MULTICAST(&SIN6(sa_grp)->sin6_addr))
 		return EINVAL;
 
-	/*
-	 * Find the membership in the membership array.
-	 */
-	for (imm = imop->im6o_memberships.lh_first;
-	     imm != NULL; imm = imm->i6mm_chain.le_next) {
-		/* sanity check */
-		if (sa_grp->sa_family != AF_INET6)
-			continue;
-
-		if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-		    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &SIN6(sa_grp)->sin6_addr))
-			break;
-	}
-
+	IN6_LOOKUP_MSHIP(SIN6(sa_grp)->sin6_addr, ifp, imop, imm);
 	if (imm == NULL) {
 		/* no msf entry */
 		grpf->gf_numsrc = 0;
@@ -2781,7 +2758,7 @@ match_msf6_per_socket(in6p, src, dst)
 
 	for (imm = LIST_FIRST(&im6o->im6o_memberships); imm != NULL;
 	     imm = LIST_NEXT(imm, i6mm_chain)) {
-		if (SS_CMP(&imm->i6mm_maddr->in6m_addr, !=, dst))
+		if (!IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr, dst))
 			continue;
 
 		msf = imm->i6mm_msf;
@@ -2829,7 +2806,6 @@ match_msf6_per_socket(in6p, src, dst)
 	/* no group address matched */
 	return 0;
 }
-
 #ifdef __FreeBSD__
 #ifdef MLDV2_DEBUG
 static void
