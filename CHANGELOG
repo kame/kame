@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1469 2001/01/06 08:40:50 jinmei Exp $
+$KAME: CHANGELOG,v 1.1470 2001/01/06 17:37:49 jinmei Exp $
 
 <200101>
+2001-01-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_pcb.c (in6_pcbnotify):
+	* {bsdi4,freebsd[34],openbsd}/sys/netinet6/in6_pcb.c (in6_pcbbind):
+	allowed an application to bind a socket to a deprecated address.
+	For openbsd, a new check if the specified address is a node's own
+	address was added as well.
+
+2001-01-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/ports/libbind8: newly added based on BIND 8.2.2p7. This
+	libbind supported A6 and DNAME.
+
 2001-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/prefix/prefix.c: changed the default values of
 	prefixes to infinity. Finite default values were bad, because they
