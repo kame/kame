@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.56 2000/07/07 12:17:15 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.57 2000/07/16 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,6 +181,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_HOSTNAME	0x10000
 #define F_FQDNOLD	0x20000
 #define F_NIGROUP	0x40000
+#define F_NOUSERDATA	(F_NODEADDR | F_FQDN | F_FQDNOLD)
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -208,6 +209,7 @@ char BSPACE = '\b';		/* characters written for flood */
 char DOT = '.';
 char *hostname;
 int ident;			/* process id to identify our packets */
+u_int8_t nonce[8];		/* nonce field for node information */
 struct in6_addr srcaddr;
 
 /* counters */
@@ -277,6 +279,9 @@ main(argc, argv)
 #ifdef USE_RFC2292BIS
 	struct ip6_rthdr *rthdr = NULL;
 #endif
+#ifndef __OpenBSD__
+	struct timeval tv;
+#endif
 #ifdef IPSEC_POLICY_IPSEC
 	char *policy_in = NULL;
 	char *policy_out = NULL;
@@ -304,7 +309,6 @@ main(argc, argv)
 			 char *cp;
 
 			 options |= F_NODEADDR;
-			 datalen = 2048; /* XXX: enough? */
 			 for (cp = optarg; *cp != '\0'; cp++) {
 				 switch(*cp) {
 				 case 'a':
@@ -424,10 +428,11 @@ main(argc, argv)
 			datalen = strtol(optarg, &e, 10);
 			if (datalen <= 0 || *optarg == '\0' || *e != '\0')
 				errx(1, "illegal datalen value -- %s", optarg);
-			if (datalen > MAXDATALEN)
+			if (datalen > MAXDATALEN) {
 				errx(1,
 				    "datalen value too large, maximum is %d",
 				    MAXDATALEN);
+			}
 			break;
 		case 'v':
 			options |= F_VERBOSE;
@@ -514,19 +519,37 @@ main(argc, argv)
 	if (options & F_FLOOD && options & F_INTERVAL)
 		errx(1, "-f and -i incompatible options");
 
-	if (datalen >= sizeof(struct timeval))	/* can we time transfer */
+	if ((options & F_NOUSERDATA) == 0 &&
+	    datalen >= sizeof(struct timeval)) {
+		/* can we time transfer */
 		timing = 1;
+	} else {
+		/* suppress timing for node information query */
+		timing = 0;
+		datalen = 2048;
+	}
 	packlen = datalen + IP6LEN + ICMP6ECHOLEN + EXTRA;
 	if (!(packet = (u_char *)malloc((u_int)packlen)))
 		err(1, "Unable to allocate packet");
 	if (!(options & F_PINGFILLED))
-		for (i = 8; i < datalen; ++i)
+		for (i = ICMP6ECHOLEN; i < packlen; ++i)
 			*datap++ = i;
 
 	ident = getpid() & 0xFFFF;
+#ifndef __OpenBSD__
+	gettimeofday(&tv, NULL);
+	srand((unsigned int)(tv.tv_sec ^ tv.tv_usec ^ (long)ident));
+	memset(nonce, 0, sizeof(nonce));
+	for (i = 0; i < sizeof(nonce); i += sizeof(int))
+		*((int *)&nonce[i]) = rand();
+#else
+	memset(nonce, 0, sizeof(nonce));
+	for (i = 0; i < sizeof(nonce); i += sizeof(u_int32_t))
+		*((u_int32_t *)&nonce[i]) = arc4random();
+#endif
 
 	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0)
-	  err(1, "socket");
+		err(1, "socket");
 
 	hold = 1;
 
@@ -959,26 +982,25 @@ pinger()
 	struct icmp6_hdr *icp;
 	struct iovec iov[2];
 	int i, cc;
+	struct icmp6_nodeinfo *nip;
+	int seq;
 
 	icp = (struct icmp6_hdr *)outpack;
+	nip = (struct icmp6_nodeinfo *)outpack;
 	memset(icp, 0, sizeof(*icp));
-	icp->icmp6_code = 0;
 	icp->icmp6_cksum = 0;
-	icp->icmp6_seq = ntransmitted++;		/* htons later */
-	icp->icmp6_id = htons(ident);			/* ID */
-
-	CLR(icp->icmp6_seq % mx_dup_ck);
-	icp->icmp6_seq = htons(icp->icmp6_seq);
+	seq = ntransmitted++;
+	CLR(seq % mx_dup_ck);
 
 	if (options & F_FQDN) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		icp->icmp6_code = ICMP6_NI_SUBJ_IPV6;
-		/* XXX: overwrite icmp6_id */
-		((struct icmp6_nodeinfo *)icp)->ni_qtype = htons(NI_QTYPE_FQDN);
-		((struct icmp6_nodeinfo *)icp)->ni_flags = htons(0);
-		if (timing)
-			(void)gettimeofday((struct timeval *)
-					   &outpack[ICMP6ECHOLEN], NULL);
+		nip->ni_qtype = htons(NI_QTYPE_FQDN);
+		nip->ni_flags = htons(0);
+
+		memcpy(nip->icmp6_ni_nonce, nonce, sizeof(nip->icmp6_ni_nonce));
+		*(u_int16_t *)nip->icmp6_ni_nonce = ntohs(seq);
+
 		memcpy(&outpack[ICMP6_NIQLEN], &dst.sin6_addr,
 		    sizeof(dst.sin6_addr));
 		cc = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
@@ -986,33 +1008,33 @@ pinger()
 	} else if (options & F_FQDNOLD) {
 		/* packet format in 03 draft - no Subject data on queries */
 		icp->icmp6_type = ICMP6_NI_QUERY;
-		/* code field is always 0 */
-		/* XXX: overwrite icmp6_id */
-		((struct icmp6_nodeinfo *)icp)->ni_qtype = htons(NI_QTYPE_FQDN);
-		((struct icmp6_nodeinfo *)icp)->ni_flags = htons(0);
-		if (timing)
-			(void)gettimeofday((struct timeval *)
-					   &outpack[ICMP6ECHOLEN], NULL);
+		icp->icmp6_code = 0;	/* code field is always 0 */
+		nip->ni_qtype = htons(NI_QTYPE_FQDN);
+		nip->ni_flags = htons(0);
+
+		memcpy(nip->icmp6_ni_nonce, nonce, sizeof(nip->icmp6_ni_nonce));
+		*(u_int16_t *)nip->icmp6_ni_nonce = ntohs(seq);
+
 		cc = ICMP6_NIQLEN;
 		datalen = 0;
 	} else if (options & F_NODEADDR) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		icp->icmp6_code = ICMP6_NI_SUBJ_IPV6;
-		/* XXX: overwrite icmp6_id */
-		((struct icmp6_nodeinfo *)icp)->ni_qtype =
-		    htons(NI_QTYPE_NODEADDR);
-		((struct icmp6_nodeinfo *)icp)->ni_flags = htons(0);
-		if (timing)
-			(void)gettimeofday((struct timeval *)
-					   &outpack[ICMP6ECHOLEN], NULL);
+		nip->ni_qtype = htons(NI_QTYPE_NODEADDR);
+		nip->ni_flags = naflags;
+
+		memcpy(nip->icmp6_ni_nonce, nonce, sizeof(nip->icmp6_ni_nonce));
+		*(u_int16_t *)nip->icmp6_ni_nonce = ntohs(seq);
+
 		memcpy(&outpack[ICMP6_NIQLEN], &dst.sin6_addr,
 		    sizeof(dst.sin6_addr));
 		cc = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
 		datalen = 0;
-		((struct icmp6_nodeinfo *)icp)->ni_flags = naflags;
-	}
-	else {
+	} else {
 		icp->icmp6_type = ICMP6_ECHO_REQUEST;
+		icp->icmp6_code = 0;
+		icp->icmp6_id = htons(ident);
+		icp->icmp6_seq = ntohs(seq);
 		if (timing)
 			(void)gettimeofday((struct timeval *)
 					   &outpack[ICMP6ECHOLEN], NULL);
@@ -1089,7 +1111,7 @@ pr_pack(buf, cc, mhdr)
 		/* XXX the following line overwrites the original packet */
 		icp->icmp6_seq = ntohs(icp->icmp6_seq);
 		if (ntohs(icp->icmp6_id) != ident)
-			return;			/* It was not our ECHO */
+			goto generic;		/* It was not our ECHO */
 		++nreceived;
 		if (timing) {
 			tp = (struct timeval *)(icp + 1);
@@ -1148,6 +1170,22 @@ pr_pack(buf, cc, mhdr)
 		}
 	} else if (icp->icmp6_type == ICMP6_NI_REPLY) { /* ICMP6_NI_REPLY */
 		struct icmp6_nodeinfo *ni = (struct icmp6_nodeinfo *)(buf + off);
+		u_int16_t seq;
+
+		seq = ntohs(*(u_int16_t *)ni->icmp6_ni_nonce);
+		if (memcmp(ni->icmp6_ni_nonce + sizeof(seq),
+		    nonce + sizeof(seq), sizeof(nonce) - sizeof(seq)) != 0) {
+			goto generic;		/* It was not our query */
+		}
+		++nreceived;
+		if (TST(seq % mx_dup_ck)) {
+			++nrepeats;
+			--nreceived;
+			dupflag = 1;
+		} else {
+			SET(seq % mx_dup_ck);
+			dupflag = 0;
+		}
 
 		(void)printf("%d bytes from %s: ", cc,
 			     pr_addr(from));
@@ -1272,6 +1310,7 @@ pr_pack(buf, cc, mhdr)
 			;
 		}
 	} else {
+generic:
 		/* We've got something other than an ECHOREPLY */
 		if (!(options & F_VERBOSE))
 			return;
