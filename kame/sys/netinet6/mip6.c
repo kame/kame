@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.67 2001/10/22 11:11:23 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.68 2001/10/24 04:44:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1127,7 +1127,9 @@ mip6_ioctl(cmd, data)
 				mrbc->pcoa.sin6_addr = mbc->mbc_pcoa;
 				mrbc->addr.sin6_addr = mbc->mbc_addr;
 				mrbc->flags = mbc->mbc_flags;
+#ifdef MIP6_DRAFT13
 				mrbc->prefixlen = mbc->mbc_prefixlen;
+#endif /* MIP6_DRAFT13 */
 				mrbc->seqno = mbc->mbc_seqno;
 				mrbc->lifetime = mbc->mbc_lifetime;
 				mrbc->remain = mbc->mbc_remain;
@@ -1495,26 +1497,30 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_remain = lifetime;
 	}
+#ifdef MIP6_DRAFT13
 	/* set the prefix length of this binding update. */
 	if (mbu->mbu_flags & IP6_BUF_HOME) {
 		/* register all ifid as a home address. */
-		IP6_BU_SETPREFIXLEN(&bu_opt, 64);
+		bu_opt->ip6ou_prefixlen = 64;
 	} else {
 		/* when registering to a CN, the prefixlen must be 0. */ 
-		IP6_BU_SETPREFIXLEN(&bu_opt, 0);
+		bu_opt->ip6ou_prefixlen = 0;
 	}
+#endif /* MIP6_DRAFT13 */
 	bu_opt.ip6ou_seqno = mbu->mbu_seqno;
 	if ((mbu->mbu_flags & IP6_BUF_ACK) == 0) {
 		/*
-		 * increase the sequence number of this BU entry.  the
-		 * seqno of a BU with ack flag will be incremented
-		 * when BA received.
+		 * increase the sequence number of the binding update
+		 * entries without the IP6_BUF_ACK flag set.  the
+		 * seqno of the binding update entries with
+		 * IP6_BUF_ACK flag set will be incremented when
+		 * matching binding acks has been received.
 		 */
 		mbu->mbu_seqno++;
 	}
 
 	if (opts && opts->ip6po_dest2) {
-		/* Destination header 2 already exists.  merge them. */
+		/* destination option 2 already exists.  merge them. */
 		size = (opts->ip6po_dest2->ip6d_len + 1) << 3;
 		bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf, size);
 		optbuf.off = size;
@@ -1600,7 +1606,7 @@ int
 mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	struct ip6_dest **pktopt_badest2;
 	u_int8_t status;
-	u_int8_t seqno;
+	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
 	u_int32_t refresh;
 {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.24 2001/10/18 08:16:47 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.25 2001/10/24 04:44:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -55,18 +55,23 @@ struct mip6_rbc {
 	struct sockaddr_in6 phaddr;
 	struct sockaddr_in6 pcoa;
 	struct sockaddr_in6 addr;
-	u_int16_t           flags;
+	u_int8_t            flags;
+#ifdef MIP6_DRAFT13
 	u_int8_t            prefixlen;
-	u_int8_t            seqno;
+#endif /* MIP6_DRAFT13 */
+	MIP6_SEQNO_T        seqno;
 	u_int32_t           lifetime;
 	int64_t             remain;
 	u_int8_t            state;
 };
 
 
-#define MIP6_HA_DEFAULT_LIFETIME 1800
-
-#define MIP6_MAX_PFX_ADV_DELAY 1000
+/* protocol constants */
+#define MIP6_HA_DEFAULT_LIFETIME   1800
+#define MIP6_MAX_UPDATE_RATE       5
+#define MIP6_MAX_PFX_ADV_DELAY     1000
+#define MIP6_DHAAD_INITIAL_TIMEOUT 2
+#define MIP6_DHAAD_RETRIES         3
 
 #define IP6SUBOPT_UNIQID 0x02
 #define IP6SUBOPT_ALTCOA 0x04
@@ -98,25 +103,6 @@ extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
 
 void mip6_init __P((void));
 
-/*
- * mip6_pfx_list functions
- */
-#if MIP6_OLD
-int mip6_pfx_list_insert __P((struct mip6_pfx_list *, struct mip6_pfx *));
-struct mip6_pfx *mip6_pfx_list_find_withhaddr
-					__P((struct mip6_pfx_list *,
-					     struct in6_addr *, int));
-struct mip6_pfx *mip6_pfx_list_find_withpfx
-					__P((struct mip6_pfx_list *,
-					     struct sockaddr_in6 *,
-					     struct sockaddr_in6 *));
-struct mip6_pfx *mip6_pfx_list_find_primary
-					__P((struct mip6_pfx_list *));
-int mip6_pfx_list_update_withndpr	__P((struct mip6_pfx_list *,
-					     struct nd_prefix *, int));
-#endif /* MIP6_OLD */
-
-
 int mip6_process_nd_prefix		__P((struct in6_addr *,
 					     struct nd_prefix *,
 					     struct nd_defrouter *,
@@ -137,7 +123,7 @@ int mip6_rthdr_create			__P((struct ip6_rthdr **,
 					     struct in6_addr *));
 int mip6_ba_destopt_create		 __P((struct ip6_dest **,
 					      u_int8_t,
-					      u_int8_t,
+					      MIP6_SEQNO_T,
 					      u_int32_t,
 					      u_int32_t));
 void mip6_destopt_discard		__P((struct mip6_pktopts *));
@@ -160,10 +146,9 @@ int mip6_ioctl				__P((u_long, caddr_t));
 int mip6_tunnel				__P((struct in6_addr *,
 					     struct in6_addr *,
 					     int, const struct encaptab **));
-int mip6_tunnel_input			__P((struct mbuf **,
-					      int *, int));
+int mip6_tunnel_input			__P((struct mbuf **, int *, int));
 int mip6_tunnel_output			__P((struct mbuf **,
-					      struct mip6_bc *));
+					     struct mip6_bc *));
 int mip6_route_optimize			__P((struct mbuf *));
 int mip6_icmp6_input			__P((struct mbuf *, int, int));
 int mip6_icmp6_tunnel_input		__P((struct mbuf *, int, int));

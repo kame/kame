@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.23 2001/07/23 05:34:10 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.24 2001/10/24 04:44:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,53 +219,42 @@ struct ip6_opt_router {
 struct ip6_opt_binding_update {
 	u_int8_t ip6ou_type;
 	u_int8_t ip6ou_len;
-	union {
-		u_int16_t ip6ou_un1_flags;		/* first 9 bits */
-		struct {
-			u_int8_t ip6ou_un2_dummy;
-			u_int8_t ip6ou_un2_prefixlen;	/* valid only 7bits */
-		} ip6ou_un2;
-	} ip6ou_un;
-	u_int8_t ip6ou_authdatalen;
+#ifdef MIP6_DRAFT13
+	u_int8_t ip6ou_flags;
+	u_int8_t ip6ou_prefixlen;
+	u_int16_t ip6ou_seqno;
+#else
+	u_int8_t ip6ou_flags;
+	u_int8_t ip6ou_reserved[2];
 	u_int8_t ip6ou_seqno;
+#endif /* MIP6_DRAFT13 */
 	u_int8_t ip6ou_lifetime[4];
-	u_int8_t ip6ou_spi[4];
-	/* followed by authentication data */
 	/* followed by sub-options */
 } __attribute__((__packed__));
-#define ip6ou_flags ip6ou_un.ip6ou_un1_flags
-#define ip6ou_prefixlen ip6ou_un.ip6ou_un2.ip6ou_un2_prefixlen
 
 /* Binding Update Flags */
-#if BYTE_ORDER == BIG_ENDIAN
-#define IP6_BUF_ACK	0x8000	/* Request a binding ack */
-#define IP6_BUF_HOME	0x4000	/* Home Registration */
-#define IP6_BUF_ROUTER	0x2000	/* Sending mobile node is a router */
-#define IP6_BUF_DAD	0x1000	/* Perform Duplicate Address Detection */
-#else /* BYTE_ORDER == LITTLE_ENDIAN */
-#define IP6_BUF_ACK	0x0080	/* Request a binding ack */
-#define IP6_BUF_HOME	0x0040	/* Home Registration */
-#define IP6_BUF_ROUTER	0x0020	/* Sending mobile node is a router */
-#define IP6_BUF_DAD	0x0010	/* Perform Duplicate Address Detection */
-#endif /* BYTE_ORDER == LITTLE_ENDIAN */
-
-/* Binding Update prefixlen manipulation */
-#define IP6_BU_SETPREFIXLEN(bu_opt, plen) do {				\
-		(bu_opt)->ip6ou_prefixlen |= ((plen) & 0x7f);		\
-	} while (0);
-#define IP6_BU_GETPREFIXLEN(bu_opt) (((bu_opt)->ip6ou_prefixlen) & 0x7f)
+#define IP6_BUF_ACK	0x80	/* Request a binding ack */
+#define IP6_BUF_HOME	0x40	/* Home Registration */
+#ifdef MIP6_DRAFT13
+#define IP6_BUF_ROUTER	0x20	/* Sending mobile node is a router */
+#define IP6_BUF_DAD	0x10	/* Perform Duplicate Address Detection */
+#else
+#define IP6_BUF_DAD	0x20	/* Perform Duplicate Address Detection */
+#endif /* MIP6_DRAFT13 */
 
 /* Binding Ack Option */
 struct ip6_opt_binding_ack {
 	u_int8_t ip6oa_type;
 	u_int8_t ip6oa_len;
 	u_int8_t ip6oa_status;
-	u_int8_t ip6oa_authdatalen;
+#ifdef MIP6_DRAFT13
+	u_int16_t ip6oa_seqno;
+#else
+	u_int8_t ip6oa_reserved;
 	u_int8_t ip6oa_seqno;
+#endif /* MIP6_DRAFT13 */
 	u_int8_t ip6oa_lifetime[4];
-	u_int8_t ip6oa_spi[4];
 	u_int8_t ip6oa_refresh[4];
-	/* followed by authentication data */
 	/* followed by sub-options */
 } __attribute__((__packed__));
 

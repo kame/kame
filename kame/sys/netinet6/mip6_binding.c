@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.23 2001/10/23 07:49:55 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.24 2001/10/24 04:44:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -109,12 +109,18 @@ static void mip6_bu_stoptimer __P((void));
 static int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
 
 /* binding cache functions. */
+#ifdef MIP6_DRAFT13
 static struct mip6_bc *mip6_bc_create 
     __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
 	 u_int8_t, u_int8_t, u_int8_t, u_int32_t));
+#else
+static struct mip6_bc *mip6_bc_create 
+    __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
+	 u_int8_t, MIP6_SEQNO_T, u_int32_t));
+#endif /* MIP6_DRAFT13 */
 static int mip6_bc_list_insert __P((struct mip6_bc_list *, struct mip6_bc *));
 static int mip6_bc_send_ba __P((struct in6_addr *, struct in6_addr *,
-				struct in6_addr *, u_int8_t, u_int8_t,
+				struct in6_addr *, u_int8_t, MIP6_SEQNO_T,
 				u_int32_t, u_int32_t));
 static int mip6_bc_proxy_control __P((struct in6_addr *, struct in6_addr *,
 				      int));
@@ -125,10 +131,10 @@ static int mip6_bc_encapcheck __P((const struct mbuf *, int, int, void *));
 
 static int mip6_process_hrbu __P((struct in6_addr *, struct in6_addr *,
 				  struct ip6_opt_binding_update *,
-				  u_int8_t, u_int32_t, struct in6_addr *));
+				  MIP6_SEQNO_T, u_int32_t, struct in6_addr *));
 static int mip6_process_hurbu __P((struct in6_addr *, struct in6_addr *,
 				   struct ip6_opt_binding_update *,
-				   u_int8_t, u_int32_t, struct in6_addr *));
+				   MIP6_SEQNO_T, u_int32_t, struct in6_addr *));
 static int mip6_tunnel_control __P((int, void *, 
 				    int (*) __P((const struct mbuf *, int, int, void *)),
 				    const struct encaptab **));
@@ -1038,7 +1044,7 @@ mip6_process_bu(m, opt)
 	struct mip6_subopt_altcoa *altcoa_subopt;
 	u_int8_t suboptlen;
 	u_int32_t lifetime;
-	u_int8_t seqno;
+	MIP6_SEQNO_T seqno;
 	struct mip6_bc *mbc;
 	int error = 0;
 
@@ -1102,7 +1108,9 @@ mip6_process_bu(m, opt)
 						     pcoa,
 						     &ip6->ip6_dst,
 						     bu_opt->ip6ou_flags,
-						     IP6_BU_GETPREFIXLEN(bu_opt),
+#ifdef MIP6_DRAFT13
+						     bu_opt->ip6ou_prefixlen,
+#endif /* MIP6_DRAFT13 */
 						     seqno,
 						     lifetime);
 				if (mbc == NULL) {
@@ -1121,7 +1129,9 @@ mip6_process_bu(m, opt)
 				/* update a BC entry. */
 				mbc->mbc_pcoa = *pcoa;
 				mbc->mbc_flags = bu_opt->ip6ou_flags;
-				mbc->mbc_prefixlen = IP6_BU_GETPREFIXLEN(bu_opt);
+#ifdef MIP6_DRAFT13
+				mbc->mbc_prefixlen = bu_opt->ip6ou_prefixlen;
+#endif /* MIP6_DRAFT13 */
 				mbc->mbc_seqno = seqno;
 				mbc->mbc_lifetime = lifetime;
 				mbc->mbc_remain = mbc->mbc_lifetime;
@@ -1181,15 +1191,18 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct in6_addr *haddr0;
 	struct in6_addr *coa;
 	struct ip6_opt_binding_update *bu_opt;
-	u_int8_t seqno;
+	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
 	struct in6_addr *haaddr;
 {
-	u_int8_t prefixlen;
 	struct mip6_bc *mbc, *mbc_next;
 	int error = 0;
+#ifdef MIP6_DRAFT13
+	u_int8_t prefixlen;
+#endif /* MIP6_DRAFT13 */
 
-	prefixlen = IP6_BU_GETPREFIXLEN(bu_opt);
+#ifdef MIP6_DRAFT13
+	prefixlen = bu_opt->ip6ou_prefixlen;
 	if (prefixlen == 0) {
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 						   haddr0);
@@ -1231,14 +1244,22 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					0);
 			return (error);
 		}
-	} else {
+	} else
+#endif /* MIP6_DRAFT13 */
+	{
 		for(mbc = LIST_FIRST(&mip6_bc_list);
 		    mbc;
 		    mbc = mbc_next) {
 			mbc_next = LIST_NEXT(mbc, mbc_entry);
 
-			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr, haddr0,
-						 prefixlen))
+			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr,
+						 haddr0,
+#ifdef MIP6_DRAFT13
+						 prefixlen
+#else
+						 64 /* XXX */
+#endif /* MIP6_DRAFT13 */
+				    ))
 				continue;
 
 			/* remove rtable for proxy ND */
@@ -1327,7 +1348,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct in6_addr *haddr0;
 	struct in6_addr *coa;
 	struct ip6_opt_binding_update *bu_opt;
-	u_int8_t seqno;
+	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
 	struct in6_addr *haaddr;
 {
@@ -1354,17 +1375,23 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		/* the haddr0 doesn't have an online prefix. */
 		/* XXX return 133 NOT HOME SUBNET */
 	}
-	if (pr->ndpr_plen != IP6_BU_GETPREFIXLEN(bu_opt)) {
+#ifdef MIP6_DRAFT13
+	if (pr->ndpr_plen != bu_opt->ip6ou_prefixlen) {
 		/* the haddr has an incorrect prefix length. */
 		/* XXX return 136 INCORRECT SUBNET PREFIX LENGTH */
 	}
+#endif /* MIP6_DRAFT13 */
 
 	/* adjust lifetime */
 	if (lifetime > prlifetime)
 		lifetime = prlifetime;
 
-	/* create binding cache entries for each onlink prefix. */
-	if (IP6_BU_GETPREFIXLEN(bu_opt) == 0) {
+#ifdef MIP6_DRAFT13
+	if (bu_opt->ip6ou_prefixlen == 0) {
+		/*
+		 * if prefixlen == 0, create a binding cache exactly
+		 * for the only address specified by the sender.
+		 */
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 						   haddr0);
 		if (mbc == NULL) {
@@ -1373,7 +1400,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					     coa,
 					     haaddr,
 					     bu_opt->ip6ou_flags,
-					     IP6_BU_GETPREFIXLEN(bu_opt),
+					     bu_opt->ip6ou_prefixlen,
 					     seqno,
 					     lifetime);
 			if (mbc == NULL) {
@@ -1398,7 +1425,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			/* update a BC entry. */
 			mbc->mbc_pcoa = *coa;
 			mbc->mbc_flags = bu_opt->ip6ou_flags;
-			mbc->mbc_prefixlen = IP6_BU_GETPREFIXLEN(bu_opt);
+			mbc->mbc_prefixlen = bu_opt->ip6ou_prefixlen;
 			mbc->mbc_seqno = seqno;
 			mbc->mbc_lifetime = lifetime;
 			mbc->mbc_remain = mbc->mbc_lifetime;	
@@ -1418,7 +1445,14 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			/* XXX UNSPECIFIED */
 			return (-1);
 		}
-	} else {
+	} else
+#endif /* MIP6_DRAFT13 */
+	{
+		/*
+		 * create/update binding cache entries for each
+		 * address derived from all the routing prefixes on
+		 * this router.
+		 */
 		for(pr = nd_prefix.lh_first;
 		    pr;
 		    pr = pr->ndpr_next) {
@@ -1439,7 +1473,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 						     coa,
 						     haaddr,
 						     bu_opt->ip6ou_flags,
-						     IP6_BU_GETPREFIXLEN(bu_opt),
+#ifdef MIP6_DRAFT13
+						     bu_opt->ip6ou_prefixlen,
+#endif /* MIP6_DRAFT13 */
 						     seqno,
 						     lifetime);
 				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
@@ -1455,7 +1491,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				/* update a BC entry. */
 				mbc->mbc_pcoa = *coa;
 				mbc->mbc_flags = bu_opt->ip6ou_flags;
-				mbc->mbc_prefixlen = IP6_BU_GETPREFIXLEN(bu_opt);
+#ifdef MIP6_DRAFT13
+				mbc->mbc_prefixlen = bu_opt->ip6ou_prefixlen;
+#endif /* MIP6_DRAFT13 */
 				mbc->mbc_seqno = seqno;
 				mbc->mbc_lifetime = lifetime;
 				mbc->mbc_remain = mbc->mbc_lifetime;
@@ -1500,7 +1538,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	struct in6_addr *dst;
 	struct in6_addr *dstcoa;
 	u_int8_t status;
-	u_int8_t seqno;
+	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
 	u_int32_t refresh;
 {
@@ -1886,10 +1924,19 @@ mip6_process_ba(m, opt)
 		return (0);
 	}
 
-	/* BU was accepted.  reset WAIT_ACK status */
+	/*
+	 * the binding updated has been accepted.  reset WAIT_ACK
+	 * status.
+	 */
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
 
-	/* increment seqno. */
+	/*
+	 * increment seqno of this binding update entry that matches
+	 * with this receiving binding ack.  note that we already have
+	 * incremented the seqno of the other binding update entries
+	 * those don't require binding acks (the binding update
+	 * entries that IP6_BUF_ACK flags are not set.)
+	 */
 	mbu->mbu_seqno++;
 
 	/* update lifetime and refresh time. */
@@ -2050,6 +2097,7 @@ mip6_bc_init()
 #endif
 }
 
+#ifdef MIP6_DRAFT13
 static struct mip6_bc *
 mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
 	struct in6_addr *phaddr;
@@ -2057,8 +2105,18 @@ mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
 	struct in6_addr *addr;
 	u_int8_t flags;
 	u_int8_t prefixlen;
-	u_int8_t seqno;
+	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
+#else
+static struct mip6_bc *
+mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime)
+	struct in6_addr *phaddr;
+	struct in6_addr *pcoa;
+	struct in6_addr *addr;
+	u_int8_t flags;
+	MIP6_SEQNO_T seqno;
+	u_int32_t lifetime;
+#endif /* MIP6_DRAFT13 */
 {
 	struct mip6_bc *mbc;
 
@@ -2076,7 +2134,9 @@ mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
 	mbc->mbc_pcoa = *pcoa;
 	mbc->mbc_addr = *addr;
 	mbc->mbc_flags = flags;
+#ifdef MIP6_DRAFT13
 	mbc->mbc_prefixlen = prefixlen;
+#endif /* MIP6_DRAFT13 */
 	mbc->mbc_seqno = seqno;
 	mbc->mbc_lifetime = lifetime;
 	mbc->mbc_remain = mbc->mbc_lifetime;

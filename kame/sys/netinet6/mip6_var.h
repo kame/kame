@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.9 2001/10/22 09:25:14 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.10 2001/10/24 04:44:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -39,6 +39,12 @@
 
 #ifndef _MIP6_VAR_H_
 #define _MIP6_VAR_H_
+
+#ifdef MIP6_DRAFT13
+#define MIP6_SEQNO_T u_int16_t
+#else
+#define MIP6_SEQNO_T u_int8_t
+#endif
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
@@ -97,8 +103,8 @@ struct mip6_bu {
 	int64_t             mbu_refremain;  /* refresh time remain */
 	u_int32_t           mbu_acktimeout; /* current ack timo value */
 	int64_t             mbu_ackremain;  /* acklifetime remain */
-	u_int8_t            mbu_seqno;      /* sequence number */
-	u_int16_t           mbu_flags;      /* BU flags */
+	MIP6_SEQNO_T        mbu_seqno;      /* sequence number */
+	u_int8_t            mbu_flags;      /* BU flags */
 	u_int8_t            mbu_state;
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	u_int8_t            mbu_dontsend;   /* peer doesn't support mip6 */
@@ -122,9 +128,11 @@ struct mip6_bc {
 	struct in6_addr       mbc_pcoa;      /* peer coa */
 	struct in6_addr       mbc_addr;      /* my addr (needed?) */
 	u_int8_t              mbc_status;    /* BA statue */
-	u_int16_t             mbc_flags;     /* recved BU flags */
+	u_int8_t              mbc_flags;     /* recved BU flags */
+#ifdef MIP6_DRAFT13
 	u_int8_t              mbc_prefixlen; /* recved BU prefixlen */
-	u_int8_t              mbc_seqno;     /* recved BU seqno */
+#endif /* MIP6_DRAFT13 */
+	MIP6_SEQNO_T          mbc_seqno;     /* recved BU seqno */
 	u_int32_t             mbc_lifetime;  /* recved BU lifetime */
 	int64_t               mbc_remain;    /* remaining lifetime */
 	u_int8_t              mbc_state;     /* BC state */
@@ -151,8 +159,13 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 
 #define MIP6_BC_TIMEOUT_INTERVAL 1
 
+#ifdef MIP6_DRAFT13
+/* Macro for modulo 2^^16 comparison */
+#define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
+#else
 /* Macro for modulo 2^^8 comparison */
 #define MIP6_LEQ(a,b)   ((int8_t)((a)-(b)) <= 0)
+#endif /* MIP6_DRAFT13 */
 
 struct mip6_config {
 	u_int32_t mcfg_debug;
@@ -179,8 +192,8 @@ struct mip6_buffer {
 #define MIP6_BUFFER_SIZE 1500 /* XXX 1500 ? */
 
 /* Definition of length for different destination options */
-#define IP6OPT_BULEN  12 /* Length of BU option */
-#define IP6OPT_BALEN  15 /* Length of BA option */
+#define IP6OPT_BULEN   8 /* Length of BU option */
+#define IP6OPT_BALEN  11 /* Length of BA option */
 #define IP6OPT_BRLEN   0 /* Length of BR option */
 #define IP6OPT_HALEN  16 /* Length of HA option */
 #define IP6OPT_UIDLEN  2 /* Length of Unique Identifier sub-option */
