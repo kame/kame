@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.32 2000/02/23 04:36:33 jinmei Exp $
+	$Id: PORTABILITY,v 1.33 2000/02/23 04:38:13 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -265,4 +265,4 @@ across those possibilities.
   is equivalent to
   # route add -inet6 default ::1 -ifp gif0 (on all OSes including
   FreeBSD)
-  The latter is much more portable and stabler than the latter.
+  The latter is much more portable and stabler than the former.
