@@ -78,7 +78,8 @@ Major parameters are listed below.
 .Pp
 .Bl -tag -width addressx -compact
 .It Ar number
-means hexa-decimal or decimal number.  The former is expressed with '0x'.
+means hexa-decimal or decimal number.
+The former is expressed with '0x'.
 .It Ar string
 .It Ar path
 .It Ar file
@@ -99,7 +100,8 @@ is one of following: B, byte, bytes, KB, MB, TB.
 .Ss Path Specification
 .Bl -tag -width Ds -compact
 .It Ic path include Ar path ;
-specifies a path to include file.  See
+specifies a path to include file.
+See
 .Ic File Include .
 .It Ic path pre_shared_key Ar file ;
 specifies a file including pre-shared key for various ID.
@@ -318,7 +320,8 @@ for ipcomp.
 .Ss Static SA configuration
 .Bl -tag -width Ds -compact
 .It Ic static_sa Ar parameters
-specifies static SA.  This
+specifies static SA.
+This
 .Ar parameters
 will be passed to
 .Xr setkey 8 .
@@ -328,7 +331,8 @@ Not yet, but only define.
 .Ss Specifying log file
 .Bl -tag -width Ds -compact
 .It Ic log ( Ar number \*(Ba Ar level ) ;
-define dump level.  It is debugging use.
+define dump level.
+It is debugging use.
 .Ar is one of following:
 .Ic info , notify , debug , debug2 , debug3 , debug4 .
 .El
