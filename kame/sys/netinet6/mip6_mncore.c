@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.32 2003/08/26 13:37:47 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.33 2003/08/27 11:53:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -473,10 +473,11 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, rtaddr);
 	if (mha) {
 		/* the entry for rtaddr exists.  update information. */
+		if (mha->mha_pref == 0 /* XXX */) {
+			/* XXX reorder by pref. */
+		}
 		mha->mha_flags = dr->flags;
-		mha->mha_lifetime = dr->rtlifetime;
-		mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
-		/* XXX how to handle preference? */
+		mip6_ha_update_lifetime(mha, dr->rtlifetime);
 	} else {
 		/* this is a lladdr mip6_ha entry. */
 		mha = mip6_ha_create(rtaddr, dr->flags, 0, dr->rtlifetime);
@@ -513,13 +514,14 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		/* XXX scope. */
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
 		if (mha) {
+			if (mha->mha_pref == 0 /* XXX */) {
+				/* XXX reorder by pref. */
+			}
 			mha->mha_flags = dr->flags;
-			mha->mha_lifetime = dr->rtlifetime;
-			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+			mip6_ha_update_lifetime(mha, 0);
 		} else {
-			/* this is a new ha or a router. */
-			mha = mip6_ha_create(&haaddr, dr->flags, 0,
-			    dr->rtlifetime);
+			/* this is a new home agent . */
+			mha = mip6_ha_create(&haaddr, dr->flags, 0, 0);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
 				    "%s:%d mip6_ha memory allcation failed.\n",
@@ -2140,7 +2142,6 @@ int
 mip6_bu_send_bu(mbu)
 	struct mip6_bu *mbu;
 {
-	struct mip6_ha *mha;
 	struct mbuf *m;
 	struct ip6_pktopts opt;
 	int error = 0;
@@ -3573,6 +3574,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int ip6mu_size, pad;
 	int bu_size = 0, nonce_size = 0, auth_size = 0, altcoa_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
+	struct mip6_prefix *mpfx;
 	int need_rr = 0, ignore_co_nonce = 0;
 	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -3616,6 +3618,11 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	if (!(mbu->mbu_flags & IP6MU_HOME)) {
 		need_rr = 1;
 	}
+
+	/* check if we have a valid prefix information. */
+	mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list, src);
+	if (mpfx == NULL)
+		return(EINVAL);
 
 	bu_size = sizeof(struct ip6m_binding_update);
 	if (need_rr) {
@@ -3680,11 +3687,8 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 			ignore_co_nonce = 1;
 		}
 	} else {
-		struct mip6_prefix *mpfx;
 		u_int32_t haddr_lifetime, coa_lifetime, lifetime;
 
-		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
-						       src);
 		haddr_lifetime = mpfx->mpfx_vltime;
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
 		lifetime = haddr_lifetime < coa_lifetime ?

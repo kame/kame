@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.79 2003/08/26 13:37:47 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.80 2003/08/27 11:53:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -485,21 +485,24 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			 * if this home agent already exists in the list,
 			 * update its lifetime.
 			 */
-			/*
-			 * XXX: TODO
-			 *
-			 * how to get the REAL lifetime of the home agent?
-			 */
-			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
-			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+			if (mha->mha_pref == 0) {
+				/*
+				 * we have no method to know the
+				 * preference of this home agent.
+				 * assume pref = 0.
+				 */
+				mha->mha_pref = 0;
+				mip6_ha_list_reinsert(&mip6_ha_list, mha);
+			}
+			mip6_ha_update_lifetime(mha, 0);
 		} else {
 			/*
 			 * create a new home agent entry and insert it
 			 * to the internal home agent list
 			 * (mip6_ha_list).
 			 */
-			mha = mip6_ha_create(&haaddr, ND_RA_FLAG_HOME_AGENT, 0,
-			    MIP6_HA_DEFAULT_LIFETIME);
+			mha = mip6_ha_create(&haaddr, ND_RA_FLAG_HOME_AGENT,
+			    0, 0);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
 				    "%s:%d: mip6_ha create failed\n",
@@ -1110,11 +1113,19 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &prefix_sa);
 		if (mha == NULL) {
 			mha = mip6_ha_create(&prefix_sa,
-			    ND_RA_FLAG_HOME_AGENT, 0, MIP6_HA_DEFAULT_LIFETIME);
+			    ND_RA_FLAG_HOME_AGENT, 0, 0);
 			mip6_ha_list_insert(&mip6_ha_list, mha);
 		} else {
-			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
-			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+			if (mha->mha_pref != 0) {
+				/*
+				 * we have no method to know the
+				 * preference of this home agent.
+				 * assume pref = 0.
+				 */
+				mha->mha_pref = 0;
+				mip6_ha_list_reinsert(&mip6_ha_list, mha);
+			}
+			mip6_ha_update_lifetime(mha, 0);
 		}
 		for (hpfx = LIST_FIRST(&hif->hif_prefix_list_home); hpfx;
 		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.28 2003/08/26 11:01:37 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.29 2003/08/27 11:53:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -214,7 +214,7 @@ mip6_prefix_settimer(mpfx, tick)
 #endif
 
 	if (tick < 0) {
-		mpfx->mpfx_expire = 0;
+		mpfx->mpfx_timeout = 0;
 		mpfx->mpfx_ntick = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_stop(&mpfx->mpfx_timer_ch);
@@ -224,7 +224,7 @@ mip6_prefix_settimer(mpfx, tick)
 		untimeout(mip6_prefix_timer, mpfx);
 #endif
 	} else {
-		mpfx->mpfx_expire = mono_time.tv_sec + tick / hz;
+		mpfx->mpfx_timeout = mono_time.tv_sec + tick / hz;
 		if (tick > INT_MAX) {
 			mpfx->mpfx_ntick = tick - INT_MAX;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -233,7 +233,7 @@ mip6_prefix_settimer(mpfx, tick)
 #elif defined(__OpenBSD__)
 			timeout_add(&mpfx->mpfx_timer_ch, INT_MAX);
 #else
-			timeout(nd6_llinfo_timer, ln, INT_MAX);
+			timeout(mip6_prefix_timer, mpfx, INT_MAX);
 #endif
 		} else {
 			mpfx->mpfx_ntick = 0;

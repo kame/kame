@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.54 2003/08/26 05:49:47 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.55 2003/08/27 11:53:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -438,7 +438,7 @@ main(argc, argv)
 			    mpfx->mpfx_vlexpire - time.tv_sec,
 			    mpfx->mpfx_pltime,
 			    mpfx->mpfx_plexpire - time.tv_sec,
-			    mpfx->mpfx_expire - time.tv_sec);
+			    mpfx->mpfx_timeout - time.tv_sec);
 			printf(ipaddr_fmt[longdisp],
 			    ip6_sprintf(&mpfx->mpfx_haddr));
 			printf("\n");
@@ -466,7 +466,6 @@ main(argc, argv)
 		mha->mha_addr.sin6_family = AF_INET6;
 		getaddress(shaarg, &mha->mha_addr);
 		mha->mha_flags = ND_RA_FLAG_HOME_AGENT;
-		mha->mha_pref = 0;
 		mha->mha_lifetime = 0xffff;
 		if(ioctl(s, SIOCAHOMEAGENT_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
@@ -502,7 +501,8 @@ main(argc, argv)
 				    raflg_sprintf(mip6_ha.mha_flags),
 				    mip6_ha.mha_pref,
 				    mip6_ha.mha_lifetime,
-				    mip6_ha.mha_expire - time.tv_sec);
+				    (mip6_ha.mha_expire == 0) ? 0
+					: mip6_ha.mha_expire - time.tv_sec);
 			}
 
 		}
@@ -522,7 +522,8 @@ main(argc, argv)
 				    raflg_sprintf(mip6_ha.mha_flags),
 				    mip6_ha.mha_pref,
 				    mip6_ha.mha_lifetime,
-				    mip6_ha.mha_expire - time.tv_sec);
+				    (mip6_ha.mha_expire == 0) ? 0
+					: mip6_ha.mha_expire - time.tv_sec);
 			}
 
 		}

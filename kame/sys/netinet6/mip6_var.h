@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.102 2003/08/26 04:27:49 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.103 2003/08/27 11:53:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -237,9 +237,17 @@ struct mip6_ha {
 	TAILQ_ENTRY(mip6_ha) mha_entry;
 	struct sockaddr_in6  mha_addr ;    /* lladdr or global addr */
 	u_int8_t             mha_flags;    /* RA flags */
-	u_int16_t            mha_pref;     /* preference */
-	u_int16_t            mha_lifetime; /* HA lifetime */
-	time_t               mha_expire;   /* expiration time of this HA. */
+	u_int16_t            mha_pref;     /* home agent preference */
+	u_int16_t            mha_lifetime; /* router lifetime */
+	time_t               mha_expire;
+
+	time_t               mha_timeout;  /* next timeout time. */
+	long                 mha_ntick;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	struct callout       mha_timer_ch;
+#elif defined(__OpenBSD__)
+	struct timeout       mha_timer_ch;
+#endif
 };
 TAILQ_HEAD(mip6_ha_list, mip6_ha);
 
@@ -261,7 +269,7 @@ struct mip6_prefix {
 	int                     mpfx_refcnt;
 
 	int                     mpfx_state;
-	u_long                  mpfx_expire;
+	time_t                  mpfx_timeout;
 	long                    mpfx_ntick;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct callout          mpfx_timer_ch;

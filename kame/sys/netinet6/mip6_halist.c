@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.7 2003/08/26 13:37:47 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.8 2003/08/27 11:53:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -54,6 +54,12 @@
 #include <sys/timeout.h>
 #endif
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
+#include <sys/limits.h>
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <machine/limits.h>
+#endif
+
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
@@ -74,6 +80,9 @@
 #include <netinet6/mip6_mncore.h>
 
 struct mip6_ha_list mip6_ha_list;
+
+static void mip6_ha_settimer(struct mip6_ha *, long);
+static void mip6_ha_timer(void *);
 
 void
 mip6_halist_init()
@@ -97,6 +106,14 @@ mip6_ha_create(addr, flags, pref, lifetime)
 	microtime(&mono_time);
 #endif
 
+	if (IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr)
+	    || IN6_IS_ADDR_LOOPBACK(&addr->sin6_addr)
+	    || IN6_IS_ADDR_MULTICAST(&addr->sin6_addr))
+		panic ("mip6_ha_create: invalid address.");
+	if (!IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)
+	    && ((flags & ND_RA_FLAG_HOME_AGENT) == 0))
+		panic ("mip6_ha_create: non link-local address must have H bit.");
+
 	MALLOC(mha, struct mip6_ha *, sizeof(struct mip6_ha), M_TEMP,
 	    M_NOWAIT);
 	if (mha == NULL) {
@@ -109,10 +126,146 @@ mip6_ha_create(addr, flags, pref, lifetime)
 	mha->mha_addr = *addr;
 	mha->mha_flags = flags;
 	mha->mha_pref = pref;
-	mha->mha_lifetime = lifetime;
-	mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mha->mha_timer_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mha->mha_timer_ch);
+#elif defined(__OpenBSD__)
+	timeout_set(&mha->mha_timer_ch, mip6_ha_timer, mha);
+#endif
+	if (IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr.sin6_addr)) {
+		mha->mha_lifetime = lifetime;
+	} else {
+		mha->mha_lifetime = 0; /* infinite. */
+	}
+	mip6_ha_update_lifetime(mha, lifetime);
 
 	return (mha);
+}
+
+void
+mip6_ha_update_lifetime(mha, lifetime)
+	struct mip6_ha *mha;
+	u_int16_t lifetime;
+{
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+
+	mip6_ha_settimer(mha, -1);
+	mha->mha_lifetime = lifetime;
+	if (mha->mha_lifetime != 0) {
+		mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+		mip6_ha_settimer(mha, mha->mha_lifetime * hz);
+	} else {
+		mha->mha_expire = 0;
+	}
+}
+
+static void
+mip6_ha_settimer(mha, tick)
+	struct mip6_ha *mha;
+	long tick;
+{
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
+	int s;
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	if (tick < 0) {
+		mha->mha_timeout = 0;
+		mha->mha_ntick = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		callout_stop(&mha->mha_timer_ch);
+#elif defined(__OpenBSD__)
+		timeout_del(&mha->mha_timer_ch);
+#else
+		untimeout(mip6_ha_timer, mha);
+#endif
+	} else {
+		mha->mha_timeout = mono_time.tv_sec + tick / hz;
+		if (tick > INT_MAX) {
+			mha->mha_ntick = tick - INT_MAX;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&mha->mha_timer_ch, INT_MAX,
+			    mip6_ha_timer, mha);
+#elif defined(__OpenBSD__)
+			timeout_add(&mha->mha_timer_ch, INT_MAX);
+#else
+			timeout(mip6_ha_timer, ln, INT_MAX);
+#endif
+		} else {
+			mha->mha_ntick = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&mha->mha_timer_ch, tick,
+			    mip6_ha_timer, mha);
+#elif defined(__OpenBSD__)
+			timeout_add(&mha->mha_timer_ch, tick);
+#else
+			timeout(mip6_ha_timer, mha, tick);
+#endif
+		}
+	}
+
+	splx(s);
+}
+
+static void
+mip6_ha_timer(arg)
+	void *arg;
+{
+	int s;
+	struct mip6_ha *mha;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif /* __FreeBSD__ */
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	mha = (struct mip6_ha *)arg;
+
+	if (mha->mha_ntick > 0) {
+		if (mha->mha_ntick > INT_MAX) {
+			mha->mha_ntick -= INT_MAX;
+			mip6_ha_settimer(mha, INT_MAX);
+		} else {
+			mha->mha_ntick = 0;
+			mip6_ha_settimer(mha, mha->mha_ntick);
+		}
+		splx(s);
+		return;
+	}
+
+	/*
+	 * XXX reset all home agent addresses in the binding update
+	 * entries.
+	 */
+
+	mip6_ha_list_remove(&mip6_ha_list, mha);
+
+	splx(s);
 }
 
 void
@@ -143,6 +296,32 @@ mip6_ha_list_insert(mha_list, mha)
 	return;
 }
 
+void
+mip6_ha_list_reinsert(mha_list, mha)
+	struct mip6_ha_list *mha_list;
+	struct mip6_ha *mha;
+{
+	struct mip6_ha *tgtmha;
+
+	if ((mha_list == NULL) || (mha == NULL)) {
+		panic("mip6_ha_list_insert: NULL pointer.");
+	}
+
+	for (tgtmha = TAILQ_FIRST(mha_list); tgtmha;
+	    tgtmha = TAILQ_NEXT(tgtmha, mha_entry)) {
+		if (tgtmha == mha)
+			break;
+	}
+
+	/* insert or move the entry to the proper place of the queue. */
+	if (tgtmha != NULL)
+		TAILQ_REMOVE(mha_list, tgtmha, mha_entry);
+	mip6_ha_list_insert(mha_list, mha);
+
+	return;
+}
+	
+
 int
 mip6_ha_list_remove(mha_list, mha)
 	struct mip6_ha_list *mha_list;
@@ -168,6 +347,7 @@ mip6_ha_list_remove(mha_list, mha)
 	}
 
 	TAILQ_REMOVE(mha_list, mha, mha_entry);
+	mip6_ha_settimer(mha, -1);
 	FREE(mha, M_TEMP);
 
 	return (0);
@@ -209,14 +389,11 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	 * if received lifetime is 0, delete the entry.
 	 * otherwise, update an entry.
 	 */
-	if (mha && lifetime == 0) {
+	if (lifetime == 0) {
 		mip6_ha_list_remove(mha_list, mha);
 	} else {
-		/* reset pref and lifetime */
-		mha->mha_pref = pref;
-		mha->mha_lifetime = lifetime;
-		mha->mha_expire = time_second + mha->mha_lifetime;
-		/* XXX re-order by pref */
+		/* reset lifetime */
+		mip6_ha_update_lifetime(mha, lifetime);
 	}
 
 	return (0);
