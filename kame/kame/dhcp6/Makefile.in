@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.5 1999/10/18 22:11:58 itojun Exp $
+# $Id: Makefile.in,v 1.6 2000/04/17 13:31:43 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -8,7 +8,7 @@ LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@
 CC=	@CC@
-TARGET=	dhcp6c dhcp6s
+TARGET=	dhcp6c dhcp6s dhcp6relay
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
@@ -21,12 +21,15 @@ mandir=	@mandir@
 
 CLIENTOBJS=	dhcp6c.o common.o dhcp6opt.o
 SERVOBJS=	dhcp6s.o common.o dhcp6opt.o
+RELAYOBJS =	dhcp6relay.o common.o
 
 all:	$(TARGET) 
 dhcp6c:	$(CLIENTOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o dhcp6c $(CLIENTOBJS) $(LIBOBJS) $(LIBS) 
 dhcp6s:	$(SERVOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o dhcp6s $(SERVOBJS) $(LIBOBJS) $(LIBS) 
+dhcp6relay: $(RELAYOBJS) $(LIBOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(RELAYOBJS) $(LIBOBJS) $(LIBS) 
 
 getaddrinfo.o:	$(srcdir)/missing/getaddrinfo.c
 getnameinfo.o:	$(srcdir)/missing/getnameinfo.c
