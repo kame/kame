@@ -2,6 +2,8 @@ PROG=	route6d
 MAN=	route6d.8
 
 CPPFLAGS+=-DINET6 -DHAVE_GETIFADDRS
+LDADD+=	-lutil
+DPADD+=	${LIBUTIL}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
