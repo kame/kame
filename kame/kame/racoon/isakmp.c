@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.161 2001/11/16 04:07:41 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.162 2001/11/20 12:45:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2336,6 +2336,7 @@ isakmp_printpacket(msg, from, my, decoded)
 
 	snapend = buf->v + buf->l;
 	isakmp_print(buf->v, buf->l, NULL);
+	vfree(buf);
 	printf("\n");
 	fflush(stdout);
 

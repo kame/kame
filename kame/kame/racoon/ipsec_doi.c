@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.149 2001/10/23 02:30:12 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.150 2001/11/20 12:46:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1088,11 +1088,14 @@ static void
 free_proppair0(pair)
 	struct prop_pair *pair;
 {
-	struct prop_pair *p, *q;
+	struct prop_pair *p, *q, *r, *s;
 
 	for (p = pair; p; p = q) {
 		q = p->next;
-		racoon_free(p);
+		for (r = p; r; r = s) {
+			s = r->tnext;
+			racoon_free(r);
+		}
 	}
 }
 
