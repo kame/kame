@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.3 2003/11/05 09:16:46 ono Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.4 2003/11/07 10:25:56 ono Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -622,10 +622,6 @@ dccp6_usrreq(so, req, m, nam, control, p)
 	}
 
  release:
-	if (control)
-		m_freem(control);
-	if (m)
-		m_freem(m);
 	splx(s);
 	return (error);
 }

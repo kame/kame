@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.23 2003/11/07 07:57:30 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.24 2003/11/07 10:25:55 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1553,7 +1553,6 @@ again:
 	if (MHLEN < hdrlen + max_linkhdr) {
 		MCLGET(m, M_DONTWAIT);
 		if ((m->m_flags & M_EXT) == 0) {
-			m_freem(m);
 			error = ENOBUFS;
 			goto release;
 		}
