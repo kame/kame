@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.244 2001/10/03 07:50:46 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.245 2001/10/15 10:39:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1056,7 +1056,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		struct ip6_rthdr0 *rth0;
 		int rthlen;
 
-		while (1) { /* XXX: should avoid inf.  loop explicitly? */
+		while (1) { /* XXX: should avoid infinite loop explicitly? */
 			struct ip6_ext *eh;
 
 			switch (nxt) {
