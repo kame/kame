@@ -1,13 +1,14 @@
 # ex:ts=8
 # New ports collection makefile for:    rsync
-# Version required:     1.6.2
+# Version required:     2.3.2
 # Date created:         Sat Aug 3, 1996
 # Whom:                 David O'Brien (obrien@cs.ucdavis.edu)
 #
-# $Id: Makefile,v 1.3 1999/09/03 12:27:35 itojun Exp $
+# $FreeBSD: ports/net/rsync/Makefile,v 1.31 2000/01/26 09:22:00 sumikawa Exp $
 #
 
-DISTNAME=	rsync-2.3.1
+DISTNAME=	rsync-2.3.2
+#CATEGORIES=	net ipv6
 CATEGORIES=	net
 MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 		ftp://sunsite.auc.dk/pub/unix/rsync/  \
@@ -15,22 +16,30 @@ MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 		ftp://ftp.fu-berlin.de/pub/unix/network/rsync/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	rsync-231-v6-19990903a.diff.gz
+		ftp://ftp.pasta.cs.uit.no/pub/IPv6/misc/
+PATCHFILES=	rsync-232-v6-20000127a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
-MAINTAINER=	itojun@itojun.org
+MAINTAINER=     itojun@itojun.org
 
 Y2K=		http://rsync.samba.org/rsync/y2k.html
 
 GNU_CONFIGURE=	yes
+
+.include <bsd.port.pre.mk>
+
+#.if ${OSVERSION} >= 400014
+CONFIGURE_ARGS=	--enable-ipv6
+#.else
+#CONFIGURE_ARGS=	--disable-ipv6
+#.endif
 MAN1=		rsync.1
 MAN5=		rsyncd.conf.5
 
 pre-configure:
-	@${MV} ${WRKSRC}/rsync.1 ${WRKSRC}/rsync.1.in
-	@${SED} -e 's:%%PREFIX%%:${PREFIX}:g'  \
-		${WRKSRC}/rsync.1.in > ${WRKSRC}/rsync.1
+	@${PERL} -pi.orig -e 's:/etc/:${PREFIX}/etc/:g' ${WRKSRC}/rsync.h
+	@${PERL} -pi.orig -e 's:/etc/:${PREFIX}/etc/:g' ${WRKSRC}/rsync.1
+	@${PERL} -pi.orig -e 's:/etc/:${PREFIX}/etc/:g' ${WRKSRC}/rsyncd.conf.5
 
 post-install:
 	@strip ${PREFIX}/bin/rsync
@@ -41,4 +50,4 @@ post-install:
 	${INSTALL_DATA} ${WRKSRC}/tech_report.tex ${PREFIX}/share/doc/rsync
 .endif
 
-.include <bsd.port.mk>
+.include <bsd.port.post.mk>
