@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.15 2000/02/07 06:18:38 mdodd Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.15.2.7 2001/03/29 10:33:00 yar Exp $
  */
 
 /*
@@ -43,12 +43,12 @@
  *
  * XXX It's incorrect to assume that we must always kludge up
  * headers on the physical device's behalf: some devices support
- * VLAN tag insersion and extraction in firmware. For these cases,
+ * VLAN tag insertion and extraction in firmware. For these cases,
  * one can change the behavior of the vlan interface by setting
  * the LINK0 flag on it (that is setting the vlan interface's LINK0
  * flag, _not_ the parent's LINK0 flag; we try to leave the parent
- * alone). If the interface as the LINK0 flag set, then it will
- * not modify the ethernet header on output because the parent
+ * alone). If the interface has the LINK0 flag set, then it will
+ * not modify the ethernet header on output, because the parent
  * can do that for itself. On input, the parent can call vlan_input_tag()
  * directly in order to supply us with an incoming mbuf and the vlan
  * tag value that goes with it.
@@ -61,6 +61,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/module.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -105,7 +106,8 @@ static	int vlan_config(struct ifvlan *ifv, struct ifnet *p);
  * later by the upper protocol layers. Unfortunately, there's no way
  * to avoid this: there really is only one physical interface.
  */
-static int vlan_setmulti(struct ifnet *ifp)
+static int
+vlan_setmulti(struct ifnet *ifp)
 {
 	struct ifnet		*ifp_p;
 	struct ifmultiaddr	*ifma, *rifma = NULL;
@@ -118,12 +120,16 @@ static int vlan_setmulti(struct ifnet *ifp)
 	sc = ifp->if_softc;
 	ifp_p = sc->ifv_p;
 
-	sdl.sdl_len = ETHER_ADDR_LEN;
+	bzero((char *)&sdl, sizeof sdl);
+	sdl.sdl_len = sizeof sdl;
 	sdl.sdl_family = AF_LINK;
+	sdl.sdl_index = ifp_p->if_index;
+	sdl.sdl_type = IFT_ETHER;
+	sdl.sdl_alen = ETHER_ADDR_LEN;
 
 	/* First, remove any existing filter entries. */
-	while(sc->vlan_mc_listhead.slh_first != NULL) {
-		mc = sc->vlan_mc_listhead.slh_first;
+	while(SLIST_FIRST(&sc->vlan_mc_listhead) != NULL) {
+		mc = SLIST_FIRST(&sc->vlan_mc_listhead);
 		bcopy((char *)&mc->mc_addr, LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_delmulti(ifp_p, (struct sockaddr *)&sdl);
 		if (error)
@@ -133,14 +139,15 @@ static int vlan_setmulti(struct ifnet *ifp)
 	}
 
 	/* Now program new ones. */
-	for (ifma = ifp->if_multiaddrs.lh_first;
-	    ifma != NULL;ifma = ifma->ifma_link.le_next) {
+	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		mc = malloc(sizeof(struct vlan_mc_entry), M_DEVBUF, M_NOWAIT);
+		mc = malloc(sizeof(struct vlan_mc_entry), M_DEVBUF, M_WAITOK);
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
 		    (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		SLIST_INSERT_HEAD(&sc->vlan_mc_listhead, mc, mc_entries);
+		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
+		    LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_addmulti(ifp_p, (struct sockaddr *)&sdl, &rifma);
 		if (error)
 			return(error);
@@ -150,7 +157,7 @@ static int vlan_setmulti(struct ifnet *ifp)
 }
 
 static void
-vlaninit(void *dummy)
+vlaninit(void)
 {
 	int i;
 
@@ -170,16 +177,34 @@ vlaninit(void *dummy)
 		ifp->if_ioctl = vlan_ioctl;
 		ifp->if_output = ether_output;
 		ifp->if_snd.ifq_maxlen = ifqmaxlen;
-		if_attach(ifp);
-		ether_ifattach(ifp);
-		bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+		ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 		/* Now undo some of the damage... */
 		ifp->if_data.ifi_type = IFT_8021_VLAN;
 		ifp->if_data.ifi_hdrlen = EVL_ENCAPLEN;
-		ifp->if_resolvemulti = 0;
 	}
 }
-PSEUDO_SET(vlaninit, if_vlan);
+
+static int
+vlan_modevent(module_t mod, int type, void *data) 
+{ 
+	switch (type) { 
+	case MOD_LOAD: 
+		vlaninit();
+		break; 
+	case MOD_UNLOAD: 
+		printf("if_vlan module unload - not possible for this module type\n"); 
+		return EINVAL; 
+	} 
+	return 0; 
+} 
+
+static moduledata_t vlan_mod = { 
+	"if_vlan", 
+	vlan_modevent, 
+	0
+}; 
+
+DECLARE_MODULE(if_vlan, vlan_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 
 static void
 vlan_ifinit(void *foo)
@@ -205,6 +230,17 @@ vlan_start(struct ifnet *ifp)
 			break;
 		if (ifp->if_bpf)
 			bpf_mtap(ifp, m);
+
+		/*
+		 * Do not run parent's if_start() if the parent is not up,
+		 * or parent's driver will cause a system crash.
+		 */
+		if ((p->if_flags & (IFF_UP | IFF_RUNNING)) !=
+					(IFF_UP | IFF_RUNNING)) {
+			m_freem(m);
+			ifp->if_data.ifi_collisions++;
+			continue;
+		}
 
 		/*
 		 * If the LINK0 flag is set, it means the underlying interface
@@ -271,10 +307,12 @@ vlan_start(struct ifnet *ifp)
 			continue;
 		}
 		IF_ENQUEUE(&p->if_snd, m);
-		if ((p->if_flags & IFF_OACTIVE) == 0) {
+		ifp->if_opackets++;
+		p->if_obytes += m->m_pkthdr.len;
+		if (m->m_flags & M_MCAST)
+			p->if_omcasts++;
+		if ((p->if_flags & IFF_OACTIVE) == 0)
 			p->if_start(p);
-			ifp->if_opackets++;
-		}
 	}
 	ifp->if_flags &= ~IFF_OACTIVE;
 
@@ -305,19 +343,6 @@ vlan_input_tag(struct ether_header *eh, struct mbuf *m, u_int16_t t)
 	 */
 	m->m_pkthdr.rcvif = &ifv->ifv_if;
 
-	if (ifv->ifv_if.if_bpf) {
-		/*
-		 * Do the usual BPF fakery.  Note that we don't support
-		 * promiscuous mode here, since it would require the
-		 * drivers to know about VLANs and we're not ready for
-		 * that yet.
-		 */
-		struct mbuf m0;
-		m0.m_next = m;
-		m0.m_len = sizeof(struct ether_header);
-		m0.m_data = (char *)eh;
-		bpf_mtap(&ifv->ifv_if, &m0);
-	}
 	ifv->ifv_if.if_ipackets++;
 	ether_input(&ifv->ifv_if, eh, m);
 	return 0;
@@ -355,19 +380,6 @@ vlan_input(struct ether_header *eh, struct mbuf *m)
 	m->m_len -= EVL_ENCAPLEN;
 	m->m_pkthdr.len -= EVL_ENCAPLEN;
 
-	if (ifv->ifv_if.if_bpf) {
-		/*
-		 * Do the usual BPF fakery.  Note that we don't support
-		 * promiscuous mode here, since it would require the
-		 * drivers to know about VLANs and we're not ready for
-		 * that yet.
-		 */
-		struct mbuf m0;
-		m0.m_next = m;
-		m0.m_len = sizeof(struct ether_header);
-		m0.m_data = (char *)eh;
-		bpf_mtap(&ifv->ifv_if, &m0);
-	}
 	ifv->ifv_if.if_ipackets++;
 	ether_input(&ifv->ifv_if, eh, m);
 	return 0;
@@ -390,9 +402,11 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 		ifv->ifv_if.if_mtu = p->if_data.ifi_mtu - EVL_ENCAPLEN;
 
 	/*
-	 * Preserve the state of the LINK0 flag for ourselves.
+	 * Copy only a selected subset of flags from the parent.
+	 * Other flags are none of our business.
 	 */
-	ifv->ifv_if.if_flags = (p->if_flags & ~(IFF_LINK0));
+	ifv->ifv_if.if_flags = (p->if_flags &
+	    (IFF_BROADCAST | IFF_MULTICAST | IFF_SIMPLEX | IFF_POINTOPOINT));
 
 	/*
 	 * Set up our ``Ethernet address'' to reflect the underlying
@@ -428,12 +442,12 @@ vlan_unconfig(struct ifnet *ifp)
 	 * while we were alive and remove them from the parent's list
 	 * as well.
 	 */
-	while(ifv->vlan_mc_listhead.slh_first != NULL) {
+	while(SLIST_FIRST(&ifv->vlan_mc_listhead) != NULL) {
 		struct sockaddr_dl	sdl;
 
 		sdl.sdl_len = ETHER_ADDR_LEN;
 		sdl.sdl_family = AF_LINK;
-		mc = ifv->vlan_mc_listhead.slh_first;
+		mc = SLIST_FIRST(&ifv->vlan_mc_listhead);
 		bcopy((char *)&mc->mc_addr, LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_delmulti(p, (struct sockaddr *)&sdl);
 		error = if_delmulti(ifp, (struct sockaddr *)&sdl);
@@ -516,8 +530,12 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (vlr.vlr_parent[0] == '\0') {
 			vlan_unconfig(ifp);
-			if_down(ifp);
-			ifp->if_flags &= ~(IFF_UP|IFF_RUNNING);
+			if (ifp->if_flags & IFF_UP) {
+				int s = splimp();
+				if_down(ifp);
+				splx(s);
+			}		
+			ifp->if_flags &= ~IFF_RUNNING;
 			break;
 		}
 		p = ifunit(vlr.vlr_parent);
