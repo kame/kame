@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.19 2001/07/11 13:17:53 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.20 2001/08/08 10:02:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,6 +90,11 @@ extern int eay_3des_weakkey __P((vchar_t *));
 extern vchar_t *eay_cast_encrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern vchar_t *eay_cast_decrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern int eay_cast_weakkey __P((vchar_t *));
+
+/* AES(RIJNDAEL) */
+extern vchar_t *eay_aes_encrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_aes_decrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern int eay_aes_weakkey __P((vchar_t *));
 
 /* hash */
 /* HMAC SHA1 */

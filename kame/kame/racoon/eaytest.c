@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.22 2001/07/11 13:17:53 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.23 2001/08/08 10:02:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -410,6 +410,24 @@ ciphertest()
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_cast_decrypt(res1, &key, (caddr_t)iv);
+	printf("decrypto:\n");
+	PVDUMP(res2);
+
+	vfree(res1);
+	vfree(res2);
+
+	/* aes */
+	printf("AES\n");
+	printf("data:\n");
+	PVDUMP(&data);
+
+	memset(iv, 0, sizeof(iv));
+	res1 = eay_aes_encrypt(&data, &key, (caddr_t)iv);
+	printf("encrypto:\n");
+	PVDUMP(res1);
+
+	memset(iv, 0, sizeof(iv));
+	res2 = eay_aes_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
 	PVDUMP(res2);
 

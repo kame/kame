@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.89 2001/08/06 09:22:49 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.90 2001/08/08 10:02:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,6 +113,7 @@ static struct cipher_algorithm cipher[] = {
 #endif
 { "3des",	eay_3des_encrypt,	eay_3des_decrypt,	eay_3des_weakkey, },
 { "cast",	eay_cast_decrypt,	eay_cast_decrypt,	eay_cast_weakkey, },
+{ "aes",	eay_aes_decrypt,	eay_aes_decrypt,	eay_aes_weakkey, },
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));

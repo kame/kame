@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.56 2001/08/05 18:48:16 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.57 2001/08/08 10:02:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,6 +74,11 @@
 #endif
 #include <openssl/cast.h>
 #include <openssl/err.h>
+#ifdef HAVE_OPENSSL_RIJNDAEL_H
+#include <openssl/rijndael.h>
+#else
+#include "crypto/rijndael/rijndael-api-fst.h"
+#endif
 
 #include "var.h"
 #include "misc.h"
@@ -1286,6 +1291,70 @@ eay_cast_weakkey(key)
 	vchar_t *key;
 {
 	return 0;	/* No known weak keys. */
+}
+
+/*
+ * AES(RIJNDAEL)-CBC
+ */
+vchar_t *
+eay_aes_encrypt(data, key, iv)
+	vchar_t *data, *key;
+	caddr_t iv;
+{
+	vchar_t *res;
+	keyInstance k;
+	cipherInstance c;
+
+	memset(&k, 0, sizeof(k));
+	if (rijndael_makeKey(&k, DIR_ENCRYPT, key->l << 3, key->v) < 0)
+		return NULL;
+
+	/* allocate buffer for result */
+	if ((res = vmalloc(data->l)) == NULL)
+		return NULL;
+
+	/* encryption data */
+	memset(&c, 0, sizeof(c));
+	if (rijndael_cipherInit(&c, MODE_ECB, NULL) < 0)
+		return NULL;
+	if (rijndael_blockEncrypt(&c, &k, data->v, data->l << 3, res->v) < 0)
+		return NULL;
+
+	return res;
+}
+
+vchar_t *
+eay_aes_decrypt(data, key, iv)
+	vchar_t *data, *key;
+	caddr_t iv;
+{
+	vchar_t *res;
+	keyInstance k;
+	cipherInstance c;
+
+	memset(&k, 0, sizeof(k));
+	if (rijndael_makeKey(&k, DIR_DECRYPT, key->l << 3, key->v) < 0)
+		return NULL;
+
+	/* allocate buffer for result */
+	if ((res = vmalloc(data->l)) == NULL)
+		return NULL;
+
+	/* decryption data */
+	memset(&c, 0, sizeof(c));
+	if (rijndael_cipherInit(&c, MODE_ECB, NULL) < 0)
+		return NULL;
+	if (rijndael_blockDecrypt(&c, &k, data->v, data->l << 3, res->v) < 0)
+		return NULL;
+
+	return res;
+}
+
+int
+eay_aes_weakkey(key)
+	vchar_t *key;
+{
+	return 0;
 }
 
 /*

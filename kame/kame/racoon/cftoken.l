@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.59 2001/05/24 06:43:24 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.60 2001/08/08 10:02:54 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -337,6 +337,7 @@ des_iv32	{ YYD; yylval.num = algtype_des_iv32;	return(ALGORITHMTYPE); }
 rc4 		{ YYD; yylval.num = algtype_rc4;	return(ALGORITHMTYPE); }
 null_enc	{ YYD; yylval.num = algtype_null_enc;	return(ALGORITHMTYPE); }
 rijndael	{ YYD; yylval.num = algtype_rijndael;	return(ALGORITHMTYPE); }
+aes		{ YYD; yylval.num = algtype_rijndael;	return(ALGORITHMTYPE); }
 twofish		{ YYD; yylval.num = algtype_twofish;	return(ALGORITHMTYPE); }
 non_auth	{ YYD; yylval.num = algtype_non_auth;	return(ALGORITHMTYPE); }
 hmac_md5	{ YYD; yylval.num = algtype_hmac_md5;	return(ALGORITHMTYPE); }
