@@ -1,4 +1,4 @@
-/*	$KAME: hmac.c,v 1.3 2002/07/08 09:52:09 t-momose Exp $	*/
+/*	$KAME: hmac.c,v 1.4 2002/07/10 07:39:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -54,7 +54,9 @@
 #else
 #include <crypto/sha1.h>
 #endif
+#ifdef IPSEC
 #include <crypto/sha2/sha2.h>
+#endif
 
 #include <crypto/hmac.h>
 
@@ -66,6 +68,7 @@ static void md5_result_stub(HMAC_CTX *, u_int8_t *);
 static void sha1_init_stub(HMAC_CTX *);
 static void sha1_update_stub(HMAC_CTX *, u_int8_t *, u_int);
 static void sha1_result_stub(HMAC_CTX *, u_int8_t *);
+#ifdef IPSEC
 static void sha2_256_init_stub(HMAC_CTX *);
 static void sha2_256_update_stub(HMAC_CTX *, u_int8_t *, u_int);
 static void sha2_256_result_stub(HMAC_CTX *, u_int8_t *);
@@ -75,18 +78,21 @@ static void sha2_384_result_stub(HMAC_CTX *, u_int8_t *);
 static void sha2_512_init_stub(HMAC_CTX *);
 static void sha2_512_update_stub(HMAC_CTX *, u_int8_t *, u_int);
 static void sha2_512_result_stub(HMAC_CTX *, u_int8_t *);
+#endif
 
 struct hmac_hash hmac_hash[] = {
 	{sizeof(MD5_CTX), 16,
 		md5_init_stub, md5_update_stub, md5_result_stub},
 	{sizeof(SHA1_CTX), SHA1_RESULTLEN,
 		sha1_init_stub, sha1_update_stub, sha1_result_stub},
+#ifdef IPSEC
 	{sizeof(SHA256_CTX), SHA256_DIGEST_LENGTH,
 		sha2_256_init_stub, sha2_256_update_stub, sha2_256_result_stub},
 	{sizeof(SHA384_CTX), SHA384_DIGEST_LENGTH,
 		sha2_384_init_stub, sha2_384_update_stub, sha2_384_result_stub},
 	{sizeof(SHA512_CTX), SHA512_DIGEST_LENGTH,
 		sha2_512_init_stub, sha2_512_update_stub, sha2_512_result_stub},
+#endif
 };
 
 static void
@@ -137,6 +143,7 @@ sha1_result_stub(hmac_ctx, result)
 	SHA1Final(result, (SHA1_CTX *)hmac_ctx->hash_ctx);
 }
 
+#ifdef IPSEC
 static void
 sha2_256_init_stub(hmac_ctx)
 	HMAC_CTX *hmac_ctx;
@@ -208,6 +215,7 @@ sha2_512_result_stub(hmac_ctx, result)
 {
 	SHA512_Final(result, (SHA512_CTX *)hmac_ctx->hash_ctx);
 }
+#endif
 
 int
 hmac_init(ctx, hmac_key, hmac_keylen, hash)
