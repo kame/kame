@@ -8,7 +8,12 @@ MASTER_SITES=	ftp://rsync.samba.org/pub/rsync/old-versions/ \
 		ftp://ftp.sunet.se/pub/unix/admin/rsync/  \
 		ftp://ftp.fu-berlin.de/pub/unix/network/rsync/
 
-MAINTAINER=     mycroft@netbsd.org
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
+		ftp://ftp.v6.kame.net/pub/kame/misc/
+PATCHFILES=	rsync-231-v6-19990902a.diff.gz
+PATCH_DIST_STRIP=	-p1
+
+MAINTAINER=     itojun@itojun.org
 HOMEPAGE=	http://samba.anu.edu.au/rsync/
 
 GNU_CONFIGURE=	yes
