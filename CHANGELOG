@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2163 2002/05/25 12:09:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.2164 2002/05/26 22:23:48 itojun Exp $
 
 <200205>
+Mon May 27 07:22:51 JST 2002  itojun@iijlab.net
+	* sys/sys/if.h: add framework to have per-domain/af data onto
+	  struct ifnet.  as discussed on bsd-api-discuss.
+
 2002-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/scope6.c (scope6_init): newly added to
 	inialize scope zone IDs for as many interfaces as possible.
