@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: debug.c,v 1.4 1999/09/20 14:28:08 jinmei Exp $
+ *  $Id: debug.c,v 1.5 2000/03/27 22:35:42 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -353,7 +353,8 @@ log(severity, syserr, format, va_alist)
 	if (!debug)
 	    fprintf(stderr, "%s: ", progname);
 	fprintf(stderr, "%02d:%02d:%02d.%03ld %s", thyme->tm_hour,
-		thyme->tm_min, thyme->tm_sec, now.tv_usec / 1000, msg);
+		thyme->tm_min, thyme->tm_sec, (long int)now.tv_usec / 1000,
+		msg);
 	if (syserr == 0)
 	    fprintf(stderr, "\n");
 	else if (syserr < sys_nerr)
