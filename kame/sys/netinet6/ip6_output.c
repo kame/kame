@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.388 2003/07/10 05:49:53 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.389 2003/07/10 05:53:06 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4572,7 +4572,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		int *hlimp;
 
 		/*
-		 * RFC 3542 obsoleted the usage of sticky IPV6_HOPLIMIT
+		 * RFC 3542 deprecated the usage of sticky IPV6_HOPLIMIT
 		 * to simplify the ordering among hoplimit options.
 		 */
 		if (optname == IPV6_HOPLIMIT && sticky)
