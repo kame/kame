@@ -24,7 +24,7 @@ INCLS=	-I${SRCDIR}/../libpcap -I${SRCDIR} -I${.CURDIR}
 # workaround for gnuc.h
 INCLS+=	-I${SRCDIR}/lbl
 DEFS=	-DHAVE_FCNTL_H=1 -DHAVE_MALLOC_H=1 -DHAVE_MEMORY_H=1 -DTIME_WITH_SYS_TIME=1 -DHAVE_NET_SLIP_H=1 -DINET6=1 -DHAVE_LIBINET6=1 -DHAVE_VFPRINTF=1 -DHAVE_STRCASECMP=1 -DHAVE_ETHER_NTOA=1 -DHAVE_SETLINEBUF=1 -DHAVE_LIBZ=1 -DHAVE_ZLIB_H=1 -DHAVE_NETINET6_IPCOMP_H=1 -DRETSIGTYPE=void -DRETSIGVAL= -DHAVE_SIGACTION=1 -DHAVE_SOCKADDR_SA_LEN=1 -DLBL_ALIGN=1  -DHAVE_FDDI -DHAVE_SIN6_LEN=1 -DHAVE_SIN_LEN=1
-CFLAGS+=	-O2
+CFLAGS+=	-O2 -g
 CPPFLAGS+=	${DEFS} ${INCLS}
 
 LDADD+=	-lz
@@ -37,24 +37,29 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-# crypto support - need SSLeay
-# make sure to have non-buggy cast128 routine with you, if you enable cast128.
+# crypto support - need OpenSSL 0.9.4
 .if exists(/usr/pkg/lib/libcrypto.a) || exists(/usr/pkg/lib/libcrypto.so.1.0)
-CPPFLAGS+=-DCRYPTO=1 -DHAVE_RC5_H=1
-#CPPFLAGS+=-DHAVE_CAST_H=1 
-.if exists(/usr/pkg/include/openssl/des.h)
-CPPFLAGS+=-I/usr/pkg/include/openssl
-.elif exists(/usr/pkg/include/ssleay/des.h)
-CPPFLAGS+=-I/usr/pkg/include/ssleay
+CPPFLAGS+=-DCRYPTO=1
+CPPFLAGS+=-I/usr/pkg/include
+.if exists(/usr/pkg/include/openssl/rc5.h)
+CPPFLAGS+=-DHAVE_RC5_H=1
+.endif
+.if exists(/usr/pkg/include/openssl/cast.h)
+CPPFLAGS+=-DHAVE_CAST_H=1 
 .endif
 LDADD+=	-L/usr/pkg/lib -lcrypto
 DPADD+=	/usr/pkg/lib/libcrypto.a
 .elif exists(/usr/local/ssl/lib/libcrypto.a)
-CPPFLAGS+=-DCRYPTO=1 -DHAVE_RC5_H=1
-#CPPFLAGS+=-DHAVE_CAST_H=1 
-CPPFLAGS+=-I/usr/local/ssl/include/openssl -I/usr/local/ssl/include
-LDADD+=	-L/usr/local/ssl/lib -lcrypto
-DPADD+=	/usr/local/ssl/lib/libcrypto.a
+CPPFLAGS+=-DCRYPTO=1
+CPPFLAGS+=-I/usr/local/ssl/include
+.if exists(/usr/local/ssl/include/openssl/rc5.h)
+CPPFLAGS+=-DHAVE_RC5_H=1
+.endif
+.if exists(/usr/local/ssl/include/openssl/cast.h)
+CPPFLAGS+=-DHAVE_CAST_H=1 
+.endif
+LDADD+=       -L/usr/local/ssl/lib -lcrypto
+DPADD+=       /usr/local/ssl/lib/libcrypto.a
 .endif
 
 version.c: VERSION
