@@ -1648,10 +1648,6 @@ ip_setmoptions(sopt, imop)
 	struct ip_mreq mreq;
 	struct ifnet *ifp;
 	struct ip_moptions *imo = *imop;
-#ifndef IGMPV3
-	struct route ro;
-	struct sockaddr_in *dst;
-#endif
 	int ifindex;
 	int s = 0;
 #ifdef IGMPV3
