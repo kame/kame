@@ -121,6 +121,9 @@ gen_rand_eui64(dst)
 	MD5_CTX ctxt;
 	u_int8_t digest[16];
 
+#ifdef __FreeBSD__
+#define hostnamelen	strlen(hostname)
+#endif
 	/* generate 8bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
