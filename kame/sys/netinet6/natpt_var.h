@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.21 2002/01/13 06:11:07 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.22 2002/01/13 06:27:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -44,6 +44,7 @@ extern struct in6_addr	natpt_prefix;
 caddr_t		 natpt_pyldaddr		__P((struct ip6_hdr *, caddr_t, int *, struct ip6_frag **));
 int		 natpt_setPrefix	__P((caddr_t));
 int		 natpt_setValue		__P((caddr_t));
+int		 natpt_getValue		__P((caddr_t));
 int		 natpt_testLog		__P((caddr_t));
 int		 natpt_break		__P((void));
 

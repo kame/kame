@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.39 2002/01/13 06:11:07 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.40 2002/01/13 06:27:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -69,6 +69,9 @@ int		natpt_initialized;
 u_int		natpt_debug;
 u_int		natpt_dump;
 struct in6_addr	natpt_prefix;
+
+struct natptctl_names	 natptctl_names[NATPTCTL_NUM] = NATPTCTL_NAMES;
+caddr_t			 natptctl_vars[NATPTCTL_NUM]  = NATPTCTL_VARS;
 
 
 /*
@@ -502,15 +505,40 @@ natpt_setPrefix(caddr_t addr)
 int
 natpt_setValue(caddr_t addr)
 {
+	caddr_t			 caddr;
 	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
-	switch (mbox->flags) {
-	case NATPT_DEBUG:
-		natpt_debug = mbox->m_uint;
+	caddr = natptctl_vars[mbox->flags];
+
+	switch(natptctl_names[mbox->flags].ctl_type) {
+	case NATPTCTL_INT:
+		*(int *)caddr = mbox->m_uint ;
 		break;
 
-	case NATPT_DUMP:
-		natpt_dump = mbox->m_uint;
+	case NATPTCTL_IN6ADDR:
+		*(struct in6_addr *)caddr = mbox->m_in6addr;
+		break;
+	}
+
+	return (0);
+}
+
+
+int
+natpt_getValue(caddr_t addr)
+{
+	caddr_t			 caddr;
+	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
+
+	caddr = natptctl_vars[mbox->flags];
+
+	switch (natptctl_names[mbox->flags].ctl_type) {
+	case NATPTCTL_INT:
+		mbox->m_uint = *(int *)natptctl_vars[mbox->flags];
+		break;
+
+	case NATPTCTL_IN6ADDR:
+		mbox->m_in6addr = *(struct in6_addr *)natptctl_vars[mbox->flags];
 		break;
 	}
 

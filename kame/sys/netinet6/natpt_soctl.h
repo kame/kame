@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.11 2001/09/02 19:06:26 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.12 2002/01/13 06:27:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -45,12 +45,16 @@
 #define	SIOCSETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
 #define	SIOCGETPREFIX	_IOWR('n',   9, struct natpt_msgBox)	/* Get prefix		*/
 #define	SIOCSETVALUE	_IOW ('n',  10, struct natpt_msgBox)	/* Set value		*/
-#define	SIOCGETVALUE	_IOW ('n',  11, struct natpt_msgBox)	/* Get value		*/
+#define	SIOCGETVALUE	_IOWR('n',  11, struct natpt_msgBox)	/* Get value		*/
 
 #define	SIOCTESTLOG	_IOW ('n',  12, struct natpt_msgBox)	/* Test log		*/
 
 #define SIOCBREAK	_IO  ('n', 255)				/* stop			*/
 
+
+/*
+ *
+ */
 
 struct natpt_msgBox
 {

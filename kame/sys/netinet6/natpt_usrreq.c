@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.18 2002/01/13 06:11:07 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.19 2002/01/13 06:27:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -332,6 +332,9 @@ natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
 
 	case SIOCSETVALUE:
 		return (natpt_setValue(data));
+
+	case SIOCGETVALUE:
+		return (natpt_getValue(data));
 
 	case SIOCTESTLOG:
 		return (natpt_testLog(data));

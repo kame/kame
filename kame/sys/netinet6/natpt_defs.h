@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.33 2001/12/13 05:43:56 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.34 2002/01/13 06:27:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -59,6 +59,61 @@
 #define	D_MATCHINGRULE6		0x00080000
 #define	D_TRANSLATEIPV6		0x00100000
 #endif	/* _KERNEL */
+
+
+/*
+ *	SIOC(GET|SET)VALUE related definitions.
+ */
+
+#define	NATPTCTL_DEFAULT	0x01
+#define	NATPTCTL_TSLOT		0x02
+
+#define	NATPTCTL_INT		1
+#define	NATPTCTL_IN6ADDR	2
+
+#define	NATPTCTL_ENABLE		0
+#define	NATPTCTL_DEBUG		1
+#define	NATPTCTL_DUMP		2
+#define	NATPTCTL_PREFIX		3
+#define	NATPTCTL_MAXTTYANY	4
+#define	NATPTCTL_MAXTTYICMP	5
+#define	NATPTCTL_MAXTTYUDP	6
+#define	NATPTCTL_MAXTTYTCP	7
+#define	NATPTCTL_TCPT_2MSL	8
+#define	NATPTCTL_TCP_MAXIDLE	9
+#define	NATPTCTL_MAXFRAGMENT	10
+#define	NATPTCTL_NULL		11
+#define	NATPTCTL_NUM		12
+
+#define	NATPTCTL_NAMES	{						\
+	{ "enable",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
+	{ "debug",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
+	{ "dump",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
+	{ "prefix",	NATPTCTL_IN6ADDR,	NATPTCTL_DEFAULT },	\
+	{ "maxTTLany",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "maxTTLicmp",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "maxTTLudp",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "maxTTLtcp",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "tcpt_2msl",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "tcp_maxidle", NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "maxFragment", NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{  NULL,	0,			0 },			\
+}
+
+#define	NATPTCTL_VARS {			\
+	(caddr_t)&natpt_enable,		\
+	(caddr_t)&natpt_debug,		\
+	(caddr_t)&natpt_dump,		\
+	(caddr_t)&natpt_prefix,		\
+}
+
+
+struct natptctl_names
+{
+	char		*ctl_name;
+	u_short		 ctl_type;
+	u_short		 ctl_attr;
+};
 
 
 /*
