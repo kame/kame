@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: savestr.c,v 1.2 97/05/09 14:52:31 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/savestr.c,v 1.1.1.1 1999/08/08 23:32:10 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -31,6 +31,7 @@ static const char rcsid[] =
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "gnuc.h"
 #ifdef HAVE_OS_PROTO_H
