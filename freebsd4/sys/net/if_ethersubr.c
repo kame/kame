@@ -34,7 +34,6 @@
  * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.8 2000/07/17 21:24:34 archie Exp $
  */
 
-#include "opt_altq.h"
 #include "opt_atalk.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
