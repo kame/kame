@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.46 2000/07/29 23:28:20 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.47 2000/08/08 08:58:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -589,9 +589,14 @@ defrouter_delreq(dr, dofree)
 		  RTF_GATEWAY, &oldrt);
 	if (oldrt) {
 		defrouter_msg(RTM_DELETE, oldrt);
-		if (oldrt->rt_refcnt <= 0)
-			oldrt->rt_refcnt++; /* XXX */
-		rtfree(oldrt);
+		if (oldrt->rt_refcnt <= 0) {
+			/*
+			 * XXX: borrowed from the RTM_DELETE case of
+			 * rtrequest().
+			 */
+			oldrt->rt_refcnt++;
+			rtfree(oldrt);
+		}
 	}
 
 	if (dofree)		/* XXX: necessary? */
