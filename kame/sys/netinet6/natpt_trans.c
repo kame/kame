@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.127 2002/06/26 05:58:38 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.128 2002/06/26 06:15:25 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1986,10 +1986,11 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		    local.port[1] = htons(FTP_DATA);
 		    remote = ats->remote;
 		    remote.port[0] = htons(FTP_DATA);
-		    remote.port[1] = 0;	/* this port should be remapped */
-
-		    if (natpt_remapRemote4Port(ats->csl, &remote) == NULL)
+		    remote.port[1] = sin6.sin6_port;
+		    if ((ats->csl->map & NATPT_REMAP_SPORT)
+			&& (natpt_remapRemote4Port(ats->csl, &remote) == NULL)) {
 			    return (0);
+		    }
 
 		    if (natpt_openIncomingV4Conn(IPPROTO_TCP, &local, &remote) == NULL)
 			    return (0);
