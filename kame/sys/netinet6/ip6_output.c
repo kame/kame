@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.174 2001/03/29 05:34:31 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.175 2001/03/30 04:48:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3905,9 +3905,7 @@ ip6_mloopback(ifp, m, dst)
 	struct sockaddr_in6 *dst;
 {
 	struct mbuf *copym;
-#ifndef SCOPEDROUTING
 	struct ip6_hdr *ip6;
-#endif
 
 	copym = m_copy(m, 0, M_COPYALL);
 	if (copym == NULL)
