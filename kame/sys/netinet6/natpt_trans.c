@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.70 2001/12/17 11:33:21 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.71 2001/12/18 02:19:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -310,9 +310,9 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 		natpt_icmp6EchoReply(cv6, &cv4);
 		break;
 
-	case MLD6_LISTENER_QUERY:
-	case MLD6_LISTENER_REPORT:
-	case MLD6_LISTENER_DONE:
+	case MLD_LISTENER_QUERY:
+	case MLD_LISTENER_REPORT:
+	case MLD_LISTENER_DONE:
 		m_freem(m4);		/* Single hop message.	Silently drop.	*/
 		return (NULL);
 
