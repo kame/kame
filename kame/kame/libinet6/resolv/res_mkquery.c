@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_mkquery.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_mkquery.c,v 1.6 2002/06/26 06:02:30 itojun Exp $";
+static char rcsid[] = "$Id: res_mkquery.c,v 1.7 2002/08/28 03:15:41 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -215,6 +215,8 @@ res_opt(n0, buf, buflen, anslen)
 
 	__putshort(T_OPT, cp);	/* TYPE */
 	cp += INT16SZ;
+	if (anslen > 0xffff)
+		anslen = 0xffff;		/* limit to 16bit value */
 	__putshort(anslen & 0xffff, cp);	/* CLASS = UDP payload size */
 	cp += INT16SZ;
 	*cp++ = NOERROR;	/* extended RCODE */
