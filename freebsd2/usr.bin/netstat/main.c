@@ -66,7 +66,7 @@ static const char rcsid[] =
 #include <unistd.h>
 #include "netstat.h"
 
-struct nlist nl[] = {
+static struct nlist nl[] = {
 #define	N_MBSTAT	0
 	{ "_mbstat" },
 #define	N_IPSTAT	1
@@ -431,7 +431,7 @@ main(argc, argv)
 	if (kvmd == NULL) {
 		errx(1, "kvm_open: %s", buf);
 	}
-	if (kvm_nlist(kvmd, nl) < 0) {
+	if (kvm_nlist(kvmd, &nl[0]) < 0) {
 		if(nlistf)
 			errx(1, "%s: kvm_nlist: %s", nlistf, kvm_geterr(kvmd));
 		else

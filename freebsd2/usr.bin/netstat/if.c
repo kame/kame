@@ -202,13 +202,21 @@ intpr(interval, ifnetaddr, pfunc)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
-				printf("%-11.11s ",
-				       netname6(&ifaddr.in6.ia_addr,
-						&ifaddr.in6.ia_prefixmask.sin6_addr));
-				printf("%-17.17s ",
-				    (char *)inet_ntop(AF_INET6,
+				cp = netname6(&ifaddr.in6.ia_addr,
+					&ifaddr.in6.ia_prefixmask.sin6_addr);
+				if (lflag && strlen(cp) > 11)
+					n = strlen(cp);
+				else
+					n = 11;
+				printf("%-*.*s ", n, n, cp);
+				cp = (char *)inet_ntop(AF_INET6,
 					&sin6->sin6_addr,
-					ntop_buf, sizeof(ntop_buf)));
+					ntop_buf, sizeof(ntop_buf));
+				if (lflag && strlen(cp) > 17)
+					n = strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
 				break;
 #endif /*INET6*/
 			case AF_IPX:
