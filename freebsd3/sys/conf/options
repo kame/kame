@@ -246,8 +246,6 @@ MROUTING		opt_mrouting.h
 GATEWAY6		opt_inet.h
 INET			opt_inet.h
 INET6			opt_inet6.h
-MIP6			opt_inet.h
-MIP6_DEBUG		opt_inet.h
 NEW_STRUCT_ROUTE	opt_global.h
 IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h

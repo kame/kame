@@ -745,13 +745,6 @@ crypto/rijndael/rijndael-api-fst.c	optional ipsec_esp
 crypto/sha2/sha2.c		optional ipsec
 crypto/twofish/twofish2.c	optional ipsec_esp
 
-netinet6/mip6.c		optional mip6
-netinet6/mip6_hooks.c	optional mip6
-netinet6/mip6_io.c	optional mip6
-netinet6/mip6_mn.c	optional mip6
-netinet6/mip6_md.c	optional mip6
-netinet6/mip6_ha.c	optional mip6
-
 ufs/ffs/ffs_alloc.c	optional ffs
 ufs/ffs/ffs_alloc.c	optional mfs
 ufs/ffs/ffs_balloc.c	optional ffs
