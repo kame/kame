@@ -1,9 +1,12 @@
 Installation procedure - grabbinb tree via cvsup
 KAME project
-$Id: INSTALL.anoncvs,v 1.1 1999/08/09 00:07:15 itojun Exp $
+$Id: INSTALL.anoncvs,v 1.2 1999/08/13 12:42:20 itojun Exp $
 
 
 You can grab the latest KAME tree via anonymous cvs (anoncvs).
+Note that KAME/BSDI3 and KAME/BSDI4 are inaccessible via anoncvs,
+due to license restriction (BSDI is commercial product and we cannot
+redistribute BSDI-copyrighted source to non-licensee).
 
 (0) Install CVS onto your client.
 
