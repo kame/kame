@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.79 2003/08/11 20:15:45 dhartmei Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.80 2003/08/21 19:12:08 frantzen Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -156,6 +156,7 @@ pfattach(int num)
 	pool_init(&pf_pooladdr_pl, sizeof(struct pf_pooladdr), 0, 0, 0,
 	    "pfpooladdrpl", NULL);
 	pfr_initialize();
+	pf_osfp_initialize();
 
 	pool_sethardlimit(&pf_state_pl, pf_pool_limits[PF_LIMIT_STATES].limit,
 	    NULL, 0);
@@ -617,6 +618,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		case DIOCRGETASTATS:
 		case DIOCRCLRASTATS:
 		case DIOCRTSTADDRS:
+		case DIOCOSFPGET:
 			break;
 		default:
 			return (EPERM);
@@ -645,6 +647,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		case DIOCRGETADDRS:
 		case DIOCRGETASTATS:
 		case DIOCRTSTADDRS:
+		case DIOCOSFPGET:
 			break;
 		default:
 			return (EACCES);
@@ -2316,6 +2319,28 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		error = pfr_ina_define(&io->pfrio_table, io->pfrio_buffer,
 		    io->pfrio_size, &io->pfrio_nadd, &io->pfrio_naddr,
 		    io->pfrio_ticket, io->pfrio_flags);
+		break;
+	}
+
+	case DIOCOSFPFLUSH:
+		s = splsoftnet();
+		pf_osfp_flush();
+		splx(s);
+		break;
+
+	case DIOCOSFPADD: {
+		struct pf_osfp_ioctl *io = (struct pf_osfp_ioctl *)addr;
+		s = splsoftnet();
+		error = pf_osfp_add(io);
+		splx(s);
+		break;
+	}
+
+	case DIOCOSFPGET: {
+		struct pf_osfp_ioctl *io = (struct pf_osfp_ioctl *)addr;
+		s = splsoftnet();
+		error = pf_osfp_get(io);
+		splx(s);
 		break;
 	}
 
