@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.102 2003/09/19 06:07:26 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.103 2003/10/30 08:44:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.102 2003/09/19 06:07:26 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.103 2003/10/30 08:44:49 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1088,7 +1088,7 @@ riprecv()
 	struct	rip6 *rp;
 	struct	netinfo6 *np, *nq;
 	struct	riprt *rrt;
-	int	len, nn, need_trigger, idx;
+	ssize_t	len, nn, need_trigger, idx;
 	char	buf[4 * RIP6_MAXMTU];
 	time_t	t;
 	struct msghdr m;
@@ -1129,6 +1129,11 @@ riprecv()
 	}
 	if (idx && IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr))
 		SET_IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr, idx);
+
+	if (len < sizeof(struct rip6)) {
+		trace(1, "Packet too short\n");
+		return;
+	}
 
 	nh = fsock.sin6_addr;
 	nn = (len - sizeof(struct rip6) + sizeof(struct netinfo6)) /
