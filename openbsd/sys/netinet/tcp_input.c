@@ -816,19 +816,6 @@ findpcb:
 			    inp->inp_ipv6.ip6_flow =
 			      oldinpcb->inp_ipv6.ip6_flow;
 			  }
-
-			  /*
-			   * inherit socket options from the listening
-			   * socket.
-			   */
-			  if (ip6) {
-			    inp->inp_flags |=
-				(oldinpcb->inp_flags & IN6P_CONTROLOPTS);
-			    if (inp->inp_flags & IN6P_CONTROLOPTS) {
-			      m_freem(inp->inp_options);
-			      inp->inp_options = NULL;
-			    }
-			  }
 			}
 #endif /* INET6 */
 			inp = (struct inpcb *)so->so_pcb;
