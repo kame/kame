@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.785 2000/04/18 03:44:17 sakane Exp $
+$Id: CHANGELOG,v 1.786 2000/04/18 04:12:54 itojun Exp $
 
 <200003>
+Tue Apr 18 13:12:40 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet6/udp6_output.c: for better code sharing, split
+	  udp6_output() from udp6_usrreq.c.
+
 Tue Apr 18 12:44:24 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	improve phase1 DH group check.
