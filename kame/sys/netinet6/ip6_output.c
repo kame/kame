@@ -101,11 +101,6 @@
 #else
 #include <netinet/in_pcb.h>
 #endif
-#ifdef MAPPED_ADDR_ENABLED
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-#include <netinet/ip_var.h>
-#endif
-#endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 
@@ -1321,6 +1316,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 							/*in6p->inp_hops = optval; XXX*/
 #else
 							in6p->in6p_hops = optval;
+#if defined(MAPPED_ADDR_ENABLED)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+							in6p->inp_ip_ttl = optval;
+#endif
+#endif
 #endif
 						}
 						break;
@@ -1773,15 +1773,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			break;
 		}
 	} else {
-#ifdef MAPPED_ADDR_ENABLED
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		if (level == IPPROTO_IP)
-			return (ip_ctloutput(so, sopt));
-#else
-		if (level == IPPROTO_IP)
-			return (ip_ctloutput(op, so, level, optname, mp));
-#endif
-#endif /* MAPPED_ADDR_ENABLED */
 		error = EINVAL;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (op == PRCO_SETOPT && *mp)
