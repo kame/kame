@@ -47,6 +47,6 @@ options 	ALTQ_PRIQ	#priority queue
 # multipath support in radix routing table
 options 	RADIX_MPATH
 
-options		MIP6
-options		MIP6_DEBUG
+options 	MIP6
+options 	MIP6_DEBUG
 pseudo-device	hif		1
