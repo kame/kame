@@ -743,7 +743,7 @@ sainfo_id
 					return -1;
 				}
 				$$ = ipsecdoi_sockaddr2id(res->ai_addr,
-					$3 == ~0 ? sizeof(struct in_addr) : $3,
+					$3 == ~0 ? (sizeof(struct in_addr) << 3): $3,
 					$5);
 				break;
 #ifdef INET6
@@ -754,7 +754,7 @@ sainfo_id
 					return -1;
 				}
 				$$ = ipsecdoi_sockaddr2id(res->ai_addr,
-					$3 == ~0 ? sizeof(struct in6_addr) : $3,
+					$3 == ~0 ? (sizeof(struct in6_addr) << 3) : $3,
 					$5);
 				break;
 #endif
