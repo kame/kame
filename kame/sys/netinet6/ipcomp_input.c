@@ -163,7 +163,7 @@ ipcomp4_input(m, va_alist)
 			/* other parameters to look at? */
 		}
 	}
-	if (cpi < IPCOMP_MAX || ipcomp_algorithms[cpi].decompress != NULL)
+	if (cpi < IPCOMP_MAX && ipcomp_algorithms[cpi].decompress != NULL)
 		algo = &ipcomp_algorithms[cpi];
 	else
 		algo = NULL;
@@ -327,7 +327,7 @@ ipcomp6_input(mp, offp, proto)
 			/* other parameters to look at? */
 		}
 	}
-	if (cpi < IPCOMP_MAX || ipcomp_algorithms[cpi].decompress != NULL)
+	if (cpi < IPCOMP_MAX && ipcomp_algorithms[cpi].decompress != NULL)
 		algo = &ipcomp_algorithms[cpi];
 	else
 		algo = NULL;
