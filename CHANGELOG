@@ -1,6 +1,18 @@
-$Id: CHANGELOG,v 1.518 2000/02/04 14:39:12 itojun Exp $
+$Id: CHANGELOG,v 1.519 2000/02/04 18:20:21 jinmei Exp $
 
 <200002>
+2000-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi3/kame/libinet6/getaddrinfo.c (explore_numeric_scope): 
+	* kame/kame/libinet6/getnameinfo.c (getnameinfo):
+	Revised the format for scoped addresses by agreement with MSR.
+	Two big changes are included:
+	- The scope ID portion is now placed before the address
+	- The delimiter character is changed to '%'
+	So for example, we can specify a link-local address on the
+	interface ne0 like ne0%fe80::1234
+	The scopedaddr-format draft will soon be revised as well according
+	to this change.
+
 Fri Feb  4 23:36:26 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_ifattach.c: improve in6_ifdetach() for cleaning
 	  up structures that depend on struct ifnet/ifaddr.  should be
