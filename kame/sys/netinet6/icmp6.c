@@ -1312,11 +1312,7 @@ icmp6_rip6_input(mp, off)
 
 /*
  * Reflect the ip6 packet back to the source.
- * The caller MUST check if the destination is multicast or not.
- * This function is usually called with a unicast destination which
- * can be safely the source of the reply packet. But some exceptions
- * exist(e.g. ECHOREPLY, PATCKET_TOOBIG, "10" in OPTION type).
- * ``off'' points to the icmp6 header, counted from the top of the mbuf.
+ * OFF points to the icmp6 header, counted from the top of the mbuf.
  */
 void
 icmp6_reflect(m, off)
