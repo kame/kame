@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.77 2002/08/24 17:21:44 matthieu Exp $ */
+/* $OpenBSD: machdep.c,v 1.79 2002/12/17 23:11:31 millert Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -95,12 +95,6 @@
 #endif
 #ifdef SYSVMSG
 #include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
 #endif
 
 #include <sys/mount.h>
@@ -816,18 +810,6 @@ allocsys(v)
 #define valloc(name, type, num) \
 	    (name) = (type *)v; v = (caddr_t)ALIGN((name)+(num))
 
-#ifdef SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -1630,7 +1612,8 @@ sendsig(catcher, sig, mask, code, type, val)
 		initsiginfo(&ksi, sig, code, type, val);
 		sip = (void *)scp + kscsize;
 		(void) copyout((caddr_t)&ksi, (caddr_t)sip, fsize - kscsize);
-	}
+	} else
+		sip = NULL;
 
 	/*
 	 * copy the frame out to userland.
@@ -1647,8 +1630,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	 */
 	frame->tf_regs[FRAME_PC] = p->p_sigcode;
 	frame->tf_regs[FRAME_A0] = sig;
-	frame->tf_regs[FRAME_A1] = (psp->ps_siginfo & sigmask(sig)) ?
-	    (u_int64_t)sip : NULL;
+	frame->tf_regs[FRAME_A1] = (u_int64_t)sip;
 	frame->tf_regs[FRAME_A2] = (u_int64_t)scp;
 	frame->tf_regs[FRAME_T12] = (u_int64_t)catcher;		/* t12 is pv */
 	alpha_pal_wrusp((unsigned long)scp);
@@ -1683,24 +1665,20 @@ sys_sigreturn(p, v, retval)
 	struct sys_sigreturn_args /* {
 		syscallarg(struct sigcontext *) sigcntxp;
 	} */ *uap = v;
-	struct sigcontext *scp, ksc;
+	struct sigcontext ksc;
+	int error;
 
-	scp = SCARG(uap, sigcntxp);
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
 	    printf("sigreturn: pid %d, scp %p\n", p->p_pid, scp);
 #endif
 
-	if (ALIGN(scp) != (u_int64_t)scp)
-		return (EINVAL);
-
 	/*
 	 * Test and fetch the context structure.
 	 * We grab it all at once for speed.
 	 */
-	if (uvm_useracc((caddr_t)scp, sizeof (*scp), B_WRITE) == 0 ||
-	    copyin((caddr_t)scp, (caddr_t)&ksc, sizeof ksc))
-		return (EINVAL);
+	if ((error = copyin(SCARG(uap, sigcntxp), &ksc, sizeof(ksc))) != 0)
+		return (error);
 
 	if (ksc.sc_regs[R_ZERO] != 0xACEDBADE)		/* magic number */
 		return (EINVAL);

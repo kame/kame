@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sis.c,v 1.27 2002/07/31 16:58:20 jason Exp $ */
+/*	$OpenBSD: if_sis.c,v 1.31 2003/03/10 12:13:23 mcbride Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -130,7 +130,7 @@ void sis_eeprom_getword(struct sis_softc *, int, u_int16_t *);
 #ifdef __i386__
 void sis_read_cmos(struct sis_softc *, struct pci_attach_args *, caddr_t, int, int);
 #endif
-void sis_read_630ea1_enaddr(struct sis_softc *, struct pci_attach_args *);
+void sis_read_mac(struct sis_softc *, struct pci_attach_args *);
 void sis_read_eeprom(struct sis_softc *, caddr_t, int, int, int);
 
 int sis_miibus_readreg(struct device *, int, int);
@@ -337,7 +337,7 @@ void sis_read_cmos(sc, pa, dest, off, cnt)
 }
 #endif
 
-void sis_read_630ea1_enaddr(sc, pa)
+void sis_read_mac(sc, pa)
 	struct sis_softc *sc;
 	struct pci_attach_args *pa;
 {
@@ -384,7 +384,8 @@ int sis_miibus_readreg(self, phy, reg)
 		return(val);
 	}
 
-	if (sc->sis_type == SIS_TYPE_900 && phy != 0)
+	if (sc->sis_type == SIS_TYPE_900 &&
+	    sc->sis_rev < SIS_REV_635 && phy != 0)
 		return(0);
 
 	CSR_WRITE_4(sc, SIS_PHYCTL, (phy << 11) | (reg << 6) | SIS_PHYOP_READ);
@@ -604,6 +605,12 @@ void sis_reset(sc)
 	return;
 }
 
+const struct pci_matchid sis_devices[] = {
+	{ PCI_VENDOR_SIS, PCI_PRODUCT_SIS_900 },
+	{ PCI_VENDOR_SIS, PCI_PRODUCT_SIS_7016 },
+	{ PCI_VENDOR_NS, PCI_PRODUCT_NS_DP83815 },
+};
+
 /*
  * Probe for an SiS chip. Check the PCI vendor and device
  * IDs against our list and return a device name if we find a match.
@@ -613,21 +620,8 @@ int sis_probe(parent, match, aux)
 	void			*match;
 	void			*aux;
 {
-	struct pci_attach_args	*pa = (struct pci_attach_args *)aux;
-
-	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_SIS &&
-	    PCI_VENDOR(pa->pa_id) != PCI_VENDOR_NS)
-		return(0);
-
-	switch (PCI_PRODUCT(pa->pa_id)) {
-	case PCI_PRODUCT_SIS_900:
-	case PCI_PRODUCT_SIS_7016:
-	case PCI_PRODUCT_NS_DP83815:
-		return(1);
-	}
-
-	return(0);
-
+	return (pci_matchbyid((struct pci_attach_args *)aux, sis_devices,
+	    sizeof(sis_devices)/sizeof(sis_devices[0])));
 }
 
 /*
@@ -750,6 +744,8 @@ void sis_attach(parent, self, aux)
 	}
 	printf(": %s", intrstr);
 
+	sc->sis_rev = PCI_REVISION(pa->pa_class);
+
 	/* Reset the adapter. */
 	sis_reset(sc);
 
@@ -810,17 +806,16 @@ void sis_attach(parent, self, aux)
 		 * requires some datasheets that I don't have access
 		 * to at the moment.
 		 */
-		command = pci_conf_read(pc, pa->pa_tag,
-		    PCI_CLASS_REG) & 0x000000ff;
-		if (command == SIS_REV_630S ||
-		    command == SIS_REV_630E)
+		if (sc->sis_rev == SIS_REV_630S ||
+		    sc->sis_rev == SIS_REV_630E ||
+		    sc->sis_rev == SIS_REV_630EA1)
 			sis_read_cmos(sc, pa, (caddr_t)&sc->arpcom.ac_enaddr,
 			    0x9, 6);
 		else
 #endif
-		if (command == SIS_REV_630EA1 ||
-		    command == SIS_REV_630ET)
-			sis_read_630ea1_enaddr(sc, pa);
+		if (sc->sis_rev == SIS_REV_635 ||
+		    sc->sis_rev == SIS_REV_630ET) 	
+			sis_read_mac(sc, pa);
 		else
 			sis_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
 			    SIS_EE_NODEADDR, 3, 0);
@@ -1371,7 +1366,7 @@ int sis_encap(sc, m_head, txidx)
 	sc->sis_ldata->sis_tx_list[cur].sis_mbuf = m_head;
 	sc->sis_ldata->sis_tx_list[cur].sis_ctl &= ~SIS_CMDSTS_MORE;
 	sc->sis_ldata->sis_tx_list[*txidx].sis_ctl |= SIS_CMDSTS_OWN;
-	sc->sis_cdata.sis_tx_cnt += i - 1;
+	sc->sis_cdata.sis_tx_cnt += i;
 	*txidx = frag;
 
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
@@ -1450,6 +1445,7 @@ void sis_init(xsc)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii;
 	int			s;
+	int                     tmp;
 
 	s = splnet();
 
@@ -1593,6 +1589,30 @@ void sis_init(xsc)
 		CSR_WRITE_4(sc, NS_PHY_TDATA, 0x0000);
 		CSR_WRITE_4(sc, NS_PHY_DSPCFG, 0x5040);
 		CSR_WRITE_4(sc, NS_PHY_SDCFG, 0x008C);
+		
+		/* 
+		 * A small number of DP83815's will have excessive receive
+		 * errors when using short cables (<30m/100feet) in 100Base-TX
+		 * mode. This patch was taken from the National Semiconductor
+		 * linux driver and (supposedly - no mention of this in any NS
+		 * docs) modifies the dsp's signal attenuation.
+		 */
+		if (IFM_SUBTYPE(mii->mii_media_active) != IFM_10_T) {
+			CSR_WRITE_4(sc, NS_PHY_PAGE, 0x0001);
+			tmp = CSR_READ_4(sc, NS_PHY_DSPCFG);
+			tmp &= 0xFFF;
+			CSR_WRITE_4(sc, NS_PHY_DSPCFG, (tmp | 0x1000));
+			DELAY(100);
+			tmp = CSR_READ_4(sc, NS_PHY_TDATA);
+			tmp &= 0xFF;
+			if (!(tmp & 0x80) || (tmp >= 0xD8)) {
+				CSR_WRITE_4(sc, NS_PHY_TDATA, 0xE8);
+				tmp = CSR_READ_4(sc, NS_PHY_DSPCFG);
+				CSR_WRITE_4(sc, NS_PHY_DSPCFG, (tmp | 0x20));
+			} else {
+				CSR_WRITE_4(sc, NS_PHY_PAGE, 0);
+			}
+		}
 	}
 
 	ifp->if_flags |= IFF_RUNNING;

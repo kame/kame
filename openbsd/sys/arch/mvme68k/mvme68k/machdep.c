@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.71 2002/04/28 14:47:53 miod Exp $ */
+/*	$OpenBSD: machdep.c,v 1.74 2003/01/04 17:41:17 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -99,12 +99,6 @@
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <machine/autoconf.h>
 #include <machine/bugio.h>
@@ -202,7 +196,7 @@ void netintr(void *);
 void myetheraddr(u_char *);
 int fpu_gettype(void);
 int memsize162(void);
-int memsize1x7(void);
+int memsize1x7(void);	/* in locore */
 int memsize(void);
 
 void
@@ -314,18 +308,6 @@ again:
 	    (name) = (type *)v; v = (caddr_t)((name)+(num))
 #define	valloclim(name, type, num, lim) \
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-#ifdef SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -1209,71 +1191,6 @@ memsize162()
 	}
 }
 #endif
-
-#if defined(MVME162) || defined(MVME167) || defined(MVME177) || defined(MVME172)
-#include <mvme68k/dev/memcreg.h>
-/*
- * XXX
- * finish writing this
- * 1) it is ugly
- * 2) it only looks at the first MEMC040/MCECC controller
- */
-int
-memsize1x7()
-{
-	struct memcreg *memc = (struct memcreg *)0xfff43000;
-	u_long   x;
-
-	x = MEMC_MEMCONF_RTOB(memc->memc_memconf);
-	return (x);
-}
-#endif
-
-int
-memsize()
-{
-	volatile unsigned int *look;
-	unsigned int *max;
-	extern char *end;
-#define MAXPHYSMEM (unsigned long)0x10000000 	/* max physical memory */
-#define PATTERN   0x5a5a5a5a
-#define STRIDE    (4*1024) 	/* 4k at a time */
-#define Roundup(value, stride) (((unsigned)(value) + (stride) - 1) & ~((stride)-1))
-	/* 
-	 * Put machine specific exception vectors in place.
-	 */
-	initvectors();
-	/*
-	 * count it up.
-	 */
-	max = (void *)MAXPHYSMEM;
-	for (look = (void *)Roundup(end, STRIDE); look < max;
-		 look = (int *)((unsigned)look + STRIDE)) {
-		unsigned save;
-
-		if (badvaddr((vaddr_t)look, 2)) {
-#if defined(DEBUG)
-			printf("%x\n", look);
-#endif
-			look = (int *)((int)look - STRIDE);
-			break;
-		}
-
-		/*
-		 * If we write a value, we expect to read the same value back.
-		 * We'll do this twice, the 2nd time with the opposite bit
-		 * pattern from the first, to make sure we check all bits.
-		 */
-		save = *look;
-		if (*look = PATTERN, *look != PATTERN)
-			break;
-		if (*look = ~PATTERN, *look != ~PATTERN)
-			break;
-		*look = save;
-	}
-	physmem = btoc(trunc_page((unsigned)look)); /* in pages */
-	return (trunc_page((unsigned)look));
-}
 
 /*
  * Boot console routines: 

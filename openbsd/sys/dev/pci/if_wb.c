@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wb.c,v 1.18 2002/07/05 13:48:11 aaron Exp $	*/
+/*	$OpenBSD: if_wb.c,v 1.20 2003/01/15 06:31:24 art Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -708,6 +708,11 @@ wb_fixmedia(sc)
 	ifmedia_set(&mii->mii_media, media);
 }
 
+const struct pci_matchid wb_devices[] = {
+	{ PCI_VENDOR_WINBOND, PCI_PRODUCT_WINBOND_W89C840F },
+	{ PCI_VENDOR_COMPEX, PCI_PRODUCT_COMPEX_RL100ATX },
+};
+
 /*
  * Probe for a Winbond chip. Check the PCI vendor and device
  * IDs against our list and return a device name if we find a match.
@@ -717,23 +722,8 @@ wb_probe(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
-	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
-
-	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_WINBOND) {
-		switch (PCI_PRODUCT(pa->pa_id)) {
-		case PCI_PRODUCT_WINBOND_W89C840F:
-			return (1);
-		}
-	}
-
-	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_COMPEX) {
-		switch (PCI_PRODUCT(pa->pa_id)) {
-		case PCI_PRODUCT_COMPEX_RL100ATX:
-			return (1);
-		}
-	}
-
-	return (0);
+	return (pci_matchbyid((struct pci_attach_args *)aux, wb_devices,
+	    sizeof(wb_devices)/sizeof(wb_devices[0])));
 }
 
 /*
@@ -1363,7 +1353,7 @@ int wb_encap(sc, c, m_head)
 			} else
 				f->wb_status = WB_TXSTAT_OWN;
 			f->wb_next = vtophys(&c->wb_ptr->wb_frag[frag + 1]);
-			f->wb_data = vtophys(mtod(m, vm_offset_t));
+			f->wb_data = vtophys(mtod(m, vaddr_t));
 			frag++;
 		}
 	}

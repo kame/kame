@@ -1,4 +1,4 @@
-/*	$OpenBSD: igmp.c,v 1.16 2002/08/28 15:43:03 pefo Exp $	*/
+/*	$OpenBSD: igmp.c,v 1.17 2003/02/12 14:41:07 jason Exp $	*/
 /*	$NetBSD: igmp.c,v 1.15 1996/02/13 23:41:25 christos Exp $	*/
 
 /*
@@ -72,6 +72,7 @@
 
 int		igmp_timers_are_running;
 struct router_info *rti_head;
+struct igmpstat igmpstat;
 
 int interface_timers_are_running;
 int state_change_timers_are_running;

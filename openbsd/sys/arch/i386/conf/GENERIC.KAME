@@ -18,24 +18,6 @@ include	"arch/i386/conf/GENERIC"
 # multipath support in radix routing table
 #option		RADIX_MPATH
 
-# ALTQ options (ALTQ is enabled in "sys/conf/GENERIC" but other ALTQ
-#		related options are enabled here)
-options 	ALTQ_CBQ	#class based queueing
-options 	ALTQ_WFQ	#weighted fair queueing
-options 	ALTQ_FIFOQ	#fifo queueing
-options 	ALTQ_RED	#random early detection
-#options 	ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
-options 	ALTQ_RIO	#triple red for diffserv (needs RED)
-#options 	ALTQ_LOCALQ	#local use
-options 	ALTQ_HFSC	#hierarchical fair service curve
-options 	ALTQ_JOBS	#joint buffer management and scheduling
-#options 	ALTQ_IPSEC	#check ipsec in IPv4
-options 	ALTQ_CDNR	#diffserv traffic conditioner
-#options 	ALTQ_BLUE	#blue by wu-chang feng
-options 	ALTQ_PRIQ	#priority queue
-#options 	ALTQ_NOPCC	#don't use processor cycle counter
-#options 	ALTQ_DEBUG	#for debugging
-
 # Source-Specific Multicast (SSM)
 #options 	IGMPV3		# IPv4
 #options 	MLDV2		# IPv6

@@ -1,4 +1,4 @@
-/*	$OpenBSD: xl.c,v 1.41 2002/08/22 19:08:50 jason Exp $	*/
+/*	$OpenBSD: xl.c,v 1.49 2003/03/24 17:40:00 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -100,9 +100,6 @@
  * Since using bus master DMA is a big win, we use this driver to
  * support the PCI "boomerang" chips even though they work with the
  * "vortex" driver in order to obtain better performance.
- *
- * This driver is in the /sys/pci directory because it only supports
- * PCI-based NICs.
  */
 
 #include "bpfilter.h"
@@ -554,6 +551,7 @@ int xl_read_eeprom(sc, dest, off, cnt, swap)
 	int			err = 0, i;
 	u_int16_t		word = 0, *ptr;
 #define EEPROM_5BIT_OFFSET(A) ((((A) << 2) & 0x7F00) | ((A) & 0x003F))
+#define EEPROM_8BIT_OFFSET(A) ((A) & 0x003F)
 	/* WARNING! DANGER!
 	 * It's easy to accidentally overwrite the rom content!
 	 * Note: the 3c575 uses 8bit EEPROM offsets.
@@ -568,7 +566,8 @@ int xl_read_eeprom(sc, dest, off, cnt, swap)
 
 	for (i = 0; i < cnt; i++) {
 		if (sc->xl_flags & XL_FLAG_8BITROM)
-			CSR_WRITE_2(sc, XL_W0_EE_CMD, (2<<8) | (off + i ));
+			CSR_WRITE_2(sc, XL_W0_EE_CMD,
+			    XL_EE_8BIT_READ | EEPROM_8BIT_OFFSET(off + i));
 		else
 			CSR_WRITE_2(sc, XL_W0_EE_CMD,
 			    XL_EE_READ | EEPROM_5BIT_OFFSET(off + i));
@@ -765,10 +764,9 @@ void xl_setmode(sc, media)
 	struct xl_softc *sc;
 	int media;
 {
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	u_int32_t icfg;
 	u_int16_t mediastat;
-
-	printf("xl%d: selecting ", sc->xl_unit);
 
 	XL_SEL_WIN(4);
 	mediastat = CSR_READ_2(sc, XL_W4_MEDIA_STATUS);
@@ -777,7 +775,7 @@ void xl_setmode(sc, media)
 
 	if (sc->xl_media & XL_MEDIAOPT_BT) {
 		if (IFM_SUBTYPE(media) == IFM_10_T) {
-			printf("10baseT transceiver, ");
+			ifp->if_baudrate = IF_Mbps(10);
 			sc->xl_xcvr = XL_XCVR_10BT;
 			icfg &= ~XL_ICFG_CONNECTOR_MASK;
 			icfg |= (XL_XCVR_10BT << XL_ICFG_CONNECTOR_BITS);
@@ -789,7 +787,7 @@ void xl_setmode(sc, media)
 
 	if (sc->xl_media & XL_MEDIAOPT_BFX) {
 		if (IFM_SUBTYPE(media) == IFM_100_FX) {
-			printf("100baseFX port, ");
+			ifp->if_baudrate = IF_Mbps(100);
 			sc->xl_xcvr = XL_XCVR_100BFX;
 			icfg &= ~XL_ICFG_CONNECTOR_MASK;
 			icfg |= (XL_XCVR_100BFX << XL_ICFG_CONNECTOR_BITS);
@@ -800,7 +798,7 @@ void xl_setmode(sc, media)
 
 	if (sc->xl_media & (XL_MEDIAOPT_AUI|XL_MEDIAOPT_10FL)) {
 		if (IFM_SUBTYPE(media) == IFM_10_5) {
-			printf("AUI port, ");
+			ifp->if_baudrate = IF_Mbps(10);
 			sc->xl_xcvr = XL_XCVR_AUI;
 			icfg &= ~XL_ICFG_CONNECTOR_MASK;
 			icfg |= (XL_XCVR_AUI << XL_ICFG_CONNECTOR_BITS);
@@ -809,7 +807,7 @@ void xl_setmode(sc, media)
 			mediastat |= ~XL_MEDIASTAT_SQEENB;
 		}
 		if (IFM_SUBTYPE(media) == IFM_10_FL) {
-			printf("10baseFL transceiver, ");
+			ifp->if_baudrate = IF_Mbps(10);
 			sc->xl_xcvr = XL_XCVR_AUI;
 			icfg &= ~XL_ICFG_CONNECTOR_MASK;
 			icfg |= (XL_XCVR_AUI << XL_ICFG_CONNECTOR_BITS);
@@ -821,7 +819,7 @@ void xl_setmode(sc, media)
 
 	if (sc->xl_media & XL_MEDIAOPT_BNC) {
 		if (IFM_SUBTYPE(media) == IFM_10_2) {
-			printf("BNC port, ");
+			ifp->if_baudrate = IF_Mbps(10);
 			sc->xl_xcvr = XL_XCVR_COAX;
 			icfg &= ~XL_ICFG_CONNECTOR_MASK;
 			icfg |= (XL_XCVR_COAX << XL_ICFG_CONNECTOR_BITS);
@@ -833,11 +831,9 @@ void xl_setmode(sc, media)
 
 	if ((media & IFM_GMASK) == IFM_FDX ||
 			IFM_SUBTYPE(media) == IFM_100_FX) {
-		printf("full duplex\n");
 		XL_SEL_WIN(3);
 		CSR_WRITE_1(sc, XL_W3_MAC_CTRL, XL_MACCTRL_DUPLEX);
 	} else {
-		printf("half duplex\n");
 		XL_SEL_WIN(3);
 		CSR_WRITE_1(sc, XL_W3_MAC_CTRL,
 			(CSR_READ_1(sc, XL_W3_MAC_CTRL) & ~XL_MACCTRL_DUPLEX));
@@ -1066,7 +1062,7 @@ int xl_list_tx_init(sc)
 }
 
 /*
- * Initialize the transmit desriptors.
+ * Initialize the transmit descriptors.
  */
 int
 xl_list_tx_init_90xB(sc)
@@ -1096,7 +1092,7 @@ xl_list_tx_init_90xB(sc)
 	}
 
 	bzero((char *)ld->xl_tx_list, sizeof(struct xl_list) * XL_TX_LIST_CNT);
-	ld->xl_tx_list[0].xl_status = XL_TXSTAT_EMPTY;
+	ld->xl_tx_list[0].xl_status = htole32(XL_TXSTAT_EMPTY);
 
 	cd->xl_tx_prod = 1;
 	cd->xl_tx_cons = 1;
@@ -1136,7 +1132,7 @@ int xl_list_rx_init(sc)
 			next +=
 			    offsetof(struct xl_list_data, xl_rx_list[i + 1]);
 		}
-		ld->xl_rx_list[i].xl_next = next;
+		ld->xl_rx_list[i].xl_next = htole32(next);
 	}
 
 	cd->xl_rx_head = &cd->xl_rx_chain[0];
@@ -1171,6 +1167,14 @@ int xl_newbuf(sc, c)
 		m_freem(m_new);
 		return (ENOBUFS);
 	}
+
+	/* sync the old map, and unload it (if necessary) */
+	if (c->map->dm_nsegs != 0) {
+		bus_dmamap_sync(sc->sc_dmat, c->map,
+		    0, c->map->dm_mapsize, BUS_DMASYNC_POSTREAD);
+		bus_dmamap_unload(sc->sc_dmat, c->map);
+	}
+
 	map = c->map;
 	c->map = sc->sc_rx_sparemap;
 	sc->sc_rx_sparemap = map;
@@ -1182,9 +1186,11 @@ int xl_newbuf(sc, c)
 	    BUS_DMASYNC_PREREAD);
 
 	c->xl_mbuf = m_new;
-	c->xl_ptr->xl_frag.xl_addr = c->map->dm_segs[0].ds_addr + ETHER_ALIGN;
-	c->xl_ptr->xl_frag.xl_len = c->map->dm_segs[0].ds_len | XL_LAST_FRAG;
-	c->xl_ptr->xl_status = 0;
+	c->xl_ptr->xl_frag.xl_addr =
+	    htole32(c->map->dm_segs[0].ds_addr + ETHER_ALIGN);
+	c->xl_ptr->xl_frag.xl_len =
+	    htole32(c->map->dm_segs[0].ds_len | XL_LAST_FRAG);
+	c->xl_ptr->xl_status = htole32(0);
 
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
 	    ((caddr_t)c->xl_ptr - sc->sc_listkva), sizeof(struct xl_list),
@@ -1237,7 +1243,8 @@ void xl_rxeof(sc)
 
 again:
 
-	while((rxstat = sc->xl_cdata.xl_rx_head->xl_ptr->xl_status)) {
+	while ((rxstat = letoh32(sc->xl_cdata.xl_rx_head->xl_ptr->xl_status))
+	    != 0) {
 		cur_rx = sc->xl_cdata.xl_rx_head;
 		sc->xl_cdata.xl_rx_head = cur_rx->xl_next;
 
@@ -1254,7 +1261,7 @@ again:
 		 */
 		if (rxstat & XL_RXSTAT_UP_ERROR) {
 			ifp->if_ierrors++;
-			cur_rx->xl_ptr->xl_status = 0;
+			cur_rx->xl_ptr->xl_status = htole32(0);
 			continue;
 		}
 
@@ -1267,16 +1274,14 @@ again:
 			printf("xl%d: bad receive status -- "
 			    "packet dropped", sc->xl_unit);
 			ifp->if_ierrors++;
-			cur_rx->xl_ptr->xl_status = 0;
+			cur_rx->xl_ptr->xl_status = htole32(0);
 			continue;
 		}
 
 		/* No errors; receive the packet. */	
 		m = cur_rx->xl_mbuf;
-		total_len = cur_rx->xl_ptr->xl_status & XL_RXSTAT_LENMASK;
-
-		bus_dmamap_sync(sc->sc_dmat, cur_rx->map, 0,
-		    cur_rx->map->dm_mapsize, BUS_DMASYNC_POSTREAD);
+		total_len = letoh32(cur_rx->xl_ptr->xl_status) &
+		    XL_RXSTAT_LENMASK;
 
 		/*
 		 * Try to conjure up a new mbuf cluster. If that
@@ -1287,7 +1292,7 @@ again:
 		 */
 		if (xl_newbuf(sc, cur_rx) == ENOBUFS) {
 			ifp->if_ierrors++;
-			cur_rx->xl_ptr->xl_status = 0;
+			cur_rx->xl_ptr->xl_status = htole32(0);
 			continue;
 		}
 
@@ -1435,12 +1440,19 @@ xl_txeof_90xB(sc)
 
 		cur_tx = &sc->xl_cdata.xl_tx_chain[idx];
 
-		if (!(cur_tx->xl_ptr->xl_status & XL_TXSTAT_DL_COMPLETE))
+		if ((cur_tx->xl_ptr->xl_status &
+		    htole32(XL_TXSTAT_DL_COMPLETE)) == 0)
 			break;
 
 		if (cur_tx->xl_mbuf != NULL) {
 			m_freem(cur_tx->xl_mbuf);
 			cur_tx->xl_mbuf = NULL;
+		}
+
+		if (cur_tx->map->dm_nsegs != 0) {
+			bus_dmamap_sync(sc->sc_dmat, cur_tx->map,
+			    0, cur_tx->map->dm_mapsize, BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->sc_dmat, cur_tx->map);
 		}
 
 		ifp->if_opackets++;
@@ -1669,8 +1681,10 @@ reload:
 		if (frag == XL_MAXFRAGS)
 			break;
 		total_len += map->dm_segs[frag].ds_len;
-		c->xl_ptr->xl_frag[frag].xl_addr = map->dm_segs[frag].ds_addr;
-		c->xl_ptr->xl_frag[frag].xl_len = map->dm_segs[frag].ds_len;
+		c->xl_ptr->xl_frag[frag].xl_addr =
+		    htole32(map->dm_segs[frag].ds_addr);
+		c->xl_ptr->xl_frag[frag].xl_len =
+		    htole32(map->dm_segs[frag].ds_len);
 	}
 
 	/*
@@ -1695,7 +1709,7 @@ reload:
 			}
 		}
 		m_copydata(m_head, 0, m_head->m_pkthdr.len,	
-					mtod(m_new, caddr_t));
+		    mtod(m_new, caddr_t));
 		m_new->m_pkthdr.len = m_new->m_len = m_head->m_pkthdr.len;
 		m_freem(m_head);
 		m_head = m_new;
@@ -1705,11 +1719,17 @@ reload:
 	bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE);
 
+	if (c->map->dm_nsegs != 0) {
+		bus_dmamap_sync(sc->sc_dmat, c->map,
+		    0, c->map->dm_mapsize, BUS_DMASYNC_POSTWRITE);
+		bus_dmamap_unload(sc->sc_dmat, c->map);
+	}
+
 	c->xl_mbuf = m_head;
 	sc->sc_tx_sparemap = c->map;
 	c->map = map;
-	c->xl_ptr->xl_frag[frag - 1].xl_len |= XL_LAST_FRAG;
-	c->xl_ptr->xl_status = total_len;
+	c->xl_ptr->xl_frag[frag - 1].xl_len |= htole32(XL_LAST_FRAG);
+	c->xl_ptr->xl_status = htole32(total_len);
 	c->xl_ptr->xl_next = 0;
 
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
@@ -1797,7 +1817,7 @@ void xl_start(ifp)
 	 * get an interupt once for the whole chain rather than
 	 * once for each packet.
 	 */
-	cur_tx->xl_ptr->xl_status |= XL_TXSTAT_DL_INTR;
+	cur_tx->xl_ptr->xl_status |= htole32(XL_TXSTAT_DL_INTR);
 
 	/*
 	 * Queue the packets. If the TX channel is clear, update
@@ -1812,7 +1832,7 @@ void xl_start(ifp)
 		    sc->sc_listmap->dm_segs[0].ds_addr +
 		    ((caddr_t)start_tx->xl_ptr - sc->sc_listkva);
 		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_status &=
-					~XL_TXSTAT_DL_INTR;
+		    htole32(~XL_TXSTAT_DL_INTR);
 		sc->xl_cdata.xl_tx_tail = cur_tx;
 	} else {
 		sc->xl_cdata.xl_tx_head = start_tx;
@@ -1869,7 +1889,7 @@ int xl_encap_90xB(sc, c, m_head)
 	 */
 	map = sc->sc_tx_sparemap;
 	d = c->xl_ptr;
-	d->xl_status = 0;
+	d->xl_status = htole32(0);
 	d->xl_next = 0;
 
 	if (bus_dmamap_load_mbuf(sc->sc_dmat, map,
@@ -1880,25 +1900,32 @@ int xl_encap_90xB(sc, c, m_head)
 		if (frag == XL_MAXFRAGS)
 			break;
 		f = &d->xl_frag[frag];
-		f->xl_addr = map->dm_segs[frag].ds_addr;
-		f->xl_len = map->dm_segs[frag].ds_len;
+		f->xl_addr = htole32(map->dm_segs[frag].ds_addr);
+		f->xl_len = htole32(map->dm_segs[frag].ds_len);
 	}
 
 	bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE);
 
+	/* sync the old map, and unload it (if necessary) */
+	if (c->map->dm_nsegs != 0) {
+		bus_dmamap_sync(sc->sc_dmat, c->map, 0, c->map->dm_mapsize,
+		    BUS_DMASYNC_POSTWRITE);
+		bus_dmamap_unload(sc->sc_dmat, c->map);
+	}
+
 	c->xl_mbuf = m_head;
 	sc->sc_tx_sparemap = c->map;
 	c->map = map;
-	c->xl_ptr->xl_frag[frag - 1].xl_len |= XL_LAST_FRAG;
-	c->xl_ptr->xl_status = XL_TXSTAT_RND_DEFEAT;
+	c->xl_ptr->xl_frag[frag - 1].xl_len |= htole32(XL_LAST_FRAG);
+	c->xl_ptr->xl_status = htole32(XL_TXSTAT_RND_DEFEAT);
 
 	if (m_head->m_pkthdr.csum & M_IPV4_CSUM_OUT)
-		c->xl_ptr->xl_status |= XL_TXSTAT_IPCKSUM;
+		c->xl_ptr->xl_status |= htole32(XL_TXSTAT_IPCKSUM);
 	if (m_head->m_pkthdr.csum & M_TCPV4_CSUM_OUT)
-		c->xl_ptr->xl_status |= XL_TXSTAT_TCPCKSUM;
+		c->xl_ptr->xl_status |= htole32(XL_TXSTAT_TCPCKSUM);
 	if (m_head->m_pkthdr.csum & M_UDPV4_CSUM_OUT)
-		c->xl_ptr->xl_status |= XL_TXSTAT_UDPCKSUM;
+		c->xl_ptr->xl_status |= htole32(XL_TXSTAT_UDPCKSUM);
 
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
 	    offsetof(struct xl_list_data, xl_tx_list[0]),
@@ -1943,7 +1970,7 @@ xl_start_90xB(ifp)
 
 		/* Chain it together. */
 		if (prev != NULL)
-			prev->xl_ptr->xl_next = cur_tx->xl_phys;
+			prev->xl_ptr->xl_next = htole32(cur_tx->xl_phys);
 		prev = cur_tx;
 
 #if NBPFILTER > 0
@@ -1972,11 +1999,11 @@ xl_start_90xB(ifp)
 	 * get an interupt once for the whole chain rather than
 	 * once for each packet.
 	 */
-	cur_tx->xl_ptr->xl_status |= XL_TXSTAT_DL_INTR;
+	cur_tx->xl_ptr->xl_status |= htole32(XL_TXSTAT_DL_INTR);
 
 	/* Start transmission */
 	sc->xl_cdata.xl_tx_prod = idx;
-	start_tx->xl_prev->xl_ptr->xl_next = start_tx->xl_phys;
+	start_tx->xl_prev->xl_ptr->xl_next = htole32(start_tx->xl_phys);
 
 	/*
 	 * Set a timeout in case the chip goes out to lunch.
@@ -2550,7 +2577,9 @@ xl_attach(sc)
 	struct ifmedia *ifm;
 
 	sc->xl_unit = sc->sc_dev.dv_unit;
+	i = splimp();
 	xl_reset(sc, 1);
+	splx(i);
 
 	/*
 	 * Get station address from the EEPROM.
@@ -2686,7 +2715,8 @@ xl_attach(sc)
 
 	if (sc->xl_flags & XL_FLAG_INVERT_MII_PWR) {
 		XL_SEL_WIN(2);
-		CSR_WRITE_2(sc, 12, 0x4000 | CSR_READ_2(sc, 12));
+		CSR_WRITE_2(sc, XL_W2_RESET_OPTIONS, XL_RESETOPT_INVMIIPWR |
+		    CSR_READ_2(sc, XL_W2_RESET_OPTIONS));
 	}
 
 	DELAY(100000);
@@ -2727,7 +2757,9 @@ xl_attach(sc)
 	 */
 	if (sc->xl_xcvr == XL_XCVR_AUTO) {
 		xl_choose_xcvr(sc, 0);
+		i = splimp();
 		xl_reset(sc, 0);
+		splx(i);
 	}
 
 	if (sc->xl_media & XL_MEDIAOPT_BT) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.107 2002/09/04 19:04:38 dhartmei Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.110 2003/02/12 14:41:07 jason Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -126,6 +126,8 @@
 #ifndef IPMTUDISCTIMEOUT
 #define IPMTUDISCTIMEOUT (10 * 60)	/* as per RFC 1191 */
 #endif
+
+struct ipqhead ipq;
 
 int encdebug = 0;
 int ipsec_keep_invalid = IPSEC_DEFAULT_EMBRYONIC_SA_TIMEOUT;
@@ -343,6 +345,7 @@ ipv4_input(m)
 	struct in_ifaddr *ia;
 	struct ipqent *ipqe;
 	int hlen, mff;
+	in_addr_t pfrdr = 0;
 #ifdef IPSEC
 	int error, s;
 	struct tdb *tdb;
@@ -443,6 +446,7 @@ ipv4_input(m)
 	/*
 	 * Packet filter
 	 */
+	pfrdr = ip->ip_dst.s_addr;
 	if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
 		goto bad;
 	if (m == NULL)
@@ -450,12 +454,7 @@ ipv4_input(m)
 
 	ip = mtod(m, struct ip *);
 	hlen = ip->ip_hl << 2;
-#endif
-
-#ifdef ALTQ
-	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0)
-		/* packet is dropped by traffic conditioner */
-		return;
+	pfrdr = (pfrdr != ip->ip_dst.s_addr);
 #endif
 
 	/*
@@ -581,7 +580,7 @@ ipv4_input(m)
 		 */
 #endif /* IPSEC */
 
-		ip_forward(m, 0);
+		ip_forward(m, pfrdr);
 	}
 	return;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.95 2002/05/27 13:42:16 itojun Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.101 2003/03/06 17:06:18 mickey Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -101,14 +101,13 @@ extern void nfs_init(void);
 const char	copyright[] =
 "Copyright (c) 1982, 1986, 1989, 1991, 1993\n"
 "\tThe Regents of the University of California.  All rights reserved.\n"
-"Copyright (c) 1995-2002 OpenBSD. All rights reserved.  http://www.OpenBSD.org\n";
+"Copyright (c) 1995-2003 OpenBSD. All rights reserved.  http://www.OpenBSD.org\n";
 
 /* Components of the first process -- never freed. */
 struct	session session0;
 struct	pgrp pgrp0;
 struct	proc proc0;
 struct	pcred cred0;
-struct	filedesc0 filedesc0;
 struct	plimit limit0;
 struct	vmspace vmspace0;
 struct	sigacts sigacts0;
@@ -171,11 +170,11 @@ int
 main(framep)
 	void *framep;				/* XXX should go away */
 {
-	register struct proc *p;
-	register struct pdevinit *pdev;
+	struct proc *p;
+	struct pdevinit *pdev;
 	struct timeval rtv;
-	register int i;
-	int s;
+	quad_t lim;
+	int s, i;
 	register_t rval[2];
 	extern struct pdevinit pdevinit[];
 	extern void scheduler_start(void);
@@ -187,8 +186,7 @@ main(framep)
 	 * Initialize the current process pointer (curproc) before
 	 * any possible traps/probes to simplify trap processing.
 	 */
-	p = &proc0;
-	curproc = p;
+	curproc = p = &proc0;
 
 	/*
 	 * Attempt to find console and initialize
@@ -217,8 +215,6 @@ main(framep)
 	 * Initialize timeouts.
 	 */
 	timeout_startup();
-
-	cpu_configure();
 
 	/* Initialize sysctls (must be done before any processes run) */
 	sysctl_init();
@@ -268,15 +264,13 @@ main(framep)
 	p->p_ucred = crget();
 	p->p_ucred->cr_ngroups = 1;	/* group 0 */
 
+	/* Initialize signal state for process 0. */
+	signal_init();
+	p->p_sigacts = &sigacts0;
+	siginit(p);
+
 	/* Create the file descriptor table. */
-	p->p_fd = &filedesc0.fd_fd;
-	filedesc0.fd_fd.fd_refcnt = 1;
-	filedesc0.fd_fd.fd_cmask = cmask;
-	filedesc0.fd_fd.fd_ofiles = filedesc0.fd_dfiles;
-	filedesc0.fd_fd.fd_ofileflags = filedesc0.fd_dfileflags;
-	filedesc0.fd_fd.fd_nfiles = NDFILE;
-	filedesc0.fd_fd.fd_himap = filedesc0.fd_dhimap;
-	filedesc0.fd_fd.fd_lomap = filedesc0.fd_dlomap;
+	p->p_fd = fdinit(NULL);
 
 	/* Create the limits structures. */
 	p->p_limit = &limit0;
@@ -287,10 +281,10 @@ main(framep)
 	limit0.pl_rlimit[RLIMIT_NOFILE].rlim_max = MIN(NOFILE_MAX,
 	    (maxfiles - NOFILE > NOFILE) ?  maxfiles - NOFILE : NOFILE);
 	limit0.pl_rlimit[RLIMIT_NPROC].rlim_cur = MAXUPRC;
-	i = ptoa(uvmexp.free);
-	limit0.pl_rlimit[RLIMIT_RSS].rlim_max = i;
-	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_max = i;
-	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = i / 3;
+	lim = ptoa(uvmexp.free);
+	limit0.pl_rlimit[RLIMIT_RSS].rlim_max = lim;
+	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_max = lim;
+	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = lim / 3;
 	limit0.p_refcnt = 1;
 
 	/* Allocate a prototype map so we have something to fork. */
@@ -311,7 +305,11 @@ main(framep)
 	 */
 	(void)chgproccnt(0, 1);
 
+	/* Initialize run queues */
 	rqinit();
+
+	/* Configure the devices */
+	cpu_configure();
 
 	/* Configure virtual memory system, set vm rlimits. */
 	uvm_init_limits(p);
@@ -368,11 +366,6 @@ main(framep)
 	/* Start the scheduler */
 	scheduler_start();
 
-	/* Initialize signal state for process 0. */
-	signal_init();
-	p->p_sigacts = &sigacts0;
-	siginit(p);
-
 	dostartuphooks();
 
 	/* Configure root/swap devices */
@@ -384,13 +377,13 @@ main(framep)
 		panic("cannot mount root");
 	CIRCLEQ_FIRST(&mountlist)->mnt_flag |= MNT_ROOTFS;
 
-	/* Get the vnode for '/'.  Set filedesc0.fd_fd.fd_cdir to reference it. */
+	/* Get the vnode for '/'.  Set p->p_fd->fd_cdir to reference it. */
 	if (VFS_ROOT(mountlist.cqh_first, &rootvnode))
 		panic("cannot find root vnode");
-	filedesc0.fd_fd.fd_cdir = rootvnode;
-	VREF(filedesc0.fd_fd.fd_cdir);
+	p->p_fd->fd_cdir = rootvnode;
+	VREF(p->p_fd->fd_cdir);
 	VOP_UNLOCK(rootvnode, 0, p);
-	filedesc0.fd_fd.fd_rdir = NULL;
+	p->p_fd->fd_rdir = NULL;
 
 	uvm_swap_init();
 
@@ -487,7 +480,8 @@ start_init(arg)
 		syscallarg(char **) argp;
 		syscallarg(char **) envp;
 	} */ args;
-	int options, i, error;
+	int options, error;
+	long i;
 	register_t retval[2];
 	char flags[4], *flagsp;
 	char **pathp, *path, *ucp, **uap, *arg0, *arg1 = NULL;
@@ -512,11 +506,7 @@ start_init(arg)
 	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 	    UVM_ADV_NORMAL, UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW)))
 		panic("init: couldn't allocate argument space");
-#ifdef MACHINE_STACK_GROWS_UP
-	p->p_vmspace->vm_maxsaddr = (caddr_t)addr + PAGE_SIZE;
-#else
 	p->p_vmspace->vm_maxsaddr = (caddr_t)addr;
-#endif
 
 	for (pathp = &initpaths[0]; (path = *pathp) != NULL; pathp++) {
 #ifdef MACHINE_STACK_GROWS_UP
@@ -583,10 +573,11 @@ start_init(arg)
 		/*
 		 * Move out the arg pointers.
 		 */
-		(void)suword((caddr_t)--uap, 0);	/* terminator */
+		i = 0;
+		copyout(&i, (caddr_t)--uap, sizeof(register_t)); /* terminator */
 		if (options != 0)
-			(void)suword((caddr_t)--uap, (long)arg1);
-		(void)suword((caddr_t)--uap, (long)arg0);
+			copyout(&arg1, (caddr_t)--uap, sizeof(register_t));
+		copyout(&arg0, (caddr_t)--uap, sizeof(register_t));
 
 		/*
 		 * Point at the arguments.
