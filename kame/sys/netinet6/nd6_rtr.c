@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.186 2001/12/12 01:55:44 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.187 2001/12/18 02:01:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1182,9 +1182,8 @@ nd6_prelist_add(pr, dr, newp)
 		}
 	}
 
-	if (dr) {
+	if (dr)
 		pfxrtr_add(new, dr);
-	}
 
 	return 0;
 }
