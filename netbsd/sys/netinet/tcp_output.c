@@ -617,6 +617,8 @@ send:
 			t = ipsec6_hdrsiz_tcp(tp);
 			break;
 #endif
+		default:
+			t = 0;
 		}
 		if (t < tp->t_ourmss)
 			tp->t_ourmss -= t;

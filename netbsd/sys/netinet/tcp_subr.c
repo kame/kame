@@ -493,6 +493,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_nxt = IPPROTO_TCP;
 			break;
 #endif
+		default:
+			th = NULL;
 		}
 		*th = *th0;
 		xchg(th->th_dport, th->th_sport, u_int16_t);
