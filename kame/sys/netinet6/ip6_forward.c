@@ -48,6 +48,10 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
 
+#ifdef IPV6FIREWALL
+#include <netinet6/ip6_fw.h>
+#endif
+
 #include <net/net_osdep.h>
 
 struct	route_in6 ip6_forward_rt;
@@ -70,7 +74,7 @@ ip6_forward(m, srcrt)
 	struct mbuf *m;
 	int srcrt;
 {
-	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	register struct sockaddr_in6 *dst;
 	register struct rtentry *rt;
 	int error, type = 0, code = 0;
@@ -182,6 +186,22 @@ ip6_forward(m, srcrt)
 	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt &&
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0)
 		type = ND_REDIRECT;
+
+#ifdef IPV6FIREWALL
+	/*
+	 * Check with the firewall...
+	 */
+	if (ip6_fw_chk_ptr) {
+		u_short port = 0;
+		/* If ipfw says divert, we have to just drop packet */
+		if ((*ip6_fw_chk_ptr)(&ip6, rt->rt_ifp, &port, &m)) {
+			m_freem(m);
+			goto freecopy;
+		}
+		if (!m)
+			goto freecopy;
+	}
+#endif
 
 	error = (*rt->rt_ifp->if_output)(rt->rt_ifp, m,
 					 (struct sockaddr *)dst,

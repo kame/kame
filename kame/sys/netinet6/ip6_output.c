@@ -107,6 +107,14 @@
 
 #include <net/net_osdep.h>
 
+#ifdef IPV6FIREWALL
+#include <netinet6/ip6_fw.h>
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+static MALLOC_DEFINE(M_IPMOPTS, "ip6_moptions", "internet multicast options");
+#endif
+
 struct ip6_exthdrs {
 	struct mbuf *ip6e_ip6;
 	struct mbuf *ip6e_hbh;
@@ -751,6 +759,24 @@ skip_ipsec2:;
 			ip6->ip6_dst.s6_addr16[1] = 0;
 	}
 
+#ifdef IPV6FIREWALL
+	/*
+	 * Check with the firewall...
+	 */
+	if (ip6_fw_chk_ptr) {
+		u_short port = 0;
+		/* If ipfw says divert, we have to just drop packet */
+		if ((*ip6_fw_chk_ptr)(&ip6, ifp, &port, &m)) {
+			m_freem(m);
+			goto done;
+		}
+		if (!m) {
+			error = EACCES;
+			goto done;
+		}
+	}
+#endif
+
 	/*
 	 * If the outgoing packet contains a hop-by-hop options header,
 	 * it must be examined and processed even by the source node.
@@ -1321,6 +1347,20 @@ ip6_ctloutput(op, so, level, optname, mp)
 				break;
 #endif /* IPSEC */
 
+#ifdef IPV6FIREWALL
+			case IPV6_FW_ADD:
+			case IPV6_FW_DEL:
+			case IPV6_FW_FLUSH:
+			case IPV6_FW_ZERO:
+				if (ip6_fw_ctl_ptr == NULL) {
+					if (m) (void)m_free(m);
+					return EINVAL;
+				}
+				error = (*ip6_fw_ctl_ptr)(optname, mp);
+				m = *mp;
+				break;
+#endif
+
 			default:
 				error = ENOPROTOOPT;
 				break;
@@ -1480,6 +1520,17 @@ ip6_ctloutput(op, so, level, optname, mp)
 				error = ipsec_get_policy(in6p->in6p_sp, mp);
 				break;
 #endif /* IPSEC */
+
+#ifdef IPV6FIREWALL
+			case IPV6_FW_GET:
+				if (ip6_fw_ctl_ptr == NULL) {
+					if (m)
+						(void)m_free(m);
+					return EINVAL;
+				}
+				error = (*ip6_fw_ctl_ptr)(optname, mp);
+				break;
+#endif
 
 			default:
 				error = ENOPROTOOPT;

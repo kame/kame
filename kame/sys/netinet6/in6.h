@@ -346,7 +346,15 @@ struct route_in6 {
 #if 1 /*IPSEC*/
 #define IPV6_IPSEC_POLICY	28 /* struct; get/set security policy */
 #endif
-#define IPV6_FAITH		32 /* bool; accept FAITH'ed connections */
+#define IPV6_FAITH		29 /* bool; accept FAITH'ed connections */
+
+#if 1 /*IPV6FIREWALL*/
+#define IPV6_FW_ADD		30 /* add a firewall rule to chain */
+#define IPV6_FW_DEL		31 /* delete a firewall rule from chain */
+#define IPV6_FW_FLUSH		32 /* flush firewall rule chain */
+#define IPV6_FW_ZERO		33 /* clear single/all firewall counter(s) */
+#define IPV6_FW_GET		34 /* get entire firewall rule chain */
+#endif
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
 #define IPV6_RTHDR_STRICT    1 /* this hop must be a neighbor. XXX old spec */

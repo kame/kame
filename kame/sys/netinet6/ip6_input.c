@@ -113,6 +113,10 @@
 #include <netinet/ip_icmp.h>
 #endif /*INET*/
 
+#ifdef IPV6FIREWALL
+#include <netinet6/ip6_fw.h>
+#endif
+
 #include <netinet6/ip6protosw.h>
 
 /* we need it for NLOOP. */
@@ -140,6 +144,12 @@ extern struct ifnet loif[NLOOP];
 int ip6_forward_srcrt;			/* XXX */
 int ip6_sourcecheck;			/* XXX */
 int ip6_sourcecheck_interval;		/* XXX */
+#endif
+
+#ifdef IPV6FIREWALL
+/* firewall hooks */
+ip6_fw_chk_t *ip6_fw_chk_ptr;
+ip6_fw_ctl_t *ip6_fw_ctl_ptr;
 #endif
 
 struct ip6stat ip6stat;
@@ -172,6 +182,9 @@ ip6_init()
 	ip6intrq.ifq_maxlen = ip6qmaxlen;
 	nd6_init();
 	frag6_init();
+#ifdef IPV6FIREWALL
+	ip6_fw_init();
+#endif
 	/*
 	 * in many cases, random() here does NOT return random number
 	 * as initialization during bootstrap time occur in fixed order.
@@ -245,7 +258,7 @@ void
 ip6_input(m)
 	struct mbuf *m;
 {
-	register struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6;
 	int off = sizeof(struct ip6_hdr), nest;
 	u_int32_t plen;
 	u_int32_t rtalert = ~0;
@@ -304,6 +317,23 @@ ip6_input(m)
 	}
 
 	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
+
+#ifdef IPV6FIREWALL
+	/*
+	 * Check with the firewall...
+	 */
+	if (ip6_fw_chk_ptr) {
+		u_short port = 0;
+		/* If ipfw says divert, we have to just drop packet */
+		/* use port as a dummy argument */
+		if ((*ip6_fw_chk_ptr)(&ip6, NULL, &port, &m)) {
+			m_freem(m);
+			m = NULL;
+		}
+		if (!m)
+			return;
+	}
+#endif
 
 	/*
 	 * Scope check
