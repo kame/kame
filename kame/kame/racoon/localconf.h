@@ -1,3 +1,5 @@
+/*	$KAME: localconf.h,v 1.17 2000/09/13 04:50:27 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.16 2000/09/12 14:46:48 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.17 2000/09/13 04:50:27 itojun Exp $ */
 
 /* local configuration */
 

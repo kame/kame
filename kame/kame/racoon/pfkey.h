@@ -1,3 +1,5 @@
+/*	$KAME: pfkey.h,v 1.11 2000/09/13 04:50:28 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.10 2000/08/31 10:21:22 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.11 2000/09/13 04:50:28 itojun Exp $ */
 
 struct ipsecsa;
 

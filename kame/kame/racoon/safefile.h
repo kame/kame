@@ -1,4 +1,6 @@
-/*	$KAME: safefile.h,v 1.1 2000/06/13 05:01:41 itojun Exp $	*/
+/*	$KAME: safefile.h,v 1.2 2000/09/13 04:50:28 itojun Exp $	*/
+
+/*	$KAME: safefile.h,v 1.2 2000/09/13 04:50:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.

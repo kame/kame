@@ -1,3 +1,5 @@
+/*	$KAME: isakmp_quick.c,v 1.51 2000/09/13 04:50:26 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.50 2000/09/06 08:53:38 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.51 2000/09/13 04:50:26 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

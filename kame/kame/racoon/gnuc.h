@@ -1,4 +1,4 @@
-/* @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/racoon/Attic/gnuc.h,v 1.1 2000/01/02 12:54:00 itojun Exp $ (LBL) */
+/*	$KAME: gnuc.h,v 1.2 2000/09/13 04:50:24 itojun Exp $	*/
 
 /* Define __P() macro, if necessary */
 #ifndef __P

@@ -1,3 +1,5 @@
+/*	$KAME: oakley.h,v 1.13 2000/09/13 04:50:27 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.12 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.13 2000/09/13 04:50:27 itojun Exp $ */
 
 /* refer to RFC 2409 */
 

@@ -1,3 +1,5 @@
+/*	$KAME: str2val.h,v 1.4 2000/09/13 04:50:29 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.h,v 1.3 2000/06/08 06:43:53 sakane Exp $ */
+/* YIPS @(#)$Id: str2val.h,v 1.4 2000/09/13 04:50:29 itojun Exp $ */
 
 extern caddr_t val2str __P((const char *, size_t));
 extern char *str2val __P((char *, int, size_t *));

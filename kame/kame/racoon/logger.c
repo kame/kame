@@ -1,3 +1,5 @@
+/*	$KAME: logger.c,v 1.3 2000/09/13 04:50:27 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: logger.c,v 1.2 2000/01/09 01:31:28 itojun Exp $
+ * $Id: logger.c,v 1.3 2000/09/13 04:50:27 itojun Exp $
  */
 
 #include <sys/types.h>

@@ -1,3 +1,5 @@
+/*	$KAME: sockmisc.h,v 1.5 2000/09/13 04:50:29 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.h,v 1.4 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.h,v 1.5 2000/09/13 04:50:29 itojun Exp $ */
 
 extern const int niflags;
 

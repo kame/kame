@@ -1,3 +1,5 @@
+/*	$KAME: crypto_openssl.h,v 1.13 2000/09/13 04:50:24 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: crypto_openssl.h,v 1.12 2000/08/30 08:33:14 sakane Exp $ */
+/* YIPS @(#)$Id: crypto_openssl.h,v 1.13 2000/09/13 04:50:24 itojun Exp $ */
 
 #ifdef HAVE_SIGNING_C
 /* X509 Certificate */

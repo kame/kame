@@ -1,3 +1,5 @@
+/*	$KAME: isakmp_newg.h,v 1.3 2000/09/13 04:50:26 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,6 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_newg.h,v 1.2 2000/06/08 06:43:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_newg.h,v 1.3 2000/09/13 04:50:26 itojun Exp $ */
 
 extern int isakmp_newgroup_r __P((struct ph1handle *, vchar_t *));

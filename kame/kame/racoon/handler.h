@@ -1,3 +1,5 @@
+/*	$KAME: handler.h,v 1.31 2000/09/13 04:50:25 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.30 2000/08/30 11:18:33 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.31 2000/09/13 04:50:25 itojun Exp $ */
 
 /* Phase 1 handler */
 /*

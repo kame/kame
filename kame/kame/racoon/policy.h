@@ -1,3 +1,5 @@
+/*	$KAME: policy.h,v 1.14 2000/09/13 04:50:28 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.13 2000/06/19 14:36:07 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.14 2000/09/13 04:50:28 itojun Exp $ */
 
 #include <sys/queue.h>
 

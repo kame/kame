@@ -1,3 +1,5 @@
+/*	$KAME: kmpstat.c,v 1.17 2000/09/13 04:50:26 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.16 2000/08/31 06:26:38 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.17 2000/09/13 04:50:26 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

@@ -1,3 +1,5 @@
+/*	$KAME: vmbuf.h,v 1.5 2000/09/13 04:50:30 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.h,v 1.4 2000/06/14 18:40:58 sakane Exp $ */
+/* YIPS @(#)$Id: vmbuf.h,v 1.5 2000/09/13 04:50:30 itojun Exp $ */
 
 /*
  *	bp      v

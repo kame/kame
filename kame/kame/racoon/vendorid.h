@@ -1,3 +1,5 @@
+/*	$KAME: vendorid.h,v 1.4 2000/09/13 04:50:30 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vendorid.h,v 1.3 2000/05/24 09:56:53 sakane Exp $ */
+/* YIPS @(#)$Id: vendorid.h,v 1.4 2000/09/13 04:50:30 itojun Exp $ */
 
 #define VENDORID	"KAME/racoon"
 

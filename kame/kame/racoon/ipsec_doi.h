@@ -1,3 +1,5 @@
+/*	$KAME: ipsec_doi.h,v 1.22 2000/09/13 04:50:25 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.21 2000/08/28 17:50:59 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.22 2000/09/13 04:50:25 itojun Exp $ */
 
 /* refered to RFC2407 */
 

@@ -1,3 +1,5 @@
+/*	$KAME: proposal.c,v 1.14 2000/09/13 04:50:28 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.13 2000/09/11 14:59:39 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.14 2000/09/13 04:50:28 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
