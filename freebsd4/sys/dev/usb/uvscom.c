@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2001, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
+ * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,8 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: uvscom.c,v 1.12 2001/11/15 15:27:04 akiyama Exp $
- *	$FreeBSD$
+ * $FreeBSD: src/sys/dev/usb/uvscom.c,v 1.1 2002/03/18 18:23:39 joe Exp $
  */
 
 /*
@@ -44,7 +43,11 @@
 #include <sys/conf.h>
 #include <sys/tty.h>
 #include <sys/file.h>
+#if __FreeBSD_version >= 500014
+#include <sys/selinfo.h>
+#else
 #include <sys/select.h>
+#endif
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
@@ -183,7 +186,7 @@ Static	void uvscom_break(struct uvscom_softc *, int);
 Static	void uvscom_set(void *, int, int, int);
 Static	void uvscom_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
 #if TODO
-Static	int  uvscom_ioctl(void *, int, u_long, caddr_t, int, struct proc *);
+Static	int  uvscom_ioctl(void *, int, u_long, caddr_t, int, usb_proc_ptr);
 #endif
 Static	int  uvscom_param(void *, int, struct termios *);
 Static	int  uvscom_open(void *, int);
@@ -243,7 +246,7 @@ USB_MATCH(uvscom)
 
 	for (i = 0; uvscom_products[i].vendor != 0; i++) {
 		if (uvscom_products[i].vendor == uaa->vendor &&
- 		    uvscom_products[i].product == uaa->product) {
+		    uvscom_products[i].product == uaa->product) {
 			return (UMATCH_VENDOR_PRODUCT);
 		}
 	}
@@ -268,17 +271,17 @@ USB_ATTACH(uvscom)
 
 	bzero(sc, sizeof (struct uvscom_softc));
 
-        usbd_devinfo(dev, 0, devinfo);
-        /* USB_ATTACH_SETUP; */
+	usbd_devinfo(dev, 0, devinfo);
+	/* USB_ATTACH_SETUP; */
 	ucom->sc_dev = self;
 	device_set_desc_copy(self, devinfo);
-        /* USB_ATTACH_SETUP; */
+	/* USB_ATTACH_SETUP; */
 
-        ucom->sc_udev = dev;
+	ucom->sc_udev = dev;
 	ucom->sc_iface = uaa->iface;
 
 	devname = USBDEVNAME(ucom->sc_dev);
-        printf("%s: %s\n", devname, devinfo);
+	printf("%s: %s\n", devname, devinfo);
 
 	DPRINTF(("uvscom attach: sc = %p\n", sc));
 
@@ -397,12 +400,12 @@ USB_DETACH(uvscom)
 
 	sc->sc_ucom.sc_dying = 1;
 
-        if (sc->sc_intr_pipe != NULL) {
-                usbd_abort_pipe(sc->sc_intr_pipe);
-                usbd_close_pipe(sc->sc_intr_pipe);
+	if (sc->sc_intr_pipe != NULL) {
+		usbd_abort_pipe(sc->sc_intr_pipe);
+		usbd_close_pipe(sc->sc_intr_pipe);
 		free(sc->sc_intr_buf, M_USBDEV);
-                sc->sc_intr_pipe = NULL;
-        }
+		sc->sc_intr_pipe = NULL;
+	}
 
 	rv = ucom_detach(&sc->sc_ucom);
 
@@ -412,19 +415,19 @@ USB_DETACH(uvscom)
 Static usbd_status
 uvscom_readstat(struct uvscom_softc *sc)
 {
-        usb_device_request_t req;
+	usb_device_request_t req;
 	usbd_status err;
 	uint16_t r;
 
 	DPRINTF(("%s: send readstat\n", USBDEVNAME(sc->sc_ucom.sc_dev)));
 
-        req.bmRequestType = UT_READ_VENDOR_DEVICE;
-        req.bRequest = UVSCOM_READ_STATUS;
-        USETW(req.wValue, 0);
-        USETW(req.wIndex, 0);
-        USETW(req.wLength, 2); 
- 
-        err = usbd_do_request(sc->sc_ucom.sc_udev, &req, &r); 
+	req.bmRequestType = UT_READ_VENDOR_DEVICE;
+	req.bRequest = UVSCOM_READ_STATUS;
+	USETW(req.wValue, 0);
+	USETW(req.wIndex, 0);
+	USETW(req.wLength, 2); 
+
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, &r); 
 	if (err) {
 		printf("%s: uvscom_readstat: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -440,18 +443,18 @@ uvscom_readstat(struct uvscom_softc *sc)
 Static usbd_status
 uvscom_shutdown(struct uvscom_softc *sc)
 {
-        usb_device_request_t req;
+	usb_device_request_t req;
 	usbd_status err;
 
 	DPRINTF(("%s: send shutdown\n", USBDEVNAME(sc->sc_ucom.sc_dev)));
 
-        req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-        req.bRequest = UVSCOM_SHUTDOWN;
-        USETW(req.wValue, 0);
-        USETW(req.wIndex, 0);
-        USETW(req.wLength, 0); 
- 
-        err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL); 
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = UVSCOM_SHUTDOWN;
+	USETW(req.wValue, 0);
+	USETW(req.wIndex, 0);
+	USETW(req.wLength, 0); 
+
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL); 
 	if (err) {
 		printf("%s: uvscom_shutdown: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -480,19 +483,19 @@ uvscom_set_crtscts(struct uvscom_softc *sc)
 Static usbd_status
 uvscom_set_line(struct uvscom_softc *sc, uint16_t line)
 {
-        usb_device_request_t req;
+	usb_device_request_t req;
 	usbd_status err;
 
 	DPRINTF(("%s: uvscom_set_line: %04x\n",
 		 USBDEVNAME(sc->sc_ucom.sc_dev), line));
 
-        req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-        req.bRequest = UVSCOM_LINE_CTL;
-        USETW(req.wValue, line);
-        USETW(req.wIndex, 0);
-        USETW(req.wLength, 0); 
- 
-        err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL); 
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = UVSCOM_LINE_CTL;
+	USETW(req.wValue, line);
+	USETW(req.wIndex, 0);
+	USETW(req.wLength, 0); 
+
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, NULL); 
 	if (err) {
 		printf("%s: uvscom_set_line: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -858,7 +861,7 @@ uvscom_get_status(void *addr, int portno, u_char *lsr, u_char *msr)
 #if TODO
 Static int
 uvscom_ioctl(void *addr, int portno, u_long cmd, caddr_t data, int flag,
-	     struct proc *p)
+	     usb_proc_ptr p)
 {
 	struct uvscom_softc *sc = addr;
 	int error = 0;

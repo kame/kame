@@ -1,6 +1,31 @@
 /*	$NetBSD: ucom.c,v 1.39 2001/08/16 22:31:24 augustss Exp $	*/
-/*	$FreeBSD$	*/
-/*	$Id: ucom.c,v 1.15 2001/11/18 10:25:15 akiyama Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.15 2002/03/18 18:23:39 joe Exp $	*/
+
+/*-
+ * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -39,6 +64,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * TODO:
+ * 1. How do I handle hotchar?
+ */
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -50,7 +80,11 @@
 #include <sys/tty.h>
 #include <sys/clist.h>
 #include <sys/file.h>
+#if __FreeBSD_version >= 500014
+#include <sys/selinfo.h>
+#else
 #include <sys/select.h>
+#endif
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
@@ -110,7 +144,6 @@ static struct cdevsw ucom_cdevsw = {
 	/* dump */      nodump,
 	/* psize */     nopsize,
 	/* flags */     D_TTY | D_KQFILTER,
-	/* bmaj */      -1,
 	/* kqfilter */	ttykqfilter,
 };
 
@@ -126,6 +159,8 @@ Static void ucom_break(struct ucom_softc *, int);
 Static usbd_status ucomstartread(struct ucom_softc *);
 Static void ucomreadcb(usbd_xfer_handle, usbd_private_handle, usbd_status);
 Static void ucomwritecb(usbd_xfer_handle, usbd_private_handle, usbd_status);
+Static void ucomstopread(struct ucom_softc *);
+static void disc_optim(struct tty *, struct termios *, struct ucom_softc *);
 
 devclass_t ucom_devclass;
 
@@ -175,12 +210,10 @@ ucom_detach(struct ucom_softc *sc)
 	if (sc->sc_bulkout_pipe != NULL)
 		usbd_abort_pipe(sc->sc_bulkout_pipe);
 
-#ifdef DIAGNOSTIC
 	if (sc->sc_tty == NULL) {
 		DPRINTF(("ucom_detach: no tty\n"));
 		return (0);
 	}
-#endif
 
 	destroy_dev(sc->dev);
 
@@ -337,7 +370,8 @@ ucomopen(dev_t dev, int flag, int mode, struct proc *p)
 		/*
 		 * Handle initial DCD.
 		 */
-		if (ISSET(sc->sc_msr, UMSR_DCD))
+		if (ISSET(sc->sc_msr, UMSR_DCD)
+		    || (minor(dev) & UCOM_CALLOUT_MASK))
 			(*linesw[tp->t_line].l_modem)(tp, 1);
 
 		ucomstartread(sc);
@@ -354,6 +388,8 @@ ucomopen(dev_t dev, int flag, int mode, struct proc *p)
 	error = (*linesw[tp->t_line].l_open)(dev, tp);
 	if (error)
 		goto bad;
+
+	disc_optim(tp, &tp->t_termios, sc);
 
 	DPRINTF(("%s: ucomopen: success\n", USBDEVNAME(sc->sc_dev)));
 
@@ -412,6 +448,7 @@ ucomclose(dev_t dev, int flag, int mode, struct proc *p)
 
 	s = spltty();
 	(*linesw[tp->t_line].l_close)(tp, flag);
+	disc_optim(tp, &tp->t_termios, sc);
 	ttyclose(tp);
 	splx(s);
 
@@ -501,6 +538,7 @@ ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	}
 
 	error = ttioctl(tp, cmd, data, flag);
+	disc_optim(tp, &tp->t_termios, sc);
 	if (error >= 0) {
 		DPRINTF(("ucomioctl: ttioctl: error = %d\n", error));
 		return (error);
@@ -707,6 +745,7 @@ ucomparam(struct tty *tp, struct termios *t)
 {
 	struct ucom_softc *sc;
 	int error;
+	usbd_status uerr;
 
 	USB_GET_SC(ucom, UCOMUNIT(tp->t_dev), sc);
 
@@ -742,12 +781,30 @@ ucomparam(struct tty *tp, struct termios *t)
 	if (sc->sc_callback->ucom_param == NULL)
 		return (0);
 
+	ucomstopread(sc);
+
 	error = sc->sc_callback->ucom_param(sc->sc_parent, sc->sc_portno, t);
 	if (error) {
 		DPRINTF(("ucomparam: callback: error = %d\n", error));
+		return (error);
 	}
 
-	return (error);
+	ttsetwater(tp);
+
+	if (t->c_cflag & CRTS_IFLOW) {
+		sc->sc_state |= UCS_RTS_IFLOW;
+	} else if (sc->sc_state & UCS_RTS_IFLOW) {
+		sc->sc_state &= ~UCS_RTS_IFLOW;
+		(void)ucomctl(sc, UMCR_RTS, DMBIS);
+	}
+
+	disc_optim(tp, t, sc);
+
+	uerr = ucomstartread(sc);
+	if (uerr != USBD_NORMAL_COMPLETION)
+		return (EIO);
+
+	return (0);
 }
 
 Static void
@@ -767,6 +824,22 @@ ucomstart(struct tty *tp)
 		return;
 
 	s = spltty();
+
+	if (tp->t_state & TS_TBLOCK) {
+		if (ISSET(sc->sc_mcr, UMCR_RTS) &&
+		    ISSET(sc->sc_state, UCS_RTS_IFLOW)) {
+			DPRINTF(("ucomstart: clear RTS\n"));
+			(void)ucomctl(sc, UMCR_RTS, DMBIC);
+		}
+	} else {
+		if (!ISSET(sc->sc_mcr, UMCR_RTS) &&
+		    tp->t_rawq.c_cc <= tp->t_ilowat &&
+		    ISSET(sc->sc_state, UCS_RTS_IFLOW)) {
+			DPRINTF(("ucomstart: set RTS\n"));
+			(void)ucomctl(sc, UMCR_RTS, DMBIS);
+		}
+	}
+
 	if (ISSET(tp->t_state, TS_BUSY | TS_TIMEOUT | TS_TTSTOP)) {
 		ttwwakeup(tp);
 		DPRINTF(("ucomstart: stopped\n"));
@@ -817,14 +890,12 @@ ucomstart(struct tty *tp)
 			USBD_NO_COPY, USBD_NO_TIMEOUT, ucomwritecb);
 	/* What can we do on error? */
 	err = usbd_transfer(sc->sc_oxfer);
-#ifdef DIAGNOSTIC
 	if (err != USBD_IN_PROGRESS)
 		printf("ucomstart: err=%s\n", usbd_errstr(err));
-#endif
 
 	ttwwakeup(tp);
 
-out:
+    out:
 	splx(s);
 }
 
@@ -838,14 +909,21 @@ ucomstop(struct tty *tp, int flag)
 
 	DPRINTF(("ucomstop: %d\n", flag));
 
-	s = spltty();
-	if (ISSET(tp->t_state, TS_BUSY)) {
-		DPRINTF(("ucomstop: XXX\n"));
-		/* XXX do what? */
-		if (!ISSET(tp->t_state, TS_TTSTOP))
-			SET(tp->t_state, TS_FLUSH);
+	if (flag & FREAD) {
+		DPRINTF(("ucomstop: read\n"));
+		ucomstopread(sc);
 	}
-	splx(s);
+
+	if (flag & FWRITE) {
+		DPRINTF(("ucomstop: write\n"));
+		s = spltty();
+		if (ISSET(tp->t_state, TS_BUSY)) {
+			/* XXX do what? */
+			if (!ISSET(tp->t_state, TS_TTSTOP))
+				SET(tp->t_state, TS_FLUSH);
+		}
+		splx(s);
+	}
 }
 
 Static void
@@ -864,7 +942,8 @@ ucomwritecb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 	if (status != USBD_NORMAL_COMPLETION) {
 		printf("%s: ucomwritecb: %s\n",
 		       USBDEVNAME(sc->sc_dev), usbd_errstr(status));
-		usbd_clear_endpoint_stall_async(sc->sc_bulkin_pipe);
+		if (status == USBD_STALLED)
+			usbd_clear_endpoint_stall_async(sc->sc_bulkin_pipe);
 		/* XXX we should restart after some delay. */
 		goto error;
 	}
@@ -900,6 +979,11 @@ ucomstartread(struct ucom_softc *sc)
 
 	DPRINTF(("ucomstartread: start\n"));
 
+	sc->sc_state &= ~UCS_RXSTOP;
+
+	if (sc->sc_bulkin_pipe == NULL)
+		return (USBD_NORMAL_COMPLETION);
+
 	usbd_setup_xfer(sc->sc_ixfer, sc->sc_bulkin_pipe, 
 			(usbd_private_handle)sc, 
 			sc->sc_ibuf, sc->sc_ibufsize,
@@ -924,14 +1008,17 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 	usbd_status err;
 	u_int32_t cc;
 	u_char *cp;
+	int lostcc;
 	int s;
 
 	DPRINTF(("ucomreadcb: status = %d\n", status));
 
 	if (status != USBD_NORMAL_COMPLETION) {
-		printf("%s: ucomreadcb: %s\n",
-		       USBDEVNAME(sc->sc_dev), usbd_errstr(status));
-		usbd_clear_endpoint_stall_async(sc->sc_bulkin_pipe);
+		if (!(sc->sc_state & UCS_RXSTOP))
+			printf("%s: ucomreadcb: %s\n",
+			       USBDEVNAME(sc->sc_dev), usbd_errstr(status));
+		if (status == USBD_STALLED)
+			usbd_clear_endpoint_stall_async(sc->sc_bulkin_pipe);
 		/* XXX we should restart after some delay. */
 		return;
 	}
@@ -943,14 +1030,35 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 					   &cp, &cc);
 
 	s = spltty();
-	/* Give characters to tty layer. */
-	while (cc-- > 0) {
-		DPRINTFN(7,("ucomreadcb: char = 0x%02x\n", *cp));
-		if ((*rint)(*cp++, tp) == -1) {
-			/* XXX what should we do? */
+	if (tp->t_state & TS_CAN_BYPASS_L_RINT) {
+		if (tp->t_rawq.c_cc + cc > tp->t_ihiwat
+		    && (sc->sc_state & UCS_RTS_IFLOW
+			|| tp->t_iflag & IXOFF)
+		    && !(tp->t_state & TS_TBLOCK))
+			ttyblock(tp);
+		lostcc = b_to_q((char *)cp, cc, &tp->t_rawq);
+		tp->t_rawcc += cc;
+		ttwakeup(tp);
+		if (tp->t_state & TS_TTSTOP
+		    && (tp->t_iflag & IXANY
+			|| tp->t_cc[VSTART] == tp->t_cc[VSTOP])) {
+			tp->t_state &= ~TS_TTSTOP;
+			tp->t_lflag &= ~FLUSHO;
+			ucomstart(tp);
+		}
+		if (lostcc > 0)
 			printf("%s: lost %d chars\n", USBDEVNAME(sc->sc_dev),
-			       cc);
-			break;
+			       lostcc);
+	} else {
+		/* Give characters to tty layer. */
+		while (cc-- > 0) {
+			DPRINTFN(7,("ucomreadcb: char = 0x%02x\n", *cp));
+			if ((*rint)(*cp++, tp) == -1) {
+				/* XXX what should we do? */
+				printf("%s: lost %d chars\n",
+				       USBDEVNAME(sc->sc_dev), cc);
+				break;
+			}
 		}
 	}
 	splx(s);
@@ -960,6 +1068,10 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 		printf("%s: read start failed\n", USBDEVNAME(sc->sc_dev));
 		/* XXX what should we dow now? */
 	}
+
+	if ((sc->sc_state & UCS_RTS_IFLOW) && !ISSET(sc->sc_mcr, UMCR_RTS)
+	    && !(tp->t_state & TS_TBLOCK))
+		ucomctl(sc, UMCR_RTS, DMBIS);
 }
 
 Static void
@@ -986,4 +1098,33 @@ ucom_cleanup(struct ucom_softc *sc)
 		usbd_free_xfer(sc->sc_oxfer);
 		sc->sc_oxfer = NULL;
 	}
+}
+
+Static void
+ucomstopread(struct ucom_softc *sc)
+{
+	if (!(sc->sc_state & UCS_RXSTOP)) {
+		if (sc->sc_bulkin_pipe == NULL)
+			return;
+		sc->sc_state |= UCS_RXSTOP;
+		usbd_abort_pipe(sc->sc_bulkin_pipe);
+	}
+}
+
+static void
+disc_optim(struct tty *tp, struct termios *t, struct ucom_softc *sc)
+{
+	if (!(t->c_iflag & (ICRNL | IGNCR | IMAXBEL | INLCR | ISTRIP | IXON))
+	    && (!(t->c_iflag & BRKINT) || (t->c_iflag & IGNBRK))
+	    && (!(t->c_iflag & PARMRK)
+		|| (t->c_iflag & (IGNPAR | IGNBRK)) == (IGNPAR | IGNBRK))
+	    && !(t->c_lflag & (ECHO | ICANON | IEXTEN | ISIG | PENDIN))
+	    && linesw[tp->t_line].l_rint == ttyinput) {
+		DPRINTF(("disc_optim: bypass l_rint\n"));
+		tp->t_state |= TS_CAN_BYPASS_L_RINT;
+	} else {
+		DPRINTF(("disc_optim: can't bypass l_rint\n"));
+		tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
+	}
+	sc->hotchar = linesw[tp->t_line].l_hotchar;
 }

@@ -1,6 +1,31 @@
 /*	$NetBSD: uplcom.c,v 1.20 2001/07/31 12:33:11 ichiro Exp $	*/
-/*	$FreeBSD$	*/
-/*	$Id: uplcom.c,v 1.9 2001/11/18 10:28:37 akiyama Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.1 2002/03/18 18:23:39 joe Exp $	*/
+
+/*-
+ * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -56,7 +81,11 @@
 #include <sys/conf.h>
 #include <sys/tty.h>
 #include <sys/file.h>
+#if __FreeBSD_version >= 500014
+#include <sys/selinfo.h>
+#else
 #include <sys/select.h>
+#endif
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
@@ -130,8 +159,8 @@ struct	uplcom_softc {
 #define UPLCOMOBUFSIZE 256
 
 Static	usbd_status uplcom_reset(struct uplcom_softc *);
-Static	usbd_status uplcom_set_line_coding(struct uplcom_softc *sc,
-					   usb_cdc_line_state_t *state);
+Static	usbd_status uplcom_set_line_coding(struct uplcom_softc *,
+					   usb_cdc_line_state_t *);
 Static	usbd_status uplcom_set_crtscts(struct uplcom_softc *);
 Static	void uplcom_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
 
@@ -140,9 +169,9 @@ Static	void uplcom_dtr(struct uplcom_softc *, int);
 Static	void uplcom_rts(struct uplcom_softc *, int);
 Static	void uplcom_break(struct uplcom_softc *, int);
 Static	void uplcom_set_line_state(struct uplcom_softc *);
-Static	void uplcom_get_status(void *, int portno, u_char *lsr, u_char *msr);
+Static	void uplcom_get_status(void *, int, u_char *, u_char *);
 #if TODO
-Static	int  uplcom_ioctl(void *, int, u_long, caddr_t, int, struct proc *);
+Static	int  uplcom_ioctl(void *, int, u_long, caddr_t, int, usb_proc_ptr);
 #endif
 Static	int  uplcom_param(void *, int, struct termios *);
 Static	int  uplcom_open(void *, int);
@@ -165,12 +194,16 @@ static const struct uplcom_product {
 } uplcom_products [] = {
 	/* I/O DATA USB-RSAQ */
 	{ USB_VENDOR_IODATA, USB_PRODUCT_IODATA_USBRSAQ },
+	/* I/O DATA USB-RSAQ2 */
+	{ USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_RSAQ2 },
 	/* PLANEX USB-RS232 URS-03 */
 	{ USB_VENDOR_ATEN, USB_PRODUCT_ATEN_UC232A },
 	/* IOGEAR/ATEN UC-232A */
 	{ USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_PL2303 },
 	/* TDK USB-PHS Adapter UHA6400 */
 	{ USB_VENDOR_TDK, USB_PRODUCT_TDK_UHA6400 },
+	/* RATOC REX-USB60 */
+	{ USB_VENDOR_RATOC, USB_PRODUCT_RATOC_REXUSB60 },
 	{ 0, 0 }
 };
 
@@ -206,7 +239,7 @@ USB_MATCH(uplcom)
 
 	for (i = 0; uplcom_products[i].vendor != 0; i++) {
 		if (uplcom_products[i].vendor == uaa->vendor &&
- 		    uplcom_products[i].product == uaa->product) {
+		    uplcom_products[i].product == uaa->product) {
 			return (UMATCH_VENDOR_PRODUCT);
 		}
 	}
@@ -231,17 +264,17 @@ USB_ATTACH(uplcom)
 
 	bzero(sc, sizeof (struct uplcom_softc));
 
-        usbd_devinfo(dev, 0, devinfo);
-        /* USB_ATTACH_SETUP; */
+	usbd_devinfo(dev, 0, devinfo);
+	/* USB_ATTACH_SETUP; */
 	ucom->sc_dev = self;
 	device_set_desc_copy(self, devinfo);
-        /* USB_ATTACH_SETUP; */
+	/* USB_ATTACH_SETUP; */
 
-        ucom->sc_udev = dev;
+	ucom->sc_udev = dev;
 	ucom->sc_iface = uaa->iface;
 
 	devname = USBDEVNAME(ucom->sc_dev);
-        printf("%s: %s\n", devname, devinfo);
+	printf("%s: %s\n", devname, devinfo);
 
 	DPRINTF(("uplcom attach: sc = %p\n", sc));
 
@@ -314,7 +347,7 @@ USB_ATTACH(uplcom)
 	 * USB-RSAQ1 has two interface
 	 *
 	 *  USB-RSAQ1       | USB-RSAQ2
- 	 * -----------------+-----------------
+	 * -----------------+-----------------
 	 * Interface 0      |Interface 0
 	 *  Interrupt(0x81) | Interrupt(0x81)
 	 * -----------------+ BulkIN(0x02)
@@ -410,12 +443,12 @@ USB_DETACH(uplcom)
 
 	DPRINTF(("uplcom_detach: sc = %p\n", sc));
 
-        if (sc->sc_intr_pipe != NULL) {
-                usbd_abort_pipe(sc->sc_intr_pipe);
-                usbd_close_pipe(sc->sc_intr_pipe);
+	if (sc->sc_intr_pipe != NULL) {
+		usbd_abort_pipe(sc->sc_intr_pipe);
+		usbd_close_pipe(sc->sc_intr_pipe);
 		free(sc->sc_intr_buf, M_USBDEV);
-                sc->sc_intr_pipe = NULL;
-        }
+		sc->sc_intr_pipe = NULL;
+	}
 
 	sc->sc_ucom.sc_dying = 1;
 
@@ -427,16 +460,16 @@ USB_DETACH(uplcom)
 Static usbd_status
 uplcom_reset(struct uplcom_softc *sc)
 {
-        usb_device_request_t req;
+	usb_device_request_t req;
 	usbd_status err;
 
-        req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
-        req.bRequest = UPLCOM_SET_REQUEST;
-        USETW(req.wValue, 0);
-        USETW(req.wIndex, sc->sc_iface_number);
-        USETW(req.wLength, 0); 
- 
-        err = usbd_do_request(sc->sc_ucom.sc_udev, &req, 0); 
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = UPLCOM_SET_REQUEST;
+	USETW(req.wValue, 0);
+	USETW(req.wIndex, sc->sc_iface_number);
+	USETW(req.wLength, 0); 
+
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, 0); 
 	if (err) {
 		printf("%s: uplcom_reset: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -748,7 +781,7 @@ uplcom_get_status(void *addr, int portno, u_char *lsr, u_char *msr)
 #if TODO
 Static int
 uplcom_ioctl(void *addr, int portno, u_long cmd, caddr_t data, int flag,
-	     struct proc *p)
+	     usb_proc_ptr p)
 {
 	struct uplcom_softc *sc = addr;
 	int error = 0;

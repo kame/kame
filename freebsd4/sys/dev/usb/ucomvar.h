@@ -1,6 +1,31 @@
 /*	$NetBSD: ucomvar.h,v 1.9 2001/01/23 21:56:17 augustss Exp $	*/
-/*	$FreeBSD$	*/
-/*	$Id: ucomvar.h,v 1.8 2001/11/18 10:27:17 akiyama Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ucomvar.h,v 1.1 2002/03/18 18:23:39 joe Exp $	*/
+
+/*-
+ * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -66,17 +91,17 @@
 struct ucom_softc;
 
 struct ucom_callback {
-	void (*ucom_get_status)(void *sc, int portno, u_char *lsr, u_char *msr);	void (*ucom_set)(void *sc, int portno, int reg, int onoff);
+	void (*ucom_get_status)(void *, int, u_char *, u_char *);
+	void (*ucom_set)(void *, int, int, int);
 #define UCOM_SET_DTR 1
 #define UCOM_SET_RTS 2
 #define UCOM_SET_BREAK 3
-	int (*ucom_param)(void *sc, int portno, struct termios *);
-	int (*ucom_ioctl)(void *sc, int portno, u_long cmd,
-			  caddr_t data, int flag, struct proc *p);
-	int (*ucom_open)(void *sc, int portno);
-	void (*ucom_close)(void *sc, int portno);
-	void (*ucom_read)(void *sc, int portno, u_char **ptr, u_int32_t *count);	void (*ucom_write)(void *sc, int portno, u_char *to, u_char *from,
-			   u_int32_t *count);
+	int (*ucom_param)(void *, int, struct termios *);
+	int (*ucom_ioctl)(void *, int, u_long, caddr_t, int, struct proc *);
+	int (*ucom_open)(void *, int);
+	void (*ucom_close)(void *, int);
+	void (*ucom_read)(void *, int, u_char **, u_int32_t *);
+	void (*ucom_write)(void *, int, u_char *, u_char *, u_int32_t *);
 };
 
 /* modem control register */
@@ -105,6 +130,10 @@ struct ucom_callback {
 #define UMSR_DDSR	0x02	/* DSR has changed state */
 #define UMSR_DCTS	0x01	/* CTS has changed state */
 
+/* ucom state declarations */
+#define UCS_RXSTOP	0x0001	/* Rx stopped */
+#define UCS_RTS_IFLOW	0x0008	/* use RTS input flow control */
+
 struct ucom_softc {
 	USBBASEDEVICE		sc_dev;		/* base device */
 	usbd_device_handle	sc_udev;	/* USB device */
@@ -131,7 +160,11 @@ struct ucom_softc {
 
 	struct tty		*sc_tty;	/* our tty */
 
+	int			sc_state;
+
 	int			sc_poll;
+	u_char			hotchar;
+
 	u_char			sc_lsr;
 	u_char			sc_msr;
 	u_char			sc_mcr;
