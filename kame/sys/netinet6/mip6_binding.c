@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.36 2001/11/19 07:50:06 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.37 2001/11/22 01:27:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -88,8 +88,8 @@ struct callout mip6_bc_ch = CALLOUT_INITIALIZER;
 struct callout mip6_bu_ch;
 struct callout mip6_bc_ch;
 #endif
-int mip6_bu_count = 0;
-int mip6_bc_count = 0;
+static int mip6_bu_count = 0;
+static int mip6_bc_count = 0;
 
 #ifdef MIP6_DRAFT13
 int mip6_use_ipsec = 0;

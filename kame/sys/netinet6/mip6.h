@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.29 2001/11/16 09:48:52 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.30 2001/11/22 01:27:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -160,9 +160,7 @@ int mip6_route_optimize			__P((struct mbuf *));
 int mip6_icmp6_input			__P((struct mbuf *, int, int));
 int mip6_icmp6_tunnel_input		__P((struct mbuf *, int, int));
 int mip6_icmp6_ha_discov_req_output	__P((struct hif_softc *));
-int mip6_icmp6_mps_output		__P((struct mip6_prefix *));
-int mip6_icmp6_mpa_output		__P((void));
-#ifdef MIP6_OLD
+#if 0
 int mip6_tunneled_rs_output		__P((struct hif_softc *,
 					     struct mip6_pfx *));
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.11 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.12 2001/11/22 01:27:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -67,29 +67,13 @@
 #include <netinet6/mip6.h>
 
 struct mip6_prefix_list mip6_prefix_list;
-int mip6_prefix_count = 0;
-
-static void mip6_prefix_timeout __P((void *));
-static void mip6_prefix_starttimer __P((void));
-static void mip6_prefix_stoptimer __P((void));
-
-#ifdef __NetBSD__
-struct callout mip6_prefix_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-struct callout mip6_prefix_ch;
-#endif
 
 extern struct mip6_subnet_list mip6_subnet_list;
 
 void
 mip6_prefix_init(void)
 {
-	mip6_prefix_count = 0;
 	LIST_INIT(&mip6_prefix_list);
-
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
-        callout_init(&mip6_prefix_ch);
-#endif
 }
 
 struct mip6_prefix *
@@ -152,14 +136,6 @@ mip6_prefix_list_insert(mpfx_list, mpfx)
 
 	LIST_INSERT_HEAD(mpfx_list, mpfx, mpfx_entry);
 
-	if (mip6_prefix_count == 0) {
-		mip6_prefix_starttimer();
-		mip6log((LOG_INFO,
-			 "%s:%d: prefix timer started.\n",
-			 __FILE__, __LINE__));
-	}
-	mip6_prefix_count++;
-
 	return (0);
 }
 
@@ -191,14 +167,6 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	
 	LIST_REMOVE(mpfx, mpfx_entry);
 	FREE(mpfx, M_TEMP);
-
-	mip6_prefix_count--;
-	if (mip6_prefix_count == 0) {
-		mip6log((LOG_INFO,
-			 "%s:%d: prefix timer stopped.\n",
-			 __FILE__, __LINE__));
-		mip6_prefix_stoptimer();
-	}
 
 	return (0);
 }
@@ -246,43 +214,4 @@ mip6_prefix_list_find_withhaddr(mpfx_list, haddr)
 
 	/* not found. */
 	return (NULL);
-}
-
-static void
-mip6_prefix_timeout(dummy)
-	void *dummy;
-{
-	int s;
-
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-	mip6_prefix_starttimer();
-
-	splx(s);
-}
-
-static void
-mip6_prefix_starttimer()
-{
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_reset(&mip6_prefix_ch,
-		      MIP6_PREFIX_TIMEOUT_INTERVAL * hz,
-		      mip6_prefix_timeout, NULL);
-#else
-	timeout(mip6_prefix_timeout, (void *)0,
-		MIP6_PREFIX_TIMEOUT_INTERVAL * hz);
-#endif
-}
-
-static void
-mip6_prefix_stoptimer()
-{
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_stop(&mip6_prefix_ch);
-#else
-	untimeout(mip6_prefix_timeout, (void *)0);
-#endif
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.9 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.10 2001/11/22 01:27:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -66,8 +66,19 @@
 #include <netinet6/mip6.h>
 
 struct mip6_subnet_list mip6_subnet_list;
+static int mip6_subnet_count = 0;
 
 extern struct mip6_prefix_list mip6_prefix_list;
+
+static void mip6_subnet_timeout __P((void *));
+static void mip6_subnet_starttimer __P((void));
+static void mip6_subnet_stoptimer __P((void));
+
+#ifdef __NetBSD__
+struct callout mip6_subnet_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct callout mip6_subnet_ch;
+#endif
 
 void
 mip6_subnet_init(void)
@@ -171,6 +182,14 @@ mip6_subnet_list_insert(ms_list, ms)
 
 	LIST_INSERT_HEAD(ms_list, ms, ms_entry);
 
+	if (mip6_subnet_count == 0) {
+		mip6_subnet_starttimer();
+		mip6log((LOG_INFO,
+			 "%s:%d: subnet timer started.\n",
+			 __FILE__, __LINE__));
+	}
+	mip6_subnet_count++;
+
 	return (0);
 }
 
@@ -187,6 +206,14 @@ mip6_subnet_list_remove(ms_list, ms)
 
 	LIST_REMOVE(ms, ms_entry);
 	error = mip6_subnet_delete(ms);
+
+	mip6_subnet_count--;
+	if (mip6_subnet_count == 0) {
+		mip6log((LOG_INFO,
+			 "%s:%d: subnet timer stopped.\n",
+			 __FILE__, __LINE__));
+		mip6_subnet_stoptimer();
+	}
 
 	return (error);
 }
@@ -211,6 +238,32 @@ mip6_subnet_list_find_withprefix(ms_list, prefix, prefixlen)
 		mspfx = mip6_subnet_prefix_list_find_withprefix(&ms->ms_mspfx_list,
 								prefix,
 								prefixlen);
+		if (mspfx) {
+			return (ms);
+		}
+	}
+
+	/* not found. */
+	return (NULL);
+}
+
+struct mip6_subnet *
+mip6_subnet_list_find_withmpfx(ms_list, mpfx)
+	struct mip6_subnet_list *ms_list;
+	struct mip6_prefix *mpfx;
+{
+	struct mip6_subnet *ms;
+	struct mip6_subnet_prefix *mspfx;
+
+	if ((ms_list == NULL) || (mpfx == NULL)) {
+		return (NULL);
+	}
+
+	for (ms = LIST_FIRST(&mip6_subnet_list);
+	     ms;
+	     ms = LIST_NEXT(ms, ms_entry)) {
+		mspfx =	mip6_subnet_prefix_list_find_withmpfx(&ms->ms_mspfx_list,
+							      mpfx);
 		if (mspfx) {
 			return (ms);
 		}
@@ -502,4 +555,95 @@ mip6_subnet_ha_list_find_withhaaddr(msha_list, haaddr)
 
 	/* not found. */
 	return (NULL);
+}
+
+static void
+mip6_subnet_timeout(arg)
+	void *arg;
+{
+	struct mip6_subnet *ms, *ms_next;
+	struct mip6_subnet_prefix *mspfx, *mspfx_next;
+	struct mip6_prefix *mpfx;
+	struct mip6_subnet_ha *msha, *msha_next, *msha_head;
+	struct mip6_ha *mha, *mha_head;
+	int s;
+
+	mip6_subnet_starttimer();
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	for (ms = LIST_FIRST(&mip6_subnet_list);
+	     ms;
+	     ms = ms_next) {
+		ms_next = LIST_NEXT(ms, ms_entry);
+
+		/* check for each ha. */
+		for (msha = TAILQ_FIRST(&ms->ms_msha_list);
+		     msha;
+		     msha = msha_next) {
+			msha_next = TAILQ_NEXT(msha, msha_entry);
+
+			mha = msha->msha_mha;
+			if (mha == NULL) {
+				/* must not happen. */
+				continue;
+			}
+			/*
+			 * XXX: TODO
+			 *
+			 * mip6_ha timeout routine will be here.
+			 */
+		}
+		msha_head = TAILQ_FIRST(&ms->ms_msha_list);
+		if ((mha_head = msha_head->msha_mha) == NULL) {
+			/* must not happen. */
+			continue;
+		}
+
+		/* check for each prefix. */
+		for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+		     mspfx;
+		     mspfx = mspfx_next) {
+			mspfx_next = TAILQ_NEXT(mspfx, mspfx_entry);
+			
+			mpfx = mspfx->mspfx_mpfx;
+			if (mpfx == NULL) {
+				/* must not happen. */
+				continue;
+			}
+			/*
+			 * XXX: TODO
+			 * check timeout and send mps req if needed.
+			 */
+		}
+	}
+
+	splx(s);
+}
+
+static void
+mip6_subnet_starttimer()
+{
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_reset(&mip6_subnet_ch,
+		      MIP6_SUBNET_TIMEOUT_INTERVAL * hz,
+		      mip6_subnet_timeout, NULL);
+#else
+	timeout(mip6_subnet_timeout, (void *)0,
+		MIP6_SUBNET_TIMEOUT_INTERVAL * hz);
+#endif
+}
+
+static void
+mip6_subnet_stoptimer()
+{
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_stop(&mip6_subnet_ch);
+#else
+	untimeout(mip6_subnet_timeout, (void *)0);
+#endif
 }
