@@ -16,6 +16,10 @@ static const char rcsid[] = "@(#)Id: fil.c,v 2.0.2.41.2.27 1998/11/22 01:50:15 d
 #endif
 #endif
 
+#ifdef _KERNEL
+#include "opt_inet.h"
+#endif
+
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -50,6 +54,11 @@ static const char rcsid[] = "@(#)Id: fil.c,v 2.0.2.41.2.27 1998/11/22 01:50:15 d
 # include <net/af.h>
 #endif
 #include <net/route.h>
+#ifdef _KERNEL
+#ifndef INET
+#error ipfilter assumes options INET
+#endif
+#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>

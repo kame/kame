@@ -819,10 +819,17 @@ sys_setsockopt(p, v, retval)
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
 		return (error);
-	if (SCARG(uap, valsize) > MLEN)
+	if (SCARG(uap, valsize) > MCLBYTES)
 		return (EINVAL);
 	if (SCARG(uap, val)) {
 		m = m_get(M_WAIT, MT_SOOPTS);
+		if (SCARG(uap, valsize) > MLEN) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				return (ENOBUFS);
+			}
+		}
 		error = copyin(SCARG(uap, val), mtod(m, caddr_t),
 			       SCARG(uap, valsize));
 		if (error) {
@@ -850,8 +857,8 @@ sys_getsockopt(p, v, retval)
 		syscallarg(unsigned int *) avalsize;
 	} */ *uap = v;
 	struct file *fp;
-	struct mbuf *m = NULL;
-	unsigned int valsize;
+	struct mbuf *m = NULL, *m0;
+	unsigned int op, i, valsize;
 	int error;
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
@@ -866,13 +873,19 @@ sys_getsockopt(p, v, retval)
 	if ((error = sogetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), &m)) == 0 && SCARG(uap, val) && valsize &&
 	    m != NULL) {
-		if (valsize > m->m_len)
-			valsize = m->m_len;
-		error = copyout(mtod(m, caddr_t), SCARG(uap, val),
-		    valsize);
+		op = 0;
+		while (m && !error && op < valsize) {
+			i = min(m->m_len, (valsize - op));
+			error = copyout(mtod(m, caddr_t), SCARG(uap, val), i);
+			op += i;
+			SCARG(uap, val) = ((u_int8_t *)SCARG(uap, val)) + i;
+			m0 = m;
+			MFREE(m0, m);
+		}
+		valsize = op;
 		if (error == 0)
-			error = copyout((caddr_t)&valsize,
-			    (caddr_t)SCARG(uap, avalsize), sizeof(valsize));
+			error = copyout(&valsize,
+					SCARG(uap, avalsize), sizeof(valsize));
 	}
 	if (m != NULL)
 		(void) m_free(m);

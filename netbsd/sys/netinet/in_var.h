@@ -138,6 +138,7 @@ extern  struct in_ifaddrhashhead *in_ifaddrhashtbl;	/* Hash table head */
 extern  struct in_ifaddrhead in_ifaddr;		/* List head (in ip_input) */
 
 extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
+extern	int	inetctlerrmap[];
 void	in_socktrim __P((struct sockaddr_in *));
 
 
@@ -307,7 +308,12 @@ void	in_setmaxmtu __P((void));
 const char *in_fmtaddr __P((struct in_addr));
 int	in_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 	    struct proc *));
+void	ip_input __P((struct mbuf *));
 int	ipflow_fastforward __P((struct mbuf *));
+
 #endif
+
+/* INET6 stuff */
+#include <netinet6/in6_var.h>
 
 #endif /* _NETINET_IN_VAR_H_ */

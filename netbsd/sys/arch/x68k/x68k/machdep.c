@@ -1080,6 +1080,7 @@ void	netintr __P((void));
 void	arpintr __P((void));
 void	atintr __P((void));
 void	ipintr __P((void));
+void	ip6intr __P((void));
 void	nsintr __P((void));
 void	clnlintr __P((void));
 void	ccittintr __P((void));
@@ -1099,6 +1100,12 @@ netintr()
 	if (netisr & (1 << NETISR_IP)) {
 		netisr &= ~(1 << NETISR_IP);
 		ipintr();
+	}
+#endif
+#ifdef INET6
+	if (netisr & (1 << NETISR_IPV6)) {
+		netisr &= ~(1 << NETISR_IPV6);
+		ip6intr();
 	}
 #endif
 #ifdef NETATALK

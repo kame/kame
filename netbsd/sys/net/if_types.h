@@ -176,4 +176,10 @@
 #define IFT_DOCSCABLEDOWNSTREAM	   0x80 /* CATV Downstream interface */
 #define IFT_DOCSCABLEUPSTREAM	   0x81 /* CATV Upstream interface */
 #define IFT_A12MPPSWITCH	   0x82	/* Avalon Parallel Processor */
+
+/* private usage... how should we define these? */
+#define	IFT_GIF		0xf0
+#define	IFT_DUMMY	0xf1
+#define IFT_PVC		0xf2
+#define IFT_FAITH	0xf3
 #endif /* _NET_IF_TYPES_H_ */

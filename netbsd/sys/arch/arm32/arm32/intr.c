@@ -66,6 +66,13 @@
 #endif	/* NARP > 0 */
 #include <netinet/ip_var.h>
 #endif 	/* INET */
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif /* INET6 */
 #ifdef NS
 #include <netns/ns_var.h>
 #endif	/* NS */
@@ -206,6 +213,12 @@ dosoftints()
 		if (netisr & (1 << NETISR_IP)) {
 			atomic_clear_bit(&netisr, (1 << NETISR_IP));
 			ipintr();
+		}
+#endif
+#ifdef INET6
+		if (netisr & (1 << NETISR_IPV6)) {
+			atomic_clear_bit(&netisr, (1 << NETISR_IPV6));
+			ip6intr();
 		}
 #endif
 #ifdef NETATALK

@@ -66,6 +66,10 @@
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#else
+#ifdef _KERNEL
+#error options CCITT assumes options INET
+#endif
 #endif
 
 #ifdef NS

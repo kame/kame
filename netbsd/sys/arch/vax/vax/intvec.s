@@ -313,6 +313,9 @@ ENTRY(netint)
 #endif
 	bbcc	$NETISR_IP,_netisr,1f; calls $0,_ipintr; 1:
 #endif
+#ifdef INET6
+	bbcc	$NETISR_IPV6,_netisr,1f; calls $0,_ip6intr; 1:
+#endif
 #ifdef NETATALK
 	bbcc	$NETISR_ATALK,_netisr,1f; calls $0,_atintr; 1:
 #endif

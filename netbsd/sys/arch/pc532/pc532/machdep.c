@@ -115,6 +115,13 @@
 #include <netinet/if_inarp.h>
 #include <netinet/ip_var.h>
 #endif
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
 #ifdef NETATALK
 #include <netatalk/at_extern.h>
 #endif
@@ -1355,6 +1362,9 @@ softnet(arg)
 	if (isr & (1 << NETISR_ARP)) arpintr();
 #endif
 	if (isr & (1 << NETISR_IP)) ipintr();
+#endif
+#ifdef INET6
+	if (isr & (1 << NETISR_IPV6)) ip6intr();
 #endif
 #ifdef NETATALK
 	if (isr & (1 << NETISR_ATALK)) atintr();

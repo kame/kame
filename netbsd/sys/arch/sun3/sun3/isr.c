@@ -116,6 +116,7 @@ isr_add_custom(level, handler)
  */
 void arpintr __P((void));
 void ipintr __P((void));
+void ip6intr __P((void));
 void atintr __P((void));
 void nsintr __P((void));
 void clnlintr __P((void));
@@ -138,6 +139,10 @@ void netintr()
 #ifdef INET
 	if (n & (1 << NETISR_IP))
 		ipintr();
+#endif
+#ifdef INET6
+	if (n & (1 << NETISR_IPV6))
+		ip6intr();
 #endif
 #ifdef NETATALK
 	if (n & (1 << NETISR_ATALK))

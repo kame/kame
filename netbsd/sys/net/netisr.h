@@ -64,6 +64,7 @@
 #define	NETISR_ATALK	16		/* same as AF_APPLETALK */
 #define	NETISR_ARP	18		/* same as AF_LINK */
 #define NETISR_IPX	23		/* same as AF_IPX */
+#define NETISR_IPV6	24		/* same as AF_INET6 */
 #define NETISR_ISDN	26		/* same as AF_E164 */
 #define NETISR_NATM	27		/* same as AF_NATM */
 #define NETISR_PPP	28		/* for PPP processing */

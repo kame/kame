@@ -43,7 +43,16 @@ struct	tcp_debug {
 	short	td_act;
 	short	td_ostate;
 	caddr_t	td_tcb;
+	int	td_family;
 	struct	tcpiphdr td_ti;
+	struct {
+#ifdef INET6
+		struct ip6_hdr ip6;
+#else
+		u_char ip6_dummy[40];	/* just to keep struct align/size */
+#endif
+		struct tcphdr th;
+	} td_ti6;
 	short	td_req;
 	struct	tcpcb td_cb;
 };

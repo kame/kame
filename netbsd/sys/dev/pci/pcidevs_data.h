@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.118.2.1 1999/04/13 22:52:43 jonathan Exp $	*/
+/*	$NetBSD$	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.114 1999/04/12 23:18:16 jonathan Exp 
+ *	NetBSD: pcidevs,v 1.113.2.1 1999/04/13 22:52:42 jonathan Exp 
  */
 
 /*
@@ -2812,6 +2812,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "Video Controller",
 	},
 	{
+	    PCI_VENDOR_INVERTEX, PCI_PRODUCT_INVERTEX_AEON,
+	    0,
+	    "Invertex",
+	    "AEON",
+	},
+	{
 	    PCI_VENDOR_MARTINMARIETTA, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "Martin-Marietta Corporation",
@@ -5563,6 +5569,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_LMC, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "LAN Media Corporation",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_INVERTEX, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "Invertex",
 	    NULL,
 	},
 	{

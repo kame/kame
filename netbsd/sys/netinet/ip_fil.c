@@ -20,6 +20,10 @@ static const char rcsid[] = "@(#)Id: ip_fil.c,v 2.0.2.44.2.10 1998/11/22 01:50:2
 #define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 #endif
 
+#ifdef _KERNEL
+#include "opt_inet.h"
+#endif
+
 #if defined(KERNEL) && !defined(_KERNEL)
 # define	_KERNEL
 #endif
@@ -78,6 +82,11 @@ static const char rcsid[] = "@(#)Id: ip_fil.c,v 2.0.2.44.2.10 1998/11/22 01:50:2
 # endif
 #endif
 #include <net/route.h>
+#ifdef _KERNEL
+#ifndef INET
+#error ipfilter assumes options INET
+#endif
+#endif
 #include <netinet/in.h>
 #if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */
 #include <netinet/in_var.h>

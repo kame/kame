@@ -83,6 +83,14 @@
 #include <netinet/ip_var.h>
 #endif
 
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
+
 #include <machine/bat.h>
 #include <machine/pmap.h>
 #include <machine/powerpc.h>
@@ -895,6 +903,10 @@ softnet()
 #endif
 	if (isr & (1 << NETISR_IP))
 		ipintr();
+#endif
+#ifdef	INET6
+	if (isr & (1 << NETISR_IPV6))
+		ip6intr();
 #endif
 #ifdef	IMP
 	if (isr & (1 << NETISR_IMP))

@@ -153,6 +153,13 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.167.2.3 1999/04/29 14:41:58 perry Exp 
 #include <netinet/if_inarp.h>
 #endif
 #endif
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
 #ifdef NS
 #include <netns/ns_var.h>
 #endif
@@ -1975,6 +1982,9 @@ netintr()
 	DONETISR(NETISR_ARP, arpintr());
 #endif
 	DONETISR(NETISR_IP, ipintr());
+#endif
+#ifdef INET6
+	DONETISR(NETISR_IPV6, ip6intr());
 #endif
 #ifdef NETATALK
 	DONETISR(NETISR_ATALK, atintr());

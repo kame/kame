@@ -143,7 +143,10 @@
 #define	M_FILECOREMNT	91	/* Filcore FS mount structures */
 #define	M_FILECORENODE	92	/* Filcore FS vnode private part */
 #define	M_RAIDFRAME	93	/* RAIDframe structures */
-#define	M_LAST		94	/* Must be last type + 1 */
+#define	M_SECA		94	/* security associations, key management */
+#define	M_IP6OPT	95	/* IPv6 options */
+#define	M_IP6NDP	96	/* IPv6 Neighbour Discovery */
+#define	M_LAST		97	/* Must be last type + 1 */
 
 #define	INITKMEMNAMES { \
 	"free",		/* 0 M_FREE */ \
@@ -240,7 +243,10 @@
 	"filecore mount", /* 91 M_FILECOREMNT */ \
 	"filecore node", /* 92 M_FILECORENODE */ \
 	"RAIDframe",	/* 93 M_RAIDFRAME */ \
-	NULL,		/* 94 */ \
+	"key mgmt",	/* 94 M_SECA */ \
+	"ip6_options",	/* 95 M_IP6OPT */ \
+	"NDP",		/* 96 M_IP6NDP */ \
+	NULL,		/* 97 */ \
 }
 
 struct kmemstats {

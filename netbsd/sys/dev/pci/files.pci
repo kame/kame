@@ -111,6 +111,11 @@ device  tl: ether, ifnet, arp, i2c, i2c_eeprom, mii
 attach  tl at pci
 file    dev/pci/if_tl.c     		tl
 
+# Invertix AEON crypto/compression card
+device	aeon: crypto
+attach	aeon at pci
+file	dev/pci/aeon.c			aeon
+
 # SDL Communications N2 PCI Network Interface
 device	ntwoc: ifnet, hd64570
 attach	ntwoc at pci with ntwoc_pci

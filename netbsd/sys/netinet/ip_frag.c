@@ -16,6 +16,10 @@ static const char rcsid[] = "@(#)Id: ip_frag.c,v 2.0.2.19.2.6 1998/11/22 01:50:2
 #endif
 #endif
 
+#ifdef _KERNEL
+#include "opt_inet.h"
+#endif
+
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +60,11 @@ static const char rcsid[] = "@(#)Id: ip_frag.c,v 2.0.2.19.2.6 1998/11/22 01:50:2
 #include <net/af.h>
 #endif
 #include <net/route.h>
+#ifdef _KERNEL
+#ifndef INET
+#error ipfilter assumes options INET
+#endif
+#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>

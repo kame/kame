@@ -897,6 +897,9 @@ void	pppintr __P((void));
 #ifdef INET
 void	ipintr __P((void));
 #endif
+#ifdef INET6
+void	ip6intr __P((void));
+#endif
 #ifdef NETATALK
 void	atintr __P((void));
 #endif
@@ -930,6 +933,12 @@ netintr()
 	if (netisr & (1 << NETISR_IP)) {
 		netisr &= ~(1 << NETISR_IP);
 		ipintr();
+	}
+#endif
+#ifdef INET6
+	if (netisr & (1 << NETISR_IPV6)) {
+		netisr &= ~(1 << NETISR_IPV6);
+		ip6intr();
 	}
 #endif
 #ifdef NETATALK

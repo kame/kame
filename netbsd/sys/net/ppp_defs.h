@@ -78,6 +78,7 @@
 #define PPP_IPCP	0x8021	/* IP Control Protocol */
 #define PPP_ATCP	0x8029	/* AppleTalk Control Protocol */
 #define PPP_IPXCP	0x802b	/* IPX Control Protocol */
+#define PPP_IPV6CP	0x8057	/* IPv6 Control Protocol */
 #define PPP_CCP		0x80fd	/* Compression Control Protocol */
 #define PPP_LCP		0xc021	/* Link Control Protocol */
 #define PPP_PAP		0xc023	/* Password Authentication Protocol */

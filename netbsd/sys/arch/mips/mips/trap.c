@@ -105,6 +105,14 @@ __KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.107 1999/03/24 05:51:05 mrg Exp $");
 #include <netinet/if_inarp.h>
 #include <netinet/ip_var.h>
 
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
+
 #include "ppp.h"
 
 #if NPPP > 0
@@ -763,6 +771,9 @@ interrupt(status, cause, pc)
 			if (isr & (1 << NETISR_ARP)) arpintr();
 #endif
 			if (isr & (1 << NETISR_IP)) ipintr();
+#endif
+#ifdef INET6
+			if (isr & (1 << NETISR_IPV6)) ip6intr();
 #endif
 #ifdef NETATALK
 			if (isr & (1 << NETISR_ATALK)) atintr();

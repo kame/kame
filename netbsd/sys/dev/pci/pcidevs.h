@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs.h,v 1.120.2.1 1999/04/13 22:52:42 jonathan Exp $	*/
+/*	$NetBSD$	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.114 1999/04/12 23:18:16 jonathan Exp 
+ *	NetBSD: pcidevs,v 1.113.2.1 1999/04/13 22:52:42 jonathan Exp 
  */
 
 /*
@@ -509,6 +509,7 @@
 #define	PCI_VENDOR_PICTUREEL	0x12c5		/* Picture Elements */
 #define	PCI_VENDOR_STB2	0x12d2		/* STB Systems (2nd PCI Vendor ID) */
 #define	PCI_VENDOR_LMC	0x1376		/* LAN Media Corporation */
+#define	PCI_VENDOR_INVERTEX	0x14e1		/* Invertex */
 #define	PCI_VENDOR_SYMPHONY2	0x1c1c		/* Symphony Labs (2nd PCI Vendor ID) */
 #define	PCI_VENDOR_TEKRAM2	0x1de1		/* Tekram Technology (2nd PCI Vendor ID) */
 #define	PCI_VENDOR_3DLABS	0x3d3d		/* 3D Labs */
@@ -1226,3 +1227,6 @@
 
 /* Zoran products */
 #define	PCI_PRODUCT_ZORAN_ZR36120	0x6120		/* Video Controller */
+
+/* Invertex */
+#define	PCI_PRODUCT_INVERTEX_AEON	0x0005		/* AEON */

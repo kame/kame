@@ -169,6 +169,9 @@ IDTVEC(softnet)
 #endif
 	DONET(NETISR_IP, _C_LABEL(ipintr))
 #endif
+#ifdef INET6
+	DONET(NETISR_IPV6, _C_LABEL(ip6intr))
+#endif
 #ifdef IMP
 	DONET(NETISR_IMP, _C_LABEL(impintr))
 #endif
