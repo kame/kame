@@ -21,7 +21,7 @@ DOCS=	CHANGELOG COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL INSTALL.cvsup \
 
 beforeinstall:
 	for i in $(DIRS); do \
-		[ -d ${DESTDIR}$$i ] || mkdir -p $${DESTDIR}$i; \
+		[ -d ${DESTDIR}$$i ] || mkdir -p $${DESTDIR}$$i; \
 	done
 	for i in $(SECTIONS); do \
 		[ -d ${DESTDIR}$(PREFIX)/man/man$$i ] || \
