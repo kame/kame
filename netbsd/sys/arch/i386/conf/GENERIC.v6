@@ -29,7 +29,7 @@ pseudo-device	gif		4
 #options 	PMDEBUG			# Enable debug feature.
 
 # Network Address Translation - Protocol Translation (NAT-PT)
-#options         NATPT
+#options 	NATPT
 
 # a pseudo device needed for ALTQ
 pseudo-device	altq			# altq pseudo-device
