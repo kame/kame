@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.39 2000/10/23 04:24:22 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.40 2000/10/25 06:31:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -420,7 +420,7 @@ ah4_input(m, va_alist)
 	}
 
 	/* was it transmitted over the IPsec tunnel SA? */
-	if (ipsec4_tunnel_validate(ip, nxt, sav) && nxt == IPPROTO_IPV4) {
+	if (ipsec4_tunnel_validate(ip, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes AH.
 		 *	IP xx AH IP' payload -> IP' payload
@@ -891,7 +891,7 @@ ah6_input(mp, offp, proto)
 	}
 
 	/* was it transmitted over the IPsec tunnel SA? */
-	if (ipsec6_tunnel_validate(ip6, nxt, sav) && nxt == IPPROTO_IPV6) {
+	if (ipsec6_tunnel_validate(ip6, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes AH.
 		 *	IP6 xx AH IP6' payload -> IP6' payload
