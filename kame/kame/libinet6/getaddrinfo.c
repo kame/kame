@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.162 2004/04/11 06:50:00 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.163 2004/04/13 07:43:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -255,7 +255,7 @@ typedef union {
 #endif
 
 /* functions in OS independent portion */
-static int str_isnumber __P((const char *));
+static int str2number __P((const char *));
 static int explore_copy __P((const struct addrinfo *, const struct addrinfo *,
 	struct addrinfo **));
 static int explore_null __P((const struct addrinfo *,
@@ -403,20 +403,21 @@ freeaddrinfo(ai)
 }
 
 static int
-str_isnumber(p)
+str2number(p)
 	const char *p;
 {
 	char *ep;
+	int v;
 
 	if (*p == '\0')
-		return NO;
+		return -1;
 	ep = NULL;
 	errno = 0;
-	(void)strtoul(p, &ep, 10);
+	v = (int)strtoul(p, &ep, 10);
 	if (errno == 0 && ep && *ep == '\0')
-		return YES;
+		return (int)v;
 	else
-		return NO;
+		return -1;
 }
 
 int
@@ -1559,14 +1560,15 @@ get_port(ai, servname, matchonly)
 		return EAI_SOCKTYPE;
 	}
 
-	if (str_isnumber(servname)) {
-		if (!allownumeric)
-			return EAI_SERVICE;
-		port = atoi(servname);
-		if (port < 0 || port > 65535)
+	port = str2number(servname);
+	if (port >= 0) {
+		if (port < 0 || 65535 < port)
 			return EAI_SERVICE;
 		port = htons(port);
 	} else {
+		if (ai->ai_flags & AI_NUMERICSERV)
+			return EAI_SERVICE;
+
 		switch (ai->ai_protocol) {
 		case IPPROTO_UDP:
 			proto = "udp";
