@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.37 2000/06/04 12:46:13 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.38 2000/07/06 05:36:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,7 +239,7 @@ nd6_ns_input(m, off, icmp6len)
 	}
 	if (!ifa) {
 		/*
-		 * We've got a NS packet, and we don't have that adddress
+		 * We've got an NS packet, and we don't have that adddress
 		 * assigned for us.  We MUST silently ignore it.
 		 * See RFC2461 7.2.3.
 		 */
