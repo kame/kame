@@ -1,4 +1,4 @@
-# $Id: sandiego.pl,v 1.1 2000/01/11 17:35:32 sakane Exp $
+# $Id: sandiego.pl,v 1.2 2000/01/11 18:06:38 itojun Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "./psk.txt" ;
@@ -28,8 +28,8 @@ padding {
 # if no listen directive is specified, racoon will listen to all
 # available interface addresses.
 listen {
-	isakmp 127.0.0.1 [7000];
-	isakmp 206.175.160.23 [500];
+#	isakmp 127.0.0.1 [7000];
+#	isakmp 0.0.0.0 [500];
 	admin [7002];	# administrative's port by kmpstat.
 }
 
@@ -170,7 +170,7 @@ remote 194.100.55.1 [500]
 	}
 }
 
-policy 206.175.160.23 0.0.0.0/0 any out ipsec
+policy 206.175.160.20/30 0.0.0.0/0 any out ipsec
 {
 	#pfs_group modp768;
 
