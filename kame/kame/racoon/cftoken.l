@@ -503,6 +503,8 @@ yycf_set_buffer(path)
 {
 	yyin = fopen(path, "r");
 	if (yyin == NULL) {
+		fprintf(stderr, "fialed to open file %s (%s)\n",
+			path, strerror(errno));
 		plog(logp, LOCATION, NULL,
 			"fialed to open file %s (%s)\n",
 			path, strerror(errno));
