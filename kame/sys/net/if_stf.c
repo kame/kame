@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.11 2000/03/11 14:34:47 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.12 2000/03/12 00:06:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -297,9 +297,7 @@ stf_getsrcifa6(ifp)
 #else
 
 		for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next) {
-			if (ia4->ia_ifp != ifp)
-				continue;
-			if (ia4->ia_addr.sin_addr.s_addr == in.s_addr)
+			if (IA_SIN(ia4)->sin_addr.s_addr == in.s_addr)
 				break;
 		}
 #endif
