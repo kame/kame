@@ -67,12 +67,10 @@ struct mld_group_record_hdr {	/* Multicast Address Record  */
 #define nmcastrcd mldv2_hdr.icmp6_data16[1]
 
 struct mld_report_hdr {	/* Multicast Report */
-    u_int8_t  mld_type;	/* Multicast Report Type */
-    u_int8_t  mld_reserved1;	/* Reserved */
-    u_int16_t mld_cksum;	/* Checksum */
-    u_int16_t mld_reserved2;	/* Reserved */
-    u_int16_t mld_grpnum;	/* Number of Multicast Address Records */
+    struct icmp6_hdr	mld_icmp6_hdr;	/* version & type of MLD message */
 };
+
+#define mld_grpnum	mld_icmp6_hdr.icmp6_data16[1]
 #endif
 
 #ifndef MLD_MINLEN
