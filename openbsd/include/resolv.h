@@ -1,4 +1,4 @@
-/*	$OpenBSD: resolv.h,v 1.10 2002/06/03 12:14:30 deraadt Exp $	*/
+/*	$OpenBSD: resolv.h,v 1.14 2003/08/01 17:38:33 avsm Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -43,11 +43,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- * 	This product includes software developed by the University of
- * 	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  * 
@@ -347,13 +343,19 @@ int		dn_expand(const u_char *, const u_char *, const u_char *,
 		    char *, int);
 int		res_init(void);
 u_int		res_randomid(void);
-int		res_query(const char *, int, int, u_char *, int);
-int		res_search(const char *, int, int, u_char *, int);
+int		res_query(const char *, int, int, u_char *, int)
+			__attribute__((__bounded__(__string__,4,5)));
+int		res_search(const char *, int, int, u_char *, int)
+			__attribute__((__bounded__(__string__,4,5)));
 int		res_querydomain(const char *, const char *, int, int,
-		    u_char *, int);
+		    u_char *, int)
+			__attribute__((__bounded__(__string__,5,6)));
 int		res_mkquery(int, const char *, int, int, const u_char *, int,
-		    const u_char *, u_char *, int);
-int		res_send(const u_char *, int, u_char *, int);
+		    const u_char *, u_char *, int)
+			__attribute__((__bounded__(__string__,5,6)))
+			__attribute__((__bounded__(__string__,8,9)));
+int		res_send(const u_char *, int, u_char *, int)
+			__attribute__((__bounded__(__string__,3,4)));
 int		res_isourserver(const struct sockaddr_in *);
 int		res_nameinquery(const char *, int, int,
 		    const u_char *, const u_char *);
