@@ -1,0 +1,3 @@
+exclude altq_conf.c
+exclude altq_conf.h
+exclude if_altq.h
