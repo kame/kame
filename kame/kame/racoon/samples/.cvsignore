@@ -2,5 +2,4 @@ basic.conf
 policy.conf
 psk.txt
 racoon.conf
-remote.conf
 sa.conf
