@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.9 2003/02/28 07:08:06 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.10 2003/03/03 01:01:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.9 2003/02/28 07:08:06 t-momose Exp $
+ * $Id: haadisc.c,v 1.10 2003/03/03 01:01:51 t-momose Exp $
  */
 
 /*
@@ -1130,10 +1130,10 @@ mpi_advert_output(dst, src, haif, id)
     map->mp_adv_type = ICMP6_MOBILEPREFIX_ADVERT;
     map->mp_adv_code = 0;
 
-    len = 4;
+    len = sizeof(struct mobile_prefix_advert);
     prefix_info = (struct nd_opt_prefix_info *)&map[1];
     /* count number of prefix informations -- to make assurance (not in spec.) */
-    count = (IPV6_MMTU - sizeof (struct ip6_hdr) -
+    count = (IPV6_MMTU - sizeof (struct ip6_hdr) - /* XXX: should include the size of routing header*/
 			 sizeof (struct mobile_prefix_advert)) / sizeof (struct nd_opt_prefix_info);
 
     /* Pick home agent prefixes */
@@ -1162,7 +1162,7 @@ mpi_advert_output(dst, src, haif, id)
     cm->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
     pi = (struct in6_pktinfo *)CMSG_DATA(cm);
     pi->ipi6_addr = *src;
-    pi->ipi6_ifindex = 0; /* determined with routeing table */
+    pi->ipi6_ifindex = 0; /* determined with a routing table */
 
     if ((len = sendmsg(sock, &sndmhdr, 0)) < 0) {
         syslog(LOG_ERR, __FUNCTION__ "%s.\n", strerror(errno));
