@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.78 2001/08/02 15:54:49 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.79 2001/08/06 10:37:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -921,7 +921,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped, loopback)
 		case AF_INET:
 			sin = (struct sockaddr_in *)ifa->ifa_addr;
 			if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY ||
-			    IN_CLASSD(sin->sin_addr.s_addr))
+			    IN_CLASSD(ntohl(sin->sin_addr.s_addr)))
 				continue;
 			if (ntohl(sin->sin_addr.s_addr) == INADDR_LOOPBACK) {
 				if (!loopback)
