@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.8 2000/12/04 06:45:29 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.9 2001/07/11 09:13:27 suz Exp $	*/
 
 %{
 /*
@@ -529,6 +529,11 @@ slash		\/
 <S_IFCONF>disable { YYD_ECHO; return(DISABLE); }
 <S_IFCONF>preference { YYD_ECHO; return(PREFERENCE); }
 <S_IFCONF>metric { YYD_ECHO; return(METRIC); }
+<S_IFCONF>robustness { YYD_ECHO; return(ROBUST); }
+<S_IFCONF>query_interval { YYD_ECHO; return(QUERY_INT); }
+<S_IFCONF>query_rsp_interval { YYD_ECHO; return(QUERY_INT_RESP); }
+<S_IFCONF>llqi { YYD_ECHO; return(LLQI); }
+<S_IFCONF>mld_version { YYD_ECHO; return(MLD_VERSION); }
 <S_IFCONF>nolistener { YYD_ECHO; return(NOLISTENER); }
 <S_IFCONF>{semi} { DP("end phyint"); BEGIN S_CNF; return(EOS); }
 

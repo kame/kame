@@ -1,7 +1,5 @@
-/*	$KAME: mld6.h,v 1.9 2001/07/11 09:13:26 suz Exp $	*/
-
 /*
- * Copyright (C) 1998 WIDE Project.
+ * Copyright (C) 1999 LSIIT Laboratory.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,37 +32,35 @@
  *
  */
 /*
- * This program has been derived from pim6dd.        
- * The pim6dd program is covered by the license in the accompanying file
- * named "LICENSE.pim6dd".
- */
-/*
- * This program has been derived from pimd.        
+ * This program has been derived from pimd.
  * The pimd program is covered by the license in the accompanying file
  * named "LICENSE.pimd".
  *
  */
 
 
-#ifndef MLD6_H
-#define MLD6_H
+#ifndef MLD6V2_PROTO_H
+#define MLD6V2_PROTO_H
 
-#define RECV_BUF_SIZE			64*1024
-#define SO_RECV_BUF_SIZE_MAX	256*1024
-#define SO_RECV_BUF_SIZE_MIN	48*1024
-#define MINHLIM							1
+/* compatibility modes and mld versions */
 
+#define MLDv2	2
+#define MLDv1	1
 
-
-extern int mld6_socket;
-extern char *mld6_recv_buf;
-extern struct sockaddr_in6 allrouters_group;
-extern struct sockaddr_in6 allnodes_group;
-extern char *mld6_send_buf;
-
-void init_mld6 __P((void));
-void send_mld6 __P((int type, int code, struct sockaddr_in6 *src,
-		    struct sockaddr_in6 *dst, struct in6_addr *group,
-		    int index, int delay, int datalen, int alert));
+extern void query_groupsV2 __P((struct uvif * v));
+extern void accept_listenerV2_query __P((struct sockaddr_in6 * src,
+					 struct in6_addr * dst,
+					 register char *query_message,
+					 int datalen));
+extern void accept_listenerV2_report __P((struct sockaddr_in6 * src,
+					  struct in6_addr * dst,
+					  register char *report_message,
+					  int datalen));
+extern struct listaddr *check_multicastV2_listener __P((struct uvif * v,
+							struct sockaddr_in6 *
+							group,
+							struct listaddr ** g,
+							struct sockaddr_in6 *
+							source));
 
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.4 2000/12/04 06:45:30 itojun Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.5 2001/07/11 09:13:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -48,6 +48,49 @@
 
 #ifndef MLD6_PROTO_H
 #define MLD6_PROTO_H
+
+/* structure used to send multicast group/source specific queries */
+typedef struct
+{
+	vifi_t vifi;
+	struct listaddr *g;
+	struct listaddr *s;
+	int q_time;
+} cbk_t;
+
+/*
+ * Constans for Multicast Listener Discovery protocol for IPv6.
+ */
+
+#define	MLD6_DEFAULT_VERSION	1
+#define MLD6_DEFAULT_ROBUSTNESS_VARIABLE        2
+#define MLD6_DEFAULT_QUERY_INTERVAL 125 /* in seconds */
+#define MLD6_DEFAULT_QUERY_RESPONSE_INTERVAL 10000 /* in milliseconds */
+#define MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL 10000 /* in milliseconds */
+
+#define MLD6_ROBUSTNESS_VARIABLE	v->uv_mld_robustness
+#define MLD6_QUERY_INTERVAL		v->uv_mld_query_interval
+#define MLD6_QUERY_RESPONSE_INTERVAL 	v->uv_mld_query_rsp_interval
+#define MLD6_LAST_LISTENER_QUERY_INTERVAL	v->uv_mld_llqi
+#ifndef MLD6_TIMER_SCALE
+#define MLD6_TIMER_SCALE 1000
+#endif
+
+#define MLD6_LISTENER_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
+                MLD6_QUERY_INTERVAL + \
+                MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
+#define MLD6_OLDER_VERSION_HOST_PRESENT (MLD6_ROBUSTNESS_VARIABLE * \
+		MLD6_QUERY_INTERVAL + \
+		MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)	
+#define MLD6_LAST_LISTENER_QUERY_COUNT      MLD6_ROBUSTNESS_VARIABLE
+
+#define MLD6_OTHER_QUERIER_PRESENT_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
+		MLD6_QUERY_INTERVAL + \
+		MLD6_QUERY_RESPONSE_INTERVAL / (2 * MLD6_TIMER_SCALE))
+#define MLD6_OLDER_VERSION_HOST_PRESENT (MLD6_ROBUSTNESS_VARIABLE * \
+		MLD6_QUERY_INTERVAL + \
+		MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
+
 
 extern void     query_groups            __P((struct uvif *v));
 extern int      check_grp_membership    __P((struct uvif *v, 

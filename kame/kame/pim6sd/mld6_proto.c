@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.19 2001/06/25 04:54:29 itojun Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.20 2001/07/11 09:13:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -109,6 +109,8 @@
 #include "defs.h"
 #include "mld6.h"
 #include "vif.h"
+#include "mld6_proto.h"
+#include "mld6v2_proto.h"
 #include "debug.h"
 #include "inet6.h"
 #include "mrt.h"
@@ -119,13 +121,6 @@
 #include "mld6_proto.h"
 
 extern struct in6_addr in6addr_any;
-
-typedef struct
-{
-	mifi_t mifi;
-	struct listaddr *g;
-	int q_time;
-} cbk_t;
 
 
 /*
@@ -181,6 +176,15 @@ accept_listener_query(src, dst, group, tmo)
 	}
 	v = &uvifs[mifi];
 	v->uv_in_mld_query++;
+
+	if(v->uv_mld_version == MLDv2)
+	{
+		log(LOG_WARNING,0,
+		    "Mif %s configured in MLDv2 received MLDv1 query (src %s)!",
+		    v->uv_name,sa6_fmt(src));
+		return;
+	}
+
 	IF_DEBUG(DEBUG_MLD)
 		log(LOG_DEBUG, 0,
 		    "accepting multicast listener query on %s: "

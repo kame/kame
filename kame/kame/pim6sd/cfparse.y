@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.14 2001/06/19 10:36:00 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.15 2001/07/11 09:13:27 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -35,6 +35,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/ip_mroute.h>
+#include <netinet/icmp6.h>
 #include <netinet6/ip6_mroute.h>
 #include <arpa/inet.h>
 #include <string.h>
@@ -53,6 +54,9 @@
 #include "pimd.h"
 #include "timer.h"
 #include "inet6.h"
+#include "mld6_proto.h"
+#include "mld6v2_proto.h"
+#include "mld6v2.h"
 
 #define set_param(var,val,p) \
 	do {\
@@ -81,7 +85,9 @@ struct attr_list {
 
 enum {IFA_FLAG, IFA_PREFERENCE, IFA_METRIC, RPA_PRIORITY, RPA_TIME,
       BSRA_PRIORITY, BSRA_TIME, BSRA_MASKLEN, IN6_PREFIX, THRESA_RATE,
-      THRESA_INTERVAL};
+      THRESA_INTERVAL,
+      IFA_ROBUST, IFA_QUERY_INT, IFA_QUERY_INT_RESP, IFA_MLD_VERSION, IFA_LLQI,
+     };
 
 static int strict;		/* flag if the grammer check is strict */
 static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
@@ -108,6 +114,7 @@ extern int yylex __P((void));
 %token YES NO
 %token REVERSELOOKUP
 %token PHYINT IFNAME DISABLE PREFERENCE METRIC NOLISTENER
+%token ROBUST QUERY_INT QUERY_INT_RESP MLD_VERSION LLQI
 %token GRPPFX
 %token CANDRP CANDBSR TIME PRIORITY MASKLEN
 %token NUMBER STRING SLASH
@@ -206,6 +213,36 @@ if_attributes:
 	|	if_attributes METRIC NUMBER
 		{
 			if (($$ = add_attribute_num($1, IFA_METRIC, $3))
+			    == NULL)
+				return(-1);
+		}
+	|	if_attributes ROBUST NUMBER
+		{
+			if (($$ = add_attribute_num($1, IFA_ROBUST, $3))
+			    == NULL)
+				return(-1);
+		}
+	|	if_attributes QUERY_INT NUMBER
+		{
+			if (($$ = add_attribute_num($1, IFA_QUERY_INT, $3))
+			    == NULL)
+				return(-1);
+		}
+	|	if_attributes QUERY_INT_RESP NUMBER
+		{
+			if (($$ = add_attribute_num($1, IFA_QUERY_INT_RESP, $3))
+ 			    == NULL)
+				return(-1);
+		}
+	|	if_attributes LLQI NUMBER
+		{
+			if (($$ = add_attribute_num($1, IFA_LLQI, $3))
+			    == NULL)
+				return(-1);
+		}
+	|	if_attributes MLD_VERSION NUMBER
+		{
+			if (($$ = add_attribute_num($1, IFA_MLD_VERSION, $3))
 			    == NULL)
 				return(-1);
 		}
@@ -604,6 +641,8 @@ phyint_config()
 	struct uvif *v;
 	vifi_t vifi;
 	struct attr_list *al;
+	unsigned int qqic;
+	unsigned int realnbr;
 	
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v) {
 		for (al = (struct attr_list *)v->config_attr; al; al = al->next) {
@@ -640,6 +679,124 @@ phyint_config()
 						    v->uv_name,
 						    v->uv_metric);
 				}
+				break;
+			case IFA_ROBUST:
+				if (al->attru.number < 1 ||
+				    al->attru.number > 7)
+					yywarn("invalid robustness(%d)",
+					       (int) al->attru.number);
+				else {
+					v->uv_mld_robustness = al->attru.number;
+					IF_DEBUG(DEBUG_MLD)
+						log(LOG_DEBUG, 0,
+						    "mld robustness var. for %s "
+						    "is %d",
+						    v->uv_name,
+						    v->uv_mld_robustness);
+				}
+				break;
+			case IFA_MLD_VERSION:
+				if (al->attru.number != 1 && 
+				    al->attru.number != 2)
+					yywarn("invalid mld version(%d)",
+					       (int) al->attru.number);
+				else {
+					v->uv_mld_version = al->attru.number;
+					IF_DEBUG(DEBUG_MLD)
+						log(LOG_DEBUG, 0,
+						    "mld version for %s "
+						    "is %d",
+						    v->uv_name,
+						    v->uv_mld_version);
+				}
+				break;
+			case IFA_QUERY_INT:
+				/* if the mld version is 2 we have to verify if this */
+				/* value is codable in the QQIC field */
+
+				if(v->uv_mld_version == MLDv2 )
+				{
+					qqic = codafloat(al->attru.number,&realnbr,3,4);
+					if(al->attru.number != realnbr )
+						yywarn("unrepresentable query int. value %.0f, corrected to %d",
+							al->attru.number,realnbr);
+				}
+
+				if(v->uv_mld_version == MLDv2) 
+					v->uv_mld_query_interval = realnbr;
+				else
+					v->uv_mld_query_interval = al->attru.number;
+
+				IF_DEBUG(DEBUG_MLD)
+					log(LOG_DEBUG, 0,
+					    "mld query interval for %s "
+					    "is %d",
+					    v->uv_name,
+					    v->uv_mld_query_interval);
+				break;
+			case IFA_QUERY_INT_RESP:
+				/* if the mld version is 2 we have to verify if this */
+				/* value is codable in the MAX RESP CODE field */
+				/* if this is mld version 1 we have to verify if this */
+				/* can be coded in 16 bits */
+				if(v->uv_mld_version == MLDv2 )
+				{
+					qqic = codafloat(al->attru.number,&realnbr,3,12);
+					if(al->attru.number != realnbr )
+						yywarn("unrepresentable query resp. value %.0f, corrected to %d",
+							al->attru.number,realnbr);
+				}
+
+				if(v->uv_mld_version == MLDv2 ) 
+					v->uv_mld_query_rsp_interval = realnbr;
+				else
+				{
+					if(al->attru.number>65536)
+					{
+						yywarn("unrepresentable query resp. value %.0f ms set to default (%d ms)",
+							al->attru.number,MLD6_DEFAULT_QUERY_RESPONSE_INTERVAL);
+					break;	
+					}	
+					v->uv_mld_query_rsp_interval = al->attru.number;
+				}
+				IF_DEBUG(DEBUG_MLD)
+					log(LOG_DEBUG, 0,
+					    "mld query resp. interval for %s "
+					    "is %d",
+					    v->uv_name,
+					    v->uv_mld_query_rsp_interval);
+				break;
+			case IFA_LLQI:
+				/* if the mld version is 2 we have to verify if this */
+				/* value is codable in the MAX RESP CODE field */
+				/* if this is mld version 1 we have to verify if this */
+				/* can be coded in 16 bits */
+				if(v->uv_mld_version == MLDv2 )
+				{
+					qqic = codafloat(al->attru.number,&realnbr,3,12);
+					if(al->attru.number != realnbr )
+						yywarn("unrepresentable llqi value %.0f, corrected to %d",
+							al->attru.number,realnbr);
+				}
+
+				if(v->uv_mld_version == MLDv2 ) 
+					v->uv_mld_llqi = realnbr;
+				else
+				{
+					if(al->attru.number>65536)
+					{
+						yywarn("unrepresentable llqi value %.0f ms set to default (%d ms)",
+							al->attru.number,MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL);
+					break;	
+					}	
+					v->uv_mld_llqi = al->attru.number;
+				}
+				IF_DEBUG(DEBUG_MLD)
+					log(LOG_DEBUG, 0,
+					    "mld llqi interval for %s "
+					    "is %d",
+					    v->uv_name,
+					    v->uv_mld_llqi);
 				break;
 			}
 		}

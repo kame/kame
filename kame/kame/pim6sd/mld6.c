@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.31 2001/06/25 04:54:29 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.32 2001/07/11 09:13:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -95,10 +95,12 @@
 #include "vif.h"
 #include "mrt.h"
 #include "mld6.h"
+#include "mld6v2.h"
 #include "kern.h"
 #include "inet6.h"
 #include "debug.h"
 #include "mld6_proto.h"
+#include "mld6v2_proto.h"
 #include "route.h"
 #include "trace.h"
 
@@ -118,9 +120,8 @@ extern struct in6_addr in6addr_linklocal_allnodes;
 
 /* local variables. */
 static struct sockaddr_in6 	dst = {sizeof(dst), AF_INET6};
-static struct msghdr 		sndmh,
-                		rcvmh;
-static struct iovec 		sndiov[2];
+struct msghdr 		sndmh, rcvmh;
+struct iovec 		sndiov[2];
 static struct iovec 		rcviov[2];
 static struct sockaddr_in6 	from;
 static u_char   		*rcvcmsgbuf = NULL;
@@ -129,8 +130,8 @@ static int			rcvcmsglen;
 #ifndef USE_RFC2292BIS
 u_int8_t raopt[IP6OPT_RTALERT_LEN];
 #endif 
-static char *sndcmsgbuf;
-static int ctlbuflen = 0;
+char *sndcmsgbuf;
+int ctlbuflen = 0;
 static u_short rtalert_code;
 
 /* local functions */
@@ -194,6 +195,8 @@ init_mld6()
     ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_REDUCTION, &filt);
     ICMP6_FILTER_SETPASS(MLD6_MTRACE_RESP, &filt);
     ICMP6_FILTER_SETPASS(MLD6_MTRACE, &filt);
+    ICMP6_FILTER_SETPASS(MLD6V2_LISTENER_REPORT,&filt);
+
     if (setsockopt(mld6_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		   sizeof(filt)) < 0)
 	log(LOG_ERR, errno, "setsockopt(ICMP6_FILTER)");
@@ -274,6 +277,11 @@ mld6_read(i, rfd)
 /*
  * Process a newly received MLD6 packet that is sitting in the input packet
  * buffer.
+ * the MLD version of a multicast listener Query is determined as
+ * follow : MLDv1 query : recvlen = 24
+ *          MLDv2 query : recvlen >= 28
+ *          MLDv2 report type!= MLDv1 report type
+ * Query messages that do not match any of the above conditions are ignored.
  */
 static void
 accept_mld6(recvlen)
@@ -392,8 +400,11 @@ int recvlen;
 	switch (mldh->mld6_type)
 	{
 	case MLD6_LISTENER_QUERY:
-		accept_listener_query(src, dst, group,
-				      ntohs(mldh->mld6_maxdelay));
+		if (recvlen == 24)
+			accept_listener_query(src, dst, group,
+					      ntohs(mldh->mld6_maxdelay));
+		if (recvlen >= 28)
+			accept_listenerV2_query(src, dst, (char *)(mldh), recvlen);
 		return;
 
 	case MLD6_LISTENER_REPORT:
@@ -402,6 +413,10 @@ int recvlen;
 
 	case MLD6_LISTENER_DONE:
 		accept_listener_done(src, dst, group);
+		return;
+
+	case MLD6V2_LISTENER_REPORT:
+		accept_listenerV2_report(src,dst,(char *)(mldh),recvlen);
 		return;
 
 	default:

@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.15 2001/06/25 04:54:31 itojun Exp $	*/
+/*	$KAME: vif.h,v 1.16 2001/07/11 09:13:26 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -124,8 +124,15 @@ struct vif_filter {
 struct listaddr {
 	struct listaddr *al_next; /* link to next addr, MUST BE FIRST */
 	struct sockaddr_in6 al_addr; /* local group or neighbor address */
+	struct listaddr *sources; /* list of sources for this group */
+
+	/* al_timer is not used in PIM-SSM; the source timer is used */
 	u_long al_timer; /* for timing out group or neighbor */
 	time_t al_ctime; /* entry creation time */
+
+	/* filter_mode is not used in PIM-SSM, because it is always INCLUDE */
+	u_int16 filter_mode; /* filter mode for mldv2 */
+	u_int16 comp_mode; /* compatibility mode (not yet) */
 	union {
 		u_int32 alu_genid; /* generation id for neighbor */
 		/* a host which reported membership */
@@ -136,6 +143,7 @@ struct listaddr {
 	u_char al_index; /* neighbor index */
 	u_long al_timerid; /* timer for group membership */
 	u_long al_query; /* timer for repeated leave query */
+	u_long al_checklist; /* TRUE I'm in checking listener state */
 	u_int16 al_flags; /* flags related to this neighbor */
 };
 
@@ -182,6 +190,11 @@ struct uvif {
 	u_int16 uv_pim_hello_timer; /* timer for sending PIM hello msgs  */
 	u_int16	uv_gq_timer;	/* Group Query timer                    */
 	u_int16	uv_jp_timer;	/* Join/Prune timer 			*/	
+	u_int16 uv_mld_version;	/* mld version of this mif */
+	u_int16 uv_mld_robustness; /* robustness variable of this vif (mld6 protocol) */
+	u_int32 uv_mld_query_interval; /* query interval of this vif (mld6 protocol) */
+	u_int32 uv_mld_query_rsp_interval;  /* query response interval of this vif (mld6 protocol) */
+	u_int32 uv_mld_llqi; /* last listener query interval */
 	int uv_local_pref;	/* default local preference for assert  */	
 	int uv_local_metric;	/* default local metric for assert     */
 	struct pim_nbr_entry *uv_pim_neighbors;	/* list of PIM nbr routers */

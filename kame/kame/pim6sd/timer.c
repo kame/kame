@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.14 2001/06/25 04:54:31 itojun Exp $	*/
+/*	$KAME: timer.c,v 1.15 2001/07/11 09:13:26 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -52,6 +52,7 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
+#include <netinet/icmp6.h>
 #include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <stdlib.h>
@@ -59,6 +60,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "defs.h"
+#include "pim6.h"
 #include "pimd.h"
 #include "mrt.h"
 #include "vif.h"
@@ -67,7 +69,9 @@
 #include "rp.h"
 #include "pim6_proto.h"
 #include "mld6.h"
+#include "mld6v2.h"
 #include "mld6_proto.h"
+#include "mld6v2_proto.h"
 #include "route.h"
 #include "kern.h"
 #include "debug.h"
@@ -229,6 +233,16 @@ age_vifs()
 	    IF_TIMEOUT(v->uv_querier->al_timer) {
 		v->uv_querier_timo++; /* count statistics */
 
+		/* send gen. query, start gen. q timer */
+		switch(v->uv_mld_version) {
+		case MLDv1:
+			query_groups(v);
+			break;
+		case MLDv2:
+			query_groupsV2(v);
+			break;
+		}
+
 		/* act as a querier by myself */
 		v->uv_flags |= VIFF_QUERIER;
 		v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
@@ -236,6 +250,19 @@ age_vifs()
 		time(&v->uv_querier->al_ctime); /* reset timestamp */
 		query_groups(v);
 	    }
+	} else {
+		/* We are in Querier state */
+		/* MLD6 query periodic */
+		IF_TIMEOUT(v->uv_gq_timer) {
+			switch(v->uv_mld_version) {
+			case 1:
+				query_groups(v);
+				break;
+			case 2:
+				query_groupsV2(v);
+				break;
+			}
+		}
 	}
 
 	/* Timeout neighbors */
@@ -357,6 +384,7 @@ age_routes()
     int             	update_rp_iif;
     int             	update_src_iif;
     if_set     	    	new_pruned_oifs;
+    grpentry_t		*g;
 
     /*
      * Timing out of the global `unicast_routing_timer` and `data_rate_timer`
@@ -1197,6 +1225,131 @@ age_routes()
 	    }			/* End of (*,G) loop */
 	}
     }				/* For all cand RPs */
+
+    /* 
+     * SSM specific loop through each (S,G) entry with G in SSM group range
+     * for each SSM group 
+     */ 
+    for (g = grplist->next; g != (grpentry_t *) NULL; g = g->next)
+    {
+	if (!SSMGROUP(&g->group))
+		continue;
+
+	/* for each source */
+        for (mrtentry_srcs = g->mrtlink; mrtentry_srcs != (mrtentry_t *) NULL; mrtentry_srcs = mrtentry_srcs->grpnext)
+        {
+	    /* outgoing interfaces timers (joined interfaces) */
+	    change_flag = FALSE;
+	    for (vifi = 0; vifi < numvifs; vifi++)
+	    {
+		if (IF_ISSET(vifi, &mrtentry_srcs->joined_oifs))
+		{
+		    /* TODO: checking for reg_num_vif is slow! */
+		    if (vifi != reg_vif_num)
+		    {
+			IF_TIMEOUT(mrtentry_srcs->vif_timers[vifi])
+			{
+			    IF_CLR(vifi, &mrtentry_srcs->joined_oifs);
+			    change_flag = TRUE;
+			    uvifs[vifi].uv_outif_timo++;
+			}
+		    }
+		}
+	    }
+
+	    update_src_iif = FALSE;
+	    if (ucast_flag == TRUE)
+	    {
+	    	/* iif toward the source */
+	         srcentry_save.incoming = mrtentry_srcs->source->incoming;
+		    srcentry_save.upstream =
+			mrtentry_srcs->source->upstream;
+		    if (set_incoming(mrtentry_srcs->source,
+				     PIM_IIF_SOURCE) != TRUE)
+		    {
+
+			/*
+			 * XXX: not in the spec! Cannot find route
+			 * toward that source. This is bad. Delete
+			 * the entry.
+			 */
+
+			delete_mrtentry(mrtentry_srcs);
+			continue;
+		    }
+		    else
+		    {
+
+			/* iif info found */
+
+			if ((srcentry_save.incoming !=
+				mrtentry_srcs->incoming)
+			    || (srcentry_save.upstream !=
+				mrtentry_srcs->upstream))
+			{
+			    /* Route change has occur */
+			    update_src_iif = TRUE;
+			    mrtentry_srcs->incoming =
+				mrtentry_srcs->source->incoming;
+			    mrtentry_srcs->upstream =
+				mrtentry_srcs->source->upstream;
+			}
+		    }
+
+	    if ((change_flag == TRUE) || (update_src_iif == TRUE))
+			/* Flush the changes */
+			change_interfaces(mrtentry_srcs,
+					  mrtentry_srcs->incoming,
+					  &mrtentry_srcs->joined_oifs,
+					  &mrtentry_srcs->pruned_oifs,
+					  &mrtentry_srcs->leaves,
+					  &mrtentry_srcs->asserted_oifs, 0);
+
+	  } /* ucast_flag == TRUE */
+
+	    /* Join/Prune timer */
+	    IF_TIMEOUT(mrtentry_srcs->jp_timer)
+	    {
+		    src_action = join_or_prune(mrtentry_srcs,
+					       mrtentry_srcs->
+					       upstream);
+		IF_DEBUG(DEBUG_PIM_JOIN_PRUNE) log(LOG_DEBUG, 0,
+						   "SSM src_action = %d",
+						   src_action);
+
+		if (src_action != PIM_ACTION_NOTHING)
+		    add_jp_entry(mrtentry_srcs->upstream,
+				 pim_join_prune_holdtime,
+				 &mrtentry_srcs->group->group,
+				 SINGLE_GRP_MSK6LEN,
+				 &mrtentry_srcs->source->address,
+				 SINGLE_SRC_MSK6LEN,
+				 mrtentry_srcs->flags,
+				 src_action);
+		SET_TIMER(mrtentry_srcs->jp_timer,
+			  pim_join_prune_period);
+	    }
+	    /* Assert timer */
+	    if (mrtentry_srcs->flags & MRTF_ASSERTED)
+	    {
+		IF_TIMEOUT(mrtentry_srcs->assert_timer)
+		{
+		    /* TODO: XXX: reset the upstream router now */
+		    mrtentry_srcs->flags &= ~MRTF_ASSERTED;
+		}
+
+	    }
+	    /* routing entry */
+	    if (TIMEOUT(mrtentry_srcs->timer))
+	    {
+		pim6dstat.pim6_rtentry_timo++;
+
+		if (IF_ISEMPTY(&mrtentry_srcs->leaves))
+		    delete_mrtentry(mrtentry_srcs);
+	    }
+
+ 	}
+    }	
 
     /* TODO: check again! */
     for (vifi = 0, v = &uvifs[0]; vifi < numvifs; vifi++, v++)

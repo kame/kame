@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.16 2001/06/25 04:54:31 itojun Exp $	*/
+/*	$KAME: vif.c,v 1.17 2001/07/11 09:13:26 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -62,6 +62,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/ip_mroute.h>
+#include <netinet/icmp6.h>
 #include <netinet6/ip6_mroute.h>
 #include <errno.h>
 #include <syslog.h>
@@ -71,6 +72,7 @@
 #include "defs.h"
 #include "vif.h"
 #include "mld6.h"
+#include "mld6v2.h"
 #include "mrt.h"
 #include "pim6.h"
 #include "pimd.h"
@@ -79,6 +81,7 @@
 #include "inet6.h"
 #include "kern.h"
 #include "mld6_proto.h"
+#include "mld6v2_proto.h"
 #include "pim6_proto.h"
 #include "mrt.h"
 #include "debug.h"
@@ -134,6 +137,11 @@ void init_vifs()
 		strncpy(v->uv_name,"",IFNAMSIZ);
 		v->uv_local_pref = default_source_preference;
 		v->uv_local_metric = default_source_metric;
+		v->uv_mld_version = MLD6_DEFAULT_VERSION;
+		v->uv_mld_robustness = MLD6_DEFAULT_ROBUSTNESS_VARIABLE;
+		v->uv_mld_query_interval = MLD6_DEFAULT_QUERY_INTERVAL;
+		v->uv_mld_query_rsp_interval = MLD6_DEFAULT_QUERY_RESPONSE_INTERVAL;
+		v->uv_mld_llqi = MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL;
 	}
 	IF_DEBUG(DEBUG_IF)
 		log(LOG_DEBUG,0,"Interfaces world initialized...");
@@ -343,7 +351,16 @@ void start_vif (vifi_t vifi)
 	    v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
 	    v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
 	    time(&v->uv_querier->al_ctime); /* reset timestamp */
-	    query_groups(v);
+	    switch (v->uv_mld_version) {
+	    case MLDv1:
+		query_groups(v);
+		break;
+	    case MLDv2:
+		query_groupsV2(v);
+		break;
+	    default:
+		break;
+	    }
   
 	    /*
 	     * Send a probe via the new vif to look for neighbors.
