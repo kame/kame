@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 /*
- * KAME $Id: scanner.l,v 1.6 2000/05/09 03:47:10 itojun Exp $
+ * KAME $Id: scanner.l,v 1.7 2000/05/09 13:20:20 itojun Exp $
  */
 
 /*
@@ -53,23 +53,23 @@
  * it is impossible for us to write a regular expression for non-numeric
  * scope identifier.
  * - Interface identifier portion is determined by kernel configuration.
- *   If you say fe80::1@ether0 and your kernel has no "ether0" interface, it is
+ *   If you say fe80::1%ether0 and your kernel has no "ether0" interface, it is
  *   invalid.
  * - Interface identifier portion is context-dependent to IPv6 numeric address
- *   portion.  For example, the regular expression cannot reject "3ffe::1@10"
+ *   portion.  For example, the regular expression cannot reject "3ffe::1%10"
  *   (scope id after global address).
  * If we would like to identify such situations, we would add a rule like 
  * following, at the very end of ruleset:
  *	.*	{ if (getaddrinfo success) return T_IPv6; else return T_STR; }
  * however, this leaves too high possibility for conflicts, like mistakingly
- * identify "10%fe80::1" as numeric "10", token "%" and then IPv6 address.
+ * identify "fe80::1%10" as IPv6 address, token "%" then numeric "10".
  *
  * If we are given numeric scope identifier, regex and getaddrinfo agree with
  * each other.
  * However, the kernel will bark about the address.  This is different story
  * from the above, IMHO.  This is like giving unreachable address to the
  * kernel (like non-existing 10.1.1.1).
- * - Imagine you say fe80::1@1000 and you only have 10 interfaces.
+ * - Imagine you say fe80::1%1000 and you only have 10 interfaces.
  *   The string will be accepted by regex and getaddrinfo.  getaddrinfo will
  *   fill in sin6_scope_id portion.
  *   The resulting sockaddr will be rejected by the kernel, since it contains
@@ -94,7 +94,7 @@
 #define YY_NO_UNPUT
 #undef YY_INPUT
 #define YY_INPUT(buf, result, max)\
- {\
+do {\
 	char *src = in_buffer;\
 	int i;\
 \
@@ -106,7 +106,7 @@
 		in_buffer += i;\
 		result = i;\
 	}\
- }
+} while (0)
 #else
 #undef getc
 #define getc(fp)  (*in_buffer == 0 ? EOF : *in_buffer++)
