@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.161 2001/07/18 12:30:38 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.162 2001/07/18 12:32:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1077,7 +1077,7 @@ nd6_free(rt, gc)
 			 * router, do not delete it.  Instead, reset the GC
 			 * timer using the router's lifetime.
 			 * Simply deleting the entry would affect default
-			 * address selection, which is not necessarily a good
+			 * router selection, which is not necessarily a good
 			 * thing, especially when we're using router preference
 			 * values.
 			 * XXX: the check for ln_state would be redundant,
