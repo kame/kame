@@ -1016,6 +1016,8 @@ set_filter(headp, prefix, line)
 static void
 param_config()
 {
+	struct in_addr ipv4id;
+
 	if (yy_debug >= 0) {	/* debug flag */
 		debug = yy_debug;
 		cprint("set %x to the debug flag\n", (u_int)debug);
@@ -1053,12 +1055,13 @@ param_config()
 	else
 		dumpfile = strdup(DUMPFILENAME);
 	if (yy_routerid != -1) {
-		bgpIdentifier = htonl((u_int32_t)yy_routerid);
-		cprint("set %x to the BGP Identifier\n", (u_int)yy_routerid);
+		ipv4id.s_addr = bgpIdentifier = htonl((u_int32_t)yy_routerid);
+		cprint("set %s to the BGP Identifier\n", inet_ntoa(ipv4id));
 	}
 	if (yy_clusterid != -1) {
-		clusterId = htonl((u_int32_t)yy_clusterid);
-		cprint("set %x to the BGP cluster ID\n", (u_int)yy_clusterid);
+		ipv4id.s_addr = clusterId = htonl((u_int32_t)yy_clusterid);
+		cprint("set %s to the BGP cluster ID\n", inet_ntoa(ipv4id));
+
 	}
 }
 
