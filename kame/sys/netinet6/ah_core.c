@@ -79,7 +79,7 @@
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
 #endif
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #ifdef HAVE_MD5
 #include <sys/md5.h>

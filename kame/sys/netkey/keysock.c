@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.10 2000/01/29 06:21:02 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.11 2000/02/06 11:01:38 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -67,7 +67,7 @@
 #include <net/raw_cb.h>
 #include <net/route.h>
 
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <netkey/key.h>
 #include <netkey/keysock.h>

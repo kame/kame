@@ -57,7 +57,7 @@
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #include <netinet6/esp.h>
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <crypto/des/des.h>
 #include <crypto/blowfish/blowfish.h>

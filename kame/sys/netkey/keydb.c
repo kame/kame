@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.58 2000/01/17 14:11:16 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.59 2000/02/06 11:01:37 itojun Exp $ */
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
@@ -50,7 +50,7 @@
 
 #include <netinet/in.h>
 
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <netinet6/ipsec.h>
 

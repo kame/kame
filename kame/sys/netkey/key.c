@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.63 2000/02/06 09:34:17 itojun Exp $ */
+/* KAME $Id: key.c,v 1.64 2000/02/06 11:01:36 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -85,7 +85,7 @@
 #endif
 #endif /* INET6 */
 
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <netkey/key.h>
 #include <netkey/keysock.h>

@@ -40,7 +40,7 @@
 #endif
 #endif
 
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 
 #ifdef _KERNEL
