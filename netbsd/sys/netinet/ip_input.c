@@ -1969,10 +1969,13 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		}
 		return (error);
 	case IPCTL_MTUDISCTIMEOUT:
+		old = ip_mtudisc_timeout;
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 		   &ip_mtudisc_timeout);
-		if (ip_mtudisc_timeout < 0)
+		if (ip_mtudisc_timeout < 0) {
+			ip_mtudisc_timeout = old;
 			return (EINVAL);
+		}
 		if (ip_mtudisc_timeout_q != NULL)
 			rt_timer_queue_change(ip_mtudisc_timeout_q, 
 					      ip_mtudisc_timeout);
