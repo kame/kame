@@ -1,7 +1,9 @@
+/*	$KAME: ping6.c,v 1.54 2000/06/12 16:16:44 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -196,7 +198,7 @@ u_int options;
 int mx_dup_ck = MAX_DUP_CHK;
 char rcvd_tbl[MAX_DUP_CHK / 8];
 
-struct addrinfo *res;	        
+struct addrinfo *res;	
 struct sockaddr_in6 dst;        /* who to ping6 */
 struct sockaddr_in6 src;        /* src addr of this packet */
 int datalen = DEFDATALEN;
@@ -274,7 +276,7 @@ main(argc, argv)
 	struct in6_pktinfo *pktinfo = NULL;
 #ifdef USE_RFC2292BIS
 	struct ip6_rthdr *rthdr = NULL;
-#endif 
+#endif
 #ifdef IPSEC_POLICY_IPSEC
 	char *policy_in = NULL;
 	char *policy_out = NULL;
@@ -599,7 +601,7 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RTHDR, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_RTHDR)");
-#endif 
+#endif
 #ifdef IPV6_RECVHOPOPTS
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &opton,
 			       sizeof(opton)))
@@ -608,7 +610,7 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPOPTS, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_HOPOPTS)");
-#endif 
+#endif
 #ifdef IPV6_RECVDSTOPTS
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &opton,
 			       sizeof(opton)))
@@ -617,16 +619,16 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_DSTOPTS)");
-#endif 
+#endif
 #ifdef IPV6_RECVRTHDRDSTOPTS
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
-#endif 
+#endif
 	}
 
 /*
-	optval = 1; 
+	optval = 1;
 	if (IN6_IS_ADDR_MULTICAST(&dst.sin6_addr))
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
 			       &optval, sizeof(optval)) == -1)
@@ -699,7 +701,7 @@ main(argc, argv)
 		int hops, error;
 #ifdef USE_RFC2292BIS
 		int rthdrlen;
-#endif 
+#endif
 
 #ifdef USE_RFC2292BIS
 		rthdrlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, argc - 1);
@@ -741,13 +743,13 @@ main(argc, argv)
 #ifndef USE_RFC2292BIS
 		if (inet6_rthdr_lasthop(scmsgp, IPV6_RTHDR_LOOSE))
 			errx(1, "can't set the last flag");
-#endif 
+#endif
 
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
 	}
 
 	{
-		/* 
+		/*
 		 * source selection
 		 */
 		int dummy, len = sizeof(src);
@@ -787,7 +789,7 @@ main(argc, argv)
 			       smsghdr.msg_controllen)) {
 			err(1, "UDP setsockopt(IPV6_PKTOPTIONS)");
 		}
-#endif 
+#endif
 				
 		if (connect(dummy, (struct sockaddr *)&src, len) < 0)
 			err(1, "UDP connect");
@@ -833,7 +835,7 @@ main(argc, argv)
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &optval,
 		       sizeof(optval)) < 0)
 		warn("setsockopt(IPV6_PKTINFO)"); /* XXX err? */
-#endif 
+#endif
 #endif /* USE_SIN6_SCOPE_ID */
 #ifdef IPV6_RECVHOPLIMIT
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &optval,
@@ -843,7 +845,7 @@ main(argc, argv)
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &optval,
 		       sizeof(optval)) < 0)
 		warn("setsockopt(IPV6_HOPLIMIT)"); /* XXX err? */
-#endif 
+#endif
 
 	printf("PING6(%d=40+8+%d bytes) ", datalen + 48, datalen);
 	printf("%s --> ", pr_addr(&src));
@@ -1958,7 +1960,7 @@ usage()
 #else
 		      "AE"
 #endif
-#endif		      
+#endif		
 		      "] [-a [aAclsg]] [-b sockbufsiz] [-c count] \n\
              [-I interface] [-i wait] [-l preload] [-p pattern] [-S sourceaddr]\n\
              [-s packetsize] [-h hoplimit] [hops...] host\n");
