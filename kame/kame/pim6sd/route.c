@@ -228,6 +228,7 @@ set_incoming(srcentry_ptr, srctype)
     v = &uvifs[srcentry_ptr->incoming];
     if (inet6_equal(&source, &neighbor_addr))
     {
+	/* XXX: what if we have more than one neighbor on this link?? */
 	srcentry_ptr->upstream = v->uv_pim_neighbors;
  	return (TRUE);
     }
