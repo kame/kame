@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2566 2004/03/16 04:58:23 suz Exp $
+$KAME: CHANGELOG,v 1.2567 2004/03/16 23:55:10 itojun Exp $
 
 <200403>
+Wed Mar 17 08:47:58 JST 2004  itojun@iijlab.net
+	* netbsd: switch to 1.6.2
+
 2004-03-16  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/{ip6_output.c, mldv2.c}: IGMPv3/MLDv2 is 
 	revived!
