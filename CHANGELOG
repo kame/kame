@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.959 2000/05/30 16:38:33 itojun Exp $
+$Id: CHANGELOG,v 1.960 2000/05/31 05:05:45 jinmei Exp $
 
 <200005>
+2000-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_mloopback): make a deep copy
+	of the IPv6 header only in an M_EXT case. Practically, we'll
+	rarely need such an extra copy.
+
 Tue May 30 23:56:04 JST 2000  itojun@iiljab.net
 	* sys/netinet6/ip6_output.c: make scopeid handling in multicast
 	loopback case (ip6_mloopback) consistent with other cases.
