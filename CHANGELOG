@@ -1,10 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.304 1999/11/30 13:20:47 sumikawa Exp $
+$Id: CHANGELOG,v 1.305 1999/11/30 15:55:37 sumikawa Exp $
 
 <199911>
+Wed Dec  1 00:47:16 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/sys/netinet6/{ip6_input.c, in6_ifattach.c}: removed
+	in6_ifattach_p2p(). GIF does not have linklocal address unless it
+	becomes up.
+	
+	* kame/sys/netinet6/in6_ifattach.c: make the destination address
+	initialize when auto-generated linklocal address is assigned to
+	P-to-P IF.
+
 Tue Nov 30 22:14:58 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd[23]/ports/sock5: add new port, SOCKS based translator by NEC
+	* freebsd[23]/ports/sock5: add new port, SOCKS based translator by NEC.
 
 Tue Nov 30 03:19:33 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c,netinet6/ipsec.c:
