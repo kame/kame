@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.146 2001/01/23 08:53:28 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.147 2001/01/23 08:55:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
 #ifndef SCOPEDROUTING
-#if !(defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
+#if defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/in6_pcb.h>
 #endif
 #endif
