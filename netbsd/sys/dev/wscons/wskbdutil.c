@@ -350,29 +350,16 @@ wskbd_get_mapentry(const struct wskbd_mapdata *mapdata, int kc,
 			return;
 
 		for (kp = mp->map; kp < mp->map + mp->map_size; kp++)
-#if 0
 			if (KS_GROUP(*kp) == KS_GROUP_Keycode &&
-			    KS_VALUE(*kp) == kc)
-#else
-			if (0)
-#endif
-			{
+			    KS_VALUE(*kp) == kc) {
 				/* First skip keycode and possible command */
 				kp++;
-#if 0
 				if (KS_GROUP(*kp) == KS_GROUP_Command ||
 				    *kp == KS_Cmd || *kp == KS_Cmd1 || *kp == KS_Cmd2)
-#else
-				if (0)
-#endif
 					mapentry->command = *kp++;
 
 				for (l = 0; kp + l < mp->map + mp->map_size; l++)
-#if 0
 					if (KS_GROUP(kp[l]) == KS_GROUP_Keycode)
-#else
-					if (0)
-#endif
 						break;
 				if (l > 4)
 					panic("wskbd_get_mapentry: %d(%d): bad entry",
@@ -439,11 +426,7 @@ wskbd_load_keymap(const struct wskbd_mapdata *mapdata,
 	for (i = 0, s = stack_ptr - 1; s >= 0; s--) {
 		mp = stack[s];
 		for (kp = mp->map; kp < mp->map + mp->map_size; kp++)
-#if 0
 			if (KS_GROUP(*kp) == KS_GROUP_Keycode && KS_VALUE(*kp) > i)
-#else
-			if (0)
-#endif
 				i = KS_VALUE(*kp);
 	}
 
@@ -452,11 +435,7 @@ wskbd_load_keymap(const struct wskbd_mapdata *mapdata,
 	for (s = stack_ptr - 1; s >= 0; s--) {
 		mp = stack[s];
 		for (kp = mp->map; kp < mp->map + mp->map_size; ) {
-#if 0
 			if (KS_GROUP(*kp) != KS_GROUP_Keycode)
-#else
-			if (1)
-#endif
 				panic("wskbd_load_keymap: %d(%d): bad entry",
 				      mp->name, *kp);
 
@@ -464,18 +443,13 @@ wskbd_load_keymap(const struct wskbd_mapdata *mapdata,
 			kp++;
 
 			if (KS_GROUP(*kp) == KS_GROUP_Command ||
-			    *kp == KS_Cmd || *kp == KS_Cmd1 || *kp == KS_Cmd2)
-			{
+			    *kp == KS_Cmd || *kp == KS_Cmd1 || *kp == KS_Cmd2) {
 				(*map)[kc].command = *kp;
 				kp++;
 			}
 
 			for (i = 0; kp + i < mp->map + mp->map_size; i++)
-#if 0
 				if (KS_GROUP(kp[i]) == KS_GROUP_Keycode)
-#else
-				if (0)
-#endif
 					break;
 
 			if (i > 4)
