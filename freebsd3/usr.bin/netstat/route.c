@@ -807,6 +807,7 @@ routename6(sa6)
 	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
 
 	sa6_local.sin6_addr = sa6->sin6_addr;
+	sa6_local.sin6_scope_id = sa6->sin6_scope_id;
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
