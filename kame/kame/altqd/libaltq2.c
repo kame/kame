@@ -1,4 +1,4 @@
-/*	$KAME: libaltq2.c,v 1.5 2002/02/20 01:57:22 kjc Exp $	*/
+/*	$KAME: libaltq2.c,v 1.6 2002/02/20 10:43:35 kjc Exp $	*/
 /*
  * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -63,12 +63,8 @@ log_write(int severity, int syserr, const char *format, ...)
 	if (severity <= l_debug) {
 		if (!daemonize) {
 			vfprintf(stderr, format, ap);
-			if (syserr != 0) {
-				if (syserr < sys_nerr)
-					fprintf(stderr, ": %s", sys_errlist[syserr]);
-				else
-					fprintf(stderr, ": errno %d", syserr);
-			}
+			if (syserr != 0)
+				fprintf(stderr, ": %s", strerror(syserr));
 			fprintf(stderr, "\n");
 		} else {
 			if (syserr == 0)
