@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.187 1999/10/15 08:01:46 itojun Exp $
+$Id: CHANGELOG,v 1.188 1999/10/17 13:41:15 jinmei Exp $
 
 <199910>
+1999-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/ripng.c (rip_process_response): logged prefix and
+	interface for non-routable prefixes or for a prefix with an
+	invalid metric.
+	Adviced by: Tetsuya Isaki <isaki@net.ipc.hiroshima-u.ac.jp>
+
 Fri Oct 15 16:53:20 JST 1999  itojun@iijlab.net
 	* kame/tcpdump/print-{tcp,udp}.c: print IP address properly when
 	  intermediate headers or IP option is present.
