@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.16 2000/08/05 17:57:17 sumikawa Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.17 2000/09/21 19:01:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -89,7 +89,7 @@ static int ipcomp_output __P((struct mbuf *, u_char *, struct mbuf *,
 /*
  * Modify the packet so that the payload is compressed.
  * The mbuf (m) must start with IPv4 or IPv6 header.
- * On failure, free the given mbuf and return NULL.
+ * On failure, free the given mbuf and return non-zero.
  *
  * on invocation:
  *	m   nexthdrp md
@@ -114,6 +114,7 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 {
 	struct mbuf *n;
 	struct mbuf *md0;
+	struct mbuf *mcopy;
 	struct mbuf *mprev;
 	struct ipcomp *ipcomp;
 	struct secasvar *sav = isr->sav;
@@ -163,11 +164,19 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		return 0;
 
 	/*
-	 * keep the original data packet, so that we can backout
-	 * our changes when compression is not necessary.
+	 * retain the original packet for two purposes:
+	 * (1) we need to backout our changes when compression is not necessary.
+	 * (2) byte lifetime computation.
+	 * normally we do not make deep copy of them.
 	 */
+	mcopy = m_copym(m, 0, M_COPYALL, M_NOWAIT);
+	if (mcopy == NULL) {
+		error = ENOBUFS;
+		return 0;
+	}
 	md0 = m_copym(md, 0, M_COPYALL, M_NOWAIT);
 	if (md0 == NULL) {
+		m_freem(mcopy);
 		error = ENOBUFS;
 		return 0;
 	}
@@ -193,12 +202,14 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		}
 		m_freem(m);
 		m_freem(md0);
+		m_freem(mcopy);
 		return EINVAL;
 	}
 	mprev->m_next = NULL;
 	if ((md = ipsec_copypkt(md)) == NULL) {
 		m_freem(m);
 		m_freem(md0);
+		m_freem(mcopy);
 		error = ENOBUFS;
 		goto fail;
 	}
@@ -209,6 +220,7 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		ipseclog((LOG_ERR, "packet compression failure\n"));
 		m = NULL;
 		m_freem(md0);
+		m_freem(mcopy);
 		switch (af) {
 #ifdef INET
 		case AF_INET:
@@ -244,13 +256,17 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 	 */
 	if (plen0 < plen) {
 		m_freem(md);
+		m_freem(mcopy);
 		mprev->m_next = md0;
 		return 0;
 	}
 
-	/* no need to backout change beyond here */
+	/*
+	 * no need to backout change beyond here.
+	 */
 	m_freem(md0);
 	md0 = NULL;
+
 	m->m_pkthdr.len -= plen0;
 	m->m_pkthdr.len += plen;
 
@@ -369,21 +385,11 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 #endif
 		}
 	}
-#if 0
-	switch (af) {
-#ifdef INET
-	case AF_INET:
-		ipsecstat.out_esphist[sav->alg_enc]++;
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		ipsec6stat.out_esphist[sav->alg_enc]++;
-		break;
-#endif
-	}
-#endif
-	key_sa_recordxfer(sav, m);
+
+	/* compute byte lifetime against original packet */
+	key_sa_recordxfer(sav, mcopy);
+	m_freem(mcopy);
+
 	return 0;
 
 fail:
