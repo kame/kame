@@ -80,7 +80,7 @@ program instead of
 Available operands for
 .Nm ifconfig :
 .Bl -tag -width Ds
-.It Ar Address
+.It Ar address
 For the
 .Tn DARPA-Internet
 family,
@@ -127,6 +127,7 @@ with different naming schemes, specifying the address family is recommended.
 The address or protocol families currently
 supported are
 .Dq inet ,
+.Dq inet6 ,
 .Dq atalk ,
 .Dq iso ,
 .Dq ipx ,
@@ -148,6 +149,8 @@ The following parameters may be set with
 Establish an additional network address for this interface.
 This is sometimes useful when changing network numbers, and
 one wishes to accept packets addressed to the old interface.
+.It Fl alias
+Remove the specified network address alias.
 .It Cm arp
 Enable the use of the Address Resolution Protocol in mapping
 between network level addresses and link level addresses (default).
@@ -244,7 +247,7 @@ Higher metrics have the effect of making a route
 less favorable; metrics are counted as addition hops
 to the destination network or host.
 .It Cm netmask Ar mask
-(Inet, inet6 and ISO)
+(inet, inet6 and ISO)
 Specify how much of the address to reserve for subdividing
 networks into sub-networks.
 The mask includes the network part of the local address
@@ -300,7 +303,7 @@ Set preferred lifetime for the address.
 .It Cm prefixlen Ar n
 (inet6 only)
 Effect is similar to
-.Cm netmask .
+.Cm netmask ,
 but you can specify by prefix length by digits.
 .It Cm tentative
 (inet6 only)
