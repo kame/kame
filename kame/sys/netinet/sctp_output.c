@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.20 2003/03/10 05:58:12 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.21 2003/04/10 11:54:38 jinmei Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -2038,7 +2038,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		}
 		ret = ip_output(m, inp->ip_inp.inp.inp_options,
 				rtp, o_flgs, inp->ip_inp.inp.inp_moptions
-#if defined(__OpenBSD__) && defined(IPSEC)
+#if (defined(__OpenBSD__) && defined(IPSEC)) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 				,(struct inpcb *)NULL
 #endif
 );
@@ -2245,7 +2245,11 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 #endif
 				 o_flgs,
 				 ((struct in6pcb *)inp)->in6p_moptions,
-				 &ifp);
+				 &ifp
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+		    , NULL
+#endif
+			);
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_OUTPUT3) {
 			printf("return from send is %d\n", ret);
@@ -7860,7 +7864,11 @@ sctp_send_abort(struct mbuf *m,
 	/* zap the stack pointer to the route */
 	bzero(&ro, sizeof ro);
 	/* out it goes */
-	(void) ip_output(mout, 0, &ro, IP_RAWOUTPUT, NULL);
+	(void) ip_output(mout, 0, &ro, IP_RAWOUTPUT, NULL
+#if (defined(__OpenBSD__) && defined(IPSEC)) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+	    , NULL
+#endif
+		);
 	sctp_pegs[SCTP_DATAGRAMS_SENT]++;
 	/* Free the route if we got one back */
 	if (ro.ro_rt)
@@ -8014,7 +8022,11 @@ sctp6_send_abort(struct mbuf *m,
 	/* zap the stack pointer to the route */
 	bzero(&ro, sizeof ro);
 	/* out it goes */
-	ip6_output(mout, NULL, &ro, 0, NULL, NULL);
+	ip6_output(mout, NULL, &ro, 0, NULL, NULL
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+	    , NULL
+#endif
+		);
 	sctp_pegs[SCTP_DATAGRAMS_SENT]++;
 	/* Free the route if we got one back */
 	if (ro.ro_rt)
@@ -8059,7 +8071,11 @@ sctp_send_operr_to(struct mbuf *m, int iphlen,
 		out->ip_src = iph->ip_dst;
 		out->ip_dst = iph->ip_src;
 		out->ip_len = scm->m_len;
-		(void) ip_output(scm, 0, &ro, IP_RAWOUTPUT, NULL);
+		(void) ip_output(scm, 0, &ro, IP_RAWOUTPUT, NULL
+#if (defined(__OpenBSD__) && defined(IPSEC)) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+		    , NULL
+#endif
+			);
 		sctp_pegs[SCTP_DATAGRAMS_SENT]++;
 		/* Free the route if we got one back */
 		if (ro.ro_rt)
@@ -8085,7 +8101,12 @@ sctp_send_operr_to(struct mbuf *m, int iphlen,
 		out6->ip6_src = in6->ip6_dst;
 		out6->ip6_dst = in6->ip6_src;
 
-		ip6_output(scm, NULL, &ro, 0, NULL, NULL);
+		ip6_output(scm, NULL, &ro, 0, NULL, NULL
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+	    , NULL
+#endif
+		);
+
 		sctp_pegs[SCTP_DATAGRAMS_SENT]++;
 		/* Free the route if we got one back */
 		if (ro.ro_rt)
