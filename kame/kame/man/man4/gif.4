@@ -1,4 +1,4 @@
-.\"	$KAME: gif.4,v 1.7 2000/04/14 09:27:27 itojun Exp $
+.\"	$KAME: gif.4,v 1.8 2000/04/16 16:40:38 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -243,3 +243,11 @@ RFC1933
 The
 .Nm
 device first appeared in WIDE hydrangea IPv6 kit.
+.\"
+.Sh BUGS
+Since there are many tunnelling protocol specifications exist,
+.Nm
+may not interoperate with peers that are picky about outer header fields.
+For example, you cannot usually use
+.Nm
+to talk with IPsec devices that use IPsec tunnel mode.
