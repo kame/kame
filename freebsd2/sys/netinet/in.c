@@ -596,13 +596,13 @@ in_lifaddr_ioctl(so, cmd, data, ifp)
 	case SIOCALIFADDR:
 	case SIOCDLIFADDR:
 		/* address must be specified on ADD and DELETE */
-		sa = &iflr->addr;
+		sa = (struct sockaddr *)&iflr->addr;
 		if (sa->sa_family != AF_INET)
 			return EINVAL;
 		if (sa->sa_len != sizeof(struct sockaddr_in))
 			return EINVAL;
 		/* XXX need improvement */
-		sa = &iflr->dstaddr;
+		sa = (struct sockaddr *)&iflr->dstaddr;
 		if (sa->sa_family && sa->sa_family != AF_INET)
 			return EINVAL;
 		if (sa->sa_family && sa->sa_len != sizeof(struct sockaddr_in))
