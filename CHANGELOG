@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.442 2000/01/16 12:51:08 itojun Exp $
+$Id: CHANGELOG,v 1.443 2000/01/16 14:32:49 itojun Exp $
 
 <200001>
+Sun Jan 16 23:30:16 JST 2000  itojun@iijlab.net
+	* kame/sys/net{inet6,key}: cleanup ipsec logging.  all logs will be
+	  generated to syslog, with proper priority (for example, sequence
+	  number cycle will be logged with LOG_WARNING).  you can
+	  suppress/enable logs by setting net.inet.ipsec.debug (or
+	  net.inet6.ipsec6.debug).   even if you supress logs, you can check
+	  "netstat -sn" to understand what was happend to ipsec stack.
+
 Sun Jan 16 21:49:38 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/fstat: make it IPv6 ready.
 	  NetBSD PR: 9199
