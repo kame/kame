@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.18 2001/11/16 10:23:22 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.19 2001/11/28 08:34:56 k-sugyou Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -29,7 +29,6 @@ todo
 - security mechanism.
 - DAD when registering CoA.
 - mobile prefix advertisement.
-- NA when returning to home.
 - complete dynamic home agent discovery. (implement user-land daemon?)
 - rate limit (many places).
 - homeagent info handling.
@@ -45,6 +44,7 @@ MN side
 - movement detection by prefix announce.
 - binding update/home registration.
 - dynamic home agent discovery.
+- NA when returning to home.
 
 CN side
 - recieving binding update.
