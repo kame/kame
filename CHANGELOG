@@ -1,6 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1357 2000/10/31 04:37:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1358 2000/11/01 08:25:47 itojun Exp $
+
+<200011>
+Wed Nov  1 17:24:31 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_{in,out}put.c: implement flow label manipulation
+	  setsockopt, as documented in draft-itojun-ipv6-flowlabel-api-00.txt.
+	  the default value can be switched by net.inet6.ip6.auto_flowlabel.
+	  experimental.
 
 <200010>
 Tue Oct 31 13:33:38 JST 2000  itojun@iijlab.net
