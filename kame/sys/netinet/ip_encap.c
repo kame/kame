@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.21 2000/03/30 14:30:06 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.22 2000/03/30 18:55:46 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,10 @@
 
 #ifdef __FreeBSD__
 # include "opt_mrouting.h"
-# if __FreeBSD__ >= 3
+# if __FreeBSD__ == 3
+#  include "opt_inet.h"
+# endif
+# if __FreeBSD__ >= 4
 #  include "opt_inet.h"
 #  include "opt_inet6.h"
 # endif
