@@ -1,4 +1,4 @@
-/*	$KAME: if_vrrp_var.h,v 1.2 2002/07/10 07:21:02 ono Exp $ */
+/*	$KAME: if_vrrp_var.h,v 1.3 2003/02/19 10:13:16 ono Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -34,28 +34,41 @@
 
 #ifdef _KERNEL
 struct vrrp_mc_entry {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	struct ether_addr		mc_addr;
 	SLIST_ENTRY(vrrp_mc_entry)	mc_entries;
+#else
+	LIST_ENTRY(vrrp_mc_entry)	mc_entries;
+	union {
+		struct ether_multi	*mcu_enm;
+	} mc_u;
+	struct sockaddr_storage		mc_addr;
+#endif
 };
 
+#define	mc_enm		mc_u.mcu_enm
+
 struct	ifvrrp {
-	struct  arpcom ifv_ac;
-	struct	ifnet *ifv_p;	/* parent inteface of this vrrp */
-#if 0
-	struct	ifv_linkmib {
-		int	ifvm_parent;
-		u_int16_t ifvm_proto; /* encapsulation ethertype */
-		u_int16_t ifvm_tag; /* tag to apply on packets leaving if */
-	}	ifv_mib;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+        struct  arpcom ifv_ac;
+#else
+        struct  ethercom ifv_ec;
 #endif
+	struct	ifnet *ifv_p;	/* parent inteface of this vrrp */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	SLIST_HEAD(__vrrp_mchead, vrrp_mc_entry)	vrrp_mc_listhead;
+#else
+	LIST_HEAD(__vrrp_mchead, vrrp_mc_entry)	vrrp_mc_listhead;
+#endif
 	LIST_ENTRY(ifvrrp) ifv_list;
 	struct resource *r_unit;	/* resource allocated for this unit */
 };
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #define	ifv_if	ifv_ac.ac_if
+#else
+#define	ifv_if	ifv_ec.ec_if
+#endif
 #endif /* _KERNEL */
-
-#define	EVL_ENCAPLEN	4	/* length in octets of encapsulation */
 
 /* sysctl(3) tags, for compatibility purposes */
 #define	VRRPCTL_PROTO	1
@@ -65,9 +78,15 @@ struct	ifvrrp {
  * Configuration structure for SIOCSETVRRP and SIOCGETVRRP ioctls.
  */
 struct	vrrpreq {
-	char	vlr_parent[IFNAMSIZ];
+	u_int32_t vr_parent_index;
+	struct sockaddr vr_lladdr;
 };
 #define	SIOCSETVRRP	SIOCSIFGENERIC
 #define	SIOCGETVRRP	SIOCGIFGENERIC
+
+#ifdef _KERNEL
+int    vrrp_input(struct ether_header *eh, struct mbuf *m);
+extern int nvrrp_active;
+#endif
 
 #endif /* _NET_IF_VRRP_VAR_H_ */

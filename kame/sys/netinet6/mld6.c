@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.76 2003/02/09 15:49:11 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.77 2003/02/19 10:13:16 ono Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -137,8 +137,12 @@
 #endif
 #include <net/if.h>
 #include <net/if_arp.h>
+#ifdef __NetBSD__
+#include <net/if_ether.h>
+#endif
 #include <net/if_types.h>
 #ifdef IFT_VRRP
+#include <net/if_dl.h>
 #include <net/if_vrrp_var.h>
 #endif
 #include <net/route.h>
