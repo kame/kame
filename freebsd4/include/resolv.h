@@ -310,6 +310,8 @@ int		res_querydomain __P((const char *, const char *, int, int,
 int		res_mkquery __P((int, const char *, int, int, const u_char *,
 				 int, const u_char *, u_char *, int));
 int		res_send __P((const u_char *, int, u_char *, int));
+int		res_send_timeout __P((const u_char *, int, u_char *, int,
+				      struct timeval *));
 int		res_isourserver __P((const struct sockaddr_in *));
 int		res_nameinquery __P((const char *, int, int,
 				     const u_char *, const u_char *));

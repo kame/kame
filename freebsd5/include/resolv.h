@@ -316,6 +316,8 @@ int		res_querydomain(const char *, const char *, int, int,
 int		res_mkquery(int, const char *, int, int, const u_char *,
 			    int, const u_char *, u_char *, int);
 int		res_send(const u_char *, int, u_char *, int);
+int		res_send_timeout(const u_char *, int, u_char *, int,
+				 struct timeval *);
 int		res_isourserver(const struct sockaddr_in *);
 int		res_nameinquery(const char *, int, int,
 				const u_char *, const u_char *);
