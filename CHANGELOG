@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2207 2002/07/30 07:20:03 itojun Exp $
+$KAME: CHANGELOG,v 1.2208 2002/07/30 08:13:07 itojun Exp $
 
 <200207>
+Tue Jul 30 17:12:19 JST 2002  itojun@iijlab.net
+	* sys/netinet/sctp*: new sctp patch from randall.
+	* faithd.libevent: support PORT response without paren.
+
 2002-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/: added a new socket option/cmsg type
 	"IPV6_PREFER_TEMPADDR" to control source address selection wrt
