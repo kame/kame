@@ -90,11 +90,11 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(TCP6))
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__)
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #endif
-#if defined(__NetBSD__) && !defined(TCP6)
+#if (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #endif
 #include <netinet6/ip6.h>
@@ -128,8 +128,10 @@
 #endif
 #endif
 
+#ifndef __OpenBSD__
 #include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
+#endif
 
 #include <netinet6/pim6_var.h>
 
@@ -180,6 +182,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
+#ifndef __OpenBSD__
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -231,6 +234,7 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif
+#endif /*OpenBSD*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC | PR_ADDR,
   rip6_input,	rip6_output,	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

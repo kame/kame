@@ -84,7 +84,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#if (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 #include <sys/proc.h>
 #endif
 
@@ -95,8 +95,12 @@
 #include <net/netisr.h>
 
 #include <netinet/in.h>
-#include <netinet6/in6_var.h>
 #include <netinet/in_systm.h>
+#ifdef INET
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#endif /*INET*/
+#include <netinet6/in6_var.h>
 #include <netinet6/ip6.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
 #include <netinet6/in6_pcb.h>
@@ -108,11 +112,6 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
 #include <netinet6/in6_prefix.h>
-
-#ifdef INET
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#endif /*INET*/
 
 #ifdef IPV6FIREWALL
 #include <netinet6/ip6_fw.h>
@@ -133,7 +132,7 @@
 
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 extern struct ifnet loif;
 #endif
 
@@ -211,7 +210,7 @@ static void
 ip6_init2(dummy)
 	void *dummy;
 {
-#ifndef __bsdi__
+#if !(defined(__bsdi__) || defined(__OpenBSD__))
 	int i;
 #endif
 	int ret;
@@ -223,7 +222,7 @@ ip6_init2(dummy)
 	 * to route local address of p2p link to loopback,
 	 * assign loopback address first. 
 	 */
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 	in6_ifattach(&loif, IN6_IFT_LOOP, NULL, 0);
 #else
 	for (i = 0; i < NLOOP; i++)
@@ -303,7 +302,7 @@ ip6_input(m)
 	} else {
 		if (m->m_next) {
 			if (m->m_flags & M_LOOP) {
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 				ip6stat.ip6s_m2m[loif.if_index]++;	/*XXX*/
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
@@ -489,7 +488,7 @@ ip6_input(m)
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
 			       &rt6_key(ip6_forward_rt.ro_rt)->sin6_addr) &&
 #endif
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 	    ip6_forward_rt.ro_rt->rt_ifp == &loif
 #else
 	    ip6_forward_rt.ro_rt->rt_ifp == &loif[0]
@@ -856,7 +855,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
 {
-#if (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
+#ifndef __OpenBSD__	/*XXX*/
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 	struct proc *p = curproc;	/* XXX */
 #endif
 #ifdef __bsdi__
@@ -865,7 +865,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	int privileged;
 
 	privileged = 0;
-#if (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
 #else
@@ -1041,6 +1041,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 #ifdef __bsdi__
 # undef sbcreatecontrol
 #endif
+
+#endif /*XXX OpenBSD*/
 }
 
 /*

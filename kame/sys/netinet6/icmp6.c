@@ -88,6 +88,10 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#ifdef __OpenBSD__
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#endif
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
@@ -127,7 +131,9 @@ static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 #endif
 
+#ifndef __OpenBSD__
 static int icmp6_rip6_input __P((struct mbuf **, int));
+#endif
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static struct mbuf * ni6_input __P((struct mbuf *, int));
 static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
@@ -169,8 +175,10 @@ icmp6_error(m, type, code, param)
 
 	icmp6stat.icp6s_error++;
 
+#ifdef M_DECRYPTED	/*not openbsd*/
 	if (m->m_flags & M_DECRYPTED)
 		goto freeit;
+#endif
 
 	oip6 = mtod(m, struct ip6_hdr *);
 
@@ -774,7 +782,13 @@ icmp6_input(mp, offp, proto)
 	}
 
  passit:
+#ifdef __OpenBSD__
+#if 0
+	rip6_input(&m, offp, IPPROTO_ICMPV6);
+#endif
+#else
 	icmp6_rip6_input(&m, *offp);
+#endif
 	return IPPROTO_DONE;
 
  freeit:
@@ -1077,6 +1091,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	return(copied);
 }
 
+#ifndef __OpenBSD__
 /*
  * XXX almost dup'ed code with rip6_input.
  */
@@ -1172,6 +1187,7 @@ icmp6_rip6_input(mp, off)
 	}
 	return IPPROTO_DONE;
 }
+#endif /*OpenBSD*/
 
 /*
  * Reflect the ip6 packet back to the source.
@@ -1710,8 +1726,10 @@ nolladdropt:;
 	m->m_pkthdr.len = m->m_len = p - (u_char *)ip6;
 
 	/* just to be safe */
+#ifdef M_DECRYPTED	/*not openbsd*/
 	if (m0->m_flags & M_DECRYPTED)
 		goto noredhdropt;
+#endif
 
     {
 	/* redirected header option */
@@ -1782,7 +1800,9 @@ nolladdropt:;
 	m->m_next = m0;
 	m->m_pkthdr.len = m->m_len + m0->m_len;
     }
+#ifdef M_DECRYPTED	/*not openbsd*/
 noredhdropt:;
+#endif
 
 	if (IN6_IS_ADDR_LINKLOCAL(&sip6->ip6_src))
 		sip6->ip6_src.s6_addr16[1] = 0;
@@ -1855,7 +1875,11 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	} else
 		level = op = optname = optlen = 0;
 #else
+#if defined(__OpenBSD__)
+	register struct inpcb *inp = sotoinpcb(so);
+#else
 	register struct in6pcb *in6p = sotoin6pcb(so);
+#endif
 	register struct mbuf *m = *mp;
 
 	optlen = m ? m->m_len : 0;
@@ -1887,9 +1911,18 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			}
 			error = sooptcopyin(sopt, inp->in6p_icmp6filt, optlen,
 				optlen);
+#elif defined(__OpenBSD__)
+			p = mtod(m, struct icmp6_filter *);
+			if (!p) {
+				error = EINVAL;
+				break;
+			}
+			bcopy(p, &inp->inp_icmp6filt,
+				sizeof(struct icmp6_filter));
+			error = 0;
 #else
 			p = mtod(m, struct icmp6_filter *);
-			if (!p || !in6p->in6p_icmp6filt) {
+			if (!p) {
 				error = EINVAL;
 				break;
 			}
@@ -1917,6 +1950,17 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			}
 			error = sooptcopyout(sopt, inp->in6p_icmp6filt,
 				sizeof(struct icmp6_filter));
+#elif defined(__OpenBSD__)
+			struct icmp6_filter *p;
+
+			p = mtod(m, struct icmp6_filter *);
+			if (!p) {
+				error = EINVAL;
+				break;
+			}
+			bcopy(&inp->inp_icmp6filt, p,
+				sizeof(struct icmp6_filter));
+			error = 0;
 #else
 			struct icmp6_filter *p;
 

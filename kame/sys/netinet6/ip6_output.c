@@ -90,6 +90,10 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#ifdef __OpenBSD__
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#endif
 #include <netinet6/ip6.h>
 #include <netinet6/icmp6.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
@@ -133,6 +137,7 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_dest2;
 };
 
+#ifndef __OpenBSD__
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *, struct sockopt *sopt));
@@ -142,12 +147,13 @@ static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 #endif
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
+#endif /*openbsd*/
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
 static int ip6_insertfraghdr __P((struct mbuf *, struct mbuf *, int,
 				  struct ip6_frag **));
 static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 extern struct ifnet loif;
 #endif
 
@@ -547,9 +553,9 @@ skip_ipsec2:;
 		 * ifp must point it.
 		 */
 		if (ro->ro_rt == 0) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 			/*
-			 * NetBSD always clones routes, if parent is
+			 * NetBSD/OpenBSD always clones routes, if parent is
 			 * PRF_CLONING.
 			 */
 			rtalloc((struct route *)ro);
@@ -637,7 +643,7 @@ skip_ipsec2:;
 				goto bad;
 			}
 			else {
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 				ifp = &loif;
 #else
 				ifp = &loif[0];
@@ -1199,6 +1205,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf **mp;
 #endif
 {
+#ifdef __OpenBSD__
+	return EINVAL;
+#else
 	int privileged;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	register struct inpcb *in6p = sotoinpcb(so);
@@ -1217,7 +1226,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 		panic("ip6_ctloutput: arg soopt is NULL");
 	}
 #else
+#ifdef HAVE_NRL_INPCB
+	register struct inpcb *inp = sotoinpcb(so);
+#else
 	register struct in6pcb *in6p = sotoin6pcb(so);
+#endif
 	register struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
@@ -1227,7 +1240,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 	error = optval = 0;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
 #else
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
@@ -1257,8 +1270,13 @@ ip6_ctloutput(op, so, level, optname, mp)
 						    m, so, sopt));
 			    }
 #else
+#ifdef HAVE_NRL_INPCB
+				return(ip6_pcbopts(&inp->inp_outputopts,
+						   m, so));
+#else
 				return(ip6_pcbopts(&in6p->in6p_outputopts,
 						   m, so));
+#endif
 #endif
 			case IPV6_HOPOPTS:
 			case IPV6_DSTOPTS:
@@ -1299,14 +1317,25 @@ ip6_ctloutput(op, so, level, optname, mp)
 							error = EINVAL;
 						else {
 							/* -1 = kernel default */
+#ifdef HAVE_NRL_INPCB
+							/*in6p->inp_hops = optval; XXX*/
+#else
 							in6p->in6p_hops = optval;
+#endif
 						}
 						break;
+#ifdef HAVE_NRL_INPCB
+	if (optval) \
+		in6p->inp_flags |= bit; \
+	else \
+		in6p->inp_flags &= ~bit;
+#else
 #define OPTSET(bit) \
 	if (optval) \
 		in6p->in6p_flags |= bit; \
 	else \
 		in6p->in6p_flags &= ~bit;
+#endif
 
 					case IPV6_RECVOPTS:
 						OPTSET(IN6P_RECVOPTS);
@@ -1741,8 +1770,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 	}
 	return(error);
+#endif /*__OpenBSD__*/
 }
 
+#ifndef __OpenBSD__
 /*
  * Set up IP6 options in pcb for insertion in output packets.
  * Store in mbuf with pointer in pcbopt, adding pseudo-option
@@ -1939,7 +1970,7 @@ ip6_setmoptions(optname, im6op, m)
 			 *   XXX: is it a good approach?
 			 */
 			if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr)) {
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 				ifp = &loif;
 #else
 				ifp = &loif[0];
@@ -2140,6 +2171,7 @@ ip6_getmoptions(optname, im6o, mp)
 		return(EOPNOTSUPP);
 	}
 }
+#endif /*OpenBSD*/
 
 /*
  * Discard the IP6 multicast options.
@@ -2375,6 +2407,7 @@ ip6_splithdr(m, exthdrs)
 	return 0;
 }
 
+#ifndef __OpenBSD__
 /*
  * Compute IPv6 extension header length.
  */
@@ -2398,3 +2431,4 @@ ip6_optlen(in6p)
 	return len;
 #undef elen
 }
+#endif

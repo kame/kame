@@ -128,5 +128,9 @@ extern char *if_name __P((struct ifnet *));
 #define ovbcopy		bcopy
 #endif
 
+#if defined(__OpenBSD__)
+#define HAVE_NRL_INPCB
+#endif
+
 #endif /*_KERNEL*/
 #endif /*__NET_NET_OSDEP_H_DEFINED_ */

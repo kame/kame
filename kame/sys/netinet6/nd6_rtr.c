@@ -743,15 +743,17 @@ prelist_update(new, dr, m)
 	int auth;
 	struct in6_addrlifetime *lt6;
 
+	auth = 0;
 	if (m) {
 		/*
 		 * Authenticity for NA consists authentication for
 		 * both IP header and IP datagrams, doesn't it ?
 		 */
+#if defined(M_AUTHIPHDR) && defined(M_AUTHIPDGM)
 		auth = (m->m_flags & M_AUTHIPHDR
 		     && m->m_flags & M_AUTHIPDGM) ? 1 : 0;
-	} else
-		auth = 0;
+#endif
+	}
 
 	if ((pr = prefix_lookup(new)) != NULL) {
 		if (pr->ndpr_ifp != new->ndpr_ifp) {

@@ -634,7 +634,7 @@ add_m6if(mifcp)
 
 	if (mifcp->mif6c_flags & MIFF_REGISTER) {
 		if (reg_mif_num == (mifi_t)-1) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 			strcpy(multicast_register_if.if_xname,
 			       "register_mif"); /* XXX */
 #else
