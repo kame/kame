@@ -2184,10 +2184,10 @@ tn(argc, argv)
     int sourceroute();
     unsigned long srlen;
     char *cmd, *hostp = 0, *portp = 0, *user = 0;
-    struct addrinfo hints, *res, *res0;
+    struct addrinfo hints, *res, *res0, *src_res, *src_res0 = NULL;
     char *cause = "telnet: unknown";
     int error = 0;
-    struct addrinfo srchints, *srcres;
+    struct addrinfo srchints;
     char *src_addr = NULL;
     char *src_portp = "0\0";
 
@@ -2256,11 +2256,16 @@ tn(argc, argv)
 	srchints.ai_family = AF_UNSPEC;
 	srchints.ai_socktype = SOCK_STREAM;
 	srchints.ai_protocol = 0;
-	error = getaddrinfo(src_addr, src_portp, &srchints, &srcres);
+	error = getaddrinfo(src_addr, src_portp, &srchints, &src_res);
 	if (error) {
 	    fprintf(stderr, "%s: %s\n", src_addr, gai_strerror(error));
 	    return 0;
 	}
+	if (src_res == NULL) {
+	    fprintf(stderr, "%s can't be reolved.\n", src_addr);
+	    return 0;
+	}
+	src_res0 = src_res;
     }
 
     (void) strcpy(_hostname, hostp);
@@ -2349,6 +2354,21 @@ tn(argc, argv)
 	    if (srp && setsockopt(net, proto, opt, srp, srlen) < 0)
 		perror("setsockopt (source route)");
 	}
+
+	if (src_addr != NULL) {
+	    for (src_res = src_res0; src_res != 0; src_res = src_res->ai_next)
+	        if (src_res->ai_family == res->ai_family)
+		    break;
+	    if (src_res == NULL)
+		src_res = src_res0;
+	    if (bind(net, src_res->ai_addr, src_res->ai_addrlen) == -1) {
+		perror("bind");
+		(void) NetClose(net);
+		net = -1;
+		continue;
+	    }
+	}
+
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
 	if (setpolicy(net, res, ipsec_policy_in) < 0) {
 	    (void) NetClose(net);
@@ -2383,6 +2403,8 @@ tn(argc, argv)
 	break;
     }
     freeaddrinfo(res0);
+    if (src_res0 != NULL)
+        freeaddrinfo(src_res0);
     if (net < 0) {
 	perror(cause);
 	return 0;
