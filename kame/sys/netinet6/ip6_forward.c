@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.84 2001/10/09 10:04:30 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.85 2001/10/24 06:12:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -468,7 +468,7 @@ ip6_forward(m, srcrt)
 	 */
 	if ((srczone = in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_src)) < 0
 	    || (dstzone = in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src)) < 0) {
-		/* XXX: is this really happen?  should return an icmp error?*/
+		/* XXX: will this really happen?  should return an icmp error? */
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
