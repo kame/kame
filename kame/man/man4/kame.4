@@ -1,0 +1,236 @@
+.\" Copyright (C) 1995, 1996, 1997, 1998 and 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: kame.4,v 1.1 1999/08/08 23:24:00 itojun Exp $
+.\"
+.Dd April 13, 1999
+.Dt KAME 4
+.Os KAME
+.\"
+.Sh NAME
+.Nm KAME
+.Nd introduction and roadmap to KAME IPv6 software package
+.\"
+.Sh DESCRIPTION
+.Nm KAME
+software package is a result of joint work of several IPv6 researchers
+in Japan, to provide reference implementation of IPv6 to
+Berkeley Software Distribution
+.Pq BSD
+derived system such as BSD/OS,
+FreeBSD and NetBSD
+.Pq in alphabetical order .
+.Pp
+.\" Package consists of set of patches and additions to kernel,
+.\" modification to application, daemons, header files and libraries.
+KAME kit consists of IPv6/IPsec-ready kernel, application, daemons,
+header files and libraries.
+.\"
+.Sh HIGHLIGHTS
+Following are some of highlights of this implementation.
+.\"
+.Ss Kernel
+IPv6 and IPsec protocol stacks are implemented and available.
+See below for conformance to standards and/or internet drafts.
+.\"
+.Ss Plug and Play and protocol stack/interface configuration
+.Xr ndp 8 ,
+.Xr prefix 8 ,
+.Xr rrenumd 8 ,
+.Xr rtadvd 8 ,
+.Xr rtsol 8 ,
+.Xr rtsold 8 .
+.\"
+.Ss Routing
+.Xr bgpd 8 ,
+.Xr hroute6d 8 ,
+.Xr rip6admin 8 ,
+.Xr rip6query 8 ,
+.Xr route6d 8 .
+.\"
+.Ss Multicast (includes routing and utilities)
+.Xr pm6dd 8 ,
+.Xr ifmcstat 8 ,
+.Xr mld6query 8 .
+.\"
+.Ss Transition Tools
+Two IPv4 to IPv6 transition tools are available.
+TCP relay translator, FAITH
+.Po
+.Xr faith 1 and
+.Xr faithd 8
+.Pc
+and SIIT IPv4-v6 NAT implemtation
+.Po
+.Xr ptrconfig 8
+.Pc . 
+.\"
+.Ss IPsec and tunnelling
+.Xr gifconfig 8 ,
+.Xr ipsec 4 ,
+.Xr racoon 8 ,
+.Xr setkey 8 .
+.\"
+.Ss Utilities/Diagnosis
+.Xr cksum6 1 ,
+.Xr icmp6dump 8 ,
+.Xr ping6 8 ,
+.Xr traceroute6 8 ,
+.Xr v6test 1 ,
+.Xr v6p 8 .
+.\"
+.Ss Application Daemons
+.Xr inet6d 8
+.\"
+.Ss Miscellaneous
+SuMiRe IPv4 NAT
+.Po
+.Xr pma 8
+.Pc .
+.\"
+.Sh DOCUMENTATION
+Although some of documentations have not modified yet, program itself
+may be heavily modified.
+Following lists are not complete, but give you some idea what kind of
+new software modules are available, or, modifications are made.
+Please refer to each manual page for detail.
+.\"
+.Ss Installation and basic usage documentations
+Please read following files in directory
+.Pa /usr/local/v6/share/doc/kame
+to get basic idea and installation methods on 
+.Nm KAME :
+.Pa README ,
+.Pa RELNOTES ,
+.Pa USAGE 
+and
+.Pa IMPLEMENTATION .
+Also check latest status of project at web page:
+.Pa http://www.kame.net/ .
+.Po
+Hope you can see a
+.Dq Dancing Turtle
+.Dv :-)
+.Pc
+.\"
+.Ss Added features (Commands/Daemons/File formats)
+.Xr cksum6 1 ,
+.Xr faith 1 ,
+.Xr faithd 8 ,
+.Xr bgpd 8 ,
+.Xr bgpd.conf 5 ,
+.Xr gifconfig 8 ,
+.Xr hroute6d 8 ,
+.Xr hroute6d.conf 5 ,
+.Xr route6d 8 ,
+.Xr icmp6dump 8 ,
+.Xr ifmcstat 8 ,
+.Xr inet6 4 ,
+.Xr inet6d 8 ,
+.Xr ipsec 4 ,
+.Xr mld6query 8 ,
+.Xr ndp 8 ,
+.Xr pim6dd 8 ,
+.Xr pim6dd.conf 5 ,
+.Xr ping6 8 ,
+.Xr pma 8 ,
+.Xr pmlog 8 ,
+.Xr prefix 8 ,
+.Xr racoon 8 ,
+.Xr rip6admin 8 ,
+.Xr rip6query 8 ,
+.Xr rrenumd 8 ,
+.Xr rrenumd.conf 5 ,
+.Xr rtadvd 8 ,
+.Xr rtadvd.conf 5 ,
+.Xr rtsol 8 ,
+.Xr rtsold 8 ,
+.Xr setkey 8 ,
+.Xr traceroute6 8 ,
+.Xr v6test 1 ,
+.Xr v6p 8
+.Ss Modified or renamed features
+.Xr arp 8 ,
+.Xr arp4 4 ,
+.Xr ftp 1 ,
+.Xr ftpd 8 ,
+.Xr ifconfig 8 ,
+.Xr inetd 8 ,
+.Xr lp 1 ,
+.Xr lpd 8 ,
+.Xr lpq 1 ,
+.Xr lpr 1 ,
+.Xr lprm 1 ,
+.Xr lptest 1 ,
+.Xr netstat 1 ,
+.Xr pac 8 ,
+.Xr ping 1 ,
+.Xr portmap 8 ,
+.Xr ppp 8 ,
+.Xr ppp.sys 5 ,
+.Xr rlogin 1 ,
+.Xr rlogind 8 ,
+.Xr route 8 ,
+.Xr rsh 1 ,
+.Xr rshd 8 ,
+.Xr sysctl 8 ,
+.Xr talk 1 ,
+.Xr talkd 8 ,
+.Xr tcpdump 1 ,
+.Xr telnet 1 ,
+.Xr telnetd 8 ,
+.Xr tftp 1 ,
+.Xr tftpd 8 ,
+.Xr traceroute 8 ,
+.Xr wall 1 ,
+.Xr write 1
+.Ss APIs introduced or modified
+.Xr if_indextoname 3 ,
+.Xr getaddrinfo 3 ,
+.Xr gethostbyname 3 ,
+.Xr getipnodebyname 3 ,
+.Xr getnameinfo 3 ,
+.Xr resolver 3 ,
+.Xr rresvport_af 3 ,
+.Xr pcap 3
+.\"
+.Sh STANDARDS
+To understand
+.Nm KAME
+protcol stack conformance, please refer
+.Pa /usr/local/v6/share/doc/kame/IMPLEMENTATION .
+.\"
+.Sh "Related project"
+TAHI project who is providing verification technology for IPv6, is
+heavily related with KAME project.
+You can get current verification
+status of KAME software at following THAI project web page:
+.Pa http://www.tahi.org/
+.Sh HISTORY
+The
+.Nm 
+project started in April 1999.
