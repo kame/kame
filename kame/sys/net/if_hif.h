@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.26 2003/10/22 02:12:53 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.27 2004/01/24 09:15:01 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,6 +110,8 @@ struct hif_softc {
 	u_int16_t              hif_dhaad_id;
 	long                   hif_dhaad_lastsent;
 	u_int8_t               hif_dhaad_count;
+	u_int16_t              hif_mps_id;
+	long                   hif_mps_lastsent;
 	struct in6_addr        hif_ifid;
 };
 LIST_HEAD(hif_softc_list, hif_softc);

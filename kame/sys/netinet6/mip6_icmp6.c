@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.86 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.87 2004/01/24 09:15:01 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -104,6 +104,7 @@
 
 #ifdef MIP6_MOBILE_NODE
 u_int16_t mip6_dhaad_id = 0;
+u_int16_t mip6_mps_id = 0;
 
 static const struct sockaddr_in6 haanyaddr_ifid64 = {
 	sizeof(struct sockaddr_in6),	/* sin6_len */
@@ -718,12 +719,35 @@ int
 mip6_icmp6_mp_sol_output(haddr, haaddr)
 	struct sockaddr_in6 *haddr, *haaddr;
 {
+	struct hif_softc *sc;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
 	struct mip6_prefix_solicit *mp_sol;
 	int icmp6len;
 	int maxlen;
 	int error;
+#ifdef __FreeBSD__
+        struct timeval mono_time;
+#endif /* __FreeBSD__ */
+ 
+#ifdef __FreeBSD__
+        microtime(&mono_time);
+#endif /* __FreeBSD__ */
+ 
+	sc = hif_list_find_withhaddr(haddr);
+	if (sc == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_icmp6_mp_sol_output:%d: "
+		    "no corresponding hif interface with %s.\n",
+		    __LINE__,
+		    ip6_sprintf(&haddr->sin6_addr)));
+		return (0);
+	}
+
+	/* rate limitation. */
+	if (sc->hif_mps_lastsent + 1 > mono_time.tv_sec) {
+		return (0);
+	}
 
 	/* estimate the size of message. */
 	maxlen = sizeof(*ip6) + sizeof(*mp_sol);
@@ -754,6 +778,9 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 	m->m_pkthdr.len = m->m_len = sizeof(*ip6) + icmp6len;
 	m->m_data += max_linkhdr;
 
+	sc->hif_mps_id = mip6_mps_id++;
+
+
 	/* fill the mobile prefix solicitation. */
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow = 0;
@@ -769,7 +796,7 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 	mp_sol = (struct mip6_prefix_solicit *)(ip6 + 1);
 	mp_sol->mip6_ps_type = MIP6_PREFIX_SOLICIT;
 	mp_sol->mip6_ps_code = 0;
-	mp_sol->mip6_ps_id = 0; /* XXX */
+	mp_sol->mip6_ps_id = htons(sc->hif_mps_id);
 	mp_sol->mip6_ps_reserved = 0;
 
 	/* calculate checksum. */
@@ -792,6 +819,9 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 		    "%s:%d: mobile prefix sol send failed (code = %d)\n",
 		    __FILE__, __LINE__, error));
 	}
+
+	/* update rate limitation factor. */
+	sc->hif_mps_lastsent = mono_time.tv_sec;
 
 	return (error);
 }
@@ -904,7 +934,13 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		}
 	}
 
-	/* XXX check id.  if it doesn't match, send mps. */
+	/* XXX */
+	/* check id.  if it doesn't match, send mps. */
+	if (hif->hif_mps_id != ntohs(mp_adv->mip6_pa_id)) {
+		mip6_icmp6_mp_sol_output(&mbu->mbu_haddr, &mbu->mbu_paddr);
+		error = EINVAL;
+		goto freeit;
+	}
 
 	icmp6len -= sizeof(*mp_adv);
 	nd6_option_init(mp_adv + 1, icmp6len, &ndopts);

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.65 2003/09/12 12:39:22 t-momose Exp $	*/
+/*	$KAME: if_hif.c,v 1.66 2004/01/24 09:15:01 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,6 +154,7 @@ t.
 #if NHIF > 0
 
 extern u_int16_t mip6_dhaad_id;
+extern u_int16_t mip6_mps_id;
 
 static int hif_site_prefix_list_update_withioctl(struct hif_softc *, caddr_t);
 static int hif_prefix_list_update_withprefix(struct hif_softc *, caddr_t);
@@ -234,6 +235,10 @@ hifattach(dummy)
 		sc->hif_dhaad_id = mip6_dhaad_id++;
 		sc->hif_dhaad_lastsent = 0;
 		sc->hif_dhaad_count = 0;
+
+		/* Mobile Prefix Solicitation. */
+		sc->hif_mps_id = mip6_mps_id++;
+		sc->hif_mps_lastsent = 0;
 
 		sc->hif_ifid = in6addr_any;
 
