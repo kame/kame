@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.64 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.65 2003/06/27 04:53:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,6 +82,7 @@ struct secpolicy {
 	int readonly;			/* write prohibited */
 	int refcnt;			/* reference count */
 	struct secpolicyindex *spidx;	/* selector - NULL if not valid */
+	u_int16_t tag;			/* PF tag */
 	u_int32_t id;			/* It's unique number on the system. */
 	u_int state;			/* 0: dead, others: alive */
 #define IPSEC_SPSTATE_DEAD	0
@@ -385,12 +386,16 @@ extern struct secpolicy *ipsec4_getpolicybysock
 	__P((struct mbuf *, u_int, struct socket *, int *));
 extern struct secpolicy *ipsec4_getpolicybyaddr
 	__P((struct mbuf *, u_int, int, int *));
+extern struct secpolicy *ipsec4_getpolicybytag
+	__P((struct mbuf *, u_int, int *));
 
 #ifdef INET6
 extern struct secpolicy *ipsec6_getpolicybysock
 	__P((struct mbuf *, u_int, struct socket *, int *));
 extern struct secpolicy *ipsec6_getpolicybyaddr
 	__P((struct mbuf *, u_int, int, int *));
+extern struct secpolicy *ipsec6_getpolicybytag
+	__P((struct mbuf *, u_int, int *));
 #endif /* INET6 */
 
 struct inpcb;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.189 2003/06/03 08:55:23 t-momose Exp $	*/
+/*	$KAME: ipsec.c,v 1.190 2003/06/27 04:53:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,6 +114,12 @@
 #endif
 #include <net/net_osdep.h>
 
+#include "pf.h"
+
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 #ifdef HAVE_NRL_INPCB
 #define in6pcb	inpcb
 #define in6p_sp	inp_sp
@@ -217,6 +223,7 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ESP_RANDPAD,
 #endif /* __FreeBSD__ */
 #endif /* INET6 */
 
+static struct pf_tag *ipsec_get_tag __P((struct mbuf *));
 static struct secpolicy *ipsec_checkpcbcache __P((struct mbuf *,
 	struct inpcbpolicy *, int));
 static int ipsec_fillpcbcache __P((struct inpcbpolicy *, struct mbuf *,
@@ -429,6 +436,18 @@ ipsec_invalpcbcacheall()
 	return 0;
 }
 
+static struct pf_tag *
+ipsec_get_tag(m)
+	struct mbuf *m;
+{
+	struct m_tag	*mtag;
+
+	if ((mtag = m_tag_find(m, PACKET_TAG_PF_TAG, NULL)) != NULL)
+		return ((struct pf_tag *)(mtag + 1));
+	else
+		return (NULL);
+}
+
 /*
  * For OUTBOUND packet having a socket. Searching SPD for packet,
  * and return a pointer to SP.
@@ -639,6 +658,35 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	return ip4_def_policy;
 }
 
+struct secpolicy *
+ipsec4_getpolicybytag(m, dir, error)
+	struct mbuf *m;
+	u_int dir;
+	int *error;
+{
+	struct pf_tag *t;
+	struct secpolicy *sp = NULL;
+
+	t = ipsec_get_tag(m);
+	if (!t) {
+		*error = ENOENT;
+		return NULL;
+	}
+	sp = key_allocspbytag(t->tag, dir);
+
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ipsec4_getpolicybytag called "
+			       "to allocate SP:%p\n", sp));
+		*error = 0;
+		return sp;
+	}
+
+	/* no SP found */
+	*error = ENOENT;
+	return NULL;
+}
+
 #ifdef INET6
 /*
  * For OUTBOUND packet having a socket. Searching SPD for packet,
@@ -847,6 +895,35 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	ip6_def_policy->refcnt++;
 	*error = 0;
 	return ip6_def_policy;
+}
+
+struct secpolicy *
+ipsec6_getpolicybytag(m, dir, error)
+	struct mbuf *m;
+	u_int dir;
+	int *error;
+{
+	struct pf_tag *t;
+	struct secpolicy *sp = NULL;
+
+	t = ipsec_get_tag(m);
+	if (!t) {
+		*error = ENOENT;
+		return NULL;
+	}
+	sp = key_allocspbytag(t->tag, dir);
+
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ipsec6_getpolicybytag called "
+			       "to allocate SP:%p\n", sp));
+		*error = 0;
+		return sp;
+	}
+
+	/* no SP found */
+	*error = ENOENT;
+	return NULL;
 }
 #endif /* INET6 */
 

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.275 2003/06/27 04:32:48 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.276 2003/06/27 04:53:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,6 +578,64 @@ found:
 	splx(s);
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP key_allocsp cause refcnt++:%d SP:%p\n",
+			sp->refcnt, sp));
+
+	return sp;
+}
+
+struct secpolicy *
+key_allocspbytag(tag, dir)
+	u_int16_t tag;
+	u_int dir;
+{
+	struct secpolicy *sp;
+	int s;
+
+	/* check direction */
+	switch (dir) {
+	case IPSEC_DIR_INBOUND:
+	case IPSEC_DIR_OUTBOUND:
+		break;
+	default:
+		panic("key_allocsp: Invalid direction is passed.");
+	}
+
+	/* get a SP entry */
+#ifdef __NetBSD__
+	s = splsoftnet();	/*called from softclock()*/
+#else
+	s = splnet();	/*called from softclock()*/
+#endif
+	LIST_FOREACH(sp, &sptree[dir], chain) {
+		KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+			printf("*** in SPD\n");
+			kdebug_secpolicyindex(sp->spidx));
+
+		if (sp->state == IPSEC_SPSTATE_DEAD)
+			continue;
+		if (sp->spidx)
+			continue;
+		if (sp->tag == tag)
+			goto found;
+	}
+
+	splx(s);
+	return NULL;
+
+found:
+	/* sanity check */
+	KEY_CHKSPDIR(sp->dir, dir, "key_allocspbytag");
+
+	/* found a SPD entry */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	sp->lastused = time_second;
+#else
+	sp->lastused = time.tv_sec;
+#endif
+	sp->refcnt++;
+	splx(s);
+	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+		printf("DP key_allocspbytag cause refcnt++:%d SP:%p\n",
 			sp->refcnt, sp));
 
 	return sp;
