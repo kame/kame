@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)gethostbyname.3	8.4 (Berkeley) 5/25/95
-.\"     $Id: getaddrinfo.3,v 1.6 2000/01/07 04:29:05 itojun Exp $
+.\"     $Id: getaddrinfo.3,v 1.7 2000/01/17 07:59:13 itojun Exp $
 .\"
 .Dd May 25, 1995
 .Dt GETADDRINFO 3
@@ -331,6 +331,105 @@ The implementation is still very experimental and non-standard.
 The current implementation assumes one-by-one relationship between
 interface and link, which is not necessarily true from the specification.
 .\"
+.Sh EXAMPLES
+The following code tries to connect to
+.Dq Li www.kame.net
+service
+.Dq Li http .
+via stream socket.
+It loops through all the addresses available, regardless from address family.
+If the destination resolves to IPv4 address, it will use
+.Dv AF_INET
+socket.
+Similarly, if it resolves to IPv6,
+.Dv AF_INET6
+socket is used.
+Observe that there is no hardcoded reference to particular address family.
+The code works even if
+.Nm getaddrinfo
+returns addresses that are not IPv4/v6.
+.Bd -literal -offset indent
+struct addrinfo hints, *res, *res0;
+int error;
+int s;
+const char *cause = NULL;
+
+memset(&hints, 0, sizeof(hints));
+hints.ai_family = PF_UNSPEC;
+hints.ai_socktype = SOCK_STREAM;
+error = getaddrinfo("www.kame.net", "http", &hints, &res0);
+if (error) {
+	err1(1, "%s", gai_strerror(error));
+	/*NOTREACHED*/
+}
+s = -1;
+for (res = res0; res; res = res->ai_next) {
+	s = socket(res->ai_family, res->ai_socktype,
+		res->ai_protocol);
+	if (s < 0) {
+		cause = "socket";
+		continue;
+	}
+
+	if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+		cause = "connect";
+		close(s);
+		s = -1;
+		continue;
+	}
+
+	break;	/* okay we got one */
+}
+if (s < 0) {
+	err(1, cause);
+	/*NOTREACHED*/
+}
+freeaddrinfo(res0);
+.Ed
+.Pp
+The following example tries to open wildcard listening socket onto service
+.Dq Li http ,
+for all the address families available.
+.Bd -literal -offset indent
+struct addrinfo hints, *res, *res0;
+int error;
+int s[MAXSOCK];
+int nsock;
+const char *cause = NULL;
+
+memset(&hints, 0, sizeof(hints));
+hints.ai_family = PF_UNSPEC;
+hints.ai_socktype = SOCK_STREAM;
+hints.ai_flags = AI_PASSIVE;
+error = getaddrinfo(NULL, "http", &hints, &res0);
+if (error) {
+	err1(1, "%s", gai_strerror(error));
+	/*NOTREACHED*/
+}
+nsock = 0;
+for (res = res0; res && nsock < MAXSOCK; res = res->ai_next) {
+	s[nsock] = socket(res->ai_family, res->ai_socktype,
+		res->ai_protocol);
+	if (s[nsock] < 0) {
+		cause = "socket";
+		continue;
+	}
+
+	if (connect(s[nsock], res->ai_addr, res->ai_addrlen) < 0) {
+		cause = "connect";
+		close(s[nsock]);
+		continue;
+	}
+
+	nsock++;
+}
+if (nsock == 0) {
+	err(1, cause);
+	/*NOTREACHED*/
+}
+freeaddrinfo(res0);
+.Ed
+.\"
 .Sh FILES
 .Bl -tag -width /etc/resolv.conf -compact
 .It Pa /etc/hosts
@@ -408,6 +507,14 @@ indicate an unknown error.
 .%T Basic Socket Interface Extensions for IPv6
 .%R RFC2553
 .%D March 1999
+.Re
+.Rs
+.%A Tatsuya Jinmei
+.%A Atsushi Onoe
+.%T "An Extension of Format for IPv6 Scoped Addresses"
+.%R internet draft
+.%N draft-ietf-ipngwg-scopedaddr-format-00.txt
+.%O work in progress material
 .Re
 .\"
 .Sh HISTORY
