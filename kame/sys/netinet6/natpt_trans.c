@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.74 2001/12/27 04:42:09 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.75 2002/01/23 06:31:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1359,6 +1359,7 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 	ip6save = *ip6;
 	frg6save = *frg6;
 	m6->m_pkthdr.len = m6->m_len = IPV6_MMTU;
+	m6->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
 	ip6_forward(m6, 1);			/* send first fragmented packet */
 
 	/*
@@ -1384,6 +1385,7 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 
 	bcopy(cv4->pyld.caddr+NATPT_MAXULP, pyld6, plen);
 	m6->m_pkthdr.len = m6->m_len = NATPT_FRGHDRSZ + plen;
+	m6->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
 	ip6_forward(m6, 1);			/* send second fragmented packet */
 }
 
