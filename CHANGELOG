@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2378 2003/04/11 10:16:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.2379 2003/04/11 10:36:55 jinmei Exp $
 
 <200304>
 2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -15,7 +15,7 @@ $KAME: CHANGELOG,v 1.2378 2003/04/11 10:16:57 jinmei Exp $
 
 2003-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): supported a string
-	notation for flag parameters.  For example, rtflags="o" specifies
+	notation for flag parameters.  For example, raflags="o" specifies
 	the daemon to set the "O bit" of the router advertisement header.
 	This change is backward compatible; the traditional numeric
 	notation is also accepted.
