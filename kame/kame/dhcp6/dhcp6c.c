@@ -1,3 +1,32 @@
+/*
+ * Copyright (C) 1998 and 1999 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -280,6 +309,7 @@ transmit(s, addr, port, hlim, buf, len)
 		/*NOTREACHED*/
 	}
 
+	dprintf((stderr, "hoplimit=%d\n", hlim));
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim,
 			sizeof(hlim)) < 0) {
 		err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
@@ -374,7 +404,18 @@ tvfix(tv)
 static void
 client6_mainloop()
 {
+	struct servtab *p;
+	char hbuf[BUFSIZ];
+
 	client6_findserv();
+	if (TAILQ_FIRST(&servtab) == NULL) {
+		errx(1, "no server found");
+		/*NOTREACHED*/
+	}
+	p = TAILQ_FIRST(&servtab);
+	inet_ntop(AF_INET6, &p->st_serv, hbuf, sizeof(hbuf));
+	dprintf((stderr, "primary server: pref=%u addr=%s\n",
+		p->st_pref, hbuf));
 }
 
 static void
@@ -400,7 +441,6 @@ client6_findserv()
 	int timeo;
 	int ret;
 	time_t sendtime, delaytime, waittime, t;
-	struct servtab *st = NULL;
 	struct servtab *p, *q;
 	enum { WAIT, DELAY } mode;
 
@@ -444,15 +484,15 @@ client6_findserv()
 			err(1, "select");
 			/*NOTREACHED*/
 		case 0:
-			if (mode == WAIT && st) {
-				/* we have more than 1 reply, receive timeout */
-				goto found;
+			if (mode == WAIT && TAILQ_FIRST(&servtab) != NULL) {
+				/* we have more than 1 reply and timeouted */
+				return;
 			}
 
 			if (mode == WAIT) {
 			} else {
 				if (timeo >= SOLICIT_RETRY)
-					goto found;
+					return;
 
 				dprintf((stderr, "send solicit\n"));
 				client6_sendsolicit(outsock);
@@ -473,16 +513,9 @@ client6_findserv()
 			}
 			client6_addserv(p);
 			if (p->st_pref == 255)
-				goto found;
+				return;
 			break;
 		}
-	}
-
-found:
-	p = TAILQ_FIRST(&servtab);
-	if (p == NULL) {
-		errx(1, "no dhcp6 server found");
-		/*NOTREACHED*/
 	}
 }
 
