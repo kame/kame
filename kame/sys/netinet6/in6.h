@@ -414,7 +414,7 @@ struct route_in6 {
 #endif
 
 /* new socket options introduced in RFC2292bis */
-#define IPV6_RTHDRDSTOPTS	35 /* ip6_dest; send dst option after rthdr */
+#define IPV6_RTHDRDSTOPTS	35 /* ip6_dest; send dst option before rthdr */
 
 #define IPV6_RECVPKTINFO	36 /* bool; recv if, dst addr */
 #define IPV6_RECVHOPLIMIT	37 /* bool; recv hop limit */

@@ -1364,6 +1364,12 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
  *      number of extension headers (RFC 2460 Section 4.1) are simply ignored.
  * XXX: We assume that each option is stored in a single mbuf.
  */
+#define CLEAN_RECVOPT(old, type) \
+do {								\
+	if ((old)->type && (old)->type->m_next) {		\
+		(old)->type->m_next = NULL;			\
+	}							\
+} while (0)
 #define MERGE_RECVOPT(new, old, type) if ((new)->type) {\
 		if ((old)->type)\
 			m_free((old)->type);\
@@ -1378,6 +1384,32 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		(p) = &(opt)->type->m_next;\
 	}
 
+static void dump_inputopts __P((char *, struct ip6_recvpktopts *));
+static void
+dump_inputopts(str, p)
+	char *str;
+	struct ip6_recvpktopts *p;
+{
+#define PRINT1(p, name) \
+do { \
+	if (p->name) { \
+		printf(" %s: %p", #name, (p)->name); \
+		if (p->name->m_next) \
+			printf("[%p]", (p)->name->m_next); \
+	} \
+} while (0)
+
+	printf("%s p=%p head=%p", str, p, p->head);
+	PRINT1(p, hlim);
+	PRINT1(p, pktinfo);
+	PRINT1(p, hbh);
+	PRINT1(p, dest1);
+	PRINT1(p, dest2);
+	PRINT1(p, rthdr);
+	printf("\n");
+#undef PRINT1
+}
+
 void
 ip6_update_recvpcbopt(old, new)
 	struct ip6_recvpktopts *new, *old;
@@ -1389,6 +1421,24 @@ ip6_update_recvpcbopt(old, new)
 		return;
 	}
 
+	dump_inputopts("old before", old);
+	if (new)
+		dump_inputopts("new before", new);
+
+#if 0
+	/*
+	 * cleanup m->m_next linkage. note that we do it in reverse order
+	 * to prevent possible memory leakage.
+	 */
+	old->head = NULL;
+	CLEAN_RECVOPT(old, rthdr);
+	CLEAN_RECVOPT(old, dest2);
+	CLEAN_RECVOPT(old, dest1);
+	CLEAN_RECVOPT(old, hbh);
+	CLEAN_RECVOPT(old, pktinfo);
+	CLEAN_RECVOPT(old, hlim);
+#endif
+
 	if (new) {
 		MERGE_RECVOPT(new, old, hlim);
 		MERGE_RECVOPT(new, old, pktinfo);
@@ -1397,6 +1447,10 @@ ip6_update_recvpcbopt(old, new)
 		MERGE_RECVOPT(new, old, dest2);
 		MERGE_RECVOPT(new, old, rthdr);
 	}
+
+	dump_inputopts("old middle", old);
+	if (new)
+		dump_inputopts("new middle", new);
 
 	/* link options */
 	mp = &old->head;
@@ -1407,6 +1461,10 @@ ip6_update_recvpcbopt(old, new)
 	LINK_RECVOPTS(old, dest2, mp);
 	LINK_RECVOPTS(old, rthdr, mp);
 	*mp = NULL;
+
+	dump_inputopts("old after", old);
+	if (new)
+		dump_inputopts("new after", new);
 }
 
 #undef MERGE_RECVOPT
