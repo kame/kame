@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2602 2004/05/14 02:31:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.2603 2004/05/14 02:39:05 suz Exp $
 
 <200405>
+2004-05-14  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/mldv2_proto.c: receives MLDv2 TO_EX{NULL} report
+	properly.
+
 2004-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: added a set of bug fixes and cleanups based on
 	comments and patches from Hiro Muraji:
