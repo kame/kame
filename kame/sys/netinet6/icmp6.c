@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.282 2002/02/04 06:28:19 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.283 2002/02/04 10:26:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1352,7 +1352,6 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	struct icmp6_mtudisc_callback *mc;
 #endif
 	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
-	struct mbuf *m = ip6cp->ip6c_m;	/* will be necessary for scope issue */
 	u_int mtu = ntohl(icmp6->icmp6_mtu);
 	struct rtentry *rt = NULL;
 #ifndef SCOPEDROUTING
