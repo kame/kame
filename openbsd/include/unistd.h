@@ -195,6 +195,8 @@ pid_t	 vfork __P((void));
 int	 issetugid __P((void));
 
 #if 1 /*INET6*/
+int	 rcmd_af __P((char **, int, const char *,
+		const char *, const char *, int *, int));
 int	 rresvport_af __P((int *, int));
 int	 iruserok_af __P((const void *, int, const char *, const char *, int));
 int	 iruserok_sa __P((const void *, int, int, const char *, const char *));
