@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.301 2002/09/06 10:27:54 suz Exp $	*/
+/*	$KAME: in6.c,v 1.302 2002/09/10 11:14:49 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1540,9 +1540,7 @@ in6_purgeaddr(ifa)
 	 * leave from multicast groups we have joined for the interface
 	 */
 	while ((imm = ia->ia6_memberships.lh_first) != NULL) {
-#ifndef MLDV2
 		LIST_REMOVE(imm, i6mm_chain);
-#endif
 		in6_leavegroup(imm);
 	}
 
@@ -3595,9 +3593,6 @@ in6_leavegroup(imm)
 		in6_delmulti(imm->i6mm_maddr);
 #endif
 	}
-#ifdef MLDV2
-	LIST_REMOVE(imm, i6mm_chain);
-#endif
 	free(imm, M_IPMADDR);
 	return 0;
 }

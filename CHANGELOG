@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2228 2002/09/10 02:29:19 itojun Exp $
+$KAME: CHANGELOG,v 1.2229 2002/09/10 11:14:48 suz Exp $
 
 <200209>
+Tue Sep 10 20:04:25 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6.c, in6_ifattach.c, in6_pcb.c,
+	  ip6_output.c
+	fixed a kernel-hangup with MLDV2 option, when an IPv6 prefix is removed
+
 Tue Sep 10 11:28:12 JST 2002  itojun@iijlab.net
 	* mdnsd: make it compatible with Rendezvous in Apple Jaguar.
 	  (use port 5353 for multicast, attach "local" at the end of local

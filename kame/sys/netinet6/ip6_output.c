@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.328 2002/09/06 10:27:54 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.329 2002/09/10 11:14:49 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3840,9 +3840,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
-#ifndef MLDV2
 		LIST_REMOVE(imm, i6mm_chain);
-#endif
 		in6_leavegroup(imm);
 		break;
 
@@ -3895,6 +3893,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 
+		LIST_REMOVE(imm, i6mm_chain);
 		error = in6_leavegroup(imm);
 		if (error != 0)
 			 printf("ip6_setmoptions: in6_leavegroup returned error. panic!\n");
@@ -4307,9 +4306,7 @@ ip6_freemoptions(im6o)
 		return;
 
 	while ((imm = im6o->im6o_memberships.lh_first) != NULL) {
-#ifndef MLDV2
 		LIST_REMOVE(imm, i6mm_chain);
-#endif
 		in6_leavegroup(imm);
 	}
 	free(im6o, M_IPMOPTS);

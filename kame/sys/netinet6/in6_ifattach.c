@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.170 2002/09/05 08:09:36 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.171 2002/09/10 11:14:49 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1020,9 +1020,7 @@ in6_ifdetach(ifp)
 		 * leave from multicast groups we have joined for the interface
 		 */
 		while ((imm = ia->ia6_memberships.lh_first) != NULL) {
-#ifndef MLDV2
 			LIST_REMOVE(imm, i6mm_chain);
-#endif
 			in6_leavegroup(imm);
 		}
 

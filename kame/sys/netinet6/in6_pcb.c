@@ -779,9 +779,7 @@ in6_pcbpurgeif0(head, ifp)
 			     imm != NULL; imm = nimm) {
 				nimm = imm->i6mm_chain.le_next;
 				if (imm->i6mm_maddr->in6m_ifp == ifp) {
-#ifndef MLDV2
 					LIST_REMOVE(imm, i6mm_chain);
-#endif
 					in6_leavegroup(imm);
 				}
 			}
