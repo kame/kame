@@ -1,9 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.99 1999/09/07 07:50:46 itojun Exp $
+$Id: CHANGELOG,v 1.100 1999/09/08 07:36:45 jinmei Exp $
 
 
 <199909>
+1999-09-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi3/sbin/ifconfig/ifconfig.c (findaddr): used AF dependent
+	comparison functions instead of simple binary comparison. With
+	this fix, you can use ifconfig add, remove and modify commands for
+	IPv6 link-local addresses without embedding an interface
+	identifier. That is, you can do
+	# ifconfig ef0 inet6 remove fe80::1
+	instead of
+	# ifconfig ef0 inet6 remove fe80:2::1
+
 Tue Sep  7 16:42:41 JST 1999  itojun@iijlab.net
 	* kame/rip6query: use getaddrinfo() and getnameinfo(), not inet_pton()
 	  and alike.  allow interface to be specified with -I.
