@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.252 1999/11/04 08:23:22 sumikawa Exp $
+$Id: CHANGELOG,v 1.253 1999/11/04 09:10:07 itojun Exp $
 
 <199911>
+Thu Nov  4 18:08:00 JST 1999  itojun@iijlab.net
+	* kame/etc/rc.net6: install reject route for scoped address without
+	  scope identifiers.  this will raise icmp6 error on, say,
+	  "ping6 fe80::1" (this is invalid since there's no scope identifier).
+
 Thu Nov  4 17:22:05 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* netbsd/pkgsrc/net/pchar, freebsd[23]/ports/pchar: pathchar
 	reimplementation.
