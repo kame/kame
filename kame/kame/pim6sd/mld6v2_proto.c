@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.29 2004/05/31 12:42:04 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.30 2004/05/31 12:48:58 suz Exp $
  */
 
 /*
@@ -565,6 +565,7 @@ accept_multicast_record(vifi, mard, src, grp)
 			    log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
 			g->al_addr = *grp;
 			g->sources = NULL;
+			g->comp_mode = MLDv2;
 
 			g->al_next = v->uv_groups;
 			v->uv_groups = g;
