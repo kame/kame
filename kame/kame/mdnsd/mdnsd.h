@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.21 2001/07/30 23:38:33 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.22 2001/08/22 03:05:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -53,9 +53,10 @@ extern int dormanttime;
 
 /* mdnsd.c */
 extern int addserv __P((const char *, int, const char *));
-extern int ismyaddr __P((const struct sockaddr *));
+extern int ismyaddr __P((const struct sockaddr *, int));
 extern int dprintf __P((const char *, ...));
 extern void status __P((void));
 
 /* mainloop.c */
 extern void mainloop __P((void));
+extern int send_updates __P((void));

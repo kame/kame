@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.14 2001/08/21 12:34:49 itojun Exp $	*/
+/*	$KAME: db.c,v 1.15 2001/08/22 03:05:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -77,14 +77,16 @@ dbtimeo()
 		if (qc->ttq.tv_sec == tv.tv_sec && qc->ttq.tv_usec > tv.tv_usec)
 			continue;
 
-		/* send NXDOMAIN to querier */
-		hp = (HEADER *)qc->qbuf;
-		hp->rcode = NXDOMAIN;
-		if (sendto(qc->sd->s, qc->qbuf, qc->qlen, 0,
-		    qc->from, qc->from->sa_len) < 0)
-			errcnt++;
+		if (qc->nreplies == 0) {
+			/* send NXDOMAIN to querier */
+			hp = (HEADER *)qc->qbuf;
+			hp->rcode = NXDOMAIN;
+			if (sendto(qc->sd->s, qc->qbuf, qc->qlen, 0,
+			    qc->from, qc->fromlen) < 0)
+				errcnt++;
 
-		dprintf("query %p expired\n", qc);
+			dprintf("query %p expired\n", qc);
+		}
 		delqcache(qc);
 	}
 
@@ -104,7 +106,7 @@ dbtimeo()
 			continue;
 
 		if (sendto(sc->sockidx, sc->sbuf, sc->slen, 0,
-		    sc->to, sc->to->sa_len) < 0)
+		    sc->to, sc->tolen) < 0)
 			errcnt++;
 		delscache(sc);
 	}
@@ -147,15 +149,16 @@ dbtimeo()
 }
 
 struct qcache *
-newqcache(from, buf, len, type)
+newqcache(from, fromlen, buf, len, type)
 	const struct sockaddr *from;
+	int fromlen;
 	char *buf;
 	int len;
 	enum nstype type;
 {
 	struct qcache *qc;
 
-	if (from->sa_len > sizeof(qc->from_ss))
+	if (fromlen > sizeof(qc->from_ss))
 		return NULL;
 
 	qc = (struct qcache *)malloc(sizeof(*qc));
@@ -169,7 +172,8 @@ newqcache(from, buf, len, type)
 	}
 
 	qc->from = (struct sockaddr *)&qc->from_ss;
-	memcpy(qc->from, from, from->sa_len);
+	qc->fromlen = fromlen;
+	memcpy(qc->from, from, fromlen);
 	memcpy(qc->qbuf, buf, len);
 	qc->qlen = len;
 	qc->type = type;
@@ -186,20 +190,22 @@ delqcache(qc)
 	LIST_REMOVE(qc, link);
 	if (qc->qbuf)
 		free(qc->qbuf);
+	if (qc->rbuf)
+		free(qc->rbuf);
 	free(qc);
 }
 
 struct scache *
-newscache(sidx, from, to, buf, len)
+newscache(sidx, from, fromlen, to, tolen, buf, len)
 	int sidx;
 	const struct sockaddr *from, *to;
+	int fromlen, tolen;
 	char *buf;
 	int len;
 {
 	struct scache *sc;
 
-	if (from->sa_len > sizeof(sc->from_ss)
-	    || to->sa_len > sizeof(sc->to_ss))
+	if (fromlen > sizeof(sc->from_ss) || tolen > sizeof(sc->to_ss))
 		return NULL;
 
 	sc = (struct scache *)malloc(sizeof(*sc));
@@ -214,9 +220,11 @@ newscache(sidx, from, to, buf, len)
 
 	sc->sockidx = -1;
 	sc->from = (struct sockaddr *)&sc->from_ss;
-	memcpy(sc->from, from, from->sa_len);
+	sc->fromlen = fromlen;
+	memcpy(sc->from, from, fromlen);
 	sc->to = (struct sockaddr *)&sc->to_ss;
-	memcpy(sc->to, to, to->sa_len);
+	sc->tolen = tolen;
+	memcpy(sc->to, to, tolen);
 	memcpy(sc->sbuf, buf, len);
 	sc->slen = len;
 
@@ -236,13 +244,14 @@ delscache(sc)
 }
 
 struct nsdb *
-newnsdb(addr, comment)
+newnsdb(addr, addrlen, comment)
 	const struct sockaddr *addr;
+	int addrlen;
 	const char *comment;
 {
 	struct nsdb *ns;
 
-	if (addr->sa_len > sizeof(ns->addr_ss))
+	if (addrlen > sizeof(ns->addr_ss))
 		return NULL;
 
 	ns = (struct nsdb *)malloc(sizeof(*ns));
@@ -251,7 +260,8 @@ newnsdb(addr, comment)
 	memset(ns, 0, sizeof(*ns));
 
 	ns->addr = (struct sockaddr *)&ns->addr_ss;
-	memcpy(ns->addr, addr, addr->sa_len);
+	memcpy(ns->addr, addr, addrlen);
+	ns->addrlen = addrlen;
 	if (comment)
 		ns->comment = strdup(comment);
 
@@ -279,7 +289,7 @@ printnsdb(ns)
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
 	printf("ns %p", ns);
-	if (getnameinfo(ns->addr, ns->addr->sa_len,
+	if (getnameinfo(ns->addr, ns->addrlen,
 	    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) == 0) {
 		printf(" %s %s", hbuf, sbuf);
 	} else

@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.43 2001/08/02 10:14:56 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.44 2001/08/22 03:05:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -98,7 +98,7 @@ main(argc, argv)
 {
 	int ch;
 	int ready4, ready6;
-	struct sockdb *sd;
+	struct sockdb *sd, *snext;
 	int nsock;
 
 	while ((ch = getopt(argc, argv, "46Dfh:i:lmNp:P:")) != -1) {
@@ -213,7 +213,8 @@ main(argc, argv)
 
 	ready4 = ready6 = 0;
 	nsock = 0;
-	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
+	for (sd = LIST_FIRST(&sockdb); sd; sd = snext) {
+		snext = LIST_NEXT(sd, link);
 		nsock++;
 
 		switch (sd->type) {
@@ -230,8 +231,15 @@ main(argc, argv)
 		case AF_INET6:
 			ready6++;
 			if (join(sd->s, sd->af, MDNS_GROUP6) < 0) {
-				err(1, "join");
-				/*NOTREACHED*/
+				/*
+				 * don't make it fatal error, as we'll see join
+				 * failure if the kernel is v4/v6 dual stack
+				 * and there's no valid IPv6 global address.
+				 */
+				warn("join");
+				close(sd->s);
+				LIST_REMOVE(sd, link);
+				continue;
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
 				errx(1, "interface %s unusable", intface);
@@ -241,8 +249,15 @@ main(argc, argv)
 		case AF_INET:
 			ready4++;
 			if (join(sd->s, sd->af, MDNS_GROUP4) < 0) {
-				err(1, "join");
-				/*NOTREACHED*/
+				/*
+				 * don't make it fatal error, as we'll see join
+				 * failure if the kernel is v4/v6 dual stack
+				 * and there's no valid IPv4 global address.
+				 */
+				warn("join");
+				close(sd->s);
+				LIST_REMOVE(sd, link);
+				continue;
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
 				errx(1, "interface %s unusable", intface);
@@ -295,6 +310,8 @@ main(argc, argv)
 		syslog(LOG_INFO, "started with %d listening sockets\n", nsock);
 	} else
 		dprintf("started with %d listening sockets\n", nsock);
+
+	send_updates();
 
 	mainloop();
 	exit(0);
@@ -586,7 +603,7 @@ addserv(n, ttl, comment)
 		multicast = 0;
 		break;
 	}
-	ns = newnsdb(res->ai_addr, comment);
+	ns = newnsdb(res->ai_addr, res->ai_addrlen, comment);
 	if (ns == NULL) {
 		freeaddrinfo(res);
 		return -1;
@@ -607,8 +624,9 @@ addserv(n, ttl, comment)
 }
 
 int
-ismyaddr(sa)
+ismyaddr(sa, salen)
 	const struct sockaddr *sa;
+	int salen;
 {
 	struct sockaddr_storage ss[2];
 	u_int32_t scope[2], loscope;
@@ -622,10 +640,10 @@ ismyaddr(sa)
 	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 
-	if (sa->sa_len > sizeof(ss[0]))
+	if (salen > sizeof(ss[0]))
 		return 0;
 
-	memcpy(&ss[0], sa, sa->sa_len);
+	memcpy(&ss[0], sa, salen);
 	scope[0] = 0;
 	loscope = if_nametoindex("lo0");	/*XXX*/
 #ifdef __KAME__
@@ -733,7 +751,7 @@ status()
 
 	fprintf(fp, "DNS servers:\n");
 	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
-		if (getnameinfo(ns->addr, ns->addr->sa_len,
+		if (getnameinfo(ns->addr, ns->addrlen,
 		    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) != 0) {
 			strcpy(hbuf, "invalid");
 			strcpy(sbuf, "invalid");

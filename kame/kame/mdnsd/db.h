@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.18 2001/08/21 12:34:49 itojun Exp $	*/
+/*	$KAME: db.h,v 1.19 2001/08/22 03:05:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -31,10 +31,13 @@
 
 struct sockdb;
 enum nstype { N_UNICAST, N_MULTICAST };
+
+/* an entry for a relayed query */
 struct qcache {
 	LIST_ENTRY(qcache) link;
 	struct sockaddr_storage from_ss;
 	struct sockaddr *from;
+	int fromlen;
 	char *qbuf;	/* original query packet */
 	int qlen;
 	u_int16_t id;	/* id on relayed query - net endian */
@@ -42,6 +45,9 @@ struct qcache {
 	struct timeval ttq;	/* time to quit */
 	size_t rbuflen;	/* receive buffer size of the querier - for EDNS0 */
 	enum nstype type;	/* mcast or unicast */
+	unsigned nreplies;	/* # of nodes replies to this (if mcast) */
+	char *rbuf;		/* first reply */
+	int rlen;
 };
 
 struct scache {
@@ -51,8 +57,10 @@ struct scache {
 	int slen;
 	struct sockaddr_storage from_ss;
 	struct sockaddr *from;
+	int fromlen;
 	struct sockaddr_storage to_ss;
 	struct sockaddr *to;
+	int tolen;
 	int sockidx;
 };
 
@@ -60,6 +68,7 @@ struct nsdb {
 	LIST_ENTRY(nsdb) link;
 	struct sockaddr_storage addr_ss;
 	struct sockaddr *addr;
+	int addrlen;
 	char *comment;
 	enum nstype type;
 	int prio;
@@ -85,13 +94,13 @@ extern LIST_HEAD(nshead, nsdb) nsdb;
 extern LIST_HEAD(sockhead, sockdb) sockdb;
 
 extern int dbtimeo __P((void));
-extern struct qcache *newqcache __P((const struct sockaddr *, char *, int,
+extern struct qcache *newqcache __P((const struct sockaddr *, int, char *, int,
 	enum nstype));
 extern void delqcache __P((struct qcache *));
 extern struct scache *newscache __P((int, const struct sockaddr *,
-	const struct sockaddr *, char *, int));
+	int, const struct sockaddr *, int, char *, int));
 extern void delscache __P((struct scache *));
-extern struct nsdb *newnsdb __P((const struct sockaddr *, const char *));
+extern struct nsdb *newnsdb __P((const struct sockaddr *, int, const char *));
 extern void delnsdb __P((struct nsdb *));
 extern void printnsdb __P((struct nsdb *));
 extern struct sockdb *newsockdb __P((int, int));
