@@ -116,9 +116,9 @@ krt_entry(rtm)
 #ifdef __bsdi__
       (rtm->rtm_flags & (RTF_XRESOLVE|RTF_BLACKHOLE|RTF_CLONED))
 #endif /*__bsdi__*/
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
       (rtm->rtm_flags & (RTF_XRESOLVE|RTF_BLACKHOLE))
-#endif /* __NetBSD__ */
+#endif /* __NetBSD__ || __OpenBSD__ */
       )
     return;             /* not interested in the link route */
 
@@ -760,7 +760,7 @@ igp_enable_rte(rte)
     break;
   default:
     fatalx("<igp_enable_rte>: Bad routing protocol");
-    break;
+    /*NOTRECHED*/
   }
 
   if (rte->rt_flags & RTF_UP)

@@ -52,7 +52,6 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif /* __FreeBSD__ >= 3 */
-#include <net/if.h>
 
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
