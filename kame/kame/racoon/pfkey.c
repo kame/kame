@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.126 2001/08/16 20:22:25 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.127 2001/08/17 10:52:37 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,7 +191,7 @@ pfkey_handler()
 
 	plog(LLV_DEBUG, LOCATION, NULL, "get pfkey %s message\n",
 		s_pfkey_type(msg->sadb_msg_type));
-	plogdump(LLV_DEBUG, msg, msg->sadb_msg_len << 3);
+	plogdump(LLV_DEBUG2, msg, msg->sadb_msg_len << 3);
 
 	/* validity check */
 	if (msg->sadb_msg_errno) {
