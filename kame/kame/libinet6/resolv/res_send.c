@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.11 2000/06/18 20:53:52 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.12 2000/06/18 21:19:42 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -395,6 +395,8 @@ res_send(buf, buflen, ans, anssiz)
 #endif
 		else if (nsap->sa_family == AF_INET)
 			salen = sizeof(struct sockaddr_in);
+		else
+			salen = 0;	/*unknown, die on connect*/
 
     same_ns:
 		if (badns & (1 << ns)) {
