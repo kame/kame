@@ -1,5 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2271 2002/11/04 06:34:58 suz Exp $
+$KAME: CHANGELOG,v 1.2272 2002/11/05 06:04:15 itojun Exp $
+
+<200211>
+Tue Nov  5 14:44:14 JST 2002  itojun@iijlab.net
+	* openbsd: synchronize to 3.2.  still needs testing.
 
 Mon Nov  4 15:27:40 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/{netinet6/in6.c, netinet6/mld6.c, netinet/in_msf.h}:
