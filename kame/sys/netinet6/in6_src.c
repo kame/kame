@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.60 2001/08/18 05:58:37 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.61 2001/08/19 07:33:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,7 +336,12 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 		/* Rule 6: Prefer matching label:  XXX not yet */
 
-		/* Rule 7: Prefer public addresses */
+		/*
+		 * Rule 7: Prefer public addresses.
+		 * We allow users to reverse the logic by configuring
+		 * a sysctl variable, so that privacy conscious users can
+		 * always prefer temporary addresses.
+		 */
 		if (!(ia_best->ia6_flags & IN6_IFF_TEMPORARY) &&
 		    (ia->ia6_flags & IN6_IFF_TEMPORARY)) {
 			if (ip6_prefer_tempaddr)
@@ -374,6 +379,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		new_matchlen = in6_matchlen(&ia->ia_addr.sin6_addr, dst);
 		if (best_matchlen < new_matchlen)
 			REPLACE(14);
+		if (new_matchlen < best_matchlen)
+			NEXT(14);
 
 		/* Rule 15 is reserved. */
 
