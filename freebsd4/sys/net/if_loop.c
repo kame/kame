@@ -283,13 +283,13 @@ if_simloop(ifp, m, af, hlen)
 		 * if the queueing discipline needs packet classification,
 		 * do it before prepending link headers.
 		 */
-		IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+		IFQ_CLASSIFY(&ifp->if_snd, m, af, &pktattr);
 
 		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
 		if (m == 0)
 			return(ENOBUFS);
 		afp = mtod(m, int32_t *);
-		*afp = (int32_t)dst->sa_family;
+		*afp = (int32_t)af;
 
 	        s = splimp();
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
