@@ -1,0 +1,73 @@
+			CHANGELOG for KAME kit, 1996
+
+$Id: CHANGELOG.1996,v 1.1 1999/10/05 09:49:25 itojun Exp $
+
+<19961225> WIDE internal release
+
+* Source selection.
+	Best address out of the same scope.
+* Interface selection.
+	Interface ID encoding to link-local addresses.
+* Flagments and reassemble. 
+* TCP fatal bug fix.
+* GIF bug fixes.
+* Automatic link-local address setup.
+* RA handling(default route and prefix).
+* Strict pakect filtering in ipv6_{input, forwarding, output}.
+* API catch up (no more HDRINCL).
+	ping6, traceroute6, rtsol.
+
+<19960908> WIDE internal release
+
+* Copyright notices are brushed up.
+* ICMPv6 netunreach bug fix. This makes Hydrangea much more stable.
+	Yusaku Hasegawa <yusaku-h@is.aist-nara.ac.jp>
+* udp6_usrreq.c logical case fix
+	Akira Kato <kato@nezu.wide.ad.jp>
+* A tiny patch for -i option of netstat6
+	Jun-ichiro Itoh <itojun@cardamom.csl.sony.co.jp>
+* if_dummy.c
+	Akira Kato <kato@nezu.wide.ad.jp>
+* in6_localaddr was deleted
+	Atsushi Onoe <onoe@sm.sony.co.jp>
+* gifconfig now requires root privilege.
+	Kazu Yamamoto
+* At booting, a message like 
+	rtinit: wrong ifa (f0810900) was (f0810c00)
+was printed. This was fixed.
+
+The causes of this bug were the followings:
+	(1) ifa_ifwithaddr compares <key> and <broadaddr>.
+	(2) Since IPv6 doesn't have broadcast address, 
+	   ifa_broadcast is filled with zero.
+	(3) bcmp() returns *0* when comparing length is zero.
+	(4) Thus, ifa_ifwithaddr always returns not the appropriate
+	   in6_ifaddr but the first in6_ifaddr.
+
+There are two solutions here:
+	(a) Bury ifa_broadcast with link-local all node multicast address.
+	(b) Avoid comparing <key> and <broadaddr> when length is zero in
+           ifa_ifwithaddr.
+Currently we went to the way of (b).
+
+	Kazu Yamamoto
+
+<19960816> WIDE internal release
+
+* af2pf and daisy_insw are now used in only IPv4 and IPv6 semantics.
+	Kazu Yamamoto
+* A password typo fix. Sorry.
+	Kazu Yamamoto
+* A typo fix in net/ppp_ipv6cp.c to prevent warnings.
+	Kazu Yamamoto
+* netstat patch for UDP6 statics.
+	Akira Kato <kato@nezu.wide.ad.jp>
+* TCP checksum patch.
+	Atsushi Onoe <onoe@sm.sony.co.jp>
+	Jun-ichiro Itoh <itojun@csl.sony.co.jp>
+* IPv6 multicast support patch for if_gif.c.
+	Akira Kato <kato@nezu.wide.ad.jp>
+
+<19960814> WIDE internal release
+
+* Initial release to WIDE project.

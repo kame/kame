@@ -1,0 +1,333 @@
+			CHANGELOG for KAME kit, 1997
+
+$Id: CHANGELOG.1997,v 1.1 1999/10/05 09:49:25 itojun Exp $
+
+<19971228-19971231>
+
+* sbin/ifconfig: prefixlen is 64 by default
+* minimum mtu is now 1280 (was 576)
+* ip6 header priority -> class fix
+* faithtelnetd/faithtelnet improvements
+
+<19971221-19971227>
+
+* advanced-api-04: specifying hoplimit by sendmsg(), for outgoing packet
+* advanced-api-04: receiving dst addr/ifindex/hoplimit by recvmsg(),
+	for incoming packet
+* src/rtadvd: tiny bug fix.
+
+<19971116-19971122>
+
+* blowfish-cbc support
+* temporary sr0 (riscom) driver fix (thanks kick&fujisaki), need more
+  investigation
+* gif rcvif fix (thanks kick)
+* hangup on two or more RA fixed (thanks demizu)
+* draft-ietf-ipngwg-icmp-namelookups-01.txt support.
+  uses type=138 for FQDN query, type=139 for FQDN reply.
+* nd6/routing table bug fix, in treatment of iface with multiple
+  IPv6 addresses.
+* advanced-api-04: icmp6 filter
+
+<19971109-19971115>
+
+* src/setkey: conform to draft-ietf-ipsec-auth-hmac-{md5-,sha1}96-01.txt
+
+<19971102-19971108>
+
+* netnatm fixes (include AF_* into ap0 bpf) by demizu
+* riscom (if_sr) fix (incomplete)
+* AH *-sha1 fix
+* base version is now FreeBSD 2.2.5-RELEASE.  2.2.2-RELEASE tree is
+  no longer maintained, basically.
+
+<19971027-19971101>
+
+* rename the name of some binary. (rshd -> rsh6d, rsh -> rsh6)
+* sendmail6 port update.
+* advanced-api-04: IN6_IS_ADDR_SAME -> IN6_ARE_ADDR_EQUAL
+* advanced-api-04: icmp6 type/code/struct
+* "goto ours" using routing table, not the loop
+* GIFng
+* backout daisy code from netinet6, now it looks like standard BSD code
+* atm support updates (you must recompile apconfig)
+
+<19971020-19971026>
+
+* sbin/route now makes prefixlen=64 by default, for ip6 routes.
+* ipv6 sppp (cisco hdlc) support.  tnx goes to fujisaki@ntt.
+* route6d patch (aggregate+filter) by kick@wide.ad.jp.
+* kernel patch for 2.2.5-RELEASE added.
+
+<19971012-19971019>
+
+* icmp6 redirect (status: send ok, receive not stable)
+* route6d improvements from kato-san
+* make synchronization with bsdi version easier
+* bsdi version releases (kernel only)
+
+<19971010-19971011>
+
+* less warnings on compilation - thanks demizu-san
+* ssh6 port directory
+* bind8 port directory
+* discovery-v2-00 conformance (status: so-so, use "options INET6_NDV2")
+
+<19971009>
+
+* NA reception handling fix (to conform to discovery-06 draft)
+* icmp6 echoreply fix (source address has been invalid)
+* unnumbered point-to-point fix
+
+<19970918-19971005>
+
+* merged in ATM card support.
+* addition: rsh6 and rshd6
+* addition: ports/sendmail6
+* portmap fix by ho-san
+* document fix by ho-san
+* "ping6 -w" fix.
+* "netinet6 -in" fix.
+* addition: etc/rc.net6
+* addition: usr.sbin/portmap (with INET6 fix)
+* document: list unsupported interfaces, comment them out in GENERIC.v6
+* addition: src/v6test
+* ah6/esp6 fixes
+* nd6 lladdr fix (be generic, don't use fixed MAC address size)
+* massive improvement in tcpdump
+* route6d version up
+* "ep" driver is officially supported.
+
+<19970918>
+
+* Ad hoc hack to resolve NDP timer problems.
+* A patch for route6d.c.
+	Atsushi Onoe <onoe@sm.sony.co.jp>
+* Goto ours if ifp->if_flags & IFF_POINTOPOINT for linklocal.
+* More IPsec.
+	itojun@itojun.org
+* ATM patch for commands and kernel.
+	Katushi Kobayashi <ikob@peer.cc.uec.ac.jp>
+* getaddrinfo patch for ping6.
+	itojun@itojun.org
+
+<19970719>
+
+* ndp -c bug fix.
+* ATM merge.
+	Katushi Kobayashi <ikob@peer.cc.uec.ac.jp>
+* Eliminated IP_TOP from telnetd.
+* in6_pcbnotify hack.
+
+<19970717>
+
+* 'Who Are You' support.
+* ping6 hack.
+* Heuristic to prevent reverse lookup for get{addr,name}info().
+* while(1) in icmp6.c was removed.
+	itojun@itojun.org
+* m_pullup() buges were fixed.
+	itojun@itojun.org
+* ICMPv6 echo/reply hack.
+* The 'crypto' directory was created.
+* A bug of extension header analysis was fixed.
+* IPsec commands were merged.
+	itojun@itojun.org
+
+<19970711>
+
+* IPsec on Hydrangea/FreeBSD was merged.
+* New telnet/telnetd.
+* A bug of imcp_error loop was fixed. 
+
+<19970709>
+
+* New getaddrinfo/getnameinfo.
+* ip6_hdrlen hack.
+	itojun@itojun.org
+* rtadvd error check.
+* See if prefixlen of RA is 64.
+* if_mz support
+	itojun@itojun.org
+* Type fix in comments.
+	ip6_mreq -> ipv6_mreq
+* ifconfig patch
+	NAKAMURA Motonori <motonori@econ.kyoto-u.ac.jp>
+* FreeBSD patch for route6d.
+	itojun@itojun.org
+
+<19970624>
+
+* Ad-hoc solution of AF_INET6 for ftp6 and ftp6d.
+* Can make without INET6.
+* IPv4 support for ifmcstat.
+* if_exp MC bug ad-hoc fix.
+* UGH! ether_ip6multicast_{min,max} were crazy... fixed.
+* nd6_nbr.c and nd6_rtr.c were also changed.
+* in6_ifattach.c was changed to support aggregatable address.
+* in6_maxmtu was fixed to skip lo0.
+* route6d hack.
+	Atsushi Onoe <onoe@sm.sony.co.jp>
+
+<19970508>
+
+* include "gif.h" in ip_input.c.
+* Many bug fixes for BSD/OS 3.0 indicated by "before_kazu".
+* socket(PF_ROUTE) bug fix for route6d.
+* Well-tested on june.
+
+<19970409>
+
+* A bug fix of ifconfig. A strange address never displays for gif
+ link-local.
+* gifconfig is now based on BSD/OS 3.0's ifconfig.
+* libinet6 was re-written.
+
+<19970408>
+
+* Support for 'de' and 'ef'.
+
+<19970407>
+
+* Numerous bug fixes for tcpdump which muneti-s enbugs many things, sigh.
+* netstat '%uq' bug fix.
+* ND6 parameters are now configurable by sysctl.
+
+<19970406>
+
+* Upgrad to BSD/OS 3.0.
+* Path MTU Discovery.
+
+<19970310>
+
+* Toobig handle code. But we should consider it after BSD/OS 3.0.
+* MD5 include files.
+* IPV6_IF_MULTICAST bug fixes. 
+* in6_contorol bug fix.
+
+<19970227>
+
+* md5.{c,h} uses u_int{n}_t.
+* Now is able to configure without INET6.
+* NGIF > 0 for ip{,6}_input.c
+* ntohl() for too big messages in tcpdump.
+
+<19970225>
+
+* ICMPV6 macros conform the adv API.
+* Some logging codes are added.
+* ip6_mreq{} -> ipv6_mreq{} to conform the adv API.
+* traceroute6 bug fix.
+* route6d's buf is extended.
+
+<19970219>
+
+* IP/IP6 never use m_pullup when ressembling. IP6 reassembly comes back.
+* icmpdump -> icmp6dump.
+* ip6_frag_input() -> frag6_input().
+* Commands use netinet/ip6.h instead netinet6/ip6.h.
+
+<19970216>
+
+* TCP based on sys210 patched 027 is now available!
+* "ne" makes one internal mbuf or one or more external mbuf.
+* telnet ::1 bug fix.
+* UDP length bug fix.
+* gethostbyname2 is deleted from commands.
+
+<19970214>
+
+* M_LOOP is defined.
+* IP6_EXTHDR_CHECK is defined!!!!!
+* nd6_rtr.c is now independent on Ethernet.
+* tcpdump displays fragments.
+* nd6_{ns, na, rtr}_input while loop bug fix.
+* This version doesn't support TCP/IP6 nor "ne". 
+
+<19970213>
+
+* group management bug fixes in in6_control() and in6_{add,del}multi().
+* struct ip6_mreq now takes if_index.
+* ip6_output handles im6r_ifindex.
+* ifinit() makes ifindex2ifnet[].
+* Mbuf statics in ip6_input().
+* This version doesn't support TCP/IP6.
+
+<19970212>
+
+* s/ndp6/nd6/g, s/NDP6/ND6/g
+* nd6_{ns,na}_{input,output} is now independent on Ethernet.
+* nd6.c is also independent on Ethernet.
+* in6_control() brush up.
+* ifmcstat displays all groups for each interface.
+* This version doesn't support TCP/IP6.
+
+<19970211>
+
+* in6_cksum()'s carry bit bug fix.
+* s/v6/6/g, s/v4/4/g, s/ndp6/nd6/g.
+* Create ip6_{frag, route, dest}.c and {ah,esp}.c.
+* ip6_input() checks out multicast before global unicast.
+* Delete many unnecessary functions and variables.
+* Names of Daisy macros have been changed.
+* Delete ip6snoproto from rip6_input.
+* Add ip6nhhist and ip6notmember.
+* Decide that ip6_input() and ip6_route_input() call ip6_forward.
+* Decide that ip6_input() handles HBH.
+* This version doesn't support TCP/IP6.
+
+<19970210>
+
+* in6_ifaddr now contains global addresses only.
+* ipv6_input() checks IF's link-local first then global.
+* if_ether6.c -> ndp6{,_nbr,_rtr}.c.
+* This version doesn't support TCP/IP6.
+
+<19970208>
+
+* Caught up to the basic API 07.
+* in6_cksum() calculates a pseudo header.
+* ICMP/UDP/TCP depends on in6_cksum() to prepare a pseudo header.
+* Now modification to packets such as ntohs() never be permitted.
+* Call icmp{,6}_paramerror if Daisy_ERROR is returned.
+* This version doesn't support TCP/IPv6.
+
+<19970201>
+
+* route6d can now aggregate routes. 
+	e.g. -A 5f09:c400::/32,gif2,gif3,gif4,gif6
+* m_copym() in icmpv6_error() bug fix.
+* icmpv6_{error,reflect} were re-written to be elegant and stable.
+* ipv6_forward() now directly calls if_output().
+* netstat -nr now displays routing tables with IPv6 oriented format.
+* netstat -s -p icmp6 now displays {in,out}hist.
+* tcpdump can tap an IF even if it doesn't have any IPv4 addresses.
+* Defined GATEWAY6, deleted IGNORERA.
+* ipv6_ignorera -> ipv6_accept_rtadv. ipv6_faithon -> ipv6_keepfaith.
+
+<19970129>
+
+* RIPng ready.
+* RADISH bug fixes.
+* ICMP refines.
+* Command bug fixes.
+
+<19970125>
+* sysctl stuff
+* FAITH (Fairewall Aided Internet Translator for Hydrangea)
+* ndp6_rs_ouput() was deleted from each PCMCIA driver. This function
+goes to missd(Miss Daemon).
+* Many bug fixes.
+
+<19970124>
+
+* Macro names and variable names conform the API drafts.
+* RADISH bug fixes. Now RTM_DELETE surely back to routing socket.
+
+<19970107> WIDE internal release
+
+* Automatic link-local address to p2p link using MD5.
+* RADISH porting.
+* netstat, route, and ndp is now completed.
+* ifname functions.
+* Several bug fixes including UDP6, gif multicast, etc.

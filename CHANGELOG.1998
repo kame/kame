@@ -1,0 +1,2741 @@
+			CHANGELOG for KAME kit, 1998
+
+$Id: CHANGELOG.1998,v 1.1 1999/10/05 09:49:25 itojun Exp $
+
+<199812>
+Thu Dec 31 20:56:12 JST 1998  itojun@iijlab.net
+	* kit/ports/ucd-snmp: upgrade base version to ucd-snmp 3.5.3.
+
+Thu Dec 31 03:37:03 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/ports/socks64:
+	made compilable on KAME FreeBSD 3.0.
+	(Include if_var.h. Should be removed in the future,
+	also with removal of in6_var.h)
+
+Wed Dec 30 22:28:58 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src
+	Made then compilable on KAME FreeBSD 3.0.
+	Especially many ifdef's are added to route6d/ifmcstat.c.
+
+Tue Dec 29 18:07:52 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* sys/net,netinet,netinet6
+	sync with FreeBSD3.0 as much as possible.(mainly netinet6)
+
+Fri Dec 25 22:06:04 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* sys/netinet6/nd6_rtr.c: Added consideration of ndpr_rrf_decrvalid
+	and ndpr_rrf_decrprefd for address lifetime initialization.
+	Without this, prefixes allocated by prefix command will be
+	IN6_IFF_DEPRECATED after some period of time.
+
+Fri Dec 25 17:02:08 JST 1998  itojun@iijlab.net
+	* kit/ports/bind8 (FreeBSD): IPv6-ready bind8.  named will accept
+	  queries to IPv6 UDP/TCP port 53, dig/nslookup/whatever are able to
+	  make queries toward IPv6 UDP/TCP port 53, and so forth.
+
+1998-12-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* in6_proto.c,ip6_input.c,ip6_var.h: removed none_input().
+	Now a packet whose protocol is IPPROTO_NONE can safely be passed
+	to the userland.
+	netinet/in_proto.c was also modified.
+
+Thu Dec 24 19:40:27 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/libinet6/resolv/res_debug.c
+	add ifdef of T_UINFO, T_UID, T_GID, to make it compilable on
+	FreeBSD 3.0.
+
+1998-12-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* probe.c (probe_init): call shutdown() after opening the probe socket
+	to make the socket `send-only'.
+
+Thu Dec 24 11:46:38 JST 1998  itojun@iijlab.net
+	* sys/netinet6/raw_ip6.c: setsockopt(IPV6_CHECSUM) sometimes caused
+	  SEGV due to a bug in mbuf boundary checks.  It is now fixed.
+
+Thu Dec 24 03:11:19 JST 1998  itojun@iijlab.net
+	* kit/ports/apache13: updated to use new patch.
+	  (fixed args for freeaddrinfo())
+	  Reported by:
+		Florent Parent <Florent.Parent@viagenie.qc.ca>
+		Andreas Wrede <andreas@planix.com>
+
+Tue Dec 22 20:10:40 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/faithd/tcp.c: Before terminating a relay process,
+	shutdown s_snd.  This make opposite-direction relay process
+	to terminate also.
+
+1998-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* mld6.c (mld6_input): Fixed a problem that zero divide occurs
+	when receiving a MLD query with Maximum Response Delay smaller
+	than 200(including zero).
+	Thanks to Niels Baggesen <Niels.Baggesen@uni-c.dk> for reporting the
+	problem and sending a patch.
+
+1998-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* ip6_output.c (ip6_setmoptions): For link-local multicast
+	detection, use IN6_IS_ADDR_MC_LINKLOCAL instead of
+	IPV6_ADDR_INT16_MLL.
+	Thanks to: Tetsuya Isaki <isaki@se.hiroshima-u.ac.jp>
+
+1998-12-22  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/rcmd.c: fix declaration of iruserok() for
+	NetBSD.
+
+Sat Dec 19 14:02:44 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/faithd/faithd.c, tcp.c
+	do closelog() and (re)openlog() for child after fork.
+	check EINTR for select() and read().
+
+Fri Dec 18 12:25:49 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/faithd/tcp.c: BUG fix:
+	fixed select fds settting. add check of send result and retry.
+	clean-up'ed select routine.
+	(Thanks for jinmei-san for code review and comment, also thanks for
+	onoe-san for many background informations)
+
+Thu Dec 17 00:26:18 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/faithd/tcp.c: BUG fix; use global integer rcvon and
+	writeon, to control the set/unset of readfds for s_rcv and
+        writefds for s_snd in select();
+
+Wed Dec 16 13:30:46 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/faithd/faithd.c: BUG fix; give syslog() correct buffer
+	pointer. This fix the strange syslog() output problem on child
+	exit.
+
+Wed Dec 16 12:48:53 1998  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+	* kit/src/faithd/tcp.c
+	Fork in tcp_relay() for going relay traffic and coming relay traffic.
+	And in those each process, do non-blocking write() so that OOB data
+	can be forwarded preferrably.
+
+1998-12-15  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/rcmd.c, rresvport_af.c: add compatible wrapper
+	functions to avoid conflict of symbols.
+
+1998-12-14  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/usr.bin/telnet/commands.c: support source route for IPv4
+	and IPv6 (@gw1@gw2@dest).
+
+1998-12-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bgp.c (connect_process): modified some code fragments not to
+	call fatal even if {set,get}sockopt is failed. This is necessary
+	to interoperate with some(e.g. Cisco) implementations when the
+	peer is not listening to the BGP port.
+
+1998-12-10  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* syncronized netinet6/* codes of three OSs as much as possible	
+
+Thu Dec 10 04:14:59 JST 1998 shin@nd.net.fujitsu.co.jp
+        * sys/neitnet/
+        * sys/neitnet6/
+        changed IPPROTO_NONE as return value to IPPROTO_DONE.
+        and use IPPROTO_NONE only for protocl type value.
+        also, this fixes mbuf leak bug when received a packet with
+        IPPROTO_NONE.
+
+1998-12-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd: supported `next hop self' when sending a BGP4+ UPDATE
+	message to an IBGP peer.
+
+1998-12-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd/parse.c: changed restriction of using the `preference'
+	keyword for an EBGP peer only.
+
+Sat Dec  5 04:53:05 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	Soft lifetime is set to 80% of hard lifetime.
+	This rate can be defined which you like by calling
+	pfkey_lifetime_rate().
+
+Fri Dec  4 02:26:13 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	It's fixed to handle session for PF_KEY.
+	It's enable to display the entries on the negotiation of phase 2.
+	About address semantics for varius case is commented into isakmp.h.
+
+Wed Dec  2 23:44:00 JST 1998  itojun@iijlab.net
+	* sys/netinet6: (NetBSD) fixed odd behavior in ND6.  Now ND6 works
+	  properly as expected.
+
+Wed Dec  2 13:17:21 JST 1998 sakane@ydc.co.jp
+	* sys/netkey/key.c:
+	Fixed to hung up the kernel when running two of racoon.
+
+<199811>
+Sat Nov 28 00:54:28 JST 1998  itojun@iijlab.net
+	* kit/src/route6d: route tag support.  route6d can advertise route tag
+	  by "-t 0x1234".   rip6query will show the advertised route tag,
+	  if non-zero value is advertised.
+
+Fri Nov 27 JST 1998  itojun@iijlab.net
+	* kit/lib/libutil: (FreeBSD) logwtmp() which takes care of IPv6 address
+	  that does not fit UT_HOSTSIZE.  (not really tested)
+	  This was intended to replace original shared library by new libutil
+	  to override logwtmp() used by /usr/bin/login.  However,
+	  /usr/bin/login records username/hostname by itself.  Therefore,
+	  the attempt was failed.
+
+Fri Nov 27 01:54:10 JST 1998  itojun@iijlab.net
+	* kit/lib/libskey: (FreeBSD) S/Key library capable of handling
+	  IPv6 hostnames listed in /etc/skey.access.
+	  You can override standard /usr/lib/libskey.so.2.0 by doing
+	  "ldconfig -m /usr/local/v6/lib".  By doing so /usr/bin/login
+	  will be able to handle IPv6 hostnames without re-compilation.
+	  To test this add the followin entry to /etc/skey.access and try
+	  a telnet session to ::1.
+		permit internet ::1 ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+	  "prefixlen" syntax is added.
+		permit internet ::1/128
+
+Thu Nov 26 10:15:35 JST 1998  k-sugyou@kame.net
+	- (FreeBSD) support IPv6 firewall
+	- kit/sbin/ip6fw: controll utility
+
+Wed Nov 25 18:36:46 JST 1998  itojun@iijlab.net
+	* kit/libexec/telnetd: perform setsockopt(IP_TOS) only if the perr
+	  is IPv4 host.
+
+Tue Nov 24 18:53:38 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	A new Diffie-Hellman group as number 5 was supported.
+
+Sat Nov 21 06:15:30 JST 1998  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: ICMP6 redirect processing was wrong.
+	  routing table update event was not properly propagated toward
+	  upper-layers.
+
+Sat Nov 21 03:55:17 JST 1998  itojun@iijlab.net
+	* KAME IPv6 on NetBSD-pmax is now confirmed to work.
+
+	  From: Feico Dillema <dillema@acm.org>
+	  Date: Fri, 20 Nov 1998 16:53:41 +0100
+	  Subject: (KAME-snap 210) Status Report KAME and NetBSD-1.3.2-pmax 
+
+Fri Nov 20 17:00:35 JST 1998  itojun@iijlab.net
+	* sys/netinet6/nd6_rtr.c: Update prefix information option processing.
+	  (experimental, FreeBSD/BSDI only)
+	  Add more comments to RA processing code.
+	  Separate prefix lifetime and address lifetime.  Address lifetime
+	  will be kept in struct in6_ifaddr.  Implement "2 hour" rule for
+	  address lifetime, which prevents DoS attack (hopefully).
+	  TODO: on-link determination must be updated.
+	* kit/sbin/ifconfig: Add code to print out address lifetime.
+	  It looks too noisy and commented out by default.
+
+Thu Nov 19 23:28:43 JST 1998 shin@nd.net.fujitsu.co.jp
+	* kit/etc/rc.net6: don't assign prefix if $prefix is null
+
+Thu Nov 19 19:03:53 JST 1998 shin@nd.net.fujitsu.co.jp
+	* sys/netinet6/nd6.h: removed reserved field of
+	the bit field, ndpr_stateflags, to also remove the necessity of
+	changing the size of reserved field at new bit member addition.
+
+Wed Nov 18 20:48:07 JST 1998  itojun@iijlab.net
+	- Header chain chasing support for tcpdump.
+	  To use this, user must specify "ip protochain x" or
+	  "ip6 protochain x".
+	  Since BPF code for header chasing cannot be optimized and is a bit
+	  slow, this is separate from "ip proto x".
+
+	  For example, "ip6 protochain 6" should capture any IPv6 packet
+	  with TCP header (TCP with AH, or TCP with hop-by-hop option,
+	  can be captured).
+	
+Wed Nov 18 10:05:42 JST 1998  itojun@iijlab.net
+	* kit/ports/lynx: fix security hole in "rlogin://" URL.
+	  (obtained from bugtraq mailing list)
+
+	  From: Artur Grabowski (art@STACKEN.KTH.SE)
+	  Date: Tue, 17 Nov 1998 17:06:00 +0100
+      
+	  http://www.geek-girl.com/bugtraq/1998_4/0489.html
+	 
+Wed Nov 18 04:00:32 JST 1998 shin@nd.net.fujitsu.co.jp
+	* kit/src/rtsol/rtsol.c
+	make compilable on FreeBSD 3.0
+
+1998-11-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/pim6dd: added to support PIMv6 dense mode.
+	Pim6dd was based on pimdd developed at the University of Oregon.
+
+Tue Nov 17 16:08:45 JST 1998 shin@nd.net.fujitsu.co.jp
+	* kit/src/gifconfig/gifconfig.8
+	manual update for gif multi dest extensions contributed from
+	dwiggins@bbn.com.
+	also descriptions about IPv6 support and enable switch of this
+	extension by link0 flag on/off is also added.
+
+Tue Nov 17 14:57:51 JST 1998 shin@nd.net.fujitsu.co.jp
+	* sys/net/if.c,if.h,if_gif.c,route.c,route.h,rtsock.c
+	* sys/netinet/in_gif.c,in_gif.h
+	* sys/neitnet6/in6_gif.c,in6_gif.h
+	* kit/sbin/route/route.8,route.c
+
+	merged gif multi dest extensions contributed from dwiggins@bbn.com.
+	IPv6 support and enable switch of this extension by link0 flag on/off
+	 is also added.
+
+Tue Nov 17 01:51:12 JST 1998 shin@nd.net.fujitsu.co.jp
+	* kit/src/gifconfig.c:
+	support of printing physical IPv6 address value
+
+Mon Nov 16 22:14:50 JST 1998 shin@nd.net.fujitsu.co.jp
+	* sys/net/if_gif.c: Bug Fix
+	added SIOC{S,G}IF{PHY,PSRC,PDST}*_IN6 ioctls to enable gif
+	tunneling over IPv6.
+
+Mon Nov 16 17:57:26 JST 1998  itojun@iijlab.net
+	* kit/src/libinet6/rcmd.c: Update ahost (1st argument)
+	  only if canonical hostname is available.  This is to preserve
+	  the original behavior.
+
+Sat Nov 14 18:25:06 JST 1998  itojun@iijlab.net
+	* kit/usr.bin/telnet/commands.c (FreeBSD/NetBSD): preserve original
+	  behavior.
+	  - if the hostname to connect to is numeric, perform canonical name
+	    lookup (look for PTR record, i.e. gethostbyaddr).
+	  - if the hostname is non-numeric, do not perform canonical name
+	    lookup.
+	* kit/usr.bin/telnet/commands.c (BSDI): preserve original behavior.
+	  - never perform canonical name lookup.
+
+Fri Nov 13 01:36:57 JST 1998  itojun@iijlab.net
+	* sys/crypto/sha1.c: fixed SHA-1 computation bug when the data source
+	  is sized multiple of 64bytes.  Thanks goes to Chris Winters
+	  <winters@itd.nrl.navy.mil> for detailed bug report!
+
+Thu Nov 12 20:14:19 JST 1998  itojun@iijlab.net
+	* sys/netinet6/in6.c: avoid hardcoding prefixlen == 64bit in
+	  SIOC[ADG]LIFADDR processing.
+
+	  bitwidth of interface id is always 64bit (defined in RFC2373),
+	  but prefixlen may NOT be 64bit.  RFC2373 allows non-RFC2374 address
+	  encoding scheme.  (see figure on page 8)
+
+Thu Nov 12 19:53:34 JST 1998  shin@nd.net.fujitsu.co.jp
+	* kit/src/rrenumd/rrenumd.c
+	"AE" options added for rrenumd authentication and
+	encryption.
+
+Thu Nov 12 16:13:53 JST 1998  itojun@iijlab.net
+	* kit/src/{libpcap,tcpdump}: support IPv6 address in pcap expression.
+		tcpdump host ::1
+		tcpdump net 3ffe:0501::/32
+
+	TODO: libpcap now requires getaddrinfo() if --enable-ipv6 is specified.
+		configure should check the existence and use alternatives
+		(missing/getaddrinfo.c?) if none found.
+	TODO: "gateway" syntax is not working in --enable-ipv6 setting.
+
+Wed Nov 12 11:43:54 JST 1998  shin@nd.net.fujitsu.co.jp
+	* sys/net/if_dummy.c: correct if_type to IFT_DUMMY
+
+Wed Nov 11 18:16:56 JST 1998  itojun@iijlab.net
+	* sys/netinet/in.c: implement SIOC[ADG]LIFADDR.
+
+Wed Nov 11 14:16:00 JST 1998  itojun@iijlab.net
+	* kit/libexec/ftpd(FreeBSD): perform ioctl(IP_TOS) and
+	  setsockopt(TCP_NOPUSH) to be performed only in IPv4 ftp connection.
+	  login.cap is now supported (but never tested).
+	  logwtmp() is fixed to log IPv6 numeric hostname as much as possible.
+	  I dunno if it is right or not.
+	  (previously logged as "invalid hostname")
+
+Wed Nov 11 13:56:59 JST 1998  itojun@iijlab.net
+	* kit/src/rtsol: use SIOC[ADG]LIFADDR when possible.  this is mainly
+	  for test purposes, but looks nice.
+
+Wed Nov 11 12:02:10 JST 1998  itojun@iijlab.net
+	* sys/netinet6/in6.c: support SIOC[ADG]LIFADDR for IPv6 address.
+	  see ipngwg mailing list #6621 (October 10).  IPv6 address support
+	  will be added when IPv6 version is confirmed to be working right.
+
+Tue Nov 10 16:23:50 JST 1998  itojun@iijlab.net
+	* sys/netinet/ip_output.c: (FreeBSD) prevent ipfw code from SEGV.
+	  NOTE: we are still wondering whether ipfw code works right with
+	  KAME or not.  Your inputs and bug reports would be really helpful.
+
+Tue Nov 10 16:10:26 JST 1998  itojun@iijlab.net
+	* kit/ports/ssh: update IPv6 patch to 1.4.
+
+Tue Nov 10 12:31:53 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: eliminate u_int{8,16,32}.  use u_int{8,16,32}_t for
+	  better portability.
+	* kit/src/racoon: support lifetime type "kb".  NOTE: no kernel support
+	  for expiration yet.
+
+Tue Nov 10 00:21:04 JST 1998  itojun@iijlab.net
+	* sys/netinet6: accumulate bytes transferred over SA, so that we can
+	  define lifetime by bytes (sadb_lifetime_bytes) in the future.
+	* kit/src/setkey: display bytes transferred over SA.
+
+Mon Nov  9 15:51:28 JST 1998  itojun@iijlab.net
+	* sys/netkey/key.c: pass FQDN and USERFQDN identity extension
+	  on ACQUIRE message.  we need to check if it is allowed to pass
+	  multiple identity extension to userland (racoon dislikes this).
+
+Mon Nov  9 15:10:16 JST 1998  itojun@iijlab.net
+	* kit/src/setkey: changed the meaning of -h flag.
+	  was: print usage and exit, now: display hexadecimal dump on -x.
+
+Sat Nov  7 00:29:19 JST 1998  shin@nd.net.fujitsu.co.jp
+	* kit/src/rrenumd/Makefile, lexer.l, rrenumd.8, rrenumd.conf.5
+	man update, and fixed lexer file to support comment in conf file.
+
+1998-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd/bgp_input.c (bgp_read): fixed a problem that bgpd
+	stopped when an ETIMEDOUT error occurred on a BGP socket.
+
+Fri Nov  6 16:27:07 JST 1998  itojun@iijlab.net
+	* sys/crypto/cast128/cast128.c: speed up by replacing core functions
+	  by macros.
+
+	Message-Id: <19981031020640N.suzuki@grelot.elec.ryukoku.ac.jp>
+	Date: Sat, 31 Oct 1998 02:06:40 +0900
+	From: Tomomi Suzuki <suzuki@grelot.elec.ryukoku.ac.jp>
+
+Fri Nov  6 14:00:30 JST 1998  itojun@iijlab.net
+	* sys/netinet6: ND6 cleanups.
+	- remove old lladdr caching code.  utilize nd6_cache_lladdr.
+	- if we got RS/RA/NS/redir packet without lladdr, make an neighbor
+	  cache entry with NOSTATE state (= considered PASSIVE).
+	- checked relationship between neighbor cache and defrouter list.  it
+	  seems fine (there will be no defrouter list without neighbor cache).
+
+Thu Nov  5 JST 1998  itojun@iijlab.net
+	* kit/src/route6d: ripng fix: update route lifetime only if the
+	  advertisement is from same gw, with same metric. (see p13 of RFC2080)
+
+	Thanks to: ikuo@intec.co.jp
+
+Thu Nov  5 21:14:01 JST 1998  shin@nd.net.fujitsu.co.jp
+	* kit/src/libinet6/resolv/res_debug.c
+	Made this really compilable on FreeBSD 3.0.
+
+Thu Nov  5 20:33:02 JST 1998  shin@nd.net.fujitsu.co.jp
+	* kit/src/libinet6/ifname.c
+	* kit/src/libinet6/resolv/res_debug.c
+	* kit/src/ndp/ndp.c
+	* kit/src/prefix/prefix.c
+	Made compilable on FreeBSD 3.0.
+	Now prefix assignment seems to be successful.
+
+Thu Nov  5 04:26:55 JST 1998  shin@nd.net.fujitsu.co.jp
+	* sys/netinet6/in6_prefix.c
+	BUG FIX: fixed matched prefix length validity check to comply
+	with spec.
+
+Thu Nov  5 02:59:55 JST 1998  shin@nd.net.fujitsu.co.jp
+	* kit/src/Makefile
+	added rrenumd to SUBDIR.
+
+Thu Nov  5 02:45:59 JST 1998  shin@nd.net.fujitsu.co.jp
+	* kit/src/rrenumd/rrenumd.c, parser.y, lexer.l, Makefile, rrenumd.8
+	fixed bugs and now it seems to be sending valid rrenum msgs.
+	* kit/src/rtadvd/rrenum.c,rtadv.c
+	fixed bugs and now seems to be successfully renumbering when
+	received rrenum msgs from rrenumd.
+	* kit/src/prefix/prefix.c
+	changed default value of use_prefix length.
+
+Wed Nov  4 23:41:05 JST 1998  itojun@iijlab.net
+	* sys/netinet6/esp*: cleanup ESP pad length processing.
+	  base spec requires 4n, cbc algorithms require 8n.
+	* sys/netinet6/ah_core.c: make sure to skip ifindex portion
+	  in ip6 src/dst address.
+
+Wed Nov  4 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: fix IPv6 ID payload.
+	* sys/netkey/key.c: changed internal structure for SA management.
+	  SA will be held into per-state linked list, not per-protocol
+	  linked list.
+
+Wed Nov  4 00:29:02 JST 1998  itojun@iijlab.net
+	* kit/src/tcpdump: try checking buggy implementation of CAST128.
+	  SSLeay 0.9.0b has a bug in encryption round # on short keys - 
+	  rounds should be 12 for key <= 80bits.
+
+Tue Nov  3 19:58:13 JST 1998  itojun@iijlab.net
+	* sys/crypto/blowfish: fixed cbc mode processing.  now it should be
+	  interoperable with other implementations (need testing).
+
+Mon Nov  2 01:02:30 JST 1998  itojun@iijlab.net
+	* kit/ports/gated-ipv6: pathname of original distribution changed.
+
+<199810>
+Mon Oct 31 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: AH algorithm must be determined by hash algorithm
+	  type attribute, not the transform type.
+	* kit/src/racoon: sanity checker for config file improved.
+	* sys/netinet6/esp_output.c: fixed a serious bug in ESP tunnel output,
+	  which mistakes policy determination and send packets in clear (simple
+	  tunnel, not ESP tunnel) in some configuration.
+	* kit/src/tcpdump: ID payload now printed properly.
+	* kit/src/racoon: parser improvements.  makefile improvements.
+	  link print-isakmp.c from tcpdump so that packets can be monitored
+	  after decryption, in debug mode.
+
+Fri Oct 30 21:52:50 JST 1998  itojun@iijlab.net
+	* sys/netinet6, kit/usr.bin/netstat: gather more stats on
+	  IPsec operations.
+
+Thu Oct 29 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: ignore notification payload on phase 1 negotiation
+	  (responder-lifetime).  this is necessary for interop with RedCreek
+	  when responder-lifetime does not match.
+	* kit/src/racoon: compute long cipher key for phase 1 properly
+	  (for example 3DES)
+	* kit/src/racoon: phase 2 quick mode: attach fake ID payload for
+	  debugging (configurable)
+	* kit/src/racoon: ignore commit bit (we don't support this yet)
+	* kit/src/racoon: bug fix in DELETE payload processing.
+		TODO: handle it more properly, (i.e. remove SA if possible)
+	* kit/src/racoon: send and check Vendor ID. (does nothing tricky
+	  at this moment)
+	* kit/src/racoon: phase 2 AH proposal must include authentication
+	  method attribute.  reject non-conforming proposal on config file,
+	  and on the packet from the peer.
+	* kit/src/racoon: filter out phase 2 proposal that does not match
+	  the SA type requested from the kernel.  For example, AH proposals
+	  will be filtered out when ESP SA is requested.
+	* kit/src/racoon: improve parser code.
+
+Wed Oct 28 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: SA payload fixes.  (1) SAi_b must be the whole
+	  SA payload sent from the initiator.  (2) responder must send the
+	  selected proposal only, not the whole payload.
+	* kit/src/racoon: phase 2 PFS fix.  config file format has changed.
+	  one must specify PFS DH group in phase 2 configuration, not per-
+	  transform configuration.
+	* kit/src/racoon: ESP with authentication is now supported.
+	  generate longer KEYMAT for this.
+	* kit/src/racoon: improve warnings on ATTR payload format.
+	* kit/src/racoon: bark if there's no "remote anonymous" section.
+	* kit/src/tcpdump: isakmp and ipsec improvements.
+
+Wed Oct 28 13:54:48 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: better PFS (Perfect Forward Secrecy) support.
+	  RFC keyed MD5 support.  ignore Vendor ID payload (we may check
+	  content of Vendor ID payload in the future).
+
+Tue Oct 27 23:28:45 GMT 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	In phase 1, using real address as ID payload,
+	if ID was not specified in config file.
+
+Tue Oct 27 22:37:30 GMT 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	Applied t_id except hash_t when decision AH algorithm.
+
+Wed Oct 28 07:05:57 JST 1998  itojun@iijlab.net
+	* kit/src/setkey: support keyed SHA1.
+	* sys/netkey: add more information about supported algorithms into
+	  SADB_REGISTER message.
+	* sys/netinet6: cleanup AH/ESP algorithm table.  add key length
+	  information into the table.
+
+Tue Oct 27 22:06:26 GMT 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	Added Some comment about checking payload.
+	Implemented new SA payload parser.
+	Removed enc_t in ipsec_sa structure.
+	Supported to handle key length per algorithm.
+
+Mon Oct 26 11:34:13 JST 1998  itojun@iijlab.net
+	* sys/netinet6: IPv4 options processing.  not tested.
+	  I believe that it will not work if there's source route option,
+	  since ip_dooptions() rewrites the ip header.
+
+Sun Oct 25 15:21:37 JST 1998  itojun@iijlab.net
+	* kit/src/rtsol: avoid kvm_read().  use ioctl() instead, to grab
+	  interface information.
+
+Sun Oct 25 JST 1998  itojun@iijlab.net
+	* sys/netinet6: add more sanity checks in esp{4,6}_input() and
+	  ah{4,6}_input(), to avoid panic in heavy ipsec sessions.
+
+Sat Oct 24 03:02:43 JST 1998 shin@nd.net.fujitsu.co.jp
+	Added parser to rrenumd. But not seems to be working yet.
+	Also man is not up to date.
+
+Thu Oct 22 04:05:15 JST 1998 sakane@ydc.co.jp
+	* sys/netkey, kit/src/racoon:
+	Fixed the behavior about ACQUIRE, GETSPI, UPDATE and ADD.
+	There were some mistakes.  Changed that kernel doesn't make a entry
+	for acquiring when SADB_ACQUIRE.
+
+Wed Oct 21 22:57:25 JST 1998  itojun@iijlab.net
+	* made rfc AH work again.
+	* fix ipsec{4,6}_hdrsiz() (bug caused SEGV on AH tunnel case)
+	* wrap IF_ENQUEUE() by splimp()
+
+Wed Oct 21 19:44:45 JST 1998  itojun@iijlab.net
+	* midway.c(en ATM driver on FreeBSD/BSDI): fix transmit buffer
+	  management.  in specific condition driver stops xmit'ing.
+
+Wed Oct 21 15:52:23 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	Begin to handle Information Exchange. need more coding.
+
+1998-10-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* if_gif.c (gif_input): put incoming packets to a network layer
+	queue instead of directly calling an input function to prevent
+	too many recursive function calls.
+	
+Wed Oct 21 13:16:39 JST 1998  itojun@iijlab.net
+	* kit/ports/gated-ipv6: port for famous routing daemon, GateDaemon IPv6.
+
+Wed Oct 21 12:11:38 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	changed the way to compute KEYMAT.
+	changed the handling SPI and KEYMAT in pfkey_update() and pfkey_add().
+	NOTE: When SA expire, racoon will be strange behavior. To be fixed.
+
+Wed Oct 21 01:19:41 JST 1998  itojun@iijab.net
+	* sys/netinet6: Update AH tunnel authenticity checking code.
+	  Consider outer IP header authentic (if it gets authenticated),
+	  and assume nothing (no authenticity) to inner IP header.
+	* sys/netinet6: more IPsec statistics.
+
+Tue Oct 20 16:47:00 JST 1998
+	* sys/netinet{,6}: make AH tunnel mode working for IPv4.
+	* sys/netinet6: more statistics for AH.
+	* sys/netinet6: better sanity checks for IPv4 AH/ESP tunnel.
+	  
+Tue Oct 20 13:54:27 JST 1998  itojun@iijlab.net
+	* sys/netinet6: make des-derived work.  need interop tests.
+
+Mon Oct 19 19:48:25 JST 1998  itojun@iijlab.net
+	* remove unused code/defines in ipsec.
+	* log() fixes.
+	* mark des-derived not working by rejecting it in esp_descbc_mature().
+	  (iv management is not right)
+
+1998-10-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* netstat/inet6.c (pim6_stats): added to print PIM for IPv6 statistics.
+
+Mon Oct 19 17:39:48 JST 1998
+	* sys/netkey/key.c: variable "sab" was defined twice in key_checksab()
+	  and it made all packets to be sent in clear.  it is now fixed.
+	  sorry for your troubles.
+
+Sun Oct 18 JST 1998
+	* kit/src/tcpdump: add some code to dump isakmp packets,
+	  on udp port 500.  However, most part of the exchange is encrypted
+	  (and that part cannot be decoded).
+
+1998-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd/bgp.c (bgp_process_update): Several bugs were fixed.
+	The bugs were mostly about BGP4+ route reflector.
+
+Thu Oct 15 16:17:09 JST 1998  itojun@iijlab.net
+	* sys/netinet6 and kit/usr.bin/netstat: added some ipsec statistics.
+
+1998-10-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd/dump.c: added to dump bgpd status to a file. The status
+	includes various information such as bgpd internal routing table
+	and BGP4+ per peer status. Please do not forget to execute the
+	configure command before compiling.
+	Man pages were also updated.
+
+Sat Oct 14 18:31:25 JST 1998 shin@nd.net.fujitsu.co.jp
+	* kit/etc/rc.net6
+	changed to use "prefix" command instead of "ifconfig" command
+	in router case.
+
+Wed Oct 14 17:44:36 JST 1998  itojun@iijlab.net
+	* kit/sys/netkey, kit/sys/net/rtsock.c: PF_KEY and PF_ROUTE sockets
+	  are stabilized.  it should work fine against severe tests.
+	  location of splnet() was wrong.
+
+Sat Oct 14 16:06:16 JST 1998 shin@nd.net.fujitsu.co.jp
+	* kit/src/Makefile
+	added "prefix" command as to be installed by default.
+
+Wed Oct 14 11:30:27 JST 1998  itojun@iijlab.net
+	* kit/sys/netkey: properly handle IPv6 address passed by SADB_ACQUIRE.
+	* kit/src/racoon: IPv6 support.  guess IPv6 stack type, socket/bind
+	  to IPv6 unspecified addr, and so forth.  need more confirmation on
+	  portability.
+
+Sat Oct 14 11:05:48 JST 1998 shin@nd.net.fujitsu.co.jp
+	*sys/netinet6/in6_var.h
+	*sys/netinet6/in6_prefix.c
+	changed bit field structure member size from u_long to u_char,
+	because BSDI suppose the size differently between kernel
+	and userland.
+	And merged some diffs of in6_prefix.c between BSD variants.
+	now "prefix" command seems to work on BSDI.
+
+Wed Oct 14 03:52:11 JST 1998  itojun@iijlab.net
+	* kit/ports/apache13: Port for apache 1.3.3.  For non-FreeBSD OSes,
+	  IPv6 patch is available from ftp://ftp.kame.net/pub/kame/misc/.
+	* kit/ports/apache12: renamed from kit/ports/apache (port for apache
+	  1.2.6).  1.3.3 is highly recommended over 1.2.6.
+
+Tue Oct 13 23:45:04 JST 1998  itojun@iijlab.net
+	* kit/src/setkey: add -x option, which dumps all the message
+	  transmitted to PF_KEY socket. (uses SADB_X_PROMISC).
+
+Tue Oct 13 23:27:36 JST 1998  itojun@iijlab.net
+	* sys/netkey: support SADB_X_PROMISC.  maybe good for debuggin'.
+
+Tue Oct 13 21:21:27 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: make racoon code free from CPU endian.
+	  now racoon works on KAME on NetBSD/sparc too.
+	  (namely, eay_bn2v() and eay_v2bn() are updated)
+
+Tue Oct 13 15:35:16 JST 1998  itojun@iijlab.net
+	* kit/src/racoon: be more strict about checking SSLeay's existence.
+	  previously we checked md5.h, but some operating systems have md5.h
+	  by default.
+
+Tue Oct 13 14:22:32 JST 1998  itojun@iijlab.net
+	* sys/netkey: Add splnet() to prevent race condition.
+	* sys/netkey/keysock.c: Changed the way sadb_msg is sent to userland.
+	  PF_KEY defines three ways to send sadb_msg to userland:
+	  (1) to requesting process only, (2) to all listening processes, and
+	  (3) to all registered processes.   The implementation now conforms
+	  to this.
+
+1998-10-12  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/name6.c
+	use res_query() for reverse lookup instead of res_search().
+	allow IPv4-compat address for getipnodebyaddr(), do not perform
+	any query for "::" to conform bsd-api-new-02.
+	allow misalign address for getipnodebyaddr().
+
+Sun Oct 11 23:31:35 JST 1998  itojun@iijlab.net
+	* sys/net*: (NetBSD) IPsec is now working.  Now we need to perform
+	  bunch of tests...
+
+Sun Oct 11 22:52:24 JST 1998  itojun@iijlab.net
+	* sys/netinet6/{esp,ah}_core.c: bark if no secret key is specified
+	  for esp/ah algorithms that require secret key.
+
+Sat Oct 11 22:35:59 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/src/prefix/prefix.8
+	*kit/src/prefix/prefix.c
+	added several checking of missing args, and changed some default
+	behaviour.
+
+Sun Oct 11 20:37:06 JST 1998  itojun@iijlab.net
+	* kit/{sbin,usr.sbin}/sysctl and sys/netkey (NetBSD and BSDI):
+	  add net.key.* sysctl MIBs.  for FreeBSD we already got net.key.*.
+
+Sat Oct 11 01:03:17 JST 1998 shin@nd.net.fujitsu.co.jp
+	*sys/netinet6/in6_prefix.c
+	changed "panic" to "log(LOG_ERR...)" in bit_copy().
+
+Sat Oct 11 00:42:15 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/src/prefix/prefix.8
+	*kit/src/prefix/prefix.c
+	update usage description of man and program.
+
+Sun Oct 10 JST 1998  itojun@iijlab.net
+	* sys/netinet6 and kit/sbin/ifconfig (NetBSD): fix ifconfig to
+	  some extent, so that we can check status of if address flags (such as
+	  "anycast").  there are some fixes necessary (ioctl API design issues).
+
+Sat Oct 10 14:46:50 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/src/prefix/prefix.c
+	fixed usage description.
+	removed unused function.
+
+Sat Oct 10 03:27:44 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/src/prefix/Makefile
+	Made compilable on NetBSD
+	also, this command seems to work on NetBSD
+
+Sat Oct 10 02:59:02 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/sbin/ifconfig.c
+		  ifconfig.8
+	removed prefix related enhance(because they are moved to
+	new "prefix" command)
+
+Sat Oct 10 02:42:00 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/src/prefix/Makefile
+			prefix.c
+			prefix.8
+	Newly added these files.
+	Actually these are prefix related functions from
+	current KAME FreeBSD sbin/ifconfig.
+	Same functions in sbin/ifconfig will be removed.
+	Only working on FreeBSD now.
+	TODO: operational check on BSDI
+	      compile check on NetBSD
+	      complete man page
+
+Sat Oct 10 01:54:58 JST 1998 shin@nd.net.fujitsu.co.jp
+	*sys/netinet6/in6_prefix.c
+	Bug Fix:
+	  change ">>" to ">>=". (discovered by itojun)
+
+Fri Oct  9 21:48:19 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/sbin/ifconfig/ifconfig.c
+	enabled "-a" for prefix renumbering commands
+	print usage for prefix related commands
+	shorten long parameters.
+
+Fri Oct  9 20:02:21 JST 1998 shin@nd.net.fujitsu.co.jp
+	*kit/src/rtadvd/rrenum.c
+	*kit/sbin/ifconfig/ifconfig.c
+	*sys/netinet6/in6_prefix.c
+	supported SIOCAIFPREFIX_IN6, SIOCCIFPREFIX_IN6,
+	SIOCSGIFPREFIX_IN6, by ifconfig.
+	And fixed several kernel bugs discovered using those commands.
+	Now prefix renumbering by ifconfig seems to be working well.
+
+1998/10/09 17:06:51 JST shin@nd.net.fujitsu.co.jp
+    i386/conf            Makefile.i386 
+  separated SYSTEM_LD macro into 2 case, where "-g" is defined and not.
+
+1998/10/09 13:32:16 JST  shin@nd.net.fujitsu.co.jp
+    i386/conf            Makefile.i386 
+  add "ulimit" to SYSTEM_LD macro, not only to SYSTEM_LD_TAIL macro.
+
+Fri Oct  9 11:52:33 JST 1998  itojun@iijlab.net
+	* kit/src/faithd: improve command/result parsing in ftp translation.
+	  support EPSV ALL.  reject PORT and PASV from client as it is bogus
+	  for IPv6 ftp connection.
+
+Thu Oct  8 21:09:30 JST 1998  itojun@iijlab.net
+	* kit/src/faithd: redesign ftp.d completely, to make the translator
+	  code more context-free.  Also, EPSV/EPRT is supported.
+
+	  TODO: utilize "EPSV ALL" for improved performance,
+	  better error recovery
+
+1998-10-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* if_gif.c (gif_output): prevented infinite call of gif_output
+	by introducing a counter variable which is static in this
+	function. Note that this approach may introduce MUTEX problem
+	when using kernel thread.
+
+Tue Oct  7 18:20:01 JST 1998 shin@nd.net.fujitsu.co.jp
+	implemented following cmd in kernel.
+		SIOCSGIFPREFIX_IN6
+		SIOCAIFPREFIX_IN6
+		SIOCCIFPREFIX_IN6
+
+	TODO: enhance ifconfig and rrenumd to utilize these cmds,
+	      and test kernel behavior
+
+1998-10-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* ip6_mroute.c: implemented kernel-level IPv6 multicast
+	forwarding. It can be compiled, but there have been no userland
+	routing daemon yet. So it will not effectively work for a while.
+
+Wed Oct  7 13:04:01 JST 1998  itojun@iijlab.net
+	* take care of IPsec tunnel in computing MTU and TCP MSS.
+	  ipsec{4,6}_hdrsiz is defined for this.
+	  {esp,ah}*_hdrsiz_* are deprecated.
+
+Wed Oct  7 1998  itojun@iijlab.net
+	* experimental ND6 code is enabled in KAME/BSDI and KAME/FreeBSD.
+	  we are trying to figure out the following spec flaws:
+	  - discovery-v2-03 talks almost nothing about how to manage neighbor
+	    cache entry on reception of RA/RS/NS/redirect without link-layer
+	    address option.
+	  - IsRouter flag sometimes becomes out-of-sync, due to neighbor
+	    cache expiration/creation rules.
+	  we are still thinking about the spec, and changing nd6_cache_lladdr().
+	  the experimental code works just fine so the change will not bite
+	  you.
+
+Wed Oct  7 00:33:03 JST 1998  itojun@iijlab.net
+	* kit/lib/libftpio: (FreeBSD only) Fixed IPv4 non-passive ftp.
+	  (bind failed due to wrong argument)
+
+Tue Oct  6 18:28:13 JST 1998  itojun@iijlab.net
+	If a packet is to be forwarded over IPsec tunnel, and it couldn't
+	due to "too big and don't fragment", report the correct tunnel MTU
+	toward the originator.
+	tunnel MTU = if MTU - sizeof(IP header) - ESP/AH headers/paddings
+
+	To test this, you may need
+		sysctl -w net.inet.ipsec.dfbit=1
+	to set DF bit on the outer IP header.
+
+Tue Oct  6 13:48:42 JST 1998  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: changed the way IPsec tunnel is created.
+	  (see ipsec4_encapsulate() in sys/netinet6/ipsec.c)
+	* sys/netinet6/ipsec.c: define new sysctl MIB, net.inet.ipsec.dfbit,
+	  to allow users to control DF bit treatment (copy/clear/set) on
+	  ipsec tunnel encapsulation.
+	  NOTE: this is per-host configuration, not a per-interface
+	  configuration defined in draft-ietf-ipsec-arch-sec-07.txt.
+
+Tue Oct  6 13:13:19 JST 1998 shin@nd.net.fujitsu.co.jp
+	fix for rtr renumbering related structure's member name and
+	  order change at ifconfig, rrenumd, rtadvd
+	maybe minimum implementation of router renumbering at rtadvd completed
+
+Tue Oct  6 12:57:50 JST 1998 shin@nd.net.fujitsu.co.jp
+	changed router renumbering related structure's member name and order.
+	added same interface check for SIOC*IFPREFIX_IN6 cmds.
+	added in6_rrenumreq structure for advanced ioctls for rtr renumbering
+	defined, SIOCAIFPREFIX_IN6, SIOCCIFPREFIX_IN6, SIOCSGIFPREFIX_IN6
+	
+	TODO: implement new SIOC*PREFIX_IN6 cmds in kernel
+
+Mon Oct  5 17:20:13 JST 1998
+	* Eliminate clause 3 from our KAME copyright notice, as we've heard
+	  that 4-clause BSD copyright irritates people very much.
+
+Mon Oct  5 10:46:05 JST 1998
+	* kit/ports/sendmail6: make it buildable, by removing -I/usr/src/sys
+	  from site.config-v6.kame.
+
+1998/10/03 00:59:54 JST shin@nd.net.fujitsu.co.jp
+    ports/mozilla        Makefile 
+    ports/mozilla/files  md5 
+  Patch level up.
+    -IPv6 hostname with AAAA record,
+     or numarical IPv6 address escaped by [  ],
+     can be specified as proxy server.
+    -adopted __res_state structure change.
+
+1998/10/02 23:54:27 JST shin@nd.net.fujitsu.co.jp
+    src/ndp              ndp.c 
+    netinet6             nd6.h nd6.c nd6_nbr.c 
+  Added "ln_expire" to llinfo_nd6 structure, and "expire" to
+  in6_nbrinfo structure.
+  NDP use them for state transition and rt_expire is no more used.
+  Also, ndp command is changed to use ln_expire to display each
+  entry's expire time.
+
+Fri Oct  2 13:13:01 JST 1998  itojun@iijlab.net
+	* kit/ports/apache: distribute IPv6 patch separately, from
+	  ftp://ftp.kame.net/pub/kame/misc/.
+
+Thu Oct  1 22:50:38 JST 1998  itojun@iijlab.net
+	* kit/src/rtadvd: add capability "nolladdr" which controls
+	  the presence of source link-layer address option on RA packets.
+	  (mostly for debugging)
+	* kit/src/ndp: add option "-A" which tries "-a" (show NDP entries)
+	  repeatedly.
+
+Thu Oct  1 11:12:25 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: mark this port broken as it is not buildable
+	  due to the change in resolver (see below).
+
+<199809>
+1998-09-30  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* sys/net/if_atmsubr.c, sys/dev/en/midway.c:
+	  fix bugs to allow "ifconfig up" for ATM-PVC interface without
+	  assigning IPv4 address.
+
+1998-09-30  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* include/resolv.h, kit/src/libinet6/resolv/:
+	  restore struct __res_state to original to keep binary
+	  compatibility (avoid SEGV on NetBSD).
+	  change default configuration options for resolver.
+	* kit/src/libinet6/name6.c:
+	  change syntax for AI_ALL (now needs AI_V4MAPPED) to conform to
+	  bsd-api-new-02(a).
+	* include/netdb.h, kit/src/libinet6/name6.c:
+	  add AI_V4MAPPED_CFG to return conditional answer of IPv4-mapped
+	  IPv6 address depends on whether kernel's mapped_addr flag is set.
+	  Also change the definition of AI_DEFAULT to (AI_V4MAPPED_CFG|
+	  AI_ADDRCONFIG).
+	* kit/src/libinet6/getaddrinfo.c:
+	  support AI_NUMERICHOST flag to conform to bsd-api-new-02a.
+	  replace CHECK_KERNPROTO by AI_ADDRCONFIG of getipnodebyname().
+	  fix 'a.foo.bar and a.v6.foo.bar' problem in PF_UNSPEC case.
+
+Wed Sep 30 13:26:22 JST 1998 sakane@ydc.co.jp
+	* sys/netkey/key.c:
+	check to be zero of acq_seq, because zero is reserved
+	as handling SADB_EXPIRE.
+
+1998/09/30 12:48:37 JST shin@nd.net.fujitsu.co.jp
+    netinet6             ip6_input.c 
+  Don't think packets destined to RTF_GATEWAY route as "goto ours".
+
+1998/09/30 02:59:38 JST shin@nd.net.fujitsu.co.jp
+    netinet6             ip6_output.c 
+  Copy m_flags(M_MCAST) to fragmented packets to disable
+  neighbor resolution procedure for them.
+  (because neighbor resolution waiting queue length is
+  for only one packet)
+
+1998/09/30 02:24:11 JST shin@nd.net.fujitsu.co.jp
+    .                    USAGE 
+  small grammar fix
+
+1998/09/29 10:09:00 JST shin@nd.net.fujitsu.co.jp
+    usr.sbin             Makefile 
+  Commented out ppp and added suggestion to use kit/ports/ppp.
+  Still leave dir of kit/usr.sbin/ppp for a while.
+
+Mon Sep 28 17:40:18 JST 1998  itojun@iijlab.net
+	* sys/netinet6/in6.h: Renamed IPV6_{JOIN,LEAVE}_MEMBERSHIP into
+	  IPV6_{JOIN,LEAVE}_GROUP to conform to bsd-api-new-02a.
+
+1998/09/26 14:13:27 JST shin@nd.net.fujitsu.co.jp
+    src/rtadvd           rrenum.c 
+  Adopted to router-renum-05.txt.
+  And still supporting, not finished.
+
+1998/09/25 16:34:20 JST shin@nd.net.fujitsu.co.jp
+    src/rrenumd          rrenumd.c 
+  Change router renumbering packet formats as new draft
+  (router-renum-05.txt)
+
+1998/09/25 16:31:44 JST shin@nd.net.fujitsu.co.jp
+    netinet6             icmp6.h 
+  Change router renumbering packet formats as new draft
+  (router-renum-05.txt)
+  Also, changed values type to u_int{8,16,32}_t as same as
+  other icmp6 structure.
+
+Thu Sep 24 21:51:19 JST 1998  itojun@iijlab.net
+	* sys/sys/socket.h: Changed CMSG_xxx macro defs.  Previously, ALIGN()
+	  was used (based on advanced API document).  However, ALIGN() in
+	  advanced API and ALIGN() in BSD unix variants (machine/param.h) have
+	  very different meanings.  So, now we've defined CMSG_ALIGN().
+
+Thu Sep 24 19:42:22 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail: Update the IPv6 patch for sendmail to be used.
+	  It is now 891+3.1W.  (W means WIDE sendmail patchkit)
+	  IPv6 patch has been distributed separately, but now it is merged
+	  into WIDE sendmail patchkit.
+
+1998-09-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd: Added new feature to restrict RIPng routes filtering
+	routes that do not match a list of prefixes.
+	Filtering function is also clarified and `default restrict'
+	attribute disappeared. Instead, `filterin default' and/or
+	`filterout default' attributes should be used.
+	Note that configuration files which used older filtering functions
+	should be rewritten.
+	The manpage was also updated, which should be read carefully.
+
+Thu Sep 24 13:19:26 JST 1998  itojun@iijlab.net
+	* sys: (KAME/FreeBSD) updated ALTQ kernel part to 1.1.2.
+	* kit/ports/altq: (KAME/FreeBSD) use ALTQ 1.1.2.
+
+	  From: Kenjiro Cho <kjc@csl.sony.co.jp>
+
+Thu Sep 24 13:19:26 JST 1998  itojun@iijlab.net
+	* sys: (KAME/BSDI) Revamp PVC ATM code.  It is now compatible with
+	  KAME/FreeBSD code.  Userland tools must be fetched from ALTQ
+	  package. (ftp://ftp.csl.sony.co.jp/pub/kjc/)
+	* kit/src/apconfig: (KAME/BSDI) removed because it is not needed
+	  any more.
+
+	  From: Kenjiro Cho <kjc@csl.sony.co.jp>
+
+1998/09/24 00:03:18 JST shin@nd.net.fujitsu.co.jp
+    src/rtadvd           rrenum.h 
+  Router Renumbering related header.
+   (Very sorry, I forgotten to add this)
+
+1998/09/23 10:49:27 JST shin@nd.net.fujitsu.co.jp
+    netinet6             icmp6.c icmp6.h in6.c in6.h in6_proto.c 
+                         in6_var.h nd6.c nd6.h nd6_nbr.c nd6_rtr.c 
+  Sync with FreeBSD/BSDI/NetBSD
+  Only for files and places where I changed recently or I thought I can do.
+
+Wed Sep 23 01:43:54 JST 1998 sakane@ydc.co.jp
+	sys/netinet6/esp_core.c:
+	Modified to do check DES weak key.
+
+Tue Sep 22 22:59:21 JST 1998  itojun@iijlab.net
+	* src/faith: clarify options.  improve behavior on error. 
+		usage: faith [-de] [-p prefix]
+			-d: disable
+			-e: enable
+			-p: configure prefix
+
+1998/09/22 14:59:36 JST shin@nd.net.fujitsu.co.jp
+    src/rtadvd           config.c rrenum.c rtadvd.c 
+  When noticed new prefix addition, try to get the prefix information via
+  SIOCGIFPREFIX.
+  If can get it, and its origin is from RA, ignore it.
+  Also router renumbering support is proceeding.(still need more work)
+
+1998/09/22 14:55:40 JST shin@nd.net.fujitsu.co.jp
+    netinet6             nd6_rtr.c 
+  Change rt_request() to rtinit() in in6_ifadd() to let it send
+  rtmsg to rtsock. Thus rtadvd become able to know that new prefix
+  is added.
+
+1998-09-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/ndp/ndp.c: option name clarification;
+	  - replaced -F option with -H option
+	  - replaced -Fp with -P
+	  - replaced -Fr with -R
+
+1998/09/22 00:51:14 JST shin@nd.net.fujitsu.co.jp
+  Modified files:        (Branch: kame_227)
+    ports/mozilla        Makefile 
+  Removed files:         (Branch: kame_227)
+    ports/mozilla/patches patch-bj patch-bk 
+  Modification of sockaddr_in6 structure as kernel change.
+  Change of library linking order so that libinet6 is linked for
+  gethostbyname2(), not libc. (by sugyo-san)
+  Patches/patch-* are deleted and now the total patch file is retrieved
+  from ftp://ftp.kame.net/pub/kame/misc.
+
+1998/09/21 22:19:26 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_prefix.c nd6.h nd6_rtr.c 
+  Bug FIX:
+    Correctly init setting ndpr_prefix's lifetimes.
+  Added prefix lifetime argument check.
+  Also, don't age nd_prefix entries whose ndpr_rrf_decrvalid and/or
+  ndpr_rrf_decrprefd is 0.
+
+1998/09/21 22:14:49 JST shin@nd.net.fujitsu.co.jp
+    sbin/ifconfig        ifconfig.c 
+  Bug Fix
+    Don't break from arg check loop, when encountered an unknown arg,
+    even if "prefix" command was specified.
+
+1998/09/21 20:54:10 JST shin@nd.net.fujitsu.co.jp
+    sbin/ifconfig        ifconfig.8 
+  Added description about prefix related add/delete extension.
+
+Mon Sep 21 19:40:10 JST 1998 sakane@ydc.co.jp
+	sys/netinet6:
+	Fixed to check replay counter.
+	It's available to define variable window size.
+
+1998/09/21 17:57:59 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_prefix.c nd6_rtr.c 
+  Bug Fix:
+    Point ndpr_prefix from ndpr_ifpr.ifpr_prefix in prelist_add()
+    where ndpr's memory is allocated.
+    Not in in6_prefix_ctl() which use stack to keep ndpr structure.
+    Now prefix deletion seems to work.
+
+1998/09/20 13:06:00 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_prefix.c nd6.h nd6_rtr.c 
+  Put 2 cases in in6_prefix_ioctl into 1.
+  Let prelist_add(), prelist_update() return errno.
+
+1998/09/20 11:29:12 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_prefix.c nd6.h nd6_rtr.c 
+  Moved if_prefixlist link/unlink into prelist_add/prelist_remove.
+  But prefix deletion via SIOCDIFPREFIX is not working yet.
+
+1998/09/20 11:28:52 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_prefix.c nd6.h nd6_rtr.c 
+  Moved if_prefixlist link/unlink into prelist_add/prelist_remove.
+  But prefix deletion via SIOCDIFPREFIX is not working yet.
+
+1998/09/20 11:21:46 JST shin@nd.net.fujitsu.co.jp
+    sbin/ifconfig        ifconfig.c 
+  Set in6_prereq's prefixlen in in6_getprefixlen()
+  Also changed the way of printing error message at prefix set/delete.
+
+1998/09/19 17:57:21 JST shin@nd.net.fujitsu.co.jp
+    netinet6             ah_core.c ah_input.c ah_output.c dest6.c 
+                         esp_core.c esp_input.c esp_output.c 
+                         frag6.c icmp6.c in6_ifattach.c in6_pcb.c 
+                         in6_proto.c in6_rmx.c ip6_forward.c 
+                         ip6_input.c ip6_output.c ipsec.c mld6.c 
+                         nd6.c nd6_nbr.c raw_ip6.c tcp6_input.c 
+                         tcp6_subr.c tcp6_usrreq.c udp6_usrreq.c 
+  Include in_var.h instead of in6_var.h
+  (Because just happen to found it)
+
+1998/09/19 17:44:39 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6.c in6_prefix.c nd6.h nd6_rtr.c 
+  Correct initialization of setting prefix contents.
+  Let prelist_update() and prelist_add() return nd_prefix structure.
+  Now prefix addition works but deletion is not yet.
+
+1998/09/19 01:43:51 JST shin@nd.net.fujitsu.co.jp
+    sbin/ifconfig        ifconfig.c 
+  Added prefix set/delete operation. But not seems to be working now.
+  TODO debugging to make it work right.
+
+1998/09/19 01:41:13 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_var.h nd6.h nd6_rtr.c in6_prefix.c 
+  Changed macro name NDPR_ORIG* to PR_ORIG*, and also moved its defs
+  from nd6.h to in6_var.h.
+  Changed the place of failsafe check in in6_prefix.c.
+
+Fri Sep 18 13:54:11 JST 1998  itojun@iijlab.net
+	* kit/libexec/ftpd: add support for "EPSV num" and "EPSV ALL",
+	  so that we can interoperate with NRL ftp client.
+	  "EPSV ALL" support is a fake, it will just get accepted and do
+	  nothing.
+
+Fri Sep 18 04:57:37 JST 1998  itojun@iijlab.net
+	* sys/netinet6/ip6.h: router alert option type is now "5", not "14".
+	  some of userland tools (such as tcpdump) need recompilation.
+	  (ftp://playground.sun.com/pub/ipng/assignments/ipv6-parameters.txt)
+
+1998/09/17 23:10:01 JST shin@nd.net.fujitsu.co.jp
+    conf                 files 
+    net                  if.h 
+    netinet6             in6.c in6_proto.c in6_var.h nd6.h 
+                         nd6_rtr.c tcp6_input.c 
+    netinet6             in6_prefix.c 
+  Support prefix SET,GET,DEL command over ioctl.
+  (implementation/confirmation from application is not yet)
+  Linked ifprefix(nd_prefix) entries from ifnet structure.
+  So if_prefixlist member is added to the end of ifnet structure.
+  All user-land applications which looks net/if.h should be recompiled.
+  And Bug Fix (discovered by jinmei san):
+    Still a sockaddr_in6 is used as an in6_addr in nd6_rtr.c
+  So Replaced temporal sockaddr_in6 by nd_prefix->ndpr_prefix.
+
+1998/09/17 18:25:44 JST shin@nd.net.fujitsu.co.jp
+    netinet6             nd6_rtr.c 
+  Bug Fix:
+    Copy only RA flags on RA receipt which already has correspondent
+    nd_prefix entry. (discovered by jinmei san)
+    Also, set ndpr_dynamic for nd_prefix entry created by receiving RA.
+    And only update dynamic nd_prefix entry when RA is received.
+
+1998/09/17 15:04:03 JST shin@nd.net.fujitsu.co.jp
+    src/ndp              ndp.c 
+  As kernel structure definition change,
+  As kernel structure definition change, changed flags to bit field.
+
+1998-09-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/traceroute6/traceroute6.c: Added -l option, which specifies
+	to print both numerical addresses and host names.
+	Because of this addition, the default format changed from printing both
+	to printing only host names.
+
+Thu Sep 17 12:51:41 JST 1998 fujisawa@kame.net
+	Add SuMiRe nat/protocol router.
+
+Thu Sep 17 04:05:03 JST 1998 sakane@ydc.co.jp
+	sys/netkey/key.c:
+	SAB do become mature when SA with proxy have become mature.
+
+Tue Sep 15 09:45:35 JST 1998 sakane@ydc.co.jp
+	kit/src/setkey,sys/netkey/keyv2.h:
+	It's changed that the name of extension flags for padding.
+	Each are seq to seq-pad, zero to zero-pad, random to random-pad.
+	It's available to define cyclic sequence number for replay prevention.
+	This is not to be used.
+
+Tue Sep 15 07:41:57 JST 1998 sakane@ydc.co.jp
+	sys/netkey/keydb.h:
+	mistaken key length was supplied by _KEYLEN().
+
+1998/09/14 22:49:20 JST shin@nd.net.fujitsu.co.jp
+    net                  if.h 
+    netinet6             nd6.c nd6.h nd6_rtr.c 
+  Preparing for prefix addition over ioctl.
+  Modified nd_prefix structure to link it to protocol independent interface
+  prefix list.(which is not yet implemented)
+  Also, some nd_prefix member name is changed to avoid name collision.
+
+Mon Sep 14 20:56:03 JST 1998 sakane@ydc.co.jp
+	kit/src/racoon:
+	It's available to handle expiration, but I don't know
+	to handle HARD lifetime.  How should I do when key had been exchanged
+	by expiration of SOFT lifetime. Now, SADB_EXPIRE HARD is ignored.
+
+Mon Sep 14 20:47:01 JST 1998 sakane@ydc.co.jp
+	sys/netkey/key.c:
+	Set expiration time when new SA generated as LARVAL by SADB_GETSPI.
+
+Mon Sep 14 17:30:22 JST 1998 sakane@ydc.co.jp
+	kit/src/racoon,kit/src/setkey,sys/netkey/key.c:
+	Infinite loop had occurred in kdebug_sadb().
+
+Mon Sep 14 14:10:59 JST 1998 sakane@ydc.co.jp
+	kit/src/racoon:
+	Fixed a bug that racoon generated many ISAKMP-SA
+	per a destination address.
+
+Mon Sep 14 04:24:17 JST sakane@ydc.co.jp
+	kit/src/racoon:
+	Many items was fixed.
+	racoon can exchange KEY in limited environment.
+	see TODO.
+
+Mon Sep 14 04:00:07 JST sakane@ydc.co.jp
+	kit/src/setkey:
+	Fixed calculation `diff time' when setkey -D.
+
+1998/09/10 13:32:42 JST shin@nd.net.fujitsu.co.jp
+    src/rtadvd           Makefile rtadvd.c 
+    src/rtadvd           rrenum.c 
+  Supporting receiving rr message. Some message checking was added.
+  Still message processing need to be added.
+
+1998/09/10 13:30:34 JST shin@nd.net.fujitsu.co.jp
+    netinet6             icmp6.c 
+  Added message validity check for ICMP6_ROUTER_RENUMBERING message
+
+1998-09-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* Set hop limit field for an outgoing packets to the value
+	advertised by a router, when user did not specify to use
+	a special value.
+
+1998/09/09 22:31:38 JST shin@nd.net.fujitsu.co.jp
+    src/faithd           faithd.c 
+  Change waitpid() to wait3() to prevent child become zombie.
+
+1998/09/09 15:36:29 JST shin@nd.net.fujitsu.co.jp
+    src/rrenumd          rrenumd.c 
+  Moved(and merged) router renumbering struct definition into
+  sys/netinet6/icmp6.h
+  And changes related to it.
+
+1998/09/09 15:34:46 JST shin@nd.net.fujitsu.co.jp
+    netinet6             icmp6.h 
+  Merged router renumbering struct definition in user-land into kernel.
+
+1998/09/09 14:48:02 JST shin@nd.net.fujitsu.co.jp
+    i386/conf            Makefile.i386 
+  Added 'ulimit -d 65536'
+
+Mon Sep 7 15:55:59 1998 sakane@ydc.co.jp
+	sys/netkey, kit/src/setkey, kit/src/racoon:
+	fixed that length in sadb_ext is a multiple of 64 bits.
+
+Mon Sep 7 12:00:49 1998 sakane@ydc.co.jp
+	sys/netkey/key.c, kit/src/setkey:
+	change the rule of prefixlen.
+	key_check() doesn't take care of prefixlen.
+	you can specify 0.0.0.0/0 as wildcard.
+
+1998/09/07 20:14:50 JST shin@nd.net.fujitsu.co.jp
+    src/tcpdump          print-icmp6.c 
+  Print router renumbering message.(just code type name)
+
+1998/09/07 18:46:58 JST shin@nd.net.fujitsu.co.jp
+    src/rrenumd          Makefile rrenumd.8 rrenumd.c
+  Initial add of rrenumd. Very ADHOC. Even more, receiving side is notyet.
+
+1998-09-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* nd6_rtr.c (rt6_flush): newly defined to purge all the entries
+	  of the routing table when their router is removed from the
+	  Default Router List.
+
+1998-09-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/ping6/ping6.c (main): fixed a problem that the -n option
+	didn't work.
+
+Thu Sep  3 18:52:35 JST 1998  itojun@iijlab.net
+	* src/tcpdump/print-ip6.c: fixed flowlabel field.
+	* src/tcpdump/print-vjc.c: fix for NetBSD (anyway it won't be
+	  used)
+
+	submitted by: Niels Baggesen <Niels.Baggesen@uni-c.dk>
+
+1998-09-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/ndp: -F option can be specified with -r and/or -p option
+	to flush the default router list and the prefix list,
+	respectively. Note that both the kernel and the ndp command
+	should be up to date.
+
+1998-09-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* nd6.c (nd6_ioctl): added 2 new ioctls; SIOCSRTRFLUSH_IN6 and
+	SIOCSPFXFLUSH_IN6. The former is to flush all default routers
+	in the default router list, and the latter is to flush all the
+	prefixes and the addresses derived from them in the prefix list.
+	
+1998-09-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/rtsold/rtsold.c (main): added -m option, which is for
+	mobile stations.
+
+<199808>
+1998-08-28  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* change getnodeby{host,addr} to getipnodeby{host,addr}
+	to conform to bsd-api-new-02.
+	* support host resolver selection (dns, /etc/hosts) for each OS
+	(/etc/host.conf for FreeBSD, /etc/irs.conf for BSD/OS,
+	 /etc/resolv.conf for NetBSD).
+
+Fri Aug 28 14:39:27 JST 1998 sumikawa@ebina.hitachi.co.jp
+	* added mld6query command, which sent Multicast Listner
+	Discovery(draft-ietf-ipngwg-mld-00.txt) query and print 
+	MLD report.
+	* ip6_input.c: fixed HBH options check bugs.
+	* ip6_output.c: enbale to join all multicast group(::) for
+	super user.
+
+Fri Aug 28 13:29:58 JST 1998 sakane@kame.net
+	* sys/netkey:
+	Fixed that reference count about SAD and SPD.
+
+1998-08-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/rtsold: Implemented a daemon version of rtsol. Many
+	imporvements were made such as;
+	- Auto solicitaion when re-attach to a link
+	- Source link-layer address option for Router Solicitations
+
+1998-08-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* netstat/inet6.c (inet6print):  Defined GETSERVBYPORT6, which
+	calls getservbyport replacing the second argument "tcp6" with
+	"tcp", "udp6" with "udp", resp.
+	- Replace getservbyport with the new macro for more friendly
+	outputs of netstat -f inet6.
+
+1998-08-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* icmp6.c (icmp6_reflect): Changed the default way when a returned
+	ICMP packet exceeds the path MTU; RFC 1885 required to truncate
+	it, but it was canceled in the new spec.
+
+Tue Aug 25 07:25:24 JST 1998 sakane@ydc.co.jp
+	* kit/src/setkey
+	It is available to define hard and soft lifetime extension,
+	and to display about lifetime.
+
+Mon Aug 24 10:40:21 JST 1998 sakane@ydc.co.jp
+	* sys/netkey:
+	Begin to implement handling for SA expiration.
+	Now, if you define lifetime then SA will be removed on time.
+	But it is used sadb_lifetime_addtime as expiration time.
+
+1998/08/22 00:41:35 JST shin@nd.net.fujitsu.co.jp
+    ports/ppp/patches    patch-ad 
+  Socks support. Don't use getaddrinfo for socks yet, because
+  wrap function of getaddrinfo is not supported by usuall socks library.
+
+1998/08/21 19:53:21 JST shin@nd.net.fujitsu.co.jp
+  Modified files:
+    ports/ppp/pkg        PLIST 
+  Added files:
+    ports/ppp/patches    patch-ab patch-ac 
+  Removed files:
+    ports/ppp/patches    patch-aa 
+  V6 support for ports/ppp.
+
+1998-08-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* sbin/ifconfig/ifconfig.c (in6_status): printed a new flag
+	`detached' for an IPv6 address, when it could be considered as
+	off-link(see below).
+	
+1998-08-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	Added some mechanism to make IPv6 router and prefix discovery be
+	compatible with mobile environment. If we move from one network
+	to another, this feature detects the fact automatically and treat
+	the older prefixes(and addresses derived from them) as off-link
+	even if their lifetime are not expired.
+	Note that the new feature is not available for FreeBSD 2.2.6.
+
+Thu Aug 20 15:17:17 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: added a patch supplied by sendmail.org
+	 that avoids duplicated "Content-transfer-encoding".
+
+Wed Aug 19 17:24:20 JST 1998 sakane@ydc.co.jp
+	* sys/netkey/key.c:
+	Fixed to call key_kill().
+	(Thanks, chippo@cdsec.com.)
+
+1998-08-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* nd6_rtr.c: Heavily changed to store advertising router list
+	in prefix list.
+	* kit/src/ndp/ndp.c (plist): changed to print the router list
+	stored in each prefix list entry.
+	Note that both the kernel and ndp command should be recompiled.
+	
+Wed Aug 19 16:33:55 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon:
+	racoon has been working on limited environment.
+	see TODO.
+
+Wed Aug 19 16:30:48 JST 1998  itojun@iijlab.net
+	* kit/ports/wu-ftpd: redistribute IPv6 patch separately
+	  from ftp://ftp.kame.net/pub/kame/misc, so that non-FreeBSD
+	  users can enjoy wu-ftpd6 patch.
+	  added EPRT/EPSV support.
+
+Wed Aug 19 15:20:27 JST 1998 sakane@ydc.co.jp
+	* sys/netkey/key.c:
+	htonl(spi) when doing SADB_GETSPI.
+
+Wed Aug 19 14:14:16 JST 1998  itojun@iijlab.net
+	* kit/lib/libftpio and kit/usr.bin/fetch:
+	  support EPRT/EPSV (draft-ietf-ftpext-ftp-over-ipv6-02).
+
+Wed Aug 19 12:48:55 JST 1998  itojun@iijlab.net
+	* kit/usr.bin/ftp and kit/libexec/ftpd:
+	  support EPRT/EPSV (draft-ietf-ftpext-ftp-over-ipv6-02).
+	  caveats:
+	  - proxy mode is not working
+	  - lacks AF negotiation
+	  - ftp tries EPRT/EPSV first, then tries LPRT/LPSV.  I dunno
+	    if it is a good thing, or a bad thing.
+
+Wed Aug 19 08:40:15 JST 1998 sakane@ydc.co.jp
+	* kit/src/racoon: Constants have been compliant with
+	  both ipsec-doi-10 and isakmp-oakley-08.
+
+Tue Aug 18 18:04:08 JST 1998  itojun@iijlab.net
+	* kit/ports/mrt: udpate base version to 1.4.8a-980728.
+	* kit/ports/popper: update base version to 2.53.
+	* kit/ports/fechmail: update base version to 4.5.5.
+	  Also, the ipv6 support for the port was broken
+	  (nobody tried this, it seems).  It is now working properly.
+
+1998/08/18 16:05:39 JST shin@nd.net.fujitsu.co.jp
+    netinet6             ip6_input.c 
+  Removed link local addr ours check.
+  (To allow multiple link local addr. Also, its not necessary
+  at least in FreeBSD KAME, because it does more general ours check
+  by looking up routing table.)
+
+Mon Aug 16 1998  itojun@iijlab.net
+	* kit and sys: To conform to bsd-api-new-02, "struct sockaddr_in6"
+	  need to be changed.  *Remove* sin6_ifindex and Reorder structure
+	  member.
+	  NOTE: you need a FULL recompilation of userland programs!!
+
+Sun Aug 15 1998  itojun@iijlab.net
+	* kit and sys: changed IPV6_{ADD,DROP}_MEMBERSHIP to 
+	  IPV6_{JOIN,LEAVE}_MEMBERSHIP, to conform to bsd-api-new-02.
+	  old def is kept for one week (one snapshot).
+
+Thu Aug 13 16:43:30 JST 1998  itojun@iijlab.net
+	* kit/libexec/tftpd: address-family independent "tftpd" daemon.
+
+Thu Aug 13 16:22:50 JST 1998  itojun@iijlab.net
+	* kit/usr.bin/tftp: address-family independent "tftp" command.
+
+Thu Aug 13 11:23:58 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: port updated to support sendmail 8.9.1a.
+
+	  port update submitted by: Issei Suzuki <issei@mikage.t-cnet.or.jp>
+
+1998-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd: supported several new features;
+          - BGP routes can be advertised without sync with
+	    RIPng(optional).
+	  - RIPng default route generation
+	  - RIPng route filter
+
+Mon Aug 10 17:04:17 JST 1998  itojun@iijlab.net
+	* kit/ports/vnc: vnc 3.3.2 with VNC-over-IPv6 capability.
+
+Sat Aug  8 17:27:10 JST 1998  itojun@iijlab.net
+	* kit/ports/altq, sys: update ALTQ to 1.1.1.
+	* kit/ports/heimdal: install sample configuration file.
+
+1998-08-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* nd6.c (nd6_timer): proper handling for unresolved packets
+	in INCOMPLETE state; send ICMP6_DST_UNREACH to the originator.
+
+Fri Aug  7 17:33:11 JST 1998  itojun@iijlab.net
+	* sys/netinet6/nd6_nbr.c: fix handling of anycast address in DAD
+	  routine.  previously anycast addresses are marked "tentative"
+	  forever.
+
+Fri Aug  7 17:07:32 JST 1998  itojun@iijlab.net
+	* kit/src/rtsol: add option "-v" (verbose).
+	  more proper handling of interface, while DAD is performed.
+	  RS retry behavior now conforms to internet-draft.
+	  (try RS until we got an RA, or we've sent MAX_ROUTER_SOLICITATIONS
+	  RS packets)
+
+1998-08-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* icmp6.c (icmp6_error): Implemented rate limitation of ICMPv6
+	error messages. The limitation interval is configurable via sysctl
+	net.inet6.icmp6.errratelimit in micro seconds(note that 0 means no
+	limitation). Because of this change, sysctl(for BSDI and NetBSD)
+	and netstat should be re-installed.
+
+Thu Aug  6 08:08:00 JST 1998  itojun@iijlab.net
+	* kit/src/tcpdump: flipped the meaning of -R flag.  tcpdump now assumes
+	  new AH/ESP packet format by default. (by adding -R it will handle
+	  packets as old AH/ESP)
+
+Wed, 5 Aug JST 1998 sakane@ydc.co.jp
+	* sys/netkey:
+	key_bbcmp() has replaced.
+	(thanks to wdk@squeak.zl2bkc.niwa.cri.nz)
+
+Sun Aug  3 1998  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: blowfish has a big key schedule struct,
+	  which caused kernel stack overflow on call to esp_blowfish_cbc_xx().
+	  made the key schedule variable a static var.
+
+Sun Aug  2 01:35:59 JST 1998  itojun@iijlab.net
+	* kit/src/traceroute: LBL traceroute, with IPsec-related modification.
+	* kit/ports/traceroute: removed (since it is imported into
+	  kit/src/traceroute).
+
+Sat Aug  1 11:59:39 JST 1998  itojun@iijlab.net
+	* kit/src/traceroute6: disable IPsec in sender side.
+	  "traceroute" protocol is not friendly with IPsec.  If you try
+	  a traceroute toward your IPsec peer, you will not be able to
+	  get the expected result.
+	  (we may have to think about enabling IPsec, later)
+	* kit/ports/traceroute: LBL traceroute, with the same care as above.
+
+Sat Aug  1 10:10:12 JST 1998  itojun@iijlab.net
+	* kit/ports/ssh: updated to 1.2.26 IPv6 patchlevel 1.2.
+
+	  ssh kit updated by: kick@wide.ad.jp
+	  port update submitted by: Issei Suzuki <issei@mikage.t-cnet.or.jp>
+
+Sat Aug  1 05:17:43 JST 1998  itojun@iijlab.net
+	* netkey/key.c: in key_mature(), perform more checks for the incoming
+	  key association.  xx_mature() in {ah,esp}_core.c implement algorithm-
+	  dependent checks.
+	* IPsec: changed some of the kernel internal API for ESP/AH algorithms.
+
+<199807>
+1998-07-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* icmp6.c (icmp6_redirect_input): Supported received redirects
+	which redirect to on-link destinations. Some ND related functions
+	were also modified to accomplish this.
+
+1998/07/30 17:57:15 JST shin@nd.net.fujitsu.co.jp
+  kit/ports/ppp - Imported sources
+  current source of user-level ppp command maintained at www.awfulhak.org.
+
+Thu Jul 30 13:08:47 JST 1998  itojun@iijlab.net
+	* 3DES ivlen has fixed (must be 8)
+
+Thu Jul 30 13:08:47 JST 1998  sakane@ydc.co.jp
+	* ipsec: support BYPASS policy 
+
+Thu Jul 30 11:09:06 JST 1998  itojun@iijlab.net
+	* ipsec interoperability fixes.
+	  - use more proper ivlen for each of the algorithms
+	  - padding rule fix (mainly for null encryption algorithm)
+	  - loosen payload length check for ESP (must be multiple of 4)
+
+1998/07/29 21:43:11 JST shin@nd.net.fujitsu.co.jp
+    netinet6             ipsec.c 
+  Changed dport to sport(Though anyway it is inside of #if 0)
+
+Wed Jul 29 21:20:34 JST 1998  sakane@ydc.co.jp
+	* sys/netinet6/esp_input.c: treat ESP NULL authentication alrogithm
+	  specially.  do not perform sequence number check.
+
+Wed Jul 29 17:48:34 JST 1998  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: 3DES code had a bug that caused SEGV.
+	  (wrong pointer was passed as key buffer)
+
+Wed Jul 29 1998  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: upper-layer protocol check code in
+	  ipsec[46]_getindex() was wrong.  it needs to care about fragmentation
+	  but it does not.  commented out for safety. (to be fixed)
+
+Wed Jul 29 1998  itojun@iijlab.net
+	* kit/src/libpcap: "tcpdump tcp" now works as expected.
+
+Tue Jul 28 19:16:48 JST 1998  k-sugyou@kame.net
+	* kit/ports/newbie: updated to 0.21p7.
+
+1998/07/28 18:26:26 JST shin@nd.net.fujitsu.co.jp
+    src/rtadvd           rtadvd.conf 
+    Added "addrs#1" for sample configuration which is necessary to
+    announce a prefix not assigned to the interface.
+
+Tue Jul 28 1998  itojun@iijlab.net
+	* kit/ports/wu-ftpd: updated to 2.4.2beta18.
+	* kit/ports/sendmail6: updated to 8.9.1 IPv6 patchlevel 2.
+
+1998-07-28  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/name6.c:
+	re-support sethostent(), endhostent(), gethostent(), and
+	gethostbyname2 (RES_USE_INET6 stuffs) for compatibility.
+	h_aliases, h_addr_list of hostent structure must be a pointer
+	of array, not NULL pointer.
+
+Tue Jul 28 07:09:50 JST 1998 sakane@ydc.co.jp
+	* sys/netinet6/ipsec.c
+	Remove the routines of the check to reject
+	when both the packet encrypted and policy was NONE.
+	Are they need ?
+
+Tue Jul 28 04:25:48 JST 1998 sakane@ydc.co.jp
+	* kit/src/setkey
+	Changed the place in the command to specify the upper layer protocol,
+	and use `any' token as wildcard.
+	For examples,
+		add ::1 ::1 0x100 ...;     -> add ::1 ::1 any 0x100 ...;
+		add ::1 ::1 0x100 tcp ...; -> add ::1 ::1 tcp 0x100 ...;
+	Sorry, it means that you must modify your configuration for IPsec.
+	Corrected to specify the IP address, port, prefix and SPI.
+	Modified the output to dump for the upper layer protocol of wildcard.
+
+Tue Jul 28 02:41:56 JST 1998 sakane@ydc.co.jp
+	* netinet6/ipsec6.[ch]
+	Remove use_{in,out}bound_spd, spd_priority and outbound_call_ike.
+	It causes system to change the IPsec definition.
+	When SP entry found, IPsec processing will be worked regardless
+	of def_policy.  If you want to do IPsec when no SP entry defined,
+	be set the def_policy to 2.  At this time, if no SA entry found,
+	IKEd will be called by kernel.
+	TODO:	The part of calling IKEd must be stable.
+
+Thu Jul 23 19:08:57 JST 1998 sakane@ydc.co.jp
+	* sys/netkey/key.c
+	Modified the behavior of SADB_ACQIURE and SADB_REGISTER.
+	It's be possible for kernel to receive SADB_ACQUIRE message
+	from user land process, and send SADB_ACQUIRE message
+	to KMd registerd.  Also, It's be possible to send algorithms
+	supported by kernel up to the KMd.
+	TODO:	sadb_supprted should be from {ah,esp}_algorithms.
+		entry acquired should be free by lifetime.
+
+1998-07-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* ip6_input.c (ip6_input,ip6_hopopts_input):
+	Router Alert Option support.
+
+1998/07/23 07:32:30 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6.c nd6_nbr.c 
+  Set Solicited Node Multicast Addr for p2p destaddr only on interface
+  with same IPv6 prefix.
+  Also, set proxy=1 when doing proxy NA.
+
+1998/07/22 22:01:51 JST	shin@nd.net.fujitsu.co.jp
+    netinet6             nd6_nbr.c in6.c 
+  Support of Proxy NDP reply.
+
+1998/07/22 19:41:52 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6.c 
+  Join and leave Solicited Node Multicast addr for proxy NDPing
+  PPP dest addr.
+  And some other small fixes.
+
+1998-07-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	Implemented MLD(Multicast Listener Discovery) host part.
+
+1998-07-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/libinet6/ip6opt.c: inet6_option_init() and inet6_option_append()
+	were newly implemented.
+
+Fri Jul 17 03:33:44 JST 1998  itojun@iijlab.net
+	* kit/src/hroute6d: install RTF_REJECT route for aggregated prefixes,
+	  so that there will be no bogus packet loop at the border routers.
+
+Thu Jul 16 23:11:45 JST 1998  sumikawa@ebina.hitachi.co.jp
+	* src/ndp, sys/netinet6/nd*
+	  - added -i options.
+	* Neighbour Discovery
+	  - supported multiple prefixes
+	  - removing unreached router from default router list
+	  - rewrote linked list handlings
+	  - fixed pruning bug
+
+Thu Jul 16 20:14:26 JST 1998  itojun@iijlab.net
+	* kit/ports/ucd-snmp: SNMP daemon/client.  There are very few
+	  IPv6 MIBs implemented at this moment.  We'll implement more in
+	  the future.
+
+Thu Jul 16 00:46:47 JST 1998 sakane@ydc.co.jp
+	* sys/netkey/key.c
+	Fixed the format for debug message.
+
+1998/07/15 19:36:03 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6_var.h 
+  Added some in6_ifaddr operating macros.
+  And optimized IN6_ARE_MASKED_ADDR_EQUAL().
+
+1998/07/15 19:00:59 JST shin@nd.net.fujitsu.co.jp
+    src/route6d          ifmcstat.c 
+  Only update mc from if6a.ia6_multiaddrs.lh_first when mc != 0.
+  (because now only top if6a has non zero ia6_multiaddrs.lh_first)
+  Also, added fe, fxp, cnw to havearpcom(p) list.
+
+1998/07/15 17:59:36 JST shin@nd.net.fujitsu.co.jp
+    usr.sbin/ppp         ip.c ipv6.c 
+  Do SIOCDIFADDR_IN6 for those addresses on which SIOCAIFADDR_IN6 failed,
+  to remove possible gabage routes.
+
+1998/07/15 16:18:15 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6.c 
+  Bug Fix:
+    When deleting an IPv6 addr, many kinds of miserable things happens
+    by dual IFAFREE at SIOCAIFADDR_IN6 in in6_control().
+
+1998-07-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* in6.c: implemented multicast kludge to save multicast addresses
+	linked from sockets when deleting all the unicast addresses.
+
+Mon Jul 13 23:47:54 JST 1998 sakane@ydc.co.jp
+	Fixed the cause of memory leak in ipsec.c.  There might be in.
+
+Mon Jul 13 21:19:33 JST 1998 sakane@ydc.co.jp
+	* kit/src/setkey
+	Changed how to parse hexadecimal strings.
+	It's possible to specify a key by hexadecimal string with `0x'.
+	The quoted strings still too. 
+
+1998-07-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	Changed the way to manage multicast groups in a socket;
+	use list of multicast memberships instead of static array
+	to eliminate limitation of number of multicast groups per socket.
+
+Mon Jul 13 10:27:20 JST 1998  itojun@iijlab.net
+	* kit/src/pluto: removed pluto IKE daemon.  we'll concentrte on 
+	  racoon IKE daemon.
+
+1998/07/13 03:38:32 JST shin@nd.net.fujitsu.co.jp
+    netinet6             icmp6.h in6_proto.c nd6.h nd6.c 
+  Add sysctl variable "nd6_proxyall" to switch on/off Proxy Neighbor
+  Advertisement.
+
+1998/07/13 03:35:39 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6.c 
+  Add a check if IFF_LOOPBACK and/or IFF_LOOPBACK is set, to
+  in6_is_ifloop_auto().
+  Also, modified some comments.
+
+1998/07/12 19:06:39 JST shin@nd.net.fujitsu.co.jp
+    netinet6             nd6_rtr.c 
+  Compare received reachable timer with basereachable timer.
+
+1998/07/12 18:45:39 JST shin@nd.net.fujitsu.co.jp
+    netinet6             nd6_rtr.c 
+  Don't recompute reachable timer, if received RA's one is 0.
+  And then, if current reachable timer value is 0(may be by some error)
+  always recompute the reachable timer.
+
+1998/07/12 18:29:04 JST shin@nd.net.fujitsu.co.jp
+    netinet6             nd6.h 
+  Bug fix:
+   Kernel halts by 0 devide at ND_COMPUTE_RTIME(0).
+   So Changed "random() %" to "random() &". This may not give mathmatically
+   perfect random value, but I believe it is practically not a problem,
+   and also performance become better.
+
+1998/07/10 17:22:27 JST shin@nd.net.fujitsu.co.jp
+    netinet6             in6.c 
+  Bug fix:
+  Every local address of p2p link is same, so its loopback entry is
+  deleted when deleteing one of it, and consequently, became not able to
+  receive packets sent to the local address.
+  So only delete the p2p local addr loopback entry, when there is only
+  one of same addresses remains.
+
+Fri Jul 10 19:55:49 JST 1998  itojun@iijlab.net
+	* kit/ports/heimdal: export control-free kerberos5 implementation.
+	  Please be aware that it is not really tested very much.
+
+Fri Jul 10 1998  itojun@iijlab.net
+	* kit/ports/vat6: famous videoconferencing system for IPv6.
+	  Please be aware that it is not tested at all, so it is marked
+	  as BROKEN.
+
+1998-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/ping6/ping6.c (summary): added fflush at the end of the
+	function.
+	Submitted by: koba@flab.fujitsu.co.jp
+
+1998-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* ip6_input.c (ip6_input): removed a quick hack for link-local
+	addresses on point-to-point interfaces. We believe there is no
+	problem.
+
+1998-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* in6_proto.c: changed the default value of icmp6_rediraccept
+	from 0 to 1.
+	KAME kernel now safely handles received redirects if they redirect 
+	to a better router. We'll soon support the redirects to on-link
+	destinations.
+
+1998-07-09  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/name6.c:
+	  fixed handling IPv4 literal address and /etc/hosts.
+	  IPv4-mapped address support is commented out until kernel will
+	  accept it.
+
+1998-07-08  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/name6.c, include/netdb.h:
+	  support getnodebyname(), getnodebyaddr(), freehostent().
+	  old interfaces (ex. gethostbyname2) are left for compatibility.
+
+Wed Jul  8 02:19:06 JST 1998  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: do not make interfaces IFF_UP on
+	  assignment of link-local unicast address.
+	* sys/net/if.c: perform IPv6 DAD on interface state changes,
+	  i.e. ioctl().
+	* kit/src/rtsol: make the interface up if it is not.
+	  try to send RS repeatedly, if the interface is under DAD state.
+
+1998/07/08 00:48:53 JST shin@nd.net.fujitsu.co.jp
+    net                  if_tun.c 
+  Stop to up unused tun* interfaces at default. They are up'ed after they
+  are configured and began to used.(and address is assigned)
+  (suggested by itojun)
+
+Mon Jul  6 12:51:52 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: update to sendmail 8.9.1+IPv6 patchlevel 1.
+
+1998/07/02 23:54:19 JST shin@nd.net.fujitsu.co.jp
+    usr.sbin/ppp         Makefile ipcp.c ipv6cp.c 
+  Added compile option for connectiong with remote sppp.
+
+1998/07/02 17:04:10 JST shin@nd.net.fujitsu.co.jp
+    netinet6             nd6.c 
+    netinet6             in6_ifattach.c 
+    When many continuous p2p interface exist, specified ifp's if_index
+    in nd6_ifattach() become so large that nd_ifinfo[if_index] could
+    point over the nd_ifinfo[] area, and break arbitrary memory value.
+    When if_index value is big, multiply new nd_ifinfo size several time
+    until the size become enough for specified ifp's if_index.
+
+Thu Jul  2 16:50:13 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: update to sendmail 8.9.0+IPv6 patchlevel 4.
+
+Thu Jul  2 12:46:08 JST 1998  itojun@iijlab.net
+	* kit/ports/popper: upgraded to use qpopper 2.52.
+
+1998-07-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* icmp6.c (icmp6_rip6_input): Removed IPV6_STRIPHDR socket option
+	and related code.
+	* raw_ip6.c (rip6_input): ditto.
+	* src/icmp6dump,ping6, rtadvd, tcpdump6: ditto.
+
+1998-07-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd: supported metric addition for incoming RIPng routes.
+
+Wed Jul  1 16:30:48 JST 1998  itojun@iijlab.net
+	* kit/src/route6d: add -T, -N options (advertise default route only,
+	  and restrict interfaces to handle)
+
+	  Submitted by: kick@wide.ad.jp
+
+Wed Jul  1 13:47:37 JST 1998  itojun@iijlab.net
+	* everywhere: ALTQ (alternate queueing framework) merged into
+	  KAME/FreeBSD kit. (not for BSDI nor NetBSD)
+	  Good things: It makes ATM driver more concrete, and you can play
+		with ALTQ.
+	  Things to be fixed: IPv6-over-ATM support has to be checked.
+		Userland tool (apconfig) is now unusable due to difference in
+		the ATM driver.   Userland tools must be installed via
+		kit/ports/altq.
+
+	  For more information about ALTQ, visit the following URL:
+		http://www.csl.sony.co.jp/person/kjc/software.html
+
+1998-07-01  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* sys/net/if{,_mib}.c: fix index value of ifnet_addrs[] to 1 origin,
+	  for sysctl net.link.generic.ifdata.<index> to work.
+
+1998-07-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* ports/popper: Supported the qpopper2.5, in which buffer overrun
+	bugs were fixed.
+
+Wed Jul  1 06:35:39 JST 1998  itojun@iijlab.net
+	* kit/libexec/rshd: bugfix on INET6 connection.
+	  Submitted by: ume@calm.imasy.org
+	* kit/src/tcpdump: check AF field on CISCO HDLC packet.
+	  Submitted from: fujiwara@rcac.tdi.co.jp
+
+Wed Jul  1 01:06:08 JST 1998  itojun@iijlab.net
+	* sys/dev/en/midway*: moved "midway*" files from sys/pci to
+	  sys/dev/en, to help ALTQ merge.
+
+<199806>
+1998-06-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd:
+	  - supported synchronization of RIPng and BGP4+
+	  - small bug fix of route aggregation
+	
+Tue Jun 30 13:35:15 JST 1998  itojun@iijlab.net
+	* sysctl MIB for net.inet6.ip6.xxx has changed. (previous def was bad)
+	  past:
+		mib[0] = CTL_NET; mib[1] = PF_INET6; mib[2] = IPPROTO_IP;
+	  now:
+		mib[0] = CTL_NET; mib[1] = PF_INET6; mib[2] = IPPROTO_IPV6;
+
+1998-06-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/route6d/route6d.c (ripalarm): when aging routes,
+	check whether rrt list is empty or not after aging. If it
+	lacks, route6d may be core dumped.
+	
+1998/06/29 19:58:02 JST shin@nd.net.fujitsu.co.jp
+    usr.sbin/ppp         command.c ipv6.c ipv6cp.c 
+    net                  rtsock.c 
+    netinet6             in6.c 
+  Made it possible to assigne IPv6 link local addr to kernel, when
+  kernel have none.
+  Please update with kernel.
+
+Mon Jun 29 13:15:05 JST 1998  itojun@iijlab.net
+	* sys/netinet6/{ah,esp}_core.c: renamed {ah,esp}.c into
+	  {ah,esp}_core.c, to avoid file name collision in NetBSD kernel
+	  source tree (with Sun ethernet driver).
+
+Mon Jun 29 02:20:01 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: update to sendmail 8.9.0+IPv6 patchlevel 3.
+
+Sun Jun 28 10:48:30 JST 1998  itojun@iijlab.net
+	* kit/ports/sendmail6: update to sendmail 8.9.0+IPv6 patchlevel 1.
+
+Fri Jun 27 1998  itojun@iijlab.net
+	* sys: Kernel now compiles with "options MROUTING".  (I have never
+	  tried IPv4 multicast code with KAME kernel, though)
+
+	  TODO: more cleaner way to deal with MBone stuff with gif interface.
+
+Fri Jun 26 23:06:54 JST 1998  itojun@iijlab.net
+	* sys: TCP MSS computation takes care of the room occupied by
+	  transport-mode IPsec (ESP/AH).  This helps TCP to be performed
+	  without packet fragmentation.
+	  The functionality was implemented in WIDE Hydrangea days, and
+	  removed by PFKEY-v2 merge.  It is now become available again.
+
+Fri Jun 26 20:44:23 JST 1998  itojun@iijlab.net
+	* sys/netinet/ip_output.c: If IPsec'ed packet is too big for the
+	  interface, turn DF bit off and fragment it.  This is the last
+	  resort for TCP packet with DF bit set.  THIS IS A QUICKHACK!
+	  This applies only for non-AH, and non-forwarding (packet from myself)
+	  case.  In AH case, we can't modify IP header (DF bit).
+	  In forwarding case, ICMP more fragment message should be sent to
+	  the originating node.
+
+	  TODO: more consideration to path MTU discovery, as gateway and as
+	  originator/final destination
+
+Fri Jun 26 15:55:12 JST 1998  itojun@iijlab.net
+	* sys/netinet6/esp_*.c: Some cleanup for ESP tunnel mode.
+	  Now KAME host is able to serve as ESP tunnel gateway.
+
+	  TODO: AH tunnel
+	  TODO: better relationship with gif tunnel
+
+1998-06-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* raw_ip6.c (rip6_input): striped all the extension headers
+	including IP6 header for a socket on which IN6P_STRIPHDR
+	was set. This feature will soon be default, not optional.
+
+Thu Jun 25 02:23:06 JST 1998  itojun@iijlab.net
+	* kit/src/libinet6/getaddrinfo.c: cleanup hostname == NULL case.
+	  If AI_PASSIVE is specified in "hint" structure, return anyaddr
+	  (0.0.0.0 or ::).  If not, return loopback address (127.0.0.1 or ::1).
+
+Wed Jun 24 16:30:00 JST 1998  sumikawa@ebina.hitachi.co.jp
+	* src/ndp, sys/netinet6/nd*
+	- added -r, -p and -F options.
+
+1998-06-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/rtadvd:
+	- Implemented dynamic prefix addition and deletion by watching
+	  the routing table.
+	- Now rtadvd is completely independent of the configuration file.
+	  It works even if the config file does not exist.
+
+Wed Jun 24 13:39:59 JST 1998 sakane@ydc.co.jp
+	sys/netkey/, sys/netinet{,6}/
+	* Fixed the behavior when the SPD is refered.
+	* Modified
+	* Adjusted ipsecstat's members.
+	kit/src/setkey/
+	* Modified debug mode and verbose mode.
+	* Fixed man page and sample script in sample.cf.
+
+1998-06-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/bgpd:
+	- fixed many bugs including infinite loop.
+	- route aggregation can be specified per interface base.
+
+Tue Jun 23 18:25:12 JST 1998  itojun@iijlab.net
+	* kit/ports/socks64: updated socks64 patch from flab.
+	  Now socks64 patch is fetchable, so you can build it yourself.
+
+1998-06-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* icmp6.h (ICMP6_ROUTER_RENUMBERING): newly defined. Because of
+	this, the definition of FQDN query and reply was changed. So
+	you may have to update both kernel and userland applications.
+
+1998-06-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* usr.sbin/portmap/from_local.c (find_local): rewrote the function
+	using sysctl interface. The older versions had the too strict
+	limitation on number of interface addresses. If you find some
+	trouble about /usr/sbin/portmap, we recommend you to replace it with
+	/usr/local/v6/sbin/portmap.
+	
+Tue Jun 23 02:58:40 JST 1998  itojun@iijlab.net
+	* kit/ports/v6tun: upgrade to 1.1.
+	* kit/ports/ssh: upgrade to 1.2.23 + IPv6 patch 1.1.
+
+	  Submitted by: kick@wide.ad.jp
+
+Tue Jun 23 1998  itojun@iijlab.net
+	* sys/netinet6/raw_ip6.c: upper-layer checksum was fixed.  In the past
+	  by invoking rtadvd kernel hangs up, due to stale pointers.
+
+1998-06-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/rtadvd:
+	- Added RA consistency check.
+	- Added received RS/RA validation
+	- Implemented timer related functions.
+	- Implemented rate limitation of sending RAs.
+	- maxinterval and mininterval were configurable.
+
+Thu Jun 18 04:36:01 JST 1998  sumikawa@ebina.hitachi.co.jp
+
+	* kit/ports/im: Email and NetNews user interface
+
+Thu Jun 18 04:36:43 JST 1998 sakane@kame.net
+	sys/netkey/, sys/netinet{,6}/, kit/src/setkey/
+	* Restructed both SPD and SAD in kernel IPsec module.
+	  There are two SPD. One is the based socket, and the another is
+	  in the system mainly to handle the packet forwarding.
+	* Some systemwide IPsec's parameters has been replaced into ipsec.h,
+	  and add new parameters to handle the SPD's functions.
+	* Add some commands for SPD management to `setkey'.
+	* Add a module for acquiring KEY, but not tested.
+	* Fixed when a PF_KEY socket was opened without PF_KEY_V2 as
+	  its protocol.
+	  Suggested by <suzuki@grelot.elec.ryukoku.ac.jp>.
+
+Tue Jun 16 21:50:40 JST 1998 k-sugyou@kame.net
+    ports/mozilla
+  update to use mozilla-19980603
+
+1998/06/16 13:32:45 JST shin@nd.net.fujitsu.co.jp
+    usr.sbin/ppp         command.c filter.c ipv6cp.c 
+  Log:
+  Several small fixes.
+  BCOPY->memcpy. Removed some func's obsolete arg. If_id initialization
+  for server.
+
+1998/06/15 21:33:31 JST shin@nd.net.fujitsu.co.jp
+    net                  if_sppp.h if_spppsubr.c 
+
+  IPV6CP of PPP support for sppp.
+  But only communication over serial cable is tested using slsppp driver
+  from fujiwara san. (At leaset, ping6 to remote link local addr is OK.)
+  Also, token negotiation is not supported yet.
+
+1998/06/14 00:42:36 JST shin@nd.net.fujitsu.co.jp
+    netinet              tcp_usrreq.c 
+    netinet6             tcp6_usrreq.c udp6_usrreq.c 
+
+  MAPPED ADDR support phase 3.
+  Now mapped addr is available for tcp.
+
+1998-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/rtadvd/config.c (getconfig): Modified to use protocol
+	default values for unspecified parameters.
+	Now users may omit almost all parameters in rtadvd.conf if
+	they want to use protocol defaults. Users are also able to
+	specify more than 2 prefixes on an interface.
+
+	* src/rtadvd/if.c: Added to include source link layer address
+	option in RAs.
+
+1998-06-12  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/getaddrinfo.c, getnameinfo.c:
+	  fix getaddrinfo() and getnameinfo() to use offsetof() to determine
+	  offset of address in struct sockaddr_in{,6}.
+	  (offsetof(struct sockaddr_in6, sin6_addr) has been changed
+	  from 8 to 16).
+
+Wed Jun 10 19:43:03 JST 1998  itojun@iijlab.net
+	* kit/src: To share kit/src among FreeBSD/BSDI/NetBSD kit, some changes
+	  are added.  All source code under kit/src must be portable across
+	  these three platforms.
+	  Submitted by: hiroshi ura
+
+1998-06-10  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* include/netdb.h: include <sys/types.h> to define size_t
+	  for struct addrinfo.
+
+1998-06-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* in6.c (in6_addmulti): added the 3rd argument to return
+	more specific errors to caller.
+	* in6.c (in6_addmulti): 
+	(in6_control): 
+	* in6_ifattach.c (in6_ifattach): 
+	* ip6_output.c (ip6_setmoptions): 
+	Reflected above change and used the error number if possible.
+	
+1998-06-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* esp_input.c (esp6_input): 
+	* ah_input.c (ah6_input): 
+	Set next header field of the previous header of ESP or AH
+	using ip6_get_prevhdr().
+	
+	* icmp6.c (icmp6_error): modified to send ICMP error for packets
+	including unknown header. Older versions discarded them, but
+	spec required to return error for such packets.
+	
+	* raw_ip6.c (rip6_input): called icmp6_error with
+	ICMP6_PARAMPROB_NEXTHEADER when there is no listening socket for
+	the incoming packet.
+	
+	* frag6.c (frag6_input): replaced a block to store new next
+	header value with calling ip6_get_prevhdr.
+	
+	* ip6_input.c (ip6_get_prevhdr): was newly defined. The function
+	is not so efficent so it will be not used when we provide a
+	better way.
+
+Tue Jun  9 21:32:47 JST 1998  itojun@itojun.org
+	* sys/netinet6/ipsec.c: fixed a critical bug when compiling kernel
+	  with IPSEC option.  No data was coming to IPv6 sockets.
+	  Suggested by: Atsushi Onoe <onoe@sm.sony.co.jp>
+
+1998-06-09  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/route6d: ignore interfaces not marked IFF_UP at
+	  initialization, to avoid failure in IPV6_ADD_MEMBERSHIP.
+
+Tue Jun  9 13:43:33 JST 1998  itojun
+	* kit/ports/v6tun: a handy tool for establishing IPv6 tunnel over
+	  IPv4 dialup/ssh session.
+
+Mon Jun  8 05:48:54 JST 1998  itojun@itojun.org
+	* ipsec: ESP payload authentication algorithm is now switchable
+	  via PF-KEY v2. (more checks need to be done)
+	* ipsec: Changed SPI handling method in kernel ipsec module.  
+	  SPI is now always kept in scalar variables in network byteorder.
+	  This is to support new netkey module.
+
+Sun Jun  7 JST 1998  itojun@itojun.org
+	* sys/crypto: Fixed SHA-1 checksum length
+	  (wrong: 16bytes  correct: 20bytes)
+	  Pointed out by: Francis Dupont
+
+Sun Jun  7 14:17:52 JST 1998  itojun@itojun.org
+	* Incorporate REVISED FreeBSD TTCP security hole fix (FreeBSD security
+	  advisory 98:03).
+	  Pointed out by: kenji rikitake
+
+Sun Jun  7 JST 1998  sakane@kame.net
+	* ipsec code is now start working, but may need some more time to
+	  stabilize.
+
+Sat Jun  6 JST 1998  itojun@itojun.org
+	* kit/ports/mrt: Multi-threaded Routing Toolkit from Merit.
+	* sys/i386/isa/if_ed.c:  location to call in6_ifattach() is fixed.
+	  Submitted by: Kouki Higuchi <luke@fct.kgc.co.jp>
+	* sys: ipsecstat is now visible via sysctl MIB.
+	* kit/usr.bin/netstat: show ipsec statistics on netstat -s.
+
+Sat Jun  6 JST 1998  sakane@kame.net
+	* sys: pfkey v2 and SPD is merged into.
+	  NOTE: This breaks IPsec code, for the moment.
+	  Also, some of userland tools (for example kit/src/pluto) cannot
+	  be compiled.
+	* kit/src/setkey: revamp for pfkey v2.
+	  NOTE: this is not compatible with past version.
+
+Fri Jun  5 JST 1998  itojun@itojun.org
+	* kit/ports/zebra: update to use zebra-980604.
+	* kit/ports/socks64: modified socks5 from Fujitsu Laboratories Ltd.
+	  (not compile-able at this moment, since socks64 patch is yet to be
+	  released)
+
+Thu Jun  4 JST 1998  itojun@itojun.org
+	* kit/src/libinet6: getaddrinfo() and getnameinfo() are cleaned up.
+
+Thu Jun  4 00:27:42 JST 1998  itojun@itojun.org
+	* Endian-ness of outbound (kernel->userland) sin6_ifindex has fixed.
+	  We temporarily use host endian as draft is yet to be released.
+
+1998/06/03 23:57:26 JST shin@nd.net.fujitsu.co.jp
+    kern                 uipc_socket.c
+    netinet              udp_usrreq.c
+    netinet6             udp6_usrreq.c in6.h in6.c in6_proto.c
+                         ip6_var.h
+
+  Mapped addr support phase2. Now UDP is aple to use mapped addr
+  by doing below.
+    sysctl -w net.inet6.ip6.mapped_addr=1
+
+Wed Jun  3 01:44:50 JST 1998  itojun@itojun.org
+	* sys/i386/isa/if_zp.c: multicast support added.  it is essential
+	  for using IPv6 on zp interface.
+
+1998/06/02 00:20:29 JST	 shin@nd.net.fujitsu.co.jp
+    netinet6             udp6_usrreq.c
+
+  PRU_DISCONNECT was denied when in6p_faddr is not UNSPEC addr.
+  Fixed it to be denied when in6p_faddr is UNSPEC addr.
+  Also, changed the macro to BSD API conformed one.
+
+1998/06/01 14:05:16 JST   shin@nd.net.fujitsu.co.jp
+    src/faith            faith.c
+
+  Changed the option argument spec of faith command.
+
+1998/06/01 12:49:31 JST   shin@nd.net.fujitsu.co.jp
+    src/libinet6         getaddrinfo.c
+
+  Changed the way of specifing faith prefix for getaddrinfo().
+  Now it is specified in environmental variable GAI.
+
+<199805>
+Sat May 30 10:42:32 JST 1998  itojun@itojun.org
+	* kit/ports/ssh: ssh port updated to use ssh 1.2.23, and IPv6 patchkit
+	  supplied by KIKUCHI Takahiro <kick@rcac.tdi.co.jp>  (Thanks!).
+	  sshd and ssh are now totally AF independent, and listens both v4 and
+	  v6 sockets!
+
+1998/05/29 21:16:00 JST   shin@nd.net.fujitsu.co.jp
+    i386/conf            GENERIC.v6 PAO.v6.diff
+
+  Added compile option to switch mapped addr usage.
+
+1998/05/29 21:09:10 JST    shin@nd.net.fujitsu.co.jp
+    kern                 uipc_socket.c
+
+  Step1 for mapped addr support.(actual support is not yet)
+  Added so_pcb2 to struct socket, and let inet6 domain use it.
+  Other domains(inet, unix, etc) continue to use so_pcb.
+
+1998/05/29 14:06:46 JST   shin@nd.net.fujitsu.co.jp
+    netinet6             in6.h in6_proto.c
+
+  Addition of a sysctl for switching mapped addr support. (actual mapped
+  addr support in kernel is not yet)
+  Also changed some part of sysctl definition in in6.h, for IPSEC defined
+  sysctls and MAPPED_ADDR_ENABLED defined sysctls could easily coexist.
+
+1998/05/28 22:30:33 JST  shin@nd.net.fujitsu.co.jp
+    ports/mozilla/patches patch-bg
+
+  Patch for af switching hack's bug fix and the other.(from sugyou)
+  Now mozilla can access v4 and v6 pages concurrently.
+  Ftp access is also available.
+
+1998/05/28 19:52:51 JST  shin@nd.net.fujitsu.co.jp
+    libexec/ftpd         ftpd.c
+
+  Fixed ftpd's ftp data connection from 21 to 20.
+
+Thu May 28 20:11:08 JST 1998  itojun@itojun.org
+	* sin6_ifindex support for (most of) connectionless inbound sockets
+	  and raw ip6 outbound packets.
+	  kit/src/ping6 now uses sin6_ifindex to control outgoing interface,
+	  as a trial case.
+
+May 27-28, 1998  itojun@itojun.org
+	* cast128 bugfixes.
+	  By Tomomi Suzuki <suzuki@grelot.elec.ryukoku.ac.jp>.
+
+May 27-28, 1998  itojun@itojun.org
+	* getaddrinfo() fix for PF_UNSPEC case.  Return IPv4/IPv6 anyaddr
+	  (0.0.0.0 or ::) or localaddr (127.0.0.1 or ::1) in AI_PASSVE cases.
+	  Suggested by KIKUCHI Takahiro <kick@rcac.tdi.co.jp>.
+
+Tue May 26 18:41:38 JST 1998  itojun@itojun.org
+	enable sockaddr_in6 new members: sin6_scope_id and sin6_ifindex.
+	NOTE!!!  please make sure make sure that all userland code, libraries
+	and port binaries are based on new definition.
+	You may want to perform the following before making userland code,
+	to make it sure:
+	% rm /usr/local/v6/lib/*
+	% find kit -name '*.o' -print | perl -nle unlink
+	% find kit -name '*.a' -print | perl -nle unlink
+				 
+Tue May 26 04:05:02 JST 1998  itojun@itojun.org
+	* preparation for sockaddr_in6 change.
+	  kernel: bzero() for sockaddr_in6 are clarified.
+	  userland: updated getaddrinfo() and getnameinfo() to make them
+	  independent of the definition of sockaddr_in6.
+	* IPV6_CHECKSUM setsockopt (advanced api)
+	* inet6_rthdr_foobaa(): routing header manipulation functions
+	  (advanced api)
+
+Mon May 25 01:15:50 JST 1998  itojun@itojun.org
+	* RC5 cbc mode added. (thanks goes to tomomi suzuki@ryukoku-u)
+
+1998/05/22 16:06:51 JST shin@nd.net.fujitsu.co.jp
+	ports/mozilla
+	now mozilla can only access IPv6 www home pages.
+
+Wed May 20 16:12:13 JST 1998  itojun@itojun.org
+	* kit/src/*: Makefile cleanups.
+
+1998-05-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* ipv6_icmp.c (icmp6_rip6_input): 
+	* raw_ip6.c (rip6_input):
+	Maked sure to 0-clear the pointer opts after each iteration
+	of for loop. Older kernel causes kernel crash when more than 1
+	raw IP6 sockets exist and optional information is expected
+	on each socket.
+
+Tue May 19 22:23:03 JST 1998  itojun@itojun.org
+	* "options DES" is obsoleted.  You just need to say "options IPSEC".
+
+Tue May 19 17:33:00 1998  sumikawa@ebina.hitachi.co.jp
+	* kit/hroute6d: changed name from route6d to avoid duplication.	
+
+1998-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* src/v6test/v6test.c (main):
+	Added -f option to specify the path of configuration file.
+	Document file was also modified.
+	
+shin        1998/05/18 21:21:32 JST
+	src/route6d          route6d.c
+	* Added ageout of each entry to ripalarm(), which is called every
+	  SUPPLY_INTERVAL6 interval
+	* Added one condition to the check if a route is loopback route or
+	  not
+
+Sun May 17 12:08:54 JST 1998  itojun@itojun.org
+	* sys/netinet6/nd6.c: implemented NDP upper-layer reachability hint.
+
+Fri May 15 12:06:03 JST 1998  itojun@itojun.org
+	* TTCP security hole fix merged in.
+	* ATM related fix.  Now we can configure kernel with ATM support.
+	  (could experienced person try this?)
+	* kit/ports/mozilla: inet6-capable mozilla.  You'll need Motif
+	  as well as some CPU power for compilation.  (some more work
+	  needs to be done)
+
+Fri May 14 1998  itojun@itojun.org
+	* some cleanups on NDP (neighbor discovery protocol).
+
+Wed May 13 18:22:09 JST 1998  itojun@itojun.org
+	* kit/ports/popper: inet6-capable qpopper.  Use with inet6d.
+	* kit/ports/fetchmail: inet6-capable fetchmail.
+
+shin        1998/05/13 17:55:59 JST
+  kit/usr.sbin/ppp
+	modifications to use SOCKS5.
+
+shin        1998/05/13 16:02:21 JST
+  kit/src/faithd
+        Changed to refer sysctl configured value for FAITH prefix.
+
+Tue May 12 12:38:21 JST 1998  itojun@itojun.org
+	* kit/ports/newbie: updated to 0.21p3.
+	* kit/ports/XFree86: imported a easy-installation for IPv6-ready
+	  XFree86 (IPv6 patch by inria forks)
+	* sys/netinet6/icmp6.c: fixed false badcode counter increments.
+
+1998-05-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	Imported toshiba-origin bgpd, which supports RIPng and
+	BGP4+. Thanks to Toru Kon'no <toru@isl.rdc.toshiba.co.jp>
+
+Mon May 11 01:59:54 JST 1998  itojun@itojun.org
+	* kit/src/tcpdump: imported LBL's tcpdump for more portability.
+	  kit/usr.sbin/tcpdump (FreeBSD origin) was removed.
+	* kit/src/libpcap: imported LBL's tcpdump for more portability.
+	  kit/src/libpcap6{,.src} (FreeBSD origin) was removed.
+
+Sat May  9 00:30:34 JST 1998  itojun@itojun.org
+	* kit/src/hroute6d: hitachi-origin route6d, with route filtering/
+	  aggregation functionalities. (quickhack-ed version imported)
+
+Fri May  8 14:37:00 JST 1998  itojun@itojun.org
+	* sys/netinet6: sanity checks for ifindex (passed via msghdr) added.
+
+Wed May  6 18:43:36 JST 1998  itojun@itojun.org
+	* kit/ports/newbie added.  This is an IPv6-aware nameserver/resolver.
+
+Wed May  6 15:43:22 JST 1998  itojun@itojun.org
+	* Makefile fixes so that "kit" can be made without modifying
+	  /usr/src/sys.
+
+shin        1998/05/05 01:49:58 JST
+  kit/src/faith
+	Added command for setting FAITH prefix value.
+
+shin        1998/05/04 20:20:13 JST
+  sys/netinet6/in6.h in6_proto.c ip6_input.c ip6_var.h
+	Enabled FAITH prefix value change from sysctl().
+
+itojun	5/5
+	snapshot name changed from "hydrangea" to "kame"
+
+1998-05-01  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/usr.bin/rsh/rsh.c
+	Search "rlogin" from $PATH to use IPv6 capable rlogin command.
+
+1998-05-01  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/src/libinet6/rcmd.c
+	Call freeaddrinfo() in rcmd() to fix memory leak.
+	Try ai_next even if ECONNREFUSED case, not to wait 31 seconds
+	when only rshd4 is available on the remote host.
+
+<199804>
+1998-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* frag6.c (frag6_input): 
+	Changed the way of deletion of the fragment header after
+	reassembling; use ovbcopy instead of copying each 4 byte
+	in a while loop.
+
+shin        1998/04/27 11:39:32 JST
+  kit/src/resolv/res_init.c
+    Bug fix.
+    Bus error happens at res_init()
+    when nameserver directive is at the end of the resolv.conf file
+    without "\n" terminated.
+
+1998-04-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* dest6.c (dest6_input): Fixed a bug of returned value; from 0 to
+	the next header identifier.
+	
+1998-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* in6_cksum.c (in6_cksum):
+	Changed the definition of the pseudo header union not to include
+	IP6 source and destination addresses.
+	Changed the way to calculate the sum of IP6 pseudo header
+	not to copy IP6 source and destination addresses to a separate
+	buffer.
+
+1998-04-10  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kit/usr.bin/telnet/commands.c
+	As original telnet, try the next available address
+	if connect() fails.
+
+Thu Apr  2 23:08:07 JST 1998   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>
+  sys/netinet6/in6.c
+
+  Added solicited node multicast address deletion at if addr deletion time.
+  And modified comment.
+
+1998-04-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* src/v6test/getconfig.c (make_frghdr): Changed not to use HTONS for
+	IP6F_MORE_FRAG, since byte order consideration for the flag
+	is now in its definition.
+
+	* src/v6test/ext.conf:
+	Added a hop by hop option.
+	Changed the configuration for too big fragment offset test case2;
+	use the correct IPv6 payload length value.
+
+	* frag6.c (frag6_input): Specification conformance.
+	- Changed the check when searching a reassemble queue for an
+	incoming fragment; don't take into account the next header field
+	of the fragment header. It was necessary for IPv4 fragments, but
+	is not required for IPv6 fragments any more.
+	- Changed to use unfragmentable part length and the next header
+	value of the fragment header in the 1st(offsset = 0) fragment.
+	The 1st fragment is not necessarily the '1st-reached' fragment.
+	- Added a check if the reassembled packet would not exceed 65535
+	bytes.
+	--> Now Hydrangea passes sumikawa & jinmei's devilish tests
+	    about fragment headers:-)
+	
+	* icmp6.c (icmp6_error): Removed the receiving interface index
+	from the errornous packet if it had link-local scope source or
+	destination.
+
+	* icmp6.h (ICMP6_TIME_EXCEED_REASSEMBLY, ICMP6_TIME_EXCEED_TRANSIT):
+	The latest advanced API conformance; EXCEEDED->EXCEED.
+
+	* src/ping6/ping6.c (pr_icmph): 
+	* src/traceroute6/traceroute6.c (packet_ok): 
+	* usr.bin/tcpdump/tcpdump/print-icmp6.c (icmp6_print): 
+	* src/icmp6dump/icmp6dump.c (dump): 
+	* icmp6.c (icmp6_input):
+	* ip6_forward.c (ip6_forward):
+	Reflected the above changes.
+	
+	* frag6.c (frag6_freef): Added a bunch of code to return ICMP error for
+	the 1st fragment.
+
+	* ip6_var.h: added ip6q_unfrglen member to ip6q{}.
+
+Thu Apr  2 17:34:50 JST 1998   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>
+  sys/net/if_tun.c
+
+  Removed SIOCSIFPHYADDR (which I added before) from tunifioctl because
+  it turned out not to be necessary for tun interface.
+
+1998-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* ip6_var.h: ip6q_nxtp member was escaped by 'notyet.' The
+	location of the member caused segmentation faults.
+
+	* ip6_input.c (ip6_input): put 'return' outside of the while loop
+	at the end of the function. It was a very careless mistake, sorry.
+
+Wed Apr  1 02:53:52 JST 1998 itojun
+	- ESP 3DES support merged in. (thanks goes to tomomi suzuki@ryukoku-u)
+
+<199803>
+
+1998/03/31 20:24:37 JST   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>
+  usr.sbin             Makefile Makefile.inc
+
+  Added ppp to SUBDIR.
+  Moved 'NOMAN= yes' from kit/Makefile.inc to portmap/Makefile.
+
+1998/03/31 20:22:50 JST   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>
+  usr.sbin/portmap     Makefile
+
+  Moved 'NOMAN= yes' from ../Makefile.inc to ./Makefile.
+
+1998/03/31 20:17:23 JST   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>p
+  usr.sbin/ppp
+
+  Several bug fixes, improvements and small changes.
+  -Re added 'set ifaddrinet6' command, because it is useful
+   when assigning p2p style addr with dest addr on ppp links.
+  -Added `set v6prefix` command to define default IPv6 prefix.
+  -Added address macros MYV6PREFIX and HISV6PREFIX. This needs
+   prefix value defined by `set v6prefix`.
+  -Enabled deletion of addrs assigned by ppp at link down time.
+  -Added japanese man.
+
+1998/03/31 11:31:42 JST   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>
+  netinet6/in6.c
+
+  When an IPv6 addr is removed, also remove the ownaddr loopback rtentry
+  if it exists. (an addtion to the change of 1998/03/31 00:38:33)
+  
+1998/03/31 00:38:33 JST   Yoshinobu Inoue <shin@nd.net.fujitsu.co.jp>
+  netinet6/in6.c nd6.c nd6.h nd6_rtr.c 
+
+  P2p interface support extension. (Because, hydrangea requires rtentry
+  for ownaddr to be set to loopback.)
+  -added nd6_p2p_rtrequest.(set ownaddr rtentry to loopback)
+  -added a function which set ownaddr rtentry to loopback, in the case
+   nd6_p2p_rtrequest doesn't work.
+  
+  Enabled the place where ln->ln_state is set to ND6_LLINFO_REACHABLE
+  when rt->rt_expire == 0, in nd6_rtrequest.
+  This seems to be necessary for setting permanent ndp entry.	
+
+1998-03-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* route6.c (ip6_rthdr0): Conformance with new spec drafts; remove check
+	if ip6r0_len <= 46.
+
+	* icmp6.c (icmp6_input): when delivering ICMPv6 error to upper
+	layers, take into account of intermediate extension headers.
+	XXX: To accomplish this, the prototype of ctlinput functions is
+	modified. It's inconsistent with the prototype of generic ctlinput
+	functions.
+
+	* udp6_usrreq.c (udp6_ctlinput):
+	if there are extension headers between ip6 header and udp header,
+	skip them.
+
+	* tcp6_subr.c (tcp6_ctlinput): 
+	if there are extension headers between ip6 header and tcp header,
+	skip them.
+
+	* nd6_nbr.c (nd6_ns_input): if the target address is an anycast,
+	clear override flag when calling nd6_na_output().
+	(nd6_na_output): remove a line where override flag is
+	automatically set. The flag is now set in nd6_ns_input if necessary.
+
+	* tcp6_input.c (tcp6_input): if the packet is anycasted, drop it.
+	(syn_cache_add6): if the packet is anycasted, it's not cached.
+
+	* icmp6.c (icmp6_reflect): 
+	add check if the destination of the original packet is an anycast
+	when choosing the source of the reflected packet.
+
+	* in6.c (in6_ifawithscope): add check if each address is an
+	anycast. If so, it's not selected.
+
+	* ip6_input.c (ip6_input): set M_ANYCAST6 flag to the mbuf header
+	when receiving packets with anycast destinations.
+	
+	* nd6.c (nd6_rtrequest): for loopbacked packets, set rt_ifa to
+	the in6_ifaddr which has the same address of the destination.
+	This hack is for receiving anycast addresses.
+
+	* sbin/ifconfig/ifconfig.c
+	support 'anycast' parameter.
+	You can configure anycast address by ifconfig with this parameter.
+	e.g. ifconfig ep0 3ffe:: alias anycast
+	Update of the kernel is also required.
+
+	* mbuf.h (M_ANYCAST6): added the flag to set to incoming anycasted
+	packets.
+
+1998-03-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* in6_var.h:
+	anycast support:
+	add ifra_flags member to in6_aliasreq{}.
+	add ia6_flags member to in6_ifaddr{}.
+	define IN6_IFF_ANYCAST flag.
+
+	* in6.c (in6_control): 
+	in SIOCAIFADDR_IN6 case, set ia6_flags from in6_aliasreq.
+
+	* in6_proto.c: add sysctl interface for ip6_hdrnestlimit.
+
+	* usr.bin/netstat/inet6.c (ip6_stats): 
+	print # of dropped packets due to too many extension headers.
+
+	* ip6_input.c (ip6_input): 
+	introduce 'ip6_hdrnestlimit', which controls the upper limit of
+	number of extension headers. default value is set in in6_proto.c.
+
+	* in6_pcb.c (in6_pcbnotify):
+	change type of the 4th argument from in6_addr to 'in6_addr *',
+	which is more efficient.
+	* tcp6_subr.c (tcp6_ctlinput): 
+	* udp6_usrreq.c (udp6_ctlinput):
+	reflect the above change when calling in6_pcbnotify().
+
+	* icmp6.c (icmp6_error): remove garbage.
+
+Thu Mar 26 13:51:48 1998  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* icmp6.c (icmp6_error):
+	improve the algorithm to check if the original packet is an ICMP6
+	error or not; do IP6_EXTHDR_CHECK for each intermediate extension header,
+	so the check will be rarely failed.
+
+Thu Mar 26 13:47:36 1998  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* ip6_input.c (ip6_input):
+	change algorithm of processing IPv6 header and Hop-by-Hop header.
+	1st check if the packet is destined to ourself, then process
+	hop-by-hop options header(if any). So if we are not a router
+	and the packet are not destined to ourself, HBH headers aren't processed.
+
+Thu Mar 26 16:40:05 JST 1998  itojun
+* bugfix to route6d: multicast address overwritten by mistake
+
+Wed Mar 25 1998  itojun
+* kernel/ip6_output.c: multicast group management ADVAPI fix
+  (forgot to embed ifindex into the multicast address)
+  now rtadvd should work correctly
+
+Tue Mar 24 00:16:06 JST 1998 shin <shin@nd.net.fujitsu.co.jp>
+* usr.sbin/ppp: several bug fix, man page add, and a little
+  enhancement(save interface id to file).
+
+Mon Mar 23 11:10:14 JST 1998
+* ports/apache: famous http server, with a patch for inet/inet6 capability.
+
+Sun Mar 22 10:42:49 JST 1998
+* cast128 support (from suzuki@ryukoku-u)
+* ah bug fix (new-ah/old-ah header size)
+
+Sun Mar 22 09:14:08 1998  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* ip6_input.c (ip6_input): 
+	use upper layer protocol identifier for faith check instead of
+	the next header value of IP6 header.
+	
+Fri Mar 20 08:13:49 1998  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* usr.bin/tcpdump/tcpdump/print-icmp6.c (icmp6_print): 
+	  ICMPv6 error parameters are 'ntohl'ed. 
+	
+Fri Mar 20 08:13:49 1998  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	* usr.bin/tcpdump/tcpdump/print-icmp6.c (icmp6_print): 
+	  ICMPv6 error parameters are 'ntohl'ed. 
+
+* sys: Bunch of advanced-api modifications
+
+Mon Mar 09 22:56:02 JST
+* sys/net/if_tun: IPv6 support
+
+Thu Mar 05 16:20:31 JST 1998 shin <shin@nd.net.fujitsu.co.jp>
+* usr.sbin/ppp: IPv6 support
+
+<199802>
+
+* sys: discovery-v2 code is now default, "options INET6_NDV2" is not needed
+  any more.
+
+<19980101-19980111>
+
+* Happy new year!
+
+* src/rtadvd: bug fix, was generated garbled packet
+	(enbug'ed by advanced-api-04 related changes)
+* sbin/{route,ifconfig}: bug fix
+	was not able to handle explicit prefixlen less than 64
+* usr.bin/netstat: -s fixed
+* now we are able to grab media addr for adaptec 5940 ATM card.
+* ip6 linklocal address assignment improved.
+	- p2p/tunnel interfaces now borrow interface id from 1st ethernet card
+* use of int{8,16,32}m_t are gone
