@@ -262,7 +262,7 @@ struct protosw inetsw[] = {
   eonprotoinit,	0,		0,		0,
 },
 #else
-{ SOCK_RAW,	&inetdomain,	IPPROTO_EON,	0,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_EON,	PR_ATOMIC|PR_ADDR,
   encap4_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,	/*XXX*/
   0,		0,		0,		0,
