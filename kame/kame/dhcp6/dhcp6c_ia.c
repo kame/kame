@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.2 2003/01/06 04:01:21 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.3 2003/01/06 06:45:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -322,7 +322,7 @@ ia_timo(arg)
 		/*
 		 * We don't need a timer for the IA.  We'll just wait for a
 		 * reply for the REBIND until all associated configuration
-		 * information for this IA expire.
+		 * parameters for this IA expire.
 		 */
 		dhcp6_remove_timer(&ia->timer);
 		break;
