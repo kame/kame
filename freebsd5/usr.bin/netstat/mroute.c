@@ -39,11 +39,11 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/mroute.c,v 1.19 2002/09/05 17:06:51 dwmalone Exp $";
+  "$FreeBSD: src/usr.bin/netstat/mroute.c,v 1.21 2003/08/07 18:21:21 hsu Exp $";
 #endif /* not lint */
 
 /*
- * Print DVMRP multicast routing structures and statistics.
+ * Print multicast routing structures and statistics.
  *
  * MROUTING 1.0
  */
@@ -68,6 +68,8 @@ static const char rcsid[] =
 #include <stdlib.h>
 #include "netstat.h"
 
+static void print_bw_meter(struct bw_meter *bw_meter, int *banner_printed);
+
 void
 mroutepr(u_long mfcaddr, u_long vifaddr)
 {
@@ -80,16 +82,35 @@ mroutepr(u_long mfcaddr, u_long vifaddr)
 	int banner_printed;
 	int saved_numeric_addr;
 	vifi_t maxvif = 0;
+	size_t len;
 
-	if (mfcaddr == 0 || vifaddr == 0) {
-		printf("No IPv4 multicast routing compiled into this system.\n");
-		return;
+	len = sizeof(mfctable);
+	if (sysctlbyname("net.inet.ip.mfctable", mfctable, &len, NULL, 0) < 0) {
+		warn("sysctl: net.inet.ip.mfctable");
+		/* Compatability with older kernels - candidate for removal */
+		if (mfcaddr == 0) {
+			printf("No IPv4 multicast routing compiled into this system.\n");
+			return;
+		}
+
+		kread(mfcaddr, (char *)mfctable, sizeof(mfctable));
+	}
+
+	len = sizeof(viftable);
+	if (sysctlbyname("net.inet.ip.viftable", viftable, &len, NULL, 0) < 0) {
+		warn("sysctl: net.inet.ip.viftable");
+		/* Compatability with older kernels - candidate for removal */
+		if (vifaddr == 0) {
+			printf("No IPv4 multicast routing compiled into this system.\n");
+			return;
+		}
+
+		kread(vifaddr, (char *)viftable, sizeof(viftable));
 	}
 
 	saved_numeric_addr = numeric_addr;
 	numeric_addr = 1;
 
-	kread(vifaddr, (char *)&viftable, sizeof(viftable));
 	banner_printed = 0;
 	for (vifi = 0, v = viftable; vifi < MAXVIFS; ++vifi, ++v) {
 		if (v->v_lcl_addr.s_addr == 0)
@@ -115,7 +136,6 @@ mroutepr(u_long mfcaddr, u_long vifaddr)
 	if (!banner_printed)
 		printf("\nVirtual Interface Table is empty\n");
 
-	kread(mfcaddr, (char *)&mfctable, sizeof(mfctable));
 	banner_printed = 0;
 	for (i = 0; i < MFCTBLSIZ; ++i) {
 		m = mfctable[i];
@@ -139,6 +159,26 @@ mroutepr(u_long mfcaddr, u_long vifaddr)
 					       mfc.mfc_ttls[vifi]);
 			}
 			printf("\n");
+
+			/* Print the bw meter information */
+			{
+				struct bw_meter bw_meter, *bwm;
+				int banner_printed2 = 0;
+				
+				bwm = mfc.mfc_bw_meter;
+				while (bwm) {
+				    kread((u_long)bwm, (char *)&bw_meter,
+						sizeof bw_meter);
+				    print_bw_meter(&bw_meter,
+						&banner_printed2);
+				    bwm = bw_meter.bm_mfc_next;
+				}
+#if 0	/* Don't ever print it? */
+				if (! banner_printed2)
+				    printf("\n  No Bandwidth Meters\n");
+#endif
+			}
+
 			m = mfc.mfc_next;
 		}
 	}
@@ -149,6 +189,77 @@ mroutepr(u_long mfcaddr, u_long vifaddr)
 	numeric_addr = saved_numeric_addr;
 }
 
+static void
+print_bw_meter(struct bw_meter *bw_meter, int *banner_printed)
+{
+	char s0[256], s1[256], s2[256], s3[256];
+	struct timeval now, end, delta;
+
+	gettimeofday(&now, NULL);
+
+	if (! *banner_printed) {
+		printf(" Bandwidth Meters\n");
+		printf("  %-30s", "Measured(Start|Packets|Bytes)");
+		printf(" %s", "Type");
+		printf("  %-30s", "Thresh(Interval|Packets|Bytes)");
+		printf(" Remain");
+		printf("\n");
+		*banner_printed = 1;
+	}
+
+	/* The measured values */
+	if (bw_meter->bm_flags & BW_METER_UNIT_PACKETS)
+		sprintf(s1, "%llu", bw_meter->bm_measured.b_packets);
+	else
+		sprintf(s1, "?");
+	if (bw_meter->bm_flags & BW_METER_UNIT_BYTES)
+		sprintf(s2, "%llu", bw_meter->bm_measured.b_bytes);
+	else
+		sprintf(s2, "?");
+	sprintf(s0, "%lu.%lu|%s|%s",
+		bw_meter->bm_start_time.tv_sec,
+		bw_meter->bm_start_time.tv_usec,
+		s1, s2);
+	printf("  %-30s", s0);
+
+	/* The type of entry */
+	sprintf(s0, "%s", "?");
+	if (bw_meter->bm_flags & BW_METER_GEQ)
+		sprintf(s0, "%s", ">=");
+	else if (bw_meter->bm_flags & BW_METER_LEQ)
+		sprintf(s0, "%s", "<=");
+	printf("  %-3s", s0);
+
+	/* The threshold values */
+	if (bw_meter->bm_flags & BW_METER_UNIT_PACKETS)
+		sprintf(s1, "%llu", bw_meter->bm_threshold.b_packets);
+	else
+		sprintf(s1, "?");
+	if (bw_meter->bm_flags & BW_METER_UNIT_BYTES)
+		sprintf(s2, "%llu", bw_meter->bm_threshold.b_bytes);
+	else
+		sprintf(s2, "?");
+	sprintf(s0, "%lu.%lu|%s|%s",
+		bw_meter->bm_threshold.b_time.tv_sec,
+		bw_meter->bm_threshold.b_time.tv_usec,
+		s1, s2);
+	printf("  %-30s", s0);
+
+	/* Remaining time */
+	timeradd(&bw_meter->bm_start_time,
+		 &bw_meter->bm_threshold.b_time, &end);
+	if (timercmp(&now, &end, <=)) {
+		timersub(&end, &now, &delta);
+		sprintf(s3, "%lu.%lu", delta.tv_sec, delta.tv_usec);
+	} else {
+		/* Negative time */
+		timersub(&now, &end, &delta);
+		sprintf(s3, "-%lu.%lu", delta.tv_sec, delta.tv_usec);
+	}
+	printf(" %s", s3);
+
+	printf("\n");
+}
 
 void
 mrt_stats(u_long mstaddr)

@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.69 2003/03/05 19:20:29 peter Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.72 2003/11/28 17:34:23 bms Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -49,6 +49,7 @@ static const char rcsid[] =
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/radix.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -224,13 +225,13 @@ pr_family(int af1)
 #ifndef INET6
 #define	WID_DST_DEFAULT(af) 	18	/* width of destination column */
 #define	WID_GW_DEFAULT(af)	18	/* width of gateway column */
-#define	WID_IF_DEFAULT(af)	6	/* width of netif column */
+#define	WID_IF_DEFAULT(af)	(Wflag ? 8 : 6)	/* width of netif column */
 #else
 #define	WID_DST_DEFAULT(af) \
 	((af) == AF_INET6 ? (numeric_addr ? 33: 18) : 18)
 #define	WID_GW_DEFAULT(af) \
 	((af) == AF_INET6 ? (numeric_addr ? 29 : 18) : 18)
-#define	WID_IF_DEFAULT(af)	((af) == AF_INET6 ? 8 : 6)
+#define	WID_IF_DEFAULT(af)	((af) == AF_INET6 ? 8 : (Wflag ? 8 : 6))
 #endif /*INET6*/
 
 static int wid_dst;
@@ -328,12 +329,9 @@ size_cols_rtentry(struct rtentry *rt)
 	}
 	if (rt->rt_ifp) {
 		if (rt->rt_ifp != lastif) {
-			len = snprintf(buffer, sizeof(buffer), "%d",
-				       ifnet.if_unit);
 			kget(rt->rt_ifp, ifnet);
-			kread((u_long)ifnet.if_name, buffer, sizeof(buffer));
 			lastif = rt->rt_ifp;
-			len += strlen(buffer);
+			len = strlen(ifnet.if_xname);
 			wid_if = MAX(len, wid_if);
 		}
 		if (rt->rt_rmx.rmx_expire) {
@@ -749,10 +747,8 @@ p_rtentry(struct rtentry *rt)
 	if (rt->rt_ifp) {
 		if (rt->rt_ifp != lastif) {
 			kget(rt->rt_ifp, ifnet);
-			kread((u_long)ifnet.if_name, buffer, sizeof(buffer));
 			lastif = rt->rt_ifp;
-			snprintf(prettyname, sizeof(prettyname),
-				 "%s%d", buffer, ifnet.if_unit);
+			strlcpy(prettyname, ifnet.if_xname, sizeof(prettyname));
 		}
 		printf("%*.*s", wid_if, wid_if, prettyname);
 		if (rt->rt_rmx.rmx_expire) {

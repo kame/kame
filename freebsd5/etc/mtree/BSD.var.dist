@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.var.dist,v 1.67 2002/11/04 07:50:48 markm Exp $
+# $FreeBSD: src/etc/mtree/BSD.var.dist,v 1.68 2003/11/29 18:22:01 ru Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -33,12 +33,10 @@
         pkg
         ..
     ..
-    empty               mode=0555 flags=schg
+    empty           mode=0555 flags=schg
     ..
-/set gname=games mode=0775
-    games
+    games           gname=games mode=0775
     ..
-/set gname=wheel mode=0755
     heimdal         mode=0700
     ..
     log

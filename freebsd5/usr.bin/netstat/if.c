@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.53 2003/03/05 19:20:28 peter Exp $";
+  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.55 2003/11/28 17:34:23 bms Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -169,7 +169,7 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 	short timer;
 	int drops;
 	struct sockaddr *sa = NULL;
-	char name[32], tname[16];
+	char name[IFNAMSIZ];
 	short network_layer;
 	short link_layer;
 
@@ -188,8 +188,12 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 		return;
 
 	if (!pfunc) {
-		printf("%-5.5s %5.5s %-13.13s %-17.17s %8.8s %5.5s",
-		       "Name", "Mtu", "Network", "Address", "Ipkts", "Ierrs");
+		if (Wflag)
+			printf("%-7.7s", "Name");
+		else
+			printf("%-5.5s", "Name");
+		printf(" %5.5s %-13.13s %-17.17s %8.8s %5.5s",
+		    "Mtu", "Network", "Address", "Ipkts", "Ierrs");
 		if (bflag)
 			printf(" %10.10s","Ibytes");
 		printf(" %8.8s %5.5s", "Opkts", "Oerrs");
@@ -216,13 +220,10 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 
 		if (ifaddraddr == 0) {
 			ifnetfound = ifnetaddr;
-			if (kread(ifnetaddr, (char *)&ifnet, sizeof ifnet) ||
-			    kread((u_long)ifnet.if_name, tname, 16))
+			if (kread(ifnetaddr, (char *)&ifnet, sizeof ifnet))
 				return;
-			tname[sizeof(tname) - 1] = '\0';
+			strlcpy(name, ifnet.if_xname, sizeof(name));
 			ifnetaddr = (u_long)TAILQ_NEXT(&ifnet, if_link);
-			snprintf(name, sizeof(name), "%s%d", tname,
-			    ifnet.if_unit);
 			if (interface != 0 && (strcmp(name, interface) != 0))
 				continue;
 			cp = index(name, '\0');
@@ -254,7 +255,11 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 		drops = ifnet.if_snd.ifq_drops;
 
 		if (ifaddraddr == 0) {
-			printf("%-5.5s %5lu ", name, ifnet.if_mtu);
+			if (Wflag)
+				printf("%-7.7s", name);
+			else
+				printf("%-5.5s", name);
+			printf(" %5lu ", ifnet.if_mtu);
 			printf("%-13.13s ", "none");
 			printf("%-17.17s ", "none");
 		} else {
@@ -271,7 +276,11 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 				    (u_long)TAILQ_NEXT(&ifaddr.ifa, ifa_link);
 				continue;
 			}
-			printf("%-5.5s %5lu ", name, ifnet.if_mtu);
+			if (Wflag)
+				printf("%-7.7s", name);
+			else
+				printf("%-5.5s", name);
+			printf(" %5lu ", ifnet.if_mtu);
 			switch (sa->sa_family) {
 			case AF_UNSPEC:
 				printf("%-13.13s ", "none");
@@ -464,7 +473,7 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 
 struct	iftot {
 	SLIST_ENTRY(iftot) chain;
-	char	ift_name[16];		/* interface name */
+	char	ift_name[IFNAMSIZ];	/* interface name */
 	u_long	ift_ip;			/* input packets */
 	u_long	ift_ie;			/* input errors */
 	u_long	ift_op;			/* output packets */
@@ -508,14 +517,11 @@ sidewaysintpr(unsigned interval1, u_long off)
 	interesting = NULL;
 	interesting_off = 0;
 	for (off = firstifnet, ip = iftot; off;) {
-		char name[16], tname[16];
+		char name[IFNAMSIZ];
 
 		if (kread(off, (char *)&ifnet, sizeof ifnet))
 			break;
-		if (kread((u_long)ifnet.if_name, tname, sizeof(tname)))
-			break;
-		tname[sizeof(tname) - 1] = '\0';
-		snprintf(name, sizeof(name), "%s%d", tname, ifnet.if_unit);
+		strlcpy(name, ifnet.if_xname, sizeof(name));
 		if (interface && strcmp(name, interface) == 0) {
 			interesting = ip;
 			interesting_off = off;

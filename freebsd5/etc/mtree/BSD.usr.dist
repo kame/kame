@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.273 2003/03/12 14:29:15 ru Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.287 2003/11/29 18:22:01 ru Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -30,8 +30,6 @@
         ..
         lint
         ..
-        msdosfs
-        ..
         stallion
         ..
     ..
@@ -52,6 +50,12 @@
     sbin
     ..
     share
+        bsnmp
+            defs
+            ..
+            mibs
+            ..
+        ..
         calendar
             de_DE.ISO8859-1
             ..
@@ -66,6 +70,8 @@
         ..
         doc
             IPv6
+            ..
+            atm
             ..
             bind
                 html
@@ -242,6 +248,8 @@
             meteor
             ..
             netgraph
+                bluetooth
+                ..
             ..
             nwclient
             ..
@@ -337,6 +345,8 @@
             ..
             af_ZA.ISO8859-15
             ..
+            am_ET.UTF-8
+            ..
             bg_BG.CP1251
             ..
             ca_ES.ISO8859-1
@@ -425,6 +435,8 @@
             ..
             hu_HU.ISO8859-2
             ..
+            hy_AM.ARMSCII-8
+            ..
             is_IS.ISO8859-1
             ..
             is_IS.ISO8859-15
@@ -440,6 +452,8 @@
             ja_JP.SJIS
             ..
             ja_JP.eucJP
+            ..
+            ko_KR.CP949
             ..
             ko_KR.eucKR
             ..
@@ -479,6 +493,8 @@
             ..
             ro_RO.ISO8859-2
             ..
+            ru_RU.CP1251
+            ..
             ru_RU.CP866
             ..
             ru_RU.ISO8859-5
@@ -502,6 +518,12 @@
             uk_UA.ISO8859-5
             ..
             uk_UA.KOI8-U
+            ..
+            zh_CN.GB18030
+            ..
+            zh_CN.GB2312
+            ..
+            zh_CN.GBK
             ..
             zh_CN.eucCN
             ..
@@ -659,6 +681,8 @@
             ..
             af_ZA.ISO8859-15
             ..
+            am_ET.UTF-8
+            ..
             bg_BG.CP1251
             ..
             ca_ES.ISO8859-1
@@ -745,6 +769,8 @@
             ..
             hu_HU.ISO8859-2
             ..
+            hy_AM.ARMSCII-8
+            ..
             is_IS.ISO8859-1
             ..
             is_IS.ISO8859-15
@@ -760,6 +786,8 @@
             ja_JP.SJIS
             ..
             ja_JP.eucJP
+            ..
+            ko_KR.CP949
             ..
             ko_KR.eucKR
             ..
@@ -799,6 +827,8 @@
             ..
             ro_RO.ISO8859-2
             ..
+            ru_RU.CP1251
+            ..
             ru_RU.CP866
             ..
             ru_RU.ISO8859-5
@@ -822,6 +852,12 @@
             uk_UA.ISO8859-5
             ..
             uk_UA.KOI8-U
+            ..
+            zh_CN.GB18030
+            ..
+            zh_CN.GB2312
+            ..
+            zh_CN.GBK
             ..
             zh_CN.eucCN
             ..
@@ -853,6 +889,8 @@
             ..
             Etc
             ..
+        ..
+        security
         ..
         sendmail
         ..

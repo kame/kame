@@ -24,12 +24,12 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/etc/rc.d/network_ipv6,v 1.34 2003/05/12 11:36:50 ume Exp $
+# $FreeBSD: src/etc/rc.d/network_ipv6,v 1.35 2003/06/29 05:15:57 mtm Exp $
 # 	From: src/etc/rc.network6,v 1.29 2002/04/06 15:15:43
 #
 
 # PROVIDE: network_ipv6
-# REQUIRE: network2
+# REQUIRE: routing
 # KEYWORD: FreeBSD
 
 . /etc/rc.subr
