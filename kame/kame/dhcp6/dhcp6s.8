@@ -26,7 +26,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dhcp6s.8,v 1.7 2000/05/13 19:56:44 itojun Exp $
+.\"     $Id: dhcp6s.8,v 1.8 2000/05/24 12:25:39 jinmei Exp $
 .\"
 .Dd Sep 12, 1999
 .Dt DHCP6S 8
@@ -62,6 +62,8 @@ IEEE 1003.1 information for current timezone
 .Pp
 .Fl n
 specifies DNS server address to be passed to clients.
+This option can be used multiple times in order to specify more than one
+DNS server.
 .Ar dnsserv
 must be an IPv6 numeric address.
 .Fl N
