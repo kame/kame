@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2525 2004/01/13 04:08:18 itojun Exp $
+$KAME: CHANGELOG,v 1.2526 2004/01/15 01:01:41 itojun Exp $
 
 <200401>
+Thu Jan 14 JST 2004  itojun@iijlab.net
+	* racoon/isakmp_inf.c: validation of hash payload was missing.
+	  code from IIJ SEIL team.  [attack script is in public knowledge,
+	  users of racoon must upgrade]
+
 Tue Jan 13 13:06:53 JST 2004  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: spelling and memory leak fix.
 	  from Bjoern A. Zeeb.
