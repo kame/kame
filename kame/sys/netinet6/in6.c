@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.285 2002/06/08 06:57:10 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.286 2002/06/08 07:07:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2508,6 +2508,7 @@ ip6_sprintf(addr)
 	return(ip6buf[ip6round]);
 }
 
+#if defined(__FreeBSD__) || defined(__bsdi__)
 int
 in6_localaddr(sa6)
 	struct sockaddr_in6 *sa6;
@@ -2529,6 +2530,7 @@ in6_localaddr(sa6)
 
 	return (0);
 }
+#endif
 
 int
 in6_is_addr_deprecated(sa6)
