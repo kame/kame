@@ -1426,10 +1426,6 @@ reinit:
 		    setsockopt(data, SOL_SOCKET, SO_DEBUG, (char *)&on,
 			       sizeof(on)) < 0)
 			warn("setsockopt (ignored)");
-		if (data_addr.su_family == AF_INET6 &&
-		    setsockopt(data, IPPROTO_IPV6, IPV6_USE_MIN_MTU, (char *)&on,
-			       sizeof(on)) < 0)
-			warn("setsockopt (ignored)");
 		result = COMPLETE + 1;
 		switch (data_addr.su_family) {
 		case AF_INET:
