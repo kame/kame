@@ -582,21 +582,6 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 			continue;
 #endif
 
-		if (do_rtchange) {
-			struct sockaddr_in6 *dst6;
-
-			/*
-			 * Since a non-connected PCB might have a cached route,
-			 * we always call in_rtchange without matching
-			 * the PCB to the src/dst pair.
-			 *
-			 * XXX: we assume in_rtchange does not free the PCB.
-			 */
-			dst6 = (struct sockaddr_in6 *)&inp->inp_route6.ro_dst;
-			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, faddr))
-				in_rtchange(inp, errno);
-		}
-
 		/*
 		 * If the error designates a new path MTU for a destination
 		 * and the application (associated with this socket) wanted to
@@ -615,9 +600,22 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 			    (u_int32_t *)cmdarg);
 		}
 
-		/* we've already handled this case */
-		if (do_rtchange)
-			continue;
+		if (do_rtchange) {
+			struct sockaddr_in6 *dst6;
+
+			/*
+			 * Since a non-connected PCB might have a cached route,
+			 * we always call in_rtchange without matching
+			 * the PCB to the src/dst pair.
+			 *
+			 * XXX: we assume in_rtchange does not free the PCB.
+			 */
+			dst6 = (struct sockaddr_in6 *)&inp->inp_route6.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, faddr))
+				in_rtchange(inp, errno);
+
+			continue; /* there's nothing to do any more */
+		}
 
 		if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
 		    !inp->inp_socket ||
