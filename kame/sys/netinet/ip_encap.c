@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.39 2000/10/01 12:37:18 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.40 2001/02/21 01:34:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -134,6 +134,11 @@ LIST_HEAD(, encaptab) encaptab = LIST_HEAD_INITIALIZER(&encaptab);
 void
 encap_init()
 {
+	static int initialized = 0;
+
+	if (initialized)
+		return;
+	initialized++;
 #if 0
 	/*
 	 * we cannot use LIST_INIT() here, since drivers may want to call
