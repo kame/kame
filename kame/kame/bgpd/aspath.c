@@ -304,8 +304,8 @@ msg2aspath(bnp, i, len, errorp)
     }
 
     if (j-i == len) {
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", buf);
+#ifdef DEBUG_BGP
+      syslog(LOG_NOTICE, "BGP+ RECV\t\t%s", buf);
 #endif
       return asp;
     }
