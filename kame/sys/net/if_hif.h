@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.7 2002/01/08 02:40:55 k-sugyou Exp $	*/
+/*	$KAME: if_hif.h,v 1.8 2002/01/26 17:01:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,6 +155,7 @@ int hif_subnet_list_insert		__P((struct hif_subnet_list *,
 					     struct hif_subnet *));
 int hif_subnet_list_remove		__P((struct hif_subnet_list *,
 					      struct hif_subnet *));
+int hif_subnet_list_remove_all		__P((struct hif_subnet_list *));
 struct hif_subnet *hif_subnet_list_find_withprefix
 					__P((struct hif_subnet_list *,
 					     struct in6_addr *,
