@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.21 2000/12/16 14:50:35 sakane Exp $	*/
+/*	$KAME: main.c,v 1.22 2000/12/17 20:21:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,23 +75,31 @@ static void parse __P((int, char **));
 void
 Usage()
 {
-	printf("Usage: %s [-v] [-p (port)] [-a (port)] "
+	printf("Usage: %s [-dFv%s] %s[-f (file)] [-l (file)] [-p (port)]\n",
+		pname,
 #ifdef INET6
-		"[-4|-6] "
+		"46",
+#else
+		"",
 #endif
-		"[-f (file)] [-d (level)] [-l (file)]\n", pname);
+#ifdef ENABLE_ADMINPORT
+		"[-a (port)] "
+#else
+		""
+#endif
+		);
+	printf("   -d: debug level, more -d will generate more debug message.\n");
+	printf("   -F: run in foreground, do not become daemon.\n");
 	printf("   -v: be more verbose\n");
-	printf("   -p: The daemon always use a port %d of UDP to send\n",
-		PORT_ISAKMP);
-	printf("       unless you specify a port by using this option.\n");
-	printf("   -a: You can specify a explicit port for administration.\n");
-	printf("   -f: specify a configuration file.\n");
-	printf("   -l: specify a log file.\n");
-	printf("   -d: is specified debug level. increasing -d becomes more verbose.\n");
-	printf("   -F: is forced running in foreground.\n");
+#ifdef ENABLE_ADMINPORT
+	printf("   -a: port number for admin port.\n");
+#endif
+	printf("   -f: pathname for configuration file.\n");
+	printf("   -l: pathname for log file.\n");
+	printf("   -p: port number for isakmp (default: %d).\n", PORT_ISAKMP);
 #ifdef INET6
-	printf("   -6: is specified IPv6 mode.\n");
-	printf("   -4: is specified IPv4 mode.\n");
+	printf("   -6: IPv6 mode.\n");
+	printf("   -4: IPv4 mode.\n");
 #endif
 	exit(1);
 }
@@ -210,8 +218,14 @@ parse(ac, av)
 			lcconf->port_isakmp = atoi(optarg);
 			break;
 		case 'a':
+#ifdef ENABLE_ADMINPORT
 			lcconf->port_admin = atoi(optarg);
 			break;
+#else
+			fprintf(stderr, "%s: the option is disabled "
+			    "in the configuration\n", pname);
+			exit(1);
+#endif
 		case 'f':
 			lcconf->racoon_conf = optarg;
 			break;
