@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.26 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.27 2004/05/14 02:29:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -78,6 +78,7 @@ extern void yyerror __P((char *, ...))
 	l->type = (t); \
 	l->ptr = (pp); \
 	l->list = (pl); \
+	l->tail = (l); \
 	} while (0)
 
 static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
@@ -162,7 +163,7 @@ option_statement:
 				cf_dns_list = $3;
 			else {
 				cf_dns_list->tail->next = $3;
-				cf_dns_list->tail = $3->next;
+				cf_dns_list->tail = $3->tail;
 			}
 		}
 	|	OPTION DNS_NAME QSTRING EOS
@@ -177,7 +178,7 @@ option_statement:
 				cf_dns_name_list->next = NULL;
 			} else {
 				cf_dns_name_list->tail->next = l;
-				cf_dns_name_list->tail = l->next;
+				cf_dns_name_list->tail = l->tail;
 			}
 		}
 	|	OPTION NTP_SERVERS address_list EOS
@@ -186,7 +187,7 @@ option_statement:
 				cf_ntp_list = $3;
 			else {
 				cf_ntp_list->tail->next = $3;
-				cf_ntp_list->tail = $3->next;
+				cf_ntp_list->tail = $3->tail;
 			}
 		}
 	|	OPTION SIP_SERVERS address_list EOS
@@ -195,7 +196,7 @@ option_statement:
 				cf_sip_list = $3;
 			else {
 				cf_sip_list->tail->next = $3;
-				cf_sip_list->tail = $3->next;
+				cf_sip_list->tail = $3->tail;
 			}
 		}
 	|	OPTION SIP_NAME QSTRING EOS
@@ -210,7 +211,7 @@ option_statement:
 				cf_sip_name_list->next = NULL;
 			} else {
 				cf_sip_name_list->tail->next = l;
-				cf_sip_name_list->tail = l->next;
+				cf_sip_name_list->tail = l->tail;
 			}
 		}
 	|	OPTION LIFETIME NUMBER EOS
