@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.4 2000/04/20 02:21:23 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.5 2000/04/20 02:31:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -57,6 +57,7 @@ scope6_ifattach(ifp)
 	struct ifnet *ifp;
 {
 	static size_t if_indexlim = 8;
+	int s = splnet();
 
 	/*
 	 * We have some arrays that should be indexed by if_index.
@@ -84,8 +85,10 @@ scope6_ifattach(ifp)
 #define SID scope6_ids[ifp->if_index]
 
 	/* don't initialize if called twice */
-	if (SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL])
+	if (SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL]) {
+		splx(s);
 		return;
+	}
 
 	/*
 	 * XXX: IPV6_ADDR_SCOPE_xxx macros are not standard.
@@ -95,6 +98,8 @@ scope6_ifattach(ifp)
 	SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL] = 1;
 	SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL] = 1;
 #undef SID
+
+	splx(s);
 }
 
 int
