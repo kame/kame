@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.20 2003/02/13 12:20:29 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.21 2003/06/27 09:43:00 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -143,7 +143,7 @@ static int hfsccmd_modify_class(struct hfsc_modify_class *);
 static int hfsccmd_add_filter(struct hfsc_add_filter *);
 static int hfsccmd_delete_filter(struct hfsc_delete_filter *);
 static int hfsccmd_class_stats(struct hfsc_class_stats *);
-static void get_class_stats(struct class_stats *, struct hfsc_class *);
+static void get_class_stats(struct hfsc_classstats *, struct hfsc_class *);
 static struct hfsc_class *clh_to_clp(struct hfsc_if *, u_long);
 static u_long clp_to_clh(struct hfsc_class *);
 
@@ -1914,7 +1914,7 @@ hfsccmd_class_stats(ap)
 {
 	struct hfsc_if *hif;
 	struct hfsc_class *cl;
-	struct class_stats stats, *usp;
+	struct hfsc_classstats stats, *usp;
 	int	n, nclasses, error;
 
 	if ((hif = altq_lookup(ap->iface.hfsc_ifname, ALTQT_HFSC)) == NULL)
@@ -1951,7 +1951,7 @@ hfsccmd_class_stats(ap)
 }
 
 static void get_class_stats(sp, cl)
-	struct class_stats *sp;
+	struct hfsc_classstats *sp;
 	struct hfsc_class *cl;
 {
 	sp->class_id = cl->cl_id;

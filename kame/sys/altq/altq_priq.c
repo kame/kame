@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.8 2003/02/13 12:20:29 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.9 2003/06/27 09:43:00 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -84,7 +84,7 @@ static int priqcmd_modify_class(struct priq_modify_class *);
 static int priqcmd_add_filter(struct priq_add_filter *);
 static int priqcmd_delete_filter(struct priq_delete_filter *);
 static int priqcmd_class_stats(struct priq_class_stats *);
-static void get_class_stats(struct class_stats *, struct priq_class *);
+static void get_class_stats(struct priq_classstats *, struct priq_class *);
 static struct priq_class *clh_to_clp(struct priq_if *, u_long);
 static u_long clp_to_clh(struct priq_class *);
 
@@ -797,7 +797,7 @@ priqcmd_class_stats(ap)
 {
 	struct priq_if *pif;
 	struct priq_class *cl;
-	struct class_stats stats, *usp;
+	struct priq_classstats stats, *usp;
 	int	pri, error;
 
 	if ((pif = altq_lookup(ap->iface.ifname, ALTQT_PRIQ)) == NULL)
@@ -821,7 +821,7 @@ priqcmd_class_stats(ap)
 }
 
 static void get_class_stats(sp, cl)
-	struct class_stats *sp;
+	struct priq_classstats *sp;
 	struct priq_class *cl;
 {
 	sp->class_handle = clp_to_clh(cl);

@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.8 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.9 2003/06/27 09:43:00 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -111,7 +111,7 @@ struct hfsc_delete_filter {
 	u_long			filter_handle;
 };
 
-struct class_stats {
+struct hfsc_classstats {
 	u_int			class_id;
 	u_long			class_handle;
 	struct service_curve	rsc;
@@ -158,7 +158,7 @@ struct hfsc_class_stats {
 	u_int32_t		machclk_freq;	/* machine clock frequency */
 	u_int			hif_classes;	/* # of classes in the tree */
 	u_int			hif_packets;	/* # of packets in the tree */
-	struct class_stats	*stats;		/* pointer to stats array */
+	struct hfsc_classstats	*stats;		/* pointer to stats array */
 };
 
 #define	HFSC_IF_ATTACH		_IOW('Q', 1, struct hfsc_attach)

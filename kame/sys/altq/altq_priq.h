@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.h,v 1.3 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_priq.h,v 1.4 2003/06/27 09:43:00 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -89,7 +89,7 @@ struct priq_delete_filter {
 	u_long			filter_handle;
 };
 
-struct class_stats {
+struct priq_classstats {
 	u_long			class_handle;
 
 	u_int			qlength;
@@ -106,7 +106,7 @@ struct priq_class_stats {
 	struct priq_interface	iface;
 	int			maxpri;	  /* in/out */
 
-	struct class_stats	*stats;   /* pointer to stats array */
+	struct priq_classstats	*stats;   /* pointer to stats array */
 };
 
 #define	PRIQ_IF_ATTACH		_IOW('Q', 1, struct priq_interface)
