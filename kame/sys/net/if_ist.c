@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.3 2004/12/09 10:38:38 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.4 2004/12/10 05:38:54 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -55,9 +55,7 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/protosw.h>
-#ifdef __FreeBSD__
 #include <sys/kernel.h>
-#endif
 #include <sys/queue.h>
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
