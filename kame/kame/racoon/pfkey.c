@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.142 2003/12/16 01:13:30 suz Exp $	*/
+/*	$KAME: pfkey.c,v 1.143 2004/12/09 03:17:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1759,7 +1759,7 @@ pk_recvdelete(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb delete message passed.\n");
 		return -1;
 	}
 	msg = (struct sadb_msg *)mhp[0];
@@ -1821,7 +1821,7 @@ pk_recvflush(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb flush message passed.\n");
 		return -1;
 	}
 
