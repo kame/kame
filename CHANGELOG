@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1537 2001/02/06 04:11:04 itojun Exp $
+$KAME: CHANGELOG,v 1.1538 2001/02/06 09:17:28 jinmei Exp $
 
 <200102>
+2001-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_p2p_rtrequest): removed.  It was
+	introduced long long ago, and is not necessary any more,
+	especially after the recent clarification on the address/prefix
+	management.
+
 Tue Feb  6 13:08:24 JST 2001 itojun@iijlab.net
 	* sys/netinet6/nd6*.c: minimize number of log() or printf() on inbound
 	  packet processing path, to avoid /var from get filluped with with
