@@ -1,4 +1,4 @@
-.\"	$KAME: altq.conf.5,v 1.9 2001/07/19 11:07:33 kjc Exp $
+.\"	$KAME: altq.conf.5,v 1.10 2001/07/25 09:35:57 kjc Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -136,7 +136,7 @@ PRIQ does not have class hierarchy and parent_name must be
 for PRIQ classes.
 .It Cm red
 Use RED (Random Early Detection) on this class queue.
-RED drops packets with the probability propotional to the average
+RED drops packets with the probability proportional to the average
 queue length.
 .It Cm rio
 Use RIO (RED with In/Out bit) on this class queue.
@@ -429,7 +429,7 @@ The average packet size in bytes to be used in CBQ over-/under-limit
 computations.
 Default value is MTU of the interface.
 .It Cm maxpacketsize
-The maxium packet size in bytes for the class.
+The maximum packet size in bytes for the class.
 Default value is MTU of the interface.
 .It Cm red
 enables RED on this class queue.
@@ -574,7 +574,7 @@ classification criteria are assigned to this class.
 Must be exactly one class on each interface defined as the default
 class.
 .It Cm qlimit
-The maxium queue size in number of packets.
+The maximum queue size in number of packets.
 Default value is 50.
 .It Cm red
 enables RED on this class queue.
@@ -653,7 +653,7 @@ classification criteria are assigned to this class.
 Must be exactly one class on each interface defined as the default
 class.
 .It Cm qlimit
-The maxium queue size in number of packets.
+The maximum queue size in number of packets.
 Default value is 50.
 .It Cm red
 enables RED on this class queue.
@@ -739,7 +739,7 @@ must be
 .Cm fifoq
 for FIFOQ.
 .It Cm qlimit
-The maxium queue size in number of packets.
+The maximum queue size in number of packets.
 Default value is 50.
 .El
 .Pp
@@ -794,7 +794,7 @@ must be
 .Cm red
 for RED.
 .It Cm qlimit
-The maxium queue size in number of packets.
+The maximum queue size in number of packets.
 Default value is 60.
 .It Cm packetsize
 The average packet size in number of bytes.
@@ -885,7 +885,7 @@ must be
 .Cm rio
 for RIO.
 .It Cm qlimit
-The maxium queue size in number of packets.
+The maximum queue size in number of packets.
 Default value is 60.
 .It Cm packetsize
 The average packet size in number of bytes.
@@ -941,7 +941,7 @@ must be
 .Cm blue
 for BLUE.
 .It Cm qlimit
-The maxium queue size in number of packets.
+The maximum queue size in number of packets.
 Default value is 60.
 .It Cm packetsize
 The average packet size in number of bytes.  Default value is 1000.
@@ -1080,7 +1080,7 @@ green_action.
 When the packet is out of the committed profile but in the peak
 profile, tswtcm takes yellow_action.
 Otherwise, tswtcm takes red_action.
-cmtd_rate and peak_rate are specified in bits per seccond.
+cmtd_rate and peak_rate are specified in bits per second.
 avg_interval provides the size of time window for averaging incoming
 rate, and is specified in milli-second.
 500 msec is ok for normal settings.
