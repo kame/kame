@@ -1361,9 +1361,12 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
   struct in6_addr *faddr,laddr = *la;
   u_short fport = fport_arg, lport = lport_arg;
   int errno;
+  void (*notify2) __P((struct inpcb *, int));
 #ifdef IPSEC
   struct sockaddr_in6 srcsa, dstsa;
 #endif /* IPSEC */
+
+  notify2 = NULL;
 
   DPRINTF(IDL_EVENT,("Entering in6_pcbnotify.  head = 0x%lx, dst is\n", (unsigned long)head));
   DDO(IDL_EVENT,dump_smart_sockaddr(dst));
@@ -1383,19 +1386,26 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
   
   /*
    * Redirects go to all references to the destination,
-   * and use in_rtchange to invalidate the route cache.
-   * Dead host indications: notify all references to the destination.
+   * and use in6_rtchange to invalidate the route cache.
+   * Dead host indications: also use in6_rtchange to invalidate
+   * the cache, and deliver the error to all the sockets.
    * Otherwise, if we have knowledge of the local port and address,
    * deliver only to that socket.
    */
-
   if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD)
     {
       fport = 0;
       lport = 0;
       laddr = in6addr_any;
-      if (cmd != PRC_HOSTDEAD)
-	notify = in_rtchange;
+
+      /*
+       * Keep the old notify function to store a soft error
+       * in each PCB.
+       */
+      if (cmd == PRC_HOSTDEAD)
+	notify2 = notify;
+
+      notify = in6_rtchange;
     }
   errno = inet6ctlerrmap[cmd];
 
@@ -1473,6 +1483,9 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 				   NULL))
 #endif /* IPSEC */
 	  (*notify)(oinp, errno);
+
+	  if (notify2)
+	    (*notify2)(oin6p, errno);
 #ifdef IPSEC
 	}
 #endif /* IPSEC */
