@@ -1,6 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.844 2000/04/30 10:51:41 jinmei Exp $
+$Id: CHANGELOG,v 1.845 2000/05/01 03:23:38 itojun Exp $
+
+<200005>
+Mon May  1 12:22:53 JST 2000  itojun@iijlab.net
+	* kame/libinet6: have more sanity check against validity of CNAME.
+	  (there were some advisory about this in the past, IIRC)
 
 <200004>
 2000-04-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
