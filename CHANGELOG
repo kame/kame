@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1475 2001/01/12 09:55:15 itojun Exp $
+$KAME: CHANGELOG,v 1.1476 2001/01/13 03:47:28 itojun Exp $
 
 <200101>
+Sat Jan 13 12:45:56 JST 2001  itojun@iijlab.net
+	* sys/netinet/ip_output.c: allow interface index to be specified with
+	  multicast set/getsockopts, by using 0.0.0.0/8 (= pass it as network
+	  endian value, 24bit in in_addr).  follows RFC1724 section 3.3.
+	  suggested by Dave Thaler.
+
 Fri Jan 12 18:54:52 JST 2001  itojun@iijlab.net
 	* bsdi4: use BSD/OS 4.2 as the base version.
 
