@@ -1,0 +1,39 @@
+$NetBSD$
+--- aclocal.m4.orig	Fri Jan 21 13:06:18 2000
++++ aclocal.m4	Wed Jan 26 03:23:25 2000
+@@ -191,15 +191,16 @@
+     AC_MSG_CHECKING(for local pcap library)
+     libpcap=FAIL
+     lastdir=FAIL
+-    places=`ls .. | sed -e 's,/$,,' -e 's,^,../,' | \
+-	egrep '/libpcap-[[0-9]]*\.[[0-9]]*(\.[[0-9]]*)?([[ab]][[0-9]]*)?$'`
++#    places=`ls .. | sed -e 's,/$,,' -e 's,^,../,' | \
++#	egrep '/libpcap-[[0-9]]*\.[[0-9]]*(\.[[0-9]]*)?([[ab]][[0-9]]*)?$'`
++    places=$prefix/lib
+     for dir in $places ../libpcap libpcap ; do
+-	    basedir=`echo $dir | sed -e 's/[[ab]][[0-9]]*$//'`
+-	    if test $lastdir = $basedir ; then
+-		    dnl skip alphas when an actual release is present
+-		    continue;
+-	    fi
+-	    lastdir=$dir
++#	    basedir=`echo $dir | sed -e 's/[[ab]][[0-9]]*$//'`
++#	    if test $lastdir = $basedir ; then
++#		    dnl skip alphas when an actual release is present
++#		    continue;
++#	    fi
++#	    lastdir=$dir
+ 	    if test -r $dir/libpcap.a ; then
+ 		    libpcap=$dir/libpcap.a
+ 		    d=$dir
+@@ -215,7 +216,9 @@
+     else
+ 	    $1=$libpcap
+ 	    if test -r $d/pcap.h; then
+-	    $2="-I$d $$2"
++		    $2="-I$d $$2"
++	    elif test -r $d/../include/pcap.h; then
++		    $2="-I$d/../include $$2"
+ 	    elif test -r $srcdir/../libpcap/pcap.h; then
+ 		    $2="-I$d -I$srcdir/../libpcap $$2"
+ 	    else

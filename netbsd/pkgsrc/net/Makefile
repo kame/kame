@@ -8,6 +8,7 @@
     SUBDIR += ethereal
     SUBDIR += gated-ipv6
     SUBDIR += irc
+    SUBDIR += libpcap
     SUBDIR += mediator
     SUBDIR += mrt
     SUBDIR += mtr
@@ -17,6 +18,7 @@
     SUBDIR += pchar
     SUBDIR += rsync
     SUBDIR += socks64
+    SUBDIR += tcpdump
     SUBDIR += tcptrace
     SUBDIR += totd
     SUBDIR += ucd-snmp
