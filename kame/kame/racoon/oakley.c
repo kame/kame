@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.58 2000/09/19 21:20:29 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.59 2000/09/20 21:13:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.58 2000/09/19 21:20:29 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.59 2000/09/20 21:13:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1070,7 +1070,7 @@ oakley_validate_auth(iph1)
 		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
-			return -1;
+			return ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		}
 
 		r_hash = (caddr_t)(iph1->pl_hash + 1);
@@ -1095,7 +1095,7 @@ oakley_validate_auth(iph1)
 		default:
 			plog(logp, LOCATION, NULL,
 				"invalid etype %d\n", iph1->etype);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE;
 		}
 		if (my_hash == NULL)
 			return -1;
@@ -1117,17 +1117,18 @@ oakley_validate_auth(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
 	    {
-		int error;
+		int error = 0;
 
 		/* validate SIG & CERT */
 		if (iph1->id_p == NULL || iph1->sig_p == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
-			return -1;
+			return ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		}
 		if (iph1->cert_p == NULL && iph1->rmconf->peerscertfile == NULL) {
 			plog(logp, LOCATION, NULL,
-				"no CERT payload found even though CR sent.\n");
+				"ERROR: no CERT payload found "
+				"even though CR sent.\n");
 			return -1;
 		}
 		YIPSDEBUG(DEBUG_CERT,
@@ -1146,8 +1147,9 @@ oakley_validate_auth(iph1)
 
 		/* check ID payload and certificate name */
 		if (iph1->rmconf->verify_cert) {
-			if (oakley_check_certid(iph1) == -1)
-				return -1;
+			error = oakley_check_certid(iph1);
+			if (error)
+				return error;
 
 			switch (iph1->rmconf->certtype) {
 			case ISAKMP_CERT_X509SIGN:
@@ -1185,7 +1187,7 @@ oakley_validate_auth(iph1)
 		default:
 			plog(logp, LOCATION, NULL,
 				"invalid etype %d\n", iph1->etype);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE;
 		}
 		if (my_hash == NULL)
 			return -1;
@@ -1220,7 +1222,7 @@ oakley_validate_auth(iph1)
 		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
-			return -1;
+			return ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		}
 		plog(logp, LOCATION, iph1->remote,
 			"not supported authmethod type %s\n",
@@ -1404,7 +1406,7 @@ oakley_check_certid(iph1)
 
 	if (iph1->id_p == NULL || iph1->cert_p == NULL) {
 		plog(logp, LOCATION, NULL, "ERROR: no ID nor CERT found.\n");
-		return -1;
+		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
@@ -1416,17 +1418,17 @@ oakley_check_certid(iph1)
 		if (!name) {
 			plog(logp, LOCATION, NULL,
 				"ERROR: Invalid SubjectName.\n");
-			return -1;
+			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 		}
 		if (idlen != name->l) {
 			plog(logp, LOCATION, NULL,
-				"ERROR: Invalid ID length.\n");
+				"ERROR: Invalid ID length in phase 1.\n");
 			vfree(name);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 		error = memcmp(id_b + 1, name->v, idlen);
 		vfree(name);
-		return error == 0 ? 0 : -1;
+		return error == 0 ? 0 : ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	case IPSECDOI_ID_IPV4_ADDR:
 	case IPSECDOI_ID_IPV6_ADDR:
 	{
@@ -1444,14 +1446,14 @@ oakley_check_certid(iph1)
 					&altname, &type, pos) !=0) {
 				plog(logp, LOCATION, NULL,
 					"ERROR: Invalid SubjectAltName.\n");
-				return -1;
+				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
 			/* it's the end condition of the loop. */
 			if (!altname) {
 				plog(logp, LOCATION, NULL,
 					"ERROR: no proper SubjectAltName.\n");
-				return -1;
+				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
 			if (check_typeofcertname(id_b->type, type) == 0)
@@ -1470,7 +1472,7 @@ oakley_check_certid(iph1)
 			plog(logp, LOCATION, NULL,
 				"ERROR: Invalid SubjectAltName.\n");
 			free(altname);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 		}
 		switch (res->ai_family) {
 		case AF_INET:
@@ -1486,12 +1488,12 @@ oakley_check_certid(iph1)
 				"ERROR: family not supported: %d.\n", res->ai_family);
 			free(altname);
 			freeaddrinfo(res);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 		}
 		error = memcmp(id_b + 1, a, idlen);
 		freeaddrinfo(res);
 		vfree(name);
-		return error == 0 ? 0 : -1;
+		return error == 0 ? 0 : ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 	case IPSECDOI_ID_FQDN:
 	case IPSECDOI_ID_USER_FQDN:
@@ -1503,14 +1505,14 @@ oakley_check_certid(iph1)
 					&altname, &type, pos) != 0){
 				plog(logp, LOCATION, NULL,
 					"ERROR: Invalid SubjectAltName.\n");
-				return -1;
+				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
 			/* it's the end condition of the loop. */
 			if (!altname) {
 				plog(logp, LOCATION, NULL,
 					"ERROR: no proper SubjectAltName.\n");
-				return -1;
+				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
 			if (check_typeofcertname(id_b->type, type) == 0)
@@ -1522,9 +1524,9 @@ oakley_check_certid(iph1)
 		}
 		if (idlen != strlen(altname)) {
 			plog(logp, LOCATION, NULL,
-				"ERROR: Invalid ID length.\n");
+				"ERROR: Invalid ID length in phase 1.\n");
 			free(altname);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 		if (check_typeofcertname(id_b->type, type) != 0) {
 			plog(logp, LOCATION, NULL,
@@ -1532,17 +1534,17 @@ oakley_check_certid(iph1)
 				s_ipsecdoi_ident(id_b->type),
 				s_ipsecdoi_ident(type));
 			free(altname);
-			return -1;
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 		error = memcmp(id_b + 1, altname, idlen);
 		free(altname);
-		return error == 0 ? 0 : -1;
+		return error == 0 ? 0 : ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 	default:
 		plog(logp, LOCATION, NULL,
 			"ERROR: Inpropper ID type passed: %s.\n",
 			s_ipsecdoi_ident(id_b->type));
-		return -1;
+		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 	/*NOTREACHED*/
 }
