@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.322 2003/01/05 17:15:30 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.323 2003/01/06 21:28:53 sumikawa Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -296,7 +296,7 @@ such cases DAD may fail, because the DAD engine sees inbound NS packet
 (actually from the node itself) and considers it as a sign of
 duplicate.  In this case, drivers should be corrected to honor
 IFF_SIMPLEX behavior.  For example, you may need to check source MAC
-address on a inbound packet, and reject it if it is from the node
+address on an inbound packet, and reject it if it is from the node
 itself.  You may also want to look at #if condition marked
 "heuristics" in sys/netinet6/nd6_nbr.c:nd6_dad_timer() as workaround
 (note that the code fragment in "heuristics" section is not spec
