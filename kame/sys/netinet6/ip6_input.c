@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.160 2001/02/05 08:11:53 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.161 2001/02/05 08:19:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1298,9 +1298,8 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 				goto bad;
 			}
 			if (*(opt + 1) != IP6OPT_RTALERT_LEN - 2) {
-				/* XXX: should we discard the packet? */
-				log(LOG_ERR, "length of router alert opt is inconsitent(%d)",
-				    *(opt + 1));
+				/* XXX stat */
+				goto bad;
 			}
 			optlen = IP6OPT_RTALERT_LEN;
 			bcopy((caddr_t)(opt + 2), (caddr_t)&rtalert_val, 2);
@@ -1313,10 +1312,8 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 				goto bad;
 			}
 			if (*(opt + 1) != IP6OPT_JUMBO_LEN - 2) {
-				/* XXX: should we discard the packet? */
-				log(LOG_ERR, "length of jumbopayload opt "
-				   "is inconsistent(%d)\n",
-				   *(opt + 1));
+				/* XXX stat */
+				goto bad;
 			}
 			optlen = IP6OPT_JUMBO_LEN;
 
