@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.75 2002/01/23 06:31:35 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.76 2002/01/23 06:46:01 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -183,6 +183,7 @@ struct mbuf	*natpt_translateTCPUDPv4To6	__P((struct pcv *, struct pAddr *,
 void		 natpt_translatePYLD4To6	__P((struct pcv *));
 
 void		 natpt_translateFragment4to66	__P((struct pcv *, struct pAddr *));
+void		 natpt_ip6_forward		__P((struct mbuf *));
 
 /* IPv4 -> IPv4 */
 struct mbuf	*natpt_translateICMPv4To4	__P((struct pcv *, struct pAddr *));
@@ -1360,7 +1361,7 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 	frg6save = *frg6;
 	m6->m_pkthdr.len = m6->m_len = IPV6_MMTU;
 	m6->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
-	ip6_forward(m6, 1);			/* send first fragmented packet */
+	natpt_ip6_forward(m6);		/* send first fragmented packet */
 
 	/*
 	 * Then, send second fragmented v6 packet.
@@ -1386,7 +1387,35 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 	bcopy(cv4->pyld.caddr+NATPT_MAXULP, pyld6, plen);
 	m6->m_pkthdr.len = m6->m_len = NATPT_FRGHDRSZ + plen;
 	m6->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
-	ip6_forward(m6, 1);			/* send second fragmented packet */
+	natpt_ip6_forward(m6);		/* send second fragmented packet */
+}
+
+
+void
+natpt_ip6_forward(struct mbuf *m)
+{
+	struct sockaddr_in6 sa6_src, sa6_dst;
+
+	/*
+	 * record the sockaddr_in6 structures of the source and
+	 * destination addresses for ip6_forward().
+	 * XXX: not care about scope zone ambiguity.
+	 */
+	bzero(&sa6_src, sizeof(sa6_src));
+	bzero(&sa6_dst, sizeof(sa6_dst));
+	sa6_src.sin6_family = sa6_dst.sin6_family = AF_INET6;
+	sa6_src.sin6_len =
+		sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
+	sa6_src.sin6_addr =
+		mtod(m, struct ip6_hdr *)->ip6_src;
+	sa6_dst.sin6_addr =
+		mtod(m, struct ip6_hdr *)->ip6_dst;
+	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst)) {
+		m_freem(m);
+		return;
+	}
+
+	ip6_forward(m, 1);
 }
 
 
