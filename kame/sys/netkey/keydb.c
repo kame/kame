@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.81 2003/09/07 05:25:20 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.82 2003/09/07 07:47:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,11 +191,13 @@ again:
 	TAILQ_FOREACH(q, &satailq, tailq) {
 		if (q->id == said)
 			goto again;
-		if (q->id < said && said < TAILQ_NEXT(q, tailq)->id)
-			break;
-		if (q->id + 1 < TAILQ_NEXT(q, tailq)->id) {
-			said = q->id + 1;
-			break;
+		if (TAILQ_NEXT(q, tailq)) {
+			if (q->id < said && said < TAILQ_NEXT(q, tailq)->id)
+				break;
+			if (q->id + 1 < TAILQ_NEXT(q, tailq)->id) {
+				said = q->id + 1;
+				break;
+			}
 		}
 	}
 
