@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.51 2002/05/31 22:00:11 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.52 2002/05/31 22:03:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,7 +118,9 @@ main(argc, argv)
 	char *argv0, *opts;
 	fd_set *fdsetp, *selectfdp;
 	int fdmasks;
+#ifdef USE_RTSOCK
 	int rtsock;
+#endif
 
 	/*
 	 * Initialization
@@ -214,6 +216,7 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 	maxfd = s;
+#ifdef USE_RTSOCK
 	if ((rtsock = rtsock_open()) < 0) {
 		warnmsg(LOG_ERR, __FUNCTION__, "failed to open a socket");
 		exit(1);
@@ -221,6 +224,7 @@ main(argc, argv)
 	}
 	if (rtsock > maxfd)
 		maxfd = rtsock;
+#endif
 
 	fdmasks = howmany(maxfd + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsetp = malloc(fdmasks)) == NULL) {
@@ -284,7 +288,9 @@ main(argc, argv)
 
 	memset(fdsetp, 0, fdmasks);
 	FD_SET(s, fdsetp);
+#ifdef USE_RTSOCK
 	FD_SET(rtsock, fdsetp);
+#endif
 	while (1) {		/* main loop */
 		int e;
 
@@ -322,8 +328,10 @@ main(argc, argv)
 		}
 
 		/* packet reception */
+#ifdef USE_RTSOCK
 		if (FD_ISSET(rtsock, selectfdp))
 			rtsock_input(rtsock);
+#endif
 		if (FD_ISSET(s, selectfdp))
 			rtsol_input(s);
 	}
