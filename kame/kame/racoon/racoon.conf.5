@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.52 2000/09/22 18:21:49 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.53 2000/09/30 15:15:53 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -350,7 +350,8 @@ define encryption algorithm for phase 1 negotiation.
 This directive must be defined.
 .Ar algorithm
 is one of following:
-.Ic des , 3des , idea , blowfish , rc5 , cast
+.Ic des , 3des , blowfish , cast
+.\".Ic rc5 , idea
 for oakley.
 In the case of other transform, must not use this statement.
 .\"
@@ -465,6 +466,7 @@ Then, based on SPD settings,
 will construct the actual proposals.
 If the SPD entry asks for ESP only, there will be 4 proposals.
 If it asks for both AH and ESP, there will be 8 proposals.
+Note that the kernel may not support the algorithm you have specified.
 .\"
 .Bl -tag -width Ds -compact
 .It Ic encryption_algorithm Ar algorithms ;
