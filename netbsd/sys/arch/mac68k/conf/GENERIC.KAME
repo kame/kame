@@ -1,0 +1,16 @@
+include	"arch/mac68k/conf/GENERIC"
+
+# most of INET6 and IPSEC items defined in GENERIC
+
+# these options will become the default behavior soon.
+options 	NEW_STRUCT_ROUTE
+#options 	USE_FIXED_P2P_PLEN
+
+# IPv6 firewall - not tested
+#options 	IPV6FIREWALL
+#options 	IPV6FIREWALL_VERBOSE
+#options 	IPV6FIREWALL_DEFAULT_TO_ACCEPT
+
+# Network Address Translation - Protocol Translation (NAT-PT)
+# not tested
+#options 	NATPT
