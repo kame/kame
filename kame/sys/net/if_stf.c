@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.115 2004/05/31 01:39:28 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.116 2004/07/07 08:43:08 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -91,7 +91,6 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/errno.h>
-#include <sys/ioctl.h>
 #include <sys/protosw.h>
 #ifdef __FreeBSD__
 #include <sys/kernel.h>
