@@ -1226,6 +1226,8 @@ static_config()
 		/* XXX: scoped addr support */
 		rte->rt_ripinfo.rip6_dest = yrte->prefix.paddr.sin6_addr;
 		rte->rt_ripinfo.rip6_plen = yrte->prefix.plen;
+		if (rte->rt_ripinfo.rip6_plen == 128)
+			rte->rt_flags |= RTF_HOST;
 
 		switch(yrte->gwtype) {
 		case GW_IFACE:
@@ -1280,6 +1282,7 @@ static_config()
 			rte->rt_proto.rtp_type = RTPROTO_IF;
 			rte->rt_proto.rtp_if = ifp;
 			rte->rt_gw = yrte->reu.gateway.sin6_addr;
+			rte->rt_flags |= RTF_GATEWAY;
 			rte->rt_flags |= RTF_BGPDGWSTATIC;
 			break;
 		default:
