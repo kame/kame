@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.69 2001/09/26 09:50:28 itojun Exp $
+$KAME: FAQ,v 1.70 2001/09/29 08:13:40 jinmei Exp $
 
 
 GENERAL
@@ -134,6 +134,12 @@ Do I still need to install KAME patches?
 
 	http://www.kame.net/project-overview.html#release talks about this
 	topic in more detail.
+
+Q: How/where can I get recent KAME stable (not snap) releases?
+	Since the KAME stack has been merged into all *BSD releases
+	officially, the KAME project will not release stable releases
+	from the project.  These official *BSD releases should be
+	considered as stable releases instead.
 
 Q: I replaced the kernel and rebooted, and lost IPv4 connectivity.  Why?
 	There are several possibilities, but it is almost always
