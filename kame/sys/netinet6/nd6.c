@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.309 2002/12/17 07:48:33 k-sugyou Exp $	*/
+/*	$KAME: nd6.c,v 1.310 2003/01/17 07:18:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2276,6 +2276,11 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	return (0);
 
   sendpkt:
+#if !defined(__OpenBSD__) && defined(IPSEC)
+	/* clean ipsec history once it goes out of the node */
+	ipsec_delaux(m);
+#endif
+
 #if defined(__OpenBSD__) && defined(IPSEC)
 	/*
 	 * If the packet needs outgoing IPsec crypto processing and the
