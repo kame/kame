@@ -816,6 +816,8 @@ tcp6_ctlinput(cmd, sa, d)
 			 * corresponding routing entry.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d);
+
+			return;
 		}
 
 		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,

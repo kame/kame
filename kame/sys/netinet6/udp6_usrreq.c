@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.68 2000/11/24 03:36:04 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.69 2000/11/24 03:57:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -613,6 +613,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding routing entry.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d);
+
+			return;
 		}
 #endif
 
