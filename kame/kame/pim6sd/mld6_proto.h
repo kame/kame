@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.9 2002/10/30 06:27:34 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.10 2004/05/23 15:33:13 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -81,9 +81,6 @@ typedef struct
 #define MLD6_LISTENER_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
                 MLD6_QUERY_INTERVAL + \
                 MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
-#define MLD6_OLDER_VERSION_HOST_PRESENT (MLD6_ROBUSTNESS_VARIABLE * \
-		MLD6_QUERY_INTERVAL + \
-		MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)	
 #define MLD6_LAST_LISTENER_QUERY_COUNT      MLD6_ROBUSTNESS_VARIABLE
 
 #define MLD6_OTHER_QUERIER_PRESENT_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
@@ -92,7 +89,6 @@ typedef struct
 #define MLD6_OLDER_VERSION_HOST_PRESENT (MLD6_ROBUSTNESS_VARIABLE * \
 		MLD6_QUERY_INTERVAL + \
 		MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
-
 
 extern void     query_groups            __P((struct uvif *v));
 extern int      check_grp_membership    __P((struct uvif *v, 
