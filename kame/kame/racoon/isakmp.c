@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.181 2004/03/31 03:14:39 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.182 2005/03/07 20:29:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1151,7 +1151,7 @@ isakmp_parsewoh(np0, gen, len)
 
 		p->type = np;
 		p->len = ntohs(gen->len);
-		if (p->len == 0 || p->len > tlen) {
+		if (p->len < sizeof(struct isakmp_gen) || p->len > tlen) {
 			plog(LLV_DEBUG, LOCATION, NULL,
 				"invalid length of payload\n");
 			vfree(result);
