@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.232 2002/03/01 04:20:23 itojun Exp $	*/
+/*	$KAME: key.c,v 1.233 2002/03/21 02:26:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2753,7 +2753,7 @@ key_delsah(sah)
 		}
 	}
 
-	/* don't delete sah only if there are savs. */
+	/* delete sah only if there's no sav. */
 	if (zombie) {
 		splx(s);
 		return;
