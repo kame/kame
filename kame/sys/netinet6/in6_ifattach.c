@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.130 2001/07/24 09:56:01 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.131 2001/07/24 09:56:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -921,8 +921,8 @@ in6_ifattach(ifp, altifp)
 	case IFT_STF:
 		/*
 		 * 6to4 interface is a very special kind of beast.
-		 * no multicast, no linklocal.  For linklocal address,
-		 * RFC2529 specifies how to make one, but there's no use and
+		 * no multicast, no linklocal.  RFC2529 specifies how to make
+		 * linklocals for 6to4 interface, but there's no use and
 		 * it is rather harmful to have one.
 		 */
 		goto statinit;
