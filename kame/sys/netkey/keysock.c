@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.23 2000/09/22 08:26:33 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.24 2000/12/03 00:41:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,20 +90,20 @@ struct pfkeystat pfkeystat;
 #ifndef __NetBSD__
 int
 key_usrreq(so, req, m, nam, control)
-	register struct socket *so;
+	struct socket *so;
 	int req;
 	struct mbuf *m, *nam, *control;
 #else
 int
 key_usrreq(so, req, m, nam, control, p)
-	register struct socket *so;
+	struct socket *so;
 	int req;
 	struct mbuf *m, *nam, *control;
 	struct proc *p;
 #endif /*__NetBSD__*/
 {
-	register int error = 0;
-	register struct keycb *kp = (struct keycb *)sotorawcb(so);
+	int error = 0;
+	struct keycb *kp = (struct keycb *)sotorawcb(so);
 	int s;
 
 #ifdef __NetBSD__

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.47 2000/11/06 11:49:41 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.48 2000/12/03 00:40:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,7 @@ in_gif_output(ifp, family, m, rt)
 	struct rtentry *rt;
 {
 #ifdef __OpenBSD__
-	register struct gif_softc *sc = (struct gif_softc*)ifp;
+	struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in *sin_src = (struct sockaddr_in *)sc->gif_psrc;
 	struct sockaddr_in *sin_dst = (struct sockaddr_in *)sc->gif_pdst;
 	struct tdb tdb;
@@ -192,7 +192,7 @@ in_gif_output(ifp, family, m, rt)
 
 	return ip_output(m, NULL, NULL, 0, NULL, NULL);
 #else
-	register struct gif_softc *sc = (struct gif_softc*)ifp;
+	struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in *dst = (struct sockaddr_in *)&sc->gif_ro.ro_dst;
 	struct sockaddr_in *sin_src = (struct sockaddr_in *)sc->gif_psrc;
 	struct sockaddr_in *sin_dst = (struct sockaddr_in *)sc->gif_pdst;
