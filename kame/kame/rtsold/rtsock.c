@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.1 2000/10/10 06:18:04 itojun Exp $	*/
+/*	$KAME: rtsock.c,v 1.2 2000/10/10 06:36:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -95,7 +95,7 @@ rtsock_input(s)
 	struct rt_msghdr *rtm;
 	int idx;
 	size_t len;
-	int ret;
+	int ret = 0;
 	const size_t lenlim =
 	    offsetof(struct rt_msghdr, rtm_msglen) + sizeof(rtm->rtm_msglen);
 
@@ -110,18 +110,23 @@ rtsock_input(s)
 		if (len < lenlim)
 			break;
 
-		for (idx = 0; rtsock_dispatch[idx].func; idx++) {
-			if (rtm->rtm_type == rtsock_dispatch[idx].type &&
-			    rtm->rtm_msglen >= rtsock_dispatch[idx].minlen) {
-				ret = (*rtsock_dispatch[idx].func)(s, rtm, lim);
-				break;
-			}
-		}
-
 		if (dflag > 1) {
 			warnmsg(LOG_INFO, __FUNCTION__,
 			    "rtmsg type %d, len=%lu", rtm->rtm_type,
 			    (u_long)len);
+		}
+
+		for (idx = 0; rtsock_dispatch[idx].func; idx++) {
+			if (rtm->rtm_type != rtsock_dispatch[idx].type)
+				continue;
+			if (rtm->rtm_msglen < rtsock_dispatch[idx].minlen) {
+				warnmsg(LOG_INFO, __FUNCTION__,
+				    "rtmsg type %d too short!", rtm->rtm_type);
+				continue;
+			}
+
+			ret = (*rtsock_dispatch[idx].func)(s, rtm, lim);
+			break;
 		}
 	}
 
