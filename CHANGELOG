@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.343 1999/12/15 17:58:14 sumikawa Exp $
+$Id: CHANGELOG,v 1.344 1999/12/16 00:47:09 jinmei Exp $
 
 <199912>
 Thu Dec 16 02:55:23 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -16,9 +16,9 @@ Wed Dec 15 17:09:45 JST 1999  shin@kame.net, itojun@iijlab.net
 	* kame/kame/{libinet6, tcpdump, v6test}: changed not to use the
 	ip6r0_addr and ip6r0_slmap members of the ip6_rthdr0 structure
 	according to <draft-ietf-ipngwg-rfc2292bis-01.txt>.
-	Note: it is recommented to update both the kernel and all the user
-	applications to avoid troubles due to size mismatch between the
-	kernel and the applications.
+	Note: it is recommented to recompile both the kernel and all the
+	user applications to avoid troubles due to size mismatch between
+	the kernel and the applications.
 
 1999-12-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{ip6.h, ip6_output.c, route6.c}:
