@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.7 2001/07/26 02:20:51 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.8 2001/07/26 02:23:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -199,7 +199,7 @@ sec_ioctl(ifp, cmd, data)
 	caddr_t data;
 {
 
-	/* forbid physical address changes */
+	/* forbid outer address changes */
 	switch (cmd) {
 #ifdef INET
 	case SIOCSIFPHYADDR:
