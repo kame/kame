@@ -4,7 +4,6 @@ PROG=	mchat
 SRCS=	mchat.c screen.c history.c
 
 CFLAGS+=-DINET6 -DIPSEC -I${SRCDIR}
-CFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
 LDADD+=	-L${.OBJDIR}/../../lib/libipsec -L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+= ${.OBJDIR}/../../lib/libipsec/libipsec.a \
