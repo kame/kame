@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.22 2001/11/27 06:33:56 k-sugyou Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.23 2001/11/27 12:05:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -67,7 +67,13 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/in_pcb.h>
+#else
 #include <netinet6/in6_pcb.h>
+#endif
 
 #ifdef IPSEC
 #ifdef __OpenBSD__
