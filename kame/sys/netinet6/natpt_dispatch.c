@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.70 2002/08/19 10:24:58 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.71 2002/09/08 16:25:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -490,6 +490,9 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 	}
 
  wayOut:;
+       /* Does not process a multicast packet. */
+       if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
+               return (IPPROTO_IP);
 
 	/* If a fragmented packet does not have enough upper layer header,
 	 * drop this packet.
