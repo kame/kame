@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1989 2001/11/27 07:30:14 suz Exp $
+$KAME: CHANGELOG,v 1.1990 2001/11/27 07:53:26 suz Exp $
 
 <200111>
 Tue Nov 27 16:03:20 JST 2001 suz@sdl.hitachi.co.jp
@@ -8,6 +8,8 @@ Tue Nov 27 16:03:20 JST 2001 suz@sdl.hitachi.co.jp
 	  based-mcast-03.txt
 	- joins all MLDv2 routers group on all interfaces listening to MLDv2
 	- updated MLDv2-related code (from Mickael Hoerdt)
+	- never uses timer with id == 0, since it means "unspecified"
+	- frees/discards/resets everything with regard to the stopping VIF.
 
 Tue Nov 27 01:35:26 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
