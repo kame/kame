@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.58 2003/01/17 00:38:26 suz Exp $	*/
+/*	$KAME: rtsold.c,v 1.59 2003/01/17 03:49:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,8 +71,12 @@ static int fflag = 0;
 #define RTR_SOLICITATION_INTERVAL	4 /* seconds */
 #define MAX_RTR_SOLICITATIONS		3 /* times */
 
-/* implementation dependent constants */
-#define PROBE_INTERVAL 60	/* seconds XXX: should be configurable */
+/* 
+ * implementation dependent constants in seconds
+ * XXX: should be configurable 
+ */
+#define PROBE_INTERVAL 60
+#define ISATAP_PROBE_INTERVAL 900 /* draft-ietf-ngtrans-isatap-09.txt 6.2.4 */
 
 /* utility macros */
 /* a < b */
@@ -432,8 +436,12 @@ ifconfig(char *ifname)
 		/*
 		 * probe routers periodically even if the link status
 		 * does not change.
+		 * (ISATAP router cannot send unsolicited RA)
 		 */
-		ifinfo->probeinterval = PROBE_INTERVAL;
+		if (is_isatap(ifinfo))
+			ifinfo->probeinterval = ISATAP_PROBE_INTERVAL;
+		else
+			ifinfo->probeinterval = PROBE_INTERVAL;
 	}
 
 	/* activate interface: interface_up returns 0 on success */
@@ -674,6 +682,9 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		if (mobile_node) {
 			/* XXX should be configurable */
 			ifinfo->timer.tv_sec = 3;
+		} else if (is_isatap(ifinfo)) {
+			/* don't have to consider I/F updown in ISATAP */
+			ifinfo->timer.tv_sec = 60;
 		} else
 			ifinfo->timer = tm_max;	/* stop timer(valid?) */
 		break;

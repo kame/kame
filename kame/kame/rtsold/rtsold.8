@@ -1,4 +1,4 @@
-.\"	$KAME: rtsold.8,v 1.17 2001/07/09 22:30:37 itojun Exp $
+.\"	$KAME: rtsold.8,v 1.18 2003/01/17 03:49:44 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -111,6 +111,9 @@ minutes, is slightly long for mobile stations.
 This feature is provided
 for such stations so that they can find new routers as soon as possible
 when they attach to another link.
+.It
+Every 900 seconds if the interface is an ISATAP interface.  Since ISATAP router
+cannot advertise unsolicited RA, ISATAP host has to send RS periodically.
 .El
 .Lp
 Once
