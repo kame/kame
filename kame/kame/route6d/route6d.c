@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.103 2003/10/30 08:44:49 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.104 2003/10/31 00:30:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.103 2003/10/30 08:44:49 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.104 2003/10/31 00:30:20 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1088,7 +1088,8 @@ riprecv()
 	struct	rip6 *rp;
 	struct	netinfo6 *np, *nq;
 	struct	riprt *rrt;
-	ssize_t	len, nn, need_trigger, idx;
+	ssize_t	len, nn;
+	unsigned int need_trigger, idx;
 	char	buf[4 * RIP6_MAXMTU];
 	time_t	t;
 	struct msghdr m;
