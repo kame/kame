@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.123 2000/07/26 05:45:06 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.124 2000/07/27 02:54:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1808,6 +1808,24 @@ icmp6_rip6_input(mp, off)
 		return IPPROTO_DONE;
 	}
 #endif
+
+	/*
+	 * Be proactive about unspecified IPv6 address in source.
+	 * As we use all-zero to indicate unbounded/unconnected pcb,
+	 * unspecified IPv6 address can be used to confuse us.
+	 *
+	 * Note that packets with unspecified IPv6 destination is
+	 * already dropped in ip6_input.
+	 *
+	 * Actually, DAD packets with unspecified IPv6 source address
+	 * is legal.  We are not sure if we can safely toss them up to raw
+	 * ip6 sockets, however.
+	 */
+	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
+		/* XXX stat */
+		m_freem(m);
+		return IPPROTO_DONE;
+	}
 
 	bzero(&opts, sizeof(opts));
 	bzero(&rip6src, sizeof(rip6src));
