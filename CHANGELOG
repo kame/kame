@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2408 2003/06/14 08:20:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.2409 2003/06/14 08:24:30 jinmei Exp $
 
 <200306>
+2003-06-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/if.c (if_detach): be sure to free the link
+	ifaddr at the end of the function.  (A supplement fix to another
+	one by ono on June 9th)
+
 Wed Jun 11 20:39:57 JST 2003	keiichi@iij.ad.jp
 	* tcp_output()
 	the length of extension headers, which are created and inserted
