@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.365 1999/12/22 12:35:02 itojun Exp $
+$Id: CHANGELOG,v 1.366 1999/12/22 16:54:15 jinmei Exp $
 
 <199912>
+1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: some new library
+	functions were added according to rfc2292bis-01.
+	See TODO.2292bis for the current status of the implementation.
+
 Wed Dec 22 21:37:07 JST 1999  itojun@iijlab.net
 	* freebsd[23]/ports/inn: upgrade to 2.2.2 (not tested by KAME team).
 	  From: Satosi KOBAYASI <kobayasi@north.ad.jp>
