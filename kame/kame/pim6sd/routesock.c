@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.12 2001/06/25 04:54:31 itojun Exp $	*/
+/*	$KAME: routesock.c,v 1.13 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -65,7 +65,6 @@
 #include "defs.h"
 #include <sys/socket.h>
 #include <net/route.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #ifdef HAVE_ROUTING_SOCKETS
 #include <net/if_dl.h>
@@ -289,7 +288,7 @@ getmsg(rtm, msglen, rpfinfop)
     register char  *cp;
     register int    i;
     struct sockaddr_in6 *sin6;
-    vifi_t          vifi;
+    mifi_t          vifi;
     struct uvif    *v;
     char            in6txt[INET6_ADDRSTRLEN];
 

@@ -11,6 +11,6 @@ to query groups at boot time not efficient because there is no RP
 - removal of unnecessary members from struct uvif
 	DVMRP-related: rmt_addr, dvmrpnbr
 	IPv4-specific: dst_addr, prefix, subnetmask
-- rename "vif" to "mif" (just to sync with KAME kernel. not so important)
+- rename "vif" to "mif" (just to sync with KAME kernel. not so important): done
 - optional MLD state in RFC2710 p12: No-Listeners-Present, Listeners-Present,
   Checking-Listeners

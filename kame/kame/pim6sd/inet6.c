@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.10 2001/07/11 09:14:34 suz Exp $	*/
+/*	$KAME: inet6.c,v 1.11 2001/08/09 08:46:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -51,7 +51,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <stdio.h>
 #include <netdb.h>

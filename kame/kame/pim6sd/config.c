@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.25 2001/07/31 14:13:12 suz Exp $	*/
+/*	$KAME: config.c,v 1.26 2001/08/09 08:46:56 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -66,7 +66,6 @@
 #endif
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_var.h>
 #include <arpa/inet.h>
@@ -98,7 +97,7 @@ void
 config_vifs_from_kernel()
 {
 	register struct uvif *v;
-	register vifi_t vifi;
+	register mifi_t vifi;
 	int i;
 	struct sockaddr_in6 addr;
 	struct in6_addr mask;

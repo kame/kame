@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.17 2001/07/11 09:34:05 suz Exp $	*/
+/*	$KAME: pim6.c,v 1.18 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -80,7 +80,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/pim6.h>
 #include <netinet/ip6.h>

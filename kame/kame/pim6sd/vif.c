@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.17 2001/07/11 09:13:26 suz Exp $	*/
+/*	$KAME: vif.c,v 1.18 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -61,7 +61,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_mroute.h>
 #include <errno.h>
@@ -88,9 +87,9 @@
 #include "timer.h"
 
 struct uvif	uvifs[MAXMIFS];	/*the list of virtualsinterfaces */
-vifi_t numvifs;				/*total number of interface */
+mifi_t numvifs;				/*total number of interface */
 int vifs_down;
-vifi_t reg_vif_num;		   /*register interface*/
+mifi_t reg_vif_num;		   /*register interface*/
 int phys_vif; /* An enabled vif that has a global address */
 int udp_socket;
 int total_interfaces;
@@ -99,15 +98,15 @@ if_set			if_result;
 
 int init_reg_vif __P((void));
 void start_all_vifs __P((void));
-void start_vif __P((vifi_t vifi));
-void stop_vif __P((vifi_t vivi));
-int update_reg_vif __P((vifi_t register_vifi));
+void start_vif __P((mifi_t vifi));
+void stop_vif __P((mifi_t vivi));
+int update_reg_vif __P((mifi_t register_vifi));
 
 extern int cfparse __P((int, int));
 
 void init_vifs()
 {
-	vifi_t vifi;
+	mifi_t vifi;
 	struct uvif *v;
 	int enabled_vifs;
 
@@ -129,7 +128,7 @@ void init_vifs()
 
 	/* clean all the interfaces ... */
 
-	for(vifi = 0,v=uvifs; vifi < MAXVIFS; ++ vifi, ++v)
+	for(vifi = 0,v=uvifs; vifi < MAXMIFS; ++ vifi, ++v)
 	{
 		memset(v,0,sizeof(*v)); /* everything is zeroed  => NULL , pointer NULL , addrANY ...) */
 		v->uv_metric = DEFAULT_METRIC;
@@ -200,10 +199,10 @@ void init_vifs()
 int init_reg_vif()
 {
 	struct uvif *v;
-	vifi_t i;
+	mifi_t i;
 
 	v = &uvifs[numvifs];
-	if (( numvifs+1 ) == MAXVIFS )
+	if (( numvifs+1 ) == MAXMIFS )
 	{
      /* Exit the program! The PIM router must have a Register vif */
     log(LOG_ERR, 0,
@@ -258,7 +257,7 @@ int init_reg_vif()
 
 void start_all_vifs()
 {
-	vifi_t vifi;
+	mifi_t vifi;
 	struct uvif *v;
 	u_int action;
 
@@ -301,7 +300,7 @@ void start_all_vifs()
  */
 
 
-void start_vif (vifi_t vifi)
+void start_vif (mifi_t vifi)
 {
 	struct uvif *v;
 
@@ -375,7 +374,7 @@ void start_vif (vifi_t vifi)
  */ 
 
 
-void stop_vif( vifi_t vifi )
+void stop_vif( mifi_t vifi )
 {
 	struct uvif *v;
 	struct listaddr *a;
@@ -459,15 +458,14 @@ void stop_vif( vifi_t vifi )
  * is UP (virtually :))
  */
 int
-update_reg_vif( vifi_t register_vifi )
+update_reg_vif( mifi_t register_vifi )
 {
     register struct uvif *v;
-    register vifi_t vifi;
+    register mifi_t vifi;
 
     /* Find the first useable vif with solid physical background */
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
-	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | VIFF_TUNNEL
-			   | MIFF_REGISTER))
+	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
 	    continue;
         /* Found. Stop the bogus Register vif first */
 	stop_vif(register_vifi);
@@ -492,7 +490,7 @@ update_reg_vif( vifi_t register_vifi )
 struct sockaddr_in6 *
 max_global_address()
 {
-	vifi_t vifi;
+	mifi_t vifi;
 	struct uvif *v;
 	struct phaddr *p;
 	struct phaddr *pmax = NULL;
@@ -530,7 +528,7 @@ max_global_address()
 
 struct sockaddr_in6 *
 uv_global(vifi)
-	vifi_t vifi;
+	mifi_t vifi;
 {
 	struct uvif *v = &uvifs[vifi];
 	struct phaddr *p;
@@ -552,7 +550,7 @@ struct sockaddr_in6 *
 local_iface(char *ifname)
 {
 	register struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 	struct phaddr *p;
 	struct phaddr *pmax = NULL;
 
@@ -594,7 +592,7 @@ local_iface(char *ifname)
 void
 check_vif_state()
 {
-    register vifi_t vifi;
+    register mifi_t vifi;
     register struct uvif *v;
     struct ifreq ifr;
     static int checking_vifs=0;
@@ -650,7 +648,7 @@ check_vif_state()
     /* Check the register(s) vif(s) */
     for( vifi=0 , v=uvifs ; vifi<numvifs ; ++vifi , ++v )
     {
-	register vifi_t vifi2;
+	register mifi_t vifi2;
 	register struct uvif *v2;
 	int found;
 
@@ -665,7 +663,7 @@ check_vif_state()
 	     */
 	    for( vifi2=0 , v2=uvifs ; vifi2<numvifs ; ++vifi2 , ++v2 )
 	    {
-		if( v2->uv_flags & ( VIFF_DISABLED|VIFF_DOWN|VIFF_TUNNEL|MIFF_REGISTER ))
+		if( v2->uv_flags & ( VIFF_DISABLED|VIFF_DOWN|MIFF_REGISTER ))
 		    continue;
 		if( IN6_ARE_ADDR_EQUAL( &v->uv_linklocal->pa_addr.sin6_addr,
 					&v2->uv_linklocal->pa_addr.sin6_addr ))
@@ -691,17 +689,17 @@ check_vif_state()
  * Return the vif number or NO_VIF if not found.
  */
 
-vifi_t
+mifi_t
 find_vif_direct(src)
     struct sockaddr_in6 *src;
 {
-    vifi_t vifi;
+    mifi_t vifi;
     register struct uvif *v;
     register struct phaddr *p;
    
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) 
     {
-    	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | VIFF_TUNNEL|MIFF_REGISTER))
+    	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
         	continue;
 	for (p = v->uv_addrs; p; p = p->pa_next) 
 	{
@@ -720,11 +718,11 @@ find_vif_direct(src)
  * otherwise return value is NO_VIF.
  */
 
-vifi_t
+mifi_t
 local_address(src)
     struct sockaddr_in6 *src;
 {
-    vifi_t vifi;
+    mifi_t vifi;
     register struct uvif *v;
     register struct phaddr *p;
 
@@ -748,17 +746,17 @@ local_address(src)
  * Return the vif number or NO_VIF if not found.
  */ 
 
-vifi_t
+mifi_t
 find_vif_direct_local(src)
     struct sockaddr_in6 *src;
 { 
-    vifi_t vifi;
+    mifi_t vifi;
     register struct uvif *v; 
     register struct phaddr *p;
    
 
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
-    	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | VIFF_TUNNEL |MIFF_REGISTER))
+    	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
         	continue;
     	for (p = v->uv_addrs; p; p = p->pa_next) {
         	if (inet6_equal(src, &p->pa_addr) ||
@@ -821,7 +819,7 @@ vif_xor(if_set *p1 , if_set *p2, if_set *result)
 void
 stop_all_vifs()
 {
-    vifi_t vifi;
+    mifi_t vifi;
     struct uvif *v;
  
     for (vifi = 0, v=uvifs; vifi < numvifs; ++vifi, ++v) {
@@ -836,7 +834,7 @@ find_vif(ifname)
 	char *ifname;
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v) {
 		if (strcasecmp(v->uv_name, ifname) == 0)

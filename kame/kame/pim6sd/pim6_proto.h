@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.h,v 1.6 2001/06/25 04:54:30 itojun Exp $	*/
+/*	$KAME: pim6_proto.h,v 1.7 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -74,9 +74,9 @@ extern int  join_or_prune       __P((mrtentry_t *mrtentry_ptr,
 extern int  receive_pim6_assert  __P((struct sockaddr_in6 *src, struct sockaddr_in6 *dst,
                          char *pim_message, int datalen));
 extern int  send_pim6_assert     __P((struct sockaddr_in6 *source, struct sockaddr_in6 *group,
-                         vifi_t vifi,
+                         mifi_t vifi,
                          mrtentry_t *mrtentry_ptr));
-extern int  send_periodic_pim6_join_prune __P((vifi_t vifi, 
+extern int  send_periodic_pim6_join_prune __P((mifi_t vifi, 
                           pim_nbr_entry_t *pim_nbr,
                           u_int16 holdtime));
 extern int  add_jp_entry        __P((pim_nbr_entry_t *pim_nbr,

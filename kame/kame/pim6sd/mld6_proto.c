@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.20 2001/07/11 09:13:26 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.21 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -99,7 +99,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
 #include <syslog.h>

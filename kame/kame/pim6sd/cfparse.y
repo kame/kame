@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.17 2001/07/31 13:57:30 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.18 2001/08/09 08:46:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -34,7 +34,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_mroute.h>
 #include <arpa/inet.h>
@@ -570,7 +569,7 @@ static int
 param_config()
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 
 	/* at first, set the default values to all the undefined variables */
 	if (srcmetric == -1) srcmetric = DEFAULT_LOCAL_METRIC;
@@ -586,7 +585,7 @@ param_config()
 	if (asserttimo == -1) asserttimo = PIM_ASSERT_TIMEOUT;
 
 	/* set protocol parameters using the configuration variables */
-	for (vifi = 0, v = uvifs; vifi < MAXVIFS; ++vifi, ++v) {
+	for (vifi = 0, v = uvifs; vifi < MAXMIFS; ++vifi, ++v) {
 		v->uv_local_metric = srcmetric;
 		v->uv_local_pref = srcpref;
 	}
@@ -639,7 +638,7 @@ static int
 phyint_config()
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 	struct attr_list *al;
 	unsigned int qqic;
 	unsigned int realnbr;
@@ -1113,7 +1112,7 @@ int
 cf_post_config()
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 
 	if (debugonly)
 		goto cleanup;
@@ -1167,7 +1166,7 @@ void
 cf_init(s, d)
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 
 	strict = s;
 	debugonly = d;

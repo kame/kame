@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.3 2001/07/11 18:43:23 suz Exp $
+ * $KAME: mld6v2.c,v 1.4 2001/08/09 08:46:57 suz Exp $
  */
 
 /*
@@ -51,7 +51,6 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/ip6.h>
 #include <stdio.h>

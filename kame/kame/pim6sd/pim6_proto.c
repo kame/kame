@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.41 2001/07/11 09:14:34 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.42 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -107,7 +107,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/pim6.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/ip6.h>
@@ -3456,7 +3455,7 @@ send_pim6_assert(source, group, mifi, mrtentry_ptr)
     srcentry_t     *srcentry_ptr;
 
     /* Don't send assert if the outgoing interface a tunnel or register vif */
-    if (uvifs[mifi].uv_flags & (MIFF_REGISTER | VIFF_TUNNEL))
+    if (uvifs[mifi].uv_flags & MIFF_REGISTER)
 	return (FALSE);
 
     data_ptr = (u_int8 *) (pim6_send_buf + sizeof(struct pim));
@@ -3808,7 +3807,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	if (mifi == incoming)
 	    continue;
 	if (uvifs[mifi].uv_flags & (VIFF_DISABLED | VIFF_DOWN |
-				    MIFF_REGISTER | VIFF_TUNNEL | VIFF_NONBRS))
+				    MIFF_REGISTER | VIFF_NONBRS))
 	    continue;
 
 	bcopy(pim_message, (char *)(pim6_send_buf), datalen);
@@ -4090,7 +4089,7 @@ send_pim6_bootstrap()
 	for (mifi = 0; mifi < numvifs; mifi++)
 	{
 	    if (uvifs[mifi].uv_flags & (VIFF_DISABLED | VIFF_DOWN |
-					MIFF_REGISTER | VIFF_TUNNEL))
+					MIFF_REGISTER))
 		continue;
 
    	     send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,

@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.8 2001/07/11 09:14:34 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.9 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -51,7 +51,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <syslog.h>
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.16 2001/07/21 08:01:58 suz Exp $	*/
+/*	$KAME: timer.c,v 1.17 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -53,7 +53,6 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -204,7 +203,7 @@ init_timers()
 void
 age_vifs()
 {
-    vifi_t			vifi;
+    mifi_t			vifi;
     register struct uvif 	*v;
     register pim_nbr_entry_t 	*next_nbr,
                    		*curr_nbr;
@@ -216,9 +215,11 @@ age_vifs()
      * defs around the "if (vifs_down)" line.
      */
 
+#if 0
 #if (!((defined SunOS) && (SunOS >= 50)))
     if (vifs_down)
 #endif				/* Solaris */
+#endif
 	check_vif_state();
 
     /* Age many things */
@@ -362,7 +363,7 @@ age_routes()
     mrtentry_t     	*mrtentry_srcs;
     mrtentry_t     	*mrtentry_srcs_next;
     struct uvif    	*v;
-    vifi_t          	vifi;
+    mifi_t          	vifi;
     pim_nbr_entry_t 	*pim_nbr_ptr;
     int             	change_flag;
     int             	rp_action,

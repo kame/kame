@@ -1,4 +1,4 @@
-/*	$KAME: kern.c,v 1.8 2001/06/25 04:54:28 itojun Exp $	*/
+/*	$KAME: kern.c,v 1.9 2001/08/09 08:46:56 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -58,7 +58,6 @@
 #endif
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_var.h>
 #include <syslog.h>
@@ -248,7 +247,7 @@ k_leave(int socket, struct in6_addr * grp, u_int ifindex)
  */
 
 void 
-k_add_vif(int socket, vifi_t vifi, struct uvif * v)
+k_add_vif(int socket, mifi_t vifi, struct uvif * v)
 {
     struct mif6ctl  mc;
 
@@ -271,7 +270,7 @@ k_add_vif(int socket, vifi_t vifi, struct uvif * v)
  */
 
 void 
-k_del_vif(int socket, vifi_t vifi)
+k_del_vif(int socket, mifi_t vifi)
 {
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_DEL_MIF,
 		   (char *) &vifi, sizeof(vifi)) < 0)
@@ -313,12 +312,12 @@ k_chg_mfc(socket, source, group, iif, oifs, rp_addr)
     int             socket;
     struct sockaddr_in6 *source;
     struct sockaddr_in6 *group;
-    vifi_t          iif;
+    mifi_t          iif;
     if_set         *oifs;
     struct sockaddr_in6 *rp_addr;
 {
     struct mf6cctl  mc;
-    vifi_t          vifi;
+    mifi_t          vifi;
     struct uvif    *v;
 
     mc.mf6cc_origin = *source;
@@ -365,7 +364,7 @@ k_chg_mfc(socket, source, group, iif, oifs, rp_addr)
 
 int 
 k_get_vif_count(vifi, retval)
-    vifi_t          vifi;
+    mifi_t          vifi;
     struct vif_count *retval;
 {
     struct sioc_mif_req6 mreq;

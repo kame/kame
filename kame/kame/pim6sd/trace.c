@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.13 2001/06/25 04:54:31 itojun Exp $	*/
+/*	$KAME: trace.c,v 1.14 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -80,7 +80,6 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_var.h>
 #include <arpa/inet.h>

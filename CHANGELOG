@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1833 2001/08/07 14:42:24 jinmei Exp $
+$KAME: CHANGELOG,v 1.1834 2001/08/09 08:46:55 suz Exp $
 
 <200108>
+Thu Aug  9 09:37:44 BST 2001	suz@sdl.hitachi.co.jp
+	* kame/kame/pim6sd: s/vifi_t/mifi_t/ to sync with kernel implementation
+	of IPv6 multicast interface. 
+
 2001-08-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_pcbopt, ip6_setpktoptions):
 	for the IPV6_NEXTHOP ancillary data/socket option, set

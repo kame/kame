@@ -1,4 +1,4 @@
-/*	$KAME: kern.h,v 1.5 2000/12/04 06:45:30 itojun Exp $	*/
+/*	$KAME: kern.h,v 1.6 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -62,11 +62,11 @@ extern void     k_stop_pim      __P((int));
 extern int      k_del_mfc       __P((int socket, struct sockaddr_in6 *source,
                      struct sockaddr_in6 *group));
 extern int      k_chg_mfc       __P((int socket, struct sockaddr_in6 *source,
-                     struct sockaddr_in6 *group, vifi_t iif, 
+                     struct sockaddr_in6 *group, mifi_t iif, 
                      if_set *oifs, struct sockaddr_in6 *rp_addr));
-extern void     k_add_vif       __P((int socket, vifi_t vifi, struct uvif *v));
-extern void     k_del_vif       __P((int socket, vifi_t vifi));
-extern int      k_get_vif_count __P((vifi_t vifi, struct vif_count *retval));
+extern void     k_add_vif       __P((int socket, mifi_t vifi, struct uvif *v));
+extern void     k_del_vif       __P((int socket, mifi_t vifi));
+extern int      k_get_vif_count __P((mifi_t vifi, struct vif_count *retval));
 extern int      k_get_sg_cnt    __P((int socket, struct sockaddr_in6 *source,
                      struct sockaddr_in6 *group,
                      struct sg_count *retval));

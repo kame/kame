@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.17 2001/07/11 09:14:34 suz Exp $	*/
+/*	$KAME: route.c,v 1.18 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -51,7 +51,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_mroute.h>
 #include <string.h>
@@ -82,7 +81,7 @@ u_int32         default_source_preference = UCAST_DEFAULT_SOURCE_PREFERENCE;
 
 /* Return the iif for given address */
 
-vifi_t
+mifi_t
 get_iif(address)
     struct sockaddr_in6	*address;
 {
@@ -283,7 +282,7 @@ set_incoming(srcentry_ptr, srctype)
 
 void
 add_leaf(vifi, source, group)
-    vifi_t          vifi;
+    mifi_t          vifi;
     struct sockaddr_in6	*source;
     struct sockaddr_in6	*group;
 {
@@ -366,7 +365,7 @@ add_leaf(vifi, source, group)
  */
 void
 delete_leaf(vifi, source, group)
-    vifi_t          vifi;
+    mifi_t          vifi;
     struct sockaddr_in6 *source;
     struct sockaddr_in6 *group;
 {
@@ -520,7 +519,7 @@ int
 change_interfaces(mrtentry_ptr, new_iif, new_joined_oifs_, new_pruned_oifs,
 		  new_leaves_, new_asserted_oifs, flags)
     mrtentry_t     *mrtentry_ptr;
-    vifi_t          new_iif;
+    mifi_t          new_iif;
     if_set      *new_joined_oifs_;
     if_set     *new_pruned_oifs;
     if_set     *new_leaves_;
@@ -536,7 +535,7 @@ change_interfaces(mrtentry_ptr, new_iif, new_joined_oifs_, new_pruned_oifs,
     if_set     old_asserted_oifs;
     if_set     new_real_oifs;	/* The result oifs */
     if_set     old_real_oifs;
-    vifi_t          old_iif;
+    mifi_t          old_iif;
     rpentry_t      *rpentry_ptr;
     cand_rp_t      *cand_rp_ptr;
     kernel_cache_t *kernel_cache_ptr;
@@ -897,7 +896,7 @@ bypass_rpentry:
  */
 int
 delete_vif_from_mrt(vifi)
-    vifi_t          vifi;
+    mifi_t          vifi;
 {
     return TRUE;
 }
@@ -943,7 +942,7 @@ process_cache_miss(im)
     static struct sockaddr_in6 group = {sizeof(group) , AF_INET6 };
 
     static struct sockaddr_in6 rp_addr = {sizeof(source) , AF_INET6 };
-    vifi_t          iif;
+    mifi_t          iif;
     mrtentry_t     *mrtentry_ptr;
     mrtentry_t     *mrtentry_rp;
 
@@ -1133,7 +1132,7 @@ process_wrong_iif(im)
 {
     static struct sockaddr_in6 source= {sizeof(source) , AF_INET6};
     static struct sockaddr_in6 group = {sizeof(group) , AF_INET6};
-    vifi_t          iif;
+    mifi_t          iif;
     mrtentry_t     *mrtentry_ptr;
 
     group.sin6_addr = im->im6_dst;

@@ -1,4 +1,4 @@
-/*	$KAME: mrt.h,v 1.9 2001/06/25 04:54:29 itojun Exp $	*/
+/*	$KAME: mrt.h,v 1.10 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -103,7 +103,7 @@
 					next=next->next;						\
 					free(prev);							\
 				}									\
-				free( (char *)( (mrtentry_ptr)->kernel_cache ) );			\
+				free( (char *)(mrtentry_ptr)->kernel_cache );				\
 				free( (char *)(mrtentry_ptr) );						\
 			} while (0)
 
@@ -142,7 +142,7 @@ typedef struct pim_nbr_entry {
 	struct pim_nbr_entry 	*prev; /* link to prev neighbor */ 
 	struct sockaddr_in6 	address; /* (primary) neighbor address */
 	struct phaddr		*aux_addrs; /* additional addresses */
-	vifi_t 			vifi;   /* which interface                */
+	mifi_t 			vifi;   /* which interface                */
 	u_int16 		timer; 	/* for timing out neighbor        */
 	build_jp_message_t	*build_jp_message;  /* A structure for fairly
 						     * complicated Join/Prune
@@ -155,7 +155,7 @@ typedef struct srcentry {
 	struct srcentry 		*prev;			/* link to prev entry               */
 	struct sockaddr_in6 	address;			/* source or RP address             */
 	struct mrtentry 		*mrtlink;		/* link to routing entries          */
-	vifi_t					incoming;	/* incoming vif                     */
+	mifi_t					incoming;	/* incoming vif                     */
 	struct pim_nbr_entry 	*upstream;			/* upstream router                  */
 	u_int32					metric;		/* Unicast Routing Metric to the source */
 	u_int32					preference;    /* The metric preference (for assers)*/		
@@ -220,7 +220,7 @@ typedef struct mrtentry {
 	struct mrtentry 		*srcprev;			/* prev entry of same source        */
 	struct grpentry 		*group;				/* pointer to group entry           */
 	struct srcentry 		*source;			/* pointer to source entry (or RP)  */
-	vifi_t					incoming;		/* the iif (either toward S or RP)  */
+	mifi_t					incoming;		/* the iif (either toward S or RP)  */
     if_set					oifs;			/* The current result oifs          */
 	if_set 					joined_oifs;		/* The joined oifs (Join received)  */
 	if_set 					pruned_oifs;		/* The pruned oifs (Prune received) */

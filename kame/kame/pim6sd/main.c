@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.21 2001/07/05 13:28:20 itojun Exp $	*/
+/*	$KAME: main.c,v 1.22 2001/08/09 08:46:57 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -62,7 +62,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -679,7 +678,7 @@ timer(i)
 static void
 cleanup()
 {
-    vifi_t vifi;
+    mifi_t vifi;
     struct uvif *v;
 
     /* inform all neighbors that I'm going to die */

@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.16 2001/07/11 09:13:26 suz Exp $	*/
+/*	$KAME: vif.h,v 1.17 2001/08/09 08:46:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -61,12 +61,12 @@
 extern int total_interfaces;
 extern int udp_socket;
 extern struct uvif uvifs[];
-extern vifi_t numvifs;
+extern mifi_t numvifs;
 extern int vifs_down; 
 extern int phys_vif;
-extern vifi_t reg_vif_num;
+extern mifi_t reg_vif_num;
 
-#define NO_VIF            	((vifi_t)MAXVIFS) /* An invalid vif index */
+#define NO_VIF            	((mifi_t)MAXMIFS) /* An invalid vif index */
 #define DEFAULT_METRIC 		1
 #define VIFF_DOWN		0x000100
 #define VIFF_DISABLED       	0x000200
@@ -255,7 +255,7 @@ struct vif_acl {
 struct rpfctl {
     struct sockaddr_in6 source; /* the source for which we want iif and rpfnbr */
     struct sockaddr_in6 rpfneighbor;/* next hop towards the source */
-    vifi_t iif; /* the incoming interface to reach the next hop */
+    mifi_t iif; /* the incoming interface to reach the next hop */
 }; 
 
 
@@ -265,11 +265,11 @@ extern void    init_vifs __P((void));
 extern void    stop_all_vifs __P((void));
 extern void    check_vif_state __P((void));
 struct sockaddr_in6 * max_global_address __P((void));
-struct sockaddr_in6 * uv_global __P((vifi_t));
-extern vifi_t   local_address       __P((struct sockaddr_in6 *src));
+struct sockaddr_in6 * uv_global __P((mifi_t));
+extern mifi_t   local_address       __P((struct sockaddr_in6 *src));
 struct sockaddr_in6 * local_iface __P((char *ifname));
-extern vifi_t   find_vif_direct     __P((struct sockaddr_in6 *src));
-extern vifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
+extern mifi_t   find_vif_direct     __P((struct sockaddr_in6 *src));
+extern mifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
 extern int vif_forwarder __P((if_set *p1 ,if_set *p2));
 extern if_set *vif_and __P((if_set *p1, if_set *p2, if_set *result)); 
 extern if_set *vif_xor __P((if_set *p1, if_set *p2, if_set *result));

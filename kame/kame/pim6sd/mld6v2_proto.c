@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.2 2001/07/11 15:51:59 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.3 2001/08/09 08:46:57 suz Exp $
  */
 
 /*
@@ -49,7 +49,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
 #include <syslog.h>
@@ -405,7 +404,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
     int             datalen;
 {
 
-    register vifi_t vifi;
+    register mifi_t vifi;
     register struct uvif *v;
     struct mld6v2_report *report;
     struct mld6v2_maddr_rec *mard;
@@ -704,7 +703,7 @@ DelVifV2(arg)
     void           *arg;
 {
     cbk_t          *cbk = (cbk_t *) arg;
-    vifi_t          vifi = cbk->mifi;
+    mifi_t          vifi = cbk->mifi;
     struct uvif    *v = &uvifs[vifi];
     struct listaddr *a, **anp, *g = cbk->g;
     struct listaddr *b, **anq, *s = cbk->s;
@@ -790,7 +789,7 @@ DelVifV2(arg)
 
 static int
 SetTimerV2(vifi, g, s)
-    vifi_t          vifi;
+    mifi_t          vifi;
     struct listaddr *g;
     struct listaddr *s;
 
