@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.8 2001/09/06 05:33:57 itojun Exp $	*/
+/*	$KAME: main.c,v 1.9 2001/09/07 07:54:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -62,6 +62,7 @@ static int cmpsockaddr __P((const struct sockaddr *, int,
 	const struct sockaddr *, int));
 
 int dflag = 0;
+int prefixlen = 64;
 const char *iface;
 
 int
@@ -71,11 +72,22 @@ main(argc, argv)
 {
 	char c;
 	int sock;
+	unsigned long v;
+	char *ep;
 
-	while ((c = getopt(argc, argv, "d")) != EOF) {
+	while ((c = getopt(argc, argv, "dl:")) != EOF) {
 		switch (c) {
 		case 'd':
 			dflag++;
+			break;
+		case 'l':
+			ep = NULL;
+			v = strtoul(optarg, &ep, 10);
+			if (!ep || *ep) {
+				errx(1, "invalid argument");
+				/*NOTREACHED*/
+			}
+			prefixlen = (int)v;
 			break;
 		default:
 			usage();
@@ -117,7 +129,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: pdelegate [-d] iface\n");
+	fprintf(stderr, "usage: pdelegate [-d] [-l prefixlen] iface\n");
 }
 
 static void
@@ -365,7 +377,7 @@ send_initreq(s, serv, servlen)
 	memset(&req, 0, sizeof(req));
 	req.icmp6_pr_hdr.icmp6_type = ICMP6_PREFIX_REQUEST;
 	req.icmp6_pr_hdr.icmp6_code = ICMP6_PR_INITIAL_REQUEST;
-	req.icmp6_pr_hdr.icmp6_pr_flaglen = 64;	/*XXX*/
+	req.icmp6_pr_hdr.icmp6_pr_flaglen = prefixlen;
 	/* global scope */
 	req.icmp6_pr_hdr.icmp6_pr_flaglen &= ~ICMP6_PR_FLAGS_SCOPE;
 
@@ -432,8 +444,24 @@ receive(s, buf, blen, from, fromlenp)
 	if (p->icmp6_pd_hdr.icmp6_type != ICMP6_PREFIX_DELEGATION)
 		return -1;
 	/* XXX we need a global prefix */
-	if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_FLAGS_SCOPE) != 0)
+	if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_FLAGS_SCOPE) != 0) {
+		warnx("address scope is not global");
 		return -1;
+	}
+	/* we assume prefixlen to match up */
+	if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK) != 
+	    prefixlen) {
+		warnx("bogus prefixlen %u != requested %d",
+		    p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK,
+		    prefixlen);
+		return -1;
+	}
+	/* routing information field is yet to be standardized */
+	if (p->icmp6_pd_rtlen || l != sizeof(*p)) {
+		warnx("bogus routing information field");
+		return -1;
+	}
+
 
 	/* XXX more validation */
 
