@@ -1,6 +1,6 @@
-# $KAME: Makefile,v 1.7 2001/02/21 06:18:36 itojun Exp $
+# $KAME: Makefile,v 1.8 2001/03/26 05:22:22 itojun Exp $
 
-DISTNAME=	openssh-2.5.1p1
+DISTNAME=	openssh-2.5.2p2
 #CATEGORIES=	security net ipv6
 CATEGORIES=	security net
 # ${MASTER_SITES} is only for if CVS won't work, period.
