@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.119 2002/02/26 02:43:29 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.120 2002/02/26 03:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -557,13 +557,6 @@ rip6_output(m, va_alist)
 	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
 		goto bad;
 	}
-	if (oifp == NULL && in6p->in6p_route.ro_rt) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-		oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
-#else
-		oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
-#endif
-	}
 
 	/* fill in the rest of the IPv6 header fields */
 	ip6->ip6_dst = *dst;
@@ -624,7 +617,7 @@ rip6_output(m, va_alist)
 		struct sockaddr_in6 sa6_src = *sa6;
 
 		if ((error = in6_recoverscope(&sa6_src, &sa6->sin6_addr,
-					      oifp)) != 0) {
+					      NULL)) != 0) {
 			goto bad;
 		}
 		sa6_src.sin6_addr = sa6->sin6_addr; /* XXX */

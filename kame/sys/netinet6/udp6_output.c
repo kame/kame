@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.58 2002/02/04 07:24:36 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.59 2002/02/26 03:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,6 +162,7 @@ udp6_output(in6p, m, addr6, control)
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
 	struct sockaddr_in6 *lsa6 = NULL, *fsa6 = NULL;
+	struct ifnet *oifp = NULL;
 #ifndef SCOPEDROUTING
 	struct sockaddr_in6 lsa6_storage;
 #endif
@@ -280,12 +281,10 @@ udp6_output(in6p, m, addr6, control)
 		}
 
 		if (!IN6_IS_ADDR_V4MAPPED(&fsa6->sin6_addr)) {
-			struct ifnet *ifp = NULL;
-
 			lsa6 = in6_selectsrc(fsa6, in6p->in6p_outputopts,
 					     in6p->in6p_moptions,
 					     &in6p->in6p_route,
-					     &in6p->in6p_lsa, &ifp, &error);
+					     &in6p->in6p_lsa, &oifp, &error);
 #ifndef SCOPEDROUTING
 			/*
 			 * XXX: sa6 may not have a valid sin6_scope_id in
@@ -305,8 +304,8 @@ udp6_output(in6p, m, addr6, control)
 				lsa6 = &lsa6_storage;
 			}
 #endif
-			if (ifp && fsa6->sin6_scope_id == 0 &&
-			    (error = scope6_setzoneid(ifp, fsa6)) != 0) {
+			if (oifp && fsa6->sin6_scope_id == 0 &&
+			    (error = scope6_setzoneid(oifp, fsa6)) != 0) {
 				goto release;
 			}
 		} else {
@@ -429,9 +428,7 @@ udp6_output(in6p, m, addr6, control)
 		ip6->ip6_plen	= htons((u_short)plen);
 #endif
 		ip6->ip6_nxt	= IPPROTO_UDP;
-		ip6->ip6_hlim	= in6_selecthlim(in6p,
-						 in6p->in6p_route.ro_rt ?
-						 in6p->in6p_route.ro_rt->rt_ifp : NULL);
+		ip6->ip6_hlim	= in6_selecthlim(in6p, oifp);
 		ip6->ip6_src	= lsa6->sin6_addr;
 		ip6->ip6_dst	= fsa6->sin6_addr;
 
