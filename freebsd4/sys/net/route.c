@@ -1456,7 +1456,7 @@ rt_draincache()
 		if (rt_cache_timeout_q->rtq_count > 0)
 			rt_cache_timeout_q->rtq_count--;
 		else
-			printf("rt_timer_timer: rtq_count reached 0\n");
+			printf("rt_draincache: rtq_count reached 0\n");
 	}
 
 	/*
