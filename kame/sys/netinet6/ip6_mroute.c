@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.26 2000/07/12 14:12:35 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.27 2000/07/13 14:39:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -121,7 +121,11 @@ struct mrt6stat	mrt6stat;
 
 struct mf6c	*mf6ctable[MF6CTBLSIZ];
 u_char		nexpire[MF6CTBLSIZ];
+#ifndef __OpenBSD__
 static struct mif6 mif6table[MAXMIFS];
+#else
+struct mif6 mif6table[MAXMIFS];
+#endif
 #ifdef MRT6DEBUG
 u_int		mrt6debug = 0;	  /* debug level 	*/
 #define		DEBUG_MFC	0x02
