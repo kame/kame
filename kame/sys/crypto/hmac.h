@@ -1,4 +1,4 @@
-/*	$KAME: hmac.h,v 1.2 2002/06/27 12:45:45 itojun Exp $	*/
+/*	$KAME: hmac.h,v 1.3 2002/07/08 09:52:10 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -54,6 +54,9 @@ typedef struct hmac_ctx	HMAC_CTX;
 extern struct hmac_hash hmac_hash[];
 #define HMAC_MD5	&hmac_hash[0]
 #define HMAC_SHA1	&hmac_hash[1]
+#define HMAC_SHA2_256	&hmac_hash[2]
+#define HMAC_SHA2_384	&hmac_hash[3]
+#define HMAC_SHA2_512	&hmac_hash[4]
 
 int hmac_init(HMAC_CTX *, u_int8_t *, int, struct hmac_hash *);
 int hmac_loop(HMAC_CTX *, u_int8_t *, int);
