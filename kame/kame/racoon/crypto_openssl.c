@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.38 2000/09/19 16:19:50 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.39 2000/09/19 18:29:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.38 2000/09/19 16:19:50 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.39 2000/09/19 18:29:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -284,10 +284,11 @@ eay_get_x509asn1subjectname(cert)
  */
 #include <openssl/x509v3.h>
 int
-eay_get_x509subjectaltname(cert, altname, type)
+eay_get_x509subjectaltname(cert, altname, type, pos)
 	vchar_t *cert;
 	char **altname;
 	int *type;
+	int pos;
 {
 	X509 *x509 = NULL;
 	X509_EXTENSION *ext;
@@ -295,9 +296,8 @@ eay_get_x509subjectaltname(cert, altname, type)
 	STACK_OF(GENERAL_NAME) *name;
 	CONF_VALUE *cval = NULL;
 	STACK_OF(CONF_VALUE) *nval = NULL;
-	char *p;
 	u_char *bp;
-	int i;
+	int i, len;
 	int error = -1;
 
 	*altname = NULL;
@@ -328,38 +328,23 @@ eay_get_x509subjectaltname(cert, altname, type)
 	if(!nval)
 		goto end;
 
-	/*
-	 * XXX What is the subjectAltName which the function should
-	 * return if CERT has multiple subjectlatnames ?
-	 * At this moment, the function only returns 1st subjectaltname.
-	 *
-	 * #define MULTI_SUBJECTALTNAME
-	 * XXX The code to get multiple subjectname has not completed.
-	 */
-    {
-	int i = 0, tlen = 0, len = 0;
-#ifdef MULTI_SUBJECTALTNAME
 	for(i = 0; i < sk_CONF_VALUE_num(nval); i++) {
-#endif
+		/* skip the name */
+		if (i + 1 != pos)
+			continue;
 		cval = sk_CONF_VALUE_value(nval, i);
 		len = strlen(cval->value) + 1;	/* '\0' included */
-		p = realloc(*altname, tlen + len);
-		if (!p) {
+		*altname = malloc(len);
+		if (!*altname) {
 			sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
 			goto end;
 		}
-		*altname = p;
-		(*altname)[tlen] = '\0';
-		strcat(*altname, cval->value);
+		strcpy(*altname, cval->value);
 
 		/* set type of the name */
 		eay_setgentype(cval->name, type);
-
-#ifdef MULTI_SUBJECTALTNAME
-		tlen += len;
 	}
-#endif
-    }
+
 	sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
 
 	error = 0;

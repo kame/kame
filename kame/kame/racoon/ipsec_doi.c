@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.101 2000/09/19 07:25:31 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.102 2000/09/19 18:29:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.101 2000/09/19 07:25:31 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.102 2000/09/19 18:29:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2972,7 +2972,7 @@ ipsecdoi_setid1(iph1)
 		if (oakley_getmycert(iph1) < 0)
 			goto err;
 		if (eay_get_x509subjectaltname(&iph1->cert->cert,
-				&altname, &type) < 0)
+				&altname, &type, 1) < 0)
 			goto err;
 		id_b.type = genid2doi(type);
 		if (id_b.type == 0) {

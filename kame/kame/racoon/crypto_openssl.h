@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.13 2000/09/13 04:50:24 itojun Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.14 2000/09/19 18:29:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: crypto_openssl.h,v 1.13 2000/09/13 04:50:24 itojun Exp $ */
+/* YIPS @(#)$Id: crypto_openssl.h,v 1.14 2000/09/19 18:29:04 sakane Exp $ */
 
 #ifdef HAVE_SIGNING_C
 /* X509 Certificate */
@@ -44,7 +44,7 @@
 
 extern int eay_check_x509cert __P((vchar_t *, char *));
 extern vchar_t *eay_get_x509asn1subjectname __P((vchar_t *));
-extern int eay_get_x509subjectaltname __P((vchar_t *, char **, int *));
+extern int eay_get_x509subjectaltname __P((vchar_t *, char **, int *, int));
 extern char *eay_get_x509text __P((vchar_t *));
 extern vchar_t *eay_get_x509cert __P((char *));
 extern vchar_t *eay_get_x509sign __P((vchar_t *, vchar_t *, vchar_t *));

@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.11 2000/09/19 17:50:45 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.12 2000/09/19 18:29:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.11 2000/09/19 17:50:45 sakane Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.12 2000/09/19 18:29:05 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -195,13 +195,20 @@ certtest()
 		vfree(vstr);
 
 		/* print subject alt name */
-		error = eay_get_x509subjectaltname(&c, &str, &type);
-		if (error) {
-			printf("no subjectaltname found.\n");
-		} else {
+	    {
+		int pos;
+		for (pos = 1; ; pos++) {
+			error = eay_get_x509subjectaltname(&c, &str, &type, pos);
+			if (error) {
+				printf("no subjectaltname found.\n");
+				break;
+			}
+			if (!str)
+				break;
 			printf("SubjectAltName: %d: %s\n", type, str);
 			free(str);
 		}
+	    }
 
 	    {
 		struct stat sb;

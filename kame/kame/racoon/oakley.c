@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.56 2000/09/19 07:46:19 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.57 2000/09/19 18:29:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.56 2000/09/19 07:46:19 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.57 2000/09/19 18:29:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1439,7 +1439,7 @@ oakley_check_certid(iph1)
 		caddr_t a = NULL;
 
 		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
-				&altname, &type) !=0) {
+				&altname, &type, 1) !=0) {
 			plog(logp, LOCATION, NULL,
 				"ERROR: Invalid SubjectAltName.\n");
 			free(altname);
@@ -1480,7 +1480,7 @@ oakley_check_certid(iph1)
 	case IPSECDOI_ID_FQDN:
 	case IPSECDOI_ID_USER_FQDN:
 		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
-				&altname, &type) !=0){
+				&altname, &type, 1) !=0){
 			plog(logp, LOCATION, NULL,
 				"ERROR: Invalid SubjectAltName.\n");
 			free(altname);
