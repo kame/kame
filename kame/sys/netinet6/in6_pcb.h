@@ -84,9 +84,7 @@ struct	in6pcb {
 					/* pointers to other pcb's */
 	struct	in6pcb *in6p_head;	/* pointer back to chain of
 					   in6pcb's for this protocol */
-	struct	in6_addr in6p_faddr; /* foreign socket address */
 	u_int16_t in6p_fport;		/* foreign port */
-	struct	in6_addr in6p_laddr;	/* local socket address */
 	u_int16_t in6p_lport;		/* local port */
 	u_int32_t in6p_flowinfo;	/* priority and flowlabel */
 	struct	socket *in6p_socket;	/* back pointer to socket */
@@ -111,6 +109,9 @@ struct	in6pcb {
 	struct icmp6_filter *in6p_icmp6filt;
 	int	in6p_cksum;		/* IPV6_CHECKSUM setsockopt */
 };
+
+#define in6p_faddr	in6p_ip6.ip6_dst
+#define in6p_laddr	in6p_ip6.ip6_src
 
 /*
  * Flags in in6p_flags
