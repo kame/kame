@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.68 2000/03/29 17:20:18 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.69 2000/03/29 17:27:16 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -490,6 +490,8 @@ in6_control(so, cmd, data, ifp)
 			return(EPERM);
 		/*fall through*/
 	case SIOCGIFPREFIX_IN6:
+		if (ip6_forwarding == 0)
+			return(EPERM);
 		return(in6_prefix_ioctl(so, cmd, data, ifp));
 	}
 
