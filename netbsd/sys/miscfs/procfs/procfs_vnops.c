@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_vnops.c,v 1.61.2.1 1999/08/28 23:28:16 he Exp $	*/
+/*	$NetBSD: procfs_vnops.c,v 1.70 2000/03/30 02:20:14 simonb Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -99,11 +99,9 @@ struct proc_target {
 };
 static int nproc_targets = sizeof(proc_targets) / sizeof(proc_targets[0]);
 
-static pid_t atopid __P((const char *, u_int));
-
 int	procfs_lookup	__P((void *));
-#define	procfs_create	genfs_eopnotsupp
-#define	procfs_mknod	genfs_eopnotsupp
+#define	procfs_create	genfs_eopnotsupp_rele
+#define	procfs_mknod	genfs_eopnotsupp_rele
 int	procfs_open	__P((void *));
 int	procfs_close	__P((void *));
 int	procfs_access	__P((void *));
@@ -111,30 +109,31 @@ int	procfs_getattr	__P((void *));
 int	procfs_setattr	__P((void *));
 #define	procfs_read	procfs_rw
 #define	procfs_write	procfs_rw
+#define	procfs_fcntl	genfs_fcntl
 #define	procfs_ioctl	genfs_enoioctl
 #define	procfs_poll	genfs_poll
 #define procfs_revoke	genfs_revoke
 #define	procfs_mmap	genfs_eopnotsupp
 #define	procfs_fsync	genfs_nullop
 #define	procfs_seek	genfs_nullop
-#define	procfs_remove	genfs_eopnotsupp
+#define	procfs_remove	genfs_eopnotsupp_rele
 int	procfs_link	__P((void *));
-#define	procfs_rename	genfs_eopnotsupp
-#define	procfs_mkdir	genfs_eopnotsupp
-#define	procfs_rmdir	genfs_eopnotsupp
+#define	procfs_rename	genfs_eopnotsupp_rele
+#define	procfs_mkdir	genfs_eopnotsupp_rele
+#define	procfs_rmdir	genfs_eopnotsupp_rele
 int	procfs_symlink	__P((void *));
 int	procfs_readdir	__P((void *));
 int	procfs_readlink	__P((void *));
 #define	procfs_abortop	genfs_abortop
 int	procfs_inactive	__P((void *));
 int	procfs_reclaim	__P((void *));
-#define	procfs_lock	genfs_nolock
-#define	procfs_unlock	genfs_nounlock
+#define	procfs_lock	genfs_lock
+#define	procfs_unlock	genfs_unlock
 int	procfs_bmap	__P((void *));
 #define	procfs_strategy	genfs_badop
 int	procfs_print	__P((void *));
 int	procfs_pathconf	__P((void *));
-#define	procfs_islocked	genfs_noislocked
+#define	procfs_islocked	genfs_islocked
 #define	procfs_advlock	genfs_einval
 #define	procfs_blkatoff	genfs_eopnotsupp
 #define	procfs_valloc	genfs_eopnotsupp
@@ -161,6 +160,7 @@ struct vnodeopv_entry_desc procfs_vnodeop_entries[] = {
 	{ &vop_setattr_desc, procfs_setattr },		/* setattr */
 	{ &vop_read_desc, procfs_read },		/* read */
 	{ &vop_write_desc, procfs_write },		/* write */
+	{ &vop_fcntl_desc, procfs_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, procfs_ioctl },		/* ioctl */
 	{ &vop_poll_desc, procfs_poll },		/* poll */
 	{ &vop_revoke_desc, procfs_revoke },		/* revoke */
@@ -324,7 +324,7 @@ procfs_bmap(v)
  * chances are that the process will still be
  * there and PFIND is not free.
  *
- * (vp) is ocked on entry, but must be unlocked on exit.
+ * (vp) is locked on entry, but must be unlocked on exit.
  */
 int
 procfs_inactive(v)
@@ -482,6 +482,7 @@ procfs_getattr(v)
 	switch (pfs->pfs_type) {
 	case Proot:
 	case Pcurproc:
+	case Pself:
 		procp = 0;
 		break;
 
@@ -573,6 +574,13 @@ procfs_getattr(v)
 		    sprintf(buf, "%ld", (long)curproc->p_pid);
 		break;
 	}
+
+	case Pself:
+		vap->va_nlink = 1;
+		vap->va_uid = 0;
+		vap->va_gid = 0;
+		vap->va_bytes = vap->va_size = sizeof("curproc");
+		break;
 
 	case Pproc:
 		vap->va_nlink = 2;
@@ -671,9 +679,20 @@ procfs_access(v)
  * general case, however for most pseudo-filesystems
  * very little needs to be done.
  *
- * unless you want to get a migraine, just make sure your
- * filesystem doesn't do any locking of its own.  otherwise
- * read and inwardly digest ufs_lookup().
+ * Locking isn't hard here, just poorly documented.
+ *
+ * If we're looking up ".", just vref the parent & return it. 
+ *
+ * If we're looking up "..", unlock the parent, and lock "..". If everything
+ * went ok, and we're on the last component and the caller requested the
+ * parent locked, try to re-lock the parent. We do this to prevent lock
+ * races.
+ *
+ * For anything else, get the needed node. Then unlock the parent if not
+ * the last component or not LOCKPARENT (i.e. if we wouldn't re-lock the
+ * parent in the .. case).
+ *
+ * We try to exit with the parent locked in error cases.
  */
 int
 procfs_lookup(v)
@@ -693,9 +712,10 @@ procfs_lookup(v)
 	pid_t pid;
 	struct pfsnode *pfs;
 	struct proc *p;
-	int i;
+	int i, error, wantpunlock, iscurproc = 0, isself = 0;
 
 	*vpp = NULL;
+	cnp->cn_flags &= ~PDIRUNLOCK;
 
 	if (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME)
 		return (EROFS);
@@ -703,18 +723,31 @@ procfs_lookup(v)
 	if (cnp->cn_namelen == 1 && *pname == '.') {
 		*vpp = dvp;
 		VREF(dvp);
-		/* vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY, curp); */
 		return (0);
 	}
 
+	wantpunlock = (~cnp->cn_flags & (LOCKPARENT | ISLASTCN));
 	pfs = VTOPFS(dvp);
 	switch (pfs->pfs_type) {
 	case Proot:
-		if (cnp->cn_flags & ISDOTDOT)
+		/*
+		 * Shouldn't get here with .. in the root node.
+		 */
+		if (cnp->cn_flags & ISDOTDOT) 
 			return (EIO);
 
-		if (CNEQ(cnp, "curproc", 7))
-			return (procfs_allocvp(dvp->v_mount, vpp, 0, Pcurproc));
+		iscurproc = CNEQ(cnp, "curproc", 7);
+		isself = CNEQ(cnp, "self", 4);
+
+		if (iscurproc || isself) {
+			error = procfs_allocvp(dvp->v_mount, vpp, 0,
+			    iscurproc ? Pcurproc : Pself);
+			if ((error == 0) && (wantpunlock)) {
+				VOP_UNLOCK(dvp, 0);
+				cnp->cn_flags |= PDIRUNLOCK;
+			}
+			return (error);
+		}
 
 		pid = atopid(pname, cnp->cn_namelen);
 		if (pid == NO_PID)
@@ -724,11 +757,29 @@ procfs_lookup(v)
 		if (p == 0)
 			break;
 
-		return (procfs_allocvp(dvp->v_mount, vpp, pid, Pproc));
+		error = procfs_allocvp(dvp->v_mount, vpp, pid, Pproc);
+		if ((error == 0) && (wantpunlock)) {
+			VOP_UNLOCK(dvp, 0);
+			cnp->cn_flags |= PDIRUNLOCK;
+		}
+		return (error);
 
 	case Pproc:
-		if (cnp->cn_flags & ISDOTDOT)
-			return (procfs_root(dvp->v_mount, vpp));
+		/*
+		 * do the .. dance. We unlock the directory, and then
+		 * get the root dir. That will automatically return ..
+		 * locked. Then if the caller wanted dvp locked, we
+		 * re-lock.
+		 */
+		if (cnp->cn_flags & ISDOTDOT) {
+			VOP_UNLOCK(dvp, 0);
+			cnp->cn_flags |= PDIRUNLOCK;
+			error = procfs_root(dvp->v_mount, vpp);
+			if ((error == 0) && (wantpunlock == 0) &&
+				    ((error = vn_lock(dvp, LK_EXCLUSIVE)) == 0))
+				cnp->cn_flags &= ~PDIRUNLOCK;
+			return (error);
+		}
 
 		p = PFIND(pfs->pfs_pid);
 		if (p == 0)
@@ -748,12 +799,21 @@ procfs_lookup(v)
 			/* We already checked that it exists. */
 			VREF(fvp);
 			vn_lock(fvp, LK_EXCLUSIVE | LK_RETRY);
+			if (wantpunlock) {
+				VOP_UNLOCK(dvp, 0);
+				cnp->cn_flags |= PDIRUNLOCK;
+			}
 			*vpp = fvp;
 			return (0);
 		}
 
-		return (procfs_allocvp(dvp->v_mount, vpp, pfs->pfs_pid,
-		    pt->pt_pfstype));
+		error = procfs_allocvp(dvp->v_mount, vpp, pfs->pfs_pid,
+					pt->pt_pfstype);
+		if ((error == 0) && (wantpunlock)) {
+			VOP_UNLOCK(dvp, 0);
+			cnp->cn_flags |= PDIRUNLOCK;
+		}
+		return (error);
 
 	default:
 		return (ENOTDIR);
@@ -860,8 +920,9 @@ procfs_readdir(v)
 
 	/*
 	 * this is for the root of the procfs filesystem
-	 * what is needed is a special entry for "curproc"
-	 * followed by an entry for each process on allproc
+	 * what is needed are special entries for "curproc"
+	 * and "self" followed by an entry for each process
+	 * on allproc
 #ifdef PROCFS_ZOMBIE
 	 * and deadproc and zombproc.
 #endif
@@ -887,6 +948,7 @@ procfs_readdir(v)
 		 * XXX: THIS LOOP ASSUMES THAT allproc IS THE FIRST
 		 * PROCLIST IN THE proclists!
 		 */
+		proclist_lock_read();
 		pd = proclists;
 #ifdef PROCFS_ZOMBIE
 	again:
@@ -905,8 +967,15 @@ procfs_readdir(v)
 
 			case 2:
 				d.d_fileno = PROCFS_FILENO(0, Pcurproc);
-				d.d_namlen = 7;
-				memcpy(d.d_name, "curproc", 8);
+				d.d_namlen = sizeof("curproc") - 1;
+				memcpy(d.d_name, "curproc", sizeof("curproc"));
+				d.d_type = DT_LNK;
+				break;
+
+			case 3:
+				d.d_fileno = PROCFS_FILENO(0, Pself);
+				d.d_namlen = sizeof("self") - 1;
+				memcpy(d.d_name, "self", sizeof("self"));
 				d.d_type = DT_LNK;
 				break;
 
@@ -938,6 +1007,7 @@ procfs_readdir(v)
 		if (p == NULL && pd->pd_list != NULL)
 			goto again;
 #endif
+		proclist_unlock_read();
 		ncookies = nc;
 
 		break;
@@ -973,10 +1043,12 @@ procfs_readlink(v)
 	char buf[16];		/* should be enough */
 	int len;
 
-	if (VTOPFS(ap->a_vp)->pfs_fileno != PROCFS_FILENO(0, Pcurproc))
+	if (VTOPFS(ap->a_vp)->pfs_fileno == PROCFS_FILENO(0, Pcurproc))
+		len = sprintf(buf, "%ld", (long)curproc->p_pid);
+	else if (VTOPFS(ap->a_vp)->pfs_fileno == PROCFS_FILENO(0, Pself))
+		len = sprintf(buf, "%s", "curproc");
+	else
 		return (EINVAL);
-
-	len = sprintf(buf, "%ld", (long)curproc->p_pid);
 
 	return (uiomove((caddr_t)buf, len, ap->a_uio));
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sig.c,v 1.87.2.1 1999/09/03 08:50:43 he Exp $	*/
+/*	$NetBSD: kern_sig.c,v 1.100 2000/05/27 00:40:46 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -42,6 +42,7 @@
 
 #include "opt_ktrace.h"
 #include "opt_compat_sunos.h"
+#include "opt_compat_netbsd32.h"	
 
 #define	SIGPROP		/* include signal properties table */
 #include <sys/param.h>
@@ -64,6 +65,8 @@
 #include <sys/core.h>
 #include <sys/ptrace.h>
 #include <sys/filedesc.h>
+#include <sys/malloc.h>
+#include <sys/pool.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -77,8 +80,13 @@
 
 void stop __P((struct proc *p));
 void killproc __P((struct proc *, char *));
-
+static int build_corename __P((struct proc *, char *));
+#if COMPAT_NETBSD32
+static int coredump32 __P((struct proc *, struct vnode *));
+#endif
 sigset_t contsigmask, stopsigmask, sigcantmask;
+
+struct pool sigacts_pool;	/* memory pool for sigacts structures */
 
 /*
  * Can process p, with pcred pc, send the signal signum to process q?
@@ -91,6 +99,80 @@ sigset_t contsigmask, stopsigmask, sigcantmask;
 	    (pc)->pc_ucred->cr_uid == (q)->p_ucred->cr_uid || \
 	    ((signum) == SIGCONT && (q)->p_session == (p)->p_session))
 
+/*
+ * Initialize signal-related data structures.
+ */
+void
+signal_init()
+{
+
+	pool_init(&sigacts_pool, sizeof(struct sigacts), 0, 0, 0, "sigapl",
+	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_SUBPROC);
+}
+
+/*
+ * Create an initial sigacts structure, using the same signal state
+ * as p.
+ */
+struct sigacts *
+sigactsinit(p)
+	struct proc *p;
+{
+	struct sigacts *ps;
+
+	ps = pool_get(&sigacts_pool, PR_WAITOK);
+	memcpy(ps, p->p_sigacts, sizeof(struct sigacts));
+	ps->ps_refcnt = 1;
+	return (ps);
+}
+
+/*
+ * Make p2 share p1's sigacts.
+ */
+void
+sigactsshare(p1, p2)
+	struct proc *p1, *p2;
+{
+
+	p2->p_sigacts = p1->p_sigacts;
+	p1->p_sigacts->ps_refcnt++;
+}
+
+/*
+ * Make this process not share its sigacts, maintaining all
+ * signal state.
+ */
+void
+sigactsunshare(p)
+	struct proc *p;
+{
+	struct sigacts *newps;
+
+	if (p->p_sigacts->ps_refcnt == 1)
+		return;
+
+	newps = sigactsinit(p);
+	sigactsfree(p);
+	p->p_sigacts = newps;
+}
+
+/*
+ * Release a sigacts structure.
+ */
+void
+sigactsfree(p)
+	struct proc *p;
+{
+	struct sigacts *ps = p->p_sigacts;
+
+	if (--ps->ps_refcnt > 0)
+		return;
+
+	p->p_sigacts = NULL;
+
+	pool_put(&sigacts_pool, ps);
+}
+
 int
 sigaction1(p, signum, nsa, osa)
 	struct proc *p;
@@ -98,7 +180,7 @@ sigaction1(p, signum, nsa, osa)
 	const struct sigaction *nsa;
 	struct sigaction *osa;
 {
-	register struct sigacts *ps = p->p_sigacts;
+	struct sigacts *ps = p->p_sigacts;
 	int prop;
 
 	if (signum <= 0 || signum >= NSIG)
@@ -175,7 +257,7 @@ sys___sigaction14(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys___sigaction14_args /* {
+	struct sys___sigaction14_args /* {
 		syscallarg(int) signum;
 		syscallarg(const struct sigaction *) nsa;
 		syscallarg(struct sigaction *) osa;
@@ -209,8 +291,8 @@ void
 siginit(p)
 	struct proc *p;
 {
-	register struct sigacts *ps = p->p_sigacts;
-	register int signum;
+	struct sigacts *ps = p->p_sigacts;
+	int signum;
 	int prop;
 
 	sigemptyset(&contsigmask);
@@ -238,6 +320,9 @@ siginit(p)
 	ps->ps_sigstk.ss_flags = SS_DISABLE;
 	ps->ps_sigstk.ss_size = 0;
 	ps->ps_sigstk.ss_sp = 0;
+
+	/* One reference. */
+	ps->ps_refcnt = 1;
 }
 
 /*
@@ -245,10 +330,10 @@ siginit(p)
  */
 void
 execsigs(p)
-	register struct proc *p;
+	struct proc *p;
 {
-	register struct sigacts *ps = p->p_sigacts;
-	register int signum;
+	struct sigacts *ps = p->p_sigacts;
+	int signum;
 	int prop;
 
 	/*
@@ -324,7 +409,7 @@ sigprocmask1(p, how, nss, oss)
  */
 int
 sys___sigprocmask14(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -370,7 +455,7 @@ sys___sigpending14(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys___sigpending14_args /* {
+	struct sys___sigpending14_args /* {
 		syscallarg(sigset_t *) set;
 	} */ *uap = v;
 	sigset_t ss;
@@ -384,7 +469,7 @@ sigsuspend1(p, ss)
 	struct proc *p;
 	const sigset_t *ss;
 {
-	register struct sigacts *ps = p->p_sigacts;
+	struct sigacts *ps = p->p_sigacts;
 
 	if (ss) {
 		/*
@@ -417,7 +502,7 @@ sigsuspend1(p, ss)
 /* ARGSUSED */
 int
 sys___sigsuspend14(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -442,7 +527,7 @@ sigaltstack1(p, nss, oss)
 	const struct sigaltstack *nss;
 	struct sigaltstack *oss;
 {
-	register struct sigacts *ps = p->p_sigacts;
+	struct sigacts *ps = p->p_sigacts;
 
 	if (oss)
 		*oss = ps->ps_sigstk;
@@ -471,7 +556,7 @@ sys___sigaltstack14(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys___sigaltstack14_args /* {
+	struct sys___sigaltstack14_args /* {
 		syscallarg(const struct sigaltstack *) nss;
 		syscallarg(struct sigaltstack *) oss;
 	} */ *uap = v;
@@ -498,16 +583,16 @@ sys___sigaltstack14(p, v, retval)
 /* ARGSUSED */
 int
 sys_kill(cp, v, retval)
-	register struct proc *cp;
+	struct proc *cp;
 	void *v;
 	register_t *retval;
 {
-	register struct sys_kill_args /* {
+	struct sys_kill_args /* {
 		syscallarg(int) pid;
 		syscallarg(int) signum;
 	} */ *uap = v;
-	register struct proc *p;
-	register struct pcred *pc = cp->p_cred;
+	struct proc *p;
+	struct pcred *pc = cp->p_cred;
 
 	if ((u_int)SCARG(uap, signum) >= NSIG)
 		return (EINVAL);
@@ -538,18 +623,19 @@ sys_kill(cp, v, retval)
  */
 int
 killpg1(cp, signum, pgid, all)
-	register struct proc *cp;
+	struct proc *cp;
 	int signum, pgid, all;
 {
-	register struct proc *p;
-	register struct pcred *pc = cp->p_cred;
+	struct proc *p;
+	struct pcred *pc = cp->p_cred;
 	struct pgrp *pgrp;
 	int nfound = 0;
 	
-	if (all)	
+	if (all) {
 		/* 
 		 * broadcast 
 		 */
+		proclist_lock_read();
 		for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
 			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM || 
 			    p == cp || !CANSIGNAL(cp, pc, p, signum))
@@ -558,7 +644,8 @@ killpg1(cp, signum, pgid, all)
 			if (signum)
 				psignal(p, signum);
 		}
-	else {
+		proclist_unlock_read();
+	} else {
 		if (pgid == 0)		
 			/* 
 			 * zero pgid means send to my process group.
@@ -574,7 +661,7 @@ killpg1(cp, signum, pgid, all)
 			    !CANSIGNAL(cp, pc, p, signum))
 				continue;
 			nfound++;
-			if (signum && p->p_stat != SZOMB)
+			if (signum && P_ZOMBIE(p) == 0)
 				psignal(p, signum);
 		}
 	}
@@ -603,7 +690,7 @@ pgsignal(pgrp, signum, checkctty)
 	struct pgrp *pgrp;
 	int signum, checkctty;
 {
-	register struct proc *p;
+	struct proc *p;
 
 	if (pgrp)
 		for (p = pgrp->pg_members.lh_first; p != 0; p = p->p_pglist.le_next)
@@ -619,10 +706,10 @@ pgsignal(pgrp, signum, checkctty)
 void
 trapsignal(p, signum, code)
 	struct proc *p;
-	register int signum;
+	int signum;
 	u_long code;
 {
-	register struct sigacts *ps = p->p_sigacts;
+	struct sigacts *ps = p->p_sigacts;
 
 	if ((p->p_flag & P_TRACED) == 0 &&
 	    sigismember(&p->p_sigcatch, signum) &&
@@ -630,7 +717,7 @@ trapsignal(p, signum, code)
 		p->p_stats->p_ru.ru_nsignals++;
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_PSIG))
-			ktrpsig(p->p_tracep, signum,
+			ktrpsig(p, signum,
 			    ps->ps_sigact[signum].sa_handler, &p->p_sigmask,
 			    code);
 #endif
@@ -667,11 +754,11 @@ trapsignal(p, signum, code)
  */
 void
 psignal(p, signum)
-	register struct proc *p;
-	register int signum;
+	struct proc *p;
+	int signum;
 {
-	register int s, prop;
-	register sig_t action;
+	int s, prop;
+	sig_t action;
 
 #ifdef DIAGNOSTIC
 	if (signum <= 0 || signum >= NSIG)
@@ -837,14 +924,18 @@ psignal(p, signum)
 			unsleep(p);
 		goto out;
 
+	case SONPROC:
+		/*
+		 * We're running; notice the signal.
+		 */
+		signotify(p);
+		goto out;
+
 	default:
 		/*
-		 * SRUN, SIDL, SZOMB do nothing with the signal,
-		 * other than kicking ourselves if we are running.
+		 * SRUN, SIDL, SDEAD, SZOMB do nothing with the signal.
 		 * It will either never be noticed, or noticed very soon.
 		 */
-		if (p == curproc)
-			signotify(p);
 		goto out;
 	}
 	/*NOTREACHED*/
@@ -904,9 +995,9 @@ firstsig(ss)
  */
 int
 issignal(p)
-	register struct proc *p;
+	struct proc *p;
 {
-	register int signum, prop;
+	int signum, prop;
 	sigset_t ss;
 
 	for (;;) {
@@ -938,7 +1029,7 @@ issignal(p)
 				psignal(p->p_pptr, SIGCHLD);
 			do {
 				stop(p);
-				mi_switch();
+				mi_switch(p);
 			} while (!trace_req(p) && p->p_flag & P_TRACED);
 
 			/*
@@ -999,7 +1090,7 @@ issignal(p)
 				if ((p->p_pptr->p_flag & P_NOCLDSTOP) == 0)
 					psignal(p->p_pptr, SIGCHLD);
 				stop(p);
-				mi_switch();
+				mi_switch(p);
 				break;
 			} else if (prop & SA_IGNORE) {
 				/*
@@ -1045,7 +1136,7 @@ keep:
  */
 void
 stop(p)
-	register struct proc *p;
+	struct proc *p;
 {
 
 	p->p_stat = SSTOP;
@@ -1059,11 +1150,11 @@ stop(p)
  */
 void
 postsig(signum)
-	register int signum;
+	int signum;
 {
-	register struct proc *p = curproc;
-	register struct sigacts *ps = p->p_sigacts;
-	register sig_t action;
+	struct proc *p = curproc;
+	struct sigacts *ps = p->p_sigacts;
+	sig_t action;
 	u_long code;
 	sigset_t *returnmask;
 
@@ -1075,7 +1166,7 @@ postsig(signum)
 	action = ps->ps_sigact[signum].sa_handler;
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_PSIG))
-		ktrpsig(p->p_tracep,
+		ktrpsig(p,
 		    signum, action, ps->ps_flags & SAS_OLDMASK ?
 		    &ps->ps_oldmask : &p->p_sigmask, 0);
 #endif
@@ -1151,18 +1242,42 @@ killproc(p, why)
  * If dumping core, save the signal number for the debugger.  Calls exit and
  * does not return.
  */
+
+#if defined(DEBUG)
+int	kern_logsigexit = 1;	/* not static to make public for sysctl */
+#else
+int	kern_logsigexit = 0;	/* not static to make public for sysctl */
+#endif
+
+static	char	*logcoredump =
+	"pid %d (%s), uid %d: exited on signal %d (core dumped)\n";
+static	char	*lognocoredump =
+	"pid %d (%s), uid %d: exited on signal %d (core not dumped, err = %d)\n";
+
 void
 sigexit(p, signum)
-	register struct proc *p;
+	struct proc *p;
 	int signum;
 {
+	int	error;
+	char	*errmsg;
 
 	p->p_acflag |= AXSIG;
 	if (sigprop[signum] & SA_CORE) {
 		p->p_sigacts->ps_sig = signum;
-		if (coredump(p) == 0)
+		if ((error = coredump(p)) == 0) {
 			signum |= WCOREFLAG;
+			errmsg = logcoredump;
+		} else {
+			errmsg = lognocoredump;
+		}
+
+		if (kern_logsigexit)
+			log(LOG_INFO, errmsg, p->p_pid, p->p_comm,
+			    p->p_cred && p->p_ucred ? p->p_ucred->cr_uid : -1,
+			    signum &~ WCOREFLAG, error);
 	}
+
 	exit1(p, W_EXITCODE(0, signum));
 	/* NOTREACHED */
 }
@@ -1173,17 +1288,16 @@ sigexit(p, signum)
  */
 int
 coredump(p)
-	register struct proc *p;
+	struct proc *p;
 {
-	register struct vnode *vp;
-	register struct vmspace *vm = p->p_vmspace;
-	register struct ucred *cred = p->p_cred->pc_ucred;
+	struct vnode *vp;
+	struct vmspace *vm = p->p_vmspace;
+	struct ucred *cred = p->p_cred->pc_ucred;
 	struct nameidata nd;
 	struct vattr vattr;
 	int error, error1;
-	char name[MAXCOMLEN+6];		/* progname.core */
+	char name[MAXPATHLEN];
 	struct core core;
-	extern int shortcorename;
 
 	/*
 	 * Make sure the process has not set-id, to prevent data leaks.
@@ -1205,16 +1319,15 @@ coredump(p)
 	 * sure that the directory is still there and that the mount flags
 	 * allow us to write core dumps there.
 	 */
-	vp = p->p_fd->fd_cdir;
+	vp = p->p_cwdi->cwdi_cdir;
 	if (vp->v_mount == NULL ||
 	    (vp->v_mount->mnt_flag & MNT_NOCOREDUMP) != 0)
 		return (EPERM);
 
-	if (shortcorename) 
-		sprintf(name, "core");
-	else
-		sprintf(name, "%s.core", p->p_comm);
-	
+	error = build_corename(p, name);
+	if (error)
+		return error;
+
 	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, p);
 	error = vn_open(&nd, O_CREAT | FWRITE | FNOSYMLINK, S_IRUSR | S_IWUSR);
 	if (error)
@@ -1232,6 +1345,11 @@ coredump(p)
 	VOP_LEASE(vp, p, cred, LEASE_WRITE);
 	VOP_SETATTR(vp, &vattr, cred, p);
 	p->p_acflag |= ACORE;
+
+#if COMPAT_NETBSD32
+	if (p->p_flag & P_32)
+		return (coredump32(p, vp));
+#endif
 #if 0
 	/*
 	 * XXX
@@ -1296,6 +1414,85 @@ out:
 	return (error);
 }
 
+#if COMPAT_NETBSD32
+/*
+ * Same as coredump, but generates a 32-bit image.
+ */
+int
+coredump32(p, vp)
+	struct proc *p;
+	struct vnode *vp;
+{
+	struct vmspace *vm = p->p_vmspace;
+	struct ucred *cred = p->p_cred->pc_ucred;
+	int error, error1;
+	struct core32 core;
+
+#if 0
+	/*
+	 * XXX
+	 * It would be nice if we at least dumped the signal state (and made it
+	 * available at run time to the debugger, as well), but this code
+	 * hasn't actually had any effect for a long time, since we don't dump
+	 * the user area.  For now, it's dead.
+	 */
+	memcpy(&p->p_addr->u_kproc.kp_proc, p, sizeof(struct proc));
+	fill_eproc(p, &p->p_addr->u_kproc.kp_eproc);
+#endif
+
+	core.c_midmag = 0;
+	strncpy(core.c_name, p->p_comm, MAXCOMLEN);
+	core.c_nseg = 0;
+	core.c_signo = p->p_sigacts->ps_sig;
+	core.c_ucode = p->p_sigacts->ps_code;
+	core.c_cpusize = 0;
+	core.c_tsize = (u_long)ctob(vm->vm_tsize);
+	core.c_dsize = (u_long)ctob(vm->vm_dsize);
+	core.c_ssize = (u_long)round_page(ctob(vm->vm_ssize));
+	error = cpu_coredump32(p, vp, cred, &core);
+	if (error)
+		goto out;
+	if (core.c_midmag == 0) {
+		/* XXX
+		 * cpu_coredump() didn't bother to set the magic; assume
+		 * this is a request to do a traditional dump. cpu_coredump()
+		 * is still responsible for setting sensible values in
+		 * the core header.
+		 */
+		if (core.c_cpusize == 0)
+			core.c_cpusize = USPACE; /* Just in case */
+		error = vn_rdwr(UIO_WRITE, vp, vm->vm_daddr,
+		    (int)core.c_dsize,
+		    (off_t)core.c_cpusize, UIO_USERSPACE,
+		    IO_NODELOCKED|IO_UNIT, cred, NULL, p);
+		if (error)
+			goto out;
+		error = vn_rdwr(UIO_WRITE, vp,
+		    (caddr_t) trunc_page(USRSTACK - ctob(vm->vm_ssize)),
+		    core.c_ssize,
+		    (off_t)(core.c_cpusize + core.c_dsize), UIO_USERSPACE,
+		    IO_NODELOCKED|IO_UNIT, cred, NULL, p);
+	} else {
+		/*
+		 * uvm_coredump() spits out all appropriate segments.
+		 * All that's left to do is to write the core header.
+		 */
+		error = uvm_coredump32(p, vp, cred, &core);
+		if (error)
+			goto out;
+		error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&core,
+		    (int)core.c_hdrsize, (off_t)0,
+		    UIO_SYSSPACE, IO_NODELOCKED|IO_UNIT, cred, NULL, p);
+	}
+out:
+	VOP_UNLOCK(vp, 0);
+	error1 = vn_close(vp, FWRITE, cred, p);
+	if (error == 0)
+		error = error1;
+	return (error);
+}
+#endif
+
 /*
  * Nonexistent system call-- signal process (may want to handle it).
  * Flag error in case process won't see signal immediately (blocked or ignored).
@@ -1310,4 +1507,53 @@ sys_nosys(p, v, retval)
 
 	psignal(p, SIGSYS);
 	return (ENOSYS);
+}
+
+static int
+build_corename(p, dst)
+	struct proc *p;
+	char *dst;
+{
+	const char *s;
+	char *d;
+	int len, i;
+	
+	for (s = p->p_limit->pl_corename, len = 0, d = dst;
+	    *s != '\0'; s++) {
+		if (*s == '%') {
+			switch (*(s+1)) {
+			case 'n':
+				i = snprintf(d,MAXPATHLEN - 1 - len, "%s",
+				    p->p_comm);
+				break;
+			case 'p':
+				i = snprintf(d, MAXPATHLEN - 1 - len, "%d",
+				    p->p_pid);
+				break;
+			case 'u':
+				i = snprintf(d, MAXPATHLEN - 1 - len, "%s",
+				    p->p_pgrp->pg_session->s_login);
+				break;
+			case 't':
+				i = snprintf(d, MAXPATHLEN - 1 - len, "%ld",
+				    p->p_stats->p_start.tv_sec);
+				break;
+			default:
+				goto copy;
+			}
+			if (i >= MAXPATHLEN - 1 - len)
+				return ENAMETOOLONG;
+			len += i;
+			d += i;
+			s++;
+		} else {
+copy:			*d = *s;
+			d++;
+			len++;
+			if (len >= MAXPATHLEN - 1)
+				return ENAMETOOLONG;
+		}
+	}
+	*d = '\0';
+	return 0;
 }

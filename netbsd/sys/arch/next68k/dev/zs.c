@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.10 1999/03/27 02:59:41 dbj Exp $	*/
+/*	$NetBSD: zs.c,v 1.12 2000/03/06 04:14:15 deberg Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -50,6 +50,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_serial.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -572,7 +573,6 @@ void
 zs_abort(cs)
 	struct zs_chanstate *cs;
 {
-#include "opt_serial.h"
 #if defined(ZS_CONSOLE_ABORT)
 	register volatile struct zschan *zc = zs_conschan;
 	int rr0;
@@ -589,8 +589,8 @@ zs_abort(cs)
 #elif defined(DDB)
 	Debugger();
 #else
-	printf("stopping on keyboard abort\n");
-	callrom();
+	/* XXX eventually, drop into next rom monitor here */
+	printf("stopping on keyboard abort not supported without DDB or KGDB\n");
 #endif
 #else /* !ZS_CONSOLE_ABORT */
 	return;

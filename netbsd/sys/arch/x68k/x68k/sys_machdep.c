@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.16.2.2 1999/11/29 21:29:22 he Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.20 2000/04/18 21:06:12 minoura Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -35,6 +35,7 @@
  *	@(#)sys_machdep.c	8.2 (Berkeley) 1/13/94
  */
 
+#include "opt_m680x0.h"
 #include "opt_compat_hpux.h"
 
 #include <sys/param.h>
@@ -143,8 +144,9 @@ cachectl1(req, addr, len, p)
 #if defined(M68040) || defined(M68060)
 	if (mmutype == MMU_68040) {
 		int inc = 0;
-		int pa = 0, doall = 0;
+		int doall = 0;
 		vaddr_t end;
+		paddr_t pa = 0;
 #ifdef COMPAT_HPUX
 		extern struct emul emul_hpux;
 
@@ -182,9 +184,8 @@ cachectl1(req, addr, len, p)
 			 */
 			if (!doall &&
 			    (pa == 0 || ((int)addr & PGOFSET) == 0)) {
-				pa = pmap_extract(p->p_vmspace->vm_map.pmap,
-						  addr);
-				if (pa == 0)
+				if (pmap_extract(p->p_vmspace->vm_map.pmap,
+				    addr, &pa) == FALSE)
 					doall = 1;
 			}
 			switch (req) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.208.2.1 1999/09/10 22:34:00 he Exp $	*/
+/*	$NetBSD: locore.s,v 1.222.2.1 2000/08/16 23:18:21 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -76,14 +76,16 @@
 
 #include "opt_cputype.h"
 #include "opt_ddb.h"
+#include "opt_ipkdb.h"
 #include "opt_vm86.h"
 #include "opt_user_ldt.h"
 #include "opt_dummy_nops.h"
-#include "opt_pmap_new.h"
 #include "opt_compat_freebsd.h"
 #include "opt_compat_linux.h"
 #include "opt_compat_ibcs2.h"
 #include "opt_compat_svr4.h"
+#include "opt_compat_oldboot.h"
+#include "opt_multiprocessor.h"
 
 #include "npx.h"
 #include "assym.h"
@@ -115,17 +117,22 @@
 /*
  * override user-land alignment before including asm.h
  */
+#ifdef __ELF__
+#define	ALIGN_DATA	.align	4
+#define	ALIGN_TEXT	.align	4,0x90	/* 4-byte boundaries, NOP-filled */
+#define	SUPERALIGN_TEXT	.align	16,0x90	/* 16-byte boundaries better for 486 */
+#else
 #define	ALIGN_DATA	.align	2
 #define	ALIGN_TEXT	.align	2,0x90	/* 4-byte boundaries, NOP-filled */
 #define	SUPERALIGN_TEXT	.align	4,0x90	/* 16-byte boundaries better for 486 */
+#endif
 #define _ALIGN_TEXT	ALIGN_TEXT
 #include <machine/asm.h>
 
 
 /* XXX temporary kluge; these should not be here */
-#define	IOM_BEGIN	0x0a0000	/* start of I/O memory "hole" */
-#define	IOM_END		0x100000	/* end of I/O memory "hole" */
-#define	IOM_SIZE	(IOM_END - IOM_BEGIN)
+/* Get definitions for IOM_BEGIN, IOM_END, and IOM_SIZE */
+#include <dev/isa/isareg.h>
 
 
 /* NB: NOP now preserves registers so NOPs can be inserted anywhere */
@@ -187,16 +194,9 @@
  *
  * XXX 4 == sizeof pde
  */
-#ifdef PMAP_NEW
 	.set	_C_LABEL(PTmap),(PDSLOT_PTE << PDSHIFT)
 	.set	_C_LABEL(PTD),(_C_LABEL(PTmap) + PDSLOT_PTE * NBPG)
 	.set	_C_LABEL(PTDpde),(_C_LABEL(PTD) + PDSLOT_PTE * 4)
-#else
-	.globl	_C_LABEL(PTmap),_C_LABEL(PTD),_C_LABEL(PTDpde)
-	.set	_C_LABEL(PTmap),(PTDPTDI << PDSHIFT)
-	.set	_C_LABEL(PTD),(_C_LABEL(PTmap) + PTDPTDI * NBPG)
-	.set	_C_LABEL(PTDpde),(_C_LABEL(PTD) + PTDPTDI * 4)
-#endif
 
 /*
  * APTmap, APTD is the alternate recursive pagemap.
@@ -204,16 +204,9 @@
  *
  * XXX 4 == sizeof pde
  */
-#ifdef PMAP_NEW
 	.set	_C_LABEL(APTmap),(PDSLOT_APTE << PDSHIFT)
 	.set	_C_LABEL(APTD),(_C_LABEL(APTmap) + PDSLOT_APTE * NBPG)
 	.set	_C_LABEL(APTDpde),(_C_LABEL(PTD) + PDSLOT_APTE * 4)
-#else
-	.globl	_C_LABEL(APTmap),_C_LABEL(APTD),_C_LABEL(APTDpde)
-	.set	_C_LABEL(APTmap),(APTDPTDI << PDSHIFT)
-	.set	_C_LABEL(APTD),(_C_LABEL(APTmap) + APTDPTDI * NBPG)
-	.set	_C_LABEL(APTDpde),(_C_LABEL(PTD) + APTDPTDI * 4)
-#endif
 
 
 /*
@@ -223,9 +216,11 @@
 
 	.globl	_C_LABEL(cpu),_C_LABEL(cpu_id),_C_LABEL(cpu_vendor)
 	.globl	_C_LABEL(cpuid_level),_C_LABEL(cpu_feature)
-	.globl	_C_LABEL(cold),_C_LABEL(esym),_C_LABEL(boothowto)
+	.globl	_C_LABEL(esym),_C_LABEL(boothowto)
 	.globl	_C_LABEL(bootinfo),_C_LABEL(atdevbase)
+#ifdef COMPAT_OLDBOOT
 	.globl	_C_LABEL(bootdev)
+#endif
 	.globl	_C_LABEL(proc0paddr),_C_LABEL(curpcb),_C_LABEL(PTDpaddr)
 	.globl	_C_LABEL(biosbasemem),_C_LABEL(biosextmem)
 	.globl	_C_LABEL(gdt)
@@ -241,7 +236,6 @@ _C_LABEL(cpuid_level):	.long	-1	# max. level accepted by 'cpuid'
 					#   instruction
 _C_LABEL(cpu_vendor):	.space	16	# vendor string returned by `cpuid'
 					#   instruction
-_C_LABEL(cold):		.long	1	# cold till we are not
 _C_LABEL(esym):		.long	0	# ptr to end of syms
 _C_LABEL(atdevbase):	.long	0	# location of start of iomem in virtual
 _C_LABEL(proc0paddr):	.long	0
@@ -272,14 +266,15 @@ tmpstk:
 start:	movw	$0x1234,0x472			# warm boot
 
 	/*
-	 * Load parameters from stack (howto, bootdev, unit, bootinfo, esym).
-	 * note: (%esp) is return address of boot
-	 * (If we want to hold onto /boot, it's physical %esp up to _end.)
+	 * Load parameters from stack
+	 * (howto, [bootdev], bootinfo, esym, basemem, extmem).
 	 */
 	movl	4(%esp),%eax
 	movl	%eax,RELOC(boothowto)
+#ifdef COMPAT_OLDBOOT
 	movl	8(%esp),%eax
 	movl	%eax,RELOC(bootdev)
+#endif
 	movl	12(%esp),%eax
 
 	testl	%eax, %eax
@@ -550,7 +545,6 @@ try586:	/* Use the `cpuid' instruction. */
 	 * Calculate the size of the kernel page table directory, and
 	 * how many entries it will have.
 	 */
-#if defined(PMAP_NEW)
 	movl	RELOC(nkpde),%ecx		# get nkpde
 	cmpl	$NKPTP_MIN,%ecx			# larger than min?
 	jge	1f
@@ -560,21 +554,6 @@ try586:	/* Use the `cpuid' instruction. */
 	jle	2f
 	movl	$NKPTP_MAX,%ecx
 2:
-#else
-	movl	RELOC(nkpde),%ecx		# get nkpde
-	testl	%ecx,%ecx			# if it's non-zero, use as-is
-	jnz	2f
-
-	movl	RELOC(biosextmem),%ecx
-	shrl	$10,%ecx			# cvt. # of KB to # of MB
-	imull	$NKPDE_SCALE,%ecx		# scale to # of KPDEs
-	addl	$NKPDE_BASE,%ecx		# and add the base.
-	cmpl	$NKPDE_MAX,%ecx			# clip to max.
-	jle	1f
-	movl	$NKPDE_MAX,%ecx
-1:	movl	%ecx,RELOC(nkpde)
-2:
-#endif
 
 	/* Clear memory for bootstrap tables. */
 	shll	$PGSHIFT,%ecx
@@ -649,21 +628,13 @@ try586:	/* Use the `cpuid' instruction. */
 
 	/* Map kernel PDEs. */
 	movl	RELOC(nkpde),%ecx			# for this many pde s,
-#if defined(PMAP_NEW)
 	leal	(PROC0PDIR+PDSLOT_KERN*4)(%esi),%ebx	# kernel pde offset
-#else
-	leal	(PROC0PDIR+KPTDI*4)(%esi),%ebx		# offset of pde for kernel
-#endif
 	leal	(SYSMAP+PG_V|PG_KW)(%esi),%eax		# pte for KPT in proc 0,
 	fillkpt
 
 	/* Install a PDE recursively mapping page directory as a page table! */
 	leal	(PROC0PDIR+PG_V|PG_KW)(%esi),%eax	# pte for ptd
-#ifdef PMAP_NEW
 	movl	%eax,(PROC0PDIR+PDSLOT_PTE*4)(%esi)	# recursive PD slot
-#else
-	movl	%eax,(PROC0PDIR+PTDPTDI*4)(%esi)	# which is where PTmap maps!
-#endif
 
 	/* Save phys. addr of PTD, for libkvm. */
 	movl	%esi,RELOC(PTDpaddr)
@@ -1150,10 +1121,8 @@ ENTRY(copyout)
 	/* Compute PTE offset for start address. */
 	shrl	$PGSHIFT,%edi
 
-#if defined(PMAP_NEW)
 	movl	_C_LABEL(curpcb),%edx
 	movl	$2f,PCB_ONFAULT(%edx)
-#endif
 
 1:	/* Check PTE for each page. */
 	testb	$PG_RW,_C_LABEL(PTmap)(,%edi,4)
@@ -1280,10 +1249,8 @@ ENTRY(copyoutstr)
 	movl	$NBPG,%ecx
 	subl	%eax,%ecx		# ecx = NBPG - (src % NBPG)
 
-#if defined(PMAP_NEW)
 	movl	_C_LABEL(curpcb),%eax
 	movl	$6f,PCB_ONFAULT(%eax)
-#endif
 
 1:	/*
 	 * Once per page, check that we are still within the bounds of user
@@ -1577,10 +1544,8 @@ ENTRY(suword)
 	jne	2f
 #endif /* I486_CPU || I586_CPU || I686_CPU */
 
-#ifdef PMAP_NEW
 	movl	_C_LABEL(curpcb),%eax
 	movl	$3f,PCB_ONFAULT(%eax)
-#endif
 
 	movl	%edx,%eax
 	shrl	$PGSHIFT,%eax		# calculate pte address
@@ -1624,10 +1589,8 @@ ENTRY(susword)
 	jne	2f
 #endif /* I486_CPU || I586_CPU || I686_CPU */
 
-#ifdef PMAP_NEW
 	movl	_C_LABEL(curpcb),%eax
 	movl	$3f,PCB_ONFAULT(%eax)
-#endif
 
 	movl	%edx,%eax
 	shrl	$PGSHIFT,%eax		# calculate pte address
@@ -1706,10 +1669,8 @@ ENTRY(subyte)
 	jne	2f
 #endif /* I486_CPU || I586_CPU || I686_CPU */
 
-#ifdef PMAP_NEW
 	movl	_C_LABEL(curpcb),%eax
 	movl	$3f,PCB_ONFAULT(%eax)
-#endif
 
 	movl	%edx,%eax
 	shrl	$PGSHIFT,%eax		# calculate pte address
@@ -1802,7 +1763,8 @@ ENTRY(longjmp)
  * actually to shrink the 0-127 range of priorities into the 32 available
  * queues.
  */
-	.globl	_C_LABEL(whichqs),_C_LABEL(qs),_C_LABEL(uvmexp),_C_LABEL(panic)
+	.globl	_C_LABEL(sched_whichqs),_C_LABEL(sched_qs)
+	.globl	_C_LABEL(uvmexp),_C_LABEL(panic)
 
 /*
  * setrunqueue(struct proc *p);
@@ -1820,8 +1782,8 @@ NENTRY(setrunqueue)
 #endif /* DIAGNOSTIC */
 	movzbl	P_PRIORITY(%eax),%edx
 	shrl	$2,%edx
-	btsl	%edx,_C_LABEL(whichqs)		# set q full bit
-	leal	_C_LABEL(qs)(,%edx,8),%edx	# locate q hdr
+	btsl	%edx,_C_LABEL(sched_whichqs)	# set q full bit
+	leal	_C_LABEL(sched_qs)(,%edx,8),%edx # locate q hdr
 	movl	P_BACK(%edx),%ecx
 	movl	%edx,P_FORW(%eax)	# link process on tail of q
 	movl	%eax,P_BACK(%edx)
@@ -1844,7 +1806,7 @@ NENTRY(remrunqueue)
 	movzbl	P_PRIORITY(%ecx),%eax
 #ifdef DIAGNOSTIC
 	shrl	$2,%eax
-	btl	%eax,_C_LABEL(whichqs)
+	btl	%eax,_C_LABEL(sched_whichqs)
 	jnc	1f
 #endif /* DIAGNOSTIC */
 	movl	P_BACK(%ecx),%edx	# unlink process
@@ -1857,7 +1819,7 @@ NENTRY(remrunqueue)
 #ifndef DIAGNOSTIC
 	shrl	$2,%eax
 #endif
-	btrl	%eax,_C_LABEL(whichqs)	# no; clear bit
+	btrl	%eax,_C_LABEL(sched_whichqs)	# no; clear bit
 2:	ret
 #ifdef DIAGNOSTIC
 1:	pushl	$3f
@@ -1875,10 +1837,17 @@ NENTRY(remrunqueue)
  */
 ENTRY(idle)
 	cli
-	movl	_C_LABEL(whichqs),%ecx
+	movl	_C_LABEL(sched_whichqs),%ecx
 	testl	%ecx,%ecx
 	jnz	sw1
 	sti
+
+	/* Try to zero some pages. */
+	movl	_C_LABEL(uvm)+UVM_PAGE_IDLE_ZERO,%ecx
+	testl	%ecx,%ecx
+	jz	1f
+	call	_C_LABEL(uvm_pageidlezero)
+1:
 #if NAPM > 0
 	call	_C_LABEL(apm_cpu_idle)
 #endif
@@ -1897,7 +1866,7 @@ NENTRY(switch_error)
 #endif /* DIAGNOSTIC */
 
 /*
- * cpu_switch(void);
+ * void cpu_switch(struct proc *)
  * Find a runnable process and switch to it.  Wait if necessary.  If the new
  * process is the same as the old one, we short-circuit the context save and
  * restore.
@@ -1937,12 +1906,12 @@ switch_search:
 
 	/* Wait for new process. */
 	cli				# splhigh doesn't do a cli
-	movl	_C_LABEL(whichqs),%ecx
+	movl	_C_LABEL(sched_whichqs),%ecx
 
 sw1:	bsfl	%ecx,%ebx		# find a full q
 	jz	_C_LABEL(idle)		# if none, idle
 
-	leal	_C_LABEL(qs)(,%ebx,8),%eax	# select q
+	leal	_C_LABEL(sched_qs)(,%ebx,8),%eax # select q
 
 	movl	P_FORW(%eax),%edi	# unlink from front of process q
 #ifdef	DIAGNOSTIC
@@ -1957,7 +1926,7 @@ sw1:	bsfl	%ecx,%ebx		# find a full q
 	jne	3f
 
 	btrl	%ebx,%ecx		# yes, clear to indicate empty
-	movl	%ecx,_C_LABEL(whichqs)	# update q status
+	movl	%ecx,_C_LABEL(sched_whichqs) # update q status
 
 3:	/* We just did it. */
 	xorl	%eax,%eax
@@ -1973,7 +1942,15 @@ sw1:	bsfl	%ecx,%ebx		# find a full q
 	/* Isolate process.  XXX Is this necessary? */
 	movl	%eax,P_BACK(%edi)
 
+#if defined(MULTIPROCESSOR)
+	/*
+	 * p->p_cpu = curcpu()
+	 * XXXSMP
+	 */
+#endif
+
 	/* Record new process. */
+	movb	$SONPROC,P_STAT(%edi)	# p->p_stat = SONPROC
 	movl	%edi,_C_LABEL(curproc)
 
 	/* It's okay to take interrupts here. */
@@ -2032,16 +2009,22 @@ switch_exited:
 	jnz	switch_restored
 #endif
 
+	/*
+	 * Activate the address space.  We're curproc, so %cr3 will
+	 * be reloaded, but we're not yet curpcb, so the LDT won't
+	 * be reloaded, although the PCB copy of the selector will
+	 * be refreshed from the pmap.
+	 */
+	pushl	%edi
+	call	_C_LABEL(pmap_activate)
+	addl	$4,%esp
+
 	/* Load TSS info. */
 	movl	_C_LABEL(gdt),%eax
-	movl	PCB_TSS_SEL(%esi),%edx
+	movl	P_MD_TSS_SEL(%edi),%edx
 
-	/* Switch address space. */
-	movl	PCB_CR3(%esi),%ecx
-	movl	%ecx,%cr3
-
-	/* Switch TSS. */
-	andl	$~0x0200,4-SEL_KPL(%eax,%edx,1)
+	/* Switch TSS. Reset "task busy" flag before */
+	andl	$~0x0200,4(%eax,%edx, 1)
 	ltr	%dx
 
 #ifdef USER_LDT
@@ -2110,7 +2093,7 @@ ENTRY(switch_exit)
 
 	/* Load TSS info. */
 	movl	_C_LABEL(gdt),%eax
-	movl	PCB_TSS_SEL(%esi),%edx
+	movl	P_MD_TSS_SEL(%ebx),%edx
 
 	/* Switch address space. */
 	movl	PCB_CR3(%esi),%ecx
@@ -2138,14 +2121,11 @@ ENTRY(switch_exit)
 	sti
 
 	/*
-	 * Nuke the TSS and schedule the dead process's
-	 * vmspace and stack to be freed.
+	 * Schedule the dead process's vmspace and stack to be freed.
 	 */
-	pushl	P_ADDR(%edi)		/* tss_free(p->p_addr) */
-	call	_C_LABEL(tss_free)
 	pushl	%edi			/* exit2(p) */
 	call	_C_LABEL(exit2)
-	addl	$8,%esp
+	addl	$4,%esp
 
 	/* Jump into cpu_switch() with the right state. */
 	movl	%ebx,%esi
@@ -2200,15 +2180,21 @@ ENTRY(savectx)
 #define	TRAP(a)		pushl $(a) ; jmp _C_LABEL(alltraps)
 #define	ZTRAP(a)	pushl $0 ; TRAP(a)
 
+#ifdef IPKDB
+#define	BPTTRAP(a)	pushl $0; pushl $(a); jmp _C_LABEL(bpttraps)
+#else
+#define	BPTTRAP(a)	ZTRAP(a)
+#endif
+
 	.text
 IDTVEC(trap00)
 	ZTRAP(T_DIVIDE)
 IDTVEC(trap01)
-	ZTRAP(T_TRCTRAP)
+	BPTTRAP(T_TRCTRAP)
 IDTVEC(trap02)
 	ZTRAP(T_NMI)
 IDTVEC(trap03)
-	ZTRAP(T_BPTFLT)
+	BPTTRAP(T_BPTFLT)
 IDTVEC(trap04)
 	ZTRAP(T_OFLOW)
 IDTVEC(trap05)
@@ -2372,6 +2358,86 @@ calltrap:
 	jmp	2b
 4:	.asciz	"WARNING: SPL NOT LOWERED ON TRAP EXIT\n"
 #endif /* DIAGNOSTIC */
+
+#ifdef IPKDB
+NENTRY(bpttraps)
+	INTRENTRY
+	call	_C_LABEL(ipkdb_trap_glue)
+	testl	%eax,%eax
+	jz	calltrap
+	INTRFASTEXIT
+
+ipkdbsetup:
+	popl	%ecx
+
+	/* Disable write protection: */
+	movl	%cr0,%eax
+	pushl	%eax
+	andl	$~CR0_WP,%eax
+	movl	%eax,%cr0
+
+	/* Substitute Protection & Page Fault handlers: */
+	movl	_C_LABEL(idt),%edx
+	pushl	13*8(%edx)
+	pushl	13*8+4(%edx)
+	pushl	14*8(%edx)
+	pushl	14*8+4(%edx)
+	movl	$fault,%eax
+	movw	%ax,13*8(%edx)
+	movw	%ax,14*8(%edx)
+	shrl	$16,%eax
+	movw	%ax,13*8+6(%edx)
+	movw	%ax,14*8+6(%edx)
+
+	pushl	%ecx
+	ret
+
+ipkdbrestore:
+	popl	%ecx
+
+	/* Restore Protection & Page Fault handlers: */
+	movl	_C_LABEL(idt),%edx
+	popl	14*8+4(%edx)
+	popl	14*8(%edx)
+	popl	13*8+4(%edx)
+	popl	13*8(%edx)
+
+	/* Restore write protection: */
+	popl	%edx
+	movl	%edx,%cr0
+
+	pushl	%ecx
+	ret
+
+NENTRY(ipkdbfbyte)
+	pushl	%ebp
+	movl	%esp,%ebp
+	call	ipkdbsetup
+	movl	8(%ebp),%edx
+	movzbl	(%edx),%eax
+faultexit:
+	call	ipkdbrestore
+	popl	%ebp
+	ret
+
+NENTRY(ipkdbsbyte)
+	pushl	%ebp
+	movl	%esp,%ebp
+	call	ipkdbsetup
+	movl	8(%ebp),%edx
+	movl	12(%ebp),%eax
+	movb	%al,(%edx)
+	call	ipkdbrestore
+	popl	%ebp
+	ret
+
+fault:
+	popl	%eax		/* error code */
+	movl	$faultexit,%eax
+	movl	%eax,(%esp)
+	movl	$-1,%eax
+	iret
+#endif	/* IPKDB */
 
 /*
  * Old call gate entry for syscall

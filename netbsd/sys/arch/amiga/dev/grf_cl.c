@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_cl.c,v 1.24.2.1 1999/07/02 18:06:49 perry Exp $	*/
+/*	$NetBSD: grf_cl.c,v 1.25 1999/06/29 19:51:28 is Exp $	*/
 
 /*
  * Copyright (c) 1997 Klaus Burkert

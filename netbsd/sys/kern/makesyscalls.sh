@@ -1,5 +1,5 @@
 #! /bin/sh -
-#	$NetBSD: makesyscalls.sh,v 1.33 1999/02/17 18:17:10 christos Exp $
+#	$NetBSD: makesyscalls.sh,v 1.35 1999/08/20 19:07:31 thorpej Exp $
 #
 # Copyright (c) 1994,1996 Christopher G. Demetriou
 # All rights reserved.
@@ -187,19 +187,19 @@ NR == 1 {
 	printf "#ifdef\tsyscallarg\n" > sysarghdr
 	printf "#undef\tsyscallarg\n" > sysarghdr
 	printf "#endif\n\n" > sysarghdr
-	printf "#define\tsyscallarg(x)\t\t\t\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\tunion {\t\t\t\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\t\t%s pad;\t\t\t\t\t\t\\\n", registertype > sysarghdr
-	printf "\t\t\tstruct { x datum; } le;\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\t\tstruct {\t\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\t\t\tint8_t pad[ (sizeof (%s) < sizeof (x))\t\\\n", \
+	printf "#define\tsyscallarg(x)\t\t\t\t\t\t\t\\\n" > sysarghdr
+	printf "\tunion {\t\t\t\t\t\t\t\t\\\n" > sysarghdr
+	printf "\t\t%s pad;\t\t\t\t\t\t\\\n", registertype > sysarghdr
+	printf "\t\tstruct { x datum; } le;\t\t\t\t\t\\\n" > sysarghdr
+	printf "\t\tstruct {\t\t\t\t\t\t\\\n" > sysarghdr
+	printf "\t\t\tint8_t pad[ (sizeof (%s) < sizeof (x))\t\\\n", \
 		registertype > sysarghdr
-	printf "\t\t\t\t\t? 0\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\t\t\t\t: sizeof (%s) - sizeof (x)];\t\\\n", \
+	printf "\t\t\t\t? 0\t\t\t\t\t\\\n" > sysarghdr
+	printf "\t\t\t\t: sizeof (%s) - sizeof (x)];\t\\\n", \
 		registertype > sysarghdr
-	printf "\t\t\t\tx datum;\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\t\t} be;\t\t\t\t\t\t\t\\\n" > sysarghdr
-	printf "\t\t}\n" > sysarghdr
+	printf "\t\t\tx datum;\t\t\t\t\t\\\n" > sysarghdr
+	printf "\t\t} be;\t\t\t\t\t\t\t\\\n" > sysarghdr
+	printf "\t}\n" > sysarghdr
 	next
 }
 NF == 0 || $1 ~ /^;/ {
@@ -456,9 +456,11 @@ $2 == "NODEF" || $2 == "NOARGS" || $2 == "INDIR" {
 	syscall++
 	next
 }
-$2 == "OBSOL" || $2 == "UNIMPL" {
+$2 == "OBSOL" || $2 == "UNIMPL" || $2 == "EXCL" {
 	if ($2 == "OBSOL")
 		comment="obsolete"
+	else if ($2 == "EXCL")
+		comment="excluded"
 	else
 		comment="unimplemented"
 	for (i = 3; i <= NF; i++)

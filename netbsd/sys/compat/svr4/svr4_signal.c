@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_signal.c,v 1.34 1999/01/21 23:20:43 christos Exp $	 */
+/*	$NetBSD: svr4_signal.c,v 1.38 2000/04/09 06:28:28 christos Exp $	 */
 
 /*-
  * Copyright (c) 1994, 1998 The NetBSD Foundation, Inc.
@@ -53,6 +53,8 @@
 
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_ucontext.h>
 #include <compat/svr4/svr4_syscallargs.h>
 #include <compat/svr4/svr4_util.h>
 #include <compat/svr4/svr4_ucontext.h>
@@ -214,7 +216,8 @@ svr4_to_native_sigaction(ssa, bsa)
 	if ((ssa->sa_flags & SVR4_SA_NOCLDSTOP) != 0)
 		bsa->sa_flags |= SA_NOCLDSTOP;
 	if ((ssa->sa_flags & ~SVR4_SA_ALLBITS) != 0)
-		DPRINTF(("svr4_to_native_sigaction: extra bits ignored\n"));
+		DPRINTF(("svr4_to_native_sigaction: extra bits %x ignored\n",
+		    ssa->sa_flags & ~SVR4_SA_ALLBITS));
 }
 
 void
@@ -252,7 +255,8 @@ svr4_to_native_sigaltstack(sss, bss)
 	if ((sss->ss_flags & SVR4_SS_ONSTACK) != 0)
 		bss->ss_flags |= SS_ONSTACK;
 	if ((sss->ss_flags & ~SVR4_SS_ALLBITS) != 0)
-/*XXX*/		printf("svr4_to_native_sigaltstack: extra bits ignored\n");
+/*XXX*/		printf("svr4_to_native_sigaltstack: extra bits %x ignored\n",
+		    sss->ss_flags & ~SVR4_SS_ALLBITS);
 }
 
 void
@@ -272,7 +276,7 @@ native_to_svr4_sigaltstack(bss, sss)
 
 int
 svr4_sys_sigaction(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -306,7 +310,7 @@ svr4_sys_sigaction(p, v, retval)
 
 int 
 svr4_sys_sigaltstack(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -342,7 +346,7 @@ svr4_sys_sigaltstack(p, v, retval)
  */
 int
 svr4_sys_signal(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -403,7 +407,7 @@ svr4_sys_signal(p, v, retval)
 
 int
 svr4_sys_sigprocmask(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -460,7 +464,7 @@ svr4_sys_sigprocmask(p, v, retval)
 
 int
 svr4_sys_sigpending(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -489,7 +493,7 @@ svr4_sys_sigpending(p, v, retval)
 
 int
 svr4_sys_sigsuspend(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -512,7 +516,7 @@ svr4_sys_sigsuspend(p, v, retval)
 
 int
 svr4_sys_pause(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -522,7 +526,7 @@ svr4_sys_pause(p, v, retval)
 
 int
 svr4_sys_kill(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -602,7 +606,7 @@ svr4_setcontext(p, uc)
 
 int 
 svr4_sys_context(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {

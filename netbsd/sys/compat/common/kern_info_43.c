@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_info_43.c,v 1.9 1999/03/24 05:51:19 mrg Exp $	*/
+/*	$NetBSD: kern_info_43.c,v 1.11 2000/03/30 11:27:14 augustss Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -152,7 +152,7 @@ compat_43_sys_getkerninfo(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct compat_43_sys_getkerninfo_args /* {
+	struct compat_43_sys_getkerninfo_args /* {
 		syscallarg(int) op;
 		syscallarg(char *) where;
 		syscallarg(int *) size;
@@ -223,9 +223,6 @@ compat_43_sys_getkerninfo(p, v, retval)
 			    (struct bsdi_si *) SCARG(uap, where);
 			struct bsdi_si ksi;
 			char *us = (char *) &usi[1];
-			extern struct timeval boottime;
-			extern char ostype[], osrelease[], machine[],
-			    hostname[], cpu_model[], version[];
 
 			if (usi == NULL) {
 				size = sizeof(ksi) +

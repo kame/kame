@@ -1,4 +1,4 @@
-/*	$NetBSD: filecore_vfsops.c,v 1.6.2.1 1999/10/18 05:05:00 cgd Exp $	*/
+/*	$NetBSD: filecore_vfsops.c,v 1.11 2000/03/16 18:08:22 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1998 Andrew McMurry
@@ -79,6 +79,7 @@ struct vfsops filecore_vfsops = {
 	filecore_fhtovp,
 	filecore_vptofh,
 	filecore_init,
+	filecore_done,
 	filecore_sysctl,
 	NULL,				/* filecore_mountroot */
 	filecore_checkexp,
@@ -335,8 +336,6 @@ filecore_mountfs(devvp, mp, p, argp)
 		fcmp->fc_gid = argp->gid;
 	}
 	
-	devvp->v_specflags |= SI_MOUNTEDON;
-
 	return 0;
 out:
 	if (bp) {
@@ -393,7 +392,8 @@ filecore_unmount(mp, mntflags, p)
 
 	fcmp = VFSTOFILECORE(mp);
 
-	fcmp->fc_devvp->v_specflags &= ~SI_MOUNTEDON;
+	if (fcmp->fc_devvp->v_type != VBAD)
+		fcmp->fc_devvp->v_specmountpoint = NULL;
 	vn_lock(fcmp->fc_devvp, LK_EXCLUSIVE | LK_RETRY);
 	error = VOP_CLOSE(fcmp->fc_devvp, FREAD, NOCRED, p);
 	vput(fcmp->fc_devvp);
@@ -577,7 +577,6 @@ filecore_vget(mp, ino, vpp)
 	}
 	ip = pool_get(&filecore_node_pool, PR_WAITOK);
 	memset((caddr_t)ip, 0, sizeof(struct filecore_node));
-	lockinit(&ip->i_lock, PINOD, "filecorenode", 0, 0);
 	vp->v_data = ip;
 	ip->i_vnode = vp;
 	ip->i_dev = dev;

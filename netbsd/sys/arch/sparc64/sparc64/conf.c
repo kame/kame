@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.4 1998/12/18 16:55:39 drochner Exp $ */
+/*	$NetBSD: conf.c,v 1.8 2000/05/23 05:11:28 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -68,11 +68,13 @@
 #include "st.h"
 #include "cd.h"
 #include "uk.h"
+#include "wd.h"
 #include "raid.h"
 
 #include "kbd.h"
 #include "ms.h"
 #include "zstty.h"
+#include "pcons.h"
 
 #include "fdc.h"		/* has NFDC and NFD; see files.sparc */
 #include "bwtwo.h"
@@ -102,7 +104,7 @@ struct bdevsw	bdevsw[] =
 	bdev_disk_init(NCCD,ccd),	/* 9: concatenated disk driver */
 	bdev_notdef(),			/* 10: SMD disk -- not this arch */
 	bdev_tape_init(NST,st),		/* 11: SCSI tape */
-	bdev_notdef(),			/* 12 */
+	bdev_disk_init(NWD,wd),		/* 12: IDE disk */
 	bdev_notdef(),			/* 13 */
 	bdev_notdef(),			/* 14 */
 	bdev_notdef(),			/* 15 */
@@ -133,7 +135,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 9: SMD disk on Xylogics 450/451 */
 	cdev_notdef(),			/* 10: systech multi-terminal board */
 	cdev_notdef(),			/* 11: DES encryption chip */
-	cdev_tty_init(NZSTTY,zs),	/* 12: Zilog 8350 serial port */
+	cdev_tty_init(NZSTTY,zs),	/* 12: Zilog 8530 serial port */
 	cdev_mouse_init(NMS,ms),	/* 13: /dev/mouse */
 	cdev_notdef(),			/* 14: cgone */
 	cdev_notdef(),			/* 15: sun /dev/winNNN */
@@ -147,7 +149,7 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NCCD,ccd),	/* 23: concatenated disk driver */
 	cdev_fd_init(1,filedesc),	/* 24: file descriptor pseudo-device */
 	cdev_ipf_init(NIPFILTER,ipl),	/* 25: ip-filter device */
-	cdev_notdef(),			/* 26 */
+	cdev_disk_init(NWD,wd),		/* 26: IDE disk */
 	cdev_fb_init(NBWTWO,bwtwo),	/* 27: /dev/bwtwo */
 	cdev_notdef(),			/* 28: Systech VPC-2200 versatec/centronics */
 	cdev_mouse_init(NKBD,kbd),	/* 29: /dev/kbd */
@@ -243,6 +245,7 @@ struct cdevsw	cdevsw[] =
 	cdev_rnd_init(NRND,rnd),	/* 119: random source pseudo-device */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 120: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 121: RAIDframe disk driver */
+	cdev_tty_init(NPCONS,pcons),	/* 122: PROM console */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -404,6 +407,7 @@ static int chrtoblktbl[] = {
 	/*119 */	NODEV,
 	/*120 */	NODEV,
 	/*121 */	25,
+	/*122 */	NODEV,
 };
 
 /*

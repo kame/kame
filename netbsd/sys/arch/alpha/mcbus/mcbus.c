@@ -1,4 +1,4 @@
-/* $NetBSD: mcbus.c,v 1.4.8.2 1999/12/16 23:16:04 he Exp $ */
+/* $NetBSD: mcbus.c,v 1.7 1999/11/16 18:37:24 mjacob Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob
@@ -37,7 +37,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mcbus.c,v 1.4.8.2 1999/12/16 23:16:04 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mcbus.c,v 1.7 1999/11/16 18:37:24 mjacob Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,7 +58,6 @@ __KERNEL_RCSID(0, "$NetBSD: mcbus.c,v 1.4.8.2 1999/12/16 23:16:04 he Exp $");
 	(!badaddr((void *)KV(MCPCIA_BRIDGE_ADDR(gid, mid)), sizeof (u_int32_t)))
 
 extern struct cfdriver mcbus_cd;
-extern int	cputype;
 
 struct mcbus_cpu_busdep mcbus_primary;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: audio_if.h,v 1.31 1999/02/17 02:37:39 mycroft Exp $	*/
+/*	$NetBSD: audio_if.h,v 1.34.12.1 2000/06/30 16:27:46 simonb Exp $	*/
 
 /*
  * Copyright (c) 1994 Havard Eidnes.
@@ -114,7 +114,7 @@ struct audio_hw_if {
 	void	*(*allocm)__P((void *, int, size_t, int, int));
 	void	(*freem)__P((void *, void *, int));
 	size_t	(*round_buffersize)__P((void *, int, size_t));
-	int	(*mappage)__P((void *, void *, int, int));
+	paddr_t	(*mappage)__P((void *, void *, off_t, int));
 
 	int 	(*get_props)__P((void *)); /* device properties */
 
@@ -135,7 +135,8 @@ struct audio_attach_args {
 #define AUDIODEV_TYPE_MPU	3
 
 /* Attach the MI driver(s) to the MD driver. */
-void	audio_attach_mi __P((struct audio_hw_if *, void *, struct device *));
+struct device *audio_attach_mi __P((struct audio_hw_if *, void *, 
+				    struct device *));
 int	audioprint __P((void *, const char *));
 
 /* Device identity flags */
@@ -152,7 +153,7 @@ int	audioprint __P((void *, const char *));
 #define ISDEVAUDIOCTL(x)	(AUDIODEV((x)) == AUDIOCTL_DEVICE)
 #define ISDEVMIXER(x)		(AUDIODEV((x)) == MIXER_DEVICE)
 
-#if !defined(__i386__) && !defined(__arm32__)
+#if !defined(__i386__) && !defined(__arm32__) && !defined(IPL_AUDIO)
 #define splaudio splbio		/* XXX */
 #define IPL_AUDIO IPL_BIO	/* XXX */
 #endif

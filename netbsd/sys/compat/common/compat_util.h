@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_util.h,v 1.5.2.1 1999/06/21 19:23:38 cgd Exp $	*/
+/*	$NetBSD: compat_util.h,v 1.6 1999/04/24 02:56:06 cgd Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.

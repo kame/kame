@@ -1,4 +1,4 @@
-/*	$NetBSD: ss.c,v 1.25.2.2 2000/01/20 20:49:43 he Exp $	*/
+/*	$NetBSD: ss.c,v 1.31 2000/05/31 23:10:39 phil Exp $	*/
 
 /*
  * Copyright (c) 1995 Kenneth Stailey.  All rights reserved.
@@ -97,6 +97,8 @@ struct scsipi_inquiry_pattern ss_patterns[] = {
 	 "HP      ", "C1130A          ", ""},
 	{T_PROCESSOR, T_FIXED,
 	 "HP      ", "C5110A          ", ""},
+	{T_PROCESSOR, T_FIXED,
+	 "HP      ", "C7670A          ", ""},
 };
 
 int
@@ -159,9 +161,7 @@ ssattach(parent, self, aux)
 	/*
 	 * Set up the buf queue for this device
 	 */
-	ss->buf_queue.b_active = 0;
-	ss->buf_queue.b_actf = 0;
-	ss->buf_queue.b_actb = &ss->buf_queue.b_actf;
+	BUFQ_INIT(&ss->buf_queue);
 	ss->flags &= ~SSF_AUTOCONF;
 }
 
@@ -205,13 +205,13 @@ ssopen(dev, flag, mode, p)
 	/*
 	 * Catch any unit attention errors.
 	 *
-	 * SCSI_IGNORE_MEDIA_CHANGE: when you have an ADF, some scanners
+	 * XS_CTL_IGNORE_MEDIA_CHANGE: when you have an ADF, some scanners
 	 * consider paper to be a changeable media
 	 *
 	 */
 	error = scsipi_test_unit_ready(sc_link,
-	    SCSI_IGNORE_MEDIA_CHANGE | SCSI_IGNORE_ILLEGAL_REQUEST |
-	    (ssmode == MODE_CONTROL ? SCSI_IGNORE_NOT_READY : 0));
+	    XS_CTL_IGNORE_MEDIA_CHANGE | XS_CTL_IGNORE_ILLEGAL_REQUEST |
+	    (ssmode == MODE_CONTROL ? XS_CTL_IGNORE_NOT_READY : 0));
 	if (error)
 		goto bad;
 
@@ -281,7 +281,7 @@ void
 ssminphys(bp)
 	struct buf *bp;
 {
-	register struct ss_softc *ss = ss_cd.cd_devs[SSUNIT(bp->b_dev)];
+	struct ss_softc *ss = ss_cd.cd_devs[SSUNIT(bp->b_dev)];
 
 	(ss->sc_link->adapter->scsipi_minphys)(bp);
 
@@ -332,7 +332,6 @@ ssstrategy(bp)
 	struct buf *bp;
 {
 	struct ss_softc *ss = ss_cd.cd_devs[SSUNIT(bp->b_dev)];
-	struct buf *dp;
 	int s;
 
 	SC_DEBUG(ss->sc_link, SDEV_DB1,
@@ -361,11 +360,7 @@ ssstrategy(bp)
 	 * at the end (a bit silly because we only have on user..
 	 * (but it could fork()))
 	 */
-	dp = &ss->buf_queue;
-	bp->b_actf = NULL;
-	bp->b_actb = dp->b_actb;
-	*dp->b_actb = bp;
-	dp->b_actb = &bp->b_actf;
+	BUFQ_INSERT_TAIL(&ss->buf_queue, bp);
 
 	/*
 	 * Tell the device to get going on the transfer if it's
@@ -405,14 +400,14 @@ ssstart(v)
 {
 	struct ss_softc *ss = v;
 	struct scsipi_link *sc_link = ss->sc_link;
-	register struct buf *bp, *dp;
+	struct buf *bp;
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("ssstart "));
 	/*
 	 * See if there is a buf to do and we are not already
 	 * doing one
 	 */
-	while (sc_link->openings > 0) {
+	while (sc_link->active < sc_link->openings) {
 		/* if a special awaits, let it proceed first */
 		if (sc_link->flags & SDEV_WAITING) {
 			sc_link->flags &= ~SDEV_WAITING;
@@ -423,14 +418,9 @@ ssstart(v)
 		/*
 		 * See if there is a buf with work for us to do..
 		 */
-		dp = &ss->buf_queue;
-		if ((bp = dp->b_actf) == NULL)
+		if ((bp = BUFQ_FIRST(&ss->buf_queue)) == NULL)
 			return;
-		if ((dp = bp->b_actf) != NULL)
-			dp->b_actb = bp->b_actb;
-		else
-			ss->buf_queue.b_actb = bp->b_actb;
-		*bp->b_actb = dp;
+		BUFQ_REMOVE(&ss->buf_queue, bp);
 
 		if (ss->special && ss->special->read) {
 			(ss->special->read)(ss, bp);

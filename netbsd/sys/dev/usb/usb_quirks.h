@@ -1,11 +1,12 @@
-/*	$NetBSD: usb_quirks.h,v 1.5 1998/12/29 15:23:59 augustss Exp $	*/
+/*	$NetBSD: usb_quirks.h,v 1.12 2000/06/01 14:29:02 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_quirks.h,v 1.9 1999/11/12 23:31:03 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,12 +42,14 @@ struct usbd_quirks {
 	u_int32_t uq_flags;	/* Device problems: */
 #define UQ_NO_SET_PROTO	0x01	/* cannot handle SET PROTOCOL. */
 #define UQ_SWAP_UNICODE	0x02	/* has some Unicode strings swapped. */
-#define UQ_HUB_POWER	0x04	/* does not respond correctly to get
-				   device status; use get hub status. */
+#define UQ_MS_REVZ	0x04	/* mouse has Z-axis reversed */
 #define UQ_NO_STRINGS	0x08	/* string descriptors are broken. */
 #define UQ_BAD_ADC	0x10	/* bad audio spec version number. */
+#define UQ_BUS_POWERED	0x20	/* device is bus powered, despite claim */
+#define UQ_BAD_AUDIO	0x40	/* device claims audio class, but isn't */
+#define UQ_SPUR_BUT_UP	0x80	/* spurious mouse button up events */
 };
 
 extern struct usbd_quirks usbd_no_quirk;
 
-struct usbd_quirks *usbd_find_quirk __P((usb_device_descriptor_t *));
+struct usbd_quirks *usbd_find_quirk(usb_device_descriptor_t *);

@@ -1,4 +1,4 @@
-/*	$NetBSD: union_subr.c,v 1.30.2.1 1999/10/18 05:05:19 cgd Exp $	*/
+/*	$NetBSD: union_subr.c,v 1.38 2000/05/27 04:52:40 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994 Jan-Simon Pendry
@@ -93,6 +93,15 @@ union_init()
 	memset((caddr_t) unvplock, 0, sizeof(unvplock));
 }
 
+/*
+ * Free global unionfs resources.
+ */
+void
+union_done()
+{
+	/* Nothing */
+}
+
 static int
 union_list_lock(ix)
 	int ix;
@@ -100,7 +109,7 @@ union_list_lock(ix)
 
 	if (unvplock[ix] & UN_LOCKED) {
 		unvplock[ix] |= UN_WANTED;
-		sleep((caddr_t) &unvplock[ix], PINOD);
+		(void) tsleep(&unvplock[ix], PINOD, "unionlk", 0);
 		return (1);
 	}
 
@@ -312,7 +321,7 @@ union_allocvp(vpp, mp, undvp, dvp, cnp, uppervp, lowervp, docache)
 	}
 
 	/* detect the root vnode (and aliases) */
-	vflag = 0;
+	vflag = VLAYER;
 	if ((uppervp == um->um_uppervp) &&
 	    ((lowervp == NULLVP) || lowervp == um->um_lowervp)) {
 		if (lowervp == NULLVP) {
@@ -399,7 +408,8 @@ loop:
 			if (un->un_flags & UN_LOCKED) {
 				vrele(UNIONTOV(un));
 				un->un_flags |= UN_WANTED;
-				sleep((caddr_t)&un->un_flags, PINOD);
+				(void) tsleep(&un->un_flags, PINOD,
+				    "unionalloc", 0);
 				goto loop;
 			}
 			un->un_flags |= UN_LOCKED;
@@ -486,6 +496,7 @@ loop:
 		M_TEMP, M_WAITOK);
 
 	(*vpp)->v_flag |= vflag;
+	(*vpp)->v_vnlock = NULL;	/* Make upper layers call VOP_LOCK */
 	if (uppervp)
 		(*vpp)->v_type = uppervp->v_type;
 	else
@@ -652,6 +663,7 @@ union_copyup(un, docopy, cred, p)
 {
 	int error;
 	struct vnode *lvp, *uvp;
+	struct vattr lvattr, uvattr;
 
 	error = union_vn_create(&uvp, un, p);
 	if (error)
@@ -669,10 +681,20 @@ union_copyup(un, docopy, cred, p)
 		 * from VOP_CLOSE
 		 */
 		vn_lock(lvp, LK_EXCLUSIVE | LK_RETRY);
-		error = VOP_OPEN(lvp, FREAD, cred, p);
+
+        	error = VOP_GETATTR(lvp, &lvattr, cred, p);
+		if (error == 0)
+			error = VOP_OPEN(lvp, FREAD, cred, p);
 		if (error == 0) {
 			error = union_copyfile(lvp, uvp, cred, p);
 			(void) VOP_CLOSE(lvp, FREAD, cred, p);
+		}
+		if (error == 0) {
+			/* Copy permissions up too */
+			VATTR_NULL(&uvattr);
+			uvattr.va_mode = lvattr.va_mode;
+			uvattr.va_flags = lvattr.va_flags;
+        		error = VOP_SETATTR(uvp, &uvattr, cred, p);
 		}
 		VOP_UNLOCK(lvp, 0);
 #ifdef UNION_DIAGNOSTIC
@@ -769,6 +791,9 @@ union_relookup(um, dvp, vpp, cnp, cn, path, pathlen)
  * (cnp) is the componentname to be created.
  * (vpp) is the returned newly created shadow directory, which
  * is returned locked.
+ *
+ * N.B. We still attempt to create shadow directories even if the union
+ * is mounted read-only, which is a little nonintuitive.
  */
 int
 union_mkshadow(um, dvp, cnp, vpp)
@@ -881,7 +906,7 @@ union_vn_create(vpp, un, p)
 	struct vattr *vap = &vat;
 	int fmode = FFLAGS(O_WRONLY|O_CREAT|O_TRUNC|O_EXCL);
 	int error;
-	int cmode = UN_FILEMODE & ~p->p_fd->fd_cmask;
+	int cmode = UN_FILEMODE & ~p->p_cwdi->cwdi_cmask;
 	struct componentname cn;
 
 	*vpp = NULLVP;

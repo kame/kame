@@ -1,4 +1,4 @@
-/*	$NetBSD: adbvar.h,v 1.14 1999/02/11 06:41:08 ender Exp $	*/
+/*	$NetBSD: adbvar.h,v 1.18.4.1 2000/09/21 13:04:21 scottr Exp $	*/
 
 /*
  * Copyright (C) 1994	Bradley A. Grantham
@@ -73,6 +73,9 @@ int	adbwrite __P((dev_t dev, struct uio *uio, int flag));
 int	adbioctl __P((dev_t , int , caddr_t , int , struct proc *));
 int	adbpoll __P((dev_t dev, int events, struct proc *p));
 
+int	adb_op_sync __P((Ptr, Ptr, Ptr, short));
+void	adb_op_comprout __P((void));
+
 /* adbsysasm.s */
 void	adb_kbd_asmcomplete __P((void));
 void	adb_ms_asmcomplete __P((void));
@@ -84,7 +87,13 @@ void	extdms_complete __P((void));
 #define ADB_HW_IISI		0x2	/* Mac IIsi series */
 #define ADB_HW_PB		0x3	/* PowerBook series */
 #define ADB_HW_CUDA		0x4	/* Machines with a Cuda chip */
-#define	MAX_ADB_HW		4	/* Number of ADB hardware types */
+#define ADB_HW_IOP		0x5	/* Machines with an IOP */
+#define	MAX_ADB_HW		5	/* Number of ADB hardware types */
+
+#define	ADB_CMDADDR(cmd)	((u_int8_t)(cmd & 0xf0) >> 4)
+#define	ADBFLUSH(dev)		((((u_int8_t)dev & 0x0f) << 4) | 0x01)
+#define	ADBLISTEN(dev, reg)	((((u_int8_t)dev & 0x0f) << 4) | 0x08 | reg)
+#define	ADBTALK(dev, reg)	((((u_int8_t)dev & 0x0f) << 4) | 0x0c | reg)
 
 #ifndef MRG_ADB
 /* adb_direct.c */

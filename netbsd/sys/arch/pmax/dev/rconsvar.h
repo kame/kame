@@ -1,4 +1,4 @@
-/* $NetBSD: rconsvar.h,v 1.2 1998/03/24 09:51:23 jonathan Exp $ */
+/*	$NetBSD: rconsvar.h,v 1.7 2000/01/09 03:55:43 simonb Exp $	*/
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -32,13 +32,23 @@
 
 #ifndef _MACHINE_RCONS_H_
 #define _MACHINE_RCONS_H_
-
 #ifdef _KERNEL
-#define RCONSDEV	85
 
+struct wsdisplay_emulops;
 struct consdev;
-extern void rcons_indev __P((struct consdev *));
-extern void rcons_vputc __P((dev_t, int));	/* XXX */
-extern void rcons_input __P((dev_t, int ic));	/*XXX*/
+struct fbinfo;
+
+void	rcons_connect __P((struct fbinfo *));
+void	rcons_connect_native __P((struct wsdisplay_emulops *, void *, int,
+	    int, int, int));
+
+void	rcons_indev __P((struct consdev *));
+void	rcons_input __P((dev_t, int ic));	/* XXX */
+
+void	rasterconsoleattach __P((int n));
+
+extern dev_t	cn_in_dev;	/* XXX rcons hackery, fix dev/fb.c */
+extern struct tty *fbconstty;	/* used in dev/dtop.c */
+
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_RCONS_H_ */

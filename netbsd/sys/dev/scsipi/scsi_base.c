@@ -1,4 +1,4 @@
-/*	$NetBSD: scsi_base.c,v 1.66.4.2 2000/01/23 12:40:43 he Exp $	*/
+/*	$NetBSD: scsi_base.c,v 1.73 2000/04/03 03:37:33 enami Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -97,13 +97,21 @@ scsi_scsipi_cmd(sc_link, scsipi_cmd, cmdlen, data_addr, datalen,
 	SC_DEBUG(sc_link, SDEV_DB2, ("scsi_scsipi_cmd\n"));
 
 #ifdef DIAGNOSTIC
-	if (bp != 0 && (flags & SCSI_NOSLEEP) == 0)
-		panic("scsi_scsipi_cmd: buffer without nosleep");
+	if (bp != NULL && (flags & XS_CTL_ASYNC) == 0)
+		panic("scsi_scsipi_cmd: buffer without async");
 #endif
 
 	if ((xs = scsipi_make_xs(sc_link, scsipi_cmd, cmdlen, data_addr,
-	    datalen, retries, timeout, bp, flags)) == NULL)
+	    datalen, retries, timeout, bp, flags)) == NULL) {
+		if (bp != NULL) {
+			s = splbio();
+			bp->b_flags |= B_ERROR;
+			bp->b_error = ENOMEM;
+			biodone(bp);
+			splx(s);
+		}
 		return (ENOMEM);
+	}
 
 	/*
 	 * Set the LUN in the CDB if we have an older device.  We also
@@ -145,4 +153,46 @@ scsi_print_addr(sc_link)
 	    ((struct device *)sc_link->device_softc)->dv_xname : "probe",
 	    ((struct device *)sc_link->adapter_softc)->dv_xname,
 	    sc_link->scsipi_scsi.target, sc_link->scsipi_scsi.lun);
+}
+
+/*
+ * Kill off all pending xfers for a scsipi_link.
+ *
+ * Must be called at splbio().
+ */
+void
+scsi_kill_pending(sc_link)
+	struct scsipi_link *sc_link;
+{
+	struct scsipi_xfer *xs, *xs_next;
+
+	/*
+	 * Note that the scsipi_done frees a xfer only if it is
+	 * an asynchronous transaction.
+	 */
+	for (xs = TAILQ_FIRST(&sc_link->pending_xfers); xs != NULL;
+	    xs = xs_next) {
+		xs_next = TAILQ_NEXT(xs, device_q);
+		xs->xs_status |= XS_STS_DONE;
+		xs->error = XS_DRIVER_STUFFUP;
+		scsipi_done(xs);
+	}
+}
+
+int
+scsiprint(aux, pnp)
+	void *aux;
+	const char *pnp;
+{
+	struct scsipi_link *l = aux;
+
+	/* only "scsibus"es can attach to "scsi"s; easy. */
+	if (pnp)
+		printf("scsibus at %s", pnp);
+
+	/* don't print channel if the controller says there can be only one. */
+	if (l->scsipi_scsi.channel != SCSI_CHANNEL_ONLY_ONE)
+		printf(" channel %d", l->scsipi_scsi.channel);
+
+	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.19.2.2 1999/10/20 22:56:05 he Exp $	*/
+/*	$NetBSD: pmap.c,v 1.28 2000/03/26 20:42:36 kleink Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -594,8 +594,7 @@ pmap_virtual_space(start, end)
  * Create and return a physical map.
  */
 struct pmap *
-pmap_create(size)
-	vsize_t size;
+pmap_create()
 {
 	struct pmap *pm;
 	
@@ -711,19 +710,6 @@ pmap_collect(pm)
 }
 
 /*
- * Make the specified pages pageable or not as requested.
- *
- * This routine is merely advisory.
- */
-void
-pmap_pageable(pm, start, end, pageable)
-	struct pmap *pm;
-	vaddr_t start, end;
-	int pageable;
-{
-}
-
-/*
  * Fill the given physical page with zeroes.
  */
 void
@@ -787,7 +773,7 @@ pmap_free_pv(pv)
 {
 	struct pv_page *pvp;
 	
-	pvp = (struct pv_page *)trunc_page(pv);
+	pvp = (struct pv_page *)trunc_page((vaddr_t)pv);
 	switch (++pvp->pvp_pgi.pgi_nfree) {
 	case 1:
 		LIST_INSERT_HEAD(&pv_page_freelist, pvp, pvp_pgi.pgi_list);
@@ -853,7 +839,7 @@ pofree(po, freepage)
 {
 	struct po_page *pop;
 	
-	pop = (struct po_page *)trunc_page(po);
+	pop = (struct po_page *)trunc_page((vaddr_t)po);
 	switch (++pop->pop_pgi.pgi_nfree) {
 	case NPOPPG:
 		if (!freepage)
@@ -966,14 +952,13 @@ pmap_remove_pv(pteidx, va, pa, pte)
 /*
  * Insert physical page at pa into the given pmap at virtual address va.
  */
-void
-pmap_enter(pm, va, pa, prot, wired, access_type)
+int
+pmap_enter(pm, va, pa, prot, flags)
 	struct pmap *pm;
 	vaddr_t va;
 	paddr_t pa;
 	vm_prot_t prot;
-	int wired;
-	vm_prot_t access_type;
+	int flags;
 {
 	sr_t sr;
 	int idx, i, s;
@@ -981,6 +966,7 @@ pmap_enter(pm, va, pa, prot, wired, access_type)
 	struct pte_ovfl *po;
 	int managed;
 	struct mem_region *mp;
+	boolean_t wired = (flags & PMAP_WIRED) != 0;
 
 	/*
 	 * Have to remove any existing mapping first.
@@ -1022,7 +1008,7 @@ pmap_enter(pm, va, pa, prot, wired, access_type)
 			/* 
 			 * Flush the real memory from the cache.
 			 */
-			syncicache((void *)pa, NBPG);
+			__syncicache((void *)pa, NBPG);
 		}
 
 	s = splimp();
@@ -1032,7 +1018,7 @@ pmap_enter(pm, va, pa, prot, wired, access_type)
 	 */
 	if (pte_insert(idx, &pte)) {
 		splx(s);
-		return;
+		return (KERN_SUCCESS);
 	}
 
 	/*
@@ -1044,6 +1030,41 @@ pmap_enter(pm, va, pa, prot, wired, access_type)
 	po->po_pte = pte;
 	LIST_INSERT_HEAD(potable + idx, po, po_list);
 	splx(s);
+
+	return (KERN_SUCCESS);
+}
+
+void
+pmap_kenter_pa(va, pa, prot)
+	vaddr_t va;
+	paddr_t pa;
+	vm_prot_t prot;
+{
+	pmap_enter(pmap_kernel(), va, pa, prot, PMAP_WIRED);
+}
+
+void
+pmap_kenter_pgs(va, pgs, npgs)
+	vaddr_t va;
+	struct vm_page **pgs;
+	int npgs;
+{
+	int i;
+
+	for (i = 0; i < npgs; i++, va += PAGE_SIZE) {
+		pmap_enter(pmap_kernel(), va, VM_PAGE_TO_PHYS(pgs[i]),
+				VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+	}
+}
+
+void
+pmap_kremove(va, len)
+	vaddr_t va;
+	vsize_t len;
+{
+	for (len >>= PAGE_SHIFT; len > 0; len--, va += PAGE_SIZE) {
+		pmap_remove(pmap_kernel(), va, va + PAGE_SIZE);
+	}
 }
 
 /*
@@ -1121,22 +1142,22 @@ pte_find(pm, va)
 /*
  * Get the physical page address for the given pmap/virtual address.
  */
-paddr_t
-pmap_extract(pm, va)
+boolean_t
+pmap_extract(pm, va, pap)
 	struct pmap *pm;
 	vaddr_t va;
+	paddr_t *pap;
 {
 	pte_t *ptp;
-	paddr_t o;
 	int s = splimp();
 	
 	if (!(ptp = pte_find(pm, va))) {
 		splx(s);
-		return 0;
+		return (FALSE);
 	}
-	o = (ptp->pte_lo & PTE_RPGN) | (va & ADDR_POFF);
+	*pap = (ptp->pte_lo & PTE_RPGN) | (va & ADDR_POFF);
 	splx(s);
-	return o;
+	return (TRUE);
 }
 
 /*
@@ -1176,32 +1197,35 @@ pmap_protect(pm, sva, eva, prot)
 	pmap_remove(pm, sva, eva);
 }
 
-void
-ptemodify(pa, mask, val)
-	paddr_t pa;
+boolean_t
+ptemodify(pg, mask, val)
+	struct vm_page *pg;
 	u_int mask;
 	u_int val;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	struct pv_entry *pv;
 	pte_t *ptp;
 	struct pte_ovfl *po;
 	int i, s;
 	char *attr;
+	int rv;
 
 	/*
 	 * First modify bits in cache.
 	 */
 	attr = pa_to_attr(pa);
 	if (attr == NULL)
-		return;
+		return FALSE;
 
 	*attr &= ~mask >> ATTRSHFT;
 	*attr |= val >> ATTRSHFT;
 	
 	pv = pa_to_pv(pa);
 	if (pv->pv_idx < 0)
-		return;
+		return FALSE;
 
+	rv = FALSE;
 	s = splimp();
 	for (; pv; pv = pv->pv_next) {
 		for (ptp = ptable + pv->pv_idx * 8, i = 8; --i >= 0; ptp++)
@@ -1211,6 +1235,7 @@ ptemodify(pa, mask, val)
 				asm volatile ("sync");
 				tlbie(pv->pv_va);
 				tlbsync();
+				rv |= ptp->pte_lo & mask; 
 				ptp->pte_lo &= ~mask;
 				ptp->pte_lo |= val;
 				asm volatile ("sync");
@@ -1223,6 +1248,7 @@ ptemodify(pa, mask, val)
 				asm volatile ("sync");
 				tlbie(pv->pv_va);
 				tlbsync();
+				rv |= ptp->pte_lo & mask; 
 				ptp->pte_lo &= ~mask;
 				ptp->pte_lo |= val;
 				asm volatile ("sync");
@@ -1230,16 +1256,18 @@ ptemodify(pa, mask, val)
 			}
 		for (po = potable[pv->pv_idx].lh_first; po; po = po->po_list.le_next)
 			if ((po->po_pte.pte_lo & PTE_RPGN) == pa) {
+				rv |= ptp->pte_lo & mask; 
 				po->po_pte.pte_lo &= ~mask;
 				po->po_pte.pte_lo |= val;
 			}
 	}
 	splx(s);
+	return rv != 0;
 }
 
 int
-ptebits(pa, bit)
-	paddr_t pa;
+ptebits(pg, bit)
+	struct vm_page *pg;
 	int bit;
 {
 	struct pv_entry *pv;
@@ -1247,6 +1275,7 @@ ptebits(pa, bit)
 	struct pte_ovfl *po;
 	int i, s, bits = 0;
 	char *attr;
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 
 	/*
 	 * First try the cache.
@@ -1302,10 +1331,11 @@ ptebits(pa, bit)
  * or it is going to read-only.
  */
 void
-pmap_page_protect(pa, prot)
-	paddr_t pa;
+pmap_page_protect(pg, prot)
+	struct vm_page *pg;
 	vm_prot_t prot;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	vaddr_t va;
 	pte_t *ptp;
 	struct pte_ovfl *po, *npo;
@@ -1314,7 +1344,7 @@ pmap_page_protect(pa, prot)
 
 	pa &= ~ADDR_POFF;
 	if (prot & VM_PROT_READ) {
-		ptemodify(pa, PTE_PP, PTE_RO);
+		ptemodify(pg, PTE_PP, PTE_RO);
 		return;
 	}
 
@@ -1377,8 +1407,8 @@ pmap_activate(p)
 	 */
 	if (pcb->pcb_pm != pmap) {
 		pcb->pcb_pm = pmap;
-		pcb->pcb_pmreal = (struct pmap *)pmap_extract(pmap_kernel(),
-		    (vaddr_t)pcb->pcb_pm);
+		(void) pmap_extract(pmap_kernel(), (vaddr_t)pcb->pcb_pm,
+		    (paddr_t *)&pcb->pcb_pmreal);
 	}
 
 	if (p == curproc) {
@@ -1433,6 +1463,6 @@ pmap_procwr(p, va, len)
 {
 	paddr_t pa;
 
-	pa = pmap_extract(p->p_vmspace->vm_map.pmap, va);
-	syncicache((void *)pa, len);
+	(void) pmap_extract(p->p_vmspace->vm_map.pmap, va, &pa);
+	__syncicache((void *)pa, len);
 }

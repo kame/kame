@@ -1,4 +1,4 @@
-/*	$NetBSD: db_access.h,v 1.6.26.2 1999/04/12 21:27:07 pk Exp $	*/
+/*	$NetBSD: db_access.h,v 1.8 1999/04/12 20:38:20 pk Exp $	*/
 
 /* 
  * Mach Operating System

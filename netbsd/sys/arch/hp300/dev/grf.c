@@ -1,4 +1,4 @@
-/*	$NetBSD: grf.c,v 1.32.2.1 1999/04/15 21:38:11 kleink Exp $	*/
+/*	$NetBSD: grf.c,v 1.35.12.1 2000/06/30 16:27:23 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -61,6 +61,7 @@
 #include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
+#include <sys/resourcevar.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -299,10 +300,11 @@ grfpoll(dev, events, p)
 }
 
 /*ARGSUSED*/
-int
+paddr_t
 grfmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct grf_softc *sc = grf_cd.cd_devs[GRFUNIT(dev)];
 
@@ -352,22 +354,22 @@ grfoff(dev)
 	return(error);
 }
 
-int
+paddr_t
 grfaddr(sc, off)
 	struct grf_softc *sc;
-	int off;
+	off_t off;
 {
 	struct grf_data *gp= sc->sc_data;
 	struct grfinfo *gi = &gp->g_display;
 
 	/* control registers */
 	if (off >= 0 && off < gi->gd_regsize)
-		return(((u_int)gi->gd_regaddr + off) >> PGSHIFT);
+		return(((paddr_t)gi->gd_regaddr + off) >> PGSHIFT);
 
 	/* frame buffer */
 	if (off >= gi->gd_regsize && off < gi->gd_regsize+gi->gd_fbsize) {
 		off -= gi->gd_regsize;
-		return(((u_int)gi->gd_fbaddr + off) >> PGSHIFT);
+		return(((paddr_t)gi->gd_fbaddr + off) >> PGSHIFT);
 	}
 	/* bogus */
 	return(-1);
@@ -637,7 +639,8 @@ grfmap(dev, addrp, p)
 	vn.v_rdev = dev;			/* XXX */
 	error = uvm_mmap(&p->p_vmspace->vm_map, (vaddr_t *)addrp,
 			 (vsize_t)len, VM_PROT_ALL, VM_PROT_ALL,
-			 flags, (caddr_t)&vn, 0);
+			 flags, (caddr_t)&vn, 0,
+			 p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 	if (error == 0)
 		(void) (*gp->g_sw->gd_mode)(gp, GM_MAP, *addrp);
 	return(error);

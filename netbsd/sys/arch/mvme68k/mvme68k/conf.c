@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.17 1999/02/14 17:54:29 scw Exp $	*/
+/*	$NetBSD: conf.c,v 1.20.4.1 2000/10/17 19:56:18 scw Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -34,6 +34,8 @@
  *
  *      @(#)conf.c	7.9 (Berkeley) 5/28/91
  */
+
+#include "opt_compat_svr4.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -182,7 +184,8 @@ struct cdevsw	cdevsw[] =
 	cdev_uk_init(NUK,uk),		/* 34: SCSI unknown */
 	cdev_rnd_init(NRND,rnd),	/* 35: random source pseudo-device */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 36: SCSI bus */
-	cdev_disk_init(NRAID,raid)	/* 37: RAIDframe disk driver */
+	cdev_disk_init(NRAID,raid),	/* 37: RAIDframe disk driver */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net) /* 38: svr4 net pseudo-device */
 };
 
 int	nchrdev = sizeof (cdevsw) / sizeof (cdevsw[0]);
@@ -203,6 +206,7 @@ dev_t	swapdev = makedev(3, 0);
 /*
  * Returns true if dev is /dev/mem or /dev/kmem.
  */
+int
 iskmemdev(dev)
 	dev_t dev;
 {
@@ -213,6 +217,7 @@ iskmemdev(dev)
 /*
  * Returns true if dev is /dev/zero.
  */
+int
 iszerodev(dev)
 	dev_t dev;
 {
@@ -289,11 +294,15 @@ chrtoblk(dev)
  */
 #include <dev/cons.h>
 
-#define zsc_pcccngetc		zscngetc
-#define zsc_pcccnputc		zscnputc
 #define zsc_pcccnpollc		nullcnpollc
 #include "zsc_pcc.h"
 cons_decl(zsc_pcc);
+
+#define zsc_pcctwocnpollc	nullcnpollc
+#define zsc_pcctwocngetc	zsc_pcccngetc
+#define zsc_pcctwocnputc	zsc_pcccnputc
+#include "zsc_pcctwo.h"
+cons_decl(zsc_pcctwo);
 
 #define clmpcccnpollc		nullcnpollc
 #include "clmpcc_pcctwo.h"
@@ -303,6 +312,9 @@ cons_decl(clmpcc);
 struct	consdev constab[] = {
 #if NZSC_PCC > 0
 	cons_init(zsc_pcc),
+#endif
+#if NZSC_PCCTWO > 0
+	cons_init(zsc_pcctwo),
 #endif
 #if NCLMPCC_PCCTWO > 0
 	cons_init(clmpcc),

@@ -1,4 +1,4 @@
-/*	$NetBSD: sbdspvar.h,v 1.42 1999/03/22 07:37:36 mycroft Exp $	*/
+/*	$NetBSD: sbdspvar.h,v 1.48.4.1 2000/06/30 16:27:49 simonb Exp $	*/
 
 /*
  * Copyright (c) 1991-1993 Regents of the University of California.
@@ -34,9 +34,9 @@
  *
  */
 
-#include "midi.h"
-#if NMIDI > 0
-#include <dev/isa/mpuvar.h>
+#include "mpu.h"
+#if NMPU > 0
+#include <dev/ic/mpuvar.h>
 #endif
 
 #define SB_MASTER_VOL	0
@@ -103,7 +103,9 @@ struct sbdsp_softc {
 	int	sc_irq;			/* interrupt */
 
 	int	sc_drq8;		/* DMA (8-bit) */
+	bus_size_t sc_drq8_maxsize;
 	int	sc_drq16;		/* DMA (16-bit) */
+	bus_size_t sc_drq16_maxsize;
 
 	int	sc_open;		/* reference count of open calls */
 #define SB_CLOSED 0
@@ -172,9 +174,11 @@ struct sbdsp_softc {
 #define SBVER_MAJOR(v)	(((v)>>8) & 0xff)
 #define SBVER_MINOR(v)	((v)&0xff)
 
-#if NMIDI > 0
+#if NMPU > 0
 	int	sc_hasmpu;
-	struct	mpu_softc sc_mpu;	/* MPU401 Uart state */
+	struct device *sc_mpudev;
+	bus_space_tag_t sc_mpu_iot;	/* tag */
+	bus_space_handle_t sc_mpu_ioh;	/* handle */
 #endif
 };
 
@@ -236,7 +240,7 @@ int	sbdsp_mixer_query_devinfo __P((void *, mixer_devinfo_t *));
 void 	*sb_malloc __P((void *, int, size_t, int, int));
 void	sb_free __P((void *, void *, int));
 size_t	sb_round_buffersize __P((void *, int, size_t));
-int	sb_mappage __P((void *, void *, int, int));
+paddr_t	sb_mappage __P((void *, void *, off_t, int));
 
 int	sbdsp_get_props __P((void *));
 

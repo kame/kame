@@ -1,4 +1,4 @@
-/* $NetBSD: prom.c,v 1.35 1999/02/26 03:59:14 thorpej Exp $ */
+/* $NetBSD: prom.c,v 1.39 2000/03/06 21:36:05 thorpej Exp $ */
 
 /* 
  * Copyright (c) 1992, 1994, 1995, 1996 Carnegie Mellon University
@@ -27,7 +27,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.35 1999/02/26 03:59:14 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.39 2000/03/06 21:36:05 thorpej Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -38,18 +38,17 @@ __KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.35 1999/02/26 03:59:14 thorpej Exp $");
 #include <sys/proc.h>
 #include <sys/user.h>
 
+#include <machine/cpu.h>
 #include <machine/rpb.h>
 #include <machine/alpha.h>
 #define	ENABLEPROM
 #include <machine/prom.h>
 
-#include <alpha/alpha/cpuvar.h>
-
 #include <dev/cons.h>
 
 /* XXX this is to fake out the console routines, while booting. */
 struct consdev promcons = { NULL, NULL, promcngetc, promcnputc,
-			    nullcnpollc, makedev(23,0), 1 };
+			    nullcnpollc, NULL, makedev(23,0), 1 };
 
 struct rpb	*hwrpb;
 int		alpha_console;
@@ -61,25 +60,6 @@ struct simplelock prom_slock;
 #ifdef _PMAP_MAY_USE_PROM_CONSOLE
 int		prom_mapped = 1;	/* Is PROM still mapped? */
 
-#if defined(MULTIPROCESSOR)
-pt_entry_t	*prom_lev1map, *saved_lev1map;
-static pt_entry_t *prom_swaplev1map __P((pt_entry_t *));
-
-static pt_entry_t *
-prom_swaplev1map(l1map)
-	pt_entry_t *l1map;
-{
-	struct alpha_pcb *apcb;
-	pt_entry_t *rl1map;
-
-	apcb = (struct alpha_pcb *)ALPHA_PHYS_TO_K0SEG(curpcb);
-
-	rl1map = (pt_entry_t *)ALPHA_PHYS_TO_K0SEG(apcb->apcb_ptbr << PGSHIFT);
-	apcb->apcb_ptbr = ALPHA_K0SEG_TO_PHYS((vaddr_t)l1map) >> PGSHIFT;
-	(void) alpha_pal_swpctx(curpcb);
-	return (rl1map);
-}
-#else /* ! MULTIPROCESSOR */
 pt_entry_t	prom_pte, saved_pte[1];	/* XXX */
 static pt_entry_t *prom_lev1map __P((void));
 
@@ -95,7 +75,6 @@ prom_lev1map()
 
 	return ((pt_entry_t *)ALPHA_PHYS_TO_K0SEG(apcb->apcb_ptbr << PGSHIFT));
 }
-#endif /* MULTIPROCESSOR */
 #endif /* _PMAP_MAY_USE_PROM_CONSOLE */
 
 void
@@ -147,9 +126,6 @@ prom_enter()
 	if (prom_mapped == 0 && curpcb != 0) {
 		if (!pmap_uses_prom_console())
 			panic("prom_enter");
-#if defined(MULTIPROCESSOR)
-		saved_lev1map = prom_swaplev1map(prom_lev1map);
-#else
 		{
 			pt_entry_t *lev1map;
 
@@ -157,8 +133,7 @@ prom_enter()
 			saved_pte[0] = lev1map[0];	/* XXX */
 			lev1map[0] = prom_pte;		/* XXX */
 		}
-#endif
-		prom_cache_sync();		/* XXX */
+		prom_cache_sync();			/* XXX */
 	}
 #endif
 	return s;
@@ -176,17 +151,13 @@ prom_leave(s)
 	if (prom_mapped == 0 && curpcb != 0) {
 		if (!pmap_uses_prom_console())
 			panic("prom_leave");
-#if defined(MULTIPROCESSOR)
-		(void) prom_swaplev1map(saved_lev1map);
-#else
 		{
 			pt_entry_t *lev1map;
 
 			lev1map = prom_lev1map();	/* XXX */
 			lev1map[0] = saved_pte[0];	/* XXX */
 		}
-#endif
-		prom_cache_sync();		/* XXX */
+		prom_cache_sync();			/* XXX */
 	}
 #endif
 	simple_unlock(&prom_slock);
@@ -372,14 +343,22 @@ hwrpb_restart_setup()
 }
 
 u_int64_t
-console_restart(ra, ai, pv)
-	u_int64_t ra, ai, pv;
+console_restart(framep)
+	struct trapframe *framep;
 {
 	struct pcs *p;
 
 	/* Clear restart-capable flag, since we can no longer restart. */
 	p = LOCATE_PCS(hwrpb, hwrpb->rpb_primary_cpu_id);
 	p->pcs_flags &= ~PCS_RC;
+
+	/* Fill in the missing frame slots */
+
+	framep->tf_regs[FRAME_PS] = p->pcs_halt_ps;
+	framep->tf_regs[FRAME_PC] = p->pcs_halt_pc;
+	framep->tf_regs[FRAME_T11] = p->pcs_halt_r25;
+	framep->tf_regs[FRAME_RA] = p->pcs_halt_r26;
+	framep->tf_regs[FRAME_T12] = p->pcs_halt_r27;
 
 	panic("user requested console halt");
 

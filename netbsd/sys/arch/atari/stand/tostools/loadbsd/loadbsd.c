@@ -1,4 +1,4 @@
-/*	$NetBSD: loadbsd.c,v 1.13 1997/11/01 06:49:22 lukem Exp $	*/
+/*	$NetBSD: loadbsd.c,v 1.15 1999/06/23 19:26:13 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 L. Weppelman
@@ -45,6 +45,13 @@
 #include "libtos.h"
 #include "loader.h"
 
+#ifdef COMPRESSED_READ
+#define	open	copen
+#define	read	cread
+#define	lseek	clseek
+#define	close	cclose
+#endif /* COMPRESSED_READ */
+
 char	*Progname;		/* How are we called		*/
 int	d_flag  = 0;		/* Output debugging output?	*/
 int	h_flag  = 0;		/* show help			*/
@@ -52,7 +59,7 @@ int	s_flag  = 0;		/* St-ram only			*/
 int	t_flag  = 0;		/* Just test, do not execute	*/
 int	v_flag  = 0;		/* show version			*/
 
-const char version[] = "$Revision: 1.13 $";
+const char version[] = "$Revision: 1.15 $";
 
 /*
  * Default name of kernel to boot, large enough to patch
@@ -151,6 +158,7 @@ char	**argv;
 		fatal(-1, "Cannot open kernel '%s'", kname);
 	if (read(fd, (char *)&ehdr, sizeof(ehdr)) != sizeof(ehdr))
 		fatal(-1, "Cannot read exec-header of '%s'", kname);
+
 	if (N_MAGIC(ehdr) != NMAGIC)
 		fatal(-1, "Not an NMAGIC file '%s'", kname);
 
@@ -163,7 +171,8 @@ char	**argv;
 	kparam.entry    = ehdr.a_entry;
 
 	if (ehdr.a_syms) {
-	  if (lseek(fd,ehdr.a_text+ehdr.a_data+ehdr.a_syms+sizeof(ehdr),0) <= 0)
+	  if (lseek(fd,ehdr.a_text+ehdr.a_data+ehdr.a_syms+sizeof(ehdr),0)
+									<= 0)
 		fatal(-1, "Cannot seek to string table in '%s'", kname);
 	  if (read(fd, (char *)&stringsz, sizeof(long)) != sizeof(long))
 		fatal(-1, "Cannot read string-table size");
@@ -179,7 +188,7 @@ char	**argv;
 	 * Read text & data, clear bss
 	 */
 	if ((read(fd, (char *)kparam.kp, ehdr.a_text) != ehdr.a_text)
-	    || (read(fd,(char *)(kparam.kp+textsz),ehdr.a_data) != ehdr.a_data))
+	    ||(read(fd,(char *)(kparam.kp+textsz),ehdr.a_data) != ehdr.a_data))
 		fatal(-1, "Unable to read kernel image\n");
 	memset(kparam.kp + textsz + ehdr.a_data, 0, ehdr.a_bss);
 
@@ -187,17 +196,18 @@ char	**argv;
 	 * Read symbol and string table
 	 */
 	if (ehdr.a_syms) {
-		long	*p;
+	    long	*p;
 
-		p = (long *)(kparam.kp + textsz + ehdr.a_data + ehdr.a_bss);
-		*p++ = ehdr.a_syms;
-		if (read(fd, (char *)p, ehdr.a_syms) != ehdr.a_syms)
-			fatal(-1, "Cannot read symbol table\n");
-		p = (long *)((char *)p + ehdr.a_syms);
-		if (read(fd, (char *)p, stringsz) != stringsz)
-			fatal(-1, "Cannot read string table\n");
-		kparam.esym_loc = (long)((char *)p-(char *)kparam.kp +stringsz);
+	    p = (long *)(kparam.kp + textsz + ehdr.a_data + ehdr.a_bss);
+	    *p++ = ehdr.a_syms;
+	    if (read(fd, (char *)p, ehdr.a_syms) != ehdr.a_syms)
+		fatal(-1, "Cannot read symbol table\n");
+	    p = (long *)((char *)p + ehdr.a_syms);
+	    if (read(fd, (char *)p, stringsz) != stringsz)
+		fatal(-1, "Cannot read string table\n");
+	    kparam.esym_loc = (long)((char *)p-(char *)kparam.kp +stringsz);
 	}
+	close(fd);
 
 	if (d_flag) {
 	    eprintf("\r\nKernel info:\r\n");
@@ -259,39 +269,45 @@ get_sys_info()
 	jar = *ADDR_P_COOKIE;
 	if (jar != NULL) {
 		do {
-			if (jar[0] == 0x5f435055) { /* _CPU	*/
-				switch (jar[1]) {
-					case 0:
-						kparam.bootflags |= ATARI_68000;
-						break;
-					case 10:
-						kparam.bootflags |= ATARI_68010;
-						break;
-					case 20:
-						kparam.bootflags |= ATARI_68020;
-						break;
-					case 30:
-						kparam.bootflags |= ATARI_68030;
-						break;
-					case 40:
-						kparam.bootflags |= ATARI_68040;
-						break;
-					case 60:
-						kparam.bootflags |= ATARI_68060;
-						break;
-					default:
-						fatal(-1, "Unknown CPU-type");
-				}
+		    if (jar[0] == 0x5f435055) { /* _CPU	*/
+			switch (jar[1]) {
+				case 0:
+					kparam.bootflags |= ATARI_68000;
+					break;
+				case 10:
+					kparam.bootflags |= ATARI_68010;
+					break;
+				case 20:
+					kparam.bootflags |= ATARI_68020;
+					break;
+				case 30:
+					kparam.bootflags |= ATARI_68030;
+					break;
+				case 40:
+					kparam.bootflags |= ATARI_68040;
+					break;
+				case 60:
+					kparam.bootflags |= ATARI_68060;
+					break;
+				default:
+					fatal(-1, "Unknown CPU-type");
 			}
-			if (jar[0] == 0x42504658) { /* BPFX	*/
-				unsigned long	*p;
+		    }
+		    if (jar[0] == 0x42504658) { /* BPFX	*/
+			unsigned long	*p;
 
-				p = (unsigned long*)jar[1];
+			p = (unsigned long*)jar[1];
 
-				kparam.ttmem_start = p[1];
-				kparam.ttmem_size  = p[2];
-			}
-			jar = &jar[2];
+			kparam.ttmem_start = p[1];
+			kparam.ttmem_size  = p[2];
+		    }
+		    if (jar[0] == 0x5f435432) { /* _CT2	*/
+			/*
+			 * The CT2 board has a different physical base address!
+			 */
+			kparam.ttmem_start = CTRAM_BASE;
+		    }
+		    jar = &jar[2];
 		} while (jar[-2]);
 	}
 	if (!(kparam.bootflags & ATARI_ANYCPU))

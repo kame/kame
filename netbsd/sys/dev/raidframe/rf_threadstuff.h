@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_threadstuff.h,v 1.4 1999/03/14 21:53:31 oster Exp $	*/
+/*	$NetBSD: rf_threadstuff.h,v 1.8 2000/06/11 03:35:38 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -85,9 +85,6 @@ typedef void *RF_ThreadArg_t;
 /*
  * In NetBSD, kernel threads are simply processes which share several
  * substructures and never run in userspace.
- *
- * XXX Note, NetBSD does not yet have a wakeup_one(), so we always
- * XXX get Thundering Herd when a condition occurs.
  */
 #define RF_WAIT_COND(_c_,_m_)           { \
 	RF_UNLOCK_MUTEX(_m_); \
@@ -96,9 +93,9 @@ typedef void *RF_ThreadArg_t;
 }
 #define RF_SIGNAL_COND(_c_)            wakeup(&(_c_))
 #define RF_BROADCAST_COND(_c_)         wakeup(&(_c_))
-#define	RF_CREATE_THREAD(_handle_, _func_, _arg_) \
-	kthread_create((void (*) __P((void *)))(_func_), (void *)(_arg_), \
-	    (struct proc **)&(_handle_), "raid")
+#define	RF_CREATE_THREAD(_handle_, _func_, _arg_, _name_) \
+	kthread_create1((void (*) __P((void *)))(_func_), (void *)(_arg_), \
+	    (struct proc **)&(_handle_), _name_)
 
 struct RF_ThreadGroup_s {
 	int     created;
@@ -181,6 +178,6 @@ int
 _rf_create_managed_cond(RF_ShutdownList_t ** listp, int *,
     char *file, int line);
 
-int     rf_cond_init(int *c);	/* XXX need to write?? */
-int     rf_cond_destroy(int *c);/* XXX need to write?? */
+int     rf_cond_init(int *c);
+int     rf_cond_destroy(int *c);
 #endif				/* !_RF__RF_THREADSTUFF_H_ */

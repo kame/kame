@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_parityscan.c,v 1.4.2.2 1999/09/28 04:46:58 cgd Exp $	*/
+/*	$NetBSD: rf_parityscan.c,v 1.9 2000/05/28 03:00:31 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -42,7 +42,6 @@
 #include "rf_engine.h"
 #include "rf_parityscan.h"
 #include "rf_map.h"
-#include "rf_sys.h"
 
 /*****************************************************************************************
  *
@@ -90,10 +89,16 @@ rf_RewriteParity(raidPtr)
 	for (i = 0; i < raidPtr->totalSectors && 
 		     rc <= RF_PARITY_CORRECTED; 
 	     i += layoutPtr->dataSectorsPerStripe) {
+		if (raidPtr->waitShutdown) {
+			/* Someone is pulling the plug on this set...
+			   abort the re-write */
+			return (1);
+		}
 		asm_h = rf_MapAccess(raidPtr, i, 
 				     layoutPtr->dataSectorsPerStripe, 
 				     NULL, RF_DONT_REMAP);
-
+		raidPtr->parity_rewrite_stripes_done = 
+			i / layoutPtr->dataSectorsPerStripe ;
 		rc = rf_VerifyParity(raidPtr, asm_h->stripeMap, 1, 0);
 
 		switch (rc) {

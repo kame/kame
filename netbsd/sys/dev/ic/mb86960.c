@@ -1,4 +1,4 @@
-/*	$NetBSD: mb86960.c,v 1.32 1999/03/25 23:19:16 thorpej Exp $	*/
+/*	$NetBSD: mb86960.c,v 1.40 2000/05/29 17:37:13 jhawk Exp $	*/
 
 /*
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
@@ -91,6 +91,11 @@
 
 #include <dev/ic/mb86960reg.h>
 #include <dev/ic/mb86960var.h>
+
+#ifndef __BUS_SPACE_HAS_STREAM_METHODS
+#define bus_space_write_multi_stream_2	bus_space_write_multi_2
+#define bus_space_read_multi_stream_2	bus_space_read_multi_2
+#endif /* __BUS_SPACE_HAS_STREAM_METHODS */
 
 /* Standard driver entry points.  These can be static. */
 void	mb86960_init	__P((struct mb86960_softc *));
@@ -266,7 +271,7 @@ mb86960_config(sc, media, nmedia, defmedia)
 #endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
-			  RND_TYPE_NET, 0);
+	    RND_TYPE_NET, 0);
 #endif
 	/* Print additional info when attached. */
 	printf("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
@@ -330,6 +335,9 @@ mb86960_config(sc, media, nmedia, defmedia)
 		    sc->sc_dev.dv_xname, buf, bbw, ram, txb, sbw);
 	}
 #endif
+
+	/* The attach is successful. */
+	sc->sc_flags |= FE_FLAGS_ATTACHED;
 }
 
 /*
@@ -343,7 +351,7 @@ mb86960_mediachange(ifp)
 
 	if (sc->sc_mediachange)
 		return ((*sc->sc_mediachange)(sc));
-	return (EINVAL);
+	return (0);
 }
 
 /*
@@ -356,7 +364,7 @@ mb86960_mediastatus(ifp, ifmr)
 {
 	struct mb86960_softc *sc = ifp->if_softc;
 
-	if (sc->sc_enabled == 0) {
+	if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0) {
 		ifmr->ifm_active = IFM_ETHER | IFM_NONE;
 		ifmr->ifm_status = 0;
 		return;
@@ -1101,7 +1109,8 @@ mb86960_intr(arg)
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
 	u_char tstat, rstat;
 
-	if (sc->sc_enabled == 0)
+	if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0 ||
+	    (sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
 		return (0);
 
 #if FE_DEBUG >= 4
@@ -1272,7 +1281,7 @@ mb86960_ioctl(ifp, cmd, data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if (sc->sc_enabled == 0) {
+		if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0) {
 			error = EIO;
 			break;
 		}
@@ -1364,7 +1373,7 @@ mb86960_get_packet(sc, len)
 	m->m_len = len;
 
 	/* Get a packet. */
-	bus_space_read_multi_2(bst, bsh, FE_BMPR8, mtod(m, u_int16_t *),
+	bus_space_read_multi_stream_2(bst, bsh, FE_BMPR8, mtod(m, u_int16_t *),
 			       (len + 1) >> 1);
 
 #if NBPFILTER > 0
@@ -1390,9 +1399,7 @@ mb86960_get_packet(sc, len)
 	}
 #endif
 
-	/* Fix up data start offset in mbuf to point past ether header. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	(*ifp->if_input)(ifp, m);
 	return (1);
 }
 
@@ -1526,7 +1533,7 @@ mb86960_write_mbufs(sc, m)
 
 		/* Output contiguous words. */
 		if (len > 1)
-			bus_space_write_multi_2(bst, bsh, FE_BMPR8,
+			bus_space_write_multi_stream_2(bst, bsh, FE_BMPR8,
 						(u_int16_t *)data, len >> 1);
 
 		/* Save remaining byte, if there is one. */
@@ -1562,15 +1569,7 @@ mb86960_getmcaf(ec, af)
 {
 	struct ifnet *ifp = &ec->ec_if;
 	struct ether_multi *enm;
-	register u_char *cp;
-	register u_int32_t crc;
-	static const u_int32_t crctab[] = {
-		0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
-		0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
-	};
-	register int len;
+	u_int32_t crc;
 	struct ether_multistep step;
 
 	/*
@@ -1600,13 +1599,8 @@ mb86960_getmcaf(ec, af)
 			goto allmulti;
 		}
 
-		cp = enm->enm_addrlo;
-		crc = 0xffffffff;
-		for (len = sizeof(enm->enm_addrlo); --len >= 0;) {
-			crc ^= *cp++;
-			crc = (crc >> 4) ^ crctab[crc & 0xf];
-			crc = (crc >> 4) ^ crctab[crc & 0xf];
-		}
+		crc = ether_crc32_le(enm->enm_addrlo, ETHER_ADDR_LEN);
+
 		/* Just want the 6 most significant bits. */
 		crc >>= 26;
 
@@ -1779,7 +1773,7 @@ mb86960_enable(sc)
 	log(LOG_INFO, "%s: mb86960_enable()\n", sc->sc_dev.dv_xname);
 #endif
 
-	if (sc->sc_enabled == 0 && sc->sc_enable != NULL) {
+	if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0 && sc->sc_enable != NULL) {
 		if ((*sc->sc_enable)(sc) != 0) {
 			printf("%s: device enable failed\n",
 			    sc->sc_dev.dv_xname);
@@ -1787,7 +1781,7 @@ mb86960_enable(sc)
 		}
 	}
 
-	sc->sc_enabled = 1;
+	sc->sc_flags |= FE_FLAGS_ENABLED;
 	return (0);
 }
 
@@ -1803,12 +1797,17 @@ mb86960_disable(sc)
 	log(LOG_INFO, "%s: mb86960_disable()\n", sc->sc_dev.dv_xname);
 #endif
 
-	if (sc->sc_enabled != 0 && sc->sc_disable != NULL) {
+	if ((sc->sc_flags & FE_FLAGS_ENABLED) != 0 && sc->sc_disable != NULL) {
 		(*sc->sc_disable)(sc);
-		sc->sc_enabled = 0;
+		sc->sc_flags &= ~FE_FLAGS_ENABLED;
 	}
 }
 
+/*
+ * mbe_activate:
+ *
+ *	Handle device activation/deactivation requests.
+ */
 int
 mb86960_activate(self, act)
 	struct device *self;
@@ -1824,17 +1823,43 @@ mb86960_activate(self, act)
 		break;
 
 	case DVACT_DEACTIVATE:
-#ifdef notyet
-		/* First, kill off the interface. */
-		if_detach(sc->sc_ec.ec_if);
-#endif
-
-		/* Now disable the interface. */
-		mb86960_disable(sc);
+		if_deactivate(&sc->sc_ec.ec_if);
 		break;
 	}
 	splx(s);
 	return (rv);
+}
+
+/*
+ * mb86960_detach:
+ *
+ *	Detach a MB86960 interface.
+ */
+int
+mb86960_detach(sc)
+	struct mb86960_softc *sc;
+{
+	struct ifnet *ifp = &sc->sc_ec.ec_if;
+
+	/* Succeed now if there's no work to do. */
+	if ((sc->sc_flags & FE_FLAGS_ATTACHED) == 0)
+		return (0);
+
+	/* Delete all media. */
+	ifmedia_delete_instance(&sc->sc_media, IFM_INST_ANY);
+
+#if NRND > 0
+	/* Unhook the entropy source. */
+	rnd_detach_source(&sc->rnd_source);
+#endif
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	ether_ifdetach(ifp);
+	if_detach(ifp);
+
+	mb86960_disable(sc);
+	return (0);
 }
 
 #if FE_DEBUG >= 1

@@ -1,11 +1,15 @@
-#	$NetBSD: Makefile,v 1.19 1999/03/14 00:04:22 fvdl Exp $
+#	$NetBSD: Makefile,v 1.31.2.1 2000/08/23 23:06:48 erh Exp $
 
 S=	${.CURDIR}/../../../../
 
-BASE= biosboot
+BASE?= biosboot
 PROG= ${BASE}.sym
 MKMAN=	no
 NEWVERSWHAT=	"BIOS Boot"
+
+.if (${BASE} != "biosboot")
+.PATH.c: ${.CURDIR}/../biosboot/
+.endif
 
 SRCS= main.c devopen.c conf.c exec.c
 
@@ -13,14 +17,36 @@ CLEANFILES+= ${BSSTART}
 
 CPPFLAGS+= -DCOMPAT_OLDBOOT -DCOMPAT_386BSD_MBRPART
 
-#Sample use of serial line debugger
+.if (${BASE} == "biosboot")
+# Various serial line configurations
+CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_PC -DDIRECT_SERIAL
+#	or
 #CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_COM0KBD
 #	or
 #CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_AUTO
 #	and maybe
 #CPPFLAGS+= -DDIRECT_SERIAL -DCOMCONS_KEYPRESS -DCONSPEED=57600
+.endif
 
+.if (${BASE} == "biosboot_com0")
+CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_COM0 -DDIRECT_SERIAL
+.endif
+
+.if (${BASE} == "biosboot_resetvideo")
+CPPFLAGS+= -DRESET_VIDEO
+CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_PC -DDIRECT_SERIAL
+.endif
+
+.if (${BASE} == "biosboot_ps2")
+CPPFLAGS+= -DIBM_L40
+CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_PC -DDIRECT_SERIAL
+.endif
+
+CPPFLAGS+= -DSUPPORT_USTARFS
 CPPFLAGS+= -DPASS_BIOSGEOM
+CPPFLAGS+= -DPASS_MEMMAP
+#CPPFLAGS+= -DBOOTPASSWD
+
 #uncomment if there are problems with memory detection
 #CPPFLAGS+= -DCONSERVATIVE_MEMDETECT
 #increase MAXFLENTRIES if "installboot" complains about
@@ -30,15 +56,15 @@ CPPFLAGS+= -DPASS_BIOSGEOM
 #CPPFLAGS+= -DPRIM_LOADSZ=9
 
 #CFLAGS= -O2 -fomit-frame-pointer -fno-defer-pop
-CFLAGS+= -Wall
+CFLAGS+= -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-main
 
-# XXX should go into library
-SRCS+= ls.c
-.PATH: ${.CURDIR}/../libsa
-
-SAMISCCPPFLAGS+= -DHEAP_START=0x10000 -DHEAP_LIMIT=0x40000
+SAMISCCPPFLAGS+= -DHEAP_START=0x20000 -DHEAP_LIMIT=0x50000
 SAMISCMAKEFLAGS= SA_USE_CREAD=yes SA_INCLUDE_NET=no
 
+.if (${BASE} == "biosboot")
 VERSIONFILE= ${.CURDIR}/version
+.else
+VERSIONFILE= ${.CURDIR}/../biosboot/version
+.endif
 
 .include "../Makefile.booters"

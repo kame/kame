@@ -1,4 +1,4 @@
-/*	$NetBSD: ite_tv.c,v 1.6.2.1 1999/07/02 16:46:52 perry Exp $	*/
+/*	$NetBSD: ite_tv.c,v 1.7 1999/06/27 14:14:30 minoura Exp $	*/
 
 /*
  * Copyright (c) 1997 Masaru Oki.

@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.14 1999/03/24 05:50:55 mrg Exp $	*/
+/*	$NetBSD: intr.c,v 1.18 2000/02/21 20:38:47 erh Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -66,6 +66,13 @@
 #endif	/* NARP > 0 */
 #include <netinet/ip_var.h>
 #endif 	/* INET */
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif /* INET6 */
 #ifdef NS
 #include <netns/ns_var.h>
 #endif	/* NS */
@@ -183,7 +190,7 @@ dosoftints()
 		INC_SINTRCNT(SOFTIRQ_CLOCK);
 		clearsoftintr(SOFTIRQ_BIT(SOFTIRQ_CLOCK));
 		softclock();
-		splx(s);
+		(void)splx(s);
 	}
 
 	/*
@@ -196,61 +203,18 @@ dosoftints()
 		INC_SINTRCNT(SOFTIRQ_NET);
 		clearsoftintr(SOFTIRQ_BIT(SOFTIRQ_NET));
 
-#ifdef INET
-#if NARP > 0
-		if (netisr & (1 << NETISR_ARP)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_ARP));
-			arpintr();
-		}
-#endif
-		if (netisr & (1 << NETISR_IP)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_IP));
-			ipintr();
-		}
-#endif
-#ifdef NETATALK
-		if (netisr & (1 << NETISR_ATALK)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_ATALK));
-			atintr();
-		}
-#endif
-#ifdef NS
-		if (netisr & (1 << NETISR_NS)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_NS));
-			nsintr();
-		}
-#endif
-#ifdef IMP
-		if (netisr & (1 << NETISR_IMP)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_IMP));
-			impintr();
-		}
-#endif
-#ifdef ISO
-		if (netisr & (1 << NETISR_ISO)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_ISO));
-			clnlintr();
-		}
-#endif
-#ifdef CCITT
-		if (netisr & (1 << NETISR_CCITT)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_CCITT));
-			ccittintr();
-		}
-#endif
-#ifdef NATM
-		if (netisr & (1 << NETISR_NATM)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_NATM));
-			natmintr();
-		}
-#endif
-#if NPPP > 0
-		if (netisr & (1 << NETISR_PPP)) {
-			atomic_clear_bit(&netisr, (1 << NETISR_PPP));
-			pppintr();
-		}
-#endif
-		splx(s);
+#define DONETISR(bit, fn) do {					\
+		if (netisr & (1 << bit)) {			\
+			atomic_clear_bit(&netisr, (1 << bit));	\
+			fn();					\
+		}						\
+} while (0)
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
+
+		(void)splx(s);
 	}
 	/*
 	 * Serial software interrupts
@@ -264,7 +228,7 @@ dosoftints()
 #if NCOM > 0
 		comsoft();
 #endif	/* NCOM > 0 */
-		splx(s);
+		(void)splx(s);
 	}
 }
 

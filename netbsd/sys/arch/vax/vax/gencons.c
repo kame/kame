@@ -1,4 +1,4 @@
-/*	$NetBSD: gencons.c,v 1.20 1999/01/19 21:04:48 ragge Exp $	*/
+/*	$NetBSD: gencons.c,v 1.24 2000/06/04 02:19:26 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -66,12 +66,16 @@ static	int pr_txdb[4] = {PR_TXDB, PR_TXDB1, PR_TXDB2, PR_TXDB3};
 static	int pr_rxdb[4] = {PR_RXDB, PR_RXDB1, PR_RXDB2, PR_RXDB3};
 
 cons_decl(gen);
+#ifdef DYNAMIC_DEVSW
+bcdev_decl(gencn);
+#else
 cdev_decl(gencn);
+#endif
 
 static	int gencnparam __P((struct tty *, struct termios *));
 static	void gencnstart __P((struct tty *));
-void	gencnrint __P((int));
-void	gencntint __P((int));
+void	gencnrint __P((void *));
+void	gencntint __P((void *));
 
 int
 gencnopen(dev, flag, mode, p)
@@ -207,13 +211,13 @@ out:	splx(s);
 }
 
 void
-gencnrint(unit)
-	int unit;
+gencnrint(arg)
+	void *arg;
 {
-	struct tty *tp;
+	struct tty *tp = *(struct tty **) arg;
+	int unit = (struct tty **) arg - gencn_tty;
 	int i;
 
-	tp = gencn_tty[unit];
 	i = mfpr(pr_rxdb[unit]) & 0377; /* Mask status flags etc... */
 
 #ifdef DDB
@@ -228,7 +232,7 @@ gencnrint(unit)
 	}
 #endif
 
-	(*linesw[tp->t_line].l_rint)(i,tp);
+	(*linesw[tp->t_line].l_rint)(i, tp);
 	return;
 }
 
@@ -240,12 +244,11 @@ gencnstop(tp, flag)
 }
 
 void
-gencntint(unit)
-	int unit;
+gencntint(arg)
+	void *arg;
 {
-	struct tty *tp;
+	struct tty *tp = *(struct tty **) arg;
 
-	tp = gencn_tty[unit];
 	tp->t_state &= ~TS_BUSY;
 
 	gencnstart(tp);
@@ -269,6 +272,8 @@ gencnprobe(cndev)
 {
 	if ((vax_cputype < VAX_TYP_UV1) || /* All older has MTPR console */
 	    (vax_boardtype == VAX_BTYP_630) ||
+	    (vax_boardtype == VAX_BTYP_660) ||
+	    (vax_boardtype == VAX_BTYP_670) ||
 	    (vax_boardtype == VAX_BTYP_650)) {
 		cndev->cn_dev = makedev(25, 0);
 		cndev->cn_pri = CN_NORMAL;
@@ -280,17 +285,21 @@ void
 gencninit(cndev)
 	struct	consdev *cndev;
 {
+
 	/* Allocate interrupt vectors */
-	scb_vecalloc(SCB_G0R, gencnrint, 0, SCB_ISTACK);
-	scb_vecalloc(SCB_G0T, gencntint, 0, SCB_ISTACK);
+	scb_vecalloc(SCB_G0R, gencnrint, &gencn_tty[0], SCB_ISTACK, NULL);
+	scb_vecalloc(SCB_G0T, gencntint, &gencn_tty[0], SCB_ISTACK, NULL);
+
 	if (vax_cputype == VAX_TYP_8SS) {
 		maxttys = 4;
-		scb_vecalloc(SCB_G1R, gencnrint, 1, SCB_ISTACK);
-		scb_vecalloc(SCB_G1T, gencntint, 1, SCB_ISTACK);
-		scb_vecalloc(SCB_G2R, gencnrint, 2, SCB_ISTACK);
-		scb_vecalloc(SCB_G2T, gencntint, 2, SCB_ISTACK);
-		scb_vecalloc(SCB_G3R, gencnrint, 3, SCB_ISTACK);
-		scb_vecalloc(SCB_G3T, gencntint, 3, SCB_ISTACK);
+		scb_vecalloc(SCB_G1R, gencnrint, &gencn_tty[1], SCB_ISTACK, NULL);
+		scb_vecalloc(SCB_G1T, gencntint, &gencn_tty[1], SCB_ISTACK, NULL);
+
+		scb_vecalloc(SCB_G2R, gencnrint, &gencn_tty[2], SCB_ISTACK, NULL);
+		scb_vecalloc(SCB_G2T, gencntint, &gencn_tty[2], SCB_ISTACK, NULL);
+
+		scb_vecalloc(SCB_G3R, gencnrint, &gencn_tty[3], SCB_ISTACK, NULL);
+		scb_vecalloc(SCB_G3T, gencntint, &gencn_tty[3], SCB_ISTACK, NULL);
 	}
 	mtpr(0, PR_TBIA); /* ??? */
 }

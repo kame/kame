@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.18 1999/03/30 04:25:36 minoura Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.24 2000/06/01 15:38:27 matt Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman
@@ -49,7 +49,7 @@
 #include <dev/scsipi/scsiconf.h>
 
 void configure __P((void));
-static void findroot __P((struct device **, int *));
+static void findroot __P((void));
 void mbattach __P((struct device *, struct device *, void *));
 int mbmatch __P((struct device *, struct cfdata*, void*));
 int x68k_config_found __P((struct cfdata *, struct device *,
@@ -59,20 +59,18 @@ static int simple_devprint __P((void *, const char *));
 static struct device *scsi_find __P((dev_t));
 static struct device *find_dev_byname __P((const char *));
 
-extern int cold;	/* 1 if still booting (locore.s) */
-int x68k_realconfig;
-#include <sys/kernel.h>
+struct device *booted_device;
+int booted_partition;
 
-struct devnametobdevmaj x68k_nam2blk[] = {
-	X68K_BOOT_DEV_LIST,
-	{ NULL,		0 },
-};
+int x68k_realconfig;
+
+#include <sys/kernel.h>
 
 /*
  * called at boot time, configure all devices on system
  */
 void
-configure()
+cpu_configure()
 {
 	extern int x68k_realconfig;
 	
@@ -81,8 +79,6 @@ configure()
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
 
-	cold = 0;
-
 	/* Turn on interrupts */
 	(void) spl0();
 }
@@ -90,15 +86,12 @@ configure()
 void
 cpu_rootconf()
 {
-	struct device *booted_device;
-	int booted_partition;
-
-	findroot(&booted_device, &booted_partition);
+	findroot();
 
 	printf("boot device: %s\n",
 	    booted_device ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, booted_partition, x68k_nam2blk);
+	setroot(booted_device, booted_partition);
 }
 
 /*ARGSUSED*/
@@ -164,20 +157,16 @@ config_console()
 }
 
 dev_t	bootdev = 0;
+struct device *booted_device;
 
 static void
-findroot(devpp, partp)
-	struct device **devpp;
-	int *partp;
+findroot(void)
 {
 	int i, majdev, unit, part;
 	char buf[32];
 
-	/*
-	 * Default to "not found".
-	 */
-	*devpp = NULL;
-	*partp = 0;
+	if (booted_device)
+		return;
 
 	if (boothowto & RB_ASKNAME)
 		return;		/* Don't bother looking */
@@ -190,23 +179,59 @@ findroot(devpp, partp)
 		/*
 		 * SCSI device
 		 */
-		if ((*devpp = scsi_find(bootdev)) != NULL)
-			*partp = B_X68K_SCSI_PART(bootdev);
+		if ((booted_device = scsi_find(bootdev)) != NULL)
+			booted_partition = B_X68K_SCSI_PART(bootdev);
 		return;
 	}
-	for (i = 0; x68k_nam2blk[i].d_name != NULL; i++)
-		if (majdev == x68k_nam2blk[i].d_maj)
+	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
+		if (majdev == dev_name2blk[i].d_maj)
 			break;
-	if (x68k_nam2blk[i].d_name == NULL)
+	if (dev_name2blk[i].d_name == NULL)
 		return;
 
 	part = B_PARTITION(bootdev);
 	unit = B_UNIT(bootdev);
 
-	sprintf(buf, "%s%d", x68k_nam2blk[i].d_name, unit);
+	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
 
-	if ((*devpp = find_dev_byname(buf)) != NULL)
-		*partp = part;
+	if ((booted_device = find_dev_byname(buf)) != NULL)
+		booted_partition = part;
+}
+
+static const char *const name_netif[] = { X68K_BOOT_NETIF_STRINGS };
+
+void
+device_register(dev, aux)
+	struct device *dev;
+	void *aux;
+{
+	int majdev;
+	char tname[16];
+
+	/*
+	 * Handle network interfaces here, the attachment information is
+	 * not available driver independantly later.
+	 * For disks, there is nothing useful available at attach time.
+	 */
+	if (dev->dv_class == DV_IFNET) {
+		majdev = B_TYPE(bootdev);
+		if (X68K_BOOT_DEV_IS_NETIF(majdev)) {
+			sprintf(tname, "%s%d",
+				name_netif[255 - majdev], B_UNIT(bootdev));
+			if (!strcmp(tname, dev->dv_xname))
+				goto found;
+		}
+	}
+	return;
+
+found:
+	if (booted_device) {
+		/* XXX should be a "panic()" */
+		printf("warning: double match for boot device (%s, %s)\n",
+		       booted_device->dv_xname, dev->dv_xname);
+		return;
+	}
+	booted_device = dev;
 }
 
 static const char *const name_scsiif[] = { X68K_BOOT_SCSIIF_STRINGS };

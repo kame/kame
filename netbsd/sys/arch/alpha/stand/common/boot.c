@@ -1,4 +1,4 @@
-/* $NetBSD: boot.c,v 1.20 1999/04/05 22:03:56 cgd Exp $ */
+/* $NetBSD: boot.c,v 1.25 2000/06/12 23:38:03 matt Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -40,6 +40,7 @@
 
 #include <lib/libsa/stand.h>
 #include <lib/libkern/libkern.h>
+#include <lib/libsa/loadfile.h>
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -57,18 +58,12 @@
 #error not UNIFIED_BOOTBLOCK and not SECONDARY_BOOTBLOCK
 #endif
 
-int loadfile __P((char *, u_int64_t *));
-
 char boot_file[128];
 char boot_flags[128];
 
 struct bootinfo_v1 bootinfo_v1;
 
-extern char bootprog_rev[], bootprog_date[], bootprog_maker[];
-
 paddr_t ffp_save, ptbr_save;
-
-extern vaddr_t ssym, esym;
 
 int debug;
 
@@ -77,6 +72,7 @@ char *kernelnames[] = {
 	"netbsd.bak",		"netbsd.bak.gz",
 	"netbsd.old",		"netbsd.old.gz",
 	"onetbsd",		"onetbsd.gz",
+	"netbsd.alpha",		"netbsd.alpha.gz",
 	NULL
 };
 
@@ -88,6 +84,7 @@ main(long fd)
 #endif
 {
 	char *name, **namep;
+	u_long marks[MARK_MAX];
 	u_int64_t entry;
 	int win;
 
@@ -129,25 +126,26 @@ main(long fd)
 		gets(boot_file);
 	}
 
+	memset(marks, 0, sizeof marks);
 	if (boot_file[0] != '\0')
-		win = (loadfile(name = boot_file, &entry) == 0);
+		win = loadfile(name = boot_file, marks, LOAD_KERNEL) == 0;
 	else
 		for (namep = kernelnames, win = 0; *namep != NULL && !win;
 		    namep++)
-			win = (loadfile(name = *namep, &entry) == 0);
+			win = loadfile(name = *namep, marks, LOAD_KERNEL) == 0;
 
+	entry = marks[MARK_ENTRY];
 	booted_dev_close();
 	printf("\n");
-	if (!win) {
+	if (!win)
 		goto fail;
-	}
 
 	/*
 	 * Fill in the bootinfo for the kernel.
 	 */
 	bzero(&bootinfo_v1, sizeof(bootinfo_v1));
-	bootinfo_v1.ssym = ssym;
-	bootinfo_v1.esym = esym;
+	bootinfo_v1.ssym = marks[MARK_SYM];
+	bootinfo_v1.esym = marks[MARK_END];
 	bcopy(name, bootinfo_v1.booted_kernel,
 	    sizeof(bootinfo_v1.booted_kernel));
 	bcopy(boot_flags, bootinfo_v1.boot_flags,

@@ -1,4 +1,4 @@
-/*	$NetBSD: kadb.c,v 1.5 1997/06/22 07:42:39 jonathan Exp $	*/
+/*	$NetBSD: kadb.c,v 1.7 2000/02/22 12:22:20 soda Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -220,8 +220,8 @@ unsigned kdb_ss_instr;
 void
 kdbsetsstep()
 {
-	register unsigned va;
-	register int *locr0 = kdbpcb.pcb_regs;
+	unsigned va;
+	int *locr0 = kdbpcb.pcb_regs;
 	int i;
 
 	/* compute next address after current location */
@@ -243,12 +243,12 @@ kdbsetsstep()
 	kdb_ss_instr = fuiword(va);
 	i = suiword((caddr_t)va, MIPS_BREAK_SSTEP);
 	if (i < 0) {
-		register struct proc *p = curproc;
-		vm_offset_t sa, ea;
+		struct proc *p = curproc;
+		vaddr_t sa, ea;
 		int rv;
 
-		sa = trunc_page((vm_offset_t)va);
-		ea = round_page((vm_offset_t)va+sizeof(int)-1);
+		sa = trunc_page((vaddr_t)va);
+		ea = round_page((vaddr_t)va+sizeof(int)-1);
 		rv = vm_map_protect(&p->p_vmspace->vm_map, sa, ea,
 			VM_PROT_DEFAULT, FALSE);
 		if (rv == KERN_SUCCESS) {
@@ -264,7 +264,7 @@ kdbsetsstep()
 void
 kdbclrsstep()
 {
-	register unsigned cr, pc, va;
+	unsigned cr, pc, va;
 	unsigned instr;
 	int i;
 
@@ -298,12 +298,12 @@ kdbclrsstep()
 	/* restore original instruction and clear BP */
 	i = suiword((caddr_t)va, kdb_ss_instr);
 	if (i < 0) {
-		register struct proc *p = curproc;
-		vm_offset_t sa, ea;
+		struct proc *p = curproc;
+		vaddr_t sa, ea;
 		int rv;
 
-		sa = trunc_page((vm_offset_t)va);
-		ea = round_page((vm_offset_t)va+sizeof(int)-1);
+		sa = trunc_page((vaddr_t)va);
+		ea = round_page((vaddr_t)va+sizeof(int)-1);
 		rv = vm_map_protect(&p->p_vmspace->vm_map, sa, ea,
 			VM_PROT_DEFAULT, FALSE);
 		if (rv == KERN_SUCCESS) {
@@ -760,7 +760,7 @@ kdbmalloc(size)
  */
 kdbprintmachdep(modif)
 {
-	register int i, j;
+	int i, j;
 	extern int tlbhi, tlblo;
 
 	switch (modif) {

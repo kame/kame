@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.39 1998/11/21 23:41:13 oster Exp $	*/
+/*	$NetBSD: conf.c,v 1.41 1999/10/28 13:43:54 leo Exp $	*/
 
 /*
  * Copyright (c) 1991 The Regents of the University of California.
@@ -34,6 +34,8 @@
  *
  *      @(#)conf.c	7.9 (Berkeley) 5/28/91
  */
+
+#include "opt_compat_svr4.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -189,6 +191,7 @@ cdev_decl(i4btel);
        (dev_type_stop((*))) enodev, 0, seltrue, \
        dev_init(c,n,mmap) }
 
+#include "audio.h"
 #include "bpfilter.h"
 #include "ch.h"
 #include "et.h"
@@ -211,6 +214,7 @@ cdev_decl(i4btel);
 #include "leo.h"
 #include "scsibus.h"
 
+cdev_decl(audio);
 cdev_decl(bpf);
 cdev_decl(ccd);
 cdev_decl(cd);
@@ -294,8 +298,8 @@ struct cdevsw	cdevsw[] =
 	cdev_rnd_init(NRND,rnd),	/* 38: random source pseudo-device */
   	cdev_leo_init(NLEO,leo),	/* 39: Circad Leonardo video */
 	cdev_et_init(NET,et),		/* 40: ET4000 color video */
-  	cdev_notdef(),			/* 41 */
-  	cdev_notdef(),			/* 42 */
+        cdev_notdef(),			/* 41: wscons placeholder	*/
+  	cdev_audio_init(NAUDIO,audio),	/* 42 */
   	cdev_notdef(),			/* 43 */
 #ifdef __I4B_IS_INTEGRATED
 	/* i4b character devices */
@@ -313,6 +317,7 @@ struct cdevsw	cdevsw[] =
 #endif /* __I4B_IS_INTEGRATED */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 49: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 50: RAIDframe disk driver */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 51: svr4 net pseudo-device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

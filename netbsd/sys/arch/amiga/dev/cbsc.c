@@ -1,4 +1,4 @@
-/*	$NetBSD: cbsc.c,v 1.8 1998/11/19 21:44:35 thorpej Exp $	*/
+/*	$NetBSD: cbsc.c,v 1.11 2000/06/05 15:08:03 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -68,13 +68,6 @@ int	cbscmatch	__P((struct device *, struct cfdata *, void *));
 /* Linkup to the rest of the kernel */
 struct cfattach cbsc_ca = {
 	sizeof(struct cbsc_softc), cbscmatch, cbscattach
-};
-
-struct scsipi_device cbsc_dev = {
-	NULL,			/* Use default error handler */
-	NULL,			/* have a queue, served by this */
-	NULL,			/* have no async handler */
-	NULL,			/* Use default 'done' routine */
 };
 
 /*
@@ -233,7 +226,7 @@ cbscattach(parent, self, aux)
 	/*
 	 * Configure interrupts.
 	 */
-	csc->sc_isr.isr_intr = (int (*)(void *))ncr53c9x_intr;
+	csc->sc_isr.isr_intr = ncr53c9x_intr;
 	csc->sc_isr.isr_arg  = sc;
 	csc->sc_isr.isr_ipl  = 2;
 	add_isr(&csc->sc_isr);
@@ -241,9 +234,7 @@ cbscattach(parent, self, aux)
 	/*
 	 * Now try to attach all the sub-devices
 	 */
-	sc->sc_adapter.scsipi_cmd = ncr53c9x_scsi_cmd;
-	sc->sc_adapter.scsipi_minphys = minphys; 
-	ncr53c9x_attach(sc, &cbsc_dev);
+	ncr53c9x_attach(sc, NULL, NULL);
 }
 
 /*
@@ -271,7 +262,7 @@ cbsc_write_reg(sc, reg, val)
 
 	csc->sc_reg[reg * 4] = v;
 #ifdef DEBUG
-if (cbsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL*/ &&
+if (cbsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL*/ &&
   reg == NCR_CMD/* && csc->sc_active*/) {
   cbsc_trace[(cbsc_trace_ptr - 1) & 127].yy = v;
 /*  printf(" cmd %x", v);*/
@@ -297,7 +288,7 @@ cbsc_dma_isintr(sc)
 	if ((csc->sc_reg[0x802] & CBSC_HB_CREQ) == 0)
 		return 0;
 #ifdef DEBUG
-if (/*sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL &&*/ cbsc_trace_enable) {
+if (/*sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL &&*/ cbsc_trace_enable) {
   cbsc_trace[cbsc_trace_ptr].status = csc->sc_reg[NCR_STAT * 4];
   cbsc_trace[cbsc_trace_ptr].xx = csc->sc_reg[NCR_CMD * 4];
   cbsc_trace[cbsc_trace_ptr].yy = csc->sc_active;
@@ -360,7 +351,7 @@ cbsc_dma_setup(sc, addr, len, datain, dmasize)
 	size_t *dmasize;
 {
 	struct cbsc_softc *csc = (struct cbsc_softc *)sc;
-	vm_offset_t pa;
+	paddr_t pa;
 	u_char *ptr;
 	size_t xfer;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.60.4.1 1999/04/21 14:53:44 perry Exp $	*/
+/*	$NetBSD: cpu.h,v 1.64 2000/05/26 21:19:50 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -68,6 +68,10 @@
  * Exported definitions unique to mac68k/68k cpu support.
  */
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Get common m68k definitions.
  */
@@ -79,6 +83,20 @@
  */
 #include <machine/intr.h>
 
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()			(&cpu_info_store)
+
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
@@ -86,6 +104,7 @@
 #define	cpu_swapin(p)			/* nothing */
 #define	cpu_wait(p)			/* nothing */
 #define	cpu_swapout(p)			/* nothing */
+#define	cpu_number()			0
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -125,6 +144,8 @@ extern int want_resched;	/* resched() was called */
 
 extern int astpending;		/* need to trap before returning to user mode */
 #define aston() (astpending++)
+
+#endif /* _KERNEL */
 
 #define CPU_CONSDEV	1
 #define CPU_MAXID	2
@@ -246,6 +267,10 @@ struct mac68k_machine_S {
 	int			scsi96;		/* Has NCR 53C96 */
 	int			scsi96_2;	/* Has 2nd 53C96 */
 	int			sonic;		/* Has SONIC e-net */
+
+	int			via1_ipl;
+	int			via2_ipl;
+	int			aux_interrupts;
 };
 
 	/* What kind of model is this */

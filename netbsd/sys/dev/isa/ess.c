@@ -1,4 +1,4 @@
-/*	$NetBSD: ess.c,v 1.44.2.2 2000/01/20 20:45:01 he Exp $	*/
+/*	$NetBSD: ess.c,v 1.51.4.1 2000/06/30 16:27:48 simonb Exp $	*/
 
 /*
  * Copyright 1997
@@ -146,7 +146,7 @@ int	ess_get_port __P((void *, mixer_ctrl_t *));
 void   *ess_malloc __P((void *, int, size_t, int, int));
 void	ess_free __P((void *, void *, int));
 size_t	ess_round_buffersize __P((void *, int, size_t));
-int	ess_mappage __P((void *, void *, int, int));
+paddr_t	ess_mappage __P((void *, void *, off_t, int));
 
 
 int	ess_query_devinfo __P((void *, mixer_devinfo_t *));
@@ -170,7 +170,7 @@ u_int	ess_srtotc __P((u_int));
 u_int	ess_srtofc __P((u_int));
 u_char	ess_get_dsp_status __P((struct ess_softc *));
 u_char	ess_dsp_read_ready __P((struct ess_softc *));
-u_char	ess_dsp_write_ready __P((struct ess_softc *sc));
+u_char	ess_dsp_write_ready __P((struct ess_softc *));
 int	ess_rdsp __P((struct ess_softc *));
 int	ess_wdsp __P((struct ess_softc *, u_char));
 u_char	ess_read_x_reg __P((struct ess_softc *, u_char));
@@ -181,13 +181,18 @@ u_char	ess_read_mix_reg __P((struct ess_softc *, u_char));
 void	ess_write_mix_reg __P((struct ess_softc *, u_char, u_char));
 void	ess_clear_mreg_bits __P((struct ess_softc *, u_char, u_char));
 void	ess_set_mreg_bits __P((struct ess_softc *, u_char, u_char));
+void	ess_read_multi_mix_reg __P((struct ess_softc *, u_char, u_int8_t *, bus_size_t));
 
 static char *essmodel[] = {
 	"unsupported",
 	"1888",
 	"1887",
 	"888",
-	"1788"
+	"1788",
+	"1869",
+	"1879",
+	"1868",
+	"1878",
 };
 
 struct audio_device ess_device = {
@@ -276,7 +281,7 @@ ess_printsc(sc)
 	       sc->sc_audio1.drq, sc->sc_audio1.irq, sc->sc_audio1.nintr,
 	       sc->sc_audio1.intr, sc->sc_audio1.arg);
 
-	if (sc->sc_model != ESS_1788) {
+	if (!ESS_USE_AUDIO1(sc->sc_model)) {
 		printf("audio2: dmachan %d irq %d nintr %lu intr %p arg %p\n",
 		       sc->sc_audio2.drq, sc->sc_audio2.irq, sc->sc_audio2.nintr,
 		       sc->sc_audio2.intr, sc->sc_audio2.arg);
@@ -508,7 +513,7 @@ ess_config_irq(sc)
 	}
 	ess_write_x_reg(sc, ESS_XCMD_IRQ_CTRL, v);
 
-	if (sc->sc_model == ESS_1788)
+	if (ESS_USE_AUDIO1(sc->sc_model))
 		return;
 
 	if (sc->sc_audio2.polled) {
@@ -553,7 +558,7 @@ ess_config_drq(sc)
 	/* Set DRQ1 */
 	ess_write_x_reg(sc, ESS_XCMD_DRQ_CTRL, v);
 
-	if (sc->sc_model == ESS_1788)
+	if (ESS_USE_AUDIO1(sc->sc_model))
 		return;
 
 	/* Configure DRQ2 */
@@ -613,10 +618,12 @@ ess_identify(sc)
 	u_char reg1;
 	u_char reg2;
 	u_char reg3;
+	u_int8_t ident[4];
 
 	sc->sc_model = ESS_UNSUPPORTED;
 	sc->sc_version = 0;
 
+	memset(ident, 0, sizeof(ident));
 
 	/*
 	 * 1. Check legacy ID bytes.  These should be 0x68 0x8n, where
@@ -677,6 +684,21 @@ ess_identify(sc)
 	if (ess_read_mix_reg(sc, ESS_MREG_SAMPLE_RATE) != reg2) {
 		/* If we got this far before failing, it's a 1788. */
 		sc->sc_model = ESS_1788;
+
+		/*
+		 * Identify ESS model for ES18[67]8.
+		 */
+		ess_read_multi_mix_reg(sc, 0x40, ident, sizeof(ident));
+		if(ident[0] == 0x18) {
+			switch(ident[1]) {
+			case 0x68:
+				sc->sc_model = ESS_1868;
+				break;
+			case 0x78:
+				sc->sc_model = ESS_1878;
+				break;
+			}
+		}
 	} else {
 		/*
 		 * 4. Determine if we can change bit 5 in mixer register 0x64.
@@ -697,6 +719,21 @@ ess_identify(sc)
 			 * Restore the original value of mixer register 0x64.
 			 */
 			ess_write_mix_reg(sc, ESS_MREG_VOLUME_CTRL, reg1);
+
+			/*
+			 * Identify ESS model for ES18[67]9.
+			 */
+			ess_read_multi_mix_reg(sc, 0x40, ident, sizeof(ident));
+			if(ident[0] == 0x18) {
+				switch(ident[1]) {
+				case 0x69:
+					sc->sc_model = ESS_1869;
+					break;
+				case 0x79:
+					sc->sc_model = ESS_1879;
+					break;
+				}
+			}
 		} else {
 			/*
 			 * 5. Determine if we can change the value of mixer
@@ -739,6 +776,10 @@ ess_setup_sc(sc, doinit)
 	struct ess_softc *sc;
 	int doinit;
 {
+
+	callout_init(&sc->sc_poll1_ch);
+	callout_init(&sc->sc_poll2_ch);
+
 	/* Reset the chip. */
 	if (ess_reset(sc) != 0) {
 		DPRINTF(("ess_setup_sc: couldn't reset chip\n"));
@@ -785,7 +826,7 @@ essmatch(sc)
 	}
 	if (!isa_drq_isfree(sc->sc_ic, sc->sc_audio1.drq))
 		return (0);
-	if (sc->sc_model != ESS_1788) {
+	if (!ESS_USE_AUDIO1(sc->sc_model)) {
 		if (!ESS_DRQ2_VALID(sc->sc_audio2.drq)) {
 			printf("ess: play drq %d invalid\n", sc->sc_audio2.drq);
 			return (0);
@@ -815,7 +856,7 @@ essmatch(sc)
 		printf("ess: record irq %d invalid\n", sc->sc_audio1.irq);
 		return (0);
 	}
-	if (sc->sc_model != ESS_1788) {
+	if (!ESS_USE_AUDIO1(sc->sc_model)) {
 		if (sc->sc_audio2.irq != -1 &&
 		    !ESS_IRQ2_VALID(sc->sc_audio2.irq)) {
 			printf("ess: play irq %d invalid\n", sc->sc_audio2.irq);
@@ -856,9 +897,6 @@ essattach(sc)
 
 	printf(": ESS Technology ES%s [version 0x%04x]\n", 
 	       essmodel[sc->sc_model], sc->sc_version);
-	
-	sc->sc_audio1.irq = -1;
-	sc->sc_audio2.irq = -1;
 
 	sc->sc_audio1.polled = sc->sc_audio1.irq == -1;
 	if (!sc->sc_audio1.polled) {
@@ -869,14 +907,15 @@ essattach(sc)
 		    sc->sc_dev.dv_xname, sc->sc_audio1.irq);
 	} else
 		printf("%s: audio1 polled\n", sc->sc_dev.dv_xname);
+	sc->sc_audio1.maxsize = isa_dmamaxsize(sc->sc_ic, sc->sc_audio1.drq);
 	if (isa_dmamap_create(sc->sc_ic, sc->sc_audio1.drq,
-	    MAX_ISADMA, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
+	    sc->sc_audio1.maxsize, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 		printf("%s: can't create map for drq %d\n",
 		       sc->sc_dev.dv_xname, sc->sc_audio1.drq);
 		return;
 	}
 
-	if (sc->sc_model != ESS_1788) {
+	if (!ESS_USE_AUDIO1(sc->sc_model)) {
 		sc->sc_audio2.polled = sc->sc_audio2.irq == -1;
 		if (!sc->sc_audio2.polled) {
 			sc->sc_audio2.ih = isa_intr_establish(sc->sc_ic,
@@ -886,8 +925,10 @@ essattach(sc)
 			    sc->sc_dev.dv_xname, sc->sc_audio2.irq);
 		} else
 			printf("%s: audio2 polled\n", sc->sc_dev.dv_xname);
+		sc->sc_audio2.maxsize = isa_dmamaxsize(sc->sc_ic,
+		    sc->sc_audio2.drq);
 		if (isa_dmamap_create(sc->sc_ic, sc->sc_audio2.drq,
-		    MAX_ISADMA, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
+		    sc->sc_audio2.maxsize, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 			printf("%s: can't create map for drq %d\n",
 			       sc->sc_dev.dv_xname, sc->sc_audio2.drq);
 			return;
@@ -909,11 +950,11 @@ essattach(sc)
 	 * Set volume of Audio 1 to zero and disable Audio 1 DAC input
 	 * to playback mixer, since playback is always through Audio 2.
 	 */
-	if (sc->sc_model != ESS_1788)
+	if (!ESS_USE_AUDIO1(sc->sc_model))
 		ess_write_mix_reg(sc, ESS_MREG_VOLUME_VOICE, 0);
 	ess_wdsp(sc, ESS_ACMD_DISABLE_SPKR);
 
-	if (sc->sc_model == ESS_1788) {
+	if (ESS_USE_AUDIO1(sc->sc_model)) {
 		ess_write_mix_reg(sc, ESS_MREG_ADC_SOURCE, ESS_SOURCE_MIC);
 		sc->in_port = ESS_SOURCE_MIC;
 		sc->ndevs = ESS_1788_NDEVS;
@@ -966,7 +1007,7 @@ essattach(sc)
 	sprintf(ess_device.name, "ES%s", essmodel[sc->sc_model]);
 	sprintf(ess_device.version, "0x%04x", sc->sc_version);
 
-	if (sc->sc_model == ESS_1788)
+	if (ESS_USE_AUDIO1(sc->sc_model))
 		audio_attach_mi(&ess_1788_hw_if, sc, &sc->sc_dev);
 	else
 		audio_attach_mi(&ess_1888_hw_if, sc, &sc->sc_dev);
@@ -992,6 +1033,7 @@ ess_open(addr, flags)
 	int flags;
 {
 	struct ess_softc *sc = addr;
+	int i;
 
 	DPRINTF(("ess_open: sc=%p\n", sc));
     
@@ -999,6 +1041,10 @@ ess_open(addr, flags)
 		return ENXIO;
 
 	ess_setup(sc);		/* because we did a reset */
+
+	/* Set all mixer controls again since some change at reset. */
+	for (i = 0; i < ESS_MAX_NDEVS; i++)
+		ess_set_gain(sc, i, 1);
 
 	sc->sc_open = 1;
 
@@ -1203,14 +1249,14 @@ ess_set_params(addr, setmode, usemode, play, rec)
 		case AUDIO_ENCODING_ULAW:
 			if (mode == AUMODE_PLAY) {
 				p->factor = 2;
-				p->sw_code = mulaw_to_ulinear16;
+				p->sw_code = mulaw_to_ulinear16_le;
 			} else
 				p->sw_code = ulinear8_to_mulaw;
 			break;
 		case AUDIO_ENCODING_ALAW:
 			if (mode == AUMODE_PLAY) {
 				p->factor = 2;
-				p->sw_code = alaw_to_ulinear16;
+				p->sw_code = alaw_to_ulinear16_le;
 			} else
 				p->sw_code = ulinear8_to_alaw;
 			break;
@@ -1227,7 +1273,7 @@ ess_set_params(addr, setmode, usemode, play, rec)
 	ess_write_x_reg(sc, ESS_XCMD_SAMPLE_RATE, ess_srtotc(rate));
 	ess_write_x_reg(sc, ESS_XCMD_FILTER_CLOCK, ess_srtofc(rate));
 
-	if (sc->sc_model != ESS_1788) {
+	if (!ESS_USE_AUDIO1(sc->sc_model)) {
 		ess_write_mix_reg(sc, ESS_MREG_SAMPLE_RATE, ess_srtotc(rate));
 		ess_write_mix_reg(sc, ESS_MREG_FILTER_CLOCK, ess_srtofc(rate));
 	}
@@ -1261,7 +1307,8 @@ ess_audio1_trigger_output(addr, start, end, blksize, intr, arg, param)
 		sc->sc_audio1.buffersize = (char *)end - (char *)start;
 		sc->sc_audio1.dmacount = 0;
 		sc->sc_audio1.blksize = blksize;
-		timeout(ess_audio1_poll, sc, hz/30);
+		callout_reset(&sc->sc_poll1_ch, hz / 30,
+		    ess_audio1_poll, sc);
 	}
 
 	reg = ess_read_x_reg(sc, ESS_XCMD_AUDIO_CTRL);
@@ -1339,7 +1386,8 @@ ess_audio2_trigger_output(addr, start, end, blksize, intr, arg, param)
 		sc->sc_audio2.buffersize = (char *)end - (char *)start;
 		sc->sc_audio2.dmacount = 0;
 		sc->sc_audio2.blksize = blksize;
-		timeout(ess_audio2_poll, sc, hz/30);
+		callout_reset(&sc->sc_poll2_ch, hz / 30,
+		    ess_audio2_poll, sc);
 	}
 
 	reg = ess_read_mix_reg(sc, ESS_MREG_AUDIO2_CTRL2);
@@ -1408,7 +1456,8 @@ ess_audio1_trigger_input(addr, start, end, blksize, intr, arg, param)
 		sc->sc_audio1.buffersize = (char *)end - (char *)start;
 		sc->sc_audio1.dmacount = 0;
 		sc->sc_audio1.blksize = blksize;
-		timeout(ess_audio1_poll, sc, hz/30);
+		callout_reset(&sc->sc_poll1_ch, hz / 30,
+		    ess_audio1_poll, sc);
 	}
 
 	reg = ess_read_x_reg(sc, ESS_XCMD_AUDIO_CTRL);
@@ -1473,7 +1522,7 @@ ess_audio1_halt(addr)
 		    ESS_AUDIO1_CTRL2_FIFO_ENABLE);
 		isa_dmaabort(sc->sc_ic, sc->sc_audio1.drq);
 		if (sc->sc_audio1.polled)
-			untimeout(ess_audio1_poll, sc);
+			callout_stop(&sc->sc_poll1_ch);
 		sc->sc_audio1.active = 0;
 	}
 
@@ -1494,7 +1543,7 @@ ess_audio2_halt(addr)
 		    ESS_AUDIO2_CTRL1_FIFO_ENABLE);
 		isa_dmaabort(sc->sc_ic, sc->sc_audio2.drq);
 		if (sc->sc_audio2.polled)
-			untimeout(ess_audio2_poll, sc);
+			callout_stop(&sc->sc_poll2_ch);
 		sc->sc_audio2.active = 0;
 	}
 
@@ -1578,7 +1627,7 @@ ess_audio1_poll(addr)
 	(*sc->sc_audio1.intr)(sc->sc_audio1.arg, dmacount);
 #endif
 
-	timeout(ess_audio1_poll, sc, hz/30);
+	callout_reset(&sc->sc_poll1_ch, hz / 30, ess_audio1_poll, sc);
 }
 
 void
@@ -1609,7 +1658,7 @@ ess_audio2_poll(addr)
 	(*sc->sc_audio2.intr)(sc->sc_audio2.arg, dmacount);
 #endif
 
-	timeout(ess_audio2_poll, sc, hz/30);
+	callout_reset(&sc->sc_poll2_ch, hz / 30, ess_audio2_poll, sc);
 }
 
 int
@@ -1682,7 +1731,7 @@ ess_set_port(addr, cp)
 		return (0);
 
 	case ESS_RECORD_SOURCE:
-		if (sc->sc_model == ESS_1788) {
+		if (ESS_USE_AUDIO1(sc->sc_model)) {
 			if (cp->type == AUDIO_MIXER_ENUM)
 				return (ess_set_in_port(sc, cp->un.ord));
 			else
@@ -1710,7 +1759,7 @@ ess_set_port(addr, cp)
 		return (0);
 	}
 
-	if (sc->sc_model == ESS_1788)
+	if (ESS_USE_AUDIO1(sc->sc_model))
 		return (EINVAL);
 
 	switch (cp->dev) {
@@ -1804,7 +1853,7 @@ ess_get_port(addr, cp)
 		return (0);
 
 	case ESS_RECORD_SOURCE:
-		if (sc->sc_model == ESS_1788)
+		if (ESS_USE_AUDIO1(sc->sc_model))
 			cp->un.ord = sc->in_port;
 		else
 			cp->un.mask = sc->in_mask;
@@ -1816,7 +1865,7 @@ ess_get_port(addr, cp)
 		return (0);
 	}
 
-	if (sc->sc_model == ESS_1788)
+	if (ESS_USE_AUDIO1(sc->sc_model))
 		return (EINVAL);
 
 	switch (cp->dev) {
@@ -1883,7 +1932,7 @@ ess_query_devinfo(addr, dip)
 	case ESS_MIC_PLAY_VOL:
 		dip->mixer_class = ESS_INPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
-		if (sc->sc_model == ESS_1788)
+		if (ESS_USE_AUDIO1(sc->sc_model))
 			dip->next = AUDIO_MIXER_LAST;
 		else
 			dip->next = ESS_MIC_PREAMP;
@@ -1974,7 +2023,7 @@ ess_query_devinfo(addr, dip)
 		dip->mixer_class = ESS_RECORD_CLASS;
 		dip->next = dip->prev = AUDIO_MIXER_LAST;
 		strcpy(dip->label.name, AudioNsource);
-		if (sc->sc_model == ESS_1788) {
+		if (ESS_USE_AUDIO1(sc->sc_model)) {
 			/*
 			 * The 1788 doesn't use the input mixer control that
 			 * the 1888 uses, because it's a pain when you only
@@ -2039,7 +2088,7 @@ ess_query_devinfo(addr, dip)
 		return (0);
 	}
 
-	if (sc->sc_model == ESS_1788)
+	if (ESS_USE_AUDIO1(sc->sc_model))
 		return (ENXIO);
 
 	switch (dip->index) {
@@ -2124,7 +2173,7 @@ ess_malloc(addr, direction, size, pool, flags)
 	struct ess_softc *sc = addr;
 	int drq;
 
-	if (sc->sc_model != ESS_1788 && direction == AUMODE_PLAY)
+	if ((!ESS_USE_AUDIO1(sc->sc_model)) && direction == AUMODE_PLAY)
 		drq = sc->sc_audio2.drq;
 	else
 		drq = sc->sc_audio1.drq;
@@ -2146,16 +2195,24 @@ ess_round_buffersize(addr, direction, size)
 	int direction;
 	size_t size;
 {
-	if (size > MAX_ISADMA)
-		size = MAX_ISADMA;
+	struct ess_softc *sc = addr;
+	bus_size_t maxsize;
+
+	if ((!ESS_USE_AUDIO1(sc->sc_model)) && direction == AUMODE_PLAY)
+		maxsize = sc->sc_audio2.maxsize;
+	else
+		maxsize = sc->sc_audio1.maxsize;
+
+	if (size > maxsize)
+		size = maxsize;
 	return (size);
 }
 
-int
+paddr_t
 ess_mappage(addr, mem, off, prot)
 	void *addr;
 	void *mem;
-	int off;
+	off_t off;
 	int prot;
 {
 	return (isa_mappage(mem, off, prot));
@@ -2197,7 +2254,7 @@ ess_reset(sc)
 	sc->sc_audio2.active = 0;
 
 	EWRITE1(iot, ioh, ESS_DSP_RESET, ESS_RESET_EXT);
-	delay(10000);
+	delay(10000);		/* XXX shouldn't delay so long */
 	EWRITE1(iot, ioh, ESS_DSP_RESET, 0);
 	if (ess_rdsp(sc) != ESS_MAGIC)
 		return (1);
@@ -2232,7 +2289,7 @@ ess_set_gain(sc, port, on)
 		src = ESS_MREG_VOLUME_MASTER;
 		break;
 	case ESS_DAC_PLAY_VOL:
-		if (sc->sc_model == ESS_1788)
+		if (ESS_USE_AUDIO1(sc->sc_model))
 			src = ESS_MREG_VOLUME_VOICE;
 		else
 			src = 0x7C;
@@ -2283,7 +2340,7 @@ ess_set_gain(sc, port, on)
 	}
 
 	/* 1788 doesn't have a separate recording mixer */
-	if (sc->sc_model == ESS_1788 && mix && src > 0x62)
+	if (ESS_USE_AUDIO1(sc->sc_model) && mix && src > 0x62)
 		return;
 
 	if (on) {
@@ -2635,4 +2692,21 @@ ess_set_mreg_bits(sc, reg, mask)
 	u_char mask;
 {
 	ess_write_mix_reg(sc, reg, ess_read_mix_reg(sc, reg) | mask);
+}
+
+void
+ess_read_multi_mix_reg(sc, reg, datap, count)
+	struct ess_softc *sc;
+	u_char reg;
+	u_int8_t *datap;
+	bus_size_t count;
+{
+	bus_space_tag_t iot = sc->sc_iot;
+	bus_space_handle_t ioh = sc->sc_ioh;
+	int s;
+
+	s = splaudio();
+	EWRITE1(iot, ioh, ESS_MIX_REG_SELECT, reg);
+	bus_space_read_multi_1(iot, ioh, ESS_MIX_REG_DATA, datap, count);
+	splx(s);
 }

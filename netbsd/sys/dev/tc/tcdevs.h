@@ -1,10 +1,10 @@
-/*	$NetBSD: tcdevs.h,v 1.12 1998/06/18 23:29:46 jonathan Exp $	*/
+/*	$NetBSD: tcdevs.h,v 1.16 2000/01/05 12:15:00 drochner Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: tcdevs,v 1.10 1998/06/18 23:28:12 jonathan Exp 
+ *	NetBSD: tcdevs,v 1.15 2000/01/05 12:14:33 drochner Exp 
  */
 
 /*
@@ -41,6 +41,9 @@
 #define	TC_DEVICE_AV01B_AA	"lofi"
 #define	TC_DESCRIPTION_AV01B_AA	"DecAudio \"LoFi\" audio/isdn"
 
+#define	TC_DEVICE_AV300_AA	"???"
+#define	TC_DESCRIPTION_AV300_AA	"Video capture option card"
+
 #define	TC_DEVICE_DGLTA_FA	"otto"
 #define	TC_DESCRIPTION_DGLTA_FA	"DGLTA ATM"
 
@@ -59,8 +62,8 @@
 #define	TC_DEVICE_PMAF_AA	"fza"
 #define	TC_DESCRIPTION_PMAF_AA	"DEC FDDIcontroller 700 (DEFZA; fiber optic)"
 
-#define	TC_DEVICE_PMAF_F	"fta"
-#define	TC_DESCRIPTION_PMAF_F	"DEFTA FDDI"
+#define	TC_DEVICE_PMAF_FA	"fta"
+#define	TC_DESCRIPTION_PMAF_FA	"DEFTA FDDI"
 
 #define	TC_DEVICE_PMAG_AA	"mfb"
 #define	TC_DESCRIPTION_PMAG_AA	"Monochrome Frame Buffer"
@@ -68,17 +71,17 @@
 #define	TC_DEVICE_PMAG_BA	"cfb"
 #define	TC_DESCRIPTION_PMAG_BA	"Color Frame Buffer"
 
-#define	TC_DEVICE_PMAG_CA	"ga"
+#define	TC_DEVICE_PMAG_CA	"px"
 #define	TC_DESCRIPTION_PMAG_CA	"2D Graphics"
 
-#define	TC_DEVICE_PMAG_DA	"gq"
-#define	TC_DESCRIPTION_PMAG_DA	"3D Graphics (LM)"
+#define	TC_DEVICE_PMAG_DA	"px"
+#define	TC_DESCRIPTION_PMAG_DA	"3D Graphics (low/mid end)"
+
+#define	TC_DEVICE_PMAG_FA	"px"
+#define	TC_DESCRIPTION_PMAG_FA	"3D Graphics (high end)"
 
 #define	TC_DEVICE_PMAG_DV	"xcfb"
 #define	TC_DESCRIPTION_PMAG_DV	"Maxine Color Frame Buffer"
-
-#define	TC_DEVICE_PMAG_FA	"gq"
-#define	TC_DESCRIPTION_PMAG_FA	"3D Graphics (HE)"
 
 #define	TC_DEVICE_PMAGB_BA	"sfb"
 #define	TC_DESCRIPTION_PMAGB_BA	"Smart Frame Buffer"
@@ -104,8 +107,14 @@
 #define	TC_DEVICE_PMAZB_AA	"tcds"
 #define	TC_DESCRIPTION_PMAZB_AA	"53c94 TCDS SCSI option card"
 
+#define	TC_DEVICE_PMAZB_AB	"tcds"
+#define	TC_DESCRIPTION_PMAZB_AB	"53c94 TCDS SCSI option card"
+
 #define	TC_DEVICE_PMAZC_AA	"tcds"
 #define	TC_DESCRIPTION_PMAZC_AA	"53c94 TCDS Fast SCSI option card"
+
+#define	TC_DEVICE_PMTNV_AA	"???"
+#define	TC_DESCRIPTION_PMTNV_AA	"Non-volatile RAM option card"
 
 #define	TC_DEVICE_T1D4PKT	"ds"
 #define	TC_DESCRIPTION_T1D4PKT	"DECWRL Turbochannel T1"
@@ -115,3 +124,12 @@
 
 #define	TC_DEVICE_PMAT_AA	"tra"
 #define	TC_DESCRIPTION_PMAT_AA	"DEC TurboChannel Token Ring Controller"
+
+#define	TC_DEVICE_PMABV_AA	"vba"
+#define	TC_DESCRIPTION_PMABV_AA	"VME Adapter"
+
+#define	TC_DEVICE_PMAP_AA	"???"
+#define	TC_DESCRIPTION_PMAP_AA	"Prestoserve"
+
+#define	TC_DEVICE_KWS_TD	"???"
+#define	TC_DESCRIPTION_KWS_TD	"Kubota Denali"

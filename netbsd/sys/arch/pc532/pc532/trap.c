@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.35 1999/03/24 05:51:09 mrg Exp $	*/
+/*	$NetBSD: trap.c,v 1.41 2000/06/06 18:52:44 soren Exp $	*/
 
 /*-
  * Copyright (c) 1996 Matthias Pfaller. All rights reserved.
@@ -45,8 +45,8 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_syscall_debug.h"
 #include "opt_ktrace.h"
-#include "opt_pmap_new.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,7 +102,7 @@ userret(p, pc, oticks)
 	int pc;
 	u_quad_t oticks;
 {
-	int sig, s;
+	int sig;
 
 	/* take pending signals */
 	while ((sig = CURSIG(p)) != 0)
@@ -110,18 +110,9 @@ userret(p, pc, oticks)
 	p->p_priority = p->p_usrpri;
 	if (want_resched) {
 		/*
-		 * Since we are curproc, a clock interrupt could
-		 * change our priority without changing run queues
-		 * (the running process is not kept on a run queue).
-		 * If this happened after we setrunqueue ourselves but
-		 * before we switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We are being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -135,7 +126,7 @@ userret(p, pc, oticks)
 		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
 	}                   
 
-	curpriority = p->p_priority;
+	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
 }
 
 char	*trap_type[] = {
@@ -402,26 +393,12 @@ trap(frame)
 		if ((caddr_t)va >= vm->vm_maxsaddr
 		    && (caddr_t)va < (caddr_t)VM_MAXUSER_ADDRESS
 		    && map != kernel_map) {
-			nss = clrnd(btoc(USRSTACK-(unsigned)va));
+			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
 				rv = KERN_FAILURE;
 				goto nogo;
 			}
 		}
-
-/*
- * PMAP_NEW allocates PTPs at pmap_enter time, not here.
- */
-#if !defined(PMAP_NEW)
-		/* Create a page table page if necessary, and wire it. */
-		if ((PTD[pdei(va)] & PG_V) == 0) {
-			unsigned v;
-			v = trunc_page(vtopte(va));
-			rv = uvm_map_pageable(map, v, v + NBPG, FALSE);
-			if (rv != KERN_SUCCESS)
-				goto nogo;
-		}
-#endif	/* PMAP_NEW */
 
 		/* Fault the original page in. */
 		rv = uvm_fault(map, va, 0, ftype);
@@ -429,19 +406,6 @@ trap(frame)
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 
-#if !defined(PMAP_NEW)
-			/*
-			 * If this is a pagefault for a PT page,
-			 * wire it. Normally we fault them in
-			 * ourselves, but this can still happen on
-			 * a ns32532 in copyout & friends.
-			 */
-			if (map != kernel_map && va >= UPT_MIN_ADDRESS &&
-			    va < UPT_MAX_ADDRESS) {
-				va = trunc_page(va);
-				uvm_map_pageable(map, va, va + NBPG, FALSE);
-			}
-#endif
 			if (type == T_ABT)
 				return;
 			goto out;
@@ -567,7 +531,7 @@ syscall(frame)
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, argsize, args);
+		ktrsyscall(p, code, argsize, args);
 #endif
 	if (error)
 		goto bad;
@@ -609,7 +573,7 @@ syscall(frame)
 	userret(p, frame.sf_regs.r_pc, sticks);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, error, rval[0]);
 #endif
 }
 
@@ -625,6 +589,6 @@ child_return(arg)
 	userret(p, p->p_md.md_regs->r_pc, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }

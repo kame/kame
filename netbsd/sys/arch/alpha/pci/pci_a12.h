@@ -1,4 +1,4 @@
-/* $NetBSD: pci_a12.h,v 1.2 1998/03/02 07:03:20 ross Exp $ */
+/* $NetBSD: pci_a12.h,v 1.3 2000/06/05 21:47:23 thorpej Exp $ */
 
 /* [Notice revision 2.0]
  * Copyright (c) 1997 Avalon Computer Systems, Inc.
@@ -40,9 +40,5 @@
 #define	PCI_A12_H()	/* Generate ctags(1) key */
 
 void	pci_a12_pickintr __P((struct a12c_config *));
-
-#ifdef EVCNT_COUNTERS
-extern struct evcnt a12_intr_evcnt;
-#endif
 
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: reg.h,v 1.1.1.1 1998/06/20 04:58:52 eeh Exp $ */
+/*	$NetBSD: reg.h,v 1.6.4.1 2000/07/18 16:23:23 mrg Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -73,7 +73,7 @@ struct trapframe32 {
  * (The slot tf_global[0] is used to store the %fp when this is used
  * as a clockframe.  This is known as `cheating'.)
  */
-struct trapframe {
+struct trapframe64 {
 	int64_t		tf_tstate;	/* tstate register */
 	int64_t		tf_pc;		/* return pc */
 	int64_t		tf_npc;		/* return npc */
@@ -110,11 +110,6 @@ struct rwindow64 {
 	int64_t	rw_in[8];		/* %i0..%i7 */
 };
 
-union rwindow {
-	struct rwindow64 v9;
-	struct rwindow32 v8;
-};
-
 /*
  * Clone trapframe for now; this seems to be the more useful
  * than the old struct reg above.
@@ -128,11 +123,10 @@ struct reg32 {
 	int	r_out[8];	/* output registers in trap's caller */
 };
 
-struct reg {
+struct reg64 {
 	int64_t	r_tstate;	/* tstate register */
 	int64_t	r_pc;		/* return pc */
 	int64_t	r_npc;		/* return npc */
-	char	r_tl;		/* trap level register -- 3 bits */
 	int	r_y;		/* %y register -- 32-bits */
 	int64_t	r_global[8];	/* global registers in trap's caller */
 	int64_t	r_out[8];	/* output registers in trap's caller */
@@ -148,29 +142,67 @@ struct reg {
  * ``I'd suggest allowing 16 ... allowing an indeterminate variable
  * size would be even better''.  Of course, we cannot do that; we
  * need to malloc these.
+ *
+ * XXXX UltraSPARC processors don't implement a floating point queue.
  */
 #define	FP_QSIZE	16
-#define ALIGNFPSTATE(f)		((struct fpstate *)(((long)(f))&(~BLOCK_ALIGN)))
+#define ALIGNFPSTATE(f)		((struct fpstate64 *)(((long)(f))&(~BLOCK_ALIGN)))
 
 struct fp_qentry {
 	int	*fq_addr;		/* the instruction's address */
 	int	fq_instr;		/* the instruction itself */
 };
-struct fpstate {
+
+struct fpstate64 {
 	u_int	fs_regs[64];		/* our view is 64 32-bit registers */
 	int64_t	fs_fsr;			/* %fsr */
+	int	fs_gsr;			/* graphics state reg */
+	int	fs_qsize;		/* actual queue depth */
+	struct	fp_qentry fs_queue[FP_QSIZE];	/* queue contents */
+};
+
+/* 
+ * For 32-bit emulations.
+ */
+struct fpstate32 {
+	u_int	fs_regs[32];		/* our view is 32 32-bit registers */
+	int	fs_fsr;			/* %fsr */
 	int	fs_qsize;		/* actual queue depth */
 	struct	fp_qentry fs_queue[FP_QSIZE];	/* queue contents */
 };
 
 /*
- * Clone fpstate into an fpreg structure to satisfy <kern/sys_process.c>
+ * The actual FP registers are made accessable (c.f. ptrace(2)) through
+ * a `struct fpreg'; <arch/sparc64/sparc64/process_machdep.c> relies on the
+ * fact that `fpreg' is a prefix of `fpstate'.
  */
-struct fpreg {
+struct fpreg64 {
 	u_int	fr_regs[64];		/* our view is 64 32-bit registers */
 	int64_t	fr_fsr;			/* %fsr */
-	int	fr_qsize;		/* actual queue depth */
-	struct	fp_qentry fr_queue[FP_QSIZE];	/* queue contents */
+	int	fr_gsr;			/* graphics state reg */
 };
+
+/*
+ * 32-bit fpreg used by 32-bit sparc CPUs
+ */
+struct fpreg32 {
+	u_int	fr_regs[32];		/* our view is 32 32-bit registers */
+	int	fr_fsr;			/* %fsr */
+};
+
+#if defined(__arch64__)
+/* Here we gotta do naughty things to let gdb work on 32-bit binaries */
+#define reg		reg64
+#define fpreg		fpreg64
+#define fpstate		fpstate64
+#define trapframe	trapframe64
+#define rwindow		rwindow64
+#else
+#define reg		reg32
+#define fpreg		fpreg32
+#define fpstate		fpstate32
+#define trapframe	trapframe32
+#define rwindow		rwindow32
+#endif
 
 #endif /* _MACHINE_REG_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.19 1999/01/31 00:55:41 castor Exp $	*/
+/*	$NetBSD: types.h,v 1.24 2000/06/09 04:37:51 soda Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -44,24 +44,24 @@
 #include <sys/cdefs.h>
 
 /*
- * Note that mips_reg_t is distinct from the register_t defined 
+ * Note that mips_reg_t is distinct from the register_t defined
  * in <types.h> to allow these structures to be as hidden from
  * the rest of the operating system as possible.
- * 
+ *
  */
 
-#if defined(_MIPS_BSD_API) && _MIPS_BSD_API != _MIPS_BSD_ABI_LP32
-typedef long long mips_reg_t;
+#if defined(_MIPS_BSD_API) && _MIPS_BSD_API != _MIPS_BSD_API_LP32
+typedef long long	mips_reg_t;
 typedef unsigned long long mips_ureg_t;
-#if _MIPS_BSD_API != _MIPS_BSD_ABI_LP32 && _MIPS_BSD_API != _MIPS_BSD_API_LP32_64CLEAN
+#if _MIPS_BSD_API != _MIPS_BSD_API_LP32 && _MIPS_BSD_API != _MIPS_BSD_API_LP32_64CLEAN
 typedef	long long	mips_fpreg_t;
 #else
-typedef	int	mips_fpreg_t;
+typedef	int		mips_fpreg_t;
 #endif
 #else
-typedef long mips_reg_t;
-typedef unsigned long mips_ureg_t;
-typedef	long	mips_fpreg_t;
+typedef long		mips_reg_t;
+typedef unsigned long	mips_ureg_t;
+typedef	long		mips_fpreg_t;
 #endif
 
 #if defined(_KERNEL)
@@ -72,13 +72,15 @@ typedef struct label_t {
 
 /* NB: This should probably be if defined(_KERNEL) */
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
-typedef	unsigned long	vm_offset_t;
-typedef	unsigned long	vm_size_t;
-
-typedef vm_offset_t	paddr_t;
-typedef vm_size_t	psize_t;
-typedef vm_offset_t	vaddr_t;
-typedef vm_size_t	vsize_t;
+#ifdef _MIPS_PADDR_T_64BIT
+typedef unsigned long long	paddr_t;
+typedef unsigned long long	psize_t;
+#else
+typedef unsigned long	paddr_t;
+typedef unsigned long	psize_t;
+#endif
+typedef unsigned long	vaddr_t;
+typedef unsigned long	vsize_t;
 #endif
 
 /*
@@ -100,5 +102,9 @@ typedef	unsigned long long	u_int64_t;
 typedef int32_t			register_t;
 
 #define	__SWAP_BROKEN
+
+#ifdef MIPS3
+#define __HAVE_CPU_COUNTER
+#endif
 
 #endif	/* _MACHTYPES_H_ */

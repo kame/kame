@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.22.2.2 1999/11/29 21:25:48 he Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.27 1999/11/28 20:30:57 is Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -50,6 +50,9 @@
 #include <sys/syscallargs.h>
 
 #include <vm/vm.h>
+
+#include <machine/cpu.h>
+#include <m68k/cacheops.h>
 
 #ifdef TRACE
 int	nvualarm;
@@ -108,8 +111,6 @@ vdoualarm(arg)
 }
 #endif
 
-#include <machine/cpu.h>
-
 /* XXX should be in an include file somewhere */
 #define CC_PURGE	1
 #define CC_FLUSH	2
@@ -129,8 +130,9 @@ cachectl1(req, addr, len, p)
 #if defined(M68040) || defined(M68060)
 	if (mmutype == MMU_68040) {
 		register int inc = 0;
-		int pa = 0, doall = 0;
+		int doall = 0;
 		vaddr_t end = 0;
+		paddr_t pa = 0;
 
 		if (addr == 0 ||
 #if defined(M68040)
@@ -160,9 +162,8 @@ cachectl1(req, addr, len, p)
 			 */
 			if (!doall &&
 			    (pa == 0 || (addr & PGOFSET) == 0)) {
-				pa = pmap_extract(p->p_vmspace->vm_map.pmap,
-						  addr);
-				if (pa == 0)
+				if (pmap_extract(p->p_vmspace->vm_map.pmap,
+				    addr, &pa) == FALSE)
 					doall = 1;
 			}
 			switch (req) {

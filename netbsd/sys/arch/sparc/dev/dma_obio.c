@@ -1,4 +1,4 @@
-/*	$NetBSD: dma_obio.c,v 1.2.6.1 1999/04/13 05:56:58 pk Exp $ */
+/*	$NetBSD: dma_obio.c,v 1.3 1999/04/12 23:01:00 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

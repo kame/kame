@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.52.2.1 1999/04/16 16:20:16 chs Exp $	*/
+/*	$NetBSD: machdep.c,v 1.67.2.2 2000/10/17 19:58:29 scw Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,10 +42,8 @@
  *	@(#)machdep.c	8.10 (Berkeley) 4/20/94
  */
 
-#include "opt_bufcache.h"
 #include "opt_ddb.h"
 #include "opt_compat_hpux.h"
-#include "opt_sysv.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,7 +56,6 @@
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/clist.h>
-#include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -71,15 +68,6 @@
 #include <sys/kcore.h>
 #include <sys/vnode.h>
 #include <sys/syscallargs.h>
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -90,6 +78,7 @@
 #include <sys/sysctl.h>
 
 #include <machine/cpu.h>
+#include <machine/bus.h>
 #include <machine/reg.h>
 #include <machine/prom.h>
 #include <machine/psl.h>
@@ -99,12 +88,23 @@
 
 #include <machine/kcore.h>	/* XXX should be pulled in by sys/kcore.h */
 
+#include <mvme68k/dev/mainbus.h>
+#include <mvme68k/mvme68k/isr.h>
 #include <mvme68k/mvme68k/seglist.h>
 
-#define	MAXMEM	64*1024*CLSIZE	/* XXX - from cmap.h */
+#ifdef DDB
+#include <machine/db_machdep.h>
+#include <ddb/db_extern.h>
+#include <ddb/db_output.h>
+#endif
+
+#define	MAXMEM	64*1024	/* XXX - from cmap.h */
 
 /* the following is used externally (sysctl_hw) */
 char	machine[] = MACHINE;	/* from <machine/param.h> */
+
+/* Our exported CPU info; we can have only one. */  
+struct cpu_info cpu_info_store;
 
 vm_map_t exec_map = NULL;
 vm_map_t mb_map = NULL;
@@ -115,20 +115,6 @@ vm_map_t phys_map = NULL;
  */
 struct	mvmeprom_brdid  boardid;
 
-/*
- * Declare these as initialized data so we can patch them.
- */
-int	nswbuf = 0;
-#ifdef	NBUF
-int	nbuf = NBUF;
-#else
-int	nbuf = 0;
-#endif
-#ifdef	BUFPAGES
-int	bufpages = BUFPAGES;
-#else
-int	bufpages = 0;
-#endif
 caddr_t	msgbufaddr;		/* KVA of message buffer */
 paddr_t msgbufpa;		/* PA of message buffer */
 
@@ -141,7 +127,16 @@ int	physmem;		/* size of physical memory */
  */
 int	safepri = PSL_LOWIPL;
 
-u_long myea; /* from ROM XXXCDC */
+/*
+ * The driver for the ethernet chip appropriate to the
+ * platform (lance or i82586) will use this variable
+ * to size the chip's packet buffer.
+ */
+#ifndef ETHER_DATA_BUFF_PAGES
+#define	ETHER_DATA_BUFF_PAGES	4
+#endif
+u_long	ether_data_buff_size = ETHER_DATA_BUFF_PAGES * NBPG;
+u_char	mvme_ea[6];
 
 extern	u_int lowram;
 extern	short exframesize[];
@@ -151,7 +146,6 @@ extern struct emul emul_hpux;
 #endif
 
 /* prototypes for local functions */ 
-caddr_t	allocsys __P((caddr_t));
 void	identifycpu __P((void));
 void	initcpu __P((void));
 void	dumpsys __P((void));
@@ -159,6 +153,10 @@ void	dumpsys __P((void));
 int	cpu_dumpsize __P((void));
 int	cpu_dump __P((int (*)(dev_t, daddr_t, caddr_t, size_t), daddr_t *));
 void	cpu_init_kcore_hdr __P((void));
+u_long	cpu_dump_mempagecnt __P((void));
+int	cpu_exec_aout_makecmds __P((struct proc *, struct exec_package *));
+void	straytrap __P((int, u_short));
+void	nmintr __P((struct frame));
 
 /*
  * Machine-independent crash dump header info.
@@ -197,11 +195,7 @@ void	mvme68k_init __P((void));
 void	mvme147_init __P((void));
 #endif
 
-#ifdef MVME162
-void	mvme162_init __P((void));
-#endif
-
-#ifdef MVME167
+#if defined(MVME162) || defined(MVME167)
 #include <mvme68k/dev/pcctworeg.h>
 void	mvme167_init __P((void));
 #endif
@@ -244,13 +238,13 @@ mvme68k_init()
 		mvme147_init();
 		break;
 #endif
-#ifdef MVME162
-	case MVME_162:
-		mvme162_init();
-		break;
-#endif
 #ifdef MVME167
 	case MVME_167:
+#endif
+#ifdef MVME162
+	case MVME_162:
+#endif
+#if defined(MVME167) || defined(MVME162)
 		mvme167_init();
 		break;
 #endif
@@ -263,8 +257,8 @@ mvme68k_init()
 	 */
 	for (i = 0; i < btoc(round_page(MSGBUFSIZE)); i++)
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
-		    msgbufpa + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    msgbufpa + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf(msgbufaddr, round_page(MSGBUFSIZE));
 }
 
@@ -275,66 +269,73 @@ mvme68k_init()
 void
 mvme147_init()
 {
-	struct pcc *pcc;
+	bus_space_tag_t bt = MVME68K_INTIO_BUS_SPACE;
+	bus_space_handle_t bh;
 
-	pcc = (struct pcc *)PCC_VADDR(PCC_REG_OFF);
+	/*
+	 * Set up a temporary mapping to the PCC's registers
+	 */
+	bus_space_map(bt, MAINBUS_PCC_OFFSET + PCC_REG_OFF, PCCREG_SIZE, 0, &bh);
 
 	/*
 	 * calibrate delay() using the 6.25 usec counter.
 	 * we adjust the delay_divisor until we get the result we want.
 	 */
-	pcc->t1_cr = PCC_TIMERCLEAR;
-	pcc->t1_pload = 0;		/* init value for counter */
-	pcc->t1_int = 0;		/* disable interrupt */
+	bus_space_write_1(bt, bh, PCCREG_TMR1_CONTROL, PCC_TIMERCLEAR);
+	bus_space_write_2(bt, bh, PCCREG_TMR1_PRELOAD, 0);
+	bus_space_write_1(bt, bh, PCCREG_TMR1_INTR_CTRL, 0);
 
 	for (delay_divisor = 140; delay_divisor > 0; delay_divisor--) {
-		pcc->t1_cr = PCC_TIMERSTART;
+		bus_space_write_1(bt, bh, PCCREG_TMR1_CONTROL, PCC_TIMERSTART);
 		delay(10000);
-		pcc->t1_cr = PCC_TIMERSTOP;
-		if (pcc->t1_count > 1600)  /* 1600 * 6.25usec == 10000usec */
+		bus_space_write_1(bt, bh, PCCREG_TMR1_CONTROL, PCC_TIMERSTOP);
+
+		/* 1600 * 6.25usec == 10000usec */
+		if (bus_space_read_2(bt, bh, PCCREG_TMR1_COUNT) > 1600)
 			break;	/* got it! */
-		pcc->t1_cr = PCC_TIMERCLEAR;
+
+		bus_space_write_1(bt, bh, PCCREG_TMR1_CONTROL, PCC_TIMERCLEAR);
 		/* retry! */
 	}
+
+	bus_space_unmap(bt, bh, PCCREG_SIZE);
 
 	/* calculate cpuspeed */
 	cpuspeed = 2048 / delay_divisor;
 }
 #endif /* MVME147 */
 
-#ifdef MVME162
+#if defined(MVME167) || defined(MVME162)
 /*
- * MVME-162 specific initialization.
- */
-void
-mvme162_init()
-{
-
-	/* XXX implement XXX */
-}
-#endif /* MVME162 */
-
-#ifdef MVME167
-/*
- * MVME-167 specific initializaion.
+ * MVME-167 and MVME-162 specific initializaion.
+ *
+ * XXX Still needs to be bus_spaced XXX
  */
 void
 mvme167_init()
 {
-	struct pcctwo *pcctwo;
+	bus_space_tag_t bt = MVME68K_INTIO_BUS_SPACE;
+	bus_space_handle_t bh;
 
-	pcctwo = (struct pcctwo *)PCCTWO_VADDR(PCCTWO_REG_OFF);
+	/*
+	 * Set up a temporary mapping to the PCCChip2's registers
+	 */
+	bus_space_map(bt, MAINBUS_PCCTWO_OFFSET + PCCTWO_REG_OFF,
+	    PCC2REG_SIZE, 0, &bh);
 
-	pcctwo->tt1_icr = 0;
+	bus_space_write_1(bt, bh, PCC2REG_TIMER1_ICSR, 0);
 
 	for (delay_divisor = 60; delay_divisor > 0; delay_divisor--) {
-		pcctwo->tt1_counter = 0;
-		pcctwo->tt1_ctrl = PCCTWO_TT_CTRL_CEN;
+		bus_space_write_4(bt, bh, PCC2REG_TIMER1_COUNTER, 0);
+		bus_space_write_1(bt, bh, PCC2REG_TIMER1_CONTROL,
+		    PCCTWO_TT_CTRL_CEN);
 		delay(10000);
-		pcctwo->tt1_ctrl = 0;
-		if (pcctwo->tt1_counter > 10000)
+		bus_space_write_1(bt, bh, PCC2REG_TIMER1_CONTROL, 0);
+		if (bus_space_read_4(bt, bh, PCC2REG_TIMER1_COUNTER) > 10000)
 			break;	/* got it! */
 	}
+
+	bus_space_unmap(bt, bh, PCC2REG_SIZE);
 
 	/* calculate cpuspeed */
 	cpuspeed = 759 / delay_divisor;
@@ -381,6 +382,7 @@ cpu_startup()
 	u_quad_t vmememsize;
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
+	char pbuf[9];
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
@@ -398,13 +400,17 @@ cpu_startup()
 	 */
 	printf(version);
 	identifycpu();
-	printf("real mem  = %d", ctob(physmem));
-	
+	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
+	printf("total memory = %s", pbuf);
+
 	for (vmememsize = 0, i = 1; i < mem_cluster_cnt; i++)
 		vmememsize += mem_clusters[i].size;
-	if (vmememsize != 0)
-		printf(" (%qu on-board, %qu VMEbus)",
-		    mem_clusters[0].size, vmememsize);
+	if (vmememsize != 0) {
+		format_bytes(pbuf, sizeof(pbuf), mem_clusters[0].size);
+		printf(" (%s on-board", pbuf);
+		format_bytes(pbuf, sizeof(pbuf), vmememsize);
+		printf(", %s VMEbus)", pbuf);
+	}
 
 	printf("\n");
 
@@ -412,11 +418,11 @@ cpu_startup()
 	 * Find out how much space we need, allocate it,
 	 * and then give everything true virtual addresses.
 	 */
-	size = (vsize_t)allocsys((caddr_t)0);
+	size = (vsize_t)allocsys(NULL, NULL);
 	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(size))) == 0)
 		panic("startup: no room for tables");
-	if ((allocsys(v) - v) != size)
-		panic("startup: talbe size inconsistency");
+	if ((allocsys(v, NULL) - v) != size)
+		panic("startup: table size inconsistency");
 
 
 	/*
@@ -444,20 +450,15 @@ cpu_startup()
 		 * "base" pages for the rest.
 		 */
 		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
 			pg = uvm_pagealloc(NULL, 0, NULL, 0);
 			if (pg == NULL)
 				panic("cpu_startup: not enough memory for "
 				      "buffer cache");
-#ifdef PMAP_NEW
-			pmap_kenter_pgs(curbuf, &pg, 1);
-#else
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    TRUE, VM_PROT_READ|VM_PROT_WRITE);
-#endif
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+				       VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
@@ -468,33 +469,27 @@ cpu_startup()
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 16*NCARGS, TRUE, FALSE, NULL);
+				 16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_PHYS_SIZE, TRUE, FALSE, NULL);
+				 VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	/*
 	 * Finally, allocate mbuf cluster submap.
 	 */
 	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_MBUF_SIZE, FALSE, FALSE, NULL);
-
-	/*
-	 * Initialize callouts
-	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+				 nmbclusters * mclbytes, VM_MAP_INTRSAFE,
+				 FALSE, NULL);
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %ld\n", ptoa(uvmexp.free));
-	printf("using %d buffers containing %d bytes of memory\n",
-		nbuf, bufpages * CLBYTES);
+	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
+	printf("avail memory = %s\n", pbuf);
+	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
+	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
 	/*
 	 * Tell the VM system that the area before the text segment
@@ -503,7 +498,7 @@ cpu_startup()
 	 * XXX Should just change KERNBASE and VM_MIN_KERNEL_ADDRESS,
 	 * XXX but not right now.
 	 */
-	if (uvm_map_protect(kernel_map, 0, round_page(&kernel_text),
+	if (uvm_map_protect(kernel_map, 0, round_page((vaddr_t)&kernel_text),
 	    UVM_PROT_NONE, TRUE) != KERN_SUCCESS)
 		panic("can't mark pre-text pages off-limits");
 
@@ -511,8 +506,8 @@ cpu_startup()
 	 * Tell the VM system that writing to the kernel text isn't allowed.
 	 * If we don't, we might end up COW'ing the text segment!
 	 */
-	if (uvm_map_protect(kernel_map, trunc_page(&kernel_text),
-	    round_page(&etext), UVM_PROT_READ|UVM_PROT_EXEC, TRUE)
+	if (uvm_map_protect(kernel_map, trunc_page((vaddr_t)&kernel_text),
+	    round_page((vaddr_t)&etext), UVM_PROT_READ|UVM_PROT_EXEC, TRUE)
 	    != KERN_SUCCESS)
 		panic("can't protect kernel text");
 
@@ -528,66 +523,6 @@ cpu_startup()
 }
 
 /*
- * Allocate space for system data structures.  We are given
- * a starting virtual address and we return a final virtual
- * address; along the way, we set each data structure pointer.
- *
- * We call allocsys() with 0 to find out how much space we want,
- * allocate that much and fill it with zeroes, and the call
- * allocsys() again with the correct base virtual address.
- */
-caddr_t
-allocsys(v)
-	caddr_t v;
-{
-
-#define valloc(name, type, num) \
-	    (name) = (type *)v; v = (caddr_t)((name)+(num))
-#define valloclim(name, type, num, lim) \
-	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(callout, struct callout, ncallout);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-
-	/*
-	 * Determine how many buffers to allocate.
-	 * We just allocate a flat 5%.  Insure a minimum of 16 buffers.
-	 * We allocate 1/2 as many swap buffer headers as file i/o buffers.
-	 */
-	if (bufpages == 0)
-		bufpages = physmem / 20 / CLSIZE;
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
-	valloc(buf, struct buf, nbuf);
-	return (v);
-}
-
-/*
  * Set registers on exec.
  */
 void
@@ -597,6 +532,7 @@ setregs(p, pack, stack)
 	u_long stack;
 {
 	struct frame *frame = (struct frame *)p->p_md.md_regs;
+	extern void m68881_restore __P((struct fpframe *));
 
 	frame->f_sr = PSL_USERSET;
 	frame->f_pc = pack->ep_entry & ~1;
@@ -627,7 +563,6 @@ setregs(p, pack, stack)
  * Info for CTL_HW
  */
 char	cpu_model[124];
-extern	char version[];
 
 void
 identifycpu()
@@ -748,6 +683,7 @@ identifycpu()
 /*
  * machine dependent system variables.
  */
+int
 cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	int *name;
 	u_int namelen;
@@ -786,7 +722,7 @@ cpu_reboot(howto, bootstr)
 	int howto;
 	char *bootstr;
 {
-	extern int cold;
+	extern void savectx __P((struct user *));
 
 	/* take a snap shot before clobbering any registers */
 	if (curproc && curproc->p_addr)
@@ -974,7 +910,7 @@ long	dumplo = 0;		/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first CLBYTES of disk space
+ * Dumps always skip the first NBPG of disk space
  * in case there might be a disk label stored there.
  * If there is extra space, put dump at the end to
  * reduce the chance that swapping trashes it.
@@ -1031,7 +967,6 @@ dumpsys()
 
 	/* XXX Should save registers. */
 
-	msgbufenabled = 0;	/* don't record dump msgs in msgbuf */
 	if (dumpdev == NODEV)
 		return;
 
@@ -1074,7 +1009,7 @@ dumpsys()
 
 			/* Print out how many MBs we have left to go. */
 			if ((totalbytesleft % (1024*1024)) == 0)
-				printf("%d ", totalbytesleft / (1024 * 1024));
+				printf("%ld ", totalbytesleft / (1024 * 1024));
 
 			/* Limit size for next transfer. */
 			n = bytes - i;
@@ -1082,7 +1017,7 @@ dumpsys()
 				n = NBPG;
 
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
-			    VM_PROT_READ, TRUE, VM_PROT_READ);
+			    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 
 			error = (*dump)(dumpdev, blkno, vmmap, n);
 			if (error)
@@ -1144,6 +1079,7 @@ initcpu()
 #endif
 }
 
+void
 straytrap(pc, evec)
 	int pc;
 	u_short evec;
@@ -1197,7 +1133,7 @@ void
 nmintr(frame)
 	struct frame frame;
 {
-	nmihand(&frame);
+	(void) nmihand(&frame);
 }
 
 /*
@@ -1207,12 +1143,13 @@ nmintr(frame)
  * environment, bumping the ABORT switch would be bad, so we enable
  * panic'ing on ABORT with the kernel option "PANICBUTTON".
  */
-void
-nmihand(frame)
-	struct frame *frame;
+int
+nmihand(arg)
+	void *arg;
 {
-
 	mvme68k_abort("ABORT SWITCH");
+
+	return 1;
 }
 
 /*
@@ -1224,7 +1161,7 @@ mvme68k_abort(cp)
 	const char *cp;
 {
 #ifdef DDB
-	printf("%s\n", cp);
+	db_printf("%s\n", cp);
 	Debugger();
 #else
 #ifdef PANICBUTTON
@@ -1242,26 +1179,10 @@ mvme68k_abort(cp)
  * Determine of the given exec package refers to something which we
  * understand and, if so, set up the vmcmds for it.
  */
+int
 cpu_exec_aout_makecmds(p, epp)
     struct proc *p;
     struct exec_package *epp;
 {
     return ENOEXEC;
-}
-
-void
-myetheraddr(ether)
-	u_char *ether;
-{
-	int e = myea;
-
-	ether[0] = 0x08;
-	ether[1] = 0x00;
-	ether[2] = 0x3e;
-	e = e >> 8;
-	ether[5] = (u_char)(e & 0xff);
-	e = e >> 8;
-	ether[4] = (u_char)(e & 0xff);
-	e = e >> 8;
-	ether[3] = (u_char)(e & 0x0f) | 0x20;
 }

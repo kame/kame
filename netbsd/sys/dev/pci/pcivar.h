@@ -1,4 +1,4 @@
-/*	$NetBSD: pcivar.h,v 1.38 1999/03/19 03:37:52 cgd Exp $	*/
+/*	$NetBSD: pcivar.h,v 1.42 2000/05/10 16:58:42 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -110,6 +110,10 @@ struct pci_attach_args {
  */
 #define	PCI_FLAGS_IO_ENABLED	0x01		/* I/O space is enabled */
 #define	PCI_FLAGS_MEM_ENABLED	0x02		/* memory space is enabled */
+#define	PCI_FLAGS_MRL_OKAY	0x04		/* Memory Read Line okay */
+#define	PCI_FLAGS_MRM_OKAY	0x08		/* Memory Read Multiple okay */
+#define	PCI_FLAGS_MWI_OKAY	0x10		/* Memory Write and Invalidate
+						   okay */
 
 /*
  * PCI device 'quirks'.
@@ -149,6 +153,7 @@ struct pci_quirkdata {
  * Configuration space access and utility functions.  (Note that most,
  * e.g. make_tag, conf_read, conf_write are declared by pci_machdep.h.)
  */
+pcireg_t pci_mapreg_type __P((pci_chipset_tag_t, pcitag_t, int));
 int	pci_mapreg_info __P((pci_chipset_tag_t, pcitag_t, int, pcireg_t,
 	    bus_addr_t *, bus_size_t *, int *));
 int	pci_mapreg_map __P((struct pci_attach_args *, int, pcireg_t, int,

@@ -1,4 +1,4 @@
-/*	$NetBSD: tcx.c,v 1.13 1998/07/29 18:36:09 pk Exp $ */
+/*	$NetBSD: tcx.c,v 1.17.4.2 2000/07/19 02:53:13 mrg Exp $ */
 
 /*
  *  Copyright (c) 1996,1998 The NetBSD Foundation, Inc.
@@ -62,16 +62,17 @@
 
 #include <vm/vm.h>
 
+#include <machine/bus.h>
 #include <machine/autoconf.h>
 #include <machine/pmap.h>
 #include <machine/fbvar.h>
-#include <machine/cpu.h>
-#include <machine/conf.h>
 
 #include <sparc/dev/btreg.h>
 #include <sparc/dev/btvar.h>
 #include <sparc/dev/tcxreg.h>
 #include <sparc/dev/sbusvar.h>
+
+#include <machine/conf.h>
 
 /* per-display variables */
 struct tcx_softc {
@@ -106,8 +107,6 @@ static struct fbdriver tcx_fbdriver = {
 	tcx_unblank, tcxopen, tcxclose, tcxioctl, tcxpoll, tcxmmap
 };
 
-extern int fbnode;
-
 static void tcx_reset __P((struct tcx_softc *));
 static void tcx_loadcmap __P((struct tcx_softc *, int, int));
 
@@ -136,12 +135,11 @@ tcxattach(parent, self, args)
 {
 	struct tcx_softc *sc = (struct tcx_softc *)self;
 	struct sbus_attach_args *sa = args;
-	int node, ramsize, i;
+	int node, ramsize;
 	volatile struct bt_regs *bt;
 	struct fbdevice *fb = &sc->sc_fb;
 	bus_space_handle_t bh;
 	int isconsole;
-	extern struct tty *fbconstty;
 
 	sc->sc_bustag = sa->sa_bustag;
 	node = sa->sa_node;
@@ -208,8 +206,7 @@ tcxattach(parent, self, args)
 	}
 	sc->sc_bt = bt = (volatile struct bt_regs *)bh;
 
-
-	isconsole = node == fbnode && fbconstty != NULL;
+	isconsole = fb_is_console(node);
 
 	printf(", id %d, rev %d, sense %d",
 		(sc->sc_thc->thc_config & THC_CFG_FBID) >> THC_CFG_FBID_SHIFT,
@@ -220,10 +217,9 @@ tcxattach(parent, self, args)
 	/* reset cursor & frame buffer controls */
 	tcx_reset(sc);
 
-	/* grab initial (current) color map (DOES THIS WORK?) */
-	bt->bt_addr = 0;
-	for (i = 0; i < 256 * 3; i++)
-		((char *)&sc->sc_cmap)[i] = bt->bt_cmap >> 24;
+	/* Initialize the default color map. */
+	bt_initcmap(&sc->sc_cmap, 256);
+	tcx_loadcmap(sc, 0, 256);
 
 	/* enable video */
 	sc->sc_thc->thc_hcmisc |= THC_MISC_VIDEN;
@@ -234,8 +230,7 @@ tcxattach(parent, self, args)
 		printf("\n");
 
 	sbus_establish(&sc->sc_sd, &sc->sc_dev);
-	if (node == fbnode)
-		fb_attach(&sc->sc_fb, isconsole);
+	fb_attach(&sc->sc_fb, isconsole);
 }
 
 int
@@ -295,12 +290,12 @@ tcxioctl(dev, cmd, data, flags, p)
 		break;
 
 	case FBIOGETCMAP:
-		return (bt_getcmap((struct fbcmap *)data, &sc->sc_cmap, 256));
+#define	p ((struct fbcmap *)data)
+		return (bt_getcmap(p, &sc->sc_cmap, 256, 1));
 
 	case FBIOPUTCMAP:
 		/* copy to software map */
-#define	p ((struct fbcmap *)data)
-		error = bt_putcmap(p, &sc->sc_cmap, 256);
+		error = bt_putcmap(p, &sc->sc_cmap, 256, 1);
 		if (error)
 			return (error);
 		/* now blast them into the chip */
@@ -432,10 +427,11 @@ struct mmo {
  *
  * XXX	needs testing against `demanding' applications (e.g., aviator)
  */
-int
+paddr_t
 tcxmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct tcx_softc *sc = tcx_cd.cd_devs[minor(dev)];
 	bus_space_handle_t bh;
@@ -486,7 +482,7 @@ tcxmmap(dev, off, prot)
 					   BUS_SPACE_MAP_LINEAR, &bh))
 				return (-1);
 
-			return ((int)bh);
+			return ((paddr_t)bh);
 		}
 	}
 	return (-1);	/* not a user-map offset */

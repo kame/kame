@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_page_i.h,v 1.9 1999/03/25 18:48:55 mrg Exp $	*/
+/*	$NetBSD: uvm_page_i.h,v 1.13 2000/05/08 23:11:53 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -80,6 +80,40 @@
 #if defined(UVM_PAGE_INLINE) || defined(UVM_PAGE)
 
 /*
+ * uvm_lock_fpageq: lock the free page queue
+ *
+ * => free page queue can be accessed in interrupt context, so this
+ *	blocks all interrupts that can cause memory allocation, and
+ *	returns the previous interrupt level.
+ */
+
+PAGE_INLINE int
+uvm_lock_fpageq()
+{
+	int s;
+
+	s = splimp();
+	simple_lock(&uvm.fpageqlock);
+	return (s);
+}
+
+/*
+ * uvm_unlock_fpageq: unlock the free page queue
+ *
+ * => caller must supply interrupt level returned by uvm_lock_fpageq()
+ *	so that it may be restored.
+ */
+
+PAGE_INLINE void
+uvm_unlock_fpageq(s)
+	int s;
+{
+
+	simple_unlock(&uvm.fpageqlock);
+	splx(s);
+}
+
+/*
  * uvm_pagelookup: look up a page
  *
  * => caller should lock object to keep someone from pulling the page
@@ -89,7 +123,7 @@
 struct vm_page *
 uvm_pagelookup(obj, off)
 	struct uvm_object *obj;
-	vaddr_t off;
+	voff_t off;
 {
 	struct vm_page *pg;
 	struct pglist *buck;
@@ -181,7 +215,7 @@ uvm_pagedeactivate(pg)
 	}
 	if ((pg->pqflags & PQ_INACTIVE) == 0) {
 #ifdef DIAGNOSTIC 
-		if (pg->wire_count)
+		if (__predict_false(pg->wire_count))
 			panic("uvm_pagedeactivate: caller did not check "
 			    "wire count");
 #endif
@@ -191,8 +225,8 @@ uvm_pagedeactivate(pg)
 			TAILQ_INSERT_TAIL(&uvm.page_inactive_obj, pg, pageq);
 		pg->pqflags |= PQ_INACTIVE;
 		uvmexp.inactive++;
-		pmap_clear_reference(PMAP_PGARG(pg));
-		if (pmap_is_modified(PMAP_PGARG(pg)))
+		pmap_clear_reference(pg);
+		if (pmap_is_modified(pg))
 			pg->flags &= ~PG_CLEAN;
 	}
 }
@@ -277,7 +311,7 @@ uvm_page_lookup_freelist(pg)
 
 	lcv = vm_physseg_find(atop(VM_PAGE_TO_PHYS(pg)), NULL);
 #ifdef DIAGNOSTIC
-	if (lcv == -1)
+	if (__predict_false(lcv == -1))
 		panic("uvm_page_lookup_freelist: unable to locate physseg");
 #endif
 	return (vm_physmem[lcv].free_list);

@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_prf.c,v 1.62 1999/02/12 00:46:11 thorpej Exp $	*/
+/*	$NetBSD: subr_prf.c,v 1.74.2.1 2000/07/04 16:05:34 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1986, 1988, 1991, 1993
@@ -41,13 +41,12 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_ipkdb.h"
 #include "opt_multiprocessor.h"
-#include "ipkdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/conf.h>
 #include <sys/reboot.h>
 #include <sys/msgbuf.h>
 #include <sys/proc.h>
@@ -64,20 +63,32 @@
 
 #ifdef DDB
 #include <ddb/ddbvar.h>
+#include <machine/db_machdep.h>
+#include <ddb/db_command.h>
+#include <ddb/db_interface.h>
+#endif
+
+#ifdef IPKDB
+#include <ipkdb/ipkdb.h>
 #endif
 
 #if defined(MULTIPROCESSOR)
-struct simplelock kprintf_slock;
+struct simplelock kprintf_slock = SIMPLELOCK_INITIALIZER;
 
+/*
+ * Use cpu_simple_lock() and cpu_simple_unlock().  These are the actual
+ * atomic locking operations, and never attempt to print debugging
+ * information.
+ */
 #define	KPRINTF_MUTEX_ENTER(s)						\
 do {									\
 	(s) = splhigh();						\
-	simple_lock(&kprintf_slock);					\
+	__cpu_simple_lock(&kprintf_slock.lock_data);			\
 } while (0)
 
 #define	KPRINTF_MUTEX_EXIT(s)						\
 do {									\
-	simple_unlock(&kprintf_slock);					\
+	__cpu_simple_unlock(&kprintf_slock.lock_data);			\
 	splx((s));							\
 } while (0)
 #else /* ! MULTIPROCESSOR */
@@ -99,7 +110,6 @@ do {									\
 #endif
 #ifdef DDB
 #include <ddb/db_output.h>	/* db_printf, db_putchar prototypes */
-extern	int db_radix;		/* XXX: for non-standard '%r' format */
 #endif
 
 
@@ -133,10 +143,10 @@ static void	 klogpri __P((int));
  */
 
 struct	tty *constty;	/* pointer to console "window" tty */
-int	consintr = 1;	/* ok to handle console interrupts? */
 extern	int log_open;	/* subr_log: is /dev/klog open? */
 const	char *panicstr; /* arg to first call to panic (used as a flag
 			   to indicate that panic has already been called). */
+int	doing_shutdown;	/* set to indicate shutdown in progress */
 
 /*
  * v_putc: routine to putc on virtual console
@@ -157,10 +167,13 @@ void (*v_putc) __P((int)) = cnputc;	/* start with cnputc (normal cons) */
  */
 
 void
-tablefull(tab)
-	const char *tab;
+tablefull(tab, hint)
+	const char *tab, *hint;
 {
-	log(LOG_ERR, "%s: table is full\n", tab);
+	if (hint)
+		log(LOG_ERR, "%s: table is full - %s\n", tab, hint);
+	else
+		log(LOG_ERR, "%s: table is full\n", tab);
 }
 
 /*
@@ -184,18 +197,19 @@ panic(fmt, va_alist)
 	va_list ap;
 
 	bootopt = RB_AUTOBOOT | RB_DUMP;
-	if (panicstr)
+	if (doing_shutdown)
 		bootopt |= RB_NOSYNC;
-	else
+	if (!panicstr)
 		panicstr = fmt;
-
+	doing_shutdown = 1;
+	
 	va_start(ap, fmt);
 	printf("panic: ");
 	vprintf(fmt, ap);
 	printf("\n");
 	va_end(ap);
 
-#if NIPKDB > 0
+#ifdef IPKDB
 	ipkdb_panic();
 #endif
 #ifdef KGDB
@@ -208,6 +222,20 @@ panic(fmt, va_alist)
 #ifdef DDB
 	if (db_onpanic)
 		Debugger();
+	else {
+		static int intrace = 0;
+
+		if (intrace==0) {
+			intrace=1;
+			printf("Begin traceback...\n");
+			db_stack_trace_print(
+			    (db_expr_t)__builtin_frame_address(0),
+			    TRUE, 65535, "", printf);
+			printf("End traceback...\n");
+			intrace=0;
+		} else
+			printf("Faulted in mid-traceback; aborting...");
+	}
 #endif
 	cpu_reboot(bootopt, NULL);
 }
@@ -247,6 +275,30 @@ log(level, fmt, va_alist)
 		kprintf(fmt, TOCONS, NULL, NULL, ap);
 		va_end(ap);
 	}
+
+	KPRINTF_MUTEX_EXIT(s);
+
+	logwakeup();		/* wake up anyone waiting for log msgs */
+}
+
+/*
+ * vlog: write to the log buffer [already have va_alist]
+ */
+
+void
+vlog(level, fmt, ap)
+	int level;
+	const char *fmt;
+	va_list ap;
+{
+	int s;
+
+	KPRINTF_MUTEX_ENTER(s);
+
+	klogpri(level);		/* log the level first */
+	kprintf(fmt, TOLOG, NULL, NULL, ap);
+	if (!log_open)
+		kprintf(fmt, TOCONS, NULL, NULL, ap);
 
 	KPRINTF_MUTEX_EXIT(s);
 
@@ -327,11 +379,11 @@ addlog(fmt, va_alist)
  */
 static void
 putchar(c, flags, tp)
-	register int c;
+	int c;
 	int flags;
 	struct tty *tp;
 {
-	register struct kern_msgbuf *mbp;
+	struct kern_msgbuf *mbp;
 
 	if (panicstr)
 		constty = NULL;
@@ -393,7 +445,7 @@ uprintf(fmt, va_alist)
 	va_dcl
 #endif
 {
-	register struct proc *p = curproc;
+	struct proc *p = curproc;
 	va_list ap;
 
 	if (p->p_flag & P_CONTROLT && p->p_session->s_ttyvp) {
@@ -421,7 +473,7 @@ uprintf(fmt, va_alist)
 
 tpr_t
 tprintf_open(p)
-	register struct proc *p;
+	struct proc *p;
 {
 
 	if (p->p_flag & P_CONTROLT && p->p_session->s_ttyvp) {
@@ -460,7 +512,7 @@ tprintf(tpr, fmt, va_alist)
 	va_dcl
 #endif
 {
-	register struct session *sess = (struct session *)tpr;
+	struct session *sess = (struct session *)tpr;
 	struct tty *tp = NULL;
 	int s, flags = TOLOG;
 	va_list ap;
@@ -551,12 +603,10 @@ printf(fmt, va_alist)
 #endif
 {
 	va_list ap;
-	int s, savintr;
+	int s;
 
 	KPRINTF_MUTEX_ENTER(s);
 
-	savintr = consintr;		/* disable interrupts */
-	consintr = 0;
 	va_start(ap, fmt);
 	kprintf(fmt, TOCONS | TOLOG, NULL, NULL, ap);
 	va_end(ap);
@@ -565,7 +615,6 @@ printf(fmt, va_alist)
 
 	if (!panicstr)
 		logwakeup();
-	consintr = savintr;		/* reenable interrupts */
 }
 
 /*
@@ -578,19 +627,16 @@ vprintf(fmt, ap)
 	const char *fmt;
 	va_list ap;
 {
-	int s, savintr;
+	int s;
 
 	KPRINTF_MUTEX_ENTER(s);
 
-	savintr = consintr;		/* disable interrupts */
-	consintr = 0;
 	kprintf(fmt, TOCONS | TOLOG, NULL, NULL, ap);
 
 	KPRINTF_MUTEX_EXIT(s);
 
 	if (!panicstr)
 		logwakeup();
-	consintr = savintr;		/* reenable interrupts */
 }
 
 /*
@@ -729,10 +775,10 @@ bitmask_snprintf(val, p, buf, buflen)
 	}
 
 	/*
-	 * If the value we printed was 0, or if we don't have room for
-	 * "<x>", we're done.
+	 * If the value we printed was 0 and we're using the old-style format,
+	 * or if we don't have room for "<x>", we're done.
 	 */
-	if (val == 0 || left < 3)
+	if (((val == 0) && (ch != '\177')) || left < 3)
 		return (buf);
 
 #define PUTBYTE(b, c, l)	\
@@ -1036,9 +1082,6 @@ reswitch:	switch (ch) {
 #ifdef DDB
 		/* XXX: non-standard '%r' format (print int in db_radix) */
 		case 'r':
-			if ((oflags & TODDB) == 0) 
-				goto default_case;
-			
 			if (db_radix == 16)
 				goto case_z;	/* signed hex */
 			_uquad = SARG();
@@ -1053,9 +1096,6 @@ reswitch:	switch (ch) {
 		/* XXX: non-standard '%z' format ("signed hex", a "hex %i")*/
 		case 'z':
 		case_z:
-			if ((oflags & TODDB) == 0) 
-				goto default_case;
-
 			xdigs = "0123456789abcdef";
 			ch = 'x';	/* the 'x' in '0x' (below) */
 			_uquad = SARG();
@@ -1312,9 +1352,6 @@ number:			if ((dprec = prec) >= 0)
 		skipsize:
 			break;
 		default:	/* "%?" prints ?, unless ? is NUL */
-#ifdef DDB
-		default_case:	/* DDB */
-#endif
 			if (ch == '\0')
 				goto done;
 			/* pretend it was %c with argument ch */

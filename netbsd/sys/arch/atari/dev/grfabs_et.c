@@ -1,4 +1,4 @@
-/*	$NetBSD: grfabs_et.c,v 1.13 1999/03/26 19:20:42 leo Exp $	*/
+/*	$NetBSD: grfabs_et.c,v 1.16 2000/04/11 07:08:45 leo Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.
@@ -458,7 +458,7 @@ et_probe_card()
 	et_priv.memsz   = PCI_VGA_SIZE;
 	et_priv.regsz   = PCI_IO_SIZE;
 
-	if (found && !atari_realconfig) {
+	if (!atari_realconfig) {
 		et_loadmode(&hw_modes[0], NULL);
 		return (1);
 	}
@@ -544,6 +544,7 @@ et_sv_reg_t		*regs;
 	regs->crt[CRT_ID_START_ADDR_LOW]   = 0x00;
 	regs->crt[CRT_ID_LINE_COMPARE]     = 0xff;
 	regs->crt[CRT_ID_UNDERLINE_LOC]    = 0x00;
+	regs->crt[CRT_ID_PRESET_ROW_SCAN]  = 0x00;
 	regs->crt[CRT_ID_OFFSET]           = mode->disp_width/16;
 	regs->crt[CRT_ID_MAX_ROW_ADDRESS]  =
 		0x40 |
@@ -668,7 +669,7 @@ et_sv_reg_t	*et_regs;
 	et_regs->aux_mode    = RSeq(ba, SEQ_ID_AUXILIARY_MODE);
 	et_regs->seg_sel     = vgar(ba, GREG_SEGMENTSELECT);
 
-	s = splx(s);
+	splx(s);
 }
 
 void
@@ -719,5 +720,5 @@ et_sv_reg_t	*et_regs;
 	i = et_regs->seq[SEQ_ID_CLOCKING_MODE] & ~0x20;
 	WSeq(ba, SEQ_ID_CLOCKING_MODE, i);
 
-	s = splx(s);
+	splx(s);
 }

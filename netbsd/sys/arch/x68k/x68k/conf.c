@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.17 1999/03/16 16:30:23 minoura Exp $	*/
+/*	$NetBSD: conf.c,v 1.19 2000/06/11 14:20:46 minoura Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -34,6 +34,8 @@
  *
  *      @(#)conf.c	7.9 (Berkeley) 5/28/91
  */
+
+#include "opt_compat_svr4.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -218,7 +220,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),
 #endif
 	cdev_tty_init(NXCOM,com),	/* 16: serial port */
-	cdev_gen_init(NAUDIO,audio),	/* 17: /dev/adpcm /dev/pcm /dev/audio */
+	cdev_audio_init(NAUDIO,audio),	/* 17: /dev/adpcm /dev/pcm /dev/audio */
 	cdev_disk_init(NFD,fd),		/* 18: floppy disk */
 	cdev_disk_init(NVND,vnd),	/* 19: vnode disk driver */
 	cdev_tape_init(NST,st),		/* 20: SCSI tape */
@@ -243,6 +245,7 @@ struct cdevsw	cdevsw[] =
 	cdev_rnd_init(NRND,rnd),	/* 39: random source pseudo-device */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 40: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 41: RAIDframe disk driver */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 42: svr4 net pseudo-device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

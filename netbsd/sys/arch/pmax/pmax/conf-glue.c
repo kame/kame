@@ -1,4 +1,4 @@
-/*	$NetBSD: conf-glue.c,v 1.18 1999/03/22 13:08:51 mrg Exp $	*/
+/*	$NetBSD: conf-glue.c,v 1.23 2000/01/10 03:24:36 simonb Exp $	*/
 
 /*
  * conf-glue.c:
@@ -18,12 +18,8 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/device.h>
-#include <sys/buf.h>
-#include <sys/dkstat.h>
 
-#include <machine/autoconf.h>
 #include <pmax/dev/device.h>
 
 #define C (char *)
@@ -39,16 +35,16 @@
 
 /* declarations for glue to 4.4bsd pmax port SCSI drivers and autoconfig */
 #if NASC > 0
-extern struct pmax_driver ascdriver;
+extern struct pmax_driver ascdriver;	/* XXX */
 #endif
 #if NSII > 0
-extern struct pmax_driver siidriver;
+extern struct pmax_driver siidriver;	/* XXX */
 #endif
 #if NRZ > 0
-extern struct pmax_driver rzdriver;
+extern struct pmax_driver rzdriver;	/* XXX */
 #endif
 #if NTZ > 0
-extern struct pmax_driver tzdriver;
+extern struct pmax_driver tzdriver;	/* XXX */
 #endif
 
 
@@ -118,8 +114,10 @@ struct pmax_scsi_device scsi_dinit[] = {
 };
 
 
-int	nomatch  __P((struct device *parent, struct cfdata *cf, void *aux));
-void	noattach __P((struct device *parent, struct device *self, void *aux));
+static int	nomatch __P((struct device *parent, struct cfdata *cf,
+		    void *aux));
+static void	noattach __P((struct device *parent, struct device *self,
+		    void *aux));
 
 
 /* placeholder definitions for new-style scsi bus/disk/tape drivers */
@@ -173,9 +171,9 @@ pmax_add_scsi(dp, unit)
 void
 configure_scsi()
 {
-	register struct pmax_ctlr *cp;
-	register struct pmax_scsi_device *dp;
-	register struct pmax_driver *drp;
+	struct pmax_ctlr *cp;
+	struct pmax_scsi_device *dp;
+	struct pmax_driver *drp;
 
 	/* probe and initialize SCSI buses */
 	for (cp = &pmax_scsi_table[0]; (drp = cp->pmax_driver) != NULL; cp++) {
@@ -198,19 +196,16 @@ configure_scsi()
 /*
  * Match function in struct cfattach of old-conf drivers: never matches.
  */
-int
+static int
 nomatch(parent, cf, aux)
 	struct device *parent;
 	struct cfdata *cf;
 	void *aux;
 {
 #if /*def DEBUG*/ 0
-	struct confargs *ca = aux;
-
-	printf("nomatch  %s: %s: %s offset 0x%lx not yet done: %x\n",
-	        parent->dv_cfdata->cf_driver->cd_name,
-	       parent->dv_xname,
-	       ca->ca_name, ca->ca_offset);
+	printf("nomatch  %s: %s not yet done\n",
+		parent->dv_cfdata->cf_driver->cd_name,
+		parent->dv_xname);
 #endif
 	return 0;
 }
@@ -219,22 +214,18 @@ nomatch(parent, cf, aux)
 /*
  * Attach function in struct cfattach of old-conf drivers: never called.
  */
-void
+static void
 noattach(parent, self, aux)
 	struct device *parent;
 	struct device *self;
 	void *aux;
 {
-	struct confargs *ca = aux;
-
-	/*XXX*/
 #ifdef DEBUG
-	printf("new attach  %s%d from %s: not yet done\n",
-	       ca->ca_name, self->dv_unit,
-	       parent->dv_xname);
+	printf("new attach  %s from %s: not yet done\n",
+		self->dv_xname, parent->dv_xname);
 #else
-	panic("Can't do new-config attach of old device %s%d\n",
-	      ca->ca_name, self->dv_unit);
+	panic("Can't do new-config attach of old device %s\n",
+		self->dv_xname);
 #endif
 	return;
 }

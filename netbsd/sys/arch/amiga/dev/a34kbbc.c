@@ -1,4 +1,4 @@
-/*	$NetBSD: a34kbbc.c,v 1.3.2.2 2000/01/08 18:19:41 he Exp $	*/
+/*	$NetBSD: a34kbbc.c,v 1.8 2000/03/15 20:40:00 kleink Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -73,11 +73,14 @@ a34kbbc_match(pdp, cfp, auxp)
 	struct cfdata *cfp;
 	void *auxp;
 {
+	static int a34kbbc_matched = 0;
+
 	if (!matchname("a34kbbc", auxp))
 		return(0);
 
-	if (cfp->cf_unit)
-		return(0);	/* only one of us please */
+	/* Allow only once instance. */
+	if (a34kbbc_matched)
+		return(0);
 
 	if (!(is_a3000() || is_a4000()))
 		return(0);
@@ -86,6 +89,7 @@ a34kbbc_match(pdp, cfp, auxp)
 	if (a34kugettod(0) == 0)
 		return(0);
 
+	a34kbbc_matched = 1;
 	return(1);
 }
 
@@ -167,7 +171,7 @@ a34kusettod(tvp)
 
 	clock_secs_to_ymdhms(secs, &dt);
 
-	rt->control1 = A3CONTROL1_HOLD_CLOCK;
+	rt->control1 = A3CONTROL1_HOLD_CLOCK;		/* implies mode 0 */
 	rt->second1 = dt.dt_sec / 10;
 	rt->second2 = dt.dt_sec % 10;
 	rt->minute1 = dt.dt_min / 10;
@@ -183,7 +187,7 @@ a34kusettod(tvp)
 	rt->year2   = dt.dt_year % 10;
 	rt->control1 = A3CONTROL1_HOLD_CLOCK | 1;	/* mode 1 registers */
 	rt->leapyear = dt.dt_year; 		/* XXX implicit % 4 */
-	rt->control1 = A3CONTROL1_FREE_CLOCK;		/* implies mode 0 */
+	rt->control1 = A3CONTROL1_FREE_CLOCK;		/* implies mode 1 */
 
 	return (1);
 }

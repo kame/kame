@@ -1,4 +1,4 @@
-/*	$NetBSD: alloc.c,v 1.12 1999/04/01 02:41:08 simonb Exp $	*/
+/*	$NetBSD: alloc.c,v 1.15 2000/03/30 12:19:47 augustss Exp $	*/
 
 /*
  * Copyright (c) 1997 Christopher G. Demetriou.  All rights reserved.
@@ -110,7 +110,7 @@
 struct fl {
 	unsigned	size;
 	struct fl	*next;
-} *freelist = (struct fl *)0;
+} *freelist;
 
 #ifdef HEAP_VARIABLE
 static char *top, *heapstart, *heaplimit;
@@ -134,7 +134,7 @@ void *
 alloc(size)
 	unsigned size;
 {
-	register struct fl **f = &freelist, **bestf = NULL;
+	struct fl **f = &freelist, **bestf = NULL;
 #ifndef ALLOC_FIRST_FIT
 	unsigned bestsize = 0xffffffff;	/* greater than any real size */
 #endif
@@ -195,7 +195,9 @@ alloc(size)
 	/* we take the best fit */
 	f = bestf;
 
+#ifndef ALLOC_FIRST_FIT
 found:
+#endif
         /* remove from freelist */
         help = (char*)*f;
 	*f = (*f)->next;
@@ -211,7 +213,7 @@ free(ptr, size)
 	void *ptr;
 	unsigned size; /* only for consistence check */
 {
-	register struct fl *f =
+	struct fl *f =
 	    (struct fl *)((char*)ptr - ALIGN(sizeof(unsigned)));
 #ifdef ALLOC_TRACE
 	printf("free(%lx, %u) (origsize %u)\n", (u_long)ptr, size, f->size);

@@ -1,4 +1,4 @@
-/* 	$NetBSD: compat_util.c,v 1.11.2.2 1999/06/21 19:23:26 cgd Exp $	*/
+/* 	$NetBSD: compat_util.c,v 1.14.12.2 2000/10/18 16:23:57 tv Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -187,9 +187,13 @@ good:
 	else {
 		sz = &ptr[len] - buf;
 		*pbuf = stackgap_alloc(sgp, sz + 1);
+		if (*pbuf == NULL) {
+			error = ENAMETOOLONG;
+			goto bad;
+		}
 		if ((error = copyout(buf, (void *)*pbuf, sz)) != 0) {
 			*pbuf = path;
-			return error;
+			goto bad;
 		}
 		free(buf, M_TEMP);
 	}
@@ -230,9 +234,11 @@ caddr_t
 stackgap_init(e)
 	struct emul *e;
 {
+	struct proc *p = curproc;		/* XXX */
 
 #define szsigcode ((caddr_t)(e->e_esigcode - e->e_sigcode))
-	return STACKGAPBASE;
+	return (caddr_t)(((unsigned long)p->p_psstr - (unsigned long)szsigcode
+		- STACKGAPLEN) & ~ALIGNBYTES);
 #undef szsigcode
 }
 
@@ -242,10 +248,18 @@ stackgap_alloc(sgp, sz)
 	caddr_t *sgp;
 	size_t sz;
 {
-	void *p = (void *) *sgp;
-
-	*sgp += ALIGN(sz);
-	return p;
+	void *n = (void *) *sgp;
+	caddr_t nsgp;
+	struct proc *p = curproc;		/* XXX */
+	struct emul *e = p->p_emul;
+	int sigsize = e->e_esigcode - e->e_sigcode;
+	
+	sz = ALIGN(sz);
+	nsgp = *sgp + sz;
+	if (nsgp > (((caddr_t)p->p_psstr) - sigsize))
+		return NULL;
+	*sgp = nsgp;
+	return n;
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: db_trace.c,v 1.22.6.2 1999/04/12 21:27:04 pk Exp $	*/
+/*	$NetBSD: db_trace.c,v 1.28 2000/05/31 16:24:24 mycroft Exp $	*/
 
 /* 
  * Mach Operating System
@@ -83,7 +83,8 @@ boolean_t	db_trace_symbols_found = FALSE;
 
 void db_find_trace_symbols __P((void));
 int db_numargs __P((struct i386_frame *));
-void db_nextframe __P((struct i386_frame **, db_addr_t *, int *, int));
+void db_nextframe __P((struct i386_frame **, db_addr_t *, int *, int,
+    void (*) (const char *, ...)));
 
 void
 db_find_trace_symbols()
@@ -137,11 +138,12 @@ db_numargs(fp)
  *   of the function that faulted, but that could get hairy.
  */
 void
-db_nextframe(fp, ip, argp, is_trap)
+db_nextframe(fp, ip, argp, is_trap, pr)
 	struct i386_frame **fp;		/* in/out */
 	db_addr_t	*ip;		/* out */
 	int *argp;			/* in */
 	int is_trap;			/* in */
+	void (*pr) __P((const char *, ...)); /* in */
 {
 
 	switch (is_trap) {
@@ -159,13 +161,13 @@ db_nextframe(fp, ip, argp, is_trap)
 		tf = (struct trapframe *)argp;
 		switch (is_trap) {
 		case TRAP:
-			db_printf("--- trap (number %d) ---\n", tf->tf_trapno);
+			(*pr)("--- trap (number %d) ---\n", tf->tf_trapno);
 			break;
 		case SYSCALL:
-			db_printf("--- syscall (number %d) ---\n", tf->tf_eax);
+			(*pr)("--- syscall (number %d) ---\n", tf->tf_eax);
 			break;
 		case INTERRUPT:
-			db_printf("--- interrupt ---\n");
+			(*pr)("--- interrupt ---\n");
 			break;
 		}
 		*fp = (struct i386_frame *)tf->tf_ebp;
@@ -176,11 +178,12 @@ db_nextframe(fp, ip, argp, is_trap)
 }
 
 void
-db_stack_trace_cmd(addr, have_addr, count, modif)
+db_stack_trace_print(addr, have_addr, count, modif, pr)
 	db_expr_t	addr;
 	boolean_t	have_addr;
 	db_expr_t	count;
 	char		*modif;
+	void		(*pr) __P((const char *, ...));
 {
 	struct i386_frame *frame, *lastframe;
 	int		*argp;
@@ -206,9 +209,6 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 		}
 	}
 
-	if (count == -1)
-		count = 65535;
-
 	if (!have_addr) {
 		frame = (struct i386_frame *)ddb_regs.tf_ebp;
 		callpc = (db_addr_t)ddb_regs.tf_eip;
@@ -216,23 +216,24 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 		if (trace_thread) {
 			struct proc *p;
 			struct user *u;
-			db_printf ("trace: pid %d ", (int)addr);
+			(*pr)("trace: pid %d ", (int)addr);
 			p = pfind(addr);
 			if (p == NULL) {
-				db_printf("not found\n");
+				(*pr)("not found\n");
 				return;
 			}	
 			if (!(p->p_flag&P_INMEM)) {
-				db_printf("swapped out\n");
+				(*pr)("swapped out\n");
 				return;
 			}
 			u = p->p_addr;
 			frame = (struct i386_frame *) u->u_pcb.pcb_ebp;
-			db_printf("at %p\n", frame);
+			(*pr)("at %p\n", frame);
 		} else
 			frame = (struct i386_frame *)addr;
 		callpc = (db_addr_t)
 			 db_get_value((int)&frame->f_retaddr, 4, FALSE);
+		frame = (struct i386_frame *)frame->f_frame;
 	}
 
 	lastframe = 0;
@@ -260,6 +261,26 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 			}
 		}
 		if (INKERNEL((int)frame) && name) {
+#ifdef __ELF__
+			if (!strcmp(name, "trap")) {
+				is_trap = TRAP;
+			} else if (!strcmp(name, "syscall")) {
+				is_trap = SYSCALL;
+			} else if (name[0] == 'X') {
+				if (!strncmp(name, "Xintr", 5) ||
+				    !strncmp(name, "Xresume", 7) ||
+				    !strncmp(name, "Xstray", 6) ||
+				    !strncmp(name, "Xhold", 5) ||
+				    !strncmp(name, "Xrecurse", 8) ||
+				    !strcmp(name, "Xdoreti") ||
+				    !strncmp(name, "Xsoft", 5)) {
+					is_trap = INTERRUPT;
+				} else
+					goto normal;
+			} else
+				goto normal;
+			narg = 0;
+#else
 			if (!strcmp(name, "_trap")) {
 				is_trap = TRAP;
 			} else if (!strcmp(name, "_syscall")) {
@@ -278,6 +299,7 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 			} else
 				goto normal;
 			narg = 0;
+#endif /* __ELF__ */
 		} else {
 		normal:
 			is_trap = NONE;
@@ -288,7 +310,7 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 				narg = db_numargs(frame);
 		}
 
-		db_printf("%s(", name);
+		(*pr)("%s(", name);
 
 		if (lastframe == 0 && offset == 0 && !have_addr) {
 			/*
@@ -302,15 +324,15 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 
 		while (narg) {
 			if (argnp)
-				db_printf("%s=", *argnp++);
-			db_printf("%lx", db_get_value((int)argp, 4, FALSE));
+				(*pr)("%s=", *argnp++);
+			(*pr)("%lx", db_get_value((int)argp, 4, FALSE));
 			argp++;
 			if (--narg != 0)
-				db_printf(",");
+				(*pr)(",");
 		}
-		db_printf(") at ");
-		db_printsym(callpc, DB_STGY_PROC);
-		db_printf("\n");
+		(*pr)(") at ");
+		db_printsym(callpc, DB_STGY_PROC, pr);
+		(*pr)("\n");
 
 		if (lastframe == 0 && offset == 0 && !have_addr) {
 			/* Frame really belongs to next callpc */
@@ -321,7 +343,7 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 		}
 
 		lastframe = frame;
-		db_nextframe(&frame, &callpc, &frame->f_arg0, is_trap);
+		db_nextframe(&frame, &callpc, &frame->f_arg0, is_trap, pr);
 
 		if (frame == 0) {
 			/* end of chain */
@@ -330,7 +352,7 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 		if (INKERNEL((int)frame)) {
 			/* staying in kernel */
 			if (frame <= lastframe) {
-				db_printf("Bad frame pointer: %p\n", frame);
+				(*pr)("Bad frame pointer: %p\n", frame);
 				break;
 			}
 		} else if (INKERNEL((int)lastframe)) {
@@ -340,7 +362,7 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 		} else {
 			/* in user */
 			if (frame <= lastframe) {
-				db_printf("Bad user frame pointer: %p\n",
+				(*pr)("Bad user frame pointer: %p\n",
 					  frame);
 				break;
 			}
@@ -349,7 +371,7 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 	}
 
 	if (count && is_trap != NONE) {
-		db_printsym(callpc, DB_STGY_XTRN);
-		db_printf(":\n");
+		db_printsym(callpc, DB_STGY_XTRN, pr);
+		(*pr)(":\n");
 	}
 }

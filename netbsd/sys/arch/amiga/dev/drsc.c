@@ -1,4 +1,4 @@
-/*	$NetBSD: drsc.c,v 1.15 1998/12/05 19:43:34 mjacob Exp $	*/
+/*	$NetBSD: drsc.c,v 1.17 2000/03/16 16:37:20 kleink Exp $	*/
 
 /*
  * Copyright (c) 1996 Ignatios Souvatzis
@@ -52,6 +52,8 @@
 #include <amiga/dev/siopvar.h>
 #include <amiga/amiga/drcustom.h>
 
+#include <machine/cpu.h>	/* is_xxx(), */
+
 void drscattach __P((struct device *, struct device *, void *));
 int drscmatch __P((struct device *, struct cfdata *, void *));
 int drsc_dmaintr __P((struct siop_softc *));
@@ -87,9 +89,14 @@ drscmatch(pdp, cfp, auxp)
 	struct cfdata *cfp;
 	void *auxp;
 {
-	if (is_draco() && matchname(auxp, "drsc") && (cfp->cf_unit == 0))
-		return(1);
-	return(0);
+	static int drsc_matched = 0;
+
+	/* Allow only one instance. */
+	if (!is_draco() || !matchname(auxp, "drsc") || drsc_matched)
+		return (0);
+
+	drsc_matched = 1;
+	return(1);
 }
 
 void

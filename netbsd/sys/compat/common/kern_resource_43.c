@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_resource_43.c,v 1.5 1997/10/15 17:03:52 mycroft Exp $	*/
+/*	$NetBSD: kern_resource_43.c,v 1.7 2000/03/30 11:27:14 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -60,7 +60,7 @@ compat_43_sys_getrlimit(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct compat_43_sys_getrlimit_args /* {
+	struct compat_43_sys_getrlimit_args /* {
 		syscallarg(int) which;
 		syscallarg(struct orlimit *) rlp;
 	} */ *uap = v;
@@ -101,5 +101,5 @@ compat_43_sys_setrlimit(p, v, retval)
 		return (error);
 	lim.rlim_cur = olim.rlim_cur;
 	lim.rlim_max = olim.rlim_max;
-	return (dosetrlimit(p, which, &lim));
+	return (dosetrlimit(p, p->p_cred, which, &lim));
 }

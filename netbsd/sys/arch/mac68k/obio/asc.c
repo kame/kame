@@ -1,4 +1,4 @@
-/*	$NetBSD: asc.c,v 1.30.4.1 1999/04/23 14:52:32 perry Exp $	*/
+/*	$NetBSD: asc.c,v 1.34.4.3 2000/09/13 12:43:25 scottr Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -126,6 +126,8 @@ ascmatch(parent, cf, aux)
 
 	if (oa->oa_addr != (-1))
 		addr = (bus_addr_t)oa->oa_addr;
+	else if (current_mac_model->machineid == MACH_MACTV)
+		return 0;
 	else if (current_mac_model->machineid == MACH_MACIIFX)
 		addr = (bus_addr_t)MAC68K_IIFX_ASC_BASE;
 	else
@@ -168,6 +170,7 @@ ascattach(parent, self, aux)
 	}
 	sc->sc_open = 0;
 	sc->sc_ringing = 0;
+	callout_init(&sc->sc_bell_ch);
 
 	for (i = 0; i < 256; i++) {	/* up part of wave, four voices? */
 		asc_wave_tab[i] = i / 4;
@@ -189,7 +192,11 @@ ascattach(parent, self, aux)
 
 	mac68k_set_bell_callback(asc_ring_bell, sc);
 #if __notyet__
-	via2_register_irq(VIA2_ASC, asc_intr, sc);
+	if (mac68k_machine.aux_interrupts) {
+		intr_establish((int (*)(void *))asc_intr, sc, 5);
+	} else {
+		via2_register_irq(VIA2_ASC, asc_intr, sc);
+	}
 	asc_intr_enable();
 #endif
 }
@@ -280,10 +287,10 @@ ascpoll(dev, events, p)
 	return (events & (POLLOUT | POLLWRNORM));
 }
 
-int
+paddr_t
 ascmmap(dev, off, prot)
 	dev_t dev;
-	int off;
+	off_t off;
 	int prot;
 {
 	int unit = ASCUNIT(dev);
@@ -292,7 +299,8 @@ ascmmap(dev, off, prot)
 
 	sc = asc_cd.cd_devs[unit];
 	if ((u_int)off < MAC68K_ASC_LEN) {
-		pa = pmap_extract(pmap_kernel(), (vaddr_t)sc->sc_handle);
+		(void) pmap_extract(pmap_kernel(), (vaddr_t)sc->sc_handle.base,
+		    &pa);
 		return m68k_btop(pa + off);
 	}
 
@@ -343,9 +351,9 @@ asc_ring_bell(arg, freq, length, volume)
 		bus_space_write_1(sc->sc_tag, sc->sc_handle, 0x80f, 0);
 		bus_space_write_1(sc->sc_tag, sc->sc_handle, 0x802, 2); /* sampled */
 		bus_space_write_1(sc->sc_tag, sc->sc_handle, 0x801, 2); /* enable sampled */
+		sc->sc_ringing = 1;
+		callout_reset(&sc->sc_bell_ch, length, asc_stop_bell, sc);
 	}
-	sc->sc_ringing++;
-	timeout(asc_stop_bell, sc, length);
 
 	return (0);
 }

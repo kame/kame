@@ -1,4 +1,4 @@
-/*	$NetBSD: aic6360var.h,v 1.3 1998/11/19 21:52:59 thorpej Exp $	*/
+/*	$NetBSD: aic6360var.h,v 1.7 2000/03/20 22:53:36 enami Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995, 1996 Charles M. Hannum.  All rights reserved.
@@ -109,7 +109,7 @@ struct aic_tinfo {
 	u_char  period;		/* Period suggestion */
 	u_char  offset;		/* Offset suggestion */
 	u_char	width;		/* Width suggestion */
-} tinfo_t;
+};
 
 struct aic_softc {
 	struct device sc_dev;
@@ -148,6 +148,7 @@ struct aic_softc {
 #define	AIC_ABORTING	0x02	/* Bailing out */
 #define AIC_DOINGDMA	0x04	/* The FIFO data path is active! */
 	u_char	sc_selid;	/* Reselection ID */
+	struct device *sc_child;/* Our child */
 
 	/* Message stuff */
 	u_char	sc_msgpriq;	/* Messages we want to send */
@@ -203,6 +204,9 @@ extern int aic_debug; /* AIC_SHOWSTART|AIC_SHOWMISC|AIC_SHOWTRACE; */
 #define AIC_ISA_IOSIZE	0x20	/* XXX */
 
 void	aicattach	__P((struct aic_softc *));
+int	aic_activate	__P((struct device *, enum devact));
+int	aic_detach	__P((struct device *, int));
 int	aicintr		__P((void *));
 int	aic_find	__P((bus_space_tag_t, bus_space_handle_t));
 void	aic_isa_attach	__P((struct device *, struct device *, void *));
+void	aic_init	__P((struct aic_softc *, int));

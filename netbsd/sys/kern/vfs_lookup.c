@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_lookup.c,v 1.28.6.1 1999/04/07 19:07:29 wrstuden Exp $	*/
+/*	$NetBSD: vfs_lookup.c,v 1.34 2000/05/27 00:40:47 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -80,11 +80,11 @@
  */
 int
 namei(ndp)
-	register struct nameidata *ndp;
+	struct nameidata *ndp;
 {
-	register struct filedesc *fdp;	/* pointer to file descriptor state */
-	register char *cp;		/* pointer into pathname argument */
-	register struct vnode *dp;	/* the directory we are searching */
+	struct cwdinfo *cwdi;		/* pointer to cwd state */
+	char *cp;			/* pointer into pathname argument */
+	struct vnode *dp;		/* the directory we are searching */
 	struct iovec aiov;		/* uio for reading symbolic links */
 	struct uio auio;
 	int error, linklen;
@@ -99,7 +99,7 @@ namei(ndp)
 	if (cnp->cn_flags & OPMASK)
 		panic ("namei: flags contaminated with nameiops");
 #endif
-	fdp = cnp->cn_proc->p_fd;
+	cwdi = cnp->cn_proc->p_cwdi;
 
 	/*
 	 * Get a buffer for the name to be translated, and copy the
@@ -129,13 +129,13 @@ namei(ndp)
 
 #ifdef KTRACE
 	if (KTRPOINT(cnp->cn_proc, KTR_NAMEI))
-		ktrnamei(cnp->cn_proc->p_tracep, cnp->cn_pnbuf);
+		ktrnamei(cnp->cn_proc, cnp->cn_pnbuf);
 #endif
 
 	/*
 	 * Get starting point for the translation.
 	 */
-	if ((ndp->ni_rootdir = fdp->fd_rdir) == NULL)
+	if ((ndp->ni_rootdir = cwdi->cwdi_rdir) == NULL)
 		ndp->ni_rootdir = rootvnode;
 	/*
 	 * Check if starting from root directory or current directory.
@@ -144,7 +144,7 @@ namei(ndp)
 		dp = ndp->ni_rootdir;
 		VREF(dp);
 	} else {
-		dp = fdp->fd_cdir;
+		dp = cwdi->cwdi_cdir;
 		VREF(dp);
 	}
 	for (;;) {
@@ -270,10 +270,10 @@ namei(ndp)
  */
 int
 lookup(ndp)
-	register struct nameidata *ndp;
+	struct nameidata *ndp;
 {
-	register const char *cp;	/* pointer into pathname argument */
-	register struct vnode *dp = 0;	/* the directory we are searching */
+	const char *cp;			/* pointer into pathname argument */
+	struct vnode *dp = 0;		/* the directory we are searching */
 	struct vnode *tdp;		/* saved dp */
 	struct mount *mp;		/* mount table entry */
 	int docache;			/* == 0 do not cache last component */
@@ -281,6 +281,7 @@ lookup(ndp)
 	int rdonly;			/* lookup read-only flag bit */
 	int error = 0;
 	int slashes;
+	int dpunlocked = 0;		/* dp has already been unlocked */
 	struct componentname *cnp = &ndp->ni_cnd;
 
 	/*
@@ -431,6 +432,7 @@ dirloop:
 unionlookup:
 	ndp->ni_dvp = dp;
 	ndp->ni_vp = NULL;
+	cnp->cn_flags &= ~PDIRUNLOCK;
 	if ((error = VOP_LOOKUP(dp, &ndp->ni_vp, cnp)) != 0) {
 #ifdef DIAGNOSTIC
 		if (ndp->ni_vp != NULL)
@@ -444,7 +446,10 @@ unionlookup:
 		    (dp->v_mount->mnt_flag & MNT_UNION)) {
 			tdp = dp;
 			dp = dp->v_mount->mnt_vnodecovered;
-			vput(tdp);
+			if (cnp->cn_flags & PDIRUNLOCK)
+				vrele(tdp);
+			else
+				vput(tdp);
 			VREF(dp);
 			vn_lock(dp, LK_EXCLUSIVE | LK_RETRY);
 			goto unionlookup;
@@ -505,11 +510,14 @@ unionlookup:
 	       (cnp->cn_flags & NOCROSSMOUNT) == 0) {
 		if (vfs_busy(mp, 0, 0))
 			continue;
+		VOP_UNLOCK(dp, 0);
 		error = VFS_ROOT(mp, &tdp);
 		vfs_unbusy(mp);
-		if (error)
+		if (error) {
+			dpunlocked = 1;
 			goto bad2;
-		vput(dp);
+		}
+		vrele(dp);
 		ndp->ni_vp = dp = tdp;
 	}
 
@@ -570,11 +578,15 @@ terminal:
 	return (0);
 
 bad2:
-	if ((cnp->cn_flags & LOCKPARENT) && (cnp->cn_flags & ISLASTCN))
+	if ((cnp->cn_flags & LOCKPARENT) && (cnp->cn_flags & ISLASTCN) &&
+			((cnp->cn_flags & PDIRUNLOCK) == 0))
 		VOP_UNLOCK(ndp->ni_dvp, 0);
 	vrele(ndp->ni_dvp);
 bad:
-	vput(dp);
+	if (dpunlocked)
+		vrele(dp);
+	else
+		vput(dp);
 	ndp->ni_vp = NULL;
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: seagate.c,v 1.33 1999/03/19 05:42:00 cgd Exp $	*/
+/*	$NetBSD: seagate.c,v 1.37 2000/05/03 21:20:07 mycroft Exp $	*/
 
 /*
  * ST01/02, Future Domain TMC-885, TMC-950 SCSI driver
@@ -563,12 +563,7 @@ sea_scsi_cmd(xs)
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("sea_scsi_cmd\n"));
 
-	flags = xs->flags;
-	if ((flags & (ITSDONE|INUSE)) != INUSE) {
-		printf("%s: done or not in use?\n", sea->sc_dev.dv_xname);
-		xs->flags &= ~ITSDONE;
-		xs->flags |= INUSE;
-	}
+	flags = xs->xs_control;
 	if ((scb = sea_get_scb(sea, flags)) == NULL) {
 		xs->error = XS_DRIVER_STUFFUP;
 		return TRY_AGAIN_LATER;
@@ -576,7 +571,7 @@ sea_scsi_cmd(xs)
 	scb->flags = SCB_ACTIVE;
 	scb->xs = xs;
 
-	if (flags & SCSI_RESET) {
+	if (flags & XS_CTL_RESET) {
 		/*
 		 * Try to send a reset command to the card.
 		 * XXX Not implemented.
@@ -603,8 +598,9 @@ sea_scsi_cmd(xs)
 	/*
 	 * Usually return SUCCESSFULLY QUEUED
 	 */
-	if ((flags & SCSI_POLL) == 0) {
-		timeout(sea_timeout, scb, (xs->timeout * hz) / 1000);
+	if ((flags & XS_CTL_POLL) == 0) {
+		callout_reset(&scb->xs->xs_callout, (xs->timeout * hz) / 1000,
+		    sea_timeout, scb);
 		splx(s);
 		return SUCCESSFULLY_QUEUED;
 	}
@@ -657,7 +653,7 @@ sea_get_scb(sea, flags)
 				    sea->sc_dev.dv_xname);
 			break;
 		}
-		if ((flags & SCSI_NOSLEEP) != 0)
+		if ((flags & XS_CTL_NOSLEEP) != 0)
 			break;
 		tsleep(&sea->free_list, PRIBIO, "seascb", 0);
 	}
@@ -843,8 +839,9 @@ sea_timeout(arg)
 		scb->flags |= SCB_ABORTED;
 		sea_abort(sea, scb);
 		/* 2 secs for the abort */
-		if ((xs->flags & SCSI_POLL) == 0)
-			timeout(sea_timeout, scb, 2 * hz);
+		if ((xs->xs_control & XS_CTL_POLL) == 0)
+			callout_reset(&scb->xs->xs_callout, 2 * hz,
+			    sea_timeout, scb);
 	}
 
 	splx(s);
@@ -954,9 +951,9 @@ sea_transfer_pio(sea, phase, count, data)
 	int *count;
 	u_char **data;
 {
-	register u_char p = *phase, tmp;
-	register int c = *count;
-	register u_char *d = *data;
+	u_char p = *phase, tmp;
+	int c = *count;
+	u_char *d = *data;
 	int timeout;
 
 	do {
@@ -1199,7 +1196,7 @@ sea_done(sea, scb)
 {
 	struct scsipi_xfer *xs = scb->xs;
 
-	untimeout(sea_timeout, scb);
+	callout_stop(&scb->xs->xs_callout);
 
 	xs->resid = scb->datalen;
 
@@ -1212,8 +1209,8 @@ sea_done(sea, scb)
 		if (scb->flags & SCB_ERROR)
 			xs->error = XS_DRIVER_STUFFUP;
 	}
-	xs->flags |= ITSDONE;
-	sea_free_scb(sea, scb, xs->flags);
+	xs->xs_status |= XS_STS_DONE;
+	sea_free_scb(sea, scb, xs->xs_control);
 	scsipi_done(xs);
 }
 
@@ -1234,7 +1231,7 @@ sea_poll(sea, xs, count)
 		if (!main_running)
 			sea_main();
 		splx(s);
-		if (xs->flags & ITSDONE)
+		if (xs->xs_status & XS_STS_DONE)
 			return 0;
 		delay(1000);
 		count--;
@@ -1323,36 +1320,36 @@ sea_information_transfer(sea)
 						break;
 					if (!(phase & STAT_IO)) {
 #ifdef SEA_ASSEMBLER
-						asm("shr $2, %%ecx\n\t\
-						    cld\n\t\
+						caddr_t junk;
+						asm("cld\n\t\
 						    rep\n\t\
 						    movsl" :
-						    "=S" (scb->data) :
+						    "=S" (scb->data),
+						    "=c" (len),
+						    "=D" (junk) :
 						    "0" (scb->data),
-						    "D" (sea->maddr_dr),
-						    "c" (BLOCK_SIZE) :
-						    "%ecx", "%edi");
+						    "1" (BLOCK_SIZE >> 2),
+						    "2" (sea->maddr_dr));
 #else
-						for (count = 0;
-						    count < BLOCK_SIZE;
-						    count++)
+					        for (len = BLOCK_SIZE;
+						    len; len--)
 							DATA = *(scb->data++);
 #endif
 					} else {
 #ifdef SEA_ASSEMBLER
-						asm("shr $2, %%ecx\n\t\
-						    cld\n\t\
+						caddr_t junk;
+						asm("cld\n\t\
 						    rep\n\t\
 						    movsl" :
-						    "=D" (scb->data) :
-						    "S" (sea->maddr_dr),
+						    "=D" (scb->data),
+						    "=c" (len),
+						    "=S" (junk) :
 						    "0" (scb->data),
-						    "c" (BLOCK_SIZE) :
-						    "%ecx", "%esi");
+						    "1" (BLOCK_SIZE >> 2),
+						    "2" (sea->maddr_dr));
 #else
-					        for (count = 0;
-						    count < BLOCK_SIZE;
-						    count++)
+					        for (len = BLOCK_SIZE;
+						    len; len--)
 							*(scb->data++) = DATA;
 #endif
 					}

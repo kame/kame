@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.2.2.1 1999/04/03 21:08:59 scottr Exp $
+#	$NetBSD: Makefile,v 1.3 1999/04/03 08:28:50 scottr Exp $
 #
 # Makefile for loadable iwm device driver kernel module
 #

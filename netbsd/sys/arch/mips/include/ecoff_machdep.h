@@ -1,4 +1,4 @@
-/*	$NetBSD: ecoff_machdep.h,v 1.15 1999/03/08 06:36:59 tsubai Exp $	*/
+/*	$NetBSD: ecoff_machdep.h,v 1.17 2000/03/28 02:58:44 simonb Exp $	*/
 
 /*
  * Copyright (c) 1997 Jonathan Stone
@@ -49,7 +49,7 @@
 #define _MIPS3_OK() 1
 #endif
 
-	
+
 #define ECOFF_MAGIC_MIPSEB	0x0160	/* mips1, big-endian */
 #define ECOFF_MAGIC_MIPSEL	0x0162	/* mips1, little-endian */
 #define ECOFF_MAGIC_MIPSEL3	0x0142	/* mips3, little-endian */
@@ -71,7 +71,7 @@
 #ifdef _KERNEL
 struct proc;
 struct exec_package;
-extern void	cpu_exec_ecoff_setregs __P((
+void	cpu_exec_ecoff_setregs __P((
     struct proc *, struct exec_package *, u_long));
 #endif	/* _KERNEL */
 
@@ -122,5 +122,3 @@ struct ecoff_extsym {
 	unsigned	:1;
 	unsigned	es_symauxindex:20;
 };
-
-

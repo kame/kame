@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_stat.c,v 1.11 1999/02/09 20:48:20 christos Exp $	*/
+/*	$NetBSD: ibcs2_stat.c,v 1.14.4.1 2000/08/30 03:59:20 sommerfeld Exp $	*/
 /*
  * Copyright (c) 1995, 1998 Scott Bartram
  * All rights reserved.
@@ -135,8 +135,8 @@ ibcs2_sys_statfs(p, v, retval)
 		syscallarg(int) len;
 		syscallarg(int) fstype;
 	} */ *uap = v;
-	register struct mount *mp;
-	register struct statfs *sp;
+	struct mount *mp;
+	struct statfs *sp;
 	int error;
 	struct nameidata nd;
 	caddr_t sg = stackgap_init(p->p_emul);
@@ -168,17 +168,21 @@ ibcs2_sys_fstatfs(p, v, retval)
 	} */ *uap = v;
 	struct file *fp;
 	struct mount *mp;
-	register struct statfs *sp;
+	struct statfs *sp;
 	int error;
 
+	/* getvnode() will use the descriptor for us */
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
 	if ((error = VFS_STATFS(mp, sp, p)) != 0)
-		return (error);
+		goto out;
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
-	return cvt_statfs(sp, (caddr_t)SCARG(uap, buf), SCARG(uap, len));
+	error = cvt_statfs(sp, (caddr_t)SCARG(uap, buf), SCARG(uap, len));
+ out:
+	FILE_UNUSE(fp, p);
+	return (error);
 }
 
 int
@@ -191,8 +195,8 @@ ibcs2_sys_statvfs(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(struct ibcs2_statvfs *) buf;
 	} */ *uap = v;
-	register struct mount *mp;
-	register struct statfs *sp;
+	struct mount *mp;
+	struct statfs *sp;
 	int error;
 	struct nameidata nd;
 	caddr_t sg = stackgap_init(p->p_emul);
@@ -223,18 +227,22 @@ ibcs2_sys_fstatvfs(p, v, retval)
 	} */ *uap = v;
 	struct file *fp;
 	struct mount *mp;
-	register struct statfs *sp;
+	struct statfs *sp;
 	int error;
 
+	/* getvnode() will use the descriptor for us */
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
 	if ((error = VFS_STATFS(mp, sp, p)) != 0)
-		return (error);
+		goto out;
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
-	return cvt_statvfs(sp, (caddr_t)SCARG(uap, buf),
+	error = cvt_statvfs(sp, (caddr_t)SCARG(uap, buf),
 			   sizeof(struct ibcs2_statvfs));
+ out:
+	FILE_UNUSE(fp, p);
+	return (error);
 }
 
 int
@@ -252,10 +260,10 @@ ibcs2_sys_stat(p, v, retval)
 	struct sys___stat13_args cup;
 	int error;
 	caddr_t sg = stackgap_init(p->p_emul);
-
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(st));
 	IBCS2_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&cup, path) = SCARG(uap, path);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(st));
+
 	if ((error = sys___stat13(p, &cup, retval)) != 0)
 		return error;
 	if ((error = copyin(SCARG(&cup, ub), &st, sizeof(st))) != 0)
@@ -281,9 +289,10 @@ ibcs2_sys_lstat(p, v, retval)
 	int error;
 	caddr_t sg = stackgap_init(p->p_emul);
 
+	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(st));
 	IBCS2_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&cup, path) = SCARG(uap, path);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(st));
+
 	if ((error = sys___lstat13(p, &cup, retval)) != 0)
 		return error;
 	if ((error = copyin(SCARG(&cup, ub), &st, sizeof(st))) != 0)
@@ -336,7 +345,6 @@ ibcs2_sys_utssys(p, v, retval)
 	case 0:			/* uname(struct utsname *) */
 	{
 		struct ibcs2_utsname sut;
-		extern char ostype[], machine[], osrelease[];
 
 		memset(&sut, 0, ibcs2_utsname_len);
 		memcpy(sut.sysname, ostype, sizeof(sut.sysname) - 1);

@@ -1,4 +1,4 @@
-/*	$NetBSD: cacheops.h,v 1.3 1998/09/02 11:16:31 leo Exp $	*/
+/*	$NetBSD: cacheops.h,v 1.8 2000/04/05 19:38:33 is Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _M68K_CACHEOPS_H_
+#define	_M68K_CACHEOPS_H_
+
 #if notyet /* XXX */
 #include <machine/cpuconf.h>
 #endif
@@ -56,11 +59,12 @@
 #define	DCIA()		DCIA_20()
 #define	DCIS()		DCIS_20()
 #define	DCIU()		DCIU_20()
-#define	DCIAS()		DCIAS_20()
+#define	DCIAS(pa)	DCIAS_20((pa))
 #define	PCIA()		PCIA_20()
 
 #elif defined(M68030) && !(defined(M68020)||defined(M68040)||defined(M68060))
 
+#define	TBIA()		TBIA_30()
 #define	TBIS(va)	TBIS_30((va))
 #define	TBIAS()		TBIAS_30()
 #define	TBIAU()		TBIAU_30()
@@ -69,7 +73,7 @@
 #define	DCIA()		DCIA_30()
 #define	DCIS()		DCIS_30()
 #define	DCIU()		DCIU_30()
-#define	DCIAS()		DCIAS_30()
+#define	DCIAS(pa)	DCIAS_30((pa))
 #define	PCIA()		PCIA_30()
 
 #elif defined(M68040) && !(defined(M68020)||defined(M68030)||defined(M68060))
@@ -83,16 +87,16 @@
 #define	DCIA()		DCIA_40()
 #define	DCIS()		DCIS_40()
 #define	DCIU()		DCIU_40()
-#define	DCIAS(va)	DCIAS_40((va))
+#define	DCIAS(pa)	DCIAS_40((pa))
 #define	PCIA()		PCIA_40()
 #define	DCFA()		DCFA_40()
-#define	ICPL(va)	ICPL_40((va))
-#define	ICPP(va)	ICPP_40((va))
-#define	DCPL(va)	DCPL_40((va))
-#define	DCPP(va)	DCPP_40((va))
+#define	ICPL(pa)	ICPL_40((pa))
+#define	ICPP(pa)	ICPP_40((pa))
+#define	DCPL(pa)	DCPL_40((pa))
+#define	DCPP(pa)	DCPP_40((pa))
 #define	DCPA()		DCPA_40()
-#define	DCFL(va)	DCFL_40((va))
-#define	DCFP(va)	DCFP_40((va))
+#define	DCFL(pa)	DCFL_40((pa))
+#define	DCFP(pa)	DCFP_40((pa))
 
 #elif defined(M68060) && !(defined(M68020)||defined(M68030)||defined(M68040))
 
@@ -105,16 +109,16 @@
 #define	DCIA()		DCIA_60()
 #define	DCIS()		DCIS_60()
 #define	DCIU()		DCIU_60()
-#define	DCIAS(va)	DCIAS_60((va))
+#define	DCIAS(pa)	DCIAS_60((pa))
 #define	PCIA()		PCIA_60()
 #define	DCFA()		DCFA_60()
-#define	ICPL(va)	ICPL_60((va))
-#define	ICPP(va)	ICPP_60((va))
-#define	DCPL(va)	DCPL_60((va))
-#define	DCPP(va)	DCPP_60((va))
+#define	ICPL(pa)	ICPL_60((pa))
+#define	ICPP(pa)	ICPP_60((pa))
+#define	DCPL(pa)	DCPL_60((pa))
+#define	DCPP(pa)	DCPP_60((pa))
 #define	DCPA()		DCPA_60()
-#define	DCFL(va)	DCFL_60((va))
-#define	DCFP(va)	DCFP_60((va))
+#define	DCFL(pa)	DCFL_60((pa))
+#define	DCFP(pa)	DCFP_60((pa))
 
 #else /* Multi-CPU config */
 
@@ -132,7 +136,8 @@ void	_ICPA __P((void));
 void	_DCIA __P((void));
 void	_DCIS __P((void));
 void	_DCIU __P((void));
-void	_DCIAS __P((vaddr_t));
+void	_DCIAS __P((paddr_t));
+void	_PCIA __P((void));
 
 #define	TBIA()		_TBIA()
 #define	TBIS(va)	_TBIS((va))
@@ -143,11 +148,11 @@ void	_DCIAS __P((vaddr_t));
 #define	DCIA()		_DCIA()
 #define	DCIS()		_DCIS()
 #define	DCIU()		_DCIU()
-#define	DCIAS(va)	_DCIAS((va))
+#define	DCIAS(pa)	_DCIAS((pa))
+#define	PCIA()		_PCIA()
 
 #if defined(M68040)||defined(M68060)
 
-void	_PCIA __P((void));
 void	_DCFA __P((void));
 void	_ICPL __P((paddr_t));
 void	_ICPP __P((paddr_t));
@@ -157,7 +162,6 @@ void	_DCPA __P((void));
 void	_DCFL __P((paddr_t));
 void	_DCFP __P((paddr_t));
 
-#define	PCIA()		_PCIA()
 #define	DCFA()		_DCFA()
 #define	ICPL(pa)	_ICPL((pa))
 #define	ICPP(pa)	_ICPP((pa))
@@ -170,3 +174,5 @@ void	_DCFP __P((paddr_t));
 #endif /* defined(M68040)||defined(M68060) */
 
 #endif
+
+#endif /* _M68K_CACHEOPS_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: lmcaudio.c,v 1.23 1999/03/24 05:50:57 mrg Exp $	*/
+/*	$NetBSD: lmcaudio.c,v 1.25 2000/03/23 06:35:17 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996, Danny C Tsen.
@@ -47,6 +47,7 @@
 #include <sys/audioio.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 
 #include <vm/vm.h>
@@ -86,6 +87,8 @@ struct audio_general {
 	int open;
 	int drain;
 } ag;
+
+static struct callout ag_drain_ch = CALLOUT_INITIALIZER;
 
 struct lmcaudio_softc {
 	struct device device;
@@ -338,7 +341,7 @@ lmcaudio_drain(addr)
 	void *addr;
 {
 	ag.drain = 1;
-	timeout(lmcaudio_timeout, &ag.drain, 30 * hz);
+	callout_reset(&ag_drain_ch, 30 * hz, lmcaudio_timeout, &ag.drain);
 	(void) tsleep(lmcaudio_timeout, PWAIT | PCATCH, "lmcdrain", 0);
 	ag.drain = 0;
 	return(0);
@@ -531,7 +534,7 @@ lmcaudio_rate(rate)
 	return(0);
 }
 
-#define PHYS(x) (pmap_extract( kernel_pmap, ((x)&PG_FRAME) ))
+#define PHYS(x, y) pmap_extract(kernel_pmap, ((x)&PG_FRAME), (paddr_t *)(y))
 
 /*
  * Program the next buffer to be used
@@ -547,6 +550,7 @@ lmcaudio_dma_program(cur, end, intr, arg)
 {
 	int size = end - cur;
 	u_int stopflag = 0;
+	paddr_t pa;
 
 	if (ag.drain) {
 		ag.drain++;
@@ -559,10 +563,12 @@ lmcaudio_dma_program(cur, end, intr, arg)
 		IOMD_WRITE_WORD(IOMD_SD0CR, 0x90);	/* Reset State Machine */
 		IOMD_WRITE_WORD(IOMD_SD0CR, 0x30);	/* Reset State Machine */
 
-		IOMD_WRITE_WORD(IOMD_SD0CURA, PHYS(cur));
-		IOMD_WRITE_WORD(IOMD_SD0ENDA, (PHYS(cur) + size - 16)|stopflag);
-		IOMD_WRITE_WORD(IOMD_SD0CURB, PHYS(cur));
-		IOMD_WRITE_WORD(IOMD_SD0ENDB, (PHYS(cur) + size - 16)|stopflag);
+		PHYS(cur, &pa);
+
+		IOMD_WRITE_WORD(IOMD_SD0CURA, pa);
+		IOMD_WRITE_WORD(IOMD_SD0ENDA, (pa + size - 16)|stopflag);
+		IOMD_WRITE_WORD(IOMD_SD0CURB, pa);
+		IOMD_WRITE_WORD(IOMD_SD0ENDB, (pa + size - 16)|stopflag);
 
 		ag.in_progress = 1;
 
@@ -590,7 +596,7 @@ lmcaudio_dma_program(cur, end, intr, arg)
 		} else {
 			/* We're OK to schedule it now */
 			ag.buffer = (++ag.buffer) & 1;
-			ag.next_cur = PHYS(cur);
+			PHYS(cur, &ag.next_cur);
 			ag.next_end = (ag.next_cur + size - 16) | stopflag;
 			ag.next_intr = intr;
 			ag.next_arg = arg;
@@ -602,6 +608,8 @@ lmcaudio_dma_program(cur, end, intr, arg)
 void
 lmcaudio_shutdown()
 {
+	paddr_t pa;
+
 	/* Shut down the channel */
 	ag.intr = NULL;
 	ag.in_progress = 0;
@@ -611,8 +619,11 @@ lmcaudio_shutdown()
 #endif
 
 	memset((char *)ag.silence, 0, NBPG);
-	IOMD_WRITE_WORD(IOMD_SD0CURA, PHYS(ag.silence));
-	IOMD_WRITE_WORD(IOMD_SD0ENDA, (PHYS(ag.silence) + NBPG - 16) | 0x80000000);
+
+	PHYS(ag.silence, &pa);
+
+	IOMD_WRITE_WORD(IOMD_SD0CURA, pa);
+	IOMD_WRITE_WORD(IOMD_SD0ENDA, (pa + NBPG - 16) | 0x80000000);
 	disable_irq(sdma_channel);
 	IOMD_WRITE_WORD(IOMD_SD0CR, 0x90);	/* Reset State Machine */
 }
@@ -656,7 +667,7 @@ lmcaudio_intr(arg)
 	}
 
 	if (xcur == 0) {
-		untimeout(lmcaudio_timeout, &ag.drain);
+		callout_stop(&ag_drain_ch);
 		wakeup(lmcaudio_timeout);
 		return(0);
 #if 0

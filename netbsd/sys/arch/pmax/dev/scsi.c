@@ -1,4 +1,4 @@
-/*	$NetBSD: scsi.c,v 1.7 1996/10/13 03:39:39 christos Exp $	*/
+/*	$NetBSD: scsi.c,v 1.10 2000/01/10 03:24:33 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -42,10 +42,8 @@
  * SCSI utility routines for making SCSI device drivers easier.
  */
 
-#include <sys/param.h>
 #include <sys/systm.h>
 
-#include <pmax/dev/device.h>
 #include <pmax/dev/scsi.h>
 
 /*
@@ -123,7 +121,7 @@ static char **scsiErrors[] = {
  */
 void
 scsiPrintSense(sp, len)
-	register ScsiClass7Sense *sp;
+	ScsiClass7Sense *sp;
 	int len;
 {
 	ScsiClass0Sense *sp0;
@@ -164,11 +162,11 @@ scsiPrintSense(sp, len)
  */
 void
 scsiGroup0Cmd(cmd, lun, block, count, c)
-	unsigned cmd;			/* group0 SCSI command */
-	unsigned lun;			/* Logical Unit Number */
-	register unsigned block;	/* starting block number for transfer */
-	unsigned count;			/* # of sectors/bytes to transfer */
-	register ScsiGroup0Cmd *c;	/* command to be filled in */
+	unsigned cmd;		/* group0 SCSI command */
+	unsigned lun;		/* Logical Unit Number */
+	unsigned block;		/* starting block number for transfer */
+	unsigned count;		/* # of sectors/bytes to transfer */
+	ScsiGroup0Cmd *c;	/* command to be filled in */
 {
 
 	c->command = cmd;
@@ -185,11 +183,11 @@ scsiGroup0Cmd(cmd, lun, block, count, c)
  */
 void
 scsiGroup1Cmd(cmd, lun, block, count, c)
-	unsigned cmd;			/* group0 SCSI command */
-	unsigned lun;			/* Logical Unit Number */
-	register unsigned block;	/* starting block number for transfer */
-	unsigned count;			/* # of sectors/bytes to transfer */
-	register ScsiGroup1Cmd *c;	/* command to be filled in */
+	unsigned cmd;		/* group0 SCSI command */
+	unsigned lun;		/* Logical Unit Number */
+	unsigned block;		/* starting block number for transfer */
+	unsigned count;		/* # of sectors/bytes to transfer */
+	ScsiGroup1Cmd *c;	/* command to be filled in */
 {
 
 	c->command = cmd;
@@ -206,7 +204,7 @@ scsiGroup1Cmd(cmd, lun, block, count, c)
 }
 
 /*
- * Print a SCSI identify  resutl
+ * Print a SCSI identify result.
  */
 void
 scsiPrintInquiry(inqbuf, i)

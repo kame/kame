@@ -1,4 +1,4 @@
-/*	$NetBSD: if_arc.h,v 1.9 1999/02/25 11:20:34 is Exp $	*/
+/*	$NetBSD: if_arc.h,v 1.13 1999/11/19 20:41:19 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -45,7 +45,7 @@
  */
 struct arc_addr {
 	u_int8_t  arc_addr_octet[1];
-};
+} __attribute__((__packed__));
 
 /*
  * Structure of a 2.5MB/s Arcnet header.
@@ -68,7 +68,7 @@ struct	arc_header {
 	u_int8_t  arc_type2;	/* same as arc_type */
 	u_int8_t  arc_flag2;	/* real flag value */
 	u_int16_t arc_seqid2;	/* real seqid value */
-};
+} __attribute__((__packed__));
 
 #define	ARC_ADDR_LEN		1
 
@@ -102,6 +102,8 @@ struct	arc_header {
 #define	ARCMTU			507
 #define	ARCMIN			0
 
+#define ARC_PHDS_MAXMTU		60480
+
 struct	arccom {
 	struct 	  ifnet ac_if;		/* network-visible interface */
 
@@ -118,12 +120,11 @@ struct	arccom {
 
 #ifdef _KERNEL
 u_int8_t arcbroadcastaddr;
+extern int arc_ipmtu;	/* XXX new ip only, no RFC 1051! */
 
 void	arc_ifattach __P((struct ifnet *, u_int8_t));
+void	arc_storelladdr __P((struct ifnet *, u_int8_t));
 char	*arc_sprintf __P((u_int8_t *));
-void	arc_input __P((struct ifnet *, struct mbuf *));
-int	arc_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
-	    struct rtentry *));
 int	arc_isphds __P((int));
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: aic6360.c,v 1.61 1998/12/05 19:43:50 mjacob Exp $	*/
+/*	$NetBSD: aic6360.c,v 1.70 2000/05/05 17:52:38 matt Exp $	*/
 
 #include "opt_ddb.h"
 #ifdef DDB
@@ -123,6 +123,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
@@ -152,9 +153,7 @@
 int aic_debug = 0x00; /* AIC_SHOWSTART|AIC_SHOWMISC|AIC_SHOWTRACE; */
 #endif
 
-void	aicattach	__P((struct aic_softc *));
 void	aic_minphys	__P((struct buf *));
-void	aic_init	__P((struct aic_softc *));
 void	aic_done	__P((struct aic_softc *, struct aic_acb *));
 void	aic_dequeue	__P((struct aic_softc *, struct aic_acb *));
 int	aic_scsi_cmd	__P((struct scsipi_xfer *));
@@ -270,8 +269,6 @@ aicattach(sc)
 	sc->sc_minsync = (2 * 250) / sc->sc_freq;
 	sc->sc_maxsync = (9 * 250) / sc->sc_freq;
 
-	aic_init(sc);	/* Init chip and driver */
-
 	/*
 	 * Fill in the adapter.
 	 */
@@ -292,11 +289,61 @@ aicattach(sc)
 	sc->sc_link.type = BUS_SCSI;
 
 	/*
-	 * ask the adapter what subunits are present
+	 * Add reference to adapter so that we drop the reference after
+	 * config_found() to make sure the adatper is disabled.
 	 */
-	config_found(&sc->sc_dev, &sc->sc_link, scsiprint);
+	if (scsipi_adapter_addref(&sc->sc_link) != 0) {
+		printf("%s: unable to enable controller\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
+
+	aic_init(sc, 1);	/* Init chip and driver */
+
+	/*
+	 * Ask the adapter what subunits are present
+	 */
+	sc->sc_child = config_found(&sc->sc_dev, &sc->sc_link, scsiprint);
+	scsipi_adapter_delref(&sc->sc_link);
 }
 
+int
+aic_activate(self, act)
+	struct device *self;
+	enum devact act;
+{
+	struct aic_softc *sc = (struct aic_softc *) self;
+	int s, rv = 0;
+
+	s = splhigh();
+	switch (act) {
+	case DVACT_ACTIVATE:
+		rv = EOPNOTSUPP;
+		break;
+
+	case DVACT_DEACTIVATE:
+		if (sc->sc_child != NULL)
+			rv = config_deactivate(sc->sc_child);
+		break;
+	}
+	splx(s);
+
+	return (rv);
+}
+
+int
+aic_detach(self, flags)
+	struct device *self;
+	int flags;
+{
+	struct aic_softc *sc = (struct aic_softc *) self;
+	int rv = 0;
+
+	if (sc->sc_child != NULL)
+		rv = config_detach(sc->sc_child, flags);
+	
+	return (rv);
+}
 
 /* Initialize AIC6360 chip itself
  * The following conditions should hold:
@@ -367,14 +414,17 @@ aic_scsi_reset(sc)
  * Initialize aic SCSI driver.
  */
 void
-aic_init(sc)
+aic_init(sc, bus_reset)
 	struct aic_softc *sc;
+	int bus_reset;
 {
 	struct aic_acb *acb;
 	int r;
 
-	aic_reset(sc);
-	aic_scsi_reset(sc);
+	if (bus_reset) {
+		aic_reset(sc);
+		aic_scsi_reset(sc);
+	}
 	aic_reset(sc);
 
 	if (sc->sc_state == AIC_INIT) {
@@ -395,12 +445,12 @@ aic_init(sc)
 		sc->sc_state = AIC_CLEANING;
 		if ((acb = sc->sc_nexus) != NULL) {
 			acb->xs->error = XS_DRIVER_STUFFUP;
-			untimeout(aic_timeout, acb);
+			callout_stop(&acb->xs->xs_callout);
 			aic_done(sc, acb);
 		}
 		while ((acb = sc->nexus_list.tqh_first) != NULL) {
 			acb->xs->error = XS_DRIVER_STUFFUP;
-			untimeout(aic_timeout, acb);
+			callout_stop(&acb->xs->xs_callout);
 			aic_done(sc, acb);
 		}
 	}
@@ -463,7 +513,7 @@ aic_get_acb(sc, flags)
 	s = splbio();
 
 	while ((acb = sc->free_list.tqh_first) == NULL &&
-	       (flags & SCSI_NOSLEEP) == 0)
+	       (flags & XS_CTL_NOSLEEP) == 0)
 		tsleep(&sc->free_list, PRIBIO, "aicacb", 0);
 	if (acb) {
 		TAILQ_REMOVE(&sc->free_list, acb, chain);
@@ -513,7 +563,17 @@ aic_scsi_cmd(xs)
 	AIC_CMDS(("[0x%x, %d]->%d ", (int)xs->cmd->opcode, xs->cmdlen,
 	    sc_link->scsipi_scsi.target));
 
-	flags = xs->flags;
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0) {
+		xs->xs_status |= XS_STS_DONE;
+		xs->error = XS_DRIVER_STUFFUP;
+		scsipi_done(xs);
+		if ((xs->xs_control & XS_CTL_POLL) == 0)
+			return (SUCCESSFULLY_QUEUED);
+		else
+			return (COMPLETE);
+	}
+
+	flags = xs->xs_control;
 	if ((acb = aic_get_acb(sc, flags)) == NULL) {
 		xs->error = XS_DRIVER_STUFFUP;
 		return TRY_AGAIN_LATER;
@@ -523,7 +583,7 @@ aic_scsi_cmd(xs)
 	acb->xs = xs;
 	acb->timeout = xs->timeout;
 
-	if (xs->flags & SCSI_RESET) {
+	if (xs->xs_control & XS_CTL_RESET) {
 		acb->flags |= ACB_RESET;
 		acb->scsipi_cmd_length = 0;
 		acb->data_length = 0;
@@ -543,7 +603,7 @@ aic_scsi_cmd(xs)
 
 	splx(s);
 
-	if ((flags & SCSI_POLL) == 0)
+	if ((flags & XS_CTL_POLL) == 0)
 		return SUCCESSFULLY_QUEUED;
 
 	/* Not allowed to use interrupts, use polling instead */
@@ -589,7 +649,7 @@ aic_poll(sc, xs, count)
 		 */
 		if ((bus_space_read_1(iot, ioh, DMASTAT) & INTSTAT) != 0)
 			aicintr(sc);
-		if ((xs->flags & ITSDONE) != 0)
+		if ((xs->xs_status & XS_STS_DONE) != 0)
 			return 0;
 		delay(1000);
 		count--;
@@ -743,13 +803,16 @@ abort:
  */
 void
 aic_sched(sc)
-	register struct aic_softc *sc;
+	struct aic_softc *sc;
 {
 	struct aic_acb *acb;
 	struct scsipi_link *sc_link;
 	struct aic_tinfo *ti;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
+
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
+		return;
 
 	/*
 	 * Find first acb in ready queue that is for a target/lunit pair that
@@ -850,7 +913,7 @@ aic_done(sc, acb)
 		}
 	}
 
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 
 #if AIC_DEBUG
 	if ((aic_debug & AIC_SHOWMISC) != 0) {
@@ -875,7 +938,7 @@ aic_done(sc, acb)
 	} else
 		aic_dequeue(sc, acb);
 
-	aic_free_acb(sc, acb, xs->flags);
+	aic_free_acb(sc, acb, xs->xs_control);
 	ti->cmds++;
 	scsipi_done(xs);
 }
@@ -908,7 +971,7 @@ aic_dequeue(sc, acb)
  */
 void
 aic_msgin(sc)
-	register struct aic_softc *sc;
+	struct aic_softc *sc;
 {
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
@@ -1015,8 +1078,8 @@ nextbyte:
 		case MSG_CMDCOMPLETE:
 			if (sc->sc_dleft < 0) {
 				sc_link = acb->xs->sc_link;
-				printf("%s: %d extra bytes from %d:%d\n",
-				    sc->sc_dev.dv_xname, -sc->sc_dleft,
+				printf("%s: %ld extra bytes from %d:%d\n",
+				    sc->sc_dev.dv_xname, (long) -sc->sc_dleft,
 				    sc_link->scsipi_scsi.target, sc_link->scsipi_scsi.lun);
 				acb->data_length = 0;
 			}
@@ -1185,7 +1248,7 @@ out:
  */
 void
 aic_msgout(sc)
-	register struct aic_softc *sc;
+	struct aic_softc *sc;
 {
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
@@ -1379,13 +1442,13 @@ out:
  */
 int
 aic_dataout_pio(sc, p, n)
-	register struct aic_softc *sc;
+	struct aic_softc *sc;
 	u_char *p;
 	int n;
 {
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	register u_char dmastat = 0;
+	u_char dmastat = 0;
 	int out = 0;
 #define DOUTAMOUNT 128		/* Full FIFO */
 
@@ -1430,7 +1493,7 @@ aic_dataout_pio(sc, p, n)
 
 			p += DOUTAMOUNT;
 		} else {
-			register int xfer;
+			int xfer;
 
 			xfer = n;
 			AIC_MISC(("%d> ", xfer));
@@ -1525,13 +1588,13 @@ phasechange:
  */
 int
 aic_datain_pio(sc, p, n)
-	register struct aic_softc *sc;
+	struct aic_softc *sc;
 	u_char *p;
 	int n;
 {
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	register u_char dmastat;
+	u_char dmastat;
 	int in = 0;
 #define DINAMOUNT 128		/* Full FIFO */
 
@@ -1574,7 +1637,7 @@ aic_datain_pio(sc, p, n)
 
 			p += DINAMOUNT;
 		} else {
-			register int xfer;
+			int xfer;
 
 			xfer = min(bus_space_read_1(iot, ioh, FIFOSTAT), n);
 			AIC_MISC((">%d ", xfer));
@@ -1651,14 +1714,17 @@ int
 aicintr(arg)
 	void *arg;
 {
-	register struct aic_softc *sc = arg;
+	struct aic_softc *sc = arg;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	u_char sstat0, sstat1;
-	register struct aic_acb *acb;
-	register struct scsipi_link *sc_link;
+	struct aic_acb *acb;
+	struct scsipi_link *sc_link;
 	struct aic_tinfo *ti;
 	int n;
+
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
+		return (0);
 
 	/*
 	 * Clear INTEN.  We enable it again before returning.  This makes the
@@ -1782,9 +1848,10 @@ loop:
 			sc->sc_cleft = acb->scsipi_cmd_length;
 
 			/* On our first connection, schedule a timeout. */
-			if ((acb->xs->flags & SCSI_POLL) == 0)
-				timeout(aic_timeout, acb,
-				    (acb->timeout * hz) / 1000);
+			if ((acb->xs->xs_control & XS_CTL_POLL) == 0)
+				callout_reset(&acb->xs->xs_callout,
+				    (acb->timeout * hz) / 1000,
+				    aic_timeout, acb);
 
 			sc->sc_state = AIC_CONNECTED;
 		} else if ((sstat1 & SELTO) != 0) {
@@ -1963,7 +2030,7 @@ dophase:
 	case PH_DATAOUT:
 		if (sc->sc_state != AIC_CONNECTED)
 			break;
-		AIC_MISC(("dataout %d ", sc->sc_dleft));
+		AIC_MISC(("dataout %ld ", (long) sc->sc_dleft));
 		n = aic_dataout_pio(sc, sc->sc_dp, sc->sc_dleft);
 		sc->sc_dp += n;
 		sc->sc_dleft -= n;
@@ -1973,7 +2040,7 @@ dophase:
 	case PH_DATAIN:
 		if (sc->sc_state != AIC_CONNECTED)
 			break;
-		AIC_MISC(("datain %d ", sc->sc_dleft));
+		AIC_MISC(("datain %ld ", (long) sc->sc_dleft));
 		n = aic_datain_pio(sc, sc->sc_dp, sc->sc_dleft);
 		sc->sc_dp += n;
 		sc->sc_dleft -= n;
@@ -1996,11 +2063,11 @@ dophase:
 	printf("%s: unexpected bus phase; resetting\n", sc->sc_dev.dv_xname);
 	AIC_BREAK();
 reset:
-	aic_init(sc);
+	aic_init(sc, 1);
 	return 1;
 
 finish:
-	untimeout(aic_timeout, acb);
+	callout_stop(&acb->xs->xs_callout);
 	aic_done(sc, acb);
 	goto out;
 
@@ -2083,7 +2150,7 @@ aic_show_scsi_cmd(acb)
 	int i;
 
 	scsi_print_addr(sc_link);
-	if ((acb->xs->flags & SCSI_RESET) == 0) {
+	if ((acb->xs->xs_control & XS_CTL_RESET) == 0) {
 		for (i = 0; i < acb->scsipi_cmd_length; i++) {
 			if (i)
 				printf(",");

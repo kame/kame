@@ -1,4 +1,4 @@
-/*	$NetBSD: cs89x0.c,v 1.9 1999/03/30 21:02:41 mycroft Exp $	*/
+/*	$NetBSD: cs89x0.c,v 1.13 2000/02/08 18:40:51 thorpej Exp $	*/
 
 /*
  * Copyright 1997
@@ -442,7 +442,16 @@ cs_attach(sc, enaddr, media, nmedia, defmedia)
 		printf("%s: invalid DMA channel, not using DMA\n",
 		    sc->sc_dev.dv_xname);
 	else {
+		bus_size_t maxsize;
 		bus_addr_t dma_addr;
+
+		maxsize = isa_dmamaxsize(sc->sc_ic, sc->sc_drq);
+		if (maxsize < CS8900_DMASIZE) {
+			printf("%s: max DMA size %lu is less than required %d\n",
+			    sc->sc_dev.dv_xname, (u_long)maxsize,
+			    CS8900_DMASIZE);
+			goto after_dma_block;
+		}
 
 		if (isa_dmamap_create(sc->sc_ic, sc->sc_drq,
 		    CS8900_DMASIZE, BUS_DMA_NOWAIT) != 0) {
@@ -1589,12 +1598,8 @@ cs_ether_input(sc, m)
 	}
 #endif
 
-	/*
-	 * Pass the packet up, with the ether header sort-of removed. ie.
-	 * adjust the data pointer to point to the data.
-	 */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	/* Pass the packet up. */
+	(*ifp->if_input)(ifp, m);
 }
 
 void 

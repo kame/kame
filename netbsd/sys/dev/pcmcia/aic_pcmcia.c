@@ -1,4 +1,4 @@
-/*	$NetBSD: aic_pcmcia.c,v 1.8.4.1 1999/04/27 13:51:29 perry Exp $	*/
+/*	$NetBSD: aic_pcmcia.c,v 1.16 2000/02/04 09:31:07 enami Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -50,6 +50,7 @@
 
 int	aic_pcmcia_match __P((struct device *, struct cfdata *, void *));
 void	aic_pcmcia_attach __P((struct device *, struct device *, void *));
+int	aic_pcmcia_detach __P((struct device *, int));
 
 struct aic_pcmcia_softc {
 	struct aic_softc sc_aic;		/* real "aic" softc */
@@ -59,45 +60,29 @@ struct aic_pcmcia_softc {
 	int sc_io_window;			/* our i/o window */
 	struct pcmcia_function *sc_pf;		/* our PCMCIA function */
 	void *sc_ih;				/* interrupt handler */
+	int sc_flags;
+#define AIC_PCMCIA_ATTACH	0x0001		/* attach is in progress */
 };
 
 struct cfattach aic_pcmcia_ca = {
-	sizeof(struct aic_pcmcia_softc), aic_pcmcia_match, aic_pcmcia_attach
+	sizeof(struct aic_pcmcia_softc), aic_pcmcia_match, aic_pcmcia_attach,
+	aic_pcmcia_detach, aic_activate
 };
 
 int	aic_pcmcia_enable __P((void *, int));
 
-struct aic_pcmcia_product {
-	u_int32_t	app_vendor;		/* PCMCIA vendor ID */
-	u_int32_t	app_product;		/* PCMCIA product ID */
-	int		app_expfunc;		/* expected function number */
-	const char	*app_name;		/* device name */
-} aic_pcmcia_products[] = {
-	{ PCMCIA_VENDOR_ADAPTEC,	PCMCIA_PRODUCT_ADAPTEC_APA1460_1,
-	  0,				PCMCIA_STR_ADAPTEC_APA1460_1 },
-	{ PCMCIA_VENDOR_ADAPTEC,	PCMCIA_PRODUCT_ADAPTEC_APA1460_2,
-	  0,				PCMCIA_STR_ADAPTEC_APA1460_2 },
+const struct pcmcia_product aic_pcmcia_products[] = {
+	{ PCMCIA_STR_ADAPTEC_APA1460,		PCMCIA_VENDOR_ADAPTEC,
+	  PCMCIA_PRODUCT_ADAPTEC_APA1460,	0 },
 
-	{ 0,				0,
-	  0,				NULL },
+	{ PCMCIA_STR_ADAPTEC_APA1460A,		PCMCIA_VENDOR_ADAPTEC,
+	  PCMCIA_PRODUCT_ADAPTEC_APA1460A,	0 },
+
+	{ PCMCIA_STR_NEWMEDIA_BUSTOASTER,	PCMCIA_VENDOR_NEWMEDIA,
+	  PCMCIA_PRODUCT_NEWMEDIA_BUSTOASTER,	0 },
+
+	{ NULL }
 };
-
-struct aic_pcmcia_product *aic_pcmcia_lookup __P((struct pcmcia_attach_args *));
-
-struct aic_pcmcia_product *
-aic_pcmcia_lookup(pa)
-	struct pcmcia_attach_args *pa;
-{
-	struct aic_pcmcia_product *app;
-
-	for (app = aic_pcmcia_products; app->app_name != NULL; app++) {
-		if (pa->manufacturer == app->app_vendor &&
-		    pa->product == app->app_product &&
-		    pa->pf->number == app->app_expfunc)
-			return (app);
-	}
-	return (NULL);
-}
 
 int
 aic_pcmcia_match(parent, match, aux)
@@ -107,7 +92,8 @@ aic_pcmcia_match(parent, match, aux)
 {
 	struct pcmcia_attach_args *pa = aux;
 
-	if (aic_pcmcia_lookup(pa) != NULL)
+        if (pcmcia_product_lookup(pa, aic_pcmcia_products,
+            sizeof aic_pcmcia_products[0], NULL) != NULL)
 		return (1);
 	return (0);
 }
@@ -122,7 +108,7 @@ aic_pcmcia_attach(parent, self, aux)
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
 	struct pcmcia_function *pf = pa->pf;
-	struct aic_pcmcia_product *app;
+	const struct pcmcia_product *pp;
 
 	psc->sc_pf = pf;
 
@@ -132,6 +118,15 @@ aic_pcmcia_attach(parent, self, aux)
 		    cfe->num_iospace != 1)
 			continue;
 
+		/*
+		 * The bustoaster has a default config as first
+		 * entry, we don't want to use that.
+		 */
+		if (pa->manufacturer == PCMCIA_VENDOR_NEWMEDIA &&
+		    pa->product == PCMCIA_PRODUCT_NEWMEDIA_BUSTOASTER &&
+		    cfe->iospace[0].start == 0)
+			continue;
+
 		if (pcmcia_io_alloc(pa->pf, cfe->iospace[0].start,
 		    cfe->iospace[0].length, 0, &psc->sc_pcioh) == 0)
 			break;
@@ -139,7 +134,7 @@ aic_pcmcia_attach(parent, self, aux)
 
 	if (cfe == 0) {
 		printf(": can't alloc i/o space\n");
-		return;
+		goto no_config_entry;
 	}
 
 	sc->sc_iot = psc->sc_pcioh.iot;
@@ -149,53 +144,75 @@ aic_pcmcia_attach(parent, self, aux)
 	pcmcia_function_init(pf, cfe);
 	if (pcmcia_function_enable(pf)) {
 		printf(": function enable failed\n");
-		return;
+		goto enable_failed;
 	}
 
 	/* Map in the io space */
 	if (pcmcia_io_map(pa->pf, PCMCIA_WIDTH_AUTO, 0, psc->sc_pcioh.size,
 	    &psc->sc_pcioh, &psc->sc_io_window)) {
 		printf(": can't map i/o space\n");
-		return;
+		goto iomap_failed;
 	}
 
 	if (!aic_find(sc->sc_iot, sc->sc_ioh)) {
 		printf(": unable to detect chip!\n");
-		return;
+		goto no_aic_found;
 	}
 
-	app = aic_pcmcia_lookup(pa);
-	if (app == NULL) {
+	pp = pcmcia_product_lookup(pa, aic_pcmcia_products,
+	    sizeof aic_pcmcia_products[0], NULL);
+	if (pp == NULL) {
 		printf("\n");
 		panic("aic_pcmcia_attach: impossible");
 	}
 
-#if 0	/* XXX power management broken somehow. */
+	printf(": %s\n", pp->pp_name);
+
 	/* We can enable and disable the controller. */
 	sc->sc_adapter.scsipi_enable = aic_pcmcia_enable;
 
-	/*
-	 * Disable the pcmcia function now; we will be enbled again
-	 * as the SCSI code adds references to probe for children.
-	 */
-	pcmcia_function_disable(pf);
-
-	printf(": %s\n", app->app_name);
-#else
-	printf(": %s\n", app->app_name);
-
-	psc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_BIO,
-	    aicintr, &psc->sc_aic);
-	if (psc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt handler\n",
-		    psc->sc_aic.sc_dev.dv_xname);
-		return;
-	}
-#endif
-
+	psc->sc_flags |= AIC_PCMCIA_ATTACH;
 	aicattach(sc);
+	psc->sc_flags &= ~AIC_PCMCIA_ATTACH;
+	return;
+
+ no_aic_found:
+	/* Unmap our i/o window. */
+	pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
+
+ iomap_failed:
+	/* Disable the device. */
+	pcmcia_function_disable(psc->sc_pf);
+
+ enable_failed:
+	/* Unmap our i/o space. */
+	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
+
+ no_config_entry:
+	psc->sc_io_window = -1;
 }
 
+int
+aic_pcmcia_detach(self, flags)
+	struct device *self;
+	int flags;
+{
+	struct aic_pcmcia_softc *sc = (struct aic_pcmcia_softc *)self;
+	int error;
+
+	if (sc->sc_io_window == -1)
+		/* Nothing to detach. */
+		return (0);
+
+	if ((error = aic_detach(self, flags)) != 0)
+		return (error);
+
+	/* Unmap our i/o window and i/o space. */
+	pcmcia_io_unmap(sc->sc_pf, sc->sc_io_window);
+	pcmcia_io_free(sc->sc_pf, &sc->sc_pcioh);
+
+	return (0);
+}
 int
 aic_pcmcia_enable(arg, onoff)
 	void *arg;
@@ -213,11 +230,22 @@ aic_pcmcia_enable(arg, onoff)
 			return (EIO);
 		}
 
-		if (pcmcia_function_enable(psc->sc_pf)) {
-			printf("%s: couldn't enable PCMCIA function\n",
-			    psc->sc_aic.sc_dev.dv_xname);
-			pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
-			return (EIO);
+		/*
+		 * If attach is in progress, we know that card power is
+		 * enabled and chip will be initialized later.
+		 * Otherwise, enable and reset now.
+		 */
+		if ((psc->sc_flags & AIC_PCMCIA_ATTACH) == 0) {
+			if (pcmcia_function_enable(psc->sc_pf)) {
+				printf("%s: couldn't enable PCMCIA function\n",
+				    psc->sc_aic.sc_dev.dv_xname);
+				pcmcia_intr_disestablish(psc->sc_pf,
+				    psc->sc_ih);
+				return (EIO);
+			}
+
+			/* Initialize only chip.  */
+			aic_init(&psc->sc_aic, 0);
 		}
 	} else {
 		pcmcia_function_disable(psc->sc_pf);

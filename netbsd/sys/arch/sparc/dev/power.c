@@ -1,4 +1,4 @@
-/*	$NetBSD: power.c,v 1.10.8.1 1999/04/28 19:02:25 perry Exp $ */
+/*	$NetBSD: power.c,v 1.11 1999/04/28 18:49:40 fair Exp $ */
 
 /*
  * Copyright (c) 1996

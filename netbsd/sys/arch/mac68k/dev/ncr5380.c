@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr5380.c,v 1.44 1998/12/05 19:43:42 mjacob Exp $	*/
+/*	$NetBSD: ncr5380.c,v 1.46 1999/12/12 08:18:49 scottr Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -186,7 +186,7 @@ extern __inline__ void finish_req(SC_REQ *reqp)
 	free_head  = reqp;
 	splx(sps);
 
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 	if (!(reqp->dr_flag & DRIVER_LINKCHK))
 		scsipi_done(xs);
 }
@@ -291,12 +291,12 @@ ncr5380_scsi_cmd(struct scsipi_xfer *xs)
 {
 	int	sps;
 	SC_REQ	*reqp, *link, *tmp;
-	int	flags = xs->flags;
+	int	flags = xs->xs_control;
 
 	/*
 	 * We do not queue RESET commands
 	 */
-	if (flags & SCSI_RESET) {
+	if (flags & XS_CTL_RESET) {
 		scsi_reset_verbose(xs->sc_link->adapter_softc,
 				   "Got reset-command");
 		return (COMPLETE);
@@ -317,7 +317,7 @@ ncr5380_scsi_cmd(struct scsipi_xfer *xs)
 	/*
 	 * Initialize our private fields
 	 */
-	reqp->dr_flag   = (flags & SCSI_POLL) ? DRIVER_NOINT : 0;
+	reqp->dr_flag   = (flags & XS_CTL_POLL) ? DRIVER_NOINT : 0;
 	reqp->phase     = NR_PHASE;
 	reqp->msgout    = MSG_NOOP;
 	reqp->status    = SCSGOOD;
@@ -330,18 +330,6 @@ ncr5380_scsi_cmd(struct scsipi_xfer *xs)
 	reqp->xdata_len = xs->datalen;
 	memcpy(&reqp->xcmd, xs->cmd, sizeof(struct scsi_generic));
 	reqp->xcmd.bytes[0] |= reqp->targ_lun << 5;
-
-	/*
-	 * Sanity check on flags...
-	 */
-	if (flags & ITSDONE) {
-		ncr_tprint(reqp, "scsi_cmd: command already done.....\n");
-		xs->flags &= ~ITSDONE;
-	}
-	if (!(flags & INUSE)) {
-		ncr_tprint(reqp, "scsi_cmd: command not in use.....\n");
-		xs->flags |= INUSE;
-	}
 
 #ifdef REAL_DMA
 	/*
@@ -424,7 +412,8 @@ ncr5380_scsi_cmd(struct scsipi_xfer *xs)
 
 	run_main(xs->sc_link->adapter_softc);
 
-	if (xs->flags & (SCSI_POLL|ITSDONE))
+	if ((xs->xs_control & XS_CTL_POLL) != 0 &&
+	    (xs->xs_status & XS_STS_DONE) != 0)
 		return (COMPLETE); /* We're booting or run_main has completed */
 	return (SUCCESSFULLY_QUEUED);
 }
@@ -444,7 +433,7 @@ ncr5380_show_scsi_cmd(struct scsipi_xfer *xs)
 	u_char	*b = (u_char *) xs->cmd;
 	int	i  = 0;
 
-	if (!(xs->flags & SCSI_RESET)) {
+	if (!(xs->xs_control & XS_CTL_RESET)) {
 		printf("(%d:%d:%d,0x%x)-", xs->sc_link->scsipi_scsi.scsibus,
 		    xs->sc_link->scsipi_scsi.target, xs->sc_link->scsipi_scsi.lun,
 			xs->sc_link->flags);
@@ -1843,7 +1832,7 @@ SC_REQ	*reqp;
 	 */
 	dm->dm_addr = phy_buf = kvtop(req_addr);
 	while (req_len) {
-		if (req_len < (phy_len = NBPG - ((u_long)req_addr & PGOFSET)))
+		if (req_len < (phy_len = NBPG - m68k_page_offset(req_addr)))
 			phy_len = req_len;
 
 		req_addr     += phy_len;

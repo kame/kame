@@ -1,4 +1,4 @@
-/*	$NetBSD: esc.c,v 1.6 1999/03/24 05:50:57 mrg Exp $	*/
+/*	$NetBSD: esc.c,v 1.8 1999/09/30 22:59:53 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1995 Scott Stevens
@@ -201,7 +201,8 @@ escinitialize(dev)
  * Setup bump buffer.
  */
 	dev->sc_bump_va = (u_char *)uvm_km_zalloc(kernel_map, dev->sc_bump_sz);
-	dev->sc_bump_pa = pmap_extract(kernel_pmap, (vm_offset_t)dev->sc_bump_va);
+	(void) pmap_extract(kernel_pmap, (vaddr_t)dev->sc_bump_va,
+	    (paddr_t *)&dev->sc_bump_pa);
 
 /*
  * Setup pages to noncachable, that way we don't have to flush the cache
@@ -229,13 +230,13 @@ esc_scsicmd(struct scsipi_xfer *xs)
 
 	slp = xs->sc_link;
 	dev = slp->adapter_softc;
-	flags = xs->flags;
+	flags = xs->xs_control;
 	target = slp->scsipi_scsi.target;
 
-	if (flags & SCSI_DATA_UIO)
+	if (flags & XS_CTL_DATA_UIO)
 		panic("esc: scsi data uio requested");
 
-	if ((flags & SCSI_POLL) && (dev->sc_flags & ESC_ACTIVE))
+	if ((flags & XS_CTL_POLL) && (dev->sc_flags & ESC_ACTIVE))
 		panic("esc_scsicmd: busy");
 
 /* Get hold of a esc_pending block. */
@@ -259,7 +260,7 @@ esc_scsicmd(struct scsipi_xfer *xs)
 	} else
 		esc_donextcmd(dev, pendp);
 
-	return((flags & SCSI_POLL) ? COMPLETE : SUCCESSFULLY_QUEUED);
+	return((flags & XS_CTL_POLL) ? COMPLETE : SUCCESSFULLY_QUEUED);
 }
 
 /*
@@ -279,7 +280,7 @@ esc_donextcmd(dev, pendp)
  * acknowledged the reset. After that we have to wait a reset to select
  * delay before anything else can happend.
  */
-	if (pendp->xs->flags & SCSI_RESET) {
+	if (pendp->xs->xs_control & XS_CTL_RESET) {
 		struct nexus	*nexus;
 
 		s = splbio();
@@ -309,7 +310,7 @@ esc_donextcmd(dev, pendp)
  * If we are polling, go to splbio and perform the command, else we poke
  * the scsi-bus via escgo to get the interrupt machine going.
  */
-	if (pendp->xs->flags & SCSI_POLL) {
+	if (pendp->xs->xs_control & XS_CTL_POLL) {
 		s = splbio();
 		escicmd(dev, pendp);
 		TAILQ_INSERT_TAIL(&dev->sc_xs_free, pendp, link);
@@ -354,7 +355,7 @@ esc_scsidone(dev, xs, stat)
 		}
 	}
 
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 
 /* Steal the next command from the queue so that one unit can't hog the bus. */
 	s = splbio();
@@ -1362,7 +1363,7 @@ esc_postaction(dev, rp, nexus)
 
 		  /* We should use polled IO here. */
 		  if (dev->sc_dma_blk_flg == ESC_CHAIN_PRG) {
-			esc_ixfer(dev/*, nexus->xs->flags & SCSI_POLL*/);
+			esc_ixfer(dev/*, nexus->xs->xs_control & XS_CTL_POLL*/);
 			dev->sc_cur_link++;
 			dev->sc_dma_len = 0;
 			break;

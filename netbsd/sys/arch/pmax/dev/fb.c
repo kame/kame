@@ -1,4 +1,4 @@
-/*	$NetBSD: fb.c,v 1.22.2.1 1999/04/30 16:11:43 perry Exp $	*/
+/*	$NetBSD: fb.c,v 1.35 2000/02/03 04:20:00 nisimura Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -66,39 +66,22 @@
 #include <sys/ioctl.h>
 #include <sys/device.h>
 #include <sys/poll.h>
-#include <sys/tty.h>
-#include <sys/time.h>
-#include <sys/kernel.h>
-#include <sys/ioctl.h>
-#include <sys/file.h>
-#include <sys/vnode.h>
-#include <sys/errno.h>
-#include <sys/proc.h>
-#include <sys/mman.h>
-#include <sys/syslog.h>
-
-#include <vm/vm.h>
-#include <miscfs/specfs/specdev.h>
-
-#include <machine/autoconf.h>
+#include <sys/malloc.h>
 #include <sys/conf.h>
+
 #include <machine/conf.h>
-
-#include <mips/cpuregs.h>		/* mips cached->uncached */
-#include <machine/pmioctl.h>
-
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
+#include <machine/pmioctl.h>
+
 #include <pmax/dev/fbreg.h>
 #include <pmax/dev/qvssvar.h>
+#include <pmax/dev/rconsvar.h>
 
 #include <pmax/pmax/cons.h>
 #include <pmax/pmax/pmaxtype.h>
 
-#include "rasterconsole.h"
-
-#include "dc_ioasic.h"
-#include "dc_ds.h"
+#include "dc.h"
 #include "scc.h"
 #include "dtop.h"
 
@@ -116,10 +99,7 @@
 /* qvss/pm compatible and old 4.4bsd/pmax driver functions */
 
 
-extern void fbScreenInit __P (( struct fbinfo *fi));
-
-
-#if (NDC_DS > 0) || (NDC_IOASIC > 0)
+#if NDC > 0
 #include <machine/dc7085cons.h>
 #include <pmax/dev/dcvar.h>
 #endif
@@ -137,7 +117,12 @@ extern void fbScreenInit __P (( struct fbinfo *fi));
 */
 #include <pmax/dev/lk201var.h>
 
-extern void rcons_connect __P((struct fbinfo *info));	/* XXX */
+#include "fb.h"
+
+static int fbndevs;
+struct fbinfo fi_console;
+struct fbinfo *fbdevs[NFB];
+static u_int8_t cmap_bits[768];         /* colormap for console */
 
 /*
  * The "blessed" framebuffer; the fb that gets
@@ -147,109 +132,63 @@ extern void rcons_connect __P((struct fbinfo *info));	/* XXX */
 struct fbinfo *firstfi = NULL;
 
 /*
- * The default cursor.
- */
-u_short defCursor[32] = {
-/* plane A */ 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF,
-	      0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF,
-/* plane B */ 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF,
-              0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF
-
-};
-
-
-/*
- * Pro-tem framebuffer pseudo-device driver
- */
-
-#include <sys/device.h>
-#include "fb.h"
-
-
-static struct {
-	struct fbinfo *cd_devs[NFB];
-	int cd_ndevs;
-} fbcd =   { {NULL}, 0} ;
-
-void fbattach __P((int n));
-
-
-
-/*
  * attach routine: required for pseudo-device
  */
 void
 fbattach(n)
 	int n;
 {
-	/* allocate space  for n framebuffers... */
+
 }
 
-/*
- * Connect a framebuffer, described by a struct fbinfo, to the
- * raster-console pseudo-device subsystem. )This would be done
- * with BStreams, if only we had them.)
- */
 void
-fbconnect (name, info, silent)
-	char *name;
-	struct fbinfo *info;
-	int silent;
+fbcnalloc(fip)
+	struct fbinfo **fip;
 {
-	int fbix;
-	static int first = 1;
+	struct fbinfo *fi = &fi_console;
 
-#ifndef FBDRIVER_DOES_ATTACH
-	/*
-	 * See if we've already configured this frame buffer;
-	 * if not, find an "fb" pseudo-device entry for it.
-	 */
-	for (fbix = 0; fbix < fbcd.cd_ndevs; fbix++)
-		if ((fbcd.cd_devs [fbix]->fi_type.fb_boardtype
-		     == info -> fi_type.fb_boardtype)
-		    && fbcd.cd_devs [fbix]->fi_unit == info -> fi_unit)
-			break;
-
-	if (fbix >= fbcd.cd_ndevs) {
-		if (fbcd.cd_ndevs >= NFB) {
-			printf("fb: more frame buffers probed than configured!\n");
-			return;
-		}
-
-		fbix = fbcd.cd_ndevs++;
-		fbcd.cd_devs [fbix] = info;
-	} else
-		info = fbcd.cd_devs [fbix];
-#endif /* FBDRIVER_DOES_ATTACH */
-
-	/*
-	 * If this is the first frame buffer we've seen, pass it to rcons.
-	 */
-	if (first) {
-		extern dev_t cn_in_dev;	/* XXX rcons hackery */
-
-		/* Only the first fb gets 4.4bsd/pmax style event ringbuffer */
-		firstfi = info;
-#if NRASTERCONSOLE > 0
-		/*XXX*/ cn_in_dev = cn_tab->cn_dev; /*XXX*/ /* FIXME */
-		rcons_connect (info);
-#endif  /* NRASTERCONSOLE */
-		first = 0;
-	}
-
-	if (!silent)
-		printf (": (%dx%dx%d)%s",
-			info -> fi_type.fb_width,
-			info -> fi_type.fb_height,
-			info -> fi_type.fb_depth,
-			(fbix != 0 ? ""
-			 : ((cn_tab -> cn_pri == CN_REMOTE)
-			    ? " (rcons)" : " (console)")));
-	return;
+	firstfi = fi; /* XXX */
+	fi->fi_cmap_bits = cmap_bits;
+	fbdevs[fbndevs++] = fi;
+	*fip = fi;
 }
 
+int
+fballoc(fip)
+	struct fbinfo **fip;
+{
+	struct fbinfo *fi;
 
-#include "fb_usrreq.c"	/* old pm-compatblie driver that supports X11R5 */
+	if (fbndevs >= NFB)
+	return (-1);
+	fi = malloc(sizeof(struct fbinfo), M_DEVBUF, M_NOWAIT);
+	if (fi == NULL)
+	goto nomemory;
+	fi->fi_cmap_bits = malloc(768, M_DEVBUF, M_NOWAIT);
+	if (fi->fi_cmap_bits == NULL) {
+		free(fi, M_DEVBUF);
+		goto nomemory;
+	}
+	if (fbndevs == 0)               /* XXX */
+		firstfi = fi;           /* XXX */
+	*fip = fbdevs[fbndevs++] = fi;
+	return (0);
+
+	nomemory:
+	return (-1);
+}
+
+void
+fbconnect(fi)
+	struct fbinfo *fi;
+{
+	if (&fi_console == fi)
+		rcons_connect(fi);
+}
+
+cdev_decl(fb);                /* generic framebuffer pseudo-device */
+
+#include "fb_usrreq.c"	/* old pm-compatible driver that supports X11R5/R6 */
 
 
 /*
@@ -270,13 +209,13 @@ tb_kbdmouseconfig(fi)
 
 	switch (systype) {
 
-#if (NDC_DS > 0) || (NDC_IOASIC > 0)
+#if NDC > 0
 	case DS_PMAX:
 	case DS_3MAX:
 		fi->fi_glasstty->KBDPutc = dcPutc;
 		fi->fi_glasstty->kbddev = makedev(DCDEV, DCKBD_PORT);
 		break;
-#endif	/* NDC_DS || NDC_IOASIC */
+#endif /* NDC */
 
 #if NSCC > 0
 	case DS_3MIN:
@@ -299,14 +238,4 @@ tb_kbdmouseconfig(fi)
 	};
 
 	return (0);
-}
-
-/*
- * pre-rcons glass-tty emulator (stub)
- */
-void
-fbScreenInit(fi)
-	struct fbinfo *fi;
-{
-	/* how to do this on rcons ? */
 }

@@ -1,4 +1,41 @@
-/*	$NetBSD: msg.h,v 1.10 1998/05/07 16:41:08 kleink Exp $	*/
+/*	$NetBSD: msg.h,v 1.13 2000/06/02 15:53:05 simonb Exp $	*/
+
+/*-
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
+ * NASA Ames Research Center.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * SVID compatible msg.h file
@@ -24,17 +61,49 @@
 
 #include <sys/ipc.h>
 
-/*
- * The MSG_NOERROR identifier value, the msqid_ds struct and the msg struct
- * are as defined by the SV API Intel 386 Processor Supplement.
- */
+#ifdef _KERNEL
+struct __msg {
+	struct	__msg *msg_next; /* next msg in the chain */
+	long	msg_type;	/* type of this message */
+    				/* >0 -> type of this message */
+    				/* 0 -> free header */
+	u_short	msg_ts;		/* size of this message */
+	short	msg_spot;	/* location of start of msg in buffer */
+};
+#endif /* _KERNEL */
 
 #define MSG_NOERROR	010000		/* don't complain about too long msgs */
 
+typedef unsigned long	msgqnum_t;
+typedef size_t		msglen_t;
+
 struct msqid_ds {
-	struct	ipc_perm msg_perm;	/* msg queue permission bits */
-	struct	msg *msg_first;	/* first message in the queue */
-	struct	msg *msg_last;	/* last message in the queue */
+	struct ipc_perm	msg_perm;	/* operation permission strucure */
+	msgqnum_t	msg_qnum;	/* number of messages in the queue */
+	msglen_t	msg_qbytes;	/* max # of bytes in the queue */
+	pid_t		msg_lspid;	/* process ID of last msgsend() */
+	pid_t		msg_lrpid;	/* process ID of last msgrcv() */
+	time_t		msg_stime;	/* time of last msgsend() */
+	time_t		msg_rtime;	/* time of last msgrcv() */
+	time_t		msg_ctime;	/* time of last change */
+
+	/*
+	 * These members are private and used only in the internal
+	 * implementation of this interface.
+	 */
+	struct __msg	*_msg_first;	/* first message in the queue */
+	struct __msg	*_msg_last;	/* last message in the queue */
+	msglen_t	_msg_cbytes;	/* # of bytes currently in queue */
+};
+
+#ifdef _KERNEL
+/*
+ * Old message queue data structure used before NetBSD 1.5.
+ */
+struct msqid_ds14 {
+	struct	ipc_perm14 msg_perm;	/* msg queue permission bits */
+	struct	__msg *msg_first;	/* first message in the queue */
+	struct	__msg *msg_last;	/* last message in the queue */
 	u_long	msg_cbytes;	/* number of bytes in use on the queue */
 	u_long	msg_qnum;	/* number of msgs in the queue */
 	u_long	msg_qbytes;	/* max # of bytes on the queue */
@@ -48,33 +117,9 @@ struct msqid_ds {
 	long	msg_pad3;
 	long	msg_pad4[4];
 };
+#endif
 
-struct msg {
-	struct	msg *msg_next;	/* next msg in the chain */
-	long	msg_type;	/* type of this message */
-    				/* >0 -> type of this message */
-    				/* 0 -> free header */
-	u_short	msg_ts;		/* size of this message */
-	short	msg_spot;	/* location of start of msg in buffer */
-};
-
-/*
- * Structure describing a message.  The SVID doesn't suggest any
- * particular name for this structure.  There is a reference in the
- * msgop man page that reads "The structure mymsg is an example of what
- * this user defined buffer might look like, and includes the following
- * members:".  This sentence is followed by two lines equivalent
- * to the mtype and mtext field declarations below.  It isn't clear
- * if "mymsg" refers to the naem of the structure type or the name of an
- * instance of the structure...
- */
-struct mymsg {
-	long	mtype;		/* message type (+ve integer) */
-	char	mtext[1];	/* message body */
-};
-
-
-#ifdef _KERNEL
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 /*
  * Based on the configuration parameters described in an SVR2 (yes, two)
  * config(1m) man page.
@@ -86,14 +131,35 @@ struct mymsg {
  * two between 8 and 1024 inclusive (and panic's if it isn't).
  */
 struct msginfo {
-	int	msgmax,		/* max chars in a message */
-		msgmni,		/* max message queue identifiers */
-		msgmnb,		/* max chars in a queue */
-		msgtql,		/* max messages in system */
-		msgssz,		/* size of a message segment (see notes above) */
-		msgseg;		/* number of message segments */
+	int32_t	msgmax;		/* max chars in a message */
+	int32_t	msgmni;		/* max message queue identifiers */
+	int32_t	msgmnb;		/* max chars in a queue */
+	int32_t	msgtql;		/* max messages in system */
+	int32_t	msgssz;		/* size of a message segment
+				   (see notes above) */
+	int32_t	msgseg;		/* number of message segments */
 };
-struct msginfo	msginfo;
+
+/* Warning: 64-bit structure padding is needed here */
+struct msgid_ds_sysctl {
+	struct		ipc_perm_sysctl msg_perm;
+	u_int64_t	msg_qnum;
+	u_int64_t	msg_qbytes;
+	u_int64_t	_msg_cbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	time_t		msg_stime;
+	time_t		msg_rtime;
+	time_t		msg_ctime;
+	int32_t		pad;
+};
+struct msg_sysctl_info {
+	struct	msginfo msginfo;
+	struct	msgid_ds_sysctl msgids[1];
+};
+#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+
+#ifdef _KERNEL
 
 #ifndef MSGSSZ
 #define MSGSSZ	8		/* Each segment must be 2^N long */
@@ -115,18 +181,10 @@ struct msginfo	msginfo;
 
 /*
  * macros to convert between msqid_ds's and msqid's.
- * (specific to this implementation)
  */
-#define MSQID(ix,ds)	((ix) & 0xffff | (((ds).msg_perm.seq << 16) & 0xffff0000))
+#define MSQID(ix,ds)	((ix) & 0xffff | (((ds).msg_perm._seq << 16) & 0xffff0000))
 #define MSQID_IX(id)	((id) & 0xffff)
 #define MSQID_SEQ(id)	(((id) >> 16) & 0xffff)
-#endif
-
-/*
- * The rest of this file is specific to this particular implementation.
- */
-
-#ifdef _KERNEL
 
 /*
  * Stuff allocated in machdep.h
@@ -137,26 +195,30 @@ struct msgmap {
     				/* 0..(MSGSEG-1) -> index of next segment */
 };
 
-char *msgpool;			/* MSGMAX byte long msg buffer pool */
-struct msgmap *msgmaps;		/* MSGSEG msgmap structures */
-struct msg *msghdrs;		/* MSGTQL msg headers */
-struct msqid_ds *msqids;	/* MSGMNI msqid_ds struct's */
+extern struct msginfo msginfo;
+extern char *msgpool;		/* MSGMAX byte long msg buffer pool */
+extern struct msgmap *msgmaps;	/* MSGSEG msgmap structures */
+extern struct __msg *msghdrs;	/* MSGTQL msg headers */
+extern struct msqid_ds *msqids;	/* MSGMNI msqid_ds struct's */
 
 #define MSG_LOCKED	01000	/* Is this msqid_ds locked? */
 
-#endif
+#endif /* _KERNEL */
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	msgctl __P((int, int, struct msqid_ds *));
+int	msgctl __P((int, int, struct msqid_ds *)) __RENAME(__msgctl13);
 int	msgget __P((key_t, int));
 int	msgsnd __P((int, const void *, size_t, int));
 ssize_t	msgrcv __P((int, void *, size_t, long, int));
 __END_DECLS
 #else
-void msginit __P((void));
+struct proc;
+
+void	msginit __P((void));
+int	msgctl1 __P((struct proc *, int, int, struct msqid_ds *));
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_MSG_H_ */

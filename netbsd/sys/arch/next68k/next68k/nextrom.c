@@ -1,4 +1,4 @@
-/*	$NetBSD: nextrom.c,v 1.10.2.1 2000/01/20 23:31:12 he Exp $	*/
+/*	$NetBSD: nextrom.c,v 1.11 1999/12/07 06:27:33 dbj Exp $	*/
 /*
  * Copyright (c) 1998 Darrin B. Jewell
  * All rights reserved.

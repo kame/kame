@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_fork.c,v 1.54 1999/03/24 05:51:23 mrg Exp $	*/
+/*	$NetBSD: kern_fork.c,v 1.66.2.1 2000/07/04 16:05:34 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -41,6 +41,7 @@
  */
 
 #include "opt_ktrace.h"
+#include "opt_multiprocessor.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,6 +59,7 @@
 #include <sys/ktrace.h>
 #include <sys/vmmeter.h>
 #include <sys/sched.h>
+#include <sys/signalvar.h>
 
 #include <sys/syscallargs.h>
 
@@ -76,7 +78,7 @@ sys_fork(p, v, retval)
 	register_t *retval;
 {
 
-	return (fork1(p, 0, retval, NULL));
+	return (fork1(p, 0, SIGCHLD, NULL, 0, NULL, NULL, retval, NULL));
 }
 
 /*
@@ -91,7 +93,8 @@ sys_vfork(p, v, retval)
 	register_t *retval;
 {
 
-	return (fork1(p, FORK_PPWAIT, retval, NULL));
+	return (fork1(p, FORK_PPWAIT, SIGCHLD, NULL, 0, NULL, NULL,
+	    retval, NULL));
 }
 
 /*
@@ -106,18 +109,24 @@ sys___vfork14(p, v, retval)
 	register_t *retval;
 {
 
-	return (fork1(p, FORK_PPWAIT|FORK_SHAREVM, retval, NULL));
+	return (fork1(p, FORK_PPWAIT|FORK_SHAREVM, SIGCHLD, NULL, 0,
+	    NULL, NULL, retval, NULL));
 }
 
 int
-fork1(p1, flags, retval, rnewprocp)
-	register struct proc *p1;
+fork1(p1, flags, exitsig, stack, stacksize, func, arg, retval, rnewprocp)
+	struct proc *p1;
 	int flags;
+	int exitsig;
+	void *stack;
+	size_t stacksize;
+	void (*func) __P((void *));
+	void *arg;
 	register_t *retval;
 	struct proc **rnewprocp;
 {
-	register struct proc *p2;
-	register uid_t uid;
+	struct proc *p2;
+	uid_t uid;
 	struct proc *newproc;
 	int count, s;
 	vaddr_t uaddr;
@@ -131,8 +140,9 @@ fork1(p1, flags, retval, rnewprocp)
 	 * processes, maxproc is the limit.
 	 */
 	uid = p1->p_cred->p_ruid;
-	if ((nprocs >= maxproc - 1 && uid != 0) || nprocs >= maxproc) {
-		tablefull("proc");
+	if (__predict_false((nprocs >= maxproc - 1 && uid != 0) ||
+			    nprocs >= maxproc)) {
+		tablefull("proc", "increase kern.maxproc or NPROC");
 		return (EAGAIN);
 	}
 
@@ -141,7 +151,8 @@ fork1(p1, flags, retval, rnewprocp)
 	 * a nonprivileged user to exceed their current limit.
 	 */
 	count = chgproccnt(uid, 1);
-	if (uid != 0 && count > p1->p_rlimit[RLIMIT_NPROC].rlim_cur) {
+	if (__predict_false(uid != 0 && count >
+			    p1->p_rlimit[RLIMIT_NPROC].rlim_cur)) {
 		(void)chgproccnt(uid, -1);
 		return (EAGAIN);
 	}
@@ -153,7 +164,7 @@ fork1(p1, flags, retval, rnewprocp)
 	 * be allocated and wired in vm_fork().
 	 */
 	uaddr = uvm_km_valloc(kernel_map, USPACE);
-	if (uaddr == 0) {
+	if (__predict_false(uaddr == 0)) {
 		(void)chgproccnt(uid, -1);
 		return (ENOMEM);
 	}
@@ -167,8 +178,9 @@ fork1(p1, flags, retval, rnewprocp)
 	newproc = pool_get(&proc_pool, PR_WAITOK);
 
 	/*
-	 * BEGIN PID ALLOCATION.  (Lock PID allocation variables eventually).
+	 * BEGIN PID ALLOCATION.
 	 */
+	s = proclist_lock_write();
 
 	/*
 	 * Find an unused process ID.  We remember a range of unused IDs
@@ -232,19 +244,25 @@ again:
 	/* Record the pid we've allocated. */
 	p2->p_pid = nextpid;
 
+	/* Record the signal to be delivered to the parent on exit. */
+	p2->p_exitsig = exitsig;
+
 	/*
 	 * Put the proc on allproc before unlocking PID allocation
 	 * so that waiters won't grab it as soon as we unlock.
 	 */
-	LIST_INSERT_HEAD(&allproc, p2, p_list);
-
-	/*
-	 * END PID ALLOCATION.  (Unlock PID allocation variables).
-	 */
 
 	p2->p_stat = SIDL;			/* protect against others */
 	p2->p_forw = p2->p_back = NULL;		/* shouldn't be necessary */
+
+	LIST_INSERT_HEAD(&allproc, p2, p_list);
+
 	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
+
+	/*
+	 * END PID ALLOCATION.
+	 */
+	proclist_unlock_write(s);
 
 	/*
 	 * Make a proc table entry for the new process.
@@ -255,6 +273,17 @@ again:
 	    (unsigned) ((caddr_t)&p2->p_endzero - (caddr_t)&p2->p_startzero));
 	memcpy(&p2->p_startcopy, &p1->p_startcopy,
 	    (unsigned) ((caddr_t)&p2->p_endcopy - (caddr_t)&p2->p_startcopy));
+
+#if !defined(MULTIPROCESSOR)
+	/*
+	 * In the single-processor case, all processes will always run
+	 * on the same CPU.  So, initialize the child's CPU to the parent's
+	 * now.  In the multiprocessor case, the child's CPU will be
+	 * initialized in the low-level context switch code when the
+	 * process runs.
+	 */
+	p2->p_cpu = p1->p_cpu;
+#endif /* ! MULTIPROCESSOR */
 
 	/*
 	 * Duplicate sub-structures as needed.
@@ -275,7 +304,16 @@ again:
 	if (p2->p_textvp)
 		VREF(p2->p_textvp);
 
-	p2->p_fd = fdcopy(p1);
+	if (flags & FORK_SHAREFILES)
+		fdshare(p1, p2);
+	else
+		p2->p_fd = fdcopy(p1);
+
+	if (flags & FORK_SHARECWD)
+		cwdshare(p1, p2);
+	else
+		p2->p_cwdi = cwdinit(p1);
+
 	/*
 	 * If p_limit is still copy-on-write, bump refcnt,
 	 * otherwise get a copy that won't be modified.
@@ -298,6 +336,9 @@ again:
 	LIST_INSERT_HEAD(&p1->p_children, p2, p_sibling);
 	LIST_INIT(&p2->p_children);
 
+	callout_init(&p2->p_realit_ch);
+	callout_init(&p2->p_tsleep_ch);
+
 #ifdef KTRACE
 	/*
 	 * Copy traceflag and tracefile if enabled.
@@ -312,6 +353,14 @@ again:
 	scheduler_fork_hook(p1, p2);
 
 	/*
+	 * Create signal actions for the child process.
+	 */
+	if (flags & FORK_SHARESIGS)
+		sigactsshare(p1, p2);
+	else
+		p2->p_sigacts = sigactsinit(p1);
+
+	/*
 	 * This begins the section where we must prevent the parent
 	 * from being swapped.
 	 */
@@ -322,7 +371,10 @@ again:
 	 * different path later.
 	 */
 	p2->p_addr = (struct user *)uaddr;
-	uvm_fork(p1, p2, (flags & FORK_SHAREVM) ? TRUE : FALSE);
+	uvm_fork(p1, p2, (flags & FORK_SHAREVM) ? TRUE : FALSE,
+	    stack, stacksize,
+	    (func != NULL) ? func : child_return,
+	    (arg != NULL) ? arg : p2);
 
 	/*
 	 * Make child runnable, set start time, and add to run queue.

@@ -1,4 +1,4 @@
-/*	$NetBSD: grf.c,v 1.13 1999/03/24 05:51:17 mrg Exp $	*/
+/*	$NetBSD: grf.c,v 1.16.12.1 2000/06/30 16:27:44 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -54,6 +54,7 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/proc.h>
+#include <sys/resourcevar.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
 #include <sys/malloc.h>
@@ -80,6 +81,7 @@ extern struct emul emul_hpux;
 #include <vm/vm_pager.h>
 
 #include <uvm/uvm_extern.h>
+#include <uvm/uvm_map.h>
 
 #include <miscfs/specfs/specdev.h>
 
@@ -101,7 +103,7 @@ int grfdebug = 0;
 cdev_decl(grf);
 int grfon __P((dev_t));
 int grfoff __P((dev_t));
-int grfaddr __P((struct grf_softc *, int));
+off_t grfaddr __P((struct grf_softc *, off_t));
 int grfmap __P((dev_t, caddr_t *, struct proc *));
 int grfunmap __P((dev_t, caddr_t, struct proc *));
 
@@ -241,10 +243,11 @@ grfpoll(dev, events, p)
 }
 
 /*ARGSUSED*/
-int
+paddr_t
 grfmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 
 	return (grfaddr(grf_cd.cd_devs[GRFUNIT(dev)], off));
@@ -285,10 +288,10 @@ grfoff(dev)
 	return(error);
 }
 
-int
+off_t
 grfaddr(gp, off)
 	struct grf_softc *gp;
-	register int off;
+	off_t off;
 {
 	register struct grfinfo *gi = &gp->g_display;
 
@@ -566,7 +569,8 @@ grfmap(dev, addrp, p)
 	vn.v_rdev = dev;			/* XXX */
 	error = uvm_mmap(&p->p_vmspace->vm_map, (vaddr_t *)addrp,
 			 (vsize_t)len, VM_PROT_ALL, VM_PROT_ALL,
-			 flags, (caddr_t)&vn, 0);
+			 flags, (caddr_t)&vn, 0,
+			 p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 	if (error == 0)
 		(void) (*gp->g_sw->gd_mode)(gp, GM_MAP, *addrp);
 	return(error);

@@ -1,4 +1,4 @@
-/*	$NetBSD: isr.c,v 1.40 1999/03/24 05:51:14 mrg Exp $	*/
+/*	$NetBSD: isr.c,v 1.42 2000/02/21 20:38:51 erh Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -116,6 +116,7 @@ isr_add_custom(level, handler)
  */
 void arpintr __P((void));
 void ipintr __P((void));
+void ip6intr __P((void));
 void atintr __P((void));
 void nsintr __P((void));
 void clnlintr __P((void));
@@ -131,36 +132,14 @@ void netintr()
 	netisr = 0;
 	splx(s);
 
-#if	NARP > 0
-	if (n & (1 << NETISR_ARP))
-		arpintr();
-#endif
-#ifdef INET
-	if (n & (1 << NETISR_IP))
-		ipintr();
-#endif
-#ifdef NETATALK
-	if (n & (1 << NETISR_ATALK))
-		atintr();
-#endif
-#ifdef NS
-	if (n & (1 << NETISR_NS))
-		nsintr();
-#endif
-#ifdef ISO
-	if (n & (1 << NETISR_ISO))
-		clnlintr();
-#endif
-#ifdef CCITT
-	if (n & (1 << NETISR_CCITT)) {
-		ccittintr();
-	}
-#endif
-#if NPPP > 0
-	if (n & (1 << NETISR_PPP)) {
-		pppintr();
-	}
-#endif
+#define DONETISR(bit, fn) do {		\
+	if (n & (1 << bit))		\
+		fn();			\
+} while (0)
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
 }
 
 

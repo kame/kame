@@ -1,11 +1,11 @@
-/*      $NetBSD: ukbd.c,v 1.28.2.2 1999/06/25 13:51:23 perry Exp $        */
+/*      $NetBSD: ukbd.c,v 1.60 2000/06/01 14:29:00 augustss Exp $        */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,16 +43,10 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
-#if defined(__NetBSD__)
 #include <sys/device.h>
 #include <sys/ioctl.h>
-#elif defined(__FreeBSD__)
-#include <sys/ioccom.h>
-#include <sys/module.h>
-#include <sys/bus.h>
-#include <machine/clock.h>
-#endif
 #include <sys/tty.h>
 #include <sys/file.h>
 #include <sys/select.h>
@@ -62,15 +56,14 @@
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbhid.h>
+
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdivar.h>
 #include <dev/usb/usbdevs.h>
 #include <dev/usb/usb_quirks.h>
 #include <dev/usb/hid.h>
 #include <dev/usb/ukbdvar.h>
 
-#if defined(__NetBSD__)
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wskbdvar.h>
 #include <dev/wscons/wsksymdef.h>
@@ -78,21 +71,14 @@
 
 #include "opt_wsdisplay_compat.h"
 
-#elif defined(__FreeBSD__)
-#include <machine/clock.h>
-#define delay(d)         DELAY(d)
-#endif
-
 #ifdef USB_DEBUG
-#define DPRINTF(x)	if (ukbddebug) printf x
-#define DPRINTFN(n,x)	if (ukbddebug>(n)) printf x
+#define DPRINTF(x)	if (ukbddebug) logprintf x
+#define DPRINTFN(n,x)	if (ukbddebug>(n)) logprintf x
 int	ukbddebug = 0;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
 #endif
-
-#define UPROTO_BOOT_KEYBOARD 1
 
 #define NKEYCODE 6
 
@@ -120,7 +106,7 @@ struct ukbd_data {
 
 /* Translate USB bitmap to USB keycode. */
 #define NMOD 8
-static struct {
+Static struct {
 	int mask, key;
 } ukbd_mods[NMOD] = {
 	{ MOD_CONTROL_L, 224 },
@@ -139,7 +125,7 @@ static struct {
  * Translate USB keycodes to US keyboard XT scancodes.
  * Scancodes >= 128 represent EXTENDED keycodes.
  */
-static u_int8_t ukbd_trtab[256] = {
+Static u_int8_t ukbd_trtab[256] = {
 	  NN,  NN,  NN,  NN,  30,  48,  46,  32, /* 00 - 07 */
 	  18,  33,  34,  35,  23,  36,  37,  38, /* 08 - 0F */
 	  50,  49,  24,  25,  16,  19,  31,  20, /* 10 - 17 */
@@ -180,7 +166,8 @@ static u_int8_t ukbd_trtab[256] = {
 #define MAXKEYS (NMOD+2*NKEYCODE)
 
 struct ukbd_softc {
-	bdevice		sc_dev;		/* base device */
+	USBBASEDEVICE	sc_dev;		/* base device */
+	usbd_device_handle sc_udev;
 	usbd_interface_handle sc_iface;	/* interface */
 	usbd_pipe_handle sc_intrpipe;	/* interrupt pipe */
 	int sc_ep_addr;
@@ -189,12 +176,13 @@ struct ukbd_softc {
 	struct ukbd_data sc_odata;
 
 	char sc_enabled;
-	char sc_disconnected;		/* device is gone */
 
 	int sc_console_keyboard;	/* we are the console keyboard */
 
 	int sc_leds;
 #if defined(__NetBSD__)
+	struct callout sc_rawrepeat_ch;
+
 	struct device *sc_wskbddev;
 #if defined(WSDISPLAY_COMPAT_RAWKBD)
 #define REP_DELAY1 400
@@ -208,16 +196,18 @@ struct ukbd_softc {
 	int sc_npollchar;
 	u_int16_t sc_pollchars[MAXKEYS];
 #endif /* defined(__NetBSD__) */
+
+	u_char sc_dying;
 };
 
 #define	UKBDUNIT(dev)	(minor(dev))
 #define	UKBD_CHUNK	128	/* chunk size for read */
 #define	UKBD_BSIZE	1020	/* buffer size */
 
-int	ukbd_is_console;
+Static int	ukbd_is_console;
 
-void	ukbd_cngetc __P((void *, u_int *, int *));
-void	ukbd_cnpollc __P((void *, int));
+Static void	ukbd_cngetc(void *, u_int *, int *);
+Static void	ukbd_cnpollc(void *, int);
 
 #if defined(__NetBSD__)
 const struct wskbd_consops ukbd_consops = {
@@ -226,15 +216,16 @@ const struct wskbd_consops ukbd_consops = {
 };
 #endif
 
-void	ukbd_intr __P((usbd_request_handle, usbd_private_handle, usbd_status));
-void	ukbd_disco __P((void *));
+Static void	ukbd_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
 
-int	ukbd_enable __P((void *, int));
-void	ukbd_set_leds __P((void *, int));
+Static int	ukbd_enable(void *, int);
+Static void	ukbd_set_leds(void *, int);
 
 #if defined(__NetBSD__)
-int	ukbd_ioctl __P((void *, u_long, caddr_t, int, struct proc *));
-void	ukbd_rawrepeat __P((void *v));
+Static int	ukbd_ioctl(void *, u_long, caddr_t, int, struct proc *);
+#ifdef WSDISPLAY_COMPAT_RAWKBD
+Static void	ukbd_rawrepeat(void *v);
+#endif
 
 const struct wskbd_accessops ukbd_accessops = {
 	ukbd_enable,
@@ -258,13 +249,13 @@ USB_MATCH(ukbd)
 	usb_interface_descriptor_t *id;
 	
 	/* Check that this is a keyboard that speaks the boot protocol. */
-	if (!uaa->iface)
+	if (uaa->iface == NULL)
 		return (UMATCH_NONE);
 	id = usbd_get_interface_descriptor(uaa->iface);
-	if (!id ||
-	    id->bInterfaceClass != UCLASS_HID || 
-	    id->bInterfaceSubClass != USUBCLASS_BOOT ||
-	    id->bInterfaceProtocol != UPROTO_BOOT_KEYBOARD)
+	if (id == NULL ||
+	    id->bInterfaceClass != UICLASS_HID || 
+	    id->bInterfaceSubClass != UISUBCLASS_BOOT ||
+	    id->bInterfaceProtocol != UIPROTO_BOOT_KEYBOARD)
 		return (UMATCH_NONE);
 	return (UMATCH_IFACECLASS_IFACESUBCLASS_IFACEPROTO);
 }
@@ -275,7 +266,7 @@ USB_ATTACH(ukbd)
 	usbd_interface_handle iface = uaa->iface;
 	usb_interface_descriptor_t *id;
 	usb_endpoint_descriptor_t *ed;
-	usbd_status r;
+	usbd_status err;
 	char devinfo[1024];
 #if defined(__NetBSD__)
 	struct wskbddev_attach_args a;
@@ -283,7 +274,7 @@ USB_ATTACH(ukbd)
 	int i;
 #endif
 	
-	sc->sc_disconnected = 1;
+	sc->sc_udev = uaa->device;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
 	usbd_devinfo(uaa->device, 0, devinfo);
@@ -292,7 +283,7 @@ USB_ATTACH(ukbd)
 	       devinfo, id->bInterfaceClass, id->bInterfaceSubClass);
 
 	ed = usbd_interface2endpoint_descriptor(iface, 0);
-	if (!ed) {
+	if (ed == NULL) {
 		printf("%s: could not read endpoint descriptor\n",
 		       USBDEVNAME(sc->sc_dev));
 		USB_ATTACH_ERROR_RETURN;
@@ -303,11 +294,11 @@ USB_ATTACH(ukbd)
 		     " bInterval=%d\n",
 		     ed->bLength, ed->bDescriptorType, 
 		     ed->bEndpointAddress & UE_ADDR,
-		     ed->bEndpointAddress & UE_IN ? "in" : "out",
+		     UE_GET_DIR(ed->bEndpointAddress)==UE_DIR_IN? "in" : "out",
 		     ed->bmAttributes & UE_XFERTYPE,
 		     UGETW(ed->wMaxPacketSize), ed->bInterval));
 
-	if ((ed->bEndpointAddress & UE_IN) != UE_IN ||
+	if (UE_GET_DIR(ed->bEndpointAddress) != UE_DIR_IN ||
 	    (ed->bmAttributes & UE_XFERTYPE) != UE_INTERRUPT) {
 		printf("%s: unexpected endpoint\n",
 		       USBDEVNAME(sc->sc_dev));
@@ -315,11 +306,11 @@ USB_ATTACH(ukbd)
 	}
 
 	if ((usbd_get_quirks(uaa->device)->uq_flags & UQ_NO_SET_PROTO) == 0) {
-		r = usbd_set_protocol(iface, 0);
+		err = usbd_set_protocol(iface, 0);
 		DPRINTFN(5, ("ukbd_attach: protocol set\n"));
-		if (r != USBD_NORMAL_COMPLETION) {
+		if (err) {
 			printf("%s: set protocol failed\n",
-			       USBDEVNAME(sc->sc_dev));
+			    USBDEVNAME(sc->sc_dev));
 			USB_ATTACH_ERROR_RETURN;
 		}
 	}
@@ -328,7 +319,6 @@ USB_ATTACH(ukbd)
 	usbd_set_idle(iface, 0, 0);
 
 	sc->sc_ep_addr = ed->bEndpointAddress;
-	sc->sc_disconnected = 0;
 
 	/*
 	 * Remember if we're the console keyboard.
@@ -341,10 +331,10 @@ USB_ATTACH(ukbd)
 		ukbd_is_console = 0;
 	}
 
-#if defined(__NetBSD__)
 	if (sc->sc_console_keyboard) {
-		DPRINTF(("ukbd_attach: console keyboard\n", sc));
+		DPRINTF(("ukbd_attach: console keyboard sc=%p\n", sc));
 		wskbd_cnattach(&ukbd_consops, sc, &ukbd_keymapdata);
+		ukbd_enable(sc, 1);
 	}
 
 	a.console = sc->sc_console_keyboard;
@@ -354,6 +344,8 @@ USB_ATTACH(ukbd)
 	a.accessops = &ukbd_accessops;
 	a.accesscookie = sc;
 
+	callout_init(&sc->sc_rawrepeat_ch);
+
 	/* Flash the leds; no real purpose, just shows we're alive. */
 	ukbd_set_leds(sc, WSKBD_LED_SCROLL | WSKBD_LED_NUM | WSKBD_LED_CAPS);
 	usbd_delay_ms(uaa->device, 400);
@@ -361,55 +353,78 @@ USB_ATTACH(ukbd)
 
 	sc->sc_wskbddev = config_found(self, &a, wskbddevprint);
 
-#elif defined(__FreeBSD__)
-	/* XXX why waste CPU in delay() ? */
-	/* It's alive!  IT'S ALIVE!  Do a little song and dance. */
-	ukbd_set_leds(sc, NUM_LOCK);
-	delay(15000);
-	ukbd_set_leds(sc, CAPS_LOCK);
-	delay(20000);
-	ukbd_set_leds(sc, SCROLL_LOCK);
-	delay(30000);
-	ukbd_set_leds(sc, CAPS_LOCK);
-	delay(50000);
-	ukbd_set_leds(sc, NUM_LOCK);
-
-	ukbd_enable(sc, 1);
-#endif
+	usbd_add_drv_event(USB_EVENT_DRIVER_ATTACH, sc->sc_udev,
+			   USBDEV(sc->sc_dev));
 
 	USB_ATTACH_SUCCESS_RETURN;
 }
 
-#if defined(__FreeBSD__)
 int
-ukbd_detach(device_t self)
+ukbd_enable(void *v, int on)
 {
-	struct ukbd_softc *sc = device_get_softc(self);
-	char *devinfo = (char *) device_get_desc(self);
+	struct ukbd_softc *sc = v;
+	usbd_status err;
 
-	if (sc->sc_enabled)
-		return (ENXIO);
+	if (on && sc->sc_dying)
+		return (EIO);
 
-	if (devinfo) {
-		device_set_desc(self, NULL);
-		free(devinfo, M_USB);
+	/* Should only be called to change state */
+	if (sc->sc_enabled == on) {
+#ifdef DIAGNOSTIC
+		printf("ukbd_enable: %s: bad call on=%d\n", 
+		       USBDEVNAME(sc->sc_dev), on);
+#endif
+		return (EBUSY);
 	}
+
+	DPRINTF(("ukbd_enable: sc=%p on=%d\n", sc, on));
+	if (on) {
+		/* Set up interrupt pipe. */
+		err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr, 
+			  USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc,
+			  &sc->sc_ndata, sizeof(sc->sc_ndata), ukbd_intr,
+			  USBD_DEFAULT_INTERVAL);
+		if (err)
+			return (EIO);
+	} else {
+		/* Disable interrupts. */
+		usbd_abort_pipe(sc->sc_intrpipe);
+		usbd_close_pipe(sc->sc_intrpipe);
+	}
+	sc->sc_enabled = on;
 
 	return (0);
 }
-#endif
 
-void
-ukbd_disco(p)
-	void *p;
+int
+ukbd_activate(device_ptr_t self, enum devact act)
 {
-	struct ukbd_softc *sc = p;
+	struct ukbd_softc *sc = (struct ukbd_softc *)self;
+	int rv = 0;
 
-	DPRINTF(("ukbd_disco: sc=%p\n", sc));
-	usbd_abort_pipe(sc->sc_intrpipe);
-	sc->sc_disconnected = 1;
+	switch (act) {
+	case DVACT_ACTIVATE:
+		return (EOPNOTSUPP);
+		break;
+
+	case DVACT_DEACTIVATE:
+		if (sc->sc_wskbddev != NULL)
+			rv = config_deactivate(sc->sc_wskbddev);
+		sc->sc_dying = 1;
+		break;
+	}
+	return (rv);
+}
+
+USB_DETACH(ukbd)
+{
+	USB_DETACH_START(ukbd, sc);
+	int rv = 0;
+
+	DPRINTF(("ukbd_detach: sc=%p flags=%d\n", sc, flags));
 
 	if (sc->sc_console_keyboard) {
+#if 0
 		/*
 		 * XXX Should probably disconnect our consops,
 		 * XXX and either notify some other keyboard that
@@ -418,45 +433,33 @@ ukbd_disco(p)
 		 * XXX back to 1 so that the next USB keyboard attached
 		 * XXX to the system will get it.
 		 */
-		panic("ukbd_disco: console keyboard");
+		panic("ukbd_detach: console keyboard");
+#else
+		/*
+		 * Disconnect our consops and set ukbd_is_console
+		 * back to 1 so that the next USB keyboard attached
+		 * to the system will get it.
+		 * XXX Should notify some other keyboard that it can be
+		 * XXX console, if there are any other keyboards.
+		 */
+		printf("%s: was console keyboard\n", USBDEVNAME(sc->sc_dev));
+		wskbd_cndetach();
+		ukbd_is_console = 1;
+#endif
 	}
-}
+	/* No need to do reference counting of ukbd, wskbd has all the goo. */
+	if (sc->sc_wskbddev != NULL)
+		rv = config_detach(sc->sc_wskbddev, flags);
 
-int
-ukbd_enable(v, on)
-	void *v;
-	int on;
-{
-	struct ukbd_softc *sc = v;
-	usbd_status r;
+	usbd_add_drv_event(USB_EVENT_DRIVER_DETACH, sc->sc_udev,
+			   USBDEV(sc->sc_dev));
 
-	if (on) {
-		/* Set up interrupt pipe. */
-		if (sc->sc_enabled)
-			return (EBUSY);
-		
-		sc->sc_enabled = 1;
-		r = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr, 
-					USBD_SHORT_XFER_OK,
-					&sc->sc_intrpipe, sc, &sc->sc_ndata, 
-					sizeof(sc->sc_ndata), ukbd_intr);
-		if (r != USBD_NORMAL_COMPLETION)
-			return (EIO);
-		usbd_set_disco(sc->sc_intrpipe, ukbd_disco, sc);
-	} else {
-		/* Disable interrupts. */
-		usbd_abort_pipe(sc->sc_intrpipe);
-		usbd_close_pipe(sc->sc_intrpipe);
-
-		sc->sc_enabled = 0;
-	}
-
-	return (0);
+	return (rv);
 }
 
 void
-ukbd_intr(reqh, addr, status)
-	usbd_request_handle reqh;
+ukbd_intr(xfer, addr, status)
+	usbd_xfer_handle xfer;
 	usbd_private_handle addr;
 	usbd_status status;
 {
@@ -464,6 +467,7 @@ ukbd_intr(reqh, addr, status)
 	struct ukbd_data *ud = &sc->sc_ndata;
 	int mod, omod;
 	u_int16_t ibuf[MAXKEYS];	/* chars events */
+	int s;
 	int nkeys, i, j;
 	int key;
 #define ADDKEY(c) ibuf[nkeys++] = (c)
@@ -472,7 +476,7 @@ ukbd_intr(reqh, addr, status)
 	if (status == USBD_CANCELLED)
 		return;
 
-	if (status != USBD_NORMAL_COMPLETION) {
+	if (status) {
 		DPRINTF(("ukbd_intr: status=%d\n", status));
 		usbd_clear_endpoint_stall_async(sc->sc_intrpipe);
 		return;
@@ -481,8 +485,10 @@ ukbd_intr(reqh, addr, status)
 	DPRINTFN(5, ("          mod=0x%02x key0=0x%02x key1=0x%02x\n",
 		     ud->modifiers, ud->keycode[0], ud->keycode[1]));
 
-	if (ud->keycode[0] == KEY_ERROR)
+	if (ud->keycode[0] == KEY_ERROR) {
+		DPRINTF(("ukbd_intr: KEY_ERROR\n"));
 		return;		/* ignore  */
+	}
 	nkeys = 0;
 	mod = ud->modifiers;
 	omod = sc->sc_odata.modifiers;
@@ -526,7 +532,6 @@ ukbd_intr(reqh, addr, status)
 	if (nkeys == 0)
 		return;
 
-#if defined(__NetBSD__)
 	if (sc->sc_polling) {
 		DPRINTFN(1,("ukbd_intr: pollchar = 0x%03x\n", ibuf[0]));
 		memcpy(sc->sc_pollchars, ibuf, nkeys * sizeof(u_int16_t));
@@ -560,53 +565,41 @@ ukbd_intr(reqh, addr, status)
 				    cbuf[j]));
 			j++;
 		}
+		s = spltty();
 		wskbd_rawinput(sc->sc_wskbddev, cbuf, j);
-		untimeout(ukbd_rawrepeat, sc);
+		splx(s);
+		callout_stop(&sc->sc_rawrepeat_ch);
 		if (npress != 0) {
 			sc->sc_nrep = npress;
-			timeout(ukbd_rawrepeat, sc, hz * REP_DELAY1 / 1000);
+			callout_reset(&sc->sc_rawrepeat_ch,
+			    hz * REP_DELAY1 / 1000, ukbd_rawrepeat, sc);
 		}
 		return;
 	}
 #endif
 
+	s = spltty();
 	for (i = 0; i < nkeys; i++) {
 		key = ibuf[i];
 		wskbd_input(sc->sc_wskbddev, 
 		    key&RELEASE ? WSCONS_EVENT_KEY_UP : WSCONS_EVENT_KEY_DOWN,
 		    key&CODEMASK);
 	}
-
-#elif defined(__FreeBSD__)
-	/* XXX shouldn't the keys be used? */
-	for (i = 0; i < nkeys; i++) {
-		c = ibuf[i];
-		printf("%c (%d) %s\n", 
-		       ((c&CODEMASK) < 32 || (c&CODEMASK) > 126 ? '.' :
-			(c&CODEMASK)), c,
-		       (c&RELEASE? "released":"pressed"));
-		if (ud->modifiers)
-			printf("0x%04x\n", ud->modifiers);
-                for (i = 0; i < NKEYCODE; i++)
-			if (ud->keycode[i])
-				printf("%d ", ud->keycode[i]);
-		printf("\n");
-	}
-#endif
+	splx(s);
 }
 
 void
-ukbd_set_leds(v, leds)
-	void *v;
-	int leds;
+ukbd_set_leds(void *v, int leds)
 {
 	struct ukbd_softc *sc = v;
 	u_int8_t res;
 
 	DPRINTF(("ukbd_set_leds: sc=%p leds=%d\n", sc, leds));
 
+	if (sc->sc_dying)
+		return;
+
 	sc->sc_leds = leds;
-#if defined(__NetBSD__)
 	res = 0;
 	if (leds & WSKBD_LED_SCROLL)
 		res |= SCROLL_LOCK;
@@ -614,33 +607,27 @@ ukbd_set_leds(v, leds)
 		res |= NUM_LOCK;
 	if (leds & WSKBD_LED_CAPS)
 		res |= CAPS_LOCK;
-#elif defined(__FreeBSD__)
-	res = leds;
-#endif
+	res |= leds & 0xf8;
 	usbd_set_report_async(sc->sc_iface, UHID_OUTPUT_REPORT, 0, &res, 1);
 }
 
-#if defined(__NetBSD__)
-
 #ifdef WSDISPLAY_COMPAT_RAWKBD
 void
-ukbd_rawrepeat(v)
-	void *v;
+ukbd_rawrepeat(void *v)
 {
 	struct ukbd_softc *sc = v;
+	int s;
 
+	s = spltty();
 	wskbd_rawinput(sc->sc_wskbddev, sc->sc_rep, sc->sc_nrep);
-	timeout(ukbd_rawrepeat, sc, hz * REP_DELAYN / 1000);
+	splx(s);
+	callout_reset(&sc->sc_rawrepeat_ch, hz * REP_DELAYN / 1000,
+	    ukbd_rawrepeat, sc);
 }
 #endif
 
 int
-ukbd_ioctl(v, cmd, data, flag, p)
-	void *v;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+ukbd_ioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	struct ukbd_softc *sc = v;
 
@@ -658,7 +645,7 @@ ukbd_ioctl(v, cmd, data, flag, p)
 	case WSKBDIO_SETMODE:
 		DPRINTF(("ukbd_ioctl: set raw = %d\n", *(int *)data));
 		sc->sc_rawkbd = *(int *)data == WSKBD_RAW;
-		untimeout(ukbd_rawrepeat, sc);
+		callout_stop(&sc->sc_rawrepeat_ch);
 		return (0);
 #endif
 	}
@@ -667,17 +654,14 @@ ukbd_ioctl(v, cmd, data, flag, p)
 
 /* Console interface. */
 void
-ukbd_cngetc(v, type, data)
-	void *v;
-	u_int *type;
-	int *data;
+ukbd_cngetc(void *v, u_int *type, int *data)
 {
 	struct ukbd_softc *sc = v;
-	usbd_lock_token s;
+	int s;
 	int c;
 
-	DPRINTFN(-1,("ukbd_cngetc: enter\n"));
-	s = usbd_lock();
+	DPRINTFN(0,("ukbd_cngetc: enter\n"));
+	s = splusb();
 	sc->sc_polling = 1;
 	while(sc->sc_npollchar <= 0)
 		usbd_dopoll(sc->sc_iface);
@@ -688,24 +672,24 @@ ukbd_cngetc(v, type, data)
 	       sc->sc_npollchar * sizeof(u_int16_t));
 	*type = c & RELEASE ? WSCONS_EVENT_KEY_UP : WSCONS_EVENT_KEY_DOWN;
 	*data = c & CODEMASK;
-	usbd_unlock(s);
-	DPRINTFN(-1,("ukbd_cngetc: return 0x%02x\n", c));
+	splx(s);
+	DPRINTFN(0,("ukbd_cngetc: return 0x%02x\n", c));
 }
 
 void
-ukbd_cnpollc(v, on)
-	void *v;
-        int on;
+ukbd_cnpollc(void *v, int on)
 {
 	struct ukbd_softc *sc = v;
+	usbd_device_handle dev;
 
 	DPRINTFN(2,("ukbd_cnpollc: sc=%p on=%d\n", v, on));
 
-	usbd_set_polling(sc->sc_iface, on);
+	(void)usbd_interface2device_handle(sc->sc_iface,&dev);
+	usbd_set_polling(dev, on);
 }
 
 int
-ukbd_cnattach()
+ukbd_cnattach(void)
 {
 
 	/*
@@ -716,9 +700,3 @@ ukbd_cnattach()
 	ukbd_is_console = 1;
 	return (0);
 }
-
-#endif /* NetBSD */
-
-#if defined(__FreeBSD__)
-DRIVER_MODULE(ukbd, usb, ukbd_driver, ukbd_devclass, usbd_driver_load, 0);
-#endif

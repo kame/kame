@@ -1,4 +1,4 @@
-/*	$NetBSD: intio_dmac.c,v 1.4 1999/03/24 14:07:38 minoura Exp $	*/
+/*	$NetBSD: intio_dmac.c,v 1.6 2000/04/18 21:06:06 minoura Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,8 @@
 /*
  * Hitachi HD63450 (= Motorola MC68450) DMAC driver for x68k.
  */
+
+#include "opt_m680x0.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -146,8 +148,8 @@ dmac_init_channels(sc)
 		sc->sc_channels[i].ch_channel = i;
 		sc->sc_channels[i].ch_name[0] = 0;
 		sc->sc_channels[i].ch_softc = &sc->sc_dev;
-		sc->sc_channels[i].ch_map =
-		  (void*) pmap_extract (pmap, (vaddr_t) &dmac_map[i]);
+		(void) pmap_extract(pmap, (vaddr_t) &dmac_map[i],
+		   (paddr_t *) &sc->sc_channels[i].ch_map);
 		bus_space_subregion(sc->sc_bst, sc->sc_bht,
 				    DMAC_CHAN_SIZE*i, DMAC_CHAN_SIZE,
 				    &sc->sc_channels[i].ch_bht);

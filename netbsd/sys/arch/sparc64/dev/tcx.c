@@ -1,4 +1,4 @@
-/*	$NetBSD: tcx.c,v 1.2 1998/09/05 16:50:38 pk Exp $ */
+/*	$NetBSD: tcx.c,v 1.3.12.1 2000/06/30 16:27:41 simonb Exp $ */
 
 /* 
  *  Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -224,7 +224,7 @@ tcxattach(parent, self, args)
 		fb->fb_type.fb_width,
 		fb->fb_type.fb_height);
 
-	isconsole = node == fbnode && fbconstty != NULL;
+	isconsole = (node == fbnode);
 
 	printf(", id %d, rev %d, sense %d",
 		(sc->sc_thc->thc_config & THC_CFG_FBID) >> THC_CFG_FBID_SHIFT,
@@ -448,10 +448,11 @@ struct mmo {
  *
  * XXX	needs testing against `demanding' applications (e.g., aviator)
  */
-int
+paddr_t
 tcxmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct tcx_softc *sc = tcx_cd.cd_devs[minor(dev)];
 	register struct mmo *mo;

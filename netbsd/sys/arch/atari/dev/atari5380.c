@@ -1,4 +1,4 @@
-/*	$NetBSD: atari5380.c,v 1.29.6.1 1999/12/16 22:22:32 he Exp $	*/
+/*	$NetBSD: atari5380.c,v 1.31 2000/03/29 14:19:22 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -1084,12 +1084,12 @@ static int
 machine_match(struct device *pdp, void *match, void *auxp,
 						struct cfdriver *cd)
 {
-	struct cfdata *cdp = match;
+	static int	we_matched = 0; /* Only one unit	*/
 
-	if (strcmp(auxp, cd->cd_name))
+	if (strcmp(auxp, cd->cd_name) || we_matched)
 		return(0);
-	if (cdp->cf_unit != 0)	/* Only one unit	*/
-		return(0);
+
+	we_matched = 1;
 	return(1);
 }
 

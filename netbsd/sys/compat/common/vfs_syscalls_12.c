@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_syscalls_12.c,v 1.4 1999/03/30 00:13:57 wrstuden Exp $	*/
+/*	$NetBSD: vfs_syscalls_12.c,v 1.6 2000/03/30 11:27:15 augustss Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -97,7 +97,7 @@ compat_12_sys_getdirentries(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct compat_12_sys_getdirentries_args /* {
+	struct compat_12_sys_getdirentries_args /* {
 		syscallarg(int) fd;
 		syscallarg(char *) buf;
 		syscallarg(u_int) count;
@@ -107,10 +107,13 @@ compat_12_sys_getdirentries(p, v, retval)
 	int error, done;
 	long loff;
 
+	/* getvnode() will use the descriptor for us */
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return error;
-	if ((fp->f_flag & FREAD) == 0)
-		return (EBADF);
+	if ((fp->f_flag & FREAD) == 0) {
+		error = EBADF;
+		goto out;
+	}
 
 	loff = fp->f_offset;
 
@@ -119,6 +122,8 @@ compat_12_sys_getdirentries(p, v, retval)
 
 	error = copyout(&loff, SCARG(uap, basep), sizeof(long));
 	*retval = done;
+ out:
+	FILE_UNUSE(fp, p);
 	return error;
 }
 
@@ -132,7 +137,7 @@ compat_12_sys_stat(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct compat_12_sys_stat_args /* {
+	struct compat_12_sys_stat_args /* {
 		syscallarg(const char *) path;
 		syscallarg(struct stat12 *) ub;
 	} */ *uap = v;
@@ -165,7 +170,7 @@ compat_12_sys_lstat(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct compat_12_sys_lstat_args /* {
+	struct compat_12_sys_lstat_args /* {
 		syscallarg(const char *) path;
 		syscallarg(struct stat12 *) ub;
 	} */ *uap = v;
@@ -197,13 +202,13 @@ compat_12_sys_fstat(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct compat_12_sys_fstat_args /* {
+	struct compat_12_sys_fstat_args /* {
 		syscallarg(int) fd;
 		syscallarg(struct stat12 *) sb;
 	} */ *uap = v;
 	int fd = SCARG(uap, fd);
-	register struct filedesc *fdp = p->p_fd;
-	register struct file *fp;
+	struct filedesc *fdp = p->p_fd;
+	struct file *fp;
 	struct stat ub;
 	struct stat12 oub;
 	int error;

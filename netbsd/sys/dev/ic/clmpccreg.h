@@ -1,4 +1,4 @@
-/*  $NetBSD: clmpccreg.h,v 1.1.2.2 1999/11/29 21:15:07 he Exp $ */
+/*  $NetBSD: clmpccreg.h,v 1.3 1999/11/28 12:23:18 scw Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

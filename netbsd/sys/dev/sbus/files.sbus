@@ -1,4 +1,4 @@
-#	$NetBSD: files.sbus,v 1.11 1999/01/17 20:44:58 pk Exp $
+#	$NetBSD: files.sbus,v 1.14 2000/03/25 19:58:05 mycroft Exp $
 #
 # Config file and device description for machine-independent SBUS code.
 # Included by ports that need it.
@@ -36,7 +36,6 @@ file	dev/sbus/if_le.c		le_sbus
 file	dev/sbus/if_le_lebuffer.c	le_lebuffer
 file	dev/sbus/if_le_ledma.c		le_ledma
 
-device	esp: scsi, ncr53c9x
 attach	esp at sbus with esp_sbus
 attach	esp at dma with esp_dma
 file	dev/sbus/esp_sbus.c		esp_sbus | esp_dma
@@ -63,13 +62,11 @@ device	qe: arp, ether, ifnet
 attach	qe at qec
 file	dev/sbus/qe.c			qe
 
-#device	hme: arp, ether, ifnet, stp2002
-#attach	hme at qec
-#file	dev/sbus/hme.c			hme
+attach	hme at sbus with hme_sbus
+file	dev/sbus/if_hme_sbus.c		hme_sbus
 
-device	audiocs: audio, auconv, ad1848
-attach	audiocs at sbus
-file	dev/sbus/cs4231_sbus.c		audiocs
+attach	audiocs at sbus with audiocs_sbus
+file	dev/sbus/cs4231_sbus.c		audiocs_sbus
 
 #
 # Magma Serial/Parallel boards

@@ -1,4 +1,4 @@
-/*	$NetBSD: ktrace.h,v 1.16 1998/09/11 12:50:12 mycroft Exp $	*/
+/*	$NetBSD: ktrace.h,v 1.19 2000/05/27 00:40:48 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -50,7 +50,6 @@
  * flags (ORed in with operation)
  */
 #define KTRFLAG_DESCEND		4	/* perform op on all children too */
-#define	KTRFLAG_FD		8	/* flag indicating fd - kernel only */
 
 /*
  * ktrace record header
@@ -92,9 +91,9 @@ struct ktr_syscall {
 #define KTR_SYSRET	2
 struct ktr_sysret {
 	short	ktr_code;
-	short	ktr_eosys;
+	short	ktr_eosys;		/* XXX unused */
 	int	ktr_error;
-	int	ktr_retval;
+	register_t ktr_retval;
 };
 
 /*
@@ -158,7 +157,6 @@ struct ktr_csw {
 #define KTRFAC_ROOT	0x80000000	/* root set this trace */
 #define KTRFAC_INHERIT	0x40000000	/* pass trace flags to children */
 #define KTRFAC_ACTIVE	0x20000000	/* ktrace logging in progress, ignore */
-#define	KTRFAC_FD	0x10000000	/* vp is a file pointer, not vnode */
 
 #ifndef	_KERNEL
 
@@ -171,13 +169,13 @@ __END_DECLS
 
 #else
 
-void ktrcsw __P((void *, int, int));
-void ktremul __P((void *, struct proc *, char *));
-void ktrgenio __P((void *, int, enum uio_rw, struct iovec *, int, int));
-void ktrnamei __P((void *, char *));
-void ktrpsig __P((void *, int, sig_t, sigset_t *, int));
-void ktrsyscall __P((void *, register_t, size_t, register_t []));
-void ktrsysret __P((void *, register_t, int, register_t));
+void ktrcsw __P((struct proc *, int, int));
+void ktremul __P((struct proc *));
+void ktrgenio __P((struct proc *, int, enum uio_rw, struct iovec *, int, int));
+void ktrnamei __P((struct proc *, char *));
+void ktrpsig __P((struct proc *, int, sig_t, sigset_t *, int));
+void ktrsyscall __P((struct proc *, register_t, size_t, register_t []));
+void ktrsysret __P((struct proc *, register_t, int, register_t));
 void ktrderef __P((struct proc *));
 void ktradref __P((struct proc *));
 

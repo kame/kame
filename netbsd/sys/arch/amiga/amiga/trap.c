@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.69 1999/03/24 05:50:53 mrg Exp $	*/
+/*	$NetBSD: trap.c,v 1.76 2000/06/06 18:52:32 soren Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,6 +43,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_syscall_debug.h"
 #include "opt_execfmt.h"
 #include "opt_ktrace.h"
 #include "opt_compat_netbsd.h"
@@ -76,6 +77,7 @@
 #include <machine/pte.h>
 
 #include <m68k/fpe/fpu_emulate.h>
+#include <m68k/cacheops.h>
 
 #ifdef COMPAT_SUNOS
 #include <compat/sunos/sunos_syscall.h>
@@ -217,7 +219,7 @@ userret(p, pc, oticks)
 	int pc;
 	u_quad_t oticks;
 {
-	int sig, s;
+	int sig;
 
 	while ((sig = CURSIG(p)) != 0)
 		postsig(sig);
@@ -226,18 +228,9 @@ userret(p, pc, oticks)
 
 	if (want_resched) {
 		/*
-		 * Since we are curproc, clock will normally just change
-		 * our priority without moving us from one queue to another
-		 * (since the running process is not on a queue.)
-		 * If that happened after we setrunqueue ourselves but before
-		 * we switch'ed, we might not be on the queue indicated by
-		 * our priority.
+		 * We are being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -249,7 +242,7 @@ userret(p, pc, oticks)
 		
 		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
 	}
-	curpriority = p->p_priority;
+	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
 }
 
 void
@@ -309,7 +302,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	extern vm_map_t kernel_map;
 	struct vmspace *vm = NULL;
 	vm_prot_t ftype;
-	vm_offset_t va;
+	vaddr_t va;
 	vm_map_t map;
 	u_int nss;
 	int rv;
@@ -389,7 +382,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 		ftype = VM_PROT_READ | VM_PROT_WRITE;
 	else
 		ftype = VM_PROT_READ;
-	va = trunc_page((vm_offset_t)v);
+	va = trunc_page((vaddr_t)v);
 #ifdef DEBUG
 	if (map == kernel_map && va == 0) {
 		printf("trap: bad kernel access at %x pc %x\n", v, fp->f_pc);
@@ -402,7 +395,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	 */
 	nss = 0;
 	if (map != kernel_map && (caddr_t)va >= vm->vm_maxsaddr) {
-		nss = clrnd(btoc(USRSTACK - (unsigned)va));
+		nss = btoc(USRSTACK - (unsigned)va);
 		if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
 			rv = KERN_FAILURE;
 			goto nogo;
@@ -492,7 +485,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	 */
 	if (map != kernel_map && (caddr_t)va >= vm->vm_maxsaddr) {
 		if (rv == KERN_SUCCESS) {
-			nss = clrnd(btoc(USRSTACK-(unsigned)va));
+			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 		} else if (rv == KERN_PROTECTION_FAILURE)
@@ -900,7 +893,7 @@ syscall(code, frame)
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, argsize, args);
+		ktrsyscall(p, code, argsize, args);
 #endif
 	if (error)
 		goto bad;
@@ -946,7 +939,7 @@ syscall(code, frame)
 	userret(p, frame.f_pc, sticks);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, error, rval[0]);
 #endif
 }
 
@@ -967,7 +960,7 @@ child_return(arg)
 	userret(p, f->f_pc, p->p_sticks);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }
 
@@ -993,13 +986,13 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 	/* See if we're going to span two pages (for word or long transfers) */
 
 	if((wb_sts & WBS_SZMASK) == WBS_SIZE_WORD)
-		if(trunc_page((vm_offset_t)wb_addr) !=
-		    trunc_page((vm_offset_t)wb_addr+1))
+		if(trunc_page((vaddr_t)wb_addr) !=
+		    trunc_page((vaddr_t)wb_addr+1))
 			wb_extra_page = 1;
 
 	if((wb_sts & WBS_SZMASK) == WBS_SIZE_LONG)
-		if(trunc_page((vm_offset_t)wb_addr) !=
-		    trunc_page((vm_offset_t)wb_addr+3))
+		if(trunc_page((vaddr_t)wb_addr) !=
+		    trunc_page((vaddr_t)wb_addr+3))
 			wb_extra_page = 3;
 
 	/*

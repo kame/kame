@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_resource.c,v 1.3 1998/12/13 18:00:52 christos Exp $	 */
+/*	$NetBSD: svr4_resource.c,v 1.6 2000/03/30 11:27:20 augustss Exp $	 */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -46,6 +46,8 @@
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_resource.h>
 #include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_ucontext.h>
 #include <compat/svr4/svr4_syscallargs.h>
 #include <compat/svr4/svr4_util.h>
 
@@ -91,7 +93,7 @@ svr4_to_native_rl(rl)
 
 int
 svr4_sys_getrlimit(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -138,7 +140,7 @@ svr4_sys_getrlimit(p, v, retval)
 
 int
 svr4_sys_setrlimit(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -183,13 +185,13 @@ svr4_sys_setrlimit(p, v, retval)
 	else if (slim.rlim_cur == SVR4_RLIM_SAVED_CUR)
 		blim.rlim_cur = limp->rlim_cur;
 
-	return dosetrlimit(p, rl, &blim);
+	return dosetrlimit(p, p->p_cred, rl, &blim);
 }
 
 
 int
 svr4_sys_getrlimit64(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -236,7 +238,7 @@ svr4_sys_getrlimit64(p, v, retval)
 
 int
 svr4_sys_setrlimit64(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -281,5 +283,5 @@ svr4_sys_setrlimit64(p, v, retval)
 	else if (slim.rlim_cur == SVR4_RLIM64_SAVED_CUR)
 		blim.rlim_cur = limp->rlim_cur;
 
-	return dosetrlimit(p, rl, &blim);
+	return dosetrlimit(p, p->p_cred, rl, &blim);
 }

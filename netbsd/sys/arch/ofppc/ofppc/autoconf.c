@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.5 1998/02/24 05:49:28 mycroft Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.9 2000/06/01 15:38:26 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -39,33 +39,22 @@
 
 #include <machine/powerpc.h>
 
-extern int cold;
-
 void configure __P((void));
-void findroot __P((void));
+static void findroot __P((void));
 
 struct device *booted_device;	/* boot device */
 int booted_partition;		/* ...and partition on that device */
-
-struct devnametobdevmaj powerpc_nam2blk[] = {
-	{ "ofdisk",	0 },
-#ifdef notyet
-	{ "md",		XXX },
-#endif
-	{ NULL,		0 },
-};
 
 /*
  * Determine device configuration for a machine.
  */
 void
-configure()
+cpu_configure()
 {
 	if (config_rootfound("mainbus", NULL) == NULL)
 		panic("configure: mainbus not configured");
 
 	(void)spl0();
-	cold = 0;
 }
 
 /*
@@ -81,7 +70,7 @@ cpu_rootconf()
 	printf("boot device: %s\n",
 	    booted_device ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, booted_partition, powerpc_nam2blk);
+	setroot(booted_device, booted_partition);
 }
 
 /*

@@ -1,11 +1,12 @@
-/*	$NetBSD: linux_misc.c,v 1.53 1999/02/09 20:37:19 christos Exp $	*/
+/*	$NetBSD: linux_misc.c,v 1.69.4.1 2000/09/11 19:25:35 fvdl Exp $	*/
 
 /*-
- * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1995, 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Frank van der Linden and Eric Haszlakiewicz.
+ * by Frank van der Linden and Eric Haszlakiewicz; by Jason R. Thorpe
+ * of the Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,8 +49,10 @@
  * Function in multiarch:
  *	linux_sys_break			: linux_break.c
  *	linux_sys_alarm			: linux_misc_notalpha.c
+ *	linux_sys_getresgid		: linux_misc_notalpha.c
  *	linux_sys_nice			: linux_misc_notalpha.c
  *	linux_sys_readdir		: linux_misc_notalpha.c
+ *	linux_sys_setresgid		: linux_misc_notalpha.c
  *	linux_sys_time			: linux_misc_notalpha.c
  *	linux_sys_utime			: linux_misc_notalpha.c
  *	linux_sys_waitpid		: linux_misc_notalpha.c
@@ -75,6 +78,7 @@
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/ptrace.h>
+#include <sys/reboot.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/signal.h>
@@ -103,7 +107,21 @@
 #include <compat/linux/common/linux_dirent.h>
 #include <compat/linux/common/linux_util.h>
 #include <compat/linux/common/linux_misc.h>
+#include <compat/linux/common/linux_ptrace.h>
+#include <compat/linux/common/linux_reboot.h>
 
+int linux_ptrace_request_map[] = {
+	LINUX_PTRACE_TRACEME,	PT_TRACE_ME,
+	LINUX_PTRACE_PEEKTEXT,	PT_READ_I,
+	LINUX_PTRACE_PEEKDATA,	PT_READ_D,
+	LINUX_PTRACE_POKETEXT,	PT_WRITE_I,
+	LINUX_PTRACE_POKEDATA,	PT_WRITE_D,
+	LINUX_PTRACE_CONT,	PT_CONTINUE,
+	LINUX_PTRACE_KILL,	PT_KILL,
+	LINUX_PTRACE_ATTACH,	PT_ATTACH,
+	LINUX_PTRACE_DETACH,	PT_DETACH,
+	-1
+};
 
 /* Local linux_misc.c functions: */
 static void bsd_to_linux_statfs __P((struct statfs *, struct linux_statfs *));
@@ -147,7 +165,7 @@ linux_sys_wait4(p, v, retval)
 		syscallarg(struct rusage *) rusage;
 	} */ *uap = v;
 	struct sys_wait4_args w4a;
-	int error, *status, tstat;
+	int error, *status, tstat, options, linux_options;
 	caddr_t sg;
 
 	if (SCARG(uap, status) != NULL) {
@@ -156,9 +174,22 @@ linux_sys_wait4(p, v, retval)
 	} else
 		status = NULL;
 
+	linux_options = SCARG(uap, options);
+	options = 0;
+	if (linux_options &
+	    ~(LINUX_WAIT4_WNOHANG|LINUX_WAIT4_WUNTRACED|LINUX_WAIT4_WCLONE))
+		return (EINVAL);
+
+	if (linux_options & LINUX_WAIT4_WNOHANG)
+		options |= WNOHANG;
+	if (linux_options & LINUX_WAIT4_WUNTRACED)
+		options |= WUNTRACED;
+	if (linux_options & LINUX_WAIT4_WCLONE)
+		options |= WALTSIG;
+
 	SCARG(&w4a, pid) = SCARG(uap, pid);
 	SCARG(&w4a, status) = status;
-	SCARG(&w4a, options) = SCARG(uap, options);
+	SCARG(&w4a, options) = options;
 	SCARG(&w4a, rusage) = SCARG(uap, rusage);
 
 	if ((error = sys_wait4(p, &w4a, retval)))
@@ -322,8 +353,6 @@ linux_sys_uname(p, v, retval)
 	struct linux_sys_uname_args /* {
 		syscallarg(struct linux_utsname *) up;
 	} */ *uap = v;
-	extern char ostype[], hostname[], osrelease[], version[], machine[],
-	    domainname[];
 	struct linux_utsname luts;
 	int len;
 	char *cp;
@@ -335,7 +364,7 @@ linux_sys_uname(p, v, retval)
 	strncpy(luts.l_machine, machine, sizeof(luts.l_machine));
 	strncpy(luts.l_domainname, domainname, sizeof(luts.l_domainname));
 
-	/* This part taken from the the uname() in libc */
+	/* This part taken from the uname() in libc */
 	len = sizeof(luts.l_version);
 	for (cp = luts.l_version; len--; ++cp) {
 		if (*cp == '\n' || *cp == '\t') {
@@ -386,7 +415,7 @@ linux_sys_mmap(p, v, retval)
 	if (SCARG(&cma,prot) & VM_PROT_WRITE) /* XXX */
 		SCARG(&cma,prot) |= VM_PROT_READ;
 	SCARG(&cma,flags) = flags;
-	SCARG(&cma,fd) = SCARG(uap, fd);
+	SCARG(&cma,fd) = flags & MAP_ANON ? -1 : SCARG(uap, fd);
 	SCARG(&cma,pad) = 0;
 	SCARG(&cma,pos) = SCARG(uap, offset);
 
@@ -532,7 +561,7 @@ linux_sys_getdents(p, v, retval)
 		syscallarg(struct linux_dirent *) dent;
 		syscallarg(unsigned int) count;
 	} */ *uap = v;
-	register struct dirent *bdp;
+	struct dirent *bdp;
 	struct vnode *vp;
 	caddr_t	inp, buf;		/* BSD-format */
 	int len, reclen;		/* BSD-format */
@@ -548,18 +577,23 @@ linux_sys_getdents(p, v, retval)
 	off_t *cookiebuf = NULL, *cookie;
 	int ncookies;
 
+	/* getvnode() will use the descriptor for us */
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 
-	if ((fp->f_flag & FREAD) == 0)
-		return (EBADF);
+	if ((fp->f_flag & FREAD) == 0) {
+		error = EBADF;
+		goto out1;
+	}
 
 	vp = (struct vnode *)fp->f_data;
-	if (vp->v_type != VDIR)
-		return (EINVAL);
+	if (vp->v_type != VDIR) {
+		error = EINVAL;
+		goto out1;
+	}
 
 	if ((error = VOP_GETATTR(vp, &va, p->p_ucred, p)))
-		return error;
+		goto out1;
 
 	nbytes = SCARG(uap, count);
 	if (nbytes == 1) {	/* emulating old, broken behaviour */
@@ -666,6 +700,8 @@ out:
 	if (cookiebuf)
 		free(cookiebuf, M_TEMP);
 	free(buf, M_TEMP);
+ out1:
+	FILE_UNUSE(fp, p);
 	return error;
 }
 
@@ -870,6 +906,40 @@ linux_sys_setregid(p, v, retval)
 	return sys_setregid(p, &bsa, retval);
 }
 
+/*
+ * We have nonexistent fsuid equal to uid.
+ * If modification is requested, refuse.
+ */
+int
+linux_sys_setfsuid(p, v, retval)
+	 struct proc *p;
+	 void *v;
+	 register_t *retval;
+{
+	 struct linux_sys_setfsuid_args /* {
+		 syscallarg(uid_t) uid;
+	 } */ *uap = v;
+	 uid_t uid;
+
+	 uid = SCARG(uap, uid);
+	 if (p->p_cred->p_ruid != uid)
+		 return sys_nosys(p, v, retval);
+	 else
+		 return (0);
+}
+
+/* XXX XXX XXX */
+#ifndef alpha
+int
+linux_sys_getfsuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	return sys_getuid(p, v, retval);
+}
+#endif
+
 int
 linux_sys___sysctl(p, v, retval)
 	struct proc *p;
@@ -893,4 +963,195 @@ linux_sys___sysctl(p, v, retval)
 	SCARG(&bsa, newlen) = ls.newlen;
 
 	return sys___sysctl(p, &bsa, retval);
+}
+
+int
+linux_sys_setresuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_setresuid_args /* {
+		syscallarg(uid_t) ruid;
+		syscallarg(uid_t) euid;
+		syscallarg(uid_t) suid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	uid_t ruid, euid, suid;
+	int error;
+
+	ruid = SCARG(uap, ruid);
+	euid = SCARG(uap, euid);
+	suid = SCARG(uap, suid);
+
+	/*
+	 * Note: These checks are a little different than the NetBSD
+	 * setreuid(2) call performs.  This precisely follows the
+	 * behavior of the Linux kernel.
+	 */
+	if (ruid != (uid_t)-1 &&
+	    ruid != pc->p_ruid &&
+	    ruid != pc->pc_ucred->cr_uid &&
+	    ruid != pc->p_svuid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (euid != (uid_t)-1 &&
+	    euid != pc->p_ruid &&
+	    euid != pc->pc_ucred->cr_uid &&
+	    euid != pc->p_svuid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (suid != (uid_t)-1 &&
+	    suid != pc->p_ruid &&
+	    suid != pc->pc_ucred->cr_uid &&
+	    suid != pc->p_svuid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	/*
+	 * Now assign the new real, effective, and saved UIDs.
+	 * Note that Linux, unlike NetBSD in setreuid(2), does not
+	 * set the saved UID in this call unless the user specifies
+	 * it.
+	 */
+	if (ruid != (uid_t)-1) {
+		(void)chgproccnt(pc->p_ruid, -1);
+		(void)chgproccnt(ruid, 1);
+		pc->p_ruid = ruid;
+	}
+
+	if (euid != (uid_t)-1) {
+		pc->pc_ucred = crcopy(pc->pc_ucred);
+		pc->pc_ucred->cr_uid = euid;
+	}
+
+	if (suid != (uid_t)-1)
+		pc->p_svuid = suid;
+
+	if (ruid != (uid_t)-1 && euid != (uid_t)-1 && suid != (uid_t)-1)
+		p->p_flag |= P_SUGID;
+	return (0);
+}
+
+int
+linux_sys_getresuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_getresuid_args /* {
+		syscallarg(uid_t *) ruid;
+		syscallarg(uid_t *) euid;
+		syscallarg(uid_t *) suid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	int error;
+
+	/*
+	 * Linux copies these values out to userspace like so:
+	 *
+	 *	1. Copy out ruid.
+	 *	2. If that succeeds, copy out euid.
+	 *	3. If both of those succeed, copy out suid.
+	 */
+	if ((error = copyout(&pc->p_ruid, SCARG(uap, ruid),
+			     sizeof(uid_t))) != 0)
+		return (error);
+
+	if ((error = copyout(&pc->pc_ucred->cr_uid, SCARG(uap, euid),
+			     sizeof(uid_t))) != 0)
+		return (error);
+
+	return (copyout(&pc->p_svuid, SCARG(uap, suid), sizeof(uid_t)));
+}
+
+int
+linux_sys_ptrace(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_ptrace_args /* {
+		i386, m68k: T=int
+		alpha: T=long
+		syscallarg(T) request;
+		syscallarg(T) pid;
+		syscallarg(T) addr;
+		syscallarg(T) data;
+	} */ *uap = v;
+	int *ptr, request;
+
+	ptr = linux_ptrace_request_map;
+	request = SCARG(uap, request);
+	while (*ptr != -1)
+		if (*ptr++ == request) {
+			struct sys_ptrace_args pta;
+			caddr_t sg;
+
+			sg = stackgap_init(p->p_emul);
+
+			SCARG(&pta, req) = *ptr;
+			SCARG(&pta, pid) = SCARG(uap, pid);
+			SCARG(&pta, addr) = (caddr_t)SCARG(uap, addr);
+			SCARG(&pta, data) = SCARG(uap, data);
+
+			return sys_ptrace(p, &pta, retval);
+		}
+		else
+			ptr++;
+
+	return LINUX_SYS_PTRACE_ARCH(p, uap, retval);
+}
+
+int
+linux_sys_reboot(struct proc *p, void *v, register_t *retval)
+{
+	struct linux_sys_reboot_args /* {
+		syscallarg(int) magic1;
+		syscallarg(int) magic2;
+		syscallarg(int) cmd;
+		syscallarg(void *) arg;
+	} */ *uap = v;
+	struct sys_reboot_args /* {
+		syscallarg(int) opt;
+		syscallarg(char *) bootstr;
+	} */ sra;
+	int error;
+
+	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		return(error);
+
+	if (SCARG(uap, magic1) != LINUX_REBOOT_MAGIC1)
+		return(EINVAL);
+	if (SCARG(uap, magic2) != LINUX_REBOOT_MAGIC2 &&
+	    SCARG(uap, magic2) != LINUX_REBOOT_MAGIC2A &&
+	    SCARG(uap, magic2) != LINUX_REBOOT_MAGIC2B)
+		return(EINVAL);
+
+	switch (SCARG(uap, cmd)) {
+	case LINUX_REBOOT_CMD_RESTART:
+		SCARG(&sra, opt) = RB_AUTOBOOT;
+		break;
+	case LINUX_REBOOT_CMD_HALT:
+		SCARG(&sra, opt) = RB_HALT;
+		break;
+	case LINUX_REBOOT_CMD_POWER_OFF:
+		SCARG(&sra, opt) = RB_HALT|RB_POWERDOWN;
+		break;
+	case LINUX_REBOOT_CMD_RESTART2:
+		/* Reboot with an argument. */
+		SCARG(&sra, opt) = RB_AUTOBOOT|RB_STRING;
+		SCARG(&sra, bootstr) = SCARG(uap, arg);
+		break;
+	case LINUX_REBOOT_CMD_CAD_ON:
+		return(EINVAL);	/* We don't implement ctrl-alt-delete */
+	case LINUX_REBOOT_CMD_CAD_OFF:
+		return(0);
+	default:
+		return(EINVAL);
+	}
+
+	return(sys_reboot(p, &sra, retval));
 }

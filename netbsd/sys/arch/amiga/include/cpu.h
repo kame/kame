@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.46 1999/02/26 22:37:57 is Exp $	*/
+/*	$NetBSD: cpu.h,v 1.49 2000/05/26 21:19:26 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,11 +48,29 @@
  * Exported definitions unique to amiga/68k cpu support.
  */
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Get common m68k CPU definitions.
  */
 #include <m68k/cpu.h>
 #define	M68K_MMU_MOTOROLA
+
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()	(&cpu_info_store)
 
 /*
  * definitions of cpu-dependent requirements
@@ -61,6 +79,7 @@
 #define	cpu_swapin(p)			/* nothing */
 #define	cpu_wait(p)			/* nothing */
 #define	cpu_swapout(p)			/* nothing */
+#define	cpu_number()			0
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -110,6 +129,7 @@ extern int want_resched;	/* resched() was called */
 extern int astpending;		/* need trap before returning to user mode */
 #define setsoftast()	(astpending = 1)
 
+#endif /* _KERNEL */
 
 /* include support for software interrupts */
 #include <machine/mtpr.h>
@@ -195,26 +215,6 @@ u_int	probeva __P((u_int, u_int));
 void	proc_trampoline __P((void));
 void	savectx __P((struct pcb *));
 void	switch_exit __P((struct proc *));
-void	DCIAS __P((vm_offset_t));
-void	DCIA __P((void));
-void	DCIS __P((void));
-void	DCIU __P((void));
-void	ICIA __P((void));
-void	ICPA __P((void));
-void	PCIA __P((void));
-void	TBIA __P((void));
-void	TBIS __P((vm_offset_t));
-void	TBIAS __P((void));
-void	TBIAU __P((void));
-#if defined(M68040) || defined(M68060)
-void	DCFA __P((void));
-void	DCFP __P((vm_offset_t));
-void	DCFL __P((vm_offset_t));
-void	DCPL __P((vm_offset_t));
-void	DCPP __P((vm_offset_t));
-void	ICPL __P((vm_offset_t));
-void	ICPP __P((vm_offset_t));
-#endif
 
 /*
  * Prototypes from machdep.c

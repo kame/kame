@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.111 1999/03/26 23:41:37 mycroft Exp $	*/
+/*	$NetBSD: pmap.c,v 1.116 1999/11/13 00:32:18 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -1974,7 +1974,7 @@ pmap_map(va, pa, endpa, prot)
 
 	sz = endpa - pa;
 	do {
-		pmap_enter(kernel_pmap, va, pa, prot, FALSE, 0);
+		pmap_enter(kernel_pmap, va, pa, prot, 0);
 		va += NBPG;
 		pa += NBPG;
 		sz -= NBPG;
@@ -2006,13 +2006,9 @@ pmap_user_init(pmap)
  *	is bounded by that size.
  */
 pmap_t
-pmap_create(size)
-	vm_size_t	size;
+pmap_create()
 {
 	pmap_t pmap;
-
-	if (size)
-		return NULL;
 
 	pmap = (pmap_t) malloc(sizeof(struct pmap), M_VMPMAP, M_WAITOK);
 	pmap_pinit(pmap);
@@ -2110,19 +2106,19 @@ pmap_reference(pmap)
  *	or lose information.  That is, this routine must actually
  *	insert this page into the given map NOW.
  */
-void
-pmap_enter(pmap, va, pa, prot, wired, access_type)
+int
+pmap_enter(pmap, va, pa, prot, flags)
 	pmap_t pmap;
 	vm_offset_t va;
 	vm_offset_t pa;
 	vm_prot_t prot;
-	boolean_t wired;
-	vm_prot_t access_type;
+	int flags;
 {
 	int new_pte, s;
+	boolean_t wired = (flags & PMAP_WIRED) != 0;
 
 	if (pmap == NULL)
-		return;
+		return (KERN_SUCCESS);
 #ifdef	PMAP_DEBUG
 	if ((pmap_debug & PMD_ENTER) ||
 		(va == pmap_db_watchva))
@@ -2156,6 +2152,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 		pmap_enter_user(pmap, va, new_pte, wired);
 	}
 	splx(s);
+	return (KERN_SUCCESS);
 }
 
 static void
@@ -2329,7 +2326,7 @@ pmap_enter_user(pmap, pgva, new_pte, wired)
 #ifdef	PMAP_DEBUG
 	/*
 	 * Some user pages are wired here, and a later
-	 * call to pmap_change_wiring() will unwire them.
+	 * call to pmap_unwire() will unwire them.
 	 * XXX - Need a separate list for wired user pmegs
 	 * so they can not be stolen from the active list.
 	 * XXX - Note: vm_fault.c assumes pmap_extract will
@@ -2489,6 +2486,39 @@ pmap_enter_user(pmap, pgva, new_pte, wired)
 	pmegp->pmeg_vpages++;
 }
 
+void
+pmap_kenter_pa(va, pa, prot)
+	vaddr_t va;
+	paddr_t pa;
+	vm_prot_t prot;
+{
+	pmap_enter(pmap_kernel(), va, pa, prot, PMAP_WIRED);
+}
+
+void
+pmap_kenter_pgs(va, pgs, npgs)
+	vaddr_t va;
+	struct vm_page **pgs;
+	int npgs;
+{
+	int i;
+
+	for (i = 0; i < npgs; i++, va += PAGE_SIZE) {
+		pmap_enter(pmap_kernel(), va, VM_PAGE_TO_PHYS(pgs[i]),
+				VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+	}
+}
+
+void
+pmap_kremove(va, len)
+	vaddr_t va;
+	vsize_t len;
+{
+	for (len >>= PAGE_SHIFT; len > 0; len--, va += PAGE_SIZE) {
+		pmap_remove(pmap_kernel(), va, va + PAGE_SIZE);
+	}
+}
+
 
 /*
  * The trap handler calls this so we can try to resolve
@@ -2622,38 +2652,43 @@ pmap_fault_reload(pmap, pgva, ftype)
 /*
  * Clear the modify bit for the given physical page.
  */
-void
-pmap_clear_modify(pa)
-	register vm_offset_t pa;
+boolean_t
+pmap_clear_modify(pg)
+	struct vm_page *pg;
 {
-	register pv_entry_t	*head;
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	pv_entry_t *head;
 	u_char *pv_flags;
 	int s;
+	boolean_t rv;
 
 	if (!pv_initialized)
-		return;
+		return FALSE;
 
 	/* The VM code may call this on device addresses! */
 	if (PA_IS_DEV(pa))
-		return;
+		return FALSE;
 
 	pv_flags = pa_to_pvflags(pa);
 	head     = pa_to_pvhead(pa);
 
 	s = splpmap();
 	*pv_flags |= pv_syncflags(*head);
+	rv = *pv_flags & PV_MOD;
 	*pv_flags &= ~PV_MOD;
 	splx(s);
+	return rv;
 }
 
 /*
  * Tell whether the given physical page has been modified.
  */
 int
-pmap_is_modified(pa)
-	vm_offset_t pa;
+pmap_is_modified(pg)
+	struct vm_page *pg;
 {
-	pv_entry_t	*head;
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	pv_entry_t *head;
 	u_char *pv_flags;
 	int rv, s;
 
@@ -2680,48 +2715,54 @@ pmap_is_modified(pa)
  * Clear the reference bit for the given physical page.
  * It's OK to just remove mappings if that's easier.
  */
-void
-pmap_clear_reference(pa)
-	register vm_offset_t pa;
+boolean_t
+pmap_clear_reference(pg)
+	struct vm_page *pg;
 {
-	register pv_entry_t	*head;
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	pv_entry_t *head;
 	u_char *pv_flags;
 	int s;
+	boolean_t rv;
 
 	if (!pv_initialized)
-		return;
+		return FALSE;
 
 	/* The VM code may call this on device addresses! */
 	if (PA_IS_DEV(pa))
-		return;
+		return FALSE;
 
 	pv_flags = pa_to_pvflags(pa);
 	head     = pa_to_pvhead(pa);
 
 	s = splpmap();
 	*pv_flags |= pv_syncflags(*head);
+	rv = *pv_flags & PV_REF;
 	*pv_flags &= ~PV_REF;
 	splx(s);
+	return rv;
 }
 
 /*
  * Tell whether the given physical page has been referenced.
  * It's OK to just return FALSE if page is not mapped.
  */
-int
-pmap_is_referenced(pa)
-	vm_offset_t	pa;
+boolean_t
+pmap_is_referenced(pg)
+	struct vm_page *pg;
 {
-	register pv_entry_t	*head;
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	pv_entry_t *head;
 	u_char *pv_flags;
-	int rv, s;
+	int s;
+	boolean_t rv;
 
 	if (!pv_initialized)
-		return (0);
+		return (FALSE);
 
 	/* The VM code may call this on device addresses! */
 	if (PA_IS_DEV(pa))
-		return (0);
+		return (FALSE);
 
 	pv_flags = pa_to_pvflags(pa);
 	head     = pa_to_pvhead(pa);
@@ -2788,17 +2829,16 @@ pmap_deactivate(p)
 }
 
 /*
- *	Routine:	pmap_change_wiring
- *	Function:	Change the wiring attribute for a map/virtual-address
+ *	Routine:	pmap_unwire
+ *	Function:	Clear the wired attribute for a map/virtual-address
  *			pair.
  *	In/out conditions:
  *			The mapping must already exist in the pmap.
  */
 void
-pmap_change_wiring(pmap, va, wired)
+pmap_unwire(pmap, va)
 	pmap_t	pmap;
 	vm_offset_t	va;
-	boolean_t	wired;
 {
 	int s, sme;
 	int wiremask, ptenum;
@@ -2808,8 +2848,8 @@ pmap_change_wiring(pmap, va, wired)
 		return;
 #ifdef PMAP_DEBUG
 	if (pmap_debug & PMD_WIRING)
-		printf("pmap_change_wiring(pmap=%p, va=0x%lx, wire=%d)\n",
-			   pmap, va, wired);
+		printf("pmap_unwire(pmap=%p, va=0x%lx)\n",
+			   pmap, va);
 #endif
 	/*
 	 * We are asked to unwire pages that were wired when
@@ -2833,12 +2873,9 @@ pmap_change_wiring(pmap, va, wired)
 
 	sme = get_segmap(va);
 	if (sme == SEGINV)
-		panic("pmap_change_wiring: invalid va=0x%lx", va);
+		panic("pmap_unwire: invalid va=0x%lx", va);
 	pmegp = pmeg_p(sme);
-	if (wired)
-		pmegp->pmeg_wired |= wiremask;
-	else
-		pmegp->pmeg_wired &= ~wiremask;
+	pmegp->pmeg_wired &= ~wiremask;
 
 	splx(s);
 }
@@ -2867,13 +2904,14 @@ pmap_copy(dst_pmap, src_pmap, dst_addr, len, src_addr)
  *		with the given map/virtual_address pair.
  *	Returns zero if VA not valid.
  */
-vm_offset_t
-pmap_extract(pmap, va)
+boolean_t
+pmap_extract(pmap, va, pap)
 	pmap_t	pmap;
 	vm_offset_t va;
+	paddr_t *pap;
 {
 	int s, sme, segnum, ptenum, pte;
-	vm_offset_t pa;
+	paddr_t pa;
 
 	pte = 0;
 	s = splpmap();
@@ -2899,7 +2937,7 @@ pmap_extract(pmap, va)
 		db_printf("pmap_extract: invalid va=0x%lx\n", va);
 		Debugger();
 #endif
-		pte = 0;
+		return (FALSE);
 	}
 	pa = PG_PA(pte);
 #ifdef	DIAGNOSTIC
@@ -2907,7 +2945,9 @@ pmap_extract(pmap, va)
 		panic("pmap_extract: not main mem, va=0x%lx\n", va);
 	}
 #endif
-	return (pa);
+	if (pap != NULL)
+		*pap = pa;
+	return (TRUE);
 }
 
 
@@ -2917,10 +2957,11 @@ pmap_extract(pmap, va)
  *	  Lower the permission for all mappings to a given page.
  */
 void
-pmap_page_protect(pa, prot)
-	vm_offset_t	 pa;
+pmap_page_protect(pg, prot)
+	struct vm_page *pg;
 	vm_prot_t	   prot;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	int s;
 
 	/* The VM code may call this on device addresses! */
@@ -2947,29 +2988,6 @@ pmap_page_protect(pa, prot)
 	}
 
 	splx(s);
-}
-
-/*
- *	Routine:	pmap_pageable
- *	Function:
- *		Make the specified pages (by pmap, offset)
- *		pageable (or not) as requested.
- *
- *		A page which is not pageable may not take
- *		a fault; therefore, its page table entry
- *		must remain valid for the duration.
- *
- *		This routine is merely advisory; pmap_enter
- *		will specify that these pages are to be wired
- *		down (or not) as appropriate.
- */
-void
-pmap_pageable(pmap, sva, eva, pageable)
-	pmap_t		pmap;
-	vm_offset_t	sva, eva;
-	boolean_t	pageable;
-{
-	/* not implemented, hopefully not needed */
 }
 
 /*

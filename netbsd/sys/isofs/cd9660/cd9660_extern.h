@@ -1,4 +1,4 @@
-/*	$NetBSD: cd9660_extern.h,v 1.6 1999/02/26 23:44:44 wrstuden Exp $	*/
+/*	$NetBSD: cd9660_extern.h,v 1.9 2000/05/27 16:03:55 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1994
@@ -53,6 +53,7 @@ enum ISO_FTYPE  { ISO_FTYPE_DEFAULT, ISO_FTYPE_9660, ISO_FTYPE_RRIP, ISO_FTYPE_E
 
 struct iso_mnt {
 	int im_flags;
+	int im_joliet_level;
 
 	struct mount *im_mountp;
 	dev_t im_dev;
@@ -97,6 +98,7 @@ int cd9660_check_export __P((struct mount *, struct mbuf *, int *,
 	    struct ucred **));
 int cd9660_vptofh __P((struct vnode *, struct fid *));
 void cd9660_init __P((void));
+void cd9660_done __P((void));
 int cd9660_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 			struct proc *));
 
@@ -106,6 +108,7 @@ extern int (**cd9660_vnodeop_p) __P((void *));
 extern int (**cd9660_specop_p) __P((void *));
 extern int (**cd9660_fifoop_p) __P((void *));
 
-int isofncmp __P((const u_char *, int, const u_char *, int));
-void isofntrans __P((u_char *, int, u_char *, u_short *, int, int));
+int isochar __P((const u_char *, const u_char *, int, u_char *));
+int isofncmp __P((const u_char *, int, const u_char *, int, int));
+void isofntrans __P((u_char *, int, u_char *, u_short *, int, int, int, int));
 ino_t isodirino __P((struct iso_directory_record *, struct iso_mnt *));

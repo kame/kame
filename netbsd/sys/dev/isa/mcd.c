@@ -1,4 +1,4 @@
-/*	$NetBSD: mcd.c,v 1.63 1999/02/08 16:33:17 bouyer Exp $	*/
+/*	$NetBSD: mcd.c,v 1.66 2000/03/23 07:01:35 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
@@ -58,6 +58,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/conf.h>
@@ -120,6 +121,8 @@ struct mcd_softc {
 	struct	disk sc_dk;
 	void *sc_ih;
 
+	struct callout sc_pintr_ch;
+
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
 
@@ -144,7 +147,8 @@ struct mcd_softc {
 #define	MCD_MD_UNKNOWN	-1
 	int	lastupc;
 #define	MCD_UPC_UNKNOWN	-1
-	struct	buf buf_queue;
+	struct buf_queue buf_queue;
+	int	active;
 	u_char	readcmd;
 	u_char	debug;
 	u_char	probe;
@@ -244,6 +248,9 @@ mcdattach(parent, self, aux)
 		printf(": mcd_find failed\n");
 		return;
 	}
+
+	BUFQ_INIT(&sc->buf_queue);
+	callout_init(&sc->sc_pintr_ch);
 
 	/*
 	 * Initialize and attach the disk structure.
@@ -454,6 +461,8 @@ mcdstrategy(bp)
 	struct buf *bp;
 {
 	struct mcd_softc *sc = mcd_cd.cd_devs[MCDUNIT(bp->b_dev)];
+	struct disklabel *lp = sc->sc_dk.dk_label;
+	daddr_t blkno;
 	int s;
 	
 	/* Test validity. */
@@ -483,15 +492,25 @@ mcdstrategy(bp)
 	 * If end of partition, just return.
 	 */
 	if (MCDPART(bp->b_dev) != RAW_PART &&
-	    bounds_check_with_label(bp, sc->sc_dk.dk_label,
+	    bounds_check_with_label(bp, lp,
 	    (sc->flags & (MCDF_WLABEL|MCDF_LABELLING)) != 0) <= 0)
 		goto done;
-	
+
+	/*
+	 * Now convert the block number to absolute and put it in
+	 * terms of the device's logical block size.
+	 */
+	blkno = bp->b_blkno / (lp->d_secsize / DEV_BSIZE);
+	if (MCDPART(bp->b_dev) != RAW_PART)
+		blkno += lp->d_partitions[MCDPART(bp->b_dev)].p_offset;
+
+	bp->b_rawblkno = blkno; 
+
 	/* Queue it. */
 	s = splbio();
-	disksort(&sc->buf_queue, bp);
+	disksort_blkno(&sc->buf_queue, bp);
 	splx(s);
-	if (!sc->buf_queue.b_active)
+	if (!sc->active)
 		mcdstart(sc);
 	return;
 
@@ -506,23 +525,22 @@ void
 mcdstart(sc)
 	struct mcd_softc *sc;
 {
-	struct buf *bp, *dp = &sc->buf_queue;
+	struct buf *bp;
 	int s;
 	
 loop:
 	s = splbio();
 
-	bp = dp->b_actf;
-	if (bp == NULL) {
+	if ((bp = BUFQ_FIRST(&sc->buf_queue)) == NULL) {
 		/* Nothing to do. */
-		dp->b_active = 0;
+		sc->active = 0;
 		splx(s);
 		return;
 	}
 
 	/* Block found to process; dequeue. */
 	MCD_TRACE("start: found block bp=0x%x\n", bp, 0, 0, 0);
-	dp->b_actf = bp->b_actf;
+	BUFQ_REMOVE(&sc->buf_queue, bp);
 	splx(s);
 
 	/* Changed media? */
@@ -534,7 +552,7 @@ loop:
 		goto loop;
 	}
 
-	dp->b_active = 1;
+	sc->active = 1;
 
 	/* Instrumentation. */
 	s = splbio();
@@ -543,12 +561,7 @@ loop:
 
 	sc->mbx.retry = MCD_RDRETRIES;
 	sc->mbx.bp = bp;
-	sc->mbx.blkno = bp->b_blkno / (sc->blksize / DEV_BSIZE);
-	if (MCDPART(bp->b_dev) != RAW_PART) {
-		struct partition *p;
-		p = &sc->sc_dk.dk_label->d_partitions[MCDPART(bp->b_dev)];
-		sc->mbx.blkno += p->p_offset;
-	}
+	sc->mbx.blkno = bp->b_rawblkno;
 	sc->mbx.nblk = bp->b_bcount / sc->blksize;
 	sc->mbx.sz = sc->blksize;
 	sc->mbx.skip = 0;
@@ -1172,7 +1185,7 @@ mcdintr(arg)
 		mbx->state = MCD_S_WAITMODE;
 
 	case MCD_S_WAITMODE:
-		untimeout(mcd_pseudointr, sc);
+		callout_stop(&sc->sc_pintr_ch);
 		for (i = 20; i; i--) {
 			x = bus_space_read_1(iot, ioh, MCD_XFER);
 			if ((x & MCD_XF_STATUSUNAVAIL) == 0)
@@ -1210,7 +1223,7 @@ mcdintr(arg)
 		mbx->state = MCD_S_WAITREAD;
 
 	case MCD_S_WAITREAD:
-		untimeout(mcd_pseudointr, sc);
+		callout_stop(&sc->sc_pintr_ch);
 	nextblock:
 	loop:
 		for (i = 20; i; i--) {
@@ -1268,7 +1281,8 @@ mcdintr(arg)
 		printf("%s: sleep in state %d\n", sc->sc_dev.dv_xname,
 		    mbx->state);
 #endif
-		timeout(mcd_pseudointr, sc, hz / 100);
+		callout_reset(&sc->sc_pintr_ch, hz / 100,
+		    mcd_pseudointr, sc);
 		return -1;
 	}
 

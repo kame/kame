@@ -1,32 +1,32 @@
-/*	$NetBSD: db_trace.c,v 1.7 1999/03/23 22:15:36 simonb Exp $	*/
+/*	$NetBSD: db_trace.c,v 1.14 2000/05/27 02:18:12 enami Exp $	*/
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1993-1987 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <vm/vm_param.h>		/* XXX boolean_t */
 
 #include <mips/mips_opcode.h>
@@ -38,8 +38,8 @@
 #include <ddb/db_variables.h>
 #include <ddb/db_sym.h>
 
-extern int __start __P((void));	/* lowest kernel code address */
-extern vaddr_t getreg_val __P((db_expr_t regno));
+int __start __P((void));	/* lowest kernel code address */
+vaddr_t getreg_val __P((db_expr_t regno));
 
 #define REG_ARG(i)	(4+i)
 #define SAVES_RA(x)	isa_spill((x),31)
@@ -54,31 +54,32 @@ extern vaddr_t getreg_val __P((db_expr_t regno));
 		 ((int *)(&((struct mips_kernel_state *)0)->sp) - (int *)0):  \
 	 -1)
 
-extern	db_sym_t localsym __P((db_sym_t sym, boolean_t isreg, int *lex_level));
+db_sym_t localsym __P((db_sym_t sym, boolean_t isreg, int *lex_level));
 
 /*
  * Machine register set.
  */
 struct mips_saved_state *db_cur_exc_frame = 0;
 
-/* 
+/*
  *  forward declarations
  */
-int print_exception_frame __P((register struct mips_saved_state *fp,
+int print_exception_frame __P((struct mips_saved_state *fp,
 			       unsigned epc));
 
 /*XXX*/
-extern void stacktrace_subr __P((int a0, int a1, int a2, int a3,
-				 u_int pc, u_int sp, u_int fp, u_int ra,
-				 void (*)(const char*, ...)));
+void stacktrace_subr __P((int a0, int a1, int a2, int a3,
+			  u_int pc, u_int sp, u_int fp, u_int ra,
+			  void (*)(const char*, ...)));
 
 /*
  * Stack trace helper.
  */
 void db_mips_stack_trace __P((int count, vaddr_t stackp,
-    vaddr_t the_pc, vaddr_t the_ra, int flags, vaddr_t kstackp));
-int	db_mips_variable_func __P((struct db_variable *vp, db_expr_t *valuep, 
-    int db_var_fun));
+			      vaddr_t the_pc, vaddr_t the_ra, int flags,
+			      vaddr_t kstackp));
+int db_mips_variable_func __P((struct db_variable *vp, db_expr_t *valuep,
+			       int db_var_fun));
 
 #define DB_SETF_REGS db_mips_variable_func
 #define DBREGS_REG()
@@ -125,23 +126,24 @@ struct db_variable db_regs[] = {
 struct db_variable *db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
 
 void
-db_stack_trace_cmd(addr, have_addr, count, modif)
+db_stack_trace_print(addr, have_addr, count, modif, pr)
 	db_expr_t	addr;
 	boolean_t	have_addr;
 	db_expr_t	count;
 	char		*modif;
+	void		(*pr) __P((const char *, ...));
 {
 #ifndef DDB_TRACE
-	stacktrace_subr(ddb_regs.f_regs[A0], ddb_regs.f_regs[A1], 
+	stacktrace_subr(ddb_regs.f_regs[A0], ddb_regs.f_regs[A1],
 			ddb_regs.f_regs[A2], ddb_regs.f_regs[A3],
 			ddb_regs.f_regs[PC],
 			ddb_regs.f_regs[SP],
 			ddb_regs.f_regs[S8],	/* non-virtual frame pointer */
 			ddb_regs.f_regs[RA],
-			db_printf);
+			pr);
 #else
 /*
- * Imcomplete but practically useful stack backtrace.
+ * Incomplete but practically useful stack backtrace.
  */
 #define	MIPS_JR_RA	0x03e00008	/* instruction code for jr ra */
 #define	MIPS_JR_K0	0x03400008	/* instruction code for jr k0 */
@@ -188,20 +190,20 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 		db_find_sym_and_offset(func, &name, &offset);
 		if (name == 0)
 			name = "?";
-		db_printf("%s()+0x%x, called by %p, stack size %d\n",
+		(*pr)("%s()+0x%x, called by %p, stack size %d\n",
 			name, pc - func, (void *)ra, stacksize);
 
 		if (ra == pc) {
-			db_printf("-- loop? --\n");
+			(*pr)("-- loop? --\n");
 			return;
 		}
 		sp += stacksize;
 		pc = ra;
 	} while (pc > (unsigned)verylocore);
 	if (pc < 0x80000000)
-		db_printf("-- user process --\n");
+		(*pr)("-- user process --\n");
 	else
-		db_printf("-- kernel entry --\n");
+		(*pr)("-- kernel entry --\n");
 #endif
 }
 
@@ -216,7 +218,7 @@ db_mips_stack_trace(count, stackp, the_pc, the_ra, flags, kstackp)
 }
 
 
-int 
+int
 db_mips_variable_func (struct db_variable *vp,
 	db_expr_t *valuep,
 	int db_var_fcn)

@@ -1,4 +1,33 @@
-/*	$NetBSD: in.c,v 1.46 1998/12/19 02:46:12 thorpej Exp $	*/
+/*	$NetBSD: in.c,v 1.61.4.3 2000/10/17 00:45:36 tv Exp $	*/
+
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -73,6 +102,7 @@
  */
 
 #include "opt_inet.h"
+#include "opt_inet_conf.h"
 #include "opt_mrouting.h"
 
 #include <sys/param.h>
@@ -98,10 +128,28 @@
 
 #ifdef INET
 
+static int in_mask2len __P((struct in_addr *));
+static void in_len2mask __P((struct in_addr *, int));
+static int in_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
+	struct ifnet *, struct proc *));
+
 #ifndef SUBNETSARELOCAL
 #define	SUBNETSARELOCAL	1
 #endif
+
+#ifndef HOSTZEROBROADCAST
+#define HOSTZEROBROADCAST 1
+#endif
+
 int subnetsarelocal = SUBNETSARELOCAL;
+int hostzeroisbroadcast = HOSTZEROBROADCAST;
+
+/*
+ * This list is used to keep track of in_multi chains which belong to
+ * deleted interface addresses.  We use in_ifaddr so that a chain head
+ * won't be deallocated until all multicast address record are deleted.
+ */
+static TAILQ_HEAD(, in_ifaddr) in_mk = TAILQ_HEAD_INITIALIZER(in_mk);
 
 /*
  * Return 1 if an internet address is for a ``local'' host
@@ -113,7 +161,7 @@ int
 in_localaddr(in)
 	struct in_addr in;
 {
-	register struct in_ifaddr *ia;
+	struct in_ifaddr *ia;
 
 	if (subnetsarelocal) {
 		for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
@@ -136,7 +184,7 @@ int
 in_canforward(in)
 	struct in_addr in;
 {
-	register u_int32_t net;
+	u_int32_t net;
 
 	if (IN_EXPERIMENTAL(in.s_addr) || IN_MULTICAST(in.s_addr))
 		return (0);
@@ -155,8 +203,8 @@ void
 in_socktrim(ap)
 	struct sockaddr_in *ap;
 {
-	register char *cplim = (char *) &ap->sin_addr;
-	register char *cp = (char *) (&ap->sin_addr + 1);
+	char *cplim = (char *) &ap->sin_addr;
+	char *cp = (char *) (&ap->sin_addr + 1);
 
 	ap->sin_len = 0;
 	while (--cp >= cplim)
@@ -196,8 +244,8 @@ unsigned long in_maxmtu;
 void
 in_setmaxmtu()
 {
-	register struct in_ifaddr *ia;
-	register struct ifnet *ifp;
+	struct in_ifaddr *ia;
+	struct ifnet *ifp;
 	unsigned long maxmtu = 0;
 
 	for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next) {
@@ -212,7 +260,43 @@ in_setmaxmtu()
 		in_maxmtu = maxmtu;
 }
 
-int	in_interfaces;		/* number of external internet interfaces */
+static int
+in_mask2len(mask)
+	struct in_addr *mask;
+{
+	int x, y;
+	u_char *p;
+
+	p = (u_char *)mask;
+	for (x = 0; x < sizeof(*mask); x++) {
+		if (p[x] != 0xff)
+			break;
+	}
+	y = 0;
+	if (x < sizeof(*mask)) {
+		for (y = 0; y < 8; y++) {
+			if ((p[x] & (0x80 >> y)) == 0)
+				break;
+		}
+	}
+	return x * 8 + y;
+}
+
+static void
+in_len2mask(mask, len)
+	struct in_addr *mask;
+	int len;
+{
+	int i;
+	u_char *p;
+
+	p = (u_char *)mask;
+	bzero(mask, sizeof(*mask));
+	for (i = 0; i < len / 8; i++)
+		p[i] = 0xff;
+	if (len % 8)
+		p[i] = (0xff00 >> (len % 8)) & 0xff;
+}
 
 /*
  * Generic internet control operations (ioctl's).
@@ -224,14 +308,27 @@ in_control(so, cmd, data, ifp, p)
 	struct socket *so;
 	u_long cmd;
 	caddr_t data;
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct proc *p;
 {
-	register struct ifreq *ifr = (struct ifreq *)data;
-	register struct in_ifaddr *ia = 0;
+	struct ifreq *ifr = (struct ifreq *)data;
+	struct in_ifaddr *ia = 0;
 	struct in_aliasreq *ifra = (struct in_aliasreq *)data;
 	struct sockaddr_in oldaddr;
 	int error, hostIsNew, maskIsNew;
+	int newifaddr;
+
+	switch (cmd) {
+	case SIOCALIFADDR:
+	case SIOCDLIFADDR:
+		if (p == 0 || (error = suser(p->p_ucred, &p->p_acflag)))
+			return(EPERM);
+		/*fall through*/
+	case SIOCGLIFADDR:
+		if (!ifp)
+			return EINVAL;
+		return in_lifaddr_ioctl(so, cmd, data, ifp, p);
+	}
 
 	/*
 	 * Find address for this interface, if it exists.
@@ -252,12 +349,21 @@ in_control(so, cmd, data, ifp, p)
 				    ifra->ifra_addr.sin_addr))
 					break;
 			}
-		if (cmd == SIOCDIFADDR && ia == 0)
-			return (EADDRNOTAVAIL);
+		if (cmd == SIOCDIFADDR) {
+			if (ia == 0)
+				return (EADDRNOTAVAIL);
+#if 1 /*def COMPAT_43*/
+			if (ifra->ifra_addr.sin_family == AF_UNSPEC)
+				ifra->ifra_addr.sin_family = AF_INET;
+#endif
+		}
 		/* FALLTHROUGH */
 	case SIOCSIFADDR:
-	case SIOCSIFNETMASK:
 	case SIOCSIFDSTADDR:
+		if (ifra->ifra_addr.sin_family != AF_INET)
+			return (EAFNOSUPPORT);
+		/* FALLTHROUGH */
+	case SIOCSIFNETMASK:
 		if (ifp == 0)
 			panic("in_control");
 
@@ -274,8 +380,10 @@ in_control(so, cmd, data, ifp, p)
 				return (ENOBUFS);
 			bzero((caddr_t)ia, sizeof *ia);
 			TAILQ_INSERT_TAIL(&in_ifaddr, ia, ia_list);
-			TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia,
+			IFAREF(&ia->ia_ifa);
+			TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
 			    ifa_list);
+			IFAREF(&ia->ia_ifa);
 			ia->ia_ifa.ifa_addr = sintosa(&ia->ia_addr);
 			ia->ia_ifa.ifa_dstaddr = sintosa(&ia->ia_dstaddr);
 			ia->ia_ifa.ifa_netmask = sintosa(&ia->ia_sockmask);
@@ -286,9 +394,9 @@ in_control(so, cmd, data, ifp, p)
 			}
 			ia->ia_ifp = ifp;
 			LIST_INIT(&ia->ia_multiaddrs);
-			if ((ifp->if_flags & IFF_LOOPBACK) == 0)
-				in_interfaces++;
-		}
+			newifaddr = 1;
+		} else
+			newifaddr = 0;
 		break;
 
 	case SIOCSIFBRDADDR:
@@ -351,7 +459,24 @@ in_control(so, cmd, data, ifp, p)
 		break;
 
 	case SIOCSIFADDR:
-		return (in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1));
+		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1);
+#if 0
+		/*
+		 * the code chokes if we are to assign multiple addresses with
+		 * the same address prefix (rtinit() will return EEXIST, which
+		 * is not fatal actually).  we will get memory leak if we
+		 * don't do it.
+		 * -> we may want to hide EEXIST from rtinit().
+		 */
+  undo:
+		if (error && newifaddr) {
+			TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
+			IFAFREE(&ia->ia_ifa);
+			TAILQ_REMOVE(&in_ifaddr, ia, ia_list);
+			IFAFREE(&ia->ia_ifa);
+		}
+#endif
+		return error;
 
 	case SIOCSIFNETMASK:
 		ia->ia_subnetmask = ia->ia_sockmask.sin_addr.s_addr =
@@ -382,8 +507,13 @@ in_control(so, cmd, data, ifp, p)
 			maskIsNew  = 1; /* We lie; but the effect's the same */
 		}
 		if (ifra->ifra_addr.sin_family == AF_INET &&
-		    (hostIsNew || maskIsNew))
+		    (hostIsNew || maskIsNew)) {
 			error = in_ifinit(ifp, ia, &ifra->ifra_addr, 0);
+#if 0
+			if (error)
+				goto undo;
+#endif
+		}
 		if ((ifp->if_flags & IFF_BROADCAST) &&
 		    (ifra->ifra_broadaddr.sin_family == AF_INET))
 			ia->ia_broadaddr = ifra->ifra_broadaddr;
@@ -398,17 +528,12 @@ in_control(so, cmd, data, ifp, p)
 		    (ia->ia_broadaddr.sin_family == AF_INET))
 			ifra->ifra_broadaddr = ia->ia_broadaddr;
 		else
-			memset(&ifra->ifra_broadaddr, 0,
-			    sizeof(ifra->ifra_broadaddr));
+			bzero(&ifra->ifra_broadaddr,
+			      sizeof(ifra->ifra_broadaddr));
 		return 0;
 
 	case SIOCDIFADDR:
-		in_ifscrub(ifp, ia);
-		LIST_REMOVE(ia, ia_hash);
-		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
-		TAILQ_REMOVE(&in_ifaddr, ia, ia_list);
-		IFAFREE((&ia->ia_ifa));
-		in_setmaxmtu();
+		in_purgeaddr(&ia->ia_ifa, ifp);
 		break;
 
 #ifdef MROUTING
@@ -427,13 +552,239 @@ in_control(so, cmd, data, ifp, p)
 	return (0);
 }
 
+void
+in_purgeaddr(ifa, ifp)
+	struct ifaddr *ifa;
+	struct ifnet *ifp;
+{
+	struct in_ifaddr *ia = (void *) ifa;
+
+	in_ifscrub(ifp, ia);
+	LIST_REMOVE(ia, ia_hash);
+	TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
+	IFAFREE(&ia->ia_ifa);
+	TAILQ_REMOVE(&in_ifaddr, ia, ia_list);
+	if (ia->ia_allhosts != NULL)
+		in_delmulti(ia->ia_allhosts);
+	if (LIST_FIRST(&ia->ia_multiaddrs) != NULL &&
+	    /*
+	     * If the interface is going away, don't bother to save
+	     * the multicast entries.
+	     */
+	    ifp->if_output != if_nulloutput)
+		in_savemkludge(ia);
+	IFAFREE(&ia->ia_ifa);
+	in_setmaxmtu();
+}
+
+void
+in_purgeif(ifp)
+	struct ifnet *ifp;
+{
+	struct ifaddr *ifa, *nifa;
+
+	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL; ifa = nifa) {
+		nifa = TAILQ_NEXT(ifa, ifa_list);
+		if (ifa->ifa_addr->sa_family != AF_INET)
+			continue;
+		in_purgeaddr(ifa, ifp);
+	}
+	in_purgemkludge(ifp);
+}
+
+/*
+ * SIOC[GAD]LIFADDR.
+ *	SIOCGLIFADDR: get first address. (???)
+ *	SIOCGLIFADDR with IFLR_PREFIX:
+ *		get first address that matches the specified prefix.
+ *	SIOCALIFADDR: add the specified address.
+ *	SIOCALIFADDR with IFLR_PREFIX:
+ *		EINVAL since we can't deduce hostid part of the address.
+ *	SIOCDLIFADDR: delete the specified address.
+ *	SIOCDLIFADDR with IFLR_PREFIX:
+ *		delete the first address that matches the specified prefix.
+ * return values:
+ *	EINVAL on invalid parameters
+ *	EADDRNOTAVAIL on prefix match failed/specified address not found
+ *	other values may be returned from in_ioctl()
+ */
+static int
+in_lifaddr_ioctl(so, cmd, data, ifp, p)
+	struct socket *so;
+	u_long cmd;
+	caddr_t	data;
+	struct ifnet *ifp;
+	struct proc *p;
+{
+	struct if_laddrreq *iflr = (struct if_laddrreq *)data;
+	struct ifaddr *ifa;
+	struct sockaddr *sa;
+
+	/* sanity checks */
+	if (!data || !ifp) {
+		panic("invalid argument to in_lifaddr_ioctl");
+		/*NOTRECHED*/
+	}
+
+	switch (cmd) {
+	case SIOCGLIFADDR:
+		/* address must be specified on GET with IFLR_PREFIX */
+		if ((iflr->flags & IFLR_PREFIX) == 0)
+			break;
+		/*FALLTHROUGH*/
+	case SIOCALIFADDR:
+	case SIOCDLIFADDR:
+		/* address must be specified on ADD and DELETE */
+		sa = (struct sockaddr *)&iflr->addr;
+		if (sa->sa_family != AF_INET)
+			return EINVAL;
+		if (sa->sa_len != sizeof(struct sockaddr_in))
+			return EINVAL;
+		/* XXX need improvement */
+		sa = (struct sockaddr *)&iflr->dstaddr;
+		if (sa->sa_family
+		 && sa->sa_family != AF_INET)
+			return EINVAL;
+		if (sa->sa_len && sa->sa_len != sizeof(struct sockaddr_in))
+			return EINVAL;
+		break;
+	default: /*shouldn't happen*/
+#if 0
+		panic("invalid cmd to in_lifaddr_ioctl");
+		/*NOTREACHED*/
+#else
+		return EOPNOTSUPP;
+#endif
+	}
+	if (sizeof(struct in_addr) * 8 < iflr->prefixlen)
+		return EINVAL;
+
+	switch (cmd) {
+	case SIOCALIFADDR:
+	    {
+		struct in_aliasreq ifra;
+
+		if (iflr->flags & IFLR_PREFIX)
+			return EINVAL;
+
+		/* copy args to in_aliasreq, perform ioctl(SIOCAIFADDR_IN6). */
+		bzero(&ifra, sizeof(ifra));
+		bcopy(iflr->iflr_name, ifra.ifra_name,
+			sizeof(ifra.ifra_name));
+
+		bcopy(&iflr->addr, &ifra.ifra_addr,
+			((struct sockaddr *)&iflr->addr)->sa_len);
+
+		if (((struct sockaddr *)&iflr->dstaddr)->sa_family) {	/*XXX*/
+			bcopy(&iflr->dstaddr, &ifra.ifra_dstaddr,
+				((struct sockaddr *)&iflr->dstaddr)->sa_len);
+		}
+
+		ifra.ifra_mask.sin_family = AF_INET;
+		ifra.ifra_mask.sin_len = sizeof(struct sockaddr_in);
+		in_len2mask(&ifra.ifra_mask.sin_addr, iflr->prefixlen);
+
+		return in_control(so, SIOCAIFADDR, (caddr_t)&ifra, ifp, p);
+	    }
+	case SIOCGLIFADDR:
+	case SIOCDLIFADDR:
+	    {
+		struct in_ifaddr *ia;
+		struct in_addr mask, candidate, match;
+		struct sockaddr_in *sin;
+		int cmp;
+
+		bzero(&mask, sizeof(mask));
+		if (iflr->flags & IFLR_PREFIX) {
+			/* lookup a prefix rather than address. */
+			in_len2mask(&mask, iflr->prefixlen);
+
+			sin = (struct sockaddr_in *)&iflr->addr;
+			match.s_addr = sin->sin_addr.s_addr;
+			match.s_addr &= mask.s_addr;
+
+			/* if you set extra bits, that's wrong */
+			if (match.s_addr != sin->sin_addr.s_addr)
+				return EINVAL;
+
+			cmp = 1;
+		} else {
+			if (cmd == SIOCGLIFADDR) {
+				/* on getting an address, take the 1st match */
+				cmp = 0;	/*XXX*/
+			} else {
+				/* on deleting an address, do exact match */
+				in_len2mask(&mask, 32);
+				sin = (struct sockaddr_in *)&iflr->addr;
+				match.s_addr = sin->sin_addr.s_addr;
+
+				cmp = 1;
+			}
+		}
+
+		for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next) {
+			if (ifa->ifa_addr->sa_family != AF_INET6)
+				continue;
+			if (!cmp)
+				break;
+			candidate.s_addr = ((struct sockaddr_in *)&ifa->ifa_addr)->sin_addr.s_addr;
+			candidate.s_addr &= mask.s_addr;
+			if (candidate.s_addr == match.s_addr)
+				break;
+		}
+		if (!ifa)
+			return EADDRNOTAVAIL;
+		ia = (struct in_ifaddr *)ifa;
+
+		if (cmd == SIOCGLIFADDR) {
+			/* fill in the if_laddrreq structure */
+			bcopy(&ia->ia_addr, &iflr->addr, ia->ia_addr.sin_len);
+
+			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
+				bcopy(&ia->ia_dstaddr, &iflr->dstaddr,
+					ia->ia_dstaddr.sin_len);
+			} else
+				bzero(&iflr->dstaddr, sizeof(iflr->dstaddr));
+
+			iflr->prefixlen =
+				in_mask2len(&ia->ia_sockmask.sin_addr);
+
+			iflr->flags = 0;	/*XXX*/
+
+			return 0;
+		} else {
+			struct in_aliasreq ifra;
+
+			/* fill in_aliasreq and do ioctl(SIOCDIFADDR_IN6) */
+			bzero(&ifra, sizeof(ifra));
+			bcopy(iflr->iflr_name, ifra.ifra_name,
+				sizeof(ifra.ifra_name));
+
+			bcopy(&ia->ia_addr, &ifra.ifra_addr,
+				ia->ia_addr.sin_len);
+			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
+				bcopy(&ia->ia_dstaddr, &ifra.ifra_dstaddr,
+					ia->ia_dstaddr.sin_len);
+			}
+			bcopy(&ia->ia_sockmask, &ifra.ifra_dstaddr,
+				ia->ia_sockmask.sin_len);
+
+			return in_control(so, SIOCDIFADDR, (caddr_t)&ifra,
+				ifp, p);
+		}
+	    }
+	}
+
+	return EOPNOTSUPP;	/*just for safety*/
+}
+
 /*
  * Delete any existing route for an interface.
  */
 void
 in_ifscrub(ifp, ia)
-	register struct ifnet *ifp;
-	register struct in_ifaddr *ia;
+	struct ifnet *ifp;
+	struct in_ifaddr *ia;
 {
 
 	if ((ia->ia_flags & IFA_ROUTE) == 0)
@@ -451,12 +802,12 @@ in_ifscrub(ifp, ia)
  */
 int
 in_ifinit(ifp, ia, sin, scrub)
-	register struct ifnet *ifp;
-	register struct in_ifaddr *ia;
+	struct ifnet *ifp;
+	struct in_ifaddr *ia;
 	struct sockaddr_in *sin;
 	int scrub;
 {
-	register u_int32_t i = sin->sin_addr.s_addr;
+	u_int32_t i = sin->sin_addr.s_addr;
 	struct sockaddr_in oldaddr;
 	int s = splimp(), flags = RTF_UP, error;
 
@@ -526,15 +877,23 @@ in_ifinit(ifp, ia, sin, scrub)
 	error = rtinit(&ia->ia_ifa, (int)RTM_ADD, flags);
 	if (!error)
 		ia->ia_flags |= IFA_ROUTE;
+	/* XXX check if the subnet route points to the same interface */
+	if (error == EEXIST)
+		error = 0;
+	/*
+	 * recover multicast kludge entry, if there is.
+	 */
+	if (ifp->if_flags & IFF_MULTICAST)
+		in_restoremkludge(ia, ifp);
 	/*
 	 * If the interface supports multicast, join the "all hosts"
 	 * multicast group on that interface.
 	 */
-	if (ifp->if_flags & IFF_MULTICAST) {
+	if ((ifp->if_flags & IFF_MULTICAST) != 0 && ia->ia_allhosts == NULL) {
 		struct in_addr addr;
 
 		addr.s_addr = INADDR_ALLHOSTS_GROUP;
-		in_addmulti(&addr, ifp);
+		ia->ia_allhosts = in_addmulti(&addr, ifp);
 	}
 	return (error);
 bad:
@@ -555,7 +914,7 @@ in_broadcast(in, ifp)
 	struct in_addr in;
 	struct ifnet *ifp;
 {
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 
 	if (in.s_addr == INADDR_BROADCAST ||
 	    in_nullhost(in))
@@ -571,14 +930,98 @@ in_broadcast(in, ifp)
 		if (ifa->ifa_addr->sa_family == AF_INET &&
 		    (in_hosteq(in, ia->ia_broadaddr.sin_addr) ||
 		     in_hosteq(in, ia->ia_netbroadcast) ||
-		     /*
-		      * Check for old-style (host 0) broadcast.
-		      */
-		     in.s_addr == ia->ia_subnet ||
-		     in.s_addr == ia->ia_net))
-			    return 1;
+		     (hostzeroisbroadcast && 
+		      /*
+		       * Check for old-style (host 0) broadcast.
+		       */
+		      (in.s_addr == ia->ia_subnet ||
+		       in.s_addr == ia->ia_net))))
+			return 1;
 	return (0);
 #undef ia
+}
+
+/*
+ * Multicast address kludge:
+ * If there were any multicast addresses attached to this interface address,
+ * either move them to another address on this interface, or save them until
+ * such time as this interface is reconfigured for IPv4.
+ */
+void
+in_savemkludge(oia)
+	struct in_ifaddr *oia;
+{
+	struct in_ifaddr *ia;
+	struct in_multi *inm, *next;
+
+	IFP_TO_IA(oia->ia_ifp, ia);
+	if (ia) {	/* there is another address */
+		for (inm = oia->ia_multiaddrs.lh_first; inm; inm = next){
+			next = inm->inm_list.le_next;
+			IFAFREE(&inm->inm_ia->ia_ifa);
+			IFAREF(&ia->ia_ifa);
+			inm->inm_ia = ia;
+			LIST_INSERT_HEAD(&ia->ia_multiaddrs, inm, inm_list);
+		}
+	} else {	/* last address on this if deleted, save */
+		TAILQ_INSERT_TAIL(&in_mk, oia, ia_list);
+		IFAREF(&oia->ia_ifa);
+	}
+}
+
+/*
+ * Continuation of multicast address hack:
+ * If there was a multicast group list previously saved for this interface,
+ * then we re-attach it to the first address configured on the i/f.
+ */
+void
+in_restoremkludge(ia, ifp)
+	struct in_ifaddr *ia;
+	struct ifnet *ifp;
+{
+	struct in_ifaddr *oia;
+
+	for (oia = TAILQ_FIRST(&in_mk); oia != NULL;
+	    oia = TAILQ_NEXT(oia, ia_list)) {
+		if (oia->ia_ifp == ifp) {
+			struct in_multi *inm, *next;
+
+			for (inm = LIST_FIRST(&oia->ia_multiaddrs);
+			    inm != NULL; inm = next) {
+				next = LIST_NEXT(inm, inm_list);
+				IFAFREE(&inm->inm_ia->ia_ifa);
+				IFAREF(&ia->ia_ifa);
+				inm->inm_ia = ia;
+				LIST_INSERT_HEAD(&ia->ia_multiaddrs,
+				    inm, inm_list);
+			}
+	    		TAILQ_REMOVE(&in_mk, oia, ia_list);
+			IFAFREE(&oia->ia_ifa);
+			break;
+		}
+	}
+}
+
+void
+in_purgemkludge(ifp)
+	struct ifnet *ifp;
+{
+	struct in_ifaddr *oia;
+
+	for (oia = TAILQ_FIRST(&in_mk); oia != NULL;
+	    oia = TAILQ_NEXT(oia, ia_list)) {
+		if (oia->ia_ifp != ifp)
+			continue;
+
+		/*
+		 * Leaving from all multicast groups joined through
+		 * this interface is done via in_pcbpurgeif().
+		 */
+
+	    	TAILQ_REMOVE(&in_mk, oia, ia_list);
+		IFAFREE(&oia->ia_ifa);
+		break;
+	}
 }
 
 /*
@@ -586,10 +1029,10 @@ in_broadcast(in, ifp)
  */
 struct in_multi *
 in_addmulti(ap, ifp)
-	register struct in_addr *ap;
-	register struct ifnet *ifp;
+	struct in_addr *ap;
+	struct ifnet *ifp;
 {
-	register struct in_multi *inm;
+	struct in_multi *inm;
 	struct ifreq ifr;
 	struct in_ifaddr *ia;
 	int s = splsoftnet();
@@ -624,6 +1067,7 @@ in_addmulti(ap, ifp)
 			return (NULL);
 		}
 		inm->inm_ia = ia;
+		IFAREF(&inm->inm_ia->ia_ifa);
 		LIST_INSERT_HEAD(&ia->ia_multiaddrs, inm, inm_list);
 		/*
 		 * Ask the network driver to update its multicast reception
@@ -653,7 +1097,7 @@ in_addmulti(ap, ifp)
  */
 void
 in_delmulti(inm)
-	register struct in_multi *inm;
+	struct in_multi *inm;
 {
 	struct ifreq ifr;
 	int s = splsoftnet();
@@ -668,6 +1112,7 @@ in_delmulti(inm)
 		 * Unlink from list.
 		 */
 		LIST_REMOVE(inm, inm_list);
+		IFAFREE(&inm->inm_ia->ia_ifa);
 		/*
 		 * Notify the network driver to update its multicast reception
 		 * filter.

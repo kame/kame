@@ -1,4 +1,4 @@
-/*	 $NetBSD: nfsnode.h,v 1.27.6.1 2000/01/05 23:40:16 he Exp $	*/
+/*	 $NetBSD: nfsnode.h,v 1.29 2000/03/30 02:46:36 simonb Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -218,7 +218,6 @@ int	nfs_pathconf	__P((void *));
 int	nfs_advlock	__P((void *));
 #define	nfs_blkatoff	genfs_eopnotsupp
 int	nfs_bwrite	__P((void *));
-int	nfs_vget	__P((struct mount *, ino_t, struct vnode **));
 #define	nfs_valloc	genfs_eopnotsupp
 #define nfs_reallocblks	genfs_eopnotsupp
 #define	nfs_vfree	genfs_nullop

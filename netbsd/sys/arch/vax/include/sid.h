@@ -1,4 +1,4 @@
-/*	$NetBSD: sid.h,v 1.10 1999/03/09 12:57:58 ragge Exp $	*/
+/*	$NetBSD: sid.h,v 1.14 2000/05/22 15:40:06 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -78,7 +78,7 @@
 #define VAX_TYP_UV1	7	/* MicroVAX I, VAXstation I */
      /* VAX_TYP_610	7 */
  
-#define VAX_BTYP_610	0x70000000	/* generic MicroVAX-I */
+#define VAX_BTYP_610	0x07000000	/* generic MicroVAX-I */
  
 /*
  * MicroVAX II series (1985)
@@ -103,6 +103,7 @@
 #define VAX_BTYP_9CC	0x0A000002	/* VAX 6000 model 210/310 */
 #define VAX_BTYP_60	0x0A000003	/* VAXstation 3520, 3540 */
 #define VAX_BTYP_420	0x0A000004	/* VAXstation 3100 models 10 - 48 */
+#define	VAX_BTYP_IS1	0x0A000006	/* Infoserver 1000 */
 #define VAX_BTYP_510	0x0A000007	/* VAXft model 110 */
      /* VAX_BTYP_520	0x0A000007	   VAXft model 310 */
 
@@ -154,10 +155,10 @@
 #define VAX_TYP_NVAX	19
 #define VAX_TYP_V13	19
  
-#define VAX_BTYP_69D	0x13000001	/* VAX 4000 model 500 */
+#define VAX_BTYP_680	0x13000001	/* VAX 4000 model 500 */
 #define VAX_BTYP_1301	0x13000001	/* VAX 4000 model 100 */
 #define VAX_BTYP_1302	0x13000002
-#define VAX_BTYP_1303	0x13000003
+#define VAX_BTYP_53	0x13000003	/* VAX 4000 model 105A */
 #define VAX_BTYP_49	0x13000004	/* MicroVAX 3100 model 90 */
 
 /*
@@ -169,6 +170,7 @@
 #define VAX_BTYP_660	0x14000001	/* VAX 4000 model 200 */
 #define VAX_BTYP_48	0x14000004	/* VAXstation 4000 VLC */
 #define VAX_BTYP_550	0x14000007	/* VAXft model 410, 610 */
+#define	VAX_BTYP_VXT	0x14000008	/* VXT 2000 */
  
 /*
  * NVAX+ chip series (1991)
@@ -181,7 +183,7 @@
 /*
  * Highest Number supported by NetBSD/VAX
  */
-#define VAX_TYP_MAX	VAX_TYP_RIGEL
+#define VAX_TYP_MAX	VAX_TYP_NVAX
 
 /*
  * compatibility with old names:

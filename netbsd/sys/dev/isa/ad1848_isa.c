@@ -1,4 +1,4 @@
-/*	$NetBSD: ad1848_isa.c,v 1.11 1999/03/22 14:54:01 mycroft Exp $	*/
+/*	$NetBSD: ad1848_isa.c,v 1.14.4.1 2000/06/30 16:27:47 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -124,6 +124,7 @@
 
 #include <dev/ic/ad1848reg.h>
 #include <dev/ic/cs4231reg.h>
+#include <dev/ic/cs4237reg.h>
 #include <dev/isa/ad1848var.h>
 #include <dev/isa/cs4231var.h>
 
@@ -330,6 +331,8 @@ ad1848_isa_probe(isc)
 				goto bad;
 			}
 
+			sc->mode = 2;
+
 			/*
 			 *  It's a CS4231, or another clone with 32 registers.
 			 *  Let's find out which by checking I25.
@@ -349,11 +352,51 @@ ad1848_isa_probe(isc)
 					break;
 				case 0x03:
 				case 0x83:
-					sc->chip_name = "CS4236/CS4236B";
+					sc->chip_name = "CS4236";
+
+					/*
+					 * Try to switch to mode3 (CS4236B or
+					 * CS4237B) by setting CMS to 3.  A
+					 * plain CS4236 will not react to
+					 * LLBM settings.
+					 */
+					ad_write(sc, SP_MISC_INFO, MODE3);
+
+					tmp1 = ad_read(sc, CS_LEFT_LINE_CONTROL);
+					ad_write(sc, CS_LEFT_LINE_CONTROL, 0xe0);
+					tmp2 = ad_read(sc, CS_LEFT_LINE_CONTROL);
+					if (tmp2 == 0xe0) {
+						/*
+						 * it's a CS4237B or another
+						 * clone supporting mode 3.
+						 * Let's determine which by
+						 * enabling extended registers
+						 * and checking X25.
+						 */
+						tmp2 = ad_xread(sc, CS_X_CHIP_VERSION);
+						switch (tmp2 & X_CHIP_VERSIONF_CID) {
+						case X_CHIP_CID_CS4236BB:
+							sc->chip_name = "CS4236BrevB";
+							break;
+						case X_CHIP_CID_CS4236B:
+							sc->chip_name = "CS4236B";
+							break;
+						case X_CHIP_CID_CS4237B:
+							sc->chip_name = "CS4237B";
+							break;
+						default:
+							sc->chip_name = "CS4236B compatible";
+							DPRINTF(("cs4236: unknown mode 3 compatible codec, version 0x%02x\n", tmp2));
+							break;
+						}
+						sc->mode = 3;
+					}
+
+					/* restore volume control information */
+					ad_write(sc, CS_LEFT_LINE_CONTROL, tmp1);
 					break;
 				}
 			}
-			sc->mode = 2;
 		}
 	}
 
@@ -393,6 +436,13 @@ ad1848_isa_attach(isc)
 	sc->sc_readreg = ad1848_isa_read;
 	sc->sc_writereg = ad1848_isa_write;
 
+	if (isc->sc_playdrq != -1)
+		isc->sc_play_maxsize = isa_dmamaxsize(isc->sc_ic,
+		    isc->sc_playdrq);
+	if (isc->sc_recdrq != -1 && isc->sc_recdrq != isc->sc_playdrq)
+		isc->sc_rec_maxsize = isa_dmamaxsize(isc->sc_ic,
+		    isc->sc_recdrq);
+
 	ad1848_attach(sc);
 }
 
@@ -410,7 +460,7 @@ ad1848_isa_open(addr, flags)
 
 	if (isc->sc_playdrq != -1) {
 		error = isa_dmamap_create(isc->sc_ic, isc->sc_playdrq,
-		    MAX_ISADMA, BUS_DMA_NOWAIT);
+		    isc->sc_play_maxsize, BUS_DMA_NOWAIT);
 		if (error) {
 			printf("%s: can't create map for drq %d\n",
 			    sc->sc_dev.dv_xname, isc->sc_playdrq);
@@ -420,7 +470,7 @@ ad1848_isa_open(addr, flags)
 	}
 	if (isc->sc_recdrq != -1 && isc->sc_recdrq != isc->sc_playdrq) {
 		error = isa_dmamap_create(isc->sc_ic, isc->sc_recdrq,
-		    MAX_ISADMA, BUS_DMA_NOWAIT);
+		    isc->sc_rec_maxsize, BUS_DMA_NOWAIT);
 		if (error) {
 			printf("%s: can't create map for drq %d\n",
 			    sc->sc_dev.dv_xname, isc->sc_recdrq);
@@ -429,9 +479,23 @@ ad1848_isa_open(addr, flags)
 		state |= 2;
 	}
 
+#ifndef AUDIO_NO_POWER_CTL
+	/* Power-up chip */
+	if (isc->powerctl)
+		isc->powerctl(isc->powerarg, flags);
+#endif
+
+	/* Init and mute wave output */
+	ad1848_mute_wave_output(sc, WAVE_MUTE2_INIT, 1);
+
 	error = ad1848_open(sc, flags);
-	if (error)
+	if (error) {
+#ifndef AUDIO_NO_POWER_CTL
+		if (isc->powerctl)
+			isc->powerctl(isc->powerarg, 0);
+#endif
 		goto bad;
+	}
 
 	DPRINTF(("ad1848_isa_open: opened\n"));
 	return (0);
@@ -467,6 +531,12 @@ ad1848_isa_close(addr)
 
 	DPRINTF(("ad1848_isa_close: stop DMA\n"));
 	ad1848_close(sc);
+
+#ifndef AUDIO_NO_POWER_CTL
+	/* Power-down chip */
+	if (isc->powerctl)
+		isc->powerctl(isc->powerarg, 0);
+#endif
 }
 
 int
@@ -492,7 +562,7 @@ ad1848_isa_trigger_input(addr, start, end, blksize, intr, arg, param)
 
 	blksize = (blksize * 8) / (param->precision * param->factor * param->channels) - 1;
 
-	if (sc->mode == 2) {
+	if (sc->mode >= 2) {
 		ad_write(sc, CS_LOWER_REC_CNT, blksize & 0xff);
 		ad_write(sc, CS_UPPER_REC_CNT, blksize >> 8);
 	} else {
@@ -532,6 +602,9 @@ ad1848_isa_trigger_output(addr, start, end, blksize, intr, arg, param)
 	ad_write(sc, SP_LOWER_BASE_COUNT, blksize & 0xff);
 	ad_write(sc, SP_UPPER_BASE_COUNT, blksize >> 8);
 
+	/* Unmute wave output */
+	ad1848_mute_wave_output(sc, WAVE_MUTE2, 0);
+
 	reg = ad_read(sc, SP_INTERFACE_CONFIG);
 	ad_write(sc, SP_INTERFACE_CONFIG, PLAYBACK_ENABLE|reg);
 
@@ -562,6 +635,9 @@ ad1848_isa_halt_output(addr)
 	struct ad1848_softc *sc = &isc->sc_ad1848;
 
 	if (isc->sc_playrun) {
+		/* Mute wave output */
+		ad1848_mute_wave_output(sc, WAVE_MUTE2, 1);
+
 		ad1848_halt_output(sc);
 		isa_dmaabort(isc->sc_ic, isc->sc_playdrq);
 		isc->sc_playrun = 0;
@@ -633,16 +709,26 @@ ad1848_isa_round_buffersize(addr, direction, size)
 	int direction;
 	size_t size;
 {
-	if (size > MAX_ISADMA)
-		size = MAX_ISADMA;
+	struct ad1848_isa_softc *isc = addr;
+	bus_size_t maxsize;
+
+	if (direction == AUMODE_PLAY)
+		maxsize = isc->sc_play_maxsize;
+	else if (isc->sc_recdrq == isc->sc_playdrq)
+		maxsize = isc->sc_play_maxsize;
+	else
+		maxsize = isc->sc_rec_maxsize;
+
+	if (size > maxsize)
+		size = maxsize;
 	return (size);
 }
 
-int
+paddr_t
 ad1848_isa_mappage(addr, mem, off, prot)
 	void *addr;
         void *mem;
-        int off;
+        off_t off;
 	int prot;
 {
 	return isa_mappage(mem, off, prot);

@@ -1,4 +1,4 @@
-/*	$NetBSD: scc.c,v 1.47.2.2 1999/04/12 21:27:06 pk Exp $	*/
+/*	$NetBSD: scc.c,v 1.65 2000/03/06 21:36:11 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1991,1990,1989,1994,1995,1996 Carnegie Mellon University
@@ -66,13 +66,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.47.2.2 1999/04/12 21:27:06 pk Exp $");
-
-#include "opt_ddb.h"
-
-#ifdef alpha
-#include "opt_dec_3000_300.h"
-#endif
+__KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.65 2000/03/06 21:36:11 thorpej Exp $");
 
 /*
  * Intel 82530 dual usart chip driver. Supports the serial port(s) on the
@@ -82,76 +76,42 @@ __KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.47.2.2 1999/04/12 21:27:06 pk Exp $");
  *
  * See: Intel MicroCommunications Handbook, Section 2, pg. 155-173, 1992.
  */
+
+#include "opt_ddb.h"
+#include "rasterconsole.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
-#include <sys/map.h>
-#include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/uio.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
 
-#include <dev/cons.h>
-
 #include <dev/dec/lk201.h>
 #include <dev/ic/z8530reg.h>
-#include <pmax/dev/pdma.h>	/* XXXXXX */
 
+#include <machine/conf.h>
+#include <machine/pmioctl.h>		/* XXX for pmEventQueue typedef */
 
-#ifdef pmax
-#include <mips/cpuregs.h>	/* phys to uncached */
+#include <pmax/pmax/cons.h>
 #include <pmax/pmax/pmaxtype.h>
 #include <pmax/pmax/maxine.h>
-#include <pmax/pmax/asic.h>
 #include <pmax/dev/sccreg.h>
 #include <pmax/dev/rconsvar.h>
-#include <pmax/tc/sccvar.h>	/* XXX */
+#include <pmax/dev/pdma.h>		/* XXXXXX */
 #include <pmax/dev/lk201var.h>
-#endif
-
-#ifdef alpha
-#include <alpha/tc/sccreg.h>
-#include <alpha/tc/sccvar.h>
-#include <machine/rpb.h>
-#include <alpha/tc/ioasicreg.h>
-#endif
-
-#include <machine/autoconf.h>
-#include <machine/bus.h>
-#include <machine/conf.h>
+#include <pmax/dev/qvssvar.h>		/* XXX mouseInput() */
+#include <pmax/tc/sccvar.h>
 
 #include <dev/tc/tcvar.h>
 #include <dev/tc/ioasicvar.h>
 
+void	ttrstrt __P((void *));
 
-#include "rasterconsole.h"
-
-extern void ttrstrt	__P((void *));
-
-#ifdef alpha
-#define	SCCDEV		15			/* XXX */
-#endif
-
-#ifdef pmax
-#define SCCDEV		17			/* XXX */
-#define RCONSDEV	85			/* XXXXXX */
-#endif
-
-/*
- * rcons glass-tty console (as used on pmax) needs lk-201 ASCII input
- * support from the tty drivers. This is ugly and broken and won't
- * compile on Alphas.
- */
-#ifdef pmax
-#if NRASTERCONSOLE > 0
-#define HAVE_RCONS
-#endif
-#endif
 
 /*
  * True iff the console unit is diverted throught this SCC device.
@@ -169,12 +129,6 @@ extern void ttrstrt	__P((void *));
 #define	SCCUNIT(dev)	((minor(dev) & 0x7ffff) >> 1)
 #define	SCCLINE(dev)	(minor(dev) & 0x1)
 #define	SCCDIALOUT(x)	(minor(x) & 0x80000)
-
-
-/* QVSS-compatible in-kernel X input event parser, pointer tracker */
-void	(*sccDivertXInput) __P((int cc)); /* X windows keyboard input routine */
-void	(*sccMouseEvent) __P((int));	/* X windows mouse motion event routine */
-void	(*sccMouseButtons) __P((int));	/* X windows mouse buttons event routine */
 
 #ifdef DEBUG
 int	debugChar;
@@ -259,12 +213,15 @@ struct cfattach scc_ca = {
 
 extern struct cfdriver scc_cd;
 
-int		sccGetc __P((dev_t));
-void		sccPutc __P((dev_t, int));
-void		sccPollc __P((dev_t, int));
-int		sccparam __P((struct tty *, struct termios *));
-void		sccstart __P((struct tty *));
-int		sccmctl __P((dev_t, int, int));
+/* QVSS-compatible in-kernel X input event parser, pointer tracker */
+void	(*sccDivertXInput) __P((int));
+void	(*sccMouseEvent) __P((void *));
+void	(*sccMouseButtons) __P((void *));
+
+static void	sccPollc __P((dev_t, int));
+static int	sccparam __P((struct tty *, struct termios *));
+static void	sccstart __P((struct tty *));
+static int	sccmctl __P((dev_t, int, int));
 static int	cold_sccparam __P((struct tty *, struct termios *,
 		    struct scc_softc *sc));
 
@@ -274,50 +231,45 @@ static void	rr __P((char *, scc_regmap_t *));
 static void	scc_modem_intr __P((dev_t));
 static void	sccreset __P((struct scc_softc *));
 
-void		scc_kbd_init __P((struct scc_softc *sc, dev_t dev));
-void		scc_mouse_init __P((struct scc_softc *sc, dev_t dev));
-void		scc_tty_init __P((struct scc_softc *sc, dev_t dev));
+#if NRASTERCONSOLE > 0
+static void	scc_kbd_init __P((struct scc_softc *sc, dev_t dev));
+static void	scc_mouse_init __P((struct scc_softc *sc, dev_t dev));
+#endif
+static void	scc_tty_init __P((struct scc_softc *sc, dev_t dev));
 
 static void	scc_txintr __P((struct scc_softc *, int, scc_regmap_t *));
 static void	scc_rxintr __P((struct scc_softc *, int, scc_regmap_t *, int));
-inline
 static void	scc_stintr __P((struct scc_softc *, int, scc_regmap_t *, int));
-int	sccintr __P((void *));
-
-#ifdef alpha
-void	scc_alphaintr __P((int));
-#endif
+static int	sccintr __P((void *));
 
 /*
  * console variables, for using serial console while still cold and
  * autoconfig has not attached the scc device.
  */
-extern  int cold;
 scc_regmap_t *scc_cons_addr = 0;
 static struct scc_softc coldcons_softc;
 static struct consdev scccons = {
-	NULL, NULL, sccGetc, sccPutc, sccPollc, NODEV, 0
+	NULL, NULL, sccGetc, sccPutc, sccPollc, NULL, NODEV, 0
 };
-void scc_consinit __P((dev_t dev, struct scc_regmap *sccaddr));
 
-
-/*
- * Set up a given unit as a serial console device.
- * We need console output when cold, and before any device is configured.
- * Should be callable when cold, to reset the chip and set parameters
- * for a remote (serial) console or kgdb line.
- * XXX
- * As most DECstations only bring out one rs-232 lead from an SCC
- * to the bulkhead, and use the other for mouse and keyboard, we
- * only allow one unit per SCC to be console.
- */
 void
-scc_consinit(dev, sccaddr)
-	dev_t dev;
-	scc_regmap_t *sccaddr;
+scc_cnattach(base, offset)
+	u_int32_t	base;
+	u_int32_t	offset;
 {
+	scc_regmap_t *sccaddr;
 	struct scc_softc *sc;
+	int dev;
 
+	/* XXX XXX XXX */
+	dev = 0;
+	if (systype == DS_3MIN || systype == DS_3MAXPLUS)
+		dev = SCCCOMM3_PORT;
+	else if (systype == DS_MAXINE)
+		dev = SCCCOMM2_PORT;
+	/* XXX XXX XXX */
+
+	sccaddr = (void *)(base + offset);
 	/* Save address in case we're cold. */
 	if (cold && scc_cons_addr == 0) {
 		scc_cons_addr = sccaddr;
@@ -333,18 +285,36 @@ scc_consinit(dev, sccaddr)
 	/* XXX make sure sccreset() called only once for this chip? */
 	sccreset(sc);
 
-	scccons.cn_dev = dev;
-	*cn_tab = scccons;
+	cn_tab = &scccons;
+	cn_tab->cn_dev = makedev(SCCDEV, dev);
+	cn_tab->cn_pri = CN_NORMAL;
 	sc->scc_softCAR |= 1 << SCCLINE(cn_tab->cn_dev);
 	scc_tty_init(sc, cn_tab->cn_dev);
 }
 
+#if NRASTERCONSOLE > 0
+void
+scc_lk201_cnattach(base, offset)
+	u_int32_t	base;
+	u_int32_t	offset;
+{
+	dev_t dev;
+
+	dev = makedev(SCCDEV, SCCKBD_PORT);
+	lk_divert(sccGetc, dev);
+
+	cn_tab = &scccons;
+	cn_tab->cn_pri = CN_NORMAL;
+	cn_tab->cn_getc = lk_getc;
+	rcons_indev(cn_tab); /* cn_dev & cn_putc */
+}
+#endif
 
 /*
  * Test to see if device is present.
  * Return true if found.
  */
-int
+static int
 sccmatch(parent, cf, aux)
 	struct device *parent;
 	struct cfdata *cf;
@@ -365,7 +335,7 @@ sccmatch(parent, cf, aux)
 	if ((strncmp(d->iada_modname, "z8530   ", TC_ROM_LLEN) != 0) &&
 	    (strncmp(d->iada_modname, "scc", TC_ROM_LLEN)!= 0))
 	    return (0);
-	    
+
 	/*
 	 * Check user-specified offset against the ioasic offset.
 	 * Allow it to be wildcarded.
@@ -385,37 +355,7 @@ sccmatch(parent, cf, aux)
 	return (1);
 }
 
-#ifdef alpha
-/*
- * Enable ioasic SCC interrupts and scc DMA engine interrupts.
- * XXX does not really belong here.
- */
-void
-scc_alphaintr(onoff)
-	int onoff;
-{
-	if (onoff) {
-		*(volatile u_int *)IOASIC_REG_IMSK(ioasic_base) |=
-		    IOASIC_INTR_SCC_1 | IOASIC_INTR_SCC_0;
-#if !defined(DEC_3000_300) && defined(SCC_DMA)
-		*(volatile u_int *)IOASIC_REG_CSR(ioasic_base) |=
-		    IOASIC_CSR_DMAEN_T1 | IOASIC_CSR_DMAEN_R1 |
-		    IOASIC_CSR_DMAEN_T2 | IOASIC_CSR_DMAEN_R2;
-#endif
-	} else {
-		*(volatile u_int *)IOASIC_REG_IMSK(ioasic_base) &=
-		    ~(IOASIC_INTR_SCC_1 | IOASIC_INTR_SCC_0);
-#if !defined(DEC_3000_300) && defined(SCC_DMA)
-		*(volatile u_int *)IOASIC_REG_CSR(ioasic_base) &=
-		    ~(IOASIC_CSR_DMAEN_T1 | IOASIC_CSR_DMAEN_R1 |
-		    IOASIC_CSR_DMAEN_T2 | IOASIC_CSR_DMAEN_R2);
-#endif
-	}
-	tc_mb();
-}
-#endif /*alpha*/
-
-void
+static void
 sccattach(parent, self, aux)
 	struct device *parent;
 	struct device *self;
@@ -432,38 +372,15 @@ sccattach(parent, self, aux)
 	struct tty ctty;
 	int s;
 #endif
-#ifdef pmax
-	extern int systype;
-#else
-	extern int cputype;
-#endif
 	int unit;
 
 	unit = sc->sc_dv.dv_unit;
 
-#ifdef pmax
 	sccaddr = (void*)MIPS_PHYS_TO_KSEG1(d->iada_addr);
-#endif
-
-#ifdef SPARSE
-	sccaddr = (void *)TC_DENSE_TO_SPARSE((tc_addr_t)sccaddr);
-#endif
 
 	/* Register the interrupt handler. */
 	ioasic_intr_establish(parent, d->iada_cookie, TC_IPL_TTY,
 		sccintr, (void *)sc);
-
-#ifdef alpha
-	/*
-	 * XXX
-	 * If  is the mandated remote console, point cn_tab at it now,
-	 * to make later tests for console-ness MI.
-	 */
-	if ((cputype == ST_DEC_3000_500 && sc->sc_dv.dv_unit == 1) ||
-	    (cputype == ST_DEC_3000_300 && sc->sc_dv.dv_unit == 0)) {
-		cn_tab->cn_dev = makedev(SCCDEV, sc->sc_dv.dv_unit * 2);
-	}
-#endif
 
 	/*
 	 * If this is the console, wait a while for any previous
@@ -478,12 +395,10 @@ sccattach(parent, self, aux)
 	for (cntr = 0; cntr < 2; cntr++) {
 		pdp->p_addr = (void *)sccaddr;
 		tp = sc->scc_tty[cntr] = ttymalloc();
-#ifdef pmax
 		if (systype == DS_MAXINE || cntr == 0)
 			tty_attach(tp);	/* XXX */
-#endif
 		pdp->p_arg = (long)tp;
-		pdp->p_fcn = (void (*)__P((struct tty*)))0;
+		pdp->p_fcn = NULL;
 		tp->t_dev = (dev_t)((unit << 1) | cntr);
 		pdp++;
 	}
@@ -507,13 +422,6 @@ sccattach(parent, self, aux)
 		 * and we just reset the chip under the console.
 		 * Re-wire  this unit up as console ASAP.
 		 */
-#ifdef alpha
-		cn_tab = &scccons;
-		cn_tab->cn_dev = makedev(SCCDEV,
-		    sc->sc_dv.dv_unit == 0 ? SCCCOMM2_PORT : SCCCOMM3_PORT);
-
-		/* Wire carrier for console. */
-#endif
 		sc->scc_softCAR |= 1 << SCCLINE(cn_tab->cn_dev);
 		scc_tty_init(sc, cn_tab->cn_dev);
 
@@ -525,7 +433,7 @@ sccattach(parent, self, aux)
 
 
 	/* Wire up any childre, like keyboards or mice. */
-#ifdef HAVE_RCONS
+#if NRASTERCONSOLE > 0
 	if (systype != DS_MAXINE) {
 		if (unit == 1) {
 			scc_kbd_init(sc, makedev(SCCDEV, SCCKBD_PORT));
@@ -533,7 +441,7 @@ sccattach(parent, self, aux)
 			scc_mouse_init(sc, makedev(SCCDEV, SCCMOUSE_PORT));
 		}
 	}
-#endif /* HAVE_RCONS */
+#endif /* NRASTERCONSOLE > 0 */
 
 }
 
@@ -541,7 +449,7 @@ sccattach(parent, self, aux)
 /*
  * Initialize line parameters for a serial console.
  */
-void
+static void
 scc_tty_init(sc, dev)
 	struct scc_softc *sc;
 	dev_t dev;
@@ -553,10 +461,8 @@ scc_tty_init(sc, dev)
 	s = spltty();
 	ctty.t_dev = dev;
 	cterm.c_cflag = (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8;
-#ifdef pmax
 	/* XXX -- why on pmax, not on Alpha? */
 	cterm.c_cflag  |= CLOCAL;
-#endif
 	cterm.c_ospeed = cterm.c_ispeed = 9600;
 	/* scc_tty_init() may be called when very cold */
 	(void) cold_sccparam(&ctty, &cterm, sc);
@@ -564,7 +470,8 @@ scc_tty_init(sc, dev)
 	splx(s);
 }
 
-void
+#if NRASTERCONSOLE > 0
+static void
 scc_kbd_init(sc, dev)
 	struct scc_softc *sc;
 	dev_t dev;
@@ -576,10 +483,8 @@ scc_kbd_init(sc, dev)
 	s = spltty();
 	ctty.t_dev = dev;
 	cterm.c_cflag = CS8;
-#ifdef pmax
 	/* XXX -- why on pmax, not on Alpha? */
 	cterm.c_cflag |= CLOCAL;
-#endif /* pmax */
 	cterm.c_ospeed = cterm.c_ispeed = 4800;
 	(void) sccparam(&ctty, &cterm);
 	DELAY(10000);
@@ -589,14 +494,14 @@ scc_kbd_init(sc, dev)
 	 * during booting. Fortunately the keyboard
 	 * works ok without it.
 	 */
-	KBDReset(ctty.t_dev, sccPutc);
+	lk_reset(ctty.t_dev, sccPutc);
 #endif /* notyet */
 	DELAY(10000);
 	splx(s);
 
 }
 
-void
+static void
 scc_mouse_init(sc, dev)
 	struct scc_softc *sc;
 	dev_t dev;
@@ -610,7 +515,7 @@ scc_mouse_init(sc, dev)
 	cterm.c_cflag = CS8 | PARENB | PARODD;
 	cterm.c_ospeed = cterm.c_ispeed = 4800;
 	(void) sccparam(&ctty, &cterm);
-#ifdef HAVE_RCONS
+#if NRASTERCONSOLE > 0
 	/*
 	 * This is a hack.  As Ted Lemon observed, we want bstreams,
 	 * or failing that, a line discipline to do the inkernel DEC
@@ -620,14 +525,15 @@ scc_mouse_init(sc, dev)
 		goto done;
 
 	DELAY(10000);
-	MouseInit(ctty.t_dev, sccPutc, sccGetc);
+	lk_mouseinit(ctty.t_dev, sccPutc, sccGetc);
 	DELAY(10000);
 
 done:
-#endif	/* HAVE_RCONS */
+#endif	/* NRASTERCONSOLE > 0 */
 
 	splx(s);
 }
+#endif
 
 
 /*
@@ -637,10 +543,10 @@ done:
  */
 static void
 sccreset(sc)
-	register struct scc_softc *sc;
+	struct scc_softc *sc;
 {
-	register scc_regmap_t *regs;
-	register u_char val;
+	scc_regmap_t *regs;
+	u_char val;
 
 	regs = (scc_regmap_t *)sc->scc_pdma[0].p_addr;
 	/*
@@ -684,12 +590,7 @@ sccreset(sc)
 	sc->scc_wreg[SCC_CHANNEL_B].wr4 = ZSWR4_CLK_X16;
 
 	/* enable DTR, RTS and SS */
-#ifdef alpha
-	/* XXX -- who changed the alpha driver to do this, and why? */
-	sc->scc_wreg[SCC_CHANNEL_B].wr5 = 0;
-#else
 	sc->scc_wreg[SCC_CHANNEL_B].wr5 = ZSWR5_RTS;
-#endif
 	sc->scc_wreg[SCC_CHANNEL_A].wr5 = ZSWR5_RTS | ZSWR5_DTR;
 
 	/* baud rates */
@@ -709,9 +610,9 @@ sccopen(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct scc_softc *sc;
-	register struct tty *tp;
-	register int unit, line;
+	struct scc_softc *sc;
+	struct tty *tp;
+	int unit, line;
 	int s, error = 0;
 
 	unit = SCCUNIT(dev);
@@ -791,9 +692,9 @@ sccclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct scc_softc *sc = scc_cd.cd_devs[SCCUNIT(dev)];
-	register struct tty *tp;
-	register int line;
+	struct scc_softc *sc = scc_cd.cd_devs[SCCUNIT(dev)];
+	struct tty *tp;
+	int line;
 
 	line = SCCLINE(dev);
 	tp = sc->scc_tty[line];
@@ -814,8 +715,8 @@ sccread(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	register struct scc_softc *sc;
-	register struct tty *tp;
+	struct scc_softc *sc;
+	struct tty *tp;
 
 	sc = scc_cd.cd_devs[SCCUNIT(dev)];		/* XXX*/
 	tp = sc->scc_tty[SCCLINE(dev)];
@@ -828,8 +729,8 @@ sccwrite(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	register struct scc_softc *sc;
-	register struct tty *tp;
+	struct scc_softc *sc;
+	struct tty *tp;
 
 	sc = scc_cd.cd_devs[SCCUNIT(dev)];	/* XXX*/
 	tp = sc->scc_tty[SCCLINE(dev)];
@@ -840,9 +741,9 @@ struct tty *
 scctty(dev)
 	dev_t dev;
 {
-	register struct scc_softc *sc;
-	register struct tty *tp;
-	register int unit = SCCUNIT(dev);
+	struct scc_softc *sc;
+	struct tty *tp;
+	int unit = SCCUNIT(dev);
 
 	if ((unit >= scc_cd.cd_ndevs) || (sc = scc_cd.cd_devs[unit]) == 0)
 		return (0);
@@ -859,8 +760,8 @@ sccioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	register struct scc_softc *sc;
-	register struct tty *tp;
+	struct scc_softc *sc;
+	struct tty *tp;
 	int error, line;
 
 	line = SCCLINE(dev);
@@ -920,12 +821,12 @@ sccioctl(dev, cmd, data, flag, p)
 /*
  * Set line parameters --  tty t_param entry point.
  */
-int
+static int
 sccparam(tp, t)
-	register struct tty *tp;
-	register struct termios *t;
+	struct tty *tp;
+	struct termios *t;
 {
-	register struct scc_softc *sc;
+	struct scc_softc *sc;
 
 	/* Extract the softc and call cold_sccparam to do all the work. */
 	sc = scc_cd.cd_devs[SCCUNIT(tp->t_dev)];
@@ -938,14 +839,14 @@ sccparam(tp, t)
  */
 static int
 cold_sccparam(tp, t, sc)
-	register struct tty *tp;
-	register struct termios *t;
-	register struct scc_softc *sc;
+	struct tty *tp;
+	struct termios *t;
+	struct scc_softc *sc;
 {
-	register scc_regmap_t *regs;
-	register int line;
-	register u_char value, wvalue;
-	register int cflag = t->c_cflag;
+	scc_regmap_t *regs;
+	int line;
+	u_char value, wvalue;
+	int cflag = t->c_cflag;
 	int ospeed;
 
 	/* Check arguments */
@@ -1049,15 +950,7 @@ cold_sccparam(tp, t, sc)
 	value = sc->scc_wreg[line].wr14;
 	SCC_WRITE_REG(regs, line, SCC_WR14, value);
 
-#ifdef alpha
-	if (SCCUNIT(tp->t_dev) == 1) {
-		/* On unit one, on the flamingo, modem control is floating! */
-		value = ZSWR15_BREAK_IE;
-	} else
-#endif
-	{
-		value = ZSWR15_BREAK_IE | ZSWR15_CTS_IE | ZSWR15_DCD_IE;
-	}
+	value = ZSWR15_BREAK_IE | ZSWR15_CTS_IE | ZSWR15_DCD_IE;
 	SCC_WRITE_REG(regs, line, SCC_WR15, value);
 
 	/* and now the enables */
@@ -1073,16 +966,12 @@ cold_sccparam(tp, t, sc)
 	SCC_WRITE_REG(regs, line, SCC_WR1, sc->scc_wreg[line].wr1);
 	tc_mb();
 
-#ifdef	alpha
-	scc_alphaintr(1);			/* XXX XXX XXX */
-#endif	/*alpha*/
-
 	return (0);
 }
 
 
 /*
- * transmission done interrupts 
+ * transmission done interrupts
  */
 static void
 scc_txintr(sc, chan, regs)
@@ -1090,17 +979,16 @@ scc_txintr(sc, chan, regs)
 	int chan;
 	scc_regmap_t *regs;
 {
-	register struct tty *tp = sc->scc_tty[chan];
-	register struct pdma *dp = &sc->scc_pdma[chan];
-	register int cc;
+	struct tty *tp = sc->scc_tty[chan];
+	struct pdma *dp = &sc->scc_pdma[chan];
+	int cc;
 
 	tp = sc->scc_tty[chan];
 	dp = &sc->scc_pdma[chan];
 	if (dp->p_mem < dp->p_end) {
 		SCC_WRITE_DATA(regs, chan, *dp->p_mem++);
-#ifdef pmax	/* Alpha handles the 1.6 msec settle time in hardware */
+		/* Alpha handles the 1.6 msec settle time in hardware */
 		DELAY(2);
-#endif
 		tc_mb();
 	} else {
 		tp->t_state &= ~TS_BUSY;
@@ -1127,8 +1015,8 @@ scc_txintr(sc, chan, regs)
 	}
 }
 
-/* 
- * receive interrupts 
+/*
+ * receive interrupts
  */
 static void
 scc_rxintr(sc, chan, regs, unit)
@@ -1137,9 +1025,12 @@ scc_rxintr(sc, chan, regs, unit)
 	scc_regmap_t *regs;
 	int unit;
 {
-	register struct tty *tp = sc->scc_tty[chan];
+	struct tty *tp = sc->scc_tty[chan];
 	int cc, rr1 = 0, rr2 = 0;	/* XXX */
+#if NRASTERCONSOLE > 0
 	char *cp;
+	int cl;
+#endif
 
 	SCC_READ_DATA(regs, chan, cc);
 	if (rr2 == SCC_RR2_A_RECV_SPECIAL ||
@@ -1170,11 +1061,11 @@ scc_rxintr(sc, chan, regs, unit)
 			(*sccDivertXInput)(cc);
 			return;
 		}
-#ifdef HAVE_RCONS
-		if ((cp = kbdMapChar(cc)) == NULL)
+#if NRASTERCONSOLE > 0
+		if ((cp = lk_mapchar(cc, &cl)) == NULL)
 			return;
-		
-		while (*cp)
+
+		while (cl--)
 			rcons_input(0, *cp++);
 #endif
 	/*
@@ -1182,7 +1073,7 @@ scc_rxintr(sc, chan, regs, unit)
 	 */
 	} else if (tp == scctty(makedev(SCCDEV, SCCMOUSE_PORT)) &&
 	    sccMouseButtons) {
-#ifdef HAVE_RCONS
+#if NRASTERCONSOLE > 0
 		/*XXX*/
 		mouseInput(cc);
 #endif
@@ -1208,7 +1099,7 @@ scc_rxintr(sc, chan, regs, unit)
 /*
  * Modem status interrupts
  */
-static void inline
+static void
 scc_stintr(sc, chan, regs, unit)
 	struct scc_softc *sc;
 	int chan;
@@ -1224,21 +1115,21 @@ scc_stintr(sc, chan, regs, unit)
 /*
  * Check for interrupts from all devices.
  */
-int
+static int
 sccintr(xxxsc)
 	void *xxxsc;
 {
-	register struct scc_softc *sc = (struct scc_softc *)xxxsc;
-	register int unit = (long)sc->sc_dv.dv_unit;
-	register scc_regmap_t *regs;
-	register int rr3;
+	struct scc_softc *sc = (struct scc_softc *)xxxsc;
+	int unit = (long)sc->sc_dv.dv_unit;
+	scc_regmap_t *regs;
+	int rr3;
 
 	regs = (scc_regmap_t *)sc->scc_pdma[0].p_addr;
 	unit <<= 1;
 
 	/* Note: only channel A has an RR3 */
 	SCC_READ_REG(regs, SCC_CHANNEL_A, ZSRR_IPEND, rr3);
-	
+
 	/*
 	 * Clear interrupt first to avoid a race condition.
 	 * If a new interrupt condition happens while we are
@@ -1287,14 +1178,14 @@ sccintr(xxxsc)
 	return 1;
 }
 
-void
+static void
 sccstart(tp)
-	register struct tty *tp;
+	struct tty *tp;
 {
-	register struct pdma *dp;
-	register scc_regmap_t *regs;
-	register struct scc_softc *sc;
-	register int cc, chan;
+	struct pdma *dp;
+	scc_regmap_t *regs;
+	struct scc_softc *sc;
+	int cc, chan;
 	u_char temp;
 	int s, sendone;
 
@@ -1338,9 +1229,8 @@ sccstart(tp)
 			panic("sccstart: No chars");
 #endif
 		SCC_WRITE_DATA(regs, chan, *dp->p_mem++);
-#ifdef pmax /* Alpha handles the 1.6 msec settle time in hardware */
+		/* Alpha handles the 1.6 msec settle time in hardware */
 		DELAY(2);
-#endif
 	}
 	tc_mb();
 out:
@@ -1353,12 +1243,12 @@ out:
 /*ARGSUSED*/
 void
 sccstop(tp, flag)
-	register struct tty *tp;
+	struct tty *tp;
 	int flag;
 {
-	register struct pdma *dp;
-	register struct scc_softc *sc;
-	register int s;
+	struct pdma *dp;
+	struct scc_softc *sc;
+	int s;
 
 	sc = scc_cd.cd_devs[SCCUNIT(tp->t_dev)];
 	dp = &sc->scc_pdma[SCCLINE(tp->t_dev)];
@@ -1371,15 +1261,15 @@ sccstop(tp, flag)
 	splx(s);
 }
 
-int
+static int
 sccmctl(dev, bits, how)
 	dev_t dev;
 	int bits, how;
 {
-	register struct scc_softc *sc;
-	register scc_regmap_t *regs;
-	register int line, mbits;
-	register u_char value;
+	struct scc_softc *sc;
+	scc_regmap_t *regs;
+	int line, mbits;
+	u_char value;
 	int s;
 
 	sc = scc_cd.cd_devs[SCCUNIT(dev)];
@@ -1439,11 +1329,11 @@ static void
 scc_modem_intr(dev)
 	dev_t dev;
 {
-	register scc_regmap_t *regs;
-	register struct scc_softc *sc;
-	register struct tty *tp;
-	register int car, chan;
-	register u_char value;
+	scc_regmap_t *regs;
+	struct scc_softc *sc;
+	struct tty *tp;
+	int car, chan;
+	u_char value;
 	int s;
 
 	chan = SCCLINE(dev);
@@ -1480,7 +1370,6 @@ scc_modem_intr(dev)
 	 * On pmax, ignore hups on a console tty.
 	 * On alpha, a no-op, for historical reasons.
 	 */
-#ifdef pmax
 	if (!CONSOLE_ON_UNIT(sc->sc_dv.dv_unit)) {
 		if (car) {
 			/* carrier present */
@@ -1489,7 +1378,6 @@ scc_modem_intr(dev)
 		} else if (tp->t_state & TS_CARR_ON)
 		  (void)(*linesw[tp->t_line].l_modem)(tp, 0);
 	}
-#endif	/* pmax */
 	splx(s);
 }
 
@@ -1500,28 +1388,24 @@ int
 sccGetc(dev)
 	dev_t dev;
 {
-	register scc_regmap_t *regs;
-	register int c, line;
-	register u_char value;
+	scc_regmap_t *regs;
+	int c, line;
+	u_char value;
 	int s;
 
 	line = SCCLINE(dev);
 	if (cold && scc_cons_addr) {
 		regs = scc_cons_addr;
 	} else {
-		register struct scc_softc *sc;
+		struct scc_softc *sc;
 		sc = scc_cd.cd_devs[SCCUNIT(dev)];
 		regs = (scc_regmap_t *)sc->scc_pdma[line].p_addr;
 	}
 
 	if (!regs)
 		return (0);
-#ifdef pmax
 	/*s = spltty(); */	/* XXX  why different spls? */
 	s = splhigh();
-#else
-	s = splhigh();
-#endif
 	for (;;) {
 		SCC_READ_REG(regs, line, SCC_RR0, value);
 		if (value & ZSRR0_RX_READY) {
@@ -1551,21 +1435,17 @@ sccPutc(dev, c)
 	dev_t dev;
 	int c;
 {
-	register scc_regmap_t *regs;
-	register int line;
-	register u_char value;
+	scc_regmap_t *regs;
+	int line;
+	u_char value;
 	int s;
 
-#ifdef pmax
 	s = spltty();	/* XXX  why different spls? */
-#else
-	s = splhigh();
-#endif
 	line = SCCLINE(dev);
 	if (cold && scc_cons_addr) {
 		regs = scc_cons_addr;
 	} else {
-		register struct scc_softc *sc;
+		struct scc_softc *sc;
 		sc = scc_cd.cd_devs[SCCUNIT(dev)];
 		regs = (scc_regmap_t *)sc->scc_pdma[line].p_addr;
 	}
@@ -1593,7 +1473,7 @@ sccPutc(dev, c)
 /*
  * Enable/disable polling mode
  */
-void
+static void
 sccPollc(dev, on)
 	dev_t dev;
 	int on;

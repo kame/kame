@@ -1,4 +1,4 @@
-/*	$NetBSD: auxreg.h,v 1.7.16.1 2000/02/08 22:48:28 he Exp $ */
+/*	$NetBSD: auxreg.h,v 1.8 2000/01/21 13:25:12 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993

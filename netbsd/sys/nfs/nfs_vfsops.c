@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_vfsops.c,v 1.83.2.1 1999/11/05 07:13:25 cgd Exp $	*/
+/*	$NetBSD: nfs_vfsops.c,v 1.91 2000/06/10 18:27:04 assar Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1995
@@ -43,7 +43,6 @@
 #endif
 
 #include <sys/param.h>
-#include <sys/conf.h>
 #include <sys/ioctl.h>
 #include <sys/signal.h>
 #include <sys/proc.h>
@@ -56,6 +55,8 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <vm/vm.h>
+#include <sys/sysctl.h>
 #include <sys/systm.h>
 
 #include <net/if.h>
@@ -107,6 +108,7 @@ struct vfsops nfs_vfsops = {
 	nfs_fhtovp,
 	nfs_vptofh,
 	nfs_vfs_init,
+	nfs_vfs_done,
 	nfs_sysctl,
 	nfs_mountroot,
 	nfs_checkexp,
@@ -128,14 +130,14 @@ static int nfs_mount_diskless __P((struct nfs_dlmount *, const char *,
 int
 nfs_statfs(mp, sbp, p)
 	struct mount *mp;
-	register struct statfs *sbp;
+	struct statfs *sbp;
 	struct proc *p;
 {
-	register struct vnode *vp;
-	register struct nfs_statfs *sfp;
-	register caddr_t cp;
-	register u_int32_t *tl;
-	register int32_t t1, t2;
+	struct vnode *vp;
+	struct nfs_statfs *sfp;
+	caddr_t cp;
+	u_int32_t *tl;
+	int32_t t1, t2;
 	caddr_t bpos, dpos, cp2;
 	struct nfsmount *nmp = VFSTONFS(mp);
 	int error = 0, v3 = (nmp->nm_flag & NFSMNT_NFSV3), retattr;
@@ -210,15 +212,15 @@ nfs_statfs(mp, sbp, p)
  */
 int
 nfs_fsinfo(nmp, vp, cred, p)
-	register struct nfsmount *nmp;
-	register struct vnode *vp;
+	struct nfsmount *nmp;
+	struct vnode *vp;
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct nfsv3_fsinfo *fsp;
-	register caddr_t cp;
-	register int32_t t1, t2;
-	register u_int32_t *tl, pref, max;
+	struct nfsv3_fsinfo *fsp;
+	caddr_t cp;
+	int32_t t1, t2;
+	u_int32_t *tl, pref, max;
 	caddr_t bpos, dpos, cp2;
 	int error = 0, retattr;
 	struct mbuf *mreq, *mrep, *md, *mb, *mb2;
@@ -558,7 +560,7 @@ nfs_mount(mp, path, data, ndp, p)
 	if (args.version != NFS_ARGSVERSION)
 		return (EPROGMISMATCH);
 	if (mp->mnt_flag & MNT_UPDATE) {
-		register struct nfsmount *nmp = VFSTONFS(mp);
+		struct nfsmount *nmp = VFSTONFS(mp);
 
 		if (nmp == NULL)
 			return (EIO);
@@ -598,19 +600,29 @@ nfs_mount(mp, path, data, ndp, p)
  */
 int
 mountnfs(argp, mp, nam, pth, hst, vpp, p)
-	register struct nfs_args *argp;
-	register struct mount *mp;
+	struct nfs_args *argp;
+	struct mount *mp;
 	struct mbuf *nam;
 	const char *pth, *hst;
 	struct vnode **vpp;
 	struct proc *p;
 {
-	register struct nfsmount *nmp;
+	struct nfsmount *nmp;
 	struct nfsnode *np;
 	int error;
 	struct vattr attrs;
 	struct ucred *cr;
 
+	/* 
+	 * If the number of nfs iothreads to use has never
+	 * been set, create a reasonable number of them.
+	 */
+
+	if (nfs_niothreads < 0) {
+		nfs_niothreads = 4;
+		nfs_getset_niothreads(TRUE);
+	}
+	
 	if (mp->mnt_flag & MNT_UPDATE) {
 		nmp = VFSTONFS(mp);
 		/* update paths, file handles, etc, here	XXX */
@@ -624,7 +636,7 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 		TAILQ_INIT(&nmp->nm_uidlruhead);
 		TAILQ_INIT(&nmp->nm_bufq);
 	}
-	vfs_getnewfsid(mp, MOUNT_NFS);
+	vfs_getnewfsid(mp);
 	nmp->nm_mountp = mp;
 
 	if (argp->flags & NFSMNT_NQNFS)
@@ -727,7 +739,7 @@ nfs_unmount(mp, mntflags, p)
 	int mntflags;
 	struct proc *p;
 {
-	register struct nfsmount *nmp;
+	struct nfsmount *nmp;
 	struct nfsnode *np;
 	struct vnode *vp;
 	int error, flags = 0;
@@ -803,7 +815,7 @@ nfs_root(mp, vpp)
 	struct mount *mp;
 	struct vnode **vpp;
 {
-	register struct vnode *vp;
+	struct vnode *vp;
 	struct nfsmount *nmp;
 	struct nfsnode *np;
 	int error;
@@ -833,7 +845,7 @@ nfs_sync(mp, waitfor, cred, p)
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct vnode *vp;
+	struct vnode *vp;
 	int error, allerror = 0;
 
 	/*
@@ -849,7 +861,8 @@ loop:
 		 */
 		if (vp->v_mount != mp)
 			goto loop;
-		if (VOP_ISLOCKED(vp) || vp->v_dirtyblkhd.lh_first == NULL)
+		if (VOP_ISLOCKED(vp) || vp->v_dirtyblkhd.lh_first == NULL ||
+		    waitfor == MNT_LAZY)
 			continue;
 		if (vget(vp, LK_EXCLUSIVE))
 			goto loop;
@@ -921,6 +934,17 @@ nfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		}
 		return 0;
 
+	case NFS_IOTHREADS:
+		nfs_getset_niothreads(0);
+
+		rv = (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &nfs_niothreads));
+
+		if (newp)
+			nfs_getset_niothreads(1);
+
+		return rv;
+                
 	default:
 		return EOPNOTSUPP;
 	}
@@ -933,7 +957,7 @@ nfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 /* ARGSUSED */
 int
 nfs_fhtovp(mp, fhp, vpp)
-	register struct mount *mp;
+	struct mount *mp;
 	struct fid *fhp;
 	struct vnode **vpp;
 {
@@ -944,7 +968,7 @@ nfs_fhtovp(mp, fhp, vpp)
 /* ARGSUSED */
 int
 nfs_checkexp(mp, nam, exflagsp, credanonp)
-	register struct mount *mp;
+	struct mount *mp;
 	struct mbuf *nam;
 	int *exflagsp;
 	struct ucred **credanonp;

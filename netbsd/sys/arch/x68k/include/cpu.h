@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.17.2.1 1999/06/24 15:53:53 perry Exp $	*/
+/*	$NetBSD: cpu.h,v 1.23 2000/05/26 21:20:27 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -49,16 +49,36 @@
  * Exported definitions unique to x68k/68k cpu support.
  */
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_m680x0.h"
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Get common m68k CPU definitions.
  */
 #include <m68k/cpu.h>
+#include <m68k/cacheops.h>
 #define	M68K_MMU_MOTOROLA
 
 /*
  * Get interrupt glue.
  */
 #include <machine/intr.h>
+
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;           /* # of spin locks held */
+	u_long ci_simple_locks;         /* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()			(&cpu_info_store)
 
 /*
  * definitions of cpu-dependent requirements
@@ -67,6 +87,7 @@
 #define	cpu_swapin(p)			/* nothing */
 #define	cpu_wait(p)			/* nothing */
 #define	cpu_swapout(p)			/* nothing */
+#define	cpu_number()			0
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -114,6 +135,8 @@ extern int want_resched;	/* resched() was called */
 extern int astpending;		/* need to trap before returning to user mode */
 #define aston() (astpending++)
 
+#endif /* _KERNEL */
+
 /*
  * CTL_MACHDEP definitions.
  */
@@ -154,24 +177,6 @@ void	proc_trampoline __P((void));
 void	loadustp __P((int));
 void	m68881_save __P((struct fpframe *));
 void	m68881_restore __P((struct fpframe *));
-void	DCIS __P((void));
-void	DCIU __P((void));
-void	ICIA __P((void));
-void	ICPA __P((void));
-void	PCIA __P((void));
-void	TBIA __P((void));
-void	TBIS __P((vaddr_t));
-void	TBIAS __P((void));
-void	TBIAU __P((void));
-#if defined(M68040) || defined(M68060)
-void	DCFA __P((void));
-void	DCFP __P((vaddr_t));
-void	DCFL __P((vaddr_t));
-void	DCPL __P((vaddr_t));
-void	DCPP __P((vaddr_t));
-void	ICPL __P((vaddr_t));
-void	ICPP __P((vaddr_t));
-#endif
 
 /* machdep.c functions */
 int	badaddr __P((caddr_t));

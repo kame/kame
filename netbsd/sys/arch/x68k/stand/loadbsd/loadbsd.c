@@ -16,16 +16,15 @@
  *		-s	single user boot (default)
  *		-D	enter kernel debugger
  *		-b	ask root device
- *		-d	use compiled-in rootdev
  *		-r	specify root device
  *
- *	$NetBSD: loadbsd.c,v 1.1.8.1 1999/04/30 16:34:06 perry Exp $
+ *	$NetBSD: loadbsd.c,v 1.4.12.1 2000/08/13 09:09:30 jdolecek Exp $
  */
 
 #include <sys/cdefs.h>
 
-__RCSID("$NetBSD: loadbsd.c,v 1.1.8.1 1999/04/30 16:34:06 perry Exp $");
-#define VERSION	"$Revision: 1.1.8.1 $ $Date: 1999/04/30 16:34:06 $"
+__RCSID("$NetBSD: loadbsd.c,v 1.4.12.1 2000/08/13 09:09:30 jdolecek Exp $");
+#define VERSION	"$Revision: 1.4.12.1 $ $Date: 2000/08/13 09:09:30 $"
 
 #include <sys/types.h>		/* ntohl */
 #include <sys/reboot.h>
@@ -69,7 +68,7 @@ const struct hatbl {
 
 /*
  * parse interface name
- * returns the next position
+ * return the next position
  */
 static const char *
 lookupif(name, pif, punit)
@@ -150,7 +149,7 @@ get_current_scsi_interface(pif, punit)
  *		/spc@0/sd@1,2:e
  *
  *	partial form:
- *		/mha@0/sd@1	= /mha@0/sd@1,0,:a
+ *		/mha@0/sd@1	= /mha@0/sd@1,0:a
  *		sd@1:e		= /current_device/sd@1,0e
  *		sd@1,2:e	= /current_device/sd@1,2:e
  */
@@ -159,7 +158,8 @@ const struct devtbl {
 	char name[3];
 	u_char major;
 } devtable[] = {
-	X68K_BOOT_DEV_LIST
+	X68K_BOOT_DEV_LIST,
+	X68K_BOOT_NETIF_LIST
 };
 
 static int
@@ -450,12 +450,11 @@ kernel options:\n\
 \t-s	single user boot (default)\n\
 \t-D	enter kernel debugger\n\
 \t-b	ask root device\n\
-\t-d	use compiled-in rootdev\n\
 \t-r	specify root device (default %s)\n\
 \t	format:  [/interface/]device@unit[,lun][:partition]\n\
 \t	    interface: one of  spc@0, spc@1, mha@0\n\
 \t		       (current boot interface if omitted)\n\
-\t	    device:    one of  fd, sd, cd, md\n\
+\t	    device:    one of  fd, sd, cd, md, ne\n\
 \t	    unit:      device unit number (SCSI ID for SCSI device)\n\
 \t	    lun:       SCSI LUN # (0 if omitted)\n\
 \t	    partition: partition letter ('a' if omitted)\n\
@@ -509,9 +508,6 @@ main(argc, argv)
 				else
 					rootdevname = *arg;
 				break;
-			case 'd':
-				boothowto |= RB_DFLTROOT;
-				break;
 			case 'b':
 				boothowto |= RB_ASKNAME;
 				break;
@@ -556,7 +552,7 @@ main(argc, argv)
 	tramp->xk.boothowto = boothowto;
 
 	/*
-	 * we never returns, and make sure the disk cache
+	 * we never return, and make sure the disk cache
 	 * be flushed (if write-back cache is enabled)
 	 */
 	if (opt_v)

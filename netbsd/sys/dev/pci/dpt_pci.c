@@ -1,7 +1,7 @@
-/*	$NetBSD: dpt_pci.c,v 1.3.2.2 2000/01/18 20:05:21 he Exp $	*/
+/*	$NetBSD: dpt_pci.c,v 1.6 2000/06/13 13:36:50 ad Exp $	*/
 
 /*
- * Copyright (c) 1999 Andy Doran <ad@NetBSD.org>
+ * Copyright (c) 1999 Andrew Doran <ad@NetBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dpt_pci.c,v 1.3.2.2 2000/01/18 20:05:21 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dpt_pci.c,v 1.6 2000/06/13 13:36:50 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,7 +70,9 @@ dpt_pci_match(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	struct pci_attach_args *pa = (struct pci_attach_args *) aux;
+	struct pci_attach_args *pa;
+	
+	pa = (struct pci_attach_args *)aux;
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_DPT && 
 	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DPT_SC_RAID)
@@ -139,7 +141,7 @@ dpt_pci_attach(parent, self, aux)
 		    sc->sc_dv.dv_xname);
 		return;	
 	}
-
+	
 	/* Now attach to the bus-independent code */
 	dpt_init(sc, intrstr);
 }

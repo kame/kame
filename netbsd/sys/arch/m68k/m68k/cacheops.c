@@ -1,4 +1,4 @@
-/*	$NetBSD: cacheops.c,v 1.3 1998/05/24 19:32:43 is Exp $	*/
+/*	$NetBSD: cacheops.c,v 1.6 2000/04/15 20:31:27 scw Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -38,9 +38,9 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <machine/cpu.h>
 #include <m68k/cpu.h>
 #include <m68k/cacheops.h>
-#include <machine/cpu.h>
 
 #if defined(_MULTI_CPU)
 
@@ -287,20 +287,10 @@ void _PCIA()
 	}
 }
 
+#if defined(M68040) || defined(M68060)
 void _DCFA()
 {
 	switch (cputype) {
-	default:
-#ifdef M68020
-	case CPU_68020:
-		DCFA_20();
-		break;
-#endif
-#ifdef M68030
-	case CPU_68030:
-		DCFA_30();
-		break;
-#endif
 #ifdef M68040
 	case CPU_68040:
 		DCFA_40();
@@ -313,9 +303,10 @@ void _DCFA()
 #endif
 	}
 }
+#endif /* M68040 || M68060 */
 
 void _TBIS(va)
-	vm_offset_t	va;
+	vaddr_t	va;
 {
 	switch (cputype) {
 	default:
@@ -342,157 +333,159 @@ void _TBIS(va)
 	}
 }
 
-void _DCIAS(va)
-	vm_offset_t	va;
+void _DCIAS(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68020
 	case CPU_68020:
-		DCIAS_20(va);
+		DCIAS_20(pa);
 		break;
 #endif
 #ifdef M68030
 	case CPU_68030:
-		DCIAS_30(va);
+		DCIAS_30(pa);
 		break;
 #endif
 #ifdef M68040
 	case CPU_68040:
-		DCIAS_40(va);
+		DCIAS_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		DCIAS_60(va);
+		DCIAS_60(pa);
 		break;
 #endif
 	}
 }
 
+#if defined(M68040) || defined(M68060)
 void _DCPA()
 {
 	switch (cputype) {
 	default:
-#ifdef M68020
-	case CPU_68020:
-		DCPA_20();
+#ifdef M68040
+	case CPU_68040:
+		DCPA_40();
 		break;
 #endif
-#ifdef M68030
-	case CPU_68030:
-		DCPA_30();
+#ifdef M68060
+	case CPU_68060:
+		DCPA_60();
 		break;
 #endif
 	}
 }
 
-void _ICPL(va)
-	vm_offset_t	va;
+void _ICPL(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68040
 	case CPU_68040:
-		ICPL_40(va);
+		ICPL_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		ICPL_60(va);
+		ICPL_60(pa);
 		break;
 #endif
 	}
 }
 
-void _ICPP(va)
-	vm_offset_t	va;
+void _ICPP(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68040
 	case CPU_68040:
-		ICPP_40(va);
+		ICPP_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		ICPP_60(va);
+		ICPP_60(pa);
 		break;
 #endif
 	}
 }
 
-void _DCPL(va)
-	vm_offset_t	va;
+void _DCPL(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68040
 	case CPU_68040:
-		DCPL_40(va);
+		DCPL_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		DCPL_60(va);
+		DCPL_60(pa);
 		break;
 #endif
 	}
 }
 
-void _DCPP(va)
-	vm_offset_t	va;
+void _DCPP(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68040
 	case CPU_68040:
-		DCPP_40(va);
+		DCPP_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		DCPP_60(va);
+		DCPP_60(pa);
 		break;
 #endif
 	}
 }
 
-void _DCFL(va)
-	vm_offset_t	va;
+void _DCFL(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68040
 	case CPU_68040:
-		DCFL_40(va);
+		DCFL_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		DCFL_60(va);
+		DCFL_60(pa);
 		break;
 #endif
 	}
 }
 
-void _DCFP(va)
-	vm_offset_t	va;
+void _DCFP(pa)
+	paddr_t	pa;
 {
 	switch (cputype) {
 	default:
 #ifdef M68040
 	case CPU_68040:
-		DCFP_40(va);
+		DCFP_40(pa);
 		break;
 #endif
 #ifdef M68060
 	case CPU_68060:
-		DCFP_60(va);
+		DCFP_60(pa);
 		break;
 #endif
 	}
 }
+#endif /* M68040 || M68060 */
 
-#endif /* defined(_TBIA) */
+#endif /* defined(_MULTI_CPU) */

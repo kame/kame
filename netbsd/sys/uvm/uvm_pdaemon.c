@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_pdaemon.c,v 1.15 1999/03/30 10:12:01 mycroft Exp $	*/
+/*	$NetBSD: uvm_pdaemon.c,v 1.19 1999/11/04 21:51:42 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -110,8 +110,9 @@ static void		uvmpd_tune __P((void));
  * => should _not_ be called by the page daemon (to avoid deadlock)
  */
 
-void uvm_wait(wmsg)
-	char *wmsg;
+void
+uvm_wait(wmsg)
+	const char *wmsg;
 {
 	int timo = 0;
 	int s = splbio();
@@ -147,7 +148,7 @@ void uvm_wait(wmsg)
 	}
 
 	simple_lock(&uvm.pagedaemon_lock);
-	thread_wakeup(&uvm.pagedaemon);		/* wake the daemon! */
+	wakeup(&uvm.pagedaemon);		/* wake the daemon! */
 	UVM_UNLOCK_AND_WAIT(&uvmexp.free, &uvm.pagedaemon_lock, FALSE, wmsg,
 	    timo);
 
@@ -303,7 +304,7 @@ uvm_pageout()
 		 */
 		if (uvmexp.free > uvmexp.reserve_kernel ||
 		    uvmexp.paging == 0)
-			thread_wakeup(&uvmexp.free);
+			wakeup(&uvmexp.free);
 	}
 	/*NOTREACHED*/
 }
@@ -367,11 +368,9 @@ uvmpd_scan_inactive(pglst)
 			 * update our copy of "free" and see if we've met
 			 * our target
 			 */
-			s = splimp();
-			uvm_lock_fpageq();
+			s = uvm_lock_fpageq();
 			free = uvmexp.free;
-			uvm_unlock_fpageq();
-			splx(s);
+			uvm_unlock_fpageq(s);
 
 			if (free + uvmexp.paging >= uvmexp.freetarg << 2 ||
 			    dirtyreacts == UVMPD_NUMDIRTYREACTS) {
@@ -404,7 +403,7 @@ uvmpd_scan_inactive(pglst)
 			 * inactive pages shouldn't have any valid mappings
 			 * and we cleared reference before deactivating).
 			 */
-			if (pmap_is_referenced(PMAP_PGARG(p))) {
+			if (pmap_is_referenced(p)) {
 				uvm_pageactivate(p);
 				uvmexp.pdreact++;
 				continue;
@@ -500,7 +499,7 @@ uvmpd_scan_inactive(pglst)
 				}
 
 				/* zap all mappings with pmap_page_protect... */
-				pmap_page_protect(PMAP_PGARG(p), VM_PROT_NONE);
+				pmap_page_protect(p, VM_PROT_NONE);
 				uvm_pagefree(p);
 				uvmexp.pdfreed++;
 			
@@ -597,7 +596,7 @@ uvmpd_scan_inactive(pglst)
 			swap_backed = ((p->pqflags & PQ_SWAPBACKED) != 0);
 			p->flags |= PG_BUSY;		/* now we own it */
 			UVM_PAGE_OWN(p, "scan_inactive");
-			pmap_page_protect(PMAP_PGARG(p), VM_PROT_READ);
+			pmap_page_protect(p, VM_PROT_READ);
 			uvmexp.pgswapout++;
 
 			/*
@@ -822,7 +821,7 @@ uvmpd_scan_inactive(pglst)
 			/* handle PG_WANTED now */
 			if (p->flags & PG_WANTED)
 				/* still holding object lock */
-				thread_wakeup(p);
+				wakeup(p);
 
 			p->flags &= ~(PG_BUSY|PG_WANTED);
 			UVM_PAGE_OWN(p, NULL);
@@ -835,8 +834,7 @@ uvmpd_scan_inactive(pglst)
 
 					simple_unlock(&anon->an_lock);
 					uvm_anfree(anon);	/* kills anon */
-					pmap_page_protect(PMAP_PGARG(p),
-					    VM_PROT_NONE);
+					pmap_page_protect(p, VM_PROT_NONE);
 					anon = NULL;
 					uvm_lock_pageq();
 					nextpg = p->pageq.tqe_next;
@@ -879,15 +877,15 @@ uvmpd_scan_inactive(pglst)
 					/* pageout was a failure... */
 					if (result != VM_PAGER_AGAIN)
 						uvm_pageactivate(p);
-					pmap_clear_reference(PMAP_PGARG(p));
+					pmap_clear_reference(p);
 					/* XXXCDC: if (swap_backed) FREE p's
 					 * swap block? */
 
 				} else {
 
 					/* pageout was a success... */
-					pmap_clear_reference(PMAP_PGARG(p));
-					pmap_clear_modify(PMAP_PGARG(p));
+					pmap_clear_reference(p);
+					pmap_clear_modify(p);
 					p->flags |= PG_CLEAN;
 					/* XXX: could free page here, but old
 					 * pagedaemon does not */
@@ -954,11 +952,9 @@ uvmpd_scan()
 	/*
 	 * get current "free" page count
 	 */
-	s = splimp();
-	uvm_lock_fpageq();
+	s = uvm_lock_fpageq();
 	free = uvmexp.free;
-	uvm_unlock_fpageq();
-	splx(s);
+	uvm_unlock_fpageq(s);
 
 #ifndef __SWAP_BROKEN
 	/*
@@ -1096,7 +1092,7 @@ uvmpd_scan()
 		 * inactive pages.
 		 */
 		if (inactive_shortage > 0) {
-			pmap_page_protect(PMAP_PGARG(p), VM_PROT_NONE);
+			pmap_page_protect(p, VM_PROT_NONE);
 			/* no need to check wire_count as pg is "active" */
 			uvm_pagedeactivate(p);
 			uvmexp.pddeact++;

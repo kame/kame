@@ -1,4 +1,4 @@
-/* $NetBSD: ipifuncs.c,v 1.5 1999/02/24 19:17:09 thorpej Exp $ */
+/* $NetBSD: ipifuncs.c,v 1.12 2000/06/05 21:47:12 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: ipifuncs.c,v 1.5 1999/02/24 19:17:09 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ipifuncs.c,v 1.12 2000/06/05 21:47:12 thorpej Exp $");
 
 /*
  * Interprocessor interrupt handlers.
@@ -51,17 +51,18 @@ __KERNEL_RCSID(0, "$NetBSD: ipifuncs.c,v 1.5 1999/02/24 19:17:09 thorpej Exp $")
 
 #include <vm/vm.h>
 
+#include <machine/atomic.h>
 #include <machine/alpha_cpu.h>
 #include <machine/cpu.h>
+#include <machine/cpuvar.h>
 #include <machine/intr.h>
 #include <machine/rpb.h>
-
-#include <alpha/alpha/cpuvar.h>
 
 void	alpha_ipi_halt __P((void));
 void	alpha_ipi_tbia __P((void));
 void	alpha_ipi_tbiap __P((void));
 void	alpha_ipi_imb __P((void));
+void	alpha_ipi_ast __P((void));
 
 /*
  * NOTE: This table must be kept in order with the bit definitions
@@ -72,7 +73,8 @@ ipifunc_t ipifuncs[ALPHA_NIPIS] = {
 	alpha_ipi_tbia,
 	alpha_ipi_tbiap,
 	pmap_do_tlb_shootdown,
-	alpha_pal_imb,
+	alpha_ipi_imb,
+	alpha_ipi_ast,
 };
 
 /*
@@ -85,11 +87,11 @@ alpha_send_ipi(cpu_id, ipimask)
 
 #ifdef DIAGNOSTIC
 	if (cpu_id >= hwrpb->rpb_pcs_cnt ||
-	    cpu_info[cpu_id].ci_dev == NULL)
+	    cpu_info[cpu_id].ci_softc == NULL)
 		panic("alpha_sched_ipi: bogus cpu_id");
 #endif
 
-	alpha_atomic_setbits_q(&cpu_info[cpu_id].ci_ipis, ipimask);
+	atomic_setbits_ulong(&cpu_info[cpu_id].ci_ipis, ipimask);
 printf("SENDING IPI TO %lu\n", cpu_id);
 	alpha_pal_wripir(cpu_id);
 printf("IPI SENT\n");
@@ -105,7 +107,7 @@ alpha_broadcast_ipi(ipimask)
 	u_long i;
 
 	for (i = 0; i < hwrpb->rpb_pcs_cnt; i++) {
-		if (cpu_info[i].ci_dev == NULL)
+		if (cpu_info[i].ci_softc == NULL)
 			continue;
 		alpha_send_ipi(i, ipimask);
 	}
@@ -120,8 +122,9 @@ alpha_ipi_halt()
 	/* Disable interrupts. */
 	(void) splhigh();
 
-	printf("%s: shutting down...\n", cpu_info[cpu_id].ci_dev->dv_xname);
-	alpha_atomic_clearbits_q(&cpus_running, (1UL << cpu_id));
+	printf("%s: shutting down...\n",
+	    cpu_info[cpu_id].ci_softc->sc_dev.dv_xname);
+	atomic_clearbits_ulong(&cpus_running, (1UL << cpu_id));
 
 	pcsp->pcs_flags &= ~(PCS_RC | PCS_HALT_REQ);
 	pcsp->pcs_flags |= PCS_HALT_STAY_HALTED;
@@ -135,7 +138,7 @@ alpha_ipi_tbia()
 	u_long cpu_id = alpha_pal_whami();
 
 	/* If we're doing a TBIA, we don't need to do a TBIAP or a SHOOTDOWN. */
-	alpha_atomic_clearbits_q(&cpu_info[cpu_id].ci_ipis,
+	atomic_clearbits_ulong(&cpu_info[cpu_id].ci_ipis,
 	    ALPHA_IPI_TBIAP|ALPHA_IPI_SHOOTDOWN);
 
 	ALPHA_TBIA();
@@ -148,4 +151,18 @@ alpha_ipi_tbiap()
 	/* Can't clear SHOOTDOWN here; might have PG_ASM mappings. */
 
 	ALPHA_TBIAP();
+}
+
+void
+alpha_ipi_imb()
+{
+
+	alpha_pal_imb();
+}
+
+void
+alpha_ipi_ast()
+{
+
+	aston(curcpu());
 }

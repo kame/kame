@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_reconmap.c,v 1.4.2.1 1999/09/28 04:48:20 cgd Exp $	*/
+/*	$NetBSD: rf_reconmap.c,v 1.6 1999/08/14 21:44:24 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -37,7 +37,6 @@
 #include <sys/time.h>
 #include "rf_general.h"
 #include "rf_utils.h"
-#include "rf_sys.h"
 
 /* special pointer values indicating that a reconstruction unit
  * has been either totally reconstructed or not at all.  Both

@@ -1,4 +1,4 @@
-/*	$NetBSD: aha.c,v 1.22 1998/12/09 08:47:18 thorpej Exp $	*/
+/*	$NetBSD: aha.c,v 1.28 2000/03/30 12:45:28 augustss Exp $	*/
 
 #include "opt_ddb.h"
 
@@ -64,6 +64,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
@@ -147,7 +148,7 @@ aha_cmd(iot, ioh, sc, icnt, ibuf, ocnt, obuf)
 	u_char *ibuf, *obuf;
 {
 	const char *name;
-	register int i;
+	int i;
 	int wait;
 	u_char sts;
 	u_char opcode = ibuf[0];
@@ -384,7 +385,7 @@ AGAIN:
 			goto next;
 		}
 
-		untimeout(aha_timeout, ccb);
+		callout_stop(&ccb->xs->xs_callout);
 		aha_done(sc, ccb);
 
 	next:
@@ -569,7 +570,7 @@ aha_get_ccb(sc, flags)
 			TAILQ_REMOVE(&sc->sc_free_ccb, ccb, chain);
 			break;
 		}
-		if ((flags & SCSI_NOSLEEP) != 0)
+		if ((flags & XS_CTL_NOSLEEP) != 0)
 			goto out;
 		tsleep(&sc->sc_free_ccb, PRIBIO, "ahaccb", 0);
 	}
@@ -695,8 +696,9 @@ aha_start_ccbs(sc)
 		/* Tell the card to poll immediately. */
 		bus_space_write_1(iot, ioh, AHA_CMD_PORT, AHA_START_SCSI);
 
-		if ((ccb->xs->flags & SCSI_POLL) == 0)
-			timeout(aha_timeout, ccb, (ccb->timeout * hz) / 1000);
+		if ((ccb->xs->xs_control & XS_CTL_POLL) == 0)
+			callout_reset(&ccb->xs->xs_callout,
+			    (ccb->timeout * hz) / 1000, aha_timeout, ccb);
 
 		++sc->sc_mbofull;
 		aha_nextmbx(wmbo, wmbx, mbo);
@@ -728,7 +730,7 @@ aha_done(sc, ccb)
 	if (xs->datalen) {
 		bus_dmamap_sync(dmat, ccb->dmamap_xfer, 0,
 		    ccb->dmamap_xfer->dm_mapsize,
-		    (xs->flags & SCSI_DATA_IN) ? BUS_DMASYNC_POSTREAD :
+		    (xs->xs_control & XS_CTL_DATA_IN) ? BUS_DMASYNC_POSTREAD :
 		    BUS_DMASYNC_POSTWRITE);
 		bus_dmamap_unload(dmat, ccb->dmamap_xfer);
 	}
@@ -783,7 +785,7 @@ aha_done(sc, ccb)
 			xs->resid = 0;
 	}
 	aha_free_ccb(sc, ccb);
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 	scsipi_done(xs);
 
 	/*
@@ -1122,23 +1124,27 @@ aha_inquire_setup_information(sc)
 #endif /* AHADEBUG */
 
 	switch (revision.reply.boardid) {
-	case 0x31:
+	case BOARD_1540_16HEAD_BIOS:
+	case BOARD_1540_64HEAD_BIOS:
+	case BOARD_1540:
 		strcpy(sc->sc_model, "1540");
 		break;
-	case 0x41:
+	case BOARD_1542:
 		strcpy(sc->sc_model, "1540A/1542A/1542B");
 		break;
-	case 0x42:
+	case BOARD_1640:
 		strcpy(sc->sc_model, "1640");
 		break;
-	case 0x43:
+	case BOARD_1740:
+		strcpy(sc->sc_model, "1740");
+		break;
+	case BOARD_1542C:
 		strcpy(sc->sc_model, "1542C");
 		break;
-	case 0x44:
-	case 0x45:
+	case BOARD_1542CF:
 		strcpy(sc->sc_model, "1542CF");
 		break;
-	case 0x46:
+	case BOARD_1542CP:
 		strcpy(sc->sc_model, "1542CP");
 		break;
 	}
@@ -1178,7 +1184,7 @@ aha_scsi_cmd(xs)
 	bus_dma_tag_t dmat = sc->sc_dmat;
 	struct aha_ccb *ccb;
 	int error, seg, flags, s;
-	int fromqueue = 0, dontqueue = 0;
+	int fromqueue = 0, dontqueue = 0, nowait = 0;
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("aha_scsi_cmd\n"));
 
@@ -1191,11 +1197,12 @@ aha_scsi_cmd(xs)
 	if (xs == TAILQ_FIRST(&sc->sc_queue)) {
 		TAILQ_REMOVE(&sc->sc_queue, xs, adapter_q);
 		fromqueue = 1;
+		nowait = 1;
 		goto get_ccb;
 	}
 
 	/* Polled requests can't be queued for later. */
-	dontqueue = xs->flags & SCSI_POLL;
+	dontqueue = xs->xs_control & XS_CTL_POLL;
 
 	/*
 	 * If there are jobs in the queue, run them first.
@@ -1226,7 +1233,9 @@ aha_scsi_cmd(xs)
 	 * is from a buf (possibly from interrupt time)
 	 * then we can't allow it to sleep
 	 */
-	flags = xs->flags;
+	flags = xs->xs_control;
+	if (nowait)
+		flags |= XS_CTL_NOSLEEP;
 	if ((ccb = aha_get_ccb(sc, flags)) == NULL) {
 		/*
 		 * If we can't queue, we lose.
@@ -1257,7 +1266,7 @@ aha_scsi_cmd(xs)
 	/*
 	 * Put all the arguments for the xfer in the ccb
 	 */
-	if (flags & SCSI_RESET) {
+	if (flags & XS_CTL_RESET) {
 		ccb->opcode = AHA_RESET_CCB;
 		ccb->scsi_cmd_length = 0;
 	} else {
@@ -1273,17 +1282,17 @@ aha_scsi_cmd(xs)
 		 * Map the DMA transfer.
 		 */
 #ifdef TFS
-		if (flags & SCSI_DATA_UIO) {
+		if (flags & XS_CTL_DATA_UIO) {
 			error = bus_dmamap_load_uio(dmat,
 			    ccb->dmamap_xfer, (struct uio *)xs->data,
-			    (flags & SCSI_NOSLEEP) ? BUS_DMA_NOWAIT :
+			    (flags & XS_CTL_NOSLEEP) ? BUS_DMA_NOWAIT :
 			    BUS_DMA_WAITOK);
 		} else
 #endif
 		{
 			error = bus_dmamap_load(dmat,
 			    ccb->dmamap_xfer, xs->data, xs->datalen, NULL,
-			    (flags & SCSI_NOSLEEP) ? BUS_DMA_NOWAIT :
+			    (flags & XS_CTL_NOSLEEP) ? BUS_DMA_NOWAIT :
 			    BUS_DMA_WAITOK);
 		}
 		
@@ -1302,7 +1311,7 @@ aha_scsi_cmd(xs)
 
 		bus_dmamap_sync(dmat, ccb->dmamap_xfer, 0,
 		    ccb->dmamap_xfer->dm_mapsize,
-		    (flags & SCSI_DATA_IN) ? BUS_DMASYNC_PREREAD :
+		    (flags & XS_CTL_DATA_IN) ? BUS_DMASYNC_PREREAD :
 		    BUS_DMASYNC_PREWRITE);
 
 		/*
@@ -1351,7 +1360,7 @@ aha_scsi_cmd(xs)
 	 * Usually return SUCCESSFULLY QUEUED
 	 */
 	SC_DEBUG(sc_link, SDEV_DB3, ("cmd_sent\n"));
-	if ((flags & SCSI_POLL) == 0)
+	if ((flags & XS_CTL_POLL) == 0)
 		return (SUCCESSFULLY_QUEUED);
 
 	/*
@@ -1390,7 +1399,7 @@ aha_poll(sc, xs, count)
 		 */
 		if (bus_space_read_1(iot, ioh, AHA_INTR_PORT) & AHA_INTR_ANYINTR)
 			aha_intr(sc);
-		if (xs->flags & ITSDONE)
+		if (xs->xs_status & XS_STS_DONE)
 			return (0);
 		delay(1000);	/* only happens in boot so ok */
 		count--;

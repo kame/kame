@@ -1,4 +1,4 @@
-/*	$NetBSD: locore_mips1.S,v 1.7 1999/02/28 21:53:00 jonathan Exp $	*/
+/*	$NetBSD: locore_mips1.S,v 1.34 2000/05/29 23:40:04 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -52,6 +52,7 @@
  *
  *	@(#)locore.s	8.5 (Berkeley) 1/4/94
  */
+#include "opt_cputype.h"
 #include "opt_ddb.h"
 #include <mips/asm.h>
 #include <mips/cpuregs.h>
@@ -84,7 +85,7 @@ VECTOR(mips1_UTLBMiss, unknown)
 	mfc0	k0, MIPS_COP_0_BAD_VADDR	# get the virtual address
 	lw	k1, 0(k1)			# get pointer to segment map
 	srl	k0, k0, PGSHIFT - 2		# compute segment map index
-	andi	k0, k0, (NPTEPG - 1) << 2
+	and	k0, k0, (NPTEPG - 1) << 2
 	beq	k1, zero, 2f			# invalid segment map
 	addu	k1, k1, k0			# index into segment map
 	lw	k0, 0(k1)			# get page PTE
@@ -164,24 +165,22 @@ mips1_SlowFault:
  * call trap() to process the condition.
  *
  * trapframe is now pointed by 5th arg {
- *  	register_t cf_args[4 + 1];
+ *	register_t cf_args[4 + 1];
  *	register_t cf_pad;
- *  	register_t cf_sp;
- *  	register_t cf_ra;
- *  	mips_reg_t tf_regs[17];		- trapframe begins here
+ *	register_t cf_sp;
+ *	register_t cf_ra;
+ *	mips_reg_t tf_regs[17];		- trapframe begins here
  * 	mips_reg_t tf_sr;		-
  * 	mips_reg_t tf_mullo;		-
  * 	mips_reg_t tf_mulhi;		-
  * 	register_t tf_epc;		- may be changed by trap() call
- *  };
+ * };
  */
 NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, -4
-	subu	sp, sp, KERNFRAME_SIZ
 #ifdef DDB
 	la	k0, _C_LABEL(kdbaux)
-	addu	k1, sp, KERNFRAME_SIZ	# Avoid violating conventions
 	sw	s0, SF_REG_S0(k0)
 	sw	s1, SF_REG_S1(k0)
 	sw	s2, SF_REG_S2(k0)
@@ -190,7 +189,7 @@ NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 	sw	s5, SF_REG_S5(k0)
 	sw	s6, SF_REG_S6(k0)
 	sw	s7, SF_REG_S7(k0)
-	sw	k1, SF_REG_SP(k0)
+	sw	sp, SF_REG_SP(k0)
 	sw	s8, SF_REG_S8(k0)
 	sw	gp, SF_REG_RA(k0)
 #endif
@@ -199,6 +198,7 @@ NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
  * We don't need to save s0 - s8, sp and gp because
  * the compiler does it for us.
  */
+	subu	sp, sp, KERNFRAME_SIZ
 	sw	AT, TF_BASE+TF_REG_AST(sp)
 	sw	v0, TF_BASE+TF_REG_V0(sp)
 	sw	v1, TF_BASE+TF_REG_V1(sp)
@@ -229,13 +229,19 @@ NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 	sw	a3, TF_BASE+TF_REG_EPC(sp)
 	addu	v0, sp, TF_BASE
 	sw	v0, KERNFRAME_ARG5(sp)		# 5th arg is p. to trapframe
+/*
+ * Call the trap handler.
+ */
 #if /* ifdef DDB */ defined(DDB) || defined(DEBUG)
-	move	ra, a3
-	sw	ra, KERNFRAME_RA(sp)		# for debugging
+	addu	v0, sp, KERNFRAME_SIZ
+	sw	v0, KERNFRAME_SP(sp)
 #endif
 	jal	_C_LABEL(trap)
-	nop
+	sw	a3,	KERNFRAME_RA(sp)	# for debugging
 
+/*
+ * Restore registers and return from the exception.
+ */
 	lw	a0, TF_BASE+TF_REG_SR(sp)
 	lw	t0, TF_BASE+TF_REG_MULLO(sp)
 	lw	t1, TF_BASE+TF_REG_MULHI(sp)
@@ -251,7 +257,7 @@ NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 	lw	a2, TF_BASE+TF_REG_A2(sp)
 	lw	a3, TF_BASE+TF_REG_A3(sp)
 	lw	t0, TF_BASE+TF_REG_T0(sp)
-	lw	t1, TF_BASE+TF_REG_T1(sp) 
+	lw	t1, TF_BASE+TF_REG_T1(sp)
 	lw	t2, TF_BASE+TF_REG_T2(sp)
 	lw	t3, TF_BASE+TF_REG_T3(sp)
 	lw	t4, TF_BASE+TF_REG_T4(sp)
@@ -259,11 +265,25 @@ NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 	lw	t6, TF_BASE+TF_REG_T6(sp)
 	lw	t7, TF_BASE+TF_REG_T7(sp)
 	lw	t8, TF_BASE+TF_REG_T8(sp)
-	lw	t9, TF_BASE+TF_REG_T9(sp)	
+	lw	t9, TF_BASE+TF_REG_T9(sp)
 	lw	ra, TF_BASE+TF_REG_RA(sp)
 	addu	sp, sp, KERNFRAME_SIZ
+#ifdef DDBnotyet
+	la	k1, _C_LABEL(kdbaux)
+	lw	s0, SF_REG_S0(k1)
+	lw	s1, SF_REG_S1(k1)
+	lw	s2, SF_REG_S2(k1)
+	lw	s3, SF_REG_S3(k1)
+	lw	s4, SF_REG_S4(k1)
+	lw	s5, SF_REG_S5(k1)
+	lw	s6, SF_REG_S6(k1)
+	lw	s7, SF_REG_S7(k1)
+	lw	sp, SF_REG_SP(k1)
+	lw	s8, SF_REG_S8(k1)
+	lw	gp, SF_REG_RA(k1)
+#endif
 	j	k0				# return to interrupted point
-	rfe	
+	rfe
 	.set	at
 END(mips1_KernGenException)
 
@@ -283,7 +303,7 @@ NESTED_NOPROFILE(mips1_UserGenException, CALLFRAME_SIZ, ra)
  */
 	lw	k1, _C_LABEL(curpcb)
 	nop
-	addiu	k1, k1, USPACE - FRAME_SIZ
+	addu	k1, k1, USPACE - FRAME_SIZ
 	sw	AT, FRAME_AST(k1)
 	sw	v0, FRAME_V0(k1)
 	sw	v1, FRAME_V1(k1)
@@ -342,7 +362,7 @@ NESTED_NOPROFILE(mips1_UserGenException, CALLFRAME_SIZ, ra)
 /*
  * Restore user registers and return. NOTE: interrupts are enabled.
  */
-	addiu	a1, sp, CALLFRAME_SIZ
+	addu	a1, sp, CALLFRAME_SIZ
 	lw	a0, FRAME_SR(a1)
 	lw	t0, FRAME_MULLO(a1)
 	lw	t1, FRAME_MULHI(a1)
@@ -400,7 +420,7 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
  */
 	lw	k1, _C_LABEL(curpcb)
 	nop
-	addiu	k1, k1, USPACE - FRAME_SIZ
+	addu	k1, k1, USPACE - FRAME_SIZ
 	sw	AT, FRAME_AST(k1)
 	sw	v0, FRAME_V0(k1)
 	sw	v1, FRAME_V1(k1)
@@ -439,7 +459,7 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 	sw	v0, FRAME_MULLO(k1)
 	sw	v1, FRAME_MULHI(k1)
 	sw	a2, FRAME_EPC(k1)
-	addiu	sp, k1, -CALLFRAME_SIZ		# switch to kernel SP
+	addu	sp, k1, -CALLFRAME_SIZ		# switch to kernel SP
 #ifdef __GP_SUPPORT__
 	la	gp, _C_LABEL(_gp)		# switch to kernel GP
 #endif
@@ -458,7 +478,7 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 /*
  * Restore user registers and return. NOTE: interrupts are enabled.
  */
-	addiu	a1, sp, CALLFRAME_SIZ
+	addu	a1, sp, CALLFRAME_SIZ
 	lw	a0, FRAME_SR(a1)
 	lw	t0, FRAME_MULLO(a1)
 	lw	t1, FRAME_MULHI(a1)
@@ -506,7 +526,7 @@ END(mips1_SystemCall)
  *
  * Handle an interrupt from kernel mode.
  * Build kernframe on stack to hold interrupted kernel context, then
- * call interrupt() to process it.
+ * call cpu_intr() to process it.
  *
  */
 NESTED_NOPROFILE(mips1_KernIntr, KERNFRAME_SIZ, ra)
@@ -542,6 +562,7 @@ NESTED_NOPROFILE(mips1_KernIntr, KERNFRAME_SIZ, ra)
 	sw	t9, TF_BASE+TF_REG_T9(sp)
 	sw	ra, TF_BASE+TF_REG_RA(sp)
 	sw	a0, TF_BASE+TF_REG_SR(sp)
+	and	a3, a0, a1			# 4th is STATUS & CAUSE
 	sw	v0, TF_BASE+TF_REG_MULLO(sp)
 	sw	v1, TF_BASE+TF_REG_MULHI(sp)
 	sw	a2, TF_BASE+TF_REG_EPC(sp)
@@ -552,7 +573,7 @@ NESTED_NOPROFILE(mips1_KernIntr, KERNFRAME_SIZ, ra)
 /*
  * Call the interrupt handler.
  */
-	jal	_C_LABEL(interrupt)
+	jal	_C_LABEL(cpu_intr)
 	nop
 /*
  * Restore registers and return from the interrupt.
@@ -597,7 +618,7 @@ END(mips1_KernIntr)
  *	kernel stack since there has to be a u page if we came from user mode.
  *	If there is a pending software interrupt, then save the remaining state
  *	and call softintr(). This is all because if we call switch() inside
- *	interrupt(), not all the user registers have been saved in u.u_pcb.
+ *	cpu_intr(), not all the user registers have been saved in u.u_pcb.
  *
  * Results:
  * 	None.
@@ -616,7 +637,7 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
  */
 	lw	k1, _C_LABEL(curpcb)
 	nop
-	addiu	k1, k1, USPACE - FRAME_SIZ
+	addu	k1, k1, USPACE - FRAME_SIZ
 	sw	AT, FRAME_AST(k1)
 	sw	v0, FRAME_V0(k1)
 	sw	v1, FRAME_V1(k1)
@@ -645,8 +666,9 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
 	sw	a0, FRAME_SR(k1)
 	sw	v0, FRAME_MULLO(k1)
 	sw	v1, FRAME_MULHI(k1)
+	and	a3, a0, a1			# 4th is STATUS & CAUSE
 	sw	a2, FRAME_EPC(k1)
-	addiu	sp, k1, -CALLFRAME_SIZ		# switch to kernel SP
+	addu	sp, k1, -CALLFRAME_SIZ		# switch to kernel SP
 #ifdef __GP_SUPPORT__
 	la	gp, _C_LABEL(_gp)		# switch to kernel GP
 #endif
@@ -660,12 +682,12 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
 /*
  * Call the interrupt handler.
  */
-	jal	_C_LABEL(interrupt)
+	jal	_C_LABEL(cpu_intr)
 	mtc0	t0, MIPS_COP_0_STATUS
 /*
  * Check pending asynchoronous traps.
  */
-	addiu	a1, sp, CALLFRAME_SIZ
+	addu	a1, sp, CALLFRAME_SIZ
 	lw	a0, FRAME_SR(a1)
 	lw	v0, _C_LABEL(astpending)	# any pending ast?
 	mtc0	a0, MIPS_COP_0_STATUS		# restore SR, disable intrs
@@ -689,7 +711,7 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
 	jal	_C_LABEL(ast)
 	mtc0	t0, MIPS_COP_0_STATUS		# enable interrupts (spl0)
 
-	addiu	a1, sp, CALLFRAME_SIZ
+	addu	a1, sp, CALLFRAME_SIZ
 	lw	a0, FRAME_SR(a1)
 	lw	s0, FRAME_S0(a1)
 	mtc0	a0, MIPS_COP_0_STATUS		# this should disable interrupts
@@ -764,7 +786,7 @@ LEAF_NOPROFILE(mips1_TLBModException)
 	tlbp					# find the TLB entry
 	mfc0	k0, MIPS_COP_0_TLB_LOW		# get the physical address
 	mfc0	k1, MIPS_COP_0_TLB_INDEX	# check to be sure its valid
-	or	k0, k0, MIPS1_TLB_MOD_BIT	# update TLB
+	or	k0, k0, MIPS1_TLB_DIRTY_BIT	# update TLB
 	blt	k1, zero, 4f			# not found!!!
 	mtc0	k0, MIPS_COP_0_TLB_LOW
 	li	k1, MIPS_KSEG0_START
@@ -826,84 +848,13 @@ LEAF_NOPROFILE(mips1_TLBMissException)
 	rfe
 
 outofworld:
-	move	a1, sp 
+	/* Ensure we have a valid sp so panic has a chance */
+	move	a1, sp
 	la	sp, start			# set sp to a valid place
-	PANIC("out of universe: ksp was %p")
+	PANIC("TLB out of universe: ksp was %p")
 	.set	at
 END(mips1_TLBMissException)
 
-
-#if 0
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBWriteIndexed --
- *
- *	Write the given entry into the TLB at the given index.
- *
- *	mips1_TLBWriteIndexed(index, highEntry, lowEntry)
- *		int index;
- *		int highEntry;
- *		int lowEntry;
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	TLB entry set.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBWriteIndexed)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Save the current PID.
-
-	sll	a0, a0, MIPS1_TLB_INDEX_SHIFT
-	mtc0	a0, MIPS_COP_0_TLB_INDEX	# Set the index.
-	mtc0	a1, MIPS_COP_0_TLB_HI		# Set up entry high.
-	mtc0	a2, MIPS_COP_0_TLB_LOW		# Set up entry low.
-	nop
-	tlbwi					# Write the TLB
-
-	mtc0	t0, MIPS_COP_0_TLB_HI		# Restore the PID.
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_TLBWriteIndexed)
-
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBWriteRandom --
- *
- *	Write the given entry into the TLB at a random location.
- *
- *	mips1_TLBWriteRandom(highEntry, lowEntry)
- *		unsigned highEntry;
- *		unsigned lowEntry;
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	TLB entry set.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBWriteRandom)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	v0, MIPS_COP_0_TLB_HI		# Save the current PID.
-	nop
-
-	mtc0	a0, MIPS_COP_0_TLB_HI		# Set up entry high.
-	mtc0	a1, MIPS_COP_0_TLB_LOW		# Set up entry low.
-	nop
-	tlbwr					# Write the TLB
-
-	mtc0	v0, MIPS_COP_0_TLB_HI		# Restore the PID.
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_TLBWriteRandom)
-#endif
 
 /*--------------------------------------------------------------------------
  *
@@ -929,134 +880,6 @@ LEAF(mips1_SetPID)
 	nop
 END(mips1_SetPID)
 
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBFlush --
- *
- *	Flush the "random" entries from the TLB.
- *
- *	mips1_TLBFlush()
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The TLB is flushed.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBFlush)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Save the PID
-	li	t1, MIPS_KSEG0_START		# invalid address
-	mtc0	t1, MIPS_COP_0_TLB_HI		# Mark entry high as invalid
-	mtc0	zero, MIPS_COP_0_TLB_LOW	# Zero out low entry.
-/*
- * Align the starting value (t1) and the upper bound (t2).
- */
-	li	t1, MIPS1_TLB_FIRST_RAND_ENTRY << MIPS1_TLB_INDEX_SHIFT
-	li	t2, MIPS1_TLB_NUM_TLB_ENTRIES << MIPS1_TLB_INDEX_SHIFT
-1:
-	mtc0	t1, MIPS_COP_0_TLB_INDEX	# Set the index register.
-	addu	t1, t1, 1 << MIPS1_TLB_INDEX_SHIFT	# Increment index.
-	bne	t1, t2, 1b
-	tlbwi					# Write the TLB entry.
-
-	mtc0	t0, MIPS_COP_0_TLB_HI		# Restore the PID
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_TLBFlush)
-
-#if 0
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBFlushPID --
- *
- *	Flush all entries with the given PID from the TLB.
- *
- *	mips1_TLBFlushPID(pid)
- *		int pid;
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	All entries corresponding to this PID are flushed.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBFlushPID)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Save the current PID
-	sll	a0, a0, MIPS1_TLB_PID_SHIFT	# Align the pid to flush.
-/*
- * Align the starting value (t1) and the upper bound (t2).
- */
-	li	t1, MIPS1_TLB_FIRST_RAND_ENTRY << MIPS1_TLB_INDEX_SHIFT
-	li	t2, MIPS1_TLB_NUM_TLB_ENTRIES << MIPS1_TLB_INDEX_SHIFT
-	mtc0	t1, MIPS_COP_0_TLB_INDEX	# Set the index register
-1:
-	addu	t1, t1, 1 << MIPS1_TLB_INDEX_SHIFT	# Increment index.
-	tlbr					# Read from the TLB
-	mfc0	t4, MIPS_COP_0_TLB_HI		# Fetch the hi register.
-	nop
-	and	t4, t4, MIPS1_TLB_PID		# compare PIDs
-	bne	t4, a0, 2f
-	li	v0, MIPS_KSEG0_START		# invalid address
-	mtc0	v0, MIPS_COP_0_TLB_HI		# Mark entry high as invalid
-	mtc0	zero, MIPS_COP_0_TLB_LOW	# Zero out low entry.
-	nop
-	tlbwi					# Write the entry.
-2:
-	bne	t1, t2, 1b
-	mtc0	t1, MIPS_COP_0_TLB_INDEX	# Set the index register
-
-	mtc0	t0, MIPS_COP_0_TLB_HI		# restore PID
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_TLBFlushPID)
-#endif
-
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBFlushAddr --
- *
- *	Flush any TLB entries for the given address and TLB PID.
- *
- *	mips1_TLBFlushAddr(highreg)
- *		unsigned highreg;
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The process's page is flushed from the TLB.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBFlushAddr)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Get current PID
-	nop
-
-	mtc0	a0, MIPS_COP_0_TLB_HI		# look for addr & PID
-	nop
-	tlbp					# Probe for the entry.
-	mfc0	v0, MIPS_COP_0_TLB_INDEX	# See what we got
-	li	t1, MIPS_KSEG0_START		# Load invalid entry.
-	bltz	v0, 1f				# index < 0 => !found
-	mtc0	t1, MIPS_COP_0_TLB_HI		# Mark entry high as invalid
-	mtc0	zero, MIPS_COP_0_TLB_LOW	# Zero out low entry.
-	nop
-	tlbwi
-1:
-	mtc0	t0, MIPS_COP_0_TLB_HI		# restore PID
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_TLBFlushAddr)
 
 /*--------------------------------------------------------------------------
  *
@@ -1076,68 +899,27 @@ END(mips1_TLBFlushAddr)
  *--------------------------------------------------------------------------
  */
 LEAF(mips1_TLBUpdate)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Save current PID
-	nop					# 2 cycles before intr disabled
-	mtc0	a0, MIPS_COP_0_TLB_HI		# init high reg.
+	mfc0	v1, MIPS_COP_0_STATUS		# save the status register
+	mtc0	zero, MIPS_COP_0_STATUS		# disable interrupts
 	nop
-	tlbp					# Probe for the entry.
-	mfc0	v0, MIPS_COP_0_TLB_INDEX	# See what we got
-	mtc0	a1, MIPS_COP_0_TLB_LOW		# init low reg.
-	bltz	v0, 1f				# index < 0 => !found
-	sra	v0, v0, MIPS1_TLB_INDEX_SHIFT	# convert index to regular num
-	b	2f
-	tlbwi					# update slot found
-1:
-	mtc0	a0, MIPS_COP_0_TLB_HI		# init high reg.
+	mfc0	t0, MIPS_COP_0_TLB_HI		# save current PID
 	nop
-	tlbwr					# enter into a random slot
+	mtc0	a0, MIPS_COP_0_TLB_HI		# set entryhi
+	nop
+	tlbp					# probe the existence
+	mfc0	v0, MIPS_COP_0_TLB_INDEX	# see what we got
+	mtc0	a1, MIPS_COP_0_TLB_LOW		# set new entrylo
+	bgez	v0, 2f				# index < 0 => !found
+	nop
+	b	3f
+	tlbwr					# add vicitimizing another
 2:
-	mtc0	t0, MIPS_COP_0_TLB_HI		# restore PID
+	tlbwi					# update the existing one
+3:
+	mtc0	t0, MIPS_COP_0_TLB_HI		# restore current PID
 	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
+	mtc0	v1, MIPS_COP_0_STATUS
 END(mips1_TLBUpdate)
-
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBFind --
- *
- *	Search the TLB for the given entry.
- *
- *	mips1_TLBFind(hi, tlb)
- *		unsigned hi;
- *		struct mips1_tlb *tlb;
- *
- * Results:
- *	Returns a value >= 0 if the entry was found (the index).
- *	Returns a value < 0 if the entry was not found.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBFind)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Get current PID
-	nop
-	mtc0	a0, MIPS_COP_0_TLB_HI		# Set up entry high.
-	nop
-	tlbp					# Probe for the entry.
-	mfc0	v0, MIPS_COP_0_TLB_INDEX	# See what we got
-	nop
-	bltz	v0, 1f				# not found
-	nop
-	tlbr					# read TLB
-	mfc0	t1, MIPS_COP_0_TLB_HI		# See what we got
-	mfc0	t2, MIPS_COP_0_TLB_LOW		# See what we got
-	sw	t1, 0(a1)
-	sw	t2, 4(a1)
-	srl	v0, v0, MIPS1_TLB_INDEX_SHIFT	# convert index to regular num
-1:
-	mtc0	t0, MIPS_COP_0_TLB_HI		# Restore current PID
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_TLBFind)
 
 /*--------------------------------------------------------------------------
  *
@@ -1173,61 +955,13 @@ LEAF(mips1_TLBRead)
 	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
 END(mips1_TLBRead)
 
-#if 0
-/*--------------------------------------------------------------------------
- *
- * mips1_TLBGetPID --
- *
- *	mips1_TLBGetPID()
- *
- * Results:
- *	Returns the current TLB pid reg.
- *
- * Side effects:
- *	None.
- *
- *--------------------------------------------------------------------------
- */
-LEAF(mips1_TLBGetPID)
-	mfc0	v0, MIPS_COP_0_TLB_HI		# get PID
-	nop
-	and	v0, v0, MIPS1_TLB_PID		# mask off PID
-	j	ra
-	srl	v0, v0, MIPS1_TLB_PID_SHIFT	# put PID in right spot
-END(mips1_TLBGetPID)
-#endif
-
-LEAF(mips1_clean_tlb)
-	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
-	mfc0	t0, MIPS_COP_0_TLB_HI		# Save the PID
-	li	t1, MIPS_KSEG0_START		# invalid address
-	mtc0	t1, MIPS_COP_0_TLB_HI		# Mark entry high as invalid
-	mtc0	zero, MIPS_COP_0_TLB_LOW	# Zero out low entry.
-/*
- * Align the starting value (t1) and the upper bound (t2).
- */
-	#li	t1, MIPS1_TLB_FIRST_RAND_ENTRY << MIPS1_TLB_INDEX_SHIFT
-	move	t1, zero
-	li	t2, MIPS1_TLB_NUM_TLB_ENTRIES << MIPS1_TLB_INDEX_SHIFT
-1:
-	mtc0	t1, MIPS_COP_0_TLB_INDEX	# Set the index register.
-	addu	t1, t1, 1 << MIPS1_TLB_INDEX_SHIFT	# Increment index.
-	bne	t1, t2, 1b
-	tlbwi					# Write the TLB entry.
-
-	mtc0	t0, MIPS_COP_0_TLB_HI		# Restore the PID
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
-END(mips1_clean_tlb)
-
 /*----------------------------------------------------------------------------
  *
  *	R3000 cache sizing and flushing code.
  *
  *----------------------------------------------------------------------------
  */
-
+#ifndef ENABLE_MIPS_TX3900
 
 /*----------------------------------------------------------------------------
  *
@@ -1449,17 +1183,6 @@ LEAF(mips1_FlushICache)
 	j	v1
 	nop
 1:
-#ifdef PMAX_CACHEFLUSH_FORCES_WBFLUSH	/* XXX */
-	/*
-	 * The insn below attempts to wait for the  writebuffer to drain. 
-	 * It does not work on all MIPS hosts or maybe even all DEC machines.
-	 * It assumes that the COP0 usability bit is wired to external
-	 * writebuffer logic. This is not true on some DECstations or on
-	 * the SONY news3400.
-	 * Why we are even doing this for an I-cache flush is beyond me.
-	 */
-	bc0f	1b				# make sure stores are complete
-#endif	/*  PMAX_CACHEFLUSH_FORCES_WBFLUSH */
 	li	v1, MIPS_SR_ISOL_CACHES | MIPS_SR_SWAP_CACHES	# DELAYSLOT
 
 	mtc0	v1, MIPS_COP_0_STATUS
@@ -1498,18 +1221,6 @@ LEAF(mips1_FlushDCache)
 	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
 	nop
 
-#ifdef PMAX_CACHEFLUSH_FORCES_WBFLUSH	/* XXX */
-	/*
-	 * The insn below attempts to wait for the writebuffer to drain. 
-	 * It does not work on all MIPS hosts or maybe even all DEC machines.
-	 * It assumes that the COP0 usability bit is wired to external
-	 * writebuffer logic. This is not true on some DECstations or on
-	 * the SONY news3400. (note the following ld is in our delayslot.)
-	 */
-1:
-	bc0f	1b				# make sure stores are complete
-#endif	/* PMAX_CACHEFLUSH_FORCES_WBFLUSH */
-
 	li	v1, MIPS_SR_ISOL_CACHES		# DELAYSLOT
 	mtc0	v1, MIPS_COP_0_STATUS
 	nop
@@ -1534,21 +1245,20 @@ LEAF(mips1_FlushDCache)
 	nop
 END(mips1_FlushDCache)
 
-/*----------------------------------------------------------------------------
+/*
+ * void mips1_wbflush(void)
  *
- * mips1_wbflush --
+ * Drain processor's write buffer, normally used to ensure any I/O
+ * register write operations are done before subsequent manipulations.
  *
- *	Return when the write buffer is empty.
+ * Some hardware implementations have a WB chip independent from CPU
+ * core, and CU0 (Coprocessor Usability #0) bit of CP0 status register
+ * is wired to indicate writebuffer condition.  This code does busy-loop
+ * while CU0 bit indicates false condition.
  *
- *	mips1_wbflush()
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------------
+ * For other hardwares which have the writebuffer logic is implemented
+ * in a system controller ASIC chip, wbflush operation would done
+ * differently.
  */
 LEAF(mips1_wbflush)
 	nop
@@ -1560,19 +1270,199 @@ LEAF(mips1_wbflush)
 	j	ra
 	nop
 END(mips1_wbflush)
+#else /* !ENABLE_MIPS_TX3900 */
+/*
+ *	The differences between R3900 and R3000.
+ *	1. Cache system
+ *		TX3912 I-cache 4KB/16B direct mapped
+ *		       D-cache 1KB/4B 2-way sa
+ *		TX3922 I-cache 16KB/16B 2-way sa
+ *		       D-cache 8KB/16B 2-way sa
+ *		(mips/mips/locore_mips1.S)
+ *
+ *	2. Coprocessor1
+ *	2.1	cache operation.
+ *		R3900 uses MIPSIII cache op like method.
+ *	2.2	R3900 specific CP0 register.
+ *		(mips/include/r3900regs.h overrides cpuregs.h)
+ *	2.3	# of TLB entries
+ *		TX3912 32 entries
+ *		TX3922 64 entries
+ *
+ *	3. System address map
+ *		kseg2 0xff000000-0xfffeffff is reserved.
+ *		(mips/include/vmparam.h)
+ *
+ * If defined both MIPS1 and ENABLE_MIPS_TX3900, it generates kernel for
+ * R3900. If defined MIPS1 only, No R3900 feature include.
+ */
 
 /*
- * mips1_proc_trampoline()
- *
- * Arrange for a function to be invoked neatly, after a cpu_switch().
- * Call the service function with one argument, specified by the s0
- * and s1 respectively.  There is no need register save operation.
+ * void mips1_ConfigCache(void)
  */
-LEAF(mips1_proc_trampoline) 
+LEAF(mips1_ConfigCache)
+	mfc0	t0, R3900_COP_0_CONFIG
+	li	t1, R3900_CONFIG_ICS_MASK
+	and	t1, t1, t0
+	srl	t1, t1, R3900_CONFIG_ICS_SHIFT
+	li	t2, R3900_MIN_CACHE_SIZE
+	sllv	t1, t2, t1
+	sw	t1, _C_LABEL(mips_L1ICacheSize)
+
+	li	t1, R3900_CONFIG_DCS_MASK
+	and	t1, t1, t0
+	srl	t1, t1, R3900_CONFIG_DCS_SHIFT
+	li	t2, R3900_MIN_CACHE_SIZE
+	sllv	t1, t2, t1
+	sw	t1, _C_LABEL(mips_L1DCacheSize)
+
+	j	ra
+	nop
+END(mips1_ConfigCache)
+
+/*
+ * R3900 2-way set-associative, line size 4byte(3900)/16byte(3920)
+ *	void mips1_FlushDCache(vaddr_t addr, vsize_t len)
+ */
+LEAF(mips1_FlushDCache)
+	lw	t0, mips_L1DCacheLSize
+	addu	a1, a1, a0			# compute ending address
+1:
+	R3900_CACHE(R3900_CACHE_D_HITINVALIDATE, 0, CPUREG_A0)
+	addu	a0, a0, t0
+	bne	a0, a1, 1b
+	nop
+
+	j	ra
+	nop
+END(mips1_FlushDCache)
+
+/*
+ * R3900 direct-mapped/2-way set-associative line size 16byte
+ *	void mips1_FlushICache(vaddr_t addr, vsize_t len)
+ */
+LEAF(mips1_FlushICache)
+	mfc0	t0, MIPS_COP_0_STATUS		# Save SR
+	nop
+	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
+	nop
+	# Disable I-cache
+	li	t1, ~R3900_CONFIG_ICE
+	mfc0	t2, R3900_COP_0_CONFIG
+	and	t1, t1, t2
+	nop
+	mtc0	t1, R3900_COP_0_CONFIG
+	j	2f	# stop streaming
+	nop
+2:
+	# Flush I-cache
+	addu	a1, 127
+	srl	a1, a1, 7	# Number of unrolled loops
+3:
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 0,   CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 16,  CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 32,  CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 48,  CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 64,  CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 80,  CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 96,  CPUREG_A0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 112, CPUREG_A0)
+	addu	a1, -1
+	bne	a1, zero, 3b
+	addu	a0, 128
+
+	# Enable I-cache
+	nop
+	mtc0	t2, R3900_COP_0_CONFIG
+	nop
+	mtc0	t0, MIPS_COP_0_STATUS		# enable interrupts
+	j	ra				# return and run cached
+	nop
+END(mips1_FlushICache)
+
+/*
+ *
+ *	void mips_FlushCache(void)
+ */
+LEAF(mips1_FlushCache)
+	lw	t1, mips_L1ICacheSize
+	lw	t2, mips_L1DCacheSize
+#	lw	t3, mips_L1ICacheLSize
+#	lw	t4, mips_L1DCacheLSize
+	nop
+	mfc0	t7, MIPS_COP_0_STATUS		# Save SR
+	nop
+	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
+	nop
+	# Disable I-cache
+	li	t5, ~R3900_CONFIG_ICE
+	mfc0	t6, R3900_COP_0_CONFIG
+	and	t5, t5, t6
+	nop
+	mtc0	t5, R3900_COP_0_CONFIG
+	j	2f	# stop streaming
+	nop
+2:
+	# Flush cache
+	li	t0, MIPS_KSEG0_START
+	addu	t1, t0, t1		# End address
+	subu	t1, t1, 128
+3:
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 0,   CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 16,  CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 32,  CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 48,  CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 64,  CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 80,  CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 96,  CPUREG_T0)
+	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 112, CPUREG_T0)
+	bne	t0, t1, 3b
+	addu	t0, t0, 128
+
+	# Flush D-cache
+	la	t0, dummy_buffer
+	addu	t1, t0, t2		# End address
+4:
+	lw	t2, 0(t0)
+	bne	t1, t0, 4b
+	addu	t0, t0, 4
+
+	# Enable I-cache
+	nop
+	mtc0	t6, R3900_COP_0_CONFIG
+	nop
+	mtc0	t7, MIPS_COP_0_STATUS		# enable interrupts
+	j	ra				# return and run cached
+	nop
+END(mips1_FlushCache)
+
+LEAF(mips1_wbflush)
+	nop
+	sync
+	nop
+	j	ra
+	nop
+END(mips1_wbflush)
+
+	.comm dummy_buffer, R3900_MAX_DCACHE_SIZE
+
+#endif /* !ENABLE_MIPS_TX3900 */
+/*
+ * mips1_proc_trampoline
+ *
+ * Special arrangement for a process about to go user mode right after
+ * fork() system call.  When the first CPU tick is scheduled to the
+ * forked child, it starts running from here.  Then, a service function
+ * is called with one argument supplied to complete final preparations,
+ * and the process returns to user mode as if the fork() system call is
+ * handled in a normal way.  No need to save any registers although this
+ * calls another.
+ */
+LEAF(mips1_proc_trampoline)
 	jal	ra, s0
 	move	a0, s1
 	.set	noat
-	addiu	a1, sp, CALLFRAME_SIZ	# a1 points exception frame
+	addu	a1, sp, CALLFRAME_SIZ	# a1 points exception frame
 	lw	a0, FRAME_SR(a1)
 	lw	t0, FRAME_MULLO(a1)
 	lw	t1, FRAME_MULHI(a1)
@@ -1618,74 +1508,194 @@ LEAF(mips1_proc_trampoline)
 END(mips1_proc_trampoline)
 
 /*
- * Resume process indicated by the pte's for its u struct
- * NOTE: This is hard coded to UPAGES == 2.
- * Also, there should be no TLB faults at this point.
+ * void mips1_cpu_switch_resume(struct proc *newproc)
  *
- * Entered from CPU-common cpu_switch()
- * a0 = new proc's p_addr
- * a1 = 1st u.pte
- * a2 = 2nd u.pte
- * a3 = Address Space Identifier (TLB Process ID) for this process
- *
- * NB: cannot be profiled due to weird argument-assing convention.
- *     mcount would trash v0, t0, t1.
+ * Wiredown the USPACE of newproc with TLB entry#0 and #1.  Check
+ * if target USPACE is already refered by any TLB entry before
+ * doing that, and make sure TBIS(them) in the case.
  */
 LEAF_NOPROFILE(mips1_cpu_switch_resume)
-	li	s0, MIPS_KSEG2_START
-	blt	a0, s0, 9f			# don't bother proc0
-	sll	a3, a3, MIPS1_TLB_PID_SHIFT	# a3 = aligned PID
-
-	ori	a1, MIPS1_PG_G			# PG_G Global
-	ori	a2, MIPS1_PG_G			# PG_G Global
-
-	mtc0	a0, MIPS_COP_0_TLB_HI		# 1st VPN w/ PID = 0
+	lw	a1, P_MD_UPTE_0(a0)		# a1 = upte[0]
+	lw	a2, P_MD_UPTE_1(a0)		# a2 = upte[1]
+	lw	s0, P_ADDR(a0)			# va = p->p_addr
+	li	s2, MIPS_KSEG2_START
+	blt	s0, s2, resume
 	nop
-	tlbp					# probe for entry
-	mfc0	s0, MIPS_COP_0_TLB_INDEX	# see if we found it
+
+	mtc0	s0, MIPS_COP_0_TLB_HI		# VPN = va
 	nop
-	bltz	s0, 1f
-	li	s0, MIPS_KSEG0_START		# found, then
-	mtc0	s0, MIPS_COP_0_TLB_HI
+	tlbp					# probe 1st VPN
+	mfc0	s1, MIPS_COP_0_TLB_INDEX
+	nop
+	bltz	s1, entry0set
+	li	s1, MIPS_KSEG0_START		# found, then
+	mtc0	s1, MIPS_COP_0_TLB_HI
 	mtc0	zero, MIPS_COP_0_TLB_LOW
 	nop
-	tlbwi					# purge it out of TLB
+	tlbwi					# TBIS(va)
 	nop
-	mtc0	a0, MIPS_COP_0_TLB_HI		# set 1st VPN again
-1:
+	mtc0	s0, MIPS_COP_0_TLB_HI		# set 1st VPN again
+entry0set:
 	mtc0	zero, MIPS_COP_0_TLB_INDEX	# TLB index #0
+	ori	a1, a1, MIPS1_PG_G
 	mtc0	a1, MIPS_COP_0_TLB_LOW		# 1st PFN w/ PG_G
 	nop
 	tlbwi					# set TLB entry #0
 
-	addu	a1, a0, NBPG
-	mtc0	a1, MIPS_COP_0_TLB_HI		# 2nd VPN w/ PID = 0
+	addu	s0, s0, NBPG
+	mtc0	s0, MIPS_COP_0_TLB_HI		# VPN = va+NBPG
 	nop
-	tlbp					# probe for entry
-	mfc0	s0, MIPS_COP_0_TLB_INDEX	# see if we found it
+	tlbp					# probe 2nd VPN
+	mfc0	s1, MIPS_COP_0_TLB_INDEX
 	nop
-	bltz	s0, 1f	
-	li	s0, MIPS_KSEG0_START		# found, then
-	mtc0	s0, MIPS_COP_0_TLB_HI
+	bltz	s1, entry1set
+	li	s1, MIPS_KSEG0_START		# found, then
+	mtc0	s1, MIPS_COP_0_TLB_HI
 	mtc0	zero, MIPS_COP_0_TLB_LOW
 	nop
-	tlbwi					# purge it from random TLB
+	tlbwi					# TBIS(va+NBPG)
 	nop
-	mtc0	a1, MIPS_COP_0_TLB_HI		# restore 2nd VPN
-1:
-	li	s0, 1 << MIPS1_TLB_INDEX_SHIFT
-	mtc0	s0, MIPS_COP_0_TLB_INDEX	# TLB index #1
-	mtc0	a2, MIPS_COP_0_TLB_LOW		# 2nd PFN
+	mtc0	s0, MIPS_COP_0_TLB_HI		# set 2nd VPN again
+entry1set:
+	li	s1, 1 << MIPS1_TLB_INDEX_SHIFT
+	mtc0	s1, MIPS_COP_0_TLB_INDEX	# TLB index #1
+	ori	a2, a2, MIPS1_PG_G
+	mtc0	a2, MIPS_COP_0_TLB_LOW		# 2nd PFN w/ PG_G
 	nop
 	tlbwi					# set TLB entry #1
-9:
-	mtc0	a3, MIPS_COP_0_TLB_HI		# set the new PID
 
+resume:
 	j	ra
 	nop
-END(mips1_cpu_switch_resume)
+	END(mips1_cpu_switch_resume)
+
+/*
+ * void mips1_TBIS(vaddr_t va)
+ *
+ * Invalidate a TLB entry for given virtual address if found in TLB.
+ */
+LEAF(mips1_TBIS)
+	mfc0	v1, MIPS_COP_0_STATUS		# save status register
+	mtc0	zero, MIPS_COP_0_STATUS		# disable interrupts
+	mfc0	t0, MIPS_COP_0_TLB_HI		# save current PID
+	nop
+
+	mtc0	a0, MIPS_COP_0_TLB_HI		# look for addr & PID
+	nop
+	tlbp					# probe the entry in question
+	mfc0	a0, MIPS_COP_0_TLB_INDEX	# see what we got
+	li	t1, MIPS_KSEG0_START		# load invalid address
+	bltz	a0, 1f				# index < 0 then skip
+	mtc0	t1, MIPS_COP_0_TLB_HI		# make entryHi invalid
+	mtc0	zero, MIPS_COP_0_TLB_LOW	# zero out entryLo
+	nop
+	tlbwi
+1:
+	mtc0	t0, MIPS_COP_0_TLB_HI		# restore PID
+	j	ra
+	mtc0	v1, MIPS_COP_0_STATUS		# restore the status register
+	END(mips1_TBIS)
+
+/*
+ * void mips1_TBIAP(int sizeofTLB)
+ *
+ * Invalidate TLB entries belong to per process user spaces while
+ * leaving entries for kernel space marked global intact.
+ */
+LEAF(mips1_TBIAP)
+	mfc0	v1, MIPS_COP_0_STATUS		# save status register
+	mtc0	zero, MIPS_COP_0_STATUS		# disable interrupts
+
+	li	t1, MIPS1_TLB_FIRST_RAND_ENTRY << MIPS1_TLB_INDEX_SHIFT
+	sll	t2, a0, MIPS1_TLB_INDEX_SHIFT
+	li	v0, MIPS_KSEG0_START		# invalid address
+
+	# do {} while (t1 < t2)
+1:
+	mtc0	t1, MIPS_COP_0_TLB_INDEX	# set index
+	nop
+	tlbr					# obtain an entry
+	mfc0	a0, MIPS_COP_0_TLB_LOW
+	nop
+	and	a0, a0, MIPS1_PG_G		# check to see it has G bit
+	bnez	a0, 2f
+	nop
+	mtc0	v0, MIPS_COP_0_TLB_HI		# make entryHi invalid
+	mtc0	zero, MIPS_COP_0_TLB_LOW	# zero out entryLo
+	nop
+	tlbwi					# invalidate the TLB entry
+2:
+	addu	t1, t1, 1 << MIPS1_TLB_INDEX_SHIFT	# increment index
+	bne	t1, t2, 1b
+	nop
+
+	j	ra				# new TLBpid will be set soon
+	mtc0	v1, MIPS_COP_0_STATUS		# restore status register
+	END(mips1_TBIAP)
+
+/*
+ * void mips1_TBIA(int sizeofTLB)
+ *
+ * Invalidate TLB entirely.
+ */
+LEAF(mips1_TBIA)
+	mfc0	v1, MIPS_COP_0_STATUS		# save the status register.
+	mtc0	zero, MIPS_COP_0_STATUS		# disable interrupts
+
+	li	t1, MIPS_KSEG0_START
+	mtc0	t1, MIPS_COP_0_TLB_HI		# make entryHi invalid
+	mtc0	zero, MIPS_COP_0_TLB_LOW	# zero out entryLo
+
+	move	t1, zero
+	sll	a0, a0, MIPS1_TLB_INDEX_SHIFT
+
+	# do {} while (t1 < a0)
+1:
+	mtc0	t1, MIPS_COP_0_TLB_INDEX	# set TLBindex
+	addu	t1, t1, 1 << MIPS1_TLB_INDEX_SHIFT	# increment index
+	bne	t1, a0, 1b
+	tlbwi					# invalidate the entry
+
+	j	ra
+	mtc0	v1, MIPS_COP_0_STATUS		# restore status register
+	END(mips1_TBIA)
+
+/*
+ * void mips1_TBRPL(vpn1, vpn2, pte)
+ *	probe TLB entry which has vpn1 address; if found, have it new
+ *	entryHi and entryLo pair of [vpn2, pte]
+ */
+LEAF(mips1_TBRPL)
+	mfc0	v1, MIPS_COP_0_STATUS
+	mtc0	zero, MIPS_COP_0_STATUS
+	mfc0	v0, MIPS_COP_0_TLB_HI
+	nop
+	mtc0	a0, MIPS_COP_0_TLB_HI
+	nop
+	tlbp
+	mfc0	t0, MIPS_COP_0_TLB_INDEX
+	nop
+	bltz	t0, 1f
+	nop
+	or	a2, a2, MIPS1_PG_G
+	mtc0	a1, MIPS_COP_0_TLB_HI
+	mtc0	a2, MIPS_COP_0_TLB_LOW
+	nop
+	tlbwi
+1:
+	mtc0	v0, MIPS_COP_0_TLB_HI
+	j	ra
+	mtc0	v1, MIPS_COP_0_STATUS
+	END(mips1_TBRPL)
 
 	.data
+
+	.globl _C_LABEL(mips1_locoresw)
+_C_LABEL(mips1_locoresw):
+	.word _C_LABEL(mips1_cpu_switch_resume)
+	.word _C_LABEL(mips1_proc_trampoline)
+	.word _C_LABEL(mips_idle)
+
 mips1_excausesw:
 	####
 	#### The kernel exception handlers.

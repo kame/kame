@@ -1,4 +1,4 @@
-/*	$NetBSD: bztzsc.c,v 1.11 1998/11/19 21:44:35 thorpej Exp $	*/
+/*	$NetBSD: bztzsc.c,v 1.14 2000/06/05 15:08:02 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -74,13 +74,6 @@ int	bztzscmatch	__P((struct device *, struct cfdata *, void *));
 /* Linkup to the rest of the kernel */
 struct cfattach bztzsc_ca = {
 	sizeof(struct bztzsc_softc), bztzscmatch, bztzscattach
-};
-
-struct scsipi_device bztzsc_dev = {
-	NULL,			/* Use default error handler */
-	NULL,			/* have a queue, served by this */
-	NULL,			/* have no async handler */
-	NULL,			/* Use default 'done' routine */
 };
 
 /*
@@ -237,7 +230,7 @@ bztzscattach(parent, self, aux)
 	/*
 	 * Configure interrupts.
 	 */
-	bsc->sc_isr.isr_intr = (int (*)(void *))ncr53c9x_intr;
+	bsc->sc_isr.isr_intr = ncr53c9x_intr;
 	bsc->sc_isr.isr_arg  = sc;
 	bsc->sc_isr.isr_ipl  = 2;
 	add_isr(&bsc->sc_isr);
@@ -245,9 +238,7 @@ bztzscattach(parent, self, aux)
 	/*
 	 * Now try to attach all the sub-devices
 	 */
-	sc->sc_adapter.scsipi_cmd = ncr53c9x_scsi_cmd;
-	sc->sc_adapter.scsipi_minphys = minphys; 
-	ncr53c9x_attach(sc, &bztzsc_dev);
+	ncr53c9x_attach(sc, NULL, NULL);
 }
 
 /*
@@ -275,7 +266,7 @@ bztzsc_write_reg(sc, reg, val)
 
 	bsc->sc_reg[reg * 4] = v;
 #ifdef DEBUG
-if (bztzsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL*/ &&
+if (bztzsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL*/ &&
   reg == NCR_CMD/* && bsc->sc_active*/) {
   bztzsc_trace[(bztzsc_trace_ptr - 1) & 127].yy = v;
 /*  printf(" cmd %x", v);*/
@@ -298,7 +289,7 @@ bztzsc_dma_isintr(sc)
 		bsc->sc_reg[0xe0] = BZTZSC_PB_LED;	/* Turn LED off */
 
 #ifdef DEBUG
-if (/*sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL &&*/ bztzsc_trace_enable) {
+if (/*sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL &&*/ bztzsc_trace_enable) {
   bztzsc_trace[bztzsc_trace_ptr].status = bsc->sc_reg[NCR_STAT * 4];
   bztzsc_trace[bztzsc_trace_ptr].xx = bsc->sc_reg[NCR_CMD * 4];
   bztzsc_trace[bztzsc_trace_ptr].yy = bsc->sc_active;
@@ -361,7 +352,7 @@ bztzsc_dma_setup(sc, addr, len, datain, dmasize)
 	size_t *dmasize;
 {
 	struct bztzsc_softc *bsc = (struct bztzsc_softc *)sc;
-	vm_offset_t pa;
+	paddr_t pa;
 	u_char *ptr;
 	size_t xfer;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.33.2.2 2000/01/20 21:22:51 he Exp $	*/
+/*	$NetBSD: machdep.c,v 1.53 2000/06/09 04:58:34 soda Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -37,12 +37,10 @@
 #include "opt_ccitt.h"
 #include "opt_iso.h"
 #include "opt_ns.h"
-#include "opt_sysv.h"
-#include "ipkdb.h"
+#include "opt_ipkdb.h"
 
 #include <sys/param.h>
 #include <sys/buf.h>
-#include <sys/callout.h>
 #include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/exec.h>
@@ -93,7 +91,9 @@
 
 #include "pckbc.h"
 #if (NPCKBC > 0)
-#include <dev/isa/pckbcvar.h>
+#include <dev/isa/isareg.h>
+#include <dev/ic/i8042reg.h>
+#include <dev/ic/pckbcvar.h>
 #endif
 
 #include "com.h"
@@ -114,6 +114,9 @@ char bootinfo[BOOTINFO_MAXSIZE];
 
 char machine[] = MACHINE;		/* machine */
 char machine_arch[] = MACHINE_ARCH;	/* machine architecture */
+
+/* Our exported CPU info; we have only one right now. */  
+struct cpu_info cpu_info_store;
 
 struct pcb *curpcb;
 struct pmap *curpm;
@@ -137,10 +140,7 @@ vaddr_t msgbuf_vaddr;
 
 paddr_t avail_end;			/* XXX temporary */
 
-caddr_t allocsys __P((caddr_t));
-
 void install_extint __P((void (*)(void)));
-int cold = 1;
 
 void
 initppc(startkernel, endkernel, args, btinfo)
@@ -159,7 +159,7 @@ initppc(startkernel, endkernel, args, btinfo)
 	extern ddblow, ddbsize;
 	extern void *startsym, *endsym;
 #endif
-#if NIPKDB > 0
+#ifdef IPKDB
 	extern ipkdblow, ipkdbsize;
 #endif
 	extern void consinit __P((void));
@@ -246,15 +246,17 @@ initppc(startkernel, endkernel, args, btinfo)
 	/*
 	 * Set up initial BAT table
 	 */
-	/* map the lowest 256 MB area */
-	battable[0].batl = BATL(0x00000000, BAT_M);
-	battable[0].batu = BATU(0x00000000);
-	/* map the PCI/ISA I/O 256 MB area */
-	battable[1].batl = BATL(BEBOX_BUS_SPACE_IO, BAT_I);
-	battable[1].batu = BATU(BEBOX_BUS_SPACE_IO);
-	/* map the PCI/ISA MEMORY 256 MB area */
-	battable[2].batl = BATL(BEBOX_BUS_SPACE_MEM, BAT_I);
-	battable[2].batu = BATU(BEBOX_BUS_SPACE_MEM);
+	/* map the lowest 256M area */
+	battable[0].batl = BATL(0x00000000, BAT_M, BAT_PP_RW);
+	battable[0].batu = BATU(0x00000000, BAT_BL_256M, BAT_Vs);
+
+	/* map the PCI/ISA I/O 256M area */
+	battable[1].batl = BATL(BEBOX_BUS_SPACE_IO, BAT_I, BAT_PP_RW);
+	battable[1].batu = BATU(BEBOX_BUS_SPACE_IO, BAT_BL_256M, BAT_Vs);
+
+	/* map the PCI/ISA MEMORY 256M area */
+	battable[2].batl = BATL(BEBOX_BUS_SPACE_MEM, BAT_I, BAT_PP_RW);
+	battable[2].batu = BATU(BEBOX_BUS_SPACE_MEM, BAT_BL_256M, BAT_Vs);
 
 	/*
 	 * Now setup fixed bat registers
@@ -307,7 +309,7 @@ initppc(startkernel, endkernel, args, btinfo)
 		case EXC_DSMISS:
 			bcopy(&tlbdsmiss, (void *)EXC_DSMISS, (size_t)&tlbdsmsize);
 			break;
-#if defined(DDB) || NIPKDB > 0
+#if defined(DDB) || defined(IPKDB)
 		case EXC_PGM:
 		case EXC_TRC:
 		case EXC_BPT:
@@ -317,10 +319,10 @@ initppc(startkernel, endkernel, args, btinfo)
 			bcopy(&ipkdblow, (void *)exc, (size_t)&ipkdbsize);
 #endif
 			break;
-#endif /* DDB || NIPKDB > 0 */
+#endif /* DDB || IPKDB */
 		}
 
-	syncicache((void *)EXC_RST, EXC_LAST - EXC_RST + 0x100);
+	__syncicache((void *)EXC_RST, EXC_LAST - EXC_RST + 0x100);
 
 	/*
 	 * external interrupt handler install
@@ -344,9 +346,9 @@ initppc(startkernel, endkernel, args, btinfo)
 	pmap_bootstrap(startkernel, endkernel);
 
 #ifdef DDB
-	ddb_init((int)(endsym - startsym), startsym, endsym);
+	ddb_init((int)((u_int)endsym - (u_int)startsym), startsym, endsym);
 #endif
-#if NIPKDB > 0
+#ifdef IPKDB
 	/*
 	 * Now trap to IPKDB
 	 */
@@ -432,8 +434,8 @@ install_extint(handler)
 		      : "=r"(omsr), "=r"(msr) : "K"((u_short)~PSL_EE));
 	extint_call = (extint_call & 0xfc000003) | offset;
 	bcopy(&extint, (void *)EXC_EXI, (size_t)&extsize);
-	syncicache((void *)&extint_call, sizeof extint_call);
-	syncicache((void *)EXC_EXI, (int)&extsize);
+	__syncicache((void *)&extint_call, sizeof extint_call);
+	__syncicache((void *)EXC_EXI, (int)&extsize);
 	asm volatile ("mtmsr %0" :: "r"(omsr));
 }
 
@@ -447,6 +449,7 @@ cpu_startup()
 	caddr_t v;
 	vaddr_t minaddr, maxaddr;
 	int base, residual;
+	char pbuf[9];
 
 	proc0.p_addr = proc0paddr;
 	v = (caddr_t)proc0paddr + USPACE;
@@ -457,7 +460,7 @@ cpu_startup()
 	if (!(bebox_mb_reg = uvm_km_valloc(kernel_map, round_page(NBPG))))
 		panic("initppc: no room for interrupt register");
 	pmap_enter(pmap_kernel(), bebox_mb_reg, MOTHER_BOARD_REG,
-	    VM_PROT_READ|VM_PROT_WRITE, TRUE, VM_PROT_READ|VM_PROT_WRITE);
+	    VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 
 	/*
 	 * Initialize error message buffer (at end of core).
@@ -466,24 +469,24 @@ cpu_startup()
 		panic("startup: no room for message buffer");
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), msgbuf_vaddr + i * NBPG,
-		    msgbuf_paddr + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    msgbuf_paddr + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf((caddr_t)msgbuf_vaddr, round_page(MSGBUFSIZE));
 
 	printf("%s", version);
 	identifycpu();
 
-	printf("real memory  = %d (%dK bytes)\n",
-		ctob(physmem), ctob(physmem) / 1024);
+	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
+	printf("total memory = %s\n", pbuf);
 
 	/*
 	 * Find out how much space we need, allocate it,
 	 * and then give everything true virtual addresses.
 	 */
-	sz = (int)allocsys((caddr_t)0);
+	sz = (int)allocsys(NULL, NULL);
 	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(sz))) == 0)
 		panic("startup: no room for tables");
-	if (allocsys(v) - v != sz)
+	if (allocsys(v, NULL) - v != sz)
 		panic("startup: table size inconsistency");
 
 	/*
@@ -516,7 +519,7 @@ cpu_startup()
 		 * "base" pages for the rest.
 		 */
 		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
 			pg = uvm_pagealloc(NULL, 0, NULL, 0);
@@ -525,7 +528,7 @@ cpu_startup()
 					"buffer cache");
 			pmap_enter(kernel_map->pmap, curbuf,
 			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    TRUE, VM_PROT_READ|VM_PROT_WRITE);
+			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
@@ -536,31 +539,24 @@ cpu_startup()
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 16*NCARGS, TRUE, FALSE, NULL);
+				 16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_PHYS_SIZE, TRUE, FALSE, NULL);
+				 VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	/*
-	 * Finally, allocate mbuf cluster submap.
+	 * No need to allocate an mbuf cluster submap.  Mbuf clusters
+	 * are allocated via the pool allocator, and we use direct-mapped
+	 * pool pages.
 	 */
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-			       VM_MBUF_SIZE, FALSE, FALSE, NULL);
 
-	/*
-	 * Initialize callouts.
-	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i - 1].c_next = &callout[i];
-
-	printf("avail memory = %d (%dK bytes)\n",
-		ptoa(uvmexp.free), ptoa(uvmexp.free) / 1024);
-	printf("using %d buffers containing %d bytes of memory\n",
-	       nbuf, bufpages * CLBYTES);
+	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
+	printf("avail memory = %s\n", pbuf);
+	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
+	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
 	/*
 	 * Set up the buffers.
@@ -580,52 +576,6 @@ cpu_startup()
 }
 
 /*
- * Allocate space for system data structures.
- */
-caddr_t
-allocsys(v)
-	caddr_t v;
-{
-#define	valloc(name, type, num) \
-	v = (caddr_t)(((name) = (type *)v) + (num))
-
-	valloc(callout, struct callout, ncallout);
-#ifdef	SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef	SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof (int));
-#endif
-#ifdef	SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-
-	/*
-	 * Decide on buffer space to use.
-	 */
-	if (bufpages == 0)
-		bufpages = (physmem / 20) / CLSIZE;
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) & ~1;
-		if (nswbuf > 256)
-			nswbuf = 256;
-	}
-	valloc(buf, struct buf, nbuf);
-
-	return (v);
-}
-
-/*
  * lookup_bootinfo:
  * Look up information in bootinfo of boot loader.
  */
@@ -634,13 +584,13 @@ lookup_bootinfo(type)
 	int type;
 {
 	struct btinfo_common *bt;
-	void *help = (void *)bootinfo;
+	struct btinfo_common *help = (struct btinfo_common *)bootinfo;
 
 	do {
-		bt = (struct btinfo_common *)help;
+		bt = help;
 		if (bt->type == type)
 			return (help);
-		help += bt->next;
+		help = (struct btinfo_common *)((char*)help + bt->next);
 	} while (bt->next &&
 		(size_t)help < (size_t)bootinfo + sizeof (bootinfo));
 
@@ -669,7 +619,8 @@ consinit()
 	if (!strcmp(consinfo->devname, "be")) {
 		pfb_cnattach(consinfo->addr);
 #if (NPCKBC > 0)
-		pckbc_cnattach(BEBOX_BUS_SPACE_IO, PCKBC_KBD_SLOT);
+		pckbc_cnattach(BEBOX_BUS_SPACE_IO, IO_KBD, KBCMDP,
+		    PCKBC_KBD_SLOT);
 #endif
 		return;
 	}
@@ -687,7 +638,8 @@ consinit()
 #endif
 dokbd:
 #if (NPCKBC > 0)
-		pckbc_cnattach(BEBOX_BUS_SPACE_IO, PCKBC_KBD_SLOT);
+		pckbc_cnattach(BEBOX_BUS_SPACE_IO, IO_KBD, KBCMDP,
+		    PCKBC_KBD_SLOT);
 #endif
 		return;
 	}
@@ -773,128 +725,7 @@ setregs(p, pack, stack)
 }
 
 /*
- * Send a signal to process.
- */
-void
-sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
-{
-	struct proc *p = curproc;
-	struct trapframe *tf;
-	struct sigframe *fp, frame;
-	struct sigacts *psp = p->p_sigacts;
-	int onstack;
-
-	tf = trapframe(p);
-
-	/* Do we need to jump onto the signal stack? */
-	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
-
-	/* Allocate space for the signal handler context. */
-	if (onstack)
-		fp = (struct sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-						  psp->ps_sigstk.ss_size);
-	else
-		fp = (struct sigframe *)tf->fixreg[1];
-	fp = (struct sigframe *)((int)(fp - 1) & ~0xf);
-
-	/* Build stack frame for signal trampoline. */
-	frame.sf_signum = sig;
-	frame.sf_code = code;
-
-	/* Save register context. */
-	bcopy(tf, &frame.sf_sc.sc_frame, sizeof *tf);
-
-	/* Save signal stack. */
-	frame.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
-
-	/* Save signal mask. */
-	frame.sf_sc.sc_mask = *mask;
-
-#ifdef COMPAT_13
-	/*
-	 * XXX We always have to save an old style signal mask because
-	 * XXX we might be delivering a signal to a process which will
-	 * XXX escape from the signal in a non-standard way and invoke
-	 * XXX sigreturn() directly.
-	 */
-	native_sigset_to_sigset13(mask, &frame.sf_sc.__sc_mask13);
-#endif
-
-	if (copyout(&frame, fp, sizeof frame) != 0) {
-		/*
-		 * Process has trashed its stack; give it an illegal
-		 * instructoin to halt it in its tracks.
-		 */
-		sigexit(p, SIGILL);
-		/* NOTREACHED */
-	}
-
-	/*
-	 * Build context to run handler in.
-	 */
-	tf->fixreg[1] = (int)fp;
-	tf->lr = (int)catcher;
-	tf->fixreg[3] = (int)sig;
-	tf->fixreg[4] = (int)code;
-	tf->fixreg[5] = (int)&frame.sf_sc;
-	tf->srr0 = (int)psp->ps_sigcode;
-
-	/* Remember that we're now on the signal stack. */
-	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
-}
-
-/*
- * System call to cleanup state after a signal handler returns.
- */
-int
-sys___sigreturn14(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	struct sys___sigreturn14_args /* {
-		syscallarg(struct sigcontext *) sigcntxp;
-	} */ *uap = v;
-	struct sigcontext sc;
-	struct trapframe *tf;
-	int error;
-
-	/*
-	 * The trampoline hands us the context.
-	 * It is unsafe to keep track of it ourselves, in the event that a
-	 * program jumps out of a signal hander.
-	 */
-	if ((error = copyin(SCARG(uap, sigcntxp), &sc, sizeof sc)) != 0)
-		return (error);
-
-	/* Restore the register context. */
-	tf = trapframe(p);
-	if ((sc.sc_frame.srr1 & PSL_USERSTATIC) != (tf->srr1 & PSL_USERSTATIC))
-		return (EINVAL);
-	bcopy(&sc.sc_frame, tf, sizeof *tf);
-
-	/* Restore signal stack. */
-	if (sc.sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
-	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
-
-	/* Restore signal mask. */
-	(void) sigprocmask1(p, SIG_SETMASK, &sc.sc_mask, 0);
-
-	return (EJUSTRETURN);
-}
-
-/*
  * Machine dependent system variables.
- * None for now.
  */
 int
 cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
@@ -909,7 +740,10 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	/* all sysctl names at this level are terminal */
 	if (namelen != 1)
 		return (ENOTDIR);
+
 	switch (name[0]) {
+	case CPU_CACHELINE:
+		return sysctl_rdint(oldp, oldlenp, newp, CACHELINESIZE);
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -924,7 +758,7 @@ long dumplo = -1;			/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first CLBYTES of disk space
+ * Dumps always skip the first NBPG of disk space
  * in case there might be a disk label stored there.
  * If there is extra space, put dump at the end to
  * reduce the chance that swapping trashes it.
@@ -948,7 +782,7 @@ cpu_dumpconf()
 
 	dumpsize = physmem;
 
-	/* Always skip the first CLBYTES, in case there is a label there. */
+	/* Always skip the first NBPG, in case there is a label there. */
 	if (dumplo < ctod(1))
 		dumplo = ctod(1);
 
@@ -972,36 +806,14 @@ void
 softnet(isr)
 	int isr;
 {
-#ifdef	INET
-#include "arp.h"
-#if NARP > 0
-	if (isr & (1 << NETISR_ARP))
-		arpintr();
-#endif
-	if (isr & (1 << NETISR_IP))
-		ipintr();
-#endif
-#ifdef	IMP
-	if (isr & (1 << NETISR_IMP))
-		impintr();
-#endif
-#ifdef	NS
-	if (isr & (1 << NETISR_NS))
-		nsintr();
-#endif
-#ifdef	ISO
-	if (isr & (1 << NETISR_ISO))
-		clnlintr();
-#endif
-#ifdef	CCITT
-	if (isr & (1 << NETISR_CCITT))
-		ccittintr();
-#endif
-#include "ppp.h"
-#if NPPP > 0
-	if (isr & (1 << NETISR_PPP))
-		pppintr();
-#endif
+#define DONETISR(bit, fn) do {		\
+	if (isr & (1 << bit))		\
+		fn();			\
+} while (0)
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
 }
 
 /*
@@ -1074,11 +886,6 @@ lcsplx(ipl)
 	splx(ipl);
 }
 
-/* not impliment */
-
-void
-dk_establish() {}
-
 /*
  * Allocate vm space and mapin the I/O address
  */
@@ -1101,7 +908,7 @@ mapiodev(pa, len)
 
 	for (; len > 0; len -= NBPG) {
 		pmap_enter(pmap_kernel(), taddr, faddr,
-			   VM_PROT_READ | VM_PROT_WRITE, 1, 0);
+			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 		faddr += NBPG;
 		taddr += NBPG;
 	}

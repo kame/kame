@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.44 1998/08/02 19:42:35 kleink Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.49 1999/09/17 19:59:42 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -105,7 +105,6 @@
 #include <sys/device.h>
 #include <sys/device.h>
 #include <sys/disklabel.h>
-#include <sys/dmap.h>
 #include <sys/malloc.h>
 #include <sys/map.h>
 #include <sys/mount.h>
@@ -134,13 +133,6 @@
 
 #include <hp300/dev/hpibvar.h>
 #include <hp300/dev/scsivar.h>
-
-/*
- * The following several variables are related to
- * the configuration process, and are used in initializing
- * the machine.
- */
-int	cold;		    /* if 1, still working on cold-start */
 
 /* XXX must be allocated statically because of early console init */
 struct	map extiomap[EIOMAPSIZE/16];
@@ -255,19 +247,11 @@ mainbussearch(parent, cf, aux)
 	return (0);
 }
 
-struct devnametobdevmaj hp300_nam2blk[] = {
-	{ "ct",		 0 },
-	{ "rd",		 2 },
-	{ "sd",		 4 },
-	{ "md",		14 },
-	{ NULL,		 0 },
-};
-
 /*
  * Determine the device configuration for the running system.
  */
 void
-configure()
+cpu_configure()
 {
 
 	/*
@@ -282,7 +266,7 @@ configure()
 	 * XXX enabled.  However, we need to initialize the HIL driver's
 	 * XXX software state prior to that, since a pending interrupt
 	 * XXX might cause the HIL's interrupt handler to be run in an
-	 * XXX unititialized environment otherwise.
+	 * XXX uninitialized environment otherwise.
 	 *
 	 * XXX These should be consolidated into some kind of table.
 	 */
@@ -296,8 +280,6 @@ configure()
 	(void)spl0();
 
 	intr_printlevels();
-
-	cold = 0;
 }
 
 /**********************************************************************
@@ -369,7 +351,7 @@ cpu_rootconf()
 	if (booted_device != NULL && booted_device->dv_class == DV_TAPE)
 		boothowto |= RB_ASKNAME;
 
-	setroot(dv, booted_partition, hp300_nam2blk);
+	setroot(dv, booted_partition);
 
 	/*
 	 * Set bootdev based on what we found as the root.

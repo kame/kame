@@ -1,4 +1,4 @@
-/* $NetBSD: vfs_getcwd.c,v 1.3.2.3 1999/07/11 10:24:09 sommerfeld Exp $ */
+/* $NetBSD: vfs_getcwd.c,v 1.13 2000/03/30 09:27:14 augustss Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -59,11 +59,9 @@ getcwd_scandir __P((struct vnode **, struct vnode **,
 static int
 getcwd_getcache __P((struct vnode **, struct vnode **,
     char **, char *));
-static int
+int
 getcwd_common __P((struct vnode *, struct vnode *,
 		   char **, char *, int, int, struct proc *));
-
-int vn_isunder __P((struct vnode *, struct vnode *, struct proc *));
 
 #define DIRENT_MINSIZE (sizeof(struct dirent) - (MAXNAMLEN+1) + 4)
 
@@ -370,7 +368,8 @@ getcwd_getcache(lvpp, uvpp, bpp, bufp)
 
 #define GETCWD_CHECK_ACCESS 0x0001
 
-static int getcwd_common (lvp, rvp, bpp, bufp, limit, flags, p)
+int 
+getcwd_common (lvp, rvp, bpp, bufp, limit, flags, p)
 	struct vnode *lvp;
 	struct vnode *rvp;
 	char **bpp;
@@ -379,14 +378,14 @@ static int getcwd_common (lvp, rvp, bpp, bufp, limit, flags, p)
 	int flags;
 	struct proc *p;
 {
-	struct filedesc *fdp = p->p_fd;
+	struct cwdinfo *cwdi = p->p_cwdi;
 	struct vnode *uvp = NULL;
 	char *bp = NULL;
 	int error;
 	int perms = VEXEC;
 
 	if (rvp == NULL) {
-		rvp = fdp->fd_rdir;
+		rvp = cwdi->cwdi_rdir;
 		if (rvp == NULL)
 			rvp = rootvnode;
 	}
@@ -505,7 +504,8 @@ out:
  * Intended to be used in chroot, chdir, fchdir, etc., to ensure that
  * chroot() actually means something.
  */
-int vn_isunder(lvp, rvp, p)
+int
+vn_isunder(lvp, rvp, p)
 	struct vnode *lvp;
 	struct vnode *rvp;
 	struct proc *p;
@@ -527,12 +527,13 @@ int vn_isunder(lvp, rvp, p)
  * Intended to be used from ptrace/procfs sorts of things.
  */
 
-int proc_isunder (p1, p2)
+int
+proc_isunder (p1, p2)
 	struct proc *p1;
 	struct proc *p2;
 {
-	struct vnode *r1 = p1->p_fd->fd_rdir;
-	struct vnode *r2 = p2->p_fd->fd_rdir;
+	struct vnode *r1 = p1->p_cwdi->cwdi_rdir;
+	struct vnode *r2 = p2->p_cwdi->cwdi_rdir;
 
 	if (r1 == NULL)
 		return (r2 == NULL);
@@ -549,12 +550,13 @@ int proc_isunder (p1, p2)
  * to reading directory contents.
  */
 
-int sys___getcwd(p, v, retval) 
+int
+sys___getcwd(p, v, retval) 
 	struct proc *p;
 	void   *v;
 	register_t *retval;
 {
-	register struct sys___getcwd_args /* {
+	struct sys___getcwd_args /* {
 		syscallarg(char *) bufp;
 		syscallarg(size_t) length;
 	} */ *uap = v;
@@ -583,7 +585,7 @@ int sys___getcwd(p, v, retval)
 	 * Since each entry takes up at least 2 bytes in the output buffer,
 	 * limit it to N/2 vnodes for an N byte buffer.
 	 */
-	error = getcwd_common (p->p_fd->fd_cdir, NULL, &bp, path, len/2,
+	error = getcwd_common (p->p_cwdi->cwdi_cdir, NULL, &bp, path, len/2,
 			       GETCWD_CHECK_ACCESS, p);
 
 	if (error)
@@ -597,6 +599,3 @@ out:
 	free(path, M_TEMP);
 	return error;
 }
-
-
-

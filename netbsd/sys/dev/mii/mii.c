@@ -1,7 +1,7 @@
-/*	$NetBSD: mii.c,v 1.11 1999/02/05 02:46:34 thorpej Exp $	*/
+/*	$NetBSD: mii.c,v 1.20.4.1 2000/07/04 04:11:12 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -62,18 +62,48 @@ int	mii_submatch __P((struct device *, struct cfdata *, void *));
  * to the network interface driver parent.
  */
 void
-mii_phy_probe(parent, mii, capmask)
+mii_attach(parent, mii, capmask, phyloc, offloc, flags)
 	struct device *parent;
 	struct mii_data *mii;
-	int capmask;
+	int capmask, phyloc, offloc, flags;
 {
 	struct mii_attach_args ma;
 	struct mii_softc *child;
-	int bmsr;
+	int bmsr, offset = 0;
+	int phymin, phymax;
 
-	LIST_INIT(&mii->mii_phys);
+	if (phyloc != MII_PHY_ANY && offloc != MII_PHY_ANY)
+		panic("mii_attach: phyloc and offloc specified");
 
-	for (ma.mii_phyno = 0; ma.mii_phyno < MII_NPHY; ma.mii_phyno++) {
+	if (phyloc == MII_PHY_ANY) {
+		phymin = 0;
+		phymax = MII_NPHY - 1;
+	} else
+		phymin = phymax = phyloc;
+
+	if ((mii->mii_flags & MIIF_INITDONE) == 0) {
+		LIST_INIT(&mii->mii_phys);
+		mii->mii_flags |= MIIF_INITDONE;
+	}
+
+	for (ma.mii_phyno = phymin; ma.mii_phyno <= phymax; ma.mii_phyno++) {
+		/*
+		 * Make sure we haven't already configured a PHY at this
+		 * address.  This allows mii_attach() to be called
+		 * multiple times.
+		 */
+		for (child = LIST_FIRST(&mii->mii_phys); child != NULL;
+		     child = LIST_NEXT(child, mii_list)) {
+			if (child->mii_phy == ma.mii_phyno) {
+				/*
+				 * Yes, there is already something
+				 * configured at this address.
+				 */
+				offset++;
+				continue;
+			}
+		}
+
 		/*
 		 * Check to see if there is a PHY at this address.  Note,
 		 * many braindead PHYs report 0/0 in their ID registers,
@@ -83,6 +113,15 @@ mii_phy_probe(parent, mii, capmask)
 		if (bmsr == 0 || bmsr == 0xffff ||
 		    (bmsr & BMSR_MEDIAMASK) == 0) {
 			/* Assume no PHY at this address. */
+			continue;
+		}
+
+		/*
+		 * There is a PHY at this address.  If we were given an
+		 * `offset' locator, skip this PHY if it doesn't match.
+		 */
+		if (offloc != MII_OFFSET_ANY && offloc != offset) {
+			offset++;
 			continue;
 		}
 
@@ -98,15 +137,85 @@ mii_phy_probe(parent, mii, capmask)
 
 		ma.mii_data = mii;
 		ma.mii_capmask = capmask;
+		ma.mii_flags = flags;
 
 		if ((child = (struct mii_softc *)config_found_sm(parent, &ma,
 		    mii_print, mii_submatch)) != NULL) {
 			/*
 			 * Link it up in the parent's MII data.
 			 */
+			callout_init(&child->mii_nway_ch);
 			LIST_INSERT_HEAD(&mii->mii_phys, child, mii_list);
+			child->mii_offset = offset;
 			mii->mii_instance++;
 		}
+		offset++;
+	}
+}
+
+void
+mii_activate(mii, act, phyloc, offloc)
+	struct mii_data *mii;
+	enum devact act;
+	int phyloc, offloc;
+{
+	struct mii_softc *child;
+
+	if (phyloc != MII_PHY_ANY && offloc != MII_PHY_ANY)
+		panic("mii_activate: phyloc and offloc specified");
+
+	if ((mii->mii_flags & MIIF_INITDONE) == 0)
+		return;
+
+	for (child = LIST_FIRST(&mii->mii_phys);
+	     child != NULL; child = LIST_NEXT(child, mii_list)) {
+		if (phyloc != MII_PHY_ANY || offloc != MII_OFFSET_ANY) {
+			if (phyloc != MII_PHY_ANY &&
+			    phyloc != child->mii_phy)
+				continue;
+			if (offloc != MII_OFFSET_ANY &&
+			    offloc != child->mii_offset)
+				continue;
+		}
+		switch (act) {
+		case DVACT_ACTIVATE:
+			panic("mii_activate: DVACT_ACTIVATE");
+			break;
+
+		case DVACT_DEACTIVATE:
+			if (config_deactivate(&child->mii_dev) != 0)
+				panic("%s: config_activate(%d) failed\n",
+				    child->mii_dev.dv_xname, act);
+		}
+	}
+}
+
+void
+mii_detach(mii, phyloc, offloc)
+	struct mii_data *mii;
+	int phyloc, offloc;
+{
+	struct mii_softc *child, *nchild;
+
+	if (phyloc != MII_PHY_ANY && offloc != MII_PHY_ANY)
+		panic("mii_detach: phyloc and offloc specified");
+
+	if ((mii->mii_flags & MIIF_INITDONE) == 0)
+		return;
+
+	for (child = LIST_FIRST(&mii->mii_phys);
+	     child != NULL; child = nchild) {
+		nchild = LIST_NEXT(child, mii_list);
+		if (phyloc != MII_PHY_ANY || offloc != MII_OFFSET_ANY) {
+			if (phyloc != MII_PHY_ANY &&
+			    phyloc != child->mii_phy)
+				continue;
+			if (offloc != MII_OFFSET_ANY &&
+			    offloc != child->mii_offset)
+				continue;
+		}
+		LIST_REMOVE(child, mii_list);
+		(void) config_detach(&child->mii_dev, DETACH_FORCE);
 	}
 }
 
@@ -142,58 +251,6 @@ mii_submatch(parent, cf, aux)
 }
 
 /*
- * Given an ifmedia word, return the corresponding ANAR value.
- */
-int
-mii_anar(media)
-	int media;
-{
-	int rv;
-
-	switch (media & (IFM_TMASK|IFM_NMASK|IFM_FDX)) {
-	case IFM_ETHER|IFM_10_T:
-		rv = ANAR_10|ANAR_CSMA;
-		break;
-	case IFM_ETHER|IFM_10_T|IFM_FDX:
-		rv = ANAR_10_FD|ANAR_CSMA;
-		break;
-	case IFM_ETHER|IFM_100_TX:
-		rv = ANAR_TX|ANAR_CSMA;
-		break;
-	case IFM_ETHER|IFM_100_TX|IFM_FDX:
-		rv = ANAR_TX_FD|ANAR_CSMA;
-		break;
-	case IFM_ETHER|IFM_100_T4:
-		rv = ANAR_T4|ANAR_CSMA;
-		break;
-	default:
-		rv = 0;
-		break;
-	}
-
-	return (rv);
-}
-
-/*
- * Given a BMCR value, return the corresponding ifmedia word.
- */
-int
-mii_media_from_bmcr(bmcr)
-	int bmcr;
-{
-	int rv = IFM_ETHER;
-
-	if (bmcr & BMCR_S100)
-		rv |= IFM_100_TX;
-	else
-		rv |= IFM_10_T;
-	if (bmcr & BMCR_FDX)
-		rv |= IFM_FDX;
-
-	return (rv);
-}
-
-/*
  * Media changed; notify all PHYs.
  */
 int
@@ -208,7 +265,7 @@ mii_mediachg(mii)
 
 	for (child = LIST_FIRST(&mii->mii_phys); child != NULL;
 	     child = LIST_NEXT(child, mii_list)) {
-		rv = (*child->mii_service)(child, mii, MII_MEDIACHG);
+		rv = PHY_SERVICE(child, mii, MII_MEDIACHG);
 		if (rv)
 			return (rv);
 	}
@@ -226,7 +283,7 @@ mii_tick(mii)
 
 	for (child = LIST_FIRST(&mii->mii_phys); child != NULL;
 	     child = LIST_NEXT(child, mii_list))
-		(void) (*child->mii_service)(child, mii, MII_TICK);
+		(void) PHY_SERVICE(child, mii, MII_TICK);
 }
 
 /*
@@ -243,59 +300,19 @@ mii_pollstat(mii)
 
 	for (child = LIST_FIRST(&mii->mii_phys); child != NULL;
 	     child = LIST_NEXT(child, mii_list))
-		(void) (*child->mii_service)(child, mii, MII_POLLSTAT);
+		(void) PHY_SERVICE(child, mii, MII_POLLSTAT);
 }
 
 /*
- * Initialize generic PHY media based on BMSR, called when a PHY is
- * attached.  We expect to be set up to print a comma-separated list
- * of media names.  Does not print a newline.
+ * Inform the PHYs that the interface is down.
  */
 void
-mii_add_media(mii, bmsr, instance)
+mii_down(mii)
 	struct mii_data *mii;
-	int bmsr, instance;
 {
-	const char *sep = "";
+	struct mii_softc *child;
 
-#define	ADD(m, c)	ifmedia_add(&mii->mii_media, (m), (c), NULL)
-#define	PRINT(s)	printf("%s%s", sep, s); sep = ", "
-
-	if (bmsr & BMSR_10THDX) {
-		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_10_T, 0, instance), 0);
-		PRINT("10baseT");
-	}
-	if (bmsr & BMSR_10TFDX) {
-		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_10_T, IFM_FDX, instance),
-		    BMCR_FDX);
-		PRINT("10baseT-FDX");
-	}
-	if (bmsr & BMSR_100TXHDX) {
-		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_100_TX, 0, instance),
-		    BMCR_S100);
-		PRINT("100baseTX");
-	}
-	if (bmsr & BMSR_100TXFDX) {
-		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_100_TX, IFM_FDX, instance),
-		    BMCR_S100|BMCR_FDX);
-		PRINT("100baseTX-FDX");
-	}
-	if (bmsr & BMSR_100T4) {
-		/*
-		 * XXX How do you enable 100baseT4?  I assume we set
-		 * XXX BMCR_S100 and then assume the PHYs will take
-		 * XXX watever action is necessary to switch themselves
-		 * XXX into T4 mode.
-		 */
-		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_100_T4, 0, instance),
-		    BMCR_S100);
-		PRINT("100baseT4");
-	}
-	if (bmsr & BMSR_ANEG) {
-		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_AUTO, 0, instance),
-		    BMCR_AUTOEN);
-		PRINT("auto");
-	}
-#undef ADD
-#undef PRINT
+	for (child = LIST_FIRST(&mii->mii_phys); child != NULL;
+	     child = LIST_NEXT(child, mii_list))
+		(void) PHY_SERVICE(child, mii, MII_DOWN);
 }

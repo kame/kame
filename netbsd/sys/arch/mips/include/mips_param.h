@@ -1,7 +1,10 @@
-/*	$NetBSD: mips_param.h,v 1.12 1999/02/09 17:15:52 tv Exp $	*/
+/*	$NetBSD: mips_param.h,v 1.20 2000/06/09 04:37:51 soda Exp $	*/
+
+#ifdef _KERNEL
+#include <machine/cpu.h>
+#endif
 
 /*
- * NOTE: SSIZE, SINCR and UPAGES must be multiples of CLSIZE.
  * On mips, UPAGES is fixed by sys/arch/mips/mips/locore code
  * to be the number of per-process-wired kernel-stack pages/PTES.
  */
@@ -24,7 +27,7 @@
  * ALIGNED_POINTER is a boolean macro that checks whether an address
  * is valid to fetch data elements of type t from on this architecture.
  * This does not reflect the optimal alignment, just the possibility
- * (within reasonable limits). 
+ * (within reasonable limits).
  *
  */
 #define	ALIGNBYTES	7
@@ -41,11 +44,11 @@
 #define	SEGSHIFT	22		/* LOG2(NBSEG) */
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages
- */ 
-#ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(6 * 1024 * 1024 / CLBYTES)
-#endif
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
+ */
+#define	NKMEMPAGES_MIN_DEFAULT	((8 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
 
 /* pages ("clicks") (4096 bytes) to disk blocks */
 #define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))
@@ -72,5 +75,5 @@
  */
 #define mips_round_page(x)	((((unsigned)(x)) + NBPG - 1) & ~(NBPG-1))
 #define mips_trunc_page(x)	((unsigned)(x) & ~(NBPG-1))
-#define mips_btop(x)		((unsigned)(x) >> PGSHIFT)
-#define mips_ptob(x)		((unsigned)(x) << PGSHIFT)
+#define mips_btop(x)		((paddr_t)(x) >> PGSHIFT)
+#define mips_ptob(x)		((paddr_t)(x) << PGSHIFT)

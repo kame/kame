@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc_mb.c,v 1.6 1999/02/19 20:57:14 leo Exp $	*/
+/*	$NetBSD: wdc_mb.c,v 1.9 2000/03/29 14:19:23 leo Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -87,14 +87,17 @@ wdc_mb_probe(parent, cfp, aux)
 	struct cfdata *cfp;
 	void *aux;
 {
-	struct channel_softc ch = { 0 };
+	static int	wdc_matched = 0;
+	struct channel_softc ch;
 	int	result = 0;
 	u_char	sv_ierb;
 
-	if ((machineid & ATARI_TT) || strcmp("wdc", aux) || cfp->cf_unit != 0)
+	if ((machineid & ATARI_TT) || strcmp("wdc", aux) || wdc_matched)
 		return 0;
 	if (!atari_realconfig)
 		return 0;
+
+	memset(&ch, 0, sizeof(ch));
 
 	ch.cmd_iot = ch.ctl_iot = mb_alloc_bus_space_tag();
 	if (ch.cmd_iot == NULL)
@@ -126,6 +129,8 @@ wdc_mb_probe(parent, cfp, aux)
 	bus_space_unmap(ch.cmd_iot,  ch.cmd_ioh, 0x40);
 	mb_free_bus_space_tag(ch.cmd_iot);
 
+	if (result)
+		wdc_matched = 1;
 	return (result);
 }
 
@@ -183,9 +188,9 @@ wdc_mb_attach(parent, self, aux)
 	/*
 	 * Setup & enable disk related interrupts.
 	 */
-	MFP->mf_ierb  |= IB_DINT;
-	MFP->mf_iprb  &= ~IB_DINT;
-	MFP->mf_imrb  |= IB_DINT;
+	MFP->mf_ierb |= IB_DINT;
+	MFP->mf_iprb  = (u_int8_t)~IB_DINT;
+	MFP->mf_imrb |= IB_DINT;
 }
 
 /*
@@ -220,7 +225,7 @@ void *softc;
 	/*
 	 * Flush pending interrupts before giving-up lock
 	 */
-	single_inst_bclr_b(MFP->mf_iprb, IB_DINT);
+	MFP->mf_iprb = (u_int8_t)~IB_DINT;
 
 	/*
 	 * Only free the lock on a Falcon. On the Hades, keep it.

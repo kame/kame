@@ -1,4 +1,4 @@
-/*	$NetBSD: if_lmc.c,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
+/*	$NetBSD: if_lmc.c,v 1.3 2000/05/03 21:08:02 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997-1999 LAN Media Corporation (LMC)
@@ -125,7 +125,6 @@
 #if NPCI > 0
 #include <pci/pcivar.h>
 #include <pci/dc21040reg.h>
-#define INCLUDE_PATH_PREFIX "pci/"
 #endif
 #endif /* __FreeBSD__ */
 
@@ -137,7 +136,6 @@
 #include <i386/isa/isavar.h>
 #include <i386/pci/pci.h>
 
-#define	INCLUDE_PATH_PREFIX	"i386/pci/"
 #endif /* __bsdi__ */
 
 #if defined(__NetBSD__)
@@ -148,17 +146,19 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/ic/dc21040reg.h>
-#define	INCLUDE_PATH_PREFIX	"dev/pci/"
 #endif /* __NetBSD__ */
 
 /*
- * Sigh.  Every OS puts these in different places.  NetBSD and FreeBSD use
- * a C preprocessor that allows this hack, but BSDI does not.  Grr.
+ * Sigh.  Every OS puts these in different places.
  */
-#if defined(__NetBSD__) || defined(__FreeBSD__)
-#include INCLUDE_PATH_PREFIX "if_lmc_types.h"
-#include INCLUDE_PATH_PREFIX "if_lmcioctl.h"
-#include INCLUDE_PATH_PREFIX "if_lmcvar.h"
+#if defined(__NetBSD__)
+#include <dev/pci/if_lmc_types.h>
+#include <dev/pci/if_lmcioctl.h>
+#include <dev/pci/if_lmcvar.h>
+#elif defined(__FreeBSD__)
+#include "pci/if_lmc_types.h"
+#include "pci/if_lmcioctl.h"
+#include "pci/if_lmcvar.h"
 #else /* BSDI */
 #include "i386/pci/if_lmctypes.h"
 #include "i386/pci/if_lmcioctl.h"
@@ -945,7 +945,7 @@ lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 	do {
 		int len = m0->m_len;
 		caddr_t addr = mtod(m0, caddr_t);
-		unsigned clsize = CLBYTES - (((u_long) addr) & (CLBYTES-1));
+		unsigned clsize = NBPG - (((u_long) addr) & PGOFSET);
 
 		while (len > 0) {
 			unsigned slen = min(len, clsize);
@@ -1010,7 +1010,7 @@ lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 			if (partial)
 				continue;
 #endif
-			clsize = CLBYTES;
+			clsize = NBPG;
 		}
 	} while ((m0 = m0->m_next) != NULL);
 

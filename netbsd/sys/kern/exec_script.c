@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_script.c,v 1.20.2.1 2000/02/01 23:11:20 he Exp $	*/
+/*	$NetBSD: exec_script.c,v 1.23 2000/02/01 01:23:29 assar Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1996 Christopher G. Demetriou
@@ -178,6 +178,7 @@ check_shell:
 			panic("exec_script_makecmds: epp already has a fd");
 #endif
 
+		/* falloc() will use the descriptor for us */
 		if ((error = falloc(p, &fp, &epp->ep_fd)) != 0) {
 			scriptvp = NULL;
 			shellargp = NULL;
@@ -189,6 +190,7 @@ check_shell:
 		fp->f_ops = &vnops;
 		fp->f_data = (caddr_t) epp->ep_vp;
 		fp->f_flag = FREAD;
+		FILE_UNUSE(fp, p);
 	}
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ae_nubus.c,v 1.28 1998/09/27 14:39:11 scottr Exp $	*/
+/*	$NetBSD: if_ae_nubus.c,v 1.29.12.1 2000/08/06 12:56:19 briggs Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -105,7 +105,6 @@ ae_nubus_match(parent, cf, aux)
 			rv = 1;
 			break;
 		case DP8390_VENDOR_DAYNA:
-		case DP8390_VENDOR_FOCUS:
 			rv = UNSUPP;
 			break;
 		default:
@@ -261,10 +260,6 @@ ae_nubus_attach(parent, self, aux)
 		success = 1;
 		break;
 
-	case DP8390_VENDOR_FOCUS:
-		printf(": unsupported Focus hardware\n");
-		break;
-
 	case DP8390_VENDOR_INTERLAN:
 		/* Map register offsets */
 		for (i = 0; i < 16; i++) /* normal order, longword aligned */
@@ -418,6 +413,11 @@ ae_nb_card_vendor(bst, bsh, na)
 		}
 		break;
 	case NUBUS_DRSW_APPLE:
+		if (na->drhw == NUBUS_DRHW_ASANTE_LC) {
+			vendor = DP8390_VENDOR_UNKNOWN;
+			break;
+		}
+		/* FALLTHROUGH */
 	case NUBUS_DRSW_DAYNA2:
 	case NUBUS_DRSW_TECHWORKS:
 	case NUBUS_DRSW_TFLLAN:
@@ -432,9 +432,6 @@ ae_nb_card_vendor(bst, bsh, na)
 		break;
 	case NUBUS_DRSW_FARALLON:
 		vendor = DP8390_VENDOR_FARALLON;
-		break;
-	case NUBUS_DRSW_FOCUS:
-		vendor = DP8390_VENDOR_FOCUS;
 		break;
 	case NUBUS_DRSW_GATOR:
 		switch (na->drhw) {

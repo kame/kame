@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_13_machdep.c,v 1.5 1999/03/26 04:29:21 eeh Exp $	*/
+/*	$NetBSD: compat_13_machdep.c,v 1.8 2000/04/10 13:34:19 pk Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,6 +37,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "opt_ddb.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -70,7 +72,7 @@ compat_13_sys_sigreturn(p, v, retval)
 	} */ *uap = v;
 	struct sigcontext13 sc, *scp;
 	sigset_t mask;
-	struct trapframe *tf;
+	struct trapframe64 *tf;
 
 	/* First ensure consistent stack state (see sendsig). */
 	write_user_windows();
@@ -81,7 +83,9 @@ compat_13_sys_sigreturn(p, v, retval)
 	if (rwindow_save(p)) {
 #ifdef DEBUG
 		printf("compat_13_sys_sigreturn: rwindow_save(%p) failed, sending SIGILL\n", p);
+#ifdef DDB
 		Debugger();
+#endif
 #endif
 		sigexit(p, SIGILL);
 	}
@@ -89,7 +93,9 @@ compat_13_sys_sigreturn(p, v, retval)
 	if (sigdebug & SDB_FOLLOW) {
 		printf("compat_13_sys_sigreturn: %s[%d], sigcntxp %p\n",
 		    p->p_comm, p->p_pid, SCARG(uap, sigcntxp));
+#ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
+#endif
 	}
 #endif
 
@@ -98,7 +104,9 @@ compat_13_sys_sigreturn(p, v, retval)
 #ifdef DEBUG
 	{
 		printf("compat_13_sys_sigreturn: copyin failed: scp=%p\n", scp);
+#ifdef DDB
 		Debugger();
+#endif
 		return (EFAULT);
 	}
 #else
@@ -117,7 +125,9 @@ compat_13_sys_sigreturn(p, v, retval)
 #ifdef DEBUG
 	{
 		printf("compat_13_sys_sigreturn: pc %p or npc %p invalid\n", scp->sc_pc, scp->sc_npc);
+#ifdef DDB
 		Debugger();
+#endif
 		return (EINVAL);
 	}
 #endif
@@ -137,7 +147,9 @@ compat_13_sys_sigreturn(p, v, retval)
 	if (sigdebug & SDB_FOLLOW) {
 		printf("compat_13_sys_sigreturn: return trapframe pc=%p sp=%p tstate=%llx\n",
 		       (vaddr_t)tf->tf_pc, (vaddr_t)tf->tf_out[6], tf->tf_tstate);
+#ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
+#endif
 	}
 #endif
 

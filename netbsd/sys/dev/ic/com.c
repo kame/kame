@@ -1,4 +1,4 @@
-/*	$NetBSD: com.c,v 1.159.2.4 2000/02/08 22:14:27 he Exp $	*/
+/*	$NetBSD: com.c,v 1.172 2000/05/03 19:19:04 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -77,6 +77,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_com.h"
 
 #include "rnd.h"
 #if NRND > 0 && defined(RND_COM)
@@ -123,7 +124,6 @@ int comprobeHAYESP __P((bus_space_handle_t hayespioh, struct com_softc *sc));
 #if defined(DDB) || defined(KGDB)
 static void com_enable_debugport __P((struct com_softc *));
 #endif
-void	com_attach_subr	__P((struct com_softc *sc));
 void	com_config	__P((struct com_softc *));
 void	com_shutdown	__P((struct com_softc *));
 int	comspeed	__P((long, long));
@@ -160,6 +160,7 @@ void 	comsoft		__P((void *));
 void 	comsoft		__P((void));
 #else
 void 	comsoft		__P((void *));
+struct callout comsoft_callout = CALLOUT_INITIALIZER;
 #endif
 #endif
 integrate void com_rxsoft	__P((struct com_softc *, struct tty *));
@@ -251,7 +252,7 @@ comspeed(speed, frequency)
 		return (-1);
 	return (x);
 
-#undef	divrnd(n, q)
+#undef	divrnd
 }
 
 #ifdef COM_DEBUG
@@ -397,6 +398,8 @@ com_attach_subr(sc)
 	int	*hayespp;
 #endif
 
+	callout_init(&sc->sc_diag_callout);
+
 	/* Disable interrupts before configuring the device. */
 	sc->sc_ier = 0;
 	bus_space_write_1(iot, ioh, com_ier, sc->sc_ier);
@@ -483,6 +486,10 @@ com_attach_subr(sc)
 	else
 		printf(": ns8250 or ns16450, no fifo\n");
 	bus_space_write_1(iot, ioh, com_fifo, 0);
+	if (ISSET(sc->sc_hwflags, COM_HW_TXFIFO_DISABLE)) {
+		sc->sc_fifolen = 1;
+		printf("%s: txfifo disabled\n", sc->sc_dev.dv_xname);
+	}
 #ifdef COM_HAYESP
 	}
 #endif
@@ -1147,7 +1154,7 @@ com_schedrx(sc)
 #else
 	if (!com_softintr_scheduled) {
 		com_softintr_scheduled = 1;
-		timeout(comsoft, NULL, 1);
+		callout_reset(&comsoft_callout, 1, comsoft, NULL);
 	}
 #endif
 #endif
@@ -1711,7 +1718,8 @@ com_rxsoft(sc, tp)
 	if (cc == com_rbuf_size) {
 		sc->sc_floods++;
 		if (sc->sc_errors++ == 0)
-			timeout(comdiag, sc, 60 * hz);
+			callout_reset(&sc->sc_diag_callout, 60 * hz,
+			    comdiag, sc);
 	}
 
 	while (cc) {
@@ -1721,7 +1729,8 @@ com_rxsoft(sc, tp)
 			if (ISSET(lsr, LSR_OE)) {
 				sc->sc_overflows++;
 				if (sc->sc_errors++ == 0)
-					timeout(comdiag, sc, 60 * hz);
+					callout_reset(&sc->sc_diag_callout,
+					    60 * hz, comdiag, sc);
 			}
 			if (ISSET(lsr, LSR_BI | LSR_FE))
 				SET(code, TTY_FE);
@@ -2125,7 +2134,7 @@ comintr(arg)
 #else
 	if (!com_softintr_scheduled) {
 		com_softintr_scheduled = 1;
-		timeout(comsoft, NULL, 1);
+		callout_reset(&comsoft_callout, 1, comsoft, NULL);
 	}
 #endif
 #endif
@@ -2230,7 +2239,8 @@ comcnattach(iot, iobase, rate, frequency, cflag)
 {
 	int res;
 	static struct consdev comcons = {
-		NULL, NULL, comcngetc, comcnputc, comcnpollc, NODEV, CN_NORMAL
+		NULL, NULL, comcngetc, comcnputc, comcnpollc, NULL,
+		    NODEV, CN_NORMAL
 	};
 
 	res = cominit(iot, iobase, rate, frequency, cflag, &comconsioh);

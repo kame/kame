@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr.c,v 1.80.2.5 1999/11/08 07:56:52 cgd Exp $	*/
+/*	$NetBSD: ncr.c,v 1.101 2000/04/08 13:49:43 tsutsui Exp $	*/
 
 /**************************************************************************
 **
@@ -209,6 +209,7 @@
 
 #ifdef KERNEL
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/kernel.h>
@@ -237,6 +238,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #ifndef __alpha__
+#undef DELAY
 #define DELAY(x)	delay(x)
 #endif
 #include <dev/scsipi/scsi_all.h>
@@ -248,7 +250,14 @@
 #if defined(__NetBSD__) && defined(__alpha__)
 /* XXX XXX NEED REAL DMA MAPPING SUPPORT XXX XXX */
 #undef vtophys
-#define	vtophys(va)	alpha_XXX_dmamap((vaddr_t)(va))
+#define	vtophys(va)	alpha_XXX_dmamap(va)
+#endif
+
+#if defined(__NetBSD__) && defined(__mips__)
+/* XXX XXX NEED REAL DMA MAPPING SUPPORT XXX XXX */
+#undef vtophys
+extern paddr_t kvtophys __P((vaddr_t)); /* XXX */
+#define	vtophys(va)	kvtophys(va)
 #endif
 
 /*==========================================================
@@ -316,6 +325,11 @@
 
 #ifdef __NetBSD__
 
+#ifndef __BUS_SPACE_HAS_STREAM_METHODS
+#define	bus_space_read_stream_4		bus_space_read_4
+#define	bus_space_write_stream_4	bus_space_write_4
+#endif /* __BUS_SPACE_HAS_STREAM_METHODS */
+
 #define	INB(r) \
     INB_OFF(offsetof(struct ncr_reg, r))
 #define	INB_OFF(o) \
@@ -337,15 +351,16 @@
     bus_space_write_4 (np->sc_st, np->sc_sh, (o), (val))
 
 #define	READSCRIPT_OFF(base, off) \
-    (base ? *((INT32 *)((char *)base + (off))) : \
-    bus_space_read_4 (np->ram_tag, np->ram_handle, off))
+    le32toh(base ? *((INT32 *)((char *)base + (off))) :			\
+		  bus_space_read_stream_4(np->ram_tag, np->ram_handle, off))
 
 #define	WRITESCRIPT_OFF(base, off, val) \
     do {								\
     	if (base)							\
-    		*((INT32 *)((char *)base + (off))) = (val); 		\
+    		*((INT32 *)((char *)base + (off))) = (htole32(val));	\
     	else								\
-    		bus_space_write_4 (np->ram_tag, np->ram_handle, off, val); \
+    		bus_space_write_stream_4(np->ram_tag, np->ram_handle,	\
+		    off, htole32(val)); \
     } while (0)
 
 #define	READSCRIPT(r) \
@@ -1125,6 +1140,7 @@ struct ncb {
 	struct device sc_dev;
 	pci_chipset_tag_t sc_pc;
 	void *sc_ih;
+	struct callout sc_timo_ch;
 	bus_space_tag_t sc_st;
 	bus_space_handle_t sc_sh;
 	bus_dma_tag_t sc_dmat;
@@ -1356,8 +1372,8 @@ struct script {
 	ncrcmd  msg_bad		[  6];
 	ncrcmd  complete	[ 13];
 	ncrcmd	cleanup		[ 12];
-	ncrcmd	cleanup0	[ 11];
-	ncrcmd	signal		[ 10];
+	ncrcmd	cleanup0	[ 9];
+	ncrcmd	signal		[ 12];
 	ncrcmd  save_dp		[  5];
 	ncrcmd  restore_dp	[  5];
 	ncrcmd  disconnect	[ 12];
@@ -1518,7 +1534,7 @@ static	int	read_tekram_eeprom
 
 #if 0
 static char ident[] =
-	"\n$NetBSD: ncr.c,v 1.80.2.5 1999/11/08 07:56:52 cgd Exp $\n";
+	"\n$NetBSD: ncr.c,v 1.101 2000/04/08 13:49:43 tsutsui Exp $\n";
 #endif
 
 static const u_long	ncr_version = NCR_VERSION	* 11
@@ -2287,20 +2303,20 @@ static	struct script script0 = {
 		0,
 	SCR_JUMP ^ IFTRUE (DATA (S_CHECK_COND)),
 		PADDRH(getcc2),
-	/*
-	**	And make the DSA register invalid.
-	*/
-/*>>>*/	SCR_LOAD_REG (dsa, 0xff), /* invalid */
-		0,
 }/*-------------------------< SIGNAL >----------------------*/,{
 	/*
 	**	if status = queue full,
 	**	reinsert in startqueue and stall queue.
 	*/
-	SCR_FROM_REG (SS_REG),
+/*>>>*/	SCR_FROM_REG (SS_REG),
 		0,
 	SCR_INT ^ IFTRUE (DATA (S_QUEUE_FULL)),
 		SIR_STALL_QUEUE,
+	/*
+	**	And make the DSA register invalid.
+	*/
+	SCR_LOAD_REG (dsa, 0xff), /* invalid */
+		0,
 	/*
 	**	if job completed ...
 	*/
@@ -3423,7 +3439,7 @@ static void ncr_script_copy_and_bind (ncb_p np, ncrcmd *src, ncrcmd *dst, int le
 					    ((old & ~RELOC_MASK) >
 					     SCRIPT_KVAR_LAST))
 						panic("ncr KVAR out of range");
-					new = vtophys((void *)script_kvars[old &
+					new = vtophys((vaddr_t)script_kvars[old &
 					    ~RELOC_MASK]);
 					break;
 				case 0:
@@ -3712,6 +3728,8 @@ static void ncr_attach (pcici_t config_id, int unit)
 	int ioh_valid, memh_valid;
 	bus_dma_segment_t seg;
 	int rseg, error;
+
+	callout_init(&np->sc_timo_ch);
 
 	i = ncr_chip_lookup(pa->pa_id, rev);
 	printf(": %s\n", ncr_chip_table[i].name);
@@ -4258,7 +4276,7 @@ static void ncr_attach (pcici_t config_id, int unit)
 	ncr_script_copy_and_bind (np, (ncrcmd *) &scripth0,
 		(ncrcmd *) np->scripth, sizeof(struct scripth));
 
-	np->ccb->p_ccb	= vtophys (np->ccb);
+	np->ccb->p_ccb	= vtophys((vaddr_t)np->ccb);
 
 	/*
 	**    Patch the script for LED support.
@@ -4274,8 +4292,8 @@ static void ncr_attach (pcici_t config_id, int unit)
 	**	init data structure
 	*/
 
-	np->ncb_dma->jump_tcb.l_cmd	= SCR_JUMP;
-	np->ncb_dma->jump_tcb.l_paddr	= NCB_SCRIPTH_PHYS (np, abort);
+	np->ncb_dma->jump_tcb.l_cmd	= htole32(SCR_JUMP);
+	np->ncb_dma->jump_tcb.l_paddr	= htole32(NCB_SCRIPTH_PHYS (np, abort));
 
 	/*
 	**  Get SCSI addr of host adapter (set by bios?).
@@ -4507,7 +4525,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	lcb_p lp;
 	tcb_p tp = &np->target[xp->sc_link->scsipi_scsi.target];
 
-	int	i, oldspl, segments, flags = xp->flags, pollmode;
+	int	i, oldspl, segments, flags = xp->xs_control, pollmode;
 	u_char	qidx, nego, idmsg, *msgptr;
 	u_long  msglen, msglen2;
 
@@ -4520,7 +4538,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	**---------------------------------------------
 	*/
 
-	if (flags & SCSI_RESET) {
+	if (flags & XS_CTL_RESET) {
 		OUTB (nc_scntl1, CRST);
 		DELAY (1000);
 		return(COMPLETE);
@@ -4536,7 +4554,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	if ((xp->sc_link->scsipi_scsi.target == np->myaddr	  ) ||
 		(xp->sc_link->scsipi_scsi.target >= MAX_TARGET) ||
 		(xp->sc_link->scsipi_scsi.lun    >= MAX_LUN   ) ||
-		(flags    & SCSI_DATA_UIO)) {
+		(flags    & XS_CTL_DATA_UIO)) {
 		xp->error = XS_DRIVER_STUFFUP;
 		return(COMPLETE);
 	};
@@ -4578,7 +4596,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	if (DEBUG_FLAGS & DEBUG_TINY) {
 		PRINT_ADDR(xp);
 		printf ("CMD=%x F=%x A=%p L=%x ", 
-			cmd->opcode, (unsigned)xp->flags, xp->data,
+			cmd->opcode, (unsigned)xp->xs_control, xp->data,
 			(unsigned)xp->datalen);
 	}
 
@@ -4590,19 +4608,10 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	**--------------------------------------------
 	*/
 
-	flags = xp->flags;
-	if (!(flags & INUSE)) {
-		printf("%s: ?INUSE?\n", ncr_name (np));
-		xp->flags |= INUSE;
-	};
-
-	if(flags & ITSDONE) {
-		printf("%s: ?ITSDONE?\n", ncr_name (np));
-		xp->flags &= ~ITSDONE;
-	};
+	flags = xp->xs_control;
 
 	if (xp->bp)
-		flags |= (SCSI_NOSLEEP); /* just to be sure */
+		flags |= (XS_CTL_NOSLEEP); /* just to be sure */
 
 	/*---------------------------------------------------
 	**
@@ -4846,14 +4855,16 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	**----------------------------------------------------
 	*/
 
-	if (flags & SCSI_DATA_IN) {
-		cp->phys.header.savep = NCB_SCRIPT_PHYS (np, data_in);
-		cp->phys.header.goalp = cp->phys.header.savep +20 +segments*16;
-	} else if (flags & SCSI_DATA_OUT) {
-		cp->phys.header.savep = NCB_SCRIPT_PHYS (np, data_out);
-		cp->phys.header.goalp = cp->phys.header.savep +20 +segments*16;
+	if (flags & XS_CTL_DATA_IN) {
+		bus_addr_t sp = NCB_SCRIPT_PHYS (np, data_in);
+		cp->phys.header.savep = htole32(sp);
+		cp->phys.header.goalp = htole32(sp + 20 + segments * 16);
+	} else if (flags & XS_CTL_DATA_OUT) {
+		bus_addr_t sp = NCB_SCRIPT_PHYS (np, data_out);
+		cp->phys.header.savep = htole32(sp);
+		cp->phys.header.goalp = htole32(sp + 20 + segments * 16);
 	} else {
-		cp->phys.header.savep = NCB_SCRIPT_PHYS (np, no_data);
+		cp->phys.header.savep = htole32(NCB_SCRIPT_PHYS (np, no_data));
 		cp->phys.header.goalp = cp->phys.header.savep;
 	};
 	cp->phys.header.lastp = cp->phys.header.savep;
@@ -4882,8 +4893,8 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	/*
 	**	Startqueue
 	*/
-	cp->phys.header.launch.l_paddr	= NCB_SCRIPT_PHYS (np, select);
-	cp->phys.header.launch.l_cmd	= SCR_JUMP;
+	cp->phys.header.launch.l_paddr	= htole32(NCB_SCRIPT_PHYS (np, select));
+	cp->phys.header.launch.l_cmd	= htole32(SCR_JUMP);
 	/*
 	**	select
 	*/
@@ -4893,21 +4904,21 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	/*
 	**	message
 	*/
-	cp->phys.smsg.addr		= CCB_PHYS (cp, scsi_smsg);
-	cp->phys.smsg.size		= msglen;
+	cp->phys.smsg.addr		= htole32(CCB_PHYS (cp, scsi_smsg));
+	cp->phys.smsg.size		= htole32(msglen);
 
-	cp->phys.smsg2.addr		= CCB_PHYS (cp, scsi_smsg2);
-	cp->phys.smsg2.size		= msglen2;
+	cp->phys.smsg2.addr		= htole32(CCB_PHYS (cp, scsi_smsg2));
+	cp->phys.smsg2.size		= htole32(msglen2);
 	/*
 	**	command
 	*/
-	cp->phys.cmd.addr		= CCB_PHYS (cp, scsi_cmd);
-	cp->phys.cmd.size		= xp->cmdlen;
+	cp->phys.cmd.addr		= htole32(CCB_PHYS (cp, scsi_cmd));
+	cp->phys.cmd.size		= htole32(xp->cmdlen);
 	/*
 	**	sense command
 	*/
-	cp->phys.scmd.addr		= CCB_PHYS (cp, sensecmd);
-	cp->phys.scmd.size		= 6;
+	cp->phys.scmd.addr		= htole32(CCB_PHYS (cp, sensecmd));
+	cp->phys.scmd.size		= htole32(6);
 	/*
 	**	patch requested size into sense command
 	*/
@@ -4919,8 +4930,8 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	/*
 	**	sense data
 	*/
-	cp->phys.sense.addr		= CCB_PHYS (cp, sense_data);
-	cp->phys.sense.size		= sizeof(struct scsipi_sense_data);
+	cp->phys.sense.addr		= htole32(CCB_PHYS (cp, sense_data));
+	cp->phys.sense.size		= htole32(sizeof(struct scsipi_sense_data));
 	/*
 	**	status
 	*/
@@ -4945,7 +4956,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	**	reselect pattern and activate this job.
 	*/
 
-	cp->jump_ccb.l_cmd	= (SCR_JUMP ^ IFFALSE (DATA (cp->tag)));
+	cp->jump_ccb.l_cmd	= htole32(SCR_JUMP ^ IFFALSE (DATA (cp->tag)));
 #ifdef __NetBSD__
 	cp->tlimit		= mono_time.tv_sec + xp->timeout / 1000 + 2;
 #else
@@ -4959,8 +4970,8 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 
 	qidx = np->squeueput + 1;
 	if (qidx >= MAX_START) qidx=0;
-	np->ncb_dma->squeue [qidx	 ] = NCB_SCRIPT_PHYS (np, idle);
-	np->ncb_dma->squeue [np->squeueput] = CCB_PHYS (cp, phys);
+	np->ncb_dma->squeue [qidx	  ] = htole32(NCB_SCRIPT_PHYS (np, idle));
+	np->ncb_dma->squeue [np->squeueput] = htole32(CCB_PHYS (cp, phys));
 	np->squeueput = qidx;
 
 	if(DEBUG_FLAGS & DEBUG_QUEUE)
@@ -4979,7 +4990,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	**	and reenable interrupts
 	*/
 #ifdef __NetBSD__
-	pollmode = flags & SCSI_POLL;
+	pollmode = flags & XS_CTL_POLL;
 #else
 	pollmode = flags & SCSI_NOMASK;
 #endif
@@ -5004,7 +5015,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 
 	if (DEBUG_FLAGS & DEBUG_POLL) printf("P");
 
-	for (i=xp->timeout; i && !(xp->flags & ITSDONE);i--) {
+	for (i=xp->timeout; i && !(xp->xs_status & XS_STS_DONE);i--) {
 		if ((DEBUG_FLAGS & DEBUG_POLL) && (cp->host_status))
 			printf ("%c", (cp->host_status & 0xf) + '0');
 		DELAY (1000);
@@ -5014,7 +5025,7 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 	/*
 	**	Abort if command not done.
 	*/
-	if (!(xp->flags & ITSDONE)) {
+	if (!(xp->xs_status & XS_STS_DONE)) {
 		printf ("%s: aborting job ...\n", ncr_name (np));
 		OUTB (nc_istat, CABRT);
 		DELAY (100000);
@@ -5022,13 +5033,13 @@ static INT32 ncr_start (struct scsipi_xfer * xp)
 		ncr_exception (np);
 	};
 
-	if (!(xp->flags & ITSDONE)) {
+	if (!(xp->xs_status & XS_STS_DONE)) {
 		printf ("%s: abortion failed at %x.\n",
 			ncr_name (np), (unsigned) INL(nc_dsp));
 		ncr_init (np, "timeout", HS_TIMEOUT);
 	};
 
-	if (!(xp->flags & ITSDONE)) {
+	if (!(xp->xs_status & XS_STS_DONE)) {
 		cp-> host_status = HS_SEL_TIMEOUT;
 		ncr_complete (np, cp);
 	};
@@ -5071,12 +5082,12 @@ void ncr_complete (ncb_p np, ccb_p cp)
 	/*
 	**	No Reselect anymore.
 	*/
-	cp->jump_ccb.l_cmd = (SCR_JUMP);
+	cp->jump_ccb.l_cmd = htole32(SCR_JUMP);
 
 	/*
 	**	No starting.
 	*/
-	cp->phys.header.launch.l_paddr= NCB_SCRIPT_PHYS (np, idle);
+	cp->phys.header.launch.l_paddr= htole32(NCB_SCRIPT_PHYS (np, idle));
 
 	/*
 	**	timestamp
@@ -5216,7 +5227,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		tp->bytes     += xp->datalen;
 		tp->transfers ++;
 #ifndef __NetBSD__
-	} else if (xp->flags & SCSI_ERR_OK) {
+	} else if (xp->xs_control & SCSI_ERR_OK) {
 
 		/*
 		**   Not correct, but errors expected.
@@ -5274,7 +5285,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		xp->error = XS_TIMEOUT;
 	}
 
-	xp->flags |= ITSDONE;
+	xp->xs_status |= XS_STS_DONE;
 
 	/*
 	**	trace output
@@ -5310,7 +5321,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 	/*
 	**	Free this ccb
 	*/
-	ncr_free_ccb (np, cp, xp->flags);
+	ncr_free_ccb (np, cp, xp->xs_control);
 
 	/*
 	**	signal completion to generic driver.
@@ -5398,7 +5409,7 @@ void ncr_init (ncb_p np, char * msg, u_long code)
 	*/
 
 	for (i=0;i<MAX_START;i++)
-		np -> ncb_dma -> squeue [i] = NCB_SCRIPT_PHYS (np, idle);
+		np -> ncb_dma -> squeue [i] = htole32(NCB_SCRIPT_PHYS (np, idle));
 
 	/*
 	**	Start at first entry.
@@ -5990,13 +6001,13 @@ static void ncr_timeout (void *arg)
 			**	Disable reselect.
 			**      Remove it from startqueue.
 			*/
-			cp->jump_ccb.l_cmd = (SCR_JUMP);
+			cp->jump_ccb.l_cmd = htole32(SCR_JUMP);
 			if (cp->phys.header.launch.l_paddr ==
-				NCB_SCRIPT_PHYS (np, select)) {
+				htole32(NCB_SCRIPT_PHYS (np, select))) {
 				printf ("%s: timeout ccb=%p (skip)\n",
 					ncr_name (np), cp);
 				cp->phys.header.launch.l_paddr
-				= NCB_SCRIPT_PHYS (np, skip);
+				= htole32(NCB_SCRIPT_PHYS (np, skip));
 			};
 
 			switch (cp->host_status) {
@@ -6007,7 +6018,7 @@ static void ncr_timeout (void *arg)
 				** still in start queue ?
 				*/
 				if (cp->phys.header.launch.l_paddr ==
-					NCB_SCRIPT_PHYS (np, skip))
+					htole32(NCB_SCRIPT_PHYS (np, skip)))
 					continue;
 
 				/* fall through */
@@ -6024,7 +6035,7 @@ static void ncr_timeout (void *arg)
 		splx (oldspl);
 	}
 
-	timeout (ncr_timeout, (caddr_t) np, step ? step : 1);
+	callout_reset (&np->sc_timo_ch, step ? step : 1, ncr_timeout, np);
 
 	if (INB(nc_istat) & (INTF|SIP|DIP)) {
 
@@ -6394,7 +6405,7 @@ void ncr_exception (ncb_p np)
 			if (i%16==15) printf (".\n");
 		};
 
-		untimeout (ncr_timeout, (caddr_t) np);
+		callout_stop (&np->sc_timo_ch);
 
 		printf ("%s: halted!\n", ncr_name(np));
 		/*
@@ -6560,11 +6571,11 @@ static void ncr_int_ma (ncb_p np, u_char dstat)
 	**	and the address at which to continue.
 	*/
 
-	if (dsp == vtophys (&cp->patch[2])) {
+	if (dsp == vtophys((vaddr_t)&cp->patch[2])) {
 		vdsp_base = cp;
 		vdsp_off = offsetof(struct ccb, patch[0]);
 		nxtdsp = READSCRIPT_OFF(vdsp_base, vdsp_off + 3*4);
-	} else if (dsp == vtophys (&cp->patch[6])) {
+	} else if (dsp == vtophys((vaddr_t)&cp->patch[6])) {
 		vdsp_base = cp;
 		vdsp_off = offsetof(struct ccb, patch[4]);
 		nxtdsp = READSCRIPT_OFF(vdsp_base, vdsp_off + 3*4);
@@ -6601,8 +6612,8 @@ static void ncr_int_ma (ncb_p np, u_char dstat)
 
 	if (cmd & 0x10) {	/* Table indirect */
 		tblp = (u_int32_t *) ((char*) &cp->phys + oadr);
-		olen = tblp[0];
-		oadr = tblp[1];
+		olen = le32toh(tblp[0]);
+		oadr = le32toh(tblp[1]);
 	} else {
 		tblp = (u_int32_t *) 0;
 		olen = READSCRIPT_OFF(vdsp_base, vdsp_off) & 0xffffff;
@@ -6644,32 +6655,33 @@ static void ncr_int_ma (ncb_p np, u_char dstat)
 	*/
 
 	newcmd = cp->patch;
-	if (cp->phys.header.savep == vtophys (newcmd)) newcmd+=4;
+	if (cp->phys.header.savep == htole32(vtophys((vaddr_t)newcmd)))
+		newcmd += 4;
 
 	/*
 	**	fillin the commands
 	*/
 
-	newcmd[0] = ((cmd & 0x0f) << 24) | rest;
-	newcmd[1] = oadr + olen - rest;
-	newcmd[2] = SCR_JUMP;
-	newcmd[3] = nxtdsp;
+	newcmd[0] = htole32(((cmd & 0x0f) << 24) | rest);
+	newcmd[1] = htole32(oadr + olen - rest);
+	newcmd[2] = htole32(SCR_JUMP);
+	newcmd[3] = htole32(nxtdsp);
 
 	if (DEBUG_FLAGS & DEBUG_PHASE) {
 		PRINT_ADDR(cp->xfer);
 		printf ("newcmd[%ld] %x %x %x %x.\n",
 			(long)(newcmd - cp->patch),
-			(unsigned)newcmd[0],
-			(unsigned)newcmd[1],
-			(unsigned)newcmd[2],
-			(unsigned)newcmd[3]);
+			(unsigned)le32toh(newcmd[0]),
+			(unsigned)le32toh(newcmd[1]),
+			(unsigned)le32toh(newcmd[2]),
+			(unsigned)le32toh(newcmd[3]));
 	}
 	/*
 	**	fake the return address (to the patch).
 	**	and restart script processor at dispatcher.
 	*/
 	np->profile.num_break++;
-	OUTL (nc_temp, vtophys (newcmd));
+	OUTL (nc_temp, vtophys((vaddr_t)newcmd));
 	if ((cmd & 7) == 0)
 		OUTL (nc_dsp, NCB_SCRIPT_PHYS (np, dispatch));
 	else
@@ -7201,8 +7213,8 @@ void ncr_int_sir (ncb_p np)
 		printf ("M_DISCONNECT received, but datapointer not saved:\n"
 			"\tdata=%x save=%x goal=%x.\n",
 			(unsigned) INL (nc_temp),
-			(unsigned) np->ncb_dma->header.savep,
-			(unsigned) np->ncb_dma->header.goalp);
+			le32toh((unsigned) np->ncb_dma->header.savep),
+			le32toh((unsigned) np->ncb_dma->header.goalp));
 		break;
 
 /*--------------------------------------------------------------------
@@ -7333,7 +7345,7 @@ static	ccb_p ncr_get_ccb
 	*/
 
 	while (cp->magic) {
-		if (flags & SCSI_NOSLEEP) break;
+		if (flags & XS_CTL_NOSLEEP) break;
 		if (tsleep ((caddr_t)cp, PRIBIO|PCATCH, "ncr", 0))
 			break;
 	};
@@ -7398,29 +7410,28 @@ static	void ncr_alloc_ccb (ncb_p np, u_long target, u_long lun)
 		/*
 		**	initialize it.
 		*/
-		tp->jump_tcb.l_cmd   = (SCR_JUMP^IFFALSE (DATA (0x80 + target)));
+		tp->jump_tcb.l_cmd   = htole32(SCR_JUMP^IFFALSE (DATA (0x80 + target)));
 		tp->jump_tcb.l_paddr = np->ncb_dma->jump_tcb.l_paddr;
 
 		tp->getscr[0] =
-			(np->features & FE_PFEN)? SCR_COPY(1) : SCR_COPY_F(1);
-		tp->getscr[1] = vtophys (&tp->sval);
-		tp->getscr[2] = np->paddr + offsetof (struct ncr_reg, nc_sxfer);
-		tp->getscr[3] =
-			(np->features & FE_PFEN)? SCR_COPY(1) : SCR_COPY_F(1);
-		tp->getscr[4] = vtophys (&tp->wval);
-		tp->getscr[5] = np->paddr + offsetof (struct ncr_reg, nc_scntl3);
+			(np->features & FE_PFEN)? htole32(SCR_COPY(1)) : htole32(SCR_COPY_F(1));
+		tp->getscr[1] = htole32(vtophys((vaddr_t)&tp->sval));
+		tp->getscr[2] = htole32(np->paddr + offsetof (struct ncr_reg, nc_sxfer));
+		tp->getscr[3] = tp->getscr[0];
+		tp->getscr[4] = htole32(vtophys((vaddr_t)&tp->wval));
+		tp->getscr[5] = htole32(np->paddr + offsetof (struct ncr_reg, nc_scntl3));
 
 		assert (( (offsetof(struct ncr_reg, nc_sxfer) ^
 			offsetof(struct tcb    , sval    )) &3) == 0);
 		assert (( (offsetof(struct ncr_reg, nc_scntl3) ^
 			offsetof(struct tcb    , wval    )) &3) == 0);
 
-		tp->call_lun.l_cmd   = (SCR_CALL);
-		tp->call_lun.l_paddr = NCB_SCRIPT_PHYS (np, resel_lun);
+		tp->call_lun.l_cmd   = htole32(SCR_CALL);
+		tp->call_lun.l_paddr = htole32(NCB_SCRIPT_PHYS (np, resel_lun));
 
-		tp->jump_lcb.l_cmd   = (SCR_JUMP);
-		tp->jump_lcb.l_paddr = NCB_SCRIPTH_PHYS (np, abort);
-		np->ncb_dma->jump_tcb.l_paddr = vtophys (&tp->jump_tcb);
+		tp->jump_lcb.l_cmd   = htole32(SCR_JUMP);
+		tp->jump_lcb.l_paddr = htole32(NCB_SCRIPTH_PHYS (np, abort));
+		np->ncb_dma->jump_tcb.l_paddr = htole32(vtophys((vaddr_t)&tp->jump_tcb));
 
 		tp->usrtags = SCSI_NCR_DFLT_TAGS;
 		ncr_setmaxtags (tp, tp->usrtags);
@@ -7441,21 +7452,21 @@ static	void ncr_alloc_ccb (ncb_p np, u_long target, u_long lun)
 		**	Initialize it
 		*/
 		bzero (lp, sizeof (*lp));
-		lp->jump_lcb.l_cmd   = (SCR_JUMP ^ IFFALSE (DATA (lun)));
+		lp->jump_lcb.l_cmd   = htole32(SCR_JUMP ^ IFFALSE (DATA (lun)));
 		lp->jump_lcb.l_paddr = tp->jump_lcb.l_paddr;
 
-		lp->call_tag.l_cmd   = (SCR_CALL);
-		lp->call_tag.l_paddr = NCB_SCRIPT_PHYS (np, resel_tag);
+		lp->call_tag.l_cmd   = htole32(SCR_CALL);
+		lp->call_tag.l_paddr = htole32(NCB_SCRIPT_PHYS (np, resel_tag));
 
-		lp->jump_ccb.l_cmd   = (SCR_JUMP);
-		lp->jump_ccb.l_paddr = NCB_SCRIPTH_PHYS (np, aborttag);
+		lp->jump_ccb.l_cmd   = htole32(SCR_JUMP);
+		lp->jump_ccb.l_paddr = htole32(NCB_SCRIPTH_PHYS (np, aborttag));
 
 		lp->actlink = 1;
 
 		/*
 		**   Chain into LUN list
 		*/
-		tp->jump_lcb.l_paddr = vtophys (&lp->jump_lcb);
+		tp->jump_lcb.l_paddr = htole32(vtophys((vaddr_t)&lp->jump_lcb));
 		tp->lp[lun] = lp;
 
 	}
@@ -7498,7 +7509,7 @@ static	void ncr_alloc_ccb (ncb_p np, u_long target, u_long lun)
 	**	Fill in physical addresses
 	*/
 
-	cp->p_ccb	     = vtophys (cp);
+	cp->p_ccb = vtophys((vaddr_t)cp);
 
 #ifdef __NetBSD__
 	if (ncr_ccb_dma_init(np, cp) != 0)
@@ -7508,11 +7519,11 @@ static	void ncr_alloc_ccb (ncb_p np, u_long target, u_long lun)
 	/*
 	**	Chain into reselect list
 	*/
-	cp->jump_ccb.l_cmd   = SCR_JUMP;
+	cp->jump_ccb.l_cmd   = htole32(SCR_JUMP);
 	cp->jump_ccb.l_paddr = lp->jump_ccb.l_paddr;
-	lp->jump_ccb.l_paddr = CCB_PHYS (cp, jump_ccb);
-	cp->call_tmp.l_cmd   = SCR_CALL;
-	cp->call_tmp.l_paddr = NCB_SCRIPT_PHYS (np, resel_tmp);
+	lp->jump_ccb.l_paddr = htole32(CCB_PHYS (cp, jump_ccb));
+	cp->call_tmp.l_cmd   = htole32(SCR_CALL);
+	cp->call_tmp.l_paddr = htole32(NCB_SCRIPT_PHYS (np, resel_tmp));
 
 	/*
 	**	Chain into wakeup list
@@ -7552,8 +7563,8 @@ static void ncr_opennings (ncb_p np, lcb_p lp, struct scsipi_xfer * xp)
 		if (!diff) return;
 
 #ifdef __NetBSD__
-		if (diff > xp->sc_link->openings)
-			diff = xp->sc_link->openings;
+		if (diff > (xp->sc_link->openings - xp->sc_link->active))
+			diff = (xp->sc_link->openings - xp->sc_link->active);
 
 		xp->sc_link->openings	-= diff;
 #else /* !__NetBSD__ */
@@ -7623,9 +7634,9 @@ static	int	ncr_scatter
 
 	for (segment = 0; segment < cp->xfer_dmamap->dm_nsegs; segment++) {
 		phys->data[segment].addr =
-		    cp->xfer_dmamap->dm_segs[segment].ds_addr;
+		    htole32(cp->xfer_dmamap->dm_segs[segment].ds_addr);
 		phys->data[segment].size =
-		    cp->xfer_dmamap->dm_segs[segment].ds_len;
+		    htole32(cp->xfer_dmamap->dm_segs[segment].ds_len);
 	}
 	return (segment);
 #else
@@ -7654,11 +7665,7 @@ static	int	ncr_scatter
 
 	free = MAX_SCATTER - 1;
 
-#ifdef __NetBSD__
-	if (vaddr & (NBPG-1)) free -= datalen / NBPG;
-#else
 	if (vaddr & PAGE_MASK) free -= datalen / PAGE_SIZE;
-#endif
 
 	if (free>1)
 		while ((chunk * free >= 2 * datalen) && (chunk>=1024))
@@ -7687,11 +7694,7 @@ static	int	ncr_scatter
 			/*
 			**	continue this segment
 			*/
-#ifdef __NetBSD__
-			pnext = (paddr & (~(NBPG - 1))) + NBPG;
-#else
 			pnext = (paddr & (~PAGE_MASK)) + PAGE_SIZE;
-#endif
 
 			/*
 			**	Compute max size
@@ -7715,8 +7718,8 @@ static	int	ncr_scatter
 			(unsigned) segsize,
 			(unsigned) datalen);
 
-		phys->data[segment].addr = segaddr;
-		phys->data[segment].size = segsize;
+		phys->data[segment].addr = SCR_BO(segaddr);
+		phys->data[segment].size = SCR_BO(segsize);
 		segment++;
 	}
 
@@ -7789,7 +7792,7 @@ static int ncr_snooptest (struct ncb* np)
 	/*
 	**	Set memory and register.
 	*/
-	ncr_cache = host_wr;
+	ncr_cache = htole32(host_wr);
 	OUTL (nc_temp, ncr_wr);
 	/*
 	**	Start script (exchange values)
@@ -7808,7 +7811,7 @@ static int ncr_snooptest (struct ncb* np)
 	/*
 	**	Read memory and register.
 	*/
-	host_rd = ncr_cache;
+	host_rd = le32toh(ncr_cache);
 	ncr_rd  = INL (nc_scratcha);
 	ncr_bk  = INL (nc_temp);
 	/*
@@ -7945,15 +7948,19 @@ struct table_entry {
 
 static struct table_entry device_tab[] =
 {
-#ifdef NCR_GETCC_WITHMSG
-	{"HP      ", "C372", "", QUIRK_NOTAGS|QUIRK_NOMSG},
-	{"", "", "", QUIRK_NOMSG},
-	{"SONY", "SDT-5000", "3.17", QUIRK_NOMSG},
-	{"WangDAT", "Model 2600", "01.7", QUIRK_NOMSG},
-	{"WangDAT", "Model 3200", "02.2", QUIRK_NOMSG},
-	{"WangDAT", "Model 1300", "02.4", QUIRK_NOMSG},
-#endif
-	{"", "", "", 0} /* catch all: must be last entry. */
+	/* XXX maybe doesn't need QUIRK_NOMSG? */
+	{"HP      ",	"C372",		"",	QUIRK_NOTAGS|QUIRK_NOMSG},
+
+	/* XXX maybe doesn't need QUIRK_NOMSG? */
+	{"QUANTUM",	"ATLAS IV",	"",	QUIRK_NOTAGS|QUIRK_NOMSG},
+
+	/*
+	 * XXX not clear what the value of NCR_GETCC_WITHMSG is if
+	 * XXX QUIRK_NOMSG is always turned on, but I am just an
+	 * XXX egg.  --cgd
+	 */
+	/* catch all: must be the last entry. */
+	{"",		"", 		"",	QUIRK_NOMSG},
 };
 
 static u_long ncr_lookup(char * id)

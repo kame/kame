@@ -1,4 +1,4 @@
-/*	$NetBSD: siop.c,v 1.1.2.1 1999/04/13 20:24:09 scw Exp $ */
+/*	$NetBSD: siop.c,v 1.5 2000/03/18 22:33:04 scw Exp $ */
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -60,6 +60,7 @@
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 
+#include <machine/cpu.h>
 #include <m68k/cacheops.h>
 
 #include <mvme68k/dev/siopreg.h>
@@ -201,14 +202,14 @@ siop_scsicmd(xs)
 
 	slp = xs->sc_link;
 	sc = slp->adapter_softc;
-	flags = xs->flags;
+	flags = xs->xs_control;
 
 	/* XXXX ?? */
-	if (flags & SCSI_DATA_UIO)
+	if (flags & XS_CTL_DATA_UIO)
 		panic("siop: scsi data uio requested");
 
 	/* XXXX ?? */
-	if (sc->sc_nexus && flags & SCSI_POLL)
+	if (sc->sc_nexus && flags & XS_CTL_POLL)
 /*		panic("siop_scsicmd: busy");*/
 		printf("siop_scsicmd: busy\n");
 
@@ -239,7 +240,7 @@ siop_scsicmd(xs)
 
 	splx(s);
 
-	if (flags & SCSI_POLL || siop_no_dma)
+	if (flags & XS_CTL_POLL || siop_no_dma)
 		return(siop_poll(sc, acb));
 	return(SUCCESSFULLY_QUEUED);
 }
@@ -300,7 +301,7 @@ siop_poll(sc, acb)
 			}
 			siop_scsidone(sc->sc_nexus, status);
 		}
-		if (xs->flags & ITSDONE)
+		if (xs->xs_status & XS_STS_DONE)
 			break;
 	}
 	splx(s);
@@ -351,7 +352,7 @@ siop_sched(sc)
 		return;
 	}
 
-	if (acb->xs->flags & SCSI_RESET)
+	if (acb->xs->xs_control & XS_CTL_RESET)
 		siopreset(sc);
 
 #if 0
@@ -421,7 +422,7 @@ siop_scsidone(acb, stat)
 			xs->error = XS_BUSY;
 			break;
 #endif
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 
 	/*
 	 * Remove the ACB from whatever queue it's on.  We have to do a bit of
@@ -920,7 +921,7 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 		/* Normal completion status, or check condition */
 #ifdef DEBUG
 		if (rp->siop_dsa != kvtop((caddr_t)&acb->ds)) {
-			printf ("siop: invalid dsa: %lx %x\n", rp->siop_dsa,
+			printf ("siop: invalid dsa: %lx %lx\n", rp->siop_dsa,
 			    kvtop((caddr_t)&acb->ds));
 			panic("*** siop DSA invalid ***");
 		}
@@ -1368,7 +1369,7 @@ bad_phase:
 	 * XXXX need to clean this up to print out the info, reset, and continue
 	 */
 	printf ("siopchkintr: target %x ds %p\n", target, &acb->ds);
-	printf ("scripts %lx ds %x rp %x dsp %lx dcmd %lx\n", sc->sc_scriptspa,
+	printf ("scripts %lx ds %lx rp %lx dsp %lx dcmd %lx\n",sc->sc_scriptspa,
 	    kvtop((caddr_t)&acb->ds), kvtop((caddr_t)rp), rp->siop_dsp,
 	    *((long *)&rp->siop_dcmd));
 	printf ("siopchkintr: istat %x dstat %x sstat0 %x dsps %lx dsa %lx sbcl %x sts %x msg %x %x sfbr %x\n",
@@ -1399,7 +1400,7 @@ siop_select(sc)
 #endif
 
 	rp = sc->sc_siopp;
-	if (acb->xs->flags & SCSI_POLL || siop_no_dma) {
+	if (acb->xs->xs_control & XS_CTL_POLL || siop_no_dma) {
 		sc->sc_flags |= SIOP_INTSOFF;
 		sc->sc_flags &= ~SIOP_INTDEFER;
 		if ((rp->siop_istat & 0x08) == 0) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_bootstrap.c,v 1.49.2.1 1999/04/21 14:58:35 perry Exp $	*/
+/*	$NetBSD: pmap_bootstrap.c,v 1.53 2000/02/14 07:01:49 scottr Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -134,7 +134,7 @@ pmap_bootstrap(nextpa, firstpa)
 	pt_entry_t protopte, *pte, *epte;
 
 	vidlen = m68k_round_page(((videosize >> 16) & 0xffff) * videorowbytes +
-	    (mac68k_vidphys & PGOFSET));
+	    m68k_page_offset(mac68k_vidphys));
 
 	/*
 	 * Calculate important physical addresses:
@@ -185,16 +185,26 @@ pmap_bootstrap(nextpa, firstpa)
 	p0upa = nextpa;
 	nextpa += USPACE;
 
-#if 0
-	if (nextpa > high[0]) {
-		printf("Failure in NetBSD boot; nextpa=0x%lx, high[0]=0x%lx.\n",
-			nextpa, high[0]);
-		printf("You're hosed!  Try booting with 32-bit addressing ");
-		printf("enabled in the memory control panel.\n");
-		printf("Older machines may need Mode32 to get that option.\n");
+	
+	for (i = 0; i < numranges; i++)
+		if (low[i] <= firstpa && firstpa < high[i])
+			break;
+	if (i >= numranges || nextpa > high[i]) {
+		if (mac68k_machine.do_graybars) {
+			printf("Failure in NetBSD boot; ");
+			if (i < numranges)
+				printf("nextpa=0x%lx, high[%d]=0x%lx.\n",
+				    nextpa, i, high[i]);
+			else
+				printf("can't find kernel RAM segment.\n");
+			printf("You're hosed!  Try booting with 32-bit ");
+			printf("addressing enabled in the memory control ");
+			printf("panel.\n");
+			printf("Older machines may need Mode32 to get that ");
+			printf("option.\n");
+		}
 		panic("Cannot work with the current memory mappings.\n");
 	}
-#endif
 
 	/*
 	 * Initialize segment table and kernel page table map.
@@ -398,7 +408,8 @@ pmap_bootstrap(nextpa, firstpa)
 	if (vidlen) {
 		pte = PA2VA(vidpa, u_int *);
 		epte = pte + VIDMAPSIZE;
-		protopte = (mac68k_vidphys & ~PGOFSET) | PG_RW | PG_V | PG_CI;
+		protopte = m68k_trunc_page(mac68k_vidphys) |
+		    PG_RW | PG_V | PG_CI;
 		while (pte < epte) {
 			*pte++ = protopte;
 			protopte += NBPG;
@@ -430,7 +441,7 @@ pmap_bootstrap(nextpa, firstpa)
 
 	if (vidlen) {
 		newvideoaddr = (u_int32_t)m68k_ptob(nptpages * NPTEPG -
-		    VIDMAPSIZE) + (mac68k_vidphys & PGOFSET);
+		    VIDMAPSIZE) + m68k_page_offset(mac68k_vidphys);
 	}
 
 	/*
@@ -478,10 +489,7 @@ pmap_bootstrap(nextpa, firstpa)
 
 	maxaddr = high[numranges - 1] - m68k_ptob(1);
 	high[numranges - 1] -= (m68k_round_page(MSGBUFSIZE) + m68k_ptob(1));
-	avail_remaining -= (m68k_round_page(MSGBUFSIZE) + m68k_ptob(1));
 	avail_end = high[numranges - 1];
-	avail_remaining = m68k_btop(m68k_trunc_page(avail_remaining));
-
 	mem_size = m68k_ptob(physmem);
 	virtual_avail = VM_MIN_KERNEL_ADDRESS + (nextpa - firstpa);
 	virtual_end = VM_MAX_KERNEL_ADDRESS;
@@ -494,7 +502,7 @@ pmap_bootstrap(nextpa, firstpa)
 	{
 		int *kp;
 
-		kp = (int *) &protection_codes;
+		kp = (int *)&protection_codes;
 		kp[VM_PROT_NONE|VM_PROT_NONE|VM_PROT_NONE] = 0;
 		kp[VM_PROT_READ|VM_PROT_NONE|VM_PROT_NONE] = PG_RO;
 		kp[VM_PROT_READ|VM_PROT_NONE|VM_PROT_EXECUTE] = PG_RO;

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_bootdhcp.c,v 1.11 1999/02/21 15:07:49 drochner Exp $	*/
+/*	$NetBSD: nfs_bootdhcp.c,v 1.15 2000/05/28 07:01:09 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1997 The NetBSD Foundation, Inc.
@@ -55,7 +55,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/ioctl.h>
 #include <sys/proc.h>
@@ -145,7 +144,8 @@ struct bootp {
  * Perhaps (struct arphdr)->ar_hrd = ARPHRD_ETHER?
  * The interface has ->if_type but not the ARP fmt.
  */
-#define HTYPE_ETHERNET		  1
+#define HTYPE_ETHERNET		1
+#define HTYPE_IEEE802		6
 
 /*
  * Vendor magic cookie (v_magic) for RFC1048
@@ -381,8 +381,8 @@ bootpcheck(m, context)
 	 */
 	if (bootp->bp_yiaddr.s_addr == INADDR_ANY ||
 	    bootp->bp_yiaddr.s_addr == INADDR_BROADCAST) {
-		printf("nfs_boot: wrong IP addr 0x%x",
-		       INTOHL(bootp->bp_yiaddr));
+		printf("nfs_boot: wrong IP addr %s",
+		       inet_ntoa(bootp->bp_yiaddr));
 		goto warn;
 	}
 
@@ -426,7 +426,7 @@ bootpcheck(m, context)
 	return (0);
 
 warn:
-	printf(" (bad reply from 0x%x)\n", INTOHL(bootp->bp_siaddr));
+	printf(" (bad reply from %s)\n", inet_ntoa(bootp->bp_siaddr));
 	return (-1);
 }
 
@@ -462,6 +462,9 @@ bootpc_call(nd, procp)
 	/* Record our H/W (Ethernet) address. */
 	{	struct sockaddr_dl *sdl = ifp->if_sadl;
 		switch (sdl->sdl_type) {
+		    case IFT_ISO88025:
+			hafmt = HTYPE_IEEE802;
+			break;
 		    case IFT_ETHER:
 		    case IFT_FDDI:
 			hafmt = HTYPE_ETHERNET;
@@ -601,12 +604,12 @@ bootpc_call(nd, procp)
 	 * the buffer at bpc.replybuf.
 	 */
 #ifdef NFS_BOOT_DHCP
-	printf("nfs_boot: %s server: 0x%x\n",
+	printf("nfs_boot: %s server: %s\n",
 	       (bpc.dhcp_ok ? "DHCP" : "BOOTP"),
 #else
-	printf("nfs_boot: BOOTP server: 0x%x\n",
+	printf("nfs_boot: BOOTP server: %s\n",
 #endif
-	       INTOHL(bpc.replybuf->bp_siaddr));
+	       inet_ntoa(bpc.replybuf->bp_siaddr));
 
 	bootp_extract(bpc.replybuf, bpc.replylen, nd);
 
@@ -637,6 +640,7 @@ bootp_extract(bootp, replylen, nd)
 	int mynamelen;
 	int mydomainlen;
 	int rootpathlen;
+	int overloaded;
 	u_int tag, len;
 	u_char *p, *limit;
 
@@ -647,6 +651,8 @@ bootp_extract(bootp, replylen, nd)
 	mydomainlen = mynamelen = rootpathlen = 0;
 	/* default root server to bootp next-server */
 	rootserver = bootp->bp_siaddr;
+	/* assume that server name field is not overloaded by default */
+	overloaded = 0;
 
 	p = &bootp->bp_vend[4];
 	limit = ((char*)bootp) + replylen;
@@ -703,6 +709,17 @@ bootp_extract(bootp, replylen, nd)
 			/* override NFS server address */
 			memcpy(&rootserver, p, 4);
 			break;
+#ifdef NFS_BOOT_DHCP
+		    case TAG_OVERLOAD:
+			if (len > 0 && ((*p & 0x02) != 0))
+				/*
+				 * The server name field in the dhcp packet
+				 * is overloaded and we can't find server
+				 * name there.
+				 */
+				overloaded = 1;
+			break;
+#endif
 		    default:
 			break;
 		}
@@ -726,13 +743,13 @@ bootp_extract(bootp, replylen, nd)
 	}
 	nd->nd_myip = bootp->bp_yiaddr;
 	if (nd->nd_myip.s_addr)
-		printf("nfs_boot: my_addr=0x%x\n", INTOHL(nd->nd_myip));
+		printf("nfs_boot: my_addr=%s\n", inet_ntoa(nd->nd_myip));
 	nd->nd_mask = netmask;
 	if (nd->nd_mask.s_addr)
-		printf("nfs_boot: my_mask=0x%x\n", INTOHL(nd->nd_mask));
+		printf("nfs_boot: my_mask=%s\n", inet_ntoa(nd->nd_mask));
 	nd->nd_gwip = gateway;
 	if (nd->nd_gwip.s_addr)
-		printf("nfs_boot: gateway=0x%x\n", INTOHL(nd->nd_gwip));
+		printf("nfs_boot: gateway=%s\n", inet_ntoa(nd->nd_gwip));
 
 	/*
 	 * Store the information about our NFS root mount.
@@ -748,14 +765,15 @@ bootp_extract(bootp, replylen, nd)
 		sin->sin_family = AF_INET;
 		sin->sin_addr = rootserver;
 		/* Server name. */
-		if (!memcmp(&rootserver, &bootp->bp_siaddr,
+		if (!overloaded && bootp->bp_sname[0] != 0 &&
+		    !memcmp(&rootserver, &bootp->bp_siaddr,
 			  sizeof(struct in_addr))) {
 			/* standard root server, we have the name */
 			strncpy(ndm->ndm_host, bootp->bp_sname, BP_SNAME_LEN-1);
 		} else {
 			/* Show the server IP address numerically. */
-			sprintf(ndm->ndm_host, "0x%8x",
-				INTOHL(rootserver));
+			strncpy(ndm->ndm_host, inet_ntoa(rootserver),
+				BP_SNAME_LEN-1);
 		}
 		len = strlen(ndm->ndm_host);
 		if (rootpath &&

@@ -1,4 +1,41 @@
-/* $NetBSD: trap.c,v 1.42.2.3 1999/06/21 19:20:13 cgd Exp $ */
+/* $NetBSD: trap.c,v 1.56 2000/06/06 18:52:30 soren Exp $ */
+
+/*-
+ * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
+ * NASA Ames Research Center.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -61,10 +98,11 @@
 #include "opt_ktrace.h"
 #include "opt_compat_osf1.h"
 #include "opt_ddb.h"
+#include "opt_syscall_debug.h"
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.42.2.3 1999/06/21 19:20:13 cgd Exp $");
+__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.56 2000/06/06 18:52:30 soren Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,6 +115,7 @@ __KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.42.2.3 1999/06/21 19:20:13 cgd Exp $");
 #include <sys/ktrace.h>
 #endif
 
+#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -144,26 +183,31 @@ userret(p, pc, oticks)
 	u_int64_t pc;
 	u_quad_t oticks;
 {
-	int sig, s;
+	struct cpu_info *ci = curcpu();
+	int sig;
+
+	KDASSERT(p->p_cpu != NULL);
+	KDASSERT(p->p_cpu == ci);
+
+	/* Do any deferred user pmap operations. */
+	PMAP_USERRET(vm_map_pmap(&p->p_vmspace->vm_map));
 
 	/* take pending signals */
 	while ((sig = CURSIG(p)) != 0)
 		postsig(sig);
 	p->p_priority = p->p_usrpri;
-	if (want_resched) {
+	if (ci->ci_want_resched) {
 		/*
-		 * Since we are curproc, a clock interrupt could
-		 * change our priority without changing run queues
-		 * (the running process is not kept on a run queue).
-		 * If this happened after we setrunqueue ourselves but
-		 * before we switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We are being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
+
+		ci = curcpu();		/* It may have changed! */
+
+		KDASSERT(p->p_cpu != NULL);
+		KDASSERT(p->p_cpu == ci);
+
+		PMAP_USERRET(vm_map_pmap(&p->p_vmspace->vm_map));
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -177,7 +221,7 @@ userret(p, pc, oticks)
 		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
 	}
 
-	curpriority = p->p_priority;
+	ci->ci_schedstate.spc_curpriority = p->p_priority;
 }
 
 static void
@@ -248,6 +292,9 @@ trap(a0, a1, a2, entry, framep)
 	u_int64_t ucode;
 	u_quad_t sticks;
 	int user;
+#if defined(DDB)
+	int call_debugger = 1;
+#endif
 
 	uvmexp.traps++;
 	p = curproc;
@@ -321,25 +368,22 @@ trap(a0, a1, a2, entry, framep)
 	case ALPHA_KENTRY_IF:
 		/*
 		 * These are always fatal in kernel, and should never
-		 * happen.
+		 * happen.  (Debugger entry is handled in XentIF.)
 		 */
 		if (!user) {
-#ifdef DDB
+#if defined(DDB)
 			/*
-			 * ...unless, of course, DDB is configured; BUGCHK
-			 * is used to invoke the kernel debugger, and we
-			 * might have set a breakpoint.
+			 * ...unless a debugger is configured.  It will
+			 * inform us if the trap was handled.
 			 */
-			if (a0 == ALPHA_IF_CODE_BUGCHK ||
-			    a0 == ALPHA_IF_CODE_BPT) {
-				if (ddb_trap(a0, a1, a2, entry, framep))
-					goto out;
-			}
+			if (alpha_debug(a0, a1, a2, entry, framep))
+				goto out;
 
 			/*
-			 * If we get here, DDB did _not_ handle the
-			 * trap, and we need to PANIC!
+			 * Debugger did NOT handle the trap, don't
+			 * call the debugger again!
 			 */
+			call_debugger = 0;
 #endif
 			goto dopanic;
 		}
@@ -377,6 +421,13 @@ trap(a0, a1, a2, entry, framep)
 			alpha_pal_wrfen(1);
 			if (fpcurproc)
 				savefpstate(&fpcurproc->p_addr->u_pcb.pcb_fp);
+			/*
+			 * XXXSMP
+			 * Need to find out where this process's FP
+			 * state actually is and possible cause it
+			 * to be saved there first (via an IPI)
+			 * before we can retore it here.
+			 */
 			fpcurproc = p;
 			restorefpstate(&fpcurproc->p_addr->u_pcb.pcb_fp);
 			alpha_pal_wrfen(0);
@@ -474,8 +525,8 @@ trap(a0, a1, a2, entry, framep)
 				if (rv == KERN_SUCCESS) {
 					unsigned nss;
 	
-					nss = clrnd(btoc(USRSTACK -
-					    (unsigned long)va));
+					nss = btoc(USRSTACK -
+					    (unsigned long)va);
 					if (nss > vm->vm_ssize)
 						vm->vm_ssize = nss;
 				} else if (rv == KERN_PROTECTION_FAILURE)
@@ -533,21 +584,13 @@ dopanic:
 
 	/* XXX dump registers */
 
-#ifdef DDB
-	/* XXX
-	 * Really would like to be able to indicate that the
-	 * kernel should _not_ panic, here.  However, two problems
-	 * exist:
-	 *
-	 *	(a) There is not currently a way for DDB to distinguish
-	 *	    between "continue and panic" and "continue, and
-	 *	    don't panic".
-	 *
-	 *	(b) panic() will again invoke the debugger, so calling
-	 *	    it here is silly.
-	 *
-	 * For now, we just do nothing.
-	 */
+#if defined(DDB)
+	if (call_debugger && alpha_debug(a0, a1, a2, entry, framep)) {
+		/*
+		 * The debugger has handled the trap; just return.
+		 */
+		goto out;
+	}
 #endif
 
 	panic("trap");
@@ -653,7 +696,7 @@ syscall(code, framep)
 	}
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, callp->sy_argsize, args + hidden);
+		ktrsyscall(p, code, callp->sy_argsize, args + hidden);
 #endif
 #ifdef SYSCALL_DEBUG
 	scdebug_call(p, code, args + hidden);
@@ -695,7 +738,7 @@ syscall(code, framep)
 	userret(p, framep->tf_regs[FRAME_PC], sticks);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, error, rval[0]);
 #endif
 }
 
@@ -715,7 +758,7 @@ child_return(arg)
 	userret(p, p->p_md.md_tf->tf_regs[FRAME_PC], 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }
 
@@ -739,7 +782,7 @@ ast(framep)
 
 	uvmexp.softs++;
 
-	astpending = 0;
+	curcpu()->ci_astpending = 0;
 	if (p->p_flag & P_OWEUPC) {
 		p->p_flag &= ~P_OWEUPC;
 		ADDUPROF(p);

@@ -1,4 +1,4 @@
-/*	$NetBSD: portal_vnops.c,v 1.33 1998/10/31 01:18:42 matt Exp $	*/
+/*	$NetBSD: portal_vnops.c,v 1.36 2000/06/05 17:21:38 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -72,8 +72,8 @@ static void	portal_closefd __P((struct proc *, int));
 static int	portal_connect __P((struct socket *, struct socket *));
 
 int	portal_lookup	__P((void *));
-#define	portal_create	genfs_eopnotsupp
-#define	portal_mknod	genfs_eopnotsupp
+#define	portal_create	genfs_eopnotsupp_rele
+#define	portal_mknod	genfs_eopnotsupp_rele
 int	portal_open	__P((void *));
 #define	portal_close	genfs_nullop
 #define	portal_access	genfs_nullop
@@ -81,29 +81,30 @@ int	portal_getattr	__P((void *));
 int	portal_setattr	__P((void *));
 #define	portal_read	genfs_eopnotsupp
 #define	portal_write	genfs_eopnotsupp
+#define	portal_fcntl	genfs_fcntl
 #define	portal_ioctl	genfs_enoioctl
 #define	portal_poll	genfs_eopnotsupp
 #define	portal_mmap	genfs_eopnotsupp
 #define portal_revoke	genfs_revoke
 #define	portal_fsync	genfs_nullop
 #define	portal_seek	genfs_seek
-#define	portal_remove	genfs_eopnotsupp
+#define	portal_remove	genfs_eopnotsupp_rele
 int	portal_link	__P((void *));
-#define	portal_rename	genfs_eopnotsupp
-#define	portal_mkdir	genfs_eopnotsupp
-#define	portal_rmdir	genfs_eopnotsupp
+#define	portal_rename	genfs_eopnotsupp_rele
+#define	portal_mkdir	genfs_eopnotsupp_rele
+#define	portal_rmdir	genfs_eopnotsupp_rele
 int	portal_symlink	__P((void *));
 int	portal_readdir	__P((void *));
 #define	portal_readlink	genfs_eopnotsupp
 #define	portal_abortop	genfs_abortop
 int	portal_inactive	__P((void *));
 int	portal_reclaim	__P((void *));
-#define	portal_lock	genfs_nolock
-#define	portal_unlock	genfs_nounlock
+#define	portal_lock	genfs_lock
+#define	portal_unlock	genfs_unlock
 #define	portal_bmap	genfs_badop
 #define	portal_strategy	genfs_badop
 int	portal_print	__P((void *));
-#define	portal_islocked	genfs_noislocked
+#define	portal_islocked	genfs_islocked
 int	portal_pathconf	__P((void *));
 #define	portal_advlock	genfs_badop
 #define	portal_blkatoff	genfs_badop
@@ -126,6 +127,7 @@ struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_setattr_desc, portal_setattr },		/* setattr */
 	{ &vop_read_desc, portal_read },		/* read */
 	{ &vop_write_desc, portal_write },		/* write */
+	{ &vop_fcntl_desc, portal_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, portal_ioctl },		/* ioctl */
 	{ &vop_poll_desc, portal_poll },		/* poll */
 	{ &vop_revoke_desc, portal_revoke },		/* revoke */
@@ -214,7 +216,6 @@ portal_lookup(v)
 	if (cnp->cn_namelen == 1 && *pname == '.') {
 		*vpp = dvp;
 		VREF(dvp);
-		/*VOP_LOCK(dvp);*/
 		return (0);
 	}
 
@@ -242,7 +243,15 @@ portal_lookup(v)
 	pt->pt_fileid = portal_fileid++;
 
 	*vpp = fvp;
-	/*VOP_LOCK(fvp);*/
+	VOP_LOCK(fvp, LK_EXCLUSIVE);
+	/*
+	 * As we are the last component of the path name, fix up
+	 * the locking on the directory node.
+	 */
+	if ((cnp->cn_flags & LOCKPARENT) == 0) {
+		VOP_UNLOCK(dvp, 0);
+		cnp->cn_flags |= PDIRUNLOCK;
+	}
 	return (0);
 
 bad:;
@@ -463,7 +472,7 @@ portal_open(v)
 	 * than a single mbuf in it.  What to do?
 	 */
 	cmsg = mtod(cm, struct cmsghdr *);
-	newfds = (cmsg->cmsg_len - sizeof(*cmsg)) / sizeof (int);
+	newfds = (cmsg->cmsg_len - CMSG_ALIGN(sizeof(*cmsg))) / sizeof(int);
 	if (newfds == 0) {
 		error = ECONNREFUSED;
 		goto bad;
@@ -474,7 +483,7 @@ portal_open(v)
 	 * integer file descriptors.  The fds were allocated by the action
 	 * of receiving the control message.
 	 */
-	ip = (int *) (cmsg + 1);
+	ip = (int *) CMSG_DATA(cmsg);
 	fd = *ip++;
 	if (newfds > 1) {
 		/*

@@ -1,4 +1,4 @@
-/*	$NetBSD: sbi.c,v 1.19 1999/02/02 18:37:21 ragge Exp $ */
+/*	$NetBSD: sbi.c,v 1.21 2000/06/04 18:02:35 ragge Exp $ */
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -29,73 +29,64 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Still to do: Write all SBI error handling.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
 
+#include <machine/bus.h>
 #include <machine/sid.h>
 #include <machine/cpu.h>
 #include <machine/nexus.h>
 
-static	int sbi_print __P((void *, const char *));
-static	int sbi_match __P((struct device *, struct cfdata *, void *));
-static	void sbi_attach __P((struct device *, struct device *, void*));
+static	int sbi_print(void *, const char *);
+static	int sbi_match(struct device *, struct cfdata *, void *);
+static	void sbi_attach(struct device *, struct device *, void*);
 
 int
-sbi_print(aux, name)
-	void *aux;
-	const char *name;
+sbi_print(void *aux, const char *name)
 {
 	struct sbi_attach_args *sa = (struct sbi_attach_args *)aux;
 	int unsupp = 0;
 
 	if (name) {
-		switch (sa->type) {
+		switch (sa->sa_type) {
 		case NEX_MBA:
 			printf("mba at %s", name);
 			break;
 		default:
-			printf("unknown device 0x%x at %s", sa->type, name);
+			printf("unknown device 0x%x at %s", sa->sa_type, name);
 			unsupp++;
 		}		
 	}
-	printf(" tr%d", sa->nexnum);
+	printf(" tr%d", sa->sa_nexnum);
 	return (unsupp ? UNSUPP : UNCONF);
 }
 
 int
-sbi_match(parent, cf, aux)
-	struct device	*parent;
-	struct cfdata *cf;
-	void *aux;
+sbi_match(struct device *parent, struct cfdata *cf, void *aux)
 {
-	struct bp_conf *bp = aux;
-
-	if (strcmp(bp->type, "sbi"))
-		return 0;
-	return 1;
+	if (vax_bustype == VAX_SBIBUS)
+		return 1;
+	return 0;
 }
 
 void
-sbi_attach(parent, self, aux)
-	struct	device	*parent, *self;
-	void	*aux;
+sbi_attach(struct device *parent, struct device *self, void *aux)
 {
 	u_int	nexnum, minnex;
 	struct	sbi_attach_args sa;
 
 	printf("\n");
 
-	/*
-	 * Now a problem: on different machines with SBI units identifies
-	 * in different ways (if they identifies themselves at all).
-	 * We have to fake identifying depending on different CPUs.
-	 */
 #define NEXPAGES (sizeof(struct nexus) / VAX_NBPG)
 	minnex = self->dv_unit * NNEXSBI;
 	for (nexnum = minnex; nexnum < minnex + NNEXSBI; nexnum++) {
-		struct  nexus *nexusP;
+		struct	nexus *nexusP = 0;
 		volatile int tmp;
 
 		nexusP = (struct nexus *)vax_map_physmem((paddr_t)NEXA8600 +
@@ -104,15 +95,19 @@ sbi_attach(parent, self, aux)
 			vax_unmap_physmem((vaddr_t)nexusP, NEXPAGES);
 		} else {
 			tmp = nexusP->nexcsr.nex_csr; /* no byte reads */
-			sa.type = tmp & 255;
+			sa.sa_type = tmp & 255;
 
-			sa.nexnum = nexnum;
-			sa.nexaddr = nexusP;
+			sa.sa_nexnum = nexnum;
+			sa.sa_ioh = (vaddr_t)nexusP;
 			config_found(self, (void*)&sa, sbi_print);
 		}
 	}
 }
 
-struct	cfattach sbi_ca = {
+struct	cfattach sbi_mainbus_ca = {
+	sizeof(struct device), sbi_match, sbi_attach
+};
+
+struct	cfattach sbi_abus_ca = {
 	sizeof(struct device), sbi_match, sbi_attach
 };

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tokensubr.c,v 1.3.2.1 1999/04/08 21:44:00 bad Exp $	*/
+/*	$NetBSD: if_tokensubr.c,v 1.10 2000/06/14 05:10:28 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1997-1999
@@ -126,15 +126,19 @@ extern struct ifqueue pkintrq;
 #define RCF_ALLROUTES (2 << 8) | TOKEN_RCF_FRAME2 | TOKEN_RCF_BROADCAST_ALL
 #define RCF_SINGLEROUTE (2 << 8) | TOKEN_RCF_FRAME2 | TOKEN_RCF_BROADCAST_SINGLE
 
+static	int token_output __P((struct ifnet *, struct mbuf *,
+	    struct sockaddr *, struct rtentry *)); 
+static	void token_input __P((struct ifnet *, struct mbuf *));
+
 /*
  * Token Ring output routine.
  * Encapsulate a packet of type family for the local net.
  * Assumes that ifp is actually pointer to arphdr structure.
  * XXX route info has to go into the same mbuf as the header
  */
-int
+static int
 token_output(ifp, m0, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct mbuf *m0;
 	struct sockaddr *dst;
 	struct rtentry *rt0;
@@ -142,8 +146,8 @@ token_output(ifp, m0, dst, rt0)
 	u_int16_t etype;
 	int s, error = 0;
 	u_char edst[ISO88025_ADDR_LEN];
-	register struct mbuf *m = m0;
-	register struct rtentry *rt;
+	struct mbuf *m = m0;
+	struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
 	struct token_header *trh;
 #ifdef INET
@@ -210,7 +214,7 @@ token_output(ifp, m0, dst, rt0)
 		break;
 	case AF_ARP:
 /*
- * XXX source routing, assume m->pktdat contains the useful stuff
+ * XXX source routing, assume m->m_data contains the useful stuff
  */
 		ah = mtod(m, struct arphdr *);
 		ah->ar_hrd = htons(ARPHRD_IEEE802);
@@ -241,7 +245,7 @@ token_output(ifp, m0, dst, rt0)
 		}
 		else {
 			bcopy((caddr_t)ar_tha(ah), (caddr_t)edst, sizeof(edst));
-			trh = (struct token_header *) m->m_pktdat;
+			trh = (struct token_header *)M_TRHSTART(m);
 			trh->token_ac = TOKEN_AC;
 			trh->token_fc = TOKEN_FC;
 			if (trh->token_shost[0] & TOKEN_RI_PRESENT) {
@@ -282,7 +286,7 @@ token_output(ifp, m0, dst, rt0)
 	case AF_ISO: {
 		int	snpalen;
 		struct	llc *l;
-		register struct sockaddr_dl *sdl;
+		struct sockaddr_dl *sdl;
 
 		if (rt && (sdl = (struct sockaddr_dl *)rt->rt_gateway) &&
 		    sdl->sdl_family == AF_LINK && sdl->sdl_alen > 0) {
@@ -327,7 +331,7 @@ token_output(ifp, m0, dst, rt0)
 #ifdef	LLC
 /*	case AF_NSAP: */
 	case AF_CCITT: {
-		register struct sockaddr_dl *sdl =
+		struct sockaddr_dl *sdl =
 		    (struct sockaddr_dl *) rt -> rt_gateway;
 
 		if (sdl && sdl->sdl_family == AF_LINK
@@ -353,7 +357,7 @@ token_output(ifp, m0, dst, rt0)
 #ifdef LLC_DEBUG
 		{
 			int i;
-			register struct llc *l = mtod(m, struct llc *);
+			struct llc *l = mtod(m, struct llc *);
 
 			printf("token_output: sending LLC2 pkt to: ");
 			for (i=0; i < ISO88025_ADDR_LEN; i++)
@@ -399,7 +403,7 @@ token_output(ifp, m0, dst, rt0)
 	if (mcopy)
 		(void) looutput(ifp, mcopy, dst, rt);
 	if (etype != 0) {
-		register struct llc *l;
+		struct llc *l;
 		M_PREPEND(m, LLC_SNAPFRAMELEN, M_DONTWAIT);
 		if (m == 0)
 			senderr(ENOBUFS);
@@ -447,12 +451,12 @@ send:
 		senderr(ENOBUFS);
 	}
 	ifp->if_obytes += m->m_pkthdr.len;
+	if (m->m_flags & M_MCAST)
+		ifp->if_omcasts++;
 	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
-	if (m->m_flags & M_MCAST)
-		ifp->if_omcasts++;
 	return (error);
 
 bad:
@@ -463,28 +467,28 @@ bad:
 
 /*
  * Process a received token ring packet;
- * the packet is in the mbuf chain m without
- * the token ring header, which is provided separately.
+ * the packet is in the mbuf chain m with
+ * the token ring header.
  */
-void
-token_input(ifp, trh, m)
+static void
+token_input(ifp, m)
 	struct ifnet *ifp;
-	register struct token_header *trh;
 	struct mbuf *m;
 {
-	register struct ifqueue *inq;
-	register struct llc *l;
-	int s;
+	struct ifqueue *inq;
+	struct llc *l;
+	struct token_header *trh;
+	int s, lan_hdr_len;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		return;
 	}
+
+	trh = mtod(m, struct token_header *);
+
 	ifp->if_lastchange = time;
-/*
- * XXX (m->m_data - (char *) trh) assumes trh is in the same buf
- */
-	ifp->if_ibytes += m->m_pkthdr.len + (m->m_data - (char *) trh);
+	ifp->if_ibytes += m->m_pkthdr.len;
 	if (bcmp((caddr_t)tokenbroadcastaddr, (caddr_t)trh->token_dhost,
 	    sizeof(tokenbroadcastaddr)) == 0)
 		m->m_flags |= M_BCAST;
@@ -492,6 +496,16 @@ token_input(ifp, trh, m)
 		m->m_flags |= M_MCAST;
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
+
+	/* Skip past the Token Ring header and RIF. */
+	lan_hdr_len = sizeof(struct token_header);
+	if (trh->token_shost[0] & TOKEN_RI_PRESENT) {
+		struct token_rif *trrif;
+
+		trrif = TOKEN_RIF(trh);
+		lan_hdr_len += (ntohs(trrif->tr_rcf) & TOKEN_RCF_LEN_MASK) >> 8;
+	}
+	m_adj(m, lan_hdr_len);
 
 	l = mtod(m, struct llc *);
 	switch (l->llc_dsap) {
@@ -580,7 +594,7 @@ token_input(ifp, trh, m)
 		case LLC_TEST_P:
 		{
 			struct sockaddr sa;
-			register struct ether_header *eh;
+			struct ether_header *eh;
 			int i;
 			u_char c = l->llc_dsap;
 
@@ -658,16 +672,17 @@ token_input(ifp, trh, m)
  */
 void
 token_ifattach(ifp, lla)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	caddr_t	lla;
 {
-	register struct sockaddr_dl *sdl;
+	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ISO88025;
 	ifp->if_addrlen = ISO88025_ADDR_LEN;
 	ifp->if_hdrlen = 14;
 	ifp->if_mtu = ISO88025_MTU;
 	ifp->if_output = token_output;
+	ifp->if_input = token_input;
 	ifp->if_broadcastaddr = tokenbroadcastaddr;
 #ifdef IFF_NOTRAILERS
 	ifp->if_flags |= IFF_NOTRAILERS;
@@ -677,4 +692,12 @@ token_ifattach(ifp, lla)
 		sdl->sdl_alen = ifp->if_addrlen;
 		bcopy(lla, LLADDR(sdl), ifp->if_addrlen);
 	}
+}
+
+void    
+token_ifdetach(ifp)
+        struct ifnet *ifp;
+{
+
+        /* Nothing. */
 }

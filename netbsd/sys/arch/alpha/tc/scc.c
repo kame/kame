@@ -1,4 +1,4 @@
-/* $NetBSD: scc.c,v 1.42.8.3 1999/08/08 07:18:35 cgd Exp $ */
+/* $NetBSD: scc.c,v 1.50 2000/03/06 21:36:05 thorpej Exp $ */
 
 /*
  * Copyright (c) 1991,1990,1989,1994,1995,1996 Carnegie Mellon University
@@ -64,7 +64,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.42.8.3 1999/08/08 07:18:35 cgd Exp $");
+__KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.50 2000/03/06 21:36:05 thorpej Exp $");
 
 #include "opt_ddb.h"
 #ifdef alpha
@@ -111,7 +111,7 @@ __KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.42.8.3 1999/08/08 07:18:35 cgd Exp $");
 #include <machine/conf.h>
 
 #include <dev/tc/tcvar.h>
-#include <alpha/tc/ioasicreg.h>
+#include <dev/tc/ioasicreg.h>
 #include <dev/tc/ioasicvar.h>
 
 #ifdef alpha
@@ -247,11 +247,10 @@ void	scc_alphaintr __P((int));
  * console variables, for using serial console while still cold and
  * autoconfig has not attached the scc device.
  */
-extern  int cold;
 scc_regmap_t *scc_cons_addr = 0;
 static struct scc_softc coldcons_softc;
 static struct consdev scccons = {
-	NULL, NULL, sccGetc, sccPutc, sccPollc, NODEV, 0
+	NULL, NULL, sccGetc, sccPutc, sccPollc, NULL, NODEV, 0
 };
 void		scc_consinit __P((dev_t dev, scc_regmap_t *sccaddr));
 
@@ -386,18 +385,18 @@ scc_alphaintr(onoff)
 	int onoff;
 {
 	if (onoff) {
-		*(volatile u_int *)IOASIC_REG_IMSK(ioasic_base) |=
+		*(volatile u_int *)(ioasic_base + IOASIC_IMSK) |=
 		    IOASIC_INTR_SCC_1 | IOASIC_INTR_SCC_0;
 #if !defined(DEC_3000_300) && defined(SCC_DMA)
-		*(volatile u_int *)IOASIC_REG_CSR(ioasic_base) |=
+		*(volatile u_int *)(ioasic_base + IOASIC_CSR) |=
 		    IOASIC_CSR_DMAEN_T1 | IOASIC_CSR_DMAEN_R1 |
 		    IOASIC_CSR_DMAEN_T2 | IOASIC_CSR_DMAEN_R2;
 #endif
 	} else {
-		*(volatile u_int *)IOASIC_REG_IMSK(ioasic_base) &=
+		*(volatile u_int *)(ioasic_base + IOASIC_IMSK) &=
 		    ~(IOASIC_INTR_SCC_1 | IOASIC_INTR_SCC_0);
 #if !defined(DEC_3000_300) && defined(SCC_DMA)
-		*(volatile u_int *)IOASIC_REG_CSR(ioasic_base) &=
+		*(volatile u_int *)(ioasic_base + IOASIC_CSR) &=
 		    ~(IOASIC_CSR_DMAEN_T1 | IOASIC_CSR_DMAEN_R1 |
 		    IOASIC_CSR_DMAEN_T2 | IOASIC_CSR_DMAEN_R2);
 #endif
@@ -421,7 +420,6 @@ sccattach(parent, self, aux)
 	struct termios cterm;
 	struct tty ctty;
 	int s;
-	extern int cputype;
 	int unit;
 
 	unit = sc->sc_dv.dv_unit;

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_page.h,v 1.11 1999/03/25 18:48:53 mrg Exp $	*/
+/*	$NetBSD: uvm_page.h,v 1.15 2000/04/24 17:12:01 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -73,17 +73,25 @@
  * uvm_page.h
  */
 
+#ifdef _KERNEL
+
+/*
+ * globals
+ */
+
+extern boolean_t vm_page_zero_enable;
+
 /*
  * macros
  */
 
 #define uvm_lock_pageq()	simple_lock(&uvm.pageqlock)
 #define uvm_unlock_pageq()	simple_unlock(&uvm.pageqlock)
-#define uvm_lock_fpageq()	simple_lock(&uvm.fpageqlock)
-#define uvm_unlock_fpageq()	simple_unlock(&uvm.fpageqlock)
 
 #define uvm_pagehash(obj,off) \
 	(((unsigned long)obj+(unsigned long)atop(off)) & uvm.page_hashmask)
+
+#define	UVM_PAGEZERO_TARGET	(uvmexp.free)
 
 /*
  * handle inline options
@@ -107,14 +115,17 @@ void uvm_page_own __P((struct vm_page *, char *));
 boolean_t uvm_page_physget __P((paddr_t *));
 #endif
 void uvm_page_rehash __P((void));
+void uvm_pageidlezero __P((void));
+
+PAGE_INLINE int uvm_lock_fpageq __P((void));
+PAGE_INLINE void uvm_unlock_fpageq __P((int));
 
 PAGE_INLINE void uvm_pageactivate __P((struct vm_page *));
 vaddr_t uvm_pageboot_alloc __P((vsize_t));
 PAGE_INLINE void uvm_pagecopy __P((struct vm_page *, struct vm_page *));
 PAGE_INLINE void uvm_pagedeactivate __P((struct vm_page *));
 void uvm_pagefree __P((struct vm_page *));
-PAGE_INLINE struct vm_page *uvm_pagelookup 
-					__P((struct uvm_object *, vaddr_t));
+PAGE_INLINE struct vm_page *uvm_pagelookup __P((struct uvm_object *, voff_t));
 void uvm_pageremove __P((struct vm_page *));
 /* uvm_pagerename: not needed */
 PAGE_INLINE void uvm_pageunwire __P((struct vm_page *));
@@ -124,5 +135,7 @@ PAGE_INLINE void uvm_pagewire __P((struct vm_page *));
 PAGE_INLINE void uvm_pagezero __P((struct vm_page *));
 
 PAGE_INLINE int uvm_page_lookup_freelist __P((struct vm_page *));
+
+#endif /* _KERNEL */
 
 #endif /* _UVM_UVM_PAGE_H_ */

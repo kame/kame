@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxlreg.h,v 1.1.6.1 1999/09/18 00:56:34 cgd Exp $	*/
+/*	$NetBSD: elinkxlreg.h,v 1.2 1999/09/01 21:03:03 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.21.2.1 2000/01/20 21:28:52 he Exp $	*/
+/*	$NetBSD: trap.c,v 1.26 2000/05/27 00:40:40 sommerfeld Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -78,8 +78,9 @@ trap(frame)
 	}
 
 	switch (type) {
-	case EXC_TRC|EXC_USER:		/* Temporarily!					XXX */
-		printf("TRC: %x\n", frame->srr0);
+	case EXC_TRC|EXC_USER:
+		frame->srr1 &= ~PSL_SE;
+		trapsignal(p, SIGTRAP, EXC_TRC);
 		break;
 	case EXC_DSI:
 		{
@@ -207,8 +208,8 @@ trap(frame)
 #ifdef	KTRACE
 					/* Can't get all the arguments! */
 					if (KTRPOINT(p, KTR_SYSCALL))
-						ktrsyscall(p->p_tracep, code,
-							   argsize, args);
+						ktrsyscall(p, code, argsize,
+						    args);
 #endif
 					goto syscall_bad;
 				}
@@ -216,7 +217,7 @@ trap(frame)
 			}
 #ifdef	KTRACE
 			if (KTRPOINT(p, KTR_SYSCALL))
-				ktrsyscall(p->p_tracep, code, argsize, params);
+				ktrsyscall(p, code, argsize, params);
 #endif
 			rval[0] = 0;
 			rval[1] = frame->fixreg[FIRSTARG + 1];
@@ -246,7 +247,7 @@ syscall_bad:
 			}
 #ifdef	KTRACE
 			if (KTRPOINT(p, KTR_SYSRET))
-				ktrsysret(p->p_tracep, code, error, rval[0]);
+				ktrsysret(p, code, error, rval[0]);
 #endif
 		}
 		break;
@@ -325,21 +326,11 @@ brain_damage:
 
 	p->p_priority = p->p_usrpri;
 	if (want_resched) {
-		int s, sig;
-
+		int sig;
 		/*
-		 * Since we are curproc, a clock interrupt could
-		 * change our priority without changing run queues
-		 * (the running process is not kept on a run queue).
-		 * If this happened after we setrunqueue ourselves but
-		 * before switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We are being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while (sig = CURSIG(p))
 			postsig(sig);
 	}
@@ -358,7 +349,7 @@ brain_damage:
 	 */
 	if (p != fpuproc)
 		frame->srr1 &= ~PSL_FP;
-	curpriority = p->p_priority;
+	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
 }
 
 void
@@ -374,10 +365,10 @@ child_return(arg)
 	tf->srr1 &= ~PSL_FP;	/* Disable FPU, as we can't be fpuproc */
 #ifdef	KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 	/* Profiling?							XXX */
-	curpriority = p->p_priority;
+	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
 }
 
 static inline void

@@ -1,4 +1,4 @@
-/*	$NetBSD: mips_machdep.c,v 1.48 1999/03/24 05:51:05 mrg Exp $	*/
+/*	$NetBSD: mips_machdep.c,v 1.90 2000/06/17 06:38:25 cgd Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -52,12 +52,10 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mips_machdep.c,v 1.48 1999/03/24 05:51:05 mrg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mips_machdep.c,v 1.90 2000/06/17 06:38:25 cgd Exp $");
 
-#include "opt_bufcache.h"
 #include "opt_compat_netbsd.h"
 #include "opt_compat_ultrix.h"
-#include "opt_sysv.h"
 #include "opt_cputype.h"
 
 #include <sys/param.h>
@@ -67,8 +65,7 @@ __KERNEL_RCSID(0, "$NetBSD: mips_machdep.c,v 1.48 1999/03/24 05:51:05 mrg Exp $"
 #include <sys/mount.h>			/* fsid_t for syscallargs */
 #include <sys/proc.h>
 #include <sys/buf.h>
-#include <sys/clist.h>  
-#include <sys/callout.h>
+#include <sys/clist.h>
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 #include <sys/syscallargs.h>
@@ -76,17 +73,8 @@ __KERNEL_RCSID(0, "$NetBSD: mips_machdep.c,v 1.48 1999/03/24 05:51:05 mrg Exp $"
 #include <sys/msgbuf.h>
 #include <sys/conf.h>
 #include <sys/core.h>
-#include <sys/kcore.h>  
+#include <sys/kcore.h>
 #include <machine/kcore.h>
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <vm/vm.h>
 
@@ -111,30 +99,11 @@ static void	mips1_vector_init __P((void));
 static void	mips3_vector_init __P((void));
 #endif
 
+mips_locore_jumpvec_t mips_locore_jumpvec;
 
-mips_locore_jumpvec_t mips_locore_jumpvec = {
-  NULL, NULL, NULL, NULL,
-  NULL, NULL, NULL, NULL,
-  NULL, NULL
-};
-
-/*
- * Declare these as initialized data so we can patch them.
- */
-#ifndef NBUF
-#define NBUF		0
-#endif
-#ifndef BUFPAGES
-#define BUFPAGES	0
-#endif
-#ifndef BUFCACHE
-#define BUFCACHE	10
-#endif
-
-int	nswbuf = 0;
-int	nbuf = NBUF;
-int	bufpages = BUFPAGES;	/* optional hardwired count */
-int	bufcache = BUFCACHE;	/* % of RAM to use for buffer cache */
+long *mips_locoresw[3];
+extern long *mips1_locoresw[];	/* locore_mips1.S */
+extern long *mips3_locoresw[];	/* locore_mips3.S */
 
 int cpu_mhz;
 int mips_num_tlb_entries;
@@ -151,23 +120,28 @@ struct	pcb  *curpcb;
 
 caddr_t	msgbufaddr;
 
+#ifdef MIPS3_4100			/* VR4100 core */
+int	default_pg_mask = 0x00001800;
+#endif
+
 #ifdef MIPS1
+#ifdef ENABLE_MIPS_TX3900
+int	r3900_icache_direct;
+#endif
 /*
- * MIPS-I (r2000 and r3000) locore-function vector.
+ * MIPS-I locore function vector
  */
 mips_locore_jumpvec_t mips1_locore_vec =
 {
 	mips1_FlushCache,
 	mips1_FlushDCache,
 	mips1_FlushICache,
-	/*mips1_FlushICache*/ mips1_FlushCache,
 	mips1_SetPID,
-	mips1_TLBFlush,
-	mips1_TLBFlushAddr,
+	mips1_TBIAP,
+	mips1_TBIS,
+	mips1_TBRPL,
 	mips1_TLBUpdate,
 	mips1_wbflush,
-	mips1_proc_trampoline,
-	mips1_cpu_switch_resume
 };
 
 static void
@@ -203,28 +177,19 @@ mips1_vector_init()
 
 #ifdef MIPS3
 /*
- * MIPS-III (r4000) locore-function vector.
+ * MIPS III locore function vector
  */
 mips_locore_jumpvec_t mips3_locore_vec =
 {
 	mips3_FlushCache,
 	mips3_FlushDCache,
 	mips3_FlushICache,
-#if 0
-	 /*
-	  * No such vector exists, perhaps it was meant to be HitFlushDCache?
-	  */
-	mips3_ForceCacheUpdate,
-#else
-	mips3_FlushCache,
-#endif
 	mips3_SetPID,
-	mips3_TLBFlush,
-	mips3_TLBFlushAddr,
+	mips3_TBIAP,
+	mips3_TBIS,
+	mips3_TBRPL,
 	mips3_TLBUpdate,
 	mips3_wbflush,
-	mips3_proc_trampoline,
-	mips3_cpu_switch_resume
 };
 
 /*----------------------------------------------------------------------------
@@ -251,7 +216,7 @@ mips3_ConfigCache()
 {
 	u_int32_t config = mips3_read_config();
 	static int snoop_check = 0;
-	register int i;
+	int i;
 
 	mips_L1ICacheSize = MIPS3_CONFIG_CACHE_SIZE(config,
 	    MIPS3_CONFIG_IC_MASK, MIPS3_CONFIG_IC_SHIFT);
@@ -262,21 +227,21 @@ mips3_ConfigCache()
 	mips_L1DCacheLSize = MIPS3_CONFIG_CACHE_L1_LSIZE(config,
 	    MIPS3_CONFIG_DB);
 
-	mips_CacheAliasMask = (mips_L1DCacheLSize - 1) & ~(NBPG - 1);
+	mips_CacheAliasMask = (mips_L1DCacheSize - 1) & ~(NBPG - 1);
 
 	/*
 	 * Clear out the I and D caches.
 	 */
 	mips_L2CacheSize = 0; /* kluge to skip L2 cache flush */
-	mips3_FlushCache();
+	MachFlushCache();
 
 	i = *(volatile int *)&snoop_check;	/* Read and cache */
-	mips3_FlushCache();			/* Flush */
+	MachFlushCache();			/* Flush */
 	*(volatile int *)MIPS_PHYS_TO_KSEG1(MIPS_KSEG0_TO_PHYS(&snoop_check))
 	    = ~i;				/* Write uncached */
 	mips_L2CacheIsSnooping = *(volatile int *)&snoop_check == ~i;
 	*(volatile int *)&snoop_check = i;	/* Write uncached */
-	mips3_FlushCache();			/* Flush */
+	MachFlushCache();			/* Flush */
 
 
 	mips_L2CachePresent = (config & MIPS3_CONFIG_SC) == 0;
@@ -332,10 +297,19 @@ mips3_vector_init()
 	mips_L2CacheSize = 1024 * 1024;
 #endif
 #ifdef arc		/* XXX */
-	mips_L2CacheSize = mips_L2CachePresent ? 1024 * 1024 : 0;
+	{
+		void machine_ConfigCache __P((void));
+
+		machine_ConfigCache();
+	}
+#endif
+#ifdef newsmips		/* XXX */
+	mips_L2CacheSize = 1024 * 1024;
 #endif
 
-	mips3_FlushCache();
+	MachFlushCache();
+
+	mips3_clearBEV();
 }
 #endif	/* MIPS3 */
 
@@ -347,10 +321,10 @@ mips3_vector_init()
  * The principal purpose of this function is to examine the
  * variable cpu_id, into which the kernel locore start code
  * writes the cpu ID register, and to then copy appropriate
- * cod into the CPU exception-vector entries and the jump tables
- * used to  hide the differences in cache and TLB handling in
+ * code into the CPU exception-vector entries and the jump tables
+ * used to hide the differences in cache and TLB handling in
  * different MIPS CPUs.
- * 
+ *
  * This should be the very first thing called by each port's
  * init_main() function.
  */
@@ -363,9 +337,6 @@ mips3_vector_init()
 void
 mips_vector_init()
 {
-	int i;
-
-	(void) &i;		/* shut off gcc unused-variable warnings */
 
 	/*
 	 * Copy exception-dispatch code down to exception vector.
@@ -380,6 +351,27 @@ mips_vector_init()
 		cpu_arch = 1;
 		mips_num_tlb_entries = MIPS1_TLB_NUM_TLB_ENTRIES;
 		break;
+#ifdef ENABLE_MIPS_TX3900
+	case MIPS_TX3900:
+		cpu_arch = 1;
+		switch (cpu_id.cpu.cp_majrev) {
+		default:
+			panic("not supported revision");
+		case 1: /* TX3912 */
+			mips_num_tlb_entries = R3900_TLB_NUM_TLB_ENTRIES;
+			r3900_icache_direct = 1;
+			mips_L1ICacheLSize = 16;
+			mips_L1DCacheLSize = 4;
+			break;
+		case 3: /* TX3922 */
+			mips_num_tlb_entries = R3920_TLB_NUM_TLB_ENTRIES;
+			r3900_icache_direct = 0;
+			mips_L1ICacheLSize = 16;
+			mips_L1DCacheLSize = 16;
+			break;
+		}
+		break;
+#endif /* ENABLE_MIPS_TX3900 */
 #endif /* MIPS1 */
 
 #ifdef MIPS3
@@ -387,62 +379,68 @@ mips_vector_init()
 		cpu_arch = 3;
 		mips_num_tlb_entries = MIPS3_TLB_NUM_TLB_ENTRIES;
 		mips3_L1TwoWayCache = 0;
-		mips3_cacheflush_bug = 0;
-#if 1  /* XXX FIXME: avoid hangs in mips3_vector_init() */
-		mips3_cacheflush_bug = 1;
-#endif
+		break;
+	case MIPS_R4100:
+		cpu_arch = 3;
+		mips_num_tlb_entries = 32;
+		mips3_L1TwoWayCache = 0;
 		break;
 	case MIPS_R4300:
 		cpu_arch = 3;
 		mips_num_tlb_entries = MIPS_R4300_TLB_NUM_TLB_ENTRIES;
 		mips3_L1TwoWayCache = 0;
-		mips3_cacheflush_bug = 0;
 		break;
 	case MIPS_R4600:
 		cpu_arch = 3;
 		mips_num_tlb_entries = MIPS3_TLB_NUM_TLB_ENTRIES;
 		mips3_L1TwoWayCache = 1;
 		/* disable interrupt while cacheflush to workaround the bug */
-		mips3_cacheflush_bug = 1;	/* R4600 only??? */
 		break;
 #ifdef ENABLE_MIPS_R4700 /* ID conflict */
 	case MIPS_R4700:
 		cpu_arch = 3;
 		mips_num_tlb_entries = MIPS3_TLB_NUM_TLB_ENTRIES;
 		mips3_L1TwoWayCache = 1;
-		mips3_cacheflush_bug = 0;
 		break;
 #endif
 #ifndef ENABLE_MIPS_R3NKK /* ID conflict */
 	case MIPS_R5000:
 #endif
-	case MIPS_RM5230:
-		cpu_arch = 4; 
+	case MIPS_RM5200:
+		cpu_arch = 4;
 		mips_num_tlb_entries = MIPS3_TLB_NUM_TLB_ENTRIES;
 		mips3_L1TwoWayCache = 1;
-		mips3_cacheflush_bug = 0;
+		break;
+
+	case MIPS_R10000:
+	case MIPS_R12000:
+		cpu_arch = 4;
+		mips_num_tlb_entries = 64;
+		mips3_L1TwoWayCache = 1;
 		break;
 #endif /* MIPS3 */
 
 	default:
-		printf("CPU type (%d) not supported\n", cpu_id.cpu.cp_imp);
+		printf("CPU type (0x%x) not supported\n", cpu_id.cpuprid);
 		cpu_reboot(RB_HALT, NULL);
 	}
 
 	switch (cpu_arch) {
 #ifdef MIPS1
 	case 1:
-		mips1_clean_tlb();
+		mips1_TBIA(mips_num_tlb_entries);
 		mips1_vector_init();
+		memcpy(mips_locoresw, mips1_locoresw, sizeof(mips_locoresw));
 		break;
 #endif
 #if (MIPS3 + MIPS4) > 0
 	case 3:
 	case 4:
 		mips3_SetWIRED(0);
-		mips3_TLBFlush(mips_num_tlb_entries);
-		mips3_SetWIRED(MIPS3_TLB_WIRED_ENTRIES);
+		mips3_TBIA(mips_num_tlb_entries);
+		mips3_SetWIRED(MIPS3_TLB_WIRED_UPAGES);
 		mips3_vector_init();
+		memcpy(mips_locoresw, mips3_locoresw, sizeof(mips_locoresw));
 		break;
 #endif
 	default:
@@ -463,37 +461,42 @@ mips_set_wbflush(flush_fn)
 struct pridtab {
 	int	cpu_imp;
 	char	*cpu_name;
-	int	cpu_isa;
 };
 struct pridtab cputab[] = {
-	{ MIPS_R2000,	"MIPS R2000 CPU",	1 },
-	{ MIPS_R3000,	"MIPS R3000 CPU",	1 },
-	{ MIPS_R6000,	"MIPS R6000 CPU",	2 },
-	{ MIPS_R4000,	"MIPS R4000 CPU",	3 },
-	{ MIPS_R3LSI,	"LSI Logic R3000 derivative", 1 },
-	{ MIPS_R6000A,	"MIPS R6000A CPU",	2 },
-	{ MIPS_R3IDT,	"IDT R3041 or RC36100 CPU", 1 },
-	{ MIPS_R10000,	"MIPS R10000/T5 CPU",	4 },
-	{ MIPS_R4200,	"NEC VR4200 CPU",	3 },
-	{ MIPS_R4300,	"NEC VR4300 CPU",	3 },
-	{ MIPS_R4100,	"NEC VR4100 CPU",	3 },
-	{ MIPS_R8000,	"MIPS R8000 Blackbird/TFP CPU", 4 },
-	{ MIPS_R4600,	"QED R4600 Orion CPU",	3 },
-	{ MIPS_R4700,	"QED R4700 Orion CPU",	3 },
-	{ MIPS_TX3900,	"Toshiba TX3900 or QED R4650 CPU", 1 }, /* see below */
-	{ MIPS_R5000,	"MIPS R5000 CPU",	4 },
-	{ MIPS_RC32364,	"IDT RC32364 CPU",	3 },
-	{ MIPS_RM5230,	"QED RM5200 CPU",	4 },
-	{ MIPS_RC64470,	"IDT RC64474/RC64475 CPU",	3 },
-	{ MIPS_R5400,	"NEC VR5400 CPU",	4 },
-#if 0 /* ID crashs */
+	{ MIPS_R2000,	"MIPS R2000 CPU",	},
+	{ MIPS_R3000,	"MIPS R3000 CPU",	},
+	{ MIPS_R6000,	"MIPS R6000 CPU",	},
+	{ MIPS_R4000,	"MIPS R4000 CPU",	},
+	{ MIPS_R3LSI,	"LSI Logic R3000 derivative", },
+	{ MIPS_R6000A,	"MIPS R6000A CPU",	},
+	{ MIPS_R3IDT,	"IDT R3041 or RC36100 CPU", },
+	{ MIPS_R10000,	"MIPS R10000/T5 CPU",	},
+	{ MIPS_R4200,	"NEC VR4200 CPU",	},
+	{ MIPS_R4300,	"NEC VR4300 CPU",	},
+	{ MIPS_R4100,	"NEC VR4100 CPU",	},
+	{ MIPS_R12000,	"MIPS R12000 CPU",	},
+	{ MIPS_R8000,	"MIPS R8000 Blackbird/TFP CPU", },
+	{ MIPS_R4600,	"QED R4600 Orion CPU",	},
+	{ MIPS_R4700,	"QED R4700 Orion CPU",	},
+#ifdef ENABLE_MIPS_TX3900
+	{ MIPS_TX3900,	"Toshiba TX3900 CPU", }, /* see below */
+#else
+	{ MIPS_TX3900,	"Toshiba TX3900 or QED R4650 CPU", }, /* see below */
+#endif
+	{ MIPS_R5000,	"MIPS R5000 CPU",	},
+	{ MIPS_RC32364,	"IDT RC32364 CPU",	},
+	{ MIPS_RM7000,	"QED RM7000 CPU",	},
+	{ MIPS_RM5200,	"QED RM5200 CPU",	},
+	{ MIPS_RC64470,	"IDT RC64474/RC64475 CPU",	},
+	{ MIPS_R5400,	"NEC VR5400 CPU",	},
+#if 0 /* ID collisions */
 	/*
 	 * According to documents from Toshiba and QED, PRid 0x22 is
 	 * used by both of TX3900 (ISA-I) and QED4640/4650 (ISA-III).
 	 * Two PRid conflicts below have not been confirmed this time.
 	 */
-	{ MIPS_R3SONY,	"SONY R3000 derivative", 1},  /* 0x21; crash R4700? */
-	{ MIPS_R3NKK,	"NKK R3000 derivative",	1},   /* 0x23; crash R5000? */
+	{ MIPS_R3SONY,	"SONY R3000 derivative", },  /* 0x21; crash R4700? */
+	{ MIPS_R3NKK,	"NKK R3000 derivative",  },  /* 0x23; crash R5000? */
 #endif
 };
 struct pridtab fputab[] = {
@@ -534,17 +537,16 @@ cpu_identify()
 		}
 	}
 	if (fpuname == NULL && fpu_id.cpu.cp_imp == cpu_id.cpu.cp_imp)
-		fpuname = "built in floating point processor";
+		fpuname = "built-in FPU";
 	if (cpu_id.cpu.cp_imp == MIPS_R4700)	/* FPU PRid is 0x20 */
-		fpuname = "built in floating point processor";
+		fpuname = "built-in FPU";
 	if (cpu_id.cpu.cp_imp == MIPS_RC64470)	/* FPU PRid is 0x21 */
-		fpuname = "built in floating point processor";
+		fpuname = "built-in FPU";
 
-	printf("cpu0: ");
 	if (cpuname != NULL)
-		printf(cpuname);
+		printf("%s (0x%x)", cpuname, cpu_id.cpuprid);
 	else
-		printf("unknown CPU type (0x%x)", cpu_id.cpu.cp_imp);
+		printf("unknown CPU type (0x%x)", cpu_id.cpuprid);
 	printf(" Rev. %d.%d", cpu_id.cpu.cp_majrev, cpu_id.cpu.cp_minrev);
 
 	if (fpuname != NULL)
@@ -557,17 +559,29 @@ cpu_identify()
 	printf("cpu0: ");
 #ifdef MIPS1
 	if (cpu_arch == 1) {
-		printf("%dkb Instruction, %dkb Data, direct mapped cache",
-		    mips_L1ICacheSize / 1024, mips_L1DCacheSize / 1024);	
+#ifdef ENABLE_MIPS_TX3900
+		printf("%dKB/%dB Instruction %s, %dKB/%dB Data 2-way set associative, %d TLB entries",
+		       mips_L1ICacheSize / 1024, mips_L1ICacheLSize,
+		       r3900_icache_direct ? "direct mapped" : "2-way set associative",
+		       mips_L1DCacheSize / 1024, mips_L1DCacheLSize,
+		       mips_num_tlb_entries);
+#else /* ENABLE_MIPS_TX3900 */
+		printf("%dKB Instruction, %dKB Data, direct mapped cache",
+		    mips_L1ICacheSize / 1024, mips_L1DCacheSize / 1024);
+#endif /* ENABLE_MIPS_TX3900 */
 	}
 #endif
 #ifdef MIPS3
 	if (cpu_arch >= 3) {
-		printf("L1 cache: %dkb/%db Instruction, %dkb/%db Data",
-		    mips_L1ICacheSize / 1024, mips_L1ICacheLSize, 
+		printf("L1 cache: %dKB/%dB instruction, %dKB/%dB data",
+		    mips_L1ICacheSize / 1024, mips_L1ICacheLSize,
 		    mips_L1DCacheSize / 1024, mips_L1DCacheLSize);
-		if (mips3_L1TwoWayCache)
+		if (mips3_L1TwoWayCache) {
 			printf(", two way set associative");
+			/* One less alias bit with 2 way cache. */
+			mips_CacheAliasMask =
+				((mips_L1DCacheSize/2) - 1) & ~(NBPG - 1);
+		}
 		else
 			printf(", direct mapped");
 		printf("\n");
@@ -578,10 +592,10 @@ cpu_identify()
 		else {
 			printf("L2 cache: ");
 			if (mips_L2CacheSize)
-				printf("%dkb", mips_L2CacheSize / 1024);
+				printf("%dKB", mips_L2CacheSize / 1024);
 			else
 				printf("unknown size");
-			printf("/%db %s, %s",
+			printf("/%dB %s, %s",
 			    mips_L2CacheLSize,
 			    mips_L2CacheMixed ? "mixed" : "separated",
 			    mips_L2CacheIsSnooping? "snooping" : "no snooping");
@@ -599,7 +613,7 @@ cpu_identify()
 #if !defined(MIPS3_L2CACHE_ABSENT)
 	if (cpu_arch >= 3 && !mips_L2CachePresent) {
 		printf("This kernel doesn't work without L2 cache.\n"
-		    "Please add \"options MIPS3_L2CACHE_ABSENT\""
+		    "Please add \"options MIPS3_L2CACHE_ABSENT\" "
 		    "to the kernel config file.\n");
 		cpu_reboot(RB_HALT, NULL);
 	}
@@ -664,7 +678,7 @@ setregs(p, pack, stack)
 	f->f_regs[A2] = 0;
 	f->f_regs[A3] = (int)PS_STRINGS;
 
-	if (fpcurproc == p)
+	if ((p->p_md.md_flags & MDP_FPUSED) && p == fpcurproc)
 		fpcurproc = (struct proc *)0;
 	memset(&p->p_addr->u_pcb.pcb_fpregs, 0, sizeof(struct fpreg));
 	p->p_md.md_flags &= ~MDP_FPUSED;
@@ -711,7 +725,7 @@ sendsig(catcher, sig, mask, code)
 	f = (struct frame *)p->p_md.md_regs;
 
 	/* Do we need to jump onto the signal stack? */
-	onstack = 
+	onstack =
 	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
 	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
 
@@ -812,7 +826,7 @@ sendsig(catcher, sig, mask, code)
  * Return to previous pc and psl as specified by
  * context left by sendsig. Check carefully to
  * make sure that the user has not modified the
- * psl to gain improper priviledges or to cause
+ * psl to gain improper privileges or to cause
  * a machine fault.
  */
 /* ARGSUSED */
@@ -872,12 +886,6 @@ sys___sigreturn14(p, v, retval)
  */
 extern phys_ram_seg_t mem_clusters[];
 extern int mem_cluster_cnt;
-
-/*
- * These are imported from pmap.c
- */
-extern pt_entry_t *Sysmap;
-extern u_int Sysmapsize;
 
 /*
  * These variables are needed by /sbin/savecore.
@@ -995,10 +1003,10 @@ cpu_dumpconf()
 	if (bdevsw[maj].d_psize == NULL)
 		goto bad;
 	nblks = (*bdevsw[maj].d_psize)(dumpdev);
-	if (nblks <= ctod(1)) 
+	if (nblks <= ctod(1))
 		goto bad;
 
-	dumpblks = cpu_dumpsize(); 
+	dumpblks = cpu_dumpsize();
 	if (dumpblks < 0)
 		goto bad;
 	dumpblks += ctod(cpu_dump_mempagecnt());
@@ -1036,7 +1044,6 @@ dumpsys()
 	/* Save registers. */
 	savectx(&dumppcb);
 
-	msgbufenabled = 0;	/* don't record dump msgs in msgbuf */
 	if (dumpdev == NODEV)
 		return;
 
@@ -1131,71 +1138,11 @@ dumpsys()
 	delay(5000000);		/* 5 seconds */
 }
 
-/*
- * Allocate space for system data structures.  We are given
- * a starting virtual address and we return a final virtual
- * address; along the way, we set each data structure pointer.
- *
- * We call allocsys() with 0 to find out how much space we want,
- * allocate that much and fill it with zeroes, and the call
- * allocsys() again with the correct base virtual address.
- */
-caddr_t  
-allocsys(v) 
-	caddr_t v;
-{                       
-
-#define valloc(name, type, num) \
-	    (name) = (type *)v; v = (caddr_t)ALIGN((name)+(num))
-
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(callout, struct callout, ncallout);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-	
-	/*
-	 * Determine how many buffers to allocate.
-	 * We allocate bufcache % of memory for buffer space.  Ensure a
-	 * minimum of 16 buffers.  We allocate 1/2 as many swap buffer
-	 * headers as file i/o buffers.
-	 */
-	if (bufpages == 0)
-		bufpages = physmem / CLSIZE * bufcache / 100;
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
-	valloc(buf, struct buf, nbuf);
-
-	return (v);
-#undef valloc
-}
-
 void
 mips_init_msgbuf()
 {
-	size_t sz = round_page(MSGBUFSIZE);
+	vsize_t sz = (vsize_t)round_page(MSGBUFSIZE);
+	vsize_t reqsz = sz;
 	struct vm_physseg *vps;
 
 	vps = &vm_physmem[vm_nphysseg - 1];
@@ -1214,29 +1161,165 @@ mips_init_msgbuf()
 		vm_nphysseg--;
 
 	/* warn if the message buffer had to be shrunk */
-	if (sz != round_page(MSGBUFSIZE))
+	if (sz != reqsz)
 		printf("WARNING: %ld bytes not available for msgbuf "
-		    "in last cluster (%d used)\n",
-		    round_page(MSGBUFSIZE), sz);
+		    "in last cluster (%ld used)\n", reqsz, sz);
 }
 
-/*
- * Initialize the U-area for proc0.  Since these need to be set up
- * before we can probe for memory, we have to use stolen pages before
- * they're loaded into the VM system.
- *
- * "space" is USPACE in size, must be page aligned, and in KSEG0.
- */
 void
-mips_init_proc0(space)
-	caddr_t space;
+savefpregs(p)
+	struct proc *p;
 {
-	/* XXX Flush cache?? */
-	memset(space, 0, USPACE);
+#ifndef NOFPU
+	u_int32_t status, fpcsr, *fp;
+	struct frame *f;
 
-	proc0.p_addr = proc0paddr = (struct user *)space;
+	if (p == NULL)
+		return;
+	/*
+	 * turnoff interrupts enabling CP1 to read FPCSR register.
+	 */
+	__asm __volatile (
+		".set noreorder		;"
+		".set noat		;"
+		"mfc0	%0, $12		;"
+		"li	$1, %2		;"
+		"mtc0	$1, $12		;"
+		"nop; nop; nop; nop	;"
+		"cfc1	%1, $31		;"
+		"cfc1	%1, $31		;"
+		".set reorder		;"
+		".set at" 
+		: "=r" (status), "=r"(fpcsr) : "i"(MIPS_SR_COP_1_BIT));
+	/*
+	 * this process yielded FPA.
+	 */
+	f = (struct frame *)p->p_md.md_regs;
+	f->f_regs[SR] &= ~MIPS_SR_COP_1_BIT;
 
-	curpcb = &proc0.p_addr->u_pcb;
-	MachSetPID(1);		/* Also establishes context using curpcb */
-	proc0.p_md.md_regs = (void *)((struct frame *)((int)curpcb+USPACE) - 1);
+	/*
+	 * save FPCSR and 32bit FP register values.
+	 */
+	fp = (int *)p->p_addr->u_pcb.pcb_fpregs.r_regs;
+	fp[32] = fpcsr;
+	__asm __volatile (
+		".set noreorder		;"
+		"swc1	$f0, 0(%0)	;"
+		"swc1	$f1, 4(%0)	;"
+		"swc1	$f2, 8(%0)	;"
+		"swc1	$f3, 12(%0)	;"
+		"swc1	$f4, 16(%0)	;"
+		"swc1	$f5, 20(%0)	;"
+		"swc1	$f6, 24(%0)	;"
+		"swc1	$f7, 28(%0)	;"
+		"swc1	$f8, 32(%0)	;"
+		"swc1	$f9, 36(%0)	;"
+		"swc1	$f10, 40(%0)	;"
+		"swc1	$f11, 44(%0)	;"
+		"swc1	$f12, 48(%0)	;"
+		"swc1	$f13, 52(%0)	;"
+		"swc1	$f14, 56(%0)	;"
+		"swc1	$f15, 60(%0)	;"
+		"swc1	$f16, 64(%0)	;"
+		"swc1	$f17, 68(%0)	;"
+		"swc1	$f18, 72(%0)	;"
+		"swc1	$f19, 76(%0)	;"
+		"swc1	$f20, 80(%0)	;"
+		"swc1	$f21, 84(%0)	;"
+		"swc1	$f22, 88(%0)	;"
+		"swc1	$f23, 92(%0)	;"
+		"swc1	$f24, 96(%0)	;"
+		"swc1	$f25, 100(%0)	;"
+		"swc1	$f26, 104(%0)	;"
+		"swc1	$f27, 108(%0)	;"
+		"swc1	$f28, 112(%0)	;"
+		"swc1	$f29, 116(%0)	;"
+		"swc1	$f30, 120(%0)	;"
+		"swc1	$f31, 124(%0)	;"
+		".set reorder" :: "r"(fp));
+	/*
+	 * stop CP1, enable interrupts.
+	 */
+	__asm __volatile ("mtc0 %0, $12" :: "r"(status));
+	return;
+#endif
+}
+
+void
+loadfpregs(p)
+	struct proc *p;
+{
+#ifndef NOFPU
+	u_int32_t status, *fp;
+	struct frame *f;
+
+	if (p == NULL)
+		panic("loading fpregs for NULL proc");
+
+	/*
+	 * turnoff interrupts enabling CP1 to load FP registers.
+	 */
+	__asm __volatile(
+		".set noreorder		;"
+		".set noat		;"
+		"mfc0	%0, $12		;"
+		"li	$1, %1		;"
+		"mtc0	$1, $12		;"
+		"nop; nop; nop; nop	;"
+		".set reorder		;"
+		".set at" : "=r"(status) : "i"(MIPS_SR_COP_1_BIT));
+
+	f = (struct frame *)p->p_md.md_regs;
+	fp = (int *)p->p_addr->u_pcb.pcb_fpregs.r_regs;
+	/*
+	 * load 32bit FP registers and establish processes' FP context.
+	 */
+	__asm __volatile(
+		".set noreorder		;"
+		"lwc1	$f0, 0(%0)	;"
+		"lwc1	$f1, 4(%0)	;"
+		"lwc1	$f2, 8(%0)	;"
+		"lwc1	$f3, 12(%0)	;"
+		"lwc1	$f4, 16(%0)	;"
+		"lwc1	$f5, 20(%0)	;"
+		"lwc1	$f6, 24(%0)	;"
+		"lwc1	$f7, 28(%0)	;"
+		"lwc1	$f8, 32(%0)	;"
+		"lwc1	$f9, 36(%0)	;"
+		"lwc1	$f10, 40(%0)	;"
+		"lwc1	$f11, 44(%0)	;"
+		"lwc1	$f12, 48(%0)	;"
+		"lwc1	$f13, 52(%0)	;"
+		"lwc1	$f14, 56(%0)	;"
+		"lwc1	$f15, 60(%0)	;"
+		"lwc1	$f16, 64(%0)	;"
+		"lwc1	$f17, 68(%0)	;"
+		"lwc1	$f18, 72(%0)	;"
+		"lwc1	$f19, 76(%0)	;"
+		"lwc1	$f20, 80(%0)	;"
+		"lwc1	$f21, 84(%0)	;"
+		"lwc1	$f22, 88(%0)	;"
+		"lwc1	$f23, 92(%0)	;"
+		"lwc1	$f24, 96(%0)	;"
+		"lwc1	$f25, 100(%0)	;"
+		"lwc1	$f26, 104(%0)	;"
+		"lwc1	$f27, 108(%0)	;"
+		"lwc1	$f28, 112(%0)	;"
+		"lwc1	$f29, 116(%0)	;"
+		"lwc1	$f30, 120(%0)	;"
+		"lwc1	$f31, 124(%0)	;"
+		".set reorder" :: "r"(fp));
+	/*
+	 * load FPCSR and stop CP1 again while enabling interrupts.
+	 */
+	__asm __volatile(
+		".set noreorder		;"
+		".set noat		;"
+		"ctc1	%0, $31		;"
+		"mtc0	%1, $12		;"
+		".set reorder		;"
+		".set at"
+		:: "r"(fp[32] &~ MIPS_FPU_EXCEPTION_BITS), "r"(status));
+	return;
+#endif
 }

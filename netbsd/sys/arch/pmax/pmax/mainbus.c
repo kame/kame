@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.30 1999/03/25 01:17:53 simonb Exp $	*/
+/* $NetBSD: mainbus.c,v 1.32 1999/11/15 09:50:20 nisimura Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -12,11 +12,11 @@
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- *
+ * 
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- *
+ * 
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -32,11 +32,8 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 
+#include <machine/sysconf.h>
 #include <machine/autoconf.h>
-#include <pmax/pmax/pmaxtype.h>
-
-#include <dev/tc/tcvar.h>	/* XXX */
-#include "tc.h"			/* XXX Is TURBOchannel configured? */
 
 /* Definition of the mainbus driver. */
 static int	mbmatch __P((struct device *, struct cfdata *, void *));
@@ -47,6 +44,8 @@ struct cfattach mainbus_ca = {
 	sizeof(struct device), mbmatch, mbattach
 };
 
+static int mainbus_found;
+
 static int
 mbmatch(parent, cf, aux)
 	struct device *parent;
@@ -54,15 +53,9 @@ mbmatch(parent, cf, aux)
 	void *aux;
 {
 
-	/*
-	 * Only one mainbus, but some people are stupid...
-	 */
-	if (cf->cf_unit > 0)
+	if (mainbus_found)
 		return (0);
 
-	/*
-	 * That one mainbus is always here.
-	 */
 	return (1);
 }
 
@@ -74,7 +67,9 @@ mbattach(parent, self, aux)
 	struct device *self;
 	void *aux;
 {
-	struct confargs nca;
+	struct mainbus_attach_args ma;
+
+	mainbus_found = 1;
 
 	printf("\n");
 
@@ -85,27 +80,13 @@ mbattach(parent, self, aux)
 	 *
 	 * For now, we only have one. Attach it directly.
 	 */
- 	nca.ca_name = "cpu";
-	nca.ca_slot = 0;
-	config_found(self, &nca, mbprint);
+ 	ma.ma_name = "cpu";
+	ma.ma_slot = 0;
+	config_found(self, &ma, mbprint);
 
-#if NTC > 0
-	if (systype == DS_3MAXPLUS || systype == DS_3MAX ||
-	    systype == DS_3MIN || systype == DS_MAXINE) {
-		/*
-		 * This system might have a turbochannel.
-		 * Call the TC subr code to look for one
-		 * and if found, to configure it.
-		 */
-		config_tcbus(self, systype /* XXX */, mbprint);
-	}
-#endif /* NTC */
-
-	if (systype == DS_PMAX || systype == DS_MIPSMATE) {
-		nca.ca_name = "baseboard";
-		nca.ca_slot = 0;
-		config_found(self, &nca, mbprint);
-	}
+	ma.ma_name = platform.iobus;
+	ma.ma_slot = 0;
+	config_found(self, &ma, mbprint);
 }
 
 static int

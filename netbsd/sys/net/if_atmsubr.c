@@ -1,4 +1,4 @@
-/*      $NetBSD: if_atmsubr.c,v 1.18 1998/07/05 22:48:07 jonathan Exp $       */
+/*      $NetBSD: if_atmsubr.c,v 1.22 2000/03/30 09:45:35 augustss Exp $       */
 
 /*
  *
@@ -64,7 +64,7 @@
 #include <netinet/in.h>
 #include <netinet/if_atm.h>
 
-#ifdef INET
+#if defined(INET) || defined(INET6)
 #include <netinet/in_var.h>
 #endif
 #ifdef NATM
@@ -90,7 +90,7 @@
 
 int
 atm_output(ifp, m0, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct mbuf *m0;
 	struct sockaddr *dst;
 	struct rtentry *rt0;
@@ -98,9 +98,10 @@ atm_output(ifp, m0, dst, rt0)
 	u_int16_t etype = 0;			/* if using LLC/SNAP */
 	int s, error = 0, sz;
 	struct atm_pseudohdr atmdst, *ad;
-	register struct mbuf *m = m0;
-	register struct rtentry *rt;
+	struct mbuf *m = m0;
+	struct rtentry *rt;
 	struct atmllc *atmllc;
+	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
@@ -141,6 +142,23 @@ atm_output(ifp, m0, dst, rt0)
 		switch (dst->sa_family) {
 #ifdef INET
 		case AF_INET:
+#endif
+#ifdef INET6
+		case AF_INET6:
+#endif
+#if defined(INET) || defined(INET6)
+			if (dst->sa_family == AF_INET)
+				etype = ETHERTYPE_IP;
+			else
+				etype = ETHERTYPE_IPV6;
+# ifdef ATM_PVCEXT
+			if (ifp->if_flags & IFF_POINTOPOINT) {
+				/* pvc subinterface */
+				struct pvcsif *pvcsif = (struct pvcsif *)ifp;
+				atmdst = pvcsif->sif_aph;
+				break;
+			}
+# endif
 			if (!atmresolve(rt, m, dst, &atmdst)) {
 				m = NULL; 
 				/* XXX: atmresolve already free'd it */
@@ -148,10 +166,19 @@ atm_output(ifp, m0, dst, rt0)
 				/* XXX: put ATMARP stuff here */
 				/* XXX: watch who frees m on failure */
 			}
-			etype = ETHERTYPE_IP;
 			break;
 #endif
 
+		case AF_UNSPEC:
+			/*
+			 * XXX: bpfwrite or output from a pvc shadow if.
+			 * assuming dst contains 12 bytes (atm pseudo
+			 * header (4) + LLC/SNAP (8))
+			 */
+			bcopy(dst->sa_data, &atmdst, sizeof(atmdst));
+			llc_hdr = (struct atmllc *)(dst->sa_data + sizeof(atmdst));
+			break;
+			
 		default:
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			printf("%s: can't handle af%d\n", ifp->if_xname, 
@@ -213,11 +240,11 @@ bad:
 void
 atm_input(ifp, ah, m, rxhand)
 	struct ifnet *ifp;
-	register struct atm_pseudohdr *ah;
+	struct atm_pseudohdr *ah;
 	struct mbuf *m;
 	void *rxhand;
 {
-	register struct ifqueue *inq;
+	struct ifqueue *inq;
 	u_int16_t etype = ETHERTYPE_IP; /* default */
 	int s;
 
@@ -277,6 +304,12 @@ atm_input(ifp, ah, m, rxhand)
 		  inq = &ipintrq;
 		  break;
 #endif /* INET */
+#ifdef INET6
+	  case ETHERTYPE_IPV6:
+		  schednetisr(NETISR_IPV6);
+		  inq = &ip6intrq;
+		  break;
+#endif
 	  default:
 	      m_freem(m);
 	      return;
@@ -297,16 +330,19 @@ atm_input(ifp, ah, m, rxhand)
  */
 void
 atm_ifattach(ifp)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 {
-	register struct ifaddr *ifa;
-	register struct sockaddr_dl *sdl;
+	struct ifaddr *ifa;
+	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ATM;
 	ifp->if_addrlen = 0;
 	ifp->if_hdrlen = 0;
 	ifp->if_mtu = ATMMTU;
 	ifp->if_output = atm_output;
+#if 0 /* XXX XXX XXX */
+	ifp->if_input = atm_input;
+#endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
@@ -332,4 +368,33 @@ atm_ifattach(ifp)
 #endif
 			break;
 		}
+
 }
+
+#ifdef ATM_PVCEXT
+
+static int pvc_max_number = 16;	/* max number of PVCs */
+static int pvc_number = 0;	/* pvc unit number */
+
+struct ifnet *
+pvcsif_alloc()
+{
+	struct pvcsif *pvcsif;
+
+	if (pvc_number >= pvc_max_number)
+		return (NULL);
+	MALLOC(pvcsif, struct pvcsif *, sizeof(struct pvcsif),
+	       M_DEVBUF, M_WAITOK);
+	if (pvcsif == NULL)
+		return (NULL);
+	bzero(pvcsif, sizeof(struct pvcsif));
+
+#ifdef __NetBSD__
+	sprintf(pvcsif->sif_if.if_xname, "pvc%d", pvc_number++);
+#else
+	pvcsif->sif_if.if_name = "pvc";
+	pvcsif->sif_if.if_unit = pvc_number++;
+#endif
+	return (&pvcsif->sif_if);
+}
+#endif /* ATM_PVCEXT */

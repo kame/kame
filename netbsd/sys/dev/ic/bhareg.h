@@ -1,4 +1,4 @@
-/*	$NetBSD: bhareg.h,v 1.12 1998/08/17 00:26:33 mycroft Exp $	*/
+/*	$NetBSD: bhareg.h,v 1.14.4.1 2000/10/04 04:12:50 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -169,10 +169,22 @@ struct bha_scat_gath {
 };
 
 struct bha_ccb {
-	u_char opcode;
-	u_char:3, data_in:1, data_out:1,:3;
-	u_char scsi_cmd_length;
-	u_char req_sense_length;
+	u_int8_t	opcode;
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_int8_t				:3,
+			data_in			:1,
+			data_out		:1,
+			wide_tag_enable		:1, /* Wide Lun CCB format */
+			wide_tag_type		:2; /* Wide Lun CCB format */
+#else
+	u_int8_t	wide_tag_type		:2, /* Wide Lun CCB format */
+			wide_tag_enable		:1, /* Wide Lun CCB format */
+			data_out		:1,
+			data_in			:1,
+						:3;
+#endif
+	u_int8_t	scsi_cmd_length;
+	u_int8_t	req_sense_length;
 	/*------------------------------------longword boundary */
 	physlen data_length;
 	/*------------------------------------longword boundary */
@@ -182,11 +194,19 @@ struct bha_ccb {
 	u_char host_stat;
 	u_char target_stat;
 	/*------------------------------------longword boundary */
-	u_char target;
-	u_char lun;
-	struct scsi_generic scsi_cmd;
-	u_char dummy2[1];
-	u_char link_id;
+	u_int8_t	target;
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_int8_t	lun			:5,
+			tag_enable		:1,
+			tag_type		:2;
+#else
+	u_int8_t	tag_type		:2,
+			tag_enable		:1,
+			lun			:5;
+#endif
+	u_int8_t	scsi_cmd[12];
+	u_int8_t	reserved2[1];
+	u_int8_t	link_id;
 	/*------------------------------------longword boundary */
 	physaddr link_addr;
 	/*------------------------------------longword boundary */
@@ -273,8 +293,13 @@ struct bha_config {
 	struct {
 		u_char  chan;
 		u_char  intr;
-		u_char  scsi_dev:3;
-		u_char	:5;
+#if BYTE_ORDER == LITTLE_ENDIAN
+		u_char  scsi_dev :3,
+				 :5;
+#else
+		u_char		 :5,
+			scsi_dev :3;
+#endif
 	} reply;
 };
 
@@ -335,20 +360,32 @@ struct bha_devices {
 };
 
 struct bha_sync {
-	u_char	offset:4;
-	u_char	period:3;
-	u_char	valid:1;
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_char	offset	:4,
+		period	:3,
+		valid	:1;
+#else
+	u_char	valid	:1,
+		period	:3,
+		offset	:4;
+#endif
 };
 
 struct bha_setup_reply {
-	u_char  sync_neg:1;
-	u_char  parity:1;
-	u_char	:6;
-	u_char  speed;
-	u_char  bus_on;
-	u_char  bus_off;
-	u_char  num_mbx;
-	u_char  mbx[3];		/*XXX */
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_int8_t	sync_neg	:1,
+			parity		:1,
+					:6;
+#else
+	u_int8_t			:6,
+			parity		:1,
+			sync_neg	:1;
+#endif
+	u_int8_t	speed;
+	u_int8_t	bus_on;
+	u_int8_t	bus_off;
+	u_int8_t	num_mbx;
+	u_int8_t	mbx[3];		/*XXX */
 	/* doesn't make sense with 32bit addresses */
 	struct bha_sync sync[8];
 	u_char  disc_sts;

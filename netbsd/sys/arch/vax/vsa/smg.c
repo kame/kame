@@ -1,4 +1,4 @@
-/*	$NetBSD: smg.c,v 1.15 1999/03/13 15:16:48 ragge Exp $ */
+/*	$NetBSD: smg.c,v 1.22.4.1 2000/06/30 16:27:44 simonb Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -33,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/time.h>
 #include <sys/malloc.h>
 #include <sys/conf.h>
@@ -47,6 +48,7 @@
 #include <machine/vsbus.h>
 #include <machine/sid.h>
 #include <machine/cpu.h>
+#include <machine/ka420.h>
 
 #include "lkc.h"
 
@@ -112,11 +114,12 @@ extern char q_font[];
 
 
 static int	smg_ioctl __P((void *, u_long, caddr_t, int, struct proc *));
-static int	smg_mmap __P((void *, off_t, int));
+static paddr_t	smg_mmap __P((void *, off_t, int));
 static int	smg_alloc_screen __P((void *, const struct wsscreen_descr *,
 				      void **, int *, int *, long *));
 static void	smg_free_screen __P((void *, void *));
-static void	smg_show_screen __P((void *, void *));
+static int	smg_show_screen __P((void *, void *, int,
+				     void (*) (void *, int, int), void *));
 static void	smg_crsr_blink __P((void *));
 
 const struct wsdisplay_accessops smg_accessops = {
@@ -138,6 +141,8 @@ struct	smg_screen {
 static	struct smg_screen smg_conscreen;
 static	struct smg_screen *curscr;
 
+static	struct callout smg_cursor_ch = CALLOUT_INITIALIZER;
+
 int
 smg_match(parent, match, aux)
 	struct device *parent;
@@ -145,10 +150,15 @@ smg_match(parent, match, aux)
 	void *aux;
 {
 	struct vsbus_attach_args *va = aux;
-	volatile short *curcmd = (short *)va->va_addr;
-	volatile short *cfgtst = (short *)vax_map_physmem(VS_CFGTST, 1);
+	volatile short *curcmd;
+	volatile short *cfgtst;
 	short tmp, tmp2;
 
+	if (vax_boardtype == VAX_BTYP_49)
+		return 0;
+
+	curcmd = (short *)va->va_addr;
+	cfgtst = (short *)vax_map_physmem(VS_CFGTST, 1);
 	/*
 	 * Try to find the cursor chip by testing the flip-flop.
 	 * If nonexistent, no glass tty.
@@ -184,7 +194,7 @@ smg_attach(parent, self, aux)
 	aa.console = !(vax_confdata & 0x20);
 	aa.scrdata = &smg_screenlist;
 	aa.accessops = &smg_accessops;
-	timeout(smg_crsr_blink, 0, hz/2);
+	callout_reset(&smg_cursor_ch, hz / 2, smg_crsr_blink, NULL);
 
 	config_found(self, &aa, wsemuldisplaydevprint);
 }
@@ -198,7 +208,7 @@ smg_crsr_blink(arg)
 {
 	if (cur_on)
 		*cursor ^= 255;
-	timeout(smg_crsr_blink, 0, hz/2);
+	callout_reset(&smg_cursor_ch, hz / 2, smg_crsr_blink, NULL);
 }
 
 void
@@ -394,7 +404,7 @@ smg_ioctl(v, cmd, data, flag, p)
 	return 0;
 }
 
-static int
+static paddr_t
 smg_mmap(v, offset, prot)
 	void *v;
 	off_t offset;
@@ -402,7 +412,7 @@ smg_mmap(v, offset, prot)
 {
 	if (offset >= SMSIZE || offset < 0)
 		return -1;
-	return (SMADDR + offset) >> CLSHIFT;
+	return (SMADDR + offset) >> PGSHIFT;
 }
 
 int
@@ -426,16 +436,19 @@ smg_free_screen(v, cookie)
 {
 }
 
-void
-smg_show_screen(v, cookie)
+int
+smg_show_screen(v, cookie, waitok, cb, cbarg)
 	void *v;
 	void *cookie;
+	int waitok;
+	void (*cb) __P((void *, int, int));
+	void *cbarg;
 {
 	struct smg_screen *ss = cookie;
 	int row, col, line;
 
 	if (ss == curscr)
-		return;
+		return (0);
 
 	for (row = 0; row < SM_ROWS; row++)
 		for (line = 0; line < SM_CHEIGHT; line++) {
@@ -455,6 +468,7 @@ smg_show_screen(v, cookie)
 	cursor = &sm_addr[(ss->ss_cury * SM_CHEIGHT * SM_COLS) + ss->ss_curx +
 	    ((SM_CHEIGHT - 1) * SM_COLS)];
 	curscr = ss;
+	return (0);
 }
 
 cons_decl(smg);
@@ -472,31 +486,39 @@ smgcninit(cndev)
 
 	curscr = &smg_conscreen;
 	wsdisplay_cnattach(&smg_stdscreen, &smg_conscreen, 0, 0, 0);
-	cn_tab->cn_dev = makedev(WSCONSOLEMAJOR, 0);
-#if NLKC
+	cn_tab->cn_pri = CN_INTERNAL;
+#if 0
 	lkccninit(cndev);
 	wsdisplay_set_cons_kbd(lkccngetc, nullcnpollc);
 #endif
 }
 
-int smgprobe(void);
-int
-smgprobe()
+/*
+ * Called very early to setup the glass tty as console.
+ * Because it's called before the VM system is inited, virtual memory
+ * for the framebuffer can be stolen directly without disturbing anything.
+ */
+void
+smgcnprobe(cndev)
+	struct  consdev *cndev;
 {
+	extern vaddr_t virtual_avail;
+
 	switch (vax_boardtype) {
 	case VAX_BTYP_410:
 	case VAX_BTYP_420:
 	case VAX_BTYP_43:
-		if (vax_confdata & 0x20) /* doesn't use graphics console */
-			break;
-		sm_addr = (caddr_t)vax_map_physmem(SMADDR, (SMSIZE/VAX_NBPG));
-		if (sm_addr == 0)
-			return 0;
-
-		return 1;
+		if ((vax_confdata & KA420_CFG_L3CON) ||
+		    (vax_confdata & KA420_CFG_MULTU))
+			break; /* doesn't use graphics console */
+		sm_addr = (caddr_t)virtual_avail;
+		virtual_avail += SMSIZE;
+		ioaccess((vaddr_t)sm_addr, SMADDR, (SMSIZE/VAX_NBPG));
+		cndev->cn_pri = CN_INTERNAL;
+		cndev->cn_dev = makedev(WSCONSOLEMAJOR, 0);
+		break;
 
 	default:
 		break;
 	}
-	return 0;
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: bootxx.c,v 1.3.2.1 1999/06/21 14:42:08 perry Exp $ */
+/* $NetBSD: bootxx.c,v 1.6 1999/11/13 21:38:20 thorpej Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.

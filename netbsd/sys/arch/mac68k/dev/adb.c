@@ -1,4 +1,4 @@
-/*	$NetBSD: adb.c,v 1.27.4.2 1999/11/29 21:21:20 he Exp $	*/
+/*	$NetBSD: adb.c,v 1.36.2.2 2000/11/15 20:20:42 tv Exp $	*/
 
 /*
  * Copyright (C) 1994	Bradley A. Grantham
@@ -46,8 +46,7 @@
 
 #include <mac68k/mac68k/macrom.h>
 #include <mac68k/dev/adbvar.h>
-#include <mac68k/dev/itevar.h>
-#include <mac68k/dev/kbdvar.h>
+#include <mac68k/dev/akbdvar.h>
 
 #include "aed.h"		/* ADB Event Device for compatibility */
 
@@ -57,6 +56,7 @@
 static int	adbmatch __P((struct device *, struct cfdata *, void *));
 static void	adbattach __P((struct device *, struct device *, void *));
 static int	adbprint __P((void *, const char *));
+void		adb_config_interrupts __P((struct device *));
 
 extern void	adb_jadbproc __P((void));
 
@@ -96,29 +96,33 @@ adbmatch(parent, cf, aux)
 }
 
 static void
-adbattach(parent, dev, aux)
-	struct device *parent, *dev;
+adbattach(parent, self, aux)
+	struct device *parent, *self;
 	void *aux;
+{
+	printf("\n");
+
+	/*
+	 * Defer configuration until interrupts are enabled.
+	 */
+	config_interrupts(self, adb_config_interrupts);
+}
+
+void
+adb_config_interrupts(self)
+	struct device *self;
 {
 	ADBDataBlock adbdata;
 	struct adb_attach_args aa_args;
 	int totaladbs;
 	int adbindex, adbaddr;
 
+	printf("%s", self->dv_xname);
 	adb_polling = 1;
 
 #ifdef MRG_ADB
-	/* 
-	 * Even if serial console only, some models require the
-         * ADB in order to get the date/time and do soft power.
-	 */
-	if ((mac68k_machine.serial_console & 0x03)) {
-		printf(": using serial console");
-		return;
-	}
-
 	if (!mrg_romready()) {
-		printf(": no ROM ADB driver in this kernel for this machine");
+		printf(": no ROM ADB driver in this kernel for this machine\n");
 		return;
 	}
 
@@ -163,7 +167,7 @@ adbattach(parent, dev, aux)
 	aa_args.origaddr = 0;
 	aa_args.adbaddr = 0;
 	aa_args.handler_id = 0;
-	(void)config_found(dev, &aa_args, adbprint);
+	(void)config_found(self, &aa_args, adbprint);
 #endif
 
 	/* for each ADB device */
@@ -175,7 +179,7 @@ adbattach(parent, dev, aux)
 		aa_args.adbaddr = adbaddr;
 		aa_args.handler_id = (int)(adbdata.devType);
 
-		(void)config_found(dev, &aa_args, adbprint);
+		(void)config_found(self, &aa_args, adbprint);
 	}
 	adb_polling = 0;
 }
@@ -183,8 +187,8 @@ adbattach(parent, dev, aux)
 
 int
 adbprint(args, name)
-        void *args;
-        const char *name;
+	void *args;
+	const char *name;
 {
 	struct adb_attach_args *aa_args = (struct adb_attach_args *)args;
 	int rv = UNCONF;
@@ -247,7 +251,75 @@ adbprint(args, name)
 #endif /* DIAGNOSTIC */
 		}
 	} else		/* a device matched and was configured */
-                printf(" addr %d: ", aa_args->origaddr);
+		printf(" addr %d: ", aa_args->origaddr);
 
 	return (rv);
+}
+
+
+/*
+ * adb_op_sync
+ *
+ * This routine does exactly what the adb_op routine does, except that after
+ * the adb_op is called, it waits until the return value is present before
+ * returning.
+ *
+ * NOTE: The user specified compRout is ignored, since this routine specifies
+ * it's own to adb_op, which is why you really called this in the first place
+ * anyway.
+ */
+int
+adb_op_sync(Ptr buffer, Ptr compRout, Ptr data, short command)
+{
+	int tmout;
+	int result;
+	volatile int flag = 0;
+
+	result = ADBOp(buffer, (void *)adb_op_comprout,
+	    (void *)&flag, command);	/* send command */
+	if (result == 0) {		/* send ok? */
+		/*
+		 * Total time to wait is calculated as follows:
+		 *  - Tlt (stop to start time): 260 usec
+		 *  - start bit: 100 usec
+		 *  - up to 8 data bytes: 64 * 100 usec = 6400 usec
+		 *  - stop bit (with SRQ): 140 usec
+		 * Total: 6900 usec
+		 *
+		 * This is the total time allowed by the specification.  Any
+		 * device that doesn't conform to this will fail to operate
+		 * properly on some Apple systems.  In spite of this we
+		 * double the time to wait; some Cuda-based apparently
+		 * queues some commands and allows the main CPU to continue
+		 * processing (radical concept, eh?).  To be safe, allow
+		 * time for two complete ADB transactions to occur.
+		 */
+		for (tmout = 13800; !flag && tmout >= 10; tmout -= 10)
+			delay(10);
+		if (!flag && tmout > 0)
+			delay(tmout);
+
+		if (!flag)
+			result = -2;
+	}
+
+	return result;
+}
+
+
+/*
+ * adb_op_comprout
+ *
+ * This function is used by the adb_op_sync routine so it knows when the
+ * function is done.
+ */
+void 
+adb_op_comprout(void)
+{
+#ifdef __NetBSD__
+	asm("movw	#1,a2@			| update flag value");
+#else				/* for macos based testing */
+	asm {
+		move.w #1,(a2) }		/* update flag value */
+#endif
 }

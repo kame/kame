@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.5 1999/02/10 17:03:27 kleink Exp $ */
+/*	$NetBSD: mem.c,v 1.6.4.1 2000/06/30 16:27:34 simonb Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -125,10 +125,10 @@ mmrw(dev, uio, flags)
 				break;
 			}
 			if (zeropage == NULL) {
-				zeropage = (caddr_t)malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(zeropage, CLBYTES);
+				zeropage = (caddr_t)malloc(NBPG, M_TEMP, M_WAITOK);
+				bzero(zeropage, NBPG);
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, NBPG);
 			error = uiomove(zeropage, c, uio);
 			continue;
 
@@ -145,10 +145,11 @@ mmrw(dev, uio, flags)
 	return error;
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
         dev_t dev;
-        int off, prot;
+	off_t off;
+	int prot;
 {
 	return -1;
 }

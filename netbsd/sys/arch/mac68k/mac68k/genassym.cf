@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.12 1999/03/24 22:28:49 ender Exp $
+#	$NetBSD: genassym.cf,v 1.18 2000/05/26 00:36:46 thorpej Exp $
 
 #
 # Copyright (c) 1990 The Regents of the University of California.
@@ -35,6 +35,8 @@
 #	@(#)genassym.c	7.8 (Berkeley) 5/7/91
 #
 
+include "opt_compat_svr4.h"
+
 include	<sys/param.h>
 include	<sys/buf.h>
 include	<sys/map.h>
@@ -47,6 +49,11 @@ include	<sys/user.h>
 include	<vm/vm.h>
 
 include <uvm/uvm_extern.h>
+
+ifdef COMPAT_SVR4
+include <compat/svr4/svr4_syscall.h>
+include <compat/svr4/svr4_ucontext.h>
+endif
 
 include	<machine/cpu.h>
 include	<machine/psl.h>
@@ -76,7 +83,6 @@ define	FPU_68040		FPU_68040
 define	UPAGES			UPAGES
 define	USPACE			USPACE
 define	P1PAGES 		P1PAGES
-define	CLSIZE			CLSIZE
 define	NBPG			NBPG
 define	NPTEPG			NPTEPG
 define	PGSHIFT 		PGSHIFT
@@ -100,6 +106,7 @@ define	P_MD_REGS		offsetof(struct proc, p_md.md_regs)
 define	P_MD_FLAGS		offsetof(struct proc, p_md.md_flags)
 define	SSLEEP			SSLEEP
 define	SRUN			SRUN
+define	SONPROC			SONPROC
 
 # interrupt/fault metering
 define	UVMEXP_INTRS		offsetof(struct uvmexp, intrs)
@@ -110,12 +117,14 @@ define	PSL_IPL7		PSL_IPL7
 define	PSL_LOWIPL		PSL_LOWIPL
 define	PSL_HIGHIPL		PSL_HIGHIPL
 define	PSL_USER		PSL_USER
+define	PSL_TS			(PSL_T | PSL_S)
 define	SPL1			(PSL_S | PSL_IPL1)
 define	SPL2			(PSL_S | PSL_IPL2)
 define	SPL3			(PSL_S | PSL_IPL3)
 define	SPL4			(PSL_S | PSL_IPL4)
 define	SPL5			(PSL_S | PSL_IPL5)
 define	SPL6			(PSL_S | PSL_IPL6)
+define	MAC68K_IPL_CLOCK	MAC68K_IPL_CLOCK
 
 # magic
 define	FC_USERD		FC_USERD
@@ -157,3 +166,12 @@ define	SYS_compat_13_sigreturn13 SYS_compat_13_sigreturn13
 define	ENOENT			ENOENT
 define	EFAULT			EFAULT
 define	ENAMETOOLONG		ENAMETOOLONG
+
+# SVR4 binary compatibility
+ifdef COMPAT_SVR4
+define SVR4_SIGF_HANDLER	offsetof(struct svr4_sigframe, sf_handler)
+define SVR4_SIGF_UC		offsetof(struct svr4_sigframe, sf_uc)
+define SVR4_SYS_context		SVR4_SYS_context
+define SVR4_SYS_exit		SVR4_SYS_exit
+define SVR4_SETCONTEXT		SVR4_SETCONTEXT
+endif

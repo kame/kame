@@ -1,11 +1,12 @@
-/*	$NetBSD: scsipiconf.h,v 1.29.2.3 2000/01/23 12:41:49 he Exp $	*/
+/*	$NetBSD: scsipiconf.h,v 1.44 2000/06/09 08:54:26 enami Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Charles M. Hannum.
+ * by Charles M. Hannum; by Jason R. Thorpe of the Numerical Aerospace
+ * Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,8 +59,8 @@
 
 typedef	int	boolean;
 
+#include <sys/callout.h>
 #include <sys/queue.h>
-#include <machine/cpu.h>
 #include <dev/scsipi/scsipi_debug.h>
 
 /*
@@ -96,6 +97,11 @@ struct proc;
 struct scsipi_link;
 struct scsipi_xfer;
 
+/*
+ * The following defines the scsipi_xfer queue.
+ */
+TAILQ_HEAD(scsipi_xfer_queue, scsipi_xfer);
+
 struct scsipi_generic {
 	u_int8_t opcode;
 	u_int8_t bytes[15];
@@ -128,14 +134,7 @@ struct scsipi_device {
 	int	(*err_handler) __P((struct scsipi_xfer *));
 			/* returns -1 to say err processing done */
 	void	(*start) __P((void *));
-
 	int	(*async) __P((void));
-	/*
-	 * When called with `0' as the second argument, we expect status
-	 * back from the upper-level driver.  When called with a `1',
-	 * we're simply notifying the upper-level driver that the command
-	 * is complete and expect no status back.
-	 */
 	void	(*done)  __P((struct scsipi_xfer *));
 };
 
@@ -148,14 +147,18 @@ struct scsipi_device {
  *	scsipi_minphys		required
  *	scsipi_ioctl		optional
  *	scsipi_enable		optional
+ *	scsipi_getgeom		optional
  */
+struct disk_parms;
 struct scsipi_adapter {
-	int	scsipi_refcnt;
+	int	scsipi_refcnt;		/* adapter reference count */
 	int	(*scsipi_cmd) __P((struct scsipi_xfer *));
 	void	(*scsipi_minphys) __P((struct buf *));
 	int	(*scsipi_ioctl) __P((struct scsipi_link *, u_long,
 		    caddr_t, int, struct proc *));
 	int	(*scsipi_enable) __P((void *, int));
+	int	(*scsipi_getgeom) __P((struct scsipi_link *,
+		    struct disk_parms *, u_long));
 };
 
 /*
@@ -168,12 +171,19 @@ struct scsipi_adapter {
  * XXX nasty.
  */
 
+/*
+ * XXX Small hack alert
+ * NOTE:  The first field of struct scsipi_link is shared with 
+ * dev/scspi/scsipiconf.h's struct ata_atapi_attach.  This allows
+ * atapibus and scsibus to attach to the same device.
+ */
 struct scsipi_link {
 	u_int8_t type;			/* device type, i.e. SCSI, ATAPI, ...*/
 #define BUS_SCSI		0
 #define BUS_ATAPI		1
-	u_int8_t openings;		/* available operations */
-	u_int8_t active;		/* operations in progress */
+/*define BUS_ATA		2*/
+	int openings;			/* max # of outstanding commands */
+	int active;			/* current # of outstanding commands */
 	int flags;			/* flags that all devices have */
 #define	SDEV_REMOVABLE	 	0x01	/* media is removable */
 #define	SDEV_MEDIA_LOADED 	0x02	/* device figures are still valid */
@@ -181,6 +191,7 @@ struct scsipi_link {
 #define	SDEV_OPEN	 	0x08	/* at least 1 open session */
 #define	SDEV_DBX		0xf0	/* debuging flags (scsipi_debug.h) */
 #define	SDEV_WAITDRAIN		0x100	/* waiting for pending_xfers to drain */
+#define	SDEV_KEEP_LABEL		0x200	/* retain label after 'full' close */
 	u_int16_t quirks;		/* per-device oddities */
 #define	SDEV_AUTOSAVE		0x0001	/*
 					 * Do implicit SAVEDATAPOINTER on
@@ -194,12 +205,13 @@ struct scsipi_link {
 #define SDEV_NOMODESENSE	0x0040	/* removable media/optical drives */
 #define SDEV_NOSTARTUNIT	0x0080	/* Do not issue START UNIT requests */
 #define	SDEV_NOSYNCCACHE	0x0100	/* does not grok SYNCHRONIZE CACHE */
-#define ADEV_CDROM		0x0200	/* device is a CD-ROM */
+#define SDEV_CDROM		0x0200	/* device is a CD-ROM */
 #define ADEV_LITTLETOC		0x0400	/* Audio TOC uses wrong byte order */
 #define ADEV_NOCAPACITY		0x0800	/* no READ_CD_CAPACITY command */
 #define ADEV_NOTUR		0x1000	/* no TEST_UNIT_READY command */
 #define ADEV_NODOORLOCK		0x2000	/* device can't lock door */
 #define ADEV_NOSENSE		0x4000	/* device can't handle request sense */
+#define SDEV_ONLYBIG		0x8000	/* only use SCSI_{READ,WRITE}_BIG */
 
 	struct	scsipi_device *device;	/* device entry points etc. */
 	void	*device_softc;		/* needed for call to foo_start */
@@ -230,12 +242,13 @@ struct scsipi_link {
 #define ACAP_LEN            0x01  /* 16 bit commands */
 		} scsipi_atapi;
 	} _scsipi_link;
-	TAILQ_HEAD(, scsipi_xfer) pending_xfers;
+	struct scsipi_xfer_queue pending_xfers;
 	int (*scsipi_cmd) __P((struct scsipi_link *, struct scsipi_generic *,
 	    int cmdlen, u_char *data_addr, int datalen, int retries,
 	    int timeout, struct buf *bp, int flags));
 	int (*scsipi_interpret_sense) __P((struct scsipi_xfer *));
 	void (*sc_print_addr) __P((struct scsipi_link *sc_link));
+	void (*scsipi_kill_pending) __P((struct scsipi_link *));
 };
 #define scsipi_scsi _scsipi_link.scsipi_scsi
 #define scsipi_atapi _scsipi_link.scsipi_atapi
@@ -258,7 +271,9 @@ struct scsipi_link {
 struct scsipi_xfer {
 	TAILQ_ENTRY(scsipi_xfer) adapter_q; /* queue entry for use by adapter */
 	TAILQ_ENTRY(scsipi_xfer) device_q;  /* device's pending xfers */
-	volatile int flags;		/* 0x00ff0000 reserved for ATAPI */
+	struct callout xs_callout;	/* callout for adapter use */
+	int	xs_control;		/* control flags */
+	__volatile int xs_status;	/* status flags */
 	struct	scsipi_link *sc_link;	/* all about our device and adapter */
 	int	retries;		/* the number of times to retry */
 	int	timeout;		/* in milliseconds */
@@ -285,27 +300,41 @@ struct scsipi_xfer {
 };
 
 /*
- * Per-request Flag values
+ * scsipi_xfer control flags
+ *
+ * To do:
+ *
+ *	- figure out what to do with XS_CTL_ESCAPE
+ *
+ *	- replace XS_CTL_URGENT with an `xs_priority' field
  */
-#define	SCSI_NOSLEEP	0x0001	/* don't sleep */
-#define	SCSI_POLL	0x0002	/* poll for completion */
-#define	SCSI_AUTOCONF	(SCSI_NOSLEEP | SCSI_POLL)
-#define	SCSI_USER	0x0004	/* Is a user cmd, call scsipi_user_done	*/
-#define	ITSDONE		0x0008	/* the transfer is as done as it gets	*/
-#define	INUSE		0x0010	/* The scsipi_xfer block is in use	*/
-#define	SCSI_SILENT	0x0020	/* don't announce NOT READY or MEDIA CHANGE */
-#define	SCSI_IGNORE_NOT_READY		0x0040	/* ignore NOT READY */
-#define	SCSI_IGNORE_MEDIA_CHANGE	0x0080	/* ignore MEDIA CHANGE */
-#define	SCSI_IGNORE_ILLEGAL_REQUEST	0x0100	/* ignore ILLEGAL REQUEST */
-#define	SCSI_RESET	0x0200	/* Reset the device in question		*/
-#define	SCSI_DATA_UIO	0x0400	/* The data address refers to a UIO	*/
-#define	SCSI_DATA_IN	0x0800	/* expect data to come INTO memory	*/
-#define	SCSI_DATA_OUT	0x1000	/* expect data to flow OUT of memory	*/
-#define	SCSI_TARGET	0x2000	/* This defines a TARGET mode op.	*/
-#define	SCSI_ESCAPE	0x4000	/* Escape operation			*/
-#define	SCSI_URGENT	0x8000	/* Urgent operation (e.g., HTAG)	*/
-#define SCSI_PROBE   0x1000000	/* We are probing the target		*/
-		 /* 0x00ff0000 reserved for ATAPI. */
+#define	XS_CTL_NOSLEEP		0x00000001	/* don't sleep */
+#define	XS_CTL_POLL		0x00000002	/* poll for completion */
+#define	XS_CTL_DISCOVERY	0x00000004	/* doing device discovery */
+#define	XS_CTL_ASYNC		0x00000008	/* command completes
+						   asynchronously */
+#define	XS_CTL_USERCMD		0x00000010	/* user issued command */
+#define	XS_CTL_SILENT		0x00000020	/* don't print sense info */
+#define	XS_CTL_IGNORE_NOT_READY	0x00000040	/* ignore NOT READY */
+#define	XS_CTL_IGNORE_MEDIA_CHANGE 					\
+				0x00000080	/* ignore media change */
+#define	XS_CTL_IGNORE_ILLEGAL_REQUEST					\
+				0x00000100	/* ignore ILLEGAL REQUEST */
+#define	XS_CTL_RESET		0x00000200	/* reset the device */
+#define	XS_CTL_DATA_UIO		0x00000400	/* xs_data points to uio */
+#define	XS_CTL_DATA_IN		0x00000800	/* data coming into memory */
+#define	XS_CTL_DATA_OUT		0x00001000	/* data going out of memory */
+#define	XS_CTL_TARGET		0x00002000	/* target mode operation */
+#define	XS_CTL_ESCAPE		0x00004000	/* escape operation */
+#define	XS_CTL_URGENT		0x00008000	/* urgent operation */
+#define	XS_CTL_SIMPLE_TAG	0x00010000	/* use a Simple Tag */
+#define	XS_CTL_ORDERED_TAG	0x00020000	/* use an Ordered Tag */
+#define	XS_CTL_DATA_ONSTACK	0x00040000	/* data is alloc'ed on stack */
+
+/*
+ * scsipi_xfer status flags
+ */
+#define	XS_STS_DONE		0x00000001	/* scsipi_xfer is done */
 
 /*
  * Error values an adapter driver may return
@@ -339,6 +368,7 @@ struct scsipi_inquiry_pattern {
 struct scsipibus_attach_args {
 	struct scsipi_link *sa_sc_link;
 	struct scsipi_inquiry_pattern sa_inqbuf;
+	struct scsipi_inquiry_data *sa_inqptr; 
 	union {				/* bus-type specific infos */
 		u_int8_t scsi_version;	/* SCSI version */
 	} scsipi_info;
@@ -354,17 +384,6 @@ struct scsi_quirk_inquiry_pattern {
 };
 
 /*
- * Macro to issue a SCSI command.  Treat it like a function:
- *
- *	int scsipi_command __P((struct scsipi_link *link,
- *	    struct scsipi_generic *scsipi_cmd, int cmdlen,
- *	    u_char *data_addr, int datalen, int retries,
- *	    int timeout, struct buf *bp, int flags));
- */
-#define	scsipi_command(l, c, cl, da, dl, r, t, b, f)			\
-	(*(l)->scsipi_cmd)((l), (c), (cl), (da), (dl), (r), (t), (b), (f))
-
-/*
  * Default number of retries, used for generic routines.
  */
 #define SCSIPIRETRIES 4
@@ -375,14 +394,11 @@ struct scsi_quirk_inquiry_pattern {
 #define	scsipi_command_direct(xs)					\
 	(*(xs)->sc_link->adapter->scsipi_cmd)((xs))
 
-/*
- * Macro to test whether a request will complete asynchronously.
- */
-#define	SCSIPI_XFER_ASYNC(xs) \
-	((xs->flags & (SCSI_NOSLEEP | SCSI_POLL)) == SCSI_NOSLEEP)
-
 #ifdef _KERNEL
 void	scsipi_init __P((void));
+int	scsipi_command __P((struct scsipi_link *,
+	    struct scsipi_generic *, int, u_char *, int,
+	    int, int, struct buf *, int));
 caddr_t	scsipi_inqmatch __P((struct scsipi_inquiry_pattern *, caddr_t,
 	    int, int, int *));
 char	*scsipi_dtype __P((int));
@@ -398,6 +414,7 @@ void	scsipi_done __P((struct scsipi_xfer *));
 void	scsipi_user_done __P((struct scsipi_xfer *));
 int	scsipi_interpret_sense __P((struct scsipi_xfer *));
 void	scsipi_wait_drain __P((struct scsipi_link *));
+void	scsipi_kill_pending __P((struct scsipi_link *));
 #ifdef SCSIVERBOSE
 void	scsipi_print_sense __P((struct scsipi_xfer *, int));
 void	scsipi_print_sense_data __P((struct scsipi_sense_data *, int));
@@ -479,7 +496,7 @@ static __inline u_int32_t
 _2btol(bytes)
 	const u_int8_t *bytes;
 {
-	register u_int32_t rv;
+	u_int32_t rv;
 
 	rv = (bytes[0] << 8) |
 	     bytes[1];
@@ -490,7 +507,7 @@ static __inline u_int32_t
 _3btol(bytes)
 	const u_int8_t *bytes;
 {
-	register u_int32_t rv;
+	u_int32_t rv;
 
 	rv = (bytes[0] << 16) |
 	     (bytes[1] << 8) |
@@ -502,7 +519,7 @@ static __inline u_int32_t
 _4btol(bytes)
 	const u_int8_t *bytes;
 {
-	register u_int32_t rv;
+	u_int32_t rv;
 
 	rv = (bytes[0] << 24) |
 	     (bytes[1] << 16) |
@@ -548,7 +565,7 @@ static __inline u_int32_t
 _2ltol(bytes)
 	const u_int8_t *bytes;
 {
-	register u_int32_t rv;
+	u_int32_t rv;
 
 	rv = bytes[0] |
 	     (bytes[1] << 8);
@@ -559,7 +576,7 @@ static __inline u_int32_t
 _3ltol(bytes)
 	const u_int8_t *bytes;
 {
-	register u_int32_t rv;
+	u_int32_t rv;
 
 	rv = bytes[0] |
 	     (bytes[1] << 8) |
@@ -571,7 +588,7 @@ static __inline u_int32_t
 _4ltol(bytes)
 	const u_int8_t *bytes;
 {
-	register u_int32_t rv;
+	u_int32_t rv;
 
 	rv = bytes[0] |
 	     (bytes[1] << 8) |

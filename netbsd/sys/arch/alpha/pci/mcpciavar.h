@@ -1,4 +1,4 @@
-/* $NetBSD: mcpciavar.h,v 1.2.2.1 1999/04/16 23:41:30 thorpej Exp $ */
+/* $NetBSD: mcpciavar.h,v 1.4 1999/04/16 02:18:07 thorpej Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob

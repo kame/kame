@@ -1,4 +1,4 @@
-/*	$NetBSD: sram.c,v 1.5.12.1 1999/06/24 15:38:47 perry Exp $	*/
+/*	$NetBSD: sram.c,v 1.6 1999/06/15 15:04:56 minoura Exp $	*/
 
 /*
  * Copyright (c) 1994 Kazuhisa Shimizu.

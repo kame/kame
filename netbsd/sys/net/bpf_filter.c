@@ -1,4 +1,4 @@
-/*	$NetBSD: bpf_filter.c,v 1.14 1997/10/09 18:20:04 christos Exp $	*/
+/*	$NetBSD: bpf_filter.c,v 1.16 2000/04/12 04:21:22 chs Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997
@@ -51,12 +51,7 @@ static const char rcsid[] =
 #include <sys/types.h>
 #include <sys/time.h>
 
-#ifdef sun
-#include <netinet/in.h>
-#endif
-
-#if defined(sparc) || defined(mips) || defined(ibm032) || \
-    (defined(__NetBSD__) && !defined(UNALIGNED_ACCESS))
+#if !defined(UNALIGNED_ACCESS)
 #define BPF_ALIGN
 #endif
 
@@ -94,12 +89,12 @@ static int m_xhalf __P((struct mbuf *, int, int *));
 
 static int
 m_xword(m, k, err)
-	register struct mbuf *m;
-	register int k, *err;
+	struct mbuf *m;
+	int k, *err;
 {
-	register int len;
-	register u_char *cp, *np;
-	register struct mbuf *m0;
+	int len;
+	u_char *cp, *np;
+	struct mbuf *m0;
 
 	MINDEX(len, m, k);
 	cp = mtod(m, u_char *) + k;
@@ -130,12 +125,12 @@ m_xword(m, k, err)
 
 static int
 m_xhalf(m, k, err)
-	register struct mbuf *m;
-	register int k, *err;
+	struct mbuf *m;
+	int k, *err;
 {
-	register int len;
-	register u_char *cp;
-	register struct mbuf *m0;
+	int len;
+	u_char *cp;
+	struct mbuf *m0;
 
 	MINDEX(len, m, k);
 	cp = mtod(m, u_char *) + k;
@@ -163,13 +158,13 @@ m_xhalf(m, k, err)
  */
 u_int
 bpf_filter(pc, p, wirelen, buflen)
-	register struct bpf_insn *pc;
-	register u_char *p;
+	struct bpf_insn *pc;
+	u_char *p;
 	u_int wirelen;
-	register u_int buflen;
+	u_int buflen;
 {
-	register u_int32_t A, X;
-	register int k;
+	u_int32_t A, X;
+	int k;
 	int32_t mem[BPF_MEMWORDS];
 
 	if (pc == 0)
@@ -236,8 +231,8 @@ bpf_filter(pc, p, wirelen, buflen)
 			k = pc->k;
 			if (k >= buflen) {
 #ifdef _KERNEL
-				register struct mbuf *m;
-				register int len;
+				struct mbuf *m;
+				int len;
 
 				if (buflen != 0)
 					return 0;
@@ -302,8 +297,8 @@ bpf_filter(pc, p, wirelen, buflen)
 			k = X + pc->k;
 			if (k >= buflen) {
 #ifdef _KERNEL
-				register struct mbuf *m;
-				register int len;
+				struct mbuf *m;
+				int len;
 
 				if (buflen != 0)
 					return 0;
@@ -322,8 +317,8 @@ bpf_filter(pc, p, wirelen, buflen)
 			k = pc->k;
 			if (k >= buflen) {
 #ifdef _KERNEL
-				register struct mbuf *m;
-				register int len;
+				struct mbuf *m;
+				int len;
 
 				if (buflen != 0)
 					return 0;
@@ -495,8 +490,8 @@ bpf_validate(f, len)
 	struct bpf_insn *f;
 	int len;
 {
-	register int i;
-	register struct bpf_insn *p;
+	int i;
+	struct bpf_insn *p;
 
 	for (i = 0; i < len; ++i) {
 		/*
@@ -505,7 +500,7 @@ bpf_validate(f, len)
 		 */
 		p = &f[i];
 		if (BPF_CLASS(p->code) == BPF_JMP) {
-			register int from = i + 1;
+			int from = i + 1;
 
 			if (BPF_OP(p->code) == BPF_JA) {
 				if ((p->k < 0) ||

@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.55 1999/03/24 05:51:08 mrg Exp $	*/
+/*	$NetBSD: locore.s,v 1.62 2000/05/31 05:06:55 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1993 Philip A. Nelson.
@@ -41,7 +41,6 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_pmap_new.h"
 
 #include "assym.h"
 
@@ -58,26 +57,6 @@
 #define	SET(a, b)	.globl	_C_LABEL(a); .set _C_LABEL(a),b
 
 /*
- * PTmap is recursive pagemap at top of virtual address space.
- * Within PTmap, the page directory can be found (third indirection).
- */
-#if !defined(PMAP_NEW)
-	SET(PTmap,	(PTDPTDI << PDSHIFT))
-	SET(PTD,	(_C_LABEL(PTmap) + PTDPTDI * NBPG))
-	SET(PTDpde,	(_C_LABEL(PTD) + PTDPTDI * PDE_SIZE))
-#endif
-
-/*
- * APTmap, APTD is the alternate recursive pagemap.
- * It's used when modifying another process's page tables.
- */
-#if !defined(PMAP_NEW)
-	SET(APTmap,	(APTDPTDI << PDSHIFT))
-	SET(APTD,	(_C_LABEL(APTmap) + APTDPTDI * NBPG))
-	SET(APTDpde,	(_C_LABEL(PTD) + APTDPTDI * PDE_SIZE))
-#endif
-
-/*
  * kernel_text is used by libkvm.
  */
 	SET(kernel_text,(KERNBASE + 0x2000))
@@ -86,7 +65,6 @@
  * Initialization
  */
 
-	DATA_D(cold,		1)	/* cold till we are not */
 	DATA_D(esym,		0)	/* pointer to end of symbols */
 	DATA_D(_have_fpu,	0)	/* Have we an FPU installed? */
 
@@ -383,7 +361,7 @@ KENTRY(copystr, 16)
 	movd	B_ARG1,r2		/* to */
 	movd	B_ARG2,r0		/* maxlen */
 	cmpqd	0,r0
-	beq	2f			/* anything to do? */
+	beq	0f			/* anything to do? */
 
 	movqd	0,r4			/* Set match value. */
 	movsb	u
@@ -394,7 +372,7 @@ KENTRY(copystr, 16)
 	 * Terminated due to limit count.
 	 * Return ENAMETOOLONG. 
 	 */
-	movd	ENAMETOOLONG,r0
+0:	movd	ENAMETOOLONG,r0
 	br	2f
 
 1:	/*
@@ -696,8 +674,8 @@ KENTRY(setrunqueue, 4)
 #endif
 	movzbd	P_PRIORITY(r0),r1
 	lshd	-2,r1
-	sbitd	r1,_C_LABEL(whichqs)(pc) /* set queue full bit */
-	addr	_C_LABEL(qs)(pc)[r1:q],r1 /* locate q hdr */
+	sbitd	r1,_C_LABEL(sched_whichqs)(pc) /* set queue full bit */
+	addr	_C_LABEL(sched_qs)(pc)[r1:q],r1 /* locate q hdr */
 	movd	P_BACK(r1),r2		/* locate q tail */
 	movd	r1,P_FORW(r0)		/* set p->p_forw */
 	movd	r0,P_BACK(r1)		/* update q's p_back */
@@ -717,7 +695,7 @@ KENTRY(remrunqueue, 4)
 	movzbd	P_PRIORITY(r1),r0
 #ifdef DIAGNOSTIC
 	lshd	-2,r0
-	tbitd	r0,_C_LABEL(whichqs)(pc)
+	tbitd	r0,_C_LABEL(sched_whichqs)(pc)
 	bfc	1f
 #endif
 	movd	P_BACK(r1),r2		/* Address of prev. item */
@@ -730,7 +708,7 @@ KENTRY(remrunqueue, 4)
 #ifndef DIAGNOSTIC
 	lshd	-2,r0
 #endif
-	cbitd	r0,_C_LABEL(whichqs)(pc) /* mark q as empty */
+	cbitd	r0,_C_LABEL(sched_whichqs)(pc) /* mark q as empty */
 2:	ret	ARGS
 #ifdef DIAGNOSTIC
 1:	PANIC("remrunqueue")		/* No queue entry! */
@@ -750,14 +728,14 @@ ENTRY_NOPROFILE(idle)
 	enter	[r3,r4,r5,r6,r7],0
 #endif
 0:	ints_off
-	ffsd	_C_LABEL(whichqs)(pc),r0
+	ffsd	_C_LABEL(sched_whichqs)(pc),r0
 	bfc	sw1
 	ints_on				/* We may lose a tick here ... */
 	wait				/* Wait for interrupt. */
 	br	0b
 
 /*
- * cpu_switch(void);
+ * void cpu_switch(struct proc *)
  * Find a runnable process and switch to it.  Wait if necessary.
  */
 KENTRY(cpu_switch, 4)
@@ -800,11 +778,11 @@ KENTRY(cpu_switch, 4)
 	ints_off
 
 	movqd	0,r0
-	ffsd	_C_LABEL(whichqs)(pc),r0 /* find a full q */
+	ffsd	_C_LABEL(sched_whichqs)(pc),r0 /* find a full q */
 	bfs	0b			/* if none, idle */
 
 sw1:	/* Get the process and unlink it from the queue. */
-	addr	_C_LABEL(qs)(pc)[r0:q],r1 /* address of qs entry! */
+	addr	_C_LABEL(sched_qs)(pc)[r0:q],r1 /* address of qs entry! */
 
 	movd	P_FORW(r1),r2		/* unlink from front of process q */
 #ifdef	DIAGNOSTIC
@@ -818,7 +796,7 @@ sw1:	/* Get the process and unlink it from the queue. */
 	cmpd	r1,r3			/* q empty? */
 	bne	3f
 
-	cbitd	r0,_C_LABEL(whichqs)(pc) /* queue is empty, turn off whichqs. */
+	cbitd	r0,_C_LABEL(sched_whichqs)(pc) /* queue is empty, turn off whichqs. */
 
 3:	movqd	0,_C_LABEL(want_resched)(pc) /* We did a resched! */
 
@@ -832,7 +810,10 @@ sw1:	/* Get the process and unlink it from the queue. */
 	/* Isolate process. XXX Is this necessary? */
 	movqd	0,P_BACK(r2)
 
+	/* p->p_cpu initialized in fork1() for single-processor */
+
 	/* Record new process. */
+	movb	SONPROC,P_STAT(r2)	/* p->p_stat = SONPROC */
 	movd	r2,_C_LABEL(curproc)(pc)
 
 	/* It's okay to take interrupts here. */

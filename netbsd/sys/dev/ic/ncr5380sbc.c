@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr5380sbc.c,v 1.30 1998/12/05 19:43:53 mjacob Exp $	*/
+/*	$NetBSD: ncr5380sbc.c,v 1.38 2000/06/06 14:24:05 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1995 David Jones, Gordon W. Ross
@@ -95,6 +95,7 @@
 #include <dev/ic/ncr5380reg.h>
 #include <dev/ic/ncr5380var.h>
 
+static void	ncr5380_reset_scsibus __P((struct ncr5380_softc *));
 static void	ncr5380_sched __P((struct ncr5380_softc *));
 static void	ncr5380_done __P((struct ncr5380_softc *));
 
@@ -127,7 +128,9 @@ void	ncr5380_cmd_timeout __P((void *));
 
 #ifndef DDB
 /* This is used only in recoverable places. */
+#ifndef Debugger
 #define Debugger() printf("Debug: ncr5380.c:%d\n", __LINE__)
+#endif
 #endif
 
 #ifdef	NCR5380_DEBUG
@@ -188,7 +191,7 @@ static __inline void ncr_sched_msgout __P((struct ncr5380_softc *, int));
 static __inline int ncr5380_wait_req(sc)
 	struct ncr5380_softc *sc;
 {
-	register int timo = ncr5380_wait_req_timo;
+	int timo = ncr5380_wait_req_timo;
 	for (;;) {
 		if (NCR5380_READ(sc, sci_bus_csr) & SCI_BUS_REQ) {
 			timo = 0;	/* return 0 */
@@ -205,7 +208,7 @@ static __inline int ncr5380_wait_req(sc)
 static __inline int ncr5380_wait_not_req(sc)
 	struct ncr5380_softc *sc;
 {
-	register int timo = ncr5380_wait_nrq_timo;
+	int timo = ncr5380_wait_nrq_timo;
 	for (;;) {
 		if ((NCR5380_READ(sc, sci_bus_csr) & SCI_BUS_REQ) == 0) {
 			timo = 0;	/* return 0 */
@@ -226,7 +229,7 @@ ncr_sched_msgout(sc, msg_code)
 {
 	/* First time, raise ATN line. */
 	if (sc->sc_msgpriq == 0) {
-		register u_char icmd;
+		u_char icmd;
 		icmd = NCR5380_READ(sc, sci_icmd) & SCI_ICMD_RMASK;
 		NCR5380_WRITE(sc, sci_icmd, (icmd | SCI_ICMD_ATN));
 		delay(2);
@@ -239,11 +242,11 @@ int
 ncr5380_pio_out(sc, phase, count, data)
 	struct ncr5380_softc *sc;
 	int phase, count;
-	unsigned char		*data;
+	unsigned char *data;
 {
-	register u_char 	icmd;
-	register int		resid;
-	register int		error;
+	u_char icmd;
+	int resid;
+	int error;
 
 	icmd = NCR5380_READ(sc, sci_icmd) & SCI_ICMD_RMASK;
 
@@ -302,9 +305,9 @@ ncr5380_pio_in(sc, phase, count, data)
 	int phase, count;
 	unsigned char			*data;
 {
-	register u_char 	icmd;
-	register int		resid;
-	register int		error;
+	u_char icmd;
+	int resid;
+	int error;
 
 	icmd = NCR5380_READ(sc, sci_icmd) & SCI_ICMD_RMASK;
 
@@ -367,10 +370,6 @@ ncr5380_init(sc)
 		for (j = 0; j < 8; j++)
 			sc->sc_matrix[i][j] = NULL;
 
-	sc->sc_link.openings = 2;	/* XXX - Not SCI_OPENINGS */
-	sc->sc_link.scsipi_scsi.max_target = 7;
-	sc->sc_link.scsipi_scsi.max_lun = 7;
-	sc->sc_link.type = BUS_SCSI;
 	sc->sc_prevphase = PHASE_INVALID;
 	sc->sc_state = NCR_IDLE;
 
@@ -391,7 +390,7 @@ ncr5380_init(sc)
 }
 
 
-void
+static void
 ncr5380_reset_scsibus(sc)
 	struct ncr5380_softc *sc;
 {
@@ -419,9 +418,10 @@ ncr5380_reset_scsibus(sc)
  * This may also called for a DMA timeout (at splbio).
  */
 int
-ncr5380_intr(sc)
-	struct ncr5380_softc *sc;
+ncr5380_intr(arg)
+	void *arg;
 {
+	struct ncr5380_softc *sc = arg;
 	int claimed = 0;
 
 	/*
@@ -602,17 +602,17 @@ ncr5380_scsi_cmd(xs)
 	int s, rv, i, flags;
 
 	sc = xs->sc_link->adapter_softc;
-	flags = xs->flags;
+	flags = xs->xs_control;
 
 	if (sc->sc_flags & NCR5380_FORCE_POLLING)
-		flags |= SCSI_POLL;
+		flags |= XS_CTL_POLL;
 
-	if (flags & SCSI_DATA_UIO)
+	if (flags & XS_CTL_DATA_UIO)
 		panic("ncr5380: scsi data uio requested");
 
 	s = splbio();
 
-	if (flags & SCSI_POLL) {
+	if (flags & XS_CTL_POLL) {
 		/* Terminate any current command. */
 		sr = sc->sc_current;
 		if (sr) {
@@ -647,14 +647,14 @@ new:
 	sr->sr_dma_hand = NULL;
 	sr->sr_dataptr = xs->data;
 	sr->sr_datalen = xs->datalen;
-	sr->sr_flags = (flags & SCSI_POLL) ? SR_IMMED : 0;
+	sr->sr_flags = (flags & XS_CTL_POLL) ? SR_IMMED : 0;
 	sr->sr_status = -1;	/* no value */
 	sc->sc_ncmds++;
 	rv = SUCCESSFULLY_QUEUED;
 
 	NCR_TRACE("scsipi_cmd: new sr=0x%x\n", (long)sr);
 
-	if (flags & SCSI_POLL) {
+	if (flags & XS_CTL_POLL) {
 		/* Force this new command to be next. */
 		sc->sc_rr = i;
 	}
@@ -670,9 +670,9 @@ new:
 				  (long) sc->sc_current);
 	}
 
-	if (flags & SCSI_POLL) {
+	if (flags & XS_CTL_POLL) {
 		/* Make sure ncr5380_sched() finished it. */
-		if ((xs->flags & ITSDONE) == 0)
+		if ((xs->xs_status & XS_STS_DONE) == 0)
 			panic("ncr5380_scsi_cmd: poll didn't finish");
 		rv = COMPLETE;
 	}
@@ -797,14 +797,14 @@ finish:
 	/* Clear our pointers to the request. */
 	sc->sc_current = NULL;
 	sc->sc_matrix[sr->sr_target][sr->sr_lun] = NULL;
-	untimeout(ncr5380_cmd_timeout, sr);
+	callout_stop(&sr->sr_xs->xs_callout);
 
 	/* Make the request free. */
 	sr->sr_xs = NULL;
 	sc->sc_ncmds--;
 
 	/* Tell common SCSI code it is done. */
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 	scsipi_done(xs);
 
 	sc->sc_state = NCR_IDLE;
@@ -989,7 +989,7 @@ next_job:
 		ncr5380_show_scsi_cmd(xs);
 	}
 #endif
-	if (xs->flags & SCSI_RESET) {
+	if (xs->xs_control & XS_CTL_RESET) {
 		NCR_TRACE("sched: cmd=reset, sr=0x%x\n", (long)sr);
 		/* Not an error, so do not set NCR_ABORTING */
 		sc->sc_msgpriq |= SEND_DEV_RESET;
@@ -997,7 +997,7 @@ next_job:
 	}
 
 #ifdef	DIAGNOSTIC
-	if ((xs->flags & (SCSI_DATA_IN | SCSI_DATA_OUT)) == 0) {
+	if ((xs->xs_control & (XS_CTL_DATA_IN | XS_CTL_DATA_OUT)) == 0) {
 		if (sc->sc_dataptr) {
 			printf("%s: ptr but no data in/out flags?\n",
 			    sc->sc_dev.dv_xname);
@@ -1036,7 +1036,8 @@ next_job:
 	if ((sr->sr_flags & SR_IMMED) == 0) {
 		i = (xs->timeout * hz) / 1000;
 		NCR_TRACE("sched: set timeout=%d\n", i);
-		timeout(ncr5380_cmd_timeout, sr, i);
+		callout_reset(&sr->sr_xs->xs_callout, i,
+		    ncr5380_cmd_timeout, sr);
 	}
 
 have_nexus:
@@ -1073,7 +1074,7 @@ ncr5380_reselect(sc)
 	struct sci_req *sr;
 	int target, lun, phase, timo;
 	int target_mask;
-	u_char bus, data, icmd, msg;
+	u_char bus, data, icmd, mode, msg;
 
 #ifdef	DIAGNOSTIC
 	/*
@@ -1239,10 +1240,14 @@ ncr5380_reselect(sc)
 		/* XXX: Restore the normal mode register. */
 		/* If this target's bit is set, do NOT check parity. */
 		if (sc->sc_parity_disable & target_mask)
-			NCR5380_WRITE(sc, sci_mode, SCI_MODE_MONBSY);
+			mode = SCI_MODE_MONBSY;
 		else
-			NCR5380_WRITE(sc, sci_mode,
-			    (SCI_MODE_MONBSY | SCI_MODE_PAR_CHK));
+			mode = SCI_MODE_MONBSY | SCI_MODE_PAR_CHK;
+		/* XXX CXD1180 asserts MONBSY before disconnect */
+		if (sc->sc_rev == NCR_VARIANT_CXD1180)
+			mode &= ~SCI_MODE_MONBSY;
+
+		NCR5380_WRITE(sc, sci_mode, mode);
 
 		/*
 		 * Another hack for the Sun3 "si", which needs
@@ -1307,7 +1312,7 @@ ncr5380_select(sc, sr)
 	struct sci_req *sr;
 {
 	int timo, s, target_mask;
-	u_char data, icmd;
+	u_char data, icmd, mode;
 
 	/* Check for reselect */
 	ncr5380_reselect(sc);
@@ -1406,7 +1411,9 @@ ncr5380_select(sc, sr)
 	 * there can be a higher selection ID than ours.
 	 * Keep this code for reference anyway...
 	 */
-	if (NCR5380_READ(sc, sci_icmd) & SCI_ICMD_LST) {
+	/* XXX CXD1180 asserts LST here */
+	if ((sc->sc_rev != NCR_VARIANT_CXD1180) &&
+		(NCR5380_READ(sc, sci_icmd) & SCI_ICMD_LST)) {
 		/* Some other target asserted SEL. */
 		NCR_TRACE("select: lost two, rc=%d\n", XS_BUSY);
 
@@ -1494,10 +1501,14 @@ success:
 
 	/* If this target's bit is set, do NOT check parity. */
 	if (sc->sc_parity_disable & target_mask)
-		NCR5380_WRITE(sc, sci_mode, SCI_MODE_MONBSY);
+		mode = SCI_MODE_MONBSY;
 	else
-		NCR5380_WRITE(sc, sci_mode,
-		    (SCI_MODE_MONBSY | SCI_MODE_PAR_CHK));
+		mode = SCI_MODE_MONBSY | SCI_MODE_PAR_CHK;
+	/* XXX CXD1180 asserts MONBSY before disconnect */
+	if (sc->sc_rev == NCR_VARIANT_CXD1180)
+		mode &= ~SCI_MODE_MONBSY;
+
+	NCR5380_WRITE(sc, sci_mode, mode);
 
 	return XS_NOERROR;
 }
@@ -1524,7 +1535,8 @@ success:
  * DISCONNECT #
  *
  * We may send these messages in prioritized order:
- * BUS DEVICE RESET #		if SCSI_RESET & xs->flags (or in weird sits.)
+ * BUS DEVICE RESET #		if XS_CTL_RESET & xs->xs_control (or in
+ *				weird sits.)
  * MESSAGE PARITY ERROR		par. err. during MSGI
  * MESSAGE REJECT		If we get a message we don't know how to handle
  * ABORT #			send on errors
@@ -1548,13 +1560,13 @@ success:
  */
 static int
 ncr5380_msg_in(sc)
-	register struct ncr5380_softc *sc;
+	struct ncr5380_softc *sc;
 {
 	struct sci_req *sr = sc->sc_current;
 	struct scsipi_xfer *xs = sr->sr_xs;
 	int n, phase;
 	int act_flags;
-	register u_char icmd;
+	u_char icmd;
 
 	/* acknowledge phase change */
 	NCR5380_WRITE(sc, sci_tcmd, PHASE_MSG_IN);
@@ -1675,6 +1687,8 @@ have_msg:
 		NCR_TRACE("msg_in: PARITY_ERROR\n", 0);
 		/* Resend the last message. */
 		ncr_sched_msgout(sc, sc->sc_msgout);
+		/* Reset icmd after scheduling the REJECT cmd - jwg */
+		icmd = NCR5380_READ(sc, sci_icmd) & SCI_ICMD_RMASK;
 		break;
 
 	case MSG_MESSAGE_REJECT:
@@ -1736,6 +1750,8 @@ have_msg:
 		/* fallthrough */
 	reject:
 		ncr_sched_msgout(sc, SEND_REJECT);
+		/* Reset icmd after scheduling the REJECT cmd - jwg */
+		icmd = NCR5380_READ(sc, sci_icmd) & SCI_ICMD_RMASK;
 		break;
 
 	abort:
@@ -1785,11 +1801,11 @@ have_msg:
  */
 static int
 ncr5380_msg_out(sc)
-	register struct ncr5380_softc *sc;
+	struct ncr5380_softc *sc;
 {
 	struct sci_req *sr = sc->sc_current;
 	int act_flags, n, phase, progress;
-	register u_char icmd, msg;
+	u_char icmd, msg;
 
 	/* acknowledge phase change */
 	NCR5380_WRITE(sc, sci_tcmd, PHASE_MSG_OUT);
@@ -2087,7 +2103,7 @@ ncr5380_data_xfer(sc, phase)
 	}
 
 	/* Validate expected phase (data_in or data_out) */
-	expected_phase = (xs->flags & SCSI_DATA_OUT) ?
+	expected_phase = (xs->xs_control & XS_CTL_DATA_OUT) ?
 		PHASE_DATA_OUT : PHASE_DATA_IN;
 	if (phase != expected_phase) {
 		printf("%s: data phase error\n", sc->sc_dev.dv_xname);
@@ -2439,7 +2455,7 @@ ncr5380_show_scsi_cmd(xs)
 	u_char	*b = (u_char *) xs->cmd;
 	int	i  = 0;
 
-	if ( ! ( xs->flags & SCSI_RESET ) ) {
+	if ( ! ( xs->xs_control & XS_CTL_RESET ) ) {
 		printf("si(%d:%d:%d)-",
 		    xs->sc_link->scsipi_scsi.scsibus,
 		    xs->sc_link->scsipi_scsi.target,
@@ -2484,8 +2500,8 @@ ncr5380_trace(msg, val)
 	char *msg;
 	long  val;
 {
-	register struct trace_ent *tr;
-	register int s;
+	struct trace_ent *tr;
+	int s;
 
 	s = splbio();
 
@@ -2597,6 +2613,63 @@ ncr5380_show_state()
 	db_printf("sc_prevphase=%d\n",	sc->sc_prevphase);
 	db_printf("sc_msgpriq=0x%x\n",	sc->sc_msgpriq);
 }
-
 #endif	/* DDB */
 #endif	/* NCR5380_DEBUG */
+
+struct scsipi_device ncr5380_dev = {
+	NULL,			/* Use default error handler */
+	NULL,			/* have a queue, served by this */
+	NULL,			/* have no async handler */
+	NULL,			/* Use default 'done' routine */
+};
+
+void
+ncr5380_attach(sc)
+	struct ncr5380_softc *sc;
+{
+
+	/*
+	 * Fill in the adapter.
+	 */
+	sc->sc_adapter.scsipi_cmd = ncr5380_scsi_cmd;
+
+	/*
+	 * Fill in the prototype scsipi_link
+	 */
+	sc->sc_link.scsipi_scsi.channel = SCSI_CHANNEL_ONLY_ONE;
+	sc->sc_link.adapter_softc = sc;
+	sc->sc_link.adapter = &sc->sc_adapter;
+	sc->sc_link.device = &ncr5380_dev;
+	sc->sc_link.openings = 2;
+	sc->sc_link.scsipi_scsi.max_target = 7;
+	sc->sc_link.scsipi_scsi.max_lun = 7;
+	sc->sc_link.type = BUS_SCSI;
+
+	/*
+	 * Add reference to adapter so that we drop the reference after
+	 * config_found() to make sure the adatper is disabled.
+	 */
+	if (scsipi_adapter_addref(&sc->sc_link) != 0) {
+		printf("%s: unable to enable controller\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
+
+	ncr5380_init(sc);	/* Init chip and driver */
+	ncr5380_reset_scsibus(sc);
+
+	/*
+	 * Ask the adapter what subunits are present
+	 */
+	(void) config_found(&sc->sc_dev, &sc->sc_link, scsiprint);
+	scsipi_adapter_delref(&sc->sc_link);
+}
+
+int
+ncr5380_detach(sc, flags)
+	struct ncr5380_softc *sc;
+	int flags;
+{
+
+	return (EOPNOTSUPP);
+}

@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.9 1999/01/31 09:21:20 mrg Exp $ */
+/*	$NetBSD: param.h,v 1.20.2.2 2000/10/18 16:31:28 tv Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -43,11 +43,32 @@
  *
  *	@(#)param.h	8.1 (Berkeley) 6/11/93
  */
+
 /*
- * Sun4M support by Aaron Brown, Harvard University.
- * Changes Copyright (c) 1995 The President and Fellows of Harvard College.
- * All rights reserved.
+ * Copyright (c) 1996-1999 Eduardo Horvath
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR  ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR  BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  */
+
+
+
 #define	_MACHINE	sparc64
 #define	MACHINE		"sparc64"
 #ifdef __arch64__
@@ -95,38 +116,87 @@
  * of the `options SUN4?' combination a particular kernel was configured with.
  * See also the definitions of NBPG, PGOFSET and PGSHIFT below.
  */
-#if defined(_KERNEL) && !defined(_LOCORE)
+#if (defined(_KERNEL) || defined(_STANDALONE)) && !defined(_LOCORE)
 extern int nbpg, pgofset, pgshift;
 #endif
-
-#define	KERNBASE	0xf8000000	/* start of kernel virtual space */
-#define	KERNTEXTOFF	(KERNBASE+0x4000)	/* start of kernel text */
 
 #define	DEV_BSIZE	512
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
 #define	BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(64 * 1024)
 
-#define	CLSIZE		1
-#define	CLSIZELOG2	0
-
-/* NOTE: SSIZE must be multiple of CLSIZE */
 #ifdef __arch64__
 /* We get stack overflows w/8K stacks in 64-bit mode */
 #define	SSIZE		2		/* initial stack size in pages */
 #else
-#define	SSIZE		1
+#define	SSIZE		2
 #endif
 #define	USPACE		(SSIZE*8192)
 
+
+/*
+ * Here are all the magic kernel virtual addresses and how they're allocated.
+ * 
+ * First, the PROM is usually a fixed-sized block from 0x00000000f0000000 to
+ * 0x00000000f0100000.  It also uses some space around 0x00000000fff00000 to
+ * map in device registers.  The rest is pretty much ours to play with.
+ *
+ * The kernel starts at KERNBASE.  Here's they layout.  We use macros to set
+ * the addresses so we can relocate everything easily.  We use 4MB locked TTEs
+ * to map in the kernel text and data segments.  Any extra pages are recycled,
+ * so they can potentially be double-mapped.  This shouldn't really be a
+ * problem since they're unused, but wild pointers can cause silent data
+ * corruption if they are in those segments.
+ *
+ * 0x0000000000000000:	64K NFO page zero
+ * 0x0000000000010000:	Userland or PROM
+ * KERNBASE:		4MB kernel text and read only data
+ *				This is mapped in the ITLB and 
+ *				Read-Only in the DTLB
+ * KERNBASE+0x400000:	4MB kernel data and BSS -- not in ITLB
+ *				Contains context table, kernel pmap,
+ *				and other important structures.
+ * KERNBASE+0x800000:	Unmapped page -- redzone
+ * KERNBASE+0x802000:	Process 0 stack and u-area
+ * KERNBASE+0x806000:	2 pages for pmap_copy_page and /dev/mem
+ * KERNBASE+0x80a000:	Start of kernel VA segment
+ * KERNEND:		End of kernel VA segment
+ * KERNEND+0x02000:	Auxreg_va (unused?)
+ * KERNEND+0x04000:	TMPMAP_VA (unused?)
+ * KERNEND+0x06000:	message buffer.
+ * KERNEND+0x010000:	64K locked TTE -- different for each CPU
+ *			Contains interrupt stack, cpu_info structure,
+ *			and 32KB kernel TSB.
+ * KERNEND+0x020000:	IODEV_BASE -- begin mapping IO devices here.
+ * 0x00000000fe000000:	IODEV_END -- end of device mapping space.
+ *
+ */
+#define	KERNBASE	0x001000000	/* start of kernel virtual space */
+#define	KERNEND		0x0e0000000	/* end of kernel virtual space */
+#define	VM_MAX_KERNEL_BUF	((KERNEND-KERNBASE)/4)
+
+#define _MAXNBPG	8192	/* fixed VAs, independent of actual NBPG */
+
+#define	AUXREG_VA	(      KERNEND + _MAXNBPG) /* 1 page REDZONE */
+#define	TMPMAP_VA	(    AUXREG_VA + _MAXNBPG)
+#define	MSGBUF_VA	(    TMPMAP_VA + _MAXNBPG)
+/*
+ * Here's the location of the interrupt stack and CPU structure.
+ */
+#define INTSTACK	(      KERNEND + 8*_MAXNBPG)/* 64K after kernel end */
+#define	EINTSTACK	(     INTSTACK + 2*USPACE)	/* 32KB */
+#define	CPUINFO_VA	(    EINTSTACK)
+#define	IODEV_BASE	(   CPUINFO_VA + 8*_MAXNBPG)/* 64K long */
+#define	IODEV_END	0x0f0000000UL		/* 16 MB of iospace */
+
 /*
  * Constants related to network buffer management.
- * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * MCLBYTES must be no larger than NBPG (the software page size), and,
  * on machines that exchange pages of input or output buffers with mbuf
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 #define	MCLBYTES	2048		/* enough for whole Ethernet packet */
 #define	MCLSHIFT	11		/* log2(MCLBYTES) */
 #define	MCLOFSET	(MCLBYTES - 1)
@@ -146,11 +216,11 @@ extern int nbpg, pgofset, pgshift;
 #define MSGBUFSIZE	NBPG
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages.
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
  */
-#ifndef	NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(6 * 1024 * 1024 / CLBYTES)
-#endif
+#define	NKMEMPAGES_MIN_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
 
 /* pages ("clicks") to disk blocks */
 #define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))
@@ -158,7 +228,7 @@ extern int nbpg, pgofset, pgshift;
 
 /* pages to bytes */
 #define	ctob(x)		((x) << PGSHIFT)
-#define	btoc(x)		(((x) + PGOFSET) >> PGSHIFT)
+#define	btoc(x)		(((vsize_t)(x) + PGOFSET) >> PGSHIFT)
 
 /* bytes to disk blocks */
 #define	btodb(x)	((x) >> DEV_BSHIFT)
@@ -184,6 +254,7 @@ extern int nbpg, pgofset, pgshift;
  */
 #ifdef _KERNEL
 #ifndef _LOCORE
+#if 0
 extern vaddr_t	dvma_base;
 extern vaddr_t	dvma_end;
 extern struct map	*dvmamap;
@@ -197,6 +268,7 @@ extern struct map	*dvmamap;
 extern caddr_t	kdvma_mapin __P((caddr_t, int, int));
 extern caddr_t	dvma_malloc __P((size_t, void *, int));
 extern void	dvma_free __P((caddr_t, size_t, void *));
+#endif
 
 extern void	delay __P((unsigned int));
 #define	DELAY(n)	delay(n)
@@ -230,6 +302,8 @@ extern int mmumod;
  * extra memory references they'll generate.
  */
 
+#define CPU_ISSUN4U	(1)
+#define CPU_ISSUN4MOR4U	(1)
 #define CPU_ISSUN4M	(0)
 #define CPU_ISSUN4C	(0)
 #define CPU_ISSUN4	(0)

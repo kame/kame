@@ -1,4 +1,4 @@
-/*	$NetBSD: essvar.h,v 1.14 1999/03/18 06:03:31 mycroft Exp $	*/
+/*	$NetBSD: essvar.h,v 1.17 2000/03/23 07:01:34 thorpej Exp $	*/
 /*
  * Copyright 1997
  * Digital Equipment Corporation. All rights reserved.
@@ -33,7 +33,7 @@
  */
 
 /*
-** @(#) $RCSfile: essvar.h,v $ $Revision: 1.14 $ (SHARK) $Date: 1999/03/18 06:03:31 $
+** @(#) $RCSfile: essvar.h,v $ $Revision: 1.17 $ (SHARK) $Date: 2000/03/23 07:01:34 $
 **
 **++
 **
@@ -62,6 +62,9 @@
 **
 **--
 */
+
+#include <sys/callout.h>
+
 #define ESS_DAC_PLAY_VOL	0
 #define ESS_MIC_PLAY_VOL	1
 #define ESS_LINE_PLAY_VOL	2
@@ -97,6 +100,7 @@
 struct ess_audio_channel
 {
 	int	drq;			/* DMA channel */
+	bus_size_t maxsize;		/* max size for DMA channel */
 #define IS16BITDRQ(drq) ((drq) >= 4)
 	int	irq;			/* IRQ line for this DMA channel */
 	int	ist;
@@ -124,6 +128,9 @@ struct ess_softc
 	bus_space_tag_t sc_iot;		/* tag */
 	bus_space_handle_t sc_ioh;	/* handle */
 
+	struct callout sc_poll1_ch;	/* audio1 poll */
+	struct callout sc_poll2_ch;	/* audio2 poll */
+
 	int	sc_iobase;		/* I/O port base address */
 
 	u_short	sc_open;		/* reference count of open calls */
@@ -148,6 +155,10 @@ struct ess_softc
 #define ESS_1887	2
 #define ESS_888		3
 #define ESS_1788	4
+#define ESS_1869	5
+#define ESS_1879	6
+#define ESS_1868	7
+#define ESS_1878	8
 
 	u_int	sc_version;		/* Legacy ES688/ES1688 ID */
 };

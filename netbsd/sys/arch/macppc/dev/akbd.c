@@ -1,4 +1,4 @@
-/*	$NetBSD: akbd.c,v 1.6.2.1 1999/05/06 19:42:17 perry Exp $	*/
+/*	$NetBSD: akbd.c,v 1.9 1999/09/05 05:30:30 tsubai Exp $	*/
 
 /*
  * Copyright (C) 1998	Colin Wood
@@ -171,7 +171,7 @@ akbdattach(parent, self, aux)
 			adbinfo.siDataAreaAddr = (Ptr)0;
 		} else {
 			printf("extended keyboard\n");
-#ifdef notyet  
+#ifdef notyet
 			blinkleds(sc);
 #endif
 		}
@@ -226,6 +226,9 @@ akbdattach(parent, self, aux)
 		break;
 	case ADB_PBJPKBD:
 		printf("PowerBook keyboard (Japanese layout)\n");
+		break;
+	case ADB_PBG3JPKBD:
+		printf("PowerBook G3 keyboard (Japanese layout)\n");
 		break;
 	default:
 		printf("mapped device (%d)\n", sc->handler_id);
@@ -492,10 +495,18 @@ kbd_intr(event)
 
 	type = press ? WSCONS_EVENT_KEY_DOWN : WSCONS_EVENT_KEY_UP;
 
-	if (key == 185) {	/* Caps Lock released */
+	switch (key) {
+	case 185:	/* Caps Lock released */
 		type = WSCONS_EVENT_KEY_DOWN;
 		wskbd_input(sc->sc_wskbddev, type, val);
 		type = WSCONS_EVENT_KEY_UP;
+		break;
+	case 245:
+		pm_eject_pcmcia(0);
+		break;
+	case 244:
+		pm_eject_pcmcia(1);
+		break;
 	}
 
 	if (adb_polling)

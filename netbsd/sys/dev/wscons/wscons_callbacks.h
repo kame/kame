@@ -1,4 +1,4 @@
-/* $NetBSD: wscons_callbacks.h,v 1.8 1999/01/18 20:03:59 drochner Exp $ */
+/* $NetBSD: wscons_callbacks.h,v 1.12 2000/03/06 21:37:16 thorpej Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -31,16 +31,9 @@
  */
 
 /*
- * Call to the glue, to get the whole process started.
- */
-void	wscons_glue_set_callback __P((void));
-
-/*
  * Calls to the display interface from the glue code.
  */
-int	wsdisplay_is_console __P((struct device *));
-struct device *wsdisplay_kbd __P((struct device *));
-void	wsdisplay_set_kbd __P((struct device *, struct device *));
+struct device *wsdisplay_set_console_kbd __P((struct device *));
 
 /*
  * Calls to the display interface from the keyboard interface.
@@ -55,18 +48,14 @@ void	wsdisplay_reset __P((struct device *, enum wsdisplay_resetops));
 void	wsdisplay_kbdholdscreen __P((struct device *v, int));
 
 void	wsdisplay_set_cons_kbd __P((int (*get)(dev_t),
-				    void (*poll)(dev_t, int)));
+				    void (*poll)(dev_t, int),
+				    void (*bell)(dev_t, u_int, u_int, u_int)));
+void	wsdisplay_unset_cons_kbd __P((void));
 
 /*
  * Calls to the keyboard interface from the glue code.
  */
-int	wskbd_is_console __P((struct device *));
-struct device *wskbd_display __P((struct device *));
-void	wskbd_set_display __P((struct device *, struct device *));
-
-/*
- * Calls to the keyboard interface from the display interface.
- */
-int	wskbd_displayioctl __P((struct device *dev, u_long cmd,
-	    caddr_t data, int flag, struct proc *p));
-int	wskbd_enable __P((struct device *, int));
+struct wsmux_softc;
+struct device *wskbd_set_console_display 
+		__P((struct device *, struct wsmux_softc *));
+int wskbd_pickfree __P((void));

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_ntptime.c,v 1.7 1998/07/31 22:50:50 perry Exp $	*/
+/*	$NetBSD: kern_ntptime.c,v 1.11 2000/06/02 18:22:44 cgd Exp $	*/
 
 /******************************************************************************
  *                                                                            *
@@ -72,7 +72,6 @@
  * The following variables are used by the hardclock() routine in the
  * kern_clock.c module and are described in that module. 
  */
-extern struct timeval time;	/* kernel time variable */
 extern int time_state;		/* clock state */
 extern int time_status;		/* clock status bits */
 extern long time_offset;	/* time adjustment (us) */
@@ -296,7 +295,7 @@ sys_ntp_adjtime(p, v, retval)
  */
 int
 sysctl_ntptime(where, sizep)
-	register char *where;
+	void *where;
 	size_t *sizep;
 {
 	struct timeval atv;
@@ -402,7 +401,7 @@ sys_ntp_adjtime(p, v, retval)
 
 int
 sysctl_ntptime(where, sizep)
-	register char *where;
+	void *where;
 	size_t *sizep;
 {
 	return (ENOSYS);

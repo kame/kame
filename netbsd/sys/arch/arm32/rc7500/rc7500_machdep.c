@@ -1,4 +1,4 @@
-/*	$NetBSD: rc7500_machdep.c,v 1.23 1999/03/29 10:02:20 mycroft Exp $	*/
+/*	$NetBSD: rc7500_machdep.c,v 1.27 2000/03/24 17:05:31 ws Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -51,6 +51,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/reboot.h>
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
@@ -78,7 +79,7 @@
 #include <machine/rtc.h>
 #include <arm32/iomd/iomdreg.h>
 
-#include "ipkdb.h"
+#include "opt_ipkdb.h"
 
 #ifdef RC7500
 #include <arm32/rc7500/rc7500_prom.h>
@@ -96,7 +97,7 @@ u_int cpu_reset_address = 0;
 #define FIQ_STACK_SIZE	1
 #define IRQ_STACK_SIZE	1
 #define ABT_STACK_SIZE	1
-#if NIPKDB > 0
+#ifdef IPKDB
 #define UND_STACK_SIZE	2
 #else
 #define UND_STACK_SIZE	1
@@ -157,8 +158,6 @@ pt_entry_t kernel_pt_table[NUM_KERNEL_PTS];
 
 struct user *proc0paddr;
 
-extern int cold;
-
 /* Prototypes */
 
 void physconputchar		__P((char));
@@ -176,7 +175,6 @@ vm_size_t map_chunk	__P((vm_offset_t pd, vm_offset_t pt, vm_offset_t va,
 			     u_int flg));
 
 void pmap_bootstrap		__P((vm_offset_t kernel_l1pt, pv_addr_t kernel_ptpt));
-caddr_t allocsys		__P((caddr_t v));
 void data_abort_handler		__P((trapframe_t *frame));
 void prefetch_abort_handler	__P((trapframe_t *frame));
 void undefinedinstruction_bounce	__P((trapframe_t *frame));
@@ -549,7 +547,7 @@ initarm(prom_id)
 
 	/* Right We have the bottom meg of memory mapped to 0x00000000
 	 * so was can get at it. The kernel will ocupy the start of it.
-	 * After the kernel/args we allocate some the the fixed page tables
+	 * After the kernel/args we allocate some of the fixed page tables
 	 * we need to get the system going.
 	 * We allocate one page directory and 8 page tables and store the
 	 * physical addresses in the kernel_pt_table array.
@@ -922,7 +920,7 @@ initarm(prom_id)
 	irq_init();
 	printf("done.\n");
 
-#if NIPKDB > 0
+#ifdef IPKDB
 	/* Initialise ipkdb */
 	ipkdb_init();
 	if (boothowto & RB_KDB)

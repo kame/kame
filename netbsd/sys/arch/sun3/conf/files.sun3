@@ -1,4 +1,4 @@
-#	$NetBSD: files.sun3,v 1.50 1999/04/08 04:37:00 gwr Exp $
+#	$NetBSD: files.sun3,v 1.57 2000/03/27 21:47:47 scottr Exp $
 
 #
 # sun3-specific configuration info
@@ -80,7 +80,7 @@ file arch/sun3/sun3/vme.c		vme
 #
 # Machine-independent SCSI drivers
 #
-include "../../../dev/scsipi/files.scsipi"
+include "dev/scsipi/files.scsipi"
 
 #
 # Devices and attributes needed below
@@ -158,7 +158,6 @@ attach si at obio with si_obio
 file	arch/sun3/dev/si_obio.c		si_obio
 
 # Sun3/80 on-board SCSI
-device esp: scsi, ncr53c9x
 attach esp at obio
 file arch/sun3/dev/esp.c		esp
 device dma
@@ -238,13 +237,15 @@ define zsevent
 file dev/sun/event.c			zsevent
 
 device kbd: zsevent
-attach kbd at zsc
+attach kbd at zsc with kbd_zs
+file dev/sun/kbd_zs.c			kbd_zs
 file dev/sun/kbd.c			kbd needs-flag
 file dev/sun/kbd_tables.c 		kbd
 file arch/sun3/dev/kd.c 		kbd
 
 device ms: zsevent
-attach ms at zsc
+attach ms at zsc with ms_zs
+file dev/sun/ms_zs.c			ms_zs
 file dev/sun/ms.c			ms needs-flag
 
 
@@ -254,8 +255,11 @@ file arch/sun3/dev/md_root.c		memory_disk_hooks
 # Compatibility modules
 
 # SunOS Binary Compatibility (COMPAT_SUNOS)
-include "../../../compat/sunos/files.sunos"
+include "compat/sunos/files.sunos"
 file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
+
+# SVR4 Binary Compatibility (COMPAT_SVR4)
+include "compat/svr4/files.svr4"
 
 # Linux binary compatibility (COMPAT_LINUX)
 include "compat/linux/files.linux"
@@ -266,7 +270,7 @@ include "compat/ossaudio/files.ossaudio"
 
 # Major numbers for root/swap device configuration
 major	{xy=3}	# Xylogics 450 and 451
-major	{vnd=5}	# vnode pseudo-device
 major	{sd=7}	# SCSI disk
 major	{xd=10}	# Xylogics 7053
 major	{md=13}	# Memory disk (for mini-kernel)
+major	{raid=25} # RAIDframe

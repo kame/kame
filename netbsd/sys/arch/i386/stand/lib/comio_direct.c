@@ -1,4 +1,4 @@
-/*	$NetBSD: comio_direct.c,v 1.3.8.1 2000/01/24 10:46:05 he Exp $	*/
+/*	$NetBSD: comio_direct.c,v 1.4 2000/01/20 15:22:57 drochner Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994, 1995, 1996, 1997

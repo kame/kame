@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.8.2.1 1999/11/21 15:43:51 he Exp $
+#	$NetBSD: genassym.cf,v 1.13 2000/05/26 00:36:51 thorpej Exp $
 
 #
 # Copyright (c) 1982, 1990, 1993
@@ -35,6 +35,8 @@
 #	@(#)genassym.c	8.3 (Berkeley) 1/4/94
 #
 
+include "opt_compat_svr4.h"
+
 include <sys/param.h>
 include <sys/buf.h>
 include <sys/map.h>
@@ -46,7 +48,13 @@ include <sys/user.h>
 
 include <vm/vm.h>
 
+include <uvm/uvm.h>
 include <uvm/uvm_extern.h>
+
+ifdef COMPAT_SVR4
+include <compat/svr4/svr4_syscall.h>
+include <compat/svr4/svr4_ucontext.h>
+endif
 
 include <machine/cpu.h>
 include <machine/psl.h>
@@ -112,6 +120,7 @@ define	P_MD_FLAGS		offsetof(struct proc, p_md.md_flags)
 define	P_MD_REGS		offsetof(struct proc, p_md.md_regs)
 define	SSLEEP			SSLEEP
 define	SRUN			SRUN
+define	SONPROC			SONPROC
 
 # interrupt/fault metering
 define	UVMEXP_INTRS		offsetof(struct uvmexp, intrs)
@@ -198,3 +207,15 @@ define	SYS_compat_13_sigreturn13 SYS_compat_13_sigreturn13
 # errno
 define	EFAULT			EFAULT
 define	ENAMETOOLONG		ENAMETOOLONG
+
+# UVM
+define	UVM_PAGE_IDLE_ZERO	offsetof(struct uvm, page_idle_zero)
+
+# SVR4 binary compatibility
+ifdef COMPAT_SVR4
+define SVR4_SIGF_HANDLER	offsetof(struct svr4_sigframe, sf_handler)
+define SVR4_SIGF_UC		offsetof(struct svr4_sigframe, sf_uc)
+define SVR4_SYS_context		SVR4_SYS_context
+define SVR4_SYS_exit		SVR4_SYS_exit
+define SVR4_SETCONTEXT		SVR4_SETCONTEXT
+endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.1 1997/10/14 06:47:20 sakamoto Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.7 2000/06/01 15:38:23 matt Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -52,37 +52,22 @@
 #include <sys/dkstat.h>
 #include <sys/disklabel.h>
 #include <sys/conf.h>
-#include <sys/dmap.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
 
 #include <machine/pte.h>
 #include <machine/intr.h>
 
-void findroot __P((struct device **, int *));
+struct device *booted_device;
+int booted_partition;
 
-/*
- * The following several variables are related to
- * the configuration process, and are used in initializing
- * the machine.
- */
-extern int	cold;		/* cold start flag initialized in locore.s */
-
-struct devnametobdevmaj bebox_nam2blk[] = {
-	{ "wd",		0 },
-	{ "sd",		4 },
-	{ "cd",		6 },
-	{ "mcd",	7 },
-	{ "fd",		2 },
-	{ "md",		17 },
-	{ NULL,		0 },
-};
+void findroot __P((void));
 
 /*
  * Determine i/o configuration for a machine.
  */
 void
-configure()
+cpu_configure()
 {
 	/* startrtclock(); */
 
@@ -94,21 +79,17 @@ configure()
 	    (u_short)imask[IPL_TTY]);
 
 	spl0();
-	cold = 0;
 }
 
 void
 cpu_rootconf()
 {
-	struct device *booted_device;
-	int booted_partition;
-
-	findroot(&booted_device, &booted_partition);
+	findroot();
 
 	printf("boot device: %s\n",
 	    booted_device ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, booted_partition, bebox_nam2blk);
+	setroot(booted_device, booted_partition);
 }
 
 u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
@@ -119,19 +100,11 @@ u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
  * change rootdev to correspond to the load device.
  */
 void
-findroot(devpp, partp)
-	struct device **devpp;
-	int *partp;
+findroot(void)
 {
 	int i, majdev, unit, part;
 	struct device *dv;
 	char buf[32];
-
-	/*
-	 * Default to "not found."
-	 */
-	*devpp = NULL;
-	*partp = 0;
 
 #if 0
 	printf("howto %x bootdev %x ", boothowto, bootdev);
@@ -141,21 +114,21 @@ findroot(devpp, partp)
 		return;
 
 	majdev = (bootdev >> B_TYPESHIFT) & B_TYPEMASK;
-	for (i = 0; bebox_nam2blk[i].d_name != NULL; i++)
-		if (majdev == bebox_nam2blk[i].d_maj)
+	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
+		if (majdev == dev_name2blk[i].d_maj)
 			break;
-	if (bebox_nam2blk[i].d_name == NULL)
+	if (dev_name2blk[i].d_name == NULL)
 		return;
 
 	part = (bootdev >> B_PARTITIONSHIFT) & B_PARTITIONMASK;
 	unit = (bootdev >> B_UNITSHIFT) & B_UNITMASK;
 
-	sprintf(buf, "%s%d", bebox_nam2blk[i].d_name, unit);
+	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
 	for (dv = alldevs.tqh_first; dv != NULL;
 	    dv = dv->dv_list.tqe_next) {
 		if (strcmp(buf, dv->dv_xname) == 0) {
-			*devpp = dv;
-			*partp = part;
+			booted_device = dv;
+			booted_partition = part;
 			return;
 		}
 	}

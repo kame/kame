@@ -1,4 +1,4 @@
-/*	$NetBSD: midi.c,v 1.11 1999/02/26 01:18:09 nathanw Exp $	*/
+/*	$NetBSD: midi.c,v 1.16 2000/05/06 14:35:28 augustss Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,6 +48,7 @@
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/syslog.h>
 #include <sys/kernel.h>
 #include <sys/signalvar.h>
@@ -112,7 +113,7 @@ midiprobe(parent, match, aux)
 
 	DPRINTFN(6,("midiprobe: type=%d sa=%p hw=%p\n", 
 		 sa->type, sa, sa->hwif));
-	return (sa->type == AUDIODEV_TYPE_MIDI) ? 1 : 0;
+	return (sa->type == AUDIODEV_TYPE_MIDI);
 }
 
 void
@@ -137,6 +138,9 @@ midiattach(parent, self, aux)
 		return;
 	}
 #endif
+
+	callout_init(&sc->sc_callout);
+
 	sc->hw_if = hwp;
 	sc->hw_hdl = hdlp;
 	midi_attach(sc, parent);
@@ -158,7 +162,7 @@ midi_attach(sc, parent)
 	sc->sc_dev = parent;
 	sc->hw_if->getinfo(sc->hw_hdl, &mi);
 	sc->props = mi.props;
-	printf(": <%s>\n", mi.name);
+	printf(": %s\n", mi.name);
 }
 
 int
@@ -235,7 +239,10 @@ midi_in(addr, data)
 		return;
 	if (data == MIDI_ACK)
 		return;
-	DPRINTFN(3, ("midi_in: %p 0x%02x\n", sc, data));
+
+	DPRINTFN(3, ("midi_in: sc=%p data=0x%02x state=%d pos=%d\n", 
+		     sc, data, sc->in_state, sc->in_pos));
+
 	if (!(sc->flags & FREAD))
 		return;		/* discard data if not reading */
 
@@ -268,8 +275,7 @@ midi_in(addr, data)
 					sc->in_state = MIDI_IN_DATA;
 					sc->in_msg[0] = sc->in_status = data;
 					sc->in_pos = 1;
-					sc->in_left = 
-						MIDI_LENGTH(sc->in_status);
+					sc->in_left = MIDI_LENGTH(data);
 				}
 				break;
 			}
@@ -516,7 +522,8 @@ midi_start_output(sc, intr)
 		psignal(sc->async, SIGIO);
 	if (mb->used > 0) {
 		if (!(sc->props & MIDI_PROP_OUT_INTR))
-			timeout(midi_timeout, sc, midi_wait);
+			callout_reset(&sc->sc_callout, midi_wait,
+			    midi_timeout, sc);
 	} else
 		sc->pbus = 0;
 	splx(s);
@@ -734,7 +741,7 @@ midi_getinfo(dev, mi)
 
 int	audioprint __P((void *, const char *));
 
-void
+struct device *
 midi_attach_mi(mhwp, hdlp, dev)
 	struct midi_hw_if *mhwp;
 	void *hdlp;
@@ -745,13 +752,13 @@ midi_attach_mi(mhwp, hdlp, dev)
 #ifdef DIAGNOSTIC
 	if (mhwp == NULL) {
 		printf("midi_attach_mi: NULL\n");
-		return;
+		return (0);
 	}
 #endif
 	arg.type = AUDIODEV_TYPE_MIDI;
 	arg.hwif = mhwp;
 	arg.hdl = hdlp;
-	(void)config_found(dev, &arg, audioprint);
+	return (config_found(dev, &arg, audioprint));
 }
 
 #endif /* NMIDI > 0 || NMIDIBUS > 0 */

@@ -1,118 +1,125 @@
-/*	$NetBSD: ip_log.c,v 1.7.2.1 1999/12/20 21:08:10 he Exp $	*/
+/*	$NetBSD: ip_log.c,v 1.10.4.1 2000/08/31 14:49:50 veego Exp $	*/
 
 /*
- * Copyright (C) 1997-1998 by Darren Reed.
+ * Copyright (C) 1997-2000 by Darren Reed.
  *
  * Redistribution and use in source and binary forms are permitted
  * provided that this notice is preserved and due credit is given
  * to the original author and the contributors.
  *
- * Id: ip_log.c,v 2.1.2.2 1999/09/21 11:55:44 darrenr Exp
+ * Id: ip_log.c,v 2.5.2.1 2000/07/19 13:11:47 darrenr Exp
  */
 #include <sys/param.h>
-#if defined(__FreeBSD__) && defined(KERNEL) && !defined(_KERNEL)
+#if defined(KERNEL) && !defined(_KERNEL)
 # define       _KERNEL
+#endif
+#if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
+    !defined(_LKM)
+# include "opt_ipfilter_log.h"
 #endif
 #ifdef  __FreeBSD__
 # if defined(_KERNEL) && !defined(IPFILTER_LKM)
-#  include <sys/osreldate.h>
 #  if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
 #   include "opt_ipfilter.h"
 #  endif
 # else
-#  include <osreldate.h>
+#  ifdef KLD_MODULE
+#   include <sys/osreldate.h>
+#  else
+#   include <osreldate.h>
+#  endif
 # endif
 #endif
-#ifndef SOLARIS
-# define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
-#endif
-#ifndef _KERNEL
-# include <stdio.h>
-# include <string.h>
-# include <stdlib.h>
-# include <ctype.h>
-#endif
-#include <sys/errno.h>
-#include <sys/types.h>
-#include <sys/file.h>
-#if __FreeBSD_version >= 220000 && defined(_KERNEL)
-# include <sys/fcntl.h>
-# include <sys/filio.h>
-#else
-# include <sys/ioctl.h>
-#endif
-#include <sys/time.h>
-#if defined(_KERNEL) && !defined(linux)
-# include <sys/systm.h>
-#endif
-#include <sys/uio.h>
-#if !SOLARIS
-# if (NetBSD > 199609) || (OpenBSD > 199603) || (__FreeBSD_version >= 300000)
-#  include <sys/dirent.h>
+#ifdef	IPFILTER_LOG
+# ifndef SOLARIS
+#  define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+# endif
+# ifndef _KERNEL
+#  include <stdio.h>
+#  include <string.h>
+#  include <stdlib.h>
+#  include <ctype.h>
+# endif
+# include <sys/errno.h>
+# include <sys/types.h>
+# include <sys/file.h>
+# if __FreeBSD_version >= 220000 && defined(_KERNEL)
+#  include <sys/fcntl.h>
+#  include <sys/filio.h>
 # else
-#  include <sys/dir.h>
+#  include <sys/ioctl.h>
+# endif
+# include <sys/time.h>
+# if defined(_KERNEL) && !defined(linux)
+#  include <sys/systm.h>
+# endif
+# include <sys/uio.h>
+# if !SOLARIS
+#  if (NetBSD > 199609) || (OpenBSD > 199603) || (__FreeBSD_version >= 300000)
+#   include <sys/dirent.h>
+#  else
+#   include <sys/dir.h>
+#  endif
+#  ifndef linux
+#   include <sys/mbuf.h>
+#  endif
+# else
+#  include <sys/filio.h>
+#  include <sys/cred.h>
+#  include <sys/ddi.h>
+#  include <sys/sunddi.h>
+#  include <sys/ksynch.h>
+#  include <sys/kmem.h>
+#  include <sys/mkdev.h>
+#  include <sys/dditypes.h>
+#  include <sys/cmn_err.h>
 # endif
 # ifndef linux
-#  include <sys/mbuf.h>
+#  include <sys/protosw.h>
 # endif
-#else
-# include <sys/filio.h>
-# include <sys/cred.h>
-# include <sys/ddi.h>
-# include <sys/sunddi.h>
-# include <sys/ksynch.h>
-# include <sys/kmem.h>
-# include <sys/mkdev.h>
-# include <sys/dditypes.h>
-# include <sys/cmn_err.h>
-#endif
-#ifndef linux
-# include <sys/protosw.h>
-#endif
-#include <sys/socket.h>
+# include <sys/socket.h>
 
-#include <net/if.h>
-#ifdef sun
-# include <net/af.h>
-#endif
-#if __FreeBSD_version >= 300000
-# include <net/if_var.h>
-#endif
-#include <net/route.h>
-#include <netinet/in.h>
-#ifdef __sgi
-# include <sys/ddi.h>
-# ifdef IFF_DRVRLOCK /* IRIX6 */
-#  include <sys/hashing.h>
+# include <net/if.h>
+# ifdef sun
+#  include <net/af.h>
 # endif
-#endif
-#if !defined(linux) && !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /*IRIX<6*/
-# include <netinet/in_var.h>
-#endif
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-#include <netinet/ip_icmp.h>
-#ifndef linux
-# include <netinet/ip_var.h>
-#endif
-#ifndef _KERNEL
-# include <syslog.h>
-#endif
-#include "netinet/ip_compat.h"
-#include <netinet/tcpip.h>
-#include "netinet/ip_fil.h"
-#include "netinet/ip_proxy.h"
-#include "netinet/ip_nat.h"
-#include "netinet/ip_frag.h"
-#include "netinet/ip_state.h"
-#include "netinet/ip_auth.h"
-#if (__FreeBSD_version >= 300000)
-# include <sys/malloc.h>
-#endif
+# if __FreeBSD_version >= 300000
+#  include <net/if_var.h>
+# endif
+# include <net/route.h>
+# include <netinet/in.h>
+# ifdef __sgi
+#  include <sys/ddi.h>
+#  ifdef IFF_DRVRLOCK /* IRIX6 */
+#   include <sys/hashing.h>
+#  endif
+# endif
+# if !defined(linux) && !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /*IRIX<6*/
+#  include <netinet/in_var.h>
+# endif
+# include <netinet/in_systm.h>
+# include <netinet/ip.h>
+# include <netinet/tcp.h>
+# include <netinet/udp.h>
+# include <netinet/ip_icmp.h>
+# ifndef linux
+#  include <netinet/ip_var.h>
+# endif
+# ifndef _KERNEL
+#  include <syslog.h>
+# endif
+# include "netinet/ip_compat.h"
+# include <netinet/tcpip.h>
+# include "netinet/ip_fil.h"
+# include "netinet/ip_proxy.h"
+# include "netinet/ip_nat.h"
+# include "netinet/ip_frag.h"
+# include "netinet/ip_state.h"
+# include "netinet/ip_auth.h"
+# if (__FreeBSD_version >= 300000)
+#  include <sys/malloc.h>
+# endif
 
-#ifdef	IPFILTER_LOG
 # ifndef MIN
 #  define	MIN(a,b)	(((a)<(b))?(a):(b))
 # endif
@@ -127,7 +134,7 @@ extern	kcondvar_t	iplwait;
 
 iplog_t	**iplh[IPL_LOGMAX+1], *iplt[IPL_LOGMAX+1], *ipll[IPL_LOGMAX+1];
 size_t	iplused[IPL_LOGMAX+1];
-fr_info_t	iplcrc[IPL_LOGMAX+1];
+static fr_info_t	iplcrc[IPL_LOGMAX+1];
 # ifdef	linux
 static struct wait_queue *iplwait[IPL_LOGMAX+1];
 # endif
@@ -166,10 +173,11 @@ fr_info_t *fin;
 mb_t *m;
 {
 	ipflog_t ipfl;
-	register size_t mlen, hlen;
+	size_t mlen, hlen;
 	size_t sizes[2];
 	void *ptrs[2];
 	int types[2];
+	u_char p;
 # if SOLARIS
 	ill_t *ifp = fin->fin_ifp;
 # else
@@ -180,15 +188,16 @@ mb_t *m;
 	 * calculate header size.
 	 */
 	hlen = fin->fin_hlen;
-	if ((ip->ip_off & IP_OFFMASK) == 0) {
-		if (ip->ip_p == IPPROTO_TCP)
+	if (fin->fin_off == 0) {
+		p = fin->fin_fi.fi_p;
+		if (p == IPPROTO_TCP)
 			hlen += MIN(sizeof(tcphdr_t), fin->fin_dlen);
-		else if (ip->ip_p == IPPROTO_UDP)
+		else if (p == IPPROTO_UDP)
 			hlen += MIN(sizeof(udphdr_t), fin->fin_dlen);
-		else if (ip->ip_p == IPPROTO_ICMP) {
-			struct	icmp	*icmp;
+		else if (p == IPPROTO_ICMP) {
+			struct icmp *icmp;
 
-			icmp = (struct icmp *)((char *)ip + hlen);
+			icmp = (struct icmp *)fin->fin_dp;
 	 
 			/*
 			 * For ICMP, if the packet is an error packet, also
@@ -233,7 +242,7 @@ mb_t *m;
 			if ((ipfl.fl_ifname[2] = ifp->if_name[2]))
 				ipfl.fl_ifname[3] = ifp->if_name[3];
 #  endif
-	mlen = (flags & FR_LOGBODY) ? MIN(ip->ip_len - hlen, 128) : 0;
+	mlen = (flags & FR_LOGBODY) ? MIN(fin->fin_plen - hlen, 128) : 0;
 # endif
 	ipfl.fl_plen = (u_char)mlen;
 	ipfl.fl_hlen = (u_char)hlen;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_trtcm_isa.c,v 1.2.2.1 1999/04/30 16:40:18 perry Exp $	*/
+/*	$NetBSD: if_trtcm_isa.c,v 1.3 1999/04/30 15:29:24 bad Exp $	*/
 
 #undef TRTCMISADEBUG
 /*

@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.21.2.1 2000/02/08 22:49:00 he Exp $
+#	$NetBSD: genassym.cf,v 1.29 2000/05/31 05:28:29 thorpej Exp $
 
 #
 # Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -91,6 +91,7 @@ include <sys/disklabel.h>
 include <sys/disk.h>
 
 include <vm/vm.h>
+include <uvm/uvm.h>
 include <uvm/uvm_extern.h>
 
 include <machine/pmap.h>
@@ -107,8 +108,7 @@ include <sparc/dev/zsvar.h>
 endif
 
 include <machine/bus.h>
-include <dev/ic/am7930reg.h>
-include <dev/ic/am7930var.h>
+include <sparc/dev/audioamdvar.h>
 
 include <sparc/dev/fdreg.h>
 include <sparc/dev/fdvar.h>
@@ -124,15 +124,16 @@ define	P_ADDR		offsetof(struct proc, p_addr)
 define	P_STAT		offsetof(struct proc, p_stat)
 define	P_WCHAN		offsetof(struct proc, p_wchan)
 define	P_VMSPACE	offsetof(struct proc, p_vmspace)
+define	P_CPU		offsetof(struct proc, p_cpu)
 define	SRUN		SRUN
+define	SONPROC		SONPROC
 
 # VM structure fields
 define	VM_PMAP		offsetof(struct vmspace, vm_map.pmap)
 define	PMAP_CTX	offsetof(struct pmap, pm_ctx)
 define	PMAP_CTXNUM	offsetof(struct pmap, pm_ctxnum)
-define	PMAP_REGPTPS	offsetof(struct pmap, pm_reg_ptps)
 
-define	REGTAB_CPU_OFF	(int)(&((int *)0)[VA_VREG(CPUINFO_VA)])
+define	UVM_PAGE_IDLE_ZERO	offsetof(struct uvm, page_idle_zero)
 
 # interrupt/fault metering
 define	V_SWTCH		offsetof(struct uvmexp, swtch)
@@ -153,8 +154,8 @@ define	CPUINFO_REDZONE		offsetof(struct cpu_info, redzone)
 define	REDSIZE			REDSIZE
 define	CPUINFO_IDLE_U		offsetof(struct cpu_info, idle_u)
 define	CPUINFO_CURPCB		offsetof(struct cpu_info, curpcb)
-define	CPUINFO_CURPROC		offsetof(struct cpu_info, _curproc)
-define	CPUINFO_SEGPTD		offsetof(struct cpu_info, cpu_seg_ptd)
+define	CPUINFO_CURPROC		offsetof(struct cpu_info, ci_curproc)
+define	CPUINFO_SELF		offsetof(struct cpu_info, ci_self)
 
 # PTE bits and related information
 define	PG_W		PG_W
@@ -215,10 +216,6 @@ define	AU_REND		offsetof(struct auio, au_rend)
 define	AU_PDATA	offsetof(struct auio, au_pdata)
 define	AU_PEND		offsetof(struct auio, au_pend)
 define	AU_EVCNT	offsetof(struct auio, au_intrcnt.ev_count)
-
-define	AMD_IR		offsetof(struct am7930, ir)
-define	AMD_BBRB	offsetof(struct am7930, bbrb)
-define	AMD_BBTB	offsetof(struct am7930, bbtb)
 
 define	PROM_BASE	PROM_BASE
 

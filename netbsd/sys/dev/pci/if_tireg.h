@@ -1,4 +1,4 @@
-/* $NetBSD: if_tireg.h,v 1.1.2.1 1999/10/05 22:06:48 he Exp $ */
+/* $NetBSD: if_tireg.h,v 1.1 1999/09/01 11:47:46 drochner Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999

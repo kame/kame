@@ -1,4 +1,4 @@
-/*	$NetBSD: db_examine.c,v 1.13.20.2 1999/04/12 21:27:07 pk Exp $	*/
+/*	$NetBSD: db_examine.c,v 1.18 2000/05/25 19:57:36 jhawk Exp $	*/
 
 /*
  * Mach Operating System
@@ -71,8 +71,7 @@ db_examine_cmd(addr, have_addr, count, modif)
 
 void
 db_examine(addr, fmt, count)
-	register
-	    db_addr_t	addr;
+	db_addr_t	addr;
 	char *		fmt;	/* format string */
 	int		count;	/* repeat count */
 {
@@ -89,7 +88,7 @@ db_examine(addr, fmt, count)
 		while ((c = *fp++) != 0) {
 			if (db_print_position() == 0) {
 				/* Always print the address. */
-				db_printsym(addr, DB_STGY_ANY);
+				db_printsym(addr, DB_STGY_ANY, db_printf);
 				db_printf(":\t");
 				db_prev = addr;
 			}
@@ -105,6 +104,10 @@ db_examine(addr, fmt, count)
 			case 'l':	/* long-word */
 				size = 4;
 				width = 12;
+				break;
+			case 'L':	/* implementation maximum */
+				size = sizeof value;
+				width = 12 * (sizeof value / 4);
 				break;
 			case 'a':	/* address */
 				db_printf("= 0x%lx\n", addr);
@@ -195,7 +198,7 @@ db_print_cmd(addr, have_addr, count, modif)
 
 	switch (db_print_format) {
 	case 'a':
-		db_printsym((db_addr_t)addr, DB_STGY_ANY);
+		db_printsym((db_addr_t)addr, DB_STGY_ANY, db_printf);
 		break;
 	case 'r':
 		db_printf("%11lr", addr);
@@ -230,15 +233,15 @@ void
 db_print_loc_and_inst(loc)
 	db_addr_t	loc;
 {
-	db_printsym(loc, DB_STGY_PROC);
+	db_printsym(loc, DB_STGY_PROC, db_printf);
 	db_printf(":\t");
 	(void) db_disasm(loc, FALSE);
 }
 
 void
 db_strcpy(dst, src)
-	register char *dst;
-	register char *src;
+	char *dst;
+	char *src;
 {
 	while ((*dst++ = *src++) != '\0')
 		;
@@ -320,7 +323,6 @@ db_search_cmd(daddr, have_addr, dcount, modif)
 
 void
 db_search(addr, size, value, mask, count)
-	register
 	db_addr_t	addr;
 	int		size;
 	db_expr_t	value;

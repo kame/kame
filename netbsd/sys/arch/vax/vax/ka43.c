@@ -1,4 +1,4 @@
-/*	$NetBSD: ka43.c,v 1.15 1999/03/13 15:16:48 ragge Exp $ */
+/*	$NetBSD: ka43.c,v 1.21 2000/04/22 18:11:27 ragge Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -52,7 +52,7 @@
 #include <machine/ka43.h>
 #include <machine/clock.h>
 
-static	void ka43_conf __P((struct device*, struct device*, void*));
+static	void ka43_conf __P((void));
 static	void ka43_steal_pages __P((void));
 
 static	int ka43_mchk __P((caddr_t));
@@ -72,7 +72,6 @@ static  void ka43_clrf __P((void));
 
 struct	cpu_dep ka43_calls = {
 	ka43_steal_pages,
-	no_nicr_clock,
 	ka43_mchk,
 	ka43_memerr,
 	ka43_conf,
@@ -83,6 +82,8 @@ struct	cpu_dep ka43_calls = {
         ka43_halt,
         ka43_reboot,
         ka43_clrf,
+	NULL,
+	CPU_RAISEIPL,
 };
 
 /*
@@ -90,11 +91,9 @@ struct	cpu_dep ka43_calls = {
  * enabled. Thus we initialize these four pointers with physical addresses,
  * but before leving ka43_steal_pages() we reset them to virtual addresses.
  */
-struct	ka43_cpu   *ka43_cpu	= (void*)KA43_CPU_BASE;
-extern  short *clk_page;
-
-u_int	*ka43_creg = (void*)KA43_CH2_CREG;
-u_int	*ka43_ctag = (void*)KA43_CT2_BASE;
+static	volatile struct	ka43_cpu   *ka43_cpu	= (void*)KA43_CPU_BASE;
+static	volatile u_int	*ka43_creg = (void*)KA43_CH2_CREG;
+static	volatile u_int	*ka43_ctag = (void*)KA43_CT2_BASE;
 
 #define KA43_MC_RESTART	0x00008000	/* Restart possible*/
 #define KA43_PSL_FPDONE	0x00010000	/* First Part Done */
@@ -153,7 +152,7 @@ ka43_mchk(addr)
 
 	/*
 	 * If either the Restart flag is set or the First-Part-Done flag
-	 * is set, and the TRAP2 (double error) bit is not set, the the
+	 * is set, and the TRAP2 (double error) bit is not set, then the
 	 * error is recoverable.
 	 */
 	if (mfpr(PR_PCSTS) & KA43_PCS_TRAP2) {
@@ -302,13 +301,9 @@ ka43_cache_enable()
 }
 
 void
-ka43_conf(parent, self, aux)
-	struct	device *parent, *self;
-	void	*aux;
+ka43_conf()
 {
-        extern  int clk_adrshift, clk_tweak;
-
-	printf(": KA43\n");
+	printf("cpu: KA43\n");
 	ka43_cpu = (void *)vax_map_physmem(VS_REGS, 1);
 
 	ka43_creg = (void *)vax_map_physmem(KA43_CH2_CREG, 1);
@@ -327,7 +322,6 @@ ka43_conf(parent, self, aux)
 }
 
 
-extern caddr_t le_iomem;
 /*
  * The interface for communication with the LANCE ethernet controller
  * is setup in the xxx_steal_pages() routine. We decrease highest
@@ -337,23 +331,8 @@ extern caddr_t le_iomem;
 void
 ka43_steal_pages()
 {
-	extern	vaddr_t avail_start;
 	int	val;
 
-
-        /*
-         * Oh holy shit! It took me over one year(!) to find out that
-         * the 3100/76 has to use diag-mem instead of physical memory
-         * for communication with LANCE (using phys-mem results in 
-         * parity errors and mchk exceptions with code 17 (0x11)).
-         * 
-         * Many thanks to Matt Thomas, without his help it could have
-         * been some more years...  ;-)
-         */
-#define LEMEM (((int)le_iomem & ~KERNBASE)|KA43_DIAGMEM)
-        MAPPHYS(le_iomem, (NI_IOSIZE/VAX_NBPG), VM_PROT_READ|VM_PROT_WRITE);
-        pmap_map((vm_offset_t)le_iomem, LEMEM, LEMEM + NI_IOSIZE,
-            VM_PROT_READ|VM_PROT_WRITE);
 
 	/*
 	 * if LANCE\'s io-buffer is above 16 MB, then the appropriate flag
@@ -363,17 +342,7 @@ ka43_steal_pages()
 	 * by the RIGEL chip itself!?!
 	 */
 	val = ka43_cpu->parctl & 0x03;	/* read the old value */
-	if (((int)le_iomem & ~KERNBASE) > 0xffffff)
-		val |= KA43_PCTL_DMA;
 	ka43_cpu->parctl = val;		/* and write new value */
-
-#if 0
-	/*
-	 * Clear all error flags, not really neccessary here, this will
-	 * be done by ka43_cache_init() anyway...
-	 */
-	ka43_clear_errors();
-#endif
 }
 
 static void

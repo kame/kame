@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ether.h,v 1.7.2.1 1999/04/09 17:19:03 drochner Exp $	*/
+/*	$NetBSD: if_ether.h,v 1.17 2000/06/17 20:57:20 matt Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -54,7 +54,7 @@
  */
 struct ether_addr {
 	u_int8_t ether_addr_octet[ETHER_ADDR_LEN];
-};
+} __attribute__((__packed__));
 
 /*
  * Structure of a 10Mb/s Ethernet header.
@@ -63,7 +63,7 @@ struct	ether_header {
 	u_int8_t  ether_dhost[ETHER_ADDR_LEN];
 	u_int8_t  ether_shost[ETHER_ADDR_LEN];
 	u_int16_t ether_type;
-};
+} __attribute__((__packed__));
 
 #include <net/ethertypes.h>
 
@@ -72,7 +72,18 @@ struct	ether_header {
 #define	ETHERMTU	(ETHER_MAX_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 #define	ETHERMIN	(ETHER_MIN_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 
+/*
+ * Ethernet CRC32 polynomials (big- and little-endian verions).
+ */
+#define	ETHER_CRC_POLY_LE	0xedb88320
+#define	ETHER_CRC_POLY_BE	0x04c11db6
+
 #ifndef _STANDALONE
+
+/*
+ * Ethernet-specific mbuf flags.
+ */
+#define	M_HASFCS	M_LINK0		/* FCS included at end of frame */
 
 #ifdef _KERNEL
 /*
@@ -91,6 +102,22 @@ struct	ether_header {
 	(enaddr)[4] = ((u_int8_t *)ipaddr)[2];				\
 	(enaddr)[5] = ((u_int8_t *)ipaddr)[3];				\
 }
+/*
+ * Macro to map an IP6 multicast address to an Ethernet multicast address.
+ * The high-order 16 bits of the Ethernet address are statically assigned,
+ * and the low-order 32 bits are taken from the low end of the IP6 address.
+ */
+#define ETHER_MAP_IPV6_MULTICAST(ip6addr, enaddr)			\
+	/* struct in6_addr *ip6addr; */					\
+	/* u_int8_t enaddr[ETHER_ADDR_LEN]; */				\
+{                                                                       \
+	(enaddr)[0] = 0x33;						\
+	(enaddr)[1] = 0x33;						\
+	(enaddr)[2] = ((u_int8_t *)ip6addr)[12];			\
+	(enaddr)[3] = ((u_int8_t *)ip6addr)[13];			\
+	(enaddr)[4] = ((u_int8_t *)ip6addr)[14];			\
+	(enaddr)[5] = ((u_int8_t *)ip6addr)[15];			\
+}
 #endif
 
 /*
@@ -101,16 +128,17 @@ struct	ether_header {
 struct	ethercom {
 	struct	 ifnet ec_if;			/* network-visible interface */
 	LIST_HEAD(, ether_multi) ec_multiaddrs;	/* list of ether multicast addrs */
-	int	 ec_multicnt;			/* length of ac_multiaddrs list */
+	int	 ec_multicnt;			/* length of ec_multiaddrs list */
 };
 
 #ifdef	_KERNEL
-u_int8_t etherbroadcastaddr[ETHER_ADDR_LEN];
-u_int8_t ether_ipmulticast_min[ETHER_ADDR_LEN];
-u_int8_t ether_ipmulticast_max[ETHER_ADDR_LEN];
+extern u_int8_t etherbroadcastaddr[ETHER_ADDR_LEN];
+extern u_int8_t ether_ipmulticast_min[ETHER_ADDR_LEN];
+extern u_int8_t ether_ipmulticast_max[ETHER_ADDR_LEN];
 
-int	ether_addmulti __P((struct ifreq *, struct ethercom *));
-int	ether_delmulti __P((struct ifreq *, struct ethercom *));
+int	ether_addmulti (struct ifreq *, struct ethercom *);
+int	ether_delmulti (struct ifreq *, struct ethercom *);
+int	ether_changeaddr (struct ifreq *, struct ethercom *);
 #endif /* _KERNEL */
 
 /*
@@ -177,10 +205,13 @@ struct ether_multistep {
 	ETHER_NEXT_MULTI((step), (enm)); \
 }
 
+#ifdef _KERNEL
+u_int32_t ether_crc32_le (const u_int8_t *, size_t);
+u_int32_t ether_crc32_be (const u_int8_t *, size_t);
+#else
 /*
  * Prototype ethers(3) functions.
  */
-#ifndef _KERNEL
 #include <sys/cdefs.h>
 __BEGIN_DECLS
 char *	ether_ntoa __P((struct ether_addr *));

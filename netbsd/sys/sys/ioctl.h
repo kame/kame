@@ -1,4 +1,4 @@
-/*	$NetBSD: ioctl.h,v 1.24.2.1 1999/06/21 19:23:11 cgd Exp $	*/
+/*	$NetBSD: ioctl.h,v 1.25 1999/04/30 05:29:20 cgd Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993, 1994

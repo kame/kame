@@ -1,4 +1,4 @@
-/*	$NetBSD: sbus.c,v 1.34.2.1 1999/04/14 21:18:30 pk Exp $ */
+/*	$NetBSD: sbus.c,v 1.36.4.1 2000/07/19 02:53:12 mrg Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -117,7 +117,8 @@ static int _sbus_bus_map __P((
 		bus_space_handle_t *));
 static void *sbus_intr_establish __P((
 		bus_space_tag_t,
-		int,			/*level*/
+		int,			/*Sbus interrupt level*/
+		int,			/*`device class' priority*/
 		int,			/*flags*/
 		int (*) __P((void *)),	/*handler*/
 		void *));		/*handler arg*/
@@ -311,7 +312,7 @@ sbus_attach_mainbus(parent, self, aux)
 	printf(": clock = %s MHz\n", clockfreq(sc->sc_clockfreq));
 
 	sbus_sc = sc;
-	sbus_attach_common(sc, "sbus", node, ma->ma_bp, NULL);
+	sbus_attach_common(sc, "sbus", node, NULL);
 }
 
 
@@ -352,7 +353,7 @@ sbus_attach_iommu(parent, self, aux)
 
 	sbus_sc = sc;
 	sbuserr_handler = sbus_error;
-	sbus_attach_common(sc, "sbus", node, ia->iom_bp, NULL);
+	sbus_attach_common(sc, "sbus", node, NULL);
 }
 
 void
@@ -378,15 +379,14 @@ sbus_attach_xbox(parent, self, aux)
 	sc->sc_clockfreq = getpropint(node, "clock-frequency", 25*1000*1000);
 	printf(": clock = %s MHz\n", clockfreq(sc->sc_clockfreq));
 
-	sbus_attach_common(sc, "sbus", node, xa->xa_bp, NULL);
+	sbus_attach_common(sc, "sbus", node, NULL);
 }
 
 void
-sbus_attach_common(sc, busname, busnode, bp, specials)
+sbus_attach_common(sc, busname, busnode, specials)
 	struct sbus_softc *sc;
 	char *busname;
 	int busnode;
-	struct bootpath *bp;
 	const char * const *specials;
 {
 	int node0, node, error;
@@ -412,12 +412,6 @@ sbus_attach_common(sc, busname, busnode, bp, specials)
 		 */
 		sc->sc_burst &= ~SBUS_BURST_64;
 	}
-
-	/* Propagate bootpath */
-	if (bp != NULL && strcmp(bp->name, busname) == 0)
-		bp++;
-	else
-		bp = NULL;
 
 	/*
 	 * Collect address translations from the OBP.
@@ -451,7 +445,7 @@ sbus_attach_common(sc, busname, busnode, bp, specials)
 		}
 
 		if (sbus_setup_attach_args(sc, sbt, sc->sc_dmatag,
-					   node, bp, &sa) != 0) {
+					   node, &sa) != 0) {
 			panic("sbus_attach: %s: incomplete", sp);
 		}
 		(void) config_found(&sc->sc_dev, (void *)&sa, sbus_print);
@@ -471,7 +465,7 @@ sbus_attach_common(sc, busname, busnode, bp, specials)
 			continue;
 
 		if (sbus_setup_attach_args(sc, sbt, sc->sc_dmatag,
-					   node, bp, &sa) != 0) {
+					   node, &sa) != 0) {
 			printf("sbus_attach: %s: incomplete\n", name);
 			continue;
 		}
@@ -481,12 +475,11 @@ sbus_attach_common(sc, busname, busnode, bp, specials)
 }
 
 int
-sbus_setup_attach_args(sc, bustag, dmatag, node, bp, sa)
+sbus_setup_attach_args(sc, bustag, dmatag, node, sa)
 	struct sbus_softc	*sc;
 	bus_space_tag_t		bustag;
 	bus_dma_tag_t		dmatag;
 	int			node;
-	struct bootpath		*bp;
 	struct sbus_attach_args	*sa;
 {
 	int n, error;
@@ -500,7 +493,6 @@ sbus_setup_attach_args(sc, bustag, dmatag, node, bp, sa)
 	sa->sa_bustag = bustag;
 	sa->sa_dmatag = dmatag;
 	sa->sa_node = node;
-	sa->sa_bp = bp;
 
 	error = getprop(node, "reg", sizeof(struct sbus_reg),
 			&sa->sa_nreg, (void **)&sa->sa_reg);
@@ -727,8 +719,9 @@ sbus_get_intr(sc, node, ipp, np)
  * Install an interrupt handler for an Sbus device.
  */
 void *
-sbus_intr_establish(t, level, flags, handler, arg)
+sbus_intr_establish(t, pri, level, flags, handler, arg)
 	bus_space_tag_t t;
+	int pri;
 	int level;
 	int flags;
 	int (*handler) __P((void *));
@@ -736,26 +729,29 @@ sbus_intr_establish(t, level, flags, handler, arg)
 {
 	struct sbus_softc *sc = t->cookie;
 	struct intrhand *ih;
-	int ipl;
+	int pil;
 
 	ih = (struct intrhand *)
 		malloc(sizeof(struct intrhand), M_DEVBUF, M_NOWAIT);
 	if (ih == NULL)
 		return (NULL);
 
+	/*
+	 * Translate Sbus interrupt priority to CPU interrupt level
+	 */
 	if ((flags & BUS_INTR_ESTABLISH_SOFTINTR) != 0)
-		ipl = level;
-	else if ((level & SBUS_INTR_COMPAT) != 0)
-		ipl = level & ~SBUS_INTR_COMPAT;
+		pil = pri;
+	else if ((pri & SBUS_INTR_COMPAT) != 0)
+		pil = pri & ~SBUS_INTR_COMPAT;
 	else
-		ipl = sc->sc_intr2ipl[level];
+		pil = sc->sc_intr2ipl[pri];
 
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
 	if ((flags & BUS_INTR_ESTABLISH_FASTTRAP) != 0)
-		intr_fasttrap(ipl, (void (*)__P((void)))handler);
+		intr_fasttrap(pil, (void (*)__P((void)))handler);
 	else
-		intr_establish(ipl, ih);
+		intr_establish(pil, ih);
 	return (ih);
 }
 

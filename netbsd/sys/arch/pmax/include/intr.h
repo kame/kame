@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.5 1998/08/25 01:55:40 nisimura Exp $	*/
+/*	$NetBSD: intr.h,v 1.15 2000/04/11 02:43:52 nisimura Exp $	*/
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -46,27 +46,50 @@
 #ifdef _KERNEL
 #ifndef _LOCORE
 
-typedef int spl_t;
-extern spl_t splx __P((spl_t));
-extern spl_t splsoftnet __P((void)), splsoftclock __P((void));
-extern spl_t splhigh __P((void));
-extern spl_t spl0 __P((void));	/* XXX should not enable TC on 3min */
+#include <mips/cpuregs.h>
 
-extern void setsoftnet __P((void)), clearsoftnet __P((void));
-extern void setsoftclock __P((void)), clearsoftclock __P((void));
+int	_splraise __P((int));
+int	_spllower __P((int));
+int	_splset __P((int));
+int	_splget __P((void));
+void	_splnone __P((void));
+void	_setsoftintr __P((int));
+void	_clrsoftintr __P((int));
 
+#define splhigh()	_splraise(MIPS_INT_MASK)
+#define spl0()		(void)_spllower(0)
+#define splx(s)		(void)_splset(s)
+#define splbio()	(_splraise(splvec.splbio))
+#define splnet()	(_splraise(splvec.splnet))
+#define spltty()	(_splraise(splvec.spltty))
+#define splimp()	(_splraise(splvec.splimp))
+#define splpmap()	(_splraise(splvec.splimp))
+#define splclock()	(_splraise(splvec.splclock))
+#define splstatclock()	(_splraise(splvec.splstatclock))
+#define spllowersoftclock() _spllower(MIPS_SOFT_INT_MASK_0)
+#define splsoftclock()	_splraise(MIPS_SOFT_INT_MASK_0)
+#define splsoftnet()	_splraise(MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
 
-extern int (*Mach_splnet) __P((void)), (*Mach_splbio) __P((void)),
-	   (*Mach_splimp) __P((void)), (*Mach_spltty) __P((void)),
-	   (*Mach_splclock) __P((void)), (*Mach_splstatclock) __P((void)),
-	   (*Mach_splnone) __P((void));
+struct splvec {
+	int	splbio;
+	int	splnet;
+	int	spltty;
+	int	splimp;
+	int	splclock;
+	int	splstatclock;
+};
+extern struct splvec splvec;
 
-#define	splnet()	(*Mach_splnet)()
-#define	splbio()	(*Mach_splbio)()
-#define	splimp()	(*Mach_splimp)()
-#define	spltty()	(*Mach_spltty)()
-#define	splclock()	(*Mach_splclock)()
-#define	splstatclock()	(*Mach_splstatclock)()
+/* Conventionals ... */
+
+#define MIPS_SPLHIGH (MIPS_INT_MASK)
+#define MIPS_SPL0 (MIPS_INT_MASK_0|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
+#define MIPS_SPL1 (MIPS_INT_MASK_1|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
+#define MIPS_SPL3 (MIPS_INT_MASK_3|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
+#define MIPS_SPL_0_1	 (MIPS_INT_MASK_1|MIPS_SPL0)
+#define MIPS_SPL_0_1_2	 (MIPS_INT_MASK_2|MIPS_SPL_0_1)
+#define MIPS_SPL_0_1_3	 (MIPS_INT_MASK_3|MIPS_SPL_0_1)
+#define MIPS_SPL_0_1_2_3 (MIPS_INT_MASK_3|MIPS_SPL_0_1_2)
 
 /*
  * Index into intrcnt[], which is defined in locore
@@ -77,24 +100,52 @@ extern u_long intrcnt[];
 #define	SOFTNET_INTR	1
 #define	SERIAL0_INTR	2
 #define	SERIAL1_INTR	3
-#define	SERIAL2_INTR	4
-#define	LANCE_INTR	5
-#define	SCSI_INTR	6
-#define	ERROR_INTR	7
-#define	HARDCLOCK	8
-#define	FPU_INTR	9
-#define	SLOT0_INTR	10
-#define	SLOT1_INTR	11
-#define	SLOT2_INTR	12
-#define	DTOP_INTR	13
-#define	ISDN_INTR	14
-#define	FLOPPY_INTR	15
-#define	STRAY_INTR	16
+#define	LANCE_INTR	4
+#define	SCSI_INTR	5
+#define	ERROR_INTR	6
+#define	HARDCLOCK	7
+#define	FPU_INTR	8
+#define	SLOT0_INTR	9
+#define	SLOT1_INTR	10
+#define	SLOT2_INTR	11
+#define	DTOP_INTR	12
+#define	ISDN_INTR	13
+#define	FLOPPY_INTR	14
+#define	STRAY_INTR	15
 
-/* handle i/o device interrupts */
-extern int (*mips_hardware_intr) __P((unsigned, unsigned, unsigned, unsigned));
+struct intrhand {
+	int	(*ih_func) __P((void *));
+	void	*ih_arg;
+};
+extern struct intrhand intrtab[];
+
+#define SYS_DEV_SCSI	SCSI_INTR
+#define SYS_DEV_LANCE	LANCE_INTR
+#define SYS_DEV_SCC0	SERIAL0_INTR
+#define SYS_DEV_SCC1	SERIAL1_INTR
+#define SYS_DEV_DTOP	DTOP_INTR
+#define SYS_DEV_FDC	FLOPPY_INTR
+#define SYS_DEV_ISDN	ISDN_INTR
+#define SYS_DEV_OPT0	SLOT0_INTR
+#define SYS_DEV_OPT1	SLOT1_INTR
+#define SYS_DEV_OPT2	SLOT2_INTR
+#define SYS_DEV_BOGUS	-1
+#define MAX_DEV_NCOOKIES 16
+
+/*
+ * software simulated interrupt
+ */
+extern unsigned ssir;
+
+#define SIR_NET		0x1
+
+#define setsoftnet()	setsoft(SIR_NET)
+#define setsoft(x) \
+	do { ssir |= (x); _setsoftintr(MIPS_SOFT_INT_MASK_1); } while (0)
+
+#define setsoftclock()	_setsoftintr(MIPS_SOFT_INT_MASK_0)
 
 #endif /* !_LOCORE */
 #endif /* _KERNEL */
 
-#endif /* !_PMAX_INTR_H_ */
+#endif	/* !_PMAX_INTR_H_ */

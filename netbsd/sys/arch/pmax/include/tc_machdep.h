@@ -1,4 +1,4 @@
-/*	$NetBSD: tc_machdep.h,v 1.10 1999/03/16 05:59:01 nisimura Exp $	*/
+/*	$NetBSD: tc_machdep.h,v 1.17 2000/02/29 04:41:59 nisimura Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -57,8 +57,8 @@
  *			region that is not cached.
  */
 
-#ifndef __MACHINE_TC_MACHDEP_H__
-#define __MACHINE_TC_MACHDEP_H__
+#ifndef _PMAX_TC_MACHDEP_H_
+#define _PMAX_TC_MACHDEP_H_
 
 #include <mips/cpuregs.h>		/* defines MIPS_PHYS_TO_KSEG1 */
 
@@ -69,39 +69,20 @@ typedef int32_t		tc_offset_t;
 #define	tc_wmb()	wbflush()
 #define	tc_syncbus()	wbflush() /* XXX how to do this on a DECstation ? */
 
-#define	tc_badaddr(tcaddr)						\
-    badaddr((void *)(tcaddr), sizeof (u_int32_t))
+#define	tc_badaddr(tcaddr) badaddr((void *)(tcaddr), sizeof (u_int32_t))
 
 #define	TC_DENSE_TO_SPARSE(addr)  (addr)
-		
-#define	TC_PHYS_TO_UNCACHED(addr) MIPS_PHYS_TO_KSEG1(addr)
 
+#define	TC_PHYS_TO_UNCACHED(addr) MIPS_PHYS_TO_KSEG1(addr)
 
 /*
  * Use the following macros to compare device names on a pmax, as
  * the autoconfig structs are in a state of flux.
  */
 #define TC_BUS_MATCHNAME(ta, name) \
-     (strncmp( (ta)->ta_modname, (name), TC_ROM_LLEN+1) == 0)
+		(strncmp( (ta)->ta_modname, (name), TC_ROM_LLEN+1) == 0)
 
-/*
- * Port-specific declarations:
- * Declarations "private" sys/dev/tc/tc.c MI functions used to search
- * for potential TC-option console devices (framebuffers),
- */
-int tc_checkslot __P((tc_addr_t slotbase, char *namep));
+#define KV(x)	((tc_addr_t)MIPS_PHYS_TO_KSEG1(x))
+#define C(x)	((void *)(u_long)(x))
 
-/*
- * And declarations for the MD function used to search for and configure
- * a TC framebuffer as system console, and to configure the TC bus
- * (the last is a hack).
- */
-
-extern int badaddr	 __P((void *, u_int));
-extern void config_tcbus __P((struct device *parent, int cputype,
-			      int printfn __P((void*, const char*)) ));
-extern int tc_findconsole __P((int preferred_slot));
-
-#define TC_KV(x)  ((tc_addr_t)MIPS_PHYS_TO_KSEG1(x))
-#define TC_C(x)	((void *)(u_long)x)
-#endif /* __MACHINE_TC_MACHDEP_H__*/
+#endif	/* !_PMAX_TC_MACHDEP_H_ */

@@ -1,4 +1,4 @@
-/* $NetBSD: vm_machdep.c,v 1.45 1999/03/26 23:41:26 mycroft Exp $ */
+/* $NetBSD: vm_machdep.c,v 1.57 2000/05/28 05:48:59 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.45 1999/03/26 23:41:26 mycroft Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.57 2000/05/28 05:48:59 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -131,19 +131,31 @@ cpu_exit(p)
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
- * Copy and update the kernel stack and pcb, making the child
- * ready to run, and marking it so that it can return differently
- * than the parent.  Returns 1 in the child process, 0 in the parent.
- * We currently double-map the user area so that the stack is at the same
- * address in each process; in the future we will probably relocate
- * the frame pointers on the stack after copying.
+ * Copy and update the pcb and trap frame, making the child ready to run.
+ * 
+ * Rig the child's kernel stack so that it will start out in
+ * switch_trampoline() and call child_return() with p2 as an
+ * argument. This causes the newly-created child process to go
+ * directly to user level with an apparent return value of 0 from
+ * fork(), while the parent process returns normally.
+ *
+ * p1 is the process being forked; if p1 == &proc0, we are creating
+ * a kernel thread, and the return path and argument are specified with
+ * `func' and `arg'.
+ *
+ * If an alternate user-level stack is requested (with non-zero values
+ * in both the stack and stacksize args), set up the user stack pointer
+ * accordingly.
  */
 void
-cpu_fork(p1, p2)
+cpu_fork(p1, p2, stack, stacksize, func, arg)
 	register struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
+	void (*func) __P((void *));
+	void *arg;
 {
 	struct user *up = p2->p_addr;
-	int i;
 
 	p2->p_md.md_tf = p1->p_md.md_tf;
 	p2->p_md.md_flags = p1->p_md.md_flags & MDP_FPUSED;
@@ -153,16 +165,6 @@ cpu_fork(p1, p2)
 	 * swap to it easily.
 	 */
 	p2->p_md.md_pcbpaddr = (void *)vtophys((vaddr_t)&up->u_pcb);
-
-	/*
-	 * Simulate a write to the process's U-area pages,
-	 * so that the system doesn't lose badly.
-	 * (If this isn't done, the kernel can't read or
-	 * write the kernel stack.  "Ouch!")
-	 */
-	for (i = 0; i < UPAGES; i++)
-		pmap_emulate_reference(p2, (vaddr_t)up + i * PAGE_SIZE,
-		    0, 1);
 
 	/*
 	 * Copy floating point state from the FP chip to the PCB
@@ -175,9 +177,7 @@ cpu_fork(p1, p2)
 	}
 
 	/*
-	 * Copy pcb and stack from proc p1 to p2.
-	 * We do this as cheaply as possible, copying only the active
-	 * part of the stack.  The stack and pcb need to agree;
+	 * Copy pcb and user stack pointer from proc p1 to p2.
 	 */
 	p2->p_addr->u_pcb = p1->p_addr->u_pcb;
 	p2->p_addr->u_pcb.pcb_hw.apcb_usp = alpha_pal_rdusp();
@@ -221,80 +221,36 @@ cpu_fork(p1, p2)
 		p2tf->tf_regs[FRAME_A4] = 1;		/* is child */
 
 		/*
-		 * Arrange for continuation at child_return(), which
-		 * will return to exception_return().  Note that the child
-		 * process doesn't stay in the kernel for long!
-		 * 
-		 * This is an inlined version of cpu_set_kpc.
+		 * If specificed, give the child a different stack.
 		 */
+		if (stack != NULL)
+			p2tf->tf_regs[FRAME_SP] = (u_long)stack + stacksize;
+
 		up->u_pcb.pcb_hw.apcb_ksp = (u_int64_t)p2tf;	
 		up->u_pcb.pcb_context[0] =
-		    (u_int64_t)child_return;		/* s0: pc */
+		    (u_int64_t)func;			/* s0: pc */
 		up->u_pcb.pcb_context[1] =
 		    (u_int64_t)exception_return;	/* s1: ra */
 		up->u_pcb.pcb_context[2] =
-		    (u_int64_t)p2;			/* s2: arg */
+		    (u_int64_t)arg;			/* s2: arg */
 		up->u_pcb.pcb_context[7] =
 		    (u_int64_t)switch_trampoline;	/* ra: assembly magic */
 	}
 }
 
 /*
- * cpu_set_kpc:
- *
- * Arrange for in-kernel execution of a process to continue at the
- * named pc, as if the code at that address were called as a function
- * with argument, the current process's process pointer.
- *
- * Note that it's assumed that when the named process returns,
- * exception_return() should be invoked, to return to user mode.
- *
- * (Note that cpu_fork(), above, uses an open-coded version of this.)
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct pcb *pcbp;
-
-	pcbp = &p->p_addr->u_pcb;
-	pcbp->pcb_context[0] = (u_int64_t)pc;	/* s0 - pc to invoke */
-	pcbp->pcb_context[1] =
-	    (u_int64_t)exception_return;	/* s1 - return address */
-	pcbp->pcb_context[2] = (u_int64_t)arg;	/* s2 - arg */
-	pcbp->pcb_context[7] =
-	    (u_int64_t)switch_trampoline;	/* ra - assembly magic */
-}
-
-/*
  * Finish a swapin operation.
- * We neded to update the cached PTEs for the user area in the
- * machine dependent part of the proc structure.
+ *
+ * We need to cache the physical address of the PCB, so we can
+ * swap context to it easily.
  */
 void
 cpu_swapin(p)
 	register struct proc *p;
 {
 	struct user *up = p->p_addr;
-	int i;
 
-	/*
-	 * Cache the physical address of the pcb, so we can swap to
-	 * it easily.
-	 */
 	p->p_md.md_pcbpaddr = (void *)vtophys((vaddr_t)&up->u_pcb);
-
-	/*
-	 * Simulate a write to the process's U-area pages,
-	 * so that the system doesn't lose badly.
-	 * (If this isn't done, the kernel can't read or
-	 * write the kernel stack.  "Ouch!")
-	 */
-	for (i = 0; i < UPAGES; i++)
-		pmap_emulate_reference(p, (vaddr_t)up + i * PAGE_SIZE,
-		    0, 1);
 }
 
 /*
@@ -334,7 +290,7 @@ pagemove(from, to, size)
 	long fidx, tidx;
 	ssize_t todo;
 
-	if (size % CLBYTES)
+	if (size % NBPG)
 		panic("pagemove");
 
 	todo = size;			/* if testing > 0, need sign... */
@@ -359,25 +315,10 @@ pagemove(from, to, size)
 	}
 }
 
-extern vm_map_t phys_map;
-
 /*
- * Map an IO request into kernel virtual address space.  Requests fall into
- * one of five catagories:
- *
- *	B_PHYS|B_UAREA:	User u-area swap.
- *			Address is relative to start of u-area (p_addr).
- *	B_PHYS|B_PAGET:	User page table swap.
- *			Address is a kernel VA in usrpt (Usrptmap).
- *	B_PHYS|B_DIRTY:	Dirty page push.
- *			Address is a VA in proc2's address space.
- *	B_PHYS|B_PGIN:	Kernel pagein of user pages.
- *			Address is VA in user's address space.
- *	B_PHYS:		User "raw" IO request.
- *			Address is VA in user's address space.
- *
- * All requests are (re)mapped into kernel VA space via the useriomap
- * (a name with only slightly more meaning than "kernelmap")
+ * Map a user I/O request into kernel virtual address space.
+ * Note: the pages are already locked by uvm_vslock(), so we
+ * do not need to pass an access_type to pmap_enter().
  */
 void
 vmapbuf(bp, len)
@@ -391,26 +332,25 @@ vmapbuf(bp, len)
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vmapbuf");
 	p = bp->b_proc;
-	faddr = trunc_page(bp->b_saveaddr = bp->b_data);
+	faddr = trunc_page((vaddr_t)bp->b_saveaddr = bp->b_data);
 	off = (vaddr_t)bp->b_data - faddr;
 	len = round_page(off + len);
 	taddr = uvm_km_valloc_wait(phys_map, len);
 	bp->b_data = (caddr_t)(taddr + off);
 	len = atop(len);
 	while (len--) {
-		pa = pmap_extract(vm_map_pmap(&p->p_vmspace->vm_map), faddr);
-		if (pa == 0)
+		if (pmap_extract(vm_map_pmap(&p->p_vmspace->vm_map), faddr,
+		    &pa) == FALSE)
 			panic("vmapbuf: null page frame");
 		pmap_enter(vm_map_pmap(phys_map), taddr, trunc_page(pa),
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
+		    VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 	}
 }
 
 /*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
+ * Unmap a previously-mapped user I/O request.
  */
 void
 vunmapbuf(bp, len)
@@ -421,7 +361,7 @@ vunmapbuf(bp, len)
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vunmapbuf");
-	addr = trunc_page(bp->b_data);
+	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
 	uvm_km_free_wakeup(phys_map, addr, len);

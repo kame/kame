@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.10.2.1 1999/11/21 15:36:21 he Exp $
+#	$NetBSD: genassym.cf,v 1.14 2000/05/26 00:36:44 thorpej Exp $
 
 #-
 # Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -36,6 +36,8 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
+include "opt_compat_svr4.h"
+
 include <sys/param.h>
 include <sys/buf.h>
 include <sys/proc.h>
@@ -46,6 +48,11 @@ include <sys/user.h>
 
 include <vm/vm.h>
 include <uvm/uvm_extern.h>
+
+ifdef COMPAT_SVR4
+include <compat/svr4/svr4_syscall.h>
+include <compat/svr4/svr4_ucontext.h>
+endif
 
 include <machine/cpu.h>
 include <machine/trap.h>
@@ -84,6 +91,7 @@ define	P_MD			offsetof(struct proc, p_md)
 define	P_PID			offsetof(struct proc, p_pid)
 define	MD_REGS			offsetof(struct mdproc, md_regs)
 define	SRUN			SRUN
+define	SONPROC			SONPROC
 
 # interrupt/fault metering
 define	UVMEXP_INTRS		offsetof(struct uvmexp, intrs)
@@ -203,3 +211,12 @@ quote #define stio_addr		0
 
 define	SCU_SOFTINT		AD_SCU + offsetof(struct scu, sys_int)
 define	SCU_SYSMASK		AD_SCU + offsetof(struct scu, sys_mask)
+
+# SVR4 binary compatibility
+ifdef COMPAT_SVR4
+define SVR4_SIGF_HANDLER	offsetof(struct svr4_sigframe, sf_handler)
+define SVR4_SIGF_UC		offsetof(struct svr4_sigframe, sf_uc)
+define SVR4_SYS_context		SVR4_SYS_context
+define SVR4_SYS_exit		SVR4_SYS_exit
+define SVR4_SETCONTEXT		SVR4_SETCONTEXT
+endif

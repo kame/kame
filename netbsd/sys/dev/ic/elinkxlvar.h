@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxlvar.h,v 1.1.6.1 1999/04/27 00:13:56 perry Exp $	*/
+/*	$NetBSD: elinkxlvar.h,v 1.6.2.1 2000/09/01 00:56:40 haya Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -77,11 +77,14 @@ struct ex_softc {
 
 	u_int ex_connectors;		/* Connectors on this card.	*/
 	mii_data_t ex_mii;		/* mii bus data 		*/
+	struct callout ex_mii_callout;	/* mii callout			*/
 	u_int ex_conf;			/* config flags */
 
 #define EX_CONF_MII		0x0001	/* has MII bus */
 #define EX_CONF_INTPHY		0x0002	/* has internal PHY */
 #define EX_CONF_90XB		0x0004	/* is 90xB */
+#define EX_CONF_INV_LED_POLARITY	0x0010	/* CardBus: LED polarity */
+#define EX_CONF_PHY_POWER	0x0020	/* CardBus: controllable PHY power */
 
 
 	/*
@@ -102,6 +105,7 @@ struct ex_softc {
 #define EX_FLAGS_SNOOPING		0x0800
 #define EX_FLAGS_100MBIT		0x1000
 #define EX_FLAGS_POWERMGMT		0x2000
+#define EX_FLAGS_ATTACHED		0x4000	/* attach has succeeded */
 
 	u_char	ex_bustype;		/* parent bus type (currently unused) */
 
@@ -116,6 +120,13 @@ struct ex_softc {
 	int (*enable) __P((struct ex_softc *));
 	void (*disable) __P((struct ex_softc *));
 	int enabled;
+	/* interrupt acknowledge hook */
+	void (*intr_ack) __P((struct ex_softc *));
+
+	void *sc_sdhook;
+
+	bus_dma_segment_t sc_useg, sc_dseg;
+	int sc_urseg, sc_drseg;
 };
 
 #define ex_waitcmd(sc) \
@@ -129,3 +140,5 @@ int	ex_intr __P((void *));
 void	ex_stop __P((struct ex_softc *));
 void	ex_watchdog __P((struct ifnet *));
 int	ex_ioctl __P((struct ifnet *ifp, u_long, caddr_t));
+int	ex_activate __P((struct device *, enum devact));
+int	ex_detach __P((struct ex_softc *));

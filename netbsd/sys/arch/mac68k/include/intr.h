@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.13 1999/02/28 04:52:07 scottr Exp $	*/
+/*	$NetBSD: intr.h,v 1.17 1999/11/06 23:05:40 scottr Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -30,88 +30,53 @@
 #ifndef _MAC68K_INTR_H_
 #define _MAC68K_INTR_H_
 
+#include <machine/psl.h>
+
 #ifdef _KERNEL
-/*
- * spl functions; all but spl0 are done in-line
- */
-
-#define _spl(s)								\
-({									\
-        register int _spl_r;						\
-									\
-        __asm __volatile ("clrl %0; movew sr,%0; movew %1,sr" :		\
-                "&=d" (_spl_r) : "di" (s));				\
-        _spl_r;								\
-})
-
-#define _splraise(s)							\
-({									\
-	int _spl_r;							\
-									\
-	__asm __volatile ("						\
-		clrl	d0					;	\
-		movw	sr,d0					;	\
-		movl	d0,%0					;	\
-		andw	#0x700,d0				;	\
-		movw	%1,d1					;	\
-		andw	#0x700,d1				;	\
-		cmpw	d0,d1					;	\
-		jle	1f					;	\
-		movw	%1,sr					;	\
-	    1:"							:	\
-		    "&=d" (_spl_r)				:	\
-		    "di" (s)					:	\
-		    "d0", "d1");					\
-	_spl_r;								\
-})
 
 /* spl0 requires checking for software interrupts */
-#define spl1()  _spl(PSL_S|PSL_IPL1)
-#define spl2()  _spl(PSL_S|PSL_IPL2)
-#define spl3()  _spl(PSL_S|PSL_IPL3)
-#define spl4()  _spl(PSL_S|PSL_IPL4)
-#define spl5()  _spl(PSL_S|PSL_IPL5)
-#define spl6()  _spl(PSL_S|PSL_IPL6)
-#define spl7()  _spl(PSL_S|PSL_IPL7)
-
-/* These spl calls are _not_ to be used by machine-independent code. */
-#define	spladb()	splhigh()
-#define	splzs()		splserial()
-#define	splsoft()	spl1()
 
 /*
- * splnet must block hardware network interrupts
- * splimp must be > spltty
+ * This array contains the appropriate PSL_S|PSL_IPL? values
+ * to raise interrupt priority to the requested level.
  */
-extern u_short	mac68k_ttyipl;
-extern u_short	mac68k_bioipl;
-extern u_short	mac68k_netipl;
-extern u_short	mac68k_impipl;
-extern u_short	mac68k_audioipl;
-extern u_short	mac68k_clockipl;
-extern u_short	mac68k_statclockipl;
-extern u_short	mac68k_schedipl;
+extern unsigned short mac68k_ipls[];
+
+#define	MAC68K_IPL_SOFT		0
+#define	MAC68K_IPL_BIO		1
+#define	MAC68K_IPL_NET		2
+#define	MAC68K_IPL_TTY		3
+#define	MAC68K_IPL_IMP		4
+#define	MAC68K_IPL_AUDIO	5
+#define	MAC68K_IPL_SERIAL	6
+#define	MAC68K_IPL_ADB		7
+#define	MAC68K_IPL_CLOCK	8
+#define	MAC68K_IPL_STATCLOCK	9
+#define	MAC68K_IPL_SCHED	10
+#define	MAC68K_IPL_HIGH		11
+#define	MAC68K_NIPLS		12
+
+/* These spl calls are _not_ to be used by machine-independent code. */
+#define	spladb()	_splraise(mac68k_ipls[MAC68K_IPL_ADB])
+#define	splzs()		splserial()
 
 /*
  * These should be used for:
  * 1) ensuring mutual exclusion (why use processor level?)
  * 2) allowing faster devices to take priority
- *
- * Note that on the Mac, most things are masked at spl1, almost
- * everything at spl2, and everything but the panic switch and
- * power at spl4.
  */
-#define	splsoftclock()	splsoft()
-#define	splsoftnet()	splsoft()
-#define	spltty()	_splraise(mac68k_ttyipl)
-#define	splbio()	_splraise(mac68k_bioipl)
-#define	splnet()	_splraise(mac68k_netipl)
-#define	splimp()	_splraise(mac68k_impipl)
-#define	splaudio()	_splraise(mac68k_audioipl)
-#define	splclock()	_splraise(mac68k_clockipl)
-#define	splstatclock()	_splraise(mac68k_statclockipl)
-#define	splsched()	_splraise(mac68k_schedipl)
-#define	splserial()	spl4()
+#define	spllowersoftclock() spl1()
+#define	splsoftclock()	_splraise(mac68k_ipls[MAC68K_IPL_SOFT])
+#define	splsoftnet()	_splraise(mac68k_ipls[MAC68K_IPL_SOFT])
+#define	spltty()	_splraise(mac68k_ipls[MAC68K_IPL_TTY])
+#define	splbio()	_splraise(mac68k_ipls[MAC68K_IPL_BIO])
+#define	splnet()	_splraise(mac68k_ipls[MAC68K_IPL_NET])
+#define	splimp()	_splraise(mac68k_ipls[MAC68K_IPL_IMP])
+#define	splaudio()	_splraise(mac68k_ipls[MAC68K_IPL_AUDIO])
+#define	splclock()	_splraise(mac68k_ipls[MAC68K_IPL_CLOCK])
+#define	splstatclock()	_splraise(mac68k_ipls[MAC68K_IPL_STATCLOCK])
+#define	splsched()	_splraise(mac68k_ipls[MAC68K_IPL_SCHED])
+#define	splserial()	_splraise(mac68k_ipls[MAC68K_IPL_SERIAL])
 #define	splhigh()	spl7()
 
 /* watch out for side effects */
@@ -129,9 +94,9 @@ extern volatile u_int8_t ssir;
 #define SIR_ADB		0x10
 
 #define	siron(mask)	\
-	__asm __volatile ( "orb %0,_ssir" : : "i" (mask))
+	__asm __volatile ( "orb %1,%0" : "=m" (ssir) : "i" (mask))
 #define	siroff(mask)	\
-	__asm __volatile ( "andb %0,_ssir" : : "ir" (~(mask)));
+	__asm __volatile ( "andb %1,%0" : "=m" (ssir) : "ir" (~(mask)));
 
 #define	setsoftnet()	siron(SIR_NET)
 #define	setsoftclock()	siron(SIR_CLOCK)

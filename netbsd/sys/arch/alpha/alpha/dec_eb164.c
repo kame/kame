@@ -1,4 +1,4 @@
-/* $NetBSD: dec_eb164.c,v 1.28.2.2 2000/02/06 17:22:29 he Exp $ */
+/* $NetBSD: dec_eb164.c,v 1.36 2000/06/20 03:48:54 matt Exp $ */
 
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_eb164.c,v 1.28.2.2 2000/02/06 17:22:29 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_eb164.c,v 1.36 2000/06/20 03:48:54 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,8 +48,10 @@ __KERNEL_RCSID(0, "$NetBSD: dec_eb164.c,v 1.28.2.2 2000/02/06 17:22:29 he Exp $"
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 
+#include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
-#include <dev/isa/pckbcvar.h>
+#include <dev/ic/i8042reg.h>
+#include <dev/ic/pckbcvar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
@@ -126,7 +128,8 @@ dec_eb164_cons_init()
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(&ccp->cc_iot, PCKBC_KBD_SLOT);
+		(void) pckbc_cnattach(&ccp->cc_iot, IO_KBD, KBCMDP,
+		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
@@ -166,7 +169,8 @@ dec_eb164_device_register(dev, aux)
 
 	if (!initted) {
 		scsiboot = (strcmp(b->protocol, "SCSI") == 0);
-		netboot = (strcmp(b->protocol, "BOOTP") == 0);
+		netboot = (strcmp(b->protocol, "BOOTP") == 0) ||
+		    (strcmp(b->protocol, "MOP") == 0);
 		/*
 		 * Add an extra check to boot from ide drives:
 		 * Newer SRM firmware use the protocol identifier IDE,
@@ -200,10 +204,10 @@ dec_eb164_device_register(dev, aux)
 		else {
 			struct pci_attach_args *pa = aux;
 
-			if ((b->slot % 1000) != pa->pa_device)
+			if (b->slot % 1000 / 100 != pa->pa_function)
 				return;
-
-			/* XXX function? */
+			if (b->slot % 100 != pa->pa_device)
+				return;
 	
 			scsipidev = dev;
 			DR_VERBOSE(printf("\nscsipidev = %s\n",
@@ -212,7 +216,7 @@ dec_eb164_device_register(dev, aux)
 		}
 	}
 
-	if (scsiboot &&
+	if ((ideboot || scsiboot) &&
 	    (!strcmp(cd->cd_name, "sd") ||
 	     !strcmp(cd->cd_name, "st") ||
 	     !strcmp(cd->cd_name, "cd"))) {
@@ -221,7 +225,11 @@ dec_eb164_device_register(dev, aux)
 		if (parent->dv_parent != scsipidev)
 			return;
 
-		if (b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+		if (sa->sa_sc_link->type == BUS_SCSI
+		    && b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+			return;
+		if (sa->sa_sc_link->type == BUS_ATAPI
+		    && b->unit / 100 != sa->sa_sc_link->scsipi_atapi.drive)
 			return;
 
 		/* XXX LUN! */

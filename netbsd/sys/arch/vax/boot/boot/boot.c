@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.2.2.1 2000/03/01 12:38:57 he Exp $ */
+/*	$NetBSD: boot.c,v 1.9.4.1 2000/07/27 16:44:21 matt Exp $ */
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -37,10 +37,12 @@
 #include "sys/param.h"
 #include "sys/reboot.h"
 #include "lib/libsa/stand.h"
+#include "lib/libsa/loadfile.h"
+#include "lib/libkern/libkern.h"
 
 #define V750UCODE(x)    ((x>>8)&255)
 
-#include <a.out.h>
+#include "machine/rpb.h"
 
 #include "vaxstand.h"
 
@@ -51,139 +53,188 @@
  */
 
 char line[100];
-int	devtype, bootdev, howto, debug;
+int	bootdev, debug;
 extern	unsigned opendev;
-extern  unsigned *bootregs;
 
-void	usage(), boot();
+void	usage(char *), boot(char *), halt(char *);
+void	Xmain(struct rpb *);
+void	autoconf(void);
+int	getsecs(void);
+int	setjmp(int *);
+int	testkey(void);
+void	loadpcs(void);
 
-struct vals {
+const struct vals {
 	char	*namn;
-	void	(*func)();
+	void	(*func)(char *);
 	char	*info;
 } val[] = {
 	{"?", usage, "Show this help menu"},
 	{"help", usage, "Same as '?'"},
-	{"boot", exec, "load and execute file"},
+	{"boot", boot, "Load and execute file"},
+	{"halt", halt, "Halts the system"},
 	{0, 0},
 };
 
-char *filer[] = {
-	"netbsd",
-	"netbsd.gz",
-	"netbsd.old",
-	"gennetbsd",
-	0,
+static struct {
+	char name[12];
+	int quiet;
+} filelist[] = {
+	{ "netbsd.vax", 1 },
+	{ "netbsd", 0 },
+	{ "netbsd.gz", 0 },
+	{ "netbsd.old", 0 },
+	{ "gennetbsd", 0 },
+	{ "", 0 },
 };
 
-Xmain()
-{
-	int io, type, sluttid, askname, filindex = 0;
-	volatile int i, j;
+int jbuf[10];
+int sluttid, senast, skip, askname;
+struct rpb bootrpb;
 
-	io=0;
+void
+Xmain(struct rpb *prpb)
+{
+	int io;
+	int j, nu;
+	u_long marks[MARK_MAX];
+
+	/* First copy rpb/bqo to its new location */
+	bcopy((caddr_t)prpb, &bootrpb, sizeof(struct rpb));
+	if (prpb->iovec) {
+		bootrpb.iovec = (int)alloc(prpb->iovecsz);
+		bcopy((caddr_t)prpb->iovec, (caddr_t)bootrpb.iovec,
+		    prpb->iovecsz);
+	}
+	io = 0;
+	skip = 1;
 	autoconf();
 
-	askname = howto & RB_ASKNAME;
+	askname = bootrpb.rpb_bootr5 & RB_ASKNAME;
 	printf("\n\r>> NetBSD/vax boot [%s %s] <<\n", __DATE__, __TIME__);
 	printf(">> Press any key to abort autoboot  ");
 	sluttid = getsecs() + 5;
+	senast = 0;
+	skip = 0;
+	setjmp(jbuf);
 	for (;;) {
-		printf("%c%d", 8, sluttid - getsecs());
-		if (sluttid <= getsecs())
+		nu = sluttid - getsecs();
+		if (senast != nu)
+			printf("%c%d", 8, nu);
+		if (nu <= 0)
 			break;
+		senast = nu;
 		if ((j = (testkey() & 0177))) {
+			skip = 1;
 			if (j != 10 && j != 13) {
 				printf("\nPress '?' for help");
 				askname = 1;
 			}
 			break;
 		}
-		for (i = 10000;i; i--)/* Don't read the timer chip too often */
-			;
 	}
+	skip = 1;
 	printf("\n");
 
 	/* First try to autoboot */
 	if (askname == 0) {
-		type = (devtype >> B_TYPESHIFT) & B_TYPEMASK;
-		if ((unsigned)type < ndevs && devsw[type].dv_name)
-			while (filer[filindex]) {
-				errno = 0;
-				printf("> boot %s\n", filer[filindex]);
-				exec(filer[filindex++], 0, 0);
-				printf("boot failed: %s\n", strerror(errno));
-				if (testkey())
-					break;
+		int fileindex;
+		for (fileindex = 0; filelist[fileindex].name[0] != '\0';
+		    fileindex++) {
+			int err;
+			errno = 0;
+			if (!filelist[fileindex].quiet)
+				printf("> boot %s\n", filelist[fileindex].name);
+			marks[MARK_START] = 0;
+			err = loadfile(filelist[fileindex].name, marks, LOAD_KERNEL|COUNT_KERNEL);
+			if (err == 0) {
+				machdep_start((char *)marks[MARK_ENTRY], 0,
+					      (void *)marks[MARK_START],
+					      (void *)marks[MARK_SYM],
+					      (void *)marks[MARK_END]);
 			}
+			if (!filelist[fileindex].quiet)
+				printf("%s: boot failed: %s\n", 
+				    filelist[fileindex].name, strerror(errno));
+#if 0 /* Will hang VAX 4000 machines */
+			if (testkey())
+				break;
+#endif
+		}
 	}
 
 	/* If any key pressed, go to conversational boot */
 	for (;;) {
-		struct vals *v = &val[0];
+		const struct vals *v = &val[0];
 		char *c, *d;
 
-start:		printf("> ");
+		printf("> ");
 		gets(line);
-		if (line[0] == 0)
+
+		c = line;
+		while (*c == ' ')
+			c++;
+
+		if (c[0] == 0)
 			continue;
 
-		if ((c = index(line, ' '))) {
-			*c++ = 0;
-			while (*c == ' ')
-				c++;
-		}
+		if ((d = index(c, ' ')))
+			*d++ = 0;
 
-		/* If *c != '-' then it is a filename */
-		if (c) {
-			if (*c == '-') {
-				d = c;
-				c = filer[0];
-			} else {
-				d = index(c, ' ');
-				if (d) {
-					*d++ = 0;
-					while (*d == ' ')
-						d++;
-					if (*d != '-')
-						goto fail;
-				}
-			}
-
-			if (d) {
-			while (*++d) {
-				if (*d == 'a')
-					howto |= RB_ASKNAME;
-				else if (*d == 'd')
-					howto |= RB_KDB;
-				else if (*d == 's')
-					howto |= RB_SINGLE;
-#ifdef notyet
-				else if (*d == 'r')
-					rawread++;
-#endif
-				else {
-fail:						printf(
-					"usage: boot [filename] [-asd]\n");
-					goto start;
-					}
-				}
-			}
-		} else
-			c = filer[0];
 		while (v->namn) {
-			if (strcmp(v->namn, line) == 0)
+			if (strcmp(v->namn, c) == 0)
 				break;
 			v++;
 		}
-		errno = 0;
 		if (v->namn)
-			(*v->func)(c, 0, 0);
+			(*v->func)(d);
 		else
-			printf("Unknown command: %s %s\n", line, (c ? c : ""));
-		if (errno)
-			printf("Command failed: %s\n", strerror(errno));
+			printf("Unknown command: %s\n", c);
 	}
+}
+
+void
+halt(char *hej)
+{
+	asm("halt");
+}
+
+void
+boot(char *arg)
+{
+	char *fn = "netbsd";
+
+	if (arg) {
+		while (*arg == ' ')
+			arg++;
+
+		if (*arg != '-') {
+			fn = arg;
+			if ((arg = index(arg, ' '))) {
+				*arg++ = 0;
+				while (*arg == ' ')
+					arg++;
+			} else
+				goto load;
+		}
+		if (*arg != '-') {
+fail:			printf("usage: boot [filename] [-asd]\n");
+			return;
+		}
+
+		while (*++arg) {
+			if (*arg == 'a')
+				bootrpb.rpb_bootr5 |= RB_ASKNAME;
+			else if (*arg == 'd')
+				bootrpb.rpb_bootr5 |= RB_KDB;
+			else if (*arg == 's')
+				bootrpb.rpb_bootr5 |= RB_SINGLE;
+			else
+				goto fail;
+		}
+	}
+load:	exec(fn, 0, 0);
+	printf("Boot failed: %s\n", strerror(errno));
 }
 
 /* 750 Patchable Control Store magic */
@@ -206,6 +257,7 @@ fail:						printf(
 })
 
 
+void
 loadpcs()
 {
 	static int pcsdone = 0;
@@ -279,9 +331,9 @@ loadpcs()
 }
 
 void
-usage()
+usage(char *hej)
 {
-	struct vals *v = &val[0];
+	const struct vals *v = &val[0];
 
 	printf("Commands:\n");
 	while (v->namn) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: smc90cx6.c,v 1.29 1999/02/16 23:34:13 is Exp $ */
+/*	$NetBSD: smc90cx6.c,v 1.35 2000/03/30 12:45:32 augustss Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  * compatibility mode) boards
  */
 
-#define BAHSOFTCOPY /**/
+/* #define BAHSOFTCOPY */
 #define BAHRETRANSMIT /**/
 
 #include "opt_inet.h"
@@ -199,7 +199,6 @@ bah_attach_subr(sc)
 
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 	ifp->if_softc = sc;
-	ifp->if_output = arc_output;
 	ifp->if_start = bah_start;
 	ifp->if_ioctl = bah_ioctl;
 	ifp->if_timer = 0;
@@ -209,7 +208,6 @@ bah_attach_subr(sc)
 
 	ifp->if_mtu = ARCMTU;
 
-	if_attach(ifp);
 	arc_ifattach(ifp, linkaddress);
 
 #if NBPFILTER > 0
@@ -221,6 +219,7 @@ bah_attach_subr(sc)
 		(void (*) __P((void *)))bah_start, ifp);
 #endif
 
+	callout_init(&sc->sc_recon_ch);
 }
 
 /*
@@ -283,7 +282,7 @@ bah_reset(sc)
 #endif
 
 	/* tell the routing level about the (possibly changed) link address */
-	arc_ifattach(ifp, linkaddress);
+	arc_storelladdr(ifp, linkaddress);
 
 	/* POR is NMI, but we need it below: */
 	sc->sc_intmask = BAH_RECON|BAH_POR;
@@ -409,14 +408,19 @@ bah_start(ifp)
 #endif
 
 #ifdef BAH_DEBUG
-	m = m_pullup(m, 3);	/* gcc does structure padding */
+	if (m->m_len < ARC_HDRLEN)
+		m = m_pullup(m, ARC_HDRLEN);/* gcc does structure padding */
 	printf("%s: start: filling %ld from %ld to %ld type %ld\n",
 	    sc->sc_dev.dv_xname, buffer, mtod(m, u_char *)[0],
 	    mtod(m, u_char *)[1], mtod(m, u_char *)[2]);
 #else
-	m = m_pullup(m, 2);
+	if (m->m_len < 2)
+		m = m_pullup(m, 2);
 #endif
 	bah_ram_ptr = buffer*512;
+
+	if (m == 0)
+		return;
 
 	/* write the addresses to RAM and throw them away */
 
@@ -560,6 +564,14 @@ bah_srint(vsc)
 		offset = GETMEM(bah_ram_ptr + 3);
 		len = 512 - offset;
 	}
+	if (len+2 >= MINCLSIZE)
+		MCLGET(m, M_DONTWAIT);
+	
+	if (m == 0) {
+		ifp->if_ierrors++;
+		goto cleanup;
+	}
+
 	type = GETMEM(bah_ram_ptr + offset);
 	m->m_data += 1 + arc_isphds(type);
 
@@ -611,9 +623,7 @@ bah_srint(vsc)
 		bpf_mtap(ifp->if_bpf, head);
 #endif
 
-	arc_input(&sc->sc_arccom.ac_if, head);
-
-	/* arc_input has freed it, we dont need to... */
+	(*sc->sc_arccom.ac_if.if_input)(&sc->sc_arccom.ac_if, head);
 
 	head = NULL;
 	ifp->if_ipackets++;
@@ -796,7 +806,7 @@ bahintr(arg)
 			 * double time if necessary.
 			 */
 	
-			untimeout(bah_reconwatch, (void *)sc);
+			callout_stop(&sc->sc_recon_ch);
 			newsec = time.tv_sec;
 			if ((newsec - sc->sc_recontime <= 2) && 
 			    (++sc->sc_reconcount == ARC_EXCESSIVE_RECONS)) {
@@ -805,7 +815,8 @@ bahintr(arg)
 				    "cable problem?\n", sc->sc_dev.dv_xname);
 			}
 			sc->sc_recontime = newsec;
-			timeout(bah_reconwatch, (void *)sc, 15*hz);
+			callout_reset(&sc->sc_recon_ch, 15 * hz,
+			    bah_reconwatch, (void *)sc);
 		}
 
 		if (maskedisr & BAH_RI) {
@@ -896,12 +907,12 @@ bah_reconwatch(arg)
  */
 int
 bah_ioctl(ifp, command, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long command;
 	caddr_t data;
 {
 	struct bah_softc *sc;
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 	struct ifreq *ifr;
 	int s, error;
 
@@ -952,10 +963,15 @@ bah_ioctl(ifp, command, data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if (ifr->ifr_addr.sa_family == AF_INET)
+		switch (ifr->ifr_addr.sa_family) {
+		case AF_INET:
+		case AF_INET6:
 			error = 0;
-		else
+			break;
+		default:
 			error = EAFNOSUPPORT;
+			break;
+		}
 		break;
 
 	default:

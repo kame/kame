@@ -1,4 +1,4 @@
-/*	$NetBSD: atapi_base.c,v 1.11.4.1 1999/06/25 20:38:20 perry Exp $	*/
+/*	$NetBSD: atapi_base.c,v 1.14 1999/09/30 22:57:52 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -98,9 +98,9 @@ atapi_interpret_sense(xs)
 		case SKEY_NOT_READY:
 			if ((sc_link->flags & SDEV_REMOVABLE) != 0)
 				sc_link->flags &= ~SDEV_MEDIA_LOADED;
-			if ((xs->flags & SCSI_IGNORE_NOT_READY) != 0)
+			if ((xs->xs_control & XS_CTL_IGNORE_NOT_READY) != 0)
 				return (0);
-			if ((xs->flags & SCSI_SILENT) != 0)
+			if ((xs->xs_control & XS_CTL_SILENT) != 0)
 				return (EIO);
 			msg = "not ready";
 			error = EIO;
@@ -114,9 +114,10 @@ atapi_interpret_sense(xs)
 			error = EIO;
 			break;
 		case SKEY_ILLEGAL_REQUEST:
-			if ((xs->flags & SCSI_IGNORE_ILLEGAL_REQUEST) != 0)
+			if ((xs->xs_control &
+			     XS_CTL_IGNORE_ILLEGAL_REQUEST) != 0)
 				return (0);
-			if ((xs->flags & SCSI_SILENT) != 0)
+			if ((xs->xs_control & XS_CTL_SILENT) != 0)
 				return (EIO);
 			msg = "illegal request";
 			error = EINVAL;
@@ -124,11 +125,12 @@ atapi_interpret_sense(xs)
 		case SKEY_UNIT_ATTENTION:
 			if ((sc_link->flags & SDEV_REMOVABLE) != 0)
 				sc_link->flags &= ~SDEV_MEDIA_LOADED;
-			if ((xs->flags & SCSI_IGNORE_MEDIA_CHANGE) != 0 ||
+			if ((xs->xs_control &
+			     XS_CTL_IGNORE_MEDIA_CHANGE) != 0 ||
 			    /* XXX Should reupload any transient state. */
 			    (sc_link->flags & SDEV_REMOVABLE) == 0)
 				return (ERESTART);
-			if ((xs->flags & SCSI_SILENT) != 0)
+			if ((xs->xs_control & XS_CTL_SILENT) != 0)
 				return (EIO);
 			msg = "unit attention";
 			error = EIO;
@@ -221,13 +223,21 @@ atapi_scsipi_cmd(sc_link, scsipi_cmd, cmdlen, data_addr, datalen,
 	SC_DEBUG(sc_link, SDEV_DB2, ("atapi_cmd\n"));
 
 #ifdef DIAGNOSTIC
-	if (bp != 0 && (flags & SCSI_NOSLEEP) == 0)
-		panic("atapi_scsipi_cmd: buffer without nosleep");
+	if (bp != NULL && (flags & XS_CTL_ASYNC) == 0)
+		panic("atapi_scsipi_cmd: buffer without async");
 #endif
 
 	if ((xs = scsipi_make_xs(sc_link, scsipi_cmd, cmdlen, data_addr,
-	    datalen, retries, timeout, bp, flags)) == NULL)
+	    datalen, retries, timeout, bp, flags)) == NULL) {
+		if (bp != NULL) {
+			s = splbio();
+			bp->b_flags |= B_ERROR;
+			bp->b_error = ENOMEM;
+			biodone(bp);
+			splx(s);
+		}
 		return (ENOMEM);
+	}
 
 	xs->cmdlen = (sc_link->scsipi_atapi.cap & ACAP_LEN) ? 16 : 12;
 
@@ -263,7 +273,7 @@ atapi_mode_select(l, data, len, flags, retries, timeout)
 
 	error = scsipi_command(l, (struct scsipi_generic *)&scsipi_cmd,
 	    sizeof(scsipi_cmd), (void *)data, len, retries, timeout, NULL,
-	    flags | SCSI_DATA_OUT);
+	    flags | XS_CTL_DATA_OUT);
 	SC_DEBUG(l, SDEV_DB2, ("atapi_mode_select: error=%d\n", error));
 	return (error);
 }
@@ -284,7 +294,7 @@ atapi_mode_sense(l, page, data, len, flags, retries, timeout)
 
 	error = scsipi_command(l, (struct scsipi_generic *)&scsipi_cmd,
 	    sizeof(scsipi_cmd), (void *)data, len, retries, timeout, NULL,
-	    flags | SCSI_DATA_IN);
+	    flags | XS_CTL_DATA_IN);
 	SC_DEBUG(l, SDEV_DB2, ("atapi_mode_sense: error=%d\n", error));
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.3 1998/09/03 13:18:44 tsubai Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.13 2000/06/01 15:38:25 matt Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -56,7 +56,6 @@
 #include <sys/buf.h>
 #include <sys/dkstat.h>
 #include <sys/conf.h>
-#include <sys/dmap.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
 
@@ -66,6 +65,7 @@
 
 #include <machine/cpu.h>
 #include <machine/adrsmap.h>
+#include <machine/romcall.h>
 
 #include <newsmips/newsmips/machid.h>
 
@@ -74,12 +74,12 @@
  * the configuration process, and are used in initializing
  * the machine.
  */
-int	cold = 1;	/* if 1, still working on cold-start */
 int	cpuspeed = 10;	/* approx # instr per usec. */
 
-extern int initcpu __P((void));		/*XXX*/
+struct device *booted_device;
+int booted_partition;
 
-void	findroot __P((struct device **, int *));
+static void findroot __P((void));
 
 /*
  * Determine mass storage and memory configuration for a machine.
@@ -89,9 +89,8 @@ void	findroot __P((struct device **, int *));
  * for attached scsi devices.
  */
 void
-configure()
+cpu_configure()
 {
-	int s;
 	extern struct idrom idrom;
 
 	printf("SONY NET WORK STATION, Model %s, ", idrom.id_model);
@@ -100,31 +99,33 @@ configure()
 	/*
 	 * Kick off autoconfiguration
 	 */
-	s = splhigh();
+	_splnone();	/* enable all interrupts */
+	splhigh();	/* ...then disable device interrupts */
 
-	*(char *)INTEN0 = INTEN0_BERR;		/* only buserr occurs */
-	*(char *)INTEN1 = 0;
+	if (systype == NEWS3400) {
+		*(char *)INTEN0 = INTEN0_BERR;	/* only buserr occurs */
+		*(char *)INTEN1 = 0;
+	}
 
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
 
-	initcpu();
+	/* Enable hardware interrupt registers. */
+	enable_intr();
 
-	cold = 0;
+	/* Configuration is finished, turn on interrupts. */
+	_splnone();	/* enable all source forcing SOFT_INTs cleared */
 }
 
 void
 cpu_rootconf()
 {
-	struct device *booted_device;
-	int booted_partition;
-
-	findroot(&booted_device, &booted_partition);
+	findroot();
 
 	printf("boot device: %s\n",
 	       booted_device ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, booted_partition, dev_name2blk);
+	setroot(booted_device, booted_partition);
 }
 
 u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
@@ -133,25 +134,21 @@ u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
  * Attempt to find the device from which we were booted.
  */
 void
-findroot(devpp, partp)
-	struct device **devpp;
-	int *partp;
+findroot()
 {
-	int unit, part, controller;
+	int ctlr, unit, part, type;
 	struct device *dv;
 
-	/*
-	 * Default to "not found".
-	 */
-	*devpp = NULL;
-	*partp = 0;
-
-	if ((bootdev & B_MAGICMASK) != 0x50000000) /* NEWS-OS's B_DEVMAGIC */
+	if (BOOTDEV_MAG(bootdev) != 5)	/* NEWS-OS's B_DEVMAGIC */
 		return;
 
-	controller = B_CONTROLLER(bootdev);
-	part = (bootdev >> 8) & 0x0f;
-	unit = (bootdev >> 20) & 0x0f;
+	ctlr = BOOTDEV_CTLR(bootdev);	/* SCSI ID */
+	unit = BOOTDEV_UNIT(bootdev);
+	part = BOOTDEV_PART(bootdev);	/* LUN */
+	type = BOOTDEV_TYPE(bootdev);
+
+	if (type != BOOTDEV_SD)
+		return;
 
 	/*
 	 * XXX assumes only one controller exists.
@@ -160,11 +157,11 @@ findroot(devpp, partp)
 		if (strcmp(dv->dv_xname, "scsibus0") == 0) {
 			struct scsibus_softc *sdv = (void *)dv;
 
-			if (sdv->sc_link[unit][0] == NULL)
+			if (sdv->sc_link[ctlr][0] == NULL)
 				continue;
 
-			*devpp = sdv->sc_link[unit][0]->device_softc;
-			*partp = part;
+			booted_device = sdv->sc_link[ctlr][0]->device_softc;
+			booted_partition = part;
 			return;
 		}
 	}

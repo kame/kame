@@ -1,4 +1,4 @@
-/*	$NetBSD: i82586var.h,v 1.11 1999/03/25 23:18:32 thorpej Exp $	*/
+/*	$NetBSD: i82586var.h,v 1.14 2000/05/11 20:55:04 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -97,7 +97,9 @@
  * This sun version based on i386 version 1.30.
  */
 
-#define I82586_DEBUG 1
+#ifndef I82586_DEBUG
+#define I82586_DEBUG 0
+#endif
 
 /* Debug elements */
 #define	IED_RINT	0x01
@@ -121,6 +123,7 @@
 #define INTR_ENTER	0		/* intr hook called on ISR entry */
 #define INTR_EXIT	1		/* intr hook called on ISR exit */
 #define INTR_LOOP	2		/* intr hook called on ISR loop */
+#define INTR_ACK	3		/* intr hook called on ie_ack */
 
 #define CHIP_PROBE	0		/* reset called from chip probe */
 #define CARD_RESET	1		/* reset called from card reset */
@@ -172,6 +175,8 @@ struct ie_softc {
 
 	bus_space_tag_t	bt;	/* bus-space tag of card memory */
 	bus_space_handle_t bh;	/* bus-space handle of card memory */
+
+	bus_dmamap_t	sc_dmamap;	/* bus dma handle */
 
 	void	*sc_iobase;	/* (MD) KVA of base of 24 bit addr space */
 	void	*sc_maddr;	/* (MD) KVA of base of chip's RAM
@@ -251,7 +256,7 @@ struct ie_softc {
 	int	async_cmd_inprogress;	/* we didn't wait for 586 to accept
 					   a command */
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	int	sc_debug;
 #endif
 };

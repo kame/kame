@@ -1,4 +1,4 @@
-/*	$NetBSD: tcic2.c,v 1.1 1999/03/23 20:04:14 bad Exp $	*/
+/*	$NetBSD: tcic2.c,v 1.5 2000/06/16 23:41:34 cgd Exp $	*/
 
 #undef	TCICDEBUG
 
@@ -421,6 +421,7 @@ tcic_attach_socket(h)
 
 	/* now, config one pcmcia device per socket */
 
+	paa.paa_busname = "pcmcia";
 	paa.pct = (pcmcia_chipset_tag_t) h->sc->pct;
 	paa.pch = (pcmcia_chipset_handle_t) h;
 	paa.iobase = h->sc->iobase;
@@ -453,7 +454,7 @@ tcic_create_event_thread(arg)
 		panic("tcic_create_event_thread: unknown tcic socket");
 	}
 
-	if (kthread_create(tcic_event_thread, h, &h->event_thread,
+	if (kthread_create1(tcic_event_thread, h, &h->event_thread,
 	    "%s,%s", h->sc->dev.dv_xname, cs)) {
 		printf("%s: unable to create event thread for sock 0x%02x\n",
 		    h->sc->dev.dv_xname, h->sock);
@@ -530,22 +531,11 @@ tcic_init_socket(h)
 }
 
 int
-#ifdef __BROKEN_INDIRECT_CONFIG
-tcic_submatch(parent, match, aux)
-#else
 tcic_submatch(parent, cf, aux)
-#endif
 	struct device *parent;
-#ifdef __BROKEN_INDIRECT_CONFIG
-	void *match;
-#else
 	struct cfdata *cf;
-#endif
 	void *aux;
 {
-#ifdef __BROKEN_INDIRECT_CONFIG
-	struct cfdata *cf = match;
-#endif
 
 	struct pcmciabus_attach_args *paa = aux;
 	struct tcic_handle *h = (struct tcic_handle *) paa->pch;
@@ -870,6 +860,8 @@ tcic_chip_do_mem_map(h, win)
 {
 	int reg, hwwin, wscnt;
 
+	int kind = h->mem[win].kind & ~PCMCIA_WIDTH_MEM_MASK;
+	int mem8 = (h->mem[win].kind & PCMCIA_WIDTH_MEM_MASK) == PCMCIA_WIDTH_MEM8;
 	DPRINTF(("tcic_chip_do_mem_map window %d: 0x%lx+0x%lx 0x%lx\n",
 		win, (u_long)h->mem[win].addr, (u_long)h->mem[win].size,
 		(u_long)h->mem[win].offset));
@@ -895,7 +887,7 @@ tcic_chip_do_mem_map(h, win)
 	/* set the card address and address space */
 	reg = 0;
 	reg = ((h->mem[win].offset >> TCIC_MEM_SHIFT) & TCIC_MMAP_ADDR_MASK);
-	reg |= (h->mem[win].kind & PCMCIA_MEM_ATTR) ? TCIC_MMAP_ATTR : 0;
+	reg |= (kind == PCMCIA_MEM_ATTR) ? TCIC_MMAP_ATTR : 0;
 	DPRINTF(("tcic_chip_do_map_mem window %d(%d) mmap 0x%04x\n",
 	    win, hwwin, reg));
 	tcic_write_ind_2(h, TCIC_WR_MMAP_N(hwwin), reg);
@@ -905,6 +897,7 @@ tcic_chip_do_mem_map(h, win)
 	/* XXX why can't I do the following two in one statement? */
 	reg = tcic_read_ind_2(h, TCIC_WR_MCTL_N(hwwin)) & TCIC_MCTL_WSCNT_MASK;
 	reg |= TCIC_MCTL_ENA|TCIC_MCTL_QUIET;
+	reg |= mem8 ? TCIC_MCTL_B8 : 0;
 	reg |= (h->sock << TCIC_MCTL_SS_SHIFT) & TCIC_MCTL_SS_MASK;
 #ifdef notyet	/* XXX must get speed from CIS somehow. -chb */
 	wscnt = tcic_ns2wscnt(h->mem[win].speed);

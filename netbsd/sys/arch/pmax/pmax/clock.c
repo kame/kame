@@ -1,4 +1,4 @@
-/* $NetBSD: clock.c,v 1.26 1999/03/25 01:17:51 simonb Exp $ */
+/* $NetBSD: clock.c,v 1.31 2000/06/04 19:14:54 cgd Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -44,19 +44,18 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.26 1999/03/25 01:17:51 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.31 2000/06/04 19:14:54 cgd Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/device.h>
 
 #include <dev/clock_subr.h>
 
 #include <machine/clock_machdep.h>
-#include <machine/autoconf.h>
 
 #include <dev/dec/clockvar.h>
+
 #include "opt_ntp.h"
 
 #define MINYEAR 1998 /* "today" */
@@ -66,7 +65,7 @@ const struct clockfns *clockfns;
 int clockinitted;
 
 #ifdef NTP
-extern int fixtick;
+extern int fixtick;		/* XXX */
 #endif
 
 void
@@ -85,7 +84,8 @@ clockattach(dev, fns)
 	clockdev = dev;
 	clockfns = fns;
 #ifdef EVCNT_COUNTERS
-	evcnt_attach(dev, "intr", &clock_intr_evcnt);
+	evcnt_attach_dynamic(&clock_intr_evcnt, EVCNT_TYPE_INTR, NULL,
+	    dev->dv_xname, "intr");
 #endif
 }
 
@@ -139,9 +139,6 @@ cpu_initclocks()
 	 * hardclock, which would then fall over because p->p_stats
 	 * isn't set at that time.
 	 */
-#ifdef 	alpha
-	set_clockintr();
-#endif
 
 	/*
 	 * Get the clock started.

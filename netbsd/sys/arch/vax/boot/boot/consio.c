@@ -1,4 +1,4 @@
-/*	$NetBSD: consio.c,v 1.2.2.1 1999/04/15 14:20:08 ragge Exp $ */
+/*	$NetBSD: consio.c,v 1.9 2000/05/20 13:35:07 ragge Exp $ */
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -45,25 +45,15 @@
 
 void setup __P((void));
 
-int	vax_cputype;
-int	vax_boardtype;
-
-int	is_750;
-int	is_mvax;
-
-unsigned       *bootregs;
-struct rpb     *rpb;
-struct bqo     *bqo;
-
-static int (*put_fp) __P((int))  = NULL;
+static void (*put_fp) __P((int))  = NULL;
 static int (*get_fp) __P((void)) = NULL;
 static int (*test_fp) __P((void)) = NULL;
 
-int pr_putchar __P((int c));	/* putchar() using mtpr/mfpr */
+void pr_putchar __P((int c));	/* putchar() using mtpr/mfpr */
 int pr_getchar __P((void));
 int pr_testchar __P((void));
 
-int rom_putchar __P((int c));	/* putchar() using ROM routines */
+void rom_putchar __P((int c));	/* putchar() using ROM routines */
 int rom_getchar __P((void));
 int rom_testchar __P((void));
 
@@ -87,18 +77,31 @@ unsigned char  *ka630_conspage;
 /* Function that initializes things for KA630 ROM console I/O */
 void ka630_consinit __P((void));
 /* Functions that use KA630 ROM for console I/O */
-int ka630_rom_putchar __P((int c));
+void ka630_rom_putchar __P((int c));
 int ka630_rom_getchar __P((void));
 int ka630_rom_testchar __P((void));
+/* Also added such a thing for KA53 - MK-991208 */
+unsigned char  *ka53_conspage;
+void ka53_consinit(void);
+void ka53_rom_putchar(int c);
+int ka53_rom_getchar(void);
+int ka53_rom_testchar(void);
 
-putchar(c)
-	int c;
+void putchar(int);
+int getchar(void);
+int testkey(void);
+void consinit(void);
+void _rtt(void);
+
+void
+putchar(int c)
 {
 	(*put_fp)(c);
 	if (c == 10)
 		(*put_fp)(13);		/* CR/LF */
 }
 
+int
 getchar() 
 {
 	int c;
@@ -111,6 +114,7 @@ getchar()
 	return c;
 }
 
+int
 testkey()
 {
 	return (*test_fp)();
@@ -121,30 +125,11 @@ testkey()
  * initializes data which are globally used and is called before main().
  */
 void 
-setup()
+consinit()
 {
-	vax_cputype = (mfpr(PR_SID) >> 24) & 0xFF;
-
 	put_fp = pr_putchar; /* Default */
 	get_fp = pr_getchar;
 	test_fp = pr_testchar;
-	/*
-	 * according to vax_cputype we initialize vax_boardtype.
-	 */
-        switch (vax_cputype) {
-
-	case VAX_TYP_UV2:
-	case VAX_TYP_CVAX:
-	case VAX_TYP_RIGEL:
-	case VAX_TYP_MARIAH:
-	case VAX_TYP_NVAX:
-	case VAX_TYP_SOC:
-		is_mvax = 1;
-		vax_boardtype = (vax_cputype << 24) |
-		    ((*(int*)0x20040004 >> 24) & 0377);
-		rpb = (struct rpb *)bootregs[11];	/* bertram: ??? */
-		break;
-        }
 
 	/*
 	 * According to the vax_boardtype (vax_cputype is not specific
@@ -157,10 +142,7 @@ setup()
 	 */
 	switch (vax_boardtype) {
 
-	case VAX_BTYP_660:
-/*	case VAX_BTYP_670: */
 	case VAX_BTYP_690:
-	case VAX_BTYP_1303:
 		put_fp = rom_putchar;
 		get_fp = rom_getchar;
 		test_fp = rom_testchar;
@@ -169,7 +151,6 @@ setup()
 		break;
 
 	case VAX_BTYP_43:
-	case VAX_BTYP_49:
 	case VAX_BTYP_410:	  
 	case VAX_BTYP_420:
 		put_fp = rom_putchar;
@@ -185,11 +166,16 @@ setup()
 
 	case VAX_BTYP_46:
 	case VAX_BTYP_48:
+	case VAX_BTYP_49:
 		put_fp = rom_putchar;
 		get_fp = rom_getchar;
 		test_fp = rom_testchar;
 		rom_putc = 0x20040068;
 		rom_getc = 0x20040054;
+		break;
+
+	case VAX_BTYP_53:
+		ka53_consinit();
 		break;
 
 #ifdef notdef
@@ -208,8 +194,8 @@ setup()
 /*
  * putchar() using MTPR
  */
-pr_putchar(c)
-        int     c;
+void
+pr_putchar(int c)
 {
 	int     timeout = 1<<15;	/* don't hang the machine! */
         while ((mfpr(PR_TXCS) & GC_RDY) == 0)  /* Wait until xmit ready */
@@ -221,12 +207,14 @@ pr_putchar(c)
 /*
  * getchar() using MFPR
  */
+int
 pr_getchar()
 {
 	while ((mfpr(PR_RXCS) & GC_DON) == 0);	/* wait for char */
 	return (mfpr(PR_RXDB));			/* now get it */
 }
 
+int
 pr_testchar()
 {
 	if (mfpr(PR_RXCS) & GC_DON)
@@ -263,6 +251,7 @@ asm("
 
 	_rom_testchar:
 		.word	0
+		mnegl	$1,r0
 		jsb	*_rom_getc
 		tstl	r0
 		beql	1f
@@ -270,6 +259,7 @@ asm("
 	1:	ret
 ");
 
+void
 _rtt()
 {
 	asm("halt");
@@ -344,3 +334,56 @@ asm("
 		jsb     *0x24(r11)      # output character (KA630_PUTC)
 		ret			# we're done
 ");
+
+/*
+ * void ka53_consinit (void)  ==> initialize KA53 ROM console I/O
+ */
+void ka53_consinit()
+{
+	ka53_conspage = (char *) 0x2014044b;
+
+	put_fp = ka53_rom_putchar;
+	get_fp = ka53_rom_getchar;
+	test_fp = ka53_rom_testchar;
+}
+
+
+/*
+ * int ka53_rom_getchar (void)  ==> getchar() using ROM-routines on KA53
+ */
+asm("
+	.globl _ka53_rom_getchar
+	_ka53_rom_getchar:
+	        .word 0x802             # save-mask: R1, R11
+	        movl    _ka53_conspage,r11      # load location of console page
+	loop53g:                        # do {
+	        jsb     *0x64(r11)      #   test for char
+	        blbc    r0, loop53g     # } while (R0 == 0)
+	        jsb     *0x6c(r11)      # get the char
+	        ret                     # we're done
+
+	_ka53_rom_testchar:
+	        .word   0
+	        movl    _ka53_conspage,r3
+	        jsb     *0x64(r3)
+	        blbc    r0,1f
+	        jsb     *0x6c(r3)       # get the char
+	1:      ret
+");
+
+/*
+ * int ka53_rom_putchar (int c) ==> putchar() using ROM-routines on KA53
+ */
+asm("
+	.globl _ka53_rom_putchar
+	_ka53_rom_putchar:
+	        .word 0x802             # save-mask: R1, R11
+	        movl    _ka53_conspage,r11      # load location of console page
+	loop53p:                        # do {
+	        jsb     *0x20(r11)      #   is rom ready?
+	        blbc    r0, loop53p     # } while (R0 == 0)
+	        movl    4(ap), r1       # R1 holds char
+	        jsb     *0x24(r11)      # output character
+                ret                     # we're done
+");
+

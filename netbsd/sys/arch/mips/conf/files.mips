@@ -1,9 +1,13 @@
-#	$NetBSD: files.mips,v 1.19 1999/01/14 18:51:31 castor Exp $
+#	$NetBSD: files.mips,v 1.26 2000/05/23 04:21:39 soren Exp $
 #
 
-defopt 	opt_cputype.h	NOTHING_YET 	# reserved for  CPU level
-defopt	opt_mips_cache.h	MIPS3_L2CACHE_ABSENT	MIPS3_L2CACHE_PRESENT
-
+defopt 	opt_cputype.h		NOTYET	# MIPS1	MIPS3	MIPS4	NOFPU
+					# MIPS3_4100	MIPS3_5200
+					# ENABLE_MIPS_TX3900
+					# ENABLE_MIPS_R4700
+					# ENABLE_MIPS_R3NKK
+defopt	opt_mips_cache.h		MIPS3_L2CACHE_ABSENT
+					MIPS3_L2CACHE_PRESENT
 file	arch/mips/mips/db_disasm.c	ddb
 file	arch/mips/mips/db_interface.c	ddb
 file	arch/mips/mips/db_trace.c	ddb
@@ -18,7 +22,13 @@ file	arch/mips/mips/sys_machdep.c		# shared mips sys_machdep
 file	arch/mips/mips/process_machdep.c	# shared process_machdep
 
 file	arch/mips/mips/in_cksum.c	inet
+file	netinet/in4_cksum.c		inet
 file	netns/ns_cksum.c		ns
 
-# Binary compatibility with previous NetBSD releases (COMPAT_XX) 
+file	arch/mips/mips/fpemu.c		softfloat
+
+# Binary compatibility with previous NetBSD releases (COMPAT_XX)
 file	arch/mips/mips/compat_13_machdep.c	compat_13 | compat_ultrix
+
+# Ultrix Binary Compatibility (COMPAT_ULTRIX)
+include "compat/ultrix/files.ultrix"

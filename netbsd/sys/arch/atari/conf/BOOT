@@ -1,5 +1,5 @@
 #
-#	$NetBSD: BOOT,v 1.27 1998/06/26 01:53:51 lukem Exp $
+#	$NetBSD: BOOT,v 1.30 2000/02/12 03:31:48 thorpej Exp $
 #
 # BOOT
 #
@@ -59,13 +59,13 @@ options 	COMPAT_10	# Compatibility to NetBSD1.0
 options 	COMPAT_11	# Compatibility to NetBSD1.1
 options 	COMPAT_12	# Compatibility to NetBSD1.2
 options 	COMPAT_13	# Compatibility to NetBSD1.3
+options 	COMPAT_14	# Compatibility to NetBSD1.4
 
 #
 # Support for various kernel options
 #
 options 	KTRACE			# Add kernel tracing system call
 options 	DIAGNOSTIC		# Add additional error checking code
-options 	NKMEMCLUSTERS=256	# Size of kernel malloc area
 
 #
 # Atari specific kernel options:
@@ -98,6 +98,8 @@ pseudo-device	md		2	# Boot memory disk
 fd0	at fdc0 unit 0		# builtin floppy drive
 fd1	at fdc0 unit 1		# external floppy drive
 zs0	at mainbus0		# Serial support through 8530
+grfcc0	at grfbus0		# graphics driver
+ite0	at grfcc0		# console
 nvr0	at mainbus0		# nvram driver
 wdc0	at mainbus0		# IDE-bus
 wd*	at wdc? drive ?		#    ... and drives

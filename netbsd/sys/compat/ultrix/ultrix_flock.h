@@ -1,4 +1,4 @@
-/* $NetBSD: ultrix_flock.h,v 1.1.12.1 2000/01/31 20:40:56 he Exp $ */
+/* $NetBSD: ultrix_flock.h,v 1.1 1999/07/30 16:03:49 drochner Exp $ */
 
 struct ultrix_flock {
 	short l_type;

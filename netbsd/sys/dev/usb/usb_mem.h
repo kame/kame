@@ -1,11 +1,12 @@
-/*	$NetBSD: usb_mem.h,v 1.4 1999/01/09 12:16:54 augustss Exp $	*/
+/*	$NetBSD: usb_mem.h,v 1.14 2000/06/01 14:29:01 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_mem.h,v 1.9 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,8 +38,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(__NetBSD__)
-typedef struct usb_block_dma {
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+typedef struct usb_dma_block {
 	bus_dma_tag_t tag;
 	bus_dmamap_t map;
         caddr_t kaddr;
@@ -47,19 +48,14 @@ typedef struct usb_block_dma {
         size_t size;
         size_t align;
 	int fullblock;
-	LIST_ENTRY(usb_block_dma) next;
+	LIST_ENTRY(usb_dma_block) next;
 } usb_dma_block_t;
 
-typedef struct {
-	usb_dma_block_t *block;
-	u_int offs;
-} usb_dma_t;
-
-#define DMAADDR(dma) ((dma)->block->segs[0].ds_addr + (dma)->offs)
+#define DMAADDR(dma) ((dma)->block->map->dm_segs[0].ds_addr + (dma)->offs)
 #define KERNADDR(dma) ((void *)((dma)->block->kaddr + (dma)->offs))
 
-usbd_status	usb_allocmem __P((bus_dma_tag_t, size_t, size_t, usb_dma_t *));
-void		usb_freemem  __P((bus_dma_tag_t, usb_dma_t *));
+usbd_status	usb_allocmem(usbd_bus_handle,size_t,size_t, usb_dma_t *);
+void		usb_freemem(usbd_bus_handle, usb_dma_t *);
 
 #elif defined(__FreeBSD__)
 
@@ -80,12 +76,14 @@ void		usb_freemem  __P((bus_dma_tag_t, usb_dma_t *));
 
 #include <machine/pmap.h>       /* for vtophys */
 
-typedef void * usb_dma_t;
-
 #define		usb_allocmem(t,s,a,p)	(*(p) = malloc(s, M_USB, M_NOWAIT), (*(p) == NULL? USBD_NOMEM: USBD_NORMAL_COMPLETION))
 #define		usb_freemem(t,p)	(free(*(p), M_USB))
 
+#ifdef __alpha__
+#define DMAADDR(dma)	(alpha_XXX_dmamap((vm_offset_t) *(dma)))
+#else
 #define DMAADDR(dma)	(vtophys(*(dma)))
+#endif
 #define KERNADDR(dma)	((void *) *(dma))
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.21 1999/04/01 09:02:53 soda Exp $	*/
+/*	$NetBSD: asm.h,v 1.23.2.1 2000/07/25 08:33:48 kleink Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -62,21 +62,26 @@
 
 /*
  * Define -pg profile entry code.
- * XXX assume .set noreorder for kernel, .set reorder for user code.
+ * Must always be noreorder, must never use a macro instruction
+ * Final addiu to t9 must always equal the size of this _KERN_MCOUNT
  */
-#define _KERN_MCOUNT		\
-	.set	noat;		\
-	move	$1,$31;		\
-	jal	_mcount;	\
-	subu	sp,sp,8;	\
-	.set at
+#define _KERN_MCOUNT						\
+	.set	push;						\
+	.set	noreorder;					\
+	.set	noat;						\
+	sw	t9,-4(sp);					\
+	move	AT,ra;						\
+	lui	t9,%hi(_mcount); 				\
+	addiu	t9,t9,%lo(_mcount);				\
+	jalr	t9;						\
+	subu	sp,sp,16;					\
+	lw	t9,4(sp);					\
+	addiu	sp,sp,8;					\
+	addiu	t9,t9,36;					\
+	.set	pop;					
 
 #ifdef GPROF
-# if defined(_KERNEL) || defined(_LOCORE)
-#  define MCOUNT _KERN_MCOUNT
-# else
-#  define MCOUNT .set noreorder; _KERN_MCOUNT ;  .set reorder;
-# endif
+#define MCOUNT _KERN_MCOUNT
 #else
 #define	MCOUNT
 #endif
@@ -96,6 +101,12 @@
 	.aent	x, 0
 #else
 #define AENT(x)
+#endif
+
+#ifdef __ELF__
+#define	WEAK_ALIAS(alias,sym)						\
+	.weak alias;							\
+	alias = sym
 #endif
 
 /*
@@ -245,7 +256,7 @@ _C_LABEL(x):
 #define NON_LEAF(x, fsize, retpc)	NESTED(x, fsize, retpc)
 #define NNON_LEAF(x, fsize, retpc)	NESTED_NOPROFILE(x, fsize, retpc)
 
-/* 
+/*
  *  standard callframe {
  *  	register_t cf_args[4];		arg0 - arg3
  *  	register_t cf_sp;		frame pointer
@@ -257,11 +268,11 @@ _C_LABEL(x):
 #define	CALLFRAME_RA	(4 * 5)
 
 /*
- * While it would be nice to be compatible with the SGI 
+ * While it would be nice to be compatible with the SGI
  * REG_L and REG_S macros, because they do not take parameters, it
  * is impossible to use them with the _MIPS_SIM_ABIX32 model.
  *
- * These macros hide the use of mips3 instructions from the 
+ * These macros hide the use of mips3 instructions from the
  * assembler to prevent the assembler from generating 64-bit style
  * ABI calls.
  */
@@ -270,7 +281,7 @@ _C_LABEL(x):
 #define	REG_L	lw
 #define REG_S	sw
 #define	REG_LI	li
-#define	REG_PROLOGUE	.set push 
+#define	REG_PROLOGUE	.set push
 #define	REG_EPILOGUE	.set pop
 #define SZREG	4
 #else

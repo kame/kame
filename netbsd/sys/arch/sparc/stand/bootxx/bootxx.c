@@ -1,4 +1,4 @@
-/*	$NetBSD: bootxx.c,v 1.4 1999/02/15 18:59:36 pk Exp $ */
+/*	$NetBSD: bootxx.c,v 1.8 2000/03/13 23:52:33 soren Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/param.h>
 #include <sys/time.h>
-#include <a.out.h>
+#include <sys/exec.h>
 
 #include <lib/libsa/stand.h>
 
@@ -56,9 +56,9 @@ struct open_file	io;
 
 /*
  * The contents of the block_* variables below is set by installboot(8)
- * to hold the the filesystem data of the second-stage boot program
- * (typically `/boot'): filesystem block size, # of filesystem blocks and
- * the block numbers themselves.
+ * to hold the filesystem data of the second-stage boot program
+ * (typically `/boot'): filesystem block size, # of filesystem
+ * blocks and the block numbers themselves.
  */
 #define MAXBLOCKNUM	256	/* enough for a 2MB boot program (bs 8K) */
 int32_t			block_size = 0;
@@ -76,6 +76,12 @@ main()
 	void (*entry)__P((void *)) = (void (*)__P((void *)))PROM_LOADADDR;
 	void	*arg;
 
+#ifdef HEAP_VARIABLE
+	{
+		extern char end[];
+		setheap((void *)ALIGN(end), (void *)0xffffffff);
+	}
+#endif
 	prom_init();
 	prom_bootdevice = prom_getbootpath();
 	io.f_flags = F_RAW;
@@ -84,10 +90,10 @@ main()
 			prom_bootdevice != NULL ? prom_bootdevice : "unknown");
 	}
 
-	(void)loadboot(&io, PROM_LOADADDR);
+	(void)loadboot(&io, (caddr_t)PROM_LOADADDR);
 	(io.f_dev->dv_close)(&io);
 
-	arg = (prom_version() == PROM_OLDMON) ? PROM_LOADADDR : romp;
+	arg = (prom_version() == PROM_OLDMON) ? (caddr_t)PROM_LOADADDR : romp;
 	(*entry)(arg);
 	_rtt();
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs.h,v 1.20 1998/11/13 20:09:54 thorpej Exp $	*/
+/*	$NetBSD: nfs.h,v 1.22 2000/06/09 00:00:17 fvdl Exp $	*/
 /*
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -68,6 +68,9 @@
 #define	NFS_MAXRAHEAD	4		/* Max. read ahead # blocks */
 #define	NFS_MAXUIDHASH	64		/* Max. # of hashed uid entries/mp */
 #define	NFS_MAXASYNCDAEMON 	20	/* Max. number async_daemons runable */
+#ifdef _KERNEL
+extern int nfs_niothreads;              /* Number of async_daemons desired */
+#endif
 #define NFS_MAXGATHERDELAY	100	/* Max. write gather delay (msec) */
 #ifndef NFS_GATHERDELAY
 #define NFS_GATHERDELAY		10	/* Default write gather delay (msec) */
@@ -238,11 +241,13 @@ struct nfsstats {
  * fs.nfs sysctl(3) identifiers
  */
 #define NFS_NFSSTATS	1		/* struct: struct nfsstats */
-#define	NFS_MAXID	2
+#define NFS_IOTHREADS	2		/* number of io threads */
+#define	NFS_MAXID	3
 
 #define NFS_NAMES { \
 	{ 0, 0 }, \
 	{ "nfsstats", CTLTYPE_STRUCT }, \
+	{ "iothreads", CTLTYPE_INT }, \
 }
 
 /*
@@ -375,7 +380,13 @@ struct nfsuid {
 /* Bits for nu_flag */
 #define	NU_INETADDR	0x1
 #define NU_NAM		0x2
+#ifdef INET6
+#define NU_NETFAM(u) \
+	(((u)->nu_flag & NU_INETADDR) ? \
+	(((u)->nu_flag & NU_NAM) ? AF_INET6 : AF_INET) : AF_ISO)
+#else
 #define NU_NETFAM(u)	(((u)->nu_flag & NU_INETADDR) ? AF_INET : AF_ISO)
+#endif
 
 struct nfssvc_sock {
 	TAILQ_ENTRY(nfssvc_sock) ns_chain;	/* List of all nfssvc_sock's */

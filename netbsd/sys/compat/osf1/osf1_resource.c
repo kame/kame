@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_resource.c,v 1.2.4.1 1999/06/21 19:27:29 cgd Exp $ */
+/* $NetBSD: osf1_resource.c,v 1.2 1999/05/05 01:51:35 cgd Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.

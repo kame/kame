@@ -1,4 +1,4 @@
-/*	$NetBSD: devopen.c,v 1.7 1998/05/15 16:38:53 drochner Exp $	 */
+/*	$NetBSD: devopen.c,v 1.9 1999/10/28 05:20:05 mycroft Exp $	 */
 
 /*
  * Copyright (c) 1996, 1997
@@ -42,12 +42,15 @@
 
 #include <libi386.h>
 #include <biosdisk.h>
+#include "devopen.h"
 #ifdef _STANDALONE
 #include <bootinfo.h>
 #endif
 
 extern int parsebootfile __P((const char *, char**, char**, unsigned int*,
 			      unsigned int*, const char**));
+
+static int dev2bios __P((char *, unsigned int, int *));
 
 static struct {
 	char           *name;
@@ -85,9 +88,6 @@ dev2bios(devname, unit, biosdev)
 		}
 	if (i == NUMBIOSDEVS)
 		return (ENXIO);
-
-	if (unit >= 4)		/* ??? */
-		return (EUNIT);
 
 	return (0);
 }

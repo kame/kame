@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.18.2.1 1999/04/03 19:40:20 is Exp $
+#	$NetBSD: Makefile,v 1.20.4.1 2000/09/19 18:15:11 is Exp $
 
 ### what we need:
 
@@ -31,13 +31,13 @@ DEFS = -D_STANDALONE -DINSECURE
 
 ### main target: ###
 
-all: ${FILES}
+realall: ${FILES}
 
 .include <bsd.prog.mk>
 
 ### special  rules for bootblocks ###
 
-INCPATH = -I${DIR_TOP} -I${DIR_TOP}/lib/libsa -I${.CURDIR} -I${.CURDIR}/../../.. -I${.CURDIR}/../aout2bb
+INCPATH = -nostdinc -I${DIR_TOP} -I${DIR_TOP}/lib/libsa -I${.CURDIR} -I${.CURDIR}/../../.. -I${.CURDIR}/../aout2bb -I${DESTDIR}/usr/include
 
 AFLAGS += -m68030 -l
 CAFLAGS += -Wa,-l -Wa,-m68030 ${INCPATH}

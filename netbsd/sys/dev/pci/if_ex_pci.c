@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ex_pci.c,v 1.5.2.3 2000/01/15 17:30:11 he Exp $	*/
+/*	$NetBSD: if_ex_pci.c,v 1.12.4.1 2000/10/19 13:54:28 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -131,14 +131,25 @@ const struct ex_pci_product {
 	  "3c905B-TX 10/100 Ethernet" },
 	{ PCI_PRODUCT_3COM_3C905BT4,	EX_CONF_90XB|EX_CONF_MII,
 	  "3c905B-T4 10/100 Ethernet" },
-	{ PCI_PRODUCT_3COM_3C905BFX,	EX_CONF_90XB|EX_CONF_MII,
+	{ PCI_PRODUCT_3COM_3C905BCOMBO,	EX_CONF_90XB/*|EX_CONF_MII|EX_CONF_INTPHY*/,
+	  "3c905B-COMBO 10/100 Ethernet" },
+	{ PCI_PRODUCT_3COM_3C905BFX,	EX_CONF_90XB,
 	  "3c905B-FX 10/100 Ethernet" },
 
 	/* XXX Internal PHY? */
 	{ PCI_PRODUCT_3COM_3C980SRV,	EX_CONF_90XB,
 	  "3c980 Server Adapter 10/100 Ethernet" },
+	{ PCI_PRODUCT_3COM_3C980CTXM,	EX_CONF_90XB,
+	  "3c980C-TXM 10/100 Ethernet" },
+
 	{ PCI_PRODUCT_3COM_3C905CTX,	EX_CONF_90XB|EX_CONF_MII,
 	  "3c905C-TX 10/100 Ethernet with mngmt" },
+
+	{ PCI_PRODUCT_3COM_3C450TX,		EX_CONF_90XB,
+	  "3c450-TX 10/100 Ethernet" },
+
+	{ PCI_PRODUCT_3COM_3CSOHO100TX,	EX_CONF_90XB,
+	  "3cSOHO100-TX 10/100 Ethernet" },
 
 	{ 0,				0,
 	  NULL },
@@ -187,7 +198,8 @@ ex_pci_attach(parent, self, aux)
 	pci_intr_handle_t ih;
 	const struct ex_pci_product *epp;
 	const char *intrstr = NULL;
-	int pmode;
+	int rev, pmreg;
+	pcireg_t reg;
 
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
 	    &sc->sc_iot, &sc->sc_ioh, NULL, NULL)) {
@@ -201,7 +213,8 @@ ex_pci_attach(parent, self, aux)
 		panic("ex_pci_attach: impossible");
 	}
 
-	printf(": 3Com %s\n", epp->epp_name);
+	rev = PCI_REVISION(pci_conf_read(pc, pa->pa_tag, PCI_CLASS_REG));
+	printf(": 3Com %s (rev. 0x%x)\n", epp->epp_name, rev);
 
 	sc->enable = NULL;
 	sc->disable = NULL;
@@ -218,9 +231,9 @@ ex_pci_attach(parent, self, aux)
 	    PCI_COMMAND_MASTER_ENABLE);
 
 	/* Get it out of power save mode if needed (BIOS bugs) */
-	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, 0, 0)) {
-		pmode = pci_conf_read(pc, pa->pa_tag, PCI_POWERCTL) & 0x3;
-		if (pmode == 3) {
+	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, &pmreg, 0)) {
+		reg = pci_conf_read(pc, pa->pa_tag, pmreg + 4) & 0x3;
+		if (reg == 3) {
 			/*
 			 * The card has lost all configuration data in
 			 * this state, so punt.
@@ -229,10 +242,10 @@ ex_pci_attach(parent, self, aux)
 			    sc->sc_dev.dv_xname);
 			return;
 		}
-		if (pmode != 0) {
+		if (reg != 0) {
 			printf("%s: waking up from power state D%d\n",
-			    sc->sc_dev.dv_xname, pmode);
-			pci_conf_write(pc, pa->pa_tag, PCI_POWERCTL, 0);
+			    sc->sc_dev.dv_xname, reg);
+			pci_conf_write(pc, pa->pa_tag, pmreg + 4, 0);
 		}
 	}
 

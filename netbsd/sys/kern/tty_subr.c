@@ -1,4 +1,4 @@
-/*	$NetBSD: tty_subr.c,v 1.17 1998/08/04 04:03:17 perry Exp $	*/
+/*	$NetBSD: tty_subr.c,v 1.19 2000/03/30 09:27:13 augustss Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Theo de Raadt
@@ -38,9 +38,6 @@
 #include <sys/buf.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
-#ifdef REAL_CLISTS
-#include <sys/clist.h>
-#endif
 #include <sys/malloc.h>
 
 /*
@@ -129,7 +126,7 @@ int
 getc(clp)
 	struct clist *clp;
 {
-	register int c = -1;
+	int c = -1;
 	int s;
 
 	s = spltty();
@@ -165,7 +162,7 @@ q_to_b(clp, cp, count)
 	u_char *cp;
 	int count;
 {
-	register int cc;
+	int cc;
 	u_char *p = cp;
 	int s;
 
@@ -201,8 +198,8 @@ ndqb(clp, flag)
 	int flag;
 {
 	int count = 0;
-	register int i;
-	register int cc;
+	int i;
+	int cc;
 	int s;
 
 	s = spltty();
@@ -244,7 +241,7 @@ ndflush(clp, count)
 	struct clist *clp;
 	int count;
 {
-	register int cc;
+	int cc;
 	int s;
 
 	s = spltty();
@@ -280,7 +277,7 @@ putc(c, clp)
 	int c;
 	struct clist *clp;
 {
-	register int i;
+	int i;
 	int s;
 
 	s = spltty();
@@ -336,7 +333,7 @@ clrbits(cp, off, len)
 	int len;
 {
 	int sby, sbi, eby, ebi;
-	register int i;
+	int i;
 	u_char mask;
 
 	if(len==1) {
@@ -374,8 +371,8 @@ b_to_q(cp, count, clp)
 	int count;
 	struct clist *clp;
 {
-	register int cc;
-	register const u_char *p = cp;
+	int cc;
+	const u_char *p = cp;
 	int s;
 
 	if (count <= 0)
@@ -436,7 +433,7 @@ static int cc;
 u_char *
 nextc(clp, cp, c)
 	struct clist *clp;
-	register u_char *cp;
+	u_char *cp;
 	int *c;
 {
 
@@ -480,7 +477,7 @@ firstc(clp, c)
 	struct clist *clp;
 	int *c;
 {
-	register u_char *cp;
+	u_char *cp;
 
 	cc = clp->c_cc;
 	if (cc == 0)

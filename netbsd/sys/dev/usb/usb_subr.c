@@ -1,11 +1,12 @@
-/*	$NetBSD: usb_subr.c,v 1.29 1999/03/18 12:08:43 augustss Exp $	*/
+/*	$NetBSD: usb_subr.c,v 1.79 2000/06/01 14:37:51 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_subr.c,v 1.18 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,14 +42,16 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/device.h>
+#include <sys/select.h>
 #elif defined(__FreeBSD__)
 #include <sys/module.h>
 #include <sys/bus.h>
 #endif
 #include <sys/proc.h>
-#include <sys/select.h>
+
+#include <machine/bus.h>
 
 #include <dev/usb/usb.h>
 
@@ -64,26 +67,30 @@
 #endif
 
 #ifdef USB_DEBUG
-#define DPRINTF(x)	if (usbdebug) printf x
-#define DPRINTFN(n,x)	if (usbdebug>(n)) printf x
+#define DPRINTF(x)	if (usbdebug) logprintf x
+#define DPRINTFN(n,x)	if (usbdebug>(n)) logprintf x
 extern int usbdebug;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
 #endif
 
-static usbd_status	usbd_set_config __P((usbd_device_handle, int));
-char *usbd_get_string __P((usbd_device_handle, int, char *));
-int usbd_getnewaddr __P((usbd_bus_handle bus));
+Static usbd_status	usbd_set_config(usbd_device_handle, int);
+Static char *usbd_get_string(usbd_device_handle, int, char *);
+Static int usbd_getnewaddr(usbd_bus_handle bus);
 #if defined(__NetBSD__)
-int usbd_print __P((void *aux, const char *pnp));
-int usbd_submatch __P((bdevice *, struct cfdata *cf, void *));
+Static int usbd_print(void *aux, const char *pnp);
+Static int usbd_submatch(device_ptr_t, struct cfdata *cf, void *);
+#elif defined(__OpenBSD__)
+Static int usbd_print(void *aux, const char *pnp);
+Static int usbd_submatch(device_ptr_t, void *, void *);
 #endif
-void usbd_free_iface_data __P((usbd_device_handle dev, int ifcno));
-void usbd_kill_pipe __P((usbd_pipe_handle));
-usbd_status usbd_probe_and_attach 
-	__P((bdevice *parent, usbd_device_handle dev, int port, int addr));
+Static void usbd_free_iface_data(usbd_device_handle dev, int ifcno);
+Static void usbd_kill_pipe(usbd_pipe_handle);
+Static usbd_status usbd_probe_and_attach(device_ptr_t parent,
+				 usbd_device_handle dev, int port, int addr);
 
+Static u_int32_t usb_cookie_no = 0;
 
 #ifdef USBVERBOSE
 typedef u_int16_t usb_vendor_id_t;
@@ -103,19 +110,16 @@ struct usb_knowndev {
 #include <dev/usb/usbdevs_data.h>
 #endif /* USBVERBOSE */
 
-#ifdef USB_DEBUG
-char *usbd_error_strs[] = {
+Static const char *usbd_error_strs[] = {
 	"NORMAL_COMPLETION",
 	"IN_PROGRESS",
 	"PENDING_REQUESTS",
 	"NOT_STARTED",
 	"INVAL",
-	"IS_IDLE",
 	"NOMEM",
 	"CANCELLED",
 	"BAD_ADDRESS",
 	"IN_USE",
-	"INTERFACE_NOT_ACTIVE",
 	"NO_ADDR",
 	"SET_ADDR_FAILED",
 	"NO_POWER",
@@ -125,44 +129,51 @@ char *usbd_error_strs[] = {
 	"TIMEOUT",
 	"SHORT_XFER",
 	"STALLED",
+	"INTERRUPTED",
 	"XXX",
 };
-#endif
+
+const char *
+usbd_errstr(usbd_status err)
+{
+	static char buffer[5];
+
+	if (err < USBD_ERROR_MAX) {
+		return usbd_error_strs[err];
+	} else {
+		snprintf(buffer, sizeof buffer, "%d", err);
+		return buffer;
+	}
+}
 
 usbd_status
-usbd_get_string_desc(dev, sindex, langid, sdesc)
-	usbd_device_handle dev;
-	int sindex;
-	int langid;
-	usb_string_descriptor_t *sdesc;
+usbd_get_string_desc(usbd_device_handle dev, int sindex, int langid,
+		     usb_string_descriptor_t *sdesc)
 {
 	usb_device_request_t req;
-	usbd_status r;
+	usbd_status err;
 
 	req.bmRequestType = UT_READ_DEVICE;
 	req.bRequest = UR_GET_DESCRIPTOR;
 	USETW2(req.wValue, UDESC_STRING, sindex);
 	USETW(req.wIndex, langid);
 	USETW(req.wLength, 1);	/* only size byte first */
-	r = usbd_do_request(dev, &req, sdesc);
-	if (r != USBD_NORMAL_COMPLETION)
-		return (r);
+	err = usbd_do_request(dev, &req, sdesc);
+	if (err)
+		return (err);
 	USETW(req.wLength, sdesc->bLength);	/* the whole string */
 	return (usbd_do_request(dev, &req, sdesc));
 }
 
 char *
-usbd_get_string(dev, si, buf)
-	usbd_device_handle dev;
-	int si;
-	char *buf;
+usbd_get_string(usbd_device_handle dev, int si, char *buf)
 {
 	int swap = dev->quirks->uq_flags & UQ_SWAP_UNICODE;
 	usb_string_descriptor_t us;
 	char *s;
 	int i, n;
 	u_int16_t c;
-	usbd_status r;
+	usbd_status err;
 
 	if (si == 0)
 		return (0);
@@ -170,16 +181,16 @@ usbd_get_string(dev, si, buf)
 		return (0);
 	if (dev->langid == USBD_NOLANG) {
 		/* Set up default language */
-		r = usbd_get_string_desc(dev, USB_LANGUAGE_TABLE, 0, &us);
-		if (r != USBD_NORMAL_COMPLETION || us.bLength < 4) {
+		err = usbd_get_string_desc(dev, USB_LANGUAGE_TABLE, 0, &us);
+		if (err || us.bLength < 4) {
 			dev->langid = 0; /* Well, just pick English then */
 		} else {
 			/* Pick the first language as the default. */
 			dev->langid = UGETW(us.bString[0]);
 		}
 	}
-	r = usbd_get_string_desc(dev, si, dev->langid, &us);
-	if (r != USBD_NORMAL_COMPLETION)
+	err = usbd_get_string_desc(dev, si, dev->langid, &us);
+	if (err)
 		return (0);
 	s = buf;
 	n = us.bLength / 2 - 1;
@@ -194,13 +205,11 @@ usbd_get_string(dev, si, buf)
 			*s++ = '?';
 	}
 	*s++ = 0;
-	return buf;
+	return (buf);
 }
 
 void
-usbd_devinfo_vp(dev, v, p)
-	usbd_device_handle dev;
-	char *v, *p;
+usbd_devinfo_vp(usbd_device_handle dev, char *v, char *p)
 {
 	usb_device_descriptor_t *udd = &dev->ddesc;
 	char *vendor = 0, *product = 0;
@@ -208,10 +217,15 @@ usbd_devinfo_vp(dev, v, p)
 	struct usb_knowndev *kdp;
 #endif
 
+	if (dev == NULL) {
+		v[0] = p[0] = '\0';
+		return;
+	}
+
 	vendor = usbd_get_string(dev, udd->iManufacturer, v);
 	product = usbd_get_string(dev, udd->iProduct, p);
 #ifdef USBVERBOSE
-	if (!vendor) {
+	if (vendor == NULL || product == NULL) {
 		for(kdp = usb_knowndevs;
 		    kdp->vendorname != NULL;
 		    kdp++) {
@@ -220,38 +234,33 @@ usbd_devinfo_vp(dev, v, p)
 			     (kdp->flags & USB_KNOWNDEV_NOPROD) != 0))
 				break;
 		}
-		if (kdp->vendorname == NULL)
-			vendor = product = NULL;
-		else {
-			vendor = kdp->vendorname;
-			product = (kdp->flags & USB_KNOWNDEV_NOPROD) == 0 ?
+		if (kdp->vendorname != NULL) {
+			if (!vendor)
+			    vendor = kdp->vendorname;
+			if (!product)
+			    product = (kdp->flags & USB_KNOWNDEV_NOPROD) == 0 ?
 				kdp->productname : NULL;
 		}
 	}
 #endif
-	if (vendor)
+	if (vendor != NULL)
 		strcpy(v, vendor);
 	else
 		sprintf(v, "vendor 0x%04x", UGETW(udd->idVendor));
-	if (product)
+	if (product != NULL)
 		strcpy(p, product);
 	else
 		sprintf(p, "product 0x%04x", UGETW(udd->idProduct));
 }
 
 int
-usbd_printBCD(cp, bcd)
-	char *cp;
-	int bcd;
+usbd_printBCD(char *cp, int bcd)
 {
 	return (sprintf(cp, "%x.%02x", bcd >> 8, bcd & 0xff));
 }
 
 void
-usbd_devinfo(dev, showclass, cp)
-	usbd_device_handle dev;
-	int showclass;
-	char *cp;
+usbd_devinfo(usbd_device_handle dev, int showclass, char *cp)
 {
 	usb_device_descriptor_t *udd = &dev->ddesc;
 	char vendor[USB_MAX_STRING_LEN];
@@ -275,12 +284,10 @@ usbd_devinfo(dev, showclass, cp)
 
 /* Delay for a certain number of ms */
 void
-usb_delay_ms(bus, ms)
-	usbd_bus_handle bus;
-	u_int ms;
+usb_delay_ms(usbd_bus_handle bus, u_int ms)
 {
 	/* Wait at least two clock ticks so we know the time has passed. */
-	if (bus->use_polling)
+	if (bus->use_polling || cold)
 		delay((ms+1) * 1000);
 	else
 		tsleep(&ms, PRIBIO, "usbdly", (ms*hz+999)/1000 + 1);
@@ -288,21 +295,16 @@ usb_delay_ms(bus, ms)
 
 /* Delay given a device handle. */
 void
-usbd_delay_ms(dev, ms)
-	usbd_device_handle dev;
-	u_int ms;
+usbd_delay_ms(usbd_device_handle dev, u_int ms)
 {
 	usb_delay_ms(dev->bus, ms);
 }
 
 usbd_status
-usbd_reset_port(dev, port, ps)
-	usbd_device_handle dev;
-	int port;
-	usb_port_status_t *ps;
+usbd_reset_port(usbd_device_handle dev, int port, usb_port_status_t *ps)
 {
 	usb_device_request_t req;
-	usbd_status r;
+	usbd_status err;
 	int n;
 	
 	req.bmRequestType = UT_WRITE_CLASS_OTHER;
@@ -310,41 +312,38 @@ usbd_reset_port(dev, port, ps)
 	USETW(req.wValue, UHF_PORT_RESET);
 	USETW(req.wIndex, port);
 	USETW(req.wLength, 0);
-	r = usbd_do_request(dev, &req, 0);
-	DPRINTFN(1,("usbd_reset_port: port %d reset done, error=%d(%s)\n",
-		    port, r, usbd_error_strs[r]));
-	if (r != USBD_NORMAL_COMPLETION)
-		return (r);
+	err = usbd_do_request(dev, &req, 0);
+	DPRINTFN(1,("usbd_reset_port: port %d reset done, error=%s\n",
+		    port, usbd_errstr(err)));
+	if (err)
+		return (err);
 	n = 10;
 	do {
 		/* Wait for device to recover from reset. */
 		usbd_delay_ms(dev, USB_PORT_RESET_DELAY);
-		r = usbd_get_port_status(dev, port, ps);
-		if (r != USBD_NORMAL_COMPLETION) {
-			DPRINTF(("usbd_reset_port: get status failed %d\n",r));
-			return (r);
+		err = usbd_get_port_status(dev, port, ps);
+		if (err) {
+			DPRINTF(("usbd_reset_port: get status failed %d\n",
+				 err));
+			return (err);
 		}
 	} while ((UGETW(ps->wPortChange) & UPS_C_PORT_RESET) == 0 && --n > 0);
-	if (n == 0) {
-		printf("usbd_reset_port: timeout\n");
-		return (USBD_IOERROR);
-	}
-	r = usbd_clear_port_feature(dev, port, UHF_C_PORT_RESET);
+	if (n == 0)
+		return (USBD_TIMEOUT);
+	err = usbd_clear_port_feature(dev, port, UHF_C_PORT_RESET);
 #ifdef USB_DEBUG
-	if (r != USBD_NORMAL_COMPLETION)
-		DPRINTF(("usbd_reset_port: clear port feature failed %d\n",r));
+	if (err)
+		DPRINTF(("usbd_reset_port: clear port feature failed %d\n",
+			 err));
 #endif
 
 	/* Wait for the device to recover from reset. */
 	usbd_delay_ms(dev, USB_PORT_RESET_RECOVERY);
-	return (r);
+	return (err);
 }
 
 usb_interface_descriptor_t *
-usbd_find_idesc(cd, ifaceidx, altidx)
-	usb_config_descriptor_t *cd;
-	int ifaceidx;
-	int altidx;
+usbd_find_idesc(usb_config_descriptor_t *cd, int ifaceidx, int altidx)
 {
 	char *p = (char *)cd;
 	char *end = p + UGETW(cd->wTotalLength);
@@ -371,15 +370,12 @@ usbd_find_idesc(cd, ifaceidx, altidx)
 				return (d);
 		}
 	}
-	return (0);
+	return (NULL);
 }
 
 usb_endpoint_descriptor_t *
-usbd_find_edesc(cd, ifaceidx, altidx, endptidx)
-	usb_config_descriptor_t *cd;
-	int ifaceidx;
-	int altidx;
-	int endptidx;
+usbd_find_edesc(usb_config_descriptor_t *cd, int ifaceidx, int altidx, 
+		int endptidx)
 {
 	char *p = (char *)cd;
 	char *end = p + UGETW(cd->wTotalLength);
@@ -388,10 +384,10 @@ usbd_find_edesc(cd, ifaceidx, altidx, endptidx)
 	int curidx;
 
 	d = usbd_find_idesc(cd, ifaceidx, altidx);
-	if (!d)
-		return (0);
+	if (d == NULL)
+		return (NULL);
 	if (endptidx >= d->bNumEndpoints) /* quick exit */
-		return (0);
+		return (NULL);
 
 	curidx = -1;
 	for (p = (char *)d + d->bLength; p < end; ) {
@@ -400,44 +396,43 @@ usbd_find_edesc(cd, ifaceidx, altidx, endptidx)
 			break;
 		p += e->bLength;
 		if (p <= end && e->bDescriptorType == UDESC_INTERFACE)
-			return (0);
+			return (NULL);
 		if (p <= end && e->bDescriptorType == UDESC_ENDPOINT) {
 			curidx++;
 			if (curidx == endptidx)
 				return (e);
 		}
 	}
-	return (0);
+	return (NULL);
 }
 
 usbd_status
-usbd_fill_iface_data(dev, ifaceidx, altidx)
-	usbd_device_handle dev;
-	int ifaceidx;
-	int altidx;
+usbd_fill_iface_data(usbd_device_handle dev, int ifaceidx, int altidx)
 {
 	usbd_interface_handle ifc = &dev->ifaces[ifaceidx];
+	usb_interface_descriptor_t *idesc;
 	char *p, *end;
 	int endpt, nendpt;
 
 	DPRINTFN(4,("usbd_fill_iface_data: ifaceidx=%d altidx=%d\n",
 		    ifaceidx, altidx));
-	ifc->device = dev;
-	ifc->idesc = usbd_find_idesc(dev->cdesc, ifaceidx, altidx);
-	if (ifc->idesc == 0)
+	idesc = usbd_find_idesc(dev->cdesc, ifaceidx, altidx);
+	if (idesc == NULL)
 		return (USBD_INVAL);
+	ifc->device = dev;
+	ifc->idesc = idesc;
 	ifc->index = ifaceidx;
 	ifc->altindex = altidx;
 	nendpt = ifc->idesc->bNumEndpoints;
-	DPRINTFN(10,("usbd_fill_iface_data: found idesc n=%d\n", nendpt));
+	DPRINTFN(4,("usbd_fill_iface_data: found idesc nendpt=%d\n", nendpt));
 	if (nendpt != 0) {
 		ifc->endpoints = malloc(nendpt * sizeof(struct usbd_endpoint),
 					M_USB, M_NOWAIT);
-		if (ifc->endpoints == 0)
+		if (ifc->endpoints == NULL)
 			return (USBD_NOMEM);
 	} else
-		ifc->endpoints = 0;
-	ifc->priv = 0;
+		ifc->endpoints = NULL;
+	ifc->priv = NULL;
 	p = (char *)ifc->idesc + ifc->idesc->bLength;
 	end = (char *)dev->cdesc + UGETW(dev->cdesc->wTotalLength);
 #define ed ((usb_endpoint_descriptor_t *)p)
@@ -451,43 +446,43 @@ usbd_fill_iface_data(dev, ifaceidx, altidx)
 			if (p + ed->bLength <= end && ed->bLength != 0 &&
 			    ed->bDescriptorType == UDESC_ENDPOINT)
 				goto found;
-			if (ed->bDescriptorType == UDESC_INTERFACE ||
-			    ed->bLength == 0)
+			if (ed->bLength == 0 ||
+			    ed->bDescriptorType == UDESC_INTERFACE)
 				break;
 		}
 		/* passed end, or bad desc */
+		DPRINTF(("usbd_fill_iface_data: bad descriptor(s): %s\n",
+			 ed->bLength == 0 ? "0 length" :
+			 ed->bDescriptorType == UDESC_INTERFACE ? "iface desc":
+			 "out of data"));
 		goto bad;
 	found:
 		ifc->endpoints[endpt].edesc = ed;
-		ifc->endpoints[endpt].state = USBD_ENDPOINT_ACTIVE;
 		ifc->endpoints[endpt].refcnt = 0;
-		ifc->endpoints[endpt].toggle = 0;
 		p += ed->bLength;
 	}
 #undef ed
 	LIST_INIT(&ifc->pipes);
-	ifc->state = USBD_INTERFACE_ACTIVE;
 	return (USBD_NORMAL_COMPLETION);
 
  bad:
-	free(ifc->endpoints, M_USB);
+	if (ifc->endpoints != NULL) {
+		free(ifc->endpoints, M_USB);
+		ifc->endpoints = NULL;
+	}
 	return (USBD_INVAL);
 }
 
 void
-usbd_free_iface_data(dev, ifcno)
-	usbd_device_handle dev;
-	int ifcno;
+usbd_free_iface_data(usbd_device_handle dev, int ifcno)
 {
 	usbd_interface_handle ifc = &dev->ifaces[ifcno];
 	if (ifc->endpoints)
 		free(ifc->endpoints, M_USB);
 }
 
-static usbd_status
-usbd_set_config(dev, conf)
-	usbd_device_handle dev;
-	int conf;
+Static usbd_status
+usbd_set_config(usbd_device_handle dev, int conf)
 {
 	usb_device_request_t req;
 
@@ -500,21 +495,21 @@ usbd_set_config(dev, conf)
 }
 
 usbd_status
-usbd_set_config_no(dev, no, msg)
-	usbd_device_handle dev;
-	int no;
-	int msg;
+usbd_set_config_no(usbd_device_handle dev, int no, int msg)
 {
 	int index;
 	usb_config_descriptor_t cd;
-	usbd_status r;
+	usbd_status err;
+
+	if (no == USB_UNCONFIG_NO)
+		return (usbd_set_config_index(dev, USB_UNCONFIG_INDEX, msg));
 
 	DPRINTFN(5,("usbd_set_config_no: %d\n", no));
 	/* Figure out what config index to use. */
 	for (index = 0; index < dev->ddesc.bNumConfigurations; index++) {
-		r = usbd_get_config_desc(dev, index, &cd);
-		if (r != USBD_NORMAL_COMPLETION)
-			return (r);
+		err = usbd_get_config_desc(dev, index, &cd);
+		if (err)
+			return (err);
 		if (cd.bConfigurationValue == no)
 			return (usbd_set_config_index(dev, index, msg));
 	}
@@ -522,21 +517,17 @@ usbd_set_config_no(dev, no, msg)
 }
 
 usbd_status
-usbd_set_config_index(dev, index, msg)
-	usbd_device_handle dev;
-	int index;
-	int msg;
+usbd_set_config_index(usbd_device_handle dev, int index, int msg)
 {
 	usb_status_t ds;
-	usb_hub_status_t hs;
 	usb_config_descriptor_t cd, *cdp;
-	usbd_status r;
+	usbd_status err;
 	int ifcidx, nifc, len, selfpowered, power;
 
 	DPRINTFN(5,("usbd_set_config_index: dev=%p index=%d\n", dev, index));
 
 	/* XXX check that all interfaces are idle */
-	if (dev->config != 0) {
+	if (dev->config != USB_UNCONFIG_NO) {
 		DPRINTF(("usbd_set_config_index: free old config\n"));
 		/* Free all configuration data structures. */
 		nifc = dev->cdesc->bNumInterface;
@@ -544,60 +535,65 @@ usbd_set_config_index(dev, index, msg)
 			usbd_free_iface_data(dev, ifcidx);
 		free(dev->ifaces, M_USB);
 		free(dev->cdesc, M_USB);
-		dev->ifaces = 0;
-		dev->cdesc = 0;
-		dev->config = 0;
-		dev->state = USBD_DEVICE_ADDRESSED;
+		dev->ifaces = NULL;
+		dev->cdesc = NULL;
+		dev->config = USB_UNCONFIG_NO;
 	}
 
-	/* Figure out what config number to use. */
-	r = usbd_get_config_desc(dev, index, &cd);
-	if (r != USBD_NORMAL_COMPLETION)
-		return (r);
+	if (index == USB_UNCONFIG_INDEX) {
+		/* We are unconfiguring the device, so leave unallocated. */
+		DPRINTF(("usbd_set_config_index: set config 0\n"));
+		err = usbd_set_config(dev, USB_UNCONFIG_NO);
+		if (err)
+			DPRINTF(("usbd_set_config_index: setting config=0 "
+				 "failed, error=%s\n", usbd_errstr(err)));
+		return (err);
+	}
+
+	/* Get the short descriptor. */
+	err = usbd_get_config_desc(dev, index, &cd);
+	if (err)
+		return (err);
 	len = UGETW(cd.wTotalLength);
 	cdp = malloc(len, M_USB, M_NOWAIT);
-	if (cdp == 0)
+	if (cdp == NULL)
 		return (USBD_NOMEM);
-	r = usbd_get_desc(dev, UDESC_CONFIG, index, len, cdp);
-	if (r != USBD_NORMAL_COMPLETION)
+	/* Get the full descriptor. */
+	err = usbd_get_desc(dev, UDESC_CONFIG, index, len, cdp);
+	if (err)
 		goto bad;
 	if (cdp->bDescriptorType != UDESC_CONFIG) {
 		DPRINTFN(-1,("usbd_set_config_index: bad desc %d\n",
 			     cdp->bDescriptorType));
-		r = USBD_INVAL;
+		err = USBD_INVAL;
 		goto bad;
 	}
+
+	/* Figure out if the device is self or bus powered. */
 	selfpowered = 0;
-	if (cdp->bmAttributes & UC_SELF_POWERED) {
+	if (!(dev->quirks->uq_flags & UQ_BUS_POWERED) &&
+	    (cdp->bmAttributes & UC_SELF_POWERED)) {
 		/* May be self powered. */
 		if (cdp->bmAttributes & UC_BUS_POWERED) {
 			/* Must ask device. */
-			if (dev->quirks->uq_flags & UQ_HUB_POWER) {
-				/* Buggy hub, use hub descriptor. */
-				r = usbd_get_hub_status(dev, &hs);
-				if (r == USBD_NORMAL_COMPLETION && 
-				    !(UGETW(hs.wHubStatus) & UHS_LOCAL_POWER))
-					selfpowered = 1;
-			} else {
-				r = usbd_get_device_status(dev, &ds);
-				if (r == USBD_NORMAL_COMPLETION && 
-				    (UGETW(ds.wStatus) & UDS_SELF_POWERED))
-					selfpowered = 1;
-			}
+			err = usbd_get_device_status(dev, &ds);
+			if (!err && (UGETW(ds.wStatus) & UDS_SELF_POWERED))
+				selfpowered = 1;
 			DPRINTF(("usbd_set_config_index: status=0x%04x, "
-				 "error=%d(%s)\n",
-				 UGETW(ds.wStatus), r, usbd_error_strs[r]));
+				 "error=%s\n",
+				 UGETW(ds.wStatus), usbd_errstr(err)));
 		} else
 			selfpowered = 1;
 	}
 	DPRINTF(("usbd_set_config_index: (addr %d) attr=0x%02x, "
-		 "selfpowered=%d, power=%d, powerquirk=%x\n", 
+		 "selfpowered=%d, power=%d\n", 
 		 dev->address, cdp->bmAttributes, 
-		 selfpowered, cdp->bMaxPower * 2,
-		 dev->quirks->uq_flags & UQ_HUB_POWER));
+		 selfpowered, cdp->bMaxPower * 2));
+
+	/* Check if we have enough power. */
 #ifdef USB_DEBUG
-	if (!dev->powersrc) {
-		printf("usbd_set_config_index: No power source?\n");
+	if (dev->powersrc == NULL) {
+		DPRINTF(("usbd_set_config_index: No power source?\n"));
 		return (USBD_IOERROR);
 	}
 #endif
@@ -610,37 +606,37 @@ usbd_set_config_index(dev, index, msg)
 			       USBDEVNAME(dev->bus->bdev), dev->address, 
 			       cdp->bConfigurationValue, 
 			       power, dev->powersrc->power);
-		r = USBD_NO_POWER;
+		err = USBD_NO_POWER;
 		goto bad;
 	}
 	dev->power = power;
 	dev->self_powered = selfpowered;
 
+	/* Set the actual configuration value. */
 	DPRINTF(("usbd_set_config_index: set config %d\n",
 		 cdp->bConfigurationValue));
-	r = usbd_set_config(dev, cdp->bConfigurationValue);
-	if (r != USBD_NORMAL_COMPLETION) {
+	err = usbd_set_config(dev, cdp->bConfigurationValue);
+	if (err) {
 		DPRINTF(("usbd_set_config_index: setting config=%d failed, "
-			 "error=%d(%s)\n",
-			 cdp->bConfigurationValue, r, usbd_error_strs[r]));
+			 "error=%s\n",
+			 cdp->bConfigurationValue, usbd_errstr(err)));
 		goto bad;
 	}
-	DPRINTF(("usbd_set_config_index: setting new config %d\n",
-		 cdp->bConfigurationValue));
+
+	/* Allocate and fill interface data. */
 	nifc = cdp->bNumInterface;
 	dev->ifaces = malloc(nifc * sizeof(struct usbd_interface), 
 			     M_USB, M_NOWAIT);
-	if (dev->ifaces == 0) {
-		r = USBD_NOMEM;
+	if (dev->ifaces == NULL) {
+		err = USBD_NOMEM;
 		goto bad;
 	}
 	DPRINTFN(5,("usbd_set_config_index: dev=%p cdesc=%p\n", dev, cdp));
 	dev->cdesc = cdp;
 	dev->config = cdp->bConfigurationValue;
-	dev->state = USBD_DEVICE_CONFIGURED;
 	for (ifcidx = 0; ifcidx < nifc; ifcidx++) {
-		r = usbd_fill_iface_data(dev, ifcidx, 0);
-		if (r != USBD_NORMAL_COMPLETION) {
+		err = usbd_fill_iface_data(dev, ifcidx, 0);
+		if (err) {
 			while (--ifcidx >= 0)
 				usbd_free_iface_data(dev, ifcidx);
 			goto bad;
@@ -651,53 +647,53 @@ usbd_set_config_index(dev, index, msg)
 
  bad:
 	free(cdp, M_USB);
-	return (r);
+	return (err);
 }
 
 /* XXX add function for alternate settings */
 
 usbd_status
-usbd_setup_pipe(dev, iface, ep, pipe)
-	usbd_device_handle dev;
-	usbd_interface_handle iface; 
-	struct usbd_endpoint *ep;
-	usbd_pipe_handle *pipe;
+usbd_setup_pipe(usbd_device_handle dev, usbd_interface_handle iface,
+		struct usbd_endpoint *ep, int ival, usbd_pipe_handle *pipe)
 {
 	usbd_pipe_handle p;
-	usbd_status r;
+	usbd_status err;
 
 	DPRINTFN(1,("usbd_setup_pipe: dev=%p iface=%p ep=%p pipe=%p\n",
 		    dev, iface, ep, pipe));
 	p = malloc(dev->bus->pipe_size, M_USB, M_NOWAIT);
-	if (p == 0)
+	if (p == NULL)
 		return (USBD_NOMEM);
 	p->device = dev;
 	p->iface = iface;
-	p->state = USBD_PIPE_ACTIVE;
 	p->endpoint = ep;
 	ep->refcnt++;
 	p->refcnt = 1;
-	p->intrreqh = 0;
+	p->intrxfer = 0;
 	p->running = 0;
-	p->disco = 0;
-	p->discoarg = 0;
+	p->aborting = 0;
+	p->repeat = 0;
+	p->interval = ival;
 	SIMPLEQ_INIT(&p->queue);
-	r = dev->bus->open_pipe(p);
-	if (r != USBD_NORMAL_COMPLETION) {
-		DPRINTFN(-1,("usbd_setup_pipe: endpoint=0x%x failed, error=%d"
-			 "(%s)\n",
-			 ep->edesc->bEndpointAddress, r, usbd_error_strs[r]));
+	usb_callout_init(p->abort_handle);
+	err = dev->bus->methods->open_pipe(p);
+	if (err) {
+		DPRINTFN(-1,("usbd_setup_pipe: endpoint=0x%x failed, error="
+			 "%s\n",
+			 ep->edesc->bEndpointAddress, usbd_errstr(err)));
 		free(p, M_USB);
-		return (r);
+		return (err);
 	}
+	/* Clear any stall and make sure DATA0 toggle will be used next. */
+	if (UE_GET_ADDR(ep->edesc->bEndpointAddress) != USB_CONTROL_ENDPOINT)
+		usbd_clear_endpoint_stall(p);
 	*pipe = p;
 	return (USBD_NORMAL_COMPLETION);
 }
 
 /* Abort the device control pipe. */
 void
-usbd_kill_pipe(pipe)
-	usbd_pipe_handle pipe;
+usbd_kill_pipe(usbd_pipe_handle pipe)
 {
 	pipe->methods->close(pipe);
 	pipe->endpoint->refcnt--;
@@ -705,8 +701,7 @@ usbd_kill_pipe(pipe)
 }
 
 int
-usbd_getnewaddr(bus)
-	usbd_bus_handle bus;
+usbd_getnewaddr(usbd_bus_handle bus)
 {
 	int addr;
 
@@ -718,15 +713,14 @@ usbd_getnewaddr(bus)
 
 
 usbd_status
-usbd_probe_and_attach(parent, dev, port, addr)
-	bdevice *parent;
-	usbd_device_handle dev;
-	int port;
-	int addr;
+usbd_probe_and_attach(device_ptr_t parent, usbd_device_handle dev,
+		      int port, int addr)
 {
 	struct usb_attach_arg uaa;
 	usb_device_descriptor_t *dd = &dev->ddesc;
-	int r, found, i, confi, nifaces;
+	int found, i, confi, nifaces;
+	usbd_status err;
+	device_ptr_t dv;
 	usbd_interface_handle ifaces[256]; /* 256 is the absolute max */
 
 #if defined(__FreeBSD__)
@@ -734,47 +728,62 @@ usbd_probe_and_attach(parent, dev, port, addr)
 	 * XXX uaa is a static var. Not a problem as it _should_ be used only
 	 * during probe and attach. Should be changed however.
 	 */
-	bdevice bdev;
-	bdev = device_add_child(*parent, NULL, -1, &uaa);
+	device_t bdev;
+	bdev = device_add_child(parent, NULL, -1, &uaa);
 	if (!bdev) {
 	    printf("%s: Device creation failed\n", USBDEVNAME(dev->bus->bdev));
 	    return (USBD_INVAL);
 	}
+	device_quiet(bdev);
 #endif
 
 	uaa.device = dev;
-	uaa.iface = 0;
-	uaa.ifaces = 0;
+	uaa.iface = NULL;
+	uaa.ifaces = NULL;
 	uaa.nifaces = 0;
 	uaa.usegeneric = 0;
 	uaa.port = port;
 	uaa.configno = UHUB_UNK_CONFIGURATION;
 	uaa.ifaceno = UHUB_UNK_INTERFACE;
+	uaa.vendor = UGETW(dd->idVendor);
+	uaa.product = UGETW(dd->idProduct);
+	uaa.release = UGETW(dd->bcdDevice);
 
 	/* First try with device specific drivers. */
-	if (USB_DO_ATTACH(dev, bdev, parent, &uaa, usbd_print, usbd_submatch))
+	DPRINTF(("usbd_probe_and_attach: trying device specific drivers\n"));
+	dv = USB_DO_ATTACH(dev, bdev, parent, &uaa, usbd_print, usbd_submatch);
+	if (dv) {
+		dev->subdevs = malloc(2 * sizeof dv, M_USB, M_NOWAIT);
+		if (dev->subdevs == NULL)
+			return (USBD_NOMEM);
+		dev->subdevs[0] = dv;
+		dev->subdevs[1] = 0;
 		return (USBD_NORMAL_COMPLETION);
+	}
 
 	DPRINTF(("usbd_probe_and_attach: no device specific driver found\n"));
 
+	DPRINTF(("usbd_probe_and_attach: looping over %d configurations\n",
+		 dd->bNumConfigurations));
 	/* Next try with interface drivers. */
 	for (confi = 0; confi < dd->bNumConfigurations; confi++) {
 		DPRINTFN(1,("usbd_probe_and_attach: trying config idx=%d\n",
 			    confi));
-		r = usbd_set_config_index(dev, confi, 1);
-		if (r != USBD_NORMAL_COMPLETION) {
+		err = usbd_set_config_index(dev, confi, 1);
+		if (err) {
 #ifdef USB_DEBUG
 			DPRINTF(("%s: port %d, set config at addr %d failed, "
-				 "error=%d(%s)\n", USBDEVNAME(*parent), port,
-				 addr, r, usbd_error_strs[r]));
+				 "error=%s\n", USBDEVPTRNAME(parent), port,
+				 addr, usbd_errstr(err)));
 #else
 			printf("%s: port %d, set config at addr %d failed\n",
-			       USBDEVNAME(*parent), port, addr);
+			       USBDEVPTRNAME(parent), port, addr);
 #endif
 #if defined(__FreeBSD__)
-			device_delete_child(*parent, bdev);
+			device_delete_child(parent, bdev);
 #endif
- 			return (r);
+
+ 			return (err);
 		}
 		nifaces = dev->cdesc->bNumInterface;
 		uaa.configno = dev->cdesc->bConfigurationValue;
@@ -782,33 +791,70 @@ usbd_probe_and_attach(parent, dev, port, addr)
 			ifaces[i] = &dev->ifaces[i];
 		uaa.ifaces = ifaces;
 		uaa.nifaces = nifaces;
-		for (found = i = 0; i < nifaces; i++) {
-			if (!ifaces[i])
+		dev->subdevs = malloc((nifaces+1) * sizeof dv, M_USB,M_NOWAIT);
+		if (dev->subdevs == NULL) {
+#if defined(__FreeBSD__)
+			device_delete_child(parent, bdev);
+#endif
+			return (USBD_NOMEM);
+		}
+
+		found = 0;
+		for (i = 0; i < nifaces; i++) {
+			if (ifaces[i] == NULL)
 				continue; /* interface already claimed */
 			uaa.iface = ifaces[i];
 			uaa.ifaceno = ifaces[i]->idesc->bInterfaceNumber;
-			if (USB_DO_ATTACH(dev, bdev, parent, &uaa, usbd_print, 
-					  usbd_submatch)) {
-				found++;
+			dv = USB_DO_ATTACH(dev, bdev, parent, &uaa, usbd_print,
+					   usbd_submatch);
+			if (dv != NULL) {
+				dev->subdevs[found++] = dv;
+				dev->subdevs[found] = 0;
 				ifaces[i] = 0; /* consumed */
+
+#if defined(__FreeBSD__)
+				/* create another child for the next iface */
+				bdev = device_add_child(parent, NULL, -1,&uaa);
+				if (!bdev) {
+					printf("%s: Device creation failed\n",
+					USBDEVNAME(dev->bus->bdev));
+					return (USBD_NORMAL_COMPLETION);
+				}
+				device_quiet(bdev);
+#endif
 			}
 		}
-		if (found != 0)
+		if (found != 0) {
+#if defined(__FreeBSD__)
+			/* remove the last created child again; it is unused */
+			device_delete_child(parent, bdev);
+#endif
 			return (USBD_NORMAL_COMPLETION);
+		}
+		free(dev->subdevs, M_USB);
+		dev->subdevs = 0;
 	}
 	/* No interfaces were attached in any of the configurations. */
-	if (dd->bNumConfigurations > 1)/* don't change if only 1 config */
+
+	if (dd->bNumConfigurations > 1) /* don't change if only 1 config */
 		usbd_set_config_index(dev, 0, 0);
 
 	DPRINTF(("usbd_probe_and_attach: no interface drivers found\n"));
 
 	/* Finally try the generic driver. */
-	uaa.iface = 0;
+	uaa.iface = NULL;
 	uaa.usegeneric = 1;
 	uaa.configno = UHUB_UNK_CONFIGURATION;
 	uaa.ifaceno = UHUB_UNK_INTERFACE;
-	if (USB_DO_ATTACH(dev, bdev, parent, &uaa, usbd_print, usbd_submatch))
+	dv = USB_DO_ATTACH(dev, bdev, parent, &uaa, usbd_print, usbd_submatch);
+	if (dv != NULL) {
+		dev->subdevs = malloc(2 * sizeof dv, M_USB, M_NOWAIT);
+		if (dev->subdevs == 0)
+			return (USBD_NOMEM);
+		dev->subdevs[0] = dv;
+		dev->subdevs[1] = 0;
 		return (USBD_NORMAL_COMPLETION);
+	}
 
 	/* 
 	 * The generic attach failed, but leave the device as it is.
@@ -817,15 +863,10 @@ usbd_probe_and_attach(parent, dev, port, addr)
 	 */
 	DPRINTF(("usbd_probe_and_attach: generic attach failed\n"));
 #if defined(__FreeBSD__)
-/*
- * XXX should we delete the child again? Left for now to avoid dangling
- * references.
-      device_delete_child(*parent, bdev);
-*/
+	device_delete_child(parent, bdev);
 #endif
  	return (USBD_NORMAL_COMPLETION);
 }
-
 
 
 /*
@@ -835,22 +876,17 @@ usbd_probe_and_attach(parent, dev, port, addr)
  * and attach a driver.
  */
 usbd_status
-usbd_new_device(parent, bus, depth, lowspeed, port, up)
-	bdevice *parent;
-	usbd_bus_handle bus;
-	int depth;
-	int lowspeed;
-	int port;
-	struct usbd_port *up;
+usbd_new_device(device_ptr_t parent, usbd_bus_handle bus, int depth,
+		int lowspeed, int port, struct usbd_port *up)
 {
 	usbd_device_handle dev;
 	usb_device_descriptor_t *dd;
-	usbd_status r;
+	usbd_status err;
 	int addr;
 	int i;
 
-	DPRINTF(("usbd_new_device bus=%p depth=%d lowspeed=%d\n",
-		 bus, depth, lowspeed));
+	DPRINTF(("usbd_new_device bus=%p port=%d depth=%d lowspeed=%d\n",
+		 bus, port, depth, lowspeed));
 	addr = usbd_getnewaddr(bus);
 	if (addr < 0) {
 		printf("%s: No free USB addresses, new device ignored.\n", 
@@ -859,7 +895,7 @@ usbd_new_device(parent, bus, depth, lowspeed, port, up)
 	}
 
 	dev = malloc(sizeof *dev, M_USB, M_NOWAIT);
-	if (dev == 0)
+	if (dev == NULL)
 		return (USBD_NOMEM);
 	memset(dev, 0, sizeof(*dev));
 
@@ -867,7 +903,6 @@ usbd_new_device(parent, bus, depth, lowspeed, port, up)
 
 	/* Set up default endpoint handle. */
 	dev->def_ep.edesc = &dev->def_ep_desc;
-	dev->def_ep.state = USBD_ENDPOINT_ACTIVE;
 
 	/* Set up default endpoint descriptor. */
 	dev->def_ep_desc.bLength = USB_ENDPOINT_DESCRIPTOR_SIZE;
@@ -877,7 +912,6 @@ usbd_new_device(parent, bus, depth, lowspeed, port, up)
 	USETW(dev->def_ep_desc.wMaxPacketSize, USB_MAX_IPACKET);
 	dev->def_ep_desc.bInterval = 0;
 
-	dev->state = USBD_DEVICE_DEFAULT;
 	dev->quirks = &usbd_no_quirk;
 	dev->address = USB_START_ADDR;
 	dev->ddesc.bMaxPacketSize = 0;
@@ -885,31 +919,38 @@ usbd_new_device(parent, bus, depth, lowspeed, port, up)
 	dev->depth = depth;
 	dev->powersrc = up;
 	dev->langid = USBD_NOLANG;
+	dev->cookie.cookie = ++usb_cookie_no;
 
-	/* Establish the the default pipe. */
-	r = usbd_setup_pipe(dev, 0, &dev->def_ep, &dev->default_pipe);
-	if (r != USBD_NORMAL_COMPLETION) {
+	/* Establish the default pipe. */
+	err = usbd_setup_pipe(dev, 0, &dev->def_ep, USBD_DEFAULT_INTERVAL,
+			      &dev->default_pipe);
+	if (err) {
 		usbd_remove_device(dev, up);
-		return (r);
+		return (err);
 	}
 
 	up->device = dev;
 	dd = &dev->ddesc;
 	/* Try a few times in case the device is slow (i.e. outside specs.) */
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < 3; i++) {
 		/* Get the first 8 bytes of the device descriptor. */
-		r = usbd_get_desc(dev, UDESC_DEVICE, 0, USB_MAX_IPACKET, dd);
-		if (r == USBD_NORMAL_COMPLETION)
+		err = usbd_get_desc(dev, UDESC_DEVICE, 0, USB_MAX_IPACKET, dd);
+		if (!err)
 			break;
 		usbd_delay_ms(dev, 200);
 	}
-	if (r != USBD_NORMAL_COMPLETION) {
+	if (err) {
 		DPRINTFN(-1, ("usbd_new_device: addr=%d, getting first desc "
-			      "failed\n",
-			      addr));
+			      "failed\n", addr));
 		usbd_remove_device(dev, up);
-		return (r);
+		return (err);
 	}
+
+	DPRINTF(("usbd_new_device: adding unit addr=%d, rev=%02x, class=%d, "
+		 "subclass=%d, protocol=%d, maxpacket=%d, len=%d, ls=%d\n", 
+		 addr,UGETW(dd->bcdUSB), dd->bDeviceClass, dd->bDeviceSubClass,
+		 dd->bDeviceProtocol, dd->bMaxPacketSize, dd->bLength, 
+		 dev->lowspeed));
 
 	if (dd->bDescriptorType != UDESC_DEVICE) {
 		/* Illegal device descriptor */
@@ -919,38 +960,35 @@ usbd_new_device(parent, bus, depth, lowspeed, port, up)
 		return (USBD_INVAL);
 	}
 
-	DPRINTF(("usbd_new_device: adding unit addr=%d, rev=%02x, class=%d, "
-		 "subclass=%d, protocol=%d, maxpacket=%d, ls=%d\n", 
-		 addr,UGETW(dd->bcdUSB), dd->bDeviceClass, dd->bDeviceSubClass,
-		 dd->bDeviceProtocol, dd->bMaxPacketSize, dev->lowspeed));
+	if (dd->bLength < USB_DEVICE_DESCRIPTOR_SIZE) {
+		DPRINTFN(-1,("usbd_new_device: bad length %d\n", dd->bLength));
+		usbd_remove_device(dev, up);
+		return (USBD_INVAL);
+	}
 
 	USETW(dev->def_ep_desc.wMaxPacketSize, dd->bMaxPacketSize);
 
-	/* Get the full device descriptor. */
-	r = usbd_get_device_desc(dev, dd);
-	if (r != USBD_NORMAL_COMPLETION) {
+	err = usbd_reload_device_desc(dev);
+	if (err) {
 		DPRINTFN(-1, ("usbd_new_device: addr=%d, getting full desc "
 			      "failed\n", addr));
 		usbd_remove_device(dev, up);
-		return (r);
+		return (err);
 	}
 
-	/* Figure out what's wrong with this device. */
-	dev->quirks = usbd_find_quirk(dd);
-
 	/* Set the address */
-	r = usbd_set_address(dev, addr);
-	if (r != USBD_NORMAL_COMPLETION) {
-		DPRINTFN(-1,("usb_new_device: set address %d failed\n",addr));
-		r = USBD_SET_ADDR_FAILED;
+	err = usbd_set_address(dev, addr);
+	DPRINTFN(5,("usbd_new_device: setting device address=%d\n", addr));
+	if (err) {
+		DPRINTFN(-1,("usb_new_device: set address %d failed\n", addr));
+		err = USBD_SET_ADDR_FAILED;
 		usbd_remove_device(dev, up);
-		return (r);
+		return (err);
 	}
 	/* Allow device time to set new address */
 	usbd_delay_ms(dev, USB_SET_ADDRESS_SETTLE);
 
 	dev->address = addr;	/* New device address now */
-	dev->state = USBD_DEVICE_ADDRESSED;
 	bus->devices[addr] = dev;
 
 	/* Assume 100mA bus powered for now. Changed when configured. */
@@ -959,24 +997,40 @@ usbd_new_device(parent, bus, depth, lowspeed, port, up)
 
 	DPRINTF(("usbd_new_device: new dev (addr %d), dev=%p, parent=%p\n", 
 		 addr, dev, parent));
-
-	r = usbd_probe_and_attach(parent, dev, port, addr);
-	if (r != USBD_NORMAL_COMPLETION) {
-		usbd_remove_device(dev, up);
-		return (r);
-  	}
   
+	usbd_add_dev_event(USB_EVENT_DEVICE_ATTACH, dev);
+
+	err = usbd_probe_and_attach(parent, dev, port, addr);
+	if (err) {
+		usbd_remove_device(dev, up);
+		return (err);
+  	}
+
   	return (USBD_NORMAL_COMPLETION);
 }
 
+usbd_status
+usbd_reload_device_desc(usbd_device_handle dev)
+{
+	usbd_status err;
+
+	/* Get the full device descriptor. */
+	err = usbd_get_device_desc(dev, &dev->ddesc);
+	if (err)
+		return (err);
+
+	/* Figure out what's wrong with this device. */
+	dev->quirks = usbd_find_quirk(&dev->ddesc);
+
+	return (USBD_NORMAL_COMPLETION);
+}
+
 void
-usbd_remove_device(dev, up)
-	usbd_device_handle dev;
-	struct usbd_port *up;
+usbd_remove_device(usbd_device_handle dev, struct usbd_port *up)
 {
 	DPRINTF(("usbd_remove_device: %p\n", dev));
   
-	if (dev->default_pipe)
+	if (dev->default_pipe != NULL)
 		usbd_kill_pipe(dev->default_pipe);
 	up->device = 0;
 	dev->bus->devices[dev->address] = 0;
@@ -984,11 +1038,9 @@ usbd_remove_device(dev, up)
 	free(dev, M_USB);
 }
 
-#if defined(__NetBSD__)  
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 int
-usbd_print(aux, pnp)
-	void *aux;
-	const char *pnp;
+usbd_print(void *aux, const char *pnp)
 {
 	struct usb_attach_arg *uaa = aux;
 	char devinfo[1024];
@@ -1006,110 +1058,103 @@ usbd_print(aux, pnp)
 		printf(" configuration %d", uaa->configno);
 	if (uaa->ifaceno != UHUB_UNK_INTERFACE)
 		printf(" interface %d", uaa->ifaceno);
+#if 0
+	/* 
+	 * It gets very crowded with these locators on the attach line.
+	 * They are not really needed since they are printed in the clear
+	 * by each driver.
+	 */
+	if (uaa->vendor != UHUB_UNK_VENDOR)
+		printf(" vendor 0x%04x", uaa->vendor);
+	if (uaa->product != UHUB_UNK_PRODUCT)
+		printf(" product 0x%04x", uaa->product);
+	if (uaa->release != UHUB_UNK_RELEASE)
+		printf(" release 0x%04x", uaa->release);
+#endif
 	return (UNCONF);
 }
 
+#if defined(__NetBSD__)
 int
-usbd_submatch(parent, cf, aux)
-	struct device *parent;
-	struct cfdata *cf;
-	void *aux;
+usbd_submatch(struct device *parent, struct cfdata *cf, void *aux)
 {
+#elif defined(__OpenBSD__)
+int
+usbd_submatch(struct device *parent, void *match, void *aux)
+{
+	struct cfdata *cf = match;
+#endif
 	struct usb_attach_arg *uaa = aux;
 
-	if ((uaa->port != 0 &&
-	     cf->uhubcf_port != UHUB_UNK_PORT &&
-	     cf->uhubcf_port != uaa->port) ||
-	    (uaa->configno != UHUB_UNK_CONFIGURATION &&
-	     cf->uhubcf_configuration != UHUB_UNK_CONFIGURATION &&
-	     cf->uhubcf_configuration != uaa->configno) ||
-	    (uaa->ifaceno != UHUB_UNK_INTERFACE &&
-	     cf->uhubcf_interface != UHUB_UNK_INTERFACE &&
-	     cf->uhubcf_interface != uaa->ifaceno))
+	DPRINTFN(5,("usbd_submatch port=%d,%d configno=%d,%d "
+	    "ifaceno=%d,%d vendor=%d,%d product=%d,%d release=%d,%d\n",
+	    uaa->port, cf->uhubcf_port,
+	    uaa->configno, cf->uhubcf_configuration,
+	    uaa->ifaceno, cf->uhubcf_interface,
+	    uaa->vendor, cf->uhubcf_vendor,
+	    uaa->product, cf->uhubcf_product,
+	    uaa->release, cf->uhubcf_release));
+	if (uaa->port != 0 &&	/* root hub has port 0, it should match */
+	    ((uaa->port != 0 &&
+	      cf->uhubcf_port != UHUB_UNK_PORT &&
+	      cf->uhubcf_port != uaa->port) ||
+	     (uaa->configno != UHUB_UNK_CONFIGURATION &&
+	      cf->uhubcf_configuration != UHUB_UNK_CONFIGURATION &&
+	      cf->uhubcf_configuration != uaa->configno) ||
+	     (uaa->ifaceno != UHUB_UNK_INTERFACE &&
+	      cf->uhubcf_interface != UHUB_UNK_INTERFACE &&
+	      cf->uhubcf_interface != uaa->ifaceno) ||
+	     (uaa->vendor != UHUB_UNK_VENDOR &&
+	      cf->uhubcf_vendor != UHUB_UNK_VENDOR &&
+	      cf->uhubcf_vendor != uaa->vendor) ||
+	     (uaa->product != UHUB_UNK_PRODUCT &&
+	      cf->uhubcf_product != UHUB_UNK_PRODUCT &&
+	      cf->uhubcf_product != uaa->product) ||
+	     (uaa->release != UHUB_UNK_RELEASE &&
+	      cf->uhubcf_release != UHUB_UNK_RELEASE &&
+	      cf->uhubcf_release != uaa->release)
+	     )
+	   )
 		return 0;
 	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
 }
 
-#elif defined(__FreeBSD__)
-static void
-usbd_bus_print_child(device_t bus, device_t dev)
-{
-	/* FIXME print the device address and the configuration used
-	 */
-}
 #endif
 
-usbd_status
-usb_insert_transfer(reqh)
-	usbd_request_handle reqh;
-{
-	usbd_pipe_handle pipe = reqh->pipe;
-	usbd_interface_handle iface = pipe->iface;
-
-	if (pipe->state == USBD_PIPE_IDLE ||
-	    (iface && iface->state == USBD_INTERFACE_IDLE))
-		return (USBD_IS_IDLE);
-	SIMPLEQ_INSERT_TAIL(&pipe->queue, reqh, next);
-	if (pipe->state != USBD_PIPE_ACTIVE ||
-	    (iface && iface->state != USBD_INTERFACE_ACTIVE))
-		return (USBD_NOT_STARTED);
-	if (pipe->running)
-		return (USBD_IN_PROGRESS);
-	pipe->running = 1;
-	return (USBD_NORMAL_COMPLETION);
-}
-
 void
-usb_start_next(pipe)
-	usbd_pipe_handle pipe;
-{
-	usbd_request_handle reqh;
-	usbd_status r;
-
-#ifdef DIAGNOSTIC
-	if (SIMPLEQ_FIRST(&pipe->queue) == 0) {
-		printf("usb_start_next: empty\n");
-		return;
-	}
-#endif
-
-	/* First remove remove old */
-	SIMPLEQ_REMOVE_HEAD(&pipe->queue, SIMPLEQ_FIRST(&pipe->queue), next);
-	if (pipe->state != USBD_PIPE_ACTIVE) {
-		pipe->running = 0;
-		return;
-	}
-	reqh = SIMPLEQ_FIRST(&pipe->queue);
-	DPRINTFN(5, ("usb_start_next: start reqh=%p\n", reqh));
-	if (!reqh)
-		pipe->running = 0;
-	else {
-		r = pipe->methods->start(reqh);
-		if (r != USBD_IN_PROGRESS) {
-			printf("usb_start_next: error=%d\n", r);
-			pipe->running = 0;
-			/* XXX do what? */
-		}
-	}
-}
-
-void
-usbd_fill_deviceinfo(dev, di)
-	usbd_device_handle dev;
-	struct usb_device_info *di;
+usbd_fill_deviceinfo(usbd_device_handle dev, struct usb_device_info *di)
 {
 	struct usbd_port *p;
-	int i, r, s;
+	int i, err, s;
 
-	di->config = dev->config;
+	di->bus = USBDEVUNIT(dev->bus->bdev);
+	di->addr = dev->address;
+	di->cookie = dev->cookie;
 	usbd_devinfo_vp(dev, di->vendor, di->product);
-	usbd_printBCD(di->revision, UGETW(dev->ddesc.bcdDevice));
+	usbd_printBCD(di->release, UGETW(dev->ddesc.bcdDevice));
 	di->vendorNo = UGETW(dev->ddesc.idVendor);
 	di->productNo = UGETW(dev->ddesc.idProduct);
+	di->releaseNo = UGETW(dev->ddesc.bcdDevice);
 	di->class = dev->ddesc.bDeviceClass;
+	di->subclass = dev->ddesc.bDeviceSubClass;
+	di->protocol = dev->ddesc.bDeviceProtocol;
+	di->config = dev->config;
 	di->power = dev->self_powered ? 0 : dev->power;
 	di->lowspeed = dev->lowspeed;
-	di->addr = dev->address;
+
+	if (dev->subdevs != NULL) {
+		for (i = 0; dev->subdevs[i] &&
+			     i < USB_MAX_DEVNAMES; i++) {
+			strncpy(di->devnames[i], USBDEVPTRNAME(dev->subdevs[i]),
+				USB_MAX_DEVNAMELEN);
+			di->devnames[i][USB_MAX_DEVNAMELEN-1] = '\0';
+                }
+        } else {
+                i = 0;
+        }
+        for (/*i is set */; i < USB_MAX_DEVNAMES; i++)
+                di->devnames[i][0] = 0;                 /* empty */
+
 	if (dev->hub) {
 		for (i = 0; 
 		     i < sizeof(di->ports) / sizeof(di->ports[0]) &&
@@ -1117,21 +1162,113 @@ usbd_fill_deviceinfo(dev, di)
 		     i++) {
 			p = &dev->hub->ports[i];
 			if (p->device)
-				r = p->device->address;
+				err = p->device->address;
 			else {
 				s = UGETW(p->status.wPortStatus);
 				if (s & UPS_PORT_ENABLED)
-					r = USB_PORT_ENABLED;
+					err = USB_PORT_ENABLED;
 				else if (s & UPS_SUSPEND)
-					r = USB_PORT_SUSPENDED;
+					err = USB_PORT_SUSPENDED;
 				else if (s & UPS_PORT_POWER)
-					r = USB_PORT_POWERED;
+					err = USB_PORT_POWERED;
 				else
-					r = USB_PORT_DISABLED;
+					err = USB_PORT_DISABLED;
 			}
-			di->ports[i] = r;
+			di->ports[i] = err;
 		}
 		di->nports = dev->hub->hubdesc.bNbrPorts;
 	} else
 		di->nports = 0;
 }
+
+void
+usb_free_device(usbd_device_handle dev)
+{
+	int ifcidx, nifc;
+
+	if (dev->default_pipe != NULL)
+		usbd_kill_pipe(dev->default_pipe);
+	if (dev->ifaces != NULL) {
+		nifc = dev->cdesc->bNumInterface;
+		for (ifcidx = 0; ifcidx < nifc; ifcidx++)
+			usbd_free_iface_data(dev, ifcidx);
+		free(dev->ifaces, M_USB);
+	}
+	if (dev->cdesc != NULL)
+		free(dev->cdesc, M_USB);
+	if (dev->subdevs != NULL)
+		free(dev->subdevs, M_USB);
+	free(dev, M_USB);
+}
+
+/*
+ * The general mechanism for detaching drivers works as follows: Each
+ * driver is responsible for maintaining a reference count on the
+ * number of outstanding references to its softc (e.g.  from
+ * processing hanging in a read or write).  The detach method of the
+ * driver decrements this counter and flags in the softc that the
+ * driver is dying and then wakes any sleepers.  It then sleeps on the
+ * softc.  Each place that can sleep must maintain the reference
+ * count.  When the reference count drops to -1 (0 is the normal value
+ * of the reference count) the a wakeup on the softc is performed
+ * signaling to the detach waiter that all references are gone.
+ */
+
+/*
+ * Called from process context when we discover that a port has
+ * been disconnected.
+ */
+void
+usb_disconnect_port(struct usbd_port *up, device_ptr_t parent)
+{
+	usbd_device_handle dev = up->device;
+	char *hubname = USBDEVPTRNAME(parent);
+	int i;
+
+	DPRINTFN(3,("uhub_disconnect: up=%p dev=%p port=%d\n", 
+		    up, dev, up->portno));
+
+#ifdef DIAGNOSTIC
+	if (dev == NULL) {
+		printf("usb_disconnect_port: no device\n");
+		return;
+	}
+#endif
+
+	if (dev->subdevs != NULL) {
+		DPRINTFN(3,("usb_disconnect_port: disconnect subdevs\n"));
+		for (i = 0; dev->subdevs[i]; i++) {
+			printf("%s: at %s", USBDEVPTRNAME(dev->subdevs[i]), 
+			       hubname);
+			if (up->portno != 0)
+				printf(" port %d", up->portno);
+			printf(" (addr %d) disconnected\n", dev->address);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+			config_detach(dev->subdevs[i], DETACH_FORCE);
+#elif defined(__FreeBSD__)
+                        device_delete_child(device_get_parent(dev->subdevs[i]),
+					    dev->subdevs[i]);
+#endif
+
+		}
+	}
+
+	usbd_add_dev_event(USB_EVENT_DEVICE_DETACH, dev);
+	dev->bus->devices[dev->address] = NULL;
+	up->device = NULL;
+	usb_free_device(dev);
+}
+
+#ifdef __OpenBSD__
+void *usb_realloc(void *p, u_int size, int pool, int flags)
+{
+	void *q;
+
+	q = malloc(size, pool, flags);
+	if (q == NULL)
+		return (NULL);
+	bcopy(p, q, size);
+	free(p, pool);
+	return (q);
+}
+#endif

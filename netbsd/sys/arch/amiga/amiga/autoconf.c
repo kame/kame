@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.63 1999/04/01 00:17:46 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.77 2000/06/10 19:34:46 frueauf Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -42,28 +42,22 @@
 #include <amiga/amiga/device.h>
 #include <amiga/amiga/custom.h>
 
-void findroot __P((struct device **, int *));
+static void findroot __P((void));
 void mbattach __P((struct device *, struct device *, void *));
 int mbprint __P((void *, const char *));
 int mbmatch __P((struct device *, struct cfdata *, void *));
 
-int cold;	/* 1 if still booting */
 #include <sys/kernel.h>
 
-struct devnametobdevmaj amiga_nam2blk[] = {
-	{ "fd",		2 },
-	{ "sd",		4 },
-	{ "cd",		7 },
-	{ "md",		15 },
-	{ NULL,		0 },
-};
 u_long boot_partition;
+struct device *booted_device;
+int booted_partition;
 
 /*
  * called at boot time, configure all devices on system
  */
 void
-configure()
+cpu_configure()
 {
 	int s;
 #ifdef DEBUG_KERNEL_START
@@ -110,7 +104,6 @@ configure()
 #else
 	splx(s);
 #endif
-	cold = 0;
 #ifdef DEBUG_KERNEL_START
 	printf("survived configure...\n");
 #endif
@@ -119,14 +112,11 @@ configure()
 void
 cpu_rootconf()
 {
-	struct device *booted_device;
-	int booted_partition;
-
-	findroot(&booted_device, &booted_partition);
+	findroot();
 #ifdef DEBUG_KERNEL_START
 	printf("survived findroot()\n");
 #endif
-	setroot(booted_device, booted_partition, amiga_nam2blk);
+	setroot(booted_device, booted_partition);
 #ifdef DEBUG_KERNEL_START
 	printf("survived setroot()\n");
 #endif
@@ -216,6 +206,7 @@ config_console()
 	if (!(is_draco()))
 #endif
 		amiga_config_found(cf, NULL, "grfcc", NULL);
+
 	/*
 	 * zbus knows when its not for real and will
 	 * only configure the appropriate hardware
@@ -236,13 +227,19 @@ mbmatch(pdp, cfp, auxp)
 	struct cfdata	*cfp;
 	void		*auxp;
 {
-
-	if (cfp->cf_unit > 0)
-		return(0);
-	/*
-	 * We are always here
+#if 0	/*
+	 * XXX is this right? but we need to be found twice
+	 * (early console init hack)
 	 */
-	return(1);
+	static int mainbus_matched = 0;
+
+	/* Allow only one instance. */
+	if (mainbus_matched)
+		return (0);
+
+	mainbus_matched = 1;
+#endif
+	return (1);
 }
 
 /*
@@ -277,16 +274,19 @@ mbattach(pdp, dp, auxp)
 		config_found(dp, "par", simple_devprint);
 		config_found(dp, "kbd", simple_devprint);
 		config_found(dp, "ms", simple_devprint);
-		config_found(dp, "ms", simple_devprint);
 		config_found(dp, "grfcc", simple_devprint);
 		config_found(dp, "fdc", simple_devprint);
 	}
-	if (is_a4000() || is_a1200())
+	if (is_a4000() || is_a1200()) {
+		config_found(dp, "wdc", simple_devprint);
 		config_found(dp, "idesc", simple_devprint);
+	}
 	if (is_a4000())			/* Try to configure A4000T SCSI */
 		config_found(dp, "afsc", simple_devprint);
 	if (is_a3000())
 		config_found(dp, "ahsc", simple_devprint);
+	if (/*is_a600() || */is_a1200())
+		config_found(dp, "pccard", simple_devprint);
 #ifdef DRACO
 	if (!is_draco())
 #endif
@@ -318,15 +318,19 @@ mbprint(auxp, pnp)
 #include "fd.h"
 #include "sd.h"
 #include "cd.h"
+#include "wd.h"
 
 #if NFD > 0
 extern  struct cfdriver fd_cd;
 #endif
 #if NSD > 0
-extern  struct cfdriver sd_cd;  
+extern  struct cfdriver sd_cd;
 #endif
 #if NCD > 0
 extern  struct cfdriver cd_cd;
+#endif
+#if NWD > 0
+extern  struct cfdriver wd_cd;
 #endif
 
 struct cfdriver *genericconf[] = {
@@ -336,6 +340,9 @@ struct cfdriver *genericconf[] = {
 #if NSD > 0
 	&sd_cd,
 #endif
+#if NWD > 0
+	&wd_cd,
+#endif
 #if NCD > 0
 	&cd_cd,
 #endif
@@ -343,22 +350,12 @@ struct cfdriver *genericconf[] = {
 };
 
 void
-findroot(devpp, partp)
-	struct device **devpp;
-	int *partp;
+findroot(void)
 {
 	struct disk *dkp;
 	struct partition *pp;
 	struct device **devs;
 	int i, maj, unit;
-
-	/*
-	 * Default to "not found".
-	 */
-	*devpp = NULL;
-
-	/* always partition 'a' */
-	*partp = 0;
 
 #if NSD > 0
 	/*
@@ -412,16 +409,16 @@ findroot(devpp, partp)
 				    pp->p_fstype != FS_SWAP))
 					continue;
 				if (pp->p_offset == boot_partition) {
-					if (*devpp == NULL) {
-						*devpp = devs[unit];
-						*partp = i;
+					if (booted_device == NULL) {
+						booted_device = devs[unit];
+						booted_partition = i;
 					} else
 						printf("Ambiguous boot device\n");
 				}
 			}
 		}
 	}
-	if (*devpp != NULL)
+	if (booted_device != NULL)
 		return;		/* we found the boot device */
 #endif
 
@@ -460,8 +457,8 @@ findroot(devpp, partp)
 
 			pp = &dkp->dk_label->d_partitions[0];
 			if (pp->p_size != 0 && pp->p_fstype == FS_BSDFFS) {
-				*devpp = devs[unit];
-				*partp = 0;
+				booted_device = devs[unit];
+				booted_partition = 0;
 				return;
 			}
 		}

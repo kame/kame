@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.2 1998/11/10 22:45:44 dbj Exp $	*/
+/*	$NetBSD: intr.h,v 1.6 1999/08/05 18:08:12 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -36,92 +36,28 @@
 /* Probably want to dealwith IPL's here @@@ */
 
 #ifdef _KERNEL
-/*
- * spl functions; all but spl0 are done in-line
- */
-
-#define _spl(s)								\
-({									\
-        register int _spl_r;						\
-									\
-        __asm __volatile ("clrl %0; movew sr,%0; movew %1,sr" :		\
-                "&=d" (_spl_r) : "di" (s));				\
-        _spl_r;								\
-})
-
-#define _splraise(s)							\
-({									\
-	int _spl_r;							\
-									\
-	__asm __volatile ("						\
-		clrl	d0					;	\
-		movw	sr,d0					;	\
-		movl	d0,%0					;	\
-		andw	#0x700,d0				;	\
-		movw	%1,d1					;	\
-		andw	#0x700,d1				;	\
-		cmpw	d0,d1					;	\
-		jle	1f					;	\
-		movw	%1,sr					;	\
-	    1:"							:	\
-		    "&=d" (_spl_r)				:	\
-		    "di" (s)					:	\
-		    "d0", "d1");					\
-	_spl_r;								\
-})
 
 /* spl0 requires checking for software interrupts */
-#define spl1()  _spl(PSL_S|PSL_IPL1)
-#define spl2()  _spl(PSL_S|PSL_IPL2)
-#define spl3()  _spl(PSL_S|PSL_IPL3)
-#define spl4()  _spl(PSL_S|PSL_IPL4)
-#define spl5()  _spl(PSL_S|PSL_IPL5)
-#define spl6()  _spl(PSL_S|PSL_IPL6)
-#define spl7()  _spl(PSL_S|PSL_IPL7)
 
 /* watch out for side effects */
 #define splx(s)         ((s) & PSL_IPL ? _spl(s) : spl0())
 
 /****************************************************************/
 
-#define spldma()        spl6()
-
-#define splscc()        spl5()
-
-#define splsched()      spl3()
-
-/* IPL used by soft interrupts: netintr(), softclock() */
-#define splsoftclock()  spl1()
-#define splsoftnet()    spl2()
-
-
-/* Highest block device (strategy) IPL. */
-#define splbio()        spl3()
-
-/* Highest tty device IPL. */
-#define spltty()        spl1()
-
-/* Highest network interface IPL. */
-#define splnet()        spl2()
-
-/*
- * Requirement: imp >= (highest network, tty, or disk IPL)
- * This is used mostly in the VM code. (Why not splvm?)
- * Note that the VM code runs at spl7 during kernel
- * initialization, and later at spl0, so we have to 
- * use splraise to avoid enabling interrupts early.
- */
-#if 0
-#define splimp()        _splraise(PSL_S|PSL_IPL3)
-#else
-#define splimp()        _splraise(PSL_S|PSL_IPL6)
-#endif
-
-#define splclock()      spl6()
-#define splstatclock()  splclock()
-
-/* Block out all interrupts (except NMI of course). */
 #define splhigh()       spl7()
+#define splserial()     _splraise(PSL_S|PSL_IPL5)
+#define splsched()      _splraise(PSL_S|PSL_IPL3)
+#define splclock()      _splraise(PSL_S|PSL_IPL6)
+#define splstatclock()  splclock()
+#define splimp()        _splraise(PSL_S|PSL_IPL6)
+#define spltty()        _splraise(PSL_S|PSL_IPL3)
+#define splbio()        _splraise(PSL_S|PSL_IPL3)
+#define splnet()        _splraise(PSL_S|PSL_IPL3)
+#define splsoftnet()    _splraise(PSL_S|PSL_IPL2)
+#define	splsoftclock()	splraise1()
+#define spllowersoftclock() spl1()
+
+#define spldma()        _splraise(PSL_S|PSL_IPL6)
 
 /****************************************************************/
 
@@ -137,9 +73,9 @@ extern volatile u_int8_t ssir;
 #define SIR_ADB		0x10
 
 #define	siron(mask)	\
-	__asm __volatile ( "orb %0,_ssir" : : "i" (mask))
+	__asm __volatile ( "orb %1,%0" : "=m" (ssir) : "i" (mask))
 #define	siroff(mask)	\
-	__asm __volatile ( "andb %0,_ssir" : : "ir" (~(mask)));
+	__asm __volatile ( "andb %1,%0" : "=m" (ssir) : "ir" (~(mask)));
 
 #define	setsoftnet()	siron(SIR_NET)
 #define	setsoftclock()	siron(SIR_CLOCK)
@@ -147,7 +83,7 @@ extern volatile u_int8_t ssir;
 #define	setsoftdtmgr()	siron(SIR_DTMGR)
 #define	setsoftadb()	siron(SIR_ADB)
 
-extern u_long allocate_sir __P((void (*)(void),void *));
+extern u_long allocate_sir __P((void (*)(void *),void *));
 extern void init_sir __P((void));
 
 /* locore.s */

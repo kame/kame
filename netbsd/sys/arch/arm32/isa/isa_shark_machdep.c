@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_shark_machdep.c,v 1.4 1999/01/01 12:42:47 mark Exp $	*/
+/*	$NetBSD: isa_shark_machdep.c,v 1.6 2000/06/04 19:14:33 cgd Exp $	*/
 
 /*
  * Copyright 1997
@@ -35,6 +35,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
@@ -134,6 +135,15 @@ isa_init8259s()
 }
 
 #define	LEGAL_IRQ(x)	((x) >= 0 && (x) < ICU_LEN && (x) != 2)
+
+const struct evcnt *
+isa_intr_evcnt(isa_chipset_tag_t ic, int irq)
+{
+
+	/* XXX for now, no evcnt parent reported */
+	return NULL;
+}
+
 /*
  * Set up an interrupt handler to start being called.
  */
@@ -147,7 +157,6 @@ isa_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 	void *ih_arg;
 {
 	    irqhandler_t *ih;
-	    extern int cold;
 
 	    /* no point in sleeping unless someone can free memory. */
 	    ih = malloc(sizeof *ih, M_DEVBUF, cold ? M_NOWAIT : M_WAITOK);

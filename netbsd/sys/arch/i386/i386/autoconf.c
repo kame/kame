@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.37 1999/04/01 00:37:50 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.53 2000/06/02 22:09:02 cgd Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -46,14 +46,18 @@
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
+
+#include "opt_compat_oldboot.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/dkstat.h>
 #include <sys/disklabel.h>
 #include <sys/conf.h>
-#include <sys/dmap.h>
+#ifdef COMPAT_OLDBOOT
 #include <sys/reboot.h>
+#endif
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/vnode.h>
@@ -66,36 +70,41 @@
 
 static int match_harddisk __P((struct device *, struct btinfo_bootdisk *));
 static void matchbiosdisks __P((void));
-void findroot __P((struct device **, int *));
+static void findroot __P((void));
 
 extern struct disklist *i386_alldisks;
 extern int i386_ndisks;
 
-/*
- * The following several variables are related to
- * the configuration process, and are used in initializing
- * the machine.
- */
-extern int	cold;		/* cold start flag initialized in locore.s */
+#include "bios32.h"
+#if NBIOS32 > 0
+#include <machine/bios32.h>
+#endif
 
-struct devnametobdevmaj i386_nam2blk[] = {
-	{ "wd",		0 },
-	{ "sd",		4 },
-	{ "cd",		6 },
-	{ "mcd",	7 },
-	{ "fd",		2 },
-	{ "md",		17 },
-	{ NULL,		0 },
-};
+#include "opt_pcibios.h"
+#ifdef PCIBIOS
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <i386/pci/pcibios.h>
+#endif
+
+struct device *booted_device;
+int booted_partition;
 
 /*
  * Determine i/o configuration for a machine.
  */
 void
-configure()
+cpu_configure()
 {
 
 	startrtclock();
+
+#if NBIOS32 > 0
+	bios32_init();
+#endif
+#ifdef PCIBIOS
+	pcibios_init();
+#endif
 
 	if (config_rootfound("mainbus", NULL) == NULL)
 		panic("configure: mainbus not configured");
@@ -105,7 +114,6 @@ configure()
 	    (u_short)imask[IPL_TTY]);
 
 	spl0();
-	cold = 0;
 
 	/* Set up proc0's TSS and LDT (after the FPU is configured). */
 	i386_proc0_tss_ldt_init();
@@ -117,16 +125,13 @@ configure()
 void
 cpu_rootconf()
 {
-	struct device *booted_device;
-	int booted_partition;
-
-	findroot(&booted_device, &booted_partition);
+	findroot();
 	matchbiosdisks();
 
 	printf("boot device: %s\n",
 	    booted_device ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, booted_partition, i386_nam2blk);
+	setroot(booted_device, booted_partition);
 }
 
 /*
@@ -155,7 +160,8 @@ matchbiosdisks()
 	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next)
 		if (dv->dv_class == DV_DISK &&
 		    (!strcmp(dv->dv_cfdata->cf_driver->cd_name, "sd") ||
-		     !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd")))
+		     !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd") ||
+		     !strcmp(dv->dv_cfdata->cf_driver->cd_name, "ca")))
 			i386_ndisks++;
 
 	if (i386_ndisks == 0)
@@ -191,13 +197,14 @@ matchbiosdisks()
 		    dv->dv_xname, dv->dv_cfdata->cf_driver->cd_name);
 #endif
 		if (!strcmp(dv->dv_cfdata->cf_driver->cd_name, "sd") ||
-		    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd")) {
+		    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd") ||
+		    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "ca")) {
 			n++;
 			sprintf(i386_alldisks->dl_nativedisks[n].ni_devname,
 			    "%s%d", dv->dv_cfdata->cf_driver->cd_name,
 			    dv->dv_unit);
 
-			for (d = i386_nam2blk; d->d_name &&
+			for (d = dev_name2blk; d->d_name &&
 			   strcmp(d->d_name, dv->dv_cfdata->cf_driver->cd_name);
 			   d++);
 			if (d->d_name == NULL)
@@ -209,7 +216,7 @@ matchbiosdisks()
 
 			error = VOP_OPEN(tv, FREAD, NOCRED, 0);
 			if (error) {
-				vrele(tv);
+				vput(tv);
 				continue;
 			}
 			error = vn_rdwr(UIO_READ, tv, mbr, DEV_BSIZE, 0,
@@ -246,14 +253,14 @@ matchbiosdisks()
 				}
 			}
 			i386_alldisks->dl_nativedisks[n].ni_nmatches = m;
-			vrele(tv);
+			vput(tv);
 		}
 	}
 }
 
-
+#ifdef COMPAT_OLDBOOT
 u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
-struct device *booted_device;
+#endif
 
 /*
  * helper function for "findroot()":
@@ -282,7 +289,7 @@ match_harddisk(dv, bid)
 	/*
 	 * lookup major number for disk block device
 	 */
-	i = i386_nam2blk;
+	i = dev_name2blk;
 	while (i->d_name &&
 	       strcmp(i->d_name, dv->dv_cfdata->cf_driver->cd_name))
 		i++;
@@ -306,7 +313,7 @@ match_harddisk(dv, bid)
 #endif
 			printf("findroot: can't open dev %s%c (%d)\n",
 			       dv->dv_xname, 'a' + bid->partition, error);
-		vrele(tmpvn);
+		vput(tmpvn);
 		return(0);
 	}
 	error = VOP_IOCTL(tmpvn, DIOCGDINFO, (caddr_t)&label, FREAD, NOCRED, 0);
@@ -328,8 +335,7 @@ match_harddisk(dv, bid)
 
 closeout:
 	VOP_CLOSE(tmpvn, FREAD, NOCRED, 0);
-	vrele(tmpvn);
-
+	vput(tmpvn);
 	return(found);
 }
 
@@ -339,25 +345,18 @@ closeout:
  * change rootdev to correspond to the load device.
  */
 void
-findroot(devpp, partp)
-	struct device **devpp;
-	int *partp;
+findroot(void)
 {
 	struct btinfo_bootdisk *bid;
 	struct device *dv;
+#ifdef COMPAT_OLDBOOT
 	int i, majdev, unit, part;
 	char buf[32];
+#endif
 
-	/*
-	 * Default to "not found."
-	 */
-	*devpp = NULL;
-	*partp = 0;
-
-	if (booted_device) {
-		*devpp = booted_device;
+	if (booted_device)
 		return;
-	}
+
 	if (lookup_bootinfo(BTINFO_NETIF)) {
 		/*
 		 * We got netboot interface information, but
@@ -398,7 +397,8 @@ findroot(devpp, partp)
 			}
 
 			if (!strcmp(dv->dv_cfdata->cf_driver->cd_name, "sd") ||
-			    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd")) {
+			    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd") ||
+			    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "ca")) {
 				/*
 				 * Don't trust BIOS device numbers, try
 				 * to match the information passed by the
@@ -411,24 +411,25 @@ findroot(devpp, partp)
 				goto found;
 			}
 
-			/* no "fd", "wd" or "sd" */
+			/* no "fd", "wd", "sd" or "ca" */
 			continue;
 
 found:
-			if (*devpp) {
+			if (booted_device) {
 				printf("warning: double match for boot "
-				    "device (%s, %s)\n", (*devpp)->dv_xname,
+				    "device (%s, %s)\n", booted_device->dv_xname,
 				    dv->dv_xname);
 				continue;
 			}
-			*devpp = dv;
-			*partp = bid->partition;
+			booted_device = dv;
+			booted_partition = bid->partition;
 		}
 
-		if (*devpp)
+		if (booted_device)
 			return;
 	}
 
+#ifdef COMPAT_OLDBOOT
 #if 0
 	printf("howto %x bootdev %x ", boothowto, bootdev);
 #endif
@@ -437,24 +438,25 @@ found:
 		return;
 
 	majdev = (bootdev >> B_TYPESHIFT) & B_TYPEMASK;
-	for (i = 0; i386_nam2blk[i].d_name != NULL; i++)
-		if (majdev == i386_nam2blk[i].d_maj)
+	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
+		if (majdev == dev_name2blk[i].d_maj)
 			break;
-	if (i386_nam2blk[i].d_name == NULL)
+	if (dev_name2blk[i].d_name == NULL)
 		return;
 
 	part = (bootdev >> B_PARTITIONSHIFT) & B_PARTITIONMASK;
 	unit = (bootdev >> B_UNITSHIFT) & B_UNITMASK;
 
-	sprintf(buf, "%s%d", i386_nam2blk[i].d_name, unit);
+	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
 	for (dv = alldevs.tqh_first; dv != NULL;
 	    dv = dv->dv_list.tqe_next) {
 		if (strcmp(buf, dv->dv_xname) == 0) {
-			*devpp = dv;
-			*partp = part;
+			booted_device = dv;
+			booted_partition = part;
 			return;
 		}
 	}
+#endif
 }
 
 #include "pci.h"
@@ -479,9 +481,13 @@ device_register(dev, aux)
 		if (bin == NULL)
 			return;
 
-		/* check driver name */
-		if (strcmp(bin->ifname, dev->dv_cfdata->cf_driver->cd_name))
-			return;
+		/*
+		 * We don't check the driver name against the device name
+		 * passed by the boot ROM. The ROM should stay usable
+		 * if the driver gets obsoleted.
+		 * The physical attachment information (checked below)
+		 * must be sufficient to identify the device.
+		 */
 
 		if (bin->bus == BI_BUS_ISA &&
 		    !strcmp(dev->dv_parent->dv_cfdata->cf_driver->cd_name,

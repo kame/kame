@@ -1,4 +1,4 @@
-/*	$NetBSD: portal_vfsops.c,v 1.21 1999/02/26 23:44:45 wrstuden Exp $	*/
+/*	$NetBSD: portal_vfsops.c,v 1.24 2000/06/10 18:27:03 assar Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -67,6 +67,7 @@
 #include <miscfs/portal/portal.h>
 
 void	portal_init __P((void));
+void	portal_done __P((void));
 int	portal_mount __P((struct mount *, const char *, void *,
 			  struct nameidata *, struct proc *));
 int	portal_start __P((struct mount *, int, struct proc *));
@@ -86,6 +87,11 @@ int	portal_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 
 void
 portal_init()
+{
+}
+
+void
+portal_done()
 {
 }
 
@@ -118,9 +124,11 @@ portal_mount(mp, path, data, ndp, p)
 	if (error)
 		return (error);
 
+	/* getsock() will use the descriptor for us */
 	if ((error = getsock(p->p_fd, args.pa_socket, &fp)) != 0)
 		return (error);
 	so = (struct socket *) fp->f_data;
+	FILE_UNUSE(fp, NULL);
 	if (so->so_proto->pr_domain->dom_family != AF_LOCAL)
 		return (ESOCKTNOSUPPORT);
 
@@ -142,7 +150,7 @@ portal_mount(mp, path, data, ndp, p)
 
 	mp->mnt_flag |= MNT_LOCAL;
 	mp->mnt_data = (qaddr_t)fmp;
-	vfs_getnewfsid(mp, MOUNT_PORTAL);
+	vfs_getnewfsid(mp);
 
 	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
 	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
@@ -202,6 +210,7 @@ portal_unmount(mp, mntflags, p)
 	 * daemon to wake up, and then the accept will get ECONNABORTED
 	 * which it interprets as a request to go and bury itself.
 	 */
+	FILE_USE(VFSTOPORTAL(mp)->pm_server);
 	soshutdown((struct socket *) VFSTOPORTAL(mp)->pm_server->f_data, 2);
 	/*
 	 * Discard reference to underlying file.  Must call closef because
@@ -358,6 +367,7 @@ struct vfsops portal_vfsops = {
 	portal_fhtovp,
 	portal_vptofh,
 	portal_init,
+	portal_done,
 	portal_sysctl,
 	NULL,				/* vfs_mountroot */
 	portal_checkexp,

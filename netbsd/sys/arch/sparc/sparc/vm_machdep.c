@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.44 1999/03/26 23:41:36 mycroft Exp $ */
+/*	$NetBSD: vm_machdep.c,v 1.54 2000/05/28 05:49:04 thorpej Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -78,17 +78,16 @@ pagemove(from, to, size)
 {
 	paddr_t pa;
 
-	if (size & CLOFSET || (int)from & CLOFSET || (int)to & CLOFSET)
+	if (size & PGOFSET || (int)from & PGOFSET || (int)to & PGOFSET)
 		panic("pagemove 1");
 	while (size > 0) {
-		pa = pmap_extract(pmap_kernel(), (vaddr_t)from);
-		if (pa == 0)
+		if (pmap_extract(pmap_kernel(), (vaddr_t)from, &pa) == FALSE)
 			panic("pagemove 2");
 		pmap_remove(pmap_kernel(),
 		    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
 		pmap_enter(pmap_kernel(),
-		    (vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE, 1,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    (vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -97,7 +96,9 @@ pagemove(from, to, size)
 
 
 /*
- * Map an IO request into kernel virtual address space.
+ * Map a user I/O request into kernel virtual address space.
+ * Note: the pages are already locked by uvm_vslock(), so we
+ * do not need to pass an access_type to pmap_enter().   
  */
 void
 vmapbuf(bp, len)
@@ -118,7 +119,7 @@ vmapbuf(bp, len)
 	 * segment boundary to avoid VAC problems!
 	 */
 	bp->b_saveaddr = bp->b_data;
-	uva = trunc_page(bp->b_data);
+	uva = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - uva;
 	len = round_page(off + len);
 	kva = uvm_km_valloc_wait(kernel_map, len);
@@ -135,12 +136,11 @@ vmapbuf(bp, len)
 	upmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
 	kpmap = vm_map_pmap(kernel_map);
 	do {
-		pa = pmap_extract(upmap, uva);
-		if (pa == 0)
+		if (pmap_extract(upmap, uva, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
 		/* Now map the page into kernel space. */
-		pmap_enter(kpmap, kva, pa | PMAP_NC,
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
+		pmap_enter(kpmap, kva, pa,
+		    VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 		uva += PAGE_SIZE;
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
@@ -148,7 +148,7 @@ vmapbuf(bp, len)
 }
 
 /*
- * Free the mappings associated with this I/O operation.
+ * Unmap a previously-mapped user I/O request.
  */
 void
 vunmapbuf(bp, len)
@@ -161,7 +161,7 @@ vunmapbuf(bp, len)
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vunmapbuf");
 
-	kva = trunc_page(bp->b_data);
+	kva = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - kva;
 	len = round_page(off + len);
 
@@ -184,15 +184,29 @@ vunmapbuf(bp, len)
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
- * Copy and update the pcb, making the child ready to run, and marking
- * it so that it can return differently than the parent.
+ * Copy and update the pcb and trap frame, making the child ready to run.
+ * 
+ * Rig the child's kernel stack so that it will start out in
+ * proc_trampoline() and call child_return() with p2 as an
+ * argument. This causes the newly-created child process to go
+ * directly to user level with an apparent return value of 0 from
+ * fork(), while the parent process returns normally.
  *
- * This function relies on the fact that the pcb is
- * the first element in struct user.
+ * p1 is the process being forked; if p1 == &proc0, we are creating
+ * a kernel thread, and the return path and argument are specified with
+ * `func' and `arg'.
+ *
+ * If an alternate user-level stack is requested (with non-zero values
+ * in both the stack and stacksize args), set up the user stack pointer
+ * accordingly.
  */
 void
-cpu_fork(p1, p2)
+cpu_fork(p1, p2, stack, stacksize, func, arg)
 	struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
+	void (*func) __P((void *));
+	void *arg;
 {
 	struct pcb *opcb = &p1->p_addr->u_pcb;
 	struct pcb *npcb = &p2->p_addr->u_pcb;
@@ -245,6 +259,12 @@ cpu_fork(p1, p2)
 	/* Copy parent's trapframe */
 	*tf2 = *(struct trapframe *)((int)opcb + USPACE - sizeof(*tf2));
 
+	/*
+	 * If specified, give the child a different stack.
+	 */
+	if (stack != NULL)
+		tf2->tf_out[6] = (u_int)stack + stacksize;
+
 	/* Duplicate efforts of syscall(), but slightly differently */
 	if (tf2->tf_global[1] & SYSCALL_G2RFLAG) {
 		/* jmp %g2 (or %g7, deprecated) on success */
@@ -264,53 +284,14 @@ cpu_fork(p1, p2)
 
 	/* Construct kernel frame to return to in cpu_switch() */
 	rp = (struct rwindow *)((u_int)npcb + TOPFRAMEOFF);
-	rp->rw_local[0] = (int)child_return;	/* Function to call */
-	rp->rw_local[1] = (int)p2;		/* and its argument */
+	rp->rw_local[0] = (int)func;		/* Function to call */
+	rp->rw_local[1] = (int)arg;		/* and its argument */
 
 	npcb->pcb_pc = (int)proc_trampoline - 8;
 	npcb->pcb_sp = (int)rp;
 	npcb->pcb_psr &= ~PSR_CWP;	/* Run in window #0 */
 	npcb->pcb_wim = 1;		/* Fence at window #1 */
 
-}
-
-/*
- * cpu_set_kpc:
- *
- * Arrange for in-kernel execution of a process to continue at the
- * named pc, as if the code at that address were called as a function
- * with the supplied argument.
- *
- * Note that it's assumed that when the named process returns,
- * we immediately return to user mode.
- *
- * (Note that cpu_fork(), above, uses an open-coded version of this.)
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct pcb *pcb;
-	struct rwindow *rp;
-
-	pcb = &p->p_addr->u_pcb;
-
-	rp = (struct rwindow *)((u_int)pcb + TOPFRAMEOFF);
-	rp->rw_local[0] = (int)pc;		/* Function to call */
-	rp->rw_local[1] = (int)arg;		/* and its argument */
-
-	/*
-	 * Frob PCB:
-	 *	- arrange to return to proc_trampoline() from cpu_switch()
-	 *	- point it at the stack frame constructed above
-	 *	- make it run in a clear set of register windows
-	 */
-	pcb->pcb_pc = (int)proc_trampoline - 8;
-	pcb->pcb_sp = (int)rp;
-	pcb->pcb_psr &= ~PSR_CWP;	/* Run in window #0 */
-	pcb->pcb_wim = 1;		/* Fence at window #1 */
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgeight.c,v 1.3 1998/11/19 15:38:24 mrg Exp $	*/
+/*	$NetBSD: cgeight.c,v 1.4.12.1 2000/06/30 16:27:40 simonb Exp $	*/
 
 /*
  * Copyright (c) 1996 Jason R. Thorpe.  All rights reserved.
@@ -155,7 +155,7 @@ cgeightmatch(parent, cf, aux)
 	/*
 	 * Make sure there's hardware there.
 	 */
-	if (probeget(ra->ra_vaddr, 4) == -1)
+	if (probeget(ra->ra_vaddr, ASI_PRIMARY, 4) == -1)
 		return (0);
 
 #if defined(SUN4)
@@ -394,13 +394,14 @@ cgeightpoll(dev, events, p)
  * goes. Starting at 8MB, it maps the ramdac for NBPG, then the p4
  * register for NBPG, then the bootrom for 0x40000.
  */
-int
+paddr_t
 cgeightmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgeight_softc *sc = cgeight_cd.cd_devs[minor(dev)];
-	int poff;
+	off_t poff;
 
 #define START_ENABLE	(128*1024)
 #define START_COLOR	((128*1024) + (128*1024))
@@ -424,7 +425,7 @@ cgeightmmap(dev, off, prot)
 		 * there really is. We compensate by double-mapping the
 		 * first page for as many other pages as it wants
 		 */
-		while ((u_int)off >= COLOR_SIZE)
+		while (off >= COLOR_SIZE)
 			off -= COLOR_SIZE;	/* XXX thorpej ??? */
 
 		poff = off + PFOUR_COLOR_OFF_COLOR;

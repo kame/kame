@@ -1,7 +1,7 @@
-/* $NetBSD: pmap.h,v 1.26.2.1 1999/04/16 23:29:02 thorpej Exp $ */
+/* $NetBSD: pmap.h,v 1.35 2000/06/08 03:10:06 thorpej Exp $ */
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -103,7 +103,7 @@
  * arrays which hold enough for ALPHA_MAXPROCS.
  */
 struct pmap {
-	LIST_ENTRY(pmap)	pm_list;	/* list of all pmaps */
+	TAILQ_ENTRY(pmap)	pm_list;	/* list of all pmaps */
 	pt_entry_t		*pm_lev1map;	/* level 1 map */
 	int			pm_count;	/* pmap reference count */
 	struct simplelock	pm_slock;	/* lock on pmap */
@@ -113,6 +113,7 @@ struct pmap {
 	unsigned int		*pm_asn;	/* address space number */
 	unsigned long		*pm_asngen;	/* ASN generation number */
 	unsigned long		pm_cpus;	/* mask of CPUs using pmap */
+	unsigned long		pm_needisync;	/* mask of CPUs needing isync */
 };
 
 typedef struct pmap	*pmap_t;
@@ -131,6 +132,7 @@ typedef struct pv_entry {
 	LIST_ENTRY(pv_entry) pv_list;	/* pv_entry list */
 	struct pmap	*pv_pmap;	/* pmap where mapping lies */
 	vaddr_t		pv_va;		/* virtual address for mapping */
+	pt_entry_t	*pv_pte;	/* PTE that maps the VA */
 } *pv_entry_t;
 
 /*
@@ -166,17 +168,6 @@ struct pv_head {
 	"l3pt",								\
 }
 
-struct pv_page_info {
-	TAILQ_ENTRY(pv_page) pgi_list;
-	LIST_HEAD(, pv_entry) pgi_freelist;
-	int pgi_nfree;
-};
-
-struct pv_page {
-	struct pv_page_info pvp_pgi;
-	struct pv_entry pvp_pv[1];		/* variable length */
-};
-
 #ifdef _KERNEL
 
 #ifndef _LKM
@@ -198,8 +189,8 @@ struct pv_page {
 #endif /* NEW_SCC_DRIVER */
 
 #if defined(MULTIPROCESSOR)
-void	pmap_tlb_shootdown __P((pmap_t, vaddr_t, pt_entry_t));
-void	pmap_do_tlb_shootdown __P((void));
+void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t);
+void	pmap_do_tlb_shootdown(void);
 #endif /* MULTIPROCESSOR */
 #endif /* _LKM */
  
@@ -216,14 +207,14 @@ extern	pt_entry_t *VPT;		/* Virtual Page Table */
 #define	PMAP_MAP_POOLPAGE(pa)		ALPHA_PHYS_TO_K0SEG((pa))
 #define	PMAP_UNMAP_POOLPAGE(va)		ALPHA_K0SEG_TO_PHYS((va))
 
-paddr_t vtophys __P((vaddr_t));
+paddr_t vtophys(vaddr_t);
 
 /* Machine-specific functions. */
-void	pmap_bootstrap __P((paddr_t ptaddr, u_int maxasn, u_long ncpuids));
-void	pmap_emulate_reference __P((struct proc *p, vaddr_t v,
-		int user, int write));
+void	pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids);
+void	pmap_emulate_reference(struct proc *p, vaddr_t v,
+		int user, int write);
 #ifdef _PMAP_MAY_USE_PROM_CONSOLE
-int	pmap_uses_prom_console __P((void));
+int	pmap_uses_prom_console(void);
 #endif
 
 #define	pmap_pte_pa(pte)	(PG_PFNUM(*(pte)) << PGSHIFT)
@@ -252,8 +243,8 @@ do {									\
 
 #define	pmap_pte_prot_chg(pte, np) ((np) ^ pmap_pte_prot(pte))
 
-static __inline pt_entry_t *pmap_l2pte __P((pmap_t, vaddr_t, pt_entry_t *));
-static __inline pt_entry_t *pmap_l3pte __P((pmap_t, vaddr_t, pt_entry_t *));
+static __inline pt_entry_t *pmap_l2pte(pmap_t, vaddr_t, pt_entry_t *);
+static __inline pt_entry_t *pmap_l3pte(pmap_t, vaddr_t, pt_entry_t *);
 
 #define	pmap_l1pte(pmap, v)						\
 	(&(pmap)->pm_lev1map[l1pte_index((vaddr_t)(v))])
@@ -298,6 +289,36 @@ pmap_l3pte(pmap, v, l2pte)
 	lev3map = (pt_entry_t *)ALPHA_PHYS_TO_K0SEG(pmap_pte_pa(l2pte));
 	return (&lev3map[l3pte_index(v)]);
 }
+
+/*
+ * Macros for locking pmap structures.
+ *
+ * Note that we if we access the kernel pmap in interrupt context, it
+ * is only to update statistics.  Since stats are updated using atomic
+ * operations, locking the kernel pmap is not necessary.  Therefore,
+ * it is not necessary to block interrupts when locking pmap strucutres.
+ */
+#define	PMAP_LOCK(pmap)		simple_lock(&(pmap)->pm_slock)
+#define	PMAP_UNLOCK(pmap)	simple_unlock(&(pmap)->pm_slock)
+
+/*
+ * Macro for processing deferred I-stream synchronization.
+ *
+ * The pmap module may defer syncing the user I-stream until the
+ * return to userspace, since the IMB PALcode op can be quite
+ * expensive.  Since user instructions won't be executed until
+ * the return to userspace, this can be deferred until userret().
+ */
+#define	PMAP_USERRET(pmap)						\
+do {									\
+	u_long cpu_mask = (1UL << cpu_number());			\
+									\
+	if ((pmap)->pm_needisync & cpu_mask) {				\
+		atomic_clearbits_ulong(&(pmap)->pm_needisync,		\
+		    cpu_mask);						\
+		alpha_pal_imb();					\
+	}								\
+} while (0)
 
 #endif /* _KERNEL */
 

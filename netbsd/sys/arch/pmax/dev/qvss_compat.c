@@ -1,4 +1,4 @@
-/*	$NetBSD: qvss_compat.c,v 1.15 1999/03/24 05:51:09 mrg Exp $	*/
+/*	$NetBSD: qvss_compat.c,v 1.25 2000/01/10 03:24:33 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,7 +38,7 @@
  *	@(#)fb.c	8.1 (Berkeley) 6/10/93
  */
 
-/* 
+/*
  *  devGraphics.c --
  *
  *     	This file contains machine-dependent routines for the graphics device.
@@ -46,7 +46,7 @@
  *	Copyright (C) 1989 Digital Equipment Corporation.
  *	Permission to use, copy, modify, and distribute this software and
  *	its documentation for any purpose and without fee is hereby granted,
- *	provided that the above copyright notice appears in all copies.  
+ *	provided that the above copyright notice appears in all copies.
  *	Digital Equipment Corporation makes no representations about the
  *	suitability of this software for any purpose.  It is provided "as is"
  *	without express or implied warranty.
@@ -66,66 +66,44 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <sys/select.h>
-#include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/mman.h>
 #include <sys/vnode.h>
+#include <sys/resourcevar.h>
 
 #include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
-
 #include <miscfs/specfs/specdev.h>
 
 #include <dev/dec/lk201.h>		/* LK-201 keycodes */
 
-#include <machine/pmioctl.h>		/* X11R5 Xserver ioctls */
-
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
+#include <machine/pmioctl.h>		/* X11R5 Xserver ioctls */
+
+#include <pmax/dev/dcvar.h>			/* DZ-11 chip console I/O */
+#include <pmax/dev/dtopvar.h>			/* dtop console I/O decls */
 #include <pmax/dev/fbreg.h>		/* XXX should be renamed fbvar.h */
+#include <pmax/dev/qvssvar.h>			/* our own externs */
 
 #include <pmax/pmax/cons.h>
 #include <pmax/pmax/pmaxtype.h>
 
-#include "dc_ds.h"
-#include "dc_ioasic.h"
+#include <pmax/tc/sccvar.h>			/* ioasic z8530 I/O decls */
+
+#include "dc.h"
 #include "scc.h"
 #include "dtop.h"
 
 
 /*
- * Forward / extern references.
- */
-
-#include <pmax/dev/qvssvar.h>			/* our own externs */
-
-struct termios; struct dcregs;
-#include <pmax/dev/dtopvar.h>			/* dtop console I/O decls */
-#include <pmax/tc/sccvar.h>			/* ioasic z8530 I/O decls */
-#include <pmax/dev/dcvar.h>			/* DZ-11 chip console I/O */
-
-/*
  * Prototypes of local functions
  */
-extern void pmEventQueueInit __P((pmEventQueue *qe));
-void	genKbdEvent __P((int ch));
-void	genMouseEvent __P((MouseReport *newRepPtr));
-void	genMouseButtons __P((MouseReport *newRepPtr));
-void	genConfigMouse __P((void));
-void	genDeconfigMouse __P((void));
-void	mouseInput __P((int cc));
+static void	genKbdEvent __P((int ch));
+static void	genMouseEvent __P((void *newRepPtr));
+static void	genMouseButtons __P((void *newRepPtr));
 
-
-#if NSCC > 0
-extern void (*sccDivertXInput) __P((int cc));
-extern void (*sccMouseEvent) __P((int));
-extern void (*sccMouseButtons) __P((int));
-#endif
-
-extern struct fbinfo *firstfi;
+extern struct fbinfo *firstfi;			/* XXX */
 
 
 /*
@@ -138,9 +116,9 @@ void
 init_pmaxfbu(fi)
 	struct fbinfo *fi;
 {
-	
+
 	int tty_rows, tty_cols; /* rows, cols for glass-tty mode */
-	register struct fbuaccess *fbu = NULL;
+	struct fbuaccess *fbu = NULL;
 
 	if (fi == NULL || fi->fi_fbu == NULL)
 		panic("init_pmaxfb: given null pointer to framebuffer\n");
@@ -175,11 +153,13 @@ init_pmaxfbu(fi)
 	/* A guess, but correct for 1024x864, 1024x768 and 1280x1024 */
 	tty_rows = (fi->fi_type.fb_height / 15) - 1;
 
+#ifdef notdef
 	if (tty_rows != fbu->scrInfo.max_row ||
 	    tty_cols != fbu->scrInfo.max_col)
 		printf("framebuffer init: size mismatch: given %dx%d, compute %dx%d\n",
 		       fbu->scrInfo.max_row, fbu->scrInfo.max_col,
 		       tty_rows, tty_cols);
+#endif
 
 	pmEventQueueInit(&fi->fi_fbu->scrInfo.qe);
 }
@@ -219,11 +199,11 @@ pmEventQueueInit(qe)
 void
 fbKbdEvent(ch, fi)
 	int ch;
-	register struct fbinfo *fi;
+	struct fbinfo *fi;
 {
-	register pmEvent *eventPtr;
+	pmEvent *eventPtr;
 	int i;
-	register struct fbuaccess *fbu = NULL;
+	struct fbuaccess *fbu = NULL;
 
 	if (!fi->fi_open)
 		return;
@@ -267,14 +247,14 @@ fbKbdEvent(ch, fi)
  *----------------------------------------------------------------------
  */
 void
-fbMouseEvent(newRepPtr, fi) 
-	register MouseReport *newRepPtr;
-	register struct fbinfo *fi;
+fbMouseEvent(newRepPtr, fi)
+	MouseReport *newRepPtr;
+	struct fbinfo *fi;
 {
 	unsigned milliSec;
 	int i;
 	pmEvent *eventPtr;
-	register struct fbuaccess *fbu = NULL;
+	struct fbuaccess *fbu = NULL;
 
 	if (!fi->fi_open)
 		return;
@@ -346,7 +326,7 @@ fbMouseEvent(newRepPtr, fi)
 		return;
 
 	i = PM_EVROUND(fbu->scrInfo.qe.eTail - 1);
-	if ((fbu->scrInfo.qe.eTail != fbu->scrInfo.qe.eHead) && 
+	if ((fbu->scrInfo.qe.eTail != fbu->scrInfo.qe.eHead) &&
 	    (i != fbu->scrInfo.qe.eHead)) {
 		pmEvent *eventPtr;
 
@@ -390,13 +370,13 @@ fbMouseEvent(newRepPtr, fi)
 void
 fbMouseButtons(newRepPtr, fi)
 	MouseReport *newRepPtr;
-	register struct fbinfo *fi;
+	struct fbinfo *fi;
 {
 	static char temp, oldSwitch, newSwitch;
 	int i, j;
 	pmEvent *eventPtr;
 	static MouseReport lastRep;
-	register struct fbuaccess *fbu = NULL;
+	struct fbuaccess *fbu = NULL;
 
 	if (!fi->fi_open)
 		return;
@@ -472,7 +452,7 @@ fbmmap_fb(fi, dev, data, p)
 	struct vnode vn;
 	struct specinfo si;
 	struct fbuaccess *fbp;
-	register struct fbuaccess *fbu = fi->fi_fbu;
+	struct fbuaccess *fbu = fi->fi_fbu;
 
 	len = mips_round_page(((vaddr_t)fbu & PGOFSET) +
 			      sizeof(struct fbuaccess)) +
@@ -487,7 +467,7 @@ fbmmap_fb(fi, dev, data, p)
 	 */
 	error = uvm_mmap(&p->p_vmspace->vm_map, &addr, len,
 		VM_PROT_ALL, VM_PROT_ALL, MAP_SHARED, (caddr_t)&vn,
-		(vaddr_t)0);
+		(vaddr_t)0, p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 	if (error)
 		return (error);
 	fbp = (struct fbuaccess *)(addr + ((vaddr_t)fbu & PGOFSET));
@@ -515,23 +495,23 @@ fbmmap_fb(fi, dev, data, p)
  * thus finessing the problem.
  */
 
-void
+static void
 genKbdEvent(ch)
 	int ch;
 {
 	fbKbdEvent(ch, firstfi);
 }
 
-void
+static void
 genMouseEvent(newRepPtr)
-	MouseReport *newRepPtr;
+	void *newRepPtr;
 {
 	fbMouseEvent(newRepPtr, firstfi);
 }
 
-void
+static void
 genMouseButtons(newRepPtr)
-	MouseReport *newRepPtr;
+	void *newRepPtr;
 {
 	fbMouseButtons(newRepPtr, firstfi);
 }
@@ -546,28 +526,22 @@ genConfigMouse()
 
 	s = spltty();
 	switch (systype) {
-#if NDC_IOASIC > 0
+
+#if NDC > 0
+	case DS_PMAX:
 	case DS_3MAX:
 		dcDivertXInput = genKbdEvent;
-		dcMouseEvent = (void (*) __P((int)))genMouseEvent;
-		dcMouseButtons = (void (*) __P((int)))genMouseButtons;
+		dcMouseEvent = genMouseEvent;
+		dcMouseButtons = genMouseButtons;
 		break;
-#endif /* NDC_IOASIC */
-
-#if NDC_DS > 0
-	case DS_PMAX:
-		dcDivertXInput = genKbdEvent;
-		dcMouseEvent = (void (*) __P((int)))genMouseEvent;
-		dcMouseButtons = (void (*) __P((int)))genMouseButtons;
-		break;
-#endif /* NDC_DS */
+#endif /* NDC */
 
 #if NSCC > 0
 	case DS_3MIN:
 	case DS_3MAXPLUS:
 		sccDivertXInput = genKbdEvent;
-		sccMouseEvent = (void (*) __P((int)))genMouseEvent;
-		sccMouseButtons = (void (*) __P((int)))genMouseButtons;
+		sccMouseEvent = genMouseEvent;
+		sccMouseButtons = genMouseButtons;
 		break;
 #endif
 #if NDTOP > 0
@@ -593,37 +567,30 @@ genDeconfigMouse()
 
 	s = spltty();
 	switch (systype) {
-#if NDC_IOASIC > 0
-	case DS_3MAX:
 
-		dcDivertXInput = (void (*) __P((int)) )0;
-		dcMouseEvent = (void (*) __P((int)) )0;
-		dcMouseButtons = (void (*) __P((int)) )0;
-		break;
-#endif  /* NDC_IOASIC */
-
-#if NDC_DS > 0
+#if NDC > 0
 	case DS_PMAX:
-		dcDivertXInput = (void (*) __P((int)) )0;
-		dcMouseEvent = (void (*) __P((int)) )0;
-		dcMouseButtons =  (void (*) __P((int)) )0;
+	case DS_3MAX:
+		dcDivertXInput = NULL;
+		dcMouseEvent = NULL;
+		dcMouseButtons =  NULL;
 		break;
-#endif /* NDC_DS */
+#endif /* NDC */
 
 #if NSCC > 0
 	case DS_3MIN:
 	case DS_3MAXPLUS:
-		sccDivertXInput = (void (*) __P((int)) )0;
-		sccMouseEvent = (void (*) __P((int)) )0;
-		sccMouseButtons = (void (*) __P((int)) )0;
+		sccDivertXInput = NULL;
+		sccMouseEvent = NULL;
+		sccMouseButtons = NULL;
 		break;
 #endif
 
 #if NDTOP > 0
 	case DS_MAXINE:
-		dtopDivertXInput = (void (*) __P((int)) )0;
-		dtopMouseEvent = (void (*) __P((MouseReport *)) )0;
-		dtopMouseButtons = (void (*) __P((MouseReport *)) )0;
+		dtopDivertXInput = NULL;
+		dtopMouseEvent = NULL;
+		dtopMouseButtons = NULL;
 		break;
 #endif
 	default:
@@ -649,7 +616,7 @@ void
 mouseInput(cc)
 	int cc;
 {
-	register MouseReport *mrp;
+	MouseReport *mrp;
 	static MouseReport currentRep;
 
 	mrp = &currentRep;

@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_socket.c,v 1.5.4.2 1999/06/26 01:52:41 cgd Exp $ */
+/* $NetBSD: osf1_socket.c,v 1.5 1999/05/10 05:58:44 cgd Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ims332.h,v 1.2 1996/04/08 00:57:38 jonathan Exp $	*/
+/*	$NetBSD: ims332.h,v 1.5 2000/01/08 01:02:35 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,28 +38,28 @@
  *	@(#)ims332.h	8.1 (Berkeley) 6/10/93
  */
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1991,1990,1989 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
@@ -167,13 +167,13 @@
 #define	IMS332_BOOT_64_BIT_MODE		0x000040	/* else 32 */
 #define	IMS332_BOOT_xxx			0xffff80	/* reserved, mbz */
 
-int ims332init (struct fbinfo *);
-void ims332InitColorMap (struct fbinfo *);
-int ims332LoadColorMap (struct fbinfo *, caddr_t, int, int);
-int ims332GetColorMap (struct fbinfo *, caddr_t, int, int);
-int ims332_video_off (struct fbinfo *);
-int ims332_video_on (struct fbinfo *);
-void ims332PosCursor (struct fbinfo *, int, int);
-void ims332RestoreCursorColor (struct fbinfo *);
-void ims332CursorColor (struct fbinfo *, unsigned int []);
-void ims332LoadCursor (struct fbinfo *, u_short *);
+int	ims332init __P((struct fbinfo *));
+void	ims332InitColorMap __P((struct fbinfo *));
+int	ims332LoadColorMap __P((struct fbinfo *, const u_char *, int, int));
+int	ims332GetColorMap __P((struct fbinfo *, u_char *, int, int));
+int	ims332_video_off __P((struct fbinfo *));
+int	ims332_video_on __P((struct fbinfo *));
+void	ims332PosCursor __P((struct fbinfo *, int, int));
+void	ims332RestoreCursorColor __P((struct fbinfo *));
+void	ims332CursorColor __P((struct fbinfo *, unsigned int []));
+void	ims332LoadCursor __P((struct fbinfo *, u_short *));

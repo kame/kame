@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fddi.h,v 1.6 1998/09/20 02:36:09 matt Exp $	*/
+/*	$NetBSD: if_fddi.h,v 1.8 1999/11/19 20:41:19 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1995 Matt Thomas (thomas@lkg.dec.com)
@@ -37,7 +37,7 @@ struct	fddi_header {
 	u_char	fddi_fc;
 	u_char	fddi_dhost[6];
 	u_char	fddi_shost[6];
-};
+} __attribute__((__packed__));
 
 #define	FDDIIPMTU		4352
 #define	FDDIMTU			4470
@@ -92,10 +92,6 @@ void    fddi_ifattach __P((struct ifnet *, caddr_t));
 #else
 void    fddi_ifattach __P((struct ifnet *));
 #endif
-void    fddi_input __P((struct ifnet *, struct fddi_header *, struct mbuf *));
-int     fddi_output __P((struct ifnet *,
-           struct mbuf *, struct sockaddr *, struct rtentry *)); 
-
 #endif
 
 #endif

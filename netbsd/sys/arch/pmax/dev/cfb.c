@@ -1,4 +1,4 @@
-/*	$NetBSD: cfb.c,v 1.29.10.2 1999/04/12 21:27:05 pk Exp $	*/
+/*	$NetBSD: cfb.c,v 1.38 2000/02/03 04:09:13 nisimura Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -46,7 +46,7 @@
  *	Copyright (C) 1989 Digital Equipment Corporation.
  *	Permission to use, copy, modify, and distribute this software and
  *	its documentation for any purpose and without fee is hereby granted,
- *	provided that the above copyright notice appears in all copies.  
+ *	provided that the above copyright notice appears in all copies.
  *	Digital Equipment Corporation makes no representations about the
  *	suitability of this software for any purpose.  It is provided "as is"
  *	without express or implied warranty.
@@ -80,51 +80,30 @@
  * rights to redistribute these changes.
  */
 
-#include "fb.h"
-#include "cfb.h"
-
-#if NCFB > 0
 #include <sys/param.h>
-#include <sys/systm.h>					/* printf() */
-#include <sys/kernel.h>
-#include <sys/errno.h>
+#include <sys/systm.h>
 #include <sys/fcntl.h>
-#include <sys/malloc.h>
 #include <sys/device.h>
 #include <dev/tc/tcvar.h>
 
-#include <mips/cpuregs.h>		/* mips cached->uncached */
+#include <machine/autoconf.h>
 #include <machine/pmioctl.h>
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
-#include <pmax/dev/cfbvar.h>		/* XXX dev/tc ? */
-
 #include <pmax/dev/bt459.h>
+#include <pmax/dev/cfbvar.h>
 #include <pmax/dev/fbreg.h>
-
-#include <machine/autoconf.h>
-
-
-#define PMAX	/* enable /dev/pm compatibility */
 
 /*
  * These need to be mapped into user space.
  */
-struct fbuaccess cfbu;
-struct pmax_fbtty cfbfb;
-struct fbinfo	cfbfi;	/*XXX*/ /* should be softc */
-
-
-/*
- * Forward references.
- */
-
-#define CMAP_BITS	(3 * 256)		/* 256 entries, 3 bytes per. */
-static u_char cmap_bits [CMAP_BITS];		/* colormap for console... */
+static struct fbuaccess		cfbu;
+static struct pmax_fbtty	cfbfb;
+static struct fbinfo		*cfb_fi;
 
 /*
  * Method table for standard framebuffer operations on a CFB.
- * The  CFB uses a Brooktree bt479 ramdac.
+ * The CFB uses a Brooktree bt479 ramdac.
  */
 struct fbdriver cfb_driver = {
 	bt459_video_on,
@@ -137,11 +116,7 @@ struct fbdriver cfb_driver = {
 	bt459CursorColor
 };
 
-int cfbinit __P((struct fbinfo *fi, caddr_t cfbaddr, int unit, int silent));
-extern void fbScreenInit __P((struct fbinfo *fi));
-
-
-#define	CFB_OFFSET_VRAM		0x0		/* from module's base */
+#define CFB_OFFSET_VRAM		0x0		/* from module's base */
 #define CFB_OFFSET_BT459	0x200000	/* Bt459 registers */
 #define CFB_OFFSET_IREQ		0x300000	/* Interrupt req. control */
 #define CFB_OFFSET_ROM		0x380000	/* Diagnostic ROM */
@@ -154,26 +129,34 @@ extern void fbScreenInit __P((struct fbinfo *fi));
  * code is completely gone.
  */
 
-int cfbmatch __P((struct device *, struct cfdata *, void *));
-void cfbattach __P((struct device *, struct device *, void *));
-int cfb_intr __P((void *sc));
+static int	cfbmatch __P((struct device *, struct cfdata *, void *));
+static void	cfbattach __P((struct device *, struct device *, void *));
+static int	cfbinit __P((struct fbinfo *, caddr_t, int, int));
+static int	cfb_intr __P((void *sc));
 
 struct cfattach cfb_ca = {
-	sizeof(struct fbinfo), cfbmatch, cfbattach
+	sizeof(struct fbsoftc), cfbmatch, cfbattach
 };
 
 int
+cfb_cnattach(addr)
+	paddr_t addr;
+{
+	struct fbinfo *fi;
+
+	fbcnalloc(&fi);
+	cfbinit(fi, (caddr_t)addr, 0, 1);
+	cfb_fi = fi;
+	return (1);
+}
+
+static int
 cfbmatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
 	void *aux;
 {
 	struct tc_attach_args *ta = aux;
-
-#ifdef FBDRIVER_DOES_ATTACH
-	/* leave configuration  to the fb driver */
-	return 0;
-#endif
 
 	/* make sure that we're looking for this type of device. */
 	if (!TC_BUS_MATCHNAME(ta, "PMAG-BA "))
@@ -187,7 +170,7 @@ cfbmatch(parent, match, aux)
  * so console-config code can attach cfb devices very early in boot,
  * to use as system console.
  */
-void
+static void
 cfbattach(parent, self, aux)
 	struct device *parent;
 	struct device *self;
@@ -196,16 +179,22 @@ cfbattach(parent, self, aux)
 	struct tc_attach_args *ta = aux;
 	caddr_t base = 	(caddr_t)(ta->ta_addr);
 	int unit = self->dv_unit;
-	struct fbinfo *fi = (struct fbinfo *) self;
+	struct fbinfo *fi;
+	
+	if (cfb_fi)
+		fi = cfb_fi;
+	else {
+		/* Allocate a struct fbinfo and point the softc at it */
+		if (fballoc(&fi) < 0 || cfbinit(fi, base, unit, 0) < 0)
+			return; /* failed */
+	}
+	((struct fbsoftc *)self)->sc_fi = fi;
 
-#ifdef notyet
-	/* if this is the console, it's already configured. */
-	if (ca->ca_slotpri == cons_slot)
-		return;	/* XXX patch up softc pointer */
-#endif
-
-	if (!cfbinit(fi, base, unit, 0))
-		return;
+	printf(": %dx%dx%d%s",
+		fi->fi_type.fb_width,
+		fi->fi_type.fb_height,
+		fi->fi_type.fb_depth, 
+		(cfb_fi) ? " console" : "");
 
 	/*
 	 * 3MIN does not mask un-established TC option interrupts,
@@ -223,36 +212,19 @@ cfbattach(parent, self, aux)
  * CFB initialization.  This is divorced from cfbattch() so that
  * a console framebuffer can be initialized early during boot.
  */
-int
+static int
 cfbinit(fi, cfbaddr, unit, silent)
 	struct fbinfo *fi;
 	caddr_t cfbaddr;
 	int unit;
 	int silent;
 {
-	/*
-	 * If this device is being intialized as the console, malloc()
-	 * is not yet up and we must use statically-allocated space.
-	 */
-	if (fi == NULL) {
-		fi = &cfbfi;	/* XXX */
-  		fi->fi_cmap_bits = (caddr_t)cmap_bits;
-	}
-	else {
-    		fi->fi_cmap_bits = malloc(CMAP_BITS, M_DEVBUF, M_NOWAIT);
-		if (fi->fi_cmap_bits == NULL) {
-			printf("cfb%d: no memory for cmap\n", unit);
-			return (0);
-		}
-	}
 
 	/* check for no frame buffer */
 	if (badaddr(cfbaddr, 4)) {
 		printf("cfb: bad address 0x%p\n", cfbaddr);
 		return (0);
 	}
-
-	/* XXX  fi should be a pointer to a field in the softc */
 
 	/* Fill in main frame buffer info struct. */
 	fi->fi_unit = unit;
@@ -273,17 +245,11 @@ cfbinit(fi, cfbaddr, unit, silent)
 	fi->fi_type.fb_cmsize = 256;
 	fi->fi_type.fb_size = CFB_FB_SIZE;
 
-
-	/*
-	 * Reset the chip.   (Initializes colormap for us as a
-	 * "helpful"  side-effect.)
-	 */
+	/* Reset the chip */
 	if (!bt459init(fi)) {
 		printf("cfb%d: vdac init failed.\n", unit);
 		return (0);
 	}
-	/*cfbInitColorMap();*/  /* done by bt459init() */
-
 
 	/*
 	 * qvss/pm-style mmap()ed event queue compatibility glue
@@ -299,33 +265,15 @@ cfbinit(fi, cfbaddr, unit, silent)
 	/* This is glass-tty state but it's in the shared structure. Ick. */
 	fi->fi_fbu->scrInfo.max_row = 56;
 	fi->fi_fbu->scrInfo.max_col = 80;
-
 	init_pmaxfbu(fi);
 
-	/*
-	 * Initialize old-style pmax glass-tty screen info.
-	 */
+	/* Initialize old-style pmax glass-tty screen info. */
 	fi->fi_glasstty = &cfbfb;
 
+	if (tb_kbdmouseconfig(fi))
+		return (-1);
 
-	/*
-	 * Initialize the color map, the screen, and the mouse.
-	 */
-	if (tb_kbdmouseconfig(fi)) {
-		printf(" (mouse/keyboard config failed)");
-		return (0);
-	}
-
-
-	/*
-	 * Connect to the raster-console pseudo-driver
-	 */
-	fbconnect("PMAG-BA", fi, silent);
-
-
-#ifdef fpinitialized
-	fp->initialized = 1;
-#endif
+	fbconnect(fi);
 	return (1);
 }
 
@@ -340,17 +288,17 @@ cfbinit(fi, cfbaddr, unit, silent)
  * This function simply dismisses CFB interrupts, or the interrupt
  * request from the card will still be active.
  */
-int
+static int
 cfb_intr(sc)
 	void *sc;
 {
-	struct fbinfo *fi = (struct fbinfo *)sc;
-	char *slot_addr = (((char *)fi->fi_base) - CFB_OFFSET_VRAM);
+	struct fbinfo *fi;
+	caddr_t slot_addr;
+
+	fi = (struct fbinfo *)sc;
+	slot_addr = (((caddr_t)fi->fi_base) - CFB_OFFSET_VRAM);
 	
 	/* reset vertical-retrace interrupt by writing a dont-care */
-	*(int*) (slot_addr+CFB_OFFSET_IREQ) = 0;
-
+	*(int*) (slot_addr + CFB_OFFSET_IREQ) = 0;
 	return (0);
 }
-
-#endif /* NCFB */

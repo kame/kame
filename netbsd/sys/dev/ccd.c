@@ -1,4 +1,4 @@
-/*	$NetBSD: ccd.c,v 1.62.2.1 1999/11/05 07:39:39 cgd Exp $	*/
+/*	$NetBSD: ccd.c,v 1.69 2000/04/05 04:03:20 enami Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 1999 The NetBSD Foundation, Inc.
@@ -95,6 +95,7 @@
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/namei.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -133,8 +134,11 @@ struct ccdbuf {
 	SIMPLEQ_ENTRY(ccdbuf) cb_q;	/* fifo of component buffers */
 };
 
-#define	CCD_GETBUF(cs)		pool_get(&(cs)->sc_cbufpool, PR_NOWAIT)
-#define	CCD_PUTBUF(cs, cbp)	pool_put(&(cs)->sc_cbufpool, cbp)
+/* component buffer pool */
+struct pool ccd_cbufpool;
+
+#define	CCD_GETBUF()		pool_get(&ccd_cbufpool, PR_NOWAIT)
+#define	CCD_PUTBUF(cbp)		pool_put(&ccd_cbufpool, cbp)
 
 #define CCDLABELDEV(dev)	\
 	(MAKEDISKDEV(major((dev)), ccdunit((dev)), RAW_PART))
@@ -188,12 +192,14 @@ ccdattach(num)
 	    M_DEVBUF, M_NOWAIT);
 	if (ccd_softc == NULL) {
 		printf("WARNING: no memory for concatenated disks\n");
-		if (ccd_softc != NULL)
-			free(ccd_softc, M_DEVBUF);
 		return;
 	}
 	numccd = num;
 	bzero(ccd_softc, num * sizeof(struct ccd_softc));
+
+	/* Initialize the component buffer pool. */
+	pool_init(&ccd_cbufpool, sizeof(struct ccdbuf), 0,
+	    0, 0, "ccdpl", 0, NULL, NULL, M_DEVBUF);
 
 	/* Initialize per-softc structures. */
 	for (i = 0; i < num; i++) {
@@ -211,16 +217,16 @@ ccdinit(cs, cpaths, vpp, p)
 	struct vnode **vpp;
 	struct proc *p;
 {
-	register struct ccdcinfo *ci = NULL;
-	register size_t size;
-	register int ix;
+	struct ccdcinfo *ci = NULL;
+	size_t size;
+	int ix;
 	struct vattr va;
 	size_t minsize;
 	int maxsecsize;
 	struct partinfo dpart;
 	struct ccdgeom *ccg = &cs->sc_geom;
 	char tmppath[MAXPATHLEN];
-	int error;
+	int error, path_alloced;
 
 #ifdef DEBUG
 	if (ccddebug & (CCDB_FOLLOW|CCDB_INIT))
@@ -239,7 +245,7 @@ ccdinit(cs, cpaths, vpp, p)
 	 */
 	maxsecsize = 0;
 	minsize = 0;
-	for (ix = 0; ix < cs->sc_nccdisks; ix++) {
+	for (ix = 0, path_alloced = 0; ix < cs->sc_nccdisks; ix++) {
 		ci = &cs->sc_cinfo[ix];
 		ci->ci_vp = vpp[ix];
 
@@ -255,11 +261,11 @@ ccdinit(cs, cpaths, vpp, p)
 				printf("%s: can't copy path, error = %d\n",
 				    cs->sc_xname, error);
 #endif
-			free(cs->sc_cinfo, M_DEVBUF);
-			return (error);
+			goto out;
 		}
 		ci->ci_path = malloc(ci->ci_pathlen, M_DEVBUF, M_WAITOK);
 		bcopy(tmppath, ci->ci_path, ci->ci_pathlen);
+		path_alloced++;
 
 		/*
 		 * XXX: Cache the component's dev_t.
@@ -271,9 +277,7 @@ ccdinit(cs, cpaths, vpp, p)
 				    cs->sc_xname, ci->ci_path,
 				    "error", error);
 #endif
-			free(ci->ci_path, M_DEVBUF);
-			free(cs->sc_cinfo, M_DEVBUF);
-			return (error);
+			goto out;
 		}
 		ci->ci_dev = va.va_rdev;
 
@@ -288,10 +292,19 @@ ccdinit(cs, cpaths, vpp, p)
 				 printf("%s: %s: ioctl failed, error = %d\n",
 				     cs->sc_xname, ci->ci_path, error);
 #endif
-			free(ci->ci_path, M_DEVBUF);
-			free(cs->sc_cinfo, M_DEVBUF);
-			return (error);
+			goto out;
 		}
+
+/*
+ * This diagnostic test is disabled (for now?) since not all port supports
+ * on-disk BSD disklabel.
+ */
+#if 0 /* def DIAGNOSTIC */
+		/* Check fstype field of component. */
+		if (dpart.part->p_fstype != FS_CCD)
+			printf("%s: WARNING: %s: fstype %d != FS_CCD\n",
+			    cs->sc_xname, ci->ci_path, dpart.part->p_fstype);
+#endif
 
 		/*
 		 * Calculate the size, truncating to an interleave
@@ -310,9 +323,8 @@ ccdinit(cs, cpaths, vpp, p)
 				printf("%s: %s: size == 0\n",
 				    cs->sc_xname, ci->ci_path);
 #endif
-			free(ci->ci_path, M_DEVBUF);
-			free(cs->sc_cinfo, M_DEVBUF);
-			return (ENODEV);
+			error = ENODEV;
+			goto out;
 		}
 
 		if (minsize == 0 || size < minsize)
@@ -332,9 +344,8 @@ ccdinit(cs, cpaths, vpp, p)
 			printf("%s: interleave must be at least %d\n",
 			    cs->sc_xname, (maxsecsize / DEV_BSIZE));
 #endif
-		free(ci->ci_path, M_DEVBUF);
-		free(cs->sc_cinfo, M_DEVBUF);
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
 
 	/*
@@ -366,16 +377,22 @@ ccdinit(cs, cpaths, vpp, p)
 	cs->sc_flags |= CCDF_INITED;
 
 	return (0);
+
+ out:
+	for (ix = 0; ix < path_alloced; ix++)
+		free(cs->sc_cinfo[ix].ci_path, M_DEVBUF);
+	free(cs->sc_cinfo, M_DEVBUF);
+	return (error);
 }
 
 static void
 ccdinterleave(cs)
-	register struct ccd_softc *cs;
+	struct ccd_softc *cs;
 {
-	register struct ccdcinfo *ci, *smallci;
-	register struct ccdiinfo *ii;
-	register daddr_t bn, lbn;
-	register int ix;
+	struct ccdcinfo *ci, *smallci;
+	struct ccdiinfo *ii;
+	daddr_t bn, lbn;
+	int ix;
 	u_long size;
 
 #ifdef DEBUG
@@ -579,11 +596,11 @@ ccdclose(dev, flags, fmt, p)
 
 void
 ccdstrategy(bp)
-	register struct buf *bp;
+	struct buf *bp;
 {
-	register int unit = ccdunit(bp->b_dev);
-	register struct ccd_softc *cs = &ccd_softc[unit];
-	register int s;
+	int unit = ccdunit(bp->b_dev);
+	struct ccd_softc *cs = &ccd_softc[unit];
+	int s;
 	int wlabel;
 	struct disklabel *lp;
 
@@ -631,10 +648,10 @@ done:
 
 static void
 ccdstart(cs, bp)
-	register struct ccd_softc *cs;
-	register struct buf *bp;
+	struct ccd_softc *cs;
+	struct buf *bp;
 {
-	register long bcount, rcount;
+	long bcount, rcount;
 	struct ccdbuf *cbp;
 	caddr_t addr;
 	daddr_t bn;
@@ -669,7 +686,7 @@ ccdstart(cs, bp)
 			/* Free the already allocated component buffers. */
 			while ((cbp = SIMPLEQ_FIRST(&cbufq)) != NULL) {
 				SIMPLEQ_REMOVE_HEAD(&cbufq, cbp, cb_q);
-				CCD_PUTBUF(cs, cbp);
+				CCD_PUTBUF(cbp);
 			}
 
 			/* Notify the upper layer we are out of memory. */
@@ -699,16 +716,16 @@ ccdstart(cs, bp)
  */
 static struct ccdbuf *
 ccdbuffer(cs, bp, bn, addr, bcount)
-	register struct ccd_softc *cs;
+	struct ccd_softc *cs;
 	struct buf *bp;
 	daddr_t bn;
 	caddr_t addr;
 	long bcount;
 {
-	register struct ccdcinfo *ci;
-	register struct ccdbuf *cbp;
-	register daddr_t cbn, cboff;
-	register u_int64_t cbc;
+	struct ccdcinfo *ci;
+	struct ccdbuf *cbp;
+	daddr_t cbn, cboff;
+	u_int64_t cbc;
 	int ccdisk;
 
 #ifdef DEBUG
@@ -726,7 +743,7 @@ ccdbuffer(cs, bp, bn, addr, bcount)
 	 * Serially concatenated
 	 */
 	if (cs->sc_ileave == 0) {
-		register daddr_t sblk;
+		daddr_t sblk;
 
 		sblk = 0;
 		for (ccdisk = 0, ci = &cs->sc_cinfo[ccdisk];
@@ -739,7 +756,7 @@ ccdbuffer(cs, bp, bn, addr, bcount)
 	 * Interleaved
 	 */
 	else {
-		register struct ccdiinfo *ii;
+		struct ccdiinfo *ii;
 		int off;
 
 		cboff = cbn % cs->sc_ileave;
@@ -763,7 +780,7 @@ ccdbuffer(cs, bp, bn, addr, bcount)
 	/*
 	 * Fill in the component buf structure.
 	 */
-	cbp = CCD_GETBUF(cs);
+	cbp = CCD_GETBUF();
 	if (cbp == NULL)
 		return (NULL);
 	cbp->cb_buf.b_flags = bp->b_flags | B_CALL;
@@ -773,6 +790,7 @@ ccdbuffer(cs, bp, bn, addr, bcount)
 	cbp->cb_buf.b_blkno = cbn + cboff;
 	cbp->cb_buf.b_data = addr;
 	cbp->cb_buf.b_vp = ci->ci_vp;
+	LIST_INIT(&cbp->cb_buf.b_dep);
 	if (cs->sc_ileave == 0)
 		cbc = dbtob((u_int64_t)(ci->ci_size - cbn));
 	else
@@ -799,8 +817,8 @@ ccdbuffer(cs, bp, bn, addr, bcount)
 
 static void
 ccdintr(cs, bp)
-	register struct ccd_softc *cs;
-	register struct buf *bp;
+	struct ccd_softc *cs;
+	struct buf *bp;
 {
 
 #ifdef DEBUG
@@ -853,7 +871,7 @@ ccdiodone(vbp)
 		       cs->sc_xname, bp->b_error, cbp->cb_comp);
 	}
 	count = cbp->cb_buf.b_bcount;
-	CCD_PUTBUF(cs, cbp);
+	CCD_PUTBUF(cbp);
 
 	/*
 	 * If all done, "interrupt".
@@ -1060,10 +1078,6 @@ ccdioctl(dev, cmd, data, flag, p)
 		/* Attach the disk. */
 		disk_attach(&cs->sc_dkdev);
 
-		/* Initialize the component buffer pool. */
-		pool_init(&cs->sc_cbufpool, sizeof(struct ccdbuf), 0,
-		    0, 0, "ccdpl", 0, NULL, NULL, M_DEVBUF);
-
 		/* Try and read the disklabel. */
 		ccdgetdisklabel(dev);
 		break;
@@ -1112,9 +1126,6 @@ ccdioctl(dev, cmd, data, flag, p)
 		free(cs->sc_cinfo, M_DEVBUF);
 		free(cs->sc_itable, M_DEVBUF);
 		cs->sc_flags &= ~CCDF_INITED;
-
-		/* Free the component buffer pool. */
-		pool_destroy(&cs->sc_cbufpool);
 
 		/* Detatch the disk. */
 		disk_detach(&cs->sc_dkdev);
@@ -1390,7 +1401,7 @@ static void
 printiinfo(ii)
 	struct ccdiinfo *ii;
 {
-	register int ix, i;
+	int ix, i;
 
 	for (ix = 0; ii->ii_ndisk; ix++, ii++) {
 		printf(" itab[%d]: #dk %d sblk %d soff %d",

@@ -1,4 +1,4 @@
-/*	$NetBSD: process_machdep.c,v 1.1 1996/09/30 16:34:53 ws Exp $	*/
+/*	$NetBSD: process_machdep.c,v 1.4 2000/06/09 14:05:04 kleink Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,8 +30,87 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <sys/param.h>
 #include <sys/proc.h>
+#include <sys/user.h>
+#include <sys/systm.h>
+#include <sys/ptrace.h>
+
+#include <machine/pcb.h>
+#include <machine/reg.h>
+
+int
+process_read_regs(p, regs)
+	struct proc *p;
+	struct reg *regs;
+{
+	struct trapframe *tf = trapframe(p);
+
+	bcopy(tf->fixreg, regs->fixreg, sizeof(regs->fixreg));
+	regs->lr = tf->lr;
+	regs->cr = tf->cr;
+	regs->xer = tf->xer;
+	regs->ctr = tf->ctr;
+	regs->pc = tf->srr0;
+
+	return 0;
+}
+
+int
+process_write_regs(p, regs)
+	struct proc *p;
+	struct reg *regs;
+{
+	struct trapframe *tf = trapframe(p);
+
+	bcopy(regs->fixreg, tf->fixreg, sizeof(regs->fixreg));
+	tf->lr = regs->lr;
+	tf->cr = regs->cr;
+	tf->xer = regs->xer;
+	tf->ctr = regs->ctr;
+	tf->srr0 = regs->pc;
+
+	return 0;
+}
+
+int
+process_read_fpregs(p, regs)
+	struct proc *p;
+	struct fpreg *regs;
+{
+	struct pcb *pcb = &p->p_addr->u_pcb;
+
+	/* Is the process using the fpu? */
+	if ((pcb->pcb_flags & PCB_FPU) == 0) {
+		bzero(regs, sizeof (struct fpreg));
+		return 0;
+	}
+
+	if (p == fpuproc)
+		save_fpu(p);
+	bcopy(&pcb->pcb_fpu, regs, sizeof (struct fpreg));
+
+	return 0;
+}
+
+int
+process_write_fpregs(p, regs)
+	struct proc *p;
+	struct fpreg *regs;
+{
+	struct pcb *pcb = &p->p_addr->u_pcb;
+
+	if (p == fpuproc)
+		fpuproc = NULL;
+
+	bcopy(regs, &pcb->pcb_fpu, sizeof(struct fpreg));
+
+	/* pcb_fpu is initialized now. */
+	pcb->pcb_flags |= PCB_FPU;
+
+	return 0;
+}
 
 /*
  * Set the process's program counter.

@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_vfsops.c,v 1.31.2.1 2000/02/01 22:55:58 he Exp $	*/
+/*	$NetBSD: procfs_vfsops.c,v 1.34 2000/06/10 18:27:03 assar Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -62,6 +62,7 @@
 #include <vm/vm.h>			/* for PAGE_SIZE */
 
 void	procfs_init __P((void));
+void	procfs_done __P((void));
 int	procfs_mount __P((struct mount *, const char *, void *,
 			  struct nameidata *, struct proc *));
 int	procfs_start __P((struct mount *, int, struct proc *));
@@ -107,7 +108,7 @@ procfs_mount(mp, path, data, ndp, p)
 	    M_UFSMNT, M_WAITOK);   /* XXX need new malloc type */
 
 	mp->mnt_data = (qaddr_t)pmnt;
-	vfs_getnewfsid(mp, MOUNT_PROCFS);
+	vfs_getnewfsid(mp);
 
 	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN, &size);
 	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
@@ -272,6 +273,12 @@ procfs_init()
 	procfs_hashinit();
 }
 
+void
+procfs_done()
+{
+	procfs_hashdone();
+}
+
 int
 procfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	int *name;
@@ -305,6 +312,7 @@ struct vfsops procfs_vfsops = {
 	procfs_fhtovp,
 	procfs_vptofh,
 	procfs_init,
+	procfs_done,
 	procfs_sysctl,
 	NULL,				/* vfs_mountroot */
 	procfs_checkexp,

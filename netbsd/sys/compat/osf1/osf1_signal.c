@@ -1,4 +1,4 @@
-/*	$NetBSD: osf1_signal.c,v 1.6.2.1 1999/06/21 19:27:41 cgd Exp $	*/
+/*	$NetBSD: osf1_signal.c,v 1.16 1999/05/05 01:51:36 cgd Exp $	*/
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: stand.h,v 1.31 1999/03/31 01:50:26 cgd Exp $	*/
+/*	$NetBSD: stand.h,v 1.40 2000/02/03 02:00:31 cgd Exp $	*/
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -237,7 +237,16 @@ ssize_t	read __P((int, void *, size_t));
 ssize_t	write __P((int, void *, size_t));
 off_t	lseek __P((int, off_t, int));
 int	ioctl __P((int, u_long, char *));
-    
+int	stat __P((const char *, struct stat *));
+int	fstat __P((int, struct stat *));
+
+extern int opterr, optind, optopt, optreset;
+extern char *optarg;
+int	getopt __P((int, char * const *, const char *));
+
+char	*getpass __P((const char *));
+int	checkpasswd __P((void));
+
 int	nodev __P((void));
 int	noioctl __P((struct open_file *, u_long, void *));
 void	nullsys __P((void));

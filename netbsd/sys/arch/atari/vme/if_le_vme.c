@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_vme.c,v 1.9.2.2 1999/12/04 19:47:45 he Exp $	*/
+/*	$NetBSD: if_le_vme.c,v 1.11 1999/10/25 14:52:55 leo Exp $	*/
 
 /*-
  * Copyright (c) 1998 maximum entropy.  All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: dec_maxine.c,v 1.8 1999/03/25 01:17:52 simonb Exp $	*/
+/* $NetBSD: dec_maxine.c,v 1.34 2000/06/06 00:08:26 nisimura Exp $ */
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -73,357 +73,319 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_maxine.c,v 1.8 1999/03/25 01:17:52 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_maxine.c,v 1.34 2000/06/06 00:08:26 nisimura Exp $");
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/device.h>
 
 #include <machine/cpu.h>
-#include <machine/intr.h>
-#include <machine/reg.h>
-#include <machine/psl.h>
-#include <machine/locore.h>		/* wbflush() */
-#include <machine/autoconf.h>		/* intr_arg_t */
 #include <machine/sysconf.h>
+#include <mips/mips/mips_mcclock.h>
 
-#include <mips/mips_param.h>		/* hokey spl()s */
-#include <mips/mips/mips_mcclock.h>	/* mcclock CPUspeed estimation */
+#include <dev/tc/tcvar.h>
+#include <dev/tc/ioasicvar.h>
+#include <dev/tc/ioasicreg.h>
 
-/* all these to get ioasic_base */
-#include <sys/device.h>			/* struct cfdata for.. */
-#include <dev/tc/tcvar.h>		/* tc type definitions for.. */
-#include <dev/tc/ioasicreg.h>		/* ioasic interrrupt masks */
-#include <dev/tc/ioasicvar.h>		/* ioasic_base */
+#include <pmax/pmax/maxine.h>
+#include <pmax/pmax/machdep.h>
+#include <pmax/pmax/memc.h>
 
-#include <pmax/pmax/clockreg.h>
-#include <pmax/pmax/turbochannel.h>
-#include <pmax/pmax/pmaxtype.h>
-#include <pmax/pmax/machdep.h>		/* XXXjrs replace with vectors */
+#include <pmax/dev/xcfbvar.h>
+#include <pmax/dev/dtopvar.h>
+#include <pmax/tc/sccvar.h>
 
-#include <pmax/pmax/maxine.h>		/* baseboard addresses (constants) */
-#include <pmax/pmax/dec_kn02_subr.h>	/* 3min/maxine memory errors */
+#include "rasterconsole.h"
+#include "xcfb.h"
 
-/*
- * Forward declarations
- */
-void		dec_maxine_init __P((void));
-void		dec_maxine_os_init __P((void));
-void		dec_maxine_bus_reset __P((void));
-void		dec_maxine_mach_init __P((void));
+void		dec_maxine_init __P((void));		/* XXX */
+static void	dec_maxine_bus_reset __P((void));
+static void	dec_maxine_cons_init __P((void));
+static void	dec_maxine_intr __P((unsigned, unsigned, unsigned, unsigned));
+static void	dec_maxine_intr_establish __P((struct device *, void *,
+		    int, int (*)(void *), void *));
 
-void		dec_maxine_enable_intr
-		   __P ((u_int slotno, int (*handler) __P((intr_arg_t sc)),
-			 intr_arg_t sc, int onoff));
-int		dec_maxine_intr __P((u_int mask, u_int pc,
-			      u_int statusReg, u_int causeReg));
-
-void		dec_maxine_device_register __P((struct device *, void *));
-void		dec_maxine_cons_init __P((void));
-
+static void	kn02ca_wbflush __P((void));
+static unsigned	kn02ca_clkread __P((void));
 
 /*
  * local declarations
  */
-u_long xine_tc3_imask;
+static u_int32_t xine_tc3_imask;
+static unsigned latched_cycle_cnt;
 
-/*
- * Fill in platform struct.
- */
+
 void
 dec_maxine_init()
 {
-
 	platform.iobus = "tcbus";
-
-	platform.os_init = dec_maxine_os_init;
 	platform.bus_reset = dec_maxine_bus_reset;
 	platform.cons_init = dec_maxine_cons_init;
-	platform.device_register = dec_maxine_device_register;
+	platform.iointr = dec_maxine_intr;
+	platform.intr_establish = dec_maxine_intr_establish;
+	platform.memsize = memsize_scan;
+	platform.clkread = kn02ca_clkread;
+	/* MAXINE has 1 microsec. free-running high resolution timer */
+ 
+	/* clear any memory errors */
+	*(u_int32_t *)MIPS_PHYS_TO_KSEG1(XINE_REG_TIMEOUT) = 0;
+	kn02ca_wbflush();
+ 
+	ioasic_base = MIPS_PHYS_TO_KSEG1(XINE_SYS_ASIC);
 
-	dec_maxine_os_init();
+	/*
+	 * MAXINE IOASIC interrupts come through INT 3, while
+	 * clock interrupt does via INT 1.  splclock and splstatclock
+	 * should block IOASIC activities.
+	 */
+	splvec.splbio = MIPS_SPL3; 
+	splvec.splnet = MIPS_SPL3;
+	splvec.spltty = MIPS_SPL3;
+	splvec.splimp = MIPS_SPL3;
+	splvec.splclock = MIPS_SPL_0_1_3;
+	splvec.splstatclock = MIPS_SPL_0_1_3;
+ 
+	/* calibrate cpu_mhz value */  
+	mc_cpuspeed(ioasic_base+IOASIC_SLOT_8_START, MIPS_INT_MASK_1);
+
+	*(u_int32_t *)(ioasic_base + IOASIC_LANCE_DECODE) = 0x3;
+	*(u_int32_t *)(ioasic_base + IOASIC_SCSI_DECODE) = 0xe;
+#if 0
+	*(u_int32_t *)(ioasic_base + IOASIC_SCC0_DECODE) = (0x10|4);
+	*(u_int32_t *)(ioasic_base + IOASIC_DTOP_DECODE) = 10;
+	*(u_int32_t *)(ioasic_base + IOASIC_FLOPPY_DECODE) = 13;
+	*(u_int32_t *)(ioasic_base + IOASIC_CSR) = 0x00001fc1;
+#endif
+  
+	/* sanitize interrupt mask */
+	xine_tc3_imask = 0;
+	*(u_int32_t *)(ioasic_base + IOASIC_INTR) = 0;
+	*(u_int32_t *)(ioasic_base + IOASIC_IMSK) = xine_tc3_imask;
+	kn02ca_wbflush();
 
 	sprintf(cpu_model, "Personal DECstation 5000/%d (MAXINE)", cpu_mhz);
 }
 
-
-/*
- * Set up OS level stuff: spls, etc.
- */
-void
-dec_maxine_os_init()
-{
-	/* clear any memory errors from probes */
-	*(volatile u_int*)MIPS_PHYS_TO_KSEG1(XINE_REG_TIMEOUT) = 0;
-	wbflush();
-
-	ioasic_base = MIPS_PHYS_TO_KSEG1(XINE_SYS_ASIC);
-	mips_hardware_intr = dec_maxine_intr;
-	tc_enable_interrupt = dec_maxine_enable_intr;
-
-	/* On the MAXINE ioasic interrupts at level 3. */
-	Mach_splbio = Mach_spl3;
-	Mach_splnet = Mach_spl3;
-	Mach_spltty = Mach_spl3;
-	Mach_splimp = Mach_spl3;
-
-	/*
-	 * Note priority inversion of ioasic and clock:
-	 * clock interrupts are at hw priority 1, and when blocking
-	 * clock interrups we we must block hw priority 3
-	 * (bio,net,tty) also.
-	 *
-	 * XXX hw priority 2 is used for memory errors, we
-	 * should not disable memory errors during clock interrupts!
-	 */
-	Mach_splclock = cpu_spl3;
-	Mach_splstatclock = cpu_spl3;
-	mcclock_addr = (volatile struct chiptime *)
-		MIPS_PHYS_TO_KSEG1(XINE_SYS_CLOCK);
-	mc_cpuspeed(mcclock_addr, MIPS_INT_MASK_1);
-
-	/*
-	 * Initialize interrupts.
-	 */
-	*(u_int *)IOASIC_REG_IMSK(ioasic_base) = XINE_IM0;
-	*(u_int *)IOASIC_REG_INTR(ioasic_base) = 0;
-}
-
-
 /*
  * Initalize the memory system and I/O buses.
  */
-void
+static void
 dec_maxine_bus_reset()
 {
 	/*
 	 * Reset interrupts, clear any errors from newconf probes
 	 */
 
-	*(volatile u_int*)MIPS_PHYS_TO_KSEG1(XINE_REG_TIMEOUT) = 0;
-	wbflush();
+	*(u_int32_t *)MIPS_PHYS_TO_KSEG1(XINE_REG_TIMEOUT) = 0;
+	kn02ca_wbflush();
 
-	*(volatile u_int *)IOASIC_REG_INTR(ioasic_base) = 0;
-	wbflush();
+	*(u_int32_t *)(ioasic_base + IOASIC_INTR) = 0;
+	kn02ca_wbflush();
 }
 
 
-void
+static void
 dec_maxine_cons_init()
 {
+	int kbd, crt, screen;
+	extern int tcfb_cnattach __P((int));		/* XXX */
+
+	kbd = crt = screen = 0;
+	prom_findcons(&kbd, &crt, &screen);
+
+	if (screen > 0) {
+#if NRASTERCONSOLE > 0
+		if (crt == 3) {
+#if NXCFB > 0
+			xcfb_cnattach();
+			dtikbd_cnattach();
+			return;
+#endif
+		}
+		else if (tcfb_cnattach(crt) > 0) {
+			dtikbd_cnattach();
+			return;
+		}
+#endif
+		printf("No framebuffer device configured for slot %d: ", crt);
+		printf("using serial console\n");
+	}
+	/*
+	 * Delay to allow PROM putchars to complete.
+	 * FIFO depth * character time,
+	 * character time = (1000000 / (defaultrate / 10))
+	 */
+	DELAY(160000000 / 9600);        /* XXX */
+
+	scc_cnattach(ioasic_base, 0x100000);
 }
 
-void
-dec_maxine_device_register(dev, aux)
+static void
+dec_maxine_intr_establish(dev, cookie, level, handler, arg)
 	struct device *dev;
-	void *aux;
+	void *cookie;
+	int level;
+	int (*handler) __P((void *));
+	void *arg;
 {
-	panic("dec_maxine_device_register unimplemented");
-}
+	unsigned mask;
 
-
-
-/*
- *  Enable/Disable interrupts from a TURBOchannel slot.
- *
- *	We pretend we actually have 11 slots even if we really have
- *	only 2: TCslots 0-1 maps to slots 0-1, TCslot 2 is used for
- *	the system (TCslot3), TCslot3 maps to slots 3-10
- *	 (see pmax/tc/ds-asic-conf.c).
- *	Note that all these interrupts come in via the IMR.
- */
-void
-dec_maxine_enable_intr(slotno, handler, sc, on)
-	register unsigned int slotno;
-	int (*handler) __P((void* softc));
-	void *sc;
-	int on;
-{
-	register unsigned mask;
-
-	switch (slotno) {
-	case 0:			/* a real slot, but  */
+	switch ((int)cookie) {
+	  case SYS_DEV_OPT0:
 		mask = XINE_INTR_TC_0;
 		break;
-	case 1:			/* a real slot, but */
+	  case SYS_DEV_OPT1:
 		mask = XINE_INTR_TC_1;
 		break;
-	case XINE_FLOPPY_SLOT:
+	  case SYS_DEV_FDC:
 		mask = XINE_INTR_FLOPPY;
 		break;
-	case XINE_SCSI_SLOT:
+	  case SYS_DEV_SCSI:
 		mask = (IOASIC_INTR_SCSI | IOASIC_INTR_SCSI_PTR_LOAD |
 			IOASIC_INTR_SCSI_OVRUN | IOASIC_INTR_SCSI_READ_E);
 		break;
-	case XINE_LANCE_SLOT:
+	  case SYS_DEV_LANCE:
 		mask = IOASIC_INTR_LANCE;
 		break;
-	case XINE_SCC0_SLOT:
-		mask = XINE_INTR_SCC_0;
+	  case SYS_DEV_SCC0:
+		mask = IOASIC_INTR_SCC_0;
 		break;
-	case XINE_DTOP_SLOT:
+	  case SYS_DEV_DTOP:
 		mask = XINE_INTR_DTOP_RX;
 		break;
-	case XINE_ISDN_SLOT:
-		mask = (XINE_INTR_ISDN | IOASIC_INTR_ISDN_OVRUN |
-			IOASIC_INTR_ISDN_TXLOAD | IOASIC_INTR_ISDN_RXLOAD);
+	  case SYS_DEV_ISDN:
+		mask = (IOASIC_INTR_ISDN_TXLOAD | IOASIC_INTR_ISDN_RXLOAD |
+			IOASIC_INTR_ISDN_OVRUN);
 		break;
-	case XINE_ASIC_SLOT:
-		mask = XINE_INTR_ASIC;
-		break;
-	default:
-		return;/* ignore */
+	  default:
+#ifdef DIAGNOSTIC
+		printf("warning: enabling unknown intr %x\n", (int)cookie);
+#endif
+		return;
 	}
 
-	if (on) {
-		xine_tc3_imask |= mask;
-		tc_slot_info[slotno].intr = handler;
-		tc_slot_info[slotno].sc = sc;
-	} else {
-		xine_tc3_imask &= ~mask;
-		tc_slot_info[slotno].intr = 0;
-		tc_slot_info[slotno].sc = 0;
-	}
-	*(u_int *)IOASIC_REG_IMSK(ioasic_base) = xine_tc3_imask;
-	wbflush();
+	xine_tc3_imask |= mask;
+	intrtab[(int)cookie].ih_func = handler;
+	intrtab[(int)cookie].ih_arg = arg;
+
+	*(u_int32_t *)(ioasic_base + IOASIC_IMSK) = xine_tc3_imask;
+	kn02ca_wbflush();
 }
 
 
-/*
- * Maxine hardware interrupts. (Personal DECstation 5000/xx)
- */
-int
-dec_maxine_intr(mask, pc, statusReg, causeReg)
-	unsigned mask;
+#define CHECKINTR(vvv, bits)					\
+    do {							\
+	if (can_serve & (bits)) {				\
+		ifound = 1;					\
+		intrcnt[vvv] += 1;				\
+		(*intrtab[vvv].ih_func)(intrtab[vvv].ih_arg);	\
+	}							\
+    } while (0)
+
+static void
+dec_maxine_intr(status, cause, pc, ipending)
+	unsigned ipending;
 	unsigned pc;
-	unsigned statusReg;
-	unsigned causeReg;
+	unsigned status;
+	unsigned cause;
 {
-	register u_int intr;
-	register volatile struct chiptime *c =
-	    (volatile struct chiptime *) MIPS_PHYS_TO_KSEG1(XINE_SYS_CLOCK);
-	volatile u_int *imaskp = (volatile u_int *)
-		MIPS_PHYS_TO_KSEG1(XINE_REG_IMSK);
-	volatile u_int *intrp = (volatile u_int *)
-		MIPS_PHYS_TO_KSEG1(XINE_REG_INTR);
-	u_int old_mask;
-	struct clockframe cf;
-	int temp;
-
-	old_mask = *imaskp & xine_tc3_imask;
-	*imaskp = xine_tc3_imask;
-
-	if (mask & MIPS_INT_MASK_4)
+	if (ipending & MIPS_INT_MASK_4)
 		prom_haltbutton();
 
 	/* handle clock interrupts ASAP */
-	if (mask & MIPS_INT_MASK_1) {
-		temp = c->regc;	/* XXX clear interrupt bits */
-		cf.pc = pc;
-		cf.sr = statusReg;
+	if (ipending & MIPS_INT_MASK_1) {
+		struct clockframe cf;
+
+		__asm __volatile("lbu $0,48(%0)" ::
+			"r"(ioasic_base + IOASIC_SLOT_8_START));
 		latched_cycle_cnt =
-		    *(u_long*)(MIPS_PHYS_TO_KSEG1(XINE_REG_FCTR));
+		    *(u_int32_t *)MIPS_PHYS_TO_KSEG1(XINE_REG_FCTR);
+		cf.pc = pc;
+		cf.sr = status;
 		hardclock(&cf);
 		intrcnt[HARDCLOCK]++;
 		/* keep clock interrupts enabled when we return */
-		causeReg &= ~MIPS_INT_MASK_1;
+		cause &= ~MIPS_INT_MASK_1;
 	}
 
 	/* If clock interrups were enabled, re-enable them ASAP. */
-	splx(MIPS_SR_INT_ENA_CUR | (statusReg & MIPS_INT_MASK_1));
+	_splset(MIPS_SR_INT_IE | (status & MIPS_INT_MASK_1));
 
-	if (mask & MIPS_INT_MASK_3) {
-		intr = *intrp;
-		/* masked interrupts are still observable */
-		intr &= old_mask;
-
-		if ((intr & XINE_INTR_SCC_0)) {
-			if (tc_slot_info[XINE_SCC0_SLOT].intr)
-				(*(tc_slot_info[XINE_SCC0_SLOT].intr))
-				(tc_slot_info[XINE_SCC0_SLOT].sc);
-			else
-				printf ("can't handle scc interrupt\n");
-			intrcnt[SERIAL0_INTR]++;
-		}
-
-		if (intr & IOASIC_INTR_SCSI_PTR_LOAD) {
-			*intrp &= ~IOASIC_INTR_SCSI_PTR_LOAD;
-#ifdef notdef
-			asc_dma_intr();
-#endif
-		}
-
-		if (intr & (IOASIC_INTR_SCSI_OVRUN | IOASIC_INTR_SCSI_READ_E))
-			*intrp &= ~(IOASIC_INTR_SCSI_OVRUN | IOASIC_INTR_SCSI_READ_E);
-
-		if (intr & IOASIC_INTR_LANCE_READ_E)
-			*intrp &= ~IOASIC_INTR_LANCE_READ_E;
-
-		if (intr & XINE_INTR_DTOP_RX) {
-			if (tc_slot_info[XINE_DTOP_SLOT].intr)
-				(*(tc_slot_info[XINE_DTOP_SLOT].intr))
-				(tc_slot_info[XINE_DTOP_SLOT].sc);
-			else
-				printf ("can't handle dtop interrupt\n");
-			intrcnt[DTOP_INTR]++;
-		}
-
-		if (intr & XINE_INTR_FLOPPY) {
-			if (tc_slot_info[XINE_FLOPPY_SLOT].intr)
-				(*(tc_slot_info[XINE_FLOPPY_SLOT].intr))
-				(tc_slot_info[XINE_FLOPPY_SLOT].sc);
-		else
-			printf ("can't handle floppy interrupt\n");
-			intrcnt[FLOPPY_INTR]++;
-		}
-
-		if (intr & XINE_INTR_TC_0) {
-			if (tc_slot_info[0].intr)
-				(*(tc_slot_info[0].intr))
-				(tc_slot_info[0].sc);
-			else
-				printf ("can't handle tc0 interrupt\n");
-			intrcnt[SLOT0_INTR]++;
-		}
-
-		if (intr & XINE_INTR_TC_1) {
-			if (tc_slot_info[1].intr)
-				(*(tc_slot_info[1].intr))
-				(tc_slot_info[1].sc);
-			else
-				printf ("can't handle tc1 interrupt\n");
-			intrcnt[SLOT1_INTR]++;
-		}
-
-		if (intr & XINE_INTR_ISDN) {
-			if (tc_slot_info[XINE_ISDN_SLOT].intr)
-				(*(tc_slot_info[XINE_ISDN_SLOT].intr))
-				(tc_slot_info[XINE_ISDN_SLOT].sc);
-			else
-				printf ("can't handle isdn interrupt\n");
-				intrcnt[ISDN_INTR]++;
-		}
-
-		if (intr & IOASIC_INTR_LANCE) {
-			if (tc_slot_info[XINE_LANCE_SLOT].intr)
-				(*(tc_slot_info[XINE_LANCE_SLOT].intr))
-				(tc_slot_info[XINE_LANCE_SLOT].sc);
-			else
-				printf ("can't handle lance interrupt\n");
-
-			intrcnt[LANCE_INTR]++;
-		}
-
-		if (intr & IOASIC_INTR_SCSI) {
-			if (tc_slot_info[XINE_SCSI_SLOT].intr)
-				(*(tc_slot_info[XINE_SCSI_SLOT].intr))
-				(tc_slot_info[XINE_SCSI_SLOT].sc);
-			else
-				printf ("can't handle scsi interrupt\n");
-			intrcnt[SCSI_INTR]++;
-		}
+	if (ipending & MIPS_INT_MASK_3) {
+		int ifound;
+		u_int32_t imsk, intr, can_serve, xxxintr;
+	
+		do {
+			ifound = 0;
+			intr = *(u_int32_t *)(ioasic_base + IOASIC_INTR);
+			imsk = *(u_int32_t *)(ioasic_base + IOASIC_IMSK);
+			can_serve = intr & imsk;
+ 
+			CHECKINTR(SYS_DEV_DTOP, XINE_INTR_DTOP);
+			CHECKINTR(SYS_DEV_SCC0, IOASIC_INTR_SCC_0);
+			CHECKINTR(SYS_DEV_LANCE, IOASIC_INTR_LANCE);
+			CHECKINTR(SYS_DEV_SCSI, IOASIC_INTR_SCSI);
+			/* CHECKINTR(SYS_DEV_OPT2, XINE_INTR_VINT);	*/
+			CHECKINTR(SYS_DEV_ISDN, (IOASIC_INTR_ISDN_TXLOAD | IOASIC_INTR_ISDN_RXLOAD));
+			/* CHECKINTR(SYS_DEV_FDC, IOASIC_INTR_FDC);	*/
+			CHECKINTR(SYS_DEV_OPT1, XINE_INTR_TC_1); 
+			CHECKINTR(SYS_DEV_OPT0, XINE_INTR_TC_0); 
+ 
+#define ERRORS	(IOASIC_INTR_ISDN_OVRUN|IOASIC_INTR_SCSI_OVRUN|IOASIC_INTR_SCSI_READ_E|IOASIC_INTR_LANCE_READ_E)
+#define PTRLOAD (IOASIC_INTR_ISDN_TXLOAD|IOASIC_INTR_ISDN_RXLOAD|IOASIC_INTR_SCSI_PTR_LOAD)
+ 
+#if 0	
+	if (can_serve & IOASIC_INTR_SCSI_PTR_LOAD) {
+		extern void asc_ptr_load __P((void *));
+		ifound = 1;
+		asc_ptr_load(intrtab[SYS_DEV_SCSI].ih_arg);
 	}
-	if (mask & MIPS_INT_MASK_2)
+#endif	
+ 
+	/* 
+	 * XXX future project is here XXX
+	 * IOASIC DMA completion interrupt (PTR_LOAD) should be checked
+	 * here, and DMA pointers serviced as soon as possible.
+	 */	
+	/*
+	 * All of IOASIC device interrupts comes through a single service
+	 * request line coupled with MIPS cpu INT 3.
+	 * Disabling INT 3 makes entire IOASIC interrupt services blocked,
+	 * and it's harmful because it causes DMA overruns during network
+	 * disk I/O interrupts.
+	 * So, Non-DMA interrupts should be selectively disabled by masking
+	 * IOASIC_IMSK register, and INT 3 itself be reenabled immediately,
+	 * and made available all the time.
+	 * DMA interrupts can then be serviced whilst still servicing
+	 * non-DMA interrupts from ioctl devices or TC options.
+	 */
+			xxxintr = can_serve & (ERRORS | PTRLOAD);
+			if (xxxintr) {
+				ifound = 1;
+				*(u_int32_t *)(ioasic_base + IOASIC_INTR)
+					= intr &~ xxxintr;
+			}
+		} while (ifound);
+	}
+	if (ipending & MIPS_INT_MASK_2)
 		kn02ba_errintr();
-	return ((statusReg & ~causeReg & MIPS_HARD_INT_MASK) |
-		MIPS_SR_INT_ENA_CUR);
+
+	_splset(MIPS_SR_INT_IE | (status & ~cause & MIPS_HARD_INT_MASK));
+}
+
+static void
+kn02ca_wbflush()
+{
+	/* read once IOASIC_IMSK */
+	__asm __volatile("lw $0,%0" ::
+	    "i"(MIPS_PHYS_TO_KSEG1(XINE_REG_IMSK)));
+}
+
+static unsigned
+kn02ca_clkread()
+{
+	u_int32_t cycles;
+  
+	cycles = *(u_int32_t *)MIPS_PHYS_TO_KSEG1(XINE_REG_FCTR);
+	return cycles - latched_cycle_cnt;
 }

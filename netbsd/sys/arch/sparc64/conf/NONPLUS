@@ -1,4 +1,4 @@
-# 	$NetBSD: NONPLUS,v 1.10 1999/03/27 17:58:20 eeh Exp $
+# 	$NetBSD: NONPLUS,v 1.19.4.2 2000/07/18 16:23:17 mrg Exp $
 
 include "arch/sparc64/conf/std.sparc64"
 
@@ -19,8 +19,9 @@ options		__ELF__		# we use elf
 
 ## Use a faster console than the PROM's slow drawing routines.  Not needed
 ## for headless (no framebuffer) machines.
-#options 	RASTERCONSOLE	# fast rasterop console
-
+#options 	RASTERCONSOLE		# fast rasterop console
+#options	FONT_GALLANT12x22	# the console font
+#options	FONT_BOLD8x16		# a somewhat smaller font
 
 #### System options that are the same for all ports
 
@@ -35,7 +36,6 @@ config		netbsd	root on ? type ?
 options		UVM_PAGE_TRKOWN
 options		UVMHIST
 #options 	UVMHIST_PRINT	# Loud!
-options 	PMAP_NEW	# new pmap interface; not yet supported
 
 ## System call tracing (see ktrace(1)).
 options 	KTRACE
@@ -127,13 +127,14 @@ options 	COMPAT_10	# NetBSD 1.0 binary compatibility
 options 	COMPAT_11	# NetBSD 1.1 binary compatibility
 options 	COMPAT_12	# NetBSD 1.2 binary compatibility
 options 	COMPAT_13	# NetBSD 1.3 binary compatibility
+options 	COMPAT_14	# NetBSD 1.4 binary compatibility
 options 	COMPAT_SUNOS	# SunOS 4.x binary compatibility
 options 	COMPAT_SVR4	# SunOS 5.x binary compatibility
 #options		COMPAT_NETBSD32	# NetBSD/sparc binary compatibility
 options 	EXEC_ELF32	# Exec module for SunOS 5.x binaries.
 #options		EXEC_ELF64	# Exec module for SunOS 5.x binaries.
 options		SYSCALL_DEBUG
-#options		COMPAT_AOUT	# NetBSD/sparc compat support
+options		COMPAT_AOUT	# NetBSD/sparc compat support
 options 	EXEC_AOUT	# execve(2) support for a.out binaries
 
 ## File systems.  You probably need at least one of FFS or NFS.
@@ -155,6 +156,7 @@ file-system	MSDOSFS		# MS-DOS FAT filesystem(s).
 options 	NFSSERVER	# Sun NFS-compatible filesystem server
 options 	QUOTA		# FFS quotas
 #options 	FFS_EI		# FFS Endian Independent support
+options		SOFTDEP		# FFS soft updates support.
 
 ## Network protocol support.  In most environments, INET is required.
 options 	INET		# IP (Internet Protocol) v4
@@ -165,7 +167,7 @@ options 	TCP_COMPAT_42	# 4.2BSD IP implementation compatibility
 #options 	NS		# Xerox NS networking
 #options 	NSIP		# Xerox NS tunneling over IP
 options 	ISO,TPIP	# OSI networking
-options 	EON		# OSI tunneling over IP
+#options 	EON		# OSI tunneling over IP
 #options 	CCITT,LLC,HDLC	# X.25 packet switched protocol
 options 	NETATALK	# AppleTalk (over Ethernet) protocol
 #options 	NTP		# Network Time Protocol in-kernel support
@@ -190,9 +192,9 @@ sbus0	at mainbus0				# sun4c and sun4u
 
 #### Standard system devices -- all required for a given architecture
 
-## Auxiliary system registers on sun4c and sun4m
-#auxreg0 at sbus0
-#auxreg0 at pci0
+## Auxiliary system registers -- We use the OBP for power management
+#auxio*	at ebus?				# auxio registers
+#auxio*	at sbus? slot ? offset ?		# auxio registers
 
 # We also need:
 # bpp0 at sbus0					# parallel port
@@ -221,13 +223,13 @@ ms0	at zs1 channel 1	# mouse
 ## called `se' and `su'
 
 ## Part of a PC87332VLJ?
-#se0	at ebus?		# 
-#kbd0	at su1 channel 0	# keyboard
-#ms0	at su1 channel 1	# mouse
-
-## These are two SAB82532 controllers
 #su0	at ebus?		# ttya
 #su1	at ebus?		# ttyb
+#kbd0	at su0			# keyboard
+#ms0	at su1			# mouse
+
+## This is the SAB82532 DUART
+#se0	at ebus?		# 
 
 
 #### Disk controllers and disks

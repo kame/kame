@@ -1,4 +1,4 @@
-/*	$NetBSD: sdvar.h,v 1.7.6.1 2000/01/23 13:46:01 he Exp $	*/
+/*	$NetBSD: sdvar.h,v 1.12 2000/05/23 10:20:15 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -74,6 +74,7 @@ struct sd_softc {
 #define	SDF_ANCIENT	0x10		/* disk is ancient; for minphys */
 #define	SDF_DIRTY	0x20		/* disk is dirty; needs cache flush */
 #define	SDF_FLUSHING	0x40		/* flushing, for sddone() */
+#define	SDF_RESTART	0x80		/* we issued a scsi_start command */
 	struct scsipi_link *sc_link;	/* contains our targ, lun, etc. */
 	struct disk_parms {
 		u_long	heads;		/* number of heads */
@@ -83,7 +84,7 @@ struct sd_softc {
 		u_long	disksize;	/* total number sectors */
 		u_long	rot_rate;	/* rotational rate, in RPM */
 	} params;
-	struct buf buf_queue;
+	struct buf_queue buf_queue;
 	u_int8_t type;
 	char name[16]; /* product name, for default disklabel */
 	const struct sd_ops *sc_ops;	/* our bus-dependent ops vector */
@@ -98,7 +99,7 @@ struct sd_softc {
 struct sd_ops {
 	int	(*sdo_get_parms) __P((struct sd_softc *, struct disk_parms *,
 		    int));
-	void	(*sdo_flush) __P((struct sd_softc *, int));
+	int	(*sdo_flush) __P((struct sd_softc *, int));
 };
 #define	SDGP_RESULT_OK		0	/* paramters obtained */
 #define	SDGP_RESULT_OFFLINE	1	/* no media, or otherwise losing */
@@ -106,3 +107,5 @@ struct sd_ops {
 
 void sdattach __P((struct device *, struct sd_softc *, struct scsipi_link *,
     const struct sd_ops *));
+int sdactivate __P((struct device *, enum devact));
+int sddetach __P((struct device *, int));

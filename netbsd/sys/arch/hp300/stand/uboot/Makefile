@@ -1,8 +1,10 @@
-#	$NetBSD: Makefile,v 1.1 1997/02/04 03:53:06 thorpej Exp $
+#	$NetBSD: Makefile,v 1.3 2000/05/31 14:31:25 he Exp $
 
 PROGAOUT=	uboot
 PROGSOURCE=	uboot.c tgets.c
 NEWVERSWHAT=	"Primary Boot"
+
+CPPFLAGS+=	-DSUPPORT_ETHERNET -DSUPPORT_TAPE -DSUPPORT_DISK
 
 install:
 	${INSTALL} -d -m 755 -o ${BINOWN} -g ${BINGRP} \
@@ -23,5 +25,17 @@ install:
 	ln ${DESTDIR}${BINDIR}/uboot.lif ${DESTDIR}${BINDIR}/bootct
 	rm -f ${DESTDIR}${BINDIR}/rbootd/SYS_UBOOT
 	ln ${DESTDIR}${BINDIR}/uboot.lif ${DESTDIR}${BINDIR}/rbootd/SYS_UBOOT
+
+.ifndef RELEASEDIR
+release:
+	@echo setenv RELEASEDIR first
+	@false
+.else
+release: uboot.lif
+	mkdir -p $(RELEASEDIR)/installation/misc
+	rm -f $(RELEASEDIR)/installation/misc/SYS_UBOOT
+	${INSTALL} -c -m 444 uboot.lif $(RELEASEDIR)/installation/misc/SYS_UBOOT
+.endif # RELEASEDIR check
+
 
 .include "../Makefile.buildboot"

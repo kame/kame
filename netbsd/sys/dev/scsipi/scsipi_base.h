@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipi_base.h,v 1.9.4.1 2000/02/28 19:09:02 he Exp $	*/
+/*	$NetBSD: scsipi_base.h,v 1.10 2000/02/28 17:44:20 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

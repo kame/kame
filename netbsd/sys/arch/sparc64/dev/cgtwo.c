@@ -1,4 +1,4 @@
-/*	$NetBSD: cgtwo.c,v 1.2 1998/08/13 02:10:41 eeh Exp $ */
+/*	$NetBSD: cgtwo.c,v 1.4.12.1 2000/06/30 16:27:41 simonb Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -147,7 +147,7 @@ cgtwomatch(parent, cf, aux)
 	/* XXX - Must do our own mapping at CG2_CTLREG_OFF */
 	bus_untmp();
 	tmp = (caddr_t)mapdev(ra->ra_reg, TMPMAP_VA, CG2_CTLREG_OFF, NBPG);
-	if (probeget(tmp, 2) != -1)
+	if (probeget(tmp, ASI_PRIMARY, 2) != -1)
 		return 1;
 #endif
 	return 0;
@@ -428,17 +428,18 @@ cgtwoputcmap(sc, cmap)
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  */
-int
+paddr_t
 cgtwommap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgtwo_softc *sc = cgtwo_cd.cd_devs[minor(dev)];
 
 	if (off & PGOFSET)
 		panic("cgtwommap");
 
-	if ((unsigned)off >= sc->sc_fb.fb_type.fb_size)
+	if (off >= sc->sc_fb.fb_type.fb_size)
 		return (-1);
 
 	return (REG2PHYS(&sc->sc_phys, off) | PMAP_NC);

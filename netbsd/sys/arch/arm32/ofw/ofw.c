@@ -1,4 +1,4 @@
-/*	$NetBSD: ofw.c,v 1.22 1999/03/29 10:02:19 mycroft Exp $	*/
+/*	$NetBSD: ofw.c,v 1.24 2000/06/06 20:17:36 matt Exp $	*/
 
 /*
  * Copyright 1997
@@ -42,6 +42,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/reboot.h>
 #include <sys/mbuf.h>
 #include <vm/vm.h>
@@ -80,7 +81,6 @@
  *  Imported variables
  */
 extern BootConfig bootconfig;	/* temporary, I hope */
-extern int cold;
 
 #ifdef	DIAGNOSTIC
 /* NOTE: These variables will be removed, well some of them */
@@ -542,6 +542,9 @@ ofw_getbootinfo(bp_pp, ba_pp)
 
 	*bp_pp = bootpathv;
 	*ba_pp = bootargsv;
+#ifdef DIAGNOSTIC
+	printf("bootpath=<%s>, bootargs=<%s>\n", bootpathv, bootargsv);
+#endif
 }
 
 vm_offset_t

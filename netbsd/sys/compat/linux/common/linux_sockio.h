@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_sockio.h,v 1.8.6.1 2000/01/15 16:15:17 he Exp $	*/
+/*	$NetBSD: linux_sockio.h,v 1.9 1999/07/17 21:46:28 jtk Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.

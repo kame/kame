@@ -1,4 +1,4 @@
-/*	$NetBSD: ultrix_pathname.c,v 1.8 1999/02/09 20:30:38 christos Exp $	*/
+/*	$NetBSD: ultrix_pathname.c,v 1.10 2000/03/30 11:27:21 augustss Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -272,8 +272,8 @@ ultrix_sys_statfs(p, v, retval)
 	register_t *retval;
 {
 	struct ultrix_sys_statfs_args *uap = v;
-	register struct mount *mp;
-	register struct statfs *sp;
+	struct mount *mp;
+	struct statfs *sp;
 	int error;
 	struct nameidata nd;
 
@@ -307,17 +307,21 @@ ultrix_sys_fstatfs(p, v, retval)
 	struct ultrix_sys_fstatfs_args *uap = v;
 	struct file *fp;
 	struct mount *mp;
-	register struct statfs *sp;
+	struct statfs *sp;
 	int error;
 
+	/* getvnode() will use the descriptor for us */
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
 	if ((error = VFS_STATFS(mp, sp, p)) != 0)
-		return (error);
+		goto out;
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
-	return ultrixstatfs(sp, (caddr_t)SCARG(uap, buf));
+	error = ultrixstatfs(sp, (caddr_t)SCARG(uap, buf));
+ out:
+	FILE_UNUSE(fp, p);
+	return (error);
 }
 
 int

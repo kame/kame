@@ -1,4 +1,4 @@
-/*	$NetBSD: in_var.h,v 1.32.2.2 1999/06/07 19:57:17 perry Exp $	*/
+/*	$NetBSD: in_var.h,v 1.39.4.1 2000/10/17 00:46:09 tv Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -100,6 +100,8 @@ struct in_ifaddr {
 #define	ia_broadaddr	ia_dstaddr
 	struct	sockaddr_in ia_sockmask; /* reserve space for general netmask */
 	LIST_HEAD(, in_multi) ia_multiaddrs; /* list of multicast addresses */
+	struct	in_multi *ia_allhosts;	/* multicast address record for
+					   the allhosts multicast group */
 };
 
 struct	in_aliasreq {
@@ -138,7 +140,7 @@ extern  struct in_ifaddrhashhead *in_ifaddrhashtbl;	/* Hash table head */
 extern  struct in_ifaddrhead in_ifaddr;		/* List head (in ip_input) */
 
 extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
-void	in_socktrim __P((struct sockaddr_in *));
+extern	int	inetctlerrmap[];
 
 
 /*
@@ -185,7 +187,7 @@ void	in_socktrim __P((struct sockaddr_in *));
 	/* struct in_addr addr; */ \
 	/* struct ifnet *ifp; */ \
 { \
-	register struct in_ifaddr *ia; \
+	struct in_ifaddr *ia; \
 \
 	INADDR_TO_IA(addr, ia); \
 	(ifp) = (ia == NULL) ? NULL : ia->ia_ifp; \
@@ -199,7 +201,7 @@ void	in_socktrim __P((struct sockaddr_in *));
 	/* struct ifnet *ifp; */ \
 	/* struct in_ifaddr *ia; */ \
 { \
-	register struct ifaddr *ifa; \
+	struct ifaddr *ifa; \
 \
 	for (ifa = (ifp)->if_addrlist.tqh_first; \
 	    ifa != NULL && ifa->ifa_addr->sa_family != AF_INET; \
@@ -255,7 +257,7 @@ struct in_multistep {
 	/* struct ifnet *ifp; */ \
 	/* struct in_multi *inm; */ \
 { \
-	register struct in_ifaddr *ia; \
+	struct in_ifaddr *ia; \
 \
 	IFP_TO_IA((ifp), ia); 			/* multicast */ \
 	if (ia == NULL) \
@@ -300,8 +302,13 @@ struct in_multistep {
 	IN_NEXT_MULTI((step), (inm)); \
 }
 
+struct ifaddr;
+
 int	in_ifinit __P((struct ifnet *,
 	    struct in_ifaddr *, struct sockaddr_in *, int));
+void	in_savemkludge __P((struct in_ifaddr *));
+void	in_restoremkludge __P((struct in_ifaddr *, struct ifnet *));
+void	in_purgemkludge __P((struct ifnet *));
 struct	in_multi *in_addmulti __P((struct in_addr *, struct ifnet *));
 void	in_delmulti __P((struct in_multi *));
 void	in_ifscrub __P((struct ifnet *, struct in_ifaddr *));
@@ -309,7 +316,14 @@ void	in_setmaxmtu __P((void));
 const char *in_fmtaddr __P((struct in_addr));
 int	in_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 	    struct proc *));
+void	in_purgeaddr __P((struct ifaddr *, struct ifnet *));
+void	in_purgeif __P((struct ifnet *));
+void	ip_input __P((struct mbuf *));
 int	ipflow_fastforward __P((struct mbuf *));
+
 #endif
+
+/* INET6 stuff */
+#include <netinet6/in6_var.h>
 
 #endif /* _NETINET_IN_VAR_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: clnp_input.c,v 1.17 1998/07/05 04:37:42 jonathan Exp $	*/
+/*	$NetBSD: clnp_input.c,v 1.20 2000/03/30 13:10:06 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -79,6 +79,7 @@ SOFTWARE.
 #include <net/route.h>
 
 #include <net/if_ether.h>
+#include <net/if_fddi.h>
 
 #include <netiso/iso.h>
 #include <netiso/iso_var.h>
@@ -120,7 +121,7 @@ void            x25esis_input();
 void
 clnp_init()
 {
-	register struct protosw *pr;
+	struct protosw *pr;
 
 	/*
 	 * CLNP protox initialization
@@ -159,8 +160,8 @@ clnp_init()
 void
 clnlintr()
 {
-	register struct mbuf *m;/* ptr to first mbuf of pkt */
-	register struct clnl_fixed *clnl;	/* ptr to fixed part of clnl
+	struct mbuf *m;/* ptr to first mbuf of pkt */
+	struct clnl_fixed *clnl;	/* ptr to fixed part of clnl
 						 * hdr */
 	int             s;	/* save and restore priority */
 	struct clnl_protosw *clnlsw;	/* ptr to protocol switch */
@@ -181,16 +182,6 @@ next:
 	if ((m->m_flags & M_PKTHDR) == 0 || m->m_pkthdr.rcvif == 0) {
 		m_freem(m);
 		goto next;
-	} else {
-		register struct ifaddr *ifa;
-		for (ifa = m->m_pkthdr.rcvif->if_addrlist.tqh_first; ifa != 0;
-		     ifa = ifa->ifa_list.tqe_next)
-			if (ifa->ifa_addr->sa_family == AF_ISO)
-				break;
-		if (ifa == 0) {
-			m_freem(m);
-			goto next;
-		}
 	}
 	bzero((caddr_t) & sh, sizeof(sh));
 	sh.snh_flags = m->m_flags & (M_MCAST | M_BCAST);
@@ -205,15 +196,27 @@ next:
 		m->m_len -= EONIPLEN;
 		m->m_pkthdr.len -= EONIPLEN;
 		break;
-
+	case IFT_ETHER:
+		bcopy((caddr_t) (mtod(m, struct ether_header *)->ether_dhost),
+		  (caddr_t) sh.snh_dhost, 2 * sizeof(sh.snh_dhost));
+		m->m_data += sizeof(struct ether_header);
+		m->m_len -= sizeof(struct ether_header);
+		m->m_pkthdr.len -= sizeof(struct ether_header);
+		break;
+	case IFT_FDDI:
+		bcopy((caddr_t) (mtod(m, struct fddi_header *)->fddi_dhost),
+		  (caddr_t) sh.snh_dhost, 2 * sizeof(sh.snh_dhost));
+		m->m_data += sizeof(struct fddi_header);
+		m->m_len -= sizeof(struct fddi_header);
+		m->m_pkthdr.len -= sizeof(struct fddi_header);
+		break;
+	case IFT_PTPSERIAL:
+		/* nothing extra to get from the mbuf */
+		bzero((caddr_t)sh.snh_dhost, sizeof(sh.snh_dhost));
+		bzero((caddr_t)sh.snh_shost, sizeof(sh.snh_shost));
+		break;
 	default:
-		if (sh.snh_ifp->if_output == ether_output) {
-			bcopy((caddr_t) (mtod(m, struct ether_header *)->ether_dhost),
-			  (caddr_t) sh.snh_dhost, 2 * sizeof(sh.snh_dhost));
-			m->m_data += sizeof(struct ether_header);
-			m->m_len -= sizeof(struct ether_header);
-			m->m_pkthdr.len -= sizeof(struct ether_header);
-		}
+		break;
 	}
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_INPUT]) {
@@ -298,7 +301,8 @@ clnp_input(m, va_alist)
 #endif
 {
 	struct snpa_hdr *shp;	/* subnetwork header */
-	register struct clnp_fixed *clnp;	/* ptr to fixed part of
+	struct ifaddr *ifa;
+	struct clnp_fixed *clnp;	/* ptr to fixed part of
 						 * header */
 	struct sockaddr_iso source;	/* source address of pkt */
 	struct sockaddr_iso target;	/* destination address of pkt */
@@ -322,6 +326,17 @@ clnp_input(m, va_alist)
 	shp = va_arg(ap, struct snpa_hdr *);
 	va_end(ap);
 
+ 	/*
+ 	 * make sure this interface has a ISO address
+ 	 */
+	for (ifa = shp->snh_ifp->if_addrlist.tqh_first; ifa != 0;
+	     ifa = ifa->ifa_list.tqe_next)
+		if (ifa->ifa_addr->sa_family == AF_ISO)
+			break;
+	if (ifa == 0) {
+		clnp_discard(m, ADDR_DESTUNREACH);
+		return;
+	}
 
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_INPUT]) {
@@ -539,12 +554,10 @@ clnp_input(m, va_alist)
 			clnp_er_input(m, &src, oidxp->cni_er_reason);
 		}
 		break;
-
 	case CLNP_DT:
 		(*isosw[clnp_protox[ISOPROTO_TP]].pr_input)(m, &source, &target,
 					     clnp->cnf_hdr_len, need_afrin);
 		break;
-
 	case CLNP_RAW:
 	case CLNP_ECR:
 #ifdef ARGO_DEBUG

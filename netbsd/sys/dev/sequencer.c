@@ -1,4 +1,4 @@
-/*	$NetBSD: sequencer.c,v 1.13 1998/11/25 22:17:07 augustss Exp $	*/
+/*	$NetBSD: sequencer.c,v 1.15 2000/03/23 07:01:27 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -151,6 +151,9 @@ void
 sequencerattach(n)
 	int n;
 {
+
+	for (n = 0; n < NSEQUENCER; n++)
+		callout_init(&seqdevs[n].sc_callout);
 }
 
 int
@@ -315,7 +318,7 @@ sequencerclose(dev, flags, ifmt, p)
 	seq_drain(sc);
 	s = splaudio();
 	if (sc->timeout) {
-		untimeout(seq_timeout, sc);
+		callout_stop(&sc->sc_callout);
 		sc->timeout = 0;
 	}
 	splx(s);
@@ -554,8 +557,8 @@ sequencerioctl(dev, cmd, addr, flag, p)
 		t = *(int *)addr;
 		if (t < 1)
 			t = 1;
-		if (t > 1000)
-			t = 1000;
+		if (t > 10000)
+			t = 10000;
 		sc->timer.timebase = t;
 		*(int *)addr = t;
 		RECALC_TICK(&sc->timer);
@@ -891,7 +894,8 @@ seq_timer(sc, cmd, parm, b)
 			}
 #endif
 			sc->timeout = 1;
-			timeout(seq_timeout, sc, ticks);
+			callout_reset(&sc->sc_callout, ticks,
+			    seq_timeout, sc);
 		}
 #ifdef SEQUENCER_DEBUG
 		else if (tick < 0)

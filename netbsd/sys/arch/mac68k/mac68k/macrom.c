@@ -1,4 +1,4 @@
-/*	$NetBSD: macrom.c,v 1.43 1999/01/10 22:52:55 scottr Exp $	*/
+/*	$NetBSD: macrom.c,v 1.44.12.1 2000/11/15 20:26:06 tv Exp $	*/
 
 /*-
  * Copyright (C) 1994	Bradley A. Grantham
@@ -683,7 +683,7 @@ mrg_aline_super(struct frame *frame)
 		 * A printf(""); is sufficient, but gcc -Wall is noisy about
 		 * it, so I figured backspace is harmless enough...
 		 */
-		printf("\010"); printf("\010");
+		printf(" "); printf("\010");
 	}
 
 #if defined(MRG_DEBUG)
@@ -756,20 +756,6 @@ mrg_aline_super(struct frame *frame)
 
 #if defined(MRG_DEBUG)
 	printf(" exit\n");
-#endif
-}
-
-	/* handle a user mode A-line trap */
-void
-mrg_aline_user()
-{
-#if 1
-	/* send process a SIGILL; aline traps are illegal as yet */
-#else /* how to handle real Mac App A-lines */
-	/* ignore for now */
-	I have no idea!
-	maybe pass SIGALINE?
-	maybe put global information about aline trap?
 #endif
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: filecore_node.c,v 1.3 1998/09/01 04:09:30 thorpej Exp $	*/
+/*	$NetBSD: filecore_node.c,v 1.5 2000/03/16 18:08:22 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1998 Andrew McMurry
@@ -73,13 +73,22 @@ int prtactive;	/* 1 => print out reclaim of active vnodes */
 void
 filecore_init()
 {
-
 	filecorehashtbl = hashinit(desiredvnodes, M_FILECOREMNT, M_WAITOK,
 	    &filecorehash);
 	simple_lock_init(&filecore_ihash_slock);
 	pool_init(&filecore_node_pool, sizeof(struct filecore_node),
 	    0, 0, 0, "filecrnopl", 0, pool_page_alloc_nointr,
 	    pool_page_free_nointr, M_FILECORENODE);
+}
+
+/*
+ * Destroy node pool and hash table.
+ */
+void
+filecore_done()
+{
+	pool_destroy(&filecore_node_pool);
+	hashdone(filecorehashtbl, M_FILECOREMNT);
 }
 
 /*
@@ -118,6 +127,7 @@ filecore_ihashins(ip)
 	struct filecore_node *ip;
 {
 	struct filecore_node **ipp, *iq;
+	struct vnode *vp;
 
 	simple_lock(&filecore_ihash_slock);
 	ipp = &filecorehashtbl[INOHASH(ip->i_dev, ip->i_number)];
@@ -128,7 +138,8 @@ filecore_ihashins(ip)
 	*ipp = ip;
 	simple_unlock(&filecore_ihash_slock);
 
-	lockmgr(&ip->i_lock, LK_EXCLUSIVE, (struct simplelock *)0);
+	vp = ip->i_vnode;
+	lockmgr(&vp->v_lock, LK_EXCLUSIVE, &vp->v_interlock);
 }
 
 /*

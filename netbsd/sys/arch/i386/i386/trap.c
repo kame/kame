@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.131 1999/03/24 05:51:02 mrg Exp $	*/
+/*	$NetBSD: trap.c,v 1.139 2000/06/06 18:52:36 soren Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -79,11 +79,11 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_syscall_debug.h"
 #include "opt_execfmt.h"
 #include "opt_math_emulate.h"
 #include "opt_vm86.h"
 #include "opt_ktrace.h"
-#include "opt_pmap_new.h"
 #include "opt_cputype.h"
 #include "opt_compat_freebsd.h"
 #include "opt_compat_linux.h"
@@ -114,6 +114,13 @@
 #ifdef DDB
 #include <machine/db_machdep.h>
 #endif
+
+#include "mca.h"
+#if NMCA > 0
+#include <machine/mca_machdep.h>
+#endif
+
+#include "isa.h"
 
 #ifdef KGDB
 #include <sys/kgdb.h>
@@ -173,7 +180,7 @@ userret(p, pc, oticks)
 	int pc;
 	u_quad_t oticks;
 {
-	int sig, s;
+	int sig;
 
 	/* take pending signals */
 	while ((sig = CURSIG(p)) != 0)
@@ -181,18 +188,9 @@ userret(p, pc, oticks)
 	p->p_priority = p->p_usrpri;
 	if (want_resched) {
 		/*
-		 * Since we are curproc, a clock interrupt could
-		 * change our priority without changing run queues
-		 * (the running process is not kept on a run queue).
-		 * If this happened after we setrunqueue ourselves but
-		 * before we switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We are being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -206,7 +204,7 @@ userret(p, pc, oticks)
 		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
 	}                   
 
-	curpriority = p->p_priority;
+	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
 }
 
 char	*trap_type[] = {
@@ -471,26 +469,20 @@ trap(frame)
 		if ((caddr_t)va >= vm->vm_maxsaddr
 		    && (caddr_t)va < (caddr_t)VM_MAXUSER_ADDRESS
 		    && map != kernel_map) {
-			nss = clrnd(btoc(USRSTACK-(unsigned)va));
+			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
-				rv = KERN_FAILURE;
-				goto nogo;
+				/*
+				 * We used to fail here. However, it may
+				 * just have been an mmap()ed page low
+				 * in the stack, which is legal. If it
+				 * wasn't, uvm_fault() will fail below.
+				 *
+				 * Set nss to 0, since this case is not
+				 * a "stack extension".
+				 */
+				nss = 0;
 			}
 		}
-
-/*
- * PMAP_NEW allocates PTPs at pmap_enter time, not here.
- */
-#if !defined(PMAP_NEW)
-		/* Create a page table page if necessary, and wire it. */
-		if ((PTD[pdei(va)] & PG_V) == 0) {
-			unsigned v;
-			v = trunc_page(vtopte(va));
-			rv = uvm_map_pageable(map, v, v + NBPG, FALSE);
-			if (rv != KERN_SUCCESS)
-				goto nogo;
-		}
-#endif	/* PMAP_NEW */
 
 		/* Fault the original page in. */
 		rv = uvm_fault(map, va, 0, ftype);
@@ -498,26 +490,11 @@ trap(frame)
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 
-#if !defined(PMAP_NEW)
-			/*
-			 * If this is a pagefault for a PT page,
-			 * wire it. Normally we fault them in
-			 * ourselves, but this can still happen on
-			 * a 386 in copyout & friends.
-			 */
-			if (map != kernel_map && va >= UPT_MIN_ADDRESS &&
-			    va < UPT_MAX_ADDRESS) {
-				va = trunc_page(va);
-				uvm_map_pageable(map, va, va + NBPG, FALSE);
-			}
-#endif
-
 			if (type == T_PAGEFLT)
 				return;
 			goto out;
 		}
 
-	nogo:
 		if (type == T_PAGEFLT) {
 			if (pcb->pcb_onfault != 0)
 				goto copyfault;
@@ -552,8 +529,7 @@ trap(frame)
 		trapsignal(p, SIGTRAP, type &~ T_USER);
 		break;
 
-#include "isa.h"
-#if	NISA > 0
+#if	NISA > 0 || NMCA > 0
 	case T_NMI:
 #if defined(KGDB) || defined(DDB)
 		/* NMI can be hooked up to a pushbutton for debugging */
@@ -569,11 +545,20 @@ trap(frame)
 #endif
 #endif /* KGDB || DDB */
 		/* machine/parity/power fail/"kitchen sink" faults */
-		if (isa_nmi() == 0)
-			return;
-		else
+
+#if NMCA > 0
+		/* mca_nmi() takes care to call isa_nmi() if appropriate */
+		if (mca_nmi() != 0)
 			goto we_re_toast;
-#endif
+		else
+			return;
+#else /* NISA > 0 */
+		if (isa_nmi() != 0)
+			goto we_re_toast;
+		else
+			return;
+#endif /* NMCA > 0 */
+#endif /* NISA > 0 || NMCA > 0 */
 	}
 
 	if ((type & T_USER) == 0)
@@ -603,9 +588,9 @@ trapwrite(addr)
 	p = curproc;
 	vm = p->p_vmspace;
 	if ((caddr_t)va >= vm->vm_maxsaddr) {
-		nss = clrnd(btoc(USRSTACK-(unsigned)va));
+		nss = btoc(USRSTACK-(unsigned)va);
 		if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur))
-			return 1;
+			nss = 0;
 	}
 
 	if (uvm_fault(&vm->vm_map, va, 0, VM_PROT_READ | VM_PROT_WRITE)
@@ -775,7 +760,7 @@ syscall(frame)
 #endif /* SYSCALL_DEBUG */
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, argsize, args);
+		ktrsyscall(p, code, argsize, args);
 #endif /* KTRACE */
 	rval[0] = 0;
 	rval[1] = frame.tf_edx;
@@ -820,7 +805,7 @@ syscall(frame)
 	userret(p, frame.tf_eip, sticks);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, error, rval[0]);
 #endif /* KTRACE */
 }
 
@@ -837,6 +822,6 @@ child_return(arg)
 	userret(p, tf->tf_eip, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }

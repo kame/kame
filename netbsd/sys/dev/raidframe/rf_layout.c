@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_layout.c,v 1.3.2.1 1999/09/27 05:02:51 cgd Exp $	*/
+/*	$NetBSD: rf_layout.c,v 1.6 2000/04/17 19:35:12 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: stdarg.h,v 1.16 1999/01/22 14:14:32 mycroft Exp $	*/
+/*	$NetBSD: stdarg.h,v 1.19 2000/02/03 16:16:07 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -39,8 +39,13 @@
 #define	_M68K_STDARG_H_
 
 #include <machine/ansi.h>
+#include <sys/featuretest.h>
 
 typedef _BSD_VA_LIST_	va_list;
+
+#ifdef __lint__
+#define __builtin_next_arg(t)	((t) ? 0 : 0)
+#endif
 
 #define	__va_size(type) \
 	(((sizeof(type) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
@@ -53,6 +58,13 @@ typedef _BSD_VA_LIST_	va_list;
 			   (ap) - (sizeof(type) < sizeof(long) &&	\
 				   sizeof(type) != __va_size(type) ?	\
 				   sizeof(type) : __va_size(type))))
+
+#if !defined(_ANSI_SOURCE) && \
+    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
+     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L)
+#define	va_copy(dest, src) \
+	((dest) = (src))
+#endif
 
 #define	va_end(ap)	
 

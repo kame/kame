@@ -1,4 +1,4 @@
-/*	$NetBSD: pfb.c,v 1.3 1999/01/11 21:54:23 drochner Exp $	*/
+/*	$NetBSD: pfb.c,v 1.5.4.1 2000/06/30 16:27:22 simonb Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -90,11 +90,12 @@ struct wsscreen_list pfb_screenlist = {
 };
 
 static int pfb_ioctl __P((void *, u_long, caddr_t, int, struct proc *));
-static int pfb_mmap __P((void *, off_t, int));
+static paddr_t pfb_mmap __P((void *, off_t, int));
 static int pfb_alloc_screen __P((void *, const struct wsscreen_descr *,
 				void **, int *, int *, long *));
 static void pfb_free_screen __P((void *, void *));
-static void pfb_show_screen __P((void *, void *));
+static int pfb_show_screen __P((void *, void *, int,
+				void (*) (void *, int, int), void *));
 
 struct wsdisplay_accessops pfb_accessops = {
 	pfb_ioctl,
@@ -143,7 +144,7 @@ pfbattach(parent, self, aux)
 		printf(": cannot map framebuffer\n");
 		return;
 	}
-	dc->dc_raster.pixels = mapiodev(dc->dc_paddr,
+	dc->dc_raster.pixels = (u_int32_t *)mapiodev(dc->dc_paddr,
 				dc->dc_linebytes * dc->dc_height);
 
 	printf(": %d x %d, %dbpp\n",
@@ -220,7 +221,7 @@ pfb_ioctl(v, cmd, data, flag, p)
 	return -1;
 }
 
-int
+paddr_t
 pfb_mmap(v, offset, prot)
 	void *v;
 	off_t offset;
@@ -271,11 +272,16 @@ pfb_free_screen(v, cookie)
 	sc->nscreens--;
 }
 
-void
-pfb_show_screen(v, cookie)
+int
+pfb_show_screen(v, cookie, waitok, cb, cbarg)
 	void *v;
 	void *cookie;
+	int waitok;
+	void (*cb) __P((void *, int, int));
+	void *cbarg;
 {
+
+	return (0);
 }
 
 int

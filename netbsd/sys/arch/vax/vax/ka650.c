@@ -1,4 +1,4 @@
-/*	$NetBSD: ka650.c,v 1.17.2.1 1999/04/19 16:29:40 perry Exp $	*/
+/*	$NetBSD: ka650.c,v 1.21 2000/04/20 18:55:50 ragge Exp $	*/
 /*
  * Copyright (c) 1988 The Regents of the University of California.
  * All rights reserved.
@@ -65,13 +65,15 @@ int	*KA650_CACHE_ptr;
 #define	CACHEOFF	0
 #define	CACHEON		1
 
-void	ka650setcache __P((int));
-static void ka650_halt __P((void));
-static void ka650_reboot __P((int));
+static	void	ka650setcache __P((int));
+static	void	ka650_halt __P((void));
+static	void	ka650_reboot __P((int));
+static	void    uvaxIII_conf __P((void));
+static	void    uvaxIII_memerr __P((void));
+static	int     uvaxIII_mchk __P((caddr_t));
 
 struct	cpu_dep	ka650_calls = {
 	0, /* No special page stealing anymore */
-	no_nicr_clock,
 	uvaxIII_mchk,
 	uvaxIII_memerr,
 	uvaxIII_conf,
@@ -81,15 +83,16 @@ struct	cpu_dep	ka650_calls = {
 	2,	/* SCB pages */
 	ka650_halt,
 	ka650_reboot,
+	0,
+	0,
+	CPU_RAISEIPL,	/* Needed for the LANCE chip */
 };
 
 /*
  * uvaxIII_conf() is called by cpu_attach to do the cpu_specific setup.
  */
 void
-uvaxIII_conf(parent, self, aux)
-	struct	device *parent, *self;
-	void	*aux;
+uvaxIII_conf()
 {
 	int syssub = GETSYSSUBT(vax_siedata);
 
@@ -105,7 +108,7 @@ uvaxIII_conf(parent, self, aux)
 	KA650_CACHE_ptr = (void *)vax_map_physmem(KA650_CACHE,
 	    (KA650_CACHESIZE/VAX_NBPG));
 
-	printf(": KA6%d%d, CVAX microcode rev %d Firmware rev %d\n",
+	printf("cpu: KA6%d%d, CVAX microcode rev %d Firmware rev %d\n",
 	    syssub == VAX_SIE_KA640 ? 4 : 5,
 	    syssub == VAX_SIE_KA655 ? 5 : 0,
 	    (vax_cpudata & 0xff), GETFRMREV(vax_siedata));
@@ -116,6 +119,8 @@ uvaxIII_conf(parent, self, aux)
 		    ctob(physmem), (int)ka650merr_ptr->merr_qbmbr);
 		panic("qbus map unprotected");
 	}
+	if (mfpr(PR_TODR) == 0)
+		mtpr(1, PR_TODR);
 }
 
 void

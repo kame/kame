@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.1.8.1 1999/05/06 19:11:50 perry Exp $
+#	$NetBSD: Makefile,v 1.2 1999/05/04 20:08:04 thorpej Exp $
 
 INCSDIR= /usr/include/dev/ofw
 

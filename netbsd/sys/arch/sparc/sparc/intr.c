@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.39 1999/02/27 16:13:59 pk Exp $ */
+/*	$NetBSD: intr.c,v 1.45 2000/05/09 20:29:28 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -67,12 +67,20 @@
 #include <machine/instr.h>
 #include <machine/trap.h>
 #include <machine/promlib.h>
+#include <sparc/sparc/asm.h>
 #include <sparc/sparc/cpuvar.h>
 
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #include <netinet/ip_var.h>
+#endif
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #endif
 #ifdef NS
 #include <netns/ns_var.h>
@@ -89,7 +97,6 @@
 #include <net/ppp_defs.h>
 #include <net/if_ppp.h>
 #endif
-#include "kbd.h"
 #include "com.h"
 #if NCOM > 0
 extern void comsoft __P((void));
@@ -137,13 +144,7 @@ int
 soft01intr(fp)
 	void *fp;
 {
-#if	NKBD > 0
-	extern int cnrom __P((void));
-	extern int rom_console_input;
 
-	if (rom_console_input && cnrom())
-		cnrint();
-#endif
 	if (sir.sir_any) {
 		/*
 		 * XXX	this is bogus: should just have a list of
@@ -158,35 +159,16 @@ soft01intr(fp)
 			netisr = 0;
 			splx(s);
 			sir.sir_which[SIR_NET] = 0;
-#ifdef INET
-#include "arp.h"
-#if NARP > 0
-			if (n & (1 << NETISR_ARP))
-				arpintr();
-#endif
-			if (n & (1 << NETISR_IP))
-				ipintr();
-#endif
-#ifdef NETATALK
-			if (n & (1 << NETISR_ATALK))
-				atintr();
-#endif
-#ifdef NS
-			if (n & (1 << NETISR_NS))
-				nsintr();
-#endif
-#ifdef ISO
-			if (n & (1 << NETISR_ISO))
-				clnlintr();
-#endif
-#ifdef NATM
-			if (n & (1 << NETISR_NATM))
-				natmintr();
-#endif
-#if NPPP > 0
-			if (n & (1 << NETISR_PPP))
-				pppintr();
-#endif
+
+#define DONETISR(bit, fn) do {		\
+	if (n & (1 << bit))		\
+		fn();			\
+} while (0)
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
+
 		}
 		if (sir.sir_which[SIR_CLOCK]) {
 			sir.sir_which[SIR_CLOCK] = 0;
@@ -214,9 +196,6 @@ int	(*sbuserr_handler) __P((void));
 int	(*vmeerr_handler) __P((void));
 int	(*moduleerr_handler) __P((void));
 
-int	nmisync1; /*XXX*/
-int	nmisync2;
-int	nmifatal;
 
 void
 nmi_hard()
@@ -229,18 +208,22 @@ nmi_hard()
 	char bits[64];
 	u_int afsr, afva;
 
-	if (cpuinfo.master == 0) {
-		while (nmisync1 == 0) ;
-		printf("CPU%d: held\n", cpuinfo.mid);
-		while (nmisync2 != 0) ;
-		/* XXX - should check module errors here */
-		if (nmifatal == 0)
-			return;
-		prom_halt();
+	afsr = afva = 0;
+	if ((*cpuinfo.get_asyncflt)(&afsr, &afva) == 0) {
+		printf("Async registers (mid %d): afsr=%s; afva=0x%x%x\n",
+			cpuinfo.mid,
+			bitmask_snprintf(afsr, AFSR_BITS, bits, sizeof(bits)),
+			(afsr & AFSR_AFA) >> AFSR_AFA_RSHIFT, afva);
 	}
 
-	nmisync2 = 1;
-	nmisync1 = 1;
+	if (cpuinfo.master == 0) {
+		/*
+		 * For now, just return.
+		 * Should wait on damage analysis done by the master.
+		 */
+		return;
+	}
+
 	/*
 	 * Examine pending system interrupts.
 	 */
@@ -269,16 +252,6 @@ nmi_hard()
 			fatal |= (*moduleerr_handler)();
 	}
 
-	if ((*cpuinfo.get_asyncflt)(&afsr, &afva) == 0) {
-		printf("Async registers: afsr=%s; afva=0x%x%x\n",
-			bitmask_snprintf(afsr, AFSR_BITS, bits, sizeof(bits)),
-			(afsr & AFSR_AFA) >> AFSR_AFA_RSHIFT, afva);
-	}
-
-
-	nmisync1 = 0;
-	nmifatal = fatal;
-	nmisync2 = 0;
 	if (fatal)
 		panic("nmi");
 }

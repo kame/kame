@@ -1,4 +1,4 @@
-/* $NetBSD: mcbusreg.h,v 1.2.8.1 1999/12/16 23:16:28 he Exp $ */
+/* $NetBSD: mcbusreg.h,v 1.3 1999/11/16 18:36:27 mjacob Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.14 1999/02/26 22:16:36 is Exp $	*/
+/*	$NetBSD: pmap.h,v 1.16 2000/05/27 22:37:47 scw Exp $	*/
 
 /* 
  * Copyright (c) 1987 Carnegie-Mellon University
@@ -44,12 +44,6 @@
 #define	_MACHINE_PMAP_H_
 
 #include <machine/pte.h>
-
-#if defined(M68040)
-#define HP_SEG_SIZE	(mmutype == MMU_68040 ? 0x40000 : NBSEG)
-#else
-#define HP_SEG_SIZE	NBSEG
-#endif
 
 /*
  * Pmap stuff
@@ -138,6 +132,9 @@ extern struct pmap	kernel_pmap_store;
 #define	active_user_pmap(pm) \
 	(curproc && \
 	 (pm) != pmap_kernel() && (pm) == curproc->p_vmspace->vm_map.pmap)
+
+extern void _pmap_set_page_cacheable __P((struct pmap *, vaddr_t));
+extern void _pmap_set_page_cacheinhibit __P((struct pmap *, vaddr_t));
 
 extern struct pv_entry	*pv_table;	/* array of entries, one per page */
 

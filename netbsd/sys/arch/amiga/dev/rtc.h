@@ -1,4 +1,4 @@
-/*	$NetBSD: rtc.h,v 1.6.2.1 2000/01/08 18:20:02 he Exp $	*/
+/*	$NetBSD: rtc.h,v 1.7 2000/01/03 21:52:15 is Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps

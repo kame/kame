@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.45 1999/04/08 05:07:35 gwr Exp $	*/
+/*	$NetBSD: pmap.c,v 1.52.4.1 2000/10/21 18:10:16 tv Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -364,9 +364,11 @@ unsigned int	NUM_A_TABLES, NUM_B_TABLES, NUM_C_TABLES;
 #define	NUM_KERN_PTES	(KVAS_SIZE >> MMU_TIC_SHIFT)
 
 /*************************** MISCELANEOUS MACROS *************************/
-#define PMAP_LOCK()	;	/* Nothing, for now */
-#define PMAP_UNLOCK()	;	/* same. */
-#define	NULL 0
+#define pmap_lock(pmap) simple_lock(&pmap->pm_lock)
+#define pmap_unlock(pmap) simple_unlock(&pmap->pm_lock)
+#define pmap_add_ref(pmap) ++pmap->pm_refcount
+#define pmap_del_ref(pmap) --pmap->pm_refcount
+#define pmap_refcount(pmap) pmap->pm_refcount
 
 static INLINE void *      mmu_ptov __P((vm_offset_t pa));
 static INLINE vm_offset_t mmu_vtop __P((void * va));
@@ -578,20 +580,6 @@ static void pmap_page_upload __P((void));
  ** - functions required by the Mach VM Pmap interface, with MACHINE_CONTIG
  **   defined.
  **/
-#ifdef INCLUDED_IN_PMAP_H
-void   pmap_bootstrap __P((void));
-void  *pmap_bootstrap_alloc __P((int));
-void   pmap_enter __P((pmap_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
-	   vm_prot_t));
-pmap_t pmap_create __P((vm_size_t));
-void   pmap_destroy __P((pmap_t));
-void   pmap_reference __P((pmap_t));
-boolean_t   pmap_is_referenced __P((vm_offset_t));
-boolean_t   pmap_is_modified __P((vm_offset_t));
-void   pmap_clear_modify __P((vm_offset_t));
-vm_offset_t pmap_extract __P((pmap_t, vm_offset_t));
-u_int  pmap_free_pages __P((void));
-#endif /* INCLUDED_IN_PMAP_H */
 int    pmap_page_index __P((vm_offset_t));
 void pmap_pinit __P((pmap_t));
 void pmap_release __P((pmap_t));
@@ -843,6 +831,7 @@ pmap_bootstrap(nextva)
 	kernel_pmap.pm_a_tmgr = NULL;
 	kernel_pmap.pm_a_phys = kernAphys;
 	kernel_pmap.pm_refcount = 1; /* always in use */
+	simple_lock_init(&kernel_pmap.pm_lock);
 
 	kernel_crp.rp_attr = MMU_LONG_DTE_LU | MMU_DT_LONG;
 	kernel_crp.rp_addr = kernAphys;
@@ -1685,19 +1674,18 @@ pmap_stroll(pmap, va, a_tbl, b_tbl, c_tbl, pte, a_idx, b_idx, pte_idx)
  * would save my hair!!)
  * This function ought to be easier to read.
  */
-void
-pmap_enter(pmap, va, pa, prot, wired, access_type)
+int
+pmap_enter(pmap, va, pa, prot, flags)
 	pmap_t	pmap;
 	vm_offset_t va;
 	vm_offset_t pa;
 	vm_prot_t prot;
-	boolean_t wired;
-	vm_prot_t access_type;
+	int flags;
 {
 	boolean_t insert, managed; /* Marks the need for PV insertion.*/
 	u_short nidx;            /* PV list index                     */
 	int s;                   /* Used for splimp()/splx()          */
-	int flags;               /* Mapping flags. eg. Cache inhibit  */
+	int mapflags;            /* Flags for the mapping (see NOTE1) */
 	u_int a_idx, b_idx, pte_idx; /* table indices                 */
 	a_tmgr_t *a_tbl;         /* A: long descriptor table manager  */
 	b_tmgr_t *b_tbl;         /* B: short descriptor table manager */
@@ -1706,17 +1694,41 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 	mmu_short_dte_t *b_dte;  /* B: short descriptor table         */
 	mmu_short_pte_t *c_pte;  /* C: short page descriptor table    */
 	pv_t      *pv;           /* pv list head                      */
+	boolean_t wired;         /* is the mapping to be wired?       */
 	enum {NONE, NEWA, NEWB, NEWC} llevel; /* used at end   */
 
 	if (pmap == NULL)
-		return;
+		return (KERN_SUCCESS);
 	if (pmap == pmap_kernel()) {
 		pmap_enter_kernel(va, pa, prot);
-		return;
+		return (KERN_SUCCESS);
 	}
 
-	flags  = (pa & ~MMU_PAGE_MASK);
-	pa    &= MMU_PAGE_MASK;
+	/*
+	 * Determine if the mapping should be wired.
+	 */
+	wired = ((flags & PMAP_WIRED) != 0);
+
+	/*
+	 * NOTE1:
+	 *
+	 * On November 13, 1999, someone changed the pmap_enter() API such
+	 * that it now accepts a 'flags' argument.  This new argument
+	 * contains bit-flags for the architecture-independent (UVM) system to
+	 * use in signalling certain mapping requirements to the architecture-
+	 * dependent (pmap) system.  The argument it replaces, 'wired', is now
+	 * one of the flags within it.
+	 *
+	 * In addition to flags signaled by the architecture-independent
+	 * system, parts of the architecture-dependent section of the sun3x
+	 * kernel pass their own flags in the lower, unused bits of the
+	 * physical address supplied to this function.  These flags are
+	 * extracted and stored in the temporary variable 'mapflags'.
+	 *
+	 * Extract sun3x specific flags from the physical address.
+	 */ 
+	mapflags  = (pa & ~MMU_PAGE_MASK);
+	pa       &= MMU_PAGE_MASK;
 
 	/*
 	 * Determine if the physical address being mapped is on-board RAM.
@@ -1724,7 +1736,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 	 * device and hence it would be disasterous to cache its contents.
 	 */
 	if ((managed = is_managed(pa)) == FALSE)
-		flags |= PMAP_NC;
+		mapflags |= PMAP_NC;
 
 	/*
 	 * For user mappings we walk along the MMU tables of the given
@@ -1922,7 +1934,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 		 * and, possibly, associated parent tables if this is a
 		 * change wiring operation.  Currently it does not.
 		 *
-		 * This may be ok if pmap_change_wiring() is the only
+		 * This may be ok if pmap_unwire() is the only
 		 * interface used to UNWIRE a page.
 		 */
 
@@ -2014,7 +2026,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 	 * bits found on the lower order of the physical address.)
 	 * mark the PTE as a cache inhibited page.
 	 */
-	if (flags & PMAP_NC)
+	if (mapflags & PMAP_NC)
 		c_pte->attr.raw |= MMU_SHORT_PTE_CI;
 
 	/*
@@ -2047,6 +2059,8 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 		default:
 			break;
 	}
+
+	return (KERN_SUCCESS);
 }
 
 /* pmap_enter_kernel			INTERNAL
@@ -2141,6 +2155,39 @@ pmap_enter_kernel(va, pa, prot)
 	}
 	splx(s);
 	
+}
+
+void
+pmap_kenter_pa(va, pa, prot)
+	vaddr_t va;
+	paddr_t pa;
+	vm_prot_t prot;
+{
+	pmap_enter(pmap_kernel(), va, pa, prot, PMAP_WIRED);
+}
+
+void
+pmap_kenter_pgs(va, pgs, npgs)
+	vaddr_t va;
+	struct vm_page **pgs;
+	int npgs;
+{
+	int i;
+
+	for (i = 0; i < npgs; i++, va += PAGE_SIZE) {
+		pmap_enter(pmap_kernel(), va, VM_PAGE_TO_PHYS(pgs[i]),
+				VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+	}
+}
+
+void
+pmap_kremove(va, len)
+	vaddr_t va;
+	vsize_t len;
+{
+	for (len >>= PAGE_SHIFT; len > 0; len--, va += PAGE_SIZE) {
+		pmap_remove(pmap_kernel(), va, va + PAGE_SIZE);
+	}
 }
 
 /* pmap_map			INTERNAL
@@ -2341,20 +2388,17 @@ pmap_protect_kernel(startva, endva, prot)
 	}
 }
 
-/* pmap_change_wiring			INTERFACE
+/* pmap_unwire				INTERFACE
  **
- * Changes the wiring of the specified page.
+ * Clear the wired attribute of the specified page.
  *
  * This function is called from vm_fault.c to unwire
- * a mapping.  It really should be called 'pmap_unwire'
- * because it is never asked to do anything but remove
- * wirings.
+ * a mapping.
  */
 void
-pmap_change_wiring(pmap, va, wire)
+pmap_unwire(pmap, va)
 	pmap_t pmap;
 	vm_offset_t va;
-	boolean_t wire;
 {
 	int a_idx, b_idx, c_idx;
 	a_tmgr_t *a_tbl;
@@ -2366,11 +2410,6 @@ pmap_change_wiring(pmap, va, wire)
 	if (pmap == pmap_kernel())
 		return;
 
-#ifdef	PMAP_DEBUG
-	if (wire == TRUE)
-		panic("pmap_change_wiring: wire requested.");
-#endif
-	
 	/*
 	 * Walk through the tables.  If the walk terminates without
 	 * a valid PTE then the address wasn't wired in the first place.
@@ -2407,26 +2446,6 @@ pmap_change_wiring(pmap, va, wire)
 			}
 		}
 	}
-}
-
-/* pmap_pageable			INTERFACE
- **
- * Make the specified range of addresses within the given pmap,
- * 'pageable' or 'not-pageable'.  A pageable page must not cause
- * any faults when referenced.  A non-pageable page may.
- *
- * This routine is only advisory.  The VM system will call pmap_enter()
- * to wire or unwire pages that are going to be made pageable before calling
- * this function.  By the time this routine is called, everything that needs
- * to be done has already been done.
- */
-void
-pmap_pageable(pmap, start, end, pageable)
-	pmap_t pmap;
-	vm_offset_t start, end;
-	boolean_t pageable;
-{
-	/* not implemented. */
 }
 
 /* pmap_copy				INTERFACE
@@ -2535,17 +2554,12 @@ pmap_collect(pmap)
  * Create and return a pmap structure.
  */
 pmap_t
-pmap_create(size)
-	vm_size_t size;
+pmap_create()
 {
 	pmap_t	pmap;
 
-	if (size)
-		return NULL;
-
 	pmap = (pmap_t) malloc(sizeof(struct pmap), M_VMPMAP, M_WAITOK);
 	pmap_pinit(pmap);
-
 	return pmap;
 }
 
@@ -2560,6 +2574,8 @@ pmap_pinit(pmap)
 	bzero(pmap, sizeof(struct pmap));
 	pmap->pm_a_tmgr = NULL;
 	pmap->pm_a_phys = kernAphys;
+	pmap->pm_refcount = 1;
+	simple_lock_init(&pmap->pm_lock);
 }
 
 /* pmap_release				INTERFACE
@@ -2622,9 +2638,9 @@ pmap_reference(pmap)
 	if (pmap == NULL)
 		return;
 
-	/* pmap_lock(pmap); */
-	pmap->pm_refcount++;
-	/* pmap_unlock(pmap); */
+	pmap_lock(pmap);
+	pmap_add_ref(pmap);
+	pmap_unlock(pmap);
 }
 
 /* pmap_dereference			INTERNAL
@@ -2641,9 +2657,9 @@ pmap_dereference(pmap)
 	if (pmap == NULL)
 		return 0;
 
-	/* pmap_lock(pmap); */
-	rtn = --pmap->pm_refcount;
-	/* pmap_unlock(pmap); */
+	pmap_lock(pmap);
+	rtn = pmap_del_ref(pmap);
+	pmap_unlock(pmap);
 
 	return rtn;
 }
@@ -2674,9 +2690,10 @@ pmap_destroy(pmap)
  * referenced (read from [or written to.])
  */
 boolean_t
-pmap_is_referenced(pa)
-	vm_offset_t pa;
+pmap_is_referenced(pg)
+	struct vm_page *pg;
 {
+	paddr_t   pa = VM_PAGE_TO_PHYS(pg);
 	pv_t      *pv;
 	int       idx, s;
 
@@ -2719,9 +2736,10 @@ pmap_is_referenced(pa)
  * modified (written to.)
  */
 boolean_t
-pmap_is_modified(pa)
-	vm_offset_t pa;
+pmap_is_modified(pg)
+	struct vm_page *pg;
 {
+	paddr_t   pa = VM_PAGE_TO_PHYS(pg);
 	pv_t      *pv;
 	int       idx, s;
 
@@ -2757,10 +2775,11 @@ pmap_is_modified(pa)
  * physical page.
  */
 void
-pmap_page_protect(pa, prot)
-	vm_offset_t pa;
+pmap_page_protect(pg, prot)
+	struct vm_page *pg;
 	vm_prot_t prot;
 {
+	paddr_t   pa = VM_PAGE_TO_PHYS(pg);
 	pv_t      *pv;
 	int       idx, s;
 	vm_offset_t va;
@@ -2904,13 +2923,18 @@ pmap_get_pteinfo(idx, pmap, tbl)
  * physical address.
  *
  */
-void
-pmap_clear_modify(pa)
-	vm_offset_t pa;
+boolean_t
+pmap_clear_modify(pg)
+	struct vm_page *pg;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	boolean_t rv;
+
 	if (!is_managed(pa))
-		return;
+		return FALSE;
+	rv = pmap_is_modified(pg);
 	pmap_clear_pv(pa, PV_FLAGS_MDFY);
+	return rv;
 }
 
 /* pmap_clear_reference			INTERFACE
@@ -2918,13 +2942,18 @@ pmap_clear_modify(pa)
  * Clear the referenced bit on the page at the specified
  * physical address.
  */
-void
-pmap_clear_reference(pa)
-	vm_offset_t pa;
+boolean_t
+pmap_clear_reference(pg)
+	struct vm_page *pg;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	boolean_t rv;
+
 	if (!is_managed(pa))
-		return;
+		return FALSE;
+	rv = pmap_is_referenced(pg);
 	pmap_clear_pv(pa, PV_FLAGS_USED);
+	return rv;
 }
 	
 /* pmap_clear_pv			INTERNAL
@@ -2987,15 +3016,16 @@ pmap_clear_pv(pa, flag)
 /* pmap_extract			INTERFACE
  **
  * Return the physical address mapped by the virtual address
- * in the specified pmap or 0 if it is not known.
+ * in the specified pmap.
  *
  * Note: this function should also apply an exclusive lock
  * on the pmap system during its duration.
  */
-vm_offset_t
-pmap_extract(pmap, va)
-	pmap_t      pmap;
-	vm_offset_t va;
+boolean_t
+pmap_extract(pmap, va, pap)
+	pmap_t pmap;
+	vaddr_t va;
+	paddr_t *pap;
 {
 	int a_idx, b_idx, pte_idx;
 	a_tmgr_t	*a_tbl;
@@ -3004,32 +3034,39 @@ pmap_extract(pmap, va)
 	mmu_short_pte_t	*c_pte;
 
 	if (pmap == pmap_kernel())
-		return pmap_extract_kernel(va);
+		return pmap_extract_kernel(va, pap);
 	if (pmap == NULL)
-		return 0;
+		return FALSE;
 
 	if (pmap_stroll(pmap, va, &a_tbl, &b_tbl, &c_tbl,
 		&c_pte, &a_idx, &b_idx, &pte_idx) == FALSE)
-		return 0;
+		return FALSE;
 
 	if (!MMU_VALID_DT(*c_pte))
-		return 0;
+		return FALSE;
 
-	return (MMU_PTE_PA(*c_pte));
+	if (pap != NULL)
+		*pap = MMU_PTE_PA(*c_pte);
+	return (TRUE);
 }
 
 /* pmap_extract_kernel		INTERNAL
  **
  * Extract a translation from the kernel address space.
  */
-vm_offset_t
-pmap_extract_kernel(va)
-	vm_offset_t va;
+boolean_t
+pmap_extract_kernel(va, pap)
+	vaddr_t va;
+	paddr_t *pap;
 {
 	mmu_short_pte_t *pte;
 
 	pte = &kernCbase[(u_int) m68k_btop(va - KERNBASE)];
-	return MMU_PTE_PA(*pte);
+	if (!MMU_VALID_DT(*pte))
+		return (FALSE);
+	if (pap != NULL)
+		*pap = MMU_PTE_PA(*pte);
+	return (TRUE);
 }
 
 /* pmap_remove_kernel		INTERNAL

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.23 1998/10/26 03:47:19 enami Exp $	*/
+/*	$NetBSD: pcib.c,v 1.26 2000/05/12 20:31:22 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -115,11 +115,6 @@ pcibmatch(parent, match, aux)
 	}
 #endif
 
-	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE &&
-	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_BRIDGE_ISA) {
-		return (1);
-	}
-
 	/*
 	 * some special cases:
 	 */
@@ -144,6 +139,30 @@ pcibmatch(parent, match, aux)
 			return (1);
 		}
 		break;
+	case PCI_VENDOR_SIS:
+		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_SIS_85C503:
+			/*
+			 * The SIS 85C503 identifies itself as a
+			 * miscellaneous prehistoric.
+			 */
+			return (1);
+		}
+		break;
+	case PCI_VENDOR_VIATECH:
+		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_VIATECH_VT82C686A_SMB:
+			/*
+			 * The VIA VT82C686A SMBus Controller itself as 
+			 * ISA bridge, but it's wrong !
+			 */
+			return (0);
+		}
+	}
+
+	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE &&
+	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_BRIDGE_ISA) {
+		return (1);
 	}
 
 	return (0);

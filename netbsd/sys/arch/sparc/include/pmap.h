@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.36.2.1 1999/07/02 16:59:17 perry Exp $ */
+/*	$NetBSD: pmap.h,v 1.48 2000/05/31 12:04:29 pk Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -101,8 +101,8 @@
  *
  * The kernel pmap cannot malloc() PTEs since malloc() will sometimes
  * allocate a new virtual segment.  Since kernel mappings are never
- * `stolen' out of the the MMU, we just keep all its PTEs there, and
- * have no software copies.  Its mmu entries are nonetheless kept on lists
+ * `stolen' out of the MMU, we just keep all its PTEs there, and have
+ * no software copies.  Its mmu entries are nonetheless kept on lists
  * so that the code that fiddles with mmu lists has something to fiddle.
  *
  ** FOR THE SUN4M
@@ -147,8 +147,8 @@ struct pmap {
 	void		*pm_regstore;
 	struct regmap	*pm_regmap;
 
-	int		*pm_reg_ptps;	/* SRMMU-edible region table for 4m */
-	int		pm_reg_ptps_pa;	/* _Physical_ address of pm_reg_ptps */
+	int		**pm_reg_ptps;	/* SRMMU-edible region tables for 4m */
+	int		*pm_reg_ptps_pa;/* _Physical_ address of pm_reg_ptps */
 
 	int		pm_gap_start;	/* Starting with this vreg there's */
 	int		pm_gap_end;	/* no valid mapping until here */
@@ -245,14 +245,13 @@ int		pmap_count_ptes __P((struct pmap *));
 void		pmap_prefer __P((vaddr_t, vaddr_t *));
 int		pmap_pa_exists __P((paddr_t));
 void		*pmap_bootstrap_alloc __P((int));
-void		pmap_change_wiring __P((pmap_t, vaddr_t, boolean_t));
+void		pmap_unwire __P((pmap_t, vaddr_t));
 void		pmap_collect __P((pmap_t));
 void		pmap_copy __P((pmap_t, pmap_t, vaddr_t, vsize_t, vaddr_t));
-pmap_t		pmap_create __P((vsize_t));
+pmap_t		pmap_create __P((void));
 void		pmap_destroy __P((pmap_t));
 void		pmap_init __P((void));
 vaddr_t		pmap_map __P((vaddr_t, paddr_t, paddr_t, int));
-void		pmap_pageable __P((pmap_t, vaddr_t, vaddr_t, boolean_t));
 paddr_t		pmap_phys_address __P((int));
 void		pmap_pinit __P((pmap_t));
 void		pmap_reference __P((pmap_t));
@@ -260,32 +259,30 @@ void		pmap_release __P((pmap_t));
 void		pmap_remove __P((pmap_t, vaddr_t, vaddr_t));
 void		pmap_update __P((void));
 void		pmap_init __P((void));
-int		pmap_page_index __P((paddr_t));
 void		pmap_virtual_space __P((vaddr_t *, vaddr_t *));
 void		pmap_redzone __P((void));
 void		kvm_uncache __P((caddr_t, int));
 struct user;
-void		switchexit __P((struct proc *));
 int		mmu_pagein __P((struct pmap *pm, vaddr_t, int));
 void		pmap_writetext __P((unsigned char *, int));
+void		pmap_globalize_boot_cpuinfo __P((struct cpu_info *));
 
-#if !defined(MACHINE_NEW_CONCONTIG)
-u_int		pmap_free_pages __P((void));
-boolean_t	pmap_next_page __P((paddr_t *));
-#endif
 
 /* SUN4/SUN4C SPECIFIC DECLARATIONS */
 
 #if defined(SUN4) || defined(SUN4C)
-void		pmap_clear_modify4_4c __P((paddr_t pa));
-void		pmap_clear_reference4_4c __P((paddr_t pa));
+boolean_t	pmap_clear_modify4_4c __P((struct vm_page *));
+boolean_t	pmap_clear_reference4_4c __P((struct vm_page *));
 void		pmap_copy_page4_4c __P((paddr_t, paddr_t));
-void		pmap_enter4_4c __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
-		    boolean_t, vm_prot_t));
-paddr_t		pmap_extract4_4c __P((pmap_t, vaddr_t));
-boolean_t	pmap_is_modified4_4c __P((paddr_t pa));
-boolean_t	pmap_is_referenced4_4c __P((paddr_t pa));
-void		pmap_page_protect4_4c __P((paddr_t, vm_prot_t));
+int		pmap_enter4_4c __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
+		    int));
+boolean_t	pmap_extract4_4c __P((pmap_t, vaddr_t, paddr_t *));
+boolean_t	pmap_is_modified4_4c __P((struct vm_page *));
+boolean_t	pmap_is_referenced4_4c __P((struct vm_page *));
+void		pmap_kenter_pa4_4c __P((vaddr_t, paddr_t, vm_prot_t));
+void		pmap_kenter_pgs4_4c __P((vaddr_t, struct vm_page **, int));
+void		pmap_kremove4_4c __P((vaddr_t, vsize_t));
+void		pmap_page_protect4_4c __P((struct vm_page *, vm_prot_t));
 void		pmap_protect4_4c __P((pmap_t, vaddr_t, vaddr_t, vm_prot_t));
 void		pmap_zero_page4_4c __P((paddr_t));
 void		pmap_changeprot4_4c __P((pmap_t, vaddr_t, vm_prot_t, int));
@@ -295,17 +292,24 @@ void		pmap_changeprot4_4c __P((pmap_t, vaddr_t, vm_prot_t, int));
 /* SIMILAR DECLARATIONS FOR SUN4M MODULE */
 
 #if defined(SUN4M)
-void		pmap_clear_modify4m __P((paddr_t pa));
-void		pmap_clear_reference4m __P((paddr_t pa));
+boolean_t	pmap_clear_modify4m __P((struct vm_page *));
+boolean_t	pmap_clear_reference4m __P((struct vm_page *));
 void		pmap_copy_page4m __P((paddr_t, paddr_t));
-void		pmap_enter4m __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
-		    boolean_t, vm_prot_t));
-paddr_t		pmap_extract4m __P((pmap_t, vaddr_t));
-boolean_t	pmap_is_modified4m __P((paddr_t pa));
-boolean_t	pmap_is_referenced4m __P((paddr_t pa));
-void		pmap_page_protect4m __P((paddr_t, vm_prot_t));
+void		pmap_copy_page_viking_mxcc(paddr_t, paddr_t);
+void		pmap_copy_page_hypersparc(paddr_t, paddr_t);
+int		pmap_enter4m __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
+		    int));
+boolean_t	pmap_extract4m __P((pmap_t, vaddr_t, paddr_t *));
+boolean_t	pmap_is_modified4m __P((struct vm_page *));
+boolean_t	pmap_is_referenced4m __P((struct vm_page *));
+void		pmap_kenter_pa4m __P((vaddr_t, paddr_t, vm_prot_t));
+void		pmap_kenter_pgs4m __P((vaddr_t, struct vm_page **, int));
+void		pmap_kremove4m __P((vaddr_t, vsize_t));
+void		pmap_page_protect4m __P((struct vm_page *, vm_prot_t));
 void		pmap_protect4m __P((pmap_t, vaddr_t, vaddr_t, vm_prot_t));
 void		pmap_zero_page4m __P((paddr_t));
+void		pmap_zero_page_viking_mxcc(paddr_t);
+void		pmap_zero_page_hypersparc(paddr_t);
 void		pmap_changeprot4m __P((pmap_t, vaddr_t, vm_prot_t, int));
 
 #endif /* defined SUN4M */
@@ -314,58 +318,66 @@ void		pmap_changeprot4m __P((pmap_t, vaddr_t, vm_prot_t, int));
 
 #define		pmap_clear_modify	pmap_clear_modify4_4c
 #define		pmap_clear_reference	pmap_clear_reference4_4c
-#define		pmap_copy_page		pmap_copy_page4_4c
 #define		pmap_enter		pmap_enter4_4c
 #define		pmap_extract		pmap_extract4_4c
 #define		pmap_is_modified	pmap_is_modified4_4c
 #define		pmap_is_referenced	pmap_is_referenced4_4c
+#define		pmap_kenter_pa		pmap_kenter_pa4_4c
+#define		pmap_kenter_pgs		pmap_kenter_pgs4_4c
+#define		pmap_kremove		pmap_kremove4_4c
 #define		pmap_page_protect	pmap_page_protect4_4c
 #define		pmap_protect		pmap_protect4_4c
-#define		pmap_zero_page		pmap_zero_page4_4c
 #define		pmap_changeprot		pmap_changeprot4_4c
 
 #elif defined(SUN4M) && !(defined(SUN4) || defined(SUN4C))
 
 #define		pmap_clear_modify	pmap_clear_modify4m
 #define		pmap_clear_reference	pmap_clear_reference4m
-#define		pmap_copy_page		pmap_copy_page4m
 #define		pmap_enter		pmap_enter4m
 #define		pmap_extract		pmap_extract4m
 #define		pmap_is_modified	pmap_is_modified4m
 #define		pmap_is_referenced	pmap_is_referenced4m
+#define		pmap_kenter_pa		pmap_kenter_pa4m
+#define		pmap_kenter_pgs		pmap_kenter_pgs4m
+#define		pmap_kremove		pmap_kremove4m
 #define		pmap_page_protect	pmap_page_protect4m
 #define		pmap_protect		pmap_protect4m
-#define		pmap_zero_page		pmap_zero_page4m
 #define		pmap_changeprot		pmap_changeprot4m
 
 #else  /* must use function pointers */
 
-extern void	(*pmap_clear_modify_p) __P((paddr_t pa));
-extern void	(*pmap_clear_reference_p) __P((paddr_t pa));
-extern void	(*pmap_copy_page_p) __P((paddr_t, paddr_t));
-extern void	(*pmap_enter_p) __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
-		    boolean_t, vm_prot_t));
-extern paddr_t	(*pmap_extract_p) __P((pmap_t, vaddr_t));
-extern boolean_t(*pmap_is_modified_p) __P((paddr_t pa));
-extern boolean_t(*pmap_is_referenced_p) __P((paddr_t pa));
-extern void	(*pmap_page_protect_p) __P((paddr_t, vm_prot_t));
+extern boolean_t(*pmap_clear_modify_p) __P((struct vm_page *));
+extern boolean_t(*pmap_clear_reference_p) __P((struct vm_page *));
+extern int	(*pmap_enter_p) __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
+		    int));
+extern boolean_t (*pmap_extract_p) __P((pmap_t, vaddr_t, paddr_t *));
+extern boolean_t(*pmap_is_modified_p) __P((struct vm_page *));
+extern boolean_t(*pmap_is_referenced_p) __P((struct vm_page *));
+extern void	(*pmap_kenter_pa_p) __P((vaddr_t, paddr_t, vm_prot_t));
+extern void	(*pmap_kenter_pgs_p) __P((vaddr_t, struct vm_page **, int));
+extern void	(*pmap_kremove_p) __P((vaddr_t, vsize_t));
+extern void	(*pmap_page_protect_p) __P((struct vm_page *, vm_prot_t));
 extern void	(*pmap_protect_p) __P((pmap_t, vaddr_t, vaddr_t, vm_prot_t));
-extern void	(*pmap_zero_page_p) __P((paddr_t));
 extern void	(*pmap_changeprot_p) __P((pmap_t, vaddr_t, vm_prot_t, int));
 
 #define		pmap_clear_modify	(*pmap_clear_modify_p)
 #define		pmap_clear_reference	(*pmap_clear_reference_p)
-#define		pmap_copy_page		(*pmap_copy_page_p)
 #define		pmap_enter		(*pmap_enter_p)
 #define		pmap_extract		(*pmap_extract_p)
 #define		pmap_is_modified	(*pmap_is_modified_p)
 #define		pmap_is_referenced	(*pmap_is_referenced_p)
+#define		pmap_kenter_pa		(*pmap_kenter_pa_p)
+#define		pmap_kenter_pgs		(*pmap_kenter_pgs_p)
+#define		pmap_kremove		(*pmap_kremove_p)
 #define		pmap_page_protect	(*pmap_page_protect_p)
 #define		pmap_protect		(*pmap_protect_p)
-#define		pmap_zero_page		(*pmap_zero_page_p)
 #define		pmap_changeprot		(*pmap_changeprot_p)
 
 #endif
+
+/* pmap_{zero,copy}_page() may be assisted by specialized hardware */
+#define		pmap_zero_page		(*cpuinfo.zero_page)
+#define		pmap_copy_page		(*cpuinfo.copy_page)
 
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ipc.h,v 1.18.4.1 1999/04/19 04:29:22 cjs Exp $	*/
+/*	$NetBSD: ipc.h,v 1.23 2000/06/02 15:53:05 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,19 +48,57 @@
 /*
  * SVID compatible ipc.h file
  */
+
 #ifndef _SYS_IPC_H_
 #define _SYS_IPC_H_
 
+#include <sys/types.h>
+
 struct ipc_perm {
+	uid_t		uid;	/* user id */
+	gid_t		gid;	/* group id */
+	uid_t		cuid;	/* creator user id */
+	gid_t		cgid;	/* creator group id */
+	mode_t		mode;	/* r/w permission */
+
+	/*
+	 * These members are private and used only in the internal
+	 * implementation of this interface.
+	 */
+	unsigned short	_seq;	/* sequence # (to generate unique
+				   msg/sem/shm id) */
+	key_t		_key;	/* user specified msg/sem/shm key */
+};
+
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+/* Warning: 64-bit structure padding is needed here */
+struct ipc_perm_sysctl {
+	u_int64_t	_key;
+	uid_t		uid;
+	gid_t		gid;
+	uid_t		cuid;
+	gid_t		cgid;
+	mode_t		mode;
+	int16_t		_seq;
+	int16_t		pad;
+};
+#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+
+#ifdef _KERNEL
+/*
+ * Old IPC permission structure used before NetBSD 1.5.
+ */
+struct ipc_perm14 {
 	unsigned short	cuid;	/* creator user id */
 	unsigned short	cgid;	/* creator group id */
 	unsigned short	uid;	/* user id */
 	unsigned short	gid;	/* group id */
 	unsigned short	mode;	/* r/w permission */
-	unsigned short	seq;	/* sequence # (to generate unique msg/sem/shm
-				   id) */
+	unsigned short	seq;	/* sequence # (to generate unique
+				   msg/sem/shm id) */
 	key_t	key;		/* user specified msg/sem/shm key */
 };
+#endif /* _KERNEL */
 
 /* X/Open required constants (same values as system 5) */
 #define	IPC_CREAT	001000	/* create entry if key does not exist */
@@ -73,18 +111,28 @@ struct ipc_perm {
 #define	IPC_SET		1	/* set options */
 #define	IPC_STAT	2	/* get options */
 
+/*
+ * Macros to convert between ipc ids and array indices or sequence ids.
+ * The first of these is used by ipcs(1), and so is defined outside the
+ * kernel as well.
+ */
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#define	IXSEQ_TO_IPCID(ix,perm)	(((perm._seq) << 16) | (ix & 0xffff))
+#endif
+
 #ifdef _KERNEL
-/* Macros to convert between ipc ids and array indices or sequence ids */
 #define	IPCID_TO_IX(id)		((id) & 0xffff)
 #define	IPCID_TO_SEQ(id)	(((id) >> 16) & 0xffff)
-#define	IXSEQ_TO_IPCID(ix,perm)	(((perm.seq) << 16) | (ix & 0xffff))
 
 /* Common access type bits, used with ipcperm(). */
 #define	IPC_R		000400	/* read permission */
 #define	IPC_W		000200	/* write/alter permission */
 #define	IPC_M		010000	/* permission to change control info */
 
-int ipcperm __P((struct ucred *, struct ipc_perm *, int));
+int	ipcperm __P((struct ucred *, struct ipc_perm *, int));
+
+void	ipc_perm14_to_native __P((struct ipc_perm14 *, struct ipc_perm *));
+void	native_to_ipc_perm14 __P((struct ipc_perm *, struct ipc_perm14 *));
 #endif /* _KERNEL */
 
 #ifndef _KERNEL

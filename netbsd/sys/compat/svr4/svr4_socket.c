@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_socket.c,v 1.6 1998/09/04 19:54:39 christos Exp $	*/
+/*	$NetBSD: svr4_socket.c,v 1.8 1999/09/07 18:20:19 christos Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -65,6 +65,8 @@
 #include <compat/svr4/svr4_socket.h>
 #include <compat/svr4/svr4_signal.h>
 #include <compat/svr4/svr4_sockmod.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_ucontext.h>
 #include <compat/svr4/svr4_syscallargs.h>
 
 struct svr4_sockcache_entry {
@@ -147,7 +149,8 @@ svr4_add_socket(p, path, st)
 	struct stat *st;
 {
 	struct svr4_sockcache_entry *e;
-	int len, error;
+	size_t len;
+	int error;
 
 	if (!initialized) {
 		TAILQ_INIT(&svr4_head);

@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.76.2.3 2000/01/17 18:40:28 he Exp $	 */
+/* $NetBSD: machdep.c,v 1.102 2000/06/05 23:45:02 jhawk Exp $	 */
 
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
@@ -45,14 +45,13 @@
  * @(#)machdep.c	7.16 (Berkeley) 6/3/91
  */
 
-#include "opt_bufcache.h"
 #include "opt_ddb.h"
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ns.h"
 #include "opt_compat_netbsd.h"
 #include "opt_compat_ultrix.h"
-#include "opt_sysv.h"
+#include "opt_multiprocessor.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,7 +66,6 @@
 #include <sys/mbuf.h>
 #include <sys/reboot.h>
 #include <sys/conf.h>
-#include <sys/callout.h>
 #include <sys/device.h>
 #include <sys/exec.h>
 #include <sys/mount.h>
@@ -75,15 +73,6 @@
 #include <sys/ptrace.h>
 #include <vm/vm.h>
 #include <sys/sysctl.h>
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <dev/cons.h>
 
@@ -127,48 +116,20 @@
 
 #include "smg.h"
 
-void	machinecheck __P((caddr_t));
-void	cmrerr __P((void));
-
 extern int virtual_avail, virtual_end;
 /*
  * We do these external declarations here, maybe they should be done
  * somewhere else...
  */
-int		cold = 1;
-int		want_resched;
 char		machine[] = MACHINE;		/* from <machine/param.h> */
 char		machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
 char		cpu_model[100];
 caddr_t		msgbufaddr;
 int		physmem;
-int		todrstopped = 0;
 int		dumpsize = 0;
 
 #define	IOMAPSZ	100
 static	struct map iomap[IOMAPSZ];
-
-caddr_t allocsys __P((caddr_t));
-
-#define valloclim(name, type, num, lim) \
-		(name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-
-#ifdef BUFCACHE
-int		bufcache = BUFCACHE;	/* % of RAM to use for buffer cache */
-#else 
-int		bufcache = 0;		/* fallback to old algorithm */
-#endif  
-#ifdef	BUFPAGES
-int		bufpages = BUFPAGES;
-#else
-int		bufpages = 0;
-#endif
-int		nswbuf = 0;
-#ifdef	NBUF
-int		nbuf = NBUF;
-#else
-int		nbuf = 0;
-#endif
 
 vm_map_t exec_map = NULL;
 vm_map_t mb_map = NULL;
@@ -178,47 +139,47 @@ vm_map_t phys_map = NULL;
 int iospace_inited = 0;
 #endif
 
+struct softintr_head softnet_head = { IPL_SOFTNET };
+struct softintr_head softserial_head = { IPL_SOFTSERIAL };
+
 void
 cpu_startup()
 {
 	caddr_t		v;
-	extern char	version[];
 	int		base, residual, i, sz;
-	vm_offset_t	minaddr, maxaddr;
-	vm_size_t	size;
+	vaddr_t		minaddr, maxaddr;
+	vsize_t		size;
 	extern unsigned int avail_end;
+	char pbuf[9];
 
 	/*
 	 * Initialize error message buffer.
 	 */
 	initmsgbuf(msgbufaddr, round_page(MSGBUFSIZE));
 
-#if VAX750 || VAX650
-	if (vax_cputype == VAX_750 || vax_cputype == VAX_650)
-		if (!mfpr(PR_TODR))
-			mtpr(todrstopped = 1, PR_TODR);
-#endif
 	/*
 	 * Good {morning,afternoon,evening,night}.
+	 * Also call CPU init on systems that need that.
 	 */
 	printf("%s\n%s\n", version, cpu_model);
-	printf("realmem = %d\n", avail_end);
-	physmem = btoc(avail_end);
+        if (dep_call->cpu_conf)
+                (*dep_call->cpu_conf)();
+
+	format_bytes(pbuf, sizeof(pbuf), avail_end);
+	printf("total memory = %s\n", pbuf);
 	panicstr = NULL;
 	mtpr(AST_NO, PR_ASTLVL);
 	spl0();
-
-	dumpsize = physmem + 1;
 
 	/*
 	 * Find out how much space we need, allocate it, and then give
 	 * everything true virtual addresses.
 	 */
 
-	sz = (int) allocsys((caddr_t) 0);
+	sz = (int) allocsys(NULL, NULL);
 	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(sz))) == 0)
 		panic("startup: no room for tables");
-	if (allocsys(v) - v != sz)
+	if (allocsys(v, NULL) - v != sz)
 		panic("startup: table size inconsistency");
 	/*
 	 * Now allocate buffers proper.	 They are different than the above in
@@ -227,13 +188,13 @@ cpu_startup()
 	size = MAXBSIZE * nbuf;		/* # bytes for buffers */
 
 	/* allocate VM for buffers... area is not managed by VM system */
-	if (uvm_map(kernel_map, (vm_offset_t *) &buffers, round_page(size),
+	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
 		    NULL, UVM_UNKNOWN_OFFSET,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
 				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
 		panic("cpu_startup: cannot allocate VM for buffers");
 
-	minaddr = (vm_offset_t) buffers;
+	minaddr = (vaddr_t) buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
 		/* don't want to alloc more physical mem than needed */
 		bufpages = btoc(MAXBSIZE) * nbuf;
@@ -242,8 +203,8 @@ cpu_startup()
 	residual = bufpages % nbuf;
 	/* now allocate RAM for buffers */
 	for (i = 0 ; i < nbuf ; i++) {
-		vm_offset_t curbuf;
-		vm_size_t curbufsize;
+		vaddr_t curbuf;
+		vsize_t curbufsize;
 		struct vm_page *pg;
 
 		/*
@@ -253,8 +214,8 @@ cpu_startup()
 		 * The rest of each buffer occupies virtual space, but has no
 		 * physical memory allocated for it.
 		 */
-		curbuf = (vm_offset_t) buffers + i * MAXBSIZE;
-		curbufsize = CLBYTES * (i < residual ? base + 1 : base);
+		curbuf = (vaddr_t) buffers + i * MAXBSIZE;
+		curbufsize = NBPG * (i < residual ? base + 1 : base);
 		while (curbufsize) {
 			pg = uvm_pagealloc(NULL, 0, NULL, 0);
 			if (pg == NULL)
@@ -262,122 +223,37 @@ cpu_startup()
 				    "not enough RAM for buffer cache");
 			pmap_enter(kernel_map->pmap, curbuf,
 			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    TRUE, VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += CLBYTES;
-			curbufsize -= CLBYTES;
+			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			curbuf += NBPG;
+			curbufsize -= NBPG;
 		}
 	}
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively limits
 	 * the number of processes exec'ing at any time.
+	 * At most one process with the full length is allowed.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 16 * NCARGS, TRUE, FALSE, NULL);
+				 NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
-	 * Finally, allocate mbuf cluster submap.
-	 */
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-			       VM_MBUF_SIZE, FALSE, FALSE, NULL);
-
-#if VAX410 || VAX43
-	/*
-	 * Allocate a submap for physio
+	 * Allocate a submap for physio.  This map effectively limits the
+	 * number of processes doing physio at any one time.
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    VM_PHYS_SIZE, TRUE, FALSE, NULL);
-#endif
-	/*
-	 * Initialize callouts
-	 */
+				   VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i - 1].c_next = &callout[i];
-	callout[i - 1].c_next = NULL;
-
-	printf("avail mem = %d\n", (int)ptoa(uvmexp.free));
-	printf("Using %d buffers containing %d bytes of memory.\n",
-	       nbuf, bufpages * CLBYTES);
+	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
+	printf("avail memory = %s\n", pbuf);
+	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
+	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
 	 */
 
 	bufinit();
-}
-
-/*
- * Allocate space for system data structures.  We are given a starting
- * virtual address and we return a final virtual address; along the way we
- * set each data structure pointer.
- * 
- * We call allocsys() with 0 to find out how much space we want, allocate that
- * much and fill it with zeroes, and then call allocsys() again with the
- * correct base virtual address.
- */
-caddr_t
-allocsys(v)
-	register caddr_t v;
-{
-
-#define valloc(name, type, num) \
-	    v = (caddr_t)(((name) = (type *)v) + (num))
-
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(callout, struct callout, ncallout);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-
-	/*
-	 * Determine how many buffers to allocate (enough to hold 5% of total
-	 * physical memory, but at least 16). Allocate 1/2 as many swap
-	 * buffer headers as file i/o buffers.
-	 */
-	if (bufpages == 0) {
-		if (bufcache == 0) {
-			if (physmem < btoc(2 * 1024 * 1024))
-				bufpages = physmem / 10;
-			else
-				bufpages = physmem / 20;
-		} else {
-			if (bufcache < 5 || bufcache > 95) {
-				printf(
-		"warning: unable to set bufcache to %d%% of RAM, using 10%%",
-				    bufcache);
-				bufcache = 10;
-			}
-			bufpages = physmem / 100 * bufcache;
-		}
-	}
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) & ~1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;	/* sanity */
-	}
-	valloc(buf, struct buf, nbuf);
-	return v;
 }
 
 long	dumplo = 0;
@@ -400,17 +276,11 @@ cpu_dumpconf()
 			dumplo = nblks - btodb(ctob(dumpsize));
 	}
 	/*
-	 * Don't dump on the first CLBYTES (why CLBYTES?) in case the dump
+	 * Don't dump on the first NBPG (why NBPG?) in case the dump
 	 * device includes a disk label.
 	 */
-	if (dumplo < btodb(CLBYTES))
-		dumplo = btodb(CLBYTES);
-}
-
-void
-cpu_initclocks()
-{
-	(*dep_call->cpu_clock) ();
+	if (dumplo < btodb(NBPG))
+		dumplo = btodb(NBPG);
 }
 
 int
@@ -434,8 +304,6 @@ setstatclockrate(hzrate)
 void
 consinit()
 {
-	extern int smgprobe(void), smgcninit(void);
-
 	/*
 	 * Init I/O memory resource map. Must be done before cninit()
 	 * is called; we may want to use iospace in the console routines.
@@ -444,22 +312,18 @@ consinit()
 #ifdef DEBUG
 	iospace_inited = 1;
 #endif
-
 	cninit();
-#if NSMG
-	/* XXX - do this probe after everything else due to wscons trouble */
-	if (smgprobe())
-		smgcninit();
-#endif
 #ifdef DDB
 	{
 		extern int end; /* Contains pointer to symsize also */
 		extern int *esym;
 
-//		extern void ksym_init(int *, int *);
-//		ksym_init(&end, esym);
 		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
 	}
+#ifdef DEBUG
+	if (sizeof(struct user) > REDZONEADDR)
+		panic("struct user inside red zone");
+#endif
 #ifdef donotworkbyunknownreason
 	if (boothowto & RB_KDB)
 		Debugger();
@@ -523,9 +387,9 @@ sys___sigreturn14(p, v, retval)
 
 	scf = p->p_addr->u_pcb.framep;
 	cntx = SCARG(uap, sigcntxp);
+
 	if (uvm_useracc((caddr_t)cntx, sizeof (*cntx), B_READ) == 0)
 		return EINVAL;
-
 	/* Compatibility mode? */
 	if ((cntx->sc_ps & (PSL_IPL | PSL_IS)) ||
 	    ((cntx->sc_ps & (PSL_U | PSL_PREVU)) != (PSL_U | PSL_PREVU)) ||
@@ -643,6 +507,7 @@ cpu_reboot(howto, b)
 	}
 	splhigh();		/* extreme priority */
 	if (howto & RB_HALT) {
+		doshutdownhooks();
 		if (dep_call->cpu_halt)
 			(*dep_call->cpu_halt) ();
 		printf("halting (in tight loop); hit\n\t^P\n\tHALT\n\n");
@@ -705,7 +570,6 @@ void
 dumpsys()
 {
 
-	msgbufenabled = 0;
 	if (dumpdev == NODEV)
 		return;
 	/*
@@ -827,6 +691,8 @@ process_sstep(p, sstep)
  * uses resource maps when allocating space, which is allocated from 
  * the IOMAP submap. The implementation is similar to the uba resource
  * map handling. Size is given in pages.
+ * If the page requested is bigger than a logical page, space is
+ * allocated from the kernel map instead.
  *
  * It is known that the first page in the iospace area is unused; it may
  * be use by console device drivers (before the map system is inited).
@@ -845,19 +711,25 @@ vax_map_physmem(phys, size)
 	if (!iospace_inited)
 		panic("vax_map_physmem: called before rminit()?!?");
 #endif
-	pageno = rmalloc(iomap, size);
-	if (pageno == 0) {
-		if (warned++ == 0) /* Warn only once */
-			printf("vax_map_physmem: iomap too small\n");
-		return 0;
+	if (size >= LTOHPN) {
+		addr = uvm_km_valloc(kernel_map, size * VAX_NBPG);
+		if (addr == 0)
+			panic("vax_map_physmem: kernel map full");
+	} else {
+		pageno = rmalloc(iomap, size);
+		if (pageno == 0) {
+			if (warned++ == 0) /* Warn only once */
+				printf("vax_map_physmem: iomap too small");
+			return 0;
+		}
+		addr = iospace + (pageno * VAX_NBPG);
 	}
-	addr = iospace + (pageno * VAX_NBPG);
 	ioaccess(addr, phys, size);
 #ifdef PHYSMEMDEBUG
 	printf("vax_map_physmem: alloc'ed %d pages for paddr %lx, at %lx\n",
 	    size, phys, addr);
 #endif
-	return addr | (phys & PGOFSET);
+	return addr | (phys & VAX_PGOFSET);
 }
 
 /*
@@ -874,6 +746,42 @@ vax_unmap_physmem(addr, size)
 	printf("vax_unmap_physmem: unmapping %d pages at addr %lx\n", 
 	    size, addr);
 #endif
-	rmfree(iomap, size, pageno);
 	iounaccess(addr, size);
+	if (size >= LTOHPN)
+		uvm_km_free(kernel_map, addr, size * VAX_NBPG);
+	else
+		rmfree(iomap, size, pageno);
+}
+
+void *
+softintr_establish(int ipl, void (*func)(void *), void *arg)
+{
+	struct softintr_handler *sh;
+	struct softintr_head *shd;
+
+	switch (ipl) {
+	case IPL_SOFTNET: shd = &softnet_head; break;
+	case IPL_SOFTSERIAL: shd = &softserial_head; break;
+	default: panic("softintr_establish: unsupported soft IPL");
+	}
+
+	sh = malloc(sizeof(*sh), M_SOFTINTR, M_NOWAIT);
+	if (sh == NULL)
+		return NULL;
+
+	LIST_INSERT_HEAD(&shd->shd_intrs, sh, sh_link);
+	sh->sh_head = shd;
+	sh->sh_pending = 0;
+	sh->sh_func = func;
+	sh->sh_arg = arg;
+
+	return sh;
+}
+
+void
+softintr_disestablish(void *arg)
+{
+	struct softintr_handler *sh = arg;
+	LIST_REMOVE(sh, sh_link);
+	free(sh, M_SOFTINTR);
 }

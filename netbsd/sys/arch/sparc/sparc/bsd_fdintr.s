@@ -1,4 +1,4 @@
-/*	$NetBSD: bsd_fdintr.s,v 1.16.2.1 2000/02/08 22:48:59 he Exp $ */
+/*	$NetBSD: bsd_fdintr.s,v 1.18 2000/01/21 13:22:01 pk Exp $ */
 
 /*
  * Copyright (c) 1995 Paul Kranenburg
@@ -50,7 +50,7 @@
 
 ! raise(0,PIL_FDSOFT)	! NOTE: CPU#0 and PIL_FDSOFT=4
 #define FD_SET_SWINTR_4M				\
-	sethi	%hi(PINTR_SINTRLEV(4)), %l5;		\
+	sethi	%hi(PINTR_SINTRLEV(PIL_FDSOFT)), %l5;	\
 	set	ICR_PI_SET, %l6;			\
 	st	%l5, [%l6]
 

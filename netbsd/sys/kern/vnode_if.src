@@ -1,4 +1,4 @@
-#	$NetBSD: vnode_if.src,v 1.16 1999/03/22 16:57:37 sommerfe Exp $
+#	$NetBSD: vnode_if.src,v 1.24 2000/05/13 23:43:07 perseant Exp $
 #
 # Copyright (c) 1992, 1993
 #	The Regents of the University of California.  All rights reserved.
@@ -49,6 +49,10 @@
 # -: not applicable.  vnode does not yet (or no longer) exists.
 # =: the same on input and output, may be either L or U.
 # X: locked if not nil.
+#
+# For operations other than VOP_LOOKUP which require a component name
+# parameter, the flags required for the initial namei() call are listed.
+# Additional flags may be added to the namei() call, but these are required.
 #     
  
 #
@@ -60,16 +64,33 @@
 #     especially that *vpp may equal dvp and both may be locked.
 #
 #    More details:
-#     On success, adds a reference to *vpp so it doesn't evaporate.
-#     If LOCKPARENT is set in cnp, dvp is returned locked even on failure.
-#     otherwise it is unlocked (unless *vpp == dvp on return)
+#     There are three types of lookups: ".", ".." (ISDOTDOT), and other.
+#     On successful lookup of ".", a reference is added to dvp, and it
+#          is returned in *vpp.
+#     To look up ISDOTDOT, dvp is unlocked, the ".." node is locked, and
+#          then dvp is relocked iff LOCKPARENT is set and this is the last
+#          component name (ISLASTCN set). This preserves the
+#          protocol of always locking nodes from root ("/") downward and
+#          prevents deadlock.
+#     Other lookups find the named node (creating the vnode if needed) and
+#          return it, locked, in *vpp.
+#     For non-"." lookups, if LOCKPARENT is not set or this was not the
+#          last component name, dvp is returned unlocked on a successful
+#          lookup.
+#     On failure, *vpp is NULL, and *dvp is left locked. If there was
+#          an error re-locking dvp (for instance in the ISDOTDOT case),
+#          the error is returned with PDIRUNLOCK set.
 #	
 #     *vpp is always locked on return if the operation succeeds.
 #     typically, if *vpp == dvp, you need to release twice, but unlock once.
 #
-#     If ISDOTDOT is set, dvp is unlocked before *vpp is 
-#     locked; dvp is then relocked.  this is done to avoid deadlocking 
-#     another process concurrently scanning downwards.
+#     The PDIRUNLOCK flag is set when dvp is unlocked in the lookup routine.
+#          It signals the caller that dvp's lock state changed. It will
+#          be set on exit if either a successful lookup unlocked the
+#          parrent, or there was an error re-locking dvp in the ISDOTDOT case.
+#
+#     See sys/sys/namei.h for a description of the SAVENAME and SAVESTART
+#          flags.
 #
 vop_lookup {
 	IN struct vnode *dvp;
@@ -81,8 +102,10 @@ vop_lookup {
 #% create     dvp     L U U
 #% create     vpp     - L -
 #
+#! create cnp	CREATE, LOCKPARENT
+#
 vop_create {
-	IN WILLRELE struct vnode *dvp;
+	IN WILLPUT struct vnode *dvp;
 	OUT struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -92,8 +115,10 @@ vop_create {
 #% mknod      dvp     L U U
 #% mknod      vpp     - X -
 #
+#! mknod cnp	CREATE, LOCKPARENT
+#
 vop_mknod {
-	IN WILLRELE struct vnode *dvp;
+	IN WILLPUT struct vnode *dvp;
 	OUT WILLRELE struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -182,6 +207,18 @@ vop_ioctl {
 };
 
 #
+#% fcntl      vp      L L L
+#
+vop_fcntl {
+	IN struct vnode *vp;
+	IN u_int command;
+	IN caddr_t data;
+	IN int fflag;
+	IN struct ucred *cred;
+	IN struct proc *p;
+};
+
+#
 #% poll     vp      U U U
 #
 vop_poll {
@@ -232,9 +269,11 @@ vop_seek {
 #% remove     dvp     L U U
 #% remove     vp      L U U
 #
+#! remove cnp	DELETE, LOCKPARENT | LOCKLEAF
+#
 vop_remove {
-	IN WILLRELE struct vnode *dvp;
-	IN WILLRELE struct vnode *vp;
+	IN WILLPUT struct vnode *dvp;
+	IN WILLPUT struct vnode *vp;
 	IN struct componentname *cnp;
 };
 
@@ -242,8 +281,10 @@ vop_remove {
 #% link               vp      U U U
 #% link               tdvp    L U U
 #
+#! link	 cnp	CREATE, LOCKPARENT
+#
 vop_link {
-	IN WILLRELE struct vnode *dvp;
+	IN WILLPUT struct vnode *dvp;
 	IN struct vnode *vp;
 	IN struct componentname *cnp;
 };
@@ -254,11 +295,16 @@ vop_link {
 #% rename     tdvp    L U U
 #% rename     tvp     X U U
 #
+#! rename fcnp	DELETE,	WANTPARENT | SAVESTART
+#! rename tcnp	RENAME, LOCKPARENT | LOCKLEAF | NOCACHE | SAVESTART
+#
+# XXX the vop_rename routines should REALLY NOT be depending on SAVESTART!
+#
 vop_rename {
 	IN WILLRELE struct vnode *fdvp;
 	IN WILLRELE struct vnode *fvp;
 	IN struct componentname *fcnp;
-	IN WILLRELE struct vnode *tdvp;
+	IN WILLPUT struct vnode *tdvp;
 	IN WILLRELE struct vnode *tvp;
 	IN struct componentname *tcnp;
 };
@@ -267,8 +313,10 @@ vop_rename {
 #% mkdir      dvp     L U U
 #% mkdir      vpp     - L - 
 #
+#! mkdir cnp	CREATE, LOCKPARENT
+#
 vop_mkdir {
-	IN WILLRELE struct vnode *dvp;
+	IN WILLPUT struct vnode *dvp;
 	OUT struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -278,9 +326,11 @@ vop_mkdir {
 #% rmdir      dvp     L U U
 #% rmdir      vp      L U U
 #
+#! rmdir cnp	DELETE, LOCKPARENT | LOCKLEAF
+#
 vop_rmdir {
-	IN WILLRELE struct vnode *dvp;
-	IN WILLRELE struct vnode *vp;
+	IN WILLPUT struct vnode *dvp;
+	IN WILLPUT struct vnode *vp;
 	IN struct componentname *cnp;
 };
 
@@ -288,12 +338,14 @@ vop_rmdir {
 #% symlink    dvp     L U U
 #% symlink    vpp     - U -
 #
+#! symlink cnp	CREATE, LOCKPARENT
+#
 # XXX - note that the return vnode has already been VRELE'ed
 #     by the filesystem layer.  To use it you must use vget,
 #     possibly with a further namei.
 #
 vop_symlink {
-	IN WILLRELE struct vnode *dvp;
+	IN WILLPUT struct vnode *dvp;
 	OUT WILLRELE struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -324,6 +376,8 @@ vop_readlink {
 #
 #% abortop    dvp     = = =
 #
+#! abortop cnp	as appropriate.
+#
 vop_abortop {
 	IN struct vnode *dvp;
 	IN struct componentname *cnp;
@@ -333,7 +387,7 @@ vop_abortop {
 #% inactive   vp      L U U  
 #
 vop_inactive {
-	IN struct vnode *vp;
+	IN WILLUNLOCK struct vnode *vp;
 	IN struct proc *p;
 };
 
@@ -435,6 +489,18 @@ vop_valloc {
 };
 
 #
+#% balloc     vp      L L L
+#
+vop_balloc {
+	IN struct vnode *vp;
+	IN off_t startoffset;
+	IN int size;
+	IN struct ucred *cred;	
+	IN int flags;
+	OUT struct buf **bpp;
+};
+
+#
 #% reallocblks        vp      L L L
 #
 vop_reallocblks {
@@ -469,7 +535,7 @@ vop_update {
 	IN struct vnode *vp;
 	IN struct timespec *access;
 	IN struct timespec *modify;
-	IN int waitfor;
+	IN int flags;
 };
 
 # 
@@ -486,6 +552,8 @@ vop_lease {
 #% whiteout   dvp     L L L
 #% whiteout   cnp     - - -
 #% whiteout   flag    - - -
+#
+#! whiteout cnp	CREATE, LOCKPARENT
 # 
 vop_whiteout {
 	IN struct vnode *dvp;

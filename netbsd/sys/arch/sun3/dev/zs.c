@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.57 1999/03/27 01:21:36 wrstuden Exp $	*/
+/*	$NetBSD: zs.c,v 1.60 2000/03/06 21:36:12 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -81,8 +81,6 @@
 #undef  NZS
 #define NZS 2
 #endif
-
-extern void Debugger __P((void));
 
 /*
  * Some warts needed by z8530tty.c -
@@ -704,6 +702,7 @@ struct consdev consdev_tty = {
 	zscngetc,
 	zscnputc,
 	nullcnpollc,
+	NULL,
 };
 
 static void

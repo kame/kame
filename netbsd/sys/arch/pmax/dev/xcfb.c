@@ -1,4 +1,4 @@
-/*	$NetBSD: xcfb.c,v 1.23.10.2 1999/04/12 21:27:06 pk Exp $	*/
+ /*	$NetBSD: xcfb.c,v 1.34 2000/02/03 04:09:18 nisimura Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,28 +38,28 @@
  *	@(#)xcfb.c	8.1 (Berkeley) 6/10/93
  */
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1991,1990,1989 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
@@ -71,7 +71,7 @@
  *	Copyright (C) 1989 Digital Equipment Corporation.
  *	Permission to use, copy, modify, and distribute this software and
  *	its documentation for any purpose and without fee is hereby granted,
- *	provided that the above copyright notice appears in all copies.  
+ *	provided that the above copyright notice appears in all copies.
  *	Digital Equipment Corporation makes no representations about the
  *	suitability of this software for any purpose.  It is provided "as is"
  *	without express or implied warranty.
@@ -80,66 +80,43 @@
  *	v 9.2 90/02/13 22:16:24 shirriff Exp  SPRITE (DECWRL)";
  */
 
-#include "fb.h"
-
-#include "xcfb.h"
 #include "dtop.h"
-#if NXCFB > 0
 #if NDTOP == 0
 xcfb needs dtop device
 #else
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/time.h>
-#include <sys/kernel.h>
-#include <sys/ioctl.h>
-#include <sys/file.h>
-#include <sys/errno.h>
-#include <sys/proc.h>
-#include <sys/mman.h>
-#include <sys/malloc.h>
-
-#include <vm/vm.h>
-
 #include <sys/device.h>
-#include <dev/tc/tcvar.h>
-#include <machine/autoconf.h>
-#include <mips/cpuregs.h>		/* mips cached->uncached */
+#include <sys/systm.h>
 
+#include <machine/autoconf.h>
 #include <machine/pmioctl.h>
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
 
+#include <pmax/pmax/maxine.h>
+#include <pmax/dev/dtopreg.h>
+#include <pmax/dev/fbreg.h>
+#include <pmax/dev/ims332.h>
+#include <pmax/dev/xcfbvar.h>
+
 #include <pmax/pmax/cons.h>
 
-#include <pmax/dev/xcfbreg.h>
-#include <pmax/dev/xcfbvar.h>
-#include <pmax/dev/ims332.h>
-#include <pmax/pmax/maxine.h>
+#include <dev/tc/tcvar.h>
 
-#include <pmax/dev/dtopreg.h>
 
-#include <pmax/dev/fbreg.h>
+#define	IMS332_ADDRESS		0xbc140000
+#define	VRAM_OFFSET		0x2000000
+#define	IMS332_RESET_ADDRESS	0xbc040100
 
 /*
  * These need to be mapped into user space.
  */
-struct fbuaccess xcfbu;
-
-
-/*
- * rcons methods and globals.
- */
-struct pmax_fbtty xcfbfb;
-
-struct fbinfo	xcfbfi;	/*XXX*/
-
-#define CMAP_BITS	(3 * 256)		/* 256 entries, 3 bytes per. */
-static u_char cmap_bits [CMAP_BITS];		/* colormap for console... */
+static struct fbuaccess xcfbu;
+static struct pmax_fbtty xcfbfb;
+static struct fbinfo *xcfb_fi;
 
 #define XCFB_FB_SIZE 0x100000	/* size of raster (mapped into userspace) */
-
 
 struct fbdriver xcfb_driver = {
 	ims332_video_on,
@@ -152,27 +129,35 @@ struct fbdriver xcfb_driver = {
 	ims332CursorColor
 };
 
-
-/*
- * Forward references.
- */
-extern u_short defCursor[32];
-
-
 /*
  * Autoconfiguration data for config.new.
  * Use static-sized softc until config.old and old autoconfig
  * code is completely gone.
  */
 
-int xcfbmatch __P((struct device *, struct cfdata *, void *));
-void xcfbattach __P((struct device *, struct device *, void *));
+static int	xcfbmatch __P((struct device *, struct cfdata *, void *));
+static void	xcfbattach __P((struct device *, struct device *, void *));
+static int	xcfbinit __P((struct fbinfo *, caddr_t, int, int));
 
 struct cfattach xcfb_ca = {
 	sizeof(struct device), xcfbmatch, xcfbattach
 };
 
 int
+xcfb_cnattach()
+{
+	struct fbinfo *fi;
+	caddr_t base;
+
+	base = (caddr_t)MIPS_PHYS_TO_KSEG1(XINE_PHYS_CFB_START);
+	fbcnalloc(&fi);
+	if (xcfbinit(fi, base, 0, 1) < 0)
+		return (0);
+	xcfb_fi = fi;
+	return (1);
+}
+
+static int
 xcfbmatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
@@ -188,57 +173,52 @@ xcfbmatch(parent, match, aux)
 	return (1);
 }
 
-void
+static void
 xcfbattach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+struct device *parent;
+struct device *self;
+void *aux;
 {
 	struct tc_attach_args *ta = aux;
+	caddr_t base = (caddr_t)ta->ta_addr;
+	int unit = self->dv_unit;
+	struct fbinfo *fi;
 
-	if (!xcfbinit(NULL, (caddr_t)ta->ta_addr, self->dv_unit, 0))
-		return;
+	if (xcfb_fi)
+		fi = xcfb_fi;
+	else {
+		if (fballoc(&fi) < 0 || xcfbinit(fi, base, unit, 1) < 0)
+		return; /* failed */
+	}
+	((struct fbsoftc *)self)->sc_fi = fi;
 
-	/* no interrupts for XCFB */
-	/*BUS_INTR_ESTABLISH(ca, xcfbintr, self->dv_unit);*/
+	printf(": %dx%dx%d%s",
+		fi->fi_type.fb_width,
+		fi->fi_type.fb_height,
+		fi->fi_type.fb_depth,
+		(xcfb_fi) ? " console" : "");
+
 	printf("\n");
 }
-
 
 /*
  * Initialization
  */
-int
+static int
 xcfbinit(fi, base, unit, silent)
 	struct fbinfo *fi;
 	caddr_t base;
 	int unit;
 	int silent;
 {
-	/*XXX*/
-	/*
-	 * If this device is being intialized as the console, malloc()
-	 * is not yet up and we must use statically-allocated space.
-	 */
-	if (fi == NULL) {
-		fi = &xcfbfi;	/* XXX */
-  		fi->fi_cmap_bits = (caddr_t)cmap_bits;
-	} else {
-    		fi->fi_cmap_bits = malloc(CMAP_BITS, M_DEVBUF, M_NOWAIT);
-		if (fi->fi_cmap_bits == NULL) {
-			printf("cfb%d: no memory for cmap\n", unit);
-			return (0);
-		}
-	}
-
+	
 	/*XXX*/
 	/*
 	 * Or Cached? A comment in the Mach driver suggests that the X server
 	 * runs faster in cached address space, but the X server is going
 	 * to blow away the data cache whenever it updates the screen, so..
 	 */
-	base = (char *) MIPS_PHYS_TO_KSEG1(XINE_PHYS_CFB_START);
-	
+
 	/* Fill in main frame buffer info struct. */
 	fi->fi_unit = unit;
 	fi->fi_pixels = (caddr_t)(base + VRAM_OFFSET);
@@ -290,23 +270,13 @@ xcfbinit(fi, base, unit, silent)
 	/* Initialize the RAMDAC. */
 	ims332init (fi);
 
-
 	/* Connect serial device(s) */
 	if (tb_kbdmouseconfig(fi)) {
-		printf(" (mouse/keyboard config failed)");
-		return (0);
+		return (-1);
 	}
 
-	/*
-	 * Connect to the raster-console pseudo-driver
-	 */
-	fbconnect("PMAG-DV", fi, silent);
-
-#ifdef	fpinitialized
-	fp->initialized = 1;
-#endif
-	return (1);
+	fbconnect(fi);
+	return (0);
 }
 
 #endif /* NDTOP */
-#endif /* NXCFB */

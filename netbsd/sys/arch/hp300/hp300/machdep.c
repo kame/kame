@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.122.2.1 1999/04/16 16:16:58 chs Exp $	*/
+/*	$NetBSD: machdep.c,v 1.140 2000/06/05 23:44:58 jhawk Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,16 +42,14 @@
  *	@(#)machdep.c	8.10 (Berkeley) 4/20/94
  */
 
-#include "opt_bufcache.h"
 #include "opt_ddb.h"
 #include "opt_compat_hpux.h"
 #include "opt_compat_netbsd.h"
-#include "opt_sysv.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/buf.h>
 #include <sys/callout.h>
+#include <sys/buf.h>
 #include <sys/clist.h>
 #include <sys/conf.h>
 #include <sys/exec.h>
@@ -74,21 +72,13 @@
 #include <sys/core.h>
 #include <sys/kcore.h>
 #include <sys/vnode.h>
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 
 #include <machine/autoconf.h>
+#include <machine/bootinfo.h>
 #include <machine/cpu.h>
 #include <machine/hp300spu.h>
 #include <machine/reg.h>
@@ -99,7 +89,7 @@
 
 #include <dev/cons.h>
 
-#define	MAXMEM	64*1024*CLSIZE	/* XXX - from cmap.h */
+#define	MAXMEM	64*1024	/* XXX - from cmap.h */
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
 
@@ -119,6 +109,9 @@
 /* the following is used externally (sysctl_hw) */
 char	machine[] = MACHINE;	/* from <machine/param.h> */
 
+/* Our exported CPU info; we can have only one. */  
+struct cpu_info cpu_info_store;
+
 vm_map_t exec_map = NULL;  
 vm_map_t mb_map = NULL;
 vm_map_t phys_map = NULL;
@@ -126,24 +119,14 @@ vm_map_t phys_map = NULL;
 extern paddr_t avail_end;
 
 /*
- * Declare these as initialized data so we can patch them.
+ * bootinfo base (physical and virtual).  The bootinfo is placed, by
+ * the boot loader, into the first page of kernel text, which is zero
+ * filled (see locore.s) and not mapped at 0.  It is remapped to a
+ * different address in pmap_bootstrap().
  */
-int	nswbuf = 0;
-#ifdef	NBUF
-int	nbuf = NBUF;
-#else
-int	nbuf = 0;
-#endif
-#ifdef	BUFPAGES
-int	bufpages = BUFPAGES;
-#else
-int	bufpages = 0;
-#endif
-#ifdef	BUFCACHE
-int	bufcache = BUFCACHE;
-#else
-int	bufcache = 10;
-#endif
+paddr_t	bootinfo_pa;
+vaddr_t	bootinfo_va;
+
 caddr_t	msgbufaddr;
 int	maxmem;			/* max memory per process */
 int	physmem = MAXMEM;	/* max supported memory, changes to actual */
@@ -161,7 +144,6 @@ extern struct emul emul_hpux;
 #endif
 
 /* prototypes for local functions */
-caddr_t	allocsys __P((caddr_t));
 void	parityenable __P((void));
 int	parityerror __P((struct frame *));
 int	parityerrorfind __P((void));
@@ -208,6 +190,7 @@ int	delay_divisor;		/* delay constant */
 void
 hp300_init()
 {
+	struct btinfo_magic *bt_mag;
 	int i;
 
 	extern paddr_t avail_start, avail_end;
@@ -231,9 +214,25 @@ hp300_init()
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
-		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
+
+	/*
+	 * Map in the bootinfo page, and make sure the bootinfo
+	 * exists by searching for the MAGIC record.  If it's not
+	 * there, disable bootinfo.
+	 */
+	pmap_enter(pmap_kernel(), bootinfo_va, bootinfo_pa,
+	    VM_PROT_READ|VM_PROT_WRITE,
+	    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	bt_mag = lookup_bootinfo(BTINFO_MAGIC);
+	if (bt_mag == NULL ||
+	    bt_mag->magic1 != BOOTINFO_MAGIC1 ||
+	    bt_mag->magic2 != BOOTINFO_MAGIC2) {
+		pmap_remove(pmap_kernel(), bootinfo_va, bootinfo_va + NBPG);
+		bootinfo_va = 0;
+	}
 }
 
 /*
@@ -266,6 +265,12 @@ consinit()
 
 	consinit_active = 0;
 
+	/*
+	 * Issue a warning if the boot loader didn't provide bootinfo.
+	 */
+	if (bootinfo_va == 0)
+		printf("WARNING: boot loader did not provide bootinfo\n");
+
 #ifdef DDB
 	{
 		extern int end;
@@ -291,6 +296,7 @@ cpu_startup()
 	int base, residual;
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
+	char pbuf[9];
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
@@ -308,17 +314,18 @@ cpu_startup()
 	 */
 	printf(version);
 	identifycpu();
-	printf("real mem  = %d\n", ctob(physmem));
+	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
+	printf("total memory = %s\n", pbuf);
 
 	/*
 	 * Find out how much space we need, allocate it,
 	 * and the give everything true virtual addresses.
 	 */
-	size = (vsize_t)allocsys((caddr_t)0);
+	size = (vsize_t)allocsys(NULL, NULL);
 	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(size))) == 0)
 		panic("startup: no room for tables");
-	if ((allocsys(v) - v) != size)
-		panic("startup: talbe size inconsistency");
+	if ((allocsys(v, NULL) - v) != size)
+		panic("startup: table size inconsistency");
 
 	/*
 	 * Now allocate buffers proper.  They are different than the above
@@ -345,20 +352,15 @@ cpu_startup()
 		 * "base" pages for the rest.
 		 */
 		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
 			pg = uvm_pagealloc(NULL, 0, NULL, 0);
 			if (pg == NULL) 
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-#if defined(PMAP_NEW)
-			pmap_kenter_pgs(curbuf, &pg, 1);
-#else
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    TRUE, VM_PROT_READ|VM_PROT_WRITE);
-#endif
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+					VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
@@ -369,34 +371,28 @@ cpu_startup()
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16*NCARGS, TRUE, FALSE, NULL);
+				   16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, TRUE, FALSE, NULL);
+				   VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	/*
 	 * Finally, allocate mbuf cluster submap.
 	 */
 	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_MBUF_SIZE, FALSE, FALSE, NULL);
-
-	/*
-	 * Initialize callouts
-	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+				 nmbclusters * mclbytes, VM_MAP_INTRSAFE,
+				 FALSE, NULL);
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %ld\n", ptoa(uvmexp.free));
-	printf("using %d buffers containing %d bytes of memory\n",
-		nbuf, bufpages * CLBYTES);
+	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
+	printf("avail memory = %s\n", pbuf);
+	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
+	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
 	/*
 	 * Tell the VM system that page 0 isn't mapped.
@@ -428,76 +424,6 @@ cpu_startup()
 	 * Set up buffers, so they can be used to read disk labels.
 	 */
 	bufinit();
-}
-
-/*
- * Allocate space for system data structures.  We are given
- * a starting virtual address and we return a final virtual
- * address; along the way we set each data structure pointer.
- *
- * We call allocsys() with 0 to find out how much space we want,
- * allocate that much and fill it with zeroes, and the call
- * allocsys() again with the correct base virtual address.
- */
-caddr_t
-allocsys(v)
-	caddr_t v;
-{
-
-#define	valloc(name, type, num)	\
-	    (name) = (type *)v; v = (caddr_t)((name)+(num))
-#define	valloclim(name, type, num, lim) \
-	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(callout, struct callout, ncallout);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM 
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns); 
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-
-	/*
-	 * Determine how many buffers to allocate.  Since HPs tend
-	 * to be long on memory and short on disk speed, we allocate
-	 * more buffer space than the BSD standard of 10% of memory
-	 * for the first 2 Meg, 5% of the remaining.  We just allocate
-	 * a flag 10%.  Insure a minimum of 16 buffers.  We allocate
-	 * 1/2 as many swap buffer headers as file i/o buffers.
-	 */
-	if (bufpages == 0) {
-		if (bufcache < 5 || bufcache > 95) {
-			printf(
-		"WARNING: unable to set bufcache to %d%% of RAM, using 10%%",
-			    bufcache);
-			bufcache = 10;
-		}
-		bufpages = physmem * bufcache / (CLSIZE * 100);
-	}
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
-	valloc(buf, struct buf, nbuf);
-	return (v);
 }
 
 /*
@@ -540,28 +466,34 @@ setregs(p, pack, stack)
  * Info for CTL_HW
  */
 char	cpu_model[120];
-extern	char version[];
 
 struct hp300_model {
 	int id;
+	int mmuid;
 	const char *name;
 	const char *speed;
 };
 
-struct hp300_model hp300_models[] = {
-	{ HP_320,	"320",		"16.67"	},
-	{ HP_330,	"318/319/330",	"16.67"	},
-	{ HP_340,	"340",		"16.67"	},
-	{ HP_345,	"345",		"50"	},
-	{ HP_350,	"350",		"25"	},
-	{ HP_360,	"360",		"25"	},
-	{ HP_370,	"370",		"33.33"	},
-	{ HP_375,	"375",		"50"	},
-	{ HP_380,	"380",		"25"	},
-	{ HP_400,	"400",		"50"	},
-	{ HP_425,	"425",		"25"	},
-	{ HP_433,	"433",		"33"	},
-	{ 0,		NULL,		NULL	},
+const struct hp300_model hp300_models[] = {
+	{ HP_320,	-1,		"320",		"16.67"	},
+	{ HP_330,	-1,		"318/319/330",	"16.67"	},
+	{ HP_340,	-1,		"340",		"16.67"	},
+	{ HP_345,	-1,		"345",		"50"	},
+	{ HP_350,	-1,		"350",		"25"	},
+	{ HP_360,	-1,		"360",		"25"	},
+	{ HP_370,	-1,		"370",		"33.33"	},
+	{ HP_375,	-1,		"375",		"50"	},
+	{ HP_380,	-1,		"380",		"25"	},
+	{ HP_385,	-1,		"385",		"33"	},
+	{ HP_400,	-1,		"400",		"50"	},
+	{ HP_425,	MMUID_425_T,	"425t",		"25"	},
+	{ HP_425,	MMUID_425_S,	"425s",		"25"	},
+	{ HP_425,	MMUID_425_E,	"425e",		"25"	},
+	{ HP_425,	-1,		"425",		"25"	},
+	{ HP_433,	MMUID_433_T,	"433t",		"33"	},
+	{ HP_433,	MMUID_433_S,	"433s",		"33"	},
+	{ HP_433,	-1,		"433",		"33"	},
+	{ 0,		-1,		NULL,		NULL	},
 };
 
 void
@@ -575,8 +507,12 @@ identifycpu()
 	 */
 	for (t = s = NULL, i = 0; hp300_models[i].name != NULL; i++) {
 		if (hp300_models[i].id == machineid) {
+			if (hp300_models[i].mmuid != -1 &&
+			    hp300_models[i].mmuid != mmuid)
+				continue;
 			t = hp300_models[i].name;
 			s = hp300_models[i].speed;
+			break;
 		}
 	}
 	if (t == NULL) {
@@ -703,6 +639,9 @@ identifycpu()
 #if !defined(HP380)
 	case HP_380:
 #endif
+#if !defined(HP385)
+	case HP_385:
+#endif
 #if !defined(HP400)
 	case HP_400:
 #endif
@@ -762,7 +701,6 @@ cpu_reboot(howto, bootstr)
 	int howto;
 	char *bootstr;
 {
-	extern int cold;
 
 #if __GNUC__	/* XXX work around lame compiler problem (gcc 2.7.2) */
 	(void)&howto;
@@ -929,7 +867,7 @@ long	dumplo = 0;		/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first CLBYTES of disk space
+ * Dumps always skip the first NBPG of disk space
  * in case there might be a disk label stored there.
  * If there is extra space, put dump at the end to
  * reduce the chance that swapping trashes it.
@@ -955,7 +893,7 @@ cpu_dumpconf()
 
 	/*
 	 * Check do see if we will fit.  Note we always skip the
-	 * first CLBYTES in case there is a disk label there.
+	 * first NBPG in case there is a disk label there.
 	 */
 	if (nblks < (ctod(dumpsize) + chdrsize + ctod(1))) {
 		dumpsize = 0;
@@ -985,9 +923,6 @@ dumpsys()
 	/* XXX initialized here because of gcc lossage */
 	maddr = lowram;
 	pg = 0;
-
-	/* Don't put dump messages in msgbuf. */
-	msgbufenabled = 0;
 
 	/* Make sure dump device is valid. */
 	if (dumpdev == NODEV)
@@ -1022,7 +957,7 @@ dumpsys()
 			printf("%d ", pg / NPGMB);
 #undef NPGMB
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
-		    VM_PROT_READ, TRUE, VM_PROT_READ);
+		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
  bad:
@@ -1128,6 +1063,33 @@ badbaddr(addr)
 	return(0);
 }
 
+/*
+ * lookup_bootinfo:
+ *
+ *	Look up information in bootinfo from boot loader.
+ */
+void *
+lookup_bootinfo(type)
+	int type;
+{
+	struct btinfo_common *bt;
+	char *help = (char *)bootinfo_va;
+
+	/* Check for a bootinfo record first. */
+	if (help == NULL)
+		return (NULL);
+
+	do {
+		bt = (struct btinfo_common *)help;
+		if (bt->type == type)
+			return (help);
+		help += bt->next;
+	} while (bt->next != 0 &&
+		 (size_t)help < (size_t)bootinfo_va + BOOTINFO_SIZE);
+
+	return (NULL);
+}
+
 #ifdef PANICBUTTON
 /*
  * Declare these so they can be patched.
@@ -1138,6 +1100,8 @@ int candbdiv = 2;	/* give em half a second (hz / candbdiv) */
 void	candbtimer __P((void *));
 
 int crashandburn;
+
+struct callout candbtimer_ch = CALLOUT_INITIALIZER;
 
 void
 candbtimer(arg)
@@ -1190,7 +1154,8 @@ nmihand(frame)
 				/* Start the crashandburn sequence */
 				printf("\n");
 				crashandburn = 1;
-				timeout(candbtimer, NULL, hz / candbdiv);
+				callout_reset(&candbtimer_ch, hz / candbdiv,
+				    candbtiner, NULL);
 			}
 		} else
 #endif /* PANICBUTTON */
@@ -1318,7 +1283,7 @@ parityerrorfind()
 	ecacheoff();
 	for (pg = btoc(lowram); pg < btoc(lowram)+physmem; pg++) {
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, ctob(pg),
-		    VM_PROT_READ, TRUE, VM_PROT_READ);
+		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 		ip = (int *)vmmap;
 		for (o = 0; o < NBPG; o += sizeof(int))
 			i = *ip++;

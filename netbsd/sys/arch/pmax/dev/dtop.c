@@ -1,4 +1,4 @@
-/*	$NetBSD: dtop.c,v 1.36.2.3 1999/12/04 19:25:54 he Exp $	*/
+/*	$NetBSD: dtop.c,v 1.53 2000/04/26 04:16:17 mhitch Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,28 +38,28 @@
  *	@(#)dtop.c	8.2 (Berkeley) 11/30/93
  */
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1991,1990,1989 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
@@ -75,13 +75,13 @@ and the Massachusetts Institute of Technology, Cambridge, Massachusetts.
 
                         All Rights Reserved
 
-Permission to use, copy, modify, and distribute this software and its 
-documentation for any purpose and without fee is hereby granted, 
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose and without fee is hereby granted,
 provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in 
+both that copyright notice and this permission notice appear in
 supporting documentation, and that the names of Digital or MIT not be
 used in advertising or publicity pertaining to distribution of the
-software without specific, written prior permission.  
+software without specific, written prior permission.
 
 DIGITAL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
 ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL
@@ -94,47 +94,40 @@ SOFTWARE.
 ********************************************************/
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.36.2.3 1999/12/04 19:25:54 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.53 2000/04/26 04:16:17 mhitch Exp $");
 
+#include "opt_ddb.h"
 #include "rasterconsole.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/ioctl.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
-#include <sys/map.h>
-#include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/uio.h>
 #include <sys/kernel.h>
-#include <sys/syslog.h>
-
 #include <sys/device.h>
-#include <machine/autoconf.h>
-#include <machine/conf.h>
 
 #include <dev/cons.h>
+#include <dev/dec/lk201.h>
+#include <dev/tc/tcvar.h>
+#include <dev/tc/ioasicreg.h>
+#include <dev/tc/ioasicvar.h>
 
-#include <mips/cpuregs.h>		/* mips cached->uncached */
+#include <machine/conf.h>
 #include <machine/dc7085cons.h>		/*  mdmctl bits same on dtop and dc? */
 
 #include <machine/pmioctl.h>
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
-#include <pmax/dev/fbreg.h>
-#include <pmax/dev/rconsvar.h>
-
-#include <pmax/pmax/asic.h>
-#include <pmax/pmax/maxine.h>
-#include <dev/tc/tcvar.h>
-#include <dev/tc/ioasicvar.h>
-#include <dev/dec/lk201.h>
 
 #include <pmax/dev/dtopreg.h>
-#include <pmax/dev/lk201var.h>
 #include <pmax/dev/dtopvar.h>
+#include <pmax/dev/fbreg.h>
+#include <pmax/dev/lk201var.h>
+#include <pmax/dev/rconsvar.h>
+
+#include <pmax/pmax/maxine.h>
 
 
 #define	DTOP_MAX_POLL	0x70000		/* about half a sec */
@@ -162,8 +155,8 @@ struct dtop_softc {
 	short		bad_pkts;
 
 	struct dtop_ds {
-		int	(*handler)
-			__P((dtop_device_t, dtop_message_t, int, int));
+		int		(*handler) __P((dtop_device_t, dtop_message_t,
+				    int, int));
 		dtop_device	status;
 	} device[(DTOP_ADDR_DEFAULT - DTOP_ADDR_FIRST) >> 1];
 
@@ -178,14 +171,14 @@ typedef struct dtop_softc *dtop_softc_t;
 /*
  * Forward/prototyped declarations
  */
-int  dtop_get_packet __P((dtop_softc_t dtop, dtop_message_t pkt));
-int  dtop_escape	__P((int c));
-void dtop_keyboard_repeat	__P((void *));
-int  dtop_null_device_handler	__P((dtop_device_t, dtop_message_t, int, int));
-int  dtop_locator_handler	__P((dtop_device_t, dtop_message_t, int, int));
-int  dtop_keyboard_handler	__P((dtop_device_t, dtop_message_t, int, int));
-int  dtopparam		__P((struct tty *, struct termios *));
-void dtopstart		__P((struct tty *));
+static int	dtop_get_packet __P((dtop_softc_t dtop, dtop_message_t pkt));
+static int	dtop_escape __P((int c));
+static void	dtop_keyboard_repeat __P((void *));
+static int	dtop_null_device_handler __P((dtop_device_t, dtop_message_t, int, int));
+static int	dtop_locator_handler __P((dtop_device_t, dtop_message_t, int, int));
+static int	dtop_keyboard_handler __P((dtop_device_t, dtop_message_t, int, int));
+static int	dtopparam __P((struct tty *, struct termios *));
+static void	dtopstart __P((struct tty *));
 
 /*
  * lk201 keyboard divisions and up/down mode key bitmap.
@@ -198,7 +191,7 @@ void dtopstart		__P((struct tty *));
  *        The fix is to adjust the division table by changing the start
  *        of division 6 (which includes the shift and control keys) to
  *        include the right shift [0xab] and changing the end of division
- *        8 to be the the up arrow [0xaa].  The initial key mode is also
+ *        8 to be the up arrow [0xaa].  The initial key mode is also
  *        modified to include the right shift key as up/down.
  */
 static u_char divbeg[NUMDIVS] = {0xbf, 0x91, 0xbc, 0xbd, 0xb0, 0xab, 0xa6,
@@ -210,18 +203,29 @@ static u_char divend[NUMDIVS] = {0xff, 0xa5, 0xbc, 0xbe, 0xb2, 0xaf, 0xa8,
  */
 static u_long keymodes[8] = {0, 0, 0, 0, 0, 0x0003e800, 0, 0};
 
+struct consdev dtopcons = { 
+	NULL, NULL, (void *)dtopKBDGetc, NULL, NULL, NULL, NODEV, 0
+};
+ 
+void dtikbd_cnattach __P((void));		/* XXX */
 
-
+void  
+dtikbd_cnattach()
+{
+	cn_tab = &dtopcons;
+	cn_tab->cn_pri = CN_NORMAL;
+	rcons_indev(cn_tab); /* cn_dev & cn_putc */
+}
 
 /*
  * Autoconfiguration data for config.new.
  * Use the statically-allocated softc until old autoconfig code and
  * config.old are completely gone.
- * 
+ *
  */
-int  dtopmatch  __P((struct device * parent, struct cfdata *match, void *aux));
-void dtopattach __P((struct device *parent, struct device *self, void *aux));
-int dtopintr	__P((void *sc));
+static int	dtopmatch __P((struct device * parent, struct cfdata *match, void *aux));
+static void	dtopattach __P((struct device *parent, struct device *self, void *aux));
+static int	dtopintr __P((void *sc));
 
 struct cfattach dtop_ca = {
 	sizeof(struct dtop_softc), dtopmatch, dtopattach
@@ -229,10 +233,16 @@ struct cfattach dtop_ca = {
 
 extern struct cfdriver dtop_cd;
 
+/* QVSS-compatible in-kernel X input event parser, pointer tracker */
+void	(*dtopDivertXInput) __P((int));
+void	(*dtopMouseEvent) __P((void *));
+void	(*dtopMouseButtons) __P((void *));
+
+
 /*
  * Match driver based on name
  */
-int
+static int
 dtopmatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
@@ -249,22 +259,23 @@ dtopmatch(parent, match, aux)
 	return (1);
 }
 
-void
+static void
 dtopattach(parent, self, aux)
 	struct device *parent;
 	struct device *self;
 	void *aux;
 {
-	register struct ioasicdev_attach_args *d = aux;
+	struct ioasicdev_attach_args *d = aux;
 	struct dtop_softc *sc = (struct dtop_softc*) self;
 	int i;
-
 
 	sc->poll = (poll_reg_t)MIPS_PHYS_TO_KSEG1(XINE_REG_INTR);
 	sc->data = (data_reg_t)d->iada_addr;
 
-	for (i = 0; i < DTOP_MAX_DEVICES; i++)
+	for (i = 0; i < DTOP_MAX_DEVICES; i++) {
 		sc->device[i].handler = dtop_null_device_handler;
+		callout_init(&sc->device[i].status.keyboard.repeat_ch);
+	}
 
 	/* a lot more needed here, fornow: */
 	sc->device[DTOP_DEVICE_NO(0x6a)].handler = dtop_locator_handler;
@@ -286,8 +297,8 @@ dtopopen(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct tty *tp;
-	register int unit;
+	struct tty *tp;
+	int unit;
 	int s, error = 0;
 	int firstopen = 0;
 
@@ -334,10 +345,9 @@ dtopopen(dev, flag, mode, p)
 #if (RASTERCONSOLE > 0) && defined(RCONS_BRAINDAMAGE)
 	/* handle raster console specially */
 	if (tp == DTOP_TTY(0) && firstopen) {
-	  	extern struct tty *fbconstty;
 		tp->t_winsize = fbconstty->t_winsize;
 	}
-#endif /* HAVE_RCONS */		
+#endif /* HAVE_RCONS */
 
 	return (error);
 }
@@ -349,8 +359,8 @@ dtopclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct tty *tp;
-	register int unit;
+	struct tty *tp;
+	int unit;
 
 	unit = minor(dev);
 	tp = DTOP_TTY(unit);
@@ -363,7 +373,7 @@ dtopread(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
 {
-	register struct tty *tp;
+	struct tty *tp;
 
 	tp = DTOP_TTY(minor(dev));
 	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
@@ -374,7 +384,7 @@ dtopwrite(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
 {
-	register struct tty *tp;
+	struct tty *tp;
 
 	tp = DTOP_TTY(minor(dev));
 	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
@@ -397,8 +407,8 @@ dtopioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	register struct tty *tp;
-	register int unit = minor(dev);
+	struct tty *tp;
+	int unit = minor(dev);
 	int error;
 
 	tp = DTOP_TTY(unit);
@@ -432,7 +442,7 @@ dtopioctl(dev, cmd, data, flag, p)
 /*
  * Interrupt routine
  */
-int
+static int
 dtopintr(sc)
 	void *sc;
 {
@@ -477,9 +487,9 @@ out:
 	return(0);
 }
 
-void
+static void
 dtopstart(tp)
-	register struct tty *tp;
+	struct tty *tp;
 {
 	int s;
 
@@ -498,7 +508,7 @@ dtopstart(tp)
 #ifdef RCONS_BRAINDAMAGE
 	/* handle console specially */
 	if (tp == DTOP_TTY(0)) {
-		register int cc;
+		int cc;
 
 		while (tp->t_outq.c_cc > 0) {
 			cc = getc(&tp->t_outq) & 0x7f;
@@ -527,7 +537,7 @@ dtopKBDPutc(dev, c)
 	dev_t dev;
 	int c;
 {
-	register int i;
+	int i;
 	static int param = 0, cmd, mod, typ;
 	static u_char parms[2];
 
@@ -574,7 +584,7 @@ dtopKBDPutc(dev, c)
  * A packet MUST be there, this is not checked for.
  */
 #define	DTOP_ESC_CHAR		0xf8
-int
+static int
 dtop_escape(c)
 	int c;
 {
@@ -589,15 +599,15 @@ dtop_escape(c)
 	}
 }
 
-int
+static int
 dtop_get_packet(dtop, pkt)
 	dtop_softc_t	dtop;
 	dtop_message_t	pkt;
 {
-	register poll_reg_t	poll;
-	register data_reg_t	data;
-	register int		max, i, len;
-	register unsigned char	c;
+	poll_reg_t	poll;
+	data_reg_t	data;
+	int		max, i, len;
+	unsigned char	c;
 	int state;
 	int escaped;
 
@@ -663,7 +673,7 @@ int
 dtopKBDGetc(dev)
 	dev_t dev;
 {
-	register int c;
+	int c;
 	dtop_softc_t dtop;
 	int s;
 
@@ -709,7 +719,7 @@ again:
 	return c;
 }
 
-int
+static int
 dtopparam(tp, t)
 	struct tty *tp;
 	struct termios *t;
@@ -721,14 +731,14 @@ dtopparam(tp, t)
 		tp->t_state |= TS_CARR_ON;
 	return (0);
 }
- 
+
 /*
  * Stop output on a line.
  */
 /*ARGSUSED*/
 void
 dtopstop(tp, flag)
-	register struct tty *tp;
+	struct tty *tp;
 	int flag;
 {
 	int s;
@@ -744,7 +754,7 @@ dtopstop(tp, flag)
 /*
  * Default handler function
  */
-int
+static int
 dtop_null_device_handler(dev, msg, event, outc)
 	 dtop_device_t	dev;
 	 dtop_message_t	msg;
@@ -762,18 +772,18 @@ dtop_null_device_handler(dev, msg, event, outc)
 /*
  * Handler for locator devices (mice)
  */
-int
+static int
 dtop_locator_handler(dev, msg, event, outc)
 	 dtop_device_t	dev;
 	 dtop_message_t	msg;
 	 int		event;
 	 int		outc;
 {
-	register unsigned short	buttons;
-	register short coord;
-	register int moved = 0;
+	unsigned short	buttons;
+	short coord;
+	int moved = 0;
 	static MouseReport currentRep;
-	register MouseReport *mrp = &currentRep;
+	MouseReport *mrp = &currentRep;
 
 	if (dtopMouseButtons) {
 		mrp->state = 0;
@@ -798,7 +808,7 @@ dtop_locator_handler(dev, msg, event, outc)
 			moved = 1;
 		}
 		mrp->dy = (coord & 0x1f);
-	
+
 		/*
 		 * Time for the buttons now
 		 * Shuffle button bits around to serial mouse order.
@@ -817,16 +827,16 @@ dtop_locator_handler(dev, msg, event, outc)
  * Special case: outc set for recv packet means
  * we are inside the kernel debugger
  */
-int
+static int
 dtop_keyboard_handler(dev, msg, event, outc)
 	dtop_device_t dev;
 	dtop_message_t msg;
 	int event;
 	int outc;
 {
-	register u_char *ls, *le, *ns, *ne;
+	u_char *ls, *le, *ns, *ne;
 	u_char save[11], retc;
-	int msg_len, c, s;
+	int msg_len, c, s, cl;
 	char *cp;
 #ifdef RCONS_BRAINDAMAGE
 	struct tty *tp = DTOP_TTY(0);
@@ -845,7 +855,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 	s = splhigh();
 	if (dev->keyboard.k_ar_state != K_AR_IDLE) {
 		dev->keyboard.k_ar_state = K_AR_IDLE;
-		untimeout(dtop_keyboard_repeat, (void *)dev);
+		callout_stop(&dev->keyboard.repeat_ch);
 	}
 	splx(s);
 	msg_len = msg->code.val.len;
@@ -905,7 +915,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 	ls = &dev->keyboard.last_codes[dev->keyboard.last_codes_count - 1];
 	for ( ; ls >= le; ls--)
 	    if ((c = *ls) != 0) {
-		(void) kbdMapChar(c);			
+		(void) lk_mapchar(c, &cl);
 
 		if (outc == 0 && dtopDivertXInput &&
 		    (keymodes[(c >> 5) & 0x7] & (1 << (c & 0x1f))))
@@ -919,7 +929,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 	retc = 0;
 	for ( ; ns >= ne; ns--)
 	    if (*ns) {
-		cp = kbdMapChar(*ns);
+		cp = lk_mapchar(*ns, &cl);
 #ifdef DDB
 		if (*ns == LK_DO) {
 			spl0();
@@ -931,7 +941,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 			(*dtopDivertXInput)(*ns);
 			c = -1; /* consumed by X */
 		    } else if (cp /*&& tp != NULL*/) {
-			for (; *cp; cp++) {
+			for (; cl; cl--, cp++) {
 #if 0
 				(*linesw[tp->t_line].l_rint)(*cp, tp);
 #else
@@ -941,8 +951,8 @@ dtop_keyboard_handler(dev, msg, event, outc)
 		    }
 		    dev->keyboard.k_ar_state = K_AR_ACTIVE;
 		}
-		/* 
-		 * return the related keycode anyways 
+		/*
+		 * return the related keycode anyways
 		 * XXX when in debugger, don't return multi-char sequences
 		 */
 		if (cp && (cp[1] == '\0') &&(retc == 0))
@@ -956,21 +966,21 @@ dtop_keyboard_handler(dev, msg, event, outc)
 		bcopy(save, dev->keyboard.last_codes, msg_len);
 	dev->keyboard.last_codes_count = msg_len;
 	if (dev->keyboard.k_ar_state == K_AR_ACTIVE)
-		timeout(dtop_keyboard_repeat, (void *)dev, hz / 2);
+		callout_reset(&dev->keyboard.repeat_ch, hz / 2,
+		    dtop_keyboard_repeat, (void *)dev);
 	return (outc);
 }
 
 /*
  * Do an autorepeat as required.
  */
-void
+static void
 dtop_keyboard_repeat(arg)
 	void *arg;
 {
 	dtop_device_t dev = (dtop_device_t)arg;
-	register int i, c;
+	int i, c, cl;
 	char *cp;
-	
 #if 0
 	struct tty *tp = DTOP_TTY(0);
 #endif
@@ -987,8 +997,8 @@ dtop_keyboard_repeat(arg)
 				continue;
 			}
 
-			if ((cp = kbdMapChar(KEY_REPEAT)) != NULL) {
-				for (; *cp; cp++) {
+			if ((cp = lk_mapchar(KEY_REPEAT, &cl)) != NULL) {
+				for (; cl; cl--, cp++) {
 #if 0
 					(*linesw[tp->t_line].l_rint)(*cp, tp);
 #else
@@ -1000,7 +1010,8 @@ dtop_keyboard_repeat(arg)
 		}
 	}
 	if (gotone)
-		timeout(dtop_keyboard_repeat, arg, hz / 20);
+		callout_reset(&dev->keyboard.repeat_ch, hz / 20,
+		    dtop_keyboard_repeat, dev);
 	else
 		dev->keyboard.k_ar_state = K_AR_IDLE;
 	splx(s);

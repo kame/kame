@@ -1,7 +1,7 @@
-/*	$NetBSD: ip_proxy.c,v 1.17.2.2 1999/12/20 21:07:31 he Exp $	*/
+/*	$NetBSD: ip_proxy.c,v 1.22 2000/05/11 19:46:06 veego Exp $	*/
 
 /*
- * Copyright (C) 1997-1998 by Darren Reed.
+ * Copyright (C) 1997-2000 by Darren Reed.
  *
  * Redistribution and use in source and binary forms are permitted
  * provided that this notice is preserved and due credit is given
@@ -9,9 +9,9 @@
  */
 #if !defined(lint)
 #if defined(__NetBSD__)
-static const char rcsid[] = "$NetBSD: ip_proxy.c,v 1.17.2.2 1999/12/20 21:07:31 he Exp $";
+static const char rcsid[] = "$NetBSD: ip_proxy.c,v 1.22 2000/05/11 19:46:06 veego Exp $";
 #else
-static const char rcsid[] = "@(#)Id: ip_proxy.c,v 2.2.2.1 1999/09/19 12:18:19 darrenr Exp ";
+static const char rcsid[] = "@(#)Id: ip_proxy.c,v 2.9.2.1 2000/05/06 12:30:50 darrenr Exp";
 #endif
 #endif
 
@@ -104,21 +104,60 @@ static int appr_fixseqack __P((fr_info_t *, ip_t *, ap_session_t *, int ));
 
 ap_session_t	*ap_sess_tab[AP_SESS_SIZE];
 ap_session_t	*ap_sess_list = NULL;
+aproxy_t	*ap_proxylist = NULL;
 aproxy_t	ap_proxies[] = {
 #ifdef	IPF_FTP_PROXY
-	{ "ftp", (char)IPPROTO_TCP, 0, 0, ippr_ftp_init, NULL,
-	  ippr_ftp_in, ippr_ftp_out },
+	{ NULL, "ftp", (char)IPPROTO_TCP, 0, 0, ippr_ftp_init, NULL,
+	  ippr_ftp_new, ippr_ftp_in, ippr_ftp_out },
 #endif
 #ifdef	IPF_RCMD_PROXY
-	{ "rcmd", (char)IPPROTO_TCP, 0, 0, ippr_rcmd_init, ippr_rcmd_new,
-	  NULL, ippr_rcmd_out },
+	{ NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, ippr_rcmd_init, NULL,
+	  ippr_rcmd_new, NULL, ippr_rcmd_out },
 #endif
 #ifdef	IPF_RAUDIO_PROXY
-	{ "raudio", (char)IPPROTO_TCP, 0, 0, ippr_raudio_init,
+	{ NULL, "raudio", (char)IPPROTO_TCP, 0, 0, ippr_raudio_init, NULL,
 	  ippr_raudio_new, ippr_raudio_in, ippr_raudio_out },
 #endif
-	{ "", '\0', 0, 0, NULL, NULL }
+	{ NULL, "", '\0', 0, 0, NULL, NULL }
 };
+
+
+int appr_add(ap)
+aproxy_t *ap;
+{
+	aproxy_t *a;
+
+	for (a = ap_proxies; a->apr_p; a++)
+		if ((a->apr_p == ap->apr_p) &&
+		    !strncmp(a->apr_label, ap->apr_label,
+			     sizeof(ap->apr_label)))
+			return -1;
+
+	for (a = ap_proxylist; a->apr_p; a = a->apr_next)
+		if ((a->apr_p == ap->apr_p) &&
+		    !strncmp(a->apr_label, ap->apr_label,
+			     sizeof(ap->apr_label)))
+			return -1;
+	ap->apr_next = ap_proxylist;
+	ap_proxylist = ap;
+	return (*ap->apr_init)();
+}
+
+
+int appr_del(ap)
+aproxy_t *ap;
+{
+	aproxy_t *a, **app;
+
+	for (app = &ap_proxylist; (a = *app); app = &a->apr_next)
+		if (a == ap) {
+			if (ap->apr_ref != 0)
+				return 1;
+			*app = a->apr_next;
+			return 0;
+		}
+	return -1;
+}
 
 
 int appr_ok(ip, tcp, nat)
@@ -149,7 +188,7 @@ ip_t *ip;
 fr_info_t *fin;
 nat_t *nat;
 {
-	register ap_session_t *aps;
+	ap_session_t *aps;
 
 	if (!apr || (apr->apr_flags & APR_DELETE) || (ip->ip_p != apr->apr_p))
 		return NULL;
@@ -158,16 +197,18 @@ nat_t *nat;
 	if (!aps)
 		return NULL;
 	bzero((char *)aps, sizeof(*aps));
-	aps->aps_next = ap_sess_list;
 	aps->aps_p = ip->ip_p;
 	aps->aps_data = NULL;
 	aps->aps_apr = apr;
 	aps->aps_psiz = 0;
-	ap_sess_list = aps;
-	aps->aps_nat = nat;
-	nat->nat_aps = aps;
 	if (apr->apr_new != NULL)
-		(void) (*apr->apr_new)(fin, ip, aps, nat);
+		if ((*apr->apr_new)(fin, ip, aps, nat) == -1) {
+			KFREE(aps);
+			return NULL;
+		}
+	aps->aps_nat = nat;
+	aps->aps_next = ap_sess_list;
+	ap_sess_list = aps;
 	return aps;
 }
 
@@ -185,6 +226,7 @@ nat_t *nat;
 	aproxy_t *apr;
 	tcphdr_t *tcp = NULL;
 	u_32_t sum;
+	short rv;
 	int err;
 
 	if (nat->nat_aps == NULL)
@@ -219,8 +261,12 @@ nat_t *nat;
 				err = (*apr->apr_inpkt)(fin, ip, aps, nat);
 		}
 
+		rv = APR_EXIT(err);
+		if (rv == -1)
+			return rv;
+
 		if (tcp != NULL) {
-			err = appr_fixseqack(fin, ip, aps, err);
+			err = appr_fixseqack(fin, ip, aps, APR_INC(err));
 #if SOLARIS && defined(_KERNEL)
 			tcp->th_sum = fr_tcpsum(fin->fin_qfm, ip, tcp);
 #else
@@ -229,9 +275,9 @@ nat_t *nat;
 		}
 		aps->aps_bytes += ip->ip_len;
 		aps->aps_pkts++;
-		return 2;
+		return 1;
 	}
-	return -1;
+	return 0;
 }
 
 
@@ -242,6 +288,13 @@ char *name;
 	aproxy_t *ap;
 
 	for (ap = ap_proxies; ap->apr_p; ap++)
+		if ((ap->apr_p == pr) &&
+		    !strncmp(name, ap->apr_label, sizeof(ap->apr_label))) {
+			ap->apr_ref++;
+			return ap;
+		}
+
+	for (ap = ap_proxylist; ap; ap = ap->apr_next)
 		if ((ap->apr_p == pr) &&
 		    !strncmp(name, ap->apr_label, sizeof(ap->apr_label))) {
 			ap->apr_ref++;
@@ -272,11 +325,9 @@ ap_session_t *aps;
 			break;
 		}
 
-	if (a) {
-		if ((aps->aps_data != NULL) && (aps->aps_psiz != 0))
-			KFREES(aps->aps_data, aps->aps_psiz);
-		KFREE(aps);
-	}
+	if ((aps->aps_data != NULL) && (aps->aps_psiz != 0))
+		KFREES(aps->aps_data, aps->aps_psiz);
+	KFREE(aps);
 }
 
 
@@ -390,4 +441,17 @@ int appr_init()
 			break;
 	}
 	return err;
+}
+
+
+void appr_unload()
+{
+	aproxy_t *ap;
+
+	for (ap = ap_proxies; ap->apr_p; ap++)
+		if (ap->apr_fini)
+			(*ap->apr_fini)();
+	for (ap = ap_proxylist; ap; ap = ap->apr_next)
+		if (ap->apr_fini)
+			(*ap->apr_fini)();
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: sb_isapnp.c,v 1.33 1999/03/22 10:00:12 mycroft Exp $	*/
+/*	$NetBSD: sb_isapnp.c,v 1.35 1999/10/18 05:11:39 itohy Exp $	*/
 
 /*
  * Copyright (c) 1991-1993 Regents of the University of California.
@@ -33,8 +33,6 @@
  * SUCH DAMAGE.
  *
  */
-
-#include "midi.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -132,11 +130,11 @@ sb_isapnp_attach(parent, self, aux)
         } else
         	sc->sc_drq16 = DRQUNK;
 
-#if NMIDI > 0
+#if NMPU > 0
 	if (ipa->ipa_nio > 1) {
 		sc->sc_hasmpu = 1;
-		sc->sc_mpu.iot = ipa->ipa_iot;
-		sc->sc_mpu.ioh = ipa->ipa_io[1].h;
+		sc->sc_mpu_iot = ipa->ipa_iot;
+		sc->sc_mpu_ioh = ipa->ipa_io[1].h;
 	}
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.h,v 1.66 1998/12/18 16:55:39 drochner Exp $	*/
+/*	$NetBSD: conf.h,v 1.75.4.2 2000/07/30 17:56:50 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -161,7 +161,7 @@ struct cdevsw {
 	struct tty *
 		(*d_tty)	__P((dev_t dev));
 	int	(*d_poll)	__P((dev_t dev, int events, struct proc *p));
-	int	(*d_mmap)	__P((dev_t, int, int));
+	paddr_t	(*d_mmap)	__P((dev_t, off_t, int));
 	int	d_type;
 };
 
@@ -175,7 +175,7 @@ extern struct cdevsw cdevsw[];
 #define	dev_type_stop(n)	void n __P((struct tty *, int))
 #define	dev_type_tty(n)		struct tty *n __P((dev_t))
 #define	dev_type_poll(n)	int n __P((dev_t, int, struct proc *))
-#define	dev_type_mmap(n)	int n __P((dev_t, int, int))
+#define	dev_type_mmap(n)	paddr_t n __P((dev_t, off_t, int))
 
 #define	cdev_decl(n) \
 	dev_decl(n,open); dev_decl(n,close); dev_decl(n,read); \
@@ -268,6 +268,7 @@ extern struct cdevsw cdevsw[];
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
 	(dev_type_mmap((*))) enodev }
+#define	cdev_ch_init(c,n)	cdev_log_init(c,n)
 
 /* open */
 #define cdev_fd_init(c,n) { \
@@ -289,13 +290,14 @@ extern struct cdevsw cdevsw[];
 	(dev_type_stop((*))) enodev, 0, (dev_type_poll((*))) enodev, \
 	(dev_type_mmap((*))) enodev }
 #define	cdev_lkm_init(c,n)	cdev__oci_init(c,n)
-#define	cdev_ch_init(c,n)	cdev__oci_init(c,n)
 #define	cdev_uk_init(c,n)	cdev__oci_init(c,n)
 #define	cdev_scsibus_init(c,n)	cdev__oci_init(c,n)
 #define	cdev_se_init(c,n)	cdev__oci_init(c,n)
+#define	cdev_ses_init(c,n)	cdev__oci_init(c,n)
+#define	cdev_sysmon_init(c,n)	cdev__oci_init(c,n)
 
 #define	cdev_usb_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
 	(dev_type_mmap((*))) enodev }
@@ -367,6 +369,13 @@ extern struct cdevsw cdevsw[];
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
 	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev, 0 }
+
+/* open, close, read, ioctl, mmap */
+#define cdev_bktr_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
+	(dev_type_stop((*))) enodev, 0, seltrue, \
+	(dev_init(c,n,mmap)) }
 
 /* symbolic sleep message strings */
 extern	const char devopn[], devio[], devwait[], devin[], devout[];
@@ -469,6 +478,17 @@ bdev_decl(uk);
 cdev_decl(uk);
 
 /*
+ * [bc]dev_decl()s for Compaq RAID devices.
+ */
+bdev_decl(ca);
+cdev_decl(ca);
+
+/*
+ * cdev_decl()s for Brooktree 8[47][89] based TV cards.
+ */
+cdev_decl(bktr);
+
+/*
  * [bc]dev_decl()s for 'fake' network devices.
  */
 cdev_decl(bpf);
@@ -519,7 +539,7 @@ struct devnametobdevmaj {
 #ifdef _KERNEL
 extern	struct devnametobdevmaj dev_name2blk[];
 struct	device;
-void	setroot __P((struct device *, int, struct devnametobdevmaj *));
+void	setroot __P((struct device *, int));
 void	swapconf __P((void));
 #endif /* _KERNEL */
 

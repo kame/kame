@@ -1,4 +1,4 @@
-/*	$NetBSD: cbiisc.c,v 1.7 1998/11/19 21:44:35 thorpej Exp $	*/
+/*	$NetBSD: cbiisc.c,v 1.10 2000/06/05 15:08:03 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -68,13 +68,6 @@ int	cbiiscmatch	__P((struct device *, struct cfdata *, void *));
 /* Linkup to the rest of the kernel */
 struct cfattach cbiisc_ca = {
 	sizeof(struct cbiisc_softc), cbiiscmatch, cbiiscattach
-};
-
-struct scsipi_device cbiisc_dev = {
-	NULL,			/* Use default error handler */
-	NULL,			/* have a queue, served by this */
-	NULL,			/* have no async handler */
-	NULL,			/* Use default 'done' routine */
 };
 
 /*
@@ -229,7 +222,7 @@ cbiiscattach(parent, self, aux)
 	/*
 	 * Configure interrupts.
 	 */
-	csc->sc_isr.isr_intr = (int (*)(void *))ncr53c9x_intr;
+	csc->sc_isr.isr_intr = ncr53c9x_intr;
 	csc->sc_isr.isr_arg  = sc;
 	csc->sc_isr.isr_ipl  = 2;
 	add_isr(&csc->sc_isr);
@@ -237,9 +230,7 @@ cbiiscattach(parent, self, aux)
 	/*
 	 * Now try to attach all the sub-devices
 	 */
-	sc->sc_adapter.scsipi_cmd = ncr53c9x_scsi_cmd;
-	sc->sc_adapter.scsipi_minphys = minphys; 
-	ncr53c9x_attach(sc, &cbiisc_dev);
+	ncr53c9x_attach(sc, NULL, NULL);
 }
 
 /*
@@ -267,7 +258,7 @@ cbiisc_write_reg(sc, reg, val)
 
 	csc->sc_reg[reg * 4] = v;
 #ifdef DEBUG
-if (cbiisc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL*/ &&
+if (cbiisc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL*/ &&
   reg == NCR_CMD/* && csc->sc_active*/) {
   cbiisc_trace[(cbiisc_trace_ptr - 1) & 127].yy = v;
 /*  printf(" cmd %x", v);*/
@@ -290,7 +281,7 @@ cbiisc_dma_isintr(sc)
 		csc->sc_reg[0x40] = 0;
 
 #ifdef DEBUG
-if (/*sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL &&*/ cbiisc_trace_enable) {
+if (/*sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL &&*/ cbiisc_trace_enable) {
   cbiisc_trace[cbiisc_trace_ptr].status = csc->sc_reg[NCR_STAT * 4];
   cbiisc_trace[cbiisc_trace_ptr].xx = csc->sc_reg[NCR_CMD * 4];
   cbiisc_trace[cbiisc_trace_ptr].yy = csc->sc_active;
@@ -353,7 +344,7 @@ cbiisc_dma_setup(sc, addr, len, datain, dmasize)
 	size_t *dmasize;
 {
 	struct cbiisc_softc *csc = (struct cbiisc_softc *)sc;
-	vm_offset_t pa;
+	paddr_t pa;
 	u_char *ptr;
 	size_t xfer;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: dp8390var.h,v 1.11 1999/02/07 01:54:50 thorpej Exp $	*/
+/*	$NetBSD: dp8390var.h,v 1.19 2000/05/29 17:37:12 jhawk Exp $	*/
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet
@@ -41,6 +41,7 @@ struct dp8390_softc {
 	int	is790;		/* NIC is a 790 */
 
 	u_int8_t cr_proto;	/* values always set in CR */
+	u_int8_t rcr_proto;	/* values always set in RCR */
 	u_int8_t dcr_reg;	/* override DCR iff LS is set */
 
 	int	mem_start;	/* offset of NIC memory */
@@ -127,12 +128,21 @@ struct dp8390_softc {
 #define DP8390_FORCE_PIO		0x0010
 
 /*
+ * The chip is ASIX AX88190 and needs work around.
+ */
+#define	DP8390_DO_AX88190_WORKAROUND	0x0020
+
+#define DP8390_ATTACHED			0x0040	/* attach has succeeded */
+
+/*
  * NIC register access macros
  */
 #define NIC_GET(t, h, reg)	bus_space_read_1(t, h,			\
 				    ((sc)->sc_reg_map[reg]))
 #define NIC_PUT(t, h, reg, val)	bus_space_write_1(t, h,			\
 				    ((sc)->sc_reg_map[reg]), (val))
+#define	NIC_BARRIER(t, h)	bus_space_barrier(t, h, 0, 0x10,	\
+			    BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE)
 
 int	dp8390_config __P((struct dp8390_softc *, int *, int, int));
 int	dp8390_intr __P((void *));
@@ -153,3 +163,9 @@ int	dp8390_enable __P((struct dp8390_softc *));
 void	dp8390_disable __P((struct dp8390_softc *));
 
 int	dp8390_activate __P((struct device *, enum devact));
+
+int	dp8390_detach __P((struct dp8390_softc *, int));
+
+#ifdef IPKDB_DP8390
+int	dp8390_ipkdb_attach __P((struct ipkdb_if *));
+#endif

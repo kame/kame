@@ -1,4 +1,4 @@
-/*	$NetBSD: db_watch.h,v 1.10.6.2 1999/04/12 21:27:08 pk Exp $	*/
+/*	$NetBSD: db_watch.h,v 1.12 1999/04/12 20:38:21 pk Exp $	*/
 
 /* 
  * Mach Operating System

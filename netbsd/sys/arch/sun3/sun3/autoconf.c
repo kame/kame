@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.51 1998/02/08 05:02:51 gwr Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.54 1999/09/17 20:07:19 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -63,16 +63,13 @@
 #error "Must have exactly one of: SUN3 and SUN3X options"
 #endif
 
-/* Want compile-time initialization here. */
-int cold = 1;
-
 /*
  * Do general device autoconfiguration,
  * then choose root device (etc.)
  * Called by machdep.c: cpu_startup()
  */
 void
-configure()
+cpu_configure()
 {
 
 	/* General device autoconfiguration. */
@@ -85,7 +82,6 @@ configure()
 	 */
 	printf("enabling interrupts\n");
 	(void)spl0();
-	cold = 0;
 }
 
 /*
@@ -162,19 +158,6 @@ bus_print(args, name)
 
 /****************************************************************/
 
-/*
- * Support code to find the boot device.
- */
-
-static struct devnametobdevmaj nam2blk[] = {
-	{ "xy",		3 },
-	{ "sd",		7 },
-	{ "xd",		10 },
-	{ "md",		13 },
-	{ "cd",		18 },
-	{ NULL,		0 },
-};
-
 /* This takes the args: name, ctlr, unit */
 typedef struct device * (*findfunc_t) __P((char *, int, int));
 
@@ -248,7 +231,7 @@ cpu_rootconf()
 	}
 
 	printf("boot device: %s%s\n", devname, partname);
-	setroot(boot_device, boot_partition, nam2blk);
+	setroot(boot_device, boot_partition);
 }
 
 /*

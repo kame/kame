@@ -1,4 +1,4 @@
-/*	$NetBSD: libi386.h,v 1.8 1999/01/28 20:22:32 christos Exp $	*/
+/*	$NetBSD: libi386.h,v 1.11 2000/04/23 19:57:14 tsarna Exp $	*/
 
 /*
  * Copyright (c) 1996
@@ -50,11 +50,13 @@ void delay __P((int));
 int getbasemem __P((void));
 int getextmemx __P((void));
 int getextmem1 __P((void));
+int biosvideomode __P((void));
 #ifdef CONSERVATIVE_MEMDETECT
 #define getextmem() getextmem1()
 #else
 #define getextmem() getextmemx()
 #endif
+void printmemlist __P((void));
 void reboot __P((void));
 void gateA20 __P((void));
 
@@ -97,6 +99,9 @@ struct bootblk_command {
 };
 void bootmenu __P((void));
 void docommand __P((char*));
+
+/* getsecs.c */
+time_t getsecs __P((void));
 
 /* in "user code": */
 void command_help __P((char *));

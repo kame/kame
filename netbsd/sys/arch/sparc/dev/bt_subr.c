@@ -1,4 +1,4 @@
-/*	$NetBSD: bt_subr.c,v 1.8 1999/03/24 05:51:10 mrg Exp $ */
+/*	$NetBSD: bt_subr.c,v 1.11 2000/04/16 22:07:24 pk Exp $ */
 
 /*
  * Copyright (c) 1993
@@ -48,6 +48,7 @@
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/errno.h>
+#include <sys/malloc.h>
 
 #include <vm/vm.h>
 
@@ -68,54 +69,211 @@
  * Implement an FBIOGETCMAP-like ioctl.
  */
 int
-bt_getcmap(p, cm, cmsize)
-	register struct fbcmap *p;
+bt_getcmap(p, cm, cmsize, uspace)
+	struct fbcmap *p;
 	union bt_cmap *cm;
 	int cmsize;
+	int uspace;
 {
-	register u_int i, start, count;
-	register u_char *cp;
+	u_int i, start, count;
+	int error = 0;
+	u_char *cp, *r, *g, *b;
+	u_char *cbuf = NULL;
 
 	start = p->index;
 	count = p->count;
 	if (start >= cmsize || start + count > cmsize)
 		return (EINVAL);
-	if (!uvm_useracc(p->red, count, B_WRITE) ||
-	    !uvm_useracc(p->green, count, B_WRITE) ||
-	    !uvm_useracc(p->blue, count, B_WRITE))
-		return (EFAULT);
-	for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 3, i++) {
-		p->red[i] = cp[0];
-		p->green[i] = cp[1];
-		p->blue[i] = cp[2];
+
+	if (uspace) {
+		/* Check user buffers for appropriate access */
+		if (!uvm_useracc(p->red, count, B_WRITE) ||
+		    !uvm_useracc(p->green, count, B_WRITE) ||
+		    !uvm_useracc(p->blue, count, B_WRITE))
+			return (EFAULT);
+
+		/* Allocate temporary buffer for color values */
+		cbuf = malloc(3*count*sizeof(char), M_TEMP, M_WAITOK);
+		r = cbuf;
+		g = r + count;
+		b = g + count;
+	} else {
+		/* Direct access in kernel space */
+		r = p->red;
+		g = p->green;
+		b = p->blue;
 	}
-	return (0);
+
+	/* Copy colors from BT map to fbcmap */
+	for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 3, i++) {
+		r[i] = cp[0];
+		g[i] = cp[1];
+		b[i] = cp[2];
+	}
+
+	if (uspace) {
+		error = copyout(r, p->red, count);
+		if (error)
+			goto out;
+		error = copyout(g, p->green, count);
+		if (error)
+			goto out;
+		error = copyout(b, p->blue, count);
+		if (error)
+			goto out;
+	}
+
+out:
+	if (cbuf != NULL)
+		free(cbuf, M_TEMP);
+
+	return (error);
 }
 
 /*
  * Implement the software portion of an FBIOPUTCMAP-like ioctl.
  */
 int
-bt_putcmap(p, cm, cmsize)
-	register struct fbcmap *p;
+bt_putcmap(p, cm, cmsize, uspace)
+	struct fbcmap *p;
 	union bt_cmap *cm;
 	int cmsize;
+	int uspace;
 {
-	register u_int i, start, count;
-	register u_char *cp;
+	u_int i, start, count;
+	int error = 0;
+	u_char *cp, *r, *g, *b;
+	u_char *cbuf = NULL;
 
 	start = p->index;
 	count = p->count;
 	if (start >= cmsize || start + count > cmsize)
 		return (EINVAL);
-	if (!uvm_useracc(p->red, count, B_READ) ||
-	    !uvm_useracc(p->green, count, B_READ) ||
-	    !uvm_useracc(p->blue, count, B_READ))
-		return (EFAULT);
-	for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 3, i++) {
-		cp[0] = p->red[i];
-		cp[1] = p->green[i];
-		cp[2] = p->blue[i];
+
+	if (uspace) {
+		/* Check user buffers for appropriate access */
+		if (!uvm_useracc(p->red, count, B_READ) ||
+		    !uvm_useracc(p->green, count, B_READ) ||
+		    !uvm_useracc(p->blue, count, B_READ))
+			return (EFAULT);
+
+		/* Allocate temporary buffer for color values */
+		cbuf = malloc(3*count*sizeof(char), M_TEMP, M_WAITOK);
+		r = cbuf;
+		g = r + count;
+		b = g + count;
+		error = copyin(p->red, r, count);
+		if (error)
+			goto out;
+		error = copyin(p->green, g, count);
+		if (error)
+			goto out;
+		error = copyin(p->blue, b, count);
+		if (error)
+			goto out;
+	} else {
+		/* Direct access in kernel space */
+		r = p->red;
+		g = p->green;
+		b = p->blue;
 	}
-	return (0);
+
+	/* Copy colors from fbcmap to BT map */
+	for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 3, i++) {
+		cp[0] = r[i];
+		cp[1] = g[i];
+		cp[2] = b[i];
+	}
+
+out:
+	if (cbuf != NULL)
+		free(cbuf, M_TEMP);
+
+	return (error);
 }
+
+/*
+ * Initialize the color map to the default state:
+ *
+ *	- 0 is white			(PROM uses entry 0 for background)
+ *	- all other entries are black	(PROM uses entry 255 for foreground)
+ */
+void
+bt_initcmap(cm, cmsize)
+	union bt_cmap *cm;
+	int cmsize;
+{
+	int i;
+	u_char *cp;
+
+	cp = &cm->cm_map[0][0];
+	cp[0] = cp[1] = cp[2] = 0xff;
+
+	for (i = 1, cp = &cm->cm_map[i][0]; i < cmsize; cp += 3, i++)
+		cp[0] = cp[1] = cp[2] = 0;
+
+#ifdef RASTERCONSOLE
+	if (cmsize > 16) {
+		/*
+		 * Setup an ANSI map at offset 1, for rasops;
+		 * see dev/fb.c for usage (XXX - this should
+		 * be replaced by more general colormap handling)
+		 */
+		extern u_char rasops_cmap[];
+		bcopy(rasops_cmap, &cm->cm_map[1][0], 3*16);
+	}
+#endif
+}
+
+#if notyet
+static void
+bt_loadcmap_packed256(fb, bt, start, ncolors)
+	struct fbdevice	*fb;
+	volatile struct bt_regs *bt;
+	int start, ncolors;
+{
+	u_int v;
+	int count, i;
+	u_char *c[3], **p;
+	struct cmap *cm = &fb->fb_cmap;
+
+	count = BT_D4M3(start + ncolors - 1) - BT_D4M3(start) + 3;
+	bt = &sc->sc_fbc->fbc_dac;
+	bt->bt_addr = BT_D4M4(start);
+
+	/*
+	 * Figure out where to start in the RGB arrays
+	 * See btreg.h for the way RGB triplets are packed into 4-byte words.
+	 */
+	c[0] = &cm->red[(4 * count) / 3)];
+	c[1] = &cm->green[(4 * count) / 3];
+	c[2] = &cm->blue[(4 * count) / 3];
+	p = &c[0];
+	i = (4 * count) % 3;	/* This much of the last triplet is already in
+				   the last packed word */
+	while (i--) {
+		c[1-i]++;
+		p++;
+	}
+
+
+	while (--count >= 0) {
+		u_int v = 0;
+
+		/*
+		 * Retrieve four colormap entries, pack them into
+		 * a 32-bit word and write to the hardware register.
+		 */
+		for (i = 0; i < 4; i++) {
+			u_char *cp = *p;
+			v |= *cp++ << (8 * i);
+			*p = cp;
+			if (p++ == &c[2])
+				/* Wrap around */
+				p = &c[0];
+		}
+
+		bt->bt_cmap = v;
+	}
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_machdep.c,v 1.12 1999/01/08 09:29:17 leo Exp $	*/
+/*	$NetBSD: isa_machdep.c,v 1.17 2000/06/04 19:14:34 cgd Exp $	*/
 
 /*
  * Copyright (c) 1997 Leo Weppelman.  All rights reserved.
@@ -85,12 +85,11 @@ void		*auxp;
 {
 	struct isabus_softc *sc = (struct isabus_softc *)dp;
 	struct isabus_attach_args	iba;
-	bus_space_tag_t			leb_alloc_bus_space_tag __P((void));
 
 	iba.iba_busname = "isa";
 	iba.iba_dmat	= BUS_ISA_DMA_TAG;
-	iba.iba_iot     = leb_alloc_bus_space_tag();
-	iba.iba_memt    = leb_alloc_bus_space_tag();
+	iba.iba_iot     = leb_alloc_bus_space_tag(NULL);
+	iba.iba_memt    = leb_alloc_bus_space_tag(NULL);
 	iba.iba_ic	= &sc->sc_chipset;
 	if ((iba.iba_iot == NULL) || (iba.iba_memt == NULL)) {
 		printf("leb_alloc_bus_space_tag failed!\n");
@@ -99,7 +98,7 @@ void		*auxp;
 	iba.iba_iot->base  = ISA_IOSTART;
 	iba.iba_memt->base = ISA_MEMSTART;
 
-	MFP->mf_aer    |= (IO_ISA1|IO_ISA2); /* ISA interrupts: LOW->HIGH */
+	MFP->mf_aer |= (IO_ISA1|IO_ISA2); /* ISA interrupts: LOW->HIGH */
 
 	printf("\n");
 	config_found(dp, &iba, isabusprint);
@@ -130,6 +129,9 @@ isa_attach_hook(parent, self, iba)
  *   - irq <= 6 -> slot 1
  *   - irq >  6 -> slot 2
  */
+
+#define	SLOTNR(irq)	((irq <= 6) ? 0 : 1)
+
 static isa_intr_info_t iinfo[2] = { { -1 }, { -1 } };
 
 static int	iifun __P((int, int));
@@ -148,10 +150,10 @@ int	sr;
 	 * Disable the interrupts
 	 */
 	if (slot == 0) {
-		MFP->mf_imrb  &= ~(IB_ISA1);
+		single_inst_bclr_b(MFP->mf_imrb, IB_ISA1);
 	}
 	else {
-		MFP->mf_imra &= ~(IA_ISA2);
+		single_inst_bclr_b(MFP->mf_imra, IA_ISA2);
 	}
 
 	if ((sr & PSL_IPL) >= (iinfo_p->ipl & PSL_IPL)) {
@@ -164,21 +166,70 @@ int	sr;
 		s = splx(iinfo_p->ipl);
 		if (slot == 0) {
 			do {
-				single_inst_bclr_b(MFP->mf_iprb, IB_ISA1);
+				MFP->mf_iprb = (u_int8_t)~IB_ISA1;
 				(void) (iinfo_p->ifunc)(iinfo_p->iarg);
 			} while (MFP->mf_iprb & IB_ISA1);
-			MFP->mf_imrb  |= IB_ISA1;
+			single_inst_bset_b(MFP->mf_imrb, IB_ISA1);
 		}
 		else {
 			do {
-				single_inst_bclr_b(MFP->mf_ipra, IA_ISA2);
+				MFP->mf_ipra = (u_int8_t)~IA_ISA2;
 				(void) (iinfo_p->ifunc)(iinfo_p->iarg);
 			} while (MFP->mf_ipra & IA_ISA2);
-			MFP->mf_imra |= IA_ISA2;
+			single_inst_bset_b(MFP->mf_imra, IA_ISA2);
 		}
 		splx(s);
 	}
 	return 1;
+}
+
+
+/*
+ * XXXX
+ * XXXX Note that this function is not really working yet! The big problem is
+ * XXXX to only generate interrupts for the slot the card is in...
+ */
+int
+isa_intr_alloc(ic, mask, type, irq)
+	isa_chipset_tag_t ic;
+	int mask;
+	int type;
+	int *irq;
+{
+	isa_intr_info_t *iinfo_p;
+	int		slot, i;
+
+
+	/*
+	 * The Hades only supports edge triggered interrupts!
+	 */
+	if (type != IST_EDGE)
+		return 1;
+
+#define	MAXIRQ		10	/* XXX: Pure fiction	*/
+	for (i = 0; i < MAXIRQ; i++) {
+		if (mask & (1<<i)) {
+		    slot    = SLOTNR(i);
+		    iinfo_p = &iinfo[slot];
+
+		    if (iinfo_p->slot < 0) {
+			*irq = i;
+			printf("WARNING: isa_intr_alloc is not yet ready!\n"
+			       "         make sure the card is in slot %d!\n",
+				slot);
+			return 0;
+		    }
+		}
+	}
+	return (1);
+}
+
+const struct evcnt *
+isa_intr_evcnt(isa_chipset_tag_t ic, int irq)
+{
+
+	/* XXX for now, no evcnt parent reported */
+	return NULL;
 }
 
 void *
@@ -198,10 +249,10 @@ isa_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 	if (type != IST_EDGE)
 		return NULL;
 
-	slot    = (irq <= 6) ? 0 : 1;
+	slot    = SLOTNR(irq);
 	iinfo_p = &iinfo[slot];
 
-	if (iinfo_p->slot > 0)
+	if (iinfo_p->slot >= 0)
 	    panic("isa_intr_establish: interrupt was already established\n");
 
 	ihand = intr_establish((slot == 0) ? 3 : 15, USER_VEC, 0,
@@ -217,12 +268,12 @@ isa_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 		 * Enable (unmask) the interrupt
 		 */
 		if (slot == 0) {
-			MFP->mf_imrb |= IB_ISA1;
-			MFP->mf_ierb |= IB_ISA1;
+			single_inst_bset_b(MFP->mf_imrb, IB_ISA1);
+			single_inst_bset_b(MFP->mf_ierb, IB_ISA1);
 		}
 		else {
-			MFP->mf_imra |= IA_ISA2;
-			MFP->mf_iera |= IA_ISA2;
+			single_inst_bset_b(MFP->mf_imra, IA_ISA2);
+			single_inst_bset_b(MFP->mf_iera, IA_ISA2);
 		}
 		return(iinfo_p);
 	}

@@ -1,4 +1,4 @@
-#	$NetBSD: POWERMAC,v 1.18 1999/02/22 20:25:43 tsubai Exp $
+#	$NetBSD: POWERMAC,v 1.22 2000/03/22 00:58:21 cgd Exp $
 #
 # POWERMAC config file
 #
@@ -22,6 +22,7 @@ options 	TRAP_PANICWAIT
 
 # Compatibility options
 options 	COMPAT_13	# NetBSD 1.3,
+options 	COMPAT_14	# NetBSD 1.4,
 options 	COMPAT_43	# and 4.3BSD
 
 # File systems
@@ -43,9 +44,11 @@ options 	NMBCLUSTERS=1024
 # These options enable verbose messages for several subsystems.
 options 	SCSIVERBOSE	# Verbose SCSI errors
 options 	PCIVERBOSE	# verbose PCI device messages
+#options 	PCI_CONFIG_DUMP	# verbosely dump PCI config space
 
 #options 	ZS_TXDMA	# Use dma on zs output
 options 	WSEMUL_VT100	# VT100 / VT220 emulation
+options 	FONT_GALLANT12x22
 
 # Kernel root file system and dump configuration.
 config	netbsd	root on ? type ?
@@ -57,7 +60,9 @@ config	netbsd	root on ? type ?
 mainbus* at root
 
 cpu*	at mainbus?
-pci*	at mainbus? bus ?
+bandit*	at mainbus?
+
+pci*	at bandit? bus ?
 pci*	at ppb? bus ?
 
 pchb*	at pci? dev ? function ?	# PCI-Host bridges

@@ -1,4 +1,4 @@
-/*	$NetBSD: clmpcc.c,v 1.4.2.4 1999/11/29 21:14:28 he Exp $ */
+/*	$NetBSD: clmpcc.c,v 1.10.4.2 2000/07/29 17:23:16 scw Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -59,6 +59,7 @@
 #include <sys/malloc.h>
 
 #include <machine/bus.h>
+#include <machine/intr.h>
 #include <machine/param.h>
 
 #include <dev/ic/clmpccreg.h>
@@ -298,7 +299,16 @@ clmpcc_attach(sc)
 	printf(": Cirrus Logic CD240%c Serial Controller\n",
 		(clmpcc_rd_msvr(sc) & CLMPCC_MSVR_PORT_ID) ? '0' : '1');
 
+#ifndef __GENERIC_SOFT_INTERRUPTS
 	sc->sc_soft_running = 0;
+#else
+	sc->sc_softintr_cookie =
+	    softintr_establish(IPL_SOFTSERIAL, clmpcc_softintr, sc);
+#ifdef DEBUG
+	if (sc->sc_softintr_cookie == NULL)
+		panic("clmpcc_attach: softintr_establish");
+#endif
+#endif
 	memset(&(sc->sc_chans[0]), 0, sizeof(sc->sc_chans));
 
 	for (chan = 0; chan < CLMPCC_NUM_CHANS; chan++) {
@@ -1216,10 +1226,14 @@ rx_done:
 		}
 
 		clmpcc_wrreg(sc, CLMPCC_REG_REOIR, 0);
+#ifndef __GENERIC_SOFT_INTERRUPTS
 		if ( sc->sc_soft_running == 0 ) {
 			sc->sc_soft_running = 1;
 			(sc->sc_softhook)(sc);
 		}
+#else
+		softintr_schedule(sc->sc_softintr_cookie);
+#endif
 	} else
 		clmpcc_wrreg(sc, CLMPCC_REG_REOIR, CLMPCC_REOIR_NO_TRANS);
 
@@ -1339,10 +1353,14 @@ clmpcc_txintr(arg)
 		 * Request Tx processing in the soft interrupt handler
 		 */
 		ch->ch_tx_done = 1;
-		if ( ! sc->sc_soft_running ) {
+#ifndef __GENERIC_SOFT_INTERRUPTS
+		if ( sc->sc_soft_running == 0 ) {
 			sc->sc_soft_running = 1;
 			(sc->sc_softhook)(sc);
 		}
+#else
+		softintr_schedule(sc->sc_softintr_cookie);
+#endif
 	}
 
 	clmpcc_wrreg(sc, CLMPCC_REG_IER, tir);
@@ -1380,15 +1398,19 @@ clmpcc_mdintr(arg)
 
 	clmpcc_wrreg(sc, CLMPCC_REG_MEOIR, 0);
 
+#ifndef __GENERIC_SOFT_INTERRUPTS
 	if ( sc->sc_soft_running == 0 ) {
 		sc->sc_soft_running = 1;
 		(sc->sc_softhook)(sc);
 	}
+#else
+	softintr_schedule(sc->sc_softintr_cookie);
+#endif
 
 	return 1;
 }
 
-int
+void
 clmpcc_softintr(arg)
 	void *arg;
 {
@@ -1401,7 +1423,9 @@ clmpcc_softintr(arg)
 	u_int c;
 	int chan;
 
+#ifndef __GENERIC_SOFT_INTERRUPTS
 	sc->sc_soft_running = 0;
+#endif
 
 	/* Handle Modem state changes too... */
 
@@ -1469,8 +1493,6 @@ clmpcc_softintr(arg)
 			(*linesw[tp->t_line].l_start)(tp);
 		}
 	}
-
-	return 0;
 }
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.6 1999/03/26 04:43:00 dbj Exp $	*/
+/*	$NetBSD: conf.c,v 1.9 2000/03/21 17:31:12 deberg Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -36,6 +36,8 @@
  * Derived a long time ago from
  *      @(#)conf.c	7.9 (Berkeley) 5/28/91
  */
+
+#include "opt_compat_svr4.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -142,6 +144,8 @@ cdev_decl(wsdisplay);
 cdev_decl(wskbd);
 #include "wsmouse.h"
 cdev_decl(wsmouse);
+#include "wsmux.h"
+cdev_decl(wsmux);
 
 dev_decl(filedesc,open);
 
@@ -159,7 +163,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 9 */
 	cdev_notdef(),			/* 10 */
 	cdev_notdef(),			/* 11 */
-	cdev_tty_init(NZSTTY,zs),	/* 12: 2 mac serial ports -- BG*/
+	cdev_tty_init(NZSTTY,zs),	/* 12: 2 NeXT serial ports */
 	cdev_disk_init(NSD,sd),		/* 13: SCSI disk */
 	cdev_tape_init(NST,st),		/* 14: SCSI tape */
 	cdev_disk_init(NCD,cd),		/* 15: SCSI CD-ROM */
@@ -191,6 +195,8 @@ struct cdevsw	cdevsw[] =
 	cdev_wsdisplay_init(NWSDISPLAY, wsdisplay), /* 41: frame buffers, etc. */
 	cdev_mouse_init(NWSKBD, wskbd), /* 42: keyboards */
 	cdev_mouse_init(NWSMOUSE, wsmouse),       /* 43: mice */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 44: svr4 net pseudo-device */
+	cdev_mouse_init(NWSMUX, wsmux),  /* 45: ws multiplexor */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -273,6 +279,11 @@ static int chrtoblktab[] = {
 	/* 38 */	NODEV,
 	/* 39 */	NODEV,
 	/* 40 */	20,
+	/* 41 */	NODEV,
+	/* 42 */	NODEV,
+	/* 43 */	NODEV,
+	/* 44 */	NODEV,
+	/* 45 */	NODEV,
 };
 
 dev_t

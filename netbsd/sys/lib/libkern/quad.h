@@ -1,4 +1,4 @@
-/*	$NetBSD: quad.h,v 1.11 1998/08/30 15:32:20 eeh Exp $	*/
+/*	$NetBSD: quad.h,v 1.14 2000/05/05 00:20:22 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -107,14 +107,13 @@ union uu {
  * as u_quad_t, while gcc 2 correctly uses int.  Unfortunately, we still use
  * both compilers.
  */
-#if __GNUC__ >= 2
+#if __GNUC_PREREQ__(2, 0) || defined(lint)
 typedef unsigned int	qshift_t;
 #else
 typedef u_quad_t	qshift_t;
 #endif
 
 __BEGIN_DECLS
-int __cmpdi2 __P((quad_t, quad_t));
 quad_t __adddi3 __P((quad_t, quad_t));
 quad_t __anddi3 __P((quad_t, quad_t));
 quad_t __ashldi3 __P((quad_t, qshift_t));

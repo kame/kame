@@ -1,4 +1,4 @@
-/*	$NetBSD: rpc_machdep.c,v 1.26.2.2 1999/06/21 16:45:25 perry Exp $	*/
+/*	$NetBSD: rpc_machdep.c,v 1.33 2000/03/24 17:05:32 ws Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -51,6 +51,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/reboot.h>
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
@@ -79,7 +80,7 @@
 #include <machine/rtc.h>
 #include <arm32/iomd/iomdreg.h>
 
-#include "ipkdb.h"
+#include "opt_ipkdb.h"
 #ifdef HYDRA
 #include "hydrabus.h"
 #endif	/* HYDRA */
@@ -95,7 +96,7 @@ u_int cpu_reset_address = 0;
 /* Define various stack sizes in pages */
 #define IRQ_STACK_SIZE	1
 #define ABT_STACK_SIZE	1
-#if NIPKDB > 0
+#ifdef IPKDB
 #define UND_STACK_SIZE	2
 #else
 #define UND_STACK_SIZE	1
@@ -152,8 +153,6 @@ pt_entry_t kernel_pt_table[NUM_KERNEL_PTS];
 
 struct user *proc0paddr;
 
-extern int cold;
-
 #ifdef CPU_SA110
 #define CPU_SA110_CACHE_CLEAN_SIZE (0x4000 * 2)
 static vaddr_t sa110_cc_base;
@@ -175,7 +174,6 @@ vm_size_t map_chunk	__P((vm_offset_t pd, vm_offset_t pt, vm_offset_t va,
 			     u_int flg));
 
 void pmap_bootstrap		__P((vm_offset_t kernel_l1pt, pv_addr_t kernel_ptpt));
-caddr_t allocsys		__P((caddr_t v));
 void data_abort_handler		__P((trapframe_t *frame));
 void prefetch_abort_handler	__P((trapframe_t *frame));
 void undefinedinstruction_bounce	__P((trapframe_t *frame));
@@ -647,7 +645,7 @@ initarm(bootconf)
 
 	/*
 	 * Since we have mapped the VRAM up into kernel space we must
-	 * now update the the bootconfig and display structures by hand.
+	 * now update the bootconfig and display structures by hand.
 	 */
 	if (bootconfig.vram[0].pages != 0) {
 		bootconfig.display_start = VMEM_VBASE;
@@ -732,7 +730,7 @@ initarm(bootconf)
 	/*
 	 * Right We have the bottom meg of memory mapped to 0x00000000
 	 * so was can get at it. The kernel will ocupy the start of it.
-	 * After the kernel/args we allocate some the the fixed page tables
+	 * After the kernel/args we allocate some of the fixed page tables
 	 * we need to get the system going.
 	 * We allocate one page directory and 8 page tables and store the
 	 * physical addresses in the kernel_pt_table array.	
@@ -1132,7 +1130,7 @@ initarm(bootconf)
 		rpc_sa110_cc_setup();	
 #endif	/* CPU_SA110 */
 
-#if NIPKDB > 0
+#ifdef IPKDB
 	/* Initialise ipkdb */
 	ipkdb_init();
 	if (boothowto & RB_KDB)
@@ -1373,10 +1371,10 @@ void
 rpc_sa110_cc_setup(void)
 {
 	int loop;
-	vm_offset_t kaddr;
+	paddr_t kaddr;
 	pt_entry_t *pte;
 
-	kaddr = pmap_extract(kernel_pmap, KERNEL_TEXT_BASE);
+	(void) pmap_extract(kernel_pmap, KERNEL_TEXT_BASE, &kaddr);
 	for (loop = 0; loop < CPU_SA110_CACHE_CLEAN_SIZE; loop += NBPG) {
 		pte = pmap_pte(kernel_pmap, (sa110_cc_base + loop));
 		*pte = L2_PTE(kaddr, AP_KR);

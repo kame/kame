@@ -1,4 +1,4 @@
-/*	$NetBSD: cgeight.c,v 1.19 1998/11/19 15:38:24 mrg Exp $	*/
+/*	$NetBSD: cgeight.c,v 1.21.4.1 2000/06/30 16:27:37 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -149,9 +149,6 @@ static struct fbdriver cgeightfbdriver = {
 	cgeightpoll, cgeightmmap
 };
 
-extern int fbnode;
-extern struct tty *fbconstty;
-
 static void cgeightloadcmap __P((struct cgeight_softc *, int, int));
 static int cgeight_get_video __P((struct cgeight_softc *));
 static void cgeight_set_video __P((struct cgeight_softc *, int));
@@ -248,7 +245,7 @@ cgeightattach(parent, self, aux)
 		 * to be found.
 		 */
 		if (eep == NULL || eep->eeConsole == EE_CONS_P4OPT)
-			isconsole = (fbconstty != NULL);
+			isconsole = fb_is_console(0);
 	}
 
 #if 0
@@ -372,12 +369,12 @@ cgeightioctl(dev, cmd, data, flags, p)
 		break;
 
 	case FBIOGETCMAP:
-		return (bt_getcmap((struct fbcmap *)data, &sc->sc_cmap, 256));
+#define p ((struct fbcmap *)data)
+		return (bt_getcmap(p, &sc->sc_cmap, 256, 1));
 
 	case FBIOPUTCMAP:
 		/* copy to software map */
-#define p ((struct fbcmap *)data)
-		error = bt_putcmap(p, &sc->sc_cmap, 256);
+		error = bt_putcmap(p, &sc->sc_cmap, 256, 1);
 		if (error)
 			return (error);
 		/* now blast them into the chip */
@@ -420,14 +417,15 @@ cgeightpoll(dev, events, p)
  * goes. Starting at 8MB, it maps the ramdac for NBPG, then the p4
  * register for NBPG, then the bootrom for 0x40000.
  */
-int
+paddr_t
 cgeightmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct cgeight_softc *sc = cgeight_cd.cd_devs[minor(dev)];
 	bus_space_handle_t bh;
-	int poff;
+	off_t poff;
 
 #define START_ENABLE	(128*1024)
 #define START_COLOR	((128*1024) + (128*1024))
@@ -500,7 +498,7 @@ cgeightmmap(dev, off, prot)
 			   BUS_SPACE_MAP_LINEAR, &bh))
 		return (-1);
 
-	return ((int)bh);
+	return ((paddr_t)bh);
 }
 
 #if defined(SUN4)

@@ -1,4 +1,4 @@
-#	$NetBSD: files.tc,v 1.15 1999/03/16 14:07:22 simonb Exp $
+#	$NetBSD: files.tc,v 1.18 2000/05/02 06:43:05 augustss Exp $
 #
 # Config file and device description for machine-independent
 # TurboChannel code.  Included by ports that need it.
@@ -21,28 +21,15 @@ file	dev/tc/ioasic_subr.c		ioasic
 attach le at ioasic with le_ioasic:	le24, le_dec_subr
 attach le at tc with le_tc:		le24, le_dec_subr
 
-file	dev/tc/if_le_ioasic.c		le_ioasic needs-flag # for le_iomem
+file	dev/tc/if_le_ioasic.c		le_ioasic
 file	dev/tc/if_le_tc.c		le_tc
 
-# ioasic audio
-attach audioamd at ioasic with am7930_ioasic
-file	dev/tc/am7930_ioasic.c		am7930_ioasic
-
+# baseboard audio
+device  bba: audio,am7930
+attach  bba at ioasic
+file    dev/tc/bba.c                    bba
 
 # DEC DEFTA TC FDDI Controller
 device	fta: pdq, fddi, ifnet, arp
 attach	fta at tc
 file	dev/tc/if_fta.c			fta
-
-# pixelstamp and STIC (stamp interface chip) support
-define stic
-file	dev/tc/stic.c		stic
-
-# DEC PMAG-C 2-D pixelstamp graphics board
-device	px
-attach	px at tc:		stic
-file	dev/tc/px.c		px
-
-# DEC PMAG-D/E/F    3-D pixelstamp+i860 8,24-plane,z-buffer graphics board
-device	pxg: stic
-attach	pxg at tc

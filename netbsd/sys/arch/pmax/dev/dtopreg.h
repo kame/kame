@@ -1,4 +1,4 @@
-/*	$NetBSD: dtopreg.h,v 1.5 1994/10/26 21:09:00 cgd Exp $	*/
+/*	$NetBSD: dtopreg.h,v 1.8 2000/04/26 04:16:17 mhitch Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,38 +38,38 @@
  *	@(#)dtopreg.h	8.1 (Berkeley) 6/10/93
  */
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1992 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
 /*
  * HISTORY
- * Log:	dtop.h,v 
+ * Log:	dtop.h,v
  * Revision 2.3  92/03/05  17:08:17  rpd
  * 	Define how many buttons and coordinates we can take.
  * 	[92/03/05            af]
- * 
+ *
  * Revision 2.2  92/03/02  18:32:17  rpd
  * 	Created from DEC specs:
  * 	"DESKTOPinterconnect Description and Protocol Specification"
@@ -79,7 +79,7 @@
  * 	"Open Desktop Bus, Keyboard Device Protocol Specification"
  * 	Version 0.7, Jan 9 1991
  * 	[92/01/19            af]
- * 
+ *
  */
 /*
  *	File: dtop.h
@@ -91,6 +91,8 @@
 
 #ifndef	_DTOP_H_
 #define	_DTOP_H_
+
+#include <sys/callout.h>
 
 #define	DTOP_MAX_DEVICES	14
 #define	DTOP_MAX_MSG_SIZE	36	/* 3 hdr + 32 data + 1 checksum */
@@ -249,6 +251,7 @@ typedef	union {
 #		define		K_AR_OFF	4	/* turn off polling pls */
 #		define		K_AR_ACTIVE	2	/* polling, no autos yet */
 #		define		K_AR_TRIGGER	1	/* sent one autorepeat */
+		struct callout	repeat_ch;
 	} keyboard;
 
 	struct {

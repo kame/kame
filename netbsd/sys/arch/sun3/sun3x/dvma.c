@@ -1,4 +1,4 @@
-/*	$NetBSD: dvma.c,v 1.12 1999/03/26 23:41:37 mycroft Exp $	*/
+/*	$NetBSD: dvma.c,v 1.14 1999/11/13 00:32:19 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -178,8 +178,9 @@ dvma_mapin(kmem_va, len, canwait)
 	void * dvma_addr;
 	vm_offset_t kva, tva;
 	register int npf, s;
-	register vm_offset_t pa;
+	paddr_t pa;
 	long off, pn;
+	boolean_t rv;
 
 	kva = (u_long)kmem_va;
 #ifdef	DIAGNOSTIC
@@ -234,15 +235,15 @@ dvma_mapin(kmem_va, len, canwait)
 		 * by external bus masters and into the special DVMA space
 		 * in the MC68030 MMU so they may be seen by the CPU.
 		 */
-		pa = pmap_extract(pmap_kernel(), kva);
+		rv = pmap_extract(pmap_kernel(), kva, &pa);
 #ifdef	DEBUG
-		if (pa == 0)
+		if (rv == FALSE)
 			panic("dvma_mapin: null page frame");
 #endif	DEBUG
 
 		iommu_enter((tva & IOMMU_VA_MASK), pa);
 		pmap_enter(pmap_kernel(), tva, pa | PMAP_NC,
-			VM_PROT_READ|VM_PROT_WRITE, 1, 0);
+			VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 	}
 
 	return (dvma_addr);

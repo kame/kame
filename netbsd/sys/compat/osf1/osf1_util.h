@@ -1,4 +1,4 @@
-/*	$NetBSD: osf1_util.h,v 1.3.8.1 1999/06/21 19:29:04 cgd Exp $	*/
+/*	$NetBSD: osf1_util.h,v 1.5 1999/04/23 18:01:05 cgd Exp $	*/
 
 #ifndef _COMPAT_OSF1_OSF1_UTIL_H_
 #define _COMPAT_OSF1_OSF1_UTIL_H_

@@ -1,4 +1,4 @@
-/* $NetBSD: mcpciareg.h,v 1.2.8.1 1999/04/16 23:40:42 thorpej Exp $ */
+/* $NetBSD: mcpciareg.h,v 1.3 1999/04/15 22:27:40 thorpej Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob

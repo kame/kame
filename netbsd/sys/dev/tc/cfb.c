@@ -1,7 +1,7 @@
-/* $NetBSD: cfb.c,v 1.10 1999/03/29 07:22:02 nisimura Exp $ */
+/* $NetBSD: cfb.c,v 1.20.4.1 2000/06/30 16:27:52 simonb Exp $ */
 
 /*
- * Copyright (c) 1998 Tohru Nishimura.  All rights reserved.
+ * Copyright (c) 1998, 1999 Tohru Nishimura.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cfb.c,v 1.10 1999/03/29 07:22:02 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cfb.c,v 1.20.4.1 2000/06/30 16:27:52 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,18 +46,17 @@ __KERNEL_RCSID(0, "$NetBSD: cfb.c,v 1.10 1999/03/29 07:22:02 nisimura Exp $");
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-#include <dev/rcons/raster.h>
 #include <dev/wscons/wsconsio.h>
-#include <dev/wscons/wscons_raster.h>
 #include <dev/wscons/wsdisplayvar.h>
+
+#include <dev/rasops/rasops.h>
+#include <dev/wsfont/wsfont.h>
 
 #include <dev/tc/tcvar.h>
 #include <dev/ic/bt459reg.h>	
 
 #include <uvm/uvm_extern.h>
 
-/* XXX BUS'IFYING XXX */
- 
 #if defined(pmax)
 #define	machine_btop(x) mips_btop(x)
 #define	MACHINE_KSEG0_TO_PHYS(x) MIPS_KSEG1_TO_PHYS(x)
@@ -84,15 +83,28 @@ __KERNEL_RCSID(0, "$NetBSD: cfb.c,v 1.10 1999/03/29 07:22:02 nisimura Exp $");
  *		} bt_lo;
  *		...
  * Although CX has single Bt459, 32bit R/W can be done w/o any trouble.
+ *
+ * struct bt459reg {
+ *         u_int32_t       bt_lo;
+ *         u_int32_t       bt_hi;
+ *         u_int32_t       bt_reg;
+ *         u_int32_t       bt_cmap;
+ * };
+ *
  */
-struct bt459reg {
-        u_int32_t       bt_lo;
-        u_int32_t       bt_hi;
-        u_int32_t       bt_reg;
-        u_int32_t       bt_cmap;
-};
 
-/* XXX XXX XXX */
+/* Bt459 hardware registers */
+#define bt_lo	0
+#define bt_hi	1
+#define bt_reg	2
+#define bt_cmap 3
+
+#define REG(base, index)	*((u_int32_t *)(base) + (index))
+#define SELECT(vdac, regno) do {			\
+	REG(vdac, bt_lo) = ((regno) & 0x00ff);		\
+	REG(vdac, bt_hi) = ((regno) & 0x0f00) >> 8;	\
+	tc_wmb();					\
+   } while (0)
 
 struct fb_devconfig {
 	vaddr_t dc_vaddr;		/* memory space virtual base address */
@@ -103,22 +115,23 @@ struct fb_devconfig {
 	int	dc_depth;		/* depth, bits per pixel */
 	int	dc_rowbytes;		/* bytes in a FB scan line */
 	vaddr_t dc_videobase;		/* base of flat frame buffer */
-	struct raster	dc_raster;	/* raster description */
-	struct rcons	dc_rcons;	/* raster blitter control info */
 	int	    dc_blanked;		/* currently has video disabled */
+
+	struct rasops_info rinfo;
 };
 
-struct hwcmap {
+struct hwcmap256 {
 #define	CMAP_SIZE	256	/* 256 R/G/B entries */
 	u_int8_t r[CMAP_SIZE];
 	u_int8_t g[CMAP_SIZE];
 	u_int8_t b[CMAP_SIZE];
 };
 
-struct hwcursor {
+struct hwcursor64 {
 	struct wsdisplay_curpos cc_pos;
 	struct wsdisplay_curpos cc_hot;
 	struct wsdisplay_curpos cc_size;
+	struct wsdisplay_curpos cc_magic;
 #define	CURSOR_MAX_SIZE	64
 	u_int8_t cc_color[6];
 	u_int64_t cc_image[64 + 64];
@@ -127,8 +140,8 @@ struct hwcursor {
 struct cfb_softc {
 	struct device sc_dev;
 	struct fb_devconfig *sc_dc;	/* device configuration */
-	struct hwcmap sc_cmap;		/* software copy of colormap */
-	struct hwcursor sc_cursor;	/* software copy of cursor */
+	struct hwcmap256 sc_cmap;	/* software copy of colormap */
+	struct hwcursor64 sc_cursor;	/* software copy of cursor */
 	int sc_curenb;			/* cursor sprite enabled */
 	int sc_changed;			/* need update of colormap */
 #define	DATA_ENB_CHANGED	0x01	/* cursor enable changed */
@@ -137,62 +150,52 @@ struct cfb_softc {
 #define	DATA_CMAP_CHANGED	0x08	/* colormap changed */
 #define	DATA_ALL_CHANGED	0x0f
 	int nscreens;
-	short magic_x, magic_y;		/* CX cursor location offset */
-#define	CX_MAGIC_X 220
-#define	CX_MAGIC_Y 35
 };
+
+#define	CX_MAGIC_X	220
+#define	CX_MAGIC_Y 	35
 
 #define	CX_FB_OFFSET	0x000000
 #define	CX_FB_SIZE	0x100000
 #define	CX_BT459_OFFSET	0x200000
 #define	CX_OFFSET_IREQ	0x300000	/* Interrupt req. control */
 
-int  cfbmatch __P((struct device *, struct cfdata *, void *));
-void cfbattach __P((struct device *, struct device *, void *));
+static int  cfbmatch __P((struct device *, struct cfdata *, void *));
+static void cfbattach __P((struct device *, struct device *, void *));
 
-struct cfattach cfb_ca = {
+const struct cfattach cfb_ca = {
 	sizeof(struct cfb_softc), cfbmatch, cfbattach,
 };
 
-void cfb_getdevconfig __P((tc_addr_t, struct fb_devconfig *));
-struct fb_devconfig cfb_console_dc;
-tc_addr_t cfb_consaddr;
+static void cfb_getdevconfig __P((tc_addr_t, struct fb_devconfig *));
+static struct fb_devconfig cfb_console_dc;
+static tc_addr_t cfb_consaddr;
 
-struct wsdisplay_emulops cfb_emulops = {
-	rcons_cursor,			/* could use hardware cursor; punt */
-	rcons_mapchar,
-	rcons_putchar,
-	rcons_copycols,
-	rcons_erasecols,
-	rcons_copyrows,
-	rcons_eraserows,
-	rcons_alloc_attr
-};
-
-struct wsscreen_descr cfb_stdscreen = {
+static struct wsscreen_descr cfb_stdscreen = {
 	"std", 0, 0,
-	&cfb_emulops,
+	0, /* textops */
 	0, 0,
-	0
+	WSSCREEN_REVERSE
 };
 
-const struct wsscreen_descr *_cfb_scrlist[] = {
+static const struct wsscreen_descr *_cfb_scrlist[] = {
 	&cfb_stdscreen,
 };
 
-struct wsscreen_list cfb_screenlist = {
+static const struct wsscreen_list cfb_screenlist = {
 	sizeof(_cfb_scrlist) / sizeof(struct wsscreen_descr *), _cfb_scrlist
 };
 
-int	cfbioctl __P((void *, u_long, caddr_t, int, struct proc *));
-int	cfbmmap __P((void *, off_t, int));
+static int	cfbioctl __P((void *, u_long, caddr_t, int, struct proc *));
+static paddr_t	cfbmmap __P((void *, off_t, int));
 
-int	cfb_alloc_screen __P((void *, const struct wsscreen_descr *,
+static int	cfb_alloc_screen __P((void *, const struct wsscreen_descr *,
 				      void **, int *, int *, long *));
-void	cfb_free_screen __P((void *, void *));
-void	cfb_show_screen __P((void *, void *));
+static void	cfb_free_screen __P((void *, void *));
+static int	cfb_show_screen __P((void *, void *, int,
+				     void (*) (void *, int, int), void *));
 
-struct wsdisplay_accessops cfb_accessops = {
+static const struct wsdisplay_accessops cfb_accessops = {
 	cfbioctl,
 	cfbmmap,
 	cfb_alloc_screen,
@@ -202,8 +205,8 @@ struct wsdisplay_accessops cfb_accessops = {
 };
 
 int  cfb_cnattach __P((tc_addr_t));
-int  cfbintr __P((void *));
-void cfbinit __P((struct fb_devconfig *));
+static int  cfbintr __P((void *));
+static void cfbinit __P((struct fb_devconfig *));
 
 static int  get_cmap __P((struct cfb_softc *, struct wsdisplay_cmap *));
 static int  set_cmap __P((struct cfb_softc *, struct wsdisplay_cmap *));
@@ -212,14 +215,6 @@ static int  get_cursor __P((struct cfb_softc *, struct wsdisplay_cursor *));
 static void set_curpos __P((struct cfb_softc *, struct wsdisplay_curpos *));
 static void bt459_set_curpos __P((struct cfb_softc *));
 
-/* XXX XXX XXX */
-#define	BT459_SELECT(vdac, regno) do {		\
-	vdac->bt_lo = (regno) & 0x00ff;		\
-	vdac->bt_hi = ((regno)& 0x0f00) >> 8;	\
-	tc_wmb();				\
-   } while (0)
-/* XXX XXX XXX */
-
 /*
  * Compose 2 bit/pixel cursor image.  Bit order will be reversed.
  *   M M M M I I I I		M I M I M I M I
@@ -227,7 +222,7 @@ static void bt459_set_curpos __P((struct cfb_softc *));
  *   3 2 1 0 3 2 1 0		0 0 1 1 2 2 3 3
  *   7 6 5 4 7 6 5 4		4 4 5 5 6 6 7 7
  */
-const static u_int8_t shuffle[256] = {
+static const u_int8_t shuffle[256] = {
 	0x00, 0x40, 0x10, 0x50, 0x04, 0x44, 0x14, 0x54,
 	0x01, 0x41, 0x11, 0x51, 0x05, 0x45, 0x15, 0x55,
 	0x80, 0xc0, 0x90, 0xd0, 0x84, 0xc4, 0x94, 0xd4,
@@ -262,7 +257,7 @@ const static u_int8_t shuffle[256] = {
 	0xab, 0xeb, 0xbb, 0xfb, 0xaf, 0xef, 0xbf, 0xff,
 };
 
-int
+static int
 cfbmatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
@@ -276,14 +271,12 @@ cfbmatch(parent, match, aux)
 	return (1);
 }
 
-void
+static void
 cfb_getdevconfig(dense_addr, dc)
 	tc_addr_t dense_addr;
 	struct fb_devconfig *dc;
 {
-	struct raster *rap;
-	struct rcons *rcp;
-	int i;
+	int i, cookie;
 
 	dc->dc_vaddr = dense_addr;
 	dc->dc_paddr = MACHINE_KSEG0_TO_PHYS(dc->dc_vaddr + CX_FB_OFFSET);
@@ -302,27 +295,39 @@ cfb_getdevconfig(dense_addr, dc)
 	for (i = 0; i < dc->dc_ht * dc->dc_rowbytes; i += sizeof(u_int32_t))
 		*(u_int32_t *)(dc->dc_videobase + i) = 0x0;
 
-	/* initialize the raster */
-	rap = &dc->dc_raster;
-	rap->width = dc->dc_wid;
-	rap->height = dc->dc_ht;
-	rap->depth = dc->dc_depth;
-	rap->linelongs = dc->dc_rowbytes / sizeof(u_int32_t);
-	rap->pixels = (u_int32_t *)dc->dc_videobase;
+	dc->rinfo.ri_flg = RI_CENTER;
+	dc->rinfo.ri_depth = dc->dc_depth;
+	dc->rinfo.ri_bits = (void *)dc->dc_videobase;
+	dc->rinfo.ri_width = dc->dc_wid;
+	dc->rinfo.ri_height = dc->dc_ht;
+	dc->rinfo.ri_stride = dc->dc_rowbytes;
 
-	/* initialize the raster console blitter */
-	rcp = &dc->dc_rcons;
-	rcp->rc_sp = rap;
-	rcp->rc_crow = rcp->rc_ccol = -1;
-	rcp->rc_crowp = &rcp->rc_crow;
-	rcp->rc_ccolp = &rcp->rc_ccol;
-	rcons_init(rcp, 34, 80);
+	wsfont_init();
+	/* prefer 8 pixel wide font */
+	if ((cookie = wsfont_find(NULL, 8, 0, 0)) <= 0)
+		cookie = wsfont_find(NULL, 0, 0, 0);
+	if (cookie <= 0) {
+		printf("cfb: font table is empty\n");
+		return;
+	}
 
-	cfb_stdscreen.nrows = dc->dc_rcons.rc_maxrow;
-	cfb_stdscreen.ncols = dc->dc_rcons.rc_maxcol;
+	if (wsfont_lock(cookie, &dc->rinfo.ri_font,
+	    WSDISPLAY_FONTORDER_R2L, WSDISPLAY_FONTORDER_L2R) <= 0) {
+		printf("cfb: couldn't lock font\n");
+		return;
+	}
+	dc->rinfo.ri_wsfcookie = cookie;
+
+	rasops_init(&dc->rinfo, 34, 80);
+
+	/* XXX shouldn't be global */
+	cfb_stdscreen.nrows = dc->rinfo.ri_rows;
+	cfb_stdscreen.ncols = dc->rinfo.ri_cols;
+	cfb_stdscreen.textops = &dc->rinfo.ri_ops;
+	cfb_stdscreen.capabilities = dc->rinfo.ri_caps;
 }
 
-void
+static void
 cfbattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
@@ -330,8 +335,7 @@ cfbattach(parent, self, aux)
 	struct cfb_softc *sc = (struct cfb_softc *)self;
 	struct tc_attach_args *ta = aux;
 	struct wsemuldisplaydev_attach_args waa;
-	struct hwcmap *cm;
-	int console, i;
+	int console;
 
 	console = (ta->ta_addr == cfb_consaddr);
 	if (console) {
@@ -346,16 +350,13 @@ cfbattach(parent, self, aux)
 	printf(": %d x %d, %dbpp\n", sc->sc_dc->dc_wid, sc->sc_dc->dc_ht,
 	    sc->sc_dc->dc_depth);
 
-	cm = &sc->sc_cmap;
-	cm->r[0] = cm->g[0] = cm->b[0] = 0;
-	for (i = 1; i < CMAP_SIZE; i++) {
-		cm->r[i] = cm->g[i] = cm->b[i] = 0xff;
-	}
-	sc->magic_x = CX_MAGIC_X;
-	sc->magic_y = CX_MAGIC_Y;
+	memcpy(&sc->sc_cmap, rasops_cmap, sizeof(struct hwcmap256));
+
+	sc->sc_cursor.cc_magic.x = CX_MAGIC_X;
+	sc->sc_cursor.cc_magic.y = CX_MAGIC_Y;
 
 	/* Establish an interrupt handler, and clear any pending interrupts */
-        tc_intr_establish(parent, ta->ta_cookie, TC_IPL_TTY, cfbintr, sc);
+	tc_intr_establish(parent, ta->ta_cookie, IPL_TTY, cfbintr, sc);
 	*(u_int8_t *)(sc->sc_dc->dc_vaddr + CX_OFFSET_IREQ) = 0;
 
 	waa.console = console;
@@ -366,7 +367,7 @@ cfbattach(parent, self, aux)
 	config_found(self, &waa, wsemuldisplaydevprint);
 }
 
-int
+static int
 cfbioctl(v, cmd, data, flag, p)
 	void *v;
 	u_long cmd;
@@ -434,7 +435,7 @@ cfbioctl(v, cmd, data, flag, p)
 	return ENOTTY;
 }
 
-int
+paddr_t
 cfbmmap(v, offset, prot)
 	void *v;
 	off_t offset;
@@ -447,7 +448,7 @@ cfbmmap(v, offset, prot)
 	return machine_btop(sc->sc_dc->dc_paddr + offset);
 }
 
-int
+static int
 cfb_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	void *v;
 	const struct wsscreen_descr *type;
@@ -461,16 +462,16 @@ cfb_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	if (sc->nscreens > 0)
 		return (ENOMEM);
 
-	*cookiep = &sc->sc_dc->dc_rcons; /* one and only for now */
+	*cookiep = &sc->sc_dc->rinfo; /* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	rcons_alloc_attr(&sc->sc_dc->dc_rcons, 0, 0, 0, &defattr);
+	(*sc->sc_dc->rinfo.ri_ops.alloc_attr)(&sc->sc_dc->rinfo, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->nscreens++;
 	return (0);
 }
 
-void
+static void
 cfb_free_screen(v, cookie)
 	void *v;
 	void *cookie;
@@ -483,32 +484,33 @@ cfb_free_screen(v, cookie)
 	sc->nscreens--;
 }
 
-void
-cfb_show_screen(v, cookie)
+static int
+cfb_show_screen(v, cookie, waitok, cb, cbarg)
 	void *v;
 	void *cookie;
+	int waitok;
+	void (*cb) __P((void *, int, int));
+	void *cbarg;
 {
+
+	return (0);
 }
 
-int
+/* EXPORT */ int
 cfb_cnattach(addr)
-        tc_addr_t addr;
+	tc_addr_t addr;
 {
-        struct fb_devconfig *dcp = &cfb_console_dc;
-        long defattr;
+	struct fb_devconfig *dcp = &cfb_console_dc;
+	long defattr;
 
-        cfb_getdevconfig(addr, dcp);
- 
-        rcons_alloc_attr(&dcp->dc_rcons, 0, 0, 0, &defattr);
-
-        wsdisplay_cnattach(&cfb_stdscreen, &dcp->dc_rcons,
-                           0, 0, defattr);
-        cfb_consaddr = addr;
-        return(0);
+	cfb_getdevconfig(addr, dcp);
+	(*dcp->rinfo.ri_ops.alloc_attr)(&dcp->rinfo, 0, 0, 0, &defattr);
+	wsdisplay_cnattach(&cfb_stdscreen, &dcp->rinfo, 0, 0, defattr);
+	cfb_consaddr = addr;
+	return(0);
 }
 
-
-int
+static int
 cfbintr(arg)
 	void *arg;
 {
@@ -525,20 +527,20 @@ cfbintr(arg)
 	v = sc->sc_changed;
 	sc->sc_changed = 0;
 	if (v & DATA_ENB_CHANGED) {
-		BT459_SELECT(vdac, BT459_REG_CCR);
-		vdac->bt_reg = (sc->sc_curenb) ? 0xc0 : 0x00;
+		SELECT(vdac, BT459_IREG_CCR);
+		REG(vdac, bt_reg) = (sc->sc_curenb) ? 0xc0 : 0x00;
 	}
 	if (v & DATA_CURCMAP_CHANGED) {
 		u_int8_t *cp = sc->sc_cursor.cc_color;
 
-		BT459_SELECT(vdac, BT459_REG_CCOLOR_2);
-		vdac->bt_reg = cp[1];	tc_wmb();
-		vdac->bt_reg = cp[3];	tc_wmb();
-		vdac->bt_reg = cp[5];	tc_wmb();
+		SELECT(vdac, BT459_IREG_CCOLOR_2);
+		REG(vdac, bt_reg) = cp[1];	tc_wmb();
+		REG(vdac, bt_reg) = cp[3];	tc_wmb();
+		REG(vdac, bt_reg) = cp[5];	tc_wmb();
 
-		vdac->bt_reg = cp[0];	tc_wmb();
-		vdac->bt_reg = cp[2];	tc_wmb();
-		vdac->bt_reg = cp[4];	tc_wmb();
+		REG(vdac, bt_reg) = cp[0];	tc_wmb();
+		REG(vdac, bt_reg) = cp[2];	tc_wmb();
+		REG(vdac, bt_reg) = cp[4];	tc_wmb();
 	}
 	if (v & DATA_CURSHAPE_CHANGED) {
 		u_int8_t *ip, *mp, img, msk;
@@ -549,47 +551,47 @@ cfbintr(arg)
 		mp = (u_int8_t *)(sc->sc_cursor.cc_image + CURSOR_MAX_SIZE);
 
 		bcnt = 0;
-		BT459_SELECT(vdac, BT459_REG_CRAM_BASE+0);
+		SELECT(vdac, BT459_IREG_CRAM_BASE+0);
 		/* 64 pixel scan line is consisted with 16 byte cursor ram */
 		while (bcnt < sc->sc_cursor.cc_size.y * 16) {
 			/* pad right half 32 pixel when smaller than 33 */
 			if ((bcnt & 0x8) && sc->sc_cursor.cc_size.x < 33) {
-				vdac->bt_reg = 0; tc_wmb();
-				vdac->bt_reg = 0; tc_wmb();
+				REG(vdac, bt_reg) = 0; tc_wmb();
+				REG(vdac, bt_reg) = 0; tc_wmb();
 			}
 			else {
 				img = *ip++;
 				msk = *mp++;
 				img &= msk;	/* cookie off image */
 				u = (msk & 0x0f) << 4 | (img & 0x0f);
-				vdac->bt_reg = shuffle[u];	tc_wmb();
+				REG(vdac, bt_reg) = shuffle[u];	tc_wmb();
 				u = (msk & 0xf0) | (img & 0xf0) >> 4;
-				vdac->bt_reg = shuffle[u];	tc_wmb();
+				REG(vdac, bt_reg) = shuffle[u];	tc_wmb();
 			}
 			bcnt += 2;
 		}
 		/* pad unoccupied scan lines */
 		while (bcnt < CURSOR_MAX_SIZE * 16) {
-			vdac->bt_reg = 0; tc_wmb();
-			vdac->bt_reg = 0; tc_wmb();
+			REG(vdac, bt_reg) = 0; tc_wmb();
+			REG(vdac, bt_reg) = 0; tc_wmb();
 			bcnt += 2;
 		}
 	}
 	if (v & DATA_CMAP_CHANGED) {
-		struct hwcmap *cm = &sc->sc_cmap;
+		struct hwcmap256 *cm = &sc->sc_cmap;
 		int index;
 
-		BT459_SELECT(vdac, 0);
+		SELECT(vdac, 0);
 		for (index = 0; index < CMAP_SIZE; index++) {
-			vdac->bt_cmap = cm->r[index];	tc_wmb();
-			vdac->bt_cmap = cm->g[index];	tc_wmb();
-			vdac->bt_cmap = cm->b[index];	tc_wmb();
+			REG(vdac, bt_cmap) = cm->r[index];	tc_wmb();
+			REG(vdac, bt_cmap) = cm->g[index];	tc_wmb();
+			REG(vdac, bt_cmap) = cm->b[index];	tc_wmb();
 		}
 	}
 	return (1);
 }
 
-void
+static void
 cfbinit(dc)
 	struct fb_devconfig *dc;
 {
@@ -597,67 +599,67 @@ cfbinit(dc)
 	struct bt459reg *vdac = (void *)(cfbbase + CX_BT459_OFFSET);
 	int i;
 
-	BT459_SELECT(vdac, BT459_REG_COMMAND_0);
-	vdac->bt_reg = 0x40; /* CMD0 */	tc_wmb();
-	vdac->bt_reg = 0x0;  /* CMD1 */	tc_wmb();
-	vdac->bt_reg = 0xc0; /* CMD2 */	tc_wmb();
-	vdac->bt_reg = 0xff; /* PRM */	tc_wmb();
-	vdac->bt_reg = 0;    /* 205 */	tc_wmb();
-	vdac->bt_reg = 0x0;  /* PBM */	tc_wmb();
-	vdac->bt_reg = 0;    /* 207 */	tc_wmb();
-	vdac->bt_reg = 0x0;  /* ORM */	tc_wmb();
-	vdac->bt_reg = 0x0;  /* OBM */	tc_wmb();
-	vdac->bt_reg = 0x0;  /* ILV */	tc_wmb();
-	vdac->bt_reg = 0x0;  /* TEST */	tc_wmb();
+	SELECT(vdac, BT459_IREG_COMMAND_0);
+	REG(vdac, bt_reg) = 0x40; /* CMD0 */	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;  /* CMD1 */	tc_wmb();
+	REG(vdac, bt_reg) = 0xc0; /* CMD2 */	tc_wmb();
+	REG(vdac, bt_reg) = 0xff; /* PRM */	tc_wmb();
+	REG(vdac, bt_reg) = 0;    /* 205 */	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;  /* PBM */	tc_wmb();
+	REG(vdac, bt_reg) = 0;    /* 207 */	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;  /* ORM */	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;  /* OBM */	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;  /* ILV */	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;  /* TEST */	tc_wmb();
 
-	BT459_SELECT(vdac, BT459_REG_CCR);
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
-	vdac->bt_reg = 0x0;	tc_wmb();
+	SELECT(vdac, BT459_IREG_CCR);
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
+	REG(vdac, bt_reg) = 0x0;	tc_wmb();
 
 	/* build sane colormap */
-	BT459_SELECT(vdac, 0);
-	vdac->bt_cmap = 0;	tc_wmb();
-	vdac->bt_cmap = 0;	tc_wmb();
-	vdac->bt_cmap = 0;	tc_wmb();
-	for (i = 1; i < CMAP_SIZE; i++) {
-		vdac->bt_cmap = 0xff;	tc_wmb();
-		vdac->bt_cmap = 0xff;	tc_wmb();
-		vdac->bt_cmap = 0xff;	tc_wmb();
+	SELECT(vdac, 0);
+	for (i = 0; i < CMAP_SIZE; i++) {
+		REG(vdac, bt_cmap) = rasops_cmap[3 * i + 0];
+		tc_wmb();
+		REG(vdac, bt_cmap) = rasops_cmap[3 * i + 1];
+		tc_wmb();
+		REG(vdac, bt_cmap) = rasops_cmap[3 * i + 2];
+		tc_wmb();
 	}
 
 	/* clear out cursor image */
-	BT459_SELECT(vdac, BT459_REG_CRAM_BASE);
+	SELECT(vdac, BT459_IREG_CRAM_BASE);
 	for (i = 0; i < 1024; i++)
-		vdac->bt_reg = 0xff;	tc_wmb();
+		REG(vdac, bt_reg) = 0xff;	tc_wmb();
 
 	/*
 	 * 2 bit/pixel cursor.  Assign MSB for cursor mask and LSB for
 	 * cursor image.  CCOLOR_2 for mask color, while CCOLOR_3 for
 	 * image color.  CCOLOR_1 will be never used.
 	 */
-	BT459_SELECT(vdac, BT459_REG_CCOLOR_1);
-	vdac->bt_reg = 0xff;	tc_wmb();
-	vdac->bt_reg = 0xff;	tc_wmb();
-	vdac->bt_reg = 0xff;	tc_wmb();
+	SELECT(vdac, BT459_IREG_CCOLOR_1);
+	REG(vdac, bt_reg) = 0xff;	tc_wmb();
+	REG(vdac, bt_reg) = 0xff;	tc_wmb();
+	REG(vdac, bt_reg) = 0xff;	tc_wmb();
 
-	vdac->bt_reg = 0;	tc_wmb();
-	vdac->bt_reg = 0;	tc_wmb();
-	vdac->bt_reg = 0;	tc_wmb();
+	REG(vdac, bt_reg) = 0;	tc_wmb();
+	REG(vdac, bt_reg) = 0;	tc_wmb();
+	REG(vdac, bt_reg) = 0;	tc_wmb();
 
-	vdac->bt_reg = 0xff;	tc_wmb();
-	vdac->bt_reg = 0xff;	tc_wmb();
-	vdac->bt_reg = 0xff;	tc_wmb();
+	REG(vdac, bt_reg) = 0xff;	tc_wmb();
+	REG(vdac, bt_reg) = 0xff;	tc_wmb();
+	REG(vdac, bt_reg) = 0xff;	tc_wmb();
 }
 
 static int
@@ -802,15 +804,17 @@ bt459_set_curpos(sc)
 
 	x = sc->sc_cursor.cc_pos.x - sc->sc_cursor.cc_hot.x;
 	y = sc->sc_cursor.cc_pos.y - sc->sc_cursor.cc_hot.y;
-	x += sc->magic_x; y += sc->magic_y; /* magic offset of CX coordinate */
+
+	x += sc->sc_cursor.cc_magic.x;
+	y += sc->sc_cursor.cc_magic.y;
 
 	s = spltty();
 
-	BT459_SELECT(vdac, BT459_REG_CURSOR_X_LOW);
-	vdac->bt_reg = x;	tc_wmb();
-	vdac->bt_reg = x >> 8;	tc_wmb();
-	vdac->bt_reg = y;	tc_wmb();
-	vdac->bt_reg = y >> 8;	tc_wmb();
+	SELECT(vdac, BT459_IREG_CURSOR_X_LOW);
+	REG(vdac, bt_reg) = x;		tc_wmb();
+	REG(vdac, bt_reg) = x >> 8;	tc_wmb();
+	REG(vdac, bt_reg) = y;		tc_wmb();
+	REG(vdac, bt_reg) = y >> 8;	tc_wmb();
 
 	splx(s);
 }

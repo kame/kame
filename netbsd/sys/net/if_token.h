@@ -1,4 +1,4 @@
-/*	$NetBSD: if_token.h,v 1.2.2.1 1999/04/08 21:44:00 bad Exp $	*/
+/*	$NetBSD: if_token.h,v 1.7 2000/02/27 03:04:09 soren Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -46,7 +46,7 @@ struct token_header {
 	u_int8_t  token_fc;			/* frame control field */
 	u_int8_t  token_dhost[ISO88025_ADDR_LEN];	/* dest. address */
 	u_int8_t  token_shost[ISO88025_ADDR_LEN];	/* source address */
-};
+} __attribute__((__packed__));
 
 #define TOKEN_MAX_BRIDGE 8
 
@@ -54,7 +54,7 @@ struct token_header {
 struct token_rif {
 	u_int16_t tr_rcf;			/* route control field */
 	u_int16_t tr_rdf[TOKEN_MAX_BRIDGE];	/* route-designator fields */
-};
+} __attribute__((__packed__));
 
 /* standard values for adress control and frame control field */
 #define TOKEN_AC		0x10
@@ -100,9 +100,18 @@ struct token_rif {
 
 /*
  * This assumes that route information fields are appended to
- * existing structures like llinfo_arp and tr_header
+ * existing structures like llinfo_arp and token_header
  */
 #define TOKEN_RIF(x) ((struct token_rif *) ((x) + 1))
+
+/*
+ * This is a kludge to get at the token ring mac header and the source route
+ * information after m_adj() has been used on the mbuf.
+ * Note that m is always an mbuf with a packet header.
+ */
+#define M_TRHSTART(m) \
+	(ALIGN(((m)->m_flags & M_EXT ? (m)->m_ext.ext_buf : &(m)->m_pktdat[0]) \
+	    + sizeof (struct token_header)) - sizeof(struct token_header))
 
 #if defined(_KERNEL)
 /*
@@ -116,10 +125,7 @@ struct token_rif {
 #define	token_sprintf		ether_sprintf
 
 void    token_ifattach __P((struct ifnet *, caddr_t));
-void    token_input __P((struct ifnet *, struct token_header *, struct mbuf *));
-int     token_output __P((struct ifnet *,
-           struct mbuf *, struct sockaddr *, struct rtentry *)); 
-
+void    token_ifdetach __P((struct ifnet *));
 #endif
 
 #endif /* !_NET_IF_TOKEN_H_ */

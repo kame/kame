@@ -1,4 +1,4 @@
-/*	$NetBSD: pdq.c,v 1.24 1998/09/28 20:37:12 matt Exp $	*/
+/*	$NetBSD: pdq.c,v 1.29 2000/05/28 01:28:52 matt Exp $	*/
 
 /*-
  * Copyright (c) 1995,1996 Matt Thomas <matt@3am-software.com>
@@ -81,6 +81,7 @@ static const char * const pdq_entities[] = {
 };
 
 static const char * const pdq_station_events[] = {
+    "Unknown Event #0",
     "Trace Received"
 };
 
@@ -653,20 +654,40 @@ pdq_process_unsolicited_events(
     pdq_unsolicited_info_t *ui = &pdq->pdq_unsolicited_info;
     volatile const pdq_consumer_block_t *cbp = pdq->pdq_cbp;
     pdq_descriptor_block_t *dbp = pdq->pdq_dbp;
-    const pdq_unsolicited_event_t *event;
-    pdq_rxdesc_t *rxd;
 
     /*
      * Process each unsolicited event (if any).
      */
 
     while (cbp->pdqcb_unsolicited_event != ui->ui_completion) {
-	rxd = &dbp->pdqdb_unsolicited_events[ui->ui_completion];
+	const pdq_unsolicited_event_t *event;
 	event = &ui->ui_events[ui->ui_completion & (PDQ_NUM_UNSOLICITED_EVENTS-1)];
 	PDQ_OS_UNSOL_EVENT_POSTSYNC(pdq, event);
 
 	switch (event->event_type) {
 	    case PDQ_UNSOLICITED_EVENT: {
+		int bad_event = 0;
+		switch (event->event_entity) {
+		    case PDQ_ENTITY_STATION: {
+			bad_event = event->event_code.value >= PDQ_STATION_EVENT_MAX;
+			break;
+		    }
+		    case PDQ_ENTITY_LINK: {
+			bad_event = event->event_code.value >= PDQ_LINK_EVENT_MAX;
+			break;
+		    }
+		    case PDQ_ENTITY_PHY_PORT: {
+			bad_event = event->event_code.value >= PDQ_PHY_EVENT_MAX;
+			break;
+		    }
+		    default: {
+			bad_event = 1;
+			break;
+		    }
+		}
+		if (bad_event) {
+		    break;
+		}
 		printf(PDQ_OS_PREFIX "Unsolicited Event: %s: %s",
 		       PDQ_OS_PREFIX_ARGS,
 		       pdq_entities[event->event_entity],
@@ -1010,6 +1031,7 @@ pdq_process_transmitted_data(
     volatile const pdq_consumer_block_t *cbp = pdq->pdq_cbp;
     pdq_descriptor_block_t *dbp = pdq->pdq_dbp;
     pdq_uint32_t completion = tx->tx_completion;
+    int reclaimed = 0;
 
     while (completion != cbp->pdqcb_transmits) {
 	PDQ_OS_DATABUF_T *pdu;
@@ -1019,7 +1041,7 @@ pdq_process_transmitted_data(
 	PDQ_OS_DATABUF_DEQUEUE(&tx->tx_txq, pdu);
 	pdq_os_transmit_done(pdq, pdu);
 	tx->tx_free += descriptor_count;
-
+	reclaimed = 1;
 	PDQ_ADVANCE(completion, descriptor_count, PDQ_RING_MASK(dbp->pdqdb_transmits));
     }
     if (tx->tx_completion != completion) {
@@ -1028,7 +1050,8 @@ pdq_process_transmitted_data(
 	PDQ_CSR_WRITE(&pdq->pdq_csrs, csr_host_int_enable, pdq->pdq_intrmask);
 	pdq_os_restart_transmitter(pdq);
     }
-    PDQ_DO_TYPE2_PRODUCER(pdq);
+    if (reclaimed)
+	PDQ_DO_TYPE2_PRODUCER(pdq);
 }
 
 void
@@ -1244,7 +1267,11 @@ pdq_stop(
     pdq_do_port_control(csrs, PDQ_PCTL_CONSUMER_BLOCK);
 
     PDQ_CSR_WRITE(csrs, csr_port_data_b, 0);
+#if !defined(BYTE_ORDER) || BYTE_ORDER == LITTLE_ENDIAN
     PDQ_CSR_WRITE(csrs, csr_port_data_a, pdq->pdq_pa_descriptor_block | PDQ_DMA_INIT_LW_BSWAP_DATA);
+#else
+    PDQ_CSR_WRITE(csrs, csr_port_data_a, pdq->pdq_pa_descriptor_block | PDQ_DMA_INIT_LW_BSWAP_DATA | PDQ_DMA_INIT_LW_BSWAP_LITERAL);
+#endif
     pdq_do_port_control(csrs, PDQ_PCTL_DMA_INIT);
 
     for (cnt = 0; cnt < 1000; cnt++) {
@@ -1405,7 +1432,7 @@ pdq_interrupt(
 				      PDQ_RING_MASK(pdq->pdq_dbp->pdqdb_host_smt));
 	    PDQ_DO_HOST_SMT_PRODUCER(pdq);
 	}
-	if (data & PDQ_PSTS_XMT_DATA_PENDING)
+	/* if (data & PDQ_PSTS_XMT_DATA_PENDING) */
 	    pdq_process_transmitted_data(pdq);
 	if (data & PDQ_PSTS_UNSOL_PENDING)
 	    pdq_process_unsolicited_events(pdq);

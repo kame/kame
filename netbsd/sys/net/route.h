@@ -1,4 +1,4 @@
-/*	$NetBSD: route.h,v 1.17 1998/12/27 18:27:48 thorpej Exp $	*/
+/*	$NetBSD: route.h,v 1.22 2000/05/04 17:33:03 ragge Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1993
@@ -99,8 +99,8 @@ struct rtentry {
 #define	rt_key(r)	((struct sockaddr *)((r)->rt_nodes->rn_key))
 #define	rt_mask(r)	((struct sockaddr *)((r)->rt_nodes->rn_mask))
 	struct	sockaddr *rt_gateway;	/* value */
-	short	rt_flags;		/* up/down?, host/net */
-	short	rt_refcnt;		/* # held references */
+	int	rt_flags;		/* up/down?, host/net */
+	int	rt_refcnt;		/* # held references */
 	u_long	rt_use;			/* raw # packets forwarded */
 	struct	ifnet *rt_ifp;		/* the answer: interface to use */
 	struct	ifaddr *rt_ifa;		/* the answer: interface to use */
@@ -185,7 +185,9 @@ struct rt_msghdr {
 #define RTM_RESOLVE	0xb	/* req to resolve dst to LL addr */
 #define RTM_NEWADDR	0xc	/* address being added to iface */
 #define RTM_DELADDR	0xd	/* address being removed from iface */
-#define RTM_IFINFO	0xe	/* iface going up/down etc. */
+#define RTM_OIFINFO	0xe	/* Old (pre-1.5) RTM_IFINFO message */
+#define RTM_IFINFO	0xf	/* iface/link going up/down etc. */
+#define	RTM_IFANNOUNCE	0x10	/* iface arrival/departure */
 
 #define RTV_MTU		0x1	/* init or lock _mtu */
 #define RTV_HOPCOUNT	0x2	/* init or lock _hopcount */
@@ -228,6 +230,7 @@ struct rt_addrinfo {
 
 struct route_cb {
 	int	ip_count;
+	int	ip6_count;
 	int	ipx_count;
 	int	ns_count;
 	int	iso_count;
@@ -276,6 +279,7 @@ void	 route_init __P((void));
 int	 route_output __P((struct mbuf *, ...));
 int	 route_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+void	 rt_ifannouncemsg __P((struct ifnet *, int));
 void	 rt_ifmsg __P((struct ifnet *));
 void	 rt_maskedcopy __P((struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *));

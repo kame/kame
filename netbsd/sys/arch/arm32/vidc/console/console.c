@@ -1,4 +1,4 @@
-/*	$NetBSD: console.c,v 1.15 1999/01/01 12:45:12 mark Exp $	*/
+/*	$NetBSD: console.c,v 1.18.4.1 2000/06/30 16:27:19 simonb Exp $	*/
 
 /*
  * Copyright (c) 1994-1995 Melvyn Tang-Richardson
@@ -56,6 +56,7 @@
 #include <sys/msgbuf.h>
 #include <sys/user.h>
 #include <sys/syslog.h>
+#include <sys/kernel.h>
 
 #include <dev/cons.h>
 
@@ -670,14 +671,14 @@ physconioctl(dev, cmd, data, flag, p)
 	return(ENOTTY);
 }
 
-int
+paddr_t
 physconmmap(dev, offset, nprot)
 	dev_t dev;
-	int offset;
+	off_t offset;
 	int nprot;
 {
 	struct vconsole *vc = find_vc(dev);
-	u_int physaddr;
+	paddr_t physaddr;
 
 	if (minor(dev) < 64) {
 		log(LOG_WARNING, "You should no longer use ttyv to mmap a frame buffer\n");
@@ -736,7 +737,7 @@ physconstart(tp)
 
 	if (cl->c_cc) {
 		tp->t_state |= TS_TIMEOUT;
-		timeout(ttrstrt, tp, 1);
+		callout_reset(&tp->t_rstrt_ch, 1, ttrstrt, tp);
 	}
 
 	if (cl->c_cc <= tp->t_lowat) {
@@ -941,7 +942,7 @@ physconputstring(string, length)
  * Get a character from the physical console
  */
 
-int getkey_polled __P(());
+int getkey_polled __P((void));
 
 char
 physcongetchar(void)
@@ -995,7 +996,6 @@ rpcconsolecnputc(dev, character)
 	dev_t dev;
 	char character;
 {
-	extern int cold;
 
 	if (rpc_buf_ptr==RPC_BUF_LEN)
 		RPC_BUF_FLUSH

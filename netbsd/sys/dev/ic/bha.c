@@ -1,4 +1,4 @@
-/*	$NetBSD: bha.c,v 1.30 1999/01/14 04:47:18 ross Exp $	*/
+/*	$NetBSD: bha.c,v 1.36.4.1 2000/10/04 04:12:12 simonb Exp $	*/
 
 #include "opt_ddb.h"
 #undef BHADIAG
@@ -63,6 +63,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
@@ -71,6 +72,8 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+
+#include <vm/vm.h>			/* for PAGE_SIZE */
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -99,7 +102,7 @@ integrate void bha_reset_ccb __P((struct bha_softc *, struct bha_ccb *));
 void bha_free_ccb __P((struct bha_softc *, struct bha_ccb *));
 integrate int bha_init_ccb __P((struct bha_softc *, struct bha_ccb *));
 struct bha_ccb *bha_get_ccb __P((struct bha_softc *, int));
-struct bha_ccb *bha_ccb_phys_kv __P((struct bha_softc *, u_long));
+struct bha_ccb *bha_ccb_phys_kv __P((struct bha_softc *, bus_addr_t));
 void bha_queue_ccb __P((struct bha_softc *, struct bha_ccb *));
 void bha_collect_mbo __P((struct bha_softc *));
 void bha_start_ccbs __P((struct bha_softc *));
@@ -145,7 +148,7 @@ bha_cmd(iot, ioh, sc, icnt, ibuf, ocnt, obuf)
 	u_char *ibuf, *obuf;
 {
 	const char *name;
-	register int i;
+	int i;
 	int wait;
 	u_char sts;
 	u_char opcode = ibuf[0];
@@ -395,7 +398,7 @@ AGAIN:
 			goto next;
 		}
 
-		untimeout(bha_timeout, ccb);
+		callout_stop(&ccb->xs->xs_callout);
 		bha_done(sc, ccb);
 
 	next:
@@ -581,7 +584,7 @@ bha_get_ccb(sc, flags)
 			TAILQ_REMOVE(&sc->sc_free_ccb, ccb, chain);
 			break;
 		}
-		if ((flags & SCSI_NOSLEEP) != 0)
+		if ((flags & XS_CTL_NOSLEEP) != 0)
 			goto out;
 		tsleep(&sc->sc_free_ccb, PRIBIO, "bhaccb", 0);
 	}
@@ -599,7 +602,7 @@ out:
 struct bha_ccb *
 bha_ccb_phys_kv(sc, ccb_phys)
 	struct bha_softc *sc;
-	u_long ccb_phys;
+	bus_addr_t ccb_phys;
 {
 	int hashnum = CCB_HASH(ccb_phys);
 	struct bha_ccb *ccb = sc->sc_ccbhash[hashnum];
@@ -707,8 +710,10 @@ bha_start_ccbs(sc)
 		/* Tell the card to poll immediately. */
 		bus_space_write_1(iot, ioh, BHA_CMD_PORT, BHA_START_SCSI);
 
-		if ((ccb->xs->flags & SCSI_POLL) == 0)
-			timeout(bha_timeout, ccb, (ccb->timeout * hz) / 1000);
+		if ((ccb->xs->xs_control & XS_CTL_POLL) == 0)
+			callout_reset(&ccb->xs->xs_callout,
+			    (ccb->timeout * hz) / 1000, bha_timeout, ccb);
+
 
 		++sc->sc_mbofull;
 		bha_nextmbx(wmbo, wmbx, mbo);
@@ -740,7 +745,7 @@ bha_done(sc, ccb)
 	if (xs->datalen) {
 		bus_dmamap_sync(dmat, ccb->dmamap_xfer, 0,
 		    ccb->dmamap_xfer->dm_mapsize,
-		    (xs->flags & SCSI_DATA_IN) ? BUS_DMASYNC_POSTREAD :
+		    (xs->xs_control & XS_CTL_DATA_IN) ? BUS_DMASYNC_POSTREAD :
 		    BUS_DMASYNC_POSTWRITE);
 		bus_dmamap_unload(dmat, ccb->dmamap_xfer);
 	}
@@ -796,7 +801,7 @@ bha_done(sc, ccb)
 			xs->resid = 0;
 	}
 	bha_free_ccb(sc, ccb);
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 	scsipi_done(xs);
 
 	/*
@@ -1291,7 +1296,7 @@ bha_scsi_cmd(xs)
 	bus_dma_tag_t dmat = sc->sc_dmat;
 	struct bha_ccb *ccb;
 	int error, seg, flags, s;
-	int fromqueue = 0, dontqueue = 0;
+	int fromqueue = 0, dontqueue = 0, nowait = 0;
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("bha_scsi_cmd\n"));
 
@@ -1304,11 +1309,12 @@ bha_scsi_cmd(xs)
 	if (xs == TAILQ_FIRST(&sc->sc_queue)) {
 		TAILQ_REMOVE(&sc->sc_queue, xs, adapter_q);
 		fromqueue = 1;
+		nowait = 1;
 		goto get_ccb;
 	}
 
 	/* Polled requests can't be queued for later. */
-	dontqueue = xs->flags & SCSI_POLL;
+	dontqueue = xs->xs_control & XS_CTL_POLL;
 
 	/*
 	 * If there are jobs in the queue, run them first.
@@ -1339,7 +1345,10 @@ bha_scsi_cmd(xs)
 	 * is from a buf (possibly from interrupt time)
 	 * then we can't allow it to sleep
 	 */
-	flags = xs->flags;
+	flags = xs->xs_control;
+	if (nowait)
+		flags |= XS_CTL_NOSLEEP;
+
 	if ((ccb = bha_get_ccb(sc, flags)) == NULL) {
 		/*
 		 * If we can't queue, we lose.
@@ -1370,7 +1379,7 @@ bha_scsi_cmd(xs)
 	/*
 	 * Put all the arguments for the xfer in the ccb
 	 */
-	if (flags & SCSI_RESET) {
+	if (flags & XS_CTL_RESET) {
 		ccb->opcode = BHA_RESET_CCB;
 		ccb->scsi_cmd_length = 0;
 	} else {
@@ -1386,17 +1395,17 @@ bha_scsi_cmd(xs)
 		 * Map the DMA transfer.
 		 */
 #ifdef TFS
-		if (flags & SCSI_DATA_UIO) {
+		if (flags & XS_CTL_DATA_UIO) {
 			error = bus_dmamap_load_uio(dmat,
 			    ccb->dmamap_xfer, (struct uio *)xs->data,
-			    (flags & SCSI_NOSLEEP) ? BUS_DMA_NOWAIT :
+			    (flags & XS_CTL_NOSLEEP) ? BUS_DMA_NOWAIT :
 			    BUS_DMA_WAITOK);
 		} else
 #endif /* TFS */
 		{
 			error = bus_dmamap_load(dmat,
 			    ccb->dmamap_xfer, xs->data, xs->datalen, NULL,
-			    (flags & SCSI_NOSLEEP) ? BUS_DMA_NOWAIT :
+			    (flags & XS_CTL_NOSLEEP) ? BUS_DMA_NOWAIT :
 			    BUS_DMA_WAITOK);
 		}
 
@@ -1415,7 +1424,7 @@ bha_scsi_cmd(xs)
 
 		bus_dmamap_sync(dmat, ccb->dmamap_xfer, 0,
 		    ccb->dmamap_xfer->dm_mapsize,
-		    (flags & SCSI_DATA_IN) ? BUS_DMASYNC_PREREAD :
+		    (flags & XS_CTL_DATA_IN) ? BUS_DMASYNC_PREREAD :
 		    BUS_DMASYNC_PREWRITE);
 
 		/*
@@ -1467,7 +1476,7 @@ bha_scsi_cmd(xs)
 	 * Usually return SUCCESSFULLY QUEUED
 	 */
 	SC_DEBUG(sc_link, SDEV_DB3, ("cmd_sent\n"));
-	if ((flags & SCSI_POLL) == 0)
+	if ((flags & XS_CTL_POLL) == 0)
 		return (SUCCESSFULLY_QUEUED);
 
 	/*
@@ -1507,7 +1516,7 @@ bha_poll(sc, xs, count)
 		if (bus_space_read_1(iot, ioh, BHA_INTR_PORT) &
 		    BHA_INTR_ANYINTR)
 			bha_intr(sc);
-		if (xs->flags & ITSDONE)
+		if (xs->xs_status & XS_STS_DONE)
 			return (0);
 		delay(1000);	/* only happens in boot so ok */
 		count--;

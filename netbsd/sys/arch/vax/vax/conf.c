@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.41 1999/03/26 22:04:07 ragge Exp $	*/
+/*	$NetBSD: conf.c,v 1.47 2000/06/12 11:13:15 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -43,6 +43,8 @@
 #include <sys/conf.h>
 #include <sys/vnode.h>
 
+#include "opt_cputype.h"
+
 #include "hp.h" /* 0 */
 bdev_decl(hp);
 
@@ -66,7 +68,7 @@ bdev_decl(ts);
 #include "mu.h"
 bdev_decl(mu);
 
-#if defined(VAX750)
+#if VAX750
 #define NCTU	1
 #else
 #define NCTU	0
@@ -161,6 +163,7 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #endif
 
 #define smgcnputc wsdisplay_cnputc
+#define	smgcnpollc nullcnpollc
 
 cons_decl(gen);
 cons_decl(dz);
@@ -171,13 +174,14 @@ cons_decl(smg);
 #include "smg.h"
 
 struct	consdev constab[]={
-#if VAX8600 || VAX8200 || VAX780 || VAX750 || VAX650 || VAX630
+#if VAX8600 || VAX8200 || VAX780 || VAX750 || VAX650 || VAX630 || VAX660 || \
+	VAX670 || VAX680
 #define NGEN	1
 	cons_init(gen), /* Generic console type; mtpr/mfpr */
 #else
 #define NGEN	0
 #endif
-#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49
+#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49 || VAX53
 	cons_init(dz),	/* DZ11-like serial console on VAXstations */
 #endif
 #if VAX650 || VAX630
@@ -188,7 +192,7 @@ struct	consdev constab[]={
 	cons_init(qd),
 #endif
 #endif
-#if 0 /* NSMG XXX fails due to wscons */
+#if NSMG
 	cons_init(smg),
 #endif
 
@@ -383,6 +387,8 @@ cdev_decl(wsdisplay);
 cdev_decl(wskbd);
 #include "wsmouse.h"
 cdev_decl(wsmouse);
+#include "wsmux.h"
+cdev_decl(wsmux);
 
 #include "scsibus.h"
 cdev_decl(scsibus);
@@ -466,6 +472,7 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NRY,ry),		/* 71: VS floppy */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 72: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 73: RAIDframe disk driver */
+	cdev_mouse_init(NWSMUX, wsmux),	/* 74: ws multiplexor */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -557,6 +564,7 @@ int	chrtoblktbl[] = {
 	NODEV,	/* 71 */
 	NODEV,	/* 72 */
 	25,	/* 73 */
+	NODEV,	/* 74 */
 };
 
 dev_t

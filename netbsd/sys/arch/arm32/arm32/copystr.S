@@ -1,4 +1,4 @@
-/*	$NetBSD: copystr.S,v 1.9.8.1 1999/11/05 07:36:55 cgd Exp $	*/
+/*	$NetBSD: copystr.S,v 1.13 1999/11/03 15:32:45 chs Exp $	*/
 
 /*
  * Copyright (c) 1995 Mark Brinicombe.
@@ -45,7 +45,7 @@
 	.text
 	.align	0
 Lcurpcb:
-	.word	_curpcb
+	.word	_C_LABEL(curpcb)
 
 Lvm_min_address:
 	.word	VM_MIN_ADDRESS
@@ -201,7 +201,7 @@ Lcopystrpcbfault:
 	mov	r2, r1
 	mov	r1, r0
 	add	r0, pc, #Lcopystrpcbfaulttext - . - 8
-	b	_panic
+	b	_C_LABEL(panic)
 
 Lcopystrpcbfaulttext:
 	.asciz	"No valid PCB during copyinoutstr() addr1=%08x addr2=%08x\n"

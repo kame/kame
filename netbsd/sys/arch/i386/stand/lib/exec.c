@@ -1,4 +1,4 @@
-/*	$NetBSD: exec.c,v 1.9.2.1 1999/04/09 17:11:29 drochner Exp $	 */
+/*	$NetBSD: exec.c,v 1.15 2000/02/22 07:45:04 dbj Exp $	 */
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -60,6 +60,8 @@
 #include "bootinfo.h"
 
 #ifdef COMPAT_OLDBOOT
+static int dev2major __P((char *, int *));
+
 static int
 dev2major(devname, major)
 	char           *devname;
@@ -92,6 +94,7 @@ exec_netbsd(file, loadaddr, boothowto)
 	u_long		marks[MARK_MAX];
 	struct btinfo_symtab btinfo_symtab;
 	u_long		extmem;
+	u_long		basemem;
 #ifdef XMS
 	u_long		xmsmem;
 	physaddr_t	origaddr = loadaddr;
@@ -105,7 +108,8 @@ exec_netbsd(file, loadaddr, boothowto)
 #endif
 
 #ifdef	DEBUG
-	printf("exec: file=%s loadaddr=0x%lx\n", file, loadaddr);
+	printf("exec: file=%s loadaddr=0x%lx\n",
+	       file ? file : "NULL", loadaddr);
 #endif
 
 	BI_ALLOC(6); /* ??? */
@@ -113,6 +117,7 @@ exec_netbsd(file, loadaddr, boothowto)
 	BI_ADD(&btinfo_console, BTINFO_CONSOLE, sizeof(struct btinfo_console));
 
 	extmem = getextmem();
+	basemem = getbasemem();
 
 #ifdef XMS
 	if ((getextmem1() == 0) && (xmsmem = checkxms())) {
@@ -131,7 +136,7 @@ exec_netbsd(file, loadaddr, boothowto)
 		 * Get the size of the kernel
 		 */
 		marks[MARK_START] = loadaddr;
-		if ((fd = loadfile(file, marks, COUNT_ALL)) == -1)
+		if ((fd = loadfile(file, marks, COUNT_KERNEL)) == -1)
 			goto out;
 		close(fd);
 
@@ -144,7 +149,7 @@ exec_netbsd(file, loadaddr, boothowto)
 	}
 #endif
 	marks[MARK_START] = loadaddr;
-	if ((fd = loadfile(file, marks, LOAD_ALL)) == -1)
+	if ((fd = loadfile(file, marks, LOAD_KERNEL)) == -1)
 		goto out;
 
 	boot_argv[0] = boothowto;
@@ -192,7 +197,7 @@ exec_netbsd(file, loadaddr, boothowto)
 	boot_argv[2] = vtophys(bootinfo);	/* old cyl offset */
 	/* argv[3] below */
 	boot_argv[4] = extmem;
-	boot_argv[5] = getbasemem();
+	boot_argv[5] = basemem;
 
 	close(fd);
 
@@ -211,7 +216,7 @@ exec_netbsd(file, loadaddr, boothowto)
 #ifdef XMS
 	if (loadaddr != origaddr) {
 		/*
-		 * We know have done our last DOS IO, so we may
+		 * We now have done our last DOS IO, so we may
 		 * trash the OS. Copy the data from the temporary
 		 * buffer to its real adress.
 		 */
@@ -238,7 +243,8 @@ exec_netbsd(file, loadaddr, boothowto)
 	btinfo_symtab.esym = marks[MARK_END];
 	BI_ADD(&btinfo_symtab, BTINFO_SYMTAB, sizeof(struct btinfo_symtab));
 
-	startprog(marks[MARK_ENTRY], BOOT_NARGS, boot_argv, 0x90000);
+	startprog(marks[MARK_ENTRY], BOOT_NARGS, boot_argv,
+		i386_trunc_page(basemem*1024));
 	panic("exec returned");
 
 out:

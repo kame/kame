@@ -1,4 +1,4 @@
-#	$NetBSD: files.osf1,v 1.3.24.1 1999/06/21 19:24:09 cgd Exp $
+#	$NetBSD: files.osf1,v 1.16 1999/05/04 04:59:21 cgd Exp $
 #
 # Config file description for machine-independent OSF/1 compat code.
 # Included by ports that need it.

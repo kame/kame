@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.3 1999/01/31 06:59:30 dbj Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.7 1999/09/17 20:04:44 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -56,7 +56,6 @@
 #include <sys/buf.h>
 #include <sys/dkstat.h>
 #include <sys/conf.h>
-#include <sys/dmap.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
 
@@ -69,13 +68,6 @@
 #include <next68k/next68k/isr.h>
 
 struct device *booted_device;	/* boot device */
-
-/*
- * The following several variables are related to
- * the configuration process, and are used in initializing
- * the machine.
- */
-int	cold;			/* if 1, still working on cold-start */
 
 void mainbus_attach __P((struct device *, struct device *, void *));
 int  mainbus_match __P((struct device *, struct cfdata *, void *));
@@ -147,19 +139,11 @@ mainbus_print(aux, cp)
 	return (UNCONF);
 }
 
-struct devnametobdevmaj next68k_nam2blk[] = {
-	{ "sd",		4 },
-	{ "st",		5 },
-	{ "cd",		6 },
-	{ "md",		13 },
-	{ NULL,		0 },
-};
-
 /*
  * Determine mass storage and memory configuration for a machine.
  */
 void
-configure()
+cpu_configure()
 {
 
 	booted_device = NULL;	/* set by device drivers (if found) */
@@ -170,8 +154,6 @@ configure()
 
 	if (config_rootfound("mainbus", NULL) == NULL)
 		panic("autoconfig failed, no root");
-
-	cold = 0;
 
 	/* Turn on interrupts */
 	spl0();
@@ -184,7 +166,7 @@ cpu_rootconf()
 	printf("boot device: %s\n",
 		(booted_device) ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, 0, next68k_nam2blk);
+	setroot(booted_device, 0);
 }
 
 #if 0 /* @@@ Does anything use this? Is it a required interface? */

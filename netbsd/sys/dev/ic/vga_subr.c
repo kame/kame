@@ -1,4 +1,4 @@
-/* $NetBSD: vga_subr.c,v 1.3 1999/01/13 16:48:58 drochner Exp $ */
+/* $NetBSD: vga_subr.c,v 1.6 2000/01/25 02:44:03 ad Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -125,7 +125,7 @@ vga_setfontset(vh, fontset1, fontset2)
 		0x08, 0x28, 0x0c, 0x2c
 	};
 
-	/* no extended fonts for now */
+	/* extended font if fontset1 != fontset2 */
 	cmap = cmaptaba[fontset1] | cmaptabb[fontset2];
 
 	vga_ts_write(vh, fontsel, cmap);
@@ -141,10 +141,11 @@ vga_setscreentype(vh, type)
 	/* lo byte */
 	vga_6845_write(vh, vde, type->fontheight * type->nrows - 1);
 
+#ifndef PCDISPLAY_SOFTCURSOR
 	/* set cursor to last 2 lines */
 	vga_6845_write(vh, curstart, type->fontheight - 2);
 	vga_6845_write(vh, curend, type->fontheight - 1);
-
+#endif
 	/*
 	 * disable colour plane 3 if needed for font selection
 	 */

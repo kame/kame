@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.h,v 1.9 1998/10/04 00:02:26 fvdl Exp $	*/
+/*	$NetBSD: linux_machdep.h,v 1.12 2000/06/11 09:21:16 veego Exp $	*/
 
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.
@@ -64,9 +64,8 @@ struct linux_sigcontext {
 	int	sc_esp_at_signal;
 	int	sc_ss;
 	int	sc_387;
-/* XXX XAX is this sigset_t? old_sigset_t? */
-/* XXX XAX what happens with RT sigs? */
-	linux_sigset_t sc_mask;
+	/* XXX check this */
+	linux_old_sigset_t sc_mask;
 	int	sc_cr2;
 };
 
@@ -95,7 +94,6 @@ __END_DECLS
  * ugly patch to fake device numbers.
  */
 #define LINUX_CONS_MAJOR   4
-#define NETBSD_PCCONS_MAJOR 12
 #define NETBSD_WSCONS_MAJOR 47
 
 /*
@@ -118,7 +116,7 @@ __END_DECLS
 #define LINUX_K_MEDIUMRAW 2
 
 /*
- * VT ioctl calls in Linux (the ones that pcvt can handle)
+ * VT ioctl calls in Linux (the ones that the pcvt emulation in wscons can handle)
  */
 #define LINUX_VT_OPENQRY    0x5600
 #define LINUX_VT_GETMODE    0x5601

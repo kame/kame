@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.8 1999/01/31 09:21:19 mrg Exp $ */
+/*	$NetBSD: asm.h,v 1.9.12.4 2000/08/07 01:26:24 mrg Exp $ */
 
 /*
  * Copyright (c) 1994 Allen Briggs
@@ -44,11 +44,22 @@
 #ifndef _ASM_H_
 #define _ASM_H_
 
+#ifndef _LOCORE
+#define _LOCORE
+#endif
+#include <machine/frame.h>
+
 #ifdef __arch64__
 #ifndef __ELF__
 #define __ELF__
 #endif
 #endif
+
+/* Pull in CCFSZ, CC64FSZ, and BIAS from frame.h */
+#ifndef _LOCORE
+#define _LOCORE
+#endif
+#include <machine/frame.h>
 
 #ifdef __ELF__
 #define	_C_LABEL(name)		name
@@ -69,10 +80,10 @@
  * to work without a stack frame (doing so requires saving %o7) .
  */
 #define PIC_PROLOGUE(dest,tmp) \
-	3: rd %pc, tmp; \
-	sethi %hi(_C_LABEL(_GLOBAL_OFFSET_TABLE_)-(3b-.)),dest; \
-	or dest,%lo(_C_LABEL(_GLOBAL_OFFSET_TABLE_)-(3b-.)),dest; \
-	add tmp,%o7,dest
+	sethi %hi(_GLOBAL_OFFSET_TABLE_-4),dest; \
+	rd %pc, tmp; \
+	or dest,%lo(_GLOBAL_OFFSET_TABLE_+4),dest; \
+	add dest,tmp,dest
 
 /*
  * PICCY_SET() does the equivalent of a `set var, %dest' instruction in
@@ -94,8 +105,8 @@
 
 #ifdef GPROF
 #define _PROF_PROLOGUE \
-	.data; .align 4; 1: .long 0; \
-	.text; save %sp,-96,%sp; sethi %hi(1b),%o0; call mcount; \
+	.data; .align 8; 1: .uaword 0; .uaword 0; \
+	.text; save %sp,-CC64FSZ,%sp; sethi %hi(1b),%o0; call _mcount; \
 	or %o0,%lo(1b),%o0; restore
 #else
 #define _PROF_PROLOGUE
@@ -103,12 +114,20 @@
 
 #define ENTRY(name)		_ENTRY(_C_LABEL(name)); _PROF_PROLOGUE
 #define	ASENTRY(name)		_ENTRY(_ASM_LABEL(name)); _PROF_PROLOGUE
-#define	FUNC(name)		ENTRY(name)
+#define	FUNC(name)		ASENTRY(name)
+#define RODATA(name)		.align 4; .text; .globl _C_LABEL(name); \
+				OTYPE(_C_LABEL(name)); _C_LABEL(name):
 
 
 #define ASMSTR			.asciz
 
 #define RCSID(name)		.asciz name
+
+#ifdef __ELF__
+#define	WEAK_ALIAS(alias,sym)						\
+	.weak alias;							\
+	alias = sym
+#endif
 
 /*
  * WARN_REFERENCES: create a warning if the specified symbol is referenced.

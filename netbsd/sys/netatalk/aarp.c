@@ -1,4 +1,4 @@
-/*	$NetBSD: aarp.c,v 1.3 1998/10/13 02:34:32 kim Exp $	*/
+/*	$NetBSD: aarp.c,v 1.5 2000/03/23 07:03:27 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
@@ -32,6 +32,7 @@
 #include <sys/syslog.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/proc.h>
 #include <sys/mbuf.h>
 #include <sys/time.h>
@@ -95,6 +96,7 @@ u_char aarp_org_code[3] = {
 	0x00, 0x00, 0x00
 };
 
+struct callout aarptimer_callout;
 
 static void
 aarptimer(ignored)
@@ -103,7 +105,7 @@ aarptimer(ignored)
 	struct aarptab *aat;
 	int             i, s;
 
-	timeout(aarptimer, NULL, AARPT_AGE * hz);
+	callout_reset(&aarptimer_callout, AARPT_AGE * hz, aarptimer, NULL);
 	aat = aarptab;
 	for (i = 0; i < AARPTAB_SIZE; i++, aat++) {
 		int killtime = (aat->aat_flags & ATF_COM) ? AARPT_KILLC :
@@ -194,8 +196,7 @@ aarpwhohas(ifp, sat)
 	if (aa->aa_flags & AFA_PHASE2) {
 		bcopy(atmulticastaddr, eh->ether_dhost,
 		    sizeof(eh->ether_dhost));
-		eh->ether_type = htons(sizeof(struct llc) +
-		    sizeof(struct ether_aarp));
+		eh->ether_type = 0;	/* if_output will treat as 802 */
 		M_PREPEND(m, sizeof(struct llc), M_WAIT);
 		llc = mtod(m, struct llc *);
 		llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
@@ -389,7 +390,7 @@ at_aarpinput(ifp, m)
 			 * probe, or probed for the same address we'd like
 			 * to use. Change the address we're probing for.
 		         */
-			untimeout(aarpprobe, ifp);
+			callout_stop(&aa->aa_probe_ch);
 			wakeup(aa);
 			m_freem(m);
 			return;
@@ -453,8 +454,6 @@ at_aarpinput(ifp, m)
 	bcopy(ea->aarp_tha, eh->ether_dhost, sizeof(eh->ether_dhost));
 
 	if (aa->aa_flags & AFA_PHASE2) {
-		eh->ether_type = htons(sizeof(struct llc) +
-		    sizeof(struct ether_aarp));
 		M_PREPEND(m, sizeof(struct llc), M_DONTWAIT);
 		if (m == NULL)
 			return;
@@ -467,6 +466,7 @@ at_aarpinput(ifp, m)
 
 		bcopy(ea->aarp_spnet, ea->aarp_tpnet, sizeof(ea->aarp_tpnet));
 		bcopy(&ma.s_net, ea->aarp_spnet, sizeof(ea->aarp_spnet));
+		eh->ether_type = 0;	/* if_output will treat as 802 */
 	} else {
 		eh->ether_type = htons(ETHERTYPE_AARP);
 	}
@@ -505,7 +505,8 @@ aarptnew(addr)
 
 	if (first) {
 		first = 0;
-		timeout(aarptimer, NULL, hz);
+		callout_init(&aarptimer_callout);
+		callout_reset(&aarptimer_callout, hz, aarptimer, NULL);
 	}
 	aat = &aarptab[AARPTAB_HASH(*addr) * AARPTAB_BSIZ];
 	for (n = 0; n < AARPTAB_BSIZ; n++, aat++) {
@@ -563,7 +564,7 @@ aarpprobe(arp)
 		wakeup(aa);
 		return;
 	} else {
-		timeout(aarpprobe, arp, hz / 5);
+		callout_reset(&aa->aa_probe_ch, hz / 5, aarpprobe, arp);
 	}
 
 	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL) {
@@ -588,8 +589,7 @@ aarpprobe(arp)
 	if (aa->aa_flags & AFA_PHASE2) {
 		bcopy(atmulticastaddr, eh->ether_dhost,
 		    sizeof(eh->ether_dhost));
-		eh->ether_type = htons(sizeof(struct llc) +
-		    sizeof(struct ether_aarp));
+		eh->ether_type = 0;	/* if_output will treat as 802 */
 		M_PREPEND(m, sizeof(struct llc), M_WAIT);
 		llc = mtod(m, struct llc *);
 		llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
@@ -628,7 +628,7 @@ aarp_clean()
 	struct aarptab *aat;
 	int             i;
 
-	untimeout(aarptimer, 0);
+	callout_stop(&aarptimer_callout);
 	for (i = 0, aat = aarptab; i < AARPTAB_SIZE; i++, aat++)
 		if (aat->aat_hold)
 			m_freem(aat->aat_hold);

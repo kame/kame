@@ -1,4 +1,33 @@
-/*	$NetBSD: if_loop.c,v 1.25 1998/07/05 06:49:17 jonathan Exp $	*/
+/*	$NetBSD: if_loop.c,v 1.30 2000/03/30 09:45:36 augustss Exp $	*/
+
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -70,6 +99,14 @@
 #include <netinet/ip.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_var.h>
+#include <netinet/ip6.h>
+#endif
+
 #ifdef NS
 #include <netns/ns.h>
 #include <netns/ns_if.h>
@@ -94,7 +131,11 @@
 #include <net/bpf.h>
 #endif
 
+#if defined(LARGE_LOMTU)
+#define LOMTU	(131072 +  MHLEN + MLEN)
+#else
 #define	LOMTU	(32768 +  MHLEN + MLEN)
+#endif
 
 struct	ifnet loif[NLOOP];
 
@@ -102,8 +143,8 @@ void
 loopattach(n)
 	int n;
 {
-	register int i;
-	register struct ifnet *ifp;
+	int i;
+	struct ifnet *ifp;
 
 	for (i = 0; i < NLOOP; i++) {
 		ifp = &loif[i];
@@ -126,12 +167,12 @@ loopattach(n)
 int
 looutput(ifp, m, dst, rt)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	int s, isr;
-	register struct ifqueue *ifq = 0;
+	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput: no header mbuf");
@@ -162,6 +203,59 @@ looutput(ifp, m, dst, rt)
 		return (rt->rt_flags & RTF_BLACKHOLE ? 0 :
 			rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
 	}
+
+#ifndef PULLDOWN_TEST
+	/*
+	 * KAME requires that the packet to be contiguous on the
+	 * mbuf.  We need to make that sure.
+	 * this kind of code should be avoided.
+	 * XXX other conditions to avoid running this part?
+	 */
+	if (m->m_len != m->m_pkthdr.len) {
+		struct mbuf *n = NULL;
+		int maxlen;
+
+		MGETHDR(n, M_DONTWAIT, MT_HEADER);
+		maxlen = MHLEN;
+		if (n)
+			M_COPY_PKTHDR(n, m);
+		if (n && m->m_pkthdr.len > maxlen) {
+			MCLGET(n, M_DONTWAIT);
+			maxlen = MCLBYTES;
+			if ((n->m_flags & M_EXT) == 0) {
+				m_free(n);
+				n = NULL;
+			}
+		}
+		if (!n) {
+			printf("looutput: mbuf allocation failed\n");
+			m_freem(m);
+			return ENOBUFS;
+		}
+
+		if (m->m_pkthdr.len <= maxlen) {
+			m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
+			n->m_len = m->m_pkthdr.len;
+			n->m_next = NULL;
+			m_freem(m);
+		} else {
+			m_copydata(m, 0, maxlen, mtod(n, caddr_t));
+			m_adj(m, maxlen);
+			n->m_len = maxlen;
+			n->m_next = m;
+			m->m_flags &= ~M_PKTHDR;
+		}
+		m = n;
+	}
+#if 0
+	if (m && m->m_next != NULL) {
+		printf("loop: not contiguous...\n");
+		m_freem(m);
+		return ENOBUFS;
+	}
+#endif
+#endif
+
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
 	switch (dst->sa_family) {
@@ -170,6 +264,13 @@ looutput(ifp, m, dst, rt)
 	case AF_INET:
 		ifq = &ipintrq;
 		isr = NETISR_IP;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		m->m_flags |= M_LOOP;
+		ifq = &ip6intrq;
+		isr = NETISR_IPV6;
 		break;
 #endif
 #ifdef NS
@@ -235,20 +336,20 @@ lortrequest(cmd, rt, sa)
 /* ARGSUSED */
 int
 loioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
-	register struct ifaddr *ifa;
-	register struct ifreq *ifr;
-	register int error = 0;
+	struct ifaddr *ifa;
+	struct ifreq *ifr;
+	int error = 0;
 
 	switch (cmd) {
 
 	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		ifa = (struct ifaddr *)data;
-		if (ifa != 0 && ifa->ifa_addr->sa_family == AF_ISO)
+		if (ifa != 0 /*&& ifa->ifa_addr->sa_family == AF_ISO*/)
 			ifa->ifa_rtrequest = lortrequest;
 		/*
 		 * Everything else is done at a higher level.
@@ -266,6 +367,10 @@ loioctl(ifp, cmd, data)
 
 #ifdef INET
 		case AF_INET:
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
 			break;
 #endif
 

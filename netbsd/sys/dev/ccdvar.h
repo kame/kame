@@ -1,7 +1,7 @@
-/*	$NetBSD: ccdvar.h,v 1.17 1999/01/21 00:35:16 thorpej Exp $	*/
+/*	$NetBSD: ccdvar.h,v 1.19 1999/08/11 02:44:35 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -79,7 +79,6 @@
  */
 
 #include <sys/lock.h>
-#include <sys/pool.h>
 #include <sys/queue.h>
 
 /*
@@ -173,19 +172,17 @@ struct ccd_softc {
 	struct ccdgeom   sc_geom;		/* pseudo geometry info */
 	char		 sc_xname[8];		/* XXX external name */
 	struct disk	 sc_dkdev;		/* generic disk device info */
-	struct pool	 sc_cbufpool;		/* component buffer pool */
 	struct lock	 sc_lock;		/* lock on this structure */
 };
 
 /* sc_flags */
-#define	CCDF_SWAP	0x01	/* interleave should be dmmax */
 #define	CCDF_UNIFORM	0x02	/* use LCCD of sizes for uniform interleave */
 #define CCDF_INITED	0x10	/* unit has been initialized */
 #define CCDF_WLABEL	0x20	/* label area is writable */
 #define CCDF_LABELLING	0x40	/* unit is currently being labelled */
 
 /* Mask of user-settable ccd flags. */
-#define CCDF_USERMASK	(CCDF_SWAP|CCDF_UNIFORM)
+#define CCDF_USERMASK	(CCDF_UNIFORM)
 
 /*
  * Before you can use a unit, it must be configured with CCDIOCSET.

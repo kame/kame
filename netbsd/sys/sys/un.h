@@ -1,4 +1,4 @@
-/*	$NetBSD: un.h,v 1.21 1999/03/22 17:54:38 sommerfe Exp $	*/
+/*	$NetBSD: un.h,v 1.23 2000/06/08 19:01:45 danw Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -42,15 +42,17 @@
  * Definitions for UNIX IPC domain.
  */
 struct	sockaddr_un {
-	u_char	sun_len;		/* total sockaddr length */
-	u_char	sun_family;		/* AF_LOCAL */
-	char	sun_path[104];		/* path name (gag) */
+	u_int8_t	sun_len;	/* total sockaddr length */
+	u_int8_t	sun_family;	/* AF_LOCAL */
+	char		sun_path[104];	/* path name (gag) */
 };
 
 /*
  * Socket options for UNIX IPC domain.
  */
+#if !defined(_XOPEN_SOURCE)
 #define	LOCAL_CREDS	0x0001		/* pass credentials to receiver */
+#endif
 
 #ifdef _KERNEL
 struct unpcb;
@@ -78,8 +80,10 @@ void	unp_setpeeraddr __P((struct unpcb *, struct mbuf *));
 #else /* !_KERNEL */
 
 /* actual length of an initialized sockaddr_un */
+#if !defined(_XOPEN_SOURCE)
 #define SUN_LEN(su) \
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
+#endif /* !_XOPEN_SOURCE */
 #endif /* _KERNEL */
 
 #endif /* !_SYS_UN_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgsix_obio.c,v 1.2 1999/03/25 00:41:47 mrg Exp $ */
+/*	$NetBSD: cgsix_obio.c,v 1.5 2000/03/30 13:57:50 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -85,7 +85,7 @@ struct cfattach cgsix_obio_ca = {
 /*
  * Match a cgsix.
  */
-int
+static int
 cgsixmatch(parent, cf, aux)
 	struct device *parent;
 	struct cfdata *cf;
@@ -106,7 +106,7 @@ cgsixmatch(parent, cf, aux)
 				cg6_pfour_probe, NULL));
 }
 
-int
+static int
 cg6_pfour_probe(vaddr, arg)
 	void *vaddr;
 	void *arg;
@@ -119,7 +119,7 @@ cg6_pfour_probe(vaddr, arg)
 /*
  * Attach a display.
  */
-void
+static void
 cgsixattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
@@ -132,12 +132,6 @@ cgsixattach(parent, self, aux)
 	bus_space_handle_t bh;
 	int constype, isconsole;
 	char *name;
-	extern struct tty *fbconstty;
-
-	if (uoba->uoba_isobio4 == 0) {
-		(*cgsix_sbus_ca.ca_attach)(parent, self, aux);
-		return;
-	}
 
 	oba = &uoba->uoba_oba4;
 
@@ -198,6 +192,16 @@ cgsixattach(parent, self, aux)
 	}
 	sc->sc_tec = (struct cg6_tec_xxx *)bh;
 
+	if (bus_space_map2(oba->oba_bustag, 0,
+			   oba->oba_paddr + CGSIX_FBC_OFFSET,
+			   sizeof(*sc->sc_fbc),
+			   BUS_SPACE_MAP_LINEAR,
+			   0, &bh) != 0) {
+		printf("%s: cannot map FBC registers\n", self->dv_xname);
+		return;
+	}
+	sc->sc_fbc = (struct cg6_fbc *)bh;
+
 
 	if (fb_pfour_id((void *)sc->sc_fhc) == PFOUR_ID_FASTCOLOR) {
 		fb->fb_flags |= FB_PFOUR;
@@ -212,7 +216,7 @@ cgsixattach(parent, self, aux)
 	 * to be found.
 	 */
 	if (eep == NULL || eep->eeConsole == constype)
-		isconsole = (fbconstty != NULL);
+		isconsole = fb_is_console(0);
 	else
 		isconsole = 0;
 
@@ -229,5 +233,5 @@ cgsixattach(parent, self, aux)
 		sc->sc_fb.fb_pixels = (caddr_t)bh;
 	}
 
-	cg6attach(sc, name, isconsole, 1);
+	cg6attach(sc, name, isconsole);
 }

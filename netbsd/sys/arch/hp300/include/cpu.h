@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.32 1999/02/26 22:37:57 is Exp $	*/
+/*	$NetBSD: cpu.h,v 1.35 2000/05/27 21:46:42 he Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -45,6 +45,10 @@
 #ifndef _HP300_CPU_H_
 #define	_HP300_CPU_H_
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Exported definitions unique to hp300/68k cpu support.
  */
@@ -59,6 +63,20 @@
  */
 #include <machine/intr.h>
 
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()	(&cpu_info_store)
+
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
@@ -66,6 +84,7 @@
 #define	cpu_swapin(p)			/* nothing */
 #define	cpu_wait(p)			/* nothing */
 #define	cpu_swapout(p)			/* nothing */
+#define	cpu_number()			0
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -112,6 +131,8 @@ extern int want_resched;	/* resched() was called */
 
 extern int astpending;		/* need to trap before returning to user mode */
 #define aston() (astpending++)
+
+#endif /* _KERNEL */
 
 /*
  * CTL_MACHDEP definitions.

@@ -1,4 +1,4 @@
-/*	$NetBSD: atapiconf.c,v 1.25.2.1 1999/07/08 17:43:26 perry Exp $	*/
+/*	$NetBSD: atapiconf.c,v 1.35 2000/04/02 23:38:19 augustss Exp $	*/
 
 /*
  * Copyright (c) 1996 Manuel Bouyer.  All rights reserved.
@@ -41,30 +41,24 @@
 #include <dev/ata/atavar.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/atapi_all.h>
-#include <dev/scsipi/scsipiconf.h>
 #include <dev/scsipi/atapiconf.h>
 
 #include "locators.h"
 
 #define SILENT_PRINTF(flags,string) if (!(flags & A_SILENT)) printf string
-
-struct atapibus_softc {
-	struct device sc_dev;
-	struct scsipi_link *adapter_link;	/* proto supplied by adapter */
-	struct scsipi_link **sc_link;		/* dynamically allocated */
-	struct ata_drive_datas *sc_drvs;	/* array supplied by adapter */
-};
+#define MAX_TARGET 1
 
 int	atapibusmatch __P((struct device *, struct cfdata *, void *));
 int	atapibussubmatch __P((struct device *, struct cfdata *, void *));
 void	atapibusattach __P((struct device *, struct device *, void *));
-int	atapiprint __P((void *, const char *));
+int	atapibusactivate __P((struct device *, enum devact));
+int	atapibusdetach __P((struct device *, int flags));
 
 int	atapi_probe_bus __P((int, int));
-void	atapi_probedev __P((struct atapibus_softc *, int ));
 
 struct cfattach atapibus_ca = {
-	sizeof(struct atapibus_softc), atapibusmatch, atapibusattach
+	sizeof(struct atapibus_softc), atapibusmatch, atapibusattach,
+	atapibusdetach, atapibusactivate,
 };
 
 extern struct cfdriver atapibus_cd;
@@ -86,6 +80,8 @@ struct scsi_quirk_inquiry_pattern atapi_quirk_patterns[] = {
 	 "FX320S", "", "q01"},			ADEV_NOSENSE},
 	{{T_CDROM, T_REMOV,
 	 "GCD-R580B", "", "1.00"},		ADEV_LITTLETOC},
+	{{T_CDROM, T_REMOV,
+	 "HITACHI CDR-7730", "", "0008a"},	ADEV_NOSENSE},
 	{{T_CDROM, T_REMOV,
 	 "MATSHITA CR-574", "", "1.02"},	ADEV_NOCAPACITY},
 	{{T_CDROM, T_REMOV,
@@ -141,23 +137,6 @@ atapibussubmatch(parent, cf, aux)
 	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
 }
 
-#if 0
-void
-atapi_fixquirk(sc_link)
-	struct scsipi_link *ad_link;
-{
-	struct ataparams *id = &ad_link->id;
-	struct atapi_quirk_inquiry_pattern *quirk;
-
-	/*
-	 * Clean up the model name, serial and revision numbers.
-	 */
-	btrim(id->model, sizeof(id->model));
-	btrim(id->serial_number, sizeof(id->serial_number));
-	btrim(id->firmware_revision, sizeof(id->firmware_revision));
-}
-#endif
-
 void
 atapibusattach(parent, self, aux)
 	struct device *parent, *self;
@@ -176,7 +155,7 @@ atapibusattach(parent, self, aux)
 	sc_link_proto = malloc(sizeof(struct scsipi_link),
 	    M_DEVBUF, M_NOWAIT);
 	if (sc_link_proto == NULL)
-	    printf("atapibusattach : can't allocate scsipi link proto\n");
+		panic("atapibusattach : can't allocate scsipi link proto\n");
 	memset(sc_link_proto, 0, sizeof(struct scsipi_link));
 
 	sc_link_proto->type = BUS_ATAPI;
@@ -188,6 +167,8 @@ atapibusattach(parent, self, aux)
 	sc_link_proto->scsipi_cmd = atapi_scsipi_cmd;
 	sc_link_proto->scsipi_interpret_sense = atapi_interpret_sense;
 	sc_link_proto->sc_print_addr = atapi_print_addr;
+	sc_link_proto->scsipi_kill_pending =
+	  ((struct atapi_adapter*)aa_link->aa_bus_private)->atapi_kill_pending;
 
 
 	sc_ab->adapter_link = sc_link_proto;
@@ -203,12 +184,78 @@ atapibusattach(parent, self, aux)
 }
 
 int
+atapibusactivate(self, act)
+	struct device *self;
+	enum devact act;
+{
+	struct atapibus_softc *sc = (struct atapibus_softc *)self;
+	struct scsipi_link *sc_link;
+	int target, error = 0, s;
+
+	s = splbio();
+	switch (act) {
+	case DVACT_ACTIVATE:
+		error = EOPNOTSUPP;
+		break;
+
+	case DVACT_DEACTIVATE:
+		for (target = 0; target <= MAX_TARGET; target++) {
+			sc_link = sc->sc_link[target];
+			if (sc_link == NULL)
+				continue;
+			error = config_deactivate(sc_link->device_softc);
+			if (error != 0)
+				goto out;
+		}
+		break;
+	}
+ out:
+	splx(s);
+	return (error);
+}
+
+int
+atapibusdetach(self, flags)
+	struct device *self;
+	int flags;
+{
+	struct atapibus_softc *sc = (struct atapibus_softc *)self;
+	struct scsipi_link *sc_link;
+	int target, error;
+
+	for (target = 0; target <= MAX_TARGET; target++) {
+		sc_link = sc->sc_link[target];
+		if (sc_link == NULL)
+			continue;
+		error = config_detach(sc_link->device_softc, flags);
+		if (error != 0)
+			return (error);
+
+		/*
+		 * We have successfully detached the child.  Drop the
+		 * direct reference for the child so that wdcdetach
+		 * won't call detach routine twice.
+		 */
+#ifdef DIAGNOSTIC
+		if (sc_link->device_softc != sc->sc_drvs[target].drv_softc)
+			panic("softc mismatch");
+#endif
+		sc->sc_drvs[target].drv_softc = NULL;
+
+		free(sc_link, M_DEVBUF);
+		sc->sc_link[target] = NULL;
+	}
+	return (0);
+}
+
+int
 atapi_probe_bus(bus, target)
 	int bus, target;
 {
 	int maxtarget, mintarget;
 	struct atapibus_softc *atapi;
 	int error;
+	struct atapi_adapter *atapi_adapter;
 
 	if (bus < 0 || bus >= atapibus_cd.cd_ndevs)
 		return (ENXIO);
@@ -226,97 +273,51 @@ atapi_probe_bus(bus, target)
 	}
 	if ((error = scsipi_adapter_addref(atapi->adapter_link)) != 0)
 		return (error);
+	atapi_adapter = (struct atapi_adapter*)atapi->adapter_link->adapter;
 	for (target = mintarget; target <= maxtarget; target++)
-		atapi_probedev(atapi, target);
+		atapi_adapter->atapi_probedev(atapi, target);
 	scsipi_adapter_delref(atapi->adapter_link);
 	return (0);
 }
 
-void
-atapi_probedev(atapi, target)
+void *
+atapi_probedev(atapi, target, sc_link, sa)
 	struct atapibus_softc *atapi;
 	int target;
-{
 	struct scsipi_link *sc_link;
-	struct scsipibus_attach_args sa;
-	struct ataparams ids;
-	struct ataparams *id = &ids;
-	struct ata_drive_datas *drvp = &atapi->sc_drvs[target];
+	struct scsipibus_attach_args *sa;
+{
 	struct cfdata *cf;
 	struct scsi_quirk_inquiry_pattern *finger;
 	int priority;
-	char serial_number[21], model[41], firmware_revision[9];
 
-	/* skip if already attached */
-	if (atapi->sc_link[target])
-		return;
-
-	if (wdc_atapi_get_params(atapi->adapter_link, target,
-	    SCSI_POLL|SCSI_NOSLEEP, id) == COMPLETE) {
-#ifdef ATAPI_DEBUG_PROBE
-		printf("%s drive %d: cmdsz 0x%x drqtype 0x%x\n",
-		    atapi->sc_dev.dv_xname, target,
-		    id->atap_config & ATAPI_CFG_CMD_MASK,
-		    id->atap_config & ATAPI_CFG_DRQ_MASK);
-#endif
-		/*
-		 * Allocate a device link and try and attach
-		 * a driver to this device.  If we fail, free
-		 * the link.
-		 */
-		sc_link = malloc(sizeof(*sc_link), M_DEVBUF, M_NOWAIT);
-		if (sc_link == NULL) {
-			printf("%s: can't allocate link for drive %d\n",
-			    atapi->sc_dev.dv_xname, target);
-			return;
-		}
-		/* Fill in link. */
-		*sc_link = *atapi->adapter_link;
-		sc_link->scsipi_atapi.drive = target;
-		sc_link->device = NULL;
-		TAILQ_INIT(&sc_link->pending_xfers);
+	/* Fill generic parts of the link. */
+	sc_link->active = 0;
+	sc_link->scsipi_atapi.drive = target;
+	sc_link->device = NULL;
+	TAILQ_INIT(&sc_link->pending_xfers);
 #if defined(SCSIDEBUG) && DEBUGTYPE == BUS_ATAPI
-		if (DEBUGTARGET == -1 || target == DEBUGTARGET)
-			sc_link->flags |= DEBUGLEVEL;
+	if (DEBUGTARGET == -1 || target == DEBUGTARGET)
+		sc_link->flags |= DEBUGLEVEL;
 #endif /* SCSIDEBUG */
-		if ((id->atap_config & ATAPI_CFG_CMD_MASK) == ATAPI_CFG_CMD_16)
-			sc_link->scsipi_atapi.cap |= ACAP_LEN;
-		sc_link->scsipi_atapi.cap |=
-		    (id->atap_config & ATAPI_CFG_DRQ_MASK);
-		sa.sa_sc_link = sc_link;
-		sa.sa_inqbuf.type =  ATAPI_CFG_TYPE(id->atap_config);
-		sa.sa_inqbuf.removable =
-		    id->atap_config & ATAPI_CFG_REMOV ? T_REMOV : T_FIXED;
-		if (sa.sa_inqbuf.removable)
-			sc_link->flags |= SDEV_REMOVABLE;
-		scsipi_strvis(model, 40, id->atap_model, 40);
-		scsipi_strvis(serial_number, 20, id->atap_serial, 20);
-		scsipi_strvis(firmware_revision, 8, id->atap_revision, 8);
-		sa.sa_inqbuf.vendor = model;
-		sa.sa_inqbuf.product = serial_number;
-		sa.sa_inqbuf.revision = firmware_revision;
+	finger = (struct scsi_quirk_inquiry_pattern *)scsipi_inqmatch(
+	    &sa->sa_inqbuf, (caddr_t)atapi_quirk_patterns,
+	    sizeof(atapi_quirk_patterns) /
+	        sizeof(atapi_quirk_patterns[0]),
+	    sizeof(atapi_quirk_patterns[0]), &priority);
+	if (priority != 0)
+		sc_link->quirks |= finger->quirks;
 
-		finger = (struct scsi_quirk_inquiry_pattern *)scsipi_inqmatch(
-		    &sa.sa_inqbuf, (caddr_t)atapi_quirk_patterns,
-		    sizeof(atapi_quirk_patterns) /
-		        sizeof(atapi_quirk_patterns[0]),
-		    sizeof(atapi_quirk_patterns[0]), &priority);
-		if (priority != 0)
-			sc_link->quirks |= finger->quirks;
-
-		if ((cf = config_search(atapibussubmatch, &atapi->sc_dev,
-		    &sa)) != 0) {
-			atapi->sc_link[target] = sc_link;
-			drvp->drv_softc = config_attach(&atapi->sc_dev, cf,
-			    &sa, atapibusprint);
-			wdc_probe_caps(drvp);
-			return;
-		} else {
-			atapibusprint(&sa, atapi->sc_dev.dv_xname);
-			printf(" not configured\n");
-			free(sc_link, M_DEVBUF);
-			return;
-		}
+	if ((cf = config_search(atapibussubmatch, &atapi->sc_dev,
+	    sa)) != 0) {
+		atapi->sc_link[target] = sc_link;
+		return (config_attach(&atapi->sc_dev, cf,
+		    sa, atapibusprint));
+	} else {
+		atapibusprint(sa, atapi->sc_dev.dv_xname);
+		printf(" not configured\n");
+		free(sc_link, M_DEVBUF);
+		return (NULL);
 	}
 }
 

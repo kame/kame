@@ -1,4 +1,4 @@
-/*	$NetBSD: fdesc_vfsops.c,v 1.27 1999/02/26 23:44:45 wrstuden Exp $	*/
+/*	$NetBSD: fdesc_vfsops.c,v 1.31 2000/06/10 18:27:02 assar Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -65,7 +65,6 @@ int	fdesc_mount __P((struct mount *, const char *, void *,
 			 struct nameidata *, struct proc *));
 int	fdesc_start __P((struct mount *, int, struct proc *));
 int	fdesc_unmount __P((struct mount *, int, struct proc *));
-int	fdesc_root __P((struct mount *, struct vnode **));
 int	fdesc_quotactl __P((struct mount *, int, uid_t, caddr_t,
 			    struct proc *));
 int	fdesc_statfs __P((struct mount *, struct statfs *, struct proc *));
@@ -111,12 +110,13 @@ fdesc_mount(mp, path, data, ndp, p)
 	fmp->f_root = rvp;
 	mp->mnt_flag |= MNT_LOCAL;
 	mp->mnt_data = (qaddr_t)fmp;
-	vfs_getnewfsid(mp, MOUNT_FDESC);
+	vfs_getnewfsid(mp);
 
 	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
 	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
 	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
 	memcpy(mp->mnt_stat.f_mntfromname, "fdesc", sizeof("fdesc"));
+	VOP_UNLOCK(rvp, 0);
 	return (0);
 }
 
@@ -344,6 +344,7 @@ struct vfsops fdesc_vfsops = {
 	fdesc_fhtovp,
 	fdesc_vptofh,
 	fdesc_init,
+	fdesc_done,
 	fdesc_sysctl,
 	NULL,				/* vfs_mountroot */
 	fdesc_checkexp,

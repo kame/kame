@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_param.h,v 1.19.2.1 1999/04/12 23:20:09 simonb Exp $	*/
+/*	$NetBSD: vm_param.h,v 1.26 2000/04/11 02:30:32 chs Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -90,7 +90,7 @@ typedef int	boolean_t;
  */
 #define	DEFAULT_PAGE_SIZE	4096
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) && !defined(PAGE_SIZE)
 /*
  *	All references to the size of a page should be done with PAGE_SIZE
  *	or PAGE_SHIFT.  The fact they are variables is hidden here so that
@@ -107,13 +107,15 @@ typedef int	boolean_t;
 #define	VM_METER	1		/* struct vmmeter */
 #define	VM_LOADAVG	2		/* struct loadavg */
 #define VM_UVMEXP	3		/* struct uvmexp */
-#define	VM_MAXID	4		/* number of valid vm ids */
+#define	VM_NKMEMPAGES	4		/* kmem_map pages */
+#define	VM_MAXID	5		/* number of valid vm ids */
 
 #define	CTL_VM_NAMES { \
 	{ 0, 0 }, \
 	{ "vmmeter", CTLTYPE_STRUCT }, \
 	{ "loadavg", CTLTYPE_STRUCT }, \
 	{ "uvmexp", CTLTYPE_STRUCT }, \
+	{ "nkmempages", CTLTYPE_INT }, \
 }
 
 
@@ -138,22 +140,16 @@ typedef int	boolean_t;
  */
 #ifdef _KERNEL
 #define	atop(x)		(((unsigned long)(x)) >> PAGE_SHIFT)
-#define	ptoa(x)		((vaddr_t)((x) << PAGE_SHIFT))
+#define	ptoa(x)		((vaddr_t)((vaddr_t)(x) << PAGE_SHIFT))
 
 /*
  * Round off or truncate to the nearest page.  These will work
  * for either addresses or counts (i.e., 1 byte rounds to 1 page).
  */
-#define	round_page(x) \
-	((vaddr_t)((((vaddr_t)(x)) + PAGE_MASK) & ~PAGE_MASK))
-#define	trunc_page(x) \
-	((vaddr_t)(((vaddr_t)(x)) & ~PAGE_MASK))
-#define	num_pages(x) \
-	((vaddr_t)((((vaddr_t)(x)) + PAGE_MASK) >> PAGE_SHIFT))
+#define	round_page(x)	(((x) + PAGE_MASK) & ~PAGE_MASK)
+#define	trunc_page(x)	((x) & ~PAGE_MASK)
 
 extern psize_t		mem_size;	/* size of physical memory (bytes) */
-extern paddr_t		first_addr;	/* first physical page */
-extern paddr_t		last_addr;	/* last physical page */
 
 #else
 /* out-of-kernel versions of round_page and trunc_page */

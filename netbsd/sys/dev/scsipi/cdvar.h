@@ -1,4 +1,4 @@
-/*	$NetBSD: cdvar.h,v 1.10 1999/02/02 13:02:49 bouyer Exp $	*/
+/*	$NetBSD: cdvar.h,v 1.12 2000/01/21 23:40:00 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
@@ -48,7 +48,7 @@ struct cd_softc {
 		int blksize;
 		u_long disksize;	/* total number sectors */
 	} params;
-	struct buf buf_queue;
+	struct buf_queue buf_queue;
 	char name[16]; /* product name, for default disklabel */
 	const struct cd_ops *sc_ops;	/* our bus-dependent ops vector */
 
@@ -69,3 +69,5 @@ struct cd_ops {
 
 void cdattach __P((struct device *, struct cd_softc *, struct scsipi_link *,
     const struct cd_ops *));
+int cdactivate __P((struct device *, enum devact));
+int cddetach __P((struct device *, int));

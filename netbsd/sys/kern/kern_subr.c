@@ -1,12 +1,12 @@
-/*	$NetBSD: kern_subr.c,v 1.45.2.1 2000/02/01 22:54:45 he Exp $	*/
+/*	$NetBSD: kern_subr.c,v 1.70 2000/05/31 06:18:03 enami Exp $	*/
 
 /*-
- * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
  * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
- * NASA Ames Research Center.
+ * NASA Ames Research Center, and by Luke Mewburn.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -107,29 +107,28 @@
 #include <net/if.h>
 
 /* XXX these should eventually move to subr_autoconf.c */
-static int findblkmajor __P((const char *, struct devnametobdevmaj *));
-static const char *findblkname __P((int, struct devnametobdevmaj *));
-static struct device *getdisk __P((char *, int, int,
-	struct devnametobdevmaj *, dev_t *, int));
-static struct device *parsedisk __P((char *, int, int,
-	struct devnametobdevmaj *, dev_t *));
-static int getstr __P((char *, int));
+static int findblkmajor __P((const char *));
+static const char *findblkname __P((int));
+static struct device *finddevice __P((const char *));
+static struct device *getdisk __P((char *, int, int, dev_t *, int));
+static struct device *parsedisk __P((char *, int, int, dev_t *));
 
 int
 uiomove(buf, n, uio)
-	register void *buf;
-	register int n;
-	register struct uio *uio;
+	void *buf;
+	int n;
+	struct uio *uio;
 {
-	register struct iovec *iov;
+	struct iovec *iov;
 	u_int cnt;
 	int error = 0;
 	char *cp = buf;
+	struct proc *p = uio->uio_procp;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ && uio->uio_rw != UIO_WRITE)
 		panic("uiomove: mode");
-	if (uio->uio_segflg == UIO_USERSPACE && uio->uio_procp != curproc)
+	if (uio->uio_segflg == UIO_USERSPACE && p != curproc)
 		panic("uiomove proc");
 #endif
 	while (n > 0 && uio->uio_resid) {
@@ -145,6 +144,11 @@ uiomove(buf, n, uio)
 		switch (uio->uio_segflg) {
 
 		case UIO_USERSPACE:
+			KDASSERT(p->p_cpu != NULL);
+			KDASSERT(p->p_cpu == curcpu());
+			if (p->p_cpu->ci_schedstate.spc_flags &
+			    SPCF_SHOULDYIELD)
+				preempt(NULL);
 			if (uio->uio_rw == UIO_READ)
 				error = copyout(cp, iov->iov_base, cnt);
 			else
@@ -159,7 +163,7 @@ uiomove(buf, n, uio)
 			else
 				error = kcopy(iov->iov_base, cp, cnt);
 			if (error)
-				return(error);
+				return (error);
 			break;
 		}
 		iov->iov_base = (caddr_t)iov->iov_base + cnt;
@@ -177,10 +181,10 @@ uiomove(buf, n, uio)
  */
 int
 ureadc(c, uio)
-	register int c;
-	register struct uio *uio;
+	int c;
+	struct uio *uio;
 {
-	register struct iovec *iov;
+	struct iovec *iov;
 
 	if (uio->uio_resid <= 0)
 		panic("ureadc: non-positive resid");
@@ -231,10 +235,24 @@ hashinit(elements, type, flags, hashmask)
 	for (hashsize = 1; hashsize < elements; hashsize <<= 1)
 		continue;
 	hashtbl = malloc((u_long)hashsize * sizeof(*hashtbl), type, flags);
+	if (hashtbl == NULL)
+		return (NULL);
 	for (i = 0; i < hashsize; i++)
 		LIST_INIT(&hashtbl[i]);
 	*hashmask = hashsize - 1;
 	return (hashtbl);
+}
+
+/*
+ * Free memory from hash table previosly allocated via hashinit().
+ */
+void
+hashdone(hashtbl, type)
+	void *hashtbl;
+	int type;
+{
+
+	free(hashtbl, type);
 }
 
 /*
@@ -259,7 +277,7 @@ shutdownhook_establish(fn, arg)
 	ndp = (struct shutdownhook_desc *)
 	    malloc(sizeof(*ndp), M_DEVBUF, M_NOWAIT);
 	if (ndp == NULL)
-		return NULL;
+		return (NULL);
 
 	ndp->sfd_fn = fn;
 	ndp->sfd_arg = arg;
@@ -313,6 +331,72 @@ doshutdownhooks()
 		 */
 		free(dp, M_DEVBUF);
 #endif
+	}
+}
+
+/*
+ * "Power hook" types, functions, and variables.
+ */
+
+struct powerhook_desc {
+	LIST_ENTRY(powerhook_desc) sfd_list;
+	void	(*sfd_fn) __P((int, void *));
+	void	*sfd_arg;
+};
+
+LIST_HEAD(, powerhook_desc) powerhook_list;
+
+void *
+powerhook_establish(fn, arg)
+	void (*fn) __P((int, void *));
+	void *arg;
+{
+	struct powerhook_desc *ndp;
+
+	ndp = (struct powerhook_desc *)
+	    malloc(sizeof(*ndp), M_DEVBUF, M_NOWAIT);
+	if (ndp == NULL)
+		return (NULL);
+
+	ndp->sfd_fn = fn;
+	ndp->sfd_arg = arg;
+	LIST_INSERT_HEAD(&powerhook_list, ndp, sfd_list);
+
+	return (ndp);
+}
+
+void
+powerhook_disestablish(vhook)
+	void *vhook;
+{
+#ifdef DIAGNOSTIC
+	struct powerhook_desc *dp;
+
+	for (dp = powerhook_list.lh_first; dp != NULL;
+	    dp = dp->sfd_list.le_next)
+                if (dp == vhook)
+			break;
+	if (dp == NULL)
+		panic("powerhook_disestablish: hook not established");
+#endif
+
+	LIST_REMOVE((struct powerhook_desc *)vhook, sfd_list);
+	free(vhook, M_DEVBUF);
+}
+
+/*
+ * Run power hooks.
+ */
+void
+dopowerhooks(why)
+	int why;
+{
+	struct powerhook_desc *dp;
+
+	for (dp = LIST_FIRST(&powerhook_list); 
+	     dp != NULL; 
+	     dp = LIST_NEXT(dp, sfd_list)) {
+		(*dp->sfd_fn)(why, dp->sfd_arg);
 	}
 }
 
@@ -413,7 +497,7 @@ exechook_establish(fn, arg)
 	edp = (struct exechook_desc *)
 	    malloc(sizeof(*edp), M_DEVBUF, M_NOWAIT);
 	if (edp == NULL)
-		return NULL;
+		return (NULL);
 
 	edp->ehk_fn = fn;
 	edp->ehk_arg = arg;
@@ -470,14 +554,23 @@ doexechooks(p)
 static struct device fakemdrootdev[NMD];
 #endif
 
+#include "raid.h"
+#if NRAID == 1
+#define BOOT_FROM_RAID_HOOKS 1 
+#endif
+
+#ifdef BOOT_FROM_RAID_HOOKS
+extern int numraid;
+extern struct device *raidrootdev;
+#endif
+
 void
-setroot(bootdv, bootpartition, nam2blk)
+setroot(bootdv, bootpartition)
 	struct device *bootdv;
 	int bootpartition;
-	struct devnametobdevmaj *nam2blk;
 {
 	struct device *dv;
-	int len, print_newline = 0;
+	int len;
 #ifdef MEMORY_DISK_HOOKS
 	int i;
 #endif
@@ -492,14 +585,6 @@ setroot(bootdv, bootpartition, nam2blk)
 	const char *deffsname;
 	struct vfsops *vops;
 	extern int (*mountroot) __P((void));
-	static struct devnametobdevmaj *last_nam2blk;
-
-	if (nam2blk == NULL) {
-		if (last_nam2blk == NULL)
-			panic("setroot: no name to bdev major map");
-		nam2blk = last_nam2blk;
-	}
-	last_nam2blk = nam2blk;
 
 #ifdef MEMORY_DISK_HOOKS
 	for (i = 0; i < NMD; i++) {
@@ -565,22 +650,20 @@ setroot(bootdv, bootpartition, nam2blk)
 				printf(")");
 			}
 			printf(": ");
-			len = getstr(buf, sizeof(buf));
+			len = cngetsn(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
 				strcpy(buf, bootdv->dv_xname);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
 				buf[--len] = '\0';
-				dv = getdisk(buf, len, 1, nam2blk,
-				    &nrootdev, 0);
+				dv = getdisk(buf, len, 1, &nrootdev, 0);
 				if (dv != NULL) {
 					rootdv = dv;
 					break;
 				}
 			}
-			dv = getdisk(buf, len, bootpartition, nam2blk,
-			    &nrootdev, 0);
+			dv = getdisk(buf, len, bootpartition, &nrootdev, 0);
 			if (dv != NULL) {
 				rootdv = dv;
 				break;
@@ -607,30 +690,26 @@ setroot(bootdv, bootpartition, nam2blk)
 				printf(" (default %sb)", defdumpdv->dv_xname);
 			}
 			printf(": ");
-			len = getstr(buf, sizeof(buf));
+			len = cngetsn(buf, sizeof(buf));
 			if (len == 0) {
 				if (defdumpdv != NULL) {
 					ndumpdev = MAKEDISKDEV(major(nrootdev),
 					    DISKUNIT(nrootdev), 1);
 				}
-				if (rootdv->dv_class == DV_IFNET)
-					dumpdv = NULL;
-				else
-					dumpdv = rootdv;
+				dumpdv = defdumpdv;
 				break;
 			}
 			if (len == 4 && strcmp(buf, "none") == 0) {
-				dumpspec = "none";
-				goto havedump;
+				dumpdv = NULL;
+				break;
 			}
-			dv = getdisk(buf, len, 1, nam2blk, &ndumpdev, 1);
-			if (dv) {
+			dv = getdisk(buf, len, 1, &ndumpdev, 1);
+			if (dv != NULL) {
 				dumpdv = dv;
 				break;
 			}
 		}
 
- havedump:
 		rootdev = nrootdev;
 		dumpdev = ndumpdev;
 
@@ -649,7 +728,7 @@ setroot(bootdv, bootpartition, nam2blk)
 
 		for (;;) {
 			printf("file system (default %s): ", deffsname);
-			len = getstr(buf, sizeof(buf));
+			len = cngetsn(buf, sizeof(buf));
 			if (len == 0)
 				break;
 			if (len == 4 && strcmp(buf, "halt") == 0)
@@ -682,7 +761,7 @@ setroot(bootdv, bootpartition, nam2blk)
 		 */
 		rootdv = bootdv;
 
-		majdev = findblkmajor(bootdv->dv_xname, nam2blk);
+		majdev = findblkmajor(bootdv->dv_xname);
 		if (majdev >= 0) {
 			/*
 			 * Root is on a disk.  `bootpartition' is root.
@@ -700,16 +779,13 @@ setroot(bootdv, bootpartition, nam2blk)
 		 * If it's a network interface, we can bail out
 		 * early.
 		 */
-		for (dv = alldevs.tqh_first; dv != NULL;
-		    dv = dv->dv_list.tqe_next)
-			if (strcmp(dv->dv_xname, rootspec) == 0)
-				break;
+		dv = finddevice(rootspec);
 		if (dv != NULL && dv->dv_class == DV_IFNET) {
 			rootdv = dv;
 			goto haveroot;
 		}
 
-		rootdevname = findblkname(major(rootdev), nam2blk);
+		rootdevname = findblkname(major(rootdev));
 		if (rootdevname == NULL) {
 			printf("unknown device major 0x%x\n", rootdev);
 			boothowto |= RB_ASKNAME;
@@ -718,13 +794,7 @@ setroot(bootdv, bootpartition, nam2blk)
 		memset(buf, 0, sizeof(buf));
 		sprintf(buf, "%s%d", rootdevname, DISKUNIT(rootdev));
 
-		for (dv = alldevs.tqh_first; dv != NULL;
-		    dv = dv->dv_list.tqe_next) {
-			if (strcmp(buf, dv->dv_xname) == 0) {
-				rootdv = dv;
-				break;
-			}
-		}
+		rootdv = finddevice(buf);
 		if (rootdv == NULL) {
 			printf("device %s (0x%x) not configured\n",
 			    buf, rootdev);
@@ -739,13 +809,12 @@ setroot(bootdv, bootpartition, nam2blk)
 
 	switch (rootdv->dv_class) {
 	case DV_IFNET:
-		/* Nothing. */
+		printf("root on %s", rootdv->dv_xname);
 		break;
 
 	case DV_DISK:
 		printf("root on %s%c", rootdv->dv_xname,
 		    DISKPART(rootdev) + 'a');
-		print_newline = 1;
 		break;
 
 	default:
@@ -756,16 +825,7 @@ setroot(bootdv, bootpartition, nam2blk)
 
 	/*
 	 * Now configure the dump device.
-	 */
-
-	if (dumpspec != NULL && strcmp(dumpspec, "none") == 0) {
-		/*
-		 * Operator doesn't want a dump device.
-		 */
-		goto nodumpdev;
-	}
-
-	/*
+	 *
 	 * If we haven't figured out the dump device, do so, with
 	 * the following rules:
 	 *
@@ -780,101 +840,102 @@ setroot(bootdv, bootpartition, nam2blk)
 	 *	    of the root device.
 	 */
 
-	if (boothowto & RB_ASKNAME) {
-		if (dumpdv == NULL) {
+	if (boothowto & RB_ASKNAME) {		/* (a) */
+		if (dumpdv == NULL)
+			goto nodumpdev;
+	} else if (dumpspec != NULL) {		/* (b) */
+		if (strcmp(dumpspec, "none") == 0 || dumpdev == NODEV) {
 			/*
-			 * Just return; dumpdev is already set to NODEV
-			 * and we don't want to print a newline in this
-			 * case.
-			 */
-			return;
-		}
-		goto out;
-	}
-
-	if (dumpspec != NULL) {
-		if (dumpdev == NODEV) {
-			/*
-			 * Looks like they tried to pick a network
+			 * Operator doesn't want a dump device.
+			 * Or looks like they tried to pick a network
 			 * device.  Oops.
 			 */
 			goto nodumpdev;
 		}
 
-		dumpdevname = findblkname(major(dumpdev), nam2blk);
+		dumpdevname = findblkname(major(dumpdev));
 		if (dumpdevname == NULL)
 			goto nodumpdev;
 		memset(buf, 0, sizeof(buf));
 		sprintf(buf, "%s%d", dumpdevname, DISKUNIT(dumpdev));
 
-		for (dv = alldevs.tqh_first; dv != NULL;
-		    dv = dv->dv_list.tqe_next) {
-			if (strcmp(buf, dv->dv_xname) == 0) {
-				dumpdv = dv;
-				break;
-			}
-		}
-		if (dv == NULL) {
+		dumpdv = finddevice(buf);
+		if (dumpdv == NULL) {
 			/*
 			 * Device not configured.
 			 */
 			goto nodumpdev;
 		}
-	} else if (rootdv->dv_class == DV_IFNET)
-		goto nodumpdev;
-	else {
-		dumpdv = rootdv;
-		dumpdev = MAKEDISKDEV(major(rootdev), dumpdv->dv_unit, 1);
+	} else {				/* (c) */
+		if (rootdv->dv_class == DV_IFNET)
+			goto nodumpdev;
+		else {
+			dumpdv = rootdv;
+			dumpdev = MAKEDISKDEV(major(rootdev),
+			    dumpdv->dv_unit, 1);
+		}
 	}
 
- out:
 	printf(" dumps on %s%c\n", dumpdv->dv_xname, DISKPART(dumpdev) + 'a');
 	return;
 
  nodumpdev:
 	dumpdev = NODEV;
-	if (print_newline)
-		printf("\n");
+	printf("\n");
 }
 
 static int
-findblkmajor(name, nam2blk)
+findblkmajor(name)
 	const char *name;
-	struct devnametobdevmaj *nam2blk;
 {
 	int i;
 
-	if (nam2blk == NULL)
-		return (-1);
-
-	for (i = 0; nam2blk[i].d_name != NULL; i++)
-		if (strncmp(name, nam2blk[i].d_name,
-		    strlen(nam2blk[i].d_name)) == 0)
-			return (nam2blk[i].d_maj);
+	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
+		if (strncmp(name, dev_name2blk[i].d_name,
+		    strlen(dev_name2blk[i].d_name)) == 0)
+			return (dev_name2blk[i].d_maj);
 	return (-1);
 }
 
 const char *
-findblkname(maj, nam2blk)
+findblkname(maj)
 	int maj;
-	struct devnametobdevmaj *nam2blk;
 {
 	int i;
 
-	if (nam2blk == NULL)
-		return (NULL);
-
-	for (i = 0; nam2blk[i].d_name != NULL; i++)
-		if (nam2blk[i].d_maj == maj)
-			return (nam2blk[i].d_name);
+	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
+		if (dev_name2blk[i].d_maj == maj)
+			return (dev_name2blk[i].d_name);
 	return (NULL);
 }
 
 static struct device *
-getdisk(str, len, defpart, nam2blk, devp, isdump)
+finddevice(name)
+	const char *name;
+{
+	struct device *dv;
+#ifdef BOOT_FROM_RAID_HOOKS
+	int j;
+
+	for (j = 0; j < numraid; j++) {
+		if (strcmp(name, raidrootdev[j].dv_xname) == 0) {
+			dv = &raidrootdev[j];
+			return (dv);
+		}
+	}
+#endif;
+
+	for (dv = TAILQ_FIRST(&alldevs); dv != NULL;
+	    dv = TAILQ_NEXT(dv, dv_list))
+		if (strcmp(dv->dv_xname, name) == 0)
+			break;
+	return (dv);
+}
+
+static struct device *
+getdisk(str, len, defpart, devp, isdump)
 	char *str;
 	int len, defpart;
-	struct devnametobdevmaj *nam2blk;
 	dev_t *devp;
 	int isdump;
 {
@@ -882,13 +943,22 @@ getdisk(str, len, defpart, nam2blk, devp, isdump)
 #ifdef MEMORY_DISK_HOOKS
 	int		i;
 #endif
+#ifdef BOOT_FROM_RAID_HOOKS
+	int 		j;
+#endif
 
-	if ((dv = parsedisk(str, len, defpart, nam2blk, devp)) == NULL) {
+	if ((dv = parsedisk(str, len, defpart, devp)) == NULL) {
 		printf("use one of:");
 #ifdef MEMORY_DISK_HOOKS
 		if (isdump == 0)
 			for (i = 0; i < NMD; i++)
 				printf(" %s[a-%c]", fakemdrootdev[i].dv_xname,
+				    'a' + MAXPARTITIONS - 1);
+#endif
+#ifdef BOOT_FROM_RAID_HOOKS
+		if (isdump == 0)
+			for (j = 0; j < numraid; j++)
+				printf(" %s[a-%c]", raidrootdev[j].dv_xname,
 				    'a' + MAXPARTITIONS - 1);
 #endif
 		for (dv = alldevs.tqh_first; dv != NULL;
@@ -907,10 +977,9 @@ getdisk(str, len, defpart, nam2blk, devp, isdump)
 }
 
 static struct device *
-parsedisk(str, len, defpart, nam2blk, devp)
+parsedisk(str, len, defpart, devp)
 	char *str;
 	int len, defpart;
-	struct devnametobdevmaj *nam2blk;
 	dev_t *devp;
 {
 	struct device *dv;
@@ -919,7 +988,6 @@ parsedisk(str, len, defpart, nam2blk, devp)
 #ifdef MEMORY_DISK_HOOKS
 	int i;
 #endif
-
 	if (len == 0)
 		return (NULL);
 
@@ -942,24 +1010,20 @@ parsedisk(str, len, defpart, nam2blk, devp)
 		}
 #endif
 
-	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
-		if (dv->dv_class == DV_DISK &&
-		    strcmp(str, dv->dv_xname) == 0) {
+	dv = finddevice(str);
+	if (dv != NULL) {
+		if (dv->dv_class == DV_DISK) {
 #ifdef MEMORY_DISK_HOOKS
  gotdisk:
 #endif
-			majdev = findblkmajor(dv->dv_xname, nam2blk);
+			majdev = findblkmajor(dv->dv_xname);
 			if (majdev < 0)
 				panic("parsedisk");
 			*devp = MAKEDISKDEV(majdev, dv->dv_unit, part);
-			break;
 		}
 
-		if (dv->dv_class == DV_IFNET &&
-		    strcmp(str, dv->dv_xname) == 0) {
+		if (dv->dv_class == DV_IFNET)
 			*devp = NODEV;
-			break;
-		}
 	}
 
 	*cp = c;
@@ -967,52 +1031,69 @@ parsedisk(str, len, defpart, nam2blk, devp)
 }
 
 /*
- * XXX shouldn't this be a common function?
+ * snprintf() `bytes' into `buf', reformatting it so that the number,
+ * plus a possible `x' + suffix extension) fits into len bytes (including
+ * the terminating NUL).
+ * Returns the number of bytes stored in buf, or -1 if there was a problem.
+ * E.g, given a len of 9 and a suffix of `B': 
+ *	bytes		result
+ *	-----		------
+ *	99999		`99999 B'
+ *	100000		`97 KB'
+ *	66715648	`65152 KB'
+ *	252215296	`240 MB'
  */
-static int
-getstr(cp, size)
-	char *cp;
-	int size;
+int
+humanize_number(buf, len, bytes, suffix, divisor)
+	char		*buf;
+	size_t		 len;
+	u_int64_t	 bytes;
+	const char	*suffix;
+	int 		divisor;
 {
-	char *lp;
-	int c, len;
+		/* prefixes are: (none), Kilo, Mega, Giga, Tera, Peta, Exa */
+	static const char prefixes[] = " KMGTPE";
 
-	cnpollc(1);
+	int		i, r;
+	u_int64_t	max;
+	size_t		suffixlen;
 
-	lp = cp;
-	len = 0;
-	for (;;) {
-		c = cngetc();
-		switch (c) {
-		case '\n':
-		case '\r':
-			printf("\n");
-			*lp++ = '\0';
-			cnpollc(0);
-			return (len);
-		case '\b':
-		case '\177':
-		case '#':
-			if (len) {
-				--len;
-				--lp;
-				printf("\b \b");
-			}
-			continue;
-		case '@':
-		case 'u'&037:
-			len = 0;
-			lp = cp;
-			printf("\n");
-			continue;
-		default:
-			if (len + 1 >= size || c < ' ') {
-				printf("\007");
-				continue;
-			}
-			printf("%c", c);
-			++len;
-			*lp++ = c;
-		}
+	if (buf == NULL || suffix == NULL)
+		return (-1);
+	if (len > 0)
+		buf[0] = '\0';
+	suffixlen = strlen(suffix);
+			/* check if enough room for `x y' + suffix + `\0' */
+	if (len < 4 + suffixlen)
+		return (-1);
+
+	max = 1;
+	for (i = 0; i < len - suffixlen - 3; i++)
+		max *= 10;
+	for (i = 0; bytes >= max && i < sizeof(prefixes); i++)
+		bytes /= divisor;
+
+	r = snprintf(buf, len, "%qu%s%c%s", (unsigned long long)bytes,
+	    i == 0 ? "" : " ", prefixes[i], suffix);
+
+	return (r);
+}
+
+int
+format_bytes(buf, len, bytes)
+	char		*buf;
+	size_t		 len;
+	u_int64_t	 bytes;
+{
+	int	rv;
+	size_t	nlen;
+
+	rv = humanize_number(buf, len, bytes, "B", 1024);
+	if (rv != -1) {
+			/* nuke the trailing ` B' if it exists */
+		nlen = strlen(buf) - 2;
+		if (strcmp(&buf[nlen], " B") == 0)
+			buf[nlen] = '\0';
 	}
+	return (rv);
 }

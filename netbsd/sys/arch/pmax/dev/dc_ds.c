@@ -1,4 +1,4 @@
-/*	$NetBSD: dc_ds.c,v 1.8 1998/04/19 10:44:41 jonathan Exp $	*/
+/*	$NetBSD: dc_ds.c,v 1.16 2000/02/03 04:19:59 nisimura Exp $	*/
 
 /*
  * Copyright 1996 The Board of Trustees of The Leland Stanford
@@ -17,22 +17,22 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/device.h>
-#include <sys/tty.h>
-#include <machine/autoconf.h>
-#include <machine/intr.h>
+
 #include <machine/dc7085cons.h>		/* XXX */
 
 #include <pmax/ibus/ibusvar.h>
 #include <pmax/dev/dcvar.h>
-#include <pmax/dev/dc_ds_cons.h>
+
 #include <pmax/pmax/kn01.h>
+#include <pmax/pmax/kn02.h>
+#include <pmax/pmax/kn230.h>
+#include <pmax/pmax/pmaxtype.h>
 
 /*
  * Autoconfig definition of driver front-end
  */
-int	dc_ds_match  __P((struct device * parent, struct cfdata *match, void *aux));
+int	dc_ds_match __P((struct device * parent, struct cfdata *match, void *aux));
 void	dc_ds_attach __P((struct device *parent, struct device *self, void *aux));
 
 struct cfattach dc_ds_ca = {
@@ -40,6 +40,7 @@ struct cfattach dc_ds_ca = {
 };
 
 
+#if 0
 /*
  * Initialize a line for (polled) console I/O
  */
@@ -47,16 +48,29 @@ int
 dc_ds_consinit(dev)
 	dev_t dev;
 {
-#if defined(DEBUG) && 1			/* XXX untested */
-	printf("dc_ds(%d,%d): serial console at 0x%x\n",
-	       minor(dev) >> 2, minor(dev) & 03,
-	       MIPS_PHYS_TO_KSEG1(KN01_SYS_DZ));
-#endif
-	/* let any  pending PROM output from boot drain */
+	u_int32_t dcaddr;
+
+	switch (systype) {
+	  case DS_PMAX:
+		dcaddr = KN01_SYS_DZ;
+		break;
+	  case DS_3MAX:
+		dcaddr = KN02_SYS_DZ;
+		break;
+	  case DS_MIPSMATE:
+		dcaddr = KN230_SYS_DZ0;
+		break;
+	  default:
+		/* XXX error?? */
+		break;
+	}
+
+	/* let any pending PROM output from boot drain */
 	DELAY(100000);
-	dc_consinit(dev, (void *)MIPS_PHYS_TO_KSEG1(KN01_SYS_DZ));
+	dc_consinit(dev, (void *)MIPS_PHYS_TO_KSEG1(dcaddr));
 	return (1);
 }
+#endif
 
 
 /*
@@ -89,7 +103,7 @@ dc_ds_attach(parent, self, aux)
 	struct device *self;
 	void *aux;
 {
-	register struct ibus_attach_args *iba = aux;
+	struct ibus_attach_args *iba = aux;
 	caddr_t dcaddr;
 	struct dc_softc *sc = (void*) self;
 
@@ -102,6 +116,6 @@ dc_ds_attach(parent, self, aux)
 			0x0,
 			0, DCCOMM_PORT);
 
-	ibus_intr_establish((void*)iba->ia_cookie, IPL_TTY, dcintr, sc);
+	ibus_intr_establish(parent, (void*)iba->ia_cookie, IPL_TTY, dcintr, sc);
 	printf("\n");
 }

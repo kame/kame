@@ -1,4 +1,4 @@
-/*	$NetBSD: bzivsc.c,v 1.6 1998/11/19 21:44:34 thorpej Exp $	*/
+/*	$NetBSD: bzivsc.c,v 1.9 2000/06/05 15:08:02 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -68,13 +68,6 @@ int	bzivscmatch	__P((struct device *, struct cfdata *, void *));
 /* Linkup to the rest of the kernel */
 struct cfattach bzivsc_ca = {
 	sizeof(struct bzivsc_softc), bzivscmatch, bzivscattach
-};
-
-struct scsipi_device bzivsc_dev = {
-	NULL,			/* Use default error handler */
-	NULL,			/* have a queue, served by this */
-	NULL,			/* have no async handler */
-	NULL,			/* Use default 'done' routine */
 };
 
 /*
@@ -233,7 +226,7 @@ bzivscattach(parent, self, aux)
 	/*
 	 * Configure interrupts.
 	 */
-	bsc->sc_isr.isr_intr = (int (*)(void *))ncr53c9x_intr;
+	bsc->sc_isr.isr_intr = ncr53c9x_intr;
 	bsc->sc_isr.isr_arg  = sc;
 	bsc->sc_isr.isr_ipl  = 2;
 	add_isr(&bsc->sc_isr);
@@ -241,9 +234,7 @@ bzivscattach(parent, self, aux)
 	/*
 	 * Now try to attach all the sub-devices
 	 */
-	sc->sc_adapter.scsipi_cmd = ncr53c9x_scsi_cmd;
-	sc->sc_adapter.scsipi_minphys = minphys;
-	ncr53c9x_attach(sc, &bzivsc_dev);
+	ncr53c9x_attach(sc, NULL, NULL);
 }
 
 /*
@@ -271,7 +262,7 @@ bzivsc_write_reg(sc, reg, val)
 
 	bsc->sc_reg[reg * 4] = v;
 #ifdef DEBUG
-if (bzivsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL*/ &&
+if (bzivsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL */ &&
   reg == NCR_CMD/* && bsc->sc_active*/) {
   bzivsc_trace[(bzivsc_trace_ptr - 1) & 127].yy = v;
 /*  printf(" cmd %x", v);*/
@@ -289,7 +280,7 @@ bzivsc_dma_isintr(sc)
 		return 0;
 
 #ifdef DEBUG
-if (/*sc->sc_nexus && sc->sc_nexus->xs->flags & SCSI_POLL &&*/ bzivsc_trace_enable) {
+if (/*sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL &&*/ bzivsc_trace_enable) {
   bzivsc_trace[bzivsc_trace_ptr].status = bsc->sc_reg[NCR_STAT * 4];
   bzivsc_trace[bzivsc_trace_ptr].xx = bsc->sc_reg[NCR_CMD * 4];
   bzivsc_trace[bzivsc_trace_ptr].yy = bsc->sc_active;
@@ -352,7 +343,7 @@ bzivsc_dma_setup(sc, addr, len, datain, dmasize)
 	size_t *dmasize;
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
-	vm_offset_t pa;
+	paddr_t pa;
 	u_char *ptr;
 	size_t xfer;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.49 1999/04/07 06:07:59 gwr Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.58 2000/05/28 05:49:04 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Gordon W. Ross
@@ -68,15 +68,34 @@
 extern void proc_do_uret __P((void));
 extern void proc_trampoline __P((void));
 
+/* XXX MAKE THIS LIKE OTHER M68K PORTS! */
+static void cpu_set_kpc __P((struct proc *, void (*)(void *), void *));
+
 /*
  * Finish a fork operation, with process p2 nearly set up.
- * Copy and update the kernel stack and pcb, making the child
- * ready to run, and marking it so that it can return differently
- * than the parent.  Returns 1 in the child process, 0 in the parent.
+ * Copy and update the pcb and trap frame, making the child ready to run.
+ * 
+ * Rig the child's kernel stack so that it will start out in
+ * proc_do_uret() and call child_return() with p2 as an
+ * argument. This causes the newly-created child process to go
+ * directly to user level with an apparent return value of 0 from
+ * fork(), while the parent process returns normally.
+ *
+ * p1 is the process being forked; if p1 == &proc0, we are creating
+ * a kernel thread, and the return path and argument are specified with
+ * `func' and `arg'.
+ *
+ * If an alternate user-level stack is requested (with non-zero values
+ * in both the stack and stacksize args), set up the user stack pointer
+ * accordingly.
  */
 void
-cpu_fork(p1, p2)
+cpu_fork(p1, p2, stack, stacksize, func, arg)
 	register struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
+	void (*func) __P((void *));
+	void *arg;
 {
 	register struct pcb *p1pcb = &p1->p_addr->u_pcb;
 	register struct pcb *p2pcb = &p2->p_addr->u_pcb;
@@ -122,6 +141,12 @@ cpu_fork(p1, p2)
 	bcopy(p1->p_md.md_regs, p2tf, sizeof(*p2tf));
 
 	/*
+	 * If specified, give the child a different stack.
+	 */
+	if (stack != NULL)
+		p2tf->tf_regs[15] = (u_int)stack + stacksize;
+
+	/*
 	 * Create a "switch frame" such that when cpu_switch returns,
 	 * this process will be in proc_do_uret() going to user mode.
 	 */
@@ -134,7 +159,7 @@ cpu_fork(p1, p2)
 	 * onto the stack of p2, very much like signal delivery.
 	 * When p2 runs, it will find itself in child_return().
 	 */
-	cpu_set_kpc(p2, child_return, p2);
+	cpu_set_kpc(p2, func, arg);
 }
 
 /*
@@ -158,7 +183,7 @@ cpu_fork(p1, p2)
  * were pushed here and return to where it would have returned
  * before we "pushed" this call.
  */
-void
+static void
 cpu_set_kpc(proc, func, arg)
 	struct proc *proc;
 	void (*func) __P((void *));
@@ -304,22 +329,23 @@ pagemove(from, to, len)
 	vaddr_t fva = (vaddr_t)from;
 	vaddr_t tva = (vaddr_t)to;
 	paddr_t pa;
+	boolean_t rv;
 
 #ifdef DEBUG
-	if (len & CLOFSET)
+	if (len & PGOFSET)
 		panic("pagemove");
 #endif
 	while (len > 0) {
-		pa = pmap_extract(kpmap, fva);
+		rv = pmap_extract(kpmap, fva, &pa);
 #ifdef DEBUG
-		if (pa == 0)
+		if (rv == FALSE)
 			panic("pagemove 2");
-		if (pmap_extract(kpmap, tva) != 0)
+		if (pmap_extract(kpmap, tva, NULL) == TRUE)
 			panic("pagemove 3");
 #endif
 		/* pmap_remove does the necessary cache flush.*/
 		pmap_remove(kpmap, fva, fva + NBPG);
-		pmap_enter(kpmap, tva, pa, prot, 1, prot);
+		pmap_enter(kpmap, tva, pa, prot, prot|PMAP_WIRED);
 		fva += NBPG;
 		tva += NBPG;
 		len -= NBPG;
@@ -327,11 +353,9 @@ pagemove(from, to, len)
 }
 
 /*
- * Map a user-space I/O request into kernel virtual address space.
- * NB: We have DVMA, and therefore need no separate phys_map.
- *
- * This routine has user context and can sleep
- * (called only by physio).
+ * Map a user I/O request into kernel virtual address space.
+ * Note: the pages are already locked by uvm_vslock(), so we
+ * do not need to pass an access_type to pmap_enter().   
  */
 void
 vmapbuf(bp, len)
@@ -361,8 +385,7 @@ vmapbuf(bp, len)
 	upmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
 	kpmap = vm_map_pmap(kernel_map);
 	do {
-		pa = pmap_extract(upmap, uva);
-		if (pa == 0)
+		if (pmap_extract(upmap, uva, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
 #ifdef	HAVECACHE
 		/* Flush write-back cache on old mappings. */
@@ -371,7 +394,7 @@ vmapbuf(bp, len)
 #endif
 		/* Now map the page into kernel space. */
 		pmap_enter(kpmap, kva, pa | PMAP_NC,
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
+		    VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 		uva += NBPG;
 		kva += NBPG;
 		len -= NBPG;
@@ -379,9 +402,7 @@ vmapbuf(bp, len)
 }
 
 /*
- * Free the io mappings associated with this I/O operation.
- * The temporary I/O mappings were non-cached, so there is
- * no need to flush write-back cache here.
+ * Unmap a previously-mapped user I/O request.
  */
 void
 vunmapbuf(bp, len)

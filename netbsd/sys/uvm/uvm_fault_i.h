@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_fault_i.h,v 1.8 1999/03/25 18:48:51 mrg Exp $	*/
+/*	$NetBSD: uvm_fault_i.h,v 1.10 2000/01/11 06:57:50 chs Exp $	*/
 
 /*
  *
@@ -50,6 +50,14 @@ uvmfault_unlockmaps(ufi, write_locked)
 	struct uvm_faultinfo *ufi;
 	boolean_t write_locked;
 {
+	/*
+	 * ufi can be NULL when this isn't really a fault,
+	 * but merely paging in anon data.
+	 */
+
+	if (ufi == NULL) {
+		return;
+	}
 
 	if (write_locked) {
 		vm_map_unlock(ufi->map);
@@ -79,6 +87,39 @@ uvmfault_unlockall(ufi, amap, uobj, anon)
 	if (amap)
 		amap_unlock(amap);
 	uvmfault_unlockmaps(ufi, FALSE);
+}
+
+/*
+ * uvmfault_check_intrsafe: check for a virtual address managed by
+ * an interrupt-safe map.
+ *
+ * => caller must provide a uvm_faultinfo structure with the IN
+ *	params properly filled in
+ * => if we find an intersafe VA, we fill in ufi->map, and return TRUE
+ */
+
+static __inline boolean_t
+uvmfault_check_intrsafe(ufi)
+	struct uvm_faultinfo *ufi;
+{
+	struct vm_map_intrsafe *vmi;
+	int s;
+
+	s = vmi_list_lock();
+	for (vmi = LIST_FIRST(&vmi_list); vmi != NULL;
+	     vmi = LIST_NEXT(vmi, vmi_list)) {
+		if (ufi->orig_rvaddr >= vm_map_min(&vmi->vmi_map) &&
+		    ufi->orig_rvaddr < vm_map_max(&vmi->vmi_map))
+			break;
+	}
+	vmi_list_unlock(s);
+
+	if (vmi != NULL) {
+		ufi->map = &vmi->vmi_map;
+		return (TRUE);
+	}
+
+	return (FALSE);
 }
 
 /*
@@ -179,8 +220,17 @@ static __inline boolean_t
 uvmfault_relock(ufi)
 	struct uvm_faultinfo *ufi;
 {
+	/*
+	 * ufi can be NULL when this isn't really a fault,
+	 * but merely paging in anon data.
+	 */
+
+	if (ufi == NULL) {
+		return TRUE;
+	}
 
 	uvmexp.fltrelck++;
+
 	/*
 	 * relock map.   fail if version mismatch (in which case nothing 
 	 * gets locked).

@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_compat.c,v 1.44 1998/12/10 17:13:07 christos Exp $	*/
+/*	$NetBSD: hpux_compat.c,v 1.49.4.1 2000/07/13 20:15:12 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -102,8 +102,6 @@ extern char sigcode[], esigcode[];
 extern struct sysent hpux_sysent[];
 extern char *hpux_syscallnames[];
 
-int	hpux_shmctl1 __P((struct proc *, struct hpux_sys_shmctl_args *,
-	    register_t *, int));
 int	hpuxtobsdioctl __P((u_long));
 
 static int	hpux_scale __P((struct timeval *));
@@ -406,8 +404,6 @@ hpux_sys_utssys(p, v, retval)
 	int i;
 	int error;
 	struct hpux_utsname	ut;
-	extern char ostype[], hostname[], osrelease[], version[];
-	extern char machine[];
 
 	switch (SCARG(uap, request)) {
 	/* uname */
@@ -670,106 +666,6 @@ hpux_sys_ptrace(p, v, retval)
 }
 #endif
 
-#ifdef SYSVSHM
-#include <sys/shm.h>
-
-int
-hpux_sys_shmctl(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	struct hpux_sys_shmctl_args *uap = v;
-
-	return (hpux_shmctl1(p, (struct hpux_sys_shmctl_args *)uap, retval, 0));
-}
-
-int
-hpux_sys_nshmctl(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;	/* struct hpux_nshmctl_args * */
-{
-	struct hpux_sys_nshmctl_args *uap = v;
-
-	return (hpux_shmctl1(p, (struct hpux_sys_shmctl_args *)uap, retval, 1));
-}
-
-/*
- * Handle HP-UX specific commands.
- */
-int
-hpux_shmctl1(p, uap, retval, isnew)
-	struct proc *p;
-	struct hpux_sys_shmctl_args *uap;
-	register_t *retval;
-	int isnew;
-{
-	struct shmid_ds *shp;
-	struct ucred *cred = p->p_ucred;
-	struct hpux_shmid_ds sbuf;
-	int error;
-	extern struct shmid_ds *shm_find_segment_by_shmid __P((int));
-
-	if ((shp = shm_find_segment_by_shmid(SCARG(uap, shmid))) == NULL)
-		return EINVAL;
-
-	switch (SCARG(uap, cmd)) {
-	case SHM_LOCK:
-	case SHM_UNLOCK:
-		/* don't really do anything, but make them think we did */
-		if (cred->cr_uid && cred->cr_uid != shp->shm_perm.uid &&
-		    cred->cr_uid != shp->shm_perm.cuid)
-			return (EPERM);
-		return (0);
-
-	case IPC_STAT:
-		if (!isnew)
-			break;
-		error = ipcperm(cred, &shp->shm_perm, IPC_R);
-		if (error == 0) {
-			sbuf.shm_perm.uid = shp->shm_perm.uid;
-			sbuf.shm_perm.gid = shp->shm_perm.gid;
-			sbuf.shm_perm.cuid = shp->shm_perm.cuid;
-			sbuf.shm_perm.cgid = shp->shm_perm.cgid;
-			sbuf.shm_perm.mode = shp->shm_perm.mode;
-			sbuf.shm_perm.seq = shp->shm_perm.seq;
-			sbuf.shm_perm.key = shp->shm_perm.key;
-			sbuf.shm_segsz = shp->shm_segsz;
-			sbuf.shm_ptbl = shp->shm_internal;	/* XXX */
-			sbuf.shm_lpid = shp->shm_lpid;
-			sbuf.shm_cpid = shp->shm_cpid;
-			sbuf.shm_nattch = shp->shm_nattch;
-			sbuf.shm_cnattch = shp->shm_nattch;	/* XXX */
-			sbuf.shm_atime = shp->shm_atime;
-			sbuf.shm_dtime = shp->shm_dtime;
-			sbuf.shm_ctime = shp->shm_ctime;
-			error = copyout((caddr_t)&sbuf, SCARG(uap, buf),
-			    sizeof sbuf);
-		}
-		return (error);
-
-	case IPC_SET:
-		if (!isnew)
-			break;
-		if (cred->cr_uid && cred->cr_uid != shp->shm_perm.uid &&
-		    cred->cr_uid != shp->shm_perm.cuid) {
-			return (EPERM);
-		}
-		error = copyin(SCARG(uap, buf), (caddr_t)&sbuf, sizeof sbuf);
-		if (error == 0) {
-			shp->shm_perm.uid = sbuf.shm_perm.uid;
-			shp->shm_perm.gid = sbuf.shm_perm.gid;
-			shp->shm_perm.mode = (shp->shm_perm.mode & ~0777)
-				| (sbuf.shm_perm.mode & 0777);
-			shp->shm_ctime = time.tv_sec;
-		}
-		return (error);
-	}
-	return (sys_shmctl(p, uap, retval));
-}
-#endif
-
 /*
  * HP-UX mmap() emulation (mainly for shared library support).
  */
@@ -1004,7 +900,7 @@ hpux_sys_getpgrp2(cp, v, retval)
 	if (p == 0)
 		return (ESRCH);
 	if (cp->p_ucred->cr_uid && p->p_ucred->cr_uid != cp->p_ucred->cr_uid &&
-	    !inferior(p))
+	    !inferior(p, cp))
 		return (EPERM);
 	*retval = p->p_pgid;
 	return (0);
@@ -1310,7 +1206,7 @@ hpux_sys_alarm_6x(p, v, retval)
 	} */ *uap = v;
 	int s = splhigh();
 
-	untimeout(realitexpire, (caddr_t)p);
+	callout_stop(&p->p_realit_ch);
 	timerclear(&p->p_realtimer.it_interval);
 	*retval = 0;
 	if (timerisset(&p->p_realtimer.it_value) &&
@@ -1323,7 +1219,12 @@ hpux_sys_alarm_6x(p, v, retval)
 	}
 	p->p_realtimer.it_value = time;
 	p->p_realtimer.it_value.tv_sec += SCARG(uap, deltat);
-	timeout(realitexpire, (caddr_t)p, hzto(&p->p_realtimer.it_value));
+	/*
+	 * We don't need to check the hzto() return value, here.
+	 * callout_reset() does it for us.
+	 */
+	callout_reset(&p->p_realit_ch, hzto(&p->p_realtimer.it_value),
+	    realitexpire, p);
 	splx(s);
 	return (0);
 }

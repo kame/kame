@@ -1,4 +1,4 @@
-/*	$NetBSD: grfvar.h,v 1.15.10.1 2000/02/18 19:34:17 he Exp $	*/
+/*	$NetBSD: grfvar.h,v 1.16 1999/08/16 19:55:27 is Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.

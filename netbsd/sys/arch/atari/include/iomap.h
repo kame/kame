@@ -1,4 +1,4 @@
-/*	$NetBSD: iomap.h,v 1.5 1998/12/20 14:33:07 thomas Exp $	*/
+/*	$NetBSD: iomap.h,v 1.8 2000/01/06 12:15:04 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -52,7 +52,7 @@ vaddr_t	pci_mem_addr;		/* KVA base of PCI mem-space		*/
 #endif /* _KERNEL */
 
 #define	PCI_CONFB_PHYS	(0xA0000000L)
-#define	PCI_CONFM_PHYS	(0x00080000L)
+#define	PCI_CONFM_PHYS	(0x00010000L)
 #define	PCI_IO_PHYS	(0xB0000000L)
 #define	PCI_MEM_PHYS	(0x80000000L)
 #define PCI_VGA_PHYS	(0x800a0000L)
@@ -60,6 +60,8 @@ vaddr_t	pci_mem_addr;		/* KVA base of PCI mem-space		*/
 #define PCI_CONF_SIZE	(4 * NBPG)
 #define PCI_IO_SIZE	(NBPG)
 #define PCI_VGA_SIZE	(32 * 1024)
+
+#define	BOOTM_VA_POOL	(32 * 8192)	/* Pre-allocated VA-space	*/
 
 #define	AD_RAM		(0x000000L)	/* main memory			*/
 #define	AD_CART		(0xFA0000L)	/* expansion cartridge		*/
@@ -87,7 +89,7 @@ vaddr_t	pci_mem_addr;		/* KVA base of PCI mem-space		*/
 #define	AD_RTC		(AD_STIO + 0x0960)	/* TT realtime clock	*/
 #define	AD_SCC		(AD_STIO + 0x0C80)	/* SCC 8530		*/
 #define	AD_SCU		(AD_STIO + 0x0E00)	/* System Control Unit	*/
-
+#define	AD_CFG_SWITCH	(AD_STIO + 0x1200)	/* Config switches	*/
 #define	AD_MFP		(AD_STIO + 0x7A00)	/* 68901		*/
 #define	AD_MFP2		(AD_STIO + 0x7A80)	/* 68901-TT		*/
 #define	AD_ACIA		(AD_STIO + 0x7C00)	/* 2 * 6850		*/

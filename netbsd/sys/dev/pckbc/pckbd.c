@@ -1,4 +1,4 @@
-/* $NetBSD: pckbd.c,v 1.17.2.1 1999/06/25 20:59:16 perry Exp $ */
+/* $NetBSD: pckbd.c,v 1.24 2000/06/05 22:20:57 sommerfeld Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -84,9 +84,11 @@
 #include <sys/malloc.h>
 #include <sys/ioctl.h>
 
-#include <dev/isa/isareg.h>
-#include <dev/isa/isavar.h>
-#include <dev/isa/pckbcvar.h>
+#include <machine/bus.h>
+
+#include <dev/isa/isavar.h>		/* XXX XXX XXX */
+
+#include <dev/ic/pckbcvar.h>
 
 #include <dev/pckbc/pckbdreg.h>
 #include <dev/pckbc/pckbdvar.h>
@@ -153,10 +155,12 @@ const struct wskbd_accessops pckbd_accessops = {
 
 void	pckbd_cngetc __P((void *, u_int *, int *));
 void	pckbd_cnpollc __P((void *, int));
+void	pckbd_cnbell __P((void *, u_int, u_int, u_int));
 
 const struct wskbd_consops pckbd_consops = {
 	pckbd_cngetc,
 	pckbd_cnpollc,
+	pckbd_cnbell,
 };
 
 const struct wskbd_mapdata pckbd_keymapdata = {
@@ -167,6 +171,15 @@ const struct wskbd_mapdata pckbd_keymapdata = {
 	KB_US,
 #endif
 };
+
+/*
+ * Hackish support for a bell on the PC Keyboard; when a suitable feeper
+ * is found, it attaches itself into the pckbd driver here.
+ */
+void	(*pckbd_bell_fn) __P((void *, u_int, u_int, u_int, int));
+void	*pckbd_bell_fn_arg;
+
+void	pckbd_bell __P((u_int, u_int, u_int, int));
 
 int	pckbd_set_xtscancode __P((pckbc_tag_t, pckbc_slot_t));
 int	pckbd_init __P((struct pckbd_internal *, pckbc_tag_t, pckbc_slot_t,
@@ -261,7 +274,7 @@ pckbdprobe(parent, cf, aux)
 	/*
 	 * XXX There are rumours that a keyboard can be connected
 	 * to the aux port as well. For me, this didn't work.
-	 * For further experiments, allow it if explicitely
+	 * For further experiments, allow it if explicitly
 	 * wired in the config file.
 	 */
 	if ((pa->pa_slot != PCKBC_KBD_SLOT) &&
@@ -337,7 +350,7 @@ pckbdattach(parent, self, aux)
 	sc->id->t_sc = sc;
 
 	pckbc_set_inputhandler(sc->id->t_kbctag, sc->id->t_kbcslot,
-			       pckbd_input, sc);
+			       pckbd_input, sc, sc->sc_dev.dv_xname);
 
 	a.console = isconsole;
 
@@ -370,7 +383,7 @@ pckbd_enable(v, on)
 
 		cmd[0] = KBC_ENABLE;
 		res = pckbc_enqueue_cmd(sc->id->t_kbctag, sc->id->t_kbcslot,
-					cmd, 1, 0, 0, 0);
+					cmd, 1, 0, 1, 0);
 		if (res) {
 			printf("pckbd_enable: command error\n");
 			return (res);
@@ -388,7 +401,7 @@ pckbd_enable(v, on)
 
 		cmd[0] = KBC_DISABLE;
 		res = pckbc_enqueue_cmd(sc->id->t_kbctag, sc->id->t_kbcslot,
-					cmd, 1, 0, 0, 0);
+					cmd, 1, 0, 1, 0);
 		if (res) {
 			printf("pckbd_disable: command error\n");
 			return (res);
@@ -570,15 +583,11 @@ pckbd_ioctl(v, cmd, data, flag, p)
 		return (0);
 	    case WSKBDIO_COMPLEXBELL:
 #define d ((struct wskbd_bell_data *)data)
-		/* keyboard can't beep - use md code */
-#ifdef __i386__
-		sysbeep(d->pitch, d->period * hz / 1000);
-		/* comes in as ms, goes out as ticks; volume ignored */
-#endif
-#ifdef __alpha__
-		isabeep(d->pitch, d->period * hz / 1000);
-		/* comes in as ms, goes out as ticks; volume ignored */
-#endif
+		/*
+		 * Keyboard can't beep directly; we have an
+		 * externally-provided global hook to do this.
+		 */
+		pckbd_bell(d->pitch, d->period, d->volume, 0);
 #undef d
 		return (0);
 #ifdef WSDISPLAY_COMPAT_RAWKBD
@@ -588,6 +597,29 @@ pckbd_ioctl(v, cmd, data, flag, p)
 #endif
 	}
 	return -1;
+}
+
+void
+pckbd_bell(pitch, period, volume, poll)
+	u_int pitch, period, volume;
+	int poll;
+{
+
+	if (pckbd_bell_fn != NULL)
+		(*pckbd_bell_fn)(pckbd_bell_fn_arg, pitch, period,
+		    volume, poll);
+}
+
+void
+pckbd_hookup_bell(fn, arg)
+	void (*fn) __P((void *, u_int, u_int, u_int, int));
+	void *arg;
+{
+
+	if (pckbd_bell_fn == NULL) {
+		pckbd_bell_fn = fn;
+		pckbd_bell_fn_arg = arg;
+	}
 }
 
 int
@@ -642,4 +674,13 @@ pckbd_cnpollc(v, on)
 	struct pckbd_internal *t = v;
 
 	pckbc_set_poll(t->t_kbctag, t->t_kbcslot, on);
+}
+
+void
+pckbd_cnbell(v, pitch, period, volume)
+	void *v;
+	u_int pitch, period, volume;
+{
+
+	pckbd_bell(pitch, period, volume, 1);
 }

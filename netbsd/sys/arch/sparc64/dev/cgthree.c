@@ -1,4 +1,4 @@
-/*	$NetBSD: cgthree.c,v 1.4 1998/11/19 15:38:24 mrg Exp $ */
+/*	$NetBSD: cgthree.c,v 1.7.12.1 2000/06/30 16:27:41 simonb Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -153,7 +153,7 @@ cgthreematch(parent, cf, aux)
 	if (ca->ca_bustype == BUS_SBUS)
 		return(1);
 	ra->ra_len = NBPG;
-	return (probeget(ra->ra_vaddr, 4) != -1);
+	return (probeget(ra->ra_vaddr, ASI_PRIMARY, 4) != -1);
 }
 
 /*
@@ -217,7 +217,7 @@ cgthreeattach(parent, self, args)
 	 * registers ourselves.  We only need the video RAM if we are
 	 * going to print characters via rconsole.
 	 */
-	isconsole = node == fbnode && fbconstty != NULL;
+	isconsole = (node == fbnode) && fbconstty != NULL;
 	if ((sc->sc_fb.fb_pixels = ca->ca_ra.ra_vaddr) == NULL && isconsole) {
 		/* this probably cannot happen, but what the heck */
 		sc->sc_fb.fb_pixels = mapiodev(ca->ca_ra.ra_reg, CG3REG_MEM,
@@ -427,10 +427,11 @@ cgthreeloadcmap(sc, start, ncolors)
  * As well, mapping at an offset of 0x04000000 causes the cg3 to be
  * mapped in flat mode without the cg4 emulation.
  */
-int
+paddr_t
 cgthreemmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgthree_softc *sc = cgthree_cd.cd_devs[minor(dev)];
 #define START		(128*1024 + 128*1024)
@@ -446,7 +447,7 @@ cgthreemmap(dev, off, prot)
 		off -= START;
 	else
 		off = 0;
-	if ((unsigned)off >= sc->sc_fb.fb_type.fb_size)
+	if (off >= sc->sc_fb.fb_type.fb_size)
 		return (-1);
 	/*
 	 * I turned on PMAP_NC here to disable the cache as I was

@@ -1,4 +1,4 @@
-#	$NetBSD: BOAT_ANCHOR,v 1.81 1999/01/14 04:26:46 cgd Exp $
+#	$NetBSD: BOAT_ANCHOR,v 1.83 2000/06/11 02:41:10 mycroft Exp $
 #
 #	BOAT_ANCHOR -- kernel for the 386-20 the gang uses for testing
 #
@@ -22,6 +22,7 @@ options 	COMPAT_10	# NetBSD 1.0,
 options 	COMPAT_11	# NetBSD 1.1,
 options 	COMPAT_12
 options 	COMPAT_13
+options 	COMPAT_14
 options 	COMPAT_43	# and 4.3BSD
 
 file-system	FFS		# UFS and quotas
@@ -50,7 +51,6 @@ isa0	at mainbus0
 npx0	at isa? port 0xf0 irq 13	# math coprocessor
 
 pc0	at isa? port 0x60 irq 1		# generic PC console device
-#vt0	at isa? port 0x60 irq 1
 
 com0	at isa? port 0x3f8 irq 4	# standard PC serial ports
 ast0	at isa? port 0x1a0 irq 3	# AST 4-port serial cards

@@ -1,4 +1,4 @@
-/*	$NetBSD: i82586.c,v 1.20.2.1 1999/09/10 23:08:17 he Exp $	*/
+/*	$NetBSD: i82586.c,v 1.27 2000/05/11 20:55:03 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -201,8 +201,7 @@ void    	i82586_mediastatus 	__P((struct ifnet *,
 						struct ifmediareq *));
 
 static int 	ie_readframe		__P((struct ie_softc *, int));
-static struct mbuf *ieget 		__P((struct ie_softc *,
-					     struct ether_header *, int *,
+static struct mbuf *ieget 		__P((struct ie_softc *, int *,
 					     int, int));
 static int	i82586_get_rbd_list	__P((struct ie_softc *,
 					     u_int16_t *, u_int16_t *, int *));
@@ -234,7 +233,7 @@ static int 	i82586_start_cmd 	__P((struct ie_softc *,
 					    int, int, int, int));
 static int	i82586_cmd_wait		__P((struct ie_softc *));
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 void 		print_rbd 	__P((struct ie_softc *, int));
 #endif
 
@@ -562,6 +561,8 @@ ie_ack(sc, mask)
 	bus_space_barrier(sc->bt, sc->bh, 0, 0, BUS_SPACE_BARRIER_READ);
 	status = (sc->ie_bus_read16)(sc, IE_SCB_STATUS(sc->scb));
 	i82586_start_cmd(sc, status & mask, 0, 0, 0);
+	if (sc->intrhook)
+		sc->intrhook(sc, INTR_ACK);
 }
 
 /*
@@ -641,7 +642,7 @@ loop:
 		if (i82586_tint(sc, status) != 0)
 			goto reset;
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	if ((status & IE_ST_CNA) && (sc->sc_debug & IED_CNA))
 		printf("%s: cna; status=0x%x\n", sc->sc_dev.dv_xname, status);
 #endif
@@ -682,7 +683,7 @@ i82586_rint(sc, scbstatus)
 static	int timesthru = 1024;
 	int i, status, off;
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	if (sc->sc_debug & IED_RINT)
 		printf("%s: rint: status 0x%x\n",
 			sc->sc_dev.dv_xname, scbstatus);
@@ -697,7 +698,7 @@ static	int timesthru = 1024;
 				  BUS_SPACE_BARRIER_READ);
 		status = sc->ie_bus_read16(sc, off);
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 		if (sc->sc_debug & IED_RINT)
 			printf("%s: rint: frame(%d) status 0x%x\n",
 				sc->sc_dev.dv_xname, i, status);
@@ -725,7 +726,7 @@ static	int timesthru = 1024;
 			drop = 1;
 		}
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 		if ((status & IE_FD_BUSY) != 0)
 			printf("%s: rint: frame(%d) busy; status=0x%x\n",
 				sc->sc_dev.dv_xname, i, status);
@@ -841,7 +842,7 @@ i82586_tint(sc, scbstatus)
 	ifp->if_timer = 0;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	if (sc->xmit_busy <= 0) {
 	    printf("i82586_tint: WEIRD: xmit_busy=%d, xctail=%d, xchead=%d\n",
 		   sc->xmit_busy, sc->xctail, sc->xchead);
@@ -852,7 +853,7 @@ i82586_tint(sc, scbstatus)
 	status = sc->ie_bus_read16(sc, IE_CMD_XMIT_STATUS(sc->xmit_cmds,
 							  sc->xctail));
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	if (sc->sc_debug & IED_TINT)
 		printf("%s: tint: SCB status 0x%x; xmit status 0x%x\n",
 			sc->sc_dev.dv_xname, scbstatus, status);
@@ -937,7 +938,7 @@ i82586_get_rbd_list(sc, start, end, pktlen)
 			 * This means we are somehow out of sync.  So, we
 			 * reset the adapter.
 			 */
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 			print_rbd(sc, rbindex);
 #endif
 			log(LOG_ERR,
@@ -1067,9 +1068,8 @@ i82586_chk_rx_ring(sc)
  * operation considerably.  (Provided that it works, of course.)
  */
 static __inline struct mbuf *
-ieget(sc, ehp, to_bpf, head, totlen)
+ieget(sc, to_bpf, head, totlen)
 	struct ie_softc *sc;
-	struct ether_header *ehp;
 	int *to_bpf;
 	int head;
 	int totlen;
@@ -1077,11 +1077,13 @@ ieget(sc, ehp, to_bpf, head, totlen)
 	struct mbuf *m, *m0, *newm;
 	int len, resid;
 	int thisrboff, thismboff;
+	struct ether_header eh;
 
 	/*
 	 * Snarf the Ethernet header.
 	 */
-	(sc->memcopyin)(sc, ehp, IE_RBUF_ADDR(sc, head), sizeof *ehp);
+	(sc->memcopyin)(sc, &eh, IE_RBUF_ADDR(sc, head),
+	    sizeof(struct ether_header));
 
 	/*
 	 * As quickly as possible, check if this packet is for us.
@@ -1090,13 +1092,13 @@ ieget(sc, ehp, to_bpf, head, totlen)
 	 * This is only a consideration when FILTER is defined; i.e., when
 	 * we are either running BPF or doing multicasting.
 	 */
-	if (!check_eh(sc, ehp, to_bpf)) {
+	if (!check_eh(sc, &eh, to_bpf)) {
 		/* just this case, it's not an error */
 		sc->sc_ethercom.ec_if.if_ierrors--;
 		return (0);
 	}
 
-	resid = totlen -= (thisrboff = sizeof *ehp);
+	resid = totlen;
 
 	MGETHDR(m0, M_DONTWAIT, MT_DATA);
 	if (m0 == 0)
@@ -1118,6 +1120,14 @@ ieget(sc, ehp, to_bpf, head, totlen)
 			len = MCLBYTES;
 		}
 
+		if (m == m0) {
+			caddr_t newdata = (caddr_t)
+			    ALIGN(m->m_data + sizeof(struct ether_header)) -
+			    sizeof(struct ether_header);
+			len -= newdata - m->m_data;
+			m->m_data = newdata;
+		}
+
 		m->m_len = len = min(totlen, len);
 
 		totlen -= len;
@@ -1132,6 +1142,14 @@ ieget(sc, ehp, to_bpf, head, totlen)
 
 	m = m0;
 	thismboff = 0;
+
+	/*
+	 * Copy the Ethernet header into the mbuf chain.
+	 */
+	memcpy(mtod(m, caddr_t), &eh, sizeof(struct ether_header));
+	thismboff = sizeof(struct ether_header);
+	thisrboff = sizeof(struct ether_header);
+	resid -= sizeof(struct ether_header);
 
 	/*
 	 * Now we take the mbuf chain (hopefully only one mbuf most of the
@@ -1189,7 +1207,6 @@ ie_readframe(sc, num)
 	int num;		/* frame number to read */
 {
 	struct mbuf *m;
-	struct ether_header eh;
 	u_int16_t bstart, bend;
 	int pktlen;
 #if NBPFILTER > 0
@@ -1202,9 +1219,9 @@ ie_readframe(sc, num)
 	}
 
 #if NBPFILTER > 0
-	m = ieget(sc, &eh, &bpf_gets_it, bstart, pktlen);
+	m = ieget(sc, &bpf_gets_it, bstart, pktlen);
 #else
-	m = ieget(sc, &eh, 0, bstart, pktlen);
+	m = ieget(sc, 0, bstart, pktlen);
 #endif
 	i82586_release_rbd_list(sc, bstart, bend);
 
@@ -1213,13 +1230,16 @@ ie_readframe(sc, num)
 		return (0);
 	}
 
-#ifdef I82586_DEBUG
-	if (sc->sc_debug & IED_READFRAME)
+#if I82586_DEBUG
+	if (sc->sc_debug & IED_READFRAME) {
+		struct ether_header *eh = mtod(m, struct ether_header *);
+
 		printf("%s: frame from ether %s type 0x%x len %d\n",
 			sc->sc_dev.dv_xname,
-			ether_sprintf(eh.ether_shost),
-			(u_int)eh.ether_type,
+			ether_sprintf(eh->ether_shost),
+			(u_int)ntohs(eh->ether_type),
 			pktlen);
+	}
 #endif
 
 #if NBPFILTER > 0
@@ -1232,13 +1252,8 @@ ie_readframe(sc, num)
 	 * tho' it will make a copy for tcpdump.)
 	 */
 	if (bpf_gets_it) {
-		struct mbuf m0;
-		m0.m_len = sizeof eh;
-		m0.m_data = (caddr_t)&eh;
-		m0.m_next = m;
-
 		/* Pass it up. */
-		bpf_mtap(sc->sc_ethercom.ec_if.if_bpf, &m0);
+		bpf_mtap(sc->sc_ethercom.ec_if.if_bpf, m);
 
 		/*
 		 * A signal passed up from the filtering code indicating that
@@ -1256,7 +1271,7 @@ ie_readframe(sc, num)
 	/*
 	 * Finally pass this packet up to higher layers.
 	 */
-	ether_input(&sc->sc_ethercom.ec_if, &eh, m);
+	(*sc->sc_ethercom.ec_if.if_input)(&sc->sc_ethercom.ec_if, m);
 	sc->sc_ethercom.ec_if.if_ipackets++;
 	return (0);
 }
@@ -1275,7 +1290,7 @@ iexmit(sc)
 
 	cur = sc->xctail;
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	if (sc->sc_debug & IED_XMIT)
 		printf("%s: xmit buffer %d\n", sc->sc_dev.dv_xname, cur);
 #endif
@@ -1379,7 +1394,7 @@ i82586_start(ifp)
 			bpf_mtap(ifp->if_bpf, m0);
 #endif
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 		if (sc->sc_debug & IED_ENQ)
 			printf("%s: fill buffer %d\n", sc->sc_dev.dv_xname,
 				sc->xchead);
@@ -1433,12 +1448,12 @@ i82586_proberam(sc)
 
 	/* Put in 16-bit mode */
 	off = IE_SCP_BUS_USE(sc->scp);
-	bus_space_write_1(sc->bt, sc->bh, off, 0);
+	(sc->ie_bus_write16)(sc, off, 0);
 	bus_space_barrier(sc->bt, sc->bh, off, 1, BUS_SPACE_BARRIER_WRITE);
 
 	/* Set the ISCP `busy' bit */
 	off = IE_ISCP_BUSY(sc->iscp);
-	bus_space_write_1(sc->bt, sc->bh, off, 1);
+	(sc->ie_bus_write16)(sc, off, 1);
 	bus_space_barrier(sc->bt, sc->bh, off, 1, BUS_SPACE_BARRIER_WRITE);
 
 	if (sc->hwreset)
@@ -1451,7 +1466,7 @@ i82586_proberam(sc)
 	/* Read back the ISCP `busy' bit; it should be clear by now */
 	off = IE_ISCP_BUSY(sc->iscp);
 	bus_space_barrier(sc->bt, sc->bh, off, 1, BUS_SPACE_BARRIER_READ);
-	result = bus_space_read_1(sc->bt, sc->bh, off) == 0;
+	result = (sc->ie_bus_read16)(sc, off) == 0;
 
 	/* Acknowledge any interrupts we may have caused. */
 	ie_ack(sc, IE_ST_WHENCE);
@@ -1629,7 +1644,7 @@ i82586_setup_bufs(sc)
 	sc->rbufs = ptr;
 	ptr += sc->nrxbuf * IE_RBUF_SIZE;
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	printf("%s: %d frames %d bufs\n", sc->sc_dev.dv_xname, sc->nframes,
 		sc->nrxbuf);
 #endif
@@ -1716,7 +1731,7 @@ i82586_setup_bufs(sc)
 	sc->rbtail = sc->nrxbuf - 1;
 
 /* link in recv frames * and buffer into the scb. */
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 	printf("%s: reserved %d bytes\n",
 		sc->sc_dev.dv_xname, ptr - sc->buf_area);
 #endif
@@ -1729,21 +1744,22 @@ ie_cfg_setup(sc, cmd, promiscuous, manchester)
 	int promiscuous, manchester;
 {
 	int cmdresult, status;
+	u_int8_t buf[IE_CMD_CFG_SZ]; /* XXX malloc? */
 
+	*IE_CMD_CFG_CNT(buf)       = 0x0c;
+	*IE_CMD_CFG_FIFO(buf)      = 8;
+        *IE_CMD_CFG_SAVEBAD(buf)   = 0x40;
+	*IE_CMD_CFG_ADDRLEN(buf)   = 0x2e;
+	*IE_CMD_CFG_PRIORITY(buf)  = 0;
+	*IE_CMD_CFG_IFS(buf)       = 0x60;
+	*IE_CMD_CFG_SLOT_LOW(buf)  = 0;
+	*IE_CMD_CFG_SLOT_HIGH(buf) = 0xf2;
+	*IE_CMD_CFG_PROMISC(buf)   = !!promiscuous | manchester << 2;
+	*IE_CMD_CFG_CRSCDT(buf)    = 0;
+	*IE_CMD_CFG_MINLEN(buf)    = 64;
+	*IE_CMD_CFG_JUNK(buf)      = 0xff;
+	sc->memcopyout(sc, buf, cmd, IE_CMD_CFG_SZ);
 	setup_simple_command(sc, IE_CMD_CONFIG, cmd);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_CNT(cmd), 0x0c);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_FIFO(cmd), 8);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_SAVEBAD(cmd), 0x40);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_ADDRLEN(cmd), 0x2e);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_PRIORITY(cmd), 0);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_IFS(cmd), 0x60);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_SLOT_LOW(cmd), 0);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_SLOT_HIGH(cmd), 0xf2);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_PROMISC(cmd),
-					  !!promiscuous | manchester << 2);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_CRSCDT(cmd), 0);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_MINLEN(cmd), 64);
-	bus_space_write_1(sc->bt, sc->bh, IE_CMD_CFG_JUNK(cmd), 0xff);
 	bus_space_barrier(sc->bt, sc->bh, cmd, IE_CMD_CFG_SZ,
 			  BUS_SPACE_BARRIER_WRITE);
 
@@ -1956,7 +1972,7 @@ iestop(sc)
 
 int
 i82586_ioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
@@ -2027,7 +2043,7 @@ i82586_ioctl(ifp, cmd, data)
 			iestop(sc);
 			i82586_init(sc);
 		}
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 		if (ifp->if_flags & IFF_DEBUG)
 			sc->sc_debug = IED_ALL;
 		else
@@ -2125,7 +2141,7 @@ i82586_mediachange(ifp)
 
         if (sc->sc_mediachange)
                 return ((*sc->sc_mediachange)(sc));
-        return (EINVAL);
+        return (0);
 }
 
 /*
@@ -2142,7 +2158,7 @@ i82586_mediastatus(ifp, ifmr)
                 (*sc->sc_mediastatus)(sc, ifmr);
 }
 
-#ifdef I82586_DEBUG
+#if I82586_DEBUG
 void
 print_rbd(sc, n)
 	struct ie_softc *sc;

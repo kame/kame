@@ -1,4 +1,4 @@
-/*	$NetBSD: am79900.c,v 1.3 1998/08/08 23:51:39 mycroft Exp $	*/
+/*	$NetBSD: am79900.c,v 1.5 2000/03/30 12:45:29 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1998
@@ -130,7 +130,7 @@ am79900_config(sc)
  */
 void
 am79900_meminit(sc)
-	register struct lance_softc *sc;
+	struct lance_softc *sc;
 {
 	u_long a;
 	int bix;
@@ -205,7 +205,7 @@ integrate void
 am79900_rint(sc)
 	struct lance_softc *sc;
 {
-	register int bix;
+	int bix;
 	int rp;
 	struct lermd rmd;
 
@@ -276,9 +276,9 @@ am79900_rint(sc)
 
 integrate void
 am79900_tint(sc)
-	register struct lance_softc *sc;
+	struct lance_softc *sc;
 {
-	register int bix;
+	int bix;
 	struct letmd tmd;
 
 	bix = sc->sc_first_td;
@@ -323,8 +323,10 @@ am79900_tint(sc)
 			if (tmd.tmd2 & LE_T2_LCOL)
 				ifp->if_collisions++;
 			if (tmd.tmd2 & LE_T2_RTRY) {
+#ifdef LEDEBUG
 				printf("%s: excessive collisions\n",
 				    sc->sc_dev.dv_xname);
+#endif
 				ifp->if_collisions += 16;
 			}
 			ifp->if_oerrors++;
@@ -356,10 +358,10 @@ am79900_tint(sc)
  */
 int
 am79900_intr(arg)
-	register void *arg;
+	void *arg;
 {
-	register struct lance_softc *sc = arg;
-	register u_int16_t isr;
+	struct lance_softc *sc = arg;
+	u_int16_t isr;
 
 	isr = (*sc->sc_rdcsr)(sc, LE_CSR0) | sc->sc_saved_csr0;
 	sc->sc_saved_csr0 = 0;
@@ -441,11 +443,11 @@ am79900_intr(arg)
  */
 void
 am79900_start(ifp)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 {
-	register struct lance_softc *sc = ifp->if_softc;
-	register int bix;
-	register struct mbuf *m;
+	struct lance_softc *sc = ifp->if_softc;
+	int bix;
+	struct mbuf *m;
 	struct letmd tmd;
 	int rp;
 	int len;

@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_vfsops.c,v 1.19 1999/02/26 23:44:50 wrstuden Exp $	*/
+/*	$NetBSD: mfs_vfsops.c,v 1.28.4.1 2000/10/17 00:53:35 tv Exp $	*/
 
 /*
  * Copyright (c) 1989, 1990, 1993, 1994
@@ -92,6 +92,7 @@ struct vfsops mfs_vfsops = {
 	ffs_fhtovp,
 	ffs_vptofh,
 	mfs_init,
+	mfs_done,
 	ffs_sysctl,
 	NULL,
 	ufs_check_export,
@@ -104,8 +105,22 @@ struct vfsops mfs_vfsops = {
 void
 mfs_init()
 {
+	/*
+	 * ffs_init() ensures to initialize necessary resources
+	 * only once.
+	 */
+	ffs_init();
 }
 
+void
+mfs_done()
+{
+	/*
+	 * ffs_done() ensures to free necessary resources
+	 * only once, when it's no more needed.
+	 */
+	ffs_done();
+}
 
 /*
  * Called by main() when mfs is going to be mounted as root.
@@ -114,7 +129,6 @@ mfs_init()
 int
 mfs_mountroot()
 {
-	extern struct vnode *rootvp;
 	struct fs *fs;
 	struct mount *mp;
 	struct proc *p = curproc;	/* XXX */
@@ -130,8 +144,10 @@ mfs_mountroot()
 		return (error);
 	}
 
-	if ((error = vfs_rootmountalloc(MOUNT_MFS, "mfs_root", &mp)))
+	if ((error = vfs_rootmountalloc(MOUNT_MFS, "mfs_root", &mp))) {
+		vrele(rootvp);
 		return (error);
+	}
 
 	mfsp = malloc(sizeof *mfsp, M_MFSNODE, M_WAITOK);
 	rootvp->v_data = mfsp;
@@ -140,13 +156,14 @@ mfs_mountroot()
 	mfsp->mfs_baseoff = mfs_rootbase;
 	mfsp->mfs_size = mfs_rootsize;
 	mfsp->mfs_vnode = rootvp;
-	mfsp->mfs_pid = p->p_pid;
-	mfsp->mfs_buflist = (struct buf *)0;
+	mfsp->mfs_proc = NULL;		/* indicate kernel space */
+	BUFQ_INIT(&mfsp->mfs_buflist);
 	if ((error = ffs_mountfs(rootvp, mp, p)) != 0) {
 		mp->mnt_op->vfs_refcount--;
 		vfs_unbusy(mp);
 		free(mp, M_MOUNT);
 		free(mfsp, M_MFSNODE);
+		vrele(rootvp);
 		return (error);
 	}	
 	simple_lock(&mountlist_slock);
@@ -192,7 +209,7 @@ mfs_initminiroot(base)
 /* ARGSUSED */
 int
 mfs_mount(mp, path, data, ndp, p)
-	register struct mount *mp;
+	struct mount *mp;
 	const char *path;
 	void *data;
 	struct nameidata *ndp;
@@ -201,8 +218,8 @@ mfs_mount(mp, path, data, ndp, p)
 	struct vnode *devvp;
 	struct mfs_args args;
 	struct ufsmount *ump;
-	register struct fs *fs;
-	register struct mfsnode *mfsp;
+	struct fs *fs;
+	struct mfsnode *mfsp;
 	size_t size;
 	int flags, error;
 
@@ -227,10 +244,8 @@ mfs_mount(mp, path, data, ndp, p)
 		}
 		if (fs->fs_ronly && (mp->mnt_flag & MNT_WANTRDWR))
 			fs->fs_ronly = 0;
-#ifdef EXPORTMFS
 		if (args.fspec == 0)
 			return (vfs_export(mp, &ump->um_export, &args.export));
-#endif
 		return (0);
 	}
 	error = getnewvnode(VT_MFS, (struct mount *)0, mfs_vnodeop_p, &devvp);
@@ -244,10 +259,10 @@ mfs_mount(mp, path, data, ndp, p)
 	mfsp->mfs_baseoff = args.base;
 	mfsp->mfs_size = args.size;
 	mfsp->mfs_vnode = devvp;
-	mfsp->mfs_pid = p->p_pid;
-	mfsp->mfs_buflist = (struct buf *)0;
+	mfsp->mfs_proc = p;
+	BUFQ_INIT(&mfsp->mfs_buflist);
 	if ((error = ffs_mountfs(devvp, mp, p)) != 0) {
-		mfsp->mfs_buflist = (struct buf *)-1;
+		BUFQ_FIRST(&mfsp->mfs_buflist) = (struct buf *) -1;
 		vrele(devvp);
 		return (error);
 	}
@@ -279,14 +294,19 @@ mfs_start(mp, flags, p)
 	int flags;
 	struct proc *p;
 {
-	register struct vnode *vp = VFSTOUFS(mp)->um_devvp;
-	register struct mfsnode *mfsp = VTOMFS(vp);
-	register struct buf *bp;
-	register caddr_t base;
+	struct vnode *vp = VFSTOUFS(mp)->um_devvp;
+	struct mfsnode *mfsp = VTOMFS(vp);
+	struct buf *bp;
+	caddr_t base;
 	int sleepreturn = 0;
 
 	base = mfsp->mfs_baseoff;
-	while (mfsp->mfs_buflist != (struct buf *)-1) {
+	while (BUFQ_FIRST(&mfsp->mfs_buflist) != (struct buf *) -1) {
+		while ((bp = BUFQ_FIRST(&mfsp->mfs_buflist)) != NULL) {
+			BUFQ_REMOVE(&mfsp->mfs_buflist, bp);
+			mfs_doio(bp, base);
+			wakeup((caddr_t)bp);
+		}
 		/*
 		 * If a non-ignored signal is received, try to unmount.
 		 * If that fails, or the filesystem is already in the
@@ -302,11 +322,6 @@ mfs_start(mp, flags, p)
 			continue;
 		}
 
-		while ((bp = mfsp->mfs_buflist) != NULL) {
-			mfsp->mfs_buflist = bp->b_actf;
-			mfs_doio(bp, base);
-			wakeup((caddr_t)bp);
-		}
 		sleepreturn = tsleep(vp, mfs_pri, "mfsidl", 0);
 	}
 	return (sleepreturn);

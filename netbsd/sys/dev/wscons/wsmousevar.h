@@ -1,4 +1,4 @@
-/* $NetBSD: wsmousevar.h,v 1.2 1998/07/27 22:33:22 drochner Exp $ */
+/* $NetBSD: wsmousevar.h,v 1.4 2000/01/08 02:57:24 takemura Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -56,13 +56,21 @@ struct wsmousedev_attach_args {
 	void	*accesscookie;				/* access cookie */
 };
 
+#include "locators.h"
+
+#define	wsmousedevcf_mux	cf_loc[WSMOUSEDEVCF_MUX]
+
 /*
- * Autoconfiugration helper functions.
+ * Autoconfiguration helper functions.
  */
 int	wsmousedevprint __P((void *, const char *));
 
 /*
  * Callbacks from the mouse driver to the wsmouse interface driver.
  */
+#define WSMOUSE_INPUT_DELTA		0
+#define WSMOUSE_INPUT_ABSOLUTE_X	(1<<0)
+#define WSMOUSE_INPUT_ABSOLUTE_Y	(1<<1)
+#define WSMOUSE_INPUT_ABSOLUTE_Z	(1<<2)
 void	wsmouse_input __P((struct device *kbddev, u_int btns,
-			   int dx, int dy, int dz));
+			   int x, int y, int z, u_int flags));

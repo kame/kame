@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tun.c,v 1.37 1999/03/04 02:38:31 mjacob Exp $	*/
+/*	$NetBSD: if_tun.c,v 1.39 2000/03/30 09:45:37 augustss Exp $	*/
 
 /*
  * Copyright (c) 1988, Julian Onions <jpo@cs.nott.ac.uk>
@@ -82,7 +82,7 @@ void
 tunattach(unused)
 	int unused;
 {
-	register int i;
+	int i;
 	struct ifnet *ifp;
 
 	for (i = 0; i < NTUN; i++) {
@@ -120,7 +120,7 @@ tunopen(dev, flag, mode, p)
 {
 	struct ifnet	*ifp;
 	struct tun_softc *tp;
-	register int	unit, error;
+	int	unit, error;
 
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return (error);
@@ -147,7 +147,7 @@ tunclose(dev, flag, mode, p)
 	int	mode;
 	struct proc *p;
 {
-	register int	unit = minor(dev), s;
+	int	unit = minor(dev), s;
 	struct tun_softc *tp = &tunctl[unit];
 	struct ifnet	*ifp = &tp->tun_if;
 	struct mbuf	*m;
@@ -170,15 +170,17 @@ tunclose(dev, flag, mode, p)
 		if_down(ifp);
 		if (ifp->if_flags & IFF_RUNNING) {
 			/* find internet addresses and delete routes */
-			register struct ifaddr *ifa;
+			struct ifaddr *ifa;
 			for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
 			    ifa = ifa->ifa_list.tqe_next) {
+#ifdef INET
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					rtinit(ifa, (int)RTM_DELETE,
 					       tp->tun_flags & TUN_DSTADDR
 							? RTF_HOST
 							: 0);
 				}
+#endif
 			}
 		}
 		splx(s);
@@ -195,7 +197,7 @@ tuninit(tp)
 	struct tun_softc *tp;
 {
 	struct ifnet	*ifp = &tp->tun_if;
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 
 	TUNDEBUG("%s: tuninit\n", ifp->if_xname);
 
@@ -204,6 +206,7 @@ tuninit(tp)
 	tp->tun_flags &= ~(TUN_IASET|TUN_DSTADDR);
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
 	     ifa = ifa->ifa_list.tqe_next) {
+#ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			struct sockaddr_in *sin;
 
@@ -217,6 +220,7 @@ tuninit(tp)
 					tp->tun_flags |= TUN_DSTADDR;
 			}
 		}
+#endif
 	}
 
 	return;
@@ -276,6 +280,8 @@ tun_ioctl(ifp, cmd, data)
 		}
 		break;
 	}
+	case SIOCSIFFLAGS:
+		break;
 	default:
 		error = EINVAL;
 	}
@@ -295,7 +301,9 @@ tun_output(ifp, m0, dst, rt)
 {
 	struct tun_softc *tp = ifp->if_softc;
 	struct proc	*p;
+#ifdef INET
 	int		s;
+#endif
 
 	TUNDEBUG ("%s: tun_output\n", ifp->if_xname);
 

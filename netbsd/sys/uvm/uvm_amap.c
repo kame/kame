@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_amap.c,v 1.19.2.2 1999/07/07 00:07:13 perry Exp $	*/
+/*	$NetBSD: uvm_amap.c,v 1.22.12.1 2000/08/02 19:42:23 thorpej Exp $	*/
 
 /*
  *
@@ -479,9 +479,8 @@ amap_share_protect(entry, prot)
 			if (amap->am_anon[lcv] == NULL)
 				continue;
 			if (amap->am_anon[lcv]->u.an_page != NULL)
-				pmap_page_protect(
-				    PMAP_PGARG(amap->am_anon[lcv]->u.an_page),
-				prot);
+				pmap_page_protect(amap->am_anon[lcv]->u.an_page,
+						  prot);
 		}
 		return;
 	}
@@ -492,8 +491,7 @@ amap_share_protect(entry, prot)
 		if (slot < entry->aref.ar_pageoff || slot >= stop)
 			continue;
 		if (amap->am_anon[slot]->u.an_page != NULL)
-			pmap_page_protect(
-			    PMAP_PGARG(amap->am_anon[slot]->u.an_page), prot);
+			pmap_page_protect(amap->am_anon[slot]->u.an_page, prot);
 	}
 	return;
 }
@@ -846,7 +844,7 @@ ReStart:
 
 	}	/* end of 'for' loop */
 
-	return;
+	amap_unlock(amap);
 }
 
 /*

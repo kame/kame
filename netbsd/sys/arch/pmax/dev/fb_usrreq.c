@@ -1,4 +1,4 @@
-/*	$NetBSD: fb_usrreq.c,v 1.13.2.1 1999/12/04 19:21:37 he Exp $	*/
+/*	$NetBSD: fb_usrreq.c,v 1.20.4.1 2000/06/30 16:27:33 simonb Exp $	*/
 
 /*ARGSUSED*/
 int
@@ -7,22 +7,28 @@ fbopen(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct fbinfo *fi;
+	struct fbinfo *fi;
 
-#ifdef fpinitialized
-	if (!fp->initialized)
-		return (ENXIO);
-#endif
-
-	if (minor(dev) >= fbcd.cd_ndevs ||
-	    (fi = fbcd.cd_devs[minor(dev)]) == NULL)
+	if (minor(dev) >= fbndevs)
 	    return(ENXIO);
+	    
+	fi = fbdevs[minor(dev)];
 
 	if (fi->fi_open)
 		return (EBUSY);
 
+	/* Save colormap for 8bpp devices */
+	if (fi->fi_type.fb_depth == 8) {
+		fi->fi_savedcmap = malloc(768, M_DEVBUF, M_NOWAIT);
+		if (fi->fi_savedcmap == NULL) {
+			printf("fbopen: no memory for cmap\n");
+			return (ENOMEM);
+		}
+		
+		fi->fi_driver->fbd_getcmap(fi, fi->fi_savedcmap, 0, 256);
+	}
+	
 	fi->fi_open = 1;
-
 	(*fi->fi_driver->fbd_initcmap)(fi);
 
 	/*
@@ -41,28 +47,34 @@ fbclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct fbinfo *fi;
-	register struct pmax_fbtty *fbtty;
+	struct fbinfo *fi;
+	struct pmax_fbtty *fbtty;
 
-	if (minor(dev) >= fbcd.cd_ndevs ||
-	    (fi = fbcd.cd_devs[minor(dev)]) == NULL)
+	if (minor(dev) >= fbndevs)
 	    return(EBADF);
+	    
+	fi = fbdevs[minor(dev)];
 
 	if (!fi->fi_open)
 		return (EBADF);
 
 	fbtty = fi->fi_glasstty;
 	fi->fi_open = 0;
-	(*fi->fi_driver->fbd_initcmap)(fi);
+
+	if (fi->fi_type.fb_depth == 8) {
+		fi->fi_driver->fbd_putcmap(fi, fi->fi_savedcmap, 0, 256);
+		free(fi->fi_savedcmap, M_DEVBUF);
+	} else
+		fi->fi_driver->fbd_initcmap(fi);
+
 	genDeconfigMouse();
-	fbScreenInit(fi);
 
 	/*
 	 * Reset the keyboard - we don't know what the X server (or whatever
 	 * was using the framebuffer) did to the keyboard.  The X11R6 server
 	 * changes the keyboard state, and doesn't reset it.
 	 */
-	KBDReset(fbtty->kbddev, fbtty->KBDPutc);
+	lk_reset(fbtty->kbddev, fbtty->KBDPutc);
 
 	bzero((caddr_t)fi->fi_pixels, fi->fi_pixelsize);
 	(*fi->fi_driver->fbd_poscursor)
@@ -78,14 +90,14 @@ fbioctl(dev, cmd, data, flag, p)
 	caddr_t data;
 	struct proc *p;
 {
-	register struct fbinfo *fi;
-	register struct pmax_fbtty *fbtty;
+	struct fbinfo *fi;
+	struct pmax_fbtty *fbtty;
 	char cmap_buf [3];
 
-	if (minor(dev) >= fbcd.cd_ndevs ||
-	    (fi = fbcd.cd_devs[minor(dev)]) == NULL)
+	if (minor(dev) >= fbndevs)
 	    return(EBADF);
-
+	    
+	fi = fbdevs[minor(dev)];
 	fbtty = fi->fi_glasstty;
 
 	switch (cmd) {
@@ -111,7 +123,6 @@ fbioctl(dev, cmd, data, flag, p)
 		/*
 		 * Initialize the screen.
 		 */
-		fbScreenInit(fi);
 		break;
 
 	case QIOCKPCMD:
@@ -218,8 +229,13 @@ fbpoll(dev, events, p)
 	int events;
 	struct proc *p;
 {
-	struct fbinfo *fi = fbcd.cd_devs[minor(dev)];
+	struct fbinfo *fi;
 	int revents = 0;
+
+	if (minor(dev) >= fbndevs)
+	    return(EBADF);
+	    
+	fi = fbdevs[minor(dev)];
 
 	if (events & (POLLIN | POLLRDNORM)) {
 		if (fi->fi_fbu->scrInfo.qe.eHead !=
@@ -243,27 +259,29 @@ fbpoll(dev, events, p)
  * Return the physical page number that corresponds to byte offset 'off'.
  */
 /*ARGSUSED*/
-int
+paddr_t
 fbmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
+	struct fbinfo *fi;
 	int len;
-	register struct fbinfo *fi;
 
 	if (off < 0)
 		return (-1);
 
-	if (minor(dev) >= fbcd.cd_ndevs ||
-	    (fi = fbcd.cd_devs[minor(dev)]) == NULL)
+	if (minor(dev) >= fbndevs)
 	    return(-1);
+	    
+	fi = fbdevs[minor(dev)];
 
 	len = mips_round_page(((vaddr_t)fi->fi_fbu & PGOFSET)
 			      + sizeof(*fi->fi_fbu));
 	if (off < len)
-		return (int)mips_btop(MIPS_KSEG0_TO_PHYS(fi->fi_fbu) + off);
+		return mips_btop(MIPS_KSEG0_TO_PHYS(fi->fi_fbu) + off);
 	off -= len;
 	if (off >= fi->fi_type.fb_size)
 		return (-1);
-	return (int)mips_btop(MIPS_KSEG1_TO_PHYS(fi->fi_pixels) + off);
+	return mips_btop(MIPS_KSEG1_TO_PHYS(fi->fi_pixels) + off);
 }

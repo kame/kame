@@ -1,4 +1,4 @@
-/*	$NetBSD: ioa.h,v 1.4.24.1 1999/04/12 21:27:11 pk Exp $	*/
+/*	$NetBSD: ioa.h,v 1.7 2000/06/12 11:13:16 ragge Exp $	*/
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -58,6 +58,7 @@
  *								*
  ****************************************************************/
 
+#include "opt_cputype.h"
 #if VAX8600
 #define	MAXNIOA		4
 #define	NIOA8600	2
@@ -115,4 +116,4 @@ struct	ioa {
 #define IOA_TYPMSK 0xf0
 #define IOA_SBIA	0x10
 
-#endif VAX8600
+#endif /* VAX8600 */

@@ -1,7 +1,7 @@
-/* $NetBSD: tfb.c,v 1.11 1999/03/29 07:22:02 nisimura Exp $ */
+/* $NetBSD: tfb.c,v 1.24.4.1 2000/06/30 16:27:52 simonb Exp $ */
 
 /*
- * Copyright (c) 1998 Tohru Nishimura.  All rights reserved.
+ * Copyright (c) 1998, 1999 Tohru Nishimura.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: tfb.c,v 1.11 1999/03/29 07:22:02 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tfb.c,v 1.24.4.1 2000/06/30 16:27:52 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,10 +46,11 @@ __KERNEL_RCSID(0, "$NetBSD: tfb.c,v 1.11 1999/03/29 07:22:02 nisimura Exp $");
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-#include <dev/rcons/raster.h>
 #include <dev/wscons/wsconsio.h>
-#include <dev/wscons/wscons_raster.h>
 #include <dev/wscons/wsdisplayvar.h>
+
+#include <dev/rasops/rasops.h>
+#include <dev/wsfont/wsfont.h>
 
 #include <dev/tc/tcvar.h>
 #include <dev/ic/bt463reg.h>
@@ -57,63 +58,96 @@ __KERNEL_RCSID(0, "$NetBSD: tfb.c,v 1.11 1999/03/29 07:22:02 nisimura Exp $");
 
 #include <uvm/uvm_extern.h>
 
-/* XXX BUS'IFYING XXX */
-
 #if defined(pmax)
 #define	machine_btop(x) mips_btop(x)
 #define	MACHINE_KSEG0_TO_PHYS(x) MIPS_KSEG0_TO_PHYS(x)
 
-struct bt463reg {
-	u_int8_t	bt_lo;
-	unsigned : 24;
-	u_int8_t	bt_hi;
-	unsigned : 24;
-	u_int8_t	bt_reg;
-	unsigned : 24;
-	u_int8_t	bt_cmap;
-};
-
 /*
+ * struct bt463reg {
+ * 	u_int8_t	bt_lo;
+ * 	unsigned : 24;
+ * 	u_int8_t	bt_hi;
+ * 	unsigned : 24;
+ * 	u_int8_t	bt_reg;
+ * 	unsigned : 24;
+ * 	u_int8_t	bt_cmap;
+ * };
+ *
  * N.B. a pair of Bt431s are located adjascently.
  * 	struct bt431twin {
  *		struct {
- *			u_int8_t u0;	for sprite image
- *			u_int8_t u1;	for sprite mask
+ *			u_int8_t u0;	for sprite mask
+ *			u_int8_t u1;	for sprite image
  *			unsigned :16;
  *		} bt_lo;
  *		...
+ *
+ * struct bt431reg {
+ * 	u_int16_t	bt_lo;
+ * 	unsigned : 16;
+ * 	u_int16_t	bt_hi;
+ * 	unsigned : 16;
+ * 	u_int16_t	bt_ram;
+ * 	unsigned : 16;
+ * 	u_int16_t	bt_ctl;
+ * };
  */
-struct bt431reg {
-	u_int16_t	bt_lo;
-	unsigned : 16;
-	u_int16_t	bt_hi;
-	unsigned : 16;
-	u_int16_t	bt_ram;
-	unsigned : 16;
-	u_int16_t	bt_ctl;
-};
+
+#define	BYTE(base, index)	*((u_int8_t *)(base) + ((index)<<2))
+#define	HALF(base, index)	*((u_int16_t *)(base) + ((index)<<1))
+
 #endif
 
 #if defined(__alpha__) || defined(alpha)
 #define machine_btop(x) alpha_btop(x)
 #define MACHINE_KSEG0_TO_PHYS(x) ALPHA_K0SEG_TO_PHYS(x)
 
-struct bt463reg {
-	u_int32_t	bt_lo;
-	u_int32_t	bt_hi;
-	u_int32_t	bt_reg;
-	u_int32_t	bt_cmap;
-};
+/*
+ * struct bt463reg {
+ * 	u_int32_t	bt_lo;
+ * 	u_int32_t	bt_hi;
+ * 	u_int32_t	bt_reg;
+ * 	u_int32_t	bt_cmap;
+ * };
+ * 
+ * struct bt431reg {
+ * 	u_int32_t	bt_lo;
+ * 	u_int32_t	bt_hi;
+ * 	u_int32_t	bt_ram;
+ * 	u_int32_t	bt_ctl;
+ * };
+ */
 
-struct bt431reg {
-	u_int32_t	bt_lo;
-	u_int32_t	bt_hi;
-	u_int32_t	bt_ram;
-	u_int32_t	bt_ctl;
-};
+#define	BYTE(base, index)	*((u_int32_t *)(base) + (index))
+#define	HALF(base, index)	*((u_int32_t *)(base) + (index))
+
 #endif
 
-/* XXX XXX XXX */
+/* Bt463 hardware registers */
+#define	bt_lo	0
+#define	bt_hi	1
+#define	bt_reg	2
+#define	bt_cmap	3
+
+/* Bt431 hardware registers */
+#define	bt_ram	2
+#define	bt_ctl	3
+
+#define	SELECT463(vdac, regno) do {			\
+	BYTE(vdac, bt_lo) = (regno) & 0x00ff;		\
+	BYTE(vdac, bt_hi) = ((regno)& 0xff00) >> 8;	\
+	tc_wmb();					\
+   } while (0)
+
+#define	TWIN(x)	   ((x) | ((x) << 8))
+#define	TWIN_LO(x) (twin = (x) & 0x00ff, (twin << 8) | twin)
+#define	TWIN_HI(x) (twin = (x) & 0xff00, twin | (twin >> 8))
+
+#define	SELECT431(curs, regno) do {	\
+	HALF(curs, bt_lo) = TWIN(regno);\
+	HALF(curs, bt_hi) = 0;		\
+	tc_wmb();			\
+   } while (0)
 
 struct fb_devconfig {
 	vaddr_t dc_vaddr;		/* memory space virtual base address */
@@ -124,22 +158,23 @@ struct fb_devconfig {
 	int	dc_depth;		/* depth, bits per pixel */
 	int	dc_rowbytes;		/* bytes in a FB scan line */
 	vaddr_t dc_videobase;		/* base of flat frame buffer */
-	struct raster	dc_raster;	/* raster description */
-	struct rcons	dc_rcons;	/* raster blitter control info */
 	int	    dc_blanked;		/* currently has video disabled */
+
+	struct rasops_info rinfo;
 };
 
-struct hwcmap {
+struct hwcmap256 {
 #define	CMAP_SIZE	256	/* R/G/B entries */
 	u_int8_t r[CMAP_SIZE];
 	u_int8_t g[CMAP_SIZE];
 	u_int8_t b[CMAP_SIZE];
 };
 
-struct hwcursor {
+struct hwcursor64 {
 	struct wsdisplay_curpos cc_pos;
 	struct wsdisplay_curpos cc_hot;
 	struct wsdisplay_curpos cc_size;
+	struct wsdisplay_curpos cc_magic;
 #define	CURSOR_MAX_SIZE	64
 	u_int8_t cc_color[6];
 	u_int64_t cc_image[64 + 64];
@@ -148,8 +183,8 @@ struct hwcursor {
 struct tfb_softc {
 	struct device sc_dev;
 	struct fb_devconfig *sc_dc;	/* device configuration */
-	struct hwcmap sc_cmap;		/* software copy of colormap */
-	struct hwcursor sc_cursor;	/* software copy of cursor */
+	struct hwcmap256 sc_cmap;	/* software copy of colormap */
+	struct hwcursor64 sc_cursor;	/* software copy of cursor */
 	int sc_curenb;			/* cursor sprite enabled */
 	int sc_changed;			/* need update of colormap */
 #define	DATA_ENB_CHANGED	0x01	/* cursor enable changed */
@@ -158,10 +193,10 @@ struct tfb_softc {
 #define	DATA_CMAP_CHANGED	0x08	/* colormap changed */
 #define	DATA_ALL_CHANGED	0x0f
 	int nscreens;
-	short magic_x, magic_y;		/* TX cursor location offset */
-#define	TX_MAGIC_X	220
-#define	TX_MAGIC_Y	35
 };
+
+#define	TX_MAGIC_X	360
+#define	TX_MAGIC_Y	36
 
 #define	TX_BT463_OFFSET	0x040000
 #define	TX_BT431_OFFSET	0x040010
@@ -169,64 +204,54 @@ struct tfb_softc {
 #define	TX_MAP_REGISTER	0x040030
 #define	TX_PIP_OFFSET	0x0800c0
 #define	TX_SELECTION	0x100000
-#define	TX_8FB_OFFSET	0x200000
-#define	TX_8FB_SIZE	0x100000
-#define	TX_24FB_OFFSET	0x400000
-#define	TX_24FB_SIZE	0x400000
+#define	TX_8BPP_OFFSET	0x200000
+#define	TX_8BPP_SIZE	0x200000
+#define	TX_24BPP_OFFSET	0x400000
+#define	TX_24BPP_SIZE	0x600000
 #define	TX_VIDEO_ENABLE	0xa00000
 
-#define TX_CTL_VIDEO_ON	0x80
-#define TX_CTL_INT_ENA	0x40
-#define TX_CTL_INT_PEND	0x20
-#define TX_CTL_SEG_ENA	0x10
-#define TX_CTL_SEG	0x0f
+#define	TX_CTL_VIDEO_ON	0x80
+#define	TX_CTL_INT_ENA	0x40
+#define	TX_CTL_INT_PEND	0x20
+#define	TX_CTL_SEG_ENA	0x10
+#define	TX_CTL_SEG	0x0f
 
-int  tfbmatch __P((struct device *, struct cfdata *, void *));
-void tfbattach __P((struct device *, struct device *, void *));
+static int  tfbmatch __P((struct device *, struct cfdata *, void *));
+static void tfbattach __P((struct device *, struct device *, void *));
 
-struct cfattach tfb_ca = {
+const struct cfattach tfb_ca = {
 	sizeof(struct tfb_softc), tfbmatch, tfbattach,
 };
 
-void tfb_getdevconfig __P((tc_addr_t, struct fb_devconfig *));
-struct fb_devconfig tfb_console_dc;
-tc_addr_t tfb_consaddr;
+static void tfb_getdevconfig __P((tc_addr_t, struct fb_devconfig *));
+static struct fb_devconfig tfb_console_dc;
+static tc_addr_t tfb_consaddr;
 
-struct wsdisplay_emulops tfb_emulops = {
-	rcons_cursor,			/* could use hardware cursor; punt */
-	rcons_mapchar,
-	rcons_putchar,
-	rcons_copycols,
-	rcons_erasecols,
-	rcons_copyrows,
-	rcons_eraserows,
-	rcons_alloc_attr
-};
-
-struct wsscreen_descr tfb_stdscreen = {
+static struct wsscreen_descr tfb_stdscreen = {
 	"std", 0, 0,
-	&tfb_emulops,
+	0, /* textops */
 	0, 0,
-	0
+	WSSCREEN_REVERSE
 };
 
-const struct wsscreen_descr *_tfb_scrlist[] = {
+static const struct wsscreen_descr *_tfb_scrlist[] = {
 	&tfb_stdscreen,
 };
 
-struct wsscreen_list tfb_screenlist = {
+static const struct wsscreen_list tfb_screenlist = {
 	sizeof(_tfb_scrlist) / sizeof(struct wsscreen_descr *), _tfb_scrlist
 };
 
-int	tfbioctl __P((void *, u_long, caddr_t, int, struct proc *));
-int	tfbmmap __P((void *, off_t, int));
+static int	tfbioctl __P((void *, u_long, caddr_t, int, struct proc *));
+static paddr_t	tfbmmap __P((void *, off_t, int));
 
-int	tfb_alloc_screen __P((void *, const struct wsscreen_descr *,
+static int	tfb_alloc_screen __P((void *, const struct wsscreen_descr *,
 				      void **, int *, int *, long *));
-void	tfb_free_screen __P((void *, void *));
-void	tfb_show_screen __P((void *, void *));
+static void	tfb_free_screen __P((void *, void *));
+static int	tfb_show_screen __P((void *, void *, int,
+				     void (*) (void *, int, int), void *));
 
-struct wsdisplay_accessops tfb_accessops = {
+static const struct wsdisplay_accessops tfb_accessops = {
 	tfbioctl,
 	tfbmmap,
 	tfb_alloc_screen,
@@ -236,8 +261,8 @@ struct wsdisplay_accessops tfb_accessops = {
 };
 
 int  tfb_cnattach __P((tc_addr_t));
-int  tfbintr __P((void *));
-void tfbinit __P((struct fb_devconfig *));
+static int  tfbintr __P((void *));
+static void tfbinit __P((struct fb_devconfig *));
 
 static int  get_cmap __P((struct tfb_softc *, struct wsdisplay_cmap *));
 static int  set_cmap __P((struct tfb_softc *, struct wsdisplay_cmap *));
@@ -246,26 +271,8 @@ static int  get_cursor __P((struct tfb_softc *, struct wsdisplay_cursor *));
 static void set_curpos __P((struct tfb_softc *, struct wsdisplay_curpos *));
 static void bt431_set_curpos __P((struct tfb_softc *));
 
-#define	TWIN_LO(x) (twin = (x) & 0x00ff, twin << 8 | twin)
-#define	TWIN_HI(x) (twin = (x) & 0xff00, twin | twin >> 8)
-
-/* XXX XXX XXX */
-#define	BT431_SELECT(curs, regno) do {	\
-	u_int16_t twin;			\
-	curs->bt_lo = TWIN_LO(regno);	\
-	curs->bt_hi = TWIN_HI(regno);	\
-	tc_wmb();			\
-   } while (0)
-
-#define	BT463_SELECT(vdac, regno) do {		\
-	vdac->bt_lo = (regno) & 0x00ff;		\
-	vdac->bt_hi = ((regno)& 0xff00) >> 8;	\
-	tc_wmb();				\
-   } while (0)
-/* XXX XXX XXX */
-
 /* bit order reverse */
-const static u_int8_t flip[256] = {
+static const u_int8_t flip[256] = {
 	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
 	0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
 	0x08, 0x88, 0x48, 0xc8, 0x28, 0xa8, 0x68, 0xe8,
@@ -300,7 +307,7 @@ const static u_int8_t flip[256] = {
 	0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff,
 };
 
-int
+static int
 tfbmatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
@@ -315,14 +322,12 @@ tfbmatch(parent, match, aux)
 	return (1);
 }
 
-void
+static void
 tfb_getdevconfig(dense_addr, dc)
 	tc_addr_t dense_addr;
 	struct fb_devconfig *dc;
 {
-	struct raster *rap;
-	struct rcons *rcp;
-	int i;
+	int i, cookie;
 
 	dc->dc_vaddr = dense_addr;
 	dc->dc_paddr = MACHINE_KSEG0_TO_PHYS(dc->dc_vaddr);
@@ -331,7 +336,7 @@ tfb_getdevconfig(dense_addr, dc)
 	dc->dc_ht = 1024;
 	dc->dc_depth = 8;
 	dc->dc_rowbytes = 1280;
-	dc->dc_videobase = dc->dc_vaddr + TX_8FB_OFFSET;
+	dc->dc_videobase = dc->dc_vaddr + TX_8BPP_OFFSET;
 	dc->dc_blanked = 0;
 
 	/* initialize colormap and cursor resource */
@@ -341,27 +346,39 @@ tfb_getdevconfig(dense_addr, dc)
 	for (i = 0; i < dc->dc_ht * dc->dc_rowbytes; i += sizeof(u_int32_t))
 		*(u_int32_t *)(dc->dc_videobase + i) = 0x0;
 
-	/* initialize the raster */
-	rap = &dc->dc_raster;
-	rap->width = dc->dc_wid;
-	rap->height = dc->dc_ht;
-	rap->depth = dc->dc_depth;
-	rap->linelongs = dc->dc_rowbytes / sizeof(u_int32_t);
-	rap->pixels = (u_int32_t *)dc->dc_videobase;
+	dc->rinfo.ri_flg = RI_CENTER;
+	dc->rinfo.ri_depth = dc->dc_depth;
+	dc->rinfo.ri_bits = (void *)dc->dc_videobase;
+	dc->rinfo.ri_width = dc->dc_wid;
+	dc->rinfo.ri_height = dc->dc_ht;
+	dc->rinfo.ri_stride = dc->dc_rowbytes;
 
-	/* initialize the raster console blitter */
-	rcp = &dc->dc_rcons;
-	rcp->rc_sp = rap;
-	rcp->rc_crow = rcp->rc_ccol = -1;
-	rcp->rc_crowp = &rcp->rc_crow;
-	rcp->rc_ccolp = &rcp->rc_ccol;
-	rcons_init(rcp, 34, 80);
+	wsfont_init();
+	/* prefer 8 pixel wide font */
+	if ((cookie = wsfont_find(NULL, 8, 0, 0)) <= 0)
+		cookie = wsfont_find(NULL, 0, 0, 0);
+	if (cookie <= 0) {
+		printf("tfb: font table is empty\n");
+		return;
+	}
 
-	tfb_stdscreen.nrows = dc->dc_rcons.rc_maxrow;
-	tfb_stdscreen.ncols = dc->dc_rcons.rc_maxcol;
+	if (wsfont_lock(cookie, &dc->rinfo.ri_font,
+	    WSDISPLAY_FONTORDER_R2L, WSDISPLAY_FONTORDER_L2R) <= 0) {
+		printf("tfb: couldn't lock font\n");
+		return;
+	}
+	dc->rinfo.ri_wsfcookie = cookie;
+
+	rasops_init(&dc->rinfo, 34, 80);
+
+	/* XXX shouldn't be global */
+	tfb_stdscreen.nrows = dc->rinfo.ri_rows;
+	tfb_stdscreen.ncols = dc->rinfo.ri_cols;
+	tfb_stdscreen.textops = &dc->rinfo.ri_ops;
+	tfb_stdscreen.capabilities = dc->rinfo.ri_caps;
 }
 
-void
+static void
 tfbattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
@@ -369,8 +386,7 @@ tfbattach(parent, self, aux)
 	struct tfb_softc *sc = (struct tfb_softc *)self;
 	struct tc_attach_args *ta = aux;
 	struct wsemuldisplaydev_attach_args waa;
-	struct hwcmap *cm;
-	int console, i;
+	int console;
 
 	console = (ta->ta_addr == tfb_consaddr);
 	if (console) {
@@ -382,17 +398,15 @@ tfbattach(parent, self, aux)
 		    malloc(sizeof(struct fb_devconfig), M_DEVBUF, M_WAITOK);
 		tfb_getdevconfig(ta->ta_addr, sc->sc_dc);
 	}
-	printf(": %d x %d, %dbpp\n", sc->sc_dc->dc_wid, sc->sc_dc->dc_ht,
-	    sc->sc_dc->dc_depth);
+	printf(": %d x %d, 8,24bpp\n", sc->sc_dc->dc_wid, sc->sc_dc->dc_ht);
 
-	cm = &sc->sc_cmap;
-	cm->r[0] = cm->g[0] = cm->b[0] = 0;
-	for (i = 1; i < CMAP_SIZE; i++) {
-		cm->r[i] = cm->g[i] = cm->b[i] = 0xff;
-	}
-	sc->magic_x = TX_MAGIC_X; sc->magic_y = TX_MAGIC_Y;
+	memcpy(&sc->sc_cmap, rasops_cmap, sizeof(struct hwcmap256));
 
-        tc_intr_establish(parent, ta->ta_cookie, TC_IPL_TTY, tfbintr, sc);
+	sc->sc_cursor.cc_magic.x = TX_MAGIC_X;
+	sc->sc_cursor.cc_magic.y = TX_MAGIC_Y;
+
+	tc_intr_establish(parent, ta->ta_cookie, IPL_TTY, tfbintr, sc);
+
 	*(u_int8_t *)(sc->sc_dc->dc_vaddr + TX_CONTROL) &= ~0x40;
 	*(u_int8_t *)(sc->sc_dc->dc_vaddr + TX_CONTROL) |= 0x40;
 
@@ -404,7 +418,7 @@ tfbattach(parent, self, aux)
 	config_found(self, &waa, wsemuldisplaydevprint);
 }
 
-int
+static int
 tfbioctl(v, cmd, data, flag, p)
 	void *v;
 	u_long cmd;
@@ -418,7 +432,7 @@ tfbioctl(v, cmd, data, flag, p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
-		*(u_int *)data = /* WSDISPLAY_TYPE_TX */ 0x19980910;
+		*(u_int *)data = WSDISPLAY_TYPE_TX;
 		return (0);
 
 	case WSDISPLAYIO_GINFO:
@@ -440,7 +454,11 @@ tfbioctl(v, cmd, data, flag, p)
 		turnoff = *(int *)data == WSDISPLAYIO_VIDEO_OFF;
 		if ((dc->dc_blanked == 0) ^ turnoff) {
 			dc->dc_blanked = turnoff;
-			/* XXX later XXX */		
+#if 0	/* XXX later XXX */		
+	To turn off;
+	- clear the MSB of TX control register; &= ~0x80,
+	- assign Bt431 register #0 with value 0x4 to hide sprite cursor.
+#endif	/* XXX XXX XXX */
 		}
 		return (0);
 
@@ -472,7 +490,7 @@ tfbioctl(v, cmd, data, flag, p)
 	return (ENOTTY);
 }
 
-int
+static paddr_t
 tfbmmap(v, offset, prot)
 	void *v;
 	off_t offset;
@@ -480,12 +498,12 @@ tfbmmap(v, offset, prot)
 {
 	struct tfb_softc *sc = v;
 
-	if (offset >= TX_8FB_SIZE || offset < 0)
+	if (offset >= TX_8BPP_SIZE || offset < 0)
 		return (-1);
-	return machine_btop(sc->sc_dc->dc_paddr + TX_8FB_OFFSET + offset);
+	return machine_btop(sc->sc_dc->dc_paddr + TX_8BPP_OFFSET + offset);
 }
 
-int
+static int
 tfb_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	void *v;
 	const struct wsscreen_descr *type;
@@ -499,16 +517,16 @@ tfb_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	if (sc->nscreens > 0)
 		return (ENOMEM);
 
-	*cookiep = &sc->sc_dc->dc_rcons; /* one and only for now */
+	*cookiep = &sc->sc_dc->rinfo; /* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	rcons_alloc_attr(&sc->sc_dc->dc_rcons, 0, 0, 0, &defattr);
+	(*sc->sc_dc->rinfo.ri_ops.alloc_attr)(&sc->sc_dc->rinfo, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->nscreens++;
 	return (0);
 }
 
-void
+static void
 tfb_free_screen(v, cookie)
 	void *v;
 	void *cookie;
@@ -521,72 +539,72 @@ tfb_free_screen(v, cookie)
 	sc->nscreens--;
 }
 
-void
-tfb_show_screen(v, cookie)
+static int
+tfb_show_screen(v, cookie, waitok, cb, cbarg)
 	void *v;
 	void *cookie;
+	int waitok;
+	void (*cb) __P((void *, int, int));
+	void *cbarg;
 {
+
+	return (0);
 }
 
-int
+/* EXPORT */ int
 tfb_cnattach(addr)
-        tc_addr_t addr;
+	tc_addr_t addr;
 {
-        struct fb_devconfig *dcp = &tfb_console_dc;
-        long defattr;
+	struct fb_devconfig *dcp = &tfb_console_dc;
+	long defattr;
 
-        tfb_getdevconfig(addr, dcp);
- 
-        rcons_alloc_attr(&dcp->dc_rcons, 0, 0, 0, &defattr);
-
-        wsdisplay_cnattach(&tfb_stdscreen, &dcp->dc_rcons,
-                           0, 0, defattr);
-        tfb_consaddr = addr;
-        return(0);
+	tfb_getdevconfig(addr, dcp);
+	(*dcp->rinfo.ri_ops.alloc_attr)(&dcp->rinfo, 0, 0, 0, &defattr);
+	wsdisplay_cnattach(&tfb_stdscreen, &dcp->rinfo, 0, 0, defattr);
+	tfb_consaddr = addr;
+	return (0);
 }
 
-int
+static int
 tfbintr(arg)
 	void *arg;
 {
 	struct tfb_softc *sc = arg;
-	caddr_t tfbbase;
-	struct bt463reg *vdac;
-	struct bt431reg *curs;
+	caddr_t tfbbase = (caddr_t)sc->sc_dc->dc_vaddr;
+	void *vdac, *curs;
 	int v;
 	
+	*(u_int8_t *)(tfbbase + TX_CONTROL) &= ~0x40;
 	if (sc->sc_changed == 0)
-		return (1);
+		goto done;
 
-	tfbbase = (caddr_t)sc->sc_dc->dc_vaddr;
 	vdac = (void *)(tfbbase + TX_BT463_OFFSET);
 	curs = (void *)(tfbbase + TX_BT431_OFFSET);
-	*(u_int8_t *)(tfbbase + TX_CONTROL) &= ~0x40;
 	v = sc->sc_changed;
 	sc->sc_changed = 0;
 	if (v & DATA_ENB_CHANGED) {
-		BT431_SELECT(curs, BT431_REG_COMMAND);
-		curs->bt_ctl = (sc->sc_curenb) ? 0x4444 : 0x0404;
+		SELECT431(curs, BT431_REG_COMMAND);
+		HALF(curs, bt_ctl) = (sc->sc_curenb) ? 0x4444 : 0x0404;
 	}
 	if (v & DATA_CURCMAP_CHANGED) {
 		u_int8_t *cp = sc->sc_cursor.cc_color;
 
-		BT463_SELECT(vdac, BT463_IREG_CURSOR_COLOR_0);
-		vdac->bt_reg = cp[1]; tc_wmb();
-		vdac->bt_reg = cp[3]; tc_wmb();
-		vdac->bt_reg = cp[5]; tc_wmb();
+		SELECT463(vdac, BT463_IREG_CURSOR_COLOR_0);
+		BYTE(vdac, bt_reg) = cp[1]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[3]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[5]; tc_wmb();
 
-		vdac->bt_reg = cp[0]; tc_wmb();
-		vdac->bt_reg = cp[2]; tc_wmb();
-		vdac->bt_reg = cp[4]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[0]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[2]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[4]; tc_wmb();
 
-		vdac->bt_reg = cp[1]; tc_wmb();
-		vdac->bt_reg = cp[3]; tc_wmb();
-		vdac->bt_reg = cp[5]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[1]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[3]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[5]; tc_wmb();
 
-		vdac->bt_reg = cp[1]; tc_wmb();
-		vdac->bt_reg = cp[3]; tc_wmb();
-		vdac->bt_reg = cp[5]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[1]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[3]; tc_wmb();
+		BYTE(vdac, bt_reg) = cp[5]; tc_wmb();
 	}
 	if (v & DATA_CURSHAPE_CHANGED) {
 		u_int8_t *ip, *mp, img, msk;
@@ -594,102 +612,126 @@ tfbintr(arg)
 
 		ip = (u_int8_t *)sc->sc_cursor.cc_image;
 		mp = (u_int8_t *)(sc->sc_cursor.cc_image + CURSOR_MAX_SIZE);
-
 		bcnt = 0;
-		BT431_SELECT(curs, BT431_REG_CRAM_BASE+0);
+		SELECT431(curs, BT431_REG_CRAM_BASE);
+
 		/* 64 pixel scan line is consisted with 16 byte cursor ram */
 		while (bcnt < sc->sc_cursor.cc_size.y * 16) {
 			/* pad right half 32 pixel when smaller than 33 */
 			if ((bcnt & 0x8) && sc->sc_cursor.cc_size.x < 33) {
-				curs->bt_ram = 0;
+				HALF(curs, bt_ram) = 0;
 				tc_wmb();
 			}
 			else {
 				img = *ip++;
 				msk = *mp++;
 				img &= msk;	/* cookie off image */
-				curs->bt_ram = (flip[msk] << 8) | flip[img];
+				HALF(curs, bt_ram)
+				    = (flip[img] << 8) | flip[msk];
 				tc_wmb();
 			}
 			bcnt += 2;
 		}
 		/* pad unoccupied scan lines */
 		while (bcnt < CURSOR_MAX_SIZE * 16) {
-			curs->bt_ram = 0;
+			HALF(curs, bt_ram) = 0;
 			tc_wmb();
 			bcnt += 2;
 		}
 	}
 	if (v & DATA_CMAP_CHANGED) {
-		struct hwcmap *cm = &sc->sc_cmap;
+		struct hwcmap256 *cm = &sc->sc_cmap;
 		int index;
 
-		BT463_SELECT(vdac, BT463_IREG_CPALETTE_RAM);
+		SELECT463(vdac, BT463_IREG_CPALETTE_RAM);
 		for (index = 0; index < CMAP_SIZE; index++) {
-			vdac->bt_cmap = cm->r[index];
-			vdac->bt_cmap = cm->g[index];
-			vdac->bt_cmap = cm->b[index];
+			BYTE(vdac, bt_cmap) = cm->r[index];
+			BYTE(vdac, bt_cmap) = cm->g[index];
+			BYTE(vdac, bt_cmap) = cm->b[index];
 		}
 	}
+done:
+	*(u_int8_t *)(tfbbase + TX_CONTROL) &= ~0x40;	/* !? Eeeh !? */
 	*(u_int8_t *)(tfbbase + TX_CONTROL) |= 0x40;
 	return (1);
 }
 
-void
+static void
 tfbinit(dc)
 	struct fb_devconfig *dc;
 {
 	caddr_t tfbbase = (caddr_t)dc->dc_vaddr;
-	struct bt463reg *vdac = (void *)(tfbbase + TX_BT463_OFFSET);
-	struct bt431reg *curs = (void *)(tfbbase + TX_BT431_OFFSET);
+	void *vdac = (void *)(tfbbase + TX_BT463_OFFSET);
+	void *curs = (void *)(tfbbase + TX_BT431_OFFSET);
 	int i;
 
-	BT463_SELECT(vdac, BT463_IREG_COMMAND_0);
-	vdac->bt_reg = 0x40;	tc_wmb();
-	vdac->bt_reg = 0x46;	tc_wmb();
-	vdac->bt_reg = 0xc0;	tc_wmb();
-	vdac->bt_reg = 0;	tc_wmb();	/* !? 204 !? */
-	vdac->bt_reg = 0xff;	tc_wmb();	/* plane  0:7  */
-	vdac->bt_reg = 0xff;	tc_wmb();	/* plane  8:15 */
-	vdac->bt_reg = 0xff;	tc_wmb();	/* plane 16:23 */
-	vdac->bt_reg = 0xff;	tc_wmb();	/* plane 24:27 */
-	vdac->bt_reg = 0x00;	tc_wmb();	/* blink  0:7  */
-	vdac->bt_reg = 0x00;	tc_wmb();	/* blink  8:15 */
-	vdac->bt_reg = 0x00;	tc_wmb();	/* blink 16:23 */
-	vdac->bt_reg = 0x00;	tc_wmb();	/* blink 24:27 */
-	vdac->bt_reg = 0x00;	tc_wmb();
+	SELECT463(vdac, BT463_IREG_COMMAND_0);
+	BYTE(vdac, bt_reg) = 0x40;	tc_wmb();	/* CMD 0 */
+	BYTE(vdac, bt_reg) = 0x46;	tc_wmb();	/* CMD 1 */
+	BYTE(vdac, bt_reg) = 0xc0;	tc_wmb();	/* CMD 2 */
+	BYTE(vdac, bt_reg) = 0;		tc_wmb();	/* !? 204 !? */
+	BYTE(vdac, bt_reg) = 0xff;	tc_wmb();	/* plane  0:7  */
+	BYTE(vdac, bt_reg) = 0xff;	tc_wmb();	/* plane  8:15 */
+	BYTE(vdac, bt_reg) = 0xff;	tc_wmb();	/* plane 16:23 */
+	BYTE(vdac, bt_reg) = 0xff;	tc_wmb();	/* plane 24:27 */
+	BYTE(vdac, bt_reg) = 0x00;	tc_wmb();	/* blink  0:7  */
+	BYTE(vdac, bt_reg) = 0x00;	tc_wmb();	/* blink  8:15 */
+	BYTE(vdac, bt_reg) = 0x00;	tc_wmb();	/* blink 16:23 */
+	BYTE(vdac, bt_reg) = 0x00;	tc_wmb();	/* blink 24:27 */
+	BYTE(vdac, bt_reg) = 0x00;	tc_wmb();
 
-	BT463_SELECT(vdac, BT463_IREG_WINDOW_TYPE_TABLE);
+#if 0 /* XXX ULTRIX does initialize 16 entry window type here XXX */
+  {
+	static u_int32_t windowtype[BT463_IREG_WINDOW_TYPE_TABLE] = {
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	};
+
+	SELECT463(vdac, BT463_IREG_WINDOW_TYPE_TABLE);
 	for (i = 0; i < BT463_NWTYPE_ENTRIES; i++) {
-		vdac->bt_reg = /* ??? */ 0;
-		vdac->bt_reg = /* ??? */ 0;
-		vdac->bt_reg = /* ??? */ 0;
+		BYTE(vdac, bt_reg) = windowtype[i];	  /*   0:7  */
+		BYTE(vdac, bt_reg) = windowtype[i] >> 8;  /*   8:15 */
+		BYTE(vdac, bt_reg) = windowtype[i] >> 16; /*  16:23 */
+	}
+  }
+#endif
+
+	SELECT463(vdac, BT463_IREG_CPALETTE_RAM);
+	for (i = 0; i < 256; i++) {
+		BYTE(vdac, bt_cmap) = rasops_cmap[3 * i + 0];
+		tc_wmb();
+		BYTE(vdac, bt_cmap) = rasops_cmap[3 * i + 1];
+		tc_wmb();
+		BYTE(vdac, bt_cmap) = rasops_cmap[3 * i + 2];
+		tc_wmb();
 	}
 
-	BT463_SELECT(vdac, BT463_IREG_CPALETTE_RAM);
-	vdac->bt_cmap = 0;	tc_wmb();
-	vdac->bt_cmap = 0;	tc_wmb();
-	vdac->bt_cmap = 0;	tc_wmb();
-	for (i = 1; i < BT463_NCMAP_ENTRIES; i++) {
-		vdac->bt_cmap = 0xff;	tc_wmb();
-		vdac->bt_cmap = 0xff;	tc_wmb();
-		vdac->bt_cmap = 0xff;	tc_wmb();
+	/* !? Eeeh !? */
+	SELECT463(vdac, 0x0100 /* BT463_IREG_CURSOR_COLOR_0 */);
+	for (i = 0; i < 256; i++) {
+		BYTE(vdac, bt_cmap) = i;	tc_wmb();
+		BYTE(vdac, bt_cmap) = i;	tc_wmb();
+		BYTE(vdac, bt_cmap) = i;	tc_wmb();
 	}
 
-	BT431_SELECT(curs, BT431_REG_COMMAND);
-	curs->bt_ctl = 0x0404;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
-	curs->bt_ctl = 0;	tc_wmb();
+	SELECT431(curs, BT431_REG_COMMAND);
+	HALF(curs, bt_ctl) = 0x0404;		tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* XLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* XHI */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* YLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* YHI */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* XWLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* XWHI */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* WYLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* WYLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* WWLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* WWHI */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* WHLO */	tc_wmb();
+	HALF(curs, bt_ctl) = 0; /* WHHI */	tc_wmb();
+
+	SELECT431(curs, BT431_REG_CRAM_BASE);
+	for (i = 0; i < 512; i++) {
+		HALF(curs, bt_ram) = 0;	tc_wmb();
+	}
 }
 
 static int
@@ -829,21 +871,23 @@ bt431_set_curpos(sc)
 	struct tfb_softc *sc;
 {
 	caddr_t tfbbase = (caddr_t)sc->sc_dc->dc_vaddr;
-	struct bt431reg *curs = (void *)(tfbbase + TX_BT431_OFFSET);
+	void *curs = (void *)(tfbbase + TX_BT431_OFFSET);
 	u_int16_t twin;
 	int x, y, s;
 
 	x = sc->sc_cursor.cc_pos.x - sc->sc_cursor.cc_hot.x;
 	y = sc->sc_cursor.cc_pos.y - sc->sc_cursor.cc_hot.y;
-	x += sc->magic_x; y += sc->magic_y; /* magic offset of TX coordinate */
+
+	x += sc->sc_cursor.cc_magic.x;
+	y += sc->sc_cursor.cc_magic.y;
 
 	s = spltty();
 
-	BT431_SELECT(curs, BT431_REG_CURSOR_X_LOW);
-	curs->bt_ctl = TWIN_LO(x);	tc_wmb();
-	curs->bt_ctl = TWIN_HI(x);	tc_wmb();
-	curs->bt_ctl = TWIN_LO(y);	tc_wmb();
-	curs->bt_ctl = TWIN_HI(y);	tc_wmb();
+	SELECT431(curs, BT431_REG_CURSOR_X_LOW);
+	HALF(curs, bt_ctl) = TWIN_LO(x);	tc_wmb();
+	HALF(curs, bt_ctl) = TWIN_HI(x);	tc_wmb();
+	HALF(curs, bt_ctl) = TWIN_LO(y);	tc_wmb();
+	HALF(curs, bt_ctl) = TWIN_HI(y);	tc_wmb();
 
 	splx(s);
 }

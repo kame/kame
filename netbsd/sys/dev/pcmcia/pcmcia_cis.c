@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmcia_cis.c,v 1.10.2.1 2000/01/15 18:05:48 he Exp $	*/
+/*	$NetBSD: pcmcia_cis.c,v 1.18.4.1 2000/08/22 07:27:22 jun Exp $	*/
 
 #define	PCMCIACISDEBUG
 
@@ -392,7 +392,8 @@ pcmcia_scan_cis(dev, fct, arg)
 					longlink_addr *= 2;
 
 				pcmcia_chip_mem_map(pct, pch, longlink_common ?
-				    PCMCIA_MEM_COMMON : PCMCIA_MEM_ATTR,
+				    (PCMCIA_WIDTH_MEM8 | PCMCIA_MEM_COMMON) :
+				    PCMCIA_MEM_ATTR,
 				    longlink_addr, PCMCIA_CIS_SIZE,
 				    &pcmh, &tuple.ptr, &window);
 
@@ -412,7 +413,8 @@ pcmcia_scan_cis(dev, fct, arg)
 
 				pcmcia_chip_mem_map(pct, pch,
 				    mfc[mfc_index].common ?
-				    PCMCIA_MEM_COMMON : PCMCIA_MEM_ATTR,
+				    (PCMCIA_WIDTH_MEM8 | PCMCIA_MEM_COMMON) :
+				    PCMCIA_MEM_ATTR,
 				    mfc[mfc_index].addr, PCMCIA_CIS_SIZE,
 				    &pcmh, &tuple.ptr, &window);
 
@@ -575,25 +577,28 @@ pcmcia_print_cis(sc)
 			if (cfe->num_iospace) {
 				printf("; iomask %lx, iospace", cfe->iomask);
 
-				for (i = 0; i < cfe->num_iospace; i++)
-					printf(" %lx%s%lx",
-					    cfe->iospace[i].start,
-					    cfe->iospace[i].length ? "-" : "",
-					    cfe->iospace[i].start +
-					      cfe->iospace[i].length - 1);
+				for (i = 0; i < cfe->num_iospace; i++) {
+					printf(" %lx", cfe->iospace[i].start);
+					if (cfe->iospace[i].length)
+						printf("-%lx",
+						    cfe->iospace[i].start +
+						    cfe->iospace[i].length - 1);
+				}
 			}
 			if (cfe->num_memspace) {
 				printf("; memspace");
 
-				for (i = 0; i < cfe->num_memspace; i++)
-					printf(" %lx%s%lx%s%lx",
-					    cfe->memspace[i].cardaddr,
-					    cfe->memspace[i].length ? "-" : "",
-					    cfe->memspace[i].cardaddr +
-					      cfe->memspace[i].length - 1,
-					    cfe->memspace[i].hostaddr ?
-					      "@" : "",
-					    cfe->memspace[i].hostaddr);
+				for (i = 0; i < cfe->num_memspace; i++) {
+					printf(" %lx",
+					    cfe->memspace[i].cardaddr);
+					if (cfe->memspace[i].length)
+						printf("-%lx",
+						    cfe->memspace[i].cardaddr +
+						    cfe->memspace[i].length - 1);
+					if (cfe->memspace[i].hostaddr)
+						printf("@%lx",
+						    cfe->memspace[i].hostaddr);
+				}
 			}
 			if (cfe->maxtwins)
 				printf("; maxtwins %d", cfe->maxtwins);
@@ -773,8 +778,14 @@ pcmcia_parse_cis_tuple(tuple, arg)
 			for (count = 0, start = 0, i = 0;
 			    (count < 4) && ((i + 4) < 256); i++) {
 				ch = pcmcia_tuple_read_1(tuple, 2 + i);
-				if (ch == 0xff)
+				if (ch == 0xff) {
+					if (i > start) {
+						state->card->cis1_info_buf[i] = 0;
+						state->card->cis1_info[count] =
+						    state->card->cis1_info_buf + start;
+					}
 					break;
+				}
 				state->card->cis1_info_buf[i] = ch;
 				if (ch == 0) {
 					state->card->cis1_info[count] =
@@ -967,6 +978,10 @@ pcmcia_parse_cis_tuple(tuple, arg)
 			if (intface) {
 				reg = pcmcia_tuple_read_1(tuple, idx);
 				idx++;
+				cfe->flags &= ~(PCMCIA_CFE_MWAIT_REQUIRED
+				    | PCMCIA_CFE_RDYBSY_ACTIVE
+				    | PCMCIA_CFE_WP_ACTIVE
+				    | PCMCIA_CFE_BVD_ACTIVE);
 				if (reg & PCMCIA_TPCE_IF_MWAIT)
 					cfe->flags |= PCMCIA_CFE_MWAIT_REQUIRED;
 				if (reg & PCMCIA_TPCE_IF_RDYBSY)
@@ -1035,6 +1050,8 @@ pcmcia_parse_cis_tuple(tuple, arg)
 				reg = pcmcia_tuple_read_1(tuple, idx);
 				idx++;
 
+				cfe->flags &=
+				    ~(PCMCIA_CFE_IO8 | PCMCIA_CFE_IO16);
 				if (reg & PCMCIA_TPCE_IO_BUSWIDTH_8BIT)
 					cfe->flags |= PCMCIA_CFE_IO8;
 				if (reg & PCMCIA_TPCE_IO_BUSWIDTH_16BIT)
@@ -1112,6 +1129,9 @@ pcmcia_parse_cis_tuple(tuple, arg)
 				reg = pcmcia_tuple_read_1(tuple, idx);
 				idx++;
 
+				cfe->flags &= ~(PCMCIA_CFE_IRQSHARE
+				    | PCMCIA_CFE_IRQPULSE
+				    | PCMCIA_CFE_IRQLEVEL);
 				if (reg & PCMCIA_TPCE_IR_SHARE)
 					cfe->flags |= PCMCIA_CFE_IRQSHARE;
 				if (reg & PCMCIA_TPCE_IR_PULSE)
@@ -1166,8 +1186,8 @@ pcmcia_parse_cis_tuple(tuple, arg)
 					reg = pcmcia_tuple_read_1(tuple, idx);
 					idx++;
 
-					cfe->num_memspace = reg &
-					    PCMCIA_TPCE_MS_COUNT;
+					cfe->num_memspace = (reg &
+					    PCMCIA_TPCE_MS_COUNT) + 1;
 
 					if (cfe->num_memspace >
 					    (sizeof(cfe->memspace) /
@@ -1234,12 +1254,15 @@ pcmcia_parse_cis_tuple(tuple, arg)
 				reg = pcmcia_tuple_read_1(tuple, idx);
 				idx++;
 
+				cfe->flags &= ~(PCMCIA_CFE_POWERDOWN
+				    | PCMCIA_CFE_READONLY
+				    | PCMCIA_CFE_AUDIO);
 				if (reg & PCMCIA_TPCE_MI_PWRDOWN)
-					cfe->flags = PCMCIA_CFE_POWERDOWN;
+					cfe->flags |= PCMCIA_CFE_POWERDOWN;
 				if (reg & PCMCIA_TPCE_MI_READONLY)
-					cfe->flags = PCMCIA_CFE_READONLY;
+					cfe->flags |= PCMCIA_CFE_READONLY;
 				if (reg & PCMCIA_TPCE_MI_AUDIO)
-					cfe->flags = PCMCIA_CFE_AUDIO;
+					cfe->flags |= PCMCIA_CFE_AUDIO;
 				cfe->maxtwins = reg & PCMCIA_TPCE_MI_MAXTWINS;
 
 				while (reg & PCMCIA_TPCE_MI_EXT) {

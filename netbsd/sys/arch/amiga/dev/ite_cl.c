@@ -1,4 +1,4 @@
-/*	$NetBSD: ite_cl.c,v 1.3.2.1 1999/06/28 23:22:17 perry Exp $	*/
+/*	$NetBSD: ite_cl.c,v 1.4 1999/06/27 21:17:17 is Exp $	*/
 
 /*
  * Copyright (c) 1995 Ezra Story

@@ -1,4 +1,4 @@
-/*	$NetBSD: file.h,v 1.18.6.1 2000/02/01 23:11:40 he Exp $	*/
+/*	$NetBSD: file.h,v 1.22 2000/02/01 01:22:45 assar Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -54,12 +54,13 @@ struct iovec;
  */
 struct file {
 	LIST_ENTRY(file) f_list;/* list of active files */
-	short	f_flag;		/* see fcntl.h */
+	int	f_flag;		/* see fcntl.h */
 #define	DTYPE_VNODE	1	/* file */
 #define	DTYPE_SOCKET	2	/* communications endpoint */
 	short	f_type;		/* descriptor type */
 	short	f_count;	/* reference count */
 	short	f_msgcount;	/* references from message queue */
+	short	f_pad0;		/* spare */
 	struct	ucred *f_cred;	/* credentials associated with descriptor */
 	struct	fileops {
 		int	(*fo_read)	__P((struct file *fp, off_t *offset,
@@ -70,13 +71,46 @@ struct file {
 					    struct ucred *cred, int flags));
 		int	(*fo_ioctl)	__P((struct file *fp, u_long com,
 					    caddr_t data, struct proc *p));
+		int	(*fo_fcntl)	__P((struct file *fp, u_int com,
+					    caddr_t data, struct proc *p));
 		int	(*fo_poll)	__P((struct file *fp, int events,
 					    struct proc *p));
 		int	(*fo_close)	__P((struct file *fp, struct proc *p));
 	} *f_ops;
 	off_t	f_offset;
 	caddr_t	f_data;		/* vnode or socket */
+	int	f_iflags;	/* internal flags */
+	int	f_usecount;	/* number active users */
 };
+
+#define	FIF_WANTCLOSE		0x01	/* a close is waiting for usecount */
+
+#ifdef DIAGNOSTIC
+#define	FILE_USE_CHECK(fp, str)						\
+do {									\
+	if ((fp)->f_usecount < 0)					\
+		panic(str);						\
+} while (0)
+#else
+#define	FILE_USE_CHECK(fp, str)		/* nothing */
+#endif
+
+#define	FILE_USE(fp)							\
+do {									\
+	(fp)->f_usecount++;						\
+	FILE_USE_CHECK((fp), "f_usecount overflow");			\
+} while (0)
+
+#define	FILE_UNUSE(fp, p)						\
+do {									\
+	if ((fp)->f_iflags & FIF_WANTCLOSE) {				\
+		/* Will drop usecount. */				\
+		(void) closef((fp), (p));				\
+	} else {							\
+		(fp)->f_usecount--;					\
+		FILE_USE_CHECK((fp), "f_usecount underflow");		\
+	}								\
+} while (0)
 
 /*
  * Flags for fo_read and fo_write.

@@ -1,10 +1,10 @@
-/*	$NetBSD: miidevs.h,v 1.5 1999/03/24 21:07:26 thorpej Exp $	*/
+/*	$NetBSD: miidevs.h,v 1.11 2000/05/08 13:26:05 augustss Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: miidevs,v 1.5 1999/03/24 21:07:04 thorpej Exp 
+ *	NetBSD: miidevs,v 1.11 2000/05/08 13:23:21 augustss Exp 
  */
 
 /*-
@@ -45,43 +45,88 @@
  */
 
 /*
- * List of known MII OUIs
+ * List of known MII OUIs.
+ * For a complete list see http://standards.ieee.org/regauth/oui/
+ *
+ * XXX Vendors do obviously not agree how OUIs (18 bit) are mapped
+ * to the 16 bits available in the id registers. The MII_OUI() macro
+ * in "mii.h" reflects the most obvious way. If a vendor uses a
+ * different mapping, an "xx" prefixed OUI is defined here which is
+ * mangled accordingly to compensate.
  */
 
-#define	MII_OUI_AMD	0x00606e	/* Advanced Micro Devices */
-#define	MII_OUI_DAVICOM	0x006040	/* Davicom Semiconductor */
-#define	MII_OUI_ICS	0x00057d	/* Integrated Circuit Systems */
+#define	MII_OUI_AMD	0x00001a	/* Advanced Micro Devices */
+#define	MII_OUI_BROADCOM	0x001018	/* Broadcom */
+#define	MII_OUI_ENABLESEMI	0x0010dd	/* Enable Semiconductor */
+#define	MII_OUI_DAVICOM	0x00606e	/* Davicom Semiconductor */
+#define	MII_OUI_ICS	0x00a0be	/* Integrated Circuit Systems */
 #define	MII_OUI_INTEL	0x00aa00	/* Intel */
-#define	MII_OUI_LEVEL1	0x1e0400	/* Level 1 */
+#define	MII_OUI_LEVEL1	0x00207b	/* Level 1 */
 #define	MII_OUI_NATSEMI	0x080017	/* National Semiconductor */
 #define	MII_OUI_QUALSEMI	0x006051	/* Quality Semiconductor */
-#define	MII_OUI_SEEQ	0x0005be	/* Seeq */
-#define	MII_OUI_SIS	0x000760	/* Silicon Integrated Systems */
-#define	MII_OUI_TI	0x100014	/* Texas Instruments */
+#define	MII_OUI_SEEQ	0x00a07d	/* Seeq */
+#define	MII_OUI_SIS	0x00e006	/* Silicon Integrated Systems */
+#define	MII_OUI_TI	0x080028	/* Texas Instruments */
+#define	MII_OUI_TSC	0x00c039	/* TDK Semiconductor */
+
+/* in the 79c873, AMD uses another OUI (which matches Davicom!) */
+#define	MII_OUI_xxAMD	0x00606e	/* Advanced Micro Devices */
+
+/* Some Intel 82553's use an alternative OUI. */
+#define	MII_OUI_xxINTEL	0x00f800	/* Intel */
+
+/* some vendors have the bits swapped within bytes
+	(ie, ordered as on the wire) */
+#define	MII_OUI_xxICS	0x00057d	/* Integrated Circuit Systems */
+#define	MII_OUI_xxSEEQ	0x0005be	/* Seeq */
+#define	MII_OUI_xxSIS	0x000760	/* Silicon Integrated Systems */
+#define	MII_OUI_xxTI	0x100014	/* Texas Instruments */
+
+/* Level 1 is completely different - from right to left.
+	(Two bits get lost in the third OUI byte.) */
+#define	MII_OUI_xxLEVEL1	0x1e0400	/* Level 1 */
+
+/* Don't know what's going on here. */
+#define	MII_OUI_xxDAVICOM	0x006040	/* Davicom Semiconductor */
+
 
 /*
  * List of known models.  Grouped by oui.
  */
 
 /* Advanced Micro Devices PHYs */
-#define	MII_MODEL_AMD_79C873	0x0000
-#define	MII_STR_AMD_79C873	"Am79C873 10/100 media interface"
+#define	MII_MODEL_xxAMD_79C873	0x0000
+#define	MII_STR_xxAMD_79C873	"Am79C873 10/100 media interface"
+#define	MII_MODEL_AMD_79c973phy	0x0036
+#define	MII_STR_AMD_79c973phy	"Am79C973 internal PHY"
+#define	MII_MODEL_AMD_79c901	0x0037
+#define	MII_STR_AMD_79c901	"Am79C901 10 PHY"
+#define	MII_MODEL_AMD_79c901home	0x0039
+#define	MII_STR_AMD_79c901home	"Am79C901 HomePHY"
+
+/* Broadcom PHYs */
+#define	MII_MODEL_BROADCOM_BCM5201	0x0021
+#define	MII_STR_BROADCOM_BCM5201	"BCM5201 10/100 media interface"
 
 /* Davicom Semiconductor PHYs */
-#define	MII_MODEL_DAVICOM_DM9101	0x0000
-#define	MII_STR_DAVICOM_DM9101	"DM9101 10/100 media interface"
+#define	MII_MODEL_xxDAVICOM_DM9101	0x0000
+#define	MII_STR_xxDAVICOM_DM9101	"DM9101 10/100 media interface"
 
 /* Integrated Circuit Systems PHYs */
-#define	MII_MODEL_ICS_1890	0x0002
-#define	MII_STR_ICS_1890	"ICS1890 10/100 media interface"
+#define	MII_MODEL_xxICS_1890	0x0002
+#define	MII_STR_xxICS_1890	"ICS1890 10/100 media interface"
 
 /* Intel PHYs */
+#define	MII_MODEL_xxINTEL_I82553	0x0000
+#define	MII_STR_xxINTEL_I82553	"i82553 10/100 media interface"
 #define	MII_MODEL_INTEL_I82555	0x0015
 #define	MII_STR_INTEL_I82555	"i82555 10/100 media interface"
+#define	MII_MODEL_INTEL_I82553	0x0035
+#define	MII_STR_INTEL_I82553	"i82553 10/100 media interface"
 
 /* Level 1 PHYs */
-#define	MII_MODEL_LEVEL1_LXT970	0x0000
-#define	MII_STR_LEVEL1_LXT970	"LXT970 10/100 media interface"
+#define	MII_MODEL_xxLEVEL1_LXT970	0x0000
+#define	MII_STR_xxLEVEL1_LXT970	"LXT970 10/100 media interface"
 
 /* National Semiconductor PHYs */
 #define	MII_MODEL_NATSEMI_DP83840	0x0000
@@ -94,17 +139,23 @@
 #define	MII_STR_QUALSEMI_QS6612	"QS6612 10/100 media interface"
 
 /* Seeq PHYs */
-#define	MII_MODEL_SEEQ_80220	0x0003
-#define	MII_STR_SEEQ_80220	"Seeq 80220 10/100 media interface"
-#define	MII_MODEL_SEEQ_84220	0x0004
-#define	MII_STR_SEEQ_84220	"Seeq 84220 10/100 media interface"
+#define	MII_MODEL_xxSEEQ_80220	0x0003
+#define	MII_STR_xxSEEQ_80220	"Seeq 80220 10/100 media interface"
+#define	MII_MODEL_xxSEEQ_84220	0x0004
+#define	MII_STR_xxSEEQ_84220	"Seeq 84220 10/100 media interface"
 
 /* Silicon Integrated Systems PHYs */
-#define	MII_MODEL_SIS_900	0x0000
-#define	MII_STR_SIS_900	"SiS 900 10/100 media interface"
+#define	MII_MODEL_xxSIS_900	0x0000
+#define	MII_STR_xxSIS_900	"SiS 900 10/100 media interface"
 
 /* Texas Instruments PHYs */
-#define	MII_MODEL_TI_TLAN10T	0x0001
-#define	MII_STR_TI_TLAN10T	"ThunderLAN 10baseT media interface"
-#define	MII_MODEL_TI_100VGPMI	0x0002
-#define	MII_STR_TI_100VGPMI	"ThunderLAN 100VG-AnyLan media interface"
+#define	MII_MODEL_xxTI_TLAN10T	0x0001
+#define	MII_STR_xxTI_TLAN10T	"ThunderLAN 10baseT media interface"
+#define	MII_MODEL_xxTI_100VGPMI	0x0002
+#define	MII_STR_xxTI_100VGPMI	"ThunderLAN 100VG-AnyLan media interface"
+
+/* TDK Semiconductor PHYs */
+#define	MII_MODEL_TSC_78Q2120	0x0014
+#define	MII_STR_TSC_78Q2120	"78Q2120 10/100 media interface"
+#define	MII_MODEL_TSC_78Q2121	0x0015
+#define	MII_STR_TSC_78Q2121	"78Q2121 100baseTX media interface"

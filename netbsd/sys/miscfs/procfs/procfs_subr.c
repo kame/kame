@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_subr.c,v 1.26.2.2 2000/02/28 09:47:49 he Exp $	*/
+/*	$NetBSD: procfs_subr.c,v 1.31 2000/03/16 18:08:26 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou.  All rights reserved.
@@ -66,7 +66,7 @@ struct simplelock pfs_hash_slock;
 
 /*
  * allocate a pfsnode/vnode pair.  the vnode is
- * referenced, but not locked.
+ * referenced, and locked.
  *
  * the pid, pfs_type, and mount point uniquely
  * identify a pfsnode.  the mount point is needed
@@ -130,6 +130,7 @@ procfs_allocvp(mp, vpp, pid, pfs_type)
 		break;
 
 	case Pcurproc:	/* /proc/curproc = lr-xr-xr-x */
+	case Pself:	/* /proc/self    = lr-xr-xr-x */
 		pfs->pfs_mode = S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
 		vp->v_type = VLNK;
 		break;
@@ -320,6 +321,15 @@ procfs_hashinit()
 	simple_lock_init(&pfs_hash_slock);
 }
 
+/*
+ * Free pfsnode hash table.
+ */
+void
+procfs_hashdone()
+{
+	hashdone(pfs_hashtbl, M_UFSMNT);
+}
+
 struct vnode *
 procfs_hashget(pid, type, mp)
 	pid_t pid;
@@ -335,8 +345,9 @@ loop:
 		vp = PFSTOV(pp);
 		if (pid == pp->pfs_pid && pp->pfs_type == type &&
 		    vp->v_mount == mp) {
+			simple_lock(&vp->v_interlock);
 			simple_unlock(&pfs_hash_slock);
-			if (vget(vp, 0))
+			if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK))
 				goto loop;
 			return (vp);
 		}
@@ -353,6 +364,9 @@ procfs_hashins(pp)
 	struct pfsnode *pp;
 {
 	struct pfs_hashhead *ppp;
+
+	/* lock the pfsnode, then put it on the appropriate hash list */
+	lockmgr(&pp->pfs_vnode->v_lock, LK_EXCLUSIVE, (struct simplelock *)0);
 
 	simple_lock(&pfs_hash_slock);
 	ppp = PFSPIDHASH(pp->pfs_pid);

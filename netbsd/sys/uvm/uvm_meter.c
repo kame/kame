@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_meter.c,v 1.8 1999/03/25 18:48:53 mrg Exp $	*/
+/*	$NetBSD: uvm_meter.c,v 1.12 2000/05/26 00:36:53 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -95,6 +95,7 @@ uvm_loadav(avg)
 	int i, nrun;
 	struct proc *p;
 
+	proclist_lock_read();
 	for (nrun = 0, p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
 		switch (p->p_stat) {
 		case SSLEEP:
@@ -102,10 +103,12 @@ uvm_loadav(avg)
 				continue;
 		/* fall through */
 		case SRUN:
+		case SONPROC:
 		case SIDL:
 			nrun++;
 		}
 	}
+	proclist_unlock_read();
 	for (i = 0; i < 3; i++)
 		avg->ldavg[i] = (cexp[i] * avg->ldavg[i] +
 		    nrun * FSCALE * (FSCALE - cexp[i])) >> FSHIFT;
@@ -144,6 +147,9 @@ uvm_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_rdstruct(oldp, oldlenp, newp, &uvmexp,
 		    sizeof(uvmexp)));
 
+	case VM_NKMEMPAGES:
+		return (sysctl_rdint(oldp, oldlenp, newp, nkmempages));
+
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -170,6 +176,7 @@ uvm_total(totalp)
 	 * calculate process statistics
 	 */
 
+	proclist_lock_read();
 	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
 		if (p->p_flag & P_SYSTEM)
 			continue;
@@ -191,6 +198,7 @@ uvm_total(totalp)
 			break;
 
 		case SRUN:
+		case SONPROC:
 		case SIDL:
 			if (p->p_flag & P_INMEM)
 				totalp->t_rq++;
@@ -222,6 +230,7 @@ uvm_total(totalp)
 			totalp->t_pw++;
 #endif
 	}
+	proclist_unlock_read();
 	/*
 	 * Calculate object memory usage statistics.
 	 */

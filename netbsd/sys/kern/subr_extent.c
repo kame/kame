@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_extent.c,v 1.24.2.1 1999/06/24 16:13:21 perry Exp $	*/
+/*	$NetBSD: subr_extent.c,v 1.32.2.1 2000/06/27 21:54:03 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -49,6 +49,11 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/lock.h>
+
+#include <vm/vm.h>
+#include <vm/vm_kern.h>
+
+#define	KMEM_IS_RUNNING		(kmem_map != NULL)
 #elif defined(_EXTENT_TESTING)
 /*
  * user-land definitions, so it can fit into a testing harness.
@@ -59,16 +64,39 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
-#define	malloc(s, t, flags)		malloc(s)
-#define	free(p, t)			free(p)
-#define	tsleep(chan, pri, str, timo)	(EWOULDBLOCK)
-#define	wakeup(chan)			((void)0)
-#define	pool_get(pool, flags)		malloc(pool->pr_size,0,0)
-#define	pool_put(pool, rp)		free(rp,0)
-#define	panic(a)			printf(a)
-#define	splhigh()			(1)
-#define	splx(s)				((void)(s))
+/*
+ * Use multi-line #defines to avoid screwing up the kernel tags file;
+ * without this, ctags produces a tags file where panic() shows up
+ * in subr_extent.c rather than subr_prf.c.
+ */
+#define	\
+malloc(s, t, flags)		malloc(s)
+#define	\
+free(p, t)			free(p)
+#define	\
+tsleep(chan, pri, str, timo)	(EWOULDBLOCK)
+#define	\
+wakeup(chan)			((void)0)
+#define	\
+pool_get(pool, flags)		malloc(pool->pr_size,0,0)
+#define	\
+pool_put(pool, rp)		free(rp,0)
+#define	\
+panic(a)			printf(a)
+#define	\
+splhigh()			(1)
+#define	\
+splx(s)				((void)(s))
+
+#define	\
+simple_lock_init(l)		((void)(l))
+#define	\
+simple_lock(l)			((void)(l))
+#define	\
+simple_unlock(l)		((void)(l))
+#define	KMEM_IS_RUNNING			(1)
 #endif
 
 static	pool_handle_t expool_create __P((void));
@@ -640,12 +668,15 @@ extent_alloc_subregion1(ex, substart, subend, size, alignment, skew, boundary,
 				    - 1;
 
 #if 0
-				printf("newstart=%x newend=%x ex_start=%x ex_end=%x boundary=%x dontcross=%x\n",
+				printf("newstart=%lx newend=%lx ex_start=%lx ex_end=%lx boundary=%lx dontcross=%lx\n",
 				    newstart, newend, ex->ex_start, ex->ex_end,
 				    boundary, dontcross);
 #endif
 
-				if (newend > dontcross) {
+				/* Check for overflow */
+				if (dontcross < ex->ex_start)
+					dontcross = ex->ex_end;
+				else if (newend > dontcross) {
 					/*
 					 * Candidate region crosses boundary.
 					 * Throw away the leading part and see
@@ -731,12 +762,15 @@ extent_alloc_subregion1(ex, substart, subend, size, alignment, skew, boundary,
 			    - 1;
 
 #if 0
-			printf("newstart=%x newend=%x ex_start=%x ex_end=%x boundary=%x dontcross=%x\n",
+			printf("newstart=%lx newend=%lx ex_start=%lx ex_end=%lx boundary=%lx dontcross=%lx\n",
 			    newstart, newend, ex->ex_start, ex->ex_end,
 			    boundary, dontcross);
 #endif
 
-			if (newend > dontcross) {
+			/* Check for overflow */
+			if (dontcross < ex->ex_start)
+				dontcross = ex->ex_end;
+			else if (newend > dontcross) {
 				/*
 				 * Candidate region crosses boundary.
 				 * Throw away the leading part and see
@@ -998,6 +1032,13 @@ extent_alloc_region_descriptor(ex, flags)
 	struct extent_region *rp;
 	int exflags;
 	int s;
+
+	/*
+	 * If the kernel memory allocator is not yet running, we can't
+	 * use it (obviously).
+	 */
+	if (KMEM_IS_RUNNING == 0)
+		flags &= ~EX_MALLOCOK;
 
 	/*
 	 * XXX Make a static, create-time flags word, so we don't

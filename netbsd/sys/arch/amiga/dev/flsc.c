@@ -1,4 +1,4 @@
-/*	$NetBSD: flsc.c,v 1.23 1998/11/19 21:44:36 thorpej Exp $	*/
+/*	$NetBSD: flsc.c,v 1.26 2000/06/05 15:08:02 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -76,13 +76,6 @@ int	flscmatch	__P((struct device *, struct cfdata *, void *));
 /* Linkup to the rest of the kernel */
 struct cfattach flsc_ca = {
 	sizeof(struct flsc_softc), flscmatch, flscattach
-};
-
-struct scsipi_device flsc_dev = {
-	NULL,			/* Use default error handler */
-	NULL,			/* have a queue, served by this */
-	NULL,			/* have no async handler */
-	NULL,			/* Use default 'done' routine */
 };
 
 /*
@@ -213,7 +206,7 @@ flscattach(parent, self, aux)
 	/*
 	 * Configure interrupts.
 	 */
-	fsc->sc_isr.isr_intr = (int (*)(void *))ncr53c9x_intr;
+	fsc->sc_isr.isr_intr = ncr53c9x_intr;
 	fsc->sc_isr.isr_arg  = sc;
 	fsc->sc_isr.isr_ipl  = 2;
 	add_isr(&fsc->sc_isr);
@@ -223,9 +216,7 @@ flscattach(parent, self, aux)
 	/*
 	 * Now try to attach all the sub-devices
 	 */
-	sc->sc_adapter.scsipi_cmd = ncr53c9x_scsi_cmd;
-	sc->sc_adapter.scsipi_minphys = minphys; 
-	ncr53c9x_attach(sc, &flsc_dev);
+	ncr53c9x_attach(sc, NULL, NULL);
 }
 
 /*
@@ -257,16 +248,16 @@ flsc_write_reg(sc, reg, val)
 		v = NCRCMD_TRANS;
 	}
 	/*
-	 * Can't do synchronous transfers in SCSI_POLL mode:
-	 * If starting SCSI_POLL command, clear defer sync negotiation
-	 * by clearing the T_NEGOTIATE flag.  If starting SCSI_POLL and
+	 * Can't do synchronous transfers in XS_CTL_POLL mode:
+	 * If starting XS_CTL_POLL command, clear defer sync negotiation
+	 * by clearing the T_NEGOTIATE flag.  If starting XS_CTL_POLL and
 	 * the device is currently running synchronous, force another
 	 * T_NEGOTIATE with 0 offset.
 	 */
 	if (reg == NCR_SELID) {
 		ti = &sc->sc_tinfo[
 		    sc->sc_nexus->xs->sc_link->scsipi_scsi.target];
-		if (sc->sc_nexus->xs->flags & SCSI_POLL) {
+		if (sc->sc_nexus->xs->xs_control & XS_CTL_POLL) {
 			if (ti->flags & T_SYNCMODE) {
 				ti->flags ^= T_SYNCMODE | T_NEGOTIATE;
 			} else if (ti->flags & T_NEGOTIATE) {
@@ -286,7 +277,7 @@ flsc_write_reg(sc, reg, val)
 	}
 	if (reg == NCR_CMD && v == NCRCMD_SETATN  &&
 	    sc->sc_flags & NCR_SYNCHNEGO &&
-	     sc->sc_nexus->xs->flags & SCSI_POLL) {
+	     sc->sc_nexus->xs->xs_control & XS_CTL_POLL) {
 		ti = &sc->sc_tinfo[
 		    sc->sc_nexus->xs->sc_link->scsipi_scsi.target];
 		ti->offset = 0;
@@ -500,7 +491,7 @@ flsc_dma_setup(sc, addr, len, datain, dmasize)
 	size_t *dmasize;
 {
 	struct flsc_softc *fsc = (struct flsc_softc *)sc;
-	vm_offset_t pa;
+	paddr_t pa;
 	u_char *ptr;
 	size_t xfer;
 
@@ -508,7 +499,7 @@ flsc_dma_setup(sc, addr, len, datain, dmasize)
 	fsc->sc_pdmalen = len;
 	fsc->sc_datain = datain;
 	fsc->sc_dmasize = *dmasize;
-	if (sc->sc_nexus->xs->flags & SCSI_POLL) {
+	if (sc->sc_nexus->xs->xs_control & XS_CTL_POLL) {
 		/* polling mode, use PIO */
 		*dmasize = fsc->sc_dmasize;
 		NCR_DMA(("pfsc_dma_setup: PIO %p/%d [%d]\n", *addr,
@@ -647,7 +638,7 @@ flsc_dma_go(sc)
 
 	NCR_DMA(("flsc_dma_go: datain %d size %d\n", fsc->sc_datain,
 	    fsc->sc_dmasize));
-	if (sc->sc_nexus->xs->flags & SCSI_POLL) {
+	if (sc->sc_nexus->xs->xs_control & XS_CTL_POLL) {
 		fsc->sc_active = 1;
 		return;
 	} else if (fsc->sc_piomode == 0) {

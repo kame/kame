@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_subr.c,v 1.31 1998/12/21 20:56:06 drochner Exp $	*/
+/*	$NetBSD: pci_subr.c,v 1.35.4.1 2000/08/10 22:48:15 soda Exp $	*/
 
 /*
  * Copyright (c) 1997 Zubin D. Dittia.  All rights reserved.
@@ -36,7 +36,7 @@
  * PCI autoconfiguration support functions.
  */
 
-#include "opt_pciverbose.h"
+#include "opt_pci.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,7 +52,7 @@
 
 static void pci_conf_print_common __P((pci_chipset_tag_t, pcitag_t,
     const pcireg_t *regs));
-static void pci_conf_print_bar __P((pci_chipset_tag_t, pcitag_t, 
+static int pci_conf_print_bar __P((pci_chipset_tag_t, pcitag_t, 
     const pcireg_t *regs, int, const char *));
 static void pci_conf_print_regs __P((const pcireg_t *regs, int first,
     int pastlast));
@@ -96,6 +96,7 @@ struct pci_class pci_subclass_network[] = {
 	{ "token ring",		PCI_SUBCLASS_NETWORK_TOKENRING,		},
 	{ "FDDI",		PCI_SUBCLASS_NETWORK_FDDI,		},
 	{ "ATM",		PCI_SUBCLASS_NETWORK_ATM,		},
+	{ "ISDN",		PCI_SUBCLASS_NETWORK_ISDN,		},
 	{ "miscellaneous",	PCI_SUBCLASS_NETWORK_MISC,		},
 	{ 0 },
 };
@@ -103,6 +104,7 @@ struct pci_class pci_subclass_network[] = {
 struct pci_class pci_subclass_display[] = {
 	{ "VGA",		PCI_SUBCLASS_DISPLAY_VGA,		},
 	{ "XGA",		PCI_SUBCLASS_DISPLAY_XGA,		},
+	{ "3D",			PCI_SUBCLASS_DISPLAY_3D,		},
 	{ "miscellaneous",	PCI_SUBCLASS_DISPLAY_MISC,		},
 	{ 0 },
 };
@@ -110,6 +112,7 @@ struct pci_class pci_subclass_display[] = {
 struct pci_class pci_subclass_multimedia[] = {
 	{ "video",		PCI_SUBCLASS_MULTIMEDIA_VIDEO,		},
 	{ "audio",		PCI_SUBCLASS_MULTIMEDIA_AUDIO,		},
+	{ "telephony",		PCI_SUBCLASS_MULTIMEDIA_TELEPHONY,	},
 	{ "miscellaneous",	PCI_SUBCLASS_MULTIMEDIA_MISC,		},
 	{ 0 },
 };
@@ -130,6 +133,7 @@ struct pci_class pci_subclass_bridge[] = {
 	{ "PCMCIA",		PCI_SUBCLASS_BRIDGE_PCMCIA,		},
 	{ "NuBus",		PCI_SUBCLASS_BRIDGE_NUBUS,		},
 	{ "CardBus",		PCI_SUBCLASS_BRIDGE_CARDBUS,		},
+	{ "RACEway",		PCI_SUBCLASS_BRIDGE_RACEWAY,		},
 	{ "miscellaneous",	PCI_SUBCLASS_BRIDGE_MISC,		},
 	{ 0 },
 };
@@ -137,6 +141,8 @@ struct pci_class pci_subclass_bridge[] = {
 struct pci_class pci_subclass_communications[] = {
 	{ "serial",		PCI_SUBCLASS_COMMUNICATIONS_SERIAL,	},
 	{ "parallel",		PCI_SUBCLASS_COMMUNICATIONS_PARALLEL,	},
+	{ "multi-port serial",	PCI_SUBCLASS_COMMUNICATIONS_MPSERIAL,	},
+	{ "modem",		PCI_SUBCLASS_COMMUNICATIONS_MODEM,	},
 	{ "miscellaneous",	PCI_SUBCLASS_COMMUNICATIONS_MISC,	},
 	{ 0 },
 };
@@ -146,6 +152,7 @@ struct pci_class pci_subclass_system[] = {
 	{ "8237 DMA",		PCI_SUBCLASS_SYSTEM_DMA,		},
 	{ "8254 timer",		PCI_SUBCLASS_SYSTEM_TIMER,		},
 	{ "RTC",		PCI_SUBCLASS_SYSTEM_RTC,		},
+	{ "PCI Hot-Plug",	PCI_SUBCLASS_SYSTEM_RTC,		},
 	{ "miscellaneous",	PCI_SUBCLASS_SYSTEM_MISC,		},
 	{ 0 },
 };
@@ -154,6 +161,8 @@ struct pci_class pci_subclass_input[] = {
 	{ "keyboard",		PCI_SUBCLASS_INPUT_KEYBOARD,		},
 	{ "digitizer",		PCI_SUBCLASS_INPUT_DIGITIZER,		},
 	{ "mouse",		PCI_SUBCLASS_INPUT_MOUSE,		},
+	{ "scanner",		PCI_SUBCLASS_INPUT_SCANNER,		},
+	{ "game port",		PCI_SUBCLASS_INPUT_GAMEPORT,		},
 	{ "miscellaneous",	PCI_SUBCLASS_INPUT_MISC,		},
 	{ 0 },
 };
@@ -170,6 +179,7 @@ struct pci_class pci_subclass_processor[] = {
 	{ "Pentium",		PCI_SUBCLASS_PROCESSOR_PENTIUM,		},
 	{ "Alpha",		PCI_SUBCLASS_PROCESSOR_ALPHA,		},
 	{ "PowerPC",		PCI_SUBCLASS_PROCESSOR_POWERPC,		},
+	{ "MIPS",		PCI_SUBCLASS_PROCESSOR_MIPS,		},
 	{ "Co-processor",	PCI_SUBCLASS_PROCESSOR_COPROC,		},
 	{ 0 },
 };
@@ -179,7 +189,43 @@ struct pci_class pci_subclass_serialbus[] = {
 	{ "ACCESS.bus",		PCI_SUBCLASS_SERIALBUS_ACCESS,		},
 	{ "SSA",		PCI_SUBCLASS_SERIALBUS_SSA,		},
 	{ "USB",		PCI_SUBCLASS_SERIALBUS_USB,		},
+	/* XXX Fiber Channel/_FIBRECHANNEL */
 	{ "Fiber Channel",	PCI_SUBCLASS_SERIALBUS_FIBER,		},
+	{ "SMBus",		PCI_SUBCLASS_SERIALBUS_SMBUS,		},
+	{ 0 },
+};
+
+struct pci_class pci_subclass_wireless[] = {
+	{ "iRDA",		PCI_SUBCLASS_WIRELESS_IRDA,		},
+	{ "Consumer IR",	PCI_SUBCLASS_WIRELESS_CONSUMERIR,	},
+	{ "RF",			PCI_SUBCLASS_WIRELESS_RF,		},
+	{ "miscellaneous",	PCI_SUBCLASS_WIRELESS_MISC,		},
+	{ 0 },
+};
+
+struct pci_class pci_subclass_i2o[] = {
+	{ "1.0",		PCI_SUBCLASS_I2O_10,			},
+	{ 0 },
+};
+
+struct pci_class pci_subclass_satcom[] = {
+	{ "TV",			PCI_SUBCLASS_SATCOM_TV,			},
+	{ "audio",		PCI_SUBCLASS_SATCOM_AUDIO,		},
+	{ "voice",		PCI_SUBCLASS_SATCOM_VOICE,		},
+	{ "data",		PCI_SUBCLASS_SATCOM_DATA,		},
+	{ 0 },
+};
+
+struct pci_class pci_subclass_crypto[] = {
+	{ "network/computing",	PCI_SUBCLASS_CRYPTO_NETCOMP,		},
+	{ "entertainment",	PCI_SUBCLASS_CRYPTO_ENTERTAINMENT,	},
+	{ "miscellaneous",	PCI_SUBCLASS_CRYPTO_MISC,		},
+	{ 0 },
+};
+
+struct pci_class pci_subclass_dasp[] = {
+	{ "DPIO",		PCI_SUBCLASS_DASP_DPIO,			},
+	{ "miscellaneous",	PCI_SUBCLASS_DASP_MISC,			},
 	{ 0 },
 };
 
@@ -210,6 +256,16 @@ struct pci_class pci_class[] = {
 	    pci_subclass_processor,				},
 	{ "serial bus",		PCI_CLASS_SERIALBUS,
 	    pci_subclass_serialbus,				},
+	{ "wireless",		PCI_CLASS_WIRELESS,
+	    pci_subclass_wireless,				},
+	{ "I2O",		PCI_CLASS_I2O,
+	    pci_subclass_i2o,					},
+	{ "satellite comm",	PCI_CLASS_SATCOM,
+	    pci_subclass_satcom,				},
+	{ "crypto",		PCI_CLASS_CRYPTO,
+	    pci_subclass_crypto,				},
+	{ "DASP",		PCI_CLASS_DASP,
+	    pci_subclass_dasp,					},
 	{ "undefined",		PCI_CLASS_UNDEFINED,
 	    0,							},
 	{ 0 },
@@ -408,6 +464,7 @@ pci_conf_print_common(pc, tag, regs)
 	onoff("Fast back-to-back transactions", PCI_COMMAND_BACKTOBACK_ENABLE);
 
 	printf("    Status register: 0x%04x\n", (rval >> 16) & 0xffff);
+	onoff("Capability List support", PCI_STATUS_CAPLIST_SUPPORT);
 	onoff("66 MHz capable", PCI_STATUS_66MHZ_SUPPORT);
 	onoff("User Definable Features (UDF) support", PCI_STATUS_UDF_SUPPORT);
 	onoff("Fast back-to-back capable", PCI_STATUS_BACKTOBACK_SUPPORT);
@@ -471,7 +528,7 @@ pci_conf_print_common(pc, tag, regs)
 	printf("    Cache Line Size: 0x%02x\n", PCI_CACHELINE(rval));
 }
 
-static void
+static int
 pci_conf_print_bar(pc, tag, regs, reg, name)
 	pci_chipset_tag_t pc;
 	pcitag_t tag;
@@ -479,8 +536,11 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 	int reg;
 	const char *name;
 {
-	int s;
+	int s, width;
 	pcireg_t mask, rval;
+	pcireg_t mask64h, rval64h;
+	
+	width = 4;
 
 	/*
 	 * Section 6.2.5.1, `Address Maps', tells us that:
@@ -507,6 +567,14 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 		pci_conf_write(pc, tag, reg, 0xffffffff);
 		mask = pci_conf_read(pc, tag, reg);
 		pci_conf_write(pc, tag, reg, rval);
+		if (PCI_MAPREG_TYPE(rval) == PCI_MAPREG_TYPE_MEM &&
+		    PCI_MAPREG_MEM_TYPE(rval) == PCI_MAPREG_MEM_TYPE_64BIT) {
+			rval64h = regs[o2i(reg + 4)];
+			pci_conf_write(pc, tag, reg + 4, 0xffffffff);
+			mask64h = pci_conf_read(pc, tag, reg + 4);
+			pci_conf_write(pc, tag, reg + 4, rval64h);
+			width = 8;
+		}
 		splx(s);
 	} else
 		mask = 0;
@@ -517,11 +585,11 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 	printf("\n      ");
 	if (rval == 0) {
 		printf("not implemented(?)\n");
-		return;
-	}
+		return width;
+	} 
 	printf("type: ");
 	if (PCI_MAPREG_TYPE(rval) == PCI_MAPREG_TYPE_MEM) {
-		const char *type, *cache;
+		const char *type, *prefetch;
 
 		switch (PCI_MAPREG_MEM_TYPE(rval)) {
 		case PCI_MAPREG_MEM_TYPE_32BIT:
@@ -537,20 +605,36 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 			type = "unknown (XXX)";
 			break;
 		}
-		if (PCI_MAPREG_MEM_CACHEABLE(rval))
-			cache = "";
+		if (PCI_MAPREG_MEM_PREFETCHABLE(rval))
+			prefetch = "";
 		else
-			cache = "non";
-		printf("%s %scacheable memory\n", type, cache);
-		printf("      base: 0x%08x, size: 0x%08x\n",
-		    PCI_MAPREG_MEM_ADDR(rval),
-		    PCI_MAPREG_MEM_SIZE(mask));
+			prefetch = "non";
+		printf("%s %sprefetchable memory\n", type, prefetch);
+		switch (PCI_MAPREG_MEM_TYPE(rval)) {
+		case PCI_MAPREG_MEM_TYPE_64BIT:
+			printf("      base: 0x%016llx, size: 0x%016llx\n",
+			    PCI_MAPREG_MEM64_ADDR(
+				((((long long) rval64h) << 32) | rval)),
+			    PCI_MAPREG_MEM64_SIZE(
+				((((long long) mask64h) << 32) | mask)));
+			break;
+		case PCI_MAPREG_MEM_TYPE_32BIT:
+		case PCI_MAPREG_MEM_TYPE_32BIT_1M:
+		default:
+			printf("      base: 0x%08x, size: 0x%08x\n",
+			    PCI_MAPREG_MEM_ADDR(rval),
+			    PCI_MAPREG_MEM_SIZE(mask));
+			break;
+		}
+
 	} else {
 		printf("i/o\n");
 		printf("      base: 0x%08x, size: 0x%08x\n",
 		    PCI_MAPREG_IO_ADDR(rval),
 		    PCI_MAPREG_IO_SIZE(mask));
 	}
+
+	return width;
 }
 
 static void
@@ -584,11 +668,11 @@ pci_conf_print_type0(pc, tag, regs)
 	pcitag_t tag;
 	const pcireg_t *regs;
 {
-	int off;
+	int off, width;
 	pcireg_t rval;
 
-	for (off = PCI_MAPREG_START; off < PCI_MAPREG_END; off += 4)
-		pci_conf_print_bar(pc, tag, regs, off, NULL);
+	for (off = PCI_MAPREG_START; off < PCI_MAPREG_END; off += width)
+		width = pci_conf_print_bar(pc, tag, regs, off, NULL);
 
 	printf("    Cardbus CIS Pointer: 0x%08x\n", regs[o2i(0x28)]);
 
@@ -598,7 +682,13 @@ pci_conf_print_type0(pc, tag, regs)
 
 	/* XXX */
 	printf("    Expansion ROM Base Address: 0x%08x\n", regs[o2i(0x30)]);
-	printf("    Reserved @ 0x34: 0x%08x\n", regs[o2i(0x34)]);
+
+	if (regs[o2i(PCI_COMMAND_STATUS_REG)] & PCI_STATUS_CAPLIST_SUPPORT)
+		printf("    Capability list pointer: 0x%02x\n",
+		    PCI_CAPLIST_PTR(regs[o2i(PCI_CAPLISTPTR_REG)]));
+	else
+		printf("    Reserved @ 0x34: 0x%08x\n", regs[o2i(0x34)]);
+
 	printf("    Reserved @ 0x38: 0x%08x\n", regs[o2i(0x38)]);
 
 	rval = regs[o2i(PCI_INTERRUPT_REG)];
@@ -622,11 +712,48 @@ pci_conf_print_type0(pc, tag, regs)
 		printf("(pin D)");
 		break;
 	default:
-		printf("(???)");
+		printf("(? ? ?)");
 		break;
 	}
 	printf("\n");
 	printf("    Interrupt line: 0x%02x\n", PCI_INTERRUPT_LINE(rval));
+
+	if (regs[o2i(PCI_COMMAND_STATUS_REG)] & PCI_STATUS_CAPLIST_SUPPORT) {
+		for (off = PCI_CAPLIST_PTR(regs[o2i(PCI_CAPLISTPTR_REG)]);
+		     off != 0;
+		     off = PCI_CAPLIST_NEXT(regs[o2i(off)])) {
+			rval = regs[o2i(off)];
+			printf("    Capability register at 0x%02x\n", off);
+
+			printf("      type: 0x%02x (", PCI_CAPLIST_CAP(rval));
+			switch (PCI_CAPLIST_CAP(rval)) {
+			case PCI_CAP_PWRMGMT:
+				printf("Power Management, rev. %d.0",
+				    (rval >> 0) & 0x07); /* XXX not clear */
+				break;
+			case PCI_CAP_AGP:
+				printf("AGP, rev. %d.%d",
+				    (rval >> 24) & 0x0f,
+				    (rval >> 20) & 0x0f);
+				break;
+			case PCI_CAP_VPD:
+				printf("VPD");
+				break;
+			case PCI_CAP_SLOTID:
+				printf("SlotID");
+				break;
+			case PCI_CAP_MBI:
+				printf("MBI");
+				break;
+			case PCI_CAP_HOTSWAP:
+				printf("Hot-swapping");
+				break;
+			default:
+				printf("unknown/reserved");
+			}
+			printf(")\n");
+		}
+	}
 }
 
 static void
@@ -635,7 +762,7 @@ pci_conf_print_type1(pc, tag, regs)
 	pcitag_t tag;
 	const pcireg_t *regs;
 {
-	int off;
+	int off, width;
 	pcireg_t rval;
 
 	/*
@@ -647,8 +774,8 @@ pci_conf_print_type1(pc, tag, regs)
 	 * respect to various standards. (XXX)
 	 */
 
-	for (off = 0x10; off < 0x18; off += 4)
-		pci_conf_print_bar(pc, tag, regs, off, NULL);
+	for (off = 0x10; off < 0x18; off += width)
+		width = pci_conf_print_bar(pc, tag, regs, off, NULL);
 
 	printf("    Primary bus number: 0x%02x\n",
 	    (regs[o2i(0x18)] >> 0) & 0xff);
@@ -739,7 +866,7 @@ pci_conf_print_type1(pc, tag, regs)
 		printf("(pin D)");
 		break;
 	default:
-		printf("(???)");
+		printf("(? ? ?)");
 		break;
 	}
 	printf("\n");
@@ -852,7 +979,7 @@ pci_conf_print_type2(pc, tag, regs)
 		printf("(pin D)");
 		break;
 	default:
-		printf("(???)");
+		printf("(? ? ?)");
 		break;
 	}
 	printf("\n");

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.21 1999/03/04 08:19:38 gwr Exp $
+#	$NetBSD: Makefile,v 1.23 2000/01/23 17:04:12 mycroft Exp $
 
 LIB=sa
 
@@ -27,7 +27,8 @@ SRC_net= net.c ether.c arp.c in_cksum.c rarp.c
 SRC_sa = alloc.c bcopy.c close.c getfile.c memcpy.c open.c \
 	 printf.c read.c sprintf.c strerror.c subr_prf.c twiddle.c
 
-SRC_kern= ashrdi3.c bcmp.c bzero.c strcmp.c strlen.c strncmp.c
+SRC_kern= ashrdi3.c bcmp.c bzero.c inet_addr.c intoa.c \
+	strcmp.c strlen.c strncmp.c
 
 SRC_here= clock.c dev_disk.c devopen.c exec_sun.c \
 	 gets.c idprom.c netif_sun.c panic.c \
@@ -37,7 +38,7 @@ SRC_here= clock.c dev_disk.c devopen.c exec_sun.c \
 SRCS= ${SRC_net} ${SRC_sa} ${SRC_kern} ${SRC_here}
 OBJS= ctrlsp.o
 
-all: libsa.a SRT0.o SRT1.o
+realall: libsa.a SRT0.o SRT1.o
 
 # only needed during build
 libinstall::

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_vnode.h,v 1.7 1999/03/25 18:48:56 mrg Exp $	*/
+/*	$NetBSD: uvm_vnode.h,v 1.9 2000/03/26 20:54:48 kleink Exp $	*/
 
 /*
  *
@@ -53,7 +53,7 @@ struct uvm_vnode {
 	struct uvm_object u_obj;	/* the actual VM object */
 	int u_flags;			/* flags */
 	int u_nio;			/* number of running I/O requests */
-	vsize_t u_size;		/* size of object */
+	voff_t u_size;			/* size of object */
 
 	/* the following entry is locked by uvn_wl_lock */
 	LIST_ENTRY(uvm_vnode) u_wlist;	/* list of writeable vnode objects */
@@ -89,6 +89,7 @@ struct uvm_vnode {
  */
 #define UVM_VNODE_BLOCKED (UVM_VNODE_ALOCK|UVM_VNODE_DYING|UVM_VNODE_RELKILL)
 
+#ifdef _KERNEL
 
 /*
  * prototypes
@@ -102,5 +103,7 @@ struct uvm_vnode {
  */
 struct uvm_object  *uvn_attach __P((void *, vm_prot_t));
 #endif
+
+#endif /* _KERNEL */
 
 #endif /* _UVM_UVM_VNODE_H_ */

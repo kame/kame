@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.69 1998/10/14 14:53:36 pk Exp $ */
+/*	$NetBSD: clock.c,v 1.71 2000/03/19 13:38:54 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -81,7 +81,6 @@
 #include <sparc/sparc/cpuvar.h>
 #include <sparc/sparc/clockreg.h>
 #include <sparc/sparc/timerreg.h>
-#include "kbd.h"
 
 /*
  * Statistics clock interval and variance, in usec.  Variance must be a
@@ -320,6 +319,9 @@ oclockattach(parent, self, aux)
 #endif /* SUN4 */
 }
 
+/* We support only on eeprom device */
+static int eeprom_attached;
+
 /*
  * Sun 4/100, 4/200 EEPROM match routine.
  */
@@ -335,7 +337,8 @@ eeprom_match(parent, cf, aux)
 	if (uoba->uoba_isobio4 == 0)
 		return (0);
 
-	if (cf->cf_unit != 0)
+	if (eeprom_attached)
+		/* We support only on eeprom device */
 		return (0);
 
 	/* Only these sun4s have oclock */
@@ -363,6 +366,7 @@ eeprom_attach(parent, self, aux)
 	struct obio4_attach_args *oba = &uoba->uoba_oba4;
 	bus_space_handle_t bh;
 
+	eeprom_attached = 1;
 	printf("\n");
 
 	if (obio_bus_map(oba->oba_bustag,
@@ -936,10 +940,6 @@ clockintr(cap)
 {
 	register volatile int discard;
 	int s;
-#if	NKBD	> 0
-	extern int cnrom __P((void));
-	extern int rom_console_input;
-#endif
 
 	/*
 	 * Protect the clearing of the clock interrupt.  If we don't
@@ -971,11 +971,6 @@ forward:
 	splx(s);
 
 	hardclock((struct clockframe *)cap);
-#if	NKBD > 0
-	if (rom_console_input && cnrom())
-		setsoftint();
-#endif
-
 	return (1);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_resource.c,v 1.50 1999/03/24 05:51:23 mrg Exp $	*/
+/*	$NetBSD: kern_resource.c,v 1.57 2000/05/31 05:02:32 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -56,7 +56,6 @@
 
 #include <uvm/uvm_extern.h>
 
-void limfree __P((struct plimit *));
 /*
  * Resource controls and accounting.
  */
@@ -67,12 +66,12 @@ sys_getpriority(curp, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_getpriority_args /* {
+	struct sys_getpriority_args /* {
 		syscallarg(int) which;
 		syscallarg(int) who;
 	} */ *uap = v;
-	register struct proc *p;
-	register int low = NZERO + PRIO_MAX + 1;
+	struct proc *p;
+	int low = NZERO + PRIO_MAX + 1;
 
 	switch (SCARG(uap, which)) {
 
@@ -87,7 +86,7 @@ sys_getpriority(curp, v, retval)
 		break;
 
 	case PRIO_PGRP: {
-		register struct pgrp *pg;
+		struct pgrp *pg;
 
 		if (SCARG(uap, who) == 0)
 			pg = curp->p_pgrp;
@@ -104,10 +103,12 @@ sys_getpriority(curp, v, retval)
 	case PRIO_USER:
 		if (SCARG(uap, who) == 0)
 			SCARG(uap, who) = curp->p_ucred->cr_uid;
+		proclist_lock_read();
 		for (p = allproc.lh_first; p != 0; p = p->p_list.le_next)
 			if (p->p_ucred->cr_uid == SCARG(uap, who) &&
 			    p->p_nice < low)
 				low = p->p_nice;
+		proclist_unlock_read();
 		break;
 
 	default:
@@ -126,12 +127,12 @@ sys_setpriority(curp, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_setpriority_args /* {
+	struct sys_setpriority_args /* {
 		syscallarg(int) which;
 		syscallarg(int) who;
 		syscallarg(int) prio;
 	} */ *uap = v;
-	register struct proc *p;
+	struct proc *p;
 	int found = 0, error = 0;
 
 	switch (SCARG(uap, which)) {
@@ -148,7 +149,7 @@ sys_setpriority(curp, v, retval)
 		break;
 
 	case PRIO_PGRP: {
-		register struct pgrp *pg;
+		struct pgrp *pg;
 		 
 		if (SCARG(uap, who) == 0)
 			pg = curp->p_pgrp;
@@ -165,11 +166,13 @@ sys_setpriority(curp, v, retval)
 	case PRIO_USER:
 		if (SCARG(uap, who) == 0)
 			SCARG(uap, who) = curp->p_ucred->cr_uid;
+		proclist_lock_read();
 		for (p = allproc.lh_first; p != 0; p = p->p_list.le_next)
 			if (p->p_ucred->cr_uid == SCARG(uap, who)) {
 				error = donice(curp, p, SCARG(uap, prio));
 				found++;
 			}
+		proclist_unlock_read();
 		break;
 
 	default:
@@ -182,10 +185,10 @@ sys_setpriority(curp, v, retval)
 
 int
 donice(curp, chgp, n)
-	register struct proc *curp, *chgp;
-	register int n;
+	struct proc *curp, *chgp;
+	int n;
 {
-	register struct pcred *pcred = curp->p_cred;
+	struct pcred *pcred = curp->p_cred;
 
 	if (pcred->pc_ucred->cr_uid && pcred->p_ruid &&
 	    pcred->pc_ucred->cr_uid != chgp->p_ucred->cr_uid &&
@@ -210,7 +213,7 @@ sys_setrlimit(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_setrlimit_args /* {
+	struct sys_setrlimit_args /* {
 		syscallarg(int) which;
 		syscallarg(const struct rlimit *) rlp;
 	} */ *uap = v;
@@ -221,17 +224,19 @@ sys_setrlimit(p, v, retval)
 	error = copyin(SCARG(uap, rlp), &alim, sizeof(struct rlimit));
 	if (error)
 		return (error);
-	return (dosetrlimit(p, which, &alim));
+	return (dosetrlimit(p, p->p_cred, which, &alim));
 }
 
 int
-dosetrlimit(p, which, limp)
+dosetrlimit(p, cred, which, limp)
 	struct proc *p;
+	struct  pcred *cred;
 	int which;
 	struct rlimit *limp;
 {
-	register struct rlimit *alimp;
+	struct rlimit *alimp;
 	extern unsigned maxdmap, maxsmap;
+	struct plimit *newplim;
 	int error;
 
 	if ((u_int)which >= RLIM_NLIMITS)
@@ -241,16 +246,22 @@ dosetrlimit(p, which, limp)
 		return (EINVAL);
 
 	alimp = &p->p_rlimit[which];
+	/* if we don't change the value, no need to limcopy() */
+	if (limp->rlim_cur == alimp->rlim_cur &&
+	    limp->rlim_max == alimp->rlim_max)
+		return 0;
+
 	if (limp->rlim_cur > alimp->rlim_max || 
 	    limp->rlim_max > alimp->rlim_max)
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(cred->pc_ucred, &p->p_acflag)) != 0)
 			return (error);
 	if (limp->rlim_cur > limp->rlim_max)
 		limp->rlim_cur = limp->rlim_max;
 	if (p->p_limit->p_refcnt > 1 &&
 	    (p->p_limit->p_lflags & PL_SHAREMOD) == 0) {
-		p->p_limit->p_refcnt--;
-		p->p_limit = limcopy(p->p_limit);
+		newplim = limcopy(p->p_limit);
+		limfree(p->p_limit);
+		p->p_limit = newplim;
 		alimp = &p->p_rlimit[which];
 	}
 
@@ -325,7 +336,7 @@ sys_getrlimit(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_getrlimit_args /* {
+	struct sys_getrlimit_args /* {
 		syscallarg(int) which;
 		syscallarg(struct rlimit *) rlp;
 	} */ *uap = v;
@@ -343,14 +354,14 @@ sys_getrlimit(p, v, retval)
  */
 void
 calcru(p, up, sp, ip)
-	register struct proc *p;
-	register struct timeval *up;
-	register struct timeval *sp;
-	register struct timeval *ip;
+	struct proc *p;
+	struct timeval *up;
+	struct timeval *sp;
+	struct timeval *ip;
 {
-	register u_quad_t u, st, ut, it, tot;
-	register long sec, usec;
-	register int s;
+	u_quad_t u, st, ut, it, tot;
+	long sec, usec;
+	int s;
 	struct timeval tv;
 
 	s = splstatclock();
@@ -370,15 +381,20 @@ calcru(p, up, sp, ip)
 
 	sec = p->p_rtime.tv_sec;
 	usec = p->p_rtime.tv_usec;
-	if (p == curproc) {
+	if (p->p_stat == SONPROC) {
+		struct schedstate_percpu *spc;
+
+		KDASSERT(p->p_cpu != NULL);
+		spc = &p->p_cpu->ci_schedstate;
+
 		/*
 		 * Adjust for the current time slice.  This is actually fairly
 		 * important since the error here is on the order of a time
 		 * quantum, which is much greater than the sampling error.
 		 */
 		microtime(&tv);
-		sec += tv.tv_sec - runtime.tv_sec;
-		usec += tv.tv_usec - runtime.tv_usec;
+		sec += tv.tv_sec - spc->spc_runtime.tv_sec;
+		usec += tv.tv_usec - spc->spc_runtime.tv_usec;
 	}
 	u = (u_quad_t) sec * 1000000 + usec;
 	st = (u * st) / tot;
@@ -397,15 +413,15 @@ calcru(p, up, sp, ip)
 /* ARGSUSED */
 int
 sys_getrusage(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	register struct sys_getrusage_args /* {
+	struct sys_getrusage_args /* {
 		syscallarg(int) who;
 		syscallarg(struct rusage *) rusage;
 	} */ *uap = v;
-	register struct rusage *rup;
+	struct rusage *rup;
 
 	switch (SCARG(uap, who)) {
 
@@ -426,10 +442,10 @@ sys_getrusage(p, v, retval)
 
 void
 ruadd(ru, ru2)
-	register struct rusage *ru, *ru2;
+	struct rusage *ru, *ru2;
 {
-	register long *ip, *ip2;
-	register int i;
+	long *ip, *ip2;
+	int i;
 
 	timeradd(&ru->ru_utime, &ru2->ru_utime, &ru->ru_utime);
 	timeradd(&ru->ru_stime, &ru2->ru_stime, &ru->ru_stime);
@@ -449,11 +465,18 @@ struct plimit *
 limcopy(lim)
 	struct plimit *lim;
 {
-	register struct plimit *newlim;
+	struct plimit *newlim;
 
 	newlim = pool_get(&plimit_pool, PR_WAITOK);
 	memcpy(newlim->pl_rlimit, lim->pl_rlimit,
 	    sizeof(struct rlimit) * RLIM_NLIMITS);
+	if (lim->pl_corename == defcorename) {
+		newlim->pl_corename = defcorename;
+	} else {
+		newlim->pl_corename = malloc(strlen(lim->pl_corename)+1,
+		    M_TEMP, M_WAITOK);
+		strcpy(newlim->pl_corename, lim->pl_corename);
+	}
 	newlim->p_lflags = 0;
 	newlim->p_refcnt = 1;
 	return (newlim);
@@ -466,5 +489,11 @@ limfree(lim)
 
 	if (--lim->p_refcnt > 0)
 		return;
+#ifdef DIAGNOSTIC
+	if (lim->p_refcnt < 0)
+		panic("limfree");
+#endif
+	if (lim->pl_corename != defcorename)
+		free(lim->pl_corename, M_TEMP);
 	pool_put(&plimit_pool, lim);
 }

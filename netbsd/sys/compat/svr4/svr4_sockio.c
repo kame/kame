@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_sockio.c,v 1.11 1998/09/04 19:54:39 christos Exp $	 */
+/*	$NetBSD: svr4_sockio.c,v 1.13 2000/04/12 15:12:13 christos Exp $	 */
 
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.
@@ -55,6 +55,8 @@
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_util.h>
 #include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_ucontext.h>
 #include <compat/svr4/svr4_syscallargs.h>
 #include <compat/svr4/svr4_stropts.h>
 #include <compat/svr4/svr4_ioctl.h>
@@ -163,8 +165,9 @@ svr4_sock_ioctl(fp, p, retval, fd, cmd, data)
 			if ((error = copyin(data, &sc, sizeof(sc))) != 0)
 				return error;
 
-			DPRINTF(("ifreq %d svr4_ifreq %d ifc_len %d\n",
-				sizeof(struct ifreq), sizeof(struct svr4_ifreq),
+			DPRINTF(("ifreq %ld svr4_ifreq %ld ifc_len %d\n",
+				(unsigned long)sizeof(struct ifreq),
+				(unsigned long)sizeof(struct svr4_ifreq),
 				sc.svr4_ifc_len));
 
 			if ((error = (*ctl)(fp, OSIOCGIFCONF,

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_hippisubr.c,v 1.2 1998/07/05 00:51:26 jonathan Exp $	*/
+/*	$NetBSD: if_hippisubr.c,v 1.5.4.1 2000/10/17 01:23:49 tv Exp $	*/
 
 /*
  * Copyright (c) 1982, 1989, 1993
@@ -58,7 +58,7 @@
 #include <net/if_hippi.h>
 
 #include <netinet/in.h>
-#ifdef INET
+#if defined(INET) || defined(INET6)
 #include <netinet/in_var.h>
 #endif
 
@@ -71,6 +71,9 @@
 #define	llc_snap	llc_un.type_snap
 #endif
 
+static	int hippi_output __P((struct ifnet *, struct mbuf *,
+	    struct sockaddr *, struct rtentry *)); 
+static	void hippi_input __P((struct ifnet *, struct mbuf *));
 
 /*
  * HIPPI output routine.
@@ -79,7 +82,7 @@
  * protocols to HIPPI, so I don't include any code for them.
  */
 
-int
+static int
 hippi_output(ifp, m0, dst, rt0)
 	struct ifnet *ifp;
 	struct mbuf *m0;
@@ -161,7 +164,7 @@ hippi_output(ifp, m0, dst, rt0)
 	}
 
 	if (htype != 0) {
-		register struct llc *l;
+		struct llc *l;
 		M_PREPEND(m, sizeof (struct llc), M_DONTWAIT);
 		if (m == 0)
 			senderr(ENOBUFS);
@@ -226,19 +229,19 @@ hippi_output(ifp, m0, dst, rt0)
 
 /*
  * Process a received HIPPI packet;
- * the packet is in the mbuf chain m without
- * the HIPPI header, which is provided separately.
+ * the packet is in the mbuf chain m with
+ * the HIPPI header.
  */
 
-void
-hippi_input(ifp, hh, m)
+static void
+hippi_input(ifp, m)
 	struct ifnet *ifp;
-	struct hippi_header *hh;
 	struct mbuf *m;
 {
-	register struct ifqueue *inq;
-	register struct llc *l;
+	struct ifqueue *inq;
+	struct llc *l;
 	u_int16_t htype;
+	struct hippi_header *hh;
 	int s;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
@@ -248,8 +251,10 @@ hippi_input(ifp, hh, m)
 
 	/* XXX:  need to check flags and drop if bogus! */
 
+	hh = mtod(m, struct hippi_header *);
+
 	ifp->if_lastchange = time;
-	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*hh);
+	ifp->if_ibytes += m->m_pkthdr.len;
 	if (hh->hi_le.le_dest_addr[0] & 1) {
 		if (bcmp((caddr_t)etherbroadcastaddr, 
 			 (caddr_t)hh->hi_le.le_dest_addr,
@@ -261,6 +266,9 @@ hippi_input(ifp, hh, m)
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
 
+	/* Skip past the HIPPI header. */
+	m_adj(m, sizeof(struct hippi_header));
+
 	l = mtod(m, struct llc *);
 	if (l->llc_dsap != LLC_SNAP_LSAP) {
 		m_freem(m);
@@ -270,12 +278,15 @@ hippi_input(ifp, hh, m)
 	m_adj(m, 8);
 	switch (htype) {
 #ifdef INET
-#ifdef INET6
-	case ETHERTYPE_IPV6:
-#endif
 	case ETHERTYPE_IP:
 		schednetisr(NETISR_IP);
 		inq = &ipintrq;
+		break;
+#endif
+#ifdef INET6
+	case ETHERTYPE_IPV6:
+		schednetisr(NETISR_IPV6);
+		inq = &ip6intrq;
 		break;
 #endif
 	default:
@@ -296,12 +307,13 @@ hippi_input(ifp, hh, m)
  * Handle packet from HIPPI that has no MAC header
  */
 
+#ifdef INET
 void
 hippi_ip_input(ifp, m)
 	struct ifnet *ifp;
 	struct mbuf *m;
 {
-	register struct ifqueue *inq;
+	struct ifqueue *inq;
 	int s;
 	u_int32_t *ip;
     
@@ -318,6 +330,7 @@ hippi_ip_input(ifp, m)
 		IF_ENQUEUE(inq, m);
 	splx(s);
 }
+#endif
 
 
 /*
@@ -325,16 +338,18 @@ hippi_ip_input(ifp, m)
  */
 void
 hippi_ifattach(ifp, lla)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	caddr_t lla;
 {
-	register struct sockaddr_dl *sdl;
+	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_HIPPI;
 	ifp->if_addrlen = 6;  /* regular 802.3 MAC address */
 	ifp->if_hdrlen = sizeof(struct hippi_header) + 8; /* add CCI */
 	ifp->if_mtu = HIPPIMTU;
 	ifp->if_output = hippi_output;
+	ifp->if_input = hippi_input;
+	ifp->if_baudrate = IF_Mbps(800);	/* XXX double-check */
 	if ((sdl = ifp->if_sadl) &&
 	    sdl->sdl_family == AF_LINK) {
 		sdl->sdl_type = IFT_HIPPI;

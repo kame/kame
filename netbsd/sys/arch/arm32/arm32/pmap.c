@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.59.2.1 1999/04/16 16:15:32 chs Exp $	*/
+/*	$NetBSD: pmap.c,v 1.67 2000/03/26 20:42:25 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -337,7 +337,7 @@ pmap_free_pv(pv)
 {
 	struct pv_page *pvp;
 
-	pvp = (struct pv_page *) trunc_page(pv);
+	pvp = (struct pv_page *) trunc_page((vaddr_t)pv);
 	switch (++pvp->pvp_pgi.pgi_nfree) {
 	case 1:
 		TAILQ_INSERT_TAIL(&pv_page_freelist, pvp, pvp_pgi.pgi_list);
@@ -386,7 +386,7 @@ pmap_collect_pv()
 			continue;
 		s = splimp();
 		for (ppv = ph; (pv = ppv->pv_next) != 0; ) {
-			pvp = (struct pv_page *) trunc_page(pv);
+			pvp = (struct pv_page *) trunc_page((vaddr_t)pv);
 			if (pvp->pvp_pgi.pgi_nfree == -1) {
 				pvp = pv_page_freelist.tqh_first;
 				if (--pvp->pvp_pgi.pgi_nfree == 0) {
@@ -659,7 +659,7 @@ pmap_map(va, spa, epa, prot)
 	int prot;
 {
 	while (spa < epa) {
-		pmap_enter(pmap_kernel(), va, spa, prot, FALSE, 0);
+		pmap_enter(pmap_kernel(), va, spa, prot, 0);
 		va += NBPG;
 		spa += NBPG;
 	}
@@ -930,13 +930,9 @@ pmap_postinit()
  */
 
 pmap_t
-pmap_create(size)
-	vm_size_t size;
+pmap_create()
 {
 	pmap_t pmap;
-
-	/* Software use map does not need a pmap */
-	if (size) return NULL;
 
 	/* Allocate memory for pmap structure and zero it */
 	pmap = (pmap_t) malloc(sizeof *pmap, M_VMPMAP, M_WAITOK);
@@ -1003,7 +999,7 @@ pmap_alloc_l1pt(void)
 		pa = VM_PAGE_TO_PHYS(m);
 
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, TRUE, 0);
+		    VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 
 		/* Revoke cacheability and bufferability */
 		/* XXX should be done better than this */
@@ -1109,7 +1105,8 @@ pmap_allocpagedir(pmap)
 	}
 #endif	/* DIAGNOSTIC */
 	pmap->pm_vptpt = uvm_km_zalloc(kernel_map, NBPG);
-	pmap->pm_pptpt = pmap_extract(kernel_pmap, pmap->pm_vptpt) & PG_FRAME;
+	(void) pmap_extract(kernel_pmap, pmap->pm_vptpt, &pmap->pm_pptpt);
+	pmap->pm_pptpt &= PG_FRAME;
 	/* Revoke cacheability and bufferability */
 	/* XXX should be done better than this */
 	pte = pmap_pte(kernel_pmap, pmap->pm_vptpt);
@@ -1174,7 +1171,7 @@ pmap_pinit(pmap)
 
 	/* Map zero page for the pmap. This will also map the L2 for it */
 	pmap_enter(pmap, 0x00000000, systempage.pv_pa,
-	    VM_PROT_READ, TRUE, VM_PROT_READ);
+	    VM_PROT_READ, VM_PROT_READ | PMAP_WIRED);
 }
 
 
@@ -1311,28 +1308,6 @@ pmap_virtual_space(start, end)
 
 
 /*
- * void pmap_pageable(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
- *   boolean_t pageable)
- *  
- * Make the specified pages (by pmap, offset) pageable (or not) as requested.
- *
- * A page which is not pageable may not take a fault; therefore, its
- * page table entry must remain valid for the duration.
- *
- * This routine is merely advisory; pmap_enter will specify that these
- * pages are to be wired down (or not) as appropriate.
- */
- 
-void
-pmap_pageable(pmap, sva, eva, pageable)
-	pmap_t pmap;
-	vm_offset_t sva;
-	vm_offset_t eva;
-	boolean_t pageable;
-{
-}
-
-/*
  * Activate the address space for the specified process.  If the process
  * is the current process, load the new MMU context.
  */
@@ -1343,8 +1318,8 @@ pmap_activate(p)
 	pmap_t pmap = p->p_vmspace->vm_map.pmap;
 	struct pcb *pcb = &p->p_addr->u_pcb;
 
-	pcb->pcb_pagedir = (pd_entry_t *)pmap_extract(kernel_pmap,
-	    (vm_offset_t)pmap->pm_pdir);
+	(void) pmap_extract(kernel_pmap, (vaddr_t)pmap->pm_pdir,
+	    (paddr_t *)&pcb->pcb_pagedir);
 
 	PDEBUG(0, printf("pmap_activate: p=%p pmap=%p pcb=%p pdir=%p l1=%p\n",
 	    p, pmap, pcb, pmap->pm_pdir, pcb->pcb_pagedir));
@@ -1998,7 +1973,7 @@ next:
 
 /*
  * void pmap_enter(pmap_t pmap, vm_offset_t va, vm_offset_t pa, vm_prot_t prot,
- * boolean_t wired)
+ * int flags)
  *  
  *      Insert the given physical page (p) at
  *      the specified virtual address (v) in the
@@ -2012,28 +1987,28 @@ next:
  *      insert this page into the given map NOW.
  */
 
-void
-pmap_enter(pmap, va, pa, prot, wired, access_type)
+int
+pmap_enter(pmap, va, pa, prot, flags)
 	pmap_t pmap;
 	vm_offset_t va;
 	vm_offset_t pa;
 	vm_prot_t prot;
-	boolean_t wired;
-	vm_prot_t access_type;
+	int flags;
 {
 	pt_entry_t *pte;
 	u_int npte;
 	int bank, off;
 	struct pv_entry *pv = NULL;
 	vm_offset_t opa;
-	int flags;
+	int nflags;
+	boolean_t wired = (flags & PMAP_WIRED) != 0;
 
 	PDEBUG(5, printf("pmap_enter: V%08lx P%08lx in pmap %p prot=%08x, wired = %d\n",
 	    va, pa, pmap, prot, wired));
 
 	/* Valid pmap ? */
 	if (pmap == NULL)
-		return;
+		return (KERN_SUCCESS);
 
 #ifdef DIAGNOSTIC
 	/* Valid address ? */
@@ -2099,11 +2074,11 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 #endif
 	}
 
-	flags = 0;
+	nflags = 0;
 	if (prot & VM_PROT_WRITE)
-		flags |= PT_Wr;
+		nflags |= PT_Wr;
 	if (wired)
-		flags |= PT_W;
+		nflags |= PT_W;
 
 	/* More debugging info */
 	PDEBUG(5, printf("pmap_enter: pte for V%08lx = V%p (%08x)\n", va, pte,
@@ -2128,7 +2103,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 			if ((bank = vm_physseg_find(atop(pa), &off)) != -1) {
 				pv = &vm_physmem[bank].pmseg.pvent[off];
 				(void) pmap_modify_pv(pmap, va, pv,
-				    PT_Wr | PT_W, flags);
+				    PT_Wr | PT_W, nflags);
  			}
 		} else {
 			/* We are replacing the page with a new one. */
@@ -2161,7 +2136,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 		 */
 		if ((bank = vm_physseg_find(atop(pa), &off)) != -1) {
 			pv = &vm_physmem[bank].pmseg.pvent[off];
-			pmap_enter_pv(pmap, va, pv, flags);
+			pmap_enter_pv(pmap, va, pv, nflags);
 		}
 	}
 
@@ -2179,14 +2154,14 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 
 	if (bank != -1) {
 #ifdef DIAGNOSTIC
-		if (access_type & ~prot)
+		if ((flags & VM_PROT_ALL) & ~prot)
 			panic("pmap_enter: access_type exceeds prot");
 #endif
 		npte |= PT_C | PT_B;
-		if (access_type & VM_PROT_WRITE) {
+		if (flags & VM_PROT_WRITE) {
 			npte |= L2_SPAGE | PT_AP(AP_W);
 			vm_physmem[bank].pmseg.attrs[off] |= PT_H | PT_M;
-		} else if (access_type & VM_PROT_ALL) {
+		} else if (flags & VM_PROT_ALL) {
 			npte |= L2_SPAGE;
 			vm_physmem[bank].pmseg.attrs[off] |= PT_H;
 		} else
@@ -2202,7 +2177,7 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 
 #ifdef MYCROFT_HACK
 	if (mycroft_hack)
-		printf("pmap_enter: pmap=%p va=%lx pa=%lx prot=%x wired=%d access_type=%x npte=%08x\n", pmap, va, pa, prot, wired, access_type, npte);
+		printf("pmap_enter: pmap=%p va=%lx pa=%lx prot=%x wired=%d access_type=%x npte=%08x\n", pmap, va, pa, prot, wired, flags & VM_PROT_ALL, npte);
 #endif
 
 	*pte = npte;
@@ -2214,8 +2189,42 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
 	cpu_tlb_flushID_SE(va);
 
 	PDEBUG(5, printf("pmap_enter: pte = V%p %08x\n", pte, *pte));
+
+	return (KERN_SUCCESS);
 }
 
+void
+pmap_kenter_pa(va, pa, prot)
+	vaddr_t va;
+	paddr_t pa;
+	vm_prot_t prot;
+{
+	pmap_enter(pmap_kernel(), va, pa, prot, PMAP_WIRED);
+}
+
+void
+pmap_kenter_pgs(va, pgs, npgs)
+	vaddr_t va;
+	struct vm_page **pgs;
+	int npgs;
+{
+	int i;
+
+	for (i = 0; i < npgs; i++, va += PAGE_SIZE) {
+		pmap_enter(pmap_kernel(), va, VM_PAGE_TO_PHYS(pgs[i]),
+				VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+	}
+}
+
+void
+pmap_kremove(va, len)
+	vaddr_t va;
+	vsize_t len;
+{
+	for (len >>= PAGE_SHIFT; len > 0; len--, va += PAGE_SIZE) {
+		pmap_remove(pmap_kernel(), va, va + PAGE_SIZE);
+	}
+}
 
 /*
  * pmap_page_protect:
@@ -2224,41 +2233,42 @@ pmap_enter(pmap, va, pa, prot, wired, access_type)
  */
 
 void
-pmap_page_protect(phys, prot)
-	vm_offset_t phys;
+pmap_page_protect(pg, prot)
+	struct vm_page *pg;
 	vm_prot_t prot;
 {
-	PDEBUG(0, printf("pmap_page_protect(pa=%lx, prot=%d)\n", phys, prot));
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+
+	PDEBUG(0, printf("pmap_page_protect(pa=%lx, prot=%d)\n", pa, prot));
 
 	switch(prot) {
 	case VM_PROT_READ:
 	case VM_PROT_READ|VM_PROT_EXECUTE:
-		pmap_copy_on_write(phys);
+		pmap_copy_on_write(pa);
 		break;
 
 	case VM_PROT_ALL:
 		break;
 
 	default:
-		pmap_remove_all(phys);
+		pmap_remove_all(pa);
 		break;
 	}
 }
 
 
 /*
- * Routine:	pmap_change_wiring
- * Function:	Change the wiring attribute for a map/virtual-address
+ * Routine:	pmap_unwire
+ * Function:	Clear the wired attribute for a map/virtual-address
  *		pair.
  * In/out conditions:
  *		The mapping must already exist in the pmap.
  */
 
 void
-pmap_change_wiring(pmap, va, wired)
+pmap_unwire(pmap, va)
 	pmap_t pmap;
 	vm_offset_t va;
-	boolean_t wired;
 {
 	pt_entry_t *pte;
 	vm_offset_t pa;
@@ -2283,7 +2293,7 @@ pmap_change_wiring(pmap, va, wired)
 		return;
 	pv = &vm_physmem[bank].pmseg.pvent[off];
 	/* Update the wired bit in the pv entry for this page. */
-	(void) pmap_modify_pv(pmap, va, pv, PT_W, wired ? PT_W : 0);
+	(void) pmap_modify_pv(pmap, va, pv, PT_W, 0);
 }
 
 /*
@@ -2392,13 +2402,14 @@ pmap_pte(pmap, va)
  *           Extract the physical page address associated
  *           with the given map/virtual_address pair.
  */
-vm_offset_t
-pmap_extract(pmap, va)
+boolean_t
+pmap_extract(pmap, va, pap)
 	pmap_t pmap;
-	vm_offset_t va;
+	vaddr_t va;
+	paddr_t *pap;
 {
 	pt_entry_t *pte;
-	vm_offset_t pa;
+	paddr_t pa;
 
 	PDEBUG(5, printf("pmap_extract: pmap=%p, va=V%08lx\n", pmap, va));
 
@@ -2409,11 +2420,11 @@ pmap_extract(pmap, va)
   
 	pte = pmap_pte(pmap, va);
 	if (!pte)
-		return(0);
+		return(FALSE);
 
 	/* Is the pte valid ? If not then no paged is actually mapped here */
 	if (!pmap_pte_v(pte))
-		return(0);
+		return(FALSE);
 
 	/* Return the physical address depending on the PTE type */
 	/* XXX What about L1 section mappings ? */
@@ -2424,7 +2435,9 @@ pmap_extract(pmap, va)
 		PDEBUG(5, printf("pmap_extract: LPAGE pa = P%08lx\n",
 		    (pa | (va & (L2_LPAGE_SIZE - 1)))));
 
-		return(pa | (va & (L2_LPAGE_SIZE - 1)));
+		if (pap != NULL)
+			*pap = pa | (va & (L2_LPAGE_SIZE - 1));
+		return (TRUE);
 	} else {
 		/* Extract the physical address from the pte */
 		pa = pmap_pte_pa(pte);
@@ -2432,7 +2445,9 @@ pmap_extract(pmap, va)
 		PDEBUG(5, printf("pmap_extract: SPAGE pa = P%08lx\n",
 		    (pa | (va & ~PG_FRAME))));
 
-		return(pa | (va & ~PG_FRAME));
+		if (pap != NULL)
+			*pap = pa | (va & ~PG_FRAME);
+		return (TRUE);
 	}
 }
 
@@ -2571,21 +2586,31 @@ pmap_clearbit(pa, maskbits)
 }
 
 
-void
-pmap_clear_modify(pa)
-	vm_offset_t pa;
+boolean_t
+pmap_clear_modify(pg)
+	struct vm_page *pg;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	boolean_t rv;
+
 	PDEBUG(0, printf("pmap_clear_modify pa=%08lx\n", pa));
+	rv = pmap_testbit(pa, PT_M);
 	pmap_clearbit(pa, PT_M);
+	return rv;
 }
 
 
-void
-pmap_clear_reference(pa)
-	vm_offset_t pa;
+boolean_t
+pmap_clear_reference(pg)
+	struct vm_page *pg;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	boolean_t rv;
+
 	PDEBUG(0, printf("pmap_clear_reference pa=%08lx\n", pa));
+	rv = pmap_testbit(pa, PT_H);
 	pmap_clearbit(pa, PT_H);
+	return rv;
 }
 
 
@@ -2599,9 +2624,10 @@ pmap_copy_on_write(pa)
 
 
 boolean_t
-pmap_is_modified(pa)
-	vm_offset_t pa;
+pmap_is_modified(pg)
+	struct vm_page *pg;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	boolean_t result;
     
 	result = pmap_testbit(pa, PT_M);
@@ -2611,9 +2637,10 @@ pmap_is_modified(pa)
 
 
 boolean_t
-pmap_is_referenced(pa)
-	vm_offset_t pa;
+pmap_is_referenced(pg)
+	struct vm_page *pg;
 {
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	boolean_t result;
 	
 	result = pmap_testbit(pa, PT_H);

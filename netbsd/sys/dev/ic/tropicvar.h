@@ -1,4 +1,4 @@
-/*	$NetBSD: tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $	*/
+/*	$NetBSD: tropicvar.h,v 1.8 2000/06/13 20:00:03 soren Exp $	*/
 
 /* 
  * Mach Operating System
@@ -30,43 +30,9 @@
  * the rights to redistribute these changes.
  */
 
-/*
- * HISTORY
- * $Log: tropicvar.h,v $
- * Revision 1.2.2.1  1999/04/29 22:22:08  perry
- * pullup 1.2->1.3 (bad)
- *
- * Revision 1.3  1999/04/29 15:47:02  bad
- * From Onno van der Linden:
- * Reorganise the driver some what.
- * Rename tr_reset() to the more appropriate tr_stop().
- * Create a common tropic reset routine and use it in the frontends.
- * Move the code in tr_config() which is only used in the card attachment
- * routines into a new tr_attach() function.
- * Take adapter off the ring through tr_shutdown() in a shutdown hook.
- * This simplifies the bus-specific frontend.
- *
- * Revision 1.2  1999/03/22 23:01:36  bad
- * Oops. RcsID police.
- *
- * Revision 1.1  1999/03/22 22:21:26  bad
- * Chipset driver for TROPIC based Token-Ring cards.
- * Frontends for IBM and 3COM ISA cards.
- *
- * By Onno van der Linden <onno@simplex.nl>.
- *
- * Revision 2.2  93/02/04  08:00:33  danner
- * 	Integrate PS2 code from IBM.
- * 	[93/01/18            prithvi]
- * 
- */
-
-/* $Header: /cvsroot/syssrc/sys/dev/ic/tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $ */
 /* $ACIS:if_lanvar.h 12.0$ */
 
-#if !defined(lint) && !defined(LOCORE)  && defined(RCS_HDRS)
-static char    *rcsidif_lanvar = "$Header: /cvsroot/syssrc/sys/dev/ic/tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $";
-#endif
+#include <sys/callout.h>
 
 /*
  * This file contains structures used in the "tr" driver for the
@@ -105,6 +71,9 @@ struct	tr_softc {
 	bus_space_handle_t sc_sramh;	/* handle for the shared ram area */
 	bus_space_handle_t sc_mmioh;	/* handle for the bios/mmio area */
 
+	struct callout sc_init_callout;
+	struct callout sc_reinit_callout;
+
 	int (*sc_mediachange) __P((struct tr_softc *));
 	void (*sc_mediastatus) __P((struct tr_softc *, struct ifmediareq *));
 	struct rbcb rbc;	/* receiver buffer control block */
@@ -124,6 +93,13 @@ struct	tr_softc {
 	caddr_t  tr_sleepevent;     	/* tr event signalled on successful */
 					/* open of adapter  */
 	unsigned short exsap_station;	/* station assigned by open sap cmd */
+
+	void *sc_sdhook;
+
+	/* Power management hooks */    
+	int (*sc_enable) __P((struct tr_softc *));
+	void (*sc_disable) __P((struct tr_softc *));
+	int sc_enabled;
 };
 
 int tr_config __P((struct tr_softc *));
@@ -135,3 +111,7 @@ void tr_stop __P((struct tr_softc *));
 int tr_reset __P((struct tr_softc *));
 void tr_sleep __P((struct tr_softc *));
 int tr_setspeed __P((struct tr_softc *, u_int8_t));
+int tr_enable __P((struct tr_softc *));
+void tr_disable __P((struct tr_softc *));
+int tr_activate __P((struct device *, enum devact));
+int tr_detach __P((struct device *, int flags));

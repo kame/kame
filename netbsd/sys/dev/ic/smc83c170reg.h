@@ -1,4 +1,4 @@
-/*	$NetBSD: smc83c170reg.h,v 1.3 1998/08/11 00:13:48 thorpej Exp $	*/
+/*	$NetBSD: smc83c170reg.h,v 1.6 2000/05/26 00:20:26 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -128,7 +128,11 @@ struct epic_rxdesc {
 #define	ER_RXCTL_LFFORM		0x0002	/* alternate fraglist format */
 #define	ER_RXCTL_FRAGLIST	0x0001	/* descriptor points to fraglist */
 
-#define	EPIC_NFRAGS		63	/* maximum number of frags in list */
+/*
+ * This is not really part of the register description, but we need
+ * to define the number of transmit fragments *somewhere*.
+ */
+#define	EPIC_NFRAGS		16	/* maximum number of frags in list */
 
 /*
  * EPIC fraglist descriptor.

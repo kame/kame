@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_mroute.h,v 1.15 1999/01/11 21:31:03 thorpej Exp $	*/
+/*	$NetBSD: ip_mroute.h,v 1.18 2000/03/23 07:03:29 thorpej Exp $	*/
 
 /*
  * Definitions for IP multicast forwarding.
@@ -15,6 +15,7 @@
 #define _NETINET_IP_MROUTE_H_
 
 #include <sys/queue.h>
+#include <sys/callout.h>
 
 /*
  * Multicast Routing set/getsockopt commands.
@@ -137,6 +138,7 @@ struct vif {
 	u_long	  v_bytes_in;		/* # bytes in on interface */
 	u_long	  v_bytes_out;		/* # bytes out on interface */
 	struct	  route v_route;	/* cached route if this is a tunnel */
+	struct	  callout v_repq_ch;	/* for tbf_reprocess_q() */
 #ifdef RSVP_ISI
 	int	  v_rsvp_on;		/* # RSVP listening on this vif */
 	struct	  socket *v_rsvpd;	/* # RSVPD daemon */
@@ -176,7 +178,7 @@ struct igmpmsg {
 	u_int8_t  im_vif;		/* vif rec'd on */
 	u_int8_t  unused3;
 	struct	  in_addr im_src, im_dst;
-};
+} __attribute__((__packed__));
 
 /*
  * Argument structure used for pkt info. while upcall is made.
@@ -211,7 +213,8 @@ int legal_vif_num __P((int));
 int ip_rsvp_vif_init __P((struct socket *, struct mbuf *));
 int ip_rsvp_vif_done __P((struct socket *, struct mbuf *));
 void ip_rsvp_force_done __P((struct socket *));
-void rsvp_input __P((struct mbuf *, struct ifnet *));
+/*int rsvp_input __P((struct mbuf *, struct ifnet *));*/
+void rsvp_input __P((struct mbuf *, int, int));
 #else
 int ip_mforward __P((struct mbuf *, struct ifnet *));
 #endif

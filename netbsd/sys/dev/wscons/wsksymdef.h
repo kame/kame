@@ -1,4 +1,4 @@
-/*	$NetBSD: wsksymdef.h,v 1.24.2.1 1999/12/04 19:41:46 he Exp $ */
+/*	$NetBSD: wsksymdef.h,v 1.34.4.1 2000/07/07 09:49:54 hannken Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -321,6 +321,7 @@
 #define	KS_KP_Tab 		0xf209
 #define	KS_KP_Enter 		0xf20d
 #define	KS_KP_Equal 		0xf23d
+#define	KS_KP_Numbersign	0xf223
 #define	KS_KP_Multiply 		0xf22a
 #define	KS_KP_Add 		0xf22b
 #define	KS_KP_Separator 	0xf22c
@@ -453,11 +454,11 @@
 			    (((k) & 0xf800) == 0xf000 ? ((k) & 0x00ff) : (k)))
 
 /*
- * Keyboard types: 8bit encoding, 8bit variant
+ * Keyboard types: 8bit encoding, 24bit variant
  */
 
-#define KB_ENCODING(e)		((e) & 0xff00)
-#define KB_VARIANT(e)		((e) & 0x00ff)
+#define KB_ENCODING(e)		((e) & 0x0000ff00)
+#define KB_VARIANT(e)		((e) & 0xffff00ff)
 
 #define KB_USER			0x0100
 #define KB_US			0x0200
@@ -468,14 +469,18 @@
 #define KB_UK			0x0700
 #define KB_JP			0x0800
 #define KB_SV			0x0900
+#define KB_NO			0x0a00
+#define KB_ES			0x0b00
 
 #define KB_NODEAD		0x0001
 #define KB_DECLK		0x0002	/* DEC LKnnn layout */
 #define KB_LK401		0x0004	/* DEC LK401 instead LK201 */
-#define KB_SWAPCTRLCAPS		0x0008	/* Swap Control-L and Caps-Lock */
+#define KB_SWAPCTRLCAPS		0x0008	/* Swap Left-Control and Caps-Lock */
 #define KB_DVORAK		0x0010	/* Dvorak layout */
+#define KB_METAESC		0x0020	/* generate ESC prefix on ALT-key */
+#define KB_IOPENER		0x0040	/* f1-f12 -> ESC,f1-f11 */
 
-#define KB_NAMETAB \
+#define KB_ENCTAB \
 	{ KB_USER,	"user" }, \
 	{ KB_US,	"us" }, \
 	{ KB_DE,	"de" }, \
@@ -485,10 +490,16 @@
 	{ KB_UK,	"uk" }, \
 	{ KB_JP,	"jp" }, \
 	{ KB_SV,	"sv" }, \
+	{ KB_NO,	"no" }, \
+	{ KB_ES,	"es" }
+
+#define KB_VARTAB \
 	{ KB_NODEAD,	"nodead" }, \
 	{ KB_DECLK,	"declk" }, \
 	{ KB_LK401,	"lk401" }, \
 	{ KB_SWAPCTRLCAPS, "swapctrlcaps" }, \
-	{ KB_DVORAK,	"dvorak" }
+	{ KB_DVORAK,	"dvorak" }, \
+	{ KB_METAESC,	"metaesc" }, \
+	{ KB_IOPENER,	"iopener" }
 
 #endif /* !_DEV_WSCONS_WSKSYMDEF_H_ */

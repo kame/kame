@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.67.2.1 2000/02/07 19:44:34 he Exp $	*/
+/*	$NetBSD: fd.c,v 1.82.2.1 2000/07/19 02:53:11 mrg Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -81,6 +81,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
@@ -104,8 +105,8 @@
 
 #include <uvm/uvm_extern.h>
 
-#include <machine/cpu.h>
 #include <machine/autoconf.h>
+#include <machine/intr.h>
 #include <machine/conf.h>
 
 #include <sparc/sparc/auxreg.h>
@@ -149,6 +150,9 @@ struct fdc_softc {
 	struct device	sc_dev;		/* boilerplate */
 	bus_space_tag_t	sc_bustag;
 
+	struct callout sc_timo_ch;	/* timeout callout */
+	struct callout sc_intr_ch;	/* pseudo-intr callout */
+
 	struct fd_softc *sc_fd[4];	/* pointers to children */
 	TAILQ_HEAD(drivehead, fd_softc) sc_drives;
 	enum fdc_state	sc_state;
@@ -186,7 +190,7 @@ int	fdcmatch_obio __P((struct device *, struct cfdata *, void *));
 void	fdcattach_mainbus __P((struct device *, struct device *, void *));
 void	fdcattach_obio __P((struct device *, struct device *, void *));
 
-void	fdcattach __P((struct fdc_softc *, int));
+int	fdcattach __P((struct fdc_softc *, int));
 
 struct cfattach fdc_mainbus_ca = {
 	sizeof(struct fdc_softc), fdcmatch_mainbus, fdcattach_mainbus
@@ -235,6 +239,9 @@ struct fd_softc {
 	struct fd_type *sc_deftype;	/* default type descriptor */
 	struct fd_type *sc_type;	/* current type descriptor */
 
+	struct callout sc_motoron_ch;
+	struct callout sc_motoroff_ch;
+
 	daddr_t	sc_blkno;	/* starting block number */
 	int sc_bcount;		/* byte count left */
 	int sc_skip;		/* bytes already transferred */
@@ -253,7 +260,8 @@ struct fd_softc {
 
 	TAILQ_ENTRY(fd_softc) sc_drivechain;
 	int sc_ops;		/* I/O ops since last switch */
-	struct buf sc_q;	/* pending I/O requests */
+	struct buf_queue sc_q;	/* pending I/O requests */
+	int sc_active;		/* number of active I/O requests */
 };
 
 /* floppy driver configuration */
@@ -544,7 +552,8 @@ fdcattach_mainbus(parent, self, aux)
 			    ma->ma_size,
 			    fdc->sc_handle);
 
-	fdcattach(fdc, ma->ma_pri);
+	if (fdcattach(fdc, ma->ma_pri) != 0)
+		bus_space_unmap(ma->ma_bustag, fdc->sc_handle, ma->ma_size);
 }
 
 void
@@ -555,6 +564,11 @@ fdcattach_obio(parent, self, aux)
 	struct fdc_softc *fdc = (void *)self;
 	union obio_attach_args *uoba = aux;
 	struct sbus_attach_args *sa = &uoba->uoba_sbus;
+
+	if (sa->sa_nintr == 0) {
+		printf(": no interrupt line configured\n");
+		return;
+	}
 
 	fdc->sc_bustag = sa->sa_bustag;
 
@@ -581,17 +595,21 @@ fdcattach_obio(parent, self, aux)
 		return;
 	}
 
-	if (sa->sa_nintr != 0)
-		fdcattach(fdc, sa->sa_pri);
+	if (fdcattach(fdc, sa->sa_pri) != 0)
+		bus_space_unmap(sa->sa_bustag, fdc->sc_handle, sa->sa_size);
 }
 
-void
+int
 fdcattach(fdc, pri)
 	struct fdc_softc *fdc;
 	int pri;
 {
 	struct fdc_attach_args fa;
+	int drive_attached;
 	char code;
+
+	callout_init(&fdc->sc_timo_ch);
+	callout_init(&fdc->sc_intr_ch);
 
 	fdc->sc_state = DEVIDLE;
 	fdc->sc_itask = FDC_ITASK_NONE;
@@ -621,30 +639,40 @@ fdcattach(fdc, pri)
 	fdc->sc_cfg = CFG_EIS|/*CFG_EFIFO|*/CFG_POLL|(8 & CFG_THRHLD_MASK);
 	if (fdconf(fdc) != 0) {
 		printf("%s: no drives attached\n", fdc->sc_dev.dv_xname);
-		return;
+		return (-1);
 	}
 
 #ifdef FDC_C_HANDLER
-	(void)bus_intr_establish(fdc->sc_bustag, pri, 0,
+	(void)bus_intr_establish(fdc->sc_bustag, pri, IPL_BIO, 0,
 				 fdc_c_hwintr, fdc);
 #else
 	fdciop = &fdc->sc_io;
-	(void)bus_intr_establish(fdc->sc_bustag, pri,
+	(void)bus_intr_establish(fdc->sc_bustag, pri, IPL_BIO,
 				 BUS_INTR_ESTABLISH_FASTTRAP,
 				 (int (*) __P((void *)))fdchwintr, NULL);
 #endif
-	(void)bus_intr_establish(fdc->sc_bustag, PIL_FDSOFT,
+	(void)bus_intr_establish(fdc->sc_bustag, PIL_FDSOFT, IPL_BIO,
 				 BUS_INTR_ESTABLISH_SOFTINTR,
 				 fdcswintr, fdc);
 
-	evcnt_attach(&fdc->sc_dev, "intr", &fdc->sc_intrcnt);
+	evcnt_attach_dynamic(&fdc->sc_intrcnt, EVCNT_TYPE_INTR, NULL,
+	    fdc->sc_dev.dv_xname, "intr");
 
 	/* physical limit: four drives per controller. */
+	drive_attached = 0;
 	for (fa.fa_drive = 0; fa.fa_drive < 4; fa.fa_drive++) {
 		fa.fa_deftype = NULL;		/* unknown */
 	fa.fa_deftype = &fd_types[0];		/* XXX */
-		(void)config_found(&fdc->sc_dev, (void *)&fa, fdprint);
+		if (config_found(&fdc->sc_dev, (void *)&fa, fdprint) != NULL)
+			drive_attached = 1;
 	}
+
+	if (drive_attached == 0) {
+		/* XXX - dis-establish interrupts here */
+		/* return (-1); */
+	}
+
+	return (0);
 }
 
 int
@@ -735,6 +763,9 @@ fdattach(parent, self, aux)
 	struct fd_type *type = fa->fa_deftype;
 	int drive = fa->fa_drive;
 
+	callout_init(&fd->sc_motoron_ch);
+	callout_init(&fd->sc_motoroff_ch);
+
 	/* XXX Allow `flags' to override device type? */
 
 	if (type)
@@ -743,6 +774,7 @@ fdattach(parent, self, aux)
 	else
 		printf(": density unknown\n");
 
+	BUFQ_INIT(&fd->sc_q);
 	fd->sc_cylin = -1;
 	fd->sc_drive = drive;
 	fd->sc_deftype = type;
@@ -768,9 +800,6 @@ fdattach(parent, self, aux)
 
 	/* Make sure the drive motor gets turned off at shutdown time. */
 	fd->sc_sdhook = shutdownhook_establish(fd_motor_off, fd);
-
-	/* XXX Need to do some more fiddling with sc_dk. */
-	dk_establish(&fd->sc_dk, &fd->sc_dv);
 }
 
 __inline struct fd_type *
@@ -828,6 +857,7 @@ fdstrategy(bp)
 		bp->b_bcount = sz << DEV_BSHIFT;
 	}
 
+	bp->b_rawblkno = bp->b_blkno;
  	bp->b_cylinder = (bp->b_blkno * DEV_BSIZE) /
 		      (FD_BSIZE(fd) * fd->sc_type->seccyl);
 
@@ -839,9 +869,9 @@ fdstrategy(bp)
 
 	/* Queue transfer on drive, activate drive and controller if idle. */
 	s = splbio();
-	disksort(&fd->sc_q, bp);
-	untimeout(fd_motor_off, fd); /* a good idea */
-	if (fd->sc_q.b_active == 0)
+	disksort_cylinder(&fd->sc_q, bp);
+	callout_stop(&fd->sc_motoroff_ch);		/* a good idea */
+	if (fd->sc_active == 0)
 		fdstart(fd);
 #ifdef DIAGNOSTIC
 	else {
@@ -870,7 +900,7 @@ fdstart(fd)
 	int active = fdc->sc_drives.tqh_first != 0;
 
 	/* Link into controller queue. */
-	fd->sc_q.b_active = 1;
+	fd->sc_active = 1;
 	TAILQ_INSERT_TAIL(&fdc->sc_drives, fd, sc_drivechain);
 
 	/* If controller not already active, start it. */
@@ -894,18 +924,18 @@ fdfinish(fd, bp)
 	if (fd->sc_drivechain.tqe_next && ++fd->sc_ops >= 8) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
-		if (bp->b_actf != NULL) {
+		if (BUFQ_NEXT(bp) != NULL) {
 			TAILQ_INSERT_TAIL(&fdc->sc_drives, fd, sc_drivechain);
 		} else
-			fd->sc_q.b_active = 0;
+			fd->sc_active = 0;
 	}
 	bp->b_resid = fd->sc_bcount;
 	fd->sc_skip = 0;
-	fd->sc_q.b_actf = bp->b_actf;
+	BUFQ_REMOVE(&fd->sc_q, bp);
 
 	biodone(bp);
 	/* turn off motor 5s from now */
-	timeout(fd_motor_off, fd, 5 * hz);
+	callout_reset(&fd->sc_motoroff_ch, 5 * hz, fd_motor_off, fd);
 	fdc->sc_state = DEVIDLE;
 }
 
@@ -1238,7 +1268,7 @@ fdctimeout(arg)
 		goto out;
 	}
 
-	if (fd->sc_q.b_actf != NULL)
+	if (BUFQ_FIRST(&fd->sc_q) != NULL)
 		fdc->sc_state++;
 	else
 		fdc->sc_state = DEVIDLE;
@@ -1398,11 +1428,11 @@ loop:
 	}
 
 	/* Is there a transfer to this drive?  If not, deactivate drive. */
-	bp = fd->sc_q.b_actf;
+	bp = BUFQ_FIRST(&fd->sc_q);
 	if (bp == NULL) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
-		fd->sc_q.b_active = 0;
+		fd->sc_active = 0;
 		goto loop;
 	}
 
@@ -1415,7 +1445,7 @@ loop:
 		fd->sc_skip = 0;
 		fd->sc_bcount = bp->b_bcount;
 		fd->sc_blkno = (bp->b_blkno * DEV_BSIZE) / FD_BSIZE(fd);
-		untimeout(fd_motor_off, fd);
+		callout_stop(&fd->sc_motoroff_ch);
 		if ((fd->sc_flags & FD_MOTOR_WAIT) != 0) {
 			fdc->sc_state = MOTORWAIT;
 			return (1);
@@ -1424,7 +1454,7 @@ loop:
 			/* Turn on the motor, being careful about pairing. */
 			struct fd_softc *ofd = fdc->sc_fd[fd->sc_drive ^ 1];
 			if (ofd && ofd->sc_flags & FD_MOTOR) {
-				untimeout(fd_motor_off, ofd);
+				callout_stop(&ofd->sc_motoroff_ch);
 				ofd->sc_flags &= ~(FD_MOTOR | FD_MOTOR_WAIT);
 			}
 			fd->sc_flags |= FD_MOTOR | FD_MOTOR_WAIT;
@@ -1432,7 +1462,8 @@ loop:
 			fdc->sc_state = MOTORWAIT;
 			if ((fdc->sc_flags & FDC_NEEDMOTORWAIT) != 0) { /*XXX*/
 				/* Allow .25s for motor to stabilize. */
-				timeout(fd_motor_on, fd, hz / 4);
+				callout_reset(&fd->sc_motoron_ch, hz / 4,
+				    fd_motor_on, fd);
 			} else {
 				fd->sc_flags &= ~FD_MOTOR_WAIT;
 				goto loop;
@@ -1462,7 +1493,7 @@ loop:
 		fd->sc_dk.dk_seek++;
 
 		disk_busy(&fd->sc_dk);
-		timeout(fdctimeout, fdc, 4 * hz);
+		callout_reset(&fdc->sc_timo_ch, 4 * hz, fdctimeout, fdc);
 
 		/* specify command */
 		FDC_WRFIFO(fdc, NE7CMD_SPECIFY);
@@ -1524,7 +1555,7 @@ loop:
 		disk_busy(&fd->sc_dk);
 
 		/* allow 3 seconds for operation */
-		timeout(fdctimeout, fdc, 3 * hz);
+		callout_reset(&fdc->sc_timo_ch, 3 * hz, fdctimeout, fdc);
 
 		if (finfo != NULL) {
 			/* formatting */
@@ -1552,11 +1583,12 @@ loop:
 		return (1);				/* will return later */
 
 	case SEEKWAIT:
-		untimeout(fdctimeout, fdc);
+		callout_stop(&fdc->sc_timo_ch);
 		fdc->sc_state = SEEKCOMPLETE;
 		if (fdc->sc_flags & FDC_NEEDHEADSETTLE) {
 			/* allow 1/50 second for heads to settle */
-			timeout(fdcpseudointr, fdc, hz / 50);
+			callout_reset(&fdc->sc_intr_ch, hz / 50,
+			    fdcpseudointr, fdc);
 			return (1);		/* will return later */
 		}
 		/*FALLTHROUGH*/
@@ -1586,7 +1618,7 @@ loop:
 		fdc->sc_state = IOCLEANUPWAIT;
 		fdc->sc_nstat = 0;
 		/* 1/10 second should be enough */
-		timeout(fdctimeout, fdc, hz/10);
+		callout_reset(&fdc->sc_timo_ch, hz / 10, fdctimeout, fdc);
 		FTC_FLIP;
 		return (1);
 
@@ -1604,13 +1636,13 @@ loop:
 		goto loop;
 
 	case IOCLEANUPWAIT: /* IO FAILED, cleanup succeeded */
-		untimeout(fdctimeout, fdc);
+		callout_stop(&fdc->sc_timo_ch);
 		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid));
 		fdcretry(fdc);
 		goto loop;
 
 	case IOCOMPLETE: /* IO DONE, post-analyze */
-		untimeout(fdctimeout, fdc);
+		callout_stop(&fdc->sc_timo_ch);
 
 		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid));
 
@@ -1693,12 +1725,12 @@ loop:
 		fdc->sc_nstat = 0;
 		fdc->sc_itask = FDC_ITASK_SENSEI;
 		fdc->sc_state = RESETCOMPLETE;
-		timeout(fdctimeout, fdc, hz / 2);
+		callout_reset(&fdc->sc_timo_ch, hz / 2, fdctimeout, fdc);
 		fdc_reset(fdc);
 		return (1);			/* will return later */
 
 	case RESETCOMPLETE:
-		untimeout(fdctimeout, fdc);
+		callout_stop(&fdc->sc_timo_ch);
 		fdconf(fdc);
 
 		/* FALLTHROUGH */
@@ -1706,18 +1738,19 @@ loop:
 		fdc->sc_state = RECALWAIT;
 		fdc->sc_itask = FDC_ITASK_SENSEI;
 		fdc->sc_nstat = 0;
-		timeout(fdctimeout, fdc, 5 * hz);
+		callout_reset(&fdc->sc_timo_ch, 5 * hz, fdctimeout, fdc);
 		/* recalibrate function */
 		FDC_WRFIFO(fdc, NE7CMD_RECAL);
 		FDC_WRFIFO(fdc, fd->sc_drive);
 		return (1);			/* will return later */
 
 	case RECALWAIT:
-		untimeout(fdctimeout, fdc);
+		callout_stop(&fdc->sc_timo_ch);
 		fdc->sc_state = RECALCOMPLETE;
 		if (fdc->sc_flags & FDC_NEEDHEADSETTLE) {
 			/* allow 1/30 second for heads to settle */
-			timeout(fdcpseudointr, fdc, hz / 30);
+			callout_reset(&fdc->sc_intr_ch, hz / 30,
+			    fdcpseudointr, fdc);
 			return (1);		/* will return later */
 		}
 
@@ -1751,7 +1784,7 @@ xxx:
 	 * We get here if the chip locks up in FDC_WRFIFO()
 	 * Cancel any operation and schedule a reset
 	 */
-	untimeout(fdctimeout, fdc);
+	callout_stop(&fdc->sc_timo_ch);
 	fdcretry(fdc);
 	(fdc)->sc_state = DORESET;
 	goto loop;
@@ -1770,7 +1803,7 @@ fdcretry(fdc)
 	int error = EIO;
 
 	fd = fdc->sc_drives.tqh_first;
-	bp = fd->sc_q.b_actf;
+	bp = BUFQ_FIRST(&fd->sc_q);
 
 	fdc->sc_overruns = 0;
 	if (fd->sc_opts & FDOPT_NORETRY)

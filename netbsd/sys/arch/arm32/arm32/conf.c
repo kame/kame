@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.38 1999/01/23 22:18:41 sommerfe Exp $	*/
+/*	$NetBSD: conf.c,v 1.42 2000/03/06 03:15:46 mark Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -43,6 +43,8 @@
  *
  * Created      : 17/09/94
  */
+
+#include "opt_footbridge.h"
  
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -183,10 +185,12 @@ int nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #include "ugen.h"
 #include "ugen.h"
 #include "ulpt.h"
+#include "ucom.h"
 #include "vcoda.h"			/* coda file system */
 #include "wsdisplay.h"
 #include "wskbd.h"
 #include "wsmouse.h"
+#include "wsmux.h"
 #include "scsibus.h"
 
 /* Character devices */
@@ -250,20 +254,11 @@ struct cdevsw cdevsw[] = {
 	cdev_lkm_dummy(),		/* 47: reserved */
 	cdev_lkm_dummy(),		/* 48: reserved */
 	cdev_mm_init(NOFROM, ofrom),	/* 49: ofrom */
-#ifdef SHARK /* XXX */
-	cdev_tty_init(NSCR,scr),        /*  50: Smart card reader  */
-#else
-	cdev_lkm_dummy(),		/* 50: reserved */
-#endif
+	cdev_tty_init(NSCR,scr),        /* 50: Smart card reader  */
 	cdev_notdef(),			/* 51: reserved */
 	cdev_rnd_init(NRND,rnd),	/* 52: random source pseudo-device */
 	cdev_prof_init(NPROFILER, prof), /* 53: fiq Profiler*/
-#if defined(FOOTBRIDGE)
 	cdev_tty_init(NFCOM, fcom),	/* 54: FOOTBRIDGE console */
-#else
-	/* FOOTBRIDGE */
-	cdev_lkm_dummy(),		/* 54: */	
-#endif	/* FOOTBRIDGE */
 	cdev_lkm_dummy(),		/* 55: Reserved for bypass device */	
 	cdev_joy_init(NJOY,joy),	/* 56: ISA joystick */
 	cdev_midi_init(NMIDI,midi),	/* 57: MIDI I/O */
@@ -281,7 +276,9 @@ struct cdevsw cdevsw[] = {
 	cdev_lkm_dummy(),		/* 69: reserved */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 70: SCSI bus */
 	cdev_disk_init(NRAID,raid),    	/* 71: RAIDframe disk driver */
-	cdev_ugen_init(NUGEN,ugen),   /* 72: USB generic driver */
+	cdev_ugen_init(NUGEN,ugen),	/* 72: USB generic driver */
+	cdev_mouse_init(NWSMUX,wsmux),	/* 73: ws multiplexor */
+	cdev_tty_init(NUCOM,ucom),	/* 74: USB tty */
 };
 
 int nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
@@ -395,6 +392,9 @@ static int chrtoblktbl[] = {
     /* 69 */	    NODEV,
     /* 70 */	    NODEV,
     /* 71 */	    71,
+    /* 72 */	    NODEV,
+    /* 73 */	    NODEV,
+    /* 74 */	    NODEV,
 };
 
 /*

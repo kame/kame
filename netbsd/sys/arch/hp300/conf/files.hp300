@@ -1,4 +1,4 @@
-#	$NetBSD: files.hp300,v 1.38 1998/12/15 19:37:01 itohy Exp $
+#	$NetBSD: files.hp300,v 1.42 2000/03/14 15:56:54 oster Exp $
 #
 # hp300-specific configuration info
 
@@ -9,7 +9,7 @@ maxusers 2 8 64
 
 # SPU configuration options.
 defopt	opt_spuconf.h HP320 HP330 HP340 HP345 HP350 HP360 HP370
-	HP375 HP380 HP400 HP425 HP433
+	HP375 HP380 HP385 HP400 HP425 HP433
 
 # Misc. options.
 defopt	USELEDS		# make the lights twinkle
@@ -136,12 +136,10 @@ file	arch/hp300/dev/hpib.c		hpibbus
 device	ct: tape
 attach	ct at hpibbus
 file	arch/hp300/dev/ct.c		ct needs-flag
-major	{ct = 0}
 
 device	mt: tape
 attach	mt at hpibbus
 file	arch/hp300/dev/mt.c		mt needs-flag
-major	{mt = 1}
 
 device	rd: disk
 attach	rd at hpibbus
@@ -172,6 +170,9 @@ file	arch/hp300/dev/st.c		st needs-flag
 device	ac
 attach	ac at oscsi
 file	arch/hp300/dev/ac.c		ac needs-flag
+
+# RAIDframe
+major	{raid = 15}
 
 # Human (Hilarious) Interface Loop
 # XXX should be a real device
@@ -205,13 +206,14 @@ file	arch/hp300/dev/md_root.c		memory_disk_hooks
 file	dev/cons.c
 file	dev/cninit.c
 
-major	{vnd = 6}
-
 #
 # HP-UX binary compatibility
 #
 include "compat/hpux/files.hpux"
 file	arch/hp300/hp300/hpux_machdep.c		compat_hpux
+
+# SVR4 Binary Compatibility (COMPAT_SVR4)
+include	"compat/svr4/files.svr4"
 
 # SunOS Binary Compatibility (COMPAT_SUNOS)
 include	"compat/sunos/files.sunos"
@@ -220,6 +222,9 @@ file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
 # Linux binary compatibility (COMPAT_LINUX)
 include "compat/linux/files.linux"
 include "compat/linux/arch/m68k/files.linux_m68k"
+
+# a.out binary compatibility (COMPAT_AOUT)
+include "compat/aout/files.aout"
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"

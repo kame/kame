@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.55 1998/11/13 04:47:03 oster Exp $	*/
+/*	$NetBSD: conf.c,v 1.57 2000/01/31 22:49:12 mhitch Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -35,6 +35,8 @@
  *      @(#)conf.c	7.9 (Berkeley) 5/28/91
  */
 
+#include "opt_compat_svr4.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -57,10 +59,13 @@
 #include "fd.h"
 #include "ccd.h"
 #include "raid.h"
+#include "wd.h"
 #include "ss.h"
 #include "ch.h"
 #include "uk.h"
 #include "md.h"
+
+bdev_decl(wd);
 
 struct bdevsw	bdevsw[] =
 {
@@ -81,6 +86,7 @@ struct bdevsw	bdevsw[] =
 	bdev_lkm_dummy(),		/* 14 */
 	bdev_disk_init(NMD,md),		/* 15: memory disk */
 	bdev_disk_init(NRAID,raid),	/* 16: RAIDframe disk driver */
+	bdev_disk_init(NWD,wd),		/* 17: IDE disk */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
@@ -104,6 +110,8 @@ dev_decl(filedesc,open);
 #include "ipfilter.h"
 #include "rnd.h"
 #include "scsibus.h"
+
+cdev_decl(wd);
 
 #ifdef __I4B_IS_INTEGRATED
 /* open, close, ioctl */
@@ -216,6 +224,8 @@ struct cdevsw	cdevsw[] =
 	cdev_lkm_dummy(),		/* 49 */
 #endif
 	cdev_disk_init(NRAID,raid),	/* 50: RAIDframe disk driver */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 51: svr4 net pseudo-device */
+	cdev_disk_init(NWD,wd),		/* 52: IDE disk */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -329,6 +339,8 @@ static int chrtoblktab[] = {
 	/* 48 */	NODEV,
 	/* 49 */	NODEV,
 	/* 50 */	16,
+	/* 51 */	NODEV,
+	/* 52 */	17,
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: scsi.h,v 1.7 1996/04/07 22:53:54 jonathan Exp $	*/
+/*	$NetBSD: scsi.h,v 1.12 2000/03/30 14:45:06 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -43,7 +43,7 @@
  *	definitions pertaining to the SCSI common command set that are
  *	common to all SCSI device types (ie disk, tapes, WORM, printers, etc).
  *	Some of the references from the proceedings of the
- *	1984 Mini/Micro Northeast conference might help in understanding SCSI. 
+ *	1984 Mini/Micro Northeast conference might help in understanding SCSI.
  *
  * from: Header: /sprite/src/kernel/dev/RCS/scsi.h,
  *	v 9.1 90/02/13 23:11:24 jhh Exp  SPRITE (Berkeley)
@@ -66,7 +66,7 @@
  */
 
 /*
- * Scsi Group0 commands all are 6 bytes and have a format according to 
+ * Scsi Group0 commands all are 6 bytes and have a format according to
  * struct ScsiGroup0Cmd.
  */
 #define SCSI_TEST_UNIT_READY	0x00
@@ -99,10 +99,18 @@
 #define SCSI_PREVENT_ALLOW	0x1e
 
 /*
+ * Arguments to SCSI_LOAD_UNLOAD command.  These are passed in byte
+ * 5 (the blockCount) of a Group0 command block.
+ */
+#define SCSI_LD_UNLOAD		0x00
+#define SCSI_LD_LOAD		0x01
+#define SCSI_LD_RETENSION	0x02
+
+/*
  * Group1 commands are all 10 bytes and have a format according to
  * struct ScsiGroup1Cmd.
  */
-#define SCSI_READ_CAPACITY	0x25	
+#define SCSI_READ_CAPACITY	0x25
 #define	SCSI_READ_EXT		0x28
 #define	SCSI_WRITE_EXT		0x2a
 #define	SCSI_SEEK_EXT		0x2b
@@ -120,7 +128,8 @@
  *
  * SCSI_CTRL_LINK - This is used to prevent a bus free phase between commands.
  *	If the command terminates successfully, a SCSI_LINKED_CMD_COMPLETE
- *	message is returned instead of the normal SCSI_COMMAND_COMPLETE message. *	The last command in a chain should not have this bit set
+ *	message is returned instead of the normal SCSI_COMMAND_COMPLETE message.
+ *	The last command in a chain should not have this bit set
  *	(and consequently gets a normal SCSI_COMMAND_COMPLETE message).
  * SCSI_CTRL_LINK_FLAG - This bit should only set when SCSI_CTRL_LINK is set and
  *	causes a SCSI_LINKED_FLAGED_CMD_COMPLETE to be returned instead of
@@ -130,7 +139,7 @@
 #define SCSI_CTRL_LINK_INTR	0x02	/* Interrupt after linked command */
 
 /*
- * The standard group0 6-byte SCSI control block.  Note that the 
+ * The standard group0 6-byte SCSI control block.  Note that the
  * fields between highAddr and blockCount inclusive are command dependent.
  * The definitions Addr and BlockCount cover most of the commands we will
  * use.
@@ -202,7 +211,7 @@ typedef struct ScsiStartStopCmd {
 } ScsiStartStopCmd;
 
 /*
- * The standard group1 10-byte SCSI control block.  Note that the 
+ * The standard group1 10-byte SCSI control block.  Note that the
  * fields between highAddr and blockCount inclusive are command dependent.
  * The definitions Addr and BlockCount cover most of the commands we will
  * use.
@@ -237,7 +246,7 @@ typedef struct ScsiGroup1Cmd {
 
 /*
  * SCSI status completion information.
- * This is returned by the device when a command completes. 
+ * This is returned by the device when a command completes.
  */
 #define	SCSI_STATUS_CHECKCOND	0x02	/* Check Condition (ie., read sense) */
 #define	SCSI_STATUS_CONDMET	0x04	/* Condition Met (ie., search worked) */
@@ -322,7 +331,7 @@ typedef struct ScsiClass7Sense {
 } ScsiClass7Sense;			/* 8 Bytes */
 
 /*
- * Key values for standardized sense class 7. 
+ * Key values for standardized sense class 7.
  */
 #define SCSI_CLASS7_NO_SENSE		0
 #define SCSI_CLASS7_RECOVERABLE		1
@@ -348,7 +357,7 @@ typedef struct ScsiClass7Sense {
 #define SCSI_CLASS7_RESERVED_15		15
 
 /*
- * Data return by the SCSI inquiry command. 
+ * Data return by the SCSI inquiry command.
  */
 typedef struct ScsiInquiryData {
 #if BYTE_ORDER == BIG_ENDIAN
@@ -483,7 +492,7 @@ typedef struct ScsiTapeModeSelectHdr {
  *	the Logical Unit of the Target which is requesting a reconnect.
  * SCSI_DIS_REC_IDENTIFY - Sent from the host to a target to indicate
  *	is supports connect/dis-connect
- *	
+ *
  */
 #define SCSI_COMMAND_COMPLETE		0x00
 #define SCSI_EXTENDED_MSG		0x01
@@ -508,6 +517,10 @@ typedef struct ScsiTapeModeSelectHdr {
 #define SCSI_SYNCHRONOUS_XFER		0x01
 #define SCSI_EXTENDED_IDENTIFY		0x02 /* only in SCSI I */
 #define SCSI_WIDE_XFER			0x03
+
+/* from old scsipiconf.h */
+#define	SCSI_SILENT	0x0020	/* don't announce NOT READY or MEDIA CHANGE */
+#define	SCSI_DATA_IN	0x0800	/* expect data to come INTO memory	*/
 
 /*
  * Driver ioctl's for various scsi operations.
@@ -552,20 +565,20 @@ struct scsi_fmt_sense {
 /*
  * Routines.
  */
-extern void scsiGroup0Cmd __P((unsigned cmd,	/* group0 SCSI command */
-			       unsigned lun,	/* Logical Unit Number */
-			       register unsigned block,
-			       unsigned count,
-			       register ScsiGroup0Cmd *c));
+void	scsiGroup0Cmd __P((unsigned cmd,	/* group0 SCSI command */
+			   unsigned lun,	/* Logical Unit Number */
+			   unsigned block,
+			   unsigned count,
+			   ScsiGroup0Cmd *c));
 
-extern void scsiGroup1Cmd __P((unsigned cmd,	/* group0 SCSI command */
-			       unsigned lun,	/* Logical Unit Number */
-			       register unsigned block,
-			       unsigned count,
-			       register ScsiGroup1Cmd *c));
+void	scsiGroup1Cmd __P((unsigned cmd,	/* group0 SCSI command */
+			   unsigned lun,	/* Logical Unit Number */
+			   unsigned block,
+			   unsigned count,
+			   ScsiGroup1Cmd *c));
 
-extern void scsiPrintSense __P((register ScsiClass7Sense *sp, int len));
-extern void scsiPrintInquiry __P((ScsiInquiryData *inqbuf, int len));
+void	scsiPrintSense __P((ScsiClass7Sense *sp, int len));
+void	scsiPrintInquiry __P((ScsiInquiryData *inqbuf, int len));
 #endif /* _KERNEL */
 
 #endif /* _SCSI_H */

@@ -1,7 +1,7 @@
-/*	$NetBSD: kern_kthread.c,v 1.3 1998/12/22 21:21:36 kleink Exp $	*/
+/*	$NetBSD: kern_kthread.c,v 1.10 2000/05/28 05:49:06 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -53,16 +53,18 @@
  */
 #include <machine/stdarg.h>
 
+int	kthread_create_now;
+
 /*
  * Fork a kernel thread.  Any process can request this to be done.
  * The VM space and limits, etc. will be shared with proc0.
  */
 int
 #if __STDC__
-kthread_create(void (*func)(void *), void *arg,
+kthread_create1(void (*func)(void *), void *arg,
     struct proc **newpp, const char *fmt, ...)
 #else
-kthread_create(func, arg, newpp, fmt, va_alist)
+kthread_create1(func, arg, newpp, fmt, va_alist)
 	void (*func) __P((void *));
 	void *arg;
 	struct proc **newpp;
@@ -75,8 +77,9 @@ kthread_create(func, arg, newpp, fmt, va_alist)
 	va_list ap;
 
 	/* First, create the new process. */
-	error = fork1(&proc0, FORK_SHAREVM, NULL, &p2);
-	if (error)
+	error = fork1(&proc0, FORK_SHAREVM | FORK_SHARECWD | FORK_SHAREFILES |
+	    FORK_SHARESIGS, SIGCHLD, NULL, 0, func, arg, NULL, &p2);
+	if (__predict_false(error != 0))
 		return (error);
 
 	/*
@@ -89,11 +92,8 @@ kthread_create(func, arg, newpp, fmt, va_alist)
 
 	/* Name it as specified. */
 	va_start(ap, fmt);
-	vsprintf(p2->p_comm, fmt, ap);
+	vsnprintf(p2->p_comm, MAXCOMLEN, fmt, ap);
 	va_end(ap);
-
-	/* Arrange for it to start at the specified function. */
-	cpu_set_kpc(p2, func, arg);
 
 	/* All done! */
 	if (newpp != NULL)
@@ -142,11 +142,16 @@ SIMPLEQ_HEAD(, kthread_q) kthread_q = SIMPLEQ_HEAD_INITIALIZER(kthread_q);
  * the caller to create threads for e.g. file systems and device drivers.
  */
 void
-kthread_create_deferred(func, arg)
+kthread_create(func, arg)
 	void (*func) __P((void *));
 	void *arg;
 {
 	struct kthread_q *kq;
+
+	if (kthread_create_now) {
+		(*func)(arg);
+		return;
+	}
 
 	kq = malloc(sizeof(*kq), M_TEMP, M_NOWAIT);
 	if (kq == NULL)
@@ -163,6 +168,9 @@ void
 kthread_run_deferred_queue()
 {
 	struct kthread_q *kq;
+
+	/* No longer need to defer kthread creation. */
+	kthread_create_now = 1;
 
 	while ((kq = SIMPLEQ_FIRST(&kthread_q)) != NULL) {
 		SIMPLEQ_REMOVE_HEAD(&kthread_q, kq, kq_q);

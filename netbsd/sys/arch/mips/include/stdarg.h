@@ -1,4 +1,4 @@
-/*	$NetBSD: stdarg.h,v 1.14 1999/01/22 14:14:32 mycroft Exp $	*/
+/*	$NetBSD: stdarg.h,v 1.19 2000/02/19 09:23:44 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -39,26 +39,40 @@
 #define	_MIPS_STDARG_H_
 
 #include <machine/ansi.h>
+#include <sys/featuretest.h>
 
 typedef _BSD_VA_LIST_	va_list;
 
-#define	__va_size(type) \
-	(((sizeof(type) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
+#ifdef __lint__
+#define __builtin_next_arg(t) ((t) ? 0 : 0)
+#endif
 
 #define	va_start(ap, last) \
 	((ap) = (va_list)__builtin_next_arg(last))
 
-#ifdef _KERNEL
-#define	va_arg(ap, type) \
-	((type *)(ap += sizeof(type)))[-1]
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define	va_arg(ap, T)							\
+	(((T *)(							\
+	    (ap) += (/*CONSTCOND*/ sizeof(T) <= sizeof(int)		\
+		? sizeof(int) : ((long)(ap) & 4) + sizeof(T)),		\
+	    (ap) - (/*CONSTCOND*/ sizeof(T) <= sizeof(int)		\
+		? sizeof(int) : sizeof(T))				\
+ 	))[0])
 #else
-#define	va_arg(ap, type) \
-	((type *)(ap += sizeof(type) == sizeof(int) ? sizeof(type) : \
-		sizeof(type) > sizeof(int) ? \
-		(-(int)(ap) & (sizeof(type) - 1)) + sizeof(type) : \
-		(abort(), 0)))[-1]
+#define	va_arg(ap, T)							\
+	(((T *)(							\
+	    (ap) += (/*CONSTCOND*/ sizeof(T) <= sizeof(int)		\
+		? sizeof(int) : ((long)(ap) & 4) + sizeof(T))		\
+ 	))[-1])
 #endif
 
-#define	va_end(ap)	
+#if !defined(_ANSI_SOURCE) && \
+    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
+     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L)
+#define	va_copy(dest, src)						\
+	((dest) = (src))
+#endif
+
+#define	va_end(ap)
 
 #endif /* !_MIPS_STDARG_H_ */

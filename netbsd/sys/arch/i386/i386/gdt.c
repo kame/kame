@@ -1,4 +1,4 @@
-/*	$NetBSD: gdt.c,v 1.16 1999/03/24 05:51:00 mrg Exp $	*/
+/*	$NetBSD: gdt.c,v 1.20.14.1 2000/08/16 23:18:20 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -39,6 +39,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/lock.h>
 #include <sys/user.h>
 
 #include <vm/vm.h>
@@ -56,9 +57,7 @@ int gdt_count;		/* number of GDT entries in use */
 int gdt_next;		/* next available slot for sweeping */
 int gdt_free;		/* next free slot; terminated with GNULL_SEL */
 
-int gdt_flags;
-#define	GDT_LOCKED	0x1
-#define	GDT_WANTED	0x2
+struct lock gdt_lock_store;
 
 static __inline void gdt_lock __P((void));
 static __inline void gdt_unlock __P((void));
@@ -82,22 +81,14 @@ static __inline void
 gdt_lock()
 {
 
-	while ((gdt_flags & GDT_LOCKED) != 0) {
-		gdt_flags |= GDT_WANTED;
-		tsleep(&gdt_flags, PZERO, "gdtlck", 0);
-	}
-	gdt_flags |= GDT_LOCKED;
+	(void) lockmgr(&gdt_lock_store, LK_EXCLUSIVE, NULL);
 }
 
 static __inline void
 gdt_unlock()
 {
 
-	gdt_flags &= ~GDT_LOCKED;
-	if ((gdt_flags & GDT_WANTED) != 0) {
-		gdt_flags &= ~GDT_WANTED;
-		wakeup(&gdt_flags);
-	}
+	(void) lockmgr(&gdt_lock_store, LK_RELEASE, NULL);
 }
 
 /*
@@ -116,12 +107,13 @@ void
 gdt_compact()
 {
 	struct proc *p;
-	struct pcb *pcb;
+	pmap_t pmap;
 	int slot = NGDT, oslot;
 
+	proclist_lock_read();
 	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
-		pcb = &p->p_addr->u_pcb;
-		oslot = IDXSEL(pcb->pcb_tss_sel);
+		pmap = p->p_vmspace->vm_map.pmap;
+		oslot = IDXSEL(p->p_md.md_tss_sel);
 		if (oslot >= gdt_count) {
 			while (gdt[slot].sd.sd_type != SDT_SYSNULL) {
 				if (++slot >= gdt_count)
@@ -129,9 +121,10 @@ gdt_compact()
 			}
 			gdt[slot] = gdt[oslot];
 			gdt[oslot].gd.gd_type = SDT_SYSNULL;
-			pcb->pcb_tss_sel = GSEL(slot, SEL_KPL);
+			p->p_md.md_tss_sel = GSEL(slot, SEL_KPL);
 		}
-		oslot = IDXSEL(pcb->pcb_ldt_sel);
+		simple_lock(&pmap->pm_lock);
+		oslot = IDXSEL(pmap->pm_ldt_sel);
 		if (oslot >= gdt_count) {
 			while (gdt[slot].sd.sd_type != SDT_SYSNULL) {
 				if (++slot >= gdt_count)
@@ -139,8 +132,14 @@ gdt_compact()
 			}
 			gdt[slot] = gdt[oslot];
 			gdt[oslot].gd.gd_type = SDT_SYSNULL;
-			pcb->pcb_ldt_sel = GSEL(slot, SEL_KPL);
+			pmap->pm_ldt_sel = GSEL(slot, SEL_KPL);
+			/*
+			 * XXXSMP: if the pmap is in use on other
+			 * processors, they need to reload thier
+			 * LDT!
+			 */
 		}
+		simple_unlock(&pmap->pm_lock);
 	}
 	for (; slot < gdt_count; slot++)
 		if (gdt[slot].gd.gd_type == SDT_SYSNULL)
@@ -150,10 +149,11 @@ gdt_compact()
 			panic("gdt_compact botch 4");
 	gdt_next = gdt_count;
 	gdt_free = GNULL_SEL;
+	proclist_unlock_read();
 }
 
 /*
- * Grow or shrink the GDT.
+ * Initialize the GDT.
  */
 void
 gdt_init()
@@ -161,6 +161,8 @@ gdt_init()
 	size_t max_len, min_len;
 	struct region_descriptor region;
 	union descriptor *old_gdt;
+
+	lockinit(&gdt_lock_store, PZERO, "gdtlck", 0, 0);
 
 	max_len = MAXGDTSIZ * sizeof(gdt[0]);
 	min_len = MINGDTSIZ * sizeof(gdt[0]);
@@ -173,13 +175,16 @@ gdt_init()
 	old_gdt = gdt;
 	gdt = (union descriptor *)uvm_km_valloc(kernel_map, max_len);
 	uvm_map_pageable(kernel_map, (vaddr_t)gdt,
-	    (vaddr_t)gdt + min_len, FALSE);
+	    (vaddr_t)gdt + min_len, FALSE, FALSE);
 	memcpy(gdt, old_gdt, NGDT * sizeof(gdt[0]));
 
 	setregion(&region, gdt, max_len - 1);
 	lgdt(&region);
 }
 
+/*
+ * Grow or shrink the GDT.
+ */
 void
 gdt_grow()
 {
@@ -190,7 +195,7 @@ gdt_grow()
 	new_len = old_len << 1;
 
 	uvm_map_pageable(kernel_map, (vaddr_t)gdt + old_len,
-	    (vaddr_t)gdt + new_len, FALSE);
+	    (vaddr_t)gdt + new_len, FALSE, FALSE);
 }
 
 void
@@ -203,7 +208,7 @@ gdt_shrink()
 	new_len = old_len >> 1;
 
 	uvm_map_pageable(kernel_map, (vaddr_t)gdt + new_len,
-	    (vaddr_t)gdt + old_len, TRUE);
+	    (vaddr_t)gdt + old_len, TRUE, FALSE);
 }
 
 /*
@@ -270,28 +275,29 @@ gdt_put_slot(slot)
 }
 
 void
-tss_alloc(pcb)
-	struct pcb *pcb;
+tss_alloc(p)
+	struct proc *p;
 {
+	struct pcb *pcb = &p->p_addr->u_pcb;
 	int slot;
 
 	slot = gdt_get_slot();
 	setsegment(&gdt[slot].sd, &pcb->pcb_tss, sizeof(struct pcb) - 1,
 	    SDT_SYS386TSS, SEL_KPL, 0, 0);
-	pcb->pcb_tss_sel = GSEL(slot, SEL_KPL);
+	p->p_md.md_tss_sel = GSEL(slot, SEL_KPL);
 }
 
 void
-tss_free(pcb)
-	struct pcb *pcb;
+tss_free(p)
+	struct proc *p;
 {
 
-	gdt_put_slot(IDXSEL(pcb->pcb_tss_sel));
+	gdt_put_slot(IDXSEL(p->p_md.md_tss_sel));
 }
 
 void
-ldt_alloc(pcb, ldt, len)
-	struct pcb *pcb;
+ldt_alloc(pmap, ldt, len)
+	struct pmap *pmap;
 	union descriptor *ldt;
 	size_t len;
 {
@@ -299,13 +305,20 @@ ldt_alloc(pcb, ldt, len)
 
 	slot = gdt_get_slot();
 	setsegment(&gdt[slot].sd, ldt, len - 1, SDT_SYSLDT, SEL_KPL, 0, 0);
-	pcb->pcb_ldt_sel = GSEL(slot, SEL_KPL);
+	simple_lock(&pmap->pm_lock);
+	pmap->pm_ldt_sel = GSEL(slot, SEL_KPL);
+	simple_unlock(&pmap->pm_lock);
 }
 
 void
-ldt_free(pcb)
-	struct pcb *pcb;
+ldt_free(pmap)
+	struct pmap *pmap;
 {
+	int slot;
 
-	gdt_put_slot(IDXSEL(pcb->pcb_ldt_sel));
+	simple_lock(&pmap->pm_lock);
+	slot = IDXSEL(pmap->pm_ldt_sel);
+	simple_unlock(&pmap->pm_lock);
+
+	gdt_put_slot(slot);
 }

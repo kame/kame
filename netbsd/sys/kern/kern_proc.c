@@ -1,4 +1,41 @@
-/*	$NetBSD: kern_proc.c,v 1.31 1998/09/08 23:47:49 thorpej Exp $	*/
+/*	$NetBSD: kern_proc.c,v 1.41 2000/05/27 00:40:45 sommerfeld Exp $	*/
+
+/*-
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
+ * NASA Ames Research Center.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -75,8 +112,34 @@ struct pgrphashhead *pgrphashtbl;
 u_long pgrphash;
 
 struct proclist allproc;
-struct proclist deadproc;	/* dead, but not yet undead */
 struct proclist zombproc;	/* resources have been freed */
+
+/*
+ * Process list locking:
+ *
+ * We have two types of locks on the proclists: read locks and write
+ * locks.  Read locks can be used in interrupt context, so while we
+ * hold the write lock, we must also block clock interrupts to
+ * lock out any scheduling changes that may happen in interrupt
+ * context.
+ *
+ * The proclist lock locks the following structures:
+ *
+ *	allproc
+ *	zombproc
+ *	pidhashtbl
+ */
+struct lock proclist_lock;
+
+/*
+ * Locking of this proclist is special; it's accessed in a
+ * critical section of process exit, and thus locking it can't
+ * modify interrupt state.  We use a simple spin lock for this
+ * proclist.  Processes on this proclist are also on zombproc;
+ * we use the p_hash member to linkup to deadproc.
+ */
+struct simplelock deadproc_slock;
+struct proclist deadproc;	/* dead, but not yet undead */
 
 struct pool proc_pool;
 struct pool pcred_pool;
@@ -91,7 +154,6 @@ struct pool rusage_pool;
  */
 const struct proclist_desc proclists[] = {
 	{ &allproc	},
-	{ &deadproc	},
 	{ &zombproc	},
 	{ NULL		},
 };
@@ -112,6 +174,11 @@ procinit()
 	for (pd = proclists; pd->pd_list != NULL; pd++)
 		LIST_INIT(pd->pd_list);
 
+	spinlockinit(&proclist_lock, "proclk", 0);
+
+	LIST_INIT(&deadproc);
+	simple_lock_init(&deadproc_slock);
+
 	pidhashtbl = hashinit(maxproc / 4, M_PROC, M_WAITOK, &pidhash);
 	pgrphashtbl = hashinit(maxproc / 4, M_PROC, M_WAITOK, &pgrphash);
 	uihashtbl = hashinit(maxproc / 16, M_PROC, M_WAITOK, &uihash);
@@ -129,6 +196,65 @@ procinit()
 }
 
 /*
+ * Acquire a read lock on the proclist.
+ */
+void
+proclist_lock_read()
+{
+	int error, s;
+
+	s = splclock();
+	error = spinlockmgr(&proclist_lock, LK_SHARED, NULL);
+#ifdef DIAGNOSTIC
+	if (__predict_false(error != 0))
+		panic("proclist_lock_read: failed to acquire lock");
+#endif
+	splx(s);
+}
+
+/*
+ * Release a read lock on the proclist.
+ */
+void
+proclist_unlock_read()
+{
+	int s;
+
+	s = splclock();
+	(void) spinlockmgr(&proclist_lock, LK_RELEASE, NULL);
+	splx(s);
+}
+
+/*
+ * Acquire a write lock on the proclist.
+ */
+int
+proclist_lock_write()
+{
+	int error, s;
+
+	s = splclock();
+	error = spinlockmgr(&proclist_lock, LK_EXCLUSIVE, NULL);
+#ifdef DIAGNOSTIC
+	if (__predict_false(error != 0))
+		panic("proclist_lock: failed to acquire lock");
+#endif
+	return (s);
+}
+
+/*
+ * Release a write lock on the proclist.
+ */
+void
+proclist_unlock_write(s)
+	int s;
+{
+
+	(void) spinlockmgr(&proclist_lock, LK_RELEASE, NULL);
+	splx(s);
+}
+
+/*
  * Change the count associated with number of processes
  * a given user is using.
  */
@@ -137,8 +263,8 @@ chgproccnt(uid, diff)
 	uid_t	uid;
 	int	diff;
 {
-	register struct uidinfo *uip;
-	register struct uihashhead *uipp;
+	struct uidinfo *uip;
+	struct uihashhead *uipp;
 
 	uipp = UIHASH(uid);
 	for (uip = uipp->lh_first; uip != 0; uip = uip->ui_hash.le_next)
@@ -167,14 +293,15 @@ chgproccnt(uid, diff)
 }
 
 /*
- * Is p an inferior of the current process?
+ * Is p an inferior of q?
  */
 int
-inferior(p)
-	register struct proc *p;
+inferior(p, q)
+	struct proc *p;
+	struct proc *q;
 {
 
-	for (; p != curproc; p = p->p_pptr)
+	for (; p != q; p = p->p_pptr)
 		if (p->p_pid == 0)
 			return (0);
 	return (1);
@@ -185,14 +312,17 @@ inferior(p)
  */
 struct proc *
 pfind(pid)
-	register pid_t pid;
+	pid_t pid;
 {
-	register struct proc *p;
+	struct proc *p;
 
+	proclist_lock_read();
 	for (p = PIDHASH(pid)->lh_first; p != 0; p = p->p_hash.le_next)
 		if (p->p_pid == pid)
-			return (p);
-	return (NULL);
+			goto out;
+ out:
+	proclist_unlock_read();
+	return (p);
 }
 
 /*
@@ -200,9 +330,9 @@ pfind(pid)
  */
 struct pgrp *
 pgfind(pgid)
-	register pid_t pgid;
+	pid_t pgid;
 {
-	register struct pgrp *pgrp;
+	struct pgrp *pgrp;
 
 	for (pgrp = PGRPHASH(pgid)->lh_first; pgrp != 0; pgrp = pgrp->pg_hash.le_next)
 		if (pgrp->pg_id == pgid)
@@ -215,16 +345,16 @@ pgfind(pgid)
  */
 int
 enterpgrp(p, pgid, mksess)
-	register struct proc *p;
+	struct proc *p;
 	pid_t pgid;
 	int mksess;
 {
-	register struct pgrp *pgrp = pgfind(pgid);
+	struct pgrp *pgrp = pgfind(pgid);
 
 #ifdef DIAGNOSTIC
-	if (pgrp != NULL && mksess)	/* firewalls */
+	if (__predict_false(pgrp != NULL && mksess))	/* firewalls */
 		panic("enterpgrp: setsid into non-empty pgrp");
-	if (SESS_LEADER(p))
+	if (__predict_false(SESS_LEADER(p)))
 		panic("enterpgrp: session leader attempted setpgrp");
 #endif
 	if (pgrp == NULL) {
@@ -234,14 +364,14 @@ enterpgrp(p, pgid, mksess)
 		 * new process group
 		 */
 #ifdef DIAGNOSTIC
-		if (p->p_pid != pgid)
+		if (__predict_false(p->p_pid != pgid))
 			panic("enterpgrp: new pgrp and pid != pgid");
 #endif
 		pgrp = pool_get(&pgrp_pool, PR_WAITOK);
 		if ((np = pfind(savepid)) == NULL || np != p)
 			return (ESRCH);
 		if (mksess) {
-			register struct session *sess;
+			struct session *sess;
 
 			/*
 			 * new session
@@ -258,7 +388,7 @@ enterpgrp(p, pgid, mksess)
 			p->p_flag &= ~P_CONTROLT;
 			pgrp->pg_session = sess;
 #ifdef DIAGNOSTIC
-			if (p != curproc)
+			if (__predict_false(p != curproc))
 				panic("enterpgrp: mksession and p != curproc");
 #endif
 		} else {
@@ -293,7 +423,7 @@ enterpgrp(p, pgid, mksess)
  */
 int
 leavepgrp(p)
-	register struct proc *p;
+	struct proc *p;
 {
 
 	LIST_REMOVE(p, p_pglist);
@@ -308,7 +438,7 @@ leavepgrp(p)
  */
 void
 pgdelete(pgrp)
-	register struct pgrp *pgrp;
+	struct pgrp *pgrp;
 {
 
 	if (pgrp->pg_session->s_ttyp != NULL && 
@@ -332,12 +462,12 @@ pgdelete(pgrp)
  */
 void
 fixjobc(p, pgrp, entering)
-	register struct proc *p;
-	register struct pgrp *pgrp;
+	struct proc *p;
+	struct pgrp *pgrp;
 	int entering;
 {
-	register struct pgrp *hispgrp;
-	register struct session *mysession = pgrp->pg_session;
+	struct pgrp *hispgrp;
+	struct session *mysession = pgrp->pg_session;
 
 	/*
 	 * Check p's parent to see whether p qualifies its own process
@@ -359,7 +489,7 @@ fixjobc(p, pgrp, entering)
 	for (p = p->p_children.lh_first; p != 0; p = p->p_sibling.le_next) {
 		if ((hispgrp = p->p_pgrp) != pgrp &&
 		    hispgrp->pg_session == mysession &&
-		    p->p_stat != SZOMB) {
+		    P_ZOMBIE(p) == 0) {
 			if (entering)
 				hispgrp->pg_jobc++;
 			else if (--hispgrp->pg_jobc == 0)
@@ -377,7 +507,7 @@ static void
 orphanpg(pg)
 	struct pgrp *pg;
 {
-	register struct proc *p;
+	struct proc *p;
 
 	for (p = pg->pg_members.lh_first; p != 0; p = p->p_pglist.le_next) {
 		if (p->p_stat == SSTOP) {
@@ -391,13 +521,36 @@ orphanpg(pg)
 	}
 }
 
+/* mark process as suid/sgid, reset some values do defaults */
+void
+p_sugid(p)
+	struct proc *p;
+{
+	struct plimit *newlim;
+
+	p->p_flag |= P_SUGID;
+	/* reset what needs to be reset in plimit */
+	if (p->p_limit->pl_corename != defcorename) {
+		if (p->p_limit->p_refcnt > 1 &&
+		    (p->p_limit->p_lflags & PL_SHAREMOD) == 0) {
+			newlim = limcopy(p->p_limit);
+			limfree(p->p_limit);
+			p->p_limit = newlim;
+		} else {
+			free(p->p_limit->pl_corename, M_TEMP);
+		}
+		p->p_limit->pl_corename = defcorename;
+	}
+}
+
+
 #ifdef DEBUG
 void
 pgrpdump()
 {
-	register struct pgrp *pgrp;
-	register struct proc *p;
-	register int i;
+	struct pgrp *pgrp;
+	struct proc *p;
+	int i;
 
 	for (i = 0; i <= pgrphash; i++) {
 		if ((pgrp = pgrphashtbl[i].lh_first) != NULL) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: installboot.c,v 1.3 1998/09/05 13:52:15 pk Exp $ */
+/*	$NetBSD: installboot.c,v 1.5.4.1 2000/08/26 00:14:19 mrg Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,6 +41,8 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
+#include <sys/mman.h>
+#include <sys/utsname.h>
 #include <ufs/ufs/dinode.h>
 #include <ufs/ufs/dir.h>
 #include <ufs/ffs/fs.h>
@@ -53,39 +55,57 @@
 #include <string.h>
 #include <unistd.h>
 
-int	verbose, nowrite, hflag;
+#include "loadfile.h"
+
+int	verbose, nowrite, sparc64, uflag, hflag = 1;
 char	*boot, *proto, *dev;
+
+#if 0
+#ifdef __ELF__
+#define SYMNAME(a)	a
+#else
+#define SYMNAME(a)	__CONCAT("_",a)
+#endif
+#else
+/* XXX: Hack in libc nlist works with both formats */
+#define SYMNAME(a)	__CONCAT("_",a)
+#endif
 
 struct nlist nl[] = {
 #define X_BLOCKTABLE	0
-	{"_block_table"},
+	{ {SYMNAME("block_table")} },
 #define X_BLOCKCOUNT	1
-	{"_block_count"},
+	{ {SYMNAME("block_count")} },
 #define X_BLOCKSIZE	2
-	{"_block_size"},
-	{NULL}
+	{ {SYMNAME("block_size")} },
+	{ {NULL} }
 };
 daddr_t	*block_table;		/* block number array in prototype image */
 int32_t	*block_count_p;		/* size of this array */
 int32_t	*block_size_p;		/* filesystem block size */
 int32_t	max_block_count;
 
-char	*karch;
-char	cpumodel[100];
-
-
-char		*loadprotoblocks __P((char *, long *));
+char		*loadprotoblocks __P((char *, size_t *));
 int		loadblocknums __P((char *, int));
 static void	devread __P((int, void *, daddr_t, size_t, char *));
 static void	usage __P((void));
 int 		main __P((int, char *[]));
 
-
 static void
 usage()
 {
-	fprintf(stderr,
-		"usage: installboot [-n] [-v] [-h] [-a <karch>] <boot> <proto> <device>\n");
+	extern char *__progname;
+
+	if (sparc64)
+		(void)fprintf(stderr,
+		    "Usage: %s [-nv] <bootblk> <device>\n"
+		    "       %s -U [-nv] <boot> <proto> <device>\n",
+		    __progname, __progname);
+	else
+		(void)fprintf(stderr,
+		    "Usage: %s [-nv] <boot> <proto> <device>\n"
+		    "       %s -u [-n] [-v] <bootblk> <device>\n",
+		    __progname, __progname);
 	exit(1);
 }
 
@@ -97,22 +117,37 @@ main(argc, argv)
 	int	c;
 	int	devfd;
 	char	*protostore;
-	long	protosize;
-	int	mib[2];
-	size_t	size;
+	size_t	protosize;
+	struct	utsname utsname;
 
-	while ((c = getopt(argc, argv, "a:vnh")) != -1) {
+	/*
+	 * For UltraSPARC machines, we turn on the uflag by default.
+	 */
+	if (uname(&utsname) == -1)
+		err(1, "uname");
+	if (strcmp(utsname.machine, "sparc64") == 0)
+		sparc64 = uflag = 1;
+
+	while ((c = getopt(argc, argv, "a:nhuUv")) != -1) {
 		switch (c) {
 		case 'a':
-			karch = optarg;
+			warnx("-a option is obsolete");
 			break;
 		case 'h':	/* Note: for backwards compatibility */
 			/* Don't strip a.out header */
-			hflag = 1;
+			warnx("-h option is obsolete");
 			break;
 		case 'n':
 			/* Do not actually write the bootblock to disk */
 			nowrite = 1;
+			break;
+		case 'u':
+			/* UltraSPARC boot block */
+			uflag = 1;
+			break;
+		case 'U':
+			/* Force non-ultrasparc */
+			uflag = 0;
 			break;
 		case 'v':
 			/* Chat */
@@ -123,57 +158,61 @@ main(argc, argv)
 		}
 	}
 
-	if (argc - optind < 3) {
-		usage();
+	if (uflag) {
+		if (argc - optind < 2)
+			usage();
+	} else {
+		if (argc - optind < 3)
+			usage();
+		boot = argv[optind++];
 	}
 
-	boot = argv[optind];
-	proto = argv[optind + 1];
-	dev = argv[optind + 2];
-
-	if (karch == NULL) {
-		mib[0] = CTL_HW;
-		mib[1] = HW_MODEL;
-		size = sizeof(cpumodel);
-		if (sysctl(mib, 2, cpumodel, &size, NULL, 0) == -1)
-			err(1, "sysctl");
-
-		if (size < 5 || strncmp(cpumodel, "SUN-4", 5) != 0) /*XXX*/ 
-			/* Assume a sun4c/sun4m */
-			karch = "sun4c";
-		else
-			karch = "sun4";
-	}
+	proto = argv[optind++];
+	dev = argv[optind];
 
 	if (verbose) {
-		printf("boot: %s\n", boot);
+		if (!uflag)
+			printf("boot: %s\n", boot);
 		printf("proto: %s\n", proto);
 		printf("device: %s\n", dev);
-		printf("architecture: %s\n", karch);
 	}
 
-	if (strcmp(karch, "sun4") == 0) {
-		hflag = 1;
-	} else if (strcmp(karch, "sun4c") == 0) {
-		hflag = 1;
-	} else if (strcmp(karch, "sun4m") == 0) {
-		hflag = 1;
-	} else
-		errx(1, "Unsupported architecture");
-
 	/* Load proto blocks into core */
-	if ((protostore = loadprotoblocks(proto, &protosize)) == NULL)
-		exit(1);
+	if (uflag == 0) {
+		if ((protostore = loadprotoblocks(proto, &protosize)) == NULL)
+			exit(1);
 
-	/* Open and check raw disk device */
-	if ((devfd = open(dev, O_RDONLY, 0)) < 0)
-		err(1, "open: %s", dev);
+		/* Open and check raw disk device */
+		if ((devfd = open(dev, O_RDONLY, 0)) < 0)
+			err(1, "open: %s", dev);
 
-	/* Extract and load block numbers */
-	if (loadblocknums(boot, devfd) != 0)
-		exit(1);
+		/* Extract and load block numbers */
+		if (loadblocknums(boot, devfd) != 0)
+			exit(1);
 
-	(void)close(devfd);
+		(void)close(devfd);
+	} else {
+		struct stat sb;
+		int protofd;
+		size_t blanklen;
+
+		if ((protofd = open(proto, O_RDONLY)) < 0)
+			err(1, "open: %s", proto);
+
+		if (fstat(protofd, &sb) < 0)
+			err(1, "fstat: %s", proto);
+
+		/* there must be a better way */
+		blanklen = DEV_BSIZE - ((sb.st_size + DEV_BSIZE) & (DEV_BSIZE - 1));
+		protosize = sb.st_size + blanklen;
+		if ((protostore = mmap(0, (size_t)protosize,
+		    PROT_READ|PROT_WRITE, MAP_PRIVATE,
+		    protofd, 0)) == MAP_FAILED)
+			err(1, "mmap: %s", proto);
+		/* and provide the rest of the block */
+		if (blanklen)
+			memset(protostore + sb.st_size, 0, blanklen);
+	}
 
 	if (nowrite)
 		return 0;
@@ -200,13 +239,11 @@ main(argc, argv)
 char *
 loadprotoblocks(fname, size)
 	char *fname;
-	long *size;
+	size_t *size;
 {
 	int	fd, sz;
-	char	*bp;
-	struct	stat statbuf;
-	struct	exec *hp;
-	long	off;
+	u_long	ap, bp, st, en;
+	u_long	marks[MARK_MAX];
 
 	/* Locate block number array in proto file */
 	if (nlist(fname, nl) != 0) {
@@ -226,89 +263,80 @@ loadprotoblocks(fname, size)
 		return NULL;
 	}
 
-	if ((fd = open(fname, O_RDONLY)) < 0) {
-		warn("open: %s", fname);
+	marks[MARK_START] = 0;
+	if ((fd = loadfile(fname, marks, COUNT_TEXT|COUNT_DATA)) == -1)
 		return NULL;
-	}
-	if (fstat(fd, &statbuf) != 0) {
-		warn("fstat: %s", fname);
-		close(fd);
-		return NULL;
-	}
-	if ((bp = calloc(roundup(statbuf.st_size, DEV_BSIZE), 1)) == NULL) {
-		warnx("malloc: %s: no memory", fname);
-		close(fd);
-		return NULL;
-	}
-	if (read(fd, bp, statbuf.st_size) != statbuf.st_size) {
-		warn("read: %s", fname);
-		free(bp);
-		close(fd);
-		return NULL;
-	}
-	close(fd);
+	(void)close(fd);
 
-	hp = (struct exec *)bp;
-	sz = (hflag ? sizeof(*hp) : 0) + hp->a_text + hp->a_data;
+	sz = (marks[MARK_END] - marks[MARK_START]) + (hflag ? 32 : 0);
 	sz = roundup(sz, DEV_BSIZE);
+	st = marks[MARK_START];
+	en = marks[MARK_ENTRY];
 
-	/* Calculate the symbols' location within the proto file */
-	off = N_DATOFF(*hp) - N_DATADDR(*hp) - (hp->a_entry - N_TXTADDR(*hp));
-	block_table = (daddr_t *) (bp + nl[X_BLOCKTABLE].n_value + off);
-	block_count_p = (int32_t *)(bp + nl[X_BLOCKCOUNT].n_value + off);
-	block_size_p = (int32_t *) (bp + nl[X_BLOCKSIZE].n_value + off);
-	if ((int)block_table & 3) {
-		warn("%s: invalid address: block_table = %x",
+	if ((ap = (u_long)malloc(sz)) == NULL) {
+		warn("malloc: %s", "");
+		return NULL;
+	}
+
+	bp = ap + (hflag ? 32 : 0);
+	marks[MARK_START] = bp - st;
+	if ((fd = loadfile(fname, marks, LOAD_TEXT|LOAD_DATA)) == -1)
+		return NULL;
+	(void)close(fd);
+
+	block_table = (daddr_t *) (bp + nl[X_BLOCKTABLE].n_value - st);
+	block_count_p = (int32_t *)(bp + nl[X_BLOCKCOUNT].n_value - st);
+	block_size_p = (int32_t *) (bp + nl[X_BLOCKSIZE].n_value - st);
+	if ((int)(u_long)block_table & 3) {
+		warn("%s: invalid address: block_table = %p",
 		     fname, block_table);
-		free(bp);
-		close(fd);
+		free((void *)bp);
 		return NULL;
 	}
-	if ((int)block_count_p & 3) {
-		warn("%s: invalid address: block_count_p = %x",
+	if ((int)(u_long)block_count_p & 3) {
+		warn("%s: invalid address: block_count_p = %p",
 		     fname, block_count_p);
-		free(bp);
-		close(fd);
+		free((void *)bp);
 		return NULL;
 	}
-	if ((int)block_size_p & 3) {
-		warn("%s: invalid address: block_size_p = %x",
+	if ((int)(u_long)block_size_p & 3) {
+		warn("%s: invalid address: block_size_p = %p",
 		     fname, block_size_p);
-		free(bp);
-		close(fd);
+		free((void *)bp);
 		return NULL;
 	}
 	max_block_count = *block_count_p;
 
 	if (verbose) {
-		printf("%s: entry point %#x\n", fname, hp->a_entry);
+		printf("%s: entry point %#lx\n", fname, en);
 		printf("%s: a.out header %s\n", fname,
-			hflag?"left on":"stripped off");
-		printf("proto bootblock size %ld\n", sz);
-		printf("room for %d filesystem blocks at %#x\n",
-			max_block_count, nl[X_BLOCKTABLE].n_value);
+		    hflag ? "left on" : "stripped off");
+		printf("proto bootblock size %d\n", sz);
+		printf("room for %d filesystem blocks at %#lx\n",
+		    max_block_count, nl[X_BLOCKTABLE].n_value);
 	}
 
-	/*
-	 * We convert the a.out header in-vitro into something that
-	 * Sun PROMs understand.
-	 * Old-style (sun4) ROMs do not expect a header at all, so
-	 * we turn the first two words into code that gets us past
-	 * the 32-byte header where the actual code begins. In assembly
-	 * speak:
-	 *	.word	MAGIC		! a NOP
-	 *	ba,a	start		!
-	 *	.skip	24		! pad
-	 * start:
-	 */
-
+	if (hflag) {
+		/*
+		 * We convert the a.out header in-vitro into something that
+		 * Sun PROMs understand.
+		 * Old-style (sun4) ROMs do not expect a header at all, so
+		 * we turn the first two words into code that gets us past
+		 * the 32-byte header where the actual code begins. In assembly
+		 * speak:
+		 *	.word	MAGIC		! a NOP
+		 *	ba,a	start		!
+		 *	.skip	24		! pad
+		 * start:
+		 */
 #define SUN_MAGIC	0x01030107
 #define SUN4_BASTART	0x30800007	/* i.e.: ba,a `start' */
-	*((int *)bp) = SUN_MAGIC;
-	*((int *)bp + 1) = SUN4_BASTART;
+		*((int *)ap) = SUN_MAGIC;
+		*((int *)ap + 1) = SUN4_BASTART;
+	}
 
 	*size = sz;
-	return (hflag ? bp : (bp + sizeof(struct exec)));
+	return (char *)ap;
 }
 
 static void

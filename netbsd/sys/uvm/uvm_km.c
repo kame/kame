@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_km.c,v 1.22.2.1 1999/04/16 16:28:45 chs Exp $	*/
+/*	$NetBSD: uvm_km.c,v 1.35 2000/05/08 23:10:20 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -67,7 +67,6 @@
  */
 
 #include "opt_uvmhist.h"
-#include "opt_pmap_new.h"
 
 /*
  * uvm_km.c: handle kernel memory allocation and management
@@ -159,12 +158,9 @@
 
 vm_map_t kernel_map = NULL;
 
-/*
- * local functions
- */
+struct vmi_list vmi_list;
+simple_lock_data_t vmi_list_slock;
 
-static int uvm_km_get __P((struct uvm_object *, vaddr_t, 
-													 vm_page_t *, int *, int, vm_prot_t, int, int));
 /*
  * local data structues
  */
@@ -173,233 +169,12 @@ static struct vm_map		kernel_map_store;
 static struct uvm_object	kmem_object_store;
 static struct uvm_object	mb_object_store;
 
-static struct uvm_pagerops km_pager = {
-	NULL,	/* init */
-	NULL, /* reference */
-	NULL, /* detach */
-	NULL, /* fault */
-	NULL, /* flush */
-	uvm_km_get, /* get */
-	/* ... rest are NULL */
-};
-
 /*
- * uvm_km_get: pager get function for kernel objects
- *
- * => currently we do not support pageout to the swap area, so this
- *    pager is very simple.    eventually we may want an anonymous 
- *    object pager which will do paging.
- * => XXXCDC: this pager should be phased out in favor of the aobj pager
+ * All pager operations here are NULL, but the object must have
+ * a pager ops vector associated with it; various places assume
+ * it to be so.
  */
-
-
-static int
-uvm_km_get(uobj, offset, pps, npagesp, centeridx, access_type, advice, flags)
-	struct uvm_object *uobj;
-	vaddr_t offset;
-	struct vm_page **pps;
-	int *npagesp;
-	int centeridx, advice, flags;
-	vm_prot_t access_type;
-{
-	vaddr_t current_offset;
-	vm_page_t ptmp;
-	int lcv, gotpages, maxpages;
-	boolean_t done;
-	UVMHIST_FUNC("uvm_km_get"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "flags=%d", flags,0,0,0);
-	
-	/*
-	 * get number of pages
-	 */
-
-	maxpages = *npagesp;
-
-	/*
-	 * step 1: handled the case where fault data structures are locked.
-	 */
-
-	if (flags & PGO_LOCKED) {
-
-		/*
-		 * step 1a: get pages that are already resident.   only do
-		 * this if the data structures are locked (i.e. the first time
-		 * through).
-		 */
-
-		done = TRUE;	/* be optimistic */
-		gotpages = 0;	/* # of pages we got so far */
-
-		for (lcv = 0, current_offset = offset ; 
-		    lcv < maxpages ; lcv++, current_offset += PAGE_SIZE) {
-
-			/* do we care about this page?  if not, skip it */
-			if (pps[lcv] == PGO_DONTCARE)
-				continue;
-
-			/* lookup page */
-			ptmp = uvm_pagelookup(uobj, current_offset);
-			
-			/* null?  attempt to allocate the page */
-			if (ptmp == NULL) {
-				ptmp = uvm_pagealloc(uobj, current_offset,
-				    NULL, 0);
-				if (ptmp) {
-					/* new page */
-					ptmp->flags &= ~(PG_BUSY|PG_FAKE);
-					UVM_PAGE_OWN(ptmp, NULL);
-					uvm_pagezero(ptmp);
-				}
-			}
-
-			/*
-			 * to be useful must get a non-busy, non-released page
-			 */
-			if (ptmp == NULL ||
-			    (ptmp->flags & (PG_BUSY|PG_RELEASED)) != 0) {
-				if (lcv == centeridx ||
-				    (flags & PGO_ALLPAGES) != 0)
-					/* need to do a wait or I/O! */
-					done = FALSE;
-				continue;
-			}
-
-			/*
-			 * useful page: busy/lock it and plug it in our
-			 * result array
-			 */
-
-			/* caller must un-busy this page */
-			ptmp->flags |= PG_BUSY;	
-			UVM_PAGE_OWN(ptmp, "uvm_km_get1");
-			pps[lcv] = ptmp;
-			gotpages++;
-
-		}	/* "for" lcv loop */
-
-		/*
-		 * step 1b: now we've either done everything needed or we
-		 * to unlock and do some waiting or I/O.
-		 */
-
-		UVMHIST_LOG(maphist, "<- done (done=%d)", done, 0,0,0);
-
-		*npagesp = gotpages;
-		if (done)
-			return(VM_PAGER_OK);		/* bingo! */
-		else
-			return(VM_PAGER_UNLOCK);	/* EEK!   Need to
-							 * unlock and I/O */
-	}
-
-	/*
-	 * step 2: get non-resident or busy pages.
-	 * object is locked.   data structures are unlocked.
-	 */
-
-	for (lcv = 0, current_offset = offset ; 
-	    lcv < maxpages ; lcv++, current_offset += PAGE_SIZE) {
-		
-		/* skip over pages we've already gotten or don't want */
-		/* skip over pages we don't _have_ to get */
-		if (pps[lcv] != NULL ||
-		    (lcv != centeridx && (flags & PGO_ALLPAGES) == 0))
-			continue;
-
-		/*
-		 * we have yet to locate the current page (pps[lcv]).   we
-		 * first look for a page that is already at the current offset.
-		 * if we find a page, we check to see if it is busy or
-		 * released.  if that is the case, then we sleep on the page
-		 * until it is no longer busy or released and repeat the
-		 * lookup.    if the page we found is neither busy nor
-		 * released, then we busy it (so we own it) and plug it into
-		 * pps[lcv].   this 'break's the following while loop and
-		 * indicates we are ready to move on to the next page in the
-		 * "lcv" loop above.
-		 *
-		 * if we exit the while loop with pps[lcv] still set to NULL,
-		 * then it means that we allocated a new busy/fake/clean page
-		 * ptmp in the object and we need to do I/O to fill in the
-		 * data.
-		 */
-
-		while (pps[lcv] == NULL) {	/* top of "pps" while loop */
-			
-			/* look for a current page */
-			ptmp = uvm_pagelookup(uobj, current_offset);
-
-			/* nope?   allocate one now (if we can) */
-			if (ptmp == NULL) {
-
-				ptmp = uvm_pagealloc(uobj, current_offset,
-				    NULL, 0);
-
-				/* out of RAM? */
-				if (ptmp == NULL) {
-					simple_unlock(&uobj->vmobjlock);
-					uvm_wait("kmgetwait1");
-					simple_lock(&uobj->vmobjlock);
-					/* goto top of pps while loop */
-					continue;
-				}
-
-				/* 
-				 * got new page ready for I/O.  break pps
-				 * while loop.  pps[lcv] is still NULL.
-				 */
-				break;		
-			}
-
-			/* page is there, see if we need to wait on it */
-			if ((ptmp->flags & (PG_BUSY|PG_RELEASED)) != 0) {
-				ptmp->flags |= PG_WANTED;
-				UVM_UNLOCK_AND_WAIT(ptmp,&uobj->vmobjlock, 0,
-				    "uvn_get",0);
-				simple_lock(&uobj->vmobjlock);
-				continue;	/* goto top of pps while loop */
-			}
-			
-			/* 
-			 * if we get here then the page has become resident
-			 * and unbusy between steps 1 and 2.  we busy it now
-			 * (so we own it) and set pps[lcv] (so that we exit
-			 * the while loop).  caller must un-busy.
-			 */
-			ptmp->flags |= PG_BUSY;
-			UVM_PAGE_OWN(ptmp, "uvm_km_get2");
-			pps[lcv] = ptmp;
-		}
-
-		/*
-		 * if we own the a valid page at the correct offset, pps[lcv]
-		 * will point to it.   nothing more to do except go to the
-		 * next page.
-		 */
-
-		if (pps[lcv])
-			continue;			/* next lcv */
-
-		/*
-		 * we have a "fake/busy/clean" page that we just allocated.  
-		 * do the needed "i/o" (in this case that means zero it).
-		 */
-
-		uvm_pagezero(ptmp);
-		ptmp->flags &= ~(PG_FAKE);
-		pps[lcv] = ptmp;
-
-	}	/* lcv loop */
-
-	/*
-	 * finally, unlock object and return.
-	 */
-
-	simple_unlock(&uobj->vmobjlock);
-	UVMHIST_LOG(maphist, "<- done (OK)",0,0,0,0);
-	return(VM_PAGER_OK);
-}
+static struct uvm_pagerops	km_pager;
 
 /*
  * uvm_km_init: init kernel maps and objects to reflect reality (i.e.
@@ -417,29 +192,44 @@ uvm_km_init(start, end)
 	vaddr_t base = VM_MIN_KERNEL_ADDRESS;
 
 	/*
-	 * first, init kernel memory objects.
+	 * first, initialize the interrupt-safe map list.
+	 */
+	LIST_INIT(&vmi_list);
+	simple_lock_init(&vmi_list_slock);
+
+	/*
+	 * next, init kernel memory objects.
 	 */
 
 	/* kernel_object: for pageable anonymous kernel memory */
+	uao_init();
 	uvm.kernel_object = uao_create(VM_MAX_KERNEL_ADDRESS -
 				 VM_MIN_KERNEL_ADDRESS, UAO_FLAG_KERNOBJ);
 
-	/* kmem_object: for malloc'd memory (wired, protected by splimp) */
+	/*
+	 * kmem_object: for use by the kernel malloc().  Memory is always
+	 * wired, and this object (and the kmem_map) can be accessed at
+	 * interrupt time.
+	 */
 	simple_lock_init(&kmem_object_store.vmobjlock);
 	kmem_object_store.pgops = &km_pager;
 	TAILQ_INIT(&kmem_object_store.memq);
 	kmem_object_store.uo_npages = 0;
 	/* we are special.  we never die */
-	kmem_object_store.uo_refs = UVM_OBJ_KERN; 
+	kmem_object_store.uo_refs = UVM_OBJ_KERN_INTRSAFE; 
 	uvmexp.kmem_object = &kmem_object_store;
 
-	/* mb_object: for mbuf memory (always wired, protected by splimp) */
+	/*
+	 * mb_object: for mbuf cluster pages on platforms which use the
+	 * mb_map.  Memory is always wired, and this object (and the mb_map)
+	 * can be accessed at interrupt time.
+	 */
 	simple_lock_init(&mb_object_store.vmobjlock);
 	mb_object_store.pgops = &km_pager;
 	TAILQ_INIT(&mb_object_store.memq);
 	mb_object_store.uo_npages = 0;
 	/* we are special.  we never die */
-	mb_object_store.uo_refs = UVM_OBJ_KERN; 
+	mb_object_store.uo_refs = UVM_OBJ_KERN_INTRSAFE; 
 	uvmexp.mb_object = &mb_object_store;
 
 	/*
@@ -447,7 +237,7 @@ uvm_km_init(start, end)
 	 * before installing.
 	 */
 
-	uvm_map_setup(&kernel_map_store, base, end, FALSE);
+	uvm_map_setup(&kernel_map_store, base, end, VM_MAP_PAGEABLE);
 	kernel_map_store.pmap = pmap_kernel();
 	if (uvm_map(&kernel_map_store, &base, start - base, NULL,
 	    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
@@ -472,11 +262,11 @@ uvm_km_init(start, end)
  *	alloc a new map
  */
 struct vm_map *
-uvm_km_suballoc(map, min, max, size, pageable, fixed, submap)
+uvm_km_suballoc(map, min, max, size, flags, fixed, submap)
 	struct vm_map *map;
 	vaddr_t *min, *max;		/* OUT, OUT */
 	vsize_t size;
-	boolean_t pageable;
+	int flags;
 	boolean_t fixed;
 	struct vm_map *submap;
 {
@@ -506,11 +296,11 @@ uvm_km_suballoc(map, min, max, size, pageable, fixed, submap)
 
 	pmap_reference(vm_map_pmap(map));
 	if (submap == NULL) {
-		submap = uvm_map_create(vm_map_pmap(map), *min, *max, pageable);
+		submap = uvm_map_create(vm_map_pmap(map), *min, *max, flags);
 		if (submap == NULL)
 			panic("uvm_km_suballoc: unable to create submap");
 	} else {
-		uvm_map_setup(submap, *min, *max, pageable);
+		uvm_map_setup(submap, *min, *max, flags);
 		submap->pmap = vm_map_pmap(map);
 	}
 
@@ -538,15 +328,17 @@ uvm_km_pgremove(uobj, start, end)
 	struct uvm_object *uobj;
 	vaddr_t start, end;
 {
-	boolean_t by_list, is_aobj;
+	boolean_t by_list;
 	struct vm_page *pp, *ppnext;
 	vaddr_t curoff;
 	UVMHIST_FUNC("uvm_km_pgremove"); UVMHIST_CALLED(maphist);
 
 	simple_lock(&uobj->vmobjlock);		/* lock object */
 
-	/* is uobj an aobj? */
-	is_aobj = uobj->pgops == &aobj_pager;
+#ifdef DIAGNOSTIC
+	if (__predict_false(uobj->pgops != &aobj_pager))
+		panic("uvm_km_pgremove: object %p not an aobj", uobj);
+#endif
 
 	/* choose cheapest traversal */
 	by_list = (uobj->uo_npages <=
@@ -564,26 +356,24 @@ uvm_km_pgremove(uobj, start, end)
 
 		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
 		    pp->flags & PG_BUSY, 0, 0);
+
 		/* now do the actual work */
-		if (pp->flags & PG_BUSY)
+		if (pp->flags & PG_BUSY) {
 			/* owner must check for this when done */
 			pp->flags |= PG_RELEASED;
-		else {
-			pmap_page_protect(PMAP_PGARG(pp), VM_PROT_NONE);
+		} else {
+			/* free the swap slot... */
+			uao_dropswap(uobj, curoff >> PAGE_SHIFT);
 
 			/*
-			 * if this kernel object is an aobj, free the swap slot.
+			 * ...and free the page; note it may be on the
+			 * active or inactive queues.
 			 */
-			if (is_aobj) {
-				uao_dropswap(uobj, curoff >> PAGE_SHIFT);
-			}
-
 			uvm_lock_pageq();
 			uvm_pagefree(pp);
 			uvm_unlock_pageq();
 		}
 		/* done */
-
 	}
 	simple_unlock(&uobj->vmobjlock);
 	return;
@@ -591,7 +381,6 @@ uvm_km_pgremove(uobj, start, end)
 loop_by_list:
 
 	for (pp = uobj->memq.tqh_first ; pp != NULL ; pp = ppnext) {
-
 		ppnext = pp->listq.tqe_next;
 		if (pp->offset < start || pp->offset >= end) {
 			continue;
@@ -599,26 +388,111 @@ loop_by_list:
 
 		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
 		    pp->flags & PG_BUSY, 0, 0);
+
 		/* now do the actual work */
-		if (pp->flags & PG_BUSY)
+		if (pp->flags & PG_BUSY) {
 			/* owner must check for this when done */
 			pp->flags |= PG_RELEASED;
-		else {
-			pmap_page_protect(PMAP_PGARG(pp), VM_PROT_NONE);
+		} else {
+			/* free the swap slot... */
+			uao_dropswap(uobj, pp->offset >> PAGE_SHIFT);
 
 			/*
-			 * if this kernel object is an aobj, free the swap slot.
+			 * ...and free the page; note it may be on the
+			 * active or inactive queues.
 			 */
-			if (is_aobj) {
-				uao_dropswap(uobj, pp->offset >> PAGE_SHIFT);
-			}
-
 			uvm_lock_pageq();
 			uvm_pagefree(pp);
 			uvm_unlock_pageq();
 		}
 		/* done */
+	}
+	simple_unlock(&uobj->vmobjlock);
+	return;
+}
 
+
+/*
+ * uvm_km_pgremove_intrsafe: like uvm_km_pgremove(), but for "intrsafe"
+ *    objects
+ *
+ * => when you unmap a part of anonymous kernel memory you want to toss
+ *    the pages right away.    (this gets called from uvm_unmap_...).
+ * => none of the pages will ever be busy, and none of them will ever
+ *    be on the active or inactive queues (because these objects are
+ *    never allowed to "page").
+ */
+
+void
+uvm_km_pgremove_intrsafe(uobj, start, end)
+	struct uvm_object *uobj;
+	vaddr_t start, end;
+{
+	boolean_t by_list;
+	struct vm_page *pp, *ppnext;
+	vaddr_t curoff;
+	UVMHIST_FUNC("uvm_km_pgremove_intrsafe"); UVMHIST_CALLED(maphist);
+
+	simple_lock(&uobj->vmobjlock);		/* lock object */
+
+#ifdef DIAGNOSTIC
+	if (__predict_false(UVM_OBJ_IS_INTRSAFE_OBJECT(uobj) == 0))
+		panic("uvm_km_pgremove_intrsafe: object %p not intrsafe", uobj);
+#endif
+
+	/* choose cheapest traversal */
+	by_list = (uobj->uo_npages <=
+	     ((end - start) >> PAGE_SHIFT) * UKM_HASH_PENALTY);
+ 
+	if (by_list)
+		goto loop_by_list;
+
+	/* by hash */
+
+	for (curoff = start ; curoff < end ; curoff += PAGE_SIZE) {
+		pp = uvm_pagelookup(uobj, curoff);
+		if (pp == NULL)
+			continue;
+
+		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
+		    pp->flags & PG_BUSY, 0, 0);
+#ifdef DIAGNOSTIC
+		if (__predict_false(pp->flags & PG_BUSY))
+			panic("uvm_km_pgremove_intrsafe: busy page");
+		if (__predict_false(pp->pqflags & PQ_ACTIVE))
+			panic("uvm_km_pgremove_intrsafe: active page");
+		if (__predict_false(pp->pqflags & PQ_INACTIVE))
+			panic("uvm_km_pgremove_intrsafe: inactive page");
+#endif
+
+		/* free the page */
+		uvm_pagefree(pp);
+	}
+	simple_unlock(&uobj->vmobjlock);
+	return;
+
+loop_by_list:
+
+	for (pp = uobj->memq.tqh_first ; pp != NULL ; pp = ppnext) {
+		ppnext = pp->listq.tqe_next;
+		if (pp->offset < start || pp->offset >= end) {
+			continue;
+		}
+
+		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
+		    pp->flags & PG_BUSY, 0, 0);
+
+#ifdef DIAGNOSTIC
+		if (__predict_false(pp->flags & PG_BUSY))
+			panic("uvm_km_pgremove_intrsafe: busy page");
+		if (__predict_false(pp->pqflags & PQ_ACTIVE))
+			panic("uvm_km_pgremove_intrsafe: active page");
+		if (__predict_false(pp->pqflags & PQ_INACTIVE))
+			panic("uvm_km_pgremove_intrsafe: inactive page");
+#endif
+
+		/* free the page */
+		uvm_pagefree(pp);
 	}
 	simple_unlock(&uobj->vmobjlock);
 	return;
@@ -654,7 +528,7 @@ uvm_km_kmemalloc(map, obj, size, flags)
 	map, obj, size, flags);
 #ifdef DIAGNOSTIC
 	/* sanity check */
-	if (vm_map_pmap(map) != pmap_kernel())
+	if (__predict_false(vm_map_pmap(map) != pmap_kernel()))
 		panic("uvm_km_kmemalloc: invalid map");
 #endif
 
@@ -669,10 +543,10 @@ uvm_km_kmemalloc(map, obj, size, flags)
 	 * allocate some virtual space
 	 */
 
-	if (uvm_map(map, &kva, size, obj, UVM_UNKNOWN_OFFSET,
+	if (__predict_false(uvm_map(map, &kva, size, obj, UVM_UNKNOWN_OFFSET,
 	      UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
 			  UVM_ADV_RANDOM, (flags & UVM_KMF_TRYLOCK))) 
-			!= KERN_SUCCESS) {
+			!= KERN_SUCCESS)) {
 		UVMHIST_LOG(maphist, "<- done (no VM)",0,0,0,0);
 		return(0);
 	}
@@ -711,7 +585,7 @@ uvm_km_kmemalloc(map, obj, size, flags)
 		 * out of memory?
 		 */
 
-		if (pg == NULL) {
+		if (__predict_false(pg == NULL)) {
 			if (flags & UVM_KMF_NOWAIT) {
 				/* free everything! */
 				uvm_unmap(map, kva, kva + size);
@@ -728,12 +602,14 @@ uvm_km_kmemalloc(map, obj, size, flags)
 		 * (because if pmap_enter wants to allocate out of kmem_object
 		 * it will need to lock it itself!)
 		 */
-#if defined(PMAP_NEW)
-		pmap_kenter_pa(loopva, VM_PAGE_TO_PHYS(pg), VM_PROT_ALL);
-#else
-		pmap_enter(map->pmap, loopva, VM_PAGE_TO_PHYS(pg),
-		    UVM_PROT_ALL, TRUE, 0);
-#endif
+		if (UVM_OBJ_IS_INTRSAFE_OBJECT(obj)) {
+			pmap_kenter_pa(loopva, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_ALL);
+		} else {
+			pmap_enter(map->pmap, loopva, VM_PAGE_TO_PHYS(pg),
+			    UVM_PROT_ALL,
+			    PMAP_WIRED | VM_PROT_READ | VM_PROT_WRITE);
+		}
 		loopva += PAGE_SIZE;
 		offset += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -775,7 +651,7 @@ uvm_km_free_wakeup(map, addr, size)
 	vm_map_lock(map);
 	(void)uvm_unmap_remove(map, trunc_page(addr), round_page(addr+size), 
 			 &dead_entries);
-	thread_wakeup(map);
+	wakeup(map);
 	vm_map_unlock(map);
 
 	if (dead_entries != NULL)
@@ -812,9 +688,10 @@ uvm_km_alloc1(map, size, zeroit)
 	 * allocate some virtual space
 	 */
 
-	if (uvm_map(map, &kva, size, uvm.kernel_object, UVM_UNKNOWN_OFFSET,
-	      UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
-			  UVM_ADV_RANDOM, 0)) != KERN_SUCCESS) {
+	if (__predict_false(uvm_map(map, &kva, size, uvm.kernel_object,
+	      UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
+					      UVM_INH_NONE, UVM_ADV_RANDOM,
+					      0)) != KERN_SUCCESS)) {
 		UVMHIST_LOG(maphist,"<- done (no VM)",0,0,0,0);
 		return(0);
 	}
@@ -844,7 +721,7 @@ uvm_km_alloc1(map, size, zeroit)
 				panic("uvm_km_alloc1: non-released page");
 			pg->flags |= PG_WANTED;
 			UVM_UNLOCK_AND_WAIT(pg, &uvm.kernel_object->vmobjlock,
-			    0, "km_alloc", 0);
+			    FALSE, "km_alloc", 0);
 			continue;   /* retry */
 		}
 		
@@ -855,18 +732,18 @@ uvm_km_alloc1(map, size, zeroit)
 			UVM_PAGE_OWN(pg, NULL);
 		}
 		simple_unlock(&uvm.kernel_object->vmobjlock);
-		if (pg == NULL) {
+		if (__predict_false(pg == NULL)) {
 			uvm_wait("km_alloc1w");	/* wait for memory */
 			continue;
 		}
 		
-		/* map it in */
-#if defined(PMAP_NEW)
-		pmap_kenter_pa(loopva, VM_PAGE_TO_PHYS(pg), UVM_PROT_ALL);
-#else
+		/*
+		 * map it in; note we're never called with an intrsafe
+		 * object, so we always use regular old pmap_enter().
+		 */
 		pmap_enter(map->pmap, loopva, VM_PAGE_TO_PHYS(pg),
-		    UVM_PROT_ALL, TRUE, 0);
-#endif
+		    UVM_PROT_ALL, PMAP_WIRED | VM_PROT_READ | VM_PROT_WRITE);
+
 		loopva += PAGE_SIZE;
 		offset += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -901,7 +778,7 @@ uvm_km_valloc(map, size)
 	UVMHIST_LOG(maphist, "(map=0x%x, size=0x%x)", map, size, 0,0);
 
 #ifdef DIAGNOSTIC
-	if (vm_map_pmap(map) != pmap_kernel())
+	if (__predict_false(vm_map_pmap(map) != pmap_kernel()))
 		panic("uvm_km_valloc");
 #endif
 
@@ -912,9 +789,10 @@ uvm_km_valloc(map, size)
 	 * allocate some virtual space.  will be demand filled by kernel_object.
 	 */
 
-	if (uvm_map(map, &kva, size, uvm.kernel_object, UVM_UNKNOWN_OFFSET,
-	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
-	    UVM_ADV_RANDOM, 0)) != KERN_SUCCESS) {
+	if (__predict_false(uvm_map(map, &kva, size, uvm.kernel_object,
+	    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
+					    UVM_INH_NONE, UVM_ADV_RANDOM,
+					    0)) != KERN_SUCCESS)) {
 		UVMHIST_LOG(maphist, "<- done (no VM)", 0,0,0,0);
 		return(0);
 	}
@@ -942,7 +820,7 @@ uvm_km_valloc_wait(map, size)
 	UVMHIST_LOG(maphist, "(map=0x%x, size=0x%x)", map, size, 0,0);
 
 #ifdef DIAGNOSTIC
-	if (vm_map_pmap(map) != pmap_kernel())
+	if (__predict_false(vm_map_pmap(map) != pmap_kernel()))
 		panic("uvm_km_valloc_wait");
 #endif
 
@@ -958,10 +836,10 @@ uvm_km_valloc_wait(map, size)
 		 * by kernel_object.
 		 */
 
-		if (uvm_map(map, &kva, size, uvm.kernel_object,
+		if (__predict_true(uvm_map(map, &kva, size, uvm.kernel_object,
 		    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL,
 		    UVM_PROT_ALL, UVM_INH_NONE, UVM_ADV_RANDOM, 0))
-		    == KERN_SUCCESS) {
+		    == KERN_SUCCESS)) {
 			UVMHIST_LOG(maphist,"<- done (kva=0x%x)", kva,0,0,0);
 			return(kva);
 		}
@@ -1000,8 +878,8 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 	vaddr_t va;
 
  again:
-	pg = uvm_pagealloc(NULL, 0, NULL, 0);
-	if (pg == NULL) {
+	pg = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_USERESERVE);
+	if (__predict_false(pg == NULL)) {
 		if (waitok) {
 			uvm_wait("plpg");
 			goto again;
@@ -1009,7 +887,7 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 			return (0);
 	}
 	va = PMAP_MAP_POOLPAGE(VM_PAGE_TO_PHYS(pg));
-	if (va == 0)
+	if (__predict_false(va == 0))
 		uvm_pagefree(pg);
 	return (va);
 #else

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_amap.h,v 1.10 1999/01/28 14:46:27 chuck Exp $	*/
+/*	$NetBSD: uvm_amap.h,v 1.12 1999/07/07 05:31:40 thorpej Exp $	*/
 
 /*
  *
@@ -50,6 +50,8 @@
  * amap implementation-specific definitions.
  */
 
+#ifdef _KERNEL
+
 /*
  * part 1: amap interface
  */
@@ -79,7 +81,7 @@ struct vm_amap;
  */
 
 AMAP_INLINE
-vaddr_t		amap_add 	/* add an anon to an amap */
+void		amap_add 	/* add an anon to an amap */
 			__P((struct vm_aref *, vaddr_t,
 			     struct vm_anon *, int));
 struct vm_amap	*amap_alloc	/* allocate a new amap */
@@ -118,7 +120,7 @@ void		amap_splitref	/* split reference to amap into two */
 			     vaddr_t));
 AMAP_INLINE
 void		amap_unadd	/* remove an anon from an amap */
-			__P((struct vm_amap *, vaddr_t));
+			__P((struct vm_aref *, vaddr_t));
 void		amap_unlock	/* unlock amap */
 			__P((struct vm_amap *));
 AMAP_INLINE
@@ -134,6 +136,7 @@ void		amap_wipeout	/* remove all anons from amap */
 #define AMAP_SHARED	0x1	/* amap is shared */
 #define AMAP_REFALL	0x2	/* amap_ref: reference entire amap */
 
+#endif /* _KERNEL */
 
 /**********************************************************************/
 
@@ -237,6 +240,7 @@ struct vm_amap {
 #define UVM_AMAP_LARGE	256	/* # of slots in "large" amap */
 #define UVM_AMAP_CHUNK	16	/* # of slots to chunk large amaps in */
 
+#ifdef _KERNEL
 
 /*
  * macros
@@ -278,5 +282,7 @@ void		amap_pp_establish	/* establish ppref */
 void		amap_wiperange		/* wipe part of an amap */
 			__P((struct vm_amap *, int, int));
 #endif	/* UVM_AMAP_PPREF */
+
+#endif /* _KERNEL */
 
 #endif /* _UVM_UVM_AMAP_H_ */

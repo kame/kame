@@ -1,4 +1,4 @@
-/* $NetBSD: dec_6600.c,v 1.1.4.1 2000/02/06 17:23:12 he Exp $ */
+/* $NetBSD: dec_6600.c,v 1.7.2.1 2000/06/27 19:45:54 thorpej Exp $ */
 
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_6600.c,v 1.1.4.1 2000/02/06 17:23:12 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_6600.c,v 1.7.2.1 2000/06/27 19:45:54 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,8 +45,10 @@ __KERNEL_RCSID(0, "$NetBSD: dec_6600.c,v 1.1.4.1 2000/02/06 17:23:12 he Exp $");
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 
+#include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
-#include <dev/isa/pckbcvar.h>
+#include <dev/ic/i8042reg.h>
+#include <dev/ic/pckbcvar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
@@ -100,7 +102,10 @@ dec_6600_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 	ctbslot = ctb->ctb_turboslot;
 
-	tsp = tsp_init(0, 0);
+	/* Console hose defaults to hose 0. */
+	tsp_console_hose = 0;
+
+	tsp = tsp_init(0, tsp_console_hose);
 
 	switch (ctb->ctb_term_type) {
 	case 2: 
@@ -127,14 +132,16 @@ dec_6600_cons_init()
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(&tsp->pc_iot, PCKBC_KBD_SLOT);
+		(void) pckbc_cnattach(&tsp->pc_iot, IO_KBD, KBCMDP,
+		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctbslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
 			isa_display_console(&tsp->pc_iot, &tsp->pc_memt);
 		else {
 			/* The display PCI might be different */
-			tsp = tsp_init(0, CTB_TURBOSLOT_HOSE(ctbslot));
+			tsp_console_hose = CTB_TURBOSLOT_HOSE(ctbslot);
+			tsp = tsp_init(0, tsp_console_hose);
 			pci_display_console(&tsp->pc_iot, &tsp->pc_memt,
 			    &tsp->pc_pc, CTB_TURBOSLOT_BUS(ctbslot),
 			    CTB_TURBOSLOT_SLOT(ctbslot), 0);
@@ -171,7 +178,8 @@ dec_6600_device_register(dev, aux)
 
 	if (!initted) {
 		scsiboot = (strcmp(b->protocol, "SCSI") == 0);
-		netboot = (strcmp(b->protocol, "BOOTP") == 0);
+		netboot = (strcmp(b->protocol, "BOOTP") == 0) ||
+		    (strcmp(b->protocol, "MOP") == 0);
 		/*
 		 * Add an extra check to boot from ide drives:
 		 * Newer SRM firmware use the protocol identifier IDE,
@@ -230,7 +238,7 @@ dec_6600_device_register(dev, aux)
 			return;
 		}
 	}
-	if (scsiboot &&
+	if ((ideboot || scsiboot) &&
 	    (!strcmp(cd->cd_name, "sd") ||
 	     !strcmp(cd->cd_name, "st") ||
 	     !strcmp(cd->cd_name, "cd"))) {
@@ -239,7 +247,11 @@ dec_6600_device_register(dev, aux)
 		if (parent->dv_parent != scsipidev)
 			return;
 
-		if (b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+		if (sa->sa_sc_link->type == BUS_SCSI
+		    && b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+			return;
+		if (sa->sa_sc_link->type == BUS_ATAPI
+		    && b->unit / 100 != sa->sa_sc_link->scsipi_atapi.drive)
 			return;
 
 		/* XXX LUN! */

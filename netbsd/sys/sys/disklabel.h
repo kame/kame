@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.51 1999/01/19 06:24:09 abs Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.60 2000/05/16 04:55:58 perseant Exp $	*/
 
 /*
  * Copyright (c) 1987, 1988, 1993
@@ -62,8 +62,10 @@
  */
 #define	DISKUNIT(dev)	(minor(dev) / MAXPARTITIONS)
 #define	DISKPART(dev)	(minor(dev) % MAXPARTITIONS)
+#define	DISKMINOR(unit, part) \
+    (((unit) * MAXPARTITIONS) + (part))
 #define	MAKEDISKDEV(maj, unit, part) \
-    (makedev((maj), ((unit) * MAXPARTITIONS) + (part)))
+    (makedev((maj), DISKMINOR((unit), (part))))
 
 #define DISKMAGIC	((u_int32_t)0x82564557)	/* The disk magic number */
 
@@ -110,8 +112,8 @@ struct disklabel {
 	u_int16_t d_sparespertrack;	/* # of spare sectors per track */
 	u_int16_t d_sparespercyl;	/* # of spare sectors per cylinder */
 	/*
-	 * Alternate cylinders include maintenance, replacement, configuration
-	 * description areas, etc.
+	 * Alternative cylinders include maintenance, replacement,
+	 * configuration description areas, etc.
 	 */
 	u_int32_t d_acylinders;		/* # of alt. cylinders per unit */
 
@@ -237,6 +239,9 @@ static const char *const dktypenames[] = {
 #define	FS_HFS		15		/* Macintosh HFS */
 #define	FS_FILECORE	16		/* Acorn Filecore Filing System */
 #define	FS_EX2FS	17		/* Linux Extended 2 file system */
+#define	FS_NTFS		18		/* Windows/NT file system */
+#define	FS_RAID		19		/* RAIDframe component */
+#define	FS_CCD		20		/* concatenated disk component */
 
 #ifdef	FSTYPENAMES
 static const char *const fstypenames[] = {
@@ -258,6 +263,9 @@ static const char *const fstypenames[] = {
 	"HFS",
 	"FILECORE",
 	"Linux Ext2",
+	"NTFS",
+	"RAID",
+	"ccd",
 	NULL
 };
 #define FSMAXTYPES	(sizeof(fstypenames) / sizeof(fstypenames[0]) - 1)
@@ -275,7 +283,7 @@ static const char *const fscknames[] = {
 	NULL,		/* Eighth edition */
 	"ffs",		/* 4.2BSD */
 	"msdos",	/* MSDOS */
-	NULL,		/* 4.4LFS */
+	"lfs",		/* 4.4LFS */
 	NULL,		/* unknown */
 	NULL,		/* HPFS */
 	NULL,		/* ISO9660 */
@@ -284,6 +292,9 @@ static const char *const fscknames[] = {
 	NULL,		/* HFS */
 	NULL,		/* FILECORE */
 	"ext2fs",	/* Linux Ext2 */
+	NULL,		/* Windows/NT */
+	NULL,		/* RAID Component */
+	NULL,		/* concatenated disk component */
 	NULL		/* NULL */
 };
 #define FSMAXNAMES	(sizeof(fscknames) / sizeof(fscknames[0]) - 1)
@@ -321,9 +332,9 @@ static const char *const fscknames[] = {
 
 #ifndef _LOCORE
 /*
- * Structure used to perform a format or other raw operation, returning
- * data and/or register values.  Register identification and format
- * are device- and driver-dependent.
+ * Structure used to perform a format or other raw operation,
+ * returning data and/or register values.  Register identification
+ * and format are device- and driver-dependent.
  */
 struct format_op {
 	char	*df_buf;
@@ -342,9 +353,13 @@ struct partinfo {
 };
 
 #ifdef _KERNEL
+struct buf_queue;
+
 void	 diskerr
 	    __P((struct buf *, char *, char *, int, int, struct disklabel *));
-void	 disksort __P((struct buf *, struct buf *));
+void	 disksort_cylinder __P((struct buf_queue *, struct buf *));
+void	 disksort_blkno __P((struct buf_queue *, struct buf *));
+void	 disksort_tail __P((struct buf_queue *, struct buf *));
 u_int	 dkcksum __P((struct disklabel *));
 int	 setdisklabel __P((struct disklabel *, struct disklabel *, u_long,
 	    struct cpu_disklabel *));

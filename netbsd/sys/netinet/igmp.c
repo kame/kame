@@ -1,4 +1,33 @@
-/*	$NetBSD: igmp.c,v 1.19.2.1 1999/04/26 15:45:02 perry Exp $	*/
+/*	$NetBSD: igmp.c,v 1.25 2000/06/16 20:21:26 matt Exp $	*/
+
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Internet Group Management Protocol (IGMP) routines.
@@ -33,7 +62,7 @@
 
 #define IP_MULTICASTOPTS	0
 
-int		igmp_timers_are_running;
+int igmp_timers_are_running;
 static struct router_info *rti_head;
 
 void igmp_sendpkt __P((struct in_multi *, int));
@@ -55,7 +84,7 @@ static int
 rti_fill(inm)
 	struct in_multi *inm;
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 
 	for (rti = rti_head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == inm->inm_ifp) {
@@ -81,7 +110,7 @@ static struct router_info *
 rti_find(ifp)
 	struct ifnet *ifp;
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 
 	for (rti = rti_head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == ifp)
@@ -106,20 +135,22 @@ igmp_input(m, va_alist)
 	va_dcl
 #endif
 {
-	register int iphlen;
-	register struct ifnet *ifp = m->m_pkthdr.rcvif;
-	register struct ip *ip = mtod(m, struct ip *);
-	register struct igmp *igmp;
-	register int minlen;
+	int proto;
+	int iphlen;
+	struct ifnet *ifp = m->m_pkthdr.rcvif;
+	struct ip *ip = mtod(m, struct ip *);
+	struct igmp *igmp;
+	int minlen;
 	struct in_multi *inm;
 	struct in_multistep step;
 	struct router_info *rti;
-	register struct in_ifaddr *ia;
+	struct in_ifaddr *ia;
 	int timer;
 	va_list ap;
 
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
+	proto = va_arg(ap, int);
 	va_end(ap);
 
 	++igmpstat.igps_rcv_total;
@@ -133,10 +164,13 @@ igmp_input(m, va_alist)
 		m_freem(m);
 		return;
 	}
-	if ((m->m_flags & M_EXT || m->m_len < minlen) &&
-	    (m = m_pullup(m, minlen)) == 0) {
-		++igmpstat.igps_rcv_tooshort;
-		return;
+	if (((m->m_flags & M_EXT) && (ip->ip_src.s_addr & IN_CLASSA_NET) == 0)
+	    || m->m_len < minlen) {
+		if ((m = m_pullup(m, minlen)) == 0) {
+			++igmpstat.igps_rcv_tooshort;
+			return;
+		}
+		ip = mtod(m, struct ip *);
 	}
 
 	/*
@@ -152,7 +186,6 @@ igmp_input(m, va_alist)
 	}
 	m->m_data -= iphlen;
 	m->m_len += iphlen;
-	ip = mtod(m, struct ip *);
 
 	switch (igmp->igmp_type) {
 
@@ -367,7 +400,8 @@ igmp_input(m, va_alist)
 	 * Pass all valid IGMP packets up to any process(es) listening
 	 * on a raw IGMP socket.
 	 */
-	rip_input(m);
+	rip_input(m, iphlen, proto);
+	return;
 }
 
 void
@@ -413,7 +447,7 @@ igmp_leavegroup(inm)
 void
 igmp_fasttimo()
 {
-	register struct in_multi *inm;
+	struct in_multi *inm;
 	struct in_multistep step;
 	int s;
 
@@ -451,7 +485,7 @@ igmp_fasttimo()
 void
 igmp_slowtimo()
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 	int s;
 
 	s = splsoftnet();

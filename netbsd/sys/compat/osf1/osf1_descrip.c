@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_descrip.c,v 1.4.4.2 1999/06/26 01:52:34 cgd Exp $ */
+/* $NetBSD: osf1_descrip.c,v 1.5 1999/06/26 01:24:41 cgd Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -244,8 +244,12 @@ osf1_sys_fstat(p, v, retval)
 	int error;
 
 	if ((unsigned)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
+	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
 		return (EBADF);
+
+	FILE_USE(fp);
+
 	switch (fp->f_type) {
 
 	case DTYPE_VNODE:
@@ -264,6 +268,8 @@ osf1_sys_fstat(p, v, retval)
 	if (error == 0)
 		error = copyout((caddr_t)&oub, (caddr_t)SCARG(uap, sb),
 		    sizeof (oub));
+
+	FILE_UNUSE(fp, p);
 	return (error);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: stdarg.h,v 1.10 1999/01/22 14:14:32 mycroft Exp $	*/
+/*	$NetBSD: stdarg.h,v 1.12 2000/02/03 16:16:11 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -39,8 +39,13 @@
 #define	_VAX_STDARG_H_
 
 #include <machine/ansi.h>
+#include <sys/featuretest.h>
 
 typedef _BSD_VA_LIST_	va_list;
+
+#ifdef __lint__
+#define __builtin_next_arg(t)		((t) ? 0 : 0)
+#endif
 
 #define	__va_size(type) \
 	(((sizeof(type) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
@@ -50,6 +55,13 @@ typedef _BSD_VA_LIST_	va_list;
 
 #define	va_arg(ap, type) \
 	(*(type *)(void *)((ap) += __va_size(type), (ap) - __va_size(type)))
+
+#if !defined(_ANSI_SOURCE) && \
+    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
+     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L)
+#define	va_copy(dest, src) \
+	((dest) = (src))
+#endif
 
 #define va_end(ap)	
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.17.2.2 1999/07/02 16:45:19 perry Exp $	*/
+/*	$NetBSD: ite.c,v 1.22 2000/05/25 03:30:19 itohy Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -110,7 +110,6 @@ __inline static void ite_cr __P((struct ite_softc *));
 __inline static void ite_rlf __P((struct ite_softc *));
 static void iteprecheckwrap __P((struct ite_softc *ip));
 static void itecheckwrap __P((struct ite_softc *ip));
-static void repeat_handler __P((void *arg));
 static int ite_argnum __P((struct ite_softc *ip));
 static int ite_zargnum __P((struct ite_softc *ip));
 static void ite_sendstr __P((struct ite_softc *ip, char *str));
@@ -557,7 +556,7 @@ itestart(tp)
 	/* we have characters remaining. */
 	if (rbp->c_cc) {
 		tp->t_state |= TS_TIMEOUT;
-		timeout(ttrstrt, (caddr_t)tp, 1);
+		callout_reset(&tp->t_rstrt_ch, 1, ttrstrt, tp);
 	}
 	/* wakeup we are below */
 	if (rbp->c_cc <= tp->t_lowat) {
@@ -762,9 +761,8 @@ ite_filter(c)
 	struct key key;
 	int s, i;
 
-	if (!kbd_ite)
+	if (!kbd_ite || !(kbd_tty = ite_tty[kbd_ite->device.dv_unit]))
 		return;
-	kbd_tty = ite_tty[kbd_ite->device.dv_unit];
 
 	/* have to make sure we're at spltty in here */
 	s = spltty ();

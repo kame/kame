@@ -1,4 +1,41 @@
-/*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
+/*	$NetBSD: uipc_mbuf.c,v 1.45.4.1 2000/08/19 07:55:31 itojun Exp $	*/
+
+/*-
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
+ * NASA Ames Research Center.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1982, 1986, 1988, 1991, 1993
@@ -51,8 +88,11 @@
 #include <net/if.h>
 
 #include <vm/vm.h>
+#include <vm/vm_kern.h>
 
 #include <uvm/uvm_extern.h>
+
+#include <sys/sysctl.h>
 
 struct	pool mbpool;		/* mbuf pool */
 struct	pool mclpool;		/* mbuf cluster pool */
@@ -63,10 +103,12 @@ int	max_protohdr;
 int	max_hdr;
 int	max_datalen;
 
-extern	vm_map_t mb_map;
-
 void	*mclpool_alloc __P((unsigned long, int, int));
 void	mclpool_release __P((void *, unsigned long, int));
+static struct mbuf *m_copym0 __P((struct mbuf *, int, int, int, int));
+
+const char *mclpool_warnmsg =
+    "WARNING: mclpool limit reached; increase NMBCLUSTERS";
 
 /*
  * Initialize the mbuf allcator.
@@ -75,9 +117,8 @@ void
 mbinit()
 {
 
-	/* XXX malloc types! */
-	pool_init(&mbpool, MSIZE, 0, 0, 0, "mbpl", 0, NULL, NULL, 0);
-	pool_init(&mclpool, MCLBYTES, 0, 0, 0, "mclpl", 0, mclpool_alloc,
+	pool_init(&mbpool, msize, 0, 0, 0, "mbpl", 0, NULL, NULL, 0);
+	pool_init(&mclpool, mclbytes, 0, 0, 0, "mclpl", 0, mclpool_alloc,
 	    mclpool_release, 0);
 
 	/*
@@ -85,14 +126,88 @@ mbinit()
 	 * mbuf clusters the kernel is to support.  Log the limit
 	 * reached message max once a minute.
 	 */
-	pool_sethardlimit(&mclpool, NMBCLUSTERS,
-	    "WARNING: mclpool limit reached; increase NMBCLUSTERS", 60);
-	
+	pool_sethardlimit(&mclpool, nmbclusters, mclpool_warnmsg, 60);
+
 	/*
-	 * XXX Consider setting a low-water mark here.  That will help
-	 * e.g. pagedaemon on diskless systems as it scrambles to clean
-	 * pages in memory starvation situations.
+	 * Set a low water mark for both mbufs and clusters.  This should
+	 * help ensure that they can be allocated in a memory starvation
+	 * situation.  This is important for e.g. diskless systems which
+	 * must allocate mbufs in order for the pagedaemon to clean pages.
 	 */
+	pool_setlowat(&mbpool, mblowat);
+	pool_setlowat(&mclpool, mcllowat);
+}
+
+int
+sysctl_dombuf(name, namelen, oldp, oldlenp, newp, newlen)
+	int *name;
+	u_int namelen;
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+	int error, newval;
+
+	/* All sysctl names at this level are terminal. */
+	if (namelen != 1)
+		return (ENOTDIR);		/* overloaded */
+
+	switch (name[0]) {
+	case MBUF_MSIZE:
+		return (sysctl_rdint(oldp, oldlenp, newp, msize));
+	case MBUF_MCLBYTES:
+		return (sysctl_rdint(oldp, oldlenp, newp, mclbytes));
+	case MBUF_NMBCLUSTERS:
+		/*
+		 * If we have direct-mapped pool pages, we can adjust this
+		 * number on the fly.  If not, we're limited by the size
+		 * of mb_map, and cannot change this value.
+		 *
+		 * Note: we only allow the value to be increased, never
+		 * decreased.
+		 */
+		if (mb_map == NULL) {
+			newval = nmbclusters;
+			error = sysctl_int(oldp, oldlenp, newp, newlen,
+			    &newval);
+			if (error != 0)
+				return (error);
+			if (newp != NULL) {
+				if (newval >= nmbclusters) {
+					nmbclusters = newval;
+					pool_sethardlimit(&mclpool,
+					    nmbclusters, mclpool_warnmsg, 60);
+				} else
+					error = EINVAL;
+			}
+			return (error);
+		} else
+			return (sysctl_rdint(oldp, oldlenp, newp, nmbclusters));
+	case MBUF_MBLOWAT:
+	case MBUF_MCLLOWAT:
+		/* New value must be >= 0. */
+		newval = (name[0] == MBUF_MBLOWAT) ? mblowat : mcllowat;
+		error = sysctl_int(oldp, oldlenp, newp, newlen, &newval);
+		if (error != 0)
+			return (error);
+		if (newp != NULL) {
+			if (newval >= 0) {
+				if (name[0] == MBUF_MBLOWAT) {
+					mblowat = newval;
+					pool_setlowat(&mbpool, newval);
+				} else {
+					mcllowat = newval;
+					pool_setlowat(&mclpool, newval);
+				}
+			} else
+				error = EINVAL;
+		}
+		return (error);
+	default:
+		return (EOPNOTSUPP);
+	}
+	/* NOTREACHED */
 }
 
 void *
@@ -235,6 +350,10 @@ m_freem(m)
 
 	if (m == NULL)
 		return;
+	if ((m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.aux) {
+		m_freem(m->m_pkthdr.aux);
+		m->m_pkthdr.aux = NULL;
+	}
 	do {
 		MFREE(m, n);
 		m = n;
@@ -287,18 +406,37 @@ m_copym(m, off0, len, wait)
 	int off0, wait;
 	int len;
 {
+	return m_copym0(m, off0, len, wait, 0);	/* shallow copy on M_EXT */
+}
+
+struct mbuf *
+m_dup(m, off0, len, wait)
+	struct mbuf *m;
+	int off0, wait;
+	int len;
+{
+	return m_copym0(m, off0, len, wait, 1);	/* deep copy */
+}
+
+static struct mbuf *
+m_copym0(m, off0, len, wait, deep)
+	struct mbuf *m;
+	int off0, wait;
+	int len;
+	int deep;	/* deep copy */
+{
 	struct mbuf *n, **np;
 	int off = off0;
 	struct mbuf *top;
 	int copyhdr = 0;
 
 	if (off < 0 || len < 0)
-		panic("m_copym");
+		panic("m_copym: off %d, len %d", off, len);
 	if (off == 0 && m->m_flags & M_PKTHDR)
 		copyhdr = 1;
 	while (off > 0) {
 		if (m == 0)
-			panic("m_copym");
+			panic("m_copym: m == 0");
 		if (off < m->m_len)
 			break;
 		off -= m->m_len;
@@ -309,7 +447,7 @@ m_copym(m, off0, len, wait)
 	while (len > 0) {
 		if (m == 0) {
 			if (len != M_COPYALL)
-				panic("m_copym");
+				panic("m_copym: m == 0 and not COPYALL");
 			break;
 		}
 		MGET(n, wait, m->m_type);
@@ -326,16 +464,37 @@ m_copym(m, off0, len, wait)
 		}
 		n->m_len = min(len, m->m_len - off);
 		if (m->m_flags & M_EXT) {
-			n->m_data = m->m_data + off;
-			n->m_ext = m->m_ext;
-			MCLADDREFERENCE(m, n);
+			if (!deep) {
+				n->m_data = m->m_data + off;
+				n->m_ext = m->m_ext;
+				MCLADDREFERENCE(m, n);
+			} else {
+				/*
+				 * we are unsure about the way m was allocated.
+				 * copy into multiple MCLBYTES cluster mbufs.
+				 */
+				MCLGET(n, wait);
+				n->m_len = 0;
+				n->m_len = M_TRAILINGSPACE(n);
+				n->m_len = min(n->m_len, len);
+				n->m_len = min(n->m_len, m->m_len - off);
+				memcpy(mtod(n, caddr_t), mtod(m, caddr_t) + off,
+				    (unsigned)n->m_len);
+			}
 		} else
 			memcpy(mtod(n, caddr_t), mtod(m, caddr_t)+off,
 			    (unsigned)n->m_len);
 		if (len != M_COPYALL)
 			len -= n->m_len;
-		off = 0;
-		m = m->m_next;
+		off += n->m_len;
+#ifdef DIAGNOSTIC
+		if (off > m->m_len)
+			panic("m_copym0 overrun");
+#endif
+		if (off == m->m_len) {
+			m = m->m_next;
+			off = 0;
+		}
 		np = &n->m_next;
 	}
 	if (top == 0)

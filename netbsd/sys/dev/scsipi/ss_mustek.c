@@ -1,4 +1,4 @@
-/*	$NetBSD: ss_mustek.c,v 1.9 1997/10/18 19:51:10 thorpej Exp $	*/
+/*	$NetBSD: ss_mustek.c,v 1.12 2000/06/09 08:54:29 enami Exp $	*/
 
 /*
  * Copyright (c) 1995 Joachim Koenig-Baltes.  All rights reserved.
@@ -329,7 +329,7 @@ mustek_trigger_scanner(ss)
 	error = scsipi_command(sc_link,
 	    (struct scsipi_generic *) &window_cmd,
 	    sizeof(window_cmd), (u_char *) &window_data, sizeof(window_data),
-	    MUSTEK_RETRIES, 5000, NULL, SCSI_DATA_OUT);
+	    MUSTEK_RETRIES, 5000, NULL, XS_CTL_DATA_OUT | XS_CTL_DATA_ONSTACK);
 	if (error)
 		return (error);
 
@@ -369,7 +369,7 @@ mustek_trigger_scanner(ss)
 	error = scsipi_command(sc_link,
 	    (struct scsipi_generic *) &mode_cmd,
 	    sizeof(mode_cmd), (u_char *) &mode_data, sizeof(mode_data),
-	    MUSTEK_RETRIES, 5000, NULL, SCSI_DATA_OUT);
+	    MUSTEK_RETRIES, 5000, NULL, XS_CTL_DATA_OUT | XS_CTL_DATA_ONSTACK);
 	if (error)
 		return (error);
 
@@ -471,6 +471,7 @@ mustek_read(ss, bp)
 	struct mustek_read_cmd cmd;
 	struct scsipi_link *sc_link = ss->sc_link;
 	u_long lines_to_read;
+	int error;
 
 	SC_DEBUG(sc_link, SDEV_DB1, ("mustek_read: start\n"));
 
@@ -486,15 +487,22 @@ mustek_read(ss, bp)
 
 	/*
 	 * go ask the adapter to do all this for us
+	 * XXX Really need NOSLEEP?
 	 */
-	if (scsipi_command(sc_link,
+	error = scsipi_command(sc_link,
 	    (struct scsipi_generic *) &cmd, sizeof(cmd),
 	    (u_char *) bp->b_data, bp->b_bcount, MUSTEK_RETRIES, 10000, bp,
-	    SCSI_NOSLEEP | SCSI_DATA_IN) != SUCCESSFULLY_QUEUED)
-		printf("%s: not queued\n", ss->sc_dev.dv_xname);
-	else {
+	    XS_CTL_NOSLEEP | XS_CTL_ASYNC | XS_CTL_DATA_IN);
+	if (error) {
+		printf("%s: not queued, error %d\n", ss->sc_dev.dv_xname,
+		    error);
+	} else {
 		ss->sio.scan_lines -= lines_to_read;
+		if (ss->sio.scan_lines < 0)
+			ss->sio.scan_lines = 0;
 		ss->sio.scan_window_size -= bp->b_bcount;
+		if (ss->sio.scan_window_size < 0)
+			ss->sio.scan_window_size = 0;
 	}
 
 	return (0);
@@ -526,7 +534,7 @@ mustek_get_status(ss, timeout, update)
 		error = scsipi_command(sc_link,
 		    (struct scsipi_generic *) &cmd, sizeof(cmd),
 		    (u_char *) &data, sizeof(data), MUSTEK_RETRIES,
-		    5000, NULL, SCSI_DATA_IN);
+		    5000, NULL, XS_CTL_DATA_IN | XS_CTL_DATA_ONSTACK);
 		if (error)
 			return (error);
 		if ((data.ready_busy == MUSTEK_READY) ||

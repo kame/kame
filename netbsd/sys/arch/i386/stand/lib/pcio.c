@@ -1,4 +1,4 @@
-/*	$NetBSD: pcio.c,v 1.8 1999/03/12 04:14:37 sommerfe Exp $	 */
+/*	$NetBSD: pcio.c,v 1.10 1999/09/10 16:23:55 drochner Exp $	 */
 
 /*
  * Copyright (c) 1996, 1997
@@ -78,7 +78,7 @@ static int getcomaddr __P((int));
 #ifdef SUPPORT_SERIAL
 static int
 getcomaddr(idx)
-int idx;
+	int idx;
 {
 	short addr;
 	/* read in BIOS data area */
@@ -203,9 +203,11 @@ nocom:
 #endif /* SUPPORT_SERIAL */
 }
 
+static inline void internal_putchar __P((int));
+
 static inline void
 internal_putchar(c)
-	int             c;
+	int c;
 {
 #ifdef SUPPORT_SERIAL
 	switch (iodev) {
@@ -226,7 +228,7 @@ internal_putchar(c)
 
 void
 putchar(c)
-	int             c;
+	int c;
 {
 	if (c == '\n')
 		internal_putchar('\r');
@@ -300,8 +302,17 @@ awaitkey(timeout, tell)
 	i = timeout * POLL_FREQ;
 
 	while (i) {
-		if (tell && (i % POLL_FREQ) == 0)
-			printf("%d\b", i/POLL_FREQ);
+		if (tell && (i % POLL_FREQ) == 0) {
+			char numbuf[20];
+			int len, j;
+
+			sprintf(numbuf, "%d ", i/POLL_FREQ);
+			len = strlen(numbuf);
+			for (j = 0; j < len; j++)
+				numbuf[len + j] = '\b';
+			numbuf[len + j] = '\0';
+			printf(numbuf);
+		}
 		if (iskey()) {
 			/* flush input buffer */
 			while (iskey())

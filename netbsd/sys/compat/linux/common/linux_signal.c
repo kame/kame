@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_signal.c,v 1.21 1998/12/19 16:27:10 drochner Exp $	*/
+/*	$NetBSD: linux_signal.c,v 1.26 2000/03/30 11:27:18 augustss Exp $	*/
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -97,7 +97,7 @@ int native_to_linux_sig[NSIG] = {
 	LINUX_SIGKILL,
 	LINUX_SIGBUS,
 	LINUX_SIGSEGV,
-	0,			/* SIGSEGV */
+	0,			/* SIGSYS */
 	LINUX_SIGPIPE,
 	LINUX_SIGALRM,
 	LINUX_SIGTERM,
@@ -219,7 +219,7 @@ linux_old_to_native_sigaction(lsa, bsa)
 		bsa->sa_flags |= SA_NODEFER;
 	if ((lsa->sa_flags & LINUX_SA_SIGINFO) != 0)
 		bsa->sa_flags |= SA_SIGINFO;
-#ifdef DEBUG
+#ifdef DEBUG_LINUX
 	if ((lsa->sa_flags & ~LINUX_SA_ALLBITS) != 0)
 /*XXX*/		printf("linux_old_to_native_sigaction: extra bits ignored\n");
 	if (lsa->sa_restorer != 0)
@@ -275,7 +275,7 @@ linux_to_native_sigaction(lsa, bsa)
 		bsa->sa_flags |= SA_NODEFER;
 	if ((lsa->sa_flags & LINUX_SA_SIGINFO) != 0)
 		bsa->sa_flags |= SA_SIGINFO;
-#ifdef DEBUG
+#ifdef DEBUG_LINUX
 	if ((lsa->sa_flags & ~LINUX_SA_ALLBITS) != 0)
 /*XXX*/		printf("linux_to_native_sigaction: extra bits ignored\n");
 	if (lsa->sa_restorer != 0)
@@ -318,7 +318,7 @@ native_to_linux_sigaction(bsa, lsa)
  */
 int
 linux_sys_rt_sigaction(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -330,9 +330,8 @@ linux_sys_rt_sigaction(p, v, retval)
 	} */ *uap = v;
 	struct linux_sigaction nlsa, olsa;
 	struct sigaction nbsa, obsa;
-	int error;
+	int error, sig;
 
-	/* XXX XAX linux_sigset_t or struct linux_sigaction here? */
 	if (SCARG(uap, sigsetsize) != sizeof(linux_sigset_t))
 		return (EINVAL);
 
@@ -342,7 +341,10 @@ linux_sys_rt_sigaction(p, v, retval)
 			return (error);
 		linux_to_native_sigaction(&nlsa, &nbsa);
 	}
-	error = sigaction1(p, linux_to_native_sig[SCARG(uap, signum)],
+	sig = SCARG(uap, signum);
+	if (sig < 0 || sig >= LINUX__NSIG)
+		return (EINVAL);
+	error = sigaction1(p, linux_to_native_sig[sig],
 	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
 	if (error)
 		return (error);
@@ -357,7 +359,7 @@ linux_sys_rt_sigaction(p, v, retval)
 
 int
 linux_sigprocmask1(p, how, set, oset)
-	register struct proc *p;
+	struct proc *p;
 	int how;
 	const linux_old_sigset_t *set;
 	linux_old_sigset_t *oset;
@@ -401,7 +403,7 @@ linux_sigprocmask1(p, how, set, oset)
 
 int
 linux_sys_rt_sigprocmask(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -412,23 +414,53 @@ linux_sys_rt_sigprocmask(p, v, retval)
 		syscallarg(size_t) sigsetsize;
 	} */ *uap = v;
 
-	/* Use non-rt function: sigsetsize is ignored. */
-	/* Assume sizeof(linux_sigset_t) == sizeof(linux_old_sigset_t) */
-	if (SCARG(uap, sigsetsize) != sizeof(linux_old_sigset_t)) {
-#ifdef LINUX_DEBUG
-	    printf("linux_sys_rt_sigprocmask: sigsetsize != sizeof(old_sigset_t)");
-#endif
-	    return(ENOSYS);
+	linux_sigset_t nlss, olss, *oset;
+	const linux_sigset_t *set;
+	sigset_t nbss, obss;
+	int error, how;
+
+	if (SCARG(uap, sigsetsize) != sizeof(linux_sigset_t))
+		return (EINVAL);
+
+	switch (SCARG(uap, how)) {
+	case LINUX_SIG_BLOCK:
+		how = SIG_BLOCK;
+		break;
+	case LINUX_SIG_UNBLOCK:
+		how = SIG_UNBLOCK;
+		break;
+	case LINUX_SIG_SETMASK:
+		how = SIG_SETMASK;
+		break;
+	default:
+		return (EINVAL);
 	}
 
-	return(linux_sigprocmask1(p, SCARG(uap, how), 
-				(const linux_old_sigset_t *)SCARG(uap, set),
-				(linux_old_sigset_t *)SCARG(uap, oset)));
+	set = SCARG(uap, set);
+	oset = SCARG(uap, oset);
+
+	if (set) {
+		error = copyin(set, &nlss, sizeof(nlss));
+		if (error)
+			return (error);
+		linux_to_native_sigset(&nlss, &nbss);
+	}
+	error = sigprocmask1(p, how,
+	    set ? &nbss : 0, oset ? &obss : 0);
+	if (error)
+		return (error); 
+	if (oset) {
+		native_to_linux_sigset(&obss, &olss);
+		error = copyout(&olss, oset, sizeof(olss));
+		if (error)
+			return (error);
+	}       
+	return (error);
 }
 
 int
 linux_sys_rt_sigpending(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -446,9 +478,10 @@ linux_sys_rt_sigpending(p, v, retval)
 	native_to_linux_sigset(&bss, &lss);
 	return copyout(&lss, SCARG(uap, set), sizeof(lss));
 }
+
 int
 linux_sys_sigpending(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -465,7 +498,7 @@ linux_sys_sigpending(p, v, retval)
 
 int
 linux_sys_sigsuspend(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -483,7 +516,7 @@ linux_sys_sigsuspend(p, v, retval)
 }
 int
 linux_sys_rt_sigsuspend(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -513,7 +546,7 @@ linux_sys_rt_sigsuspend(p, v, retval)
  */
 int
 linux_sys_rt_queueinfo(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -533,7 +566,7 @@ linux_sys_rt_queueinfo(p, v, retval)
 
 int
 linux_sys_kill(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -542,8 +575,12 @@ linux_sys_kill(p, v, retval)
 		syscallarg(int) signum;
 	} */ *uap = v;
 	struct sys_kill_args ka;
+	int sig;
 
 	SCARG(&ka, pid) = SCARG(uap, pid);
-	SCARG(&ka, signum) = linux_to_native_sig[SCARG(uap, signum)];
+	sig = SCARG(uap, signum);
+	if (sig < 0 || sig >= LINUX__NSIG)
+		return (EINVAL);
+	SCARG(&ka, signum) = linux_to_native_sig[sig];
 	return sys_kill(p, &ka, retval);
 }

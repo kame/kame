@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.8 1999/03/23 00:32:00 thorpej Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.11 2000/02/11 19:30:28 thorpej Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -34,7 +34,7 @@
 #ifndef	_MACHINE_VMPARAM_H_
 #define	_MACHINE_VMPARAM_H_
 
-#define	USRTEXT		CLBYTES
+#define	USRTEXT		NBPG
 #define	USRSTACK	VM_MAXUSER_ADDRESS
 
 #ifndef	MAXTSIZ
@@ -89,9 +89,7 @@
 #define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)(KERNEL_SR << ADDR_SR_SHFT))
 #define	VM_MAX_KERNEL_ADDRESS	(VM_MIN_KERNEL_ADDRESS + SEGMENT_LENGTH - 1)
 
-#define	VM_KMEM_SIZE		(NKMEMCLUSTERS * CLBYTES)
-#define	VM_MBUF_SIZE		(NMBCLUSTERS * MCLBYTES)
-#define	VM_PHYS_SIZE		(USRIOSIZE * CLBYTES)
+#define	VM_PHYS_SIZE		(USRIOSIZE * NBPG)
 
 struct pmap_physseg {
 	struct pv_entry *pvent;

@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.16 1999/01/31 14:06:40 scw Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.18 2000/03/18 22:33:06 scw Exp $	*/
 
 /*
  * Copyright (c) 1995 Dale Rahn.
@@ -31,6 +31,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/device.h>
 #define FSTYPENAMES
@@ -42,8 +43,6 @@
 #include <dev/scsipi/scsiconf.h>
 
 #include <machine/autoconf.h>
-
-#define b_cylin b_resid
 
 #ifdef DEBUG
 int disksubr_debug = 0;
@@ -109,7 +108,7 @@ dk_establish(dk, dev)
 char *
 readdisklabel(dev, strat, lp, clp)
 	dev_t dev;
-	void (*strat)();
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 {
@@ -124,7 +123,7 @@ readdisklabel(dev, strat, lp, clp)
 	bp->b_blkno = 0; /* contained in block 0 */
 	bp->b_bcount = lp->d_secsize;
 	bp->b_flags = B_BUSY | B_READ;
-	bp->b_cylin = 0; /* contained in block 0 */
+	bp->b_cylinder = 0; /* contained in block 0 */
 	(*strat)(bp);
 
 	if (biowait(bp)) {
@@ -222,9 +221,10 @@ setdisklabel(olp, nlp, openmask, clp)
 /*
  * Write disk label back to device after modification.
  */
+int
 writedisklabel(dev, strat, lp, clp)
 	dev_t dev;
-	void (*strat)();
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 {
@@ -245,10 +245,10 @@ writedisklabel(dev, strat, lp, clp)
 	bp->b_blkno = 0; /* contained in block 0 */
 	bp->b_bcount = lp->d_secsize;
 	bp->b_flags = B_BUSY | B_READ;
-	bp->b_cylin = 0; /* contained in block 0 */
+	bp->b_cylinder = 0; /* contained in block 0 */
 	(*strat)(bp);
 
-	if (error = biowait(bp)) {
+	if ( (error = biowait(bp)) != 0 ) {
 		/* nothing */
 	} else {
 		bcopy(bp->b_data, clp, sizeof(struct cpu_disklabel));
@@ -281,7 +281,7 @@ writedisklabel(dev, strat, lp, clp)
 		bp->b_blkno = 0; /* contained in block 0 */
 		bp->b_bcount = lp->d_secsize;
 		bp->b_flags = B_WRITE;
-		bp->b_cylin = 0; /* contained in block 0 */
+		bp->b_cylinder = 0; /* contained in block 0 */
 		(*strat)(bp);
 
 		error = biowait(bp);
@@ -330,7 +330,7 @@ bounds_check_with_label(bp, lp, wlabel)
         }
 
 	/* calculate cylinder for disksort to order transfers with */
-        bp->b_cylin = (bp->b_blkno + p->p_offset) / lp->d_secpercyl;
+        bp->b_cylinder = (bp->b_blkno + p->p_offset) / lp->d_secpercyl;
 	return(1);
 
 bad:
@@ -523,8 +523,8 @@ printclp(clp, str)
 	int max, i;
 
 	printf("%s\n", str);
-	printf("magic1 %x\n", clp->magic1);
-	printf("magic2 %x\n", clp->magic2);
+	printf("magic1 %lx\n", clp->magic1);
+	printf("magic2 %lx\n", clp->magic2);
 	printf("typename %s\n", clp->vid_vd);
 	printf("secsize %x nsect %x ntrack %x ncylinders %x\n",
 	    clp->cfg_psm, clp->cfg_spt, clp->cfg_hds, clp->cfg_trk);

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgsix.c,v 1.43 1999/03/24 05:51:10 mrg Exp $ */
+/*	$NetBSD: cgsix.c,v 1.50.4.1 2000/06/30 16:27:38 simonb Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -121,6 +121,11 @@
 #include <sparc/dev/cgsixvar.h>
 #include <sparc/dev/pfourreg.h>
 
+#ifdef RASTERCONSOLE
+#include <dev/rasops/rasops.h>
+#include <dev/wscons/wsconsio.h>
+#endif
+
 static void	cg6_unblank __P((struct device *));
 
 /* cdevsw prototypes */
@@ -133,31 +138,315 @@ static struct fbdriver cg6_fbdriver = {
 	cg6_unblank, cgsixopen, cgsixclose, cgsixioctl, cgsixpoll, cgsixmmap
 };
 
-/*
- * Unlike the bw2 and cg3 drivers, we do not need to provide an rconsole
- * interface, as the cg6 is fast enough.. but provide a knob to turn it
- * on anyway.
- */
-#ifdef RASTERCONSOLE
-int cgsix_use_rasterconsole = 0;
-#endif
-
 static void cg6_reset __P((struct cgsix_softc *));
 static void cg6_loadcmap __P((struct cgsix_softc *, int, int));
 static void cg6_loadomap __P((struct cgsix_softc *));
 static void cg6_setcursor __P((struct cgsix_softc *));/* set position */
 static void cg6_loadcursor __P((struct cgsix_softc *));/* set shape */
 
+#ifdef RASTERCONSOLE
+int cgsix_use_rasterconsole = 1;	/* Testing knob */
+
+/*
+ * cg6 accelerated console routines.
+ *
+ * Note that buried in this code in several places is the assumption
+ * that pixels are exactly one byte wide.  Since this is cg6-specific
+ * code, this seems safe.  This assumption resides in things like the
+ * use of ri_emuwidth without messing around with ri_pelbytes, or the
+ * assumption that ri_font->fontwidth is the right thing to multiply
+ * character-cell counts by to get byte counts.
+ */
+
+/*
+ * Magic values for blitter
+ */
+
+/* Value for the alu register for screen-to-screen copies */
+#define CG6_ALU_COPY	(						\
+	  0x80000000 /* GX_PLANE_ONES (ignore planemask register) */	\
+	| 0x20000000 /* GX_PIXEL_ONES (ignore pixelmask register) */	\
+	| 0x00800000 /* GX_ATTR_SUPP (function unknown) */		\
+	| 0x00000000 /* GX_RAST_BOOL (function unknown) */		\
+	| 0x00000000 /* GX_PLOT_PLOT (function unknown) */		\
+	| 0x08000000 /* GX_PATTERN_ONES (ignore pattern) */		\
+	| 0x01000000 /* GX_POLYG_OVERLAP (unsure - handle overlap?) */	\
+	| 0x0000cccc /* ALU = src */					\
+)
+
+/* Value for the alu register for region fills */
+#define CG6_ALU_FILL	(						\
+	  0x80000000 /* GX_PLANE_ONES (ignore planemask register) */	\
+	| 0x20000000 /* GX_PIXEL_ONES (ignore pixelmask register) */	\
+	| 0x00800000 /* GX_ATTR_SUPP (function unknown) */		\
+	| 0x00000000 /* GX_RAST_BOOL (function unknown) */		\
+	| 0x00000000 /* GX_PLOT_PLOT (function unknown) */		\
+	| 0x08000000 /* GX_PATTERN_ONES (ignore pattern) */		\
+	| 0x01000000 /* GX_POLYG_OVERLAP (unsure - handle overlap?) */	\
+	| 0x0000ff00 /* ALU = fg color */				\
+)
+
+/* Value for the alu register for toggling an area */
+#define CG6_ALU_FLIP	(						\
+	  0x80000000 /* GX_PLANE_ONES (ignore planemask register) */	\
+	| 0x20000000 /* GX_PIXEL_ONES (ignore pixelmask register) */	\
+	| 0x00800000 /* GX_ATTR_SUPP (function unknown) */		\
+	| 0x00000000 /* GX_RAST_BOOL (function unknown) */		\
+	| 0x00000000 /* GX_PLOT_PLOT (function unknown) */		\
+	| 0x08000000 /* GX_PATTERN_ONES (ignore pattern) */		\
+	| 0x01000000 /* GX_POLYG_OVERLAP (unsure - handle overlap?) */	\
+	| 0x00005555 /* ALU = ~dst */					\
+)
+
+/*
+ * Wait for a blit to finish.
+ * 0x8000000 bit: function unknown; 0x20000000 bit: GX_BLT_INPROGRESS
+ */
+#define CG6_BLIT_WAIT(fbc) do {						\
+	while (((fbc)->fbc_blit & 0xa0000000) == 0xa0000000)		\
+		/*EMPTY*/;						\
+} while (0)
+
+/*
+ * Wait for a drawing operation to finish, or at least get queued.
+ * 0x8000000 bit: function unknown; 0x20000000 bit: GX_FULL
+ */
+#define CG6_DRAW_WAIT(fbc) do {						\
+       	while (((fbc)->fbc_draw & 0xa0000000) == 0xa0000000)		\
+		/*EMPTY*/;						\
+} while (0)
+
+/*
+ * Wait for the whole engine to go idle.  This may not matter in our case;
+ * I'm not sure whether blits are actually queued or not.  It more likely
+ * is intended for lines and such that do get queued.
+ * 0x10000000 bit: GX_INPROGRESS
+ */
+#define CG6_DRAIN(fbc) do {						\
+	while ((fbc)->fbc_s & 0x10000000)				\
+		/*EMPTY*/;						\
+} while (0)
+
+static void
+cg6_ras_copyrows(void *cookie, int src, int dst, int n)
+{
+	struct rasops_info *ri;
+	volatile struct cg6_fbc *fbc;
+
+	ri = cookie;
+	if (dst == src)
+		return;
+	if (src < 0) {
+		n += src;
+		src = 0;
+	}
+	if (src+n > ri->ri_rows)
+		n = ri->ri_rows - src;
+	if (dst < 0) {
+		n += dst;
+		dst = 0;
+	}
+	if (dst+n > ri->ri_rows)
+		n = ri->ri_rows - dst;
+	if (n <= 0)
+		return;
+	n *= ri->ri_font->fontheight;
+	src *= ri->ri_font->fontheight;
+	dst *= ri->ri_font->fontheight;
+	fbc = ((struct cgsix_softc *)ri->ri_hw)->sc_fbc;
+	fbc->fbc_clip = 0;
+	fbc->fbc_s = 0;
+	fbc->fbc_offx = 0;
+	fbc->fbc_offy = 0;
+	fbc->fbc_clipminx = 0;
+	fbc->fbc_clipminy = 0;
+	fbc->fbc_clipmaxx = ri->ri_width - 1;
+	fbc->fbc_clipmaxy = ri->ri_height - 1;
+	fbc->fbc_alu = CG6_ALU_COPY;
+	fbc->fbc_x0 = ri->ri_xorigin;
+	fbc->fbc_y0 = ri->ri_yorigin + src;
+	fbc->fbc_x1 = ri->ri_xorigin + ri->ri_emuwidth - 1;
+	fbc->fbc_y1 = ri->ri_yorigin + src + n - 1;
+	fbc->fbc_x2 = ri->ri_xorigin;
+	fbc->fbc_y2 = ri->ri_yorigin + dst;
+	fbc->fbc_x3 = ri->ri_xorigin + ri->ri_emuwidth - 1;
+	fbc->fbc_y3 = ri->ri_yorigin + dst + n - 1;
+	CG6_BLIT_WAIT(fbc);
+	CG6_DRAIN(fbc);
+}
+
+static void
+cg6_ras_copycols(void *cookie, int row, int src, int dst, int n)
+{
+	struct rasops_info *ri;
+	volatile struct cg6_fbc *fbc;
+
+	ri = cookie;
+	if (dst == src)
+		return;
+	if ((row < 0) || (row >= ri->ri_rows))
+		return;
+	if (src < 0) {
+		n += src;
+		src = 0;
+	}
+	if (src+n > ri->ri_cols)
+		n = ri->ri_cols - src;
+	if (dst < 0) {
+		n += dst;
+		dst = 0;
+	}
+	if (dst+n > ri->ri_cols)
+		n = ri->ri_cols - dst;
+	if (n <= 0)
+		return;
+	n *= ri->ri_font->fontwidth;
+	src *= ri->ri_font->fontwidth;
+	dst *= ri->ri_font->fontwidth;
+	row *= ri->ri_font->fontheight;
+	fbc = ((struct cgsix_softc *)ri->ri_hw)->sc_fbc;
+	fbc->fbc_clip = 0;
+	fbc->fbc_s = 0;
+	fbc->fbc_offx = 0;
+	fbc->fbc_offy = 0;
+	fbc->fbc_clipminx = 0;
+	fbc->fbc_clipminy = 0;
+	fbc->fbc_clipmaxx = ri->ri_width - 1;
+	fbc->fbc_clipmaxy = ri->ri_height - 1;
+	fbc->fbc_alu = CG6_ALU_COPY;
+	fbc->fbc_x0 = ri->ri_xorigin + src;
+	fbc->fbc_y0 = ri->ri_yorigin + row;
+	fbc->fbc_x1 = ri->ri_xorigin + src + n - 1;
+	fbc->fbc_y1 = ri->ri_yorigin + row + ri->ri_font->fontheight - 1;
+	fbc->fbc_x2 = ri->ri_xorigin + dst;
+	fbc->fbc_y2 = ri->ri_yorigin + row;
+	fbc->fbc_x3 = ri->ri_xorigin + dst + n - 1;
+	fbc->fbc_y3 = ri->ri_yorigin + row + ri->ri_font->fontheight - 1;
+	CG6_BLIT_WAIT(fbc);
+	CG6_DRAIN(fbc);
+}
+
+static void
+cg6_ras_erasecols(void *cookie, int row, int col, int n, long int attr)
+{
+	struct rasops_info *ri;
+	volatile struct cg6_fbc *fbc;
+
+	ri = cookie;
+	if ((row < 0) || (row >= ri->ri_rows))
+		return;
+	if (col < 0) {
+		n += col;
+		col = 0;
+	}
+	if (col+n > ri->ri_cols)
+		n = ri->ri_cols - col;
+	if (n <= 0)
+		return;
+	n *= ri->ri_font->fontwidth;
+	col *= ri->ri_font->fontwidth;
+	row *= ri->ri_font->fontheight;
+	fbc = ((struct cgsix_softc *)ri->ri_hw)->sc_fbc;
+	fbc->fbc_clip = 0;
+	fbc->fbc_s = 0;
+	fbc->fbc_offx = 0;
+	fbc->fbc_offy = 0;
+	fbc->fbc_clipminx = 0;
+	fbc->fbc_clipminy = 0;
+	fbc->fbc_clipmaxx = ri->ri_width - 1;
+	fbc->fbc_clipmaxy = ri->ri_height - 1;
+	fbc->fbc_alu = CG6_ALU_FILL;
+	fbc->fbc_fg = ri->ri_devcmap[(attr >> 16) & 0xf];
+	fbc->fbc_arecty = ri->ri_yorigin + row;
+	fbc->fbc_arectx = ri->ri_xorigin + col;
+	fbc->fbc_arecty = ri->ri_yorigin + row + ri->ri_font->fontheight - 1;
+	fbc->fbc_arectx = ri->ri_xorigin + col + n - 1;
+	CG6_DRAW_WAIT(fbc);
+	CG6_DRAIN(fbc);
+}
+
+static void
+cg6_ras_eraserows(void *cookie, int row, int n, long int attr)
+{
+	struct rasops_info *ri;
+	volatile struct cg6_fbc *fbc;
+
+	ri = cookie;
+	if (row < 0) {
+		n += row;
+		row = 0;
+	}
+	if (row+n > ri->ri_rows)
+		n = ri->ri_rows - row;
+	if (n <= 0)
+		return;
+	fbc = ((struct cgsix_softc *)ri->ri_hw)->sc_fbc;
+	fbc->fbc_clip = 0;
+	fbc->fbc_s = 0;
+	fbc->fbc_offx = 0;
+	fbc->fbc_offy = 0;
+	fbc->fbc_clipminx = 0;
+	fbc->fbc_clipminy = 0;
+	fbc->fbc_clipmaxx = ri->ri_width - 1;
+	fbc->fbc_clipmaxy = ri->ri_height - 1;
+	fbc->fbc_alu = CG6_ALU_FILL;
+	fbc->fbc_fg = ri->ri_devcmap[(attr >> 16) & 0xf];
+	if ((n == ri->ri_rows) && (ri->ri_flg & RI_FULLCLEAR)) {
+		fbc->fbc_arecty = 0;
+		fbc->fbc_arectx = 0;
+		fbc->fbc_arecty = ri->ri_height - 1;
+		fbc->fbc_arectx = ri->ri_width - 1;
+	} else {
+		row *= ri->ri_font->fontheight;
+		fbc->fbc_arecty = ri->ri_yorigin + row;
+		fbc->fbc_arectx = ri->ri_xorigin;
+		fbc->fbc_arecty = ri->ri_yorigin + row + (n * ri->ri_font->fontheight) - 1;
+		fbc->fbc_arectx = ri->ri_xorigin + ri->ri_emuwidth - 1;
+	}
+	CG6_DRAW_WAIT(fbc);
+	CG6_DRAIN(fbc);
+}
+
+/*
+ * Really want something more like fg^bg here, but that would be more
+ * or less impossible to migrate to colors.  So we hope there's
+ * something not too inappropriate in the colormap...besides, it's what
+ * the non-accelerated code did. :-)
+ */
+static void
+cg6_ras_do_cursor(struct rasops_info *ri)
+{
+	volatile struct cg6_fbc *fbc;
+	int row;
+	int col;
+
+	row = ri->ri_crow * ri->ri_font->fontheight;
+	col = ri->ri_ccol * ri->ri_font->fontwidth;
+	fbc = ((struct cgsix_softc *)ri->ri_hw)->sc_fbc;
+	fbc->fbc_clip = 0;
+	fbc->fbc_s = 0;
+	fbc->fbc_offx = 0;
+	fbc->fbc_offy = 0;
+	fbc->fbc_clipminx = 0;
+	fbc->fbc_clipminy = 0;
+	fbc->fbc_clipmaxx = ri->ri_width - 1;
+	fbc->fbc_clipmaxy = ri->ri_height - 1;
+	fbc->fbc_alu = CG6_ALU_FLIP;
+	fbc->fbc_arecty = ri->ri_yorigin + row;
+	fbc->fbc_arectx = ri->ri_xorigin + col;
+	fbc->fbc_arecty = ri->ri_yorigin + row + ri->ri_font->fontheight - 1;
+	fbc->fbc_arectx = ri->ri_xorigin + col + ri->ri_font->fontwidth - 1;
+	CG6_DRAW_WAIT(fbc);
+	CG6_DRAIN(fbc);
+}
+#endif /* RASTERCONSOLE */
 
 void
-cg6attach(sc, name, isconsole, isfb)
+cg6attach(sc, name, isconsole)
 	struct cgsix_softc *sc;
 	char *name;
 	int isconsole;
-	int isfb;
 {
-	int i;
-	volatile struct bt_regs *bt = sc->sc_bt;
 	struct fbdevice *fb = &sc->sc_fb;
 
 	fb->fb_driver = &cg6_fbdriver;
@@ -178,25 +467,26 @@ cg6attach(sc, name, isconsole, isfb)
 	/* reset cursor & frame buffer controls */
 	cg6_reset(sc);
 
-	/* grab initial (current) color map (DOES THIS WORK?) */
-	bt->bt_addr = 0;
-	for (i = 0; i < 256 * 3; i++)
-		((char *)&sc->sc_cmap)[i] = bt->bt_cmap >> 24;
-
 	/* enable video */
 	sc->sc_thc->thc_misc |= THC_MISC_VIDEN;
 
 	if (isconsole) {
 		printf(" (console)");
 #ifdef RASTERCONSOLE
-		if (cgsix_use_rasterconsole)
+		if (cgsix_use_rasterconsole) {
 			fbrcons_init(&sc->sc_fb);
+			sc->sc_fb.fb_rinfo.ri_hw = sc;
+			sc->sc_fb.fb_rinfo.ri_ops.copyrows = cg6_ras_copyrows;
+			sc->sc_fb.fb_rinfo.ri_ops.copycols = cg6_ras_copycols;
+			sc->sc_fb.fb_rinfo.ri_ops.erasecols = cg6_ras_erasecols;
+			sc->sc_fb.fb_rinfo.ri_ops.eraserows = cg6_ras_eraserows;
+			sc->sc_fb.fb_rinfo.ri_do_cursor = cg6_ras_do_cursor;
+		}
 #endif
 	}
 
 	printf("\n");
-	if (isfb)
-		fb_attach(&sc->sc_fb, isconsole);
+	fb_attach(&sc->sc_fb, isconsole);
 }
 
 
@@ -222,6 +512,11 @@ cgsixclose(dev, flags, mode, p)
 	struct cgsix_softc *sc = cgsix_cd.cd_devs[minor(dev)];
 
 	cg6_reset(sc);
+
+	/* (re-)initialize the default color map */
+	bt_initcmap(&sc->sc_cmap, 256);
+	cg6_loadcmap(sc, 0, 256);
+
 	return (0);
 }
 
@@ -258,12 +553,12 @@ cgsixioctl(dev, cmd, data, flags, p)
 		break;
 
 	case FBIOGETCMAP:
-		return (bt_getcmap((struct fbcmap *)data, &sc->sc_cmap, 256));
+#define	p ((struct fbcmap *)data)
+		return (bt_getcmap(p, &sc->sc_cmap, 256, 1));
 
 	case FBIOPUTCMAP:
 		/* copy to software map */
-#define	p ((struct fbcmap *)data)
-		error = bt_putcmap(p, &sc->sc_cmap, 256);
+		error = bt_putcmap(p, &sc->sc_cmap, 256, 1);
 		if (error)
 			return (error);
 		/* now blast them into the chip */
@@ -311,7 +606,7 @@ cgsixioctl(dev, cmd, data, flags, p)
 		}
 		if (p->cmap.red != NULL) {
 			error = bt_getcmap(&p->cmap,
-			    (union bt_cmap *)&cc->cc_color, 2);
+			    (union bt_cmap *)&cc->cc_color, 2, 1);
 			if (error)
 				return (error);
 		} else {
@@ -335,7 +630,7 @@ cgsixioctl(dev, cmd, data, flags, p)
 			 * copies are small (8 bytes)...
 			 */
 			tcm = cc->cc_color;
-			error = bt_putcmap(&p->cmap, (union bt_cmap *)&tcm, 2);
+			error = bt_putcmap(&p->cmap, (union bt_cmap *)&tcm, 2, 1);
 			if (error)
 				return (error);
 		}
@@ -580,10 +875,11 @@ struct mmo {
  *
  * XXX	needs testing against `demanding' applications (e.g., aviator)
  */
-int
+paddr_t
 cgsixmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct cgsix_softc *sc = cgsix_cd.cd_devs[minor(dev)];
 	struct mmo *mo;
@@ -625,7 +921,7 @@ cgsixmmap(dev, off, prot)
 					   BUS_SPACE_MAP_LINEAR, &bh))
 				return (-1);
 
-			return ((int)bh);
+			return ((paddr_t)bh);
 		}
 	}
 

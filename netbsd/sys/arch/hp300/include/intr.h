@@ -1,7 +1,7 @@
-/*	$NetBSD: intr.h,v 1.4 1998/05/18 17:37:38 kleink Exp $	*/
+/*	$NetBSD: intr.h,v 1.7 1999/08/05 18:08:10 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -83,75 +83,39 @@ struct isr {
 #define	IPLTOPSL(x)	((((x) & 0xf) << 8) | PSL_S)
 
 #ifdef _KERNEL
-/*
- * spl functions; all but spl0 are done in-line
- */
-
-#define	_spl(s)								\
-({									\
-	register int _spl_r;						\
-									\
-	__asm __volatile ("clrl %0; movew sr,%0; movew %1,sr" :		\
-	    "&=d" (_spl_r) : "di" (s));					\
-	_spl_r;								\
-})
-
-#define	_splraise(s)							\
-({									\
-	int _spl_r;							\
-									\
-	__asm __volatile ("						\
-		clrl	d0					;	\
-		movw	sr,d0					;	\
-		movl	d0,%0					;	\
-		andw	#0x700,d0				;	\
-		movw	%1,d1					;	\
-		andw	#0x700,d1				;	\
-		cmpw	d0,d1					;	\
-		jle	1f					;	\
-		movw	%1,sr					;	\
-	    1:"							:	\
-		    "&=d" (_spl_r)				:	\
-		    "di" (s)					:	\
-		    "d0", "d1");					\
-	_spl_r;								\
-})
-
 /* spl0 requires checking for software interrupts */
-#define	spl1()	_spl(PSL_S|PSL_IPL1)
-#define	spl2()	_spl(PSL_S|PSL_IPL2)
-#define	spl3()	_spl(PSL_S|PSL_IPL3)
-#define	spl4()	_spl(PSL_S|PSL_IPL4)
-#define	spl5()	_spl(PSL_S|PSL_IPL5)
-#define	spl6()	_spl(PSL_S|PSL_IPL6)
-#define	spl7()	_spl(PSL_S|PSL_IPL7)
 
 /*
- * These four globals contain the appropriate PSL_S|PSL_IPL? values
+ * This array contains the appropriate PSL_S|PSL_IPL? values
  * to raise interrupt priority to the requested level.
  */
-extern	unsigned short hp300_bioipl;
-extern	unsigned short hp300_netipl;
-extern	unsigned short hp300_ttyipl;
-extern	unsigned short hp300_impipl;
+extern unsigned short hp300_ipls[];
+
+#define	HP300_IPL_SOFT		0
+#define	HP300_IPL_BIO		1
+#define	HP300_IPL_NET		2
+#define	HP300_IPL_TTY		3
+#define	HP300_IPL_IMP		4
+#define	HP300_IPL_CLOCK		5
+#define	HP300_IPL_HIGH		6
+#define	HP300_NIPLS		7
 
 /* These spl calls are _not_ to be used by machine-independent code. */
-#define	splhil()	_splraise(PSL_S|PSL_IPL1)
+#define	splhil()	splraise1()
 #define	splkbd()	splhil()
-#define	splsoft()	spl1()
 
 /* These spl calls are used by machine-independent code. */
+#define	spllowersoftclock() spl1()
+#define	splsoft()	splraise1()
 #define	splsoftclock()	splsoft()
 #define	splsoftnet()	splsoft()
-#define	splbio()	_splraise(hp300_bioipl)
-#define	splnet()	_splraise(hp300_netipl)
-#define	spltty()	_splraise(hp300_ttyipl)
-#define	splimp()	_splraise(hp300_impipl)
+#define	splbio()	_splraise(hp300_ipls[HP300_IPL_BIO])
+#define	splnet()	_splraise(hp300_ipls[HP300_IPL_NET])
+#define	spltty()	_splraise(hp300_ipls[HP300_IPL_TTY])
+#define	splimp()	_splraise(hp300_ipls[HP300_IPL_IMP])
 #define	splclock()	spl6()
-#define	splstatclock()	spl6()
-#define	splvm()		spl6()
+#define	splstatclock()	splclock()
 #define	splhigh()	spl7()
-#define	splsched()	spl7()
 
 /* watch out for side effects */
 #define	splx(s)		((s) & PSL_IPL ? _spl((s)) : spl0())
@@ -165,9 +129,9 @@ extern volatile u_int8_t ssir;
 #define	SIR_CLOCK	0x02
 
 #define	siron(mask)	\
-	__asm __volatile ( "orb %0,_ssir" : : "i" ((mask)))
+	__asm __volatile ( "orb %1,%0" : "=m" (ssir) : "i" ((mask)))
 #define	siroff(mask)	\
-	__asm __volatile ( "andb %0,_ssir" : : "ir" (~(mask)));
+	__asm __volatile ( "andb %1,%0" : "=m" (ssir) : "ir" (~(mask)));
 
 #define	setsoftnet()	siron(SIR_NET)
 #define	setsoftclock()	siron(SIR_CLOCK)

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.inc,v 1.1.2.1 2000/03/01 12:38:55 he Exp $
+#	$NetBSD: Makefile.inc,v 1.2 1999/07/18 05:55:45 abs Exp $
 
 XXRPB=0x1F4240
 RELOC=0x2f0000

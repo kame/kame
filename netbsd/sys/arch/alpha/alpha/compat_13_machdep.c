@@ -1,4 +1,4 @@
-/* $NetBSD: compat_13_machdep.c,v 1.4 1999/02/23 03:20:00 thorpej Exp $ */
+/* $NetBSD: compat_13_machdep.c,v 1.6 1999/08/16 02:59:22 simonb Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.4 1999/02/23 03:20:00 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.6 1999/08/16 02:59:22 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,8 +44,6 @@ __KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.4 1999/02/23 03:20:00 thorpe
 #include <machine/reg.h>
 #include <machine/alpha.h>
 
-#include <alpha/alpha/cpuvar.h>
-
 /*
  * System call to cleanup state after a signal
  * has been taken.  Reset signal mask and
@@ -53,7 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.4 1999/02/23 03:20:00 thorpe
  * Return to previous pc and psl as specified by
  * context left by sendsig. Check carefully to
  * make sure that the user has not modified the
- * psl to gain improper priviledges or to cause
+ * psl to gain improper privileges or to cause
  * a machine fault.
  */
 /* ARGSUSED */

@@ -1,7 +1,7 @@
-/* $NetBSD: cpu.c,v 1.35.2.1 1999/07/02 17:33:45 perry Exp $ */
+/* $NetBSD: cpu.c,v 1.51 2000/06/12 23:35:11 sommerfeld Exp $ */
 
 /*-
- * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -66,7 +66,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.35.2.1 1999/07/02 17:33:45 perry Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.51 2000/06/12 23:35:11 sommerfeld Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -78,13 +78,13 @@ __KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.35.2.1 1999/07/02 17:33:45 perry Exp $");
 
 #include <vm/vm.h>
 
+#include <machine/atomic.h>
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
+#include <machine/cpuvar.h>
 #include <machine/rpb.h>
 #include <machine/prom.h>
 #include <machine/alpha.h>
-
-#include <alpha/alpha/cpuvar.h>
 
 #if defined(MULTIPROCESSOR)
 #include <sys/malloc.h>
@@ -97,20 +97,29 @@ __KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.35.2.1 1999/07/02 17:33:45 perry Exp $");
 struct cpu_info cpu_info[ALPHA_MAXPROCS];
 
 /* Bitmask of CPUs currently running. */
-u_long cpus_running;
+__volatile u_long cpus_running;
 
-void	cpu_create_idle_thread __P((void *));
+void	cpu_boot_secondary __P((struct cpu_info *));
 #else
-paddr_t curpcb;				/* PA of our current context */
-struct	proc *fpcurproc;		/* current owner of FPU */
+struct	cpu_info cpu_info_store;
 #endif /* MULTIPROCESSOR */
+
+/*
+ * The Implementation Version and the Architecture Mask must be
+ * consistent across all CPUs in the system, so we set it for the
+ * primary and announce the AMASK extensions if they exist.
+ *
+ * Note, we invert the AMASK so that if a bit is set, it means "has
+ * extension".
+ */
+u_long	cpu_implver, cpu_amask;
 
 /* Definition of the driver for autoconfig. */
 static int	cpumatch(struct device *, struct cfdata *, void *);
 static void	cpuattach(struct device *, struct device *, void *);
 
 struct cfattach cpu_ca = {
-	sizeof(struct device), cpumatch, cpuattach
+	sizeof(struct cpu_softc), cpumatch, cpuattach
 };
 
 extern struct cfdriver cpu_cd;
@@ -140,15 +149,17 @@ struct cputable_struct {
 	char	*cpu_major_name;
 	char	**cpu_minor_names;
 } cpunametable[] = {
-	{ PCS_PROC_EV3,		"EV3",		0		},
+	{ PCS_PROC_EV3,		"EV3",		NULL		},
 	{ PCS_PROC_EV4,		"21064",	ev4minor	},
-	{ PCS_PROC_SIMULATION,	"Sim",		0		},
+	{ PCS_PROC_SIMULATION,	"Sim",		NULL		},
 	{ PCS_PROC_LCA4,	"LCA",		lcaminor	},
 	{ PCS_PROC_EV5,		"21164",	ev5minor	},
 	{ PCS_PROC_EV45,	"21064A",	ev45minor	},
 	{ PCS_PROC_EV56,	"21164A",	ev56minor	},
 	{ PCS_PROC_EV6,		"21264",	ev6minor	},
-	{ PCS_PROC_PCA56,	"PCA56",	pca56minor	}
+	{ PCS_PROC_PCA56,	"PCA56",	pca56minor	},
+	{ PCS_PROC_PCA57,	"PCA57",	NULL		},
+	{ PCS_PROC_EV67,	"21264A",	NULL		},
 };
 
 /*
@@ -156,15 +167,19 @@ struct cputable_struct {
  * works.
  *
  * As we find processors during the autoconfiguration sequence, all
- * processors that are available and not the primary are set up to
- * have a kernel thread created for them.  This kernel thread will
- * be that CPUs "idle thread" (analog of proc0).  These threads are
- * created after init(8) is created.
+ * processors have idle stacks and PCBs created for them, including
+ * the primary (although the primary idles on proc0's PCB until its
+ * idle PCB is created).
  *
- * cpu_create_idle_thread() creates one idle thread, and starts that
- * thread's prcessor, switches it to OSF/1 PALcode, sets the entry point
- * to cpu_spinup_trampoline, and then sends a "START" command to the
- * secondary processor's console.
+ * Right before calling uvm_scheduler(), main() calls, on proc0's
+ * context, cpu_boot_secondary_processors().  This is our key to
+ * actually spin up the additional processor's we've found.  We
+ * run through our cpu_info[] array looking for secondary processors
+ * with idle PCBs, and spin them up.
+ *
+ * The spinup involves switching the secondary processor to the
+ * OSF/1 PALcode, setting the entry point to cpu_spinup_trampoline(),
+ * and sending a "START" message to the secondary's console.
  *
  * Upon successful processor bootup, the cpu_spinup_trampoline will call
  * cpu_hatch(), which will print a message indicating that the processor
@@ -192,21 +207,26 @@ cpumatch(parent, cfdata, aux)
 }
 
 static void
-cpuattach(parent, dev, aux)
+cpuattach(parent, self, aux)
 	struct device *parent;
-	struct device *dev;
+	struct device *self;
 	void *aux;
 {
+	struct cpu_softc *sc = (void *) self;
 	struct mainbus_attach_args *ma = aux;
 	int i;
 	char **s;
-        struct pcs *p;
+	struct pcs *p;
 #ifdef DEBUG
 	int needcomma;
 #endif
 	u_int32_t major, minor;
-#if defined(MULTIPROCESSOR)
 	struct cpu_info *ci;
+#if defined(MULTIPROCESSOR)
+	extern paddr_t avail_start, avail_end;
+	struct pcb *pcb;
+	struct pglist mlist;
+	int error;
 #endif
 
 	p = LOCATE_PCS(hwrpb, ma->ma_slot);
@@ -221,7 +241,7 @@ cpuattach(parent, dev, aux)
 			printf("%s-%d", cpunametable[i].cpu_major_name, minor);
 			s = cpunametable[i].cpu_minor_names;
 			for(i = 0; s && s[i]; ++i) {
-				if (i == minor) {
+				if (i == minor && strlen(s[i]) != 0) {
 					printf(" (%s)\n", s[i]);
 					goto recognized;
 				}
@@ -230,14 +250,27 @@ cpuattach(parent, dev, aux)
 			goto recognized;
 		}
 	}
-	printf("UNKNOWN CPU TYPE (%d:%d)", major, minor);
+	printf("UNKNOWN CPU TYPE (%d:%d)\n", major, minor);
 
 recognized:
 
+	if (ma->ma_slot == hwrpb->rpb_primary_cpu_id) {
+		cpu_implver = alpha_implver();
+		if (cpu_implver >= ALPHA_IMPLVER_EV5)
+			cpu_amask =
+			    (~alpha_amask(ALPHA_AMASK_ALL)) & ALPHA_AMASK_ALL;
+		if (cpu_amask) {
+			char bits[64];
+
+			printf("%s: Architecture extensions: %s\n",
+			    sc->sc_dev.dv_xname, bitmask_snprintf(cpu_amask,
+				ALPHA_AMASK_BITS, bits, sizeof(bits)));
+		}
+	}
+
 #ifdef DEBUG
-	/* XXX SHOULD CHECK ARCHITECTURE MASK, TOO */
 	if (p->pcs_proc_var != 0) {
-		printf("%s: ", dev->dv_xname);
+		printf("%s: ", sc->sc_dev.dv_xname);
 
 		needcomma = 0;
 		if (p->pcs_proc_var & PCS_VAR_VAXFP) {
@@ -259,17 +292,20 @@ recognized:
 	}
 #endif
 
-#if defined(MULTIPROCESSOR)
 	if (ma->ma_slot > ALPHA_WHAMI_MAXID) {
-		printf("%s: procssor ID too large, ignoring\n", dev->dv_xname);
+		if (ma->ma_slot == hwrpb->rpb_primary_cpu_id)
+			panic("cpu_attach: primary CPU ID too large");
+		printf("%s: procssor ID too large, ignoring\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 
+#if defined(MULTIPROCESSOR)
 	ci = &cpu_info[ma->ma_slot];
-	simple_lock_init(&ci->ci_slock);
+#else
+	ci = &cpu_info_store;
+#endif
 	ci->ci_cpuid = ma->ma_slot;
-	ci->ci_dev = dev;
-#endif /* MULTIPROCESSOR */
 
 	/*
 	 * Though we could (should?) attach the LCA cpus' PCI
@@ -280,84 +316,130 @@ recognized:
 
 #if defined(MULTIPROCESSOR)
 	/*
-	 * If we're the primary CPU, no more work to do; we're already
-	 * running!
+	 * Make sure the processor is available for use.
 	 */
-	if (ma->ma_slot == hwrpb->rpb_primary_cpu_id) {
-		u_long cpumask = (1UL << ma->ma_slot);
-
-		ci->ci_flags |= CPUF_PRIMARY;
-		ci->ci_idle_thread = &proc0;
-		alpha_atomic_setbits_q(&cpus_running, cpumask);
-		return;
-	}
-
-	/*
-	 * Not the primary CPU; need to queue a kernel thread to be created
-	 * to be this processor's idle thread.  The creation of the kernel
-	 * thread will also spin up the processor.
-	 */
-
 	if ((p->pcs_flags & PCS_PA) == 0) {
-		printf("%s: processor not available for use\n", dev->dv_xname);
+		if (ma->ma_slot == hwrpb->rpb_primary_cpu_id)
+			panic("cpu_attach: primary not available?!");
+		printf("%s: processor not available for use\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
-
-	kthread_create_deferred(cpu_create_idle_thread, ci);
-#endif /* MULTIPROCESSOR */
-}
-
-#if defined(MULTIPROCESSOR)
-void
-cpu_create_idle_thread(arg)
-	void *arg;
-{
-	struct cpu_info *ci = arg;
-	struct proc *p;
-	long timeout;
-	struct pcs *pcsp, *primary_pcsp;
-	struct pcb *pcb;
-	u_long cpumask;
-
-	primary_pcsp = LOCATE_PCS(hwrpb, hwrpb->rpb_primary_cpu_id);
-	pcsp = LOCATE_PCS(hwrpb, ci->ci_cpuid);
-	cpumask = (1UL << ci->ci_cpuid);
 
 	/* Make sure the processor has valid PALcode. */
-	if ((pcsp->pcs_flags & PCS_PV) == 0) {
-		printf("%s: PALcode not valid\n", ci->ci_dev->dv_xname);
+	if ((p->pcs_flags & PCS_PV) == 0) {
+		if (ma->ma_slot == hwrpb->rpb_primary_cpu_id)
+			panic("cpu_attach: primary has invalid PALcode?!");
+		printf("%s: PALcode not valid\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
 	/*
-	 * Create the CPU's idle thread.  Note, the thread entry point
-	 * and argument is effectively ignored in this case; we set up
-	 * the entry point below, when we set up the CPU's HWPCB.
+	 * Allocate UPAGES contiguous pages for the idle PCB and stack.
 	 */
-	if (kthread_create(NULL, NULL, &ci->ci_idle_thread, "%s idle",
-	    ci->ci_dev->dv_xname)) {
-		printf("%s: unable to create idle thread\n",
-		    ci->ci_dev->dv_xname);
+	TAILQ_INIT(&mlist);
+	error = uvm_pglistalloc(USPACE, avail_start, avail_end, 0, 0,
+	    &mlist, 1, 1);
+	if (error != 0) {
+		if (ma->ma_slot == hwrpb->rpb_primary_cpu_id) {
+			panic("cpu_attach: unable to allocate idle stack for"
+			    " primary");
+		}
+		printf("%s: unable to allocate idle stack\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
-	p = ci->ci_idle_thread;
+
+	ci->ci_idle_pcb_paddr = VM_PAGE_TO_PHYS(TAILQ_FIRST(&mlist));
+	pcb = ci->ci_idle_pcb = (struct pcb *)
+	    ALPHA_PHYS_TO_K0SEG(ci->ci_idle_pcb_paddr);
+	memset(pcb, 0, USPACE);
 
 	/*
-	 * Initialize the idle thread's PCB.  Note we initialize the
-	 * ASN and PTBR now, but we're going to call pmap_activate()
-	 * immediately once the CPU is hatched.
+	 * Initialize the idle stack pointer, reserving space for an
+	 * (empty) trapframe (XXX is the trapframe really necessary?)
 	 */
-	pcb = &p->p_addr->u_pcb;
+	pcb->pcb_hw.apcb_ksp =
+	    (u_int64_t)pcb + USPACE - sizeof(struct trapframe);
+
+	/*
+	 * Initialize the idle PCB.
+	 */
 	pcb->pcb_hw.apcb_backup_ksp = pcb->pcb_hw.apcb_ksp;
 	pcb->pcb_hw.apcb_asn = proc0.p_addr->u_pcb.pcb_hw.apcb_asn;
 	pcb->pcb_hw.apcb_ptbr = proc0.p_addr->u_pcb.pcb_hw.apcb_ptbr;
-	memcpy(pcsp->pcs_hwpcb, &pcb->pcb_hw, sizeof(pcb->pcb_hw));
 #if 0
 	printf("%s: hwpcb ksp = 0x%lx\n", sc->sc_dev.dv_xname,
 	    pcb->pcb_hw.apcb_ksp);
 	printf("%s: hwpcb ptbr = 0x%lx\n", sc->sc_dev.dv_xname,
 	    pcb->pcb_hw.apcb_ptbr);
 #endif
+
+	/*
+	 * If we're the primary CPU, no more work to do; we're already
+	 * running!
+	 */
+	if (ma->ma_slot == hwrpb->rpb_primary_cpu_id) {
+		ci->ci_flags |= CPUF_PRIMARY;
+		atomic_setbits_ulong(&cpus_running, (1UL << ma->ma_slot));
+	}
+#else /* ! MULTIPROCESSOR */
+	/*
+	 * Bail out now if we're not the primary CPU.
+	 */
+	if (ma->ma_slot != hwrpb->rpb_primary_cpu_id)
+		return;
+#endif /* MULTIPROCESSOR */
+
+	ci->ci_softc = sc;
+
+	evcnt_attach_dynamic(&sc->sc_evcnt_clock, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "clock");
+	evcnt_attach_dynamic(&sc->sc_evcnt_device, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "device");
+#if defined(MULTIPROCESSOR)
+	evcnt_attach_dynamic(&sc->sc_evcnt_ipi, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "ipi");
+#endif
+}
+
+#if defined(MULTIPROCESSOR)
+void
+cpu_boot_secondary_processors()
+{
+	struct cpu_info *ci;
+	u_long i;
+
+	for (i = 0; i < ALPHA_MAXPROCS; i++) {
+		ci = &cpu_info[i];
+		if (ci->ci_idle_pcb == NULL)
+			continue;
+		if (ci->ci_flags & CPUF_PRIMARY)
+			continue;
+
+		/* This processor is all set up; boot it! */
+		cpu_boot_secondary(ci);
+	}
+}
+
+void
+cpu_boot_secondary(ci)
+	struct cpu_info *ci;
+{
+	long timeout;
+	struct pcs *pcsp, *primary_pcsp;
+	struct pcb *pcb;
+	u_long cpumask;
+
+	pcb = ci->ci_idle_pcb;
+	primary_pcsp = LOCATE_PCS(hwrpb, hwrpb->rpb_primary_cpu_id);
+	pcsp = LOCATE_PCS(hwrpb, ci->ci_cpuid);
+	cpumask = (1UL << ci->ci_cpuid);
+
+	/*
+	 * Set up the PCS's HWPCB to match ours.
+	 */
+	memcpy(pcsp->pcs_hwpcb, &pcb->pcb_hw, sizeof(pcb->pcb_hw));
 
 	/*
 	 * Set up the HWRPB to restart the secondary processor
@@ -393,7 +475,7 @@ cpu_create_idle_thread(arg)
 	/* Send a "START" command to the secondary CPU's console. */
 	if (cpu_iccb_send(ci->ci_cpuid, "START\r\n")) {
 		printf("%s: unable to issue `START' command\n",
-		    ci->ci_dev->dv_xname);
+		    ci->ci_softc->sc_dev.dv_xname);
 		return;
 	}
 
@@ -405,7 +487,8 @@ cpu_create_idle_thread(arg)
 		delay(1000);
 	}
 	if (timeout == 0)
-		printf("%s: processor failed to boot\n", ci->ci_dev->dv_xname);
+		printf("%s: processor failed to boot\n",
+		    ci->ci_softc->sc_dev.dv_xname);
 
 	/*
 	 * ...and now wait for verification that it's running kernel
@@ -413,12 +496,13 @@ cpu_create_idle_thread(arg)
 	 */
 	for (timeout = 10000; timeout != 0; timeout--) {
 		alpha_mb();
-		if ((volatile u_long)cpus_running & cpumask)
+		if (cpus_running & cpumask)
 			break;
 		delay(1000);
 	}
 	if (timeout == 0)
-		printf("%s: processor failed to hatch\n", ci->ci_dev->dv_xname);
+		printf("%s: processor failed to hatch\n",
+		    ci->ci_softc->sc_dev.dv_xname);
 }
 
 void
@@ -430,12 +514,12 @@ cpu_halt_secondary(cpu_id)
 
 #ifdef DIAGNOSTIC
 	if (cpu_id >= hwrpb->rpb_pcs_cnt ||
-	    cpu_info[cpu_id].ci_dev == NULL)
+	    cpu_info[cpu_id].ci_softc == NULL)
 		panic("cpu_halt_secondary: bogus cpu_id");
 #endif
 
 	alpha_mb();
-	if (((volatile u_long)cpus_running & cpumask) == 0) {
+	if ((cpus_running & cpumask) == 0) {
 		/* Processor not running. */
 		return;
 	}
@@ -446,14 +530,14 @@ cpu_halt_secondary(cpu_id)
 	/* ...and wait for it to shut down. */
 	for (timeout = 10000; timeout != 0; timeout--) {
 		alpha_mb();
-		if (((volatile u_long)cpus_running & cpumask) == 0)
+		if ((cpus_running & cpumask) == 0)
 			return;
 		delay(1000);
 	}
 
 	/* Erk, secondary failed to halt. */
 	printf("WARNING: %s (ID %lu) failed to halt\n",
-	    cpu_info[cpu_id].ci_dev->dv_xname, cpu_id);
+	    cpu_info[cpu_id].ci_softc->sc_dev.dv_xname, cpu_id);
 }
 
 void
@@ -463,18 +547,18 @@ cpu_hatch(ci)
 	u_long cpumask = (1UL << ci->ci_cpuid);
 
 	/* Set our `curpcb' to reflect our context. */
-	curpcb = (paddr_t)ci->ci_idle_thread->p_md.md_pcbpaddr;
+	curpcb = ci->ci_idle_pcb_paddr;
 
-	/* Fully activate our address space. */
-	pmap_activate(ci->ci_idle_thread);
+	/* Mark the kernel pmap active on this processor. */
+	atomic_setbits_ulong(&pmap_kernel()->pm_cpus, cpumask);
 
 	/* Initialize trap vectors for this processor. */
 	trap_init();
 
 	/* Yahoo!  We're running kernel code!  Announce it! */
-	printf("%s: processor ID %lu running\n", ci->ci_dev->dv_xname,
-	    alpha_pal_whami());
-	alpha_atomic_setbits_q(&cpus_running, cpumask);
+	printf("%s: processor ID %lu running\n",
+	    ci->ci_softc->sc_dev.dv_xname, cpu_number());
+	atomic_setbits_ulong(&cpus_running, cpumask);
 
 	/*
 	 * Lower interrupt level so that we can get IPIs.  Don't use
@@ -514,7 +598,7 @@ cpu_iccb_send(cpu_id, msg)
 	 */
 	strcpy(pcsp->pcs_iccb.iccb_rxbuf, msg);
 	pcsp->pcs_iccb.iccb_rxlen = strlen(msg);
-	(void) alpha_atomic_testset_q(&hwrpb->rpb_rxrdy, cpumask);
+	atomic_setbits_ulong(&hwrpb->rpb_rxrdy, cpumask);
 
 	/* Wait for the message to be received. */
 	for (timeout = 10000; timeout != 0; timeout--) {

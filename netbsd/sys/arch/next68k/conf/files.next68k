@@ -1,4 +1,4 @@
-# $NetBSD: files.next68k,v 1.10.2.1 1999/04/26 15:23:04 perry Exp $
+# $NetBSD: files.next68k,v 1.16 2000/03/27 21:47:47 scottr Exp $
 
 # next68k-specific configuration info
 
@@ -9,6 +9,7 @@ maxusers 2 8 64
 
 # serial console options
 defopt opt_serial.h ZS_CONSOLE_ABORT
+defopt opt_serial.h SERCONSOLE
 
 device mainbus { }
 attach mainbus at root
@@ -82,22 +83,24 @@ file    arch/next68k/dev/nextkbd.c      nextkbd needs-flag
 file	arch/next68k/dev/wskbdmap_next.c		nextkbd
 file    arch/next68k/dev/nextcons.c                     nextkbd
 
-device	esp: scsi, ncr53c9x, disk
 attach	esp at intio
 file	arch/next68k/dev/esp.c		esp needs-flag
 
 # Memory disk for boot tape
 file arch/next68k/dev/md_root.c		memory_disk_hooks
 major	{sd = 4}
-major	{st = 5}
 major	{cd = 6}
-major	{vnd = 8}
 major	{md = 13}
 
+# RAIDframe
+major	{raid = 20}
 
 # SunOS Binary Compatibility (COMPAT_SUNOS)
 include "compat/sunos/files.sunos"
 file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
+
+# SVR4 Binary Compatibility (COMPAT_SVR4)
+include "compat/svr4/files.svr4"
 
 # Linux binary compatibility (COMPAT_LINUX)
 include "compat/linux/files.linux"

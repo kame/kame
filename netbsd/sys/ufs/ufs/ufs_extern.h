@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs_extern.h,v 1.17 1999/02/26 23:44:50 wrstuden Exp $	*/
+/*	$NetBSD: ufs_extern.h,v 1.23 2000/03/16 18:26:49 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993, 1994
@@ -35,10 +35,6 @@
  *	@(#)ufs_extern.h	8.10 (Berkeley) 5/14/95
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
-#include "opt_ffs.h"
-#endif
-
 struct buf;
 struct componentname;
 struct direct;
@@ -68,11 +64,12 @@ int	ufs_close	__P((void *));
 int	ufs_create	__P((void *));
 int	ufs_getattr	__P((void *));
 int	ufs_inactive	__P((void *));
+#define	ufs_fcntl	genfs_fcntl
 #define	ufs_ioctl	genfs_enoioctl
-int	ufs_islocked	__P((void *));
+#define	ufs_islocked	genfs_islocked
 #define	ufs_lease_check genfs_lease_check
 int	ufs_link	__P((void *));
-int	ufs_lock	__P((void *));
+#define ufs_lock	genfs_lock
 int	ufs_lookup	__P((void *));
 int	ufs_mkdir	__P((void *));
 int	ufs_mknod	__P((void *));
@@ -91,7 +88,7 @@ int	ufs_rmdir	__P((void *));
 int	ufs_setattr	__P((void *));
 int	ufs_strategy	__P((void *));
 int	ufs_symlink	__P((void *));
-int	ufs_unlock	__P((void *));
+#define ufs_unlock	genfs_unlock
 int	ufs_whiteout	__P((void *));
 int	ufsspec_close	__P((void *));
 int	ufsspec_read	__P((void *));
@@ -108,25 +105,24 @@ int ufs_getlbns __P((struct vnode *, ufs_daddr_t, struct indir *, int *));
 
 /* ufs_ihash.c */
 void ufs_ihashinit __P((void));
+void ufs_ihashdone __P((void));
 struct vnode *ufs_ihashlookup __P((dev_t, ino_t));
-struct vnode *ufs_ihashget __P((dev_t, ino_t));
+struct vnode *ufs_ihashget __P((dev_t, ino_t, int));
 void ufs_ihashins __P((struct inode *));
 void ufs_ihashrem __P((struct inode *));
 
 /* ufs_inode.c */
-void ufs_init __P((void));
 int ufs_reclaim __P((struct vnode *, struct proc *));
 
 /* ufs_lookup.c */
 void ufs_dirbad __P((struct inode *, doff_t, char *));
 int ufs_dirbadentry __P((struct vnode *, struct direct *, int));
-int ufs_direnter __P((struct inode *, struct vnode *,
-		      struct componentname *));
-int ufs_direnter2 __P((struct vnode *, struct direct *, struct ucred *,
-		       struct proc *));
-int ufs_dirremove __P((struct vnode *, struct componentname *));
-int ufs_dirrewrite __P((struct inode *, struct inode *,
-			struct componentname *));
+void ufs_makedirentry __P((struct inode *, struct componentname *,
+			   struct direct *));
+int ufs_direnter __P((struct vnode *, struct vnode *, struct direct *,
+		      struct componentname *, struct buf *));
+int ufs_dirremove __P((struct vnode *, struct inode *, int, int));
+int ufs_dirrewrite __P((struct inode *, struct inode *, ino_t, int, int));
 int ufs_dirempty __P((struct inode *, ino_t, struct ucred *));
 int ufs_checkpath __P((struct inode *, struct inode *, struct ucred *));
 
@@ -151,6 +147,8 @@ int dqsync __P((struct vnode *, struct dquot *));
 void dqflush __P((struct vnode *));
 
 /* ufs_vfsops.c */
+void ufs_init __P((void));
+void ufs_done __P((void));
 int ufs_start __P((struct mount *, int, struct proc *));
 int ufs_root __P((struct mount *, struct vnode **));
 int ufs_quotactl __P((struct mount *, int, uid_t, caddr_t, struct proc *));
@@ -164,14 +162,17 @@ int ufs_vinit __P((struct mount *, int (**) __P((void *)),
 int ufs_makeinode __P((int, struct vnode *, struct vnode **,
 		       struct componentname *));
 
-__END_DECLS
+/*
+ * Soft dependency function prototypes.
+ */
+void  softdep_setup_directory_add __P((struct buf *, struct inode *, off_t,
+                                      long, struct buf *));
+void  softdep_change_directoryentry_offset __P((struct inode *, caddr_t,
+                                      caddr_t, caddr_t, int));
+void  softdep_setup_remove __P((struct buf *,struct inode *, struct inode *,
+                              int));
+void  softdep_setup_directory_change __P((struct buf *, struct inode *,
+                              struct inode *, long, int));
+void  softdep_change_linkcnt __P((struct inode *));
 
-/* Macros to access UFS flags */
-#ifdef FFS_EI
-#define	UFS_MPNEEDSWAP(mp)	(VFSTOUFS(mp)->um_flags & UFS_NEEDSWAP)
-#define	UFS_IPNEEDSWAP(ip) \
-	(VFSTOUFS(ITOV(ip)->v_mount)->um_flags & UFS_NEEDSWAP)
-#else
-#define	UFS_MPNEEDSWAP(mp) (0)
-#define	UFS_IPNEEDSWAP(ip) (0)
-#endif
+__END_DECLS

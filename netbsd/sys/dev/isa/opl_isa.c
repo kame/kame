@@ -1,4 +1,4 @@
-/*	$NetBSD: opl_isa.c,v 1.1.6.1 1999/04/16 20:26:52 augustss Exp $	*/
+/*	$NetBSD: opl_isa.c,v 1.4 2000/02/26 05:11:27 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -83,6 +83,8 @@ opl_isa_match(parent, match, aux)
 		return (0);
 	r = opl_find(&sc);
         bus_space_unmap(sc.iot, sc.ioh, OPL_SIZE);
+	if (r != 0)
+		ia->ia_iosize = OPL_SIZE;
 	return (r);
 }
 
@@ -94,6 +96,8 @@ opl_isa_attach(parent, self, aux)
 {
 	struct opl_softc *sc = (struct opl_softc *)self;
 	struct isa_attach_args *ia = aux;
+
+	sc->iot = ia->ia_iot;
 
 	if (bus_space_map(sc->iot, ia->ia_iobase, OPL_SIZE, 0, &sc->ioh)) {
 		printf("opl_isa_attach: bus_space_map failed\n");

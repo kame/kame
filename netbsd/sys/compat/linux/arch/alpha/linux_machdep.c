@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.c,v 1.6 1999/03/24 05:51:19 mrg Exp $	*/
+/*	$NetBSD: linux_machdep.c,v 1.9 2000/03/30 11:27:16 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,8 +40,6 @@
  *	written by Frank van der Linden
  *
  */
-
-#include "opt_pmap_new.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,7 +107,7 @@ void setup_linux_rt_sigframe(tf, sig, mask)
 	int sig;
 	sigset_t *mask;
 {
-	register struct proc *p = curproc;
+	struct proc *p = curproc;
 	struct linux_rt_sigframe *sfp, sigframe;
 	struct sigacts *psp = p->p_sigacts;
 	int onstack;
@@ -143,8 +141,12 @@ void setup_linux_rt_sigframe(tf, sig, mask)
 	 */
 	bzero(&sigframe.uc, sizeof(struct linux_ucontext));
 	sigframe.uc.uc_mcontext.sc_onstack = onstack;
-	/* XXX XAX is sc_mask the correct field? isn't there more room here? */
-	native_to_linux_sigset(mask, &sigframe.uc.uc_mcontext.sc_mask);
+
+	/* Setup potentially partial signal mask in sc_mask. */
+	/* But get all of it in uc_sigmask */
+	native_to_linux_old_sigset(mask, &sigframe.uc.uc_mcontext.sc_mask);
+	native_to_linux_sigset(mask, &sigframe.uc.uc_sigmask);
+
 	sigframe.uc.uc_mcontext.sc_pc = tf->tf_regs[FRAME_PC];
 	sigframe.uc.uc_mcontext.sc_ps = ALPHA_PSL_USERMODE;
 	frametoreg(tf, (struct reg *)sigframe.uc.uc_mcontext.sc_regs);
@@ -210,7 +212,7 @@ void setup_linux_sigframe(tf, sig, mask)
 	int sig;
 	sigset_t *mask;
 {
-	register struct proc *p = curproc;
+	struct proc *p = curproc;
 	struct linux_sigframe *sfp, sigframe;
 	struct sigacts *psp = p->p_sigacts;
 	int onstack;
@@ -310,8 +312,8 @@ linux_sendsig(catcher, sig, mask, code)
 	sigset_t *mask;
 	u_long code;
 {
-	register struct proc *p = curproc;
-	register struct trapframe *tf = p->p_md.md_tf;
+	struct proc *p = curproc;
+	struct trapframe *tf = p->p_md.md_tf;
 	struct linux_emuldata *edp;
 
 	/* Setup the signal frame (and part of the trapframe) */
@@ -359,11 +361,9 @@ linux_sendsig(catcher, sig, mask, code)
  */
 
 int
-linux_restore_sigcontext(p, context)
-	struct proc *p;
-	struct linux_sigcontext context;
+linux_restore_sigcontext(struct proc *p, struct linux_sigcontext context,
+			 sigset_t *mask)
 {
-	sigset_t bss;
 
 	/*
 	 * Linux doesn't (yet) have alternate signal stacks.
@@ -376,9 +376,7 @@ linux_restore_sigcontext(p, context)
 	    p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Reset the signal mask */
-	/* XXX XAX which sigset do we use? */
-	linux_to_native_sigset(&context.sc_mask, &bss);
-	(void) sigprocmask1(p, SIG_SETMASK, &bss, 0);
+	(void) sigprocmask1(p, SIG_SETMASK, mask, 0);
 
 	/*
 	 * Check for security violations.
@@ -419,6 +417,7 @@ linux_sys_rt_sigreturn(p, v, retval)
 		syscallarg(struct linux_rt_sigframe *) sfp;
 	} */ *uap = v;
 	struct linux_rt_sigframe *sfp, sigframe;
+	sigset_t mask;
 
 	/*
 	 * The trampoline code hands us the context.
@@ -438,7 +437,10 @@ linux_sys_rt_sigreturn(p, v, retval)
 			sizeof(struct linux_rt_sigframe)) != 0)
 		return (EFAULT);
 
-	return(linux_restore_sigcontext(p, sigframe.uc.uc_mcontext));
+	/* Grab the signal mask */
+	linux_to_native_sigset(&sigframe.uc.uc_sigmask, &mask);
+
+	return(linux_restore_sigcontext(p, sigframe.uc.uc_mcontext, &mask));
 }
 
 
@@ -451,7 +453,8 @@ linux_sys_sigreturn(p, v, retval)
 	struct linux_sys_sigreturn_args /* {
 		syscallarg(struct linux_sigframe *) sfp;
 	} */ *uap = v;
-	struct linux_sigcontext *scp, context;
+	struct linux_sigframe *sfp, frame;
+	sigset_t mask;
 
 	/*
 	 * The trampoline code hands us the context.
@@ -459,21 +462,21 @@ linux_sys_sigreturn(p, v, retval)
 	 * program jumps out of a signal handler.
 	 */
 
-	/* XXX Only works because sigcontext is first in sigframe */
-	/* XXX extramask is ignored */
-	scp = (struct linux_sigcontext *)SCARG(uap, sfp);
-
-	if (ALIGN(scp) != (u_int64_t)scp)
+	sfp = SCARG(uap, sfp);
+	if (ALIGN(sfp) != (u_int64_t)sfp)
 		return(EINVAL);
 
 	/*
-	 * Fetch the context structure.
+	 * Fetch the frame structure.
 	 */
-	if (copyin((caddr_t)scp, &context,
-			sizeof(struct linux_sigcontext)) != 0)
-		return (EFAULT);
+	if (copyin((caddr_t)sfp, &frame, sizeof(struct linux_sigframe)) != 0)
+		return(EFAULT);
 
-	return(linux_restore_sigcontext(p, context));
+	/* Grab the signal mask. */
+	/* XXX use frame.extramask */
+	linux_old_to_native_sigset(frame.sf_sc.sc_mask, &mask);
+
+	return(linux_restore_sigcontext(p, frame.sf_sc, &mask));
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_threadstuff.c,v 1.3 1999/02/05 00:06:18 oster Exp $	*/
+/*	$NetBSD: rf_threadstuff.c,v 1.5 1999/12/07 02:13:28 oster Exp $	*/
 /*
  * rf_threadstuff.c
  */
@@ -36,7 +36,6 @@
 
 static void mutex_destroyer(void *);
 static void cond_destroyer(void *);
-void    thread_wakeup(void *);
 
 /*
  * Shared stuff
@@ -139,13 +138,8 @@ _rf_destroy_threadgroup(g, file, line)
 {
 	int     rc1, rc2;
 
-#if RF_DEBUG_ATOMIC > 0
-	rc1 = _rf_mutex_destroy(&g->mutex, file, line);
-	rc2 = _rf_cond_destroy(&g->cond, file, line);
-#else				/* RF_DEBUG_ATOMIC > 0 */
 	rc1 = rf_mutex_destroy(&g->mutex);
 	rc2 = rf_cond_destroy(&g->cond);
-#endif				/* RF_DEBUG_ATOMIC > 0 */
 	if (rc1)
 		return (rc1);
 	return (rc2);
@@ -159,16 +153,6 @@ _rf_init_threadgroup(g, file, line)
 {
 	int     rc;
 
-#if RF_DEBUG_ATOMIC > 0
-	rc = _rf_mutex_init(&g->mutex, file, line);
-	if (rc)
-		return (rc);
-	rc = _rf_cond_init(&g->cond, file, line);
-	if (rc) {
-		_rf_mutex_destroy(&g->mutex, file, line);
-		return (rc);
-	}
-#else				/* RF_DEBUG_ATOMIC > 0 */
 	rc = rf_mutex_init(&g->mutex);
 	if (rc)
 		return (rc);
@@ -177,7 +161,6 @@ _rf_init_threadgroup(g, file, line)
 		rf_mutex_destroy(&g->mutex);
 		return (rc);
 	}
-#endif				/* RF_DEBUG_ATOMIC > 0 */
 	g->created = g->running = g->shutdown = 0;
 	return (0);
 }

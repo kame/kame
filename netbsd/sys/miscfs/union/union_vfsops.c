@@ -1,4 +1,4 @@
-/*	$NetBSD: union_vfsops.c,v 1.21 1999/02/26 23:44:46 wrstuden Exp $	*/
+/*	$NetBSD: union_vfsops.c,v 1.25 2000/06/10 18:27:04 assar Exp $	*/
 
 /*
  * Copyright (c) 1994 The Regents of the University of California.
@@ -188,7 +188,7 @@ union_mount(mp, path, data, ndp, p)
 
 	um->um_cred = p->p_ucred;
 	crhold(um->um_cred);
-	um->um_cmode = UN_DIRMODE &~ p->p_fd->fd_cmask;
+	um->um_cmode = UN_DIRMODE &~ p->p_cwdi->cwdi_cmask;
 
 	/*
 	 * Depending on what you think the MNT_LOCAL flag might mean,
@@ -216,7 +216,7 @@ union_mount(mp, path, data, ndp, p)
 	mp->mnt_flag |= (um->um_uppervp->v_mount->mnt_flag & MNT_RDONLY);
 
 	mp->mnt_data = (qaddr_t)um;
-	vfs_getnewfsid(mp, MOUNT_UNION);
+	vfs_getnewfsid(mp);
 
 	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
 	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
@@ -294,14 +294,10 @@ union_unmount(mp, mntflags, p)
 	struct vnode *um_rootvp;
 	int error;
 	int freeing;
-	int flags = 0;
 
 #ifdef UNION_DIAGNOSTIC
 	printf("union_unmount(mp = %p)\n", mp);
 #endif
-
-	if (mntflags & MNT_FORCE)
-		flags |= FORCECLOSE;
 
 	if ((error = union_root(mp, &um_rootvp)) != 0)
 		return (error);
@@ -315,7 +311,7 @@ union_unmount(mp, mntflags, p)
 	 * (d) times, where (d) is the maximum tree depth
 	 * in the filesystem.
 	 */
-	for (freeing = 0; vflush(mp, um_rootvp, flags) != 0;) {
+	for (freeing = 0; vflush(mp, um_rootvp, 0) != 0;) {
 		struct vnode *vp;
 		int n;
 
@@ -332,6 +328,14 @@ union_unmount(mp, mntflags, p)
 		/* otherwise try once more time */
 		freeing = n;
 	}
+
+	/*
+	 * Ok, now that we've tried doing it gently, get out the hammer.
+	 */
+
+	if (mntflags & MNT_FORCE)
+		vflush(mp, um_rootvp, FORCECLOSE);
+	
 
 	/* At this point the root vnode should have a single reference */
 	if (um_rootvp->v_usecount > 1) {
@@ -576,6 +580,7 @@ struct vfsops union_vfsops = {
 	union_fhtovp,
 	union_vptofh,
 	union_init,
+	union_done,
 	union_sysctl,
 	NULL,				/* vfs_mountroot */
 	union_checkexp,

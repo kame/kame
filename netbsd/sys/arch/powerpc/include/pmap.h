@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.11 1999/03/05 06:10:48 tsubai Exp $	*/
+/*	$NetBSD: pmap.h,v 1.17 2000/03/30 16:18:24 jdolecek Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -63,23 +63,35 @@ typedef	struct pmap *pmap_t;
 extern struct pmap kernel_pmap_;
 #define	pmap_kernel()	(&kernel_pmap_)
 
-#define pmap_clear_modify(pa)		(ptemodify((pa), PTE_CHG, 0))
-#define	pmap_clear_reference(pa)	(ptemodify((pa), PTE_REF, 0))
-#define	pmap_is_modified(pa)		(ptebits((pa), PTE_CHG))
-#define	pmap_is_referenced(pa)		(ptebits((pa), PTE_REF))
-#define	pmap_change_wiring(pm, va, wired)
+#define pmap_clear_modify(pg)		(ptemodify((pg), PTE_CHG, 0))
+#define	pmap_clear_reference(pg)	(ptemodify((pg), PTE_REF, 0))
+#define	pmap_is_modified(pg)		(ptebits((pg), PTE_CHG))
+#define	pmap_is_referenced(pg)		(ptebits((pg), PTE_REF))
+#define	pmap_unwire(pm, va)
 
 #define	pmap_phys_address(x)		(x)
 
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 
 void pmap_bootstrap __P((u_int kernelstart, u_int kernelend));
-paddr_t pmap_extract __P((struct pmap *, vaddr_t));
-void ptemodify __P((paddr_t, u_int, u_int));
-int ptebits __P((paddr_t, int));
+boolean_t pmap_extract __P((struct pmap *, vaddr_t, paddr_t *));
+boolean_t ptemodify __P((struct vm_page *, u_int, u_int));
+int ptebits __P((struct vm_page *, int));
 
 #define PMAP_NEED_PROCWR
 void pmap_procwr __P((struct proc *, vaddr_t, size_t));
+
+/*
+ * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
+ *
+ * Note: This won't work if we have more memory than can be direct-mapped
+ * VA==PA all at once.  But pmap_copy_page() and pmap_zero_page() will have
+ * this problem, too.
+ */
+#define	PMAP_MAP_POOLPAGE(pa)	(pa)
+#define	PMAP_UNMAP_POOLPAGE(pa)	(pa)
+
+static __inline paddr_t vtophys __P((vaddr_t));
 
 static __inline paddr_t
 vtophys(va)
@@ -89,7 +101,7 @@ vtophys(va)
 
 	/* XXX should check battable */
 
-	if ((pa = pmap_extract(pmap_kernel(), va)) != 0)
+	if (pmap_extract(pmap_kernel(), va, &pa))
 		return pa;
 	return va;
 }

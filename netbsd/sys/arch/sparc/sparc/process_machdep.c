@@ -1,4 +1,4 @@
-/*	$NetBSD: process_machdep.c,v 1.6.24.1 2000/01/08 18:02:35 he Exp $ */
+/*	$NetBSD: process_machdep.c,v 1.7 1999/12/29 15:21:27 pk Exp $ */
 
 /*
  * Copyright (c) 1993 The Regents of the University of California.

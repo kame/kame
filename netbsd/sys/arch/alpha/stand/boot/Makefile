@@ -1,14 +1,18 @@
-# $NetBSD: Makefile,v 1.26 1999/04/05 06:56:23 cgd Exp $
+# $NetBSD: Makefile,v 1.28.12.1 2000/09/26 15:47:58 simonb Exp $
 
 PROG = boot
 
-SRCS = start.S boot.c loadfile.c blkdev.c prom.c prom_disp.S OSFpal.c
+SRCS = start.S boot.c blkdev.c prom.c prom_disp.S OSFpal.c
 SRCS+= filesystem.c prom_swpal.S booted_dev.c
+
+# XXX for debugging primary and secondary together
+# SRCS+= putstr.c putulong.c
 
 BOOT_RELOC = ${SECONDARY_LOAD_ADDRESS}
 
 CPPFLAGS += ${SECONDARY_CPPFLAGS} \
 		-DBOOT_TYPE_NAME='"Secondary"' \
+		-DBOOTXX_RAID1_SUPPORT \
 		-DLIBSA_SINGLE_DEVICE=blkdev \
 		  -D"blkdevioctl(x,y,z)=EINVAL"
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ims332.c,v 1.8 1997/11/16 10:17:57 jonathan Exp $	*/
+/*	$NetBSD: ims332.c,v 1.12 2000/01/10 03:24:32 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993, 1995
@@ -40,19 +40,16 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: ims332.c,v 1.8 1997/11/16 10:17:57 jonathan Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ims332.c,v 1.12 2000/01/10 03:24:32 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <sys/kernel.h>
-#include <sys/errno.h>
 
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
 
 #include <pmax/dev/ims332.h>
-
 
 #define	assert_ims332_reset_bit(r)	*r &= ~0x40
 #define	deassert_ims332_reset_bit(r)	*r |=  0x40
@@ -77,7 +74,7 @@ ims332init(fi)
 	 * Initialize the screen. (xcfb-specific)
 	 */
 #ifdef notdef
-	register u_int *reset = (u_int *)fi -> fi_base;
+	u_int *reset = (u_int *)fi -> fi_base;
 
 
 	assert_ims332_reset_bit(reset);
@@ -138,9 +135,9 @@ ims332_read_register(fi, regno)
 	struct fbinfo *fi;
 	int regno;
 {
-	register u_char *regs = (u_char *)fi -> fi_vdac;
+	u_char *regs = (u_char *)fi -> fi_vdac;
 	unsigned char *rptr;
-	register u_int val, v1;
+	u_int val, v1;
 
 	/* spec sez: */
 	rptr = regs + 0x80000 + (regno << 4);
@@ -154,9 +151,9 @@ static void
 ims332_write_register(fi, regno, val)
 	struct fbinfo *fi;
 	int regno;
-	register unsigned int val;
+	unsigned int val;
 {
-	register u_char *regs = (u_char *)fi -> fi_vdac;
+	u_char *regs = (u_char *)fi -> fi_vdac;
 	u_char *wptr;
 
 	/* spec sez: */
@@ -169,11 +166,11 @@ ims332_write_register(fi, regno, val)
 /*
  * Turn off hardware cursor sprite.
  */
-static __inline void	
+static __inline void
 ims332_cursor_off(fi)
-	register struct fbinfo *fi;
+	struct fbinfo *fi;
 {
-	register u_int csr;
+	u_int csr;
 
 	csr = ims332_read_register (fi, IMS332_REG_CSR_A);
 	csr |= IMS332_CSR_A_DISABLE_CURSOR;
@@ -182,13 +179,13 @@ ims332_cursor_off(fi)
 
 
 /*
- * Turn on hardware cursor. 
+ * Turn on hardware cursor.
  */
-static __inline void	
+static __inline void
 ims332_cursor_on(fi)
-	register struct fbinfo *fi;
+	struct fbinfo *fi;
 {
-	register u_int csr;
+	u_int csr;
 
 	csr = ims332_read_register (fi, IMS332_REG_CSR_A);
 	csr &= ~IMS332_CSR_A_DISABLE_CURSOR;
@@ -197,7 +194,7 @@ ims332_cursor_on(fi)
 
 /*
  * Set screen colourmap to default state.
- * For X11's benefit, the default sate entry is that 
+ * For X11's benefit, the default sate entry is that
  * zero is black and all other entries are full white.
  * The hardwaer cursor is turned off.
  */
@@ -231,7 +228,7 @@ ims332InitColorMap(fi)
 int
 ims332LoadColorMap(fi, bits, index, count)
 	struct fbinfo *fi;
-	caddr_t bits;
+	const u_char *bits;
 	int index, count;
 {
 	u_char *cmap_bits;
@@ -262,7 +259,7 @@ ims332LoadColorMap(fi, bits, index, count)
 int
 ims332GetColorMap(fi, bits, index, count)
 	struct fbinfo *fi;
-	caddr_t bits;
+	u_char *bits;
 	int index, count;
 {
 	u_char *cmap_bits;
@@ -323,7 +320,7 @@ ims332_video_on (fi)
 			       ((unsigned)cmap [0] |
 				((unsigned)cmap [1] << 8) |
 				((unsigned)cmap [2] << 16)));
-	
+
 	ims332_write_register (fi, IMS332_REG_COLOR_MASK, 0xffffffff);
 
 	/* cursor now */
@@ -381,7 +378,7 @@ ims332CursorColor (fi, color)
 	struct fbinfo *fi;
 	unsigned int color[];
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < 6; i++)
 		cursor_RGB[i] = (u_char)(color[i] >> 8);
@@ -394,8 +391,8 @@ ims332LoadCursor(fi, cursor)
 	struct fbinfo *fi;
 	u_short *cursor;
 {
-	register int i, j, k, pos;
-	register u_short ap, bp, out;
+	int i, j, k, pos;
+	u_short ap, bp, out;
 
 	/*
 	 * Fill in the cursor sprite using the A and B planes, as provided

@@ -1,4 +1,4 @@
-/*	$NetBSD: adv.c,v 1.11 1999/03/04 20:16:56 dante Exp $	*/
+/*	$NetBSD: adv.c,v 1.16.4.1 2000/08/11 22:24:44 tls Exp $	*/
 
 /*
  * Generic driver for the Advanced Systems Inc. Narrow SCSI controllers
@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
@@ -73,7 +74,7 @@
 /******************************************************************************/
 
 
-static int adv_alloc_ccbs __P((ASC_SOFTC *));
+static int adv_alloc_control_data __P((ASC_SOFTC *));
 static int adv_create_ccbs __P((ASC_SOFTC *, ADV_CCB *, int));
 static void adv_free_ccb __P((ASC_SOFTC *, ADV_CCB *));
 static void adv_reset_ccb __P((ADV_CCB *));
@@ -82,7 +83,6 @@ static ADV_CCB *adv_get_ccb __P((ASC_SOFTC *, int));
 static void adv_queue_ccb __P((ASC_SOFTC *, ADV_CCB *));
 static void adv_start_ccbs __P((ASC_SOFTC *));
 
-static u_int8_t *adv_alloc_overrunbuf __P((char *dvname, bus_dma_tag_t));
 
 static int adv_scsi_cmd __P((struct scsipi_xfer *));
 static void advminphys __P((struct buf *));
@@ -111,17 +111,12 @@ struct scsipi_device adv_dev =
 
 
 /******************************************************************************/
-/*                            scsipi_xfer queue routines                      */
-/******************************************************************************/
-
-
-/******************************************************************************/
 /*                             Control Blocks routines                        */
 /******************************************************************************/
 
 
 static int
-adv_alloc_ccbs(sc)
+adv_alloc_control_data(sc)
 	ASC_SOFTC      *sc;
 {
 	bus_dma_segment_t seg;
@@ -160,6 +155,13 @@ adv_alloc_ccbs(sc)
 		       sc->sc_dev.dv_xname, error);
 		return (error);
 	}
+
+	/*
+	 * Initialize the overrun_buf address.
+	 */
+	sc->overrun_buf = sc->sc_dmamap_control->dm_segs[0].ds_addr +
+	    offsetof(struct adv_control, overrun_buf);
+
 	return (0);
 }
 
@@ -234,6 +236,8 @@ adv_init_ccb(sc, ccb)
 {
 	int	hashnum, error;
 
+	callout_init(&ccb->ccb_watchdog);
+
 	/*
          * Create the DMA map for this CCB.
          */
@@ -287,7 +291,7 @@ adv_get_ccb(sc, flags)
 			TAILQ_REMOVE(&sc->sc_free_ccb, ccb, chain);
 			break;
 		}
-		if ((flags & SCSI_NOSLEEP) != 0)
+		if ((flags & XS_CTL_NOSLEEP) != 0)
 			goto out;
 
 		tsleep(&sc->sc_free_ccb, PRIBIO, "advccb", 0);
@@ -344,85 +348,22 @@ adv_start_ccbs(sc)
 
 	while ((ccb = sc->sc_waiting_ccb.tqh_first) != NULL) {
 		if (ccb->flags & CCB_WATCHDOG)
-			untimeout(adv_watchdog, ccb);
+			callout_stop(&ccb->ccb_watchdog);
 
 		if (AscExeScsiQueue(sc, &ccb->scsiq) == ASC_BUSY) {
 			ccb->flags |= CCB_WATCHDOG;
-			timeout(adv_watchdog, ccb,
-				(ADV_WATCH_TIMEOUT * hz) / 1000);
+			callout_reset(&ccb->ccb_watchdog,
+			    (ADV_WATCH_TIMEOUT * hz) / 1000,
+			    adv_watchdog, ccb);
 			break;
 		}
 		TAILQ_REMOVE(&sc->sc_waiting_ccb, ccb, chain);
 
-		if ((ccb->xs->flags & SCSI_POLL) == 0)
-			timeout(adv_timeout, ccb, (ccb->timeout * hz) / 1000);
+		if ((ccb->xs->xs_control & XS_CTL_POLL) == 0)
+			callout_reset(&ccb->xs->xs_callout,
+			    (ccb->timeout * hz) / 1000,
+			    adv_timeout, ccb);
 	}
-}
-
-
-/******************************************************************************/
-/*                      DMA able memory allocation routines                   */
-/******************************************************************************/
-
-
-/*
- * Allocate a DMA able memory for overrun_buffer.
- * This memory can be safely shared among all the AdvanSys boards.
- */
-u_int8_t       *
-adv_alloc_overrunbuf(dvname, dmat)
-	char           *dvname;
-	bus_dma_tag_t   dmat;
-{
-	static u_int8_t *overrunbuf = NULL;
-
-	bus_dmamap_t    ovrbuf_dmamap;
-	bus_dma_segment_t seg;
-	int             rseg, error;
-
-
-	/*
-         * if an overrun buffer has been already allocated don't allocate it
-         * again. Instead return the address of the allocated buffer.
-         */
-	if (overrunbuf)
-		return (overrunbuf);
-
-
-	if ((error = bus_dmamem_alloc(dmat, ASC_OVERRUN_BSIZE,
-			   NBPG, 0, &seg, 1, &rseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to allocate overrun buffer, error = %d\n",
-		       dvname, error);
-		return (0);
-	}
-	if ((error = bus_dmamem_map(dmat, &seg, rseg, ASC_OVERRUN_BSIZE,
-	(caddr_t *) & overrunbuf, BUS_DMA_NOWAIT | BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map overrun buffer, error = %d\n",
-		       dvname, error);
-
-		bus_dmamem_free(dmat, &seg, 1);
-		return (0);
-	}
-	if ((error = bus_dmamap_create(dmat, ASC_OVERRUN_BSIZE, 1,
-	      ASC_OVERRUN_BSIZE, 0, BUS_DMA_NOWAIT, &ovrbuf_dmamap)) != 0) {
-		printf("%s: unable to create overrun buffer DMA map,"
-		       " error = %d\n", dvname, error);
-
-		bus_dmamem_unmap(dmat, overrunbuf, ASC_OVERRUN_BSIZE);
-		bus_dmamem_free(dmat, &seg, 1);
-		return (0);
-	}
-	if ((error = bus_dmamap_load(dmat, ovrbuf_dmamap, overrunbuf,
-			   ASC_OVERRUN_BSIZE, NULL, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to load overrun buffer DMA map,"
-		       " error = %d\n", dvname, error);
-
-		bus_dmamap_destroy(dmat, ovrbuf_dmamap);
-		bus_dmamem_unmap(dmat, overrunbuf, ASC_OVERRUN_BSIZE);
-		bus_dmamem_free(dmat, &seg, 1);
-		return (0);
-	}
-	return (overrunbuf);
 }
 
 
@@ -437,8 +378,10 @@ adv_init(sc)
 {
 	int             warn;
 
-	if (!AscFindSignature(sc->sc_iot, sc->sc_ioh))
-		panic("adv_init: adv_find_signature failed");
+	if (!AscFindSignature(sc->sc_iot, sc->sc_ioh)) {
+		printf("adv_init: failed to find signature\n");
+		return (1);
+	}
 
 	/*
          * Read the board configuration
@@ -505,11 +448,6 @@ adv_init(sc)
 	}
 	sc->isr_callback = (ASC_CALLBACK) adv_narrow_isr_callback;
 
-	if (!(sc->overrun_buf = adv_alloc_overrunbuf(sc->sc_dev.dv_xname,
-						     sc->sc_dmat))) {
-		return (1);
-	}
-
 	return (0);
 }
 
@@ -573,11 +511,11 @@ adv_attach(sc)
 
 
 	/*
-         * Allocate the Control Blocks.
+         * Allocate the Control Blocks and the overrun buffer.
          */
-	error = adv_alloc_ccbs(sc);
+	error = adv_alloc_control_data(sc);
 	if (error)
-		return; /* (error) */ ;
+		return; /* (error) */
 
 	/*
          * Create and initialize the Control Blocks.
@@ -619,7 +557,7 @@ adv_scsi_cmd(xs)
 	bus_dma_tag_t   dmat = sc->sc_dmat;
 	ADV_CCB        *ccb;
 	int             s, flags, error, nsegs;
-	int             fromqueue = 1, dontqueue = 0;
+	int             fromqueue = 0, dontqueue = 0, nowait = 0;
 
 
 	s = splbio();		/* protect the queue */
@@ -631,10 +569,11 @@ adv_scsi_cmd(xs)
 	if (xs == TAILQ_FIRST(&sc->sc_queue)) {
 		TAILQ_REMOVE(&sc->sc_queue, xs, adapter_q);
 		fromqueue = 1;
+		nowait = 1;
 	} else {
 
 		/* Polled requests can't be queued for later. */
-		dontqueue = xs->flags & SCSI_POLL;
+		dontqueue = xs->xs_control & XS_CTL_POLL;
 
 		/*
                  * If there are jobs in the queue, run them first.
@@ -666,7 +605,9 @@ adv_scsi_cmd(xs)
          * then we can't allow it to sleep
          */
 
-	flags = xs->flags;
+	flags = xs->xs_control;
+	if (nowait)
+		flags |= XS_CTL_NOSLEEP;
 	if ((ccb = adv_get_ccb(sc, flags)) == NULL) {
 		/*
                  * If we can't queue, we lose.
@@ -722,7 +663,10 @@ adv_scsi_cmd(xs)
 	    (sc->reqcnt[sc_link->scsipi_scsi.target] % 255) == 0) {
 		ccb->scsiq.q2.tag_code = M2_QTAG_MSG_ORDERED;
 	} else {
-		ccb->scsiq.q2.tag_code = M2_QTAG_MSG_SIMPLE;
+		if((xs->bp != NULL) && xs->bp->b_flags & B_ASYNC)
+			ccb->scsiq.q2.tag_code = M2_QTAG_MSG_SIMPLE;
+		else
+			ccb->scsiq.q2.tag_code = M2_QTAG_MSG_ORDERED;
 	}
 
 
@@ -734,13 +678,13 @@ adv_scsi_cmd(xs)
 		if (flags & SCSI_DATA_UIO) {
 			error = bus_dmamap_load_uio(dmat,
 				  ccb->dmamap_xfer, (struct uio *) xs->data,
-						    (flags & SCSI_NOSLEEP) ? BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
+						    (flags & XS_CTL_NOSLEEP) ? BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
 		} else
 #endif				/* TFS */
 		{
 			error = bus_dmamap_load(dmat,
 			      ccb->dmamap_xfer, xs->data, xs->datalen, NULL,
-						(flags & SCSI_NOSLEEP) ? BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
+						(flags & XS_CTL_NOSLEEP) ? BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
 		}
 
 		if (error) {
@@ -760,7 +704,7 @@ adv_scsi_cmd(xs)
 		}
 		bus_dmamap_sync(dmat, ccb->dmamap_xfer, 0,
 				ccb->dmamap_xfer->dm_mapsize,
-			      (flags & SCSI_DATA_IN) ? BUS_DMASYNC_PREREAD :
+			      (flags & XS_CTL_DATA_IN) ? BUS_DMASYNC_PREREAD :
 				BUS_DMASYNC_PREWRITE);
 
 
@@ -802,7 +746,7 @@ adv_scsi_cmd(xs)
 	/*
          * Usually return SUCCESSFULLY QUEUED
          */
-	if ((flags & SCSI_POLL) == 0)
+	if ((flags & XS_CTL_POLL) == 0)
 		return (SUCCESSFULLY_QUEUED);
 
 	/*
@@ -867,7 +811,7 @@ adv_poll(sc, xs, count)
 	/* timeouts are in msec, so we loop in 1000 usec cycles */
 	while (count) {
 		adv_intr(sc);
-		if (xs->flags & ITSDONE)
+		if (xs->xs_status & XS_STS_DONE)
 			return (0);
 		delay(1000);	/* only happens in boot so ok */
 		count--;
@@ -966,7 +910,7 @@ adv_narrow_isr_callback(sc, qdonep)
 			xs->sc_link->scsipi_scsi.target,
 			xs->sc_link->scsipi_scsi.lun, xs->cmd->opcode);
 #endif
-	untimeout(adv_timeout, ccb);
+	callout_stop(&ccb->xs->xs_callout);
 
 	/*
          * If we were a data transfer, unload the map that described
@@ -975,8 +919,8 @@ adv_narrow_isr_callback(sc, qdonep)
 	if (xs->datalen) {
 		bus_dmamap_sync(dmat, ccb->dmamap_xfer, 0,
 				ccb->dmamap_xfer->dm_mapsize,
-			 (xs->flags & SCSI_DATA_IN) ? BUS_DMASYNC_POSTREAD :
-				BUS_DMASYNC_POSTWRITE);
+			 (xs->xs_control & XS_CTL_DATA_IN) ?
+			 BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
 		bus_dmamap_unload(dmat, ccb->dmamap_xfer);
 	}
 	if ((ccb->flags & CCB_ALLOC) == 0) {
@@ -1045,6 +989,6 @@ adv_narrow_isr_callback(sc, qdonep)
 
 
 	adv_free_ccb(sc, ccb);
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 	scsipi_done(xs);
 }

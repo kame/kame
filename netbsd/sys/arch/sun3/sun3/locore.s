@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.66.2.1 1999/04/30 16:28:17 perry Exp $	*/
+/*	$NetBSD: locore.s,v 1.74 2000/05/31 05:06:56 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Gordon W. Ross
@@ -44,6 +44,7 @@
  */
 
 #include "opt_compat_netbsd.h"
+#include "opt_compat_svr4.h"
 #include "opt_compat_sunos.h"
 
 #include "assym.h"
@@ -368,8 +369,17 @@ GLOBAL(trace)
 	clrl	sp@-			| stack adjust count
 	moveml	#0xFFFF,sp@-
 	moveq	#T_TRACE,d0
-	btst	#5,sp@(FR_HW)		| was supervisor mode?
-	jne	_ASM_LABEL(kbrkpt)	|  yes, kernel brkpt
+
+	| Check PSW and see what happen.
+	|   T=0 S=0	(should not happen)
+	|   T=1 S=0	trace trap from user mode
+	|   T=0 S=1	trace trap on a trap instruction
+	|   T=1 S=1	trace trap from system mode (kernel breakpoint)
+
+	movw	sp@(FR_HW),d1		| get PSW
+	notw	d1			| XXX no support for T0 on 680[234]0
+	andw	#PSL_TS,d1		| from system mode (T=1, S=1)?
+	jeq	_ASM_LABEL(kbrkpt)	|  yes, kernel brkpt
 	jra	_ASM_LABEL(fault)	| no, user-mode fault
 
 /*
@@ -631,7 +641,7 @@ Lidle:
 GLOBAL(_Idle)				| See clock.c
 	movw	#PSL_HIGHIPL,sr
 	addql	#1, _C_LABEL(Idle_count)
-	tstl	_C_LABEL(whichqs)
+	tstl	_C_LABEL(sched_whichqs)
 	jeq	Lidle
 	movw	#PSL_LOWIPL,sr
 	jra	Lsw1
@@ -661,7 +671,7 @@ Lsw1:
 	 * then take the first proc from that queue.
 	 */
 	clrl	d0
-	lea	_C_LABEL(whichqs),a0
+	lea	_C_LABEL(sched_whichqs),a0
 	movl	a0@,d1
 Lswchk:
 	btst	d0,d1
@@ -688,20 +698,28 @@ Lswfnd:
 Lswok:
 	movl	d0,d1
 	lslb	#3,d1			| convert queue number to index
-	addl	#_qs,d1			| locate queue (q)
+	addl	#_C_LABEL(sched_qs),d1	| locate queue (q)
 	movl	d1,a1
 	cmpl	a1@(P_FORW),a1		| anyone on queue?
 	jeq	Lbadsw			| no, panic
 	movl	a1@(P_FORW),a0		| p = q->p_forw
+#ifdef DIAGNOSTIC
+	tstl	a0@(P_WCHAN)
+	jne	Lbadsw
+	cmpb	#SRUN,a0@(P_STAT)
+	jne	Lbadsw
+#endif
 	movl	a0@(P_FORW),a1@(P_FORW)	| q->p_forw = p->p_forw
 	movl	a0@(P_FORW),a1		| q = p->p_forw
 	movl	a0@(P_BACK),a1@(P_BACK)	| q->p_back = p->p_back
 	cmpl	a0@(P_FORW),d1		| anyone left on queue?
 	jeq	Lsw2			| no, skip
-	movl	_C_LABEL(whichqs),d1
+	movl	_C_LABEL(sched_whichqs),d1
 	bset	d0,d1			| yes, reset bit
-	movl	d1,_C_LABEL(whichqs)
+	movl	d1,_C_LABEL(sched_whichqs)
 Lsw2:
+	/* p->p_cpu initialized in fork1() for single-processor */
+	movb	#SONPROC,a0@(P_STAT)	| p->p_stat = SONPROC
 	movl	a0,_C_LABEL(curproc)
 	clrl	_C_LABEL(want_resched)
 #ifdef notyet
@@ -734,12 +752,6 @@ Lswnofpsave:
 	 * In this section, keep:  a0=curproc, a1=curpcb
 	 */
 
-#ifdef DIAGNOSTIC
-	tstl	a0@(P_WCHAN)
-	jne	Lbadsw
-	cmpb	#SRUN,a0@(P_STAT)
-	jne	Lbadsw
-#endif
 	clrl	a0@(P_BACK)		| clear back link
 	movl	a0@(P_ADDR),a1		| get p_addr
 	movl	a1,_C_LABEL(curpcb)
@@ -941,6 +953,16 @@ GLOBAL(_delay)
 	movl	sp@(4),d0
 	| d1 = delay_divisor;
 	movl	_C_LABEL(delay_divisor),d1
+	jra	L_delay			/* Jump into the loop! */
+
+	/*
+	 * Align the branch target of the loop to a half-line (8-byte)
+	 * boundary to minimize cache effects.  This guarantees both
+	 * that there will be no prefetch stalls due to cache line burst
+	 * operations and that the loop will run from a single cache
+	 * half-line.
+	 */
+	.align	8
 L_delay:
 	subl	d1,d0
 	jgt	L_delay

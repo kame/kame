@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.c,v 1.35.2.2 2000/03/01 12:46:36 he Exp $	*/
+/*	$NetBSD: locore.c,v 1.47.2.1 2000/09/04 17:35:14 ragge Exp $	*/
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -31,12 +31,13 @@
 
  /* All bugs are subject to removal without further notice */
 		
+#include "opt_compat_netbsd.h"
 
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+#include <sys/user.h>
 
 #include <vm/vm.h>
 
@@ -48,42 +49,37 @@
 #include <machine/pte.h>
 #include <machine/pmap.h>
 #include <machine/nexus.h>
+#include <machine/rpb.h>
 
-void	start __P((void));
-void	main __P((void));
+#include "opt_cputype.h"
+
+void	start(struct rpb *);
+void	main(void);
 
 extern	paddr_t avail_end;
-paddr_t	esym;
+paddr_t esym;
 u_int	proc0paddr;
 
-/* 
- * We set up some information about the machine we're
- * running on and thus initializes/uses vax_cputype and vax_boardtype.
- * There should be no need to change/reinitialize these variables
- * outside of this routine, they should be read only!
- */
-int vax_cputype;	/* highest byte of SID register */
-int vax_bustype;	/* holds/defines all busses on this machine */
-int vax_boardtype;	/* machine dependend, combination of SID and SIE */
-int vax_systype;	/* machine dependend identification of the system */
- 
-int vax_cpudata;	/* contents of the SID register */
-int vax_siedata;	/* contents of the SIE register */
-int vax_confdata;	/* machine dependend, configuration/setup data */
 /*
- * Also; the strict cpu-dependent information is set up here, in
+ * The strict cpu-dependent information is set up here, in
  * form of a pointer to a struct that is specific for each cpu.
  */
 extern struct cpu_dep ka780_calls;
 extern struct cpu_dep ka750_calls;
 extern struct cpu_dep ka860_calls;
 extern struct cpu_dep ka820_calls;
+extern struct cpu_dep ka88_calls;
 extern struct cpu_dep ka43_calls;
 extern struct cpu_dep ka46_calls;
 extern struct cpu_dep ka48_calls;
+extern struct cpu_dep ka49_calls;
+extern struct cpu_dep ka53_calls;
 extern struct cpu_dep ka410_calls;
 extern struct cpu_dep ka630_calls;
 extern struct cpu_dep ka650_calls;
+extern struct cpu_dep ka660_calls;
+extern struct cpu_dep ka670_calls;
+extern struct cpu_dep ka680_calls;
 
 /*
  * Start is called from boot; the first routine that is called
@@ -92,199 +88,151 @@ extern struct cpu_dep ka650_calls;
  * management is disabled, and no interrupt system is active.
  */
 void
-start()
+start(struct rpb *prpb)
 {
-	extern char cpu_model[];
 	extern void *scratch;
 	struct pte *pt;
 
 	mtpr(AST_NO, PR_ASTLVL); /* Turn off ASTs */
 
-	/* Count up memory etc... early machine dependent routines */
-	vax_cputype = ((vax_cpudata = mfpr(PR_SID)) >> 24);
+	findcpu(); /* Set up the CPU identifying variables */
 
-	switch (vax_cputype) {
+	cpu_model[0] = 0; /* Be sure */
+	if (vax_confdata & 0x80)
+		strcpy(cpu_model, "MicroVAX ");
+	else
+		strcpy(cpu_model, "VAXstation ");
+
+	switch (vax_boardtype) {
 #if VAX780
-	case VAX_TYP_780:
-		vax_bustype = VAX_SBIBUS | VAX_CPUBUS;
-		vax_boardtype = VAX_BTYP_780;
+	case VAX_BTYP_780:
 		dep_call = &ka780_calls;
+		strcpy(cpu_model,"VAX 11/780");
+		if (vax_cpudata & 0x100)
+			cpu_model[9] = '5';
 		break;
 #endif
 #if VAX750
-	case VAX_TYP_750:
-		vax_bustype = VAX_CMIBUS | VAX_CPUBUS;
-		vax_boardtype = VAX_BTYP_750;
+	case VAX_BTYP_750:
 		dep_call = &ka750_calls;
 		strcpy(cpu_model, "VAX 11/750");
 		break;
 #endif
 #if VAX8600
-	case VAX_TYP_790:
-		vax_bustype = VAX_CPUBUS | VAX_MEMBUS;
-		vax_boardtype = VAX_BTYP_790;
+	case VAX_BTYP_790:
 		dep_call = &ka860_calls;
 		strcpy(cpu_model,"VAX 8600");
 		if (vax_cpudata & 0x100)
 			cpu_model[6] = '5';
 		break;
 #endif
-#if VAX630 || VAX650 || VAX410 || VAX43 || VAX46 || VAX48
-	case VAX_TYP_UV2:
-	case VAX_TYP_CVAX:
-	case VAX_TYP_RIGEL:
-	case VAX_TYP_MARIAH:
-	case VAX_TYP_SOC:
-		vax_siedata = *(int *)(0x20040004);	/* SIE address */
-		vax_boardtype = (vax_cputype<<24) | ((vax_siedata>>24)&0xFF);
-
-		switch (vax_boardtype) {
-#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49
-		case VAX_BTYP_420: /* They are very similar */
-		case VAX_BTYP_410:
-		case VAX_BTYP_43:
-		case VAX_BTYP_46:
-		case VAX_BTYP_48:
-		case VAX_BTYP_49:
-			vax_confdata = *(int *)(0x20020000);
-			vax_bustype = VAX_VSBUS | VAX_CPUBUS;
 #if VAX410
-			if (vax_boardtype == VAX_BTYP_410 || 
-			    vax_boardtype == VAX_BTYP_420)
-				dep_call = &ka410_calls;
+	case VAX_BTYP_420: /* They are very similar */
+		dep_call = &ka410_calls;
+		strcat(cpu_model, "3100");
+		if (((vax_siedata >> 8) & 0xff) == 1)
+			strcat(cpu_model, "/m{38,48}");
+		else if (((vax_siedata >> 8) & 0xff) == 0)
+			strcat(cpu_model, "/m{30,40}");
+		break;
+
+	case VAX_BTYP_410:
+		dep_call = &ka410_calls;
+		strcat(cpu_model, "2000");
+		break;
 #endif
 #if VAX43
-			if (vax_boardtype == VAX_BTYP_43)
-				dep_call = &ka43_calls;
+	case VAX_BTYP_43:
+		dep_call = &ka43_calls;
+		strcat(cpu_model, "3100/m76");
+		break;
 #endif
 #if VAX46
-			if (vax_boardtype == VAX_BTYP_46)
-				dep_call = &ka46_calls;
+	case VAX_BTYP_46:
+		dep_call = &ka46_calls;
+		strcat(cpu_model, "4000/60");
+		break;
 #endif
 #if VAX48
-			if (vax_boardtype == VAX_BTYP_48)
-				dep_call = &ka48_calls;
+	case VAX_BTYP_48:
+		dep_call = &ka48_calls;
+		if (vax_confdata & 0x80)
+			strcat(cpu_model, "3100/m{30,40}");
+		else
+			strcat(cpu_model, "4000 VLC");
+		break;
 #endif
 #if VAX49
-			if (vax_boardtype == VAX_BTYP_49)
-				dep_call = &ka48_calls;
+	case VAX_BTYP_49:
+		dep_call = &ka49_calls;
+		strcat(cpu_model, "4000/90");
+		break;
 #endif
-#if VAX410 || VAX43
-			if ((
-#if VAX410 && VAX43
-				dep_call == &ka410_calls ||
-				dep_call == &ka43_calls
-#elif VAX410
-				dep_call == &ka410_calls
-#else
-				dep_call == &ka43_calls
-#endif
-			    ) && (vax_confdata & 0x80))
-				strcpy(cpu_model, "MicroVAX ");
-			else
-				strcpy(cpu_model, "VAXstation ");
-#endif
-
-			switch (vax_boardtype) {
-#if VAX410
-			case VAX_BTYP_410:
-                        	strcat(cpu_model, "2000");
-				break;
-#endif
-#if VAX43
-			case VAX_BTYP_43:
-                        	strcat(cpu_model, "3100/m76");
-				break;
-#endif
-#if VAX46
-			case VAX_BTYP_46:
-                        	strcat(cpu_model, "4000/60");
-				break;
-#endif
-#if VAX48
-			case VAX_BTYP_48:
-				strcat(cpu_model, "4000 VLC");
-				break;
-#endif
-#if VAX49
-			case VAX_BTYP_49:
-				strcat(cpu_model, "4000/90");
-				break;
-#endif
-			default:
-#if VAX410
-			case VAX_BTYP_420:
-                        	strcat(cpu_model, "3100");
-				switch ((vax_siedata >> 8) & 0xff) {
-				case 0:
-                        		strcat(cpu_model, "/m{30,40}");
-					break;
-
-				case 1:
-                        		strcat(cpu_model, "/m{38,48}");
-					break;
-
-				case 2:
-					break;
-
-				default:
-					strcat(cpu_model, " unknown model");
-					break;
-				}
-#endif
-				break;
-			}
-			break;
+#if VAX53
+	case VAX_BTYP_53:
+		dep_call = &ka53_calls;
+		strcpy(cpu_model, "VAX 4000/105A");
+		break;
 #endif
 #if VAX630
-		case VAX_BTYP_630:
-			dep_call = &ka630_calls;
-			vax_bustype = VAX_UNIBUS | VAX_CPUBUS;
-			strcpy(cpu_model,"MicroVAX II");
-			break;
+	case VAX_BTYP_630:
+		dep_call = &ka630_calls;
+		strcpy(cpu_model,"MicroVAX II");
+		break;
 #endif
 #if VAX650
-		case VAX_BTYP_650:
-			vax_bustype = VAX_UNIBUS | VAX_CPUBUS;
-			dep_call = &ka650_calls;
-			strcpy(cpu_model,"MicroVAX ");
-			switch ((vax_siedata >> 8) & 255) {
-			case VAX_SIE_KA640:
-				strcat(cpu_model, "3300/3400");
-				break;
-
-			case VAX_SIE_KA650:
-				strcat(cpu_model, "3500/3600");
-				break;
-
-			case VAX_SIE_KA655:
-				strcat(cpu_model, "3800/3900");
-				break;
-
-			default:
-				strcat(cpu_model, "III");
-				break;
-			}
+	case VAX_BTYP_650:
+		dep_call = &ka650_calls;
+		strcpy(cpu_model,"MicroVAX ");
+		switch ((vax_siedata >> 8) & 255) {
+		case VAX_SIE_KA640:
+			strcat(cpu_model, "3300/3400");
 			break;
-#endif
-#if VAX670
-		case VAX_BTYP_670:
-			dep_call = &ka650_calls;
-			vax_bustype = VAX_UNIBUS | VAX_CPUBUS;
-			strcpy(cpu_model,"VAX 4000/300");
+
+		case VAX_SIE_KA650:
+			strcat(cpu_model, "3500/3600");
 			break;
-#endif
+
+		case VAX_SIE_KA655:
+			strcat(cpu_model, "3800/3900");
+			break;
+
 		default:
+			strcat(cpu_model, "III");
 			break;
 		}
 		break;
 #endif
+#if VAX660
+	case VAX_BTYP_660:
+		dep_call = &ka660_calls;
+		strcpy(cpu_model,"VAX 4000/200");
+		break;
+#endif
+#if VAX670
+	case VAX_BTYP_670:
+		dep_call = &ka670_calls;
+		strcpy(cpu_model,"VAX 4000/300");
+		break;
+#endif
+#if VAX680
+	case VAX_BTYP_680:
+		dep_call = &ka680_calls;
+		strcpy(cpu_model,"VAX 4000/500");
+		break;
+#endif
 #if VAX8200
-	case VAX_TYP_8SS:
-		vax_boardtype = VAX_BTYP_8000;
-		vax_bustype = VAX_BIBUS;
+	case VAX_BTYP_8000:
 		mastercpu = mfpr(PR_BINID);
 		dep_call = &ka820_calls;
+		strcpy(cpu_model, "VAX 8200");
+		break;
+#endif
+#if VAX8800
+	case VAX_BTYP_8PS:
+	case VAX_BTYP_8800: /* Matches all other KA88-machines also */
+		strcpy(cpu_model, "VAX 8800");
+		dep_call = &ka88_calls;
 		break;
 #endif
 	default:
@@ -292,26 +240,43 @@ start()
 		asm("halt");
 	}
 
-        /*
-         * Machines older than MicroVAX II have their boot blocks
-         * loaded directly or the boot program loaded from console
-         * media, so we need to figure out their memory size.
-         * This is not easily done on MicroVAXen, so we get it from
-         * VMB instead.
-         */
-        if (avail_end == 0)
-                while (badaddr((caddr_t)avail_end, 4) == 0)
-                        avail_end += VAX_NBPG * 128;
+	/*
+	 * Machines older than MicroVAX II have their boot blocks
+	 * loaded directly or the boot program loaded from console
+	 * media, so we need to figure out their memory size.
+	 * This is not easily done on MicroVAXen, so we get it from
+	 * VMB instead.
+	 *
+	 * In post-1.4 a RPB is always provided from the boot blocks.
+	 */
+#if defined(COMPAT_14)
+	if (prpb == 0) {
+		bzero((caddr_t)proc0paddr + REDZONEADDR, sizeof(struct rpb));
+		prpb = (struct rpb *)(proc0paddr + REDZONEADDR);
+		prpb->pfncnt = avail_end >> VAX_PGSHIFT;
+		prpb->rpb_base = (void *)-1;	/* RPB is fake */
+	} else
+#endif
+	bcopy(prpb, (caddr_t)proc0paddr + REDZONEADDR, sizeof(struct rpb));
+	if (prpb->pfncnt)
+		avail_end = prpb->pfncnt << VAX_PGSHIFT;
+	else
+		while (badaddr((caddr_t)avail_end, 4) == 0)
+			avail_end += VAX_NBPG * 128;
+	boothowto = prpb->rpb_bootr5;
 
-        avail_end = TRUNC_PAGE(avail_end); /* be sure */
+	avail_end = TRUNC_PAGE(avail_end); /* be sure */
 
 	proc0.p_addr = (void *)proc0paddr; /* XXX */
+
+	/* Clear the used parts of the uarea except for the pcb */
+	bzero(&proc0.p_addr->u_stats, sizeof(struct user) - sizeof(struct pcb));
 
 	pmap_bootstrap();
 
 	/* Now running virtual. set red zone for proc0 */
 	pt = kvtopte((u_int)proc0.p_addr + REDZONEADDR);
-        pt->pg_v = 0;
+	pt->pg_v = 0;
 
 	((struct pcb *)proc0paddr)->framep = scratch;
 

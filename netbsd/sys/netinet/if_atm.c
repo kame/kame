@@ -1,4 +1,4 @@
-/*      $NetBSD: if_atm.c,v 1.10 1998/09/13 15:45:40 christos Exp $       */
+/*      $NetBSD: if_atm.c,v 1.12 2000/03/30 13:24:53 augustss Exp $       */
 
 /*
  *
@@ -39,7 +39,7 @@
 #include "opt_inet.h"
 #include "opt_natm.h"
 
-#ifdef INET
+#if defined(INET) || defined(INET6)
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -81,10 +81,10 @@
 void
 atm_rtrequest(req, rt, sa)
 	int req;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct sockaddr *sa;
 {
-	register struct sockaddr *gate = rt->rt_gateway;
+	struct sockaddr *gate = rt->rt_gateway;
 	struct atm_pseudoioctl api;
 #ifdef NATM
 	struct sockaddr_in *sin;
@@ -225,10 +225,10 @@ failed:
 
 int
 atmresolve(rt, m, dst, desten)
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct mbuf *m;
-	register struct sockaddr *dst;
-	register struct atm_pseudohdr *desten;	/* OUT */
+	struct sockaddr *dst;
+	struct atm_pseudohdr *desten;	/* OUT */
 
 {
 	struct sockaddr_dl *sdl;

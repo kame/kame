@@ -1,4 +1,4 @@
-/*	$NetBSD: z8530tty.c,v 1.59.2.2 2000/01/20 23:24:16 he Exp $	*/
+/*	$NetBSD: z8530tty.c,v 1.67 2000/04/14 20:33:48 pk Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999
@@ -152,6 +152,8 @@ struct zstty_softc {
 	struct  tty *zst_tty;
 	struct	zs_chanstate *zst_cs;
 
+	struct callout zst_diag_ch;
+
 	u_int zst_overflows,
 	      zst_floods,
 	      zst_errors;
@@ -273,6 +275,9 @@ zstty_attach(parent, self, aux)
 	struct tty *tp;
 	int channel, s, tty_unit;
 	dev_t dev;
+	char *i, *o;
+
+	callout_init(&zst->zst_diag_ch);
 
 	tty_unit = zst->zst_dev.dv_unit;
 	channel = args->channel;
@@ -288,26 +293,45 @@ zstty_attach(parent, self, aux)
 	if (zst->zst_swflags)
 		printf(" flags 0x%x", zst->zst_swflags);
 
-	if (ISSET(zst->zst_hwflags, ZS_HWFLAG_CONSOLE)) {
-		printf(" (console)\n");
-		DELAY(20000);
+	/*
+	 * Check whether we serve as a console device.
+	 * XXX - split console input/output channels aren't
+	 *	 supported yet on /dev/console
+	 */
+	i = o = NULL;
+	if ((zst->zst_hwflags & ZS_HWFLAG_CONSOLE_INPUT) != 0) {
+		i = "input";
+		if ((args->hwflags & ZS_HWFLAG_USE_CONSDEV) != 0) {
+			cn_tab->cn_pollc = args->consdev->cn_pollc;
+			cn_tab->cn_getc = args->consdev->cn_getc;
+		}
 		cn_tab->cn_dev = dev;
-	} else
+	}
+	if ((zst->zst_hwflags & ZS_HWFLAG_CONSOLE_OUTPUT) != 0) {
+		o = "output";
+		if ((args->hwflags & ZS_HWFLAG_USE_CONSDEV) != 0) {
+			cn_tab->cn_putc = args->consdev->cn_putc;
+		}
+		cn_tab->cn_dev = dev;
+	}
+	if (i != NULL || o != NULL)
+		printf(" (console %s)", i ? (o ? "i/o" : i) : o);
+
 #ifdef KGDB
 	if (zs_check_kgdb(cs, dev)) {
 		/*
 		 * Allow kgdb to "take over" this port.  Returns true
 		 * if this serial port is in-use by kgdb.
 		 */
-		printf(" (kgdb)\n");
+		printf(" (kgdb)");
 		/*
 		 * This is the kgdb port (exclusive use)
 		 * so skip the normal attach code.
 		 */
 		return;
-	} else
+	}
 #endif
-		printf("\n");
+	printf("\n");
 
 	tp = ttymalloc();
 	tp->t_dev = dev;
@@ -325,7 +349,10 @@ zstty_attach(parent, self, aux)
 	zst->zst_rbget = zst->zst_rbput = zst->zst_rbuf;
 	zst->zst_rbavail = zstty_rbuf_size;
 
-	/* XXX - Do we need an MD hook here? */
+	/* if there are no enable/disable functions, assume the device
+	   is always enabled */
+	if (!cs->enable)
+		cs->enabled = 1;
 
 	/*
 	 * Hardware init
@@ -435,6 +462,15 @@ zs_shutdown(zst)
 		zs_write_reg(cs, 1, cs->cs_creg[1]);
 	}
 
+	/* Call the power management hook. */
+	if (cs->disable) {
+#ifdef DIAGNOSTIC
+		if (!cs->enabled)
+			panic("zs_shutdown: not enabled?");
+#endif
+		(*cs->disable)(zst->zst_cs);
+	}
+
 	splx(s);
 }
 
@@ -481,6 +517,16 @@ zsopen(dev, flags, mode, p)
 		struct termios t;
 
 		tp->t_dev = dev;
+
+		/* Call the power management hook. */
+		if (cs->enable) {
+			if ((*cs->enable)(cs)) {
+				splx(s);
+				printf("%s: device enable failed\n",
+			       	zst->zst_dev.dv_xname);
+				return (EIO);
+			}
+		}
 
 		/*
 		 * Initialize the termios status to the defaults.  Add in the
@@ -1454,7 +1500,7 @@ zstty_stint(cs, force)
 	 * even when interrupts are locking up the machine.
 	 */
 	if (ISSET(rr0, ZSRR0_BREAK) &&
-	    ISSET(zst->zst_hwflags, ZS_HWFLAG_CONSOLE)) {
+	    ISSET(zst->zst_hwflags, ZS_HWFLAG_CONSOLE_INPUT)) {
 		zs_abort(cs);
 		return;
 	}
@@ -1567,7 +1613,8 @@ zstty_rxsoft(zst, tp)
 	if (cc == zstty_rbuf_size) {
 		zst->zst_floods++;
 		if (zst->zst_errors++ == 0)
-			timeout(zstty_diag, zst, 60 * hz);
+			callout_reset(&zst->zst_diag_ch, 60 * hz,
+			    zstty_diag, zst);
 	}
 
 	/* If not yet open, drop the entire buffer content here */
@@ -1584,7 +1631,8 @@ zstty_rxsoft(zst, tp)
 			if (ISSET(rr1, ZSRR1_DO)) {
 				zst->zst_overflows++;
 				if (zst->zst_errors++ == 0)
-					timeout(zstty_diag, zst, 60 * hz);
+					callout_reset(&zst->zst_diag_ch,
+					    60 * hz, zstty_diag, zst);
 			}
 			if (ISSET(rr1, ZSRR1_FE))
 				SET(code, TTY_FE);

@@ -1,4 +1,4 @@
-/*	$NetBSD: sbc.c,v 1.38 1998/11/19 21:46:24 thorpej Exp $	*/
+/*	$NetBSD: sbc.c,v 1.41 2000/03/18 16:13:23 mycroft Exp $	*/
 
 /*
  * Copyright (C) 1996 Scott Reynolds.  All rights reserved.
@@ -89,15 +89,6 @@ int	sbc_debug = 0 /* | SBC_DB_INTR | SBC_DB_DMA */;
 int	sbc_link_flags = 0 /* | SDEV_DB2 */;
 int	sbc_options = 0 /* | SBC_PDMA */;
 
-/* This is copied from julian's bt driver */
-/* "so we have a default dev struct for our link struct." */
-struct scsipi_device sbc_dev = {
-	NULL,		/* Use default error handler.	    */
-	NULL,		/* Use default start handler.		*/
-	NULL,		/* Use default async handler.	    */
-	NULL,		/* Use default "done" routine.	    */
-};
-
 extern label_t	*nofault;
 extern caddr_t	m68k_fault_addr;
 
@@ -183,7 +174,6 @@ sbc_irq_intr(p)
 	struct ncr5380_softc *ncr_sc = p;
 	struct sbc_softc *sc = (struct sbc_softc *)ncr_sc;
 	int claimed = 0;
-	extern int cold;
 
 	/* How we ever arrive here without IRQ set is a mystery... */
 	if (*ncr_sc->sci_csr & SCI_CSR_INT) {
@@ -653,7 +643,7 @@ found:
 	dh->dh_len = xlen;
 
 	/* Copy the 'write' flag for convenience. */
-	if (xs->flags & SCSI_DATA_OUT)
+	if (xs->xs_control & XS_CTL_DATA_OUT)
 		dh->dh_flags |= SBC_DH_OUT;
 
 	sr->sr_dma_hand = dh;

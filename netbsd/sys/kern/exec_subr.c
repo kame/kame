@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_subr.c,v 1.16 1999/03/24 05:51:22 mrg Exp $	*/
+/*	$NetBSD: exec_subr.c,v 1.18.2.2 2000/11/05 22:43:40 tv Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1996 Christopher G. Demetriou
@@ -59,7 +59,7 @@
  */
 
 void
-new_vmcmd(evsp, proc, len, addr, vp, offset, prot)
+new_vmcmd(evsp, proc, len, addr, vp, offset, prot, flags)
 	struct	exec_vmcmd_set *evsp;
 	int	(*proc) __P((struct proc * p, struct exec_vmcmd *));
 	u_long	len;
@@ -67,6 +67,7 @@ new_vmcmd(evsp, proc, len, addr, vp, offset, prot)
 	struct	vnode *vp;
 	u_long	offset;
 	u_int	prot;
+	int	flags;
 {
 	struct exec_vmcmd    *vcp;
 
@@ -80,6 +81,7 @@ new_vmcmd(evsp, proc, len, addr, vp, offset, prot)
 		vref(vp);
 	vcp->ev_offset = offset;
 	vcp->ev_prot = prot;
+	vcp->ev_flags = flags;
 }
 #endif /* DEBUG */
 
@@ -161,6 +163,8 @@ vmcmd_map_pagedvn(p, cmd)
                 return(EINVAL);
 	if (cmd->ev_addr & PAGE_MASK)
 		return(EINVAL);
+	if (cmd->ev_len & PAGE_MASK)
+		return(EINVAL);
 
 	/*
 	 * first, attach to the object
@@ -206,11 +210,16 @@ vmcmd_map_readvn(p, cmd)
 	struct exec_vmcmd *cmd;
 {
 	int error;
+	long diff;
 
 	if (cmd->ev_len == 0)
 		return(KERN_SUCCESS); /* XXXCDC: should it happen? */
 	
-	cmd->ev_addr = trunc_page(cmd->ev_addr); /* required by uvm_map */
+	diff = cmd->ev_addr - trunc_page(cmd->ev_addr);
+	cmd->ev_addr -= diff;			/* required by uvm_map */
+	cmd->ev_offset -= diff;
+	cmd->ev_len += diff;
+
 	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, 
 			round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 
 			UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
@@ -219,6 +228,16 @@ vmcmd_map_readvn(p, cmd)
 
 	if (error)
 		return error;
+
+	return vmcmd_readvn(p, cmd);
+}
+
+int
+vmcmd_readvn(p, cmd)
+	struct proc *p;
+	struct exec_vmcmd *cmd;
+{
+	int error;
 
 	error = vn_rdwr(UIO_READ, cmd->ev_vp, (caddr_t)cmd->ev_addr,
 	    cmd->ev_len, cmd->ev_offset, UIO_USERSPACE, IO_UNIT,
@@ -254,11 +273,15 @@ vmcmd_map_zero(p, cmd)
 	struct exec_vmcmd *cmd;
 {
 	int error;
+	long diff;
 
 	if (cmd->ev_len == 0)
 		return(KERN_SUCCESS); /* XXXCDC: should it happen? */
 	
-	cmd->ev_addr = trunc_page(cmd->ev_addr); /* required by uvm_map */
+	diff = cmd->ev_addr - trunc_page(cmd->ev_addr);
+	cmd->ev_addr -= diff;			/* required by uvm_map */
+	cmd->ev_len += diff;
+
 	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, 
 			round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 
 			UVM_MAPFLAG(cmd->ev_prot, UVM_PROT_ALL, UVM_INH_COPY,

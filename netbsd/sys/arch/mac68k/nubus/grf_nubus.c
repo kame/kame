@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_nubus.c,v 1.52.8.1 1999/06/21 15:05:54 perry Exp $	*/
+/*	$NetBSD: grf_nubus.c,v 1.57.4.1 2000/08/06 02:08:04 briggs Exp $	*/
 
 /*
  * Copyright (c) 1995 Allen Briggs.  All rights reserved.
@@ -31,8 +31,6 @@
 /*
  * Device-specific routines for handling Nubus-based video cards.
  */
-
-#include "opt_grf.h"
 
 #include <sys/param.h>
 
@@ -69,6 +67,7 @@ static void	grfmv_intr_lapis __P((void *vsc));
 static void	grfmv_intr_formac __P((void *vsc));
 static void	grfmv_intr_vimage __P((void *vsc));
 static void	grfmv_intr_gvimage __P((void *vsc));
+static void	grfmv_intr_radius_gsc __P((void *vsc));
 
 static int	grfmv_mode __P((struct grf_softc *gp, int cmd, void *arg));
 static int	grfmv_match __P((struct device *, struct cfdata *, void *));
@@ -210,7 +209,7 @@ bad:
 	gm->hres = image.hRes;
 	gm->vres = image.vRes;
 	gm->fbsize = gm->height * gm->rowbytes;
-	gm->fbbase = (caddr_t)sc->sc_handle;	/* XXX evil hack */
+	gm->fbbase = (caddr_t)(sc->sc_handle.base);	/* XXX evil hack */
 	gm->fboff = image.offset;
 
 	strncpy(cardname, nubus_get_card_name(sc->sc_tag, sc->sc_handle,
@@ -281,6 +280,9 @@ bad:
 	case NUBUS_DRHW_RPC24XP:
 		add_nubus_intr(na->slot, grfmv_intr_radius24, sc);
 		break;
+	case NUBUS_DRHW_RADGSC:
+		add_nubus_intr(na->slot, grfmv_intr_radius_gsc, sc);
+		break;
 	case NUBUS_DRHW_FIILX:
 	case NUBUS_DRHW_FIISXDSP:
 	case NUBUS_DRHW_FUTURASX:
@@ -307,6 +309,7 @@ bad:
 		break;
 	case NUBUS_DRHW_ROPS24LXI:
 	case NUBUS_DRHW_ROPS24XLTV:
+	case NUBUS_DRHW_ROPS24MXTV:
 		sc->cli_offset = 0xfb0010;
 		sc->cli_value = 0x00;
 		add_nubus_intr(na->slot, grfmv_intr_generic_write4, sc);
@@ -323,7 +326,10 @@ bad:
 		add_nubus_intr(na->slot, grfmv_intr_generic_write4, sc);
 		break;
 	case NUBUS_DRHW_MICRON:
-		/* What do we know about this one? */
+		sc->cli_offset = 0xa00014;
+		sc->cli_value = 0;
+		add_nubus_intr(na->slot, grfmv_intr_generic_write4, sc);
+		break;
 	default:
 		printf("%s: Unknown video card ID 0x%x --",
 		    sc->sc_dev.dv_xname, sc->card_id);
@@ -476,7 +482,7 @@ grfmv_intr_cb264(vsc)
 	volatile char *slotbase;
 
 	sc = (struct grfbus_softc *)vsc;
-	slotbase = (volatile char *)sc->sc_handle;	/* XXX evil hack */
+	slotbase = (volatile char *)(sc->sc_handle.base); /* XXX evil hack */
 	asm volatile("	movl	%0,a0
 			movl	a0@(0xff6028),d0
 			andl	#0x2,d0
@@ -530,7 +536,7 @@ grfmv_intr_cb364(vsc)
 	volatile char *slotbase;
 
 	sc = (struct grfbus_softc *)vsc;
-	slotbase = (volatile char *)sc->sc_handle;	/* XXX evil hack */
+	slotbase = (volatile char *)(sc->sc_handle.base); /* XXX evil hack */
 	asm volatile("	movl	%0,a0
 			movl	a0@(0xfe6028),d0
 			andl	#0x2,d0
@@ -692,3 +698,19 @@ grfmv_intr_gvimage(vsc)
 
 	dummy = bus_space_read_1(sc->sc_tag, sc->sc_handle, 0xf00000);
 }
+
+/*
+ * Routine to clear interrupts for the Radius GS/C
+ */
+/*ARGSUSED*/
+static void
+grfmv_intr_radius_gsc(vsc)
+	void	*vsc;
+{
+	struct grfbus_softc *sc = (struct grfbus_softc *)vsc;
+	u_int8_t dummy;
+
+	dummy = bus_space_read_1(sc->sc_tag, sc->sc_handle, 0xfb802);
+	bus_space_write_1(sc->sc_tag, sc->sc_handle, 0xfb802, 0xff);
+}
+

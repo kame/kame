@@ -1,4 +1,4 @@
-/*	$NetBSD: cgfourteen.c,v 1.15 1999/03/24 05:51:10 mrg Exp $ */
+/*	$NetBSD: cgfourteen.c,v 1.16.4.1 2000/06/30 16:27:38 simonb Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -118,9 +118,6 @@ static struct fbdriver cgfourteenfbdriver = {
 	cgfourteenunblank, cgfourteenopen, cgfourteenclose, cgfourteenioctl,
 	cgfourteenpoll, cgfourteenmmap
 };
-
-extern int fbnode;
-extern struct tty *fbconstty;
 
 static void cg14_set_video __P((struct cgfourteen_softc *, int));
 static int  cg14_get_video __P((struct cgfourteen_softc *));
@@ -260,7 +257,7 @@ cgfourteenattach(parent, self, aux)
 		sc->sc_cmap.cm_chip[i] = lut[i];
 
 	/* See if we're the console */
-	isconsole = node == fbnode && fbconstty != NULL;
+	isconsole = fb_is_console(node);
 
 	if (isconsole) {
 		printf(" (console)\n");
@@ -277,8 +274,7 @@ cgfourteenattach(parent, self, aux)
 		printf("\n");
 
 	/* Attach to /dev/fb */
-	if (node == fbnode)
-		fb_attach(&sc->sc_fb, isconsole);
+	fb_attach(&sc->sc_fb, isconsole);
 }
 
 /*
@@ -535,10 +531,11 @@ cgfourteenunblank(dev)
  * tell the chip to ignore the X channel. XXX where does it get the X value
  * to use?
  */
-int
+paddr_t
 cgfourteenmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct cgfourteen_softc *sc = cgfourteen_cd.cd_devs[minor(dev)];
 	bus_space_handle_t bh;
@@ -566,7 +563,7 @@ cgfourteenmmap(dev, off, prot)
 				   BUS_SPACE_MAP_LINEAR, &bh))
 			return (-1);
 
-		return ((int)bh);
+		return ((off_t)bh);
 	}
 #endif
 	
@@ -583,7 +580,7 @@ cgfourteenmmap(dev, off, prot)
 	else
 		off = 0;
 
-	if ((unsigned)off >= sc->sc_fb.fb_type.fb_size *
+	if (off >= sc->sc_fb.fb_type.fb_size *
 		sc->sc_fb.fb_type.fb_depth/8) {
 #ifdef DEBUG
 		printf("\nmmap request out of bounds: request 0x%x, "
@@ -599,7 +596,7 @@ cgfourteenmmap(dev, off, prot)
 			   BUS_SPACE_MAP_LINEAR, &bh))
 		return (-1);
 
-	return ((int)bh);
+	return ((paddr_t)bh);
 }
 
 int

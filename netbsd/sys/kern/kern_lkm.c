@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_lkm.c,v 1.47 1999/03/24 05:51:23 mrg Exp $	*/
+/*	$NetBSD: kern_lkm.c,v 1.50 2000/03/28 06:26:22 simonb Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -157,20 +157,19 @@ lkmunreserve()
 	if (lkm_state == LKMS_IDLE)
 		return;
 
+	if (curp && curp->syms) {
 #ifdef DDB
-	if (curp && curp->private.lkm_any && curp->private.lkm_any->lkm_name)
-	    db_del_symbol_table(curp->private.lkm_any->lkm_name);
+		db_del_symbol_table(curp->private.lkm_any->lkm_name);
 #endif
+		uvm_km_free(kernel_map, curp->syms, curp->sym_size);/**/
+		curp->syms = 0;
+	}
 	/*
 	 * Actually unreserve the memory
 	 */
 	if (curp && curp->area) {
 		uvm_km_free(kernel_map, curp->area, curp->size);/**/
 		curp->area = 0;
-	}
-	if (curp && curp->syms) {
-		uvm_km_free(kernel_map, curp->syms, curp->sym_size);/**/
-		curp->syms = 0;
 	}
 	lkm_state = LKMS_IDLE;
 }
@@ -346,7 +345,8 @@ lkmioctl(dev, cmd, data, flag, p)
 		if ((curp->sym_offset + i) < curp->sym_size) {
 			lkm_state = LKMS_LOADING;
 #ifdef DEBUG
-			printf( "LKM: LMLOADSYMS (loading @ %ld of %ld, i = %d)\n",
+			if (lkmdebug & LKMDB_LOAD)
+		printf( "LKM: LMLOADSYMS (loading @ %ld of %ld, i = %d)\n",
 			curp->sym_offset, curp->sym_size, i);
 #endif	/* DEBUG*/
 		}
@@ -368,9 +368,6 @@ lkmioctl(dev, cmd, data, flag, p)
 		break;
 
 	case LMREADY:		/* module loaded: call entry */
-#ifdef DEBUG
-	    printf("LKM: try READY");
-#endif	/* DEBUG */
 		if (securelevel > 0)
 			return EPERM;
 
@@ -736,7 +733,6 @@ _lkm_dev(lkmtp, cmd)
 	struct lkm_dev *args = lkmtp->private.lkm_dev;
 	int i;
 	int error = 0;
-	extern int nblkdev, nchrdev;	/* from conf.c */
 
 	switch(cmd) {
 	case LKM_E_LOAD:

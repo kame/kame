@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.2.6.1 1999/06/22 22:24:30 perry Exp $	*/
+/*	$NetBSD: machdep.c,v 1.3 1999/05/03 09:19:29 matthias Exp $	*/
 
 /*
  * Copyright (c) 1994 Philip L. Budne.

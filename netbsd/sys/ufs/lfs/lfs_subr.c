@@ -1,7 +1,7 @@
-/*	$NetBSD: lfs_subr.c,v 1.9.2.1 2000/01/20 21:11:21 he Exp $	*/
+/*	$NetBSD: lfs_subr.c,v 1.15.2.1 2000/09/14 18:50:19 perseant Exp $	*/
 
 /*-
- * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -99,7 +99,7 @@ lfs_blkatoff(v)
 		char **a_res;
 		struct buf **a_bpp;
 		} */ *ap = v;
-	register struct lfs *fs;
+	struct lfs *fs;
 	struct inode *ip;
 	struct buf *bp;
 	ufs_daddr_t lbn;
@@ -181,7 +181,9 @@ lfs_segunlock(fs)
 	struct mount *mp;
 	extern int lfs_dirvcount;
 	
-	if (fs->lfs_seglock == 1) {
+	sp = fs->lfs_sp;
+
+	if (fs->lfs_seglock == 1 && !(sp->seg_flags & SEGM_PROT)) {
 
 		mp = fs->lfs_ivnode->v_mount;
 		/*
@@ -203,7 +205,7 @@ lfs_segunlock(fs)
 		for (; vp && vp != BEG_OF_VLIST; vp = BACK_VP(vp)) {
 #else
 	loop:
-		for (vp = mp->mnt_vnodelist.lh_first;
+		 for (vp = mp->mnt_vnodelist.lh_first;
 		     vp != NULL;
 		     vp = vp->v_mntvnodes.le_next) {
 #endif
@@ -211,21 +213,34 @@ lfs_segunlock(fs)
 				goto loop;
 			if (vp->v_type == VNON)
 				continue;
-			if(vp->v_flag & VDIROP) {
-				/* No vref, it has one from before */
+			if (lfs_vref(vp))
+				continue;
+			if (VOP_ISLOCKED(vp) &&
+                            vp->v_lock.lk_lockholder != curproc->p_pid) {
+				lfs_vunref(vp);
+				continue;
+			}
+			if ((vp->v_flag & VDIROP) &&
+			    !(VTOI(vp)->i_flag & IN_ADIROP)) {
 				--lfs_dirvcount;
 				vp->v_flag &= ~VDIROP;
 				wakeup(&lfs_dirvcount);
+				fs->lfs_unlockvp = vp;
+				lfs_vunref(vp);
 				vrele(vp);
+				fs->lfs_unlockvp = NULL;
+			} else {
+				lfs_vunref(vp);
 			}
 		}
+	}
 
-		sp = fs->lfs_sp;
+	if (fs->lfs_seglock == 1) {
 		sync = sp->seg_flags & SEGM_SYNC;
 		ckp = sp->seg_flags & SEGM_CKP;
 		if (sp->bpp != sp->cbpp) {
 			/* Free allocated segment summary */
-			fs->lfs_offset -= LFS_SUMMARY_SIZE / DEV_BSIZE;
+			fs->lfs_offset -= btodb(LFS_SUMMARY_SIZE);
                         lfs_freebuf(*sp->bpp);
 		} else
 			printf ("unlock to 0 with no summary");

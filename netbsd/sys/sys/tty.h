@@ -1,4 +1,4 @@
-/*	$NetBSD: tty.h,v 1.45.2.1 1999/06/21 19:22:57 cgd Exp $	*/
+/*	$NetBSD: tty.h,v 1.49 2000/03/28 05:52:15 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -46,8 +46,8 @@
 #include <sys/termios.h>
 #include <sys/select.h>		/* For struct selinfo. */
 #include <sys/queue.h>
+#include <sys/callout.h>
 
-#ifndef REAL_CLISTS
 /*
  * Clists are actually ring buffers. The c_cc, c_cf, c_cl fields have
  * exactly the same behaviour as in true clists.
@@ -65,17 +65,6 @@ struct clist {
 	u_char	*c_ce;		/* c_ce + c_len */
 	u_char	*c_cq;		/* N bits/bytes long, see tty_subr.c */
 };
-#else
-/*
- * Clists are character lists, which is a variable length linked list
- * of cblocks, with a count of the number of characters in the list.
- */
-struct clist {
-	int	c_cc;		/* Number of characters in the clist. */
-	u_char	*c_cf;		/* Pointer to the first cblock. */
-	u_char	*c_cl;		/* Pointer to the last cblock. */
-};
-#endif /* !REAL_CLISTS */
 
 /*
  * Per-tty structure.
@@ -91,6 +80,8 @@ struct tty {
 	struct	clist t_canq;		/* Device canonical queue. */
 	long	t_cancc;		/* Canonical queue statistics. */
 	struct	clist t_outq;		/* Device output queue. */
+	struct	callout t_outq_ch;	/* for ttycheckoutq() */
+	struct	callout t_rstrt_ch;	/* for delayed output start */
 	long	t_outcc;		/* Output queue statistics. */
 	u_char	t_line;			/* Interface to device drivers. */
 	dev_t	t_dev;			/* Device. */
@@ -257,12 +248,6 @@ struct tty
 	*ttymalloc __P((void));
 void	 ttyfree __P((struct tty *));
 u_char	*firstc __P((struct clist *clp, int *c));
-
-int	cttyopen __P((dev_t, int, int, struct proc *));
-int	cttyread __P((dev_t, struct uio *, int));
-int	cttywrite __P((dev_t, struct uio *, int));
-int	cttyioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-int	cttypoll __P((dev_t, int, struct proc *));
 
 int	clalloc __P((struct clist *, int, int));
 void	clfree __P((struct clist *));

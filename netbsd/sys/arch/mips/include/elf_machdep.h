@@ -1,12 +1,14 @@
-/*	$NetBSD: elf_machdep.h,v 1.4 1998/03/25 04:06:50 mhitch Exp $	*/
+/*	$NetBSD: elf_machdep.h,v 1.7 2000/04/02 15:35:50 minoura Exp $	*/
 
 #define	ELF32_MACHDEP_ID_CASES						\
-		case Elf_em_mips:					\
+		case EM_MIPS:						\
 			break;
 
 #define	ELF64_MACHDEP_ID_CASES						\
 		/* no 64-bit ELF machine types supported */
 
+
+#define ARCH_ELFSIZE		32	/* MD native binary size */
 
 /* mips relocs.  */
 
@@ -32,7 +34,7 @@
 #define R_MIPS_UNUSED2		14
 #define R_MIPS_UNUSED3		15
 
-/* 
+/*
  * The remaining relocs are apparently part of the 64-bit Irix ELF ABI.
  */
 #define R_MIPS_SHIFT5		16

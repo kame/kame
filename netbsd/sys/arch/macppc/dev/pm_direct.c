@@ -1,4 +1,4 @@
-/*	$NetBSD: pm_direct.c,v 1.3 1998/12/07 17:17:14 tsubai Exp $	*/
+/*	$NetBSD: pm_direct.c,v 1.9 2000/06/08 22:10:46 tsubai Exp $	*/
 
 /*
  * Copyright (C) 1997 Takashi Hamada
@@ -96,10 +96,10 @@ signed char pm_send_cmd_type[] = {
 	0x00, 0x00,   -1,   -1,   -1,   -1,   -1, 0x00,
 	  -1, 0x00, 0x02, 0x01, 0x01,   -1,   -1,   -1,
 	0x00,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
-	0x04, 0x14,   -1,   -1,   -1,   -1,   -1,   -1,
-	0x00, 0x00, 0x02,   -1,   -1,   -1,   -1,   -1,
+	0x04, 0x14,   -1, 0x03,   -1,   -1,   -1,   -1,
+	0x00, 0x00, 0x02, 0x02,   -1,   -1,   -1,   -1,
 	0x01, 0x01,   -1,   -1,   -1,   -1,   -1,   -1,
-	0x00, 0x00,   -1,   -1,   -1,   -1,   -1,   -1,
+	0x00, 0x00,   -1,   -1, 0x01,   -1,   -1,   -1,
 	0x01, 0x00, 0x02, 0x02,   -1, 0x01, 0x03, 0x01,
 	0x00, 0x01, 0x00, 0x00, 0x00,   -1,   -1,   -1,
 	0x02,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
@@ -133,7 +133,7 @@ signed char pm_receive_cmd_type[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	  -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x05, 0x15,   -1,   -1,   -1,   -1,   -1,   -1,
+	0x05, 0x15,   -1, 0x02,   -1,   -1,   -1,   -1,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x02, 0x02,   -1,   -1,   -1,   -1,   -1,   -1,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -223,7 +223,6 @@ struct adbCommand {
 	u_int	ack_only;	/* 1 for no special processing */
 };
 extern	void	adb_pass_up __P((struct adbCommand *));
-
 
 #if 0
 /*
@@ -481,7 +480,9 @@ pm_pmgrop_pm1(pmdata)
 				/* restore formar value */
 				via_reg(VIA1, vDirA) = via1_vDirA;
 				via_reg(VIA1, vIER) = via1_vIER;
-					return 0xffffcd38;
+				if (s != 0x81815963)
+					splx(s);
+				return 0xffffcd38;
 			}
 
 			/* send # of PM data */
@@ -523,7 +524,7 @@ pm_pmgrop_pm1(pmdata)
 			pm_buf = (u_char *)pmdata->r_buf;
 			for (i = 0; i < num_pm_data; i++) {
 				if ((rval = pm_receive_pm1(&pm_data)) != 0)
-					break;				/* timeout */
+					break;		/* timeout */
 				pm_buf[i] = pm_data;
 			}
 
@@ -1034,8 +1035,10 @@ pm_adb_op(buffer, compRout, data, command)
 	}
 
 	rval = pmgrop(&pmdata);
-	if (rval != 0)
+	if (rval != 0) {
+		splx(s);
 		return 1;
+	}
 
 	adbWaiting = 1;
 	adbWaitingCmd = command;
@@ -1054,8 +1057,10 @@ pm_adb_op(buffer, compRout, data, command)
 			(void)intr_dispatch(0x70);
 #endif
 #endif
-		if ((--delay) < 0)
+		if ((--delay) < 0) {
+			splx(s);
 			return 1;
+		}
 	}
 
 	/* this command enables the interrupt by operating ADB devices */
@@ -1143,7 +1148,7 @@ pm_adb_poll_next_device_pm1(pmdata)
 
 	/* find another existent ADB device to poll */
 	for (i = 1; i < 16; i++) {
-		ndid = (((pmdata->data[3] & 0xf0) >> 4) + i) & 0xf;
+		ndid = (ADB_CMDADDR(pmdata->data[3]) + i) & 0xf;
 		bendid <<= ndid;
 		if ((pm_existent_ADB_devices & bendid) != 0)
 			break;
@@ -1165,10 +1170,23 @@ pm_adb_restart()
 {
 	PMData p;
 
-	p.command = 0xd0;	/* reset CPU */
+	p.command = PMU_RESET_CPU;
 	p.num_data = 0;
 	p.s_buf = p.data;
 	p.r_buf = p.data;
+	pmgrop(&p);
+}
+
+void
+pm_adb_poweroff()
+{
+	PMData p;
+
+	p.command = PMU_POWER_OFF;
+	p.num_data = 4;
+	p.s_buf = p.data;
+	p.r_buf = p.data;
+	strcpy(p.data, "MATT");
 	pmgrop(&p);
 }
 
@@ -1178,11 +1196,113 @@ pm_read_date_time(time)
 {
 	PMData p;
 
-	p.command = 0x38;	/* read time */
+	p.command = PMU_READ_RTC;
 	p.num_data = 0;
 	p.s_buf = p.data;
 	p.r_buf = p.data;
 	pmgrop(&p);
 
 	bcopy(p.data, time, 4);
+}
+
+void
+pm_set_date_time(time)
+	u_long time;
+{
+	PMData p;
+
+	p.command = PMU_SET_RTC;
+	p.num_data = 4;
+	p.s_buf = p.r_buf = p.data;
+	bcopy(&time, p.data, 4);
+	pmgrop(&p);
+}
+
+int
+pm_read_brightness()
+{
+	PMData p;
+
+	p.command = PMU_READ_BRIGHTNESS;
+	p.num_data = 1;		/* XXX why 1? */
+	p.s_buf = p.r_buf = p.data;
+	p.data[0] = 0;
+	pmgrop(&p);
+
+	return p.data[0];
+}
+
+void
+pm_set_brightness(val)
+	int val;
+{
+	PMData p;
+
+	val = 0x7f - val / 2;
+	if (val < 0x08)
+		val = 0x08;
+	if (val > 0x78)
+		val = 0x78;
+
+	p.command = PMU_SET_BRIGHTNESS;
+	p.num_data = 1;
+	p.s_buf = p.r_buf = p.data;
+	p.data[0] = val;
+	pmgrop(&p);
+}
+
+void
+pm_init_brightness()
+{
+	int val;
+
+	val = pm_read_brightness();
+	pm_set_brightness(val);
+}
+
+void
+pm_eject_pcmcia(slot)
+	int slot;
+{
+	PMData p;
+
+	if (slot != 0 && slot != 1)
+		return;
+
+	p.command = PMU_EJECT_PCMCIA;
+	p.num_data = 1;
+	p.s_buf = p.r_buf = p.data;
+	p.data[0] = 5 + slot;	/* XXX */
+	pmgrop(&p);
+}
+
+int
+pm_read_nvram(addr)
+	int addr;
+{
+	PMData p;
+
+	p.command = PMU_READ_NVRAM;
+	p.num_data = 2;
+	p.s_buf = p.r_buf = p.data;
+	p.data[0] = addr >> 8;
+	p.data[1] = addr;
+	pmgrop(&p);
+
+	return p.data[0];
+}
+
+void
+pm_write_nvram(addr, val)
+	int addr, val;
+{
+	PMData p;
+
+	p.command = PMU_WRITE_NVRAM;
+	p.num_data = 3;
+	p.s_buf = p.r_buf = p.data;
+	p.data[0] = addr >> 8;
+	p.data[1] = addr;
+	p.data[2] = val;
+	pmgrop(&p);
 }

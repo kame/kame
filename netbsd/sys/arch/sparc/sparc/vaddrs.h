@@ -1,4 +1,4 @@
-/*	$NetBSD: vaddrs.h,v 1.9.6.1 2000/01/16 17:40:28 he Exp $ */
+/*	$NetBSD: vaddrs.h,v 1.10 2000/01/04 15:08:30 pk Exp $ */
 
 /*
  * Copyright (c) 1996

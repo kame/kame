@@ -1,4 +1,4 @@
-/*	$NetBSD: bha_isa.c,v 1.14 1998/08/15 10:10:51 mycroft Exp $	*/
+/*	$NetBSD: bha_isa.c,v 1.15.12.1 2000/10/04 04:14:10 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: par.c,v 1.17 1998/01/12 10:40:09 thorpej Exp $	*/
+/*	$NetBSD: par.c,v 1.22 2000/04/23 19:55:51 mhitch Exp $	*/
 
 /*
  * Copyright (c) 1982, 1990 The Regents of the University of California.
@@ -49,6 +49,7 @@
 #include <sys/malloc.h>
 #include <sys/file.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/proc.h>
 
 #include <amiga/amiga/device.h>
@@ -59,14 +60,21 @@
 #include <machine/conf.h>
 
 struct	par_softc {
+	struct device sc_dev;
+
 	int	sc_flags;
 	struct	parparam sc_param;
 #define sc_burst sc_param.burst
 #define sc_timo  sc_param.timo
 #define sc_delay sc_param.delay
+
+	struct callout sc_timo_ch;
+	struct callout sc_start_ch;
 } *par_softcp;
 
 #define getparsp(x)	(x > 0 ? NULL : par_softcp)
+
+struct callout parintr_ch = CALLOUT_INITIALIZER;
 
 /* sc_flags values */
 #define	PARF_ALIVE	0x01	
@@ -102,7 +110,7 @@ void parattach __P((struct device *, struct device *, void *));
 int parmatch __P((struct device *, struct cfdata *, void *));
 
 struct cfattach par_ca = {
-	sizeof(struct device), parmatch, parattach
+	sizeof(struct par_softc), parmatch, parattach
 };
 
 /*ARGSUSED*/
@@ -112,10 +120,13 @@ parmatch(pdp, cfp, auxp)
 	struct cfdata *cfp;
 	void *auxp;
 {
+	static int par_found = 0;
 
-	if (matchname((char *)auxp, "par") && cfp->cf_unit == 0)
-		return(1);
-	return(0);
+	if (!matchname((char *)auxp, "par") || par_found)
+		return(0);
+
+	par_found = 1;
+	return(1);
 }
 
 void
@@ -130,6 +141,9 @@ parattach(pdp, dp, auxp)
 #endif
 		par_softcp->sc_flags = PARF_ALIVE;
 	printf("\n");
+
+	callout_init(&par_softcp->sc_timo_ch);
+	callout_init(&par_softcp->sc_start_ch);
 }
 
 int
@@ -198,14 +212,11 @@ void
 parstart(arg)
 	void *arg;
 {
-	struct par_softc *sc;
-	int unit;
+	struct par_softc *sc = arg;
 
-	unit = (int)arg;
-	sc = getparsp(unit);
 #ifdef DEBUG
 	if (pardebug & PDB_FOLLOW)
-		printf("parstart(%x)\n", unit);
+		printf("parstart(%x)\n", sc->sc_dev.dv_unit);
 #endif
 	sc->sc_flags &= ~PARF_DELAY;
 	wakeup(sc);
@@ -215,14 +226,11 @@ void
 partimo(arg)
 	void *arg;
 {
-	struct par_softc *sc;
-	int unit;
+	struct par_softc *sc = arg;
 
-	unit = (int) arg;
-	sc = getparsp(unit);
 #ifdef DEBUG
 	if (pardebug & PDB_FOLLOW)
-		printf("partimo(%x)\n", unit);
+		printf("partimo(%x)\n", sc->sc_dev.dv_unit);
 #endif
 	sc->sc_flags &= ~(PARF_UIO|PARF_TIMO);
 	wakeup(sc);
@@ -291,7 +299,7 @@ parrw(dev, uio)
   if (sc->sc_timo > 0) 
     {
       sc->sc_flags |= PARF_TIMO;
-      timeout(partimo, (void *)unit, sc->sc_timo);
+      callout_reset(&sc->sc_timo_ch, sc->sc_timo, partimo, sc);
     }
   while (uio->uio_resid > 0) 
     {
@@ -312,7 +320,7 @@ again:
       /*
        * Check if we timed out during sleep or uiomove
        */
-      (void) splsoftclock();
+      (void) spllowersoftclock();
       if ((sc->sc_flags & PARF_UIO) == 0) 
 	{
 #ifdef DEBUG
@@ -322,7 +330,7 @@ again:
 #endif
 	  if (sc->sc_flags & PARF_TIMO) 
 	    {
-	      untimeout(partimo, (void *)unit);
+	      callout_stop(&sc->sc_timo_ch);
 	      sc->sc_flags &= ~PARF_TIMO;
 	    }
 	  splx(s);
@@ -388,7 +396,7 @@ again:
       if (sc->sc_delay > 0) 
 	{
 	  sc->sc_flags |= PARF_DELAY;
-	  timeout(parstart, (void *)unit, sc->sc_delay);
+	  callout_reset(&sc->sc_start_ch, sc->sc_delay, parstart, sc);
 	  error = tsleep(sc, PCATCH | (PZERO - 1), "par-cdelay", 0);
 	  if (error) 
 	    {
@@ -412,12 +420,12 @@ again:
   s = splsoftclock();
   if (sc->sc_flags & PARF_TIMO) 
     {
-      untimeout(partimo, (void *)unit);
+      callout_stop(&sc->sc_timo_ch);
       sc->sc_flags &= ~PARF_TIMO;
     }
   if (sc->sc_flags & PARF_DELAY) 
     {
-      untimeout(parstart, (void *)unit);
+      callout_stop(&sc->sc_start_ch);
       sc->sc_flags &= ~PARF_DELAY;
     }
   splx(s);
@@ -533,7 +541,7 @@ parintr(arg)
 	 */
 	if (mask) {
 		if (partimeout_pending)
-			untimeout(parintr, 0);
+			callout_stop(&parintr_ch);
 		if (parsend_pending)
 			parsend_pending = 0;
 	}
@@ -569,7 +577,7 @@ parsendch (ch)
 		 & (CIAB_PRA_SEL|CIAB_PRA_BUSY|CIAB_PRA_POUT)));
 #endif
       /* wait a second, and try again */
-      timeout(parintr, 0, hz);
+      callout_reset(&parintr_ch, hz, parintr, NULL);
       partimeout_pending = 1;
       /* this is essentially a flipflop to have us wait for the
 	 first character being transmitted when trying to transmit
@@ -585,7 +593,7 @@ parsendch (ch)
 	    printf ("parsendch interrupted, error = %d\n", error);
 #endif
 	  if (partimeout_pending)
-	    untimeout(parintr, 0);
+	    callout_stop(&parintr_ch);
 
 	  partimeout_pending = 0;
 	}

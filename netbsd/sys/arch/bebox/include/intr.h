@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.6 1998/08/15 10:11:01 mycroft Exp $	*/
+/*	$NetBSD: intr.h,v 1.9 1999/08/05 18:08:10 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -45,11 +45,12 @@
 #define	IPL_SOFTNET	7	/* software network interrupt */
 #define	IPL_BIO		6	/* block I/O */
 #define	IPL_NET		5	/* network */
-#define	IPL_TTY		4	/* terminal */
+#define	IPL_SOFTSERIAL	4	/* software serial interrupt */
+#define	IPL_TTY		3	/* terminal */
 #define	IPL_IMP		3	/* memory allocation */
 #define	IPL_AUDIO	2	/* audio */
 #define	IPL_CLOCK	1	/* clock */
-#define	IPL_HIGH	0	/* everything */
+#define	IPL_HIGH	1	/* everything */
 #define	IPL_SERIAL	0	/* serial */
 #define	NIPL		10
 
@@ -83,9 +84,14 @@ int  splsoftnet   __P((void));
 
 void do_pending_int __P((void));
 
+static __inline int splraise __P((int));
+static __inline int spllower __P((int));
+static __inline void splx __P((int));
+static __inline void set_sint __P((int));
 
 extern volatile int cpl, ipending, astpending, tickspending;
 extern int imask[];
+extern long intrcnt[];
 
 /*
  *  Reorder protection in the following inline functions is
@@ -168,13 +174,14 @@ set_sint(pending)
 #define splbio()	splraise(imask[IPL_BIO])
 #define splnet()	splraise(imask[IPL_NET])
 #define spltty()	splraise(imask[IPL_TTY])
-#define splclock()	splraise(SPL_CLOCK|SINT_CLOCK|SINT_NET)
+#define splclock()	splraise(imask[IPL_CLOCK])
 #define splimp()	splraise(imask[IPL_IMP])
 #define	splserial()	splraise(imask[IPL_SERIAL])
-#define splstatclock()	splhigh()
-#define	splsoftclock()	spllower(SINT_CLOCK)
-#define	splsoftnet()	splraise(SINT_NET)
-#define	splsoftserial()	splraise(SINT_SERIAL)
+#define splstatclock()	splclock()
+#define	spllowersoftclock() spllower(imask[IPL_SOFTCLOCK])
+#define	splsoftclock()	splraise(imask[IPL_SOFTCLOCK])
+#define	splsoftnet()	splraise(imask[IPL_SOFTNET])
+#define	splsoftserial()	splraise(imask[IPL_SOFTSERIAL])
 
 #define spllpt()	spltty()
 
@@ -182,7 +189,7 @@ set_sint(pending)
 #define	setsoftnet()	set_sint(SINT_NET);
 #define	setsoftserial()	set_sint(SINT_SERIAL);
 
-#define	splhigh()	splraise(0xffffffff)
+#define	splhigh()	splraise(imask[IPL_HIGH])
 #define	spl0()		spllower(0)
 
 #endif /* !_LOCORE */

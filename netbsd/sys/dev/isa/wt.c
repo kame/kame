@@ -1,4 +1,4 @@
-/*	$NetBSD: wt.c,v 1.46 1999/01/10 21:57:19 augustss Exp $	*/
+/*	$NetBSD: wt.c,v 1.49 2000/03/23 07:01:36 thorpej Exp $	*/
 
 /*
  * Streamer tape driver.
@@ -52,6 +52,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/buf.h>
 #include <sys/fcntl.h>
@@ -123,6 +124,8 @@ struct wt_softc {
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
 	isa_chipset_tag_t	sc_ic;
+
+	struct callout		sc_timer_ch;
 
 	enum wttype type;	/* type of controller */
 	int chan;		/* dma channel number, 1..3 */
@@ -230,6 +233,7 @@ wtattach(parent, self, aux)
 	struct isa_attach_args *ia = aux;
 	bus_space_tag_t iot = ia->ia_iot;
 	bus_space_handle_t ioh;
+	bus_size_t maxsize;
 
 	/* Map i/o space */
 	if (bus_space_map(iot, ia->ia_iobase, AV_NPORT, 0, &ioh)) {
@@ -240,6 +244,8 @@ wtattach(parent, self, aux)
 	sc->sc_iot = iot;
 	sc->sc_ioh = ioh;
 	sc->sc_ic = ia->ia_ic;
+
+	callout_init(&sc->sc_timer_ch);
 
 	/* Try Wangtek. */
 	if (wtreset(iot, ioh, &wtregs)) {
@@ -268,6 +274,12 @@ ok:
 	sc->dens = -1;			/* unknown density */
 
 	sc->chan = ia->ia_drq;
+
+	if ((maxsize = isa_dmamaxsize(sc->sc_ic, sc->chan)) < MAXPHYS) {
+		printf("%s: max DMA size %lu is less than required %d\n",
+		    sc->sc_dev.dv_xname, (u_long)maxsize, MAXPHYS);
+		return;
+	}
 
 	if (isa_dmamap_create(sc->sc_ic, sc->chan, MAXPHYS,
 	    BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
@@ -965,7 +977,8 @@ wtclock(sc)
 	 * Some controllers seem to lose dma interrupts too often.  To make the
 	 * tape stream we need 1 tick timeout.
 	 */
-	timeout(wttimer, sc, (sc->flags & TPACTIVE) ? 1 : hz);
+	callout_reset(&sc->sc_timer_ch, (sc->flags & TPACTIVE) ? 1 : hz,
+	    wttimer, sc);
 }
 
 /*

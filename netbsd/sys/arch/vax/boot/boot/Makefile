@@ -1,12 +1,13 @@
-#	$NetBSD: Makefile,v 1.3.2.1 2000/03/01 12:38:56 he Exp $
+#	$NetBSD: Makefile,v 1.10.2.1 2000/07/27 16:44:21 matt Exp $
 
-S=	${.CURDIR}/../../../../
+S=	${.CURDIR}/../../../..
 
 PROG=	boot
 NOMAN=	1
-DEVS=	hp.c ctu.c ra.c tmscp.c mfm.c if_qe.c if_le.c if_ze.c
+WARNS?=	1
+DEVS=	hp.c ctu.c ra.c mfm.c if_qe.c if_le.c if_ze.c if_de.c if_ni.c
 SRCS=	srt0.s boot.c devopen.c conf.c autoconf.c netio.c rom.c romread.s \
-	urem.s udiv.s consio.c str.s ${DEVS}
+	urem.s udiv.s consio.c str.s ${DEVS} findcpu.c
 
 CLEANFILES+=${PROG} ${PROG}.mop
 CPPFLAGS+=-DSUPPORT_BOOTPARAMS -DSUPPORT_BOOTP -DSUPPORT_DHCP -D_STANDALONE
@@ -16,7 +17,7 @@ BINDIR=	/
 MDEC_DIR=/usr/mdec
 
 SA_AS=	library
-SAMISCMAKEFLAGS=SA_USE_CREAD=yes SA_INCLUDE_NET=yes
+SAMISCMAKEFLAGS=SA_USE_CREAD=yes SA_INCLUDE_NET=yes SA_USE_LOADFILE=yes
 .include "${S}/lib/libsa/Makefile.inc"
 LIBSA=	${SALIB}
 
@@ -24,10 +25,19 @@ Z_AS=	library
 .include "${S}/lib/libz/Makefile.inc"
 LIBZ=	${ZLIB}
 
+KERN_AS=library
+.include "${S}/lib/libkern/Makefile.inc"
+LIBKERN=${KERNLIB}
 
-${PROG}: ${OBJS} ${LIBSA} ${LIBZ}
+.BEGIN:
+	@[ -h machine ] || ln -s ${S}/arch/${MACHINE}/include machine
+	@[ -h ${MACHINE_ARCH} ] || ln -s ${S}/arch/${MACHINE_ARCH}/include ${MACHINE_ARCH}
+.NOPATH: machine ${MACHINE_ARCH}
+CLEANFILES+= machine ${MACHINE_ARCH}
+
+${PROG}: ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN}
 	ld -N -Ttext ${RELOC} -e nisse -o ${PROG} ${OBJS} \
-	    ${LIBSA} ${LIBZ} ${LIBSA}
+	    ${LIBSA} ${LIBZ} ${LIBSA} ${LIBKERN}
 	/usr/sbin/mopa.out ${PROG} ${PROG}.mop
 	strip ${PROG}
 	size ${PROG}

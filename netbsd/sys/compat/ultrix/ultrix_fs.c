@@ -1,4 +1,4 @@
-/*	$NetBSD: ultrix_fs.c,v 1.16 1998/08/09 20:37:56 perry Exp $	*/
+/*	$NetBSD: ultrix_fs.c,v 1.18 2000/03/30 11:27:21 augustss Exp $	*/
 
 /*
  * Copyright (c) 1995, 1997 Jonathan Stone
@@ -157,8 +157,8 @@ make_ultrix_mntent __P(( struct statfs *sp, struct ultrix_fs_data *tem));
  */
 static void
 make_ultrix_mntent(sp, tem)
-	register struct statfs *sp;
-	register struct ultrix_fs_data *tem;
+	struct statfs *sp;
+	struct ultrix_fs_data *tem;
 {
 
 	memset(tem, 0, sizeof (*tem));
@@ -218,6 +218,7 @@ ultrix_sys_getmnt(p, v, retval)
 	long count, maxcount;
 	int error = 0;
 
+	nmp = NULL;	/* XXX keep gcc quiet */
 	path = NULL;
 	error = 0;
 	maxcount = SCARG(uap, bufsize) / sizeof(struct ultrix_fs_data);

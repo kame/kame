@@ -1,4 +1,4 @@
-/*	$NetBSD: dec_exec.h,v 1.4 1994/10/26 21:10:52 cgd Exp $	*/
+/*	$NetBSD: dec_exec.h,v 1.6 2000/01/09 15:34:42 ad Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -38,14 +38,13 @@
  *	@(#)dec_exec.h	8.1 (Berkeley) 6/10/93
  */
 
-
 /*
  * Portions of this file are subject to the following copyright notice:
  *
  * Copyright (C) 1989 Digital Equipment Corporation.
  * Permission to use, copy, modify, and distribute this software and
  * its documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appears in all copies.  
+ * provided that the above copyright notice appears in all copies.
  * Digital Equipment Corporation makes no representations about the
  * suitability of this software for any purpose.  It is provided "as is"
  * without express or implied warranty.
@@ -56,14 +55,17 @@
  * shirriff Exp  SPRITE (Berkeley)
  */
 
+#ifndef _PMAX_DEC_EXEC_H_
+#define _PMAX_DEC_EXEC_H_
+
 /* Description of the COFF section. */
 struct coff_exec {
 #define	COFF_MAGIC	0x0162
 	u_short	magic;		/* The magic number. */
 
 	u_short	numSections;	/* The number of sections. */
-	long	timeDateStamp;	/* Time and date stamp. */		
-	long	symPtr;		/* File pointer to symbolic header. */	
+	long	timeDateStamp;	/* Time and date stamp. */
+	long	symPtr;		/* File pointer to symbolic header. */
 	long	numSyms;	/* Size of symbolic header. */
 	u_short	optHeader;	/* Size of optional header. */
 	u_short	flags;		/* Flags. */
@@ -97,3 +99,5 @@ typedef struct {
 	u_short	numLnno;	/* Numberof gp tables. */
 	long	flags;		/* Section flags. */
 } ProcSectionHeader;
+
+#endif	/* !_PMAX_DEC_EXEC_H_ */

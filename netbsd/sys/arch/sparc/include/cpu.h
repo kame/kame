@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.32 1999/01/19 10:02:40 pk Exp $ */
+/*	$NetBSD: cpu.h,v 1.40 2000/06/05 20:47:47 thorpej Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -50,10 +50,12 @@
 /*
  * CTL_MACHDEP definitions.
  */
-#define	CPU_MAXID	1	/* no valid machdep ids */
+#define	CPU_BOOTED_KERNEL	1	/* string: booted kernel name */
+#define	CPU_MAXID		2	/* number of valid machdep ids */
 
-#define	CTL_MACHDEP_NAMES { \
-	{ 0, 0 }, \
+#define	CTL_MACHDEP_NAMES {			\
+	{ 0, 0 },				\
+	{ "booted_kernel", CTLTYPE_STRING },	\
 }
 
 #ifdef _KERNEL
@@ -61,16 +63,31 @@
  * Exported definitions unique to SPARC cpu support.
  */
 
+#if !defined(_LKM)
+#include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
+#endif
+
 #include <machine/psl.h>
+#include <sparc/sparc/cpuvar.h>
 #include <sparc/sparc/intreg.h>
 
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
+#define	curcpu()		(cpuinfo.ci_self)
+#define	curproc			(curcpu()->ci_curproc)
+#define	CPU_IS_PRIMARY(ci)	((ci)->master)
+
 #define	cpu_swapin(p)	/* nothing */
 #define	cpu_swapout(p)	/* nothing */
 #define	cpu_wait(p)	/* nothing */
+#define	cpu_number()	(cpuinfo.cpu_no)
+
+#if defined(MULTIPROCESSOR)
+void	cpu_boot_secondary_processors __P((void));
+#endif
 
 /*
  * Arguments to hardclock, softclock and gatherstats encapsulate the
@@ -202,6 +219,7 @@ int	probeget __P((caddr_t, int));
 void	write_all_windows __P((void));
 void	write_user_windows __P((void));
 void 	proc_trampoline __P((void));
+void	switchexit __P((struct proc *));
 struct pcb;
 void	snapshot __P((struct pcb *));
 struct frame *getfp __P((void));

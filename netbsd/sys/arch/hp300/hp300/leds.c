@@ -1,4 +1,4 @@
-/*	$NetBSD: leds.c,v 1.4 1999/03/26 23:41:29 mycroft Exp $	*/
+/*	$NetBSD: leds.c,v 1.6 1999/11/13 00:30:31 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -60,7 +60,7 @@ ledinit()
 {
 
 	pmap_enter(pmap_kernel(), (vaddr_t)ledbase, (paddr_t)LED_ADDR,
-	    VM_PROT_READ|VM_PROT_WRITE, TRUE, VM_PROT_READ|VM_PROT_WRITE);
+	    VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	ledaddr = (u_int8_t *) ((long)ledbase | (LED_ADDR & PGOFSET));
 }
 
@@ -78,9 +78,10 @@ ledcontrol(ons, offs, togs)
 	int ons, offs, togs;
 {
 
-	__asm __volatile ("	orb	%0,_currentleds;
-				andb	%1,_currentleds;
-				eorb	%2,_currentleds"
-				    : : "d" (ons), "d" (~offs), "d" (togs));
+	__asm __volatile ("	orb	%1,%0;
+				andb	%2,%0;
+				eorb	%3,%0"
+				    : "=m" (currentleds)
+				    : "d" (ons), "d" (~offs), "d" (togs));
 	*ledaddr = ~currentleds;
 }

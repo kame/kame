@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.14 1999/02/20 16:24:53 scw Exp $	*/
+/*	$NetBSD: param.h,v 1.21 2000/05/27 22:37:47 scw Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -51,11 +51,21 @@
 #define	_MACHINE 	mvme68k
 #define	MACHINE		"mvme68k"
 
+/*
+ * Grab the interrupt definitions
+ */
+#include <machine/intr.h>
+
 #define	PGSHIFT		12		/* LOG2(NBPG) */
 #define	KERNBASE	0x00000000	/* start of kernel virtual */
 
 #define	SEGSHIFT	22		/* LOG2(NBSEG) */
+#if defined(M68030) && !defined(M68040) && !defined(M68060)
 #define NBSEG		(1 << SEGSHIFT)	/* bytes/segment */
+#else
+#define	NBSEG		((mmutype == MMU_68040) ? \
+				(32 * (1 << PGSHIFT)) : (256 * (1 << PGSHIFT)))
+#endif
 #define	SEGOFSET	(NBSEG-1)	/* byte offset into segment */
 
 #define	UPAGES		3		/* pages of u-area */
@@ -65,50 +75,11 @@
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
  */
-#ifndef NKMEMCLUSTERS
-# define	NKMEMCLUSTERS	(2048 * 1024 / CLBYTES)
-#endif
-
-/*
- * spl functions; all but spl0 are done in-line
- */
-#include <machine/psl.h>
-
-#define _spl(s) \
-({ \
-        int _spl_r; \
-\
-        __asm __volatile ("clrl %0; movew sr,%0; movew %1,sr" : \
-                "&=d" (_spl_r) : "di" (s)); \
-        _spl_r; \
-})
-
-/* spl0 requires checking for software interrupts */
-#define spl1()  _spl(PSL_S|PSL_IPL1)
-#define spl2()  _spl(PSL_S|PSL_IPL2)
-#define spl3()  _spl(PSL_S|PSL_IPL3)
-#define spl4()  _spl(PSL_S|PSL_IPL4)
-#define spl5()  _spl(PSL_S|PSL_IPL5)
-#define spl6()  _spl(PSL_S|PSL_IPL6)
-#define spl7()  _spl(PSL_S|PSL_IPL7)
-
-#define splsoftclock()  spl1()
-#define splsoftnet()    spl1()
-#define splbio()        spl2()
-#define splnet()        spl3()
-#define spltty()        spl3()
-#define splimp()        spl3()
-#define splserial()     spl4()
-#define splclock()      spl5()
-#define splstatclock()	spl5()
-#define splvm()         spl5()
-#define splhigh()       spl7()
-#define splsched()      spl7()
-
-/* watch out for side effects */
-#define splx(s)         (s & PSL_IPL ? _spl(s) : spl0())
+#define	NKMEMPAGES_MIN_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
 
 #if defined(_KERNEL) && !defined(_LOCORE)
 extern void _delay __P((unsigned));

@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.7 1999/03/26 04:29:21 eeh Exp $ */
+/*	$NetBSD: psl.h,v 1.11.12.2 2000/07/31 02:11:01 mrg Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -84,6 +84,7 @@
 #define PIL_BIO		5
 #define PIL_VIDEO	5
 #define	PIL_TTY		6
+#define	PIL_LPT		6
 #define	PIL_NET		6
 #define PIL_IMP		7
 #define	PIL_CLOCK	10
@@ -135,20 +136,31 @@
 
 #define	PSTATE_BITS "\20\14IG\13MG\12CLE\11TLE\10\7MM\6RED\5PEF\4AM\3PRIV\2IE\1AG"
 
+
+/*
+ * 32-bit code requires TSO or at best PSO since that's what's supported on
+ * SPARC V8 and earlier machines.
+ *
+ * 64-bit code sets the memory model in the ELF header.
+ *
+ * We're running kernel code in TSO for the moment so we don't need to worry
+ * about possible memory barrier bugs.
+ */
+
 #ifdef __arch64__
 #define PSTATE_PROM	(PSTATE_MM_TSO|PSTATE_PRIV)
 #define PSTATE_NUCLEUS	(PSTATE_MM_TSO|PSTATE_PRIV|PSTATE_AG)
 #define PSTATE_KERN	(PSTATE_MM_TSO|PSTATE_PRIV)
 #define PSTATE_INTR	(PSTATE_KERN|PSTATE_IE)
-#define PSTATE_USER32	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_IE)	/* It's easier to debug */
-#define PSTATE_USER	(PSTATE_MM_RMO|PSTATE_AM|PSTATE_IE)
+#define PSTATE_USER32	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_IE)
+#define PSTATE_USER	(PSTATE_MM_RMO|PSTATE_IE)
 #else
 #define PSTATE_PROM	(PSTATE_MM_TSO|PSTATE_PRIV)
 #define PSTATE_NUCLEUS	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_PRIV|PSTATE_AG)
 #define PSTATE_KERN	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_PRIV)
 #define PSTATE_INTR	(PSTATE_KERN|PSTATE_IE)
-#define PSTATE_USER32	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_IE)	/* It's easier to debug */
-#define PSTATE_USER	(PSTATE_MM_RMO|PSTATE_AM|PSTATE_IE)
+#define PSTATE_USER32	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_IE)
+#define PSTATE_USER	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_IE)
 #endif
 
 /*
@@ -158,8 +170,7 @@
  *  +-----+-----+-----+--------+---+-----+
  *  | CCR | ASI |  -  | PSTATE | - | CWP |
  *  +-----+-----+-----+--------+---+-----+
- *
- */
+ * */
 
 #define TSTATE_CWP		0x01f
 #define TSTATE_PSTATE		0x6ff00
@@ -346,6 +357,8 @@ static __inline int name() \
 
 SPL(spl0, 0)
 
+SPL(spllowersoftclock, 1)
+
 SPLHOLD(splsoftint, 1)
 #define	splsoftclock	splsoftint
 #define	splsoftnet	splsoftint
@@ -364,6 +377,9 @@ SPLHOLD(splnet, PIL_NET)
 
 /* tty input runs at software level 6 */
 SPLHOLD(spltty, PIL_TTY)
+
+/* parallel port runs at software level 6 */
+SPLHOLD(spllpt, PIL_LPT)
 
 /*
  * Memory allocation (must be as high as highest network, tty, or disk device)
@@ -404,12 +420,14 @@ static __inline void splx(newpil)
 #endif
 
 #define	spl0()	spl0X(__FILE__, __LINE__)
+#define	spllowersoftclock() spllowersoftclockX(__FILE__, __LINE__)
 #define	splsoftint()	splsoftintX(__FILE__, __LINE__)
 #define	splausoft()	splausoftX(__FILE__, __LINE__)
 #define	splfdsoft()	splfdsoftX(__FILE__, __LINE__)
 #define	splbio()	splbioX(__FILE__, __LINE__)
 #define	splnet()	splnetX(__FILE__, __LINE__)
 #define	spltty()	splttyX(__FILE__, __LINE__)
+#define	spllpt()	spllptX(__FILE__, __LINE__)
 #define	splimp()	splimpX(__FILE__, __LINE__)
 #define	splpmap()	splpmapX(__FILE__, __LINE__)
 #define	splclock()	splclockX(__FILE__, __LINE__)

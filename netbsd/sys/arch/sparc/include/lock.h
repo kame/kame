@@ -1,7 +1,7 @@
-/*	$NetBSD: lock.h,v 1.3 1998/11/04 06:19:55 chs Exp $ */
+/*	$NetBSD: lock.h,v 1.10 2000/05/05 20:12:00 hannken Exp $ */
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -43,62 +43,78 @@
  * Machine dependent spin lock operations.
  */
 
-#if defined(_KERNEL)
+/*
+ * The value for __SIMPLELOCK_LOCKED is what ldstub() naturally stores
+ * `lock_data' given its address (and the fact that SPARC is big-endian).
+ */
 
-#include <sparc/sparc/asm.h>
+typedef	__volatile int		__cpu_simple_lock_t;
 
-static void	simple_lock_init __P((__volatile struct simplelock *));
-static void	simple_lock __P((__volatile struct simplelock *));
-static int	simple_lock_try __P((__volatile struct simplelock *));
-static void	simple_unlock __P((__volatile struct simplelock *));
+#define	__SIMPLELOCK_LOCKED	0xff000000
+#define	__SIMPLELOCK_UNLOCKED	0
 
-static __inline__ void
-simple_lock_init (alp)
-	__volatile struct simplelock *alp;
+/* XXX So we can expose this to userland. */
+#ifdef __lint__
+#define __ldstub(__addr)	(__addr)
+#else /* !__lint__ */
+#define	__ldstub(__addr)						\
+({									\
+	int __v;							\
+									\
+	__asm __volatile("ldstub [%1],%0"				\
+	    : "=r" (__v)						\
+	    : "r" (__addr)						\
+	    : "memory");						\
+									\
+	__v;								\
+})
+#endif /* __lint__ */
+
+static __inline void __cpu_simple_lock_init __P((__cpu_simple_lock_t *))
+	__attribute__((__unused__));
+static __inline void __cpu_simple_lock __P((__cpu_simple_lock_t *))
+	__attribute__((__unused__));
+static __inline int __cpu_simple_lock_try __P((__cpu_simple_lock_t *))
+	__attribute__((__unused__));
+static __inline void __cpu_simple_unlock __P((__cpu_simple_lock_t *))
+	__attribute__((__unused__));
+
+static __inline void
+__cpu_simple_lock_init(__cpu_simple_lock_t *alp)
 {
 
-	alp->lock_data = 0;
+	*alp = __SIMPLELOCK_UNLOCKED;
 }
 
-static __inline__ void
-simple_lock (alp)
-	__volatile struct simplelock *alp;
+static __inline void
+__cpu_simple_lock(__cpu_simple_lock_t *alp)
 {
 
 	/*
-	 * If someone else holds the lock use simple
-	 * reads until it is released, then retry the
-	 * atomic operation. This reduces memory bus contention
-	 * becaused the cache-coherency logic does not have to
-	 * broadcast invalidates on the lock while we spin on it.
+	 * If someone else holds the lock use simple reads until it
+	 * is released, then retry the atomic operation. This reduces
+	 * memory bus contention because the cache-coherency logic
+	 * does not have to broadcast invalidates on the lock while
+	 * we spin on it.
 	 */
-	while (ldstub(&alp->lock_data) != 0) {
-		while (alp->lock_data != 0)
-			/*void*/;
+	while (__ldstub(alp) != __SIMPLELOCK_UNLOCKED) {
+		while (*alp != __SIMPLELOCK_UNLOCKED)
+			/* spin */ ;
 	}
 }
 
-static __inline__ int
-simple_lock_try (alp)
-	__volatile struct simplelock *alp;
+static __inline int
+__cpu_simple_lock_try(__cpu_simple_lock_t *alp)
 {
 
-	return (ldstub(&alp->lock_data) == 0);
+	return (__ldstub(alp) == __SIMPLELOCK_UNLOCKED);
 }
 
-static __inline__ void
-simple_unlock (alp)
-	__volatile struct simplelock *alp;
+static __inline void
+__cpu_simple_unlock(__cpu_simple_lock_t *alp)
 {
 
-	alp->lock_data = 0;
+	*alp = __SIMPLELOCK_UNLOCKED;
 }
-
-#if defined(LOCKDEBUG)
-#define simple_lock_dump()
-#define simple_lock_freecheck(start, end)
-#endif /* LOCKDEBUG */
-
-#endif /* _KERNEL */
 
 #endif /* _MACHINE_LOCK_H */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mha.c,v 1.15.2.1 1999/04/19 04:41:34 cjs Exp $	*/
+/*	$NetBSD: mha.c,v 1.21 2000/06/16 17:15:54 minoura Exp $	*/
 
 /*-
  * Copyright (c) 1996-1999 The NetBSD Foundation, Inc.
@@ -329,6 +329,8 @@ mhaattach(parent, self, aux)
 
 	tmpsc = sc;	/* XXX */
 
+	printf (": Mankai Mach-2 Fast SCSI Host Adaptor\n");
+
 	SPC_TRACE(("mhaattach  "));
 	sc->sc_state = SPC_INIT;
 	sc->sc_iobase = INTIO_ADDR(ia->ia_addr + 0x80); /* XXX */
@@ -346,9 +348,7 @@ mhaattach(parent, self, aux)
 
 	mha_init(sc);	/* Init chip and driver */
 
-	printf("\n%s: Resetting SCSI bus... ", self->dv_xname);
 	mha_scsi_reset(sc);	/* XXX: some devices need this. */
-	printf("done\n");
 
 	sc->sc_phase  = BUSFREE_PHASE;
 
@@ -719,7 +719,7 @@ mha_scsi_cmd(xs)
 	SPC_CMDS(("[0x%x, %d]->%d ", (int)xs->cmd->opcode, xs->cmdlen,
 	    sc_link->scsipi_scsi.target));
 
-	flags = xs->flags;
+	flags = xs->xs_control;
 
 	/* Get a mha command block */
 	s = splbio();
@@ -747,7 +747,8 @@ mha_scsi_cmd(xs)
 	ACB_SETQ(acb, ACB_QREADY);
 	TAILQ_INSERT_TAIL(&sc->ready_list, acb, chain);
 #if 1
-	timeout(mha_timeout, acb, (xs->timeout*hz)/1000);
+	callout_reset(&acb->xs->xs_callout, (xs->timeout*hz)/1000,
+	    mha_timeout, acb);
 #endif
 
 	/*
@@ -758,7 +759,7 @@ mha_scsi_cmd(xs)
 
 	splx(s);
 
-	if (flags & SCSI_POLL) {
+	if (flags & XS_CTL_POLL) {
 		/* Not allowed to use interrupts, use polling instead */
 		return mha_poll(sc, acb);
 	}
@@ -800,7 +801,7 @@ mha_poll(sc, acb)
 		 */
 		if (SSR & SS_IREQUEST)
 			mhaintr(sc);
-		if ((xs->flags & ITSDONE) != 0)
+		if ((xs->xs_status & XS_STS_DONE) != 0)
 			break;
 		DELAY(10);
 #if 1
@@ -937,7 +938,7 @@ mha_done(sc, acb)
 	SPC_TRACE(("[mha_done(error:%x)] ", xs->error));
 
 #if 1
-	untimeout(mha_timeout, acb);
+	callout_stop(&acb->xs->xs_callout);
 #endif
 
 	/*
@@ -980,7 +981,8 @@ mha_done(sc, acb)
 				ACB_SETQ(acb, ACB_QREADY);
 				ti->lubusy &= ~(1<<sc_link->scsipi_scsi.lun);
 				ti->senses++;
-				timeout(mha_timeout, acb, (xs->timeout*hz)/1000);
+				callout_reset(&acb->xs->xs_callout,
+				    (xs->timeout*hz)/1000, mha_timeout, acb);
 				if (sc->sc_nexus == acb) {
 					sc->sc_nexus = NULL;
 					sc->sc_state = SPC_IDLE;
@@ -1008,7 +1010,7 @@ mha_done(sc, acb)
 		}
 	}
 
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 
 #if SPC_DEBUG
 	if ((mha_debug & SPC_SHOWMISC) != 0) {
@@ -1055,7 +1057,7 @@ mha_done(sc, acb)
 	TAILQ_INSERT_HEAD(&sc->free_list, acb, chain);
 	acb->flags = ACB_QFREE;
 #else
-	mha_free_acb(sc, acb, xs->flags);
+	mha_free_acb(sc, acb, xs->xs_control);
 #endif
 
 	ti->cmds++;
@@ -1950,13 +1952,13 @@ mhaintr(arg)
 					/* 最初は CMD PHASE ということらしい */
 					if (acb->dleft) {
 						/* データ転送がありうる場合 */
-						if (acb->xs->flags & SCSI_DATA_IN) {
+						if (acb->xs->xs_control & XS_CTL_DATA_IN) {
 							sc->sc_phase = DATA_IN_PHASE;
 							n = mha_datain(sc, sc->sc_dp, sc->sc_dleft);
 							sc->sc_dp += n;
 							sc->sc_dleft -= n;
 						}
-						else if (acb->xs->flags & SCSI_DATA_OUT) {
+						else if (acb->xs->xs_control & XS_CTL_DATA_OUT) {
 							sc->sc_phase = DATA_OUT_PHASE;
 							n = mha_dataout(sc, sc->sc_dp, sc->sc_dleft);
 							sc->sc_dp += n;
@@ -2130,7 +2132,7 @@ mha_show_scsi_cmd(acb)
 	int i;
 
 	scsi_print_addr(sc_link);
-	if ((acb->xs->flags & SCSI_RESET) == 0) {
+	if ((acb->xs->xs_control & XS_CTL_RESET) == 0) {
 		for (i = 0; i < acb->clen; i++) {
 			if (i)
 				printf(",");

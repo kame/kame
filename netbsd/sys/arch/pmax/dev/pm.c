@@ -1,4 +1,4 @@
-/*	$NetBSD: pm.c,v 1.26 1998/03/30 02:34:25 jonathan Exp $	*/
+/*	$NetBSD: pm.c,v 1.33.4.1 2000/11/02 23:43:50 tv Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,7 +38,7 @@
  *	@(#)pm.c	8.1 (Berkeley) 6/10/93
  */
 
-/* 
+/*
  *  devGraphics.c --
  *
  *     	This file contains machine-dependent routines for the graphics device.
@@ -46,7 +46,7 @@
  *	Copyright (C) 1989 Digital Equipment Corporation.
  *	Permission to use, copy, modify, and distribute this software and
  *	its documentation for any purpose and without fee is hereby granted,
- *	provided that the above copyright notice appears in all copies.  
+ *	provided that the above copyright notice appears in all copies.
  *	Digital Equipment Corporation makes no representations about the
  *	suitability of this software for any purpose.  It is provided "as is"
  *	without express or implied warranty.
@@ -56,78 +56,46 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: pm.c,v 1.26 1998/03/30 02:34:25 jonathan Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pm.c,v 1.33.4.1 2000/11/02 23:43:50 tv Exp $");
 
 
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/device.h>
-#include <sys/kernel.h>
+#include <sys/systm.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
-#include <sys/errno.h>
-#include <sys/proc.h>
-#include <sys/mman.h>
-#include <sys/malloc.h>
-#include <sys/systm.h>
 
-#include <vm/vm.h>
-
+#include <pmax/pmax/kn01.h>
+#include <pmax/ibus/ibusvar.h>
 #include <machine/autoconf.h>
-#include <machine/bus.h>		/* XXX wbflush() */
-
-#include <machine/pmioctl.h>
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
-
+#include <machine/locore.h>		/* wbflush() */
+#include <machine/pmioctl.h>
+#include <pmax/dev/bt478var.h>
 #include <pmax/dev/fbreg.h>
 #include <pmax/dev/pmvar.h>
-
 #include <pmax/dev/pmreg.h>
-#include <pmax/dev/bt478var.h>
+
 
 
 /*
  * These need to be mapped into user space.
  */
-extern struct fbuaccess pmu;
-struct fbuaccess pmu;
-static u_short curReg;		/* copy of PCCRegs.cmdr since it's read only */
+static u_short	curReg;		/* copy of PCCRegs.cmdr since it's read only */
 
-/*
- * rcons methods and globals.
- */
-struct pmax_fbtty pmfb;
+static struct fbuaccess pmu;
+static struct pmax_fbtty pmfb;	
+static struct fbinfo *pm_fi;
 
-/*
- * Forward references.
- */
-extern void pmScreenInit __P((struct fbinfo *fi));
-static void pmLoadCursor __P((struct fbinfo *fi, u_short *ptr));
-void pmPosCursor __P((struct fbinfo *fi, int x, int y));
+static int	pm_video_on __P ((struct fbinfo *));
+static int	pm_video_off __P ((struct fbinfo *));
+static void	pmInitColorMap __P((struct fbinfo *fi));
+static void	pmPosCursor __P((struct fbinfo *fi, int x, int y));
+static void	pmLoadCursor __P((struct fbinfo *fi, u_short *ptr));
+static void	pccCursorOff __P((struct fbinfo *fi));
 
-void bt478CursorColor __P((struct fbinfo *fi, u_int *color));
-void bt478InitColorMap __P((struct fbinfo *fi));
-
-void pccCursorOn  __P((struct fbinfo *fi));
-void pccCursorOff __P((struct fbinfo *fi));
-void pmInitColorMap __P((struct fbinfo *fi));
-
-int pminit __P((struct fbinfo *fi, int unit, int cold_console_flag));
-int pmattach __P((struct fbinfo *fi, int unit, int cold_console_flag));
-
-static int pm_video_on __P ((struct fbinfo *));
-static int pm_video_off __P ((struct fbinfo *));
-
-
-
-#define CMAP_BITS	(3 * 256)		/* 256 entries, 3 bytes per. */
-static u_char cmap_bits [CMAP_BITS];		/* colormap for console... */
-
-
-/* new-style raster-cons "driver" methods */
-
-struct fbdriver pm_driver = {
+static struct fbdriver pm_driver = {
 	pm_video_on,
 	pm_video_off,
 	pmInitColorMap,		/* pcc cursor wrapper for bt478InitColorMap */
@@ -138,80 +106,154 @@ struct fbdriver pm_driver = {
 	bt478CursorColor,
 };
 
+static int  pmmatch __P((struct device *, struct cfdata *, void *));
+static void pmattach __P((struct device *, struct device *, void *));
+static int  pminit __P((struct fbinfo *, caddr_t, int));
 
+struct cfattach pm_ds_ca = {
+	sizeof(struct device), pmmatch, pmattach
+};
 
-/*
- * Machine-independent backend to attach a pm device.
- * assumes the following fields in struct fbinfo *fi have been set
- * by the MD front-end:
- *
- * fi->fi_pixels	framebuffer raster memory
- * fi->fi_vdac		vdac register address
- * fi->fi_base		address of programmable cursor chip registers
- * fi->fi_type.fb_depth	1 (mono) or 8 (colour)
- * fi->fi_fbu		QVSS-compatible user-mapped fbinfo struct
- */
 int
-pmattach(fi, unit, cold_console_flag)
-	struct fbinfo *fi;
-	int unit;
-	int cold_console_flag;
+pm_cnattach()
 {
-	register PCCRegs *pcc = (PCCRegs *)fi->fi_base;
+	struct fbinfo *fi;
+	caddr_t base;
 
-	/* check for no frame buffer */
-	if (badaddr((char *)fi->fi_pixels, 4))
+#if 0
+	ULTRIX does in this way;
+	check the presense of monochrome bit in CSR.
+	if set, there is a monochrome framebuffer
+	if not set, try two write and read cycles of framebuffer to make
+	sure the presense of video memory.
+#else
+	base = (caddr_t)MIPS_PHYS_TO_KSEG1(KN01_SYS_PCC);
+	if (badaddr(base, 4))
+		return (0);
+#endif
+
+	fbcnalloc(&fi);
+	if (pminit(fi, base, 0) < 0)
+		return (0);
+	pm_fi = fi;
+	return (1);
+}
+
+static int
+pmmatch(parent, match, aux)
+	struct device *parent;
+	struct cfdata *match;
+	void *aux;
+{
+	struct ibus_attach_args *ia = aux;
+	caddr_t pmaddr = (caddr_t)ia->ia_addr;
+
+	/* make sure that we're looking for this type of device. */
+	if (strcmp(ia->ia_name, "pm") != 0)
 		return (0);
 
-	/* Fill in the stuff that differs from monochrome to color. */
-	if (fi->fi_type.fb_depth == 1) {
+	if (badaddr(pmaddr, 4))
+		return (0);
+
+	return (1);
+}
+
+static void
+pmattach(parent, self, aux)
+	struct device *parent;
+	struct device *self;
+	void *aux;
+{
+	struct ibus_attach_args *ia = aux;
+	caddr_t base = (caddr_t)ia->ia_addr;
+	struct fbinfo *fi;
+
+	if (pm_fi)
+		fi = pm_fi;
+	else {
+		if (fballoc(&fi) < 0 || pminit(fi, base, self->dv_unit) < 0)
+			return; /* failed */
+	}
+	((struct fbsoftc *)self)->sc_fi = fi;
+
+	printf(": %dx%dx%d%s",
+		fi->fi_type.fb_width,
+		fi->fi_type.fb_height,
+		fi->fi_type.fb_depth, 
+		(pm_fi) ? " console" : "");
+
+	printf("\n");
+}
+
+int
+pminit(fi, base, unit)
+	struct fbinfo *fi;
+	caddr_t base;
+	int unit;
+{
+	u_int16_t kn01csr;
+	PCCRegs *pcc;
+
+	kn01csr = *(volatile u_int16_t *)MIPS_PHYS_TO_KSEG1(KN01_SYS_CSR);
+
+	fi->fi_unit = unit;
+	fi->fi_pixels = (caddr_t)MIPS_PHYS_TO_KSEG1(KN01_PHYS_FBUF_START);
+	fi->fi_base = base; /* PCC address */
+	fi->fi_vdac = (caddr_t)MIPS_PHYS_TO_KSEG1(KN01_SYS_VDAC);
+
+	if (kn01csr & KN01_CSR_MONO) {
+		fi->fi_type.fb_boardtype = PMAX_FBTYPE_PM_MONO;
 		fi->fi_type.fb_depth = 1;
 		fi->fi_type.fb_cmsize = 0;
-		fi->fi_type.fb_boardtype = PMAX_FBTYPE_PM_MONO;
 		fi->fi_type.fb_size = 0x40000;
-		fi->fi_linebytes = 256;
-	} else {
+		fi->fi_pixelsize = (1024 / 8) * 864;
+		fi->fi_linebytes = 2048 / 8;
+	}
+	else {
+		fi->fi_type.fb_boardtype = PMAX_FBTYPE_PM_COLOR;
 		fi->fi_type.fb_depth = 8;
 		fi->fi_type.fb_cmsize = 256;
-		fi->fi_type.fb_boardtype = PMAX_FBTYPE_PM_COLOR;
 		fi->fi_type.fb_size = 0x100000;
+		fi->fi_pixelsize = 1024 * 864;
 		fi->fi_linebytes = 1024;
 	}
-
-	/* Fill in main frame buffer info struct. */
-
-	fi->fi_driver = &pm_driver;
-	fi->fi_pixelsize =
-		((fi->fi_type.fb_depth == 1) ? 1024 / 8 : 1024) * 864;
-	fi->fi_blanked = 0;
-
-	if (cold_console_flag) {
-  		fi->fi_cmap_bits = (caddr_t)cmap_bits;
-	} else {
-    		fi->fi_cmap_bits = malloc(CMAP_BITS, M_DEVBUF, M_NOWAIT);
-		if (fi->fi_cmap_bits == NULL) {
-			printf("pm%d: no memory for cmap\n", unit);
-			return (0);
-		}
-	}
-
 	fi->fi_type.fb_width = 1024;
 	fi->fi_type.fb_height = 864;
-
+	fi->fi_size = fi->fi_type.fb_size;
+	fi->fi_driver = &pm_driver;
+	fi->fi_blanked = 0;
 
 	/*
-	 * Compatibility glue
+	 * Set mmap'able address of qvss-compatible user info structure.
+	 *
+	 * Must be in Uncached space since the fbuaccess structure is
+	 * mapped into the user's address space uncached.
+	 *
+	 * XXX can go away when MI support for d_mmap entrypoints added.
+	 */
+	fi->fi_fbu = (void *)MIPS_PHYS_TO_KSEG1(MIPS_KSEG0_TO_PHYS(&pmu));
+
+	/* This is glass-tty state but it's in the shared structure. Ick. */
+	fi->fi_fbu->scrInfo.max_row = 56;
+	fi->fi_fbu->scrInfo.max_col = 80;
+
+	/* These are non-zero on the kn01 framebuffer. Why? */
+	fi->fi_fbu->scrInfo.min_cur_x = -15;
+	fi->fi_fbu->scrInfo.min_cur_y = -15;
+
+	init_pmaxfbu(fi);
+
+	/*
+	 * Initialize old-style glass-tty screen info.
 	 */
 	fi->fi_glasstty = &pmfb;
-
-
-	/*
-	 * Initialize the screen.
-	 */
-	pcc->cmdr = PCC_FOPB | PCC_VBHI;
+	/* it's safe to assume serial driver existence in this case */
+	tb_kbdmouseconfig(fi);
 
 	/* Initialize the cursor register on . */
 	/* Turn off the hardware cursor sprite for rcons text mode. */
+	pcc = (PCCRegs *)fi->fi_base;
+	pcc->cmdr = PCC_FOPB | PCC_VBHI;
 	curReg = 0;	/* XXX */
 	pccCursorOff(fi);
 
@@ -220,37 +262,10 @@ pmattach(fi, unit, cold_console_flag)
 	 */
 	bt478init(fi);
 
-	/*
-	 * Initialize old-style pmax screen info.
-	 */
-	fi->fi_fbu->scrInfo.max_row = 56;
-	fi->fi_fbu->scrInfo.max_col = 80;
+	fbconnect(fi);
 
-	init_pmaxfbu(fi);
-
-	/* These are non-zero on the kn01 framebuffer. Why? */
-	fi->fi_fbu->scrInfo.min_cur_x = -15;
-	fi->fi_fbu->scrInfo.min_cur_y = -15;
-
-
-#ifdef notanymore
-	bt478InitColorMap(fi);	/* done inside bt478init() */
-#endif
-
-	/*
-	 * Connect to the raster-console pseudo-driver.
-	 */
-	fi->fi_glasstty = &pmfb; /*XXX*/
-	fbconnect((fi->fi_type.fb_depth == 1) ? "KN01 mfb" : "KN01 cfb",
-		  fi, cold_console_flag);
-
-
-#ifdef fpinitialized
-	fp->initialized = 1;
-#endif
-	return (1);
+	return (0);
 }
-
 
 /*
  * ----------------------------------------------------------------------------
@@ -274,8 +289,8 @@ pmLoadCursor(fi, cur)
 	struct fbinfo *fi;
 	unsigned short *cur;
 {
-	register PCCRegs *pcc = (PCCRegs *)fi->fi_base;
-	register int i;
+	PCCRegs *pcc = (PCCRegs *)fi->fi_base;
+	int i;
 
 	curReg |= PCC_LODSA;
 	pcc->cmdr = curReg;
@@ -304,18 +319,18 @@ pmLoadCursor(fi, cur)
  *
  * Side effects:
  *	None.
- *	NB:  should not turn on the hardwar cursor, since the 
+ *	NB:  should not turn on the hardwar cursor, since the
  *	Xserver positions the cursor to upper left corner as the last
  * 	cursor operation before it exits.
  *
  *----------------------------------------------------------------------
  */
-void
+static void
 pmPosCursor(fi, x, y)
-	register struct fbinfo *fi;
-	register int x, y;
+	struct fbinfo *fi;
+	int x, y;
 {
-	register PCCRegs *pcc = (PCCRegs *)fi->fi_base;
+	PCCRegs *pcc = (PCCRegs *)fi->fi_base;
 
 	if (y < fi->fi_fbu->scrInfo.min_cur_y ||
 	    y > fi->fi_fbu->scrInfo.max_cur_y)
@@ -330,6 +345,7 @@ pmPosCursor(fi, x, y)
 }
 
 
+#if 0	/* XXX not used */
 /*
  * Turn hardware cursor on by turning on the enable for A and B
  * overlay planes. video output under the cursor sprite is then
@@ -338,10 +354,11 @@ pmPosCursor(fi, x, y)
 void pccCursorOn(fi)
 	struct fbinfo *fi;
 {
-	register PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
+	PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
 	pcc -> cmdr = curReg | (PCC_ENPA | PCC_ENPB);
 	wbflush();
 }
+#endif
 
 
 /*
@@ -349,10 +366,11 @@ void pccCursorOn(fi)
  * overlay planes. video output under the cursor sprite is then
  * determined by the framebuffer contents.
  */
-void pccCursorOff(fi)
+static void
+pccCursorOff(fi)
 	struct fbinfo *fi;
 {
-	register PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
+	PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
 	pcc -> cmdr = curReg & ~(PCC_ENPA | PCC_ENPB);
 	wbflush();
 }
@@ -362,7 +380,8 @@ void pccCursorOff(fi)
  * Initialize colourmap to default values.
  * The default cursor hardware state is off.
  */
-void pmInitColorMap(fi)
+void
+pmInitColorMap(fi)
 	struct fbinfo *fi;
 {
 	bt478InitColorMap(fi);
@@ -374,14 +393,14 @@ void pmInitColorMap(fi)
  * Enable the video display.
  */
 static int
-pm_video_on (fi)
+pm_video_on(fi)
 	struct fbinfo *fi;
 {
-	register PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
+	PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
 
 	if (!fi -> fi_blanked)
 		return 0;
-	
+
 	pcc -> cmdr = curReg & ~(PCC_FOPA | PCC_FOPB);
 	bt478RestoreCursorColor (fi);
 	fi -> fi_blanked = 0;
@@ -395,14 +414,15 @@ pm_video_on (fi)
  *  determined  by  colourmap entry 12 (0x0c), which we set here to
  *  black.
  */
-static int pm_video_off (fi)
+static int
+pm_video_off(fi)
 	struct fbinfo *fi;
 {
-	register PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
+	PCCRegs *pcc = (PCCRegs *)fi -> fi_base;
 
 	if (fi -> fi_blanked)
 		return 0;
-	
+
 	bt478BlankCursor (fi);
 	pcc -> cmdr = curReg | PCC_FOPA | PCC_FOPB;
 	fi -> fi_blanked = 1;

@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs.h,v 1.26.2.1 2000/02/01 22:56:20 he Exp $	*/
+/*	$NetBSD: procfs.h,v 1.29 2000/03/16 18:08:26 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -45,6 +45,7 @@
 typedef enum {
 	Proot,		/* the filesystem root */
 	Pcurproc,	/* symbolic link for curproc */
+	Pself,		/* like curproc, but this is the Linux name */
 	Pproc,		/* a process-specific sub-directory */
 	Pfile,		/* the executable file */
 	Pmem,		/* the process's memory image */
@@ -136,6 +137,7 @@ int procfs_docmdline __P((struct proc *, struct proc *, struct pfsnode *,
 int procfs_checkioperm __P((struct proc *, struct proc *));
 void procfs_revoke_vnodes __P((struct proc *, void *));
 void procfs_hashinit __P((void));
+void procfs_hashdone __P((void));
 
 /* functions to check whether or not files should be displayed */
 int procfs_validfile __P((struct proc *));

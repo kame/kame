@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.15 1999/01/19 18:18:42 thorpej Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.17 2000/03/14 14:11:06 soren Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -137,7 +137,7 @@ sys_sysarch(p, v, retval)
 		error =  mips_user_cacheflush(p, cfua.va, cfua.nbytes,
 		     cfua.whichcache);
 		break;
-	}		
+	}
 	case MIPS_CACHECTL: {
 		struct mips_cachectl_args ccua;
 
@@ -145,7 +145,7 @@ sys_sysarch(p, v, retval)
 		if (error != 0) return (error);
 		error = mips_user_cachectl(p, ccua.va, ccua.nbytes, ccua.ctl);
 		break;
-	}		
+	}
 	default:
 		error = ENOSYS;
 		break;
@@ -224,8 +224,8 @@ mips_user_cachectl(p, va, nbytes, cachectl)
 	return(EOPNOTSUPP);
 #else
 	/*
-	 * Use the merged mips3  pmap cache-control functions
-	 * to change the cache attributes of each page in the virtual-address range,
+	 * Use the merged mips3 pmap cache-control functions to change
+	 * the cache attributes of each page in the virtual-address range,
 	 * by manually mapping to a  physical address and changing the
 	 * pmap attributes of the  PA of each page in the range.
 	 * Force misses on non-present pages to be sure the cacheable bits

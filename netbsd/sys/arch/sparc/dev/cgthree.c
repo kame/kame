@@ -1,4 +1,4 @@
-/*	$NetBSD: cgthree.c,v 1.40 1998/11/19 15:38:24 mrg Exp $ */
+/*	$NetBSD: cgthree.c,v 1.45.4.1 2000/06/30 16:27:38 simonb Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -133,7 +133,7 @@ static void	cgthreeattach_sbus(struct device *, struct device *, void *);
 static void	cgthreeattach_obio(struct device *, struct device *, void *);
 
 static void	cgthreeunblank(struct device *);
-static void	cgthreeattach __P((struct cgthree_softc *, char *, int, int));
+static void	cgthreeattach __P((struct cgthree_softc *, char *, int));
 
 /* cdevsw prototypes */
 cdev_decl(cgthree);
@@ -153,9 +153,6 @@ static struct fbdriver cgthreefbdriver = {
 	cgthreeunblank, cgthreeopen, cgthreeclose, cgthreeioctl, cgthreepoll,
 	cgthreemmap
 };
-
-extern int fbnode;
-extern struct tty *fbconstty;
 
 static void cgthreeloadcmap __P((struct cgthree_softc *, int, int));
 static void cgthree_set_video __P((struct cgthree_softc *, int));
@@ -255,7 +252,7 @@ cgthreeattach_sbus(parent, self, args)
 	}
 	sc->sc_fbc = (struct fbcontrol *)bh;
 
-	isconsole = node == fbnode && fbconstty != NULL;
+	isconsole = fb_is_console(node);
 	name = getpropstring(node, "model");
 
 	if (sa->sa_npromvaddrs != 0)
@@ -275,7 +272,7 @@ cgthreeattach_sbus(parent, self, args)
 	}
 
 	sbus_establish(&sc->sc_sd, &sc->sc_dev);
-	cgthreeattach(sc, name, isconsole, node == fbnode);
+	cgthreeattach(sc, name, isconsole);
 }
 
 void
@@ -322,7 +319,7 @@ cgthreeattach_obio(parent, self, aux)
 	}
 	sc->sc_fbc = (struct fbcontrol *)bh;
 
-	isconsole = fbconstty != NULL;
+	isconsole = fb_is_console(0);
 	name = "cgthree";
 
 	if (isconsole) {
@@ -339,48 +336,47 @@ cgthreeattach_obio(parent, self, aux)
 		sc->sc_fb.fb_pixels = (char *)bh;
 	}
 
-	cgthreeattach(sc, name, isconsole, 1);
+	cgthreeattach(sc, name, isconsole);
 }
 
 void
-cgthreeattach(sc, name, isconsole, isfb)
+cgthreeattach(sc, name, isconsole)
 	struct cgthree_softc *sc;
 	char *name;
 	int isconsole;
-	int isfb;
 {
 	int i;
 	struct fbdevice *fb = &sc->sc_fb;
-	volatile struct bt_regs *bt;
+	volatile struct fbcontrol *fbc = sc->sc_fbc;
+	volatile struct bt_regs *bt = &fbc->fbc_dac;
 
+	fb->fb_type.fb_cmsize = 256;
 	fb->fb_type.fb_size = fb->fb_type.fb_height * fb->fb_linebytes;
 	printf(": %s, %d x %d", name,
 		fb->fb_type.fb_width, fb->fb_type.fb_height);
 
-
 	/* Transfer video magic to board, if it's not running */
-	if ((sc->sc_fbc->fbc_ctrl & FBC_TIMING) == 0)
+	if ((fbc->fbc_ctrl & FBC_TIMING) == 0) {
+		int sense = (fbc->fbc_status & FBS_MSENSE);
+		/* Search table for video timings fitting this monitor */
 		for (i = 0; i < sizeof(cg3_videoctrl)/sizeof(cg3_videoctrl[0]);
 		     i++) {
-			volatile struct fbcontrol *fbc = sc->sc_fbc;
-			if ((fbc->fbc_status & FBS_MSENSE) ==
-			     cg3_videoctrl[i].sense) {
-				int j;
-				printf(" setting video ctrl");
-				for (j = 0; j < 12; j++)
-					fbc->fbc_vcontrol[j] =
-						cg3_videoctrl[i].vctrl[j];
-				fbc->fbc_ctrl |= FBC_TIMING;
-				break;
-			}
-		}
+			int j;
+			if (sense != cg3_videoctrl[i].sense)
+				continue;
 
-	/* grab initial (current) color map */
-	fb->fb_type.fb_cmsize = 256;
-	bt = &sc->sc_fbc->fbc_dac;
-	bt->bt_addr = 0;
-	for (i = 0; i < 256 * 3 / 4; i++)
-		sc->sc_cmap.cm_chip[i] = bt->bt_cmap;
+			printf(" setting video ctrl");
+			for (j = 0; j < 12; j++)
+				fbc->fbc_vcontrol[j] =
+					cg3_videoctrl[i].vctrl[j];
+			fbc->fbc_ctrl |= FBC_TIMING;
+			break;
+		}
+	}
+
+	/* Initialize the default color map. */
+	bt_initcmap(&sc->sc_cmap, 256);
+	cgthreeloadcmap(sc, 0, 256);
 
 	/* make sure we are not blanked */
 	cgthree_set_video(sc, 1);
@@ -394,8 +390,7 @@ cgthreeattach(sc, name, isconsole, isfb)
 	} else
 		printf("\n");
 
-	if (isfb)
-		fb_attach(fb, isconsole);
+	fb_attach(fb, isconsole);
 }
 
 
@@ -453,12 +448,12 @@ cgthreeioctl(dev, cmd, data, flags, p)
 		break;
 
 	case FBIOGETCMAP:
-		return (bt_getcmap((struct fbcmap *)data, &sc->sc_cmap, 256));
+#define p ((struct fbcmap *)data)
+		return (bt_getcmap(p, &sc->sc_cmap, 256, 1));
 
 	case FBIOPUTCMAP:
 		/* copy to software map */
-#define p ((struct fbcmap *)data)
-		error = bt_putcmap(p, &sc->sc_cmap, 256);
+		error = bt_putcmap(p, &sc->sc_cmap, 256, 1);
 		if (error)
 			return (error);
 		/* now blast them into the chip */
@@ -556,10 +551,11 @@ cgthreeloadcmap(sc, start, ncolors)
  * As well, mapping at an offset of 0x04000000 causes the cg3 to be
  * mapped in flat mode without the cg4 emulation.
  */
-int
+paddr_t
 cgthreemmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct cgthree_softc *sc = cgthree_cd.cd_devs[minor(dev)];
 	bus_space_handle_t bh;
@@ -578,7 +574,7 @@ cgthreemmap(dev, off, prot)
 	else
 		off = 0;
 
-	if ((unsigned)off >= sc->sc_fb.fb_type.fb_size)
+	if (off >= sc->sc_fb.fb_type.fb_size)
 		return (-1);
 
 	if (bus_space_mmap(sc->sc_bustag,
@@ -587,5 +583,5 @@ cgthreemmap(dev, off, prot)
 			   BUS_SPACE_MAP_LINEAR, &bh))
 		return (-1);
 
-	return ((int)bh);
+	return ((paddr_t)bh);
 }

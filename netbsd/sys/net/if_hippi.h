@@ -1,4 +1,4 @@
-/*	$NetBSD: if_hippi.h,v 1.4 1998/05/29 13:37:39 kleink Exp $	*/
+/*	$NetBSD: if_hippi.h,v 1.6 1999/11/19 20:41:19 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -50,7 +50,7 @@ struct hippi_fp {
 	u_int16_t fp_offsets;
 #define HIPPI_FP_D2_MASK	0x07
 	u_int32_t fp_d2_len;
-};
+} __attribute__((__packed__));
 
 struct hippi_le {
 	u_int32_t le_dest_switch;
@@ -59,12 +59,12 @@ struct hippi_le {
 	u_int8_t  le_dest_addr[6];
 	u_int16_t le_local_admin;
 	u_int8_t  le_src_addr[6];
-};
+} __attribute__((__packed__));
 
 struct hippi_header {
 	struct hippi_fp	hi_fp;
 	struct hippi_le	hi_le;
-};
+} __attribute__((__packed__));
 
 #define HIPPI_HDRLEN (sizeof(struct hippi_header))
 
@@ -82,10 +82,6 @@ struct hippi_header {
 
 #ifdef _KERNEL
 void    hippi_ifattach __P((struct ifnet *, caddr_t));
-void    hippi_input __P((struct ifnet *, struct hippi_header *, 
-			 struct mbuf *));
 void    hippi_ip_input __P((struct ifnet *, struct mbuf *));
-int     hippi_output __P((struct ifnet *,
-		  struct mbuf *, struct sockaddr *, struct rtentry *)); 
 #endif /* _KERNEL */
 #endif /* !_NET_IF_HIPPI_H_ */

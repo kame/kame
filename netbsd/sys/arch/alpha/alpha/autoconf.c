@@ -1,4 +1,4 @@
-/* $NetBSD: autoconf.c,v 1.33 1999/02/23 03:20:00 thorpej Exp $ */
+/* $NetBSD: autoconf.c,v 1.37 2000/06/03 20:47:36 thorpej Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -46,7 +46,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.33 1999/02/23 03:20:00 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.37 2000/06/03 20:47:36 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,6 +61,7 @@ __KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.33 1999/02/23 03:20:00 thorpej Exp $"
 #include <machine/cpu.h>
 #include <machine/prom.h>
 #include <machine/conf.h>
+#include <machine/intr.h>
 
 struct device		*booted_device;
 int			booted_partition;
@@ -69,25 +70,16 @@ struct bootdev_data	*bootdev_data;
 void	parse_prom_bootdev __P((void));
 int	atoi __P((char *));
 
-struct devnametobdevmaj alpha_nam2blk[] = {
-	{ "st",		2 },
-	{ "cd",		3 },
-	{ "md",		6 },
-	{ "sd",		8 },
-	{ "fd",		0 },
-	{ "wd",		4 },
-	{ NULL,		0 },
-};
-
 /*
- * configure:
+ * cpu_configure:
  * called at boot time, configure all devices on system
  */
 void
-configure()
+cpu_configure()
 {
 
 	parse_prom_bootdev();
+	softintr_init();
 
 	/*
 	 * Disable interrupts during autoconfiguration.  splhigh() won't
@@ -99,7 +91,6 @@ configure()
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
 	(void)spl0();
-	cold = 0;
 
 	/*
 	 * Note that bootstrapping is finished, and set the HWRPB up  
@@ -115,7 +106,7 @@ cpu_rootconf()
 	if (booted_device == NULL)
 		printf("WARNING: can't figure what device matches \"%s\"\n",
 		    bootinfo.booted_dev);
-	setroot(booted_device, booted_partition, alpha_nam2blk);
+	setroot(booted_device, booted_partition);
 }
 
 void

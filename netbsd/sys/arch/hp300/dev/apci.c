@@ -1,7 +1,7 @@
-/*	$NetBSD: apci.c,v 1.4 1998/03/28 23:49:06 thorpej Exp $	*/
+/*	$NetBSD: apci.c,v 1.8 2000/03/23 06:37:23 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -123,6 +123,7 @@ struct apci_softc {
 	struct	device sc_dev;		/* generic device glue */
 	struct	apciregs *sc_apci;	/* device registers */
 	struct	tty *sc_tty;		/* tty glue */
+	struct	callout sc_diag_ch;
 	int	sc_ferr,
 		sc_perr,
 		sc_oflow,
@@ -152,8 +153,6 @@ void	apcistart __P((struct tty *));
 int	apcimctl __P((struct apci_softc *, int, int));
 void	apciinit __P((struct apciregs *, int));
 void	apcitimeout __P((void *));
-
-int	apcicheckdca __P((void));
 
 cdev_decl(apci);
 
@@ -212,16 +211,11 @@ apcimatch(parent, match, aux)
 	case FRODO_APCI_OFFSET(1):
 	case FRODO_APCI_OFFSET(2):
 	case FRODO_APCI_OFFSET(3):
-		break;
-	default:
-		return (0);
+		/* Yup, we exist! */
+		return (1);
 	}
 
-	/* Make sure there's not a DCA in the way. */
-	if (fa->fa_offset == FRODO_APCI_OFFSET(1) && apcicheckdca())
-		return (0);
-
-	return (1);
+	return (0);
 }
 
 void
@@ -236,6 +230,8 @@ apciattach(parent, self, aux)
 	sc->sc_apci = apci =
 	    (struct apciregs *)IIOV(FRODO_BASE + fa->fa_offset);
 	sc->sc_flags = 0;
+
+	callout_init(&sc->sc_diag_ch);
 
 	/* Are we the console? */
 	if (apci == apci_cn) {
@@ -366,7 +362,7 @@ apciopen(dev, flag, mode, p)
 
 	/* clear errors, start timeout */
 	sc->sc_ferr = sc->sc_perr = sc->sc_oflow = sc->sc_toterr = 0;
-	timeout(apcitimeout, sc, hz);
+	callout_reset(&sc->sc_diag_ch, hz, apcitimeout, sc);
 
  bad:
 	return (error);
@@ -716,7 +712,7 @@ apciparam(tp, t)
 		apci->ap_ier = (ospeed >> 8) & 0xff;
 		apci->ap_cfcr = cfcr;
 	} else
-		apci->ap_cfcr;
+		apci->ap_cfcr = cfcr;
 
 	/* and copy to tty */
 	tp->t_ispeed = t->c_ispeed;
@@ -872,47 +868,8 @@ apcitimeout(arg)
 		    sc->sc_dev.dv_xname, ferr, perr, oflow, sc->sc_toterr);
 	}
 
-	timeout(apcitimeout, sc, hz);
+	callout_reset(&sc->sc_diag_ch, hz, apcitimeout, sc);
 }
-
-int
-apcicheckdca()
-{
-	caddr_t va;
-	int rv = 0;
-
-	/*
-	 * On systems that also have a dca at select code 9, we
-	 * cannot use the second UART, as it is mapped to select
-	 * code 9 by the firmware.  We check for this by mapping
-	 * select code 9 and checking for a dca.  Yuck.
-	 */
-	va = iomap(dio_scodetopa(9), NBPG);
-	if (va == NULL) {
-		printf("apcicheckdca: can't map scode 9!\n");
-		return (1);	/* Safety. */
-	}
-
-	/* Check for hardware. */
-	if (badaddr(va)) {
-		/* Nothing there, assume APCI. */
-		goto unmap;
-	}
-
-	/* Check DIO ID against DCA IDs. */
-	switch (DIO_ID(va)) {
-	case DIO_DEVICE_ID_DCA0:
-	case DIO_DEVICE_ID_DCA0REM:
-	case DIO_DEVICE_ID_DCA1:
-	case DIO_DEVICE_ID_DCA1REM:
-		rv = 1;
-	}
- unmap:
-	iounmap(va, NBPG);
-
-	return (rv);
-}
-
 
 /*
  * The following routines are required for the APCI to act as the console.
@@ -936,27 +893,29 @@ apcicnprobe(cp)
 	if (conforced)
 		return;
 
-	/* These can only exist on 400-series machines. */
-	switch (machineid) {
-	case HP_400:
-	case HP_425:
-	case HP_433:
-		break;
-
-	default:
+	/*
+	 * The APCI can only be a console on a 425e; on other 4xx
+	 * models, the "first" serial port is mapped to the DCA
+	 * at select code 9.  See frodo.c for the autoconfiguration
+	 * version of this check.
+	 */
+	if (machineid != HP_425 || mmuid != MMUID_425_E)
 		return;
-	}
 
-	/* Make sure a DCA isn't in the way. */
-	if (apcicheckdca() == 0) {
 #ifdef APCI_FORCE_CONSOLE
-		cp->cn_pri = CN_REMOTE;
-		conforced = 1;
-		conscode = -2;			/* XXX */
+	cp->cn_pri = CN_REMOTE;
+	conforced = 1;
+	conscode = -2;			/* XXX */
 #else
-		cp->cn_pri = CN_NORMAL;
+	cp->cn_pri = CN_NORMAL;
 #endif
-	}
+
+	/*
+	 * If our priority is higher than the currently-remembered
+	 * console, install ourselves.
+	 */
+	if (((cn_tab == NULL) || (cp->cn_pri > cn_tab->cn_pri)) || conforced)
+		cn_tab = cp;
 }
 
 /* ARGSUSED */

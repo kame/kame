@@ -6,7 +6,7 @@ mkdir
 rmdir
 symlink
 */
-/*	$NetBSD: coda_vnops.c,v 1.9.4.4 2000/02/12 17:01:32 he Exp $	*/
+/*	$NetBSD: coda_vnops.c,v 1.18 2000/04/05 18:39:09 phil Exp $	*/
 
 /*
  * 
@@ -51,235 +51,6 @@ symlink
  * This code was written for the Coda file system at Carnegie Mellon
  * University.  Contributers include David Steere, James Kistler, and
  * M. Satyanarayanan.  
- */
-
-/*
- * HISTORY
- * $Log: coda_vnops.c,v $
- * Revision 1.9.4.4  2000/02/12 17:01:32  he
- * Apply patch (requested by he):
- *   Fix a compile problem under CODA_VERBOSE caused by the v_usecount
- *   widening.
- *
- * Revision 1.9.4.3  2000/02/06 17:16:28  he
- * Apply patch (requested by christos):
- *   Fix a compilation problem caused by the widening of v_usecount.
- *
- * Revision 1.9.4.2  1999/10/18 05:04:48  cgd
- * pull up rev 1.14 from trunk (requested by wrstuden):
- *   In spec_close(), call the device's close routine with the vnode
- *   unlocked if the call might block. Force a non-blocking close if
- *   VXLOCK is set.  This eliminates a potential deadlock situation, and
- *   should eliminate the dirty buffers on reboot issue.
- *
- * Revision 1.9.4.1  1999/10/10 20:50:52  cgd
- * pull up rev 1.13 from trunk (requested by mycroft):
- *   Fix potential overflow of v_usecount and v_writecount (and panics
- *   resulting from this) by widening them to `long'.  Mostly affects
- *   systems where maxvnodes>=32768.
- *
- * Revision 1.9  1998/12/10 02:22:52  rvb
- * Commit a couple of old fixes
- *
- * Revision 1.8  1998/11/09 16:36:16  rvb
- * Change the way unmounting happens to guarantee that the
- * client programs are allowed to finish up (coda_call is
- * forced to complete) and release their locks.  Thus there
- * is a reasonable chance that the vflush implicit in the
- * unmount will not get hung on held locks.
- *
- * Revision 1.7  1998/09/28 17:55:22  rvb
- * I want to distinguish from DEBUG printouts and CODA_VERBOSE printouts.
- * The latter are normal informational messages that are sometimes
- * interesting to view.
- *
- * Revision 1.6  1998/09/26 15:24:47  tv
- * DIAGNOSTIC -> DEBUG for all non-panic messages.  DIAGNOSTIC is only for
- * sanity checks and should not turn on any messages not already printed
- * without it.
- *
- * Revision 1.5  1998/09/25 15:01:13  rvb
- * Conditionalize "stray" printouts under DIAGNOSTIC and DEBUG.
- * Make files compile if DEBUG is on (from  Alan Barrett).  Finally,
- * make coda an lkm.
- *
- * Revision 1.4  1998/09/15 02:03:00  rvb
- * Final piece of rename cfs->coda
- *
- * Revision 1.3  1998/09/12 15:05:49  rvb
- * Change cfs/CFS in symbols, strings and constants to coda/CODA
- * to avoid fs conflicts.
- *
- * Revision 1.2  1998/09/08 17:12:48  rvb
- * Pass2 complete
- *
- * Revision 1.1.1.1  1998/08/29 21:26:46  rvb
- * Very Preliminary Coda
- *
- * Revision 1.12  1998/08/28 18:28:00  rvb
- * NetBSD -current is stricter!
- *
- * Revision 1.11  1998/08/28 18:12:23  rvb
- * Now it also works on FreeBSD -current.  This code will be
- * committed to the FreeBSD -current and NetBSD -current
- * trees.  It will then be tailored to the particular platform
- * by flushing conditional code.
- *
- * Revision 1.10  1998/08/18 17:05:21  rvb
- * Don't use __RCSID now
- *
- * Revision 1.9  1998/08/18 16:31:46  rvb
- * Sync the code for NetBSD -current; test on 1.3 later
- *
- * Revision 1.8  98/02/24  22:22:50  rvb
- * Fixes up mainly to flush iopen and friends
- * 
- * Revision 1.7  98/01/31  20:53:15  rvb
- * First version that works on FreeBSD 2.2.5
- * 
- * Revision 1.6  98/01/23  11:53:47  rvb
- * Bring RVB_CODA1_1 to HEAD
- * 
- * Revision 1.5.2.8  98/01/23  11:21:11  rvb
- * Sync with 2.2.5
- * 
- * Revision 1.5.2.7  97/12/19  14:26:08  rvb
- * session id
- * 
- * Revision 1.5.2.6  97/12/16  22:01:34  rvb
- * Oops add cfs_subr.h cfs_venus.h; sync with peter
- * 
- * Revision 1.5.2.5  97/12/16  12:40:14  rvb
- * Sync with 1.3
- * 
- * Revision 1.5.2.4  97/12/10  14:08:31  rvb
- * Fix O_ flags; check result in coda_call
- * 
- * Revision 1.5.2.3  97/12/10  11:40:27  rvb
- * No more ody
- * 
- * Revision 1.5.2.2  97/12/09  16:07:15  rvb
- * Sync with vfs/include/coda.h
- * 
- * Revision 1.5.2.1  97/12/06  17:41:25  rvb
- * Sync with peters coda.h
- * 
- * Revision 1.5  97/12/05  10:39:23  rvb
- * Read CHANGES
- * 
- * Revision 1.4.14.10  97/11/25  08:08:48  rvb
- * cfs_venus ... done; until cred/vattr change
- * 
- * Revision 1.4.14.9  97/11/24  15:44:48  rvb
- * Final cfs_venus.c w/o macros, but one locking bug
- * 
- * Revision 1.4.14.8  97/11/21  11:28:04  rvb
- * cfs_venus.c is done: first pass
- * 
- * Revision 1.4.14.7  97/11/20  11:46:51  rvb
- * Capture current cfs_venus
- * 
- * Revision 1.4.14.6  97/11/18  10:27:19  rvb
- * cfs_nbsd.c is DEAD!!!; integrated into cfs_vf/vnops.c
- * cfs_nb_foo and cfs_foo are joined
- * 
- * Revision 1.4.14.5  97/11/13  22:03:03  rvb
- * pass2 cfs_NetBSD.h mt
- * 
- * Revision 1.4.14.4  97/11/12  12:09:42  rvb
- * reorg pass1
- * 
- * Revision 1.4.14.3  97/11/06  21:03:28  rvb
- * don't include headers in headers
- * 
- * Revision 1.4.14.2  97/10/29  16:06:30  rvb
- * Kill DYING
- * 
- * Revision 1.4.14.1  1997/10/28 23:10:18  rvb
- * >64Meg; venus can be killed!
- *
- * Revision 1.4  1997/02/20 13:54:50  lily
- * check for NULL return from coda_nc_lookup before CTOV
- *
- * Revision 1.3  1996/12/12 22:11:02  bnoble
- * Fixed the "downcall invokes venus operation" deadlock in all known cases.
- * There may be more
- *
- * Revision 1.2  1996/01/02 16:57:07  bnoble
- * Added support for Coda MiniCache and raw inode calls (final commit)
- *
- * Revision 1.1.2.1  1995/12/20 01:57:34  bnoble
- * Added CODA-specific files
- *
- * Revision 3.1.1.1  1995/03/04  19:08:06  bnoble
- * Branch for NetBSD port revisions
- *
- * Revision 3.1  1995/03/04  19:08:04  bnoble
- * Bump to major revision 3 to prepare for NetBSD port
- *
- * Revision 2.6  1995/02/17  16:25:26  dcs
- * These versions represent several changes:
- * 1. Allow venus to restart even if outstanding references exist.
- * 2. Have only one ctlvp per client, as opposed to one per mounted cfs device.d
- * 3. Allow ody_expand to return many members, not just one.
- *
- * Revision 2.5  94/11/09  20:29:27  dcs
- * Small bug in remove dealing with hard links and link counts was fixed.
- * 
- * Revision 2.4  94/10/14  09:58:42  dcs
- * Made changes 'cause sun4s have braindead compilers
- * 
- * Revision 2.3  94/10/12  16:46:37  dcs
- * Cleaned kernel/venus interface by removing XDR junk, plus
- * so cleanup to allow this code to be more easily ported.
- * 
- * Revision 2.2  94/09/20  14:12:41  dcs
- * Fixed bug in rename when moving a directory.
- * 
- * Revision 2.1  94/07/21  16:25:22  satya
- * Conversion to C++ 3.0; start of Coda Release 2.0
- * 
- * Revision 1.4  93/12/17  01:38:01  luqi
- * Changes made for kernel to pass process info to Venus:
- * 
- * (1) in file cfs.h
- * add process id and process group id in most of the cfs argument types.
- * 
- * (2) in file cfs_vnodeops.c
- * add process info passing in most of the cfs vnode operations.
- * 
- * (3) in file cfs_xdr.c
- * expand xdr routines according changes in (1). 
- * add variable pass_process_info to allow venus for kernel version checking.
- * 
- * Revision 1.3  93/05/28  16:24:33  bnoble
- * *** empty log message ***
- * 
- * Revision 1.2  92/10/27  17:58:25  lily
- * merge kernel/latest and alpha/src/cfs
- * 
- * Revision 2.4  92/09/30  14:16:37  mja
- * 	Redid buffer allocation so that it does kmem_{alloc,free} for all
- * 	architectures.  Zone allocation, previously used on the 386, caused
- * 	panics if it was invoked repeatedly.  Stack allocation, previously
- * 	used on all other architectures, tickled some Mach bug that appeared
- * 	with large stack frames.
- * 	[91/02/09            jjk]
- * 
- * 	Added contributors blurb.
- * 	[90/12/13            jjk]
- * 
- * Revision 2.3  90/07/26  15:50:09  mrt
- * 	    Fixed fix to rename to remove .. from moved directories.
- * 	[90/06/28            dcs]
- * 
- * Revision 1.7  90/06/28  16:24:25  dcs
- * Fixed bug with moving directories, we weren't flushing .. for the moved directory.
- * 
- * Revision 1.6  90/05/31  17:01:47  dcs
- * Prepare for merge with facilities kernel.
- * 
- * 
  */
 
 #include <sys/param.h>
@@ -353,6 +124,7 @@ struct vnodeopv_entry_desc coda_vnodeop_entries[] = {
     { &vop_setattr_desc, coda_setattr },	/* setattr */
     { &vop_read_desc, coda_read },		/* read */
     { &vop_write_desc, coda_write },		/* write */
+    { &vop_fcntl_desc, genfs_fcntl },		/* fcntl */
     { &vop_ioctl_desc, coda_ioctl },		/* ioctl */
 /* 1.3    { &vop_select_desc, coda_select },	select */
     { &vop_mmap_desc, coda_vop_error },		/* mmap */
@@ -423,7 +195,7 @@ coda_vop_nop(void *anon) {
 int
 coda_vnodeopstats_init(void)
 {
-	register int i;
+	int i;
 	
 	for(i=0;i<CODA_VNODEOPS_SIZE;i++) {
 		coda_vnodeopstats[i].opcode = i;
@@ -452,7 +224,7 @@ coda_open(v)
      */
 /* true args */
     struct vop_open_args *ap = v;
-    register struct vnode **vpp = &(ap->a_vp);
+    struct vnode **vpp = &(ap->a_vp);
     struct cnode *cp = VTOC(*vpp);
     int flag = ap->a_mode & (~O_EXCL);
     struct ucred *cred = ap->a_cred;
@@ -549,7 +321,7 @@ coda_close(v)
     if (IS_UNMOUNTING(cp)) {
 	if (cp->c_ovp) {
 #ifdef	CODA_VERBOSE
-	    printf("coda_close: destroying container ref %ld, ufs vp %p of vp %p/cp %p\n",
+	    printf("coda_close: destroying container ref %d, ufs vp %p of vp %p/cp %p\n",
 		    vp->v_usecount, cp->c_ovp, vp, cp);
 #endif
 #ifdef	hmm
@@ -626,9 +398,10 @@ coda_rdwr(vp, uiop, rw, ioflag, cred, p)
 
     MARK_ENTRY(CODA_RDWR_STATS);
 
-    CODADEBUG(CODA_RDWR, myprintf(("coda_rdwr(%d, %p, %d, %qd, %d)\n", rw, 
-			      uiop->uio_iov->iov_base, uiop->uio_resid, 
-			      uiop->uio_offset, uiop->uio_segflg)); )
+    CODADEBUG(CODA_RDWR, myprintf(("coda_rdwr(%d, %p, %lu, %lld, %d)\n", rw, 
+			      uiop->uio_iov->iov_base,
+			      (unsigned long) uiop->uio_resid, 
+			      (long long) uiop->uio_offset, uiop->uio_segflg)); )
 	
     /* Check for rdwr of control object. */
     if (IS_CTL_VP(vp)) {
@@ -669,7 +442,9 @@ coda_rdwr(vp, uiop, rw, ioflag, cred, p)
 	    MARK_INT_GEN(CODA_OPEN_STATS);
 	    error = VOP_OPEN(vp, (rw == UIO_READ ? FREAD : FWRITE), 
 			     cred, p);
+#ifdef	CODA_VERBOSE
 printf("coda_rdwr: Internally Opening %p\n", vp);
+#endif
 	    if (error) {
 		MARK_INT_FAIL(CODA_RDWR_STATS);
 		return(error);
@@ -855,9 +630,9 @@ coda_setattr(v)
 {
 /* true args */
     struct vop_setattr_args *ap = v;
-    register struct vnode *vp = ap->a_vp;
+    struct vnode *vp = ap->a_vp;
     struct cnode *cp = VTOC(vp);
-    register struct vattr *vap = ap->a_vap;
+    struct vattr *vap = ap->a_vap;
     struct ucred *cred = ap->a_cred;
     struct proc *p = ap->a_p;
 /* locals */
@@ -1104,7 +879,7 @@ coda_inactive(v)
 	    printf("coda_inactive: cp->ovp != NULL use %ld: vp %p, cp %p\n",
 	    	   vp->v_usecount, vp, cp);
 #endif
-	lockmgr(&cp->c_lock, LK_RELEASE, &vp->v_interlock);
+	lockmgr(&vp->v_lock, LK_RELEASE, &vp->v_interlock);
     } else {
 #ifdef OLD_DIAGNOSTIC
 	if (CTOV(cp)->v_usecount) {
@@ -1154,6 +929,8 @@ coda_lookup(v)
     ViceFid VFid;
     int	vtype;
     int error = 0;
+
+    cnp->cn_flags &= ~PDIRUNLOCK;
 
     MARK_ENTRY(CODA_LOOKUP_STATS);
 
@@ -1263,6 +1040,7 @@ coda_lookup(v)
 	    if ((error = VOP_UNLOCK(dvp, 0))) {
 		return error; 
 	    }	    
+	    cnp->cn_flags |= PDIRUNLOCK;
 	    /* 
 	     * The parent is unlocked.  As long as there is a child,
 	     * lock it without bothering to check anything else. 
@@ -1655,7 +1433,7 @@ coda_mkdir(v)
     struct vnode *dvp = ap->a_dvp;
     struct cnode *dcp = VTOC(dvp);	
     struct componentname  *cnp = ap->a_cnp;
-    register struct vattr *va = ap->a_vap;
+    struct vattr *va = ap->a_vap;
     struct vnode **vpp = ap->a_vpp;
     struct ucred *cred = cnp->cn_cred;
     struct proc *p = cnp->cn_proc;
@@ -1914,7 +1692,7 @@ coda_readdir(v)
     struct vop_readdir_args *ap = v;
     struct vnode *vp = ap->a_vp;
     struct cnode *cp = VTOC(vp);
-    register struct uio *uiop = ap->a_uio;
+    struct uio *uiop = ap->a_uio;
     struct ucred *cred = ap->a_cred;
     int *eofflag = ap->a_eofflag;
     off_t **cookies = ap->a_cookies;
@@ -1926,7 +1704,7 @@ coda_readdir(v)
 
     MARK_ENTRY(CODA_READDIR_STATS);
 
-    CODADEBUG(CODA_READDIR, myprintf(("coda_readdir(%p, %d, %qd, %d)\n", uiop->uio_iov->iov_base, uiop->uio_resid, uiop->uio_offset, uiop->uio_segflg)); )
+    CODADEBUG(CODA_READDIR, myprintf(("coda_readdir(%p, %lu, %lld, %d)\n", uiop->uio_iov->iov_base, (unsigned long) uiop->uio_resid, (long long) uiop->uio_offset, uiop->uio_segflg)); )
 	
     /* Check for readdir of control object. */
     if (IS_CTL_VP(vp)) {
@@ -1943,7 +1721,9 @@ coda_readdir(v)
 	    opened_internally = 1;
 	    MARK_INT_GEN(CODA_OPEN_STATS);
 	    error = VOP_OPEN(vp, FREAD, cred, p);
+#ifdef	CODA_VERBOSE
 printf("coda_readdir: Internally Opening %p\n", vp);
+#endif
 	    if (error) return(error);
 	}
 	
@@ -2002,7 +1782,7 @@ coda_strategy(v)
 {
 /* true args */
     struct vop_strategy_args *ap = v;
-    register struct buf *bp __attribute__((unused)) = ap->a_bp;
+    struct buf *bp __attribute__((unused)) = ap->a_bp;
     struct proc *p __attribute__((unused)) = curproc;
 /* upcall decl */
 /* locals */
@@ -2067,7 +1847,7 @@ coda_lock(v)
 		  cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique));
     }
 
-    return (lockmgr(&cp->c_lock, ap->a_flags, &vp->v_interlock));
+    return (lockmgr(&vp->v_lock, ap->a_flags, &vp->v_interlock));
 }
 
 int
@@ -2087,7 +1867,7 @@ coda_unlock(v)
 		  cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique));
     }
 
-    return (lockmgr(&cp->c_lock, ap->a_flags | LK_RELEASE, &vp->v_interlock));
+    return (lockmgr(&vp->v_lock, ap->a_flags | LK_RELEASE, &vp->v_interlock));
 }
 
 int
@@ -2096,10 +1876,9 @@ coda_islocked(v)
 {
 /* true args */
     struct vop_islocked_args *ap = v;
-    struct cnode *cp = VTOC(ap->a_vp);
     ENTRY;
 
-    return (lockstatus(&cp->c_lock));
+    return (lockstatus(&ap->a_vp->v_lock));
 }
 
 /* How one looks up a vnode given a device/inode pair: */
@@ -2218,7 +1997,6 @@ make_coda_node(fid, vfsp, type)
 	struct vnode *vp;
 	
 	cp = coda_alloc();
-	lockinit(&cp->c_lock, PINOD, "cnode", 0, 0);
 	cp->c_fid = *fid;
 	
 	err = getnewvnode(VT_CODA, vfsp, coda_vnodeop_p, &vp);  

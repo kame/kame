@@ -1,4 +1,4 @@
-/*	$NetBSD: fbvar.h,v 1.10 1998/03/21 19:42:00 pk Exp $ */
+/*	$NetBSD: fbvar.h,v 1.12.4.1 2000/06/30 16:27:39 simonb Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -51,6 +51,8 @@
 
 #ifdef RASTERCONSOLE
 #include <dev/rcons/rcons.h>
+#include <dev/wscons/wsdisplayvar.h>
+#include <dev/rasops/rasops.h>
 #endif
 
 struct fbdriver {
@@ -60,8 +62,12 @@ struct fbdriver {
 	int	(*fbd_close) __P((dev_t, int, int, struct proc *));
 	int	(*fbd_ioctl) __P((dev_t, u_long, caddr_t, int, struct proc *));
 	int	(*fbd_poll) __P((dev_t, int, struct proc *));
-	int	(*fbd_mmap) __P((dev_t, int, int));
+	paddr_t	(*fbd_mmap) __P((dev_t, off_t, int));
 #ifdef notyet
+	/* 
+	 * XXX redundant idea? these can hook into rasops on a per-device 
+	 * basis like: fb_rinfo.ri_ops.copycols = ....;
+	 */
 	void	(*fbd_wrrop)();		/* `write region' rasterop */
 	void	(*fbd_cprop)();		/* `copy region' rasterop */
 	void	(*fbd_clrop)();		/* `clear region' rasterop */
@@ -87,12 +93,14 @@ struct fbdevice {
 #ifdef RASTERCONSOLE
 	/* Raster console emulator state */
 	struct	rconsole fb_rcons;
+	struct	rasops_info fb_rinfo;
 #endif
 };
 
 void	fb_attach __P((struct fbdevice *, int));
 void	fb_setsize_obp __P((struct fbdevice *, int, int, int, int));
 void	fb_setsize_eeprom __P((struct fbdevice *, int, int, int));
+int	fb_is_console __P((int));
 #ifdef RASTERCONSOLE
 void	fbrcons_init __P((struct fbdevice *));
 int	fbrcons_rows __P((void));

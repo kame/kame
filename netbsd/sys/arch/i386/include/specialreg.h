@@ -1,4 +1,4 @@
-/*	$NetBSD: specialreg.h,v 1.8 1997/09/05 22:28:12 chuck Exp $	*/
+/*	$NetBSD: specialreg.h,v 1.11 2000/03/27 23:15:57 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -89,23 +89,129 @@
  * CPUID "features" bits:
  */
 
-#define CPUID_FPU	0x0001	/* processor has an FPU? */
-#define CPUID_VME	0x0002	/* has virtual mode (%cr4's VME/PVI) */
-#define CPUID_DE	0x0004	/* has debugging extension */
-#define CPUID_PSE	0x0008	/* has page 4MB page size extension */
-#define CPUID_TSC	0x0010	/* has time stamp counter */
-#define CPUID_MSR	0x0020	/* has mode specific registers */
-#define CPUID_PAE	0x0040	/* has phys address extension */
-#define CPUID_MCE	0x0080	/* has machine check exception */
-#define CPUID_CX8	0x0100	/* has CMPXCHG8B instruction */
-#define CPUID_APIC	0x0200	/* has enabled APIC */
-#define CPUID_B10	0x0400	/* reserved, MTRR */
-#define CPUID_B11	0x0800	/* has SYSENTER/SYSEXIT extension */
-#define CPUID_MTRR	0x1000	/* has memory type range register */
-#define CPUID_PGE	0x2000	/* has page global extension */
-#define CPUID_MCA	0x4000	/* has machine check architecture */
-#define CPUID_CMOV	0x8000	/* has CMOVcc instruction */
-/* bits 16->22: unknown, 23=MMX supported, 24-31 reserved */
+#define CPUID_FPU	0x00000001	/* processor has an FPU? */
+#define CPUID_VME	0x00000002	/* has virtual mode (%cr4's VME/PVI) */
+#define CPUID_DE	0x00000004	/* has debugging extension */
+#define CPUID_PSE	0x00000008	/* has page 4MB page size extension */
+#define CPUID_TSC	0x00000010	/* has time stamp counter */
+#define CPUID_MSR	0x00000020	/* has mode specific registers */
+#define CPUID_PAE	0x00000040	/* has phys address extension */
+#define CPUID_MCE	0x00000080	/* has machine check exception */
+#define CPUID_CX8	0x00000100	/* has CMPXCHG8B instruction */
+#define CPUID_APIC	0x00000200	/* has enabled APIC */
+#define CPUID_B10	0x00000400	/* reserved, MTRR */
+#define CPUID_SEP	0x00000800	/* has SYSENTER/SYSEXIT extension */
+#define CPUID_MTRR	0x00001000	/* has memory type range register */
+#define CPUID_PGE	0x00002000	/* has page global extension */
+#define CPUID_MCA	0x00004000	/* has machine check architecture */
+#define CPUID_CMOV	0x00008000	/* has CMOVcc instruction */
+#define CPUID_FGPAT	0x00010000	/* Page Attribute Table */
+#define CPUID_PSE36	0x00020000	/* 36-bit PSE */
+#define CPUID_PN	0x00040000	/* processor serial number */
+#define CPUID_B19	0x00080000	/* reserved */
+#define CPUID_B20	0x00100000	/* reserved */
+#define CPUID_B21	0x00200000	/* reserved */
+#define CPUID_B22	0x00400000	/* reserved */
+#define CPUID_MMX	0x00800000	/* MMX supported */
+#define CPUID_FXSR	0x01000000	/* fast FP/MMX save/restore */
+#define CPUID_XMM	0x02000000	/* streaming SIMD extensions */
+/* bits 26->31 also reserved. */
+
+#define CPUID_FLAGS1	"\20\1FPU\2VME\3DE\4PSE\5TSC\6MSR\7PAE\10MCE\11CX8\12APIC\13B10\14SEP\15MTRR"
+#define CPUID_FLAGS2 "\20\16PGE\17MCA\20CMOV\21FGPAT\22PSE36\23PN\24B19\25B20\26B21\27B22\30MMX\31FXSR\32XMM\33B26\34B27\35B28\36B29\37B30\40B31"
+
+/*
+ * Model-specific registers for the i386 family
+ */
+#define MSR_P5_MC_ADDR		0x000	/* P5 only */
+#define MSR_P5_MC_TYPE		0x001	/* P5 only */
+#define MSR_TSC			0x010
+#define	MSR_CESR		0x011	/* P5 only (trap on P6) */
+#define	MSR_CTR0		0x012	/* P5 only (trap on P6) */
+#define	MSR_CTR1		0x013	/* P5 only (trap on P6) */
+#define MSR_APICBASE		0x01b
+#define MSR_EBL_CR_POWERON	0x02a
+#define	MSR_TEST_CTL		0x033
+#define MSR_BIOS_UPDT_TRIG	0x079
+#define	MSR_BBL_CR_D0		0x088	/* PII+ only */
+#define	MSR_BBL_CR_D1		0x089	/* PII+ only */
+#define	MSR_BBL_CR_D2		0x08a	/* PII+ only */
+#define MSR_BIOS_SIGN		0x08b
+#define MSR_PERFCTR0		0x0c1
+#define MSR_PERFCTR1		0x0c2
+#define MSR_MTRRcap		0x0fe
+#define	MSR_BBL_CR_ADDR		0x116	/* PII+ only */
+#define	MSR_BBL_CR_DECC		0x118	/* PII+ only */
+#define	MSR_BBL_CR_CTL		0x119	/* PII+ only */
+#define	MSR_BBL_CR_TRIG		0x11a	/* PII+ only */
+#define	MSR_BBL_CR_BUSY		0x11b	/* PII+ only */
+#define	MSR_BBL_CR_CTR3		0x11e	/* PII+ only */
+#define MSR_MCG_CAP		0x179
+#define MSR_MCG_STATUS		0x17a
+#define MSR_MCG_CTL		0x17b
+#define MSR_EVNTSEL0		0x186
+#define MSR_EVNTSEL1		0x187
+#define MSR_DEBUGCTLMSR		0x1d9
+#define MSR_LASTBRANCHFROMIP	0x1db
+#define MSR_LASTBRANCHTOIP	0x1dc
+#define MSR_LASTINTFROMIP	0x1dd
+#define MSR_LASTINTTOIP		0x1de
+#define MSR_ROB_CR_BKUPTMPDR6	0x1e0
+#define	MSR_MTRRphysBase0	0x200
+#define	MSR_MTRRphysMask0	0x201
+#define	MSR_MTRRphysBase1	0x202
+#define	MSR_MTRRphysMask1	0x203
+#define	MSR_MTRRphysBase2	0x204
+#define	MSR_MTRRphysMask2	0x205
+#define	MSR_MTRRphysBase3	0x206
+#define	MSR_MTRRphysMask3	0x207
+#define	MSR_MTRRphysBase4	0x208
+#define	MSR_MTRRphysMask4	0x209
+#define	MSR_MTRRphysBase5	0x20a
+#define	MSR_MTRRphysMask5	0x20b
+#define	MSR_MTRRphysBase6	0x20c
+#define	MSR_MTRRphysMask6	0x20d
+#define	MSR_MTRRphysBase7	0x20e
+#define	MSR_MTRRphysMask7	0x20f
+#define	MSR_MTRRfix64K_00000	0x250
+#define	MSR_MTRRfix16K_80000	0x258
+#define	MSR_MTRRfix16K_A0000	0x259
+#define	MSR_MTRRfix4K_C0000	0x268
+#define	MSR_MTRRfix4K_C8000	0x269
+#define	MSR_MTRRfix4K_D0000	0x26a
+#define	MSR_MTRRfix4K_D8000	0x26b
+#define	MSR_MTRRfix4K_E0000	0x26c
+#define	MSR_MTRRfix4K_E8000	0x26d
+#define	MSR_MTRRfix4K_F0000	0x26e
+#define	MSR_MTRRfix4K_F8000	0x26f
+#define MSR_MTRRdefType		0x2ff
+#define MSR_MC0_CTL		0x400
+#define MSR_MC0_STATUS		0x401
+#define MSR_MC0_ADDR		0x402
+#define MSR_MC0_MISC		0x403
+#define MSR_MC1_CTL		0x404
+#define MSR_MC1_STATUS		0x405
+#define MSR_MC1_ADDR		0x406
+#define MSR_MC1_MISC		0x407
+#define MSR_MC2_CTL		0x408
+#define MSR_MC2_STATUS		0x409
+#define MSR_MC2_ADDR		0x40a
+#define MSR_MC2_MISC		0x40b
+#define MSR_MC4_CTL		0x40c
+#define MSR_MC4_STATUS		0x40d
+#define MSR_MC4_ADDR		0x40e
+#define MSR_MC4_MISC		0x40f
+#define MSR_MC3_CTL		0x410
+#define MSR_MC3_STATUS		0x411
+#define MSR_MC3_ADDR		0x412
+#define MSR_MC3_MISC		0x413
+
+/*
+ * Constants related to MTRRs
+ */
+#define MTRR_N64K		8	/* numbers of fixed-size entries */
+#define MTRR_N16K		16
+#define MTRR_N4K		64
 
 /*
  * the following four 3-byte registers control the non-cacheable regions.

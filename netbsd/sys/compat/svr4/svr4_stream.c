@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_stream.c,v 1.34 1999/01/23 23:44:08 christos Exp $	 */
+/*	$NetBSD: svr4_stream.c,v 1.38.4.1 2000/08/30 03:59:21 sommerfeld Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -68,6 +68,8 @@
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_util.h>
 #include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_ucontext.h>
 #include <compat/svr4/svr4_syscallargs.h>
 #include <compat/svr4/svr4_stropts.h>
 #include <compat/svr4/svr4_timod.h>
@@ -155,18 +157,23 @@ show_ioc(str, ioc)
 	const char		*str;
 	struct svr4_strioctl	*ioc;
 {
-	u_char *ptr = (u_char *) malloc(ioc->len, M_TEMP, M_WAITOK);
+	u_char *ptr;
 	int error;
 
+	len = ioc->len;
+	if (len > 1024)
+		len = 1024;
+
+	ptr = (u_char *) malloc(len, M_TEMP, M_WAITOK);	
 	uprintf("%s cmd = %ld, timeout = %d, len = %d, buf = %p { ",
 	    str, ioc->cmd, ioc->timeout, ioc->len, ioc->buf);
 
-	if ((error = copyin(ioc->buf, ptr, ioc->len)) != 0) {
+	if ((error = copyin(ioc->buf, ptr, len)) != 0) {
 		free((char *) ptr, M_TEMP);
 		return error;
 	}
 
-	bufprint(ptr, ioc->len);
+	bufprint(ptr, len);
 
 	uprintf("}\n");
 
@@ -184,6 +191,9 @@ show_strbuf(str)
 	int maxlen = str->maxlen;
 	int len = str->len;
 
+	if (maxlen > 8192)
+		maxlen = 8192;
+	
 	if (maxlen < 0)
 		maxlen = 0;
 
@@ -434,8 +444,8 @@ si_ogetudata(fp, fd, ioc, p)
 	struct svr4_si_sockparms pa;
 
 	if (ioc->len != sizeof(ud) && ioc->len != sizeof(ud) - sizeof(int)) {
-		DPRINTF(("SI_OGETUDATA: Wrong size %d != %d\n",
-			 sizeof(ud), ioc->len));
+		DPRINTF(("SI_OGETUDATA: Wrong size %ld != %d\n",
+		    (unsigned long)sizeof(ud), ioc->len));
 		return EINVAL;
 	}
 
@@ -509,6 +519,9 @@ si_listen(fp, fd, ioc, p)
 	if (st == NULL)
 		return EINVAL;
 
+	if (ioc->len > sizeof(lst))
+		return EINVAL;
+
 	if ((error = copyin(ioc->buf, &lst, ioc->len)) != 0)
 		return error;
 
@@ -569,8 +582,8 @@ si_getudata(fp, fd, ioc, p)
 	struct svr4_si_udata ud;
 
 	if (sizeof(ud) != ioc->len) {
-		DPRINTF(("SI_GETUDATA: Wrong size %d != %d\n",
-			 sizeof(ud), ioc->len));
+		DPRINTF(("SI_GETUDATA: Wrong size %ld != %d\n",
+		    (unsigned long)sizeof(ud), ioc->len));
 		return EINVAL;
 	}
 
@@ -627,8 +640,8 @@ si_shutdown(fp, fd, ioc, p)
 	register_t retval;
 
 	if (ioc->len != sizeof(SCARG(&ap, how))) {
-		DPRINTF(("SI_SHUTDOWN: Wrong size %d != %d\n",
-			 sizeof(SCARG(&ap, how)), ioc->len));
+		DPRINTF(("SI_SHUTDOWN: Wrong size %ld != %d\n",
+		    (unsigned long)sizeof(SCARG(&ap, how)), ioc->len));
 		return EINVAL;
 	}
 
@@ -709,6 +722,9 @@ ti_getinfo(fp, fd, ioc, p)
 
 	memset(&info, 0, sizeof(info));
 
+	if (ioc->len > sizeof(info))
+		return EINVAL;
+	
 	if ((error = copyin(ioc->buf, &info, ioc->len)) != 0)
 		return error;
 
@@ -758,6 +774,9 @@ ti_bind(fp, fd, ioc, p)
 		return EINVAL;
 	}
 
+	if (ioc->len > sizeof(bnd))
+		return EINVAL;
+	
 	if ((error = copyin(ioc->buf, &bnd, ioc->len)) != 0)
 		return error;
 
@@ -1159,6 +1178,12 @@ i_str(fp, p, retval, fd, cmd, dat)
 	int			 error;
 	struct svr4_strioctl	 ioc;
 
+	/*
+	 * Noop on non sockets
+	 */
+	if (fp->f_type != DTYPE_SOCKET)
+		return 0;
+
 	if ((error = copyin(dat, &ioc, sizeof(ioc))) != 0)
 		return error;
 
@@ -1461,7 +1486,7 @@ svr4_stream_ioctl(fp, p, retval, fd, cmd, dat)
 
 int
 svr4_sys_putmsg(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -1514,8 +1539,8 @@ svr4_sys_putmsg(p, v, retval)
 	}
 
 	if (ctl.len > sizeof(sc)) {
-		DPRINTF(("putmsg: Bad control size %d != %d\n", ctl.len,
-			 sizeof(struct svr4_strmcmd)));
+		DPRINTF(("putmsg: Bad control size %ld != %d\n",
+		    (unsigned long)sizeof(struct svr4_strmcmd), ctl.len));
 		return EINVAL;
 	}
 
@@ -1629,7 +1654,7 @@ svr4_sys_putmsg(p, v, retval)
 
 int
 svr4_sys_getmsg(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
@@ -1854,6 +1879,8 @@ svr4_sys_getmsg(p, v, retval)
 		DPRINTF(("getmsg: TI_SENDTO_REQUEST\n"));
 		if (ctl.maxlen > 36 && ctl.len < 36)
 		    ctl.len = 36;
+		if (ctl.len > sizeof(sc))
+			ctl.len = sizeof(sc);
 
 		if ((error = copyin(ctl.buf, &sc, ctl.len)) != 0)
 			return error;

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgsix.c,v 1.4 1999/03/24 05:51:13 mrg Exp $ */
+/*	$NetBSD: cgsix.c,v 1.4.18.2 2000/09/09 17:30:54 eeh Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -569,9 +569,9 @@ cg6_unblank(dev)
 #define	CG6_USER_DHC	0x80000000
 
 struct mmo {
-	u_int	mo_uaddr;	/* user (virtual) address */
-	u_int	mo_size;	/* size, or 0 for video ram size */
-	u_int	mo_physoff;	/* offset from sc_physadr */
+	u_long	mo_uaddr;	/* user (virtual) address */
+	u_long	mo_size;	/* size, or 0 for video ram size */
+	u_long	mo_physoff;	/* offset from sc_physadr */
 };
 
 /*
@@ -580,10 +580,11 @@ struct mmo {
  *
  * XXX	needs testing against `demanding' applications (e.g., aviator)
  */
-int
+paddr_t
 cgsixmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct cgsix_softc *sc = cgsix_cd.cd_devs[minor(dev)];
 	struct mmo *mo;
@@ -613,7 +614,7 @@ cgsixmmap(dev, off, prot)
 	 * one byte is as good as one page.
 	 */
 	for (mo = mmo; mo < &mmo[NMMO]; mo++) {
-		if ((u_int)off < mo->mo_uaddr)
+		if ((u_long)off < mo->mo_uaddr)
 			continue;
 		u = off - mo->mo_uaddr;
 		sz = mo->mo_size ? mo->mo_size : sc->sc_fb.fb_type.fb_size;
@@ -623,7 +624,7 @@ cgsixmmap(dev, off, prot)
 					   sc->sc_paddr+u+mo->mo_physoff,
 					   BUS_SPACE_MAP_LINEAR, &bh))
 				return (-1);
-			return ((int)bh);
+			return ((paddr_t)bh);
 		}
 	}
 

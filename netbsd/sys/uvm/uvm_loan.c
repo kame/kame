@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_loan.c,v 1.14.2.1 1999/04/16 16:29:09 chs Exp $	*/
+/*	$NetBSD: uvm_loan.c,v 1.20 2000/04/10 00:32:46 thorpej Exp $	*/
 
 /*
  *
@@ -59,7 +59,7 @@
  *
  * there are 3 types of loans possible:
  *  O->K  uvm_object page to wired kernel page (e.g. mbuf data area)
- *  A->K  anon page to kernel wired kernel page (e.g. mbuf data area)
+ *  A->K  anon page to wired kernel page (e.g. mbuf data area)
  *  O->A  uvm_object to anon loan (e.g. vnode page to an anon)
  * note that it possible to have an O page loaned to both an A and K
  * at the same time.
@@ -68,10 +68,15 @@
  * a uvm_object and a vm_anon, but PQ_ANON will not be set.   this sort
  * of page is considered "owned" by the uvm_object (not the anon).
  *
- * each loan of a page to a wired kernel page bumps the pg->wire_count.
- * wired kernel mappings should be entered with pmap_kenter functions
- * so that pmap_page_protect() will not affect the kernel mappings.
- * (this requires the PMAP_NEW interface...).
+ * each loan of a page to the kernel bumps the pg->wire_count.  the
+ * kernel mappings for these pages will be read-only and wired.  since
+ * the page will also be wired, it will not be a candidate for pageout,
+ * and thus will never be pmap_page_protect()'d with VM_PROT_NONE.  a
+ * write fault in the kernel to one of these pages will not cause
+ * copy-on-write.  instead, the page fault is considered fatal.  this
+ * is because the kernel mapping will have no way to look up the
+ * object/anon which the page is owned by.  this is a good side-effect,
+ * since a kernel write to a loaned page is an error.
  *
  * owners that want to free their pages and discover that they are 
  * loaned out simply "disown" them (the page becomes an orphan).  these
@@ -96,7 +101,7 @@
  *
  * note that loaning a page causes all mappings of the page to become
  * read-only (via pmap_page_protect).   this could have an unexpected
- * effect on normal "wired" pages if one is not careful.
+ * effect on normal "wired" pages if one is not careful (XXX).
  */
 
 /*
@@ -220,6 +225,11 @@ uvm_loan(map, start, len, result, flags)
 	void **output;
 	int rv;
 
+#ifdef DIAGNOSTIC
+	if (map->flags & VM_MAP_INTRSAFE)
+		panic("uvm_loan: intrsafe map");
+#endif
+
 	/*
 	 * ensure that one and only one of the flags is set
 	 */
@@ -325,7 +335,7 @@ uvm_loananon(ufi, output, flags, anon)
 		pg = anon->u.an_page;
 		if (pg && (pg->pqflags & PQ_ANON) != 0 && anon->an_ref == 1)
 			/* read protect it */
-			pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+			pmap_page_protect(pg, VM_PROT_READ);
 		anon->an_ref++;
 		**output = anon;
 		*output = (*output) + 1;
@@ -370,7 +380,7 @@ uvm_loananon(ufi, output, flags, anon)
 	pg = anon->u.an_page;
 	uvm_lock_pageq();
 	if (pg->loan_count == 0)
-		pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+		pmap_page_protect(pg, VM_PROT_READ);
 	pg->loan_count++;
 	uvm_pagewire(pg);	/* always wire it */
 	uvm_unlock_pageq();
@@ -490,7 +500,7 @@ uvm_loanuobj(ufi, output, flags, va)
 
 			if (pg->flags & PG_WANTED)
 				/* still holding object lock */
-				thread_wakeup(pg);
+				wakeup(pg);
 
 			if (pg->flags & PG_RELEASED) {
 #ifdef DIAGNOSTIC
@@ -522,14 +532,14 @@ uvm_loanuobj(ufi, output, flags, va)
 	if ((flags & UVM_LOAN_TOANON) == 0) {	/* loan to wired-kernel page? */
 		uvm_lock_pageq();
 		if (pg->loan_count == 0)
-			pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+			pmap_page_protect(pg, VM_PROT_READ);
 		pg->loan_count++;
 		uvm_pagewire(pg);
 		uvm_unlock_pageq();
 		**output = pg;
 		*output = (*output) + 1;
 		if (pg->flags & PG_WANTED)
-			thread_wakeup(pg);
+			wakeup(pg);
 		pg->flags &= ~(PG_WANTED|PG_BUSY);
 		UVM_PAGE_OWN(pg, NULL);
 		return(1);		/* got it! */
@@ -553,7 +563,7 @@ uvm_loanuobj(ufi, output, flags, va)
 		uvm_pageactivate(pg);	/* reactivate */
 		uvm_unlock_pageq();
 		if (pg->flags & PG_WANTED)
-			thread_wakeup(pg);
+			wakeup(pg);
 		pg->flags &= ~(PG_WANTED|PG_BUSY);
 		UVM_PAGE_OWN(pg, NULL);
 		return(1);
@@ -566,7 +576,7 @@ uvm_loanuobj(ufi, output, flags, va)
 	anon = uvm_analloc();
 	if (anon == NULL) {		/* out of VM! */
 		if (pg->flags & PG_WANTED)
-			thread_wakeup(pg);
+			wakeup(pg);
 		pg->flags &= ~(PG_WANTED|PG_BUSY);
 		UVM_PAGE_OWN(pg, NULL);
 		uvmfault_unlockall(ufi, amap, uobj, NULL);
@@ -576,14 +586,14 @@ uvm_loanuobj(ufi, output, flags, va)
 	pg->uanon = anon;
 	uvm_lock_pageq();
 	if (pg->loan_count == 0)
-		pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+		pmap_page_protect(pg, VM_PROT_READ);
 	pg->loan_count++;
 	uvm_pageactivate(pg);
 	uvm_unlock_pageq();
 	**output = anon;
 	*output = (*output) + 1;
 	if (pg->flags & PG_WANTED)
-		thread_wakeup(pg);
+		wakeup(pg);
 	pg->flags &= ~(PG_WANTED|PG_BUSY);
 	UVM_PAGE_OWN(pg, NULL);
 	return(1);
@@ -610,7 +620,8 @@ uvm_loanzero(ufi, output, flags)
 
 	if ((flags & UVM_LOAN_TOANON) == 0) {	/* loaning to kernel-page */
 
-		while ((pg = uvm_pagealloc(NULL, 0, NULL, 0)) == NULL) {
+		while ((pg = uvm_pagealloc(NULL, 0, NULL,
+		    UVM_PGA_ZERO)) == NULL) {
 			uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap, 
 			    ufi->entry->object.uvm_obj, NULL);
 			uvm_wait("loanzero1");
@@ -624,8 +635,7 @@ uvm_loanzero(ufi, output, flags)
 			/* ... and try again */
 		}
 		
-		/* got a page, zero it and return */
-		uvm_pagezero(pg);		/* clears PG_CLEAN */
+		/* got a zero'd page; return */
 		pg->flags &= ~(PG_BUSY|PG_FAKE);
 		UVM_PAGE_OWN(pg, NULL);
 		**output = pg;
@@ -640,7 +650,7 @@ uvm_loanzero(ufi, output, flags)
 
 	/* loaning to an anon */
 	while ((anon = uvm_analloc()) == NULL || 
-	    (pg = uvm_pagealloc(NULL, 0, anon, 0)) == NULL) {
+	    (pg = uvm_pagealloc(NULL, 0, anon, UVM_PGA_ZERO)) == NULL) {
 		
 		/* unlock everything */
 		uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap,
@@ -665,8 +675,7 @@ uvm_loanzero(ufi, output, flags)
 		/* ... and try again */
 	}
 
-	/* got a page, zero it and return */
-	uvm_pagezero(pg);		/* clears PG_CLEAN */
+	/* got a zero'd page; return */
 	pg->flags &= ~(PG_BUSY|PG_FAKE);
 	UVM_PAGE_OWN(pg, NULL);
 	uvm_lock_pageq();
@@ -740,7 +749,7 @@ uvm_unloanpage(ploans, npages)
 	panic("uvm_unloanpage: page %p unowned but PG_BUSY!", pg);
 
 			/* be safe */
-			pmap_page_protect(PMAP_PGARG(pg), VM_PROT_NONE);
+			pmap_page_protect(pg, VM_PROT_NONE);
 			uvm_pagefree(pg);	/* pageq locked above */
 
 		}

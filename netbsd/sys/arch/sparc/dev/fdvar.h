@@ -1,4 +1,4 @@
-/*	$NetBSD: fdvar.h,v 1.8.6.1 2000/02/07 19:44:34 he Exp $	*/
+/*	$NetBSD: fdvar.h,v 1.10 2000/01/21 13:22:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

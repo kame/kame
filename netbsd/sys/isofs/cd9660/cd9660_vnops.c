@@ -1,4 +1,4 @@
-/*	$NetBSD: cd9660_vnops.c,v 1.52 1999/03/22 19:21:08 kleink Exp $	*/
+/*	$NetBSD: cd9660_vnops.c,v 1.58 2000/05/27 16:03:56 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1994
@@ -49,7 +49,6 @@
 #include <sys/stat.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
-#include <sys/conf.h>
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
@@ -63,6 +62,7 @@
 #include <isofs/cd9660/cd9660_extern.h>
 #include <isofs/cd9660/cd9660_node.h>
 #include <isofs/cd9660/iso_rrip.h>
+#include <isofs/cd9660/cd9660_mount.h>
 
 /*
  * Structure for reading directories
@@ -102,7 +102,7 @@ cd9660_mknod(ndp, vap, cred, p)
 	vput(ndp->ni_vp);
 	return (EINVAL);
 #else
-	register struct vnode *vp;
+	struct vnode *vp;
 	struct iso_node *ip;
 	struct iso_dnode *dp;
 	int error;
@@ -193,7 +193,7 @@ cd9660_getattr(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct iso_node *ip = VTOI(vp);
-	register struct vattr *vap = ap->a_vap;
+	struct vattr *vap = ap->a_vap;
 
 	vap->va_fsid	= ip->i_dev;
 	vap->va_fileid	= ip->i_number;
@@ -263,9 +263,9 @@ cd9660_read(v)
 		struct ucred *a_cred;
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
-	register struct uio *uio = ap->a_uio;
-	register struct iso_node *ip = VTOI(vp);
-	register struct iso_mnt *imp;
+	struct uio *uio = ap->a_uio;
+	struct iso_node *ip = VTOI(vp);
+	struct iso_mnt *imp;
 	struct buf *bp;
 	daddr_t lbn, rablock;
 	off_t diff;
@@ -433,7 +433,7 @@ cd9660_readdir(v)
 		off_t **a_cookies;
 		int *a_ncookies;
 	} */ *ap = v;
-	register struct uio *uio = ap->a_uio;
+	struct uio *uio = ap->a_uio;
 	struct isoreaddir *idp;
 	struct vnode *vdp = ap->a_vp;
 	struct iso_node *dp;
@@ -550,21 +550,24 @@ cd9660_readdir(v)
 				error = iso_uiodir(idp,&idp->current,idp->curroff);
 			break;
 		default:	/* ISO_FTYPE_DEFAULT || ISO_FTYPE_9660 */
-			strcpy(idp->current.d_name,"..");
-			switch (ep->name[0]) {
+			isofntrans(ep->name,idp->current.d_namlen,
+				   idp->current.d_name, &namelen,
+				   imp->iso_ftype == ISO_FTYPE_9660,
+				   (imp->im_flags & ISOFSMNT_NOCASETRANS) == 0,
+				   isonum_711(ep->flags)&4,
+				   imp->im_joliet_level);
+			switch (idp->current.d_name[0]) {
 			case 0:
+				idp->current.d_name[0] = '.';
 				idp->current.d_namlen = 1;
 				error = iso_uiodir(idp,&idp->current,idp->curroff);
 				break;
 			case 1:
+				strcpy(idp->current.d_name,"..");
 				idp->current.d_namlen = 2;
 				error = iso_uiodir(idp,&idp->current,idp->curroff);
 				break;
 			default:
-				isofntrans(ep->name,idp->current.d_namlen,
-					   idp->current.d_name, &namelen,
-					   imp->iso_ftype == ISO_FTYPE_9660,
-					   isonum_711(ep->flags)&4);
 				idp->current.d_namlen = (u_char)namelen;
 				if (imp->iso_ftype == ISO_FTYPE_DEFAULT)
 					error = iso_shipdir(idp);
@@ -740,41 +743,6 @@ cd9660_symlink(v)
 }
 
 /*
- * Lock an inode.
- */
-int
-cd9660_lock(v)
-	void *v;
-{
-	struct vop_lock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *ap = v;
-	register struct vnode *vp = ap->a_vp;
-
-	return (lockmgr(&VTOI(vp)->i_lock, ap->a_flags, &vp->v_interlock));
-}
-
-/*
- * Unlock an inode.
- */
-int
-cd9660_unlock(v)
-	void *v;
-{
-	struct vop_unlock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *ap = v;
-	struct vnode *vp = ap->a_vp;
-
-	return (lockmgr(&VTOI(vp)->i_lock, ap->a_flags | LK_RELEASE,
-		&vp->v_interlock));
-}
-
-/*
  * Calculate the logical to physical mapping if not done already,
  * then call the device strategy routine.
  */
@@ -785,9 +753,9 @@ cd9660_strategy(v)
 	struct vop_strategy_args /* {
 		struct buf *a_bp;
 	} */ *ap = v;
-	register struct buf *bp = ap->a_bp;
-	register struct vnode *vp = bp->b_vp;
-	register struct iso_node *ip;
+	struct buf *bp = ap->a_bp;
+	struct vnode *vp = bp->b_vp;
+	struct iso_node *ip;
 	int error;
 
 	ip = VTOI(vp);
@@ -825,20 +793,6 @@ cd9660_print(v)
 
 	printf("tag VT_ISOFS, isofs vnode\n");
 	return (0);
-}
-
-/*
- * Check for a locked inode.
- */
-int
-cd9660_islocked(v)
-	void *v;
-{
-	struct vop_islocked_args /* {
-		struct vnode *a_vp;
-	} */ *ap = v;
-
-	return (lockstatus(&VTOI(ap->a_vp)->i_lock));
 }
 
 /*
@@ -970,6 +924,7 @@ struct vnodeopv_entry_desc cd9660_vnodeop_entries[] = {
 	{ &vop_read_desc, cd9660_read },		/* read */
 	{ &vop_write_desc, cd9660_write },		/* write */
 	{ &vop_lease_desc, cd9660_lease_check },	/* lease */
+	{ &vop_fcntl_desc, genfs_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, cd9660_ioctl },		/* ioctl */
 	{ &vop_poll_desc, cd9660_poll },		/* poll */
 	{ &vop_revoke_desc, cd9660_revoke },		/* revoke */
@@ -987,12 +942,12 @@ struct vnodeopv_entry_desc cd9660_vnodeop_entries[] = {
 	{ &vop_abortop_desc, cd9660_abortop },		/* abortop */
 	{ &vop_inactive_desc, cd9660_inactive },	/* inactive */
 	{ &vop_reclaim_desc, cd9660_reclaim },		/* reclaim */
-	{ &vop_lock_desc, cd9660_lock },		/* lock */
-	{ &vop_unlock_desc, cd9660_unlock },		/* unlock */
+	{ &vop_lock_desc, genfs_lock },			/* lock */
+	{ &vop_unlock_desc, genfs_unlock },		/* unlock */
 	{ &vop_bmap_desc, cd9660_bmap },		/* bmap */
 	{ &vop_strategy_desc, cd9660_strategy },	/* strategy */
 	{ &vop_print_desc, cd9660_print },		/* print */
-	{ &vop_islocked_desc, cd9660_islocked },	/* islocked */
+	{ &vop_islocked_desc, genfs_islocked },		/* islocked */
 	{ &vop_pathconf_desc, cd9660_pathconf },	/* pathconf */
 	{ &vop_advlock_desc, cd9660_advlock },		/* advlock */
 	{ &vop_blkatoff_desc, cd9660_blkatoff },	/* blkatoff */
@@ -1023,6 +978,7 @@ struct vnodeopv_entry_desc cd9660_specop_entries[] = {
 	{ &vop_read_desc, spec_read },			/* read */
 	{ &vop_write_desc, spec_write },		/* write */
 	{ &vop_lease_desc, spec_lease_check },		/* lease */
+	{ &vop_fcntl_desc, genfs_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, spec_ioctl },		/* ioctl */
 	{ &vop_poll_desc, spec_poll },			/* poll */
 	{ &vop_revoke_desc, spec_revoke },		/* revoke */
@@ -1040,12 +996,12 @@ struct vnodeopv_entry_desc cd9660_specop_entries[] = {
 	{ &vop_abortop_desc, spec_abortop },		/* abortop */
 	{ &vop_inactive_desc, cd9660_inactive },	/* inactive */
 	{ &vop_reclaim_desc, cd9660_reclaim },		/* reclaim */
-	{ &vop_lock_desc, cd9660_lock },		/* lock */
-	{ &vop_unlock_desc, cd9660_unlock },		/* unlock */
+	{ &vop_lock_desc, genfs_lock },			/* lock */
+	{ &vop_unlock_desc, genfs_unlock },		/* unlock */
 	{ &vop_bmap_desc, spec_bmap },			/* bmap */
 	{ &vop_strategy_desc, spec_strategy },		/* strategy */
 	{ &vop_print_desc, cd9660_print },		/* print */
-	{ &vop_islocked_desc, cd9660_islocked },	/* islocked */
+	{ &vop_islocked_desc, genfs_islocked },		/* islocked */
 	{ &vop_pathconf_desc, spec_pathconf },		/* pathconf */
 	{ &vop_advlock_desc, spec_advlock },		/* advlock */
 	{ &vop_blkatoff_desc, spec_blkatoff },		/* blkatoff */
@@ -1073,6 +1029,7 @@ struct vnodeopv_entry_desc cd9660_fifoop_entries[] = {
 	{ &vop_read_desc, fifo_read },			/* read */
 	{ &vop_write_desc, fifo_write },		/* write */
 	{ &vop_lease_desc, fifo_lease_check },		/* lease */
+	{ &vop_fcntl_desc, genfs_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, fifo_ioctl },		/* ioctl */
 	{ &vop_poll_desc, fifo_poll },			/* poll */
 	{ &vop_revoke_desc, fifo_revoke },		/* revoke */
@@ -1090,12 +1047,12 @@ struct vnodeopv_entry_desc cd9660_fifoop_entries[] = {
 	{ &vop_abortop_desc, fifo_abortop },		/* abortop */
 	{ &vop_inactive_desc, cd9660_inactive },	/* inactive */
 	{ &vop_reclaim_desc, cd9660_reclaim },		/* reclaim */
-	{ &vop_lock_desc, cd9660_lock },		/* lock */
-	{ &vop_unlock_desc, cd9660_unlock },		/* unlock */
+	{ &vop_lock_desc, genfs_lock },			/* lock */
+	{ &vop_unlock_desc, genfs_unlock },		/* unlock */
 	{ &vop_bmap_desc, fifo_bmap },			/* bmap */
 	{ &vop_strategy_desc, fifo_strategy },		/* strategy */
 	{ &vop_print_desc, cd9660_print },		/* print */
-	{ &vop_islocked_desc, cd9660_islocked },	/* islocked */
+	{ &vop_islocked_desc, genfs_islocked },		/* islocked */
 	{ &vop_pathconf_desc, fifo_pathconf },		/* pathconf */
 	{ &vop_advlock_desc, fifo_advlock },		/* advlock */
 	{ &vop_blkatoff_desc, fifo_blkatoff },		/* blkatoff */

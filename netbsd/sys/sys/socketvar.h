@@ -1,4 +1,4 @@
-/*	$NetBSD: socketvar.h,v 1.37 1999/03/23 10:45:37 lukem Exp $	*/
+/*	$NetBSD: socketvar.h,v 1.40 2000/03/28 05:06:20 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -41,9 +41,7 @@
 #include <sys/select.h>			/* for struct selinfo */
 #include <sys/queue.h>
 
-#if defined(_KERNEL) && !defined(_LKM)
-#include "opt_sb_max.h"
-#else
+#if !defined(_KERNEL) || defined(LKM)
 struct uio;
 #endif
 
@@ -225,10 +223,9 @@ struct socket {
 			} while (0)
 
 #ifdef _KERNEL
-u_long	sb_max;
+extern	u_long sb_max;
 /* to catch callers missing new second argument to sonewconn: */
 #define	sonewconn(head, connstatus)	sonewconn1((head), (connstatus))
-struct	socket *sonewconn1 __P((struct socket *head, int connstatus));
 
 /* strings for sleep message: */
 extern	const char netio[], netcon[], netcls[];
@@ -248,6 +245,8 @@ int	soo_read __P((struct file *fp, off_t *offset, struct uio *uio,
 	    struct ucred *cred, int flags));
 int	soo_write __P((struct file *fp, off_t *offset, struct uio *uio,
 	    struct ucred *cred, int flags));
+int	soo_fcntl __P((struct file *fp, u_int cmd, caddr_t data,
+	    struct proc *p));
 int	soo_ioctl __P((struct file *fp, u_long cmd, caddr_t data,
 	    struct proc *p));
 int	soo_poll __P((struct file *fp, int events, struct proc *p));

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.3 1997/11/27 10:18:43 sakamoto Exp $	*/
+/*	$NetBSD: cpu.h,v 1.7 2000/05/26 21:19:36 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995-1997 Wolfgang Solfrank.
@@ -33,8 +33,28 @@
 #ifndef	_MACHINE_CPU_H_
 #define	_MACHINE_CPU_H_
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_lockdebug.h"
+#endif
+
 #include <machine/frame.h>
 #include <machine/psl.h>
+#include <machine/intr.h>
+
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()		(&cpu_info_store)
+#endif
 
 #define	CLKF_USERMODE(frame)	(((frame)->srr1 & PSL_PR) != 0)
 #define	CLKF_BASEPRI(frame)	((frame)->pri == 0)
@@ -43,8 +63,9 @@
 
 #define	cpu_swapout(p)
 #define cpu_wait(p)
+#define	cpu_number()		0
 
-extern void delay __P((int));
+extern void delay __P((unsigned int));
 #define	DELAY(n)		delay(n)
 
 extern volatile int want_resched;
@@ -54,28 +75,12 @@ extern volatile int astpending;
 #define	need_proftick(p)	((p)->p_flag |= P_OWEUPC, astpending = 1)
 #define	signotify(p)		(astpending = 1)
 
-#define	CACHELINESIZE	32			/* For now		XXX */
-
-extern __inline void
-syncicache(from, len)
-	void *from;
-	int len;
-{
-	int l = len;
-	void *p = from;
-	
-	do {
-		__asm__ __volatile ("dcbst 0,%0" :: "r"(p));
-		p += CACHELINESIZE;
-	} while ((l -= CACHELINESIZE) > 0);
-	__asm__ __volatile ("sync");
-	do {
-		__asm__ __volatile ("icbi 0,%0" :: "r"(from));
-		from += CACHELINESIZE;
-	} while ((len -= CACHELINESIZE) > 0);
-	__asm__ __volatile ("isync");
-}
-
 extern char *bootpath;
+
+#if defined(_KERNEL) || defined(_STANDALONE)
+#define	CACHELINESIZE	32
+#endif
+
+#include <powerpc/cpu.h>
 
 #endif	/* _MACHINE_CPU_H_ */

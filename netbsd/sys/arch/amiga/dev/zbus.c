@@ -1,4 +1,4 @@
-/*	$NetBSD: zbus.c,v 1.39 1999/03/31 02:47:38 mhitch Exp $	*/
+/*	$NetBSD: zbus.c,v 1.43 1999/11/25 22:11:03 is Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -160,10 +160,15 @@ static struct aconfdata aconftab[] = {
 	{ "apssc",	8738,	35 },	/* Apollo '060 scsi */
 	/* KATO development */
 	{ "aumld",	2145,	128 },	/* Melody MPEG layer 2 audio board */
+	/* Individual Computers Jens Schoenfeld */
+	{ "buddha",	4626,	0 },
+	{ "X-serve",	4626,	23 },	/* X-serve Ethernet */
 	/* VMC Harald Frank */
 	{ "blst",	5001,	1},	/* ISDN Blaster */
 	{ "hyper4",	5001,	2},	/* Hypercom4-Zbus */
-	{ "hyper3",	5001,	3}	/* Hypercom3-Zbus */
+	{ "hyper3Z",	5001,	3},	/* Hypercom3-Zbus */
+	{ "hyper4+",	5001,	6},	/* Hypercom4+ */
+	{ "hyper3+",	5001,	7}	/* Hypercom3+ */
 };
 static int naconfent = sizeof(aconftab) / sizeof(struct aconfdata);
 
@@ -332,7 +337,7 @@ zbusprint(auxp, pnp)
 		if (zap->manid == -1)
 			rv = UNSUPP;
 	}
-	printf(" pa %p man/pro %d/%d", zap->pa, zap->manid, zap->prodid);
+	printf(" pa %8p man/pro %d/%d", zap->pa, zap->manid, zap->prodid);
 	return(rv);
 }
 
@@ -348,8 +353,8 @@ zbusmap (pa, size)
 	caddr_t pa;
 	u_int size;
 {
-	static vm_offset_t nextkva = 0;
-	vm_offset_t kva;
+	static vaddr_t nextkva = 0;
+	vaddr_t kva;
 
 	if (nextkva == 0)
 		nextkva = ZBUSADDR;

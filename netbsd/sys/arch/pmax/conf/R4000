@@ -2,7 +2,7 @@
 # R4000 (any model) kernel config file
 
 #
-# 	$NetBSD: R4000,v 1.13 1999/03/27 08:15:29 simonb Exp $
+# 	$NetBSD: R4000,v 1.20 2000/05/28 06:02:13 gmcgarry Exp $
 #
 include		"arch/pmax/conf/std.pmax"
 
@@ -27,9 +27,8 @@ options 	DDB_ONPANIC=0		# don't enter debugger on panic
 options 	"COMPAT_43"		# compatibility with 4.3BSD binaries
 options 	KTRACE			# system call tracing support
 options 	LKM			# loadable kernel modules
-options 	"NKMEMCLUSTERS=1024"	# 4K pages in kernel malloc pool
 
-#Old 4.4bsd/pmax kgdb options
+# Old 4.4BSD/pmax kgdb options
 #options 	KGDB			# support for kernel gdb
 #options 	"KGDBRATE=19200"	# kernel gdb port rate (default 9600)
 #options 	"KGDBDEV=15*256+0"	# device for kernel gdb
@@ -70,7 +69,13 @@ options 	GATEWAY		# IP packet forwarding
 #options 	COMPAT_11	# NetBSD 1.1,
 options 	COMPAT_12	# Netbsd 1.2 reboot()
 options 	COMPAT_13	# Netbsd 1.3
+options 	COMPAT_14	# Netbsd 1.4
 
+# Raster console options
+options		FONT_BOLD8x16		# Font for fb devices
+options		FONT_LUCIDA16x29	# Font for px devices
+#options	FONT_GALLANT12x22
+#options	FONT_QVSS8x15
 
 # pmax specific
 options 	COMPAT_ULTRIX	# ultrix compatibility
@@ -82,19 +87,36 @@ config		netbsd		root on ? type ?
 mainbus0	at root
 cpu*		at mainbus0
 
+## Peripheral Bus Support (for devices to attach to)
+## ----------------------------------------------------------------------------
 
-#########################################################################
-# I/O bus and device options						#
-#########################################################################
+# TURBOchannel bus support
+tc*	at	mainbus0
 
-# TC bus and supported options. (All but PMAXes have a turbochannel.)
-include 	"arch/pmax/conf/tc.std"
+# 3MIN, 3MAX+ and MAXINE have IOASIC in system slot
+ioasic0	at	tc?
+mcclock0 at	ioasic? offset ?	# DS1287 RTC
+asc0	at	ioasic? offset ?	# NCR53C94 SCSI with IOASIC
+le0	at	ioasic? offset ?	# LANCE
+scc0	at	ioasic? offset ?	# Z85C30
+scc1	at	ioasic? offset ?	# Z85C30
+dtop0	at	ioasic? offset ?	# MAXINE kbd and mouse
+bba0	at	ioasic? offset ?	# MAXINE baseboard audio
+audio*	at	bba0
+#fdc	at	ioasic? offset ?	# MAXINE floppy disk (not supported)
 
-# ioasic standard baseboard options (5000/2x, 5000/1xx, 5000/2[46]0)
-include 	"arch/pmax/conf/builtin.ioasic"
-
-# MAXINE-only ioasic baseboard devices and on-baseboard "options"
-include 	"arch/pmax/conf/builtin.maxine"
+# TURBOchannel devices
+mfb*	at	tc?			# PMAG-A MX Monochrome Framebuffer
+cfb*	at	tc?			# PMAG-B CX Color Framebuffer
+#tfb*	at	tc?			# PMAG-RO TX True Color Framebuffer
+sfb*	at	tc?			# PMAGB-B HX Smart Framebuffer
+#sfbp*	at	tc?			# PMAGD HX+ Smart Framebuffer
+xcfb0	at	tc?			# PMAG-DV Color Framebuffer at MAXINE
+asc*	at	tc?			# PMAZ-A single channel SCSI
+le*	at	tc?			# PMAD-A LANCE
+fta*	at	tc?			# PMAF-F FDDI
+#tcds*	at	tc?			# PMAZB/PMAZC dual channel SCSI
+#asc*	at	tcds? chip ?
 
 #########################################################################
 # SCSI configuration							#
@@ -102,7 +124,7 @@ include 	"arch/pmax/conf/builtin.maxine"
 
 oldscsibus*	at asc?
 #
-# SCSI configuration for old 4.4bsd/pmax DECstation SCSI driver
+# SCSI configuration for old 4.4BSD/pmax DECstation SCSI driver
 #
 include 	"arch/pmax/conf/scsi.pmax"
 #include 	"arch/pmax/conf/mi.scsi"		# not yet supported

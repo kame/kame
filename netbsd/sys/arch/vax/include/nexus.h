@@ -1,4 +1,4 @@
-/*	$NetBSD: nexus.h,v 1.13 1999/02/02 18:37:22 ragge Exp $	*/
+/*	$NetBSD: nexus.h,v 1.18 2000/06/12 11:13:16 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -37,17 +37,26 @@
 
 #ifndef _VAX_NEXUS_H_
 #define _VAX_NEXUS_H_
+
+#include <machine/bus.h>
+
+#ifdef _KERNEL
+#include "opt_cputype.h"
+#endif
 /*
  * Different definitions for nicer autoconf probing.
  */
-#define VAX_SBIBUS      1       /* SBI parent; 780/790 */
-#define VAX_CPUBUS      2       /* Has backplane CPU */
-#define VAX_MEMBUS      4       /* Has backplane memory */ 
-#define VAX_UNIBUS      8       /* Directly attached (630/650) */
-#define VAX_VSBUS       16      /* VAXstation board */
-#define VAX_BIBUS       32      /* BI bus expansions: 8200/8800 */ 
-#define VAX_CMIBUS	64	/* CMI backplane (750) */
-
+enum bustypes {
+	VAX_SBIBUS,		/* SBI parent (780) */
+	VAX_CMIBUS,		/* CMI backplane (750) */
+	VAX_UNIBUS,		/* Direct backplane (730) */
+	VAX_ABUS,		/* SBI placeholder (8600) */
+	VAX_BIBUS,		/* BI bus (8200) */
+	VAX_NBIBUS,		/* NBI backplane (8800) */
+	VAX_VSBUS,		/* Virtual vaxstation bus */
+	VAX_IBUS,		/* Internal Microvax bus */
+	VAX_XMIBUS,		/* XMI master bus (6000) */
+};
 /*
  * Information about nexus's.
  *
@@ -82,9 +91,7 @@
 #define	MAXNNEXUS NNEXSBI
 #endif
 
-#ifndef _LOCORE
-
-#include <sys/types.h>
+#ifdef _KERNEL
 
 struct	nexus {
 	union nexcsr {
@@ -95,10 +102,10 @@ struct	nexus {
 };
 
 struct sbi_attach_args {
-	u_int	nexnum; 	/* This nexus TR number */
-	u_int	type;		/* This nexus type */
-	int	nexinfo;	/* Some info sent between attach & match */
-	void	*nexaddr;	/* Virtual address of this nexus */
+	int sa_nexnum; 		/* This nexus TR number */
+	int sa_type;		/* This nexus type */
+	bus_space_tag_t sa_iot;
+	bus_space_handle_t sa_ioh;
 };
 
 /* Memory device struct. This should be somewhere else */
@@ -116,9 +123,6 @@ struct bp_conf {
 	int bp_addr;
 };
 
-extern caddr_t *nex_vec;
-#define nex_vec_num(ipl, nexnum) nex_vec[(ipl-14)*16+nexnum]
-
 #endif
 
 /*
@@ -134,7 +138,7 @@ extern caddr_t *nex_vec;
 #define	NEX_CFGFLT	(0xfc000000)
 
 #ifndef _LOCORE
-#if defined(VAX780) || defined(VAX8600)
+#if VAX780 || VAX8600
 #define	NEXFLT_BITS \
 "\20\40PARFLT\37WSQFLT\36URDFLT\35ISQFLT\34MXTFLT\33XMTFLT"
 #endif
@@ -180,9 +184,10 @@ extern caddr_t *nex_vec;
 #define	NEX_MEM256I	0x74		/* 256K chips, interleaved */
 
 /* Memory classes */
-#define	M780C		0
-#define	M780EL		1
-#define	M780EU		2
+#define	M_NONE		0
+#define	M780C		1
+#define	M780EL		2
+#define	M780EU		3
 
 /* Memory recover defines */
 #define	MCHK_PANIC	-1

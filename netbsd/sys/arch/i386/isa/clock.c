@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.61.2.1 2000/02/04 23:06:19 he Exp $	*/
+/*	$NetBSD: clock.c,v 1.65 2000/05/11 16:38:13 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994 Charles M. Hannum.
@@ -113,6 +113,11 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #if (NPCPPI > 0)
 #include <dev/isa/pcppivar.h>
 
+#include "mca.h"
+#if NMCA > 0
+#include <machine/mca_machdep.h>	/* for MCA_system */
+#endif
+
 #ifdef CLOCKDEBUG
 int clock_debug = 0;
 #define DPRINTF(arg) if (clock_debug) printf arg
@@ -131,7 +136,6 @@ static int ppi_attached;
 static pcppi_tag_t ppicookie;
 #endif /* PCPPI */
 
-static void initrtclock __P((void));
 void	spinwait __P((int));
 int	clockintr __P((void *));
 int	gettick __P((void));
@@ -271,7 +275,7 @@ gettick_broken_latch()
 }
 
 /* minimal initialization, enough for delay() */
-static void
+void
 initrtclock()
 {
 	u_long tval;
@@ -403,6 +407,13 @@ clockintr(arg)
 	struct clockframe *frame = arg;		/* not strictly necessary */
 
 	hardclock(frame);
+
+#if NMCA > 0
+	if (MCA_system) {
+		/* Reset PS/2 clock interrupt by asserting bit 7 of port 0x61 */
+		outb(0x61, inb(0x61) | 0x80);
+	}
+#endif
 	return -1;
 }
 
@@ -464,14 +475,13 @@ delay(n)
 		 * code so we can take advantage of the intermediate 64-bit
 		 * quantity to prevent loss of significance.
 		 */
-		register int m;
+		int m;
 		__asm __volatile("mul %3"
 				 : "=a" (n), "=d" (m)
 				 : "0" (n), "r" (TIMER_FREQ));
-		__asm __volatile("div %3"
-				 : "=a" (n)
-				 : "0" (n), "d" (m), "r" (1000000)
-				 : "%edx");
+		__asm __volatile("div %4"
+				 : "=a" (n), "=d" (m)
+				 : "0" (n), "1" (m), "r" (1000000));
 #else
 		/*
 		 * Calculate ((n * TIMER_FREQ) / 1e6) without using floating

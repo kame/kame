@@ -1,4 +1,4 @@
-/*	$NetBSD: xd.c,v 1.23 1998/12/13 17:57:19 kleink Exp $	*/
+/*	$NetBSD: xd.c,v 1.30 2000/06/04 19:15:07 cgd Exp $	*/
 
 /*
  *
@@ -294,7 +294,7 @@ xddummystrat(bp)
 {
 	if (bp->b_bcount != XDFM_BPS)
 		panic("xddummystrat");
-	bcopy(xd_labeldata, bp->b_un.b_addr, XDFM_BPS);
+	bcopy(xd_labeldata, bp->b_data, XDFM_BPS);
 	bp->b_flags |= B_DONE;
 	bp->b_flags &= ~B_BUSY;
 }
@@ -439,9 +439,8 @@ xdcattach(parent, self, aux)
 
 	/* init queue of waiting bufs */
 
-	xdc->sc_wq.b_active = 0;
-	xdc->sc_wq.b_actf = 0;
-	xdc->sc_wq.b_actb = &xdc->sc_wq.b_actf;
+	BUFQ_INIT(&xdc->sc_wq);
+	callout_init(&xdc->sc_tick_ch);
 
 	/*
 	 * section 7 of the manual tells us how to init the controller:
@@ -481,7 +480,8 @@ xdcattach(parent, self, aux)
 	/* link in interrupt with higher level software */
 	isr_add_vectored(xdcintr, (void *)xdc,
 	                 ca->ca_intpri, ca->ca_intvec);
-	evcnt_attach(&xdc->sc_dev, "intr", &xdc->sc_intrcnt);
+	evcnt_attach_dynamic(&xdc->sc_intrcnt, EVCNT_TYPE_INTR, NULL,
+	    xdc->sc_dev.dv_xname, "intr");
 
 	/* now we must look for disks using autoconfig */
 	xa.booting = 1;
@@ -489,7 +489,7 @@ xdcattach(parent, self, aux)
 		(void) config_found(self, (void *) &xa, xdc_print);
 
 	/* start the watchdog clock */
-	timeout(xdc_tick, xdc, XDC_TICKCNT);
+	callout_reset(&xdc->sc_tick_ch, XDC_TICKCNT, xdc_tick, xdc);
 }
 
 int
@@ -565,7 +565,6 @@ xdattach(parent, self, aux)
 
 	/* Do init work common to attach and open. */
 	xd_init(xd);
-	dk_establish(&xd->sc_dk, &xd->sc_dev);
 }
 
 /*
@@ -585,7 +584,6 @@ xd_init(xd)
 	struct xd_iopb_drive *driopb;
 	void *dvmabuf;
 	int rqno, err, spt, mb, blk, lcv, fullmode, newstate;
-	extern int cold;
 
 	xdc = xd->parent;
 	xd->state = XD_DRIVE_ATTACHING;
@@ -1027,7 +1025,6 @@ xdstrategy(bp)
 {
 	struct xd_softc *xd;
 	struct xdc_softc *parent;
-	struct buf *wq;
 	int     s, unit;
 
 	unit = DISKUNIT(bp->b_dev);
@@ -1078,7 +1075,7 @@ xdstrategy(bp)
 
 	/* first, give jobs in front of us a chance */
 	parent = xd->parent;
-	while (parent->nfree > 0 && parent->sc_wq.b_actf)
+	while (parent->nfree > 0 && BUFQ_FIRST(&parent->sc_wq) != NULL)
 		if (xdc_startbuf(parent, NULL, NULL) != XD_ERR_AOK)
 			break;
 
@@ -1087,11 +1084,7 @@ xdstrategy(bp)
 	 * buffs will get picked up later by xdcintr().
 	 */
 	if (parent->nfree == 0) {
-		wq = &xd->parent->sc_wq;
-		bp->b_actf = 0;
-		bp->b_actb = wq->b_actb;
-		*wq->b_actb = bp;
-		wq->b_actb = &bp->b_actf;
+		BUFQ_INSERT_TAIL(&parent->sc_wq, bp);
 		splx(s);
 		return;
 	}
@@ -1139,7 +1132,7 @@ xdcintr(v)
 	xdc_start(xdcsc, XDC_MAXIOPB);
 
 	/* fill up any remaining iorq's with queue'd buffers */
-	while (xdcsc->nfree > 0 && xdcsc->sc_wq.b_actf)
+	while (xdcsc->nfree > 0 && BUFQ_FIRST(&xdcsc->sc_wq) != NULL)
 		if (xdc_startbuf(xdcsc, NULL, NULL) != XD_ERR_AOK)
 			break;
 
@@ -1370,7 +1363,6 @@ xdc_startbuf(xdcsc, xdsc, bp)
 	int     rqno, partno;
 	struct xd_iorq *iorq;
 	struct xd_iopb *iopb;
-	struct buf *wq;
 	u_long  block;
 	caddr_t dbuf;
 
@@ -1383,15 +1375,10 @@ xdc_startbuf(xdcsc, xdsc, bp)
 	/* get buf */
 
 	if (bp == NULL) {
-		bp = xdcsc->sc_wq.b_actf;
-		if (!bp)
+		bp = BUFQ_FIRST(&xdcsc->sc_wq);
+		if (bp == NULL)
 			panic("xdc_startbuf bp");
-		wq = bp->b_actf;
-		if (wq)
-			wq->b_actb = bp->b_actb;
-		else
-			xdcsc->sc_wq.b_actb = bp->b_actb;
-		*bp->b_actb = wq;
+		BUFQ_REMOVE(&xdcsc->sc_wq, bp);
 		xdsc = xdcsc->sc_drives[DISKUNIT(bp->b_dev)];
 	}
 	partno = DISKPART(bp->b_dev);
@@ -1432,11 +1419,7 @@ xdc_startbuf(xdcsc, xdsc, bp)
 		printf("%s: warning: out of DVMA space\n",
 			   xdcsc->sc_dev.dv_xname);
 		XDC_FREE(xdcsc, rqno);
-		wq = &xdcsc->sc_wq;	/* put at end of queue */
-		bp->b_actf = 0;
-		bp->b_actb = wq->b_actb;
-		*wq->b_actb = bp;
-		wq->b_actb = &bp->b_actf;
+		BUFQ_INSERT_TAIL(&xdcsc->sc_wq, bp);
 		return (XD_ERR_FAIL);	/* XXX: need some sort of
 		                         * call-back scheme here? */
 	}
@@ -1517,7 +1500,7 @@ xdc_submit_iorq(xdcsc, iorqno, type)
 			return XD_ERR_AOK;	/* success */
 		case XD_SUB_WAIT:
 			while (iorq->iopb->done == 0) {
-				sleep(iorq, PRIBIO);
+				(void) tsleep(iorq, PRIBIO, "xdciorq", 0);
 			}
 			return (iorq->errno);
 		case XD_SUB_POLL:
@@ -1549,7 +1532,7 @@ xdc_submit_iorq(xdcsc, iorqno, type)
 		return (XD_ERR_AOK);	/* success */
 	case XD_SUB_WAIT:
 		while (iorq->iopb->done == 0) {
-			sleep(iorq, PRIBIO);
+			(void) tsleep(iorq, PRIBIO, "xdciorq", 0);
 		}
 		return (iorq->errno);
 	case XD_SUB_POLL:
@@ -1637,7 +1620,7 @@ xdc_piodriver(xdcsc, iorqno, freeone)
 	/* now that we've drained everything, start up any bufs that have
 	 * queued */
 
-	while (xdcsc->nfree > 0 && xdcsc->sc_wq.b_actf)
+	while (xdcsc->nfree > 0 && BUFQ_FIRST(&xdcsc->sc_wq) != NULL)
 		if (xdc_startbuf(xdcsc, NULL, NULL) != XD_ERR_AOK)
 			break;
 
@@ -2155,7 +2138,7 @@ xdc_tick(arg)
 
 	/* until next time */
 
-	timeout(xdc_tick, xdcsc, XDC_TICKCNT);
+	callout_reset(&xdcsc->sc_tick_ch, XDC_TICKCNT, xdc_tick, xdcsc);
 }
 
 /*

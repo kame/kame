@@ -1,4 +1,4 @@
-/*	$NetBSD: advnops.c,v 1.48.2.1 1999/06/22 14:32:52 perry Exp $	*/
+/*	$NetBSD: advnops.c,v 1.53 2000/05/19 18:54:22 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -60,21 +60,19 @@ extern struct vnodeops adosfs_vnodeops;
 int	adosfs_getattr	__P((void *));
 int	adosfs_read	__P((void *));
 int	adosfs_write	__P((void *));
+#define	adosfs_fcntl	genfs_fcntl
 #define	adosfs_ioctl	genfs_enoioctl
 #define	adosfs_poll	genfs_poll
 int	adosfs_strategy	__P((void *));
 int	adosfs_link	__P((void *));
 int	adosfs_symlink	__P((void *));
 #define	adosfs_abortop	genfs_abortop
-int	adosfs_lock	__P((void *));
-int	adosfs_unlock	__P((void *));
 int	adosfs_bmap	__P((void *));
 int	adosfs_print	__P((void *));
 int	adosfs_readdir	__P((void *));
 int	adosfs_access	__P((void *));
 int	adosfs_readlink	__P((void *));
 int	adosfs_inactive	__P((void *));
-int	adosfs_islocked	__P((void *));
 int	adosfs_reclaim	__P((void *));
 int	adosfs_pathconf	__P((void *));
 
@@ -113,9 +111,10 @@ struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
 	{ &vop_read_desc, adosfs_read },		/* read */
 	{ &vop_write_desc, adosfs_write },		/* write */
 	{ &vop_lease_desc, adosfs_lease_check },	/* lease */
+	{ &vop_fcntl_desc, adosfs_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, adosfs_ioctl },		/* ioctl */
 	{ &vop_poll_desc, adosfs_poll },		/* poll */
-	{ &vop_revoke_desc, adosfs_poll },		/* revoke */
+	{ &vop_revoke_desc, adosfs_revoke },		/* revoke */
 	{ &vop_mmap_desc, adosfs_mmap },		/* mmap */
 	{ &vop_fsync_desc, adosfs_fsync },		/* fsync */
 	{ &vop_seek_desc, adosfs_seek },		/* seek */
@@ -130,12 +129,12 @@ struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
 	{ &vop_abortop_desc, adosfs_abortop },		/* abortop */
 	{ &vop_inactive_desc, adosfs_inactive },	/* inactive */
 	{ &vop_reclaim_desc, adosfs_reclaim },		/* reclaim */
-	{ &vop_lock_desc, adosfs_lock },		/* lock */
-	{ &vop_unlock_desc, adosfs_unlock },		/* unlock */
+	{ &vop_lock_desc, genfs_lock },			/* lock */
+	{ &vop_unlock_desc, genfs_unlock },		/* unlock */
 	{ &vop_bmap_desc, adosfs_bmap },		/* bmap */
 	{ &vop_strategy_desc, adosfs_strategy },	/* strategy */
 	{ &vop_print_desc, adosfs_print },		/* print */
-	{ &vop_islocked_desc, adosfs_islocked },	/* islocked */
+	{ &vop_islocked_desc, genfs_islocked },		/* islocked */
 	{ &vop_pathconf_desc, adosfs_pathconf },	/* pathconf */
 	{ &vop_advlock_desc, adosfs_advlock },		/* advlock */
 	{ &vop_blkatoff_desc, adosfs_blkatoff },	/* blkatoff */
@@ -323,7 +322,7 @@ adosfs_read(v)
 		printf(" %d+%d-%d+%d", lbn, on, lbn, n);
 #endif
 		n = min(n, (u_int)size - bp->b_resid);
-		error = uiomove(bp->b_un.b_addr + on +
+		error = uiomove(bp->b_data + on +
 				amp->bsize - amp->dbsize, (int)n, uio);
 		brelse(bp);
 	} while (error == 0 && uio->uio_resid > 0 && n != 0);
@@ -433,43 +432,6 @@ adosfs_symlink(v)
 	vput(ap->a_dvp);
 	return (EROFS);
 }
-
-/*
- * lock the anode
- */
-int
-adosfs_lock(v)
-	void *v;
-{
-	struct vop_lock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *sp = v;
-	struct vnode *vp = sp->a_vp;
-
-	return (lockmgr(&VTOA(vp)->lock, sp->a_flags, &vp->v_interlock));
-
-}
-
-/*
- * unlock an anode
- */
-int
-adosfs_unlock(v)
-	void *v;
-{
-	struct vop_unlock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *sp = v;
-	struct vnode *vp = sp->a_vp;
-
-	return (lockmgr(&VTOA(vp)->lock, sp->a_flags | LK_RELEASE,
-		&vp->v_interlock));
-}
-
 
 /*
  * Wait until the vnode has finished changing state.
@@ -895,17 +857,6 @@ adosfs_inactive(v)
 	printf(" 0)");
 #endif
 	return(0);
-}
-
-int
-adosfs_islocked(v)
-	void *v;
-{
-	struct vop_islocked_args /* {
-		struct vnode *a_vp;
-	} */ *sp = v;
-
-	return (lockstatus(&VTOA(sp->a_vp)->lock));
 }
 
 /*

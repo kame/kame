@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_net.c,v 1.17.2.1 1999/04/06 15:00:45 tv Exp $	 */
+/*	$NetBSD: svr4_net.c,v 1.22 2000/03/23 05:16:16 thorpej Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -70,6 +70,8 @@
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_util.h>
 #include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_ucontext.h>
 #include <compat/svr4/svr4_syscallargs.h>
 #include <compat/svr4/svr4_ioctl.h>
 #include <compat/svr4/svr4_stropts.h>
@@ -97,7 +99,7 @@ static int svr4_soo_close __P((struct file *, struct proc *));
 static int svr4_ptm_alloc __P((struct proc *));
 
 static struct fileops svr4_netops = {
-	soo_read, soo_write, soo_ioctl, soo_poll, svr4_soo_close
+	soo_read, soo_write, soo_ioctl, soo_fcntl, soo_poll, svr4_soo_close
 };
 
 
@@ -185,12 +187,14 @@ svr4_netopen(dev, flag, mode, p)
 		return EOPNOTSUPP;
 	}
 
+	/* falloc() will use the descriptor for us */
 	if ((error = falloc(p, &fp, &fd)) != 0)
 		return error;
 
 	if ((error = socreate(family, &so, type, protocol)) != 0) {
 		DPRINTF(("socreate error %d\n", error));
-		p->p_fd->fd_ofiles[fd] = 0;
+		fdremove(p->p_fd, fd);
+		FILE_UNUSE(fp, NULL);
 		ffree(fp);
 		return error;
 	}
@@ -205,6 +209,7 @@ svr4_netopen(dev, flag, mode, p)
 	DPRINTF(("ok);\n"));
 
 	p->p_dupfd = fd;
+	FILE_UNUSE(fp, p);
 	return ENXIO;
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: syscall.c,v 1.24 1999/03/30 10:10:57 mycroft Exp $	*/
+/*	$NetBSD: syscall.c,v 1.28 2000/06/06 18:52:33 soren Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -43,6 +43,7 @@
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 #include "opt_pmap_debug.h"
+#include "opt_syscall_debug.h"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -163,10 +164,9 @@ syscall(frame, code)
 		for (loop = frame->tf_pc - 32; loop < frame->tf_pc; loop += 4)
 			disassemble(loop);
 
-		dumpframe(frame);
 		printf("CPU ID=%08x\n", cpu_id());
 		printf("MMU Fault address=%08x status=%08x\n", cpu_faultaddress(), cpu_faultstatus());
-		printf("Page table entry for 0x%08x at 0x%08x = 0x%08x\n",
+		printf("Page table entry for 0x%08x at %p = 0x%08x\n",
 		    frame->tf_pc - INSN_SIZE, vtopte(frame->tf_pc - INSN_SIZE),
 		    *vtopte(frame->tf_pc - INSN_SIZE));
 #endif	/* ARM700BUGTRACK */
@@ -243,7 +243,7 @@ syscall(frame, code)
 #endif	/* DDB && PORTMASTER */
 
 	case SYS_syscall:
-		/* Don't have to look in user space, we have it in the the trapframe */
+		/* Don't have to look in user space, we have it in the trapframe */
 /*		code = fuword(params);*/
 		code = ReadWord(params);
 		params += sizeof(int);
@@ -301,7 +301,7 @@ syscall(frame, code)
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, argsize, args);
+		ktrsyscall(p, code, argsize, args);
 #endif
 	rval[0] = 0;
 	rval[1] = frame->tf_r1;
@@ -350,7 +350,7 @@ bad:
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, error, rval[0]);
 #endif
 }
 
@@ -370,7 +370,7 @@ child_return(arg)
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.37 1999/03/14 01:24:18 kleink Exp $	*/
+/*	$NetBSD: types.h,v 1.43 2000/04/16 23:12:13 christos Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993, 1994
@@ -59,11 +59,16 @@ typedef unsigned char	unchar;		/* Sys V compatibility */
 typedef	unsigned short	ushort;		/* Sys V compatibility */
 typedef	unsigned int	uint;		/* Sys V compatibility */
 typedef unsigned long	ulong;		/* Sys V compatibility */
+
+typedef	u_long		cpuid_t;
 #endif
 
 typedef	u_int64_t	u_quad_t;	/* quads */
 typedef	int64_t		quad_t;
 typedef	quad_t *	qaddr_t;
+
+typedef	quad_t		longlong_t;	/* ANSI long long type */
+typedef	u_quad_t	u_longlong_t;	/* ANSI unsigned long long type */
 
 typedef	int64_t		blkcnt_t;	/* fs block count */
 typedef	u_int32_t	blksize_t;	/* fs optimal block size */
@@ -83,6 +88,20 @@ typedef quad_t		rlim_t;		/* resource limit */
 typedef	int32_t		segsz_t;	/* segment size */
 typedef	int32_t		swblk_t;	/* swap offset */
 typedef	u_int32_t	uid_t;		/* user id */
+typedef	int32_t		dtime_t;	/* on-disk time_t */
+
+#if defined(_KERNEL) || defined(_LIBC)
+/*
+ * semctl(2)'s argument structure.  This is here for the benefit of
+ * <sys/syscallargs.h>.  It is not in the user's namespace in SUSv2.
+ * The SUSv2 semctl(2) takes variable arguments.
+ */
+union __semun {
+	int		val;		/* value for SETVAL */
+	struct semid_ds	*buf;		/* buffer for IPC_STAT & IPC_SET */
+	unsigned short	*array;		/* array for GETALL & SETALL */
+};
+#endif /* _KERNEL || _LIBC */
 
 /*
  * These belong in unistd.h, but are placed here too to ensure that
@@ -151,8 +170,23 @@ typedef	_BSD_USECONDS_T_	useconds_t;
 #undef	_BSD_USECONDS_T_
 #endif
 
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
-#define	NBBY	8		/* number of bits in a byte */
+#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
+    (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    (_XOPEN_SOURCE - 0) >= 500
+
+/*
+ * Implementation dependent defines, hidden from user space. X/Open does not
+ * specify them.
+ */
+#define	__NBBY	8		/* number of bits in a byte */
+typedef int32_t	__fd_mask;
+#define __NFDBITS	(sizeof(__fd_mask) * __NBBY)	/* bits per mask */
+
+#ifndef howmany
+#define	__howmany(x, y)	(((x) + ((y) - 1)) / (y))
+#else
+#define __howmany(x, y) howmany(x, y)
+#endif
 
 /*
  * Select uses bit masks of file descriptors in longs.  These macros
@@ -164,22 +198,33 @@ typedef	_BSD_USECONDS_T_	useconds_t;
 #define	FD_SETSIZE	256
 #endif
 
-typedef int32_t	fd_mask;
-#define NFDBITS	(sizeof(fd_mask) * NBBY)	/* bits per mask */
-
-#ifndef howmany
-#define	howmany(x, y)	(((x) + ((y) - 1)) / (y))
-#endif
-
 typedef	struct fd_set {
-	fd_mask	fds_bits[howmany(FD_SETSIZE, NFDBITS)];
+	__fd_mask	fds_bits[__howmany(FD_SETSIZE, __NFDBITS)];
 } fd_set;
 
-#define	FD_SET(n, p)	((p)->fds_bits[(n)/NFDBITS] |= (1 << ((n) % NFDBITS)))
-#define	FD_CLR(n, p)	((p)->fds_bits[(n)/NFDBITS] &= ~(1 << ((n) % NFDBITS)))
-#define	FD_ISSET(n, p)	((p)->fds_bits[(n)/NFDBITS] & (1 << ((n) % NFDBITS)))
-#define	FD_COPY(f, t)	(void)memcpy((t), (f), sizeof(*(f)))
+#define	FD_SET(n, p)	\
+    ((p)->fds_bits[(n)/__NFDBITS] |= (1 << ((n) % __NFDBITS)))
+#define	FD_CLR(n, p)	\
+    ((p)->fds_bits[(n)/__NFDBITS] &= ~(1 << ((n) % __NFDBITS)))
+#define	FD_ISSET(n, p)	\
+    ((p)->fds_bits[(n)/__NFDBITS] & (1 << ((n) % __NFDBITS)))
 #define	FD_ZERO(p)	(void)memset((p), 0, sizeof(*(p)))
+
+/*
+ * Expose our internals if we are not required to hide them.
+ */
+#ifndef _XOPEN_SOURCE
+
+#define NBBY __NBBY
+#define fd_mask __fd_mask
+#define NFDBITS __NFDBITS
+#ifndef howmany
+#define howmany(a, b) __howmany(a, b)
+#endif
+
+#define	FD_COPY(f, t)	(void)memcpy((t), (f), sizeof(*(f)))
+
+#endif
 
 #if defined(__STDC__) && defined(_KERNEL)
 /*

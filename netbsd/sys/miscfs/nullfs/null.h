@@ -1,4 +1,37 @@
-/*	$NetBSD: null.h,v 1.9 1997/10/06 09:32:31 thorpej Exp $	*/
+/*	$NetBSD: null.h,v 1.11 2000/03/13 23:52:40 soren Exp $	*/
+
+/*
+ * Copyright (c) 1999 National Aeronautics & Space Administration
+ * All rights reserved.
+ *
+ * This software was written by William Studnemund of the
+ * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the National Aeronautics & Space Administration
+ *    nor the names of its contributors may be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NATIONAL AERONAUTICS & SPACE ADMINISTRATION
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE ADMINISTRATION OR CONTRIB-
+ * UTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+ * OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -39,50 +72,50 @@
  *	@(#)null.h	8.2 (Berkeley) 1/21/94
  */
 
-struct null_args {
-	char		*target;	/* Target of loopback  */
-};
+#include <miscfs/genfs/layer.h>
 
-struct null_mount {
-	struct mount	*nullm_vfs;
-	struct vnode	*nullm_rootvp;	/* Reference to root null_node */
+struct null_args {
+	struct	layer_args	la;	/* generic layerfs args */
 };
+#define	nulla_target	la.target
+#define	nulla_export	la.export
 
 #ifdef _KERNEL
+struct null_mount {
+	struct	layer_mount	lm;	/* generic layerfs mount stuff */
+};
+#define	nullm_vfs		lm.layerm_vfs
+#define	nullm_rootvp		lm.layerm_rootvp
+#define	nullm_export		lm.layerm_export
+#define	nullm_flags		lm.layerm_flags
+#define	nullm_size		lm.layerm_size
+#define	nullm_tag		lm.layerm_tag
+#define	nullm_bypass		lm.layerm_bypass
+#define	nullm_alloc		lm.layerm_alloc
+#define	nullm_vnodeop_p		lm.layerm_vnodeop_p
+#define	nullm_node_hashtbl	lm.layerm_node_hashtbl
+#define	nullm_node_hash		lm.layerm_node_hash
+#define	nullm_hashlock		lm.layerm_hashlock
+
 /*
  * A cache of vnode references
  */
 struct null_node {
-	LIST_ENTRY(null_node)	null_hash;	/* Hash list */
-	struct vnode	        *null_lowervp;	/* VREFed once */
-	struct vnode		*null_vnode;	/* Back pointer */
-	unsigned int		null_flags;	/* locking, etc. */
-#ifdef DIAGNOSTIC
-	pid_t			null_pid;	/* who's locking it? */
-	caddr_t			null_lockpc; /* their return addr */
-	caddr_t			null_lockpc2; /* their return addr^2 */
-#endif
+	struct	layer_node	ln;
 };
+#define	null_hash	ln.layer_hash
+#define	null_lowervp	ln.layer_lowervp
+#define	null_vnode	ln.layer_vnode
+#define	null_flags	ln.layer_flags
 
-#if defined(__alpha__) || !defined(__GNUC__) || __GNUC__ < 2 || \
-	(__GNUC__ == 2 && __GNUC_MINOR__ < 5)
-#define RETURN_PC(frameno) (void *)0
-#else
-#define RETURN_PC(frameno) __builtin_return_address(frameno)
-#endif
-
-#define NULL_WANTED	0x01
-#define NULL_LOCKED	0x02
-#define NULL_LLOCK	0x04
-
-extern int null_node_create __P((struct mount *mp, struct vnode *target, struct vnode **vpp, int lockit));
+int null_node_create __P((struct mount *mp, struct vnode *target, struct vnode **vpp));
 
 #define	MOUNTTONULLMOUNT(mp) ((struct null_mount *)((mp)->mnt_data))
 #define	VTONULL(vp) ((struct null_node *)(vp)->v_data)
 #define	NULLTOV(xp) ((xp)->null_vnode)
 #ifdef NULLFS_DIAGNOSTIC
-extern struct vnode *null_checkvp __P((struct vnode *vp, char *fil, int lno));
-#define	NULLVPTOLOWERVP(vp) null_checkvp((vp), __FILE__, __LINE__)
+extern struct vnode *layer_checkvp __P((struct vnode *vp, char *fil, int lno));
+#define	NULLVPTOLOWERVP(vp) layer_checkvp((vp), __FILE__, __LINE__)
 #else
 #define	NULLVPTOLOWERVP(vp) (VTONULL(vp)->null_lowervp)
 #endif

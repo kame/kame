@@ -1,4 +1,4 @@
-/*	$NetBSD: vm.h,v 1.20 1999/03/24 05:51:33 mrg Exp $	*/
+/*	$NetBSD: vm.h,v 1.22.4.2 2000/10/18 16:24:00 tv Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -38,7 +38,8 @@
 #ifndef VM_H
 #define VM_H
 
-typedef int vm_inherit_t;		/* XXX: inheritance codes */
+typedef int		vm_inherit_t;	/* XXX: inheritance codes */
+typedef off_t           voff_t;		/* XXX: offset within a uvm_object */
 
 union vm_map_object;
 typedef union vm_map_object vm_map_object_t;
@@ -49,23 +50,17 @@ typedef struct vm_map_entry *vm_map_entry_t;
 struct vm_map;
 typedef struct vm_map *vm_map_t;
 
-struct vm_object;
-typedef struct vm_object *vm_object_t;
-
 struct vm_page;
 typedef struct vm_page  *vm_page_t;
-
-struct pager_struct;
-typedef struct pager_struct *vm_pager_t;
 
 #include <sys/vmmeter.h>
 #include <sys/queue.h>
 #include <vm/vm_param.h>
 #include <sys/lock.h>
 #include <vm/vm_prot.h>
-#include <vm/vm_inherit.h>
 #include <vm/vm_map.h>
-#include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pager.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 
@@ -88,6 +83,7 @@ struct vmspace {
 	caddr_t	vm_taddr;	/* user virtual address of text XXX */
 	caddr_t	vm_daddr;	/* user virtual address of data XXX */
 	caddr_t vm_maxsaddr;	/* user VA at max stack growth */
+	caddr_t vm_minsaddr;    /* user VA at top of stack */
 };
 
 #ifdef	pmap_resident_count

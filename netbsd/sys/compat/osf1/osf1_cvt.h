@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_cvt.h,v 1.5.4.2 1999/06/26 01:52:28 cgd Exp $ */
+/* $NetBSD: osf1_cvt.h,v 1.6 1999/06/26 01:23:25 cgd Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.

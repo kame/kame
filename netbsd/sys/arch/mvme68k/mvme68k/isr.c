@@ -1,4 +1,4 @@
-/*	$NetBSD: isr.c,v 1.13 1999/03/24 05:51:06 mrg Exp $	*/
+/*	$NetBSD: isr.c,v 1.16.4.1 2000/07/22 15:51:42 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -75,6 +75,9 @@ void
 isrinit()
 {
 	int i;
+
+	/* No soft interrupts pending */
+	ssir = 1;
 
 	/* Initialize the autovector lists. */
 	for (i = 0; i < NISRAUTOVEC; ++i) {
@@ -283,53 +286,51 @@ isrdispatch_vectored(pc, evec, frame)
 }
 
 /*
- * XXX Why on earth isn't this in a common file?!
+ * netisr junk...
+ * XXX - This really belongs in some common file,
+ *	i.e.  src/sys/net/netisr.c
+ * Also, should use an array of chars instead of
+ * a bitmask to avoid atomicity locking issues.
  */
+
+#include "arp.h"	/* for NARP */
+#include "ppp.h"
+
+/*
+ * Declarations for the netisr functions...
+ * They are in the header files, but that's not
+ * really a good reason to drag all those in.
+ */
+void netintr __P((void));
+void arpintr __P((void));
+void ipintr __P((void));
+void ip6intr __P((void));
+void atintr __P((void));
+void nsintr __P((void));
+void clnlintr __P((void));
+void ccittintr __P((void));
+void pppintr __P((void));
+
 void
 netintr()
 {
-#ifdef INET
-#include "arp.h"
-#if NARP > 0
-	if (netisr & (1 << NETISR_ARP)) {
-		netisr &= ~(1 << NETISR_ARP);
-		arpintr();
-	}
-#endif
-	if (netisr & (1 << NETISR_IP)) {
-		netisr &= ~(1 << NETISR_IP);
-		ipintr();
-	}
-#endif
-#ifdef NETATALK
-	if (netisr & (1 << NETISR_ATALK)) {
-		netisr &= ~(1 << NETISR_ATALK);
-		atintr();
-	}
-#endif
-#ifdef NS
-	if (netisr & (1 << NETISR_NS)) {
-		netisr &= ~(1 << NETISR_NS);
-		nsintr();
-	}
-#endif
-#ifdef ISO
-	if (netisr & (1 << NETISR_ISO)) {
-		netisr &= ~(1 << NETISR_ISO);
-		clnlintr();
-	}
-#endif
-#ifdef CCITT
-	if (netisr & (1 << NETISR_CCITT)) {
-		netisr &= ~(1 << NETISR_CCITT);
-		ccittintr();
-	}
-#endif
-#include "ppp.h"
-#if NPPP > 0
-	if (netisr & (1 << NETISR_PPP)) {
-		netisr &= ~(1 << NETISR_PPP);
-		pppintr();
-	}
-#endif
+	int n, s;
+
+	s = splhigh();
+	n = netisr;
+	netisr = 0;
+	splx(s);
+
+#define DONETISR(bit, fn) do {		\
+		if (n & (1 << bit)) 	\
+			fn();		\
+		} while (0)
+
+	s = splsoftnet();
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
+
+	splx(s);
 }

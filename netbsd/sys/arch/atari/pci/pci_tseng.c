@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_tseng.c,v 1.2.2.1 1999/06/22 17:07:29 perry Exp $	*/
+/*	$NetBSD: pci_tseng.c,v 1.3 1999/06/03 12:38:50 leo Exp $	*/
 
 /*
  * Copyright (c) 1999 Leo Weppelman.  All rights reserved.

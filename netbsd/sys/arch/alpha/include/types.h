@@ -1,4 +1,4 @@
-/* $NetBSD: types.h,v 1.12 1998/08/14 16:50:03 thorpej Exp $ */
+/* $NetBSD: types.h,v 1.16 2000/06/08 02:19:20 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1990, 1993
@@ -70,6 +70,9 @@ typedef	unsigned long		u_int64_t;
 
 typedef int64_t			register_t;
 
+#define __HAVE_DEVICE_REGISTER
 #define __HAVE_NWSCONS
+#define	__HAVE_ATOMIC_OPERATIONS
+#define	__HAVE_CPU_COUNTER
 
 #endif	/* _MACHTYPES_H_ */

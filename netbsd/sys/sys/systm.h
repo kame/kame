@@ -1,4 +1,4 @@
-/*	$NetBSD: systm.h,v 1.89.2.2 2000/02/01 22:55:30 he Exp $	*/
+/*	$NetBSD: systm.h,v 1.111.2.2 2000/07/14 18:10:51 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1988, 1991, 1993
@@ -71,18 +71,31 @@
 #ifndef _SYS_SYSTM_H_
 #define _SYS_SYSTM_H_
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_ddb.h"
+#endif
+
 #include <machine/endian.h>
 
+struct clockframe;
 struct device;
 struct proc;
-struct uio;
+struct timeval;
 struct tty;
+struct uio;
 struct vnode;
 
 extern int securelevel;		/* system security level */
 extern const char *panicstr;	/* panic message */
-extern char version[];		/* system version */
-extern char copyright[];	/* system copyright */
+extern int doing_shutdown;	/* shutting down */
+
+extern const char copyright[];	/* system copyright */
+extern char cpu_model[];	/* machine/cpu model name */
+extern char machine[];		/* machine type */
+extern char machine_arch[];	/* machine architecture */
+extern const char osrelease[];	/* short system version */
+extern const char ostype[];	/* system type */
+extern const char version[];	/* system version */
 
 extern int autonicetime;        /* time (in seconds) before autoniceval */
 extern int autoniceval;         /* proc priority after autonicetime */
@@ -91,8 +104,6 @@ extern int nblkdev;		/* number of entries in bdevsw */
 extern int nchrdev;		/* number of entries in cdevsw */
 
 extern int selwait;		/* select timeout address */
-
-extern u_char curpriority;	/* priority of current process */
 
 extern int maxmem;		/* max memory per process */
 extern int physmem;		/* physical memory */
@@ -114,10 +125,6 @@ extern const char *rootspec;	/* how root device was specified */
  */
 extern dev_t swapdev;		/* swapping device */
 extern struct vnode *swapdev_vp;/* vnode equivalent to above */
-
-struct proc;
-struct tty;
-struct uio;
 
 typedef int	sy_call_t __P((struct proc *, void *, register_t *));
 
@@ -162,6 +169,7 @@ int	lkmenodev __P((void));
 
 int	seltrue __P((dev_t dev, int events, struct proc *p));
 void	*hashinit __P((int count, int type, int flags, u_long *hashmask));
+void	hashdone __P((void *hashtbl, int type));
 int	sys_nosys __P((struct proc *, void *, register_t *));
 
 
@@ -188,20 +196,11 @@ void	ttyprintf __P((struct tty *, const char *, ...))
 
 char	*bitmask_snprintf __P((u_quad_t, const char *, char *, size_t));
 
-void	tablefull __P((const char *));
+int	humanize_number __P((char *, size_t, u_int64_t, const char *, int));
+int	format_bytes __P((char *, size_t, u_int64_t));
 
-void	*memchr __P((const void *, int, size_t));
-int      memcmp __P((const void *, const void *, size_t));
-void    *memcpy __P((void *, const void *, size_t));
-void    *memmove __P((void *, const void *, size_t));
-void    *memset __P((void *, int, size_t));
+void	tablefull __P((const char *, const char *));
 
-/* XXX b*() are now macros. should remove these prototypes soon */
-#if 0
-void	bcopy __P((const void *, void *, size_t));
-void	bzero __P((void *, size_t));
-int	bcmp __P((const void *, const void *, size_t));
-#endif
 int	kcopy __P((const void *, void *, size_t));
 
 #define bcopy(src, dst, len)	memcpy(dst, src, len)
@@ -230,13 +229,9 @@ int	fuswintr __P((const void *));
 long	fuword __P((const void *));
 long	fuiword __P((const void *));
 
-struct timeval;
 int	hzto __P((struct timeval *tv));
-void	timeout __P((void (*func)(void *), void *arg, int ticks));
-void	untimeout __P((void (*func)(void *), void *arg));
 void	realitexpire __P((void *));
 
-struct clockframe;
 void	hardclock __P((struct clockframe *frame));
 void	softclock __P((void));
 void	statclock __P((struct clockframe *frame));
@@ -265,6 +260,16 @@ void	shutdownhook_disestablish __P((void *));
 void	doshutdownhooks __P((void));
 
 /*
+ * Power managment hooks.
+ */
+void	*powerhook_establish __P((void (*)(int, void *), void *));
+void	powerhook_disestablish __P((void *));
+void	dopowerhooks __P((int));
+#define PWR_RESUME 0
+#define PWR_SUSPEND 1
+#define PWR_STANDBY 2
+
+/*
  * Mountroot hooks.  Device drivers establish these to be executed
  * just before (*mountroot)() if the passed device is selected
  * as the root device.
@@ -286,6 +291,12 @@ void	doexechooks __P((struct proc *));
 int	uiomove __P((void *, int, struct uio *));
 
 #ifdef _KERNEL
+caddr_t	allocsys __P((caddr_t, caddr_t (*)(caddr_t)));
+#define	ALLOCSYS(base, name, type, num) \
+	    (name) = (type *)(base); (base) = (caddr_t)ALIGN((name)+(num))
+#endif
+
+#ifdef _KERNEL
 int	setjmp	__P((label_t *));
 void	longjmp	__P((label_t *));
 #endif
@@ -293,10 +304,9 @@ void	longjmp	__P((label_t *));
 void	consinit __P((void));
 
 void	cpu_startup __P((void));
+void	cpu_configure __P((void));
 void	cpu_rootconf __P((void));
 void	cpu_dumpconf __P((void));
-void	cpu_set_kpc __P((struct proc *, void (*)(void *), void *));
-
 
 #ifdef GPROF
 void	kmstartup __P((void));
@@ -307,8 +317,13 @@ void	kmstartup __P((void));
 #endif
 
 #ifdef _KERNEL
+#if defined(DDB) || defined(_SUN3_) || defined(_SUN3X_)
+/* note that cpu_Debugger() is always available on sun3/sun3x */
+void	cpu_Debugger __P((void));
+#define Debugger	cpu_Debugger
+#endif
+
 #ifdef DDB
-void	Debugger __P((void));
 /*
  * Enter debugger(s) from console attention if enabled
  */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ep_isa.c,v 1.24.6.1 1999/04/28 14:04:33 perry Exp $	*/
+/*	$NetBSD: if_ep_isa.c,v 1.26 1999/04/28 01:20:01 jonathan Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ka630.c,v 1.14 1999/02/02 18:37:21 ragge Exp $	*/
+/*	$NetBSD: ka630.c,v 1.19 2000/06/12 11:13:14 ragge Exp $	*/
 /*-
  * Copyright (c) 1982, 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -44,6 +44,8 @@
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
 
+#include "opt_cputype.h"
+
 #include <machine/cpu.h>
 #include <machine/pmap.h>
 #include <machine/ka630.h>
@@ -52,18 +54,15 @@
 
 static struct uvaxIIcpu *uvaxIIcpu_ptr;
 
-static void ka630_conf __P((struct device *, struct device *, void *));
+static void ka630_conf __P((void));
 static void ka630_memerr __P((void));
 static int ka630_mchk __P((caddr_t));
 static void ka630_halt __P((void));
 static void ka630_reboot __P((int));
 static void ka630_clrf __P((void));
 
-extern	short *clk_page;
-
 struct	cpu_dep ka630_calls = {
 	0,
-	no_nicr_clock,
 	ka630_mchk,
 	ka630_memerr,
 	ka630_conf,
@@ -80,12 +79,8 @@ struct	cpu_dep ka630_calls = {
  * uvaxII_conf() is called by cpu_attach to do the cpu_specific setup.
  */
 void
-ka630_conf(parent, self, aux)
-	struct	device *parent, *self;
-	void	*aux;
+ka630_conf()
 {
-	extern	int clk_adrshift, clk_tweak;
-
 	clk_adrshift = 0;	/* Addressed at short's... */
 	clk_tweak = 0;		/* ...and no shifting */
 	clk_page = (short *)vax_map_physmem((paddr_t)KA630CLK, 1);
@@ -97,8 +92,6 @@ ka630_conf(parent, self, aux)
 	 */
 	uvaxIIcpu_ptr->uvaxII_mser = (UVAXIIMSER_PEN | UVAXIIMSER_MERR |
 	    UVAXIIMSER_LEB);
-
-	printf(": %s\n", "KA630");
 }
 
 /* log crd errors */

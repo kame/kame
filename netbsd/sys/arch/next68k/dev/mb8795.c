@@ -1,4 +1,4 @@
-/*	$NetBSD: mb8795.c,v 1.10 1999/02/28 17:11:52 explorer Exp $	*/
+/*	$NetBSD: mb8795.c,v 1.17 1999/08/29 05:51:45 dbj Exp $	*/
 /*
  * Copyright (c) 1998 Darrin B. Jewell
  * All rights reserved.
@@ -94,12 +94,13 @@
 #include "mb8795reg.h"
 #include "mb8795var.h"
 
-#if 0
+#if 1
 #define XE_DEBUG
 #endif
 
 #ifdef XE_DEBUG
-#define DPRINTF(x) printf x;
+int xe_debug = 0;
+#define DPRINTF(x) if (xe_debug) printf x;
 #else
 #define DPRINTF(x)
 #endif
@@ -278,8 +279,8 @@ mb8795_rint(sc)
 	bus_space_write_1(sc->sc_bst,sc->sc_bsh, XE_RXSTAT, XE_RXSTAT_CLEAR);
 
 #if 0
-	DPRINTF(("%s: rx interrupt, rxstat = %b\n",
-			sc->sc_dev.dv_xname, rxstat, XE_RXSTAT_BITS));
+	printf("%s: rx interrupt, rxstat = %b\n",
+			sc->sc_dev.dv_xname, rxstat, XE_RXSTAT_BITS);
 #endif
 
 	if (rxstat & XE_RXSTAT_RESET) {
@@ -337,11 +338,9 @@ mb8795_rint(sc)
 				
 			/* Find receive length and chop off CRC */
 			/* @@@ assumes packet is all in first segment
-			 * also assumes segment length is length of packet.
-			 * see comment in nextdma.c nextdma_intr();
 			 */
-			m->m_pkthdr.len = map->dm_segs[0].ds_len-4;
-			m->m_len = map->dm_segs[0].ds_len-4;
+			m->m_pkthdr.len = map->dm_segs[0].ds_xfer_len-4;
+			m->m_len = map->dm_segs[0].ds_xfer_len-4;
 			m->m_pkthdr.rcvif = ifp;
 
 			bus_dmamap_unload(sc->sc_rx_dmat, map);
@@ -364,17 +363,11 @@ mb8795_rint(sc)
 #endif
 		
 			{
-				struct ether_header *eh;
-
 				ifp->if_ipackets++;
 				debugipkt++;
 
-				/* We assume that the header fit entirely in one mbuf. */
-				eh = mtod(m, struct ether_header *);
-
-				/* Pass the packet up, with the ether header sort-of removed. */
-				m_adj(m, sizeof(struct ether_header));
-				ether_input(ifp, eh, m);
+				/* Pass the packet up. */
+				(*ifp->if_input)(ifp, m);
 			}
 
 			s = spldma();
@@ -388,17 +381,13 @@ mb8795_rint(sc)
 	DPRINTF(("%s: rx interrupt, rxstat = %b\n",
 			sc->sc_dev.dv_xname, rxstat, XE_RXSTAT_BITS));
 
-#if 0 && defined(XE_DEBUG)
-	{
-		DPRINTF(("rxstat = 0x%b\n",
-				bus_space_read_1(sc->sc_bst,sc->sc_bsh, XE_RXSTAT), XE_RXSTAT_BITS));
-		DPRINTF(("rxmask = 0x%b\n",
-				bus_space_read_1(sc->sc_bst,sc->sc_bsh, XE_RXMASK), XE_RXMASK_BITS));
-		DPRINTF(("rxmode = 0x%b\n",
-				bus_space_read_1(sc->sc_bst,sc->sc_bsh, XE_RXMODE), XE_RXMODE_BITS));
-	}
-#endif
-	
+	DPRINTF(("rxstat = 0x%b\n",
+			bus_space_read_1(sc->sc_bst,sc->sc_bsh, XE_RXSTAT), XE_RXSTAT_BITS));
+	DPRINTF(("rxmask = 0x%b\n",
+			bus_space_read_1(sc->sc_bst,sc->sc_bsh, XE_RXMASK), XE_RXMASK_BITS));
+	DPRINTF(("rxmode = 0x%b\n",
+			bus_space_read_1(sc->sc_bst,sc->sc_bsh, XE_RXMODE), XE_RXMODE_BITS));
+
 	return;
 }
 
@@ -410,7 +399,6 @@ mb8795_tint(sc)
      struct mb8795_softc *sc;
 	
 {
-	int reset = 0;
 	u_char txstat;
 	u_char txmask;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
@@ -439,11 +427,6 @@ mb8795_tint(sc)
 		printf("%s: tx 16th collision\n", sc->sc_dev.dv_xname);
 		ifp->if_oerrors++;
 		ifp->if_collisions += 16;
-	}
-
-	if (reset) {
-		mb8795_reset(sc);
-		return;
 	}
 
 #if 0
@@ -563,7 +546,7 @@ mb8795_init(sc)
 	nextdma_init(sc->sc_tx_nd);
 	nextdma_init(sc->sc_rx_nd);
 
-	nextdma_start(sc->sc_rx_nd, DMACSR_READ);
+	nextdma_start(sc->sc_rx_nd, DMACSR_SETREAD);
 
 	if (ifp->if_snd.ifq_head != NULL) {
 		mb8795_start(ifp);
@@ -831,7 +814,7 @@ mb8795_start(ifp)
   bus_dmamap_sync(sc->sc_tx_dmat, sc->sc_tx_dmamap, 0,
 			sc->sc_tx_dmamap->dm_mapsize, BUS_DMASYNC_PREWRITE);
 
-	nextdma_start(sc->sc_tx_nd, DMACSR_WRITE);
+	nextdma_start(sc->sc_tx_nd, DMACSR_SETWRITE);
 
 #if NBPFILTER > 0
   /*
@@ -1039,7 +1022,7 @@ mb8795_rxdma_continue(arg)
 	}
 #if (defined(DIAGNOSTIC))
 	else {
-		printf("%s: out of receive DMA buffers\n",sc->sc_dev.dv_xname);
+		panic("%s: out of receive DMA buffers\n",sc->sc_dev.dv_xname);
 	}
 #endif
 
@@ -1083,7 +1066,7 @@ mb8795_mediachange(ifp)
 
 	if (sc->sc_mediachange)
 		return ((*sc->sc_mediachange)(sc));
-	return (EINVAL);
+	return (0);
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: sbic.c,v 1.34.6.1 1999/10/05 21:45:10 he Exp $	*/
+/*	$NetBSD: sbic.c,v 1.39 2000/03/23 06:33:12 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -84,7 +84,6 @@
 #define	SBIC_DATA_WAIT	50000	/* wait per data in/out step */
 #define	SBIC_INIT_WAIT	50000	/* wait per step (both) during init */
 
-#define	b_cylin		b_resid
 #define SBIC_WAIT(regs, until, timeo) sbicwait(regs, until, timeo, __LINE__)
 
 int  sbicicmd __P((struct sbic_softc *, int, int, void *, int, void *, int));
@@ -381,12 +380,12 @@ sbic_scsicmd(xs)
 	slp = xs->sc_link;
 	dev = slp->adapter_softc;
 	SBIC_TRACE(dev);
-	flags = xs->flags;
+	flags = xs->xs_control;
 
-	if (flags & SCSI_DATA_UIO)
+	if (flags & XS_CTL_DATA_UIO)
 		panic("sbic: scsi data uio requested");
 
-	if (dev->sc_nexus && flags & SCSI_POLL)
+	if (dev->sc_nexus && flags & XS_CTL_POLL)
 		panic("sbic_scsicmd: busy");
 
 	if (slp->scsipi_scsi.target == slp->scsipi_scsi.adapter_target)
@@ -412,7 +411,7 @@ sbic_scsicmd(xs)
 	}
 
 	acb->flags = ACB_ACTIVE;
-	if (flags & SCSI_DATA_IN)
+	if (flags & XS_CTL_DATA_IN)
 		acb->flags |= ACB_DATAIN;
 	acb->xs = xs;
 	bcopy(xs->cmd, &acb->cmd, xs->cmdlen);
@@ -421,7 +420,7 @@ sbic_scsicmd(xs)
 	acb->sc_kv.dc_count = xs->datalen;
 	acb->pa_addr = xs->data ? (char *)kvtop(xs->data) : 0;	/* XXXX check */
 
-	if (flags & SCSI_POLL) {
+	if (flags & XS_CTL_POLL) {
 		s = splbio();
 		/*
 		 * This has major side effects -- it locks up the machine
@@ -463,9 +462,9 @@ sbic_scsicmd(xs)
 	splx(s);
 
 	SBIC_TRACE(dev);
-/* TODO:  add sbic_poll to do SCSI_POLL operations */
+/* TODO:  add sbic_poll to do XS_CTL_POLL operations */
 #if 0
-	if (flags & SCSI_POLL)
+	if (flags & XS_CTL_POLL)
 		return(COMPLETE);
 #endif
 	return(SUCCESSFULLY_QUEUED);
@@ -510,9 +509,9 @@ sbic_sched(dev)
 
 	dev->sc_xs = xs = acb->xs;
 	slp = xs->sc_link;
-	flags = xs->flags;
+	flags = xs->xs_control;
 
-	if (flags & SCSI_RESET)
+	if (flags & XS_CTL_RESET)
 		sbicreset(dev);
 
 #ifdef DEBUG
@@ -523,13 +522,12 @@ sbic_sched(dev)
 	dev->sc_stat[0] = -1;
 	dev->target = slp->scsipi_scsi.target;
 	dev->lun = slp->scsipi_scsi.lun;
-	if ( flags & SCSI_POLL || ( !sbic_parallel_operations
-				   && (/*phase == STATUS_PHASE ||*/
-				       sbicdmaok(dev, xs) == 0) ) )
+	if ( flags & XS_CTL_POLL || ( !sbic_parallel_operations
+				   && (sbicdmaok(dev, xs) == 0)))
 		stat = sbicicmd(dev, slp->scsipi_scsi.target,
 			slp->scsipi_scsi.lun, &acb->cmd,
 		    acb->clen, acb->sc_kv.dc_addr, acb->sc_kv.dc_count);
-	else if (sbicgo(dev, xs) == 0) {
+	else if (sbicgo(dev, xs) == 0 && xs->error != XS_SELTIMEOUT) {
 		SBIC_TRACE(dev);
 		return;
 	} else
@@ -625,7 +623,7 @@ sbic_scsidone(acb, stat)
 			xs->error = XS_BUSY;
 			break;
 #endif
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 
 	/*
 	 * Remove the ACB from whatever queue it's on.  We have to do a bit of
@@ -684,7 +682,8 @@ sbicdmaok(dev, xs)
 	struct sbic_softc *dev;
 	struct scsipi_xfer *xs;
 {
-	if (sbic_no_dma || xs->datalen & 0x1 || (u_int)xs->data & 0x3)
+	if (sbic_no_dma || !xs->datalen || xs->datalen & 0x1 ||
+	    (u_int)xs->data & 0x3)
 		return(0);
 	/*
 	 * controller supports dma to any addresses?
@@ -847,6 +846,7 @@ sbicinit(dev)
 		TAILQ_INIT(&dev->ready_list);
 		TAILQ_INIT(&dev->nexus_list);
 		TAILQ_INIT(&dev->free_list);
+		callout_init(&dev->sc_timo_ch);
 		dev->sc_nexus = NULL;
 		dev->sc_xs = NULL;
 		acb = dev->sc_acb;
@@ -858,7 +858,8 @@ sbicinit(dev)
 		bzero(dev->sc_tinfo, sizeof(dev->sc_tinfo));
 #ifdef DEBUG
 		/* make sure timeout is really not needed */
-		timeout((void *)sbictimeout, dev, 30 * hz);
+		callout_reset(&dev->sc_timo_ch, 30 * hz,
+		    (void *)sbictimeout, dev);
 #endif
 
 	} else panic("sbic: reinitializing driver!");
@@ -990,7 +991,7 @@ sbicerror(dev, regs, csr)
 	if (xs == NULL)
 		panic("sbicerror");
 #endif
-	if (xs->flags & SCSI_SILENT)
+	if (xs->xs_control & XS_CTL_SILENT)
 		return;
 
 	printf("%s: ", dev->sc_dev.dv_xname);
@@ -1127,7 +1128,7 @@ sbicselectbus(dev, regs, target, lun, our_addr)
 
 
 		if (dev->sc_sync[id].state != SYNC_START){
-			if( dev->sc_xs->flags & SCSI_POLL
+			if( dev->sc_xs->xs_control & XS_CTL_POLL
 			   || (dev->sc_flags & SBICF_ICMD)
 			   || !sbic_enable_reselect )
 				SEND_BYTE (regs, MSG_IDENTIFY | lun);
@@ -1408,7 +1409,7 @@ sbicicmd(dev, target, lun, cbuf, clen, buf, len)
 		 */
 		if (!( dev->sc_flags & SBICF_SELECTED )
 		    && sbicselectbus(dev, regs, target, lun, dev->sc_scsiaddr)) {
-			/*printf("sbicicmd trying to select busy bus!\n");*/
+			/* printf("sbicicmd: trying to select busy bus!\n"); */
 			dev->sc_flags &= ~SBICF_ICMD;
 			return(-1);
 		}
@@ -1685,7 +1686,7 @@ sbicgo(dev, xs)
 	 */
 	if (sbicselectbus(dev, regs, dev->target, dev->lun,
 	    dev->sc_scsiaddr)) {
-/*		printf("sbicgo: Trying to select busy bus!\n"); */
+		/* printf("sbicgo: Trying to select busy bus!\n"); */
 		SBIC_TRACE(dev);
 		return(0); /* Not done: needs to be rescheduled */
 	}
@@ -2331,7 +2332,7 @@ sbicnextstate(dev, csr, asr)
 	case SBIC_CSR_MIS_1|DATA_IN_PHASE:
 	case SBIC_CSR_MIS_2|DATA_OUT_PHASE:
 	case SBIC_CSR_MIS_2|DATA_IN_PHASE:
-		if( dev->sc_xs->flags & SCSI_POLL || dev->sc_flags & SBICF_ICMD
+		if( dev->sc_xs->xs_control & XS_CTL_POLL || dev->sc_flags & SBICF_ICMD
 		   || acb->sc_dmacmd == 0 ) {
 			/* Do PIO */
 			SET_SBIC_control(regs, SBIC_CTL_EDI | SBIC_CTL_IDI);
@@ -2444,7 +2445,7 @@ sbicnextstate(dev, csr, asr)
 		dev->sc_nexus = NULL;
 		dev->sc_xs = NULL;
 
-		if( acb->xs->flags & SCSI_POLL
+		if( acb->xs->xs_control & XS_CTL_POLL
 		   || (dev->sc_flags & SBICF_ICMD)
 		   || !sbic_parallel_operations ) {
 			SBIC_TRACE(dev);
@@ -2713,7 +2714,8 @@ sbictimeout(dev)
 		dev->sc_dmatimo++;
 	}
 	splx(s);
-	timeout((void *)sbictimeout, dev, 30 * hz);
+	callout_reset(&dev->sc_timo_ch, 30 * hz,
+	    (void *)sbictimeout, dev);
 }
 
 void

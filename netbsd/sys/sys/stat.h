@@ -1,4 +1,4 @@
-/*	$NetBSD: stat.h,v 1.37 1998/09/21 01:50:44 simonb Exp $	*/
+/*	$NetBSD: stat.h,v 1.40 2000/04/17 14:31:23 mrg Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -186,6 +186,8 @@ struct stat {
 #define	_S_ISVTX  0001000		/* save swapped text even after use */
 #define	_S_IFSOCK 0140000		/* socket */
 #define	_S_IFWHT  0160000		/* whiteout */
+#define	_S_ARCH1  0200000		/* Archive state 1, ls -l shows 'a' */
+#define	_S_ARCH2  0400000		/* Archive state 2, ls -l shows 'A' */
 
 #if !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE)
 #define	S_IFMT	 _S_IFMT
@@ -200,6 +202,9 @@ struct stat {
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #define	S_IFSOCK _S_IFSOCK
 #define	S_IFWHT  _S_IFWHT
+
+#define	S_ARCH1	_S_ARCH1
+#define	S_ARCH2	_S_ARCH2
 #endif
 
 #define	S_ISDIR(m)	((m & _S_IFMT) == _S_IFDIR)	/* directory */
@@ -252,7 +257,7 @@ struct stat {
 #endif /* _KERNEL */
 #endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_STANDALONE)
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
@@ -283,9 +288,10 @@ int	mknod __P((const char *, mode_t, dev_t));
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 int	chflags __P((const char *, unsigned long));
 int	fchflags __P((int, unsigned long));
+int	lchflags __P((const char *, unsigned long));
 int	lchmod __P((const char *, mode_t));
 #endif /* !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) */
 __END_DECLS
 
-#endif /* !_KERNEL */
+#endif /* !_KERNEL && !_STANDALONE */
 #endif /* !_SYS_STAT_H_ */

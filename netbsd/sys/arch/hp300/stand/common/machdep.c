@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.4 1997/06/28 07:20:25 thorpej Exp $	*/
+/*	$NetBSD: machdep.c,v 1.7 1999/12/14 20:57:44 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -70,12 +70,32 @@ getmachineid()
 		cp = "375"; break;
 	case HP_380:
 		cp = "380"; break;
+	case HP_385:
+		cp = "385"; break;
 	case HP_400:
 		cp = "400"; break;
 	case HP_425:
-		cp = "425"; break;
+		switch (mmuid) {
+		case MMUID_425_T:
+			cp = "425t"; break;
+		case MMUID_425_S:
+			cp = "425s"; break;
+		case MMUID_425_E:
+			cp = "425e"; break;
+		default:
+			cp = "425"; break;
+		}
+		break;
 	case HP_433:
-		cp = "433"; break;
+		switch (mmuid) {
+		case MMUID_433_T:
+			cp = "433t"; break;
+		case MMUID_433_S:
+			cp = "433s"; break;
+		default:
+			cp = "433"; break;
+		}
+		break;
 	default:
 		cp = "???"; break;
 	}
@@ -171,21 +191,24 @@ machdep_start(entry, howto, loadaddr, ssym, esym)
 	char *ssym, *esym; 
 {
 
-	/*
-	 * Adjust entry point and announce it.
-	 */
+	/* Adjust entry point. */
 	entry += (long)loadaddr;
+	transfer(entry, howto, opendev, cons_scode, loadaddr, esym);
+}
+
+void
+transfer(entry, howto, od, csc, lr, es)
+	char *entry;
+	int howto, od, csc;
+	char *lr, *es;
+{
+
 	printf("Entry point: 0x%lx\n", (u_long)entry);
 
 #ifdef EXEC_DEBUG
-	printf("\n\nReturn to boot...\n")
-	getchar();
+	printf("\n\nReturn to boot...\n");
+	(void) getchar();
 #endif
 
-	__asm __volatile ("movl %0,d7" : : "m" (howto));
-	__asm __volatile ("movl %0,d6" : : "m" (opendev));
-	__asm __volatile ("movl %0,d5" : : "m" (cons_scode));
-	__asm __volatile ("movl %0,a5" : : "a" (loadaddr));
-	__asm __volatile ("movl %0,a4" : : "a" (esym));
-	(*((int (*)())entry))();
+	_transfer(entry, howto, od, csc, lr, es);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.28 1998/11/11 06:43:49 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.30 2000/05/26 21:20:06 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -41,6 +41,10 @@
 #ifndef _NS532_CPU_H_
 #define _NS532_CPU_H_
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Definitions unique to ns532 cpu support.
  *
@@ -50,12 +54,28 @@
 #include <machine/psl.h>
 #include <machine/frame.h>
 
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()			(&cpu_info_store)
+#endif
+
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
 #define cpu_swapin(p)           	/* nothing */
 #define	cpu_wait(p)			/* nothing */
+#define	cpu_number()			0
 
 /*
  * Arguments to hardclock, softclock and gatherstats

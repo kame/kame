@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.13 1998/12/23 15:09:48 christos Exp $	*/
+/*	$NetBSD: asm.h,v 1.17.6.1 2000/07/25 08:22:48 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -62,11 +62,7 @@
 #endif
 
 #ifdef __ELF__
-# ifdef __STDC__
-#  define _C_LABEL(x)	x
-# else
-#  define _C_LABEL(x)	x
-# endif
+# define _C_LABEL(x)	x
 #else
 # ifdef __STDC__
 #  define _C_LABEL(x)	_ ## x
@@ -76,17 +72,34 @@
 #endif
 #define	_ASM_LABEL(x)	x
 
+#ifdef __STDC__
+# define __CONCAT(x,y)	x ## y
+# define __STRING(x)	#x
+#else
+# define __CONCAT(x,y)	x/**/y
+# define __STRING(x)	"x"
+#endif
+
 /* let kernels and others override entrypoint alignment */
 #ifndef _ALIGN_TEXT
-# define _ALIGN_TEXT .align 2
+# ifdef __ELF__
+#  define _ALIGN_TEXT .align 4
+# else
+#  define _ALIGN_TEXT .align 2
+# endif
 #endif
 
 #define _ENTRY(x) \
 	.text; _ALIGN_TEXT; .globl x; .type x,@function; x:
 
 #ifdef GPROF
-# define _PROF_PROLOGUE	\
+# ifdef __ELF__
+#  define _PROF_PROLOGUE	\
+	pushl %ebp; movl %esp,%ebp; call PIC_PLT(__mcount); popl %ebp
+# else 
+#  define _PROF_PROLOGUE	\
 	pushl %ebp; movl %esp,%ebp; call PIC_PLT(mcount); popl %ebp
+# endif
 #else
 # define _PROF_PROLOGUE
 #endif
@@ -101,13 +114,21 @@
 
 #define RCSID(x)	.text; .asciz x
 
+#ifdef __ELF__
+#define	WEAK_ALIAS(alias,sym)						\
+	.weak alias;							\
+	alias = sym
+#endif
+
 #ifdef __STDC__
-#define	__STRING(x)			#x
 #define	WARN_REFERENCES(sym,msg)					\
 	.stabs msg ## ,30,0,0,0 ;					\
-	.stabs __STRING(_ ## sym) ## ,1,0,0,0
+	.stabs __STRING(_C_LABEL(sym)) ## ,1,0,0,0
+#elif defined(__ELF__)
+#define	WARN_REFERENCES(sym,msg)					\
+	.stabs msg,30,0,0,0 ;						\
+	.stabs __STRING(sym),1,0,0,0
 #else
-#define	__STRING(x)			"x"
 #define	WARN_REFERENCES(sym,msg)					\
 	.stabs msg,30,0,0,0 ;						\
 	.stabs __STRING(_/**/sym),1,0,0,0

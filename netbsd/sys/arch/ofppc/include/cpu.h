@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.3 1997/11/05 04:19:04 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.7 2000/05/26 21:20:05 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995-1997 Wolfgang Solfrank.
@@ -33,7 +33,26 @@
 #ifndef	_MACHINE_CPU_H_
 #define	_MACHINE_CPU_H_
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_lockdebug.h"
+#endif
+
 #include <machine/frame.h>
+
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()		(&cpu_info_store)
+#endif
 
 struct machvec {
 	int (*splhigh) __P((void));
@@ -43,6 +62,7 @@ struct machvec {
 	int (*spltty) __P((void));
 	int (*splimp) __P((void));
 	int (*splclock) __P((void));
+	int (*spllowersoftclock) __P((void));
 	int (*splsoftclock) __P((void));
 	int (*splsoftnet) __P((void));
 	int (*splx) __P((int));
@@ -62,6 +82,7 @@ extern struct machvec machine_interface;
 #define	spltty()	((*machine_interface.spltty)())
 #define	splimp()	((*machine_interface.splimp)())
 #define	splclock()	((*machine_interface.splclock)())
+#define	spllowersoftclock() ((*machine_interface.spllowersoftclock)())
 #define	splsoftclock()	((*machine_interface.splsoftclock)())
 #define	splstatclock()	splclock()
 #define	splsoftnet()	((*machine_interface.splsoftnet)())
@@ -80,6 +101,7 @@ extern struct machvec machine_interface;
 
 #define	cpu_swapout(p)
 #define cpu_wait(p)
+#define	cpu_number()		0
 
 extern void delay __P((unsigned));
 #define	DELAY(n)		delay(n)
@@ -91,28 +113,12 @@ extern __volatile int astpending;
 #define	need_proftick(p)	((p)->p_flag |= P_OWEUPC, astpending = 1)
 #define	signotify(p)		(astpending = 1)
 
-#define	CACHELINESIZE	32			/* For now		XXX */
-
-extern __inline void
-syncicache(from, len)
-	void *from;
-	int len;
-{
-	int l = len;
-	void *p = from;
-	
-	do {
-		__asm__ __volatile ("dcbst 0,%0" :: "r"(p));
-		p += CACHELINESIZE;
-	} while ((l -= CACHELINESIZE) > 0);
-	__asm__ __volatile ("sync");
-	do {
-		__asm__ __volatile ("icbi 0,%0" :: "r"(from));
-		from += CACHELINESIZE;
-	} while ((len -= CACHELINESIZE) > 0);
-	__asm__ __volatile ("isync");
-}
-
 extern char *bootpath;
+
+#ifdef	_KERNEL
+#define	CACHELINESIZE	32
+#endif
+
+#include <powerpc/cpu.h>
 
 #endif	/* _MACHINE_CPU_H_ */

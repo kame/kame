@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.6 1999/02/13 02:54:48 lukem Exp $
+#	$NetBSD: Makefile,v 1.8 2000/01/23 17:04:07 mycroft Exp $
 
 S=	${.CURDIR}/../../../..
 
@@ -28,13 +28,11 @@ CPPFLAGS+=	-DPOWERPC_BOOT_AOUT
 CPPFLAGS+=	-DPOWERPC_BOOT_ELF
 CPPFLAGS+=	-DCOMPAT_386BSD_MBRPART
 
-.BEGIN: ${.OBJDIR}/machine
-depend all: ${.OBJDIR}/machine
-CLEANFILES+= ${.OBJDIR}/machine
-
-${.OBJDIR}/machine::
-	-rm -f $@
-	ln -s $S/arch/ofppc/include $@
+.BEGIN:
+	@[ -h machine ] || ln -s ${S}/arch/${MACHINE}/include machine
+	@[ -h powerpc ] || ln -s ${S}/arch/powerpc/include powerpc
+.NOPATH: machine powerpc
+CLEANFILES+= machine powerpc
 
 ### find out what to use for libkern
 KERN_AS=	library

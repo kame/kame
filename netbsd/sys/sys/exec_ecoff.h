@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_ecoff.h,v 1.10.22.1 1999/06/21 19:22:46 cgd Exp $	*/
+/*	$NetBSD: exec_ecoff.h,v 1.11 1999/04/27 05:36:43 cgd Exp $	*/
 
 /*
  * Copyright (c) 1994 Adam Glass

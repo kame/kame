@@ -1,4 +1,4 @@
-/*	$NetBSD: samachdep.h,v 1.3 1997/05/12 07:54:45 thorpej Exp $	*/
+/*	$NetBSD: samachdep.h,v 1.5 1999/12/14 20:57:44 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1982, 1990, 1993
@@ -60,7 +60,7 @@
 #define MHZ_33		4
 #define MHZ_50		6
 
-extern	int cpuspeed, machineid;
+extern	int cpuspeed, machineid, mmuid;
 extern	int howto;
 extern	int cons_scode;
 extern	u_int opendev;
@@ -69,6 +69,11 @@ extern	char *getmachineid();
 
 extern	int userom;
 extern	void romputchar __P((int));
+
+void	transfer __P((char *entry, int howto, int opendev, int conscode,
+	    char *lowram, char *esym));
+void	_transfer __P((char *entry, int howto, int opendev, int conscode,
+	    char *lowram, char *esym));
 
 #define DELAY(n)	{ register int N = cpuspeed * (n); while (--N > 0); }
 

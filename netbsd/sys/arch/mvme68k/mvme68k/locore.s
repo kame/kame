@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.48.2.4 1999/11/21 15:41:35 he Exp $	*/
+/*	$NetBSD: locore.s,v 1.61.2.2 2000/10/17 19:57:43 scw Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,7 +43,9 @@
  */
 
 #include "opt_compat_netbsd.h"
+#include "opt_compat_svr4.h"
 #include "opt_compat_sunos.h"
+#include "opt_fpsp.h"
 #include "opt_ddb.h"
 
 #include "assym.h"
@@ -190,8 +192,17 @@ ASENTRY_NOPROFILE(start)
 	/* XXXCDC SHUTUP 147 CALL */
 
 	/* Save our ethernet address */
-	RELOC(myea, a0)
-	movl	0xfffe0778,a0@		| XXXCDC -- HARDWIRED HEX
+	RELOC(mvme_ea, a0)
+	lea	0xfffe0778,a1		| XXXCDC -- HARDWIRED HEX
+	movb	#0x08,a0@+
+	clrb	a0@+
+	movb	#0x3e,a0@+
+	movql	#0x0f,d0
+	andb	a1@+,d0
+	orb	#0x20,d0
+	movb	d0,a0@+
+	movb	a1@+,a0@+
+	movb	a1@,a0@
 
 	/*
 	 * Fix up the physical addresses of the MVME147's onboard
@@ -251,11 +262,14 @@ Lnot147:
 	/* MVME-162 - 68040 CPU/MMU/FPU */
 	cmpw	#MVME_162,d0
 	jne	Lnot162
+	btst	#6,0xfff4202e		| MVME162LX 200/300 ?
+	jeq	Lnotyet			| We don't support any others
+
 	RELOC(mmutype,a0)
 	movl	#MMU_68040,a0@
 	RELOC(cputype,a0)
 	movl	#CPU_68040,a0@
-	RELOC(fputype,a0)
+	RELOC(fputype,a0)		| XXX What about FPU-less version?
 	movl	#FPU_68040,a0@
 	RELOC(vectab,a0)
 	RELOC(buserr40,a1)
@@ -263,12 +277,49 @@ Lnot147:
 	movl	a1,a0@(8)
 	movl	a2,a0@(12)
 
-#if 1	/* XXX */
-	jra	Lnotyet
-#else
-	/* XXX more XXX */
-	jra	Lstart1
-#endif
+	/*
+	 * Determine if this board has a VMEchip2
+	 */
+	btst	#1,0xfff4202e		| VMEchip2 presence detect
+	jne	1f			| Jump if it doesn't exist.
+
+	/*
+	 * Disable all interrupts from VMEchip2. This is especially
+	 * useful when the kernel doesn't have the VMEchip2 driver
+	 * configured. If we didn't do this, then we're at the mercy
+	 * of whatever VMEchip2 interrupts the ROM set up. For example,
+	 * hitting the ABORT switch could kill the system...
+	 */
+	movl	0xfff40088,d0
+	andl	#0xff7fffff,d0		| Clear 'MIEN'
+	movl	d0,0xfff40088
+1:
+	/*
+	 * Determine how much onboard memory is installed
+	 */
+	movql	#0x07,d0
+	andb	0xfff42024,d0
+	lea	Ldramsize162,a0
+	movl	a0@(d0:w:4),d1		| Lookup the size
+	jeq	Lmemcquery		| Assume a MEMC chip if this is zero.
+	jra	Lis16x_common
+
+	.data
+	.even
+	/*
+	 * Table of DRAM register size values -> actual size in bytes
+	 */
+Ldramsize162:
+	.long	0x00100000
+	.long	0x00200000
+	.long	0x00000000
+	.long	0x00400000
+	.long	0x00400000
+	.long	0x00800000
+	.long	0x00000000
+	.long	0x01000000
+	.text
+
 Lnot162:
 #endif
 
@@ -291,12 +342,6 @@ Lis167:
 	movl	a1,a0@(8)
 	movl	a2,a0@(12)
 
-	/* Save our ethernet address */
-	movel	0xfffc1f2e,d0
-	lsll	#8,d0
-	RELOC(myea, a0)
-	movl	d0,a0@
-
 	/*
 	 * Disable all interrupts from VMEchip2. This is especially
 	 * useful when the kernel doesn't have the VMEchip2 driver
@@ -307,16 +352,10 @@ Lis167:
 	movl	0xfff40088,d0
 	andl	#0xff7fffff,d0		| Clear 'MIEN'
 	movl	d0,0xfff40088
+#endif
 
-	/*
-	 * Fix up the physical addresses of the MVME167's onboard
-	 * I/O registers.
-	 */
-	RELOC(intiobase_phys, a0);
-	movl	#INTIOBASE167,a0@
-	RELOC(intiotop_phys, a0);
-	movl	#INTIOTOP167,a0@
-
+#if defined(MVME167) || defined(MVME162)
+Lmemcquery:
 	/*
 	 * Figure out the size of onboard DRAM by querying
 	 * the memory controller ASIC(s)
@@ -335,6 +374,27 @@ Lis167:
 	bsr	memc040read
 	addl	d0,d1
 #endif
+
+Lis16x_common:
+	/* Save our ethernet address */
+	RELOC(mvme_ea, a0)
+	lea	0xfffc1f2c,a1
+	movb	a1@+,a0@+
+	movb	a1@+,a0@+
+	movb	a1@+,a0@+
+	movb	a1@+,a0@+
+	movb	a1@+,a0@+
+	movb	a1@,a0@
+
+	/*
+	 * Fix up the physical addresses of the MVME167's onboard
+	 * I/O registers.
+	 */
+	RELOC(intiobase_phys, a0);
+	movl	#INTIOBASE167,a0@
+	RELOC(intiotop_phys, a0);
+	movl	#INTIOTOP167,a0@
+
 	/*
 	 * Initialise first physical memory segment with onboard RAM details
 	 */
@@ -343,9 +403,37 @@ Lis167:
 	movl	d1,a0@(4)		| phys_seg_list[0].ps_end
 	clrl	a0@(8)			| phys_seg_list[0].ps_startpage
 
-	/* No offboard RAM (yet) */
+	/* offboard RAM */
 	clrl	a0@(0x0c)		| phys_seg_list[1].ps_start
+	movl	#NBPG-1,d0
+	addl	0xfffc0000,d0		| Start of offboard segment
+	andl	#-NBPG,d0		| Round up to page boundary
+	beq	Ldone167		| Jump if none defined
+	movl	#NBPG,d1		| Note: implicit '+1'
+	addl	0xfffc0004,d1		| End of offboard segment
+	andl	#-NBPG,d1		| Round up to page boundary
+	cmpl	d1,d0			| Quick and dirty validity check
+	bcss	Lramsave167		| Yup, looks good.
+	movel	a0@(4),d1		| Just use onboard RAM otherwise
+	bras	Ldone167
 
+Lramsave167:
+	movl	d0,a0@(0x0c)		| phys_seg_list[1].ps_start
+	movl	d1,a0@(0x10)		| phys_seg_list[1].ps_end
+	clrl	a0@(0x14)		| phys_seg_list[1].ps_startpage
+
+	/*
+	 * Offboard RAM needs to be cleared to zero to initialise parity
+	 * on most VMEbus RAM cards. Without this, some cards will buserr
+	 * when first read.
+	 */
+	movel	d0,a0			| offboard start address again.
+Lramclr167:
+	clrl	a0@+			| zap a word
+	cmpl	a0,d1			| reached end?
+	bnes	Lramclr167
+
+Ldone167:
 	moveq	#PGSHIFT,d2
 	lsrl	d2,d1			| convert to page (click) number
 	RELOC(maxmem, a0)
@@ -873,10 +961,10 @@ ENTRY_NOPROFILE(trap0)
 	tstl	_C_LABEL(astpending)
 	jne	Lrei2
 	tstb	_C_LABEL(ssir)
-	jeq	Ltrap1
+	jne	Ltrap1
 	movw	#SPL1,sr
 	tstb	_C_LABEL(ssir)
-	jne	Lsir1
+	jeq	Lsir1
 Ltrap1:
 	movl	sp@(FR_SP),a0		| grab and restore
 	movl	a0,usp			|   user SP
@@ -1081,6 +1169,10 @@ ENTRY_NOPROFILE(intrhand_vectored)
  *
  * This code is complicated by the fact that sendsig may have been called
  * necessitating a stack cleanup.
+ *
+ * Note that 'ssir' is zero when a soft interrupt is pending, otherwise it
+ * is non-zero. This is because it is tested elsewhere using the m68k `tas'
+ * instruction.
  */
 
 BSS(ssir,1)
@@ -1122,7 +1214,7 @@ Laststkadj:
 	rte				| and do real RTE
 Lchksir:
 	tstb	_C_LABEL(ssir)		| SIR pending?
-	jeq	Ldorte			| no, all done
+	jne	Ldorte			| no, all done
 	movl	d0,sp@-			| need a scratch register
 	movw	sp@(4),d0		| get SR
 	andw	#PSL_IPL7,d0		| mask all but IPL
@@ -1131,7 +1223,7 @@ Lchksir:
 Lgotsir:
 	movw	#SPL1,sr		| prevent others from servicing int
 	tstb	_C_LABEL(ssir)		| too late?
-	jeq	Ldorte			| yes, oh well...
+	jne	Ldorte			| yes, oh well...
 	clrl	sp@-			| stack adjust
 	moveml	#0xFFFF,sp@-		| save all registers
 	movl	usp,a1			| including
@@ -1207,7 +1299,7 @@ ENTRY(switch_exit)
 ASENTRY_NOPROFILE(Idle)
 	stop	#PSL_LOWIPL
 	movw	#PSL_HIGHIPL,sr
-	movl    _C_LABEL(whichqs),d0
+	movl    _C_LABEL(sched_whichqs),d0
 	jeq     _ASM_LABEL(Idle)
 	jra	Lsw1
 
@@ -1239,7 +1331,7 @@ ENTRY(cpu_switch)
 	 * then take the first proc from that queue.
 	 */
 	movw    #PSL_HIGHIPL,sr         | lock out interrupts
-	movl    _C_LABEL(whichqs),d0
+	movl    _C_LABEL(sched_whichqs),d0
 	jeq     _ASM_LABEL(Idle)
 Lsw1:
 	movl    d0,d1
@@ -1250,20 +1342,28 @@ Lsw1:
 
 	movl    d1,d0
 	lslb    #3,d1                   | convert queue number to index
-	addl    #_C_LABEL(qs),d1        | locate queue (q)
+	addl    #_C_LABEL(sched_qs),d1  | locate queue (q)
 	movl    d1,a1
 	movl    a1@(P_FORW),a0          | p = q->p_forw
 	cmpal   d1,a0                   | anyone on queue?
 	jeq     Lbadsw                  | no, panic
+#ifdef DIAGNOSTIC
+	tstl	a0@(P_WCHAN)
+	jne	Lbadsw
+	cmpb	#SRUN,a0@(P_STAT)
+	jne	Lbadsw
+#endif
 	movl    a0@(P_FORW),a1@(P_FORW) | q->p_forw = p->p_forw
 	movl    a0@(P_FORW),a1          | n = p->p_forw
 	movl    d1,a1@(P_BACK)          | n->p_back = q
 	cmpal   d1,a1                   | anyone left on queue?
 	jne     Lsw2                    | yes, skip
-	movl    _C_LABEL(whichqs),d1
+	movl    _C_LABEL(sched_whichqs),d1
 	bclr    d0,d1                   | no, clear bit
-	movl    d1,_C_LABEL(whichqs)
+	movl    d1,_C_LABEL(sched_whichqs)
 Lsw2:
+	/* p->p_cpu initialized in fork1() for single-processor */
+	movb	#SONPROC,a0@(P_STAT)	| p->p_stat = SONPROC
 	movl	a0,_C_LABEL(curproc)
 	clrl	_C_LABEL(want_resched)
 #ifdef notyet
@@ -1307,12 +1407,6 @@ Lsavfp60:
 #endif
 Lswnofpsave:
 
-#ifdef DIAGNOSTIC
-	tstl	a0@(P_WCHAN)
-	jne	Lbadsw
-	cmpb	#SRUN,a0@(P_STAT)
-	jne	Lbadsw
-#endif
 	clrl	a0@(P_BACK)		| clear back link
 	/* low byte of p_md.md_flags */
 	movb	a0@(P_MD_FLAGS+3),_ASM_LABEL(mdpflag)
@@ -1511,7 +1605,7 @@ ENTRY(spl0)
 	movw	sr,d0			| get old SR for return
 	movw	#PSL_LOWIPL,sr		| restore new SR
 	tstb	_C_LABEL(ssir)		| software interrupt pending?
-	jeq	Lspldone		| no, all done
+	jne	Lspldone		| no, all done
 	subql	#4,sp			| make room for RTE frame
 	movl	sp@(4),sp@(2)		| position return address
 	clrw	sp@(6)			| set frame type 0
@@ -1537,6 +1631,16 @@ ENTRY_NOPROFILE(_delay)
 	movl	sp@(4),d0
 	| d1 = delay_divisor
 	movl	_C_LABEL(delay_divisor),d1
+	jra	L_delay			/* Jump into the loop! */
+
+	/*
+	 * Align the branch target of the loop to a half-line (8-byte)
+	 * boundary to minimize cache effects.  This guarantees both
+	 * that there will be no prefetch stalls due to cache line burst
+	 * operations and that the loop will run from a single cache
+	 * half-line.
+	 */
+	.align	8
 L_delay:
 	subl	d1,d0
 	jgt	L_delay
@@ -1704,9 +1808,6 @@ GLOBAL(bootaddr)
 	.long	0
 GLOBAL(boothowto)
 	.long	0
-
-GLOBAL(cold)
-	.long	1		| cold start flag
 
 GLOBAL(want_resched)
 	.long	0

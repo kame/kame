@@ -1,4 +1,4 @@
-/*	$NetBSD: if_mc.c,v 1.12.4.2 2000/01/05 23:52:31 he Exp $	*/
+/*	$NetBSD: if_mc.c,v 1.15 1999/12/20 01:06:40 scottr Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>
@@ -510,7 +510,9 @@ struct mc_softc *sc = arg;
 	}
 
 	if (ir & CERR) {
+#ifdef MCDEBUG
 		printf("%s: collision error\n", sc->sc_dev.dv_xname);
+#endif
 		sc->sc_if.if_collisions++;
 	}
 
@@ -557,6 +559,7 @@ mc_tint(sc)
 	else if (xmtfs & ONE)
 		sc->sc_if.if_collisions++;
 	else if (xmtfs & RTRY) {
+		printf("%s: excessive collisions\n", sc->sc_dev.dv_xname);
 		sc->sc_if.if_collisions += 16;
 		sc->sc_if.if_oerrors++;
 	}
@@ -624,7 +627,9 @@ mace_read(sc, pkt, len)
 	int len;
 {
 	struct ifnet *ifp = &sc->sc_if;
+#if NBPFILTER > 0
 	struct ether_header *eh = (struct ether_header *)pkt;
+#endif
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
@@ -659,9 +664,8 @@ mace_read(sc, pkt, len)
 
 	ifp->if_ipackets++;
 
-	/* Pass the packet up, with the ether header sort-of removed. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	/* Pass the packet up. */
+	(*ifp->if_input)(ifp, m);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: ka410.c,v 1.17 1999/03/13 15:16:48 ragge Exp $ */
+/*	$NetBSD: ka410.c,v 1.22 2000/04/22 18:11:27 ragge Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -53,8 +53,7 @@
 #include <machine/clock.h>
 #include <machine/vsbus.h>
 
-static	void	ka410_conf __P((struct device*, struct device*, void*));
-static	void	ka410_steal_pages __P((void));
+static	void	ka410_conf __P((void));
 static	void	ka410_memerr __P((void));
 static	int	ka410_mchk __P((caddr_t));
 static	void	ka410_halt __P((void));
@@ -65,14 +64,11 @@ static	void	ka410_clrf __P((void));
 static	caddr_t	l2cache;	/* mapped in address */
 static	long 	*cacr;		/* l2csche ctlr reg */
 
-extern  short *clk_page;
-
 /* 
  * Declaration of 410-specific calls.
  */
 struct	cpu_dep ka410_calls = {
-	ka410_steal_pages,
-	no_nicr_clock,
+	0,
 	ka410_mchk,
 	ka410_memerr, 
 	ka410_conf,
@@ -83,15 +79,14 @@ struct	cpu_dep ka410_calls = {
 	ka410_halt,
 	ka410_reboot,
 	ka410_clrf,
+	NULL,
+	CPU_RAISEIPL,
 };
 
 
 void
-ka410_conf(parent, self, aux)
-	struct	device *parent, *self;
-	void	*aux;
+ka410_conf()
 {
-        extern  int clk_adrshift, clk_tweak;
 	struct vs_cpu *ka410_cpu;
 
 	ka410_cpu = (struct vs_cpu *)vax_map_physmem(VS_REGS, 1);
@@ -99,14 +94,14 @@ ka410_conf(parent, self, aux)
 	switch (vax_cputype) {
 	case VAX_TYP_UV2:
 		ka410_cpu->vc_410mser = 1;
-		printf(": KA410\n");
+		printf("cpu: KA410\n");
 		break;
 
 	case VAX_TYP_CVAX:
-		printf(": KA41/42\n");
+		printf("cpu: KA41/42\n");
 		ka410_cpu->vc_vdcorg = 0; /* XXX */
 		ka410_cpu->vc_parctl = PARCTL_CPEN | PARCTL_DPEN ;
-		printf("%s: Enabling primary cache, ", self->dv_xname);
+		printf("cpu: Enabling primary cache, ");
 mtpr(KA420_CADR_S2E|KA420_CADR_S1E|KA420_CADR_ISE|KA420_CADR_DSE, PR_CADR);
 		if (vax_confdata & KA420_CFG_CACHPR) {
 			l2cache = (void *)vax_map_physmem(KA420_CH2_BASE,
@@ -147,16 +142,6 @@ ka410_mchk(addr)
 {
 	panic("Machine check");
 	return 0;
-}
-
-extern caddr_t le_iomem;
-
-void
-ka410_steal_pages()
-{
-	extern	vaddr_t avail_start;
-
-	MAPPHYS(le_iomem, (NI_IOSIZE/VAX_NBPG), VM_PROT_READ|VM_PROT_WRITE);
 }
 
 static void

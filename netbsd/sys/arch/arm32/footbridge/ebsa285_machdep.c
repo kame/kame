@@ -1,4 +1,4 @@
-/*	$NetBSD: ebsa285_machdep.c,v 1.6 1999/03/29 10:02:19 mycroft Exp $	*/
+/*	$NetBSD: ebsa285_machdep.c,v 1.12 2000/06/09 04:58:34 soda Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.
@@ -45,6 +45,7 @@
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/exec.h>
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
@@ -71,10 +72,11 @@
 #include <arm32/footbridge/dc21285mem.h>
 #include <arm32/footbridge/dc21285reg.h>
 
-#include "ipkdb.h"
+#include "opt_ipkdb.h"
 
 #include "isa.h"
 #if NISA > 0
+#include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
 #endif
 
@@ -93,7 +95,7 @@ u_int dc21285_fclk = FCLK;
 /* Define various stack sizes in pages */
 #define IRQ_STACK_SIZE	1
 #define ABT_STACK_SIZE	1
-#if NIPKDB > 0
+#ifdef IPKDB
 #define UND_STACK_SIZE	2
 #else
 #define UND_STACK_SIZE	1
@@ -167,7 +169,6 @@ vm_size_t map_chunk	__P((vm_offset_t pd, vm_offset_t pt, vm_offset_t va,
 void pmap_bootstrap		__P((vm_offset_t kernel_l1pt,
     pv_addr_t kernel_ptpt));
 void process_kernel_args	__P((char *));
-caddr_t allocsys		__P((caddr_t v));
 void data_abort_handler		__P((trapframe_t *frame));
 void prefetch_abort_handler	__P((trapframe_t *frame));
 void undefinedinstruction_bounce	__P((trapframe_t *frame));
@@ -178,8 +179,6 @@ extern pt_entry_t *pmap_pte	__P((pmap_t pmap, vm_offset_t va));
 extern void db_machine_init	__P((void));
 extern void parse_mi_bootargs	__P((char *args));
 extern void dumpsys		__P((void));
-
-extern int cold;
 
 /* A load of console goo. */
 #include "vga.h"
@@ -192,7 +191,8 @@ extern int cold;
 
 #include "pckbc.h"
 #if (NPCKBC > 0)
-#include <dev/isa/pckbcvar.h>
+#include <dev/ic/i8042reg.h>
+#include <dev/ic/pckbcvar.h>
 #endif
 
 #include "com.h"
@@ -215,6 +215,7 @@ extern int cold;
 #ifndef CONMODE
 #define CONMODE ((TTYDEF_CFLAG & ~(CSIZE | CSTOPB | PARENB)) | CS8) /* 8N1 */
 #endif
+
 int comcnspeed = CONSPEED;
 int comcnmode = CONMODE;
 
@@ -316,9 +317,9 @@ struct l1_sec_map {
 	/* Map 16MB of type 0 PCI config access */
 	{ DC21285_PCI_TYPE_0_CONFIG_VBASE,	DC21285_PCI_TYPE_0_CONFIG,
 	    DC21285_PCI_TYPE_0_CONFIG_VSIZE,	0 },
-	/* Map 128MB of 32 bit PCI address space for MEM accesses */
-	{ DC21285_PCI_MEM_VBASE,		DC21285_PCI_MEM_BASE,
-	    DC21285_PCI_MEM_VSIZE,		0 },
+	/* Map 1MB of 32 bit PCI address space for ISA MEM accesses via PCI */
+	{ DC21285_PCI_ISA_MEM_VBASE,		DC21285_PCI_MEM_BASE,
+	    DC21285_PCI_ISA_MEM_VSIZE,		0 },
 	{ 0, 0, 0, 0 }
 };
 
@@ -734,7 +735,7 @@ initarm(bootinfo)
 	irq_init();
 	printf("done.\n");
 
-#if NIPKDB > 0
+#ifdef IPKDB
 	/* Initialise ipkdb */
 	ipkdb_init();
 	if (boothowto & RB_KDB)
@@ -839,8 +840,7 @@ consinit(void)
 
 #if NISA > 0
 	/* Initialise the ISA subsystem early ... */
-
-	isa_cats_init(DC21285_PCI_IO_VBASE, DC21285_PCI_MEM_VBASE);
+	isa_cats_init(DC21285_PCI_IO_VBASE, DC21285_PCI_ISA_MEM_VBASE);
 #endif
 
 	footbridge_pci_bs_tag_init();
@@ -856,7 +856,7 @@ consinit(void)
 		vga_cnattach(&footbridge_pci_io_bs_tag,
 		    &footbridge_pci_mem_bs_tag, - 1, 0);
 #if (NPCKBC > 0)
-		pckbc_cnattach(&isa_io_bs_tag, PCKBC_KBD_SLOT);
+		pckbc_cnattach(&isa_io_bs_tag, IO_KBD, KBCMDP, PCKBC_KBD_SLOT);
 #endif	/* NPCKBC */
 	}
 #endif	/* NVGA */

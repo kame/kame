@@ -1,4 +1,4 @@
-/*	$NetBSD: mips3_pte.h,v 1.8 1998/09/11 16:46:31 jonathan Exp $	*/
+/*	$NetBSD: mips3_pte.h,v 1.13 2000/06/09 05:51:43 soda Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -52,15 +52,15 @@ struct mips3_pte {
 unsigned int	pg_prot:2,		/* SW: access control */
 		pg_pfnum:24,		/* HW: core page frame number or 0 */
 		pg_attr:3,		/* HW: cache attribute */
-		pg_m:1,			/* HW: modified (dirty) bit */
+		pg_m:1,			/* HW: dirty bit */
 		pg_v:1,			/* HW: valid bit */
-		pg_g:1;			/* HW: ignore pid bit */
+		pg_g:1;			/* HW: ignore asid bit */
 #endif
 #if BYTE_ORDER == LITTLE_ENDIAN
-unsigned int 	pg_g:1,			/* HW: ignore pid bit */
+unsigned int 	pg_g:1,			/* HW: ignore asid bit */
 		pg_v:1,			/* HW: valid bit */
-		pg_m:1,			/* HW: modified (dirty) bit */
-		pg_attr:3,			/* HW: cache attribute */
+		pg_m:1,			/* HW: dirty bit */
+		pg_attr:3,		/* HW: cache attribute */
 		pg_pfnum:24,		/* HW: core page frame number or 0 */
 		pg_prot:2;		/* SW: access control */
 #endif
@@ -88,34 +88,43 @@ struct tlb {
 #define	MIPS3_PG_G	0x00000001	/* Global; ignore ASID if in lo0 & lo1 */
 #define	MIPS3_PG_V	0x00000002	/* Valid */
 #define	MIPS3_PG_NV	0x00000000
-#define	MIPS3_PG_M	0x00000004	/* Dirty; i.e. writable */
+#define	MIPS3_PG_D	0x00000004	/* Dirty */
 #define	MIPS3_PG_ATTR	0x0000003f
 #define	MIPS3_PG_UNCACHED 0x00000010
-#define	MIPS3_PG_CACHED	0x00000018	/* Cacheable noncoherent */
+#ifdef HPCMIPS_L1CACHE_DISABLE		/* MIPS3_L1CACHE_DISABLE */
+#define MIPS3_PG_CACHED MIPS3_PG_UNCACHED /* XXX: brain damaged!!! */
+#else /* HPCMIPS_L1CACHE_DISABLE */
+#define MIPS3_PG_CACHED 0x00000018 /* Cacheable noncoherent */
+#endif /* ! HPCMIPS_L1CACHE_DISABLE */
 #define	MIPS3_PG_CACHEMODE 0x00000038
 /* Write protected */
 #define	MIPS3_PG_ROPAGE	(MIPS3_PG_V | MIPS3_PG_RO | MIPS3_PG_CACHED)
 
 /* Not wr-prot not clean */
-#define	MIPS3_PG_RWPAGE	(MIPS3_PG_V | MIPS3_PG_M | MIPS3_PG_CACHED)
+#define	MIPS3_PG_RWPAGE	(MIPS3_PG_V | MIPS3_PG_D | MIPS3_PG_CACHED)
 
 /* Not wr-prot but clean */
 #define	MIPS3_PG_CWPAGE	(MIPS3_PG_V | MIPS3_PG_CACHED)
 #define	MIPS3_PG_IOPAGE \
-	(MIPS3_PG_G | MIPS3_PG_V | MIPS3_PG_M | MIPS3_PG_UNCACHED)
+	(MIPS3_PG_G | MIPS3_PG_V | MIPS3_PG_D | MIPS3_PG_UNCACHED)
 #define	MIPS3_PG_FRAME	0x3fffffc0
+#ifdef MIPS3_4100			/* VR4100 core */
+#define MIPS3_PG_SHIFT	4
+#else
 #define MIPS3_PG_SHIFT	6
+#endif
 
 /* pte accessor macros */
 
 #define mips3_pfn_is_ext(x) ((x) & 0x3c000000)
-#define mips3_vad_to_pfn(x) (((unsigned)(x) >> MIPS3_PG_SHIFT) & MIPS3_PG_FRAME)
-#define mips3_vad_to_pfn64(x) (((quad_t)(x) >> MIPS3_PG_SHIFT) & MIPS3_PG_FRAME)
-#define mips3_pfn_to_vad(x) (((x) & MIPS3_PG_FRAME) << MIPS3_PG_SHIFT)
-#define mips3_vad_to_vpn(x) ((unsigned)(x) & MIPS3_PG_SVPN)
+#define mips3_paddr_to_tlbpfn(x) \
+    (((paddr_t)(x) >> MIPS3_PG_SHIFT) & MIPS3_PG_FRAME)
+#define mips3_tlbpfn_to_paddr(x) \
+    ((paddr_t)((x) & MIPS3_PG_FRAME) << MIPS3_PG_SHIFT)
+#define mips3_vad_to_vpn(x) ((vaddr_t)(x) & MIPS3_PG_SVPN)
 #define mips3_vpn_to_vad(x) ((x) & MIPS3_PG_SVPN)
 
-#define MIPS3_PTE_TO_PADDR(pte) (mips3_pfn_to_vad(pte))
+#define MIPS3_PTE_TO_PADDR(pte) (mips3_tlbpfn_to_paddr(pte))
 #define MIPS3_PAGE_IS_RDONLY(pte,va) \
     (pmap_is_page_ro(pmap_kernel(), mips_trunc_page(va), (pte)))
 

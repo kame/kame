@@ -1,9 +1,5 @@
-# $NetBSD: Makefile,v 1.3 1998/09/25 15:05:12 rvb Exp $
+# $NetBSD: Makefile,v 1.6 1999/05/18 23:06:02 tron Exp $
 
-.if (${MACHINE} == "amiga")
-SUBDIR+=	adosfs
-.endif
-
-SUBDIR+=	isofs miscfs msdosfs ufs coda
+SUBDIR+=	adosfs isofs miscfs msdosfs ntfs ufs coda
 
 .include <bsd.subdir.mk>

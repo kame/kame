@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_domain.c,v 1.25 1999/01/14 01:14:01 thorpej Exp $	*/
+/*	$NetBSD: uipc_domain.c,v 1.31 2000/03/30 09:27:14 augustss Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -36,11 +36,13 @@
  */
 
 #include "opt_inet.h"
+#include "opt_ipsec.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
 #include "opt_iso.h"
 #include "opt_ns.h"
 #include "opt_natm.h"
+#include "arp.h"
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -50,12 +52,15 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/proc.h>
 #include <vm/vm.h>
 #include <sys/sysctl.h>
 
 void	pffasttimo __P((void *));
 void	pfslowtimo __P((void *));
+
+struct callout pffasttimo_ch, pfslowtimo_ch;
 
 /*
  * Current time values for fast and slow timeouts.  We can use u_int
@@ -74,15 +79,21 @@ u_int	pffasttimo_now;
 void
 domaininit()
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 
 #undef unix
+	/*
+	 * KAME NOTE: ADDDOMAIN(route) is moved to the last part so that
+	 * it will be initialized as the *first* element.  confusing!
+	 */
 #ifndef lint
 	ADDDOMAIN(unix);
-	ADDDOMAIN(route);
 #ifdef INET
 	ADDDOMAIN(inet);
+#endif
+#ifdef INET6
+	ADDDOMAIN(inet6);
 #endif
 #ifdef NS
 	ADDDOMAIN(ns);
@@ -99,6 +110,13 @@ domaininit()
 #ifdef NETATALK
 	ADDDOMAIN(atalk);
 #endif
+#ifdef IPSEC
+	ADDDOMAIN(key);
+#endif
+#if NARP > 0
+	ADDDOMAIN(arp);
+#endif
+	ADDDOMAIN(route);
 #endif /* ! lint */
 
 	for (dp = domains; dp; dp = dp->dom_next) {
@@ -113,49 +131,65 @@ domaininit()
 		max_linkhdr = 16;
 	max_hdr = max_linkhdr + max_protohdr;
 	max_datalen = MHLEN - max_hdr;
-	timeout(pffasttimo, NULL, 1);
-	timeout(pfslowtimo, NULL, 1);
+
+	callout_init(&pffasttimo_ch);
+	callout_init(&pfslowtimo_ch);
+
+	callout_reset(&pffasttimo_ch, 1, pffasttimo, NULL);
+	callout_reset(&pfslowtimo_ch, 1, pfslowtimo, NULL);
+}
+
+struct domain *
+pffinddomain(family)
+	int family;
+{
+	struct domain *dp;
+
+	for (dp = domains; dp != NULL; dp = dp->dom_next)
+		if (dp->dom_family == family)
+			return (dp);
+	return (NULL);
 }
 
 struct protosw *
 pffindtype(family, type)
 	int family, type;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 
-	for (dp = domains; dp; dp = dp->dom_next)
-		if (dp->dom_family == family)
-			goto found;
-	return (0);
-found:
+	dp = pffinddomain(family);
+	if (dp == NULL)
+		return (NULL);
+
 	for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 		if (pr->pr_type && pr->pr_type == type)
 			return (pr);
-	return (0);
+
+	return (NULL);
 }
 
 struct protosw *
 pffindproto(family, protocol, type)
 	int family, protocol, type;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
-	struct protosw *maybe = 0;
+	struct domain *dp;
+	struct protosw *pr;
+	struct protosw *maybe = NULL;
 
 	if (family == 0)
-		return (0);
-	for (dp = domains; dp; dp = dp->dom_next)
-		if (dp->dom_family == family)
-			goto found;
-	return (0);
-found:
+		return (NULL);
+
+	dp = pffinddomain(family);
+	if (dp == NULL)
+		return (NULL);
+
 	for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++) {
 		if ((pr->pr_protocol == protocol) && (pr->pr_type == type))
 			return (pr);
 
 		if (type == SOCK_RAW && pr->pr_type == SOCK_RAW &&
-		    pr->pr_protocol == 0 && maybe == (struct protosw *)0)
+		    pr->pr_protocol == 0 && maybe == NULL)
 			maybe = pr;
 	}
 	return (maybe);
@@ -171,27 +205,43 @@ net_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	size_t newlen;
 	struct proc *p;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 	int family, protocol;
 
 	/*
-	 * All sysctl names at this level are nonterminal;
-	 * next two components are protocol family and protocol number,
-	 * then at least one addition component.
+	 * All sysctl names at this level are nonterminal.
+	 * PF_KEY: next component is protocol family, and then at least one
+	 *	additional component.
+	 * usually: next two components are protocol family and protocol
+	 *	number, then at least one addition component.
 	 */
-	if (namelen < 3)
+	if (namelen < 2)
 		return (EISDIR);		/* overloaded */
 	family = name[0];
-	protocol = name[1];
 
 	if (family == 0)
 		return (0);
-	for (dp = domains; dp; dp = dp->dom_next)
-		if (dp->dom_family == family)
-			goto found;
-	return (ENOPROTOOPT);
-found:
+
+	dp = pffinddomain(family);
+	if (dp == NULL)
+		return (ENOPROTOOPT);
+
+	switch (family) {
+#ifdef IPSEC
+	case PF_KEY:
+		pr = dp->dom_protosw;
+		if (pr->pr_sysctl)
+			return ((*pr->pr_sysctl)(name + 1, namelen - 1,
+				oldp, oldlenp, newp, newlen));
+		return (ENOPROTOOPT);
+#endif
+	default:
+		break;
+	}
+	if (namelen < 3)
+		return (EISDIR);		/* overloaded */
+	protocol = name[1];
 	for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 		if (pr->pr_protocol == protocol && pr->pr_sysctl)
 			return ((*pr->pr_sysctl)(name + 2, namelen - 2,
@@ -204,8 +254,8 @@ pfctlinput(cmd, sa)
 	int cmd;
 	struct sockaddr *sa;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 
 	for (dp = domains; dp; dp = dp->dom_next)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
@@ -217,8 +267,8 @@ void
 pfslowtimo(arg)
 	void *arg;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 
 	pfslowtimo_now++;
 
@@ -226,15 +276,15 @@ pfslowtimo(arg)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_slowtimo)
 				(*pr->pr_slowtimo)();
-	timeout(pfslowtimo, NULL, hz/2);
+	callout_reset(&pfslowtimo_ch, hz / 2, pfslowtimo, NULL);
 }
 
 void
 pffasttimo(arg)
 	void *arg;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 
 	pffasttimo_now++;
 
@@ -242,5 +292,5 @@ pffasttimo(arg)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_fasttimo)
 				(*pr->pr_fasttimo)();
-	timeout(pffasttimo, NULL, hz/5);
+	callout_reset(&pffasttimo_ch, hz / 5, pffasttimo, NULL);
 }

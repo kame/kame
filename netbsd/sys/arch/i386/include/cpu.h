@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.53 1999/04/01 00:37:50 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.64 2000/06/04 21:27:38 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -41,6 +41,11 @@
 #ifndef _I386_CPU_H_
 #define _I386_CPU_H_
 
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Definitions unique to i386 cpu support.
  */
@@ -48,12 +53,27 @@
 #include <machine/frame.h>
 #include <machine/segments.h>
 
+#include <sys/sched.h>
+struct cpu_info {
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+};
+
+#ifdef _KERNEL
+extern struct cpu_info cpu_info_store;
+
+#define	curcpu()			(&cpu_info_store)
+#endif
+
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
 #define	cpu_swapin(p)			/* nothing */
-#define	cpu_wait(p)			/* nothing */
+#define	cpu_number()			0
 
 /*
  * Arguments to hardclock, softclock and statclock
@@ -67,7 +87,7 @@
 #define	CLKF_USERMODE(frame)	USERMODE((frame)->if_cs, (frame)->if_eflags)
 #define	CLKF_BASEPRI(frame)	((frame)->if_ppl == 0)
 #define	CLKF_PC(frame)		((frame)->if_eip)
-#define	CLKF_INTR(frame)	(0)	/* XXX should have an interrupt stack */
+#define	CLKF_INTR(frame)	((frame)->if_ppl & (1 << IPL_TAGINTR))
 
 /*
  * Preempt the current process if in interrupt from user mode,
@@ -93,7 +113,6 @@ int	want_resched;		/* resched() was called */
  * We need a machine-independent name for this.
  */
 #define	DELAY(x)		delay(x)
-void	delay __P((int));
 
 /*
  * pull in #defines for kinds of processors
@@ -121,9 +140,13 @@ struct cpu_cpuid_nameclass {
 };
 
 #ifdef _KERNEL
+extern int biosbasemem;
+extern int biosextmem;
 extern int cpu;
 extern int cpu_class;
 extern int cpu_feature;
+extern int cpu_id;
+extern char cpu_vendor[];
 extern int cpuid_level;
 extern struct cpu_nocpuid_nameclass i386_nocpuid_cpus[];
 extern struct cpu_cpuid_nameclass i386_cpuid_cpus[];
@@ -146,6 +169,7 @@ void	switch_exit __P((struct proc *));
 void	proc_trampoline __P((void));
 
 /* clock.c */
+void	initrtclock __P((void));
 void	startrtclock __P((void));
 
 /* npx.c */
@@ -188,6 +212,13 @@ void	vm86_gpfault __P((struct proc *, int));
 /* trap.c */
 void	child_return __P((void *));
 
+/* consinit.c */
+void kgdb_port_init __P((void));
+
+/* bus_machdep.c */
+void i386_bus_space_init __P((void));
+void i386_bus_space_mallocok __P((void));
+
 #endif /* _KERNEL */
 
 /* 
@@ -199,7 +230,8 @@ void	child_return __P((void *));
 #define	CPU_NKPDE		4	/* int: number of kernel PDEs */
 #define	CPU_BOOTED_KERNEL	5	/* string: booted kernel name */
 #define CPU_DISKINFO		6	/* disk geometry information */
-#define	CPU_MAXID		7	/* number of valid machdep ids */
+#define CPU_FPU_PRESENT		7	/* FPU is present */
+#define	CPU_MAXID		8	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
@@ -209,6 +241,7 @@ void	child_return __P((void *));
 	{ "nkpde", CTLTYPE_INT }, \
 	{ "booted_kernel", CTLTYPE_STRING }, \
 	{ "diskinfo", CTLTYPE_STRUCT }, \
+	{ "fpu_present", CTLTYPE_INT }, \
 }
 
 

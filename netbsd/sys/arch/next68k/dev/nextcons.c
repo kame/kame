@@ -1,4 +1,4 @@
-/*	$NetBSD: nextcons.c,v 1.1.2.1 1999/04/29 15:58:56 perry Exp $	*/
+/*	$NetBSD: nextcons.c,v 1.2.12.1 2000/10/06 23:16:52 deberg Exp $	*/
 
 /*
  * Copyright (c) 1999 Darrin B. Jewell
@@ -67,7 +67,9 @@ nextcnprobe(struct consdev *cp)
 {
 
 	if ((rom_machine_type == NeXT_WARP9)
-	    || (rom_machine_type == NeXT_X15))
+	    || (rom_machine_type == NeXT_X15)
+	    || (rom_machine_type == NeXT_WARP9C)
+	    || (rom_machine_type == NeXT_TURBO_COLOR))
 		cp->cn_pri = CN_INTERNAL;
 	else 
 		cp->cn_pri = CN_DEAD;

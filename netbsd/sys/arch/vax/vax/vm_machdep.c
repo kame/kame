@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.47.2.1 1999/05/03 12:56:52 perry Exp $	     */
+/*	$NetBSD: vm_machdep.c,v 1.65 2000/06/12 11:13:14 ragge Exp $	     */
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -60,16 +60,14 @@
 
 #include <sys/syscallargs.h>
 
-volatile int whichqs;
+#include "opt_cputype.h"
 
 /*
  * pagemove - moves pages at virtual address from to virtual address to,
  * block moved of size size. Using fast insn bcopy for pte move.
  */
 void
-pagemove(from, to, size)
-	caddr_t from, to;
-	size_t size;
+pagemove(caddr_t from, caddr_t to, size_t size)
 {
 	pt_entry_t *fpte, *tpte;
 	int	stor;
@@ -84,22 +82,36 @@ pagemove(from, to, size)
 }
 
 /*
- * cpu_fork() copies parent process trapframe directly into child PCB
- * so that when we swtch() to the child process it will go directly
- * back to user mode without any need to jump back through kernel.
- * We also take away mapping for the second page after pcb, so that
- * we get something like a "red zone".
- * No need for either double-map kernel stack or relocate it when
- * forking.
+ * Finish a fork operation, with process p2 nearly set up.
+ * Copy and update the pcb and trap frame, making the child ready to run.
+ * 
+ * Rig the child's kernel stack so that it will start out in
+ * proc_trampoline() and call child_return() with p2 as an
+ * argument. This causes the newly-created child process to go
+ * directly to user level with an apparent return value of 0 from
+ * fork(), while the parent process returns normally.
+ *
+ * p1 is the process being forked; if p1 == &proc0, we are creating
+ * a kernel thread, and the return path and argument are specified with
+ * `func' and `arg'.
+ *
+ * If an alternate user-level stack is requested (with non-zero values
+ * in both the stack and stacksize args), set up the user stack pointer
+ * accordingly.
+ *
+ * cpu_fork() copies parent process trapframe and creates a fake CALLS
+ * frame on top of it, so that it can safely call child_return().
+ * We also take away mapping for the fourth page after pcb, so that
+ * we get something like a "red zone" for the kernel stack.
  */
 void
-cpu_fork(p1, p2)
-	struct proc *p1, *p2;
+cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize,
+    void (*func)(void *), void *arg)
 {
-	struct pte *pt;
-	struct pcb *nyproc;
+	struct pcb *pcb;
 	struct trapframe *tf;
-	struct pmap *pmap, *opmap;
+	struct callsframe *cf;
+	extern int sret; /* Return address in trap routine */
 
 #ifdef DIAGNOSTIC
 	/*
@@ -109,74 +121,61 @@ cpu_fork(p1, p2)
 		panic("cpu_fork: curproc");
 #endif
 
-	nyproc = &p2->p_addr->u_pcb;
-	tf = p1->p_addr->u_pcb.framep;
-	opmap = p1->p_vmspace->vm_map.pmap;
-	pmap = p2->p_vmspace->vm_map.pmap;
-
-	/* Mark page invalid */
-	pt = kvtopte((u_int)p2->p_addr + REDZONEADDR);
-	pt->pg_v = 0; 
+	/*
+	 * Copy the trap frame.
+	 */
+	tf = (struct trapframe *)((u_int)p2->p_addr + USPACE) - 1;
+	p2->p_addr->u_pcb.framep = tf;
+	bcopy(p1->p_addr->u_pcb.framep, tf, sizeof(*tf));
 
 	/*
 	 * Activate address space for the new process.	The PTEs have
 	 * already been allocated by way of pmap_create().
+	 * This writes the page table registers to the PCB.
 	 */
 	pmap_activate(p2);
 
-	/* Set up internal defs in PCB. */
-	nyproc->iftrap = NULL;
-	nyproc->KSP = (u_int)p2->p_addr + USPACE;
+	/* Mark guard page invalid in kernel stack */
+	kvtopte((u_int)p2->p_addr + REDZONEADDR)->pg_v = 0;
 
-	/* General registers as taken from userspace */
-	/* trapframe should be synced with pcb */
-	bcopy(&tf->r2,&nyproc->R[2],10*sizeof(int));
-	nyproc->AP = tf->ap;
-	nyproc->FP = tf->fp;
-	nyproc->USP = tf->sp;
-	nyproc->PC = tf->pc;
-	nyproc->PSL = tf->psl & ~PSL_C;
-	nyproc->R[0] = p1->p_pid; /* parent pid. (shouldn't be needed) */
-	nyproc->R[1] = 1;
+	/*
+	 * Set up the calls frame above (below) the trapframe
+	 * and populate it with something good.
+	 * This is so that we can simulate that we were called by a
+	 * CALLS insn in the function given as argument.
+	 */
+	cf = (struct callsframe *)tf - 1;
+	cf->ca_cond = 0;
+	cf->ca_maskpsw = 0x20000000;	/* CALLS stack frame, no registers */
+	cf->ca_pc = (unsigned)&sret;	/* return PC; userspace trampoline */
+	cf->ca_argno = 1;
+	cf->ca_arg1 = (int)arg;
 
-	return; /* Child is ready. Parent, return! */
-}
+	/*
+	 * Set up internal defs in PCB. This matches the "fake" CALLS frame
+	 * that were constructed earlier.
+	 */
+	pcb = &p2->p_addr->u_pcb;
+	pcb->iftrap = NULL;
+	pcb->KSP = (long)cf;
+	pcb->FP = (long)cf;
+	pcb->AP = (long)&cf->ca_argno;
+	pcb->PC = (int)func + 2;	/* Skip save mask */
 
-/*
- * cpu_set_kpc() sets up pcb for the new kernel process so that it will
- * start at the procedure pointed to by pc next time swtch() is called.
- * When that procedure returns, it will pop off everything from the
- * faked calls frame on the kernel stack, do an REI and go down to
- * user mode.
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct pcb *nyproc;
-	struct {
-		struct	callsframe cf;
-		struct	trapframe tf;
-	} *kc;
-	extern int sret, boothowto;
+	/*
+	 * If specified, give the child a different stack.
+	 */
+	if (stack != NULL)
+		tf->sp = (u_long)stack + stacksize;
 
-	nyproc = &p->p_addr->u_pcb;
-	(unsigned)kc = nyproc->FP = nyproc->KSP =
-	    (unsigned)p->p_addr + USPACE - sizeof(*kc);
-	kc->cf.ca_cond = 0;
-	kc->cf.ca_maskpsw = 0x20000000;
-	kc->cf.ca_pc = (unsigned)&sret;
-	kc->cf.ca_argno = 1;
-	kc->cf.ca_arg1 = (unsigned)arg;
-	kc->tf.r11 = boothowto; /* If we have old init */
-	kc->tf.psl = 0x3c00000;
-
-	nyproc->framep = (void *)&kc->tf;
-	nyproc->AP = (unsigned)&kc->cf.ca_argno;
-	nyproc->FP = nyproc->KSP = (unsigned)kc;
-	nyproc->PC = (unsigned)pc + 2;
+	/*
+	 * Set the last return information after fork().
+	 * This is only interesting if the child will return to userspace,
+	 * but doesn't hurt otherwise.
+	 */
+	tf->r0 = p1->p_pid; /* parent pid. (shouldn't be needed) */
+	tf->r1 = 1;
+	tf->psl = PSL_U|PSL_PREVU;
 }
 
 int
@@ -243,92 +242,14 @@ cpu_coredump(p, vp, cred, chdr)
 }
 
 /*
- * cpu_swapin() is called just before a process shall be swapped in.
- * Kernel stack and pcb must be mapped when we swtch() to this new
- * process, to guarantee that we frob all pages here to ensure that
- * they actually are in-core. Kernel stack red zone is also updated
- * here.
+ * Kernel stack red zone need to be set when a process is swapped in.
  */
 void
 cpu_swapin(p)
 	struct proc *p;
 {
-	struct pte *pt;
-	u_int uarea, i, *j, rv;
-
-	uarea = (u_int)p->p_addr;
-
-	for (i = uarea;i < uarea + USPACE;i += PAGE_SIZE) {
-		j = (u_int *)kvtopte(i);
-		if ((*j & PG_V) == 0) {
-			rv = uvm_fault(kernel_map, i, 0,
-			    VM_PROT_WRITE|VM_PROT_READ);
-			if (rv != KERN_SUCCESS)
-				panic("cpu_swapin: rv %d",rv);
-		}
-	}
-
-	pt = kvtopte(uarea + VAX_NBPG);
-	pt->pg_v = 0; /* Set kernel stack red zone */
+	kvtopte((vaddr_t)p->p_addr + REDZONEADDR)->pg_v = 0;
 }
-
-#if VAX410 || VAX43
-/*
- * vmapbuf()/vunmapbuf() only used on some vaxstations without
- * any busadapter with MMU.
- * XXX - This must be reworked to be effective.
- */
-void
-vmapbuf(bp, len)
-	struct buf *bp;
-	vm_size_t len;
-{
-	vm_offset_t faddr, taddr, off, pa;
-	pmap_t fmap, tmap;
-
-	if ((vax_boardtype != VAX_BTYP_43) && (vax_boardtype != VAX_BTYP_410))
-		return;
-	faddr = trunc_page(bp->b_saveaddr = bp->b_data);
-	off = (vm_offset_t)bp->b_data - faddr;
-	len = round_page(off + len);
-	taddr = uvm_km_valloc_wait(phys_map, len);
-	bp->b_data = (caddr_t)(taddr + off);
-	fmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
-	tmap = vm_map_pmap(phys_map);
-	len = len >> VAX_PGSHIFT;
-	while (len--) {
-		pa = pmap_extract(fmap, faddr);
-		if (pa == 0)
-			panic("vmapbuf: null page frame for %x", (u_int)faddr);
-
-		pmap_enter(tmap, taddr, pa & ~(VAX_NBPG - 1),
-			   VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
-		faddr += VAX_NBPG;
-		taddr += VAX_NBPG;
-	}
-}
-
-/*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
- */
-void
-vunmapbuf(bp, len)
-	struct buf *bp;
-	vm_size_t len;
-{
-	vm_offset_t addr, off;
-
-	if ((vax_boardtype != VAX_BTYP_43) && (vax_boardtype != VAX_BTYP_410))
-		return;
-	addr = trunc_page(bp->b_data);
-	off = (vm_offset_t)bp->b_data - addr;
-	len = round_page(off + len);
-	uvm_km_free_wakeup(phys_map, addr, len);
-	bp->b_data = bp->b_saveaddr;
-	bp->b_saveaddr = 0;
-}
-#endif
 
 /*
  * Map in a bunch of pages read/writeable for the kernel.
@@ -360,4 +281,72 @@ iounaccess(vaddr, npgs)
 	for (i = 0; i < npgs; i++)
 		pte[i] = 0;
 	mtpr(0, PR_TBIA);
+}
+
+extern vm_map_t phys_map;
+
+/*
+ * Map a user I/O request into kernel virtual address space.
+ * Note: the pages are already locked by uvm_vslock(), so we
+ * do not need to pass an access_type to pmap_enter().
+ */
+void
+vmapbuf(bp, len)
+	struct buf *bp;
+	vsize_t len;
+{
+#if VAX46 || VAX48 || VAX49
+	vaddr_t faddr, taddr, off;
+	paddr_t pa;
+	struct proc *p;
+
+	if (vax_boardtype != VAX_BTYP_46
+	    && vax_boardtype != VAX_BTYP_48
+	    && vax_boardtype != VAX_BTYP_49)
+		return;
+	if ((bp->b_flags & B_PHYS) == 0)
+		panic("vmapbuf");
+	p = bp->b_proc;
+	faddr = trunc_page((vaddr_t)bp->b_saveaddr = bp->b_data);
+	off = (vaddr_t)bp->b_data - faddr;
+	len = round_page(off + len);
+	taddr = uvm_km_valloc_wait(phys_map, len);
+	bp->b_data = (caddr_t)(taddr + off);
+	len = atop(len);
+	while (len--) {
+		if (pmap_extract(vm_map_pmap(&p->p_vmspace->vm_map), faddr,
+		    &pa) == FALSE)
+			panic("vmapbuf: null page frame");
+		pmap_enter(vm_map_pmap(phys_map), taddr, trunc_page(pa),
+		    VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+		faddr += PAGE_SIZE;
+		taddr += PAGE_SIZE;
+	}
+#endif
+}
+
+/*
+ * Unmap a previously-mapped user I/O request.
+ */
+void
+vunmapbuf(bp, len)
+	struct buf *bp;
+	vsize_t len;
+{
+#if VAX46 || VAX48 || VAX49
+	vaddr_t addr, off;
+
+	if (vax_boardtype != VAX_BTYP_46
+	    && vax_boardtype != VAX_BTYP_48
+	    && vax_boardtype != VAX_BTYP_49)
+		return;
+	if ((bp->b_flags & B_PHYS) == 0)
+		panic("vunmapbuf");
+	addr = trunc_page((vaddr_t)bp->b_data);
+	off = (vaddr_t)bp->b_data - addr;
+	len = round_page(off + len);
+	uvm_km_free_wakeup(phys_map, addr, len);
+	bp->b_data = bp->b_saveaddr;
+	bp->b_saveaddr = NULL;
+#endif
 }

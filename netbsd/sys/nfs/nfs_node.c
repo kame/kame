@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_node.c,v 1.28.6.1 2000/01/05 23:39:14 he Exp $	*/
+/*	$NetBSD: nfs_node.c,v 1.33 2000/03/30 12:51:14 augustss Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -86,16 +86,27 @@ nfs_nhinit()
 }
 
 /*
+ * Free resources previoslu allocated in nfs_nhinit().
+ */
+void
+nfs_nhdone()
+{
+	hashdone(nfsnodehashtbl, M_NFSNODE);
+	pool_destroy(&nfs_node_pool);
+	pool_destroy(&nfs_vattr_pool);
+}
+
+/*
  * Compute an entry in the NFS hash table structure
  */
 u_long
 nfs_hash(fhp, fhsize)
-	register nfsfh_t *fhp;
+	nfsfh_t *fhp;
 	int fhsize;
 {
-	register u_char *fhpp;
-	register u_long fhsum;
-	register int i;
+	u_char *fhpp;
+	u_long fhsum;
+	int i;
 
 	fhpp = &fhp->fh_bytes[0];
 	fhsum = 0;
@@ -113,14 +124,13 @@ nfs_hash(fhp, fhsize)
 int
 nfs_nget(mntp, fhp, fhsize, npp)
 	struct mount *mntp;
-	register nfsfh_t *fhp;
+	nfsfh_t *fhp;
 	int fhsize;
 	struct nfsnode **npp;
 {
-	register struct nfsnode *np;
+	struct nfsnode *np;
 	struct nfsnodehashhead *nhpp;
-	register struct vnode *vp;
-	extern int (**nfsv2_vnodeop_p)__P((void *));
+	struct vnode *vp;
 	struct vnode *nvp;
 	int error;
 
@@ -144,6 +154,7 @@ loop:
 		lockmgr(&nfs_hashlock, LK_RELEASE, 0);
 		return (error);
 	}
+	nvp->v_vnlock = 0;	/* XXX At least untill we do locking */
 	vp = nvp;
 	np = pool_get(&nfs_node_pool, PR_WAITOK);
 	memset((caddr_t)np, 0, sizeof *np);
@@ -175,8 +186,8 @@ nfs_inactive(v)
 		struct vnode *a_vp;
 		struct proc *a_p;
 	} */ *ap = v;
-	register struct nfsnode *np;
-	register struct sillyrename *sp;
+	struct nfsnode *np;
+	struct sillyrename *sp;
 	struct proc *p = ap->a_p;
 	extern int prtactive;
 
@@ -231,9 +242,9 @@ nfs_reclaim(v)
 	struct vop_reclaim_args /* {
 		struct vnode *a_vp;
 	} */ *ap = v;
-	register struct vnode *vp = ap->a_vp;
-	register struct nfsnode *np = VTONFS(vp);
-	register struct nfsmount *nmp = VFSTONFS(vp->v_mount);
+	struct vnode *vp = ap->a_vp;
+	struct nfsnode *np = VTONFS(vp);
+	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	extern int prtactive;
 
 	if (prtactive && vp->v_usecount != 0)

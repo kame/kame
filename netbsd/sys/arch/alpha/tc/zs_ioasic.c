@@ -1,4 +1,4 @@
-/* $NetBSD: zs_ioasic.c,v 1.5 1999/02/03 20:25:05 mycroft Exp $ */
+/* $NetBSD: zs_ioasic.c,v 1.12 2000/06/03 20:47:41 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: zs_ioasic.c,v 1.5 1999/02/03 20:25:05 mycroft Exp $");
+__KERNEL_RCSID(0, "$NetBSD: zs_ioasic.c,v 1.12 2000/06/03 20:47:41 thorpej Exp $");
 
 /*
  * Zilog Z8530 Dual UART driver (machine-dependent part).  This driver
@@ -53,6 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: zs_ioasic.c,v 1.5 1999/02/03 20:25:05 mycroft Exp $"
 #include "opt_ddb.h"
 #include "opt_dec_3000_300.h"
 #include "opt_zs_ioasic_dma.h"
+#include "zskbd.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,13 +68,14 @@ __KERNEL_RCSID(0, "$NetBSD: zs_ioasic.c,v 1.5 1999/02/03 20:25:05 mycroft Exp $"
 #include <sys/syslog.h>
 
 #include <machine/autoconf.h>
+#include <machine/intr.h>
 #include <machine/z8530var.h>
 
 #include <dev/cons.h>
 #include <dev/ic/z8530reg.h>
 
 #include <dev/tc/tcvar.h>
-#include <alpha/tc/ioasicreg.h>
+#include <dev/tc/ioasicreg.h>
 #include <dev/tc/ioasicvar.h>
 #include <dev/dec/zskbdvar.h>
 
@@ -93,7 +95,7 @@ void	zs_ioasic_cnpollc __P((dev_t, int));
 
 struct consdev zs_ioasic_cons = {
 	NULL, NULL, zs_ioasic_cngetc, zs_ioasic_cnputc,
-	zs_ioasic_cnpollc, NODEV, CN_NORMAL,
+	zs_ioasic_cnpollc, NULL, NODEV, CN_NORMAL,
 };
 
 tc_offset_t zs_ioasic_console_offset;
@@ -201,9 +203,8 @@ void	zs_ioasic_softintr __P((void *));
 /* Misc. */
 void	zs_ioasic_enable __P((int));
 
-volatile int zs_ioasic_soft_scheduled;
-
 extern struct cfdriver ioasic_cd;
+extern struct cfdriver zsc_cd;
 
 /*
  * Is the zs chip present?
@@ -355,7 +356,11 @@ zs_ioasic_attach(parent, self, aux)
 	 * Set up the ioasic interrupt handler.
 	 */
 	ioasic_intr_establish(parent, d->iada_cookie, TC_IPL_TTY,
-	    zs_ioasic_hardintr, (void *) zs);
+	    zs_ioasic_hardintr, zs);
+	zs->zsc_sih = softintr_establish(IPL_SOFTSERIAL,
+	    zs_ioasic_softintr, zs);
+	if (zs->zsc_sih == NULL)
+		panic("zs_ioasic_attach: unable to register softintr");
 
 	/*
 	 * Set the master interrupt enable and interrupt vector.  The
@@ -401,18 +406,18 @@ zs_ioasic_enable(onoff)
 {
 
 	if (onoff) {
-		*(volatile u_int *)IOASIC_REG_IMSK(ioasic_base) |=
+		*(volatile u_int *)(ioasic_base + IOASIC_IMSK) |=
 		    IOASIC_INTR_SCC_1 | IOASIC_INTR_SCC_0;
 #if !defined(DEC_3000_300) && defined(ZS_IOASIC_DMA)
-		*(volatile u_int *)IOASIC_REG_CSR(ioasic_base) |=
+		*(volatile u_int *)(ioasic_base + IOASIC_CSR) |=
 		    IOASIC_CSR_DMAEN_T1 | IOASIC_CSR_DMAEN_R1 |
 		    IOASIC_CSR_DMAEN_T2 | IOASIC_CSR_DMAEN_R2;
 #endif
 	} else {
-		*(volatile u_int *)IOASIC_REG_IMSK(ioasic_base) &= 
+		*(volatile u_int *)(ioasic_base + IOASIC_IMSK) &= 
 		    ~(IOASIC_INTR_SCC_1 | IOASIC_INTR_SCC_0);
 #if !defined(DEC_3000_300) && defined(ZS_IOASIC_DMA)
-		*(volatile u_int *)IOASIC_REG_CSR(ioasic_base) &=
+		*(volatile u_int *)(ioasic_base + IOASIC_CSR) &=
 		    ~(IOASIC_CSR_DMAEN_T1 | IOASIC_CSR_DMAEN_R1 |
 		    IOASIC_CSR_DMAEN_T2 | IOASIC_CSR_DMAEN_R2);
 #endif
@@ -427,23 +432,20 @@ int
 zs_ioasic_hardintr(arg)
 	void *arg;
 {
-	struct zsc_softc *zs = arg;
-	int softreq;
+	struct zsc_softc *zsc = arg;
 
 	/*
 	 * Call the upper-level MI hardware interrupt handler.
 	 */
-	zsc_intr_hard(zs);
+	zsc_intr_hard(zsc);
 
 	/*
 	 * Check to see if we need to schedule any software-level
 	 * processing interrupts.
 	 */
-	softreq = zs->zsc_cs[0]->cs_softreq | zs->zsc_cs[1]->cs_softreq;
-	if (softreq && (zs_ioasic_soft_scheduled == 0)) {
-		zs_ioasic_soft_scheduled = 1;
-		timeout(zs_ioasic_softintr, (void *)zs, 1);
-	}
+	if (zsc->zsc_cs[0]->cs_softreq | zsc->zsc_cs[1]->cs_softreq)
+		softintr_schedule(zsc->zsc_sih);
+
 	return (1);
 }
 
@@ -454,12 +456,11 @@ void
 zs_ioasic_softintr(arg)
 	void *arg;
 {
-	struct zsc_softc *zs = arg;
+	struct zsc_softc *zsc = arg;
 	int s;
 
 	s = spltty();
-	zs_ioasic_soft_scheduled = 0;
-	(void) zsc_intr_soft(zs);
+	(void) zsc_intr_soft(zsc);
 	splx(s);
 }
 
@@ -779,9 +780,6 @@ zs_ioasic_cninit(ioasic_addr, zs_offset, channel)
 
 	/* Copy "pending" to "current" and H/W. */
 	zs_loadchannelregs(cs);
-
-	/* Point the console at the SCC. */
-	cn_tab = &zs_ioasic_cons;
 }
 
 /*
@@ -820,6 +818,7 @@ zs_ioasic_lk201_cnattach(ioasic_addr, zs_offset, channel)
 	zs_ioasic_conschanstate->cs_defspeed = 4800;
 	zs_ioasic_conschanstate->cs_defcflag =
 	     (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8;
+	zs_ioasic_conschanstate->cs_brg_clk = PCLK / 16;
 	return (zskbd_cnattach(zs_ioasic_conschanstate));
 #else
 	return (ENXIO);

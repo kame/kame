@@ -1,4 +1,4 @@
-/*	$NetBSD: ka46.c,v 1.6 1999/03/13 15:16:48 ragge Exp $ */
+/*	$NetBSD: ka46.c,v 1.13 2000/04/22 18:11:27 ragge Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -54,7 +54,7 @@
 #include <machine/clock.h>
 #include <machine/vsbus.h>
 
-static	void	ka46_conf __P((struct device*, struct device*, void*));
+static	void	ka46_conf __P((void));
 static	void	ka46_steal_pages __P((void));
 static	void	ka46_memerr __P((void));
 static	int	ka46_mchk __P((caddr_t));
@@ -63,14 +63,12 @@ static	void	ka46_reboot __P((int));
 static	void	ka46_cache_enable __P((void));
 
 struct	vs_cpu *ka46_cpu;
-extern  short *clk_page;
 
 /* 
  * Declaration of 46-specific calls.
  */
 struct	cpu_dep ka46_calls = {
 	ka46_steal_pages,
-	no_nicr_clock,
 	ka46_mchk,
 	ka46_memerr, 
 	ka46_conf,
@@ -80,19 +78,18 @@ struct	cpu_dep ka46_calls = {
 	2,	/* SCB pages */
 	ka46_halt,
 	ka46_reboot,
+	NULL,
+	NULL,
+	CPU_RAISEIPL,
 };
 
 
 void
-ka46_conf(parent, self, aux)
-	struct	device *parent, *self;
-	void	*aux;
+ka46_conf()
 {
-        extern  int clk_adrshift, clk_tweak;
-
-	printf(": KA46\n");
+	printf("cpu: KA46\n");
 	ka46_cpu = (void *)vax_map_physmem(VS_REGS, 1);
-	printf("%s: turning on floating point chip\n", self->dv_xname);
+	printf("cpu: turning on floating point chip\n");
 	mtpr(2, PR_ACCS); /* Enable floating points */
 	/*
 	 * Setup parameters necessary to read time from clock chip.
@@ -148,39 +145,12 @@ ka46_mchk(addr)
 	return 0;
 }
 
-extern caddr_t le_iomem;
-
 void
 ka46_steal_pages()
 {
-	extern	vm_offset_t avail_start, virtual_avail, avail_end;
-	int	i;
-
-	MAPPHYS(le_iomem, (NI_IOSIZE/VAX_NBPG), VM_PROT_READ|VM_PROT_WRITE);
 
 	/* Turn on caches (to speed up execution a bit) */
 	ka46_cache_enable();
-	/*
-	 * The I/O MMU maps all 16K device addressable memory to
-	 * the low 16M of the physical memory. In this way the
-	 * device operations emulate the VS3100 way.
-	 * This area must be on a 128k boundary and that causes
-	 * a slight waste of memory. We steal it from the end.
-	 *
-	 * This will be reworked the day NetBSD/vax changes to
-	 * 4K pages. (No use before that).
-	 */
-	{	int *io_map, *lio_map;
-
-		avail_end &= ~0x3ffff;
-		lio_map = (int *)avail_end;
-		*(int *)(VS_REGS + 8) = avail_end & 0x07fe0000;
-		MAPVIRT(io_map, (0x20000 / VAX_NBPG));
-		pmap_map((vm_offset_t)io_map, (vm_offset_t)avail_end,
-		    (vm_offset_t)avail_end + 0x20000, VM_PROT_READ|VM_PROT_WRITE);
-		for (i = 0; i < 0x8000; i++)
-			lio_map[i] = 0x80000000|i;
-	}
 }
 
 static void

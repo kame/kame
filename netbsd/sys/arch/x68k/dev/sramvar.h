@@ -1,4 +1,4 @@
-/*	$NetBSD: sramvar.h,v 1.1.1.1.26.1 1999/06/24 15:40:51 perry Exp $	*/
+/*	$NetBSD: sramvar.h,v 1.2 1999/06/23 15:20:36 minoura Exp $	*/
 
 /*
  * Copyright (c) 1994 Kazuhisa Shimizu.

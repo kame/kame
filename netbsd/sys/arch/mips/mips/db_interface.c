@@ -1,27 +1,27 @@
-/*	$NetBSD: db_interface.c,v 1.14 1999/03/23 22:15:36 simonb Exp $	*/
+/*	$NetBSD: db_interface.c,v 1.28 2000/06/09 06:30:35 soda Exp $	*/
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
@@ -53,15 +53,13 @@
 int	db_active = 0;
 mips_reg_t kdbaux[11]; /* XXX struct switchframe: better inside curpcb? XXX */
 
-void db_halt_cmd __P((db_expr_t, int, db_expr_t, char *));
 void db_tlbdump_cmd __P((db_expr_t, int, db_expr_t, char *));
-void db_trapdump_cmd __P((db_expr_t, int, db_expr_t, char *));
 void db_kvtophys_cmd __P((db_expr_t, int, db_expr_t, char *));
 
-extern void	kdbpoke __P((vaddr_t addr, int newval));
-extern vaddr_t	MachEmulateBranch __P((struct frame *, vaddr_t, unsigned, int));
+void	kdbpoke __P((vaddr_t addr, int newval));
+vaddr_t	MachEmulateBranch __P((struct frame *, vaddr_t, unsigned, int));
 
-extern paddr_t kvtophys __P((vaddr_t));
+paddr_t kvtophys __P((vaddr_t));
 
 #ifdef DDB_TRACE
 int
@@ -179,13 +177,50 @@ kdb_trap(type, tfp)
 	cnpollc(0);
 	db_active--;
 
-	tfp[21] = f->f_regs[PC]; /* XXX resume XXX */
+	if (type & T_USER)
+		*(struct frame *)curproc->p_md.md_regs = *f;
+	else {
+		/* Synthetic full scale register context when trap happens */
+		tfp[0] = f->f_regs[AST];
+		tfp[1] = f->f_regs[V0];
+		tfp[2] = f->f_regs[V1];
+		tfp[3] = f->f_regs[A0];
+		tfp[4] = f->f_regs[A1];
+		tfp[5] = f->f_regs[A2];
+		tfp[6] = f->f_regs[A3];
+		tfp[7] = f->f_regs[T0];
+		tfp[8] = f->f_regs[T1];
+		tfp[9] = f->f_regs[T2];
+		tfp[10] = f->f_regs[T3];
+		tfp[11] = f->f_regs[T4];
+		tfp[12] = f->f_regs[T5];
+		tfp[13] = f->f_regs[T6];
+		tfp[14] = f->f_regs[T7];
+		tfp[15] = f->f_regs[T8];
+		tfp[16] = f->f_regs[T9];
+		tfp[17] = f->f_regs[RA];
+		tfp[18] = f->f_regs[SR];
+		tfp[19] = f->f_regs[MULLO];
+		tfp[20] = f->f_regs[MULHI];
+		tfp[21] = f->f_regs[PC];
+		kdbaux[0] = f->f_regs[S0];
+		kdbaux[1] = f->f_regs[S1];
+		kdbaux[2] = f->f_regs[S2];
+		kdbaux[3] = f->f_regs[S3];
+		kdbaux[4] = f->f_regs[S4];
+		kdbaux[5] = f->f_regs[S5];
+		kdbaux[6] = f->f_regs[S6];
+		kdbaux[7] = f->f_regs[S7];
+		kdbaux[8] = f->f_regs[SP];
+		kdbaux[9] = f->f_regs[S8];
+		kdbaux[10] = f->f_regs[GP];
+	}
 
 	return (1);
 }
 
 void
-Debugger()
+cpu_Debugger()
 {
 	asm("break");
 }
@@ -205,7 +240,7 @@ db_read_bytes(addr, size, data)
 
 	if (size) {
 		unsigned tmp;
-		register char *dst = (char*)data;
+		char *dst = (char*)data;
 
 		tmp = kdbpeek(addr);
 		while (size--) {
@@ -241,7 +276,7 @@ db_write_bytes(addr, size, data)
 		kdbpoke(addr++, *(int*)data), addr += 4, size -= 4;
 	if (size) {
 		unsigned tmp = kdbpeek(addr), tmp1 = 0;
-		register char *src = (char*)data;
+		char *src = (char*)data;
 
 		tmp >>= (size << 3);
 		tmp <<= (size << 3);
@@ -251,21 +286,6 @@ db_write_bytes(addr, size, data)
 		}
 		kdbpoke(addr, tmp|tmp1);
 	}
-}
-
-
-void
-db_halt_cmd(addr, have_addr, count, modif)
-	db_expr_t addr;
-	int have_addr;
-	db_expr_t count;
-	char *modif;
-{
-	/*
-	 * Force a halt.  Don't sync disks in case we panicked
-	 * trying to do just that.
-	 */
-	cpu_reboot(RB_HALT|RB_NOSYNC, 0);
 }
 
 void
@@ -282,16 +302,16 @@ db_tlbdump_cmd(addr, have_addr, count, modif)
 			u_int32_t tlb_lo;
 		} tlb;
 		int i;
-		extern void mips1_TLBRead __P((int, struct mips1_tlb *));
+		void mips1_TLBRead __P((int, struct mips1_tlb *));
 
-		for (i = 0; i < MIPS1_TLB_NUM_TLB_ENTRIES; i++) {
+		for (i = 0; i < mips_num_tlb_entries; i++) {
 			mips1_TLBRead(i, &tlb);
 			db_printf("TLB%c%2d Hi 0x%08x Lo 0x%08x",
 				(tlb.tlb_lo & MIPS1_PG_V) ? ' ' : '*',
 				i, tlb.tlb_hi,
 				tlb.tlb_lo & MIPS1_PG_FRAME);
 			db_printf(" %c%c%c\n",
-				(tlb.tlb_lo & MIPS1_PG_M) ? 'M' : ' ',
+				(tlb.tlb_lo & MIPS1_PG_D) ? 'D' : ' ',
 				(tlb.tlb_lo & MIPS1_PG_G) ? 'G' : ' ',
 				(tlb.tlb_lo & MIPS1_PG_N) ? 'N' : ' ');
 		}
@@ -302,39 +322,24 @@ db_tlbdump_cmd(addr, have_addr, count, modif)
 		struct tlb tlb;
 		int i;
 
-		for (i = 0; i < MIPS3_TLB_NUM_TLB_ENTRIES; i++) {
+		for (i = 0; i < mips_num_tlb_entries; i++) {
 			mips3_TLBRead(i, &tlb);
-			db_printf("TLB%c%2d Hi 0%x08x ",
+			db_printf("TLB%c%2d Hi 0x%08x ",
 			(tlb.tlb_lo0 | tlb.tlb_lo1) & MIPS3_PG_V ? ' ' : '*',
 				i, tlb.tlb_hi);
-			db_printf("Lo0=0x%08x %c%c attr %x",
-				(unsigned)pfn_to_vad(tlb.tlb_lo0),
-				(tlb.tlb_lo0 & MIPS3_PG_M) ? 'M' : ' ',
+			db_printf("Lo0=0x%08x %c%c attr %x ",
+				(unsigned)mips_tlbpfn_to_paddr(tlb.tlb_lo0),
+				(tlb.tlb_lo0 & MIPS3_PG_D) ? 'D' : ' ',
 				(tlb.tlb_lo0 & MIPS3_PG_G) ? 'G' : ' ',
 				(tlb.tlb_lo0 >> 3) & 7);
-			db_printf("Lo1=0x%08x %c%c atr %x sz=%x\n", 
-				(unsigned)pfn_to_vad(tlb.tlb_lo1),
-				(tlb.tlb_lo1 & MIPS3_PG_M) ? 'M' : ' ',
+			db_printf("Lo1=0x%08x %c%c attr %x sz=%x\n",
+				(unsigned)mips_tlbpfn_to_paddr(tlb.tlb_lo1),
+				(tlb.tlb_lo1 & MIPS3_PG_D) ? 'D' : ' ',
 				(tlb.tlb_lo1 & MIPS3_PG_G) ? 'G' : ' ',
 				(tlb.tlb_lo1 >> 3) & 7,
 				tlb.tlb_mask);
 		}
 	}
-#endif
-}
-
-void
-db_trapdump_cmd(addr, have_addr, count, modif)
-	db_expr_t addr;
-	int have_addr;
-	db_expr_t count;
-	char *modif;
-{
-#ifdef DEBUG_TRAP
-	extern void show_traplog __P((char*));
-	show_traplog("CPU exception log:");
-#else
-	db_printf("trap log only available with options DEBUG_TRAP.\n");
 #endif
 }
 
@@ -354,9 +359,7 @@ db_kvtophys_cmd(addr, have_addr, count, modif)
 }
 
 struct db_command mips_db_command_table[] = {
-	{ "halt",	db_halt_cmd,		0,	0 },
 	{ "kvtop",	db_kvtophys_cmd,	0,	0 },
-	{ "trapdump",	db_trapdump_cmd,	0,	0 },
 	{ "tlb",	db_tlbdump_cmd,		0,	0 },
 	{ (char *)0, }
 };

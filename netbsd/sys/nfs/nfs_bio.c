@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_bio.c,v 1.45 1999/03/24 05:51:28 mrg Exp $	*/
+/*	$NetBSD: nfs_bio.c,v 1.49 2000/05/18 08:34:26 pk Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -72,13 +72,13 @@ extern struct nfsstats nfsstats;
  */
 int
 nfs_bioread(vp, uio, ioflag, cred, cflag)
-	register struct vnode *vp;
-	register struct uio *uio;
+	struct vnode *vp;
+	struct uio *uio;
 	int ioflag, cflag;
 	struct ucred *cred;
 {
-	register struct nfsnode *np = VTONFS(vp);
-	register int biosize, diff;
+	struct nfsnode *np = VTONFS(vp);
+	int biosize, diff;
 	struct buf *bp = NULL, *rabp;
 	struct vattr vattr;
 	struct proc *p;
@@ -550,12 +550,12 @@ nfs_write(v)
 		int  a_ioflag;
 		struct ucred *a_cred;
 	} */ *ap = v;
-	register int biosize;
-	register struct uio *uio = ap->a_uio;
+	int biosize;
+	struct uio *uio = ap->a_uio;
 	struct proc *p = uio->uio_procp;
-	register struct vnode *vp = ap->a_vp;
+	struct vnode *vp = ap->a_vp;
 	struct nfsnode *np = VTONFS(vp);
-	register struct ucred *cred = ap->a_cred;
+	struct ucred *cred = ap->a_cred;
 	int ioflag = ap->a_ioflag;
 	struct buf *bp;
 	struct vattr vattr;
@@ -768,7 +768,7 @@ nfs_getcacheblk(vp, bn, size, p)
 	int size;
 	struct proc *p;
 {
-	register struct buf *bp;
+	struct buf *bp;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 
 	if (nmp->nm_flag & NFSMNT_INT) {
@@ -795,7 +795,7 @@ nfs_vinvalbuf(vp, flags, cred, p, intrflg)
 	struct proc *p;
 	int intrflg;
 {
-	register struct nfsnode *np = VTONFS(vp);
+	struct nfsnode *np = VTONFS(vp);
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	int error = 0, slpflag, slptimeo;
 
@@ -850,11 +850,11 @@ nfs_vinvalbuf(vp, flags, cred, p, intrflg)
  */
 int
 nfs_asyncio(bp, cred)
-	register struct buf *bp;
+	struct buf *bp;
 	struct ucred *cred;
 {
-	register int i;
-	register struct nfsmount *nmp;
+	int i;
+	struct nfsmount *nmp;
 	int gotiod, slpflag = 0, slptimeo = 0, error;
 
 	if (nfs_numasync == 0)
@@ -931,7 +931,7 @@ again:
 				bp->b_wcred = cred;
 			}
 		}
-	
+
 		TAILQ_INSERT_TAIL(&nmp->nm_bufq, bp, b_freelist);
 		nmp->nm_bufqlen++;
 		return (0);
@@ -950,15 +950,15 @@ again:
  */
 int
 nfs_doio(bp, cr, p)
-	register struct buf *bp;
+	struct buf *bp;
 	struct ucred *cr;
 	struct proc *p;
 {
-	register struct uio *uiop;
-	register struct vnode *vp;
+	struct uio *uiop;
+	struct vnode *vp;
 	struct nfsnode *np;
 	struct nfsmount *nmp;
-	int error = 0, diff, len, iomode, must_commit = 0;
+	int error = 0, diff, len, iomode, must_commit = 0, s;
 	struct uio uio;
 	struct iovec io;
 
@@ -1080,10 +1080,11 @@ nfs_doio(bp, cr, p)
 		iomode = NFSV3WRITE_FILESYNC;
 	    bp->b_flags |= B_WRITEINPROG;
 #ifdef fvdl_debug
-	    printf("nfs_doio(%x): bp %x doff %d dend %d\n", 
+	    printf("nfs_doio(%p): bp %p doff %d dend %d\n", 
 		vp, bp, bp->b_dirtyoff, bp->b_dirtyend);
 #endif
 	    error = nfs_writerpc(vp, uiop, cr, &iomode, &must_commit);
+	    s = splbio();
 	    if (!error && iomode == NFSV3WRITE_UNSTABLE)
 		bp->b_flags |= B_NEEDCOMMIT;
 	    else
@@ -1110,9 +1111,9 @@ nfs_doio(bp, cr, p)
 		 * buffer to the clean list, we have to reassign it back to the
 		 * dirty one. Ugh.
 		 */
-		if (bp->b_flags & B_ASYNC)
+		if (bp->b_flags & B_ASYNC) {
 		    reassignbuf(bp, vp);
-		else if (error)
+		} else if (error)
 		    bp->b_flags |= B_EINTR;
 	    } else {
 		if (error) {
@@ -1122,6 +1123,7 @@ nfs_doio(bp, cr, p)
 		}
 		bp->b_dirtyoff = bp->b_dirtyend = 0;
 	    }
+	    splx(s);
 	}
 	bp->b_resid = uiop->uio_resid;
 	if (must_commit)

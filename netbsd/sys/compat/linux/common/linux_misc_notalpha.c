@@ -1,11 +1,12 @@
-/*	$NetBSD: linux_misc_notalpha.c,v 1.50 1999/02/09 20:37:19 christos Exp $	*/
+/*	$NetBSD: linux_misc_notalpha.c,v 1.53.4.2 2000/08/30 03:59:20 sommerfeld Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Frank van der Linden and Eric Haszlakiewicz.
+ * by Frank van der Linden and Eric Haszlakiewicz; by Jason R. Thorpe
+ * of the Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -92,7 +93,7 @@ linux_sys_alarm(p, v, retval)
 	/*
 	 * Clear any pending timer alarms.
 	 */
-	untimeout(realitexpire, p);
+	callout_stop(&p->p_realit_ch);
 	timerclear(&itp->it_interval);
 	if (timerisset(&itp->it_value) &&
 	    timercmp(&itp->it_value, &time, >))
@@ -125,8 +126,13 @@ linux_sys_alarm(p, v, retval)
 	}
 
 	if (timerisset(&it.it_value)) {
+		/*
+		 * Don't need to check hzto() return value, here.
+		 * callout_reset() does it for us.
+		 */
 		timeradd(&it.it_value, &time, &it.it_value);
-		timeout(realitexpire, p, hzto(&it.it_value));
+		callout_reset(&p->p_realit_ch, hzto(&it.it_value),
+		    realitexpire, p);
 	}
 	p->p_realtimer = it;
 	splx(s);
@@ -224,6 +230,7 @@ linux_sys_utime(p, v, retval)
 	struct linux_utimbuf lut;
 
 	sg = stackgap_init(p->p_emul);
+	tvp = (struct timeval *) stackgap_alloc(&sg, sizeof(tv));
 	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&ua, path) = SCARG(uap, path);
@@ -234,7 +241,6 @@ linux_sys_utime(p, v, retval)
 		tv[0].tv_usec = tv[1].tv_usec = 0;
 		tv[0].tv_sec = lut.l_actime;
 		tv[1].tv_sec = lut.l_modtime;
-		tvp = (struct timeval *) stackgap_alloc(&sg, sizeof(tv));
 		if ((error = copyout(tv, tvp, sizeof tv)))
 			return error;
 		SCARG(&ua, tptr) = tvp;
@@ -288,6 +294,137 @@ linux_sys_waitpid(p, v, retval)
 		bsd_to_linux_wstat(&tstat);
 		return copyout(&tstat, SCARG(uap, status), sizeof tstat);
 	}
+
+	return 0;
+}
+
+int
+linux_sys_setresgid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_setresgid_args /* {
+		syscallarg(gid_t) rgid;
+		syscallarg(gid_t) egid;
+		syscallarg(gid_t) sgid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	gid_t rgid, egid, sgid;
+	int error;
+
+	rgid = SCARG(uap, rgid);
+	egid = SCARG(uap, egid);
+	sgid = SCARG(uap, sgid);
+
+	/*
+	 * Note: These checks are a little different than the NetBSD
+	 * setregid(2) call performs.  This precisely follows the
+	 * behavior of the Linux kernel.
+	 */
+	if (rgid != (gid_t)-1 &&
+	    rgid != pc->p_rgid &&
+	    rgid != pc->pc_ucred->cr_gid &&
+	    rgid != pc->p_svgid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (egid != (gid_t)-1 &&
+	    egid != pc->p_rgid &&
+	    egid != pc->pc_ucred->cr_gid &&
+	    egid != pc->p_svgid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (sgid != (gid_t)-1 &&
+	    sgid != pc->p_rgid &&
+	    sgid != pc->pc_ucred->cr_gid &&
+	    sgid != pc->p_svgid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	/*
+	 * Now assign the real, effective, and saved GIDs.
+	 * Note that Linux, unlike NetBSD in setregid(2), does not
+	 * set the saved UID in this call unless the user specifies
+	 * it.
+	 */
+	if (rgid != (gid_t)-1)
+		pc->p_rgid = rgid;
+
+	if (egid != (gid_t)-1) {
+		pc->pc_ucred = crcopy(pc->pc_ucred);
+		pc->pc_ucred->cr_gid = egid;
+	}
+
+	if (sgid != (gid_t)-1)
+		pc->p_svgid = sgid;
+
+	if (rgid != (gid_t)-1 && egid != (gid_t)-1 && sgid != (gid_t)-1)
+		p->p_flag |= P_SUGID;
+	return (0);
+}
+
+int
+linux_sys_getresgid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_getresgid_args /* {
+		syscallarg(gid_t *) rgid;
+		syscallarg(gid_t *) egid;
+		syscallarg(gid_t *) sgid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	int error;
+
+	/*
+	 * Linux copies these values out to userspace like so:
+	 *
+	 *	1. Copy out rgid.
+	 *	2. If that succeeds, copy out egid.
+	 *	3. If both of those succeed, copy out sgid.
+	 */
+	if ((error = copyout(&pc->p_rgid, SCARG(uap, rgid),
+			     sizeof(gid_t))) != 0)
+		return (error);
+
+	if ((error = copyout(&pc->pc_ucred->cr_uid, SCARG(uap, egid),
+			     sizeof(gid_t))) != 0)
+		return (error);
+
+	return (copyout(&pc->p_svgid, SCARG(uap, sgid), sizeof(gid_t)));
+}
+
+/*
+ * I wonder why Linux has settimeofday() _and_ stime().. Still, we
+ * need to deal with it.
+ */
+int
+linux_sys_stime(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_time_args /* {
+		linux_time_t *t;
+	} */ *uap = v;
+	struct timeval atv;
+	linux_time_t tt;
+	int error;
+
+	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		return (error);
+
+	if ((error = copyin(&tt, SCARG(uap, t), sizeof tt)) != 0)
+		return error;
+
+	atv.tv_sec = tt;
+	atv.tv_usec = 0;
+
+	if ((error = settime(&atv)))
+		return (error);
 
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: rcons.c,v 1.21 1999/01/28 10:35:53 jonathan Exp $	*/
+/*	$NetBSD: rcons.c,v 1.41.4.3 2000/11/05 22:37:45 tv Exp $	*/
 
 /*
  * Copyright (c) 1995
@@ -41,66 +41,48 @@
 #if NRASTERCONSOLE > 0
 
 #include <sys/param.h>
+#include <sys/conf.h>
+#include <sys/device.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
-#include <sys/buf.h>
-#include <sys/ioctl.h>
 #include <sys/tty.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <sys/conf.h>
-#include <machine/conf.h>
-#include <sys/vnode.h>
 
-#include <pmax/dev/sccreg.h>
-#include <pmax/pmax/kn01.h>
-#include <pmax/pmax/kn02.h>
-#include <pmax/pmax/kmin.h>
-#include <pmax/pmax/maxine.h>
-#include <pmax/pmax/kn03.h>
-#include <pmax/pmax/asic.h>
-#include <pmax/pmax/turbochannel.h>
-#include <pmax/pmax/pmaxtype.h>
-#include <pmax/dev/rconsvar.h>
-#include <dev/cons.h>
-
-#include <sys/device.h>
-#include <machine/fbio.h>
+#include <dev/wscons/wsdisplayvar.h>
+#include <dev/wscons/wsconsio.h>
+#include <dev/wsfont/wsfont.h>
+#include <dev/rasops/rasops.h>
 #include <dev/rcons/rcons.h>
-#include <dev/rcons/rcons_subr.h>
-#include <dev/rcons/raster.h>
+
+#include <machine/fbio.h>
 #include <machine/fbvar.h>
+#include <machine/conf.h>
 
-#include <machine/pmioctl.h>
-#include <pmax/dev/fbreg.h>
+#include <pmax/pmax/cons.h>
+
 #include <pmax/dev/lk201var.h>
+#include <pmax/dev/rconsvar.h>
 
-
+#include "fb.h"
+#include "px.h"
 
 /*
  * Console I/O is redirected to the appropriate device, either a screen and
  * keyboard, a serial port, or the "virtual" console.
  */
 
-extern struct tty *constty;	/* virtual console output device */
+extern struct tty *constty;	/* XXX virtual console output device */
 struct tty *fbconstty;		/* Frame buffer console tty... */
 struct tty rcons_tty [NRASTERCONSOLE];	/* Console tty struct... */
 
-struct	vnode *cn_in_devvp;	/* vnode for underlying input device. */
-dev_t	cn_in_dev = NODEV;	/* console input device. */
+dev_t	cn_in_dev = NODEV;		/* console input device. */
 
 char rcons_maxcols [20];
 
-void	rcons_connect __P((struct fbinfo *info));
-void	rasterconsoleattach __P((int n));
-void	rcons_vputc __P ((dev_t dev, int c));
+static struct rconsole rc;
 
-
-void	rconsreset __P((struct tty *tp, int rw));
-void	rcons_input __P((dev_t dev, int ic));
-
+static void	rcons_vputc __P((dev_t dev, int c));
 #ifdef notyet
-void		rconsstart		__P((struct tty *));
+void		rconsstart __P((struct tty *));
 static void	rcons_later __P((void*));
 #endif
 
@@ -109,12 +91,59 @@ static void	rcons_later __P((void*));
  * rcons_connect is called by fbconnect when the first frame buffer is
  * attached.   That frame buffer will always be the console frame buffer.
  */
+#if NFB > 0
 void
 rcons_connect (info)
 	struct fbinfo *info;
 {
-	static struct rconsole rc;
-	static int row, col;
+	static struct rasops_info ri;
+	int cookie, epwf, bior;
+
+	/* XXX */
+	switch (info->fi_type.fb_boardtype) {
+	case PMAX_FBTYPE_MFB:
+		ri.ri_depth = 8;
+		ri.ri_flg = RI_CLEAR | RI_FORCEMONO;
+		epwf = 0;
+		bior = WSDISPLAY_FONTORDER_L2R;
+		break;
+	case PMAX_FBTYPE_PM_MONO:
+	case PMAX_FBTYPE_PM_COLOR:
+		ri.ri_depth = info->fi_type.fb_depth;
+		ri.ri_flg = RI_CLEAR;
+		epwf = 1;
+		bior = WSDISPLAY_FONTORDER_R2L;
+		break;
+	default:
+		ri.ri_depth = info->fi_type.fb_depth;
+		ri.ri_flg = RI_CLEAR;
+		epwf = (ri.ri_depth != 8);
+		bior = WSDISPLAY_FONTORDER_L2R;
+		break;
+	}
+
+	ri.ri_width = info->fi_type.fb_width;
+	ri.ri_height = info->fi_type.fb_height;
+	ri.ri_stride = info->fi_linebytes;
+	ri.ri_bits = (u_char *)info->fi_pixels;
+
+	wsfont_init();
+
+	if (epwf)
+		cookie = wsfont_find(NULL, 8, 0, 0);
+	else
+		cookie = wsfont_find("Gallant", 0, 0, 0);
+
+	if (cookie > 0)
+		wsfont_lock(cookie, &ri.ri_font, bior,
+		    WSDISPLAY_FONTORDER_L2R);
+
+	/* Get operations set and set framebugger colormap */
+	if (rasops_init(&ri, 5000, 80))
+		panic("rcons_connect: rasops_init failed");
+
+	if (ri.ri_depth == 8 && info->fi_type.fb_boardtype != PMAX_FBTYPE_MFB)
+		info->fi_driver->fbd_putcmap(info, rasops_cmap, 0, 256);
 
 	fbconstty = &rcons_tty [0];
 	fbconstty->t_dev = makedev(85, 0);	/* /dev/console */
@@ -126,47 +155,65 @@ rcons_connect (info)
 	 * the part that rcons.h says
 	 * "This section must be filled in by the framebugger device"
 	 */
-	rc.rc_width = info->fi_type.fb_width;
-	rc.rc_height = info->fi_type.fb_height;
-	rc.rc_depth = info->fi_type.fb_depth;
-	rc.rc_pixels =info->fi_pixels;
-	rc.rc_linebytes = info->fi_linebytes;
-#define HW_FONT_WIDTH 8
-#define HW_FONT_HEIGHT 15
-	rc.rc_maxrow = rc.rc_height / HW_FONT_HEIGHT;
-	rc.rc_maxcol = 80;
+	rc.rc_ops = &ri.ri_ops;
+	rc.rc_cookie = &ri;
+	rc.rc_maxrow = ri.ri_rows;
+	rc.rc_maxcol = ri.ri_cols;
 	rc.rc_bell = lk_bell;
-
-	/* Initialize the state information. */
-	rc.rc_bits = 0;
-	rc.rc_ringing = 0;
-	rc.rc_belldepth = 0;
-	rc.rc_scroll = 0;
-	rc.rc_p0 = 0;
-	rc.rc_p1 = 0;
-
-	/* The following two items may optionally be left zero */
-	rc.rc_row = &row;
-	rc.rc_col = &col;
-
-	/* Initialize the rastercons font to something suitable for a qvss */
-	rcons_font(&rc);
-
-
-	row = (rc.rc_height / HW_FONT_HEIGHT) - 1;
-	col = 0;
-
-	rcons_init (&rc);
-
-
-	rc.rc_xorigin = 0;
-	rc.rc_yorigin = 0;
+	rc.rc_width = ri.ri_width;
+	rc.rc_height = ri.ri_height;
+	rc.rc_row = 0;
+	rc.rc_col = 0;
+	rc.rc_deffgcolor = WSCOL_WHITE;
+	rc.rc_defbgcolor = WSCOL_BLACK;
+	rcons_init(&rc, 1);
+	rcons_ttyinit(fbconstty);
 }
+#endif
 
-/* 
+
+/*
+ * Called by drivers which can provide a native 'struct wsdisplay_emulops'.
+ */
+#if NPX > 0
+void
+rcons_connect_native (ops, cookie, width, height, cols, rows)
+	struct wsdisplay_emulops *ops;
+	void *cookie;
+	int width, height, cols, rows;
+{
+	/*XXX*/ cn_in_dev = cn_tab->cn_dev; /*XXX*/ /* FIXME */
+
+	fbconstty = &rcons_tty [0];
+	fbconstty->t_dev = makedev(85, 0);	/* /dev/console */
+	fbconstty->t_ispeed = fbconstty->t_ospeed = TTYDEF_SPEED;
+	fbconstty->t_param = (int (*)(struct tty *, struct termios *))nullop;
+
+	/*
+	 * Connect the console geometry...
+	 * the part that rcons.h says
+	 * "This section must be filled in by the framebugger device"
+	 */
+	rc.rc_ops = ops;
+	rc.rc_cookie = cookie;
+	rc.rc_bell = lk_bell;
+	rc.rc_width = width;
+	rc.rc_height = width;
+	rc.rc_maxcol = cols;
+	rc.rc_maxrow = rows;
+	rc.rc_row = 0;
+	rc.rc_col = 0;
+	rc.rc_deffgcolor = WSCOL_WHITE;
+	rc.rc_defbgcolor = WSCOL_BLACK;
+	rcons_init(&rc, 1);
+	rcons_ttyinit(fbconstty);
+}
+#endif
+
+/*
  * Hack around the rcons putchar interface not taking a dev_t.
  */
-void
+static void
 rcons_vputc(dev, c)
 	dev_t dev;
 	int c;
@@ -175,7 +222,6 @@ rcons_vputc(dev, c)
 	 * Call the pointer-to-function that rcons_init tried to give us,
 	 * discarding the dev_t argument.
 	 */
-	extern void rcons_cnputc __P((int c));
 	rcons_cnputc(c);
 }
 
@@ -187,12 +233,12 @@ void
 rcons_indev(cn)
 	struct consdev *cn;
 {
- 	register int s;
+ 	int s;
 
 	s = spltty();
 
 	/* Send any subsequent console calls to this cn_tab to rcons. */
-	cn->cn_dev = makedev (RCONSDEV, 0);	
+	cn->cn_dev = makedev (RCONSDEV, 0);
 
 	/* fixup for signature mismatch. */
 	cn->cn_putc = rcons_vputc;
@@ -210,7 +256,7 @@ void
 rasterconsoleattach (n)
 	int n;
 {
-	register struct tty *tp = &rcons_tty [0];
+	struct tty *tp = &rcons_tty [0];
 
 #ifdef notyet
 	int status;
@@ -243,7 +289,7 @@ rasterconsoleattach (n)
 	 * console device at rcons.
 	 */
 #endif
-	
+
 }
 
 /* ARGSUSED */
@@ -253,7 +299,7 @@ rconsopen(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct tty *tp = &rcons_tty [0];
+	struct tty *tp = &rcons_tty [0];
  	/*static int firstopen = 1;*/
 	int status;
 
@@ -283,7 +329,7 @@ rconsclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	register struct tty *tp = &rcons_tty [0];
+	struct tty *tp = &rcons_tty [0];
 
 	(*linesw[tp->t_line].l_close)(tp, flag);
 	ttyclose(tp);
@@ -298,7 +344,7 @@ rconsread(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	register struct tty *tp = &rcons_tty [0];
+	struct tty *tp = &rcons_tty [0];
 
 	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
 }
@@ -310,7 +356,7 @@ rconswrite(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	register struct tty *tp;
+	struct tty *tp;
 
 	tp = &rcons_tty [0];
 	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
@@ -320,7 +366,8 @@ struct tty *
 rconstty(dev)
         dev_t dev;
 {
-        register struct tty *tp = &rcons_tty [0];
+        struct tty *tp = &rcons_tty[0];
+
         return (tp);
 }
 
@@ -332,7 +379,7 @@ rconsioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	register struct tty *tp;
+	struct tty *tp;
 	int error;
 
 	tp = &rcons_tty [0];
@@ -352,16 +399,6 @@ rconsstop(tp, rw)
 
 }
 
-/*ARGSUSED*/
-void
-rconsreset(tp, rw)
-	struct tty *tp;
-	int rw;
-{
-
-}
-
-
 int
 rconspoll(dev, events, p)
 	dev_t dev;
@@ -372,11 +409,11 @@ rconspoll(dev, events, p)
 }
 
 /*ARGSUSED*/
-int
-rconsmmap (dev, off, prot)
+paddr_t
+rconsmmap(dev, off, prot)
 	dev_t dev;
-	 int off;
-	 int prot;
+	off_t off;
+	int prot;
 {
 
 	return -1;
@@ -389,7 +426,7 @@ rconsstart(tp)
 	struct tty *tp;
 {
 	struct clist *cl;
-	register int s;
+	int s;
 
 	s = spltty();
 	if (tp->t_state & (TS_BUSY|TS_TTSTOP|TS_TIMEOUT))
@@ -400,13 +437,13 @@ rconsstart(tp)
 		tp->t_state |= TS_BUSY;
 		if (0 /* hardware prio */) {
 			/* called at level zero - update screen now. */
-			(void) splsoftclock();
+			(void) spllowersoftclock();
 			/*kd_putfb(tp);*/
 			(void) spltty();
 			tp->t_state &= ~TS_BUSY;
 		} else {
 			/* called at interrupt level - do it later */
-			timeout(rcons_later, (void*)tp, 0);
+			callout_reset(&tp->t_rstrt_ch, 0, rcons_later, tp);
 		}
 	}
 	if (cl->c_cc <= tp->t_lowat) {
@@ -430,7 +467,7 @@ rcons_later(tpaddr)
 	void *tpaddr;
 {
 	struct tty *tp = tpaddr;
-	register int s;
+	int s;
 
 #if 0
 	/*XXX*/printf("rcons_later\n");
@@ -460,7 +497,7 @@ rcons_input (dev, ic)
 	int unit = minor (dev);
 
 #ifdef RCONS_DEBUG
-	printf("rcons_input: unit %d gives %c on \n", unit, ic);
+	printf("rcons_input: dev %d.%d gives %c\n", major(dev), unit, ic);
 #endif
 
 	if (unit > NRASTERCONSOLE)

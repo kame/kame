@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.17 1999/03/15 15:47:22 leo Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.22 2000/06/04 19:14:35 cgd Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.  All rights reserved.
@@ -66,7 +66,18 @@
  */
 #define PCI_MEM_START   0x00100000      /*   1 MByte */
 #define PCI_IO_START    0x00004000      /*  16 kByte (some PCI cards allow only
-					    I/O addresses up to 0xffff) */
+					    I/O adresses up to 0xffff) */
+
+/*
+ * PCI memory and IO should be aligned acording to this masks
+ */
+#define PCI_MACHDEP_IO_ALIGN_MASK	0xffffff00
+#define PCI_MACHDEP_MEM_ALIGN_MASK	0xfffff000
+
+/*
+ * Convert a PCI 'device' number to a slot number.
+ */
+#define	DEV2SLOT(dev)	(3 - dev)
 
 /*
  * Struct to hold the memory and I/O datas of the pci devices
@@ -115,8 +126,6 @@ struct device	*pdp, *dp;
 void		*auxp;
 {
 	struct pcibus_attach_args	pba;
-	bus_space_tag_t			leb_alloc_bus_space_tag __P((void));
-
 
 	enable_pci_devices();
 
@@ -125,8 +134,8 @@ void		*auxp;
 	pba.pba_bus     = 0;
 	pba.pba_flags	= PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	pba.pba_dmat	= BUS_PCI_DMA_TAG;
-	pba.pba_iot     = leb_alloc_bus_space_tag();
-	pba.pba_memt    = leb_alloc_bus_space_tag();
+	pba.pba_iot     = leb_alloc_bus_space_tag(NULL);
+	pba.pba_memt    = leb_alloc_bus_space_tag(NULL);
 	if ((pba.pba_iot == NULL) || (pba.pba_memt == NULL)) {
 		printf("leb_alloc_bus_space_tag failed!\n");
 		return;
@@ -300,12 +309,15 @@ enable_pci_devices()
 	/*
 	 * special case: if a display card is found and memory is enabled
 	 * preserve 128k at 0xa0000 as vga memory.
+	 * XXX: if a display card is found without being enabled, leave
+	 *      it alone! You will usually only create conflicts by enabeling
+	 *      it.
 	 */
 	class = pci_conf_read(pc, tag, PCI_CLASS_REG);
 	switch (PCI_CLASS(class)) {
 	    case PCI_CLASS_PREHISTORIC:
 	    case PCI_CLASS_DISPLAY:
-		if (csr & (PCI_COMMAND_MEM_ENABLE | PCI_COMMAND_MASTER_ENABLE)) {
+	      if (csr & (PCI_COMMAND_MEM_ENABLE | PCI_COMMAND_MASTER_ENABLE)) {
 		    p = (struct pci_memreg *)malloc(sizeof(struct pci_memreg),
 				M_TEMP, M_WAITOK);
 		    memset(p, '\0', sizeof(struct pci_memreg));
@@ -318,7 +330,8 @@ enable_pci_devices()
 		    p->address = 0xa0000;
 
 		    insert_into_list(&memlist, p);
-		}
+	      }
+	      else continue;
 	}
 
 	for (reg = PCI_MAPREG_START; reg < PCI_MAPREG_END; reg += 4) {
@@ -344,6 +357,14 @@ enable_pci_devices()
 		p->size = PCI_MAPREG_IO_SIZE(mask);
 
 		/*
+		 * Align IO if necessary
+		 */
+		if (p->size < PCI_MAPREG_IO_SIZE(PCI_MACHDEP_IO_ALIGN_MASK)) {
+		    p->mask = PCI_MACHDEP_IO_ALIGN_MASK;
+		    p->size = PCI_MAPREG_IO_SIZE(p->mask);
+		}
+
+		/*
 		 * if I/O is already enabled (probably by the console driver)
 		 * save the address in order to take care about it later.
 		 */
@@ -353,6 +374,14 @@ enable_pci_devices()
 		insert_into_list(&iolist, p);
 	    } else {
 		p->size = PCI_MAPREG_MEM_SIZE(mask);
+
+		/*
+		 * Align memory if necessary
+		 */
+		if (p->size < PCI_MAPREG_IO_SIZE(PCI_MACHDEP_MEM_ALIGN_MASK)) {
+		    p->mask = PCI_MACHDEP_MEM_ALIGN_MASK;
+		    p->size = PCI_MAPREG_MEM_SIZE(p->mask);
+		}
 
 		/*
 		 * if memory is already enabled (probably by the console driver)
@@ -373,8 +402,8 @@ enable_pci_devices()
 	 * number. This makes sense on the atari because the
 	 * individual slots are hard-wired to a specific MFP-pin.
 	 */
-	csr  = (dev << PCI_INTERRUPT_PIN_SHIFT);
-	csr |= (dev << PCI_INTERRUPT_LINE_SHIFT);
+	csr  = (DEV2SLOT(dev) << PCI_INTERRUPT_PIN_SHIFT);
+	csr |= (DEV2SLOT(dev) << PCI_INTERRUPT_LINE_SHIFT);
 	pci_conf_write(pc, tag, PCI_INTERRUPT_REG, csr);
     }
 
@@ -437,6 +466,7 @@ enable_pci_devices()
 		csr = pci_conf_read(pc, p->tag, PCI_COMMAND_STATUS_REG);
 		csr |= PCI_COMMAND_MEM_ENABLE | PCI_COMMAND_MASTER_ENABLE;
 		pci_conf_write(pc, p->tag, PCI_COMMAND_STATUS_REG, csr);
+		p->csr = csr;
 	    }
 	}
 	p = LIST_NEXT(p, link);
@@ -477,6 +507,7 @@ enable_pci_devices()
 		csr = pci_conf_read(pc, p->tag, PCI_COMMAND_STATUS_REG);
 		csr |= PCI_COMMAND_IO_ENABLE | PCI_COMMAND_MASTER_ENABLE;
 		pci_conf_write(pc, p->tag, PCI_COMMAND_STATUS_REG, csr);
+		p->csr = csr;
 	    }
 	}
 	p = LIST_NEXT(p, link);
@@ -609,6 +640,16 @@ pci_intr_string(pc, ih)
 	sprintf(irqstr, "irq %d", ih);
 	return (irqstr);
 	
+}
+
+const struct evcnt *
+pci_intr_evcnt(pc, ih)
+	pci_chipset_tag_t pc;
+	pci_intr_handle_t ih;
+{
+
+	/* XXX for now, no evcnt parent reported */
+	return NULL;
 }
 
 /*

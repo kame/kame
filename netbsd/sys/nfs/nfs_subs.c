@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_subs.c,v 1.69.2.1 1999/09/10 22:24:25 he Exp $	*/
+/*	$NetBSD: nfs_subs.c,v 1.77.2.1 2000/10/30 22:22:58 tv Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -41,6 +41,7 @@
 #include "fs_nfs.h"
 #include "opt_nfsserver.h"
 #include "opt_iso.h"
+#include "opt_inet.h"
 
 /*
  * These functions support the macros and help fiddle mbuf chains for
@@ -104,7 +105,6 @@ nfstype nfsv3_type[9] = { NFNON, NFREG, NFDIR, NFBLK, NFCHR, NFLNK, NFSOCK,
 enum vtype nv2tov_type[8] = { VNON, VREG, VDIR, VBLK, VCHR, VLNK, VNON, VNON };
 enum vtype nv3tov_type[8]={ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO };
 int nfs_ticks;
-extern struct nfs_public nfs_pub;
 
 /* NFS client/server stats. */
 struct nfsstats nfsstats;
@@ -538,8 +538,6 @@ extern int nqsrv_clockskew;
 extern int nqsrv_writeslack;
 extern int nqsrv_maxlease;
 extern int nqnfs_piggy[NFS_NPROCS];
-extern nfstype nfsv2_type[9];
-extern nfstype nfsv3_type[9];
 extern struct nfsnodehashhead *nfsnodehashtbl;
 extern u_long nfsnodehash;
 
@@ -560,9 +558,9 @@ nfsm_reqh(vp, procid, hsiz, bposp)
 	int hsiz;
 	caddr_t *bposp;
 {
-	register struct mbuf *mb;
-	register u_int32_t *tl;
-	register caddr_t bpos;
+	struct mbuf *mb;
+	u_int32_t *tl;
+	caddr_t bpos;
 	struct mbuf *mb2;
 	struct nfsmount *nmp;
 	int nqflag;
@@ -604,7 +602,7 @@ nfsm_reqh(vp, procid, hsiz, bposp)
 struct mbuf *
 nfsm_rpchead(cr, nmflag, procid, auth_type, auth_len, auth_str, verf_len,
 	verf_str, mrest, mrest_len, mbp, xidp)
-	register struct ucred *cr;
+	struct ucred *cr;
 	int nmflag;
 	int procid;
 	int auth_type;
@@ -617,10 +615,10 @@ nfsm_rpchead(cr, nmflag, procid, auth_type, auth_len, auth_str, verf_len,
 	struct mbuf **mbp;
 	u_int32_t *xidp;
 {
-	register struct mbuf *mb;
-	register u_int32_t *tl;
-	register caddr_t bpos;
-	register int i;
+	struct mbuf *mb;
+	u_int32_t *tl;
+	caddr_t bpos;
+	int i;
 	struct mbuf *mreq, *mb2;
 	int siz, grpsiz, authsiz;
 	struct timeval tv;
@@ -768,13 +766,13 @@ nfsm_rpchead(cr, nmflag, procid, auth_type, auth_len, auth_str, verf_len,
 int
 nfsm_mbuftouio(mrep, uiop, siz, dpos)
 	struct mbuf **mrep;
-	register struct uio *uiop;
+	struct uio *uiop;
 	int siz;
 	caddr_t *dpos;
 {
-	register char *mbufcp, *uiocp;
-	register int xfer, left, len;
-	register struct mbuf *mp;
+	char *mbufcp, *uiocp;
+	int xfer, left, len;
+	struct mbuf *mp;
 	long uiosiz, rem;
 	int error = 0;
 
@@ -843,14 +841,14 @@ nfsm_mbuftouio(mrep, uiop, siz, dpos)
  */
 int
 nfsm_uiotombuf(uiop, mq, siz, bpos)
-	register struct uio *uiop;
+	struct uio *uiop;
 	struct mbuf **mq;
 	int siz;
 	caddr_t *bpos;
 {
-	register char *uiocp;
-	register struct mbuf *mp, *mp2;
-	register int xfer, left, mlen;
+	char *uiocp;
+	struct mbuf *mp, *mp2;
+	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
 	char *cp;
 
@@ -937,7 +935,7 @@ nfsm_disct(mdp, dposp, siz, left, cp2)
 	int left;
 	caddr_t *cp2;
 {
-	register struct mbuf *m1, *m2;
+	struct mbuf *m1, *m2;
 	struct mbuf *havebuf = NULL;
 	caddr_t src = *dposp;
 	caddr_t dst;
@@ -1044,8 +1042,8 @@ nfs_adv(mdp, dposp, offs, left)
 	int offs;
 	int left;
 {
-	register struct mbuf *m;
-	register int s;
+	struct mbuf *m;
+	int s;
 
 	m = *mdp;
 	s = left;
@@ -1071,7 +1069,7 @@ nfsm_strtmbuf(mb, bpos, cp, siz)
 	const char *cp;
 	long siz;
 {
-	register struct mbuf *m1 = NULL, *m2;
+	struct mbuf *m1 = NULL, *m2;
 	long left, xfer, len, tlen;
 	u_int32_t *tl;
 	int putsize;
@@ -1401,7 +1399,7 @@ void
 nfs_init()
 {
 
-#if !defined(alpha) && defined(DIAGNOSTIC)
+#if !defined(alpha) && !defined(_LP64) && defined(DIAGNOSTIC)
 	/*
 	 * Check to see if major data structures haven't bloated.
 	 */
@@ -1467,7 +1465,7 @@ nfs_init()
 void
 nfs_vfs_init()
 {
-	register int i;
+	int i;
 
 	/* Ensure async daemons disabled */
 	for (i = 0; i < NFS_MAXASYNCDAEMON; i++) {
@@ -1475,6 +1473,12 @@ nfs_vfs_init()
 		nfs_iodmount[i] = (struct nfsmount *)0;
 	}
 	nfs_nhinit();			/* Init the nfsnode table */
+}
+
+void
+nfs_vfs_done()
+{
+	nfs_nhdone();
 }
 
 /*
@@ -1498,7 +1502,7 @@ nfsm_loadattrcache(vpp, mdp, dposp, vaper)
 	caddr_t *dposp;
 	struct vattr *vaper;
 {
-	register int32_t t1;
+	int32_t t1;
 	caddr_t cp2;
 	int error = 0;
 	struct mbuf *md;
@@ -1518,15 +1522,15 @@ nfs_loadattrcache(vpp, fp, vaper)
 	struct nfs_fattr *fp;
 	struct vattr *vaper;
 {
-	register struct vnode *vp = *vpp;
-	register struct vattr *vap;
+	struct vnode *vp = *vpp;
+	struct vattr *vap;
 	int v3 = NFS_ISV3(vp);
 	enum vtype vtyp;
 	u_short vmode;
 	struct timespec mtime;
 	struct vnode *nvp;
 	int32_t rdev;
-	register struct nfsnode *np;
+	struct nfsnode *np;
 	extern int (**spec_nfsv2nodeop_p) __P((void *));
 
 	if (v3) {
@@ -1558,7 +1562,7 @@ nfs_loadattrcache(vpp, fp, vaper)
 	 * information.
 	 */
 	np = VTONFS(vp);
-	if (vp->v_type != vtyp) {
+	if (vp->v_type == VNON) {
 		vp->v_type = vtyp;
 		if (vp->v_type == VFIFO) {
 			extern int (**fifo_nfsv2nodeop_p) __P((void *));
@@ -1573,13 +1577,15 @@ nfs_loadattrcache(vpp, fp, vaper)
 				 * Since the nfsnode does not have a lock, its
 				 * vnode lock has to be carried over.
 				 */
-				nvp->v_vnlock = vp->v_vnlock;
-				vp->v_vnlock = NULL;
 				nvp->v_data = vp->v_data;
 				vp->v_data = NULL;
 				vp->v_op = spec_vnodeop_p;
-				vrele(vp);
+				vput(vp);
 				vgone(vp);
+				/*
+				 * XXX When nfs starts locking, we need to
+				 * lock the new node here.
+				 */
 				/*
 				 * Reinitialize aliased node.
 				 */
@@ -1595,15 +1601,26 @@ nfs_loadattrcache(vpp, fp, vaper)
 	vap->va_rdev = (dev_t)rdev;
 	vap->va_mtime = mtime;
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
+	switch (vtyp) {
+	case VDIR:
+		vap->va_blocksize = NFS_DIRFRAGSIZ;
+		break;
+	case VBLK:
+		vap->va_blocksize = BLKDEV_IOSIZE;
+		break;
+	case VCHR:
+		vap->va_blocksize = MAXBSIZE;
+		break;
+	default:
+		vap->va_blocksize = v3 ? vp->v_mount->mnt_stat.f_iosize :
+		    fxdr_unsigned(int32_t, fp->fa2_blocksize);
+		break;
+	}
 	if (v3) {
 		vap->va_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
 		vap->va_uid = fxdr_unsigned(uid_t, fp->fa_uid);
 		vap->va_gid = fxdr_unsigned(gid_t, fp->fa_gid);
 		vap->va_size = fxdr_hyper(&fp->fa3_size);
-		if (vtyp == VDIR)
-			vap->va_blocksize = NFS_DIRFRAGSIZ;
-		else
-			vap->va_blocksize = NFS_FABLKSIZE;
 		vap->va_bytes = fxdr_hyper(&fp->fa3_used);
 		vap->va_fileid = fxdr_unsigned(int32_t,
 		    fp->fa3_fileid.nfsuquad[1]);
@@ -1616,11 +1633,6 @@ nfs_loadattrcache(vpp, fp, vaper)
 		vap->va_uid = fxdr_unsigned(uid_t, fp->fa_uid);
 		vap->va_gid = fxdr_unsigned(gid_t, fp->fa_gid);
 		vap->va_size = fxdr_unsigned(u_int32_t, fp->fa2_size);
-		if (vtyp == VDIR)
-			vap->va_blocksize = NFS_DIRFRAGSIZ;
-		else
-			vap->va_blocksize =
-				fxdr_unsigned(int32_t, fp->fa2_blocksize);
 		vap->va_bytes = fxdr_unsigned(int32_t, fp->fa2_blocks)
 		    * NFS_FABLKSIZE;
 		vap->va_fileid = fxdr_unsigned(int32_t, fp->fa2_fileid);
@@ -1665,11 +1677,11 @@ nfs_loadattrcache(vpp, fp, vaper)
  */
 int
 nfs_getattrcache(vp, vaper)
-	register struct vnode *vp;
+	struct vnode *vp;
 	struct vattr *vaper;
 {
-	register struct nfsnode *np = VTONFS(vp);
-	register struct vattr *vap;
+	struct nfsnode *np = VTONFS(vp);
+	struct vattr *vap;
 
 	if ((time.tv_sec - np->n_attrstamp) >= NFS_ATTRTIMEO(np)) {
 		nfsstats.attrcache_misses++;
@@ -1781,7 +1793,7 @@ nfs_cookieheuristic(vp, flagp, p, cred)
  */
 int
 nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
-	register struct nameidata *ndp;
+	struct nameidata *ndp;
 	fhandle_t *fhp;
 	int len;
 	struct nfssvc_sock *slp;
@@ -1792,9 +1804,9 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 	struct proc *p;
 	int kerbflag, pubflag;
 {
-	register int i, rem;
-	register struct mbuf *md;
-	register char *fromcp, *tocp, *cp;
+	int i, rem;
+	struct mbuf *md;
+	char *fromcp, *tocp, *cp;
 	struct iovec aiov;
 	struct uio auio;
 	struct vnode *dp;
@@ -2015,12 +2027,12 @@ out:
 void
 nfsm_adj(mp, len, nul)
 	struct mbuf *mp;
-	register int len;
+	int len;
 	int nul;
 {
-	register struct mbuf *m;
-	register int count, i;
-	register char *cp;
+	struct mbuf *m;
+	int count, i;
+	char *cp;
 
 	/*
 	 * Trim from tail.  Scan the mbuf chain,
@@ -2078,15 +2090,15 @@ void
 nfsm_srvwcc(nfsd, before_ret, before_vap, after_ret, after_vap, mbp, bposp)
 	struct nfsrv_descript *nfsd;
 	int before_ret;
-	register struct vattr *before_vap;
+	struct vattr *before_vap;
 	int after_ret;
 	struct vattr *after_vap;
 	struct mbuf **mbp;
 	char **bposp;
 {
-	register struct mbuf *mb = *mbp, *mb2;
-	register char *bpos = *bposp;
-	register u_int32_t *tl;
+	struct mbuf *mb = *mbp, *mb2;
+	char *bpos = *bposp;
+	u_int32_t *tl;
 
 	if (before_ret) {
 		nfsm_build(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -2113,10 +2125,10 @@ nfsm_srvpostopattr(nfsd, after_ret, after_vap, mbp, bposp)
 	struct mbuf **mbp;
 	char **bposp;
 {
-	register struct mbuf *mb = *mbp, *mb2;
-	register char *bpos = *bposp;
-	register u_int32_t *tl;
-	register struct nfs_fattr *fp;
+	struct mbuf *mb = *mbp, *mb2;
+	char *bpos = *bposp;
+	u_int32_t *tl;
+	struct nfs_fattr *fp;
 
 	if (after_ret) {
 		nfsm_build(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -2133,9 +2145,9 @@ nfsm_srvpostopattr(nfsd, after_ret, after_vap, mbp, bposp)
 
 void
 nfsm_srvfattr(nfsd, vap, fp)
-	register struct nfsrv_descript *nfsd;
-	register struct vattr *vap;
-	register struct nfs_fattr *fp;
+	struct nfsrv_descript *nfsd;
+	struct vattr *vap;
+	struct nfs_fattr *fp;
 {
 
 	fp->fa_nlink = txdr_unsigned(vap->va_nlink);
@@ -2191,8 +2203,8 @@ nfsrv_fhtovp(fhp, lockflag, vpp, cred, slp, nam, rdonlyp, kerbflag, pubflag)
 	int *rdonlyp;
 	int kerbflag;
 {
-	register struct mount *mp;
-	register int i;
+	struct mount *mp;
+	int i;
 	struct ucred *credanon;
 	int error, exflags;
 	struct sockaddr_in *saddr;
@@ -2217,11 +2229,18 @@ nfsrv_fhtovp(fhp, lockflag, vpp, cred, slp, nam, rdonlyp, kerbflag, pubflag)
 
 	if (!(exflags & (MNT_EXNORESPORT|MNT_EXPUBLIC))) {
 		saddr = mtod(nam, struct sockaddr_in *);
-		if (saddr->sin_family == AF_INET &&
+		if ((saddr->sin_family == AF_INET) &&
 		    ntohs(saddr->sin_port) >= IPPORT_RESERVED) {
 			vput(*vpp);
 			return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 		}
+#ifdef INET6
+		if ((saddr->sin_family == AF_INET6) &&
+		    ntohs(saddr->sin_port) >= IPV6PORT_RESERVED) {
+			vput(*vpp);
+			return (NFSERR_AUTHERR | AUTH_TOOWEAK);
+		}
+#endif
 	}
 	/*
 	 * Check/setup credentials.
@@ -2281,7 +2300,7 @@ netaddr_match(family, haddr, nam)
 	union nethostaddr *haddr;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in *inetaddr;
+	struct sockaddr_in *inetaddr;
 
 	switch (family) {
 	case AF_INET:
@@ -2290,10 +2309,22 @@ netaddr_match(family, haddr, nam)
 		    inetaddr->sin_addr.s_addr == haddr->had_inetaddr)
 			return (1);
 		break;
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 *sin6_1, *sin6_2;
+
+		sin6_1 = mtod(nam, struct sockaddr_in6 *);
+		sin6_2 = mtod(haddr->had_nam, struct sockaddr_in6 *);
+		if (sin6_1->sin6_family == AF_INET6 &&
+		    IN6_ARE_ADDR_EQUAL(&sin6_1->sin6_addr, &sin6_2->sin6_addr))
+			return 1;
+	    }
+#endif
 #ifdef ISO
 	case AF_ISO:
 	    {
-		register struct sockaddr_iso *isoaddr1, *isoaddr2;
+		struct sockaddr_iso *isoaddr1, *isoaddr2;
 
 		isoaddr1 = mtod(nam, struct sockaddr_iso *);
 		isoaddr2 = mtod(haddr->had_nam, struct sockaddr_iso *);
@@ -2322,8 +2353,8 @@ void
 nfs_clearcommit(mp)
 	struct mount *mp;
 {
-	register struct vnode *vp, *nvp;
-	register struct buf *bp, *nbp;
+	struct vnode *vp, *nvp;
+	struct buf *bp, *nbp;
 	int s;
 
 	s = splbio();
@@ -2349,9 +2380,9 @@ loop:
 int
 nfsrv_errmap(nd, err)
 	struct nfsrv_descript *nd;
-	register int err;
+	int err;
 {
-	register short *defaulterrp, *errp;
+	short *defaulterrp, *errp;
 
 	if (nd->nd_flag & ND_NFSV3) {
 	    if (nd->nd_procnum <= NFSPROC_COMMIT) {
@@ -2378,10 +2409,10 @@ nfsrv_errmap(nd, err)
  */
 void
 nfsrvw_sort(list, num)
-        register gid_t *list;
-        register int num;
+        gid_t *list;
+        int num;
 {
-	register int i, j;
+	int i, j;
 	gid_t v;
 
 	/* Insertion sort. */
@@ -2399,9 +2430,9 @@ nfsrvw_sort(list, num)
  */
 void
 nfsrv_setcred(incred, outcred)
-	register struct ucred *incred, *outcred;
+	struct ucred *incred, *outcred;
 {
-	register int i;
+	int i;
 
 	memset((caddr_t)outcred, 0, sizeof (struct ucred));
 	outcred->cr_ref = 1;

@@ -1,4 +1,4 @@
-/*	$NetBSD: lsi64854.c,v 1.5.2.2 1999/04/23 15:11:18 perry Exp $ */
+/*	$NetBSD: lsi64854.c,v 1.10 2000/06/12 05:25:48 mrg Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -264,8 +264,8 @@ lsi64854_setup(sc, addr, len, datain, dmasize)
 	sc->sc_dmaaddr = addr;
 	sc->sc_dmalen = len;
 
-	DPRINTF(("%s: start %d@%p,%d\n", sc->sc_dev.dv_xname,
-		*sc->sc_dmalen, *sc->sc_dmaaddr, datain ? 1 : 0));
+	DPRINTF(("%s: start %ld@%p,%d\n", sc->sc_dev.dv_xname,
+		(long)*sc->sc_dmalen, *sc->sc_dmaaddr, datain ? 1 : 0));
 
 	/*
 	 * the rules say we cannot transfer more than the limit
@@ -275,7 +275,7 @@ lsi64854_setup(sc, addr, len, datain, dmasize)
 	*dmasize = sc->sc_dmasize =
 		min(*dmasize, DMAMAX((size_t) *sc->sc_dmaaddr));
 
-	DPRINTF(("dma_setup: dmasize = %d\n", sc->sc_dmasize));
+	DPRINTF(("dma_setup: dmasize = %ld\n", (long)sc->sc_dmasize));
 
 	/* Program the DMA address */
 	if (sc->sc_dmasize) {
@@ -287,7 +287,7 @@ lsi64854_setup(sc, addr, len, datain, dmasize)
 			panic("%s: cannot allocate DVMA address",
 			      sc->sc_dev.dv_xname);
 		bus_dmamap_sync(sc->sc_dmatag, sc->sc_dmamap,
-				(bus_addr_t)sc->sc_dvmaaddr, sc->sc_dmasize,
+				(bus_addr_t)(u_long)sc->sc_dvmaaddr, sc->sc_dmasize,
 				datain
 					? BUS_DMASYNC_PREREAD
 					: BUS_DMASYNC_PREWRITE);
@@ -422,7 +422,7 @@ lsi64854_scsi_intr(arg)
 
 	if (sc->sc_dmamap->dm_nsegs > 0) {
 		bus_dmamap_sync(sc->sc_dmatag, sc->sc_dmamap,
-				(bus_addr_t)sc->sc_dvmaaddr, sc->sc_dmasize,
+				(bus_addr_t)(u_long)sc->sc_dvmaaddr, sc->sc_dmasize,
 				(csr & D_WRITE) != 0
 					? BUS_DMASYNC_POSTREAD
 					: BUS_DMASYNC_POSTWRITE);
@@ -454,7 +454,7 @@ lsi64854_enet_intr(arg)
 	struct lsi64854_softc *sc = arg;
 	char bits[64];
 	u_int32_t csr;
-static int dodrain=0;
+	static int dodrain = 0;
 
 	csr = L64854_GCSR(sc);
 
@@ -499,8 +499,8 @@ lsi64854_setup_pp(sc, addr, len, datain, dmasize)
 	sc->sc_dmaaddr = addr;
 	sc->sc_dmalen = len;
 
-	DPRINTF(("%s: start %d@%p,%d\n", sc->sc_dev.dv_xname,
-		*sc->sc_dmalen, *sc->sc_dmaaddr, datain ? 1 : 0));
+	DPRINTF(("%s: start %ld@%p,%d\n", sc->sc_dev.dv_xname,
+		(long)*sc->sc_dmalen, *sc->sc_dmaaddr, datain ? 1 : 0));
 
 	/*
 	 * the rules say we cannot transfer more than the limit
@@ -510,7 +510,7 @@ lsi64854_setup_pp(sc, addr, len, datain, dmasize)
 	*dmasize = sc->sc_dmasize =
 		min(*dmasize, DMAMAX((size_t) *sc->sc_dmaaddr));
 
-	DPRINTF(("dma_setup: dmasize = %d\n", sc->sc_dmasize));
+	DPRINTF(("dma_setup: dmasize = %ld\n", (long)sc->sc_dmasize));
 
 	/* Program the DMA address */
 	if (sc->sc_dmasize) {
@@ -522,7 +522,7 @@ lsi64854_setup_pp(sc, addr, len, datain, dmasize)
 			panic("%s: cannot allocate DVMA address",
 			      sc->sc_dev.dv_xname);
 		bus_dmamap_sync(sc->sc_dmatag, sc->sc_dmamap,
-				(bus_addr_t)sc->sc_dvmaaddr, sc->sc_dmasize,
+				(bus_addr_t)(u_long)sc->sc_dvmaaddr, sc->sc_dmasize,
 				datain
 					? BUS_DMASYNC_PREREAD
 					: BUS_DMASYNC_PREWRITE);
@@ -597,7 +597,7 @@ lsi64854_pp_intr(arg)
 
 	if (sc->sc_dmamap->dm_nsegs > 0) {
 		bus_dmamap_sync(sc->sc_dmatag, sc->sc_dmamap,
-				(bus_addr_t)sc->sc_dvmaaddr, sc->sc_dmasize,
+				(bus_addr_t)(u_long)sc->sc_dvmaaddr, sc->sc_dmasize,
 				(csr & D_WRITE) != 0
 					? BUS_DMASYNC_POSTREAD
 					: BUS_DMASYNC_POSTWRITE);

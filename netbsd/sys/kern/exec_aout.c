@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_aout.c,v 1.15 1996/09/26 23:34:46 cgd Exp $	*/
+/*	$NetBSD: exec_aout.c,v 1.17 2000/06/13 06:21:51 chs Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -126,14 +126,14 @@ exec_aout_prep_zmagic(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 
 	/* set up command for text segment */
-	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_text,
+	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, round_page(execp->a_text),
 	    epp->ep_taddr, epp->ep_vp, 0, VM_PROT_READ|VM_PROT_EXECUTE);
 
 	/* set up command for data segment */
-	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_data,
+	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, round_page(execp->a_data),
 	    epp->ep_daddr, epp->ep_vp, execp->a_text,
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.19.8.2 2000/01/21 00:27:47 he Exp $	*/
+/*	$NetBSD: clock.c,v 1.23 2000/06/07 14:26:11 leo Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -262,12 +262,22 @@ long
 clkread()
 {
 	u_int	delta;
+	u_char	ipra, tadr;
 
-	delta = ((divisor - MFP->mf_tadr) * tick) / divisor;
+	/*
+	 * Note: Order is important!
+	 * By reading 'ipra' before 'tadr' and caching the data, I try to avoid
+	 * the situation that very low value in 'tadr' is read (== a big delta)
+	 * while also acccounting for a full 'tick' because the counter went
+	 * through zero during the calculations.
+	 */
+	ipra = MFP->mf_ipra; tadr = MFP->mf_tadr;
+
+	delta = ((divisor - tadr) * tick) / divisor;
 	/*
 	 * Account for pending clock interrupts
 	 */
-	if(MFP->mf_iera & IA_TIMA)
+	if(ipra & IA_TIMA)
 		return(delta + tick);
 	return(delta);
 }
@@ -304,7 +314,7 @@ int	n;
 	    u_int	temp;
 		
 	    __asm __volatile ("mulul %2,%1:%0" : "=d" (n), "=d" (temp)
-					       : "d" (TIMB_FREQ));
+					       : "d" (TIMB_FREQ), "d" (n));
 	    __asm __volatile ("divul %1,%2:%0" : "=d" (n)
 					       : "d"(1000000),"d"(temp),"0"(n));
 	}

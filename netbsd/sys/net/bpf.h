@@ -1,4 +1,4 @@
-/*	$NetBSD: bpf.h,v 1.22 1998/07/25 11:31:18 explorer Exp $	*/
+/*	$NetBSD: bpf.h,v 1.25.4.1 2000/11/03 19:24:08 tv Exp $	*/
 
 /*
  * Copyright (c) 1990, 1991, 1993
@@ -161,8 +161,8 @@ struct bpf_hdr {
  */
 #ifdef _KERNEL
 #if defined(__arm32__) || defined(__i386__) || defined(__m68k__) || \
-    defined(__mips__) || defined(__ns32k__) || defined(__sparc__) || \
-    defined(__vax__)
+    defined(__mips__) || defined(__ns32k__) || defined(__vax__) || \
+    defined(__sh3__) || (defined(__sparc__) && !defined(__sparc64__))
 #define SIZEOF_BPF_HDR 18
 #else
 #define SIZEOF_BPF_HDR sizeof(struct bpf_hdr)
@@ -189,6 +189,10 @@ struct bpf_hdr {
 #define DLT_PPP_BSDOS	14	/* BSD/OS Point-to-point Protocol */
 #define DLT_HIPPI	15	/* HIPPI */
 #define DLT_HDLC	16	/* HDLC framing */
+
+/* NetBSD-specific types */
+#define	DLT_PPP_SERIAL	50	/* PPP over serial (async and sync) */
+#define	DLT_PPP_ETHER	51	/* PPP over Ethernet */
 
 /*
  * The instruction encondings.
@@ -267,6 +271,8 @@ int	 bpf_validate __P((struct bpf_insn *, int));
 void	 bpf_tap __P((caddr_t, u_char *, u_int));
 void	 bpf_mtap __P((caddr_t, struct mbuf *));
 void	 bpfattach __P((caddr_t *, struct ifnet *, u_int, u_int));
+void	 bpfdetach __P((struct ifnet *));
+void	 bpf_change_type __P((caddr_t *, u_int, u_int));
 void	 bpfilterattach __P((int));
 #endif
 

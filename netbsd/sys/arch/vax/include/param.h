@@ -1,4 +1,4 @@
-/*      $NetBSD: param.h,v 1.35.2.1 1999/05/03 12:57:36 perry Exp $    */
+/*      $NetBSD: param.h,v 1.43.2.1 2000/07/23 03:49:34 itojun Exp $    */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -73,6 +73,7 @@
 #define	VAX_PGSHIFT	9
 #define	VAX_NBPG	(1 << VAX_PGSHIFT)
 #define	VAX_PGOFSET	(VAX_NBPG - 1)
+#define	VAX_NPTEPG	(VAX_NBPG / 4)
 
 #define	KERNBASE	0x80000000		/* start of kernel virtual */
 
@@ -82,9 +83,6 @@
 #define BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(63 * 1024)	/* max raw I/O transfer size */
 #define	MAXBSIZE	0x4000		/* max FS block size - XXX */
-
-#define	CLSIZELOG2	0		/* XXX - die */
-#define	CLSIZE		1		/* XXX - die */
 
 #define	UPAGES		2		/* pages of u-area */
 #define USPACE		(NBPG*UPAGES)
@@ -103,7 +101,7 @@
  */
 
 #ifndef	MSIZE
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 #endif	/* MSIZE */
 
 #ifndef	MCLSHIFT
@@ -126,12 +124,11 @@
 #endif	/* NMBCLUSTERS */
 
 /*
- * Size of kernel malloc arena in NBPG-sized logical pages
- */ 
-
-#ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(4096*1024/NBPG)
-#endif
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
+ */
+#define	NKMEMPAGES_MIN_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
 
 /*
  * Some macros for units conversion
@@ -164,39 +161,7 @@
 #define	bdbtofsb(bn)	((bn) / (BLKDEV_IOSIZE/DEV_BSIZE))
 
 #ifdef _KERNEL
-#ifndef lint
-#define splx(reg)                                       \
-({                                                      \
-        register int val;                               \
-        __asm__ __volatile ("mfpr $0x12,%0;mtpr %1,$0x12"	\
-                        : "&=g" (val)                   \
-                        : "g" (reg));                   \
-        val;                                            \
-})
-#endif
-
-#define	spl0()		splx(0)		/* IPL0  */
-#define splsoftclock()  splx(8)		/* IPL08 */
-#define splsoftnet()    splx(0xc)	/* IPL0C */
-#define	splddb()	splx(0xf)	/* IPL0F */
-#define splbio()        splx(0x15)	/* IPL15 */
-#define splnet()        splx(0x15)	/* IPL15 */
-#define spltty()        splx(0x15)	/* IPL15 */
-#define splimp()        splx(0x17)	/* IPL17 */
-#define splclock()      splx(0x18)	/* IPL18 */
-#define splhigh()       splx(0x1f)	/* IPL1F */
-#define	splstatclock()	splclock()
-
-/* These are better to use when playing with VAX buses */
-#define	spl4()		splx(0x14)
-#define	spl5()		splx(0x15)
-#define	spl6()		splx(0x16)
-#define	spl7()		splx(0x17)
-
-#if !defined(VAX410) && !defined(VAX43)
-#define vmapbuf(p,q)
-#define vunmapbuf(p,q)
-#endif
+#include <machine/intr.h>
 
 /* Prototype needed for delay() */
 #ifndef	_LOCORE

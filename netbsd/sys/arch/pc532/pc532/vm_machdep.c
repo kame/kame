@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.31 1999/03/24 05:51:09 mrg Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.42 2000/05/28 05:49:03 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996 Matthias Pfaller.
@@ -43,8 +43,6 @@
  *	@(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  */
 
-#include "opt_pmap_new.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -70,13 +68,29 @@ void	setredzone __P((u_short *, caddr_t));
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
- * Copy the pcb and setup the kernel stack for the child.
- * Setup the child's stackframe to return to child_return
- * via proc_trampoline from cpu_switch.
+ * Copy and update the pcb and trap frame, making the child ready to run.
+ * 
+ * Rig the child's kernel stack so that it will start out in
+ * proc_trampoline() and call child_return() with p2 as an
+ * argument. This causes the newly-created child process to go
+ * directly to user level with an apparent return value of 0 from
+ * fork(), while the parent process returns normally.
+ *
+ * p1 is the process being forked; if p1 == &proc0, we are creating
+ * a kernel thread, and the return path and argument are specified with
+ * `func' and `arg'.
+ *
+ * If an alternate user-level stack is requested (with non-zero values
+ * in both the stack and stacksize args), set up the user stack pointer
+ * accordingly.
  */
 void
-cpu_fork(p1, p2)
+cpu_fork(p1, p2, stack, stacksize, func, arg)
 	register struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
+	void (*func) __P((void *));
+	void *arg;
 {
 	register struct pcb *pcb = &p2->p_addr->u_pcb;
 	register struct syscframe *tf;
@@ -100,46 +114,26 @@ cpu_fork(p1, p2)
 	pmap_activate(p2);
 
 	/*
-	 * Copy the syscframe, and arrange for the child to return directly
-	 * through rei().  Note the in-line cpu_set_kpc().
+	 * Copy the syscframe.
 	 */
 	tf = (struct syscframe *)((u_int)p2->p_addr + USPACE) - 1;
+
+	/*
+	 * If specified, give the child a different stack.
+	 */
+	if (stack != NULL)
+		tf->sf_regs.r_sp = (u_int)stack + stacksize;
+
 	p2->p_md.md_regs = &tf->sf_regs;
 	sf = (struct switchframe *)tf - 1;
 	sf->sf_p  = p2;
 	sf->sf_pc = (long) proc_trampoline;
 	sf->sf_fp = (long) &tf->sf_regs.r_fp;
-	sf->sf_r3 = (long) child_return;
-	sf->sf_r4 = (long) p2;
+	sf->sf_r3 = (long) func;
+	sf->sf_r4 = (long) arg;
 	sf->sf_pl = imask[IPL_ZERO];
 	pcb->pcb_ksp = (long) sf;
 	pcb->pcb_kfp = (long) &sf->sf_fp;
-}
-
-/*
- * cpu_set_kpc:
- *
- * Arrange for in-kernel execution of a process to continue at the
- * named pc, as if the code at that address were called as a function
- * with the supplied argument.
- *
- * Note that it's assumed that when the named process returns, rei()
- * should be invoked, to return to user mode.
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct pcb *pcbp;
-	struct switchframe *sf;
-
-	pcbp = &p->p_addr->u_pcb;
-	sf = (struct switchframe *) pcbp->pcb_ksp;
-	sf->sf_pc = (long) proc_trampoline;
-	sf->sf_r3 = (long) pc;
-	sf->sf_r4 = (long) arg;
 }
 
 /*
@@ -283,7 +277,7 @@ pagemove(from, to, size)
 {
 	register pt_entry_t *fpte, *tpte, ofpte, otpte;
 
-	if (size % CLBYTES)
+	if (size % NBPG)
 		panic("pagemove");
 	fpte = kvtopte(from);
 	tpte = kvtopte(to);
@@ -321,35 +315,20 @@ int
 kvtop(addr)
 	register caddr_t addr;
 {
-	vaddr_t va;
+	paddr_t pa;
 
-	va = pmap_extract(pmap_kernel(), (vaddr_t)addr);
-	if (va == 0)
+	if (pmap_extract(pmap_kernel(), (vaddr_t)addr, &pa) == FALSE)
 		panic("kvtop: zero page frame");
-	return((int)va);
+	return((int)pa);
 }
 
 extern vm_map_t phys_map;
 
 /*
- * Map an IO request into kernel virtual address space.  Requests fall into
- * one of five catagories:
- *
- *	B_PHYS|B_UAREA:	User u-area swap.
- *			Address is relative to start of u-area (p_addr).
- *	B_PHYS|B_PAGET:	User page table swap.
- *			Address is a kernel VA in usrpt (Usrptmap).
- *	B_PHYS|B_DIRTY:	Dirty page push.
- *			Address is a VA in proc2's address space.
- *	B_PHYS|B_PGIN:	Kernel pagein of user pages.
- *			Address is VA in user's address space.
- *	B_PHYS:		User "raw" IO request.
- *			Address is VA in user's address space.
- *
- * All requests are (re)mapped into kernel VA space via the useriomap
- * (a name with only slightly more meaning than "kernelmap")
+ * Map a user I/O request into kernel virtual address space.
+ * Note: the pages are already locked by uvm_vslock(), so we
+ * do not need to pass an access_type to pmap_enter().   
  */
-#if defined(PMAP_NEW)
 void
 vmapbuf(bp, len)
 	struct buf *bp;
@@ -357,11 +336,10 @@ vmapbuf(bp, len)
 {
 	vaddr_t faddr, taddr, off;
 	paddr_t fpa;
-	pt_entry_t *tpte;
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vmapbuf");
-	faddr = trunc_page(bp->b_saveaddr = bp->b_data);
+	faddr = trunc_page((vaddr_t)bp->b_saveaddr = bp->b_data);
 	off = (vaddr_t)bp->b_data - faddr;
 	len = round_page(off + len);
 	taddr= uvm_km_valloc_wait(phys_map, len);
@@ -378,51 +356,19 @@ vmapbuf(bp, len)
 	 * where we we just allocated (TLB will be flushed when our
 	 * mapping is removed).
 	 */
-	tpte = PTE_BASE + ns532_btop(taddr);
 	while (len) {
-		fpa = pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
-				   faddr);
-		*tpte = fpa | PG_RW | PG_V;
-		tpte++;
+		(void) pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
+		    faddr, &fpa);
+		pmap_enter(vm_map_pmap(phys_map), taddr, fpa,
+			   VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 		faddr += PAGE_SIZE;
+		taddr += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	}
 }
 
-#else /* PMAP_NEW */
-
-void
-vmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
-{
-	vaddr_t faddr, taddr, off;
-	pt_entry_t *fpte, *tpte;
-	pt_entry_t *pmap_pte __P((pmap_t, vaddr_t));
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vmapbuf");
-	faddr = trunc_page(bp->b_saveaddr = bp->b_data);
-	off = (vaddr_t)bp->b_data - faddr;
-	len = round_page(off + len);
-	taddr = uvm_km_valloc_wait(phys_map, len);
-	bp->b_data = (caddr_t)(taddr + off);
-	/*
-	 * The region is locked, so we expect that pmap_pte() will return
-	 * non-NULL.
-	 */
-	fpte = pmap_pte(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map), faddr);
-	tpte = pmap_pte(vm_map_pmap(phys_map), taddr);
-	do {
-		*tpte++ = *fpte++;
-		len -= PAGE_SIZE;
-	} while (len);
-}
-#endif
-
 /*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
+ * Unmap a previously-mapped user I/O request.
  */
 void
 vunmapbuf(bp, len)
@@ -433,7 +379,7 @@ vunmapbuf(bp, len)
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vunmapbuf");
-	addr = trunc_page(bp->b_data);
+	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
 	uvm_km_free_wakeup(phys_map, addr, len);

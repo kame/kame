@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.29 1999/02/07 09:34:58 jonathan Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.36 2000/06/06 20:17:34 matt Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -60,6 +60,7 @@
 #ifdef SHARK
 #include <arm32/shark/sequoia.h>
 extern void	ofrootfound __P((void));
+extern void	ofw_device_register __P((struct device *, void *aux));
 extern void	startrtclock __P((void));
 #endif
 
@@ -70,54 +71,37 @@ extern void	startrtclock __P((void));
 
 #include "podulebus.h"
 
-static	struct device *booted_device;
-static	int booted_partition;
+struct device *booted_device;
+int booted_partition;
 
 extern dev_t dumpdev;
-extern int cold;
 
 void dumpconf __P((void));
 void isa_intr_init __P((void));
 
 #ifndef MEMORY_DISK_IS_ROOT
-static void get_device __P((char *name, struct device **devpp, int *partp));
+static void get_device __P((char *name));
 static void set_root_device __P((void));
 #endif
-
-/* Table major numbers for the device names, NULL terminated */
-
-struct devnametobdevmaj arm32_nam2blk[] = {
-	{ "wd",		16 },
-	{ "fd",		17 },
-	{ "md",		18 },
-	{ "sd",		24 },
-	{ "cd",		26 },
-	{ NULL,		0 },
-};
 
 #ifndef MEMORY_DISK_IS_ROOT
 /* Decode a device name to a major and minor number */
 
 static void
-get_device(name, devpp, partp)
+get_device(name)
 	char *name;
-	struct device **devpp;
-	int *partp;
 {
 	int loop, unit, part;
 	char buf[32], *cp;
 	struct device *dv;
 
-	*devpp = NULL;
-	*partp = 0;
-    
 	if (strncmp(name, "/dev/", 5) == 0)
 		name += 5;
 
-	for (loop = 0; arm32_nam2blk[loop].d_name != NULL; ++loop) {
-		if (strncmp(name, arm32_nam2blk[loop].d_name,
-		    strlen(arm32_nam2blk[loop].d_name)) == 0) {
-			name += strlen(arm32_nam2blk[loop].d_name);
+	for (loop = 0; dev_name2blk[loop].d_name != NULL; ++loop) {
+		if (strncmp(name, dev_name2blk[loop].d_name,
+		    strlen(dev_name2blk[loop].d_name)) == 0) {
+			name += strlen(dev_name2blk[loop].d_name);
 			unit = part = 0;
 
 			cp = name;
@@ -130,12 +114,12 @@ get_device(name, devpp, partp)
 				part = *cp - 'a';
 			else if (*cp != '\0' && *cp != ' ')
 				return;
-			sprintf(buf, "%s%d", arm32_nam2blk[loop].d_name, unit);
+			sprintf(buf, "%s%d", dev_name2blk[loop].d_name, unit);
 			for (dv = alldevs.tqh_first; dv != NULL;
 			    dv = dv->dv_list.tqe_next) {
 				if (strcmp(buf, dv->dv_xname) == 0) {
-					*devpp = dv;
-					*partp = part;
+					booted_device = dv;
+					booted_partition = part;
 					return;
 				}
 			}
@@ -152,12 +136,12 @@ set_root_device()
 	char *ptr;
             
 	if (boot_file)
-		get_device(boot_file, &booted_device, &booted_partition);
+		get_device(boot_file);
 	if (boot_args) {
 		ptr = strstr(boot_args, "root=");
 		if (ptr) {
 			ptr += 5;
-			get_device(ptr, &booted_device, &booted_partition);
+			get_device(ptr);
 		}
 	}
 }
@@ -175,19 +159,19 @@ cpu_rootconf()
 	printf("boot device: %s\n",
 	    booted_device != NULL ? booted_device->dv_xname : "<unknown>");
 #endif
-	setroot(booted_device, booted_partition, arm32_nam2blk);
+	setroot(booted_device, booted_partition);
 }
 
 
 /*
- * void configure()
+ * void cpu_configure()
  *
  * Configure all the root devices
  * The root devices are expected to configure their own children
  */
 
 void
-configure()
+cpu_configure()
 {
 	/*
 	 * Configure all the roots.
@@ -232,7 +216,14 @@ configure()
 
 	/* Time to start taking interrupts so lets open the flood gates .... */
 	(void)spl0();
-	cold = 0;
 }
 
+void
+device_register(struct device *dev, void *aux)
+{
+#if defined(OFWGENCFG) || defined(SHARK)
+	/* Temporary for SHARK! */
+	ofw_device_register(dev, aux);
+#endif
+}
 /* End of autoconf.c */

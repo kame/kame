@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.26 1998/07/04 22:18:21 jonathan Exp $	*/
+/*	$NetBSD: ite.c,v 1.29 2000/03/23 06:36:04 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -59,6 +59,7 @@
 #include <sys/tty.h>
 #include <sys/termios.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/proc.h>
 #include <dev/cons.h>
 
@@ -90,7 +91,15 @@ u_int	ite_confunits;			/* configured units */
 int	start_repeat_timeo = 30;	/* first repeat after x s/100 */
 int	next_repeat_timeo  = 10;	/* next repeat after x s/100 */
 
-int	ite_default_wrap   = 1;		/* you want vtxxx-nam, binpatch */
+/*
+ * Patchable
+ */
+int ite_default_x      = 0;	/* def leftedge offset			*/
+int ite_default_y      = 0;	/* def topedge offset			*/
+int ite_default_width  = 640;	/* def width				*/
+int ite_default_depth  = 1;	/* def depth				*/
+int ite_default_height = 400;	/* def height				*/
+int ite_default_wrap   = 1;	/* if you want vtxxx-nam -> binpatch	*/
 
 struct	ite_softc con_itesoftc;
 u_char	cons_tabs[MAX_TABS];
@@ -153,7 +162,6 @@ itematch(pdp, cfp, auxp)
 	void		*auxp;
 {
 	struct grf_softc *gp  = auxp;
-	dev_t		 itedev;
 	int		 maj;
 	
 	/*
@@ -171,20 +179,8 @@ itematch(pdp, cfp, auxp)
 	for(maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == iteopen)
 			break;
-	itedev = makedev(maj, cfp->cf_unit);
 
-	/*
-	 * Try to make sure that a single ite will not be attached to
-	 * multiple grf's.
-	 * Note that the console grf is the only grf that will ever enter
-	 * here with itedev != (dev_t)-1.
-	 */
-	if (gp->g_itedev == (dev_t)-1) {
-		if (ite_confunits & (1 << ITEUNIT(itedev)))
-				return (0);
-	}
-
-	gp->g_itedev = itedev;
+	gp->g_itedev = makedev(maj, cfp->cf_unit);
 	return(1);
 }
 
@@ -639,7 +635,7 @@ itestart(tp)
 		/* we have characters remaining. */
 		if (rbp->c_cc) {
 			tp->t_state |= TS_TIMEOUT;
-			timeout(ttrstrt, tp, 1);
+			callout_reset(&tp->t_rstrt_ch, 1, ttrstrt, tp);
 		}
 		/* wakeup we are below */
 		if (rbp->c_cc <= tp->t_lowat) {
@@ -704,7 +700,7 @@ int	flag;
 		ip->flags &= ~ITE_ACTIVE;
 }
 
-void
+static void
 ite_switch(unit)
 int	unit;
 {
@@ -883,6 +879,8 @@ enum caller	caller;
 static u_int last_char;
 static u_char tout_pending;
 
+static struct callout repeat_ch = CALLOUT_INITIALIZER;
+
 /*ARGSUSED*/
 static void
 repeat_handler(arg)
@@ -932,7 +930,7 @@ enum caller	caller;
 	 */
 	if (up) {
 		if(tout_pending) {
-			untimeout(repeat_handler, 0);
+			callout_stop(&repeat_ch);
 			tout_pending = 0;
 			last_char    = 0;
 		}
@@ -943,7 +941,7 @@ enum caller	caller;
 		/*
 		 * Different character, stop also
 		 */
-		untimeout(repeat_handler, 0);
+		callout_stop(&repeat_ch);
 		tout_pending = 0;
 		last_char    = 0;
 	}
@@ -1014,13 +1012,15 @@ enum caller	caller;
 	if(!tout_pending && caller == ITEFILT_TTY && kbd_ite->key_repeat) {
 		tout_pending = 1;
 		last_char    = c;
-		timeout(repeat_handler, 0, start_repeat_timeo * hz / 100);
+		callout_reset(&repeat_ch, start_repeat_timeo * hz / 100,
+		    repeat_handler, NULL);
 	}
 	else if(!tout_pending && caller==ITEFILT_REPEATER
 				&& kbd_ite->key_repeat) {
 		tout_pending = 1;
 		last_char    = c;
-		timeout(repeat_handler, 0, next_repeat_timeo * hz / 100);
+		callout_reset(&repeat_ch, next_repeat_timeo * hz / 100,
+		    repeat_handler, NULL);
 	}
 	/* handle dead keys */
 	if (key.mode & KBD_MODE_DEAD) {

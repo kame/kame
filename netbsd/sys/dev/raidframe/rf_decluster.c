@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_decluster.c,v 1.3 1999/02/05 00:06:08 oster Exp $	*/
+/*	$NetBSD: rf_decluster.c,v 1.5 2000/03/07 01:54:29 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -57,7 +57,6 @@
 #include "rf_alloclist.h"
 #include "rf_general.h"
 #include "rf_shutdown.h"
-#include "rf_sys.h"
 
 extern int rf_copyback_in_progress;	/* debug only */
 
@@ -556,11 +555,6 @@ rf_decluster_adjust_params(
     RF_StripeNum_t * base_suid)
 {
 	RF_DeclusteredConfigInfo_t *info = (RF_DeclusteredConfigInfo_t *) layoutPtr->layoutSpecificInfo;
-#if defined(__NetBSD__) && defined(_KERNEL)
-	/* Nothing! */
-#else
-	char    pc = layoutPtr->map->parityConfig;
-#endif
 
 	if (*SUID >= info->FullTableLimitSUID) {
 		/* new full table size is size of last full table on disk */

@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_socket2.c,v 1.28.2.1 1999/09/22 03:19:44 cgd Exp $	*/
+/*	$NetBSD: uipc_socket2.c,v 1.36 2000/03/30 09:27:14 augustss Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
@@ -56,8 +56,6 @@ const char	netio[] = "netio";
 const char	netcon[] = "netcon";
 const char	netcls[] = "netcls";
 
-u_long	sb_max = SB_MAX;		/* patchable */
-
 /*
  * Procedures to manipulate state flags of socket
  * and do appropriate wakeups.  Normal sequence from the
@@ -90,7 +88,7 @@ u_long	sb_max = SB_MAX;		/* patchable */
 
 void
 soisconnecting(so)
-	register struct socket *so;
+	struct socket *so;
 {
 
 	so->so_state &= ~(SS_ISCONNECTED|SS_ISDISCONNECTING);
@@ -99,9 +97,9 @@ soisconnecting(so)
 
 void
 soisconnected(so)
-	register struct socket *so;
+	struct socket *so;
 {
-	register struct socket *head = so->so_head;
+	struct socket *head = so->so_head;
 
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISDISCONNECTING|SS_ISCONFIRMING);
 	so->so_state |= SS_ISCONNECTED;
@@ -118,7 +116,7 @@ soisconnected(so)
 
 void
 soisdisconnecting(so)
-	register struct socket *so;
+	struct socket *so;
 {
 
 	so->so_state &= ~SS_ISCONNECTING;
@@ -130,7 +128,7 @@ soisdisconnecting(so)
 
 void
 soisdisconnected(so)
-	register struct socket *so;
+	struct socket *so;
 {
 
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
@@ -153,10 +151,10 @@ soisdisconnected(so)
  */
 struct socket *
 sonewconn1(head, connstatus)
-	register struct socket *head;
+	struct socket *head;
 	int connstatus;
 {
-	register struct socket *so;
+	struct socket *so;
 	int soqueue = connstatus ? 1 : 0;
 
 	if (head->so_qlen + head->so_q0len > 3 * head->so_qlimit / 2)
@@ -194,7 +192,7 @@ sonewconn1(head, connstatus)
 
 void
 soqinsque(head, so, q)
-	register struct socket *head, *so;
+	struct socket *head, *so;
 	int q;
 {
 
@@ -216,7 +214,7 @@ soqinsque(head, so, q)
 
 int
 soqremque(so, q)
-	register struct socket *so;
+	struct socket *so;
 	int q;
 {
 	struct socket *head = so->so_head;
@@ -284,7 +282,7 @@ sbwait(sb)
  */
 int
 sb_lock(sb)
-	register struct sockbuf *sb;
+	struct sockbuf *sb;
 {
 	int error;
 
@@ -307,8 +305,8 @@ sb_lock(sb)
  */
 void
 sowakeup(so, sb)
-	register struct socket *so;
-	register struct sockbuf *sb;
+	struct socket *so;
+	struct sockbuf *sb;
 {
 	struct proc *p;
 
@@ -362,7 +360,7 @@ sowakeup(so, sb)
 
 int
 soreserve(so, sndcc, rcvcc)
-	register struct socket *so;
+	struct socket *so;
 	u_long sndcc, rcvcc;
 {
 
@@ -451,7 +449,7 @@ sbappend(sb, m)
 	struct sockbuf *sb;
 	struct mbuf *m;
 {
-	register struct mbuf *n;
+	struct mbuf *n;
 
 	if (m == 0)
 		return;
@@ -471,10 +469,10 @@ sbappend(sb, m)
 #ifdef SOCKBUF_DEBUG
 void
 sbcheck(sb)
-	register struct sockbuf *sb;
+	struct sockbuf *sb;
 {
-	register struct mbuf *m;
-	register int len = 0, mbcnt = 0;
+	struct mbuf *m;
+	int len = 0, mbcnt = 0;
 
 	for (m = sb->sb_mb; m; m = m->m_next) {
 		len += m->m_len;
@@ -498,10 +496,10 @@ sbcheck(sb)
  */
 void
 sbappendrecord(sb, m0)
-	register struct sockbuf *sb;
-	register struct mbuf *m0;
+	struct sockbuf *sb;
+	struct mbuf *m0;
 {
-	register struct mbuf *m;
+	struct mbuf *m;
 
 	if (m0 == 0)
 		return;
@@ -533,11 +531,11 @@ sbappendrecord(sb, m0)
  */
 void
 sbinsertoob(sb, m0)
-	register struct sockbuf *sb;
-	register struct mbuf *m0;
+	struct sockbuf *sb;
+	struct mbuf *m0;
 {
-	register struct mbuf *m;
-	register struct mbuf **mp;
+	struct mbuf *m;
+	struct mbuf **mp;
 
 	if (m0 == 0)
 		return;
@@ -578,11 +576,11 @@ sbinsertoob(sb, m0)
  */
 int
 sbappendaddr(sb, asa, m0, control)
-	register struct sockbuf *sb;
+	struct sockbuf *sb;
 	struct sockaddr *asa;
 	struct mbuf *m0, *control;
 {
-	register struct mbuf *m, *n;
+	struct mbuf *m, *n;
 	int space = asa->sa_len;
 
 if (m0 && (m0->m_flags & M_PKTHDR) == 0)
@@ -629,7 +627,7 @@ sbappendcontrol(sb, m0, control)
 	struct sockbuf *sb;
 	struct mbuf *m0, *control;
 {
-	register struct mbuf *m, *n;
+	struct mbuf *m, *n;
 	int space = 0;
 
 	if (control == 0)
@@ -663,11 +661,11 @@ sbappendcontrol(sb, m0, control)
  */
 void
 sbcompress(sb, m, n)
-	register struct sockbuf *sb;
-	register struct mbuf *m, *n;
+	struct sockbuf *sb;
+	struct mbuf *m, *n;
 {
-	register int eor = 0;
-	register struct mbuf *o;
+	int eor = 0;
+	struct mbuf *o;
 
 	while (m) {
 		eor |= m->m_flags & M_EOR;
@@ -715,7 +713,7 @@ sbcompress(sb, m, n)
  */
 void
 sbflush(sb)
-	register struct sockbuf *sb;
+	struct sockbuf *sb;
 {
 
 	if (sb->sb_flags & SB_LOCK)
@@ -731,10 +729,10 @@ sbflush(sb)
  */
 void
 sbdrop(sb, len)
-	register struct sockbuf *sb;
-	register int len;
+	struct sockbuf *sb;
+	int len;
 {
-	register struct mbuf *m, *mn;
+	struct mbuf *m, *mn;
 	struct mbuf *next;
 
 	next = (m = sb->sb_mb) ? m->m_nextpkt : 0;
@@ -775,9 +773,9 @@ sbdrop(sb, len)
  */
 void
 sbdroprecord(sb)
-	register struct sockbuf *sb;
+	struct sockbuf *sb;
 {
-	register struct mbuf *m, *mn;
+	struct mbuf *m, *mn;
 
 	m = sb->sb_mb;
 	if (m) {
@@ -796,19 +794,30 @@ sbdroprecord(sb)
 struct mbuf *
 sbcreatecontrol(p, size, type, level)
 	caddr_t p;
-	register int size;
+	int size;
 	int type, level;
 {
-	register struct cmsghdr *cp;
+	struct cmsghdr *cp;
 	struct mbuf *m;
+
+	if (CMSG_SPACE(size) > MCLBYTES) {
+		printf("sbcreatecontrol: message too large %d\n", size);
+		return NULL;
+	}
 
 	if ((m = m_get(M_DONTWAIT, MT_CONTROL)) == NULL)
 		return ((struct mbuf *) NULL);
+	if (CMSG_SPACE(size) > MLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			return NULL;
+		}
+	}
 	cp = mtod(m, struct cmsghdr *);
 	memcpy(CMSG_DATA(cp), p, size);
-	size += sizeof(*cp);
-	m->m_len = size;
-	cp->cmsg_len = size;
+	m->m_len = CMSG_SPACE(size);
+	cp->cmsg_len = CMSG_LEN(size);
 	cp->cmsg_level = level;
 	cp->cmsg_type = type;
 	return (m);

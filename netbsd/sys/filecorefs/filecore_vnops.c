@@ -1,4 +1,4 @@
-/*	$NetBSD: filecore_vnops.c,v 1.6 1999/03/22 19:21:08 kleink Exp $	*/
+/*	$NetBSD: filecore_vnops.c,v 1.8 1999/08/03 20:19:18 wrstuden Exp $	*/
 
 /*-
  * Copyright (c) 1998 Andrew McMurry
@@ -404,41 +404,6 @@ filecore_symlink(v)
 }
 
 /*
- * Lock an inode.
- */
-int
-filecore_lock(v)
-	void *v;
-{
-	struct vop_lock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *ap = v;
-	struct vnode *vp = ap->a_vp;
-
-	return (lockmgr(&VTOI(vp)->i_lock, ap->a_flags, &vp->v_interlock));
-}
-
-/*
- * Unlock an inode.
- */
-int
-filecore_unlock(v)
-	void *v;
-{
-	struct vop_unlock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *ap = v;
-	struct vnode *vp = ap->a_vp;
-
-	return (lockmgr(&VTOI(vp)->i_lock, ap->a_flags | LK_RELEASE,
-		&vp->v_interlock));
-}
-
-/*
  * Calculate the logical to physical mapping if not done already,
  * then call the device strategy routine.
  */
@@ -487,20 +452,6 @@ filecore_print(v)
 
 	printf("tag VT_FILECORE, filecore vnode\n");
 	return (0);
-}
-
-/*
- * Check for a locked inode.
- */
-int
-filecore_islocked(v)
-	void *v;
-{
-	struct vop_islocked_args /* {
-		struct vnode *a_vp;
-	} */ *ap = v;
-
-	return (lockstatus(&VTOI(ap->a_vp)->i_lock));
 }
 
 /*
@@ -556,6 +507,7 @@ int	lease_check	__P((void *));
 #else
 #define	filecore_lease_check	genfs_nullop
 #endif
+#define	filecore_fcntl	genfs_fcntl
 #define	filecore_ioctl	genfs_enoioctl
 #define	filecore_fsync	genfs_nullop
 #define	filecore_remove	genfs_eopnotsupp
@@ -588,6 +540,7 @@ struct vnodeopv_entry_desc filecore_vnodeop_entries[] = {
 	{ &vop_read_desc, filecore_read },		/* read */
 	{ &vop_write_desc, filecore_write },		/* write */
 	{ &vop_lease_desc, filecore_lease_check },	/* lease */
+	{ &vop_fcntl_desc, filecore_fcntl },		/* fcntl */
 	{ &vop_ioctl_desc, filecore_ioctl },		/* ioctl */
 	{ &vop_poll_desc, filecore_poll },		/* poll */
 	{ &vop_revoke_desc, filecore_revoke },		/* revoke */
@@ -605,12 +558,12 @@ struct vnodeopv_entry_desc filecore_vnodeop_entries[] = {
 	{ &vop_abortop_desc, filecore_abortop },       	/* abortop */
 	{ &vop_inactive_desc, filecore_inactive },	/* inactive */
 	{ &vop_reclaim_desc, filecore_reclaim },       	/* reclaim */
-	{ &vop_lock_desc, filecore_lock },		/* lock */
-	{ &vop_unlock_desc, filecore_unlock },		/* unlock */
+	{ &vop_lock_desc, genfs_lock },			/* lock */
+	{ &vop_unlock_desc, genfs_unlock },		/* unlock */
 	{ &vop_bmap_desc, filecore_bmap },		/* bmap */
 	{ &vop_strategy_desc, filecore_strategy },	/* strategy */
 	{ &vop_print_desc, filecore_print },		/* print */
-	{ &vop_islocked_desc, filecore_islocked },	/* islocked */
+	{ &vop_islocked_desc, genfs_islocked },		/* islocked */
 	{ &vop_pathconf_desc, filecore_pathconf },	/* pathconf */
 	{ &vop_advlock_desc, filecore_advlock },       	/* advlock */
 	{ &vop_blkatoff_desc, filecore_blkatoff },	/* blkatoff */

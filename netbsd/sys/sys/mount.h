@@ -1,4 +1,4 @@
-/*	$NetBSD: mount.h,v 1.74 1999/03/25 05:06:32 sommerfe Exp $	*/
+/*	$NetBSD: mount.h,v 1.85 2000/06/10 18:44:44 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1989, 1991, 1993
@@ -40,6 +40,9 @@
 
 #ifndef _KERNEL
 #include <sys/ucred.h>
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#include <sys/stat.h>
+#endif /* !_POSIX_C_SOURCE */
 #endif
 #include <sys/queue.h>
 #include <sys/lock.h>
@@ -67,7 +70,7 @@ struct fid {
 
 struct statfs {
 	short	f_type;			/* type of file system */
-	u_short	f_flags;		/* copy of mount flags */
+	u_short	f_oflags;		/* deprecated copy of mount flags */
 	long	f_bsize;		/* fundamental file system block size */
 	long	f_iosize;		/* optimal transfer block size */
 	long	f_blocks;		/* total data blocks in file system */
@@ -77,7 +80,10 @@ struct statfs {
 	long	f_ffree;		/* free file nodes in fs */
 	fsid_t	f_fsid;			/* file system id */
 	uid_t	f_owner;		/* user that mounted the file system */
-	long	f_spare[4];		/* spare for later */
+	long	f_flags;		/* copy of mount flags */
+	long	f_syncwrites;		/* count of sync writes since mount */
+	long	f_asyncwrites;		/* count of async writes since mount */
+	long	f_spare[1];		/* spare for later */
 	char	f_fstypename[MFSNAMELEN]; /* fs type name */
 	char	f_mntonname[MNAMELEN];	  /* directory on which mounted */
 	char	f_mntfromname[MNAMELEN];  /* mounted file system */
@@ -95,6 +101,7 @@ struct statfs {
 #define	MOUNT_FDESC	"fdesc"		/* File Descriptor Filesystem */
 #define	MOUNT_PORTAL	"portal"	/* Portal Filesystem */
 #define	MOUNT_NULL	"null"		/* Minimal Filesystem Layer */
+#define	MOUNT_OVERLAY	"overlay"	/* Minimal Overlay Filesystem Layer */
 #define	MOUNT_UMAP	"umap"	/* User/Group Identifier Remapping Filesystem */
 #define	MOUNT_KERNFS	"kernfs"	/* Kernel Information Filesystem */
 #define	MOUNT_PROCFS	"procfs"	/* /proc Filesystem */
@@ -106,6 +113,7 @@ struct statfs {
 #define	MOUNT_CFS	"coda"		/* Coda Filesystem */
 #define	MOUNT_CODA	"coda"		/* Coda Filesystem */
 #define	MOUNT_FILECORE	"filecore"	/* Acorn Filecore Filesystem */
+#define	MOUNT_NTFS	"ntfs"		/* Windows/NT Filesystem */
 
 /*
  * Structure per mounted file system.  Each mounted file system has an
@@ -118,12 +126,15 @@ struct mount {
 	CIRCLEQ_ENTRY(mount) mnt_list;		/* mount list */
 	struct vfsops	*mnt_op;		/* operations on fs */
 	struct vnode	*mnt_vnodecovered;	/* vnode we mounted on */
+	struct vnode	*mnt_syncer;		/* syncer vnode */
 	struct vnodelst	mnt_vnodelist;		/* list of vnodes this mount */
 	struct lock	mnt_lock;		/* mount structure lock */
 	int		mnt_flag;		/* flags */
 	int		mnt_maxsymlinklen;	/* max size of short symlink */
 	struct statfs	mnt_stat;		/* cache of filesystem stats */
 	qaddr_t		mnt_data;		/* private data */
+	int		mnt_wcnt;		/* count of vfs_busy waiters */
+	struct proc	*mnt_unmounter;		/* who is unmounting */
 };
 
 /*
@@ -138,7 +149,6 @@ struct mount {
 #define __MNT_UNUSED1	0x00100000
 #define __MNT_UNUSED2	0x00400000
 #define __MNT_UNUSED3	0x00800000
-#define __MNT_UNUSED4	0x80000000
 
 #define	MNT_RDONLY	0x00000001	/* read only filesystem */
 #define	MNT_SYNCHRONOUS	0x00000002	/* file system written synchronously */
@@ -151,6 +161,7 @@ struct mount {
 #define MNT_NOATIME	0x04000000	/* Never update access times in fs */
 #define MNT_SYMPERM	0x20000000	/* recognize symlink permission */
 #define MNT_NODEVMTIME	0x40000000	/* Never update mod times for devs */
+#define MNT_SOFTDEP	0x80000000	/* Use soft dependencies */
 
 /*
  * exported mount flags.
@@ -172,10 +183,8 @@ struct mount {
 
 /*
  * Mask of flags that are visible to statfs()
- * Since f_flags in struct statfs is short, this mask overflows on
- * most architecture.  XXX.
  */
-#define	MNT_VISFLAGMASK	0x7c00ffff
+#define	MNT_VISFLAGMASK	0xfc00ffff
 
 /*
  * External filesystem control flags.
@@ -196,7 +205,7 @@ struct mount {
  * past the mount point.  This keeps the subtree stable during mounts
  * and unmounts.
  */
-#define	MNT_MWAIT	0x00200000	/* waiting for unmount to finish */
+#define	MNT_GONE	0x00200000	/* filesystem is gone.. */
 #define MNT_UNMOUNT	0x01000000	/* unmount in progress */
 #define MNT_WANTRDWR	0x02000000	/* upgrade to read/write requested */
 
@@ -213,7 +222,8 @@ struct mount {
 #define VFS_MAXTYPENUM	1		/* int: highest defined fs type */
 #define VFS_CONF	2		/* struct: vfsconf for filesystem given
 					   as next argument */
-#define	VFSGEN_MAXID	3		/* number of valid vfs.generic ids */
+#define VFS_USERMOUNT	3		/* enable/disable fs mnt by non-root */
+#define	VFSGEN_MAXID	4		/* number of valid vfs.generic ids */
 
 /*
  * XXX NOTE!  These must be in the order of mountcompatnames[] in
@@ -242,6 +252,7 @@ struct mount {
 	{ MOUNT_EXT2FS, CTLTYPE_NODE }, \
 	{ MOUNT_CODA, CTLTYPE_NODE }, \
 	{ MOUNT_FILECORE, CTLTYPE_NODE }, \
+	{ MOUNT_NTFS, CTLTYPE_NODE }, \
 }
 
 #define	VFS_MAXID	20		/* number of valid vfs ids */
@@ -250,6 +261,7 @@ struct mount {
 	{ 0, 0 }, \
 	{ "maxtypenum", CTLTYPE_INT }, \
 	{ "conf", CTLTYPE_NODE }, 	/* Special */ \
+	{ "usermount", CTLTYPE_INT }, \
 }
 
 /*
@@ -282,7 +294,7 @@ struct vnodeopv_desc;
 #endif
 
 struct vfsops {
-	char	*vfs_name;
+	const char *vfs_name;
 	int	(*vfs_mount)	__P((struct mount *mp, const char *path,
 				    void *data, struct nameidata *ndp,
 				    struct proc *p));
@@ -303,6 +315,7 @@ struct vfsops {
 				    struct vnode **vpp));
 	int	(*vfs_vptofh)	__P((struct vnode *vp, struct fid *fhp));
 	void	(*vfs_init)	__P((void));
+	void	(*vfs_done)	__P((void));
 	int	(*vfs_sysctl)	__P((int *, u_int, void *, size_t *, void *,
 				    size_t, struct proc *));
 	int	(*vfs_mountroot) __P((void));
@@ -333,8 +346,9 @@ struct vfsops {
  *
  * waitfor flags to vfs_sync() and getfsstat()
  */
-#define MNT_WAIT	1
-#define MNT_NOWAIT	2
+#define MNT_WAIT	1	/* synchronously wait for I/O to complete */
+#define MNT_NOWAIT	2	/* start all I/O, but do not wait for it */
+#define MNT_LAZY 	3	/* push data not written by filesystem syncer */
 
 /*
  * Generic file handle
@@ -408,7 +422,7 @@ int	vfs_mountedon __P((struct vnode *));/* is a vfs mounted on vp */
 int	vfs_mountroot __P((void));
 void	vfs_shutdown __P((void));	    /* unmount and sync file systems */
 void	vfs_unlock __P((struct mount *));   /* unlock a vfs */
-void	vfs_unmountall __P((void));	    /* unmount file systems */
+void	vfs_unmountall __P((struct proc *));	    /* unmount file systems */
 int 	vfs_busy __P((struct mount *, int, struct simplelock *));
 int	vfs_rootmountalloc __P((char *, char *, struct mount **));
 void	vfs_unbusy __P((struct mount *));
@@ -424,7 +438,7 @@ extern	int nvfssw;
 extern	struct nfs_public nfs_pub;
 extern	struct simplelock mountlist_slock;
 extern	struct simplelock spechash_slock;
-long	makefstype __P((char *));
+long	makefstype __P((const char *));
 int	dounmount __P((struct mount *, int, struct proc *));
 void	vfsinit __P((void));
 void	vfs_opv_init __P((struct vnodeopv_desc **));
@@ -448,6 +462,11 @@ int	getmntinfo __P((struct statfs **, int));
 int	mount __P((const char *, const char *, int, void *));
 int	statfs __P((const char *, struct statfs *));
 int	unmount __P((const char *, int));
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+int	fhopen __P((const fhandle_t *, int));
+int	fhstat __P((const fhandle_t *, struct stat *));
+int	fhstatfs __P((const fhandle_t *, struct statfs *));
+#endif /* !_POSIX_C_SOURCE */
 __END_DECLS
 
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: aed.c,v 1.7.4.1 1999/11/21 15:04:05 he Exp $	*/
+/*	$NetBSD: aed.c,v 1.10 2000/03/23 06:39:56 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1994	Bradley A. Grantham
@@ -48,8 +48,7 @@
 #include <mac68k/mac68k/macrom.h>
 #include <mac68k/dev/adbvar.h>
 #include <mac68k/dev/aedvar.h>
-#include <mac68k/dev/itevar.h>
-#include <mac68k/dev/kbdvar.h>
+#include <mac68k/dev/akbdvar.h>
 
 /*
  * Function declarations.
@@ -100,6 +99,8 @@ aedattach(parent, self, aux)
 	struct adb_attach_args *aa_args = (struct adb_attach_args *)aux;
 	struct aed_softc *sc = (struct aed_softc *)self;
 
+	callout_init(&sc->sc_repeat_ch);
+
 	sc->origaddr = aa_args->origaddr;
 	sc->adbaddr = aa_args->adbaddr;
 	sc->handler_id = aa_args->handler_id;
@@ -133,11 +134,12 @@ aedattach(parent, self, aux)
  * button emulation handler first.  Pass mouse events directly to
  * the handoff function.
  */
-void
+int
 aed_input(event)
         adb_event_t *event;
 {
         adb_event_t new_event = *event;
+	int rv = aed_sc->sc_open;
 
 	switch (event->def_addr) {
 	case ADBADDR_KBD:
@@ -154,9 +156,11 @@ aed_input(event)
 #ifdef DIAGNOSTIC
 		panic("aed: received event from unsupported device!\n");
 #endif
+		rv = 0;
 		break;
 	}
 
+	return (rv);
 }
 
 /*
@@ -317,7 +321,8 @@ aed_kbdrpt(kstate)
 	aed_handoff(&aed_sc->sc_rptevent);	/* do key down */
 
 	if (aed_sc->sc_repeating == aed_sc->sc_rptevent.u.k.key) {
-		timeout(aed_kbdrpt, kstate, aed_sc->sc_rptinterval);
+		callout_reset(&aed_sc->sc_repeat_ch, aed_sc->sc_rptinterval,
+		    aed_kbdrpt, kstate);
 	}
 }
 
@@ -337,15 +342,16 @@ aed_dokeyupdown(event)
 	if (ADBK_PRESS(event->u.k.key) && keyboard[kbd_key][0] != 0) {
 		/* ignore shift & control */
 		if (aed_sc->sc_repeating != -1) {
-			untimeout(aed_kbdrpt, (void *)aed_sc);
+			callout_stop(&aed_sc->sc_repeat_ch);
 		}
 		aed_sc->sc_rptevent = *event;
 		aed_sc->sc_repeating = kbd_key;
-		timeout(aed_kbdrpt, (void *)aed_sc, aed_sc->sc_rptdelay);
+		callout_reset(&aed_sc->sc_repeat_ch, aed_sc->sc_rptdelay,
+		    aed_kbdrpt, (void *)aed_sc);
 	} else {
 		if (aed_sc->sc_repeating != -1) {
 			aed_sc->sc_repeating = -1;
-			untimeout(aed_kbdrpt, (void *)aed_sc);
+			callout_stop(&aed_sc->sc_repeat_ch);
 		}
 		aed_sc->sc_rptevent = *event;
 	}
@@ -362,10 +368,6 @@ aed_handoff(event)
 {
 	if (aed_sc->sc_open && !adb_polling)
 		aed_enqevent(event);
-	else {
-		if (event->def_addr == 2)
-			ite_intr(event);
-	}
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_physio.c,v 1.35 1999/03/24 05:51:23 mrg Exp $	*/
+/*	$NetBSD: kern_physio.c,v 1.42 2000/05/08 20:03:20 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -44,7 +44,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/conf.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
 
@@ -86,7 +85,7 @@ physio(strategy, bp, dev, flags, minphys, uio)
 	int error, done, i, nobuf, s, todo;
 
 	error = 0;
-	flags &= B_READ | B_WRITE;
+	flags &= B_READ | B_WRITE | B_ORDERED;
 
 	/*
 	 * [check user read/write access to the data buffer]
@@ -95,13 +94,15 @@ physio(strategy, bp, dev, flags, minphys, uio)
 	 * writing, so we ignore the uio's rw parameter.  Also note that if
 	 * we're doing a read, that's a *write* to user-space.
 	 */
-	if (uio->uio_segflg == UIO_USERSPACE)
-		for (i = 0; i < uio->uio_iovcnt; i++)
+	if (uio->uio_segflg == UIO_USERSPACE) {
+		for (i = 0; i < uio->uio_iovcnt; i++) {
 			/* XXXCDC: map not locked, rethink */
-			if (!uvm_useracc(uio->uio_iov[i].iov_base,
+			if (__predict_false(!uvm_useracc(uio->uio_iov[i].iov_base,
 				     uio->uio_iov[i].iov_len,
-				     (flags == B_READ) ? B_WRITE : B_READ))
+				     (flags == B_READ) ? B_WRITE : B_READ)))
 				return (EFAULT);
+		}
+	}
 
 	/* Make sure we have a buffer, creating one if necessary. */
 	if ((nobuf = (bp == NULL)) != 0) {
@@ -135,6 +136,7 @@ physio(strategy, bp, dev, flags, minphys, uio)
 	bp->b_dev = dev;
 	bp->b_error = 0;
 	bp->b_proc = p;
+	LIST_INIT(&bp->b_dep);
 
 	/*
 	 * [while there are data to transfer and no I/O error]
@@ -180,7 +182,14 @@ physio(strategy, bp, dev, flags, minphys, uio)
 			 * restores it.
 			 */
 			PHOLD(p);
-			uvm_vslock(p, bp->b_data, todo);
+			if (__predict_false(uvm_vslock(p, bp->b_data, todo,
+			    (flags & B_READ) ?
+			    VM_PROT_READ | VM_PROT_WRITE : VM_PROT_READ)
+			    != KERN_SUCCESS)) {
+				bp->b_flags |= B_ERROR;
+				bp->b_error = EFAULT;
+				goto after_vsunlock;
+			}
 			vmapbuf(bp, todo);
 
 			/* [call strategy to start the transfer] */
@@ -212,6 +221,7 @@ physio(strategy, bp, dev, flags, minphys, uio)
 			 */
 			vunmapbuf(bp, todo);
 			uvm_vsunlock(p, bp->b_data, todo);
+ after_vsunlock:
 			PRELE(p);
 
 			/* remember error value (save a splbio/splx pair) */
@@ -224,9 +234,9 @@ physio(strategy, bp, dev, flags, minphys, uio)
 			 */
 			done = bp->b_bcount - bp->b_resid;
 #ifdef DIAGNOSTIC
-			if (done < 0)
+			if (__predict_false(done < 0))
 				panic("done < 0; strategy broken");
-			if (done > todo)
+			if (__predict_false(done > todo))
 				panic("done > todo; strategy broken");
 #endif
 			iovp->iov_len -= done;
@@ -275,8 +285,11 @@ struct buf *
 getphysbuf()
 {
 	struct buf *bp;
+	int s;
 
-	bp = malloc(sizeof(*bp), M_TEMP, M_WAITOK);
+	s = splbio();
+	bp = pool_get(&bufpool, PR_WAITOK);
+	splx(s);
 	memset(bp, 0, sizeof(*bp));
 
 	/* XXXCDC: are the following two lines necessary? */
@@ -293,15 +306,17 @@ void
 putphysbuf(bp)
         struct buf *bp;
 {
+	int s;
 
 	/* XXXCDC: is this necesary? */
 	if (bp->b_vp)
 		brelvp(bp);
 
-	if (bp->b_flags & B_WANTED)
+	if (__predict_false(bp->b_flags & B_WANTED))
 		panic("putphysbuf: private buf B_WANTED");
-	free(bp, M_TEMP);
-
+	s = splbio();
+	pool_put(&bufpool, bp);
+	splx(s);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: apmcall.s,v 1.5.4.2 1999/12/20 15:56:49 he Exp $ */
+/*	$NetBSD: apmcall.s,v 1.7 1999/12/08 16:46:33 joda Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: sfb.c,v 1.27.8.2 1999/04/12 21:27:05 pk Exp $	*/
+/*	$NetBSD: sfb.c,v 1.37 2000/02/03 04:09:17 nisimura Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -46,7 +46,7 @@
  *	Copyright (C) 1989 Digital Equipment Corporation.
  *	Permission to use, copy, modify, and distribute this software and
  *	its documentation for any purpose and without fee is hereby granted,
- *	provided that the above copyright notice appears in all copies.  
+ *	provided that the above copyright notice appears in all copies.
  *	Digital Equipment Corporation makes no representations about the
  *	suitability of this software for any purpose.  It is provided "as is"
  *	without express or implied warranty.
@@ -80,30 +80,22 @@
  * rights to redistribute these changes.
  */
 
-#include "fb.h"
-#include "sfb.h"
-
 #include <sys/param.h>
-#include <sys/systm.h>					/* printf() */
-#include <sys/kernel.h>
-#include <sys/errno.h>
+#include <sys/systm.h>
 #include <sys/device.h>
-#include <sys/fcntl.h>
-#include <sys/malloc.h>
+
 #include <dev/tc/tcvar.h>
 
 #include <machine/autoconf.h>
 #include <machine/fbio.h>
 #include <machine/fbvar.h>
-#include <pmax/dev/sfbvar.h>		/* XXX dev/tc ? */
+#include <machine/pmioctl.h>
 
 #include <pmax/dev/bt459.h>
+#include <pmax/dev/fbreg.h>
+#include <pmax/dev/sfbvar.h>		/* XXX dev/tc ? */
 #include <pmax/dev/sfbreg.h>
 
-#include <mips/cpuregs.h>		/* mips cached->uncached */
-
-#include <machine/pmioctl.h>
-#include <pmax/dev/fbreg.h>
 
 /*  turn on SFB-driver debugging  */
 /* #define SFBDEBUG */
@@ -111,23 +103,19 @@
 /*
  * These need to be mapped into user space.
  */
-struct fbuaccess sfbu;
-struct pmax_fbtty sfbfb;
-struct fbinfo	sfbfi;	/*XXX*/ /* should be softc */
+static struct fbuaccess sfbu;
+static struct pmax_fbtty sfbfb;
+static struct fbinfo *sfb_fi;
 
 
 /*
  * Forward references.
  */
 
-int sfbinit __P((struct fbinfo *fi, caddr_t sfbaddr, int unit, int silent));
-
-#define CMAP_BITS	(3 * 256)		/* 256 entries, 3 bytes per. */
-static u_char cmap_bits [CMAP_BITS];		/* colormap for console... */
-
-int sfbmatch __P((struct device *, struct cfdata *, void *));
-void sfbattach __P((struct device *, struct device *, void *));
-int sfb_intr __P((void *sc));
+static int	sfbmatch __P((struct device *, struct cfdata *, void *));
+static void	sfbattach __P((struct device *, struct device *, void *));
+static int	sfbinit __P((struct fbinfo *, caddr_t, int, int));
+static int	sfb_intr __P((void *sc));
 
 struct cfattach sfb_ca = {
 	sizeof(struct fbinfo), sfbmatch, sfbattach
@@ -144,10 +132,24 @@ struct fbdriver sfb_driver = {
 	bt459CursorColor
 };
 
+int
+sfb_cnattach(addr)
+paddr_t addr;
+{
+	struct fbinfo *fi;
+	caddr_t base;
+
+	base = (caddr_t)MIPS_PHYS_TO_KSEG1(addr);
+	fbcnalloc(&fi);
+	if (sfbinit(fi, base, 0, 1) < 0)
+	      return (0);
+	sfb_fi = fi;
+	return (1);
+}
 
 /* match and attach routines cut-and-pasted from cfb */
 
-int
+static int
 sfbmatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
@@ -159,14 +161,6 @@ sfbmatch(parent, match, aux)
 	if (!TC_BUS_MATCHNAME(ta, "PMAGB-BA"))
 		return (0);
 
-	/*
-	 * if the TC rom ident matches, assume the VRAM is present too.
-	 */
-#if 0
-	if (badaddr( ((caddr_t)ta->ta_addr) + SFB_OFFSET_VRAM, 4))
-		return (0);
-#endif
-
 	return (1);
 }
 
@@ -174,7 +168,7 @@ sfbmatch(parent, match, aux)
  * Attach a device.  Hand off all the work to sfbinit(),
  * so console-config code can attach sfbs early in boot.
  */
-void
+static void
 sfbattach(parent, self, aux)
 	struct device *parent;
 	struct device *self;
@@ -183,16 +177,21 @@ sfbattach(parent, self, aux)
 	struct tc_attach_args *ta = aux;
 	caddr_t sfbaddr = (caddr_t)ta->ta_addr;
 	int unit = self->dv_unit;
-	struct fbinfo *fi = (struct fbinfo *) self;
+	struct fbinfo *fi;
 
-#ifdef notyet
-	/* if this is the console, it's already configured. */
-	if (ta->ta_cookie == cons_slot)
-		return;	/* XXX patch up f softc pointer */
-#endif
+	if (sfb_fi)
+		fi = sfb_fi;
+	else {
+		if (fballoc(&fi) < 0 || sfbinit(fi, sfbaddr, unit, 0) < 0)
+		return; /* failed */
+	}
+	((struct fbsoftc *)self)->sc_fi = fi;
 
-	if (!sfbinit(fi, sfbaddr, unit, 0))
-		return;
+	printf(": %dx%dx%d%s",
+		fi->fi_type.fb_width,
+		fi->fi_type.fb_height,
+		fi->fi_type.fb_depth,
+		(sfb_fi) ? " console" : "");
 
 #if 0 /*XXX*/
 
@@ -218,7 +217,7 @@ sfbattach(parent, self, aux)
 /*
  * Initialization
  */
-int
+static int
 sfbinit(fi, base, unit, silent)
 	struct fbinfo *fi;
 	char *base;
@@ -228,22 +227,6 @@ sfbinit(fi, base, unit, silent)
 
 	int h_setup, v_setup;
 	int x_pixels, y_pixels;	/* visible pixel dimensions */
-
-	/*
-	 * If this device is being intialized as the console, malloc()
-	 * is not yet up and we must use statically-allocated space.
-	 */
-	if (fi == NULL) {
-		fi = &sfbfi;	/* XXX */
-  		fi->fi_cmap_bits = (caddr_t)cmap_bits;
-	}
-	else {
-    		fi->fi_cmap_bits = malloc(CMAP_BITS, M_DEVBUF, M_NOWAIT);
-		if (fi->fi_cmap_bits == NULL) {
-			printf("sfb%d: no memory for cmap\n", unit);
-			return (0);
-		}
-	}
 
 	/* check for no frame buffer */
 	if (badaddr(base + SFB_OFFSET_VRAM, 4))
@@ -301,7 +284,7 @@ sfbinit(fi, base, unit, silent)
 	fi->fi_fbu->scrInfo.max_col = 80;
 
 #if defined(DEBUG) || defined(SFBDEBUG)
-	printf(" (tty %d rows by %d cols) ", 
+	printf(" (tty %d rows by %d cols) ",
 	       fi->fi_fbu->scrInfo.max_row, fi->fi_fbu->scrInfo.max_col);
 #endif
 	init_pmaxfbu(fi);
@@ -316,39 +299,34 @@ sfbinit(fi, base, unit, silent)
 	 * Initialize the color map, the screen, and the mouse.
 	 */
 	if (tb_kbdmouseconfig(fi)) {
-		printf(" (mouse/keyboard config failed)");
-		return (0);
+		return (-1);
 	}
-
-
-	/*sfbInitColorMap();*/  /* done by bt459init() */
-
-	/*
-	 * Connect to the raster-console pseudo-driver
-	 */
-
-	fbconnect ("PMAGB-BA", fi, silent);
-	return (1);
+	fbconnect(fi);
+	return (0);
 }
 
 
 /*
- * The  TURBOChannel sfb interrupts by default on every vertical retrace,
+ * The TURBOChannel sfb interrupts by default on every vertical retrace,
  * and we don't know to disable those interrupt requests.
- * The 4.4BSD/pamx kernel never enabled delivery of those interrupts from the TC bus,
- * but there's a kernel design bug on the 3MIN, where disabling
- * (or enabling) TC option interrupts has no effect; each slot interrupt is
- * mapped directly to a separate R3000 interrupt  and they always seem to be taken.
+ * The 4.4BSD/pmax kernel never enabled delivery of those interrupts
+ * from the TC bus, but there's a kernel design bug on the 3MIN, where
+ * disabling (or enabling) TC option interrupts has no effect; each slot
+ * interrupt is mapped directly to a separate R3000 interrupt and they
+ * always seem to be taken.
  *
  * This function simply dismisses SFB interrupts, or the interrupt
  * request from the card will still be active.
  */
-int
+static int
 sfb_intr(sc)
 	void *sc;
 {
-	struct fbinfo *fi = (struct fbinfo *)sc;
-	char *slot_addr = (((char *)fi->fi_base) - SFB_ASIC_OFFSET);
+	struct fbinfo *fi;
+	char *slot_addr;
+
+	fi = (struct fbinfo *)sc;
+	slot_addr = (((char *)fi->fi_base) - SFB_ASIC_OFFSET);
 	
 	/* reset vertical-retrace interrupt by writing a dont-care */
 	*(int*) (slot_addr + SFB_CLEAR) = 0;

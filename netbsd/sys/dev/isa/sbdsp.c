@@ -1,4 +1,4 @@
-/*	$NetBSD: sbdsp.c,v 1.98 1999/03/22 14:38:02 mycroft Exp $	*/
+/*	$NetBSD: sbdsp.c,v 1.104.4.1 2000/06/30 16:27:48 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -81,9 +81,11 @@
  */
 
 #include "midi.h"
+#include "mpu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
 #include <sys/syslog.h>
@@ -214,7 +216,6 @@ static struct sbmode sbrmodes[] = {
 void	sbversion __P((struct sbdsp_softc *));
 void	sbdsp_jazz16_probe __P((struct sbdsp_softc *));
 void	sbdsp_set_mixer_gain __P((struct sbdsp_softc *sc, int port));
-void	sbdsp_to __P((void *));
 void	sbdsp_pause __P((struct sbdsp_softc *));
 int	sbdsp_set_timeconst __P((struct sbdsp_softc *, int));
 int	sbdsp16_set_rate __P((struct sbdsp_softc *, int, int));
@@ -417,6 +418,14 @@ sbdsp_attach(sc)
 	sc->sc_fullduplex = ISSB16CLASS(sc) && 
 	    sc->sc_drq8 != -1 && sc->sc_drq16 != -1 &&
 	    sc->sc_drq8 != sc->sc_drq16;
+
+	if (sc->sc_drq8 != -1)
+		sc->sc_drq8_maxsize = isa_dmamaxsize(sc->sc_ic,
+		    sc->sc_drq8);
+
+	if (sc->sc_drq16 != -1 && sc->sc_drq16 != sc->sc_drq8)
+		sc->sc_drq16_maxsize = isa_dmamaxsize(sc->sc_ic,
+		    sc->sc_drq16);
 }
 
 void
@@ -611,7 +620,7 @@ sbdsp_set_params(addr, setmode, usemode, play, rec)
 				break;
 			case AUDIO_ENCODING_ULAW:
 				if (mode == AUMODE_PLAY) {
-					swcode = mulaw_to_ulinear16;
+					swcode = mulaw_to_ulinear16_le;
 					factor = 2;
 					m = &sbpmodes[PLAY16];
 				} else
@@ -620,7 +629,7 @@ sbdsp_set_params(addr, setmode, usemode, play, rec)
 				break;
 			case AUDIO_ENCODING_ALAW:
 				if (mode == AUMODE_PLAY) {
-					swcode = alaw_to_ulinear16;
+					swcode = alaw_to_ulinear16_le;
 					factor = 2;
 					m = &sbpmodes[PLAY16];
 				} else
@@ -637,14 +646,15 @@ sbdsp_set_params(addr, setmode, usemode, play, rec)
 			case AUDIO_ENCODING_SLINEAR_LE:
 				break;
 			case AUDIO_ENCODING_ULINEAR_LE:
-				swcode = change_sign16;
+				swcode = change_sign16_le;
 				break;
 			case AUDIO_ENCODING_SLINEAR_BE:
 				swcode = swap_bytes;
 				break;
 			case AUDIO_ENCODING_ULINEAR_BE:
 				swcode = mode == AUMODE_PLAY ?
-					swap_bytes_change_sign16 : change_sign16_swap_bytes;
+					swap_bytes_change_sign16_le : 
+					change_sign16_swap_bytes_le;
 				break;
 			case AUDIO_ENCODING_ULAW:
 				swcode = mode == AUMODE_PLAY ? 
@@ -712,7 +722,7 @@ sbdsp_set_params(addr, setmode, usemode, play, rec)
 		DPRINTF(("sbdsp_set_params: fd=%d, usemode=%d, idma=%d, odma=%d\n", sc->sc_fullduplex, usemode, sc->sc_i.dmachan, sc->sc_o.dmachan));
 		if (sc->sc_o.dmachan == sc->sc_drq8) {
 			/* Use 16 bit DMA for playing by expanding the samples. */
-			play->sw_code = linear8_to_linear16;
+			play->sw_code = linear8_to_linear16_le;
 			play->factor = 2;
 			sc->sc_o.modep = &sbpmodes[PLAY16];
 			sc->sc_o.dmachan = sc->sc_drq16;
@@ -879,7 +889,7 @@ sbdsp_open(addr, flags)
 
 	if (sc->sc_drq8 != -1) {
 		error = isa_dmamap_create(sc->sc_ic, sc->sc_drq8,
-		    MAX_ISADMA, BUS_DMA_NOWAIT);
+		    sc->sc_drq8_maxsize, BUS_DMA_NOWAIT);
 		if (error) {
 			printf("%s: can't create map for drq %d\n",
 			    sc->sc_dev.dv_xname, sc->sc_drq8);
@@ -889,7 +899,7 @@ sbdsp_open(addr, flags)
 	}
 	if (sc->sc_drq16 != -1 && sc->sc_drq16 != sc->sc_drq8) {
 		error = isa_dmamap_create(sc->sc_ic, sc->sc_drq16,
-		    MAX_ISADMA, BUS_DMA_NOWAIT);
+		    sc->sc_drq16_maxsize, BUS_DMA_NOWAIT);
 		if (error) {
 			printf("%s: can't create map for drq %d\n",
 			    sc->sc_dev.dv_xname, sc->sc_drq16);
@@ -1042,25 +1052,12 @@ sbdsp_rdsp(sc)
 	return -1;
 }
 
-/*
- * Doing certain things (like toggling the speaker) make
- * the SB hardware go away for a while, so pause a little.
- */
-void
-sbdsp_to(arg)
-	void *arg;
-{
-	wakeup(arg);
-}
-
 void
 sbdsp_pause(sc)
 	struct sbdsp_softc *sc;
 {
-	extern int hz;
 
-	timeout(sbdsp_to, sbdsp_to, hz/8);
-	(void)tsleep(sbdsp_to, PWAIT, "sbpause", 0);
+	(void) tsleep(sbdsp_pause, PWAIT, "sbpause", hz / 8);
 }
 
 /*
@@ -1535,9 +1532,9 @@ sbdsp_intr(arg)
 		if (sc->sc_intr16)
 			sc->sc_intr16(arg);
 	}
-#if NMIDI > 0
-	if ((irq & SBP_IRQ_MPU401) && sc->sc_hasmpu) {
-		mpu_intr(&sc->sc_mpu);
+#if NMPU > 0
+	if ((irq & SBP_IRQ_MPU401) && sc->sc_mpudev) {
+		mpu_intr(sc->sc_mpudev);
 	}
 #endif
 	return 1;
@@ -2279,16 +2276,24 @@ sb_round_buffersize(addr, direction, size)
 	int direction;
 	size_t size;
 {
-	if (size > MAX_ISADMA)
-		size = MAX_ISADMA;
+	struct sbdsp_softc *sc = addr;
+	bus_size_t maxsize;
+
+	if (sc->sc_drq8 != -1)
+		maxsize = sc->sc_drq8_maxsize;
+	else
+		maxsize = sc->sc_drq16_maxsize;
+
+	if (size > maxsize)
+		size = maxsize;
 	return (size);
 }
 
-int
+paddr_t
 sb_mappage(addr, mem, off, prot)
 	void *addr;
 	void *mem;
-	int off;
+	off_t off;
 	int prot;
 {
 	return isa_mappage(mem, off, prot);
@@ -2303,7 +2308,7 @@ sbdsp_get_props(addr)
 	       (sc->sc_fullduplex ? AUDIO_PROP_FULLDUPLEX : 0);
 }
 
-#if NMIDI > 0
+#if NMPU > 0
 /*
  * MIDI related routines.
  */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mesh.c,v 1.1.2.3 2000/02/23 22:36:43 he Exp $	*/
+/*	$NetBSD: mesh.c,v 1.4 2000/03/23 06:40:34 thorpej Exp $	*/
 
 /*-
  * Copyright (C) 1999	Internet Research Institute, Inc.
@@ -474,7 +474,7 @@ mesh_select(sc, scb)
 	sc->sc_prevphase = MESH_SELECTING;
 	sc->sc_nextstate = MESH_IDENTIFY;
 
-	timeout(mesh_timeout, scb, 10*hz);
+	callout_reset(&scb->xs->xs_callout, 10 * hz, mesh_timeout, scb);
 }
 
 void
@@ -923,7 +923,7 @@ mesh_scsi_cmd(xs)
 	u_int flags;
 	int s;
 
-	flags = xs->flags;
+	flags = xs->xs_control;
 
 	scb = mesh_get_scb(sc);
 	scb->xs = xs;
@@ -938,13 +938,13 @@ mesh_scsi_cmd(xs)
 	scb->target = sc_link->scsipi_scsi.target;
 	sc->sc_imsglen = 0;	/* XXX ? */
 
-	if (flags & SCSI_POLL)
+	if (flags & XS_CTL_POLL)
 		scb->flags |= MESH_POLL;
 #if 0
-	if (flags & SCSI_DATA_OUT)
+	if (flags & XS_CTL_DATA_OUT)
 		scb->flags &= ~MESH_READ;
 #endif
-	if (flags & SCSI_DATA_IN)
+	if (flags & XS_CTL_DATA_IN)
 		scb->flags |= MESH_READ;
 
 	s = splbio();
@@ -956,7 +956,7 @@ mesh_scsi_cmd(xs)
 
 	splx(s);
 
-	if ((flags & SCSI_POLL) == 0)
+	if ((flags & XS_CTL_POLL) == 0)
 		return SUCCESSFULLY_QUEUED;
 
 	if (mesh_poll(sc, xs)) {
@@ -1005,7 +1005,7 @@ mesh_poll(sc, xs)
 		if (mesh_read_reg(sc, MESH_INTERRUPT))
 			mesh_intr(sc);
 
-		if (xs->flags & ITSDONE)
+		if (xs->xs_status & XS_STS_DONE)
 			return 0;
 		DELAY(1000);
 		count--;
@@ -1027,7 +1027,7 @@ mesh_done(sc, scb)
 	sc->sc_nextstate = MESH_BUSFREE;
 	sc->sc_nexus = NULL;
 
-	untimeout(mesh_timeout, scb);
+	callout_stop(&scb->xs->xs_callout);
 
 	if (scb->status == SCSI_BUSY) {
 		xs->error = XS_BUSY;
@@ -1035,8 +1035,14 @@ mesh_done(sc, scb)
 	}
 
 	if (scb->status == SCSI_CHECK) {
-		if (scb->flags & MESH_SENSE)
-			panic("SCSI_CHECK && MESH_SENSE?");
+		if (scb->flags & MESH_SENSE) {
+			printf("mesh: SCSI_CHECK && MESH_SENSE?\n");
+			xs->xs_status |= XS_STS_DONE;
+			xs->error = XS_DRIVER_STUFFUP;
+			scsipi_done(xs);
+			mesh_free_scb(sc, scb);
+			return;
+		}
 		xs->resid = scb->resid;
 		mesh_sense(sc, scb);
 		return;
@@ -1050,11 +1056,11 @@ mesh_done(sc, scb)
 			xs->resid = scb->resid;
 	}
 
-	xs->flags |= ITSDONE;
+	xs->xs_status |= XS_STS_DONE;
 
 	mesh_set_reg(sc, MESH_SYNC_PARAM, 2);
 
-	if ((xs->flags & SCSI_POLL) == 0)
+	if ((xs->xs_control & XS_CTL_POLL) == 0)
 		mesh_sched(sc);
 
 	scsipi_done(xs);

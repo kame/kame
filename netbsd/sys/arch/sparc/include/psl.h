@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.16 1998/11/26 22:53:13 pk Exp $ */
+/*	$NetBSD: psl.h,v 1.21 2000/06/09 10:43:52 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -75,13 +75,19 @@
 
 #define	PSR_BITS "\20\16EC\15EF\10S\7PS\6ET"
 
+/* define audio software interrupts to be at software level 4 */
+#define	PIL_AUSOFT	4
+/* define floppy software interrupts to be at software level 4 too */
+#define PIL_FDSOFT	4
+/* network hardware interrupts at at most (XXX - is that true?) level 6 */
+#define	PIL_NET		6
 #define	PIL_CLOCK	10
 
 #if defined(_KERNEL) && !defined(_LOCORE)
 
 static __inline int getpsr __P((void));
 static __inline void setpsr __P((int));
-static __inline int spl0 __P((void));
+static __inline void spl0 __P((void));
 static __inline int splhigh __P((void));
 static __inline void splx __P((int));
 static __inline int getmid __P((void));
@@ -109,12 +115,10 @@ static __inline void setpsr(newpsr)
 	int newpsr;
 {
 	__asm __volatile("wr %0,0,%%psr" : : "r" (newpsr));
-	__asm __volatile("nop");
-	__asm __volatile("nop");
-	__asm __volatile("nop");
+	__asm __volatile("nop; nop; nop");
 }
 
-static __inline int spl0()
+static __inline void spl0()
 {
 	int psr, oldipl;
 
@@ -132,7 +136,6 @@ static __inline int spl0()
 	 * on the bits to be changed.
 	 */
 	__asm __volatile("nop; nop; nop");
-	return (oldipl);
 }
 
 /*
@@ -140,9 +143,9 @@ static __inline int spl0()
  * (spl0 and splhigh are special since they put all 0s or all 1s
  * into the ipl field.)
  */
-#define	SPL(name, newipl) \
-static __inline int name __P((void)); \
-static __inline int name() \
+#define	_SPLSET(name, newipl) \
+static __inline void name __P((void)); \
+static __inline void name() \
 { \
 	int psr, oldipl; \
 	__asm __volatile("rd %%psr,%0" : "=r" (psr)); \
@@ -151,9 +154,9 @@ static __inline int name() \
 	__asm __volatile("wr %0,%1,%%psr" : : \
 	    "r" (psr), "n" ((newipl) << 8)); \
 	__asm __volatile("nop; nop; nop"); \
-	return (oldipl); \
 }
-/* A non-priority-decreasing version of SPL */
+
+/* Raise IPL and return previous value */
 #define	_SPLRAISE(name, newipl) \
 static __inline int name __P((void)); \
 static __inline int name() \
@@ -162,7 +165,7 @@ static __inline int name() \
 	__asm __volatile("rd %%psr,%0" : "=r" (psr)); \
 	oldipl = psr & PSR_PIL; \
 	if ((newipl << 8) <= oldipl) \
-		return oldipl; \
+		return (oldipl); \
 	psr &= ~oldipl; \
 	__asm __volatile("wr %0,%1,%%psr" : : \
 	    "r" (psr), "n" ((newipl) << 8)); \
@@ -170,50 +173,51 @@ static __inline int name() \
 	return (oldipl); \
 }
 
-SPL(splsoftint, 1)
+_SPLSET(spllowersoftclock, 1)
+
+_SPLRAISE(splsoftint, 1)
 #define	splsoftclock	splsoftint
 #define	splsoftnet	splsoftint
 
-/* audio software interrupts are at software level 4 */
-#define	PIL_AUSOFT	4
-SPL(splausoft, PIL_AUSOFT)
 
-/* floppy software interrupts are at software level 4 too */
-#define PIL_FDSOFT	4
-SPL(splfdsoft, PIL_FDSOFT)
+/* audio software interrupts */
+_SPLRAISE(splausoft, PIL_AUSOFT)
+
+/* floppy software interrupts */
+_SPLRAISE(splfdsoft, PIL_FDSOFT)
 
 /* Block devices */
-SPL(splbio, 5)
+_SPLRAISE(splbio, 5)
 
 /* network hardware interrupts are at level 6 */
-#define	PIL_NET	6
-SPL(splnet, PIL_NET)
+_SPLRAISE(splnet, PIL_NET)
 
 /* tty input runs at software level 6 */
 #define	PIL_TTY	6
-SPL(spltty, PIL_TTY)
+_SPLRAISE(spltty, PIL_TTY)
 
 /*
  * Memory allocation (must be as high as highest network, tty, or disk device)
  */
-SPL(splimp, 7)
-SPL(splpmap, 7)
+_SPLRAISE(splimp, 7)
+_SPLRAISE(splpmap, 7)
 
 /* clock interrupts at level 10 */
-SPL(splclock, PIL_CLOCK)
+_SPLRAISE(splclock, PIL_CLOCK)
 
-/* fd hardware interrupts are at level 11 */
-SPL(splfd, 11)
+/* fd hardware, ts102, and tadpole microcontoller interrupts are at level 11 */
+_SPLRAISE(splfd, 11)
+_SPLRAISE(splts102, 11)
 
 /* zs hardware interrupts are at level 12 */
-SPL(splzs, 12)
-SPL(splserial, 12)	/* XXX - other serial hardware might not be at lvl 12 */
+_SPLRAISE(splzs, 12)
+_SPLRAISE(splserial, 12) /* XXX - other serial hardware might not be at lvl 12 */
 
 /* audio hardware interrupts are at level 13 */
-SPL(splaudio, 13)
+_SPLRAISE(splaudio, 13)
 
 /* second sparc timer interrupts at level 14 */
-SPL(splstatclock, 14)
+_SPLRAISE(splstatclock, 14)
 
 static __inline int splhigh()
 {

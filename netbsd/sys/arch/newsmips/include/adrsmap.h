@@ -1,4 +1,5 @@
-/*	$NetBSD: adrsmap.h,v 1.2 1999/02/15 04:36:35 hubertf Exp $	*/
+/*	$NetBSD: adrsmap.h,v 1.4 1999/12/23 06:52:30 tsubai Exp $	*/
+
 /*
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -45,10 +46,9 @@
  * Define all hardware address map.
  */
 
-#ifndef __ADRSMAP__
-#define	__ADRSMAP__	1
+#ifndef __MACHINE_ADRSMAP__
+#define __MACHINE_ADRSMAP__
 
-#ifdef news3400
 /*----------------------------------------------------------------------
  *	news3400
  *----------------------------------------------------------------------*/
@@ -216,6 +216,73 @@
 /*XXX: SHOULD BE FIX*/
 
 #define	ABEINT_BADDR	0xbfdc0038
-#endif /* news3400 */
 
-#endif /* !__ADRSMAP__ */
+#define	NEWS5000_DIP_SWITCH	0xbf3d0000
+#define	NEWS5000_IDROM		0xbf3c0000
+
+#define	NEWS5000_TIMER0		0xbf800000
+#define	NEWS5000_NVRAM		0xbf880000
+#define	NEWS5000_NVRAM_SIZE	0x07f8
+#define	NEWS5000_RTC_PORT	0xbf881fe0
+
+#define	NEWS5000_INTCLR0	0xbf4e0000
+#define	NEWS5000_INTCLR1	0xbf4e0004
+#define	NEWS5000_INTCLR2	0xbf4e0008
+#define	NEWS5000_INTCLR3	0xbf4e000c
+#define	NEWS5000_INTCLR4	0xbf4e0010
+#define	NEWS5000_INTCLR5	0xbf4e0014
+
+#define	NEWS5000_INTEN0		0xbfa00000
+#define	NEWS5000_INTEN1		0xbfa00004
+#define	NEWS5000_INTEN2		0xbfa00008
+#define	NEWS5000_INTEN3		0xbfa0000c
+#define	NEWS5000_INTEN4		0xbfa00010
+#define	NEWS5000_INTEN5		0xbfa00014
+
+#define	NEWS5000_INTST0		0xbfa00020
+#define	NEWS5000_INTST1		0xbfa00024
+#define	NEWS5000_INTST2		0xbfa00028
+#define	NEWS5000_INTST3		0xbfa0002c
+#define	NEWS5000_INTST4		0xbfa00030
+#define	NEWS5000_INTST5		0xbfa00034
+
+/*
+ * level0 intr (INTMASK0/INTSTAT0)
+ */
+#define	NEWS5000_INT0_DMAC	0x01
+#define	NEWS5000_INT0_SONIC	0x02
+#define	NEWS5000_INT0_FDC	0x10
+
+/*
+ * level1 intr (INTMASK1/INTSTAT1)
+ */
+#define	NEWS5000_INT1_KBD	0x01
+#define	NEWS5000_INT1_SCC	0x02
+#define	NEWS5000_INT1_AUDIO0	0x04
+#define	NEWS5000_INT1_AUDIO1	0x08
+#define	NEWS5000_INT1_PARALLEL	0x20
+#define	NEWS5000_INT1_FB	0x80
+
+/*
+ * level2 intr (INTMASK2/INTSTAT2)
+ */
+#define	NEWS5000_INT2_TIMER0	0x01
+#define	NEWS5000_INT2_TIMER1	0x02
+
+#define	NEWS5000_WBFLUSH	0xbf520004
+
+#define	NEWS5000_LED_POWER	0xbf3f0000
+#define	NEWS5000_LED_DISK	0xbf3f0004
+#define	NEWS5000_LED_FLOPPY	0xbf3f0008
+#define	NEWS5000_LED_SEC	0xbf3f000c
+#define	NEWS5000_LED_NET	0xbf3f0010
+#define	NEWS5000_LED_CD		0xbf3f0014
+
+#define	NEWS5000_APBUS_INTMSK	0xb4c0000c
+#define	NEWS5000_APBUS_INTST	0xb4c00014
+#define	NEWS5000_APBUS_CTRL	0xb4c00034
+#define	NEWS5000_APBUS_DMA	0xb4c00084
+
+#define	NEWS5000_SCCPORT0A	0xbe950000
+
+#endif /* !__MACHINE_ADRSMAP__ */

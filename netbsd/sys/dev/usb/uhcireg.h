@@ -1,11 +1,12 @@
-/*	$NetBSD: uhcireg.h,v 1.5 1998/12/27 23:40:52 augustss Exp $	*/
+/*	$NetBSD: uhcireg.h,v 1.11.4.1 2000/08/22 04:11:56 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcireg.h,v 1.12 1999/11/17 22:33:42 n_hibma Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,6 +47,10 @@
 #define  PCI_USBREV_MASK	0xff
 #define  PCI_USBREV_PRE_1_0	0x00
 #define  PCI_USBREV_1_0		0x10
+#define  PCI_USBREV_1_1		0x11
+
+#define PCI_LEGSUP		0xc0	/* Legacy Support register */
+#define  PCI_LEGSUP_USBPIRQDEN	0x2000	/* USB PIRQ D Enable */
 
 #define PCI_CBIO		0x20	/* configuration base IO */
 
@@ -112,14 +117,15 @@ typedef u_int32_t uhci_physaddr_t;
 #define UHCI_PTR_Q		0x00000002
 #define UHCI_PTR_VF		0x00000004
 
-typedef union {
-	struct uhci_soft_qh *sqh;
-	struct uhci_soft_td *std;
-} uhci_soft_td_qh_t;
+/* 
+ * Wait this long after a QH has been removed.  This gives that HC a
+ * chance to stop looking at it before it's recycled.
+ */
+#define UHCI_QH_REMOVE_DELAY	5
 
 /*
- * The Queue Heads and Transfer Descriptors and accessed
- * by both the CPU and the USB controller which runs
+ * The Queue Heads and Transfer Descriptors are accessed
+ * by both the CPU and the USB controller which run
  * concurrently.  This means that they have to be accessed
  * with great care.  As long as the data structures are
  * not linked into the controller's frame list they cannot
@@ -162,10 +168,7 @@ typedef struct {
 #define UHCI_TD_GET_MAXLEN(s)	((((s) >> 21) + 1) & 0x7ff)
 #define UHCI_TD_MAXLEN_MASK	0xffe00000
 	u_int32_t td_buffer;
-	uhci_soft_td_qh_t link; /* soft version of the td_link field */
-	/* padding to 32 bytes */
 } uhci_td_t;
-#define UHCI_TD_SIZE 32
 
 #define UHCI_TD_ERROR (UHCI_TD_BITSTUFF|UHCI_TD_CRCTO|UHCI_TD_BABBLE|UHCI_TD_DBUFFER|UHCI_TD_STALLED)
 
@@ -181,10 +184,6 @@ typedef struct {
 typedef struct {
 	uhci_physaddr_t qh_hlink;
 	uhci_physaddr_t qh_elink;
-	struct uhci_soft_qh *hlink; /* soft version of qh_hlink */
-	struct uhci_soft_td *elink; /* soft version of qh_elink */
-	/* padding to 32 bytes */
 } uhci_qh_t;
-#define UHCI_QH_SIZE 32
 
 #endif /* _DEV_PCI_UHCIREG_H_ */

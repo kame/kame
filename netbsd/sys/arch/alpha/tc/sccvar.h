@@ -1,4 +1,4 @@
-/* $NetBSD: sccvar.h,v 1.5.16.1 1999/08/08 07:19:05 cgd Exp $ */
+/* $NetBSD: sccvar.h,v 1.6 1999/08/08 01:44:58 ross Exp $ */
 
 /* 
  * Copyright (c) 1991,1990,1989,1994,1995 Carnegie Mellon University
