@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.396 2003/09/05 23:17:04 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.397 2003/09/06 02:36:48 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1522,7 +1522,7 @@ skip_ipsec2:;
 	} else {
 		struct mbuf **mnext, *m_frgpart;
 		struct ip6_frag *ip6f;
-		u_int32_t id = htonl(ip6_id++);
+		u_int32_t id = htonl(ip6_randomid());
 		u_char nextproto;
 		struct ip6ctlparam ip6cp;
 		u_int32_t mtu32;

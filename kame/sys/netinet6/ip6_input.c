@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.325 2003/08/27 19:12:02 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.326 2003/09/06 02:36:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -299,11 +299,8 @@ ip6_init()
 	 * as initialization during bootstrap time occur in fixed order.
 	 */
 	microtime(&tv);
-	ip6_flow_seq = random() ^ tv.tv_usec;
-	microtime(&tv);
 	ip6_desync_factor = (random() ^ tv.tv_usec) % MAX_TEMP_DESYNC_FACTOR;
 #else
-	ip6_flow_seq = arc4random();
 	ip6_desync_factor = arc4random() % MAX_TEMP_DESYNC_FACTOR;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.116 2003/08/09 14:41:26 suz Exp $	*/
+/*	$KAME: ip6_var.h,v 1.117 2003/09/06 02:36:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -501,7 +501,6 @@ int	dest6_mip6_hao __P((struct mbuf *, int, int));
 int	mobility6_input __P((struct mbuf **, int *, int));
 int	mobility6_send_be __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
 				u_int8_t, struct sockaddr_in6 *));
-int	none_input __P((struct mbuf **, int *, int));
 
 #ifdef NEW_STRUCT_ROUTE
 struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
@@ -518,6 +517,9 @@ int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
 	struct rtentry **, int));
 #endif
+
+u_int32_t ip6_randomid __P((void));
+u_int32_t ip6_randomflowlabel __P((void));
 #endif /* _KERNEL */
 
 #endif /* !_NETINET6_IP6_VAR_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.137 2003/08/14 07:59:53 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.138 2003/09/06 02:36:48 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -603,7 +603,6 @@ int	ip6_maxfrags = 200;
 int	ip6_log_interval = 5;
 int	ip6_hdrnestlimit = 50;	/* appropriate? */
 int	ip6_dad_count = 1;	/* DupAddrDetectionTransmits */
-u_int32_t ip6_flow_seq;
 int	ip6_auto_flowlabel = 1;
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
@@ -616,7 +615,6 @@ const int ip6_v6only = 1;
 int	ip6_v6only = 0;
 #endif
 
-u_int32_t ip6_id = 0UL;
 int	ip6_keepfaith = 0;
 time_t	ip6_log_time = (time_t)0L;
 

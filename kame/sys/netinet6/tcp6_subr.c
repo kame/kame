@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.47 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.48 2003/09/06 02:36:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,8 +180,8 @@ tcp6_template(t6p)
 	n->i6t_i.ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL) {
 		n->i6t_i.ip6_flow &= ~IPV6_FLOWLABEL_MASK;
-		n->i6t_i.ip6_flow |=
-			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+		n->i6t_i.ip6_flow |= (htonl(ip6_randomflowlabel()) &
+		    IPV6_FLOWLABEL_MASK);
 	}
 	n->i6t_i.ip6_vfc &= ~IPV6_VERSION_MASK;
 	n->i6t_i.ip6_vfc |= IPV6_VERSION;
@@ -319,7 +319,8 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	nip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 	nip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
 	if (in6p && (in6p->in6p_flags & IN6P_AUTOFLOWLABEL))
-		nip6->ip6_flow |= (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+		nip6->ip6_flow |= (htonl(ip6_randomflowlabel()) &
+		    IPV6_FLOWLABEL_MASK);
 	nth->th_flags = flags;
 	nth->th_urp = 0;
 	nth->th_sum = 0;

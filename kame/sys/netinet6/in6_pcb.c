@@ -495,7 +495,7 @@ in6_pcbconnect(in6p, nam)
 	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL)
 		in6p->in6p_flowinfo |=
-		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+		    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 #ifdef IPSEC
 	if (in6p->in6p_socket->so_type == SOCK_STREAM)
 		ipsec_pcbconn(in6p->in6p_sp);

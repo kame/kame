@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.48 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: frag6.c,v 1.49 2003/09/06 02:36:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -176,16 +176,6 @@ frag6_init()
 	ip6_maxfrags = nmbclusters / 4;
 #endif
 
-#ifdef __bsdi__
-	/*
-	 * in many cases, random() here does NOT return random number
-	 * as initialization during bootstrap time occur in fixed order.
-	 */
-	microtime(&tv);
-	ip6_id = random() ^ tv.tv_usec;
-#else
-	ip6_id = arc4random();
-#endif
 	ip6q.ip6q_next = ip6q.ip6q_prev = &ip6q;
 }
 
