@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.74 2004/02/05 11:02:08 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.75 2004/02/06 08:34:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -153,7 +153,7 @@
 
 extern	struct protosw inetsw[];
 static	int udp6_detach __P((struct socket *so));
-static void pass_to_pcb6 __P((struct mbuf *, struct mbuf *, struct inpcb *,
+static void pass_to_pcb6 __P((struct mbuf *, struct mbuf *, struct inpcb **,
 			      struct in6_addr *, struct inpcb *, int));
 
 int
@@ -303,7 +303,7 @@ udp6_input(mp, offp, proto)
 				/* receive data from any source */
 				if (msf->msf_grpjoin != 0 &&
 				    msf->msf_blknumsrc == 0) {
-					pass_to_pcb6(m, opts, last,
+					pass_to_pcb6(m, opts, &last,
 						     &ip6->ip6_src, in6p, off);
 					break;
 				}
@@ -324,7 +324,7 @@ udp6_input(mp, offp, proto)
 						break;
 					}
 
-					pass_to_pcb6(m, opts, last,
+					pass_to_pcb6(m, opts, &last,
 						     &ip6->ip6_src, in6p, off);
 					break;
 				}
@@ -352,7 +352,7 @@ udp6_input(mp, offp, proto)
 				/* blocks since the source matched with block
 				 * list */
 				if (msfsrc == NULL)
-					pass_to_pcb6(m, opts, last,
+					pass_to_pcb6(m, opts, &last,
 						     &ip6->ip6_src, in6p, off);
 
 			end_of_search:
@@ -905,7 +905,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 static void
 pass_to_pcb6(m, opts, last, src, in6p, off)
 	struct mbuf *m, *opts;
-	struct inpcb *last;
+	struct inpcb **last;
 	struct in6_addr *src;
 	struct inpcb *in6p;
 	int off;
@@ -913,7 +913,7 @@ pass_to_pcb6(m, opts, last, src, in6p, off)
 	struct mbuf *n;
 	struct sockaddr_in6 from;
 
-	if (last == NULL)
+	if (*last == NULL)
 		goto end;
 
 	bzero(&from, sizeof(from));
@@ -923,7 +923,7 @@ pass_to_pcb6(m, opts, last, src, in6p, off)
 
 #ifdef IPSEC
 	/* check AH/ESP integrity. */
-	if (ipsec6_in_reject_so(m, last->in6p_socket)) {
+	if (ipsec6_in_reject_so(m, (*last)->in6p_socket)) {
 		ipsec6stat.in_polvio++;
 		/* do not inject data to pcb */
 		return;
@@ -931,32 +931,33 @@ pass_to_pcb6(m, opts, last, src, in6p, off)
 #endif
 #ifdef FAST_IPSEC
 	/* Check AH/ESP integrity. */
-	if (ipsec6_in_reject(m, last))
+	if (ipsec6_in_reject(m, (*last)))
 		return;
 #endif /* FAST_IPSEC */
-	if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
-		/*
-		 * KAME NOTE: do not m_copy(m, offset, ...) above.
-		 * sbappendaddr() expects M_PKTHDR, and m_copy()
-		 * only if offset is 0. will copy M_PKTHDR
-		 */
-		if (last->in6p_flags & IN6P_CONTROLOPTS
-		    || last->in6p_socket->so_options & SO_TIMESTAMP)
-			ip6_savecontrol(last, n, &opts);
-			m_adj(n, off + sizeof(struct udphdr));
-		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&from, n, opts) == 0) {
-			m_freem(n);
-			if (opts)
-				m_freem(opts);
-			udpstat.udps_fullsock++;
-		} else
-			sorwakeup(last->in6p_socket);
-		opts = NULL;
-	}
+	if ((n = m_copy(m, 0, M_COPYALL)) == NULL)
+		goto end;
+
+	/*
+	 * KAME NOTE: do not m_copy(m, offset, ...) above.
+	 * sbappendaddr() expects M_PKTHDR, and m_copy()
+	 * only if offset is 0. will copy M_PKTHDR
+	 */
+	if ((*last)->in6p_flags & IN6P_CONTROLOPTS
+	    || (*last)->in6p_socket->so_options & SO_TIMESTAMP)
+		ip6_savecontrol(*last, n, &opts);
+	m_adj(n, off + sizeof(struct udphdr));
+	if (sbappendaddr(&(*last)->in6p_socket->so_rcv,
+			(struct sockaddr *)&from, n, opts) == 0) {
+		m_freem(n);
+		if (opts)
+			m_freem(opts);
+		udpstat.udps_fullsock++;
+	} else
+		sorwakeup(last->in6p_socket);
+	opts = NULL;
 
 end:
-	last = in6p;
+	*last = in6p;
 	return;
 }
 
