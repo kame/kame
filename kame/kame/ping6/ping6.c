@@ -1509,7 +1509,7 @@ setpolicy(so, policy)
 	char *buf;
 
 	if (policy == NULL)
-		return -1;
+		return 0;	/* ignore */
 
 	buf = ipsec_set_policy(policy, strlen(policy));
 	if (buf == NULL)
