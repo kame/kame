@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.149 2001/07/23 14:47:19 sumikawa Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.150 2001/07/23 14:49:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1725,6 +1725,7 @@ nd6_prefix_onlink(pr)
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_len = sizeof(mask6);
 	mask6.sin6_addr = pr->ndpr_mask;
+	/* rtrequest() will probably set RTF_UP, but we're not sure. */
 	rtflags = ifa->ifa_flags | RTF_UP;
 	if (nd6_need_cache(ifp)) {
 		/* explicitly set in case ifa_flags does not set the flag. */
