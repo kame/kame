@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.61 2001/01/23 11:50:21 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.62 2001/01/23 11:53:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1158,7 +1158,6 @@ prelist_update(new, dr, m)
 				(*mip6_probe_pfxrtrs_hook)();
 		}
 #endif /* MIP6 */
-
 	} else {
 		int error_tmp;
 
