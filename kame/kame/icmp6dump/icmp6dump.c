@@ -95,9 +95,6 @@ void
 dump()
 {
 	int i, j;
-#ifdef OLD_RAWSOCK
-	struct ip6_hdr *ip6;
-#endif
 	struct icmp6_hdr *icmp6;
 	u_char buf[1024];
 	struct sockaddr_in6 from;
@@ -108,22 +105,12 @@ dump()
 			  (struct sockaddr *)&from,
 			  &from_len)) < 0)
 		return;
-#ifndef OLD_RAWSOCK
+
 	if (i < sizeof(struct icmp6_hdr)) {
 		printf("too short!\n");
 		return;
 	}
-
 	icmp6 = (struct icmp6_hdr *)buf;
-#else
-	if (i < sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr)) {
-		printf("too short!\n");
-		return;
-	}
-
-	ip6 = (struct ip6_hdr *)buf;
-	icmp6 = (struct icmp6_hdr *)(ip6 + 1);	/*xxx*/
-#endif
 
 	printf("from %s, ", inet_ntop(AF_INET6, &from.sin6_addr,
 				      ntop_buf, sizeof(ntop_buf)));
