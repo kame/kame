@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.6 2000/03/09 02:53:51 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.7 2000/03/13 17:56:10 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -100,6 +100,7 @@ struct options
 	unsigned	daemon:1;	/* TRUE if daemon mode			*/
 	unsigned	logsyslog:1;	/* TRUE if log to syslog		*/
 	unsigned	logstderr:1;	/* TRUE if log to stderr		*/
+	unsigned	logopened:1;	/* TRUE if openLog() done		*/
     }	b;
     char	*pidFilename;
     char	*statsFilename;
@@ -177,7 +178,12 @@ parseArgument(int argc, char *argv[])
 	{
 	  case 'b':
 	    if ((*optarg == 'd') && (*(optarg+1) == '\0'))
+	    {
 		__op.b.daemon = 1;
+		__op.b.logsyslog = 1;
+		__op.b.logstderr = 0;
+		openLog();
+	    }
 	    else
 		goto	illegalopt;
 	    break;
@@ -470,10 +476,20 @@ quitting(int status)
 void
 openLog()
 {
-    int		logopt = 0;
+    if (isOff(logopened))
+    {
+	__op.b.logopened = 1;
 
-    logopt = LOG_PID | LOG_NOWAIT;
-    openlog("natptlog", logopt, LOG_DAEMON);
+	if (isOn(logsyslog))
+	{
+	    int		logopt = 0;
+
+	    logopt = LOG_PID | LOG_NOWAIT;
+	    openlog("natptlog", logopt, LOG_DAEMON);
+	}
+
+	log(LOG_INFO, "starting natptlog");
+    }
 }
 
 
@@ -674,23 +690,21 @@ sighandler(int sig)
 void
 preinit()
 {
+    __op.b.daemon = 0;
     __op.b.logsyslog = 0;
     __op.b.logstderr = 1;
-
-    openLog();
-    log(LOG_INFO, "starting natptlog");
+    __op.b.logopened = 0;
 }
 
 
 void
 init_main()
 {
+    openLog();
+
     if (isOn(daemon)
 	&& (daemon(0, 0) < 0))
     {
-	__op.b.logsyslog = 1;
-	__op.b.logstderr = 0;
-
 	log(LOG_ERR, "init_main(): failure on daemon()"),
 	exit(errno);
     }
