@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2342 2003/02/08 19:35:27 kjc Exp $
+$KAME: CHANGELOG,v 1.2343 2003/02/10 05:15:27 suz Exp $
 
 <200302>
+Mon 10 Feb 2002 14:11:46 JST	suz@crl.hitachi.co.jp
+	* freebsd5/sys/netinet6/in6_pcb.c: getsockname()/getpeername() 
+	  now returns proper port number for IPv6 socket.
+	  (this makes rpcbind work properly on freebsd5)
+
 2003/02/09 03:33:58 JST kjc@csl.sony.co.jp
 	merge altq support into the freebsd5 tree.
 	the original code was made for 5.0-dp1 and it hasn't been fully
