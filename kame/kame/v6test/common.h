@@ -57,6 +57,7 @@
 
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+#include <netinet6/pim6.h>
 #ifdef IPSEC
 #include <netinet6/ah.h>
 #endif
