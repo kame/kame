@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.23 2000/02/22 14:01:59 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.24 2000/02/26 09:31:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -476,10 +476,16 @@ in_gif_ioctl(ifp, cmd, data)
 			goto bad;
 		}
 
-		if (sc->gif_psrc != NULL)
+		if (sc->encap_cookie)
+			(void)encap_detach(sc->encap_cookie);
+		if (sc->gif_psrc != NULL) {
 			free((caddr_t)sc->gif_psrc, M_IFADDR);
-		if (sc->gif_pdst != NULL)
+			sc->gif_psrc = NULL;
+		}
+		if (sc->gif_pdst != NULL) {
 			free((caddr_t)sc->gif_pdst, M_IFADDR);
+			sc->gif_pdst = NULL;
+		}
 
 		p = encap_attach(ifr->ifr_addr.sa_family, -1, src,
 			(struct sockaddr *)&smask4, dst,
@@ -489,8 +495,6 @@ in_gif_ioctl(ifp, cmd, data)
 			error = EINVAL;
 			goto bad;
 		}
-		if (sc->encap_cookie)
-			(void)encap_detach(sc->encap_cookie);
 		sc->encap_cookie = p;
 		sc->gif_oflags = ifp->if_flags;
 
