@@ -461,17 +461,12 @@ struct login_info *login_info;
 	    struct sockaddr_in6 *mask6 = (struct sockaddr_in6 *)&mask;
 	    struct sockaddr_in6 *pattern6 = (struct sockaddr_in6 *)&pattern;
 	    struct in6_addr masked;
+	    int i;
 	    masked = sin6->sin6_addr;
-	    masked.s6_addr32[0] &= mask6->sin6_addr.s6_addr32[0];
-	    masked.s6_addr32[1] &= mask6->sin6_addr.s6_addr32[1];
-	    masked.s6_addr32[2] &= mask6->sin6_addr.s6_addr32[2];
-	    masked.s6_addr32[3] &= mask6->sin6_addr.s6_addr32[3];
-	    if (masked.s6_addr32[0] == pattern6->sin6_addr.s6_addr32[0]
-	     && masked.s6_addr32[1] == pattern6->sin6_addr.s6_addr32[1]
-	     && masked.s6_addr32[2] == pattern6->sin6_addr.s6_addr32[2]
-	     && masked.s6_addr32[3] == pattern6->sin6_addr.s6_addr32[3]) {
+	    for (i = 0; i < (int)sizeof(struct in6_addr); i++)
+		    masked.s6_addr[i] &= mask6->sin6_addr.s6_addr[i];
+	    if (IN6_ARE_ADDR_EQUAL(&masked, &pattern6->sin6_addr))
 		return 1;
-	    }
 	    break;
 	  }
 #endif
