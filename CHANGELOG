@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1142 2000/07/21 12:18:48 jinmei Exp $
+$Id: CHANGELOG,v 1.1143 2000/07/21 13:40:48 itojun Exp $
 
 <200006>
+Fri Jul 21 22:37:44 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/sendmail.beta: use 8.11.0.
+	* netbsd/pkgsrc/net/netperf: use the latest IPv6 patch (7/21).
+
 2000-07-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/bgp.c: clarification about the advanced API;
 	do not use IPV6_PKTOPTIONS in pure RFC2292 (i.e. not 2292bis)
