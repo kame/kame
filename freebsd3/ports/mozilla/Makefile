@@ -6,7 +6,7 @@
 #
 
 PORTNAME=	mozilla
-PORTVERSION= 	M15
+PORTVERSION= 	M16
 PKGNAME=	${PORTNAME}-${PORTVERSION}
 CATEGORIES=	www #ipv6
 MASTER_SITES=	ftp://ftp.mozilla.org/pub/mozilla/releases/${PORTVERSION:S/M/m/}/src/
@@ -37,9 +37,9 @@ CONFIGURE_ARGS=					\
 		--disable-xterm-updates		\
 		--enable-cpp-exceptions		\
 		--enable-double-buffer		\
-		--enable-editor			\
-		--enable-mailnews		\
-		--enable-mathml			\
+		--disable-editor			\
+		--disable-mailnews		\
+		--disable-mathml			\
 		--enable-optimize		\
 		--enable-pics			\
 		--enable-tests			\
