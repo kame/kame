@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.18 2001/10/24 06:54:11 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.19 2001/10/24 06:55:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -941,8 +941,7 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
 		if (ifa->ifa_addr->sa_family != af)
 			continue;
 
-		if ((niflags & NI_NODEADDR_FLAG_ALL) == 0 &&
-		    strcmp(ifname, ifa->ifa_name) != 0)
+		if (ifname && strcmp(ifname, ifa->ifa_name) != 0)
 			continue;
 
 		/* XXX reorder preferred/deprecated */
