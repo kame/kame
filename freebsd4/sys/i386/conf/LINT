@@ -2721,7 +2721,6 @@ options 	VFS_BIO_DEBUG
 options		XBONEHACK
 
 # KAME extensions
-pseudo-device	sec			#IPsec tunnel by sec* device
 options 	NATM			#native mode ATM
 options 	ENABLE_DEFAULT_SCOPE
 
