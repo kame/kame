@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.533 2000/02/08 04:26:03 itojun Exp $
+$Id: CHANGELOG,v 1.534 2000/02/08 05:20:52 itojun Exp $
 
 <200002>
 Tue Feb  8 03:00:45 JST 2000  itojun@iijlab.net
@@ -8,6 +8,8 @@ Tue Feb  8 03:00:45 JST 2000  itojun@iijlab.net
 	  build tree is made available for netbsd and freebsd2.
 	  for other platforms, build tree will be populated soon.
 	  not really tested by KAME team yet.
+	* kame/rtadvd: modified for mobile-ip6 support.
+	* kame/mip6config, kame/mip6stat: mobile-ip6 controllers.
 	* libinet6/getaddrinfo.c: for AF_INET numeric address resolution,
 	  use inet_aton() based on X/Open spec.  waiting for clarification
 	  in ipngwg.
