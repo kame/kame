@@ -299,28 +299,12 @@ rip6_ctlinput(cmd, sa, d)
  * Tack on options user may have setup with control call.
  */
 int
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 rip6_output(m, so, dstsock, control)
 	struct mbuf *m;
 	struct socket *so;
 	struct sockaddr_in6 *dstsock;
 	struct mbuf *control;
-#else
-#if __STDC__
-rip6_output(struct mbuf *m, ...)
-#else
-rip6_output(m, va_alist)
-	struct mbuf *m;
-	va_dcl
-#endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD >= 4) */
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	struct socket *so;
-	struct sockaddr_in6 *dstsock;
-	struct mbuf *control;
-	va_list ap;
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 	struct in6_addr *dst;
 	struct ip6_hdr *ip6;
 	struct inpcb *in6p;
@@ -331,14 +315,6 @@ rip6_output(m, va_alist)
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	int flags;
-
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	va_start(ap, m);
-	so = va_arg(ap, struct socket *);
-	dstsock = va_arg(ap, struct sockaddr_in6 *);
-	control = va_arg(ap, struct mbuf *);
-	va_end(ap);
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 	in6p = sotoin6pcb(so);
 	stickyopt = in6p->in6p_outputopts;
