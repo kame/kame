@@ -53,6 +53,9 @@ static FILE *fp;
 
 extern struct rainfo *ralist;
 
+static char *ether_str __P((struct sockaddr_dl *));
+static void if_dump __P((void));
+
 static char *
 ether_str(sdl)
 	struct sockaddr_dl *sdl;
@@ -86,8 +89,10 @@ if_dump()
 
 		/* control information */
 		lastsent = (time_t)rai->lastsent.tv_sec;
-		fprintf(fp, "  Last RA sent: %s, waits: %d\n", ctime(&lastsent),
-			rai->waiting);
+		if (lastsent) /* ctime() appends CR by itself */
+			fprintf(fp, "  Last RA sent: %s", ctime(&lastsent));
+		fprintf(fp, "  waits: %d, initcount: %d\n",
+			rai->waiting, rai->initcounter);
 
 		/* interface information */
 		if (rai->advlinkopt)
@@ -100,17 +105,17 @@ if_dump()
 			"  DefaultLifetime: %d, MaxAdvInterval: %d, "
 			"MinAdvInterval: %d\n",
 			rai->lifetime, rai->maxinterval, rai->mininterval);
-		fprintf(fp, "  Flags: %s%s%s, MTU: %d\n",
+		fprintf(fp, "  Flags: %s%s%s MTU: %d\n",
 			rai->managedflg ? "M" : "", rai->otherflg ? "O" : "",
 #ifdef MIP6
 			rai->haflg ? "H" :
 #endif
 			"", rai->linkmtu);
-		fprintf(fp, "  ReachableTime: %d RetransTimer: %d, "
+		fprintf(fp, "  ReachableTime: %d, RetransTimer: %d, "
 			"CurHopLimit: %d\n", rai->reachabletime,
 			rai->retranstimer, rai->hoplimit);
 #ifdef MIP6
-		fprintf(fp, "  HAPreference: %d HALifetime: %d\n",
+		fprintf(fp, "  HAPreference: %d, HALifetime: %d\n",
 			rai->hapref, rai->hatime);
 #endif 
 
@@ -120,7 +125,7 @@ if_dump()
 				fprintf(fp, "  Prefixes:\n");
 				first = 0;
 			}
-			fprintf(fp, "    %s/%d: ",
+			fprintf(fp, "    %s/%d(",
 				inet_ntop(AF_INET6, &pfx->prefix,
 					  prefixbuf, sizeof(prefixbuf)),
 				pfx->prefixlen);
@@ -134,7 +139,7 @@ if_dump()
 			else
 				fprintf(fp, "pltime: %ld, ",
 					(long)pfx->preflifetime);
-			fprintf(fp, "flags: %s%s%s\n",
+			fprintf(fp, "flags: %s%s%s)\n",
 				pfx->onlinkflg ? "L" : "",
 				pfx->autoconfflg ? "A" : "",
 #ifdef MIP6
