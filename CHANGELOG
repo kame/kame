@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.43 1999/08/20 09:16:02 itojun Exp $
+$Id: CHANGELOG,v 1.44 1999/08/20 11:30:14 itojun Exp $
 
 <199908>
+Fri Aug 20 20:27:34 JST 1999  itojun@iijlab.net
+	* bsdi3/usr.sbin/inetd: inetd with IPv6 and IPsec support.
+	  inet6d will be left uncompiled for good.
+
 Fri Aug 20 18:13:36 JST 1999  itojun@iijlab.net
 	* sys/netinet/in_gif.c, sys/netinet6/in6_gif.c:
 	  do not capture tunnelled packet when gif interface is down
