@@ -209,11 +209,6 @@ server6_init()
 		err(1, "bind(insock)");
 		/*NOTREACHED*/
 	}
-	if (setsockopt(insock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-			&ifidx, sizeof(ifidx)) < 0) {
-		err(1, "setsockopt(insock, IPV6_MULTICAST_IF)");
-		/*NOTREACHED*/
-	}
 	freeaddrinfo(res);
 
 	hints.ai_flags = 0;
@@ -261,10 +256,16 @@ server6_init()
 		err(1, "socket(outsock)");
 		/*NOTREACHED*/
 	}
+	/* set outgoing interface of multicast packets for DHCP reconfig */
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 			&ifidx, sizeof(ifidx)) < 0) {
 		err(1, "setsockopt(outsock, IPV6_MULTICAST_IF)");
 		/*NOTREACHED*/
+	}
+	if (shutdown(outsock, 0)) {
+		/* make the socket write-only */
+		err(1, "shutdown(outbound, 0)");
+		/* NOTREACHED */
 	}
 	freeaddrinfo(res);
 
