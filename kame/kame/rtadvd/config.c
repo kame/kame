@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.38 2001/06/01 05:09:20 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.39 2001/06/01 18:00:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -454,7 +454,7 @@ getconfig(intface)
 		/* link into chain */
 		insque(rti, &tmp->route);
 
-		makeentry(entbuf, i, "rtrplen", added);
+		makeentry(entbuf, i, "rtplen", added);
 		MAYHAVE(val, entbuf, 64);
 		if (val < 0 || val > 128) {
 			syslog(LOG_ERR,
@@ -464,7 +464,7 @@ getconfig(intface)
 		}
 		rti->prefixlen = (int)val;
 
-		makeentry(entbuf, i, "rtrflags", added);
+		makeentry(entbuf, i, "rtflags", added);
 		MAYHAVE(val, entbuf, 0);
 		rti->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
 		if (rti->rtpref == ND_RA_FLAG_RTPREF_RSV) {
@@ -473,7 +473,7 @@ getconfig(intface)
 			exit(1);
 		}
 
-		makeentry(entbuf, i, "rtrltime", added);
+		makeentry(entbuf, i, "rtltime", added);
 		/*
 		 * XXX: since default value of route lifetime is not defined in
 		 * draft-draves-route-selection-01.txt, I took the default 
@@ -483,13 +483,13 @@ getconfig(intface)
 		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
 		if (val64 < 0 || val64 > 0xffffffff) {
 			syslog(LOG_ERR,
-			       "<%s> rtrltime out of range",
+			       "<%s> rtltime out of range",
 			       __FUNCTION__);
 			exit(1);
 		}
 		rti->ltime = (u_int32_t)val64;
 
-		makeentry(entbuf, i, "rtrprefix", added);
+		makeentry(entbuf, i, "rtprefix", added);
 		addr = (char *)agetstr(entbuf, &bp);
 		if (addr == NULL) {
 			syslog(LOG_ERR,
