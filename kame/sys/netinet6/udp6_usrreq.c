@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.99 2002/01/31 14:14:55 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.100 2002/02/02 07:06:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -262,12 +262,12 @@ udp6_input(mp, offp, proto)
 		     in6p = in6p->in6p_next) {
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
-				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa,
 							&ip6->ip6_dst))
 					continue;
 			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
 							&ip6->ip6_src) ||
 				   in6p->in6p_fport != uh->uh_sport)
@@ -688,7 +688,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_CONNECT:
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 			error = EISCONN;
 			break;
 		}
@@ -712,7 +712,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_DISCONNECT:
-		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 			error = ENOTCONN;
 			break;
 		}

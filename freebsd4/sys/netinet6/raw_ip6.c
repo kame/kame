@@ -179,10 +179,10 @@ rip6_input(mp, offp, proto)
 		if (in6p->in6p_ip6_nxt &&
 		    in6p->in6p_ip6_nxt != proto)
 			continue;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa.sin6_addr) &&
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 			continue;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa.sin6_addr) &&
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src))
 			continue;
 		if (in6p->in6p_cksum != -1) {
@@ -653,7 +653,7 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
 
-	if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
+	if (!SA6_IS_ADDR_UNSPECIFIED(addr) &&
 	    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)
 		return EADDRNOTAVAIL;
 	if (ia &&

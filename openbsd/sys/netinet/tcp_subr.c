@@ -590,8 +590,8 @@ tcp_close(tp)
 	if (tp->pf == PF_INET6) {
 		if (rt)
 			bound_to_specific =
-			    !(IN6_IS_ADDR_UNSPECIFIED(&
-			    ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr));
+			    !(SA6_IS_ADDR_UNSPECIFIED(
+			      (struct sockaddr_in6 *)rt_key(rt)));
 	} else {
 		if (rt)
 			bound_to_specific =

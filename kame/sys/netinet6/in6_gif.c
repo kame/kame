@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.90 2002/01/31 14:14:51 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.91 2002/02/02 07:06:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -326,7 +326,7 @@ in6_gif_output(ifp, family, m)
 	ip6->ip6_hlim	= ip6_gif_hlim;
 	ip6->ip6_src	= sin6_src->sin6_addr;
 	/* bidirectional configured tunnel mode */
-	if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
+	if (!SA6_IS_ADDR_UNSPECIFIED(sin6_dst))
 		ip6->ip6_dst = sin6_dst->sin6_addr;
 	else  {
 		m_freem(m);

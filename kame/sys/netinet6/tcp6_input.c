@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.48 2002/01/31 14:14:54 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.49 2002/02/02 07:06:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -229,7 +229,7 @@ tcp6_listen_lookup(dst, dport)
 			continue;
 		if (in6p->in6p_lport != dport)
 			continue;
-		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
 			if (maybe == NULL)
 				maybe = in6p;
 		} else if (SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
@@ -937,7 +937,7 @@ after_listen:
 		 * that the association is unique, and the
 		 * local address is always set here.
 		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
+		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
 			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
 		sa6_copy_addr(src_sa6, &in6p->in6p_fsa);
 		in6p->in6p_fport = th->th_sport;
@@ -951,7 +951,7 @@ after_listen:
 		sin6.sin6_addr = ip6->ip6_src;
 		sin6.sin6_port = th->th_sport;
 		lsa6 = in6p->in6p_lsa6;
-		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
+		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
 			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
 		if (in6_pcbconnectok(in6p, &sin6)) {
 			sa6_copy_addr(&lsa6, &in6p->in6p_lsa);
@@ -2099,7 +2099,7 @@ tcp6_rtlookup(in6p)
 	}
 
 	/* No route yet, so try to acquire one */
-	if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+	if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 		struct sockaddr_in6 *dst6;
 
 		bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));

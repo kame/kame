@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.43 2002/01/31 14:17:14 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.44 2002/01/31 15:43:44 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,7 +128,7 @@ in6_pcbbind(inp, nam, p)
 
 	if (!in6_ifaddr) /* XXX broken! */
 		return (EADDRNOTAVAIL);
-	if (inp->inp_lport || !IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+	if (inp->inp_lport || !SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 		return(EINVAL);
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0)
 		wild = 1;
@@ -155,7 +155,7 @@ in6_pcbbind(inp, nam, p)
 			 */
 			if (so->so_options & SO_REUSEADDR)
 				reuseport = SO_REUSEADDR|SO_REUSEPORT;
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+		} else if (!SA6_IS_ADDR_UNSPECIFIED(sin6)) {
 			struct ifaddr *ia = NULL;
 #ifndef SCOPEDROUTING
 			u_int32_t lzone; 
@@ -196,15 +196,15 @@ in6_pcbbind(inp, nam, p)
 				t = in6_pcblookup_local(pcbinfo, sin6, lport,
 							INPLOOKUP_WILDCARD);
 				if (t &&
-				    (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) ||
-				     !IN6_IS_ADDR_UNSPECIFIED(&t->in6p_laddr) ||
+				    (!SA6_IS_ADDR_UNSPECIFIED(sin6) ||
+				     !SA6_IS_ADDR_UNSPECIFIED(&t->in6p_lsa) ||
 				     (t->inp_socket->so_options &
 				      SO_REUSEPORT) == 0) &&
 				    (so->so_cred->cr_uid !=
 				     t->inp_socket->so_cred->cr_uid))
 					return (EADDRINUSE);
 				if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0 &&
-				    IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+				    SA6_IS_ADDR_UNSPECIFIED(sin6)) {
 					struct sockaddr_in sin;
 
 					in6_sin6_2_sin(&sin, sin6);
@@ -225,7 +225,7 @@ in6_pcbbind(inp, nam, p)
 			if (t && (reuseport & t->inp_socket->so_options) == 0)
 				return(EADDRINUSE);
 			if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0 &&
-			    IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+			    SA6_IS_ADDR_UNSPECIFIED(sin6)) {
 				struct sockaddr_in sin;
 
 				in6_sin6_2_sin(&sin, sin6);
@@ -295,7 +295,7 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		 * If the destination address is UNSPECIFIED addr,
 		 * use the loopback addr, e.g ::1.
 		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+		if (SA6_IS_ADDR_UNSPECIFIED(sin6))
 			sin6->sin6_addr = in6addr_loopback;
 	}
 	{
@@ -363,12 +363,12 @@ in6_pcbconnect(inp, nam, p)
 #endif
 
 	if (in6_pcblookup_hash(inp->inp_pcbinfo, sin6, sin6->sin6_port,
-			       IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
+			       SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)
 			       ? addr6 : &inp->in6p_lsa,
 			       inp->inp_lport, 0, NULL) != NULL) {
 		return (EADDRINUSE);
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa.sin6_addr)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
 		if (inp->inp_lport == 0) {
 			error = in6_pcbbind(inp, (struct sockaddr *)0, p);
 			if (error)
@@ -794,7 +794,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		return;
 
 	sa6_dst = (struct sockaddr_in6 *)dst;
-	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr))
+	if (SA6_IS_ADDR_UNSPECIFIED(sa6_dst))
 		return;
 
 	/*
@@ -837,7 +837,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
-		    (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) ||
+		    (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa) ||
 		     SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa, sa6_dst))) {
 			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
@@ -859,7 +859,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa, sa6_dst) ||
 			 inp->inp_socket == 0 ||
 			 (lport && inp->inp_lport != lport) ||
-			 (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
+			 (!SA6_IS_ADDR_UNSPECIFIED(&sa6_src) &&
 			  !SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, &sa6_src)) ||
 			 (fport && inp->inp_fport != fport))
 			continue;
@@ -896,7 +896,7 @@ in6_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 		LIST_FOREACH(inp, head, inp_hash) {
 			if ((inp->inp_vflag & INP_IPV6) == 0)
 				continue;
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) &&
+			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa) &&
 			    SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, laddr) &&
 			    inp->inp_lport == lport) {
 				/*
@@ -934,11 +934,10 @@ in6_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 				wildcard = 0;
 				if ((inp->inp_vflag & INP_IPV6) == 0)
 					continue;
-				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
+				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 					wildcard++;
-				if (!IN6_IS_ADDR_UNSPECIFIED(
-				        &inp->in6p_laddr)) {
-					if (IN6_IS_ADDR_UNSPECIFIED(&laddr->sin6_addr))
+				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
+					if (SA6_IS_ADDR_UNSPECIFIED(laddr))
 						wildcard++;
 					else if (!SA6_ARE_ADDR_EQUAL(
 							 &inp->in6p_lsa,
@@ -946,7 +945,7 @@ in6_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 						continue;
 					}
 				} else {
-					if (!IN6_IS_ADDR_UNSPECIFIED(&laddr->sin6_addr))
+					if (!SA6_IS_ADDR_UNSPECIFIED(laddr))
 						wildcard++;
 				}
 				if (wildcard < matchwild) {
@@ -1102,13 +1101,13 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 		LIST_FOREACH(inp, head, inp_hash) {
 			if ((inp->inp_vflag & INP_IPV6) == 0)
 				continue;
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) &&
+			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa) &&
 			    inp->inp_lport == lport) {
 				if (faith && (inp->inp_flags & INP_FAITH) == 0)
 					continue;
 				if (SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, laddr))
 					return (inp);
-				else if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+				else if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 					local_wild = inp;
 			}
 		}

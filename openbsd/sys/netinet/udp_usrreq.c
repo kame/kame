@@ -434,7 +434,7 @@ udp_input(m, va_alist)
 				continue;
 #ifdef INET6
 			if (ipv6) {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
+				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
 								dst_sa6))
 						continue;
@@ -447,7 +447,7 @@ udp_input(m, va_alist)
 			}
 #ifdef INET6
 			if (ipv6) {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
+				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
 								src_sa6)  ||
 					    inp->inp_fport != uh->uh_sport)
@@ -1098,7 +1098,7 @@ udp_usrreq(so, req, m, addr, control)
 	case PRU_CONNECT:
 #ifdef INET6 
 		if (inp->inp_flags & INP_IPV6) {
-			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa)) {
 				error = EISCONN;
 				break;
 			}
@@ -1137,7 +1137,7 @@ udp_usrreq(so, req, m, addr, control)
 	case PRU_DISCONNECT:
 #ifdef INET6 
 		if (inp->inp_flags & INP_IPV6) {
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
+			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa)) {
 				error = ENOTCONN;
 				break;
 			}

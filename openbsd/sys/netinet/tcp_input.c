@@ -1210,7 +1210,7 @@ findpcb:
 			sin6->sin6_flowinfo = htonl(0x0fffffff) &
 				inp->inp_ipv6.ip6_flow;
 			lsa6 = inp->in6p_lsa;
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
+			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 			/* This is a good optimization. */
 			if (in6_pcbconnect(inp, am)) {

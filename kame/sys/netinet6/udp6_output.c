@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.56 2002/01/31 14:14:55 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.57 2002/02/02 07:06:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,7 +237,7 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 			/* how about ::ffff:0.0.0.0 case? */
 			error = EISCONN;
 			goto release;
@@ -265,7 +265,7 @@ udp6_output(in6p, m, addr6, control)
 				error = EINVAL;
 				goto release;
 			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)
 			    && !IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)) {
 				/*
 				 * when remote addr is an IPv4-mapped address, 
@@ -318,7 +318,7 @@ udp6_output(in6p, m, addr6, control)
 			 * udp_output() directly in this case, and thus we'll
 			 * never see this path.
 			 */
-			if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+			if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
 				struct sockaddr_in *sinp, sin_dst;
 
 				bzero(&sin_dst, sizeof(sin_dst));
@@ -365,7 +365,7 @@ udp6_output(in6p, m, addr6, control)
 			)
 			goto release;
 	} else {
-		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 			error = ENOTCONN;
 			goto release;
 		}

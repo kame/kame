@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.93 2002/01/31 14:14:51 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.94 2002/02/02 07:06:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,7 +213,7 @@ ip6_forward(m, srcrt)
 	 * Do not forward packets to multicast destination (should be handled
 	 * by ip6_mforward().
 	 * Do not forward packets with unspecified source.  It was discussed
-	 * in July 2000, on ipngwg mailing list.
+	 * in July 2000, on the ipngwg mailing list.
 	 */
 	if ((m->m_flags & (M_BCAST|M_MCAST)) != 0 ||
 	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||

@@ -751,25 +751,25 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 			    (inp->inp_flags & IN6P_FAITH) == 0)
 				continue;
 
-			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6)) {
-				if (IN6_IS_ADDR_UNSPECIFIED(&lsa6->sin6_addr))
+			if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
+				if (SA6_IS_ADDR_UNSPECIFIED(lsa6))
 					wildcard++;
 				else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
 							     lsa6))
 					continue;
 			} else {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&lsa6->sin6_addr))
+				if (!SA6_IS_ADDR_UNSPECIFIED(lsa6))
 					wildcard++;
 			}
 
-			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
-				if (IN6_IS_ADDR_UNSPECIFIED(&fsa6->sin6_addr))
+			if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa)) {
+				if (SA6_IS_ADDR_UNSPECIFIED(fsa6))
 					wildcard++;
 				else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
 				    fsa6) || inp->inp_fport != fport)
 					continue;
 			} else {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&fsa6->sin6_addr))
+				if (!SA6_IS_ADDR_UNSPECIFIED(fsa6))
 					wildcard++;
 			}
 		} else
@@ -827,7 +827,7 @@ in_pcbrtentry(inp)
 		switch(sotopf(inp->inp_socket)) {
 #ifdef INET6
 		case PF_INET6:
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
+			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 				break;
 			ro->ro_dst.sa_family = AF_INET6;
 			ro->ro_dst.sa_len = sizeof(struct sockaddr_in6);

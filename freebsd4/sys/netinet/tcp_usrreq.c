@@ -240,7 +240,7 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&sin6p->sin6_addr))
+		if (SA6_IS_ADDR_UNSPECIFIED(sin6p))
 			inp->inp_vflag |= INP_IPV4;
 		else if (IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
 			struct sockaddr_in sin;
@@ -828,7 +828,7 @@ tcp6_connect(tp, nam, p)
 #endif
 	oinp = in6_pcblookup_hash(inp->inp_pcbinfo,
 				  sin6, sin6->sin6_port,
-				  IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
+				  SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)
 				  ? addr6 : &inp->in6p_lsa,
 				  inp->inp_lport,  0, NULL);
 	if (oinp) {
@@ -840,7 +840,7 @@ tcp6_connect(tp, nam, p)
 		else
 			return EADDRINUSE;
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa.sin6_addr)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
 		inp->in6p_lsa.sin6_addr = addr6->sin6_addr;
 		inp->in6p_lsa.sin6_scope_id = addr6->sin6_scope_id;
 	}

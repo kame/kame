@@ -1126,7 +1126,7 @@ findpcb:
 			sa6_copy_addr(src_sa6, sin6);
 			sin6->sin6_port = th->th_sport;
 			lsa6 = inp->in6p_lsa;
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 			if (in6_pcbconnect(inp, (struct sockaddr *)sin6,
 					   &proc0)) {

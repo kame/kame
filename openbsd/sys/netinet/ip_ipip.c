@@ -484,9 +484,9 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 
 #ifdef INET6
 	case AF_INET6:
-		if (IN6_IS_ADDR_UNSPECIFIED(&tdb->tdb_dst.sin6.sin6_addr) ||
+		if (SA6_IS_ADDR_UNSPECIFIED(&tdb->tdb_dst.sin6) ||
 		    tdb->tdb_src.sa.sa_family != AF_INET6 ||
-		    IN6_IS_ADDR_UNSPECIFIED(&tdb->tdb_src.sin6.sin6_addr)) {
+		    SA6_IS_ADDR_UNSPECIFIED(&tdb->tdb_src.sin6)) {
 
 			DPRINTF(("ipip_output(): unspecified tunnel endpoind "
 			    "address in SA %s/%08x\n",

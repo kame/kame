@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.6 2001/07/29 19:32:40 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.45 2002/01/31 14:17:15 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.46 2002/02/02 07:07:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -247,12 +247,12 @@ udp6_input(mp, offp, proto)
 				continue;
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa,
 							src))
 					continue;
 			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
 							dst) ||
 				   in6p->in6p_fport != uh->uh_sport)
@@ -588,7 +588,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 		sin6_p = (struct sockaddr_in6 *)nam;
 
-		if (IN6_IS_ADDR_UNSPECIFIED(&sin6_p->sin6_addr))
+		if (SA6_IS_ADDR_UNSPECIFIED(sin6_p))
 			inp->inp_vflag |= INP_IPV4;
 		else if (IN6_IS_ADDR_V4MAPPED(&sin6_p->sin6_addr)) {
 			struct sockaddr_in sin;
@@ -640,7 +640,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			return error;
 		}
 	}
-	if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
+	if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 		return EISCONN;
 	s = splnet();
 	error = in6_pcbconnect(inp, nam, p);
@@ -689,7 +689,7 @@ udp6_disconnect(struct socket *so)
 	}
 #endif
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
+	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 		return ENOTCONN;
 
 	s = splnet();
@@ -747,7 +747,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 				 */
 				return EINVAL;
 			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
+			if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)
 			    && !IN6_IS_ADDR_V4MAPPED(&inp->in6p_laddr)) {
 				/*
 				 * when remote addr is IPv4-mapped

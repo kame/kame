@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.281 2002/02/02 06:39:52 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.282 2002/02/02 07:06:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2118,7 +2118,7 @@ do { \
 					 * see ipng mailing list, Jun 22 2001.
 					 */
 					if (in6p->in6p_lport ||
-					    !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
+					    !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
 					{
 						error = EINVAL;
 						break;
@@ -4000,7 +4000,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			if (sa6->sin6_len != sizeof(struct sockaddr_in6))
 				return(EINVAL);
 
-			if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
+			if (SA6_IS_ADDR_UNSPECIFIED(sa6) ||
 			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
 				return(EINVAL);
 			}

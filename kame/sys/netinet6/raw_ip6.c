@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.115 2002/01/31 14:14:54 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.116 2002/02/02 07:06:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,10 +241,10 @@ rip6_input(mp, offp, proto)
 		if (in6p->in6p_ip6.ip6_nxt &&
 		    in6p->in6p_ip6.ip6_nxt != proto)
 			continue;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 			continue;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src))
 			continue;
 		if (in6p->in6p_cksum != -1) {
@@ -859,7 +859,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		lzone = addr->sin6_scope_id;
 		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
-		if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
+		if (!SA6_IS_ADDR_UNSPECIFIED(addr) &&
 		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0) {
 			error = EADDRNOTAVAIL;
 			break;

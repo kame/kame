@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.104 2002/01/31 14:14:51 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.105 2002/02/02 07:06:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -271,7 +271,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	/*
 	 * Otherwise, if the socket has already bound the source, just use it.
 	 */
-	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(&laddr->sin6_addr))
+	if (laddr && !SA6_IS_ADDR_UNSPECIFIED(laddr))
 		return(laddr);
 
 	/*

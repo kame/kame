@@ -188,7 +188,7 @@ in6_pcbbind(inp, nam)
 	if (in6_ifaddr == 0 || in_ifaddr == 0)
 		return EADDRNOTAVAIL;
 
-	if (inp->inp_lport != 0 || !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
+	if (inp->inp_lport != 0 || !SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 		return EINVAL;	/* If already bound, EINVAL! */
 
 	if ((so->so_options & (SO_REUSEADDR | SO_REUSEPORT)) == 0 &&
@@ -230,7 +230,7 @@ in6_pcbbind(inp, nam)
 			 */
 			if (so->so_options & SO_REUSEADDR)
 				reuseport = SO_REUSEADDR | SO_REUSEPORT;
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+		} else if (!SA6_IS_ADDR_UNSPECIFIED(sin6)) {
 			struct ifaddr *ia = NULL;
 #ifndef SCOPEDROUTING
 			u_int32_t lzone; 
@@ -496,7 +496,7 @@ in6_pcbconnect(inp, nam)
 
 	/* sanity check for mapped address case */
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
+		if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 			inp->inp_laddr6.s6_addr16[5] = htons(0xffff);
 		if (!IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6))
 			return EINVAL;
@@ -571,11 +571,11 @@ in6_pcbconnect(inp, nam)
 	inp->inp_ipv6.ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);
 
 	if (in_pcblookup(inp->inp_table, sin6, sin6->sin6_port,
-	    IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) ? src6 : &inp->in6p_lsa,
+	    SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa) ? src6 : &inp->in6p_lsa,
 	    inp->inp_lport, INPLOOKUP_IPV6)) {
 		return(EADDRINUSE);
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) ||
+	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa) ||
 	    (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6) &&
 	     inp->inp_laddr6.s6_addr32[3] == 0)) {
 		if (inp->inp_lport == 0)
@@ -627,7 +627,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		return 1;
 
 	sa6_dst = (struct sockaddr_in6 *)dst;
-	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr))
+	if (SA6_IS_ADDR_UNSPECIFIED(sa6_dst))
 		return 1;
 	if (IN6_IS_ADDR_V4MAPPED(&sa6_dst->sin6_addr))
 		printf("Huh?  Thought in6_pcbnotify() never got "
@@ -674,7 +674,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
-		    (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6) ||
+		    (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa) ||
 		     SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
 					sa6_dst))) {
 			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
@@ -685,7 +685,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * XXX See comment in NetBSD sys/netinet6/in6_pcb.c
 		 */
 		if ((PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) &&
-		    IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) &&
+		    SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa) &&
 		    inp->inp_route.ro_rt &&
 		    !(inp->inp_route.ro_rt->rt_flags & RTF_HOST)) {
 			struct sockaddr_in6 *dst6;
@@ -716,7 +716,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa, sa6_dst) ||
 			 inp->inp_socket == 0 ||
 			 (lport && inp->inp_lport != lport) ||
-			 (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
+			 (!SA6_IS_ADDR_UNSPECIFIED(&sa6_src) &&
 			  !SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, &sa6_src)) ||
 			 (fport && inp->inp_fport != fport)) {
 			continue;

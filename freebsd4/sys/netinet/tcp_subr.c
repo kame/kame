@@ -650,7 +650,7 @@ tcp_close(tp)
 			if ((rt = inp->in6p_route.ro_rt) == NULL)
 				goto no_valid_rt;
 			sin6 = (struct sockaddr_in6 *)rt_key(rt);
-			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+			if (SA6_IS_ADDR_UNSPECIFIED(sin6))
 				goto no_valid_rt;
 		}
 		else
@@ -1395,7 +1395,7 @@ tcp_rtlookup6(inp)
 	rt = ro6->ro_rt;
 	if (rt == NULL || !(rt->rt_flags & RTF_UP)) {
 		/* No route yet, so try to acquire one */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
+		if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa)) {
 			struct sockaddr_in6 *dst6;
 
 			dst6 = (struct sockaddr_in6 *)&ro6->ro_dst;

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.87 2002/01/31 14:14:54 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.88 2002/02/02 07:06:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,7 +160,7 @@ nd6_ns_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6->sin6_addr)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(saddr6)) {
 		/* dst has to be a solicited node multicast address. */
 		if (daddr6->sin6_addr.s6_addr16[0] == IPV6_ADDR_INT16_MLL
 		    && daddr6->sin6_addr.s6_addr32[1] == 0
@@ -314,7 +314,7 @@ nd6_ns_input(m, off, icmp6len)
 		 * If not, the packet is for addess resolution;
 		 * silently ignore it.
 		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&saddr6->sin6_addr))
+		if (SA6_IS_ADDR_UNSPECIFIED(saddr6))
 			nd6_dad_ns_input(ifa);
 
 		goto freeit;
@@ -328,7 +328,7 @@ nd6_ns_input(m, off, icmp6len)
 	 * the address.
 	 * S bit ("solicited") must be zero.
 	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6->sin6_addr)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(saddr6)) {
 		struct sockaddr_in6 sa6_all;
 
 		bzero(&sa6_all, sizeof(sa6_all));
@@ -1046,7 +1046,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
 	dst_sa = *daddr6;
-	if (IN6_IS_ADDR_UNSPECIFIED(&daddr6->sin6_addr)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(daddr6)) {
 		/* reply to DAD */
 		dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
 		dst_sa.sin6_addr.s6_addr16[1] = 0;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.112 2002/02/01 14:46:24 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.113 2002/02/02 07:06:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -789,7 +789,7 @@ mip6_select_coa2(void)
 			     | IN6_IFF_DUPLICATED
 			     | IN6_IFF_DEPRECATED))
 				continue;
-			if (IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr))
+			if (SA6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr))
 				continue;
 			if (IN6_IS_ADDR_LOOPBACK(&ia6->ia_addr.sin6_addr))
 				continue;

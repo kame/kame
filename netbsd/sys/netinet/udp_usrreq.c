@@ -686,7 +686,7 @@ udp6_realinput(af, src, dst, m, off)
 		     in6p = in6p->in6p_next) {
 			if (in6p->in6p_lport != dport)
 				continue;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 					continue;
 			} else {
@@ -694,7 +694,7 @@ udp6_realinput(af, src, dst, m, off)
 				    (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
 							src) ||
 				    in6p->in6p_fport != sport) {

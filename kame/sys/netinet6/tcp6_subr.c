@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.37 2001/12/25 01:22:38 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.38 2002/02/02 07:06:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -418,7 +418,7 @@ tcp6_close(t6p)
 	 */
 	if (SEQ_LT(t6p->iss + so->so_snd.sb_hiwat * 16, t6p->snd_max) &&
 	    (rt = in6p->in6p_route.ro_rt) &&
-	    (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr))){
+	    (SA6_IS_ADDR_UNSPECIFIED((struct sockaddr_in6 *)rt_key(rt)))) {
 		u_long i = 0;
 
 		if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {
