@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.105 2003/01/22 08:53:24 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.106 2003/01/23 05:08:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -70,6 +70,7 @@
 #include "config.h"
 #include "common.h"
 #include "timer.h"
+#include "dhcp6c.h"
 #include "dhcp6c_ia.h"
 #include "prefixconf.h"
 
@@ -100,7 +101,6 @@ static void process_signals __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
 static struct dhcp6_serverinfo *select_server __P((struct dhcp6_if *));
-static void client6_send __P((struct dhcp6_event *));
 static void client6_recv __P((void));
 static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
@@ -116,9 +116,6 @@ static int sa2plen __P((struct sockaddr_in6 *));
 
 struct dhcp6_timer *client6_timo __P((void *));
 int client6_ifinit __P((struct dhcp6_if *));
-void client6_send_renew __P((struct dhcp6_event *));
-void client6_send_rebind __P((struct dhcp6_event *));
-void client6_send_release __P((struct dhcp6_event *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -574,17 +571,11 @@ client6_timo(arg)
 	case DHCP6S_INFOREQ:
 		client6_send(ev);
 		break;
-	case DHCP6S_RELEASE:
-		client6_send_release(ev);
-		break;
 	case DHCP6S_RENEW:
 	case DHCP6S_REBIND:
-		if (!TAILQ_EMPTY(&ev->data_list)) {
-			if (ev->state == DHCP6S_RENEW)
-				client6_send_renew(ev);
-			else
-				client6_send_rebind(ev);
-		} else {
+		if (!TAILQ_EMPTY(&ev->data_list))
+			client6_send(ev);
+		else {
 			dprintf(LOG_INFO, "%s"
 			    "all information to be updated was canceled",
 			    FNAME);
@@ -700,7 +691,7 @@ sa2plen(sa6)
 }
 #endif
 
-static void
+void
 client6_send(ev)
 	struct dhcp6_event *ev;
 {
@@ -708,9 +699,11 @@ client6_send(ev)
 	char buf[BUFSIZ];
 	struct sockaddr_in6 dst;
 	struct dhcp6 *dh6;
+	struct duid *serverid = NULL;
 	struct dhcp6_optinfo optinfo;
 	ssize_t optlen, len;
 	struct dhcp6_listval *iapd;
+	struct dhcp6_eventdata *evd;
 
 	ifp = ev->ifp;
 
@@ -722,11 +715,16 @@ client6_send(ev)
 		dh6->dh6_msgtype = DH6_SOLICIT;
 		break;
 	case DHCP6S_REQUEST:
-		if (ifp->current_server == NULL) {
-			dprintf(LOG_ERR, "%s" "assumption failure", FNAME);
-			exit(1); /* XXX */
-		}
 		dh6->dh6_msgtype = DH6_REQUEST;
+		break;
+	case DHCP6S_RENEW:
+		dh6->dh6_msgtype = DH6_RENEW;
+		break;
+	case DHCP6S_REBIND:
+		dh6->dh6_msgtype = DH6_REBIND;
+		break;
+	case DHCP6S_RELEASE:
+		dh6->dh6_msgtype = DH6_RELEASE;
 		break;
 	case DHCP6S_INFOREQ:
 		dh6->dh6_msgtype = DH6_INFORM_REQ;
@@ -735,6 +733,7 @@ client6_send(ev)
 		dprintf(LOG_ERR, "%s" "unexpected state", FNAME);
 		exit(1);	/* XXX */
 	}
+
 	if (ev->timeouts == 0) {
 		/*
 		 * A client SHOULD generate a random number that cannot easily
@@ -762,13 +761,18 @@ client6_send(ev)
 	dhcp6_init_options(&optinfo);
 
 	/* server ID */
-	if (ev->state == DHCP6S_REQUEST) {
-		if (duidcpy(&optinfo.serverID,
-		    &ifp->current_server->optinfo.serverID)) {
-			dprintf(LOG_ERR, "%s" "failed to copy server ID",
-			    FNAME);
-			goto end;
-		}
+	switch (ev->state) {
+	case DHCP6S_REQUEST:
+		serverid = &ifp->current_server->optinfo.serverID;
+		break;
+	case DHCP6S_RENEW:
+	case DHCP6S_RELEASE:
+		serverid = &ev->serverid;
+		break;
+	}
+	if (serverid && duidcpy(&optinfo.serverID, serverid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto end;
 	}
 
 	/* client ID */
@@ -777,7 +781,7 @@ client6_send(ev)
 		goto end;
 	}
 
-	/* rapid commit */
+	/* rapid commit (in Solicit only) */
 	if (ev->state == DHCP6S_SOLICIT &&
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		optinfo.rapidcommit = 1;
@@ -836,13 +840,15 @@ client6_send(ev)
 	}
 
 	/* option request options */
-	if (dhcp6_copy_list(&optinfo.reqopt_list, &ifp->reqopt_list)) {
-		dprintf(LOG_ERR, "%s" "failed to copy requested options",
+	if (ev->state != DHCP6S_RELEASE &&
+	    dhcp6_copy_list(&optinfo.reqopt_list, &ifp->reqopt_list)) {
+		dprintf(LOG_ERR, "%s"
+		    "failed to copy requested options",
 		    FNAME);
 		goto end;
 	}
 
-	/* configuration information provided by the server */
+	/* configuration information provided by the server (request only) */
 	if (ev->state == DHCP6S_REQUEST) {
 		/* do we have to check if we wanted prefixes? */
 		if (dhcp6_copy_list(&optinfo.prefix_list,
@@ -850,6 +856,25 @@ client6_send(ev)
 			dprintf(LOG_ERR, "%s" "failed to copy prefixes",
 			    FNAME);
 			goto end;
+		}
+	}
+
+	/* configuration information specified as event data */
+	for (evd = TAILQ_FIRST(&ev->data_list); evd;
+	     evd = TAILQ_NEXT(evd, link)) {
+		switch(evd->type) {
+		case DHCP6_EVDATA_IAPD:
+			if (dhcp6_copy_list(&optinfo.iapd_list,
+			    (struct dhcp6_list *)evd->data)) {
+				dprintf(LOG_NOTICE, "%s" "failed to add "
+				    "an IAPD", FNAME);
+				goto end;
+			}
+			break;
+		default:
+			dprintf(LOG_ERR, FNAME "unexpected event data (%d)",
+			    evd->type);
+			exit(1);
 		}
 	}
 
@@ -886,333 +911,26 @@ client6_send(ev)
 	return;
 }
 
-void
-client6_send_renew(ev)
-	struct dhcp6_event *ev;
+/* result will be a - b */
+static void
+tv_sub(a, b, result)
+	struct timeval *a, *b, *result;
 {
-	struct dhcp6_if *ifp;
-	struct dhcp6_eventdata *evd;
-	struct dhcp6_optinfo optinfo;
-	struct dhcp6 *dh6;
-	char buf[BUFSIZ];
-	ssize_t optlen, len;
-	struct sockaddr_in6 dst;
+	if (a->tv_sec < b->tv_sec ||
+	    (a->tv_sec == b->tv_sec && a->tv_usec < b->tv_usec)) {
+		result->tv_sec = 0;
+		result->tv_usec = 0;
 
-	ifp = ev->ifp;
-
-	dh6 = (struct dhcp6 *)buf;
-	memset(dh6, 0, sizeof(*dh6));
-	dh6->dh6_msgtype = DH6_RENEW;
-	if (ev->timeouts == 0) {
-#ifdef HAVE_ARC4RANDOM
-		ev->xid = arc4random() & DH6_XIDMASK;
-#else
-		ev->xid = random() & DH6_XIDMASK;
-#endif
-		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
-			FNAME, ev->xid);
-	}
-	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
-	dh6->dh6_xid |= htonl(ev->xid);
-	len = sizeof(*dh6);
-
-	/*
-	 * construct options
-	 */
-	dhcp6_init_options(&optinfo);
-
-	/* server ID */
-	if (duidcpy(&optinfo.serverID, &ev->serverid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
-		goto end;
+		return;
 	}
 
-	/* client ID */
-	if (duidcpy(&optinfo.clientID, &client_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
-		goto end;
-	}
+	result->tv_sec = a->tv_sec - b->tv_sec;
+	if (a->tv_usec < b->tv_usec) {
+		result->tv_usec = a->tv_usec + 1000000 - b->tv_usec;
+		result->tv_sec -= 1;
+	} else
+		result->tv_usec = a->tv_usec - b->tv_usec;
 
-	/* elapsed time */
-	if (ev->timeouts == 0) {
-		gettimeofday(&ev->tv_start, NULL);
-		optinfo.elapsed_time = 0;
-	} else {
-		struct timeval now, tv_diff;
-
-		gettimeofday(&now, NULL);
-		tv_sub(&now, &ev->tv_start, &tv_diff);
-
-		optinfo.elapsed_time =
-		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
-	}
-
-	/* configuration information to be renewed */
-	for (evd = TAILQ_FIRST(&ev->data_list); evd;
-	     evd = TAILQ_NEXT(evd, link)) {
-		switch(evd->type) {
-		case DHCP6_EVDATA_IAPD:
-			if (dhcp6_copy_list(&optinfo.iapd_list,
-			    (struct dhcp6_list *)evd->data)) {
-				dprintf(LOG_NOTICE, "%s" "failed to add "
-				    "an IAPD", FNAME);
-				goto end;
-			}
-			break;
-		default:
-			dprintf(LOG_ERR, FNAME "unexpected event data (%d)",
-			    evd->type);
-			exit(1);
-		}
-	}
-
-	/* set options in the message */
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
-					(struct dhcp6opt *)(buf + sizeof(buf)),
-					&optinfo)) < 0) {
-		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
-		goto end;
-	}
-	len += optlen;
-
-	/*
-	 * Unless otherwise specified in this document or in a document that
-	 * describes how IPv6 is carried over a specific type of link (for link
-	 * types that do not support multicast), a client sends DHCP messages
-	 * to the All_DHCP_Relay_Agents_and_Servers.
-	 * [dhcpv6-28 Section 13.]
-	 */
-	dst = *sa6_allagent;
-	dst.sin6_scope_id = ifp->linkid;
-
-	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
-	    ((struct sockaddr *)&dst)->sa_len) == -1) {
-		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
-		goto end;
-	}
-
-	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
-		dhcp6msgstr(dh6->dh6_msgtype),
-		addr2str((struct sockaddr *)&dst));
-
-  end:
-	dhcp6_clear_options(&optinfo);
-	return;
-}
-
-void
-client6_send_rebind(ev)
-	struct dhcp6_event *ev;
-{
-	struct dhcp6_if *ifp;
-	struct dhcp6_eventdata *evd;
-	struct dhcp6_optinfo optinfo;
-	struct dhcp6 *dh6;
-	char buf[BUFSIZ];
-	ssize_t optlen, len;
-	struct sockaddr_in6 dst;
-
-	ifp = ev->ifp;
-	
-	dh6 = (struct dhcp6 *)buf;
-	memset(dh6, 0, sizeof(*dh6));
-	dh6->dh6_msgtype = DH6_REBIND;
-	if (ev->timeouts == 0) {
-#ifdef HAVE_ARC4RANDOM
-		ev->xid = arc4random() & DH6_XIDMASK;
-#else
-		ev->xid = random() & DH6_XIDMASK;
-#endif
-		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
-			FNAME, ev->xid);
-	}
-	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
-	dh6->dh6_xid |= htonl(ev->xid);
-	len = sizeof(*dh6);
-
-	/*
-	 * construct options
-	 */
-	dhcp6_init_options(&optinfo);
-
-	/* client ID */
-	if (duidcpy(&optinfo.clientID, &client_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
-		goto end;
-	}
-
-	/* elapsed time */
-	if (ev->timeouts == 0) {
-		gettimeofday(&ev->tv_start, NULL);
-		optinfo.elapsed_time = 0;
-	} else {
-		struct timeval now, tv_diff;
-
-		gettimeofday(&now, NULL);
-		tv_sub(&now, &ev->tv_start, &tv_diff);
-
-		optinfo.elapsed_time =
-		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
-	}
-
-	/* configuration information to be rebound */
-	for (evd = TAILQ_FIRST(&ev->data_list); evd;
-	     evd = TAILQ_NEXT(evd, link)) {
-		switch(evd->type) {
-		case DHCP6_EVDATA_IAPD:
-			if (dhcp6_copy_list(&optinfo.iapd_list,
-			    (struct dhcp6_list *)evd->data)) {
-				dprintf(LOG_NOTICE, "%s" "failed to add "
-				    "an IAPD", FNAME);
-				goto end;
-			}
-			break;
-		default:
-			dprintf(LOG_ERR, "%s"
-			    "unexpected event data (type %d)",
-			    FNAME, evd->type);
-			exit(1);
-		}
-	}
-
-	/* set options in the message */
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
-					(struct dhcp6opt *)(buf + sizeof(buf)),
-					&optinfo)) < 0) {
-		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
-		goto end;
-	}
-	len += optlen;
-
-	/*
-	 * Unless otherwise specified in this document or in a document that
-	 * describes how IPv6 is carried over a specific type of link (for link
-	 * types that do not support multicast), a client sends DHCP messages
-	 * to the All_DHCP_Relay_Agents_and_Servers.
-	 * [dhcpv6-28 Section 13.]
-	 */
-	dst = *sa6_allagent;
-	dst.sin6_scope_id = ifp->linkid;
-
-	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
-	    ((struct sockaddr *)&dst)->sa_len) == -1) {
-		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
-		goto end;
-	}
-
-	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
-		dhcp6msgstr(dh6->dh6_msgtype),
-		addr2str((struct sockaddr *)&dst));
-
-  end:
-	dhcp6_clear_options(&optinfo);
-	return;
-}
-
-void
-client6_send_release(ev)
-	struct dhcp6_event *ev;
-{
-	struct dhcp6_if *ifp;
-	struct dhcp6_eventdata *evd;
-	struct dhcp6_optinfo optinfo;
-	struct dhcp6 *dh6;
-	char buf[BUFSIZ];
-	ssize_t optlen, len;
-	struct sockaddr_in6 dst;
-
-	ifp = ev->ifp;
-	
-	dh6 = (struct dhcp6 *)buf;
-	memset(dh6, 0, sizeof(*dh6));
-	dh6->dh6_msgtype = DH6_RELEASE;
-	if (ev->timeouts == 0) {
-#ifdef HAVE_ARC4RANDOM
-		ev->xid = arc4random() & DH6_XIDMASK;
-#else
-		ev->xid = random() & DH6_XIDMASK;
-#endif
-		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
-			FNAME, ev->xid);
-	}
-	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
-	dh6->dh6_xid |= htonl(ev->xid);
-	len = sizeof(*dh6);
-
-	/*
-	 * construct options
-	 */
-	dhcp6_init_options(&optinfo);
-
-	/* server ID */
-	if (duidcpy(&optinfo.serverID, &ev->serverid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
-		goto end;
-	}
-
-	/* client ID */
-	if (duidcpy(&optinfo.clientID, &client_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
-		goto end;
-	}
-
-	/* elapsed time */
-	if (ev->timeouts == 0) {
-		gettimeofday(&ev->tv_start, NULL);
-		optinfo.elapsed_time = 0;
-	} else {
-		struct timeval now, tv_diff;
-
-		gettimeofday(&now, NULL);
-		tv_sub(&now, &ev->tv_start, &tv_diff);
-
-		optinfo.elapsed_time =
-		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
-	}
-
-	/* configuration information to be released */
-	for (evd = TAILQ_FIRST(&ev->data_list); evd;
-	     evd = TAILQ_NEXT(evd, link)) {
-		switch(evd->type) {
-		case DHCP6_EVDATA_IAPD:
-			if (dhcp6_copy_list(&optinfo.iapd_list,
-			    (struct dhcp6_list *)evd->data)) {
-				dprintf(LOG_NOTICE, "%s" "failed to add "
-				    "an IAPD", FNAME);
-				goto end;
-			}
-			break;
-		default:
-			dprintf(LOG_ERR, FNAME "unexpected event data (%d)",
-			    evd->type);
-			exit(1);
-		}
-	}
-
-	/* set options in the message */
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
-					(struct dhcp6opt *)(buf + sizeof(buf)),
-					&optinfo)) < 0) {
-		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
-		goto end;
-	}
-	len += optlen;
-
-	dst = *sa6_allagent;
-	dst.sin6_scope_id = ifp->linkid;
-
-	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
-	    ((struct sockaddr *)&dst)->sa_len) == -1) {
-		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
-		goto end;
-	}
-
-	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
-		dhcp6msgstr(dh6->dh6_msgtype),
-		addr2str((struct sockaddr *)&dst));
-
-  end:
-	dhcp6_clear_options(&optinfo);
 	return;
 }
 
@@ -1594,27 +1312,4 @@ find_event_withid(ifp, xid)
 	}
 
 	return (NULL);
-}
-
-/* result will be a - b */
-static void
-tv_sub(a, b, result)
-	struct timeval *a, *b, *result;
-{
-	if (a->tv_sec < b->tv_sec ||
-	    (a->tv_sec == b->tv_sec && a->tv_usec < b->tv_usec)) {
-		result->tv_sec = 0;
-		result->tv_usec = 0;
-
-		return;
-	}
-
-	result->tv_sec = a->tv_sec - b->tv_sec;
-	if (a->tv_usec < b->tv_usec) {
-		result->tv_usec = a->tv_usec + 1000000 - b->tv_usec;
-		result->tv_sec -= 1;
-	} else
-		result->tv_usec = a->tv_usec - b->tv_usec;
-
-	return;
 }

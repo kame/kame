@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.7 2003/01/22 08:53:24 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.8 2003/01/23 05:08:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -42,6 +42,7 @@
 #include "config.h"
 #include "common.h"
 #include "timer.h"
+#include "dhcp6c.h"
 #include "dhcp6c_ia.h"
 #include "prefixconf.h"
 
@@ -82,12 +83,6 @@ static struct dhcp6_timer *ia_timo __P((void *));
 
 static char *iastr __P((iatype_t));
 static char *statestr __P((iastate_t));
-
-extern struct dhcp6_timer *client6_timo __P((void *));
-extern int client6_ifinit __P((struct dhcp6_if *));
-extern void client6_send_renew __P((struct dhcp6_event *));
-extern void client6_send_rebind __P((struct dhcp6_event *));
-extern void client6_send_release __P((struct dhcp6_event *));
 
 void
 init_ia()
@@ -323,7 +318,7 @@ release_ia(ia)
 	dhcp6_set_timeoparam(ev);
 	dhcp6_reset_timer(ev);
 
-	client6_send_release(ev);
+	client6_send(ev);
 
 	return (0);
 
@@ -475,10 +470,8 @@ ia_timo(arg)
 
 	switch(ia->state) {
 	case IAS_RENEW:
-		client6_send_renew(ev);
-		break;
 	case IAS_REBIND:
-		client6_send_rebind(ev);
+		client6_send(ev);
 		break;
 	case IAS_ACTIVE:
 		/* what to do? */
