@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.77 2001/10/16 05:47:49 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.78 2001/10/24 02:19:54 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1006,6 +1006,9 @@ nd6_ifptomac(ifp)
 	case IFT_IEEE1394:
 #ifdef IFT_PROPVIRTUAL
 	case IFT_PROPVIRTUAL:
+#endif
+#ifdef IFT_L2VLAN
+	case IFT_L2VLAN:
 #endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.210 2001/10/19 06:26:13 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.211 2001/10/24 02:19:54 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2278,6 +2278,9 @@ nd6_need_cache(ifp)
 #ifdef IFT_PROPVIRTUAL
 	case IFT_PROPVIRTUAL:
 #endif
+#ifdef IFT_L2VLAN
+	case IFT_L2VLAN:
+#endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
 #endif
@@ -2305,6 +2308,9 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 		case IFT_FDDI:
 #ifdef IFT_PROPVIRTUAL
 		case IFT_PROPVIRTUAL:
+#endif
+#ifdef IFT_L2VLAN
+		case IFT_L2VLAN:
 #endif
 #ifdef IFT_IEEE80211
 		case IFT_IEEE80211:
