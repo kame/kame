@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.23 2003/04/02 23:28:58 itojun Exp $	*/
+/*	$KAME: if.c,v 1.24 2003/04/11 12:34:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,6 +185,7 @@ interface_status(struct ifinfo *ifinfo)
 	if (ifmr.ifm_status & IFM_AVALID) {
 		switch (ifmr.ifm_active & IFM_NMASK) {
 		case IFM_ETHER:
+		case IFM_IEEE80211:
 			if (ifmr.ifm_status & IFM_ACTIVE)
 				goto active;
 			else
