@@ -187,6 +187,15 @@ icmp6_error(m, type, code, param)
 		goto freeit;
 #endif
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), );
+#else
+	if (m->m_len < sizeof(struct ip6_hdr)) {
+		m = m_pullup(m, sizeof(struct ip6_hdr));
+		if (m == NULL)
+			return;
+	}
+#endif
 	oip6 = mtod(m, struct ip6_hdr *);
 
 	/*
@@ -209,10 +218,9 @@ icmp6_error(m, type, code, param)
 	/*
 	 * If the erroneous packet is also an ICMP error, discard it.
 	 */
-	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), );
 	off = sizeof(struct ip6_hdr);
 	nxt = oip6->ip6_nxt;
-	while(1) {		/* XXX: should avoid inf. loop explicitly? */
+	while (1) {		/* XXX: should avoid inf. loop explicitly? */
 		struct ip6_ext *ip6e;
 		struct icmp6_hdr *icp;
 
@@ -231,8 +239,17 @@ icmp6_error(m, type, code, param)
 			/* What if unknown header followed by ICMP error? */
 			goto generate;
 		case IPPROTO_ICMPV6:
+#ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, 0, off + sizeof(struct icmp6_hdr), );
 			icp = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
+#else
+			IP6_EXTHDR_GET(icp, struct icmp6_hdr *, m, off,
+				sizeof(*icp));
+			if (icp == NULL) {
+				icmp6stat.icp6s_tooshort++;
+				return;
+			}
+#endif
 			if (icp->icmp6_type < ICMP6_ECHO_REQUEST
 			 || icp->icmp6_type == ND_REDIRECT) {
 				/*
@@ -250,8 +267,17 @@ icmp6_error(m, type, code, param)
 		case IPPROTO_DSTOPTS:
 		case IPPROTO_ROUTING:
 		case IPPROTO_AH:
+#ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, 0, off + sizeof(struct ip6_ext), );
 			ip6e = (struct ip6_ext *)(mtod(m, caddr_t) + off);
+#else
+			IP6_EXTHDR_GET(ip6e, struct ip6_ext *, m, off,
+				sizeof(*ip6e));
+			if (ip6e == NULL) {
+				/*XXX stat */
+				return;
+			}
+#endif
 			if (nxt == IPPROTO_AH)
 				off += (ip6e->ip6e_len + 2) << 2;
 			else
@@ -873,14 +899,23 @@ ni6_input(m, off)
 	struct mbuf *m;
 	int off;
 {
-	struct icmp6_nodeinfo *ni6 =
-		(struct icmp6_nodeinfo *)(mtod(m, caddr_t) + off), *nni6;
+	struct icmp6_nodeinfo *ni6, *nni6;
 	struct mbuf *n = NULL;
-	u_int16_t qtype = ntohs(ni6->ni_qtype);
+	u_int16_t qtype;
 	int replylen = sizeof(struct ip6_hdr) + sizeof(struct icmp6_nodeinfo);
 	struct ni_reply_fqdn *fqdn;
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
+
+#ifndef PULLDOWN_TEST
+	ni6 = (struct icmp6_nodeinfo *)(mtod(m, caddr_t) + off);
+#else
+	IP6_EXTHDR_GET(ni6, struct icmp6_nodeinfo *, m, off,
+		sizeof(*ni6));
+	if (ni6 == NULL)
+		return NULL;
+#endif
+	qtype = ntohs(ni6->ni_qtype);
 
 	switch(qtype) {
 	 case NI_QTYPE_NOOP:
@@ -936,7 +971,7 @@ ni6_input(m, off)
 	/* copy mbuf header and IPv6 + Node Information base headers */
 	bcopy(mtod(m, caddr_t), mtod(n, caddr_t), sizeof(struct ip6_hdr));
 	nni6 = (struct icmp6_nodeinfo *)(mtod(n, struct ip6_hdr *) + 1); 
-	bcopy(mtod(m, caddr_t) + off, (caddr_t)nni6, sizeof(struct icmp6_nodeinfo));
+	bcopy((caddr_t)ni6, (caddr_t)nni6, sizeof(struct icmp6_nodeinfo));
 
 	/* qtype dependent procedure */
 	switch (qtype) {

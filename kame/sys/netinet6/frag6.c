@@ -182,7 +182,9 @@ frag6_input(mp, offp, proto)
 	 * Presence of header sizes in mbufs
 	 * would confuse code below.
 	 */
-	
+#ifdef PULLDOWN_TEST
+	/* XXX too strong mbuf requirement in m_pulldown() world */
+#endif
 	offset += sizeof(struct ip6_frag);
 	m->m_data += offset;
 	m->m_len -= offset;
