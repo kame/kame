@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1780 2001/07/18 11:25:52 jinmei Exp $
+$KAME: CHANGELOG,v 1.1781 2001/07/18 11:28:15 jinmei Exp $
 
 <200107>
 2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,6 +10,10 @@ $KAME: CHANGELOG,v 1.1780 2001/07/18 11:25:52 jinmei Exp $
 	This change would help the case that we've moved to a new link where
 	we have a router that does not provide prefixes and we configure
 	an address by hand.
+
+2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/contrib/bind/src/lib/resolv/res_init.c (res_setoptions):
+	applied the fix below.
 
 Wed Jul 18 18:06:25 JST 2001  itojun@iijlab.net
 	* libinet6/resolv/res_init.c: by putting "insecure1" or "insecure2"
