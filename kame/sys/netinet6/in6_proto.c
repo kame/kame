@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.77 2001/02/03 18:25:25 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.78 2001/02/04 01:58:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -666,72 +666,6 @@ SYSCTL_NODE(_net_inet6,	IPPROTO_ESP,	ipsec6,	CTLFLAG_RW, 0,	"IPSEC6");
 /* net.inet6.ip6 */
 static int
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
-sysctl_ip6_forwarding(SYSCTL_HANDLER_ARGS)
-#else
-sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
-#endif
-{
-	int error = 0;
-	int old_ip6_forwarding;
-	int changed;
-
-	error = SYSCTL_OUT(req, arg1, sizeof(int));
-	if (error || !req->newptr)
-		return (error);
-	old_ip6_forwarding = ip6_forwarding;
-	error = SYSCTL_IN(req, arg1, sizeof(int));
-	if (error != 0)
-		return (error);
-	changed = (ip6_forwarding ? 1 : 0) ^ (old_ip6_forwarding ? 1 : 0);
-	if (changed == 0)
-		return (error);
-	/*
-	 * XXX while host->router removes prefix got from RA,
-	 * router->host case nukes all the prefixes managed by in6_prefix.c
-	 * (both RR and static).  therefore, switching from host->router->host
-	 * will remove statically configured addresses/prefixes.
-	 * not sure if it is intended behavior or not.
-	 */
-	if (ip6_forwarding != 0) {	/* host becomes router */
-		int s = splnet();
-		struct nd_prefix *pr, *next;
-
-		for (pr = nd_prefix.lh_first; pr; pr = next) {
-			struct in6_ifaddr *ia, *ia_next;
-
-			next = pr->ndpr_next;
-			for (ia = in6_ifaddr; ia; ia = ia_next) {
-				struct in6_addr *in6_pfx;
-				int plen_ifa;
-
-				/* ia might be removed. keep the next ptr. */
-				ia_next = ia->ia_next;
-
-				if ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0)
-					continue;
-
-				in6_pfx = &ia->ia_prefixmask.sin6_addr;
-				plen_ifa = in6_mask2len(in6_pfx, NULL);
-				if (pr->ndpr_plen == plen_ifa &&
-				    in6_are_prefix_equal(in6_pfx,
-							 &pr->ndpr_prefix.sin6_addr,
-							 pr->ndpr_plen))
-					in6_purgeaddr(&ia->ia_ifa);
-			}
-			prelist_remove(pr);
-		}
-		splx(s);
-	} else {			/* router becomes host */
-		while(!LIST_EMPTY(&rr_prefix))
-			delete_each_prefix(LIST_FIRST(&rr_prefix),
-					   PR_ORIG_KERNEL);
-	}
-
-	return (error);
-}
-
-static int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 sysctl_ip6_temppltime(SYSCTL_HANDLER_ARGS)
 #else
 sysctl_ip6_temppltime SYSCTL_HANDLER_ARGS
@@ -775,9 +709,8 @@ sysctl_ip6_tempvltime SYSCTL_HANDLER_ARGS
 	return(error);
 }
 
-SYSCTL_OID(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
-	   CTLTYPE_INT|CTLFLAG_RW, &ip6_forwarding, 0, sysctl_ip6_forwarding,
-	   "I", "");
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_FORWARDING,
+	forwarding, CTLFLAG_RW, 	&ip6_forwarding,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_SENDREDIRECTS,
 	redirect, CTLFLAG_RW,		&ip6_sendredirects,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_DEFHLIM,
