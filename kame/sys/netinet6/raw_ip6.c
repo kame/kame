@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.58 2001/02/07 05:49:13 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.59 2001/02/07 06:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,6 +423,7 @@ rip6_output(m, va_alist)
 	int type, code;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	va_list ap;
+	int flags;
 
 	va_start(ap, m);
 	so = va_arg(ap, struct socket *);
@@ -553,9 +554,13 @@ rip6_output(m, va_alist)
 		goto bad;
 	}
 #endif /*IPSEC*/
+
+	flags = 0;
+	if (in6p->in6p_flags & IN6P_MINMTU)
+		flags |= IPV6_MINMTU;
 	
-	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions,
-			   &oifp);
+	error = ip6_output(m, optp, &in6p->in6p_route, flags,
+	    in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
 			icmp6_ifoutstat_inc(oifp, type, code);
