@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.146 2001/07/22 01:30:59 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.147 2001/07/23 14:04:37 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1181,7 +1181,7 @@ prelist_update(new, dr, m)
 		 */
 
 		/*
-		 * Update prefix information.  Note that the on-link (L) bit
+		 * Update prefix information. Note that the on-link (L) bit
 		 * and the autonomous (A) bit should NOT be changed from 1
 		 * to 0.
 		 */
