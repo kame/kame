@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2107 2002/03/27 02:52:02 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2108 2002/03/29 05:30:42 jinmei Exp $
 
 <200203>
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_addifreq): set
+	RTF_CLONING when installing a default route to an interface
+	in order to perform ND correctly.  Previously this flag was
+	implicitly set from the corresponding ifa_flags, which was dropped
+	by a fix on 2002-02-26.  We could revert the former change, but I
+	belive we should set the flag explicitly.
+
 2002-03-27 Shin'ichi Fujisawa <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.[ch]:
 	- Fix some fragmentation related bugs.
