@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.16 2002/11/22 06:18:36 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.17 2002/12/02 15:14:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,6 +67,15 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif
+
+#include <net/net_osdep.h>
+
+static struct timeval ip6me_ppslim_last;
+static int ip6me_pps_count = 0;
+static int ip6me_ppslim = 60; /* XXX must be configurable. */
+
+static int mobility6_be_ratelimit(const struct sockaddr_in6 *,
+    const struct sockaddr_in6 *, const int);
 
 /*
  * Mobility header processing.
@@ -241,8 +250,7 @@ mobility6_input(mp, offp, proto)
 }
 
 /*
- * send binding error message.
- * XXX duplicated code.  see dest6_send_be().
+ * send a binding error message.
  */
 int
 mobility6_send_be(src, dst, status, home)
@@ -255,9 +263,9 @@ mobility6_send_be(src, dst, status, home)
 	struct ip6_pktopts opt;
 	int error = 0;
 
-	/*
-	 * XXX a binding message must be rate limited (per host?).
-	 */
+	/* a binding message must be rate limited. */
+	if (mobility6_be_ratelimit(dst, home, status))
+		return (0); /* rate limited. */
 
 	init_ip6pktopts(&opt);
 
@@ -282,4 +290,24 @@ mobility6_send_be(src, dst, status, home)
 		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (error);
+}
+
+static int
+mobility6_be_ratelimit(dst, hoa, status)
+	const struct sockaddr_in6 *dst;	/* not used at this moment */
+	const struct sockaddr_in6 *hoa;	/* not used at this moment */
+	const int status;		/* not used at this moment */
+{
+	int ret;
+
+	ret = 0;	/* okay to send */
+
+	/* PPS limit */
+	if (!ppsratecheck(&ip6me_ppslim_last, &ip6me_pps_count,
+	    ip6me_ppslim)) {
+		/* The packet is subject to rate limit */
+		ret++;
+	}
+
+	return ret;
 }
