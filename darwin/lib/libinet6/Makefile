@@ -18,10 +18,11 @@ SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
 SRCS+=	rthdr.c ip6opt.c
 SRCS+=	bindresvport.c
 SRCS+=	getifaddrs.c
+SRCS+=	strlcpy.c strlcat.c
 
 MAN3=	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
 	inet6_rthdr_space.3 bindresvport.3 inet6_opt_init.3 inet6_rth_space.3 \
-	getifaddrs.3
+	getifaddrs.3 strlcpy.3
 MLINKS+=	if_indextoname.3 if_nametoindex.3 \
 		if_indextoname.3 if_nameindex.3 \
 		if_indextoname.3 if_freenameindex.3 \
@@ -49,7 +50,8 @@ MLINKS+=	if_indextoname.3 if_nametoindex.3 \
 		inet6_rth_space.3 inet6_rth_reverse.3 \
 		inet6_rth_space.3 inet6_rth_segments.3 \
 		inet6_rth_space.3 inet6_rth_getaddr.3 \
-		getifaddrs.3 freeifaddrs.3
+		getifaddrs.3 freeifaddrs.3 \
+		strlcpy.3 strlcat.3
 
 .PATH:	${SRCDIR} ${SRCDIR}/resolv
 
