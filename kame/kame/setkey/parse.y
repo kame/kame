@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.18 2000/04/24 19:01:53 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.19 2000/05/23 14:17:06 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -343,7 +343,7 @@ key_string
 
 			if ((pp_key = malloc($1.len)) == 0) {
 				free($1.buf);
-				yyerror(strerror(errno));
+				yyerror("not enough core");
 				return -1;
 			}
 			memset(pp_key, 0, $1.len);
@@ -460,7 +460,7 @@ ipaddress
 			u_int sa_len = $1.len;
 
 			if ((in = (struct sockaddr_in *)malloc(sa_len)) == 0) {
-				yyerror(strerror(errno));
+				yyerror("not enough core");
 				free($1.buf);
 				return -1;
 			}
@@ -482,7 +482,7 @@ ipaddress
 
 			if ((in6 = (struct sockaddr_in6 *)malloc(sa_len)) == 0) {
 				free($1.buf);
-				yyerror(strerror(errno));
+				yyerror("not enough core");
 				return -1;
 			}
 			memset((caddr_t)in6, 0, sa_len);
@@ -494,10 +494,12 @@ ipaddress
 					&in6->sin6_addr);
 
 			pp_addr = (struct sockaddr *)in6;
-#else
-			yyerror("IPv6 address not supported");
-#endif
 			free($1.buf);
+#else
+			free($1.buf);
+			yyerror("IPv6 address not supported");
+			return -1;
+#endif
 		}
 	;
 
