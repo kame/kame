@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.250 2002/06/27 14:35:10 itojun Exp $	*/
+/*	$KAME: key.c,v 1.251 2002/07/08 09:33:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,12 +166,11 @@ static LIST_HEAD(_spacqtree, secspacq) spacqtree;	/* SP acquiring list */
 struct key_cb key_cb;
 
 /* search order for SAs */
-static const u_int saorder_state_valid[] = {
+static const u_int saorder_state_valid_prefer_old[] = {
 	SADB_SASTATE_DYING, SADB_SASTATE_MATURE,
-	/*
-	 * This order is important because we must select a oldest SA
-	 * for outbound processing.  For inbound, This is not important.
-	 */
+};
+static const u_int saorder_state_valid_prefer_new[] = {
+	SADB_SASTATE_MATURE, SADB_SASTATE_DYING,
 };
 static const u_int saorder_state_alive[] = {
 	/* except DEAD */
@@ -762,6 +761,8 @@ key_allocsa_policy(saidx)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int stateidx, state;
+	const u_int *saorder_state_valid;
+	int arraysize;
 
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
@@ -774,10 +775,19 @@ key_allocsa_policy(saidx)
 
     found:
 
-	/* search valid state */
-	for (stateidx = 0;
-	     stateidx < _ARRAYLEN(saorder_state_valid);
-	     stateidx++) {
+	/*
+	 * search a valid state list for outbound packet.
+	 * This search order is important.
+	 */
+	if (key_preferred_oldsa) {
+		saorder_state_valid = saorder_state_valid_prefer_old;
+		arraysize = _ARRAYLEN(saorder_state_valid_prefer_old);
+	} else {
+		saorder_state_valid = saorder_state_valid_prefer_new;
+		arraysize = _ARRAYLEN(saorder_state_valid_prefer_new);
+	}
+
+	for (stateidx = 0; stateidx < arraysize; stateidx++) {
 
 		state = saorder_state_valid[stateidx];
 
@@ -950,6 +960,8 @@ key_allocsa(family, src, dst, proto, spi)
 	u_int stateidx, state;
 	struct sockaddr_in sin;
 	int s;
+	const u_int *saorder_state_valid;
+	int arraysize;
 
 	/* sanity check */
 	if (src == NULL || dst == NULL)
@@ -958,6 +970,18 @@ key_allocsa(family, src, dst, proto, spi)
 	    (((struct sockaddr *)src)->sa_family != AF_INET6 ||
 	     ((struct sockaddr *)dst)->sa_family != AF_INET6)) {
 		panic("key_allocsa: src/dst family is inconsistent\n");
+	}
+
+	/*
+	 * when both systems employ similar strategy to use a SA.
+	 * the search order is important even in the inbound case.
+	 */
+	if (key_preferred_oldsa) {
+		saorder_state_valid = saorder_state_valid_prefer_old;
+		arraysize = _ARRAYLEN(saorder_state_valid_prefer_old);
+	} else {
+		saorder_state_valid = saorder_state_valid_prefer_new;
+		arraysize = _ARRAYLEN(saorder_state_valid_prefer_new);
 	}
 
 	/*
@@ -972,10 +996,11 @@ key_allocsa(family, src, dst, proto, spi)
 	s = splnet();	/*called from softclock()*/
 #endif
 	LIST_FOREACH(sah, &sahtree, chain) {
-		/* search valid state */
-		for (stateidx = 0;
-		     stateidx < _ARRAYLEN(saorder_state_valid);
-		     stateidx++) {
+		/*
+		 * search a valid state list for inbound packet.
+	 	 * the search order is not important.
+		 */
+		for (stateidx = 0; stateidx < arraysize; stateidx++) {
 			state = saorder_state_valid[stateidx];
 			LIST_FOREACH(sav, &sah->savtree[state], chain) {
 				/* sanity check */
