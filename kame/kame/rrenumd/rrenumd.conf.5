@@ -1,4 +1,4 @@
-.\"	$KAME: rrenumd.conf.5,v 1.5 2001/02/06 02:07:58 itojun Exp $
+.\"	$KAME: rrenumd.conf.5,v 1.6 2001/02/06 02:10:29 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -93,7 +93,7 @@ can be any combination of single or multiple numerical IPv6 addrs,
 or Full Qualified Domain Names.
 .Ar retrycmd
 has following syntax.
-
+.Pp
 .\"
 .Bl -tag -width Ds -compact
 .It Ic retry Ar retry-num
@@ -196,14 +196,14 @@ Let the prefix to be added to have on-link or off-link nature
 for the assigned interface.
 If
 .Cm on
-is specified, the prefix have on-link nature.
+is specified, the prefix have on-link nature
 (e.g. the prefix
-belong to the link)
+belong to the link).
 If
 .Cm off
-is specified, the prefix have off-link nature.
+is specified, the prefix have off-link nature
 (e.g. the
-prefix does not belong to the link)
+prefix does not belong to the link).
 .It Cm raf_auto Cm on|off
 Enable or disable the autonomous address auto configuration
 for the prefix to be added.
@@ -246,9 +246,9 @@ has just same syntax with above add|change|setglobal statement.
 .Sh EXAMPLE
 For each configuration file example shown below, we suppose
 every IPv6 subnet has its own prefix beginning with
-fec0:0:0::/48 and with its own subnet number.
+fec0:0:0::/48 and with its own subnet number
 (in this case,
-subnet number is 7th and 8th octet value of the prefix)
+subnet number is 7th and 8th octet value of the prefix).
 .Pp
 If you want to assign prefixes beginning with 3ffe:501:ffff::/48
 to each subnet, then following configuration will be enough,
@@ -262,7 +262,7 @@ dest ff05::2;
 add match-prefix fec0:0:0:: /48 use-prefix 3ffe:501:ffff:: /48 keeplen 16;
 .Ed
 .\"
-
+.Pp
 If your routers don't support IPv6 multicast forwarding,
 you'll need to specify each destination at
 .Cm dest
@@ -274,7 +274,7 @@ dest fec0:0:0:1:260:8ff:fe24:fb3a fec0:0:0:2:200:eff:fe2e:dfe1 fec0:0:0:3:5254:f
 add match-prefix fec0:0:0:: /48 use-prefix 3ffe:501:ffff:: /48 keeplen 16;
 .Ed
 .\"
-
+.Pp
 If you are going to do renumbering, then following procedure will be natural.
 .Bl -enum -offset indent
 .It
@@ -284,8 +284,8 @@ Set old prefix lifetimes to some appropriate transition
 period.
 In the followng example we use 1 week for valid
 lifetime, and 0 for preferred lifetime.
-Also, enable old prefix lifetime expiration.
-(By default, it is static and does not expire)
+Also, enable old prefix lifetime expiration
+(By default, it is static and does not expire).
 .It
 After the transition period, old prefixes should become
 invalid, and may have been deleted.
@@ -294,7 +294,7 @@ renumbering message, which specifies old prefixes as match
 prefix, and no use prefix.
 .El
 .\"
-
+.Pp
 The following configuration file will do 1 and 2.
 .\"
 .Bd -literal -offset indent
@@ -309,11 +309,11 @@ seqnum 1 {
 	};
 .Ed
 .\"
-
-And the following configuration file will do 3.
+.Pp
+And the following configuration file will do 3
 (should be
 used for the router renumbering message to be sent 1 week
-afterward)
+afterward).
 .\"
 .Bd -literal -offset indent
 dest ff05::2;
@@ -321,7 +321,7 @@ dest ff05::2;
 change match-prefix 3ffe:501:ffff:: /48;
 .Ed
 .\"
-
+.Pp
 In the above example, only
 .Cm add
 and
@@ -333,7 +333,6 @@ command.
 command is almost same with
 .Cm change
 command except that it deletes all pre-defined IPv6 global address.
-
 .Sh SEE ALSO
 .Xr rrenumd 8 ,
 .Xr prefix 8
