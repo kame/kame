@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.68 2000/07/18 01:17:30 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.69 2000/07/21 15:51:20 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -67,6 +67,7 @@
 
 #include "schedule.h"
 #include "localconf.h"
+#include "remoteconf.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "isakmp_inf.h"
@@ -902,6 +903,7 @@ pk_sendupdate(iph2)
 	struct ph2handle *iph2;
 {
 	struct saproto *pr;
+	struct sockaddr *src = NULL, *dst = NULL;
 	int e_type, e_keylen, a_type, a_keylen, flags;
 	u_int satype, mode;
 
@@ -909,6 +911,15 @@ pk_sendupdate(iph2)
 	if (iph2->approval == NULL) {
 		plog(logp, LOCATION, NULL,
 			"no approvaled SAs found.\n");
+	}
+
+	/* for mobile IPv6 */
+	if (iph2->ph1->rmconf->support_mip6 && iph2->src_id && iph2->dst_id) {
+		src = iph2->src_id;
+		dst = iph2->dst_id;
+	} else {
+		src = iph2->src;
+		dst = iph2->dst;
 	}
 
 	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
@@ -1079,6 +1090,7 @@ pk_sendadd(iph2)
 	struct ph2handle *iph2;
 {
 	struct saproto *pr;
+	struct sockaddr *src = NULL, *dst = NULL;
 	int e_type, e_keylen, a_type, a_keylen, flags;
 	u_int satype, mode;
 
@@ -1086,6 +1098,15 @@ pk_sendadd(iph2)
 	if (iph2->approval == NULL) {
 		plog(logp, LOCATION, NULL,
 			"no approvaled SAs found.\n");
+	}
+
+	/* for mobile IPv6 */
+	if (iph2->ph1->rmconf->support_mip6 && iph2->src_id && iph2->dst_id) {
+		src = iph2->src_id;
+		dst = iph2->dst_id;
+	} else {
+		src = iph2->src;
+		dst = iph2->dst;
 	}
 
 	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {

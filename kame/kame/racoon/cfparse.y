@@ -148,6 +148,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE
 %token CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
+%token GENERATE_POLICY SUPPORT_MIP6
 %token POST_COMMAND
 %token EXEC_PATH EXEC_COMMAND EXEC_SUCCESS EXEC_FAILURE
 
@@ -985,6 +986,8 @@ remote_spec
 		}
 		dh_group_num EOS
 	|	KEEPALIVE EOS { cur_rmconf->keepalive = TRUE; }
+	|	GENERATE_POLICY SWITCH EOS { cur_rmconf->gen_policy = $2; }
+	|	SUPPORT_MIP6 SWITCH EOS { cur_rmconf->support_mip6 = $2; }
 	|	INITIAL_CONTACT SWITCH EOS { cur_rmconf->ini_contact = $2; }
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{

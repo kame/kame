@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.44 2000/07/18 05:43:14 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.45 2000/07/21 15:51:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1008,25 +1008,15 @@ quick_r1recv(iph2, msg0)
 	}
     }
 
-	/* check the existence of ID payload */
-	if ((iph2->id_p != NULL && iph2->id == NULL)
-	 || (iph2->id_p == NULL && iph2->id != NULL)) {
-		/* XXX send information */
-		plog(logp, LOCATION, NULL,
-			"Both ID wasn't found in payload.\n");
-		error = ISAKMP_NTYPE_INVALID_ID_INFORMATION;
-		goto end;
-	}
-
 	/* get sainfo */
-	if (get_sainfo_r(iph2) < 0) {
+	if (get_sainfo_r(iph2) != 0) {
 		plog(logp, LOCATION, NULL,
 			"failed to get sainfo.\n");
 		error = ISAKMP_INTERNAL_ERROR;
 		goto end;
 	}
 
-	/* create responder's proposal */
+	/* check the existence of ID payload and create responder's proposal */
 	if (get_proposal_r(iph2) < 0) {
 		plog(logp, LOCATION, NULL,
 			"failed to get proposal for responder.\n");
@@ -1631,7 +1621,8 @@ get_sainfo_r(iph2)
 				"invalid family: %d\n", iph2->src->sa_family);
 			goto end;
 		}
-		idsrc = ipsecdoi_sockaddr2id(iph2->src, prefixlen, IPSEC_ULPROTO_ANY);
+		idsrc = ipsecdoi_sockaddr2id(iph2->src, prefixlen,
+					IPSEC_ULPROTO_ANY);
 	} else {
 		idsrc = vdup(iph2->id);
 	}
@@ -1654,7 +1645,8 @@ get_sainfo_r(iph2)
 				"invalid family: %d\n", iph2->dst->sa_family);
 			goto end;
 		}
-		iddst = ipsecdoi_sockaddr2id(iph2->dst, prefixlen, IPSEC_ULPROTO_ANY);
+		iddst = ipsecdoi_sockaddr2id(iph2->dst, prefixlen,
+					IPSEC_ULPROTO_ANY);
 	} else {
 		iddst = vdup(iph2->id_p);
 	}
@@ -1686,7 +1678,9 @@ end:
 }
 
 /*
- * get remote's policy from SPD copied from kernel.
+ * Copy IP addresses in 2 of ID payloads into id[src,dst] if both ID types
+ * are IP address and same address family.
+ * Then get remote's policy from SPD copied from kernel.
  * If the type of ID payload is address or subnet type, then the index is
  * made from the payload.  If there is no ID payload, or the type of ID
  * payload is NOT address type, then the index is made from the address
@@ -1698,122 +1692,147 @@ get_proposal_r(iph2)
 	struct ph2handle *iph2;
 {
 	struct policyindex spidx;
+	u_int8_t prefixlen;
 	struct secpolicy *sp;
 	struct ipsecrequest *req;
 	struct saprop *newpp = NULL;
+	int idi2type = 0;	/* switch whether copy IDs into id[src,dst]. */
+	int error;
 
-	/* check */
+	/* check the existence of ID payload */
 	if ((iph2->id_p != NULL && iph2->id == NULL)
 	 || (iph2->id_p == NULL && iph2->id != NULL)) {
 		plog(logp, LOCATION, NULL,
-			"Both ID wasn't found in payload.\n");
-		return -1;
+			"ERROR: Both IDs wasn't found in payload.\n");
+		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 
-	if (iph2->src->sa_family != iph2->dst->sa_family) {
+	/* make sure if id[src,dst] is null. */
+	if (iph2->src_id || iph2->dst_id) {
 		plog(logp, LOCATION, NULL,
-			"family mismatch, src:%d dst:%d\n",
-				iph2->src->sa_family,
-				iph2->src->sa_family);
-		return -1;
+			"FATAL: Why do ID[src,dst] exist already.\n");
+		return ISAKMP_INTERNAL_ERROR;
 	}
 
 	memset(&spidx, 0, sizeof(spidx));
 
 #define _XIDT(d) ((struct ipsecdoi_id_b *)(d)->v)->type
 
-	if (iph2->id_p != NULL && iph2->id != NULL
+	spidx.dir = IPSEC_DIR_INBOUND;
+
+	/* make them from ID payload or phase 1 addresses. */
+	if (iph2->id != NULL
 	 && (_XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR
 	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR
 	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR_SUBNET
-	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR_SUBNET)
+	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR_SUBNET)) {
+		/* get a destination address of a policy */
+		error = ipsecdoi_id2sockaddr(iph2->id,
+				(struct sockaddr *)&spidx.dst,
+				&spidx.prefd, &spidx.ul_proto);
+		if (error)
+			return error;
+
+		if (_XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR
+		 || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR)
+			idi2type = _XIDT(iph2->id);
+	} else {
+
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"get a destination address of SP index "
+				"from phase1 address "
+				"due to no ID payloads found "
+				"OR because ID type is not address.\n"));
+
+		memcpy(&spidx.dst, iph2->src, iph2->src->sa_len);
+	}
+
+	if (iph2->id_p != NULL
 	 && (_XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR_SUBNET
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR_SUBNET)) {
-		/* from ID payload */
-		if (ipsecdoi_id2sockaddr(iph2->id_p,
+		/* get a source address of inbound SA */
+		error = ipsecdoi_id2sockaddr(iph2->id_p,
 				(struct sockaddr *)&spidx.src,
-				&spidx.prefs, &spidx.ul_proto) != 0)
-			return -1;
+				&spidx.prefs, &spidx.ul_proto);
+		if (error)
+			return error;
 
-		if (ipsecdoi_id2sockaddr(iph2->id,
-				(struct sockaddr *)&spidx.dst,
-				&spidx.prefd, &spidx.ul_proto) != 0)
-			return -1;
-
-		spidx.dir = IPSEC_DIR_INBOUND;
-
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"get src address from ID payload "
-				"%s prefixlen=%u ul_proto=%u\n",
-				saddr2str((struct sockaddr *)&spidx.src),
-				spidx.prefs, spidx.ul_proto));
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"get dst address from ID payload "
-				"%s prefixlen=%u ul_proto=%u\n",
-				saddr2str((struct sockaddr *)&spidx.dst),
-				spidx.prefd, spidx.ul_proto));
+		/* make id[src,dst] if both ID types are IP address and same */
+		if (_XIDT(iph2->id_p) == idi2type
+		 && spidx.dst.ss_family == spidx.src.ss_family) {
+			iph2->src_id = dupsaddr((struct sockaddr *)&spidx.dst);
+			iph2->dst_id = dupsaddr((struct sockaddr *)&spidx.src);
+		}
 	} else {
-		u_int8_t prefixlen;
-
 		YIPSDEBUG(DEBUG_MISC,
 			plog(logp, LOCATION, NULL,
-				"get ipsec policy index from phase1 address "
+				"get a source address of SP index "
+				"from phase1 address "
 				"due to no ID payloads found "
 				"OR because ID type is not address.\n"));
 
-		switch (iph2->src->sa_family) {
-		case AF_INET:
-			prefixlen = sizeof(struct in_addr) << 3;
-			break;
-#ifdef INET6
-		case AF_INET6:
-			prefixlen = sizeof(struct in6_addr) << 3;
-			break;
-#endif
-		default:
-			plog(logp, LOCATION, NULL,
-				"invalid family: %d\n", iph2->src->sa_family);
-			return -1;
-		}
+		memcpy(&spidx.src, iph2->dst, iph2->dst->sa_len);
+	}
 
-		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
-				iph2->dst,
-				iph2->src,
-				prefixlen,
-				prefixlen,
-				IPSEC_ULPROTO_ANY,
-				&spidx);
-	} 
+	switch (spidx.src.ss_family) {
+	case AF_INET:
+		prefixlen = sizeof(struct in_addr) << 3;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		prefixlen = sizeof(struct in6_addr) << 3;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph2->src->sa_family);
+		free(iph2->src_id);
+		free(iph2->dst_id);
+		return ISAKMP_INTERNAL_ERROR;
+	}
+
 #undef _XIDT(d)
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL,
+			"get a src address from ID payload "
+			"%s prefixlen=%u ul_proto=%u\n",
+			saddr2str((struct sockaddr *)&spidx.src),
+			spidx.prefs, spidx.ul_proto));
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL,
+			"get dst address from ID payload "
+			"%s prefixlen=%u ul_proto=%u\n",
+			saddr2str((struct sockaddr *)&spidx.dst),
+			spidx.prefd, spidx.ul_proto));
 
 	sp = getsp_r(&spidx);
 	if (sp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"no policy found: %s\n", spidx2str(&spidx));
-		return -1;
+			"ERROR: no policy found: %s\n", spidx2str(&spidx));
+		return ISAKMP_INTERNAL_ERROR;
 	}
 
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL,
-			"suitable SP found:%s\n", spidx2str(&spidx)));
+			"DEBUG: suitable SP found:%s\n", spidx2str(&spidx)));
 
 	/* require IPsec ? */
 	if (sp->policy != IPSEC_POLICY_IPSEC) {
 		plog(logp, LOCATION, NULL,
-			"policy found, but no IPsec required: %s\n",
+			"NOTICE: policy found, but no IPsec required: %s\n",
 			spidx2str(&spidx));
-		return -1;
+		return ISAKMP_INTERNAL_ERROR;
 	}
 
 	/* allocate ipsec sa proposal */
 	newpp = newsaprop();
 	if (newpp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate saprop.\n");
+			"FATAL: failed to allocate saprop.\n");
 		goto err;
 	}
 	newpp->prop_no = 1;

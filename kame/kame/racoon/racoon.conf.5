@@ -235,6 +235,10 @@ Not yet.
 .It Ic initial_contact (on \(ba off) ;
 enable to send INITIAL-CONTACT message.
 .\"
+.It Ic support_mip6 (on \(ba off) ;
+If this value is set on then both values of ID payloads in phase 2 exchange
+are always used as the addresses of end-point of IPsec-SAs.
+.\"
 .It Ic nonce_size Ar number ;
 define the byte size of nonce value.
 Racoon can send any value although

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.31 2000/07/19 08:58:08 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.32 2000/07/21 15:51:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -514,6 +514,14 @@ delph2(iph2)
 	if (iph2->dst) {
 		free(iph2->dst);
 		iph2->dst = NULL;
+	}
+	if (iph2->src_id) {
+	      free(iph2->src_id);
+	      iph2->src_id = NULL;
+	}
+	if (iph2->dst_id) {
+	      free(iph2->dst_id);
+	      iph2->dst_id = NULL;
 	}
 
 	if (iph2->proposal) {

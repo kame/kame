@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.26 2000/07/18 14:44:33 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.27 2000/07/21 15:51:19 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -196,6 +196,13 @@ struct ph1handle {
 struct ph2handle {
 	struct sockaddr *src;		/* my address of SA. */
 	struct sockaddr *dst;		/* peer's address of SA. */
+
+		/*
+		 * copy ip address from ID payloads when ID type is ip address.
+		 * In other case, they must be null.
+		 */
+	struct sockaddr *src_id;
+	struct sockaddr *dst_id;
 
 	u_int32_t spid;			/* policy id by kernel */
 
