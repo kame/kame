@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.276 2002/06/08 00:55:53 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.277 2002/06/08 01:02:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1053,7 +1053,7 @@ nd6_free(rt, gc)
 		s = splnet();
 #endif
 		dr = defrouter_lookup((struct sockaddr_in6 *)rt_key(rt),
-				      rt->rt_ifp);
+		    rt->rt_ifp);
 
 		if (dr != NULL && dr->expire &&
 		    ln->ln_state == ND6_LLINFO_STALE && gc) {
@@ -1141,7 +1141,7 @@ nd6_free(rt, gc)
 	 * cached routes.
 	 */
 	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
-		  rt_mask(rt), 0, (struct rtentry **)0);
+	    rt_mask(rt), 0, (struct rtentry **)0);
 
 	return(next);
 }
