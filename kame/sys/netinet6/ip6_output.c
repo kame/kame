@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.276 2002/01/10 13:46:22 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.277 2002/01/11 07:51:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,10 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <netinet/in_pcb.h>
+#include <netinet6/in6_pcb.h>
+#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
