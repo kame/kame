@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.18 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: vif.c,v 1.19 2001/11/27 07:02:52 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -240,6 +240,7 @@ int init_reg_vif()
 	memcpy(v,&uvifs[i],sizeof(*v));
 	strncpy(v->uv_name,"register_mif0",IFNAMSIZ);
 	v->uv_flags = MIFF_REGISTER;
+	v->uv_mld_version = MLDv1;
 
 #ifdef PIM_EXPERIMENTAL
 	v->uv_flags |= MIFF_REGISTER_KERNEL_ENCAP;
