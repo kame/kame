@@ -1,4 +1,4 @@
-/*	$KAME: if_indextoname.c,v 1.4 2000/04/24 10:08:41 itojun Exp $	*/
+/*	$KAME: if_indextoname.c,v 1.5 2000/11/07 22:25:45 jinmei Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -34,23 +34,24 @@
 #include <string.h>
 
 /*
- * From RFC 2133:
+ * From RFC 2533:
  *
- * 4.2.  Index-to-Name
+ *  The second function maps an interface index into its corresponding
+ *  name.
  *
- *    The second function maps an interface index into its corresponding
- *    name.
+ *    #include <net/if.h>
  *
- *        #include <net/if.h>
+ *    char  *if_indextoname(unsigned int ifindex, char *ifname);
  *
- *        char  *if_indextoname(unsigned int ifindex, char *ifname);
- *
- *    The ifname argument must point to a buffer of at least IFNAMSIZ bytes
- *    into which the interface name corresponding to the specified index is
- *    returned.  (IFNAMSIZ is also defined in <net/if.h> and its value
- *    includes a terminating null byte at the end of the interface name.)
- *    This pointer is also the return value of the function.  If there is
- *    no interface corresponding to the specified index, NULL is returned.
+ * The ifname argument must point to a buffer of at least IF_NAMESIZE
+ * bytes into which the interface name corresponding to the specified
+ * index is returned.  (IF_NAMESIZE is also defined in <net/if.h> and
+ * its value includes a terminating null byte at the end of the
+ * interface name.) This pointer is also the return value of the
+ * function.  If there is no interface corresponding to the specified
+ * index, NULL is returned, and errno is set to ENXIO, if there was a
+ * system error (such as running out of memory), if_indextoname returns
+ * NULL and errno would be set to the proper value (e.g., ENOMEM).
  */
 
 char *
