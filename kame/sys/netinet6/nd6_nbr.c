@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.75 2001/07/29 10:52:28 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.76 2001/07/29 11:58:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -528,7 +528,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, NULL);
+	ip6_output(m, NULL, NULL, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL);
 	icmp6_ifstat_inc(ifp, ifs6_out_msg);
 	icmp6_ifstat_inc(ifp, ifs6_out_neighborsolicit);
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]++;

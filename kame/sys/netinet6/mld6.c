@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.30 2001/07/29 09:23:06 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.31 2001/07/29 11:58:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -219,12 +219,15 @@ mld6_input(m, off)
 #endif
 
 	/* source address validation */
-	ip6 = mtod(m, struct ip6_hdr *);/* in case mpullup */
-	if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
-		log(LOG_ERR,
+	ip6 = mtod(m, struct ip6_hdr *); /* in case mpullup */
+	if (!(IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src) ||
+	      IN6_IS_ADDR_UNSPECIFIED( &ip6->ip6_src))) {
+#if 0				/* do not log in an input path */
+		log(LOG_INFO,
 		    "mld6_input: src %s is not link-local (grp=%s)\n",
 		    ip6_sprintf(&ip6->ip6_src),
 		    ip6_sprintf(&mldh->mld6_addr));
+#endif
 		/*
 		 * spec (RFC2710) does not explicitly
 		 * specify to discard the packet from a non link-local
@@ -419,16 +422,19 @@ mld6_sendpkt(in6m, type, dst)
 	struct ip6_moptions im6o;
 	struct in6_ifaddr *ia;
 	struct ifnet *ifp = in6m->in6m_ifp;
+	int ignflags;
 
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
+	 * We do not reject tentative addresses for MLD report to deal with
+	 * the case where we first join a link-local address.
 	 */
-	if ((ia = in6ifa_ifpforlinklocal(ifp,
-					 IN6_IFF_NOTREADY|IN6_IFF_ANYCAST))
-	    == NULL) {
+	ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & ~IN6_IFF_TENTATIVE;
+	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL)
 		return;
-	}
+	if ((ia->ia6_flags & IN6_IFF_TENTATIVE))
+		ia = NULL;
 
 	/*
 	 * Allocate mbufs to store ip6 header and MLD header.
@@ -458,7 +464,7 @@ mld6_sendpkt(in6m, type, dst)
 	/* ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	/* ip6_hlim will be set by im6o.im6o_multicast_hlim */
-	ip6->ip6_src = ia->ia_addr.sin6_addr;
+	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
 	ip6->ip6_dst = dst ? *dst : in6m->in6m_addr;
 
 	/* fill in the MLD header */
@@ -503,5 +509,5 @@ mld6_sendpkt(in6m, type, dst)
 		break;
 	}
 
-	ip6_output(mh, &ip6_opts, NULL, 0, &im6o, NULL);
+	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
 }
