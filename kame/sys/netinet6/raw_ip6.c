@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.60 2001/02/07 06:21:20 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.61 2001/02/07 06:46:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,7 +311,7 @@ rip6_ctlinput(cmd, sa, d)
 		notify = in6_rtchange, d = NULL;
 	else if (cmd == PRC_HOSTDEAD)
 		d = NULL;
-#ifdef __NetBSD__ /*defined(__NetBSD__) || defined(__OpenBSD__)*/
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	else if (cmd == PRC_MSGSIZE)
 		; /* special code is present, see below */
 #endif
@@ -333,11 +333,10 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
-#ifdef __NetBSD__ /*defined(__NetBSD__) || defined(__OpenBSD__)*/
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	if (ip6 && cmd == PRC_MSGSIZE) {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 		int valid = 0;
-#ifdef __NetBSD__
 		struct in6pcb *in6p;
 
 		/*
@@ -347,9 +346,15 @@ rip6_ctlinput(cmd, sa, d)
 		 * XXX chase extension headers, or pass final nxt value
 		 * from icmp6_notify_error()
 		 */
+		in6p = NULL;
+#ifdef __NetBSD__
 		in6p = in6_pcblookup_connect(&rawin6pcb,
 		    &sa6->sin6_addr, 0,
 		    (struct in6_addr *)&sa6_src->sin6_addr, 0, 0);
+#elif defined(__OpenBSD__)
+		in6p = in6_pcbhashlookup(&rawin6pcbtable, &sa6->sin6_addr, 0,
+		    (struct in6_addr *)&sa6_src->sin6_addr, 0);
+#endif
 #if 0
 		if (!in6p) {
 			/*
@@ -359,15 +364,20 @@ rip6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local
 			 * address (= s) is really ours.
 			 */
+#ifdef __NetBSD__
 			in6p = in6_pcblookup_bind(&rawin6pcb,
 			    &sa6->sin6_addr, 0, 0))
+#elif defined(__OpenBSD__)
+			in6p = in_pcblookup(&rawin6pcbtable, &sa6->sin6_addr, 0,
+			    (struct in6_addr *)&sa6_src->sin6_addr, 0,
+			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+#endif
 		}
 #endif
 
 		if (in6p && in6p->in6p_ip6.ip6_nxt &&
 		    in6p->in6p_ip6.ip6_nxt == ip6->ip6_nxt)
 			valid = 1;
-#endif
 
 		/*
 		 * Depending on the value of "valid" and routing table
