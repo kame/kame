@@ -11,4 +11,9 @@ TCPDUMPSRCDIR=	${KAMEROOT}/kame/kame/kame/tcpdump
 
 ETCDIR?=	/etc/racoon
 
+.if defined(SBIN_RACOON) && ${SBIN_RACOON} == "yes"
+BINDIR?=        /sbin
+LDSTATIC?=      -static
+.endif
+
 .include "../Makefile.inc"
