@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.9 2002/06/18 07:35:14 keiichi Exp $
+.\"	$KAME: mip6control.8,v 1.10 2002/09/18 05:32:52 k-sugyou Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -37,39 +37,17 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Oo -i
-.Ar ifname
-.Oc
-.Op -abcghlmnw
-.Oo -H
-.Ar home_prefix
--P
-.Ar prefixlen
-.Oc
-.Oo -A
-.Ar home_agent_global_addr
--L
-.Ar home_agent_linklocal_addr
-.Oc
-.Oo -u
-.Ar address#port
-.Oc
-.Oo -v
-.Ar address#port
-.Oc
-.Oo -F
-.Ar [ifp1[:ifp2[:ifp3]]]
-.Oc
-.Oo -S
-.Ar 0|1
-.Oc
-.Oo -T
-.Ar 0|1
-.Oc
-.Oo -D
-.Ar 0|1
-.Oc
-.\"
+.Op Fl i Ar ifname
+.Op Fl abcghlmnw
+.Op Fl H Ar home_prefix
+.Op Fl P Ar prefixlen
+.Op Fl A Ar home_agent_global_addr
+.Op Fl L Ar home_agent_linklocal_addr
+.Op Fl u Ar address#port
+.Op Fl v Ar address#port
+.Op Fl F Ar ifp1[:ifp2[:ifp3]]
+.Op Fl S Ar 0|1
+.Op Fl D Ar 0|1
 .Sh DESCRIPTION
 .Nm
 sets/gets KAME/MIP6 related information.
@@ -127,20 +105,12 @@ Add a rule that MN doesn't add a Home Address option to the outgoing packet.
 Delete the rule which specified one.
 .It Fl w
 Show the rule.
-.It Fl F Ar [ifp1[:ifp2[:ifp3]]]
+.It Fl F Ar ifp1[:ifp2[:ifp3]]
 Set preferrable network interfaces for CoA selection.
 Specify nothing to remove the preferences.
 .It Fl S Ar 0|1
 When set to 0, the IPsec protection check of the incoming binding updates
 and binding acks will not be performed (always pass the check).
-.It Fl T Ar 0|1
-When set to 0, the authentication sub-option check of the incoming binding
-updates and binding acks will not be performed.  Also, do not insert
-the authentication sub-option when sending the binding updates/binding
-acks.  Note that, mip6control -S 1 -T 0 doesn't mean 'use only the IPsec
-mechanism to protect binding updates and binging acks' in ID-15
-environment.  This is equivalent to mip6control -S 0 -T 0 in ID-15
-environment.
 .It Fl D Ar 0|1
 When set to 0, no debug messages are printed.
 .El

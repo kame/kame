@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.31 2002/08/28 13:35:05 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.32 2002/09/18 05:32:53 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,7 +129,7 @@ usage()
 		      "usage: %s [-i ifname] [-abcghlmnw]"
 		      " [-H home_prefix -P prefixlen]"
 		      " [-u address#port] [-v address#port]"
-		      " [-S 0|1] [-T 0|1] [-D 0|1]\n",
+		      " [-S 0|1] [-D 0|1]\n",
 		      __progname);
 	exit(1);
 }
@@ -303,8 +303,10 @@ main(argc, argv)
 		printf("node type: %s\n", type);
 		printf("IPsec protection: %s\n",
 		       mip6_config.mcfg_use_ipsec ? "enable" : "disable");
+#if 0
 		printf("authentication sub-option: %s\n",
 		       mip6_config.mcfg_use_authdata ? "enable" : "disable");
+#endif
 		printf("debug: %s\n",
 		       mip6_config.mcfg_debug ? "enable" : "disable");
 	}
