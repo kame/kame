@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.138 1999/09/26 07:49:10 jinmei Exp $
+$Id: CHANGELOG,v 1.139 1999/09/26 19:43:53 sumikawa Exp $
 
 <199909>
+Mon Sep 27 04:33:31 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/tcp_wrapper, netbsd/ports/tcp_wrapper:
+	  upgraded to latest IPv6 patch made by ume@mahoroba.org.
+
 1999-09-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6: made the code as much portable as possible.
 	Some macros were added and were used in configure.in to aclocal.m4
