@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1233 2000/08/24 11:31:45 sakane Exp $
+$KAME: CHANGELOG,v 1.1234 2000/08/25 10:37:05 jinmei Exp $
 
 <200008>
+2000-08-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_lifaddr_ioctl): made
+	SIOC[DG]LIFADDR scope-aware; fe80::/64 (not /10) will be accepted
+	to specify a link-local address.
+	In response to a report from Francis Dupont
+	<Francis.Dupont@enst-bretagne.fr>.
+
 Thu Aug 24 20:17:26 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	It is possible to verify the signer chain in the certificate.
