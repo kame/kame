@@ -186,9 +186,10 @@ dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
 	ap = rte->rt_aspath;
 
 	fprintf(fp, "%s", indent); /* indentation */
-	fprintf(fp, "%s/%d nexthop: %s\n",
+	fprintf(fp, "%s%s/%d\n", (rte->rt_flags & RTF_INSTALLED) ? "*" : " ",
 		ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		rte->rt_ripinfo.rip6_plen, ip6str(&rte->rt_bgw, 0));
+		rte->rt_ripinfo.rip6_plen);
+	fprintf(fp, "%s  Nexthop: %s\n", indent, ip6str(&rte->rt_bgw, 0));
 
 	fprintf(fp, "%s  ", indent); /* more indent */
 	fprintf(fp, "Gateway: %s ",
@@ -528,8 +529,9 @@ show_bgp_route_entry(fp, bre)
 	char *indent = " ";
 
 	dump_bgp_rtentry(fp, bre->rte, indent);
-	fprintf(fp, "%sPeerInfo: Addr: %s, ID: %s, Type: %s\n", indent,
-		bgp_peerstr(bnp),
+	fprintf(fp, "%sPeerInfo: Addr: %s, ", indent, bgp_peerstr(bnp));
+	
+	fprintf(fp, "%s          ID: %s, Type: %s\n", indent,
 		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
 		(bnp->rp_mode & BGPO_IGP) ? "IBGP" : "EBGP");
 }
@@ -572,8 +574,10 @@ print_bgp_routes(fp)
 
 	brl = make_bgp_route_list(); /* make a sorted list */
 	for (bre = bgp_route_headentry(brl); bre;
-	     bre = bgp_route_nextentry(brl, bre))
+	     bre = bgp_route_nextentry(brl, bre)) {
+		fputc('\n', fp);
 		show_bgp_route_entry(fp, bre);
+	}
 	free_bgp_route_list(brl);
 }
 
