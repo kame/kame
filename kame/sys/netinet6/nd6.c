@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.317 2003/06/18 08:29:04 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.318 2003/06/19 03:35:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1327,12 +1327,13 @@ nd6_rtrequest(req, rt, sa)
 		 *     SIN(rt_mask(rt))->sin_addr.s_addr != 0xffffffff)
 		 *	   rt->rt_flags |= RTF_CLONING;
 		 */
-		if (rt->rt_flags & (RTF_CLONING | RTF_LLINFO)) {
+		if ((rt->rt_flags & RTF_CLONING) ||
+		    ((rt->rt_flags & RTF_LLINFO) && !ln)) {
 			/*
-			 * Case 1: This route should come from
-			 * a route to interface.  RTF_LLINFO flag is set
-			 * for a host route whose destination should be
-			 * treated as on-link.
+			 * Case 1: This route should come from a route to
+			 * interface (RTF_CLONING case) or the route should be
+			 * treated as on-link but is currently not
+			 * (RTF_LLINFO && !ln case).
 			 */
 			rt_setgate(rt, rt_key(rt),
 				   (struct sockaddr *)&null_sdl);
