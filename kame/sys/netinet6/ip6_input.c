@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.185 2001/03/02 11:43:33 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.186 2001/03/16 11:38:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -674,6 +674,20 @@ ip6_input(m)
 		} else {
 			ip6stat.ip6s_badscope++;
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
+			goto bad;
+		}
+	}
+
+	/* drop packets if interface ID portion is already filled */
+	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src) &&
+		    ip6->ip6_src.s6_addr16[1]) {
+			ip6stat.ip6s_badscope++;
+			goto bad;
+		}
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst) &&
+		    ip6->ip6_dst.s6_addr16[1]) {
+			ip6stat.ip6s_badscope++;
 			goto bad;
 		}
 	}
