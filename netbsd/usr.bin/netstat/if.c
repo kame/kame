@@ -234,6 +234,15 @@ intpr(interval, ifnetaddr, pfunc)
 				else
 					n = 13;
 				printf("%-*.*s ", n, n, cp);
+#if 0 /* KAME_SCOPEID: don't do it twice */
+				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+					sin6->sin6_scope_id =
+						ntohs(*(u_int16_t *)
+						  &sin6->sin6_addr.s6_addr[2]);
+					sin6->sin6_addr.s6_addr[2] = 0;
+					sin6->sin6_addr.s6_addr[3] = 0;
+				}
+#endif
 				if (getnameinfo((struct sockaddr *)sin6,
 						sin6->sin6_len,
 						hbuf, sizeof(hbuf), NULL, 0,

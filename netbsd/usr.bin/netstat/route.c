@@ -434,6 +434,7 @@ p_sockaddr(sa, mask, flags, width)
 	case AF_INET6:
 	    {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
+#ifdef KAME_SCOPEID
 		struct in6_addr *in6 = &sa6->sin6_addr;
 
 		/*
@@ -446,6 +447,7 @@ p_sockaddr(sa, mask, flags, width)
 		    sa6->sin6_scope_id = (u_int32_t)ntohs(*(u_short *)&in6->s6_addr[2]);
 		    *(u_short *)&in6->s6_addr[2] = 0;
 		}
+#endif
 
 		if (flags & RTF_HOST)
 			cp = routename6(sa6);
@@ -849,6 +851,14 @@ netname6(sa6, mask)
 
 	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
 		return("default");
+
+#ifdef KAME_SCOPEID
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+		sa6->sin6_scope_id =
+			ntohs(*(u_int16_t *)&sa6->sin6_addr.s6_addr[2]);
+		sa6->sin6_addr.s6_addr[2] = sa6->sin6_addr.s6_addr[3] = 0;
+	}
+#endif
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;

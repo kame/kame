@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.7 1999/10/27 11:58:34 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.8 1999/10/27 12:08:03 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -1197,12 +1197,14 @@ inet6name(in6p)
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_addr = *in6p;
+#ifdef KAME_SCOPEID
 		if (IN6_IS_ADDR_LINKLOCAL(in6p)) {
 			sin6.sin6_scope_id =
 				ntohs(*(u_int16_t *)&in6p->s6_addr[2]);
 			sin6.sin6_addr.s6_addr[2] = 0;
 			sin6.sin6_addr.s6_addr[3] = 0;
 		}
+#endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
 				hbuf, sizeof(hbuf), NULL, 0,
 				NI_NUMERICHOST | NI_WITHSCOPEID)) {
