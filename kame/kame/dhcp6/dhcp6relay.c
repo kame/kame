@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.46 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.47 2003/08/01 06:55:35 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -243,7 +243,6 @@ make_prefix(pstr0)
 
 	return (pent);
 }
-
 
 static void
 relay6_init()
@@ -751,7 +750,7 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	    (struct dhcp6opt *)(relaybuf + sizeof (relaybuf)),
 	    &optinfo)) < 0) {
 		dprintf(LOG_INFO, FNAME,
-		    "failed to construct reply options");
+		    "failed to construct relay options");
 		goto out;
 	}
 	relaylen += optlen;
@@ -818,7 +817,7 @@ relay_to_client(dh6relay, len, from)
 	    in6addr2str(&dh6relay->dh6relay_peeraddr, 0));
 
 	/*
-	 * parse and validate options in the relay forward message.
+	 * parse and validate options in the relay reply message.
 	 */
 	dhcp6_init_options(&optinfo);
 	if (dhcp6_get_options((struct dhcp6opt *)(dh6relay + 1),
