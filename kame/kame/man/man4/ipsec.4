@@ -1,4 +1,4 @@
-.\"	$KAME: ipsec.4,v 1.14 2001/01/22 07:29:45 itojun Exp $
+.\"	$KAME: ipsec.4,v 1.15 2001/04/05 01:00:45 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -103,7 +103,7 @@ by using the above described APIs.
 The kernel implements experimental policy management code.
 You can manage the IPsec policy in two ways.
 One is to configure per-socket policy using
-.Xr setsockopt 3 .
+.Xr setsockopt 2 .
 The other is to configure kernel packet filter-based policy using
 .Dv PF_KEY
 interface, via
@@ -112,7 +112,7 @@ In both cases, IPsec policy must be specified with syntax described in
 .Xr ipsec_set_policy 3 .
 .Pp
 With
-.Xr setsockopt 3 ,
+.Xr setsockopt 2 ,
 you can define IPsec policy in per-socket basis.
 You can enforce particular IPsec policy onto packets that go through
 particular socket.
