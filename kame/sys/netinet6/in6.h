@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.47 2000/06/25 08:05:29 sumikawa Exp $	*/
+/*	$KAME: in6.h,v 1.48 2000/06/26 15:55:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,7 +90,7 @@
  * When a user does a bind(2) or connect(2) with a port number of zero,
  * a non-conflicting local port address is chosen.
  *
- * The default range is IPPORT_ANONMIX to IPPORT_ANONMAX, although
+ * The default range is IPPORT_ANONMIN to IPPORT_ANONMAX, although
  * that is settable by sysctl(3); net.inet.ip.anonportmin and
  * net.inet.ip.anonportmax respectively.
  *
