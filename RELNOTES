@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/21 04:46:42 $
+		     $Date: 2000/04/21 04:48:04 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -25,9 +25,9 @@ KNOWN BUGS/TWISTS
 Most of the following problems will be fixed in near-future SNAP
 releases, and the next STABLE release,
 
-You can find problem reports from other KAME users, at
+You can find problem reports from other KAME users, at:
 	http://orange.kame.net/dev/query-pr-summary.cgi
-.  Many of old ones have been solved.
+Many of old ones have been solved.
 
 - "faithd" sometimes fail to relay rsh/rlogin connection properly.
   Some part of data connection seems to be lost.  rlogin session may
