@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.45 1999/08/20 13:09:59 itojun Exp $
+$Id: CHANGELOG,v 1.46 1999/08/21 16:35:42 jinmei Exp $
 
 <199908>
+1999-08-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* sys/netinet6/udp6_usrreq.c (udp6_output): now got rid of
+	in6_pcbconnect, which needs splnet and affects performance, since
+	we saw no essential reason for calling in6_pcbconnect.
+	Instead, in6_selectsrc and in6_pcbsetport are used in order to
+	fill in the local address and in the local port.
+
 Fri Aug 20 20:27:34 JST 1999  itojun@iijlab.net
 	* bsdi3/usr.sbin/inetd: inetd with IPv6 and IPsec support.
 	  inet6d will be left uncompiled for good.
