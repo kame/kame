@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.16 2001/06/22 15:24:45 itojun Exp $
+$KAME: FAQ,v 1.17 2001/06/28 19:51:30 itojun Exp $
 
 
 GENERAL
@@ -441,7 +441,7 @@ users only, like www.kame.net?)
 	fragment would print "IPv6 <address>" or "not IPv6 <address>"
 	depending on the clients' address.
 
-		if ($ENV{'REMOTE_HOST'} =~ /^[a-fA-F0-9:]$/) {
+		if ($ENV{'REMOTE_HOST'} =~ /^[a-fA-F0-9:]+$/) {
 			print "IPv6 " . $ENV{'REMOTE_HOST'} . "\n";
 		} else {
 			print "not IPv6 " . $ENV{'REMOTE_HOST'} . "\n";
