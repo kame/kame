@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.66 2000/10/22 23:59:26 itojun Exp $
+	$KAME: RELNOTES,v 1.67 2000/11/22 08:23:41 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -9,9 +9,10 @@ BACKWARD COMPATIBILITY NOTICE
 Please understand that the KAME kit is, from its nature, a distribution
 of very experimental set of software.  Do not assume ANY backward
 copmatibility, for source, binary nor configuration file, between
-different version of KAME kits.  This means that you MUST recompile
-everything every time you upgrade KAME kit, to ensure it works.
-You may also need to update your configuration files to meet the latest
+different version of KAME kits, or between KAME-patched tree and
+normal *BSD tree.  This means that you MUST recompile everything
+every time you upgrade KAME kit, to ensure it works.  You may also
+need to update your configuration files to meet the latest
 implementation.  We are not ignoring backward compatibility issues,
 however, we are sometimes unable to maintain backward compatibility.
 
