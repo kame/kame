@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1161 2000/07/28 03:50:30 itojun Exp $
+$KAME: CHANGELOG,v 1.1162 2000/07/28 10:01:31 kjc Exp $
 
 <200007>
+Fri 28 Jul 18:56:23 JST 2000  kjc@csl.sony.co.jp
+	* make altqd aware of token bucket regulators
+	 - install a token bucket regulator when an interface is
+	   attached unless there is already one installed.
+	 - remove the installed tbr when the interface is detached.
+
 Fri Jul 28 12:46:55 JST 2000  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_output.c: add missing call to tcp6_quench().
 	* GENERIC.v6 config file for all *BSD:
