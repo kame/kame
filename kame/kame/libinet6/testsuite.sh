@@ -1,7 +1,7 @@
 #
 TEST=./test
 #TEST='./test -v'
-IF=`ifconfig -l | awk '{print $1}'`
+IF=`ifconfig -a | grep -v '^	' | sed -e 's/:.*//' | head -1 | awk '{print $1}'`
 
 echo '== basic ones'
 $TEST ::1 http

@@ -28,11 +28,16 @@ print1(title, res, h, s)
 {
 	char *start, *end;
 	int error;
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
 	if (res->ai_addr) {
 		error = getnameinfo(res->ai_addr, res->ai_addr->sa_len,
 				    host, sizeof(host), serv, sizeof(serv),
-				    NI_NUMERICHOST | NI_WITHSCOPEID);
+				    niflag);
 		h = host;
 		s = serv;
 	} else
