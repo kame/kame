@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.166 2002/07/18 12:22:29 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.167 2002/08/01 05:17:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1793,7 +1793,7 @@ ipsec_in_reject(sp, m)
 
 	case IPSEC_POLICY_ENTRUST:
 	default:
-		panic("ipsec_hdrsiz: Invalid policy found. %d\n", sp->policy);
+		panic("ipsec_in_reject: Invalid policy found. %d\n", sp->policy);
 	}
 
 	need_auth = 0;
@@ -1872,9 +1872,9 @@ ipsec4_in_reject_so(m, so)
 	else
 		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_INBOUND, so, &error);
 
+	/* XXX should be panic ? -> No, there may be error. */
 	if (sp == NULL)
-		return 0;	/* XXX should be panic ?
-				 * -> No, there may be error. */
+		return 0;
 
 	result = ipsec_in_reject(sp, m);
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
