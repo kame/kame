@@ -594,6 +594,7 @@ file crypto/rijndael/rijndael-alg-fst.c		ipsec & ipsec_esp
 file crypto/rijndael/rijndael-api-fst.c		ipsec & ipsec_esp
 file crypto/sha2/sha2.c			ipsec
 file crypto/twofish/twofish2.c		ipsec & ipsec_esp
+file crypto/hmac.c			inet6 & mip6
 file ddb/db_access.c			ddb | kgdb
 file ddb/db_aout.c			ddb
 file ddb/db_break.c			ddb
