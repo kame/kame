@@ -190,6 +190,11 @@ main(argc, argv)
 		struct fd_set select_fd = fdset;
 
 		timeout = rtsol_check_timer();
+
+		/* with -1, if we have no timeout, we are done (or failed) */
+		if (once && timeout == NULL)
+			break;
+
 		if ((e = select(s + 1, &select_fd, NULL, NULL, timeout)) < 1) {
 			if (e < 0) {
 				warnmsg(LOG_ERR, __FUNCTION__, "select: %s",
@@ -203,6 +208,7 @@ main(argc, argv)
 			rtsol_input(s);
 
 		if (once) {
+			/* with -1, if all if have got RA packet, we are done */
 			struct ifinfo *ifi;
 			for (ifi = iflist; ifi; ifi = ifi->next) {
 				if (ifi->racnt == 0)

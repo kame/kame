@@ -400,7 +400,8 @@ getifa(char *name, struct in6_ifaddr *ifap)
 	       name);
 
   bad:
-	kvm_close(kvmd);
+	if (kvmd)
+		kvm_close(kvmd);
 	return -1;
 }
 
