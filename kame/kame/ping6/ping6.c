@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.85 2000/08/31 13:23:46 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.86 2000/09/04 03:02:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,10 +108,12 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <net/if.h>
 #include <net/route.h>
 
-#include <netinet/in_systm.h>
 #include <netinet/in.h>
+#if 0
+#include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
+#endif
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <arpa/inet.h>
