@@ -162,20 +162,12 @@ struct multi6_kludge {
 };
 #endif
 
-/*
- * Determine whether an IP6 address is in a reserved set of addresses
- * that may not be forwarded, or whether datagrams to that destination
- * may be forwarded.
- */
 int
-in6_canforward(src, dst)
-	struct	in6_addr *src, *dst;
+in6_are_addr_samescope(src, dst, srcifp, dstifp)
+	struct in6_addr *src, *dst;
+	struct ifnet *srcifp, *dstifp;
 {
-	if (IN6_IS_ADDR_LINKLOCAL(src) ||
-	   IN6_IS_ADDR_LINKLOCAL(dst) ||
-	   IN6_IS_ADDR_MULTICAST(dst))
-		return(0);
-	return(1);
+	
 }
 
 /*

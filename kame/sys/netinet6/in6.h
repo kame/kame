@@ -640,7 +640,6 @@ struct in6_pktinfo {
 #ifdef _KERNEL
 struct cmsghdr;
 
-int	in6_canforward __P((struct in6_addr *, struct in6_addr *));
 int	in6_cksum __P((struct mbuf *, u_int8_t, u_int32_t, u_int32_t));
 int	in6_localaddr __P((struct in6_addr *));
 int	in6_addrscope __P((struct in6_addr *));
