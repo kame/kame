@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.39 2003/09/02 09:48:46 suz Exp $	*/
+/*	$KAME: vif.c,v 1.40 2004/04/18 15:03:13 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -347,14 +347,6 @@ void start_vif (mifi_t vifi)
 	    k_join(mld6_socket, &allrouters_group.sin6_addr, v->uv_ifindex);
 
 	    /*
-	     * Join the All-MLDv2-routers multicast group on the interface
-	     * if it is configured so.
-	     */
-	    if (v->uv_mld_version & MLDv2)
-		k_join(mld6_socket, &allmldv2routers_group.sin6_addr,
-		       v->uv_ifindex);
-
-	    /*
 	     * Until neighbors are discovered, assume responsibility for sending
 	     * periodic group membership queries to the subnet.  Send the first
 	     * query.
@@ -409,9 +401,7 @@ void stop_vif( mifi_t vifi )
 	{
 		k_leave( mld6_socket , &allpim6routers_group.sin6_addr , v->uv_ifindex );
 		k_leave( mld6_socket , &allrouters_group.sin6_addr , v->uv_ifindex );
-		if (v->uv_mld_version & MLDv2)
-		    k_leave(mld6_socket, &allmldv2routers_group.sin6_addr,
-		    	    v->uv_ifindex);
+
     /*
      * Discard all group addresses.  (No need to tell kernel;
      * the k_del_vif() call will clean up kernel state.)
