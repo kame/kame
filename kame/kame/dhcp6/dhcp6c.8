@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.35 2005/03/01 03:30:42 suz Exp $
+.\"	$KAME: dhcp6c.8,v 1.36 2005/03/17 05:27:01 suz Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -171,10 +171,7 @@ command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .Sh BUGS
 .Nm
 is incomplete and violates DHCPv6 protocol spec, in several aspects.
-In particular, it does not handle address allocation via DHCPv6.
-This is, however, rather intentional;
-the authors believe stateless address autoconfiguration is enough for
-IPv6 and will not implement the stateful method in the future.
+In particular, temporary address assignment is intentionally omitted.
 .Pp
 Some of useful option type values are still not officially assigned.
 The current implementation uses experimental values,

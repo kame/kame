@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.8,v 1.33 2005/01/07 13:25:04 suz Exp $
+.\"	$KAME: dhcp6s.8,v 1.34 2005/03/17 05:27:01 suz Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -50,6 +50,8 @@ can give the following information to clients.
 .Bl -bullet -compact
 .It
 IPv6 prefixes for the requesting site
+.It
+Non-temporary IPv6 addresses
 .It
 A list of the DNS server addresses
 .It
@@ -140,7 +142,7 @@ is incomplete and violates DHCPv6 protocol spec, in several aspects.
 To name a few:
 .Bl -enum
 .It
-it does not assign IPv6 addresses
+it does not assign temporary IPv6 addresses
 .Pq nor will .
 .It
 Some of useful option type values are still not officially assigned.
