@@ -616,15 +616,22 @@ ip_input(struct mbuf *m)
 	/*
 	 * Packet filter
 	 */
-	pfrdr = ip->ip_dst.s_addr;
-	if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
-		goto bad;
-	if (m == NULL)
-		return;
+#ifdef IPSEC
+	if (!ipsec_getnhist(m))
+#else
+	if (1)
+#endif
+	{
+		pfrdr = ip->ip_dst.s_addr;
+		if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+			goto bad;
+		if (m == NULL)
+			return;
 
-	ip = mtod(m, struct ip *);
-	hlen = ip->ip_hl << 2;
-	pfrdr = (pfrdr != ip->ip_dst.s_addr);
+		ip = mtod(m, struct ip *);
+		hlen = ip->ip_hl << 2;
+		pfrdr = (pfrdr != ip->ip_dst.s_addr);
+	}
 #endif
 
 	/*

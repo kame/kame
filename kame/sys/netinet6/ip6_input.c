@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.317 2003/06/26 09:59:45 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.318 2003/06/28 02:21:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -548,12 +548,19 @@ ip6_input(m)
 	/*
 	 * Packet filter
 	 */
-	if (pf_test6(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
-		goto bad;
-	if (m == NULL)
-		return;
+#ifdef IPSEC
+	if (!ipsec_getnhist(m))
+#else
+	if (1)
+#endif
+	{
+		if (pf_test6(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+			goto bad;
+		if (m == NULL)
+			return;
 
-	ip6 = mtod(m, struct ip6_hdr *);
+		ip6 = mtod(m, struct ip6_hdr *);
+	}
 #endif
 
 #ifdef PFIL_HOOKS
