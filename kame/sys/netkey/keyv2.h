@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.8 1999/10/27 16:33:19 sakane Exp $ */
+/* $Id: keyv2.h,v 1.9 1999/11/03 12:57:01 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -238,8 +238,9 @@ struct sadb_x_ipsecrequest {
 					 * This value is true length of bytes.
 					 * Not in units of 64 bits. */
   u_int16_t sadb_x_ipsecrequest_proto;	/* See ipsec.h */
-  u_int16_t sadb_x_ipsecrequest_mode;	/* See ipsec.h. Not SADB_SATYPE_XX */
-  u_int16_t sadb_x_ipsecrequest_level;	/* See ipsec.h */
+  u_int8_t sadb_x_ipsecrequest_mode;	/* See IPSEC_MODE_XX in ipsec.h. */
+  u_int8_t sadb_x_ipsecrequest_level;	/* See IPSEC_LEVEL_XX in ipsec.h */
+  u_int16_t sadb_x_ipsecrequest_reqid;	/* See ipsec.h */
 
   /*
    * followed by source IP address of SA, and immediately followed by
