@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.324 2003/08/27 18:23:26 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.325 2003/08/27 19:12:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1768,11 +1768,10 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 
 			/*
 			 * XXX: We copy the whole header even if a
-			 * jumbo payload option is included, which
-			 * option is to be removed before returning
-			 * in the RFC 2292.
-			 * Note: this constraint is removed in
-			 * 2292bis.
+			 * jumbo payload option is included, the option which
+			 * is to be removed before returning according to
+			 * RFC2292.
+			 * Note: this constraint is removed in 2292bis.
 			 */
 			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
 			    IS2292(IPV6_2292HOPOPTS, IPV6_HOPOPTS),
