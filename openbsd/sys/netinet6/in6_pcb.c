@@ -210,7 +210,9 @@ in6_pcbbind(inp, nam)
       if (lport)
 	{
 	  struct inpcb *t;
+#if 0
 	  struct in_addr fa,la;
+#endif
 
 	  /* Question:  Do we wish to continue the Berkeley tradition of
 	     ports < IPPORT_RESERVED be only for root? 
@@ -224,6 +226,7 @@ in6_pcbbind(inp, nam)
 	      (error = suser(p->p_ucred, &p->p_acflag)))
 	    return error;
 
+#if 0
 	  if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 	    {
 	      fa.s_addr = 0;
@@ -235,6 +238,7 @@ in6_pcbbind(inp, nam)
 
 	    }
 	  else
+#endif
 	    {
 	      t = in_pcblookup(head, (struct in_addr *)&zeroin6_addr, 0,
 			(struct in_addr *)&sin6->sin6_addr, lport, wild);
