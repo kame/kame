@@ -249,8 +249,13 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	extern int errno, optind;
+#ifndef __NetBSD__
+	extern int errno;
+#endif
+#ifdef __FreeBSD__ && __FreeBSD__ < 3
+	extern int optind;
 	extern char *optarg;
+#endif
 	struct itimerval itimer;
 	struct sockaddr_in6 from;
 	struct timeval timeout;
