@@ -30,7 +30,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <sys/errno.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #if TIME_WITH_SYS_TIME
@@ -43,6 +42,7 @@
 #  include <time.h>
 # endif
 #endif
+#include <errno.h>
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

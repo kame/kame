@@ -30,7 +30,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <sys/errno.h>
 #include <sys/ioctl.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
@@ -48,6 +47,7 @@
 #endif
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdarg.h>
