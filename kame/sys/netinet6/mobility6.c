@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.10 2002/08/26 12:59:14 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.11 2002/09/23 10:21:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,7 @@ mobility6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
+	struct mbuf *n; /* for ip6aux */
 	struct ip6_hdr *ip6;
 	struct ip6_mobility *mh6;
 	int off = *offp, mh6len;
@@ -193,7 +194,19 @@ mobility6_input(mp, offp, proto)
 		break;
 
 	default:
-		/* XXX */
+		/* send an binding error message. */
+		n = ip6_findaux(m);
+		if (n) {
+			struct ip6aux *ip6a;
+			struct sockaddr_in6 src_sa;
+			ip6a = mtod(n, struct ip6aux *);
+			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
+				src_sa = ip6a->ip6a_src;
+				src_sa.sin6_addr = ip6a->ip6a_coa;
+				(void)mobility6_send_be(ip6a->ip6a_dst,
+				    &src_sa, ip6a->ip6a_src);
+			}
+		}
 		m_freem(m);
 		mip6stat.mip6s_unknowntype++;
 		return (IPPROTO_DONE);
@@ -203,4 +216,48 @@ mobility6_input(mp, offp, proto)
 	*offp = off;
 
 	return (mh6->ip6m_pproto);
+}
+
+/*
+ * send binding error message.
+ * XXX duplicated code.  see dest6_send_be().
+ */
+static int
+mobility6_send_be(src, dst, home)
+	struct sockaddr_in6 *src;
+	struct sockaddr_in6 *dst;
+	struct sockaddr_in6 *home;
+{
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	/*
+	 * XXX a binding message must be rate limited (per host?).
+	 */
+
+	init_ip6pktopts(&opt);
+
+	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
+	if (m == NULL)
+		return (ENOMEM);
+
+	error = mip6_ip6me_create(&opt.ip6po_mobility, src, dst,
+				  IP6ME_STATUS_UNKNOWN_MH_TYPE, home);
+	if (error) {
+		m_freem(m);
+		goto free_ip6pktopts;
+	}
+
+	/* output a binding missing message. */
+	mip6stat.mip6s_obe++;
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error)
+		goto free_ip6pktopts;
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (error);
 }
