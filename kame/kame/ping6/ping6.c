@@ -1160,13 +1160,23 @@ pr_pack(buf, cc, mhdr)
 						if (cp + 1 < end && *cp)
 							printf(".");
 					} else {
-						/* terminating dot */
-						printf(".");
+						if (cp == end) {
+							/* FQDN */
+							printf(".");
+						} else if (cp + 1 == end &&
+							   *cp == '\0') {
+							/* truncated */
+						} else {
+							/* invalid */
+							printf("???");
+						}
+						break;
 					}
 				}
+		fqdnnameend:;
 			}
 			if (options & F_VERBOSE) {
-				long ttl;
+				int32_t ttl;
 				int comma = 0;
 
 				(void)printf(" (");
@@ -1186,19 +1196,18 @@ pr_pack(buf, cc, mhdr)
 					/* case of refusion, unkown */
 					goto fqdnend;
 				}
-				ttl = ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
+				ttl = (int32_t)ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
 				if (comma)
 					printf(",");
 				if (!(ni->ni_flags & NI_FQDN_FLAG_VALIDTTL))
 					(void)printf("TTL=%d:meaningless",
 						     (int)ttl);
 				else {
-					if (ttl < 0)
+					if (ttl < 0) {
 						(void)printf("TTL=%d:invalid",
-							     (int)ttl);
-					else
-						(void)printf("TTL=%d",
-							     (int)ttl);
+						    ttl);
+					} else
+						(void)printf("TTL=%d", ttl);
 				}
 				comma++;
 
