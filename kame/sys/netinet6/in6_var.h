@@ -414,7 +414,7 @@ extern struct icmp6_ifstat **icmp6_ifstat;
 extern size_t icmp6_ifstatmax;
 #define in6_ifstat_inc(ifp, tag) \
 do {								\
-	if ((ifp) && (ifp)->if_index < if_index			\
+	if ((ifp) && (ifp)->if_index <= if_index		\
 	 && (ifp)->if_index < in6_ifstatmax			\
 	 && in6_ifstat && in6_ifstat[(ifp)->if_index]) {	\
 		in6_ifstat[(ifp)->if_index]->tag++;		\
