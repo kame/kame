@@ -37,6 +37,9 @@ afterinstall:
 			cp ../$$i $(PREFIX)/share/doc/kame; \
 		fi \
 	done
+	cp kame/mip6config/README_MIP6.txt $(PREFIX)/share/doc/kame
+	cp kame/mip6config/QUICKSTART $(PREFIX)/share/doc/kame
+	cp ${.CURDIR}/INSTALL ${PREFIX}/share/doc/kame/INSTALL.openbsd
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
 		kame/etc/MAKEDEV.altq /dev
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \

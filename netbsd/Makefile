@@ -40,6 +40,8 @@ afterinstall:
 			cp ${.CURDIR}/../$$i ${DESTDIR}${PREFIX}/share/doc/kame; \
 		fi \
 	done
+	cp kame/mip6config/README_MIP6.txt $(PREFIX)/share/doc/kame
+	cp kame/mip6config/QUICKSTART $(PREFIX)/share/doc/kame
 	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.netbsd
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
 		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
