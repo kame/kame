@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1337 2000/10/15 14:43:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.1338 2000/10/15 20:25:45 sumikawa Exp $
 
 <200010>
+Mon Oct 16 05:13:56 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/mozilla: upgrade to M18
+
 2000-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_mtudisc_update): update path
 	MTU information only when a corresponding host route already
