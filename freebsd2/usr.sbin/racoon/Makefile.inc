@@ -14,6 +14,9 @@ CFLAGS+=-I/usr/local/include/openssl
 CFLAGS+=-I/usr/local/include/ssleay
 .elif exists(/usr/local/ssl/include)
 CFLAGS+=-I/usr/local/ssl/include
+.if exists(/usr/local/ssl/include/openssl)
+CFLAGS+=-I/usr/local/ssl/include/openssl
+.endif
 .endif
 
 LDADD+=	-ly -ll
