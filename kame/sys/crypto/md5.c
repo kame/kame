@@ -1,4 +1,4 @@
-/*	$KAME: md5.c,v 1.4 2000/03/27 04:36:22 sumikawa Exp $	*/
+/*	$KAME: md5.c,v 1.5 2000/11/08 06:13:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,7 +32,11 @@
 #include <sys/types.h>
 #include <sys/cdefs.h>
 #include <sys/time.h>
+#ifdef _KERNEL
 #include <sys/systm.h>
+#else
+#include <string.h>
+#endif
 #include <crypto/md5.h>
 
 #define SHIFT(X, s) (((X) << (s)) | ((X) >> (32 - (s))))

@@ -23,7 +23,11 @@
 #include	<sys/cdefs.h>
 #include	<sys/param.h>
 #include	<sys/types.h>
+#ifdef _KERNEL
 #include	<sys/systm.h>
+#else
+#include	<string.h>
+#endif
 #include	<machine/endian.h>
 
 #if BYTE_ORDER == LITTLE_ENDIAN
