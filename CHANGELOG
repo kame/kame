@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.919 2000/05/22 22:15:12 sakane Exp $
+$Id: CHANGELOG,v 1.920 2000/05/22 22:41:26 sakane Exp $
 
 <200005>
+Tue May 23 07:41:08 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	don't bark when the life duration of attribute in SA payload is
+	encoded TV format.  It's allowed by RFC.
+
 Tue May 23 07:14:59 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	some fixes.
