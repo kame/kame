@@ -203,6 +203,30 @@ in6_pcbbind(inp, nam)
 			 */
 			if (so->so_options & SO_REUSEADDR)
 				reuseport = SO_REUSEADDR | SO_REUSEPORT;
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+			struct ifaddr *ia = NULL;
+
+			sin6->sin6_port = 0;  /*
+					       * Yechhhh, because of upcoming
+					       * call to ifa_ifwithaddr(), which
+					       * does bcmp's over the PORTS as
+					       * well.  (What about flow?)
+					       */
+			sin6->sin6_flowinfo = 0;
+			if ((ia = ifa_ifwithaddr((struct sockaddr *)sin6))
+			    == NULL)
+				return EADDRNOTAVAIL;
+
+			/*
+			 * XXX: bind to an anycast address might accidentally
+			 * cause sending a packet with anycast source address.
+			 * We should allow to bind to a deprecated address, since
+			 * the application dare to use it.
+			 */
+			if (ia &&
+			    ((struct in6_ifaddr *)ia)->ia6_flags &
+			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|IN6_IFF_DETACHED))
+				return(EADDRNOTAVAIL);
 		}
 #if 0 /* we don't support it */
 		else if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
