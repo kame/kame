@@ -1,4 +1,4 @@
-$Id: TODO,v 1.21 2000/09/21 06:09:22 itojun Exp $
+$Id: TODO,v 1.22 2000/09/21 20:00:18 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -9,6 +9,8 @@ o The documents for users convenience.
 o split log file based on client.  printf-like config directive, i.e.
   "logfile racoon.%s.log", should be useful here.
 o fix flag for logging
+o IPComp SA with wellknown CPI in CPI field.  how to handle it?
+  if wellknown CPI is used in IKE negotiation, we will end up installing it.
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
