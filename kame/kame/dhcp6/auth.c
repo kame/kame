@@ -1,4 +1,4 @@
-/*	$KAME: auth.c,v 1.2 2004/06/12 10:43:34 jinmei Exp $	*/
+/*	$KAME: auth.c,v 1.3 2004/06/17 13:09:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -111,11 +111,8 @@ dhcp6_validate_key(key)
 	if (key->expire == 0)	/* never expire */
 		return (0);
 
-	if (time(&now) == -1) {
-		dprintf(LOG_ERR, FNAME, "cannot get current time: %s",
-		    strerror(errno));
+	if (time(&now) == -1)
 		return (-1);	/* treat it as expiration (XXX) */
-	}
 
 	if (now > key->expire)
 		return (-1);
@@ -135,17 +132,14 @@ dhcp6_calc_mac(buf, len, proto, alg, off, key)
 
 	/* right now, we don't care about the protocol */
 
-	if (alg != DHCP6_AUTHALG_HMACMD5) {
-		dprintf(LOG_ERR, FNAME, "unsupported algorithm (%d)", alg);
+	if (alg != DHCP6_AUTHALG_HMACMD5)
 		return (-1);
-	}
 
 	if (off + MD5_DIGESTLENGTH > len) {
 		/*
 		 * this should be assured by the caller, but check it here
 		 * for safety.
 		 */
-		dprintf(LOG_ERR, FNAME, "message is too short for signing");
 		return (-1);
 	}
 
@@ -172,15 +166,11 @@ dhcp6_verify_mac(buf, len, proto, alg, off, key)
 
 	/* right now, we don't care about the protocol */
 
-	if (alg != DHCP6_AUTHALG_HMACMD5) {
-		dprintf(LOG_ERR, FNAME, "unsupported algorithm (%d)", alg);
+	if (alg != DHCP6_AUTHALG_HMACMD5)
 		return (-1);
-	}
 
-	if (off + MD5_DIGESTLENGTH > len) {
-		dprintf(LOG_INFO, FNAME, "message is too short for MAC");
+	if (off + MD5_DIGESTLENGTH > len)
 		return (-1);
-	}
 
 	/*
 	 * Copy the MAC value and clear the field.
