@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: message.c,v 1.1 2000/01/07 15:08:34 fujisawa Exp $
+ *	$Id: message.c,v 1.2 2000/05/22 10:01:49 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -693,7 +693,7 @@ rewriteRR(int ftype, int ttype, struct _RR *rr)
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_addr = ((struct sockaddr_in6 *)natptPrefix->ai_addr)->sin6_addr;
-	sin6->sin6_addr.s6_addr[12] = sin4->sin_addr.s_addr;
+	*((struct in_addr *)&sin6->sin6_addr.s6_addr[12]) = sin4->sin_addr;
 	rr->RData = (char *)sin6;
 	xfree(sin4);
     }
