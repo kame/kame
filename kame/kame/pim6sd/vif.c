@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.30 2002/12/15 04:23:23 suz Exp $	*/
+/*	$KAME: vif.c,v 1.31 2002/12/15 04:24:35 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -211,11 +211,11 @@ int init_reg_vif()
 	v = &uvifs[numvifs];
 	if (( numvifs+1 ) == MAXMIFS )
 	{
-     /* Exit the program! The PIM router must have a Register vif */
-    log(LOG_ERR, 0,
-        "cannot install the Register vif: too many interfaces");
-    /* To make lint happy */
-    return (FALSE);
+	     /* Exit the program! The PIM router must have a Register vif */
+	    log(LOG_ERR, 0,
+		"cannot install the Register vif: too many interfaces");
+	    /* To make lint happy */
+	    return (FALSE);
 	}
 
     /*
