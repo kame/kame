@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.105 2000/08/18 05:28:19 suz Exp $	*/
+/*	$KAME: in6.c,v 1.106 2000/08/25 10:32:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1360,7 +1360,17 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				continue;
 			if (!cmp)
 				break;
+
 			bcopy(IFA_IN6(ifa), &candidate, sizeof(candidate));
+#ifndef SCOPEDROUTING
+			/*
+			 * XXX: this is adhoc, but is necessary to allow
+			 * a user to specify fe80::/64 (not /10) for a
+			 * link-local address.
+			 */
+			if (IN6_IS_ADDR_LINKLOCAL(&candidate))
+				candidate.s6_addr16[1] = 0;
+#endif
 			candidate.s6_addr32[0] &= mask.s6_addr32[0];
 			candidate.s6_addr32[1] &= mask.s6_addr32[1];
 			candidate.s6_addr32[2] &= mask.s6_addr32[2];
@@ -1373,12 +1383,32 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		ia = ifa2ia6(ifa);
 
 		if (cmd == SIOCGLIFADDR) {
+#ifndef SCOPEDROUTING
+			struct sockaddr_in6 *s6;
+#endif
+
 			/* fill in the if_laddrreq structure */
 			bcopy(&ia->ia_addr, &iflr->addr, ia->ia_addr.sin6_len);
-
+#ifndef SCOPEDROUTING		/* XXX see above */
+			s6 = (struct sockaddr_in6 *)&iflr->addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
+				s6->sin6_addr.s6_addr16[1] = 0;
+				s6->sin6_scope_id =
+					in6_addr2scopeid(ifp, &s6->sin6_addr);
+			}
+#endif
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
 				bcopy(&ia->ia_dstaddr, &iflr->dstaddr,
 					ia->ia_dstaddr.sin6_len);
+#ifndef SCOPEDROUTING		/* XXX see above */
+				s6 = (struct sockaddr_in6 *)&iflr->dstaddr;
+				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
+					s6->sin6_addr.s6_addr16[1] = 0;
+					s6->sin6_scope_id =
+						in6_addr2scopeid(ifp,
+								 &s6->sin6_addr);
+				}
+#endif
 			} else
 				bzero(&iflr->dstaddr, sizeof(iflr->dstaddr));
 
