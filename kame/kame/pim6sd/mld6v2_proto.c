@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.44 2004/06/14 08:16:03 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.45 2004/06/15 09:57:00 suz Exp $
  */
 
 /*
@@ -237,7 +237,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     register struct uvif *v;
     struct sockaddr_in6 group_sa = { sizeof(group_sa), AF_INET6 };
     struct sockaddr_in6 source_sa = { sizeof(source_sa), AF_INET6 };
-    struct listaddr *g, *s;
+    struct listaddr *g = NULL, *s;
     struct in6_addr *group;
     struct mldv2_hdr *mldh;
     int             tmo;
@@ -374,10 +374,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	IF_DEBUG(DEBUG_MLD)
 		log_msg(LOG_DEBUG, 0, "Group-Specific-Query");
 
-	for (g = v->uv_groups; g != NULL; g = g->al_next) {
-		if (inet6_equal(&group_sa, &g->al_addr))
-			break;
-	}
+	check_multicastV2_listener(v, &group_sa, &g, NULL);
 	if (g == NULL) {
 		log_msg(LOG_DEBUG, 0, "do nothing due to a lack of a "
 			"correspoding group record");
@@ -899,16 +896,14 @@ mld_shift_to_v2mode(arg)
 	struct sockaddr_in6 *grp = &cbk->g->al_addr;
 	mifi_t mifi = cbk->mifi;
 	struct uvif *v = &uvifs[mifi];
-	struct listaddr *g;
+	struct listaddr *g = NULL;
 
 	log_msg(LOG_DEBUG, 0,
 	    "shift back mode from MLDv1-compat to MLDv2 for %s on Mif %s",
 	    sa6_fmt(grp), v->uv_name);
 
 	/* locate group info from this interface */
-	for (g = v->uv_groups; g != NULL; g = g->al_next)
-		if (inet6_equal(&g->al_addr, grp))
-			break;
+	check_multicastV2_listener(v, grp, &g, NULL);
 	if (g == NULL) {
 		log_msg(LOG_ERR, 0,
 		    "tried to shift back to MLDv2 mode for %s on Mif %s,"
