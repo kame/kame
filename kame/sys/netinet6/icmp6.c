@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.175 2000/12/12 05:12:38 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.176 2000/12/21 01:50:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,6 +132,29 @@
 
 #include <net/net_osdep.h>
 
+#ifdef HAVE_NRL_INPCB
+/* inpcb members */
+#define in6pcb		inpcb
+#define in6p_laddr	inp_laddr6
+#define in6p_faddr	inp_faddr6
+#define in6p_icmp6filt	inp_icmp6filt
+#define in6p_route	inp_route
+#define in6p_socket	inp_socket
+#define in6p_flags	inp_flags
+#define in6p_moptions	inp_moptions6
+#define in6p_outputopts	inp_outputopts6
+#define in6p_ip6	inp_ipv6
+#define in6p_flowinfo	inp_flowinfo
+#define in6p_sp		inp_sp
+#define in6p_next	inp_next
+#define in6p_prev	inp_prev
+/* macro names */
+#define sotoin6pcb	sotoinpcb
+/* function names */
+#define in6_pcbdetach	in_pcbdetach
+#define in6_rtchange	in_rtchange
+#endif
+
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
 extern u_char ip6_protox[];
@@ -177,9 +200,7 @@ static int icmp6_redirect_lowat = 1024;
 #endif
 
 static void icmp6_errcount __P((struct icmp6errstat *, int, int));
-#ifndef HAVE_NRL_INPCB
 static int icmp6_rip6_input __P((struct mbuf **, int));
-#endif
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
@@ -936,11 +957,9 @@ icmp6_input(mp, offp, proto)
 		break;
 	}
 
-#ifdef HAVE_NRL_INPCB
-	rip6_input(&m, offp, IPPROTO_ICMPV6);
-#else
+	/* deliver the packet to appropriate sockets */
 	icmp6_rip6_input(&m, *offp);
-#endif
+
 	return IPPROTO_DONE;
 
  freeit:
@@ -2029,7 +2048,6 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	return(copied);
 }
 
-#ifndef HAVE_NRL_INPCB
 /*
  * XXX almost dup'ed code with rip6_input.
  */
@@ -2066,16 +2084,24 @@ icmp6_rip6_input(mp, off)
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	LIST_FOREACH(in6p, &ripcb, inp_list)
+#elif defined(__OpenBSD__)
+	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
+	     in6p != (struct inpcb *)&rawin6pcbtable.inpt_queue;
+	     in6p = in6p->inp_queue.cqe_next)
 #else
 	for (in6p = rawin6pcb.in6p_next;
 	     in6p != &rawin6pcb; in6p = in6p->in6p_next)
 #endif
 	{
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		if ((in6p->inp_vflag & INP_IPV6) == NULL)
+		if ((in6p->inp_vflag & INP_IPV6) == 0)
 			continue;
 #endif
-		if (in6p->in6p_ip6_nxt != IPPROTO_ICMPV6)
+#ifdef HAVE_NRL_INPCB
+		if (!(in6p->in6p_flags & INP_IPV6))
+			continue;
+#endif
+		if (in6p->in6p_ip6.ip6_nxt != IPPROTO_ICMPV6)
 			continue;
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
 		   !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
@@ -2129,7 +2155,6 @@ icmp6_rip6_input(mp, off)
 	}
 	return IPPROTO_DONE;
 }
-#endif /*HAVE_NRL_INPCB*/
 
 /*
  * Reflect the ip6 packet back to the source.
