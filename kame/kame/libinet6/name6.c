@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.6 1999/09/26 12:40:45 jinmei Exp $ */
+/* $Id: name6.c,v 1.7 1999/10/13 02:04:42 k-sugyou Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -513,6 +513,8 @@ gethostbyaddr(const char *src, int len, int af)
 
 	if (saved_hp != NULL)
 		freehostent(saved_hp);
+	saved_hp = NULL;
+
 	saved_hp = getipnodebyaddr(src, len, af, &h_errno);
 	if (af == AF_INET && saved_hp != NULL) {
 		if ((_res.options & RES_INIT) == 0)
