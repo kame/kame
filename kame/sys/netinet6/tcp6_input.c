@@ -75,6 +75,13 @@
  *	@(#)tcp_input.c	8.5 (Berkeley) 4/10/94
  */
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#include "opt_inet.h"
+#ifdef __NetBSD__	/*XXX*/
+#include "opt_ipsec.h"
+#endif
+#endif
+
 #ifndef TUBA_INCLUDE
 #include <sys/param.h>
 #include <sys/systm.h>

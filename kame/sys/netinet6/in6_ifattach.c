@@ -154,7 +154,7 @@ found:
 	if (found_first_ifid) {
 		printf("%s: supplying EUI64: "
 			"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
-			ifp->if_xname,
+			if_name(ifp),
 			first_ifid[0] & 0xff, first_ifid[1] & 0xff,
 			first_ifid[2] & 0xff, first_ifid[3] & 0xff,
 			first_ifid[4] & 0xff, first_ifid[5] & 0xff,
@@ -229,13 +229,13 @@ in6_ifattach(ifp, type, laddr, noloop)
 
 	if (type == IN6_IFT_P2P && found_first_ifid == 0) {
 		printf("%s: no ifid available for IPv6 link-local address\n",
-			ifp->if_xname);
+			if_name(ifp));
 		return;
 	}
 
 	if ((ifp->if_flags & IFF_MULTICAST) == 0) {
 		printf("%s: not multicast capable, IPv6 not enabled\n",
-			ifp->if_xname);
+			if_name(ifp));
 		return;
 	}
 	    
@@ -374,11 +374,11 @@ in6_ifattach(ifp, type, laddr, noloop)
 			switch (error) {
 			case EAFNOSUPPORT:
 				printf("%s: IPv6 not supported\n",
-					ifp->if_xname);
+					if_name(ifp));
 				break;
 			default:
 				printf("%s: SIOCSIFADDR error %d\n",
-					ifp->if_xname, error);
+					if_name(ifp), error);
 				break;
 			}
 
@@ -634,7 +634,7 @@ in6_ifdetach(ifp)
 #ifdef DEBUG
 			else
 				printf("%s: didn't unlink in6ifaddr from "
-				    "list\n", ifp->if_xname);
+				    "list\n", if_name(ifp));
 #endif
 		}
 

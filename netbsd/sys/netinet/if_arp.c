@@ -134,7 +134,9 @@ static	void arptimer __P((void *));
 static	struct llinfo_arp *arplookup __P((struct in_addr *, int, int));
 static	void in_arpinput __P((struct mbuf *));
 
+#if NLOOP > 0
 extern	struct ifnet loif[NLOOP];
+#endif
 LIST_HEAD(, llinfo_arp) llinfo_arp;
 struct	ifqueue arpintrq = {0, 0, 0, 50};
 int	arp_inuse, arp_allocated, arp_intimer;
@@ -328,8 +330,10 @@ arp_rtrequest(req, rt, sa)
 			    LLADDR(SDL(gate)),
 			    SDL(gate)->sdl_alen = 
 			    rt->rt_ifp->if_data.ifi_addrlen);
+#if NLOOP > 0
 			if (useloopback)
 				rt->rt_ifp = &loif[0];
+#endif
 		}
 		break;
 

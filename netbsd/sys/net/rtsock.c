@@ -64,6 +64,8 @@
  *	@(#)rtsock.c	8.7 (Berkeley) 10/12/95
  */
 
+#include "opt_inet.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>

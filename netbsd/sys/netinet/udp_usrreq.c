@@ -63,9 +63,12 @@
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
  */
+
+#include "opt_ipsec.h"
+
 #include "ipkdb.h"
 
-/* MAPPED_ADDR_ENABLE should be revisited */
+/* XXX MAPPED_ADDR_ENABLED should be revisited */
 
 #include <sys/param.h>
 #include <sys/malloc.h>

@@ -70,7 +70,6 @@
 #include <netinet/if_inarp.h>
 #include <net/if_fddi.h>
 #endif /* __NetBSD__ */
-#include <netinet6/in6_systm.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>

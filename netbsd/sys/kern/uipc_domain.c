@@ -36,6 +36,7 @@
  */
 
 #include "opt_inet.h"
+#include "opt_ipsec.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
 #include "opt_iso.h"

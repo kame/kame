@@ -49,7 +49,9 @@ defopt  opt_compat_netbsd.h	COMPAT_09 COMPAT_10 COMPAT_11 COMPAT_12
 				COMPAT_13 COMPAT_NOMID
 
 # networking protocols
-defopt	INET
+defopt	opt_inet.h	INET INET6
+defopt	opt_ipsec.h	IPSEC IPSEC_ESP
+defopt	opt_inet_conf.h	SUBNETSARELOCAL HOSTZEROBROADCAST
 defopt	opt_atalk.h	NETATALK
 defopt	opt_ns.h	NSIP	 	# XNS tunneled over IP
 defopt	opt_iso.h	ISO TPIP	# ISO network stack

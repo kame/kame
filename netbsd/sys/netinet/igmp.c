@@ -39,6 +39,7 @@
  * MULTICAST Revision: 1.3
  */
 
+#include "opt_ipsec.h"
 #include "opt_mrouting.h"
 
 #include <sys/param.h>

@@ -62,6 +62,10 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
+#ifdef __NetBSD__	/*XXX*/
+#include "opt_ipsec.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>

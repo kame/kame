@@ -101,7 +101,6 @@
 #include <netinet/if_ether.h>
 #endif
 
-#include <netinet6/in6_systm.h>
 #include <netinet6/nd6.h>
 #include <netinet6/ip6.h>
 #include <netinet6/mld6_var.h>

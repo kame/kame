@@ -64,6 +64,7 @@
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
  */
 
+#include "opt_ipsec.h"
 #include "opt_mrouting.h"
 
 #include <sys/param.h>

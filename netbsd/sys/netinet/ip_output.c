@@ -102,6 +102,7 @@
  */
 
 #include "opt_pfil_hooks.h"
+#include "opt_ipsec.h"
 #include "opt_mrouting.h"
 
 #include <sys/param.h>

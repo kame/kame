@@ -34,6 +34,12 @@
 #ifndef _NETINET6_AH_H_
 #define _NETINET6_AH_H_
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(_KERNEL) && !defined(_LKM)
+#include "opt_inet.h"
+#endif
+#endif
+
 #include <netkey/keydb.h>		/* for struct secas */
 
 struct ah {

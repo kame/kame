@@ -62,6 +62,10 @@
  *	@(#)raw_ip.c	8.2 (Berkeley) 1/4/94
  */
 
+#ifdef __NetBSD__	/*XXX*/
+#include "opt_ipsec.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -80,7 +84,6 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#include <netinet6/in6_systm.h>
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6_mroute.h>

@@ -101,6 +101,8 @@
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
  */
 
+#include "opt_ipsec.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>

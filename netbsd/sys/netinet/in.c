@@ -102,6 +102,7 @@
  */
 
 #include "opt_inet.h"
+#include "opt_inet_conf.h"
 #include "opt_mrouting.h"
 
 #include <sys/param.h>
