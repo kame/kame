@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.16 2000/03/12 10:47:53 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.17 2000/03/12 10:50:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -444,9 +444,7 @@ stf_checkinner(in6, ifp)
 	 * reject packets with 6to4(broadcast)
 	 */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
-	for (ia4 = in_ifaddr.tqh_first;
-	     ia4;
-	     ia4 = ia4->ia_list.tqe_next)
+	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
 #else
 	for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next)
 #endif
