@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.175 2001/07/23 18:51:26 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.176 2001/07/24 05:30:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -563,6 +563,12 @@ nd6_timer(ignored_arg)
 						 * older rcvif?
 						 */
 						m->m_pkthdr.rcvif = rt->rt_ifp;
+					} else {
+						/*
+						 * noone initialized rcvif
+						 * until this point.
+						 */
+						m->m_pkthdr.rcvif = NULL;
 					}
 					icmp6_error(m, ICMP6_DST_UNREACH,
 						    ICMP6_DST_UNREACH_ADDR, 0);

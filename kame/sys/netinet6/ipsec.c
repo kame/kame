@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.104 2001/07/06 06:16:55 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.105 2001/07/24 05:30:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2815,7 +2815,12 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			 * XXX: should we restrict the error to TCP packets?
 			 * XXX: should we directly notify sockets via
 			 *      pfctlinputs?
+			 *
+			 * Noone have initialized rcvif until this point,
+			 * so clear it.
 			 */
+			if ((state->m->m_flags & M_PKTHDR) != 0)
+				state->m->m_pkthdr.rcvif = NULL;
 			icmp6_error(state->m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADMIN, 0);
 			state->m = NULL; /* icmp6_error freed the mbuf */
