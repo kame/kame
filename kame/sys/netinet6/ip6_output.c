@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.145 2001/01/16 14:14:17 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.146 2001/01/21 06:12:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2257,8 +2257,12 @@ do { \
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (in6p->in6p_inputopts &&
 				    in6p->in6p_inputopts->head) {
-					error = soopt_mcopyout(sopt,
-							       in6p->in6p_inputopts->head);
+					struct mbuf *m;
+					m = m_copym(in6p->in6p_inputopts->head,
+					    M_COPYALL, M_WAIT);
+					error = soopt_mcopyout(sopt, m);
+					if (error == 0)
+						m_freem(m);
 				} else
 					sopt->sopt_valsize = 0;
 #elif defined(HAVE_NRL_INPCB)
@@ -2570,7 +2574,8 @@ do { \
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /*XXX*/
-				m_freem(m);
+				if (error == 0 && m)
+					m_freem(m);
 #endif
 				break;
 			  }
@@ -2596,7 +2601,7 @@ do { \
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /* XXX */
-				if (m)
+				if (error == 0 && m)
 					m_freem(m);
 #endif
 			  }
