@@ -1,4 +1,4 @@
-/*	$KAME: connect.c,v 1.10 2001/09/18 10:49:57 jinmei Exp $ */
+/*	$KAME: connect.c,v 1.11 2001/09/18 11:02:55 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -39,6 +39,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <err.h>
+
+#include "common.h"
 
 void setopthdr __P((int, int));
 void usage __P(());
