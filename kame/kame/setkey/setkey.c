@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.31 2003/09/08 12:31:58 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.32 2003/09/08 12:33:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -538,6 +538,7 @@ dumpkernfs(dir)
 	}
 
 	closedir(p);
+	return (0);
 }
 
 /*------------------------------------------------------------*/
