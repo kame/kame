@@ -11,7 +11,7 @@ ALTQMOD_CBQ_RED?=	1
 ALTQMOD_CBQ_RIO?=	1
 ALTQMOD_CBQ_FLOWVALVE?=	1
 ALTQMOD_INET?=	1
-ALTQMOD_INET6?=	0
+ALTQMOD_INET6?=	1
 
 opt_altq.h:
 	echo "#define CBQ 1" > opt_altq.h

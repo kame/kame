@@ -7,7 +7,7 @@ CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h opt_inet.h
 
 ALTQMOD_INET?=	1
-ALTQMOD_INET6?=	0
+ALTQMOD_INET6?=	1
 
 opt_altq.h:
 	echo "#define CDNR 1" > opt_altq.h

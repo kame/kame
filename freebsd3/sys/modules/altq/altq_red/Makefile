@@ -8,7 +8,7 @@ CLEANFILES+= opt_altq.h opt_inet.h
 
 ALTQMOD_FLOWVALVE?=	1
 ALTQMOD_INET?=	1
-ALTQMOD_INET6?=	0
+ALTQMOD_INET6?=	1
 
 opt_altq.h:
 	echo "#define RED 1" > opt_altq.h
