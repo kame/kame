@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.17 2001/08/14 12:26:05 sakane Exp $	*/
+/*	$KAME: algorithm.h,v 1.18 2001/08/14 14:55:27 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,6 +139,14 @@ struct enc_algorithm {
 	int (*keylen) __P((int));
 };
 
+/* dh group */
+struct dh_algorithm {
+	char *name;
+	int type;
+	int doi;
+	struct dhgroup *dhgroup;
+};
+
 /* ipcomp, auth meth, dh group */
 struct misc_algorithm {
 	char *name;
@@ -167,8 +175,11 @@ extern int alg_ipsec_hmacdef_doi __P((int));
 extern int alg_ipsec_hmacdef_hashlen __P((int));
 
 extern int alg_ipsec_compdef_doi __P((int));
+
 extern int alg_oakley_dhdef_doi __P((int));
 extern int alg_oakley_dhdef_ok __P((int));
+extern struct dhgroup *alg_oakley_dhdef_group __P((int));
+
 extern int alg_oakley_authdef_doi __P((int));
 
 extern int default_keylen __P((int, int));

@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.94 2001/08/14 12:26:06 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.95 2001/08/14 14:55:27 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,7 @@
 #include "handler.h"
 #include "ipsec_doi.h"
 #include "algorithm.h"
+#include "dhgroup.h"
 #include "sainfo.h"
 #include "proposal.h"
 #include "crypto_openssl.h"
@@ -81,21 +82,24 @@
 #define OUTBOUND_SA	0
 #define INBOUND_SA	1
 
-#define INITDHVAL(s, a, d, t)                                                  \
+#define INITDHVAL(a, s, d, t)                                                  \
 do {                                                                           \
-	(a)->v = str2val((s), 16, &(a)->l);                                    \
-	memset(&dhgroup[(d)], 0, sizeof(struct dhgroup));                      \
-	dhgroup[(d)].type = (t);                                               \
-	dhgroup[(d)].prime = vdup(a);                                          \
-	dhgroup[(d)].gen1 = 2;                                                 \
-	dhgroup[(d)].gen2 = 0;                                                 \
+	vchar_t buf;                                                           \
+	buf.v = str2val((s), 16, &buf.l);                                      \
+	memset(&a, 0, sizeof(struct dhgroup));                                 \
+	a.type = (t);                                                          \
+	a.prime = vdup(&buf);                                                  \
+	a.gen1 = 2;                                                            \
+	a.gen2 = 0;                                                            \
 } while(0);
 
-struct dhgroup dhgroup[MAXDHGROUP];
-
-static vchar_t oakley_prime768;
-static vchar_t oakley_prime1024;
-static vchar_t oakley_prime1536;
+struct dhgroup dh_modp768;
+struct dhgroup dh_modp1024;
+struct dhgroup dh_modp1536;
+struct dhgroup dh_modp2048;
+struct dhgroup dh_modp3072;
+struct dhgroup dh_modp4096;
+struct dhgroup dh_modp8192;
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
 #ifdef HAVE_SIGNING_C
@@ -111,16 +115,26 @@ oakley_get_defaultlifetime()
 	return OAKLEY_ATTR_SA_LD_SEC_DEFAULT;
 }
 
-void
+int
 oakley_dhinit()
 {
 	/* set DH MODP */
-	INITDHVAL(OAKLEY_PRIME_MODP768, &oakley_prime768,
+	INITDHVAL(dh_modp768, OAKLEY_PRIME_MODP768,
 		OAKLEY_ATTR_GRP_DESC_MODP768, OAKLEY_ATTR_GRP_TYPE_MODP);
-	INITDHVAL(OAKLEY_PRIME_MODP1024, &oakley_prime1024,
+	INITDHVAL(dh_modp1024, OAKLEY_PRIME_MODP1024,
 		OAKLEY_ATTR_GRP_DESC_MODP1024, OAKLEY_ATTR_GRP_TYPE_MODP);
-	INITDHVAL(OAKLEY_PRIME_MODP1536, &oakley_prime1536,
+	INITDHVAL(dh_modp1536, OAKLEY_PRIME_MODP1536,
 		OAKLEY_ATTR_GRP_DESC_MODP1536, OAKLEY_ATTR_GRP_TYPE_MODP);
+	INITDHVAL(dh_modp2048, OAKLEY_PRIME_MODP2048,
+		OAKLEY_ATTR_GRP_DESC_MODP2048, OAKLEY_ATTR_GRP_TYPE_MODP);
+	INITDHVAL(dh_modp3072, OAKLEY_PRIME_MODP3072,
+		OAKLEY_ATTR_GRP_DESC_MODP3072, OAKLEY_ATTR_GRP_TYPE_MODP);
+	INITDHVAL(dh_modp4096, OAKLEY_PRIME_MODP4096,
+		OAKLEY_ATTR_GRP_DESC_MODP4096, OAKLEY_ATTR_GRP_TYPE_MODP);
+	INITDHVAL(dh_modp8192, OAKLEY_PRIME_MODP8192,
+		OAKLEY_ATTR_GRP_DESC_MODP8192, OAKLEY_ATTR_GRP_TYPE_MODP);
+
+	return 0;
 }
 
 void
@@ -248,40 +262,34 @@ oakley_setdhgroup(group, dhgrp)
 	int group;
 	struct dhgroup **dhgrp;
 {
+	struct dhgroup *g;
+
+	*dhgrp = NULL;	/* just make sure, initialize */
+
+	g = alg_oakley_dhdef_group(group);
+	if (g == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid DH parameter grp=%d.\n", group);
+		return -1;
+	}
+
+	if (!g->type || !g->prime || !g->gen1) {
+		/* unsuported */
+		plog(LLV_ERROR, LOCATION, NULL,
+			"unsupported DH parameters grp=%d.\n", group);
+		return -1;
+	}
+
 	*dhgrp = racoon_calloc(1, sizeof(struct dhgroup));
 	if (*dhgrp == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get DH buffer.\n");
 		return 0;
 	}
-	switch (group) {
-	case OAKLEY_ATTR_GRP_DESC_MODP768:
-	case OAKLEY_ATTR_GRP_DESC_MODP1024:
-	case OAKLEY_ATTR_GRP_DESC_MODP1536:
-	case OAKLEY_ATTR_GRP_DESC_MODP2048:
-	case OAKLEY_ATTR_GRP_DESC_MODP3072:
-	case OAKLEY_ATTR_GRP_DESC_MODP4096:
-	case OAKLEY_ATTR_GRP_DESC_MODP8192:
-		if (group > ARRAYLEN(dhgroup)
-		 || dhgroup[group].type == 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"invalid DH parameter grp=%d.\n", group);
-			racoon_free(*dhgrp);
-			*dhgrp = NULL;
-			return -1;
-		}
-		/* set defined dh vlaues */
-		memcpy(*dhgrp, &dhgroup[group], sizeof(dhgroup[group]));
-		(*dhgrp)->prime = vdup(dhgroup[group].prime);
-		break;
-	default:
-		if (!(*dhgrp)->type || !(*dhgrp)->prime || !(*dhgrp)->gen1) {
-			/* XXX unsuported */
-			plog(LLV_ERROR, LOCATION, NULL,
-				"unsupported DH parameters grp=%d.\n", group);
-			return -1;
-		}
-	}
+
+	/* set defined dh vlaues */
+	memcpy(*dhgrp, g, sizeof(*g));
+	(*dhgrp)->prime = vdup(g->prime);
 
 	return 0;
 }

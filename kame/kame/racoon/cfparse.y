@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.105 2001/08/14 05:54:51 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.106 2001/08/14 14:55:27 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -442,7 +442,7 @@ policy_specswrap
 			/*
 			if (cur_spidx->policy->pfs_group != 0
 			 && oakley_setdhgroup(cur_spidx->policy->pfs_group,
-					&cur_spidx->policy->pfsgrp) < 0) {
+					&cur_spidx->policy->pfsgrp) == -1) {
 				yyerror("failed to set DH value.\n");
 				return -1;
 			}
@@ -1497,11 +1497,11 @@ expand_isakmpspec(prop_no, trns_no, types,
 	int j;
 	char tb[10];
 	plog(LLV_DEBUG2, LOCATION, NULL,
-		"p:%d t:%d ", prop_no, trns_no);
+		"p:%d t:%d\n", prop_no, trns_no);
 	for (j = class; j < MAXALGCLASS; j++) {
 		snprintf(tb, sizeof(tb), "%d", types[j]);
 		plog(LLV_DEBUG2, LOCATION, NULL,
-			"%s%s%s%s ",
+			"%s%s%s%s\n",
 			s_algtype(j, types[j]),
 			types[j] ? "(" : "",
 			tb[0] == '0' ? "" : tb,

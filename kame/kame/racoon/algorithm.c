@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.18 2001/08/14 13:45:28 itojun Exp $	*/
+/*	$KAME: algorithm.c,v 1.19 2001/08/14 14:55:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,6 +40,7 @@
 #include "debug.h"
 
 #include "crypto_openssl.h"
+#include "dhgroup.h"
 #include "algorithm.h"
 #include "oakley.h"
 #include "isakmp_var.h"
@@ -213,14 +214,21 @@ static struct misc_algorithm oakley_authdef[] = {
 { "gssapi_krb",	algtype_gssapikrb,	OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB, },
 };
 
-static struct misc_algorithm oakley_dhdef[] = {
-{ "modp768",	algtype_modp768,	OAKLEY_ATTR_GRP_DESC_MODP768, },
-{ "modp1024",	algtype_modp1024,	OAKLEY_ATTR_GRP_DESC_MODP1024, },
-{ "modp1536",	algtype_modp1536,	OAKLEY_ATTR_GRP_DESC_MODP1536, },
-{ "modp2048",	algtype_modp2048,	OAKLEY_ATTR_GRP_DESC_MODP2048, },
-{ "modp3072",	algtype_modp3072,	OAKLEY_ATTR_GRP_DESC_MODP3072, },
-{ "modp4096",	algtype_modp4096,	OAKLEY_ATTR_GRP_DESC_MODP4096, },
-{ "modp8192",	algtype_modp8192,	OAKLEY_ATTR_GRP_DESC_MODP8192, },
+static struct dh_algorithm oakley_dhdef[] = {
+{ "modp768",	algtype_modp768,	OAKLEY_ATTR_GRP_DESC_MODP768,
+		&dh_modp768, },
+{ "modp1024",	algtype_modp1024,	OAKLEY_ATTR_GRP_DESC_MODP1024,
+		&dh_modp1024, },
+{ "modp1536",	algtype_modp1536,	OAKLEY_ATTR_GRP_DESC_MODP1536,
+		&dh_modp1536, },
+{ "modp2048",	algtype_modp2048,	OAKLEY_ATTR_GRP_DESC_MODP2048,
+		&dh_modp2048, },
+{ "modp3072",	algtype_modp3072,	OAKLEY_ATTR_GRP_DESC_MODP3072,
+		&dh_modp3072, },
+{ "modp4096",	algtype_modp4096,	OAKLEY_ATTR_GRP_DESC_MODP4096,
+		&dh_modp4096, },
+{ "modp8192",	algtype_modp8192,	OAKLEY_ATTR_GRP_DESC_MODP8192,
+		&dh_modp8192, },
 };
 
 static struct hash_algorithm *alg_oakley_hashdef __P((int));
@@ -228,7 +236,7 @@ static struct hmac_algorithm *alg_oakley_hmacdef __P((int));
 static struct enc_algorithm *alg_oakley_encdef __P((int));
 static struct enc_algorithm *alg_ipsec_encdef __P((int));
 static struct hmac_algorithm *alg_ipsec_hmacdef __P((int));
-static struct misc_algorithm *alg_oakley_dhdef __P((int));
+static struct dh_algorithm *alg_oakley_dhdef __P((int));
 
 /* oakley hash algorithm */
 static struct hash_algorithm *
@@ -576,7 +584,7 @@ alg_ipsec_compdef_doi(type)
 }
 
 /* dh algorithm */
-static struct misc_algorithm *
+static struct dh_algorithm *
 alg_oakley_dhdef(doi)
 	int doi;
 {
@@ -595,7 +603,7 @@ int
 alg_oakley_dhdef_ok(doi)
 	int doi;
 {
-	struct misc_algorithm *f;
+	struct dh_algorithm *f;
 
 	f = alg_oakley_dhdef(doi);
 	if (f == NULL)
@@ -616,6 +624,19 @@ alg_oakley_dhdef_doi(type)
 			break;
 		}
 	return res;
+}
+
+struct dhgroup *
+alg_oakley_dhdef_group(doi)
+	int doi;
+{
+	struct dh_algorithm *f;
+
+	f = alg_oakley_dhdef(doi);
+	if (f == NULL || f->dhgroup == NULL)
+		return NULL;
+
+	return f->dhgroup;
 }
 
 /* authentication method */

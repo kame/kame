@@ -1,4 +1,4 @@
-/*	$KAME: strnames.c,v 1.20 2001/08/09 07:32:19 sakane Exp $	*/
+/*	$KAME: strnames.c,v 1.21 2001/08/14 14:55:27 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -620,6 +620,10 @@ static struct ksmap name_attr_isakmp_desc[] = {
 { OAKLEY_ATTR_GRP_DESC_EC2N155,		"EC2N group on GP[2^155]",	NULL },
 { OAKLEY_ATTR_GRP_DESC_EC2N185,		"EC2N group on GP[2^185]",	NULL },
 { OAKLEY_ATTR_GRP_DESC_MODP1536,	"1536-bit MODP group",	NULL },
+{ OAKLEY_ATTR_GRP_DESC_MODP2048,	"2048-bit MODP group",	NULL },
+{ OAKLEY_ATTR_GRP_DESC_MODP3072,	"3072-bit MODP group",	NULL },
+{ OAKLEY_ATTR_GRP_DESC_MODP4096,	"4096-bit MODP group",	NULL },
+{ OAKLEY_ATTR_GRP_DESC_MODP8192,	"8192-bit MODP group",	NULL },
 };
 
 char *
