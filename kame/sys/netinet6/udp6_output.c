@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.25 2001/05/21 05:43:59 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.26 2001/05/21 09:29:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -297,7 +297,7 @@ udp6_output(in6p, m, addr6, control)
 			error = ENOTCONN;
 			goto release;
 		}
-		if (IN6_IS_ADDR_V4MAPPED(faddr)) {
+		if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr)) {
 #ifdef __OpenBSD__		/* does not support mapped addresses */
 			if (1)
 #else
