@@ -907,7 +907,7 @@ findpcb:
 #endif
 					ip6_savecontrol(inp, ip6, m,
 							&newopts,
-							&inp->in6p_options);
+							&inp->in6p_inputopts);
 					ip6_update_recvpcbopt(&inp->in6p_inputopts,
 							      &newopts);
 					if (newopts.head) {
