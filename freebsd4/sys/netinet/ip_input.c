@@ -1541,8 +1541,11 @@ ip_forward(m, srcrt)
 	/*
 	 * Save at most 64 bytes of the packet in case
 	 * we need to generate an ICMP message to the src.
+	 * Pullup to avoid sharing mbuf cluster between m and mcopy.
 	 */
-	mcopy = m_copy(m, 0, imin((int)ip->ip_len, 64));
+	mcopy = m_copym(m, 0, imin((int)ip->ip_len, 64), M_DONTWAIT);
+	if (mcopy)
+		mcopy = m_pullup(mcopy, ip->ip_hl << 2);
 
 	/*
 	 * If forwarding packet using same interface that it came in on,
