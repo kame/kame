@@ -1,3 +1,4 @@
+bin/afslog
 bin/compile_et
 bin/des
 bin/ftp
@@ -11,6 +12,7 @@ bin/kx
 bin/login
 bin/otp
 bin/otpprint
+bin/pagsh
 bin/pfrom
 bin/rsh
 bin/rxtelnet
@@ -51,6 +53,7 @@ include/otp.h
 include/parse_bytes.h
 include/parse_time.h
 include/parse_units.h
+include/rc4.h
 include/resolve.h
 include/roken-common.h
 include/roken.h
@@ -62,6 +65,8 @@ include/ss/ss.h
 @unexec install-info --delete %D/info/heimdal.info %D/info/dir
 info/heimdal.info
 @exec install-info %D/info/heimdal.info %D/info/dir
+lib/lib45.a
+lib/lib45.la
 lib/libasn1.a
 lib/libasn1.la
 lib/libcom_err.a
@@ -77,6 +82,8 @@ lib/libkadm5clnt.a
 lib/libkadm5clnt.la
 lib/libkadm5srv.a
 lib/libkadm5srv.la
+lib/libkafs.a
+lib/libkafs.la
 lib/libkrb5.a
 lib/libkrb5.la
 lib/libotp.a
