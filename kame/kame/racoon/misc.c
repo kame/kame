@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.19 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: misc.c,v 1.20 2000/12/15 15:28:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,26 +38,34 @@
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
+#include <ctype.h>
 
 #include "var.h"
 #include "misc.h"
 #include "debug.h"
 
-int
+#if 0
+static int bindump __P((void *, size_t));
+
+static int
 bindump(buf0, len)
         void *buf0;
         size_t len;
 {
-	caddr_t buf = (caddr_t)buf0;
+	unsigned char *buf = (unsigned char *)buf0;
 	size_t i;
 
 	for (i = 0; i < len; i++) {
-		printf("%c", (unsigned char)buf[i]);
+		if ((buf[i] & 0x80) || !isprint(buf[i]))
+			printf("\\x%x", buf[i]);
+		else
+			printf("%c", buf[i]);
 	}
 	printf("\n");
 
 	return 0;
 }
+#endif
 
 int
 hexdump(buf0, len)
