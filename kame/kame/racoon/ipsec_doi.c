@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.73 2000/05/31 15:06:55 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.74 2000/05/31 17:45:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2895,7 +2895,7 @@ ipsecdoi_id2sockaddr(
 		}
 
 		/* sanity check */
-		if (buf->l < (alen <<3))
+		if (buf->l < alen)
 			return -1;
 
 		/* get subnet mask length */
