@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2401 2003/05/29 09:03:14 sakane Exp $
+$KAME: CHANGELOG,v 1.2402 2003/05/30 01:26:15 itojun Exp $
 
 <200305>
+Fri May 30 10:25:33 JST 2003  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_input.c: inherit IPV6_V6ONLY bit from
+	  listening socket.  NetBSD PR 21713
+
 Thu May 29 18:01:28 JST 2003 sakane@kame.net
 	* kame/racoon
 	the patches from <Francis.Dupont@enst-bretagne.fr>
