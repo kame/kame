@@ -270,7 +270,13 @@ int in6_gif_input(mp, offp, proto)
 		ip6stat.ip6s_nogif++;
 		return IPPROTO_DONE;
 	}
-	
+
+	if ((gifp->if_flags & IFF_UP) == 0) {
+		m_freem(m);
+		ip6stat.ip6s_nogif++;
+		return IPPROTO_DONE;
+	}
+
 	otos = ip6->ip6_flow;
 	m_adj(m, *offp);
 

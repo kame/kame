@@ -330,6 +330,12 @@ in_gif_input(m, va_alist)
 		return;
 	}
 
+	if ((gifp->if_flags & IFF_UP) == 0) {
+		m_freem(m);
+		ipstat.ips_nogif++;
+		return;
+	}
+
 	otos = ip->ip_tos;
 	m_adj(m, off);
 
