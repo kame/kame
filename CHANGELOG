@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2004 2001/12/12 15:35:24 sakane Exp $
+$KAME: CHANGELOG,v 1.2005 2001/12/13 05:39:59 fujisawa Exp $
 
 <200112>
 Thu Dec 13 00:31:47 JST 2001 sakane@kame.net
@@ -56,7 +56,7 @@ Thu Dec 13 00:31:47 JST 2001 sakane@kame.net
 	      bytes.
 
 	      There is a host that sends a IPv4 packet which DF bit is
-	      set but does not listen an ICMP message.  Or an ICMP
+	      set but does not listen to an ICMP message.  Or an ICMP
 	      "packet too big" message may be dropped at a firewall
 	      prior to this host.
 
