@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.46 2000/06/12 18:11:07 itojun Exp $
+$Id: COVERAGE,v 1.47 2000/06/12 18:13:14 itojun Exp $
 
 
 x: supported/integrated
@@ -116,6 +116,8 @@ NAT/PT		(+)	-	-	-	notyet	-	-
 mobile-ip6	(+)	-	-	-	notyet	-	-
 
 IPv6 RPC	-	x	-	-	notyet	-	-
+
+IPv6 NFS	-	x	-	-	notyet	-	-
 
 resolver support for IPv6 transport
 		(+)	(*1)	-	-	notyet	-	-
