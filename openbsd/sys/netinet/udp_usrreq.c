@@ -459,9 +459,12 @@ udp_input(m, va_alist)
 #endif /* INET6 */
 					    &srcsa.sa, n, opts) == 0) {
 						m_freem(n);
+						if (opts)
+							m_freem(opts);
 						udpstat.udps_fullsock++;
 					} else
 						sorwakeup(last);
+					opts = NULL;
 				}
 			}
 			last = inp->inp_socket;
