@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.66 2004/03/03 05:39:59 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.67 2004/03/27 03:27:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,7 +71,7 @@
 #include "vendorid.h"
 
 #ifdef HAVE_GSSAPI
-#include "gssapi.h"
+#include "auth_gssapi.h"
 #endif
 
 static vchar_t *ident_ir2mx __P((struct ph1handle *));

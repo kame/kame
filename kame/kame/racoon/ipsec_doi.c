@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.168 2004/03/03 02:28:46 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.169 2004/03/27 03:27:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,7 +82,7 @@
 #include "gcmalloc.h"
 
 #ifdef HAVE_GSSAPI
-#include "gssapi.h"
+#include "auth_gssapi.h"
 #endif
 
 int verbose_proposal_check = 1;

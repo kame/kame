@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.116 2003/10/01 01:57:32 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.117 2004/03/27 03:27:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@
 #endif
 
 #ifdef HAVE_GSSAPI
-#include "gssapi.h"
+#include "auth_gssapi.h"
 #endif
 
 #define OUTBOUND_SA	0

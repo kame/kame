@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.120 2004/03/03 05:14:39 mk Exp $	*/
+/*	$KAME: cfparse.y,v 1.121 2004/03/27 03:27:45 suz Exp $	*/
 
 %{
 /*
@@ -73,7 +73,7 @@
 #include "strnames.h"
 #include "gcmalloc.h"
 #ifdef HAVE_GSSAPI
-#include "gssapi.h"
+#include "auth_gssapi.h"
 #endif
 #include "vendorid.h"
 

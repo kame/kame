@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.58 2004/03/17 14:39:18 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.59 2004/03/27 03:27:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,7 +72,7 @@
 #include "strnames.h"
 
 #ifdef HAVE_GSSAPI
-#include "gssapi.h"
+#include "auth_gssapi.h"
 #endif
 
 /*
