@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.18 2002/01/13 12:48:12 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.19 2002/01/13 13:30:17 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -233,6 +233,9 @@ showVariables()
 	struct natptctl_names	 ctlnames[] = NATPTCTL_NAMES;
 
 	for (idx = 0; ctlnames[idx].ctl_name; idx++) {
+		if ((ctlnames[idx].ctl_attr & NATPTCTL_DEFAULT) == 0)
+			continue;
+
 		if (getValue(idx, (caddr_t)&Bow) <= 0) {
 			err(errno, "%s(): getvalue failure", fn);
 		}
