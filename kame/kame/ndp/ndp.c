@@ -122,7 +122,6 @@
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
-extern int errno;
 static int pid;
 static int fflag;
 static int nflag;

@@ -34,6 +34,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
+#include <errno.h>
 #include <err.h>
 
 #include <sys/types.h>
@@ -55,7 +56,6 @@
 #endif
 
 int	s;
-extern int errno;
 struct sockaddr_in6 sin6;
 struct rip6	*ripbuf;
 

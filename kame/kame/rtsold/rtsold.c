@@ -214,7 +214,6 @@ main(argc, argv)
 	FD_ZERO(&fdset);
 	FD_SET(s, &fdset);
 	while (1) {		/* main loop */
-		extern int errno;
 		int e;
 		struct fd_set select_fd = fdset;
 

@@ -93,7 +93,6 @@ int	mtu;
 int	setpsrc = 0;
 int	s;
 kvm_t	*kvmd;
-extern	int errno;
 
 #ifdef INET6
 char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
@@ -684,8 +683,6 @@ void
 Perror(cmd)
 	char *cmd;
 {
-	extern int errno;
-
 	switch (errno) {
 
 	case ENXIO:

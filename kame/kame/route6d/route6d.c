@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.9 2000/01/29 06:23:43 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.10 2000/02/01 00:25:35 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.9 2000/01/29 06:23:43 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.10 2000/02/01 00:25:35 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -49,6 +49,7 @@ static char _rcsid[] = "$Id: route6d.c,v 1.9 2000/01/29 06:23:43 itojun Exp $";
 #endif
 #include <syslog.h>
 #include <stddef.h>
+#include <errno.h>
 #include <err.h>
 
 #include <sys/types.h>
@@ -57,7 +58,6 @@ static char _rcsid[] = "$Id: route6d.c,v 1.9 2000/01/29 06:23:43 itojun Exp $";
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
-#include <sys/errno.h>
 #ifdef ADVAPI
 #include <sys/uio.h>
 #endif
@@ -206,8 +206,6 @@ static	u_long	seq = 0;
 #define RTF_SENDANYWAY		0x40000000
 #define	RTF_CHANGED		0x80000000
 #define	RTF_ROUTE_H		0xffff
-
-extern int errno;
 
 int main __P((int, char **));
 void ripalarm __P((int));

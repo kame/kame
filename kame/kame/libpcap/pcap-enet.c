@@ -33,8 +33,6 @@ struct packet_header {
 	u_char			packet[8]
 };
 
-extern int errno;
-
 #define BUFSPACE (4*1024)
 
 /* Forwards */

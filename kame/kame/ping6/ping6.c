@@ -249,9 +249,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-#ifndef __NetBSD__
-	extern int errno;
-#endif
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 	extern int optind;
 	extern char *optarg;
