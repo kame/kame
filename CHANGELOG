@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1478 2001/01/15 07:54:50 inoue Exp $
+$KAME: CHANGELOG,v 1.1479 2001/01/15 15:44:37 itojun Exp $
 
 <200101>
+Tue Jan 16 00:43:19 JST 2001  itojun@iijab.net
+	* sys/netinet6/mld6.c: emit MLD6 packet correctly (MTU setting was
+	  wrong and the packet did not go out of the node).  the bug was
+	  introduced around November 27, 2000.
+
 Mon Jan 15 12:53:37 JST 2001  yu-inoue@jp.fujitsu.com
 	* route6d:
 	when interface down, route vanishes(like router).
