@@ -170,7 +170,7 @@ looutput(ifp, m, dst, rt)
 		m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
 		n->m_pkthdr = m->m_pkthdr;
 		n->m_len = m->m_pkthdr.len;
-		m_tag_copy_chain(n, m);
+		SLIST_INIT(&m->m_pkthdr.tags);
 		m_freem(m);
 		m = n;
 	}
