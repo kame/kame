@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.38 2002/06/26 06:02:22 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.39 2002/08/27 08:50:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1104,11 +1104,7 @@ gethostent(void)
 #include <arpa/nameser.h>
 #include <resolv.h>
 
-#if PACKETSZ > 1024
-#define	MAXPACKET	PACKETSZ
-#else
-#define	MAXPACKET	1024
-#endif
+#define	MAXPACKET	(64*1024)
 
 typedef union {
 	HEADER hdr;
@@ -1398,7 +1394,7 @@ _dns_ghbyname(const char *name, int af, int *errp)
 	struct hostent *hp;
 	int qtype;
 	struct hostent hbuf;
-	querybuf buf;
+	querybuf *buf;
 
 	if ((_res.options & RES_INIT) == 0) {
 		if (res_init() < 0) {
@@ -1423,12 +1419,19 @@ _dns_ghbyname(const char *name, int af, int *errp)
 		*errp = NO_RECOVERY;
 		return NULL;
 	}
-	n = res_search(name, C_IN, qtype, buf.buf, sizeof(buf));
+	buf = malloc(sizeof(*buf));
+	if (buf == NULL) {
+		*errp = NETDB_INTERNAL;
+		return NULL;
+	}
+	n = res_search(name, C_IN, qtype, buf->buf, sizeof(buf->buf));
 	if (n < 0) {
+		free(buf);
 		*errp = h_errno;
 		return NULL;
 	}
-	hp = getanswer(&buf, n, name, qtype, &hbuf, errp);
+	hp = getanswer(buf, n, name, qtype, &hbuf, errp);
+	free(buf);
 	if (!hp)
 		return NULL;
 	return _hpcopy(&hbuf, errp);
@@ -1446,7 +1449,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 #ifdef INET6
 	static const char hex[] = "0123456789abcdef";
 #endif
-	querybuf buf;
+	querybuf *buf;
 	char qbuf[MAXDNAME+1];
 	char *hlist[2];
 	char *tld6[] = { "ip6.arpa", "ip6.int", NULL };
@@ -1484,6 +1487,11 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	hbuf.h_length = addrlen;
 	na = 0;
 
+	buf = malloc(sizeof(*buf));
+	if (buf == NULL) {
+		*errp = NETDB_INTERNAL;
+		return NULL;
+	}
 	for (/* nothing */; *tld; tld++) {
 		/*
 		 * XXX assumes that MAXDNAME is big enough - error checks
@@ -1519,12 +1527,12 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 			break;
 		}
 
-		n = res_query(qbuf, C_IN, T_PTR, buf.buf, sizeof buf.buf);
+		n = res_query(qbuf, C_IN, T_PTR, buf->buf, sizeof buf->buf);
 		if (n < 0) {
 			*errp = h_errno;
 			continue;
 		}
-		hp = getanswer(&buf, n, qbuf, T_PTR, &hbuf, errp);
+		hp = getanswer(buf, n, qbuf, T_PTR, &hbuf, errp);
 		if (!hp)
 			continue;
 		hbuf.h_addrtype = af;
@@ -1534,6 +1542,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		hlist[1] = NULL;
 		return _hpcopy(&hbuf, errp);
 	}
+	free(buf);
 	return NULL;
 }
 

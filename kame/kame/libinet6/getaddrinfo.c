@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.139 2002/07/25 21:53:46 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.140 2002/08/27 08:50:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,11 +239,7 @@ struct res_target {
 };
 #endif
 
-#if PACKETSZ > 1024
-#define MAXPACKET	PACKETSZ
-#else
-#define MAXPACKET	1024
-#endif
+#define MAXPACKET	(64*1024)
 
 typedef union {
 	HEADER hdr;
@@ -2248,7 +2244,7 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	va_list	 ap;
 {
 	struct addrinfo *ai;
-	querybuf buf, buf2, *bp;
+	querybuf *buf, *buf2, *bp;
 	const char *name;
 	const struct addrinfo *pai;
 	struct addrinfo sentinel, *cur;
@@ -2262,47 +2258,64 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
 
+	buf = malloc(sizeof(*buf));
+	if (!buf) {
+		h_errno = NETDB_INTERNAL;
+		return NS_NOTFOUND;
+	}
+	buf2 = malloc(sizeof(*buf2));
+	if (!buf2) {
+		free(buf);
+		h_errno = NETDB_INTERNAL;
+		return NS_NOTFOUND;
+	}
+
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
 		/* prefer IPv6 */
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		q.next = &q2;
 		q2.name = name;
 		q2.qclass = C_IN;
 		q2.qtype = T_A;
-		q2.answer = buf2.buf;
-		q2.anslen = sizeof(buf2);
+		q2.answer = buf2->buf;
+		q2.anslen = sizeof(buf2->buf);
 		break;
 	case AF_INET:
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_A;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		break;
 	case AF_INET6:
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		break;
 	default:
+		free(buf);
+		free(buf2);
 		return NS_UNAVAIL;
 	}
-	if (res_searchN(name, &q) < 0)
+	if (res_searchN(name, &q) < 0) {
+		free(buf);
+		free(buf2);
 		return NS_NOTFOUND;
+	}
 	p = &q;
 	while (p) {
 		/* ugly... */
 		if (p == &q)
-			bp = &buf;
+			bp = buf;
 		else if (p == &q2)
-			bp = &buf2;
+			bp = buf2;
 		else {
 			/* XXX should be abort() */
 			p = p->next;
@@ -2317,6 +2330,8 @@ _dns_getaddrinfo(rv, cb_data, ap)
 		}
 		p = p->next;
 	}
+	free(buf);
+	free(buf2);
 	if (sentinel.ai_next == NULL)
 		switch (h_errno) {
 		case HOST_NOT_FOUND:
@@ -3257,7 +3272,7 @@ _dns_getaddrinfo(name, pai)
 	const struct addrinfo *pai;
 {
 	struct addrinfo *ai;
-	querybuf buf, buf2;
+	querybuf *buf, *buf2;
 	struct addrinfo sentinel, *cur;
 	struct res_target q, q2;
 
@@ -3266,51 +3281,70 @@ _dns_getaddrinfo(name, pai)
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
 
+	buf = malloc(sizeof(*buf));
+	if (!buf) {
+		h_errno = NETDB_INTERNAL;
+		return NULL;
+	}
+	buf2 = malloc(sizeof(*buf2));
+	if (!buf2) {
+		free(buf);
+		h_errno = NETDB_INTERNAL;
+		return NULL;
+	}
+
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
 		/* prefer IPv6 */
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		q.next = &q2;
 		q2.name = name;
 		q2.qclass = C_IN;
 		q2.qtype = T_A;
-		q2.answer = buf2.buf;
-		q2.anslen = sizeof(buf2);
+		q2.answer = buf2->buf;
+		q2.anslen = sizeof(buf2->buf);
 		break;
 	case AF_INET:
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_A;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		break;
 	case AF_INET6:
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		break;
 	default:
+		free(buf);
+		free(buf2);
 		return NULL;
 	}
-	if (res_searchN(name, &q) < 0)
+	if (res_searchN(name, &q) < 0) {
+		free(buf);
+		free(buf2);
 		return NULL;
-	ai = getanswer(&buf, q.n, q.name, q.qtype, pai);
+	}
+	ai = getanswer(buf, q.n, q.name, q.qtype, pai);
 	if (ai) {
 		cur->ai_next = ai;
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
 	if (q.next) {
-		ai = getanswer(&buf2, q2.n, q2.name, q2.qtype, pai);
+		ai = getanswer(buf2, q2.n, q2.name, q2.qtype, pai);
 		if (ai)
 			cur->ai_next = ai;
 	}
+	free(buf);
+	free(buf2);
 	return sentinel.ai_next;
 }
 
@@ -4471,7 +4505,7 @@ _dns_getaddrinfo(pai, hostname, res)
 	struct addrinfo **res;
 {
 	struct addrinfo *ai;
-	querybuf buf, buf2;
+	querybuf *buf, *buf2;
 	const char *name;
 	struct addrinfo sentinel, *cur;
 	struct res_target q, q2;
@@ -4481,51 +4515,70 @@ _dns_getaddrinfo(pai, hostname, res)
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
 
+	buf = malloc(sizeof(*buf));
+	if (!buf) {
+		h_errno = NETDB_INTERNAL;
+		return NULL;
+	}
+	buf2 = malloc(sizeof(*buf2));
+	if (!buf2) {
+		free(buf);
+		h_errno = NETDB_INTERNAL;
+		return NULL;
+	}
+
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
 		/* prefer IPv6 */
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		q.next = &q2;
 		q2.name = name;
 		q2.qclass = C_IN;
 		q2.qtype = T_A;
-		q2.answer = buf2.buf;
-		q2.anslen = sizeof(buf2);
+		q2.answer = buf2->buf;
+		q2.anslen = sizeof(buf2->buf);
 		break;
 	case AF_INET:
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_A;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		break;
 	case AF_INET6:
 		q.name = name;
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
-		q.answer = buf.buf;
-		q.anslen = sizeof(buf);
+		q.answer = buf->buf;
+		q.anslen = sizeof(buf->buf);
 		break;
 	default:
+		free(buf);
+		free(buf2);
 		return EAI_FAIL;
 	}
-	if (res_searchN(hostname, &q) < 0)
+	if (res_searchN(hostname, &q) < 0) {
+		free(buf);
+		free(buf2);
 		return EAI_NONAME;
-	ai = getanswer(&buf, q.n, q.name, q.qtype, pai);
+	}
+	ai = getanswer(buf, q.n, q.name, q.qtype, pai);
 	if (ai) {
 		cur->ai_next = ai;
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
 	if (q.next) {
-		ai = getanswer(&buf2, q2.n, q2.name, q2.qtype, pai);
+		ai = getanswer(buf2, q2.n, q2.name, q2.qtype, pai);
 		if (ai)
 			cur->ai_next = ai;
 	}
+	free(buf);
+	free(buf2);
 	if (sentinel.ai_next == NULL)
 		switch (h_errno) {
 		case HOST_NOT_FOUND:
