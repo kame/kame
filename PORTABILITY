@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.5 1999/08/20 06:26:56 itojun Exp $
+$Id: PORTABILITY,v 1.6 1999/08/24 08:27:33 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -69,14 +69,15 @@ across those possibilities.
 	} while (0)
   Without this wrapper nasty mistakes can happen.
 
-- BSDI3 make is a bit different from others:
-  (1) MAN[0-9] does not respect .PATH
-  (2) $> does not respect .PATH
-  You'll need to implement necessary tricks on your own.
-  The former one can be solved like below but is not a clean solution.
-	.PATH:	${SRCDIR}
-	_MAN5=	foo.5
-	MAN5=	${_MAN5:s/^/${SRCDIR}\//g}
+- for BSDI3, you need to set MAN[0-9] like below:
+	MAN5=	foo.0
+	MLINKS=	foo.5 baa.5
+  For NetBSD, you need to set MAN (not MAN[0-9]):
+	MAN=	foo.5
+	MLINKS=	foo.5 baa.5
+  For other cases, you need to set MAN[0-9] like below:
+	MAN5=	foo.5
+	MLINKS=	foo.5 baa.5
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
   If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
