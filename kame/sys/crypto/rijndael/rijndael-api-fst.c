@@ -1,4 +1,5 @@
 /*	$NetBSD: rijndael-api-fst.c,v 1.14 2003/07/16 05:08:08 itojun Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.17 2003/07/16 05:09:38 itojun Exp $	*/
 
 /**
  * rijndael-api-fst.c
