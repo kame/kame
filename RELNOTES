@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/06/22 08:32:37 $
+		     $Date: 2000/06/27 15:56:36 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -14,7 +14,7 @@ of very experimental set of software.  Do not assume ANY backward
 copmatibility, for source, binary nor configuration file, between
 different version of KAME kits.  This means that you MUST recompile
 everything every time you upgrade KAME kit, to ensure it works.
-You may also need to update your configuration files to the latest
+You may also need to update your configuration files to meet the latest
 implementation.  We are not ignoring backward compatibility issues,
 however, we are sometimes unable to maintain backward compatibility.
 
@@ -84,7 +84,7 @@ Many of old ones have been solved.
 
 - libinet6 resolver code does not support NIS lookup.
 
-- openbsd: 3C905B card does not handle multicast properly, and will have 
-  major problem with IPv6.  already corrected in SNAP kits.
+- openbsd: 3COM 3C905B card driver (xl) does not handle multicast properly,
+  and will have a major problem with IPv6.  already corrected in SNAP kits.
 
 							<end of RELNOTES>
