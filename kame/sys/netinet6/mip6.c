@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.132 2002/06/18 07:35:15 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.133 2002/06/19 03:34:30 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -904,13 +904,16 @@ mip6_select_coa2(void)
 
 			/* prefer user specified CoA interfaces. */
 			if (strncmp(if_name(ifp),
-			    mip6_preferred_ifnames.mip6pi_ifname[0], IFNAMSIZ))
+			    mip6_preferred_ifnames.mip6pi_ifname[0],
+			    IFNAMSIZ) == 0)
 				score += 4;
 			if (strncmp(if_name(ifp),
-			    mip6_preferred_ifnames.mip6pi_ifname[1], IFNAMSIZ))
+			    mip6_preferred_ifnames.mip6pi_ifname[1],
+			    IFNAMSIZ) == 0)
 				score += 3;
 			if (strncmp(if_name(ifp),
-			    mip6_preferred_ifnames.mip6pi_ifname[2], IFNAMSIZ))
+			    mip6_preferred_ifnames.mip6pi_ifname[2],
+			    IFNAMSIZ) == 0)
 				score += 2;
 
 			/* keep CoA same as possible. */
