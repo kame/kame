@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.209 2001/08/16 05:36:03 itojun Exp $	*/
+/*	$KAME: key.c,v 1.210 2001/09/03 08:28:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -316,7 +316,7 @@ do { \
 #define KMALLOC(p, t, n)                                                     \
 	((p) = (t) malloc((unsigned long)(n), M_SECA, M_NOWAIT))
 #define KFREE(p)                                                             \
-	free((caddr_t)(p), M_SECA);
+	free((caddr_t)(p), M_SECA)
 #else
 #define KMALLOC(p, t, n) \
 do { \
