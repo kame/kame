@@ -702,7 +702,6 @@ ftp_copycommand(int src, int dst, enum state *state)
 	struct sockaddr_in6 *sin6;
 	enum state nstate;
 	char ch;
-	struct sockaddr *sa;
 
 	/* OOB data handling */
 	error = ioctl(src, SIOCATMARK, &atmark);
