@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.52 2001/02/07 04:58:47 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.53 2001/03/01 08:54:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -455,9 +455,16 @@ noreplaycheck:
 			goto bad;
 		}
 
-		if (nxt != IPPROTO_DONE)
+		if (nxt != IPPROTO_DONE) {
+#ifdef PR_LASTHDR
+			if ((inetsw[ip_protox[nxt]].pr_flags & PR_LASTHDR) != 0 &&
+			    ipsec4_in_reject(m, NULL)) {
+				ipsecstat.in_polvio++;
+				goto bad;
+			}
+#endif
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
-		else
+		} else
 			m_freem(m);
 		m = NULL;
 	}

@@ -378,13 +378,6 @@ icmp_input(m, va_alist)
 		printf("icmp_input, type %d code %d\n", icp->icmp_type,
 		    icp->icmp_code);
 #endif
-#ifdef IPSEC
-	/* drop it if it does not match the policy */
-	if (ipsec4_in_reject(m, NULL)) {
-		ipsecstat.in_polvio++;
-		goto freeit;
-	}
-#endif
 	if (icp->icmp_type > ICMP_MAXTYPE)
 		goto raw;
 	icmpstat.icps_inhist[icp->icmp_type]++;

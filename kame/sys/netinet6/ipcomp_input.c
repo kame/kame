@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.23 2001/01/23 15:23:35 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.24 2001/03/01 08:54:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -236,9 +236,16 @@ ipcomp4_input(m, va_alist)
 		sav = NULL;
 	}
 
-	if (nxt != IPPROTO_DONE)
+	if (nxt != IPPROTO_DONE) {
+#ifdef PR_LASTHDR
+		if ((inetsw[ip_protox[nxt]].pr_flags & PR_LASTHDR) != 0 &&
+		    ipsec4_in_reject(m, NULL)) {
+			ipsecstat.in_polvio++;
+			goto fail;
+		}
+#endif
 		(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
-	else
+	} else
 		m_freem(m);
 	m = NULL;
 

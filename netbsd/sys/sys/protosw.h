@@ -1,4 +1,4 @@
-/*	$NetBSD: protosw.h,v 1.17 1998/06/02 20:55:53 thorpej Exp $	*/
+/*	$NetBSD: protosw.h,v 1.22 2000/02/17 10:59:41 darrenr Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -61,6 +61,11 @@
  * described below.
  */
 
+/*
+ * For pfil_head structure.
+ */
+#include <net/pfil.h>
+
 struct mbuf;
 struct sockaddr;
 struct socket;
@@ -100,6 +105,7 @@ struct protosw {
 			__P((void));
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));
+	struct	pfil_head	pr_pfh;
 };
 
 #define	PR_SLOWHZ	2		/* 2 slow timeouts per second */
@@ -115,6 +121,8 @@ struct protosw {
 #define	PR_CONNREQUIRED	0x04		/* connection required by protocol */
 #define	PR_WANTRCVD	0x08		/* want PRU_RCVD calls */
 #define	PR_RIGHTS	0x10		/* passes capabilities */
+#define	PR_LISTEN	0x20		/* supports listen(2) and accept(2) */
+#define	PR_LASTHDR	0x40		/* enforce ipsec policy; last header */
 
 /*
  * The arguments to usrreq are:
@@ -152,8 +160,9 @@ struct protosw {
 #define	PRU_SLOWTIMO		19	/* 500ms timeout */
 #define	PRU_PROTORCV		20	/* receive from below */
 #define	PRU_PROTOSEND		21	/* send to below */
+#define	PRU_PURGEIF		22	/* purge specified if */
 
-#define	PRU_NREQ		22
+#define	PRU_NREQ		23
 
 #ifdef PRUREQUESTS
 char *prurequests[] = {
@@ -162,7 +171,7 @@ char *prurequests[] = {
 	"RCVD",		"SEND",		"ABORT",	"CONTROL",
 	"SENSE",	"RCVOOB",	"SENDOOB",	"SOCKADDR",
 	"PEERADDR",	"CONNECT2",	"FASTTIMO",	"SLOWTIMO",
-	"PROTORCV",	"PROTOSEND",
+	"PROTORCV",	"PROTOSEND",	"PURGEIF",
 };
 #endif
 
@@ -255,6 +264,8 @@ extern	u_int pffasttimo_now;
 struct sockaddr;
 struct protosw *pffindproto __P((int, int, int));
 struct protosw *pffindtype __P((int, int));
+struct domain *pffinddomain __P((int));
+extern struct protosw inetsw[];
 void pfctlinput __P((int, struct sockaddr *));
 #endif /* _KERNEL */
 
