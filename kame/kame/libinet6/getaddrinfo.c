@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.160 2003/05/17 01:30:42 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.161 2004/04/09 16:31:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -763,6 +763,8 @@ reorder(sentinel)
 		aio[i].aio_dstscope = gai_addr2scopetype(ai->ai_addr);
 		aio[i].aio_dstpolicy = match_addrselectpolicy(ai->ai_addr,
 							      &policyhead);
+
+		set_source(&aio[i], &policyhead);
 	}
 
 	/* perform sorting. */
