@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.160 1999/10/06 04:39:25 jinmei Exp $
+$Id: CHANGELOG,v 1.161 1999/10/06 08:28:14 itojun Exp $
 
 <199910>
+Wed Oct  6 17:28:05 JST 1999  itojun@iijlab.net
+	* kame/bindtest: tests how the kernel implements bind(2) on IPv4/v6
+	  socket.  is not compiled in default compilation.
+
 1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/pim6sd.conf.5: was added for configuration
 	guide.
