@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcps.rb,v 1.3 2000/04/21 14:21:21 jinmei Exp $
+# $Id: dtcps.rb,v 1.4 2001/01/16 01:40:34 jinmei Exp $
 #
 
 require "socket"
@@ -192,6 +192,8 @@ def tunnelcleanup(tun)
     debugmsg("ifconfig #{tun[0]} inet6 #{tun[4]} #{tun[3]} -alias\n")
     system("ifconfig #{tun[0]} inet6 #{tun[4]} #{tun[3]} -alias")
   end
+  debugmsg("gifconfig #{tun[0]} delete\n")
+  system("gifconfig #{tun[0]} delete")
   debugmsg("ifconfig #{tun[0]} down\n")
   system("ifconfig #{tun[0]} down")
 end
