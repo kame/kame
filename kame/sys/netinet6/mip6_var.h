@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.19 2002/01/17 05:24:03 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.20 2002/01/18 08:35:03 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -165,7 +165,9 @@ struct mip6_bc {
 #define MIP6_BA_STATUS_RESOURCES             131
 #define MIP6_BA_STATUS_NOT_SUPPORTED         132
 #define MIP6_BA_STATUS_NOT_HOME_SUBNET       133
-/* #define MIP6_BA_STATUS_INCORRECT_IFID_LENGTH 136 */
+#ifdef MIP6_DRAFT13
+#define MIP6_BA_STATUS_INCORRECT_IFID_LENGTH 136
+#endif
 #define MIP6_BA_STATUS_NOT_HOME_AGENT        137
 #define MIP6_BA_STATUS_DAD_FAILED            138
 #define MIP6_BA_STATUS_NO_SA                 139

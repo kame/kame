@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.64 2002/01/18 08:23:53 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.65 2002/01/18 08:35:02 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1461,6 +1461,19 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	if (pr->ndpr_plen != bu_opt->ip6ou_prefixlen) {
 		/* the haddr has an incorrect prefix length. */
 		/* XXX return 136 INCORRECT SUBNET PREFIX LENGTH */
+		if (mip6_bc_send_ba(haaddr, haddr0, coa,
+				    MIP6_BA_STATUS_INCORRECT_IFID_LENGTH,
+				    seqno,
+				    0,
+				    0)) {
+			mip6log((LOG_ERR,
+				 "%s:%d: sending BA to %s(%s) failed. "
+				 "send it later.\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(haddr0),
+				 ip6_sprintf(coa)));
+		}
+		return (0); /* XXX is 0 OK? */
 	}
 	if ((bu_opt->ip6ou_flags & IP6_BUF_ROUTER) != 0) {
 		/* XXX we don't support R bit in GNA and proxy ND */
