@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.369 2004/05/24 11:29:08 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.370 2004/05/25 01:12:32 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -966,9 +966,6 @@ in6_update_ifa(ifp, ifra, ia)
 {
 	int error = 0, hostIsNew = 0, plen = -1;
 	struct in6_ifaddr *oia;
-#if __FreeBSD__
-	struct ifaddr *ifa;
-#endif
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
 	struct in6_multi_mship *imm;
@@ -2014,8 +2011,10 @@ in6_ifinit(ifp, ia, sin6, newhost)
 		in6_ifaddloop(&(ia->ia_ifa));
 	}
 
+#ifndef __FreeBSD__
 	if (ifp->if_flags & IFF_MULTICAST)
 		in6_restoremkludge(ia, ifp);
+#endif
 
 	return (error);
 }
