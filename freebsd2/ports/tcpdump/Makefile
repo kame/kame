@@ -6,8 +6,8 @@
 # $FreeBSD$
 #
 
-DISTNAME=	tcpdump-2000_06_05
-PKGNAME=	tcpdump-20000605
+DISTNAME=	tcpdump-2000.08.28
+PKGNAME=	tcpdump-20000828
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
@@ -22,7 +22,5 @@ CONFIGURE_ARGS+=--enable-ipv6
 
 pre-configure:
 	(cd ${WRKSRC}; autoreconf)
-
-INSTALL_TARGET=	install install-man
 
 .include <bsd.port.mk>

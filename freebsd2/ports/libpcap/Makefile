@@ -6,8 +6,8 @@
 # $FreeBSD$
 #
 
-DISTNAME=	libpcap-2000_06_05
-PKGNAME=	libpcap-20000605
+DISTNAME=	libpcap-2000.08.28
+PKGNAME=	libpcap-20000828
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
@@ -15,8 +15,6 @@ MAINTAINER=	sumikawa@kame.net
 
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS+=	--enable-ipv6
-
-INSTALL_TARGET=	install install-incl install-man
 
 pre-install:
 	${MKDIR} ${PREFIX}/include/net
