@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.29 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: policy.c,v 1.30 2000/09/19 00:11:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.29 2000/09/13 04:50:28 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.30 2000/09/19 00:11:26 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -228,8 +228,11 @@ cmpspidx_wild(a, b)
 
 	/* compare src address */
 	if (sizeof(sa1) < a->src.ss_len || sizeof(sa2) < b->src.ss_len) {
-		plog(logp, LOCATION, NULL, "unexpected error\n");
-		exit(1);
+		plog(logp, LOCATION, NULL,
+			"ERROR: unexpected error: "
+			"src.ss_len:%d dst.ss_len:%d\n",
+			a->src.ss_len, b->src.ss_len);
+		return 1;
 	}
 	mask_sockaddr((struct sockaddr *)&sa1, (struct sockaddr *)&a->src,
 		b->prefs);
