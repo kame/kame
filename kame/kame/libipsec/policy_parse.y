@@ -1,4 +1,4 @@
-/*	$KAME: policy_parse.y,v 1.17 2003/10/03 21:52:11 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.18 2003/11/23 08:20:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -293,7 +293,7 @@ init_x_policy()
 {
 	struct sadb_x_policy *p;
 
-	pbuf = malloc(tlen);
+	pbuf = malloc(sizeof(struct sadb_x_policy));
 	if (pbuf == NULL) {
 		__ipsec_errcode = EIPSEC_NO_BUFS;
 		return -1;
