@@ -318,6 +318,16 @@ int	in_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 void	in_pcbremlists __P((struct inpcb *inp));
 int	prison_xinpcb __P((struct proc *p, struct inpcb *inp));
+
+#ifdef NEW_STRUCT_ROUTE
+int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+			 struct ip6_moptions *, struct route *,
+			 struct ifnet **, struct rtentry **, int));
+#else
+int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+			 struct ip6_moptions *, struct route_in6 *,
+			 struct ifnet **, struct rtentry **, int));
+#endif
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */
