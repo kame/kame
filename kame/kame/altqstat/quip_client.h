@@ -1,4 +1,4 @@
-/*	$KAME: quip_client.h,v 1.3 2001/08/15 12:51:59 kjc Exp $	*/
+/*	$KAME: quip_client.h,v 1.4 2001/08/16 07:43:15 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -40,14 +40,14 @@ extern int quip_echo;
 
 int quip_openserver(void);
 int quip_closeserver(void);
-void quip_sendrequest(FILE *fp, const char *request);
-int quip_recvresponse(FILE *fp, char *header, char *body, int *blen);
+void quip_sendrequest(FILE *, const char *);
+int quip_recvresponse(FILE *, char *, char *, int *);
 void quip_rawmode(void);
-char *quip_selectinterface(char *ifname);
-char *quip_selectqdisc(char *ifname, char *qdisc_name);
-void quip_chandle2name(const char *ifname, u_long handle, char *name, size_t size);
-void quip_printqdisc(const char *ifname);
-void quip_printfilter(const char *ifname, const u_long handle);
+char *quip_selectinterface(char *);
+char *quip_selectqdisc(char *, char *);
+void quip_chandle2name(const char *, u_long, char *, size_t);
+void quip_printqdisc(const char *);
+void quip_printfilter(const char *, const u_long);
 void quip_printconfig(void);
 
 #endif /* _QUIP_CLIENT_H_ */

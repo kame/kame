@@ -1,4 +1,4 @@
-/*	$KAME: altqd.c,v 1.3 2001/08/15 03:36:07 kjc Exp $	*/
+/*	$KAME: altqd.c,v 1.4 2001/08/16 07:43:13 itojun Exp $	*/
 /*
  * Copyright (c) 2001 Theo de Raadt
  * All rights reserved.
@@ -85,6 +85,12 @@ fd_set	fds, t_fds;
 #define  DEFAULT_DEBUG_MASK	0
 #define  DEFAULT_LOGGING_LEVEL	LOG_INFO
 
+void usage(void);
+void sig_pipe(int);
+void sig_hup(int);
+void sig_int(int);
+void sig_term(int);
+
 void
 usage(void)
 {
@@ -104,19 +110,19 @@ sig_pipe(int sig)
 int gotsig_hup, gotsig_int, gotsig_term;
 
 void
-sig_hup()
+sig_hup(int sig)
 {
 	gotsig_hup = 1;
 }
 
 void
-sig_int()
+sig_int(int sig)
 {
 	gotsig_int = 1;
 }
 
 void
-sig_term()
+sig_term(int sig)
 {
 	gotsig_term = 1;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.10 2001/08/15 12:51:57 kjc Exp $	*/
+/*	$KAME: parser.c,v 1.11 2001/08/16 07:43:15 itojun Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -54,37 +54,33 @@
 /*
  * Forward & External Declarations
  */
-static int is_qdisc_name(const char *qname);
-static int qdisc_interface_parser(const char * qname, const char *ifname,
-				  int argc, char **argv);
-static int qdisc_class_parser(const char *qname, const char *ifname,
-			      const char *class_name, const char *parent_name,
-			      int argc, char **argv);
+static int is_qdisc_name(const char *);
+static int qdisc_interface_parser(const char *, const char *, int, char **);
+static int qdisc_class_parser(const char *, const char *, const char *,
+	const char *, int, char **);
 
-static int pfxcmp(const char *s1, const char *s2);
-static int next_word(char **cpp, char *b);
+static int pfxcmp(const char *, const char *);
+static int next_word(char **, char *);
 
-static int do_cmd(int op, char *cmdbuf);
-static int get_ifname(char **cpp, char **ifnamep);
-static int get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask);
-static int get_port(const char *name, u_int16_t *port_no);
-static int get_proto(const char *name, int *proto_no);
-static int get_fltr_opts(char **cpp, char *fltr_name, size_t len, int *ruleno);
-static int interface_parser(char *cmdbuf);
-static int class_parser(char *cmdbuf) ;
-static int filter_parser(char *cmdbuf);
+static int do_cmd(int, char *);
+static int get_ifname(char **, char **);
+static int get_addr(char **, struct in_addr *, struct in_addr *);
+static int get_port(const char *, u_int16_t *);
+static int get_proto(const char *, int *);
+static int get_fltr_opts(char **, char *, size_t, int *);
+static int interface_parser(char *);
+static int class_parser(char *) ;
+static int filter_parser(char *);
 #ifdef INET6
-static int filter6_parser(char *cmdbuf);
-static int get_ip6addr(char **cpp, struct in6_addr *addr,
-		       struct in6_addr *mask);
+static int filter6_parser(char *);
+static int get_ip6addr(char **, struct in6_addr *, struct in6_addr *);
 #endif
-static int ctl_parser(char *cmdbuf);
-static int delete_parser(char *cmdbuf);
-static int red_parser(char *cmdbuf);
-static int rio_parser(char *cmdbuf);
-static int conditioner_parser(char *cmdbuf);
-static int tc_action_parser(char *ifname, char **cpp,
-			    struct tc_action *action);
+static int ctl_parser(char *);
+static int delete_parser(char *);
+static int red_parser(char *);
+static int rio_parser(char *);
+static int conditioner_parser(char *);
+static int tc_action_parser(char *, char **, struct tc_action *);
 
 /*
  * Globals

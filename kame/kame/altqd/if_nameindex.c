@@ -1,3 +1,4 @@
+/*	$KAME: if_nameindex.c,v 1.2 2001/08/16 07:43:13 itojun Exp $	*/
 /*
  * if_nameindex defined in RFC2133 (Basic Socket Interface Extensions
  * for IPv6)

@@ -1,4 +1,4 @@
-/*	$KAME: qop_cdnr.c,v 1.7 2001/08/15 12:51:57 kjc Exp $	*/
+/*	$KAME: qop_cdnr.c,v 1.8 2001/08/16 07:43:16 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -54,17 +54,17 @@
  * we use the existing qop interface to support conditioner.
  */
 
-static struct ifinfo *cdnr_ifname2ifinfo(const char *ifname);
-static int cdnr_attach(struct ifinfo *ifinfo);
-static int cdnr_detach(struct ifinfo *ifinfo);
-static int cdnr_enable(struct ifinfo *ifinfo);
-static int cdnr_disable(struct ifinfo *ifinfo);
-static int cdnr_add_class(struct classinfo *clinfo);
-static int cdnr_modify_class(struct classinfo *clinfo, void *arg);
-static int cdnr_delete_class(struct classinfo *clinfo);
-static int cdnr_add_filter(struct fltrinfo *fltrinfo);
-static int cdnr_delete_filter(struct fltrinfo *fltrinfo);
-static int verify_tbprofile(struct tb_profile *profile, const char *cdnr_name);
+static struct ifinfo *cdnr_ifname2ifinfo(const char *);
+static int cdnr_attach(struct ifinfo *);
+static int cdnr_detach(struct ifinfo *);
+static int cdnr_enable(struct ifinfo *);
+static int cdnr_disable(struct ifinfo *);
+static int cdnr_add_class(struct classinfo *);
+static int cdnr_modify_class(struct classinfo *, void *);
+static int cdnr_delete_class(struct classinfo *);
+static int cdnr_add_filter(struct fltrinfo *);
+static int cdnr_delete_filter(struct fltrinfo *);
+static int verify_tbprofile(struct tb_profile *, const char *);
 
 #define CDNR_DEVICE	"/dev/altq/cdnr"
 

@@ -1,4 +1,4 @@
-/*	$KAME: quip_client.c,v 1.3 2001/08/15 12:51:59 kjc Exp $	*/
+/*	$KAME: quip_client.c,v 1.4 2001/08/16 07:43:15 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -103,7 +103,7 @@ enum nametype { INTERFACE, CLASS, FILTER, CONDITIONER };
 static FILE *server = NULL;
 int quip_echo = 0;
 
-static char *extract_ifname(const char *name);
+static char *extract_ifname(const char *);
 
 int
 quip_openserver(void)

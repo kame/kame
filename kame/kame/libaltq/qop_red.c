@@ -1,4 +1,4 @@
-/*	$KAME: qop_red.c,v 1.3 2000/10/18 09:15:19 kjc Exp $	*/
+/*	$KAME: qop_red.c,v 1.4 2001/08/16 07:43:17 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -49,10 +49,10 @@
 #include "altq_qop.h"
 #include "qop_red.h"
 
-static int red_attach(struct ifinfo *ifinfo);
-static int red_detach(struct ifinfo *ifinfo);
-static int red_enable(struct ifinfo *ifinfo);
-static int red_disable(struct ifinfo *ifinfo);
+static int red_attach(struct ifinfo *);
+static int red_detach(struct ifinfo *);
+static int red_enable(struct ifinfo *);
+static int red_disable(struct ifinfo *);
 
 #define RED_DEVICE	"/dev/altq/red"
 

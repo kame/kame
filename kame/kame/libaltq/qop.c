@@ -1,4 +1,4 @@
-/*	$KAME: qop.c,v 1.8 2001/08/16 04:31:41 kjc Exp $	*/
+/*	$KAME: qop.c,v 1.9 2001/08/16 07:43:15 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -86,17 +86,16 @@ int	Debug_mode = 0;		/* nosched (dummy mode) */
 /*
  * internal functions
  */
-static int get_ifmtu(const char *ifname);
-static void tbr_install(const char *ifname);
-static void tbr_deinstall(const char *ifname);
-static int add_filter_rule(struct ifinfo *ifinfo, struct fltrinfo *fltrinfo,
-			   struct fltrinfo **conflict);
-static int remove_filter_rule(struct ifinfo *ifinfo,
-			      struct fltrinfo *fltrinfo);
-static int filt_check_relation(struct flow_filter *front,
-			       struct flow_filter *back);
-static int filt_disjoint(struct flow_filter *front, struct flow_filter *back);
-static int filt_subset(struct flow_filter *front, struct flow_filter *back);
+static int get_ifmtu(const char *);
+static void tbr_install(const char *);
+static void tbr_deinstall(const char *);
+static int add_filter_rule(struct ifinfo *, struct fltrinfo *,
+			   struct fltrinfo **);
+static int remove_filter_rule(struct ifinfo *,
+			      struct fltrinfo *);
+static int filt_check_relation(struct flow_filter *, struct flow_filter *);
+static int filt_disjoint(struct flow_filter *, struct flow_filter *);
+static int filt_subset(struct flow_filter *, struct flow_filter *);
 
 /*
  * QCMD (Queue Command) API

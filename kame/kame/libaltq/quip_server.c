@@ -1,4 +1,4 @@
-/*	$KAME: quip_server.c,v 1.4 2001/08/15 12:51:58 kjc Exp $	*/
+/*	$KAME: quip_server.c,v 1.5 2001/08/16 07:43:17 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -52,12 +52,12 @@ extern LIST_HEAD(qop_iflist, ifinfo)	qop_iflist;
 
 #define EQUAL(s1, s2)	(strcmp((s1), (s2)) == 0)
 
-static int next_word(char **cpp, char *b);
+static int next_word(char **, char *);
 
-static int query_list(const char *cmd, const char *arg, char *msg, size_t maxmsg);
-static int query_handle2name(const char *cmd, const char *arg, char *msg, size_t maxmsg);
-static int query_qdisc(const char *cmd, const char *arg, char *msg, size_t maxmsg);
-static int query_filterspec(const char *cmd, const char *arg, char *msg, size_t maxmsg);
+static int query_list(const char *, const char *, char *, size_t);
+static int query_handle2name(const char *, const char *, char *, size_t);
+static int query_qdisc(const char *, const char *, char *, size_t);
+static int query_filterspec(const char *, const char *, char *, size_t);
 
 int
 quip_input(FILE *fp)
@@ -172,7 +172,6 @@ expand_classname(struct classinfo *clinfo, char *name, size_t maxname)
 	struct classinfo *ci = clinfo;
 #define CLASSNAMEMAX	256
 	char buf[2][CLASSNAMEMAX], *b0, *b1, *tmp;
-	int len;
 
 	b0 = buf[0]; b1 = buf[1];
 	b1[0] = '\0';

@@ -1,4 +1,4 @@
-/*	$KAME: altqstat.c,v 1.5 2001/08/15 12:51:58 kjc Exp $	*/
+/*	$KAME: altqstat.c,v 1.6 2001/08/16 07:43:14 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -54,7 +54,7 @@ char *qdisc_name = NULL;
 
 stat_loop_t *stat_loop;
 
-static void sig_handler(int sig);
+static void sig_handler(int);
 static void usage(void);
 
 static void
