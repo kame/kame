@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/12 06:13:52 $
+			$Date: 1999/08/13 12:50:31 $
 
 1. IPv6
 
@@ -36,8 +36,8 @@ RFC2283: Multiprotocol Extensions for BGP-4
     * so-called "BGP4+".
     * KAME-supplied bgpd supports this.
 RFC2292: Advanced Sockets API for IPv6
-    * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI
-      (KAME/FreeBSD228 only)
+    * For supported library functions/kernel APIs, see
+      kame/sys/netinet6/ADVAPI.
 RFC2362: Protocol Independent Multicast-Sparse Mode (PIM-SM)
     * RFC2362 defines packet formats for PIM-SM.  draft-ietf-pim-ipv6-01.txt
       is written based on this.
@@ -68,9 +68,8 @@ RFC2553: Basic Socket Interface Extensions for IPv6
     * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
       socket (3.8) are,
 	- supported on KAME/FreeBSD3x and it seems to be working well.
-	- also supported on KAME/FreeBSD228, but it is not tested well
-	  so disabled by default.
-	- not supported on KAME/NetBSD and KAME/BSDI.
+	- supported only for tcp on KAME/NetBSD,
+	- not supported on KAME/FreeBSD228 and KAME/BSDI3.
       see 1.12 in this document for details.
 draft-ietf-ipngwg-ipv6router-alert-04: IPv6 router alert option
 draft-ietf-ipngwg-router-renum-08: Router renumbering for IPv6
@@ -367,9 +366,8 @@ according to DNS.
 
 1.11 Kernel Internals
 
- (*) TCP stack is merged between netinet and netinet6 on KAME/FreeBSD3x,
-     so if your platform is FreeBSD3x, then there is no difference
-     between tcp6 and tcp in following description.
+ (*) TCP/UDP part is handled differently between opeating system platforms.
+     See 1.12 for dteails.
 
 The current KAME has escaped from the IPv4 netinet logic.  While
 ip_forward() calls ip_output(), ip6_forward() directly calls
@@ -442,21 +440,16 @@ We KAME team have 4 OS platforms right now, and behavior is silghtly
 different between them.  To summarize:
 - All KAME implementations treat tcp/udp port number space separately
   between IPv4 and IPv6.
-- KAME/BSDI does not support IPv4 mapped address, nor special wildcard bind
-  on AF_INET6.
+- KAME/BSDI3 and KAME/FreeBSD228 does not support IPv4 mapped address,
+  nor special wildcard bind on AF_INET6.
 - KAME/FreeBSD3x supports IPv4 mapped address, and special wildcard bind on
   AF_INET6.  They seem to be working well and enabled by default.
   You can disable those two by runtime and kernel compile configuration.
   (you can't enable only one of them: they comes together)
-- KAME/FreeBSD228 supports both, but it is not tested well so disabled by
-  default.
-  You can enable those two by runtime and kernel compile configuration.
-  (you can't enable only one of them: they comes together)
-- KAME/FreeBSD228 and KAME/FreeBSD3x implements slightly different behavior
-  for special wildcard bind on AF_INET6.
+- KAME/NetBSD supports both, for TCP only.  This is always enabled.
 
 The following sections will give you the details, and how you can
-configure the behavior on KAME/FreeBSD{228,31}.
+configure the behavior.
 
 Advise to application implementers: to implement a portable IPv6 application
 (which works on multiple IPv6 kernels), we believe that the following
@@ -482,7 +475,7 @@ on ipv6imp mailing list, in mid March 1999 and it looks that there's
 no concrete consensus (means, up to implementers).  You may want to
 check the mailing list archives.
 
-1.12.1 KAME/BSDI
+1.12.1 KAME/BSDI3 and KAME/FreeBSD228
 
 The platform do not support IPv4 mapped address.
 The IPv4 mapped address support needs tweaked implementation in
@@ -568,58 +561,19 @@ If the following events happen, KAME/FreeBSD3x will behave like this:
 - Stop sendmail4.  Here, on KAME/FreeBSD3x, IPv4 and IPv6 conections will
   be routed to sendmail6.  This is different from KAME/FreeBSD228.
 
-1.12.3 KAME/FreeBSD228
-
-The platform can be configued to support IPv4 mapped address/special AF_INET6
-wildcard bind (disabled by default).  If you disable it, it behaves as
-described in 1.12.1.
-
-KAME/FreeBSD228 works mostly the same as KAME/FreeBSD31, except the paragraphs
-under (*) mark in 1.12.2.  Please refer to 1.12.2 for other parts.
-
-	Wildcard bind on AF_INET6 affects the behavior of wildcard bind on
-	AF_INET.
-	If events happen in the following order, application B fails to
-	bind.  Therefore, both IPv4 and IPv6 connections will be routed to
-	application A.
-	- application A perform wildcard bind on AF_INET6, port X
-	- application B perform wildcard bind on AF_INET, port X -> fail
-	- IPv4 connection arrives
-	- IPv6 connection arrives
-	If the following events happen, IPv4 connection will be routed to
-	application B, and IPv6 connection will be routed to application
-	A.  This behavior is the same as described in 1.12.1.
-	- application B perform wildcard bind on AF_INET, port X
-	- application A perform wildcard bind on AF_INET6, port X
-	- IPv4 connection arrives
-	- IPv6 connection arrives
-
-	If the following events happen, KAME/FreeBSD228 will behave like this:
-	- sendmail4 is running.  It is doing wildcard bind on AF_INET.
-	- Invoke sendmail6.  It will do a wildcard bind on AF_INET6.
-	- Stop sendmail4.  Here, on KAME/FreeBSD228, sendmail6 will be able to
-	  get IPv6 connections only.  This is different from KAME/FreeBSD31.
-
 1.12.4 KAME/NetBSD
 
-The platform supports two separate kernel configuration, namely
-with "options TCP6", and without "options TCP6".
-
-If "options TCP6" is defined, separate tcp6 code is used (sys/netinet6/tcp6*)
-and will behave just like KAME/BSDI (see 1.12.1 for details).
-
-If "options TCP6" is NOT defined, it will use shared tcp4/6 code
-(from sys/netinet/tcp*).  In this configuration, udp4/6 behaves just like
-in KAME/BSDI (see 1.12.1 for details).  tcp4/6 supports IPv4 mapped
-address/special AF_INET6 wildcard bind and are enabled by default.
-At this moment there is no way to disable it.
-
-(more to be written)
+On KAME/NetBSD, TCP stack is merged into one, but differently from
+KAME/FreeBSD3x.  It will use shared tcp4/6 code (from sys/netinet/tcp*).
+In this configuration, udp4/6 behaves just like in KAME/BSDI (see
+1.12.1 for details).  tcp4/6 supports IPv4 mapped address/special
+AF_INET6 wildcard bind and are enabled by default.  At this moment
+there is no way to disable it.
 
 1.12.5 configuration and implementation
 
-On KAME/FreeBSD31 and KAME/FreeBSD228, the behavior is 
-configurable by following procedure.  To enable it:
+On KAME/FreeBSD3x, the behavior is configurable by following procedure.
+To enable it:
 - Add the "MAPPED_ADDR_ENABLED" kernel config option into your
   kernel config file (see "sys/i386/conf/GENERIC.v6" sample file)
   and build your kernel, and
@@ -627,15 +581,6 @@ configurable by following procedure.  To enable it:
 	# sysctl -w net.inet6.ip6.mapped_addr=1
 Note that, to enable the behavior you'll need to do the both of the above.
 If you do not do the both, the behavior is disabled.
-
-The behavior is enabled by default on KAME/FreeBSD31, but disabled
-by default on KAME/FreeBSD228, because those functions are not well
-tested on KAME/FreeBSD228.
-Implementation is quite different between KAME/FreeBSD31 and
-KAME/FreeBSD228, because tcp stack code and protocol contorol block
-(pcb) implementation are merged between netinet and netinet6 in
-KAME/FreeBSD31 code, but they are separate in KAME/FreeBSD228 code.
-This is the reason for different behavior in two OSes.
 
 2. Network Drivers
 
