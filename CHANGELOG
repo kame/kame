@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.744 2000/04/03 04:03:57 itojun Exp $
+$Id: CHANGELOG,v 1.745 2000/04/04 08:49:25 itojun Exp $
 
 <200003>
+Tue Apr  4 17:48:20 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: support setsockopt(IPV6_USE_MIN_MTU)
+	  in 2292bis advanced API.  bsdi3/freebsd2/netbsd only at this moment.
+
 Mon Apr  3 12:36:01 JST 2000  itojun@iijlab.net
 	* */lib/libpcap, */usr.sbin/tcpdump: remove to avoid duplicated effort
 	  with tcpdump.org.  if you want them, use pkgsrc/ports.
