@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1453 2000/12/25 10:07:04 jinmei Exp $
+$KAME: CHANGELOG,v 1.1454 2000/12/26 12:02:45 jinmei Exp $
 
 <200012>
+2000-12-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/lib/libinet6/resolv: supported EDNS0. See log on
+	Wed Apr 26 12:00:59 JST 2000 by itojun for more details.
+
 2000-12-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/lib/libinet6: supported IPv6 transport of DNS resolver.
 	you should updated bsdi4/contrib as well.
