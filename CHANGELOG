@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1694 2001/05/28 16:13:40 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1695 2001/05/29 12:41:19 fujisawa Exp $
 
 <200105>
+2001-05-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c
+	- Translate LPSV to PASV.
+	- Translate PASV result(*1) to LPSV result(*2).
+	    *1: 227 Entering Passive Mode (...)
+	    *2: 228 Entering Long Passive Mode (...)
+	  Todo: LPRT -> PORT, PORT result -> LPRT result.
+
 2001-05-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs.h,trans.c,tslot.c,var.h}
 	- convert FTP EPRT command to PORT.
