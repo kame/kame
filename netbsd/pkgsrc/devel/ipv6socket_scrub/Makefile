@@ -1,5 +1,5 @@
 # $NetBSD$
-# KAME $Id: Makefile,v 1.4 1999/11/25 08:47:02 itojun Exp $
+# KAME $Id: Makefile,v 1.5 1999/11/28 14:32:53 itojun Exp $
 #
 
 DISTNAME=		IPv6socket_scrub
@@ -19,8 +19,10 @@ NO_PACKAGE=		"not redistributable"
 RESTRICTED=		"not redistributable, license agreement required"
 
 do-fetch:
-	@${ECHO} "===> You need to sign the agreement on ${HOMEPAGE}"
-	@${ECHO} "     and fetch on your own."
+	@if test \! -f ${DISTDIR}/${DISTNAME}${EXTRACT_SUFX}; then \
+		${ECHO} "===> You need to sign the agreement on ${HOMEPAGE}"; \
+		${ECHO} "     and fetch on your own."; \
+	fi
 
 do-install:
 	${INSTALL_PROGRAM} ${WRKSRC}/ipv6socket_scrub ${PREFIX}/bin
