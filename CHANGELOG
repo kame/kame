@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2699 2004/12/02 13:03:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.2700 2004/12/03 05:50:13 jinmei Exp $
 
 <200412>
+2004-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/common.c: silenced strict-aliasing warnings.
+	Otherwise dhcp6 could not be built with -O2 on FreeBSD 5.3.
+	(KAME-PR 851)
+
 2004-12-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/config.c (configure_commit): corrected list
 	management operation.  (mostly harmless, but it was incorrect.)
