@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.100 1999/09/08 07:36:45 jinmei Exp $
+$Id: CHANGELOG,v 1.101 1999/09/08 10:37:07 itojun Exp $
 
 
 <199909>
+Wed Sep  8 19:34:57 JST 1999  itojun@iijlab.net
+	* netbsd/sys/dev/ic/sm91cxx.c: avoid duplicated multicast packet
+	  reception on promiscuous mode.  this fixes DAD failure during
+	  promiscuous mode.
+
 1999-09-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi3/sbin/ifconfig/ifconfig.c (findaddr): used AF dependent
 	comparison functions instead of simple binary comparison. With
