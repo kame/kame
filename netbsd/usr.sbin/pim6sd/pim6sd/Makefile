@@ -36,12 +36,8 @@ CFLAGS+= -g
 CPPFLAGS+=-I.
 CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
 CPPFLAGS+=-DHAVE_STDARG_H -DYY_NO_UNPUT
-LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
-	-L${.CURDIR}/../../../lib/libinet6/obj \
-	-L/usr/local/v6/lib -linet6
-DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
+LDADD+=	-L${.CURDIR}/../../../lib/libinet6 -linet6
+DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a
 LDADD+=-ly -ll
 YFLAGS+=-d
 CLEANFILES+=	y.tab.h cfparse.h

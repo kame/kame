@@ -5,10 +5,10 @@
 
 PROG=	systat
 
-.PATH:	${NETBSDSRCDIR}/usr.bin/vmstat ${NETBSDSRCDIR}/usr.bin/who
+.PATH:	${.CURDIR}/../../usr.bin/vmstat ${.CURDIR}/../../usr.bin/who
 
-CPPFLAGS+=-I${NETBSDSRCDIR}/usr.bin/vmstat -DSUPPORT_UTMP -DSUPPORT_UTMPX \
-	-I${NETBSDSRCDIR}/usr.bin/who
+CPPFLAGS+=-I${.CURDIR}/../../usr.bin/vmstat -DSUPPORT_UTMP -DSUPPORT_UTMPX \
+	-I${.CURDIR}/../../usr.bin/who
 CWARNFLAGS+=    -Wno-format-y2k
 SRCS=	bufcache.c cmds.c cmdtab.c disks.c dkstats.c fetch.c globalcmds.c \
 	icmp.c iostat.c ip.c keyboard.c main.c mbufs.c netcmds.c netstat.c \
@@ -23,13 +23,9 @@ MLINKS+=systat.1 sysstat.1
 CPPFLAGS+=-DINET6 -DIPSEC
 SRCS+=	ip6.c ipsec.c
 
-.if exists(/usr/local/v6/lib/libinet6.a)
-LDADD+= -L${.CURDIR}/../../lib/libinet6 \
-	-L${.CURDIR}/../../lib/libinet6/obj \
-	-L/usr/local/v6/lib -linet6
-DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
+.if exists(${.CURDIR}/../../lib/libinet6.a)
+LDADD+= -L${.CURDIR}/../../lib/libinet6 -linet6
+DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a
 .endif
 
 .include <bsd.prog.mk>

@@ -13,7 +13,7 @@ SRCS=	main.c session.c isakmp.c handler.c arc4random.c \
 	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c \
 	proposal.c sainfo.c vendorid.c safefile.c backupsa.c \
 	dnssec.c getcertsbyname.c
-SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c sha2.c
+SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c
 
 MAN=	racoon.8 racoon.conf.5
 
@@ -52,8 +52,6 @@ CPPFLAGS+=-I${RACOONSRCDIR}/missing
 .if (${MKKERBEROS} != "no")
 CPPFLAGS+=-DHAVE_GSSAPI 
 .endif
-# sys.mk generates cfparse.h, not y.tab.h
-CPPFLAGS+=-DHAVE_CFPARSE_H
 YFLAGS+=-d
 
 # Certificate support

@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2001/12/27 13:05:49 jinmei Exp $
+#	$KAME: Makefile,v 1.2 2005/01/05 07:37:32 itojun Exp $
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,11 +28,8 @@
 SRCDIR=	${.CURDIR}/../../kame/ip6addrctl
 PROG=	ip6addrctl
 
-LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
-	-L/usr/local/v6/lib -linet6
-DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 -linet6
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a
 
 MAN= ip6addrctl.8
 

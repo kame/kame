@@ -36,11 +36,8 @@ SRCDIR=	${.CURDIR}/../../../kame/mping
 .PATH:	${SRCDIR}
 
 CFLAGS+= -I$(.CURDIR)/../../../kame/mping
-LDADD+=	-L/usr/local/v6/lib -L${.OBJDIR}/../../../lib/libinet6 \
-	-L${.OBJDIR}/../../../lib/libinet6/obj -linet6
-DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
-	${.OBJDIR}/../../../lib/libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a 
+LDADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a
+DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a
 LDADD+=	-lm
 DPADD+=	${LIBM}
 
