@@ -499,12 +499,11 @@ dump(addr)
 {
 	int mib[6];
 	size_t needed;
-	char *host, *lim, *buf, *next;
+	char *lim, *buf, *next;
 	struct rt_msghdr *rtm;
 	struct sockaddr_in6 *sin;
 	struct sockaddr_dl *sdl;
 	extern int h_errno;
-	struct hostent *hp;
 	struct in6_nbrinfo *nbi;
 	struct timeval time;
 	int addrwidth;
