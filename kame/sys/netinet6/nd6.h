@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.36 2001/02/03 13:37:51 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.37 2001/02/03 15:30:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -271,6 +271,7 @@ extern struct ifnet *nd6_defifp;  /* XXXYYY */
 extern int nd6_defifindex;
 extern int ip6_desync_factor;	/* seconds */
 extern int ip6_temp_preferred_lifetime; /* seconds */
+extern int ip6_temp_valid_lifetime; /* seconds */
 extern int ip6_anon_regen_advance; /* seconds */
 
 union nd_opts {

@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.71 2000/12/12 23:46:08 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.72 2001/02/03 15:30:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -612,9 +612,13 @@ struct ip6_mtuinfo {
 #define IPV6CTL_LOWPORTMIN	30	/* minimum reserved port */
 #define IPV6CTL_LOWPORTMAX	31	/* maximum reserved port */
 #endif
+#define IPV6CTL_USETEMPADDR	32	/* use temporary addresses (RFC3041) */
+#define IPV6CTL_TEMPPLTIME	33	/* preferred lifetime for tmpaddrs */
+#define IPV6CTL_TEMPVLTIME	34	/* valid lifetime for tmpaddrs */
+
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
-#define IPV6CTL_MAXID		32
+#define IPV6CTL_MAXID		35
 
 #ifdef IPV6CTL_MAPPED_ADDR
 #define __IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
@@ -740,6 +744,9 @@ struct ip6_mtuinfo {
 	{ __IPV6CTL_NAMES_ANONPORTMAX, __IPV6CTL_TYPE_ANONPORTMAX }, \
 	{ __IPV6CTL_NAMES_LOWPORTMIN, __IPV6CTL_TYPE_LOWPORTMIN }, \
 	{ __IPV6CTL_NAMES_LOWPORTMAX, __IPV6CTL_TYPE_LOWPORTMAX }, \
+	{ "use_tempaddr", CTLTYPE_INT }, \
+	{ "temppltime", CTLTYPE_INT }, \
+	{ "tempvltime", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__

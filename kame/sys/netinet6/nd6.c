@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.98 2001/02/02 15:21:17 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.99 2001/02/03 15:30:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -629,7 +629,7 @@ nd6_timer(ignored_arg)
 			 */
 			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
 			    (oldflags & IN6_IFF_DEPRECATED) == 0 &&
-			    ip6_usetmpaddr) {
+			    ip6_use_tempaddr) {
 				/*
 				 * XXX: we separated the routine as a function
 				 * just because indentation issue...

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.154 2001/02/03 13:19:15 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.155 2001/02/03 15:30:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2590,7 +2590,29 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		}
 		return (error);
 #endif
-#endif
+#endif /* !IPNOPRIVPORTS */
+	case IPV6CTL_USETEMPADDR:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				  &ip6_use_tempaddr);
+	case IPV6CTL_TEMPPLTIME:
+		old = ip6_temp_preferred_lifetime;
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ip6_temp_preferred_lifetime);
+		if (ip6_temp_preferred_lifetime <
+		    ip6_desync_factor + ip6_anon_regen_advance) {
+			ip6_temp_preferred_lifetime = old;
+			return(EINVAL);
+		}
+		return(error);
+	case IPV6CTL_TEMPVLTIME:
+		old = ip6_temp_valid_lifetime;
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ip6_temp_valid_lifetime);
+		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
+			ip6_temp_valid_lifetime = old;
+			return(EINVAL);
+		}
+		return(error);
 	default:
 		return EOPNOTSUPP;
 	}

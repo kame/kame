@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.86 2001/02/03 13:37:51 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.87 2001/02/03 15:30:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,14 +99,14 @@ struct ifnet *nd6_defifp;
 int nd6_defifindex;
 
 #ifdef IPV6TMPADDR
-int ip6_usetmpaddr = IPV6TMPADDR;
+int ip6_use_tempaddr = IPV6TMPADDR;
 #else
-int ip6_usetmpaddr = 0;
+int ip6_use_tempaddr = 0;
 #endif
 
 int ip6_desync_factor;
 int ip6_temp_preferred_lifetime = DEF_TEMP_PREFERRED_LIFETIME;
-static int ip6_temp_valid_lifetime = DEF_TEMP_VALID_LIFETIME;
+int ip6_temp_valid_lifetime = DEF_TEMP_VALID_LIFETIME;
 /*
  * shorter lifetimes for debugging purposes.
 int ip6_temp_preferred_lifetime = 800;
@@ -1282,7 +1282,7 @@ prelist_update(new, dr, m)
 			 * addresses.  Thus, we specifiy 1 as the 2nd arg of
 			 * in6_tmpifadd().
 			 */
-			if (ip6_usetmpaddr) {
+			if (ip6_use_tempaddr) {
 				int e;
 				if ((e = in6_tmpifadd(ia6, 1)) != 0) {
 					log(LOG_NOTICE, "prelist_update: "
