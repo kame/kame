@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.102 2003/07/08 20:54:47 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.103 2003/07/12 15:18:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -162,9 +162,9 @@ static int set_pim6 __P((int *));
 static int get_pim6 __P((struct mbuf *));
 #endif
 static int socket_send __P((struct socket *, struct mbuf *,
-			    struct sockaddr_in6 *));
+	    struct sockaddr_in6 *));
 static int register_send __P((struct ip6_hdr *, struct mif6 *, struct mbuf *,
-			      struct sockaddr_in6 *, struct sockaddr_in6 *));
+	    struct sockaddr_in6 *, struct sockaddr_in6 *));
 
 /*
  * Globals.  All but ip6_mrouter, ip6_mrtproto and mrt6stat could be static,
@@ -187,17 +187,17 @@ static struct mif6 mif6table[MAXMIFS];
 #endif
 #ifdef MRT6DEBUG
 u_int		mrt6debug = 0;	  /* debug level 	*/
-#define		DEBUG_MFC	0x02
-#define		DEBUG_FORWARD	0x04
-#define		DEBUG_EXPIRE	0x08
-#define		DEBUG_XMIT	0x10
-#define         DEBUG_REG       0x20
-#define         DEBUG_PIM       0x40
+#define DEBUG_MFC	0x02
+#define DEBUG_FORWARD	0x04
+#define DEBUG_EXPIRE	0x08
+#define DEBUG_XMIT	0x10
+#define DEBUG_REG	0x20
+#define DEBUG_PIM	0x40
 #endif
 
 static void	expire_upcalls __P((void *));
-#define		EXPIRE_TIMEOUT	(hz / 4)	/* 4x / second */
-#define		UPCALL_EXPIRE	6		/* number of timeouts */
+#define	EXPIRE_TIMEOUT	(hz / 4)	/* 4x / second */
+#define	UPCALL_EXPIRE	6		/* number of timeouts */
 
 #ifdef INET
 #ifdef MROUTING
