@@ -126,12 +126,14 @@ rip_sockinit()
   ripsin.sin6_family   = AF_INET6;
   ripsin.sin6_port     = htons(RIPNG_PORT);
   ripsin.sin6_flowinfo = 0;
+
+  /* bind must be called before filling RIPNG_DEST in ripsin */
+  if (bind(ripsock, (struct sockaddr *)&ripsin, sizeof(ripsin)) < 0)
+    fatal("<rip_init>: bind");
+
   if (inet_pton(AF_INET6, RIPNG_DEST, (void *)&ripsin.sin6_addr) != 1)
     fatal("<rip_init>: inet_pton");
   mreq.ipv6mr_multiaddr = ripsin.sin6_addr;
-
-  if (bind(ripsock, (struct sockaddr *)&ripsin, sizeof(ripsin)) < 0)
-    fatal("<rip_init>: bind");
 
   for (ripif = ripifs; ripif; ) { /* XXX: odd loop */
     if ((ripif->rip_mode & IFS_NORIPIN) != 0)
