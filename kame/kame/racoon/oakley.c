@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.25 2000/02/23 10:36:03 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.26 2000/02/23 12:25:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1516,7 +1516,7 @@ oakley_getidstr(id, len)
 	case IPSECDOI_ID_FQDN:
 	case IPSECDOI_ID_USER_FQDN:
 		idstrlen = len - sizeof(*id);
-		idsrc = (char *)id + 1;
+		idsrc = (char *)(id + 1);
 		break;
 	default:
 		plog(logp, LOCATION, NULL,
