@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.45 2001/02/09 05:59:46 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.46 2001/05/21 05:37:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,7 +137,15 @@ struct	in6pcb {
 #define IN6P_LOWPORT		0x2000000 /* user wants "low" port binding */
 #define IN6P_ANONPORT		0x4000000 /* port chosen for user */
 #define IN6P_FAITH		0x8000000 /* accept FAITH'ed connections */
+#if 0
+/*
+ * IN6P_BINDV6ONLY should be obsoleted by IN6P_IPV6_V6ONLY.
+ * Once we are sure that this macro is not referred from anywhere, we should
+ * completely delete the definition.
+ * jinmei@kame.net, 20010625.
+ */
 #define IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
+#endif
 #define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define IN6P_MTU		0x80000000 /* receive path MTU */
