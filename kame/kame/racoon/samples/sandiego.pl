@@ -1,4 +1,16 @@
-# $Id: sandiego.pl,v 1.2 2000/01/11 18:06:38 itojun Exp $
+die "too few arguments" if (scalar(@ARGV) != 2);
+$me = $ARGV[0];
+$you = $ARGV[0];
+$hostname = `hostname`;
+$hostname =~ s/\n$//;
+$userfqdn = `whoami`;
+$userfqdn =~ s/\n$//;
+$userfqdn .= '@' . $hostname;
+$rcsid = '$Id: sandiego.pl,v 1.3 2000/01/11 18:40:49 itojun Exp $';
+
+print <<EOF;
+# automatically generated from $rcsid
+# do not edit
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "./psk.txt" ;
@@ -9,8 +21,8 @@ path certificate "./cert.txt" ;
 
 # personal infomation.
 identifier vendor_id "KAME/racoon";
-identifier user_fqdn "sakane@kame.net";
-identifier fqdn "mine.kame.net";
+identifier user_fqdn "$userfqdn";
+identifier fqdn "$hostname";
 identifier keyid "./keyid.txt";
 
 # "log" specifies logging level.  It is followed by either "info", "notify",
@@ -170,11 +182,11 @@ remote 194.100.55.1 [500]
 	}
 }
 
-policy 206.175.160.20/30 0.0.0.0/0 any out ipsec
+policy $me/32 $you/32 any inout ipsec
 {
 	#pfs_group modp768;
 
-	# This proposal means IP2|AH|ESP|IP1|ULP.
+	# This proposal means IP2|AH|ESP|ULP.
 	proposal {
 		lifetime time 300 second;
 		lifetime byte 10000 KB;
@@ -194,7 +206,7 @@ policy 206.175.160.20/30 0.0.0.0/0 any out ipsec
 		}
 	}
 
-	# This proposal means IP2|ESP|IP1|ULP.
+	# This proposal means IP2|ESP|ULP.
 	proposal {
 		lifetime time 600 second;
 		lifetime byte 10000 KB;
@@ -207,4 +219,4 @@ policy 206.175.160.20/30 0.0.0.0/0 any out ipsec
 	}
 
 }
-
+EOF
