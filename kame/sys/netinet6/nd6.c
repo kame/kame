@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.177 2001/07/24 08:55:30 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.178 2001/07/24 17:54:27 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1266,7 +1266,7 @@ nd6_rtrequest(req, rt, sa)
 			if (ln && ln->ln_expire == 0) {
 				/* kludge for desktops */
 #if 0
-				printf("nd6_request: time.tv_sec is zero; "
+				printf("nd6_rtequest: time.tv_sec is zero; "
 				       "treat it as 1\n");
 #endif
 				ln->ln_expire = 1;
