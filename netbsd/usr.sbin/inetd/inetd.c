@@ -891,7 +891,7 @@ config(signo)
 			error = getaddrinfo(host, port, &hints, &res);
 			if (error) {
 				if (host == NULL) {
-					syslog(LOG_ERR, "%s/%s: %s: "
+					syslog(LOG_WARNING, "%s/%s: %s: "
 					    "the address family is not "
 					    "supported by the kernel",
 					    sep->se_service, sep->se_proto,
