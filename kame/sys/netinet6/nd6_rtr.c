@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.48 2000/08/12 08:08:00 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.49 2000/08/21 05:59:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1042,6 +1042,11 @@ prelist_update(new, dr, m)
 			lt6->ia6t_pltime = new->ndpr_pltime;
 			in6_init_address_ltimes(new, lt6, 1);
 		} else {
+			u_int32_t storedlifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			long time_second = time.tv_sec;
+#endif
+
 #define TWOHOUR		(120*60)
 			/*
 			 * We have seen the prefix before, and we have added
@@ -1056,17 +1061,27 @@ prelist_update(new, dr, m)
 			lt6 = &ia6->ia6_lifetime;
 
 #if 0	/* RFC 2462 5.5.3 (e) */
+			storedlifetime = lt6->ia6t_vltime;
 			lt6->ia6t_pltime = new->ndpr_pltime;
-			if (TWOHOUR < new->ndpr_vltime
-			 || lt6pr->nd < new->ndpr_vltime) {
+			if (TWOHOUR < new->ndpr_vltime ||
+			    storedlifetime < new->ndpr_vltime) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
-			} else if (auth
-				&& lt6->ia6t_vltime <= TWOHOUR0
-				&& new->ndpr_vltime <= lt6->ia6t_vltime) {
+			} else if (auth &&
+				   storedlifetime <= TWOHOUR
+#if 0
+				   /* this condition is redundant */
+				   && new->ndpr_vltime <= storedlifetime
+#endif
+				) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
 			} else {
+				/*
+				 * new->ndpr_vltime <= TWOHOUR &&
+				 * new->ndpr_vltime <= storedlifetime &&
+				 * not authenticated
+				 */
 				lt6->ia6t_vltime = TWOHOUR;
 				update++;
 			}
@@ -1075,8 +1090,22 @@ prelist_update(new, dr, m)
 			new->ndpr_apltime = new->ndpr_pltime;
 			lt6->ia6t_pltime = new->ndpr_pltime;
 #else	/* update from Jim Bound, (ipng 6712) */
-			if (TWOHOUR < new->ndpr_vltime
-			 || lt6->ia6t_vltime < new->ndpr_vltime) {
+			/*
+			 * If the received Valid Lifetime is greater than 2
+			 * hours or greater than Stored Lifetime, update the
+			 * Valid Lifetime of the corresponding address, else
+			 * ignore the prefix, unless the Router Advertisement 
+			 * has been authenticated.
+			 * Note that in this scenario the definition of
+			 * StoredLifetime is the time remaining for the valid
+			 * Lifetime since it was received by a Router
+			 * Advertisement, which is different from the
+			 * definition in RFC2462.
+			 */
+			storedlifetime = lt6->ia6t_expire > time_second ?
+				lt6->ia6t_expire - time_second : 0;
+			if (TWOHOUR < new->ndpr_vltime ||
+			    storedlifetime < new->ndpr_vltime) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
 			} else if (auth) {
