@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.24 2001/09/06 09:35:59 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.25 2001/09/19 10:08:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -386,15 +386,15 @@ natpt_checkICMP(struct pcv *cv4)
 
 		if (pad->sa_family != AF_INET)
 			continue;
-		if (icmpip4->ip_src.s_addr != pad->in4src.s_addr)
+		if (icmpip4->ip_src.s_addr != pad->in4dst.s_addr)
 			continue;
-		if (icmpip4->ip_dst.s_addr != pad->in4dst.s_addr)
+		if (icmpip4->ip_dst.s_addr != pad->in4src.s_addr)
 			continue;
 
 		if (icmpudp4) {
-			if (icmpudp4->uh_sport != pad->port[0])
+			if (icmpudp4->uh_sport != pad->port[1])
 				continue;
-			if (icmpudp4->uh_dport != pad->port[1])
+			if (icmpudp4->uh_dport != pad->port[0])
 				continue;
 		}
 

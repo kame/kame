@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.46 2001/09/19 09:47:34 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.47 2001/09/19 10:08:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -764,6 +764,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	cv6.ip.ip6 = ip6 = mtod(m6, struct ip6_hdr *);
 	cv6.pyld.caddr = (caddr_t)cv6.ip.ip6 + sizeof(struct ip6_hdr);
 	cv6.fromto = cv4->fromto;
+	cv6.flags  = cv4->flags;
 
 	ip6->ip6_nxt  = IPPROTO_ICMPV6;
 	natpt_composeIPv6Hdr(ip4, pad, ip6);
@@ -1025,13 +1026,15 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 	case ICMP_UNREACH:
 	case ICMP_TIMXCEED:	/* traceroute return */
-		{
+		if (cv6->flags & NATPT_TRACEROUTE) {
 			struct udphdr	*icmpudp6;
 
 			icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 +
 						     sizeof(struct ip6_hdr));
-			icmpudp6->uh_sport = pad->port[1];
-			icmpudp6->uh_dport = pad->port[0];
+			icmpip6->ip6_src = pad->in6src;
+			icmpip6->ip6_dst = pad->in6dst;
+			icmpudp6->uh_sport = pad->port[0];
+			icmpudp6->uh_dport = pad->port[1];
 		}
 		break;
 	}
