@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2634 2004/07/05 08:09:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2635 2004/07/06 10:21:46 suz Exp $
 
 <200407>
+2004-07-06  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/vif.c: fixed a bug that pim6sd cannot receive
+	PIM messages on MLDv2-ready kernel.
+
 2004-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): ignored manually
 	configured addresses to decide whether to autoconfigure a new

@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.43 2004/06/09 19:09:22 suz Exp $	*/
+/*	$KAME: vif.c,v 1.44 2004/07/06 10:21:47 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -336,7 +336,7 @@ void start_vif (mifi_t vifi)
 	    /*
 	     * Join the PIM multicast group on the interface.
 	     */
-	    k_join(mld6_socket, &allpim6routers_group.sin6_addr,
+	    k_join(pim6_socket, &allpim6routers_group.sin6_addr,
 		   v->uv_ifindex);
 
 	    /*
@@ -397,7 +397,7 @@ stop_vif(mifi_t vifi)
 	 */
 	v = &uvifs[vifi];
 	if (!(v->uv_flags & MIFF_REGISTER)) {
-		k_leave(mld6_socket, &allpim6routers_group.sin6_addr,
+		k_leave(pim6_socket, &allpim6routers_group.sin6_addr,
 			v->uv_ifindex);
 		k_leave(mld6_socket, &allrouters_group.sin6_addr,
 			v->uv_ifindex);
