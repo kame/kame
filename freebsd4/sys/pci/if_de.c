@@ -5208,11 +5208,6 @@ tulip_pci_attach(device_t dev)
 	return ENXIO;
     }
 
-    sc = (tulip_softc_t *) malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT);
-    if (sc == NULL)
-	return;
-    bzero(sc, sizeof(*sc));				/* Zero out the softc*/
-
     sc = device_get_softc(dev);
     sc->tulip_pci_busno = pci_get_bus(dev);
     sc->tulip_pci_devno = pci_get_slot(dev);

@@ -915,17 +915,6 @@ srattach(struct sr_hardc *hc)
 		ifp->if_watchdog = srwatchdog;
 		IFQ_SET_READY(&ifp->if_snd);
 
-		/*
-		 * Despite the fact that we want to allow both PPP *and*
-		 * Frame Relay access to a channel, due to the architecture
-		 * of the system, we'll have to do the attach here.
-		 *
-		 * At some point I'll defer the attach to the "up" call and
-		 * have the attach/detach performed when the interface is
-		 * up/downed...
-		 */
-		sc->attached = 0;
-		sc->protocol = N2_USE_PPP;	/* default protocol */
 		sc->ifsppp.pp_flags = PP_KEEPALIVE;
 		sppp_attach((struct ifnet *)&sc->ifsppp);
 		if_attach(ifp);
