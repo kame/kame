@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.75 2001/11/05 02:49:16 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.76 2001/12/18 02:10:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -341,7 +341,7 @@ extern u_int32_t ip6_temp_valid_lifetime; /* seconds */
 extern int ip6_temp_regen_advance; /* seconds */
 
 union nd_opts {
-	struct nd_opt_hdr *nd_opt_array[10];	/* max = target address list */
+	struct nd_opt_hdr *nd_opt_array[13];	/* max = target address list */
 	struct {
 		struct nd_opt_hdr *zero;
 		struct nd_opt_hdr *src_lladdr;
