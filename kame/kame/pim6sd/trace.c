@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.10 2000/07/24 01:00:29 itojun Exp $	*/
+/*	$KAME: trace.c,v 1.11 2000/08/08 05:08:44 jinmei Exp $	*/
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -312,11 +312,9 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
     
 	/* copy the packet to the sending buffer */
 	p = mld6_send_buf + sizeof(struct mld6_hdr);
-    
 	bcopy(data, p, datalen);
-    
 	p += datalen;
-    
+
 	/*
 	 * If there is no room to insert our reply, coopt the previous hop
 	 * error indication to relay this fact.
