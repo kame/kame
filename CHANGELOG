@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1928 2001/10/23 11:02:11 jinmei Exp $
+$KAME: CHANGELOG,v 1.1929 2001/10/23 11:03:12 jinmei Exp $
 
 <200110>
+2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c: NULL-clear m->m_pkthdr.rcvif
+	before calling ip6_mforward(). [KAME PR sys/387]
+
 2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/v6test: removed the -c option introduced on
 	2001-09-16, just because we do not need the function.
