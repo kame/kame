@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.18 2001/09/05 12:45:11 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.19 2001/09/18 12:31:20 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -365,6 +365,8 @@ res_send(buf, buflen, ans, anssiz)
 	int gotsomewhere, connreset, terrno, try, v_circuit, resplen, ns;
 	register int n;
 	u_int badns;	/* XXX NSMAX can't exceed #/bits in this var */
+	int changeserver = 0;
+	struct sockaddr_storage newnsap;
 
 	if ((_res.options & RES_INIT) == 0 && res_init() == -1) {
 		/* errno should have been set by res_init() in this case. */
@@ -822,19 +824,24 @@ read_len:
 					ans, (resplen>anssiz)?anssiz:resplen);
 				goto wait;
 			}
+			changeserver = 0;
 #if CHECK_SRVR_ADDR
-			if (!(_res.options & RES_INSECURE1) &&
-			    !res_isourserver((struct sockaddr_in *)&from)) {
-				/*
-				 * response from wrong server? ignore it.
-				 * XXX - potential security hazard could
-				 *	 be detected here.
-				 */
-				DprintQ((_res.options & RES_DEBUG) ||
-					(_res.pfcode & RES_PRF_REPLY),
-					(stdout, ";; not our server:\n"),
-					ans, (resplen>anssiz)?anssiz:resplen);
-				goto wait;
+			if (!res_isourserver((struct sockaddr_in *)&from)) {
+				if (!(_res.options & RES_INSECURE1)) {
+					/*
+					 * response from wrong server?
+					 * ignore it.
+					 * XXX - potential security hazard
+					 * could be detected here.
+					 *	 
+					 */
+					DprintQ((_res.options & RES_DEBUG) ||
+						(_res.pfcode & RES_PRF_REPLY),
+						(stdout, ";; not our server:\n"),
+						ans, (resplen>anssiz)?anssiz:resplen);
+					goto wait;
+				}
+				changeserver = 1;
 			}
 #endif
 			if (!(_res.options & RES_INSECURE2) &&
@@ -872,6 +879,10 @@ read_len:
 				       (stdout, ";; truncated answer\n"));
 				v_circuit = 1;
 				res_close();
+				if (changeserver) {
+					newnsap = from;
+					nsap = (struct sockaddr *)&newnsap;
+				}
 				goto same_ns;
 			}
 		} /*if vc/dg*/
