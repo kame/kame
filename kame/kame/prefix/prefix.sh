@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#	$KAME: prefix.sh,v 1.11 2001/02/04 03:52:16 jinmei Exp $
+#	$KAME: prefix.sh,v 1.12 2001/05/26 23:38:10 itojun Exp $
 
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -61,7 +61,7 @@ case $command in
 	exec ifconfig $iface inet6 $address prefixlen 64 alias
     ;;
     delete)
-    	addrs=`ifconfig ed0 inet6 | grep "inet6 $prefix" |  awk '{print $2}'`
+    	addrs=`ifconfig $iface inet6 | grep "inet6 $prefix" |  awk '{print $2}'`
 	for a in $addrs; do
 	    ifconfig $iface inet6 $a -alias
 	done
