@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.116 2004/07/07 08:43:08 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.117 2004/07/27 13:12:00 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -231,7 +231,7 @@ stfattach(dummy)
 #else
 	nstf = NSTF;
 #endif
-	stf = malloc(nstf * sizeof(struct stf_softc), M_DEVBUF, M_WAIT);
+	stf = malloc(nstf * sizeof(struct stf_softc), M_DEVBUF, M_WAITOK);
 	bzero(stf, nstf * sizeof(struct stf_softc));
 	sc = stf;
 

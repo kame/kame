@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.109 2004/05/27 05:05:10 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.110 2004/07/27 13:11:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,7 +154,7 @@ gifattach(dummy)
 	ngif = NGIF;
 #endif
 	gif_softc = sc = malloc(ngif * sizeof(struct gif_softc),
-	    M_DEVBUF, M_WAIT);
+	    M_DEVBUF, M_WAITOK);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.70 2004/05/26 09:54:46 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.71 2004/07/27 13:11:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,7 +188,7 @@ hifattach(dummy)
 
 	LIST_INIT(&hif_softc_list);
 
-	sc = malloc(NHIF * sizeof(struct hif_softc), M_DEVBUF, M_WAIT);
+	sc = malloc(NHIF * sizeof(struct hif_softc), M_DEVBUF, M_WAITOK);
 	bzero(sc, NHIF * sizeof(struct hif_softc));
 	for (i = 0 ; i < NHIF; sc++, i++) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)

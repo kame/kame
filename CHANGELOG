@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2649 2004/07/26 09:43:25 suz Exp $
+$KAME: CHANGELOG,v 1.2650 2004/07/27 13:11:59 suz Exp $
 
 <200407>
+2004-07-27  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/net/if*.c: removed a "malloc() failure" warning message
+ 	  at start-up time on freebsd5.
+
 Mon Jul 26 17:21:06 JST 2004	keiichi@iij.ad.jp
 	* freebsd[45]/sys/netinet/tcp_syncache.c tcp_var.h:
 	Initialize IPv6 flowinfo field in syncache/syncookie mechanism.
