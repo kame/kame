@@ -3249,7 +3249,7 @@ pim_input_to_daemon:
      * XXX: the outer IP header pkt size of a Register is not adjust to
      * reflect the fact that the inner multicast data is truncated.
      */
-    rip_input(m, iphlen, proto);
+    rip_input(m, iphlen);
 
     return;
 }
