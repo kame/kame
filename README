@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/12/10 14:18:34 $
+			$Date: 2000/01/30 09:45:36 $
 
 <<<Project Overview>>>
 
@@ -90,26 +90,29 @@ Current core members are:
       Shin-ichi FUJISAWA  Yokogawa Electric Corporation
            Kazushi SUGYO  NEC Corporation
          Yoshinobu INOUE  Fujitsu Limited
+	     Kenjiro CHO  Sony Computer Science Laboratory Inc.
 
 <<<Acknowledgements>>>
 
 The core members deeply thank the original members and the
-contributers including Keiichi SHIMA, Yusaku HASEGAWA, Kentaro MISU,
-Yasushi YAMASAKI, Atsushi ONOE, Noritoshi DEMIZU, Katsushi KOBAYASHI,
-Takahiro KIKUCHI, Motonori NAKAMURA, Kazunori FUJIWARA, Kenjiro CHO,
-HO Sonmyong, Masanari TSUBAI, Hiroshi URA, Craig Metz, Chris the Elder,
-UO Youjiro, Wayne Knowles, Hajimu UMEMOTO, Ichiro Fukuhara,
-David P. Wiggins, Martti Kuparinen, Tetsuya Isaki, Erik Bertelsen,
-Toshio Shimojou, Kazunori Fujiwara, Kimio Ishii, Masafumi OE,
-SUZUKI Shinsuke, Mickael Hoerdt, Arkadiusz Miskiewicz,
-Wolfgang Rupprecht, YASUOKA Masahiko, Nobumichi Ozoe,
-Frederic SOULIER, Koji Kondo, David PATE, Kenjiro Komaki, Satosi KOBAYASI,
-Takashi Tanaka, Heiko W. Rupp, Kazuto Ushioda, Masahiro Ishiyama,
-Bill Sommerfeld, Jason Thorpe, Yasunari Momoi, Chris P. Ross,
-Hideaki Imaizumi, Alexander Fung, Scott Mace, Peter Tattam,
-Hideaki YOSHIFUJI, Naoyasu Takenaka, Wada Keiji, Theo de Raadt,
-Niels Baggesen, Takahiro Yugawa, Laine Stump, Hans-Joachim Knobloch,
-Angelos D. Keromytis and KOIE Hidetaka (in no particular order).
+contributers including:
+Keiichi SHIMA, Yusaku HASEGAWA, Kentaro MISU, Yasushi YAMASAKI,
+Atsushi ONOE, Noritoshi DEMIZU, Katsushi KOBAYASHI, Takahiro KIKUCHI,
+Motonori NAKAMURA, Kazunori FUJIWARA, Kenjiro CHO, HO Sonmyong,
+Masanari TSUBAI, Hiroshi URA, Craig Metz, Chris the Elder, UO
+Youjiro, Wayne Knowles, Hajimu UMEMOTO, Ichiro Fukuhara, David P.
+Wiggins, Martti Kuparinen, Tetsuya Isaki, Erik Bertelsen, Toshio
+Shimojou, Kazunori Fujiwara, Kimio Ishii, Masafumi OE, SUZUKI
+Shinsuke, Mickael Hoerdt, Arkadiusz Miskiewicz, Wolfgang Rupprecht,
+YASUOKA Masahiko, Nobumichi Ozoe, Frederic SOULIER, Koji Kondo,
+David PATE, Kenjiro Komaki, Satosi KOBAYASI, Takashi Tanaka, Heiko
+W. Rupp, Kazuto Ushioda, Masahiro Ishiyama, Bill Sommerfeld, Jason
+Thorpe, Yasunari Momoi, Chris P. Ross, Hideaki Imaizumi, Alexander
+Fung, Scott Mace, Peter Tattam, Hideaki YOSHIFUJI, Naoyasu Takenaka,
+Wada Keiji, Theo de Raadt, Niels Baggesen, Takahiro Yugawa, Laine
+Stump, Hans-Joachim Knobloch, Angelos D. Keromytis, KOIE Hidetaka,
+Markus Friedl, Ryota HIROSE, Shigeya Suzuki, and Assar Westerlund.
+(in no particular order).
 
 We also would like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
