@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.335 2003/06/02 06:51:24 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.336 2003/07/16 17:11:10 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -613,7 +613,7 @@ not forward the packets.  net.inet6.ip6.forwarding defines whether this
 node is a router or a host (router if it is 1, host if it is 0).
 
 It is NOT recommended to change net.inet6.ip6.forwarding while the node
-is in operation.   IPv6 specification defines behavior for "host" and "router"
+is in operation.  IPv6 specification defines behavior for "host" and "router"
 quite differently, and switching from one to another can cause serious
 troubles.  It is recommended to configure the variable at bootstrap time only.
 
