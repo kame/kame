@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.391 2000/01/01 18:47:42 itojun Exp $
+$Id: CHANGELOG,v 1.392 2000/01/01 19:04:05 itojun Exp $
 
 <200001>
 Sun Jan  2 03:46:57 JST 2000  itojun@iijlab.net
-	* sys/netinet6/icmp6.[ch]: add net.inet6.icmp6.nodeinfo sysctl MIB to
-	  enable/disable node information query processing in the kernel.
+	* sys/netinet6/icmp6.[ch]: add net.inet6.icmp6.nodeinfo sysctl MIB,
+	  which enables/disables node information query processing in the
+	  kernel.
 
 Sat Jan  1 03:02:02 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/ftp: fix "ftp URL" behavior.  it failed if the
