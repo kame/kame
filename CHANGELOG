@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.537 2000/02/08 14:15:41 sakane Exp $
+$Id: CHANGELOG,v 1.538 2000/02/08 15:12:57 jinmei Exp $
 
 <200002>
+2000-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c: removed in6_canforward() according to
+	the recent clarification in ip6_forward().
+
+2000-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_forward.c (ip6_forward): if a forwarded
+	packet is going to break a scope boundary, return an icmp6
+	destination unreachable (beyond scope) error.
+
 Tue Feb  8 23:13:32 JST 2000 sakane@kame.net
 	* kame/racoon:
 	  man page updated against recent modification.
