@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.362 2004/02/05 11:32:51 suz Exp $	*/
+/*	$KAME: in6.c,v 1.363 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1807,8 +1807,8 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 
 			/* hostid part must be zero. */
 			sin6 = (struct sockaddr_in6 *)&iflr->addr;
-			if (sin6->sin6_addr.s6_addr32[2] != 0
-			 || sin6->sin6_addr.s6_addr32[3] != 0) {
+			if (sin6->sin6_addr.s6_addr32[2] != 0 ||
+			    sin6->sin6_addr.s6_addr32[3] != 0) {
 				return EINVAL;
 			}
 		} else

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.139 2004/02/12 08:20:55 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.140 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -301,9 +301,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	for (uh = LIST_FIRST(&mip6_unuse_hoa);
 	     uh;
 	     uh = LIST_NEXT(uh, unuse_entry)) {
-		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr)
-			 || IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr))
-		    && (!uh->unuse_port || (dstsock->sin6_port == uh->unuse_port))) {
+		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr) ||
+		     IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr)) &&
+		    (!uh->unuse_port || dstsock->sin6_port == uh->unuse_port)) {
 			usecoa = 1;
 			break;
 		}

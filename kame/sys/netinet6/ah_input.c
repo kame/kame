@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.85 2004/02/11 10:48:26 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.86 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -382,8 +382,8 @@ ah4_input(m, va_alist)
 		}
 
 		nip = (struct ip *)((u_char *)(ah + 1) + sizoff + siz1);
-		if (nip->ip_src.s_addr != ip->ip_src.s_addr
-		 || nip->ip_dst.s_addr != ip->ip_dst.s_addr) {
+		if (nip->ip_src.s_addr != ip->ip_src.s_addr ||
+		    nip->ip_dst.s_addr != ip->ip_dst.s_addr) {
 			m->m_flags &= ~M_AUTHIPHDR;
 			m->m_flags &= ~M_AUTHIPDGM;
 		}
@@ -867,8 +867,8 @@ ah6_input(mp, offp, proto)
 				+ sizeof(struct ip6_hdr), IPPROTO_DONE);
 
 		nip6 = (struct ip6_hdr *)((u_char *)(ah + 1) + sizoff + siz1);
-		if (!IN6_ARE_ADDR_EQUAL(&nip6->ip6_src, &ip6->ip6_src)
-		 || !IN6_ARE_ADDR_EQUAL(&nip6->ip6_dst, &ip6->ip6_dst)) {
+		if (!IN6_ARE_ADDR_EQUAL(&nip6->ip6_src, &ip6->ip6_src) ||
+		    !IN6_ARE_ADDR_EQUAL(&nip6->ip6_dst, &ip6->ip6_dst)) {
 			m->m_flags &= ~M_AUTHIPHDR;
 			m->m_flags &= ~M_AUTHIPDGM;
 		}

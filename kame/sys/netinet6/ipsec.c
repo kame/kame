@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.212 2004/02/11 21:40:59 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.213 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1920,9 +1920,9 @@ ipsec_in_reject(sp, m)
 		printf("ipsec_in_reject: auth:%d conf:%d icv:%d m_flags:%x\n",
 			need_auth, need_conf, need_icv, m->m_flags));
 
-	if ((need_conf && !(m->m_flags & M_DECRYPTED))
-	 || (!need_auth && need_icv && !(m->m_flags & M_AUTHIPDGM))
-	 || (need_auth && !(m->m_flags & M_AUTHIPHDR)))
+	if ((need_conf && !(m->m_flags & M_DECRYPTED)) ||
+	    (!need_auth && need_icv && !(m->m_flags & M_AUTHIPDGM)) ||
+	    (need_auth && !(m->m_flags & M_AUTHIPHDR)))
 		return 1;
 
 	return 0;
@@ -2206,9 +2206,9 @@ ipsec4_encapsulate(m, sav)
 	size_t plen;
 
 	/* can't tunnel between different AFs */
-	if (((struct sockaddr *)&sav->sah->saidx.src)->sa_family
-		!= ((struct sockaddr *)&sav->sah->saidx.dst)->sa_family
-	 || ((struct sockaddr *)&sav->sah->saidx.src)->sa_family != AF_INET) {
+	if (((struct sockaddr *)&sav->sah->saidx.src)->sa_family !=
+	    ((struct sockaddr *)&sav->sah->saidx.dst)->sa_family ||
+	    ((struct sockaddr *)&sav->sah->saidx.src)->sa_family != AF_INET) {
 		m_freem(m);
 		return EINVAL;
 	}
@@ -2342,9 +2342,9 @@ ipsec6_encapsulate(m, sav)
 	int error;
 
 	/* can't tunnel between different AFs */
-	if (((struct sockaddr *)&sav->sah->saidx.src)->sa_family
-		!= ((struct sockaddr *)&sav->sah->saidx.dst)->sa_family
-	 || ((struct sockaddr *)&sav->sah->saidx.src)->sa_family != AF_INET6) {
+	if (((struct sockaddr *)&sav->sah->saidx.src)->sa_family !=
+	    ((struct sockaddr *)&sav->sah->saidx.dst)->sa_family ||
+	    ((struct sockaddr *)&sav->sah->saidx.src)->sa_family != AF_INET6) {
 		m_freem(m);
 		return EINVAL;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.86 2004/02/11 10:48:27 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.87 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -798,8 +798,8 @@ noreplaycheck:
 	nxt = esptail.esp_nxt;
 	taillen = esptail.esp_padlen + sizeof(esptail);
 
-	if (m->m_pkthdr.len < taillen
-	 || m->m_pkthdr.len - taillen < sizeof(struct ip6_hdr)) {	/* ? */
+	if (m->m_pkthdr.len < taillen ||
+	    m->m_pkthdr.len - taillen < sizeof(struct ip6_hdr)) {	/* ? */
 		ipseclog((LOG_WARNING,
 		    "bad pad length in IPv6 ESP input: %s %s\n",
 		    ipsec6_logpacketstr(ip6, spi), ipsec_logsastr(sav)));

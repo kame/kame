@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.188 2004/02/05 10:09:23 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.189 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1023,8 +1023,8 @@ in6_ifdetach(ifp)
 		next = ifa->ifa_list.tqe_next;
 #endif
 
-		if (ifa->ifa_addr->sa_family != AF_INET6
-		 || !IN6_IS_ADDR_LINKLOCAL(&satosin6(&ifa->ifa_addr)->sin6_addr)) {
+		if (ifa->ifa_addr->sa_family != AF_INET6 ||
+		    !IN6_IS_ADDR_LINKLOCAL(&satosin6(&ifa->ifa_addr)->sin6_addr)) {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 			ifaprev = ifa;
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.246 2004/02/11 10:32:51 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.247 2004/02/12 15:38:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -381,8 +381,8 @@ nd6_ra_input(m, off, icmp6len)
 				continue;
 			}
 
-			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix)
-			 || IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix)) {
+			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
+			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix)) {
 				nd6log((LOG_INFO,
 				    "nd6_ra_input: invalid prefix "
 				    "%s, ignored\n",
@@ -391,8 +391,8 @@ nd6_ra_input(m, off, icmp6len)
 			}
 
 			/* aggregatable unicast address, rfc2374 */
-			if ((pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) == 0x20
-			 && pi->nd_opt_pi_prefix_len != 64) {
+			if ((pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) == 0x20 &&
+			    pi->nd_opt_pi_prefix_len != 64) {
 				nd6log((LOG_INFO,
 				    "nd6_ra_input: invalid prefixlen "
 				    "%d for rfc2374 prefix %s, ignored\n",
