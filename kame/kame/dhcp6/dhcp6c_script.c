@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.4 2003/05/16 20:04:36 itojun Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.5 2003/07/31 21:44:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -60,6 +60,8 @@
 #include "common.h"
 
 static char dnsserver_str[] = "new_domain_name_servers";
+static char dnsname_str[] = "new_domain_name";
+static char ntpserver_str[] = "new_ntp_servers";
 
 static int safefile __P((const char *));
 
@@ -69,7 +71,7 @@ client6_script(ifp, state, optinfo)
 	int state;
 	struct dhcp6_optinfo *optinfo;
 {
-	int i, dnsservers, envc, elen;
+	int i, dnsservers, ntpservers, dnsnamelen, envc, elen;
 	char **envp, *s, *scriptpath;
 	char reason[] = "REASON=NBI";
 	struct dhcp6_listval *v;
@@ -82,12 +84,22 @@ client6_script(ifp, state, optinfo)
 
 	/* initialize counters */
 	dnsservers = 0;
-	envc = 2;     /* we always include the reason and the terminator */
+	ntpservers = 0;
+	dnsnamelen = 0;
+	envc = 2;     /* we at least include the reason and the terminator */
 
 	/* count the number of variables */
 	for (v = TAILQ_FIRST(&optinfo->dns_list); v; v = TAILQ_NEXT(v, link))
 		dnsservers++;
 	envc += dnsservers ? 1 : 0;
+	for (v = TAILQ_FIRST(&optinfo->dnsname_list); v;
+	    v = TAILQ_NEXT(v, link)) {
+		dnsnamelen += v->val_vbuf.dv_len;
+	}
+	envc += dnsnamelen ? 1 : 0;
+	for (v = TAILQ_FIRST(&optinfo->ntp_list); v; v = TAILQ_NEXT(v, link))
+		ntpservers++;
+	envc += ntpservers ? 1 : 0;
 
 	/* allocate an environments array */
 	if ((envp = malloc(sizeof (char *) * envc)) == NULL) {
@@ -124,6 +136,41 @@ client6_script(ifp, state, optinfo)
 
 			addr = in6addr2str(&v->val_addr6, 0);
 			strlcat(s, addr, elen);
+			strlcat(s, " ", elen);
+		}
+	}
+	if (ntpservers) {
+		elen = sizeof (ntpserver_str) +
+		    (INET6_ADDRSTRLEN + 1) * ntpservers + 1;
+		if ((s = envp[i++] = malloc(elen)) == NULL) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to allocate strings for NTP servers");
+			goto clean;
+		}
+		memset(s, 0, elen);
+		snprintf(s, elen, "%s=", ntpserver_str);
+		for (v = TAILQ_FIRST(&optinfo->ntp_list); v;
+		    v = TAILQ_NEXT(v, link)) {
+			char *addr;
+
+			addr = in6addr2str(&v->val_addr6, 0);
+			strlcat(s, addr, elen);
+			strlcat(s, " ", elen);
+		}
+	}
+
+	if (dnsnamelen) {
+		elen = sizeof (dnsname_str) + dnsnamelen + 1;
+		if ((s = envp[i++] = malloc(elen)) == NULL) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to allocate strings for NTP servers");
+			goto clean;
+		}
+		memset(s, 0, elen);
+		snprintf(s, elen, "%s=", dnsname_str);
+		for (v = TAILQ_FIRST(&optinfo->dnsname_list); v;
+		    v = TAILQ_NEXT(v, link)) {
+			strlcat(s, v->val_vbuf.dv_buf, elen);
 			strlcat(s, " ", elen);
 		}
 	}

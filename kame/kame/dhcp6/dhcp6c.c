@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.118 2003/04/11 13:16:14 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.119 2003/07/31 21:44:11 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1379,6 +1379,28 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		for (d = TAILQ_FIRST(&optinfo->dns_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
 			dprintf(LOG_DEBUG, FNAME, "nameserver[%d] %s",
+			    i, in6addr2str(&d->val_addr6, 0));
+		}
+	}
+
+	if (!TAILQ_EMPTY(&optinfo->dnsname_list)) {
+		struct dhcp6_listval *d;
+		int i = 0;
+
+		for (d = TAILQ_FIRST(&optinfo->dnsname_list); d;
+		     d = TAILQ_NEXT(d, link), i++) {
+			dprintf(LOG_DEBUG, FNAME, "Domain search list[%d] %s",
+			    i, d->val_vbuf.dv_buf);
+		}
+	}
+
+	if (!TAILQ_EMPTY(&optinfo->ntp_list)) {
+		struct dhcp6_listval *d;
+		int i = 0;
+
+		for (d = TAILQ_FIRST(&optinfo->ntp_list); d;
+		     d = TAILQ_NEXT(d, link), i++) {
+			dprintf(LOG_DEBUG, FNAME, "NTP server[%d] %s",
 			    i, in6addr2str(&d->val_addr6, 0));
 		}
 	}

@@ -153,6 +153,18 @@ else
 fi
 AC_SUBST(dhcpopt_dns)
 
+AC_MSG_CHECKING(for DHCP DNS_NAME option)
+AC_ARG_WITH(opt-dnsname,
+[  --with-opt-dnsname=VALUE    specify DHCP option value for DNS_NAME],
+    dhcpopt_dnsname="$withval", dhcpopt_dnsname=0)
+if test $dhcpopt_dnsname = 0 ; then
+	dhcpopt_dnsname=26
+	AC_MSG_RESULT(unspecified and using $dhcpopt_dnsname)
+else
+	AC_MSG_RESULT(using $dhcpopt_dnsname)
+fi
+AC_SUBST(dhcpopt_dnsname)
+
 AC_MSG_CHECKING(for DHCP prefix delegation option)
 AC_ARG_WITH(opt-pdel,
 [  --with-opt-pdel=VALUE   specify DHCP option value for prefix delegation],
@@ -224,6 +236,18 @@ else
 	AC_MSG_RESULT(using $dhcpstcode_no_prefix)
 fi
 AC_SUBST(dhcpstcode_no_prefix)
+
+AC_MSG_CHECKING(for DHCP NTP option)
+AC_ARG_WITH(opt-ntp,
+[  --with-opt-ntp=VALUE    specify DHCP option value for NTP],
+    dhcpopt_ntp="$withval", dhcpopt_ntp=0)
+if test $dhcpopt_ntp = 0 ; then
+	dhcpopt_ntp=35
+	AC_MSG_RESULT(unspecified and using $dhcpopt_ntp)
+else
+	AC_MSG_RESULT(using $dhcpopt_ntp)
+fi
+AC_SUBST(dhcpopt_ntp)
 
 AC_CHECK_HEADERS(stdarg.h)
 

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.104 2003/07/17 07:54:48 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.105 2003/07/31 21:44:11 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -116,7 +116,7 @@ char *device = NULL;
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 
-static const struct sockaddr_in6 *sa6_any_downstream;
+static const struct sockaddr_in6 *sa6_any_downstream, *sa6_any_relay;
 static struct msghdr rmh;
 static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
@@ -134,6 +134,7 @@ static void server6_recv __P((int));
 static void free_relayinfo __P((struct relayinfo *));
 static int process_relayforw __P((struct dhcp6 **, struct dhcp6opt **,
     struct relayinfolist *, struct sockaddr *));
+static int set_statelessinfo __P((struct dhcp6_optinfo *));
 static int react_solicit __P((struct dhcp6_if *, struct dhcp6 *,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
 static int react_request __P((struct dhcp6_if *, struct in6_pktinfo *,
@@ -194,6 +195,8 @@ main(argc, argv)
 
 	TAILQ_INIT(&arg_dnslist);
 	TAILQ_INIT(&dnslist);
+	TAILQ_INIT(&dnsnamelist);
+	TAILQ_INIT(&ntplist);
 
 	srandom(time(NULL) & getpid());
 	while ((ch = getopt(argc, argv, "c:dDfn:")) != -1) {
@@ -289,6 +292,7 @@ server6_init()
 	struct ipv6_mreq mreq6;
 	static struct iovec iov;
 	static struct sockaddr_in6 sa6_any_downstream_storage;
+	static struct sockaddr_in6 sa6_any_relay_storage;
 
 	TAILQ_INIT(&dhcp6_binding_head);
 
@@ -458,6 +462,21 @@ server6_init()
 	memcpy(&sa6_any_downstream_storage, res->ai_addr, res->ai_addrlen);
 	sa6_any_downstream =
 		(const struct sockaddr_in6*)&sa6_any_downstream_storage;
+	freeaddrinfo(res);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	error = getaddrinfo("::", DH6PORT_UPSTREAM, &hints, &res);
+	if (error) {
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
+		exit(1);
+	}
+	memcpy(&sa6_any_relay_storage, res->ai_addr, res->ai_addrlen);
+	sa6_any_relay =
+		(const struct sockaddr_in6*)&sa6_any_relay_storage;
 	freeaddrinfo(res);
 }
 
@@ -751,6 +770,33 @@ process_relayforw(dh6p, optendp, relayinfohead, from)
 	return (-1);
 }
 
+/*
+ * Set stateless configuration information to a option structure.
+ * It is the caller's responsibility to deal with error cases.
+ */
+static int
+set_statelessinfo(optinfo)
+	struct dhcp6_optinfo *optinfo;
+{
+	/* DNS server */
+	if (dhcp6_copy_list(&optinfo->dns_list, &dnslist)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
+		return (-1);
+	}
+
+	/* DNS search list */
+	if (dhcp6_copy_list(&optinfo->dnsname_list, &dnsnamelist)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS search list");
+		return (-1);
+	}
+
+	/* NTP server */
+	if (dhcp6_copy_list(&optinfo->ntp_list, &ntplist)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy NTP servers");
+		return (-1);
+	}
+}
+
 static int
 react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
@@ -804,9 +850,10 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	if (ifp->server_pref != DH6OPT_PREF_UNDEF)
 		roptinfo.pref = ifp->server_pref;
 
-	/* DNS server */
-	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
+	/* add other configuration information */
+	if (set_statelessinfo(&roptinfo)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to set other stateless information");
 		goto fail;
 	}
 
@@ -1050,9 +1097,9 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	 * Add options to the Reply message for any other configuration
 	 * information to be assigned to the client.
 	 */
-	/* DNS server */
-	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
+	if (set_statelessinfo(&roptinfo)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to set other stateless information");
 		goto fail;
 	}
 
@@ -1155,9 +1202,9 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	}
 
 	/* add other configuration information */
-	/* DNS server */
-	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy DNS list");
+	if (set_statelessinfo(&roptinfo)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to set other stateless information");
 		goto fail;
 	}
 
@@ -1242,9 +1289,9 @@ react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	}
 
 	/* add other configuration information */
-	/* DNS server */
-	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy DNS list");
+	if (set_statelessinfo(&roptinfo)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to set other stateless information");
 		goto fail;
 	}
 
@@ -1589,9 +1636,10 @@ react_informreq(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 		goto fail;
 	}
 
-	/* DNS server */
-	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
+	/* set stateless information */
+	if (set_statelessinfo(&roptinfo)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to set other stateless information");
 		goto fail;
 	}
 
@@ -1620,6 +1668,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 	char replybuf[BUFSIZ];
 	struct sockaddr_in6 dst;
 	int len, optlen;
+	int relayed = 0;
 	struct dhcp6 *dh6;
 	struct dhcp6_relay *dh6relay;
 	struct relayinfo *relayinfo;
@@ -1650,6 +1699,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 		struct dhcp6_vbuf relaymsgbuf;
 		struct dhcp6_relay *dh6relay;
 
+		relayed = 1;
 		dhcp6_init_options(&relayopt);
 
 		relaymsgbuf.dv_len = len;
@@ -1689,7 +1739,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 	}
 
 	/* specify the destination and send the reply */
-	dst = *sa6_any_downstream;
+	dst = relayed ? *sa6_any_relay : *sa6_any_downstream;
 	dst.sin6_addr = ((struct sockaddr_in6 *)from)->sin6_addr;
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,

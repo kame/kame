@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.86 2003/07/20 11:13:20 suz Exp $	*/
+/*	$KAME: common.c,v 1.87 2003/07/31 21:44:10 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -76,14 +76,15 @@
 #include <common.h>
 #include <timer.h>
 
+#define MAXDNAME 255
+
 int foreground;
 int debug_thresh;
 
-#if 0
-static unsigned int if_maxindex __P((void));
-#endif
 static int dhcp6_count_list __P((struct dhcp6_list *));
 static int in6_matchflags __P((struct sockaddr *, char *, int));
+static ssize_t dnsencode __P((const char *, char *, size_t));
+static char *dnsdecode __P((u_char **, u_char *, char *, size_t));
 static int copyout_option __P((char *, char *, struct dhcp6_listval *));
 static int copyin_option __P((int, struct dhcp6opt *, struct dhcp6opt *,
     struct dhcp6_list *));
@@ -154,6 +155,11 @@ dhcp6_clear_listval(lv)
 	struct dhcp6_listval *lv;
 {
 	dhcp6_clear_list(&lv->sublist);
+	switch (lv->type) {
+	case DHCP6_LISTVAL_VBUF:
+		dhcp6_vbuf_free(&lv->val_vbuf);
+		break;
+	}
 	free(lv);
 }
 
@@ -207,6 +213,12 @@ dhcp6_find_listval(head, type, val, option)
 				return (lv);
 			}
 			break;
+		case DHCP6_LISTVAL_VBUF:
+			if (dhcp6_vbuf_cmp(&lv->val_vbuf,
+			    (struct dhcp6_vbuf *)val) == 0) {
+				return (lv);
+			}
+			break;
 		}
 	}
 
@@ -245,6 +257,10 @@ dhcp6_add_listval(head, type, val, sublist)
 		break;
 	case DHCP6_LISTVAL_IAPD:
 		lv->val_ia = *(struct dhcp6_ia *)val;
+		break;
+	case DHCP6_LISTVAL_VBUF:
+		if (dhcp6_vbuf_copy(&lv->val_vbuf, (struct dhcp6_vbuf *)val))
+			goto fail;
 		break;
 	default:
 		dprintf(LOG_ERR, FNAME,
@@ -288,6 +304,16 @@ dhcp6_vbuf_free(vbuf)
 
 	vbuf->dv_len = 0;
 	vbuf->dv_buf = NULL;
+}
+
+int
+dhcp6_vbuf_cmp(vb1, vb2)
+	struct dhcp6_vbuf *vb1, *vb2;
+{
+	if (vb1->dv_len != vb2->dv_len)
+		return (vb1->dv_len - vb2->dv_len);
+
+	return (memcmp(vb1->dv_buf, vb2->dv_buf, vb1->dv_len));
 }
 
 struct dhcp6_event *
@@ -353,23 +379,6 @@ dhcp6_remove_evdata(ev)
 			free(evd);
 	}
 }
-
-#if 0
-static unsigned int
-if_maxindex()
-{
-	struct if_nameindex *p, *p0;
-	unsigned int max = 0;
-
-	p0 = if_nameindex();
-	for (p = p0; p && p->if_index && p->if_name; p++) {
-		if (max < p->if_index)
-			max = p->if_index;
-	}
-	if_freenameindex(p0);
-	return (max);
-}
-#endif
 
 int
 getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
@@ -867,6 +876,8 @@ dhcp6_init_options(optinfo)
 	TAILQ_INIT(&optinfo->reqopt_list);
 	TAILQ_INIT(&optinfo->stcode_list);
 	TAILQ_INIT(&optinfo->dns_list);
+	TAILQ_INIT(&optinfo->dnsname_list);
+	TAILQ_INIT(&optinfo->ntp_list);
 	TAILQ_INIT(&optinfo->prefix_list);
 }
 
@@ -882,6 +893,8 @@ dhcp6_clear_options(optinfo)
 	dhcp6_clear_list(&optinfo->reqopt_list);
 	dhcp6_clear_list(&optinfo->stcode_list);
 	dhcp6_clear_list(&optinfo->dns_list);
+	dhcp6_clear_list(&optinfo->dnsname_list);
+	dhcp6_clear_list(&optinfo->ntp_list);
 	dhcp6_clear_list(&optinfo->prefix_list);
 
 	if (optinfo->relaymsg_msg)
@@ -910,6 +923,10 @@ dhcp6_copy_options(dst, src)
 	if (dhcp6_copy_list(&dst->stcode_list, &src->stcode_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->dns_list, &src->dns_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->dns_list, &src->dnsname_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->ntp_list, &src->ntp_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->prefix_list, &src->prefix_list))
 		goto fail;
@@ -1114,6 +1131,54 @@ dhcp6_get_options(p, ep, optinfo)
 			  nextdns:
 			}
 			break;
+		case DH6OPT_DNSNAME:
+			val = cp;
+			while (val < cp + optlen) {
+				struct dhcp6_vbuf vb;
+				char name[MAXDNAME + 1];
+
+				if (dnsdecode((u_char **)&val,
+				    (u_char *)(cp + optlen), name,
+				    sizeof(name)) == NULL) {
+					dprintf(LOG_INFO, FNAME, "failed to"
+					    "decode a DNS name");
+					goto malformed;	/* or proceed? */
+				}
+
+				vb.dv_len = strlen(name) + 1;
+				vb.dv_buf = name;
+
+				if (dhcp6_add_listval(&optinfo->dnsname_list,
+				    DHCP6_LISTVAL_VBUF, &vb, NULL) == NULL) {
+					dprintf(LOG_ERR, FNAME, "failed to"
+					    "copy a DNS name");
+					goto fail;
+				}
+			}
+			break;
+		case DH6OPT_NTP:
+			if (optlen % sizeof(struct in6_addr) || optlen == 0)
+				goto malformed;
+			for (val = cp; val < cp + optlen;
+			     val += sizeof(struct in6_addr)) {
+				if (dhcp6_find_listval(&optinfo->ntp_list,
+				    DHCP6_LISTVAL_ADDR6, val, 0)) {
+					dprintf(LOG_INFO, FNAME, "duplicated "
+					    "NTP server address (%s)",
+					    in6addr2str((struct in6_addr *)val,
+						0));
+					goto nextntp;
+				}
+
+				if (dhcp6_add_listval(&optinfo->ntp_list,
+				    DHCP6_LISTVAL_ADDR6, val, NULL) == NULL) {
+					dprintf(LOG_ERR, FNAME, "failed to "
+					    "copy NTP server address");
+					goto fail;
+				}
+			  nextntp:
+			}
+			break;
 		case DH6OPT_IA_PD:
 			if (optlen + sizeof(struct dhcp6opt) <
 			    sizeof(optia))
@@ -1173,6 +1238,55 @@ dhcp6_get_options(p, ep, optinfo)
   fail:
 	dhcp6_clear_options(optinfo);
 	return (-1);
+}
+
+static char *
+dnsdecode(sp, ep, buf, bufsiz)
+	u_char **sp;
+	u_char *ep;
+	char *buf;
+	size_t bufsiz;
+{
+	int i, l;
+	u_char *cp;
+	char tmpbuf[MAXDNAME + 1];
+
+	cp = *sp;
+	*buf = '\0';
+
+	if (cp >= ep)
+		return (NULL);
+	while (cp < ep) {
+		i = *cp;
+		if (i == 0 || cp != *sp) {
+			if (strlcat((char *)buf, ".", bufsiz) >= bufsiz)
+				return (NULL);	/* result overrun */
+		}
+		if (i == 0)
+			break;
+		cp++;
+
+		if (i > 0x3f)
+			return (NULL); /* invalid label */
+
+		if (i > ep - cp)
+			return (NULL); /* source overrun */
+		while (i-- > 0 && cp < ep) {
+			if (!isprint(*cp)) /* we don't accept non-printables */
+				return (NULL);
+			l = snprintf(tmpbuf, sizeof(tmpbuf), "%c" , *cp);
+			if (l >= sizeof(tmpbuf) || l < 0)
+				return (NULL);
+			if (strlcat(buf, tmpbuf, bufsiz) >= bufsiz)
+				return (NULL); /* result overrun */
+			cp++;
+		}
+	}
+	if (i != 0)
+		return (NULL);	/* not terminated */
+	cp++;
+	*sp = cp;
+	return (buf);
 }
 
 static int
@@ -1435,7 +1549,7 @@ dhcp6_set_options(bp, ep, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6opt *p = bp, opth;
-	struct dhcp6_listval *stcode, *op;
+	struct dhcp6_listval *stcode, *op, *d;
 	int len = 0, optlen;
 	char *tmpbuf = NULL;
 
@@ -1496,7 +1610,6 @@ dhcp6_set_options(bp, ep, optinfo)
 
 	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
 		struct in6_addr *in6;
-		struct dhcp6_listval *d;
 
 		tmpbuf = NULL;
 		optlen = dhcp6_count_list(&optinfo->dns_list) *
@@ -1512,6 +1625,65 @@ dhcp6_set_options(bp, ep, optinfo)
 			memcpy(in6, &d->val_addr6, sizeof(*in6));
 		}
 		COPY_OPTION(DH6OPT_DNS, optlen, tmpbuf, p);
+		free(tmpbuf);
+	}
+
+	optlen = 0;
+	for (d = TAILQ_FIRST(&optinfo->dnsname_list); d;
+	    d = TAILQ_NEXT(d, link)) {
+		optlen += (d->val_vbuf.dv_len + 1);
+	}
+	if (optlen) {
+		char name[MAXDNAME], *cp, *ep;
+		tmpbuf = NULL;
+
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "memory allocation failed for DNS options");
+			goto fail;
+		}
+		cp = tmpbuf;
+		ep = cp + optlen;
+		for (d = TAILQ_FIRST(&optinfo->dnsname_list); d;
+		     d = TAILQ_NEXT(d, link)) {
+			int nlen;
+
+			nlen = dnsencode((const char *)d->val_vbuf.dv_buf,
+			    name, sizeof (name));
+			if (nlen < 0) {
+				dprintf(LOG_ERR, FNAME,
+				    "failed to encode a DNS name");
+				goto fail;
+			}
+			if (ep - cp < nlen) {
+				dprintf(LOG_ERR, FNAME,
+				    "buffer length for DNS name is too short");
+				goto fail;
+			}
+			memcpy(cp, name, nlen);
+			cp += nlen;
+		}
+		COPY_OPTION(DH6OPT_DNSNAME, optlen, tmpbuf, p);
+		free(tmpbuf);
+	}
+
+	if (!TAILQ_EMPTY(&optinfo->ntp_list)) {
+		struct in6_addr *in6;
+
+		tmpbuf = NULL;
+		optlen = dhcp6_count_list(&optinfo->ntp_list) *
+			sizeof(struct in6_addr);
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "memory allocation failed for NTP options");
+			goto fail;
+		}
+		in6 = (struct in6_addr *)tmpbuf;
+		for (d = TAILQ_FIRST(&optinfo->ntp_list); d;
+		     d = TAILQ_NEXT(d, link), in6++) {
+			memcpy(in6, &d->val_addr6, sizeof(*in6));
+		}
+		COPY_OPTION(DH6OPT_NTP, optlen, tmpbuf, p);
 		free(tmpbuf);
 	}
 
@@ -1596,6 +1768,65 @@ dhcp6_set_options(bp, ep, optinfo)
 	return (-1);
 }
 #undef COPY_OPTION
+
+static ssize_t
+dnsencode(name, buf, buflen)
+	const char *name;
+	char *buf;
+	size_t buflen;
+{
+	char *cp, *ep;
+	const char *p, *q;
+	int i, nterm = 1;
+	int namelen = strlen(name);
+
+	cp = buf;
+	ep = cp + buflen;
+
+	/* if not certain about my name, return an empty buffer */
+	if (namelen == 0)
+		return (0);
+
+	p = name;
+	while (cp < ep && p < name + namelen) {
+		i = 0;
+		for (q = p; q < name + namelen && *q && *q != '.'; q++)
+			i++;
+		/* result does not fit into buf */
+		if (cp + i + 1 >= ep)
+			goto fail;
+		/*
+		 * DNS label length restriction, RFC1035 page 8.
+		 * "i == 0" case is included here to avoid returning
+		 * 0-length label on "foo..bar".
+		 */
+		if (i <= 0 || i >= 64)
+			goto fail;
+		*cp++ = i;
+		if (!isalpha(p[0]) || !isalnum(p[i - 1]))
+			goto fail;
+		while (i > 0) {
+			if (!isalnum(*p) && *p != '-')
+				goto fail;
+			if (isupper(*p))
+				*cp++ = tolower(*p++);
+			else
+				*cp++ = *p++;
+			i--;
+		}
+		p = q;
+		if (p < name + namelen && *p == '.')
+			p++;
+	}
+	/* termination */
+	if (cp + 1 >= ep)
+		goto fail;
+	*cp++ = '\0';
+	return (cp - buf);
+
+ fail:
+	return (-1);
+}
 
 /*
  * Construct a DHCPv6 option along with sub-options in the wire format.
@@ -1893,6 +2124,10 @@ dhcp6optstr(type)
 		return ("reconfigure message");
 	case DH6OPT_DNS:
 		return ("DNS");
+	case DH6OPT_DNSNAME:
+		return ("domain search list");
+	case DH6OPT_NTP:
+		return ("NTP server");
 	case DH6OPT_PREFIX_DELEGATION:
 		return ("prefix delegation");
 	case DH6OPT_PREFIX_INFORMATION:

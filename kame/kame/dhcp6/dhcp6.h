@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.41 2003/07/14 09:51:43 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.42 2003/07/31 21:44:11 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -111,7 +111,8 @@ struct dhcp6_prefix {
 /* Internal data structure */
 typedef enum { DHCP6_LISTVAL_NUM = 1,
 	       DHCP6_LISTVAL_STCODE, DHCP6_LISTVAL_ADDR6,
-	       DHCP6_LISTVAL_IAPD, DHCP6_LISTVAL_PREFIX6 
+	       DHCP6_LISTVAL_IAPD, DHCP6_LISTVAL_PREFIX6,
+	       DHCP6_LISTVAL_VBUF
 } dhcp6_listval_type_t;
 TAILQ_HEAD(dhcp6_list, dhcp6_listval);
 struct dhcp6_listval {
@@ -125,6 +126,7 @@ struct dhcp6_listval {
 		struct in6_addr uv_addr6;
 		struct dhcp6_prefix uv_prefix6;
 		struct dhcp6_ia uv_ia;
+		struct dhcp6_vbuf uv_vbuf;
 	} uv;
 
 	struct dhcp6_list sublist;
@@ -134,6 +136,7 @@ struct dhcp6_listval {
 #define val_addr6 uv.uv_addr6
 #define val_ia uv.uv_ia
 #define val_prefix6 uv.uv_prefix6
+#define val_vbuf uv.uv_vbuf
 
 struct dhcp6_optinfo {
 	struct duid clientID;	/* DUID */
@@ -147,6 +150,8 @@ struct dhcp6_optinfo {
 	struct dhcp6_list reqopt_list; /* options in option request */
 	struct dhcp6_list stcode_list; /* status code */
 	struct dhcp6_list dns_list; /* DNS server list */
+	struct dhcp6_list dnsname_list; /* Domain Search list */
+	struct dhcp6_list ntp_list; /* NTP server list */
 	struct dhcp6_list prefix_list; /* prefix list */
 
 	struct dhcp6_vbuf relay_msg; /* relay message */
@@ -220,9 +225,12 @@ struct dhcp6_relay {
  * assigned.
  */
 #define DH6OPT_DNS CONF_DH6OPT_DNS
+#define DH6OPT_DNSNAME CONF_DH6OPT_DNSNAME
 #define DH6OPT_PREFIX_DELEGATION CONF_DH6OPT_PREFIX_DELEGATION
 #define DH6OPT_PREFIX_INFORMATION CONF_DH6OPT_PREFIX_INFORMATION
 #define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
+
+#define DH6OPT_NTP CONF_DH6OPT_NTP
 
 /* The following two are KAME specific. */
 #define DH6OPT_IA_PD CONF_DH6OPT_IA_PD

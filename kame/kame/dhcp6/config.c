@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.30 2003/07/20 11:27:54 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.31 2003/07/31 21:44:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,12 +51,12 @@ extern int errno;
 
 struct dhcp6_if *dhcp6_if;
 struct prefix_ifconf *prefix_ifconflist;
-struct dhcp6_list dnslist;
+struct dhcp6_list dnslist, dnsnamelist, ntplist;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 struct ia_conflist ia_conflist0;
 static struct host_conf *host_conflist0, *host_conflist;
-static struct dhcp6_list dnslist0; 
+static struct dhcp6_list dnslist0, dnsnamelist0, ntplist0;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
@@ -78,7 +78,7 @@ struct dhcp6_ifconf {
 	struct ia_conflist iaconf_list;
 };
 
-extern struct cf_list *cf_dns_list;
+extern struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 extern char *configfilename;
 
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
@@ -516,12 +516,15 @@ configure_global_option()
 {
 	struct cf_list *cl;
 
-	/* DNS servers */
-	if (cf_dns_list && dhcp6_mode != DHCP6_MODE_SERVER) {
+	/* check against configuration restriction */
+	if ((cf_dns_list && cf_dns_name_list) &&
+	    dhcp6_mode != DHCP6_MODE_SERVER) {
 		dprintf(LOG_INFO, FNAME, "%s:%d server-only configuration",
 		    configfilename, cf_dns_list->line);
 		goto bad;
 	}
+
+	/* DNS servers */
 	TAILQ_INIT(&dnslist0);
 	for (cl = cf_dns_list; cl; cl = cl->next) {
 		/* duplication check */
@@ -540,10 +543,66 @@ configure_global_option()
 		}
 	}
 
+	/* DNS name */
+	TAILQ_INIT(&dnsnamelist0);
+	for (cl = cf_dns_name_list; cl; cl = cl->next) {
+		char *name, *cp;
+		struct dhcp6_vbuf name_vbuf;
+
+		name = strdup(cl->ptr + 1);
+		if (name == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to copy a DNS name");
+			goto bad;
+		}
+		cp = name + strlen(name) - 1;
+		*cp = '\0';	/* clear the terminating quote */
+
+		name_vbuf.dv_buf = name;
+		name_vbuf.dv_len = strlen(name) + 1;
+
+		/* duplication check */
+		if (dhcp6_find_listval(&dnsnamelist0, DHCP6_LISTVAL_VBUF,
+		    &name_vbuf, 0)) {
+			dprintf(LOG_INFO, FNAME,
+			    "%s:%d duplicated DNS name: %s",
+			    configfilename, cl->line);
+			dhcp6_vbuf_free(&name_vbuf);
+			goto bad;
+		}
+
+		/* add the name */
+		if (dhcp6_add_listval(&dnsnamelist0, DHCP6_LISTVAL_VBUF,
+		    &name_vbuf, NULL) == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to add a DNS name");
+			dhcp6_vbuf_free(&name_vbuf);
+			goto bad;
+		}
+		dhcp6_vbuf_free(&name_vbuf);
+	}
+
+	/* NTP servers */
+	TAILQ_INIT(&ntplist0);
+	for (cl = cf_ntp_list; cl; cl = cl->next) {
+		/* duplication check */
+		if (dhcp6_find_listval(&ntplist0, DHCP6_LISTVAL_ADDR6,
+		    cl->ptr, 0)) {
+			dprintf(LOG_INFO, FNAME,
+			    "%s:%d duplicated NTP server: %s",
+			    configfilename, cl->line,
+			    in6addr2str((struct in6_addr *)cl->ptr, 0));
+			goto bad;
+		}
+		if (dhcp6_add_listval(&ntplist0, DHCP6_LISTVAL_ADDR6,
+		    cl->ptr, NULL) == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to add an NTP server");
+			goto bad;
+		}
+	}
+
 	return (0);
 
   bad:
-	return (-1);
+	return (-1);		/* no need to free intermediate list */
 }
 
 static int
@@ -618,7 +677,7 @@ get_default_ifid(pif)
 		    strerror(errno));
 		return (-1);
 	}
-	
+
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		char *cp;
 
@@ -675,6 +734,10 @@ configure_cleanup()
 	host_conflist0 = NULL;
 	dhcp6_clear_list(&dnslist0);
 	TAILQ_INIT(&dnslist0);
+	dhcp6_clear_list(&dnsnamelist0);
+	TAILQ_INIT(&dnsnamelist0);
+	dhcp6_clear_list(&ntplist0);
+	TAILQ_INIT(&ntplist0);
 }
 
 void
@@ -726,6 +789,14 @@ configure_commit()
 	/* commit DNS addresses */
 	dhcp6_clear_list(&dnslist);
 	dhcp6_move_list(&dnslist, &dnslist0);
+
+	/* commit DNS names */
+	dhcp6_clear_list(&dnsnamelist);
+	dhcp6_move_list(&dnsnamelist, &dnsnamelist0);
+
+	/* commit NTP addresses */
+	dhcp6_clear_list(&ntplist);
+	dhcp6_move_list(&ntplist, &ntplist0);
 }
 
 static void
@@ -873,9 +944,21 @@ add_options(opcode, ifc, cfl0)
 			}
 			break;
 		case DHCPOPT_DNS:
+		case DHCPOPT_DNSNAME:
+		case DHCPOPT_NTP:
+			switch (cfl->type) {
+			case DHCPOPT_DNS:
+				opttype = DH6OPT_DNS;
+				break;
+			case DHCPOPT_DNSNAME:
+				opttype = DH6OPT_DNSNAME;
+				break;
+			case DHCPOPT_NTP:
+				opttype = DH6OPT_NTP;
+				break;
+			}
 			switch(opcode) {
 			case DHCPOPTCODE_REQUEST:
-				opttype = DH6OPT_DNS;
 				if (dhcp6_add_listval(&ifc->reqopt_list,
 				    DHCP6_LISTVAL_NUM, &opttype, NULL)
 				    == NULL) {

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.22 2003/04/11 07:13:21 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.23 2003/07/31 21:44:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -81,7 +81,7 @@ extern void yyerror __P((char *, ...))
 	} while (0)
 
 static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
-struct cf_list *cf_dns_list;
+struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 
 extern int yylex __P((void));
 static void cleanup __P((void));
@@ -94,7 +94,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token ID_ASSOC IA_PD IAID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
-%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS
+%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS
 %token INFO_ONLY
 %token SCRIPT
 
@@ -111,7 +111,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %type <str> IFNAME HOSTNAME DUID_ID STRING QSTRING IAID
 %type <num> NUMBER duration
 %type <list> declaration declarations dhcpoption ifparam ifparams
-%type <list> address_list address_list_ent
+%type <list> address_list address_list_ent dhcpoption_list
 %type <list> iaconf_list iaconf prefix_interface
 %type <prefix> prefixparam
 
@@ -153,15 +153,39 @@ host_statement:
 	;
 
 option_statement:
-	OPTION DNS_SERVERS address_list EOS
-	{
-		if (cf_dns_list == NULL)
-			cf_dns_list = $3;
-		else {
-			cf_dns_list->tail->next = $3;
-			cf_dns_list->tail = $3->next;
+		OPTION DNS_SERVERS address_list EOS
+		{
+			if (cf_dns_list == NULL)
+				cf_dns_list = $3;
+			else {
+				cf_dns_list->tail->next = $3;
+				cf_dns_list->tail = $3->next;
+			}
 		}
-	}
+	|	OPTION DNS_NAME QSTRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, CFLISTENT_GENERIC, $3, NULL);
+
+			if (cf_dns_name_list == NULL) {
+				cf_dns_name_list = l;
+				cf_dns_name_list->tail = l;
+				cf_dns_name_list->next = NULL;
+			} else {
+				cf_dns_name_list->tail->next = l;
+				cf_dns_name_list->tail = l->next;
+			}
+		}
+	|	OPTION NTP_SERVERS address_list EOS
+		{
+			if (cf_ntp_list == NULL)
+				cf_ntp_list = $3;
+			else {
+				cf_ntp_list->tail->next = $3;
+				cf_ntp_list->tail = $3->next;
+			}
+		}
 	;
 
 ia_statement:
@@ -226,7 +250,7 @@ address_list_ent:
 		}
 		*a = a0;
 
-		MAKE_CFLIST(l, ADDRESS_LIST_ENT, a, NULL);
+		MAKE_CFLIST(l, CFLISTENT_GENERIC, a, NULL);
 
 		$$ = l;
 	}
@@ -251,7 +275,7 @@ declarations:
 	;
 	
 declaration:
-		SEND dhcpoption EOS
+		SEND dhcpoption_list EOS
 		{
 			struct cf_list *l;
 
@@ -259,7 +283,7 @@ declaration:
 
 			$$ = l;
 		}
-	|	REQUEST dhcpoption EOS
+	|	REQUEST dhcpoption_list EOS
 		{
 			struct cf_list *l;
 
@@ -318,6 +342,21 @@ declaration:
 		}
 	;
 
+dhcpoption_list:
+		dhcpoption
+		{
+			$$ = $1;
+		}
+	|	dhcpoption COMMA dhcpoption_list
+		{
+			struct cf_list *head;
+
+			$1->next = $3;
+			$1->tail = $3->tail;
+
+			$$ = $1;
+		}
+
 dhcpoption:
 		RAPID_COMMIT
 		{
@@ -335,11 +374,27 @@ dhcpoption:
 			l->num = $2;
 			$$ = l;
 		}
-	|	DNS_SERVERS	
+	|	DNS_SERVERS
 		{
 			struct cf_list *l;
 
 			MAKE_CFLIST(l, DHCPOPT_DNS, NULL, NULL);
+			/* currently no value */
+			$$ = l;
+		}
+	|	DNS_NAME
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_DNSNAME, NULL, NULL);
+			/* currently no value */
+			$$ = l;
+		}
+	|	NTP_SERVERS	
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_NTP, NULL, NULL);
 			/* currently no value */
 			$$ = l;
 		}
@@ -528,6 +583,8 @@ cleanup()
 	cleanup_namelist(iapdlist_head);
 
 	cleanup_cflist(cf_dns_list);
+	cleanup_cflist(cf_dns_name_list);
+	cleanup_cflist(cf_ntp_list);
 }
 
 static void

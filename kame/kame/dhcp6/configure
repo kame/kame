@@ -829,12 +829,14 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-mediator         build with mediator (obsolete)
   --with-opt-dns=VALUE    specify DHCP option value for DNS
+  --with-opt-dnsname=VALUE    specify DHCP option value for DNS_NAME
   --with-opt-pdel=VALUE   specify DHCP option value for prefix delegation
   --with-opt-pinfo=VALUE  specify DHCP option value for prefix information
   --with-opt-preq=VALUE   specify DHCP option value for prefix request
   --with-opt-ia-pd=VALUE  specify DHCP option value for IA_PD
   --with-opt-ia-pd-prefix=VALUE   specify DHCP option value for IA_PD prefix
   --with-stcode-no-prefix=VALUE   specify DHCP status code for NoPrefixAvail
+  --with-opt-ntp=VALUE    specify DHCP option value for NTP
 
 Some influential environment variables:
   CC          C compiler command
@@ -4222,6 +4224,26 @@ echo "${ECHO_T}using $dhcpopt_dns" >&6
 fi
 
 
+echo "$as_me:$LINENO: checking for DHCP DNS_NAME option" >&5
+echo $ECHO_N "checking for DHCP DNS_NAME option... $ECHO_C" >&6
+
+# Check whether --with-opt-dnsname or --without-opt-dnsname was given.
+if test "${with_opt_dnsname+set}" = set; then
+  withval="$with_opt_dnsname"
+  dhcpopt_dnsname="$withval"
+else
+  dhcpopt_dnsname=0
+fi;
+if test $dhcpopt_dnsname = 0 ; then
+	dhcpopt_dnsname=26
+	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_dnsname" >&5
+echo "${ECHO_T}unspecified and using $dhcpopt_dnsname" >&6
+else
+	echo "$as_me:$LINENO: result: using $dhcpopt_dnsname" >&5
+echo "${ECHO_T}using $dhcpopt_dnsname" >&6
+fi
+
+
 echo "$as_me:$LINENO: checking for DHCP prefix delegation option" >&5
 echo $ECHO_N "checking for DHCP prefix delegation option... $ECHO_C" >&6
 
@@ -4339,6 +4361,26 @@ echo "${ECHO_T}unspecified and using $dhcpstcode_no_prefix" >&6
 else
 	echo "$as_me:$LINENO: result: using $dhcpstcode_no_prefix" >&5
 echo "${ECHO_T}using $dhcpstcode_no_prefix" >&6
+fi
+
+
+echo "$as_me:$LINENO: checking for DHCP NTP option" >&5
+echo $ECHO_N "checking for DHCP NTP option... $ECHO_C" >&6
+
+# Check whether --with-opt-ntp or --without-opt-ntp was given.
+if test "${with_opt_ntp+set}" = set; then
+  withval="$with_opt_ntp"
+  dhcpopt_ntp="$withval"
+else
+  dhcpopt_ntp=0
+fi;
+if test $dhcpopt_ntp = 0 ; then
+	dhcpopt_ntp=35
+	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_ntp" >&5
+echo "${ECHO_T}unspecified and using $dhcpopt_ntp" >&6
+else
+	echo "$as_me:$LINENO: result: using $dhcpopt_ntp" >&5
+echo "${ECHO_T}using $dhcpopt_ntp" >&6
 fi
 
 
@@ -5050,12 +5092,14 @@ s,@OBJEXT@,$OBJEXT,;t t
 s,@CPP@,$CPP,;t t
 s,@LIBOBJS@,$LIBOBJS,;t t
 s,@dhcpopt_dns@,$dhcpopt_dns,;t t
+s,@dhcpopt_dnsname@,$dhcpopt_dnsname,;t t
 s,@dhcpopt_pdel@,$dhcpopt_pdel,;t t
 s,@dhcpopt_pinfo@,$dhcpopt_pinfo,;t t
 s,@dhcpopt_preq@,$dhcpopt_preq,;t t
 s,@dhcpopt_ia_pd@,$dhcpopt_ia_pd,;t t
 s,@dhcpopt_ia_pd_prefix@,$dhcpopt_ia_pd_prefix,;t t
 s,@dhcpstcode_no_prefix@,$dhcpstcode_no_prefix,;t t
+s,@dhcpopt_ntp@,$dhcpopt_ntp,;t t
 CEOF
 
 _ACEOF

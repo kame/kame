@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.9 2003/04/12 11:41:27 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.10 2003/07/31 21:44:11 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -70,6 +70,14 @@ options.
 .Ic domain-name-servers
 .Xc
 means a Domain Name Server option.
+.It Xo
+.Ic domain-name
+.Xc
+means a domain name option.
+.It Xo
+.Ic ntp-servers
+.Xc
+means an NTP server option.
 .It Ic ia-pd Ar ID
 means an IA_PD
 .Pq Identity Association for Prefix Delegation
@@ -105,10 +113,15 @@ Some options can only appear in particular messages according to the
 specification,
 in which case the appearance of the options is limited to be compliant
 with the specification.
-.Ic rapid-commit
-and
-.Ic ia-pd
-options can be specified in a send statement.
+.Pp
+.Ar send-options
+is a comma-separated list of options,
+each of which should be specified as described above.
+Multiple
+.Ic send
+statements can also be specified,
+in which case all the specified options will be sent.
+.Pp
 When
 .Ic rapid-commit
 is specified,
@@ -129,10 +142,27 @@ must exist with the same
 .It Ic request Ar request-options ;
 This statement specifies DHCPv6 options to be included in an
 option-request option.
-Currently only
+.Ar request-options
+is a comma-separated list of options,
+which can consist of the following options.
+.Bl -tag -width Ds -compact
+.It Xo
 .Ic domain-name-servers
-can be specified in a request statement,
-which requests a list of Domain Name Server addresses.
+.Xc
+requests a list of Domain Name Server addresses.
+.It Xo
+.Ic domain-name
+.Xc
+requests a DNS search path.
+.It Xo
+.Ic ntp-servers
+.Xc
+requests a list of NTP server addresses.
+.El
+Multiple
+.Ic request
+statements can also be specified,
+in which case all the specified options will be requested.
 .It Ic information-only ;
 This statement specifies
 .Nm dhcp6c
