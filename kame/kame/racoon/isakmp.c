@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.140 2001/05/26 00:18:19 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.141 2001/06/01 03:48:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -863,7 +863,7 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 
 	a = strdup(saddr2str(iph1->local));
 	plog(LLV_INFO, LOCATION, NULL,
-		"responde new phase 1 negotiation: %s<=>%s\n",
+		"respond new phase 1 negotiation: %s<=>%s\n",
 		a, saddr2str(iph1->remote));
 	racoon_free(a);
     }
@@ -974,7 +974,7 @@ isakmp_ph2begin_r(iph1, msg)
 
 	a = strdup(saddr2str(iph2->src));
 	plog(LLV_INFO, LOCATION, NULL,
-		"responde new phase 2 negotiation: %s<=>%s\n",
+		"respond new phase 2 negotiation: %s<=>%s\n",
 		a, saddr2str(iph2->dst));
 	racoon_free(a);
     }
