@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.337 2003/03/03 00:56:13 t-momose Exp $	*/
+/*	$KAME: icmp6.c,v 1.338 2003/03/19 08:07:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3220,8 +3220,11 @@ icmp6_redirect_output(m0, rt)
 		/* connect m0 to m */
 		m->m_next = m0;
 		m->m_pkthdr.len = m->m_len + m0->m_len;
+		m0 = NULL;
 	}
 noredhdropt:
+	if (m0)
+		m_freem(m0);
 
 	/* XXX: clear embedded link IDs in the inner header */
 	in6_clearscope(&sip6->ip6_src);
