@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.141 2001/01/22 13:20:34 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.142 2001/01/22 13:38:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1103,7 +1103,7 @@ in6_update_ifa(ifp, ifra, ia)
 	case IFT_DUMMY:
 #endif
 	case IFT_FAITH:
-	case IFT_GIF:
+	case IFT_GIF:		/* can we really skip DAD? */
 	case IFT_LOOP:
 	default:
 		break;
