@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.49 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.50 2000/09/06 08:53:38 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -194,7 +194,7 @@ quick_i1send(iph2, msg)
 	/* generate ID value */
 	if (ipsecdoi_setid2(iph2) < 0) {
 		plog(logp, LOCATION, NULL,
-			"failt to get ID.\n");
+			"failed to get ID.\n");
 		goto end;
 	}
 	YIPSDEBUG(DEBUG_KEY,
@@ -1722,7 +1722,7 @@ end:
 }
 
 /*
- * Copy IP addresses in 2 of ID payloads into id[src,dst] if both ID types
+ * Copy both IP addresses in ID payloads into [src,dst]_id if both ID types
  * are IP address and same address family.
  * Then get remote's policy from SPD copied from kernel.
  * If the type of ID payload is address or subnet type, then the index is
@@ -1736,7 +1736,6 @@ get_proposal_r(iph2)
 	struct ph2handle *iph2;
 {
 	struct policyindex spidx;
-	u_int8_t prefixlen;
 	struct secpolicy *sp;
 	struct ipsecrequest *req;
 	struct saprop *newpp = NULL;
@@ -1762,9 +1761,11 @@ get_proposal_r(iph2)
 
 #define _XIDT(d) ((struct ipsecdoi_id_b *)(d)->v)->type
 
+	/* make a spidx; a key to search SPD */
 	spidx.dir = IPSEC_DIR_INBOUND;
+	spidx.ul_proto = 0;
 
-	/* make them from ID payload or phase 1 addresses. */
+	/* make src/dst index from ID payload or phase 1 addresses. */
 	if (iph2->id != NULL
 	 && (_XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR
 	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR
@@ -1789,9 +1790,28 @@ get_proposal_r(iph2)
 				"due to no ID payloads found "
 				"OR because ID type is not address.\n"));
 
+		/*
+		 * copy the SOURCE address of IKE into the DESTINATION address
+		 * of the key to search the SPD because the direction of policy
+		 * is inbound.
+		 */
 		memcpy(&spidx.dst, iph2->src, iph2->src->sa_len);
+		switch (spidx.dst.ss_family) {
+		case AF_INET:
+			spidx.prefd = sizeof(struct in_addr) << 3;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			spidx.prefd = sizeof(struct in6_addr) << 3;
+			break;
+#endif
+		default:
+			spidx.prefd = 0;
+			break;
+		}
 	}
 
+	/* set source address */
 	if (iph2->id_p != NULL
 	 && (_XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR
@@ -1818,24 +1838,21 @@ get_proposal_r(iph2)
 				"due to no ID payloads found "
 				"OR because ID type is not address.\n"));
 
+		/* see above comment. */
 		memcpy(&spidx.src, iph2->dst, iph2->dst->sa_len);
-	}
-
-	switch (spidx.src.ss_family) {
-	case AF_INET:
-		prefixlen = sizeof(struct in_addr) << 3;
-		break;
+		switch (spidx.src.ss_family) {
+		case AF_INET:
+			spidx.prefs = sizeof(struct in_addr) << 3;
+			break;
 #ifdef INET6
-	case AF_INET6:
-		prefixlen = sizeof(struct in6_addr) << 3;
-		break;
+		case AF_INET6:
+			spidx.prefs = sizeof(struct in6_addr) << 3;
+			break;
 #endif
-	default:
-		plog(logp, LOCATION, NULL,
-			"invalid family: %d\n", iph2->src->sa_family);
-		free(iph2->src_id);
-		free(iph2->dst_id);
-		return ISAKMP_INTERNAL_ERROR;
+		default:
+			spidx.prefs = 0;
+			break;
+		}
 	}
 
 #undef _XIDT(d)
