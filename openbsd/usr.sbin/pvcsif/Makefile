@@ -3,7 +3,7 @@ SRCS=	pvcsif.c
 
 MAN=	pvc.4 pvcsif.8
 
-CFLAGS+=-DINET6
+CPPFLAGS+=-DINET6
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
