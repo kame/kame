@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/etc/rc.network6,v 1.5.2.22 2002/04/16 18:43:52 ume Exp $
+# $FreeBSD: src/etc/rc.network6,v 1.5.2.23 2002/07/24 18:25:42 ume Exp $
 #
 
 # Note that almost all of the user-configurable behavior is not in this
@@ -170,18 +170,19 @@ network6_pass1() {
 	# setup faith
 	network6_faith_setup
 
+	# ipv6_router
+	case ${ipv6_router_enable} in
+	[Yy][Ee][Ss])
+		if [ -x ${ipv6_router} ]; then
+			echo -n " ${ipv6_router}"
+			${ipv6_router} ${ipv6_router_flags}
+		fi
+		;;
+	esac
+
+
 	case ${ipv6_gateway_enable} in
 	[Yy][Ee][Ss])
-		# ipv6_router
-		case ${ipv6_router_enable} in
-		[Yy][Ee][Ss])
-			if [ -x ${ipv6_router} ]; then
-				echo -n " ${ipv6_router}"
-				${ipv6_router} ${ipv6_router_flags}
-			fi
-			;;
-		esac
-
 		# rtadvd
 		# This should enabled with a great care.
 		# You may want to fine-tune /etc/rtadvd.conf.

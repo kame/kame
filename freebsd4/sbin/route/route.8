@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)route.8	8.3 (Berkeley) 3/19/94
-.\" $FreeBSD: src/sbin/route/route.8,v 1.17.2.7 2001/10/02 10:04:01 ru Exp $
+.\" $FreeBSD: src/sbin/route/route.8,v 1.17.2.8 2002/07/24 12:55:09 ru Exp $
 .\"
 .Dd June 8, 2001
 .Dt ROUTE 8
@@ -73,7 +73,11 @@ to forget this, especially when attempting to repair networking operations).
 .It Fl v
 (verbose) Print additional details.
 .It Fl q
-Suppress all output.
+Suppress all output from the
+.Cm add , delete ,
+and
+.Cm flush
+commands.
 .El
 .Pp
 The

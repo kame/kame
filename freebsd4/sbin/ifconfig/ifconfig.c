@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.16 2002/04/03 11:48:48 ru Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.18 2002/08/30 14:23:38 sobomax Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -98,6 +98,7 @@ static const char rcsid[] =
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ifaddrs.h>
 
 #include "ifconfig.h"
 
@@ -175,6 +176,7 @@ c_func	setip6flags;
 c_func  setip6pltime;
 c_func  setip6vltime;
 c_func2	setip6lifetime;
+c_func	setip6eui64;
 #endif
 c_func	setifipdst;
 c_func	setifflags, setifmetric, setifmtu, setifcap;
@@ -200,6 +202,8 @@ struct	cmd {
 	{ "-arp",	IFF_NOARP,	setifflags },
 	{ "debug",	IFF_DEBUG,	setifflags },
 	{ "-debug",	-IFF_DEBUG,	setifflags },
+	{ "promisc",	IFF_PPROMISC,	setifflags },
+	{ "-promisc",	-IFF_PPROMISC,	setifflags },
 	{ "add",	IFF_UP,		notealias },
 	{ "alias",	IFF_UP,		notealias },
 	{ "-alias",	-IFF_UP,	notealias },
@@ -222,6 +226,7 @@ struct	cmd {
 	{ "-autoconf",	-IN6_IFF_AUTOCONF, setip6flags },
 	{ "pltime",     NEXTARG,        setip6pltime },
 	{ "vltime",     NEXTARG,        setip6vltime },
+	{ "eui64",	0,		setip6eui64 },
 #endif
 	{ "range",	NEXTARG,	setatrange },
 	{ "phase",	NEXTARG,	setatphase },
@@ -947,6 +952,43 @@ setip6lifetime(cmd, val, s, afp)
 		in6_addreq.ifra_lifetime.ia6t_pltime = newval;
 	}
 }
+
+void
+setip6eui64(cmd, dummy, s, afp)
+	const char *cmd;
+	int dummy __unused;
+	int s;
+	const struct afswtch *afp;
+{
+	struct ifaddrs *ifap, *ifa;
+	const struct sockaddr_in6 *sin6 = NULL;
+	const struct in6_addr *lladdr = NULL;
+	struct in6_addr *in6;
+
+	if (afp->af_af != AF_INET6)
+		errx(EXIT_FAILURE, "%s not allowed for the AF", cmd);
+ 	in6 = (struct in6_addr *)&in6_addreq.ifra_addr.sin6_addr;
+	if (memcmp(&in6addr_any.s6_addr[8], &in6->s6_addr[8], 8) != 0)
+		errx(EXIT_FAILURE, "interface index is already filled");
+	if (getifaddrs(&ifap) != 0)
+		err(EXIT_FAILURE, "getifaddrs");
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family == AF_INET6 &&
+		    strcmp(ifa->ifa_name, name) == 0) {
+			sin6 = (const struct sockaddr_in6 *)ifa->ifa_addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+				lladdr = &sin6->sin6_addr;
+				break;
+			}
+		}
+	}
+	if (!lladdr)
+		errx(EXIT_FAILURE, "could not determine link local address"); 
+
+ 	memcpy(&in6->s6_addr[8], &lladdr->s6_addr[8], 8);
+
+	freeifaddrs(ifap);
+}
 #endif
 
 void
@@ -1028,14 +1070,15 @@ setifflags(vname, value, s, afp)
  		exit(1);
  	}
 	strncpy(my_ifr.ifr_name, name, sizeof (my_ifr.ifr_name));
- 	flags = my_ifr.ifr_flags;
+	flags = (my_ifr.ifr_flags & 0xffff) | (my_ifr.ifr_flagshigh << 16);
 
 	if (value < 0) {
 		value = -value;
 		flags &= ~value;
 	} else
 		flags |= value;
-	my_ifr.ifr_flags = flags;
+	my_ifr.ifr_flags = flags & 0xffff;
+	my_ifr.ifr_flagshigh = flags >> 16;
 	if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&my_ifr) < 0)
 		Perror(vname);
 }
