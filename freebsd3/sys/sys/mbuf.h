@@ -350,7 +350,7 @@ union mcluster {
 		_mm->m_nextpkt = NULL;					\
 		_mm->m_data = _mm->m_pktdat;				\
 		_mm->m_flags = M_PKTHDR;				\
-		bzero(&(m)->m_pkthdr, sizeof((m)->m_pkthdr));		\
+		bzero(&(_mm)->m_pkthdr, sizeof((_mm)->m_pkthdr));	\
 		(m) = _mm;						\
 		splx(_ms);						\
 	} else {							\
