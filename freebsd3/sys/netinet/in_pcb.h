@@ -261,18 +261,13 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
 #define IN6P_RTHDR		0x100000 /* receive routing header */
 #define IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 #define IN6P_BINDV6ONLY		0x10000000
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
 
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 					INP_RECVIF|\
 				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)
-
-#ifdef MAPPED_ADDR_ENABLED
 #define INP_UNMAPPABLEOPTS	(IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR)
-#endif
 
  /* for KAME src sync over BSD*'s */
 #define	IN6P_HIGHPORT		INP_HIGHPORT

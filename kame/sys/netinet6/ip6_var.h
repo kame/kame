@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.29 2000/03/25 07:23:48 sumikawa Exp $	*/
+/*	$KAME: ip6_var.h,v 1.30 2000/03/29 03:45:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,9 +254,9 @@ extern int	ip6_gif_hlim;		/* Hop limit for gif encap packet */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
 					 * walk list every 5 sec.    */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 extern int	ip6_mapped_addr_on;
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 #if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
 extern int	ip6_bindv6only;
 #endif

@@ -776,12 +776,10 @@ findpcb:
 			if (isipv6)
 				inp->in6p_laddr = ip6->ip6_dst;
 			else {
-#ifdef MAPPED_ADDR_ENABLED
 				if (ip6_mapped_addr_on) {
 					inp->inp_vflag &= ~INP_IPV6;
 					inp->inp_vflag |= INP_IPV4;
 				}
-#endif /* MAPPED_ADDR_ENABLED */
 #endif /* INET6 */
 			inp->inp_laddr = ip->ip_dst;
 #ifdef INET6

@@ -231,7 +231,6 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 		error = EAFNOSUPPORT;
 		goto out;
 	}
-#ifdef MAPPED_ADDR_ENABLED
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_BINDV6ONLY) == NULL) {
@@ -248,7 +247,6 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 			goto out;
 		}
 	}
-#endif /* MAPPED_ADDR_ENABLED */
 	error = in6_pcbbind(inp, nam, p);
 	COMMON_END(PRU_BIND);
 }
@@ -284,12 +282,10 @@ tcp6_usr_listen(struct socket *so, struct proc *p)
 
 	COMMON_START();
 	if (inp->inp_lport == 0) {
-#ifdef MAPPED_ADDR_ENABLED
 		inp->inp_vflag &= ~INP_IPV4;
 		if (ip6_mapped_addr_on &&
 		    (inp->inp_flags & IN6P_BINDV6ONLY) == NULL)
 			inp->inp_vflag |= INP_IPV4;
-#endif /* MAPPED_ADDR_ENABLED */
 		error = in6_pcbbind(inp, (struct sockaddr *)0, p);
 	}
 	if (error == 0)
@@ -354,7 +350,6 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		error = EAFNOSUPPORT;
 		goto out;
 	}
-#ifdef MAPPED_ADDR_ENABLED
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if (ip6_mapped_addr_on &&
@@ -370,17 +365,14 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		error = tcp_output(tp);
 		goto out;
 	}
-#endif /* MAPPED_ADDR_ENABLED */
 	if ((error = tcp6_connect(tp, nam, p)) != 0)
 		goto out;
 	tp->t_maxseg = tp->t_maxopd = tcp_v6mssdflt;
 	error = tcp_output(tp);
 	if (error)
 		goto out;
-#ifdef MAPPED_ADDR_ENABLED
 	if (ip6_mapped_addr_on)
 		inp->inp_vflag |= INP_IPV6;
-#endif /* MAPPED_ADDR_ENABLED */
 	COMMON_END(PRU_CONNECT);
 }
 #endif /* INET6 */

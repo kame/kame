@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.40 2000/03/25 07:23:42 sumikawa Exp $	*/
+/*	$KAME: in6.h,v 1.41 2000/03/29 03:45:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -650,7 +650,6 @@ int	in6_addrscope __P((struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithscope __P((struct ifnet *, struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
-#ifdef MAPPED_ADDR_ENABLED
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 struct sockaddr;
 
@@ -661,7 +660,6 @@ void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
 void	in6_sin6_2_sin_in_sock __P((struct sockaddr *nam));
 void	in6_sin_2_v4mapsin6_in_sock __P((struct sockaddr **nam));
 #endif
-#endif /* MAPPED_ADDR_ENABLED */
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))

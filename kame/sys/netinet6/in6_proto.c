@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.45 2000/03/25 07:23:45 sumikawa Exp $	*/
+/*	$KAME: in6_proto.c,v 1.46 2000/03/29 03:45:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -488,7 +488,7 @@ int	ip6_gif_hlim = 0;
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec.    */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	ip6_mapped_addr_on = 1;
 #endif
 #if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
@@ -698,10 +698,10 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEPRECATED,
 	use_deprecated, CTLFLAG_RW,	&ip6_use_deprecated,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RR_PRUNE,
 	rr_prune, CTLFLAG_RW,	&ip6_rr_prune,			0, "");
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAPPED_ADDR,
 	mapped_addr, CTLFLAG_RW,	&ip6_mapped_addr_on,	0, "");
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

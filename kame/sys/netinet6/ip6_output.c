@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.87 2000/03/25 07:23:48 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.88 2000/03/29 03:45:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1396,7 +1396,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			case IPV6_BINDV6ONLY:
 #endif
 				if (optlen != sizeof(int))
@@ -1422,7 +1422,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 							in6p->in6p_hops = optval;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 							if ((in6p->in6p_vflag &
 							     INP_IPV4) != 0)
 								in6p->inp_ip_ttl = optval;
@@ -1521,7 +1521,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 						OPTSET(IN6P_FAITH);
 						break;
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 					case IPV6_BINDV6ONLY:
 						OPTSET(IN6P_BINDV6ONLY);
 						break;
@@ -1833,7 +1833,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 			case IPV6_FAITH:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
 #endif
 #ifndef __bsdi__
@@ -1881,7 +1881,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 					optval = OPTBIT(IN6P_FAITH);
 					break;
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 				case IPV6_BINDV6ONLY:
 					optval = OPTBIT(IN6P_BINDV6ONLY);
 					break;

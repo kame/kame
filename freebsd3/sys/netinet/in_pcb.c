@@ -40,9 +40,9 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 #include <sys/domain.h>
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -226,7 +226,7 @@ in_pcbbind(inp, nam, p)
 				     (t->inp_socket->so_cred) &&
 				     (so->so_cred->p_ruid !=
 				      t->inp_socket->so_cred->p_ruid)) {
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 					if (ip6_mapped_addr_on == 0 ||
 					    ntohl(sin->sin_addr.s_addr) !=
 					    INADDR_ANY ||
@@ -234,7 +234,7 @@ in_pcbbind(inp, nam, p)
 					    INADDR_ANY ||
 					    INP_SOCKAF(so) ==
 					    INP_SOCKAF(t->inp_socket))
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 					return (EADDRINUSE);
 				}
 			}
@@ -242,7 +242,7 @@ in_pcbbind(inp, nam, p)
 			    lport, wild);
 			if (t &&
 			    (reuseport & t->inp_socket->so_options) == 0) {
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 				if (ip6_mapped_addr_on == 0 ||
 				    ntohl(sin->sin_addr.s_addr) !=
 				    INADDR_ANY ||
@@ -250,7 +250,7 @@ in_pcbbind(inp, nam, p)
 				    INADDR_ANY ||
 				    INP_SOCKAF(so) ==
 				    INP_SOCKAF(t->inp_socket))
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 				return (EADDRINUSE);
 			}
 		}
@@ -850,9 +850,9 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 	}
 	if (wildcard) {
 		struct inpcb *local_wild = NULL;
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 		struct inpcb *local_wild_mapped = NULL;
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 
 		head = &pcbinfo->hashbase[INP_PCBHASH(INADDR_ANY, lport, 0, pcbinfo->hashmask)];
 		for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
@@ -868,20 +868,20 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 				if (inp->inp_laddr.s_addr == laddr.s_addr)
 					return (inp);
 				else if (inp->inp_laddr.s_addr == INADDR_ANY) {
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 					if (INP_CHECK_SOCKAF(inp->inp_socket,
 							     AF_INET6))
 						local_wild_mapped = inp;
 					else
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 					local_wild = inp;
 				}
 			}
 		}
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 		if (local_wild == NULL)
 			return (local_wild_mapped);
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 		return (local_wild);
 	}
 

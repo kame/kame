@@ -822,13 +822,11 @@ in6_mapped_sockaddr(struct socket *so, struct sockaddr **nam)
 
 	if (inp == NULL)
 		return EINVAL;
-#ifdef MAPPED_ADDR_ENABLED
 	if (inp->inp_vflag & INP_IPV4) {
 		error = in_setsockaddr(so, nam);
 		if (error == NULL)
 			in6_sin_2_v4mapsin6_in_sock(nam);
 	} else
-#endif /* MAPPED_ADDR_ENABLED */
 	error = in6_setsockaddr(so, nam);
 
 	return error;
@@ -842,14 +840,12 @@ in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
 
 	if (inp == NULL)
 		return EINVAL;
-#ifdef MAPPED_ADDR_ENABLED
 	if (inp->inp_vflag & INP_IPV4) {
 		error = in_setpeeraddr(so, nam);
 		if (error == NULL)
 			in6_sin_2_v4mapsin6_in_sock(nam);
 	} else
-#endif /* MAPPED_ADDR_ENABLED */
-	error = in6_setpeeraddr(so, nam);
+		error = in6_setpeeraddr(so, nam);
 
 	return error;
 }

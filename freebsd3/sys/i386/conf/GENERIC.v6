@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.24 1999/12/05 01:56:42 luoqi Exp $
-# $Id: GENERIC.v6,v 1.14 2000/03/18 03:09:31 itojun Exp $
+# $Id: GENERIC.v6,v 1.15 2000/03/29 03:45:59 sumikawa Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -46,7 +46,6 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	"IPSEC_IPV6FWD"         #IP security tunnel for IPv6
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
-options 	MAPPED_ADDR_ENABLED	#enable IPv4, on IPv6 socket
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"

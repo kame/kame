@@ -70,9 +70,9 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 #include <sys/domain.h>
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 #include <sys/proc.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -133,7 +133,7 @@ SYSCTL_STRUCT(_net_inet_udp, UDPCTL_STATS, stats, CTLFLAG_RD,
 	&udpstat, udpstat, "");
 
 static struct	sockaddr_in udp_in = { sizeof(udp_in), AF_INET };
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 struct udp_in6 {
 	struct sockaddr_in6	uin6_sin;
 	u_char			uin6_init_done : 1;
@@ -145,11 +145,11 @@ struct udp_ip6 {
 	struct ip6_hdr		uip6_ip6;
 	u_char			uip6_init_done : 1;
 } udp_ip6;
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif /* INET6 */
 
 static void udp_append __P((struct inpcb *last, struct ip *ip,
 			    struct mbuf *n, int off));
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 static void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
 #endif
 
@@ -179,7 +179,7 @@ udp_input(m, off, proto)
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 	struct ip6_recvpktopts opts6;
 #endif 
 	int len;
@@ -187,7 +187,7 @@ udp_input(m, off, proto)
 	struct sockaddr *append_sa;
 
 	udpstat.udps_ipackets++;
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 	bzero(&opts6, sizeof(opts6));
 #endif
 
@@ -281,9 +281,9 @@ udp_input(m, off, proto)
 		 * (Algorithm copied from raw_intr().)
 		 */
 		last = NULL;
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 		udp_in6.uin6_init_done = udp_ip6.uip6_init_done = 0;
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 		LIST_FOREACH(inp, &udb, inp_list) {
 			if ((inp->inp_vflag & INP_IPV4) == NULL)
 				continue;
@@ -391,7 +391,7 @@ udp_input(m, off, proto)
 	udp_in.sin_addr = ip->ip_src;
 	if (inp->inp_flags & INP_CONTROLOPTS
 	    || inp->inp_socket->so_options & SO_TIMESTAMP) {
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 		if (inp->inp_vflag & INP_IPV6) {
 			int savedflags;
 
@@ -406,13 +406,13 @@ udp_input(m, off, proto)
 		ip_savecontrol(inp, &opts, ip, m);
 	}
 	m_adj(m, iphlen + sizeof(struct udphdr));
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 	if (inp->inp_vflag & INP_IPV6) {
 		in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
 		append_sa = (struct sockaddr *)&udp_in6;
 		opts = opts6.head;
 	} else
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#endif
 	append_sa = (struct sockaddr *)&udp_in;
 	if (sbappendaddr(&inp->inp_socket->so_rcv, append_sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
@@ -427,7 +427,7 @@ bad:
 	return;
 }
 
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 static void
 ip_2_ip6_hdr(ip6, ip)
 	struct ip6_hdr *ip6;
@@ -459,16 +459,14 @@ udp_append(last, ip, n, off)
 {
 	struct sockaddr *append_sa;
 	struct mbuf *opts = 0;
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 	struct ip6_recvpktopts opts6;
-#endif
 
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 	bzero(&opts6, sizeof(opts6));
 #endif
 	if (last->inp_flags & INP_CONTROLOPTS ||
 	    last->inp_socket->so_options & SO_TIMESTAMP) {
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 		if (last->inp_vflag & INP_IPV6) {
 			int savedflags;
 
@@ -485,7 +483,7 @@ udp_append(last, ip, n, off)
 #endif
 		ip_savecontrol(last, &opts, ip, n);
 	}
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#ifdef INET6
 	if (last->inp_vflag & INP_IPV6) {
 		if (udp_in6.uin6_init_done == 0) {
 			in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);

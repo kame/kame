@@ -113,9 +113,7 @@
  * Per RFC 768, August, 1980.
  */
 
-#ifdef MAPPED_ADDR_ENABLED
 extern	struct protosw inetsw[];
-#endif /* MAPPED_ADDR_ENABLED */
 
 static	int in6_mcmatch __P((struct inpcb *, struct in6_addr *, struct ifnet *));
 static	int udp6_detach __P((struct socket *so));
@@ -785,7 +783,6 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (inp == 0)
 		return EINVAL;
 
-#ifdef MAPPED_ADDR_ENABLED
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_BINDV6ONLY) == NULL) {
@@ -807,7 +804,6 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 			return error;
 		}
 	}
-#endif /* MAPPED_ADDR_ENABLED */
 
 	s = splnet();
 	error = in6_pcbbind(inp, nam, p);
@@ -825,7 +821,6 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (inp == 0)
 		return EINVAL;
 
-#ifdef MAPPED_ADDR_ENABLED
 	if (ip6_mapped_addr_on) {
 		struct sockaddr_in6 *sin6_p;
 
@@ -847,7 +842,6 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			return error;
 		}
 	}
-#endif /* MAPPED_ADDR_ENABLED */
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 		return EISCONN;
@@ -860,12 +854,10 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 	splx(s);
 	if (error == NULL) {
-#ifdef MAPPED_ADDR_ENABLED
 		if (ip6_mapped_addr_on) { /* should be non mapped addr */
 			inp->inp_vflag &= ~INP_IPV4;
 			inp->inp_vflag |= INP_IPV6;
 		}
-#endif /* MAPPED_ADDR_ENABLED */
 		soisconnected(so);
 	}
 	return error;
@@ -896,14 +888,12 @@ udp6_disconnect(struct socket *so)
 	if (inp == 0)
 		return EINVAL;
 
-#ifdef MAPPED_ADDR_ENABLED
 	if (inp->inp_vflag & INP_IPV4) {
 		struct pr_usrreqs *pru;
 
 		pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
 		return ((*pru->pru_disconnect)(so));
 	}
-#endif /* MAPPED_ADDR_ENABLED */
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 		return ENOTCONN;
@@ -928,7 +918,6 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		return EINVAL;
 	}
 
-#ifdef MAPPED_ADDR_ENABLED
 	if (ip6_mapped_addr_on) {
 		int hasv4addr;
 		struct sockaddr_in6 *sin6 = 0;
@@ -956,7 +945,6 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 			return error;
 		}
 	}
-#endif /* MAPPED_ADDR_ENABLED */
 
 	return udp6_output(inp, m, addr, control, p);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.64 2000/03/25 07:23:42 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.65 2000/03/29 03:45:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2513,7 +2513,7 @@ in6_setmaxmtu()
 		in6_maxmtu = maxmtu;
 }
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 /*
  * Convert sockaddr_in6 to sockaddr_in. Original sockaddr_in6 must be
  * v4 mapped addr or v4 compat addr
