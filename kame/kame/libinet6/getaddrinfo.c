@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.148 2003/04/15 12:27:21 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.149 2003/04/17 08:37:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,7 +189,7 @@ struct explore {
 
 static const struct explore explore[] = {
 #if 0
-	{ PF_LOCAL, 0, ANY, ANY, NULL, 0x01 },
+	{ PF_LOCAL, ANY, ANY, NULL, 0x01 },
 #endif
 #ifdef INET6
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
@@ -499,16 +499,22 @@ getaddrinfo(hostname, servname, hints, res)
 		 */
 		if (pai->ai_socktype != ANY && pai->ai_protocol != ANY) {
 			for (ex = explore; ex->e_af >= 0; ex++) {
-				if (pai->ai_family != ex->e_af)
+				if (!MATCH_FAMILY(pai->ai_family, ex->e_af,
+				    WILD_AF(ex)))
 					continue;
-				if (ex->e_socktype == ANY)
+				if (!MATCH(pai->ai_socktype, ex->e_socktype,
+				    WILD_SOCKTYPE(ex)))
 					continue;
-				if (ex->e_protocol == ANY)
+				if (!MATCH(pai->ai_protocol, ex->e_protocol,
+				    WILD_PROTOCOL(ex)))
 					continue;
-				if (pai->ai_socktype == ex->e_socktype &&
-				    pai->ai_protocol != ex->e_protocol) {
-					ERR(EAI_BADHINTS);
-				}
+
+				/* matched */
+				break;
+			}
+
+			if (ex->e_af < 0) {
+				ERR(EAI_BADHINTS);
 			}
 		}
 	}
