@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.123 2004/06/12 13:12:28 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.124 2004/06/12 13:15:13 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -614,8 +614,7 @@ server6_do_command(buf, len)
 	}
 
 	if (version > DHCP6CTL_VERSION) {
-		dprintf(LOG_INFO, FNAME, "unsupported version: %d",
-		    version);
+		dprintf(LOG_INFO, FNAME, "unsupported version: %d", version);
 		return (DHCP6CTL_R_FAILURE);
 	}
 
