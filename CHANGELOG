@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.625 2000/02/27 08:30:15 itojun Exp $
+$Id: CHANGELOG,v 1.626 2000/02/27 08:51:25 itojun Exp $
 
 <200002>
+Sun Feb 27 17:49:32 JST 2000  itojun@iijlab.net
+	* netbsd/lib/libinet6/getaddrinfo.c: add netbsd-specific getaddrinfo,
+	  which keeps search order declared in /etc/nsswitch.conf.
+
 Sun Feb 27 16:43:04 JST 2000  itojun@iijlab.net
 	* */sys/sys/socket.h: use ALIGNBYTES, instead of sizeof(long) - 1,
 	  for CMSG alignment.  without it CMSG alignment is not spec
