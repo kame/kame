@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.345 2004/02/13 11:28:18 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.346 2004/02/13 11:54:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -601,8 +601,8 @@ nd6_llinfo_timer(arg)
 #endif
 			if (m) {
 				ln->ln_hold = NULL;
-				icmp6_error(m, ICMP6_DST_UNREACH,
-				    ICMP6_DST_UNREACH_ADDR, 0);
+				icmp6_error2(m, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_ADDR, 0, rt->rt_ifp);
 			}
 			if (rt)
 				(void)nd6_free(rt, 0);

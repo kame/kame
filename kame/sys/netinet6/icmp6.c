@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.371 2004/02/13 10:38:44 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.372 2004/02/13 11:54:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -327,6 +327,51 @@ icmp6_mtudisc_callback_register(func)
 	LIST_INSERT_HEAD(&icmp6_mtudisc_callbacks, mc, mc_list);
 }
 #endif
+
+/*
+ * A wrapper function for icmp6_error() necessary when the erroneous packet
+ * may not contain enough scope zone information.
+ */
+void
+icmp6_error2(m, type, code, param, ifp)
+	struct mbuf *m;
+	int type, code, param;
+	struct ifnet *ifp;
+{
+	struct ip6_hdr *ip6;
+	struct sockaddr_in6 sa6;
+
+	if (ifp == NULL)
+		return;
+
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), );
+#else
+	if (m->m_len < sizeof(struct ip6_hdr)) {
+		m = m_pullup(m, sizeof(struct ip6_hdr));
+		if (m == NULL)
+			return;
+	}
+#endif
+
+	ip6 = mtod(m, struct ip6_hdr *);
+
+	bzero(&sa6, sizeof(sa6));
+	sa6.sin6_family = AF_INET6;
+	sa6.sin6_len = sizeof(sa6);
+
+	sa6.sin6_addr = ip6->ip6_src;
+	if (scope6_setzoneid(ifp, &sa6))
+		return;
+	ip6->ip6_src = sa6.sin6_addr;
+
+	sa6.sin6_addr = ip6->ip6_dst;
+	if (scope6_setzoneid(ifp, &sa6))
+		return;
+	ip6->ip6_dst = sa6.sin6_addr;
+
+	icmp6_error(m, type, code, param);
+}
 
 /*
  * Generate an error packet of type error in response to bad IP6 packet.
