@@ -5,18 +5,21 @@ CATEGORIES=	security net
 MASTER_SITES= 	ftp://ftp.funet.fi/pub/unix/security/login/ssh/ \
 		ftp://ftp.cs.hut.fi/pub/ssh/
 
-PATCH_SITES=	http://www.ssh.fi/sshprotocols2/patches/
-PATCHFILES=	patch-${DISTNAME}-bsd.tty.chown
+# the patch conflicts with IPv6 patch.
+#PATCH_SITES=	http://www.ssh.fi/sshprotocols2/patches/
+#PATCHFILES=	patch-${DISTNAME}-bsd.tty.chown
+PATCH_SITES+=	ftp://ftp.kyoto.wide.ad.jp/IPv6/ssh/
+PATCHFILES+=	ssh-1.2.27-IPv6-1.5-patch.gz
 PATCH_DIST_STRIP= -p1
 
-NEED_VERSION=	1.121
+#NEED_VERSION=	1.121
 
 NO_CDROM=	"CRYPTO: Third party crypto not allowed."
 RESTRICTED=	"Crypto; export-controlled"
 
 MAINTAINER=	todd@openbsd.org
 
-.if defined(NO_WARNINGS) || (defined(USA_RESIDENT) && ${USA_RESIDENT:U} == YES)
+.if defined(NO_WARNINGS) || (defined(USA_RESIDENT) && ${USA_RESIDENT} == YES)
 MASTER_SITES0=	ftp://nic.funet.fi/pub/crypt/mirrors/ftp.dsi.unimi.it/applied-crypto/ \
 		ftp://idea.dsi.unimi.it/pub/security/crypt/math/
 DISTFILES=	${DISTNAME}.tar.gz rsaref2.tar.gz:0
@@ -30,6 +33,7 @@ GNU_CONFIGURE=	yes
 CONFIGURE_ARGS=	--with-etcdir=${ETCDIR} \
 		--with-rsh=${RSHPROG} \
 		--with-libwrap
+CONFIGURE_ARGS+=--enable-ipv6
 CONFIGURE_ENV= PERL=/usr/bin/perl
 
 .if defined(X11) && ${X11} == NO
@@ -47,43 +51,43 @@ CONFIGURE_ARGS= --without-x
 #
 #CONFIGURE_ARGS+= --with-none
 
-.if defined(USA_RESIDENT) && ${USA_RESIDENT:U} == YES
+.if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
 CONFIGURE_ARGS+= --with-rsaref
 .endif
 
 # Include SOCKS firewall support
-.if defined(USE_SOCKS) && ${USE_SOCKS:U} == YES
+.if defined(USE_SOCKS) && ${USE_SOCKS} == YES
 CONFIGURE_ARGS+= --with-socks="-L${PREFIX}/lib -lsocks5" --with-socks5
 .endif
 
 # Include support for the SecureID card
 # Warning: untested !
-.if defined(USE_SECUREID) && ${USE_SECUREID:U} == YES
+.if defined(USE_SECUREID) && ${USE_SECUREID} == YES
 CONFIGURE_ARGS+= --with-secureid
 .endif
 
 # Don't use IDEA. IDEA can be freely used for non-commercial use. However,
 # commercial use may require a licence in a number of countries
 #
-.if defined(DONT_USE_IDEA) && ${DONT_USE_IDEA:U} == YES
+.if defined(DONT_USE_IDEA) && ${DONT_USE_IDEA} == YES
 CONFIGURE_ARGS+= --without-idea
 .endif
 
 pre-patch:
-.if defined(USA_RESIDENT) && ${USA_RESIDENT:U} == YES
+.if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
 	@${CP} ${FILESDIR}/patch-rsaref2 ${PATCHDIR}
 .endif
 	@${MV} -f ${WRKSRC}/make-ssh-known-hosts.pl \
 	    ${WRKSRC}/make-ssh-known-hosts.pl.in
 
 post-patch:
-.if defined(USA_RESIDENT) && ${USA_RESIDENT:U} == YES
+.if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
 	@${RM} ${PATCHDIR}/patch-rsaref2
 .endif
 
 fetch-depends:
 .if !defined(NO_WARNINGS)
-.if !defined(USA_RESIDENT) || ${USA_RESIDENT:U} != YES && ${USA_RESIDENT:U} != NO
+.if !defined(USA_RESIDENT) || ${USA_RESIDENT} != YES && ${USA_RESIDENT} != NO
 	@${ECHO}
 	@${ECHO} You must set variable USA_RESIDENT to YES if you are a USA
 	@${ECHO} resident or NO otherwise.  USA residents must obtain the
@@ -99,7 +103,7 @@ fetch-depends:
 .endif
 
 post-extract:
-.if defined(USA_RESIDENT) && ${USA_RESIDENT:U} == YES
+.if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
 	@${MV} ${WRKDIR}/rsaref2 ${WRKSRC}/rsaref2
 .endif
 
