@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.17 2000/07/16 08:25:51 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.18 2000/08/30 17:26:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -91,10 +91,21 @@ initlcconf()
 void
 flushlcconf()
 {
+	int i;
+
 	setdefault();
 	clear_myaddr(&lcconf->myaddrs);
-	free(lcconf->pathinfo);
-	free(lcconf->ident);
+	for (i = 0; i < LC_PATHTYPE_MAX; i++) {
+		if (lcconf->pathinfo[i]) {
+			free(lcconf->pathinfo[i]);
+			lcconf->pathinfo[i] = NULL;
+		}
+	}
+	for (i = 0; i < LC_IDENTTYPE_MAX; i++) {
+		if (lcconf->ident[i])
+			vfree(lcconf->ident[i]);
+		lcconf->ident[i] = NULL;
+	}
 	flushalgstrength(lcconf->algstrength);
 }
 
