@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/11 13:16:04 $
+			$Date: 1999/10/11 13:20:22 $
 
 1. IPv6
 
@@ -650,6 +650,14 @@ KAME/OpenBSD uses OpenBSD-based TCP/UDP stack and inpcb source code, which
 was derived from NRL IPv6/IPsec stack.  I guess it supports IPv4 mapped
 address and speical AF_INET6 wildcard bind.  The implementation is, again,
 different from other KAME/*BSDs.
+Note that NRL inpcb layer has different behavior than KAME implementation,
+namely:
+- If you bind(2) a socket to IPv6 wildcard address (::) then bind(2)
+  another socket to IPv4 wildcard address (0.0.0.0), the latter will fail
+  with EADDRINUSE.
+- If you bind(2) to IPv4 wildcard address then IPv6 wildcard address,
+  both will success.  However, all IPv4 traffic (and IPv6 traffic) will be
+  captured by IPv6 wildcard socket.
 
 1.12.6 configuration and implementation
 
