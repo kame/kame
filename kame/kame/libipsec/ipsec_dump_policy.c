@@ -42,6 +42,10 @@
 
 #include "ipsec_strerror.h"
 
+#ifdef USE_GETNAMEINFO
+#undef USE_GETNAMEINFO
+#endif
+
 static const char *ipsp_dir_strs[] = {
 	"any", "in", "out",
 };
@@ -49,6 +53,8 @@ static const char *ipsp_dir_strs[] = {
 static const char *ipsp_policy_strs[] = {
 	"discard", "none", "ipsec", "entrust", "bypass",
 };
+
+static int set_addresses __P((char *buf, caddr_t ptr));
 
 /*
  * policy is sadb_x_policy buffer.
@@ -64,6 +70,7 @@ ipsec_dump_policy(policy, delimiter)
 	struct sadb_x_ipsecrequest *xisr;
 	int xtlen, buflen;
 	char *buf;
+	int error;
 
 	/* sanity check */
 	if (policy == NULL)
@@ -147,17 +154,16 @@ ipsec_dump_policy(policy, delimiter)
 	xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
 
 	while (xtlen > 0) {
+		strcat(buf, delimiter);
+
 		switch (xisr->sadb_x_ipsecrequest_proto) {
 		case IPPROTO_ESP:
-			strcat(buf, delimiter);
 			strcat(buf, "esp");
 			break;
 		case IPPROTO_AH:
-			strcat(buf, delimiter);
 			strcat(buf, "ah");
 			break;
 		case IPPROTO_IPCOMP:
-			strcat(buf, delimiter);
 			strcat(buf, "ipcomp");
 			break;
 		default:
@@ -166,15 +172,17 @@ ipsec_dump_policy(policy, delimiter)
 			return NULL;
 		}
 
+		strcat(buf, "/");
+
 		switch (xisr->sadb_x_ipsecrequest_mode) {
 		case IPSEC_MODE_ANY:
-			strcat(buf, "/any");
+			strcat(buf, "any");
 			break;
 		case IPSEC_MODE_TRANSPORT:
-			strcat(buf, "/transport");
+			strcat(buf, "transport");
 			break;
 		case IPSEC_MODE_TUNNEL:
-			strcat(buf, "/tunnel");
+			strcat(buf, "tunnel");
 			break;
 		default:
 			ipsec_errcode = EIPSEC_INVAL_MODE;
@@ -182,31 +190,17 @@ ipsec_dump_policy(policy, delimiter)
 			return NULL;
 		}
 
-	    {
-		char tmp[100]; /* XXX */
-		struct sockaddr *saddr = (struct sockaddr *)(xisr + 1);
-#if 1
-		inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
-			tmp, sizeof(tmp));
-#else
-		getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
-			NULL, 0, NI_NUMERICHOST);
-#endif
 		strcat(buf, "/");
-		strcat(buf, tmp);
-		strcat(buf, "-");
 
-		saddr = (struct sockaddr *)((caddr_t)saddr + saddr->sa_len);
-#if 1
-		inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
-			tmp, sizeof(tmp));
-#else
-		getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
-			NULL, 0, NI_NUMERICHOST);
-#endif
-		strcat(buf, tmp);
-	    }
-		
+		if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
+			error = set_addresses(buf, (caddr_t)(xisr + 1));
+			if (error) {
+				ipsec_errcode = EIPSEC_INVAL_MODE;
+				free(buf);
+				return NULL;
+			}
+		}
+
 		switch (xisr->sadb_x_ipsecrequest_level) {
 		case IPSEC_LEVEL_DEFAULT:
 			strcat(buf, "/default");
@@ -233,4 +227,36 @@ ipsec_dump_policy(policy, delimiter)
 
 	ipsec_errcode = EIPSEC_NO_ERROR;
 	return buf;
+}
+
+static int
+set_addresses(buf, ptr)
+	char *buf;
+	caddr_t ptr;
+{
+	char tmp[100]; /* XXX */
+	struct sockaddr *saddr = (struct sockaddr *)ptr;
+
+#ifdef USE_GETNAMEINFO
+	getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
+		NULL, 0, NI_NUMERICHOST);
+#else
+	inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
+		tmp, sizeof(tmp));
+#endif
+	strcat(buf, tmp);
+
+	strcat(buf, "-");
+
+	saddr = (struct sockaddr *)((caddr_t)saddr + saddr->sa_len);
+#ifdef USE_GETNAMEINFO
+	getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
+		NULL, 0, NI_NUMERICHOST);
+#else
+	inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
+		tmp, sizeof(tmp));
+#endif
+	strcat(buf, tmp);
+
+	return 0;
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.3 1999/09/13 14:43:04 itojun Exp $ */
+/* KAME $Id: setkey.c,v 1.4 1999/10/25 13:30:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -457,7 +457,7 @@ static char *ipproto[] = {
 /*40*/	NULL, "ip6", NULL, "rt6", "frag6",
 	NULL, "rsvp", "gre", NULL, NULL,
 /*50*/	"esp", "ah", NULL, NULL, NULL,
-	NULL, NULL, "icmp6", "none", NULL,
+	NULL, NULL, NULL, "icmp6", "none",
 /*60*/	"dst6",
 };
 

@@ -50,6 +50,7 @@ char *requests[] = {
 "out discard",
 "out none",
 "in entrust",
+"out entrust",
 "in bypass",				/* may be error */
 "out ipsec esp",			/* error */
 "in ipsec ah/transport",
