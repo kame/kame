@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.166 2001/03/06 00:22:03 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.167 2001/03/11 06:04:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -391,10 +391,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* if we have any extension header, we cannot perform IPsec */
 		if (exthdrs.ip6e_hbh || exthdrs.ip6e_dest1 ||
 		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2) {
+			splx(s);
 			error = EHOSTUNREACH;
 			goto freehdrs;
 		}
 #endif
+		splx(s);
 	}
 
 	/* Fall through to the routing/multicast handling code */
