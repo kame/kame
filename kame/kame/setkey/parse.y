@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.26 2000/06/07 03:10:20 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.27 2000/06/09 11:18:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -48,6 +48,7 @@
 #include <ctype.h>
 #include <errno.h>
 
+#include "libpfkey.h"
 #include "vchar.h"
 
 #define ATOX(c) \
