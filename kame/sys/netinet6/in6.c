@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.156 2001/02/02 14:23:41 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.157 2001/02/02 15:59:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -844,7 +844,7 @@ in6_control(so, cmd, data, ifp)
 
 		/*
 		 * If the address being deleted is the only one that owns
-		 * the corresponding on-link prefix, expire the prefix as well.
+		 * the corresponding prefix, expire the prefix as well.
 		 * XXX: theoretically, we don't have to warry about such
 		 * relationship, since we separate the address management
 		 * and the prefix management.  We do this, however, to provide
@@ -865,14 +865,13 @@ in6_control(so, cmd, data, ifp)
 		}
 		/*
 		 * The logic of the following condition is a bit complicated.
-		 * We expire an on-link prefix when
+		 * We expire the prefix when
 		 * 1. the address obeys autoconfiguration and it is the
 		 *    only owner of the associated prefix, or
 		 * 2. the address does not obey autoconf and there is no
 		 *    other owner of the prefix.
 		 */
 		if ((pr = nd6_prefix_lookup(&pr0)) != NULL &&
-		    (pr->ndpr_stateflags & NDPRF_ONLINK) != 0 &&
 		    (((ia->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
 		      pr->ndpr_refcnt == 1) ||
 		     ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0 &&
