@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.23 2002/06/03 03:12:36 itojun Exp $
+.\"	$KAME: ndp.8,v 1.24 2002/06/03 03:22:40 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -37,22 +37,20 @@
 .\"
 .Sh SYNOPSIS
 .Nm ndp
+.Op Fl nt
 .Fl a
-.Op Fl nt
 .Nm ndp
+.Op Fl nt
 .Fl A Ar wait
-.Op Fl nt
 .Nm ndp
+.Op Fl nt
 .Fl c
-.Op Fl nt
 .Nm ndp
-.Fl d
 .Op Fl nt
-.Ar hostname
+.Fl d Ar hostname
 .Nm ndp
-.Fl f
 .Op Fl nt
-.Ar filename
+.Fl f Ar filename
 .Nm ndp
 .Fl H
 .Nm ndp
@@ -72,10 +70,8 @@
 .Nm ndp
 .Fl R
 .Nm ndp
-.Fl s
 .Op Fl nt
-.Ar nodename
-.Ar ether_addr
+.Fl s Ar nodename ether_addr
 .Op Li temp
 .Op Li proxy
 .\"
@@ -83,12 +79,12 @@
 The
 .Nm
 command manipulates the address mapping table
-used by Neighbor Discovery Protocol (NDP).
+used by the Neighbor Discovery Protocol (NDP).
 .Bl -tag -width Ds
 .It Fl a
 Dump the currently existing NDP entries.
 The following information will be printed:
-.Bl -tag -width Ds
+.Bl -tag -width NeighborXX
 .It Neighbor
 IPv6 address of the neighbor.
 .It Linklayer Address
@@ -99,16 +95,31 @@ when the address is not available.
 .It Netif
 Network interface associated with the neighbor cache entry.
 .It Expire
-The time until the expiry of the entry.
+The time until expiry of the entry.
 The entry could become
-.Dq Li permanent
-when it will never expire.
+.Dq Li permanent ,
+in which case it will never expire.
 .It S
-State of the neighbor cache entry, in a single letter.
-They are:
-Nostate, Waitdelete, Incomplete, Reachable, Stale, Delay and Probe.
-.Dq Li ?
-indicates unknown state, which should never happen.
+State of the neighbor cache entry, as a single letter:
+.Bl -tag -width indent -compact
+.Pp
+.It N
+Nostate
+.It W
+Waitdelete
+.It I
+Incomplete
+.It R
+Reachable
+.It S
+Stale
+.It D
+Deay
+.It P
+Probe
+.It ?
+Unknown state (should never happen).
+.El
 .It Flgs
 Flags on the neighbor cache entry, in a single letter.
 They are: Router, proxy neighbor advertisement
@@ -158,6 +169,7 @@ special character
 .Ql - ,
 which means the flag should be cleared.
 .\"
+.Pp
 .Bl -tag -width Ds -compact
 .It Xo
 .Ic nud
@@ -189,7 +201,7 @@ selection, see the
 file supplied with the KAME kit.
 .El
 .It Fl n
-Do not try to resolve numeric address to hostname.
+Do not try to resolve numeric addresses to hostnames.
 .It Fl p
 Show prefix list.
 .It Fl P
@@ -210,8 +222,8 @@ responding to requests for
 .Ar hostname
 even though the host address is not its own.
 .It Fl t
-Print timestamp on each entries,
-to make it possible to merge output with
+Print timestamp on each entry,
+making it possible to merge output with
 .Xr tcpdump 8 .
 Most useful when used with
 .Fl A .
