@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.3 2000/01/10 00:39:36 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.4 2000/01/10 01:23:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -384,12 +384,12 @@ quick_i2recv(iph2, msg0)
 			break;
 
 		case ISAKMP_NPTYPE_NONCE:
-			if (isakmp_p2ph(iph2->nonce_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph2->nonce_p, pa->ptr) < 0)
 				goto end;
 			break;
 
 		case ISAKMP_NPTYPE_KE:
-			if (isakmp_p2ph(iph2->dhpub_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph2->dhpub_p, pa->ptr) < 0)
 				goto end;
 			break;
 
@@ -922,12 +922,12 @@ quick_r1recv(iph2, msg0)
 			break;
 
 		case ISAKMP_NPTYPE_NONCE:
-			if (isakmp_p2ph(iph2->nonce_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph2->nonce_p, pa->ptr) < 0)
 				goto end;
 			break;
 
 		case ISAKMP_NPTYPE_KE:
-			if (isakmp_p2ph(iph2->dhpub_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph2->dhpub_p, pa->ptr) < 0)
 				goto end;
 			break;
 
@@ -936,7 +936,7 @@ quick_r1recv(iph2, msg0)
 				/* for IDci */
 				f_id_order++;
 
-				if (isakmp_p2ph(iph2->id_p, pa->ptr) < 0)
+				if (isakmp_p2ph(&iph2->id_p, pa->ptr) < 0)
 					goto end;
 				YIPSDEBUG(DEBUG_KEY,
 					plog(logp, LOCATION, NULL,
@@ -953,7 +953,7 @@ quick_r1recv(iph2, msg0)
 					/* XXX we allowed in this case. */
 				}
 
-				if (isakmp_p2ph(iph2->id, pa->ptr) < 0)
+				if (isakmp_p2ph(&iph2->id, pa->ptr) < 0)
 					goto end;
 				YIPSDEBUG(DEBUG_KEY,
 					plog(logp, LOCATION, NULL,

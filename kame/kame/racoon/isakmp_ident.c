@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.2 2000/01/09 22:59:36 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.3 2000/01/10 01:23:28 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -347,11 +347,11 @@ ident_i3recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph1->dhpub_p, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_NONCE:
-			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph1->nonce_p, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
@@ -504,7 +504,7 @@ ident_i4recv(iph1, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_ID:
-			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_HASH:
@@ -838,11 +838,11 @@ ident_r2recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph1->dhpub_p, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_NONCE:
-			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph1->nonce_p, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
@@ -992,7 +992,7 @@ ident_r3recv(iph1, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_ID:
-			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_HASH:

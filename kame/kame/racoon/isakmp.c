@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.17 2000/01/10 00:39:36 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.18 2000/01/10 01:23:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1479,16 +1479,16 @@ end:
  */
 int
 isakmp_p2ph(buf, gen)
-	vchar_t *buf;
+	vchar_t **buf;
 	struct isakmp_gen *gen;
 {
-	buf = vmalloc(ntohs(gen->len) - sizeof(*gen));
-	if (buf == NULL) {
+	*buf = vmalloc(ntohs(gen->len) - sizeof(*gen));
+	if (*buf == NULL) {
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
 		return -1;
 	}
-	memcpy(buf->v, gen + 1, buf->l);
+	memcpy((*buf)->v, gen + 1, (*buf)->l);
 
 	return 0;
 }

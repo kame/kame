@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.9 2000/01/09 01:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.10 2000/01/10 01:23:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -710,6 +710,9 @@ isakmp_info_recv_n(msg, from)
 		switch (pap->type) {
 		case ISAKMP_NPTYPE_HASH:
 			/* do something here */
+			break;
+		case ISAKMP_NPTYPE_NONCE:
+			/* send to ack */
 			break;
 		case ISAKMP_NPTYPE_N:
 			n = (struct isakmp_pl_n *)pap->ptr;

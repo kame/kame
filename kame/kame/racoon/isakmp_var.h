@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.4 2000/01/09 22:59:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.5 2000/01/10 01:23:29 sakane Exp $ */
 
 #define PORT_ISAKMP 500
 
@@ -81,7 +81,7 @@ extern caddr_t isakmp_set_attr_l
 extern int isakmp_newcookie
 	__P((caddr_t place, struct sockaddr *remote, struct sockaddr *local));
 
-extern int isakmp_p2ph __P((vchar_t *buf, struct isakmp_gen *gen));
+extern int isakmp_p2ph __P((vchar_t **buf, struct isakmp_gen *gen));
 
 extern void isakmp_check_vendorid __P((struct isakmp_gen *gen, struct sockaddr *from));
 
