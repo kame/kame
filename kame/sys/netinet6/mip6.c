@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.142 2002/07/13 17:55:24 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.143 2002/07/16 07:30:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -199,6 +199,7 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 #ifdef MIP6_DRAFT17
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
+static void mip6_update_nonce_nodekey(void);
 #endif /* MIP6_DRAFT17 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -2535,6 +2536,18 @@ mip6_create_nodekey(nodekey)
 		((u_long *)nodekey)[i] = random();
 }
 
+/* This function should be called periodically */
+static void
+mip6_update_nonce_nodekey()
+{
+	nonce_index++;
+	if (++nonce_head >= mip6_nonce + MIP6_NONCE_HISTORY)
+		nonce_head = mip6_nonce;
+	
+	mip6_create_nonce(nonce_head);
+	mip6_create_nodekey(mip6_nodekey + (nonce_head - mip6_nonce));
+}
+
 int
 mip6_get_nonce(index, nonce)
 	int index;	/* nonce index */
@@ -2698,7 +2711,7 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 				break;
 		}
 		
-		mh += *(mh + 1) + 2;
+		mh += *(mh + 1);
 		mopt->valid_options |= valid_option;
 	}
 
@@ -2724,5 +2737,4 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 	hmac_loop(&hmac_ctx, (u_int8_t *)nonce, sizeof(mip6_nonce_t));
 	hmac_result(&hmac_ctx, (u_int8_t *)cookie);
 }
-
 #endif /* MIP6_DRAFT17 */

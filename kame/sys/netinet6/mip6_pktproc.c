@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.21 2002/07/15 15:01:52 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.22 2002/07/16 07:30:07 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1549,8 +1549,10 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 		/* Calculate authenticator */
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-		hmac_loop(&hmac_ctx, (u_int8_t *)&src->sin6_addr, sizeof(src->sin6_addr));
-		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr, sizeof(dst->sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)&src->sin6_addr,
+			  sizeof(src->sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr,
+			  sizeof(dst->sin6_addr));
 		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
 		if (auth_size - (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN)) {
 			hmac_loop(&hmac_ctx,
