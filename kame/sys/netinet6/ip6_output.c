@@ -226,8 +226,13 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	if (opt) {
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
-		/* Destination options header(1st part) */
-		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
+		if (opt->ip6po_rthdr) {
+			/*
+			 * Destination options header(1st part)
+			 * This only makes sence with a routing header. 
+			 */
+			MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
+		}
 		/* Routing header */
 		MAKE_EXTHDR(opt->ip6po_rthdr, &exthdrs.ip6e_rthdr);
 		/* Destination options header(2nd part) */
@@ -3098,7 +3103,9 @@ ip6_optlen(in6p)
     (((struct ip6_ext *)(x)) ? (((struct ip6_ext *)(x))->ip6e_len + 1) << 3 : 0)
 
 	len += elen(in6p->in6p_outputopts->ip6po_hbh);
-	len += elen(in6p->in6p_outputopts->ip6po_dest1);
+	if (in6p->in6p_outputopts->ip6po_rthdr)
+		/* dest1 is valid with rthdr only */
+		len += elen(in6p->in6p_outputopts->ip6po_dest1);
 	len += elen(in6p->in6p_outputopts->ip6po_rthdr);
 	len += elen(in6p->in6p_outputopts->ip6po_dest2);
 	return len;
