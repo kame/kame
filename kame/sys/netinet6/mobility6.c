@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.8 2002/07/29 06:50:19 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.9 2002/08/06 11:00:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,6 +100,14 @@ mobility6_input(mp, offp, proto)
 		return (IPPROTO_DONE);
 	}
 
+	if (mh6->ip6m_pproto != IPPROTO_NONE) {
+		mip6log((LOG_INFO, "%s:%d: Payload Proto %d.\n",
+			__FILE__, __LINE__, mh6->ip6m_pproto));
+		/* 9.2.1 silent discard */
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
+
 	/*
 	 * calculate the checksum
 	 */
@@ -187,10 +195,6 @@ mobility6_input(mp, offp, proto)
 	}
 
 	*offp = off;
-	if (mh6->ip6m_pproto != IPPROTO_NONE) {
-		mip6log((LOG_INFO, "%s:%d: Payload Proto %d.\n",
-			__FILE__, __LINE__, mh6->ip6m_pproto));
-	}
 
 	return (mh6->ip6m_pproto);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.100 2002/08/05 11:49:17 k-sugyou Exp $	*/
+/*	$KAME: ip6_var.h,v 1.101 2002/08/06 11:00:54 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,7 +473,7 @@ int	rip6_usrreq __P((struct socket *,
 
 int	dest6_input __P((struct mbuf **, int *, int));
 #ifdef MIP6
-int	dest6_mip6_hao __P((struct mbuf *, int));
+int	dest6_mip6_hao __P((struct mbuf *, int, int));
 #endif
 int	mobility6_input __P((struct mbuf **, int *, int));
 int	none_input __P((struct mbuf **, int *, int));

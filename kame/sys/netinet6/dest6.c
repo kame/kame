@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.45 2002/08/05 11:49:16 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.46 2002/08/06 11:00:54 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,9 +307,9 @@ dest6_nextopt(m, off, ip6o)
 }
 
 int
-dest6_mip6_hao(m, nxt)
+dest6_mip6_hao(m, mhoff, nxt)
 struct mbuf *m;
-int nxt;
+int mhoff, nxt;
 {
 	struct ip6_hdr *ip6;
 	struct ip6aux *ip6a;
@@ -317,7 +317,8 @@ int nxt;
 	struct mbuf *n;
 	struct sockaddr_in6 home_sa;
 	struct ip6_opt_home_address haopt;
-	int newoff, off, proto;
+	struct ip6_mobility mh;
+	int newoff, off, proto, swap;
 
 	if (!MIP6_IS_MN)
 		return (0);
@@ -359,7 +360,16 @@ int nxt;
 	}
 	m_copydata(m, off, sizeof(haopt), (caddr_t)&haopt);
 
-	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP || nxt == IPPROTO_MOBILITY)
+	swap = 0;
+	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP)
+		swap = 1;
+	if (nxt == IPPROTO_MOBILITY) {
+		m_copydata(m, mhoff, sizeof(mh), (caddr_t)&mh);
+		if (mh.ip6m_type == IP6M_BINDING_UPDATE)
+			swap = 1;
+	}
+
+	if (swap)
 		return dest6_swap_hao(ip6, ip6a, &haopt);
 
 	/* reject */

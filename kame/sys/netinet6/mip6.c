@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.153 2002/08/06 01:23:16 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.154 2002/08/06 11:00:54 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1648,7 +1648,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct sockaddr_in6 *dst;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
-	int s, error = 0;
+	int s, error = 0, need_hao = 0;
 
 	mip6opt->mip6po_rthdr = NULL;
 	mip6opt->mip6po_haddr = NULL;
@@ -1736,7 +1736,11 @@ mip6_exthdr_create(m, opt, mip6opt)
 		goto noneed;
 	}
 
-	if (ip6->ip6_nxt == IPPROTO_NONE) {
+	if (opt && opt->ip6po_mobility != NULL) {
+		if (opt->ip6po_mobility->ip6m_type == IP6M_BINDING_UPDATE)
+			need_hao = 1;
+	}
+	else if (ip6->ip6_nxt == IPPROTO_NONE) {
 		/* create a binding update mobility header. */
 		error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
 				  	src, dst, sc);
@@ -1747,18 +1751,14 @@ mip6_exthdr_create(m, opt, mip6opt)
 			 	__FILE__, __LINE__));
 			goto bad;
 		}
+		if (mip6opt->mip6po_mobility != NULL)
+			need_hao = 1;
 	}
-#if 0	/* I-D 18 */
-	if (mbu->mbu_flags & IP6MU_HOME) {
-		/* to my home agent. */
-		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_IDLE)
-			goto noneed;
-	} else {
+	if ((mbu->mbu_flags & IP6MU_HOME) == 0) {
 		/* to any of correspondent nodes. */
-		if (mbu->mbu_fsm_state != MIP6_BU_FSM_STATE_BOUND)
+		if (!need_hao && mbu->mbu_fsm_state != MIP6_BU_FSM_STATE_BOUND)
 			goto noneed;
 	}
-#endif
 	/* create haddr destopt. */
 	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
 					  src, dst, sc);

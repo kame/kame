@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.289 2002/08/05 11:49:16 k-sugyou Exp $	*/
+/*	$KAME: ip6_input.c,v 1.290 2002/08/06 11:00:54 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1131,7 +1131,7 @@ ip6_input(m)
 		 * headers have been processed.  get from Ericsson
 		 * code.  need more consideration.
 		 */
-		if (dest6_mip6_hao(m, nxt) < 0)
+		if (dest6_mip6_hao(m, off, nxt) < 0)
 			goto bad;
 		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
 		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
