@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.10 1999/12/23 17:25:20 itojun Exp $
+.\"     $Id: ping6.8,v 1.11 1999/12/23 17:39:45 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -53,6 +53,7 @@ packets to network hosts
 .Op Fl P Ar policy
 .Op Fl S Ar sourceaddr
 .Op Fl s Ar packetsize
+.Op Ar hops...
 .Ar host
 .Sh DESCRIPTION
 .Nm
@@ -176,9 +177,16 @@ when finished.
 .It Fl R
 Make the kernel believe that the target
 .Ar host
+.Po
+or the first
+.Ar hop
+if you specify
+.Ar hops
+.Pc
 is reachable, by injecting upper-layer reachability confirmation hint.
 The option is meaningful only if the target
 .Ar host
+.Pq or the first hop
 is a neighbor.
 .It Fl S Ar sourceaddr
 Specifies the source address of request packets.
@@ -218,6 +226,11 @@ This option was remained for backward compatibility.
 has no effect if
 .Fl w
 is specified.
+.It Ar hops
+IPv6 addresses for intermediate nodes,
+which will be put into type 0 routing header.
+.It Ar host
+IPv6 adddress of the final destination node.
 .El
 .Pp
 When using
