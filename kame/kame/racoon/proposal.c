@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.35 2001/08/16 06:13:25 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.36 2001/08/16 06:20:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -683,7 +683,7 @@ aproppair2saprop(p0)
 		 * that unspecified == transport), as well as RFC2407
 		 * (unspecified == implementation dependent default).
 		 */
-		newpr->encmode = IPSECDOI_ATTR_ENC_MODE_DEFAULT;
+		newpr->encmode = IPSECDOI_ATTR_ENC_MODE_TRNS;
 
 		for (t = p; t; t = t->tnext) {
 

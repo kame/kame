@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.33 2001/08/14 12:26:06 sakane Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.34 2001/08/16 06:20:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,7 +97,6 @@
 #define IPSECDOI_ATTR_GRP_DESC                3 /* B */
 #define IPSECDOI_ATTR_ENC_MODE                4 /* B */
 	/* default value: host dependent */
-#define   IPSECDOI_ATTR_ENC_MODE_DEFAULT        2	/* NOTE:internal use */
 #define   IPSECDOI_ATTR_ENC_MODE_ANY            0	/* NOTE:internal use */
 #define   IPSECDOI_ATTR_ENC_MODE_TUNNEL         1
 #define   IPSECDOI_ATTR_ENC_MODE_TRNS           2
