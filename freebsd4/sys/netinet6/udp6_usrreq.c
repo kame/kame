@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.27 2001/05/21 05:45:10 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.28 2001/07/25 03:25:00 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -546,6 +546,7 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	inp->inp_vflag |= INP_IPV6;
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;	/* just to be sure */
+#ifdef INET
 	/*
 	 * XXX: ugly!!
 	 * IPv4 TTL initialization is necessary for an IPv6 socket as well,
@@ -553,6 +554,7 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	 * which may match an IPv4-mapped IPv6 address.
 	 */
 	inp->inp_ip_ttl = ip_defttl;
+#endif
 #ifdef IPSEC
 	error = ipsec_init_policy(so, &inp->in6p_sp);
 	if (error != 0) {
@@ -575,6 +577,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
+#ifdef INET
 	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
 
@@ -594,7 +597,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 			return error;
 		}
 	}
-
+#endif
 	s = splnet();
 	error = in6_pcbbind(inp, nam, p);
 	splx(s);
@@ -611,6 +614,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (inp == 0)
 		return EINVAL;
 
+#ifdef INET
 	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
 
@@ -632,18 +636,20 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			return error;
 		}
 	}
-
+#endif
 	if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 		return EISCONN;
 	s = splnet();
 	error = in6_pcbconnect(inp, nam, p);
 	splx(s);
 	if (error == 0) {
+#ifdef INET
 		if (ip6_mapped_addr_on) { /* should be non mapped addr */
 			inp->inp_vflag &= ~INP_IPV4;
 			inp->inp_vflag |= INP_IPV6;
 		}
 		soisconnected(so);
+#endif
 	}
 	return error;
 }
@@ -673,12 +679,14 @@ udp6_disconnect(struct socket *so)
 	if (inp == 0)
 		return EINVAL;
 
+#ifdef INET
 	if (inp->inp_vflag & INP_IPV4) {
 		struct pr_usrreqs *pru;
 
 		pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
 		return ((*pru->pru_disconnect)(so));
 	}
+#endif
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 		return ENOTCONN;
@@ -715,6 +723,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		}
 	}
 
+#ifdef INET
 	if (ip6_mapped_addr_on) {
 		int hasv4addr;
 		struct sockaddr_in6 *sin6 = 0;
@@ -738,6 +747,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 			return error;
 		}
 	}
+#endif
 
 	return udp6_output(inp, m, addr, control, p);
 
