@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.71 2000/08/13 20:06:29 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.72 2000/08/13 20:12:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,6 +122,9 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifdef __OpenBSD__
+#include <math.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -228,6 +231,9 @@ int timing;			/* flag to do timing */
 double tmin = 999999999.0;	/* minimum round trip time */
 double tmax = 0.0;		/* maximum round trip time */
 double tsum = 0.0;		/* sum of all times, for doing average */
+#ifdef __OpenBSD__
+double tsumsq = 0.0;		/* sum of all times squared, for std. dev. */
+#endif
 
 /* for node addresses */
 u_short naflags;
@@ -1250,6 +1256,9 @@ pr_pack(buf, cc, mhdr)
 			triptime = ((double)tv.tv_sec) * 1000.0 +
 			    ((double)tv.tv_usec) / 1000.0;
 			tsum += triptime;
+#ifdef __OpenBSD__
+			tsumsq += triptime * triptime;
+#endif
 			if (triptime < tmin)
 				tmin = triptime;
 			if (triptime > tmax)
@@ -1748,9 +1757,18 @@ summary()
 	(void)putchar('\n');
 	if (nreceived && timing) {
 		/* Only display average to microseconds */
-		i = 1000.0 * tsum / (nreceived + nrepeats);
-		(void)printf("round-trip min/avg/max = %g/%g/%g ms\n",
-		    tmin, ((double)i) / 1000.0, tmax);
+		double num = nreceived + nrepeats;
+		double avg = tsum / num;
+#ifdef __OpenBSD__
+		double dev = sqrt(tsumsq / num - avg * avg);
+		(void)printf(
+		    "round-trip min/avg/max/std-dev = %.3f/%.3f/%.3f/%.3f ms\n",
+		    tmin, avg, tmax, dev);
+#else
+		(void)printf(
+		    "round-trip min/avg/max = %.3f/%.3f/%.3f ms\n",
+		    tmin, avg, tmax);
+#endif
 		(void)fflush(stdout);
 	}
 }
