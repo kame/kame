@@ -1,4 +1,4 @@
-/*	$KAME: mconnect.c,v 1.3 2000/11/06 12:49:34 jinmei Exp $ */
+/*	$KAME: mconnect.c,v 1.4 2000/11/06 14:42:06 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -69,7 +69,7 @@ mconnect(ai0, errorp)
 	int flags, maxsock = -1, fdmasks = -1, connsock = -1;
 	fd_set *rfdmaskp = NULL, *wfdmaskp = NULL;
 	struct timeval timo;
-	struct conninfo *conn0, *conn, *cnext, **conn_prev = &conn0;
+	struct conninfo *conn0, *conn, *cnext, **cprev = &conn0;
 
 	/* make intermediate structure to manage connection list */
 	for (ai = ai0; ai != NULL; ai = ai->ai_next, rest++) {
@@ -115,8 +115,8 @@ mconnect(ai0, errorp)
 			maxsock = s;
 
 		memset(conn, 0, sizeof(*conn));
-		*conn_prev = conn;
-		conn_prev = &conn->conn_next;
+		*cprev = conn;
+		cprev = &conn->conn_next;
 		conn->conn_ai = ai;
 		conn->conn_fd = s;
 		conn->conn_status = CONN_BEFORE;
@@ -170,6 +170,7 @@ mconnect(ai0, errorp)
 					mc_dprint(conn->conn_ai, "connect",
 						  errno);
 #endif
+					close(conn->conn_fd);
 					conn->conn_status = CONN_FAILED;
 					rest--;
 					break;
@@ -262,7 +263,7 @@ mconnect(ai0, errorp)
 		free(conn);
 	}
 
-	if (connsock == -1)
+	if (connsock == -1 && errorp != NULL)
 		*errorp = error;
 	return(connsock);
 }
