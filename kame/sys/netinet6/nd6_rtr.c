@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.52 2000/08/29 07:31:24 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.53 2000/10/03 11:51:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -510,6 +510,9 @@ defrouter_addifreq(ifp)
 	struct ifaddr *ifa;
 	struct rtentry *newrt = NULL;
 	int error, flags;
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+	struct rt_addrinfo info;
+#endif
 
 	bzero(&def, sizeof(def));
 	bzero(&mask, sizeof(mask));
@@ -532,9 +535,19 @@ defrouter_addifreq(ifp)
 	flags = ifa->ifa_flags;
 	if ((ifp->if_flags & IFF_POINTOPOINT) != 0)
 		flags &= ~RTF_CLONING;
-	if ((error = rtrequest(RTM_ADD, (struct sockaddr *)&def,
-			       ifa->ifa_addr, (struct sockaddr *)&mask,
-			       flags, &newrt)) != 0) {
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+	bzero(&info, sizeof(info));
+	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
+	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)ifa->ifa_addr;
+	info.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask;
+	info.rti_info[RTAX_IFA] = (struct sockaddr *)ifa->ifa_addr;
+	info.rti_flags = flags;
+	error = rtrequest1(RTM_ADD, &info, &newrt);
+#else
+	error = rtrequest(RTM_ADD, (struct sockaddr *)&def, ifa->ifa_addr,
+			  (struct sockaddr *)&mask, flags, &newrt);
+#endif
+	if (error != 0) {
 		log(LOG_ERR,
 		    "defrouter_addifreq: failed to install a route to "
 		    "interface %s (errno = %d)\n",
