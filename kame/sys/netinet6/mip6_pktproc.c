@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.9 2002/06/18 06:02:05 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.10 2002/06/18 07:30:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1332,7 +1332,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	*pktopt_mobility = NULL;
 
 	ip6ma_size = sizeof(struct ip6m_binding_ack);
-	pad = (ip6ma_size + 4) & ~4;
+	pad = (ip6ma_size + 8) & 7;
 	ip6ma_size += pad;	/* XXX */
 
 	MALLOC(ip6ma, struct ip6m_binding_ack *,
