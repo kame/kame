@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.15 2004/06/10 12:42:40 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.16 2004/06/11 02:42:05 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -390,7 +390,7 @@ Currently, the only available method is
 which means the use of a monotonically increasing counter.
 If this method is specified,
 .Ic dhcp6c
-will be used an NTP-format timestamp of authenticating the message.
+will be used an NTP-format timestamp when it authenticates the message.
 This substatement can be omitted,
 in which case
 .Ic monocounter
@@ -522,7 +522,7 @@ To include an authentication option for DHCPv6 authentication,
 .Ic interface
 statement should be modified and
 .Ic authentication
-should be added and as follows:
+should be added as follows:
 .Bd -literal -offset
 interface ppp0 {
         send ia-pd 0;
