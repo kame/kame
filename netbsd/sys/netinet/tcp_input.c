@@ -3407,6 +3407,7 @@ syn_cache_respond(sc, m)
 	struct ip *ip = NULL;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
+	int ip6oflags;
 #endif
 	struct tcphdr *th;
 	u_int hlen;
@@ -3617,11 +3618,16 @@ syn_cache_respond(sc, m)
 		ip6->ip6_hlim = in6_selecthlim(NULL,
 				ro->ro_rt ? ro->ro_rt->rt_ifp : NULL);
 
+		ip6oflags = 0;
+		if (sc->sc_tp && sc->sc_tp->t_in6pcb &&
+		    (sc->sc_tp->t_in6pcb->in6p_flags & IN6P_MINMTU))
+			ip6oflags |= IPV6_MINMTU;
+
 #ifdef NEW_STRUCT_ROUTE
-		error = ip6_output(m, NULL /*XXX*/, ro, 0, NULL, NULL);
+		error = ip6_output(m, NULL /*XXX*/, ro, ip6oflags, NULL, NULL);
 #else
 		error = ip6_output(m, NULL /*XXX*/, (struct route_in6 *)ro,
-			0, NULL, NULL);
+		    ip6oflags, NULL, NULL);
 #endif
 		break;
 #endif

@@ -215,9 +215,9 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 	size = tcp_mssdflt;
 	if (rt->rt_rmx.rmx_mtu != 0)
 		size = rt->rt_rmx.rmx_mtu - iphlen - sizeof(struct tcphdr);
-	else if (ip_mtudisc || ifp->if_flags & IFF_LOOPBACK)
+	else if ((ifp->if_flags & IFF_LOOPBACK) != 0)
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
-	else if (inp && in_localaddr(inp->inp_faddr))
+	else if (inp && (ip_mtudisc || in_localaddr(inp->inp_faddr)))
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 #ifdef INET6
 	else if (in6p) {
@@ -225,13 +225,22 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 			/* mapped addr case */
 			struct in_addr d;
 			bcopy(&in6p->in6p_faddr.s6_addr32[3], &d, sizeof(d));
-			if (in_localaddr(d))
+			if (ip_mtudisc || in_localaddr(d))
 				size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		} else {
-			if (in6_localaddr(&in6p->in6p_faddr))
-				size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+			/*
+			 * for IPv6, path MTU discovery is always turned on,
+			 * or the node must use packet size <= 1280.
+			 */
+			size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		}
 	}
+
+	/* the socket option overrides any other settings */
+	if (in6p && !IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr) &&
+	    (in6p->in6p_flags & IN6P_MINMTU) &&
+	    size > IPV6_MMTU - iphlen - sizeof(struct tcphdr))
+		size = IPV6_MMTU - iphlen - sizeof(struct tcphdr);
 #endif
 	size -= tcp_optlen(tp);
 	/*
@@ -1056,17 +1065,21 @@ send:
 	case AF_INET6:
 	    {
 		struct ip6_pktopts *opts;
+		int ip6oflags;
+
+		ip6oflags = so->so_options & SO_DONTROUTE;
+		if (tp->t_in6pcb && (tp->t_in6pcb->in6p_flags & IN6P_MINMTU))
+			ip6oflags |= IPV6_MINMTU;
 
 		if (tp->t_in6pcb)
 			opts = tp->t_in6pcb->in6p_outputopts;
 		else
 			opts = NULL;
 #ifdef NEW_STRUCT_ROUTE
-		error = ip6_output(m, opts, ro, so->so_options & SO_DONTROUTE,
-			0, NULL);
+		error = ip6_output(m, opts, ro, ip6oflags, 0, NULL);
 #else
 		error = ip6_output(m, opts, (struct route_in6 *)ro,
-			so->so_options & SO_DONTROUTE, 0, NULL);
+		    ip6oflags, 0, NULL);
 #endif
 		break;
 	    }

@@ -401,6 +401,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 	struct ip *ip;
 #ifdef INET6
 	struct ip6_hdr *ip6;
+	int ip6oflags;
 #endif
 	int family;	/* family on packet, not inpcb/in6pcb! */
 	struct tcphdr *th;
@@ -748,11 +749,14 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		break;
 #ifdef INET6
 	case AF_INET6:
+		ip6oflags = 0;
+		if (tp->t_in6pcb && (tp->t_in6pcb->in6p_flags & IN6P_MINMTU))
+			ip6oflags |= IPV6_MINMTU;
 #ifdef NEW_STRUCT_ROUTE
-		error = ip6_output(m, NULL, ro, 0, NULL, NULL);
+		error = ip6_output(m, NULL, ro, ip6oflags, NULL, NULL);
 #else
-		error = ip6_output(m, NULL, (struct route_in6 *)ro, 0, NULL,
-			NULL);
+		error = ip6_output(m, NULL, (struct route_in6 *)ro, ip6oflags,
+		    NULL, NULL);
 #endif
 		break;
 #endif
