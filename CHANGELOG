@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.179 1999/10/08 09:47:45 itojun Exp $
+$Id: CHANGELOG,v 1.180 1999/10/09 02:34:36 itojun Exp $
 
 <199910>
+Sat Oct  9 11:35:32 JST 1999  itojun@iijlab.net
+	* openbsd/ports/net/bind8, netbsd/pkgsrc/net/bind8,
+	  freebsd[23]/ports/bind8: upgrade IPv6 patch.  AAAA dynamic update
+	  is now available.
+	  why do I have to commit it FOUR times... :-(
+
 Fri Oct  8 17:26:09 JST 1999  itojun@iijlab.net
 	* openbsd/ports/net/bind8: bind 812 with IPv6 support.
 	* openbsd/ports/net/zebra: zebra 0.79.
