@@ -8,4 +8,14 @@ LDADD+=-lutil
 #make symlink to old socket location for transitional period
 SYMLINKS=	/var/run/log /dev/log
 
+CPPFLAGS+=-DINET6
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+
+# KAME scopeid hack
+CPPFLAGS+=-DKAME_SCOPEID
+
 .include <bsd.prog.mk>
