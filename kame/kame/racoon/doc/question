@@ -1,4 +1,4 @@
-$Id: question,v 1.9 2000/01/12 21:53:43 sakane Exp $
+$Id: question,v 1.10 2000/01/18 05:07:14 sakane Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -87,3 +87,5 @@ Q. Waht's msgid of informational exchange for error notify message during
    Or new msgid created ?  If later case, spi must be conveyed.
 	-> new msgid should be used
 	-> then, how can we deduce phase 2 from the notification?
+
+Q. I don't know the situation to initiate acknowledged informational.
