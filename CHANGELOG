@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.965 2000/06/02 23:09:15 sumikawa Exp $
+$Id: CHANGELOG,v 1.966 2000/06/03 16:13:35 sumikawa Exp $
 
 <200006>
+Sun Jun  4 01:12:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* {freebsd3/ports, netbsd/pkgsrc/net}/p5-Socket6: upgrade to 0.07.
+
 Sat Jun  3 08:08:43 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/{libpcap,tcpdump}: use 2000/5/29 weekly snap.
 	* freebsd3/ports/mod_perl: mod_perl-1.24.tar.gz
