@@ -1,4 +1,4 @@
-/*	$KAME: faithd.h,v 1.7 2001/07/02 14:36:48 itojun Exp $	*/
+/*	$KAME: faithd.h,v 1.8 2001/09/05 03:04:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -44,7 +44,7 @@ extern void exit_failure __P((const char *, ...))
 	__attribute__((__format__(__printf__, 1, 2)));
 
 #define DEFAULT_PORT_NAME	"telnet"
-#define DEFAULT_DIR	"/usr/local/v6/libexec"
+#define DEFAULT_DIR	"/usr/libexec"
 #define DEFAULT_NAME	"telnetd"
 #define DEFAULT_PATH	(DEFAULT_DIR "/" DEFAULT_NAME)
 

@@ -1,4 +1,4 @@
-/*	$KAME: prefix.h,v 1.3 2000/11/19 11:45:38 itojun Exp $	*/
+/*	$KAME: prefix.h,v 1.4 2001/09/05 03:04:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -43,7 +43,7 @@ struct config {
 	struct prefix src;	/* src to use for outgoing connection */
 };
 
-#define _PATH_PREFIX_CONF	"/usr/local/v6/etc/faithd.conf"
+#define _PATH_PREFIX_CONF	"/etc/faithd.conf"
 
 extern const char *prefix_string __P((const struct prefix *));
 extern int prefix_match __P((const struct prefix *, const struct sockaddr *));

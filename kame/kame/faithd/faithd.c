@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.40 2001/07/02 14:36:48 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.41 2001/09/05 03:04:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -33,7 +33,7 @@
  * User level translator from IPv6 to IPv4.
  *
  * Usage: faithd [<port> <progpath> <arg1(progname)> <arg2> ...]
- *   e.g. faithd telnet /usr/local/v6/sbin/telnetd telnetd
+ *   e.g. faithd telnet /usr/libexec/telnetd telnetd
  */
 #define HAVE_GETIFADDRS
 
