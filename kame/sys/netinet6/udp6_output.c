@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.42 2001/09/10 08:55:01 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.43 2001/10/15 09:19:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -456,7 +456,7 @@ udp6_output(in6p, m, addr6, control)
 		flags = (in6p->in6p_socket->so_options &
 			 (SO_DONTROUTE | SO_BROADCAST));
 		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
-		udp6->uh_sum = in_cksum(m, hlen + plen) == 0;
+		udp6->uh_sum = in_cksum(m, hlen + plen);
 #elif (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 		flags = (in6p->inp_socket->so_options &
 			 (SO_DONTROUTE | SO_BROADCAST));
