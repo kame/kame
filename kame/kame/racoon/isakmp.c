@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.142 2001/06/07 01:57:58 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.143 2001/06/28 10:45:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -678,6 +678,14 @@ quick_main(iph2, msg)
 	if (iph2->status == PHASE2ST_ESTABLISHED
 	 || iph2->status == PHASE2ST_GETSPISENT)
 		return 0;
+
+	/* don't process it because there is no suitable phase1-sa. */
+	if (iph2->ph1->status == PHASE2ST_EXPIRED) {
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"the negotiation is stopped, "
+			"because there is no suitable ISAKMP-SA.\n");
+		return -1;
+	}
 
 	/* add the message to received-list before processing it */
 	if (add_recvedpkt(msg, &iph2->rlist)) {
@@ -1668,6 +1676,14 @@ int
 isakmp_post_getspi(iph2)
 	struct ph2handle *iph2;
 {
+	/* don't process it because there is no suitable phase1-sa. */
+	if (iph2->ph1->status == PHASE2ST_EXPIRED) {
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"the negotiation is stopped, "
+			"because there is no suitable ISAKMP-SA.\n");
+		return -1;
+	}
+
 	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0)
