@@ -1,0 +1,11 @@
+--- makefile.in-	Fri Oct  8 11:47:32 1999
++++ makefile.in	Fri Oct  8 11:47:35 1999
+@@ -19,7 +19,7 @@
+ LINT		= @LINT@
+ 
+ LIBS		= @LIBS@
+-#LIBS+=		-L/usr/local/v6/lib -linet6
++LIBS+=		-L/usr/local/v6/lib -linet6
+ 
+ INSTALL		= @INSTALL@
+ INSTALL_PROGRAM	= @INSTALL_PROGRAM@

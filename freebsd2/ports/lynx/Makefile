@@ -4,23 +4,23 @@
 # Date created:         12 May 1998
 # Whom:                 k-sugyou
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:08 itojun Exp $
+# $Id: Makefile,v 1.2 1999/10/08 03:37:42 itojun Exp $
 #
 
-DISTNAME=       lynx2.8.1rel.1
-PKGNAME=        lynx-2.8.1.1
+DISTNAME=       lynx2-8-2
+PKGNAME=        lynx-2.8.2.0
 CATEGORIES=	www
-MASTER_SITES=   http://sol.slcc.edu/lynx/current/
+MASTER_SITES=   http://sol.slcc.edu/lynx/release2-8-2/ \
+		ftp://ftp.iij.ad.jp/pub/NetBSD/packages/distfiles/
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	lynx-281-v6-19990520.diff.gz
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=	lynx-282-v6-19991008.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	k-sugyou@kame.net
 
 NO_LATEST_LINK=	YES
-WRKSRC=         ${WRKDIR}/lynx2-8-1
+WRKSRC=         ${WRKDIR}/lynx2-8-2
 GNU_CONFIGURE=  YES
 CONFIGURE_ARGS= --with-zlib
 MAKEFILE=       makefile
