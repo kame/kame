@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.207 2001/10/17 09:27:33 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.208 2001/10/19 05:58:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2565,8 +2565,11 @@ fill_prlist(req)
 		struct nd_pfxrouter *pfr;
 
 #ifndef __FreeBSD__
-		if (oldp && p + 1 <= pe) {
+		if (oldp && p + 1 <= pe)
+#else
+		if (1)
 #endif
+		{
 			bzero(p, sizeof(*p));
 #ifndef __FreeBSD__
 			sin6 = (struct sockaddr_in6 *)(p + 1);
@@ -2639,8 +2642,9 @@ fill_prlist(req)
 #ifndef __FreeBSD__
 			p->advrtrs = advrtrs;
 #endif
+		}
 #ifndef __FreeBSD__
-		} else {
+		else {
 			advrtrs = 0;
 			for (pfr = pr->ndpr_advrtrs.lh_first; pfr;
 			     pfr = pfr->pfr_next)
