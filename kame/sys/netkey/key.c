@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.110 2000/05/22 06:22:45 itojun Exp $	*/
+/*	$KAME: key.c,v 1.111 2000/05/22 06:24:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -725,7 +725,7 @@ key_do_allocsa_policy(sah, state)
  *	of a Security Parameter Index (SPI), an IP Destination Address, and a
  *	security protocol (AH or ESP) identifier.
  * Note that, however, we do need to keep source address in IPsec SA.
- * IPsec SA.  IKE specification and PF_KEY specification do assume that we
+ * IKE specification and PF_KEY specification do assume that we
  * keep source address in IPsec SA.  We see a tricky situation here.
  */
 struct secasvar *
