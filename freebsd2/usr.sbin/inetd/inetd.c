@@ -1063,6 +1063,7 @@ ipsecsetup(sep)
 	char *policy_in = NULL;
 	char *policy_out = NULL;
 	int level;
+	int opt;
 
 	switch (sep->se_family) {
 	case AF_INET:
@@ -1086,42 +1087,45 @@ ipsecsetup(sep)
 		else if (!strncmp("out", sep->se_policy, 3))
 			policy_out = sep->se_policy;
 		else {
-			syslog(LOG_ERR, "invalid security policy \"%s\"", sep->se_policy);
+			syslog(LOG_ERR, "invalid security policy \"%s\"",
+				sep->se_policy);
 			return;
 		}
 	}
 
 	if (policy_in != NULL) {
+		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY_IN
+					    : IPV6_IPSEC_POLICY_IN;
 		len = ipsec_get_policylen(policy_in);
 		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
 			ipsec_set_policy(buf, len, policy_in);
-			if (setsockopt(sep->se_fd, level,
-					(level == IPPROTO_IP ?
-					    IP_IPSEC_POLICY_IN :
-					    IPV6_IPSEC_POLICY_IN),
-					buf, len) < 0) {
-				syslog(LOG_ERR, "%s/%s: ipsec initialization failed; %s",
-					sep->se_service, sep->se_proto, policy_in);
+			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+				syslog(LOG_ERR,
+					"%s/%s: ipsec initialization failed; %s",
+					sep->se_service, sep->se_proto,
+					policy_in);
 			}
 			free(buf);
 		} else
-			syslog(LOG_ERR, "invalid security policy \"%s\"", policy_in);
+			syslog(LOG_ERR, "invalid security policy \"%s\"",
+				policy_in);
 	}
 	if (policy_out != NULL) {
+		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY_OUT
+					    : IPV6_IPSEC_POLICY_OUT;
 		len = ipsec_get_policylen(policy_out);
 		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
 			ipsec_set_policy(buf, len, policy_out);
-			if (setsockopt(sep->se_fd, level,
-					(level == IPPROTO_IP ?
-					    IP_IPSEC_POLICY_OUT :
-					    IPV6_IPSEC_POLICY_OUT),
-					buf, len) < 0) {
-				syslog(LOG_ERR, "%s/%s: ipsec initialization failed; %s",
-					sep->se_service, sep->se_proto, policy_out);
+			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+				syslog(LOG_ERR,
+					"%s/%s: ipsec initialization failed; %s",
+					sep->se_service, sep->se_proto,
+					policy_out);
 			}
 			free(buf);
 		} else
-			syslog(LOG_ERR, "invalid security policy \"%s\"", policy_out);
+			syslog(LOG_ERR, "invalid security policy \"%s\"",
+				policy_out);
 	}
 }
 #endif
