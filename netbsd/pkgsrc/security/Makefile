@@ -6,7 +6,7 @@
 
     SUBDIR += heimdal
     SUBDIR += ssh
-    SUBDIR += tcpd6
     SUBDIR += tcp_wrapper
+    SUBDIR += tcpd6
 
 .include "../mk/bsd.pkg.subdir.mk"
