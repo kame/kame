@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.205 2001/08/13 20:05:50 itojun Exp $	*/
+/*	$KAME: key.c,v 1.206 2001/08/13 20:13:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -236,10 +236,8 @@ static int ipsec_ah_keymin = 128;
 SYSCTL_DECL(_net_key);
 #endif
 
-#ifdef IPSEC_DEBUG
 SYSCTL_INT(_net_key, KEYCTL_DEBUG_LEVEL,	debug,	CTLFLAG_RW, \
 	&key_debug_level,	0,	"");
-#endif
 
 /* max count of trial for the decision of spi value */
 SYSCTL_INT(_net_key, KEYCTL_SPI_TRY,		spi_trycnt,	CTLFLAG_RW, \
@@ -7601,11 +7599,9 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	if (name[0] >= KEYCTL_MAXID)
 		return EOPNOTSUPP;
 	switch (name[0]) {
-#ifdef IPSEC_DEBUG
 	case KEYCTL_DEBUG_LEVEL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_debug_level);
-#endif
 	default:
 		return sysctl_int_arr(key_sysvars, name, namelen,
 			oldp, oldlenp, newp, newlen);
@@ -7629,11 +7625,9 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	if (name[0] >= KEYCTL_MAXID)
 		return EOPNOTSUPP;
 	switch (name[0]) {
-#ifdef IPSEC_DEBUG
 	case KEYCTL_DEBUG_LEVEL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_debug_level);
-#endif
 	case KEYCTL_SPI_TRY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_spi_trycnt);
