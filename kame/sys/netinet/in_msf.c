@@ -3826,6 +3826,122 @@ sa_cmp(struct sockaddr *a, struct sockaddr *b)
 	return 0;
 }
 
+/*
+ * check if the given IP address matches with the MSF (per-interface
+ * source filter). return 1/0 if matches/not matches, respectively.
+ */
+int
+match_msf4_per_if(inm, src, dst)
+	struct in_multi *inm;
+	struct in_addr *src;
+	struct in_addr *dst;
+{
+	struct in_multi_source *inms;
+	struct in_addr_source *ias;
+
+	inms = inm->inm_source;
+	/* inms is NULL only in case of 224.0.0.0/24 */
+	if (inms == NULL) {
+		/* assumes 224.0.0.0/24 case has already been eliminated */
+		if (IN_LOCAL_GROUP(dst))
+			return 1;
+		igmplog((LOG_DEBUG, "grp found, but src is NULL. impossible\n"));
+		return 0;
+	}
+	if (inms->ims_grpjoin > 0)
+		return 1;
+
+	if (inms->ims_cur == NULL || inms->ims_cur->head == NULL)
+		return 0;
+
+	LIST_FOREACH(ias, inms->ims_cur->head, ias_list) {
+		if (ias->ias_addr.sin_family != AF_INET)
+			continue;
+
+		/* matching src address found */
+		if (ias->ias_addr.sin_addr.s_addr == src->s_addr) {
+			if (inms->ims_mode == MCAST_INCLUDE)
+				return 1;
+			return 0;
+		}
+	}
+	
+	/* no source-filter matched */
+	if (inms->ims_mode == MCAST_INCLUDE)
+		return 0;
+	return 1;
+}
+
+/*
+ * check if the given IP address matches with the MSF (per-socket
+ * source filter).  return 1/0 if matches/not matches, respectively.
+ */
+int
+match_msf4_per_socket(inp, src, dst)
+	struct inpcb *inp;
+	struct in_addr *src;
+	struct in_addr *dst;
+{
+	int i;
+	struct sock_msf *msf;
+	struct ip_moptions *imo;
+	struct sock_msf_source *msfsrc;
+	
+	/*
+	 * Receive multicast data which fits MSF condition.
+	 * Broadcast data needs no further check.
+	 */
+#ifdef FreeBSD
+	if (!IN_MULTICAST(ntohl(dst->s_addr)))
+#else
+	if (!IN_MULTICAST(dst->s_addr))
+#endif
+		return 0;
+		
+	if ((imo = inp->inp_moptions) == NULL)
+		return 0;
+	for (i = 0; i < imo->imo_num_memberships; i++) {
+		if (imo->imo_membership[i]->inm_addr.s_addr != dst->s_addr)
+			continue;
+		
+		msf = imo->imo_msf[i];
+		if (msf == NULL)
+			continue;
+
+		/* receive data from any source */
+		if (msf->msf_grpjoin != 0 && msf->msf_blknumsrc == 0)
+			return 1;
+
+		/* 1. search allow-list */
+		if (msf->msf_numsrc == 0)
+			goto search_block_list;
+		
+		LIST_FOREACH(msfsrc, msf->msf_head, list) {
+			if (msfsrc->src.ss_family != AF_INET)
+				continue;
+			if (SIN_ADDR(&msfsrc->src) == src->s_addr)
+				return 1;
+		}
+		
+		/* 2. search_block_list */
+	search_block_list:
+		if (msf->msf_blknumsrc == 0)
+			goto end_of_search;
+		LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
+			if (msfsrc->src.ss_family != AF_INET)
+				continue;
+			if (SIN_ADDR(&msfsrc->src) == src->s_addr)
+				return 0;
+		}
+		return 1;
+
+	end_of_search:
+		;
+	}
+
+	/* no group address matched */
+	return 0;
+}
 
 #ifdef __FreeBSD__
 #ifdef IGMPV3_DEBUG

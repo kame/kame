@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2580 2004/04/02 08:38:11 sakane Exp $
+$KAME: CHANGELOG,v 1.2581 2004/04/02 11:02:11 suz Exp $
 
 <200404>
 
@@ -17,8 +17,12 @@ Fri Apr  2 16:27:00 JST 2004 sakane@kame.net
 
 2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* netbsd/sys/netinet/udp_usrreq.c
-	code cleanup: uses a per-socket/interface MSF-check functions 
+	code cleanup: uses a per-socket/interface MSF-check function
 	implemented at Feb 6 2004.
+
+	* freebsd4/sys/netinet/udp_usrreq.c, kame/sys/netinet/in_msf.[ch]
+	code cleanup: implemented a per-socket/interface MSF-check 
+	function for IPv4, like the above one
 
 2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys/netinet/igmp.c

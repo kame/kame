@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.13 2004/03/24 09:03:29 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.14 2004/04/02 11:02:11 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -270,5 +270,9 @@ void	in_cleanmopt_source_addr(struct sock_msf *, int);
 void	in_undomopt_source_addr(struct sock_msf *, int);
 void	in_undomopt_source_list(struct sock_msf *, u_int);
 int	sa_cmp(struct sockaddr *, struct sockaddr *);
+int	match_msf4_per_if(struct in_multi *, struct in_addr *,
+                          struct in_addr *);
+int	match_msf4_per_socket(struct inpcb *, struct in_addr *,
+			      struct in_addr *);
 #endif /* _KERNEL */
 #endif /* _NETINET_INMSF_H_ */

@@ -199,13 +199,6 @@ udp_input(m, off)
 	int len;
 	struct ip save_ip;
 	struct sockaddr *append_sa;
-#ifdef IGMPV3
-	struct sockaddr_in src;
-	struct ip_moptions *imo;
-	struct sockaddr_in *sin;
-	struct sock_msf_source *msfsrc;
-	int i;
-#endif
 
 	udpstat.udps_ipackets++;
 
@@ -342,117 +335,15 @@ udp_input(m, off)
 				    inp->inp_fport != uh->uh_sport)
 					continue;
 			}
-#ifdef IGMPV3
-#ifdef IPSEC
-#define PASS_TO_PCB() \
-	do { \
-		if (last != NULL) { \
-			struct mbuf *n; \
-			/* check AH/ESP integrity. */ \
-			if (ipsec4_in_reject_so(m, last->inp_socket)) \
-				ipsecstat.in_polvio++; \
-				/* do not inject data to pcb */ \
-			else \
-			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) \
-				udp_append(last, ip, n, iphlen + sizeof(struct udphdr)); \
-		} \
-		last = inp; \
-	} while (0)
-#else /* !IPSEC */
-#define PASS_TO_PCB() \
-	do { \
-		if (last != NULL) { \
-			struct mbuf *n; \
-			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) \
-				udp_append(last, ip, n, iphlen + sizeof(struct udphdr)); \
-		} \
-		last = inp; \
-	} while (0)
-#endif /* IPSEC */
 			/*
 			 * Receive multicast data which fits MSF condition.
 			 * Broadcast data needs no further check.
 			 */
-			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
-				PASS_TO_PCB();
-				goto next_inp;
-			}
-			
-			if ((imo = inp->inp_moptions) == NULL)
+#ifdef IGMPV3
+			if (match_msf4_per_socket(inp, &ip->ip_src,
+						  &ip->ip_dst) == 0)
 				continue;
-			bzero(&src, sizeof(src));
-			src.sin_family = AF_INET;
-			src.sin_len = sizeof(src);
-			bcopy(&ip->ip_src, &src.sin_addr, sizeof(ip->ip_src));
-			for (i = 0; i < imo->imo_num_memberships; i++) {
-				if (imo->imo_membership[i]->inm_addr.s_addr
-				    != ip->ip_dst.s_addr)
-					continue;
-				
-				/* receive data from any source */
-				if (imo->imo_msf[i]->msf_grpjoin != 0) {
-					PASS_TO_PCB();
-					break;
-				}
-				goto search_allow_list;
-
-			search_allow_list:
-				if (imo->imo_msf[i]->msf_numsrc == 0)
-					goto search_block_list;
-				
-				LIST_FOREACH(msfsrc,
-					     imo->imo_msf[i]->msf_head,
-					     list) {
-					sin = (struct sockaddr_in *)&msfsrc->src;
-					if (sin->sin_family != AF_INET)
-						continue;
-					if (SS_CMP(sin, <, &src))
-						continue;
-					if (SS_CMP(sin, >, &src)) {
-						/* terminate search, as there
-						 * will be no match */
-						break;
-					}
-					
-					PASS_TO_PCB();
-					break;
-				}
-				
-			search_block_list:
-				if (imo->imo_msf[i]->msf_blknumsrc == 0)
-					goto end_of_search;
-
-				LIST_FOREACH(msfsrc,
-					     imo->imo_msf[i]->msf_blkhead,
-					     list) {
-					sin = (struct sockaddr_in *)&msfsrc->src;
-					if (sin->sin_family != AF_INET)
-						continue;
-					if (SS_CMP(sin, <, &src))
-						continue;
-					if (SS_CMP(sin, ==, &src)) {
-						/* blocks since the src matched
-						 * with block list */
-						break;
-					}
-					
-					/* terminate search, as there will be
-					 * no match */
-					msfsrc = NULL;
-					break;
-				}
-				/* blocks since the source matched with block
-				 * list */
-				if (msfsrc == NULL)
-					PASS_TO_PCB();
-				
-			end_of_search:
-				goto next_inp;
-			}
-			if (i == imo->imo_num_memberships)
-				continue;
-#undef PASS_TO_PCB
-#else
+#endif
 			if (last != NULL) {
 				struct mbuf *n;
 
@@ -474,11 +365,7 @@ udp_input(m, off)
 						   iphlen +
 						   sizeof(struct udphdr));
 			}
-#endif /* IGMPV3 */
 
-#ifdef IGMPV3
-		next_inp:
-#endif
 			last = inp;
 			/*
 			 * Don't look for additional matches if this one does
