@@ -277,24 +277,26 @@ main(argc, argv)
 			 datalen = 2048; /* XXX: enough? */
 			 for (cp = optarg; *cp != '\0'; cp++) {
 				 switch(*cp) {
-				  case 'a':
-				  case 'A':
-					  naflags |= NI_NODEADDR_FLAG_ALL;
-					  break;
-				  case 'l':
-				  case 'L':
-					  naflags |= NI_NODEADDR_FLAG_LINKLOCAL;
-					  break;
-				  case 's':
-				  case 'S':
-					  naflags |= NI_NODEADDR_FLAG_SITELOCAL;
-					  break;
-				  case 'g':
-				  case 'G':
-					  naflags |= NI_NODEADDR_FLAG_GLOBAL;
-					  break;
-				  default:
-					  usage();
+				 case 'a':
+					 naflags |= NI_NODEADDR_FLAG_ALL;
+					 break;
+				 case 'l':
+				 case 'L':
+					 naflags |= NI_NODEADDR_FLAG_LINKLOCAL;
+					 break;
+				 case 's':
+				 case 'S':
+					 naflags |= NI_NODEADDR_FLAG_SITELOCAL;
+					 break;
+				 case 'g':
+				 case 'G':
+					 naflags |= NI_NODEADDR_FLAG_GLOBAL;
+					 break;
+				 case 'A': /* experimental. not in the spec */
+					 naflags |= NI_NODEADDR_FLAG_ANYCAST;
+					 break;
+				 default:
+					 usage();
 				 }
 			 }
 			 break;
