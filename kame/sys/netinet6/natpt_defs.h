@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_defs.h,v 1.4 2000/02/18 11:25:04 fujisawa Exp $
+ *	$Id: natpt_defs.h,v 1.5 2000/02/19 07:04:08 itojun Exp $
  */
 
 #define	SAME		(0)
@@ -85,9 +85,6 @@
 #define	D_TRANSLATINGIPV6		0x00100000
 #define	D_TRANSLATEDIPV6		0x01000000
 
-#endif	/* defined(KERNEL)			*/
-
-
 #define	fixSuMiReICMPBug	(1)
 
 #ifdef fixSuMiReICMPBug
@@ -95,6 +92,7 @@
 #define	ICMPSRC		(0x02c410ac)		/* == 172.16.196.2	XXX	*/
 #endif
 
+#endif	/* defined(KERNEL)			*/
 
 /*
  *	OS dependencies
