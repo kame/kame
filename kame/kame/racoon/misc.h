@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.h,v 1.1 1999/08/08 23:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: misc.h,v 1.2 1999/08/21 18:30:57 sakane Exp $ */
 
 #define YDUMP_BIN 0
 #define YDUMP_HEX 1
@@ -44,7 +44,7 @@ extern int plog2 __P((struct sockaddr *, const char *, const char *,
 	...));
 extern int pdump __P((void *, int, int));
 extern u_char *mem2str __P((const u_char *, int));
-extern char *strtob __P((char *, int, int *));
+extern char *strtob __P((char *, int, size_t *));
 
 extern int saddrcmp_woport __P((struct sockaddr *addr1,
 	struct sockaddr *addr2));
