@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.63 2000/08/26 10:00:45 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.64 2000/10/01 12:37:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,7 +216,9 @@ in6_pcbbind(in6p, nam)
 			 */
 			if (so->so_options & SO_REUSEADDR)
 				reuseport = SO_REUSEADDR|SO_REUSEPORT;
-		} else if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+		}
+#ifndef TCP6
+		else if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 			struct sockaddr_in sin;
 
 			bzero(&sin, sizeof(sin));
@@ -226,7 +228,9 @@ in6_pcbbind(in6p, nam)
 				sizeof(sin.sin_addr));
 			if (ifa_ifwithaddr((struct sockaddr *)&sin) == 0)
 				return EADDRNOTAVAIL;
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+		}
+#endif
+		else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			struct ifaddr *ia = NULL;
 
 			sin6->sin6_port = 0;		/* yech... */
@@ -263,6 +267,7 @@ in6_pcbbind(in6p, nam)
 				return(EACCES);
 #endif
 
+#ifndef TCP6
 			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 				/* should check this but we can't ... */
 #if 0
@@ -274,7 +279,9 @@ in6_pcbbind(in6p, nam)
 				if (t && (reuseport & t->inp_socket->so_options) == 0)
 					return EADDRINUSE;
 #endif
-			} else {
+			} else
+#endif
+			{
 				struct in6pcb *t;
 
 				t = in6_pcblookup(head, &zeroin6_addr, 0,
@@ -327,13 +334,16 @@ in6_pcbconnect(in6p, nam)
 	if (sin6->sin6_port == 0)
 		return(EADDRNOTAVAIL);
 
+#ifndef TCP6
 	/* sanity check for mapped address case */
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			in6p->in6p_laddr.s6_addr16[5] = htons(0xffff);
 		if (!IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 			return EINVAL;
-	} else {
+	} else
+#endif
+	{
 		if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 			return EINVAL;
 	}
@@ -347,6 +357,7 @@ in6_pcbconnect(in6p, nam)
 		return EINVAL;
 
 	/* Source address selection. */
+#ifndef TCP6
 	if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
 	 && in6p->in6p_laddr.s6_addr32[3] == 0) {
 #ifdef INET
@@ -371,7 +382,9 @@ in6_pcbconnect(in6p, nam)
 #else
 		return EADDRNOTAVAIL;
 #endif
-	} else {
+	} else
+#endif
+	{
 		/*
 		 * XXX: in6_selectsrc might replace the bound local address
 		 * with the address specified by setsockopt(IPV6_PKTINFO).
@@ -400,9 +413,14 @@ in6_pcbconnect(in6p, nam)
 			 in6p->in6p_lport,
 			 0))
 		return(EADDRINUSE);
+#ifndef TCP6
 	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)
 	 || (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
-	  && in6p->in6p_laddr.s6_addr32[3] == 0)) {
+	  && in6p->in6p_laddr.s6_addr32[3] == 0))
+#else
+	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
+#endif
+	{
 		if (in6p->in6p_lport == 0) {
 #ifdef __NetBSD__
 			(void)in6_pcbbind(in6p, (struct mbuf *)0,
@@ -813,6 +831,7 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 		if (in6p->in6p_lport != lport)
 			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+#ifndef TCP6
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
 #ifndef INET6_BINDV6ONLY
 				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
@@ -823,14 +842,17 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 				continue;
 #endif
 			} else
+#endif
 				match = in6p;
 		}
+#ifndef TCP6
 		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
 			 in6p->in6p_laddr.s6_addr32[3] == 0) {
 			if (IN6_IS_ADDR_V4MAPPED(laddr6) &&
 			    laddr6->s6_addr32[3] != 0)
 				match = in6p;
 		}
+#endif
 		else if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))
 			return in6p;
 	}
