@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.11 2003/07/07 11:23:44 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.12 2003/07/08 06:51:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -872,6 +872,8 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 #endif /* MIP6_CALLOUTTEST */
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
+	mbc->mbc_llmbc = NULL;
+	mbc->mbc_refcnt = 0;
 
 	if (mip6_bc_list_insert(&mip6_bc_list, mbc)) {
 		FREE(mbc, M_TEMP);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.2 2003/07/08 06:51:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -94,7 +94,8 @@ mip6_process_hrbu(bi)
 {
 	struct nd_prefix *pr, *llpr = NULL;
 	struct ifnet *hifp = NULL;
-	struct sockaddr_in6 haddr;
+	struct sockaddr_in6 lladdr;
+	struct mip6_bc *llmbc = NULL;
 	struct mip6_bc *mbc = NULL;
 	struct mip6_bc *prim_mbc = NULL;
 	u_int32_t prlifetime = 0;
@@ -178,57 +179,57 @@ mip6_process_hrbu(bi)
 	 * link-local.
 	 */
 	if ((bi->mbc_flags & IP6MU_LINK) != 0 && llpr != NULL) {
-		mip6_create_addr(&haddr,
+		mip6_create_addr(&lladdr,
 				 (const struct sockaddr_in6 *)&bi->mbc_phaddr,
 				 llpr);
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &haddr);
-		if (mbc == NULL) {
+		llmbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &lladdr);
+		if (llmbc == NULL) {
 			/*
 			 * create a new binding cache entry for the
 			 * link-local.
 			 */
-			mbc = mip6_bc_create(&haddr, &bi->mbc_pcoa,
+			llmbc = mip6_bc_create(&lladdr, &bi->mbc_pcoa,
 			    &bi->mbc_addr, bi->mbc_flags, bi->mbc_seqno,
 			    bi->mbc_lifetime, hifp);
-			if (mbc == NULL) {
+			if (llmbc == NULL) {
 				/* XXX INSUFFICIENT RESOURCE error */
 				return (-1);
 			}
 
 			/* start DAD processing. */
-			mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
-			mip6_dad_start(mbc);
-		} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-			mbc->mbc_pcoa = bi->mbc_pcoa;
-			mbc->mbc_seqno = bi->mbc_seqno;
+			llmbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
+			mip6_dad_start(llmbc);
+		} else if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+			llmbc->mbc_pcoa = bi->mbc_pcoa;
+			llmbc->mbc_seqno = bi->mbc_seqno;
 			busy++;
 		} else {
 			/*
 			 * update the existing binding cache entry for
 			 * the link-local.
 			 */
-			mbc->mbc_pcoa = bi->mbc_pcoa;
-			mbc->mbc_flags = bi->mbc_flags;
-			mbc->mbc_seqno = bi->mbc_seqno;
-			mbc->mbc_lifetime = bi->mbc_lifetime;
-			mbc->mbc_expire
-				= time_second + mbc->mbc_lifetime;
+			llmbc->mbc_pcoa = bi->mbc_pcoa;
+			llmbc->mbc_flags = bi->mbc_flags;
+			llmbc->mbc_seqno = bi->mbc_seqno;
+			llmbc->mbc_lifetime = bi->mbc_lifetime;
+			llmbc->mbc_expire
+				= time_second + llmbc->mbc_lifetime;
 			/* sanity check for overflow. */
-			if (mbc->mbc_expire < time_second)
-				mbc->mbc_expire = 0x7fffffff;
+			if (llmbc->mbc_expire < time_second)
+				llmbc->mbc_expire = 0x7fffffff;
 #ifdef MIP6_CALLOUTTEST
-			mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
-			mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
+			mip6_timeoutentry_update(llmbc->mbc_timeout, llmbc->mbc_expire);
+			mip6_timeoutentry_update(llmbc->mbc_brr_timeout, llmbc->mbc_expire - mbc->mbc_lifetime / 4);
 #endif /* MIP6_CALLOUTTEST */
-			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+			llmbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 			/* modify encapsulation entry */
 			/* XXX */
-			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, mbc,
-				mip6_bc_encapcheck, &mbc->mbc_encap)) {
+			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, llmbc,
+				mip6_bc_encapcheck, &llmbc->mbc_encap)) {
 				/* XXX error */
 			}
 		}
-		mbc->mbc_flags |= IP6MU_CLONED;
+		llmbc->mbc_flags |= IP6MU_CLONED;
 	}
 
 	/*
@@ -249,6 +250,15 @@ mip6_process_hrbu(bi)
 		/* mark that we should do DAD later in this function. */
 		mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 		prim_mbc = mbc;
+
+		/*
+		 * if the request has IP6MU_LINK flag, refer the
+		 * link-local entry.
+		 */
+		if (bi->mbc_flags & IP6MU_LINK) {
+			mbc->mbc_llmbc = llmbc;
+			llmbc->mbc_refcnt++;
+		}
 	} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
 		mbc->mbc_pcoa = bi->mbc_pcoa;
 		mbc->mbc_seqno = bi->mbc_seqno;
@@ -288,14 +298,14 @@ mip6_process_hrbu(bi)
 
 	if (prim_mbc) {
 		/*
-		 * a new binding cache(es) is created. start DAD
+		 * a new binding cache is created. start DAD
 		 * proccesing.
 		 */
 		mip6_dad_start(prim_mbc);
 	} else {
 		/*
-		 * a binding cache entry(ies) are update.  return a
-		 * binding ack.
+		 * a binding cache entry is updated.  return a binding
+		 * ack.
 		 */
 		bi->mbc_refresh = bi->mbc_lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
 		if (bi->mbc_refresh < MIP6_REFRESH_MINLIFETIME)
@@ -312,7 +322,7 @@ int
 mip6_process_hurbu(bi)
 	struct mip6_bc *bi;
 {
-	struct mip6_bc *mbc, *mbc_next;
+	struct mip6_bc *llmbc, *mbc, *mbc_next;
 	struct nd_prefix *pr;
 	struct ifnet *hifp = NULL;
 	int error = 0;
@@ -362,6 +372,10 @@ mip6_process_hurbu(bi)
 	}
 
 	/* remove a BC entry. */
+	if (bi->mbc_flags & IP6MU_LINK)
+		llmbc = mbc->mbc_llmbc;
+	else
+		llmbc = NULL;
 	error = mip6_bc_list_remove(&mip6_bc_list, mbc);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -373,56 +387,39 @@ mip6_process_hurbu(bi)
 		return (error);
 	}
 
-	mbc = NULL;
-	if ((bi->mbc_flags & IP6MU_LINK) != 0) {
-		for (mbc = LIST_FIRST(&mip6_bc_list);
-		    mbc;
-		    mbc = mbc_next) {
-			mbc_next = LIST_NEXT(mbc, mbc_entry);
+	if (llmbc != NULL) { /* 'L'=1 */
+		llmbc->mbc_refcnt--;
+		if (llmbc->mbc_refcnt == 0) {
+			if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+				mip6_dad_stop(llmbc);
+			} else {
+				/* remove rtable for proxy ND */
+				if (mip6_bc_proxy_control(&bi->mbc_phaddr,
+					&bi->mbc_addr, RTM_DELETE)) {
+					/* XXX UNSPECIFIED */
+					return (-1);
+				}
 
-			if (mbc->mbc_ifp != hifp)
-				continue;
-
-			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr.sin6_addr))
-				break;
-
-			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-						 &bi->mbc_phaddr.sin6_addr,
-						 64 /* XXX */))
-				continue;
-		}
-	}
-	if (mbc != NULL) { /* 'L'=1 */
-		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-			mip6_dad_stop(mbc);
-		}
-		else {
-			/* remove rtable for proxy ND */
-			if (mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_DELETE)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
+				/* remove encapsulation entry */
+				if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+					llmbc, mip6_bc_encapcheck,
+					&llmbc->mbc_encap)) {
+					/* XXX UNSPECIFIED */
+					return (-1);
+				}
 			}
 
-			/* remove encapsulation entry */
-			if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						mbc,
-						mip6_bc_encapcheck,
-						&mbc->mbc_encap)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
+			/* remove a BC entry. */
+			error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: can't remove BC.\n",
+				    __FILE__, __LINE__));
+				bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+				bi->mbc_send_ba = 1;
+				bi->mbc_lifetime = bi->mbc_refresh = 0;
+				return (error);
 			}
-		}
-
-		/* remove a BC entry. */
-		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: can't remove BC.\n",
-				 __FILE__, __LINE__));
-			bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
-			bi->mbc_send_ba = 1;
-			bi->mbc_lifetime = bi->mbc_refresh = 0;
-			return (error);
 		}
 	}
 

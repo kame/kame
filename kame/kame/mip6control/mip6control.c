@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.43 2003/04/24 02:29:18 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.44 2003/07/08 06:51:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,8 +96,8 @@ static const char *bc_desc[] = {
 };
 #else
 static const char *bc_desc[] = {
-	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltexp\tstate\n",
-	"phaddr\t\t\t\t\tpcoa\t\t\t\t\taddr\t\t\t\t\tflags\tseqno\tlifetim\tltexp\tstate\n"
+	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltexp\tstate\trefcnt\n",
+	"phaddr\t\t\t\t\tpcoa\t\t\t\t\taddr\t\t\t\t\tflags\tseqno\tlifetim\tltexp\tstate\trefcnt\n"
 };
 #endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
@@ -585,7 +585,7 @@ main(argc, argv)
 #ifdef MIP6_DRAFT13
 			       "%-7s %7u %7u %7u %7ld %-7s\n",
 #else
-			       "%-7s %7u %7u %7ld %-7s\n",
+			       "%-7s %7u %7u %7ld %-7s %7u\n",
 #endif /* MIP6_DRAFT13 */
 			       buflg_sprintf(mbc->mbc_flags),
 #ifdef MIP6_DRAFT13
@@ -594,7 +594,8 @@ main(argc, argv)
 			       mbc->mbc_seqno,
 			       mbc->mbc_lifetime,
 			       mbc->mbc_expire - time.tv_sec,
-			       bcflg_sprintf(mbc->mbc_state));
+			       bcflg_sprintf(mbc->mbc_state),
+			       mbc->mbc_refcnt);
 		}
 	}
 
