@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.15 2001/09/02 19:32:28 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.16 2001/09/03 00:45:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -30,10 +30,10 @@
  */
 
 #include <sys/param.h>
-#include <sys/errno.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 
+#include <errno.h>
 #include <err.h>
 #include <fcntl.h>
 #include <kvm.h>
