@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.223 2001/09/20 06:18:03 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.224 2001/09/20 06:55:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2652,6 +2652,10 @@ do { \
 #endif
 				break;
 
+#ifdef HAVE_NRL_INPCB
+#define in6p inp
+#define in6p_outputopts inp_outputopts6
+#endif
 			case IPV6_OTCLASS:
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 				    optname, &optdata, &optdatalen);
@@ -2665,6 +2669,10 @@ do { \
 				bcopy(optdata, mtod(m, caddr_t), optdatalen);
 #endif
 				break;
+#ifdef HAVE_NRL_INPCB
+#undef in6p
+#undef in6p_outputopts
+#endif
 
 			case IPV6_2292PKTINFO:
 			case IPV6_2292HOPLIMIT:
