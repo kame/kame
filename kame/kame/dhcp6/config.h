@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.32 2004/06/12 10:43:34 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.33 2004/09/03 10:26:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -43,7 +43,7 @@ struct dhcp6_if {
 	struct dhcp6_timer *timer;
 
 	/* event queue */
-	TAILQ_HEAD(, dhcp6_event) event_list;	
+	TAILQ_HEAD(, dhcp6_event) event_list;
 
 	/* static parameters of the interface */
 	char *ifname;
