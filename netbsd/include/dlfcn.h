@@ -1,4 +1,4 @@
-/*	$NetBSD: dlfcn.h,v 1.9 1998/09/05 13:11:07 pk Exp $	*/
+/*	$NetBSD: dlfcn.h,v 1.13 2000/06/13 01:21:53 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -46,7 +46,7 @@ typedef struct _dl_info {
 	const char	*dli_fname;	/* File defining the symbol */
 	void		*dli_fbase;	/* Base address */
 	const char	*dli_sname;	/* Symbol name */
-	void		*dli_saddr;	/* Symbol address */
+	const void	*dli_saddr;	/* Symbol address */
 } Dl_info;
 #endif /* !defined(_XOPEN_SOURCE) */
 
@@ -54,14 +54,14 @@ typedef struct _dl_info {
  * User interface to the run-time linker.
  */
 __BEGIN_DECLS
-extern void	*dlopen __P((const char *, int));
-extern int	dlclose __P((void *));
-extern void	*dlsym __P((void *, const char *));
+void	*dlopen __P((const char *, int));
+int	dlclose __P((void *));
+void	*dlsym __P((void *, const char *));
 #if !defined(_XOPEN_SOURCE)
-extern int	dladdr __P((void *, Dl_info *));
-extern int	dlctl __P((void *, int, void *));
+int	dladdr __P((const void *, Dl_info *));
+int	dlctl __P((void *, int, void *));
 #endif
-extern char	*dlerror __P((void));
+__aconst char *dlerror __P((void));
 __END_DECLS
 
 /* Values for dlopen `mode'. */

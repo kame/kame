@@ -1,11 +1,11 @@
-/*	$NetBSD: strings.h,v 1.8 2000/01/10 16:58:38 kleink Exp $	*/
+/*	$NetBSD: wchar.h,v 1.1 2000/04/20 09:56:37 kleink Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Klaus Klein.
+ * by Julian Coleman.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,36 +36,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _STRINGS_H_
-#define _STRINGS_H_
+#ifndef _WCHAR_H_
+#define _WCHAR_H_
 
 #include <machine/ansi.h>
-#include <sys/featuretest.h>
+
+#ifdef	_BSD_WCHAR_T_
+typedef	_BSD_WCHAR_T_	wchar_t;
+#undef	_BSD_WCHAR_T_
+#endif
+
+#ifdef	_BSD_WINT_T_
+typedef	_BSD_WINT_T_	wint_t;
+#undef	_BSD_WINT_T_
+#endif
 
 #ifdef	_BSD_SIZE_T_
 typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
 #endif
 
-#ifndef	_XOPEN_SOURCE
-#include <sys/null.h>
-#endif
-
-#include <sys/cdefs.h>
-
-__BEGIN_DECLS
-int	 bcmp __P((const void *, const void *, size_t));
-void	 bcopy __P((const void *, void *, size_t));
-void	 bzero __P((void *, size_t));
-int	 ffs __P((int));
-char	*index __P((const char *, int));
-char	*rindex __P((const char *, int));
-int	 strcasecmp __P((const char *, const char *));
-int	 strncasecmp __P((const char *, const char *, size_t));
-__END_DECLS
-
-#if !defined(_XOPEN_SOURCE)
-#include <string.h>
-#endif
-
-#endif /* !defined(_STRINGS_H_) */
+#endif /* !_WCHAR_H_ */

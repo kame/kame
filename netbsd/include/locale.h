@@ -1,4 +1,4 @@
-/*	$NetBSD: locale.h,v 1.7 1998/02/02 21:07:29 perry Exp $	*/
+/*	$NetBSD: locale.h,v 1.9.4.1 2000/08/09 17:42:18 tshiozak Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -59,9 +59,7 @@ struct lconv {
 	char	n_sign_posn;
 };
 
-#ifndef NULL
-#define	NULL	0
-#endif
+#include <sys/null.h>
 
 #define	LC_ALL		0
 #define	LC_COLLATE	1
@@ -77,7 +75,12 @@ struct lconv {
 
 __BEGIN_DECLS
 struct lconv	*localeconv __P((void));
+#ifdef __SETLOCALE_SOURCE__
 char		*setlocale __P((int, const char *));
+char		*__setlocale_mb_len_max_32 __P((int, const char *));
+#else /* !__SETLOCALE_SOURCE__ */
+char		*setlocale __P((int, const char *)) __RENAME(__setlocale_mb_len_max_32);
+#endif /* !__SETLOCALE_SOURCE__ */
 __END_DECLS
 
 #endif /* _LOCALE_H_ */

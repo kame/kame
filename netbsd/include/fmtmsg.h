@@ -1,7 +1,7 @@
-/*	$NetBSD: strings.h,v 1.8 2000/01/10 16:58:38 kleink Exp $	*/
+/*	$NetBSD: fmtmsg.h,v 1.1 1999/09/12 19:04:30 kleink Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,36 +36,53 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _STRINGS_H_
-#define _STRINGS_H_
+#ifndef _FMTMSG_H_
+#define _FMTMSG_H_
 
-#include <machine/ansi.h>
-#include <sys/featuretest.h>
+/* Major Classifications: identifies the source of the condition. */
+#define MM_HARD		0x01L	/* Hardware */
+#define MM_SOFT		0x02L	/* Software */
+#define MM_FIRM		0x03L	/* Firmware */
 
-#ifdef	_BSD_SIZE_T_
-typedef	_BSD_SIZE_T_	size_t;
-#undef	_BSD_SIZE_T_
-#endif
+/* Message Source Subclassifications: type of software. */
+#define MM_APPL		0x04L	/* Application */
+#define MM_UTIL		0x08L	/* Utility */
+#define MM_OPSYS	0x0cL	/* Operating system */
 
-#ifndef	_XOPEN_SOURCE
-#include <sys/null.h>
-#endif
+/* Display Subclassifications: where to display the message. */
+#define MM_PRINT	0x10L	/* Display on standard error */
+#define MM_CONSOLE	0x20L	/* Display on system console */
+
+/* Status subclassifications: whether the application will recover. */
+#define MM_RECOVER	0x40L	/* Recoverable */
+#define MM_NRECOV	0x80L	/* Non-recoverable */
+
+/* Severity: seriousness of the condition. */
+#define MM_NOSEV	0	/* No severity level provided */
+#define MM_HALT		1	/* Error causing application to halt */
+#define MM_ERROR	2	/* Encountered a non-fatal fault */
+#define MM_WARNING	3	/* Unusual non-error condition */
+#define MM_INFO		4	/* Informative message */
+
+/* `Null' values for message components. */
+#define MM_NULLMC	0L		/* `Null' classsification component */
+#define MM_NULLLBL	(char *)0	/* `Null' label component */
+#define MM_NULLSEV	0		/* `Null' severity component */
+#define MM_NULLTXT	(char *)0	/* `Null' text component */
+#define MM_NULLACT	(char *)0	/* `Null' action component */
+#define MM_NULLTAG	(char *)0	/* `Null' tag component */
+
+/* Return values for fmtmsg(). */
+#define MM_OK		0	/* Function succeeded */
+#define MM_NOTOK	(-1)	/* Function failed completely */
+#define MM_NOMSG	0x01	/* Unable to perform MM_PRINT */
+#define MM_NOCON	0x02	/* Unable to perform MM_CONSOLE */
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	 bcmp __P((const void *, const void *, size_t));
-void	 bcopy __P((const void *, void *, size_t));
-void	 bzero __P((void *, size_t));
-int	 ffs __P((int));
-char	*index __P((const char *, int));
-char	*rindex __P((const char *, int));
-int	 strcasecmp __P((const char *, const char *));
-int	 strncasecmp __P((const char *, const char *, size_t));
+int	fmtmsg __P((long, const char *, int, const char *, const char *,
+	    const char *));
 __END_DECLS
 
-#if !defined(_XOPEN_SOURCE)
-#include <string.h>
-#endif
-
-#endif /* !defined(_STRINGS_H_) */
+#endif /* !_FMTMSG_H_ */

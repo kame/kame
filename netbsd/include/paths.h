@@ -1,4 +1,4 @@
-/*	$NetBSD: paths.h,v 1.13 1999/03/26 07:27:04 mrg Exp $	*/
+/*	$NetBSD: paths.h,v 1.14.4.1 2000/07/17 19:55:51 mjl Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -73,6 +73,7 @@
 #define	_PATH_OAUDIOCTL	"/dev/audioctl"
 #define	_PATH_SENDMAIL	"/usr/sbin/sendmail"
 #define	_PATH_SHELLS	"/etc/shells"
+#define	_PATH_SKEYKEYS	"/etc/skeykeys"
 #define	_PATH_SOUND	"/dev/sound0"
 #define	_PATH_TTY	"/dev/tty"
 #define	_PATH_UNIX	"/netbsd"
@@ -83,6 +84,7 @@
  * see the __CONCAT() macro from <sys/cdefs.h> for cpp examples.
  */
 #define	_PATH_DEV	"/dev/"
+#define	_PATH_EMUL_AOUT	"/emul/aout/"
 #define	_PATH_TMP	"/tmp/"
 #define	_PATH_VARDB	"/var/db/"
 #define	_PATH_VARRUN	"/var/run/"

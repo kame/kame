@@ -1,4 +1,4 @@
-/*	$NetBSD: stdlib.h,v 1.42 1999/02/06 15:04:05 kleink Exp $	*/
+/*	$NetBSD: stdlib.h,v 1.45.4.2 2000/08/10 16:44:02 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -68,8 +68,19 @@ typedef struct {
 	long rem;		/* remainder */
 } ldiv_t;
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if !defined(_ANSI_SOURCE) && \
+    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
+     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L)
+typedef struct {
+	/* LONGLONG */
+	long long int quot;	/* quotient */
+	/* LONGLONG */
+	long long int rem;	/* remainder */
+} lldiv_t;
+#endif
+
+#if !defined(_ANSI_SOURCE) && !defined(_ISOC99_SOURCE) && \
+    !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 typedef struct {
 	quad_t quot;		/* quotient */
 	quad_t rem;		/* remainder */
@@ -77,21 +88,15 @@ typedef struct {
 #endif
 
 
-#ifndef	NULL
-#define	NULL	0
-#endif
+#include <sys/null.h>
 
 #define	EXIT_FAILURE	1
 #define	EXIT_SUCCESS	0
 
 #define	RAND_MAX	0x7fffffff
 
-#if 0	/* no wide char stuff (yet) */
-extern int __mb_cur_max;
+extern size_t __mb_cur_max;
 #define	MB_CUR_MAX	__mb_cur_max
-#else
-#define	MB_CUR_MAX	1	/* XXX */
-#endif
 
 __BEGIN_DECLS
 __dead	 void abort __P((void)) __attribute__((__noreturn__));
@@ -191,6 +196,22 @@ int	 ttyslot __P((void));
 void	*valloc __P((size_t));		/* obsoleted by malloc() */
 #endif
 
+/*
+ * ISO C99
+ */
+#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
+    defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L
+/* LONGLONG */
+long long int	atoll __P((const char *));
+/* LONGLONG */
+long long int	llabs __P((long long int));
+/* LONGLONG */
+lldiv_t		lldiv __P((long long int, long long int));
+/* LONGLONG */
+long long int	strtoll __P((const char *, char **, int));
+/* LONGLONG */
+unsigned long long int	strtoull __P((const char *, char **, int));
+#endif
 
 /*
  * Implementation-defined extensions

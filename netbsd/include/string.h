@@ -1,4 +1,4 @@
-/*	$NetBSD: string.h,v 1.18 1998/07/27 09:09:26 mycroft Exp $	*/
+/*	$NetBSD: string.h,v 1.22 2000/01/10 16:58:38 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -44,9 +44,7 @@ typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
 #endif
 
-#ifndef	NULL
-#define	NULL	0
-#endif
+#include <sys/null.h>
 
 #include <sys/cdefs.h>
 #include <sys/featuretest.h>
@@ -89,6 +87,8 @@ char	*strdup __P((const char *));
 #if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
     !defined(_XOPEN_SOURCE)
 #include <strings.h>		/* for backwards-compatibilty */
+size_t	 strlcat __P((char *, const char *, size_t));
+size_t	 strlcpy __P((char *, const char *, size_t));
 char	*strsep __P((char **, const char *));
 #endif /* !defined(_ANSI_SOURCE) && !defined(_POSIX_SOURCE) && ... */
 __END_DECLS

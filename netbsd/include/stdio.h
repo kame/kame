@@ -1,4 +1,4 @@
-/*	$NetBSD: stdio.h,v 1.30 1998/11/20 14:39:38 kleink Exp $	*/
+/*	$NetBSD: stdio.h,v 1.32 2000/01/10 16:58:38 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -54,9 +54,7 @@ typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
 #endif
 
-#ifndef NULL
-#define	NULL	0
-#endif
+#include <sys/null.h>
 
 /*      
  * This is fairly grotesque, but pure ANSI code must not inspect the

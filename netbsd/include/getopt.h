@@ -1,11 +1,11 @@
-/*	$NetBSD: strings.h,v 1.8 2000/01/10 16:58:38 kleink Exp $	*/
+/*	$NetBSD: getopt.h,v 1.3 2000/04/02 22:03:29 christos Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Klaus Klein.
+ * by Dieter Baron and Thomas Klausner.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,37 +35,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef _GETOPT_H_
+#define _GETOPT_H_
 
-#ifndef _STRINGS_H_
-#define _STRINGS_H_
+#include <unistd.h>
+/*
+ * Gnu like getopt_long() and BSD4.4 getsubopt()/optreset extensions
+ */
+#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
+#define no_argument        0
+#define required_argument  1
+#define optional_argument  2
 
-#include <machine/ansi.h>
-#include <sys/featuretest.h>
-
-#ifdef	_BSD_SIZE_T_
-typedef	_BSD_SIZE_T_	size_t;
-#undef	_BSD_SIZE_T_
-#endif
-
-#ifndef	_XOPEN_SOURCE
-#include <sys/null.h>
-#endif
-
-#include <sys/cdefs.h>
+struct option {
+	/* name of long option */
+	const char *name;
+	/*
+	 * one of no_argument, required_argument, and optional_argument:
+	 * whether option takes an argument
+	 */
+	int has_arg;
+	/* if not NULL, set *flag to val when option found */
+	int *flag;
+	/* if flag not NULL, value to set *flag to; else return value */
+	int val;
+};
 
 __BEGIN_DECLS
-int	 bcmp __P((const void *, const void *, size_t));
-void	 bcopy __P((const void *, void *, size_t));
-void	 bzero __P((void *, size_t));
-int	 ffs __P((int));
-char	*index __P((const char *, int));
-char	*rindex __P((const char *, int));
-int	 strcasecmp __P((const char *, const char *));
-int	 strncasecmp __P((const char *, const char *, size_t));
+int getopt_long __P((int, char * const *, const char *,
+    const struct option *, int *));
 __END_DECLS
-
-#if !defined(_XOPEN_SOURCE)
-#include <string.h>
 #endif
-
-#endif /* !defined(_STRINGS_H_) */
+ 
+#endif /* !_GETOPT_H_ */

@@ -1,7 +1,7 @@
-/*	$NetBSD: strings.h,v 1.8 2000/01/10 16:58:38 kleink Exp $	*/
+/*	$NetBSD: ulimit.h,v 1.1 1999/09/13 18:38:04 kleink Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,36 +36,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _STRINGS_H_
-#define _STRINGS_H_
+#ifndef _ULIMIT_H_
+#define _ULIMIT_H_
 
-#include <machine/ansi.h>
-#include <sys/featuretest.h>
-
-#ifdef	_BSD_SIZE_T_
-typedef	_BSD_SIZE_T_	size_t;
-#undef	_BSD_SIZE_T_
-#endif
-
-#ifndef	_XOPEN_SOURCE
-#include <sys/null.h>
-#endif
+#define UL_GETFSIZE	1	/* Get maximum file size */
+#define UL_SETFSIZE	2	/* Set maximum file size */
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	 bcmp __P((const void *, const void *, size_t));
-void	 bcopy __P((const void *, void *, size_t));
-void	 bzero __P((void *, size_t));
-int	 ffs __P((int));
-char	*index __P((const char *, int));
-char	*rindex __P((const char *, int));
-int	 strcasecmp __P((const char *, const char *));
-int	 strncasecmp __P((const char *, const char *, size_t));
+long int ulimit __P((int, ...));
 __END_DECLS
 
-#if !defined(_XOPEN_SOURCE)
-#include <string.h>
-#endif
-
-#endif /* !defined(_STRINGS_H_) */
+#endif /* !_ULIMIT_H_ */
