@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.59 2001/08/16 03:55:48 jinmei Exp $	*/
+/*	$KAME: ip_encap.c,v 1.60 2001/08/17 10:09:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -829,6 +829,8 @@ encap6_ctlinput(cmd, sa, d)
 	void *cmdarg;
 	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
 	int nxt;
+	struct encaptab *ep;
+	const struct ip6protosw *psw;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -869,12 +871,16 @@ encap6_ctlinput(cmd, sa, d)
 		int valid = 0;
 		struct encaptab *match;
 
+#if 0
 		/*
 		 * Check to see if we have a valid encap configuration.
 		 * XXX chase extension headers, or pass final nxt value
 		 * from icmp6_notify_error()
+		 *
+		 * XXX m is not the correct arg to encap6_lookup here */
 		 */
 		match = encap6_lookup(m, off, nxt);
+#endif
 
 		if (match)
 			valid++;
@@ -889,6 +895,20 @@ encap6_ctlinput(cmd, sa, d)
 		icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 	}
 #endif
+
+	/* inform all listeners */
+	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
+		if (ep->af != AF_INET6)
+			continue;
+		if (ep->proto >= 0 && ep->proto != nxt)
+			continue;
+
+		/* should optimize by looking at address pairs */
+
+		psw = (const struct ip6protosw *)ep->psw;
+		if (psw && psw->pr_ctlinput)
+			(*psw->pr_ctlinput)(cmd, sa, d);
+	}
 }
 #endif
 
