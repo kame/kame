@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for EXPORTABLE_SYSTEM definition
 
-SUBDIR+=route sysctl
+SUBDIR+=sysctl
 
 SUBDIR+=ping6 rtsol
 
