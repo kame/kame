@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.45 2001/11/16 04:08:10 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.46 2001/12/13 17:11:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -748,6 +748,8 @@ flushsaproto(head)
 	for (p = head; p != NULL; p = save) {
 		save = p->next;
 		flushsatrns(p->head);
+		vfree(p->keymat);
+		vfree(p->keymat_p);
 		racoon_free(p);
 	}
 
