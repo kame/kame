@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.58 2000/01/17 13:01:03 itojun Exp $ */
+/* KAME $Id: key.c,v 1.59 2000/01/17 14:11:15 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -880,7 +880,7 @@ key_delsp(sp)
 	}
     }
 
-	KFREE(sp);
+	keydb_delsecpolicy(sp);
 
 	splx(s);
 
@@ -919,12 +919,9 @@ key_newsp()
 {
 	struct secpolicy *newsp = NULL;
 
-	KMALLOC(newsp, struct secpolicy *, sizeof(*newsp));
-	if (newsp == NULL) {
-		printf("key_newsp: No more memory.\n");
-		return NULL;
-	}
-	bzero(newsp, sizeof(*newsp));
+	newsp = keydb_newsecpolicy();
+	if (!newsp)
+		return newsp;
 
 	newsp->refcnt = 1;
 	newsp->req = NULL;
@@ -1744,25 +1741,16 @@ key_newsah(saidx)
 	struct secasindex *saidx;
 {
 	struct secashead *newsah;
-	u_int stateidx;
 
 	/* sanity check */
 	if (saidx == NULL)
 		panic("key_newsaidx: NULL pointer is passed.\n");
 
-	KMALLOC(newsah, struct secashead *, sizeof(struct secashead));
-	if (newsah == NULL) {
+	newsah = keydb_newsecashead();
+	if (newsah == NULL)
 		return NULL;
-	}
-	bzero((caddr_t)newsah, sizeof(struct secashead));
 
 	bcopy(saidx, &newsah->saidx, sizeof(newsah->saidx));
-
-	for (stateidx = 0;
-	     stateidx < _ARRAYLEN(saorder_state_any);
-	     stateidx++) {
-		LIST_INIT(&newsah->savtree[saorder_state_any[stateidx]]);
-	}
 
 	/* add to saidxtree */
 	newsah->state = SADB_SASTATE_MATURE;
@@ -1950,11 +1938,8 @@ key_delsav(sav)
 		KFREE(sav->key_auth);
 	if (sav->key_enc != NULL)
 		KFREE(sav->key_enc);
-	if (sav->replay != NULL) {
-		if (sav->replay->bitmap != NULL)
-			KFREE(sav->replay->bitmap);
-		KFREE(sav->replay);
-	}
+	if (sav->replay != NULL)
+		keydb_delsecreplay(sav->replay);
 	if (sav->lft_c != NULL)
 		KFREE(sav->lft_c);
 	if (sav->lft_h != NULL)
@@ -2116,25 +2101,11 @@ key_setsaval(sav, mhp)
 
 		/* replay window */
 		if ((sa0->sadb_sa_flags & SADB_X_EXT_OLD) == 0) {
-			KMALLOC(sav->replay, struct secreplay *,
-				sizeof(struct secreplay));
+			sav->replay = keydb_newsecreplay(sa0->sadb_sa_replay);
 			if (sav->replay == NULL) {
 				printf("key_setsaval: No more memory.\n");
 				error = ENOBUFS;
 				goto err;
-			}
-			bzero(sav->replay, sizeof(struct secreplay));
-
-			if ((sav->replay->wsize = sa0->sadb_sa_replay) != 0) {
-				KMALLOC(sav->replay->bitmap, caddr_t,
-					sav->replay->wsize);
-				if (sav->replay->bitmap == NULL) {
-					printf("key_setsaval: "
-					       "No more memory.\n");
-					error = ENOBUFS;
-					goto err;
-				}
-				bzero(sav->replay->bitmap, sa0->sadb_sa_replay);
 			}
 		}
 	}
@@ -2346,11 +2317,8 @@ key_setsaval(sav, mhp)
 
     err:
 	/* initialization */
-	if (sav->replay != NULL) {
-		if (sav->replay->bitmap != NULL)
-			KFREE(sav->replay->bitmap);
-		KFREE(sav->replay);
-	}
+	if (sav->replay != NULL)
+		keydb_delsecreplay(sav->replay);
 	if (sav->key_auth != NULL)
 		KFREE(sav->key_auth);
 	if (sav->key_enc != NULL)
@@ -5897,7 +5865,7 @@ key_init()
 #endif
 
 #ifndef IPSEC_DEBUG2
-	timeout((void *)key_timehandler, (void *)0, 100);
+	timeout((void *)key_timehandler, (void *)0, hz);
 #endif /*IPSEC_DEBUG2*/
 
 	/* initialize key statistics */

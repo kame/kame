@@ -536,6 +536,7 @@ file kern/exec_conf.c
 file kern/exec_ecoff.c			exec_ecoff
 
 file netkey/key.c			ipsec
+file netkey/keydb.c			ipsec
 file netkey/key_debug.c			ipsec
 file netkey/keysock.c			ipsec
 

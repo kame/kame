@@ -30,13 +30,7 @@
 #ifndef _NETKEY_KEYDB_H_
 #define _NETKEY_KEYDB_H_
 
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
-#endif
-
-#ifdef KERNEL
+#ifdef _KERNEL
 
 #include <netkey/key_var.h>
 
@@ -146,6 +140,23 @@ struct key_cb {
 	int any_count;
 };
 
-#endif /* KERNEL */
+/* secpolicy */
+extern struct secpolicy *keydb_newsecpolicy __P((void));
+extern void keydb_delsecpolicy __P((struct secpolicy *));
+/* secashead */
+extern struct secashead *keydb_newsecashead __P((void));
+extern void keydb_delsecashead __P((struct secashead *));
+/* secasvar */
+extern struct secasvar *keydb_newsecasvar __P((void));
+extern void keydb_refsecasvar __P((struct secasvar *));
+extern void keydb_freesecasvar __P((struct secasvar *));
+/* secreplay */
+extern struct secreplay *keydb_newsecreplay __P((size_t));
+extern void keydb_delsecreplay __P((struct secreplay *));
+/* secreg */
+extern struct secreg *keydb_newsecreg __P((void));
+extern void keydb_delsecreg __P((struct secreg *));
+
+#endif /* _KERNEL */
 
 #endif /* _NETKEY_KEYDB_H_ */

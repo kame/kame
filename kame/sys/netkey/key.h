@@ -27,18 +27,12 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key.h,v 1.5 2000/01/17 10:11:15 itojun Exp $ */
+/* $Id: key.h,v 1.6 2000/01/17 14:11:15 itojun Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_
 
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
-#endif
-
-#if defined(KERNEL)
+#ifdef _KERNEL
 
 extern struct key_cb key_cb;
 

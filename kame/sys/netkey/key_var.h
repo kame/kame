@@ -92,7 +92,7 @@
 
 #define _INADDR(in) ((struct sockaddr_in *)(in))
 
-#if defined(INET6)
+#ifdef INET6
 #define _IN6ADDR(in6) ((struct sockaddr_in6 *)(in6))
 #define _SALENBYAF(family) \
 	(((family) == AF_INET) ? \
