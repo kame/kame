@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.28 2000/05/28 23:25:07 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.29 2000/06/08 12:39:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -668,10 +668,9 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 #ifdef ENABLE_DEFAULT_SCOPE
-		if (addr->sin6_scope_id == 0) {	/* not change if specified  */
+		if (addr->sin6_scope_id == 0)	/* not change if specified  */
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
-		}
 #endif
 #ifdef __NetBSD__
 		/*
@@ -710,6 +709,9 @@ rip6_usrreq(so, req, m, nam, control, p)
 	    {
 		struct sockaddr_in6 *addr = mtod(nam, struct sockaddr_in6 *);
 		struct in6_addr *in6a = NULL;
+#ifdef ENABLE_DEFAULT_SCOPE
+		struct sockaddr_in6 sin6;
+#endif
 
 		if (nam->m_len != sizeof(*addr)) {
 			error = EINVAL;
@@ -730,9 +732,13 @@ rip6_usrreq(so, req, m, nam, control, p)
 		}
 
 #ifdef ENABLE_DEFAULT_SCOPE
-		if (addr->sin6_scope_id == 0)
+		if (addr->sin6_scope_id == 0) {
+			/* protect *addr */
+			sin6 = *addr;
+			addr = &sin6;
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
+		}
 #endif
 
 		/* Source address selection. XXX: need pcblookup? */
@@ -770,6 +776,9 @@ rip6_usrreq(so, req, m, nam, control, p)
 	    {
 		struct sockaddr_in6 tmp;
 		struct sockaddr_in6 *dst;
+#ifdef ENABLE_DEFAULT_SCOPE
+		struct sockaddr_in6 sin6;
+#endif
 
 		if (so->so_state & SS_ISCONNECTED) {
 			if (nam) {
@@ -791,9 +800,13 @@ rip6_usrreq(so, req, m, nam, control, p)
 			dst = mtod(nam, struct sockaddr_in6 *);
 		}
 #ifdef ENABLE_DEFAULT_SCOPE
-		if (dst->sin6_scope_id == 0)
+		if (dst->sin6_scope_id == 0) {
+			/* protect *addr */
+			sin6 = *dst;
+			dst = &sin6;
 			dst->sin6_scope_id =
 				scope6_addr2default(&dst->sin6_addr);
+		}
 #endif
 		error = rip6_output(m, so, dst, control);
 		m = NULL;

@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.46 2000/06/06 10:20:48 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.47 2000/06/07 03:31:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,6 +339,7 @@ in6_pcbconnect(in6p, nam)
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
 	struct in6_addr mapped;
+	struct sockaddr_in6 tmp;
 
 	(void)&in6a;				/* XXX fool gcc */
 
@@ -360,9 +361,14 @@ in6_pcbconnect(in6p, nam)
 			return EINVAL;
 	}
 
+	/* protect *sin6 from overwrites */
+	tmp = *sin6;
+	sin6 = &tmp;
+
 #ifdef ENABLE_DEFAULT_SCOPE
-      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
-	      sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
+	/* do not override if already specified */
+	if (sin6->sin6_scope_id == 0)
+		sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
 #endif
 
 	/*

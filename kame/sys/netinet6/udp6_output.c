@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.10 2000/06/05 02:48:03 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.11 2000/06/08 12:39:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,6 +182,7 @@ udp6_output(in6p, m, addr6, control)
 	struct ip *ip;
 #endif
 	int flags;
+	struct sockaddr_in6 tmp;
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
@@ -232,6 +233,10 @@ udp6_output(in6p, m, addr6, control)
 			error = EISCONN;
 			goto release;
 		}
+
+		/* protect *sin6 from overwrites */
+		tmp = *sin6;
+		sin6 = &tmp;
 
 		faddr = &sin6->sin6_addr;
 		fport = sin6->sin6_port; /* allow 0 port */
