@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.12 2002/10/09 18:01:22 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.13 2002/10/17 02:15:58 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -2320,7 +2320,7 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag)
 		panic("sbappendaddr_nocheck");
 	if (m0)
 		space += m0->m_pkthdr.len;
-	m0->m_pkthdr.csum_data = (int)tag;
+	m0->m_pkthdr.csum = (int)tag;
 	for (n = control; n; n = n->m_next) {
 		space += n->m_len;
 		if (n->m_next == 0)	/* keep pointer to last control buf */
