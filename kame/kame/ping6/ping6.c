@@ -475,24 +475,20 @@ main(argc, argv)
 		int len;
 		char *buf;
 		if (policy_in != NULL) {
-			if ((len = ipsec_get_policylen(policy_in)) < 0)
+			buf = ipsec_set_policy(policy_in, strlen(policy_in));
+			if (buf == NULL)
 				errx(1, ipsec_strerror());
-			if ((buf = malloc(len)) == NULL)
-				err(1, "malloc");
-			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
-				errx(1, ipsec_strerror());
+			len = ipsec_get_policylen(buf);
 			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 					buf, len) < 0)
 				warnx("Unable to set IPSec policy");
 			free(buf);
 		}
 		if (policy_out != NULL) {
-			if ((len = ipsec_get_policylen(policy_out)) < 0)
+			buf = ipsec_set_policy(policy_out, strlen(policy_out));
+			if (buf == NULL)
 				errx(1, ipsec_strerror());
-			if ((buf = malloc(len)) == NULL)
-				err(1, "malloc");
-			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
-				errx(1, ipsec_strerror());
+			len = ipsec_get_policylen(buf);
 			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 					buf, len) < 0)
 				warnx("Unable to set IPSec policy");
