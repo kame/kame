@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.106 2001/08/14 14:55:27 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.107 2001/08/16 20:24:59 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1158,6 +1158,7 @@ dh_group_num
 	;
 identifierstring
 	:	/* nothing */ { $$ = NULL; }
+	|	ADDRSTRING { $$ = $1; }
 	|	QUOTEDSTRING { $$ = $1; }
 	;
 isakmpproposal_specs

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.143 2001/08/16 20:22:25 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.144 2001/08/16 20:24:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3070,6 +3070,7 @@ ipsecdoi_setid1(iph1)
 	vchar_t *ret = NULL;
 	struct ipsecdoi_id_b id_b;
 	vchar_t *ident = NULL;
+	struct sockaddr *ipid = NULL;
 
 	/* init */
 	id_b.proto_id = 0;
@@ -3106,25 +3107,36 @@ ipsecdoi_setid1(iph1)
 		break;
 #endif
 	case IDTYPE_ADDRESS:
+		/*
+		 * if the value of the id type was set by the configuration
+		 * file, then use it.  otherwise the value is get from local
+		 * ip address by using ike negotiation.
+		 */
+		if (iph1->rmconf->idv)
+			ipid = (struct sockaddr *)iph1->rmconf->idv->v;
+		/*FALLTHROUGH*/
 	default:
 	    {
 		int l;
 		caddr_t p;
 
+		if (ipid == NULL)
+			ipid = iph1->local;
+
 		/* use IP address */
-		switch (iph1->local->sa_family) {
+		switch (ipid->sa_family) {
 		case AF_INET:
 			id_b.type = IPSECDOI_ID_IPV4_ADDR;
-			id_b.port = ((struct sockaddr_in *)iph1->local)->sin_port;
+			id_b.port = ((struct sockaddr_in *)ipid)->sin_port;
 			l = sizeof(struct in_addr);
-			p = (caddr_t)&((struct sockaddr_in *)iph1->local)->sin_addr;
+			p = (caddr_t)&((struct sockaddr_in *)ipid)->sin_addr;
 			break;
 #ifdef INET6
 		case AF_INET6:
 			id_b.type = IPSECDOI_ID_IPV6_ADDR;
-			id_b.port = ((struct sockaddr_in6 *)iph1->local)->sin6_port;
+			id_b.port = ((struct sockaddr_in6 *)ipid)->sin6_port;
 			l = sizeof(struct in6_addr);
-			p = (caddr_t)&((struct sockaddr_in6 *)iph1->local)->sin6_addr;
+			p = (caddr_t)&((struct sockaddr_in6 *)ipid)->sin6_addr;
 			break;
 #endif
 		default:
@@ -3234,9 +3246,26 @@ set_identifier(vpp, type, value)
 		break;
 	}
 	case IDTYPE_ADDRESS:
-		/* XXX get from node's address */
-		/* but should be defined here */
+	{
+		struct sockaddr *sa;
+
+		/* length is adjusted since QUOTEDSTRING teminates NULL. */
+		if (value->l == 0)
+			break;
+
+		sa = str2saddr(value->v, NULL);
+		if (sa == NULL) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"invalid ip address %s\n", value->v);
+			return -1;
+		}
+
+		new = vmalloc(sa->sa_len);
+		if (new == NULL)
+			return -1;
+		memcpy(new->v, sa, new->l);
 		break;
+	}
 	case IDTYPE_ASN1DN:
 		new = eay_str2asn1dn(value->v, value->l - 1);
 		if (new == NULL)
