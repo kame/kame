@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.100 2001/02/24 17:47:22 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.101 2001/02/25 10:33:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1623,9 +1623,14 @@ nd6_prefix_onlink(pr)
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_len = sizeof(mask6);
 	mask6.sin6_addr = pr->ndpr_mask;
-	rtflags = ifa->ifa_flags | RTF_UP;
-	if (!nd6_need_cache(ifp))
+	rtflags = ifa->ifa_flags | RTF_CLONING | RTF_UP;
+	if (nd6_need_cache(ifp)) {
+		/* explicitly set in case ifa_flags does not set the flag. */
+		rtflags |= RTF_CLONING;
+	} else {
+		/* explicitly clear in case ifa_flags sets the flag. */
 		rtflags &= ~RTF_CLONING;
+	}
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&pr->ndpr_prefix,
 			  ifa->ifa_addr, (struct sockaddr *)&mask6,
 			  rtflags, &rt);
