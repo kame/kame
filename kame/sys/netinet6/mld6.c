@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.48 2002/08/01 08:10:36 ono Exp $	*/
+/*	$KAME: mld6.c,v 1.49 2002/08/01 08:20:31 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -86,7 +86,9 @@
 #include <dev/rndvar.h>
 #endif
 
+#ifdef __FreeBSD__
 #include <net/ethernet.h>
+#endif
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/if_types.h>
