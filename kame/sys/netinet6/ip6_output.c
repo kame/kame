@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.161 2001/02/10 02:07:34 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.162 2001/02/10 04:42:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2721,12 +2721,12 @@ ip6_pcbopts(pktopt, m, so)
 /*
  * Set up an IP6 option in pcb for insertion in output packets or
  * specifying behavior of outgoing packets.
- * XXX: The logic of this function is very similar to ip6_setpktoptions().
  */
 void
 init_ip6pktopts(opt)
 	struct ip6_pktopts *opt;
 {
+
 	bzero(opt, sizeof(*opt));
 	opt->ip6po_hlim = -1;	/* -1 means default hop limit */
 	opt->ip6po_mtu = -1;	/* -1 means not to specify the MTU */
