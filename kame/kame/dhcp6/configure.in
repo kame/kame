@@ -12,39 +12,41 @@ AC_CHECK_LIB(c, kvm_open, [], [AC_CHECK_LIB(kvm, kvm_open)])
 AC_CHECK_LIB(mld, nlist)
 
 dnl pcap library
-CFLAGS="-I. $CFLAGS"
-AC_MSG_CHECKING(for pcap library/header)
-for dir in /usr/local/libpcap /usr/local/v6 /usr/local \
-		../libpcap* ../../libpcap*; do
-	ac_cv_pcap_lib=no
-	ac_cv_pcap_include=no
-	if test -d $dir -a -f $dir/libpcap.a; then
-		ac_cv_pcap_lib="$dir"
-	elif test -d $dir/lib -a -f $dir/lib/libpcap.a; then
-		ac_cv_pcap_lib="$dir/lib"
-	fi
-	if test -d $dir -a -f $dir/pcap.h; then
-		ac_cv_pcap_include="$dir"
-	elif test -d $dir/include -a -f $dir/include/pcap.h; then
-		ac_cv_pcap_include="$dir/include"
-	fi
-	if test "$ac_cv_pcap_lib" != "no" -a "$ac_cv_pcap_include" != "no"; then
-		LIBS="-L$ac_cv_pcap_lib $LIBS"
-		CFLAGS="-I$ac_cv_pcap_include $CFLAGS"
-		break
-	fi
-done
-if test "$ac_cv_pcap_lib" = "no" -a "$ac_cv_pcap_include" = "no"; then
-	AC_MSG_RESULT(no)
-else
-	AC_MSG_RESULT($ac_cv_pcap_lib and $ac_cv_pcap_include)
-fi
-AC_CHECK_LIB(pcap, pcap_lookupdev, [],
-	[echo "Fatal: libpcap.a not found"
-	exit 1])
-AC_TRY_COMPILE([#include <pcap.h>], [], [], [dnl
-	echo "Fatal: pcap.h not found"
-	exit 1])
+dnl CFLAGS="-I. $CFLAGS"
+dnl AC_MSG_CHECKING(for pcap library/header)
+dnl for dir in /usr/local/libpcap /usr/local/v6 /usr/local \
+dnl 		../libpcap* ../../libpcap*; do
+dnl 	ac_cv_pcap_lib=no
+dnl 	ac_cv_pcap_include=no
+dnl 	if test -d $dir -a -f $dir/libpcap.a; then
+dnl 		ac_cv_pcap_lib="$dir"
+dnl 	elif test -d $dir/lib -a -f $dir/lib/libpcap.a; then
+dnl 		ac_cv_pcap_lib="$dir/lib"
+dnl 	fi
+dnl 	if test -d $dir -a -f $dir/pcap.h; then
+dnl 		ac_cv_pcap_include="$dir"
+dnl 	elif test -d $dir/include -a -f $dir/include/pcap.h; then
+dnl 		ac_cv_pcap_include="$dir/include"
+dnl 	fi
+dnl 	if test "$ac_cv_pcap_lib" != "no" -a "$ac_cv_pcap_include" != "no"; then
+dnl 		LIBS="-L$ac_cv_pcap_lib $LIBS"
+dnl 		CFLAGS="-I$ac_cv_pcap_include $CFLAGS"
+dnl 		break
+dnl 	fi
+dnl done
+dnl if test "$ac_cv_pcap_lib" = "no" -a "$ac_cv_pcap_include" = "no"; then
+dnl 	AC_MSG_RESULT(no)
+dnl else
+dnl 	AC_MSG_RESULT($ac_cv_pcap_lib and $ac_cv_pcap_include)
+dnl fi
+dnl AC_CHECK_LIB(pcap, pcap_lookupdev, [],
+dnl 	[echo "Fatal: libpcap.a not found"
+dnl 	exit 1])
+dnl AC_TRY_COMPILE([#include <pcap.h>], [], [], [dnl
+dnl 	echo "Fatal: pcap.h not found"
+dnl 	exit 1])
+
+CFLAGS="$CFLAGS -I\$(srcdir)"
 
 AC_MSG_CHECKING(for getaddrinfo/getnameinfo library)
 AC_EGREP_CPP(yes,
