@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_hfsc.c,v 1.1 2000/01/18 07:29:06 kjc Exp $
+ * $Id: qop_hfsc.c,v 1.2 2000/02/02 09:31:04 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -611,7 +611,7 @@ qop_hfsc_modify_class(struct classinfo *clinfo,
 		hfsc_clinfo->fsc = *sc;
 	}
 
-	error = qop_modify_class(clinfo, (void *)sctype);
+	error = qop_modify_class(clinfo, (void *)((long)sctype));
 	if (error == 0)
 		return (0);
 
@@ -1061,9 +1061,9 @@ hfsc_modify_class(struct classinfo *clinfo, void *arg)
 {
 	struct hfsc_modify_class class_mod;
 	struct hfsc_classinfo *hfsc_clinfo;
-	int sctype;
+	long sctype;
 
-	sctype = (int)arg;
+	sctype = (long)arg;
 	hfsc_clinfo = clinfo->private;
 
 	memset(&class_mod, 0, sizeof(class_mod));
