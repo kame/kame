@@ -991,12 +991,12 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 		goto bad;
 	}
 
-	max = fragoff + ip_len;
 	/* Respect maximum length */
-	if (max > IP_MAXPACKET) {
-		DPFPRINTF(("max packet %d\n", max));
+	if (fragoff + ip_len > IP_MAXPACKET) {
+		DPFPRINTF(("max packet %d\n", fragoff + ip_len));
 		goto bad;
 	}
+	max = fragoff + ip_len; 
 
 	if ((r->rule_flag & (PFRULE_FRAGCROP|PFRULE_FRAGDROP)) == 0) {
 		/* Fully buffer all of the fragments */
