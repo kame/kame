@@ -1,0 +1,25 @@
+# New ports collection makefile for:    xtris
+# Version required:     1.15
+# Date created:         24. Sep 97
+# Whom:                 sec@42.org
+#
+# $FreeBSD: ports/games/xtris/Makefile,v 1.3 1999/08/25 06:06:24 obrien Exp $
+# KAME $Id: Makefile,v 1.1 1999/12/20 08:02:37 itojun Exp $
+#
+
+DISTNAME=       xtris-1.15
+CATEGORIES=	games
+MASTER_SITES=	http://www.iagora.com/~espel/xtris/
+
+PATCH_SITES=	ftp://ftp2.v6.linux.or.jp/pub/Linux/IPv6-2/xtris/
+PATCHFILES=	xtris-1.15-v6-19991218.diff.gz
+PATCH_DIST_STRIP=	-p1
+
+MAINTAINER=	sumikawa@kame.net
+
+RESTRICTED=	"Possible trademark infringement"
+WRKSRC=		${WRKDIR}/xtris
+
+USE_X11=	yes
+
+.include "../../mk/bsd.pkg.mk"

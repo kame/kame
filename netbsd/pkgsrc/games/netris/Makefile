@@ -4,7 +4,7 @@
 # Whom:	desmo
 #
 # $FreeBSD: ports/games/netris/Makefile,v 1.2 1999/08/25 06:04:08 obrien Exp $
-# $Id: Makefile,v 1.1 1999/12/20 07:57:37 itojun Exp $
+# KAME $Id: Makefile,v 1.2 1999/12/20 08:02:36 itojun Exp $
 #
 
 DISTNAME=		netris-0.5
