@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.8 2001/08/10 09:07:09 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.11 2001/10/18 10:33:25 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -228,9 +228,9 @@ pr_family(int af)
 #define	WID_IF(af)	6	/* width of netif column */
 #else
 #define	WID_DST(af) \
-	((af) == AF_INET6 ? (lflag ? 39 : (nflag ? 33: 18)) : 18)
+	((af) == AF_INET6 ? (Wflag ? 39 : (numeric_addr ? 33: 18)) : 18)
 #define	WID_GW(af) \
-	((af) == AF_INET6 ? (lflag ? 31 : (nflag ? 29 : 18)) : 18)
+	((af) == AF_INET6 ? (Wflag ? 31 : (numeric_addr ? 29 : 18)) : 18)
 #define	WID_IF(af)	((af) == AF_INET6 ? 8 : 6)
 #endif /*INET6*/
 
@@ -243,8 +243,8 @@ pr_rthdr(int af)
 
 	if (Aflag)
 		printf("%-8.8s ","Address");
-	if (af == AF_INET || lflag)
-		if (lflag)
+	if (af == AF_INET || Wflag)
+		if (Wflag)
 			printf("%-*.*s %-*.*s %-6.6s %6.6s %8.8s %6.6s %*.*s %6s\n",
 				WID_DST(af), WID_DST(af), "Destination",
 				WID_GW(af), WID_GW(af), "Gateway",
@@ -553,7 +553,7 @@ p_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags, int width)
 	if (width < 0 )
 		printf("%s ", cp);
 	else {
-		if (nflag)
+		if (numeric_addr)
 			printf("%-*s ", width, cp);
 		else
 			printf("%-*.*s ", width, width, cp);
@@ -603,9 +603,9 @@ p_rtentry(struct rtentry *rt)
 	p_sockaddr(kgetsa(rt->rt_gateway), NULL, RTF_HOST,
 	    WID_GW(addr.u_sa.sa_family));
 	p_flags(rt->rt_flags, "%-6.6s ");
-	if (addr.u_sa.sa_family == AF_INET || lflag) {
+	if (addr.u_sa.sa_family == AF_INET || Wflag) {
 		printf("%6ld %8ld ", rt->rt_refcnt, rt->rt_use);
-		if (lflag) {
+		if (Wflag) {
 			if (rt->rt_rmx.rmx_mtu != 0)
 				printf("%6lu ", rt->rt_rmx.rmx_mtu);
 			else
@@ -643,7 +643,7 @@ routename(u_long in)
 	struct hostent *hp;
 
 	cp = 0;
-	if (!nflag) {
+	if (!numeric_addr) {
 		hp = gethostbyaddr((char *)&in, sizeof (struct in_addr),
 			AF_INET);
 		if (hp) {
@@ -715,24 +715,31 @@ netname(u_long in, u_long mask)
 	char *cp = 0;
 	static char line[MAXHOSTNAMELEN];
 	struct netent *np = 0;
-	u_long net, omask, dmask;
+	u_long dmask;
 	register u_long i;
+
+#define	NSHIFT(m) (							\
+	(m) == IN_CLASSA_NET ? IN_CLASSA_NSHIFT :			\
+	(m) == IN_CLASSB_NET ? IN_CLASSB_NSHIFT :			\
+	(m) == IN_CLASSC_NET ? IN_CLASSC_NSHIFT :			\
+	0)
 
 	i = ntohl(in);
 	dmask = forgemask(i);
-	omask = mask;
-	if (!nflag && i) {
-		net = i & dmask;
-		if (!(np = getnetbyaddr(i, AF_INET)) && net != i)
-			np = getnetbyaddr(net, AF_INET);
-		if (np) {
+	if (!numeric_addr && i) {
+		np = getnetbyaddr(i >> NSHIFT(mask), AF_INET);
+		if (np == NULL && mask == 0)
+			np = getnetbyaddr(i >> NSHIFT(dmask), AF_INET);
+		if (np != NULL) {
 			cp = np->n_name;
 			trimdomain(cp, strlen(cp));
 		}
 	}
-	if (cp)
+#undef NSHIFT
+	if (cp != NULL) {
 		strncpy(line, cp, sizeof(line) - 1);
-	else {
+		line[sizeof(line) - 1] = '\0';
+	} else {
 		switch (dmask) {
 		case IN_CLASSA_NET:
 			if ((i & IN_CLASSA_HOST) == 0) {
@@ -760,7 +767,7 @@ netname(u_long in, u_long mask)
 			break;
 		}
 	}
-	domask(line+strlen(line), i, omask);
+	domask(line + strlen(line), i, mask);
 	return (line);
 }
 
@@ -821,12 +828,12 @@ netname6(struct sockaddr_in6 *sa6, struct in6_addr *mask)
 	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
 		return("default");
 
-	if (nflag)
+	if (numeric_addr)
 		flag |= NI_NUMERICHOST;
 	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
 		    NULL, 0, flag);
 
-	if (nflag)
+	if (numeric_addr)
 		sprintf(&line[strlen(line)], "/%d", masklen);
 
 	return line;
@@ -847,7 +854,7 @@ routename6(struct sockaddr_in6 *sa6)
 	sa6_local.sin6_addr = sa6->sin6_addr;
 	sa6_local.sin6_scope_id = sa6->sin6_scope_id;
 
-	if (nflag)
+	if (numeric_addr)
 		flag |= NI_NUMERICHOST;
 
 	getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,

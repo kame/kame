@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.9 2001/08/10 09:07:09 ru Exp $
+ * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.11 2001/09/17 14:53:17 ru Exp $
  */
 
 #ifndef lint
@@ -1055,7 +1055,7 @@ rip6_stats(u_long off __unused, char *name, int af __unused)
 
 /*
  * Pretty print an Internet address (net address + port).
- * If the nflag was specified, use numbers instead of names.
+ * Take numeric_addr and numeric_port into consideration.
  */
 #define GETSERVBYPORT6(port, proto, ret)\
 {\
@@ -1074,7 +1074,7 @@ inet6print(struct in6_addr *in6, int port, char *proto, int numeric)
 	char line[80], *cp;
 	int width;
 
-	sprintf(line, "%.*s.", lflag ? 39 :
+	sprintf(line, "%.*s.", Wflag ? 39 :
 		(Aflag && !numeric) ? 12 : 16, inet6name(in6));
 	cp = index(line, '\0');
 	if (!numeric && port)
@@ -1083,13 +1083,13 @@ inet6print(struct in6_addr *in6, int port, char *proto, int numeric)
 		sprintf(cp, "%.8s", sp ? sp->s_name : "*");
 	else
 		sprintf(cp, "%d", ntohs((u_short)port));
-	width = lflag ? 45 : Aflag ? 18 : 22;
+	width = Wflag ? 45 : Aflag ? 18 : 22;
 	printf("%-*.*s ", width, width, line);
 }
 
 /*
  * Construct an Internet address representation.
- * If the nflag has been supplied, give
+ * If the numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
  */
 
@@ -1102,7 +1102,7 @@ inet6name(struct in6_addr *in6p)
 	static char domain[MAXHOSTNAMELEN];
 	static int first = 1;
 
-	if (first && !nflag) {
+	if (first && !numeric_addr) {
 		first = 0;
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
 		    (cp = index(domain, '.')))
@@ -1111,7 +1111,7 @@ inet6name(struct in6_addr *in6p)
 			domain[0] = 0;
 	}
 	cp = 0;
-	if (!nflag && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
+	if (!numeric_addr && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
 		hp = gethostbyaddr((char *)in6p, sizeof(*in6p), AF_INET6);
 		if (hp) {
 			if ((cp = index(hp->h_name, '.')) &&
