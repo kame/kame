@@ -1,4 +1,4 @@
-/*	$KAME: revlookupd.c,v 1.3 2002/06/04 05:06:49 itojun Exp $	*/
+/*	$KAME: revlookupd.c,v 1.4 2003/06/27 07:47:38 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -424,6 +424,7 @@ join(s, af, group)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+	hints.ai_protocol = IPPROTO_UDP;	/*dummy*/
 	hints.ai_flags = AI_NUMERICHOST;
 	if (getaddrinfo(group, "0", &hints, &res) != 0)
 		return -1;
@@ -570,6 +571,7 @@ addserv(n, ttl, comment)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+	hints.ai_protocol = IPPROTO_UDP;	/*dummy*/
 	hints.ai_flags = AI_NUMERICHOST;
 	if (getaddrinfo(n, dstport, &hints, &res) != 0)
 		return -1;
