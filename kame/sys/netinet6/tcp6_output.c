@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.18 2002/02/02 08:27:12 jinmei Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.19 2002/04/19 07:30:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -402,7 +402,8 @@ send:
 	 * bump the packet length beyond the permissible segment length.
 	 */
 	if (t6p->t_in6pcb->in6p_outputopts &&
-	    (t6p->t_in6pcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
+	    (t6p->t_in6pcb->in6p_outputopts->ip6po_minmtu
+	     == IP6PO_MINMTU_ALL)) { /* note that TCP never uses multicast */
 		maxseg = IPV6_MMTU - hdrlen;
 	} else
 		maxseg = t6p->t_maxseg;
@@ -655,7 +656,8 @@ send:
 
 	ip6oflags = 0;
 	if (t6p->t_in6pcb->in6p_outputopts &&
-	    (t6p->t_in6pcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
+	    (t6p->t_in6pcb->in6p_outputopts->ip6po_minmtu ==
+	     IP6PO_MINMTU_ALL)) {
 		ip6oflags |= IPV6_MINMTU;
 	}
 	ip6oflags |= (so->so_options & SO_DONTROUTE);

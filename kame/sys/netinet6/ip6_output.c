@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.295 2002/04/12 14:59:40 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.296 2002/04/19 07:30:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1193,13 +1193,27 @@ skip_ipsec2:;
 		goto bad;
 
 	/*
-	 * An advanced API option (IPV6_USE_MIN_MTU) overrides mtu setting.
-	 * The caller of this function may also specify to use the minimum MTU
+	 * The caller of this function may specify to use the minimum MTU
 	 * in some cases.
+	 * An advanced API option (IPV6_USE_MIN_MTU) can also overrides MTU
+	 * setting.  The logic is a bit complected; by default, unicast packets
+	 * will follow path MTU while multicast packets will be sent at the
+	 * minimum MTU.  If IP6PO_MINMTU_ALL is specified, all packets
+	 * including unicast ones will be sent at the minimum MTU.  Multicast
+	 * packets will always be sent at the minimum MTU unless
+	 * IP6PO_MINMTU_DISABLE is explicitly specified.
+	 * See rfc2292bis (07 and later) for more details.
 	 */
-	if (mtu > IPV6_MMTU && ((flags & IPV6_MINMTU) ||
-				(opt && (opt->ip6po_flags & IP6PO_MINMTU)))) {
-		mtu = IPV6_MMTU;
+	if (mtu > IPV6_MMTU) {
+		if ((flags & IPV6_MINMTU))
+			mtu = IPV6_MMTU;
+		else if (opt && opt->ip6po_minmtu == IP6PO_MINMTU_ALL)
+			mtu = IPV6_MMTU;
+		else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
+			 (opt == NULL ||
+			  opt->ip6po_minmtu != IP6PO_MINMTU_DISABLE)) {
+			mtu = IPV6_MMTU;
+		}
 	}
 
 #ifndef SCOPEDROUTING
@@ -3123,7 +3137,8 @@ ip6_getpcbopt(pktopt, optname, mp)
 	struct ip6_ext *ip6e;
 	int error = 0;
 	struct in6_pktinfo null_pktinfo;
-	int deftclass = 0, on, flag = 0;
+	int deftclass = 0, on;
+	int defminmtu = IP6PO_MINMTU_MCASTONLY;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct mbuf *m;
 #endif
@@ -3183,17 +3198,15 @@ ip6_getpcbopt(pktopt, optname, mp)
 			optdatalen = pktopt->ip6po_nexthop->sa_len;
 		}
 		break;
-	case IPV6_DONTFRAG:
 	case IPV6_USE_MIN_MTU:
-		switch (optname) {
-		case IPV6_USE_MIN_MTU:
-			flag = IP6PO_MINMTU;
-			break;
-		case IPV6_DONTFRAG:
-			flag = IP6PO_DONTFRAG;
-			break;
-		}
-		if (pktopt && ((pktopt->ip6po_flags) & flag))
+		if (pktopt)
+			optdata = (void *)&pktopt->ip6po_minmtu;
+		else
+			optdata = (void *)&defminmtu;
+		optdatalen = sizeof(int);
+		break;
+	case IPV6_DONTFRAG:
+		if (pktopt && ((pktopt->ip6po_flags) & IP6PO_DONTFRAG))
 			on = 1;
 		else
 			on = 0;
@@ -3297,7 +3310,7 @@ ip6_copypktopts(src, canwait)
 	struct ip6_pktopts *dst;
 
 	if (src == NULL) {
-		printf("ip6_clearpktopts: invalid argument\n");
+		printf("ip6_copypktopts: invalid argument\n");
 		return(NULL);
 	}
 
@@ -4211,37 +4224,33 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		break;
 
 	case IPV6_USE_MIN_MTU:
-	case IPV6_DONTFRAG:
 	{
-		int on, flag = 0;
+		int minmtupolicy;
 
 		if (len != sizeof(int))
 			return(EINVAL);
-		on = *(int *)buf;
+		minmtupolicy = *(int *)buf;
+		if (minmtupolicy != IP6PO_MINMTU_MCASTONLY &&
+		    minmtupolicy != IP6PO_MINMTU_DISABLE &&
+		    minmtupolicy != IP6PO_MINMTU_ALL) {
+			return(EINVAL);
+		}
+		opt->ip6po_minmtu = minmtupolicy;
+		break;
+	}
+	case IPV6_DONTFRAG:
+		if (len != sizeof(int))
+			return(EINVAL);
 
-		if (optname == IPV6_DONTFRAG && uproto == IPPROTO_TCP) {
+		if (uproto == IPPROTO_TCP || *(int *)buf == 0) {
 			/*
 			 * we ignore this option for TCP sockets.
 			 * (rfc2292bis leaves this case unspecified.)
 			 */
-			on = 0;
-		}
-
-		switch (optname) {
-		case IPV6_USE_MIN_MTU:
-			flag = IP6PO_MINMTU;
-			break;
-		case IPV6_DONTFRAG:
-			flag = IP6PO_DONTFRAG;
-			break;
-		}
-
-		if (on)
-			opt->ip6po_flags |= flag;
-		else
-			opt->ip6po_flags &= ~flag;
+			opt->ip6po_flags &= ~IP6PO_DONTFRAG;
+		} else
+			opt->ip6po_flags |= IP6PO_DONTFRAG;
 		break;
-	}
 
 	default:
 		return(ENOPROTOOPT);	

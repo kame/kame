@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.89 2002/03/02 09:56:16 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.90 2002/04/19 07:30:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,13 +161,19 @@ struct	ip6_pktopts {
 
 	/* Destination options header (after a routing header) */
 	struct	ip6_dest *ip6po_dest2;
+	
+	int	ip6po_tclass;	/* traffic class */
 
-	/* traffic class */
-	int		ip6po_tclass;
+	int	ip6po_minmtu;  /* fragment vs PMTU discovery policy */
+#define IP6PO_MINMTU_MCASTONLY	-1 /* default; send at min MTU for multicast*/
+#define IP6PO_MINMTU_DISABLE	 0 /* always perform pmtu disc */
+#define IP6PO_MINMTU_ALL	 1 /* always send at min MTU */
 
 	int ip6po_flags;
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
+#if 0				/* obsoleted; do not reuse the value */
 #define IP6PO_MINMTU	0x02	/* use minimum MTU (IPV6_USE_MIN_MTU) */
+#endif
 #define IP6PO_DONTFRAG	0x04	/* disable fragmentation (IPV6_DONTFRAG) */
 #define IP6PO_USECOA	0x08	/* use care of address */
 
