@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.230 2003/04/23 09:15:52 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.231 2003/05/08 14:10:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -546,6 +546,7 @@ nd6_rtmsg(cmd, rt)
 	struct rtentry *rt;
 {
 	struct rt_addrinfo info;
+	struct sockaddr *ifpaddr;
 
 	bzero((caddr_t)&info, sizeof(info));
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* BSDI4 */
@@ -556,11 +557,11 @@ nd6_rtmsg(cmd, rt)
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	info.rti_info[RTAX_IFP] = rt->rt_ifp->if_addrlist->ifa_addr;
+	ifpaddr = rt->rt_ifp->if_addrlist->ifa_addr;
 #else
-	info.rti_info[RTAX_IFP] =
-	    (struct sockaddr *)TAILQ_FIRST(&rt->rt_ifp->if_addrlist);
+	ifpaddr = TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
 #endif
+	info.rti_info[RTAX_IFP] = ifpaddr;
 	info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 
 	rt_missmsg(cmd, &info, rt->rt_flags, 0);
