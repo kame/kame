@@ -41,7 +41,6 @@
 #include "opt_bdg.h"
 #include "opt_mac.h"
 #include "opt_netgraph.h"
-#include "vrrp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,10 +63,6 @@
 #include <net/ethernet.h>
 #include <net/bridge.h>
 #include <net/if_vlan_var.h>
-#if NVRRP > 0
-#include <net/if_arp.h>
-#include <net/if_vrrp_var.h>
-#endif
 
 #if defined(INET) || defined(INET6)
 #include <netinet/in.h>
@@ -537,9 +532,6 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 {
 	struct ether_header *eh;
 	u_short etype;
-#if NVRRP > 0
-	struct m_tag *mtag;
-#endif
 
 	/*
 	 * Do consistency checks to verify assumptions
@@ -619,12 +611,6 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 			return;
 	}
 
-#if NVRRP > 0
-	if (nvrrp_active > 0 &&
-	    (mtag = m_tag_find(m, PACKET_TAG_VRRP, NULL)) == NULL) {
-		vrrp_input(eh, m);
-	}
-#endif
 
 	/* Check for bridging mode */
 	if (BDG_ACTIVE(ifp) ) {
@@ -755,12 +741,10 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 				    sdl->sdl_family == AF_LINK)
 					break;
 
-			if (ifp->if_type != IFT_VRRP) {
-				if (sdl && bcmp(LLADDR(sdl), eh->ether_shost,
-				    ETHER_ADDR_LEN) == 0) {
-					m_freem(m);
-					return;
-				}
+			if (sdl && bcmp(LLADDR(sdl), eh->ether_shost,
+			    ETHER_ADDR_LEN) == 0) {
+				m_freem(m);
+				return;
 			}
 		}
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,

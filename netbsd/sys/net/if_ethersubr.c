@@ -80,7 +80,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95.2.2 2003/01/26 10:32:57 jmc Ex
 #include "bridge.h"
 #include "bpfilter.h"
 #include "arp.h"
-#include "vrrp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,10 +124,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95.2.2 2003/01/26 10:32:57 jmc Ex
 
 #if NBRIDGE > 0
 #include <net/if_bridgevar.h>
-#endif
-
-#if NVRRP > 0
-#include <net/if_vrrp_var.h>
 #endif
 
 #include <netinet/in.h>
@@ -752,13 +747,6 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 		ifp = m->m_pkthdr.rcvif;
 	}
 #endif /* NBRIDGE > 0 */
-
-#if NVRRP > 0
-	if (nvrrp_active > 0 &&
-	    (mtag = m_tag_find(m, PACKET_TAG_VRRP, NULL)) == NULL) {
-		vrrp_input(eh, m);
-	}
-#endif
 
 	/*
 	 * XXX This comparison is redundant if we are a bridge

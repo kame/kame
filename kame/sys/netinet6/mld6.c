@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.82 2003/05/09 08:40:56 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.83 2003/08/05 11:47:36 ono Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -151,10 +151,6 @@
 #endif
 #endif
 #include <net/if_types.h>
-#ifdef IFT_VRRP
-#include <net/if_dl.h>
-#include <net/if_vrrp_var.h>
-#endif
 
 #include <net/net_osdep.h>
 
@@ -969,14 +965,6 @@ mld6_sendpkt(in6m, type, dst)
 	struct in6_ifaddr *ia = NULL;
 	struct sockaddr_in6 src_sa, dst_sa;
 
-#ifdef IFT_VRRP
-	if (ifp->if_type == IFT_VRRP) {
-		ifp = ((struct ifvrrp *)ifp->if_softc)->ifv_p;
-		if (ifp == NULL)
-			return;
-	}
-#endif
-
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
@@ -1136,14 +1124,6 @@ mld_sendbuf(mh, ifp)
 	struct mbuf *md;
 	struct in6_ifaddr *ia = NULL;
 	struct sockaddr_in6 src_sa, dst_sa;
-
-#ifdef IFT_VRRP
-	if (ifp->if_type == IFT_VRRP) {
-		ifp = ((struct ifvrrp *)ifp->if_softc)->ifv_p;
-		if (ifp == NULL)
-			return;
-	}
-#endif
 
 	/*
 	 * At first, find a link local address on the outgoing interface

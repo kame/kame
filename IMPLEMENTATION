@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.346 2003/08/01 08:01:57 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.347 2003/08/05 11:47:31 ono Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -237,7 +237,6 @@ draft-ietf-dnsext-mdns-03.txt: Multicast DNS
       near future, so don't rely upon it.
 draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
     * See 1.9 in this document for details.
-draft-ietf-vrrp-ipv6-spec-02.txt: Virtual Router Redundancy Protocol for IPv6
 draft-ietf-dhc-dhcpv6-opt-prefix-delegation-01.txt:
 	IPv6 Prefix Options for DHCPv6
 draft-itojun-ipv6-tcp-to-anycast-01.txt:

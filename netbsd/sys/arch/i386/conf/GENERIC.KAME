@@ -56,9 +56,6 @@ options 	RADIX_MPATH
 #options 	MIP6_NOHAIPSEC		# disable ha-ipsec draft support
 #options 	MIP6_DEBUG
 
-# Virtual Router Redundancy Protocol(VRRP)
-#pseudo-device  vrrp    2
-
 pseudo-device 	pf			# PF packet filter
 pseudo-device 	pflog
 pseudo-device 	pfsync

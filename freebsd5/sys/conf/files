@@ -1173,7 +1173,6 @@ net/if_stf.c		count stf
 net/if_tun.c		optional tun
 net/if_tap.c		optional tap
 net/if_vlan.c		optional vlan
-net/if_vrrp.c		count vrrp
 net/intrq.c		standard
 net/net_osdep.c		standard
 net/netisr.c		standard

@@ -540,7 +540,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 #define PACKET_TAG_INET6			19 /* IPv6 info */
 #define PACKET_TAG_ESP				20 /* ESP information */
 
-#define	PACKET_TAG_MAX				21
+#define	PACKET_TAG_MAX				22
 
 /* Packet tag routines */
 struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);

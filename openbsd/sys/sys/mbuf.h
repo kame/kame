@@ -615,7 +615,6 @@ struct m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_PF_TAG			15 /* PF tags */
 #define PACKET_TAG_ENCAP			16 /* encapsulation data */
 #define PACKET_TAG_INET6			17 /* IPv6 info */
-#define PACKET_TAG_VRRP                         18 /* VRRP processing */
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */

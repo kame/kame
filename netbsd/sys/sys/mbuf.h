@@ -708,7 +708,6 @@ struct	m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_ENCAP			2  /* encapsulation data */
 #define PACKET_TAG_ESP				3  /* ESP information */
 #define PACKET_TAG_GIF				8  /* GIF processing done */
-#define PACKET_TAG_VRRP				10 /* VRRP processing */
 #define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
 #define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
 #define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */

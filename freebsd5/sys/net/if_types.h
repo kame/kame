@@ -251,5 +251,4 @@
 #define	IFT_FAITH	0xf2
 #define IFT_DUMMY      	0xf4
 #define IFT_HIF        	0xf5
-#define IFT_VRRP       	0xf6
 #endif /* !_NET_IF_TYPES_H_ */

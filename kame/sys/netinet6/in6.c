@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.341 2003/07/28 11:04:32 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.342 2003/08/05 11:47:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4039,9 +4039,6 @@ in6if_do_dad(ifp)
 	switch (ifp->if_type) {
 #ifdef IFT_DUMMY
 	case IFT_DUMMY:
-#endif
-#ifdef IFT_VRRP
-	case IFT_VRRP:
 #endif
 	case IFT_FAITH:
 		/*

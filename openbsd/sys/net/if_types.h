@@ -271,6 +271,5 @@
 #define	IFT_PFLOG	0xf5		/* Packet filter logging */
 #define	IFT_PFSYNC	0xf6		/* Packet filter state syncing */
 #define IFT_HIF		0xf7
-#define IFT_VRRP        0xf8            /* vrrp virtual interface */
 
 #endif /* _NET_IF_TYPES_H_ */

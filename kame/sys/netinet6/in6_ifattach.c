@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.182 2003/07/08 09:27:06 ono Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.183 2003/08/05 11:47:35 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -913,10 +913,6 @@ in6_ifattach(ifp, altifp)
 	 * quirks based on interface type
 	 */
 	switch (ifp->if_type) {
-#ifdef IFT_VRRP
-	case IFT_VRRP:
-		return;
-#endif
 #ifdef IFT_STF
 	case IFT_STF:
 		/*

@@ -904,7 +904,6 @@ defpseudo faith:	ifnet
 defpseudo stf:		ifnet
 defpseudo irframetty:	irframedrv, irdasir
 defpseudo hif:		ifnet
-defpseudo vrrp:		ifnet, ether
 defpseudo pf:		ifnet
 defpseudo pflog:	ifnet
 defpseudo pfsync:	ifnet
@@ -1127,7 +1126,6 @@ file	net/if_tokensubr.c		token			needs-flag
 file	net/if_tun.c			tun			needs-flag
 file	net/if_vlan.c			vlan			needs-flag
 file	net/if_pppoe.c			pppoe			needs-flag
-file	net/if_vrrp.c			vrrp			needs-flag
 #file net/net_osdep.c
 file	net/pf.c			pf			needs-flag
 file	net/pf_norm.c			pf
