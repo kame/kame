@@ -59,17 +59,6 @@
 #ifndef VIF_H
 #define VIF_H
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <net/route.h>
-#include <net/if.h>
-#include <netinet6/ip6_mroute.h>
-#include <netinet/ip_mroute.h>
-#include "defs.h"
-
 extern int total_interfaces;
 extern int udp_socket;
 extern struct uvif uvifs[];

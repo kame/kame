@@ -45,6 +45,12 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/param.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/ip_mroute.h>
+#include <netinet6/ip6_mroute.h>
 #include <stdio.h>
 #include <netdb.h>
 #include <string.h>

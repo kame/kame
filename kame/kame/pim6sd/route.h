@@ -47,8 +47,6 @@
 #ifndef ROUTE_H
 #define ROUTE_H
 
-#include "mrt.h"
-
 extern u_int32 default_source_preference;
 extern u_int32 default_source_metric;
 

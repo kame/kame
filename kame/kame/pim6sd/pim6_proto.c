@@ -105,13 +105,19 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <net/if.h>
+#include <net/route.h>
 #include <netinet/in.h>
+#include <netinet/ip_mroute.h>
 #include <netinet6/pim6.h>
+#include <netinet6/ip6_mroute.h>
 #include <netinet/ip6.h>
 #include <syslog.h>
 #include <stdlib.h>
-#include "mrt.h"
+#include <stdio.h>
+#include <string.h>
 #include "defs.h"
+#include "mrt.h"
 #include "vif.h"
 #include "debug.h"
 #include "pim6.h"

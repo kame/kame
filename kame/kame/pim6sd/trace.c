@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.7 1999/09/16 08:45:45 jinmei Exp $
+ *  $Id: trace.c,v 1.8 2000/07/14 08:48:01 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -76,25 +76,29 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "vif.h"
-#include "inet6.h"
 #include <sys/ioctl.h>
 #include <sys/uio.h>
-#include <errno.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6.h>
+#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_var.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <syslog.h>
 #include <string.h>
+#include <stdio.h>
 #include "defs.h"
+#include "vif.h"
+#include "mrt.h"
+#include "inet6.h"
 #include "mld6.h"
 #include "kern.h"
 #include "debug.h"

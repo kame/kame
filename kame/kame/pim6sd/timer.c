@@ -47,12 +47,22 @@
  *
  */
 
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/ip_mroute.h>
+#include <netinet6/ip6_mroute.h>
 #include <stdlib.h>
 #include <syslog.h>
+#include <stdio.h>
+#include <string.h>
+#include "defs.h"
 #include "pimd.h"
 #include "mrt.h"
 #include "vif.h"
-#include <netinet6/ip6_mroute.h>
 #include "timer.h"
 #include "debug.h"
 #include "rp.h"

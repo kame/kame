@@ -48,8 +48,6 @@
 #ifndef CALLOUT_H
 #define CALLOUT_H
 
-#include "defs.h"
-
 extern void     callout_init      __P((void));
 extern void     free_all_callouts __P((void));
 extern void     age_callout_queue __P((int));

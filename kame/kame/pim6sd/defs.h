@@ -47,8 +47,6 @@
 #ifndef DEFS_H
 #define DEFS_H
 
-#include <sys/types.h>
-
 #define	TRUE		1
 #define	FALSE		0
 #define ELSE else           /* To make emacs cc-mode happy */

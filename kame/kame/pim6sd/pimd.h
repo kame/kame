@@ -50,11 +50,6 @@
 #ifndef PIMD_H
 #define PIMD_H
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include "defs.h"
-
 #define PIM_PROTOCOL_VERSION		2
 
 /* PIM protocol timers (in seconds) */

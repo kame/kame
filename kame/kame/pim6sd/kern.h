@@ -46,8 +46,6 @@
 
 #ifndef KERN_H 
 #define KERN_H
-#include "vif.h"
-#include "mrt.h"
 
 extern void     k_set_rcvbuf    __P((int socket, int bufsize, int minsize));
 extern void     k_set_hlim       __P((int socket, int t));

@@ -56,8 +56,15 @@
  *
  */
 
+#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/ip_mroute.h>
+#include <netinet6/ip6_mroute.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -65,6 +72,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "pathnames.h"
 #include "defs.h"
 #include "debug.h"

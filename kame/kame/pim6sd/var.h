@@ -26,12 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: var.h,v 1.1 1999/10/29 09:04:54 jinmei Exp $ */
+/* YIPS @(#)$Id: var.h,v 1.2 2000/07/14 08:48:01 itojun Exp $ */
 
 #if !defined(_VAR_H_)
 #define _VAR_H_
-
-#include <sys/socket.h>
 
 #define MAX3(a,b,c) (a > b ? (a > c ? a : c) : (b > c ? b : c))
 

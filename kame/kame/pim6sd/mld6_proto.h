@@ -47,8 +47,6 @@
 #ifndef MLD6_PROTO_H
 #define MLD6_PROTO_H
 
-#include "vif.h"
-
 extern void     query_groups            __P((struct uvif *v));
 extern int      check_grp_membership    __P((struct uvif *v, 
                                              struct sockaddr_in6 *group));

@@ -48,7 +48,17 @@
  */
 
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/ip_mroute.h>
+#include <netinet/ip6.h>
+#include <netinet6/ip6_mroute.h>
+#include <string.h>
+#include <stdio.h>
 #include <syslog.h>
+#include "defs.h"
 #include "pimd.h"
 #include "vif.h"
 #include "mrt.h"
@@ -60,8 +70,6 @@
 #include "kern.h"
 #include "timer.h"
 #include "inet6.h"
-#include <netinet6/ip6_mroute.h>
-#include <netinet/ip6.h>
 #include "routesock.h"
 
 static void process_cache_miss __P((struct mrt6msg * im));

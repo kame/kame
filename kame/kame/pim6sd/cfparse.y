@@ -28,17 +28,21 @@
  */
 %{
 #include <sys/types.h>
-
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/route.h>
 #include <netinet/in.h>
-
+#include <netinet/ip_mroute.h>
+#include <netinet6/ip6_mroute.h>
 #include <arpa/inet.h>
-
 #include <string.h>
 #include <syslog.h>
+#include <stdio.h>
 
 #include "defs.h"
-#include "rp.h"
 #include "vif.h"
+#include "mrt.h"
+#include "rp.h"
 
 #include "var.h"
 #include "vmbuf.h"

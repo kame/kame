@@ -47,9 +47,6 @@
 #ifndef RP_H
 #define RP_H
 
-#include "defs.h"
-#include "mrt.h"
-
 extern cand_rp_t				*cand_rp_list;
 extern grp_mask_t       *grp_mask_list;
 extern cand_rp_t        *segmented_cand_rp_list;

@@ -47,9 +47,6 @@
 
 #ifndef DEBUG_H
 #define DEBUG_H 
-#include <sys/types.h>
-#include <stdio.h>
-
 extern unsigned long	debug;
 extern int log_nmsgs;
 extern FILE *log_fp;

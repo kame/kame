@@ -93,20 +93,25 @@
  *
  */
 
-#include <sys/param.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
+#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include "defs.h"
 #include "mld6.h"
 #include "vif.h"
 #include "debug.h"
 #include "inet6.h"
+#include "mrt.h"
 #include "route.h"
 #include "callout.h"
 #include "timer.h"

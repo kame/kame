@@ -49,9 +49,6 @@
 
 #ifndef PIM6_PROTO_H
 #define PIM6_PROTO_H
-#include "defs.h"
-#include "vif.h"
-#include "mrt.h"
 
 extern build_jp_message_t *build_jp_message_pool;
 extern int               build_jp_message_pool_counter;

@@ -56,13 +56,23 @@
  *
  */
 
+#include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/ip_mroute.h>
+#include <netinet6/ip6_mroute.h>
 #include <errno.h>
 #include <syslog.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include "defs.h"
 #include "vif.h"
 #include "mld6.h"
+#include "mrt.h"
 #include "pim6.h"
 #include "pimd.h"
 #include "route.h"

@@ -47,14 +47,6 @@
 #ifndef PIM6_H
 #define PIM6_H
 
-#include <sys/param.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <netinet6/ip6_mroute.h>
-
 extern struct sockaddr_in6 allpim6routers_group;
 extern char *pim6_send_buf;
 extern int 	pim6_socket;

@@ -51,18 +51,6 @@
 #ifndef MRT_H
 #define MRT_H
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <net/route.h>
-#include <netinet/in.h>
-#include <netinet/ip_mroute.h>
-#include <netinet6/ip6_mroute.h>
-#include <string.h>
-#include "defs.h"
-
-
 /* flags for the mrt entries */
 
 #define MRTF_SPT                0x0001  /* iif toward source                */

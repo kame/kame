@@ -46,7 +46,6 @@
 
 #ifndef INET6_H
 #define INET6_H
-#include "vif.h"
 
 extern int numerichost;
 

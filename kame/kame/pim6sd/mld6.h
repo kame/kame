@@ -47,11 +47,6 @@
 #ifndef MLD6_H
 #define MLD6_H
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-
 #define RECV_BUF_SIZE			64*1024
 #define SO_RECV_BUF_SIZE_MAX	256*1024
 #define SO_RECV_BUF_SIZE_MIN	48*1024

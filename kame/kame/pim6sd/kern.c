@@ -47,22 +47,27 @@
  *
  */
 
+#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <errno.h>
 #include <net/if.h>
-#include <net/route.h>
-#include <netinet/in.h>
-#include <netinet6/ip6_mroute.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/ip_mroute.h>
+#include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_var.h>
 #include <syslog.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include "defs.h"
 #include "pimd.h"
+#include "vif.h"
 #include "inet6.h"
 #include "vif.h"
 #include "mrt.h"
