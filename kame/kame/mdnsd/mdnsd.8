@@ -1,0 +1,107 @@
+.\"     $KAME: mdnsd.8,v 1.1 2000/05/21 05:30:15 itojun Exp $
+.\"
+.\" Copyright (C) 2000 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd May 21, 1999
+.Dt MDNSD 8
+.Os KAME
+.Sh NAME
+.Nm mdnsd
+.Nd multicast DNS resolver
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Fl 46
+.Op Fl d Ar dnsserv
+.Op Fl p Ar port
+.Fl i Ar intface
+.\"
+.Sh DESCRIPTION
+.Nm
+serves as multicast DNS resolver.
+.Nm
+will get unicast DNS queries from local node,
+and forward the queries toward multicast DNS address on interface specified by
+.Ar intface .
+Whenever a reply comes back against the multicast queries,
+.Nm
+will forward the reply to the original querier.
+.Pp
+.Nm
+will also reply to multicast DNS queries from other nodes.
+.Pp
+.Fl 4
+and
+.Fl 6
+controls the address family to use for DNS transport.
+.Pp
+With
+.Fl d ,
+.Nm
+will advertise DNS server
+.Ar dnsserv
+to
+.Li _dns._udp.lcl
+SRV queries.
+.Ar dnsserv
+must be a fully qualified canonical DNS name.
+.Ar dnsserv
+must not point to CNAME record.
+Also, it must carry terminating period, like
+.Dq Li ns.ietf.org. .
+.Pp
+.Fl p
+lets you change the listening UDP port.
+.\"
+.Sh SEE ALSO
+.Rs
+.%A Bernard Aboba
+.%A Dave Thaler
+.%A Levon Esibov
+.%D March 9, 2000
+.%T Multicast DNS
+.%R internet draft
+.%N draft-aboba-dnsext-mdns-00.txt
+.%O work in progress material
+.Re
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+.Nm
+does not become daemon at this moment.
+.Pp
+.Nm
+does not handle DNS queries/replies over TCP transport.
+.Pp
+Some of
+.Pq or most of
+the features are not implemented yet.
