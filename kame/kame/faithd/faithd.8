@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.17 2000/11/19 11:45:38 itojun Exp $
+.\"	$KAME: faithd.8,v 1.18 2000/12/02 21:39:14 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -137,22 +137,23 @@ You can also specify
 .Ar serverargs
 for the arguments for the local daemon.
 .Pp
-If
-.Fl d
-is given, debugging information will be generated using
+The following options are available:
+.Bl -tag -width indent
+.It Fl d
+Debugging information will be generated using
 .Xr syslog 3 .
-If
-.Fl p
-is given,
-.Nm
-will use privileged TCP port number as source port,
+.It Fl f Ar configfile
+Specify a configuration file for access control.
+See below.
+.It Fl p
+Use privileged TCP port number as source port,
 for IPv4 TCP connection toward final destination.
 For relaying
 .Xr ftp 1
 and
 .Xr rlogin 1 ,
-.Fl p
-is not necessary as special program code is supplied.
+this flag is not necessary as special program code is supplied.
+.El
 .Pp
 .Nm
 will relay both normal and out-of-band TCP data.
