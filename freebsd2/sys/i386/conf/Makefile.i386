@@ -39,6 +39,8 @@ INCLUDES+= -I$S/../include
 INCLUDES+= -I/usr/include
 .endif
 COPTS=	${INCLUDES} ${IDENT} -DKERNEL
+# KAME mandatory options
+COPTS+=	-D_KERNEL -DTCP6
 CFLAGS=	${COPTFLAGS} ${CWARNFLAGS} ${DEBUG} ${COPTS}
 LOAD_ADDRESS?=	F0100000
 .if defined(PROF)

@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: GENERIC.v6,v 1.1 1999/08/05 14:32:50 itojun Exp $
+#	$Id: GENERIC.v6,v 1.2 1999/09/07 11:06:21 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -32,10 +32,6 @@ options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
-
-# for code sharing - mandatory
-options		_KERNEL
-options		"TCP6"
 
 # special kernel for TAHI test team - not for general users
 ###options		TAHI
