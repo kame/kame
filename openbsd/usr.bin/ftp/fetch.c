@@ -779,8 +779,9 @@ int
 isurl(p)
 	const char *p;
 {
-	if (strncasecmp(p, FTP_URL, sizeof(FTP_URL) - 1) == 0
-	 || strncasecmp(p, HTTP_URL, sizeof(HTTP_URL) - 1) == 0) {
+	if (strncasecmp(p, FTP_URL, sizeof(FTP_URL) - 1) == 0 ||
+	    strncasecmp(p, HTTP_URL, sizeof(HTTP_URL) - 1) == 0 ||
+	    strncasecmp(p, FILE_URL, sizeof(FILE_URL) - 1) == 0) {
 		return 1;
 	}
 	return 0;
