@@ -63,6 +63,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <errno.h>
 
 #ifndef HAVE_PORTABLE_PROTOTYPE
 #include "cdecl_ext.h"
@@ -516,9 +517,11 @@ explore_fqdn(pai, hostname, servname, res)
 	 * XXX errno?
 	 */
 	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0)
-		return 0;
-	close(s);
+	if (s < 0) {
+		if (errno != EMFILE)
+			return 0;
+	} else
+		close(s);
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -637,9 +640,11 @@ explore_null(pai, hostname, servname, res)
 	 * XXX errno?
 	 */
 	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0)
-		return 0;
-	close(s);
+	if (s < 0) {
+		if (errno != EMFILE)
+			return 0;
+	} else
+		close(s);
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
