@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.20 2003/04/24 06:28:25 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.21 2003/08/14 10:34:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
+
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+#include <sys/callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
+#endif
 
 #include <net/route.h>
 

@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.3 2003/08/07 02:05:27 t-momose Exp $	*/
+/*	$KAME: mpa.c,v 1.4 2003/08/14 10:34:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,13 +30,19 @@
  */
 
 /*
- * $Id: mpa.c,v 1.3 2003/08/07 02:05:27 t-momose Exp $
+ * $Id: mpa.c,v 1.4 2003/08/14 10:34:09 keiichi Exp $
  */
 
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/time.h>
+
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+#include <sys/callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
+#endif
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
