@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.77 2001/11/16 11:51:16 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.78 2001/11/19 07:50:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -130,7 +130,9 @@ static int mip6_babr_destopt_create __P((struct ip6_dest **,
 static void mip6_find_offset __P((struct mip6_buffer *));
 static void mip6_align_destopt __P((struct mip6_buffer *));
 static caddr_t mip6_add_opt2dh __P((caddr_t, struct mip6_buffer *));
+#ifndef MIP6_DRAFT13
 static int mip6_add_subopt2dh __P((u_int8_t *, struct mip6_buffer *));
+#endif
 
 void
 mip6_init()
@@ -1451,8 +1453,10 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct hif_softc *sc;
 {
 	struct ip6_opt_binding_update bu_opt, *bu_opt_pos;
+#ifndef MIP6_DRAFT13
 	int suboptlen;
 	struct mip6_subopt_authdata *authdata;
+#endif
 	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
 	struct mip6_bu *hrmbu;
@@ -1563,8 +1567,10 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		/* when registering to a CN, the prefixlen must be 0. */ 
 		bu_opt.ip6ou_prefixlen = 0;
 	}
-#endif /* MIP6_DRAFT13 */
+	bu_opt.ip6ou_seqno = htons(mbu->mbu_seqno);
+#else
 	bu_opt.ip6ou_seqno = mbu->mbu_seqno;
+#endif /* MIP6_DRAFT13 */
 	if ((mbu->mbu_flags & IP6_BUF_ACK) == 0) {
 		/*
 		 * increase the sequence number of the binding update
@@ -1794,7 +1800,11 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	ba_opt.ip6oa_type = IP6OPT_BINDING_ACK;
 	ba_opt.ip6oa_len = IP6OPT_BALEN; /* XXX consider authdata */
 	ba_opt.ip6oa_status = status;
+#ifdef MIP6_DRAFT13
+	ba_opt.ip6oa_seqno = htons(seqno);
+#else
 	ba_opt.ip6oa_seqno = seqno;
+#endif
 	bcopy((caddr_t)&lifetime, (caddr_t)ba_opt.ip6oa_lifetime,
 	      sizeof(lifetime));
 	bcopy((caddr_t)&refresh, (caddr_t)ba_opt.ip6oa_refresh,
@@ -2068,13 +2078,15 @@ mip6_add_opt2dh(opt, dh)
 	return pos;
 }
 
+#ifndef MIP6_DRAFT13
 static int
 mip6_add_subopt2dh(subopt, dh)
 	u_int8_t *subopt; /* MIP6 sub-options */
 	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH  */
 {
 	int suboptlen = 0;
-	u_int8_t type, len, padn, off;
+	u_int8_t type, padn;
+	u_int8_t len, off;
 	int rest;
 
 	/* verify input */
@@ -2133,6 +2145,7 @@ mip6_add_subopt2dh(subopt, dh)
 
 	return (suboptlen);
 }
+#endif /* !MIP6_DRAFT13 */
 
 /*
  ******************************************************************************

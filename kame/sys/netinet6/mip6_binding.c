@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.35 2001/11/16 09:48:53 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.36 2001/11/19 07:50:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -91,6 +91,10 @@ struct callout mip6_bc_ch;
 int mip6_bu_count = 0;
 int mip6_bc_count = 0;
 
+#ifdef MIP6_DRAFT13
+int mip6_use_ipsec = 0;
+#endif
+
 /* binding update functions. */
 static int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
 static int mip6_bu_list_remove_all __P((struct mip6_bu_list *));
@@ -133,10 +137,11 @@ static int mip6_tunnel_control __P((int, void *,
 				    const struct encaptab **));
 static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
 				    u_int8_t));
+#ifndef MIP6_DRAFT13
 static int mip6_verify_authdata __P((struct mbuf *,
 				     struct ip6_opt_binding_update *,
 				     struct mip6_subopt_authdata *));
-
+#endif
 
 #ifdef MIP6_DEBUG
 void mip6_bu_print __P((struct mip6_bu *));
@@ -717,6 +722,7 @@ mip6_validate_bu(m, opt)
 	struct mbuf *n;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_opt_binding_update *bu_opt;
+	MIP6_SEQNO_T seqno;
 	struct mip6_bc *mbc;
 #ifndef MIP6_DRAFT13
 	int error = 0;
@@ -730,7 +736,8 @@ mip6_validate_bu(m, opt)
 	/* Make sure that the BU is protected by an AH (see 4.4, 10.12). */
 #ifdef IPSEC
 #ifndef __OpenBSD__
-	if (!((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
+	if (!mip6_use_ipsec &&
+	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
 		mip6log((LOG_NOTICE, "%s:%d: an unprotected BU from %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
@@ -841,13 +848,18 @@ mip6_validate_bu(m, opt)
 		/* no BC yet.  create it later. */
 		return (0);
 	}
-	if (MIP6_LEQ(bu_opt->ip6ou_seqno, mbc->mbc_seqno)) {
+#ifdef MIP6_DRAFT13
+	seqno = ntohs(bu_opt->ip6ou_seqno);
+#else
+	seqno = bu_opt->ip6ou_seqno;
+#endif
+	if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
 			 "%s:%d: received sequence no (%d) <= current "
 			 "seq no (%d) in BU from host %s.\n",
 			 __FILE__, __LINE__,
-			 bu_opt->ip6ou_seqno,
+			 seqno,
 			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
 #ifndef MIP6_DRAFT13
 		/* seqno is too small.  send TOO_SMALL error. */
@@ -919,7 +931,11 @@ mip6_process_bu(m, opt)
 	}
 
 	lifetime = ntohl(*(u_int32_t *)bu_opt->ip6ou_lifetime);
+#ifdef MIP6_DRAFT13
+	seqno = ntohs(bu_opt->ip6ou_seqno);
+#else
 	seqno = bu_opt->ip6ou_seqno;
+#endif
 
 	/*
 	 * lifetime != 0 and haddr != coa means that this BU is a reqeust
@@ -1065,7 +1081,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		 */
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
 				    MIP6_BA_STATUS_NOT_HOME_SUBNET,
-				    bu_opt->ip6ou_seqno,
+				    seqno,
 				    0,
 				    0)) {
 			mip6log((LOG_ERR,
@@ -1086,7 +1102,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			/* XXX NOT_HOME_AGENT */
 			mip6_bc_send_ba(haaddr, haddr0, coa,
 					MIP6_BA_STATUS_NOT_HOME_AGENT,
-					bu_opt->ip6ou_seqno,
+					seqno,
 					0,
 					0);
 			return (0);
@@ -1115,7 +1131,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				 __FILE__, __LINE__));
 			mip6_bc_send_ba(haaddr, haddr0, coa,
 					MIP6_BA_STATUS_UNSPECIFIED,
-					bu_opt->ip6ou_seqno,
+					seqno,
 					0,
 					0);
 			return (error);
@@ -1162,7 +1178,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					 __FILE__, __LINE__));
 				mip6_bc_send_ba(haaddr, haddr0, coa,
 						MIP6_BA_STATUS_UNSPECIFIED,
-						bu_opt->ip6ou_seqno,
+						seqno,
 						0,
 						0);
 				return (error);
@@ -1173,7 +1189,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	/* return BA */
 	if (mip6_bc_send_ba(haaddr, haddr0, coa,
 			    MIP6_BA_STATUS_ACCEPTED,
-			    bu_opt->ip6ou_seqno,
+			    seqno,
 			    0,
 			    0)) {
 		mip6log((LOG_ERR,
@@ -1267,7 +1283,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		 */
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
 				    MIP6_BA_STATUS_NOT_HOME_SUBNET,
-				    bu_opt->ip6ou_seqno,
+				    seqno,
 				    0,
 				    0)) {
 			mip6log((LOG_ERR,
@@ -1425,7 +1441,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		/* return BA */
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
 				    MIP6_BA_STATUS_ACCEPTED,
-				    bu_opt->ip6ou_seqno,
+				    seqno,
 				    lifetime,
 				    lifetime / 2 /* XXX */)) {
 			mip6log((LOG_ERR,
@@ -1725,6 +1741,7 @@ mip6_validate_ba(m, opt)
 {
 	struct ip6_hdr *ip6;
 	struct ip6_opt_binding_ack *ba_opt;
+	MIP6_SEQNO_T		   seqno;
 	struct mip6_bu             *mbu;
 	struct hif_softc           *sc;
 
@@ -1735,7 +1752,8 @@ mip6_validate_ba(m, opt)
 	/* Make sure that the BA is protected by an AH (see 4.4, 10.12). */
 #ifdef IPSEC
 #ifndef __OpenBSD__
-	if (!((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
+	if (!mip6_use_ipsec &&
+	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: an unprotected BA from %s.\n",
 			 __FILE__, __LINE__,
@@ -1781,7 +1799,10 @@ mip6_validate_ba(m, opt)
 		/* silently ignore */
 		return (1);
 	}
-#ifndef MIP6_DRAFT13
+#ifdef MIP6_DRAFT13
+	seqno = ntohs(ba_opt->ip6oa_seqno);
+#else
+	seqno = ba_opt->ip6oa_seqno;
 	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
 		/*
 		 * our HA has a greater seq number in her binging
@@ -1792,14 +1813,15 @@ mip6_validate_ba(m, opt)
 		 */
 		goto validate_ba_valid;
 	}
-#endif /* !MIP6_DRAFT13 */
-	else if (ba_opt->ip6oa_seqno != mbu->mbu_seqno) {
+	else
+#endif /* MIP6_DRAFT13 */
+	if (seqno != mbu->mbu_seqno) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
 			 "%s:%d: unmached sequence no "
 			 "(%d recv, %d sent) from host %s.\n",
 			 __FILE__, __LINE__,
-			 ba_opt->ip6oa_seqno,
+			 seqno,
 			 mbu->mbu_seqno,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore */
@@ -1977,6 +1999,7 @@ mip6_process_ba(m, opt)
 	return (0);
 }
 
+#ifndef MIP6_DRAFT13
 static int
 mip6_verify_authdata(m, bu_opt, authdata)
 	struct mbuf *m;
@@ -2019,6 +2042,7 @@ mip6_authdata_create(src, dst, coa, bu_opt)
 
 	return (authdata);
 }
+#endif /* !MIP6_DRAFT13 */
 
 /*
  * binding request management functions
