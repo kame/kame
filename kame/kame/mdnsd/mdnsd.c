@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.51 2001/11/21 04:19:31 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.52 2001/11/21 04:22:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -63,9 +63,9 @@ const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
-static int mcasthops6 = 255;
+static int mcasthops6 = 1;
 static int mcastloop6 = 0;
-static unsigned char mcasthops4 = 255;
+static unsigned char mcasthops4 = 1;
 static unsigned char mcastloop4 = 0;
 int dflag = 0;
 int fflag = 0;
