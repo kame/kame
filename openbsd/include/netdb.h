@@ -193,7 +193,9 @@ struct	protoent {
 #define NI_NOFQDN	4	/* return a short name if in the local domain */
 #define NI_NAMEREQD	8	/* fail if either host or service name is unknown */
 #define NI_DGRAM	16	/* look up datagram service instead of stream */
+#if 0 /* obsolete */
 #define NI_WITHSCOPEID	32	/* KAME hack: attach scopeid to host portion */
+#endif
 
 #define NI_MAXHOST	MAXHOSTNAMELEN	/* max host name returned by getnameinfo */
 #define NI_MAXSERV	32	/* max serv. name length returned by getnameinfo */
