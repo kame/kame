@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.54 2000/06/27 16:51:34 itojun Exp $
+$KAME: COVERAGE,v 1.55 2000/07/04 16:42:54 itojun Exp $
 
 
 x: supported/integrated
@@ -41,7 +41,7 @@ KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 		*BSD	net	open	free	net15	open27	free40	bsdi42
 		--	--	--	--	--	--	--	---
 KAME IPv6 as of	latest	early	early	early	notyet	late	early
-			june00	june00	nov99		may00	nov99
+			jun00	jun00	jul00		may00	nov99
 
 IPv4 IPsec	KAME	KAME	openbsd	KAME	notyet	openbsd	KAME
 
@@ -52,7 +52,7 @@ IPv6 IPsec	KAME	KAME	openbsd	KAME	notyet	-	KAME
 
 KAME IPsec as of
 		latest	12jun00	-	early	notyet	-	early
-					nov99			nov99
+					jul00			nov99
 
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -60,18 +60,18 @@ advanced API	2292bis	2292	2292	2292	notyet	2292	2292
 
 getifaddrs	x	x	x	-	notyet	x	-
 
-icmp6 nodeinfo	05	05	05	05-	notyet	05-	05-
+icmp6 nodeinfo	05	05	05	05	notyet	05-	05-
 			(*1)	(*1)	(*1)		(*1)	(*1)
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
 
-nd6_proxyall	-	-	-	x	notyet	-	x
+nd6_proxyall	-	-	-	-	notyet	-	x
 
-ndp -s proxy	x	x	x	-	notyet	x	-
+ndp -s proxy	x	x	x	x	notyet	x	-
 
-ndp -I		x	x	x	-	notyet	x	-
+ndp -I		x	x	x	x	notyet	x	-
 
-NUD on p2p	x	x	x	-	notyet	x	-
+NUD on p2p	x	x	x	x	notyet	x	-
   (ndp -i)
 
 NUD on p2p only if real neighbor
@@ -79,11 +79,11 @@ NUD on p2p only if real neighbor
      (*1) temporary workaround (no NUD on p2p by default)
 
 icmp6 beyondscope
-		x	x	x	-	notyet	(*1)	-
+		x	x	x	x	notyet	(*1)	-
     (*1) supports it, but has bug in link-local address check.
 
 old/new mrt6msg (old: overlay with ip6 header, new: with MLD6 header)
-		new	(*1)	(*1)	old	notyet	old	old
+		new	(*1)	(*1)	(*1)	notyet	old	old
     (*1) supports both new/old mrt6msg, to provide binary backward compat
 
 CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	ALIGN	ALIGN
@@ -97,7 +97,7 @@ CMSG passing in unix domain socket obeys CMSG_xx
 		-	x	-	x	notyet	-	x
 
 getaddrinfo obeys configured resolv order
-		(+)	x	x	-	notyet	x	-
+		(+)	x	x	x	notyet	x	-
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
 		-	-	-	?	notyet	-	?
@@ -113,10 +113,9 @@ getnameinfo uses EAI_xx as return value (2553bis)
 
 ALTQ		(+)	-	-	-	notyet	-	-
 
-IPsec		(+)	x	(*1)	(*2)	notyet	(*1)	(*2)
+IPsec		(+)	x	(*1)	x	notyet	(*1)	(*2)
     (*1) OpenBSD IPsec is available for IPv4 IPsec.  OpenBSD team is working
 	 on OpenBSD IPsec support for IPv6 IPsec (no KAME IPsec is integrated)
-    (*2) policy management code is different from post-dec99 code
 
 NAT/PT		(+)	-	-	-	notyet	-	-
 
@@ -127,25 +126,25 @@ IPv6 RPC	-	x	-	-	notyet	-	-
 IPv6 NFS	-	x	-	-	notyet	-	-
 
 resolver support for IPv6 transport
-		(+)	(*1)	-	-	notyet	-	-
+		(+)	(*1)	-	?	notyet	-	-
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
 scoped addr in /etc/hosts (getaddrinfo)
-		(+)	x	x	-	notyet	x	-
+		(+)	x	x	x	notyet	x	-
 
 scoped addr in /etc/resolv.conf "nameserver" line
 		(+)	x	-	-	notyet	-	-
 
 ipsec socket passing to ip{6,}_output
-		aux	aux	-	rcvif	notyet	-	rcvif
-					+ flags			+ flags
+		aux	aux	-	aux	notyet	-	rcvif
+								+ flags
 
 source address selection
-		latest	may00	may00	nov99	notyet	feb00	nov99
-					+ sitelocal		+ sitelocal
+		latest	may00	may00	may00	notyet	feb00	nov99
+								+ sitelocal
 
-6to4 intface	x	x	-	gifhack	notyet	-	gifhack
+6to4 intface	x	x	-	x	notyet	-	gifhack
 
 basic userland	x	x	x	x	notyet	x	x
 
