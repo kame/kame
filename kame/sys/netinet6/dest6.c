@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.58 2003/06/26 09:42:49 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.59 2003/07/11 13:21:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -370,7 +370,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 			 mh.ip6m_type == IP6M_CAREOF_TEST_INIT)
 			return (-1);
 		else if (mh.ip6m_type > IP6M_LAST_TYPE)
-			return (0);
+			swap = 1;	/* must be sent BE with UNRECOGNIZED_TYPE */
 	}
 
 	if (swap) {
