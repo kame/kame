@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.27 2000/05/24 09:56:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.28 2000/05/30 01:05:20 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -194,6 +194,7 @@ agg_i2recv(iph1, msg)
 {
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
+	vchar_t *satmp = NULL;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -221,7 +222,7 @@ agg_i2recv(iph1, msg)
 			pa->type, ISAKMP_NPTYPE_SA);
 		goto end;
 	}
-	if (isakmp_p2ph(&iph1->sa, pa->ptr) < 0)
+	if (isakmp_p2ph(&satmp, pa->ptr) < 0)
 		goto end;
 	pa++;
 
@@ -342,6 +343,8 @@ agg_i2recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+	if (satmp)
+		vfree(satmp);
 	return error;
 }
 
