@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1793 2001/07/21 01:31:40 itojun Exp $
+$KAME: CHANGELOG,v 1.1794 2001/07/21 04:32:28 itojun Exp $
 
 <200107>
+Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
+	* sys/netinet6/nd6_rtr.c: simplify default router list manipulation.
+	  try to install multiple default routes into routing table, if
+	  there are multiple RA sources (routers).
+
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	* *bsd*/sys/net/route.c: make equal() more pickier about sa_len,
 	  to avoid possible data buffer overrun.
