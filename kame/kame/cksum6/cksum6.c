@@ -1,3 +1,5 @@
+/*	$KAME: cksum6.c,v 1.3 2000/11/24 11:36:15 itojun Exp $	*/
+
 /*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -118,10 +120,12 @@ main(argc, argv)
 		printf("unknown proto %x\n", packet[6]);
 		break;
 	}
-printf("off=%d, len=%d, input=%d, proto=%d\n", off, len, i, packet[6]);
-	if (all) {
+	if (debug)
+		printf("off=%d, len=%d, input=%d, proto=%d\n", off, len, i,
+		    packet[6]);
+	if (all)
 		cksum = in_cksum(packet, len);
-	} else {
+	else {
 		u_char ipovly[40];
 		bcopy(&packet[8], &ipovly[0], 32);
 		ipovly[32] = 0;
@@ -174,19 +178,19 @@ in_cksum(addr, len)
 	register int sum = 0;
 	u_short answer = 0;
 
-  if (debug) {
-    u_char *p = (u_char *)addr;
-    int i;
-    printf("checksum packets: \n\t");
-    for (i = 0; i < len; i++) {
-	printf("%02x", p[i]);
-	if (i % 16 == 15)
-	    printf("\n\t");
-	else if (i % 2 == 1)
-	    printf(" ");
-    }
-    printf("\n");
-  }
+	if (debug) {
+		u_char *p = (u_char *)addr;
+		int i;
+		printf("checksum packets: \n\t");
+		for (i = 0; i < len; i++) {
+			printf("%02x", p[i]);
+			if (i % 16 == 15)
+				printf("\n\t");
+			else if (i % 2 == 1)
+				printf(" ");
+		}
+		printf("\n");
+	}
 	/*
 	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
 	 * sequential 16 bit words to it, and at the end, fold back all the
