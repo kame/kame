@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1103 2000/07/05 03:03:21 itojun Exp $
+$Id: CHANGELOG,v 1.1104 2000/07/05 08:18:24 suz Exp $
 
 <200006>
+Wed Jul  5 12:08:16 JST 2000  suz@kame.net
+	* bsdi3/sys/conf/files.i386, bsdi3/sys/conf/GENERIC.KAME,
+	  bsdi3/sys/i386/isa/{if_wi.c,if_wireg.h,wiioctl.h}
+	  bsdi3/usr.sbin/wiconfig, bsdi3/usr.sbin/Makefile
+	  ported WaveLAN driver and its configuration program from bsdi4
+	  (geertj permitted it. Thanks!) 
+
 Wed Jul  5 11:30:39 JST 2000  itojun@iiljab.net
 	* {netbsd,openbsd,freebsd4}/lib/libinet6/getaddrinfo.c,
 	  kame/libinet6/getaddrinfo.c:
