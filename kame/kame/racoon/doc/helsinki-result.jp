@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.27 2001/08/15 13:05:17 sakane Exp $
+$KAME: helsinki-result.jp,v 1.28 2001/08/16 04:55:34 itojun Exp $
 
 
 generic
@@ -272,11 +272,21 @@ Netoctave
 
 
 isakmpd (jakob@openbsd)
+	Tue Aug 14
 	IPv4, ESP, transport mode
 	phase 1 3DES + SHA1, group 2, lifetime = 10min
 	phase 2 AES + SHA1, group 2, lifetime = 2min
 
 	問題なし。
+
+	Wed Aug 15 21:25:49 JST 2001
+	IPv6, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES + SHA1, group 2, lifetime = 2min
+
+	向こうはmain modeでFQDNをIDに使いたがったが、こういうエラーで怒られる。
+	sakaneはこれはwgでの合意と思っているが、要確認。
+2001-08-15 21:14:41: ERROR: ipsec_doi.c:3063:ipsecdoi_checkid1(): Expecting IP address type in main mode, but FQDN.
 
 
 Fitec
@@ -304,6 +314,7 @@ SSH
 
 	500 proposalを投げてくる。proposal#は1byteなので弾くべき。
 	racoonは最初に全部パースしてるみたい。
+
 
 freeswan
 	IPv4, IPComp + ESP, transport mode
