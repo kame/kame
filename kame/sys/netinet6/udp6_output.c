@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.54 2001/12/27 05:12:38 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.55 2002/01/20 10:40:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,13 +473,13 @@ udp6_output(in6p, m, addr6, control)
 		if (flags & IP_SENDONES) {
 			/* See the comment in udp_output(). */
 			ui->ui_dst.s_addr = INADDR_BROADCAST;
-			udp6->uh_sum = in_cksum(m, ulen);
+			udp6->uh_sum = in_cksum(m, hlen + plen);
 			bcopy(&faddr->s6_addr[12], &ui->ui_dst,
 			    sizeof(ui->ui_dst));
 		} else {
 			bcopy(&faddr->s6_addr[12], &ui->ui_dst,
 			    sizeof(ui->ui_dst));
-			udp6->uh_sum = in_cksum(m, ulen);
+			udp6->uh_sum = in_cksum(m, hlen + plen);
 		}
 #else
 #error OS not supported
