@@ -746,7 +746,7 @@ skip_ipsec:
 	if (error == EMSGSIZE)
 		goto bad;
 
-	for (m = m0; m; m = m0) {
+	for (; m; m = m0) {
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
 		if (error == 0) {

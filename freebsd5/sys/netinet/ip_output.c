@@ -1173,7 +1173,7 @@ pass:
 	if (error == EMSGSIZE)
 		goto bad;
 
-	for (m = m0; m; m = m0) {
+	for (; m; m = m0) {
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
 #ifdef IPSEC
