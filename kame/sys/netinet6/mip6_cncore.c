@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.6 2003/06/16 09:34:28 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.7 2003/06/19 18:33:34 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1412,7 +1412,6 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
 	return (bcmp(mopt->mopt_auth + 2, authdata, MOPT_AUTH_LEN(mopt)));
 }
 
-/* For CN side function */
 int
 mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore_co_nonce, key_bm)
 	struct sockaddr_in6 *hoa_sa;
@@ -1906,7 +1905,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		mip6stat.mip6s_rrauthfail++;
 		if (bi.mbc_status >= IP6MA_STATUS_HOME_NONCE_EXPIRED &&
 		    bi.mbc_status <= IP6MA_STATUS_NONCE_EXPIRED) {
-			bi.mbc_seqno = mbc->mbc_seqno;
 			bi.mbc_send_ba = 1;
 	 		error = EINVAL;
 			goto send_ba;
