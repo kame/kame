@@ -244,6 +244,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
+#endif /*TCP4*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC | PR_ADDR,
   rip6_input,	rip6_output,	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -272,7 +273,6 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
-#endif /*bsdi4*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_DSTOPTS,PR_ATOMIC|PR_ADDR,
   dest6_input,	0,	 	0,		0,
   0,	  
