@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.177 2003/05/29 08:59:51 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.178 2003/11/11 05:00:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1732,7 +1732,7 @@ isakmp_post_getspi(iph2)
 #endif
 
 	/* don't process it because there is no suitable phase1-sa. */
-	if (iph2->ph1->status == PHASE2ST_EXPIRED) {
+	if (iph2->ph1->status == PHASE1ST_EXPIRED) {
 		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"the negotiation is stopped, "
 			"because there is no suitable ISAKMP-SA.\n");
