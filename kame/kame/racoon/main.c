@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.32 2001/04/03 15:51:56 thorpej Exp $	*/
+/*	$KAME: main.c,v 1.33 2001/04/19 08:49:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,13 @@ int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 static int loading_sa = 0;	/* install sa when racoon boots up. */
 
-static char version[] = "@(#)racoon 20001216 sakane@ydc.co.jp";
+#define RACOON_VERSION	"20001216 sakane@ydc.co.jp"
+#ifdef RACOON_PKG_VERSION
+static char version0[] = "@(#)package version " RACOON_PKG_VERSION ;
+static char version[] = "@(#)internal version " RACOON_VERSION ;
+#else
+static char version[] = "@(#)racoon 20001216 " RACOON_VERSION ;
+#endif
 
 int main __P((int, char **));
 static void Usage __P((void));
@@ -150,6 +156,9 @@ main(ac, av)
 	ploginit();
 	random_init();
 
+#ifdef RACOON_PKG_VERSION
+	plog(LLV_INFO, LOCATION, NULL, "%s\n", version0);
+#endif
 	plog(LLV_INFO, LOCATION, NULL, "%s\n", version);
 	plog(LLV_INFO, LOCATION, NULL, "@(#)"
 	"This product linked software developed by the OpenSSL Project "
