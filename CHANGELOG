@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2356 2003/03/12 16:03:32 jinmei Exp $
+$KAME: CHANGELOG,v 1.2357 2003/03/14 05:43:43 jinmei Exp $
 
 <200303>
+2003-03-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/configure.in: checked if __func__ works with
+	string concatenation.
+	From: Masahiro =Rhythm Drive= Ishiyama <masahiro@isl.rdc.toshiba.co.jp>
+
 2003-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rafixd: this is a new application.  The rafixd daemon
 	invalidates bogus RAs by overriding them with the 0 router
