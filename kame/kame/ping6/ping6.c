@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.143 2001/11/09 07:35:17 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.144 2001/11/10 08:06:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -923,9 +923,14 @@ main(argc, argv)
 			err(1, "UDP setsockopt(IPV6_PKTINFO)");
 
 		if (hoplimit != -1 &&
-		    setsockopt(dummy, IPPROTO_IPV6, IPV6_HOPLIMIT,
+		    setsockopt(dummy, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
 		    (void *)&hoplimit, sizeof(hoplimit)))
-			err(1, "UDP setsockopt(IPV6_HOPLIMIT)");
+			err(1, "UDP setsockopt(IPV6_UNICAST_HOPS)");
+
+		if (hoplimit != -1 &&
+		    setsockopt(dummy, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+		    (void *)&hoplimit, sizeof(hoplimit)))
+			err(1, "UDP setsockopt(IPV6_MULTICAST_HOPS)");
 
 		if (rthdr &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_RTHDR,
