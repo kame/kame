@@ -333,10 +333,12 @@ checkremote()
 		hints.ai_socktype = SOCK_STREAM;
 		res = NULL;
 		error = getaddrinfo(name, NULL, &hints, &res);
-		if (error) {
+		if (error || !res->ai_canonname) {
 			(void)snprintf(errbuf, sizeof(errbuf),
 				"unable to get official name for local machine %s: %s",
 				name, gai_strerror(error));
+			if (res)
+				freeaddrinfo(res);
 			return errbuf;
 		} else {
 			strncpy(name, res->ai_canonname, sizeof(name) - 1);
@@ -351,10 +353,12 @@ checkremote()
 		hints.ai_socktype = SOCK_STREAM;
 		res = NULL;
 		error = getaddrinfo(RM, NULL, &hints, &res);
-		if (error) {
+		if (error || !res->ai_canonname) {
 			(void)snprintf(errbuf, sizeof(errbuf),
 				"unable to get official name for local machine %s: %s",
 				RM, gai_strerror(error));
+			if (res)
+				freeaddrinfo(res);
 			return errbuf;
 		}
   
