@@ -277,7 +277,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 #ifdef IPSEC
 	if (ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL) != 0) {
 		m_freem(m);
-		return NULL;
+		return;
 	}
 #endif /*IPSEC*/
 	(void) ip_output(m, NULL, ro, 0, NULL);
