@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.6 2000/03/11 08:01:51 itojun Exp $
+.\"     $KAME: stf.4,v 1.7 2000/03/11 14:22:15 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -101,11 +101,23 @@ to make your node generate improper tunnelled packet.
 Administrators must take caution when enabling the interface.
 It is recommended to filter/audit
 incoming IPv4 packet with IP protocol number 41, as necessary.
+To prevent possible DoS attacks,
+.Nm
+interface filters out packets with the following property:
+.Bl -bullet
+.It
+Packets with IPv4 multicast address as outer destination
+.It
+Packets with 6to4 address based on IPv4 multicast address, as inner destination/source
+.It
+Packets with 6to4 address based on 0.0.0.0, as inner destination/source
+.It
+Packets with 6to4 address based on 255.255.255.255, as inner destination/source
+.El
+.Pp
 You may also want to reject encapsulated IPv6 packets with
 suspicious 6to4 addresses, like
-.Li 2002:7f00::/24
-and/or
-.Li 2002:0000:0000::/48 .
+.Li 2002:7f00::/24.
 .\"
 .Sh EXAMPLES
 Note that
