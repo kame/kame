@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2724 2005/02/22 13:54:27 suz Exp $
+$KAME: CHANGELOG,v 1.2725 2005/02/22 14:00:17 suz Exp $
 
 <200502>
+2005-02-22  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/net/pf.c, freebsd5/sys/contrib/pf/net/pf.c: fixed a bug that
+	  PF discards every packet with option headers.
+
+	  Reported by: Stig Venaas
+
 2005-02-22  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/ip6_input.c: fixed PF malfunction for inbound
 	  IPv6 traffic on freebsd5.
