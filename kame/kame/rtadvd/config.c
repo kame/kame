@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.46 2001/06/02 18:40:26 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.47 2001/06/02 18:50:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -92,7 +92,7 @@ getconfig(intface)
 
 #define MUSTHAVE(var, cap)	\
     do {								\
-	int t;								\
+	long long t;							\
 	if ((t = agetnum(cap)) < 0) {					\
 		fprintf(stderr, "rtadvd: need %s for interface %s\n",	\
 			cap, intface);					\
