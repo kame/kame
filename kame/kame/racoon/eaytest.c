@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.34 2001/09/07 01:33:26 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.35 2001/09/07 01:35:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -760,8 +760,10 @@ main(ac, av)
 			(func[i].func)(ac, av);
 	} else {
 		for (i = 0; i < len; i++) {
-			if (strcmp(*av, func[i].name) == 0)
+			if (strcmp(*av, func[i].name) == 0) {
 				(func[i].func)(ac, av);
+				break;
+			}
 		}
 		if (i == len)
 			Usage();
