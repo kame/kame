@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2256 2002/10/18 10:07:39 suz Exp $
+$KAME: CHANGELOG,v 1.2257 2002/10/20 08:27:17 jinmei Exp $
 
 <200210>
 Fri Oct 18 18:57:42 JST 2002	suz@crl.hitachi.co.jp
@@ -25,7 +25,6 @@ Fri Oct 18 18:57:42 JST 2002	suz@crl.hitachi.co.jp
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* netbsd/sys/net/route.h: used padding in the route structure
 	instead of using sockaddr_storage.  (See the change on Oct 7 below.)
-	the change above.
 
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_control): do not differentiate
