@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.20 2000/03/12 10:55:26 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.21 2000/03/12 11:43:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -244,6 +244,9 @@ stf_encapcheck(m, off, proto, arg)
 
 	sc = (struct stf_softc *)arg;
 	if (sc == NULL)
+		return 0;
+
+	if ((sc->sc_if.if_flags & IFF_UP) == 0)
 		return 0;
 
 	if (proto != IPPROTO_IPV6)
