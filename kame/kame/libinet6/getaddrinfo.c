@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.150 2003/04/17 13:08:38 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.151 2003/04/17 13:15:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -628,10 +628,6 @@ getaddrinfo(hostname, servname, hints, res)
 #endif
 
 globcopy:
-	/*
-	 * we would like to prefer AF_INET6 than AF_INET, so we'll make an
-	 * outer loop by AFs.
-	 */
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
