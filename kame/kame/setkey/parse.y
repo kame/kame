@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.27 2000/06/09 11:18:16 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.28 2000/06/10 06:47:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -568,12 +568,9 @@ setkeymsg()
 	m_msg.sadb_msg_type = p_type;
 	m_msg.sadb_msg_errno = 0;
 	m_msg.sadb_msg_satype = p_satype;
-	m_msg.sadb_msg_mode = p_mode;
-	m_msg.sadb_msg_reserved1 = 0;
+	m_msg.sadb_msg_reserved = 0;
 	m_msg.sadb_msg_seq = 0;
 	m_msg.sadb_msg_pid = getpid();
-	m_msg.sadb_msg_reqid = p_reqid;
-	m_msg.sadb_msg_reserved2 = 0;
 
 	m_len = sizeof(struct sadb_msg);
 	memcpy(m_buf, &m_msg, m_len);
@@ -653,6 +650,7 @@ setkeymsg()
 	case SADB_GET:
 	    {
 		struct sadb_sa m_sa;
+		struct sadb_x_sa2 m_sa2;
 		struct sadb_address m_addr;
 		u_int len;
 
@@ -667,6 +665,15 @@ setkeymsg()
 		m_sa.sadb_sa_flags = p_ext;
 
 		memcpy(m_buf + m_len, &m_sa, len);
+		m_len += len;
+
+		len = sizeof(struct sadb_x_sa2);
+		m_sa2.sadb_x_sa2_len = PFKEY_UNIT64(len);
+		m_sa2.sadb_x_sa2_exttype = SADB_X_EXT_SA2;
+		m_sa2.sadb_x_sa2_mode = p_mode;
+		m_sa2.sadb_x_sa2_reqid = p_reqid;
+
+		memcpy(m_buf + m_len, &m_sa2, len);
 		m_len += len;
 
 		/* set src */

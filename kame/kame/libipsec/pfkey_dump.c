@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.18 2000/06/08 21:28:32 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.19 2000/06/10 06:47:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -147,6 +147,7 @@ pfkey_sadump(m)
 {
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_sa *m_sa;
+	struct sadb_x_sa2 *m_sa2;
 	struct sadb_lifetime *m_lftc, *m_lfth, *m_lfts;
 	struct sadb_address *m_saddr, *m_daddr, *m_paddr;
 	struct sadb_key *m_auth, *m_enc;
@@ -164,6 +165,7 @@ pfkey_sadump(m)
 	}
 
 	m_sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
+	m_sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
 	m_lftc = (struct sadb_lifetime *)mhp[SADB_EXT_LIFETIME_CURRENT];
 	m_lfth = (struct sadb_lifetime *)mhp[SADB_EXT_LIFETIME_HARD];
 	m_lfts = (struct sadb_lifetime *)mhp[SADB_EXT_LIFETIME_SOFT];
@@ -195,18 +197,22 @@ pfkey_sadump(m)
 		printf("no SA extension.\n");
 		return;
 	}
+	if (m_sa2 == NULL) {
+		printf("no SA2 extension.\n");
+		return;
+	}
 	printf("\n\t");
 
 	GETMSGSTR(_str_satype, m->sadb_msg_satype);
 
 	printf("mode=");
-	GETMSGSTR(_str_mode, m->sadb_msg_mode);
+	GETMSGSTR(_str_mode, m_sa2->sadb_x_sa2_mode);
 
 	printf("spi=%u(0x%08x) reqid=%u(0x%08x)\n",
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
-		(u_int32_t)m->sadb_msg_reqid,
-		(u_int32_t)m->sadb_msg_reqid);
+		(u_int32_t)m_sa2->sadb_x_sa2_reqid,
+		(u_int32_t)m_sa2->sadb_x_sa2_reqid);
 
 	/* encryption key */
 	if (m->sadb_msg_satype == SADB_X_SATYPE_IPCOMP) {
@@ -287,7 +293,7 @@ pfkey_sadump(m)
 	}
 
 	/* XXX DEBUG */
-	printf("\trefcnt=%u\n", m->sadb_msg_reserved2);
+	printf("\trefcnt=%u\n", m->sadb_msg_reserved);
 
 	return;
 }
@@ -394,7 +400,7 @@ pfkey_spdump(m)
 		(u_long)m->sadb_msg_pid);
 
 	/* XXX TEST */
-	printf("\trefcnt=%u\n", m->sadb_msg_reserved2);
+	printf("\trefcnt=%u\n", m->sadb_msg_reserved);
 
 	return;
 }

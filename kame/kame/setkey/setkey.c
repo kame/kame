@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.13 2000/06/08 21:55:23 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.14 2000/06/10 06:47:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -220,12 +220,9 @@ sendkeyshort(type)
 	m_msg->sadb_msg_errno = 0;
 	m_msg->sadb_msg_satype = SADB_SATYPE_UNSPEC;
 	m_msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	m_msg->sadb_msg_mode = IPSEC_MODE_ANY;
-	m_msg->sadb_msg_reserved1 = 0;
+	m_msg->sadb_msg_reserved = 0;
 	m_msg->sadb_msg_seq = 0;
 	m_msg->sadb_msg_pid = getpid();
-	m_msg->sadb_msg_reqid = 0;
-	m_msg->sadb_msg_reserved2 = 0;
 
 	sendkeymsg();
 
@@ -246,12 +243,9 @@ promisc()
 	m_msg->sadb_msg_errno = 0;
 	m_msg->sadb_msg_satype = 1;
 	m_msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	m_msg->sadb_msg_mode = IPSEC_MODE_ANY;
-	m_msg->sadb_msg_reserved1 = 0;
+	m_msg->sadb_msg_reserved = 0;
 	m_msg->sadb_msg_seq = 0;
 	m_msg->sadb_msg_pid = getpid();
-	m_msg->sadb_msg_reqid = 0;
-	m_msg->sadb_msg_reserved2 = 0;
 
 	if ((so = socket(PF_KEY, SOCK_RAW, PF_KEY_V2)) < 0) {
 		err(1, "socket(PF_KEY)");

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.46 2000/06/08 21:28:33 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.47 2000/06/10 06:47:10 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -989,6 +989,7 @@ pk_recvupdate(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_sa *sa;
+	struct sadb_x_sa2 *sa2;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
 	u_int proto_id, encmode;
@@ -1002,6 +1003,7 @@ pk_recvupdate(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL
 	 || mhp[SADB_EXT_SA] == NULL
+	 || mhp[SADB_X_EXT_SA2] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -1012,6 +1014,7 @@ pk_recvupdate(mhp)
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
+	sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
@@ -1037,10 +1040,10 @@ pk_recvupdate(mhp)
 				"invalid proto_id %d\n", msg->sadb_msg_satype);
 			return -1;
 		}
-		encmode = pfkey2ipsecdoi_mode(msg->sadb_msg_mode);
+		encmode = pfkey2ipsecdoi_mode(sa2->sadb_x_sa2_mode);
 		if (encmode == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid encmode %d\n", msg->sadb_msg_mode);
+				"invalid encmode %d\n", sa2->sadb_x_sa2_mode);
 			return -1;
 		}
 
@@ -1094,7 +1097,7 @@ pk_recvupdate(mhp)
 		"IPsec-SA established %s-%s %s/%s spi:%ld\n",
 		xsrc, saddrwop2str(iph2->dst),
 		s_pfkey_satype(msg->sadb_msg_satype),
-		s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
+		s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
 		ntohl(sa->sadb_sa_spi));
 	free(xsrc);
     }
@@ -1173,6 +1176,7 @@ pk_recvadd(mhp)
 	caddr_t *mhp;
 {
 	struct sadb_msg *msg;
+	struct sadb_x_sa2 *sa2;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
 
@@ -1182,6 +1186,7 @@ pk_recvadd(mhp)
 
 	/* sanity check */
 	if (mhp[0] == NULL
+	 || mhp[SADB_X_EXT_SA2] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -1191,6 +1196,7 @@ pk_recvadd(mhp)
 	msg = (struct sadb_msg *)mhp[0];
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+	sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
@@ -1212,7 +1218,7 @@ pk_recvadd(mhp)
 		"pfkey %s success %s/%s/%s->%s\n",
 		s_pfkey_type(msg->sadb_msg_type),
 		s_pfkey_satype(msg->sadb_msg_satype),
-		s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
+		s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
 		xsrc,
 		saddrwop2str(iph2->dst));
 	free(xsrc);
@@ -1227,6 +1233,7 @@ pk_recvexpire(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_sa *sa;
+	struct sadb_x_sa2 *sa2;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
 	u_int proto_id;
@@ -1246,6 +1253,7 @@ pk_recvexpire(mhp)
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+	sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
 
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
@@ -1260,7 +1268,7 @@ pk_recvexpire(mhp)
 		plog(logp, LOCATION, NULL,
 			"ERROR: no such a SA found %s/%s/%s->%s spi:%ld\n",
 			s_pfkey_satype(msg->sadb_msg_satype),
-			s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
+			s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
 			xsrc,
 			saddrwop2str(dst),
 			ntohl(sa->sadb_sa_spi));
@@ -1276,7 +1284,7 @@ pk_recvexpire(mhp)
 		"IPsec-SA expired %s-%s %s/%s spi:%ld\n",
 		xsrc, saddrwop2str(iph2->dst),
 		s_pfkey_satype(msg->sadb_msg_satype),
-		s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
+		s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
 		ntohl(sa->sadb_sa_spi));
 	free(xsrc);
     }

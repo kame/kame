@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.32 2000/06/08 21:28:33 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.33 2000/06/10 06:47:10 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -911,7 +911,7 @@ purge_spi(proto, spi, n)
 						ntohl(spi[i])));
 				pfkey_send_delete(lcconf->sock_pfkey,
 					msg->sadb_msg_satype,
-					msg->sadb_msg_mode,
+					IPSEC_MODE_ANY,
 					(struct sockaddr *)(src + 1),
 					(struct sockaddr *)(dst + 1),
 					sa->sadb_sa_spi);
