@@ -6,7 +6,7 @@ CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.pasta.cs.uit.no/pub/Vermicelli/
 
 MAINTAINER=	feico@pasta.cs.uit.no
-HOMEPAGE=	http://www.vermicelli.cs.uit.no/ipv6/software.html
+HOMEPAGE=	http://www.vermicelli.pasta.cs.uit.no/ipv6/software.html
 
 WRKSRC=         ${WRKDIR}/totd-1.1p4
 
