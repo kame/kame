@@ -69,7 +69,6 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/map.h>
-#define MBTYPES
 #include <sys/mbuf.h>
 
 /*
