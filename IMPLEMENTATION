@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.318 2002/10/30 05:45:53 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.319 2002/11/11 03:19:21 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -263,7 +263,7 @@ draft-vida-mld-v2-05.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv
     * Multicast Source Filter works only for UDP packets.
 draft-ietf-idmr-msf-api-03.txt: Socket Interface Extensions for Multicast Source Filters
     * IPv4 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
-    * IPv6 works for kame/freebsd4 and kame/netbsd.
+    * IPv6 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
 
 
 1.2 Neighbor Discovery
