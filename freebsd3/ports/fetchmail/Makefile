@@ -12,7 +12,7 @@
 # this Makefile.
 
 PORTNAME=	fetchmail
-PORTVERSION=	5.4.0
+PORTVERSION=	5.5.1
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.ccil.org/pub/esr/fetchmail/
 
