@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.66 2001/10/18 09:04:39 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.67 2001/10/22 11:11:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1219,7 +1219,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	struct mip6_bc *mbc;
-	int error = 0;
+	int s, error = 0;
 
 	mip6opt->mip6po_rthdr = NULL;
 	mip6opt->mip6po_haddr = NULL;
@@ -1249,19 +1249,31 @@ mip6_exthdr_create(m, opt, mip6opt)
 		 * 2001 12:51:34 -0700 with the subject 'Coexistence
 		 * with other uses for routing header'.
 		 */
+#ifdef __NetBSD__
+		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: rthdr creation failed.\n",
 				 __FILE__, __LINE__));
+			splx(s);
 			goto bad;
 		}
+		splx(s);
 	}
 
 	/*
 	 * insert BA/BR if pending BA/BR exist.
 	 */
 	/* XXX */
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
 	if (mbc) {
 		/*
@@ -1270,11 +1282,17 @@ mip6_exthdr_create(m, opt, mip6opt)
 		 */
 		
 	}
+	splx(s);
 
 	/* following stuff is applied only for MN. */
 	if (!MIP6_IS_MN)
 		return (0);
 
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	/*
 	 * find hif that has a home address that is the same
 	 * to the source address of this sending ip packet
@@ -1285,6 +1303,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		 * this source addrss is not one of our home addresses.
 		 * we don't need any special care about this packet.
 		 */
+		splx(s);
 		return (0);
 	}
 
@@ -1292,6 +1311,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	mbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if (mbu == NULL) {
 		/* no home registration action started yet. */
+		splx(s);
 		return (0);
 	}
 	if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_NOTREG) {
@@ -1299,6 +1319,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		 * we have not registered yet.  this means we are still
 		 * home.
 		 */
+		splx(s);
 		return (0);
 	}
 
@@ -1309,6 +1330,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		mip6log((LOG_ERR,
 			 "%s:%d: BU destopt insertion failed.\n",
 			 __FILE__, __LINE__));
+		splx(s);
 		goto bad;
 	}
 
@@ -1320,9 +1342,11 @@ mip6_exthdr_create(m, opt, mip6opt)
 			 "%s:%d: homeaddress insertion failed.\n",
 			 __FILE__, __LINE__));
 		
+		splx(s);
 		goto bad;
 	}
 
+	splx(s);
 	return (0);
  bad:
 	m_freem(m);
@@ -1362,6 +1386,7 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst)
 	struct in6_addr *dst;
 {
 	struct mip6_bc *mbc;
+	int error = 0;
 
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
 	if (mbc == NULL) {
@@ -1369,8 +1394,9 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst)
 		return (0);
 	}
 
-	if (mip6_rthdr_create(pktopt_rthdr, &mbc->mbc_pcoa)) {
-		return (-1);
+	error = mip6_rthdr_create(pktopt_rthdr, &mbc->mbc_pcoa);
+	if (error) {
+		return (error);
 	}
 
 	return (0);
@@ -1387,14 +1413,10 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct ip6_opt_binding_update bu_opt;
 	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
-#define MIP6_CREATE_BU_WHEN_INITIATE 1
-#ifdef MIP6_CREATE_BU_WHEN_INITIATE
 	struct mip6_bu *hrmbu;
-#endif
-	int size;
+	int size, error = 0;
 
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
-#ifdef MIP6_CREATE_BU_WHEN_INITIATE
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if ((mbu == NULL) && (hrmbu != NULL) &&
 	    (hrmbu->mbu_reg_state == MIP6_BU_REG_STATE_REG)) {
@@ -1413,10 +1435,10 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	}
-#else
-	if (mbu == NULL)
+	if (mbu == NULL) {
+		/* this is the case that the home registration is on going. */
 		return (0);
-#endif
+	}
 	if (mbu->mbu_dontsend) {
 		/*
 		 * mbu_dontsend is set when we receive ICMP6_PARAM_PROB
@@ -1505,7 +1527,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 
 	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
 
-	return (0);
+	return (error);
 }
 
 static int
@@ -1542,8 +1564,9 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	bcopy((caddr_t)coa, haddr_opt.ip6oh_addr, sizeof(*coa));
 
 	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
-	if (optbuf.buf == NULL)
+	if (optbuf.buf == NULL) {
 		return (ENOMEM);
+	}
 	bzero((caddr_t)optbuf.buf, MIP6_BUFFER_SIZE);
 	/* homeaddr alignment restriction == 0 */
 	optbuf.off = 0;
