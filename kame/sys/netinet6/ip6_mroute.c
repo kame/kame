@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.60 2002/02/09 06:49:45 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.61 2002/03/02 08:28:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -117,8 +117,8 @@ static int get_pim6 __P((struct mbuf *));
 #endif
 static int socket_send __P((struct socket *, struct mbuf *,
 			    struct sockaddr_in6 *));
-static int register_send __P((struct ip6_hdr *, struct mif6 *,
-			      struct mbuf *));
+static int register_send __P((struct ip6_hdr *, struct mif6 *, struct mbuf *,
+			      struct sockaddr_in6 *, struct sockaddr_in6 *));
 
 /*
  * Globals.  All but ip6_mrouter, ip6_mrtproto and mrt6stat could be static,
@@ -1460,7 +1460,7 @@ ip6_mdq(m, ifp, rt)
 
 #define MC6_SEND(ip6, mifp, m, s, d) do {			\
 		if ((mifp)->m6_flags & MIFF_REGISTER)		\
-		    register_send((ip6), (mifp), (m));		\
+		    register_send((ip6), (mifp), (m), (s), (d));\
 		else						\
 		    phyint_send((ip6), (mifp), (m), (s), (d));	\
 } while (0)
@@ -1740,14 +1740,15 @@ phyint_send(ip6, mifp, m, src, dst)
 }
 
 static int
-register_send(ip6, mif, m)
+register_send(ip6, mif, m, src, dst)
 	struct ip6_hdr *ip6;
 	struct mif6 *mif;
 	struct mbuf *m;
+	struct sockaddr_in6 *src;
+	struct sockaddr_in6 *dst; /* XXX currently unused */
 {
 	struct mbuf *mm;
 	int i, len = m->m_pkthdr.len;
-	static struct sockaddr_in6 sin6 = { sizeof(sin6), AF_INET6 };
 	struct mrt6msg *im6;
 
 #ifdef MRT6DEBUG
@@ -1783,8 +1784,6 @@ register_send(ip6, mif, m)
 	/*
 	 * Send message to routing daemon
 	 */
-	sin6.sin6_addr = ip6->ip6_src;
-
 	im6 = mtod(mm, struct mrt6msg *);
 	im6->im6_msgtype      = MRT6MSG_WHOLEPKT;
 	im6->im6_mbz          = 0;
@@ -1794,7 +1793,7 @@ register_send(ip6, mif, m)
 	/* iif info is not given for reg. encap.n */
 	mrt6stat.mrt6s_upcalls++;
 
-	if (socket_send(ip6_mrouter, mm, &sin6) < 0) {
+	if (socket_send(ip6_mrouter, mm, src) < 0) {
 #ifdef MRT6DEBUG
 		if (mrt6debug)
 			log(LOG_WARNING,
