@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.29 2003/06/27 05:20:00 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.30 2003/06/27 05:36:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -260,8 +260,7 @@ struct sadb_x_ipsecrequest {
 struct sadb_x_tag {
   u_int16_t sadb_x_tag_len;
   u_int16_t sadb_x_tag_exttype;
-  u_int16_t sadb_x_tag_tag;
-  u_int16_t sadb_x_tag_reserved;
+  char sadb_x_tag_name[16];
 };
 
 #define SADB_EXT_RESERVED             0

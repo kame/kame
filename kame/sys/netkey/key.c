@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.277 2003/06/27 05:20:00 itojun Exp $	*/
+/*	$KAME: key.c,v 1.278 2003/06/27 05:36:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,6 +104,11 @@
 #include <netinet6/ipcomp.h>
 
 #include <machine/stdarg.h>
+
+#include "pf.h"
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
 
 /* randomness */
 #ifdef __NetBSD__
@@ -1835,7 +1840,7 @@ key_spdadd(so, m, mhp)
 	if (mhp->ext[SADB_EXT_ADDRESS_SRC])
 		newsp = key_getsp(&spidx, xpl0->sadb_x_policy_dir);
 	else
-		newsp = key_getspbytag(tag->sadb_x_tag_tag,
+		newsp = key_getspbytag(pf_tagname2tag(tag->sadb_x_tag_name),
 		    xpl0->sadb_x_policy_dir);
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		if (newsp) {
@@ -1876,7 +1881,7 @@ key_spdadd(so, m, mhp)
 			return key_senderror(so, m, EINVAL);
 		}
 	} else
-		newsp->tag = tag->sadb_x_tag_tag;
+		newsp->tag = pf_tagname2tag(tag->sadb_x_tag_name);
 
 	for (isr = newsp->req; isr; isr = isr->next) {
 		struct sockaddr *sa;
@@ -3883,7 +3888,7 @@ key_setsadbxtag(tag)
 	bzero(p, len);
 	p->sadb_x_tag_len = PFKEY_UNIT64(len);
 	p->sadb_x_tag_exttype = SADB_X_EXT_SA2;
-	p->sadb_x_tag_tag = tag;
+	pf_tag2tagname(tag, p->sadb_x_tag_name);
 
 	return m;
 }
