@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.22 2001/10/24 07:55:52 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.23 2001/10/24 08:35:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1138,12 +1138,16 @@ ismyaddr(sa, salen)
 			    (u_int32_t)sin6.sin6_addr.s6_addr[2] << 8;
 			sin6.sin6_addr.s6_addr[2] = 0;
 			sin6.sin6_addr.s6_addr[3] = 0;
-			if (memcmp(&sin6, sa, salen) == 0)
+			if (memcmp(&sin6, sa, salen) == 0) {
+				freeifaddrs(ifap);
 				return 1;
+			}
 		}
 #endif
-		if (memcmp(ifa->ifa_addr, sa, salen) == 0)
+		if (memcmp(ifa->ifa_addr, sa, salen) == 0) {
+			freeifaddrs(ifap);
 			return 1;
+		}
 	}
 
 	freeifaddrs(ifap);
