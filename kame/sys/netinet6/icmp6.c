@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.359 2003/09/21 09:33:42 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.360 2003/10/01 12:13:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1213,8 +1213,16 @@ icmp6_notify_error(m, off, icmp6len, code)
 				 * is 0, all intermediate hops must
 				 * have been passed.
 				 */
-				if (rth->ip6r_segleft &&
-				    rth->ip6r_type == IPV6_RTHDR_TYPE_0) {
+				if (
+#ifdef MIP6
+				    rth->ip6r_segleft &&
+				    (rth->ip6r_type == IPV6_RTHDR_TYPE_0 ||
+				    rth->ip6r_type == IPV6_RTHDR_TYPE_2)
+#else
+				    rth->ip6r_segleft &&
+				    rth->ip6r_type == IPV6_RTHDR_TYPE_0
+#endif /* MIP6 */
+				    ) {
 					int hops;
 
 #ifndef PULLDOWN_TEST
