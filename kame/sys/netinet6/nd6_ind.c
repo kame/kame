@@ -1,4 +1,4 @@
-/*	$KAME: nd6_ind.c,v 1.5 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: nd6_ind.c,v 1.6 2004/02/16 05:37:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -161,7 +161,7 @@ nd6_ins_output(ifp, daddr6, taddr6, ln, dad)
 	struct ifnet *ifp;
 	const struct in6_addr *daddr6, *taddr6;
 	struct llinfo_nd6 *ln;	/* for source address determination */
-	int dad;	/* duplicated address detection */
+	int dad;	/* duplicate address detection */
 {
 	return;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.144 2004/02/16 03:59:41 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.145 2004/02/16 05:37:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,7 +118,7 @@ static int dad_maxtry = 15;	/* max # of *tries* to transmit DAD packet */
  * Input a Neighbor Solicitation Message.
  *
  * Based on RFC 2461
- * Based on RFC 2462 (duplicated address detection)
+ * Based on RFC 2462 (duplicate address detection)
  */
 void
 nd6_ns_input(m, off, icmp6len)
@@ -318,7 +318,7 @@ nd6_ns_input(m, off, icmp6len)
 	if (tentative) {
 		/*
 		 * If source address is unspecified address, it is for
-		 * duplicated address detection.
+		 * duplicate address detection.
 		 *
 		 * If not, the packet is for addess resolution;
 		 * silently ignore it.
@@ -382,14 +382,14 @@ nd6_ns_input(m, off, icmp6len)
  *	- ND6 header source datalink address
  *
  * Based on RFC 2461
- * Based on RFC 2462 (duplicated address detection)
+ * Based on RFC 2462 (duplicate address detection)
  */
 void
 nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	struct ifnet *ifp;
 	const struct in6_addr *daddr6, *taddr6;
 	struct llinfo_nd6 *ln;	/* for source address determination */
-	int dad;	/* duplicated address detection */
+	int dad;	/* duplicate address detection */
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -641,7 +641,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
  * Neighbor advertisement input handling.
  *
  * Based on RFC 2461
- * Based on RFC 2462 (duplicated address detection)
+ * Based on RFC 2462 (duplicate address detection)
  *
  * the following items are not implemented yet:
  * - proxy advertisement delay rule (RFC2461 7.2.8, last paragraph, SHOULD)
@@ -1251,7 +1251,7 @@ nd6_dad_stoptimer(dp)
 }
 
 /*
- * Start Duplicated Address Detection (DAD) for specified interface address.
+ * Start Duplicate Address Detection (DAD) for specified interface address.
  */
 void
 nd6_dad_start(ifa, tick)
