@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.55 2000/06/28 07:04:33 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.56 2000/06/28 07:56:02 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1717,40 +1717,32 @@ pk_recvspddump(mhp)
 			"inappropriate sadb spddump message passed.\n");
 		return -1;
 	}
+	msg = (struct sadb_msg *)mhp[0];
 
-	for (msg = (struct sadb_msg *)mhp[0];
-	     msg->sadb_msg_errno == 0;
-	     msg = (struct sadb_msg *)((caddr_t)msg + PFKEY_EXTLEN(msg))) {
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
 
-		saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
-		daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
-		xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+			saddr + 1,
+			daddr + 1,
+			saddr->sadb_address_prefixlen,
+			daddr->sadb_address_prefixlen,
+			saddr->sadb_address_proto,
+			&spidx);
 
-		KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
-				saddr + 1,
-				daddr + 1,
-				saddr->sadb_address_prefixlen,
-				daddr->sadb_address_prefixlen,
-				saddr->sadb_address_proto,
-				&spidx);
-
-		sp = getsp(&spidx);
-		if (sp != NULL) {
-			plog(logp, LOCATION, NULL,
-				"such policy already exists. "
-				"anyway replace it: %s\n",
-				spidx2str(&spidx));
-			remsp(sp);
-			delsp(sp);
-		}
-
-		if (addnewsp(mhp) < 0)
-			return -1;
-
-		/* last part ? */
-		if (msg->sadb_msg_seq == 0)
-			break;
+	sp = getsp(&spidx);
+	if (sp != NULL) {
+		plog(logp, LOCATION, NULL,
+			"such policy already exists. "
+			"anyway replace it: %s\n",
+			spidx2str(&spidx));
+		remsp(sp);
+		delsp(sp);
 	}
+
+	if (addnewsp(mhp) < 0)
+		return -1;
 
 	return 0;
 }
