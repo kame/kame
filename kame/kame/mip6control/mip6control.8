@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.7 2002/01/22 04:46:25 keiichi Exp $
+.\"	$KAME: mip6control.8,v 1.8 2002/01/25 00:07:31 keiichi Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -46,6 +46,11 @@
 -P
 .Ar prefixlen
 .Oc
+.Oo -A
+.Ar home_agent_global_addr
+-L
+.Ar home_agent_linklocal_addr
+.Oc
 .Oo -u
 .Ar address#port
 .Oc
@@ -82,6 +87,20 @@ option.
 Specify the length of the prefix to be assinged to the mobile node.
 Use with
 .Fl H
+option.
+.It Fl A Ar home_agent_global_address
+Specify the global address of the home agent of this mobile node.
+If your home agent supports DHAAD (Dynamic Home Agent Address Discovery),
+you need not use this switch.
+Use with
+.Fl L
+option.
+.It Fl L Ar home_agent_linklocal_address
+Specify the linklocal address of the home agent of this mobile node.
+If your home agent supports DHAAD (Dynamic Home Agent Address Discovery),
+you need not use this switch.
+Use with
+.Fl A
 option.
 .It Fl m
 Start acting as a mobile node.
