@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2013 2001/12/19 14:50:27 jinmei Exp $
+$KAME: CHANGELOG,v 1.2014 2001/12/19 21:50:25 sakane Exp $
 
 <200112>
+Thu Dec 20 06:48:57 JST 2001 sakane@kame.net
+	* kame/racoon:
+	fixed that the negotiation always failed when "verify_identifier"
+	was defined with aggressive mode.
+
 2001-12-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (get_addrselectpolicy): enabled
 	for FreeBSD.
