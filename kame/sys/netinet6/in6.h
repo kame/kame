@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.58 2000/08/27 00:56:38 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.59 2000/08/27 01:37:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -449,6 +449,13 @@ struct route_in6 {
 #if 0
 #define IPV6_PKTOPTIONS		52 /* buf/cmsghdr; set/get IPv6 options */
 				   /* obsoleted by 2292bis */
+#endif
+
+#ifdef __OpenBSD__
+#define IPV6_AUTH_LEVEL		53   /* int; authentication used */
+#define IPV6_ESP_TRANS_LEVEL	54   /* int; transport encryption */
+#define IPV6_ESP_NETWORK_LEVEL	55   /* int; full-packet encryption */
+#define IPSEC6_OUTSA		56   /* set the outbound SA for a socket */
 #endif
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
 
