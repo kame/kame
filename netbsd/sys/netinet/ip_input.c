@@ -177,6 +177,7 @@ __KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.150.4.2 2002/11/12 14:44:11 tron Exp 
 #include "gif.h"
 #include <net/if_gre.h>
 #include "gre.h"
+#include "pf.h"
 
 #ifdef MROUTING
 #include <netinet/ip_mroute.h>
@@ -185,6 +186,10 @@ __KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.150.4.2 2002/11/12 14:44:11 tron Exp 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#endif
+
+#if NPF > 0
+#include <net/pfvar.h>
 #endif
 
 #ifndef	IPFORWARDING
@@ -441,6 +446,7 @@ ip_input(struct mbuf *m)
 	struct ipqent *ipqe;
 	int hlen = 0, mff, len;
 	int downmatch;
+	in_addr_t pfrdr = 0;
 
 #ifdef	DIAGNOSTIC
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -606,6 +612,21 @@ ip_input(struct mbuf *m)
 	NTOHS(ip->ip_len);
 	NTOHS(ip->ip_off);
 
+#if NPF > 0
+	/*
+	 * Packet filter
+	 */
+	pfrdr = ip->ip_dst.s_addr;
+	if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+		goto bad;
+	if (m == NULL)
+		return;
+
+	ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
+	pfrdr = (pfrdr != ip->ip_dst.s_addr);
+#endif
+
 	/*
 	 * Process options and, if not destined for us,
 	 * ship it on.  ip_dooptions returns 1 when an
@@ -750,7 +771,7 @@ ip_input(struct mbuf *m)
 		}
 #endif
 
-		ip_forward(m, 0);
+		ip_forward(m, pfrdr);
 	}
 	return;
 

@@ -175,6 +175,12 @@ __KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.2 2002/11/01 12:14:28 tron Exp
 #include <netkey/key_debug.h>
 #endif /*IPSEC*/
 
+#include "pf.h"
+
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 static struct mbuf *ip_insertoptions __P((struct mbuf *, struct mbuf *, int *));
 static int ip_getmopt_ifargs
 	__P((int, struct ifnet **, struct in_addr *, struct in_addr *));
@@ -650,6 +656,19 @@ skip_ipsec:
 
 	ip = mtod(m, struct ip *);
 #endif /* PFIL_HOOKS */
+
+#if NPF > 0
+	if (pf_test(PF_OUT, ifp, &m) != PF_PASS) {
+		error = EHOSTUNREACH;
+		m_freem(m);
+		goto done;
+	}
+	if (m == NULL)
+		goto done;
+
+	ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
+#endif
 
 	/*
 	 * If small enough for mtu of path, can just send directly.
