@@ -1,7 +1,7 @@
 # $NetBSD$
 
-DISTNAME=	libpcap-2000.09.18
-PKGNAME=	libpcap-20000918
+DISTNAME=	libpcap-2000.09.25
+PKGNAME=	libpcap-20000925
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
