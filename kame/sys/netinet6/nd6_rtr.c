@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.133 2001/07/21 09:29:22 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.134 2001/07/21 09:31:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -780,12 +780,10 @@ defrouter_select()
 		return;
 	}
 
-	installedpref = RTPREF_INVALID;
 	installcount = 0;
 
 	/*
-	 * shortcut - default router list is empty,
-	 * no need to chase the chain
+	 * If default router list is empty, no need to chase the chain
 	 */
 	if (!TAILQ_FIRST(&nd_defrouter))
 		goto empty;
@@ -793,6 +791,7 @@ defrouter_select()
 	/*
 	 * Search for a (probably) reachable router from the list.
 	 */
+	installedpref = RTPREF_INVALID;
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		install = 0;
