@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.17 2001/11/09 09:40:56 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.18 2002/01/02 11:07:06 jinmei Exp $ (LBL)";
 #endif
 
 /*
@@ -215,6 +215,10 @@ static const char rcsid[] =
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#ifdef INET6
+#include <netinet/ip6.h>
+#endif
+
 #include <arpa/inet.h>
 
 #include <ctype.h>
@@ -274,6 +278,9 @@ struct udphdr *outudp;		/* last output (udp) packet */
 void *outdata;			/* last output (udp) packet */
 
 struct icmp *outicmp;		/* last output (icmp) packet */
+#ifdef INET6
+struct ip6_hdr *outip6;		/* last output (tunneled IPv6) packet */
+#endif
 
 /* loose source route gateway list (including room for final destination) */
 u_int32_t gwlist[NGATEWAYS + 1];
@@ -303,6 +310,7 @@ int verbose;
 int waittime = 5;		/* time to wait for response (in seconds) */
 int nflag;			/* print addresses numerically */
 int useicmp;			/* use icmp echo instead of udp packets */
+int useipv6;			/* use IPv6 header instead of udp packets */
 #ifdef CANT_HACK_CKSUM
 int docksum = 0;		/* don't calculate checksums */
 #else
@@ -363,9 +371,12 @@ main(int argc, char **argv)
 		prog = argv[0];
 
 	opterr = 0;
-	while ((op = getopt(argc, argv, "dFInrvxf:g:i:m:p:q:s:t:w:")) != -1)
+	while ((op = getopt(argc, argv, "6dFInrvxf:g:i:m:p:q:s:t:w:")) != -1)
 		switch (op) {
 
+		case '6':
+			++useipv6;
+			break;
 		case 'd':
 			options |= SO_DEBUG;
 			break;
@@ -456,9 +467,28 @@ main(int argc, char **argv)
 	if (!docksum)
 		Fprintf(stderr, "%s: Warning: ckecksums disabled\n", prog);
 
+#ifndef INET6
+	if (useipv6) {
+		Fprintf(stderr,
+			"%s: the program was not build with INET6\n",
+			prog);
+		exit(1);
+	}
+#endif
+
+	if (useipv6 && useicmp) {
+		Fprintf(stderr, "%s: -6 and -I are exclusive\n", prog);
+		exit(1);
+	}
+
 	if (lsrr > 0)
 		optlen = (lsrr + 1) * sizeof(gwlist[0]);
 	minpacket = sizeof(*outip) + sizeof(struct outdata) + optlen;
+#ifdef INET6
+	if (useipv6)
+		minpacket += sizeof(struct ip6_hdr);
+	else
+#endif
 	if (useicmp)
 		minpacket += 8;			/* XXX magic number */
 	else
@@ -546,6 +576,21 @@ main(int argc, char **argv)
 
 	outip->ip_hl = (outp - (u_char *)outip) >> 2;
 	ident = (getpid() & 0xffff) | 0x8000;
+#ifdef INET6
+	if (useipv6) {
+		outip->ip_p = IPPROTO_IPV6;
+
+		outip6 = (struct ip6_hdr *)outp;
+		outip6->ip6_vfc = IPV6_VERSION;	/* XXX: will be overridden */
+		outip6->ip6_plen = htons(sizeof(struct outdata));
+		outip6->ip6_nxt = IPPROTO_NONE;
+		outip6->ip6_hlim = 0;
+		inet_pton(AF_INET6, "fe80::1", &outip6->ip6_src);
+		inet_pton(AF_INET6, "fe80::2", &outip6->ip6_dst);
+
+		outdata = (struct outdata *)(outp + sizeof(*outip6));
+	} else
+#endif
 	if (useicmp) {
 		outip->ip_p = IPPROTO_ICMP;
 
@@ -615,8 +660,20 @@ main(int argc, char **argv)
 #ifndef __hpux
 	sndsock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 #else
-	sndsock = socket(AF_INET, SOCK_RAW,
-	    useicmp ? IPPROTO_ICMP : IPPROTO_UDP);
+	{
+		int proto;
+
+#ifdef INET6
+		if (useipv6)
+			proto = IPPROTO_IPV6;
+		else
+#endif
+		if (useicmp)
+			proto = IPPROTO_ICMP;
+		else
+			proto = IPPROTO_UDP;
+		sndsock = socket(AF_INET, SOCK_RAW, proto);
+	}
 #endif
 	if (sndsock < 0) {
 		Fprintf(stderr, "%s: raw socket: %s\n", prog, strerror(errno));
@@ -992,6 +1049,15 @@ send_probe(register int seq, int ttl, register struct timeval *tp)
 	memcpy(outdata, &outsetup, sizeof(outsetup));
     }
 
+#ifdef INET6
+	if (useipv6) {
+		u_int32_t flow32 = ((u_int32_t)seq) & 0x0000ffff;
+
+		flow32 = htonl(flow32);
+		outip6->ip6_flow = flow32;
+		outip6->ip6_vfc = IPV6_VERSION;
+	} else
+#endif
 	if (useicmp)
 		outicmp->icmp_seq = htons(seq);
 	else
@@ -999,6 +1065,11 @@ send_probe(register int seq, int ttl, register struct timeval *tp)
 
 	/* (We can only do the checksum if we know our ip address) */
 	if (docksum) {
+#ifdef INET6
+		if (useipv6)
+			;
+		else
+#endif
 		if (useicmp) {
 			outicmp->icmp_cksum = 0;
 			outicmp->icmp_cksum = in_cksum((u_short *)outicmp,
@@ -1062,7 +1133,19 @@ send_probe(register int seq, int ttl, register struct timeval *tp)
 #endif
 
 #ifdef __hpux
-	cc = sendto(sndsock, useicmp ? (char *)outicmp : (char *)outudp,
+	{
+		char *sendbuf;
+
+#ifdef INET6
+		if (useipv6)
+			sendbuf = outip6;
+		else
+#endif
+		if (useicmp)
+			sendbuf = (char *)outicm;
+		else
+			sendbuf = (char *)outudp;
+		cc = sendto(sndsock, sendbuf,
 	    packlen - (sizeof(*outip) + optlen), 0, &whereto, sizeof(whereto));
 	if (cc > 0)
 		cc += sizeof(*outip) + optlen;
@@ -1143,6 +1226,25 @@ packet_ok(register u_char *buf, int cc, register struct sockaddr_in *from,
 
 		hip = &icp->icmp_ip;
 		hlen = hip->ip_hl << 2;
+#ifdef INET6
+		if (useipv6) {
+			struct ip6_hdr *ip6;
+
+			ip6 = (struct ip6_hdr *)((u_char *)hip + hlen);
+			/* XXX 8 is a magic number */
+			if (hlen + 8 <= cc) {
+				u_int32_t flow32 = (ip6->ip6_flow & IPV6_FLOWINFO_MASK);
+				u_int32_t seq32;
+
+				seq32 = ((u_int32_t)seq) & 0x0000ffff;
+
+				if (flow32 == htonl(seq32)) {
+					return (type == ICMP_TIMXCEED ? -1 :
+						code + 1);
+				}
+			}
+		} else
+#endif
 		if (useicmp) {
 			/* XXX */
 			if (type == ICMP_ECHOREPLY &&
@@ -1422,7 +1524,7 @@ usage(void)
 	extern char version[];
 
 	Fprintf(stderr, "Version %s\n", version);
-	Fprintf(stderr, "Usage: %s [-dFInrvx] [-g gateway] [-i iface] \
+	Fprintf(stderr, "Usage: %s [-6dFInrvx] [-g gateway] [-i iface] \
 [-f first_ttl] [-m max_ttl]\n\t[ -p port] [-q nqueries] [-s src_addr] [-t tos] \
 [-w waittime]\n\thost [packetlen]\n",
 	    prog);
