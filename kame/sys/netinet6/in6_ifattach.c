@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.69 2000/11/05 16:53:46 onoe Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.70 2000/11/30 06:25:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1179,7 +1179,10 @@ in6_ifdetach(ifp)
 	in6_purgemkludge(ifp);
 #endif
 
-	/* remove neighbor management table */
+	/*
+	 * remove neighbor management table.  we call it twice just to make
+	 * sure we nuke everything.  maybe we need just one call.
+	 */
 	nd6_purge(ifp);
 
 	/* remove route to link-local allnodes multicast (ff02::1) */
