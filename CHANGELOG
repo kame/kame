@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.125 1999/09/21 17:13:31 jinmei Exp $
+$Id: CHANGELOG,v 1.126 1999/09/21 18:47:16 itojun Exp $
 
 
 <199909>
+Wed Sep 22 JST 1999  itojun@iijlab.net
+	* openbsd: bunch of fixes and merges for KAME/openbsd.
+	  basic operations are IPv6 ready but still needs more work.
+	* netbsd/pkgsrc/www/squid11: upgrade to latest IPv6 patch.
+
 1999-09-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* openbsd/sys/dev/ic/elink3.c (epget): prevented the input routine
 	from deviding two (small) mbufs; the new routine always stores an
