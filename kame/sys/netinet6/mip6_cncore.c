@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.21 2003/07/30 12:39:41 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.22 2003/07/31 02:48:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1218,10 +1218,18 @@ mip6_bc_timeout(dummy)
 		/* expiration check. */
 		if (mbc->mbc_expire < time_second) {
 #ifdef MIP6_HOME_AGENT
-			if (mbc->mbc_llmbc)
+			if (mbc->mbc_flags & IP6MU_CLONED) {
+				/*
+				 * cloned entry is removed when the
+				 * last referring mbc is removed.
+				 */
+				continue;
+			}
+			if (mbc->mbc_llmbc != NULL) {
 				/* remove a cloned entry. */
 				error = mip6_bc_list_remove(&mip6_bc_list,
 				    mbc->mbc_llmbc);
+			}
 			if (error) {
 				mip6log((LOG_ERR,
 				    "%s:%d: failed to remove "
