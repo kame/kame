@@ -56,7 +56,7 @@ option		UNION		# union file system
 
 #option		GATEWAY		# packet forwarding
 option		INET		# IP + ICMP + TCP + UDP
-option		IPSEC		# IPsec
+#option		IPSEC		# IPsec
 #option		KEY		# PF_KEY (implied by IPSEC)
 #option		NS		# XNS
 #option		NSIP		# XNS tunneling over IP
@@ -75,7 +75,7 @@ pseudo-device	bpfilter 8	# packet filter
 pseudo-device	sl	2	# CSLIP
 pseudo-device	ppp	2	# PPP
 pseudo-device	tun	2	# network tunneling over tty
-pseudo-device	enc	1	# IPSEC needs the encapsulation interface
+#pseudo-device	enc	1	# IPSEC needs the encapsulation interface
 #pseudo-device	strip	1	# Starmode Radio IP interface
 
 pseudo-device	pty	64	# pseudo-terminals
