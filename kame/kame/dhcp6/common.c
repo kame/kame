@@ -123,7 +123,7 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 		if (ifa->ifa_addr->sa_len > sizeof(sin6))
 			continue;
 
-		if (in6_matchflags(ifa->ifa_addr, ifnam, ignoreflags))
+		if (in6_matchflags(ifa->ifa_addr, ifa->ifa_name, ignoreflags))
 			continue;
 
 		memcpy(&sin6, ifa->ifa_addr, ifa->ifa_addr->sa_len);
@@ -471,7 +471,8 @@ in6_matchflags(addr, ifnam, flags)
 	ifr6.ifr_addr = *(struct sockaddr_in6 *)addr;
 
 	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6)"); /* assert? */
+		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6, %s)",
+		     addr2str(addr));
 		close(s);
 		return(-1);
 	}
