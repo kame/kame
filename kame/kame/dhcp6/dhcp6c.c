@@ -512,10 +512,6 @@ client6_sendsolicit(s, solicitid)
 		errx(1, "getifaddr failed");
 		/* NOTREACHED */
 	}
-#ifdef __KAME__
-	dh6s->dh6sol_cliaddr.s6_addr[2] = 0;
-	dh6s->dh6sol_cliaddr.s6_addr[3] = 0;
-#endif
 	current_cliaddr = dh6s->dh6sol_cliaddr;
 
 	if (firsttime) {	/* XXX: currently we have no cache */
@@ -628,10 +624,6 @@ client6_sendrequest(s, p)
 		errx(1, "getifaddr failed");
 		/* NOTREACHED */
 	}
-#ifdef __KAME__
-	dh6r->dh6req_cliaddr.s6_addr[2] = 0;
-	dh6r->dh6req_cliaddr.s6_addr[3] = 0;
-#endif
 	p->st_llcli = dh6r->dh6req_cliaddr; /* we can override this */
 
 	memset(&hints, 0, sizeof(hints));

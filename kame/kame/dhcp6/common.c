@@ -127,6 +127,12 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 			continue;
 
 		memcpy(&sin6, ifa->ifa_addr, ifa->ifa_addr->sa_len);
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr)) {
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
 		if (plen % 8 == 0) {
 			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
 				continue;
@@ -147,6 +153,10 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 				continue;
 		}
 		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(addr))
+			addr->s6_addr[2] = addr->s6_addr[3] = 0; 
+#endif
 		error = 0;
 		break;
 	}
@@ -210,6 +220,12 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 		if (ifr->ifr_addr.sa_len > sizeof(sin6))
 			continue;
 		memcpy(&sin6, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr)) {
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
 		if (plen % 8 == 0) {
 			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
 				continue;
@@ -229,6 +245,10 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 				continue;
 		}
 		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(addr))
+			addr->s6_addr[2] = addr->s6_addr[3] = 0;
+#endif
 		error = 0;
 		break;
 	}

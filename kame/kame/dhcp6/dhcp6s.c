@@ -596,10 +596,6 @@ server6_react_solicit(buf, siz, rcvpi)
 	memcpy(&dh6a->dh6adv_relayaddr, &dh6s->dh6sol_relayaddr,
 	       sizeof(dh6s->dh6sol_relayaddr));
 
-#ifdef __KAME__
-	if (IN6_IS_ADDR_LINKLOCAL(&servaddr))
-		servaddr.s6_addr[2] = servaddr.s6_addr[3] = 0;
-#endif
 	memcpy(&dh6a->dh6adv_serveraddr, &servaddr, sizeof(servaddr));
 	dh6a->dh6adv_pref = DEFAULT_SERVER_PREFERENCE;
 
