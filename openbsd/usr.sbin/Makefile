@@ -5,7 +5,6 @@ SUBDIR+=inetd sysctl
 SUBDIR+=rtsold ifmcstat ndp mping
 SUBDIR+=traceroute6 rtadvd mld6query rrenumd prefix icmp6dump gifconfig
 SUBDIR+=rip6query route6d faithd bgpd hroute6d pvcbridge pvcsif pvctxctl
-SUBDIR+=scope6config
 .if ${MACHINE_ARCH} == "i386"
 SUBDIR+=altqd
 .endif
