@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.15 2000/03/11 23:28:18 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.16 2000/03/22 17:33:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.15 2000/03/11 23:28:18 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.16 2000/03/22 17:33:43 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -792,6 +792,10 @@ tobeadv(rrt, ifcp)
 
 	/* Special care for static routes */
 	if (rrt->rrt_flags & RTF_STATIC) {
+		/* XXX don't advertise reject/blackhole routes */
+		if (rrt->rrt_flags & (RTF_REJECT | RTF_BLACKHOLE))
+			return 0;
+
 		if (Sflag)	/* Yes, advertise it anyway */
 			return 1;
 		if (sflag && rrt->rrt_index != ifcp->ifc_index)
