@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.235 2001/11/04 12:15:54 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.236 2001/11/10 10:49:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3794,6 +3794,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		 * address assigned to the node, and can be used as the
 		 * packet's source address.
 		 */
+#if 0				/* let in6_selectsrc() check this */
 		if (!IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
 			struct in6_ifaddr *ia6;
 			struct sockaddr_in6 sin6;
@@ -3829,6 +3830,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 				return(EADDRNOTAVAIL);
 			}
 		}
+#endif /* 0 */
 
 		if (sticky) {
 			if (opt->ip6po_pktinfo == NULL) {
