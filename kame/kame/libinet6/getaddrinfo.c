@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.93 2001/01/09 05:36:46 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.94 2001/01/09 07:23:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,10 @@
  *   presented above.
  */
 
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#include "port_before.h"
+#endif
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -96,6 +100,12 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#include <irs.h>
+#include "port_after.h"
+#include "irs_data.h"
+#endif
 
 #define ANY 0
 #define YES 1
@@ -219,10 +229,7 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 	const char *, struct addrinfo **));
 
 /* identify behavior of OS dependent portion */
-#ifdef __NetBSD__
-#define USE_FQDN_UNSPEC_LOOKUP	1
-#undef USE_GETIPNODEBY
-#elif defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #define USE_FQDN_UNSPEC_LOOKUP	1
 #undef USE_GETIPNODEBY
 #else
@@ -1105,7 +1112,7 @@ trynumeric:
  * OS dependent portions below
  */
 
-#if !defined(__NetBSD__) && !defined(__OpenBSD__)
+#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 /*
  * FQDN hostname, DNS lookup
  */
@@ -3318,4 +3325,199 @@ res_querydomainN(name, domain, target)
 	return (res_queryN(longname, target));
 }
 
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+
+static struct net_data *init __P((void));
+
+struct addrinfo *hostent2addrinfo __P((struct hostent *,
+				       const struct addrinfo *));
+struct addrinfo *addr2addrinfo __P((const struct addrinfo *,
+				    const char *));
+
+/*
+ * FQDN hostname, DNS lookup
+ */
+static int
+explore_fqdn(pai, hostname, servname, res)
+	const struct addrinfo *pai;
+	const char *hostname;
+	const char *servname;
+	struct addrinfo **res;
+{
+	struct addrinfo *result;
+	struct addrinfo *cur;
+	struct net_data *net_data = init();
+	struct irs_ho *ho;
+	int error = 0;
+	char tmp[NS_MAXDNAME];
+	const char *cp;
+
+	result = NULL;
+
+	/*
+	 * if the servname does not match socktype/protocol, ignore it.
+	 */
+	if (get_portmatch(pai, servname) != 0)
+		return(0);
+
+	if (!net_data || !(ho = net_data->ho))
+		return(0);
+#if 0				/* XXX (notyet) */
+	if (net_data->ho_stayopen && net_data->ho_last &&
+	    net_data->ho_last->h_addrtype == af) {
+		if (ns_samename(name, net_data->ho_last->h_name) == 1)
+			return (net_data->ho_last);
+		for (hap = net_data->ho_last->h_aliases; hap && *hap; hap++)
+			if (ns_samename(name, *hap) == 1)
+				return (net_data->ho_last);
+	}
+#endif
+	if (!strchr(hostname, '.') &&
+	    (cp = res_hostalias(net_data->res, hostname,
+				tmp, sizeof(tmp))))
+		hostname = cp;
+	result = (*ho->addrinfo)(ho, hostname, pai);
+	if (!net_data->ho_stayopen) {
+		(*ho->minimize)(ho);
+	}
+	if (result == NULL) {
+		int *e = __h_errno();
+
+		switch(*e) {
+		case NETDB_INTERNAL:
+			error = EAI_SYSTEM;
+			break;
+		case TRY_AGAIN:
+			error = EAI_AGAIN;
+			break;
+		case NO_RECOVERY:
+			error = EAI_FAIL;
+			break;
+		case HOST_NOT_FOUND:
+		case NO_DATA:
+			error = EAI_NODATA;
+			break;
+		default:
+		case NETDB_SUCCESS: /* should be impossible... */
+			error = EAI_NODATA;
+			break;
+		}
+		goto free;
+	}
+
+	for (cur = result; cur; cur = cur->ai_next) {
+		GET_PORT(cur, servname); /* XXX: redundant lookups... */
+		/* canonname should already be filled. */
+	}
+
+	*res = result;
+
+	return(0);
+
+free:
+	if (result)
+		freeaddrinfo(result);
+	return error;
+}
+
+struct addrinfo *
+hostent2addrinfo(hp, pai)
+	struct hostent *hp;
+	const struct addrinfo *pai;
+{
+	int i, af, error = 0;
+	char **aplist = NULL, *ap;
+	struct addrinfo sentinel, *cur;
+	const struct afd *afd;
+
+	af = hp->h_addrtype;
+	if (pai->ai_family != AF_UNSPEC && af != pai->ai_family)
+		return(NULL);
+
+	afd = find_afd(af);
+	if (afd == NULL)
+		return(NULL);
+
+	aplist = hp->h_addr_list;
+
+	memset(&sentinel, 0, sizeof(sentinel));
+	cur = &sentinel;
+
+	for (i = 0; (ap = aplist[i]) != NULL; i++) {
+#if 0				/* the trick seems too much */
+#ifdef INET6
+		af = hp->h_addr_list;
+		if (af == AF_INET6 &&
+		    IN6_IS_ADDR_V4MAPPED((struct in6_addr *)ap)) {
+			af = AF_INET;
+			ap = ap + sizeof(struct in6_addr)
+				- sizeof(struct in_addr);
+		}
+		afd = find_afd(af);
+		if (afd == NULL)
+			continue;
+#endif
+#endif /* 0 */
+
+		GET_AI(cur->ai_next, afd, ap);
+
+		/* GET_PORT(cur->ai_next, servname); */
+		if ((pai->ai_flags & AI_CANONNAME) != 0) {
+			/*
+			 * RFC2553 says that ai_canonname will be set only for
+			 * the first element.  we do it for all the elements,
+			 * just for convenience.
+			 */
+			GET_CANONNAME(cur->ai_next, hp->h_name);
+		}
+		while (cur && cur->ai_next) /* no need to loop, actually. */
+			cur = cur->ai_next;
+		continue;
+
+	free:
+		if (cur->ai_next)
+			freeaddrinfo(cur->ai_next);
+		cur->ai_next = NULL;
+		/* continue, without tht pointer CUR advanced. */
+	}
+
+	return(sentinel.ai_next);
+}
+
+struct addrinfo *
+addr2addrinfo(pai, cp)
+	const struct addrinfo *pai;
+	const char *cp;
+{
+	const struct afd *afd;
+
+	afd = find_afd(pai->ai_family);
+	if (afd == NULL)
+		return(NULL);
+
+	return(get_ai(pai, afd, cp));
+}
+
+static struct net_data *
+init()
+{
+	struct net_data *net_data;
+
+	if (!(net_data = net_data_init(NULL)))
+		goto error;
+	if (!net_data->ho) {
+		net_data->ho = (*net_data->irs->ho_map)(net_data->irs);
+		if (!net_data->ho || !net_data->res) {
+error:
+			errno = EIO;
+			if (net_data && net_data->res)
+				RES_SET_H_ERRNO(net_data->res, NETDB_INTERNAL);
+			return (NULL);
+		}
+
+		(*net_data->ho->res_set)(net_data->ho, net_data->res, NULL);
+	}
+
+	return (net_data);
+}
 #endif	/* os dependent portion */
