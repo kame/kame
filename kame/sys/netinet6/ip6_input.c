@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.287 2002/07/26 02:36:11 k-sugyou Exp $	*/
+/*	$KAME: ip6_input.c,v 1.288 2002/07/31 09:54:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,7 +175,6 @@
 #include <net/net_osdep.h>
 
 extern struct domain inet6domain;
-extern struct ip6protosw inet6sw[];
 #ifdef __bsdi__
 #if _BSDI_VERSION < 199802
 extern struct ifnet loif;
