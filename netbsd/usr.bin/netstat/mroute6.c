@@ -76,9 +76,9 @@
 
 #include <netinet/in.h>
 
-#define KERNEL 1
+#define _KERNEL 1
 #include <netinet6/ip6_mroute.h>
-#undef KERNEL
+#undef _KERNEL
 
 #include <stdio.h>
 #include "netstat.h"
