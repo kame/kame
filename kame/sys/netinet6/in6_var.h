@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.104 2004/11/18 08:22:47 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.105 2004/12/09 02:19:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,8 @@ struct in6_ifextra {
 	struct scope6_id *scope6_id;
 };
 
+LIST_HEAD(mip6_bul_list, mip6_bul_internal); /* XXX */
+
 struct	in6_ifaddr {
 	struct	ifaddr ia_ifa;		/* protocol-independent info */
 #define	ia_ifp		ia_ifa.ifa_ifp
@@ -125,6 +127,9 @@ struct	in6_ifaddr {
 
 	/* multicast addresses joined from the kernel */
 	LIST_HEAD(, in6_multi_mship) ia6_memberships;
+
+	/* binding update entreis for this address */
+	struct mip6_bul_list ia6_mbul_list;
 };
 
 /* control structure to manage address selection policy */
@@ -410,6 +415,9 @@ struct	in6_rrenumreq {
 #define SIOCSIFPHYADDR_IN6       _IOW('i', 70, struct in6_aliasreq)
 #define	SIOCGIFPSRCADDR_IN6	_IOWR('i', 71, struct in6_ifreq)
 #define	SIOCGIFPDSTADDR_IN6	_IOWR('i', 72, struct in6_ifreq)
+#define SIOCSIFPHYNEXTHOP_IN6    _IOW('i', 140, struct in6_ifreq) /* set gif addres */
+#define	SIOCGIFPHYNEXTHOP_IN6	_IOWR('i', 141, struct in6_ifreq) /* get gif nexthop addres */
+
 
 #define SIOCGIFAFLAG_IN6	_IOWR('i', 73, struct in6_ifreq)
 
@@ -465,14 +473,21 @@ struct	in6_rrenumreq {
 					 */
 #define IN6_IFF_AUTOCONF	0x40	/* autoconfigurable address. */
 #define IN6_IFF_TEMPORARY	0x80	/* temporary (anonymous) address. */
-#define IN6_IFF_HOME		0x100	/* MIP6 home address. */
+#define IN6_IFF_HOME		0x100	/* MIP6:home address */
+#define IN6_IFF_DEREGISTERING	0x200	/* MIP6:deregistering address */
 
 /* do not input/output */
 #define IN6_IFF_NOTREADY (IN6_IFF_TENTATIVE|IN6_IFF_DUPLICATED)
 
 /* flags which cannot be changed by hand */
+#ifndef MIP6
 #define IN6_IFF_READONLY (IN6_IFF_DUPLICATED|IN6_IFF_DETACHED|\
     IN6_IFF_NODAD|IN6_IFF_TEMPORARY)
+#else
+/* Mobile IPv6 userland program requires to assign an address with NODAD. */
+#define IN6_IFF_READONLY (IN6_IFF_DUPLICATED|IN6_IFF_DETACHED|\
+    IN6_IFF_TEMPORARY)
+#endif /* !MIP6 */
 
 #ifdef _KERNEL
 #define IN6_ARE_SCOPE_CMP(a,b) ((a)-(b))

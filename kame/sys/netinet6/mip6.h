@@ -1,7 +1,7 @@
-/*	$KAME: mip6.h,v 1.62 2003/09/06 10:11:05 keiichi Exp $	*/
+/*	$Id: mip6.h,v 1.63 2004/12/09 02:19:10 t-momose Exp $	*/
 
 /*
- * Copyright (C) 2001 WIDE Project.  All rights reserved.
+ * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,40 +28,31 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MIP6_H_
-#define _MIP6_H_
+#ifndef _NETINET6_MIP6_H_
+#define _NETINET6_MIP6_H_
 
-/* protocol constants. */
-#define MIP6_HA_DEFAULT_LIFETIME   1800
-#define MIP6_MAX_UPDATE_RATE       5
-#define MIP6_MAX_PFX_ADV_DELAY     1000
-#define MIP6_DHAAD_INITIAL_TIMEOUT 2
-#define MIP6_DHAAD_RETRIES         3
-#define MIP6_BA_INITIAL_TIMEOUT    1
-#define MIP6_BA_MAX_TIMEOUT        256
-#define MIP6_BU_MAX_BACKOFF        7
-#define MIP6_MAX_MOB_PFX_ADV_INTERVAL	86400
-#define MIP6_MIN_MOB_PFX_ADV_INTERVAL	  600
+#define IP6OPT_HALEN	16	/* Length of home address option */
+
+/* Mobile IPv6 nodetype definition and evaluation */
+#define MIP6_NODETYPE_NONE			0x00
+#define MIP6_NODETYPE_CORRESPONDENT_NODE	0x01
+#define MIP6_NODETYPE_HOME_AGENT		0x02
+#define MIP6_NODETYPE_MOBILE_NODE		0x04
+#define MIP6_NODETYPE_MOBILE_ROUTER		0x08
 
 /*
  * Names for Mobile IPv6 sysctl objects
  */
 #define MIP6CTL_DEBUG			1
 #define MIP6CTL_USE_IPSEC		2
-#define MIP6CTL_BC_MAXLIFETIME		3
-#define MIP6CTL_HRBC_MAXLIFETIME	4
-#define MIP6CTL_BU_MAXLIFETIME		5
-#define MIP6CTL_HRBU_MAXLIFETIME	6
-#define MIP6CTL_MAXID			7
-
+#define MIP6CTL_RR_HINT_PPSLIM		3
+#define MIP6CTL_MAXID			4
+ 
 #define MIP6CTL_NAMES {				\
 	{ 0, 0 },				\
 	{ "debug", CTLTYPE_INT },		\
 	{ "use_ipsec", CTLTYPE_INT },		\
-	{ "bc_maxlifetime", CTLTYPE_INT},	\
-	{ "hrbc_maxlifetime", CTLTYPE_INT},	\
-	{ "bu_maxlifetime", CTLTYPE_INT},	\
-	{ "hrbu_maxlifetime", CTLTYPE_INT},	\
+	{ "rr_hint_ppslimit", CTLTYPE_INT },	\
 }
 
-#endif /* !_MIP6_H_ */
+#endif /* !_NETINET6_MIP6_H_ */

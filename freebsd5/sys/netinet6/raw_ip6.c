@@ -62,6 +62,7 @@
 
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -101,6 +102,9 @@
 #include <netinet6/raw_ip6.h>
 #include <netinet6/scope6_var.h>
 #include <netinet6/raw_ip6.h>
+#ifdef MIP6
+#include <netinet/ip6mh.h>
+#endif /* MIP6 */
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -568,6 +572,11 @@ rip6_attach(struct socket *so, int proto, struct thread *td)
 	inp->inp_vflag |= INP_IPV6;
 	inp->in6p_ip6_nxt = (long)proto;
 	inp->in6p_hops = -1;	/* use kernel default */
+#ifdef MIP6
+	if (proto == IPPROTO_MH)
+		inp->in6p_cksum = offsetof(struct ip6_mh, ip6mh_cksum);
+	else
+#endif
 	inp->in6p_cksum = -1;
 	MALLOC(inp->in6p_icmp6filt, struct icmp6_filter *,
 	       sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);

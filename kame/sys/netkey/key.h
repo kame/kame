@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.35 2004/12/01 07:48:24 suz Exp $	*/
+/*	$KAME: key.h,v 1.36 2004/12/09 02:19:30 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,12 +96,12 @@ extern void key_sa_stir_iv __P((struct secasvar *));
 	key_freesav(*psav)
 #endif
 
-#if defined(MIP6) && !defined(MIP6_NOHAIPSEC)
-int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,
+#ifdef MIP6
+void key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
-int key_mip6_update_home_agent_ipsecdb(struct sockaddr_in6 *,
+void key_mip6_update_home_agent_ipsecdb(struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
-#endif
+#endif /* MIP6 */
 
 #ifdef __FreeBSD__
 #ifdef MALLOC_DECLARE

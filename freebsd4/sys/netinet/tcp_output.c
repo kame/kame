@@ -37,7 +37,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
-#include "opt_mip6.h"
 #include "opt_tcpdebug.h"
 
 #include <sys/param.h>
@@ -82,19 +81,7 @@
 #define	IPSEC
 #endif /*FAST_IPSEC*/
 
-#if defined(INET6) && defined(MIP6)
-#include <net/if.h>
-#include <netinet/ip6mh.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#endif /* INET6 && MIP6 */
-
 #include <machine/in_cksum.h>
-
-#if defined(INET6) && defined(MIP6)
-static int mip6_hdrsiz_tcp(struct tcpcb *);
-#endif /* INET6 && MIP6 */
 
 #ifdef notyet
 extern struct mbuf *m_copypack();
@@ -606,9 +593,6 @@ send:
 #ifdef IPSEC
 	ipoptlen += ipsec_hdrsiz_tcp(tp);
 #endif
-#if defined(INET6) && defined(MIP6)
-	ipoptlen += mip6_hdrsiz_tcp(tp);
-#endif /* INET6 && MIP6 */
 
 	/*
 	 * Adjust data length if insertion of options will
@@ -1131,19 +1115,3 @@ tcp_setpersist(tp)
 	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
 		tp->t_rxtshift++;
 }
-
-#if defined(INET6) && defined(MIP6)
-static int
-mip6_hdrsiz_tcp(tp)
-	struct tcpcb *tp;
-{
-	struct inpcb *inp;
-
-	if ((tp == NULL)
-	    || ((inp = tp->t_inpcb) == NULL)
-	    || (inp->inp_vflag & INP_IPV6) == 0)
-		return (0);
-
-	return (mip6_exthdr_size(&inp->in6p_laddr, &inp->in6p_faddr));
-}
-#endif /* INET6 && MIP6 */

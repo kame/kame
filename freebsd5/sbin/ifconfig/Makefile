@@ -8,6 +8,7 @@ SRCS=	ifconfig.c
 SRCS+=	ifmedia.c
 CFLAGS+=-DUSE_IF_MEDIA
 CFLAGS+=-DINET6
+CFLAGS+=-DMIP6
 
 #comment out to exclude SIOC[GS]ETVLAN support
 SRCS+=	ifvlan.c

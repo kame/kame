@@ -237,6 +237,7 @@ struct rt_msghdr {
 #define	RTM_NEWMADDR	0xf	/* mcast group membership being added to if */
 #define	RTM_DELMADDR	0x10	/* mcast group membership being deleted */
 #define	RTM_IFANNOUNCE	0x11	/* iface arrival/departure */
+#define	RTM_ADDRINFO	0x12	/* change address flags */
 
 /*
  * Bitmask values for rtm_inits and rmx_locks.
@@ -362,6 +363,7 @@ void	 route_init __P((void));
 int	 rt_getifa __P((struct rt_addrinfo *));
 void	 rt_ifannouncemsg __P((struct ifnet *, int));
 void	 rt_ifmsg __P((struct ifnet *));
+void	 rt_addrinfomsg __P((struct ifaddr *));
 void	 rt_missmsg __P((int, struct rt_addrinfo *, int, int));
 void	 rt_newaddrmsg __P((int, struct ifaddr *, int, struct rtentry *));
 void	 rt_newmaddrmsg __P((int, struct ifmultiaddr *));

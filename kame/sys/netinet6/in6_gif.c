@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.112 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: in6_gif.c,v 1.113 2004/12/09 02:19:03 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,10 +32,12 @@
 #ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_iso.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -81,6 +83,9 @@
 #endif
 
 #include <net/if_gif.h>
+#ifdef MIP6
+#include <net/if_nemo.h>
+#endif /* MIP6 */
 
 #ifdef __OpenBSD__
 #include "bridge.h"
@@ -183,7 +188,6 @@ in6_gif_output(ifp, family, m)
 		m_freem(m);
 		return EAFNOSUPPORT;
 	}
-
 #if NBRIDGE > 0
 	if (family == AF_LINK) {
 	        mp = NULL;
@@ -247,6 +251,13 @@ in6_gif_output(ifp, family, m)
 #ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
+#ifdef MIP6
+        struct ip6_pktopts  pktopt;
+
+	bzero(&pktopt, sizeof(pktopt));
+	pktopt.ip6po_hlim = -1;   /* -1 means default hop limit */
+#endif /* MIP6 */
+
 
 	if (sin6_src == NULL || sin6_dst == NULL ||
 	    sin6_src->sin6_family != AF_INET6 ||
@@ -349,19 +360,52 @@ in6_gif_output(ifp, family, m)
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
+#ifdef MIP6
+	/* 
+	 * if gif has a nexthop address in the gif_softc, point the route entry 
+	 * of the nexthop address and pass it to ip6_output
+	 */
+	if (sc->gif_nexthop) {
+		pktopt.ip6po_nexthop =
+			(struct sockaddr *)malloc(sizeof(struct sockaddr_in6),
+				M_TEMP, M_NOWAIT); 
+
+		if (pktopt.ip6po_nexthop == NULL) {
+			m_freem(m);
+			return ENOMEM;
+		}
+
+
+		bzero(pktopt.ip6po_nexthop, sizeof(struct sockaddr_in6));
+		bcopy(sc->gif_nexthop, pktopt.ip6po_nexthop, sizeof(struct sockaddr_in6));
+		satosin6(pktopt.ip6po_nexthop)->sin6_scope_id = 0; /* XXX */
+	} 
+#endif /* MIP6 */
+
+
 #ifdef IPV6_MINMTU
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
+#ifndef MIP6
 	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL
+#else
+	error = ip6_output(m, (pktopt.ip6po_nexthop) ? &pktopt : NULL, 
+		&sc->gif_ro6, IPV6_MINMTU, 0, NULL
+#endif /* MIP6 */
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			   );
 #else
+#ifndef MIP6
 	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL
+#else
+	error = ip6_output(m, (pktopt.ip6po_nexthop) ? &pktopt : NULL, 
+		&sc->gif_ro6, 0, 0, NULL
+#endif /* MIP6 */
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif

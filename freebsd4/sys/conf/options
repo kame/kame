@@ -294,12 +294,6 @@ ENABLE_DEFAULT_SCOPE	opt_global.h
 IP6_AUTO_LINKLOCAL	opt_inet6.h
 SCOPEDEBUG		opt_inet6.h	# for debug only.  don't merge it.
 LARGE_LOMTU		opt_inet6.h
-MIP6			opt_mip6.h
-MIP6_MOBILE_NODE	opt_mip6.h
-MIP6_HOME_AGENT		opt_mip6.h
-MIP6_DEBUG		opt_mip6.h
-MIP6_STATIC_HADDR	opt_mip6.h
-MIP6_NOHAIPSEC		opt_mip6.h
 NATPT			opt_natpt.h
 NATPT_NAT		opt_natpt.h
 NEW_STRUCT_ROUTE	opt_global.h
@@ -355,6 +349,10 @@ SCTP_MAP_LOGGING        opt_sctp.h
 #
 DCCP			opt_dccp.h
 DCCP_TFRC		opt_dccp.h
+#
+MIP6			opt_mip6.h
+HOMEAGENT		opt_mip6.h
+MIP6_MCOA		opt_mip6.h
 #
 SLIP_IFF_OPTS		opt_slip.h
 TCPDEBUG

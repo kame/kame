@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.112 2004/11/12 06:00:40 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.113 2004/12/09 02:18:54 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,10 +32,12 @@
 #ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_iso.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -206,6 +208,9 @@ gifattach0(sc)
 #else
 	bpfattach(&sc->gif_if.if_bpf, &sc->gif_if, DLT_NULL, sizeof(u_int));
 #endif
+#endif
+#ifdef MIP6
+	sc->gif_nexthop = NULL;
 #endif
 }
 
@@ -892,7 +897,52 @@ gif_ioctl(ifp, cmd, data)
 	case SIOCSIFFLAGS:
 		/* if_ioctl() takes care of it */
 		break;
+#ifdef MIP6
+	case SIOCSIFPHYNEXTHOP: 
+	case SIOCSIFPHYNEXTHOP_IN6: {
+		struct sockaddr *nh = NULL;
+		int nhlen = 0;
 
+		switch (ifr->ifr_addr.sa_family) {
+#ifdef INET
+		case AF_INET:	/* IP supports Multicast */
+			error = EAFNOSUPPORT;
+			break;
+#endif /* INET */
+#ifdef INET6
+		case AF_INET6:	/* IP6 supports Multicast */
+			nh = (struct sockaddr *)
+				&(((struct in6_ifreq *)data)->ifr_addr);
+			nhlen = sizeof(((struct in6_ifreq *)data)->ifr_addr);
+			break;
+#endif /* INET6 */
+		default:  /* Other protocols doesn't support Multicast */
+			error = EAFNOSUPPORT;
+			break;
+		}
+
+		if (error)
+			return error;
+
+		/* if pointer is null, allocate memory */
+		if (sc->gif_nexthop == NULL) {
+			sc->gif_nexthop = (struct sockaddr *)malloc(nhlen, M_IFADDR, M_WAITOK);
+			if (sc->gif_nexthop == NULL)
+				return ENOMEM;
+
+			bzero(sc->gif_nexthop, nhlen);
+		}
+		/* set request address into gif_nexthop */
+		bcopy(nh, sc->gif_nexthop, nhlen);
+		in6_embedscope(&satosin6(sc->gif_nexthop)->sin6_addr, satosin6(sc->gif_nexthop));
+		break;
+	}
+	case SIOCDIFPHYNEXTHOP: 
+		/* if pointer is not null, free the memory */
+		if (sc->gif_nexthop) 
+			free(sc->gif_nexthop, M_IFADDR);
+		break;
+#endif
 	default:
 		error = EINVAL;
 		break;
@@ -1059,6 +1109,13 @@ gif_delete_tunnel(ifp)
 		free((caddr_t)sc->gif_pdst, M_IFADDR);
 		sc->gif_pdst = NULL;
 	}
+#ifdef MIP6
+	if (sc->gif_nexthop) {
+		free((caddr_t)sc->gif_nexthop, M_IFADDR);
+		sc->gif_nexthop = NULL;
+	}
+#endif /* MIP6 */
+
 	/* it is safe to detach from both */
 #ifdef INET
 	(void)in_gif_detach(sc);

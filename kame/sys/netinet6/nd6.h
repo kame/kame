@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.113 2004/08/11 10:20:48 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.114 2004/12/09 02:19:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,6 +103,7 @@ struct nd_ifinfo {
 #define ND6_IFF_IFDISABLED	0x8 /* IPv6 operation is disabled due to
 				     * DAD failure.  (XXX: not ND-specific)
 				     */
+#define ND6_IFF_DONT_SET_IFROUTE	0x10
 
 #ifdef _KERNEL
 #define ND_IFINFO(ifp) \

@@ -343,10 +343,7 @@ device		stf	1
 
 # Mobile IPv6
 #options 	MIP6
-#options 	MIP6_HOME_AGENT
-#options 	MIP6_MOBILE_NODE
-#device		hif	1
-#options 	MIP6_DEBUG
+#device		mip	1
 
 device		pf
 device		pflog

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.205 2004/11/30 18:05:40 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.206 2004/12/09 02:19:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,7 +31,6 @@
 
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -76,16 +75,6 @@
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/scope6_var.h>
 
-#ifdef MIP6
-#include <netinet/ip6mh.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#ifdef MIP6_MOBILE_NODE
-#include <netinet6/mip6_mncore.h>
-#endif
-#endif
-
 #include <net/if_ist.h>
 #include <net/net_osdep.h>
 
@@ -115,9 +104,7 @@ static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
 static int generate_tmp_ifid __P((u_int8_t *, const u_int8_t *, u_int8_t *));
-#ifndef MIP6
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
-#endif /* !MIP6 */
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
 static int in6_ifattach_loopback __P((struct ifnet *));
 
@@ -502,11 +489,7 @@ found:
  * available on ifp0, borrow interface identifier from other information
  * sources.
  */
-#ifdef MIP6
-int
-#else /* !MIP6 */
 static int
-#endif /* !MIP6 */
 get_ifid(ifp0, altifp, in6)
 	struct ifnet *ifp0;
 	struct ifnet *altifp;	/* secondary EUI64 source */
@@ -1122,11 +1105,6 @@ in6_ifdetach(ifp)
 		RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET6]);
 #endif
 	}
-
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	if (MIP6_IS_MN)
-		mip6_process_movement();
-#endif /* MIP6 && MIP6_MOBILE_NODE */
 }
 
 int

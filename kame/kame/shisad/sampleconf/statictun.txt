@@ -1,0 +1,4 @@
+#Static Tunnel Assignment File
+#TunnelName HomeAddress BindingID(optional)
+nemo3 2001:200:0:8c08::328 111
+nemo6 2001:200:0:8c08::328 800

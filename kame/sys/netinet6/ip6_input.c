@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.350 2004/12/01 05:07:16 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.351 2004/12/09 02:19:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,6 +75,7 @@
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -126,16 +127,6 @@
 #include <netinet6/scope6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
-#ifdef MIP6
-#include <netinet/ip6mh.h>
-#include <net/if_hif.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#ifdef MIP6_MOBILE_NODE
-#include <netinet6/mip6_mncore.h>
-#endif /* MIP6_MOBILE_NODE */
-#endif /* MIP6 */
 
 #include <net/if_stf.h>
 
@@ -280,10 +271,6 @@ ip6_init()
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);
 #endif
-
-#ifdef MIP6
-	mip6_init();
-#endif /* MIP6 */
 
 #if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
 	/* Register our Packet Filter hook. */
@@ -589,6 +576,15 @@ ip6_input(m)
 	}
 #endif
 
+	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
+
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET6) == 0) {
+		/* packet is dropped by traffic conditioner */
+		return;
+	}
+#endif
+
 #if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 	/*
 	 * Check with the firewall...
@@ -838,18 +834,22 @@ ip6_input(m)
 	     ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP)
 #else
 	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP
-#endif
-								) {
+#endif /* MIP6 */
+	    ) {
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
 #ifdef MIP6
 		/* check unicast NS */
 	    	if ((ip6_forward_rt.ro_rt->rt_flags & RTF_ANNOUNCE) != 0) {
+			/* This route shows proxy nd. thus the packet was
+			 *  captured. this packet should be tunneled to
+			 * actual coa with tunneling unless this is NS.
+			 */
 			int nxt, loff;
 			struct icmp6_hdr *icp;
 			loff = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt);
 			if (loff <  0 || nxt != IPPROTO_ICMPV6)
-				goto mip6_fowarding;
+				goto mip6_forwarding;
 #ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, 0, loff + sizeof(struct icmp6_hdr),);
 			icp = (struct icmp6_hdr *)(mtod(m, caddr_t) + loff);
@@ -862,9 +862,9 @@ ip6_input(m)
 			}
 #endif
 			if (icp->icmp6_type != ND_NEIGHBOR_SOLICIT)
-				goto mip6_fowarding;
+				goto mip6_forwarding;
 		}
-#endif
+#endif /* MIP6 */
 		/*
 		 * record address information into m_tag.
 		 */
@@ -894,10 +894,10 @@ ip6_input(m)
 			goto bad;
 		}
 	}
-#ifdef MIP6
- mip6_fowarding:
-#endif
 
+#ifdef MIP6
+ mip6_forwarding:
+#endif /* MIP6 */
 	/*
 	 * FAITH (Firewall Aided Internet Translator)
 	 */
@@ -1149,21 +1149,6 @@ ip6_input(m)
 #ifdef MIP6
 		if (dest6_mip6_hao(m, off, nxt) < 0)
 			goto bad;
-#ifdef MIP6_MOBILE_NODE
-		/*
-		 * XXX
-		 * check if the packet was tunneled after all extention
-		 * headers have been processed.  get from Ericsson
-		 * code.  need more consideration.
-		 */
-		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
-		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
-		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH) &&
-		    (nxt != IPPROTO_MH) && (nxt != IPPROTO_NONE)) {
-			if (mip6_route_optimize(m))
-				goto bad;
-		}
-#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}

@@ -4,8 +4,5 @@ include	"arch/macppc/conf/GENERIC"
 
 # Mobile IPv6
 #options	MIP6			# required for all node types
-#options	MIP6_HOME_AGENT		# required for a home agent
-#options	MIP6_MOBILE_NODE	# required for a mobile node
-#pseudo-device	hif	1		# required for a mobile node
-#options	MIP6_HAIPSEC		# ha-ipsec draft support
+#pseudo-device	mip	1		# required for a mobile node
 #options	MIP6_DEBUG

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.391 2004/10/26 06:29:14 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.392 2004/12/09 02:19:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,7 +68,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
-#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -135,20 +134,6 @@
 #if defined(NFAITH) && 0 < NFAITH
 #include <net/if_faith.h>
 #endif
-
-#ifdef MIP6
-#include <netinet/ip6mh.h>
-#include <net/if_hif.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#ifdef MIP6_HOME_AGENT
-#include <netinet6/mip6_hacore.h>
-#endif /* MIP6_HOME_AGENT */
-#ifdef MIP6_MOBILE_NODE
-#include <netinet6/mip6_mncore.h>
-#endif /* MIP6_MOBILE_NODE */
-#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -519,9 +504,6 @@ icmp6_error(m, type, code, param)
 			}
 			oip6 = mtod(m, struct ip6_hdr *); /* adjust pointer */
 		}
-#ifdef MIP6
-		ip6a->ip6a_flags |= IP6A_NOTUSEBC;
-#endif
 	}
 
 	if (m->m_pkthdr.len >= ICMPV6_PLD_MAXLEN)
@@ -654,13 +636,6 @@ icmp6_input(mp, offp, proto)
 
 	icmp6stat.icp6s_inhist[icmp6->icmp6_type]++;
 
-#if defined(MIP6) && defined(MIP6_HOME_AGENT)
-	if (mip6_icmp6_tunnel_input(m, off, icmp6len)) {
-		m = NULL;
-		goto freeit;
-	}
-#endif /* MIP6 && MIP6_HOME_AGENT */
-
 #ifdef MLDV2
 	/* 
 	 * see whether the received packet matches with per-interface MSF,
@@ -687,12 +662,6 @@ icmp6_input(mp, offp, proto)
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
-#if defined(MIP6)
-		if (mip6_icmp6_input(m, off, icmp6len)) {
-			m = NULL;
-			goto freeit;
-		}
-#endif /* MIP6 */
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			code = PRC_UNREACH_NET;
@@ -753,12 +722,6 @@ icmp6_input(mp, offp, proto)
 
 	case ICMP6_PARAM_PROB:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_paramprob);
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-		if (mip6_icmp6_input(m, off, icmp6len)) {
-			m = NULL;
-			goto freeit;
-		}
-#endif /* MIP6 && MIP6_MOBILE_NODE */
 		switch (code) {
 		case ICMP6_PARAMPROB_NEXTHEADER:
 			code = PRC_UNREACH_PROTOCOL;
@@ -863,46 +826,6 @@ icmp6_input(mp, offp, proto)
 		if (code != 0)
 			goto badcode;
 		break;
-
-#if defined(MIP6) && defined(MIP6_HOME_AGENT)
-	case MIP6_HA_DISCOVERY_REQUEST:
-		if (icmp6len < sizeof(struct mip6_dhaad_req))
-			goto badlen;
-		if (code != 0)
-			goto badcode;
-		break;
-
-	case MIP6_PREFIX_SOLICIT:
-		if (icmp6len < sizeof(struct mip6_prefix_solicit))
-			goto badlen;
-		if (code != 0)
-			goto badcode;
-		break;
-#endif /* MIP6 && MIP6_HOME_AGENT */
-
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	case MIP6_HA_DISCOVERY_REPLY:
-		if (icmp6len < sizeof(struct mip6_dhaad_rep))
-			goto badlen;
-		if (code != 0)
-			goto badcode;
-		if (mip6_icmp6_input(m, off, icmp6len)) {
-			m = NULL;
-			goto freeit;
-		}
-		break;
-
-	case MIP6_PREFIX_ADVERT:
-		if (icmp6len < sizeof (struct mip6_prefix_advert))
-			goto badlen;
-		if (code != 0)
-			goto badcode;
-		if (mip6_icmp6_input(m, off, icmp6len)) {
-			m = NULL;
-			goto freeit;
-		}
-		break;
-#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	case MLD_LISTENER_QUERY:
 	case MLD_LISTENER_REPORT:
@@ -1265,14 +1188,8 @@ icmp6_notify_error(m, off, icmp6len, code)
 				 * have been passed.
 				 */
 				if (
-#ifdef MIP6
-				    rth->ip6r_segleft &&
-				    (rth->ip6r_type == IPV6_RTHDR_TYPE_0 ||
-				    rth->ip6r_type == IPV6_RTHDR_TYPE_2)
-#else
 				    rth->ip6r_segleft &&
 				    rth->ip6r_type == IPV6_RTHDR_TYPE_0
-#endif /* MIP6 */
 				    ) {
 					int hops;
 

@@ -4,9 +4,9 @@ SUBDIR+=faithd gifconfig hroute6d icmp6dump \
 #SUBDIR+=altqd pvcbridge pvcsif pvctxctl tbrconfig
 SUBDIR+=ifmcstat
 SUBDIR+=racoon
-SUBDIR+=mip6control had mip6stat
 SUBDIR+=ip6addrctl
 #SUBDIR+=natptconfig natptlog
 SUBDIR+=dhcp6
+SUBDIR+=shisad
 
 .include <bsd.subdir.mk>

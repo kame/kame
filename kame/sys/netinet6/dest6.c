@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.67 2004/05/24 11:29:08 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.68 2004/12/09 02:19:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,6 +36,7 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -63,15 +64,10 @@
 #include <netinet6/scope6_var.h>
 
 #ifdef MIP6
+#include <net/mipsock.h>
 #include <netinet/ip6mh.h>
-#include <net/if_hif.h>
-#include <netinet6/nd6.h>
-#include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#endif /* MIP6 */
 
-#ifdef MIP6
 static int	dest6_swap_hao __P((struct ip6_hdr *, struct ip6aux *,
 				    struct ip6_opt_home_address *));
 static int	dest6_nextopt __P((struct mbuf *, int, struct ip6_opt *));
@@ -92,15 +88,14 @@ dest6_input(mp, offp, proto)
 #ifdef MIP6
 	struct m_tag *n;
 	struct in6_addr home;
-	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6aux *ip6a = NULL;
+	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6_hdr *ip6;
-	struct mip6_bc *mbc;
+	struct mip6_bc_internal *bce;
 	int verified = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-#endif
-
+#endif /* MIP6 */
 	/* validation of the length of the header */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(*dstopts), IPPROTO_DONE);
@@ -169,30 +164,30 @@ dest6_input(mp, offp, proto)
 			bcopy(&home, &ip6a->ip6a_coa, sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 
+#if 0
 			mip6stat.mip6s_hao++;
+#endif
 
 			/* check whether this HAO is 'verified'. */
-			if ((mbc = mip6_bc_list_find_withphaddr(
-				&mip6_bc_list, &home)) != NULL) {
+			if (
+#ifndef MIP6_MCOA
+				(bce = mip6_bce_get(&home, &ip6->ip6_dst))
+#else
+				(bce = mip6_bce_get(&home, &ip6->ip6_dst, &ip6->ip6_src, 0))
+#endif /* MIP6_MCOA */
+				&& IN6_ARE_ADDR_EQUAL(&bce->mbc_coa, &ip6->ip6_src)) {
 				/*
 				 * we have a corresponding binding
 				 * cache entry for the home address
 				 * includes in this HAO.
 				 */
-				if (IN6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
-				    &ip6->ip6_src))
-					verified = 1;
+				verified = 1;
 			}
 			/*
 			 * we have neither a corresponding binding
 			 * cache nor ESP header. we have no clue to
 			 * beleive this HAO is a correct one.
 			 */
-			/*
-			 * Currently, no valid sub-options are
-			 * defined for use in a Home Address option.
-			 */
-
 			break;
 #endif /* MIP6 */
 		default:		/* unknown option */
@@ -207,11 +202,9 @@ dest6_input(mp, offp, proto)
 
 #ifdef MIP6
 	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
-	if (verified)
-		if (dest6_swap_hao(ip6, ip6a, haopt) < 0)
-			goto bad;
+	if (verified && dest6_swap_hao(ip6, ip6a, haopt) < 0)
+		goto bad;
 #endif /* MIP6 */
-
 	*offp = off;
 	return (dstopts->ip6d_nxt);
 
@@ -290,7 +283,6 @@ dest6_mip6_hao(m, mhoff, nxt)
 	struct m_tag *n;
 	struct in6_addr home;
 	struct ip6_opt_home_address haopt;
-	struct ip6_mh mh;
 	int newoff, off, proto, swap;
 
 	/* XXX should care about destopt1 and destopt2.  in destopt2,
@@ -334,35 +326,28 @@ dest6_mip6_hao(m, mhoff, nxt)
 	    (caddr_t)&haopt);
 
 	swap = 0;
-	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP)
+	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP || nxt == IPPROTO_MH)
 		swap = 1;
-	if (nxt == IPPROTO_MH) {
-		m_copydata(m, mhoff, sizeof(mh), (caddr_t)&mh);
-		if (mh.ip6mh_type == IP6_MH_TYPE_BU)
-			swap = 1;
-		else if (mh.ip6mh_type == IP6_MH_TYPE_HOTI ||
-			 mh.ip6mh_type == IP6_MH_TYPE_COTI)
-			return (-1);
-		else if (mh.ip6mh_type > IP6_MH_TYPE_MAX)
-			swap = 1;	/* must be sent BE with UNRECOGNIZED_TYPE */
-	}
 
 	home = *(struct in6_addr *)haopt.ip6oh_addr;
-	/*
-	 * reject invalid home-addresses
-	 */
+	/* reject invalid home addresses. */
 	if (IN6_IS_ADDR_MULTICAST(&home) ||
 	    IN6_IS_ADDR_LINKLOCAL(&home) ||
 	    IN6_IS_ADDR_V4MAPPED(&home)  ||
 	    IN6_IS_ADDR_UNSPECIFIED(&home) ||
 	    IN6_IS_ADDR_LOOPBACK(&home)) {
 		ip6stat.ip6s_badscope++;
-		if (!(nxt == IPPROTO_MH && mh.ip6mh_type == IP6_MH_TYPE_BU)) {
-			/* BE is sent only when the received packet is 
-			   not BU */
-			(void)mobility6_send_be(&ip6->ip6_dst, &ip6->ip6_src, 
-			    IP6_MH_BES_UNKNOWN_HAO, &home);
+		if (nxt == IPPROTO_MH) {
+			/*
+			 * a binding error message is sent only when
+			 * the received packet is not a binding update
+			 * message.
+			 */
+			return (0);
 		}
+		/* notify to send a binding error by the mobility socket. */
+		(void)mips_notify_be_hint(&ip6->ip6_src, &ip6->ip6_dst, &home,
+		    IP6_MH_BES_UNKNOWN_HAO);
 		return (-1);
 	}
 
@@ -377,9 +362,11 @@ dest6_mip6_hao(m, mhoff, nxt)
 	}
 
 	/* reject */
-	mip6stat.mip6s_unverifiedhao++;
-	mobility6_send_be(&ip6->ip6_dst, &ip6->ip6_src,
-	    IP6_MH_BES_UNKNOWN_HAO, &home);
+/*	mip6stat.mip6s_unverifiedhao++;*/
+
+	/* notify to send a binding error by the mobility socket. */
+	(void)mips_notify_be_hint(&ip6->ip6_src, &ip6->ip6_dst, &home,
+	    IP6_MH_BES_UNKNOWN_HAO);
 
 	return (-1);
 }

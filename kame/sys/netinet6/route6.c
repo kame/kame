@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.55 2004/11/19 04:50:44 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.56 2004/12/09 02:19:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,6 +36,7 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -52,26 +53,20 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 
-#include <netinet/icmp6.h>
-
 #ifdef MIP6
+#include "mip.h"
 #include <netinet/ip6mh.h>
-#include <net/if_hif.h>
-#include <netinet6/nd6.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#ifdef MIP6_MOBILE_NODE
-#include <netinet6/mip6_mncore.h>
-#endif /* MIP6_MOBILE_NODE */
-#endif /* MIP6 */
+#endif
+
+#include <netinet/icmp6.h>
 
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+
+#if defined(MIP6) && NMIP > 0
 static int ip6_rthdr2 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr2 *));
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#endif /* defined(MIP6) && NMIP > 0 */
 
 int
 route6_input(mp, offp, proto)
@@ -111,6 +106,8 @@ route6_input(mp, offp, proto)
 	switch (rh->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		rhlen = (rh->ip6r_len + 1) << 3;
+		if (rh->ip6r_segleft == 0)
+			break;	/* Final dst. Just ignore the header. */
 #ifndef PULLDOWN_TEST
 		/*
 		 * note on option length:
@@ -136,28 +133,10 @@ route6_input(mp, offp, proto)
 		if (ip6_rthdr0(m, ip6, (struct ip6_rthdr0 *)rh))
 			return (IPPROTO_DONE);
 		break;
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+#if defined(MIP6) && NMIP > 0
 	case IPV6_RTHDR_TYPE_2:
-		/* sanity check. */
-		if (!MIP6_IS_MN) {
-			/* the node must be a mobile node. */
-			return (IPPROTO_DONE);
-		}
-		if (rh->ip6r_len != 2) {
-			/*
-			 * the length field in the RH must be exactly
-			 * 2.
-			 */
-			return (IPPROTO_DONE);
-		}
-		if (rh->ip6r_segleft > 1) {
-			/*
-			 * the segments left field in the RH must be
-			 * exactry 1.
-			 */
-			return (IPPROTO_DONE);
-		}
-		rhlen = 24; /* (rh->ip6r_len + 1) << 3 */
+		rhlen = (rh->ip6r_len + 1) << 3;
+
 #ifndef PULLDOWN_TEST
 		IP6_EXTHDR_CHECK(m, off, rhlen, IPPROTO_DONE);
 #else
@@ -167,21 +146,17 @@ route6_input(mp, offp, proto)
 			return IPPROTO_DONE;
 		}
 #endif
-		if (ip6_rthdr2(m, ip6, (struct ip6_rthdr2 *)rh))
-			return (IPPROTO_DONE);
+
+		if (ip6_rthdr2(m, ip6, (struct ip6_rthdr2 *)rh)) 
+			return(IPPROTO_DONE);
+
 		break;
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#endif /* defined(MIP6) && NMIP > 0 */
 	default:
 		/* unknown routing type */
 		if (rh->ip6r_segleft == 0) {
 			rhlen = (rh->ip6r_len + 1) << 3;
 			break;	/* Final dst. Just ignore the header. */
-			/* 
-			 * even if the routing header length is greater than 
-			 * the remaining packet size, a buffer overrun does not
-			 * occur, since such packet will be discarded in the 
-			 * processing of the next header.
-			 */
 		}
 		ip6stat.ip6s_badoptions++;
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
@@ -220,7 +195,7 @@ ip6_rthdr0(m, ip6, rh0)
 		) {
 		/*
 		 * Type 0 routing header can't contain more than 23 addresses.
-		 * RFC 2460: this limitation was removed since strict/loose
+		 * RFC 2462: this limitation was removed since strict/loose
 		 * bitmap field was deleted.
 		 */
 		ip6stat.ip6s_badoptions++;
@@ -308,42 +283,72 @@ ip6_rthdr0(m, ip6, rh0)
 	return (-1);
 }
 
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-/*
- * type 2 routing header processing.
- */
+#if defined(MIP6) && NMIP > 0
+/* Type2 routing header processing */
 static int
 ip6_rthdr2(m, ip6, rh2)
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
 	struct ip6_rthdr2 *rh2;
 {
-	int rh2_has_hoa;
-	struct sockaddr_in6 next_sa;
-	struct hif_softc *sc;
-	struct mip6_bu *mbu;
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;
+	struct sockaddr_in6 next_sa;
 
-	rh2_has_hoa = 0;
+	if (rh2->ip6r2_segleft == 0)
+		return (0);
+
+	/* section 11.3.3 */
+	if (rh2->ip6r2_len != 2) {
+		ip6stat.ip6s_badoptions++;
+		goto bad;
+	}
+
+	if (rh2->ip6r2_segleft != 1) { 
+		ip6stat.ip6s_badoptions++;
+		goto bad;
+	}
+
+	rh2->ip6r2_segleft--;
+	nextaddr = (struct in6_addr *)(rh2 + 1);
+
+	/*
+	 * reject invalid addresses.  be proactive about malicious use of
+	 * IPv4 mapped/compat address.
+	 * XXX need more checks?
+	 */
+	if (IN6_IS_ADDR_MULTICAST(nextaddr) ||
+		IN6_IS_ADDR_UNSPECIFIED(nextaddr) ||
+		IN6_IS_ADDR_V4MAPPED(nextaddr) ||
+		IN6_IS_ADDR_V4COMPAT(nextaddr)) {
+		ip6stat.ip6s_badoptions++;
+		goto bad;
+	}
+
+	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
+		IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_dst) ||
+		IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst) ||
+		IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst)) {
+		ip6stat.ip6s_badoptions++;
+		goto bad;
+	}
 
 	/*
 	 * determine the scope zone of the next hop, based on the interface
 	 * of the current hop.
 	 * [draft-ietf-ipngwg-scoping-arch, Section 9]
 	 */
-	if ((ifa = ip6_getdstifaddr(m)) == NULL)
+	if ((ifa = ip6_getdstifaddr(m)) == NULL) 
 		goto bad;
+	/*
+	 * construct a sockaddr_in6 for the next hop with the zone ID,
+	 * then update the recorded destination address.
+	 */
 	bzero(&next_sa, sizeof(next_sa));
-	next_sa.sin6_len = sizeof(next_sa);
 	next_sa.sin6_family = AF_INET6;
-	bcopy((const void *)(rh2 + 1), &next_sa.sin6_addr,
-	      sizeof(struct in6_addr));
-	nextaddr = (struct in6_addr *)(rh2 + 1);
-	if (in6_addr2zoneid(ifa->ia_ifp,
-			    &next_sa.sin6_addr,
-			    &next_sa.sin6_scope_id)) {
-		/* should not happen. */
+	next_sa.sin6_len = sizeof(next_sa);
+	next_sa.sin6_addr = *nextaddr;
+	if (in6_addr2zoneid(ifa->ia_ifp, nextaddr, &next_sa.sin6_scope_id)) {
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
@@ -353,105 +358,26 @@ ip6_rthdr2(m, ip6, rh2)
 		goto bad;
 	}
 
-	/* check addresses in ip6_dst and rh2. */
-	for (sc = LIST_FIRST(&hif_softc_list); sc;
-	    sc = LIST_NEXT(sc, hif_entry)) {
-		for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
-		     mbu = LIST_NEXT(mbu, mbu_entry)) {
-			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
-				continue;
 
-			/* XXX should we check a registration status? */
+	/* Check BUL xxx */
 
-			if (rh2->ip6r2_segleft == 0) {
-				struct m_tag *mtag;
-				struct ip6aux *ip6a;
-
-				/*
-				 * if segleft == 0, ip6_dst must be
-				 * one of our home addresses.
-				 */
-				if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-					&mbu->mbu_haddr))
-					continue;
-
-				mip6stat.mip6s_rthdr2++;
-
-				/*
-				 * if the previous hop is the coa that
-				 * is corresponding to the hoa in
-				 * ip6_dst, the route is optimized
-				 * already.
-				 */
-				if (!IN6_ARE_ADDR_EQUAL(&next_sa.sin6_addr,
-					&mbu->mbu_coa)) {
-					/* coa mismatch.  discard this. */
-					goto bad;
-				}
-
-				/*
-				 * the route is already optimized.
-				 * set optimized flag in m_aux.
-				 */
-				mtag = ip6_findaux(m);
-				if (mtag) {
-					ip6a = (struct ip6aux *)(mtag + 1);
-					ip6a->ip6a_flags
-						|= IP6A_ROUTEOPTIMIZED;
-					return (0);
-				}
-				/* if n == 0 return error. */
-				goto bad;
-			} else {
-				/*
-				 * if segleft == 1, the specified
-				 * intermediate node must be one of
-				 * our home addresses.
-				 */
-				if (!IN6_ARE_ADDR_EQUAL(&next_sa.sin6_addr,
-					&mbu->mbu_haddr))
-					continue;
-				rh2_has_hoa++;
-			}
-		}
-	}
-	if (rh2_has_hoa == 0) {
-		/*
-		 * this rh2 includes an address that is not one of our
-		 * home addresses.
-		 */
-		goto bad;
-	}
-
-	rh2->ip6r2_segleft--;
-
-	/*
-	 * reject invalid addresses.  be proactive about malicious use of
-	 * IPv4 mapped/compat address.
-	 * XXX need more checks?
-	 */
-	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) {
-		ip6stat.ip6s_badoptions++;
-		goto bad;
-	}
-
-	/*
-	 * Swap the IPv6 destination address and nextaddr. Forward the packet.
-	 */
-	tmpaddr = *nextaddr;
+	/* Swap the IPv6 destination address and nextaddr. Forward the packet.  */
+  	tmpaddr = *nextaddr;
 	*nextaddr = ip6->ip6_dst;
-	in6_clearscope(nextaddr);
+	if (IN6_IS_ADDR_LINKLOCAL(nextaddr))
+		nextaddr->s6_addr16[1] = 0;
 	ip6->ip6_dst = tmpaddr;
-	ip6_forward(m, 1);
+
+	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst))
+		ip6->ip6_dst.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
+  	ip6_forward(m, 1);
 
 	return (-1);			/* m would be freed in ip6_forward() */
 
   bad:
 	m_freem(m);
 	return (-1);
+
 }
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#endif /* defined(MIP6) && NMIP > 0 */

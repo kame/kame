@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.153 2004/07/26 02:57:35 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.154 2004/12/09 02:19:05 t-momose Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -67,9 +67,9 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
-#include "opt_mip6.h"
 #include "opt_sctp.h"
 #include "opt_dccp.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -77,6 +77,7 @@
 #include "opt_iso.h"
 #include "opt_sctp.h"
 #include "opt_dccp.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -186,15 +187,11 @@
 #endif
 #endif /* IPSEC */
 
-#include <netinet6/ip6protosw.h>
-
 #ifdef MIP6
-#include <netinet/ip6mh.h>
-#include <net/if_hif.h>
-#include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
 #endif /* MIP6 */
+
+#include <netinet6/ip6protosw.h>
 
 #include <net/net_osdep.h>
 
@@ -407,14 +404,20 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #ifdef MIP6
-{ SOCK_RAW,	&inet6domain,	IPPROTO_MH,PR_ATOMIC|PR_ADDR,
-  mobility6_input,	0,	 	0,		rip6_ctloutput,
+{ SOCK_RAW,	&inet6domain,	IPPROTO_MH,PR_ATOMIC|PR_ADDR|PR_LASTHDR,
+  mip6_input,	0,	 	0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
+#else
+  rip6_usrreq,
+#endif
   0,		0,		0,		0,
 #ifndef __FreeBSD__
   mip6_sysctl,
 #else
+# if __FreeBSD__ >= 3
   &rip6_usrreqs,
+# endif
 #endif
 },
 #endif /* MIP6 */
@@ -526,21 +529,22 @@ struct ip6protosw inet6sw[] = {
 },
 };
 
-#if defined(MIP6) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
+/* To receive tunneled packet on mobile node or home agent */
+#if defined(MIP6)
 struct ip6protosw mip6_tunnel_protosw =
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   mip6_tunnel_input, rip6_output,	0,	rip6_ctloutput,
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
   rip6_usrreq,
 #endif
   0,            0,              0,              0,
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &rip6_usrreqs
 #endif
 };
-#endif /* MIP6 && (MIP6_HOME_AGENT || MIP6_MOBILE_NODE) */
+#endif /* MIP6 */
 
 #ifdef __FreeBSD__
 extern int in6_inithead __P((void **, int));
@@ -647,9 +651,6 @@ SYSCTL_NODE(_net,	PF_INET6,	inet6,	CTLFLAG_RW,	0,
 /* net.inet6 */
 SYSCTL_NODE(_net_inet6,	IPPROTO_IPV6,	ip6,	CTLFLAG_RW, 0,	"IP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_ICMPV6,	icmp6,	CTLFLAG_RW, 0,	"ICMP6");
-#ifdef MIP6
-SYSCTL_NODE(_net_inet6,	IPPROTO_MH,	mip6,	CTLFLAG_RW, 0,	"MIP6");
-#endif /* MIP6 */
 SYSCTL_NODE(_net_inet6,	IPPROTO_UDP,	udp6,	CTLFLAG_RW, 0,	"UDP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_TCP,	tcp6,	CTLFLAG_RW, 0,	"TCP6");
 #ifdef SCTP
@@ -658,6 +659,9 @@ SYSCTL_NODE(_net_inet6,	IPPROTO_SCTP,	sctp6,	CTLFLAG_RW, 0,	"SCTP6");
 #ifdef IPSEC
 SYSCTL_NODE(_net_inet6,	IPPROTO_ESP,	ipsec6,	CTLFLAG_RW, 0,	"IPSEC6");
 #endif /* IPSEC */
+#ifdef MIP6
+SYSCTL_NODE(_net_inet6,	IPPROTO_MH,	mip6,	CTLFLAG_RW, 0,	"MIP6");
+#endif /* MIP6 */
 
 /* net.inet6.ip6 */
 static int

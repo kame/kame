@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.159 2004/07/22 08:09:19 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.160 2004/12/09 02:19:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,8 +64,12 @@
  *	@(#)raw_ip.c	8.2 (Berkeley) 1/4/94
  */
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_mip6.h"
+#endif
 #ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -102,6 +106,10 @@
 #include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
 #include <netinet6/raw_ip6.h>
+
+#ifdef MIP6
+#include <netinet/ip6mh.h>
+#endif /* MIP6 */
 
 #ifdef __OpenBSD__
 #undef IPSEC
@@ -187,6 +195,8 @@ rip6_input(mp, offp, proto)
 
 	rip6stat.rip6s_ipackets++;
 
+	rip6src.sin6_family = AF_INET6;
+	rip6src.sin6_len = sizeof(struct sockaddr_in6);
 	if (in6_recoverscope(&rip6src, &ip6->ip6_src, m->m_pkthdr.rcvif)) {
 		m_freem(m);
 		return IPPROTO_DONE;
@@ -540,6 +550,9 @@ rip6_output(m, va_alist)
 	ip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
+#ifdef MIP6
+	    so->so_proto->pr_protocol == IPPROTO_MH ||
+#endif /* MIP6 */
 	    in6p->in6p_cksum != -1) {
 		struct mbuf *n;
 		int off;
@@ -553,6 +566,10 @@ rip6_output(m, va_alist)
 		/* compute checksum */
 		if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
 			off = offsetof(struct icmp6_hdr, icmp6_cksum);
+#ifdef MIP6
+		else if (so->so_proto->pr_protocol == IPPROTO_MH)
+			off = offsetof(struct ip6_mh, ip6mh_cksum);
+#endif /* MIP6 */
 		else
 			off = in6p->in6p_cksum;
 		if (plen < off + 1) {

@@ -152,8 +152,9 @@ struct	accept_filter_arg {
 					 * in interface output routine
 					 */
 #define	AF_NETGRAPH	32		/* Netgraph sockets */
+#define AF_MOBILITY	33
 
-#define	AF_MAX		33
+#define	AF_MAX		34
 
 /*
  * Structure used by kernel to store most
@@ -229,6 +230,7 @@ struct sockaddr_storage {
 #define	PF_NATM		AF_NATM
 #define	PF_ATM		AF_ATM
 #define	PF_NETGRAPH	AF_NETGRAPH
+#define	PF_MOBILITY	AF_MOBILITY
 
 #define	PF_MAX		AF_MAX
 

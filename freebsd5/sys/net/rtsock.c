@@ -690,6 +690,7 @@ rt_msg1(int type, struct rt_addrinfo *rtinfo)
 
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
+	case RTM_ADDRINFO:
 		len = sizeof(struct ifa_msghdr);
 		break;
 
@@ -995,7 +996,35 @@ rt_ifannouncemsg(struct ifnet *ifp, int what)
 	strlcpy(ifan->ifan_name, ifp->if_xname, sizeof(ifan->ifan_name));
 	ifan->ifan_what = what;
 	rt_dispatch(m, NULL);
- }
+}
+
+/*
+ * This routine is called to generate a message from the routing
+ * socket indicating that the status of a address has changed.
+ */
+void
+rt_addrinfomsg(ifa)
+	register struct ifaddr *ifa;
+{
+	struct ifnet *ifp = ifa->ifa_ifp;
+	struct ifa_msghdr *ifam;
+	struct mbuf *m;
+	struct rt_addrinfo info;
+
+	if (route_cb.any_count == 0)
+		return;
+	bzero((caddr_t)&info, sizeof(info));
+	info.rti_info[RTAX_IFA] = ifa->ifa_addr;
+	m = rt_msg1(RTM_ADDRINFO, &info);
+	if (m == 0)
+		return;
+	ifam = mtod(m, struct ifa_msghdr *);
+	ifam->ifam_index = ifp->if_index;
+	ifam->ifam_metric = ifa->ifa_metric;
+	ifam->ifam_flags = ifa->ifa_flags;
+	ifam->ifam_addrs = info.rti_addrs;
+	rt_dispatch(m, ifa->ifa_addr);
+}
 
 static void
 rt_dispatch(struct mbuf *m, const struct sockaddr *sa)

@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.1 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: ip6mh.h,v 1.2 2004/12/09 02:19:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -181,18 +181,22 @@ struct ip6_mh_binding_update {
 
 /* Binding Update flags */
 #if BYTE_ORDER == BIG_ENDIAN
-#define IP6MU_ACK	0x8000	/* request a binding ack */
-#define IP6MU_HOME	0x4000	/* home registration */
-#define IP6MU_LINK	0x2000	/* link-local address compatibility */
-#define IP6MU_KEY	0x1000	/* key management mobility compatibility */
-#define IP6MU_CLONED	0x0100	/* KAME: internal use */
+#define IP6_MH_BU_ACK		0x8000	/* request a binding ack */
+#define IP6_MH_BU_HOME		0x4000	/* home registration */
+#define IP6_MH_BU_LLOCAL	0x2000	/* link-local address compatibility */
+#define IP6_MH_BU_KEYM		0x1000	/* key management mobility compatibility */
+#define IP6_MH_BU_ROUTER	0x0400  /* Prefix Registration (MIP6_NEMO) */
+#define IP6_MH_BU_MCOA		0x0200  /* Multiple CoA Registrations (MIP6_MCOA)*/
+#define IP6_MH_BU_CLONED	0x0100	/* KAME: internal use */
 #endif /* BIG_ENDIAN */
 #if BYTE_ORDER == LITTLE_ENDIAN
-#define IP6MU_ACK	0x0080	/* request a binding ack */
-#define IP6MU_HOME	0x0040	/* home registration */
-#define IP6MU_LINK	0x0020	/* link-local address compatibility */
-#define IP6MU_KEY	0x0010	/* key management mobility compatibility */
-#define IP6MU_CLONED	0x0001	/* KAME: internal use */
+#define IP6_MH_BU_ACK		0x0080	/* request a binding ack */
+#define IP6_MH_BU_HOME		0x0040	/* home registration */
+#define IP6_MH_BU_LLOCAL	0x0020	/* link-local address compatibility */
+#define IP6_MH_BU_KEYM		0x0010	/* key management mobility compatibility */
+#define IP6_MH_BU_ROUTER	0x0004  /* Prefix Registration (MIP6_NEMO) */
+#define IP6_MH_BU_MCOA		0x0002  /* Multiple CoA Registrations (MIP6_MCOA)*/
+#define IP6_MH_BU_CLONED	0x0001	/* KAME: internal use */
 #endif /* LITTLE_ENDIAN */
 
 /* Binding Acknowledgement (BA) message */
@@ -213,7 +217,8 @@ struct ip6_mh_binding_ack {
 #endif /* _KERNEL */
 
 /* Binding Acknowledgement Flags */
-#define IP6_MH_BA_KEYM	0x80	/* key management mobility */
+#define IP6_MH_BA_KEYM	 0x80	/* key management mobility */
+#define IP6_MH_BA_ROUTER 0x40	/* Mobile Router */
 
 /* Binding Ack status codes */
 #define IP6_MH_BAS_ACCEPTED		0   /* Binding Update accepted */
@@ -231,6 +236,11 @@ struct ip6_mh_binding_ack {
 #define IP6_MH_BAS_COA_NI_EXPIRED	137 /* Expired Care-of Nonce Index */
 #define IP6_MH_BAS_NI_EXPIRED		138 /* Expired Nonces */
 #define IP6_MH_BAS_REG_NOT_ALLOWED	139 /* Registration type change disallowed */
+#define IP6_MH_BAS_MR_NOT_PERMIT        140 /* Mobile Router Operation not permitted */
+#define IP6_MH_BAS_INVALID_PREFIX       141 /* Invalid Prefix */
+#define IP6_MH_BAS_NOT_AUTHORIZED       142 /* Not Authorized for Prefix */
+#define IP6_MH_BAS_NO_PREFIX_INFO       143 /* Mobile Network Prefix information unavailable */
+
 
 /* Binding Error (BE) message */
 struct ip6_mh_binding_error {
@@ -266,6 +276,8 @@ struct ip6_mh_opt {
 #define IP6_MHOPT_ALTCOA	3	/* Alternate Care-of Address */
 #define IP6_MHOPT_NONCEID	4	/* Nonce Indices */
 #define IP6_MHOPT_BAUTH		5	/* Binding Authorization Data */
+#define IP6_MHOPT_PREFIX        6       /* Mobile Network Prefix */
+#define IP6_MHOPT_BID           7       /* Binding Unique Identifier */
 
 /* Binding Refresh Advice */
 struct ip6_mh_opt_refresh_advice {
@@ -310,5 +322,29 @@ struct ip6_mh_opt_auth_data {
 #ifdef _KERNEL
 #define IP6MOPT_AUTHDATA_SIZE (sizeof(struct ip6_mh_opt_auth_data) + MIP6_AUTHENTICATOR_LEN)
 #endif /* _KERNEL */
+
+/* NEMO Basic Support: Mobile Network Prefix Option */
+struct ip6_mh_opt_prefix {
+        uint8_t ip6mopfx_type;
+        uint8_t ip6mopfx_len;
+        uint8_t ip6mopfx_reserved;
+        uint8_t ip6mopfx_pfxlen;
+        struct in6_addr ip6mopfx_pfx;
+} __attribute__((__packed__));
+
+/* Multiple CoA Registrations (MIP6_MCOA) */
+struct ip6_mh_opt_bid {
+        uint8_t ip6mobid_type;
+        uint8_t ip6mobid_len;
+        uint16_t ip6mobid_bid;
+        uint16_t ip6mobid_reserved;
+} __attribute__((__packed__));
+/* Binding Unique Identifier flag */
+#if BYTE_ORDER == BIG_ENDIAN
+#define IP6OPTBID_STOP	0x8000	/* stop proxy NA */
+#endif /* BIG_ENDIAN */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define IP6OPTBID_STOP	0x0080	/* stop proxy NA */
+#endif /* LITTLE_ENDIAN */
 
 #endif /* not _NETINET_IP6MH_H_ */

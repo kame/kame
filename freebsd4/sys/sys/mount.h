@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mount.h	8.21 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/sys/mount.h,v 1.89 2000/01/19 06:07:34 rwatson Exp $
+ * $FreeBSD: src/sys/sys/mount.h,v 1.89.2.7 2003/04/04 20:35:57 tegge Exp $
  */
 
 #ifndef _SYS_MOUNT_H_
@@ -46,7 +46,9 @@
 #endif /* !_KERNEL */
 
 #include <sys/queue.h>
+#ifdef _KERNEL
 #include <sys/lock.h>
+#endif
 
 typedef struct fsid { int32_t val[2]; } fsid_t;	/* file system id type */
 
@@ -99,12 +101,20 @@ struct statfs {
 	long    f_spare[2];		/* unused spare */
 };
 
+#ifdef _KERNEL
 /*
  * Structure per mounted file system.  Each mounted file system has an
  * array of operations and an instance record.  The file systems are
  * put on a doubly linked list.
+ *
+ * NOTE: mnt_nvnodelist and mnt_reservedvnlist.  At the moment vnodes
+ * are linked into mnt_nvnodelist.  At some point in the near future the
+ * vnode list will be split into a 'dirty' and 'clean' list. mnt_nvnodelist
+ * will become the dirty list and mnt_reservedvnlist will become the 'clean'
+ * list.  Filesystem kld's syncing code should remain compatible since
+ * they only need to scan the dirty vnode list (nvnodelist -> dirtyvnodelist).
  */
-LIST_HEAD(vnodelst, vnode);
+TAILQ_HEAD(vnodelst, vnode);
 
 struct mount {
 	TAILQ_ENTRY(mount) mnt_list;		/* mount list */
@@ -112,7 +122,7 @@ struct mount {
 	struct vfsconf	*mnt_vfc;		/* configuration info */
 	struct vnode	*mnt_vnodecovered;	/* vnode we mounted on */
 	struct vnode	*mnt_syncer;		/* syncer vnode */
-	struct vnodelst	mnt_vnodelist;		/* list of vnodes this mount */
+	struct vnodelst	mnt_nvnodelist;		/* list of vnodes this mount */
 	struct lock	mnt_lock;		/* mount structure lock */
 	int		mnt_flag;		/* flags shared with user */
 	int		mnt_kern_flag;		/* kernel only flags */
@@ -121,7 +131,10 @@ struct mount {
 	qaddr_t		mnt_data;		/* private data */
 	time_t		mnt_time;		/* last time written*/
 	u_int		mnt_iosize_max;		/* max IO request size */
+	struct vnodelst	mnt_reservedvnlist;	/* (future) dirty vnode list */
+	int		mnt_nvnodelistsize;	/* # of vnodes on this mount */
 };
+#endif /* _KERNEL */
 
 /*
  * User specifiable flags.
@@ -165,7 +178,6 @@ struct mount {
  * Mask of flags that are visible to statfs()
  * XXX I think that this could now become (~(MNT_CMDFLAGS))
  * but the 'mount' program may need changing to handle this.
- * XXX MNT_EXPUBLIC is presently left out. I don't know why.
  */
 #define	MNT_VISFLAGMASK	(MNT_RDONLY	| MNT_SYNCHRONOUS | MNT_NOEXEC	| \
 			MNT_NOSUID	| MNT_NODEV	| MNT_UNION	| \
@@ -174,8 +186,7 @@ struct mount {
 			MNT_LOCAL	| MNT_USER	| MNT_QUOTA	| \
 			MNT_ROOTFS	| MNT_NOATIME	| MNT_NOCLUSTERR| \
 			MNT_NOCLUSTERW	| MNT_SUIDDIR	| MNT_SOFTDEP	| \
-			MNT_IGNORE \
-			/*	| MNT_EXPUBLIC */)
+			MNT_IGNORE	| MNT_NOSYMFOLLOW | MNT_EXPUBLIC )
 /*
  * External filesystem command modifier flags.
  * Unmount can use the MNT_FORCE flag.
@@ -192,7 +203,13 @@ struct mount {
  * MNTK_UNMOUNT locks the mount entry so that name lookup cannot proceed
  * past the mount point.  This keeps the subtree stable during mounts
  * and unmounts.
+ *
+ * MNTK_UNMOUNTF permits filesystems to detect a forced unmount while
+ * dounmount() is still waiting to lock the mountpoint. This allows
+ * the filesystem to cancel operations that might otherwise deadlock
+ * with the unmount attempt (used by NFS).
  */
+#define MNTK_UNMOUNTF	0x00000001	/* forced unmount in progress */
 #define MNTK_UNMOUNT	0x01000000	/* unmount in progress */
 #define	MNTK_MWAIT	0x02000000	/* waiting for unmount to finish */
 #define MNTK_WANTRDWR	0x04000000	/* upgrade to read/write requested */
@@ -372,7 +389,7 @@ struct vfsops {
 
 #include <net/radix.h>
 
-#define	AF_MAX		33	/* XXX */
+#define	AF_MAX		34	/* XXX */
 
 /*
  * Network address lookup element

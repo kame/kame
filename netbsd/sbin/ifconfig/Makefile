@@ -17,5 +17,6 @@ CPPFLAGS+=-DINET6
 
 # KAME scope id hack
 CPPFLAGS+=-DKAME_SCOPEID
+CPPFLAGS+=-DMIP6
 
 .include <bsd.prog.mk>

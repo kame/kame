@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.38 2004/07/24 00:51:31 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.39 2004/12/09 02:18:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -635,7 +635,22 @@ static const char *ipproto[] = {
 	NULL, "rsvp", "gre", NULL, NULL,
 /*50*/	"esp", "ah", NULL, NULL, NULL,
 	NULL, NULL, NULL, "icmp6", "none",
-/*60*/	"dst6",
+/*60*/	"dst6",NULL,NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*70*/	NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*80*/	NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*90*/	NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*100*/	NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*110*/	NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*120*/	NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+/*130*/	NULL, NULL, NULL, NULL, NULL,
+	"mh", NULL, NULL, NULL, NULL,
 };
 
 #define STR_OR_ID(x, tab) \

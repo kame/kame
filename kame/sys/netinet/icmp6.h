@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.94 2004/07/09 14:13:59 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.95 2004/12/09 02:19:00 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -427,6 +427,14 @@ struct mip6_dhaad_req {		/* HA Address Discovery Request */
 #define mip6_dhreq_id		mip6_dhreq_hdr.icmp6_data16[0]
 #define mip6_dhreq_reserved	mip6_dhreq_hdr.icmp6_data16[1]
 
+#if BYTE_ORDER == BIG_ENDIAN
+#define MIP6_DHREQ_FLAG_MR	0x8000
+#endif /* BIG_ENDIAN */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define MIP6_DHREQ_FLAG_MR	0x0080
+#endif /* LITTLE_ENDIAN */
+
+
 struct mip6_dhaad_rep {		/* HA Address Discovery Reply */
 	struct icmp6_hdr	mip6_dhrep_hdr;
 	/* could be followed by home agent addresses */
@@ -437,6 +445,13 @@ struct mip6_dhaad_rep {		/* HA Address Discovery Reply */
 #define mip6_dhrep_cksum	mip6_dhrep_hdr.icmp6_cksum
 #define mip6_dhrep_id		mip6_dhrep_hdr.icmp6_data16[0]
 #define mip6_dhrep_reserved	mip6_dhrep_hdr.icmp6_data16[1]
+
+#if BYTE_ORDER == BIG_ENDIAN
+#define MIP6_DHREP_FLAG_MR	0x8000
+#endif /* BIG_ENDIAN */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define MIP6_DHREP_FLAG_MR	0x0080
+#endif /* LITTLE_ENDIAN */
 
 struct mip6_prefix_solicit {	/* Mobile Prefix Solicitation */
 	struct icmp6_hdr	mip6_ps_hdr;
@@ -529,6 +544,13 @@ struct nd_opt_homeagent_info {	/* Home Agent info */
 	u_int16_t	nd_opt_hai_preference;
 	u_int16_t	nd_opt_hai_lifetime;
 } __attribute__((__packed__));
+
+#if BYTE_ORDER == BIG_ENDIAN
+#define MIP6_HAINFO_FLAG_MR	0x8000
+#endif /* BIG_ENDIAN */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define MIP6_HAINFO_FLAG_MR	0x0080
+#endif /* LITTLE_ENDIAN */
 
 struct nd_opt_route_info {	/* route info */
 	u_int8_t	nd_opt_rti_type;

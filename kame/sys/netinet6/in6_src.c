@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.150 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: in6_src.c,v 1.151 2004/12/09 02:19:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,6 +71,7 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -94,6 +95,7 @@
 #include <sys/proc.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/route.h>
 #ifdef RADIX_MPATH
 #include <net/radix_mpath.h>
@@ -113,17 +115,16 @@
 #include <netinet6/nd6.h>
 #include <netinet6/scope6_var.h>
 
+#include <net/net_osdep.h>
+
 #ifdef MIP6
-#include <netinet/ip6mh.h>
-#include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
-#ifdef MIP6_MOBILE_NODE
-#include <netinet6/mip6_mncore.h>
-#endif /* MIP6_MOBILE_NODE */
+#include "mip.h"
+#if NMIP > 0
+#include <net/if_mip.h>
+#endif /* NMIP > 0 */
 #endif /* MIP6 */
-
-#include <net/net_osdep.h>
 
 #ifndef __OpenBSD__
 #include "loop.h"
@@ -144,10 +145,6 @@ static struct mtx addrsel_lock;
 struct in6_addrpolicy defaultaddrpolicy;
 
 int ip6_prefer_tempaddr = 0;
-
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-struct mip6_unuse_hoa_list mip6_unuse_hoa;
-#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 #ifdef NEW_STRUCT_ROUTE
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
@@ -216,11 +213,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 	u_int32_t odstzone;
 	int prefer_tempaddr;
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	struct hif_softc *sc;
-	struct mip6_unuse_hoa *uh;
-	u_int8_t usecoa = 0;
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#if defined(MIP6) && NMIP > 0
+	u_int8_t ip6po_usecoa = 0;
+#endif /* MIP6 && NMIP > 0 */
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -292,7 +287,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp)) != 0)
 		return (NULL);
 
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+#if defined(MIP6) && NMIP > 0
 	/*
 	 * a caller can specify IP6PO_USECOA to not to use a home
 	 * address.  for example, the case that the neighbour
@@ -300,24 +295,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	 */
 	if (opts != NULL &&
 	    (opts->ip6po_flags & IP6PO_USECOA) != 0) {
-		usecoa = 1;
+		ip6po_usecoa = 1;
 	}
-	/*
-	 * a user can specify destination addresses or detination
-	 * ports for which he don't want to use a home address when
-	 * sending packets.
-	 */
-	for (uh = LIST_FIRST(&mip6_unuse_hoa);
-	     uh;
-	     uh = LIST_NEXT(uh, unuse_entry)) {
-		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr) ||
-		     IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr)) &&
-		    (!uh->unuse_port || dstsock->sin6_port == uh->unuse_port)) {
-			usecoa = 1;
-			break;
-		}
-	}
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#endif /* MIP6 && NMIP > 0 */
 
 #ifdef DIAGNOSTIC
 	if (ifp == NULL)	/* this should not happen */
@@ -357,6 +337,13 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		if (!ip6_use_deprecated && IFA6_IS_DEPRECATED(ia))
 			continue;
 
+#if defined(MIP6) && NMIP > 0
+		/* avoid unusable home addresses. */
+		if ((ia->ia6_flags & IN6_IFF_HOME) &&
+		    !mip6_ifa6_is_addr_valid_hoa(ia))
+			continue;
+#endif /* MIP6 && NMIP > 0 */
+
 		/* Rule 1: Prefer same address */
 		if (IN6_ARE_ADDR_EQUAL(dst, &ia->ia_addr.sin6_addr)) {
 			ia_best = ia;
@@ -390,148 +377,74 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			REPLACE(3);
 
 		/* Rule 4: Prefer home addresses */
+#if defined(MIP6) && NMIP > 0
+		if (!MIP6_IS_MN)
+			goto skip_rule4;
+
+		if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+		    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+			/* both address are not home addresses. */
+			goto skip_rule4;
+		}
+
 		/*
-		 * XXX: This is a TODO.  We should probably merge the MIP6
-		 * case above.
+		 * If SA is simultaneously a home address and care-of
+		 * address and SB is not, then prefer SA. Similarly,
+		 * if SB is simultaneously a home address and care-of
+		 * address and SA is not, then prefer SB.
 		 */
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-		{
-			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
-			struct sockaddr_in6 ia_addr;
-
+		if (((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+			ia_best->ia_ifp->if_type != IFT_MIP)
+		    &&
+		    ((ia->ia6_flags & IN6_IFF_HOME) != 0 &&
+			ia->ia_ifp->if_type == IFT_MIP))
+			NEXT(4);
+		if (((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+			ia_best->ia_ifp->if_type == IFT_MIP)
+		    &&
+		    ((ia->ia6_flags & IN6_IFF_HOME) != 0 &&
+			ia->ia_ifp->if_type != IFT_MIP))
+			REPLACE(4);
+		if (ip6po_usecoa == 0) {
 			/*
-			 * If SA is simultaneously a home address and
-			 * care-of address and SB is not, then prefer
-			 * SA. Similarly, if SB is simultaneously a
-			 * home address and care-of address and SA is
-			 * not, then prefer SB.
+			 * If SA is just a home address and SB is just
+			 * a care-of address, then prefer
+			 * SA. Similarly, if SB is just a home address
+			 * and SA is just a care-of address, then
+			 * prefer SB.
 			 */
-			if (ia_best->ia6_flags & IN6_IFF_HOME) {
-				/*
-				 * find a binding update entry for ia_best.
-				 */
-				ia_addr = ia_best->ia_addr;
-				if(in6_addr2zoneid(ia_best->ia_ifp,
-						   &ia_addr.sin6_addr,
-						   &ia_addr.sin6_scope_id)) {
-					*errorp = EINVAL; /* XXX */
-					return (NULL);
-				}
-				for (sc = LIST_FIRST(&hif_softc_list); sc;
-				    sc = LIST_NEXT(sc, hif_entry)) {
-					mbu_ia_best = mip6_bu_list_find_home_registration(
-					    &sc->hif_bu_list,
-					    &ia_addr.sin6_addr);
-					if (mbu_ia_best)
-						break;
-				}
-			}
-			if (ia->ia6_flags & IN6_IFF_HOME) {
-				/*
-				 * find a binding update entry for ia.
-				 */
-				ia_addr = ia->ia_addr;
-				if(in6_addr2zoneid(ia->ia_ifp,
-						   &ia_addr.sin6_addr,
-						   &ia_addr.sin6_scope_id)) {
-					*errorp = EINVAL; /* XXX */
-					return (NULL);
-				}
-				for (sc = LIST_FIRST(&hif_softc_list); sc;
-				    sc = LIST_NEXT(sc, hif_entry)) {
-					mbu_ia = mip6_bu_list_find_home_registration(
-					    &sc->hif_bu_list,
-					    &ia_addr.sin6_addr);
-					if (mbu_ia)
-						break;
-				}
-			}
-
-			/*
-			 * even if the address is a home address, we
-			 * do not use them if they are not registered
-			 * (or re-registered) yet.  this condition is
-			 * not explicitly stated in the address
-			 * selection draft.
-			 */
-			if ((mbu_ia_best &&
-			    (mbu_ia_best->mbu_pri_fsm_state
-			    != MIP6_BU_PRI_FSM_STATE_BOUND))) {
-				/* XXX will break stat! */
-				REPLACE(0);
-			}
-			if ((mbu_ia &&
-			    (mbu_ia->mbu_pri_fsm_state
-			    != MIP6_BU_PRI_FSM_STATE_BOUND))) {
-				/* XXX will break stat! */
-				NEXT(0);
-			}
-
-			/*
-			 * if the binding update entry for a certain
-			 * address exists and its registration status
-			 * is MIP6_BU_FSM_STATE_IDLE, the address is a
-			 * home address and a care of addres
-			 * simultaneously.
-			 */
-			if ((mbu_ia_best &&
-			     (mbu_ia_best->mbu_pri_fsm_state
-			      == MIP6_BU_PRI_FSM_STATE_IDLE))
-			    &&
-			    !(mbu_ia &&
-			      (mbu_ia->mbu_pri_fsm_state
-			       == MIP6_BU_PRI_FSM_STATE_IDLE))) {
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
 				NEXT(4);
 			}
-			if (!(mbu_ia_best &&
-			      (mbu_ia_best->mbu_pri_fsm_state
-			       == MIP6_BU_PRI_FSM_STATE_IDLE))
-			    &&
-			    (mbu_ia &&
-			     (mbu_ia->mbu_pri_fsm_state
-			      == MIP6_BU_PRI_FSM_STATE_IDLE))) {
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
 				REPLACE(4);
 			}
-			if (usecoa != 0) {
-				/*
-				 * a sender don't want to use a home
-				 * address because:
-				 *
-				 * 1) we cannot use.  (ex. NS or NA to
-				 * global addresses.)
-				 *
-				 * 2) a user specified not to use.
-				 * (ex. mip6control -u)
-				 */
-				if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
-				    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
-					/* XXX will break stat! */
-					NEXT(0);
-				}
-				if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-				    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
-					/* XXX will break stat! */
-					REPLACE(0);
-				}
-			} else {
-				/*
-				 * If SA is just a home address and SB
-				 * is just a care-of address, then
-				 * prefer SA. Similarly, if SB is just
-				 * a home address and SA is just a
-				 * care-of address, then prefer SB.
-				 */
-				if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-				    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
-					NEXT(4);
-				}
-				if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
-				    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
-					REPLACE(4);
-				}
+		} else {
+			/*
+			 * a sender don't want to use a home address
+			 * because:
+			 *
+			 * 1) we cannot use.  (ex. NS or NA to global
+			 * addresses.)
+			 *
+			 * 2) a user specified not to use.
+			 * (ex. mip6control -u)
+			 */
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
+				/* XXX breaks stat */
+				NEXT(0);
 			}
-		}
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+				/* XXX breaks stat */
+				REPLACE(0);
+			}
+		}			
+	skip_rule4:
+#endif /* MIP6 && NMIP > 0 */
 
 		/* Rule 5: Prefer outgoing interface */
 		if (ia_best->ia_ifp == ifp && ia->ia_ifp != ifp)

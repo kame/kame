@@ -273,6 +273,12 @@ const struct cmd {
 	{ "-autoconf",	-IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
 	{ "vltime",	NEXTARG,	0,		setia6vltime },
+#ifdef MIP6
+	{ "home",	IN6_IFF_HOME, 	0,	setia6flags },
+	{ "-home",	-IN6_IFF_HOME,	0,	setia6flags },
+	{ "deregistering",	IN6_IFF_DEREGISTERING, 0, setia6flags },
+	{ "-deregistering",	-IN6_IFF_DEREGISTERING, 0, setia6flags },
+#endif /* MIP6 */
 #endif /*INET6*/
 #ifndef INET_ONLY
 	{ "range",	NEXTARG,	0,		setatrange },
@@ -2398,6 +2404,10 @@ in6_alias(creq)
 #ifdef IN6_IFF_HOME
 		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_HOME) != 0)
 			printf(" home");
+#endif
+#ifdef IN6_IFF_DEREGISTERING
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEREGISTERING) != 0)
+			printf("deregistering ");
 #endif
 	}
 

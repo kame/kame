@@ -127,6 +127,9 @@
 #define	SIOCDIFPHYADDR	 _IOW('i', 73, struct ifreq)	/* delete gif addrs */
 #define	SIOCSLIFPHYADDR	 _IOW('i', 74, struct if_laddrreq) /* set gif addrs */
 #define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
+#define	SIOCSIFPHYNEXTHOP   _IOW('i', 76, struct ifreq) /* set gif nexthop addres */
+#define	SIOCDIFPHYNEXTHOP   _IOW('i', 77, struct ifreq) /* delete gif nexthop addres */
+#define	SIOCGIFPHYNEXTHOP	_IOWR('i', 78, struct ifreq)	/* get gif nexthop addr */
 
 #define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
 #define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
@@ -141,6 +144,8 @@
 #define SIOCIFCREATE	_IOWR('i', 122, struct ifreq)	/* create clone if */
 #define SIOCIFDESTROY	 _IOW('i', 121, struct ifreq)	/* destroy clone if */
 #define SIOCIFGCLONERS	_IOWR('i', 120, struct if_clonereq) /* get cloners */
+
+#define SIOGBULIST	_IOWR('i', 125, struct if_bulreq) /* get BUL */
 
 #define	SIOCSIPMSFILTER	 _IO('s', 130)			/* set src list */
 #define	SIOCGIPMSFILTER	 _IO('s', 131)			/* get src list */

@@ -9,7 +9,6 @@ SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
 SUBDIR+=racoon
 SUBDIR+=dhcp6
-
-SUBDIR+=mip6control had mip6stat
+SUBDIR+=shisad
 
 .include <bsd.subdir.mk>

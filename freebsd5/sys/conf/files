@@ -249,11 +249,9 @@ crypto/rijndael/rijndael-alg-fst.c	optional ipsec
 crypto/rijndael/rijndael-api.c	optional ipsec
 opencrypto/rmd160.c	optional ipsec
 crypto/sha1.c		optional ipsec
-crypto/sha1.c		optional mip6
 crypto/sha2/sha2.c	optional ipsec
 crypto/twofish/twofish2.c	optional ipsec_esp
 #crypto/rc5/rc5.c		optional ipsec ipsec_esp
-crypto/hmac.c		optional mip6
 ddb/db_access.c			optional	ddb
 ddb/db_break.c			optional	ddb
 ddb/db_command.c		optional	ddb
@@ -1268,6 +1266,8 @@ net/if_stf.c		count stf
 net/if_tun.c		optional tun
 net/if_tap.c		optional tap
 net/if_vlan.c		optional vlan
+net/if_mip.c		count mip mip6
+net/if_nemo.c		count nemo mip6
 net/net_osdep.c		standard
 net/netisr.c		standard
 net/ppp_deflate.c	optional ppp_deflate
@@ -1287,6 +1287,7 @@ net/zlib.c		optional ppp_deflate
 net/zlib.c		optional ipsec
 net/zlib.c		optional crypto
 net/zlib.c		optional geom_uzip
+net/mipsock.c		optional inet6 mip6
 net80211/ieee80211.c	optional wlan
 net80211/ieee80211_crypto.c	optional wlan
 net80211/ieee80211_input.c	optional wlan
@@ -1589,15 +1590,7 @@ netinet6/sctp6_usrreq.c	optional inet6 sctp
 netinet6/udp6_output.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
 netinet6/dccp6_usrreq.c	optional inet6 dccp
-net/if_hif.c		count hif optional mip6 mip6_mobile_node
-netinet6/mobility6.c	optional inet6 mip6
-netinet6/mip6_cncore.c	optional mip6
-netinet6/mip6_icmp6.c	optional mip6
-netinet6/mip6_hacore.c	optional mip6 mip6_home_agent
-netinet6/mip6_mncore.c	optional mip6 mip6_mobile_node
-netinet6/mip6_prefix.c	optional mip6 mip6_mobile_node
-netinet6/mip6_halist.c	optional mip6 mip6_mobile_node
-netinet6/mip6_fsm.c	optional mip6 mip6_mobile_node
+netinet6/mip6.c		optional inet6 mip6
 netipsec/ipsec.c	optional fast_ipsec
 netipsec/ipsec_input.c	optional fast_ipsec
 netipsec/ipsec_mbuf.c	optional fast_ipsec

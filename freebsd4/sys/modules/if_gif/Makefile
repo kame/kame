@@ -3,7 +3,7 @@
 .PATH: ${.CURDIR}/../../net ${.CURDIR}/../../netinet ${.CURDIR}/../../netinet6
 
 KMOD=	if_gif
-SRCS=	if_gif.c in_gif.c in6_gif.c opt_inet.h opt_inet6.h opt_mrouting.h gif.h bpf.h
+SRCS=	if_gif.c in_gif.c in6_gif.c opt_inet.h opt_inet6.h opt_mrouting.h opt_mip6.h gif.h bpf.h
 NOMAN=
 
 opt_inet.h:

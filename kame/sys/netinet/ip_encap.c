@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.99 2004/08/17 07:04:29 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.100 2004/12/09 02:19:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,10 +67,6 @@
  * FreeBSD is excluded here as they make max_keylen a static variable, and
  * thus forbid definition of radix table other than proper domains.
  */
-#ifndef __FreeBSD__
-#define USE_RADIX
-#endif
-
 #ifdef __FreeBSD__
 #include "opt_mrouting.h"
 #include "opt_inet.h"
@@ -79,6 +75,13 @@
 #ifdef __NetBSD__
 #include "opt_mrouting.h"
 #include "opt_inet.h"
+#include "opt_mip6.h"
+#endif
+
+#ifndef __FreeBSD__
+#ifndef MIP6
+#define USE_RADIX
+#endif /* MIP6 */
 #endif
 
 #include <sys/param.h>

@@ -3,7 +3,7 @@
 .PATH: ${.CURDIR}/../../net
 
 KMOD=	if_stf
-SRCS=	if_stf.c opt_inet.h opt_inet6.h opt_global.h stf.h gif.h bpf.h
+SRCS=	if_stf.c opt_inet.h opt_inet6.h opt_global.h opt_mip6.h stf.h gif.h bpf.h
 NOMAN=
 
 opt_inet.h:
@@ -14,6 +14,9 @@ opt_inet6.h:
 
 opt_global.h:
 	echo "#define NEW_STRUCT_ROUTE 1" > ${.TARGET}
+
+opt_mip6.h:
+	echo "#define MIP6 0" > ${.TARGET}
 
 stf.h:
 	echo "#define NSTF 1" > ${.TARGET}

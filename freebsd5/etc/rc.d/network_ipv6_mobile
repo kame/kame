@@ -1,0 +1,150 @@
+#!/bin/sh
+#
+# Copyright (c) 2004  The KAME Project
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+
+# PROVIDE: network_ipv6_mobile
+# REQUIRE: network_ipv6
+
+PATH=/usr/local/v6/bin:/usr/local/v6/sbin:${PATH}
+. /etc/rc.subr
+. /etc/network.subr
+
+name="network_ipv6_mobile"
+rcvar=`set_rcvar ipv6_mobile`
+start_cmd="network_ipv6_mobile_start"
+
+network_ipv6_mobile_start()
+{
+	echo 'Doing Mobile IPv6 network setup:'
+
+	if ! ${SYSCTL_N} net.inet6.mip6.debug 2> /dev/null; then
+	  echo 'No MIP6 kernel'
+	  return
+	fi
+
+	case ${ipv6_mobile_debug_enable} in
+	[Yy][Ee][Ss])
+		${SYSCTL_W} net.inet6.mip6.debug=1
+		;;
+	[Nn][Oo])
+		${SYSCTL_W} net.inet6.mip6.debug=0
+		;;
+	esac
+
+	case ${ipv6_mobile_security_enable} in
+	[Yy][Ee][Ss])
+		${SYSCTL_W} net.inet6.mip6.use_ipsec=1
+		;;
+	[Nn][Oo])
+		${SYSCTL_W} net.inet6.mip6.use_ipsec=0
+		;;
+	esac
+
+	case ${ipv6_mobile_nodetype} in
+	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
+		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1
+		# setup SPD/SA
+		if [ `${SYSCTL_N} net.inet6.mip6.use_ipsec` = "1" ]; then
+			for node_dir in ${ipv6_mobile_config_dir}
+			do
+				if [ ! -e ${node_dir}/add ]; then
+					continue;
+				fi
+				setkey -f ${node_dir}/add
+				setkey -f ${node_dir}/spdadd_mobile_node
+			done
+		fi
+
+		echo -n ' mnd'
+		mnd -n -i mip0
+		echo -n ' mdd'
+		mdd -n
+		echo -n ' cnd'
+		cnd -n
+		echo -n ' rtsold'
+		rtsold -a -m
+		;;
+	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
+		case ${ipv6_mobile_home_interface} in
+		'')
+			;;
+		*)
+			# setup SPD/SA
+			if [ `sysctl -n net.inet6.mip6.use_ipsec` = '1' ]; then
+				for node_dir in ${ipv6_mobile_config_dir}
+				do
+					if [ ! -e ${node_dir}/add ]; then
+						continue;
+					fi
+					setkey -f ${node_dir}/add
+					setkey -f ${node_dir}/spdadd_home_agent
+				done
+			fi
+
+			home_prefixes=`mobileip6_getprefixes ${ipv6_mobile_home_interface}`
+			for home_prefix in ${home_prefixes}
+			do
+				# XXX desribe the case plen != 64
+				ifconfig ${ipv6_mobile_home_interface} inet6 ${home_prefix}:fdff:ffff:ffff:fffe prefixlen 64 anycast alias
+			done
+
+			echo -n ' had'
+			had -n -i ${ipv6_mobile_home_interface}
+			echo -n ' cnd'
+			cnd -n
+			echo -n ' rtadvd'
+			rtadvd -m ${ipv6_mobile_home_interface}
+			# take in Router Advertisement
+			rtsol ${ipv6_mobile_home_interface} > /dev/null 2>&1
+			;;
+		esac
+		;;
+	*)
+		echo -n ' cnd'
+		cnd -n
+	esac
+
+	echo ''
+}
+
+mobileip6_getprefixes() {
+	ndp -p 2>/dev/null | while read prefix interface rest; do
+		if [ X$interface = X"if="$1 ]; then
+			case ${prefix} in
+			fe80:*)
+				;;
+			fec0:*)
+				;;
+			[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*)
+				prefix64=`expr "${prefix}" : '\(.*\)::/64'`
+				echo ${prefix64}
+			esac
+		fi
+	done
+}
+
+load_rc_config $name
+run_rc_command "$1"

@@ -320,7 +320,6 @@ case ${ipv6_enable} in
 	[Yy][Ee][Ss])
 		if [ -r /etc/rc.mobileip6 ]; then
 			. /etc/rc.mobileip6
-			mobileip6_pass1
 		fi
 		;;
 	esac
@@ -432,6 +431,18 @@ fi
 if [ -n "${network_pass1_done}" ]; then
 	network_pass2
 fi
+
+case ${ipv6_enable} in
+[Yy][Ee][Ss])
+	case ${ipv6_mobile_enable} in
+	[Yy][Ee][Ss])
+		if [ -r /etc/rc.mobileip6 ]; then
+			mobileip6_pass2
+		fi
+		;;
+	esac
+	;;
+esac
 
 # Enable/Check the quotas (must be after ypbind if using NIS)
 #

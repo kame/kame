@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.384 2004/11/18 08:22:47 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.385 2004/12/09 02:19:03 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -102,6 +102,7 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -158,17 +159,6 @@
 #endif
 #endif
 
-#ifdef MIP6
-#include <netinet/ip6mh.h>
-#include <net/if_hif.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#ifdef MIP6_MOBILE_NODE
-#include <netinet6/mip6_mncore.h>
-#endif /* MIP6_MOBILE_NODE */
-#endif /* MIP6 */
-
 #ifdef MLDV2
 #include <netinet/icmp6.h>
 #include <netinet6/in6_msf.h>
@@ -178,6 +168,15 @@
 #if NGIF > 0
 #include <net/if_gif.h>
 #endif
+
+#ifdef MIP6
+#include "mip.h"
+#include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#if NMIP > 0
+#include <net/if_mip.h>
+#endif /* NMIP > 0 */
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -330,36 +329,6 @@ in6_ifaddloop(struct ifaddr *ifa)
 	need_loop = (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
 	    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0);
 
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	/*
-	 * XXX delete a loopback rtentry for my own address before
-	 * adding a new loopback entry.  there is a case that the same
-	 * addresses are configured simultaneously on different
-	 * interfaces when a mobile node returns home.  in that case,
-	 * we must discard the old one (that is for the HoA assigned
-	 * to hif interface) before adding a new one so that the new
-	 * rtentry for CoA (this is eventually HoA) is installed
-	 * correctly.
-	 */
-	if (rt)
-		rtfree(rt);
-	if (!need_loop) {
-		in6_ifloop_request(RTM_DELETE, ifa);
-	}
-
-	/*
-	 * lookup a route again, since MIP6 code releases the route
-	 * allocated in the head of this function.
-	 */
-	rt = rtalloc1(ifa->ifa_addr, 0
-#ifdef __FreeBSD__
-		      , 0
-#endif /* __FreeBSD__ */
-		);
-
-	need_loop = (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
-	    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0);
-#endif /* MIP6 && MIP6_MOBILE_NODE */
 	if (rt)
 		rtfree(rt);
 	if (need_loop) {
@@ -535,21 +504,6 @@ in6_control(so, cmd, data, ifp, p)
 			return (EPERM);
 		return (in6_src_ioctl(cmd, data));
 	}
-
-#ifdef MIP6
-	switch (cmd) {
-	case SIOCSMIP6CFG:
-	case SIOCSUNUSEHA:
-	case SIOCDUNUSEHA:
-	case SIOCDBC:
-		if (!privileged)
-			return (EPERM);
-		return (mip6_ioctl(cmd, data));
-	case SIOCGBC:
-	case SIOCSPREFERREDIFNAMES:
-		return (mip6_ioctl(cmd, data));
-	}
-#endif /* MIP6 */
 
 	if (ifp == NULL)
 		return (EOPNOTSUPP);
@@ -882,11 +836,11 @@ in6_control(so, cmd, data, ifp, p)
 		pr0.ndpr_plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr,
 		    NULL);
 		if (pr0.ndpr_plen == 128) {
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-			if (MIP6_IS_MN)
-				mip6_process_movement();
-#endif /* MIP6 && MIP6_MOBILE_NODE */
 			break;	/* we don't need to install a host route. */
+#if defined(MIP6) && NMIP > 0
+		} else if ((ia->ia6_flags & IN6_IFF_HOME) && (ifp->if_type == IFT_MIP)) {
+			break;  /* we don't need to install a interface route. for home address */
+#endif 
 		}
 		pr0.ndpr_prefix = ifra->ifra_addr;
 		/* apply the mask for safety. */
@@ -1150,6 +1104,9 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			return (ENOBUFS);
 		bzero((caddr_t)ia, sizeof(*ia));
 		LIST_INIT(&ia->ia6_memberships);
+#if defined(MIP6) && NMIP > 0
+		LIST_INIT(&ia->ia6_mbul_list);
+#endif /* MIP6 && NMIP > 0 */
 		/* Initialize the address and masks, and put time stamp */
 #if defined(__FreeBSD__) && (__FreeBSD_version >= 501000)
 		IFA_LOCK_INIT(&ia->ia_ifa);
@@ -1263,11 +1220,11 @@ in6_update_ifa(ifp, ifra, ia, flags)
 	 * source address.
 	 */
 	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
-#else
-	if (hostIsNew && in6if_do_dad(ifp))
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+	if (hostIsNew && in6if_do_dad(ifp)
+#if defined(MIP6) && NMIP > 0
+	    && !(ia->ia6_flags & IN6_IFF_HOME) /* XXX XXX XXX */
+#endif /* MIP6 && NMIP > 0 */
+		) 
 		ia->ia6_flags |= IN6_IFF_TENTATIVE;
 
 	/*
@@ -1537,13 +1494,9 @@ in6_update_ifa(ifp, ifra, ia, flags)
 	 * XXX It may be of use, if we can administratively
 	 * disable DAD.
 	 */
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia) &&
-	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
-#else
 	if (hostIsNew && in6if_do_dad(ifp) &&
-	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+	    ((ifra->ifra_flags & IN6_IFF_NODAD) == 0) &&
+	    (ia->ia6_flags & IN6_IFF_TENTATIVE))
 	{
 		int mindelay, maxdelay;
 
@@ -1601,19 +1554,6 @@ in6_purgeaddr(ifa)
 	/* stop DAD processing */
 	nd6_dad_stop(ifa);
 
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	if (MIP6_IS_MN) {
-		struct hif_softc *hif;
-		for (hif = LIST_FIRST(&hif_softc_list); hif;
-		    hif = LIST_NEXT(hif, hif_entry)) {
-			if (hif->hif_coa_ifa == ia) {
-				IFAFREE(&hif->hif_coa_ifa->ia_ifa);
-				hif->hif_coa_ifa = NULL;
-			}
-		}
-	}
-#endif /* MIP6 && MIP6_MOBILE_NODE */
-
 	/*
 	 * delete route to the destination of the address being purged.
 	 * The interface must be p2p or loopback in this case.
@@ -1643,6 +1583,15 @@ in6_purgeaddr(ifa)
 		LIST_REMOVE(imm, i6mm_chain);
 		in6_leavegroup(imm);
 	}
+
+#if defined(MIP6) && NMIP > 0
+	{
+		struct mip6_bul_internal *mbul;
+		while ((mbul = LIST_FIRST(&ia->ia6_mbul_list)) != NULL) {
+			mip6_bul_remove(mbul);
+		}
+	}
+#endif /* MIP6 && NMIP > 0 */
 
 	in6_unlink_ifa(ia, ifp);
 }

@@ -45,6 +45,7 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $"
 #include "opt_iso.h"
 #include "opt_ns.h"
 #include "opt_natm.h"
+#include "opt_mip6.h"
 #include "arp.h"
 
 #include <sys/param.h>
@@ -116,6 +117,9 @@ domaininit()
 #endif
 #ifdef IPSEC
 	ADDDOMAIN(key);
+#endif
+#ifdef MIP6
+	ADDDOMAIN(mip);
 #endif
 #ifdef INET
 #if NARP > 0
