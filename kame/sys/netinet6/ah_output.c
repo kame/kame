@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.16 2000/02/22 14:04:14 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.17 2000/03/09 08:54:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,7 +406,8 @@ ah6_output(m, nexthdrp, md, isr)
 			"sav->replay is null: SPI=%u\n",
 			(u_int32_t)ntohl(sav->spi)));
 		ipsec6stat.out_inval++;
-		return 0;	/* no change at all */
+		m_freem(m);
+		return EINVAL;
 	}
 
 	algo = &ah_algorithms[sav->alg_auth];
@@ -461,12 +462,14 @@ ah6_output(m, nexthdrp, md, isr)
 	 * and the algorithm specified.
 	 */
 	error = ah6_calccksum(m, (caddr_t)ahsumpos, algo, sav);
-	if (error)
+	if (error) {
 		ipsec6stat.out_inval++;
-	else
+		m_freem(m);
+	} else {
 		ipsec6stat.out_success++;
+		key_sa_recordxfer(sav, m);
+	}
 	ipsec6stat.out_ahhist[sav->alg_auth]++;
-	key_sa_recordxfer(sav, m);
 
 	return(error);
 }
