@@ -961,13 +961,15 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;
+			size_t len = 0;
 			int priv;
 
 			priv = (inp->inp_socket->so_state & SS_PRIV) ? 1 : 0;
-			if (m != 0) {
+			if (m) {
 				req = mtod(m, caddr_t);
+				len = m->m_len;
 			}
-			error = ipsec4_set_policy(inp, optname, req, priv);
+			error = ipsec4_set_policy(inp, optname, req, len, priv);
 			break;
 		}
 #endif /*IPSEC*/
@@ -1064,10 +1066,13 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;
+			size_t len = 0;
 
-			if (m != 0)
+			if (m) {
 				req = mtod(m, caddr_t);
-			error = ipsec4_get_policy(inp, req, mp);
+				len = m->m_len;
+			}
+			error = ipsec4_get_policy(inp, req, len, mp);
 			break;
 		}
 #endif /*IPSEC*/

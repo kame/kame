@@ -1165,7 +1165,8 @@ ip_ctloutput(so, sopt)
 #ifdef IPSEC
 		case IP_IPSEC_POLICY:
 		{
-			caddr_t req;
+			caddr_t req = NULL;
+			size_t len = 0;
 			int priv;
 			struct mbuf *m;
 			int optname;
@@ -1177,9 +1178,12 @@ ip_ctloutput(so, sopt)
 			priv = (sopt->sopt_p != NULL &&
 				suser(sopt->sopt_p->p_ucred,
 				      &sopt->sopt_p->p_acflag) != 0) ? 0 : 1;
-			req = mtod(m, caddr_t);
+			if (m) {
+				req = mtod(m, caddr_t);
+				len = m->m_len;
+			}
 			optname = sopt->sopt_name;
-			error = ipsec4_set_policy(inp, optname, req, priv);
+			error = ipsec4_set_policy(inp, optname, req, len, priv);
 			m_freem(m);
 			break;
 		}
@@ -1269,11 +1273,14 @@ ip_ctloutput(so, sopt)
 		case IP_IPSEC_POLICY:
 		{
 			struct mbuf *m;
+			size_t len = 0;
 			caddr_t req = NULL;
 
-			if (m != 0)
+			if (m) {
 				req = mtod(m, caddr_t);
-			error = ipsec4_get_policy(sotoinpcb(so), req, &m);
+				len = m->m_len;
+			}
+			error = ipsec4_get_policy(sotoinpcb(so), req, len, &m);
 			if (error == 0)
 				error = soopt_mcopyout(sopt, m); /* XXX */
 			m_freem(m);
