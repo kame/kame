@@ -1,4 +1,5 @@
-#include <sys/types.h>
+/*	$KAME: test.c,v 1.15 2002/07/05 15:50:11 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, and 2002 WIDE Project.
  * All rights reserved.
@@ -28,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

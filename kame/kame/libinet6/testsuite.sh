@@ -1,3 +1,4 @@
+#	$KAME: testsuite.sh,v 1.13 2002/07/05 15:50:11 itojun Exp $
 #
 # Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, and 2002 WIDE Project.
 # All rights reserved.
