@@ -177,6 +177,8 @@ struct nlist nl[] = {
 	{ "_mif6table" },
 #define N_PFKEYSTAT	53
 	{ "_pfkeystat" },
+#define N_RIP6STAT	54
+	{ "_rip6stat" },
 	{ "" },
 };
 
@@ -233,6 +235,8 @@ struct protox ip6protox[] = {
 #endif
 	{ -1,		N_PIM6STAT,	1,	0,
 	  pim6_stats,	NULL,		0,	"pim6" },
+	{ -1,		N_RIP6STAT,	1,	0,
+	  rip6_stats,	NULL,		0,	"rip6" },
 	{ -1,		-1,		0,	0,
 	  0,		NULL,		0,	0 }
 };
