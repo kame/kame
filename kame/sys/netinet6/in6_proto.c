@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.75 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.76 2001/01/30 14:18:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -697,7 +697,7 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 		struct nd_prefix *pr, *next;
 
 		for (pr = nd_prefix.lh_first; pr; pr = next) {
-			sturct in6_ifaddr *ia, *ia_next;
+			struct in6_ifaddr *ia, *ia_next;
 
 			next = pr->ndpr_next;
 			for (ia = in6_ifaddr; ia; ia = ia_next) {
@@ -707,11 +707,11 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 				/* ia might be removed. keep the next ptr. */
 				ia_next = ia->ia_next;
 
-				if ((ia->in6_flags & IN6_IFF_AUTOCONF) == 0)
+				if ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0)
 					continue;
 
 				in6_pfx = &ia->ia_prefixmask.sin6_addr;
-				plen_ifa = in6_mask2len(in6_pfx);
+				plen_ifa = in6_mask2len(in6_pfx, NULL);
 				if (pr->ndpr_plen == plen_ifa &&
 				    in6_are_prefix_equal(in6_pfx,
 							 &pr->ndpr_prefix.sin6_addr,
