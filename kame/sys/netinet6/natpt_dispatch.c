@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.40 2002/01/13 06:27:07 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.41 2002/01/13 12:33:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -508,7 +508,10 @@ natpt_setValue(caddr_t addr)
 	caddr_t			 caddr;
 	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
-	caddr = natptctl_vars[mbox->flags];
+	if ((mbox->flags < 0) || (mbox->flags >= NATPTCTL_NULL))
+		return (0);
+	if ((caddr = natptctl_vars[mbox->flags]) == NULL)
+		return (0);
 
 	switch(natptctl_names[mbox->flags].ctl_type) {
 	case NATPTCTL_INT:
@@ -530,15 +533,18 @@ natpt_getValue(caddr_t addr)
 	caddr_t			 caddr;
 	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
-	caddr = natptctl_vars[mbox->flags];
+	if ((mbox->flags < 0) || (mbox->flags >= NATPTCTL_NULL))
+		return (0);
+	if ((caddr = natptctl_vars[mbox->flags]) == NULL)
+		return (0);
 
 	switch (natptctl_names[mbox->flags].ctl_type) {
 	case NATPTCTL_INT:
-		mbox->m_uint = *(int *)natptctl_vars[mbox->flags];
+		mbox->m_uint = *(int *)caddr;
 		break;
 
 	case NATPTCTL_IN6ADDR:
-		mbox->m_in6addr = *(struct in6_addr *)natptctl_vars[mbox->flags];
+		mbox->m_in6addr = *(struct in6_addr *)caddr;
 		break;
 	}
 
