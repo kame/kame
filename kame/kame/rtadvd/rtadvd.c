@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.31 2000/06/23 06:34:51 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.32 2000/07/19 13:06:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #include <net/route.h>

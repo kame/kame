@@ -31,6 +31,7 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #include <net/route.h>
