@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.31 2000/04/14 08:43:32 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.32 2000/04/17 03:02:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -362,6 +362,7 @@ gif_encapcheck4(m, off, proto, arg)
 	struct gif_softc *sc;
 	struct sockaddr_in *src, *dst;
 	int addrmatch;
+	struct in_ifaddr *ia4;
 
 	/* sanity check done in caller */
 	sc = (struct gif_softc *)arg;
@@ -385,11 +386,23 @@ gif_encapcheck4(m, off, proto, arg)
 		return 0;
 
 	/* martian filters on outer source - NOT done in ip_input! */
-	if (IN_CLASSD(&ip.ip_src.s_addr))
+	if (IN_MULTICAST(&ip.ip_src.s_addr))
 		return 0;
 	switch ((ntohl(&ip.ip_src.s_addr) & 0xff000000) >> 24) {
 	case 0: case 127: case 255:
 		return 0;
+	}
+	/* reject packets with broadcast on source */
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
+#else
+	for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next)
+#endif
+	{
+		if ((ia4->ia_ifa.ifa_ifp->if_flags & IFF_BROADCAST) == 0)
+			continue;
+		if (ip.ip_src.s_addr == ia4->ia_broadaddr.sin_addr.s_addr)
+			return 0;
 	}
 
 	/* ingress filters on outer source */
