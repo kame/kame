@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.309 2003/04/04 09:28:37 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.310 2003/04/08 08:15:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1076,7 +1076,7 @@ ip6_input(m)
 		if (ip6->ip6_plen == 0 && plen == 0) {
 			/*
 			 * Note that if a valid jumbo payload option is
-			 * contained, ip6_hoptops_input() must set a valid
+			 * contained, ip6_hopopts_input() must set a valid
 			 * (non-zero) payload length to the variable plen.
 			 */
 			ip6stat.ip6s_badoptions++;
