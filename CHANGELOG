@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.415 2000/01/07 16:23:34 fujisawa Exp $
+$Id: CHANGELOG,v 1.416 2000/01/07 17:30:11 jinmei Exp $
 
 <200001>
 Sat Jan  8 00:37:28 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
@@ -39,7 +39,7 @@ Sat Jan  8 00:09:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	- if the erroneous packet contains a routing header, examine the
 	header to determine the final destination and use it to update
 	path MTU.
-	- if the erroneous packet contians a fragment header, stop
+	- if the erroneous packet contains a fragment header, stop
 	chasing the header chain unless it is the first fragment.
 
 	With the former fix the kernel will perform path MTU discovery
@@ -105,8 +105,8 @@ Wed Jan  5 02:49:05 JST 2000  itojun@iijlab.net
 	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: implemented some new
 	functions introduced in rfc2292bis (see TODO.2292bis for more
 	details).
-	All the new functions except rresvport_af, rcmd_af, and rexec_af
-	are now	available.
+	All the new functions except rcmd_af and rexec_af are now
+	available.
 
 2000-01-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{various files}: implemented the new advanced
