@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.92 2000/05/08 03:09:39 itojun Exp $	*/
+/*	$KAME: key.c,v 1.93 2000/05/08 03:28:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -437,7 +437,8 @@ static struct secspacq *key_newspacq __P((struct secpolicyindex *));
 static struct secspacq *key_getspacq __P((struct secpolicyindex *));
 static int key_acquire2 __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
-static struct sadb_msg *key_register __P((caddr_t *, struct socket *));
+static int key_register __P((struct socket *, struct mbuf *,
+	struct sadb_msghdr *));
 static int key_expire __P((struct secasvar *));
 static int key_flush __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
@@ -5692,69 +5693,65 @@ key_acquire2(so, m, mhp)
  *    0     : succeed
  *    others: error number
  */
-static struct sadb_msg *
-key_register(mhp, so)
-	caddr_t *mhp;
+static int
+key_register(so, m, mhp)
 	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	struct secreg *reg, *newreg = 0;
 
 	/* sanity check */
-	if (mhp == NULL || so == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_register: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
 	/* check for invalid register message */
-	if (msg0->sadb_msg_satype >= sizeof(regtree)/sizeof(regtree[0])) {
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
-	}
+	if (mhp->msg->sadb_msg_satype >= sizeof(regtree)/sizeof(regtree[0]))
+		return key_senderror(so, m, EINVAL);
 
 	/* When SATYPE_UNSPEC is specified, only return sabd_supported. */
-	if (msg0->sadb_msg_satype == SADB_SATYPE_UNSPEC)
+	if (mhp->msg->sadb_msg_satype == SADB_SATYPE_UNSPEC)
 		goto setmsg;
 
 	/* check whether existing or not */
-	LIST_FOREACH(reg, &regtree[msg0->sadb_msg_satype], chain) {
+	LIST_FOREACH(reg, &regtree[mhp->msg->sadb_msg_satype], chain) {
 		if (reg->so == so) {
 #ifdef IPSEC_DEBUG
 			printf("key_register: socket exists already.\n");
 #endif
-			msg0->sadb_msg_errno = EEXIST;
-			return NULL;
+			return key_senderror(so, m, EEXIST);
 		}
 	}
 
 	/* create regnode */
-	KMALLOC(newreg, struct secreg *, sizeof(struct secreg));
+	KMALLOC(newreg, struct secreg *, sizeof(*newreg));
 	if (newreg == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_register: No more memory.\n");
 #endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
+		return key_senderror(so, m, ENOBUFS);
 	}
-	bzero((caddr_t)newreg, sizeof(struct secreg));
+	bzero((caddr_t)newreg, sizeof(*newreg));
 
 	newreg->so = so;
 	((struct keycb *)sotorawcb(so))->kp_registered++;
 
 	/* add regnode to regtree. */
-	LIST_INSERT_HEAD(&regtree[msg0->sadb_msg_satype], newreg, chain);
+	LIST_INSERT_HEAD(&regtree[mhp->msg->sadb_msg_satype], newreg, chain);
 
   setmsg:
-  {
+    {
+	struct mbuf *n;
 	struct sadb_msg *newmsg;
 	struct sadb_supported *sup;
 	u_int len, alen, elen;
-	caddr_t p;
+	int off;
+	int i;
+	struct sadb_alg *alg;
 
 	/* create new sadb_msg to reply. */
 	alen = sizeof(struct sadb_supported)
 		+ ((SADB_AALG_MAX - 1) * sizeof(struct sadb_alg));
-
 #ifdef IPSEC_ESP
 	elen = sizeof(struct sadb_supported)
 		+ ((SADB_EALG_MAX - 1) * sizeof(struct sadb_alg));
@@ -5762,81 +5759,85 @@ key_register(mhp, so)
 	elen = 0;
 #endif
 
-	len = sizeof(struct sadb_msg)
-		+ alen
-		+ elen;
+	len = sizeof(struct sadb_msg) + alen + elen;
 
-	KMALLOC(newmsg, struct sadb_msg *, len);
-	if (newmsg == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_register: No more memory.\n");
-#endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
+	if (len > MCLBYTES)
+		return key_senderror(so, m, ENOBUFS);
+
+	MGETHDR(n, M_DONTWAIT, MT_DATA);
+	if (len > MHLEN) {
+		MCLGET(n, M_DONTWAIT);
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
+		}
 	}
-	bzero((caddr_t)newmsg, len);
+	if (!n)
+		return key_senderror(so, m, ENOBUFS);
 
-	bcopy((caddr_t)mhp[0], (caddr_t)newmsg, sizeof(*msg0));
+	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t));
+	newmsg = mtod(n, struct sadb_msg *);
 	newmsg->sadb_msg_errno = 0;
 	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
-	p = (caddr_t)newmsg + sizeof(*msg0);
+	off = PFKEY_ALIGN8(sizeof(struct sadb_msg));
 
 	/* for authentication algorithm */
-	sup = (struct sadb_supported *)p;
-	sup->sadb_supported_len = PFKEY_UNIT64(alen);
-	sup->sadb_supported_exttype = SADB_EXT_SUPPORTED_AUTH;
-	p += sizeof(*sup);
+	if (alen) {
+		sup = (struct sadb_supported *)(mtod(n, caddr_t) + off);
+		sup->sadb_supported_len = PFKEY_UNIT64(alen);
+		sup->sadb_supported_exttype = SADB_EXT_SUPPORTED_AUTH;
+		off += PFKEY_ALIGN8(sizeof(*sup));
 
-    {
-	int i;
-	struct sadb_alg *alg;
-	struct ah_algorithm *algo;
+		for (i = 1; i < SADB_AALG_MAX; i++) {
+			struct ah_algorithm *aalgo;
 
-	for (i = 1; i < SADB_AALG_MAX; i++) {
-		algo = &ah_algorithms[i];
-		alg = (struct sadb_alg *)p;
-		alg->sadb_alg_id = i;
-		alg->sadb_alg_ivlen = 0;
-		alg->sadb_alg_minbits = algo->keymin;
-		alg->sadb_alg_maxbits = algo->keymax;
-		p += sizeof(struct sadb_alg);
+			aalgo = &ah_algorithms[i];
+			alg = (struct sadb_alg *)(mtod(n, caddr_t) + off);
+			alg->sadb_alg_id = i;
+			alg->sadb_alg_ivlen = 0;
+			alg->sadb_alg_minbits = aalgo->keymin;
+			alg->sadb_alg_maxbits = aalgo->keymax;
+			off += PFKEY_ALIGN8(sizeof(*alg));
+		}
 	}
-    }
 
 #ifdef IPSEC_ESP
 	/* for encryption algorithm */
-	sup = (struct sadb_supported *)p;
-	sup->sadb_supported_len = PFKEY_UNIT64(elen);
-	sup->sadb_supported_exttype = SADB_EXT_SUPPORTED_ENCRYPT;
-	p += sizeof(*sup);
+	if (elen) {
+		sup = (struct sadb_supported *)(mtod(n, caddr_t) + off);
+		sup->sadb_supported_len = PFKEY_UNIT64(elen);
+		sup->sadb_supported_exttype = SADB_EXT_SUPPORTED_ENCRYPT;
+		off += PFKEY_ALIGN8(sizeof(*sup));
 
-    {
-	int i;
-	struct sadb_alg *alg;
-	struct esp_algorithm *algo;
+		for (i = 1; i < SADB_EALG_MAX; i++) {
+			struct esp_algorithm *ealgo;
 
-	for (i = 1; i < SADB_EALG_MAX; i++) {
-		algo = &esp_algorithms[i];
-
-		alg = (struct sadb_alg *)p;
-		alg->sadb_alg_id = i;
-		if (algo && algo->ivlen) {
-			/*
-			 * give NULL to get the value preferred by algorithm
-			 * XXX SADB_X_EXT_DERIV ?
-			 */
-			alg->sadb_alg_ivlen = (*algo->ivlen)(NULL);
-		} else
-			alg->sadb_alg_ivlen = 0;
-		alg->sadb_alg_minbits = algo->keymin;
-		alg->sadb_alg_maxbits = algo->keymax;
-		p += sizeof(struct sadb_alg);
+			ealgo = &esp_algorithms[i];
+			alg = (struct sadb_alg *)(mtod(n, caddr_t) + off);
+			alg->sadb_alg_id = i;
+			if (ealgo && ealgo->ivlen) {
+				/*
+				 * give NULL to get the value preferred by
+				 * algorithm XXX SADB_X_EXT_DERIV ?
+				 */
+				alg->sadb_alg_ivlen = (*ealgo->ivlen)(NULL);
+			} else
+				alg->sadb_alg_ivlen = 0;
+			alg->sadb_alg_minbits = ealgo->keymin;
+			alg->sadb_alg_maxbits = ealgo->keymax;
+			off += PFKEY_ALIGN8(sizeof(struct sadb_alg));
+		}
 	}
-    }
 #endif
 
-	return newmsg;
-  }
+#ifdef DIGAGNOSTIC
+	if (off != len)
+		panic("length assumption failed in key_register");
+#endif
+
+	m_freem(m);
+	return key_sendup_mbuf(so, n, KEY_SENDUP_REGISTERED);
+    }
 }
 
 /*
@@ -6545,10 +6546,7 @@ key_parse(m, so)
 		return key_acquire2(so, m, &mh);
 
 	case SADB_REGISTER:
-		if ((newmsg = key_register((caddr_t *)mh.ext, so)) == NULL)
-			goto sendback;
-		target = KEY_SENDUP_REGISTERED;
-		break;
+		return key_register(so, m, &mh);
 
 	case SADB_EXPIRE:
 #ifdef IPSEC_DEBUG
