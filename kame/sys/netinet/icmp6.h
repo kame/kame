@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.82 2003/02/05 10:23:32 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.83 2003/03/04 18:57:32 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -518,7 +518,7 @@ struct nd_opt_homeagent_info {	/* Home Agent info */
 	u_int8_t	nd_opt_hai_type;
 	u_int8_t	nd_opt_hai_len;
 	u_int16_t	nd_opt_hai_reserved;
-	int16_t		nd_opt_hai_preference;
+	u_int16_t	nd_opt_hai_preference;
 	u_int16_t	nd_opt_hai_lifetime;
 } __attribute__((__packed__));
 
