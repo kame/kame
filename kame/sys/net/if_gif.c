@@ -429,9 +429,10 @@ gif_ioctl(ifp, cmd, data)
 			    bcmp(sc2->gif_pdst, dst, dst->sa_len) == 0 &&
 			    sc2->gif_psrc->sa_family == src->sa_family &&
 			    sc2->gif_psrc->sa_len == src->sa_family &&
-			    bcmp(sc2->gif_psrc, src, src->sa_len) == 0)
+			    bcmp(sc2->gif_psrc, src, src->sa_len) == 0) {
 				error = EADDRNOTAVAIL;
 				goto bad;
+			}
 		}
 
 		switch (ifr->ifr_addr.sa_family) {
