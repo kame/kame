@@ -31,7 +31,7 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet6/ipsec.h>
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/key_var.h>
 #include <netkey/key_debug.h>
 

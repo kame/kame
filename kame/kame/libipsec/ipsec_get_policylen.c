@@ -32,7 +32,7 @@
 
 #include <netinet6/ipsec.h>
 
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 
 #include "ipsec_strerror.h"
 

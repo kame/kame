@@ -30,7 +30,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/key_var.h>
 #include <netinet/in.h>
 #include <netinet6/in6.h>

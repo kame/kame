@@ -26,14 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.7 2000/01/12 06:09:32 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.8 2000/02/01 16:57:44 sumikawa Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <netkey/key_var.h>
 
