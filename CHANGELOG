@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2739 2005/03/29 15:50:44 jinmei Exp $
+$KAME: CHANGELOG,v 1.2740 2005/04/01 06:04:36 suz Exp $
+
+<200504>
+2005-04-01  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/kame/rtadvd/configc, rtadvd.[ch]: reflect router-variables
+	in RA configuration into host-variables in kernel.
 
 <200503>
 2005-03-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>

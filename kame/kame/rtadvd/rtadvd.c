@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.89 2004/11/30 18:05:41 suz Exp $	*/
+/*	$KAME: rtadvd.c,v 1.90 2005/04/01 06:04:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,6 +30,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/time.h>
@@ -38,10 +39,13 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_dl.h>
+#include <net/if_var.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
+#include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 
 #include <arpa/inet.h>
 
@@ -431,6 +435,37 @@ die()
 			ra_output(ra);
 		sleep(MIN_DELAY_BETWEEN_RAS);
 	}
+#ifdef SIOCSIFINFO_IN6
+	{
+		int s;
+
+		if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+			syslog(LOG_ERR, "<%s> socket: %s", __func__,
+			       strerror(errno));
+			exit(1);
+		}
+
+		/* 
+		 * reinitialize the RA-relates host variables to the
+		 * default value of the kernel.
+		 */
+		for (ra = ralist; ra; ra = ra->next) {
+			struct in6_ndireq ndi;
+
+			memset(&ndi, 0, sizeof(ndi));
+			strncpy(ndi.ifname, ra->ifname, IFNAMSIZ);
+			ndi.ndi.chlim = ra->orig_chlim;
+			ndi.ndi.retrans = ra->orig_retrans;
+			ndi.ndi.basereachable = ra->orig_basereachable;
+			if (ioctl(s, SIOCSIFINFO_IN6, (caddr_t)&ndi) < 0) {
+				syslog(LOG_INFO,
+				     "<%s> ioctl:SIOCSIFINFO_IN6 at %s: %s",
+				     __func__, ra->ifname, strerror(errno));
+			}
+		}
+		close(s);
+	}
+#endif
 	exit(0);
 	/*NOTREACHED*/
 }
