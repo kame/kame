@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.197 2001/09/18 11:34:16 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.198 2001/09/18 13:35:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1004,7 +1004,7 @@ nd6_lookup(addr6, create, ifp)
 				    "nd6_lookup: failed to add route for a "
 				    "neighbor(%s), errno=%d\n",
 				    ip6_sprintf(addr6), e);
-#else
+#endif
 				return(NULL);
 			}
 			if (rt == NULL)
