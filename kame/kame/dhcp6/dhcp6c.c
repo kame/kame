@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.154 2005/03/01 03:30:42 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.155 2005/03/02 07:26:28 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -319,7 +319,7 @@ client6_init()
 		exit(1);
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
-		dprintf(LOG_ERR, FNAME, "bind(inbonud): %s", strerror(errno));
+		dprintf(LOG_ERR, FNAME, "bind(inbound): %s", strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res);
@@ -381,7 +381,7 @@ client6_init()
 		exit(1);
 	}
 	if (bind(outsock, res->ai_addr, res->ai_addrlen) < 0) {
-		dprintf(LOG_ERR, FNAME, "bind(outbonud): %s",
+		dprintf(LOG_ERR, FNAME, "bind(outbound): %s",
 		    strerror(errno));
 		exit(1);
 	}
