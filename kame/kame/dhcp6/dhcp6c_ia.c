@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.27 2005/02/27 03:36:07 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.28 2005/02/27 03:51:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -161,6 +161,16 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 					    siav->val_prefix6.plen);
 				}
 				break;
+			case DHCP6_LISTVAL_STATEFULADDR6:
+				ianac = (struct iana_conf *)iac;
+				if (update_address(ia, &siav->val_prefix6, ifp,
+				    &ia->ctl, callback)) {
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed to update"
+					    "an address %s",
+					    in6addr2str(&siav->val_prefix6.addr, 0));
+				}
+				break;
 			case DHCP6_LISTVAL_STCODE:
 				dprintf(LOG_INFO, FNAME,
 				    "status code for %s-%lu: %s",
@@ -185,16 +195,6 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 					    ia->conf->iaid);
 					reestablish_ia(ia);
 					goto nextia;
-				}
-				break;
-			case DHCP6_LISTVAL_STATEFULADDR6:
-				ianac = (struct iana_conf *)iac;
-				if (update_address(ia, &siav->val_prefix6, ifp,
-				    &ia->ctl, callback)) {
-					dprintf(LOG_NOTICE, FNAME,
-					    "failed to update"
-					    "an address %s",
-					    in6addr2str(&siav->val_prefix6.addr, 0));
 				}
 				break;
 			default:
