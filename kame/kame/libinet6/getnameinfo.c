@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.36 2000/04/26 15:47:15 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.37 2000/04/26 15:58:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,9 +94,9 @@ struct sockinet {
 };
 
 #ifdef INET6
-static int ip6_parsenumeric __P((const struct sockaddr *, char *, char *,
-				 int, int));
-static int ip6_sa2str __P((struct sockaddr_in6 *, char *, size_t, int));
+static int ip6_parsenumeric __P((const struct sockaddr *, const char *, char *,
+				 size_t, int));
+static int ip6_sa2str __P((const struct sockaddr_in6 *, char *, size_t, int));
 #endif 
 
 #define ENI_NOSOCKET 	0
@@ -122,7 +122,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	struct hostent *hp;
 	u_short port;
 	int family, i;
-	char *addr;
+	const char *addr;
 	u_int32_t v4a;
 	int h_error;
 	char numserv[512];
@@ -148,8 +148,9 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	if (salen != afd->a_socklen)
 		return ENI_SALEN;
 	
-	port = ((struct sockinet *)sa)->si_port; /* network byte order */
-	addr = (char *)sa + afd->a_off;
+	/* network byte order */
+	port = ((const struct sockinet *)sa)->si_port;
+	addr = (const char *)sa + afd->a_off;
 
 	if (serv == NULL || servlen == 0) {
 		/*
@@ -180,7 +181,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	switch (sa->sa_family) {
 	case AF_INET:
 		v4a = (u_int32_t)
-			ntohl(((struct sockaddr_in *)sa)->sin_addr.s_addr);
+		    ntohl(((const struct sockaddr_in *)sa)->sin_addr.s_addr);
 		if (IN_MULTICAST(v4a) || IN_EXPERIMENTAL(v4a))
 			flags |= NI_NUMERICHOST;
 		v4a >>= IN_CLASSA_NSHIFT;
@@ -190,8 +191,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #ifdef INET6
 	case AF_INET6:
 	    {
-		struct sockaddr_in6 *sin6;
-		sin6 = (struct sockaddr_in6 *)sa;
+		const struct sockaddr_in6 *sin6;
+		sin6 = (const struct sockaddr_in6 *)sa;
 		switch (sin6->sin6_addr.s6_addr[0]) {
 		case 0x00:
 			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
@@ -315,8 +316,10 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 static int
 ip6_parsenumeric(sa, addr, host, hostlen, flags)
 	const struct sockaddr *sa;
-	char *addr, *host;
-	int flags, hostlen;
+	const char *addr;
+	char *host;
+	size_t hostlen;
+	int flags;
 {
 	int numaddrlen;
 	char numaddr[512];
@@ -336,7 +339,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 	    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
 	     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
 #endif
-	    ((struct sockaddr_in6 *)sa)->sin6_scope_id) {
+	    ((const struct sockaddr_in6 *)sa)->sin6_scope_id) {
 #ifndef ALWAYS_WITHSCOPE
 		if (flags & NI_WITHSCOPEID)
 #endif /* !ALWAYS_WITHSCOPE */
@@ -345,7 +348,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 			int scopelen;
 
 			/* ip6_sa2str never fails */
-			scopelen = ip6_sa2str((struct sockaddr_in6 *)sa,
+			scopelen = ip6_sa2str((const struct sockaddr_in6 *)sa,
 					      scopebuf, sizeof(scopebuf),
 					      0);
 			if (scopelen + 1 + numaddrlen + 1 > hostlen)
@@ -383,7 +386,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 /* ARGSUSED */
 static int
 ip6_sa2str(sa6, buf, bufsiz, flags)
-	struct sockaddr_in6 *sa6;
+	const struct sockaddr_in6 *sa6;
 	char *buf;
 	size_t bufsiz;
 	int flags;
