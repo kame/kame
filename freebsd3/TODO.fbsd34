@@ -17,7 +17,7 @@ libexec
 ports
 	bump the major version of several shared libraries: done
 	sync with ports-current
-		ssh:
+		ssh: done
 		vic6: done
 		vat6: done
 
@@ -40,9 +40,6 @@ usr.sbin
 	lpr: done
 
 MEMOs:
-	- conf/options: keyword "PTR" is still used as opt_ptr.h.
-	  we should renmame it.
-
 	- NETGRAPH has include in FreeBSD-3.4. We check whether it is
 	  friendly with KAME IPv6
 
