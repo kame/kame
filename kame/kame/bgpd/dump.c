@@ -46,6 +46,7 @@ char *dumpfile;
 #define DUMPFILE "/var/log/bgpd.dump"
 
 static char *aspath2str(struct aspath *);
+static char *cll2str(struct clstrlist *);
 
 static void
 dump_if_rtable(FILE *fp, struct rt_entry *base)
@@ -188,6 +189,11 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 
 		fprintf(fp, "      "); /* more indent */
 		fprintf(fp, "ASPATH: %s\n", aspath2str(ap));
+		if (ap->asp_clstr) {
+			fprintf(fp, "      "); /* more indent */
+			fprintf(fp, "Cluster list: %s\n",
+				cll2str(ap->asp_clstr));
+		}
 
 		if ((rte = rte->rt_next) == base)
 			break;
@@ -424,6 +430,29 @@ aspath2str(struct aspath *aspath)
 		}
 
 		asg = asg->asg_next;
+	}
+
+	return(buf);
+}
+
+static char *
+cll2str(cll)
+	struct clstrlist *cll;
+{
+	static char buf[LINE_MAX];
+	char inetaddrstr[INET_ADDRSTRLEN];
+	struct clstrlist *cll_top = cll;
+	int l = 0;
+
+	if (cll == NULL)
+		return("Nil");
+
+	while(cll) {
+		l += sprintf(&buf[l], "%s ", inet_ntop(AF_INET, &cll->cll_id,
+						       inetaddrstr,
+						       INET_ADDRSTRLEN));
+		if ((cll = cll->cll_next) == cll_top)
+			break;
 	}
 
 	return(buf);

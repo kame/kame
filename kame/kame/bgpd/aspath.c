@@ -796,8 +796,7 @@ msg2clstrlist(bnp, i, len)
   while (1){
     MALLOC(cll, struct clstrlist);
 
-    cll->cll_id = ntohl(*(u_int32_t *)&bnp->rp_inpkt[j]);
-
+    memcpy((char *)&cll->cll_id, &bnp->rp_inpkt[j], PA_LEN_CLUSTER);
     bufwlen = sprintf(&buf[l], "%u ", cll->cll_id);
     l += bufwlen;
 
@@ -843,7 +842,6 @@ clstrlist2msg(cll, i)
      int               i;      /* tracer */
 {
   struct clstrlist *icll;
-  u_int32_t         netcid;
   int               j;         /* tracer (local) */
 
 #ifdef DEBUG
@@ -864,9 +862,7 @@ clstrlist2msg(cll, i)
 
   icll = cll;
   while(1) {
-
-    netcid = htonl(icll->cll_id);
-    memcpy(&outpkt[j], &netcid, PA_LEN_CLUSTER);
+    memcpy(&outpkt[j], &icll->cll_id, PA_LEN_CLUSTER);
 #ifdef DEBUG
     bufwlen = sprintf(&buf[l], "%u ", icll->cll_id);
     l += bufwlen;
@@ -904,7 +900,6 @@ bgp_new_clstrlist(id)
   return cll;
 }
 
-
 /*
  *    free_clstrlist()
  */
@@ -936,3 +931,42 @@ free_clstrlist(cll)
   return;
 }
 
+#ifdef notyet
+struct optatr *
+add_optatr(optatr, bnp, i, len)
+	struct optatr *optatr;
+	int i;			/* tracer */
+	int len;
+{
+	struct optatr *newoptatr;
+
+	/* allocate memory */
+	MALLOC(newoptatr, sizeof(*newoptatr));
+	MALLOC(newoptatr->data, len);
+
+	/* set values */
+	newoptatr->len = len;
+	memcpy(newoptatr->data, newoptatr->databnp->rp_inpkt[i], len);
+
+	/* link into the chain */
+	newoptatr->next = optatr;
+	
+	return(newoptatr);
+}
+
+void
+free_optatr_list(optatr)
+	struct optatr *optatr;
+{
+	struct optatr *next = NULL;
+
+	while(optatr) {
+		next = optatr->next;
+		free(optatr->data);
+		free(optatr);
+		optatr = next;
+	}
+
+	return;
+}
+#endif
