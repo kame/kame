@@ -1,8 +1,26 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1570 2001/02/26 06:37:30 itojun Exp $
+$KAME: CHANGELOG,v 1.1571 2001/02/26 09:26:04 itojun Exp $
 
 <200102>
+Mon Feb 26 18:21:08 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_{in,out}put.c: support 2553bis-03 IPV6_V6ONLY
+	  socket option (not finished yet).
+	  (1) supply net.inet6.ip6.v6only on all platforms.  it shows the
+	  kernel default behavior for IPV6_V6ONLY socket option.  mutable
+	  on netbsd/freebsd3/freebsd4, immutable on other platforms.
+	  (2) support IPV6_V6ONLY on all platforms.  on netbsd/freebsd3/
+	  freebsd4, the socket option is mutable and has per-socket state.
+	  on other platforms, we can only read it (you can set it if the
+	  value is same as the default - non-changeable - behavior).
+
+	  TODO: synchronize AF_INET6 socket behavior with 2553bis-03.
+	  (at least netbsd does not meet 2553bis-03)
+
+	  NOTE: netbsd IPV6_BINDV6ONLY is now obsoleted.  old binaries should
+	  just work (IPV6_V6ONLY uses same socket option # as IPV6_BINDV6ONLY).
+	  NOTE: freebsd net.inet6.ip6.mapped_addr is obsoleted.
+
 Mon Feb 26 15:36:51 JST 2001  itojun@iijlab.net
 	* sys/netinet*/raw*.c: validate inbound IPsec policy on raw socket
 	  processing.  from: kalyan@juniper.net
