@@ -95,6 +95,12 @@ struct ipsecrequest {
 	struct secpolicy *sp;	/* back pointer to SP */
 };
 
+/* security policy in PCB */
+struct inpcbpolicy {
+	struct secpolicy *sp_in;
+	struct secpolicy *sp_out;
+	int priv;			/* privileged socket ? */
+};
 #endif /*KERNEL*/
 
 #define IPSEC_PORT_ANY		65535
@@ -287,8 +293,9 @@ struct inpcb;
 #ifdef INET6
 struct in6pcb;
 #endif
-extern int ipsec_init_policy __P((struct secpolicy **));
-extern struct secpolicy *ipsec_copy_policy __P((struct secpolicy *));
+extern int ipsec_init_policy __P((struct socket *so, struct inpcbpolicy **));
+extern int ipsec_copy_policy
+	__P((struct inpcbpolicy *, struct inpcbpolicy *));
 extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *));
 
 extern int ipsec4_set_policy __P((struct inpcb *inp, int optname,

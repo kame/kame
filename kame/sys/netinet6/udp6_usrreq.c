@@ -842,11 +842,8 @@ udp6_usrreq(so, req, m, addr6, control)
 		in6p = sotoin6pcb(so);
 		in6p->in6p_cksum = -1;	/* just to be sure */
 #ifdef IPSEC
-		if ((error = ipsec_init_policy(&in6p->in6p_sp_in))) {
-			in6_pcbdetach(in6p);
-			break;
-		}
-		if ((error = ipsec_init_policy(&in6p->in6p_sp_out))) {
+		error = ipsec_init_policy(so, &in6p->in6p_sp);
+		if (error != 0) {
 			in6_pcbdetach(in6p);
 			break;
 		}

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.4 1999/09/09 09:27:25 sakane Exp $ */
+/* $Id: keyv2.h,v 1.5 1999/10/19 04:36:52 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -137,6 +137,14 @@ struct sadb_ident {
   u_int16_t sadb_ident_type;
   u_int16_t sadb_ident_reserved;
   u_int64_t sadb_ident_id;
+};
+union sadb_x_ident_id {
+  u_int64_t sadb_x_ident_id;
+  struct _sadb_x_ident_id_addr {
+    u_int16_t prefix;
+    u_int16_t ul_proto;
+    u_int32_t reserved;
+  } sadb_x_ident_id_addr;
 };
 
 struct sadb_sens {
@@ -308,7 +316,8 @@ struct sadb_x_ipsecrequest {
 #define SADB_IDENTTYPE_PREFIX     1
 #define SADB_IDENTTYPE_FQDN       2
 #define SADB_IDENTTYPE_USERFQDN   3
-#define SADB_IDENTTYPE_MAX        3
+#define SADB_X_IDENTTYPE_ADDR     4
+#define SADB_IDENTTYPE_MAX        4
 
 /* `flags' in sadb_sa structure holds followings */
 #define SADB_X_EXT_NONE		0x0000	/* i.e. new format. */

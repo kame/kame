@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.12 1999/09/14 03:43:48 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.13 1999/10/19 04:36:51 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -282,6 +282,9 @@ static caddr_t key_setsadbmsg __P((caddr_t buf, u_int8_t type, int tlen,
 static caddr_t key_setsadbsa __P((caddr_t buf, struct secasvar *sav));
 static caddr_t key_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
 	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
+static caddr_t key_setsadbident
+	__P((caddr_t buf, u_int16_t exttype, u_int16_t idtype,
+		caddr_t string, int stringlen, u_int64_t id));
 static caddr_t key_setsadbext __P((caddr_t p, caddr_t ext));
 static void *key_newbuf __P((void *src, u_int len));
 #ifdef INET6
@@ -646,9 +649,6 @@ void
 key_freeso(so)
 	struct socket *so;
 {
-	struct secpolicy **sp_in = NULL;
-	struct secpolicy **sp_out = NULL;
-
 	/* sanity check */
 	if (so == NULL)
 		panic("key_freeso: NULL pointer is passed.\n");
@@ -662,8 +662,8 @@ key_freeso(so)
 		/* Does it have a PCB ? */
 		if (pcb == NULL)
 			return;
-		sp_in = &pcb->inp_sp_in;
-		sp_out = &pcb->inp_sp_out;
+		key_freesp_so(&pcb->inp_sp->sp_in);
+		key_freesp_so(&pcb->inp_sp->sp_out);
 	    }
 		break;
 #endif
@@ -675,8 +675,8 @@ key_freeso(so)
 		/* Does it have a PCB ? */
 		if (pcb == NULL)
 			return;
-		sp_in = &pcb->in6p_sp_in;
-		sp_out = &pcb->in6p_sp_out;
+		key_freesp_so(&pcb->in6p_sp->sp_in);
+		key_freesp_so(&pcb->in6p_sp->sp_out);
 	    }
 		break;
 #endif /* INET6 */
@@ -685,9 +685,6 @@ key_freeso(so)
 			so->so_proto->pr_domain->dom_family);
 		return;
 	}
-
-	key_freesp_so(sp_in);
-	key_freesp_so(sp_out);
 
 	return;
 }
@@ -2541,6 +2538,36 @@ key_setsadbaddr(buf, exttype, saddr, prefixlen, ul_proto)
 }
 
 /*
+ * set data into sadb_ident.
+ * `buf' must has been allocated sufficiently.
+ */
+static caddr_t
+key_setsadbident(buf, exttype, idtype, string, stringlen, id)
+	caddr_t buf;
+	u_int16_t exttype, idtype;
+	caddr_t string;
+	int stringlen;
+	u_int64_t id;
+{
+	struct sadb_ident *p;
+	u_int len;
+
+	p = (struct sadb_ident *)buf;
+	len = sizeof(struct sadb_ident) + PFKEY_ALIGN8(stringlen);
+
+	bzero(p, len);
+	p->sadb_ident_len = PFKEY_UNIT64(len);
+	p->sadb_ident_exttype = exttype;
+	p->sadb_ident_type = idtype;
+	p->sadb_ident_reserved = 0;
+	p->sadb_ident_id = id;
+
+	bcopy(string, p + 1, stringlen);
+
+	return(buf + len);
+}
+
+/*
  * copy buffer of any sadb extension type into sadb_ext.
  * assume that sadb_ext_len shifted down >> 3.
  * i.e. shift length up when setting length of extension.
@@ -4011,6 +4038,7 @@ key_acquire(saidx, spidx)
 
     {
 	struct sadb_msg *newmsg = NULL;
+	union sadb_x_ident_id id;
 	u_int len;
 	caddr_t p;
 
@@ -4021,9 +4049,8 @@ key_acquire(saidx, spidx)
 		+ sizeof(struct sadb_address)
 		+ PFKEY_ALIGN8(saidx->dst.__ss_len)
 		+ sizeof(struct sadb_ident)
-		+ sizeof(struct sadb_address)
 		+ PFKEY_ALIGN8(spidx->src.__ss_len)
-		+ sizeof(struct sadb_address)
+		+ sizeof(struct sadb_ident)
 		+ PFKEY_ALIGN8(spidx->dst.__ss_len)
 		+ sizeof(struct sadb_prop)
 		+ sizeof(struct sadb_comb); /* XXX to be multiple */
@@ -4063,16 +4090,23 @@ key_acquire(saidx, spidx)
 	                    IPSEC_ULPROTO_ANY);
 
 	/* set sadb_address for spidx's. */
-	p = key_setsadbaddr(p,
+	id.sadb_x_ident_id_addr.prefix = spidx->prefs;
+	id.sadb_x_ident_id_addr.ul_proto = spidx->ul_proto;
+	p = key_setsadbident(p,
 	                    SADB_EXT_IDENTITY_SRC,
-	                    (struct sockaddr *)&spidx->src,
-	                    spidx->prefs,
-	                    spidx->ul_proto);
-	p = key_setsadbaddr(p,
+			    SADB_X_IDENTTYPE_ADDR,
+	                    (caddr_t)&spidx->src,
+			    spidx->src.__ss_len,
+			    *(u_int64_t *)&id);
+
+	id.sadb_x_ident_id_addr.prefix = spidx->prefd;
+	id.sadb_x_ident_id_addr.ul_proto = spidx->ul_proto;
+	p = key_setsadbident(p,
 	                    SADB_EXT_IDENTITY_DST,
-	                    (struct sockaddr *)&spidx->dst,
-	                    spidx->prefd,
-	                    spidx->ul_proto);
+			    SADB_X_IDENTTYPE_ADDR,
+	                    (caddr_t)&spidx->dst,
+			    spidx->dst.__ss_len,
+			    *(u_int64_t *)&id);
 
 	/* create proposal extension */
 	/* set combination extension */
