@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.4 2000/01/10 18:03:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.5 2000/01/10 18:52:19 itojun Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -506,6 +506,11 @@ ident_i4recv(iph1, msg0)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
+			if (ipsecdoi_checkid1(iph1) < 0) {
+				plog(logp, LOCATION, iph1->remote,
+					"invalid ID payload.\n");
+				goto end;
+			}
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -994,6 +999,11 @@ ident_r3recv(iph1, msg0)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
+			if (ipsecdoi_checkid1(iph1) < 0) {
+				plog(logp, LOCATION, iph1->remote,
+					"invalid ID payload.\n");
+				goto end;
+			}
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;

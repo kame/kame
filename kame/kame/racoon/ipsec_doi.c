@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.8 2000/01/10 18:20:36 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.9 2000/01/10 18:52:17 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2529,6 +2529,67 @@ ipproto2doi(proto)
 		return IPSECDOI_PROTO_IPCOMP;
 	}
 	return -1;	/* XXX */
+}
+
+/*
+ * check if phase 1 ID payload conforms RFC2407 4.6.2.
+ * (proto, port) must be (0, 0) or (udp, 500).
+ *
+ * "ident" should be ID payload without general header, i.e.
+ * value set to iph1->id_p after isakmp_p2ph().
+ */
+int
+ipsecdoi_checkid1(iph1)
+	struct ph1handle *iph1;
+{
+	struct ipsecdoi_id_b *id_b;
+
+	if (iph1->id_p == NULL) {
+		plog(logp, LOCATION, NULL,
+			"invalid iph1 passed (id_p == NULL\n");
+		goto err;
+	}
+	if (iph1->id_p->l < sizeof(id_b)) {
+		plog(logp, LOCATION, NULL,
+			"invalid value passed as \"ident\" (len=%lu)\n",
+			(u_long)iph1->id_p->l);
+		goto err;
+	}
+
+	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
+
+	if (id_b->type != IPSECDOI_ID_IPV4_ADDR
+	 && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
+		plog(logp, LOCATION, NULL,
+			"wrong ID payload type %u.\n", id_b->type);
+		goto err;
+	}
+
+	if (id_b->proto_id == 0 && ntohs(id_b->port) == 0)
+		return 0;
+	if (id_b->proto_id == IPPROTO_UDP) {
+		if (ntohs(id_b->port) == _INPORTBYSA(iph1->remote))
+			return 0;
+#if 1
+		/* allow hardcoded "500" for now */
+		if (ntohs(id_b->port) == 500)
+			return 0;
+#endif
+	}
+
+#if 0
+	plog(logp, LOCATION, NULL,
+		"wrong ID payload (proto, port) = (%u, %u).\n",
+		id_b->proto_id, ntohs(id_b->port));
+	return -1;
+#else
+	plog(logp, LOCATION, NULL,
+		"wrong ID payload (proto, port) = (%u, %u), okay for now.\n",
+		id_b->proto_id, ntohs(id_b->port));
+	return 0;
+#endif
+err:
+	return -1;
 }
 
 /*
