@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.88 2001/07/25 04:47:35 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.89 2001/07/25 16:25:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -691,7 +691,7 @@ udp6_usrreq(so, req, m, addr6, control)
 			break;
 		in6p = sotoin6pcb(so);
 		in6p->in6p_cksum = -1;	/* just to be sure */
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__NetBSD__)
 		error = ipsec_init_policy(so, &in6p->in6p_sp);
 		if (error != 0) {
 			in6_pcbdetach(in6p);

@@ -1232,13 +1232,6 @@ udp_usrreq(so, req, m, nam, control, p)
 			break;
 		inp = sotoinpcb(so);
 		inp->inp_ip.ip_ttl = ip_defttl;
-#ifdef IPSEC
-		error = ipsec_init_policy(so, &inp->inp_sp);
-		if (error != 0) {
-			in_pcbdetach(inp);
-			break;
-		}
-#endif /*IPSEC*/
 		break;
 
 	case PRU_DETACH:

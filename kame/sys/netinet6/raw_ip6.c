@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.83 2001/07/24 05:09:28 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.84 2001/07/25 16:25:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -785,7 +785,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		in6p = sotoin6pcb(so);
 		in6p->in6p_ip6.ip6_nxt = (long)nam;
 		in6p->in6p_cksum = -1;
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__NetBSD__)
 		error = ipsec_init_policy(so, &in6p->in6p_sp);
 		if (error != 0) {
 			in6_pcbdetach(in6p);

@@ -498,7 +498,7 @@ sctp_attach(so)
 	if (error)
 		return error;
 	inp = sotoinpcb(so);
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__NetBSD__)
 	if (inp) {
 		error = ipsec_init_policy(so, &inp->inp_sp);
 		if (error != 0) {
