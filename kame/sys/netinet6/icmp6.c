@@ -1403,8 +1403,16 @@ icmp6_rip6_input(mp, off)
 	struct icmp6_hdr *icmp6;
 	struct ip6_recvpktopts opts;
 
+#ifndef PULLDOWN_TEST
 	/* this is assumed to be safe. */
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off, sizeof(*icmp6));
+	if (icmp6 == NULL) {
+		/* m is already reclaimed */
+		return IPPROTO_DONE;
+	}
+#endif
 
 	bzero(&opts, sizeof(opts));
 	bzero(&rip6src, sizeof(rip6src));
