@@ -1,4 +1,4 @@
-/*	$KAME: mfc.c,v 1.5 2004/02/02 04:48:55 suz Exp $	*/
+/*	$KAME: mfc.c,v 1.6 2004/07/09 14:18:16 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -31,7 +31,7 @@
 
 #include "mfc.h"
 
-int s4, s6;
+int s4 = -1, s6 = -1;
 static int mif2phyif[MAXMIFS];
 static int vif2phyif[MAXVIFS];
 
@@ -75,7 +75,7 @@ mfc_init()
 	}
 	on = 1;
 	if (setsockopt(s4, IPPROTO_IP, MRT_INIT, &on, sizeof(on)) < 0) {
-		errx(1, "MRT_INIT %s", strerror(errno));
+		warn("IPv4 multicast is disabled");
 	}
 
 	/* enable IPv6 multicast routing */
@@ -84,7 +84,7 @@ mfc_init()
 	}
 	on = 1;
 	if (setsockopt(s6, IPPROTO_IPV6, MRT6_INIT, &on, sizeof(on)) < 0) {
-		errx(1, "MRT6_INIT %s", strerror(errno));
+		warn("IPv6 multicast is disabled");
 	}
 
 	/* start vif/mif management */
@@ -101,6 +101,8 @@ add_mif6(const char *ifname)
 	int ifindex = 0;
 	int err;
 
+	if (s6 < 0)
+		errx(1, "IPv6 multicasting is disabled");
 	bzero(&mif6c, sizeof(mif6c));
 	ifindex = if_nametoindex(ifname);
 	if (get_mifi(&mif6c.mif6c_mifi, ifindex) == 0)
@@ -124,6 +126,8 @@ add_mif4(const char *ifname)
 	int ifindex = 0;
 	int err;
 
+	if (s4 < 0)
+		errx(1, "IPv4 multicasting is disabled");
 	bzero(&vifc, sizeof(vifc));
 	ifindex = if_nametoindex(ifname);
 	if (get_vifi(&vifc.vifc_vifi, ifindex) == 0)
@@ -148,6 +152,8 @@ add_reg_mif6(void)
 	int ifindex = 0;
 	int err;
 
+	if (s6 < 0)
+		errx(1, "IPv6 multicasting is disabled");
 	bzero(&mif6c, sizeof(mif6c));
 	ifindex = if_nametoindex("lo0");
 	if (get_mifi(&mif6c.mif6c_mifi, ifindex) == 0)
@@ -170,6 +176,8 @@ add_mfc6(struct sockaddr *src, struct sockaddr *dst, mifi_t in,
 {
 	struct mf6cctl mf6c;
 
+	if (s6 < 0)
+		errx(1, "IPv6 multicasting is disabled");
 	bcopy(src, &mf6c.mf6cc_origin, sizeof(mf6c.mf6cc_origin));
 	bcopy(dst, &mf6c.mf6cc_mcastgrp, sizeof(mf6c.mf6cc_mcastgrp));
 	mf6c.mf6cc_parent = in;
@@ -187,6 +195,8 @@ add_mfc4(struct sockaddr *src, struct sockaddr *dst, mifi_t in,
 	struct mfcctl mfc;
 	int i;
 
+	if (s4 < 0)
+		errx(1, "IPv4 multicasting is disabled");
 	bcopy(&((struct sockaddr_in *)src)->sin_addr, &mfc.mfcc_origin,
 	      sizeof(mfc.mfcc_origin));
 	bcopy(&((struct sockaddr_in *)dst)->sin_addr, &mfc.mfcc_mcastgrp,
