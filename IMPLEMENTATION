@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.216 2001/05/25 07:43:01 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.217 2001/05/28 00:01:40 itojun Exp $
 
 1. IPv6
 
@@ -1005,15 +1005,13 @@ It should be noted that the default configuration of KAME/NetBSD is not
 conformant to RFC2553 section 3.8.  It is intentionally turned off by default
 for security reasons.
 
-1.12.3.1 KAME/NetBSD, listening side
-
 The platform can be configured to support IPv4 mapped address/special AF_INET6
 wildcard bind (disabled by default).  Kernel behavior can be summarized as
 follows:
 - default: special support code will be compiled in, but is disabled by
   default.  It can be controlled by sysctl (net.inet6.ip6.v6only),
   or setsockopt(IPV6_V6ONLY).
-- add "INET6_V6ONLY": No special support code for AF_INET6 wildcard socket
+- add "INET6_BINDV6ONLY": No special support code for AF_INET6 wildcard socket
   will be compiled in.  AF_INET6 sockets and AF_INET sockets are totally
   separate.  The behavior is similar to what described in 1.12.1.
 
@@ -1022,6 +1020,8 @@ only.  In other words, per-socket configuration will be copied from sysctl
 configuration at in6pcb creation time.  To change per-socket behavior, you
 must perform setsockopt or reopen the socket.  Change in sysctl configuration
 will not change the behavior or sockets that are already opened.
+
+1.12.3.1 KAME/NetBSD, listening side
 
 Wildcard AF_INET6 socket grabs IPv4 connection if and only if the following 
 conditions are satisfied:
@@ -1034,10 +1034,12 @@ number duplicate and other twists.
 
 1.12.3.2 KAME/NetBSD, initiating side
 
-When you initiate a connection, you can always connect to IPv4 destination
-over AF_INET6 socket, usin IPv4 mapped address destination (::ffff:10.1.1.1).
-This is enabled independently from the configuration for listening side, and
-always enabled.
+When getsockopt(IPV6_V6ONLY) is 0 for a socket, you can make a outgoing
+traffic to IPv4 destination over AF_INET6 socket, using IPv4 mapped
+address destination (::ffff:10.1.1.1).
+
+When getsockopt(IPV6_V6ONLY) is 1 for a socket, you cannot use IPv4 mapped
+address for outgoing traffic.
 
 1.12.4 KAME/BSDI4
 
