@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.71 2001/03/17 17:36:32 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.72 2001/03/17 17:48:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -644,7 +644,7 @@ rip6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 			return (error);
 		case IPV6_CHECKSUM:
-			if (so->so_proto->pr_protocol != IPPROTO_ICMPV6)
+			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
 				return EINVAL;
 			in6p = sotoin6pcb(so);
 			if (op == PRCO_SETOPT) {
