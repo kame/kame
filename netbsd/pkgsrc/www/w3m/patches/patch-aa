@@ -1,7 +1,5 @@
-$NetBSD: patch-aa,v 1.1.1.1 1999/09/27 05:37:36 sakamoto Exp $
-
---- configure.orig	Tue Aug 17 18:58:57 1999
-+++ configure	Tue Sep 21 09:40:29 1999
+--- configure.orig	Tue Aug 17 02:58:57 1999
++++ configure	Mon Oct  4 02:55:57 1999
 @@ -96,57 +96,57 @@
    NetBSD )
  # Newer NetBSD system doesn't define 'unix' symbol anymore, but GC library
@@ -724,3 +722,12 @@ $NetBSD: patch-aa,v 1.1.1.1 1999/09/27 05:37:36 sakamoto Exp $
  echo "dldflags='$ldflags'" >> config.param
  
  echo "Checking machine dependency."
+@@ -970,7 +979,7 @@
+ /*
+    If you want to use IPv6, define this symbol.
+  */
+-#undef INET6
++#define INET6
+ 
+ /**********************************************************/
+ #ifdef makefile_parameter

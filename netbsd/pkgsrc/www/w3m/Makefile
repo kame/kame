@@ -50,7 +50,8 @@ CONFIGURE_ENV+=	def_use_color=y def_use_mouse=y
 CONFIGURE_ENV+=	def_use_menu=y def_use_matrix=y
 CONFIGURE_ENV+=	editor=vi mailer=Mail dbrowser=
 CONFIGURE_ENV+=	cc="${CC}" termlib="-ltermcap"
-CONFIGURE_ENV+=	dldflags="-Wl,-rpath,${LOCALBASE}/lib -L${LOCALBASE}/lib"
+CONFIGURE_ENV+=	dldflags="-Wl,-rpath,${LOCALBASE}/lib -L${LOCALBASE}/lib -L/usr/local/v6/lib -linet6"
+CONFIGURE_ENV+=	LOCALBASE="${LOCALBASE}"
 
 pre-build:
 	@(cd ${WRKSRC}; \

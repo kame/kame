@@ -4,9 +4,6 @@
 
 .include "../mk/bsd.prefs.mk"
 
-    SUBDIR += apache13
-    SUBDIR += lynx
-    SUBDIR += squid11
-    SUBDIR += w3m
+    SUBDIR += boehm-gc
 
 .include "../mk/bsd.pkg.subdir.mk"
