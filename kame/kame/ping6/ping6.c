@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.170 2004/02/13 11:47:45 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.171 2004/03/14 10:22:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2737,6 +2737,6 @@ usage()
 	    "] [-a [aAclsg]] [-b sockbufsiz] [-c count] \n"
             "\t[-I interface] [-i wait] [-l preload] [-p pattern] "
 	    "[-S sourceaddr]\n"
-            "\t[-s packetsize] [-h hoplimit] [hops...] [-g gateway] host\n");
+            "\t[-s packetsize] [-h hoplimit] [-g gateway] [hops...] host\n");
 	exit(1);
 }
