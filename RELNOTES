@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 10:20:33 $
+		     $Date: 1999/10/07 11:08:59 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -29,6 +29,8 @@ and the next STABLE release,
   unable to fix this.  If you would like to use racoon, please use more
   recent SNAP kit instead.
 - freebsd[23]/usr.bin/fetch does not properly handle IPv6 passive mode (EPSV).
+- When IPsec header is present, TCP MSS computation violates specification
+  (no interoperability nor performance problem is experienced, though).
 
 PLATFORM DIFFERENCES
 ====================
