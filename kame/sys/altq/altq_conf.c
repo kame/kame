@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.20 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.21 2003/08/09 16:57:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -327,7 +327,9 @@ altq_drvinit(unused)
 
 	if (!altq_devsw_installed) {
 		dev = makedev(CDEV_MAJOR,0);
+#if defined(__FreeBSD__) && __FreeBSD_version < 501000
 		cdevsw_add(&dev,&altq_cdevsw,NULL);
+#endif
 		altq_devsw_installed = 1;
 #ifdef DEVFS
 		for (i=0; i<naltqsw; i++)
@@ -352,7 +354,9 @@ altq_drvinit(unused)
 	mtx_init(&altq_mtx, "altq global lock", MTX_DEF);
 #endif
 #endif
+#if defined(__FreeBSD__) && __FreeBSD_version < 501000
 	cdevsw_add(&altq_cdevsw);
+#endif
 	altq_devsw_installed = 1;
 	printf("altq: major number is %d\n", CDEV_MAJOR);
 
