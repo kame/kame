@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.35 2001/09/07 01:35:06 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.36 2001/09/07 05:10:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,13 +30,17 @@
  */
 
 #include <sys/types.h>
-
+#include <sys/stat.h>
 #include <netinet/in.h>
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <err.h>
 
 #include "var.h"
 #include "vmbuf.h"
@@ -55,6 +59,7 @@ u_int32_t loglevel = 4;
 /* prototype */
 
 void certtest __P((int, char **));
+static char **getcerts __P((char *));
 void ciphertest __P((int, char **));
 void hmactest __P((int, char **));
 void sha2test __P((int, char **));
@@ -66,20 +71,146 @@ void Usage __P((void));
 
 /* test */
 
-#include <sys/stat.h>
-#include <unistd.h>
 void
 certtest(ac, av)
 	int ac;
 	char **av;
 {
-	vchar_t c;
-	char *str;
-	vchar_t *vstr;
+	char *certpath;
+	char **certs;
 	int type;
 	int error;
-	int i;
-	static char *certs[] = {
+
+	printf("\n**Test for Certificate.**\n");
+
+    {
+	char dnstr[] = "C=JP, ST=Kanagawa, L=Fujisawa, O=WIDE Project, OU=KAME Project, CN=Shoichi Sakane/Email=sakane@kame.net";
+	vchar_t *asn1dn = NULL, asn1dn0;
+	char dn0[] = {
+		0x30,0x81,0x9a,0x31,0x0b,0x30,0x09,0x06,
+		0x03,0x55,0x04,0x06,0x13,0x02,0x4a,0x50,
+		0x31,0x11,0x30,0x0f,0x06,0x03,0x55,0x04,
+		0x08,0x13,0x08,0x4b,0x61,0x6e,0x61,0x67,
+		0x61,0x77,0x61,0x31,0x11,0x30,0x0f,0x06,
+		0x03,0x55,0x04,0x07,0x13,0x08,0x46,0x75,
+		0x6a,0x69,0x73,0x61,0x77,0x61,0x31,0x15,
+		0x30,0x13,0x06,0x03,0x55,0x04,0x0a,0x13,
+		0x0c,0x57,0x49,0x44,0x45,0x20,0x50,0x72,
+		0x6f,0x6a,0x65,0x63,0x74,0x31,0x15,0x30,
+		0x13,0x06,0x03,0x55,0x04,0x0b,0x13,0x0c,
+		0x4b,0x41,0x4d,0x45,0x20,0x50,0x72,0x6f,
+		0x6a,0x65,0x63,0x74,0x31,0x17,0x30,0x15,
+		0x06,0x03,0x55,0x04,0x03,0x13,0x0e,0x53,
+		0x68,0x6f,0x69,0x63,0x68,0x69,0x20,0x53,
+		0x61,0x6b,0x61,0x6e,0x65,0x31,0x1e,0x30,
+		0x1c,0x06,0x09,0x2a,0x86,0x48,0x86,0xf7,
+		0x0d,0x01,0x09,0x01,
+		0x0c,	/* <== XXX */
+		0x0f,0x73,0x61,
+		0x6b,0x61,0x6e,0x65,0x40,0x6b,0x61,0x6d,
+		0x65,0x2e,0x6e,0x65,0x74,
+	};
+
+	printf("check to convert the string into subjectName.\n");
+	printf("%s\n", dnstr);
+
+	asn1dn0.v = dn0;
+	asn1dn0.l = sizeof(dn0);
+
+	asn1dn = eay_str2asn1dn(dnstr, sizeof(dnstr));
+	if (asn1dn == NULL || asn1dn->l != asn1dn0.l)
+		errx(1, "asn1dn length mismatched.\n");
+
+	/*
+	 * NOTE: The value pointed by "<==" above is different from the
+	 * return of eay_str2asn1dn().  but eay_cmp_asn1dn() can distinguish
+	 * both of the names are same name.
+	 */
+	if (eay_cmp_asn1dn(&asn1dn0,  asn1dn))
+		errx(1, "asn1dn mismatched.\n");
+	vfree(asn1dn);
+
+	printf("succeed.\n");
+    }
+
+	eay_init_error();
+
+	/* get certs */
+	if (ac > 1) {
+		certpath = *(av + 1);
+		certs = getcerts(certpath);
+	} else {
+		printf("\nCAUTION: These certificates are probably invalid "
+			"on your environment because you don't have their "
+			"issuer's certs in your environment.\n\n");
+
+		certpath = "/usr/local/openssl/certs";
+		certs = getcerts(NULL);
+	}
+
+	while (*certs != NULL) {
+
+		vchar_t c;
+		char *str;
+		vchar_t *vstr;
+
+		printf("===CERT===\n");
+
+		c.v = *certs;
+		c.l = strlen(*certs);
+
+		/* print text */
+		str = eay_get_x509text(&c);
+		printf("%s", str);
+		racoon_free(str);
+
+		/* print ASN.1 of subject name */
+		vstr = eay_get_x509asn1subjectname(&c);
+		if (!vstr)
+			return;
+		PVDUMP(vstr);
+		printf("\n");
+		vfree(vstr);
+
+		/* print subject alt name */
+	    {
+		int pos;
+		for (pos = 1; ; pos++) {
+			error = eay_get_x509subjectaltname(&c, &str, &type, pos);
+			if (error) {
+				printf("no subjectaltname found.\n");
+				break;
+			}
+			if (!str)
+				break;
+			printf("SubjectAltName: %d: %s\n", type, str);
+			racoon_free(str);
+		}
+	    }
+
+		error = eay_check_x509cert(&c, certpath);
+		if (error)
+			printf("ERROR: cert is invalid.\n");
+		printf("\n");
+
+		certs++;
+	}
+}
+
+static char **
+getcerts(path)
+	char *path;
+{
+	char **certs = NULL, **p;
+	DIR *dirp;
+	struct dirent *dp;
+	struct stat sb;
+	char buf[512];
+	int len;
+	int n;
+	int fd;
+
+	static char *samplecerts[] = {
 /* self signed */
 "-----BEGIN CERTIFICATE-----\n"
 "MIICpTCCAg4CAQAwDQYJKoZIhvcNAQEEBQAwgZoxCzAJBgNVBAYTAkpQMREwDwYD\n"
@@ -179,124 +310,65 @@ certtest(ac, av)
 "Y8++0dC8NVvendIILcJBM5nbDq1TqIbb8K3SP80XhO5JLVJkoZiQftAMjo0peZPO\n"
 "EQ==\n"
 "-----END CERTIFICATE-----\n\n",
+	NULL,
 	};
 
-	printf("\n**Test for Certificate.**\n");
+	if (path == NULL)
+		return (char **)&samplecerts;
 
-    {
-	char dnstr[] = "C=JP, ST=Kanagawa, L=Fujisawa, O=WIDE Project, OU=KAME Project, CN=Shoichi Sakane/Email=sakane@kame.net";
-	vchar_t *asn1dn = NULL, asn1dn0;
-	char dn0[] = {
-		0x30,0x81,0x9a,0x31,0x0b,0x30,0x09,0x06,
-		0x03,0x55,0x04,0x06,0x13,0x02,0x4a,0x50,
-		0x31,0x11,0x30,0x0f,0x06,0x03,0x55,0x04,
-		0x08,0x13,0x08,0x4b,0x61,0x6e,0x61,0x67,
-		0x61,0x77,0x61,0x31,0x11,0x30,0x0f,0x06,
-		0x03,0x55,0x04,0x07,0x13,0x08,0x46,0x75,
-		0x6a,0x69,0x73,0x61,0x77,0x61,0x31,0x15,
-		0x30,0x13,0x06,0x03,0x55,0x04,0x0a,0x13,
-		0x0c,0x57,0x49,0x44,0x45,0x20,0x50,0x72,
-		0x6f,0x6a,0x65,0x63,0x74,0x31,0x15,0x30,
-		0x13,0x06,0x03,0x55,0x04,0x0b,0x13,0x0c,
-		0x4b,0x41,0x4d,0x45,0x20,0x50,0x72,0x6f,
-		0x6a,0x65,0x63,0x74,0x31,0x17,0x30,0x15,
-		0x06,0x03,0x55,0x04,0x03,0x13,0x0e,0x53,
-		0x68,0x6f,0x69,0x63,0x68,0x69,0x20,0x53,
-		0x61,0x6b,0x61,0x6e,0x65,0x31,0x1e,0x30,
-		0x1c,0x06,0x09,0x2a,0x86,0x48,0x86,0xf7,
-		0x0d,0x01,0x09,0x01,
-		0x0c,	/* <== XXX */
-		0x0f,0x73,0x61,
-		0x6b,0x61,0x6e,0x65,0x40,0x6b,0x61,0x6d,
-		0x65,0x2e,0x6e,0x65,0x74,
-	};
-
-	printf("check to convert the string into subjectName.\n");
-	printf("%s\n", dnstr);
-
-	asn1dn0.v = dn0;
-	asn1dn0.l = sizeof(dn0);
-
-	asn1dn = eay_str2asn1dn(dnstr, sizeof(dnstr));
-	if (asn1dn == NULL || asn1dn->l != asn1dn0.l) {
-		printf("asn1dn length mismatched.\n");
-		exit(1);
+	stat(path, &sb);
+	if (!(sb.st_mode & S_IFDIR)) {
+		printf("ERROR: %s is not directory.\n", path);
+		exit(0);
 	}
-	/*
-	 * NOTE: The value pointed by "<==" above is different from the
-	 * return of eay_str2asn1dn().  but eay_cmp_asn1dn() can distinguish
-	 * both of the names are same name.
-	 */
-	if (eay_cmp_asn1dn(&asn1dn0,  asn1dn)) {
-		printf("asn1dn mismatched.\n");
-		exit(1);
+
+	dirp = opendir(path);
+	if (dirp == NULL) {
+		printf("opendir failed.\n");
+		exit(0);
 	}
-	vfree(asn1dn);
 
-	printf("succeed.\n");
-    }
+	n = 0;
+	while ((dp = readdir(dirp)) != NULL) {
+		if (dp->d_type != DT_REG)
+			continue;
+		if (strcmp(dp->d_name + dp->d_namlen - 4, "cert"))
+			continue;
+		snprintf(buf, sizeof(buf), "%s/%s", path, dp->d_name);
+		stat(buf, &sb);
 
-	printf("\nCAUTION: These certificates may be invalid on your "
-		"environment because it was signed by SSH test CA and you "
-		"may not own their issuer's certificates.\n\n");
+		p = (char **)realloc(certs, (n + 1) * sizeof(certs));
+		if (p == NULL)
+			err(1, "realloc");
+		certs = p;
 
-	eay_init_error();
+		certs[n] = malloc(sb.st_size + 1);
+		if (certs[n] == NULL)
+			err(1, "malloc");
 
-	for (i = 0; i < sizeof(certs)/sizeof(certs[0]); i++) {
+		fd = open(buf, O_RDONLY);
+		if (fd == -1)
+			err(1, "open");
+		len = read(fd, certs[n], sb.st_size);
+		if (len == -1)
+			err(1, "read");
+		if (len != sb.st_size)
+			errx(1, "read: length mismatch");
+		certs[n][sb.st_size] = '\0';
+		close(fd);
 
-		printf("CERT[%d]===\n", i);
+		printf("%s: %d\n", dp->d_name, (int)sb.st_size);
 
-		c.v = certs[i];
-		c.l = strlen(certs[i]);
-
-		/* print text */
-		str = eay_get_x509text(&c);
-		printf("%s", str);
-		racoon_free(str);
-
-		/* print ASN.1 of subject name */
-		vstr = eay_get_x509asn1subjectname(&c);
-		if (!vstr)
-			return;
-		PVDUMP(vstr);
-		printf("\n");
-		vfree(vstr);
-
-		/* print subject alt name */
-	    {
-		int pos;
-		for (pos = 1; ; pos++) {
-			error = eay_get_x509subjectaltname(&c, &str, &type, pos);
-			if (error) {
-				printf("no subjectaltname found.\n");
-				break;
-			}
-			if (!str)
-				break;
-			printf("SubjectAltName: %d: %s\n", type, str);
-			racoon_free(str);
-		}
-	    }
-
-	    {
-		struct stat sb;
-		char *capath;
-		if (ac > 1)
-			capath = *(av + 1);
-		else
-			capath = "/usr/local/openssl/certs";
-
-		stat(capath, &sb);
-		if (!(sb.st_mode & S_IFDIR)) {
-			printf("ERROR: %s is not directory.\n", capath);
-			return;
-		}
-
-		error = eay_check_x509cert(&c, capath);
-		printf("cert is %s\n", error ? "invalid" : "valid");
-		printf("\n");
-	    }
+		n++;
 	}
+
+	p = (char **)realloc(certs, (n + 1) * sizeof(certs));
+	if (p == NULL)
+		err(1, "realloc");
+	certs = p;
+	certs[n] = NULL;
+
+	return certs;
 }
 
 void
@@ -775,6 +847,7 @@ main(ac, av)
 void
 Usage()
 {
-	printf("Usage: eaytest [dh|md5|sha1|hmac|cipher|cert]\n");
+	printf("Usage: eaytest [dh|md5|sha1|hmac|cipher]\n");
+	printf("       eaytest cert [cert_directory]\n");
 	exit(0);
 }
