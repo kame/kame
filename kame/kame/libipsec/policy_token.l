@@ -82,9 +82,7 @@ decstring	{digit}+
 hexpair		{hexdigit}{hexdigit}
 hexstring	0[xX]{hexdigit}+
 octetstring	{octet}({dot}{octet})+
-ipaddress	[a-zA-Z0-9:\._][a-zA-Z0-9:\._]*
-name		{letter}(({letter}|{digit}|{hyphen})*({letter}|{digit}))*
-hostname	{name}(({dot}{name})+{dot}?)?
+ipaddress	[a-zA-Z0-9:\._][a-zA-Z0-9:\._]*(%[a-zA-Z0-9]+)?
 
 %%
 
