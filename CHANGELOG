@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1587 2001/03/04 22:21:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1588 2001/03/05 02:27:26 jinmei Exp $
 
 <200103>
 Mon Mar  5 JST 2001  itojun@iijlab.net
 	* sys/netinet6/raw_ip6.c: avoid 1-byte mbuf buffer overrun, and/or
-	  unalignmed memory access, in rip6_output().  commented by yoshfuji.
+	  unaligned memory access, in rip6_output().  commented by yoshfuji.
 	  it will be tickled only if a evil/buggy root process runs.
 
 2001-03-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
