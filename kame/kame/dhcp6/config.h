@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.12 2002/05/17 01:37:50 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.13 2002/05/17 07:26:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -62,7 +62,7 @@ struct dhcp6_if {
 	int server_pref;	/* server preference (server only) */
 
 	struct dhcp6_optconf *send_options;
-	struct dhcp6_optconf *request_options;
+	struct dhcp6_list reqopt_list;
 
 	struct dhcp6_serverinfo *current_server;
 	struct dhcp6_serverinfo *servers;
@@ -71,7 +71,8 @@ struct dhcp6_if {
 struct dhcp6_serverinfo {
 	struct dhcp6_serverinfo *next;
 
-	struct duid id;		/* server's identifier */
+	/* option information provided in the advertisement */
+	struct dhcp6_optinfo optinfo;
 
 	int pref;		/* preference */
 	int active;		/* bool; if this server is active or not */
@@ -93,9 +94,10 @@ struct dhcp6_ifconf {
 
 	int server_pref;	/* server preference (server only) */
 
-	struct dhcp6_optconf *request_options;
 	struct dhcp6_optconf *send_options;
 	struct dhcp6_optconf *allow_options;
+
+	struct dhcp6_list reqopt_list;
 };
 
 struct prefix_ifconf {
@@ -118,7 +120,7 @@ struct host_conf {
 	char *name;		/* host name to identify the host */
 	struct duid duid;	/* DUID for the host */
 	/* delegated prefixes for the host: */
-	struct delegated_prefix_list prefix;
+	struct dhcp6_list prefix_list;
 };
 
 /* DHCP option information */
@@ -139,6 +141,7 @@ struct cf_namelist {
 
 struct cf_list {
 	struct cf_list *next;
+	struct cf_list *tail;
 	int type;
 	int line;		/* the line number of the config file */
 
@@ -173,3 +176,5 @@ extern struct dhcp6_if *find_ifconfbyname __P((char *));
 extern struct dhcp6_if *find_ifconfbyid __P((unsigned int));
 extern struct prefix_ifconf *find_prefixifconf __P((char *));
 extern struct host_conf *find_hostconf __P((struct duid *));
+extern struct dhcp6_prefix *find_prefix6 __P((struct dhcp6_list *,
+					      struct dhcp6_prefix *));

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.9 2002/05/17 01:37:49 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.10 2002/05/17 07:26:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -89,7 +89,7 @@ static void cleanup_cflist __P((struct cf_list *));
 	long long num;
 	char* str;
 	struct cf_list *list;
-	struct delegated_prefix_info *prefix;
+	struct dhcp6_prefix *prefix;
 }
 
 %type <str> IFNAME HOSTNAME DUID_ID STRING
@@ -149,8 +149,18 @@ declarations:
 		{ $$ = NULL; }
 	|	declarations declaration
 		{
-			$2->next = $1; /* XXX reverse order */
-			$$ = $2;
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2;
+			}
+
+			$$ = head;
 		}
 	;
 	
@@ -237,8 +247,18 @@ ifparams:
 		{ $$ = NULL; }
 	|	ifparams ifparam
 		{
-			$2->next = $1; /* XXX reverse order */
-			$$ = $2;
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2;
+			}
+
+			$$ = head;
 		}
 	;
 
@@ -256,7 +276,7 @@ ifparam:
 prefixparam:
 	STRING SLASH NUMBER duration
 	{
-		struct delegated_prefix_info pconf0, *pconf;		
+		struct dhcp6_prefix pconf0, *pconf;		
 
 		memset(&pconf0, 0, sizeof(pconf0));
 		if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.13 2002/05/17 01:37:49 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.14 2002/05/17 07:26:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -61,7 +61,7 @@ enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 extern char *configfilename;
 
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
-static int add_prefix __P((struct host_conf *, struct delegated_prefix_info *));
+static int add_prefix __P((struct host_conf *, struct dhcp6_prefix *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_prefixifconf __P((struct prefix_ifconf *));
 static void clear_hostconf __P((struct host_conf *));
@@ -143,6 +143,7 @@ configure_interface(iflist)
 		}
 
 		ifc->server_pref = DH6OPT_PREF_UNDEF;
+		TAILQ_INIT(&ifc->reqopt_list);
 
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
@@ -293,7 +294,7 @@ configure_host(hostlist)
 			goto bad;
 		}
 		memset(hconf, 0, sizeof(*hconf));
-		TAILQ_INIT(&hconf->prefix);
+		TAILQ_INIT(&hconf->prefix_list);
 		hconf->next = host_conflist0;
 		host_conflist0 = hconf;
 
@@ -490,12 +491,18 @@ configure_commit()
 	for (ifc = dhcp6_ifconflist; ifc; ifc = ifc->next) {
 		if ((ifp = find_ifconfbyname(ifc->ifname)) != NULL) {
 			ifp->send_flags = ifc->send_flags;
+
 			ifp->allow_flags = ifc->allow_flags;
+
 			clear_options(ifp->send_options);
+
 			ifp->send_options = ifc->send_options;
-			clear_options(ifp->request_options);
-			ifp->request_options = ifc->request_options;
 			ifc->send_options = NULL;
+
+			dhcp6_clear_list(&ifp->reqopt_list);
+			ifp->reqopt_list = ifc->reqopt_list;
+			TAILQ_INIT(&ifc->reqopt_list);
+
 			ifp->server_pref = ifc->server_pref;
 		}
 	}
@@ -529,6 +536,7 @@ clear_ifconf(iflist)
 
 		free(ifc->ifname);
 		clear_options(ifc->send_options);
+		dhcp6_clear_list(&ifc->reqopt_list);
 
 		free(ifc);
 	}
@@ -553,14 +561,14 @@ clear_hostconf(hlist)
 	struct host_conf *hlist;
 {
 	struct host_conf *host, *host_next;
-	struct delegated_prefix *p, *np;
+	struct dhcp6_listval *p;
 
 	for (host = hlist; host; host = host_next) {
 		host_next = host->next;
 
 		free(host->name);
-		for (p = TAILQ_FIRST(&host->prefix); p; p = np) {
-			np = TAILQ_NEXT(p, link);
+		while (p = TAILQ_FIRST(&host->prefix_list)) {
+			TAILQ_REMOVE(&host->prefix_list, p, link);
 			free(p);
 		}
 		if (host->duid.duid_id)
@@ -589,10 +597,23 @@ add_options(opcode, ifc, cfl0)
 	struct dhcp6_ifconf *ifc;
 	struct cf_list *cfl0;
 {
-	struct dhcp6_optconf *opt;
+	struct dhcp6_listval *opt;
 	struct cf_list *cfl;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
+		if (opcode ==  DHCPOPTCODE_REQUEST) {
+			for (TAILQ_FIRST(&ifc->reqopt_list); opt;
+			     opt = TAILQ_NEXT(opt, link)) {
+				if (opt->val_num == cfl->type) {
+					dprintf(LOG_INFO, "%s"
+						"duplicated requested"
+						" option: %s", FNAME,
+						dhcpoptstr(cfl->type));
+					goto next; /* ignore it */
+				}
+			}
+		}
+
 		switch(cfl->type) {
 		case DHCPOPT_RAPID_COMMIT:
 			switch(opcode) {
@@ -612,17 +633,6 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_PREFIX_DELEGATION:
 			switch(opcode) {
 			case DHCPOPTCODE_REQUEST:
-				for (opt = ifc->request_options; opt;
-				     opt = opt->next) {
-					if (opt->type ==
-					    DH6OPT_PREFIX_DELEGATION) {
-						dprintf(LOG_INFO, "%s"
-							"duplicated requested"
-							" option: %s", FNAME,
-							dhcpoptstr(opt->type));
-						goto next; /* ignore it */
-					}
-				}
 				if ((opt = malloc(sizeof(*opt))) == NULL) {
 					dprintf(LOG_ERR, "%s"
 						"memory allocation failed",
@@ -630,9 +640,9 @@ add_options(opcode, ifc, cfl0)
 					return(-1);
 				}
 				memset(opt, 0, sizeof(*opt));
-				opt->type = DH6OPT_PREFIX_DELEGATION;
-				opt->next = ifc->request_options;
-				ifc->request_options = opt;
+				opt->val_num = DH6OPT_PREFIX_DELEGATION;
+				TAILQ_INSERT_TAIL(&ifc->reqopt_list, opt,
+						  link);
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
@@ -656,10 +666,10 @@ add_options(opcode, ifc, cfl0)
 static int
 add_prefix(hconf, prefix0)
 	struct host_conf *hconf;
-	struct delegated_prefix_info *prefix0;
+	struct dhcp6_prefix *prefix0;
 {
-	struct delegated_prefix_info oprefix;
-	struct delegated_prefix *p, *pent;
+	struct dhcp6_prefix oprefix;
+	struct dhcp6_listval *p, *pent;
 
 	oprefix = *prefix0;
 
@@ -690,9 +700,10 @@ add_prefix(hconf, prefix0)
 	}
 
 	/* prefix duplication check */
-	for (p = TAILQ_FIRST(&hconf->prefix); p; p = TAILQ_NEXT(p, link)) {
-		if (IN6_ARE_ADDR_EQUAL(&p->prefix.addr, &oprefix.addr) &&
-		    p->prefix.plen == oprefix.plen) {
+	for (p = TAILQ_FIRST(&hconf->prefix_list); p;
+	     p = TAILQ_NEXT(p, link)) {
+		if (IN6_ARE_ADDR_EQUAL(&p->val_prefix6.addr, &oprefix.addr) &&
+		    p->val_prefix6.plen == oprefix.plen) {
 			dprintf(LOG_ERR, "%s"
 				"duplicated prefix: %s/%d for %s", FNAME,
 				in6addr2str(&oprefix.addr, 0), oprefix.plen,
@@ -708,8 +719,8 @@ add_prefix(hconf, prefix0)
 		return(-1);
 	}
 	memset(pent, 0, sizeof(*pent));
-	pent->prefix = oprefix;
-	TAILQ_INSERT_TAIL(&hconf->prefix, pent, link);
+	pent->val_prefix6 = oprefix;
+	TAILQ_INSERT_TAIL(&hconf->prefix_list, pent, link);
 
 	return(0);
 }
@@ -771,4 +782,19 @@ find_hostconf(duid)
 	}
 
 	return(NULL);
+}
+
+struct dhcp6_prefix *
+find_prefix6(list, prefix)
+	struct dhcp6_list *list;
+	struct dhcp6_prefix *prefix;
+{
+	struct dhcp6_listval *v;
+
+	for (v = TAILQ_FIRST(list); v; v = TAILQ_NEXT(v, link)) {
+		if (v->val_prefix6.plen == prefix->plen &&
+		    IN6_ARE_ADDR_EQUAL(&v->val_prefix6.addr, &prefix->addr)) {
+			return(&v->val_prefix6);
+		}
+	}
 }

@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.24 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.25 2002/05/17 07:26:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -38,6 +38,9 @@ extern int debug_thresh;
 extern char *device;
 
 /* common.c */
+extern int dhcp6_copy_list __P((struct dhcp6_list *, struct dhcp6_list *));
+extern void dhcp6_clear_list __P((struct dhcp6_list *));
+extern int dhcp6_count_list __P((struct dhcp6_list *));
 extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *,
 			  int, int, int));
 extern int transmit_sa __P((int, struct sockaddr *, char *, size_t));
@@ -54,6 +57,8 @@ extern void dprintf __P((int, const char *, ...));
 extern int get_duid __P((char *, struct duid *));
 extern void dhcp6_init_options __P((struct dhcp6_optinfo *));
 extern void dhcp6_clear_options __P((struct dhcp6_optinfo *));
+extern int dhcp6_copy_options __P((struct dhcp6_optinfo *,
+				   struct dhcp6_optinfo *));
 extern int dhcp6_get_options __P((struct dhcp6opt *, struct dhcp6opt *,
 				  struct dhcp6_optinfo *));
 extern int dhcp6_set_options __P((struct dhcp6opt *, struct dhcp6opt *,

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.27 2002/05/17 02:17:58 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.28 2002/05/17 07:26:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -78,32 +78,36 @@ struct duid {
 };
 
 /* option information */
-struct dnslist {
-	TAILQ_ENTRY(dnslist) link;
-	struct in6_addr addr;
-};
-TAILQ_HEAD(dnsq, dnslist);
-
-struct delegated_prefix_info {		/* delegated prefix information */
+struct dhcp6_prefix {		/* delegated prefix information */
 	struct in6_addr addr;
 	int plen;
 	u_int32_t duration;
 };
 
-struct delegated_prefix {
-	TAILQ_ENTRY(delegated_prefix) link;
-	struct delegated_prefix_info prefix;
+struct dhcp6_listval {
+	TAILQ_ENTRY(dhcp6_listval) link;
+
+	union {
+		int uv_num;
+		struct in6_addr uv_addr6;
+		struct dhcp6_prefix uv_prefix6;
+	} uv;
 };
-TAILQ_HEAD(delegated_prefix_list, delegated_prefix);
+#define val_num uv.uv_num
+#define val_addr6 uv.uv_addr6
+#define val_prefix6 uv.uv_prefix6
+TAILQ_HEAD(dhcp6_list, dhcp6_listval);
 
 struct dhcp6_optinfo {
 	struct duid clientID;	/* DUID */
 	struct duid serverID;	/* DUID */
-	struct dhcp6_optconf *requests;	/* options in option request */
+
 	int rapidcommit;	/* bool */
-	struct dnsq dnslist;	/* DNS server list */
-	struct delegated_prefix_list prefix; /* prefix list */
 	int pref;		/* server preference */
+
+	struct dhcp6_list reqopt_list; /*  options in option request */
+	struct dhcp6_list dns_list; /* DNS server list */
+	struct dhcp6_list prefix_list; /* prefix list */
 };
 
 /* DHCP6 base packet format */

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.52 2002/05/17 01:37:49 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.53 2002/05/17 07:26:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -85,6 +85,56 @@ static int in6_matchflags __P((struct sockaddr *, char *, int));
 static ssize_t gethwid __P((char *, int, const char *, u_int16_t *));
 static int get_delegated_prefixes __P((char *, char *,
 				       struct dhcp6_optinfo *));
+
+int
+dhcp6_copy_list(dst, src)
+	struct dhcp6_list *dst, *src;
+{
+	struct dhcp6_listval *ent, *dent;
+
+	for (ent = TAILQ_FIRST(src); ent; ent = TAILQ_NEXT(ent, link)) {
+		if ((dent = malloc(sizeof(*dent))) == NULL)
+			goto fail;
+
+		memset(dent, 0, sizeof(*dent));
+		memcpy(&dent->uv, &ent->uv, sizeof(ent->uv));
+
+		TAILQ_INSERT_TAIL(dst, dent, link);
+	}
+
+	return 0;
+
+  fail:
+	dhcp6_clear_list(dst);
+	return -1;
+}
+
+void
+dhcp6_clear_list(head)
+	struct dhcp6_list *head;
+{
+	struct dhcp6_listval *v;
+
+	while (v = TAILQ_FIRST(head)) {
+		TAILQ_REMOVE(head, v, link);
+		free(v);
+	}
+
+	return;
+}
+
+int
+dhcp6_count_list(head)
+	struct dhcp6_list *head;
+{
+	struct dhcp6_listval *v;
+	int i;
+
+	for (i = 0, v = TAILQ_FIRST(head); v; v = TAILQ_NEXT(v, link))
+		i++;
+
+	return i;
+}
 
 #if 0
 static unsigned int
@@ -550,8 +600,9 @@ dhcp6_init_options(optinfo)
 
 	optinfo->pref = DH6OPT_PREF_UNDEF;
 
-	TAILQ_INIT(&optinfo->dnslist);
-	TAILQ_INIT(&optinfo->prefix);
+	TAILQ_INIT(&optinfo->reqopt_list);
+	TAILQ_INIT(&optinfo->dns_list);
+	TAILQ_INIT(&optinfo->prefix_list);
 }
 
 void
@@ -562,27 +613,37 @@ dhcp6_clear_options(optinfo)
 	struct dnslist *d, *dn;
 	struct delegated_prefix *p, *pn;
 
-	for (ropt = optinfo->requests; ropt; ropt = ropt_next) {
-		ropt_next = ropt->next;
-
-		if (ropt->val)
-			free(ropt->val);
-		free(ropt);
-	}
-
-	for (d = TAILQ_FIRST(&optinfo->dnslist); d; d = dn) {
-		dn = TAILQ_NEXT(d, link);
-		TAILQ_REMOVE(&optinfo->dnslist, d, link);
-		free(d);
-	}
-
-	for (p = TAILQ_FIRST(&optinfo->prefix); p; p = pn) {
-		pn = TAILQ_NEXT(p, link);
-		TAILQ_REMOVE(&optinfo->prefix, p, link);
-		free(p);
-	}
+	dhcp6_clear_list(&optinfo->reqopt_list);
+	dhcp6_clear_list(&optinfo->dns_list);
+	dhcp6_clear_list(&optinfo->prefix_list);
 
 	dhcp6_init_options(optinfo);
+}
+
+int
+dhcp6_copy_options(src, dst)
+	struct dhcp6_optinfo *src, *dst;
+{
+	if (duidcpy(&dst->clientID, &src->clientID))
+		goto fail;
+	if (duidcpy(&dst->serverID, &src->serverID))
+		goto fail;
+	dst->rapidcommit = src->rapidcommit;
+
+	if (dhcp6_copy_list(&dst->reqopt_list, &src->reqopt_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->dns_list, &src->dns_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->prefix_list, &src->prefix_list))
+		goto fail;
+	dst->pref = src->pref;
+
+	return 0;
+
+  fail:
+	/* cleanup temporary resources */
+	dhcp6_clear_options(dst);
+	return -1;
 }
 
 int
@@ -594,7 +655,6 @@ dhcp6_get_options(p, ep, optinfo)
 	int i, opt, optlen, reqopts;
 	char *cp, *val;
 	u_int8_t val8;
-	struct dhcp6_optconf *optconf;
 
 	for (; p + 1 <= ep; p = np) {
 		/*
@@ -640,39 +700,37 @@ dhcp6_get_options(p, ep, optinfo)
 			reqopts = optlen / 2;
 			for (i = 0, val = cp; i < reqopts;
 			     i++, val += sizeof(u_int16_t)) {
-				struct dhcp6_optconf *opt;
+				struct dhcp6_listval *opt;
 				u_int16_t opttype;
 
 				memcpy(&opttype, val, sizeof(u_int16_t));
 				opttype = ntohs(opttype);
 
 				/* duplication check */
-				for (opt = optinfo->requests; opt;
-				     opt = opt->next) {
-					if (opt->type == opttype) {
+				for (opt = TAILQ_FIRST(&optinfo->reqopt_list);
+				     opt; opt = TAILQ_NEXT(opt, link)) {
+					if (opt->val_num == opttype) {
 						dprintf(LOG_INFO,
 							"dhcp6_get_options: "
 							"duplicated option "
 							"type (%s)",
 							dhcpoptstr(opttype));
-						goto nextoption;
 					}
+					goto nextoption;
 				}
-
-				optconf = (struct dhcp6_optconf *)
-					malloc(sizeof(*optconf));
-				if (optconf == NULL) {
-					dprintf(LOG_NOTICE,
+				if ((opt = malloc(sizeof(*opt))) == NULL) {
+					dprintf(LOG_NOTICE, "%s"
 						"memory allocation failed "
-						"during parse options");
+						"during parse options", FNAME);
 					goto fail;
 				}
-				memset(optconf, 0, sizeof(*optconf));
-				optconf->type = opttype;
+				memset(opt, 0, sizeof(*opt));
+				opt->val_num = opttype;
 				dprintf(LOG_DEBUG, "  requested option: %s",
-					dhcpoptstr(optconf->type));
-				optconf->next = optinfo->requests;
-				optinfo->requests = optconf;
+					dhcpoptstr(opttype));
+
+				TAILQ_INSERT_TAIL(&optinfo->reqopt_list,
+						  opt, link);
 
 			  nextoption:
 			}
@@ -692,17 +750,18 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
-				struct dnslist *dle;
+				struct dhcp6_listval *dlv;
 
-				if ((dle = malloc(sizeof *dle)) == NULL) {
+				if ((dlv = malloc(sizeof *dlv)) == NULL) {
 					dprintf(LOG_ERR, "memory allocation"
 						"failed during parse options");
 					goto fail;
 				}
-				memcpy(&dle->addr, val,
+				memset(dlv, 0, sizeof(*dlv));
+				memcpy(&dlv->val_addr6, val,
 				       sizeof(struct in6_addr));
-				TAILQ_INSERT_TAIL(&optinfo->dnslist,
-						  dle, link);
+				TAILQ_INSERT_TAIL(&optinfo->dns_list,
+						  dlv, link);
 			}
 			break;
 		case DH6OPT_PREFIX_DELEGATION:
@@ -735,7 +794,7 @@ get_delegated_prefixes(p, ep, optinfo)
 	char *np, *cp;
 	struct dhcp6opt opth;
 	struct dhcp6_prefix_info pi;
-	struct delegated_prefix *dp;
+	struct dhcp6_listval *dp;
 	int optlen, opt;
 
 	for (; p + sizeof(struct dhcp6opt) <= ep; p = np) {
@@ -773,11 +832,11 @@ get_delegated_prefixes(p, ep, optinfo)
 			prefix6_mask(&pi.dh6_pi_paddr, pi.dh6_pi_plen);
 
 			/* duplication check */
-			for (dp = TAILQ_FIRST(&optinfo->prefix); dp;
+			for (dp = TAILQ_FIRST(&optinfo->prefix_list); dp;
 			     dp = TAILQ_NEXT(dp, link)) {
-				if (pi.dh6_pi_plen == dp->prefix.plen &&
+				if (pi.dh6_pi_plen == dp->val_prefix6.plen &&
 				    IN6_ARE_ADDR_EQUAL(&pi.dh6_pi_paddr,
-						       &dp->prefix.addr)) {
+						       &dp->val_prefix6.addr)) {
 					dprintf(LOG_INFO,
 						"get_delegated_prefixes: "
 						"duplicated prefix: %s/%d",
@@ -807,11 +866,11 @@ get_delegated_prefixes(p, ep, optinfo)
 				goto fail;
 			}
 			memset(dp, 0, sizeof(*dp));
-			dp->prefix.addr = pi.dh6_pi_paddr;
-			dp->prefix.plen = pi.dh6_pi_plen;
-			dp->prefix.duration = pi.dh6_pi_duration;
+			dp->val_prefix6.addr = pi.dh6_pi_paddr;
+			dp->val_prefix6.plen = pi.dh6_pi_plen;
+			dp->val_prefix6.duration = pi.dh6_pi_duration;
 
-			TAILQ_INSERT_TAIL(&optinfo->prefix, dp, link);
+			TAILQ_INSERT_TAIL(&optinfo->prefix_list, dp, link);
 		}
 
 	  nextoption:
@@ -870,70 +929,63 @@ dhcp6_set_options(bp, ep, optinfo)
 		COPY_OPTION(DH6OPT_PREFERENCE, sizeof(p8), &p8, p);
 	}
 
-	if (!TAILQ_EMPTY(&optinfo->dnslist)) {
+	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
 		struct in6_addr *in6;
-		struct dnslist *d;
-		int ns;
+		struct dhcp6_listval *d;
 
 		tmpbuf = NULL;
-		for (ns = 0, d = TAILQ_FIRST(&optinfo->dnslist); d;
-		     d = TAILQ_NEXT(d, link), ns++)
-			;
-		optlen = ns * sizeof(struct in6_addr);
+		optlen = dhcp6_count_list(&optinfo->dns_list) *
+			sizeof(struct in6_addr);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
 			dprintf(LOG_ERR,
 				"memory allocation failed for DNS options");
 			goto fail;
 		}
 		in6 = (struct in6_addr *)tmpbuf;
-		for (d = TAILQ_FIRST(&optinfo->dnslist); d;
+		for (d = TAILQ_FIRST(&optinfo->dns_list); d;
 		     d = TAILQ_NEXT(d, link), in6++) {
-			memcpy(in6, &d->addr, sizeof(*in6));
+			memcpy(in6, &d->val_addr6, sizeof(*in6));
 		}
 		COPY_OPTION(DH6OPT_DNS, optlen, tmpbuf, p);
 		free(tmpbuf);
 	}
 
-	if (optinfo->requests) {
-		int nopts;
-		struct dhcp6_optconf *opt;
+	if (!TAILQ_EMPTY(&optinfo->reqopt_list)) {
+		struct dhcp6_listval *opt;
 		u_int16_t *valp;
 
 		tmpbuf = NULL;
-		for (nopts = 0, opt = optinfo->requests; opt;
-		     opt = opt->next, nopts++)
-			;
-		optlen = nopts * sizeof(u_int16_t);
+		optlen = dhcp6_count_list(&optinfo->reqopt_list) *
+			sizeof(u_int16_t);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
 			dprintf(LOG_ERR,
 				"memory allocation failed for options");
 			goto fail;
 		}
-		for (opt = optinfo->requests, valp = (u_int16_t *)tmpbuf; opt;
-		     opt = opt->next, valp++) {
-			*valp = htons(opt->type);
+		valp = (u_int16_t *)tmpbuf;
+		for (opt = TAILQ_FIRST(&optinfo->reqopt_list); opt;
+		     opt = TAILQ_NEXT(opt, link), valp++) {
+			*valp = htons((u_int16_t)opt->val_num);
 		}
 		COPY_OPTION(DH6OPT_ORO, optlen, tmpbuf, p);
 		free(tmpbuf);
 	}
 
-	if (!TAILQ_EMPTY(&optinfo->prefix)) {
+	if (!TAILQ_EMPTY(&optinfo->prefix_list)) {
 		int pfxs;
 		char *tp;
-		struct delegated_prefix *dp;
+		struct dhcp6_listval *dp;
 		struct dhcp6_prefix_info pi;
 
 		tmpbuf = NULL;
-		for (pfxs = 0, dp = TAILQ_FIRST(&optinfo->prefix); dp;
-		     dp = TAILQ_NEXT(dp, link), pfxs++)
-			;
-		optlen = pfxs * sizeof(struct dhcp6_prefix_info);
+		optlen = dhcp6_count_list(&optinfo->prefix_list) *
+			sizeof(struct dhcp6_prefix_info);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR,
-				"memory allocation failed for options");
+			dprintf(LOG_ERR, "%s"
+				"memory allocation failed for options", FNAME);
 			goto fail;
 		}
-		for (dp = TAILQ_FIRST(&optinfo->prefix), tp = tmpbuf; dp;
+		for (dp = TAILQ_FIRST(&optinfo->prefix_list), tp = tmpbuf; dp;
 		     dp = TAILQ_NEXT(dp, link), tp += sizeof(pi)) {
 			/*
 			 * XXX: We need a temporary structure due to alignment
@@ -942,9 +994,9 @@ dhcp6_set_options(bp, ep, optinfo)
 			memset(&pi, 0, sizeof(pi));
 			pi.dh6_pi_type = htons(DH6OPT_PREFIX_INFORMATION);
 			pi.dh6_pi_len = htons(sizeof(pi) - 4);
-			pi.dh6_pi_duration = htonl(dp->prefix.duration);
-			pi.dh6_pi_plen = dp->prefix.plen;
-			memcpy(&pi.dh6_pi_paddr, &dp->prefix.addr,
+			pi.dh6_pi_duration = htonl(dp->val_prefix6.duration);
+			pi.dh6_pi_plen = dp->val_prefix6.plen;
+			memcpy(&pi.dh6_pi_paddr, &dp->val_prefix6.addr,
 			       sizeof(struct in6_addr));
 			memcpy(tp, &pi, sizeof(pi));
 		}

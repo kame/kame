@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.81 2002/05/17 01:37:50 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.82 2002/05/17 07:26:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -110,7 +110,7 @@ static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 static void reset_timer __P((struct dhcp6_if *));
 static void set_timeoparam __P((struct dhcp6_if *));
 
-extern int add_ifprefix __P((struct delegated_prefix_info *,
+extern int add_ifprefix __P((struct dhcp6_prefix *,
 			     struct prefix_ifconf *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
@@ -425,7 +425,7 @@ select_server(ifp)
 	for (s = ifp->servers; s; s = s->next) {
 		if (s->active) {
 			dprintf(LOG_DEBUG, "%s" "picked a server (ID: %s)",
-				FNAME, duidstr(&s->id));
+				FNAME, duidstr(&s->optinfo.serverID));
 			return(s);
 		}
 	}
@@ -683,7 +683,7 @@ client6_send(ifp, s)
 
 	/* server ID */
 	if (ifp->state == DHCP6S_REQUEST)
-		optinfo.serverID = ifp->current_server->id;
+		optinfo.serverID = ifp->current_server->optinfo.serverID;
 
 	/* client ID */
 	optinfo.clientID = client_duid;
@@ -695,7 +695,16 @@ client6_send(ifp, s)
 	}
 
 	/* option request options */
-	optinfo.requests = ifp->request_options;
+	optinfo.reqopt_list = ifp->reqopt_list;
+
+	/* configuration information provided by the server */
+	if (ifp->state == DHCP6S_REQUEST) {
+		/* do we have to check if we wanted prefixes? */
+		if (!TAILQ_EMPTY(&ifp->current_server->optinfo.prefix_list)) {
+			optinfo.prefix_list =
+				ifp->current_server->optinfo.prefix_list;
+		}
+	}
 
 	/* set options in the message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
@@ -839,28 +848,29 @@ client6_recv()
 }
 
 static int
-client6_recvadvert(ifp, dh6, len, optinfo)
+client6_recvadvert(ifp, dh6, len, optinfo0)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	ssize_t len;
-	struct dhcp6_optinfo *optinfo;
+	struct dhcp6_optinfo *optinfo0;
 {
 	struct dhcp6_serverinfo *newserver, *s, **sp;
+	struct dhcp6_optinfo optinfo;
 
 	/* packet validation based on Section 15.3 of dhcpv6-24. */
-	if (optinfo->serverID.duid_len == 0) {
+	if (optinfo0->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
 		return -1;
 	} else {
 		dprintf(LOG_DEBUG, "%s" "server ID: %s, pref=%d", FNAME,
-			duidstr(&optinfo->serverID),
-			optinfo->pref);
+			duidstr(&optinfo0->serverID),
+			optinfo0->pref);
 	}
-	if (optinfo->clientID.duid_len == 0) {
+	if (optinfo0->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
 		return -1;
 	}
-	if (duidcmp(&optinfo->clientID, &client_duid)) {
+	if (duidcmp(&optinfo0->clientID, &client_duid)) {
 		dprintf(LOG_INFO, "%s" "client DUID mismatch", FNAME);
 		return -1;
 	}
@@ -878,26 +888,27 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 	;
 
 	/* ignore the server if it is known */
-	if (find_server(ifp, &optinfo->serverID)) {
+	if (find_server(ifp, &optinfo0->serverID)) {
 		dprintf(LOG_INFO, "%s" "duplicated server (ID: %s)",
-			FNAME, duidstr(&optinfo->serverID));
+			FNAME, duidstr(&optinfo0->serverID));
 		return -1;
 	}
 
 	/* keep the server */
+	dhcp6_init_options(&optinfo);
+	if (dhcp6_copy_options(optinfo0, &optinfo)) {
+		dprintf(LOG_ERR, "%s" "failed to copy options", FNAME);
+		return -1;
+	}
 	if ((newserver = malloc(sizeof(*newserver))) == NULL) {
 		dprintf(LOG_ERR, "%s" "memory allocation failed for server",
 			FNAME);
 		return -1;
 	}
 	memset(newserver, 0, sizeof(*newserver));
-	if (duidcpy(&newserver->id, &optinfo->serverID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server DUID", FNAME);
-		free(newserver);
-		return -1;
-	}
-	if (optinfo->pref != DH6OPT_PREF_UNDEF)
-		newserver->pref = optinfo->pref;
+	if (optinfo0->pref != DH6OPT_PREF_UNDEF)
+		newserver->pref = optinfo0->pref;
+	newserver->optinfo = optinfo;
 	newserver->active = 1;
 	for (sp = &ifp->servers; *sp; sp = &(*sp)->next) {
 		if ((*sp)->pref != DH6OPT_PREF_MAX &&
@@ -956,7 +967,7 @@ find_server(ifp, duid)
 	struct dhcp6_serverinfo *s;
 
 	for (s = ifp->servers; s; s = s->next) {
-		if (duidcmp(&s->id, duid) == 0)
+		if (duidcmp(&s->optinfo.serverID, duid) == 0)
 			return(s);
 	}
 
@@ -970,7 +981,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 {
-	struct delegated_prefix *p;
+	struct dhcp6_listval *p;
 	struct prefix_ifconf *pif;
 
 	/*
@@ -1001,21 +1012,22 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		return -1;
 	}
 
-	if (!TAILQ_EMPTY(&optinfo->dnslist)) {
-		struct dnslist *d;
+	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
+		struct dhcp6_listval *d;
 		int i = 0;
 
-		for (d = TAILQ_FIRST(&optinfo->dnslist); d;
+		for (d = TAILQ_FIRST(&optinfo->dns_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
 			dprintf(LOG_DEBUG, "%s" "nameserver[%d] %s",
-				FNAME, i, in6addr2str(&d->addr, 0));
+				FNAME, i, in6addr2str(&d->val_addr6, 0));
 		}
 	}
-
-	for (p = TAILQ_FIRST(&optinfo->prefix); p; p = TAILQ_NEXT(p, link)) {
+	
+	for (p = TAILQ_FIRST(&optinfo->prefix_list); p;
+	     p = TAILQ_NEXT(p, link)) {
 		for (pif = prefix_ifconflist; pif; pif = pif->next) {
 			if (strcmp(pif->ifname, ifp->ifname)) {
-				(void)add_ifprefix(&p->prefix, pif);
+				(void)add_ifprefix(&p->val_prefix6, pif);
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.1 2002/05/09 13:41:06 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.2 2002/05/17 07:26:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -75,7 +75,7 @@ static int ifaddrconf __P((struct dhcp6_ifprefix *, struct prefix_ifconf *));
 
 int
 add_ifprefix(prefix, pconf)
-	struct delegated_prefix_info *prefix;
+	struct dhcp6_prefix *prefix;
 	struct prefix_ifconf *pconf;
 {
 	struct dhcp6_ifprefix *ifpfx = NULL;

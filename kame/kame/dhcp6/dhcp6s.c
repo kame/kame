@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.77 2002/05/17 01:37:50 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.78 2002/05/17 07:26:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -83,7 +83,7 @@ static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
 static char *rmsgctlbuf;
 static struct duid server_duid;
-static struct dnsq dnslist;
+static struct dhcp6_list dnslist;
 
 #define LINK_LOCAL_PLEN 10
 #define SITE_LOCAL_PLEN 10
@@ -118,7 +118,7 @@ main(argc, argv)
 {
 	int ch;
 	struct in6_addr a;
-	struct dnslist *dle;
+	struct dhcp6_listval *dlv;
 	char *progname;
 
 	if ((progname = strrchr(*argv, '/')) == NULL)
@@ -144,12 +144,12 @@ main(argc, argv)
 				errx(1, "invalid DNS server %s", optarg);
 				/* NOTREACHED */
 			}
-			if ((dle = malloc(sizeof *dle)) == NULL) {
+			if ((dlv = malloc(sizeof *dlv)) == NULL) {
 				errx(1, "malloc failed for a DNS server");
 				/* NOTREACHED */
 			}
-			dle->addr = a;
-			TAILQ_INSERT_TAIL(&dnslist, dle, link);
+			dlv->val_addr6 = a;
+			TAILQ_INSERT_TAIL(&dnslist, dlv, link);
 			break;
 		default:
 			usage();
@@ -507,7 +507,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
-	struct dhcp6_optconf *opt;
+	struct dhcp6_listval *opt;
 	int resptype;
 
 	/*
@@ -545,18 +545,20 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 		roptinfo.pref = ifp->server_pref;
 
 	/* DNS server */
-	roptinfo.dnslist = dnslist;
+	roptinfo.dns_list = dnslist;
 
 	/*
 	 * see if we have information for requested options, and if so,
 	 * configure corresponding options.
 	 */
-	for (opt = optinfo->requests; opt; opt = opt->next) {
-		switch(opt->type) {
+	for (opt = TAILQ_FIRST(&optinfo->reqopt_list); opt;
+	     opt = TAILQ_NEXT(opt, link)) {
+		switch(opt->val_num) {
 		case DH6OPT_PREFIX_DELEGATION:
 			if (client_conf &&
-			    !TAILQ_EMPTY(&client_conf->prefix)) {
-				roptinfo.prefix = client_conf->prefix;
+			    !TAILQ_EMPTY(&client_conf->prefix_list)) {
+				roptinfo.prefix_list =
+					client_conf->prefix_list;
 			}
 			break;
 		}
@@ -594,7 +596,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
-	struct dhcp6_optconf *opt;
+	struct dhcp6_listval *opt, *p;
 
 	/* message validation according to Section 15.4 of dhcpv6-24 */
 
@@ -654,28 +656,64 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 * for the client.
 	 * (Note that our implementation does not assign addresses (nor will)).
 	 */
-	for (opt = optinfo->requests; opt; opt = opt->next) {
-		switch(opt->type) {
-		case DH6OPT_PREFIX_DELEGATION:
-			if (client_conf &&
-			    !TAILQ_EMPTY(&client_conf->prefix)) {
-				/* create a binding for the prefix. (notyet) */
-				roptinfo.prefix = client_conf->prefix;
+	/* prefixes */
+	for (p = TAILQ_FIRST(&optinfo->prefix_list); p;
+	     p = TAILQ_NEXT(p, link)) {
+		struct dhcp6_prefix *dp;
+		struct dhcp6_listval *dl;
+
+		if (client_conf &&
+		    (dp = find_prefix6(&client_conf->prefix_list,
+				       &p->val_prefix6))) {
+			/*
+			 * TODO: check if the requesting router is authorized.
+			 */
+
+			/* added the list to the prefix list in the reply */
+			if ((dl = malloc(sizeof(*dl))) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to allocate "
+					"memory for prefix", FNAME);
+				goto fail;
 			}
-			break;
+			dl->val_prefix6 = *dp;
+			TAILQ_INSERT_TAIL(&roptinfo.prefix_list, dl, link);
 		}
 	}
+
+	/*
+	 * If the Request message contained an Option Request option, the
+	 * server MUST include options in the Reply message for any options in
+	 * the Option Request option the server is configured to return to the
+	 * client.
+	 * [dhcpv6-24 18.2.1]
+	 * Note: our current implementation always includes all information
+	 * that we can provide.  So we do not have to check the option request
+	 * options.
+	 */
+#if 0
+	for (opt = TAILQ_FIRST(&optinfo->reqopt_list); opt;
+	     opt = TAILQ_NEXT(opt, link)) {
+		;
+	}
+#endif
 
 	/*
 	 * Adds options to the Reply message for any other configuration
 	 * information to be assigned to the client.
 	 */
 	/* DNS server */
-	roptinfo.dnslist = dnslist;
+	roptinfo.dns_list = dnslist;
 
 	/* send a reply message. */
-	return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-			    &roptinfo));
+	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+			   &roptinfo);
+
+	dhcp6_clear_list(&roptinfo.prefix_list);
+	return 0;
+
+  fail:
+	dhcp6_clear_list(&roptinfo.prefix_list);
+	return -1;
 }
 
 static int
@@ -708,7 +746,7 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 		roptinfo.clientID = optinfo->clientID;
 
 	/* DNS server */
-	roptinfo.dnslist = dnslist;
+	roptinfo.dns_list = dnslist;
 
 	return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
 			    &roptinfo));
