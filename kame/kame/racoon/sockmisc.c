@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.37 2003/05/09 05:18:39 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.38 2003/05/09 05:31:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,7 +497,7 @@ sendfromto(s, buf, buflen, src, dst, cnt)
 			plog(LLV_DEBUG, LOCATION, NULL,
 				"%d times of %d bytes message will be sent "
 				"to %s\n",
-				i + 1, len, saddr2str(src));
+				i + 1, len, saddr2str(dst));
 		}
 		plogdump(LLV_DEBUG, (char *)buf, buflen);
 
