@@ -1278,10 +1278,22 @@ ip_ctloutput(so, sopt)
 			size_t len = 0;
 			caddr_t req = NULL;
 
+			if (error = soopt_getm(sopt, &m)) /* XXX */
+				break;
+			if (error = soopt_mcopyin(sopt, m)) /* XXX */
+				break;
+			if (m) {
+				req = mtod(m, caddr_t);
+				len = m->m_len;
+			}
+
 			error = ipsec4_get_policy(sotoinpcb(so), req, len, &m);
 			if (error == 0)
 				error = soopt_mcopyout(sopt, m); /* XXX */
-			m_freem(m);
+
+			/* if error, m_freem called at soopt_mcopyout(). */
+			if (error == 0)
+				m_freem(m);
 			break;
 		}
 #endif /*IPSEC*/
