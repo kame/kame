@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.7 2000/03/09 02:59:54 fujisawa Exp $
+ *	$Id: show.c,v 1.8 2000/03/13 18:01:46 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -36,6 +36,7 @@
 #include <err.h>
 #include <errno.h>
 #include <netdb.h>
+#include <paths.h>
 
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
@@ -63,15 +64,11 @@
  *
  */
 
-extern	int	_fd;
-
-#ifdef __bsdi__
-#define	EXECFILE	"/bsd"
-#else
-#define	EXECFILE	"/kernel"
-#endif	/* ifdef __bsdi__	*/
-
 #ifdef readKMEM
+
+#ifdef __NetBSD__
+#include <i386/cpu.h>
+#endif
 
 #include <kvm.h>
 
@@ -82,6 +79,7 @@ static	struct nlist	nl[] =
     { "_natptStatic" },
     { "_natptDynamic" },
     { "_tSlotEntry" },
+    { "_natpt_initialized" },
     { "_natpt_debug" },
     { "_natpt_dump" },
     { "_natpt_prefix" },
@@ -100,6 +98,9 @@ static void	_showRuleFaith		__P((int, struct _cSlot *));
 static void	_showXlate		__P((int, u_long));
 static void	_writeXlateHeader	__P((void));
 
+#if defined(__NetBSD__) || defined(__bsdi__)
+const char	*getbootfile		__P((void));
+#endif
 
 /*
  *
@@ -199,6 +200,12 @@ void
 showVariables()
 {
     u_int	value;
+
+    if (readNL((caddr_t)&value, sizeof(value), "_ip6_protocol_tr") > 0)
+	printf("%12s: 0x%08x (%d)\n", "ipn6_protocol_tr", value, value);
+
+    if (readNL((caddr_t)&value, sizeof(value), "_natpt_initialized") > 0)
+	printf("%12s: 0x%08x (%d)\n", "natpt_initialized", value, value);
 
     if (readNL((caddr_t)&value, sizeof(value), "_natpt_debug") > 0)
 	printf("%12s: 0x%08x (%d)\n", "natpt_debug", value, value);
@@ -377,25 +384,11 @@ u_long
 openKvm()
 {
     int		rv;
-    char	Wow[128];
+    char	Wow[MAXPATHLEN];
 
     bzero(Wow, sizeof(Wow));
 
-#ifdef __bsdi__
-    bcopy(EXECFILE, Wow, strlen(EXECFILE));
-#endif	/*  __bsdi__  */
-
-#ifdef __FreeBSD__
-    {
-	int	mib[2];
-	size_t	len = sizeof(Wow);
-
-	mib[0] = CTL_KERN;
-	mib[1] = KERN_BOOTFILE;
-	if (sysctl(mib, 2, Wow,  &len, NULL, 0) == ERROR)
-	    strcpy(Wow, EXECFILE);
-    }
-#endif	/*  __FreeBSD__  */
+    strcpy(Wow, getbootfile());
 
     if ((kd = kvm_open(Wow, NULL, NULL, O_RDONLY, "kvm_open")) <= (kvm_t *)0)
 	err(errno, "Open failure on kvm_open");
@@ -430,4 +423,36 @@ closeKvm()
 {
     kvm_close(kd);
 }
+
+
+#ifdef __NetBSD__
+const char *
+getbootfile(void)
+{
+    static char	Bow[MAXPATHLEN];
+    static char	Wow[MAXPATHLEN];
+    int		mib[2];
+    size_t	len = sizeof(Wow);
+
+    mib[0] = CTL_MACHDEP;
+    mib[1] = CPU_BOOTED_KERNEL;
+    if (sysctl(mib, 2, Wow, &len, NULL, 0) == ERROR)
+	return ("/netbsd");
+
+    if (Wow[0] == '/')
+	return (Wow);
+    else
+	sprintf(Bow, "/%s", Wow);
+
+    return (Bow);
+}
+#endif	/* __NetBSD */
+
+#ifdef __bsdi__
+const char *
+getbootfile(void)
+{
+    return (_PATH_KERNEL);
+}
+#endif	/* __bsdi__ */
 #endif	/* ifdef readKMEM	*/
