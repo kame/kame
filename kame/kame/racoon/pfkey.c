@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.63 2000/07/15 16:08:01 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.64 2000/07/16 01:07:12 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -131,6 +131,29 @@ NULL,	/* SADB_X_SPDDELETE2 */
 static int addnewsp __P((caddr_t *));
 static const char *sadbsecas2str __P((struct sockaddr *, struct sockaddr *,
 	int, u_int32_t, int));
+
+/* cope with old kame headers - ugly */
+#ifndef SADB_X_AALG_MD5
+#define SADB_X_AALG_MD5		SADB_AALG_MD5	
+#endif
+#ifndef SADB_X_AALG_SHA
+#define SADB_X_AALG_SHA		SADB_AALG_SHA
+#endif
+#ifndef SADB_X_AALG_NULL
+#define SADB_X_AALG_NULL	SADB_AALG_NULL
+#endif
+
+#ifndef SADB_X_EALG_BLOWFISHCBC
+#define SADB_X_EALG_BLOWFISHCBC	SADB_EALG_BLOWFISHCBC
+#endif
+#ifndef SADB_X_EALG_CAST128CBC
+#define SADB_X_EALG_CAST128CBC	SADB_EALG_CAST128CBC
+#endif
+#ifndef SADB_X_EALG_RC5CBC
+#ifdef SADB_EALG_RC5CBC
+#define SADB_X_EALG_RC5CBC	SADB_EALG_RC5CBC
+#endif
+#endif
 
 /*
  * PF_KEY packet handler
