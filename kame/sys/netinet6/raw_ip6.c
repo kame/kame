@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.57 2001/01/23 15:23:36 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.58 2001/02/07 05:49:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,6 +294,7 @@ rip6_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct ip6_hdr *ip6;
+	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
 	struct ip6ctlparam *ip6cp = NULL;
@@ -311,6 +312,10 @@ rip6_ctlinput(cmd, sa, d)
 		notify = in6_rtchange, d = NULL;
 	else if (cmd == PRC_HOSTDEAD)
 		d = NULL;
+#ifdef __NetBSD__ /*defined(__NetBSD__) || defined(__OpenBSD__)*/
+	else if (cmd == PRC_MSGSIZE)
+		; /* special code is present, see below */
+#endif
 	else if (inet6ctlerrmap[cmd] == 0)
 		return;
 
@@ -329,12 +334,66 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
+#ifdef __NetBSD__ /*defined(__NetBSD__) || defined(__OpenBSD__)*/
+	if (ip6 && cmd == PRC_MSGSIZE) {
+		int valid = 0;
+#ifdef __NetBSD__
+		struct in6pcb *in6p;
+
+		/*
+		 * Check to see if we have a valid raw IPv6 socket
+		 * corresponding to the address in the ICMPv6 message
+		 * payload, and the protocol (ip6_nxt) meets the socket.
+		 * XXX chase extension headers, or pass final nxt value
+		 * from icmp6_notify_error()
+		 */
+		in6p = in6_pcblookup_connect(&rawin6pcb,
+		    &sa6->sin6_addr, 0,
+		    (struct in6_addr *)&sa6_src->sin6_addr, 0, 0);
+#if 0
+		if (!in6p) {
+			/*
+			 * As the use of sendto(2) is fairly popular,
+			 * we may want to allow non-connected pcb too.
+			 * But it could be too weak against attacks...
+			 * We should at least check if the local
+			 * address (= s) is really ours.
+			 */
+			in6p = in6_pcblookup_bind(&rawin6pcb,
+			    &sa6->sin6_addr, 0, 0))
+		}
+#endif
+
+		if (in6p && in6p->in6p_ip6.ip6_nxt &&
+		    in6p->in6p_ip6.ip6_nxt == ip6->ip6_nxt)
+			valid = 1;
+#endif
+
+		/*
+		 * Depending on the value of "valid" and routing table
+		 * size (mtudisc_{hi,lo}wat), we will:
+		 * - recalcurate the new MTU and create the
+		 *   corresponding routing entry, or
+		 * - ignore the MTU change notification.
+		 */
+		icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+
+		/*
+		 * regardless of if we called icmp6_mtudisc_update(),
+		 * we need to call in6_pcbnotify(), to notify path
+		 * MTU change to the userland (2292bis-02), because
+		 * some unconnected sockets may share the same
+		 * destination and want to know the path MTU.
+		 */
+	}
+#endif
+
 #ifdef __OpenBSD__
-	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0, (struct sockaddr *)sa6_src,
-	    0, cmd, cmdarg, notify);
+	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0,
+	    (struct sockaddr *)sa6_src, 0, cmd, cmdarg, notify);
 #else
-	(void) in6_pcbnotify(&rawin6pcb, sa, 0, (struct sockaddr *)sa6_src,
-	    0, cmd, cmdarg, notify);
+	(void) in6_pcbnotify(&rawin6pcb, sa, 0,
+	    (struct sockaddr *)sa6_src, 0, cmd, cmdarg, notify);
 #endif
 }
 
