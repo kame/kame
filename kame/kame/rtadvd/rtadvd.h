@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.14 2000/11/11 06:57:22 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.15 2001/03/21 17:41:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -118,6 +118,7 @@ struct	rainfo {
 #ifdef MIP6
 	int	haflg;		/* HAFlag */
 #endif
+	int	rtpref;		/* router preference */
 	u_int32_t linkmtu;	/* AdvLinkMTU */
 	u_int32_t reachabletime; /* AdvReachableTime */
 	u_int32_t retranstimer;	/* AdvRetransTimer */

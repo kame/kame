@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.33 2001/02/05 05:52:13 k-sugyou Exp $	*/
+/*	$KAME: config.c,v 1.34 2001/03/21 17:41:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -174,12 +174,18 @@ getconfig(intface)
 	tmp->hoplimit = val & 0xff;
 
 	MAYHAVE(val, "raflags", 0);
-	tmp->managedflg= val & ND_RA_FLAG_MANAGED;
+	tmp->managedflg = val & ND_RA_FLAG_MANAGED;
 	tmp->otherflg = val & ND_RA_FLAG_OTHER;
 #ifdef MIP6
 	if (mobileip6)
 		tmp->haflg = val & ND_RA_FLAG_HA;
 #endif
+	tmp->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
+	if (tmp->rtpref == ND_RA_FLAG_RTPREF_RSV) {
+		syslog(LOG_ERR, "<%s> invalid router preference on %s",
+		       __FUNCTION__, intface);
+		exit(1);
+	}
 
 	MAYHAVE(val, "rltime", tmp->maxinterval * 3);
 	if (val && (val < tmp->maxinterval || val > MAXROUTERLIFETIME)) {
@@ -718,7 +724,12 @@ make_packet(struct rainfo *rainfo)
 	ra->nd_ra_code = 0;
 	ra->nd_ra_cksum = 0;
 	ra->nd_ra_curhoplimit = (u_int8_t)(0xff & rainfo->hoplimit);
-	ra->nd_ra_flags_reserved = 0;
+	ra->nd_ra_flags_reserved = 0; /* just in case */
+	/*
+	 * XXX: the router preference field, which is a 2-bit field, should be
+	 * initialized before other fields.
+	 */
+	ra->nd_ra_flags_reserved = 0xff & rainfo->rtpref;
 	ra->nd_ra_flags_reserved |=
 		rainfo->managedflg ? ND_RA_FLAG_MANAGED : 0;
 	ra->nd_ra_flags_reserved |=

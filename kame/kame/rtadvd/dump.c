@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.15 2000/11/11 06:57:22 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.16 2001/03/21 17:41:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -70,6 +70,13 @@ static void if_dump __P((void));
 #else
 #define LONGLONG "%llu"
 #endif
+
+static char *rtpref_str[] = {
+	"medium",		/* 00 */
+	"high",			/* 01 */
+	"rsv",			/* 10 */
+	"low"			/* 11 */
+};
 
 static char *
 ether_str(sdl)
@@ -143,12 +150,15 @@ if_dump()
 			"  DefaultLifetime: %d, MaxAdvInterval: %d, "
 			"MinAdvInterval: %d\n",
 			rai->lifetime, rai->maxinterval, rai->mininterval);
-		fprintf(fp, "  Flags: %s%s%s MTU: %d\n",
+		fprintf(fp, "  Flags: %s%s%s, ",
 			rai->managedflg ? "M" : "", rai->otherflg ? "O" : "",
 #ifdef MIP6
 			rai->haflg ? "H" :
 #endif
-			"", rai->linkmtu);
+			"");
+		fprintf(fp, "Preference: %s, ",
+			rtpref_str[(rai->rtpref >> 3) & 0xff]);
+		fprintf(fp, "MTU: %d\n", rai->linkmtu);
 		fprintf(fp, "  ReachableTime: %d, RetransTimer: %d, "
 			"CurHopLimit: %d\n", rai->reachabletime,
 			rai->retranstimer, rai->hoplimit);
