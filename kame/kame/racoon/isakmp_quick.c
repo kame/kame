@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.16 2000/01/12 15:09:06 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.17 2000/01/14 01:33:08 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1225,10 +1225,19 @@ quick_r2send(iph2, msg)
 	    {
 		struct ipsecsakeys *k;
 		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (prop->proto_id == k->proto_id) {
+			if (prop->proto_id != k->proto_id)
+				continue;
+
+			if (prop->spi_size == sizeof(k->spi))
 				memcpy(prop + 1, &k->spi, sizeof(k->spi));
-				break;
+			else if (prop->spi_size == 2 && prop->proto_id == IPSECDOI_PROTO_IPCOMP)
+				memcpy(prop + 1, (caddr_t)(&k->spi + 1) - 2, 2);
+			else {
+				plog(logp, LOCATION, NULL,
+					"spi size mismatch: %d %d\n",
+					sizeof(k->spi), prop->spi_size);
 			}
+			break;
 		}
 		if (k == NULL) {
 			plog(logp, LOCATION, NULL,

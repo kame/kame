@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.17 2000/01/14 00:31:33 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.18 2000/01/14 01:33:09 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -730,6 +730,8 @@ int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype, comptype,
 		if ((*e_type = ipsecdoi2pfkey_calg(comptype)) == ~0)
 			goto bad;
 		*e_keylen = 0;
+
+		*flags = SADB_X_EXT_RAWCPI;
 
 		*a_type = SADB_AALG_NONE;
 		*a_keylen = 0;
