@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.47 2001/04/25 03:25:34 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.48 2001/04/25 03:28:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,11 +64,6 @@
 #ifdef NEED_ADDRINFO_H
 #include "addrinfo.h"
 #endif
-
-#define SUCCESS 0
-#define ANY 0
-#define YES 1
-#define NO  0
 
 static const struct afd {
 	int a_af;
@@ -303,7 +298,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			}
 		}
 	}
-	return SUCCESS;
+	return(0);
 }
 
 #ifdef INET6
