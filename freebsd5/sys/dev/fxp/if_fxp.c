@@ -27,12 +27,15 @@
  *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.198 2003/11/28 05:28:28 imp Exp $");
+
 /*
  * Intel EtherExpress Pro/100B PCI Fast Ethernet driver
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.180 2003/05/25 05:04:26 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.198 2003/11/28 05:28:28 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,8 +72,8 @@ __FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.180 2003/05/25 05:04:26 truckma
 #include <machine/in_cksum.h>
 #endif
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>		/* for PCIM_CMD_xxx */
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>		/* for PCIM_CMD_xxx */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -140,6 +143,7 @@ static u_char fxp_cb_config_template[] = {
 
 struct fxp_ident {
 	u_int16_t	devid;
+	int16_t		revid;		/* -1 matches anything */
 	char 		*name;
 };
 
@@ -150,27 +154,42 @@ struct fxp_ident {
  * them.
  */
 static struct fxp_ident fxp_ident_table[] = {
-    { 0x1029,		"Intel 82559 PCI/CardBus Pro/100" },
-    { 0x1030,		"Intel 82559 Pro/100 Ethernet" },
-    { 0x1031,		"Intel 82801CAM (ICH3) Pro/100 VE Ethernet" },
-    { 0x1032,		"Intel 82801CAM (ICH3) Pro/100 VE Ethernet" },
-    { 0x1033,		"Intel 82801CAM (ICH3) Pro/100 VM Ethernet" },
-    { 0x1034,		"Intel 82801CAM (ICH3) Pro/100 VM Ethernet" },
-    { 0x1035,		"Intel 82801CAM (ICH3) Pro/100 Ethernet" },
-    { 0x1036,		"Intel 82801CAM (ICH3) Pro/100 Ethernet" },
-    { 0x1037,		"Intel 82801CAM (ICH3) Pro/100 Ethernet" },
-    { 0x1038,		"Intel 82801CAM (ICH3) Pro/100 VM Ethernet" },
-    { 0x1039,		"Intel 82801DB (ICH4) Pro/100 VE Ethernet" },
-    { 0x103A,		"Intel 82801DB (ICH4) Pro/100 Ethernet" },
-    { 0x103B,		"Intel 82801DB (ICH4) Pro/100 VM Ethernet" },
-    { 0x103C,		"Intel 82801DB (ICH4) Pro/100 Ethernet" },
-    { 0x103D,		"Intel 82801DB (ICH4) Pro/100 VE Ethernet" },
-    { 0x103E,		"Intel 82801DB (ICH4) Pro/100 VM Ethernet" },
-    { 0x1059,		"Intel 82551QM Pro/100 M Mobile Connection" },
-    { 0x1209,		"Intel 82559ER Embedded 10/100 Ethernet" },
-    { 0x1229,		"Intel 82557/8/9 EtherExpress Pro/100(B) Ethernet" },
-    { 0x2449,		"Intel 82801BA/CAM (ICH2/3) Pro/100 Ethernet" },
-    { 0,		NULL },
+    { 0x1029,	-1,	"Intel 82559 PCI/CardBus Pro/100" },
+    { 0x1030,	-1,	"Intel 82559 Pro/100 Ethernet" },
+    { 0x1031,	-1,	"Intel 82801CAM (ICH3) Pro/100 VE Ethernet" },
+    { 0x1032,	-1,	"Intel 82801CAM (ICH3) Pro/100 VE Ethernet" },
+    { 0x1033,	-1,	"Intel 82801CAM (ICH3) Pro/100 VM Ethernet" },
+    { 0x1034,	-1,	"Intel 82801CAM (ICH3) Pro/100 VM Ethernet" },
+    { 0x1035,	-1,	"Intel 82801CAM (ICH3) Pro/100 Ethernet" },
+    { 0x1036,	-1,	"Intel 82801CAM (ICH3) Pro/100 Ethernet" },
+    { 0x1037,	-1,	"Intel 82801CAM (ICH3) Pro/100 Ethernet" },
+    { 0x1038,	-1,	"Intel 82801CAM (ICH3) Pro/100 VM Ethernet" },
+    { 0x1039,	-1,	"Intel 82801DB (ICH4) Pro/100 VE Ethernet" },
+    { 0x103A,	-1,	"Intel 82801DB (ICH4) Pro/100 Ethernet" },
+    { 0x103B,	-1,	"Intel 82801DB (ICH4) Pro/100 VM Ethernet" },
+    { 0x103C,	-1,	"Intel 82801DB (ICH4) Pro/100 Ethernet" },
+    { 0x103D,	-1,	"Intel 82801DB (ICH4) Pro/100 VE Ethernet" },
+    { 0x103E,	-1,	"Intel 82801DB (ICH4) Pro/100 VM Ethernet" },
+    { 0x1050,	-1,	"Intel 82801BA (D865) Pro/100 VE Ethernet" },
+    { 0x1059,	-1,	"Intel 82551QM Pro/100 M Mobile Connection" },
+    { 0x1209,	-1,	"Intel 82559ER Embedded 10/100 Ethernet" },
+    { 0x1229,	0x01,	"Intel 82557 Pro/100 Ethernet" },
+    { 0x1229,	0x02,	"Intel 82557 Pro/100 Ethernet" },
+    { 0x1229,	0x03,	"Intel 82557 Pro/100 Ethernet" },
+    { 0x1229,	0x04,	"Intel 82558 Pro/100 Ethernet" },
+    { 0x1229,	0x05,	"Intel 82558 Pro/100 Ethernet" },
+    { 0x1229,	0x06,	"Intel 82559 Pro/100 Ethernet" },
+    { 0x1229,	0x07,	"Intel 82559 Pro/100 Ethernet" },
+    { 0x1229,	0x08,	"Intel 82559 Pro/100 Ethernet" },
+    { 0x1229,	0x09,	"Intel 82559ER Pro/100 Ethernet" },
+    { 0x1229,	0x0c,	"Intel 82550 Pro/100 Ethernet" },
+    { 0x1229,	0x0d,	"Intel 82550 Pro/100 Ethernet" },
+    { 0x1229,	0x0e,	"Intel 82550 Pro/100 Ethernet" },
+    { 0x1229,	0x0f,	"Intel 82551 Pro/100 Ethernet" },
+    { 0x1229,	0x10,	"Intel 82551 Pro/100 Ethernet" },
+    { 0x1229,	-1,	"Intel 82557/8/9 Pro/100 Ethernet" },
+    { 0x2449,	-1,	"Intel 82801BA/CAM (ICH2/3) Pro/100 Ethernet" },
+    { 0,	-1,	NULL },
 };
 
 #ifdef FXP_IP_CSUM_WAR
@@ -192,7 +211,9 @@ static void		fxp_intr_body(struct fxp_softc *sc, struct ifnet *ifp,
 static void 		fxp_init(void *xsc);
 static void 		fxp_init_body(struct fxp_softc *sc);
 static void 		fxp_tick(void *xsc);
+#ifndef BURN_BRIDGES
 static void		fxp_powerstate_d0(device_t dev);
+#endif
 static void 		fxp_start(struct ifnet *ifp);
 static void 		fxp_start_body(struct ifnet *ifp);
 static void		fxp_stop(struct fxp_softc *sc);
@@ -227,9 +248,9 @@ static int		sysctl_int_range(SYSCTL_HANDLER_ARGS,
 			    int low, int high);
 static int		sysctl_hw_fxp_bundle_max(SYSCTL_HANDLER_ARGS);
 static int		sysctl_hw_fxp_int_delay(SYSCTL_HANDLER_ARGS);
-static __inline void 	fxp_scb_wait(struct fxp_softc *sc);
-static __inline void	fxp_scb_cmd(struct fxp_softc *sc, int cmd);
-static __inline void	fxp_dma_wait(struct fxp_softc *sc,
+static void 		fxp_scb_wait(struct fxp_softc *sc);
+static void		fxp_scb_cmd(struct fxp_softc *sc, int cmd);
+static void		fxp_dma_wait(struct fxp_softc *sc,
     			    volatile u_int16_t *status, bus_dma_tag_t dmat,
 			    bus_dmamap_t map);
 
@@ -272,7 +293,7 @@ TUNABLE_INT("hw.fxp_noflow", &fxp_noflow);
  * Wait for the previous command to be accepted (but not necessarily
  * completed).
  */
-static __inline void
+static void
 fxp_scb_wait(struct fxp_softc *sc)
 {
 	int i = 10000;
@@ -287,7 +308,7 @@ fxp_scb_wait(struct fxp_softc *sc)
 		    CSR_READ_2(sc, FXP_CSR_FLOWCONTROL));
 }
 
-static __inline void
+static void
 fxp_scb_cmd(struct fxp_softc *sc, int cmd)
 {
 
@@ -298,7 +319,7 @@ fxp_scb_cmd(struct fxp_softc *sc, int cmd)
 	CSR_WRITE_1(sc, FXP_CSR_SCB_COMMAND, cmd);
 }
 
-static __inline void
+static void
 fxp_dma_wait(struct fxp_softc *sc, volatile u_int16_t *status,
     bus_dma_tag_t dmat, bus_dmamap_t map)
 {
@@ -314,18 +335,21 @@ fxp_dma_wait(struct fxp_softc *sc, volatile u_int16_t *status,
 }
 
 /*
- * Return identification string if this is device is ours.
+ * Return identification string if this device is ours.
  */
 static int
 fxp_probe(device_t dev)
 {
 	u_int16_t devid;
+	u_int8_t revid;
 	struct fxp_ident *ident;
 
 	if (pci_get_vendor(dev) == FXP_VENDORID_INTEL) {
 		devid = pci_get_device(dev);
+		revid = pci_get_revid(dev);
 		for (ident = fxp_ident_table; ident->name != NULL; ident++) {
-			if (ident->devid == devid) {
+			if (ident->devid == devid &&
+			    (ident->revid == revid || ident->revid == -1)) {
 				device_set_desc(dev, ident->name);
 				return (0);
 			}
@@ -334,6 +358,7 @@ fxp_probe(device_t dev)
 	return (ENXIO);
 }
 
+#ifndef BURN_BRIDGES
 static void
 fxp_powerstate_d0(device_t dev)
 {
@@ -359,6 +384,7 @@ fxp_powerstate_d0(device_t dev)
 	}
 #endif
 }
+#endif
 
 static void
 fxp_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
@@ -386,7 +412,7 @@ fxp_attach(device_t dev)
 	int s, ipcbxmit_disable;
 
 	sc->dev = dev;
-	callout_handle_init(&sc->stat_ch);
+	callout_init(&sc->stat_ch, CALLOUT_MPSAFE);
 	sysctl_ctx_init(&sc->sysctl_ctx);
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
@@ -400,9 +426,9 @@ fxp_attach(device_t dev)
 	 */
 	pci_enable_busmaster(dev);
 	val = pci_read_config(dev, PCIR_COMMAND, 2);
-
+#ifndef BURN_BRIDGES
 	fxp_powerstate_d0(dev);
-
+#endif
 	/*
 	 * Figure out which we should try first - memory mapping or i/o mapping?
 	 * We default to memory mapping. Then we accept an override from the
@@ -621,7 +647,7 @@ fxp_attach(device_t dev)
 	maxtxseg = sc->flags & FXP_FLAG_EXT_RFA ? FXP_NTXSEG - 1 : FXP_NTXSEG;
 	error = bus_dma_tag_create(NULL, 2, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, MCLBYTES * maxtxseg,
-	    maxtxseg, MCLBYTES, 0, &sc->fxp_mtag);
+	    maxtxseg, MCLBYTES, 0, busdma_lock_mutex, &Giant, &sc->fxp_mtag);
 	if (error) {
 		device_printf(dev, "could not allocate dma tag\n");
 		goto fail;
@@ -629,14 +655,15 @@ fxp_attach(device_t dev)
 
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, sizeof(struct fxp_stats), 1,
-	    sizeof(struct fxp_stats), 0, &sc->fxp_stag);
+	    sizeof(struct fxp_stats), 0, busdma_lock_mutex, &Giant,
+	    &sc->fxp_stag);
 	if (error) {
 		device_printf(dev, "could not allocate dma tag\n");
 		goto fail;
 	}
 
 	error = bus_dmamem_alloc(sc->fxp_stag, (void **)&sc->fxp_stats,
-	    BUS_DMA_NOWAIT, &sc->fxp_smap);
+	    BUS_DMA_NOWAIT | BUS_DMA_ZERO, &sc->fxp_smap);
 	if (error)
 		goto fail;
 	error = bus_dmamap_load(sc->fxp_stag, sc->fxp_smap, sc->fxp_stats,
@@ -645,21 +672,19 @@ fxp_attach(device_t dev)
 		device_printf(dev, "could not map the stats buffer\n");
 		goto fail;
 	}
-	bzero(sc->fxp_stats, sizeof(struct fxp_stats));
 
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, FXP_TXCB_SZ, 1,
-	    FXP_TXCB_SZ, 0, &sc->cbl_tag);
+	    FXP_TXCB_SZ, 0, busdma_lock_mutex, &Giant, &sc->cbl_tag);
 	if (error) {
 		device_printf(dev, "could not allocate dma tag\n");
 		goto fail;
 	}
 
 	error = bus_dmamem_alloc(sc->cbl_tag, (void **)&sc->fxp_desc.cbl_list,
-	    BUS_DMA_NOWAIT, &sc->cbl_map);
+	    BUS_DMA_NOWAIT | BUS_DMA_ZERO, &sc->cbl_map);
 	if (error)
 		goto fail;
-	bzero(sc->fxp_desc.cbl_list, FXP_TXCB_SZ);
 
 	error = bus_dmamap_load(sc->cbl_tag, sc->cbl_map,
 	    sc->fxp_desc.cbl_list, FXP_TXCB_SZ, fxp_dma_map_addr,
@@ -671,7 +696,8 @@ fxp_attach(device_t dev)
 
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, sizeof(struct fxp_cb_mcs), 1,
-	    sizeof(struct fxp_cb_mcs), 0, &sc->mcs_tag);
+	    sizeof(struct fxp_cb_mcs), 0, busdma_lock_mutex, &Giant,
+	    &sc->mcs_tag);
 	if (error) {
 		device_printf(dev, "could not allocate dma tag\n");
 		goto fail;
@@ -767,8 +793,7 @@ fxp_attach(device_t dev)
 	}
 
 	ifp = &sc->arpcom.ac_if;
-	ifp->if_unit = device_get_unit(dev);
-	ifp->if_name = "fxp";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_output = ether_output;
 	ifp->if_baudrate = 100000000;
 	ifp->if_init = fxp_init;
@@ -809,7 +834,7 @@ fxp_attach(device_t dev)
 	 * however, ifp and its functions are not fully locked so MPSAFE
 	 * should not be used unless you can handle potential data loss.
 	 */
-	error = bus_setup_intr(dev, sc->irq, INTR_TYPE_NET /*|INTR_MPSAFE*/,
+	error = bus_setup_intr(dev, sc->irq, INTR_TYPE_NET | INTR_MPSAFE,
 			       fxp_intr, sc, &sc->ih);
 	if (error) {
 		device_printf(dev, "could not setup irq\n");
@@ -969,7 +994,7 @@ fxp_suspend(device_t dev)
 	fxp_stop(sc);
 	
 	for (i = 0; i < 5; i++)
-		sc->saved_maps[i] = pci_read_config(dev, PCIR_MAPS + i * 4, 4);
+		sc->saved_maps[i] = pci_read_config(dev, PCIR_BAR(i), 4);
 	sc->saved_biosaddr = pci_read_config(dev, PCIR_BIOS, 4);
 	sc->saved_intline = pci_read_config(dev, PCIR_INTLINE, 1);
 	sc->saved_cachelnsz = pci_read_config(dev, PCIR_CACHELNSZ, 1);
@@ -997,12 +1022,12 @@ fxp_resume(device_t dev)
 
 	FXP_LOCK(sc);
 	s = splimp();
-
+#ifndef BURN_BRIDGES
 	fxp_powerstate_d0(dev);
-
+#endif
 	/* better way to do this? */
 	for (i = 0; i < 5; i++)
-		pci_write_config(dev, PCIR_MAPS + i * 4, sc->saved_maps[i], 4);
+		pci_write_config(dev, PCIR_BAR(i), sc->saved_maps[i], 4);
 	pci_write_config(dev, PCIR_BIOS, sc->saved_biosaddr, 4);
 	pci_write_config(dev, PCIR_INTLINE, sc->saved_intline, 1);
 	pci_write_config(dev, PCIR_CACHELNSZ, sc->saved_cachelnsz, 1);
@@ -1399,24 +1424,13 @@ fxp_start_body(struct ifnet *ifp)
 			 * mbuf chain first. Bail out if we can't get the
 			 * new buffers.
 			 */
-			MGETHDR(mn, M_DONTWAIT, MT_DATA);
+			mn = m_defrag(mb_head, M_DONTWAIT);
 			if (mn == NULL) {
 				m_freem(mb_head);
 				break;
+			} else {
+				mb_head = mn;
 			}
-			if (mb_head->m_pkthdr.len > MHLEN) {
-				MCLGET(mn, M_DONTWAIT);
-				if ((mn->m_flags & M_EXT) == 0) {
-					m_freem(mn);
-					m_freem(mb_head);
-					break;
-				}
-			}
-			m_copydata(mb_head, 0, mb_head->m_pkthdr.len,
-			    mtod(mn, caddr_t));
-			mn->m_pkthdr.len = mn->m_len = mb_head->m_pkthdr.len;
-			m_freem(mb_head);
-			mb_head = mn;
 			error = bus_dmamap_load_mbuf(sc->fxp_mtag, txp->tx_map,
 			    mb_head, fxp_dma_map_txbuf, sc, 0);
 			if (error) {
@@ -1562,8 +1576,8 @@ fxp_intr(void *xsc)
 	if (ether_poll_register(fxp_poll, ifp)) {
 		/* disable interrupts */
 		CSR_WRITE_1(sc, FXP_CSR_SCB_INTRCNTL, FXP_SCB_INTR_DISABLE);
-		fxp_poll(ifp, 0, 1);
 		FXP_UNLOCK(sc);
+		fxp_poll(ifp, 0, 1);
 		return;
 	}
 #endif
@@ -1751,7 +1765,17 @@ fxp_intr_body(struct fxp_softc *sc, struct ifnet *ifp, u_int8_t statack,
 			m->m_pkthdr.len = m->m_len = total_len;
 			m->m_pkthdr.rcvif = ifp;
 
+			/*
+			 * Drop locks before calling if_input() since it
+			 * may re-enter fxp_start() in the netisr case.
+			 * This would result in a lock reversal.  Better
+			 * performance might be obtained by chaining all
+			 * packets received, dropping the lock, and then
+			 * calling if_input() on each one.
+			 */
+			FXP_UNLOCK(sc);
 			(*ifp->if_input)(ifp, m);
+			FXP_LOCK(sc);
 		}
 	}
 	if (rnr) {
@@ -1866,7 +1890,7 @@ fxp_tick(void *xsc)
 	/*
 	 * Schedule another timeout one second from now.
 	 */
-	sc->stat_ch = timeout(fxp_tick, sc, hz);
+	callout_reset(&sc->stat_ch, hz, fxp_tick, sc);
 	FXP_UNLOCK(sc);
 	splx(s);
 }
@@ -1891,7 +1915,7 @@ fxp_stop(struct fxp_softc *sc)
 	/*
 	 * Cancel stats updater.
 	 */
-	untimeout(fxp_tick, sc, sc->stat_ch);
+	callout_stop(&sc->stat_ch);
 
 	/*
 	 * Issue software reset, which also unloads the microcode.
@@ -2222,7 +2246,7 @@ fxp_init_body(struct fxp_softc *sc)
 	/*
 	 * Start stats updater.
 	 */
-	sc->stat_ch = timeout(fxp_tick, sc, hz);
+	callout_reset(&sc->stat_ch, hz, fxp_tick, sc);
 	splx(s);
 }
 
@@ -2309,16 +2333,16 @@ fxp_add_rfabuf(struct fxp_softc *sc, struct fxp_rx *rxp)
 	m->m_data += sc->rfa_size;
 	rfa->size = htole16(MCLBYTES - sc->rfa_size - RFA_ALIGNMENT_FUDGE);
 
-	/*
-	 * Initialize the rest of the RFA.  Note that since the RFA
-	 * is misaligned, we cannot store values directly.  Instead,
-	 * we use an optimized, inline copy.
-	 */
-
 	rfa->rfa_status = 0;
 	rfa->rfa_control = htole16(FXP_RFA_CONTROL_EL);
 	rfa->actual_size = 0;
 
+	/*
+	 * Initialize the rest of the RFA.  Note that since the RFA
+	 * is misaligned, we cannot store values directly.  We're thus
+	 * using the le32enc() function which handles endianness and
+	 * is also alignment-safe.
+	 */
 	le32enc(&rfa->link_addr, 0xffffffff);
 	le32enc(&rfa->rbd_addr, 0xffffffff);
 

@@ -1308,8 +1308,7 @@ safe_process(void *arg, struct cryptop *crp, int hint)
 				if (re->re_src_m->m_flags & M_PKTHDR) {
 					len = MHLEN;
 					MGETHDR(m, M_DONTWAIT, MT_DATA);
-					if (m && !m_dup_pkthdr(m, re->re_src_m,
-					    M_DONTWAIT)) {
+					if (m && !m_dup_pkthdr(m, re->re_src_m)) {
 						m_free(m);
 						m = NULL;
 					}

@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ar/if_ar.c,v 1.58 2003/04/23 15:40:11 jhay Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar.c,v 1.60 2003/10/31 18:31:56 brooks Exp $");
 
 /*
  * Programming assumptions and other issues.
@@ -42,7 +43,6 @@
  *
  * There should be a way to set/reset Raw HDLC/PPP, Loopback, DCE/DTE,
  * internal/external clock, etc.....
- *
  */
 
 #include "opt_netgraph.h"
@@ -293,8 +293,8 @@ ar_attach(device_t device)
 		ifp = &sc->ifsppp.pp_if;
 
 		ifp->if_softc = sc;
-		ifp->if_unit = sc->unit;
-		ifp->if_name = "ar";
+		if_initname(ifp, device_get_name(device),
+		    device_get_unit(device));
 		ifp->if_mtu = PP_MTU;
 		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
 		ifp->if_ioctl = arioctl;

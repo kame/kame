@@ -24,8 +24,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $NetBSD: pdq_ifsubr.c,v 1.12 1997/06/05 01:56:35 thomas Exp$
- * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.22 2003/03/16 00:24:18 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.23 2003/08/24 17:54:16 obrien Exp $");
 
 /*
  * DEC PDQ FDDI Controller; code for BSD derived operating systems

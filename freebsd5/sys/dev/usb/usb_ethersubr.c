@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.17 2003/11/14 11:09:45 johan Exp $");
+
 /*
  * Callbacks in the USB code operate at splusb() (actually splbio()
  * in FreeBSD). However adding packets to the input queues has to be
@@ -47,9 +50,6 @@
  * in general. Right now, I need USB network interfaces to work
  * properly.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.14 2003/04/03 21:36:32 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,7 +114,7 @@ void usb_register_netisr()
 {
 	if (mtx_inited)
 		return;
-	netisr_register(NETISR_USB, (netisr_t *)usbintr, NULL);
+	netisr_register(NETISR_USB, (netisr_t *)usbintr, NULL, 0);
 	mtx_init(&usbq_tx.ifq_mtx, "usbq_tx_mtx", NULL, MTX_DEF);
 	mtx_init(&usbq_rx.ifq_mtx, "usbq_rx_mtx", NULL, MTX_DEF);
 	mtx_inited++;

@@ -34,12 +34,15 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.21 2003/10/31 18:32:05 brooks Exp $");
+
 /*
  * Driver for 3c990 (Typhoon) Ethernet ASIC
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.17 2003/04/16 03:16:55 mdodd Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.21 2003/10/31 18:32:05 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,7 +93,7 @@ __FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.17 2003/04/16 03:16:55 mdodd Ex
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.17 2003/04/16 03:16:55 mdodd Exp $";
+  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.21 2003/10/31 18:32:05 brooks Exp $";
 #endif
 
 /*
@@ -223,7 +226,7 @@ txp_attach(dev)
 
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -245,7 +248,7 @@ txp_attach(dev)
 		pci_write_config(dev, TXP_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, TXP_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -352,8 +355,7 @@ txp_attach(dev)
 
 	ifp = &sc->sc_arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "txp";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = txp_ioctl;

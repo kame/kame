@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.76 2003/11/14 11:09:45 johan Exp $");
+
 /*
  * ADMtek AN986 Pegasus and AN8511 Pegasus II USB to ethernet driver.
  * Datasheet is available from http://www.admtek.com.tw.
@@ -59,9 +62,6 @@
  * done using usbd_transfer() and friends.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.68 2003/04/15 06:37:27 mdodd Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -79,6 +79,10 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.68 2003/04/15 06:37:27 mdodd Ex
 #include <net/bpf.h>
 
 #include <sys/bus.h>
+#include <machine/bus.h>
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>
+#endif
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -147,6 +151,7 @@ Static const struct aue_type aue_devs[] = {
  {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX3},	  LSYS },
  {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBLTX},	  PII },
  {{ USB_VENDOR_ELSA,		USB_PRODUCT_ELSA_USB2ETHERNET},	  0 },
+ {{ USB_VENDOR_HAWKING,		USB_PRODUCT_HAWKING_UF100},       PII },
  {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTX},	  0 },
  {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTXS},	  PII },
  {{ USB_VENDOR_KINGSTON,	USB_PRODUCT_KINGSTON_KNU101TX},   0 },
@@ -156,6 +161,7 @@ Static const struct aue_type aue_devs[] = {
  {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100H1},	  LSYS|PNA },
  {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TA},	  LSYS },
  {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TX2},	  LSYS|PII },
+ {{ USB_VENDOR_MICROSOFT,	USB_PRODUCT_MICROSOFT_MN110},	  PII },
  {{ USB_VENDOR_MELCO,		USB_PRODUCT_MELCO_LUATX1},	  0 },
  {{ USB_VENDOR_MELCO,		USB_PRODUCT_MELCO_LUATX5},	  0 },
  {{ USB_VENDOR_MELCO,		USB_PRODUCT_MELCO_LUA2TX5},	  PII },
@@ -201,7 +207,7 @@ Static int aue_miibus_writereg(device_ptr_t, int, int, int);
 Static void aue_miibus_statchg(device_ptr_t);
 
 Static void aue_setmulti(struct aue_softc *);
-Static u_int32_t aue_crc(caddr_t);
+Static u_int32_t aue_mchash(caddr_t);
 Static void aue_reset(struct aue_softc *);
 
 Static int aue_csr_read_1(struct aue_softc *, int);
@@ -516,9 +522,11 @@ aue_miibus_statchg(device_ptr_t dev)
 #define AUE_BITS	6
 
 Static u_int32_t
-aue_crc(caddr_t addr)
+aue_mchash(caddr_t addr)
 {
-	u_int32_t		idx, bit, data, crc;
+	u_int32_t	crc;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
@@ -552,10 +560,15 @@ aue_setmulti(struct aue_softc *sc)
 		aue_csr_write_1(sc, AUE_MAR0 + i, 0);
 
 	/* now program new ones */
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#if __FreeBSD_version >= 500000
+	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#else
+	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#endif
+	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = aue_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = aue_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
 	}
 
@@ -702,8 +715,10 @@ USB_ATTACH(aue)
 		}
 	}
 
+#if __FreeBSD_version >= 500000
 	mtx_init(&sc->aue_mtx, device_get_nameunit(self), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
+#endif
 	AUE_LOCK(sc);
 
 	/* Reset the adapter. */
@@ -723,8 +738,7 @@ USB_ATTACH(aue)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->aue_unit;
-	ifp->if_name = "aue";
+	if_initname(ifp, "aue", sc->aue_unit);
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = aue_ioctl;
@@ -753,7 +767,9 @@ USB_ATTACH(aue)
 	    aue_ifmedia_upd, aue_ifmedia_sts)) {
 		printf("aue%d: MII without any PHY!\n", sc->aue_unit);
 		AUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 		mtx_destroy(&sc->aue_mtx);
+#endif
 		USB_ATTACH_ERROR_RETURN;
 	}
 
@@ -763,7 +779,11 @@ USB_ATTACH(aue)
 	/*
 	 * Call MI attach routine.
 	 */
+#if __FreeBSD_version >= 500000
 	ether_ifattach(ifp, eaddr);
+#else
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 	callout_handle_init(&sc->aue_stat_ch);
 	usb_register_netisr();
 	sc->aue_dying = 0;
@@ -784,7 +804,11 @@ aue_detach(device_ptr_t dev)
 
 	sc->aue_dying = 1;
 	untimeout(aue_tick, sc, sc->aue_stat_ch);
+#if __FreeBSD_version >= 500000
 	ether_ifdetach(ifp);
+#else
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 
 	if (sc->aue_ep[AUE_ENDPT_TX] != NULL)
 		usbd_abort_pipe(sc->aue_ep[AUE_ENDPT_TX]);
@@ -796,7 +820,9 @@ aue_detach(device_ptr_t dev)
 #endif
 
 	AUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->aue_mtx);
+#endif
 
 	return (0);
 }

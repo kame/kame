@@ -1,4 +1,5 @@
-/*
+/*-
+ * Written by: yen_cw@myson.com.tw
  * Copyright (c) 2002 Myson Technology Inc.
  * All rights reserved.
  *
@@ -23,13 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Written by: yen_cw@myson.com.tw  available at: http://www.myson.com.tw/
- *
- * Myson fast ethernet PCI NIC driver
+ * Myson fast ethernet PCI NIC driver, available at: http://www.myson.com.tw/
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/my/if_my.c,v 1.16 2003/04/15 06:37:25 mdodd Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/my/if_my.c,v 1.21 2003/11/14 19:00:30 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,8 +63,8 @@ __FBSDID("$FreeBSD: src/sys/dev/my/if_my.c,v 1.16 2003/04/15 06:37:25 mdodd Exp 
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -91,7 +90,7 @@ static int      MY_USEIOSPACE = 1;
 
 #ifndef lint
 static          const char rcsid[] =
-"$Id: if_my.c,v 1.50 2001/12/03 04:15:33 <yen_cw@myson.com.tw> wpaul Exp $";
+"$Id: if_my.c,v 1.16 2003/04/15 06:37:25 mdodd Exp $";
 #endif
 
 /*
@@ -143,7 +142,7 @@ static void     my_autoneg_mii(struct my_softc *, int, int);
 static void     my_setmode_mii(struct my_softc *, int);
 static void     my_getmode_mii(struct my_softc *);
 static void     my_setcfg(struct my_softc *, int);
-static u_int8_t my_calchash(caddr_t);
+static u_int32_t my_mchash(caddr_t);
 static void     my_setmulti(struct my_softc *);
 static void     my_reset(struct my_softc *);
 static int      my_list_rx_init(struct my_softc *);
@@ -314,22 +313,20 @@ my_phy_writereg(struct my_softc * sc, int reg, int data)
 	return;
 }
 
-static          u_int8_t
-my_calchash(caddr_t addr)
+static u_int32_t
+my_mchash(caddr_t addr)
 {
 	u_int32_t       crc, carry;
-	int             i, j;
-	u_int8_t        c;
+	int             idx, bit;
+	u_int8_t        data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF;	/* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -382,7 +379,7 @@ my_setmulti(struct my_softc * sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = my_calchash(LLADDR((struct sockaddr_dl *) ifma->ifma_addr));
+		h = my_mchash(LLADDR((struct sockaddr_dl *) ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -995,8 +992,7 @@ my_attach(device_t dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "my";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = my_ioctl;
@@ -1282,7 +1278,9 @@ my_rxeof(struct my_softc * sc)
 			}
 		}
 #endif
+		MY_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		MY_LOCK(sc);
 	}
 	MY_UNLOCK(sc);
 	return;
@@ -1876,5 +1874,3 @@ my_shutdown(device_t dev)
 	my_stop(sc);
 	return;
 }
-
-

@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.217 2003/04/05 18:12:36 cognet Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed.c,v 1.223 2003/11/14 17:16:56 obrien Exp $");
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet
@@ -103,7 +104,7 @@ static u_short	ed_pio_write_mbufs(struct ed_softc *, struct mbuf *, int);
 
 static void	ed_setrcr	(struct ed_softc *);
 
-static u_int32_t ds_crc		(u_char *ep);
+static u_int32_t ds_mchash	(caddr_t addr);
 
 /*
  * Interrupt conversion table for WD/SMC ASIC/83C584
@@ -911,6 +912,120 @@ ed_probe_3Com(dev, port_rid, flags)
 }
 
 /*
+ * Probe and vendor-specific initialization routine for SIC boards
+ */
+int
+ed_probe_SIC(dev, port_rid, flags)
+	device_t dev;
+	int port_rid;
+	int flags;
+{
+	struct ed_softc *sc = device_get_softc(dev);
+	int	error;
+	int	i;
+	u_int	memsize;
+	u_long	conf_maddr, conf_msize;
+	u_char	sum;
+
+	error = ed_alloc_port(dev, 0, ED_SIC_IO_PORTS);
+	if (error)
+		return (error);
+
+	sc->asic_offset = ED_SIC_ASIC_OFFSET;
+	sc->nic_offset  = ED_SIC_NIC_OFFSET;
+
+	error = bus_get_resource(dev, SYS_RES_MEMORY, 0,
+				 &conf_maddr, &conf_msize);
+	if (error)
+		return (error);
+
+	memsize = 16384;
+	if (conf_msize > 1)
+		memsize = conf_msize;
+
+	error = ed_alloc_memory(dev, 0, memsize);
+	if (error)
+		return (error);
+
+	sc->mem_start = (caddr_t) rman_get_virtual(sc->mem_res);
+	sc->mem_size  = memsize;
+
+	/* Reset card to force it into a known state. */
+	ed_asic_outb(sc, 0, 0x00);
+	DELAY(100);
+
+	/*
+	 * Here we check the card ROM, if the checksum passes, and the
+	 * type code and ethernet address check out, then we know we have
+	 * an SIC card.
+	 */
+	ed_asic_outb(sc, 0, 0x81);
+	DELAY(100);
+
+	sum = sc->mem_start[6];
+	for (i = 0; i < ETHER_ADDR_LEN; i++) {
+		sum ^= (sc->arpcom.ac_enaddr[i] = sc->mem_start[i]);
+	}
+#ifdef ED_DEBUG
+	device_printf(dev, "ed_probe_sic: got address %6D\n",
+		      sc->arpcom.ac_enaddr, ":");
+#endif
+	if (sum != 0) {
+		return (ENXIO);
+	}
+	if ((sc->arpcom.ac_enaddr[0] | sc->arpcom.ac_enaddr[1] |
+	     sc->arpcom.ac_enaddr[2]) == 0) {
+		return (ENXIO);
+	}
+
+	sc->vendor   = ED_VENDOR_SIC;
+	sc->type_str = "SIC";
+	sc->isa16bit = 0;
+	sc->cr_proto = 0;
+
+	/*
+	 * SIC RAM page 0x0000-0x3fff(or 0x7fff)
+	 */
+	ed_asic_outb(sc, 0, 0x80);
+	DELAY(100);
+
+	/*
+	 * Now zero memory and verify that it is clear
+	 */
+	bzero(sc->mem_start, sc->mem_size);
+
+	for (i = 0; i < sc->mem_size; i++) {
+		if (sc->mem_start[i]) {
+			device_printf(dev, "failed to clear shared memory "
+				"at %jx - check configuration\n",
+				(uintmax_t)kvtop(sc->mem_start + i));
+
+			return (ENXIO);
+		}
+	}
+
+	sc->mem_shared = 1;
+	sc->mem_end = sc->mem_start + sc->mem_size;
+
+	/*
+	 * allocate one xmit buffer if < 16k, two buffers otherwise
+	 */
+	if ((sc->mem_size < 16384) || (flags & ED_FLAGS_NO_MULTI_BUFFERING)) {
+		sc->txb_cnt = 1;
+	} else {
+		sc->txb_cnt = 2;
+	}
+	sc->tx_page_start = 0;
+
+	sc->rec_page_start = sc->tx_page_start + ED_TXBUF_SIZE * sc->txb_cnt;
+	sc->rec_page_stop = sc->tx_page_start + sc->mem_size / ED_PAGE_SIZE;
+
+	sc->mem_ring = sc->mem_start + sc->txb_cnt * ED_PAGE_SIZE * ED_TXBUF_SIZE;
+
+	return (0);
+}
+
+/*
  * Probe and vendor-specific initialization routine for NE1000/2000 boards
  */
 int
@@ -1586,11 +1701,10 @@ ed_release_resources(dev)
  * Install interface into kernel networking data structures
  */
 int
-ed_attach(sc, unit, flags)
-	struct ed_softc *sc;
-	int unit;
-	int flags;
+ed_attach(dev)
+	device_t dev;
 {
+	struct ed_softc *sc = device_get_softc(dev);
 	struct ifnet *ifp = &sc->arpcom.ac_if;
 
 	callout_handle_init(&sc->tick_ch);
@@ -1599,52 +1713,49 @@ ed_attach(sc, unit, flags)
 	 */
 	ed_stop(sc);
 
-	if (!ifp->if_name) {
-		/*
-		 * Initialize ifnet structure
-		 */
-		ifp->if_softc = sc;
-		ifp->if_unit = unit;
-		ifp->if_name = "ed";
-		ifp->if_output = ether_output;
-		ifp->if_start = ed_start;
-		ifp->if_ioctl = ed_ioctl;
-		ifp->if_watchdog = ed_watchdog;
-		ifp->if_init = ed_init;
-		IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-		ifp->if_linkmib = &sc->mibdata;
-		ifp->if_linkmiblen = sizeof sc->mibdata;
-		IFQ_SET_READY(&ifp->if_snd);
-		/*
-		 * XXX - should do a better job.
-		 */
-		if (sc->chip_type == ED_CHIP_TYPE_WD790)
-			sc->mibdata.dot3StatsEtherChipSet =
-				DOT3CHIPSET(dot3VendorWesternDigital,
-					    dot3ChipSetWesternDigital83C790);
-		else
-			sc->mibdata.dot3StatsEtherChipSet =
-				DOT3CHIPSET(dot3VendorNational, 
-					    dot3ChipSetNational8390);
-		sc->mibdata.dot3Compliance = DOT3COMPLIANCE_COLLS;
+	/*
+	 * Initialize ifnet structure
+	 */
+	ifp->if_softc = sc;
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
+	ifp->if_output = ether_output;
+	ifp->if_start = ed_start;
+	ifp->if_ioctl = ed_ioctl;
+	ifp->if_watchdog = ed_watchdog;
+	ifp->if_init = ed_init;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	ifp->if_linkmib = &sc->mibdata;
+	ifp->if_linkmiblen = sizeof sc->mibdata;
+	IFQ_SET_READY(&ifp->if_snd);
+	/*
+	 * XXX - should do a better job.
+	 */
+	if (sc->chip_type == ED_CHIP_TYPE_WD790)
+		sc->mibdata.dot3StatsEtherChipSet =
+			DOT3CHIPSET(dot3VendorWesternDigital,
+				    dot3ChipSetWesternDigital83C790);
+	else
+		sc->mibdata.dot3StatsEtherChipSet =
+			DOT3CHIPSET(dot3VendorNational, 
+				    dot3ChipSetNational8390);
+	sc->mibdata.dot3Compliance = DOT3COMPLIANCE_COLLS;
 
-		/*
-		 * Set default state for ALTPHYS flag (used to disable the 
-		 * tranceiver for AUI operation), based on compile-time 
-		 * config option.
-		 */
-		if (flags & ED_FLAGS_DISABLE_TRANCEIVER)
-			ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | 
-			    IFF_MULTICAST | IFF_ALTPHYS);
-		else
-			ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX |
-			    IFF_MULTICAST);
+	/*
+	 * Set default state for ALTPHYS flag (used to disable the 
+	 * tranceiver for AUI operation), based on compile-time 
+	 * config option.
+	 */
+	if (device_get_flags(dev) & ED_FLAGS_DISABLE_TRANCEIVER)
+		ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | 
+		    IFF_MULTICAST | IFF_ALTPHYS);
+	else
+		ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX |
+		    IFF_MULTICAST);
 
-		/*
-		 * Attach the interface
-		 */
-		ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-	}
+	/*
+	 * Attach the interface
+	 */
+	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 	/* device attach does transition from UNCONFIGURED to IDLE state */
 
 	/*
@@ -1735,7 +1846,7 @@ ed_watchdog(ifp)
 
 	if (sc->gone)
 		return;
-	log(LOG_ERR, "ed%d: device timeout\n", ifp->if_unit);
+	log(LOG_ERR, "%s: device timeout\n", ifp->if_xname);
 	ifp->if_oerrors++;
 
 	ed_reset(ifp);
@@ -2238,8 +2349,8 @@ ed_rint(sc)
 			 * Really BAD. The ring pointers are corrupted.
 			 */
 			log(LOG_ERR,
-			    "ed%d: NIC memory corrupt - invalid packet length %d\n",
-			    ifp->if_unit, len);
+			    "%s: NIC memory corrupt - invalid packet length %d\n",
+			    ifp->if_xname, len);
 			ifp->if_ierrors++;
 			ed_reset(ifp);
 			return;
@@ -2443,8 +2554,8 @@ edintr(arg)
 				ifp->if_ierrors++;
 #ifdef DIAGNOSTIC
 				log(LOG_WARNING,
-				    "ed%d: warning - receiver ring buffer overrun\n",
-				    ifp->if_unit);
+				    "%s: warning - receiver ring buffer overrun\n",
+				    ifp->if_xname);
 #endif
 
 				/*
@@ -2946,8 +3057,8 @@ ed_pio_write_mbufs(sc, m, dst)
 	while (((ed_nic_inb(sc, ED_P0_ISR) & ED_ISR_RDC) != ED_ISR_RDC) && --maxwait);
 
 	if (!maxwait) {
-		log(LOG_WARNING, "ed%d: remote transmit DMA failed to complete\n",
-		    ifp->if_unit);
+		log(LOG_WARNING, "%s: remote transmit DMA failed to complete\n",
+		    ifp->if_xname);
 		ed_reset(ifp);
 		return(0);
 	}
@@ -3154,7 +3265,7 @@ ed_hpp_write_mbufs(struct ed_softc *sc, struct mbuf *m, int dst)
 				/* finish the last word of the previous mbuf */
 				if (wantbyte) {
 					savebyte[1] = *data;
-					*d = *((ushort *) savebyte);
+					*d = *((u_short *) savebyte);
 					data++; len--; wantbyte = 0;
 				}
 				/* output contiguous words */
@@ -3422,22 +3533,20 @@ ed_setrcr(sc)
  * Compute crc for ethernet address
  */
 static u_int32_t
-ds_crc(ep)
-	u_char *ep;
+ds_mchash(addr)
+	caddr_t addr;
 {
-#define POLYNOMIAL 0x04c11db6
+#define ED_POLYNOMIAL 0x04c11db6
 	register u_int32_t crc = 0xffffffff;
-	register int carry, i, j;
-	register u_char b;
+	register int carry, idx, bit;
+	register u_char data;
 
-	for (i = 6; --i >= 0;) {
-		b = *ep++;
-		for (j = 8; --j >= 0;) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (b & 0x01);
+	for (idx = 6; --idx >= 0;) {
+		for (data = *addr++, bit = 8; --bit >= 0; data >>=1 ) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			b >>= 1;
 			if (carry)
-				crc = (crc ^ POLYNOMIAL) | carry;
+				crc = (crc ^ ED_POLYNOMIAL) | carry;
 		}
 	}
 	return crc;
@@ -3463,7 +3572,7 @@ ds_getmcaf(sc, mcaf)
 	TAILQ_FOREACH(ifma, &sc->arpcom.ac_if.if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		index = ds_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr))
+		index = ds_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr))
 			>> 26;
 		af[index >> 3] |= 1 << (index & 7);
 	}

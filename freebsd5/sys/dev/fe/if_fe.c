@@ -20,8 +20,10 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe.c,v 1.79 2003/11/13 20:55:48 obrien Exp $");
+
 /*
- * $FreeBSD: src/sys/dev/fe/if_fe.c,v 1.76 2003/02/19 05:47:04 imp Exp $
  *
  * Device driver for Fujitsu MB86960A/MB86965A based Ethernet cards.
  * Contributed by M. Sekiguchi. <seki@sysrap.cs.fujitsu.co.jp>
@@ -421,8 +423,8 @@ fe_read_eeprom_jli (struct fe_softc * sc, u_char * data)
 		int i;
 		data -= JLI_EEPROM_SIZE;
 		for (i = 0; i < JLI_EEPROM_SIZE; i += 16) {
-			printf("fe%d: EEPROM(JLI):%3x: %16D\n",
-			       sc->sc_unit, i, data + i, " ");
+			printf("%s: EEPROM(JLI):%3x: %16D\n",
+			       sc->sc_xname, i, data + i, " ");
 		}
 	}
 #endif
@@ -537,8 +539,8 @@ fe_read_eeprom_ssi (struct fe_softc *sc, u_char *data)
 		int i;
 		data -= SSI_EEPROM_SIZE;
 		for (i = 0; i < SSI_EEPROM_SIZE; i += 16) {
-			printf("fe%d: EEPROM(SSI):%3x: %16D\n",
-			       sc->sc_unit, i, data + i, " ");
+			printf("%s: EEPROM(SSI):%3x: %16D\n",
+			       sc->sc_xname, i, data + i, " ");
 		}
 	}
 #endif
@@ -639,8 +641,8 @@ fe_read_eeprom_lnx (struct fe_softc *sc, u_char *data)
 		   this board was not a TDK/LANX) or not working
 		   properly.  */
 		if (bootverbose) {
-			printf("fe%d: no ACK received from EEPROM(LNX)\n",
-			       sc->sc_unit);
+			printf("%s: no ACK received from EEPROM(LNX)\n",
+			       sc->sc_xname);
 		}
 		/* Clear the given buffer to indicate we could not get
                    any info. and return.  */
@@ -678,8 +680,8 @@ fe_read_eeprom_lnx (struct fe_softc *sc, u_char *data)
 	if (bootverbose) {
 		data -= LNX_EEPROM_SIZE;
 		for (i = 0; i < LNX_EEPROM_SIZE; i += 16) {
-			printf("fe%d: EEPROM(LNX):%3x: %16D\n",
-			       sc->sc_unit, i, data + i, " ");
+			printf("%s: EEPROM(LNX):%3x: %16D\n",
+			       sc->sc_xname, i, data + i, " ");
 		}
 	}
 #endif
@@ -737,8 +739,7 @@ fe_attach (device_t dev)
 	 * Initialize ifnet structure
 	 */
  	sc->sc_if.if_softc    = sc;
-	sc->sc_if.if_unit     = sc->sc_unit;
-	sc->sc_if.if_name     = "fe";
+	if_initname(&sc->sc_if, device_get_name(dev), device_get_unit(dev));
 	sc->sc_if.if_output   = ether_output;
 	sc->sc_if.if_start    = fe_start;
 	sc->sc_if.if_ioctl    = fe_ioctl;
@@ -790,8 +791,8 @@ fe_attach (device_t dev)
 	  default:
 		/* Oops, we can't work with single buffer configuration.  */
 		if (bootverbose) {
-			printf("fe%d: strange TXBSIZ config; fixing\n",
-			       sc->sc_unit);
+			printf("%s: strange TXBSIZ config; fixing\n",
+			       sc->sc_xname);
 		}
 		sc->proto_dlcr6 &= ~FE_D6_TXBSIZ;
 		sc->proto_dlcr6 |=  FE_D6_TXBSIZ_2x2KB;
@@ -1012,7 +1013,7 @@ fe_init (void * xsc)
 	/* We need an address. */
 	if (TAILQ_EMPTY(&sc->sc_if.if_addrhead)) { /* XXX unlikely */
 #ifdef DIAGNOSTIC
-		printf("fe%d: init() without any address\n", sc->sc_unit);
+		printf("%s: init() without any address\n", sc->sc_xname);
 #endif
 		return;
 	}
@@ -1097,8 +1098,8 @@ fe_init (void * xsc)
 	 * The following message helps discovering the fact.  FIXME.
 	 */
 	if (!(fe_inb(sc, FE_DLCR5) & FE_D5_BUFEMP)) {
-		printf("fe%d: receive buffer has some data after reset\n",
-		       sc->sc_unit);
+		printf("%s: receive buffer has some data after reset\n",
+		       sc->sc_xname);
 		fe_emptybuffer(sc);
 	}
 
@@ -1365,7 +1366,7 @@ fe_emptybuffer (struct fe_softc * sc)
 	u_char saved_dlcr5;
 
 #ifdef FE_DEBUG
-	printf("fe%d: emptying receive buffer\n", sc->sc_unit);
+	printf("%s: emptying receive buffer\n", sc->sc_xname);
 #endif
 
 	/*
@@ -1401,7 +1402,7 @@ fe_emptybuffer (struct fe_softc * sc)
 	 * Double check.
 	 */
 	if (fe_inb(sc, FE_DLCR5) & FE_D5_BUFEMP) {
-		printf("fe%d: could not empty receive buffer\n", sc->sc_unit);
+		printf("%s: could not empty receive buffer\n", sc->sc_xname);
 		/* Hmm.  What should I do if this happens?  FIXME.  */
 	}
 
@@ -1432,8 +1433,8 @@ fe_tint (struct fe_softc * sc, u_char tstat)
 		 * are left unsent in transmission buffer.
 		 */
 		left = fe_inb(sc, FE_BMPR10);
-		printf("fe%d: excessive collision (%d/%d)\n",
-		       sc->sc_unit, left, sc->txb_sched);
+		printf("%s: excessive collision (%d/%d)\n",
+		       sc->sc_xname, left, sc->txb_sched);
 
 		/*
 		 * Clear the collision flag (in 86960) here
@@ -1635,7 +1636,7 @@ fe_rint (struct fe_softc * sc, u_char rstat)
 		if ((status & 0xF0) != 0x20 ||
 		    len > ETHER_MAX_LEN - ETHER_CRC_LEN ||
 		    len < ETHER_MIN_LEN - ETHER_CRC_LEN) {
-			printf("fe%d: RX buffer out-of-sync\n", sc->sc_unit);
+			printf("%s: RX buffer out-of-sync\n", sc->sc_xname);
 			sc->sc_if.if_ierrors++;
 			sc->mibdata.dot3StatsInternalMacReceiveErrors++;
 			fe_reset(sc);
@@ -1665,7 +1666,7 @@ fe_rint (struct fe_softc * sc, u_char rstat)
 
 	/* Maximum number of frames has been received.  Something
            strange is happening here... */
-	printf("fe%d: unusual receive flood\n", sc->sc_unit);
+	printf("%s: unusual receive flood\n", sc->sc_xname);
 	sc->mibdata.dot3StatsInternalMacReceiveErrors++;
 	fe_reset(sc);
 }
@@ -1739,7 +1740,7 @@ fe_intr (void *arg)
 			fe_start(&sc->sc_if);
 	}
 
-	printf("fe%d: too many loops\n", sc->sc_unit);
+	printf("%s: too many loops\n", sc->sc_xname);
 }
 
 /*
@@ -1917,7 +1918,7 @@ fe_write_mbufs (struct fe_softc *sc, struct mbuf *m)
 
 	/* Check if this matches the one in the packet header.  */
 	if (length != m->m_pkthdr.len) {
-		printf("fe%d: packet length mismatch? (%d/%d)\n", sc->sc_unit,
+		printf("%s: packet length mismatch? (%d/%d)\n", sc->sc_xname,
 		       length, m->m_pkthdr.len);
 	}
 #else
@@ -1933,8 +1934,8 @@ fe_write_mbufs (struct fe_softc *sc, struct mbuf *m)
 	 */
 	if (length < ETHER_HDR_LEN ||
 	    length > ETHER_MAX_LEN - ETHER_CRC_LEN) {
-		printf("fe%d: got an out-of-spec packet (%u bytes) to send\n",
-			sc->sc_unit, length);
+		printf("%s: got an out-of-spec packet (%u bytes) to send\n",
+			sc->sc_xname, length);
 		sc->sc_if.if_oerrors++;
 		sc->mibdata.dot3StatsInternalMacTransmitErrors++;
 		return;
@@ -2046,26 +2047,24 @@ fe_write_mbufs (struct fe_softc *sc, struct mbuf *m)
 /*
  * Compute hash value for an Ethernet address
  */
-static int
-fe_hash ( u_char * ep )
+static u_int32_t
+fe_mchash (caddr_t addr)
 {
-#define FE_HASH_MAGIC_NUMBER 0xEDB88320L
+#define	FE_POLY 0xEDB88320L
 
-	u_long hash = 0xFFFFFFFFL;
-	int i, j;
-	u_char b;
-	u_long m;
+	u_long carry, crc = 0xFFFFFFFFL;
+	int idx, bit;
+	u_int8_t data;
 
-	for ( i = ETHER_ADDR_LEN; --i >= 0; ) {
-		b = *ep++;
-		for ( j = 8; --j >= 0; ) {
-			m = hash;
-			hash >>= 1;
-			if ( ( m ^ b ) & 1 ) hash ^= FE_HASH_MAGIC_NUMBER;
-			b >>= 1;
+	for ( idx = ETHER_ADDR_LEN; --idx >= 0; ) {
+		for (data = *addr++, bit = 8; --bit >= 0; data >>= 1) {
+			carry = crc;
+			crc >>= 1;
+			if ((carry ^ data) & 1)
+				crc ^= FE_POLY;
 		}
 	}
-	return ( ( int )( hash >> 26 ) );
+	return (crc >> 26);
 }
 
 /*
@@ -2083,10 +2082,10 @@ fe_mcaf ( struct fe_softc *sc )
 	TAILQ_FOREACH(ifma, &sc->arpcom.ac_if.if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		index = fe_hash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		index = fe_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 #ifdef FE_DEBUG
-		printf("fe%d: hash(%6D) == %d\n",
-			sc->sc_unit, enm->enm_addrlo , ":", index);
+		printf("%s: hash(%6D) == %d\n",
+			sc->sc_xname, enm->enm_addrlo , ":", index);
 #endif
 
 		filter.data[index >> 3] |= 1 << (index & 7);
@@ -2228,8 +2227,8 @@ fe_medchange (struct ifnet *ifp)
 		if (bit2media[b] == sc->media.ifm_media) break;
 	}
 	if (((1 << b) & sc->mbitmap) == 0) {
-		printf("fe%d: got an unsupported media request (0x%x)\n",
-		       sc->sc_unit, sc->media.ifm_media);
+		printf("%s: got an unsupported media request (0x%x)\n",
+		       sc->sc_xname, sc->media.ifm_media);
 		return EINVAL;
 	}
 #endif

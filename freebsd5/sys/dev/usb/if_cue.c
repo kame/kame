@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.44 2003/11/14 11:09:45 johan Exp $");
+
 /*
  * CATC USB-EL1210A USB to ethernet driver. Used in the CATC Netmate
  * adapters and others.
@@ -48,9 +51,6 @@
  * transaction, which helps performance a great deal.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.34 2003/04/15 06:37:27 mdodd Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -67,6 +67,10 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.34 2003/04/15 06:37:27 mdodd Ex
 #include <net/bpf.h>
 
 #include <sys/bus.h>
+#include <machine/bus.h>
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>
+#endif
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -109,7 +113,7 @@ Static void cue_watchdog(struct ifnet *);
 Static void cue_shutdown(device_ptr_t);
 
 Static void cue_setmulti(struct cue_softc *);
-Static u_int32_t cue_crc(caddr_t);
+Static uint32_t cue_mchash(const uint8_t *);
 Static void cue_reset(struct cue_softc *);
 
 Static int cue_csr_read_1(struct cue_softc *, int);
@@ -323,10 +327,12 @@ cue_getmac(struct cue_softc *sc, void *buf)
 #define CUE_POLY	0xEDB88320
 #define CUE_BITS	9
 
-Static u_int32_t
-cue_crc(caddr_t addr)
+Static uint32_t
+cue_mchash(const uint8_t *addr)
 {
-	u_int32_t		idx, bit, data, crc;
+	uint32_t	crc;
+	int		idx, bit;
+	uint8_t		data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
@@ -351,8 +357,8 @@ cue_setmulti(struct cue_softc *sc)
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
 		for (i = 0; i < CUE_MCAST_TABLE_LEN; i++)
 			sc->cue_mctab[i] = 0xFF;
-			cue_mem(sc, CUE_CMD_WRITESRAM, CUE_MCAST_TABLE_ADDR,
-			    &sc->cue_mctab, CUE_MCAST_TABLE_LEN);
+		cue_mem(sc, CUE_CMD_WRITESRAM, CUE_MCAST_TABLE_ADDR,
+		    &sc->cue_mctab, CUE_MCAST_TABLE_LEN);
 		return;
 	}
 
@@ -361,11 +367,16 @@ cue_setmulti(struct cue_softc *sc)
 		sc->cue_mctab[i] = 0;
 
 	/* now program new ones */
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#if __FreeBSD_version >= 500000
+	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#else
+	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#endif
+	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = cue_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
-		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);		
+		h = cue_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);
 	}
 
 	/*
@@ -373,8 +384,12 @@ cue_setmulti(struct cue_softc *sc)
 	 * so we can receive broadcast frames.
  	 */
 	if (ifp->if_flags & IFF_BROADCAST) {
-		h = cue_crc(ifp->if_broadcastaddr);
-		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);		
+#if __FreeBSD_version >= 500000
+		h = cue_mchash(ifp->if_broadcastaddr);
+#else
+		h = cue_mchash(etherbroadcastaddr);
+#endif
+		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);
 	}
 
 	cue_mem(sc, CUE_CMD_WRITESRAM, CUE_MCAST_TABLE_ADDR,
@@ -480,8 +495,10 @@ USB_ATTACH(cue)
 		}
 	}
 
+#if __FreeBSD_version >= 500000
 	mtx_init(&sc->cue_mtx, device_get_nameunit(self), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
+#endif
 	CUE_LOCK(sc);
 
 #ifdef notdef
@@ -502,8 +519,7 @@ USB_ATTACH(cue)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->cue_unit;
-	ifp->if_name = "cue";
+	if_initname(ifp, "cue", sc->cue_unit);
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = cue_ioctl;
@@ -521,7 +537,11 @@ USB_ATTACH(cue)
 	/*
 	 * Call MI attach routine.
 	 */
+#if __FreeBSD_version >= 500000
 	ether_ifattach(ifp, eaddr);
+#else
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 	callout_handle_init(&sc->cue_stat_ch);
 	usb_register_netisr();
 	sc->cue_dying = 0;
@@ -542,7 +562,11 @@ cue_detach(device_ptr_t dev)
 
 	sc->cue_dying = 1;
 	untimeout(cue_tick, sc, sc->cue_stat_ch);
+#if __FreeBSD_version >= 500000
 	ether_ifdetach(ifp);
+#else
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 
 	if (sc->cue_ep[CUE_ENDPT_TX] != NULL)
 		usbd_abort_pipe(sc->cue_ep[CUE_ENDPT_TX]);
@@ -552,7 +576,9 @@ cue_detach(device_ptr_t dev)
 		usbd_abort_pipe(sc->cue_ep[CUE_ENDPT_INTR]);
 
 	CUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->cue_mtx);
+#endif
 
 	return(0);
 }

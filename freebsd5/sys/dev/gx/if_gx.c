@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/gx/if_gx.c,v 1.10 2003/04/15 06:37:24 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/gx/if_gx.c,v 1.13 2003/10/31 18:32:01 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,8 +64,8 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -340,8 +341,7 @@ gx_attach(device_t dev)
 	/* Set up ifnet structure */
 	ifp = &gx->arpcom.ac_if;
 	ifp->if_softc = gx;
-	ifp->if_unit = device_get_unit(dev);
-	ifp->if_name = "gx";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = gx_ioctl;
 	ifp->if_output = ether_output;

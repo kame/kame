@@ -707,6 +707,7 @@ re_diag(sc)
 	int			total_len, i, error = 0;
 	u_int8_t		dst[] = { 0x00, 'h', 'e', 'l', 'l', 'o' };
 	u_int8_t		src[] = { 0x00, 'w', 'o', 'r', 'l', 'd' };
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/* Allocate a single mbuf */
 
@@ -744,7 +745,7 @@ re_diag(sc)
 	 */
 
 	CSR_WRITE_2(sc, RL_ISR, 0xFFFF);
-	IF_HANDOFF(&ifp->if_snd, m0, ifp);
+	IFQ_HANDOFF(ifp, m0, &pktattr, error);
 	m0 = NULL;
 
 	/* Wait for it to propagate through the chip */

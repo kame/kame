@@ -47,10 +47,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ie/if_ie.c,v 1.94 2003/03/29 13:36:40 mdodd Exp $
- *
  * MAINTAINER: Matthew N. Dodd <winter@jurai.net>
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ie/if_ie.c,v 1.97 2003/10/31 18:32:02 brooks Exp $");
 
 /*
  * Intel 82586 Ethernet chip
@@ -306,8 +307,7 @@ ie_attach(device_t dev)
 			ie_hardware_names[sc->hard_type], sc->hard_vers + 1);
 
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->unit;
-	ifp->if_name = "ie";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_start = iestart;
@@ -328,6 +328,14 @@ ie_attach(device_t dev)
 
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 	return (0);
+}
+
+static __inline void
+ie_ack(struct ie_softc *sc, u_int mask)
+{
+
+	sc->scb->ie_command = sc->scb->ie_status & mask;
+	(*sc->ie_chan_attn) (sc);
 }
 
 /*
@@ -1222,14 +1230,6 @@ sl_read_ether(struct ie_softc *sc, unsigned char *addr)
 
 	for (i = 0; i < 6; i++)
 		addr[i] = inb(PORT(sc) + i);
-}
-
-static __inline void
-ie_ack(struct ie_softc *sc, u_int mask)
-{
-
-	sc->scb->ie_command = sc->scb->ie_status & mask;
-	(*sc->ie_chan_attn) (sc);
 }
 
 static void

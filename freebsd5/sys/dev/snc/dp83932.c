@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.10 2003/04/08 14:25:44 des Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.12 2003/11/01 23:24:38 brooks Exp $	*/
 /*	$NecBSD: dp83932.c,v 1.5 1999/07/29 05:08:44 kmatsuda Exp $	*/
 /*	$NetBSD: if_snc.c,v 1.18 1998/04/25 21:27:40 scottr Exp $	*/
 
@@ -172,8 +172,8 @@ sncconfig(sc, media, nmedia, defmedia, myea)
 #endif
 
 	ifp->if_softc = sc;
-        ifp->if_unit = device_get_unit(sc->sc_dev);
-        ifp->if_name = "snc";
+	if_initname(ifp, device_get_name(sc->sc_dev),
+	    device_get_unit(sc->sc_dev));
 	ifp->if_ioctl = sncioctl;
         ifp->if_output = ether_output;
 	ifp->if_start = sncstart;
@@ -725,7 +725,7 @@ camdump(sc)
 	wbflush();
 
 	for (i = 0; i < 16; i++) {
-		ushort  ap2, ap1, ap0;
+		u_short  ap2, ap1, ap0;
 		NIC_PUT(sc, SNCR_CEP, i);
 		wbflush();
 		ap2 = NIC_GET(sc, SNCR_CAP2);

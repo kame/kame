@@ -1724,7 +1724,7 @@ ath_rx_proc(void *arg, int npending)
 					ds->ds_rxstat.rs_antenna;
 				/* XXX TSF */
 
-				(void) m_dup_pkthdr(mb, m, M_DONTWAIT);
+				(void) m_dup_pkthdr(mb, m);
 				mb->m_next = m;
 				mb->m_data = (caddr_t)&sc->sc_rx_th;
 				mb->m_len = sizeof(sc->sc_rx_th);
