@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.94 2001/12/18 02:23:44 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.95 2001/12/21 00:47:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1402,7 +1402,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 	splx(s);
 	return (0);
  bad:
-	m_freem(m);
 	return (error);
 }
 
@@ -1667,6 +1666,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mip6log((LOG_ERR,
 			 "%s:%d: failed to create authdata sub-option.\n",
 			 __FILE__, __LINE__));
+		free(optbuf.buf, M_IP6OPT);
 		return (EINVAL);
 	}
 	suboptlen = mip6_add_subopt2dh((u_int8_t *)authdata, &optbuf);
@@ -2282,10 +2282,12 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 
 	switch (*opt) {
 	case IP6OPT_BINDING_UPDATE:
+#if 0
 		if ((opt - (u_int8_t *)dstopts) % 4 != 2) {
 			ip6stat.ip6s_badoptions++;
 			goto bad;
 		}
+#endif
 
 		error = mip6_validate_bu(m, opt);
 		if (error == -1) {
@@ -2314,10 +2316,12 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		if (!MIP6_IS_MN)
 			return (0);
 
+#if 0
 		if ((opt - (u_int8_t *)dstopts) % 4 != 3) {
 			ip6stat.ip6s_badoptions++;
 			goto bad;
 		}
+#endif
 
 		error = mip6_validate_ba(m, opt);
 		if (error == -1) {
