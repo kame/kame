@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.100 2001/02/01 15:51:16 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.101 2001/02/02 05:03:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2140,6 +2140,7 @@ addnewsp(mhp)
 	new->spidx.dir = xpl->sadb_x_policy_dir;
 	new->id = xpl->sadb_x_policy_id;
 	new->policy = xpl->sadb_x_policy_type;
+	new->req = NULL;
 
 	/* check policy */
 	switch (xpl->sadb_x_policy_type) {
@@ -2147,7 +2148,6 @@ addnewsp(mhp)
 	case IPSEC_POLICY_NONE:
 	case IPSEC_POLICY_ENTRUST:
 	case IPSEC_POLICY_BYPASS:
-		new->req = NULL;
 		break;
 
 	case IPSEC_POLICY_IPSEC:
