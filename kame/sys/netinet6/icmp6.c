@@ -133,6 +133,8 @@ extern struct inpcbhead ripcb;
 extern u_int icmp6errratelim;
 #ifdef __NetBSD__
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
+#endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 extern int pmtu_expire;
 #endif
 
@@ -147,9 +149,12 @@ static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
 			  struct ifnet **));
 static int ni6_store_addrs __P((struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
 				struct ifnet *, int));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
-static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
+static void icmp6_mtudisc_timeout __P((struct rtentry *));
+#endif
+#ifdef __NetBSD__
+static void icmp6_mtudisc_rttimeout __P((struct rtentry *, struct rttimer *));
 #endif
 
 #ifdef COMPAT_RFC1885
@@ -431,7 +436,7 @@ icmp6_input(mp, offp, proto)
 		sin6.sin6_family = PF_INET6;
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
 		sin6.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		rt = rtalloc1((struct sockaddr *)&sin6, 1);	/*clone*/
 		if (!rt || (rt->rt_flags & RTF_HOST) == 0) {
 			if (rt)
@@ -2072,7 +2077,7 @@ icmp6_ratelimit(dst, type, code)
 	return 0;
 }
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *
 icmp6_mtudisc_clone(dst)
 	struct sockaddr *dst;
@@ -2101,8 +2106,13 @@ icmp6_mtudisc_clone(dst)
 		rtfree(rt);
 		rt = nrt;
 	}
-	error = rt_timer_add(rt, icmp6_mtudisc_timeout,
+#if defined(__OpenBSD__)
+	timeout((void (*) __P((void *)))icmp6_mtudisc_timeout, rt,
+		hz * pmtu_expire);
+#elif defined(__NetBSD__)
+	error = rt_timer_add(rt, icmp6_mtudisc_rttimeout,
 			icmp6_mtudisc_timeout_q);
+#endif
 	if (error) {
 		rtfree(rt);
 		return NULL;
@@ -2111,11 +2121,24 @@ icmp6_mtudisc_clone(dst)
 	return rt;	/* caller need to call rtfree() */
 }
 
+#ifdef __NetBSD__
 static void
-icmp6_mtudisc_timeout(rt, r)
+icmp6_mtudisc_rttimeout(rt, r)
 	struct rtentry *rt;
 	struct rttimer *r;
 {
+	icmp6_mtudisc_timeout(rt);
+}
+#endif
+
+static void
+icmp6_mtudisc_timeout(rt)
+	struct rtentry *rt;
+{
+#ifndef __NetBSD__
+	int s = splnet();
+#endif
+
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
 	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) == 
@@ -2127,6 +2150,9 @@ icmp6_mtudisc_timeout(rt, r)
 			rt->rt_rmx.rmx_mtu = 0;
 		}
 	}
+#ifndef __NetBSD__
+	splx(s);
+#endif
 }
 #endif /*__NetBSD__*/
 
