@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.13 2000/12/04 06:45:32 itojun Exp $	*/
+/*	$KAME: vif.h,v 1.14 2001/04/17 18:31:37 jinmei Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -125,21 +125,21 @@ struct vif_filter {
 };
 
 struct listaddr {
-	struct listaddr			*al_next;		/* link to next addr, MUST BE FIRST */
-	struct sockaddr_in6		 al_addr;		/* local group or neighbor address  */
-	u_long				al_timer;		/* for timing out group or neighbor */
-	time_t				al_ctime;		/* entry creation time              */
-	union 				{
-						u_int32				alu_genid;	/* generation id for neighbor       */
-						struct sockaddr_in6 alu_reporter;		/* a host which reported membership */
-					} al_alu;						
-	u_char 				al_pv;				/* router protocol version          */
-	u_char 				al_mv;			 	/* router mrouted version           */				
-	u_char 				al_old;				/* time since heard old report      */
-	u_char 				al_index;			/* neighbor index                   */
-	u_long 				al_timerid;			/* timer for group membership       */
-	u_long 				al_query;			/* timer for repeated leave query   */
-	u_int16 			al_flags;			/* flags related to this neighbor   */
+	struct listaddr *al_next; /* link to next addr, MUST BE FIRST */
+	struct sockaddr_in6 al_addr; /* local group or neighbor address */
+	u_long al_timer; /* for timing out group or neighbor */
+	time_t al_ctime; /* entry creation time */
+	union {
+		u_int32 alu_genid; /* generation id for neighbor */
+		/* a host which reported membership */
+		struct sockaddr_in6 alu_reporter;
+	} al_alu;
+	u_char al_pv; /* router protocol version */
+	u_char al_mv;  /* router mrouted version */
+	u_char al_index; /* neighbor index */
+	u_long al_timerid; /* timer for group membership */
+	u_long al_query; /* timer for repeated leave query */
+	u_int16 al_flags; /* flags related to this neighbor */
 };
 
 #define al_genid al_alu.alu_genid
