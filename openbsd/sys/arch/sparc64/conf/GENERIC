@@ -1,0 +1,112 @@
+#	$OpenBSD: GENERIC,v 1.26 2001/10/15 18:44:56 jason Exp $
+# 	$NetBSD: GENERIC32,v 1.18 2001/07/20 00:07:12 eeh Exp $
+
+machine		sparc64
+
+include "../../../conf/GENERIC"
+
+option		SUN4U
+option		_LP64
+
+option		PCIVERBOSE
+
+maxusers	64
+
+config		bsd	swap generic
+
+# Main bus and CPU .. all systems.
+mainbus0 at root
+cpu0	at mainbus0
+
+# Bus types found on SPARC systems.
+
+sbus0	at mainbus0				# Ultra 1
+psycho*	at mainbus0
+pci*	at psycho?				# Ultra 5
+pci*	at ppb?
+ppb*	at pci? dev ? function ?
+ebus*	at pci?
+
+hme*	at pci? dev ? function ?
+gem*	at pci? dev ? function ?
+siop*	at pci? dev ? function ?
+scsibus* at siop?
+
+#### Standard system devices -- all required for a given architecture
+
+auxio*	at ebus?
+beeper*	at ebus?
+
+#com*	at ebus?	#*BROKEN*
+
+audioce*	at ebus?
+audio*		at audioce?
+
+zs*	at sbus? slot ? offset ?
+zstty*	at zs? channel ?
+
+## PROM console driver -- if all else fails
+pcons0	at mainbus0				# PROM console
+
+## Mostek clock 
+clock*	at sbus? slot ? offset ?
+clock*	at ebus?
+
+## Timer chip found on (some) sun4u systems.
+timer*	at mainbus0
+
+## Lance Ethernet - AMD7990
+le*		at sbus? slot ? offset ?
+ledma*		at sbus? slot ? offset ?
+le*		at ledma?
+
+# Quad-ethernet glue device, and sub-devices
+qec*		at sbus? slot ? offset ?
+qe*		at qec?
+be*		at qec?
+
+hme*		at sbus? slot ? offset ?
+
+pciide*	at pci? dev ? function ? flags 0x0000
+wd*	at pciide? channel ? drive ? flags 0x0a00
+atapiscsi* at pciide? channel ?
+scsibus* at atapiscsi?
+
+#
+# Note the flags on the esp entries below, that work around
+# deficiencies in the current driver:
+#	bits 0-7:  disable disconnect/reselect for the corresponding target
+#	bits 8-15: disable synch negotiation for target [bit-8]
+#	Note: targets 4-7 have disconnect/reselect enabled on the premise
+#	      that tape devices normally have one of these targets. Tape
+#	      devices should be allowed to disconnect for the SCSI bus
+#	      to operate acceptably.
+#
+dma*	at sbus? slot ? offset ?		# SBus
+esp*	at dma? flags 0x0000			# SBus
+esp*	at sbus? slot ? offset ?
+
+isp*	at sbus? slot ? offset ?
+
+# SCSI bus layer.  SCSI devices attach to the SCSI bus, which attaches
+# to the underlying hardware controller.
+scsibus*	at esp?
+scsibus*	at isp?
+
+# These entries find devices on all SCSI busses and assign
+# unit numers dynamically.
+sd*		at scsibus? target ? lun ?	# SCSI disks
+st*		at scsibus? target ? lun ?	# SCSI tapes
+cd*		at scsibus? target ? lun ?	# SCSI CD-ROMs
+ch*		at scsibus? target ? lun ?	# SCSI changer devices
+ss*		at scsibus? target ? lun ?	# SCSI scanners
+uk*		at scsibus? target ? lun ?	# unknown SCSI devices
+
+# Media Independent Interface (mii) drivers)
+nsphy*	at mii? phy ?				# NS and compatible PHYs
+qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
+ukphy*	at mii? phy ?				# Unknown PHYs
+
+audiocs*	at sbus? slot ? offset ?
+audio*		at audiocs?
+
