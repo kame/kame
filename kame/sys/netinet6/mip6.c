@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.171 2002/09/25 13:52:47 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.172 2002/09/26 08:19:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2769,7 +2769,7 @@ mip6_hexdump("CN: Auth: ", sizeof(coa_sa->sin6_addr), &coa_sa->sin6_addr);
 mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_dst), &ip6->ip6_dst);
 #endif
 	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu,
-		  (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu);
+		  (u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata ) - (u_int8_t *)ip6mu);
 #ifdef RR_DBG
 mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu);
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.55 2002/09/26 06:45:22 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.56 2002/09/26 08:19:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1599,7 +1599,7 @@ mip6_hexdump("MN: Auth: ", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_ad
 #ifdef RR_DBG
 mip6_hexdump("MN: Auth: ", sizeof(dst->sin6_addr), &dst->sin6_addr);
 #endif
-		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
+		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) );
 #ifdef RR_DBG
 mip6_hexdump("MN: Auth: ", bu_size + nonce_size, ip6mu);
 #endif
