@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/06 09:57:39 $
+		     $Date: 1999/10/06 16:30:35 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -352,8 +352,8 @@ algorithm names.  Our choice is MD5 for AH, new-HMAC-SHA1 for new AH,
 and new-DES-expIV with 8 byte IV for new ESP.
 
 Key length highly depends on each algorithm.  For example, key
-length must be equal to 16 for MD5, 20 for new-HMAC-SHA1, and 8 for
-new-DES-expIV.  Now we choose "MYSECRETMYSECRET",
+length must be equal to 16 bytes for MD5, 20 for new-HMAC-SHA1,
+and 8 for new-DES-expIV.  Now we choose "MYSECRETMYSECRET",
 "KAMEKAMEKAMEKAMEKAME", "PASSWORD", respectively.
 
 OK, let's assign SPI (Security Parameter Index) for each protocol.
@@ -393,22 +393,26 @@ Now, let's setup security association.  Execute "setkey" on both HOST
 A and B:
 
 # setkey -c
-add 10.2.3.4 10.6.7.8 any 1000 -p ah -A keyed-md5 "MYSECRETMYSECRET" ;
-add 10.6.7.8 10.2.3.4 any 2000 -p ah -A hmac-sha1 "KAMEKAMEKAMEKAMEKAME" ;
-add 10.6.7.8 10.2.3.4 any 3000 -p esp -E des-cbc "PASSWORD" ;
+add 10.2.3.4 10.6.7.8 ah  1000 -m transport -A keyed-md5 "MYSECRETMYSECRET" ;
+add 10.6.7.8 10.2.3.4 ah  2000 -m transport -A hmac-sha1 "KAMEKAMEKAMEKAMEKAME" ;
+add 10.6.7.8 10.2.3.4 esp 3000 -m transport -E des-cbc "PASSWORD" ;
 ^D
 
 Actually, IPsec communication doesn't proccess until security policy
 entries will be defined.  In this case, you must setup each host.
 
-A and B:
+At A:
 # setkey -c
-spdadd 10.2.3.4 10.6.7.8 any -P ipsec ah/require ;
-spdadd 10.6.7.8 10.2.3.4 any -P ipsec esp/require ;
-spdadd 10.6.7.8 10.2.3.4 any -P ipsec ah/require ;
+spdadd 10.2.3.4 10.6.7.8 any -P out ipsec
+	ah/transport/10.2.3.4-10.6.7.8/require ;
 ^D
 
-Other examples can be found in src/setkey/sample.cf.
+At B:
+spdadd 10.6.7.8 10.2.3.4 any -P out ipsec
+	esp/transport/10.6.7.8-10.2.3.4/require ;
+spdadd 10.6.7.8 10.2.3.4 any -P out ipsec
+	ah/transport/10.6.7.8-10.2.3.4/require ;
+^D
 
 To utilize the security associations installed into the kernel, you
 must set the socket security level by using setsockopt().
@@ -416,7 +420,18 @@ This is per-application (or per-socket) security.  For example,
 the "ping" command has the -P option with parameter to enable AH and/or ESP.
 
 For example:
-% ping -P "ipsec esp/require ah/use/192.168.0.1" 10.0.0.2
+% ping -P "out ipsec \
+	ah/transport/10.0.1.1-10.0.2.2/use \
+	esp/tunnel/10.0.1.1-10.0.1.2/require" 10.0.2.2
+
+If there are proper SAs, this policy specification causes ICMP packet
+to be AH transport mode inner ESP tunnel mode like below.
+
+	   HOST C -----------> GATEWAY D ----------> HOST E
+	  10.0.1.1        10.0.1.2   10.0.2.1       10.0.2.2
+	    | |                 |                    |
+	    | ======= ESP =======                    |
+	    ==================== AH ==================
 
 <<<NATv4>>>
 
