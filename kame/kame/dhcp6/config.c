@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.1 2002/04/30 14:49:08 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.2 2002/05/01 10:30:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -45,7 +45,7 @@ struct dhcp_if *dhcp_if;
 static struct dhcp_ifconf *dhcp_ifconflist;
 
 static int add_options __P((struct dhcp_ifconf *, struct dhcp_optconf **,
-			    struct cf_dhcpoption *));
+			    u_long *, struct cf_dhcpoption *));
 
 static void clear_ifconf __P((struct dhcp_ifconf *));
 static void clear_options __P((struct dhcp_optconf *));
@@ -124,11 +124,18 @@ configure_interface(iflist)
 			switch(dcl->decl_type) {
 			case DECL_SEND:
 				if (add_options(ifc, &ifc->send_options,
+						&ifc->send_flags,
+						(struct cf_dhcpoption *)dcl->decl_val))
+					goto bad;
+				break;
+			case DECL_ALLOW:
+				if (add_options(ifc, &ifc->allow_options,
+						&ifc->allow_flags,
 						(struct cf_dhcpoption *)dcl->decl_val))
 					goto bad;
 				break;
 			case DECL_INFO_ONLY:
-				ifc->flags |= DHCIFF_INFO_ONLY;
+				ifc->send_flags |= DHCIFF_INFO_ONLY;
 				break;
 			}
 		}
@@ -157,7 +164,8 @@ configure_commit()
 
 	for (ifc = dhcp_ifconflist; ifc; ifc = ifc->next) {
 		if ((ifp = find_ifconf(ifc->ifname)) != NULL) {
-			ifp->flags = ifc->flags;
+			ifp->send_flags = ifc->send_flags;
+			ifp->allow_flags = ifc->allow_flags;
 			clear_options(ifp->send_options);
 			ifp->send_options = ifc->send_options;
 			ifc->send_options = NULL;
@@ -197,9 +205,10 @@ clear_options(opt0)
 }
 
 static int
-add_options(ifc, optp0, cfopt)
+add_options(ifc, optp0, flagp, cfopt)
 	struct dhcp_ifconf *ifc;
 	struct dhcp_optconf **optp0;
+	u_long *flagp;
 	struct cf_dhcpoption *cfopt;
 {
 	struct dhcp_optconf *opt, **optp;
@@ -207,21 +216,19 @@ add_options(ifc, optp0, cfopt)
 
 	optp = optp0;
 	for (cfo = cfopt; cfo; cfo = cfo->dhcpopt_next) {
-		if ((opt = (struct dhcp_optconf *)malloc(sizeof(*opt)))
-		    == NULL) {
-			dprintf(LOG_ERR, "malloc failed");
-			return(-1);
-		}
-		memset(opt, 0, sizeof(*opt));
-		*optp = opt;
-		optp = &opt->next;
-
 		switch(cfo->dhcpopt_type) {
 		case DHCPOPT_RAPID_COMMIT:
-			ifc->flags |= DHCIFF_RAPID_COMMIT;
-			opt->type = DH6OPT_RAPID_COMMIT;
-			opt->len = 0;
+			*flagp |= DHCIFF_RAPID_COMMIT;
 			break;
+		default:
+			if ((opt = (struct dhcp_optconf *)malloc(sizeof(*opt)))
+			    == NULL) {
+				dprintf(LOG_ERR, "malloc failed");
+				return(-1);
+			}
+			memset(opt, 0, sizeof(*opt));
+			*optp = opt;
+			optp = &opt->next;
 		}
 	}
 

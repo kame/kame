@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.3 2002/05/01 04:47:53 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.4 2002/05/01 10:30:35 jinmei Exp $	*/
 
 %{
 /*
@@ -109,6 +109,8 @@ ecl		\}
 
 	/* generic options */
 <S_CNF>information-only { DECHO; return(INFO_ONLY); }
+
+<S_CNF>allow { DECHO; return(ALLOW); }
 
 	/* misc */
 {ws}		{ ; }

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.1 2002/04/30 14:49:08 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.2 2002/05/01 10:30:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -130,6 +130,20 @@ declaration:
 			}
 			memset(d, 0, sizeof(*d));
 			d->decl_type = DECL_INFO_ONLY;
+			$$ = d;
+		}
+	|	ALLOW dhcpoption EOS
+		{
+			struct cf_declaration *d;
+
+			d = (struct cf_declaration *)malloc(sizeof(*d));
+			if (d == NULL) {
+				yywarn("can't allocate memory");
+				return(-1);
+			}
+			memset(d, 0, sizeof(*d));
+			d->decl_type = DECL_ALLOW;
+			d->decl_val = $2;
 			$$ = d;
 		}
 	;

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.2 2002/05/01 06:12:09 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.3 2002/05/01 10:30:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,7 +51,9 @@ struct dhcp_if {
 	u_int32_t linkid;	/* to send link-local packets */
 
 	/* configuration parameters */
-	u_long flags;
+	u_long send_flags;
+	u_long allow_flags;
+
 #define DHCIFF_INFO_ONLY 0x1
 #define DHCIFF_RAPID_COMMIT 0x2
 
@@ -65,9 +67,13 @@ struct dhcp_ifconf {
 	struct dhcp_ifconf *next;
 
 	char *ifname;
-	u_long flags;
+
+	/* configuration flags */
+	u_long send_flags;
+	u_long allow_flags;
 
 	struct dhcp_optconf *send_options;
+	struct dhcp_optconf *allow_options;
 };
 
 /* DHCP option information */
@@ -102,7 +108,7 @@ struct cf_dhcpoption {
 	void *dhcpopt_val;
 };
 
-enum {DECL_SEND, DECL_INFO_ONLY};
+enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY};
 enum {DHCPOPT_RAPID_COMMIT};
 
 extern struct dhcp_ifconf *dhcp_iflist;

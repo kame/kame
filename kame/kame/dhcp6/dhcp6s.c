@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.62 2002/05/01 08:06:44 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.63 2002/05/01 10:30:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -66,6 +66,7 @@
 
 #include <dhcp6.h>
 #include <common.h>
+#include <config.h>
 
 struct dnslist {
 	TAILQ_ENTRY(dnslist) link;
@@ -80,6 +81,7 @@ char *device = NULL;
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 
+static const struct sockaddr_in6 *sa6_any_downstream;
 static struct msghdr rmh;
 static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
@@ -91,13 +93,23 @@ static struct duid server_duid;
 #define GLOBAL_PLEN 3
 
 #define DUID_FILE "/etc/dhcp6s_duid"
+#define DHCP6S_CONF "/usr/local/v6/etc/dhcp6s.conf"
 
 static void usage __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
 static ssize_t server6_recv __P((int, struct sockaddr *, int *));
-static void server6_react __P((size_t, struct sockaddr *, int));
-static int server6_react_informreq __P((char *, size_t, struct sockaddr *, int));
+static void server6_react __P((struct dhcp_if *, size_t,
+			       struct sockaddr *, int));
+static int server6_react_informreq __P((struct dhcp_if *, char *, size_t,
+					struct dhcp6_optinfo *,
+					struct sockaddr *, int));
+static int server6_react_solicit __P((struct dhcp_if *, char *, size_t,
+				      struct dhcp6_optinfo *,
+				      struct sockaddr *, int));
+static int server6_send_reply __P((struct dhcp_if *, struct dhcp6 *,
+				   struct dhcp6_optinfo *,
+				   struct sockaddr *, int));
 
 int
 main(argc, argv)
@@ -160,6 +172,13 @@ main(argc, argv)
 	}
 	setloglevel(debug);
 
+	ifinit(device);
+
+	if ((cfparse(DHCP6S_CONF)) != 0) {
+		dprintf(LOG_ERR, "failed to parse configuration file");
+		exit(1);
+	}
+
 	server6_init();
 
 	server6_mainloop();
@@ -186,14 +205,19 @@ server6_init()
 	int on = 1;
 	struct ipv6_mreq mreq6;
 	static struct iovec iov[2];
+	static struct sockaddr_in6 sa6_any_downstream_storage;
 
 	ifidx = if_nametoindex(device);
-	if (ifidx == 0)
-		errx(1, "invalid interface %s", device);
+	if (ifidx == 0) {
+		dprintf(LOG_ERR, "invalid interface %s", device);
+		exit(1);
+	}
 
 	/* get our DUID */
-	if (get_duid(DUID_FILE, &server_duid))
-		errx(1, "failed to get a DUID");
+	if (get_duid(DUID_FILE, &server_duid)) {
+		dprintf(LOG_ERR, "failed to get a DUID");
+		exit(1);
+	}
 
 	/* initialize send/receive buffer */
 	iov[0].iov_base = (caddr_t)rdatabuf;
@@ -202,8 +226,8 @@ server6_init()
 	rmh.msg_iovlen = 1;
 	rmsgctllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if ((rmsgctlbuf = (char *)malloc(rmsgctllen)) == NULL) {
-		errx(1, "memory allocation failed");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "memory allocation failed");
+		exit(1);
 	}
 
 	/* initialize socket */
@@ -214,35 +238,37 @@ server6_init()
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
 	}
 	insock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (insock < 0) {
-		err(1, "socket(insock)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "socket(insock): %s", strerror(errno));
+		exit(1);
 	}
 	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT,
 		       &on, sizeof(on)) < 0) {
-		err(1, "setsockopt(insock, SO_REUSEPORT)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "setsockopt(insock, SO_REUSEPORT): %s",
+			strerror(errno));
+		exit(1);
 	}
 	if (setsockopt(insock, SOL_SOCKET, SO_REUSEADDR,
 		       &on, sizeof(on)) < 0) {
-		err(1, "setsockopt(insock, SO_REUSEADDR)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "setsockopt(insock, SO_REUSEADDR): %s",
+			strerror(errno));
+		exit(1);
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
-		err(1, "bind(insock)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "bind(insock): %s", strerror(errno));
+		exit(1);
 	}
 	freeaddrinfo(res);
 
 	hints.ai_flags = 0;
 	error = getaddrinfo(DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, &hints, &res2);
 	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
 	mreq6.ipv6mr_interface = ifidx;
@@ -251,15 +277,17 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		err(1, "setsockopt(insock, IPV6_JOIN_GROUP)");
+		dprintf(LOG_ERR, "setsockopt(insock, IPV6_JOIN_GROUP)",
+			strerror(errno));
+		exit(1);
 	}
 	freeaddrinfo(res2);
 
 	hints.ai_flags = 0;
 	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM, &hints, &res2);
 	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
 	mreq6.ipv6mr_interface = ifidx;
@@ -268,32 +296,49 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		err(1, "setsockopt(insock, IPV6_JOIN_GROUP)");
+		dprintf(LOG_ERR, "setsockopt(insock, IPV6_JOIN_GROUP): %s",
+			strerror(errno));
+		exit(1);
 	}
 	freeaddrinfo(res2);
 
 	hints.ai_flags = 0;
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
 	}
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
-		err(1, "socket(outsock)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "socket(outsock): %s", strerror(errno));
+		exit(1);
 	}
 	/* set outgoing interface of multicast packets for DHCP reconfig */
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 	    &ifidx, sizeof(ifidx)) < 0) {
-		err(1, "setsockopt(outsock, IPV6_MULTICAST_IF)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "setsockopt(outsock, IPV6_MULTICAST_IF): %s",
+			strerror(errno));
+		exit(1);
 	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
-		err(1, "shutdown(outbound, 0)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "shutdown(outbound, 0): %s", strerror(errno));
+		exit(1);
 	}
+	freeaddrinfo(res);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
+	if (error) {
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
+	}
+	memcpy(&sa6_any_downstream_storage, res->ai_addr, res->ai_addrlen);
+	sa6_any_downstream =
+		(const struct sockaddr_in6*)&sa6_any_downstream_storage;
 	freeaddrinfo(res);
 }
 
@@ -305,6 +350,12 @@ server6_mainloop()
 	ssize_t l;
 	struct sockaddr_storage from;
 	int fromlen;
+	struct dhcp_if *ifp;	/* XXX: multiple-interface support */
+
+	if ((ifp = find_ifconf(device)) == NULL) {
+		dprintf(LOG_ERR, "interface %s not configured", device);
+		exit(1);
+	}
 
 	while (1) {
 		FD_ZERO(&r);
@@ -322,10 +373,10 @@ server6_mainloop()
 		if (FD_ISSET(insock, &r)) {
 			fromlen = sizeof(from);
 			l = server6_recv(insock, (struct sockaddr *)&from,
-			    &fromlen);
+					 &fromlen);
 			if (l > 0) {
-				server6_react(l, (struct sockaddr *)&from,
-				    fromlen);
+				server6_react(ifp, l, (struct sockaddr *)&from,
+					      fromlen);
 			}
 		}
 	}
@@ -351,23 +402,46 @@ server6_recv(s, from, fromlen)
 }
 
 static void
-server6_react(siz, from, fromlen)
+server6_react(ifp, siz, from, fromlen)
+	struct dhcp_if *ifp;
 	size_t siz;
 	struct sockaddr *from;
 	int fromlen;
 {
 	struct dhcp6 *dh6;
+	struct dhcp6opt *opt, *eopt;
+	struct dhcp6_optinfo optinfo;
 
 	if (siz < sizeof(*dh6)) {
-		dprintf(LOG_INFO, "relay6_react: short packet");
+		dprintf(LOG_INFO, "server6_react: short packet");
 		return;
 	}
 
 	dh6 = (struct dhcp6 *)rdatabuf;
 
+	dprintf(LOG_DEBUG, "server6_react: react to %s",
+		dhcpmsgstr(dh6->dh6_msgtype));
+
+	/*
+	 * parse and validate options in the request
+	 */
+	dhcp6_init_options(&optinfo);
+	opt = (struct dhcp6opt *)(dh6 + 1);
+	eopt = (struct dhcp6opt *)(rdatabuf + siz);
+	if (dhcp6_get_options(opt, eopt, &optinfo) < 0) {
+		dprintf(LOG_INFO,
+			"server6_react: failed to parse options");
+		return;
+	}
+
 	switch (dh6->dh6_msgtype) {
+	case DH6_SOLICIT:
+		(void)server6_react_solicit(ifp, rdatabuf, siz, &optinfo,
+					    from, fromlen);
+		break;
 	case DH6_INFORM_REQ:
-		(void)server6_react_informreq(rdatabuf, siz, from, fromlen);
+		(void)server6_react_informreq(ifp, rdatabuf, siz, &optinfo,
+					      from, fromlen);
 		break;
 	default:
 		dprintf(LOG_INFO, "unknown or unsupported msgtype %s",
@@ -377,83 +451,94 @@ server6_react(siz, from, fromlen)
 }
 
 static int
-server6_react_informreq(buf, siz, from, fromlen)
+server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
+	struct dhcp_if *ifp;
 	char *buf;
 	size_t siz;
+	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
 {
-	struct dhcp6 *dh6r;
-	struct dhcp6 *dh6p;
-	char sbuf[BUFSIZ];
-	ssize_t len;
-	struct sockaddr_in6 dst;
-	struct addrinfo hints, *res;
-	int error, ns, optlen;
-	struct dhcp6opt *opt, *eopt;
-	char *ext, *ep, *p, *dnsbuf = NULL;
-	struct dhcp6_optinfo optinfo, roptinfo;
-	struct dnslist *d;
-
-	dprintf(LOG_DEBUG, "server6_react_informreq");
-
-	if (siz < sizeof(*dh6r)) {
-		dprintf(LOG_INFO, "server6_react_informreq: short packet");
+	/*
+	 * Servers MUST discard any Solicit messages that do not include a
+	 * Client Identifier option. [dhcpv6-24 Section 15.2]
+	 */
+	if (optinfo->clientID.duid_len == 0) {
+		dprintf(LOG_INFO,
+			"server6_react_solicit: no client ID option");
 		return(-1);
 	}
-	dh6r = (struct dhcp6 *)buf;
 
 	/*
-	 * parse and validate options in the request
+	 * If the client has included a Rapid Commit option and the server
+	 * has been configured to respond with committed address assignments
+	 * and other resources, responds to the Solicit with a Reply message.
+	 * [dhcpv6-24 Section 17.2.1]
 	 */
-	dhcp6_init_options(&optinfo);
-	opt = (struct dhcp6opt *)(dh6r + 1);
-	eopt = (struct dhcp6opt *)(buf + siz);
-	if (dhcp6_get_options(opt, eopt, &optinfo) < 0) {
-		dprintf(LOG_INFO,
-			"server6_react_informreq: failed to parse options");
-		return -1;
+	if (optinfo->rapidcommit && (ifp->allow_flags & DHCIFF_RAPID_COMMIT)) {
+		/* notyet: create and record the bindings for the client */
+		return(server6_send_reply(ifp, (struct dhcp6 *)buf, optinfo,
+					  from, fromlen));
+	} else {
+		/* we don't support this case */
+		dprintf(LOG_INFO, "server6_react_solicit: failed to react: "
+			"rapid commit disabled or not requested");
+		return(-1);
 	}
 
+	return(0);
+}
+
+static int
+server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
+	struct dhcp_if *ifp;
+	char *buf;
+	size_t siz;
+	struct dhcp6_optinfo *optinfo;
+	struct sockaddr *from;
+	int fromlen;
+{
 	/* if a server information is included, it must match ours. */
-	if (optinfo.serverID.duid_len &&
-	    (optinfo.serverID.duid_len != server_duid.duid_len ||
-	     memcmp(optinfo.serverID.duid_id, server_duid.duid_id,
+	if (optinfo->serverID.duid_len &&
+	    (optinfo->serverID.duid_len != server_duid.duid_len ||
+	     memcmp(optinfo->serverID.duid_id, server_duid.duid_id,
 		    server_duid.duid_len))) {
 		dprintf(LOG_INFO,
 			"server6_react_informreq: server DUID mismatch");
 		return(-1);
 	}
 
-	/*
-	 * construct a reply message
-	 */
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_protocol = IPPROTO_UDP;
-	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
-	if (error) {
-		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
-		exit(1);
-		/* NOTREACHED */
-	}
-	memcpy(&dst, res->ai_addr, res->ai_addrlen);
-	freeaddrinfo(res);
+	return(server6_send_reply(ifp, (struct dhcp6 *)buf, optinfo,
+				  from, fromlen));
+}
 
-	if (sizeof(struct dhcp6) + sizeof(struct in6_addr) > sizeof(sbuf)) {
+static int
+server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
+	struct dhcp_if *ifp;
+	struct dhcp6 *origmsg;
+	struct dhcp6_optinfo *optinfo;
+	struct sockaddr *from;
+	int fromlen;
+{
+	char replybuf[BUFSIZ];
+	char *dnsbuf = NULL, *p;
+	struct sockaddr_in6 dst;
+	int len, ns, optlen;
+	struct dhcp6 *dh6;
+	struct dhcp6_optinfo roptinfo;
+	struct dnslist *d;
+
+	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
 		dprintf(LOG_ERR, "buffer size assumption failed");
 		exit(1);
 		/* NOTREACHED */
 	}
 
-	dh6p = (struct dhcp6 *)sbuf;
-	ep = sbuf + sizeof(sbuf);
-	len = sizeof(*dh6p);
-	memset(dh6p, 0, sizeof(*dh6p));
-	ext = (char *)(dh6p + 1);
-	dh6p->dh6_msgtypexid = dh6r->dh6_msgtypexid;
-	dh6p->dh6_msgtype = DH6_REPLY;
+	dh6 = (struct dhcp6 *)replybuf;
+	len = sizeof(*dh6);
+	memset(dh6, 0, sizeof(*dh6));
+	dh6->dh6_msgtypexid = origmsg->dh6_msgtypexid;
+	dh6->dh6_msgtype = DH6_REPLY;
 
 	/*
 	 * attach necessary options
@@ -464,14 +549,14 @@ server6_react_informreq(buf, siz, from, fromlen)
 	roptinfo.serverID = server_duid;
 
 	/* copy client information back (if provided) */
-	if (optinfo.clientID.duid_id)
-		roptinfo.clientID = optinfo.clientID;
+	if (optinfo->clientID.duid_id)
+		roptinfo.clientID = optinfo->clientID;
 
 	/* DNS server */
 	for (ns = 0, d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link))
 		ns++;
 	if (ns) {
-		optinfo.dns.n = ns;
+		roptinfo.dns.n = ns;
 		if ((dnsbuf = malloc(sizeof(struct in6_addr) * ns)) == NULL) {
 			dprintf(LOG_WARNING, "server6_react_informreq: "
 				"malloc failed for DNS list");
@@ -485,8 +570,9 @@ server6_react_informreq(buf, siz, from, fromlen)
 	}
 
 	/* set options in the reply message */
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)ext,
-					(struct dhcp6opt *)ep,
+	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+					(struct dhcp6opt *)(replybuf +
+							    sizeof(replybuf)),
 					&roptinfo)) < 0) {
 		dprintf(LOG_INFO, "server6_react_informreq: "
 			"failed to construct reply options");
@@ -497,7 +583,8 @@ server6_react_informreq(buf, siz, from, fromlen)
 	dst.sin6_addr = ((struct sockaddr_in6 *)from)->sin6_addr;
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 
-	if (transmit_sa(outsock, (struct sockaddr *)&dst, 0, sbuf, len) != 0) {
+	if (transmit_sa(outsock, (struct sockaddr *)&dst,
+			0, replybuf, len) != 0) {
 		dprintf(LOG_ERR, "transmit to %s failed",
 			addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */

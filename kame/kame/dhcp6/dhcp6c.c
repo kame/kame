@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.70 2002/05/01 08:09:16 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.71 2002/05/01 10:30:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -292,7 +292,7 @@ client6_mainloop()
 	fd_set r;
 
 	if ((ifp = find_ifconf(device)) == NULL) {
-		dprintf(LOG_ERR, "interface %s not configured", ifp);
+		dprintf(LOG_ERR, "interface %s not configured", device);
 		exit(1);
 	}
 
@@ -343,9 +343,10 @@ client6_mainloop()
 				switch(ifp->state) {
 				case DHCP6S_INIT:
 					ifp->timeouts = 0;
-					if ((ifp->flags & DHCIFF_INFO_ONLY))
+					if ((ifp->send_flags &
+					     DHCIFF_INFO_ONLY)) {
 						ifp->state = DHCP6S_INFOREQ;
-					else
+					} else
 						ifp->state = DHCP6S_SOLICIT;
 					set_timeoparam(ifp);
 					break;
@@ -623,7 +624,7 @@ client6_send(ifp, s)
 
 	/* rapid commit */
 	if (ifp->state == DHCP6S_SOLICIT &&
-	    (ifp->flags & DHCIFF_RAPID_COMMIT)) {
+	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		optinfo.rapidcommit = 1;
 	}
 
@@ -691,7 +692,7 @@ client6_recv(ifp)
 		 */
 		if (ifp->state == DHCP6S_INFOREQ ||
 		    (ifp->state == DHCP6S_SOLICIT &&
-		     (ifp->flags & DHCIFF_RAPID_COMMIT))) {
+		     (ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
 			return(client6_recvreply(ifp, dh6, len));
 		} else {
 			dprintf(LOG_INFO, "client6_recv: unexpected reply");
