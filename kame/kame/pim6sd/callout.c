@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.6 2000/12/04 06:45:28 itojun Exp $	*/
+/*	$KAME: callout.c,v 1.7 2001/11/27 07:28:10 suz Exp $	*/
 
 /*
  * The mrouted program is covered by the license in the accompanying file
@@ -187,6 +187,12 @@ timer_setTimer(delay, action, data)
     node->time = delay;
     node->next = 0;
     node->id = ++id;
+    /*
+     * since id==0 means "unspecified" (see {left,clear}Timer),
+     * it should not be 0 normally
+     */
+    if (node->id == 0)
+	node->id = ++id;
 
     prev = ptr = Q;
 
