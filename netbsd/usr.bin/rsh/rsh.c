@@ -357,21 +357,21 @@ try_connect:
 		if (doencrypt)
 			errx(1, "the -x flag requires Kerberos authentication.");
 #ifdef IN_RCMD
-		rem = orcmd(&host, sp->s_port, locuser ? locuser :
-#else
-		rem = rcmd(&host, sp->s_port,
-#endif
-		    name,
+		rem = orcmd(&host, sp->s_port, locuser ? locuser : name,
 		    user, args, &remerr);
+#else
+		rem = rcmd(&host, sp->s_port, name, user, args, &remerr,
+		    PF_UNSPEC);
+#endif
 	}
 #else /* KERBEROS */
 
 #ifdef IN_RCMD
-	rem = orcmd(&host, sp->s_port, locuser ? locuser :
+	rem = orcmd(&host, sp->s_port, locuser ? locuser : name, user, args,
+	    &remerr);
 #else
-	rem = rcmd(&host, sp->s_port,
+	rem = rcmd_af(&host, sp->s_port, name, user, args, &remerr, PF_UNSPEC);
 #endif
-	    name, user, args, &remerr);
 #endif /* KERBEROS */
 	(void)free(name);
 

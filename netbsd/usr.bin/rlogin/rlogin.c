@@ -402,12 +402,13 @@ try_connect:
 		if (doencrypt)
 			errx(1, "the -x flag requires Kerberos authentication.");
 #endif /* CRYPT */
-		rem = rcmd(&host, sp->s_port, name, user, term, 0);
+		rem = rcmd_af(&host, sp->s_port, name, user, term, 0,
+		    PF_UNSPEC);
 		if (rem < 0)
 			exit(1);
 	}
 #else
-	rem = rcmd(&host, sp->s_port, name, user, term, 0);
+	rem = rcmd_af(&host, sp->s_port, name, user, term, 0, PF_UNSPEC);
 
 #endif /* KERBEROS */
 
