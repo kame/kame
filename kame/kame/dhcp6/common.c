@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.79 2003/03/14 11:06:26 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.80 2003/04/16 09:42:34 itojun Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1767,7 +1767,7 @@ dhcp6optstr(type)
 	case DH6OPT_IA_PD_PREFIX:
 		return ("IA_PD prefix");
 	default:
-		sprintf(genstr, "opt_%d", type);
+		snprintf(genstr, sizeof(genstr), "opt_%d", type);
 		return (genstr);
 	}
 }
