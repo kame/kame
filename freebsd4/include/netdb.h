@@ -63,7 +63,6 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 
 #ifndef _PATH_HEQUIV
 # define	_PATH_HEQUIV	"/etc/hosts.equiv"
@@ -193,6 +192,14 @@ struct addrinfo {
  */
 #define	SCOPE_DELIMITER	'%'
 
+/*
+ * data types - basically forward decl for getnameinfo()
+ */
+#ifndef __SOCKLEN_T_DEFINED
+typedef u_int32_t	socklen_t;
+#define __SOCKLEN_T_DEFINED
+#endif
+ 
 __BEGIN_DECLS
 void		endhostent __P((void));
 void		endnetent __P((void));
