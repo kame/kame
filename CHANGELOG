@@ -1,7 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1943 2001/10/25 09:47:39 jinmei Exp $
+$KAME: CHANGELOG,v 1.1944 2001/10/25 09:51:16 jinmei Exp $
 
 <200110>
+2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_gif.c (in6_gif_output):
+	* kame/sys/netinet/in_gif.c (in_gif_output):
+	Checked if the cached route (per gif) is up before using it.
+	This should be verified for all type of cached routes, but we've
+	forgotten the check.  With this change, FreeBSD and BSD/OS will be
+	able to catch a more specific route for the destination as soon as
+	possible.
+
+	(OpenBSD IPv6 only)merged recent changes into the openbsd specific
+	code path.
+
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.h: removed the ndpr_addr member from the
 	nd_prefix structure, which was effectively not used anywhere.  The
