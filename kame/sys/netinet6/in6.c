@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.158 2001/02/03 15:30:53 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.159 2001/02/03 16:23:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2565,7 +2565,7 @@ in6_ifawithscope(oifp, dst)
 				    == 0 &&
 				    (ifat->ia6_flags & IN6_IFF_TEMPORARY)
 				    != 0 &&
-				    ifat->ia6_lifetime.ia6t_pltime > 0)
+				    ifat->ia6_lifetime.ia6t_pltime > 0)	/* XXX wrong */
 					goto replace;
 			}
 

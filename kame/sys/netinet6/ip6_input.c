@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.155 2001/02/03 15:30:53 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.156 2001/02/03 16:23:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2595,12 +2595,12 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip6_use_tempaddr);
 	case IPV6CTL_TEMPPLTIME:
-		old = ip6_temp_preferred_lifetime;
+		u_old = ip6_temp_preferred_lifetime;
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 				   &ip6_temp_preferred_lifetime);
 		if (ip6_temp_preferred_lifetime <
 		    ip6_desync_factor + ip6_anon_regen_advance) {
-			ip6_temp_preferred_lifetime = old;
+			ip6_temp_preferred_lifetime = u_old;
 			return(EINVAL);
 		}
 		return(error);
@@ -2632,18 +2632,37 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void	*newp;
 	size_t	newlen;
 {
+	int error = 0;
+
 	if (name[0] >= IPV6CTL_MAXID)
 		return (EOPNOTSUPP);
 
 	switch (name[0]) {
 	case IPV6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &ip6stat,
-		    sizeof(ip6stat));
+				      sizeof(ip6stat));
 	case IPV6CTL_KAME_VERSION:
 		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
+	case IPV6CTL_TEMPPLTIME:
+		error = sysctl_int_arr(ip6_sysvars, name, namelen,
+				       oldp, oldlenp, newp, newlen);
+		if (ip6_temp_preferred_lifetime <
+		    ip6_desync_factor + ip6_anon_regen_advance) {
+			ip6_temp_preferred_lifetime = *(int *)oldp;
+			return(EINVAL);
+		}
+		return(error);
+	case IPV6CTL_TEMPVLTIME:
+		error = sysctl_int_arr(ip6_sysvars, name, namelen,
+				       oldp, oldlenp, newp, newlen);
+		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
+			ip6_temp_valid_lifetime = *(int *)oldp;
+			return(EINVAL);
+		}
+		return(error);
 	default:
 		return (sysctl_int_arr(ip6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
+				       oldp, oldlenp, newp, newlen));
 	}
 }
 #endif /* __bsdi__ */

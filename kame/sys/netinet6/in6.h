@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.72 2001/02/03 15:30:53 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.73 2001/02/03 16:23:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -783,6 +783,9 @@ struct ip6_mtuinfo {
 	__IPV6CTL_VARS_ANONPORTMAX, \
 	__IPV6CTL_VARS_LOWPORTMIN, \
 	__IPV6CTL_VARS_LOWPORTMAX, \
+	&ip6_use_tempaddr, \
+	&ip6_temp_preferred_lifetime, \
+	&ip6_temp_valid_lifetime, \
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
