@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1488 2001/01/20 16:06:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.1489 2001/01/20 16:32:28 jinmei Exp $
 
 <200101>
+2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/bin/ping/ping.c: corrected the output format when the
+	command is build without "INET6" being defined.
+
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/udp_usrreq.c (udp_input):
 	* bsdi4/sys/netinet/tcp_input.c (tcp_input):
