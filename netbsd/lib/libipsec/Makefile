@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/libipsec
 
 LIB=	ipsec
-CFLAGS+=-g
+CFLAGS+=-g -Wall -Werror
 CPPFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6 -I. -DYY_NO_UNPUT
 
 .PATH:	${SRCDIR}
