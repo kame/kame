@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1763 2001/07/09 14:00:29 sakane Exp $
+$KAME: CHANGELOG,v 1.1764 2001/07/10 06:34:37 itojun Exp $
 
 <200107>
+Tue Jul 10 15:34:09 JST 2001  itojun@iijlab.net
+	* netbsd: switch to NetBSD-1.5.1 from NetBSD-1.5.
+
 Mon Jul  9 23:01:10 JST 2001 sakane@kame.net
 	* kame/racoon:
 	- print all of rejected attributes in phase 1 proposal when no suitable
