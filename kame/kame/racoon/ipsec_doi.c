@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.62 2000/04/24 20:57:12 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.63 2000/05/11 07:53:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -346,7 +346,7 @@ t2isakmpsa(trns, sa)
 	struct isakmpsa *sa;
 {
 	struct isakmp_data *d, *prev;
-	int flag, type, lorv;
+	int flag, type;
 	int error = -1;
 	int life_t;
 	int keylen = 0;
@@ -370,13 +370,12 @@ t2isakmpsa(trns, sa)
 
 		type = ntohs(d->type) & ~ISAKMP_GEN_MASK;
 		flag = ntohs(d->type) & ISAKMP_GEN_MASK;
-		lorv = d->lorv;
 
 		YIPSDEBUG(DEBUG_DSA,
 			plog(logp, LOCATION, NULL,
 				"type=%s, flag=0x%04x, lorv=%s\n",
 				s_oakley_attr(type), flag,
-				s_oakley_attr_v(type, ntohs(lorv))));
+				s_oakley_attr_v(type, ntohs(d->lorv))));
 
 		/* get variable-sized item */
 		switch (type) {
@@ -389,9 +388,9 @@ t2isakmpsa(trns, sa)
 		case OAKLEY_ATTR_GRP_ORDER:
 			if (flag) {	/*TV*/
 				len = 2;
-				p = (u_char *)&lorv;
+				p = (u_char *)&d->lorv;
 			} else {	/*TLV*/
-				len = ntohs(lorv);
+				len = ntohs(d->lorv);
 				p = (u_char *)(d + 1);
 			}
 			val = vmalloc(len);
@@ -406,24 +405,24 @@ t2isakmpsa(trns, sa)
 
 		switch (type) {
 		case OAKLEY_ATTR_ENC_ALG:
-			sa->enctype = (u_int8_t)ntohs(lorv);
+			sa->enctype = (u_int8_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_HASH_ALG:
-			sa->hashtype = (u_int8_t)ntohs(lorv);
+			sa->hashtype = (u_int8_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_AUTH_METHOD:
-			sa->authmethod = (u_int8_t)ntohs(lorv);
+			sa->authmethod = (u_int8_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_GRP_DESC:
-			sa->dh_group = (u_int8_t)ntohs(lorv);
+			sa->dh_group = (u_int8_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_GRP_TYPE:
 		{
-			int type = (int)ntohs(lorv);
+			int type = (int)ntohs(d->lorv);
 			if (type == OAKLEY_ATTR_GRP_TYPE_MODP)
 				sa->dhgrp->type = type;
 			else
@@ -437,9 +436,9 @@ t2isakmpsa(trns, sa)
 		case OAKLEY_ATTR_GRP_GEN_ONE:
 			vfree(val);
 			if (!flag)
-				sa->dhgrp->gen1 = ntohs(lorv);
+				sa->dhgrp->gen1 = ntohs(d->lorv);
 			else {
-				int len = ntohs(lorv);
+				int len = ntohs(d->lorv);
 				sa->dhgrp->gen1 = 0;
 				if (len > 4)
 					return -1;
@@ -451,9 +450,9 @@ t2isakmpsa(trns, sa)
 		case OAKLEY_ATTR_GRP_GEN_TWO:
 			vfree(val);
 			if (!flag)
-				sa->dhgrp->gen2 = ntohs(lorv);
+				sa->dhgrp->gen2 = ntohs(d->lorv);
 			else {
-				int len = ntohs(lorv);
+				int len = ntohs(d->lorv);
 				sa->dhgrp->gen2 = 0;
 				if (len > 4)
 					return -1;
@@ -472,7 +471,7 @@ t2isakmpsa(trns, sa)
 
 		case OAKLEY_ATTR_SA_LD_TYPE:
 		{
-			int type = (int)ntohs(lorv);
+			int type = (int)ntohs(d->lorv);
 			switch (type) {
 			case OAKLEY_ATTR_SA_LD_TYPE_SEC:
 			case OAKLEY_ATTR_SA_LD_TYPE_KB:
@@ -519,7 +518,7 @@ t2isakmpsa(trns, sa)
 
 		case OAKLEY_ATTR_KEY_LEN:
 		{
-			int len = ntohs(lorv);
+			int len = ntohs(d->lorv);
 			if (len % 8 != 0) {
 				plog(logp, LOCATION, NULL,
 					"keylen %d: not multiple of 8\n",
@@ -548,8 +547,8 @@ t2isakmpsa(trns, sa)
 			tlen -= sizeof(*d);
 			d = (struct isakmp_data *)((char *)d + sizeof(*d));
 		} else {
-			tlen -= (sizeof(*d) + ntohs(lorv));
-			d = (struct isakmp_data *)((char *)d + sizeof(*d) + ntohs(lorv));
+			tlen -= (sizeof(*d) + ntohs(d->lorv));
+			d = (struct isakmp_data *)((char *)d + sizeof(*d) + ntohs(d->lorv));
 		}
 	}
 
@@ -1398,7 +1397,8 @@ check_attr_isakmp(trns)
 {
 	struct isakmp_data *d;
 	int tlen;
-	int flag, type, lorv;
+	int flag, type;
+	u_int16_t lorv;
 
 	tlen = ntohs(trns->h.len) - sizeof(struct isakmp_pl_t);
 	d = (struct isakmp_data *)((caddr_t)trns + sizeof(struct isakmp_pl_t));
@@ -1620,7 +1620,8 @@ check_attr_ipsec(proto_id, trns)
 {
 	struct isakmp_data *d;
 	int tlen;
-	int flag, type = 0, lorv;
+	int flag, type = 0;
+	u_int16_t lorv;
 	int attrseen[16];	/* XXX magic number */
 
 	tlen = ntohs(trns->h.len) - sizeof(struct isakmp_pl_t);
@@ -1812,7 +1813,8 @@ check_attr_ipcomp(trns)
 {
 	struct isakmp_data *d;
 	int tlen;
-	int flag, type = 0, lorv;
+	int flag, type = 0;
+	u_int16_t lorv;
 	int attrseen[16];	/* XXX magic number */
 
 	tlen = ntohs(trns->h.len) - sizeof(struct isakmp_pl_t);
@@ -2913,7 +2915,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 	struct satrns *tr;
 {
 	struct isakmp_data *d, *prev;
-	int flag, type, lorv;
+	int flag, type;
 	int error = -1;
 	int life_t;
 	vchar_t *ld_buf = NULL;
@@ -2933,18 +2935,17 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 
 		type = ntohs(d->type) & ~ISAKMP_GEN_MASK;
 		flag = ntohs(d->type) & ISAKMP_GEN_MASK;
-		lorv = d->lorv;
 
 		YIPSDEBUG(DEBUG_DSA,
 			plog(logp, LOCATION, NULL,
 				"type=%s, flag=0x%04x, lorv=%s\n",
 				s_ipsecdoi_attr(type), flag,
-				s_ipsecdoi_attr_v(type, ntohs(lorv))));
+				s_ipsecdoi_attr_v(type, ntohs(d->lorv))));
 
 		switch (type) {
 		case IPSECDOI_ATTR_SA_LD_TYPE:
 		{
-			int type = ntohs(lorv);
+			int type = ntohs(d->lorv);
 			switch (type) {
 			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
@@ -2978,9 +2979,9 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 					    "vmalloc (%s)\n", strerror(errno));
 					goto end;
 				}
-				memcpy(ld_buf->v, &lorv, sizeof(d->lorv));
+				memcpy(ld_buf->v, &d->lorv, sizeof(d->lorv));
 			} else {
-				int len = ntohs(lorv);
+				int len = ntohs(d->lorv);
 				/* i.e. ISAKMP_GEN_TLV */
 				ld_buf = vmalloc(len);
 				if (ld_buf == NULL) {
@@ -3033,8 +3034,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			 *   Appendix A of [IKE].
 			 */
 			if (pp->pfs_group == 0)
-				pp->pfs_group = (u_int8_t)ntohs(lorv);
-			else if (pp->pfs_group != (u_int8_t)ntohs(lorv)) {
+				pp->pfs_group = (u_int8_t)ntohs(d->lorv);
+			else if (pp->pfs_group != (u_int8_t)ntohs(d->lorv)) {
 				plog(logp, LOCATION, NULL,
 					"pfs_group mismatched "
 					"in a proposal.\n");
@@ -3044,13 +3045,13 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 
 		case IPSECDOI_ATTR_ENC_MODE:
 			if (pr->encmode != 0
-			 && pr->encmode != (u_int8_t)ntohs(lorv)) {
+			 && pr->encmode != (u_int8_t)ntohs(d->lorv)) {
 				plog(logp, LOCATION, NULL,
 					"multiple encmode exist "
 					"in a transform.\n");
 				goto end;
 			}
-			pr->encmode = (u_int8_t)ntohs(lorv);
+			pr->encmode = (u_int8_t)ntohs(d->lorv);
 			break;
 
 		case IPSECDOI_ATTR_AUTH:
@@ -3060,7 +3061,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 					"in a transform.\n");
 				goto end;
 			}
-			tr->authtype = (u_int8_t)ntohs(lorv);
+			tr->authtype = (u_int8_t)ntohs(d->lorv);
 			break;
 
 		case IPSECDOI_ATTR_KEY_LENGTH:
@@ -3069,7 +3070,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 					"key length defined but not ESP");
 				goto end;
 			}
-			tr->encklen = ntohs(lorv);
+			tr->encklen = ntohs(d->lorv);
 			break;
 
 		case IPSECDOI_ATTR_KEY_ROUNDS:
@@ -3084,8 +3085,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			tlen -= sizeof(*d);
 			d = (struct isakmp_data *)((char *)d + sizeof(*d));
 		} else {
-			tlen -= (sizeof(*d) + ntohs(lorv));
-			d = (struct isakmp_data *)((caddr_t)d + sizeof(*d) + ntohs(lorv));
+			tlen -= (sizeof(*d) + ntohs(d->lorv));
+			d = (struct isakmp_data *)((caddr_t)d + sizeof(*d) + ntohs(d->lorv));
 		}
 	}
 
