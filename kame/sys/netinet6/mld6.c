@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.100 2004/05/25 02:11:36 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.101 2004/06/14 06:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -869,6 +869,16 @@ in6_addmulti(maddr6, ifp, errorp)
 	*errorp = 0;
 
 	/*
+	 * if we have the group already, use it
+	 */
+	IN6_LOOKUP_MULTI(*maddr6, ifp, in6m);
+	if (in6m) {
+		in6m->in6m_refcount++;
+		splx(s);
+		return (NULL);
+	}
+
+	/*
 	 * Call generic routine to add membership or increment
 	 * refcount.  It wants addresses in the form of a sockaddr,
 	 * so we build one here (being careful to zero the unused bytes).
@@ -880,7 +890,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	*errorp = if_addmulti(ifp, (struct sockaddr *)&sa6, &ifma);
 	if (*errorp) {
 		splx(s);
-		return 0;
+		return (NULL);
 	}
 
 	/*
