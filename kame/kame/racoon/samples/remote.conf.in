@@ -1,4 +1,4 @@
-# $Id: remote.conf.in,v 1.1 2000/01/09 01:31:39 itojun Exp $
+# $Id: remote.conf.in,v 1.2 2000/01/13 19:55:59 sakane Exp $
 
 # IKE SA configuration
 
@@ -180,7 +180,7 @@ remote 172.16.1.133
 
 	# default lifetime inlayed each proposals.
 	lifetime time 20 sec;	# sec,min,hour
-	lifetime byte 100 B;	# B,KB,GB
+	lifetime byte 1500 B;	# B,KB,GB
 
 	proposal {
 		# they can be defined explicitly.

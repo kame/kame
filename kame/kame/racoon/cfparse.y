@@ -499,8 +499,15 @@ ipsecproposal_spec
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->lifetime = $3 * $4;
-			else
+			else {
 				prhead->lifebyte = $3 * $4;
+				if (prhead->lifebyte < 1024) {
+					yyerror("byte size should be more "
+						"than 1024B.");
+					return -1;
+				}
+				prhead->lifebyte /= 1024;
+			}
 		}
 	|	PROTOCOL secproto
 		{
@@ -718,8 +725,15 @@ remote_spec
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->lifetime = $3 * $4;
-			else
+			else {
 				prhead->lifebyte = $3 * $4;
+				if (prhead->lifebyte < 1024) {
+					yyerror("byte size should be more "
+						"than 1024B.");
+					return -1;
+				}
+				prhead->lifebyte /= 1024;
+			}
 		}
 	|	PROPOSAL
 		{
@@ -766,8 +780,15 @@ isakmpproposal_spec
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->spspec->lifetime = $3 * $4;
-			else
+			else {
 				prhead->spspec->lifebyte = $3 * $4;
+				if (prhead->spspec->lifebyte < 1024) {
+					yyerror("byte size should be "
+						"more than 1024B.");
+					return -1;
+				}
+				prhead->spspec->lifebyte /= 1024;
+			}
 		}
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
