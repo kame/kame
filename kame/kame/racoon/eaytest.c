@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.1 1999/08/08 23:31:20 itojun Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.2 1999/08/12 05:42:05 itojun Exp $ */
 
 #include <sys/types.h>
 
@@ -83,6 +83,7 @@ ciphertest()
 	vfree(res1);
 	vfree(res2);
 
+#ifdef HAVE_IDEA_H
 	/* idea */
 	printf("IDEA\n");
 	printf("data:\n");
@@ -100,6 +101,7 @@ ciphertest()
 
 	vfree(res1);
 	vfree(res2);
+#endif
 
 	/* blowfish */
 	printf("BLOWFISH\n");

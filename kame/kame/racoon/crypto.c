@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto.c,v 1.1 1999/08/08 23:31:20 itojun Exp $ */
+/* YIPS $Id: crypto.c,v 1.2 1999/08/12 05:42:05 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -45,7 +45,9 @@
 #include <md5.h>
 #include <sha.h>
 #include <des.h>
+#ifdef HAVE_IDEA_H
 #include <idea.h>
+#endif
 #include <blowfish.h>
 #include <rc5.h>
 #include <cast.h>
@@ -104,6 +106,7 @@ eay_des_weakkey(key)
 	return des_is_weak_key((C_Block *)key->v);
 }
 
+#ifdef HAVE_IDEA_H
 /*
  * IDEA-CBC
  */
@@ -156,6 +159,7 @@ eay_idea_weakkey(key)
 {
 	return 0;	/* XXX */
 }
+#endif
 
 /*
  * BLOWFISH-CBC
