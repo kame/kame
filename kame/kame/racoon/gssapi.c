@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.9 2001/01/29 17:37:52 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.10 2001/01/29 17:41:20 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -69,8 +69,6 @@
 
 #include "gssapi.h"
 
-static int gssapi_get_default_name(struct ph1handle *, int, gss_name_t *);
-
 static void
 gssapi_error(OM_uint32 status_code, const char *where,
 	     const char *fmt, ...)
@@ -94,6 +92,31 @@ gssapi_error(OM_uint32 status_code, const char *where,
 				"%s\n", status_string.value);
 		gss_release_buffer(&min_stat, &status_string);
 	} while (message_context != 0);
+}
+
+static int
+gssapi_get_default_name(struct ph1handle *iph1, int remote, gss_name_t *service)
+{
+	char name[NI_MAXHOST];
+	struct sockaddr *sa;
+	gss_buffer_desc name_token;
+	OM_uint32 min_stat, maj_stat;
+
+	sa = remote ? iph1->remote : iph1->local;
+
+	if (getnameinfo(sa, sa->sa_len, name, NI_MAXHOST, NULL, 0, 0) != 0)
+		return -1;
+
+	name_token.length = asprintf((char **)&name_token.value,
+	    "%s@%s", GSSAPI_DEF_NAME, name);  
+	maj_stat = gss_import_name(&min_stat, &name_token,
+	    GSS_C_NT_HOSTBASED_SERVICE, service);
+	if (GSS_ERROR(maj_stat)) {
+		gssapi_error(maj_stat, LOCATION, "import name\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 static int
@@ -560,31 +583,6 @@ gssapi_free_state(struct ph1handle *iph1)
 	if (gps->gss_cred != GSS_C_NO_CREDENTIAL)
 		gss_release_cred(&min_stat, &gps->gss_cred);
 	free(gps);
-}
-
-static int
-gssapi_get_default_name(struct ph1handle *iph1, int remote, gss_name_t *service)
-{
-	char name[NI_MAXHOST];
-	struct sockaddr *sa;
-	gss_buffer_desc name_token;
-	OM_uint32 min_stat, maj_stat;
-
-	sa = remote ? iph1->remote : iph1->local;
-
-	if (getnameinfo(sa, sa->sa_len, name, NI_MAXHOST, NULL, 0, 0) != 0)
-		return -1;
-
-	name_token.length = asprintf((char **)&name_token.value,
-	    "%s@%s", GSSAPI_DEF_NAME, name);  
-	maj_stat = gss_import_name(&min_stat, &name_token,
-	    GSS_C_NT_HOSTBASED_SERVICE, service);
-	if (GSS_ERROR(maj_stat)) {
-		gssapi_error(maj_stat, LOCATION, "import name\n");
-		return -1;
-	}
-
-	return 0;
 }
 
 vchar_t *
