@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.13 2000/06/18 21:39:21 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.14 2000/06/19 00:02:12 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -388,7 +388,11 @@ res_send(buf, buflen, ans, anssiz)
 	for (try = 0; try < _res.retry; try++) {
 	    for (ns = 0; ns < _res.nscount; ns++) {
 		struct sockaddr *nsap = get_nsaddr(ns);
+#ifdef HAVE_SOCKLEN_T
+		socklen_t salen;
+#else
 		int salen;
+#endif
 
 		if (nsap->sa_len)
 			salen = nsap->sa_len;
