@@ -89,12 +89,13 @@ ip6_forward(m, srcrt)
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		if (ip6_log_time + ip6_log_interval < time.tv_sec) {
+		if (ip6_log_time + ip6_log_interval < time.tv_sec)
 			ip6_log_time = time.tv_sec;
 #else
-		if (ip6_log_time + ip6_log_interval < time_second) {
+		if (ip6_log_time + ip6_log_interval < time_second)
 			ip6_log_time = time_second;
 #endif
+		{
 			log(LOG_DEBUG,
 			    "cannot forward "
 			    "from %s to %s nxt %d received on %s\n",
