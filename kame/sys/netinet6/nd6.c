@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.318 2003/06/19 03:35:06 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.319 2003/06/19 03:56:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,7 +543,7 @@ nd6_llinfo_timer(arg)
 			ln->ln_asked++;
 			ln->ln_expire = time_second +
 			    ND6_RETRANS_SEC(ndi->retrans);
-			nd6_llinfo_settimer(ln, ndi->retrans * hz);
+			nd6_llinfo_settimer(ln, ndi->retrans / 1000 * hz);
 			nd6_ns_output(ifp, NULL, dst, ln, 0);
 		} else {
 			struct mbuf *m = ln->ln_hold;
@@ -588,7 +588,7 @@ nd6_llinfo_timer(arg)
 			ln->ln_state = ND6_LLINFO_PROBE;
 			ln->ln_expire = time_second +
 			    ND6_RETRANS_SEC(ndi->retrans);
-			nd6_llinfo_settimer(ln, ndi->retrans * hz);
+			nd6_llinfo_settimer(ln, ndi->retrans / 1000 * hz);
 			nd6_ns_output(ifp, dst, dst, ln, 0);
 		} else {
 			ln->ln_state = ND6_LLINFO_STALE; /* XXX */
@@ -601,7 +601,7 @@ nd6_llinfo_timer(arg)
 			ln->ln_asked++;
 			ln->ln_expire = time_second +
 			    ND6_RETRANS_SEC(ndi->retrans);
-			nd6_llinfo_settimer(ln, ndi->retrans * hz);
+			nd6_llinfo_settimer(ln, ndi->retrans / 1000 * hz);
 			nd6_ns_output(ifp, dst, dst, ln, 0);
 		} else {
 			(void)nd6_free(rt, 0);
@@ -2328,7 +2328,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		ln->ln_asked++;
 		ln->ln_expire = time_second +
 		    ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
-		nd6_llinfo_settimer(ln, ND_IFINFO(ifp)->retrans * hz);
+		nd6_llinfo_settimer(ln, ND_IFINFO(ifp)->retrans / 1000 * hz);
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return (0);
