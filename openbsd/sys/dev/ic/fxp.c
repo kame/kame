@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxp.c,v 1.28 2001/09/20 17:02:31 mpech Exp $	*/
+/*	$OpenBSD: fxp.c,v 1.33 2002/03/15 22:15:09 art Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -82,7 +82,7 @@
 
 #include <netinet/if_ether.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -107,8 +107,8 @@
 /*
  * Inline function to copy a 16-bit aligned 32-bit quantity.
  */
-static __inline void fxp_lwcopy __P((volatile u_int32_t *,
-	volatile u_int32_t *));
+static __inline void fxp_lwcopy(volatile u_int32_t *,
+	volatile u_int32_t *);
 static __inline void
 fxp_lwcopy(src, dst)
 	volatile u_int32_t *src, *dst;
@@ -152,24 +152,24 @@ static u_char fxp_cb_config_template[] = {
 	0x5	/* 21 */
 };
 
-int fxp_mediachange		__P((struct ifnet *));
-void fxp_mediastatus		__P((struct ifnet *, struct ifmediareq *));
-void fxp_scb_wait	__P((struct fxp_softc *));
-void fxp_start			__P((struct ifnet *));
-int fxp_ioctl			__P((struct ifnet *, u_long, caddr_t));
-void fxp_init			__P((void *));
-void fxp_stop			__P((struct fxp_softc *, int));
-void fxp_watchdog		__P((struct ifnet *));
-int fxp_add_rfabuf		__P((struct fxp_softc *, struct mbuf *));
-int fxp_mdi_read		__P((struct device *, int, int));
-void fxp_mdi_write		__P((struct device *, int, int, int));
-void fxp_autosize_eeprom	__P((struct fxp_softc *));
-void fxp_statchg		__P((struct device *));
-void fxp_read_eeprom		__P((struct fxp_softc *, u_int16_t *,
-				    int, int));
-void fxp_stats_update		__P((void *));
-void fxp_mc_setup		__P((struct fxp_softc *, int));
-void fxp_scb_cmd		__P((struct fxp_softc *, u_int8_t));
+int fxp_mediachange(struct ifnet *);
+void fxp_mediastatus(struct ifnet *, struct ifmediareq *);
+void fxp_scb_wait(struct fxp_softc *);
+void fxp_start(struct ifnet *);
+int fxp_ioctl(struct ifnet *, u_long, caddr_t);
+void fxp_init(void *);
+void fxp_stop(struct fxp_softc *, int);
+void fxp_watchdog(struct ifnet *);
+int fxp_add_rfabuf(struct fxp_softc *, struct mbuf *);
+int fxp_mdi_read(struct device *, int, int);
+void fxp_mdi_write(struct device *, int, int, int);
+void fxp_autosize_eeprom(struct fxp_softc *);
+void fxp_statchg(struct device *);
+void fxp_read_eeprom(struct fxp_softc *, u_int16_t *,
+				    int, int);
+void fxp_stats_update(void *);
+void fxp_mc_setup(struct fxp_softc *, int);
+void fxp_scb_cmd(struct fxp_softc *, u_int8_t);
 
 /*
  * Set initial transmit threshold at 64 (512 bytes). This is
@@ -220,8 +220,8 @@ fxp_scb_wait(sc)
  * Operating system-specific autoconfiguration glue
  *************************************************************/
 
-void	fxp_shutdown __P((void *));
-void	fxp_power __P((int, void *));
+void	fxp_shutdown(void *);
+void	fxp_power(int, void *);
 
 struct cfdriver fxp_cd = {
 	NULL, "fxp", DV_IFNET
@@ -812,7 +812,7 @@ rcvloop:
 			m = sc->rfa_headm;
 			rfap = m->m_ext.ext_buf + RFA_ALIGNMENT_FUDGE;
 			rxmap = *((bus_dmamap_t *)m->m_ext.ext_buf);
-			fxp_bus_dmamap_sync(sc->sc_dmat, rxmap,
+			bus_dmamap_sync(sc->sc_dmat, rxmap,
 			    0, MCLBYTES, BUS_DMASYNC_POSTREAD |
 			    BUS_DMASYNC_POSTWRITE);
 
@@ -928,6 +928,7 @@ fxp_stats_update(arg)
 	if (sc->rx_idle_secs > FXP_MAX_RX_IDLE) {
 		sc->rx_idle_secs = 0;
 		fxp_init(sc);
+		splx(s);
 		return;
 	}
 	/*
@@ -1223,8 +1224,9 @@ fxp_init(xsc)
 	sc->sc_cbt_cnt = 1;
 	sc->sc_ctrl->tx_cb[0].cb_command = FXP_CB_COMMAND_NOP |
 	    FXP_CB_COMMAND_S | FXP_CB_COMMAND_I;
-	fxp_bus_dmamap_sync(sc->sc_dmat, sc->tx_cb_map, 0,
-	    sc->tx_cb_map->dm_mapsize, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->sc_dmat, sc->tx_cb_map, 0,
+	    sc->tx_cb_map->dm_mapsize,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	fxp_scb_wait(sc);
 	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, sc->tx_cb_map->dm_segs->ds_addr +
@@ -1383,7 +1385,7 @@ fxp_add_rfabuf(sc, oldm)
 
 	sc->rfa_tailm = m;
 
-	fxp_bus_dmamap_sync(sc->sc_dmat, rxmap, 0, MCLBYTES,
+	bus_dmamap_sync(sc->sc_dmat, rxmap, 0, MCLBYTES,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	return (m == oldm);
@@ -1547,7 +1549,7 @@ fxp_ioctl(ifp, command, data)
 	default:
 		error = EINVAL;
 	}
-	(void) splx(s);
+	splx(s);
 	return (error);
 }
 

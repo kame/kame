@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.22 2001/07/27 02:17:54 itojun Exp $	*/
+/*	$OpenBSD: in.c,v 1.25 2002/04/01 02:44:08 itojun Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -86,13 +86,13 @@
 
 #ifdef INET
 
-static int in_mask2len __P((struct in_addr *));
-static void in_len2mask __P((struct in_addr *, int));
-static int in_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
-	struct ifnet *));
+static int in_mask2len(struct in_addr *);
+static void in_len2mask(struct in_addr *, int);
+static int in_lifaddr_ioctl(struct socket *, u_long, caddr_t,
+	struct ifnet *);
 
-static int in_addprefix __P((struct in_ifaddr *, int));
-static int in_scrubprefix __P((struct in_ifaddr *));
+static int in_addprefix(struct in_ifaddr *, int);
+static int in_scrubprefix(struct in_ifaddr *);
 
 #ifndef SUBNETSARELOCAL
 #define	SUBNETSARELOCAL	0

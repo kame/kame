@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.20 2001/09/26 03:39:59 deraadt Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.25 2001/11/30 19:48:09 provos Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -54,9 +54,10 @@
  */
 
 /* strings for sleep message: */
-char	netio[] = "netio";
 char	netcon[] = "netcon";
 char	netcls[] = "netcls";
+char	netio[] = "netio";
+char	netlck[] = "netlck";
 
 u_long	sb_max = SB_MAX;		/* patchable */
 
@@ -110,7 +111,7 @@ soisconnected(so)
 	if (head && soqremque(so, 0)) {
 		soqinsque(head, so, 1);
 		sorwakeup(head);
-		wakeup((caddr_t)&head->so_timeo);
+		wakeup_one((caddr_t)&head->so_timeo);
 	} else {
 		wakeup((caddr_t)&so->so_timeo);
 		sorwakeup(so);
@@ -149,6 +150,8 @@ soisdisconnected(so)
  * then we allocate a new structure, properly linked into the
  * data structure of the original socket, and return this.
  * Connstatus may be 0, or SS_ISCONFIRMING, or SS_ISCONNECTED.
+ *
+ * Must be called at splsoftnet()
  */
 struct socket *
 sonewconn(head, connstatus)
@@ -160,7 +163,7 @@ sonewconn(head, connstatus)
 
 	if (head->so_qlen + head->so_q0len > head->so_qlimit * 3)
 		return ((struct socket *)0);
-	MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_DONTWAIT);
+	so = pool_get(&socket_pool, PR_NOWAIT);
 	if (so == NULL)
 		return ((struct socket *)0);
 	bzero((caddr_t)so, sizeof(*so));
@@ -180,7 +183,7 @@ sonewconn(head, connstatus)
 	if ((*so->so_proto->pr_usrreq)(so, PRU_ATTACH,
 	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0)) {
 		(void) soqremque(so, soqueue);
-		(void) free((caddr_t)so, M_SOCKET);
+		pool_put(&socket_pool, so);
 		return ((struct socket *)0);
 	}
 	if (connstatus) {
@@ -192,53 +195,43 @@ sonewconn(head, connstatus)
 }
 
 void
-soqinsque(head, so, q)
-	register struct socket *head, *so;
-	int q;
+soqinsque(struct socket *head, struct socket *so, int q)
 {
 
-	register struct socket **prev;
+#ifdef DIAGNOSTIC
+	if (so->so_onq != NULL)
+		panic("soqinsque");
+#endif
+
 	so->so_head = head;
 	if (q == 0) {
 		head->so_q0len++;
-		so->so_q0 = 0;
-		for (prev = &(head->so_q0); *prev; )
-			prev = &((*prev)->so_q0);
+		so->so_onq = &head->so_q0;
 	} else {
 		head->so_qlen++;
-		so->so_q = 0;
-		for (prev = &(head->so_q); *prev; )
-			prev = &((*prev)->so_q);
+		so->so_onq = &head->so_q;
 	}
-	*prev = so;
+	TAILQ_INSERT_TAIL(so->so_onq, so, so_qe);
 }
 
 int
-soqremque(so, q)
-	register struct socket *so;
-	int q;
+soqremque(struct socket *so, int q)
 {
-	register struct socket *head, *prev, *next;
+	struct socket *head;
 
 	head = so->so_head;
-	prev = head;
-	for (;;) {
-		next = q ? prev->so_q : prev->so_q0;
-		if (next == so)
-			break;
-		if (next == 0)
-			return (0);
-		prev = next;
-	}
 	if (q == 0) {
-		prev->so_q0 = next->so_q0;
+		if (so->so_onq != &head->so_q0)
+			return (0);
 		head->so_q0len--;
 	} else {
-		prev->so_q = next->so_q;
+		if (so->so_onq != &head->so_q)
+			return (0);
 		head->so_qlen--;
 	}
-	next->so_q0 = next->so_q = 0;
-	next->so_head = 0;
+	TAILQ_REMOVE(so->so_onq, so, so_qe);
+	so->so_onq = NULL;
+	so->so_head = NULL;
 	return (1);
 }
 
@@ -298,7 +291,7 @@ sb_lock(sb)
 		sb->sb_flags |= SB_WANT;
 		error = tsleep((caddr_t)&sb->sb_flags,
 		    (sb->sb_flags & SB_NOINTR) ?
-		    PSOCK : PSOCK|PCATCH, netio, 0);
+		    PSOCK : PSOCK|PCATCH, netlck, 0);
 		if (error)
 			return (error);
 	}
@@ -657,12 +650,10 @@ sbappendcontrol(sb, m0, control)
  * is null, the buffer is presumed empty.
  */
 void
-sbcompress(sb, m, n)
-	register struct sockbuf *sb;
-	register struct mbuf *m, *n;
+sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n)
 {
-	register int eor = 0;
-	register struct mbuf *o;
+	int eor = 0;
+	struct mbuf *o;
 
 	while (m) {
 		eor |= m->m_flags & M_EOR;
@@ -673,8 +664,10 @@ sbcompress(sb, m, n)
 			m = m_free(m);
 			continue;
 		}
-		if (n && (n->m_flags & (M_EXT | M_EOR)) == 0 &&
-		    (n->m_data + n->m_len + m->m_len) < &n->m_dat[MLEN] &&
+		if (n && (n->m_flags & M_EOR) == 0 &&
+		    /* M_TRAILINGSPACE() checks buffer writeability */
+		    m->m_len <= MCLBYTES / 4 && /* XXX Don't copy too much */
+		    m->m_len <= M_TRAILINGSPACE(n) &&
 		    n->m_type == m->m_type) {
 			bcopy(mtod(m, caddr_t), mtod(n, caddr_t) + n->m_len,
 			    (unsigned)m->m_len);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.49 2001/06/29 22:46:05 fgsch Exp $	*/
+/*	$OpenBSD: if.c,v 1.51 2002/03/14 01:27:09 millert Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -107,23 +107,23 @@
 #include <net/if_bridge.h>
 #endif
 
-void	if_attachsetup __P((struct ifnet *));
-int	if_detach_rtdelete __P((struct radix_node *, void *));
-int	if_mark_ignore __P((struct radix_node *, void *));
-int	if_mark_unignore __P((struct radix_node *, void *));
+void	if_attachsetup(struct ifnet *);
+int	if_detach_rtdelete(struct radix_node *, void *);
+int	if_mark_ignore(struct radix_node *, void *);
+int	if_mark_unignore(struct radix_node *, void *);
 
 int	ifqmaxlen = IFQ_MAXLEN;
 
-void	if_detached_start __P((struct ifnet *));
-int	if_detached_ioctl __P((struct ifnet *, u_long, caddr_t));
-void	if_detached_watchdog __P((struct ifnet *));
+void	if_detached_start(struct ifnet *);
+int	if_detached_ioctl(struct ifnet *, u_long, caddr_t);
+void	if_detached_watchdog(struct ifnet *);
 
 #ifdef INET6
 /*
  * XXX: declare here to avoid to include many inet6 related files..
  * should be more generalized?
  */
-extern void nd6_setmtu __P((struct ifnet *));
+extern void nd6_setmtu(struct ifnet *);
 #endif 
 
 /*
@@ -409,8 +409,8 @@ ifa_ifwithaddr(addr)
 
 #define	equal(a1, a2) \
   (bcmp((caddr_t)(a1), (caddr_t)(a2), ((struct sockaddr *)(a1))->sa_len) == 0)
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
-	    for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
+	    TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 		if (ifa->ifa_addr->sa_family != addr->sa_family)
 			continue;
 		if (equal(addr, ifa->ifa_addr))
@@ -420,6 +420,7 @@ ifa_ifwithaddr(addr)
 		    ifa->ifa_broadaddr->sa_len != 0 &&
 		    equal(ifa->ifa_broadaddr, addr))
 			return (ifa);
+	    }
 	}
 	return (NULL);
 }
@@ -434,14 +435,15 @@ ifa_ifwithdstaddr(addr)
 	register struct ifnet *ifp;
 	register struct ifaddr *ifa;
 
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 	    if (ifp->if_flags & IFF_POINTOPOINT)
-		for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
+	        TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family != addr->sa_family ||
 			    ifa->ifa_dstaddr == NULL)
 				continue;
 			if (equal(addr, ifa->ifa_dstaddr))
 				return (ifa);
+		}
 	}
 	return (NULL);
 }
@@ -465,8 +467,8 @@ ifa_ifwithnet(addr)
 	    if (sdl->sdl_index && sdl->sdl_index <= if_index)
 		return (ifnet_addrs[sdl->sdl_index]);
 	}
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
-		for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
+		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 			register char *cp, *cp2, *cp3;
 
 			if (ifa->ifa_addr->sa_family != af ||
@@ -486,6 +488,7 @@ ifa_ifwithnet(addr)
 			    (caddr_t)ifa_maybe->ifa_netmask))
 				ifa_maybe = ifa;
 		}
+	}
 	return (ifa_maybe);
 }
 
@@ -499,10 +502,12 @@ ifa_ifwithaf(af)
 	register struct ifnet *ifp;
 	register struct ifaddr *ifa;
 
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
-		for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next)
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
+		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family == af)
 				return (ifa);
+		}
+	}
 	return (NULL);
 }
 
@@ -523,7 +528,7 @@ ifaof_ifpforaddr(addr, ifp)
 
 	if (af >= AF_MAX)
 		return (NULL);
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 		if (ifa->ifa_addr->sa_family != af)
 			continue;
 		ifa_maybe = ifa;
@@ -588,8 +593,9 @@ if_down(ifp)
 
 	ifp->if_flags &= ~IFF_UP;
 	microtime(&ifp->if_lastchange);
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next)
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 		pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
+	}
 	IFQ_PURGE(&ifp->if_snd);
 	rt_ifmsg(ifp);
 
@@ -623,9 +629,9 @@ if_up(ifp)
 	microtime(&ifp->if_lastchange);
 #ifdef notyet
 	/* this has no effect on IP, and will kill all ISO connections XXX */
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-	    ifa = ifa->ifa_list.tqe_next)
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 		pfctlinput(PRC_IFUP, ifa->ifa_addr);
+	}
 #endif
 	rt_ifmsg(ifp);
 #ifdef INET6
@@ -675,7 +681,7 @@ if_slowtimo(arg)
 	struct ifnet *ifp;
 	int s = splimp();
 
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next) {
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		if (ifp->if_timer == 0 || --ifp->if_timer)
 			continue;
 		if (ifp->if_watchdog)
@@ -695,10 +701,10 @@ ifunit(name)
 {
 	register struct ifnet *ifp;
 
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		if (strcmp(ifp->if_xname, name) == 0)
 			return (ifp);
-
+	}
 	return (NULL);
 }
 
@@ -908,13 +914,13 @@ ifconf(cmd, data)
 
 	/* If ifc->ifc_len is 0, fill it in with the needed size and return. */
 	if (space == 0) {
-		for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next) {
+		TAILQ_FOREACH(ifp, &ifnet, if_list) {
 			register struct sockaddr *sa;
 
-			if ((ifa = ifp->if_addrlist.tqh_first) == 0)
+			if (TAILQ_EMPTY(&ifp->if_addrlist))
 				space += sizeof (ifr);
 			else 
-				for (; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
+				TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 					sa = ifa->ifa_addr;
 #if defined(COMPAT_43) || defined(COMPAT_LINUX) || defined(COMPAT_SVR4)
 					if (cmd != OSIOCGIFCONF)
@@ -930,10 +936,10 @@ ifconf(cmd, data)
 	}
 
 	ifrp = ifc->ifc_req;
-	for (ifp = ifnet.tqh_first; space >= sizeof (ifr) && ifp != 0;
-	    ifp = ifp->if_list.tqe_next) {
+	for (ifp = TAILQ_FIRST(&ifnet); space >= sizeof(ifr) &&
+	    ifp != TAILQ_END(&ifnet); ifp = TAILQ_NEXT(ifp, if_list)) {
 		bcopy(ifp->if_xname, ifr.ifr_name, IFNAMSIZ);
-		if ((ifa = ifp->if_addrlist.tqh_first) == 0) {
+		if (TAILQ_EMPTY(&ifp->if_addrlist)) {
 			bzero((caddr_t)&ifr.ifr_addr, sizeof(ifr.ifr_addr));
 			error = copyout((caddr_t)&ifr, (caddr_t)ifrp,
 			    sizeof(ifr));
@@ -941,8 +947,10 @@ ifconf(cmd, data)
 				break;
 			space -= sizeof (ifr), ifrp++;
 		} else 
-			for (; space >= sizeof (ifr) && ifa != 0;
-			    ifa = ifa->ifa_list.tqe_next) {
+			for (ifa = TAILQ_FIRST(&ifp->if_addrlist);
+			    space >= sizeof (ifr) &&
+			    ifa != TAILQ_END(&ifp->if_addrlist);
+			    ifa = TAILQ_NEXT(ifa, ifa_list)) {
 				register struct sockaddr *sa = ifa->ifa_addr;
 #if defined(COMPAT_43) || defined(COMPAT_LINUX) || defined(COMPAT_SVR4)
 				if (cmd == OSIOCGIFCONF) {

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.279 2001/10/08 19:30:40 deraadt Exp $
+#	$OpenBSD: GENERIC,v 1.294 2002/04/08 01:52:34 frantzen Exp $
 #	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
 #
 #	GENERIC -- everything that's currently supported
@@ -12,7 +12,7 @@ option		I386_CPU	# CPU classes; at least one is REQUIRED
 option		I486_CPU
 option		I586_CPU
 option		I686_CPU
-option		GPL_MATH_EMULATE	# floating point emulation. required.
+option		GPL_MATH_EMULATE	# floating point emulation.
 
 option		USER_PCICONF	# user-space PCI configuration
 
@@ -55,7 +55,7 @@ pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
 pci*	at pchb? bus ?
-pcib*	at pci? dev ? function ?	# PCI-ISA bridges (do nothing)
+pcib*	at pci? dev ? function ?	# PCI-ISA bridge
 
 # ISA PCMCIA controllers
 #option PCMCIAVERBOSE
@@ -186,10 +186,12 @@ mms1	at isa? port 0x238 irq 5
 wsmouse*	at lms? mux 0
 wsmouse*	at mms? mux 0
 
-bt0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-bt1	at isa? disable port 0x334 irq ? drq ? # BusLogic [57]4X SCSI controllers
-bt2	at isa? disable port ? irq ?
-scsibus* at bt?
+bha0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
+bha1	at isa? disable port 0x334 irq ? drq ? # BusLogic [57]4X SCSI controllers
+bha2	at isa? disable port ? irq ?
+bha*	at pci? dev ? function ?
+#bha*	at eisa? slot ?			# XXX eisa still runs in isa-compat
+scsibus* at bha?
 aha0	at isa? port 0x330 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 aha1	at isa? port 0x334 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 aha*	at isapnp?
@@ -235,6 +237,8 @@ pcscp*	at pci? dev ? function ?	# AMD 53c974 PCscsi-PCI SCSI
 scsibus* at pcscp?
 sea0	at isa? disable iomem 0xc8000 irq 5	# Seagate ST0[12] SCSI controllers
 scsibus* at sea?
+trm*	at pci? dev ? function ?	# Tekram DC-3x5U SCSI Controllers
+scsibus* at trm?
 uha0	at isa? port 0x330 irq ? drq ?	# UltraStor [13]4f SCSI controllers
 uha1	at isa? disable port 0x334 irq ? drq ? # UltraStor [13]4f SCSI controllers
 uha*	at eisa? slot ?			# UltraStor 24f SCSI controllers
@@ -332,10 +336,11 @@ dc*	at cardbus? dev ? function ?		# 21143, "tulip" clone ethernet
 ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
 skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
-wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
+gx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 txp*	at pci? dev ? function ?		# 3com 3CR990
 nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
+stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 
 # Wireless network cards
@@ -378,12 +383,15 @@ sv*	at pci? dev ? function ?		# S3 SonicVibes (S3 617)
 neo*	at pci? dev ? function ?		# NeoMagic 256AV/ZX
 cmpci*	at pci? dev ? function ?		# C-Media CMI8338/8738
 auich*	at pci? dev ? function ?		# i82801 ICH AC'97 audio
+autri*	at pci? dev ? function ?		# Trident 4D WAVE
+auvia*	at pci? dev ? function ?		# VIA VT82C686A
 clcs*	at pci? dev ? function ?		# CS4280 CrystalClear audio
 clct*	at pci? dev ? function ?		# CS4281 CrystalClear audio
 fms*	at pci? dev ? function ?		# Forte Media FM801
-auvia*	at pci? dev ? function ?		# VIA VT82C686A
 maestro* at pci? dev ? function ?		# ESS Maestro PCI
+esa*	at pci? dev ? function ?		# ESS Maestro3 PCI
 yds*	at pci? dev ? function ?		# Yamaha YMF Audio
+emu*	at pci? dev ? function ?		# SB Live!
 sb0	at isa? port 0x220 irq 5 drq 1		# SoundBlaster
 sb*	at isapnp?
 ess*	at isapnp?				# ESS Tech ES188[78], ES888
@@ -408,6 +416,7 @@ midi*	at sb?			# SB MPU401 port
 midi*	at opl?			# OPL FM synth
 midi*	at ym?
 midi*	at mpu?
+midi*	at autri?
 
 # The spkr driver provides a simple tone interface to the built in speaker.
 #spkr0	at pcppi?		# PC speaker
@@ -428,23 +437,33 @@ audio*	at cmpci?
 audio*	at clcs?
 audio*	at clct?
 audio*	at auich?
-audio*	at fms?
+audio*	at autri?
 audio*	at auvia?
+audio*	at fms?
 audio*	at uaudio?
 audio*	at maestro?
+audio*	at esa?
 audio*	at yds?
-
-# FM-Radio devices
-#sf4r0	at pci?			# SoundForte RadioLink SF64-PCR FM Radio Card
-#sf2r0	at isa? port 0x384      # SoundForte RadioLink SF16-FMR2 FM Radio Card
-#az0	at isa? port 0x350      # Aztech/PackardBell FM Radio Card
-
-# FM-Radio support
-#radio*  at sf4r0
-#radio*  at sf2r0
-#radio*  at az0
+audio*	at emu?
 
 bktr0	at pci? dev ? function ?
+
+# FM-Radio devices
+#mr*	at pci? dev ? function ? # Guillemot Maxi Radio FM2000 PCI Radio Card
+#sf4r*	at pci? dev ? function ? # SoundForte RadioLink SF64-PCR FM Radio Card
+#sf2r0	at isa? port 0x384      # SoundForte RadioLink SF16-FMR2 FM Radio Card
+#az0	at isa? port 0x350      # Aztech/PackardBell FM Radio Card
+#rt0	at isa? port 0x30c	# AIMS Lab Radiotrack FM Radio Card
+#rtii0	at isa? port 0x30c	# AIMS Lab Radiotrack II FM Radio Card
+
+# FM-Radio support
+#radio*	at mr?
+#radio*	at sf4r?
+#radio*	at bktr?
+#radio*	at sf2r0
+#radio*	at az0
+#radio*	at rt0
+#radio*	at rtii0
 
 # Joystick driver. Probe is a little strange; add only if you have one.
 #joy0	at isa? port 0x201

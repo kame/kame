@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.273 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.274 2002/05/20 09:27:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2162,7 +2162,9 @@ u_char	inet6ctlerrmap[PRC_NCMDS] = {
 };
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __NetBSD__
 #include <vm/vm.h>
+#endif
 #include <sys/sysctl.h>
 
 int

@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_atm.h,v 1.10 2001/06/09 06:16:37 angelos Exp $       */
+/*      $OpenBSD: if_atm.h,v 1.11 2002/03/14 01:27:09 millert Exp $       */
 
 /*
  *
@@ -143,7 +143,6 @@ int	atm_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 		struct rtentry *));
 
 #ifdef ATM_PVCEXT
-#ifdef _KERNEL
 #include <sys/queue.h>
 /*
  * ATM PVC subinterface: a trick to assign a subinterface
@@ -163,10 +162,14 @@ struct pvcsif {
 	struct ifnet *sif_fwdifp;	/* bridging ifp */
 	LIST_ENTRY(pvcsif) sif_links;
 };
-struct ifnet *pvcsif_alloc __P((void));
-int pvc_set_fwd __P((char *, char *, int));
-#endif
+struct ifnet *pvcsif_alloc(void);
+int pvc_set_fwd(char *, char *, int);
 #endif /* ATM_PVCEXT */
 
+void	atm_ifattach(struct ifnet *);
+void	atm_input(struct ifnet *, struct atm_pseudohdr *,
+		struct mbuf *, void *);
+int	atm_output(struct ifnet *, struct mbuf *, struct sockaddr *, 
+		struct rtentry *);
 #endif /* _KERNEL */
 #endif /* _NET_IF_ATM_H_ */

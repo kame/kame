@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_spppsubr.c,v 1.10 2001/07/10 11:09:07 espie Exp $	*/
+/*	$OpenBSD: if_spppsubr.c,v 1.14 2002/03/12 09:51:20 kjc Exp $	*/
 /*
  * Synchronous PPP/Cisco link level subroutines.
  * Keepalive protocol implemented in both Cisco and PPP modes.
@@ -703,10 +703,10 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 
 		if (! IF_QFULL (&sp->pp_fastq) &&
 		    ((ip->ip_tos & IPTOS_LOWDELAY) ||
-	    	    ((ip->ip_p == IPPROTO_TCP &&
-	    	    m->m_len >= sizeof (struct ip) + sizeof (struct tcphdr) &&
-	    	    (INTERACTIVE (ntohs (tcp->th_sport)))) ||
-	    	    INTERACTIVE (ntohs (tcp->th_dport)))))
+	    	     (ip->ip_p == IPPROTO_TCP &&
+	    	      m->m_len >= sizeof (struct ip) + sizeof (struct tcphdr) &&
+	    	      (INTERACTIVE (ntohs (tcp->th_sport)) ||
+	    	       INTERACTIVE (ntohs (tcp->th_dport))))))
 			ifq = &sp->pp_fastq;
 	}
 #endif
@@ -3902,16 +3902,17 @@ sppp_get_ip_addrs(struct sppp *sp, u_long *src, u_long *dst, u_long *srcmask)
 	     ifa;
 	     ifa = ifa->ifa_link.tqe_next)
 #else
-	for (ifa = ifp->if_addrlist.tqh_first, si = 0;
-	     ifa;
-	     ifa = ifa->ifa_list.tqe_next)
+	si = 0;
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #endif
+	{
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			si = (struct sockaddr_in *)ifa->ifa_addr;
 			sm = (struct sockaddr_in *)ifa->ifa_netmask;
 			if (si)
 				break;
 		}
+	}
 	if (ifa) {
 		if (si && si->sin_addr.s_addr) {
 			ssrc = si->sin_addr.s_addr;
@@ -3948,9 +3949,8 @@ sppp_set_ip_addr(struct sppp *sp, u_long src)
 	     ifa;
 	     ifa = ifa->ifa_link.tqe_next)
 #else
-	for (ifa = ifp->if_addrlist.tqh_first, si = 0;
-	     ifa;
-	     ifa = ifa->ifa_list.tqe_next)
+	si = 0;
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #endif
 	{
 		if (ifa->ifa_addr->sa_family == AF_INET)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.17 2001/09/20 17:02:31 mpech Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.21 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -74,7 +74,7 @@
 #include <sys/domain.h>
 #include <sys/protosw.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -98,10 +98,10 @@ struct walkarg {
 };
 
 static struct mbuf *
-		rt_msg1 __P((int, struct rt_addrinfo *));
-static int	rt_msg2 __P((int,
-		    struct rt_addrinfo *, caddr_t, struct walkarg *));
-static void	rt_xaddrs __P((caddr_t, caddr_t, struct rt_addrinfo *));
+		rt_msg1(int, struct rt_addrinfo *);
+static int	rt_msg2(int,
+		    struct rt_addrinfo *, caddr_t, struct walkarg *);
+static void	rt_xaddrs(caddr_t, caddr_t, struct rt_addrinfo *);
 
 /* Sleazy use of local variables throughout file, warning!!!! */
 #define dst	info.rti_info[RTAX_DST]
@@ -181,13 +181,7 @@ route_usrreq(so, req, m, nam, control)
 
 /*ARGSUSED*/
 int
-#if __STDC__
 route_output(struct mbuf *m, ...)
-#else
-route_output(m, va_alist)
-	struct mbuf *m;
-	va_dcl
-#endif
 {
 	register struct rt_msghdr *rtm = 0;
 	register struct radix_node *rn = 0;
@@ -298,7 +292,8 @@ route_output(m, va_alist)
 			genmask = rt->rt_genmask;
 			if (rtm->rtm_addrs & (RTA_IFP | RTA_IFA)) {
 				if ((ifp = rt->rt_ifp) != NULL) {
-					ifpaddr = ifp->if_addrlist.tqh_first->ifa_addr;
+					ifpaddr =
+					    TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
 					ifaaddr = rt->rt_ifa->ifa_addr;
 					if (ifp->if_flags & IFF_POINTOPOINT)
 						brdaddr = rt->rt_ifa->ifa_dstaddr;
@@ -746,7 +741,7 @@ rt_newaddrmsg(cmd, ifa, error, rt)
 			int ncmd = cmd == RTM_ADD ? RTM_NEWADDR : RTM_DELADDR;
 
 			ifaaddr = sa = ifa->ifa_addr;
-			ifpaddr = ifp->if_addrlist.tqh_first->ifa_addr;
+			ifpaddr = TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
 			netmask = ifa->ifa_netmask;
 			brdaddr = ifa->ifa_dstaddr;
 			if ((m = rt_msg1(ncmd, &info)) == NULL)
@@ -800,7 +795,7 @@ sysctl_dumpentry(rn, v)
 	netmask = rt_mask(rt);
 	genmask = rt->rt_genmask;
 	if (rt->rt_ifp) {
-		ifpaddr = rt->rt_ifp->if_addrlist.tqh_first->ifa_addr;
+		ifpaddr = TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
 		ifaaddr = rt->rt_ifa->ifa_addr;
 		if (rt->rt_ifp->if_flags & IFF_POINTOPOINT)
 			brdaddr = rt->rt_ifa->ifa_dstaddr;
@@ -834,10 +829,10 @@ sysctl_iflist(af, w)
 	int	len, error = 0;
 
 	bzero((caddr_t)&info, sizeof(info));
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next) {
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		if (w->w_arg && w->w_arg != ifp->if_index)
 			continue;
-		ifa = ifp->if_addrlist.tqh_first;
+		ifa = TAILQ_FIRST(&ifp->if_addrlist);
 		ifpaddr = ifa->ifa_addr;
 		len = rt_msg2(RTM_IFINFO, &info, (caddr_t)0, w);
 		ifpaddr = 0;
@@ -854,7 +849,8 @@ sysctl_iflist(af, w)
 				return (error);
 			w->w_where += len;
 		}
-		while ((ifa = ifa->ifa_list.tqe_next) != NULL) {
+		while ((ifa = TAILQ_NEXT(ifa, ifa_list)) !=
+		    TAILQ_END(&ifp->if_addrlist)) {
 			if (af && af != ifa->ifa_addr->sa_family)
 				continue;
 			ifaaddr = ifa->ifa_addr;

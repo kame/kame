@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.12 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.13 2002/05/20 09:27:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -47,7 +47,6 @@
 #include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/syslog.h>
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 #include <sys/queue.h>
 

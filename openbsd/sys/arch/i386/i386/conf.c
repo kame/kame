@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.81 2001/10/04 21:46:03 gluk Exp $	*/
+/*	$OpenBSD: conf.c,v 1.88 2002/03/14 01:26:32 millert Exp $	*/
 /*	$NetBSD: conf.c,v 1.75 1996/05/03 19:40:20 christos Exp $	*/
 
 /*
@@ -63,8 +63,6 @@ bdev_decl(scd);
 #include "ccd.h"
 #include "raid.h"
 #include "rd.h"
-bdev_decl(rd);
-cdev_decl(rd);
 
 struct bdevsw	bdevsw[] =
 {
@@ -99,12 +97,6 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
 /* open, close, write, ioctl */
 #define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
-
-/* open, close, write, ioctl */
-#define	cdev_spkr_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
 	0, seltrue, (dev_type_mmap((*))) enodev }
@@ -162,7 +154,6 @@ cdev_decl(pc);
 #include "lpt.h"
 cdev_decl(lpt);
 #include "ch.h"
-dev_decl(filedesc,open);
 #include "bpfilter.h"
 #if 0
 #include "pcmcia.h"
@@ -183,12 +174,9 @@ cdev_decl(cy);
 cdev_decl(mcd);
 #include "tun.h"
 #include "audio.h"
-cdev_decl(audio);
 #include "midi.h"
-cdev_decl(midi);
 #include "sequencer.h"
 cdev_decl(music);
-cdev_decl(svr4_net);
 #include "joy.h"
 #include "apm.h"
 #include "pctr.h"
@@ -216,10 +204,11 @@ cdev_decl(ulpt);
 cdev_decl(urio);
 #include "ucom.h"
 cdev_decl(ucom);
+#include "uscanner.h"
+cdev_decl(uscanner);
 #include "cz.h"
 cdev_decl(cztty);
 #include "radio.h"
-cdev_decl(radio);
 
 /* XXX -- this needs to be supported by config(8)! */
 #if (NCOM > 0) && (NPCCOM > 0)
@@ -230,7 +219,6 @@ cdev_decl(radio);
 #include "wskbd.h"
 #include "wsmouse.h"
 #include "wsmux.h"
-cdev_decl(wsmux);
 
 #ifdef USER_PCICONF
 #include "pci.h"
@@ -348,6 +336,7 @@ struct cdevsw	cdevsw[] =
 	cdev_altq_init(NALTQ,altq),	/* 74: ALTQ control interface */
 	cdev_iop_init(NIOP,iop),	/* 75: I2O IOP control interface */
 	cdev_radio_init(NRADIO, radio), /* 76: generic radio I/O */
+	cdev_ugen_init(NUSCANNER,uscanner),	/* 77: USB scanners */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -443,6 +432,13 @@ static int chrtoblktbl[] = {
 	/* 45 */	NODEV,
 	/* 46 */	NODEV,
 	/* 47 */	17,
+	/* 48 */	NODEV,
+	/* 49 */	NODEV,
+	/* 50 */	NODEV,
+	/* 51 */	NODEV,
+	/* 52 */	NODEV,
+	/* 53 */	NODEV,
+	/* 54 */	19,
 };
 
 /*
@@ -489,33 +485,27 @@ blktochr(dev)
  * disk driver name -> bdev major number table, which follows.
  * Note: floppies are not included as those are differentiated by the BIOS.
  */
-static struct {
-	char *name;
-	int maj;
-} disk_maj[] = {
-	{ "wd", 0 },
-	{ "sd", 4 },
-#if 0
-	/* XXX It's not clear at all that recognizing these will help us */
-	{ "cd", 6 },
-	{ "mcd", 7 },		/* XXX I wonder if any BIOSes support this */
-	{ "scd", 15 }		/* 	-	   "		-	   */
-#endif
-};
-
-dev_t dev_rawpart __P((struct device *));	/* XXX */
+int findblkmajor(struct device *dv);
+dev_t dev_rawpart(struct device *);	/* XXX */
 
 dev_t
 dev_rawpart(dv)
 	struct device *dv;
 {
-	int i;
+	int majdev;
 
-	for (i = 0; i < sizeof disk_maj / sizeof disk_maj[0]; i++)
-		if (strcmp(dv->dv_cfdata->cf_driver->cd_name,
-		    disk_maj[i].name) == 0)
-			return (MAKEDISKDEV(disk_maj[i].maj, dv->dv_unit,
-			    RAW_PART));
+	majdev = findblkmajor(dv);
+
+	switch (majdev) {
+	/* add here any device you want to be checksummed on boot */
+	case 0:		/* wd */
+	case 4:		/* sd */
+		return (MAKEDISKDEV(majdev, dv->dv_unit, RAW_PART));
+		break;
+	default:
+		;
+	}
+
 	return (NODEV);
 }
 

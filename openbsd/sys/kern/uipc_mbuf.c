@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_mbuf.c,v 1.41 2001/09/12 00:23:33 art Exp $	*/
+/*	$OpenBSD: uipc_mbuf.c,v 1.57 2002/03/14 01:27:05 millert Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.15.4.1 1996/06/13 17:11:44 cgd Exp $	*/
 
 /*
@@ -37,22 +37,49 @@
  */
 
 /*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
+ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
 #define MBTYPES
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
@@ -63,22 +90,23 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 struct	pool mbpool;		/* mbuf pool */
 struct	pool mclpool;		/* mbuf cluster pool */
 
-extern	vm_map_t mb_map;
-int	needqueuedrain;
+struct vm_map *mb_map;
 
-void	*mclpool_alloc __P((unsigned long, int, int));
-void	mclpool_release __P((void *, unsigned long, int));
-struct mbuf *m_copym0 __P((struct mbuf *, int, int, int, int));
+void	*mclpool_alloc(struct pool *, int);
+void	mclpool_release(struct pool *, void *);
+struct mbuf *m_copym0(struct mbuf *, int, int, int, int);
 
 const char *mclpool_warnmsg =
     "WARNING: mclpool limit reached; increase NMBCLUSTERS";
+
+struct pool_allocator mclpool_allocator = {
+	mclpool_alloc, mclpool_release, 0,
+};
 
 /*
  * Initialize the mbuf allcator.
@@ -86,16 +114,23 @@ const char *mclpool_warnmsg =
 void
 mbinit()
 {
-	pool_init(&mbpool, MSIZE, 0, 0, 0, "mbpl", 0, NULL, NULL, 0);
-	pool_init(&mclpool, MCLBYTES, 0, 0, 0, "mclpl", 0, mclpool_alloc,
-	    mclpool_release, 0);
+	vaddr_t minaddr, maxaddr;
+
+	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    nmbclust*(MCLBYTES), VM_MAP_INTRSAFE, FALSE, NULL);
+
+	pool_init(&mbpool, MSIZE, 0, 0, 0, "mbpl", NULL);
+	pool_init(&mclpool, MCLBYTES, 0, 0, 0, "mclpl", &mclpool_allocator);
+
+	pool_set_drain_hook(&mbpool, m_reclaim, NULL);
+	pool_set_drain_hook(&mclpool, m_reclaim, NULL);
 
 	/*
 	 * Set the hard limit on the mclpool to the number of
 	 * mbuf clusters the kernel is to support.  Log the limit
 	 * reached message max once a minute.
 	 */
-	pool_sethardlimit(&mclpool, nmbclusters, mclpool_warnmsg, 60);
+	(void)pool_sethardlimit(&mclpool, nmbclust, mclpool_warnmsg, 60);
 
 	/*
 	 * Set a low water mark for both mbufs and clusters.  This should
@@ -109,10 +144,7 @@ mbinit()
 
 
 void *
-mclpool_alloc(sz, flags, mtype)
-	unsigned long sz;
-	int flags;
-	int mtype;
+mclpool_alloc(struct pool *pp, int flags)
 {
 	boolean_t waitok = (flags & PR_WAITOK) ? TRUE : FALSE;
 
@@ -121,73 +153,18 @@ mclpool_alloc(sz, flags, mtype)
 }
 
 void
-mclpool_release(v, sz, mtype)
-	void *v;
-	unsigned long sz;
-	int mtype;
+mclpool_release(struct pool *pp, void *v)
 {
 	uvm_km_free_poolpage1(mb_map, (vaddr_t)v);
 }
 
-/*
- * When MGET failes, ask protocols to free space when short of memory,
- * then re-attempt to allocate an mbuf.
- */
-struct mbuf *
-m_retry(i, t)
-	int i, t;
-{
-	register struct mbuf *m;
-
-	if (i & M_DONTWAIT) {
-		needqueuedrain = 1;
-		setsoftnet();
-		return (NULL);
-	}
-	m_reclaim();
-#define m_retry(i, t)	NULL
-	MGET(m, i, t);
-#undef m_retry
-	if (m != NULL)
-		mbstat.m_wait++;
-	else
-		mbstat.m_drops++;
-	return (m);
-}
-
-/*
- * As above; retry an MGETHDR.
- */
-struct mbuf *
-m_retryhdr(i, t)
-	int i, t;
-{
-	register struct mbuf *m;
-
-	if (i & M_DONTWAIT) {
-		needqueuedrain = 1;
-		setsoftnet();
-		return (NULL);
-	}
-	m_reclaim();
-#define m_retryhdr(i, t) NULL
-	MGETHDR(m, i, t);
-#undef m_retryhdr
-	if (m != NULL)
-		mbstat.m_wait++;
-	else
-		mbstat.m_drops++;
-	return (m);
-}
-
 void
-m_reclaim()
+m_reclaim(void *arg, int flags)
 {
 	register struct domain *dp;
 	register struct protosw *pr;
 	int s = splimp();
 
-	needqueuedrain = 0;
 	for (dp = domains; dp; dp = dp->dom_next)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_drain)
@@ -852,7 +829,7 @@ m_devget(buf, totlen, off0, ifp, copy)
 	char *buf;
 	int totlen, off0;
 	struct ifnet *ifp;
-	void (*copy) __P((const void *, void *, size_t));
+	void (*copy)(const void *, void *, size_t);
 {
 	register struct mbuf *m;
 	struct mbuf *top = NULL, **mp = &top;
@@ -924,15 +901,18 @@ m_zero(m)
 	struct mbuf *m;
 {
 	while (m) {
-		if (m->m_flags & M_PKTHDR)
-			memset((void *)(m + sizeof(struct m_hdr) +
-			    sizeof(struct pkthdr)), 0, MHLEN);
-		else
-			memset((void *)(m + sizeof(struct m_hdr)), 0, MLEN);
-		if ((m->m_flags & M_EXT) &&
-		    (m->m_ext.ext_free == NULL) &&
-		    !MCLISREFERENCED(m))
+#ifdef DIAGNOSTIC
+		if (M_READONLY(m))
+			panic("m_zero: M_READONLY");
+#endif /* DIAGNOSTIC */
+		if (m->m_flags & M_EXT)
 			memset(m->m_ext.ext_buf, 0, m->m_ext.ext_size);
+		else {
+			if (m->m_flags & M_PKTHDR)
+				memset(m->m_pktdat, 0, MHLEN);
+			else
+				memset(m->m_dat, 0, MLEN);
+		}
 		m = m->m_next;
 	}
 }

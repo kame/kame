@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket.c,v 1.35 2001/06/22 14:14:09 deraadt Exp $	*/
+/*	$OpenBSD: uipc_socket.c,v 1.41 2002/02/05 22:04:43 nordin Exp $	*/
 /*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 
 /*
@@ -50,6 +50,7 @@
 #include <sys/socketvar.h>
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
+#include <sys/pool.h>
 
 void 	filt_sordetach(struct knote *kn);
 int 	filt_soread(struct knote *kn, long hint);
@@ -72,6 +73,15 @@ struct filterops sowrite_filtops =
 int	somaxconn = SOMAXCONN;
 int	sominconn = SOMINCONN;
 
+struct pool socket_pool;
+
+void
+soinit(void)
+{
+
+	pool_init(&socket_pool, sizeof(struct socket), 0, 0, 0, "sockpl", NULL);
+}
+
 /*
  * Socket operation routines.
  * These routines are called by the routines in
@@ -88,9 +98,9 @@ socreate(dom, aso, type, proto)
 	int proto;
 {
 	struct proc *p = curproc;		/* XXX */
-	register struct protosw *prp;
-	register struct socket *so;
-	register int error;
+	struct protosw *prp;
+	struct socket *so;
+	int error, s;
 
 	if (proto)
 		prp = pffindproto(dom, proto, type);
@@ -100,8 +110,11 @@ socreate(dom, aso, type, proto)
 		return (EPROTONOSUPPORT);
 	if (prp->pr_type != type)
 		return (EPROTOTYPE);
-	MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_WAIT);
+	s = splsoftnet();
+	so = pool_get(&socket_pool, PR_WAITOK);
 	bzero((caddr_t)so, sizeof(*so));
+	TAILQ_INIT(&so->so_q0);
+	TAILQ_INIT(&so->so_q);
 	so->so_type = type;
 	if (p->p_ucred->cr_uid == 0)
 		so->so_state = SS_PRIV;
@@ -113,6 +126,7 @@ socreate(dom, aso, type, proto)
 	if (error) {
 		so->so_state |= SS_NOFDREF;
 		sofree(so);
+		splx(s);
 		return (error);
 	}
 #ifdef COMPAT_SUNOS
@@ -122,6 +136,7 @@ socreate(dom, aso, type, proto)
 			so->so_options |= SO_BROADCAST;
 	}
 #endif
+	splx(s);
 	*aso = so;
 	return (0);
 }
@@ -150,7 +165,7 @@ solisten(so, backlog)
 	oldopt = so->so_options;
 	oldqlimit = so->so_qlimit;
 
-	if (so->so_q == 0)
+	if (TAILQ_FIRST(&so->so_q) == NULL)
 		so->so_options |= SO_ACCEPTCONN;
 	if (backlog < 0 || backlog > somaxconn)
 		backlog = somaxconn;
@@ -174,6 +189,10 @@ solisten(so, backlog)
 	return (0);
 }
 
+/*
+ *  Must be called at splsoftnet()
+ */
+
 void
 sofree(so)
 	register struct socket *so;
@@ -192,7 +211,7 @@ sofree(so)
 	}
 	sbrelease(&so->so_snd);
 	sorflush(so);
-	FREE(so, M_SOCKET);
+	pool_put(&socket_pool, so);
 }
 
 /*
@@ -209,11 +228,11 @@ soclose(so)
 	int error = 0;
 
 	if (so->so_options & SO_ACCEPTCONN) {
-		while ((so2 = so->so_q0) != NULL) {
+		while ((so2 = TAILQ_FIRST(&so->so_q0)) != NULL) {
 			(void) soqremque(so2, 0);
 			(void) soabort(so2);
 		}
-		while ((so2 = so->so_q) != NULL) {
+		while ((so2 = TAILQ_FIRST(&so->so_q)) != NULL) {
 			(void) soqremque(so2, 1);
 			(void) soabort(so2);
 		}
@@ -380,10 +399,10 @@ sosend(so, addr, uio, top, control, flags)
 {
 	struct proc *p = curproc;		/* XXX */
 	struct mbuf **mp;
-	register struct mbuf *m;
-	register long space, len;
-	register quad_t resid;
-	int clen = 0, error, s, dontroute, mlen;
+	struct mbuf *m;
+	long space, len, mlen, clen = 0;
+	quad_t resid;
+	int error, s, dontroute;
 	int atomic = sosendallatonce(so) || top;
 
 	if (uio)
@@ -418,8 +437,12 @@ restart:
 		s = splsoftnet();
 		if (so->so_state & SS_CANTSENDMORE)
 			snderr(EPIPE);
-		if (so->so_error)
-			snderr(so->so_error);
+		if (so->so_error) {
+			error = so->so_error;
+			so->so_error = 0;
+			splx(s);
+			goto release;
+		}
 		if ((so->so_state & SS_ISCONNECTED) == 0) {
 			if (so->so_proto->pr_flags & PR_CONNREQUIRED) {
 				if ((so->so_state & SS_ISCONFIRMING) == 0 &&
@@ -471,19 +494,15 @@ restart:
 					if ((m->m_flags & M_EXT) == 0)
 						goto nopages;
 					mlen = MCLBYTES;
-#ifdef	MAPPED_MBUFS
-					len = min(MCLBYTES, resid);
-#else
 					if (atomic && top == 0) {
-						len = min(MCLBYTES - max_hdr, resid);
+						len = lmin(MCLBYTES - max_hdr, resid);
 						m->m_data += max_hdr;
 					} else
-						len = min(MCLBYTES, resid);
-#endif
+						len = lmin(MCLBYTES, resid);
 					space -= len;
 				} else {
 nopages:
-					len = min(min(mlen, resid), space);
+					len = lmin(lmin(mlen, resid), space);
 					space -= len;
 					/*
 					 * For datagram protocols, leave room
@@ -957,7 +976,9 @@ sosetopt(so, level, optname, m0)
 		switch (optname) {
 
 		case SO_LINGER:
-			if (m == NULL || m->m_len != sizeof (struct linger)) {
+			if (m == NULL || m->m_len != sizeof (struct linger) ||
+			    mtod(m, struct linger *)->l_linger < 0 ||
+			    mtod(m, struct linger *)->l_linger > SHRT_MAX) {
 				error = EINVAL;
 				goto bad;
 			}

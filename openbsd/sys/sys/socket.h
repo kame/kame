@@ -1,4 +1,4 @@
-/*	$OpenBSD: socket.h,v 1.39 2001/09/07 16:45:25 itojun Exp $	*/
+/*	$OpenBSD: socket.h,v 1.43 2002/03/15 02:11:01 itojun Exp $	*/
 /*	$NetBSD: socket.h,v 1.14 1996/02/09 18:25:36 christos Exp $	*/
 
 /*
@@ -184,7 +184,6 @@ struct sockproto {
 #define	PF_LOCAL	AF_LOCAL
 #define	PF_UNIX		PF_LOCAL	/* backward compatibility */
 #define	PF_INET		AF_INET
-#define	PF_INET6	AF_INET6
 #define	PF_IMPLINK	AF_IMPLINK
 #define	PF_PUP		AF_PUP
 #define	PF_CHAOS	AF_CHAOS
@@ -315,11 +314,11 @@ struct sockcred {
  * Used value-result for recvmsg, value only for sendmsg.
  */
 struct msghdr {
-	caddr_t		msg_name;	/* optional address */
+	void		*msg_name;	/* optional address */
 	socklen_t	msg_namelen;	/* size of address */
 	struct		iovec *msg_iov;	/* scatter/gather array */
 	u_int		msg_iovlen;	/* # elements in msg_iov */
-	caddr_t		msg_control;	/* ancillary data, see below */
+	void		*msg_control;	/* ancillary data, see below */
 	socklen_t	msg_controllen;	/* ancillary data buffer len */
 	int		msg_flags;	/* flags on received message */
 };
@@ -357,7 +356,7 @@ struct cmsghdr {
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
 	(((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len) + \
 			    __CMSG_ALIGN(sizeof(struct cmsghdr)) > \
-	    (mhdr)->msg_control + (mhdr)->msg_controllen) ? \
+	    ((caddr_t)(mhdr)->msg_control) + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
 	    (struct cmsghdr *)((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len)))
 
@@ -413,25 +412,25 @@ struct omsghdr {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	accept __P((int, struct sockaddr *, socklen_t *));
-int	bind __P((int, const struct sockaddr *, socklen_t));
-int	connect __P((int, const struct sockaddr *, socklen_t));
-int	getpeereid __P((int, uid_t *, gid_t *));
-int	getpeername __P((int, struct sockaddr *, socklen_t *));
-int	getsockname __P((int, struct sockaddr *, socklen_t *));
-int	getsockopt __P((int, int, int, void *, socklen_t *));
-int	listen __P((int, int));
-ssize_t	recv __P((int, void *, size_t, int));
-ssize_t	recvfrom __P((int, void *, size_t, int, struct sockaddr *, socklen_t *));
-ssize_t	recvmsg __P((int, struct msghdr *, int));
-ssize_t	send __P((int, const void *, size_t, int));
-ssize_t	sendto __P((int, const void *,
-	    size_t, int, const struct sockaddr *, socklen_t));
-ssize_t	sendmsg __P((int, const struct msghdr *, int));
-int	setsockopt __P((int, int, int, const void *, socklen_t));
-int	shutdown __P((int, int));
-int	socket __P((int, int, int));
-int	socketpair __P((int, int, int, int *));
+int	accept(int, struct sockaddr *, socklen_t *);
+int	bind(int, const struct sockaddr *, socklen_t);
+int	connect(int, const struct sockaddr *, socklen_t);
+int	getpeereid(int, uid_t *, gid_t *);
+int	getpeername(int, struct sockaddr *, socklen_t *);
+int	getsockname(int, struct sockaddr *, socklen_t *);
+int	getsockopt(int, int, int, void *, socklen_t *);
+int	listen(int, int);
+ssize_t	recv(int, void *, size_t, int);
+ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+ssize_t	recvmsg(int, struct msghdr *, int);
+ssize_t	send(int, const void *, size_t, int);
+ssize_t	sendto(int, const void *,
+	    size_t, int, const struct sockaddr *, socklen_t);
+ssize_t	sendmsg(int, const struct msghdr *, int);
+int	setsockopt(int, int, int, const void *, socklen_t);
+int	shutdown(int, int);
+int	socket(int, int, int);
+int	socketpair(int, int, int, int *);
 __END_DECLS
 #else
 # if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_LINUX) || \
@@ -441,7 +440,7 @@ __END_DECLS
 #  define MSG_COMPAT	0x8000
 # endif
 
-void	pfctlinput __P((int, struct sockaddr *));
+void	pfctlinput(int, struct sockaddr *);
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_SOCKET_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_proto.c,v 1.32 2001/08/08 15:07:04 jjbg Exp $	*/
+/*	$OpenBSD: in_proto.c,v 1.34 2002/03/01 22:29:29 provos Exp $	*/
 /*	$NetBSD: in_proto.c,v 1.14 1996/02/18 18:58:32 christos Exp $	*/
 
 /*
@@ -202,7 +202,7 @@ struct protosw inetsw[] = {
 { SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_ABRTACPTDIS,
   tcp_input,	0,		tcp_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
-  tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
+  tcp_init,	0,		tcp_slowtimo,	tcp_drain,	tcp_sysctl
 },
 #ifdef SCTP
 /* Order is very important here, we add the good one in
@@ -231,7 +231,7 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR,
   icmp_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,
-  0,		0,		0,		0,		icmp_sysctl
+  icmp_init,	0,		0,		0,		icmp_sysctl
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
   encap4_input,	rip_output, 	0,		rip_ctloutput,

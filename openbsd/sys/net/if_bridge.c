@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.c,v 1.76 2001/08/21 15:18:20 jason Exp $	*/
+/*	$OpenBSD: if_bridge.c,v 1.88 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -29,6 +29,11 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
+ *
  */
 
 #include "bpfilter.h"
@@ -57,10 +62,16 @@
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
+#include <netinet/ip_var.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip_ipsp.h>
 
 #include <net/if_enc.h>
+#endif
+
+#ifdef INET6
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #endif
 
 #if NPF > 0
@@ -111,37 +122,39 @@ extern int ifqmaxlen;
 struct bridge_softc *bridgectl;
 int nbridge;
 
-void	bridgeattach __P((int));
-int	bridge_ioctl __P((struct ifnet *, u_long, caddr_t));
-void	bridge_start __P((struct ifnet *));
-void	bridgeintr_frame __P((struct bridge_softc *, struct mbuf *));
-void	bridge_broadcast __P((struct bridge_softc *, struct ifnet *,
-    struct ether_header *, struct mbuf *));
-void	bridge_stop __P((struct bridge_softc *));
-void	bridge_init __P((struct bridge_softc *));
-int	bridge_bifconf __P((struct bridge_softc *, struct ifbifconf *));
+void	bridgeattach(int);
+int	bridge_ioctl(struct ifnet *, u_long, caddr_t);
+void	bridge_start(struct ifnet *);
+void	bridgeintr_frame(struct bridge_softc *, struct mbuf *);
+void	bridge_broadcast(struct bridge_softc *, struct ifnet *,
+    struct ether_header *, struct mbuf *);
+void	bridge_span(struct bridge_softc *, struct ether_header *,
+    struct mbuf *);
+void	bridge_stop(struct bridge_softc *);
+void	bridge_init(struct bridge_softc *);
+int	bridge_bifconf(struct bridge_softc *, struct ifbifconf *);
 
-void	bridge_timer __P((void *));
-int	bridge_rtfind __P((struct bridge_softc *, struct ifbaconf *));
-void	bridge_rtage __P((struct bridge_softc *));
-void	bridge_rttrim __P((struct bridge_softc *));
-void	bridge_rtdelete __P((struct bridge_softc *, struct ifnet *));
-int	bridge_rtdaddr __P((struct bridge_softc *, struct ether_addr *));
-int	bridge_rtflush __P((struct bridge_softc *, int));
-struct ifnet *	bridge_rtupdate __P((struct bridge_softc *,
-    struct ether_addr *, struct ifnet *ifp, int, u_int8_t));
-struct ifnet *	bridge_rtlookup __P((struct bridge_softc *,
-    struct ether_addr *));
-u_int32_t	bridge_hash __P((struct bridge_softc *, struct ether_addr *));
-int bridge_blocknonip __P((struct ether_header *, struct mbuf *));
-int		bridge_addrule __P((struct bridge_iflist *,
-    struct ifbrlreq *, int out));
-int		bridge_flushrule __P((struct bridge_iflist *));
-int	bridge_brlconf __P((struct bridge_softc *, struct ifbrlconf *));
-u_int8_t bridge_filterrule __P((struct brl_head *, struct ether_header *));
+void	bridge_timer(void *);
+int	bridge_rtfind(struct bridge_softc *, struct ifbaconf *);
+void	bridge_rtage(struct bridge_softc *);
+void	bridge_rttrim(struct bridge_softc *);
+void	bridge_rtdelete(struct bridge_softc *, struct ifnet *);
+int	bridge_rtdaddr(struct bridge_softc *, struct ether_addr *);
+int	bridge_rtflush(struct bridge_softc *, int);
+struct ifnet *	bridge_rtupdate(struct bridge_softc *,
+    struct ether_addr *, struct ifnet *ifp, int, u_int8_t);
+struct ifnet *	bridge_rtlookup(struct bridge_softc *,
+    struct ether_addr *);
+u_int32_t	bridge_hash(struct bridge_softc *, struct ether_addr *);
+int bridge_blocknonip(struct ether_header *, struct mbuf *);
+int		bridge_addrule(struct bridge_iflist *,
+    struct ifbrlreq *, int out);
+int		bridge_flushrule(struct bridge_iflist *);
+int	bridge_brlconf(struct bridge_softc *, struct ifbrlconf *);
+u_int8_t bridge_filterrule(struct brl_head *, struct ether_header *);
 #if NPF > 0
-struct mbuf *bridge_filter __P((struct bridge_softc *, int, struct ifnet *,
-    struct ether_header *, struct mbuf *m));
+struct mbuf *bridge_filter(struct bridge_softc *, int, struct ifnet *,
+    struct ether_header *, struct mbuf *m);
 #endif
 
 #define	ETHERADDR_IS_IP_MCAST(a) \
@@ -175,6 +188,7 @@ bridgeattach(n)
 		sc->sc_hold_time = BSTP_DEFAULT_HOLD_TIME;
 		timeout_set(&sc->sc_brtimeout, bridge_timer, sc);
 		LIST_INIT(&sc->sc_iflist);
+		LIST_INIT(&sc->sc_spanlist);
 		ifp = &sc->sc_if;
 		sprintf(ifp->if_xname, "bridge%d", i);
 		ifp->if_softc = sc;
@@ -229,6 +243,16 @@ bridge_ioctl(ifp, cmd, data)
 			break;
 		}
 		if (ifs->if_bridge != NULL) {
+			error = EBUSY;
+			break;
+		}
+
+		/* If it's in the span list, it can't be a member. */
+		LIST_FOREACH(p, &sc->sc_spanlist, next) {
+			if (p->ifp == ifs)
+				break;
+		}
+		if (p != LIST_END(&sc->sc_spanlist)) {
 			error = EBUSY;
 			break;
 		}
@@ -323,6 +347,58 @@ bridge_ioctl(ifp, cmd, data)
 	case SIOCBRDGIFS:
 		error = bridge_bifconf(sc, bifconf);
 		break;
+	case SIOCBRDGADDS:
+		if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
+			break;
+		ifs = ifunit(req->ifbr_ifsname);
+		if (ifs == NULL) {			/* no such interface */
+			error = ENOENT;
+			break;
+		}
+		if (ifs->if_bridge == (caddr_t)sc) {
+			error = EEXIST;
+			break;
+		}
+		if (ifs->if_bridge != NULL) {
+			error = EBUSY;
+			break;
+		}
+		LIST_FOREACH(p, &sc->sc_spanlist, next) {
+			if (p->ifp == ifs)
+				break;
+		}
+		if (p != LIST_END(&sc->sc_spanlist)) {
+			error = EBUSY;
+			break;
+		}
+		p = (struct bridge_iflist *)malloc(
+		    sizeof(struct bridge_iflist), M_DEVBUF, M_NOWAIT);
+		if (p == NULL) {
+			error = ENOMEM;
+			break;
+		}
+		bzero(p, sizeof(struct bridge_iflist));
+		p->ifp = ifs;
+		SIMPLEQ_INIT(&p->bif_brlin);
+		SIMPLEQ_INIT(&p->bif_brlout);
+		LIST_INSERT_HEAD(&sc->sc_spanlist, p, next);
+		break;
+	case SIOCBRDGDELS:
+		if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
+			break;
+		LIST_FOREACH(p, &sc->sc_spanlist, next) {
+			if (strncmp(p->ifp->if_xname, req->ifbr_ifsname,
+			    sizeof(p->ifp->if_xname)) == 0) {
+				LIST_REMOVE(p, next);
+				free(p, M_DEVBUF);
+				break;
+			}
+		}
+		if (p == LIST_END(&sc->sc_spanlist)) {
+			error = ENOENT;
+			break;
+		}
+		break;
 	case SIOCBRDGGIFFLGS:
 		ifs = ifunit(req->ifbr_ifsname);
 		if (ifs == NULL) {
@@ -364,6 +440,10 @@ bridge_ioctl(ifp, cmd, data)
 		}
 		if (p == LIST_END(&sc->sc_iflist)) {
 			error = ESRCH;
+			break;
+		}
+		if (req->ifbr_ifsflags & IFBIF_RO_MASK) {
+			error = EINVAL;
 			break;
 		}
 		if ((req->ifbr_ifsflags & IFBIF_STP) &&
@@ -577,6 +657,9 @@ bridge_bifconf(sc, bifc)
 	LIST_FOREACH(p, &sc->sc_iflist, next) {
 		total++;
 	}
+	LIST_FOREACH(p, &sc->sc_spanlist, next) {
+		total++;
+	}
 	if (bifc->ifbic_len == 0) {
 		i = total;
 		goto done;
@@ -588,6 +671,22 @@ bridge_bifconf(sc, bifc)
 		strlcpy(breq.ifbr_name, sc->sc_if.if_xname, IFNAMSIZ);
 		strlcpy(breq.ifbr_ifsname, p->ifp->if_xname, IFNAMSIZ);
 		breq.ifbr_ifsflags = p->bif_flags;
+		breq.ifbr_state = p->bif_state;
+		breq.ifbr_priority = p->bif_priority;
+		breq.ifbr_portno = p->ifp->if_index & 0xff;
+		error = copyout((caddr_t)&breq,
+		    (caddr_t)(bifc->ifbic_req + i), sizeof(breq));
+		if (error)
+			goto done;
+		i++;
+		bifc->ifbic_len -= sizeof(breq);
+	}
+	LIST_FOREACH(p, &sc->sc_spanlist, next) {
+		if (bifc->ifbic_len < sizeof(breq))
+			break;
+		strlcpy(breq.ifbr_name, sc->sc_if.if_xname, IFNAMSIZ);
+		strlcpy(breq.ifbr_ifsname, p->ifp->if_xname, IFNAMSIZ);
+		breq.ifbr_ifsflags = p->bif_flags | IFBIF_SPAN;
 		breq.ifbr_state = p->bif_state;
 		breq.ifbr_priority = p->bif_priority;
 		breq.ifbr_portno = p->ifp->if_index & 0xff;
@@ -805,6 +904,8 @@ bridge_output(ifp, m, sa, rt)
 			return (0);
 		}
 
+		bridge_span(sc, NULL, m);
+
 		LIST_FOREACH(p, &sc->sc_iflist, next) {
 			dst_if = p->ifp;
 			if ((dst_if->if_flags & IFF_RUNNING) == 0)
@@ -821,11 +922,33 @@ bridge_output(ifp, m, sa, rt)
 				used = 1;
 				mc = m;
 			} else {
-				mc = m_copym(m, 0, M_COPYALL, M_NOWAIT);
-				if (mc == NULL) {
+				struct mbuf *m1, *m2, *mx;
+
+				m1 = m_copym2(m, 0, sizeof(struct ether_header),
+				    M_DONTWAIT);
+				if (m1 == NULL) {
 					sc->sc_if.if_oerrors++;
 					continue;
 				}
+				m2 = m_copym2(m, sizeof(struct ether_header),
+				    M_COPYALL, M_DONTWAIT);
+				if (m2 == NULL) {
+					m_freem(m1);
+					sc->sc_if.if_oerrors++;
+					continue;
+				}
+
+				for (mx = m1; mx->m_next != NULL; mx = mx->m_next)
+					/*EMPTY*/;
+				mx->m_next = m2;
+
+				if (m1->m_flags & M_PKTHDR) {
+					len = 0;
+					for (mx = m1; mx != NULL; mx = mx->m_next)
+						len += mx->m_len;
+					m1->m_pkthdr.len = len;
+				}
+				mc = m1;
 			}
 			len = mc->m_pkthdr.len;
 			mflags = mc->m_flags;
@@ -853,6 +976,7 @@ bridge_output(ifp, m, sa, rt)
 	}
 
 sendunicast:
+	bridge_span(sc, NULL, m);
 	if ((dst_if->if_flags & IFF_RUNNING) == 0) {
 		m_freem(m);
 		splx(s);
@@ -1153,6 +1277,8 @@ bridge_input(ifp, eh, m)
 	if (ifl == LIST_END(&sc->sc_iflist))
 		return (m);
 
+	bridge_span(sc, eh, m);
+
 	if (m->m_flags & (M_BCAST | M_MCAST)) {
 		/* Tap off 802.1D packets, they do not get forwarded */
 		if (bcmp(eh->ether_dhost, bstp_etheraddr, ETHER_ADDR_LEN) == 0) {
@@ -1274,8 +1400,8 @@ bridge_broadcast(sc, ifp, eh, m)
 	struct bridge_iflist *p;
 	struct mbuf *mc;
 	struct ifnet *dst_if;
-	int error, len, used = 0;
-	short mflags;
+	int error, len = m->m_pkthdr.len, used = 0;
+	short mflags = m->m_flags;
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	LIST_FOREACH(p, &sc->sc_iflist, next) {
@@ -1321,11 +1447,34 @@ bridge_broadcast(sc, ifp, eh, m)
 			mc = m;
 			used = 1;
 		} else {
-			mc = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
-			if (mc == NULL) {
+			struct mbuf *m1, *m2, *mx;
+
+			m1 = m_copym2(m, 0, sizeof(struct ether_header),
+			    M_DONTWAIT);
+			if (m1 == NULL) {
 				sc->sc_if.if_oerrors++;
 				continue;
 			}
+			m2 = m_copym2(m, sizeof(struct ether_header),
+			    M_COPYALL, M_DONTWAIT);
+			if (m2 == NULL) {
+				m_freem(m1);
+				sc->sc_if.if_oerrors++;
+				continue;
+			}
+
+			for (mx = m1; mx->m_next != NULL; mx = mx->m_next)
+				/*EMPTY*/;
+			mx->m_next = m2;
+
+			if (m1->m_flags & M_PKTHDR) {
+				int len = 0;
+
+				for (mx = m1; mx != NULL; mx = mx->m_next)
+					len += mx->m_len;
+				m1->m_pkthdr.len = len;
+			}
+			mc = m1;
 		}
 
 #if NPF > 0
@@ -1354,6 +1503,73 @@ bridge_broadcast(sc, ifp, eh, m)
 
 	if (!used)
 		m_freem(m);
+}
+
+void
+bridge_span(sc, eh, morig)
+	struct bridge_softc *sc;
+	struct ether_header *eh;
+	struct mbuf *morig;
+{
+	struct bridge_iflist *p;
+	struct ifnet *ifp;
+	struct mbuf *mc, *m;
+	int error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
+
+	if (LIST_EMPTY(&sc->sc_spanlist))
+		return;
+
+	m = m_copym2(morig, 0, M_COPYALL, M_NOWAIT);
+	if (m == NULL)
+		return;
+	if (eh != NULL) {
+		M_PREPEND(m, sizeof(struct ether_header), M_DONTWAIT);
+		if (m == NULL)
+			return;
+		bcopy(eh, mtod(m, caddr_t), sizeof(struct ether_header));
+	}
+
+	LIST_FOREACH(p, &sc->sc_spanlist, next) {
+		ifp = p->ifp;
+
+		if ((ifp->if_flags & IFF_RUNNING) == 0)
+			continue;
+
+#ifdef ALTQ
+		if (ALTQ_IS_ENABLED(&ifp->if_snd) == 0)
+#endif
+			if (IF_QFULL(&ifp->if_snd)) {
+				IF_DROP(&ifp->if_snd);
+				sc->sc_if.if_oerrors++;
+				continue;
+			}
+
+		mc = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
+		if (mc == NULL) {
+			sc->sc_if.if_oerrors++;
+			continue;
+		}
+
+#ifdef ALTQ
+		if (ALTQ_IS_ENABLED(&ifp->if_snd))
+			altq_etherclassify(&ifp->if_snd, mc, &pktattr);
+#endif
+
+		IFQ_ENQUEUE(&ifp->if_snd, mc, &pktattr, error);
+		if (error) {
+			sc->sc_if.if_oerrors++;
+			continue;
+		}
+		sc->sc_if.if_opackets++;
+		sc->sc_if.if_obytes += m->m_pkthdr.len;
+		ifp->if_obytes += m->m_pkthdr.len;
+		if (m->m_flags & M_MCAST)
+			ifp->if_omcasts++;
+		if ((ifp->if_flags & IFF_OACTIVE) == 0)
+			(*ifp->if_start)(ifp);
+	}
+	m_freem(m);
 }
 
 struct ifnet *
@@ -1926,15 +2142,15 @@ bridge_filter(sc, dir, ifp, eh, m)
 	struct ether_header *eh;
 	struct mbuf *m;
 {
-#if NPF == 0
-	return (m);
-#else
 	struct llc llc;
 	int hassnap = 0;
 	struct ip *ip;
 	int hlen;
+	u_int16_t etype;
 
-	if (eh->ether_type != htons(ETHERTYPE_IP)) {
+	etype = ntohs(eh->ether_type);
+
+	if (etype != ETHERTYPE_IP && etype != ETHERTYPE_IPV6) {
 		if (eh->ether_type > ETHERMTU ||
 		    m->m_pkthdr.len < (LLC_SNAPFRAMELEN +
 		    sizeof(struct ether_header)))
@@ -1948,8 +2164,11 @@ bridge_filter(sc, dir, ifp, eh, m)
 		    llc.llc_control != LLC_UI ||
 		    llc.llc_snap.org_code[0] ||
 		    llc.llc_snap.org_code[1] ||
-		    llc.llc_snap.org_code[2] ||
-		    llc.llc_snap.ether_type != htons(ETHERTYPE_IP))
+		    llc.llc_snap.org_code[2])
+			return (m);
+
+		etype = ntohs(llc.llc_snap.ether_type);
+		if (etype != ETHERTYPE_IP && etype != ETHERTYPE_IPV6)
 			return (m);
 		hassnap = 1;
 	}
@@ -1958,63 +2177,114 @@ bridge_filter(sc, dir, ifp, eh, m)
 	if (hassnap)
 		m_adj(m, LLC_SNAPFRAMELEN);
 
-	if (m->m_pkthdr.len < sizeof(struct ip))
-		goto dropit;
+	switch (etype) {
 
-	/* Copy minimal header, and drop invalids */
-	if (m->m_len < sizeof(struct ip) &&
-	    (m = m_pullup(m, sizeof(struct ip))) == NULL)
-		return (NULL);
-	ip = mtod(m, struct ip *);
+	case ETHERTYPE_IP:
+		if (m->m_pkthdr.len < sizeof(struct ip))
+			goto dropit;
 
-	if (ip->ip_v != IPVERSION)
-		goto dropit;
-
-	hlen = ip->ip_hl << 2;	/* get whole header length */
-	if (hlen < sizeof(struct ip))
-		goto dropit;
-	if (hlen > m->m_len) {
-		if ((m = m_pullup(m, hlen)) == NULL)
+		/* Copy minimal header, and drop invalids */
+		if (m->m_len < sizeof(struct ip) &&
+		    (m = m_pullup(m, sizeof(struct ip))) == NULL) {
+			ipstat.ips_toosmall++;
 			return (NULL);
+		}
 		ip = mtod(m, struct ip *);
+		
+		if (ip->ip_v != IPVERSION) {
+			ipstat.ips_badvers++;
+			goto dropit;
+		}
+		
+		hlen = ip->ip_hl << 2;	/* get whole header length */
+		if (hlen < sizeof(struct ip)) {
+			ipstat.ips_badhlen++;
+			goto dropit;
+		}
+		if (hlen > m->m_len) {
+			if ((m = m_pullup(m, hlen)) == NULL) {
+				ipstat.ips_badhlen++;
+				return (NULL);
+			}
+			ip = mtod(m, struct ip *);
+		}
+		
+		if ((ip->ip_sum = in_cksum(m, hlen)) != 0) {
+			ipstat.ips_badsum++;
+			goto dropit;
+		}
+		
+		NTOHS(ip->ip_len);
+		if (ip->ip_len < hlen)
+			goto dropit;
+		NTOHS(ip->ip_id);
+		NTOHS(ip->ip_off);
+		
+		if (m->m_pkthdr.len < ip->ip_len)
+			goto dropit;
+		if (m->m_pkthdr.len > ip->ip_len) {
+			if (m->m_len == m->m_pkthdr.len) {
+				m->m_len = ip->ip_len;
+				m->m_pkthdr.len = ip->ip_len;
+			} else
+				m_adj(m, ip->ip_len - m->m_pkthdr.len);
+		}
+		
+		/* Finally, we get to filter the packet! */
+		m->m_pkthdr.rcvif = ifp;
+		if (pf_test(dir, ifp, &m) != PF_PASS)
+			goto dropit;
+		if (m == NULL)
+			goto dropit;
+		
+		/* Rebuild the IP header */
+		if (m->m_len < hlen && ((m = m_pullup(m, hlen)) == NULL))
+			return (NULL);
+		if (m->m_len < sizeof(struct ip))
+			goto dropit;
+		ip = mtod(m, struct ip *);
+		HTONS(ip->ip_len);
+		HTONS(ip->ip_id);
+		HTONS(ip->ip_off);
+		ip->ip_sum = 0;
+		ip->ip_sum = in_cksum(m, hlen);
+
+		break;
+
+#ifdef INET6
+	case ETHERTYPE_IPV6: {
+		struct ip6_hdr *ip6;
+
+		if (m->m_len < sizeof(struct ip6_hdr)) {
+			if ((m = m_pullup(m, sizeof(struct ip6_hdr)))
+			    == NULL) {
+				ip6stat.ip6s_toosmall++;
+				return (NULL);
+			}
+		}
+		
+		ip6 = mtod(m, struct ip6_hdr *);
+		
+		if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+			ip6stat.ip6s_badvers++;
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_hdrerr);
+			goto dropit;
+		}
+
+		if (pf_test6(dir, ifp, &m) != PF_PASS)
+			goto dropit;
+		if (m == NULL)
+			return (NULL);
+		
+		break;
 	}
-
-	if ((ip->ip_sum = in_cksum(m, hlen)) != 0)
+#endif /* INET6 */
+		
+	default:
 		goto dropit;
-
-	NTOHS(ip->ip_len);
-	if (ip->ip_len < hlen)
-		goto dropit;
-	NTOHS(ip->ip_id);
-	NTOHS(ip->ip_off);
-
-	if (m->m_pkthdr.len < ip->ip_len)
-		goto dropit;
-	if (m->m_pkthdr.len > ip->ip_len) {
-		if (m->m_len == m->m_pkthdr.len) {
-			m->m_len = ip->ip_len;
-			m->m_pkthdr.len = ip->ip_len;
-		} else
-			m_adj(m, ip->ip_len - m->m_pkthdr.len);
+		break;
 	}
-
-	/* Finally, we get to filter the packet! */
-	m->m_pkthdr.rcvif = ifp;
-	if (pf_test(dir, ifp, &m) != PF_PASS)
-		goto dropit;
-
-	/* Rebuild the IP header */
-	if (m->m_len < hlen && ((m = m_pullup(m, hlen)) == NULL))
-		return (NULL);
-	if (m->m_len < sizeof(struct ip))
-		goto dropit;
-	ip = mtod(m, struct ip *);
-	HTONS(ip->ip_len);
-	HTONS(ip->ip_id);
-	HTONS(ip->ip_off);
-	ip->ip_sum = 0;
-	ip->ip_sum = in_cksum(m, hlen);
-
+	
 	/* Reattach SNAP header */
 	if (hassnap) {
 		M_PREPEND(m, LLC_SNAPFRAMELEN, M_DONTWAIT);
@@ -2035,6 +2305,5 @@ dropit:
 	if (m != NULL)
 		m_freem(m);
 	return (NULL);
-#endif /* NPF == 0 */
 }
-#endif
+#endif /* NPF > 0 */

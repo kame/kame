@@ -1,4 +1,4 @@
-/*	$OpenBSD: an.c,v 1.20 2001/09/29 21:54:00 mickey Exp $	*/
+/*	$OpenBSD: an.c,v 1.23 2002/03/14 01:26:54 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -138,32 +138,32 @@ struct cfdriver an_cd = {
 	NULL, "an", DV_IFNET
 };
 
-void an_reset		__P((struct an_softc *));
-int an_ioctl		__P((struct ifnet *, u_long, caddr_t));
-int an_init_tx_ring	__P((struct an_softc *));
-void an_start		__P((struct ifnet *));
-void an_watchdog		__P((struct ifnet *));
-void an_rxeof		__P((struct an_softc *));
-void an_txeof		__P((struct an_softc *, int));
+void an_reset(struct an_softc *);
+int an_ioctl(struct ifnet *, u_long, caddr_t);
+int an_init_tx_ring(struct an_softc *);
+void an_start(struct ifnet *);
+void an_watchdog(struct ifnet *);
+void an_rxeof(struct an_softc *);
+void an_txeof(struct an_softc *, int);
 
-void an_promisc		__P((struct an_softc *, int));
-int an_cmd		__P((struct an_softc *, int, int));
-int an_read_record	__P((struct an_softc *, struct an_ltv_gen *));
-int an_write_record	__P((struct an_softc *, struct an_ltv_gen *));
-int an_read_data		__P((struct an_softc *, int,
-					int, caddr_t, int));
-int an_write_data	__P((struct an_softc *, int,
-					int, caddr_t, int));
-int an_seek		__P((struct an_softc *, int, int, int));
-int an_alloc_nicmem	__P((struct an_softc *, int, int *));
-void an_stats_update	__P((void *));
-void an_setdef		__P((struct an_softc *, struct an_req *));
+void an_promisc(struct an_softc *, int);
+int an_cmd(struct an_softc *, int, int);
+int an_read_record(struct an_softc *, struct an_ltv_gen *);
+int an_write_record(struct an_softc *, struct an_ltv_gen *);
+int an_read_data(struct an_softc *, int,
+					int, caddr_t, int);
+int an_write_data(struct an_softc *, int,
+					int, caddr_t, int);
+int an_seek(struct an_softc *, int, int, int);
+int an_alloc_nicmem(struct an_softc *, int, int *);
+void an_stats_update(void *);
+void an_setdef(struct an_softc *, struct an_req *);
 #ifdef ANCACHE
-void an_cache_store	__P((struct an_softc *, struct ether_header *,
-					struct mbuf *, unsigned short));
+void an_cache_store(struct an_softc *, struct ether_header *,
+					struct mbuf *, unsigned short);
 #endif
-int an_media_change	__P((struct ifnet *));
-void an_media_status	__P((struct ifnet *, struct ifmediareq *));
+int an_media_change(struct ifnet *);
+void an_media_status(struct ifnet *, struct ifmediareq *);
 
 static __inline void
 an_swap16(u_int16_t *p, int cnt)
@@ -610,6 +610,7 @@ an_read_record(sc, ltv)
 {
 	u_int16_t	*ptr, len;
 	int		i;
+	u_int16_t	ltv_data_length;
 
 	if (ltv->an_len < 4 || ltv->an_type == 0)
 		return(EINVAL);
@@ -629,23 +630,28 @@ an_read_record(sc, ltv)
 	}
 
 	/*
-	 * Read the length and record type and make sure they
-	 * match what we expect (this verifies that we have enough
+	 * Read the length to make sure it
+	 * matches what we expect (this verifies that we have enough
 	 * room to hold all of the returned data).
 	 */
 	len = CSR_READ_2(sc, AN_DATA1);
-	if (len > ltv->an_len) {
+
+	/*
+	 * Work out record's data length, which is struct length - type word
+	 * as we have just read the length.
+	 */
+	ltv_data_length = ltv->an_len - sizeof(u_int16_t);
+
+	if (len > ltv_data_length) {
 		printf("%s: RID 0x%04x record length mismatch -- expected %d, "
 		    "got %d\n", sc->sc_dev.dv_xname, ltv->an_type,
-		    ltv->an_len, len);
+		    ltv_data_length, len);
 		return(ENOSPC);
 	}
 
-	ltv->an_len = len;
-
 	/* Now read the data. */
 	ptr = ltv->an_val;
-	for (i = 0; i < (ltv->an_len - 1) >> 1; i++)
+	for (i = 0; i < (len - 1) >> 1; i++)
 		ptr[i] = CSR_READ_2(sc, AN_DATA1);
 
 #if BYTE_ORDER == BIG_ENDIAN
