@@ -1128,6 +1128,8 @@ in6_status(s, info)
 		printf("deprecated ");
 	if ((flags6 & IN6_IFF_AUTOCONF) != 0)
 		printf("autoconf ");
+	if ((flags6 & IN6_IFF_TEMPORARY) != 0)
+		printf("temporary ");
 
         if (scopeid)
 		printf("scopeid 0x%x ", scopeid);
