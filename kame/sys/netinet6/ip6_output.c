@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.211 2001/08/03 21:04:17 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.212 2001/08/07 14:13:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3001,6 +3001,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 			    != 0) {
 				return(EINVAL);
 			}
+			sa6->sin6_scope_id = 0; /* XXX */
 #endif
 			break;
 		}
@@ -3828,6 +3829,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				    != 0) {
 					return(EINVAL);
 				}
+				sa6->sin6_scope_id = 0; /* XXX */
 #endif
 				break;
 			case AF_LINK:	/* should eventually be supported */
