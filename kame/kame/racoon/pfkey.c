@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.35 2000/05/11 09:38:20 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.36 2000/05/19 12:45:25 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -361,6 +361,8 @@ pfkey_flush_sadb(proto)
 int
 pfkey_init()
 {
+	int reg_fail = 0;
+
 	if ((lcconf->sock_pfkey = pfkey_open()) < 0) {
 		plog(logp, LOCATION, NULL,
 			"libipsec failed pfkey open (%s)", ipsec_strerror());
@@ -371,25 +373,32 @@ pfkey_init()
 		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_ESP) < 0) {
 		plog(logp, LOCATION, NULL,
-			"libipesc failed regist esp (%s)", ipsec_strerror());
-		pfkey_close(lcconf->sock_pfkey);
-		return -1;
+			"WARNING: failed to regist esp (%s)", ipsec_strerror());
+		reg_fail++;
+		/*FALLTHROUGH*/
 	}
 
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_AH) < 0) {
 		plog(logp, LOCATION, NULL,
-			"libipsec failed regist ah (%s)", ipsec_strerror());
-		pfkey_close(lcconf->sock_pfkey);
-		return -1;
+			"WARNING: failed to regist ah (%s)", ipsec_strerror());
+		reg_fail++;
+		/*FALLTHROUGH*/
 	}
 
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_X_SATYPE_IPCOMP) < 0) {
 		plog(logp, LOCATION, NULL,
-			"libipsec failed regist ipcomp (%s)", ipsec_strerror());
+			"WARNING: failed to regist ipcomp (%s)", ipsec_strerror());
+		reg_fail++;
+		/*FALLTHROUGH*/
+	}
+
+	if (reg_fail == 3) {
+		plog(logp, LOCATION, NULL,
+			"failed to regist any protocol.");
 		pfkey_close(lcconf->sock_pfkey);
 		return -1;
 	}
