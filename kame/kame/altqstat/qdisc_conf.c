@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qdisc_conf.c,v 1.1 2000/01/18 07:29:01 kjc Exp $
+ * $Id: qdisc_conf.c,v 1.2 2000/01/19 07:50:07 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <err.h>
 
 #include "altqstat.h"
