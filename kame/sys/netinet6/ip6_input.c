@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.84 2000/05/10 00:21:16 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.85 2000/05/15 03:48:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -907,63 +907,75 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			 *rtalertp = ntohs(rtalert_val);
 			 break;
 		 case IP6OPT_JUMBO:
-			 /* XXX may need check for alignment */
-			 if (hbhlen < IP6OPT_JUMBO_LEN) {
-				 ip6stat.ip6s_toosmall++;
-				 goto bad;
-			 }
-			 if (*(opt + 1) != IP6OPT_JUMBO_LEN - 2)
-				  /* XXX: should we discard the packet? */
-				 log(LOG_ERR, "length of jumbopayload opt "
-				     "is inconsistent(%d)",
-				     *(opt + 1));
-			 optlen = IP6OPT_JUMBO_LEN;
+			/* XXX may need check for alignment */
+			if (hbhlen < IP6OPT_JUMBO_LEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+			if (*(opt + 1) != IP6OPT_JUMBO_LEN - 2)
+				 /* XXX: should we discard the packet? */
+				log(LOG_ERR, "length of jumbopayload opt "
+				    "is inconsistent(%d)",
+				    *(opt + 1));
+			optlen = IP6OPT_JUMBO_LEN;
 
-			 /*
-			  * We can simply cast because of the alignment
-			  * requirement of the jumbo payload option.
-			  */
-#if 0
-			 jumboplen = ntohl(*(u_int32_t *)(opt + 2));
-#else
-			 bcopy(opt + 2, &jumboplen, sizeof(jumboplen));
-			 jumboplen = (u_int32_t)htonl(jumboplen);
+			/*
+			 * IPv6 packets that have non 0 payload length
+			 * must not contain a jumbo paylod option.
+			 */
+			ip6 = mtod(m, struct ip6_hdr *);
+			if (ip6->ip6_plen) {
+				ip6stat.ip6s_badoptions++;
+				icmp6_error(m, ICMP6_PARAM_PROB,
+					    ICMP6_PARAMPROB_HEADER,
+					    sizeof(struct ip6_hdr) +
+					    sizeof(struct ip6_hbh) +
+					    opt - opthead);
+				return(-1);
+			}
+
+			/*
+			 * We may see jumbolen in unaligned location, so
+			 * we'd need to perform bcopy().
+			 */
+			bcopy(opt + 2, &jumboplen, sizeof(jumboplen));
+			jumboplen = (u_int32_t)htonl(jumboplen);
+
+#if 1
+			/*
+			 * if there are multiple jumbo payload options,
+			 * *plenp will be non-zero and the packet will be
+			 * rejected.
+			 * the behavior may need some debate in ipngwg -
+			 * multiple options does not make sense, however,
+			 * there's no explicit mention in specification.
+			 */
+			if (*plenp != 0) {
+				ip6stat.ip6s_badoptions++;
+				icmp6_error(m, ICMP6_PARAM_PROB,
+					    ICMP6_PARAMPROB_HEADER,
+					    sizeof(struct ip6_hdr) +
+					    sizeof(struct ip6_hbh) +
+					    opt + 2 - opthead);
+				return(-1);
+			}
 #endif
-			 if (*plenp != 0 || jumboplen <= IPV6_MAXPACKET) {
-				 /*
-				  * payload length field must be zero.
-				  * jumbo payload length must be larger
-				  * than 65535.
-				  *
-				  * if there are multiple jumbo payload
-				  * options, *plenp will be non-zero and
-				  * the packet will be rejected.
-				  */
-				 ip6stat.ip6s_badoptions++;
-				 icmp6_error(m, ICMP6_PARAM_PROB,
-					     ICMP6_PARAMPROB_HEADER,
-					     sizeof(struct ip6_hdr) +
-					     sizeof(struct ip6_hbh) +
-					     opt + 2 - opthead);
-				 return(-1);
-			 }
-			 *plenp = jumboplen;
 
-			 ip6 = mtod(m, struct ip6_hdr *);
-			 if (ip6->ip6_plen) {
-				 /*
-				  * IPv6 packets that have non 0 payload length
-				  * must not contain a jumbo paylod option.
-				  */
-				 ip6stat.ip6s_badoptions++;
-				 icmp6_error(m, ICMP6_PARAM_PROB,
-					     ICMP6_PARAMPROB_HEADER,
-					     sizeof(struct ip6_hdr) +
-					     sizeof(struct ip6_hbh) +
-					     opt - opthead);
-				 return(-1);
-			 }
-			 break;
+			/*
+			 * jumbo payload length must be larger than 65535.
+			 */
+			if (jumboplen <= IPV6_MAXPACKET) {
+				ip6stat.ip6s_badoptions++;
+				icmp6_error(m, ICMP6_PARAM_PROB,
+					    ICMP6_PARAMPROB_HEADER,
+					    sizeof(struct ip6_hdr) +
+					    sizeof(struct ip6_hbh) +
+					    opt + 2 - opthead);
+				return(-1);
+			}
+			*plenp = jumboplen;
+
+			break;
 		 default:		/* unknown option */
 			 if (hbhlen < IP6OPT_MINLEN) {
 				 ip6stat.ip6s_toosmall++;
