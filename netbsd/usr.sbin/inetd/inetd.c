@@ -236,6 +236,7 @@ __RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
 #ifndef IPSEC_POLICY_IPSEC	/* no ipsec support on old ipsec */
 #undef IPSEC
 #endif
+#include "ipsec.h"
 #endif
 
 #ifdef LIBWRAP
@@ -363,11 +364,6 @@ void		retry __P((int));
 void		run_service __P((int, struct servtab *));
 int		setconfig __P((void));
 void		setup __P((struct servtab *));
-#ifdef IPSEC
-int		ipsecsetup __P((struct servtab *));
-int		ipsecsetup_test __P((const char *));
-int		ipsecsetup0 __P((struct servtab *, const char *, int));
-#endif
 char	       *sskip __P((char **));
 char	       *skip __P((char **));
 void		tcpmux __P((int, struct servtab *));
@@ -821,10 +817,11 @@ config(signo)
 #ifdef IPSEC
 			SWAP(char *, sep->se_policy, cp->se_policy);
 			if (sep->se_fd != -1) {
-				if (ipsecsetup(sep) < 0 && sep->se_policy) {
-					syslog(LOG_ERR,
-					    "%s: ipsec initialization failed",
-					    sep->se_service);
+				if (ipsecsetup(sep->se_family, sep->se_fd,
+				    sep->se_policy) < 0 && sep->se_policy) {
+					syslog(LOG_ERR, "%s/%s: "
+					    "ipsec initialization failed",
+					    sep->se_service, sep->se_proto);
 					sep->se_checked = 0;
 					continue;
 				}
@@ -1060,7 +1057,8 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 		syslog(LOG_ERR, "setsockopt (SO_RCVBUF %d): %m",
 		    sep->se_rcvbuf);
 #ifdef IPSEC
-	if (ipsecsetup(sep) < 0 && sep->se_policy) {
+	if (ipsecsetup(sep->se_family, sep->se_fd, sep->se_policy) < 0
+	 && sep->se_policy) {
 		syslog(LOG_ERR, "%s/%s: ipsec setup failed",
 		    sep->se_service, sep->se_proto);
 		close(sep->se_fd);
@@ -1096,122 +1094,6 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 		fprintf(stderr, "registered %s on %d\n",
 		    sep->se_server, sep->se_fd);
 }
-
-#ifdef IPSEC
-int
-ipsecsetup(sep)
-	struct servtab *sep;
-{
-	char *p0, *p;
-	int error;
-
-	if (!sep->se_policy || sep->se_policy[0] == '\0')
-		p0 = p = newstr("in entrust; out entrust");
-	else
-		p0 = p = newstr(sep->se_policy);
-
-	error = 0;
-	while (1) {
-		p = strtok(p, ";");
-		if (p == NULL)
-			break;
-		while (*p && isspace(*p))
-			p++;
-		if (!*p) {
-			p = NULL;
-			continue;
-		}
-		error = ipsecsetup0(sep, p, 1);
-		if (error < 0)
-			break;
-		p = NULL;
-	}
-
-	free(p0);
-	return error;
-}
-
-int
-ipsecsetup_test(policy)
-	const char *policy;
-{
-	char *p0, *p;
-	char *buf;
-	int error;
-
-	if (!policy)
-		return -1;
-	p0 = p = newstr((char *)policy);
-
-	error = 0;
-	while (1) {
-		p = strtok(p, ";");
-		if (p == NULL)
-			break;
-		while (*p && isspace(*p))
-			p++;
-		if (!*p) {
-			p = NULL;
-			continue;
-		}
-		buf = ipsec_set_policy((char *)p, strlen(p));
-		if (buf == NULL) {
-			error = -1;
-			break;
-		}
-		free(buf);
-		p = NULL;
-	}
-
-	free(p0);
-	return error;
-}
-
-int
-ipsecsetup0(sep, policy, commit)
-	struct servtab *sep;
-	const char *policy;
-	int commit;
-{
-	int level;
-	int opt;
-	char *buf;
-	int error;
-
-	switch (sep->se_family) {
-	case AF_INET:
-		level = IPPROTO_IP;
-		opt = IP_IPSEC_POLICY;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		level = IPPROTO_IPV6;
-		opt = IPV6_IPSEC_POLICY;
-		break;
-#endif
-	default:
-		return -1;
-	}
-
-	buf = ipsec_set_policy((char *)policy, strlen(policy));
-	if (buf != NULL) {
-		error = 0;
-		if (commit && setsockopt(sep->se_fd, level, opt,
-				buf, ipsec_get_policylen(buf)) < 0) {
-			syslog(LOG_ERR,
-				"%s/%s: ipsec initialization failed; %s",
-				sep->se_service, sep->se_proto, policy);
-			error = -1;
-		}
-		free(buf);
-	} else {
-		syslog(LOG_ERR, "invalid security policy \"%s\"",
-			policy);
-		error = -1;
-	}
-	return error;
-}
-#endif
 
 /*
  * Finish with a service and its socket.
