@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1533 2001/02/04 17:46:24 jinmei Exp $
+$KAME: CHANGELOG,v 1.1534 2001/02/04 22:25:04 itojun Exp $
 
 <200102>
 2001-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -100,7 +100,7 @@ Wed Jan 31 17:43:23 JST 2001 sakane@ydc.cojp
 	XXX racoon simply adds SAs to the end of the file specified.
 
 Tue Jan 30 05:03:01 JST 2001  itojun@iijlab.net
-	* route6d: correctd RTA_NETMASK handling (do not look at sa_family).
+	* route6d: corrected RTA_NETMASK handling (do not look at sa_family).
 	  bug report from IIJ SEIL team.
 
 Mon Jan 29 JST 2001  itojun@iijlab.net
