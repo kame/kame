@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.60 2000/07/05 04:23:33 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.61 2000/07/05 07:39:16 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1318,8 +1318,7 @@ pk_recvacquire(mhp)
 	/* search for proper policyindex */
 	sp = getspbyspid(xpl->sadb_x_policy_id);
 	if (sp == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no policy found %s.\n", spidx2str(&sp->spidx));
+		plog(logp, LOCATION, NULL, "no policy found %s.\n");
 		return -1;
 	}
 	YIPSDEBUG(DEBUG_PFKEY,
