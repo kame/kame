@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.75 2000/06/14 18:54:32 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.76 2000/06/27 16:56:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -203,11 +203,11 @@ isakmp_handler(so_isakmp)
 	}
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	YIPSDEBUG(DEBUG_NET,
+	YIPSDEBUG(DEBUG_NOTIFY,
 		plog(logp, LOCATION, (struct sockaddr *)&local,
 			"%d bytes message received from %s\n",
 			len, saddr2str((struct sockaddr *)&remote)));
-	YIPSDEBUG(DEBUG_DNET, PVDUMP(buf));
+	YIPSDEBUG(DEBUG_NET, PVDUMP(buf));
 
 	/* avoid packets with malicious port/address */
 	switch (remote.ss_family) {
@@ -1259,11 +1259,11 @@ isakmp_send(iph1, buf)
 		}
 	}
 
-	YIPSDEBUG(DEBUG_NET,
+	YIPSDEBUG(DEBUG_NOTIFY,
 		plog(logp, LOCATION, iph1->local,
 			"%d times of %d bytes message will be sent.\n",
 			iph1->rmconf->count_persend, len));
-	YIPSDEBUG(DEBUG_DNET, PVDUMP(buf));
+	YIPSDEBUG(DEBUG_NET, PVDUMP(buf));
 
 	return 0;
 }

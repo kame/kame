@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.39 2000/06/19 09:21:25 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.40 2000/06/27 16:56:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1831,8 +1831,8 @@ oakley_compute_enckey(iph1)
 				plog(logp, LOCATION, NULL,
 					"compute intermediate cipher key K%d\n",
 					subkey));
-			YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(buf));
-			YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(res));
+			YIPSDEBUG(DEBUG_CRYPT, PVDUMP(buf));
+			YIPSDEBUG(DEBUG_CRYPT, PVDUMP(res));
 
 			cplen = (res->l < ep - p) ? res->l : ep - p;
 			memcpy(p, res->v, cplen);
@@ -1867,7 +1867,7 @@ oakley_compute_enckey(iph1)
 
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL, "final cipher key computed: "));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(iph1->key));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(iph1->key));
 
 	error = 0;
 
@@ -1941,7 +1941,7 @@ oakley_newiv(iph1)
 	vfree(buf);
 
 	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "IV computed: "));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(newivm->iv));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(newivm->iv));
 
 	iph1->ivm = newivm;
 
@@ -1987,7 +1987,7 @@ oakley_newiv2(iph1, msgid)
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL, "compute IV for phase2\n"));
 	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "phase1 last IV: "));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(buf));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(buf));
 
 	/* allocate IVm */
 	newivm = CALLOC(sizeof(struct isakmp_ivm), struct isakmp_ivm *);
@@ -2012,7 +2012,7 @@ oakley_newiv2(iph1, msgid)
 
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL, "phase2 IV computed: "));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(newivm->iv));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(newivm->iv));
 
 end:
 	if (error && newivm != NULL)
@@ -2064,7 +2064,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	memcpy(ivep->v, (caddr_t)&msg->v[msg->l - CBC_BLOCKLEN], CBC_BLOCKLEN);
 
 	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "IV saved: "));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(ivep));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(ivep));
 	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "IV not sync yet\n"));
 
 	pl = msg->v + sizeof(struct isakmp);
@@ -2092,7 +2092,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 		plog(logp, LOCATION, NULL,
 			"decrypt(%s)\n",
 			cipher[iph1->approval->enctype].name));
-	YIPSDEBUG(DEBUG_DCRYPT,
+	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL,
 			"with key: ");
 		PVDUMP(iph1->key));
@@ -2103,7 +2103,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	if (new == NULL)
 		goto end;
 
-	YIPSDEBUG(DEBUG_DCRYPT,
+	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL,
 			"decrypted payload by IV: ");
 		PVDUMP(ivdp));
@@ -2111,7 +2111,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL,
 			"decrypted payload, but not trimed.\n"));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(new));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(new));
 
 	/* get padding length */
 	if (lcconf->pad_excltail)
@@ -2128,7 +2128,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 			plog(logp, LOCATION, NULL,
 				"invalied padding len=%u, buflen=%u.\n",
 				padlen, new->l);
-			YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(new));
+			YIPSDEBUG(DEBUG_CRYPT, PVDUMP(new));
 			goto end;
 		}
 		new->l -= padlen;
@@ -2157,7 +2157,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL,
 			"decrypted.\n"));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(buf));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(buf));
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph1->remote, iph1->local, 1);
@@ -2222,7 +2222,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	else
 		buf->v[len + padlen - 1] = padlen;
 
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(buf));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(buf));
 
 	/* do encrypt */
 	if (iph1->approval->enctype > ARRAYLEN(cipher)
@@ -2236,7 +2236,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 		plog(logp, LOCATION, NULL,
 			"encrypt(%s).\n",
 			cipher[iph1->approval->enctype].name));
-	YIPSDEBUG(DEBUG_DCRYPT,
+	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL,
 			"with key: ");
 		PVDUMP(iph1->key));
@@ -2247,7 +2247,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	if (new == NULL)
 		goto end;
 
-	YIPSDEBUG(DEBUG_DCRYPT,
+	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL,
 			"encrypted payload by IV: ");
 		PVDUMP(ivep));
@@ -2257,7 +2257,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	memcpy(ivp->v, (caddr_t)&new->v[new->l - CBC_BLOCKLEN], CBC_BLOCKLEN);
 
 	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "save IV for next: "));
-	YIPSDEBUG(DEBUG_DCRYPT, PVDUMP(ivp));
+	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(ivp));
 
 	/* create new buffer */
 	len = sizeof(struct isakmp) + new->l;
