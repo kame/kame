@@ -1,0 +1,11 @@
+--- configure.kame-v6.orig	Thu Jan  7 22:01:41 1999
++++ configure.kame-v6	Thu Jan  7 22:02:47 1999
+@@ -1,6 +1,8 @@
+ #! /bin/sh
+ 
+ CFLAGS="-DINET6 -g"
++# If you are using KAME prior to 1999/01/07, comment the line out
++CFLAGS="$CFLAGS -Dss_len=__ss_len -Dss_family=__ss_family"
+ LDFLAGS="-L/usr/local/v6/lib"
+ LIBS="-linet6"
+ export CFLAGS LDFLAGS LIBS

@@ -1,0 +1,242 @@
+# $NetBSD: mk.conf.example,v 1.26 1998/09/01 13:56:42 agc Exp $
+#
+# Sample /etc/mk.conf file, which can be used to set specific values
+# for building either NetBSD or some of the NetBSD packages collection.
+# See the NetBSD packages(7) manual page for a full description of all
+# available options.
+#
+# Definitely not complete yet. - agc Fri Mar 27 16:42:38 GMT 1998
+#
+
+#
+#	Firstly, definitions for NetBSD and package collection
+#
+
+MANZ=		1		# gzip manual pages at installation time
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#LOCALBASE=	/usr/local	# Where non-X-based packages will be installed
+                                # Possible: any path
+                                # Default: /usr/pkg
+
+#CROSSBASE=	/usr/pkg/cross	# Where "cross" category packages install
+                                # Possible: any path
+                                # Default: ${LOCALBASE}/cross
+
+#X11BASE=	/usr/X11R6	# Where X11 is installed on the system
+                                # (and the default install path of X11 pkgs)
+                                # Possible: any path
+                                # Default: /usr/X11R6
+
+#USE_LOCALBASE_FOR_X11=		# Use the value of LOCALBASE, not X11BASE,
+                                # for installing X11-dependent pkgs
+                                # (requires X11R6.1, or NetBSD's X sets)
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#PACKAGES=       ${PKGSRCDIR}/packages/${MACHINE_ARCH}
+                                # Store generated packages on a per-
+                                # architecture base
+                                # Possible: any path you like
+                                # Default: /usr/pkgsrc/packages
+
+#OBJMACHINE=	1		# use machine-specific object directories,
+                                # e.g. work.i386, work.sparc
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#WRKOBJDIR=	/usr/tmp	# build here instead of in pkgsrc
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#UVM=		1		# Use the new UVM virtual memory subsystem
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#PASSIVE_FETCH=	1		# Use ftp(1) in passive mode, for use behind
+                                # filtering firewalls.
+                                # (Set by default in ftp(1) in NetBSD-current)
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#ACCEPTABLE_LICENSES=	shareware no-commercial-use
+                                # Whitespace-delimited list of the types of
+                                # license which are acceptable for installation.
+                                # (apart from standard "free" licenses such as
+                                # Berkeley/CMU and GPL).
+                                # Possible: shareware, no-commercial-use
+                                # 
+                                # Default: none
+
+#FAILOVER_FETCH= yes            # Perform a checksum at "make fetch" time.
+                                # If the checksum doesn't match the stored
+                                # value, try to retrieve the file from the
+                                # next site in the list
+                                # Possible: set, not set
+                                # Default: not set
+
+#USETBL= yes			# Run raw manual pages through tbl(1) before
+                                # piping through troff(1) when formatting
+                                # manual pages.
+                                # Possible: set, not set
+                                # Default: not set
+
+
+
+#
+#	Definitions used only in the packages collection
+#
+
+#AMANDA_USER=	backup		# Used in the amanda package to specify the
+                                # login user and group responsible for backups
+                                # Possible: any user name
+                                # Default: backup
+
+#BOOTSTRAP_EGCS=		# Used in egcs-current package to set
+                                # bootstrap compile (two-stage) mode.
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#DOMAIN_NAME=			# Used in the knews package to set the domain
+                                # name.
+                                # Possible: almost anything really, usually a
+                                #           FQDN.
+                                # Default: none
+
+#DONT_USE_IDEA=			# Used in ssh package to stop IDEA encryption
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#EXTRA_DICT=			# Used by ispell package to specify an extra
+                                # national dictionary.
+                                # Possible: [agc - unknown]
+                                # Default: not defined
+
+#GIMP_SMALL_DATA=		# Used in gimp package to specify installation
+                                # of the small data set only.
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#ISPELL_FR=			# Used by ispell to specify a French/English
+                                # dictionary.
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#LANG=				# Used by ispell to specify national dictionary
+                                # Possible: not defined, british
+                                # Default: not defined
+                                # [agc - this must conflict with the locale?]
+
+#LIBWRAP_FWD=			# Make libwrap also compare against forwards
+                                # Possible: not defined, YES
+                                # Default: not defined
+
+#MAKE_EBONES=			# Used in fetchmail and zephyr to specify use
+                                # of non-USA Kerberos-compatible subsystem.
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#MAKE_KERBEROS4=		# Used in the fetchmail package to specify use
+                                # of Kerberos subsystem.
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+NMH_MTA=	smtp		# default MTA for use in nmh.
+                                # Possible: smtp or sendmail.
+                                # Default: smtp
+
+#NOPORTDOCS=			# If defined, used to stop installation of
+                                # any documentation.
+                                # Possible: defined, not defined
+                                # Default: not defined.
+
+#NOMANINSTALL=			# Used in expact package to stop installation
+                                # of manual pages.
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+PAPERSIZE=	A4		# Default paper size for packages.
+                                # Possible: A4, Letter, Letterdj.
+                                # Default: none
+
+#PATCH_DEBUG=			# Used in exmh package to denote debugging
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#PGGROUP=ingres			# Used in postgresql package as the groupname
+                                # of the database administrator
+                                # Possible: any group name
+                                # Default: ingres
+
+#PGUSER=pgsql			# Used in postgresql package as the username
+                                # of the database admin
+                                # Possible: any user name
+                                # Default: pgsql
+
+#RCS_LOCALID=			# Used in cvs-current package for an RCS Id
+                                # which is expanded.
+                                # Possible: anything (within reason)
+                                # Default: none
+
+#SSH_CONF_DIR=			# Used in ssh to set the configuration
+                                # directory.
+                                # Possible: any valid directory
+                                # Default: /etc
+
+#SSH_SUID=			# Used in ssh to enable setuid installation
+                                # of "ssh" binary.
+                                # Possible: YES, or NO.
+                                # Default: NO
+
+#USE_MENUS=			# Used in xvile package to build in support for
+                                # menus.
+                                # Possible: defined, not defined
+                                # Default: undefined
+
+#USE_MULE=			# Used in xemacs package to build MULE
+                                # extensions
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#USE_RSAREF2=	NO		# Use the RSA reference package
+                                # Possible: YES (US domestic only), or NO.
+                                # Default: not defined.
+
+#USE_SOCKS=			# Used to specify SOCKS firewall support
+                                # Set this to the version of socks necessary.
+                                # Possible: 4, 5, not defined
+                                # Default: not defined
+
+#USE_XFACE=			# Used in xemacs package to build in
+                                # support for xface (pkgsrc/mail/face)
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+#ZIP_ENCRYPTION=		# Add encryption code to zip, zip1, and unzip
+                                # Possible: defined, not defined
+                                # Default: not defined
+
+
+#
+#	Overrides for faster or cheaper sites.
+#
+#	Refer to http://www.netbsd.org/Sites/net.html or /usr/doc/MIRRORS
+#	for information on determining the location of NetBSD mirror sites.
+#
+
+# Australia (AARNET).  Swap order of ftp.au.netbsd.org and
+# ftp2.au.netbsd.org if your link to University of Queensland is
+# cheaper/faster than your link to RMIT University (Melbourne).
+#
+#MASTER_SITE_XCONTRIB=	ftp://mirror.aarnet.edu.au/X11/contrib/%SUBDIR%/
+#MASTER_SITE_GNU=	ftp://mirror.aarnet.edu.au/gnu/%SUBDIR%/
+#MASTER_SITE_PERL_CPAN=	ftp://mirror.aarnet.edu.au/perl/CPAN/%SUBDIR%/
+#MASTER_SITE_TEX_CTAN=	ftp://mirror.aarnet.edu.au/tex-archive/%SUBDIR%/
+#MASTER_SITE_SUNSITE=	ftp://mirror.aarnet.edu.au/sunsite.unc.edu/%SUBDIR%/
+#MASTER_SITE_BACKUP=	\
+#	ftp://ftp.au.netbsd.org/pub/NetBSD/packages/distfiles/${DIST_SUBDIR}/ \
+#	ftp://ftp2.au.netbsd.org/pub/NetBSD/packages/distfiles/${DIST_SUBDIR}/ \
+#MASTER_SITE_LOCAL=	\
+#	ftp://ftp.au.netbsd.org/pub/NetBSD/packages/distfiles/LOCAL_PORTS/ \
+#	ftp://ftp2.au.netbsd.org/pub/NetBSD/packages/distfiles/LOCAL_PORTS/

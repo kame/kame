@@ -1,0 +1,30 @@
+--- lib/rip/ripng.c-	Tue Jan  5 18:19:37 1999
++++ lib/rip/ripng.c	Tue Jan  5 18:20:25 1999
+@@ -397,8 +397,13 @@
+ {
+     struct ipv6_mreq mreq;
+     char tmp6[INET6_ADDRSTRLEN];
++#ifdef IPV6_LEAVE_MEMBERSHIP
++    int cmd = IPV6_LEAVE_MEMBERSHIP;
++    char *s_cmd = "IPV6_LEAVE_MEMBERSHIP";
++#else
+     int cmd = IPV6_DROP_MEMBERSHIP;
+     char *s_cmd = "IPV6_DROP_MEMBERSHIP";
++#endif
+     interface_t *interface = rip_interface->interface;
+ 
+     /* 
+@@ -442,8 +447,13 @@
+ 	    }
+ 	}
+ #endif /* SOLARIS_IPV6 */
++#ifdef IPV6_JOIN_MEMBERSHIP
++        cmd = IPV6_JOIN_MEMBERSHIP;
++        s_cmd = "IPV6_JOIN_MEMBERSHIP";
++#else
+         cmd = IPV6_ADD_MEMBERSHIP;
+         s_cmd = "IPV6_ADD_MEMBERSHIP";
++#endif
+     }
+ 
+ 	if (rip_interface->sockfd >= 0) {

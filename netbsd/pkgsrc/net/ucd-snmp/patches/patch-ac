@@ -1,0 +1,20 @@
+--- snmplib/Makefile.in.orig	Fri Jun 26 22:47:23 1998
++++ snmplib/Makefile.in	Fri Jun 26 22:48:18 1998
+@@ -14,6 +14,8 @@
+ 	party_parse.o context_parse.o acl_parse.o \
+ 	system.o vacm.o int64.o
+ 
++SHLIB_VERSION=3.5
++
+ INSTALLHEADERS=asn1.h snmp_api.h snmp_client.h snmp_impl.h snmp.h parse.h mib.h
+ 
+ CFLAGS=@CFLAGS@ @SHLIB_CFLAGS@
+@@ -25,6 +27,8 @@
+ libsnmp.$(SHLIB_EXTENSION):    ${OBJS}
+ 	$(SHLIB_LD_CMD) libsnmp.$(SHLIB_EXTENSION) ${OBJS}
+ 	$(RANLIB) libsnmp.$(SHLIB_EXTENSION)
++	ln libsnmp.$(SHLIB_EXTENSION) \
++		libsnmp.$(SHLIB_EXTENSION).$(SHLIB_VERSION)
+ 
+ installdirs:
+ 	@$(SHELL) $(srcdir)/../mkinstalldirs $(libdir) $(includedir)
