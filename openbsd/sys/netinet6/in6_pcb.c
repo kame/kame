@@ -291,6 +291,8 @@ in6_pcbsetport(laddr, inp)
 	struct proc *p = curproc;		/* XXX */
 	int error;
 
+	/* XXX we no longer support IPv4 mapped address, so no tweaks here */
+
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
 	     (so->so_options & SO_ACCEPTCONN) == 0))
