@@ -91,6 +91,7 @@ int	flags;
 int	metric;
 int	mtu;
 int	setpsrc = 0;
+int	newaddr = 0;
 int	s;
 kvm_t	*kvmd;
 
@@ -101,7 +102,7 @@ char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
 void setifpsrc __P((char *, int));
 void setifpdst __P((char *, int));
 void setifflags __P((char *, int));
-
+void delifaddrs __P((char *, int));
 
 #define	NEXTARG		0xffffff
 
@@ -112,6 +113,7 @@ struct	cmd {
 } cmds[] = {
 	{ "up",		IFF_UP,		setifflags } ,
 	{ "down",	-IFF_UP,	setifflags },
+	{ "delete",	0,		delifaddrs },
 	{ 0,		0,		setifpsrc },
 	{ 0,		0,		setifpdst },
 };
@@ -394,10 +396,13 @@ ifconfig(argc, argv, af, rafp)
 		}
 		argc--, argv++;
 	}
-	if (1 /*newaddr*/) {
+	if (newaddr) {
 		strncpy(rafp->af_addreq, name, sizeof ifr.ifr_name);
 		if (ioctl(s, rafp->af_pifaddr, rafp->af_addreq) < 0)
 			Perror("ioctl (SIOCSIFPHYADDR)");
+	}
+	else if (setpsrc) {
+		errx(1, "destination is not specified");
 	}
 	return(0);
 }
@@ -423,6 +428,7 @@ setifpdst(addr, param)
 {
 	param = 0;	/*fool gcc*/
 	(*afp->af_getaddr)(addr, PDST);
+	newaddr = 1;
 }
 
 void
@@ -445,6 +451,19 @@ setifflags(vname, value)
 	ifr.ifr_flags = flags;
 	if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr) < 0)
 		Perror(vname);
+}
+
+/* ARGSUSED */
+void
+delifaddrs(vname, param)
+	char *vname;
+	int param;
+{
+	param = 0;		/* fool gcc */
+	vname = NULL;		/* ditto */
+
+	if (ioctl(s, SIOCDIFPHYADDR, (caddr_t)&ifr) < 0)
+		err(1, "ioctl(SIOCDIFPHYADDR)");
 }
 
 #define	IFFBITS \
