@@ -355,6 +355,15 @@ udp6_stats(off, name)
 #undef p1
 }
 
+#ifdef DCCP
+void
+dccp6_stats(off, name)
+	u_long off;
+	char *name;
+{
+}
+#endif
+
 static	char *ip6nh[] = {
 /*0*/	"hop by hop",
 	"ICMP",

@@ -181,6 +181,12 @@ struct nlist nl[] = {
 	{ "_arpstat" },
 #define N_RIP6STAT	55
 	{ "_rip6stat" },
+#define N_DCCPSTAT	56
+	{ "_dccpstat" },
+#define	N_DCCPBTABLE	57
+	{ "_dccpbtable" },
+#define	N_DCCPB6	58
+	{ "_dccpb6" },
 	{ "" },
 };
 
@@ -202,6 +208,10 @@ struct protox {
 	  tcp_stats,	NULL,		tcp_dump,	"tcp" },
 	{ N_UDBTABLE,	N_UDPSTAT,	1,	protopr,
 	  udp_stats,	NULL,		0,	"udp" },
+#ifdef DCCP
+	{ N_DCCPBTABLE,	N_DCCPSTAT,	1,	protopr,
+	  dccp_stats,	NULL,		0,	"dccp" },
+#endif	
 	{ -1,		N_IPSTAT,	1,	0,
 	  ip_stats,	NULL,		0,	"ip" },
 	{ -1,		N_ICMPSTAT,	1,	0,
@@ -231,6 +241,10 @@ struct protox ip6protox[] = {
 #endif
 	{ N_UDB6,	N_UDP6STAT,	1,	ip6protopr,
 	  udp6_stats,	NULL,		0,	"udp6" },
+#ifdef DCCP
+	{ N_DCCPB6,	N_DCCPSTAT,	1,	ip6protopr,
+	  dccp6_stats,	NULL,		0,	"dccp6" },
+#endif	
 #ifdef IPSEC
 	{ -1,		N_IPSEC6STAT,	1,	0,
 	  ipsec_stats,	NULL,		0,	"ipsec6" },

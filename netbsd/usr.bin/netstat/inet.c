@@ -75,6 +75,11 @@ __RCSID("$NetBSD: inet.c,v 1.51 2002/02/27 02:33:51 lukem Exp $");
 #include <netinet/tcp_debug.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#ifdef DCCP
+#include <netinet/dccp.h>
+#define DCCPSTATES
+#include <netinet/dccp_var.h>
+#endif
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -85,6 +90,9 @@ __RCSID("$NetBSD: inet.c,v 1.51 2002/02/27 02:33:51 lukem Exp $");
 
 struct	inpcb inpcb;
 struct	tcpcb tcpcb;
+#ifdef DCCP
+struct  dccpcb dccpcb;
+#endif
 struct	socket sockb;
 
 char	*inetname __P((struct in_addr *));
@@ -107,6 +115,9 @@ protopr(off, name)
 	struct inpcb *head, *next, *prev;
 	struct inpcb inpcb;
 	int istcp, compact;
+#ifdef DCCP
+	int isdccp;
+#endif
 	static int first = 1;
 	static char *shorttcpstates[] = {
 		"CLOSED",	"LISTEN",	"SYNSEN",	"SYSRCV",
@@ -117,6 +128,9 @@ protopr(off, name)
 	if (off == 0)
 		return;
 	istcp = strcmp(name, "tcp") == 0;
+#ifdef DCCP
+	isdccp = strcmp(name, "dccp") == 0;
+#endif
 	kread(off, (char *)&table, sizeof table);
 	prev = head =
 	    (struct inpcb *)&((struct inpcbtable *)off)->inpt_queue.cqh_first;
@@ -149,6 +163,12 @@ protopr(off, name)
 			kread((u_long)inpcb.inp_ppcb,
 			    (char *)&tcpcb, sizeof (tcpcb));
 		}
+#ifdef DCCP
+		if (isdccp) {
+			kread((u_long)inpcb.inp_ppcb,
+			    (char *)&dccpcb, sizeof (dccpcb));
+		}
+#endif
 		if (first) {
 			printf("Active Internet connections");
 			if (aflag)
@@ -164,7 +184,11 @@ protopr(off, name)
 			first = 0;
 		}
 		if (Aflag) {
+#ifdef DCCP
+			if (istcp || isdccp)
+#else
 			if (istcp)
+#endif
 				printf("%8lx ", (u_long) inpcb.inp_ppcb);
 			else
 				printf("%8lx ", (u_long) prev);
@@ -189,6 +213,14 @@ protopr(off, name)
 				    shorttcpstates[tcpcb.t_state] :
 				    tcpstates[tcpcb.t_state]);
 		}
+#ifdef DCCP
+		if (isdccp) {
+			if (dccpcb.state >= DCCP_NSTATES)
+				printf(" %d", dccpcb.state);
+			else
+				printf(" %s", dccpstates[dccpcb.state]);
+		}
+#endif
 		putchar('\n');
 	}
 }
@@ -361,6 +393,15 @@ udp_stats(off, name)
 #undef p
 #undef p3
 }
+
+#ifdef DCCP
+void
+dccp_stats(off, name)
+	u_long off;
+	char *name;
+{
+}
+#endif
 
 /*
  * Dump IP statistics structure.
