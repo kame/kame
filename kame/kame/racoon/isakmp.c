@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.90 2000/08/09 18:27:58 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.91 2000/08/09 18:29:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1712,7 +1712,7 @@ isakmp_set_attr_l(buf, type, val)
 	return buf + sizeof(*data);
 }
 
-/* add a variable data attribute to the buffer by reallocating it.
+/* add a variable data attribute to the buffer by reallocating it. */
 vchar_t *
 isakmp_add_attr_v(buf0, type, val, len)
 	vchar_t *buf0;
@@ -1744,7 +1744,7 @@ isakmp_add_attr_v(buf0, type, val, len)
 	return buf;
 }
 
-/* add a fixed data attribute to the buffer by reallocating it.
+/* add a fixed data attribute to the buffer by reallocating it. */
 vchar_t *
 isakmp_add_attr_l(buf0, type, val)
 	vchar_t *buf0;
