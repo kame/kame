@@ -273,14 +273,14 @@ char *
 addr2str(sa)
 	struct sockaddr *sa;
 {
-	static char addrbuf[8][MAXHOSTNAMELEN];
+	static char addrbuf[8][NI_MAXHOST];
 	static int round = 0;
 	char *cp;
 
 	round = (round + 1) & 7;
 	cp = addrbuf[round];
 
-	getnameinfo(sa, sa->sa_len, cp, MAXHOSTNAMELEN, NULL, 0,
+	getnameinfo(sa, sa->sa_len, cp, NI_MAXHOST, NULL, 0,
 		    NI_NUMERICHOST|NI_WITHSCOPEID);
 
 	return(cp);
