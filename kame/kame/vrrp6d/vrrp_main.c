@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_main.c,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
+/*	$KAME: vrrp_main.c,v 1.6 2003/04/16 09:47:41 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -80,7 +80,7 @@ vrrp_main_post_init(struct vrrp_vr * vr)
 	struct ether_addr *ethaddr;
 	char macaddr[18];
 	
-	snprintf(macaddr, 18, "00:00:5e:00:01:%02d", vr->vr_id);
+	snprintf(macaddr, 18, "00:00:5e:00:01:%02x", vr->vr_id);
 	macaddr[17] = '\0';
 	
 	if ((ethaddr = ether_aton(macaddr)) == NULL) {
