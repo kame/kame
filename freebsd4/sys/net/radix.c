@@ -62,7 +62,6 @@
 
 static int	rn_walktree_from __P((struct radix_node_head *h, void *a,
 				      void *m, walktree_f_t *f, void *w));
-static int rn_walktree __P((struct radix_node_head *, walktree_f_t *, void *));
 static struct radix_node
 	 *rn_insert __P((void *, struct radix_node_head *, int *,
 			struct radix_node [2])),
@@ -995,7 +994,7 @@ rn_walktree_from(h, a, m, f, w)
 	return 0;
 }
 
-static int
+int
 rn_walktree(h, f, w)
 	struct radix_node_head *h;
 	walktree_f_t *f;
