@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.28 2003/08/28 01:35:05 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.29 2003/08/28 01:38:04 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -325,6 +325,11 @@ like below is recommended when you use the result of
 .Nm
 for access control purposes.
 .Bd -literal -offset indent
+struct sockaddr *sa;
+socklen_t salen;
+char addr[NI_MAXHOST];
+struct addrinfo hints, *res;
+
 error = getnameinfo(sa, salen, addr, sizeof(addr),
     NULL, 0, NI_NAMEREQD);
 if (error == 0) {
