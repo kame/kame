@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.47 2000/02/08 18:04:46 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.48 2000/02/08 18:10:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -362,18 +362,24 @@ get_ph1approvalx(p, proposal)
 		return NULL;
 	for (s = proposal; s != NULL; s = s->next) {
 		YIPSDEBUG(DEBUG_SA,
-			printf("lifetime = %ld\n", s->lifetime);
-			printf("lifebyte = %d\n", s->lifebyte);
-			printf("enctype = %s\n",
+			plog(logp, LOCATION, NULL,
+				"DB lifetime = %ld\n", s->lifetime);
+			plog(logp, LOCATION, NULL,
+				"DB lifebyte = %d\n", s->lifebyte);
+			plog(logp, LOCATION, NULL,
+				"DB enctype = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
 						s->enctype));
-			printf("hashtype = %s\n",
+			plog(logp, LOCATION, NULL,
+				"DB hashtype = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
 						s->authmethod));
-			printf("authmethod = %s\n",
+			plog(logp, LOCATION, NULL,
+				"DB authmethod = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
 						s->authmethod));
-			printf("dh_group = %s\n",
+			plog(logp, LOCATION, NULL,
+				"DB dh_group = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
 						s->authmethod));
 		);
