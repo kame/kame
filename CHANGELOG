@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1379 2000/11/09 05:00:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.1380 2000/11/09 05:20:12 jinmei Exp $
 
 <200011>
 2000-11-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -18,9 +18,8 @@ Thu Nov  9 02:21:00 JST 2000  itojun@iijlab.net
 	  instead of m_free().
 	* sys/netinet6?/tcp6?_input.c: reject SYN if the destination address is
 	  a deprecated address, and we forbid the use of deprecated address.
-	  (done for freebsd2/bsdi3/openbsd/netbsd)
 	* sys/sys/mbuf.h: get rid of M_ANYCAST6. flag bit is a precious resource
-	  (done for freebsd2/bsdi3/openbsd/netbsd)
+	  (done for freebsd2/bsdi[34]/openbsd/netbsd)
 
 Thu Nov  9 02:17:10 JST 2000 sakane@ydc.co.jp
 	*racoon:
