@@ -900,6 +900,7 @@ routename6(sa6)
 	sa6_local.sin6_family = AF_INET6;
 	sa6_local.sin6_len = sizeof(struct sockaddr_in6);
 	sa6_local.sin6_addr = sa6->sin6_addr;
+	sa6_local.sin6_scope_id = sa6->sin6_scope_id;
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
