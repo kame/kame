@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.69 2001/06/03 06:42:16 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.70 2001/06/13 04:28:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.69 2001/06/03 06:42:16 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.70 2001/06/13 04:28:17 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -3348,22 +3348,28 @@ tracet(level, fmt, va_alist)
 {
 	va_list ap;
 
-#ifdef __STDC__
-	va_start(ap, fmt);
-#else
-	va_start(ap);
-#endif
 	if (level <= dflag) {
+#ifdef __STDC__
+		va_start(ap, fmt);
+#else
+		va_start(ap);
+#endif
 		fprintf(stderr, "%s: ", hms());
 		vfprintf(stderr, fmt, ap);
+		va_end(ap);
 	}
 	if (dflag) {
+#ifdef __STDC__
+		va_start(ap, fmt);
+#else
+		va_start(ap);
+#endif
 		if (level > 0)
 			vsyslog(LOG_DEBUG, fmt, ap);
 		else
 			vsyslog(LOG_WARNING, fmt, ap);
+		va_end(ap);
 	}
-	va_end(ap);
 }
 
 void
@@ -3378,20 +3384,27 @@ trace(level, fmt, va_alist)
 {
 	va_list ap;
 
+	if (level <= dflag) {
 #ifdef __STDC__
-	va_start(ap, fmt);
+		va_start(ap, fmt);
 #else
-	va_start(ap);
+		va_start(ap);
 #endif
-	if (level <= dflag)
 		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+	}
 	if (dflag) {
+#ifdef __STDC__
+		va_start(ap, fmt);
+#else
+		va_start(ap);
+#endif
 		if (level > 0)
 			vsyslog(LOG_DEBUG, fmt, ap);
 		else
 			vsyslog(LOG_WARNING, fmt, ap);
+		va_end(ap);
 	}
-	va_end(ap);
 }
 
 unsigned int
