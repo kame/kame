@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.117 2001/01/26 13:13:07 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.118 2001/01/26 13:14:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,8 +216,7 @@ int ident;			/* process id to identify our packets */
 u_int8_t nonce[8];		/* nonce field for node information */
 struct in6_addr srcaddr;
 int hoplimit = -1;		/* hoplimit */
-int pathmtu = 0;		/* path MTU for the destination.
-				   0 means unspecified. */
+int pathmtu = 0;		/* path MTU for the destination.  0 = unspec. */
 
 /* counters */
 long npackets;			/* max packets to transmit */
