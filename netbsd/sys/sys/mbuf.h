@@ -498,6 +498,20 @@ struct mbstat {
 	u_long	m_wait;		/* times waited for space */
 	u_long	m_drain;	/* times drained protocols for space */
 	u_short	m_mtypes[256];	/* type specific mbuf allocations */
+
+	u_quad_t m_exthdrget;	/* # of calls to IP6_EXTHDR_GET */
+	u_quad_t m_exthdrget0;	/* # of calls to IP6_EXTHDR_GET0 */
+	u_quad_t m_pulldowns;	/* # of calls to m_pulldown */
+	u_quad_t m_pulldown_copy; /* # of mbuf copies in m_pulldown */
+	u_quad_t m_pulldown_alloc; /* # of mbuf allocs in m_pulldown */
+	u_quad_t m_pullups;	/* # of calls to m_pullup */
+	u_quad_t m_pullup_copy;	/* # of possible m_pullup copies */
+	u_quad_t m_pullup_alloc; /* # of possible m_pullup mallocs */
+	u_quad_t m_pullup_fail;	/* # of possible m_pullup failures */
+	u_quad_t m_pullup2;	/* # of calls to m_pullup2 */
+	u_quad_t m_pullup2_copy; /* # of possible m_pullup2 copies */
+	u_quad_t m_pullup2_alloc; /* # of possible m_pullup2 mallocs */
+	u_quad_t m_pullup2_fail; /* # of possible m_pullup2 failures */
 };
 
 /*

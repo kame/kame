@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.17 2000/07/12 13:01:44 jinmei Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.18 2000/07/12 16:07:16 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -65,13 +65,10 @@
  *	@(#)uipc_mbuf.c	8.4 (Berkeley) 2/14/95
  */
 
-#define PULLDOWN_STAT
 /*#define PULLDOWN_DEBUG*/
 
-#ifdef PULLDOWN_STAT
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-#include "opt_inet.h"
-#endif
+#ifndef __NetBSD__
+#undef PULLDOWN_STAT
 #endif
 
 #include <sys/param.h>
@@ -79,16 +76,6 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#if defined(PULLDOWN_STAT) && defined(INET6) /* XXX */
-#ifdef NEW_STRUCT_ROUTE
-#include <sys/socket.h>
-#include <net/route.h>
-#endif
-
-#include <netinet/in.h>
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
 
 /*
  * ensure that [off, off + len) is contiguous on the mbuf chain "m".
@@ -109,7 +96,7 @@ m_pulldown(m, off, len, offp)
 	struct mbuf *n, *o;
 	int hlen, tlen, olen;
 	int sharedcluster;
-#if defined(PULLDOWN_STAT) && defined(INET6)
+#ifdef PULLDOWN_STAT
 	static struct mbuf *prev = NULL;
 	int prevlen = 0, prevmlen = 0;
 #endif
@@ -122,15 +109,15 @@ m_pulldown(m, off, len, offp)
 		return NULL;	/* impossible */
 	}
 
-#if defined(PULLDOWN_STAT) && defined(INET6)
-	ip6stat.ip6s_pulldown++;
+#ifdef PULLDOWN_STAT
+	mbstat.m_pulldowns++;
 #endif
 
-#if defined(PULLDOWN_STAT) && defined(INET6)
+#ifdef PULLDOWN_STAT
 	/* statistics for m_pullup */
-	ip6stat.ip6s_pullup++;
+	mbstat.m_pullups++;
 	if (off + len > MHLEN)
-		ip6stat.ip6s_pullup_fail++;
+		mbstat.m_pullup_fail++;
 	else {
 		int dlen, mlen;
 
@@ -138,16 +125,16 @@ m_pulldown(m, off, len, offp)
 		mlen = (prev == m) ? prevmlen : m->m_len + M_TRAILINGSPACE(m);
 
 		if (dlen >= off + len)
-			ip6stat.ip6s_pullup--; /* call will not be made! */
+			mbstat.m_pullups--; /* call will not be made! */
 		else if ((m->m_flags & M_EXT) != 0) {
-			ip6stat.ip6s_pullup_alloc++;
-			ip6stat.ip6s_pullup_copy++;
+			mbstat.m_pullup_alloc++;
+			mbstat.m_pullup_copy++;
 		} else {
 			if (mlen >= off + len)
-				ip6stat.ip6s_pullup_copy++;
+				mbstat.m_pullup_copy++;
 			else {
-				ip6stat.ip6s_pullup_alloc++;
-				ip6stat.ip6s_pullup_copy++;
+				mbstat.m_pullup_alloc++;
+				mbstat.m_pullup_copy++;
 			}
 		}
 
@@ -156,9 +143,9 @@ m_pulldown(m, off, len, offp)
 	}
 
 	/* statistics for m_pullup2 */
-	ip6stat.ip6s_pullup2++;
+	mbstat.m_pullup2++;
 	if (off + len > MCLBYTES)
-		ip6stat.ip6s_pullup2_fail++;
+		mbstat.m_pullup2_fail++;
 	else {
 		int dlen, mlen;
 
@@ -168,17 +155,17 @@ m_pulldown(m, off, len, offp)
 		prevmlen = mlen;
 
 		if (dlen >= off + len)
-			ip6stat.ip6s_pullup2--; /* call will not be made! */
+			mbstat.m_pullup2--; /* call will not be made! */
 		else if ((m->m_flags & M_EXT) != 0) {
-			ip6stat.ip6s_pullup2_alloc++;
-			ip6stat.ip6s_pullup2_copy++;
+			mbstat.m_pullup2_alloc++;
+			mbstat.m_pullup2_copy++;
 			prevmlen = (off + len > MHLEN) ? MCLBYTES : MHLEN;
 		} else {
 			if (mlen >= off + len)
-				ip6stat.ip6s_pullup2_copy++;
+				mbstat.m_pullup2_copy++;
 			else {
-				ip6stat.ip6s_pullup2_alloc++;
-				ip6stat.ip6s_pullup2_copy++;
+				mbstat.m_pullup2_alloc++;
+				mbstat.m_pullup2_copy++;
 				prevmlen = (off + len > MHLEN) ? MCLBYTES
 							       : MHLEN;
 			}
@@ -219,8 +206,8 @@ m_pulldown(m, off, len, offp)
 	if ((off == 0 || offp) && len <= n->m_len - off)
 		goto ok;
 
-#if defined(PULLDOWN_STAT) && defined(INET6)
-	ip6stat.ip6s_pulldown_copy++;
+#ifdef PULLDOWN_STAT
+	mbstat.m_pulldown_copy++;
 #endif
 
 	/*
@@ -307,8 +294,8 @@ m_pulldown(m, off, len, offp)
 	 * now, we need to do the hard way.  don't m_copy as there's no room
 	 * on both end.
 	 */
-#if defined(PULLDOWN_STAT) && defined(INET6)
-	ip6stat.ip6s_pulldown_alloc++;
+#ifdef PULLDOWN_STAT
+	mbstat.m_pulldown_alloc++;
 #endif
 	MGET(o, M_DONTWAIT, m->m_type);
 	if (o == NULL) {
@@ -397,6 +384,10 @@ m_aux_find(m, af, type)
 
 	for (n = m->m_pkthdr.aux; n; n = n->m_next) {
 		t = (struct mauxtag *)n->m_dat;
+		if (n->m_data != ((caddr_t)t) + sizeof(struct mauxtag)) {
+			printf("m_aux_find: invalid m_data for mbuf=%p (%p %p)\n", n, t, n->m_data);
+			continue;
+		}
 		if (t->af == af && t->type == type)
 			return n;
 	}
@@ -418,6 +409,10 @@ m_aux_delete(m, victim)
 	n = m->m_pkthdr.aux;
 	while (n) {
 		t = (struct mauxtag *)n->m_dat;
+		if (n->m_data != ((caddr_t)t) + sizeof(struct mauxtag)) {
+			printf("m_aux_delete: invalid m_data for mbuf=%p (%p %p)\n", n, t, n->m_data);
+			continue;
+		}
 		next = n->m_next;
 		if (n == victim) {
 			if (prev)
