@@ -239,8 +239,8 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 	}
 
 	/* the socket option overrides any other settings */
-	if (in6p && !IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr) &&
-	    (in6p->in6p_flags & IN6P_MINMTU) &&
+	if (in6p && (in6p->in6p_flags & IN6P_MINMTU) &&
+	    !IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr) &&
 	    size > IPV6_MMTU - iphlen - sizeof(struct tcphdr))
 		size = IPV6_MMTU - iphlen - sizeof(struct tcphdr);
 #endif
