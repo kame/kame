@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.65 2000/06/12 17:57:58 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.66 2000/06/12 18:17:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1438,6 +1438,7 @@ isakmp_post_acquire(iph2)
 
 	/* found ISAKMP-SA, but on negotiation. */
 	if (iph1->status != PHASE1ST_ESTABLISHED) {
+		iph2->retry_checkph1 = lcconf->retry_checkph1;
 		sched_new(1, isakmp_chkph1there, iph2);
 		YIPSDEBUG(DEBUG_STAMP,
 			plog(logp, LOCATION, iph2->dst,
@@ -1488,8 +1489,6 @@ isakmp_chkph1there(iph2)
 	struct ph2handle *iph2;
 {
 	struct ph1handle *iph1;
-
-	SCHED_INIT(iph2->scr);
 
 	iph2->retry_checkph1--;
 	if (iph2->retry_checkph1 < 0) {
