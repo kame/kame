@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.84 2000/08/31 07:32:41 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.85 2000/08/31 13:23:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1586,10 +1586,11 @@ pr_rthdr(void *extbuf)
 		in6 = inet6_rth_getaddr(extbuf, i);
 		if (in6 == NULL)
 			printf("   [%d]<NULL>\n", i);
-		else
-			printf("   [%d]%s\n", i,
-			       inet_ntop(AF_INET6, in6,
-					 ntopbuf, sizeof(ntopbuf)));
+		else {
+			if (!inet_ntop(AF_INET6, in6, ntopbuf, sizeof(ntopbuf)))
+				strncpy(ntopbuf, "?", sizeof(ntopbuf));
+			printf("   [%d]%s\n", i, ntopbuf);
+		}
 	}
 
 	return;
@@ -1737,8 +1738,9 @@ pr_nodeaddr(ni, nilen)
 	if (nilen <= 0)
 		printf("  no address\n");
 	for (; nilen > 0; nilen -= sizeof(*ia6), ia6 += 1) {
-		printf("  %s\n",
-		       inet_ntop(AF_INET6, ia6, ntop_buf, sizeof(ntop_buf)));
+		if (!inet_ntop(AF_INET6, ia6, ntop_buf, sizeof(ntop_buf)))
+			strncpy(ntop_buf, "?", sizeof(ntop_buf));
+		printf("  %s\n", ntop_buf);
 	}
 }
 
@@ -1990,12 +1992,14 @@ pr_icmph(icp, end)
 	case ND_REDIRECT:
 		red = (struct nd_redirect *)icp;
 		(void)printf("Redirect\n");
-		(void)printf("Destination: %s",
-			     inet_ntop(AF_INET6, &red->nd_rd_dst,
-				       ntop_buf, sizeof(ntop_buf)));
-		(void)printf("New Target: %s",
-			     inet_ntop(AF_INET6, &red->nd_rd_target,
-				       ntop_buf, sizeof(ntop_buf)));
+		if (!inet_ntop(AF_INET6, &red->nd_rd_dst, ntop_buf,
+		    sizeof(ntop_buf)))
+			strncpy(ntop_buf, "?", sizeof(ntop_buf));
+		(void)printf("Destination: %s", ntop_buf);
+		if (!inet_ntop(AF_INET6, &red->nd_rd_target, ntop_buf,
+		    sizeof(ntop_buf)))
+			strncpy(ntop_buf, "?", sizeof(ntop_buf));
+		(void)printf("New Target: %s", ntop_buf);
 		break;
 	case ICMP6_NI_QUERY:
 		(void)printf("Node Information Query");
@@ -2123,10 +2127,12 @@ pr_iph(ip6)
 	       (ip6->ip6_vfc & IPV6_VERSION_MASK) >> 4, tc, (int)ntohl(flow),
 	       ntohs(ip6->ip6_plen),
 	       ip6->ip6_nxt, ip6->ip6_hlim);
-	printf("%s->", inet_ntop(AF_INET6, &ip6->ip6_src,
-				  ntop_buf, sizeof(ntop_buf)));
-	printf("%s\n", inet_ntop(AF_INET6, &ip6->ip6_dst,
-				 ntop_buf, sizeof(ntop_buf)));
+	if (!inet_ntop(AF_INET6, &ip6->ip6_src, ntop_buf, sizeof(ntop_buf)))
+		strncpy(ntop_buf, "?", sizeof(ntop_buf));
+	printf("%s->", ntop_buf);
+	if (!inet_ntop(AF_INET6, &ip6->ip6_dst, ntop_buf, sizeof(ntop_buf)))
+		strncpy(ntop_buf, "?", sizeof(ntop_buf));
+	printf("%s\n", ntop_buf);
 }
 
 /*
