@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.49 2001/07/24 18:54:16 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.50 2001/07/24 19:21:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,6 +55,13 @@
  */
 /* XXX is M_NETADDR correct? */
 
+/*
+ * With USE_RADIX the code will use radix table for tunnel lookup.
+ * Faster on machines with thousands of tunnel registerations (= interfaces).
+ *
+ * The code assumes that radix table code can handle non-continuous netmask,
+ * as it will pass radix table memory region with (src + dst) sockaddr pair.
+ */
 #define USE_RADIX
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
