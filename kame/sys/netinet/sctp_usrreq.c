@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.12 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.13 2002/06/07 01:41:08 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -346,10 +346,10 @@ sctp_ctlinput(cmd, sa, vip)
 		 * Thus for our call we reverse the to and the from in the
 		 * lookup.
 		 */
-#ifdef __FreeBSD__
-		s = splnet();
-#else
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
 #endif
 		stcb = sctp_findassociation_addr_sa((struct sockaddr *)&from,
 						    (struct sockaddr *)&to,
@@ -375,10 +375,10 @@ sctp_ctlinput(cmd, sa, vip)
 			}
 		} else {
 			if (PRC_IS_REDIRECT(cmd) && inp) {
-#ifdef __FreeBSD__
-				s = splnet();
-#else
+#ifdef __NetBSD__
 				s = splsoftnet();
+#else
+				s = splnet();
 #endif
 				in_rtchange((struct inpcb *)inp,
 					    inetctlerrmap[cmd]);
@@ -414,10 +414,10 @@ sctp_pcblist(SYSCTL_HANDLER_ARGS)
 		return EPERM;
 
 	/* OK, now we're committed to doing something. */
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	gencnt = sctppcbinfo.ipi_gencnt_ep;
 	n = sctppcbinfo.ipi_count_ep;
@@ -435,10 +435,10 @@ sctp_pcblist(SYSCTL_HANDLER_ARGS)
 	if (inp_list == 0)
 		return ENOMEM;
 	
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	for (s_inp = sctppcbinfo.listhead.lh_first, i = 0; 
 	     s_inp && i < n;
@@ -520,10 +520,10 @@ sctp_pcblist(SYSCTL_HANDLER_ARGS)
 		 * while we were processing this request, and it
 		 * might be necessary to retry.
 		 */
-#ifdef __FreeBSD__
-		s = splnet();
-#else
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
 #endif
 		xig.xig_gen = sctppcbinfo.ipi_gencnt_ep;
 		xig.xig_sogen = so_gencnt;
@@ -554,10 +554,10 @@ sctp_getcred(SYSCTL_HANDLER_ARGS)
 	if (error)
 		return (error);
 	
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	inp = sctp_pcb_findep((struct sockaddr *)&addrs[0]);
 	if (inp == NULL || inp->sctp_socket == NULL) {
@@ -607,10 +607,10 @@ sctp_abort(struct socket *so)
 	if (inp == 0)
 		return EINVAL;	/* ??? possible? panic instead? */
 	soisdisconnected(so);
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	sctp_inpcb_free(inp,1);
 	splx(s);
@@ -631,10 +631,10 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 	error = soreserve(so, sctp_sendspace, sctp_recvspace);
 	if (error)
 		return error;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	error = sctp_inpcb_alloc(so);
 
@@ -681,10 +681,10 @@ sctp_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 	if (inp == 0)
 		return EINVAL;
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	error = sctp_inpcb_bind(so, addr, p);
 	splx(s);
@@ -701,10 +701,10 @@ sctp_detach(struct socket *so)
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
 		return EINVAL;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	sctp_inpcb_free(inp,0);
 	splx(s);
@@ -762,10 +762,10 @@ sctp_disconnect(struct socket *so)
 	struct sctp_inpcb *inp;
 	int s;
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
@@ -842,10 +842,10 @@ sctp_shutdown(struct socket *so)
 	struct sctp_inpcb *inp;
 	int s;
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
@@ -2584,10 +2584,10 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 	int s, error;
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	if (inp == 0) {
 		splx(s);
@@ -2665,10 +2665,10 @@ sctp_ctloutput(op, so, level, optname, mp)
 
 	family = so->so_proto->pr_domain->dom_family;
 	error = 0;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	switch (family) {
 	case PF_INET:
@@ -2731,10 +2731,10 @@ sctp_ctloutput(op, so, level, optname, mp)
 static int
 sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 {
-#ifdef __FreeBSD__
-	int s = splnet();
-#else
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
 #endif
 	int error = 0;
 	struct sctp_inpcb *inp;
@@ -2828,10 +2828,10 @@ sctp_usr_recvd(struct socket *so, int flags)
 	 */
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
@@ -2888,10 +2888,10 @@ sctp_listen(struct socket *so, struct proc *p)
 	 * to the sys/kern/uipc_socket.c module to reverse this but this
 	 * MUST be in place if the socket API for SCTP is to work properly.
 	 */
-#ifdef __FreeBSD__
-	int s = splnet();
-#else
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
 #endif
 	int error = 0;
 	struct sctp_inpcb *inp;
@@ -2954,10 +2954,10 @@ sctp_accept(struct socket *so,
 	    )
 {
 #ifdef SCTP_TCP_MODEL_SUPPORT
-#ifdef __FreeBSD__
-	int s = splnet();
-#else
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
 #endif
 	struct sctp_tcb *tcb;
 	struct sockaddr *prim;
@@ -3068,10 +3068,10 @@ sctp_ingetaddr(struct socket *so,
 #endif
 	sin->sin_family = AF_INET;
 	sin->sin_len = sizeof(*sin);
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (!inp) {
@@ -3144,10 +3144,10 @@ sctp_peeraddr(struct socket *so,
 	sin->sin_family = AF_INET;
 	sin->sin_len = sizeof(*sin);
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	/* We must recapture incase we blocked */
 	inp = (struct sctp_inpcb *)so->so_pcb;
@@ -3222,10 +3222,10 @@ sctp_usrreq(so, req, m, nam, control)
 
 	family = so->so_proto->pr_domain->dom_family;
 
-#ifdef __FreeBSD__
-	s = splnet();
-#else
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	if (req == PRU_CONTROL) {
 		switch (family) {

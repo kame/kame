@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.7 2002/05/27 14:32:50 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.8 2002/06/07 01:41:07 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -531,9 +531,9 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			}
 #else
 #ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
 #else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
 #endif
 #endif
 		}else{
@@ -541,9 +541,9 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL);
 #else
 #ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
 #else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
 #endif
 #endif
 		}
@@ -1166,9 +1166,9 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			}
 #else
 #ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
 #else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
 #endif
 #endif
 		} else {
@@ -1176,9 +1176,9 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL);
 #else
 #ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
 #else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
 #endif
 #endif
 		}
@@ -2149,7 +2149,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 					sctp_mtu_size_reset(&tcb->asoc,rtp->ro_rt->rt_rmx.rmx_mtu);
 				}
 			} else if (ifp) {
-				if (ND_IFINFO(ifp)->linkmtu && 
+				if (ND_IFINFO(ifp)->linkmtu &&
 				    (tcb->asoc.smallest_mtu > ND_IFINFO(ifp)->linkmtu)){
 					sctp_mtu_size_reset(&tcb->asoc, ND_IFINFO(ifp)->linkmtu);
 				}
