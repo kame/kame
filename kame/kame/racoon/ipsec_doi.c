@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.40 2000/01/14 03:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.41 2000/01/14 05:36:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2547,22 +2547,40 @@ setph1attr(sa, buf)
 	int attrlen = 0;
 
 	if (sa->lifetime) {
-		attrlen += sizeof(struct isakmp_data) +
-			sizeof(struct isakmp_data) + sizeof(sa->lifetime);
+		attrlen += sizeof(struct isakmp_data)
+			+ sizeof(struct isakmp_data);
+		if (sa->lifetime > 0xffff)
+			attrlen += sizeof(sa->lifetime);
 		if (buf) {
-			u_int32_t v = htonl((u_int32_t)sa->lifetime); /* XXX */
-			p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE, OAKLEY_ATTR_SA_LD_TYPE_SEC);
-			p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE,
+						OAKLEY_ATTR_SA_LD_TYPE_SEC);
+			if (sa->lifetime > 0xffff) {
+				u_int32_t v = htonl((u_int32_t)sa->lifetime);
+				p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD,
+						(caddr_t)&v, sizeof(v));
+			} else {
+				p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD,
+							sa->lifetime);
+			}
 		}
 	}
 
 	if (sa->lifebyte) {
-		attrlen += sizeof(struct isakmp_data) +
-			sizeof(struct isakmp_data) + sizeof(sa->lifebyte);
+		attrlen += sizeof(struct isakmp_data)
+			+ sizeof(struct isakmp_data);
+		if (sa->lifebyte > 0xffff)
+			attrlen += sizeof(sa->lifebyte);
 		if (buf) {
-			u_int32_t v = htonl((u_int32_t)sa->lifebyte); /* XXX */
-			p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE, OAKLEY_ATTR_SA_LD_TYPE_KB);
-			p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE,
+						OAKLEY_ATTR_SA_LD_TYPE_KB);
+			if (sa->lifebyte > 0xffff) {
+				u_int32_t v = htonl((u_int32_t)sa->lifebyte);
+				p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD,
+							(caddr_t)&v, sizeof(v));
+			} else {
+				p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD,
+							sa->lifebyte);
+			}
 		}
 	}
 	if (sa->enctype) {
@@ -2798,12 +2816,16 @@ getph2proplen(proposal)
 			len += sizeof(struct isakmp_data);
 
 			if (b->lifetime) {
-				len += sizeof(struct isakmp_data) +
-					sizeof(struct isakmp_data) + sizeof(u_int32_t);
+				len += sizeof(struct isakmp_data)
+					+ sizeof(struct isakmp_data);
+				if (b->lifetime > 0xffff)
+					len += sizeof(u_int32_t);
 			}
 			if (b->lifebyte) {
-				len += sizeof(struct isakmp_data) +
-					sizeof(struct isakmp_data) + sizeof(u_int32_t);
+				len += sizeof(struct isakmp_data)
+					+ sizeof(struct isakmp_data);
+				if (b->lifebyte > 0xffff)
+					len += sizeof(u_int32_t);
 			}
 			if (b->encklen)
 				len += sizeof(struct isakmp_data);
@@ -2906,12 +2928,14 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
 
 	len = sizeof(struct isakmp_data);
 	if (b->lifetime) {
-		len += sizeof(struct isakmp_data) +
-			sizeof(struct isakmp_data) + sizeof(u_int32_t);
+		len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+		if (b->lifetime > 0xffff)
+			len += sizeof(u_int32_t);
 	}
 	if (b->lifebyte) {
-		len += sizeof(struct isakmp_data) +
-			sizeof(struct isakmp_data) + sizeof(u_int32_t);
+		len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+		if (b->lifebyte > 0xffff)
+			len += sizeof(u_int32_t);
 	}
 	if (b->encklen)
 		len += sizeof(struct isakmp_data);
@@ -3022,15 +3046,29 @@ setph2attr(buf, sa, len)
 	*len = 0;
 
 	if (sa->lifetime) {
-		u_int32_t v = htonl((u_int32_t)sa->lifetime); /* XXX */
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD_TYPE, IPSECDOI_ATTR_SA_LD_TYPE_SEC);
-		p = isakmp_set_attr_v(p, IPSECDOI_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD_TYPE,
+					IPSECDOI_ATTR_SA_LD_TYPE_SEC);
+		if (sa->lifetime > 0xffff) {
+			u_int32_t v = htonl((u_int32_t)sa->lifetime);
+			p = isakmp_set_attr_v(p, IPSECDOI_ATTR_SA_LD,
+						(caddr_t)&v, sizeof(v));
+		} else {
+			p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD,
+						sa->lifetime);
+		}
 	}
 
 	if (sa->lifebyte) {
-		u_int32_t v = htonl((u_int32_t)sa->lifebyte); /* XXX */
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD_TYPE, IPSECDOI_ATTR_SA_LD_TYPE_KB);
-		p = isakmp_set_attr_v(p, IPSECDOI_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD_TYPE,
+					IPSECDOI_ATTR_SA_LD_TYPE_KB);
+		if (sa->lifebyte > 0xffff) {
+			u_int32_t v = htonl((u_int32_t)sa->lifebyte);
+			p = isakmp_set_attr_v(p, IPSECDOI_ATTR_SA_LD,
+						(caddr_t)&v, sizeof(v));
+		} else {
+			p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD,
+						sa->lifebyte);
+		}
 	}
 
 	p = isakmp_set_attr_l(p, IPSECDOI_ATTR_ENC_MODE, sa->encmode);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.18 2000/01/14 01:33:09 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.19 2000/01/14 05:36:56 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -964,7 +964,8 @@ pk_sendupdate(iph2)
 		}
 
 		/* set algorithm type and key length */
-		plog(logp, LOCATION, NULL, "%u %u %u\n", s->proto_id, s->enctype, s->authtype, s->comptype);
+		plog(logp, LOCATION, NULL, "%u %u %u\n",
+			s->proto_id, s->enctype, s->authtype, s->comptype);
 		e_keylen = iph2->approval->encklen;
 		if (pfkey_convertfromipsecdoi(
 				s->proto_id,
@@ -976,7 +977,9 @@ pk_sendupdate(iph2)
 			return -1;
 
 		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL, "call pfkey_send_update\n"););
+			plog(logp, LOCATION, NULL,
+				"call pfkey_send_update\n"););
+
 		if (pfkey_send_update(
 				lcconf->sock_pfkey,
 				satype,
