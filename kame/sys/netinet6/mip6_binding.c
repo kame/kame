@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.14 2001/09/20 07:12:50 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.15 2001/09/20 08:27:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -190,7 +190,7 @@ mip6_bu_list_find_withhaddr(bu_list, haddr)
 
 struct mip6_bu *
 mip6_bu_create(paddr, mpfx, coa, flags, sc)
-	struct in6_addr *paddr;
+	const struct in6_addr *paddr;
 	struct mip6_prefix *mpfx;
 	struct in6_addr *coa;
 	u_int16_t flags;
@@ -284,7 +284,7 @@ mip6_home_registration(sc)
 			
 	}
 	if (mbu == NULL) {
-		struct in6_addr *haaddr;
+		const struct in6_addr *haaddr;
 		struct mip6_ha *mha;
 		struct mip6_subnet_prefix *mspfx;
 		struct mip6_prefix *mpfx;
@@ -2325,6 +2325,8 @@ mip6_tunnel_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
+	struct mbuf *n;
+	struct ip6aux *ip6a;
 	struct ip6_hdr *ip6;
 	int s, af = 0;
 	u_int32_t otos;
@@ -2345,16 +2347,24 @@ mip6_tunnel_input(mp, offp, proto)
 		}
 
 		/* Tell MN that this packet was tunnelled. */
-		m->m_flags |= M_MIP6TUNNEL;
+		n = ip6_addaux(m);
+		if (!n) {
+			goto bad;	
+		}
+		ip6a = mtod(n, struct ip6aux *);
+		if ((ip6a->ip6a_flags & IP6A_MIP6TUNNELED) != 0) {
+			/* ip6 in ip6 in ip6 ?? */
+			goto bad;
+		}
+		ip6a->ip6a_flags |= IP6A_MIP6TUNNELED;
 
 		ip6 = mtod(m, struct ip6_hdr *);
 
 		s = splimp();
 		if (IF_QFULL(&ip6intrq)) {
 			IF_DROP(&ip6intrq);	/* update statistics */
-			m_freem(m);
 			splx(s);
-			return (IPPROTO_DONE);
+			goto bad;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
 #if 0
@@ -2366,10 +2376,13 @@ mip6_tunnel_input(mp, offp, proto)
 	}
 	default:
 		mip6log((LOG_ERR, "protocol %d not supported.\n", proto));
-		m_freem(m);
-		return (IPPROTO_DONE);
+		goto bad;
 	}
 
+	return (IPPROTO_DONE);
+
+  bad:
+	m_freem(m);
 	return (IPPROTO_DONE);
 }
 
@@ -2492,6 +2505,8 @@ int
 mip6_route_optimize(m)
 	struct mbuf *m;
 {
+	struct mbuf *n;
+	struct ip6aux *ip6a;
 	struct ip6_hdr *ip6;
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
@@ -2504,11 +2519,14 @@ mip6_route_optimize(m)
 		return (0);
 	}
 
-	if (!(m->m_flags & M_MIP6TUNNEL)) {
-		/*
-		 * XXX
-		 * not tunneled packet.  no need to optimize route.
-		 */
+	n = ip6_findaux(m);
+	if (!n) {
+		/* not tunneled packet.  no need to optimize route. */
+		return (0);
+	}
+	ip6a = mtod(n, struct ip6aux *);
+	if ((ip6a->ip6a_flags & IP6A_MIP6TUNNELED) == 0) {
+		/* not tunneled packet.  no need to optimize route. */
 		return (0);
 	}
 
