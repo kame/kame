@@ -1071,6 +1071,8 @@ packet_ok(mhdr, cc, seq)
 		warnx("failed to get received hop limit or packet info");
 #if 0
 		return(0);
+#else
+		rcvhlim = 0;	/*XXX*/
 #endif
 	}
 	else
@@ -1102,8 +1104,9 @@ packet_ok(mhdr, cc, seq)
 		    sbuf, sizeof(sbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
 			strcpy(sbuf, "invalid");
 		Printf("\n%d bytes from %s to %s", cc, sbuf,
-			inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
-				   dbuf, sizeof(dbuf)));
+		    rcvpktinfo ? inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
+					dbuf, sizeof(dbuf))
+			       : "?");
 		Printf(": icmp type %d (%s) code %d\n", type, pr_type(type),
 		       icp->icmp6_code);
 		p = (u_int8_t *)(icp + 1);
@@ -1189,12 +1192,14 @@ print(mhdr, cc)
 	if (verbose) {
 #ifdef OLDRAWSOCKET
 		Printf(" %d bytes to %s", cc,
-		       inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
-				 hbuf, sizeof(hbuf)));
+		    rcvpktinfo ? inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
+					hbuf, sizeof(hbuf))
+			       : "?");
 #else
 		Printf(" %d bytes of data to %s", cc,
-		       inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
-				 hbuf, sizeof(hbuf)));
+		    rcvpktinfo ?  inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
+					hbuf, sizeof(hbuf))
+			       : "?");
 #endif
 	}
 }
