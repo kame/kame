@@ -213,6 +213,12 @@ struct addrinfo {
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
+#define NI_WITHSCOPEID	0x00000020
+
+/*
+ * Scope delimit character
+ */
+#define SCOPE_DELIMITER	'@'
 
 __BEGIN_DECLS
 void		endhostent __P((void));
