@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1926 2001/10/22 09:30:36 keiichi Exp $
+$KAME: CHANGELOG,v 1.1927 2001/10/23 01:11:39 sakane Exp $
 
 <200110>
+Tue Oct 23 10:11:07 JST 2001 sakane@kame.net
+	* kame/kame/racoon:
+	racoon gives up the negotiation when racoon cannot find any pre-shared
+	key in the case of the aggressive mode AND verify_identifier is set on.
+
 Mon Oct 22 18:28:07 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_binding.c
         - fix a bug of the updating routine of the BC entries
