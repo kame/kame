@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1760 2001/07/06 05:39:58 suz Exp $
+$KAME: CHANGELOG,v 1.1761 2001/07/06 06:19:31 itojun Exp $
 
 <200107>
+Fri Jul  6 15:17:25 JST 2001  itojun@iijlab.net
+	* netbsd/sys/sys/systm.h: declare ovbcopy() for better code sharing.
+
 Fri Jul  6 14:37:30 JST 2001	suz@sdl.hitachi.co.jp
 	* freebsd4/usr.bin/v6test: added v6test to FreeBSD4-KAME
 
