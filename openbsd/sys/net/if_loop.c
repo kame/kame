@@ -250,13 +250,11 @@ looutput(ifp, m, dst, rt)
 			return ENOBUFS;
 		}
 
-		n->m_pkthdr.rcvif = m->m_pkthdr.rcvif;
-		n->m_pkthdr.len = m->m_pkthdr.len;
+		M_COPY_PKTHDR(n, m);
 		if (m->m_pkthdr.len <= MCLBYTES) {
 			m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
 			n->m_len = m->m_pkthdr.len;
-			n->m_pkthdr.aux = m->m_pkthdr.aux;
-			m->m_pkthdr.aux = (struct mbuf *)NULL;
+			n->m_next = NULL;
 			m_freem(m);
 		} else {
 			m_copydata(m, 0, MCLBYTES, mtod(n, caddr_t));
