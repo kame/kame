@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.272 2001/08/31 05:15:08 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.273 2001/09/03 10:10:02 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -221,7 +221,7 @@ draft-ietf-ipngwg-temp-addresses-v2-00.txt:
 draft-ietf-pim-sm-v2-new-02.txt
 	A revised version of RFC2362, which includes the IPv6 specific
 	packet format and protocol descriptions.
-draft-ietf-dnsext-mdns-00.txt: Multicast DNS
+draft-ietf-dnsext-mdns-03.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
