@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.274 2001/09/09 21:45:37 sakane Exp $
+	$KAME: IMPLEMENTATION,v 1.275 2001/09/13 01:51:48 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1760,7 +1760,7 @@ following standards:
 		(expired, available in ftp://ftp.kame.net/pub/internet-drafts/)
 	draft-ietf-ipsec-ciph-aes-cbc-01.txt
     IPComp:
-	RFC2393: IP Payload Compression Protocol (IPComp)
+	RFC3173: IP Payload Compression Protocol (IPComp)
 IKE specifications (rfc240[7-9].txt) are implemented in userland
 as "racoon" IKE daemon.
 
