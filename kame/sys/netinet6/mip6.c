@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.100 2002/01/08 02:40:57 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.101 2002/01/11 07:01:56 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -89,6 +89,17 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 
+#ifndef MIP6_CONFIG_DEBUG
+#ifdef MIP6_DEBUG
+#define MIP6_CONFIG_DEBUG 1
+#else
+#define MIP6_CONFIG_DEBUG 0
+#endif
+#endif /* !MIP6_CONFIG_DEBUG */
+#ifndef MIP6_CONFIG_USE_IPSEC
+#define MIP6_CONFIG_USE_IPSEC 1
+#endif /* !MIP6_CONFIG_USE_IPSEC */
+
 extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_prefix_list mip6_prefix_list;
 
@@ -158,12 +169,8 @@ mip6_init()
 {
 	bzero(&mip6_config, sizeof(mip6_config));
 	mip6_config.mcfg_type = 0;
-#ifdef MIP6_DEBUG
-	mip6_config.mcfg_debug = 1;
-#else /* MIP6_DEBUG */
-	mip6_config.mcfg_debug = 0;
-#endif /* MIP6_DEBUG */
-	mip6_config.mcfg_use_ipsec = 0;
+	mip6_config.mcfg_debug = MIP6_CONFIG_DEBUG;
+	mip6_config.mcfg_use_ipsec = MIP6_CONFIG_USE_IPSEC;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
         callout_init(&mip6_pfx_ch);
@@ -1608,7 +1615,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 			sav = isr->sav;
 		}
 	}
-	if (sav == NULL) {
+	if (sav == NULL && mip6_config.mcfg_use_ipsec != 0)
+	{
 		/* no security association. */
 		mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; /* XXX */
 		error = EACCES;
@@ -1703,6 +1711,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
+if (sav != NULL) {	/* XXX */
 	/*
 	 * create and insert an authentication data sub-option.
 	 */
@@ -1741,6 +1750,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		error = ENOMEM;
 		goto freesp;
 	}
+}
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
 	
@@ -1939,7 +1949,8 @@ mip6_ba_destopt_create(pktopt_badest2, src, dst,
 			sav = isr->sav;
 		}
 	}
-	if (sav == NULL) {
+	if (sav == NULL && mip6_config.mcfg_use_ipsec != 0)
+	{
 		/* no security association. */
 		error = EACCES;
 		goto freesp;
@@ -1975,6 +1986,7 @@ mip6_ba_destopt_create(pktopt_badest2, src, dst,
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
+if (sav != NULL) {	/* XXX */
 	/*
 	 * create and insert an authentication data sub-option.
 	 */
@@ -2012,6 +2024,7 @@ mip6_ba_destopt_create(pktopt_badest2, src, dst,
 			 __FILE__, __LINE__));
 		goto freesp;
 	}
+}
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
 

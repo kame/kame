@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.58 2002/01/08 02:40:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.59 2002/01/11 07:01:57 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -929,8 +929,10 @@ mip6_validate_bu(m, opt)
 				 "from host %s\n",
 				 __FILE__, __LINE__,
 				 ip6_sprintf(&ip6->ip6_src)));
-			/* discard. */
-			/* XXX */
+			if (mip6_config.mcfg_use_ipsec != 0) {
+				/* silently ignore */
+				return (1);
+			}
 		} else {
 			/*
 			 * if the packet is not protected by the ipsec
@@ -1667,6 +1669,7 @@ mip6_dad_stop(mbc)
 		return (ENOENT);
 	nd6_dad_stop((struct ifaddr *)ia);
 	free(ia, M_IFADDR);
+	mbc->mbc_dad = NULL;
 	return (0);
 }
 
@@ -2022,7 +2025,9 @@ mip6_ifa_need_dad(ia)
 		if (mbu != NULL)
 			break;
 	}
+#ifdef MIP6_DEBUG
 if(mbu)	mip6_bu_print(mbu);
+#endif
 	if ((mbu == NULL) || (mbu->mbu_lifetime <= 0))
 		need_dad = 1;
 
@@ -2235,8 +2240,10 @@ mip6_validate_ba(m, opt)
 				 "from host %s\n",
 				 __FILE__, __LINE__,
 				 ip6_sprintf(&ip6->ip6_src)));
-			/* discard. */
-			/* XXX */
+			if (mip6_config.mcfg_use_ipsec != 0) {
+				/* silently ignore */
+				return (1);
+			}
 		} else {
 			/*
 			 * if the packet is not protected by the ipsec
