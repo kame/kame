@@ -214,7 +214,12 @@ struct inpcb;
 struct sockopt;
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));
+#else
 int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+#endif
+
 void	ip6_init __P((void));
 void	ip6intr __P((void));
 void	ip6_input __P((struct mbuf *));
