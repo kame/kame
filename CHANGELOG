@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.921 2000/05/23 12:50:55 sakane Exp $
+$Id: CHANGELOG,v 1.922 2000/05/23 16:32:20 itojun Exp $
 
 <200005>
+Wed May 24 01:29:46 JST 2000  itojun@iijlab.net
+	* netbsd/usr.sbin/pppd: pppd with IPv6 support.  from netbsd-current.
+	* netbsd/sys/net/if_ppp.c: async ppp kernel code with IPv6 support.
+	  from netbsd-current.  it will change ioctl API slightly,
+	  and stock netbsd142 pppd may choke.
+
 Tue May 23 21:51:00 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	fix to get local address to be used by sending address.  It was
