@@ -28,12 +28,13 @@ SRCDIR=	${.CURDIR}/../../../kame/dhcp6
 
 PROG=	dhcp6c
 SRCS=	dhcp6c.c common.c config.c if.c prefixconf.c dhcp6c_ia.c timer.c \
-	dhcp6c_script.c base64.c \
+	dhcp6c_script.c base64.c auth.c \
 	cfparse.y cftoken.l
 CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g -Wall -Werror
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
-CFLAGS+= -DINET6=1 -DHAVE_GETIFADDRS=1 -DHAVE_IFADDRS_H=1 -DHAVE_STDARG_H=1
+CFLAGS+= -DINET6=1 -DHAVE_GETIFADDRS=1 -DTIME_WITH_SYS_TIME=1 \
+	-DHAVE_IFADDRS_H=1 -DHAVE_STDARG_H=1
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
