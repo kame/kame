@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.56 2002/12/02 13:59:29 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.57 2002/12/06 04:41:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -405,7 +405,7 @@ natpt_setRules(caddr_t addr)
 
 
 int
-natpt_openIncomingV4Rule(int proto, struct pAddr *local, struct pAddr *remote)
+natpt_openTemporaryRule(int proto, struct pAddr *local, struct pAddr *remote)
 {
 	struct cSlot	*cst;
 

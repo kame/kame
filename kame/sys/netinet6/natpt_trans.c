@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.153 2002/12/04 05:00:32 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.154 2002/12/06 04:41:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2252,7 +2252,7 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		if (natpt_openIncomingV4Conn(IPPROTO_TCP, &remote, &local) == NULL)
 			return (0);
 #else
-		if (natpt_openIncomingV4Rule(IPPROTO_TCP, &remote, &local) == 0)
+		if (natpt_openTemporaryRule(IPPROTO_TCP, &remote, &local) == 0)
 			return (0);
 #endif
 
@@ -2381,7 +2381,7 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 		remote.addr[0] = ats->local.addr[1];	/* 0: v4 client address */
 							/* 1: v4 server address */
 
-		if (natpt_openIncomingV4Rule(IPPROTO_TCP, &local, &remote) == 0)
+		if (natpt_openTemporaryRule(IPPROTO_TCP, &local, &remote) == 0)
 			return (0);
 
 		wp = Wow;
