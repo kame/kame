@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.296 2002/11/20 07:39:33 fujisawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.297 2002/12/09 09:49:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1276,7 +1276,6 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
 	struct mbuf *m = *mp;
 	int off = *offp, hbhlen;
 	struct ip6_hbh *hbh;
-	u_int8_t *opt;
 
 	/* validation of the length of the header */
 #ifndef PULLDOWN_TEST
@@ -1303,7 +1302,6 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
 #endif
 	off += hbhlen;
 	hbhlen -= sizeof(struct ip6_hbh);
-	opt = (u_int8_t *)hbh + sizeof(struct ip6_hbh);
 
 	if (ip6_process_hopopts(m, (u_int8_t *)hbh + sizeof(struct ip6_hbh),
 				hbhlen, rtalertp, plenp) < 0)
