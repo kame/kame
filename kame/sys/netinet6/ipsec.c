@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.148 2002/06/12 01:37:25 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.149 2002/06/12 17:55:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,7 +138,7 @@ int ip4_esp_trans_deflev = IPSEC_LEVEL_USE;
 int ip4_esp_net_deflev = IPSEC_LEVEL_USE;
 int ip4_ah_trans_deflev = IPSEC_LEVEL_USE;
 int ip4_ah_net_deflev = IPSEC_LEVEL_USE;
-struct secpolicy ip4_def_policy;
+struct secpolicy *ip4_def_policy;
 int ip4_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
 int ip4_esp_randpad = -1;
 
@@ -185,7 +185,7 @@ int ip6_esp_trans_deflev = IPSEC_LEVEL_USE;
 int ip6_esp_net_deflev = IPSEC_LEVEL_USE;
 int ip6_ah_trans_deflev = IPSEC_LEVEL_USE;
 int ip6_ah_net_deflev = IPSEC_LEVEL_USE;
-struct secpolicy ip6_def_policy;
+struct secpolicy *ip6_def_policy;
 int ip6_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
 int ip6_esp_randpad = -1;
 
@@ -230,8 +230,8 @@ static struct inpcbpolicy *ipsec_newpcbpolicy __P((void));
 static void ipsec_delpcbpolicy __P((struct inpcbpolicy *));
 #if 0
 static int ipsec_deepcopy_pcbpolicy __P((struct inpcbpolicy *));
-static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *));
 #endif
+static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *));
 static int ipsec_set_policy
 	__P((struct secpolicy **, int, caddr_t, size_t, int));
 static int ipsec_get_policy __P((struct secpolicy *, struct mbuf **));
@@ -502,10 +502,10 @@ ipsec4_getpolicybysock(m, dir, so, error)
 			}
 
 			/* no SP found */
-			ip4_def_policy.refcnt++;
+			ip4_def_policy->refcnt++;
 			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, &ip4_def_policy, dir);
-			return &ip4_def_policy;
+			ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
+			return ip4_def_policy;
 
 		case IPSEC_POLICY_IPSEC:
 			currsp->refcnt++;
@@ -545,10 +545,10 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		return NULL;
 
 	case IPSEC_POLICY_ENTRUST:
-		ip4_def_policy.refcnt++;
+		ip4_def_policy->refcnt++;
 		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, &ip4_def_policy, dir);
-		return &ip4_def_policy;
+		ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
+		return ip4_def_policy;
 
 	case IPSEC_POLICY_IPSEC:
 		currsp->refcnt++;
@@ -614,9 +614,9 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	}
 
 	/* no SP found */
-	ip4_def_policy.refcnt++;
+	ip4_def_policy->refcnt++;
 	*error = 0;
-	return &ip4_def_policy;
+	return ip4_def_policy;
 }
 
 #ifdef INET6
@@ -704,10 +704,10 @@ ipsec6_getpolicybysock(m, dir, so, error)
 			}
 
 			/* no SP found */
-			ip6_def_policy.refcnt++;
+			ip6_def_policy->refcnt++;
 			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, &ip6_def_policy, dir);
-			return &ip6_def_policy;
+			ipsec_fillpcbcache(pcbsp, m, ip6_def_policy, dir);
+			return ip6_def_policy;
 
 		case IPSEC_POLICY_IPSEC:
 			currsp->refcnt++;
@@ -747,10 +747,10 @@ ipsec6_getpolicybysock(m, dir, so, error)
 		return NULL;
 
 	case IPSEC_POLICY_ENTRUST:
-		ip6_def_policy.refcnt++;
+		ip6_def_policy->refcnt++;
 		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, &ip6_def_policy, dir);
-		return &ip6_def_policy;
+		ipsec_fillpcbcache(pcbsp, m, ip6_def_policy, dir);
+		return ip6_def_policy;
 
 	case IPSEC_POLICY_IPSEC:
 		currsp->refcnt++;
@@ -823,9 +823,9 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	}
 
 	/* no SP found */
-	ip6_def_policy.refcnt++;
+	ip6_def_policy->refcnt++;
 	*error = 0;
-	return &ip6_def_policy;
+	return ip6_def_policy;
 }
 #endif /* INET6 */
 
@@ -1256,12 +1256,22 @@ ipsec_copy_pcbpolicy(old, new)
 
 	if (new->sp_in)
 		key_freesp(new->sp_in);
-	new->sp_in = old->sp_in;
-	new->sp_in->refcnt++;
+	if (old->sp_in->policy == IPSEC_POLICY_IPSEC)
+		new->sp_in = ipsec_deepcopy_policy(old->sp_in);
+	else {
+		new->sp_in = old->sp_in;
+		new->sp_in->refcnt++;
+	}
+
 	if (new->sp_out)
 		key_freesp(new->sp_out);
-	new->sp_out = old->sp_out;
-	new->sp_out->refcnt++;
+	if (old->sp_out->policy == IPSEC_POLICY_IPSEC)
+		new->sp_out = ipsec_deepcopy_policy(old->sp_out);
+	else {
+		new->sp_out = old->sp_out;
+		new->sp_out->refcnt++;
+	}
+
 	new->priv = old->priv;
 
 	return 0;
@@ -1290,6 +1300,7 @@ ipsec_deepcopy_pcbpolicy(pcb_sp)
 
 	return 0;
 }
+#endif
 
 /* deep-copy a policy in PCB */
 static struct secpolicy *
@@ -1333,6 +1344,9 @@ ipsec_deepcopy_policy(src)
 		q = &((*q)->next);
 	}
 
+	if (src->spidx)
+		keydb_setsecpolicyindex(dst, src->spidx);
+
 	dst->req = newchain;
 	dst->state = src->state;
 	dst->policy = src->policy;
@@ -1346,9 +1360,9 @@ fail:
 		free(p, M_SECA);
 		p = NULL;
 	}
+	key_freesp(dst);
 	return NULL;
 }
-#endif
 
 /* set policy and ipsec request if present. */
 static int
@@ -3930,7 +3944,7 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				     &ipsecstat, sizeof(ipsecstat));
 	case IPSECCTL_DEF_POLICY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_def_policy.policy);
+				  &ip4_def_policy->policy);
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
@@ -4035,7 +4049,7 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				     &ipsec6stat, sizeof(ipsec6stat));
 	case IPSECCTL_DEF_POLICY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_def_policy.policy);
+				  &ip6_def_policy->policy);
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();

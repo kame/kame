@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.65 2002/06/12 01:14:02 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.66 2002/06/12 17:55:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,6 +62,8 @@
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
 #endif
 
+extern TAILQ_HEAD(_sptailq, secpolicy) sptailq;
+
 static void keydb_delsecasvar __P((struct secasvar *));
 
 /*
@@ -70,12 +72,34 @@ static void keydb_delsecasvar __P((struct secasvar *));
 struct secpolicy *
 keydb_newsecpolicy()
 {
-	struct secpolicy *p;
+	struct secpolicy *p, *np;
 
 	p = (struct secpolicy *)malloc(sizeof(*p), M_SECA, M_NOWAIT);
 	if (!p)
 		return p;
 	bzero(p, sizeof(*p));
+	if (TAILQ_EMPTY(&sptailq)) {
+		p->id = 1;
+		TAILQ_INSERT_HEAD(&sptailq, p, tailq);
+		return p;
+	} else if (TAILQ_LAST(&sptailq, _sptailq)->id < 0xffffffff) {
+		p->id = TAILQ_LAST(&sptailq, _sptailq)->id + 1;
+		TAILQ_INSERT_TAIL(&sptailq, p, tailq);
+		return p;
+	} else {
+		TAILQ_FOREACH(np, &sptailq, tailq) {
+			if (np->id + 1 != TAILQ_NEXT(np, tailq)->id) {
+				p->id = np->id + 1;
+				TAILQ_INSERT_AFTER(&sptailq, np, p, tailq);
+				break;
+			}
+		}
+		if (!np) {
+			free(p, M_SECA);
+			return NULL;
+		}
+	}
+
 	return p;
 }
 
@@ -84,6 +108,7 @@ keydb_delsecpolicy(p)
 	struct secpolicy *p;
 {
 
+	TAILQ_REMOVE(&sptailq, p, tailq);
 	if (p->spidx)
 		free(p->spidx, M_SECA);
 	free(p, M_SECA);

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.58 2002/06/12 01:14:01 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.59 2002/06/12 17:55:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,7 +75,8 @@ struct secpolicyindex {
 
 /* Security Policy Data Base */
 struct secpolicy {
-	LIST_ENTRY(secpolicy) chain;
+	TAILQ_ENTRY(secpolicy) tailq;	/* all SPD entries, both pcb/table */
+	LIST_ENTRY(secpolicy) chain;	/* SPD entries on table */
 
 	u_int8_t dir;			/* direction of packet flow */
 	int readonly;			/* write prohibited */
@@ -352,7 +353,7 @@ extern int ipsec_tunnel_device;
 
 #ifdef INET
 extern struct ipsecstat ipsecstat;
-extern struct secpolicy ip4_def_policy;
+extern struct secpolicy *ip4_def_policy;
 extern int ip4_esp_trans_deflev;
 extern int ip4_esp_net_deflev;
 extern int ip4_ah_trans_deflev;
@@ -366,7 +367,7 @@ extern int ip4_esp_randpad;
 
 #ifdef INET6
 extern struct ipsecstat ipsec6stat;
-extern struct secpolicy ip6_def_policy;
+extern struct secpolicy *ip6_def_policy;
 extern int ip6_esp_trans_deflev;
 extern int ip6_esp_net_deflev;
 extern int ip6_ah_trans_deflev;
