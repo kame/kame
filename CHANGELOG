@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.987 2000/06/08 14:00:27 itojun Exp $
+$Id: CHANGELOG,v 1.988 2000/06/09 01:13:07 itojun Exp $
 
 <200006>
+Fri Jun  9 10:10:08 JST 2000  itojun@iijlab.net
+	* *bsd*/sys/netinet6/in6_pcb.c, kame/sys/netinet6/in6_src.c:
+	  add in6_embedscope() and in6_recoverscope(), to avoid code duplicate
+	  for KAME scopeid hack.
+	* {bsdi4,openbsd}/sys/netinet6/in6_pcb.c: add scope consideration
+	  to in6_pcbbind.
+
 Thu Jun  8 22:58:24 JST 2000  itojun@iijlab.net
 	* kame/ping6/ping6.c: make sure to clear ni_flags on ping6 -w
 	  or ping6 -W.  From: yoshfuji
