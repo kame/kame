@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.2 2002/04/15 10:00:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -517,13 +517,21 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,t_rt); 
       }
 #else
+#ifdef __FreeBSD__
+      rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+#else
       rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+#endif
 #endif
     }else{
 #ifdef SCTP_ALTERNATE_ROUTE
       rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL);
 #else
+#ifdef __FreeBSD__
+      rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+#else
       rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+#endif
 #endif
     }
   }
@@ -1144,13 +1152,21 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 	rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,t_rt);
       }
 #else
+#ifdef __FreeBSD__
+      rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+#else
       rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+#endif
 #endif
     } else {
 #ifdef SCTP_ALTERNATE_ROUTE
       rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL);
 #else
+#ifdef __FreeBSD__
+      rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0, 0UL);
+#else
       rtp->ro_rt = rtalloc1(&rtp->ro_dst, 0);
+#endif
 #endif
     }
   }

@@ -326,6 +326,7 @@ struct msghdr {
 #define	MSG_WAITALL	0x40		/* wait for full request or error */
 #define	MSG_DONTWAIT	0x80		/* this message should be nonblocking */
 #define	MSG_EOF		0x100		/* data completes connection */
+#define MSG_NOTIFICATION 0x200		/* notification message */
 #define MSG_COMPAT      0x8000		/* used in sendit() */
 
 /*

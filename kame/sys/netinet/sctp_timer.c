@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.2 2002/04/15 10:00:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -256,7 +256,11 @@ sctp_find_alternate_net(struct sctp_tcb *tcb,
 			alt->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&alt->ra._l_addr,
 							  NULL);
 #else
+#ifdef __FreeBSD__
+			alt->ra.ro_rt = rtalloc1((struct sockaddr *)&alt->ra._l_addr, 0, 0UL);
+#else
 			alt->ra.ro_rt = rtalloc1((struct sockaddr *)&alt->ra._l_addr, 0);
+#endif
 #endif
 		}
 		if (((alt->dest_state & SCTP_ADDR_REACHABLE) ==

@@ -276,6 +276,12 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 
 options 	NEW_STRUCT_ROUTE	# mandatory
 
+options 	SCTP		# adds SCTP stack to kernel - requires INET6
+options 	SCTP_DEBUG	# adds debugging support for SCTP
+#options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
+#options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
+#options 	SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
+
 # Router Preference on host side
 #options 	RTPREF
 
@@ -314,3 +320,4 @@ options 	TCP_ECN		# ECN support in TCP
 #pseudo-device	atm
 #pseudo-device	dummy	1
 #pseudo-device	stf
+pseudo-device	sec

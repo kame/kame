@@ -106,6 +106,7 @@ struct protosw {
  *	and the protocol understands the MSG_EOF flag.  The first property is
  *	is only relevant if PR_CONNREQUIRED is set (otherwise sendto is allowed
  *	anyhow).
+ * PR_ADDR_OPT requires PR_ATOMIC (like PR_ADDR) 
  */
 #define	PR_ATOMIC	0x01		/* exchange atomic messages only */
 #define	PR_ADDR		0x02		/* addresses given with messages */
@@ -114,6 +115,7 @@ struct protosw {
 #define	PR_RIGHTS	0x10		/* passes capabilities */
 #define PR_IMPLOPCL	0x20		/* implied open/close */
 #define	PR_LASTHDR	0x40		/* enforce ipsec policy; last header */
+#define PR_ADDR_OPT     0x80		/* allow addresses during delivery */
 
 /*
  * The arguments to usrreq are:

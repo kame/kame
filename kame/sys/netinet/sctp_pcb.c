@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.2 2002/04/15 10:00:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1805,7 +1805,11 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	netp->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&netp->ra._l_addr,
 					   NULL);
 #else
+#ifdef __FreeBSD__
+	netp->ra.ro_rt = rtalloc1((struct sockaddr *)&netp->ra._l_addr, 0, 0UL);
+#else
 	netp->ra.ro_rt = rtalloc1((struct sockaddr *)&netp->ra._l_addr, 0);
+#endif
 #endif
 	netfirst = TAILQ_FIRST(&tasoc->asoc.nets);
 	if (netp->ra.ro_rt == NULL) {

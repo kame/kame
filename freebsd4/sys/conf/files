@@ -862,6 +862,18 @@ netinet/ip_input.c	optional inet
 netinet/ip_mroute.c	optional inet
 netinet/ip_output.c	optional inet
 netinet/raw_ip.c	optional inet
+netinet/sctp_asconf.c	optional inet sctp
+netinet/sctp_crc32.c	optional inet sctp
+netinet/sctp_hashdriver.c	optional inet sctp
+netinet/sctp_indata.c	optional inet sctp
+netinet/sctp_input.c	optional inet sctp
+netinet/sctp_output.c	optional inet sctp
+netinet/sctp_pcb.c	optional inet sctp
+netinet/sctp_peeloff.c	optional inet sctp
+netinet/sctp_sha1.c	optional inet sctp
+netinet/sctp_timer.c	optional inet sctp
+netinet/sctp_usrreq.c	optional inet sctp
+netinet/sctputil.c	optional inet sctp
 netinet/tcp_debug.c	optional tcpdebug
 netinet/tcp_input.c	optional inet
 netinet/tcp_output.c	optional inet
@@ -912,6 +924,7 @@ netinet6/nd6_rtr.c	optional inet6
 netinet6/raw_ip6.c	optional inet6
 netinet6/route6.c	optional inet6
 netinet6/scope6.c	optional inet6
+netinet6/sctp6_usrreq.c	optional inet6 sctp
 netinet6/udp6_output.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
 net/if_hif.c		optional hif mip6
