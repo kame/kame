@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.9 1999/10/29 03:04:26 itojun Exp $ */
+/* $Id: name6.c,v 1.10 1999/11/28 15:59:43 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -21,6 +21,7 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/cdefs.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 
@@ -554,11 +555,23 @@ getnodebyname(const char *name, int af, int flags)
 	return getipnodebyname(name, af, flags, &h_errno);
 }
 
+#ifdef __warn_references
+__warn_references(getnodebyname,
+	"warning: getnodebyname() deprecated, "
+	"should use getaddrinfo() or getipnodebyname()");
+#endif
+
 struct hostent *
 getnodebyaddr(const void *src, size_t len, int af)
 {
 	return getipnodebyaddr(src, len, af, &h_errno);
 }
+
+#ifdef __warn_references
+__warn_references(getnodebyaddr,
+	"warning: getnodebyaddr() deprecated, "
+	"should use getnameinfo() or getipnodebyaddr()");
+#endif
 
 /*
  * Private utility functions
