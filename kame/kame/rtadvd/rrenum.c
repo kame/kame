@@ -1,4 +1,4 @@
-/*	$KAME: rrenum.c,v 1.4 2000/07/03 02:51:08 itojun Exp $	*/
+/*	$KAME: rrenum.c,v 1.5 2000/11/08 02:29:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,8 +175,8 @@ do_use_prefix(int len, struct rr_pco_match *rpm, struct in6_rrenumreq *irr) {
 			(rpu->rpu_ramask & ICMP6_RR_PCOUSE_RAFLAGS_ONLINK);
 		irr->irr_raf_mask_auto =
 			(rpu->rpu_ramask & ICMP6_RR_PCOUSE_RAFLAGS_AUTO);
-		irr->irr_vltime = rpu->rpu_vltime;
-		irr->irr_pltime = rpu->rpu_pltime;
+		irr->irr_vltime = ntohl(rpu->rpu_vltime);
+		irr->irr_pltime = ntohl(rpu->rpu_pltime);
 		irr->irr_raf_onlink =
 			(rpu->rpu_raflags & ICMP6_RR_PCOUSE_RAFLAGS_ONLINK);
 		irr->irr_raf_auto =
