@@ -45,6 +45,7 @@
 
 #include "ipip.h"
 #include "opt_mrouting.h"
+#include "opt_ipsec.h"
 
 #if NIPIP > 0 || defined(MROUTING)
 
@@ -273,7 +274,7 @@ ipip_output(ifp, m0, dst, rt)
 	ifp->if_obytes += m0->m_pkthdr.len;
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
+	m0->m_pkthdr.rcvif = NULL;
 #endif
 	error = ip_output(m0, NULL, &sc->sc_route, 0, NULL);
 	if (error)
