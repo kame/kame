@@ -6,6 +6,7 @@ ip6mrouter=NO
 #----------
 # manual configurations - in case ip6router=YES
 #route6dflags=
+#mroute6dflags=
 #
 ## list of interfaces, and prefix for interfaces
 ## NOTE: no trailing double colon necessary here!
