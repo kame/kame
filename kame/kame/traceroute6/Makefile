@@ -31,15 +31,25 @@ CFLAGS+=-DINET6 -DIPSEC
 .else
 CPPFLAGS+=-DINET6 -DIPSEC
 .endif
+.if exists(/usr/local/v6/lib/libipsec.a)
 LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
 	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -lipsec -linet6
-DPADD+=	${.OBJDIR}/../libipsec/libipsec.a \
-	${.OBJDIR}/../libipsec/obj/libipsec.a \
+	-L/usr/local/v6/lib -lipsec
+DPADD+=	${.OBJDIR}/../libinet6/libipsec.a \
+	${.OBJDIR}/../libinet6/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
+.else
+LDADD+=	-lipsec
+DPADD+=	${LIBIPSEC}
+.endif
+.if exists(/usr/local/v6/lib/libinet6.a)
+LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
+	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
+	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+.endif
 
 .if (${OPSYS} != "NetBSD")
 MAN8=	traceroute6.8
