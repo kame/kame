@@ -693,7 +693,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		    in6p->in6p_socket == 0 ||
 		    (lport && in6p->in6p_lport != lport) ||
 		    (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
-		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &sa6_src.sin6_addr)) ||
+		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
+		    &sa6_src.sin6_addr)) ||
 		    (fport && in6p->in6p_fport != fport))
 			continue;
 
