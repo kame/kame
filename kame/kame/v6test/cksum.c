@@ -47,7 +47,6 @@ struct new_ip6_rthdr0 {
 
 int all;
 int debug;
-extern int cflag;	/* defined in v6test.c */
 
 static u_short in_cksum __P((u_short *, u_short *, int));
 
@@ -70,10 +69,6 @@ cksum6(int linkhdrlen, int size)
 	u_char *ep = packet + size;
 	u_char nxt;
 	
-	/* does not generate checksum if "-c" is on */
-	if (cflag)
-		return;
-
 	if (size < sizeof(struct ip6_hdr))
 		return;
 
