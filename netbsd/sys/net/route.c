@@ -687,20 +687,18 @@ rtinit(ifa, cmd, flags)
 {
 	struct rtentry *rt;
 	struct sockaddr *dst, *odst;
-	struct sockaddr *netmask;
 	struct sockaddr_storage deldst;
 	struct rtentry *nrt = 0;
 	int error;
 	struct rt_addrinfo info;
 
 	dst = flags & RTF_HOST ? ifa->ifa_dstaddr : ifa->ifa_addr;
-	netmask = flags & RTF_HOST ? NULL : ifa->ifa_netmask;
 	if (cmd == RTM_DELETE) {
-		if (netmask) {
+		if ((flags & RTF_HOST) == 0 && ifa->ifa_netmask) {
 			/* Delete subnet route for this interface */
 			odst = dst;
 			dst = (struct sockaddr *)&deldst;
-			rt_maskedcopy(odst, dst, netmask);
+			rt_maskedcopy(odst, dst, ifa->ifa_netmask);
 		}
 		if ((rt = rtalloc1(dst, 0)) != NULL) {
 			rt->rt_refcnt--;
@@ -714,7 +712,7 @@ rtinit(ifa, cmd, flags)
 	info.rti_flags = flags | ifa->ifa_flags;
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = ifa->ifa_addr;
-	info.rti_info[RTAX_NETMASK] = netmask;
+	info.rti_info[RTAX_NETMASK] = ifa->ifa_netmask;
 	error = rtrequest1(cmd, &info, &nrt);
 	if (cmd == RTM_DELETE && error == 0 && (rt = nrt)) {
 		rt_newaddrmsg(cmd, ifa, error, nrt);
