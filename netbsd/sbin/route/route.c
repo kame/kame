@@ -1041,23 +1041,24 @@ getaddr(which, s, hpp)
 	case AF_INET6:
 	    {
 		struct addrinfo hints, *res;
-		struct sockaddr_in6 *sin6;
 
 		memset(&hints, 0, sizeof(hints));
-		hints.ai_family = afamily;
+		hints.ai_family = afamily;	/*AF_INET6*/
 		hints.ai_flags = AI_NUMERICHOST;
 		hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
-		if (getaddrinfo(s, "0", &hints, &res) != 0) {
+		if (getaddrinfo(s, "0", &hints, &res) != 0 ||
+		    res->ai_family != afamily ||
+		    res->ai_addrlen != sizeof(su->sin6)) {
 			(void) fprintf(stderr, "%s: bad value\n", s);
 			exit(1);
 		}
-		sin6 = (struct sockaddr_in6 *)res->ai_addr;
-		memcpy(&su->sin6, sin6, sizeof(su->sin6));
+		memcpy(&su->sin6, res->ai_addr, sizeof(su->sin6));
 #ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) &&
-		    sin6->sin6_scope_id) {
+		    su->sin6.sin6_scope_id) {
 			*(u_int16_t *)&su->sin6.sin6_addr.s6_addr[2] =
-				htons(sin6->sin6_scope_id);
+				htons(su->sin6.sin6_scope_id);
+			su->sin6.sin6_scope_id = 0;
 		}
 #endif
 		inet6_makenetandmask(&su->sin6);
