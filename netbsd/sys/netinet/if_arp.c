@@ -583,12 +583,15 @@ arp_rtdrain(rt, rtt)
 	struct llinfo_arp *la;
 	struct sockaddr_dl *sdl;
 
+	ARP_LOCK(1);		/* we may already be locked here. */
+
 	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL) {
 		/*
 		 * This case can happen when rtflushclone() invalidated the
 		 * route entry but there are still positive references to
 		 * this entry.
 		 */
+		ARP_UNLOCK();
 		return;
 	}
 
@@ -597,11 +600,13 @@ arp_rtdrain(rt, rtt)
 	if (sdl && sdl->sdl_family == AF_LINK && /* check just in case */
 	    sdl->sdl_alen != 0) {
 		rt_add_cache(rt, arp_rtdrain);
+		ARP_UNLOCK();
 		return;
 	}
 
 	arptfree(la);
 
+	ARP_UNLOCK();
 	return;			/* the caller will free rtt */
 }
 
