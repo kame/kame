@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.181 2001/07/29 09:23:07 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.182 2001/08/01 16:44:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -993,6 +993,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	struct ifnet *ifp;
 {
 	struct ifaddr *ifa;
+	struct nd_prefix *pr;
 	int i;
 
 #define IFADDR6(a) ((((struct in6_ifaddr *)(a))->ia_addr).sin6_addr)
@@ -1002,6 +1003,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * A link-local address is always a neighbor.
 	 * XXX: we should use the sin6_scope_id field rather than the embedded
 	 * interface index.
+	 * XXX: a link does not necessarily specify a single interface.
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr) &&
 	    ntohs(*(u_int16_t *)&addr->sin6_addr.s6_addr[2]) == ifp->if_index)
@@ -1011,24 +1013,18 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * If the address matches one of our addresses,
 	 * it should be a neighbor.
 	 */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first;
-	     ifa;
-	     ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			next: continue;
+	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+		if (pr->ndpr_ifp != ifp)
+			continue;
 
 		for (i = 0; i < 4; i++) {
-			if ((IFADDR6(ifa).s6_addr32[i] ^
+			if ((pr->ndpr_mask.s6_addr32[i] ^
 			     addr->sin6_addr.s6_addr32[i]) &
-			    IFMASK6(ifa).s6_addr32[i])
-				goto next;
+			    pr->ndpr_addr.s6_addr32[i])
+				break;
 		}
-		return(1);
+		if (i == 4)	/* full match */
+			return(1);
 	}
 
 	/*
