@@ -1,10 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2741 2005/04/01 07:31:00 suz Exp $
+$KAME: CHANGELOG,v 1.2742 2005/04/04 09:14:57 suz Exp $
 
 <200504>
+2005-04-04  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet6/nd6.c: when the number of the packets queued in
+	  a NDP cache exceed the limit, discard the oldest packet, 
+	  as specified in RFC2461 7.2.2.
+
 2005-04-01  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet/icmp6.h, kame/sys/netinet6/icmp6.c, nd6.c: limits 
-	the number of fragmented packets stored in a NDP cache.
+	the number of unresolved packets stored in a NDP cache.
 	(To prevent a DoS attack using 2005-01-21's change)
 
 2005-04-01  SUZUKI, Shinsuke <suz@kame.net>

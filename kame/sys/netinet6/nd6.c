@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.374 2005/04/01 09:25:02 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.375 2005/04/04 09:14:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2546,22 +2546,28 @@ again:
 	 * There is a neighbor cache entry, but no ethernet address
 	 * response yet.  Append this latest packet to the end of the
 	 * packet queue in the mbuf, unless the number of the packet
-	 * does not exceed nd6_maxqueuelen.
+	 * does not exceed nd6_maxqueuelen.  When it exceeds nd6_maxqueuelen,
+	 * the oldest packet in the queue will be removed.
 	 */
 	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
 	if (ln->ln_hold) {
-		struct mbuf *m_hold, *m_hold_last; 
+		struct mbuf *m_hold;
 		int i;
 
-		m_hold = m_hold_last = ln->ln_hold;
-		for (i = 0; i < nd6_maxqueuelen; i++) {
-			if (m_hold == NULL) {
-				m_hold_last->m_nextpkt = m;
+		i = 0;
+		for (m_hold = ln->ln_hold; m_hold; m_hold = m_hold->m_nextpkt) {
+			i++;
+			if (m_hold->m_nextpkt == NULL) {
+				m_hold->m_nextpkt = m;
 				break;
 			}
-			m_hold_last = m_hold;
-			m_hold = m_hold->m_nextpkt;
+		}
+		while (i >= nd6_maxqueuelen) {
+			m_hold = ln->ln_hold;
+			ln->ln_hold = ln->ln_hold->m_nextpkt;
+			m_free(m_hold);
+			i--;
 		}
 	} else {
 		ln->ln_hold = m;
