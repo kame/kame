@@ -849,7 +849,6 @@ netinet6/ip6_input.c	optional inet6
 netinet6/ip6_mroute.c	optional inet6
 netinet6/ip6_output.c	optional inet6
 netinet6/in6_pcb.c	optional inet6
-netinet6/in6_prefix.c	optional inet6
 netinet6/in6_proto.c	optional inet6
 netinet6/in6_rmx.c	optional inet6
 netinet6/in6_src.c	optional inet6

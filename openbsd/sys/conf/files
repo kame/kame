@@ -834,7 +834,6 @@ file netinet6/in6_ifattach.c		inet6
 file netinet6/in6_cksum.c		inet6
 #file netinet6/in6_pcb.c		inet6
 file netinet6/in6_src.c			inet6
-file netinet6/in6_prefix.c		inet6
 file netinet6/in6_proto.c		inet6
 file netinet6/dest6.c			inet6
 file netinet6/frag6.c			inet6
