@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.10 2000/07/21 15:51:20 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.11 2000/08/09 17:23:21 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,6 +61,7 @@
 #include "remoteconf.h"
 #include "localconf.h"
 #include "grabmyaddr.h"
+#include "proposal.h"
 
 static LIST_HEAD(_rmtree, remoteconf) rmtree;
 
@@ -153,6 +154,7 @@ newrmconf()
 	new->nonce_size = DEFAULT_NONCE_SIZE;
 	new->keepalive = FALSE;
 	new->ini_contact = TRUE;
+	new->pcheck_level = PROP_CHECK_STRICT;
 	new->support_mip6 = FALSE;
 	new->gen_policy = FALSE;
 	new->retry_counter = lcconf->retry_counter;

@@ -148,6 +148,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE
 %token CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
+%token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
 %token GENERATE_POLICY SUPPORT_MIP6
 %token POST_COMMAND
 %token EXEC_PATH EXEC_COMMAND EXEC_SUCCESS EXEC_FAILURE
@@ -171,7 +172,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %type <num> LIFETYPE UNITTYPE
 %type <num> SECLEVELTYPE SECMODETYPE 
 %type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE
-%type <num> CERTTYPE CERT_X509
+%type <num> CERTTYPE CERT_X509 PROPOSAL_CHECK_LEVEL
 %type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT sainfo_id
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
@@ -989,6 +990,7 @@ remote_spec
 	|	GENERATE_POLICY SWITCH EOS { cur_rmconf->gen_policy = $2; }
 	|	SUPPORT_MIP6 SWITCH EOS { cur_rmconf->support_mip6 = $2; }
 	|	INITIAL_CONTACT SWITCH EOS { cur_rmconf->ini_contact = $2; }
+	|	PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL EOS { cur_rmconf->pcheck_level = $2; }
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{
 			if ($2 == CF_LIFETYPE_TIME)

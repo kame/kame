@@ -235,6 +235,27 @@ Not yet.
 .It Ic initial_contact (on \(ba off) ;
 enable to send INITIAL-CONTACT message.
 .\"
+.It Ic proposal_check Ar level ;
+specifies the action of lifetime length selection on the responder side.
+default level is
+.Ic strict .
+If the
+.Ar level
+is;
+.Bl -tag -width Ds -compact
+.It Ic obey
+the responder obey the initiator anytime.
+.It Ic strict
+If the responder's length is longer than the initiator's one, the
+responder uses the intitiator's one.  Otherwise rejects the proposal.
+.It Ic claim
+If the responder's length is longer than the initiator's one, the
+responder use the intitiator's one.  If the responder's length is
+shorter than the initiator's one, the responder uses own length
+AND send RESPONDER-LIFETIME notify message to a initiator in the
+case of lifetime.
+.El
+.\"
 .It Ic support_mip6 (on \(ba off) ;
 If this value is set on then both values of ID payloads in phase 2 exchange
 are always used as the addresses of end-point of IPsec-SAs.

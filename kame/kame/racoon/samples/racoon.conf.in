@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.11 2000/07/31 14:40:58 sakane Exp $
+# $KAME: racoon.conf.in,v 1.12 2000/08/09 17:23:21 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -69,6 +69,7 @@ remote anonymous
 	lifetime byte 5 MB;	# B,KB,GB
 	initial_contact on;
 	support_mip6 on;
+	proposal_check obey;	# obey, strict or claim
 
 	proposal {
 		encryption_algorithm 3des;

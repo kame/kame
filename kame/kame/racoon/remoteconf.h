@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.11 2000/07/21 15:51:20 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.12 2000/08/09 17:23:21 sakane Exp $ */
 
 /* remote configuration */
 
@@ -56,6 +56,7 @@ struct remoteconf {
 	int support_mip6;		/* support mip6 */
 	int gen_policy;			/* XXX not yet, for anonymous client. */
 	int ini_contact;		/* initial contact */
+	int pcheck_level;		/* level of propocl checking */
 
 	int dh_group;			/* use it when only aggressive mode */
 	struct dhgroup *dhgrp;		/* use it when only aggressive mode */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.93 2000/07/18 05:07:05 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.94 2000/08/09 17:23:20 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -698,7 +698,11 @@ ipsecdoi_checkph2proposal(iph2)
 		goto end;
 	}
 
-	/* check and select a proposal. */
+	/*
+	 * check and select a proposal.
+	 * ensure that there is no modification of the proposal by
+	 * cmp_aproppair_i()
+	 */
 	p = get_ph2approval(iph2, rpair);
 	if (p == NULL)
 		goto end;
@@ -882,7 +886,7 @@ get_ph2approvalx(iph2, pp)
 					"my single bundle:\n");
 				printsaprop0(q2););
 
-			pr = cmpsaprop_alloc(q1, q2);
+			pr = cmpsaprop_alloc(iph2->ph1, q1, q2);
 			if (pr != NULL)
 				goto found;
 

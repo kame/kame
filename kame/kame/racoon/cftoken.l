@@ -32,6 +32,7 @@
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "ipsec_doi.h"
+#include "proposal.h"
 #include "y.tab.h"
 
 int yyerrorcount = 0;
@@ -269,6 +270,10 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>generate_policy	{ YYD; return(GENERATE_POLICY); }
 <S_RMTS>support_mip6	{ YYD; return(SUPPORT_MIP6); }
 <S_RMTS>initial_contact	{ YYD; return(INITIAL_CONTACT); }
+<S_RMTS>proposal_check	{ YYD; return(PROPOSAL_CHECK); }
+<S_RMTS>obey		{ YYD; yylval.num = PROP_CHECK_OBEY; return(PROPOSAL_CHECK_LEVEL); }
+<S_RMTS>strict		{ YYD; yylval.num = PROP_CHECK_STRICT; return(PROPOSAL_CHECK_LEVEL); }
+<S_RMTS>claim		{ YYD; yylval.num = PROP_CHECK_CLAIM; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>keepalive	{ YYD; return(KEEPALIVE); }
 <S_RMTS>lifetime	{ YYD; return(LIFETIME); }
 <S_RMTS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }

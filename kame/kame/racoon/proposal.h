@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.1 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.2 2000/08/09 17:23:20 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -54,6 +54,8 @@ struct saprop {
 	time_t lifetime;
 	int lifebyte;
 	int pfs_group;			/* pfs group */
+	int claim;			/* flag to send RESPONDER-LIFETIME. */
+					/* XXX assumed DOI values are 1 or 2. */
 
 	struct saproto *head;
 	struct saprop *next;
@@ -136,7 +138,29 @@ struct prop_pair {
 };
 #define MAXPROPPAIRLEN	256	/* It's enough because field size is 1 octet. */
 
+/*
+ * Lifetime length selection refered to the section 4.5.4 of RFC2407.
+ * It does not conform to the description of RFC.  There are three type of
+ * the behavior.  If the value of "proposal_check" in "remote" directive is;
+ *     "obey"
+ *         the responder obey the initiator anytime.
+ *     "strict"
+ *         If the responder's length is longer than the initiator's one, the
+ *         responder uses the intitiator's one.  Otherwise rejects the proposal.
+ *     "claim"
+ *         If the responder's length is longer than the initiator's one, the
+ *         responder use the intitiator's one.  If the responder's length is
+ *         shorter than the initiator's one, the responder uses own length
+ *         AND send RESPONDER-LIFETIME notify message to a initiator in the
+ *         case of lifetime.
+ * XXX should be defined the behavior of key length.
+ */
+#define PROP_CHECK_OBEY		1
+#define PROP_CHECK_STRICT	2
+#define PROP_CHECK_CLAIM	3
+
 struct sainfo;
+struct ph1handle;
 extern struct saprop *newsaprop __P((void));
 extern struct saproto *newsaproto __P((void));
 extern void inssaprop __P((struct saprop **, struct saprop *));
@@ -144,7 +168,7 @@ extern void inssaproto __P((struct saprop *, struct saproto *));
 extern struct satrns *newsatrns __P((void));
 extern void inssatrns __P((struct saproto *, struct satrns *));
 extern struct saprop *cmpsaprop_alloc
-	__P((const struct saprop *, const struct saprop *));
+	__P((struct ph1handle *, const struct saprop *, const struct saprop *));
 extern int cmpsaprop __P((const struct saprop *, const struct saprop *));
 extern int cmpsatrns __P((const struct satrns *, const struct satrns *));
 extern int set_satrnsbysainfo __P((struct saproto *, struct sainfo *));
