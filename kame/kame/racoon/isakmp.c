@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.119 2001/01/06 06:34:52 jinmei Exp $	*/
+/*	$KAME: isakmp.c,v 1.120 2001/01/10 16:27:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1567,16 +1567,20 @@ isakmp_post_acquire(iph2)
 
 	/* no ISAKMP-SA found. */
 	if (iph1 == NULL) {
+		struct sched *sc;
+
 		iph2->retry_checkph1 = lcconf->retry_checkph1;
-		sched_new(1, isakmp_chkph1there_stub, iph2);
+		sc = sched_new(1, isakmp_chkph1there_stub, iph2);
 		plog(LLV_INFO, LOCATION, NULL,
 			"IPsec-SA request for %s queued "
 			"due to no phase1 found.\n",
 			saddrwop2str(iph2->dst));
 
 		/* begin ident mode */
-		if (isakmp_ph1begin_i(rmconf, iph2->dst) < 0)
+		if (isakmp_ph1begin_i(rmconf, iph2->dst) < 0) {
+			SCHED_KILL(sc);
 			return -1;
+		}
 
 		return 0;
 		/*NOTREACHED*/
