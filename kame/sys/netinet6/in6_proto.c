@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.152 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.153 2004/07/26 02:57:35 keiichi Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -408,13 +408,13 @@ struct ip6protosw inet6sw[] = {
 },
 #ifdef MIP6
 { SOCK_RAW,	&inet6domain,	IPPROTO_MH,PR_ATOMIC|PR_ADDR,
-  mobility6_input,	0,	 	0,		0,
+  mobility6_input,	0,	 	0,		rip6_ctloutput,
   0,
   0,		0,		0,		0,
 #ifndef __FreeBSD__
   mip6_sysctl,
 #else
-  &nousrreqs,
+  &rip6_usrreqs,
 #endif
 },
 #endif /* MIP6 */
