@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.70 2002/05/30 15:05:46 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.71 2002/06/07 04:09:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -228,7 +228,7 @@ static int pim6;
 	       switch (xxs) { \
 		      case 2: \
 			  delta += 1000000; \
-			      /* fall through */ \
+			      /* FALLTHROUGH */ \
 		      case 1: \
 			  delta += 1000000; \
 			  break; \

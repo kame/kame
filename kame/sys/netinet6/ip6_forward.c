@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.101 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.102 2002/06/07 04:09:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,7 +333,7 @@ ip6_forward(m, srcrt)
 			break;
 		default:
 			printf("ip6_output (ipsec): error code %d\n", error);
-			/* fall through */
+			/* FALLTHROUGH */
 		case ENOENT:
 			/* don't show these error codes to the user */
 			break;

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.279 2002/06/07 03:50:51 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.280 2002/06/07 04:09:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,7 +497,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSIFINFO_FLAGS:
 		if (!privileged)
 			return(EPERM);
-		/* fall through */
+		/* FALLTHROUGH */
 	case OSIOCGIFINFO_IN6:
 	case SIOCGIFINFO_IN6:
 	case SIOCGDRLST_IN6:
@@ -539,7 +539,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCDLIFADDR:
 		if (!privileged)
 			return(EPERM);
-		/* fall through */
+		/* FALLTHROUGH */
 	case SIOCGLIFADDR:
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 		return in6_lifaddr_ioctl(so, cmd, data, ifp, p);
@@ -645,7 +645,7 @@ in6_control(so, cmd, data, ifp)
 
 	case SIOCGIFADDR_IN6:
 		/* This interface is basically deprecated. use SIOCGIFCONF. */
-		/* fall through */
+		/* FALLTHROUGH */
 	case SIOCGIFAFLAG_IN6:
 	case SIOCGIFNETMASK_IN6:
 	case SIOCGIFDSTADDR_IN6:

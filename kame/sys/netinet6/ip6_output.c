@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.305 2002/05/31 04:20:15 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.306 2002/06/07 04:09:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -747,7 +747,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 				break;
 			default:
 				printf("ip6_output (ipsec): error code %d\n", error);
-				/* fall through */
+				/* FALLTHROUGH */
 			case ENOENT:
 				/* don't show these error codes to the user */
 				error = 0;
@@ -1012,7 +1012,7 @@ skip_ipsec2:;
 				break;
 			default:
 				printf("ip6_output (ipsec): error code %d\n", error);
-				/* fall through */
+				/* FALLTHROUGH */
 			case ENOENT:
 				/* don't show these error codes to the user */
 				error = 0;
@@ -1629,7 +1629,7 @@ freehdrs:
 	m_freem(exthdrs.ip6e_haddr);
 	m_freem(exthdrs.ip6e_mobility);
 #endif /* MIP6 */
-	/* fall through */
+	/* FALLTHROUGH */
 bad:
 	m_freem(m);
 	goto done;
@@ -2020,7 +2020,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 					error = EPERM;
 					break;
 				}
-				/* fall through */
+				/* FALLTHROUGH */
 			case IPV6_UNICAST_HOPS:
 			case IPV6_HOPLIMIT:
 			case IPV6_FAITH:

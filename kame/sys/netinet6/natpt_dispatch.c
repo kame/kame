@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.58 2002/05/30 05:59:02 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.59 2002/06/07 04:09:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -388,7 +388,7 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 				natpt_param = (caddr_t)ip6rt - (caddr_t)ip6 + 3;
 				return (NULL); /* discard this packet */
 			}
-			/* fall through */
+			/* FALLTHROUGH */
 
 		case IPPROTO_HOPOPTS:
 		case IPPROTO_DSTOPTS:
