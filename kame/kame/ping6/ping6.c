@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.86 2000/09/04 03:02:40 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.87 2000/09/04 03:23:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -917,7 +917,9 @@ main(argc, argv)
 		pinger();
 
 	(void)signal(SIGINT, onint);
+#ifdef SIGINFO
 	(void)signal(SIGINFO, oninfo);
+#endif
 
 	if ((options & F_FLOOD) == 0) {
 		(void)signal(SIGALRM, onalrm);
