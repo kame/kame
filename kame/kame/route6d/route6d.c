@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.97 2003/04/22 09:55:37 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.98 2003/04/24 12:26:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.97 2003/04/22 09:55:37 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.98 2003/04/24 12:26:19 keiichi Exp $";
 #endif
 
 #include <stdio.h>
@@ -617,6 +617,7 @@ init()
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, port, &hints, &res);
 	if (error) {
@@ -671,6 +672,7 @@ init()
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
 	error = getaddrinfo(RIP6_DEST, port, &hints, &res);
 	if (error) {
 		fatal("%s", gai_strerror(error));
