@@ -1,5 +1,5 @@
 PROG=	racoon
-SRCS=	main.c session.c isakmp.c handler.c random.c \
+SRCS=	main.c session.c isakmp.c handler.c \
 	isakmp_ident.c isakmp_agg.c isakmp_base.c \
 	isakmp_quick.c isakmp_inf.c isakmp_newg.c \
 	pfkey.c admin.c ipsec_doi.c oakley.c grabmyaddr.c \
@@ -13,7 +13,7 @@ SRCS=	main.c session.c isakmp.c handler.c random.c \
 SRCS+=	print-isakmp.c
 SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c sha2.c
 CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
-	-DHAVE_PRINT_ISAKMP_C=1
+	-DHAVE_PRINT_ISAKMP_C=1 -DHAVE_ARC4RANDOM=1
 CFLAGS+=-I${SRCDIR}/missing
 
 # for debugging malloc/mfree
