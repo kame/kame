@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.185 1999/10/13 12:51:27 jinmei Exp $
+$Id: CHANGELOG,v 1.186 1999/10/14 08:28:14 itojun Exp $
 
 <199910>
+Thu Oct 14 17:27:26 JST 1999  itojun@iijlab.net
+	* kame/tcpdump: fix endian-ness problem in big endian machines.
+	  From: KOIE Hidetaka <hide@koie.org>
+
 1999-10-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_ctloutput): fixed mbuf leak on
 	setsockopt(ICMP6_FILTER).
