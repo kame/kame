@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.65 2000/10/10 13:34:01 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.66 2000/10/10 15:35:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,6 @@ u_long	rip6_recvspace = RIPV6RCVQ;
 /* ICMPV6 parameters */
 int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
-struct timeval icmp6errratelim = { 0, 0 };	/* no ratelimit */
 int	icmp6errppslim = 100;		/* 100pps */
 int	icmp6_nodeinfo = 1;		/* enable/disable NI response */
 
@@ -742,9 +741,6 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRTIMEOUT,
 	redirtimeout, CTLFLAG_RW,	&icmp6_redirtimeout,	0, "");
 SYSCTL_STRUCT(_net_inet6_icmp6, ICMPV6CTL_STATS, stats, CTLFLAG_RD,
 	&icmp6stat, icmp6stat, "");
-SYSCTL_PROC(_net_inet6_icmp6, ICMPV6CTL_ERRRATELIMIT,
-	errratelimit, CTLTYPE_INT|CTLFLAG_RW,
-	0, sizeof(int), sysctl_icmp6_ratelimit, "I", "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_PRUNE,
 	nd6_prune, CTLFLAG_RW,		&nd6_prune,	0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_DELAY,

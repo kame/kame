@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.146 2000/10/01 12:37:20 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.147 2000/10/10 15:35:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,10 +143,9 @@ extern struct in6pcb rawin6pcb;
 #else
 extern struct inpcbhead ripcb;
 #endif
-extern struct timeval icmp6errratelim;
-static struct timeval icmp6errratelim_last;
 extern int icmp6errppslim;
 static int icmp6errpps_count = 0;
+static struct timeval icmp6errppslim_last;
 extern int icmp6_nodeinfo;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
@@ -162,8 +161,11 @@ static void icmp6_mtudisc_update __P((struct in6_addr *, struct icmp6_hdr *,
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
-#ifndef HAVE_RATECHECK
-static int ratecheck __P((struct timeval *, struct timeval *));
+#if 0 /*ndef HAVE_RATECHECK*/
+static int ratecheck __P((struct timeval *, const struct timeval *));
+#endif
+#ifndef HAVE_PPSRATECHECK
+static int ppsratecheck __P((struct timeval *, int *, int));
 #endif
 static struct mbuf *ni6_input __P((struct mbuf *, int));
 static struct mbuf *ni6_nametodns __P((const char *, int, int));
@@ -2173,9 +2175,6 @@ icmp6_fasttimo()
 {
 
 	mld6_fasttimeo();
-
-	/* reset ICMPv6 pps limit */
-	icmp6errpps_count = 0;
 }
 
 static const char *
@@ -2835,45 +2834,102 @@ icmp6_ctloutput(op, so, level, optname, mp)
 }
 #endif /*NRL inpcb*/
 
-#ifndef HAVE_RATECHECK
+#if 0 /*ndef HAVE_RATECHECK*/
 /*
- * ratecheck() returns true if it is okay to send.  We return
- * true if it is not okay to send.
+ * ratecheck(): simple time-based rate-limit checking.  see ratecheck(9)
+ * for usage and rationale.
  */
 static int
-ratecheck(last, limit)
-	struct timeval *last;
-	struct timeval *limit;
+ratecheck(lasttime, mininterval)
+	struct timeval *lasttime;
+	const struct timeval *mininterval;
 {
-	struct timeval tp;
-	struct timeval nextsend;
+	struct timeval tv, delta;
+	int s, rv = 0;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	microtime(&tp);
-	tp.tv_sec = time_second;
+	s = splclock(); 
+#ifndef __FreeBSD__
+	tv = mono_time;
 #else
-	tp = time;
+	microtime(&tv);
 #endif
+	splx(s);
 
-	/* rate limit */
-	if (last->tv_sec != 0 || last->tv_usec != 0) {
-		nextsend.tv_sec = last->tv_sec + limit->tv_sec;
-		nextsend.tv_usec = last->tv_usec + limit->tv_usec;
-		nextsend.tv_sec += (nextsend.tv_usec / 1000000);
-		nextsend.tv_usec %= 1000000;
+	timersub(&tv, lasttime, &delta);
 
-		if (nextsend.tv_sec == tp.tv_sec && nextsend.tv_usec <= tp.tv_usec)
-			;
-		else if (nextsend.tv_sec <= tp.tv_sec)
-			;
-		else {
-			/* The packet is subject to rate limit */
-			return 0;
-		}
+	/*
+	 * check for 0,0 is so that the message will be seen at least once,
+	 * even if interval is huge.
+	 */
+	if (timercmp(&delta, mininterval, >=) ||
+	    (lasttime->tv_sec == 0 && lasttime->tv_usec == 0)) {
+		*lasttime = tv;
+		rv = 1;
 	}
 
-	*last = tp;
-	return 1;
+	return (rv);
+}
+#endif
+
+#ifndef HAVE_PPSRATECHECK
+/*
+ * ppsratecheck(): packets (or events) per second limitation.
+ */
+static int
+ppsratecheck(lasttime, curpps, maxpps)
+	struct timeval *lasttime;
+	int *curpps;
+	int maxpps;	/* maximum pps allowed */
+{
+	struct timeval tv, delta;
+	int s, rv;
+
+	s = splclock(); 
+#ifndef __FreeBSD__
+	tv = mono_time;
+#else
+	microtime(&tv);
+#endif
+	splx(s);
+
+	timersub(&tv, lasttime, &delta);
+
+	/*
+	 * check for 0,0 is so that the message will be seen at least once.
+	 * if more than one second have passed since the last update of
+	 * lasttime, reset the counter.
+	 *
+	 * we do increment *curpps even in *curpps < maxpps case, as some may
+	 * try to use *curpps for stat purposes as well.
+	 */
+	if ((lasttime->tv_sec == 0 && lasttime->tv_usec == 0) ||
+	    delta.tv_sec >= 1) {
+		*lasttime = tv;
+		*curpps = 0;
+		rv = 1;
+	} else if (maxpps < 0)
+		rv = 1;
+	else if (*curpps < maxpps)
+		rv = 1;
+	else
+		rv = 0;
+
+#if 1 /*DIAGNOSTIC?*/
+	/* be careful about wrap-around */
+	if (*curpps + 1 > *curpps)
+		*curpps = *curpps + 1;
+#else
+	/*
+	 * assume that there's not too many calls to this function.
+	 * not sure if the assumption holds, as it depends on *caller's*
+	 * behavior, not the behavior of this function.
+	 * IMHO it is wrong to make assumption on the caller's behavior,
+	 * so the above #if is #if 1, not #ifdef DIAGNOSTIC.
+	 */
+	*curpps = *curpps + 1;
+#endif
+
+	return (rv);
 }
 #endif
 
@@ -2882,14 +2938,6 @@ ratecheck(last, limit)
  * Returns 0 if it is okay to send the icmp6 packet.
  * Returns 1 if the router SHOULD NOT send this icmp6 packet due to rate
  * limitation.
- *
- * There are two limitations defined:
- * - pps limit: ICMPv6 error packet cannot exceed defined packet-per-second.
- *   we measure it every 0.2 second, since fasttimo works every 0.2 second.
- * - rate limit: ICMPv6 error packet cannot appear more than once per
- *   defined interval.
- * In any case, if we perform rate limitation, we'll see jitter in the ICMPv6
- * error packets.
  *
  * XXX per-destination/type check necessary?
  */
@@ -2904,13 +2952,8 @@ icmp6_ratelimit(dst, type, code)
 	ret = 0;	/*okay to send*/
 
 	/* PPS limit */
-	icmp6errpps_count++;
-	if (icmp6errppslim && icmp6errpps_count > icmp6errppslim / 5) {
-		/* The packet is subject to pps limit */
-		ret++;
-	}
-
-	if (!ratecheck(&icmp6errratelim_last, &icmp6errratelim)) {
+	if (!ppsratecheck(&icmp6errppslim_last, &icmp6errpps_count,
+	    icmp6errppslim)) {
 		/* The packet is subject to rate limit */
 		ret++;
 	}
@@ -3011,28 +3054,6 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &icmp6stat,
 		    sizeof(icmp6stat));
-	case ICMPV6CTL_ERRRATELIMIT:
-	    {
-		int rate_usec, error, s;
-
-		/*
-		 * The sysctl specifies the rate in usec-between-icmp,
-		 * so we must convert from/to a timeval.
-		 */
-		rate_usec = (icmp6errratelim.tv_sec * 1000000) +
-		    icmp6errratelim.tv_usec;
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &rate_usec);
-		if (error)
-			return (error);
-		if (rate_usec < 0)
-			return (EINVAL);
-		s = splnet();
-		icmp6errratelim.tv_sec = rate_usec / 1000000;
-		icmp6errratelim.tv_usec = rate_usec % 1000000;
-		splx(s);
-
-		return (0);
-	    }
 	default:
 		return (sysctl_int_arr(icmp6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));
@@ -3068,28 +3089,6 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_STATS:
 		return sysctl_rdstruct(oldp, oldlenp, newp,
 				&icmp6stat, sizeof(icmp6stat));
-	case ICMPV6CTL_ERRRATELIMIT:
-	    {
-		int rate_usec, error, s;
-
-		/*
-		 * The sysctl specifies the rate in usec-between-icmp,
-		 * so we must convert from/to a timeval.
-		 */
-		rate_usec = (icmp6errratelim.tv_sec * 1000000) +
-		    icmp6errratelim.tv_usec;
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &rate_usec);
-		if (error)
-			return (error);
-		if (rate_usec < 0)
-			return (EINVAL);
-		s = splsoftnet();
-		icmp6errratelim.tv_sec = rate_usec / 1000000;
-		icmp6errratelim.tv_usec = rate_usec % 1000000;
-		splx(s);
-
-		return (0);
-	    }
 	case ICMPV6CTL_ND6_PRUNE:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &nd6_prune);
 	case ICMPV6CTL_ND6_DELAY:
