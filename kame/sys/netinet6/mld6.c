@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.72 2002/11/04 07:32:06 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.73 2002/11/11 09:10:46 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -829,6 +829,10 @@ mld6_fasttimeo()
 	cbuflen = sbuflen = 0;
 #endif
 	IN6_FIRST_MULTI(step, in6m);
+	if (in6m == NULL) {
+		splx(s);
+		return;
+	}
 	ifp = in6m->in6m_ifp;
 	while (in6m != NULL) {
 		if (in6m->in6m_timer == 0)
