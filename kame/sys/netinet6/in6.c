@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.82 2000/05/30 10:16:24 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.83 2000/06/12 14:50:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -617,6 +617,7 @@ in6_control(so, cmd, data, ifp)
 				oia->ia_next = ia;
 			} else
 				in6_ifaddr = ia;
+			/* gain a refcnt for the link from in6_ifaddr */
 			ia->ia_ifa.ifa_refcnt++;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -630,6 +631,7 @@ in6_control(so, cmd, data, ifp)
 			TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
 			    ifa_list);
 #endif
+			/* gain another recnt for the link from if_addrlist */
 			ia->ia_ifa.ifa_refcnt++;
 
 			newifaddr = 1;
@@ -817,6 +819,7 @@ in6_control(so, cmd, data, ifp)
 #else
 			TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
 #endif
+			/* release a refcnt for the link from if_addrlist */
 			IFAFREE(&ia->ia_ifa);
 
 			oia = ia;
@@ -832,6 +835,7 @@ in6_control(so, cmd, data, ifp)
 					    "from list\n");
 				}
 			}
+			/* release another refcnt for the link from in6_ifaddr */
 			IFAFREE(&oia->ia_ifa);
 		}
 #endif
@@ -1056,6 +1060,7 @@ in6_purgeaddr(ifa, ifp)
 #else
 	TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
 #endif
+	/* release a refcnt for the link from if_addrlist */
 	IFAFREE(&ia->ia_ifa);
 
 	oia = ia;
@@ -1081,6 +1086,7 @@ in6_purgeaddr(ifa, ifp)
 		in6_savemkludge(oia);
 #endif
 
+	/* release another refcnt for the link from in6_ifaddr */
 	IFAFREE(&oia->ia_ifa);
 }
 
