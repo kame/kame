@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.34 2002/07/29 10:30:20 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.35 2002/07/29 13:58:19 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -90,8 +90,6 @@ static int mip6_ip6mc_create __P((struct ip6_mobility **,
 				  struct sockaddr_in6 *,
 				  struct sockaddr_in6 *,
 				  u_int32_t));
-static int mip6_ip6ma_process __P((struct mbuf *,
-				   struct ip6m_binding_ack *, int));
 static int mip6_ip6mhi_create __P((struct ip6_mobility **,
 				   struct mip6_bu *));
 static int mip6_ip6mci_create __P((struct ip6_mobility **,
@@ -716,6 +714,11 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
+	u_int32_t lifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
+	int error = 0;
 
 #ifdef IPSEC
 	/*
@@ -804,52 +807,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 
  check_mobility_options:
 
-	return(mip6_ip6ma_process(m, ip6ma, ip6malen));
-}
-
-static int
-mip6_ip6ma_process(m, ip6ma, ip6malen)
-	struct mbuf *m;
-	struct ip6m_binding_ack *ip6ma;
-	int ip6malen;
-{
-	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
-	struct hif_softc *sc;
-	struct mip6_bu *mbu;
-	u_int32_t lifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
-	int error = 0;
-
-	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		/* must not happen. */
-		m_freem(m);
-		return (EINVAL);
-	}
-
-	sc = hif_list_find_withhaddr(dst_sa);
-	if (sc == NULL) {
-		/* must not happen? */
-                mip6log((LOG_NOTICE,
-                         "%s:%d: no hif interface found.\n",
-                         __FILE__, __LINE__, ip6_sprintf(&ip6->ip6_src)));
-		m_freem(m);
-		return (EINVAL);
-	}
-
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
-	if (mbu == NULL) {
-                mip6log((LOG_NOTICE,
-                         "%s:%d: no matching binding update entry found "
-			 "from host %s.\n",
-                         __FILE__, __LINE__, ip6_sprintf(&ip6->ip6_src)));
-                /* ignore */
-		m_freem(m);
-                return (EINVAL);
-	}
 
 	if (ip6ma->ip6ma_status >= IP6MA_STATUS_ERRORBASE) {
                 mip6log((LOG_NOTICE,
@@ -864,7 +821,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 		}
 		if (ip6ma->ip6ma_status == IP6MA_STATUS_SEQNO_TOO_SMALL) {
 			/* seqno is too small.  adjust it and resend. */
-			mbu->mbu_seqno = ip6ma->ip6ma_seqno + 1;
+			mbu->mbu_seqno = ntohs(ip6ma->ip6ma_seqno) + 1;
 			mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 			return (0);
 		}
