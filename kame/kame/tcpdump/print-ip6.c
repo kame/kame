@@ -118,8 +118,9 @@ ip6_print(register const u_char *bp, register int length)
 			nh = *cp;
 			break;
 		case IPPROTO_FRAGMENT:
-			frag6_print(cp, (const u_char *)ip6);
-			hlen = 8;
+			hlen = frag6_print(cp, (const u_char *)ip6);
+			if (snapend <= cp + hlen)
+				goto end;
 			nh = *cp;
 			break;
 		case IPPROTO_ROUTING:

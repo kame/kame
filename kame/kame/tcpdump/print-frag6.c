@@ -50,7 +50,7 @@ static const char rcsid[] =
 #include "interface.h"
 #include "addrtoname.h"
 
-void
+int
 frag6_print(register const u_char *bp, register const u_char *bp2)
 {
 	register const struct ip6_frag *dp;
@@ -70,21 +70,31 @@ frag6_print(register const u_char *bp, register const u_char *bp2)
 	TCHECK(dp->ip6f_offlg);
 
 	if (vflag) {
-		printf("frag (0x%08x:%d|%d) ",
+		printf("frag (0x%08x:%d|%d)",
 		       ntohl(dp->ip6f_ident),
 		       ntohs(dp->ip6f_offlg & IP6F_OFF_MASK),
 		       sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen) -
 			       (bp - bp2) - sizeof(struct ip6_frag));
 	} else {
-		printf("frag (%d|%d) ",
+		printf("frag (%d|%d)",
 		       ntohs(dp->ip6f_offlg & IP6F_OFF_MASK),
 		       sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen) -
 			       (bp - bp2) - sizeof(struct ip6_frag));
 	}
 
-	return;
+#if 0
+	/* it is meaningless to decode non-first fragment */
+	if (ntohs(dp->ip6f_offlg & IP6F_OFF_MASK) != 0)
+		return 65535;
+	else
+#endif
+	{
+		fputs(" ", stdout);
+		return sizeof(struct ip6_frag);
+	}
 trunc:
 	fputs("[|frag]", stdout);
+	return 65535;
 #undef TCHECK
 }
 #endif /* INET6 */
