@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.161 1999/10/06 08:28:14 itojun Exp $
+$Id: CHANGELOG,v 1.162 1999/10/06 10:41:53 itojun Exp $
 
 <199910>
+Wed Oct  6 19:42:56 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/totd: totd, a DNS server for translation
+	  services like faithd(8).
+	  From: Feico Dillema <dillema@acm.org>
+
 Wed Oct  6 17:28:05 JST 1999  itojun@iijlab.net
 	* kame/bindtest: tests how the kernel implements bind(2) on IPv4/v6
 	  socket.  is not compiled in default compilation.
