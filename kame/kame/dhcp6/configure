@@ -4374,8 +4374,8 @@ if test "${with_opt_lifetime+set}" = set; then
 else
   dhcpopt_lifetime=0
 fi;
-if test $dhcpopt_ntp = 0 ; then
-	dhcpopt_ntp=36
+if test $dhcpopt_lifetime = 0 ; then
+	dhcpopt_lifetime=36
 	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_lifetime" >&5
 echo "${ECHO_T}unspecified and using $dhcpopt_lifetime" >&6
 else
