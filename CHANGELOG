@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.204 1999/10/21 14:59:51 itojun Exp $
+$Id: CHANGELOG,v 1.205 1999/10/21 15:42:41 itojun Exp $
 
 <199910>
+Thu Oct 21 08:40:24 PDT 1999  itojun@iijlab.ne
+	* netbsd/sys/netinet/udp_usrreq.c: advanced API has been broken for
+	  IPv6 UDP due to a one-letter typo.  it is now fixed.
+
 Thu Oct 21 07:57:02 PDT 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ucd-snmp: upgrade to 4.0.1 with IPv6 fixes.
 
