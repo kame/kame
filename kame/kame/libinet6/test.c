@@ -112,13 +112,14 @@ main(argc, argv)
 
 	p = *argv[0] ? argv[0] : NULL;
 	q = *argv[1] ? argv[1] : NULL;
+
+	print1("arg:", &ai, p ? p : "(empty)", q ? q : "(empty)");
+
 	error = getaddrinfo(p, q, &ai, &res);
 	if (error) {
 		printf("%s\n", gai_strerror(error));
 		exit(1);
 	}
-
-	print1("arg:", &ai, argv[0], argv[1]);
 
 	i = 1;
 	do {
