@@ -1,3 +1,5 @@
+/*	$KAME: config.c,v 1.7 2000/12/04 06:33:09 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Southern California.
  *  All rights reserved.
@@ -33,8 +35,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
- *
- *  $Id: config.c,v 1.6 2000/02/23 16:10:26 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.

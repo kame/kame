@@ -1,3 +1,5 @@
+/*	$KAME: callout.c,v 1.2 2000/12/04 06:33:09 itojun Exp $	*/
+
 /*
  * The mrouted program is covered by the license in the accompanying file
  * named "LICENSE.mrouted". Use of the mrouted program represents acceptance

@@ -1,3 +1,5 @@
+/*	$KAME: vif.h,v 1.3 2000/12/04 06:33:11 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Southern California.
  *  All rights reserved.
@@ -33,8 +35,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
- *
- *  $Id: vif.h,v 1.2 1999/08/24 16:45:23 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.

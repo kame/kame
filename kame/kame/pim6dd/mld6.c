@@ -1,3 +1,5 @@
+/*	$KAME: mld6.c,v 1.17 2000/12/04 06:33:10 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -62,8 +64,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
- *
- *  $Id: mld6.c,v 1.16 2000/12/04 04:23:00 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.

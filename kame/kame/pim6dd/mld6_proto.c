@@ -1,3 +1,5 @@
+/*	$KAME: mld6_proto.c,v 1.6 2000/12/04 06:33:10 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -61,8 +63,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
- *
- *  $Id: mld6_proto.c,v 1.5 2000/10/05 22:20:38 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.

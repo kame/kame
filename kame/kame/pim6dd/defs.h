@@ -1,3 +1,5 @@
+/*	$KAME: defs.h,v 1.10 2000/12/04 06:33:09 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Oregon.
  *  All rights reserved.
@@ -32,8 +34,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
- *
- *  $Id: defs.h,v 1.9 2000/10/05 22:20:38 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.

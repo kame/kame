@@ -1,3 +1,5 @@
+/*	$KAME: trace.c,v 1.6 2000/12/04 06:33:11 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -61,8 +63,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
- *
- *  $Id: trace.c,v 1.5 1999/09/16 08:46:00 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.

@@ -1,3 +1,5 @@
+/*	$KAME: mrt.c,v 1.4 2000/12/04 06:33:10 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Oregon.
  *  All rights reserved.
@@ -32,8 +34,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
- *
- *  $Id: mrt.c,v 1.3 2000/05/18 16:09:39 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.

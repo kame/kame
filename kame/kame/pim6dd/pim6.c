@@ -1,3 +1,5 @@
+/*	$KAME: pim6.c,v 1.8 2000/12/04 06:33:10 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -61,8 +63,6 @@
 /*
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
- *
- *  $Id: pim6.c,v 1.7 2000/12/04 04:23:00 jinmei Exp $
  */
 
 #include "defs.h"
