@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2175 2002/05/31 04:12:12 itojun Exp $
+$KAME: CHANGELOG,v 1.2176 2002/05/31 13:32:07 jinmei Exp $
 
 <200205>
+2002-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd: changed the behavior when an interface-direct
+	prefix being advertised was removed from the kernel;
+	rtadvd will continue to advertise the prefix with zero lifetimes
+	rather than to stop advertising the prefix.
+	This will help renumber a receiving host by deprecating the
+	address derived from the old prefix.
+
 Fri May 31 12:56:52 JST 2002  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: implement RFC2460 section 5, last
 	  paragraph (ICMPv6 too big with < 1280).
