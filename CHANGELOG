@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1495 2001/01/21 13:14:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1496 2001/01/21 16:10:43 itojun Exp $
 
 <200101>
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -46,6 +46,10 @@ Sun Jan 21 01:37:23 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	compute checksum correctly for a packet with scoped source or
 	destination addresses.
 	All BSD/OS 4.2 users are recommended to apply this fix.
+
+Sat Jan 20 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: candidate fix for KAME PR 233 (tunnelled packet
+	  may cause bad ARP).
 
 Fri Jan 19 17:09:17 JST 2001  itojun@iijlab.net
 	* sys/netinet/icmp6.h: synchronize RR flag bit definitions to
