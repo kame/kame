@@ -1572,6 +1572,9 @@ _yp_getaddrinfo(name, pai)
 
 extern const char *__hostalias __P((const char *));
 extern int h_errno;
+#ifdef RES_USE_EDNS0
+extern int res_opt __P((int, u_char *, int, int));
+#endif
 
 /*
  * Formulate a normal query, send, and await answer.
@@ -1623,6 +1626,10 @@ res_queryN(name, target)
 
 		n = res_mkquery(QUERY, name, class, type, NULL, 0, NULL,
 		    buf, sizeof(buf));
+#ifdef RES_USE_EDNS0
+		if (n > 0 && (_res.options & RES_USE_EDNS0) != 0)
+			n = res_opt(n, buf, sizeof(buf), anslen);
+#endif
 		if (n <= 0) {
 #ifdef DEBUG
 			if (_res.options & RES_DEBUG)
