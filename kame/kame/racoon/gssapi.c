@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.14 2001/01/29 23:18:52 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.15 2001/01/29 23:24:54 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -99,22 +99,14 @@ gssapi_error(OM_uint32 status_code, const char *where,
  * this is to be portable.
  */
 static int
-gssapi_vm2gssbuf(vchar_t *vmbuf, gss_buffer_t *gsstoken)
+gssapi_vm2gssbuf(vchar_t *vmbuf, gss_buffer_t gsstoken)
 {
-	if (*gsstoken == NULL) {
-		*gsstoken = (gss_buffer_t)malloc(sizeof (gss_buffer_desc));
-		if (*gsstoken == NULL)
-			return -1;
-	}
 
-	(*gsstoken)->value = malloc(vmbuf->l);
-	if ((*gsstoken)->value == NULL) {
-		free(*gsstoken);
+	gsstoken->value = malloc(vmbuf->l);
+	if (gsstoken->value == NULL)
 		return -1;
-	}
-
-	memcpy((*gsstoken)->value, vmbuf->v, vmbuf->l);
-	(*gsstoken)->length = vmbuf->l;
+	memcpy(gsstoken->value, vmbuf->v, vmbuf->l);
+	gsstoken->length = vmbuf->l;
 
 	return 0;
 }
@@ -122,6 +114,7 @@ gssapi_vm2gssbuf(vchar_t *vmbuf, gss_buffer_t *gsstoken)
 static int
 gssapi_gss2vmbuf(gss_buffer_t gsstoken, vchar_t **vmbuf)
 {
+
 	*vmbuf = vmalloc(gsstoken->length);
 	if (*vmbuf == NULL)
 		return -1;
@@ -382,7 +375,7 @@ gssapi_save_received_token(struct ph1handle *iph1, vchar_t *token)
 
 	gsstoken = &gps->gss_p[gps->gsscnt_p];
 
-	ret = gssapi_vm2gssbuf(token, &gsstoken);
+	ret = gssapi_vm2gssbuf(token, gsstoken);
 	if (ret < 0)
 		return ret;
 	gps->gsscnt_p++;
@@ -489,8 +482,8 @@ gssapi_wraphash(struct ph1handle *iph1)
 {
 	struct gssapi_ph1_state *gps;
 	OM_uint32 maj_stat, min_stat;
-	gss_buffer_desc hash_out_buf;
-	gss_buffer_t hash_in = NULL, hash_out = &hash_out_buf;
+	gss_buffer_desc hash_in_buf, hash_out_buf;
+	gss_buffer_t hash_in = &hash_in_buf, hash_out = &hash_out_buf;
 	vchar_t *outbuf;
 
 	gps = gssapi_get_state(iph1);
@@ -506,7 +499,7 @@ gssapi_wraphash(struct ph1handle *iph1)
 		return NULL;
 	}
 
-	gssapi_vm2gssbuf(iph1->hash, &hash_in);
+	gssapi_vm2gssbuf(iph1->hash, hash_in);
 
 	maj_stat = gss_wrap(&min_stat, gps->gss_context, 1, GSS_C_QOP_DEFAULT,
 	    hash_in, NULL, hash_out);
@@ -516,7 +509,6 @@ gssapi_wraphash(struct ph1handle *iph1)
 		if (GSS_ERROR(maj_stat))
 			gssapi_error(maj_stat, LOCATION,
 			    "release hash_in buffer\n");
-		free(hash_in);
 		return NULL;
 	}
 
@@ -526,7 +518,6 @@ gssapi_wraphash(struct ph1handle *iph1)
 	maj_stat = gss_release_buffer(&min_stat, hash_in);
 	if (GSS_ERROR(maj_stat))
 		gssapi_error(maj_stat, LOCATION, "release hash_in buffer\n");
-	free(hash_in);
 
 	gssapi_gss2vmbuf(hash_out, &outbuf);
 	maj_stat = gss_release_buffer(&min_stat, hash_out);
