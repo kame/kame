@@ -210,46 +210,43 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  * Equality
  */
 #define IN6_ARE_ADDR_EQUAL(a, b)			\
-	(((a)->s6_addr32[0] == (b)->s6_addr32[0]) &&	\
-	 ((a)->s6_addr32[1] == (b)->s6_addr32[1]) &&	\
-	 ((a)->s6_addr32[2] == (b)->s6_addr32[2]) &&	\
-	 ((a)->s6_addr32[3] == (b)->s6_addr32[3]))
+	(memcmp((a), (b), sizeof(struct in6_addr)) == 0)
 
 /*
  * Unspecified
  */
 #define IN6_IS_ADDR_UNSPECIFIED(a)	\
-	(((a)->s6_addr32[0] == 0) &&	\
-	 ((a)->s6_addr32[1] == 0) &&	\
-	 ((a)->s6_addr32[2] == 0) &&	\
-	 ((a)->s6_addr32[3] == 0))
+	((*(u_int32_t *)(&(a)->s6_addr[0]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[4]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[8]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[12]) == 0))
 
 /*
  * Loopback
  */
 #define IN6_IS_ADDR_LOOPBACK(a)		\
-	(((a)->s6_addr32[0] == 0) &&	\
-	 ((a)->s6_addr32[1] == 0) &&	\
-	 ((a)->s6_addr32[2] == 0) &&	\
-	 ((a)->s6_addr32[3] == ntohl(1)))
+	((*(u_int32_t *)(&(a)->s6_addr[0]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[4]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[8]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[12]) == ntohl(1)))
 
 /*
  * IPv4 compatible
  */
 #define IN6_IS_ADDR_V4COMPAT(a)		\
-	(((a)->s6_addr32[0] == 0) &&	\
-	 ((a)->s6_addr32[1] == 0) &&	\
-	 ((a)->s6_addr32[2] == 0) &&	\
-	 ((a)->s6_addr32[3] != 0) &&	\
-	 ((a)->s6_addr32[3] != ntohl(1)))
+	((*(u_int32_t *)(&(a)->s6_addr[0]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[4]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[8]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[12]) != 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[12]) != ntohl(1)))
 
 /*
  * Mapped
  */
 #define IN6_IS_ADDR_V4MAPPED(a)		      \
-	(((a)->s6_addr32[0] == 0) &&	      \
-	 ((a)->s6_addr32[1] == 0) &&	      \
-	 ((a)->s6_addr32[2] == ntohl(0xffff)))
+	((*(u_int32_t *)(&(a)->s6_addr[0]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[4]) == 0) &&	\
+	 (*(u_int32_t *)(&(a)->s6_addr[8]) == ntohl(0x0000ffff)))
 
 /*
  * KAME Scope Values
@@ -265,11 +262,12 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 
 /*
  * Unicast Scope
+ * Note that we must check topmost 10 bits only, not 16 bits (see RFC2373).
  */
 #define IN6_IS_ADDR_LINKLOCAL(a)	\
-	((a)->s6_addr16[0] == IPV6_ADDR_INT16_ULL)
+	(((a)->s6_addr[0] == 0xfe) && (((a)->s6_addr[1] & 0xc0) == 0x80))
 #define IN6_IS_ADDR_SITELOCAL(a)	\
-	((a)->s6_addr16[0] == IPV6_ADDR_INT16_USL)
+	(((a)->s6_addr[0] == 0xfe) && (((a)->s6_addr[1] & 0xc0) == 0xc0))
 
 /*
  * Multicast
