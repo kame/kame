@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.37 2000/10/10 13:02:30 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.38 2000/11/07 16:27:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.37 2000/10/10 13:02:30 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.38 2000/11/07 16:27:59 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2249,6 +2249,21 @@ rt_entry(rtm, again)
 		(RTF_CLONING|RTF_XRESOLVE|RTF_LLINFO|RTF_BLACKHOLE)) {
 		return;		/* not interested in the link route */
 	}
+	/* do not look at cloned routes */
+#ifdef RTF_WASCLONED
+	if (rtm->rtm_flags & RTF_WASCLONED)
+		return;
+#endif
+#ifdef RTF_CLONED
+	if (rtm->rtm_flags & RTF_CLONED)
+		return;
+#endif
+	/*
+	 * do not look at dynamic routes.
+	 * netbsd/openbsd cloned routes have UGHD.
+	 */
+	if (rtm->rtm_flags & RTF_DYNAMIC)
+		return;
 	rtmp = (char *)(rtm + 1);
 	/* Destination */
 	if ((rtm->rtm_addrs & RTA_DST) == 0)
