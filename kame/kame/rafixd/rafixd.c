@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.2 2003/03/14 10:01:24 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.3 2003/03/14 11:53:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -855,6 +855,13 @@ recv_ra(s)
 	resid = len - sizeof(*rap);
 	for (hdr = (struct nd_opt_hdr *)(rap + 1), optlen = 0; resid > 0;
 	    resid -= optlen) {
+		if (resid < sizeof(struct nd_opt_hdr)) {
+			dprintf(LOG_INFO, FNAME,
+			    "short RA option header from %s",
+			    addr2str((struct sockaddr *)&from));
+			break;
+		}
+
 		hdr = (struct nd_opt_hdr *)((caddr_t)hdr + optlen);
 		optlen = hdr->nd_opt_len << 3;
 		if (hdr->nd_opt_len == 0) {
