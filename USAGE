@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 02:36:45 $
+		     $Date: 1999/10/07 02:51:39 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -14,13 +14,13 @@ related to KAME kit.
 <<<ifconfig>>>
 
 A link-local address is automatically assigned to each interface on
-the first time that the interface becomes up. Althogh it is usually
-the boot time, there are some exceptions. If you find an interface
+the first time that the interface becomes up.  Althogh it is usually
+the boot time, there are some exceptions.  If you find an interface
 without a link-local address, please make the interface up by hand.
 Some network drivers allow an interface to become up even without a
-hardware address (e.g. for PCMCIA network cards). In such cases, it is
+hardware address (e.g. for PCMCIA network cards).  In such cases, it is
 possible that an interface has no link-local address even if the
-interface is up. If you see such situation, please disable the
+interface is up.  If you see such situation, please disable the
 interface once and then re-enable it (i.e. do `ifconfig IF down;
 ifconfig IF up').
 
@@ -50,7 +50,7 @@ See also "/usr/local/v6/etc/rc.net6".
 
 In IPv6 architecture, an IPv6 address of an interface can be generated
 from a prefix assigned to it, and a link-dependent identifier for the
-interface. So assigning a full IPv6 address by ifconfig is not
+interface.  So assigning a full IPv6 address by ifconfig is not
 necessary anymore, because user can only take care of prefix, by
 letting system take care of interface identifier.
 
