@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ppp.c,v 1.50 1999/01/09 21:47:09 thorpej Exp $	*/
+/*	$NetBSD: if_ppp.c,v 1.58 2000/03/30 09:45:36 augustss Exp $	*/
 /*	Id: if_ppp.c,v 1.6 1997/03/04 03:33:00 paulus Exp 	*/
 
 /*
@@ -196,8 +196,8 @@ struct compressor *ppp_compressors[8] = {
 void
 pppattach()
 {
-    register struct ppp_softc *sc;
-    register int i = 0;
+    struct ppp_softc *sc;
+    int i = 0;
 
     for (sc = ppp_softc; i < NPPP; sc++) {
 	sc->sc_unit = i;	/* XXX */
@@ -309,15 +309,25 @@ pppdealloc(sc)
     sc->sc_rc_state = NULL;
 #endif /* PPP_COMPRESS */
 #ifdef PPP_FILTER
-    if (sc->sc_pass_filt.bf_insns != 0) {
-	FREE(sc->sc_pass_filt.bf_insns, M_DEVBUF);
-	sc->sc_pass_filt.bf_insns = 0;
-	sc->sc_pass_filt.bf_len = 0;
+    if (sc->sc_pass_filt_in.bf_insns != 0) {
+	FREE(sc->sc_pass_filt_in.bf_insns, M_DEVBUF);
+	sc->sc_pass_filt_in.bf_insns = 0;
+	sc->sc_pass_filt_in.bf_len = 0;
     }
-    if (sc->sc_active_filt.bf_insns != 0) {
-	FREE(sc->sc_active_filt.bf_insns, M_DEVBUF);
-	sc->sc_active_filt.bf_insns = 0;
-	sc->sc_active_filt.bf_len = 0;
+    if (sc->sc_pass_filt_out.bf_insns != 0) {
+	FREE(sc->sc_pass_filt_out.bf_insns, M_DEVBUF);
+	sc->sc_pass_filt_out.bf_insns = 0;
+	sc->sc_pass_filt_out.bf_len = 0;
+    }
+    if (sc->sc_active_filt_in.bf_insns != 0) {
+	FREE(sc->sc_active_filt_in.bf_insns, M_DEVBUF);
+	sc->sc_active_filt_in.bf_insns = 0;
+	sc->sc_active_filt_in.bf_len = 0;
+    }
+    if (sc->sc_active_filt_out.bf_insns != 0) {
+	FREE(sc->sc_active_filt_out.bf_insns, M_DEVBUF);
+	sc->sc_active_filt_out.bf_insns = 0;
+	sc->sc_active_filt_out.bf_len = 0;
     }
 #endif /* PPP_FILTER */
 #ifdef VJC
@@ -476,6 +486,9 @@ pppioctl(sc, cmd, data, flag, p)
 	case PPP_IP:
 	    npx = NP_IP;
 	    break;
+	case PPP_IPV6:
+	    npx = NP_IPV6;
+	    break;
 	default:
 	    return EINVAL;
 	}
@@ -507,36 +520,57 @@ pppioctl(sc, cmd, data, flag, p)
 #ifdef PPP_FILTER
     case PPPIOCSPASS:
     case PPPIOCSACTIVE:
+	/* These are no longer supported. */
+	return EOPNOTSUPP;
+
+    case PPPIOCSIPASS:
+    case PPPIOCSOPASS:
+    case PPPIOCSIACTIVE:
+    case PPPIOCSOACTIVE:
 	nbp = (struct bpf_program *) data;
 	if ((unsigned) nbp->bf_len > BPF_MAXINSNS)
 	    return EINVAL;
 	newcodelen = nbp->bf_len * sizeof(struct bpf_insn);
 	if (newcodelen != 0) {
-	    MALLOC(newcode, struct bpf_insn *, newcodelen, M_DEVBUF, M_WAITOK);
-	    if (newcode == 0) {
-		return EINVAL;		/* or sumpin */
-	    }
+	    newcode = malloc(newcodelen, M_DEVBUF, M_WAITOK);
+	    /* WAITOK -- malloc() never fails. */
 	    if ((error = copyin((caddr_t)nbp->bf_insns, (caddr_t)newcode,
 			       newcodelen)) != 0) {
-		FREE(newcode, M_DEVBUF);
+		free(newcode, M_DEVBUF);
 		return error;
 	    }
 	    if (!bpf_validate(newcode, nbp->bf_len)) {
-		FREE(newcode, M_DEVBUF);
+		free(newcode, M_DEVBUF);
 		return EINVAL;
 	    }
 	} else
 	    newcode = 0;
-	bp = (cmd == PPPIOCSPASS)? &sc->sc_pass_filt: &sc->sc_active_filt;
+	switch (cmd) {
+	case PPPIOCSIPASS:
+	    bp = &sc->sc_pass_filt_in;
+	    break;
+
+	case PPPIOCSOPASS:
+	    bp = &sc->sc_pass_filt_out;
+	    break;
+
+	case PPPIOCSIACTIVE:
+	    bp = &sc->sc_active_filt_in;
+	    break;
+
+	case PPPIOCSOACTIVE:
+	    bp = &sc->sc_active_filt_out;
+	    break;
+	}
 	oldcode = bp->bf_insns;
 	s = splimp();
 	bp->bf_len = nbp->bf_len;
 	bp->bf_insns = newcode;
 	splx(s);
 	if (oldcode != 0)
-	    FREE(oldcode, M_DEVBUF);
+	    free(oldcode, M_DEVBUF);
 	break;
-#endif
+#endif /* PPP_FILTER */
 
     default:
 	return (-1);
@@ -549,14 +583,14 @@ pppioctl(sc, cmd, data, flag, p)
  */
 static int
 pppsioctl(ifp, cmd, data)
-    register struct ifnet *ifp;
+    struct ifnet *ifp;
     u_long cmd;
     caddr_t data;
 {
-    register struct proc *p = curproc;	/* XXX */
-    register struct ppp_softc *sc = ifp->if_softc;
-    register struct ifaddr *ifa = (struct ifaddr *)data;
-    register struct ifreq *ifr = (struct ifreq *)data;
+    struct proc *p = curproc;	/* XXX */
+    struct ppp_softc *sc = ifp->if_softc;
+    struct ifaddr *ifa = (struct ifaddr *)data;
+    struct ifreq *ifr = (struct ifreq *)data;
     struct ppp_stats *psp;
 #ifdef	PPP_COMPRESS
     struct ppp_comp_stats *pcp;
@@ -570,13 +604,35 @@ pppsioctl(ifp, cmd, data)
 	break;
 
     case SIOCSIFADDR:
-	if (ifa->ifa_addr->sa_family != AF_INET)
+	switch (ifa->ifa_addr->sa_family) {
+#ifdef INET
+	case AF_INET:
+	    break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+	    break;
+#endif
+	default:
 	    error = EAFNOSUPPORT;
+	    break;
+	}
 	break;
 
     case SIOCSIFDSTADDR:
-	if (ifa->ifa_addr->sa_family != AF_INET)
+	switch (ifa->ifa_addr->sa_family) {
+#ifdef INET
+	case AF_INET:
+	    break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+	    break;
+#endif
+	default:
 	    error = EAFNOSUPPORT;
+	    break;
+	}
 	break;
 
     case SIOCSIFMTU:
@@ -598,6 +654,10 @@ pppsioctl(ifp, cmd, data)
 	switch(ifr->ifr_addr.sa_family) {
 #ifdef INET
 	case AF_INET:
+	    break;
+#endif
+#ifdef INET6
+	case AF_INET6:
 	    break;
 #endif
 	default:
@@ -653,7 +713,7 @@ pppoutput(ifp, m0, dst, rtp)
     struct sockaddr *dst;
     struct rtentry *rtp;
 {
-    register struct ppp_softc *sc = ifp->if_softc;
+    struct ppp_softc *sc = ifp->if_softc;
     int protocol, address, control;
     u_char *cp;
     int s, error;
@@ -688,6 +748,24 @@ pppoutput(ifp, m0, dst, rtp)
 	ip = mtod(m0, struct ip *);
 	if (ip->ip_tos & IPTOS_LOWDELAY)
 	    m0->m_flags |= M_HIGHPRI;
+	break;
+#endif
+#ifdef INET6
+    case AF_INET6:
+	address = PPP_ALLSTATIONS;	/*XXX*/
+	control = PPP_UI;		/*XXX*/
+	protocol = PPP_IPV6;
+	mode = sc->sc_npmode[NP_IPV6];
+
+#if 0	/* XXX flowinfo/traffic class, maybe? */
+	/*
+	 * If this packet has the "low delay" bit set in the IP header,
+	 * put it on the fastq instead.
+	 */
+	ip = mtod(m0, struct ip *);
+	if (ip->ip_tos & IPTOS_LOWDELAY)
+	    m0->m_flags |= M_HIGHPRI;
+#endif
 	break;
 #endif
     case AF_UNSPEC:
@@ -744,18 +822,14 @@ pppoutput(ifp, m0, dst, rtp)
 	pppdumpm(m0);
     }
 
-#if defined(PPP_FILTER) || NBPFILTER > 0
-    *mtod(m0, u_char *) = SLIPDIR_OUT;
-#endif
-
     if ((protocol & 0x8000) == 0) {
 #ifdef PPP_FILTER
 	/*
 	 * Apply the pass and active filters to the packet,
 	 * but only if it is a data packet.
 	 */
-	if (sc->sc_pass_filt.bf_insns != 0
-	    && bpf_filter(sc->sc_pass_filt.bf_insns, (u_char *) m0,
+	if (sc->sc_pass_filt_out.bf_insns != 0
+	    && bpf_filter(sc->sc_pass_filt_out.bf_insns, (u_char *) m0,
 			  len, 0) == 0) {
 	    error = 0;		/* drop this packet */
 	    goto bad;
@@ -764,10 +838,10 @@ pppoutput(ifp, m0, dst, rtp)
 	/*
 	 * Update the time we sent the most recent packet.
 	 */
-	if (sc->sc_active_filt.bf_insns == 0
-	    || bpf_filter(sc->sc_active_filt.bf_insns, (u_char *) m0, len, 0))
+	if (sc->sc_active_filt_out.bf_insns == 0
+	    || bpf_filter(sc->sc_active_filt_out.bf_insns, (u_char *) m0,
+	    		  len, 0))
 	    sc->sc_last_sent = time.tv_sec;
-
 #else
 	/*
 	 * Update the time we sent the most recent packet.
@@ -782,10 +856,6 @@ pppoutput(ifp, m0, dst, rtp)
      */
     if (sc->sc_bpf)
 	bpf_mtap(sc->sc_bpf, m0);
-#endif
-
-#if defined(PPP_FILTER) || NBPFILTER > 0
-    *mtod(m0, u_char *) = address;
 #endif
 
     /*
@@ -839,6 +909,9 @@ ppp_requeue(sc)
 	switch (PPP_PROTOCOL(mtod(m, u_char *))) {
 	case PPP_IP:
 	    mode = sc->sc_npmode[NP_IP];
+	    break;
+	case PPP_IPV6:
+	    mode = sc->sc_npmode[NP_IPV6];
 	    break;
 	default:
 	    mode = NPMODE_PASS;
@@ -1391,28 +1464,23 @@ ppp_inproc(sc, m)
     m->m_pkthdr.len = ilen;
     m->m_pkthdr.rcvif = ifp;
 
-#if defined(PPP_FILTER) || NBPFILTER > 0
-    *mtod(m, u_char *) = SLIPDIR_IN;
-#endif
-
     if ((proto & 0x8000) == 0) {
 #ifdef PPP_FILTER
 	/*
 	 * See whether we want to pass this packet, and
 	 * if it counts as link activity.
 	 */
-	adrs = *mtod(m, u_char *);	/* save address field */
-	if (sc->sc_pass_filt.bf_insns != 0
-	    && bpf_filter(sc->sc_pass_filt.bf_insns, (u_char *) m,
+	if (sc->sc_pass_filt_in.bf_insns != 0
+	    && bpf_filter(sc->sc_pass_filt_in.bf_insns, (u_char *) m,
 			  ilen, 0) == 0) {
 	    /* drop this packet */
 	    m_freem(m);
 	    return;
 	}
-	if (sc->sc_active_filt.bf_insns == 0
-	    || bpf_filter(sc->sc_active_filt.bf_insns, (u_char *) m, ilen, 0))
+	if (sc->sc_active_filt_in.bf_insns == 0
+	    || bpf_filter(sc->sc_active_filt_in.bf_insns, (u_char *) m,
+	    		  ilen, 0))
 	    sc->sc_last_recv = time.tv_sec;
-
 #else
 	/*
 	 * Record the time that we received this packet.
@@ -1425,10 +1493,6 @@ ppp_inproc(sc, m)
     /* See if bpf wants to look at the packet. */
     if (sc->sc_bpf)
 	bpf_mtap(sc->sc_bpf, m);
-#endif
-
-#if defined(PPP_FILTER) || NBPFILTER > 0
-    *mtod(m, u_char *) = adrs;
 #endif
 
     rv = 0;
@@ -1453,6 +1517,25 @@ ppp_inproc(sc, m)
 #endif
 	schednetisr(NETISR_IP);
 	inq = &ipintrq;
+	break;
+#endif
+
+#ifdef INET6
+    case PPP_IPV6:
+	/*
+	 * IPv6 packet - take off the ppp header and pass it up to IPv6.
+	 */
+	if ((ifp->if_flags & IFF_UP) == 0
+	    || sc->sc_npmode[NP_IPV6] != NPMODE_PASS) {
+	    /* interface is down - drop the packet. */
+	    m_freem(m);
+	    return;
+	}
+	m->m_pkthdr.len -= PPP_HDRLEN;
+	m->m_data += PPP_HDRLEN;
+	m->m_len -= PPP_HDRLEN;
+	schednetisr(NETISR_IPV6);
+	inq = &ip6intrq;
 	break;
 #endif
 

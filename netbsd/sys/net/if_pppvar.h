@@ -1,4 +1,4 @@
-/*	$NetBSD: if_pppvar.h,v 1.8 1998/02/09 17:43:52 perry Exp $	*/
+/*	$NetBSD: if_pppvar.h,v 1.11 2000/03/23 07:03:25 thorpej Exp $	*/
 /*	Id: if_pppvar.h,v 1.3 1996/07/01 01:04:37 paulus Exp	 */
 
 /*
@@ -51,7 +51,8 @@
  * indexing sc_npmode.
  */
 #define NP_IP	0		/* Internet Protocol */
-#define NUM_NP	1		/* Number of NPs. */
+#define NP_IPV6	1		/* Internet Protocol version 6 */
+#define NUM_NP	2		/* Number of NPs. */
 
 /*
  * Structure describing each ppp unit.
@@ -82,8 +83,13 @@ struct ppp_softc {
 	time_t	sc_last_sent;		/* time (secs) last NP pkt sent */
 	time_t	sc_last_recv;		/* time (secs) last NP pkt rcvd */
 #ifdef PPP_FILTER
-	struct	bpf_program sc_pass_filt;   /* filter for packets to pass */
-	struct	bpf_program sc_active_filt; /* filter for "non-idle" packets */
+	/* Filter for packets to pass. */
+	struct	bpf_program sc_pass_filt_in;
+	struct	bpf_program sc_pass_filt_out;
+
+	/* Filter for "non-idle" packets. */
+	struct	bpf_program sc_active_filt_in;
+	struct	bpf_program sc_active_filt_out;
 #endif /* PPP_FILTER */
 #ifdef	VJC
 	struct	slcompress *sc_comp; 	/* vjc control buffer */
