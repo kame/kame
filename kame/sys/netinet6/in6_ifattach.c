@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.39 2000/03/02 09:24:45 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.40 2000/03/02 09:38:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -548,6 +548,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ib,
 			ifa_list);
 #endif
+		ib->ia_ifa.ifa_refcnt++;
 
 		ib->ia_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 		ib->ia_prefixmask.sin6_family = AF_INET6;
