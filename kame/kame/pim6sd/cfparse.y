@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.31 2003/04/30 05:09:00 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.32 2003/05/09 04:09:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -928,12 +928,12 @@ static_rp_config()
 {
 	struct attr_list *al;
 
-	if (cand_rp_flag == TRUE) {
+	if (cand_rp_flag == TRUE && static_rp) {
 		yywarn("cand-rp and static-rp configuration cannot coexist");
 		return -1;
 	}
 
-	if (cand_bsr_flag == TRUE) {
+	if (cand_bsr_flag == TRUE && static_rp) {
 		yywarn("cand-bsr and static-rp configuration cannot coexist");
 		return -1;
 	}
