@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.325 2003/06/25 06:15:56 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.326 2003/06/25 07:10:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -512,7 +512,6 @@ nd6_llinfo_settimer(ln, tick)
 			callout_reset(&ln->ln_timer_ch, INT_MAX,
 			    nd6_llinfo_timer, ln);
 #elif defined(__OpenBSD__)
-			timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
 			timeout_add(&ln->ln_timer_ch, INT_MAX);
 #else
 			timeout(nd6_llinfo_timer, ln, INT_MAX);
@@ -523,7 +522,6 @@ nd6_llinfo_settimer(ln, tick)
 			callout_reset(&ln->ln_timer_ch, tick,
 			    nd6_llinfo_timer, ln);
 #elif defined(__OpenBSD__)
-			timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
 			timeout_add(&ln->ln_timer_ch, tick);
 #else
 			timeout(nd6_llinfo_timer, ln, tick);
@@ -1440,6 +1438,8 @@ nd6_rtrequest(req, rt, sa)
 		callout_init(&ln->ln_timer_ch, NULL);
 #elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_init(&ln->ln_timer_ch);
+#elif defined(__OpenBSD__)
+		timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
 #endif
 		/* this is required for "ndp" command. - shin */
 		if (req == RTM_ADD) {
@@ -1585,6 +1585,7 @@ nd6_rtrequest(req, rt, sa)
 		ln->ln_next->ln_prev = ln->ln_prev;
 		ln->ln_prev->ln_next = ln->ln_next;
 		ln->ln_prev = NULL;
+		nd6_llinfo_settimer(ln, -1);
 		rt->rt_llinfo = 0;
 		rt->rt_flags &= ~RTF_LLINFO;
 		if (ln->ln_hold)
@@ -2368,7 +2369,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		}
 #endif /* IPSEC */
 		return ((*ifp->if_output)(origifp, m, (struct sockaddr *)dst,
-					 rt));
+		    rt));
 	}
 #if defined(__OpenBSD__) && defined(IPSEC)
 	if (mtag != NULL &&
