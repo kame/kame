@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.317 2002/06/25 10:07:02 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.318 2002/07/25 08:42:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2196,6 +2196,12 @@ do { \
 #endif
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 					OPTSET(IN6P_IPV6_V6ONLY);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+					if (optval)
+						in6p->in6p_vflag &= ~INP_IPV4;
+					else
+						in6p->in6p_vflag |= INP_IPV4;
+#endif
 #else
 					if ((ip6_v6only && optval) ||
 					    (!ip6_v6only && !optval))
