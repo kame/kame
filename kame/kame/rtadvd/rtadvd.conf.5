@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.3 2000/05/16 13:34:14 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.4 2000/05/22 22:10:53 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -34,39 +34,42 @@
 .Nm rtadvd.conf
 .Nd config file for router advertisement daemon
 .Sh DESCRIPTION
-The file describes how the router advertisement packet must be constructed
+This file describes how the router advertisement packet must be constructed
 for each of the interfaces.
 .Pp
-It obeys famous
+It obeys the famous
 .Xr termcap 5
 file format.
 Each line in the file describes a network interface.
 Fields are separated by a colon
-.Po
-.Dq \&:
-.Pc ,
+.Pq Sq \&: ,
 and each field contains one capability description.
-Lines may be concatenated by \e character.
-The comment marker is `#' character.
+Lines may be concatenated by
+.Sq \e
+character.
+The comment marker is the
+.Sq \#
+character.
 .Pp
 .Sh CAPABILITIES
 Capabilities describe the value to be filled into ICMPv6 router
-advertisement message and to control
+advertisement messages and to control
 .Xr rtadvd 8
 behavior.
 Therefore, you are encouraged to read IETF neighbor discovery documents
-if you would like to modify sample configuration file.
+if you would like to modify the sample configuration file.
 .Pp
 Note that almost all items have default values.
 If you omit an item, the default value of the item will be used.
 .Pp
-There are two items to control interval of sending router advertisements.
+There are two items which control the interval of sending router advertisements.
 .Bl -tag -width indent
 .It Cm \&maxinterval
 (num) The maximum time allowed between sending unsolicited
 multicast router advertisements
 .Pq unit: seconds .
-The default value is 600. Its value must be no less than 4 seconds
+The default value is 600.
+Its value must be no less than 4 seconds
 and no greater than 1800 seconds.
 .It Cm \&mininterval
 (num) The minimum time allowed between sending unsolicited multicast
@@ -176,7 +179,8 @@ which will be attached to router advertisement header.
 .It Cm \&mtu
 (num or str) MTU (maximum transmission unit) field.
 If 0 is specified, it means that the option will not be included.
-The default value is 0. If the special string
+The default value is 0.
+If the special string
 .Dq auto
 is specified for this item, MTU option will be included and its value
 will be set to the interface MTU automatically.
