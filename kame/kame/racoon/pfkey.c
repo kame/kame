@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.114 2001/06/07 01:59:22 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.115 2001/06/27 14:16:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,6 +103,7 @@ static int pk_recvflush __P((caddr_t *));
 static int pk_recvspdupdate __P((caddr_t *));
 static int pk_recvspdadd __P((caddr_t *));
 static int pk_recvspddelete __P((caddr_t *));
+static int pk_recvspdexpire __P((caddr_t *));
 static int pk_recvspdget __P((caddr_t *));
 static int pk_recvspddump __P((caddr_t *));
 static int pk_recvspdflush __P((caddr_t *));
@@ -130,7 +131,7 @@ NULL,	/* SADB_X_SPDACQUIRE */
 pk_recvspddump,
 pk_recvspdflush,
 NULL,	/* SADB_X_SPDSETIDX */
-NULL,	/* SADB_X_SPDEXPIRE */
+pk_recvspdexpire,
 NULL,	/* SADB_X_SPDDELETE2 */
 };
 
@@ -1920,6 +1921,50 @@ pk_recvspddelete(mhp)
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spddelete message passed.\n");
+		return -1;
+	}
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+			saddr + 1,
+			daddr + 1,
+			saddr->sadb_address_prefixlen,
+			daddr->sadb_address_prefixlen,
+			saddr->sadb_address_proto,
+			&spidx);
+
+	sp = getsp(&spidx);
+	if (sp == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no policy found: %s\n",
+			spidx2str(&spidx));
+		return -1;
+	}
+
+	remsp(sp);
+	delsp(sp);
+
+	return 0;
+}
+
+static int
+pk_recvspdexpire(mhp)
+	caddr_t *mhp;
+{
+	struct sadb_address *saddr, *daddr;
+	struct sadb_x_policy *xpl;
+	struct policyindex spidx;
+	struct secpolicy *sp;
+
+	/* sanity check */
+	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"inappropriate sadb spdexpire message passed.\n");
 		return -1;
 	}
 	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
