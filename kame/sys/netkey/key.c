@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.81 2000/05/07 03:12:42 itojun Exp $	*/
+/*	$KAME: key.c,v 1.82 2000/05/07 03:50:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,7 +339,7 @@ static caddr_t key_setsadbxpolicy
 static caddr_t key_setsadbext __P((caddr_t, caddr_t));
 static void *key_newbuf __P((void *, u_int));
 #ifdef INET6
-static int key_ismyaddr6 __P((caddr_t));
+static int key_ismyaddr6 __P((struct sockaddr_in6 *));
 #endif
 #if 0
 static int key_isloopback __P((u_int, caddr_t));
@@ -2161,9 +2161,9 @@ key_getspmsglen(sp)
 
 	tlen = (sizeof(struct sadb_msg)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sp->spidx.src.ss_family))
+		+ PFKEY_ALIGN8(sp->spidx.src.ss_len)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sp->spidx.dst.ss_family)));
+		+ PFKEY_ALIGN8(sp->spidx.dst.ss_len));
 
 	tlen += key_getspreqmsglen(sp);
 
@@ -2485,8 +2485,7 @@ key_checkspidup(saidx, spi)
 
 	/* check all SAD */
 	LIST_FOREACH(sah, &sahtree, chain) {
-		if (!key_ismyaddr(sah->saidx.dst.ss_family,
-		                  _INADDRBYSA(&sah->saidx.dst)))
+		if (!key_ismyaddr((struct sockaddr *)&sah->saidx.dst))
 			continue;
 		sav = key_getsavbyspi(sah, spi);
 		if (sav != NULL)
@@ -2859,9 +2858,9 @@ key_getmsglen(sav)
 
 	len += sizeof(struct sadb_sa);
 	len += (sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sav->sah->saidx.src.ss_family)));
+		+ PFKEY_ALIGN8(sav->sah->saidx.src.ss_len));
 	len += (sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sav->sah->saidx.dst.ss_family)));
+		+ PFKEY_ALIGN8(sav->sah->saidx.dst.ss_len));
 
 	if (sav->key_auth != NULL)
 		len += sav->key_auth->sadb_key_len;
@@ -3142,7 +3141,7 @@ key_setdumpsa(newmsg, sav, type, satype, seq, pid)
 			p = key_setsadbaddr(p,
 			      SADB_EXT_ADDRESS_SRC,
 			      (struct sockaddr *)&sav->sah->saidx.src,
-			      _INALENBYAF(sav->sah->saidx.src.ss_family) << 3,
+			      sav->sah->saidx.src.ss_len << 3,
 			      IPSEC_ULPROTO_ANY);
 			break;
 
@@ -3456,19 +3455,22 @@ key_newbuf(src, len)
  *	0: false
  */
 int
-key_ismyaddr(family, addr)
-	u_int family;
-	caddr_t addr;
+key_ismyaddr(sa)
+	struct sockaddr *sa;
 {
+#ifdef INET
+	struct sockaddr_in *sin;
+	struct in_ifaddr *ia;
+#endif
+
 	/* sanity check */
-	if (addr == NULL)
+	if (sa == NULL)
 		panic("key_ismyaddr: NULL pointer is passed.\n");
 
-	switch (family) {
+	switch (sa->sa_family) {
+#ifdef INET
 	case AF_INET:
-	{
-		struct in_ifaddr *ia;
-
+		sin = (struct sockaddr_in *)sa;
 #ifdef __NetBSD__
 		for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next)
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -3477,15 +3479,19 @@ key_ismyaddr(family, addr)
 #else
 		for (ia = in_ifaddr; ia; ia = ia->ia_next)
 #endif
-			if (bcmp(addr,
-			        (caddr_t)&ia->ia_addr.sin_addr,
-			        _INALENBYAF(family)) == 0)
+		{
+			if (sin->sin_family == ia->ia_addr.sin_family &&
+			    sin->sin_len == ia->ia_addr.sin_len &&
+			    sin->sin_addr.s_addr == ia->ia_addr.sin_addr.s_addr)
+			{
 				return 1;
-	}
+			}
+		}
 		break;
+#endif
 #ifdef INET6
 	case AF_INET6:
-		return key_ismyaddr6(addr);
+		return key_ismyaddr6((struct sockaddr_in6 *)sa);
 #endif
 	}
 
@@ -3502,50 +3508,44 @@ key_ismyaddr(family, addr)
 #include <netinet6/in6_var.h>
 
 static int
-key_ismyaddr6(addr)
-	caddr_t addr;
+key_ismyaddr6(sin6)
+	struct sockaddr_in6 *sin6;
 {
-	struct in6_addr *a = (struct in6_addr *)addr;
 	struct in6_ifaddr *ia;
+	struct in6_multi *in6m;
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (bcmp(addr, (caddr_t)&ia->ia_addr.sin6_addr,
-				_INALENBYAF(AF_INET6)) == 0) {
+		if (sin6->sin6_family == ia->ia_addr.sin6_family &&
+		    sin6->sin6_len == ia->ia_addr.sin6_len &&
+		    sin6->sin6_scope_id == ia->ia_addr.sin6_scope_id &&
+		    IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &ia->ia_addr.sin6_addr)) {
 			return 1;
 		}
 
-		/* XXX Multicast */
-	    {
-	  	struct	in6_multi *in6m = 0;
 
+		/*
+		 * XXX Multicast
+		 * XXX why do we care about multlicast here while we don't care
+		 * about IPv4 multicast??
+		 * XXX scope
+		 */
+		in6m = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		IN6_LOOKUP_MULTI(*(struct in6_addr *)addr, ia->ia_ifp, in6m);
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
-		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, a);
+		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &sin6->sin6_addr);
 		     (in6m) = in6m->in6m_entry.le_next)
 			continue;
 #endif
 		if (in6m)
 			return 1;
-	    }
 	}
 
 	/* loopback, just for safety */
-	if (IN6_IS_ADDR_LOOPBACK(a))
+	if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
 		return 1;
-
-#if 0
-	/* FAITH */
-	if (ip6_keepfaith &&
-	    (a->s6_addr32[0] == ip6_faith_prefix.s6_addr32[0] &&
-	     a->s6_addr32[1] == ip6_faith_prefix.s6_addr32[1] &&
-	     a->s6_addr32[2] == ip6_faith_prefix.s6_addr32[2]))
-		return 1;
-#endif
-
-	/* XXX anycast */
 
 	return 0;
 }
