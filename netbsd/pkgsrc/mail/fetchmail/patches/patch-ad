@@ -1,0 +1,12 @@
+--- acconfig.h-	Mon Jan 24 17:14:45 2000
++++ acconfig.h	Mon Jan 24 17:15:07 2000
+@@ -127,6 +127,9 @@
+ /* Define to the version of the distribution.  */
+ #undef VERSION
+ 
++/* Define if you have md5 in libc.  */
++#undef HAVE_MD5
++
+ 
+ /* Leave that blank line there!!  Autoheader needs it.
+    If you're adding to this file, keep in mind:
