@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.39 2001/06/20 07:05:00 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.40 2001/10/09 11:16:45 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -288,6 +288,17 @@ explicitly.
 The following items are for ICMPv6 route information option,
 which will be attached to router advertisement header.
 These items are optional.
+In the following list, each keyword beginning with
+.Dq rt
+could be replaced with the one beginning with
+.Dq rtr
+for compatibility reason.
+For example,
+.Cm rtrplen
+is accepted instead of
+.Cm rtplen .
+However, the former type of keywords has basically been obsoleted,
+and should not be used any more.
 .Bl -tag -width indent
 .It Cm \&routes
 (num) Number of routes.
@@ -301,6 +312,18 @@ value of
 .Cm routes.
 Each index shall follow the name of each item, e.g.,
 .Dq rtplen2 .
+.It Cm \&rtprefix
+(str) The prefix filled into the Prefix field of route information option.
+Since
+.Dq \&:
+is used for
+.Xr termcap 5
+file format as well as IPv6 numeric address, the field MUST be quoted by
+doublequote character.
+This field cannot be
+omitted if the value of
+.Cm addrs
+is more than 0.
 .It Cm \&rtplen
 (num) Prefix length field in route information option.
 The default value is 64.
@@ -317,22 +340,18 @@ and Bit 3
 .Pc
 are used to encode the route preference for the route.
 The default value is 0x00, i.e. medium preference.
-.It Cm \&rtprefix
-(str) The prefix filled into the Prefix field of route information option.
-Since
-.Dq \&:
-is used for
-.Xr termcap 5
-file format as well as IPv6 numeric address, the field MUST be quoted by
-doublequote character.
-This field cannot be
-omitted if the value of
-.Cm addrs
-is more than 0.
 .It Cm \&rtltime
 (num) route lifetime field in route information option.
 .Pq unit: seconds .
+Since the specification does not define the default value of this
+item, the value for this item should be specified by hand.
+However,
+.Nm rtadvd
+allows this item to be unspecified, and uses the router lifetime
+as the default value in such a case, just for compatibility with an
+old version of the program.
 .El
+.Pp
 You can also refer one line from another by using
 .Cm tc
 capability.
