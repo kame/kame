@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.44 2000/04/11 05:56:33 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.45 2000/04/11 06:03:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,14 +84,6 @@ static int get_ifid __P((struct ifnet *, struct in6_addr *));
 
 #define IFID_LOCAL(in6)		(!EUI64_LOCAL(in6))
 #define IFID_UNIVERSAL(in6)	(!EUI64_UNIVERSAL(in6))
-
-/*dummy*/
-int
-in6_ifattach_getifid(ifp)
-	struct ifnet *ifp;
-{
-	return 0;
-}
 
 /*
  * Generate a last-resort interface identifier, when the machine has no
