@@ -293,4 +293,5 @@ int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
 	struct inpcb *, struct ifnet **));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
+void in6_clearscope __P((struct in6_addr *));
 #endif
