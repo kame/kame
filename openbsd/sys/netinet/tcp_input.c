@@ -931,13 +931,13 @@ findpcb:
 			 * Drop TCP, IP headers and TCP options then add data
 			 * to socket buffer.
 			 */
-			m_adj(m, iphlen + off);
-			sbappend(&so->so_rcv, m);
-			sorwakeup(so);
 			if (th->th_flags & TH_PUSH)
 				tp->t_flags |= TF_ACKNOW;
 			else
 				tp->t_flags |= TF_DELACK;
+			m_adj(m, iphlen + off);
+			sbappend(&so->so_rcv, m);
+			sorwakeup(so);
 			return;
 		}
 	}
