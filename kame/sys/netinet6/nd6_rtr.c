@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.153 2001/07/23 15:17:15 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.154 2001/07/23 15:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,8 +76,7 @@
 
 static __inline__ int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
-static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *,
-	struct in6_addr *));
+static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *));
 static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 	struct nd_defrouter *));
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
@@ -1406,7 +1405,7 @@ prelist_update(new, dr, m)
 		 * No address matched and the valid lifetime is non-zero.
 		 * Create a new address.
 		 */
-		if ((ia6 = in6_ifadd(new, NULL)) != NULL) {
+		if ((ia6 = in6_ifadd(new)) != NULL) {
 			/*
 			 * note that we should use pr (not new) for reference.
 			 */
@@ -1861,9 +1860,8 @@ nd6_prefix_offlink(pr)
 }
 
 static struct in6_ifaddr *
-in6_ifadd(pr, ifid)
+in6_ifadd(pr)
 	struct nd_prefix *pr;
-	struct in6_addr  *ifid;   /* Mobile IPv6 addition */
 {
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct ifaddr *ifa;
@@ -1894,10 +1892,6 @@ in6_ifadd(pr, ifid)
 	 * (4) it is easier to manage when an interface has addresses
 	 * with the same interface identifier, than to have multiple addresses
 	 * with different interface identifiers.
-	 *
-	 * Mobile IPv6 addition: allow for caller to specify a wished interface
-	 * ID. This is to not break connections when moving addresses between
-	 * interfaces.
 	 */
 	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0);/* 0 is OK? */
 	if (ifa)
@@ -1941,16 +1935,14 @@ in6_ifadd(pr, ifid)
 	ifra.ifra_addr.sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
 
 	/* interface ID */
-	if (ifid == NULL || IN6_IS_ADDR_UNSPECIFIED(ifid))
-		ifid = &ib->ia_addr.sin6_addr;
-	ifra.ifra_addr.sin6_addr.s6_addr32[0]
-		|= (ifid->s6_addr32[0] & ~mask.s6_addr32[0]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[1]
-		|= (ifid->s6_addr32[1] & ~mask.s6_addr32[1]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[2]
-		|= (ifid->s6_addr32[2] & ~mask.s6_addr32[2]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[3]
-		|= (ifid->s6_addr32[3] & ~mask.s6_addr32[3]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[0] |=
+	    (ib->ia_addr.sin6_addr.s6_addr32[0] & ~mask.s6_addr32[0]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[1] |=
+	    (ib->ia_addr.sin6_addr.s6_addr32[1] & ~mask.s6_addr32[1]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[2] |=
+	    (ib->ia_addr.sin6_addr.s6_addr32[2] & ~mask.s6_addr32[2]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[3] |=
+	    (ib->ia_addr.sin6_addr.s6_addr32[3] & ~mask.s6_addr32[3]);
 	    
 	/* new prefix mask. */
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
