@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.98 2000/09/13 04:50:25 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.99 2000/09/18 19:01:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.98 2000/09/13 04:50:25 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.99 2000/09/18 19:01:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -293,26 +293,33 @@ get_ph1approvalx(p, proposal)
 		return NULL;
 	for (s = proposal; s != NULL; s = s->next) {
 		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"DB lifetime = %ld\n", s->lifetime);
-			plog(logp, LOCATION, NULL,
-				"DB lifebyte = %d\n", s->lifebyte);
-			plog(logp, LOCATION, NULL,
-				"DB enctype = %s\n",
+			plog(logp, LOCATION, NULL, "Compared: DB:Peer\n");
+			plog(logp, LOCATION, NULL, "(lifetime = %ld:%ld)\n",
+				s->lifetime, sa.lifetime);
+			plog(logp, LOCATION, NULL, "(lifebyte = %ld:%ld)\n",
+				s->lifebyte, sa.lifebyte);
+			plog(logp, LOCATION, NULL, "enctype = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
-						s->enctype));
-			plog(logp, LOCATION, NULL,
-				"DB hashtype = %s\n",
+						s->enctype),
+				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
+						sa.enctype));
+			plog(logp, LOCATION, NULL, "(encklen = %d:%d)\n",
+				s->encklen, sa.encklen);
+			plog(logp, LOCATION, NULL, "hashtype = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
-						s->hashtype));
-			plog(logp, LOCATION, NULL,
-				"DB authmethod = %s\n",
+						s->hashtype),
+				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
+						sa.hashtype));
+			plog(logp, LOCATION, NULL, "authmethod = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
-						s->authmethod));
-			plog(logp, LOCATION, NULL,
-				"DB dh_group = %s\n",
+						s->authmethod),
+				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
+						sa.authmethod));
+			plog(logp, LOCATION, NULL, "dh_group = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
-						s->dh_group));
+						s->dh_group),
+				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
+						sa.dh_group));
 		);
 #if 0
 		/* XXX to be considered */
