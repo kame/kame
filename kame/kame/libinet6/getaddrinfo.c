@@ -529,11 +529,6 @@ explore_fqdn(pai, hostname, servname, res)
 
 	afd = find_afd(pai->ai_family);
 
-	/*
-	 * post-RFC2553: should look at (pai->ai_flags & AI_ADDRCONFIG).
-	 * we need to add AI_ADDRCONFIG handling code by ourselves in case
-	 * we don't have getipnodebyname().
-	 */
 #ifdef USE_GETIPNODEBY
 	hp = getipnodebyname(hostname, pai->ai_family,
 	    pai->ai_flags & AI_ADDRCONFIG, &h_error);
