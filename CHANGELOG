@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1423 2000/12/04 10:56:39 itojun Exp $
+$KAME: CHANGELOG,v 1.1424 2000/12/04 11:28:06 itojun Exp $
 
 <200012>
+Mon Dec  4 20:27:27 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/udp_usrreq.c: fix IPv4 multicast input path.
+	  NetBSD PR 11629.
+
 Mon Dec  4 19:55:10 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_pcb.c (netbsd/openbsd):
 	  re-introduce workaround for updating cached routes in unconnected
