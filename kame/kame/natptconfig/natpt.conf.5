@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.10 2001/11/09 01:02:38 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.11 2001/11/09 02:23:58 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -145,11 +145,7 @@ IPv4 packet destined to specified IPv4 address is translated to IPv6
 packet going to specified address.  This rule translate both source
 and destination address.
 .Pp
-.\"	map from any4       to 202.249.11.252 port 28672 - 32767
 .\"	map from 10.0.0.3/8 to 202.249.11.252 port 28672 - 32767
-.It Xo Sy map from any4 to Ar v4addr
-.Op Sy port Ar num Sy - Ar mum
-.Xc
 .It Xo Sy map from Ar v4addr
 .Op Sy \&/ Ar num
 .Sy to Ar v4addr
@@ -157,10 +153,8 @@ and destination address.
 .Xc
 Translate IPv4 packet to IPv4 packet.
 .Pp
-The former is translate IPv4 packet coming from arbitrary host.  The
-latter is translate IPv4 packet coming from specified host or address
-range.  Both rules translate incoming IPv4 packet to packet coming out
-of specified IPv4 address.  The number after
+IPv4 packet coming from specified host or address range is translated
+to packet coming out of specified IPv4 address.  The number after
 .Sy \&/
 specifies address mask.  When address mask is not specified, it is
 treated as if 
