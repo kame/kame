@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.45 2000/10/04 17:41:00 itojun Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.46 2000/10/18 09:51:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -270,11 +270,6 @@ agg_i2recv(iph1, msg)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
-			if (ipsecdoi_checkid1(iph1) < 0) {
-				plog(logp, LOCATION, iph1->remote,
-					"invalid ID payload.\n");
-				goto end;
-			}
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -317,6 +312,12 @@ agg_i2recv(iph1, msg)
 
 	/* payload existency check */
 	/* XXX to be checked each authentication method. */
+
+	/* verify identifier */
+	if (ipsecdoi_checkid1(iph1) < 0) {
+		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		goto end;
+	}
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(satmp, iph1) < 0) {
@@ -574,11 +575,6 @@ agg_r1recv(iph1, msg)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
-			if (ipsecdoi_checkid1(iph1) < 0) {
-				plog(logp, LOCATION, iph1->remote,
-					"invalid ID payload.\n");
-				goto end;
-			}
 			break;
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -604,6 +600,12 @@ agg_r1recv(iph1, msg)
 
 	/* payload existency check */
 	/* XXX to be checked each authentication method. */
+
+	/* verify identifier */
+	if (ipsecdoi_checkid1(iph1) < 0) {
+		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		goto end;
+	}
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.46 2000/10/04 17:41:00 itojun Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.47 2000/10/18 09:51:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -521,11 +521,6 @@ ident_i4recv(iph1, msg0)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
-			if (ipsecdoi_checkid1(iph1) < 0) {
-				plog(logp, LOCATION, iph1->remote,
-					"invalid ID payload.\n");
-				goto end;
-			}
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -566,6 +561,12 @@ ident_i4recv(iph1, msg0)
 
 	/* see handler.h about IV synchronization. */
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
+
+	/* verify identifier */
+	if (ipsecdoi_checkid1(iph1) < 0) {
+		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		goto end;
+	}
 
 	/* validate authentication value */
     {
@@ -1011,11 +1012,6 @@ ident_r3recv(iph1, msg0)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
-			if (ipsecdoi_checkid1(iph1) < 0) {
-				plog(logp, LOCATION, iph1->remote,
-					"invalid ID payload.\n");
-				goto end;
-			}
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -1091,6 +1087,12 @@ ident_r3recv(iph1, msg0)
 
 	/* see handler.h about IV synchronization. */
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
+
+	/* verify identifier */
+	if (ipsecdoi_checkid1(iph1) < 0) {
+		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		goto end;
+	}
 
 	/* validate authentication value */
     {

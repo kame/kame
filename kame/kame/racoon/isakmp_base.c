@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.37 2000/10/04 17:41:00 itojun Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.38 2000/10/18 09:51:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,11 +221,6 @@ base_i2recv(iph1, msg)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
-			if (ipsecdoi_checkid1(iph1) < 0) {
-				plog(logp, LOCATION, iph1->remote,
-					"invalid ID payload.\n");
-				goto end;
-			}
 			break;
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -246,6 +241,12 @@ base_i2recv(iph1, msg)
 	if (iph1->nonce_p == NULL || iph1->id_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"few isakmp message received.\n");
+		goto end;
+	}
+
+	/* veryfy identifier */
+	if (ipsecdoi_checkid1(iph1) < 0) {
+		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
 		goto end;
 	}
 
@@ -645,11 +646,6 @@ base_r1recv(iph1, msg)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
-			if (ipsecdoi_checkid1(iph1) < 0) {
-				plog(logp, LOCATION, iph1->remote,
-					"invalid ID payload.\n");
-				goto end;
-			}
 			break;
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -670,6 +666,12 @@ base_r1recv(iph1, msg)
 	if (iph1->nonce_p == NULL || iph1->id_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"few isakmp message received.\n");
+		goto end;
+	}
+
+	/* verify identifier */
+	if (ipsecdoi_checkid1(iph1) < 0) {
+		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
 		goto end;
 	}
 

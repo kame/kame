@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.116 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.117 2000/10/18 09:51:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2873,91 +2873,122 @@ ipproto2doi(proto)
 }
 
 /*
- * check if phase 1 ID payload conforms RFC2407 4.6.2.
- * (proto, port) must be (0, 0) or (udp, 500).
+ * check the following:
+ * - In main mode with pre-shared key, only address type can be used.
+ * - if proper type for phase 1 ?
+ * - if phase 1 ID payload conformed RFC2407 4.6.2.
+ *   (proto, port) must be (0, 0), (udp, 500) or (udp, [specified]).
+ * - if ID payload sent from peer is equal to the ID expected by me.
  *
- * "ident" should be ID payload without general header, i.e.
- * value set to iph1->id_p after isakmp_p2ph().
+ * both of "id" and "id_p" should be ID payload without general header,
  */
 int
 ipsecdoi_checkid1(iph1)
 	struct ph1handle *iph1;
 {
 	struct ipsecdoi_id_b *id_b;
+	vchar_t *ident = NULL;
 
 	if (iph1->id_p == NULL) {
 		plog(logp, LOCATION, NULL,
 			"invalid iph1 passed id_p == NULL\n");
-		goto err;
+		return -1;
 	}
 	if (iph1->id_p->l < sizeof(id_b)) {
 		plog(logp, LOCATION, NULL,
 			"invalid value passed as \"ident\" (len=%lu)\n",
 			(u_long)iph1->id_p->l);
-		goto err;
+		return -1;
 	}
 
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
 
-	/*
-	 * In main mode with pre-shared key, only type of specific address
-	 * can be used.
-	 */
+	/* In main mode with pre-shared key, only address type can be used. */
 	if (iph1->etype == ISAKMP_ETYPE_IDENT
 	 && iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
 		 if (id_b->type != IPSECDOI_ID_IPV4_ADDR
-		 && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
+		  && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
 			plog(logp, LOCATION, NULL,
-				"Expecting IP address type in main mode, "
+				"ERROR: Expecting IP address type in main mode, "
 				"but %s.\n", s_ipsecdoi_ident(id_b->type));
-			goto err;
+			return -1;
 		}
-
-		if (id_b->proto_id == 0 && ntohs(id_b->port) == 0)
-			return 0;
-		if (id_b->proto_id == IPPROTO_UDP) {
-			switch (iph1->remote->sa_family) {
-			case AF_INET:
-				if (ntohs(id_b->port)
-				 == ((struct sockaddr_in *)iph1->remote)->sin_port)
-					return 0;
-				break;
-#ifdef INET6
-			case AF_INET6:
-				if (ntohs(id_b->port)
-				 == ((struct sockaddr_in6 *)iph1->remote)->sin6_port)
-					return 0;
-				break;
-#endif
-			default:
-				plog(logp, LOCATION, NULL,
-					"invalid family: %d\n",
-					iph1->remote->sa_family);
-				goto err;
-			}
-#if 1
-			/* allow hardcoded "500" for now */
-			if (ntohs(id_b->port) == 500)
-				return 0;
-#endif
-		}
-
-#if 0
-		plog(logp, LOCATION, NULL,
-			"wrong ID payload (proto, port) = (%u, %u).\n",
-			id_b->proto_id, ntohs(id_b->port));
-		return -1;
-#else
-		plog(logp, LOCATION, NULL,
-			"wrong ID payload (proto, port) = (%u, %u), "
-			"okay for now.\n",
-			id_b->proto_id, ntohs(id_b->port));
-		return 0;
-#endif
 	}
+
+	/* if proper type for phase 1 ? */
+	switch (id_b->type) {
+	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV4_ADDR_RANGE:
+	case IPSECDOI_ID_IPV6_ADDR_RANGE:
+		plog(logp, LOCATION, NULL,
+			"WARNING: such ID type %s is not proper.\n",
+			s_ipsecdoi_ident(id_b->type));
+		/*FALLTHROUGH*/
+	}
+
+	/* if phase 1 ID payload conformed RFC2407 4.6.2. */
+	if (id_b->type == IPSECDOI_ID_IPV4_ADDR
+	 && id_b->type == IPSECDOI_ID_IPV6_ADDR) {
+
+		if (id_b->proto_id == 0 && ntohs(id_b->port) != 0) {
+			plog(logp, LOCATION, NULL,
+				"WARNINIG: protocol ID and Port mismatched. "
+				"proto_id:%d port:%d\n",
+				id_b->proto_id, ntohs(id_b->port));
+			/*FALLTHROUGH*/
+
+		} else if (id_b->proto_id == IPPROTO_UDP) {
+			/*
+			 * copmaring with expecting port.
+			 * always permit if port is equal to PORT_ISAKMP
+			 */
+			if (ntohs(id_b->port) != PORT_ISAKMP) {
+
+				u_int16_t port;
+
+				switch (iph1->remote->sa_family) {
+				case AF_INET:
+					port = ((struct sockaddr_in *)iph1->remote)->sin_port;
+					break;
+#ifdef INET6
+				case AF_INET6:
+					port = ((struct sockaddr_in6 *)iph1->remote)->sin6_port;
+					break;
+#endif
+				default:
+					plog(logp, LOCATION, NULL,
+						"invalid family: %d\n",
+						iph1->remote->sa_family);
+					return -1;
+				}
+				if (ntohs(id_b->port) != port) {
+					plog(logp, LOCATION, NULL,
+						"WARNINIG: port %d expected, but %d\n",
+						port, ntohs(id_b->port));
+					/*FALLTHROUGH*/
+				}
+			}
+		}
+	}
+
+	/* compare with the ID if specified. */
+	if (iph1->rmconf->idv_p) {
+		 if (iph1->rmconf->idvtype_p != id_b->type) {
+			plog(logp, LOCATION, NULL,
+				"WARNINIG: ID type mismatched.\n");
+			/*FALLTHROUGH*/
+		}
+		ident = getidval(iph1->rmconf->idvtype_p, iph1->rmconf->idv_p);
+		if (memcmp(ident->v, id_b + 1, ident->l)) {
+			plog(logp, LOCATION, NULL,
+				"WARNINIG: ID value mismatched.\n");
+			/*FALLTHROUGH*/
+		}
+		vfree(ident);
+	}
+
 	return 0;
-err:
-	return -1;
 }
 
 /*
@@ -2976,78 +3007,57 @@ ipsecdoi_setid1(iph1)
 	/* init */
 	id_b.proto_id = 0;
 	id_b.port = 0;
+	ident = NULL;
 
 	switch (iph1->rmconf->idvtype) {
 	case IDTYPE_FQDN:
 		id_b.type = IPSECDOI_ID_FQDN;
 		ident = getidval(iph1->rmconf->idvtype, iph1->rmconf->idv);
-		if (!ident) {
-			plog(logp, LOCATION, NULL,
-				"failed to get ID value.\n");
-			goto err;
-		}
 		break;
 	case IDTYPE_USERFQDN:
 		id_b.type = IPSECDOI_ID_USER_FQDN;
 		ident = getidval(iph1->rmconf->idvtype, iph1->rmconf->idv);
-		if (!ident) {
-			plog(logp, LOCATION, NULL,
-				"failed to get ID value.\n");
-			goto err;
-		}
 		break;
 	case IDTYPE_KEYID:
 		id_b.type = IPSECDOI_ID_KEY_ID;
 		ident = getidval(iph1->rmconf->idvtype, iph1->rmconf->idv);
-		if (!ident) {
-			plog(logp, LOCATION, NULL,
-				"failed to get ID value.\n");
-			goto err;
-		}
 		break;
 #ifdef HAVE_SIGNING_C
 	case IDTYPE_ASN1DN:
 		id_b.type = IPSECDOI_ID_DER_ASN1_DN;
 		if (iph1->rmconf->idv) {
-			/* XXX it must be encode to asn1dn. */
+			/* XXX it must be encoded to asn1dn. */
 			ident = vdup(iph1->rmconf->idv);
 		} else {
-			if (oakley_getmycert(iph1) < 0)
-				goto err;
+			if (oakley_getmycert(iph1) < 0) {
+				plog(logp, LOCATION, NULL,
+					"failed to get own CERT.\n");
+				return NULL;
+			}
 			ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
 		}
 		break;
 #endif
 	case IDTYPE_ADDRESS:
 	default:
+	    {
+		int l;
+		caddr_t p;
+
 		/* use IP address */
 		switch (iph1->local->sa_family) {
 		case AF_INET:
 			id_b.type = IPSECDOI_ID_IPV4_ADDR;
 			id_b.port = ((struct sockaddr_in *)iph1->local)->sin_port;
-			ident = vmalloc(sizeof(struct in_addr));
-			if (!ident) {
-				plog(logp, LOCATION, NULL,
-					"failed to get ID value.\n");
-				goto err;
-			}
-			memcpy(ident->v,
-			    &((struct sockaddr_in *)iph1->local)->sin_addr,
-			    ident->l);
+			l = sizeof(struct in_addr);
+			p = (caddr_t)&((struct sockaddr_in *)iph1->local)->sin_addr;
 			break;
 #ifdef INET6
 		case AF_INET6:
 			id_b.type = IPSECDOI_ID_IPV6_ADDR;
 			id_b.port = ((struct sockaddr_in6 *)iph1->local)->sin6_port;
-			ident = vmalloc(sizeof(struct in6_addr));
-			if (!ident) {
-				plog(logp, LOCATION, NULL,
-					"failed to get ID value.\n");
-				goto err;
-			}
-			memcpy(ident->v,
-			    &((struct sockaddr_in6 *)iph1->local)->sin6_addr,
-			    ident->l);
+			l = sizeof(struct in6_addr);
+			p = (caddr_t)&((struct sockaddr_in6 *)iph1->local)->sin6_addr;
 			break;
 #endif
 		default:
@@ -3055,6 +3065,14 @@ ipsecdoi_setid1(iph1)
 			goto err;
 		}
 		id_b.proto_id = IPPROTO_UDP;
+		ident = vmalloc(l);
+		if (!ident) {
+			plog(logp, LOCATION, NULL,
+				"failed to get ID buffer.\n");
+			return NULL;
+		}
+		memcpy(ident->v, p, ident->l);
+	    }
 	}
 
 	ret = vmalloc(sizeof(id_b) + ident->l);
