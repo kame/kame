@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.39 2000/05/31 15:59:09 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.40 2000/05/31 16:04:04 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1496,7 +1496,6 @@ err:
 		n--;
 	}
 	return -1;
-	return 0;
 }
 
 static int
