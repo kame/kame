@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.79 2001/11/12 07:41:12 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.80 2001/11/21 06:41:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,6 +82,10 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #endif
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -367,6 +371,9 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	int maxlen;
 	caddr_t mac;
 	struct sockaddr_in6 sin6_in;
+#ifdef MIP6
+	int unicast_ns = 0;
+#endif
 	
 	if (IN6_IS_ADDR_MULTICAST(taddr6))
 		return;
@@ -395,6 +402,34 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		return;
 	m->m_pkthdr.rcvif = NULL;
 
+#ifdef MIP6
+	if (MIP6_IS_MN && daddr6 == NULL && !dad) {
+		struct hif_softc *sc;
+		struct mip6_bu *mbu;
+
+		/* 10.20. Returning Home */
+		for (sc = TAILQ_FIRST(&hif_softc_list);
+		     sc;
+		     sc = TAILQ_NEXT(sc, hif_entry)) {
+			mbu = mip6_bu_list_find_withpaddr(
+							&sc->hif_bu_list,
+							(struct in6_addr *)taddr6);
+			if (mbu == NULL)
+				continue;
+			if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
+				continue;
+			if (mbu->mbu_reg_state ==
+					MIP6_BU_REG_STATE_DEREGWAITACK) {
+				/* unspecified source */
+				dad = 1;
+				if (ln && ND6_IS_LLINFO_PROBREACH(ln))
+					unicast_ns = 1;
+			}
+			break;
+		}
+	}
+	if (!unicast_ns)
+#endif
 	if (daddr6 == NULL || IN6_IS_ADDR_MULTICAST(daddr6)) {
 		m->m_flags |= M_MCAST;
 		im6o.im6o_multicast_ifp = ifp;
@@ -416,6 +451,10 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	ip6->ip6_hlim = 255;
 	if (daddr6)
 		ip6->ip6_dst = *daddr6;
+#ifdef MIP6
+	else if (unicast_ns)
+		ip6->ip6_dst = *taddr6;
+#endif
 	else {
 		ip6->ip6_dst.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
 		ip6->ip6_dst.s6_addr16[1] = htons(ifp->if_index);
