@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.263 1999/11/07 15:44:41 itojun Exp $
+$Id: CHANGELOG,v 1.264 1999/11/09 12:17:41 itojun Exp $
 
 <199911>
+Tue Nov  9 07:14:23 EST 1999  itojun@iijlab.net
+	* kame/libpcap/scanner.l: make IPv6 parsing more strict.
+	  this makes arp[0:1] to work again ("0:1" was mistakingly
+	  considered as IPv6 address).  Uses very ugly regex...
+
 Sun Nov  7 10:40:55 EST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_input.c: implement tcp_pullup(),
 	  which ensures mbuf alignment match with what tcp_input() assumes.
