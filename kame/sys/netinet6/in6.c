@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.133 2001/01/22 11:48:10 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.134 2001/01/22 11:57:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -850,8 +850,8 @@ in6_update_ifa(ifp, ifra, ia)
 		 * The following message seems noisy, but we dare to add it for
 		 * diagnosis.
 		 */
-		printf("in6_update_ifa: prefixlen must be 128 when "
-		       "dstaddr is specified\n");
+		log(LOG_INFO, "in6_update_ifa: prefixlen must be 128 when "
+		    "dstaddr is specified\n");
 		return(EINVAL);
 	}
 	/* lifetime consistency check */
