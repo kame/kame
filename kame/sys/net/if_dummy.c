@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.18 2002/09/27 09:31:12 k-sugyou Exp $	*/
+/*	$KAME: if_dummy.c,v 1.19 2003/01/10 08:41:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -184,7 +184,7 @@ dummyattach(dummy)
 		ifp->if_dlt = DLT_NULL;
 #endif
 		if_attach(ifp);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_alloc_sadl(ifp);
 #endif
 #if NBPFILTER > 0

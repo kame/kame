@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.31 2002/10/08 07:18:09 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.32 2003/01/10 08:41:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -168,7 +168,7 @@ faithattach(faith)
 		ifp->if_dlt = DLT_NULL;
 #endif
 		if_attach(ifp);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_alloc_sadl(ifp);
 #endif
 #if NBPFILTER > 0

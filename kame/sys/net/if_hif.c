@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.38 2002/11/12 03:12:05 k-sugyou Exp $	*/
+/*	$KAME: if_hif.c,v 1.39 2003/01/10 08:41:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -211,7 +211,7 @@ hifattach(dummy)
 		IFQ_SET_READY(&sc->hif_if.if_snd);
 #endif
 		if_attach(&sc->hif_if);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_alloc_sadl(&sc->hif_if);
 #endif
 #if NBPFILTER > 0

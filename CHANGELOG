@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2301 2003/01/09 12:04:55 suz Exp $
+$KAME: CHANGELOG,v 1.2302 2003/01/10 08:41:45 suz Exp $
 
 <200301>
+Fri Jan 10 17:27:10 JST 2003	suz@crl.hitachi.co.jp
+	* kame/sys/net/if_*.c:
+	  fixed a bug that some interfaces cannot be manipulated under
+	  OpenBSD+KAME.
+
 Thu Jan  9 20:10:24 JST 2003	suz@crl.hitachi.co.jp
 	* {netbsd,openbsd}/sys/conf/files, {netbsd,openbsd}/sys/sys/sockio.h,
 	  {netbsd,openbsd}/sbin/ifconfig, kame/sys/net/if_stf.c:
