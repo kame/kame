@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1755 2001/07/03 08:22:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1756 2001/07/03 08:22:39 jinmei Exp $
 
 <200107>
 2001-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -15,7 +15,7 @@ $KAME: CHANGELOG,v 1.1755 2001/07/03 08:22:00 jinmei Exp $
 	  records, and
 	+ the application just tries to connect to all the entries that
 	  getaddrinfo(3) returns.
-	XXX: items to be considered.
+	XXX: items to be considered:
 	- some of the logic is not implemented.
 	- this routine opens a socket to get the corresponding source
 	  address for each destination candidate.  This might cause
