@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.54 2001/02/06 03:45:16 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.55 2001/02/06 04:21:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1250,8 +1250,8 @@ nd6_dad_timer(ifa)
 
 	/* timeouted with IFF_{RUNNING,UP} check */
 	if (dp->dad_ns_tcount > dad_maxtry) {
-		log(LOG_ERR, "%s: could not run DAD, driver problem?\n",
-		    if_name(ifa->ifa_ifp));
+		nd6log((LOG_INFO, "%s: could not run DAD, driver problem?\n",
+			if_name(ifa->ifa_ifp)));
 
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 		free(dp, M_IP6NDP);
