@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.56 2001/07/27 04:52:35 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.57 2001/07/29 05:14:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -315,6 +315,9 @@ encap4_lookup(m, off, proto)
 		 * We need to loop through all the possible candidates
 		 * to get the best match - the search takes O(n) for
 		 * n attachments (i.e. interfaces).
+		 *
+		 * For radix-based lookup, I guess source takes precedence.
+		 * See rn_{refines,lexobetter} for the correct answer.
 		 */
 		if (prio <= 0)
 			continue;
