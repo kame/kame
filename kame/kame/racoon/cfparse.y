@@ -74,7 +74,6 @@ static int num2dhgroup[] = {
 	OAKLEY_ATTR_GRP_DESC_MODP1536,
 };
 
-static int cur_algclass;
 static struct policyindex *cur_spidx;
 static struct remoteconf *cur_rmconf;
 static int tmpalgtype[MAXALGCLASS];
@@ -357,6 +356,9 @@ timer_stmt
 	/* algorithm */
 algorithm_statement
 	:	ALGORITHM_LEVEL BOC algorithm_stmts EOC
+		{
+			yywarn("algorithm directive are obsoleted.");
+		}
 	;
 algorithm_stmts
 	:	/* nothing */
@@ -366,7 +368,7 @@ algorithm_stmt
 	:	algorithm_class BOC algorithm_strengthes EOC
 	;
 algorithm_class
-	:	ALGORITHM_CLASS { cur_algclass = $1; }
+	:	ALGORITHM_CLASS
 	;
 algorithm_strengthes
 	:	/* nothing */
@@ -374,33 +376,13 @@ algorithm_strengthes
 	;
 algorithm_strength
 	:	STRENGTHTYPE algorithm_types EOS
-		{
-			lcconf->algstrength[cur_algclass]->algtype[$1] = $2;
-			YIPSDEBUG(DEBUG_CONF,
-				printf("current algclass = %s\n",
-					s_algclass(cur_algclass));
-				printf("%s\n", BIT2STR($2)));
-			$2 = 0;
-		}
 	;
 algorithm_types
-	:	algorithm_type {
-			$$ = (1 << $1) >> 1;
-		}
-	|	algorithm_type algorithm_types {
-			$$ = (1 << $1) >> 1;
-			$$ |= $2;
-		}
+	:	algorithm_type 
+	|	algorithm_type algorithm_types 
 	;
 algorithm_type
 	:	ALGORITHMTYPE
-		{
-			$$ = algtype2doi(cur_algclass, $1);
-			if ($$ == -1) {
-				yyerror("parse error");
-				return -1;
-			}
-		}
 	;
 
 	/* policy */
@@ -556,7 +538,10 @@ secproto_specs
 secproto_spec
 	:	SECLEVEL SECLEVELTYPE EOS { prhead->spspec->ipsec_level = $2; }
 	|	SECMODE secmode EOS
-	|	STRENGTH STRENGTHTYPE EOS { prhead->spspec->strength = $2; }
+	|	STRENGTH STRENGTHTYPE EOS
+		{
+			yyerror("strength directive are obsoleted.");
+		}
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
 			int doi;
@@ -798,7 +783,10 @@ isakmpproposal_specs
 	|	isakmpproposal_specs isakmpproposal_spec
 	;
 isakmpproposal_spec
-	:	STRENGTH STRENGTHTYPE EOS { prhead->spspec->strength = $2; }
+	:	STRENGTH STRENGTHTYPE EOS
+		{
+			yyerror("strength directive are obsoleted.");
+		}
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{
 			if ($2 == CF_LIFETYPE_TIME)
