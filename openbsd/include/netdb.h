@@ -1,4 +1,4 @@
-/*	$OpenBSD: netdb.h,v 1.18 2003/06/02 19:34:12 millert Exp $	*/
+/*	$OpenBSD: netdb.h,v 1.19 2004/04/14 07:06:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,8 +185,9 @@ struct	protoent {
 #define AI_PASSIVE	1	/* socket address is intended for bind() */
 #define AI_CANONNAME	2	/* request for canonical name */
 #define AI_NUMERICHOST	4	/* don't ever try hostname reverse lookup */
-#define AI_NUMERICSERV	8	/* don't ever try service name lookup */
-#define AI_ADDRCONFIG	0x10	/* only if any address is assigned */
+#define AI_EXT		8	/* enable non-portable extensions */
+#define AI_NUMERICSERV	16	/* don't ever try service name lookup */
+#define AI_ADDRCONFIG	32	/* only if any address is assigned */
 /* valid flags for addrinfo (not a standard def, apps should not use it) */
 #define AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV | \
