@@ -400,7 +400,7 @@ struct cmsghdr {
  * This is different from ALIGN() defined in ARCH/include/param.h.
  * XXX think again carefully about architecture dependencies.
  */
-#define CMSG_ALIGN(n)		(((n) + 3) & ~3)
+#define CMSG_ALIGN(n)	(((n) + sizeof(long) - 1) & ~(sizeof(long) - 1))
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
