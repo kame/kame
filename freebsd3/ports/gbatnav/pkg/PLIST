@@ -1,0 +1,14 @@
+bin/gbnclient
+bin/gbnrobot
+bin/gbnserver
+share/gnome/gnome/apps/Games/gbnclient.desktop
+share/gnome/gnome/apps/Games/gbnserver.desktop
+share/gnome/pixmaps/gbnrobot.png
+share/gnome/pixmaps/gnome-gbatnav.png
+share/gnome/pixmaps/gnome-gbatnavd.png
+var/games/gbatnav.scores
+share/gnome/gnome/help/gbatnav/C/index.html
+share/gnome/gnome/help/gbatnav/C/topic.dat
+share/locale/es/LC_MESSAGES/gbatnav.mo
+@dirrm share/gnome/help/gbatnav/C
+@dirrm share/gnome/help/gbatnav

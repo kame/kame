@@ -1,0 +1,8 @@
+--- gbnserver/ipv6.h-	Fri Jun 23 18:44:31 2000
++++ gbnserver/ipv6.h	Fri Jun 23 18:44:37 2000
+@@ -1,4 +1,4 @@
+ /* Soporte para IPv6 para el Batalla Naval */
+ 
+ /* Please, comment this line if you DONT have IPv6 support */
+-/* #define INET6 1 */
++#define INET6 1

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.27 2000/06/20 18:17:14 sumikawa Exp $
+# $Id: Makefile,v 1.28 2000/06/23 10:06:28 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -11,6 +11,7 @@ SUBDIR+=	emacs20
 SUBDIR+=	fetchmail
 SUBDIR+=	fwtk6
 SUBDIR+=	gated-ipv6
+SUBDIR+=	gbatnav
 SUBDIR+=	geta
 SUBDIR+=	heimdal
 SUBDIR+=	icecast
