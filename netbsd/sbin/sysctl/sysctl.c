@@ -80,6 +80,7 @@ __RCSID("$NetBSD: sysctl.c,v 1.58 2002/03/24 00:11:00 sommerfeld Exp $");
 #include <netinet/tcp.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
+#include <netinet/sctp_var.h>
 
 #ifdef INET6
 #include <netinet/ip6.h>
