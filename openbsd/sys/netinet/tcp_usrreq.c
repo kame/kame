@@ -795,27 +795,18 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	if  (*oldlenp < sizeof(tir))
 		return (ENOMEM);
 	if ((error = copyin(oldp, &tir, sizeof (tir))) != 0 )
+
 		return (error);
 	switch (tir.faddr.ss_family) {
 #ifdef INET6
 	case AF_INET6:
 		is_ipv6 = 1;
 		fin6 = (struct sockaddr_in6 *)&tir.faddr;
-		if (ip6_use_defzone && fin6->sin6_scope_id == 0) {
-			fin6->sin6_scope_id =
-				scope6_addr2default(&fin6->sin6_addr);
-		}
-		error = in6_embedscope(&f6, fin6);
-		if (error)
-			return EINVAL;	/*?*/
+		if ((error = scope6_check_id(fin6, 0)) != 0)
+			return(error);
 		lin6 = (struct sockaddr_in6 *)&tir.laddr;
-		if (ip6_use_defzone && lin6->sin6_scope_id == 0) {
-			lin6->sin6_scope_id =
-				scope6_addr2default(&lin6->sin6_addr);
-		}
-		error = in6_embedscope(&l6, lin6);
-		if (error)
-			return EINVAL;	/*?*/
+		if ((error = scope6_check_id(lin6, 0)) != 0)
+			return(error);
 		break;
 #endif
 	case AF_INET:
