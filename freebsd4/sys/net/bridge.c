@@ -610,7 +610,7 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
 {
     struct ifnet *src = m0->m_pkthdr.rcvif; /* could be NULL in output */
     struct ifnet *ifp, *last = NULL ;
-    int s ;
+    int error = 0, s ;
     int shared = bdg_copy ; /* someone else is using the mbuf */
     int once = 0;      /* loop only once */
     struct ifnet *real_dst = dst ; /* real dst from ether_output */
@@ -783,6 +783,8 @@ forward:
     for (;;) {
 	if (last) { /* need to forward packet leftover from previous loop */
 	    struct mbuf *m ;
+	    short mflags;
+	    int len;
 #ifdef ALTQ
 	    struct altq_pktattr pktattr;
 	    int af;
@@ -797,6 +799,7 @@ forward:
 		    printf("bdg_forward: sorry, m_copypacket failed!\n");
 		    return m0 ; /* the original is still there... */
 		}
+	    }
 #ifdef ALTQ
 	    if (ALTQ_IS_ENABLED(&last->if_snd)) {
 		    u_short	ether_type;
@@ -849,7 +852,6 @@ forward:
 		if (m->m_pkthdr.len != m->m_len) /* this pkt is on >1 bufs */
 		    bdg_split_pkts++;
 
-		IF_ENQUEUE(&last->if_snd, m);
 		if ((last->if_flags & IFF_OACTIVE) == 0)
 		    (*last->if_start)(last);
 	    }

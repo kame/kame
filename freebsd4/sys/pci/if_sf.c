@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sf.c,v 1.18 1999/12/05 20:02:44 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.5 2001/01/22 19:13:16 wpaul Exp $
  */
 
 /*
@@ -120,7 +120,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sf.c,v 1.18 1999/12/05 20:02:44 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.5 2001/01/22 19:13:16 wpaul Exp $";
 #endif
 
 static struct sf_type sf_devs[] = {
@@ -711,10 +711,10 @@ static int sf_attach(dev)
 	/*
 	 * Map control/status registers.
 	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= (PCIM_CMD_PORTEN|PCIM_CMD_MEMEN|PCIM_CMD_BUSMASTEREN);
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef SF_USEIOSPACE
 	if (!(command & PCIM_CMD_PORTEN)) {
@@ -824,15 +824,13 @@ static int sf_attach(dev)
 	ifp->if_watchdog = sf_watchdog;
 	ifp->if_init = sf_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = SF_TX_DLIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SF_TX_DLIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -851,7 +849,7 @@ static int sf_detach(dev)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	sf_stop(sc);
 
 	bus_generic_detach(dev);
@@ -1017,20 +1015,9 @@ static void sf_rxeof(sc)
 		eh = mtod(m, struct ether_header *);
 		ifp->if_ipackets++;
 
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-			    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			    ETHER_ADDR_LEN) && !(eh->ether_dhost[0] & 1))) {
-				m_freem(m);
-				continue;
-			}
-		}
-
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);
-
 	}
 
 	csr_write_4(sc, SF_CQ_CONSIDX,
@@ -1133,7 +1120,7 @@ static void sf_intr(arg)
 	/* Re-enable interrupts. */
 	csr_write_4(sc, SF_IMR, SF_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sf_start(ifp);
 
 	return;
@@ -1194,6 +1181,11 @@ static void sf_init(xsc)
 	} else {
 		SF_CLRBIT(sc, SF_RXFILT, SF_RXFILT_BROAD);
 	}
+
+	/*
+	 * Load the multicast filter.
+	 */
+	sf_setmulti(sc);
 
 	/* Init the completion queue indexes */
 	csr_write_4(sc, SF_CQ_CONSIDX, 0);
@@ -1332,12 +1324,24 @@ static void sf_start(ifp)
 	i = SF_IDX_HI(txprod) >> 4;
 
 	while(sc->sf_ldata->sf_tx_dlist[i].sf_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		if (sc->sf_tx_cnt == (SF_TX_DLIST_CNT - 2)) {
+			ifp->if_flags |= IFF_OACTIVE;
+			cur_tx = NULL;
+			break;
+		}
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		cur_tx = &sc->sf_ldata->sf_tx_dlist[i];
-		sf_encap(sc, cur_tx, m_head);
+		if (sf_encap(sc, cur_tx, m_head)) {
+			ifp->if_flags |= IFF_OACTIVE;
+			cur_tx = NULL;
+			break;
+		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1348,8 +1352,6 @@ static void sf_start(ifp)
 
 		SF_INC(i, SF_TX_DLIST_CNT);
 		sc->sf_tx_cnt++;
-		if (sc->sf_tx_cnt == (SF_TX_DLIST_CNT - 2))
-			break;
 	}
 
 	if (cur_tx == NULL)
@@ -1448,7 +1450,7 @@ static void sf_stats_update(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
 			sc->sf_link++;
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				sf_start(ifp);
 	}
 
@@ -1473,7 +1475,7 @@ static void sf_watchdog(ifp)
 	sf_reset(sc);
 	sf_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sf_start(ifp);
 
 	return;
