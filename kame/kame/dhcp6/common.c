@@ -124,7 +124,7 @@ getifaddr(addr, ifnam, prefix, plen)
 		break;
 	}
 
-	free(ifap);
+	freeifaddrs(ifap);
 	return error;
 #else
 	int s;

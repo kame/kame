@@ -748,7 +748,7 @@ grab_myaddrs()
 		}
 	}
 
-	free(ifa);
+	freeifaddrs(ifap);
 #else
 	int s;
 	unsigned int maxif;

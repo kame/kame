@@ -350,12 +350,12 @@ get_llflag(const char *name)
 			exit(1);
 		}
 
-		free(ifap);
+		freeifaddrs(ifap);
 		close(s);
 		return ifr6.ifr_ifru.ifru_flags6;
 	}
 
-	free(ifap);
+	freeifaddrs(ifap);
 	close(s);
 	return -1;
 #else

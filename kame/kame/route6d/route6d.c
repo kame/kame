@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.11 2000/02/23 08:07:12 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.12 2000/02/23 16:10:27 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.11 2000/02/23 08:07:12 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.12 2000/02/23 16:10:27 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1270,7 +1270,7 @@ ifconfig()
 		}
 	}
 	close(s);
-	free(ifap);
+	freeifaddrs(ifap);
 #else
 	int	s, i;
 	char	*buf;

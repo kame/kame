@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: config.c,v 1.5 2000/02/23 06:44:45 jinmei Exp $
+ *  $Id: config.c,v 1.6 2000/02/23 16:10:26 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -204,7 +204,7 @@ config_vifs_from_kernel()
 	}
     }
 
-    free(ifap);
+    freeifaddrs(ifap);
 #else /* !HAVE_GETIFADDRS */
     ifc.ifc_len = num_ifreq * sizeof(struct ifreq);
     ifc.ifc_buf = calloc(ifc.ifc_len, sizeof(char));

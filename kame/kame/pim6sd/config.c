@@ -250,7 +250,7 @@ config_vifs_from_kernel()
 
 	}
 
-	free(ifap);
+	freeifaddrs(ifap);
 #else  /* !HAVE_GETIFADDRS */
 	ifc.ifc_len = num_ifreq * sizeof (struct ifreq);
 	ifc.ifc_buf = calloc(ifc.ifc_len,sizeof(char));
