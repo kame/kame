@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.54 2002/08/15 05:25:09 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.55 2002/08/21 23:34:37 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -121,12 +121,13 @@ natpt_lookForRule6(struct pcv *cv6)
 }
 
 
-struct cSlot *
+struct sockaddr_in *
 natpt_reverseLookForRule6(struct sockaddr_in6 *sin6)
 {
 	int s;
 	int proto;
 	struct cSlot *csl;
+	static struct sockaddr_in sin4;
 
 	proto = 0;
 	if (sin6->sin6_family == IPPROTO_ICMPV6)
@@ -138,21 +139,33 @@ natpt_reverseLookForRule6(struct sockaddr_in6 *sin6)
 
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
-		if (csl->Remote.sa_family != AF_INET6)
-			continue;
-
 		if ((csl->proto != 0)
 		    && ((csl->proto & proto) == 0))
 			continue;
 
-		if ((csl->map & NATPT_REDIRECT_ADDR) == 0)
-			continue;
+		if (csl->Remote.sa_family == AF_INET6) {
+			if ((csl->map & NATPT_REDIRECT_ADDR) == 0)
+				continue;
 
-		if (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &csl->remote.daddr.in6))
-			continue;
+			if (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr,
+						&csl->remote.daddr.in6))
+				continue;
 
-		splx(s);
-		return (csl);
+			splx(s);
+			bzero(&sin4, sizeof(struct sockaddr_in));
+			sin4.sin_addr = csl->local.daddr.in4;
+			return (&sin4);
+		}
+
+		if (((csl->map & NATPT_BIDIR) != 0)
+		    && IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &csl->Local.in6src)) {
+			bzero(&sin4, sizeof(struct sockaddr_in));
+			sin4.sin_addr = csl->Remote.in4src;
+			splx(s);
+			return (&sin4);
+		}
+
+		continue;
 	}
 
 	splx(s);

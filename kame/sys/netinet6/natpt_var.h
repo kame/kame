@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.35 2002/08/19 10:24:58 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.36 2002/08/21 23:34:37 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -71,7 +71,7 @@ int		 natpt_ntop		__P((int, const void *, char *, size_t));
 
 /*  natpt_rule.c */
 struct cSlot	*natpt_lookForRule6	__P((struct pcv *));
-struct cSlot	*natpt_reverseLookForRule6 __P((struct sockaddr_in6 *sin6));
+struct sockaddr_in *natpt_reverseLookForRule6 __P((struct sockaddr_in6 *sin6));
 struct cSlot	*natpt_lookForRule4	__P((struct pcv *));
 int		 natpt_setRules		__P((caddr_t));
 int		 natpt_openIncomingV4Rule __P((int, struct pAddr *, struct pAddr *));

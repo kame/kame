@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.145 2002/08/14 06:19:21 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.146 2002/08/21 23:34:37 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -614,7 +614,8 @@ natpt_revertICMPv6To4address(struct pcv *cv6, struct mbuf *m4)
 		struct ip6_hdr	*icmpip6;
 		struct icmp	*icmp4;
 		struct icmp6_hdr *icmp6;
-		struct sockaddr_in6	sin6;
+		struct sockaddr_in	*sin4;
+		struct sockaddr_in6	 sin6;
 
 		icmp6 = cv6->pyld.icmp6;
 		icmpip6 = (struct ip6_hdr *)((caddr_t)icmp6 + sizeof(struct icmp6_hdr));
@@ -625,14 +626,14 @@ natpt_revertICMPv6To4address(struct pcv *cv6, struct mbuf *m4)
 		bzero(&sin6, sizeof(struct sockaddr_in6));
 		sin6.sin6_family = icmpip4->ip_p; /* divert to upper layer protocol */
 		sin6.sin6_addr = icmpip6->ip6_dst;
-		if ((csl = natpt_reverseLookForRule6(&sin6)) != NULL) {
+		if ((sin4 = natpt_reverseLookForRule6(&sin6)) != NULL) {
 			u_short		ip_sum;
 			struct in_addr	ip_old, ip_new;
 			
 			ip_sum = icmpip4->ip_sum;
 			ip_old = icmpip4->ip_dst;
-			ip_new = csl->local.daddr.in4;
-			icmpip4->ip_dst = csl->local.daddr.in4;
+			ip_new = sin4->sin_addr;
+			icmpip4->ip_dst = sin4->sin_addr;
 			icmpip4->ip_sum
 				= natpt_fixCksum(htons(ip_sum),
 					(u_char *)&ip_old, sizeof(struct in_addr),
