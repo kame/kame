@@ -88,7 +88,7 @@ struct sockinet {
 };
 
 #ifdef INET6
-static char *ip6_sa2str __P((struct sockaddr_in6 *, char *, int));
+static char *ip6_sa2str __P((struct sockaddr_in6 *, char *, size_t, int));
 #endif 
 
 #define ENI_NOSOCKET 	0
@@ -240,7 +240,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 				int scopelen;
 
 				if ((s = ip6_sa2str((struct sockaddr_in6 *)sa,
-						    scopebuf, 0)) == NULL)
+					scopebuf, sizeof(scopebuf), 0)) == NULL)
 					/* XXX what should we do? */
 					strcpy(scopebuf, "0");
 
@@ -318,9 +318,10 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #ifdef INET6
 /* ARGSUSED */
 static char *
-ip6_sa2str(sa6, buf, flags)
+ip6_sa2str(sa6, buf, bufsiz, flags)
 	struct sockaddr_in6 *sa6;
 	char *buf;
+	size_t bufsiz;
 	int flags;
 {
 	unsigned int ifindex = (unsigned int)sa6->sin6_scope_id;
@@ -328,7 +329,7 @@ ip6_sa2str(sa6, buf, flags)
 
 #ifdef notyet
 	if (flags & NI_NUMERICSCOPE) {
-		sprintf(buf, "%d", sa6->sin6_scope_id);
+		snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id);
 		return(buf);
 	}
 #endif
@@ -337,7 +338,7 @@ ip6_sa2str(sa6, buf, flags)
 		return(if_indextoname(ifindex, buf));
 
 	/* last resort */
-	sprintf(buf, "%d", sa6->sin6_scope_id);
+	snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id);
 	return(buf);
 }
 #endif 
