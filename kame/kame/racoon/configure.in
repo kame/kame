@@ -474,4 +474,15 @@ AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(gettimeofday select socket strerror strtol strtoul)
 AC_REPLACE_FUNCS(strdup)
 
-AC_OUTPUT(Makefile)
+dnl expand ${sysconfdir}, ugly...
+if test "x$prefix" = xNONE; then
+	sysconfdir_x=`echo $sysconfdir | sed -e 's,${prefix},'"$ac_default_prefix,"`
+else
+	sysconfdir_x=`echo $sysconfdir | sed -e 's,${prefix},'"$prefix,"`
+
+fi
+echo $sysconfdir_x
+AC_SUBST(sysconfdir_x)
+
+AC_OUTPUT(Makefile samples/basic.conf samples/policy.conf samples/psk.txt
+	samples/psk.txt samples/racoon.conf samples/remote.conf samples/sa.conf)

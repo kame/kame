@@ -1,17 +1,17 @@
-# $Id: basic.conf.in,v 1.1 2000/01/09 01:31:38 itojun Exp $
+# $Id: basic.conf.in,v 1.2 2000/01/10 17:33:07 itojun Exp $
 
 # search this file for pre_shared_key with various ID key.
-path pre_shared_key "/usr/local/etc/racoon/psk.txt" ;
+path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
 
 # racoon will search this directory if the certificate or certificate request
 # is received.
-path certificate "/usr/local/etc/racoon/cert.txt" ;
+path certificate "@sysconfdir_x@/racoon/cert.txt" ;
 
 # personal infomation.
 identifier vendor_id "KAME/racoon";
 identifier user_fqdn "sakane@kame.net";
 identifier fqdn "mine.kame.net";
-identifier keyid "/usr/local/etc/racoon/keyid.txt";
+identifier keyid "@sysconfdir_x@/racoon/keyid.txt";
 
 # "log" specifies logging level.  It is followed by either "info", "notify",
 # "debug" or "debug2".

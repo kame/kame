@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.11 2000/01/09 22:59:32 sakane Exp $
+# YIPS $Id: Makefile.in,v 1.12 2000/01/10 17:33:01 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -16,6 +16,7 @@ prefix=	@prefix@
 bindir=	@bindir@
 mandir=	@mandir@
 exec_prefix=	@exec_prefix@
+sysconfdir=	@sysconfdir@
 INSTALL=@INSTALL@
 
 PROG=	racoon kmpstat eaytest
@@ -28,6 +29,8 @@ OBJS=	main.o session.o isakmp.o handler.o \
 	cfparse.o cftoken.o strnames.o \
 	vmbuf.o plog.o logger.o schedule.o str2val.o misc.o sockmisc.o \
 	@LIBOBJS@
+# under samples
+CONF=	basic.conf policy.conf psk.txt racoon.conf remote.conf sa.conf
 
 all: $(PROG)
 
@@ -73,12 +76,21 @@ install:
 	$(INSTALL) -s -o bin -g bin -m 555 racoon $(prefix)/sbin
 	$(INSTALL) -o bin -g bin -m 444 racoon.8 $(mandir)/man8
 	$(INSTALL) -o bin -g bin -m 444 racoon.conf.5 $(mandir)/man5
+	mkdir -p ${sysconfdir}/racoon
+	for i in $(CONF); do \
+		$(INSTALL) -o bin -g bin -m 444 samples/$$i \
+			${sysconfdir/racoon; \
+	done
 
 clean:
 	-rm -f $(PROG) *.o *.core y.tab.h
 
 distclean: clean
 	-rm -f Makefile config.cache config.status config.log
+	-for i in $(CONF); do \
+		rm -f samples/$$i; \
+	done
+
 
 depend:
 	mkdep ${CFLAGS:M-[ID]*} $(srcdir)/*.c

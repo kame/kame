@@ -1,8 +1,8 @@
-# $Id: racoon.conf.in,v 1.1 2000/01/09 01:31:39 itojun Exp $
+# $Id: racoon.conf.in,v 1.2 2000/01/10 17:33:09 itojun Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
-path include "/usr/local/etc/racoon" ;
+path include "@sysconfdir_x@/racoon" ;
 include "basic.conf" ;
 include "remote.conf" ;
 include "policy.conf" ;
