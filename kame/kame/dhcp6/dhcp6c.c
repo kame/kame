@@ -45,6 +45,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#include <net/if_dl.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -149,6 +150,7 @@ static void client6_sendrequest __P((int, struct servtab *));
 static int client6_recvreply __P((int, struct servtab *));
 static void client6_sleep __P((void));
 void client6_hup __P((int));
+static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 static void setloglevel __P((void));
 static void dprintf __P((int, const char *, ...));
@@ -414,6 +416,51 @@ client6_hup(sig)
 	signaled = 1;
 }
 
+static int
+sa2plen(sa6)
+	struct sockaddr_in6 *sa6;
+{
+	int masklen;
+	u_char *p, *lim;
+	
+	p = (u_char *)(&sa6->sin6_addr);
+	lim = (u_char *)sa6 + sa6->sin6_len;
+	for (masklen = 0; p < lim; p++) {
+		switch (*p) {
+		case 0xff:
+			masklen += 8;
+			break;
+		case 0xfe:
+			masklen += 7;
+			break;
+		case 0xfc:
+			masklen += 6;
+			break;
+		case 0xf8:
+			masklen += 5;
+			break;
+		case 0xf0:
+			masklen += 4;
+			break;
+		case 0xe0:
+			masklen += 3;
+			break;
+		case 0xc0:
+			masklen += 2;
+			break;
+		case 0x80:
+			masklen += 1;
+			break;
+		case 0x00:
+			break;
+		default:
+			return(-1);
+		}
+	}
+
+	return(masklen);
+}
+
 static void
 client6_sleep()
 {
@@ -440,7 +487,7 @@ client6_sleep()
 		if (errno == EINTR && signaled) {
 			dprintf(LOG_INFO,
 				"client6_sleep: signal from a user recieved."
-				" activate DHCPv6");
+				" activate DHCPv6.");
 			goto activate;
 		}
 		dprintf(LOG_WARNING,
@@ -464,7 +511,7 @@ client6_sleep()
 	     rtm = (struct rt_msghdr *)(((char *)rtm) + rtm->rtm_msglen)) {
 		/* just for safety */
 		if (!rtm->rtm_msglen) {
-			dprintf(LOG_WARNING, "client_sleep: rtm_msglen is 0 "
+			dprintf(LOG_WARNING, "client6_sleep: rtm_msglen is 0 "
 				"(msgbuf=%p lim=%p rtm=%p)", msg, lim, rtm);
 			break;
 		}
@@ -482,11 +529,46 @@ client6_sleep()
 			continue;
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)dst)->sin6_addr) &&
-		    IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)mask)->sin6_addr)) {
+		    sa2plen((struct sockaddr_in6 *)mask) == 0) {
+			struct sockaddr *gw;
+
 			dprintf(LOG_INFO,
 				"client6_sleep: default router has changed. "
 				"activate DHCPv6.");
+			if ((gw = rti_info[RTAX_GATEWAY]) != NULL) {
+				switch (gw->sa_family) {
+				case AF_INET6:
+					dprintf(LOG_INFO,
+						"  new gateway: %s",
+						addr2str(gw));
+					break;
+				case AF_LINK:
+				{
+					struct sockaddr_dl *sdl;
+					char ifnambuf[IF_NAMESIZE];
+
+					sdl = (struct sockaddr_dl *)gw;
+					if (if_indextoname(sdl->sdl_index,
+							   ifnambuf) != NULL) {
+						dprintf(LOG_INFO,
+							"  new default to %s",
+							ifnambuf);
+					}
+					else {
+						dprintf(LOG_INFO,
+							"  new default to ?");
+					}
+					break;
+				}
+				}
+			}
+
 			goto activate;
+		}
+		else {
+			dprintf(LOG_DEBUG,
+				"client6_sleep: rtmsg add dst = %s, mask = %s",
+				addr2str(dst), addr2str(mask));
 		}
 	}
 
