@@ -3,6 +3,10 @@ SRCDIR=	${.CURDIR}/../../kame/traceroute
 PROG=	traceroute
 SRCS=	traceroute.c ifaddrlist.c savestr.c version.c
 
+BINOWN=	root
+BINGRP=	bin
+BINMODE=4555
+
 DEFS =  -DHAVE_MALLOC_H=1 -DHAVE_SYS_SELECT_H=1 -DHAVE_SYS_SOCKIO_H=1 -DHAVE_STRERROR=1 -DHAVE_SETLINEBUF=1 -DHAVE_SOCKADDR_SA_LEN=1  -DIPSEC
 CFLAGS+=-I${SRCDIR} -O2
 CFLAGS+=${DEFS}
