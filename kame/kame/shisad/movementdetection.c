@@ -1,4 +1,4 @@
-/*      $Id: movementdetection.c,v 1.3 2005/01/26 04:47:53 ryuji Exp $  */
+/*      $Id: movementdetection.c,v 1.4 2005/03/11 06:27:37 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -404,10 +404,11 @@ mdd_md_reg(coa, bid)
 	mdinfo->mipm_md_hdr.miph_seq	= random();
 	mdinfo->mipm_md_hint		= MIPM_MD_ADDR;
 	mdinfo->mipm_md_command		= MIPM_MD_REREG;
-	if (mddinfo.multiplecoa) 
-		mdinfo->mipm_md_bid = bid; 
 	memcpy(MIPD_HOA(mdinfo), &hoa, sizeof(hoa));
 	memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
+	if (mddinfo.multiplecoa) 
+		memcpy(&((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port,
+		    &bid, sizeof(u_int16_t));
 	
 	if (write(mddinfo.mipsock, mdinfo, len) < 0) {
 		if (DEBUGNORM)
@@ -1482,7 +1483,6 @@ mdd_md_dereg(struct if_info *dereg_ifinfo) {
 		mdinfo->mipm_md_hint		= MIPM_MD_ADDR;
 		mdinfo->mipm_md_command		= MIPM_MD_DEREGFOREIGN;
 		mdinfo->mipm_md_ifindex		= ifinfo->ifindex;
-		mdinfo->mipm_md_bid             = dereg_ifinfo->bid;
 
 		memset(&hoa, 0, sizeof(hoa)); 
 		hoa.sin6_family = AF_INET6;
@@ -1493,8 +1493,12 @@ mdd_md_dereg(struct if_info *dereg_ifinfo) {
 		       sizeof(struct sockaddr_in6));
 		memcpy(MIPD_COA(mdinfo), (struct sockaddr_in6 *)&dereg_ifinfo->coa, 
 		       sizeof(struct sockaddr_in6));
+		memcpy(&((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port,
+		    &dereg_ifinfo->bid, sizeof(u_int16_t));
 		memcpy(MIPD_COA2(mdinfo), (struct sockaddr_in6 *)&ifinfo->coa, 
 		       sizeof(struct sockaddr_in6));
+		memcpy(&((struct sockaddr_in6 *)MIPD_COA2(mdinfo))->sin6_port,
+		    &dereg_ifinfo->bid, sizeof(u_int16_t));
 
 		if (write(mddinfo.mipsock, mdinfo, len) < 0) {
 			if (DEBUGNORM) {
