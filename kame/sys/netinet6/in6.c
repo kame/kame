@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.131 2001/01/22 11:42:22 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.132 2001/01/22 11:47:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -324,6 +324,13 @@ in6_ifremloop(struct ifaddr *ifa)
 	}
 
 	if (ia_count == 1) {
+		/*
+		 * Before deleting, check if a corresponding loopbacked host
+		 * route surely exists. With this check, we can avoid to
+		 * delete an interface direct route whose destination is same
+		 * as the address being removed. This can happen when remofing
+		 * a subnet-router anycast address on a shared interface. 
+		 */
 		rt = rtalloc1(ifa->ifa_addr, 0
 #ifdef __FreeBSD__
 			      , 0
