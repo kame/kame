@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.248 2001/11/17 07:46:38 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.249 2001/11/19 07:47:34 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1249,7 +1249,7 @@ in6_update_ifa(ifp, ifra, ia)
 				log(LOG_ERR,
 				    "in6_update_ifa: addmulti failed for "
 				    "%s on %s (errno=%d)\n",
-				    ip6_sprintf(&mltaddr.sin6_addr), 
+				    ip6_sprintf(&llsol), 
 				    if_name(ifp), error);
 				goto cleanup;
 			}
