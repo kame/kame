@@ -920,6 +920,7 @@ netinet/accf_http.c	optional accept_filter_http
 netinet/if_atm.c	optional atm
 netinet/if_ether.c	optional ether
 netinet/in_gif.c	optional gif inet
+netinet/in4_cksum.c	optional inet
 netinet/igmp.c		optional inet
 netinet/in_msf.c	optional igmpv3
 netinet/in_msf.c	optional mldv2
