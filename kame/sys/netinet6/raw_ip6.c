@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.152 2004/02/13 09:52:42 keiichi Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.153 2004/04/09 08:10:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -795,8 +795,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		lzone = addr->sin6_scope_id;
 		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
-		if (!(IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
-		      addr->sin6_scope_id == 0) &&
+		if (IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0) {
 			error = EADDRNOTAVAIL;
 			break;
@@ -847,9 +846,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 		if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
 			break;
 
-		if ((error = in6_embedscope(&in6, addr)) != 0)
-			break;
-
 		/* Source address selection. XXX: need pcblookup? */
 		src = in6_selectsrc(addr, in6p->in6p_outputopts,
 		    in6p->in6p_moptions, &in6p->in6p_route,
@@ -863,8 +859,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		    (error = scope6_setzoneid(ifp, addr)) != 0) { /* XXX */
 			break;
 		}
-		if ((error = in6_embedscope(&in6p->in6p_faddr, addr)) != 0)
-			break;
+		in6p->in6p_faddr = addr->sin6_addr;
 		in6p->in6p_laddr = *src;
 		soisconnected(so);
 		break;
