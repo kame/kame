@@ -1,3 +1,5 @@
+/*	$KAME: bittypes.h,v 1.2 2001/01/26 07:41:22 jinmei Exp $ */
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

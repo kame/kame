@@ -1,3 +1,5 @@
+/*	$KAME: ifaddrs.h,v 1.2 2001/01/26 07:41:22 jinmei Exp $ */
+
 /*
  * Copyright (c) 1995, 1999
  *	Berkeley Software Design, Inc.  All rights reserved.

@@ -1,3 +1,5 @@
+/*	$KAME: sockstorage.h,v 1.3 2001/01/26 07:41:23 jinmei Exp $ */
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

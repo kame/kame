@@ -1,3 +1,5 @@
+/*	$KAME: addrinfo.h,v 1.5 2001/01/26 07:41:22 jinmei Exp $ */
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
