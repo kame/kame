@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.31 2000/07/10 07:24:48 jinmei Exp $	*/
+/*	$KAME: route6d.c,v 1.32 2000/07/15 04:50:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.31 2000/07/10 07:24:48 jinmei Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.32 2000/07/15 04:50:43 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2782,6 +2782,22 @@ ifonly:
 		rrt->rrt_rflags = RRTF_AGGREGATE;
 		rrt->rrt_t = 0;
 		rrt->rrt_index = loopifindex;
+		if (getroute(&rrt->rrt_info, &gw)) {
+#if 0
+			/*
+			 * When the address has already been registered in the
+			 * kernel routing table, it should be removed 
+			 */
+			delroute(&rrt->rrt_info, &gw);
+#else
+			/* it is more safe behavior */
+			errno = EINVAL;
+			fatal("%s/%u already in routing table, "
+			    "cannot aggregate",
+			    inet6_n2p(&rrt->rrt_info.rip6_dest),
+			    rrt->rrt_info.rip6_plen);
+#endif
+		}
 		/* Put the route to the list */
 		rrt->rrt_next = riprt;
 		riprt = rrt;
@@ -2791,13 +2807,6 @@ ifonly:
 		/* Add this route to the kernel */
 		if (nflag) 	/* do not modify kernel routing table */
 			continue;
-		if (getroute(&rrt->rrt_info, &gw)) {
-			/*
-			 * When the address has already been registered in the
-			 * kernel routing table, it should be removed 
-			 */
-			delroute(&rrt->rrt_info, &gw);
-		}
 		addroute(rrt, &in6addr_loopback, loopifcp);
 	}
 }
