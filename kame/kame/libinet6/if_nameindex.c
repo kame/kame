@@ -1,4 +1,4 @@
-/*	$KAME: if_nameindex.c,v 1.6 2000/11/24 08:08:41 itojun Exp $	*/
+/*	$KAME: if_nameindex.c,v 1.7 2000/11/24 08:17:20 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -37,29 +37,29 @@
  * From RFC 2553:
  *
  * 4.3 Return All Interface Names and Indexes
- * 
+ *
  *    The if_nameindex structure holds the information about a single
  *    interface and is defined as a result of including the <net/if.h>
  *    header.
- * 
+ *
  *       struct if_nameindex {
  *         unsigned int   if_index;  /* 1, 2, ... */
  *         char          *if_name;   /* null terminated name: "le0", ... */
  *       };
- * 
+ *
  *    The final function returns an array of if_nameindex structures, one
  *    structure per interface.
- * 
+ *
  *       struct if_nameindex  *if_nameindex(void);
- * 
+ *
  *    The end of the array of structures is indicated by a structure with
  *    an if_index of 0 and an if_name of NULL.  The function returns a NULL
  *    pointer upon an error, and would set errno to the appropriate value.
- * 
+ *
  *    The memory used for this array of structures along with the interface
  *    names pointed to by the if_name members is obtained dynamically.
  *    This memory is freed by the next function.
- * 
+ *
  * 4.4.  Free Memory
  *
  *    The following function frees the dynamic memory that was allocated by
