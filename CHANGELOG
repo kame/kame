@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1267 2000/09/12 08:46:04 jinmei Exp $
+$KAME: CHANGELOG,v 1.1268 2000/09/12 08:53:42 itojun Exp $
 
 <200009>
+Tue Sep 12 17:52:01 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_input.c: workaround to recent IPv6 ESP problem
+	  (started early Sep with ESP core crypto engine rewrite).
+	  perform m_pullup2 equivalent on IPv6 ESP transport mode, to avoid
+	  non-continuous mbuf.  (this is not necessary for m_pulldown case)
+	  KAME PR 283.  Thanks to TAHI guys and users@jp.ipv6.org.
+
 2000-09-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c (ip6_forward): if the incoming
 	interface equals to the outgoing one, and the link attached to the
