@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.98 2001/02/10 01:05:15 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.99 2001/02/10 13:18:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1129,7 +1129,7 @@ prelist_update(new, dr, m)
 			    ip6_sprintf(&new->ndpr_prefix.sin6_addr),
 					new->ndpr_plen, if_name(new->ndpr_ifp),
 					error, newpr);
-			goto end;
+			goto end; /* we should just give up in this case. */
 		}
 		pr = newpr;
 	}
@@ -1142,7 +1142,7 @@ prelist_update(new, dr, m)
 
 	/* 5.5.3 (a). Ignore the prefix without the A bit set. */
 	if (!new->ndpr_raf_auto)
-		goto end;
+		goto afteraddrconf;
 
 	/*
 	 * 5.5.3 (b). the link-local prefix should have been ignored in
@@ -1311,8 +1311,8 @@ prelist_update(new, dr, m)
 		}
 	}
 
-#ifdef MIP6
   afteraddrconf:
+#ifdef MIP6
 	if (newprefix) {
 		int onlink;
 
