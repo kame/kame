@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.163 2001/02/04 08:45:17 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.164 2001/02/04 08:47:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2535,7 +2535,10 @@ in6_ifawithscope(oifp, dst)
 			 *   (this must be already done above.)
 			 * - addresses on the outgoing I/F are preferred to
 			 *   ones on other interfaces if none of above
-			 *   tiebreaks.
+			 *   tiebreaks.  In the table below, the column "bI"
+			 *   means if the best_ifa is on the outgoing
+			 *   interface, and the column "oI" means if the ifa
+			 *   is on the outgoing interface.
 			 * - If there is no other reasons to choose one,
 			 *   longest address match against dst is considered.
 			 *
