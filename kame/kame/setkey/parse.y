@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.77 2003/05/28 08:32:06 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.78 2003/05/29 12:26:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -168,7 +168,7 @@ delete_command
 				return -1;
 			}
 			if (p_mode != IPSEC_MODE_ANY)
-				yyerror("WARNING: mode is obsoleted.");
+				yyerror("WARNING: mode is obsolete");
 
 			status = setkeymsg_addr(SADB_DELETE, $5, $3, $4, 0);
 			if (status < 0)
@@ -195,7 +195,7 @@ get_command
 			int status;
 
 			if (p_mode != IPSEC_MODE_ANY)
-				yyerror("WARNING: mode is obsoleted.");
+				yyerror("WARNING: mode is obsolete");
 
 			status = setkeymsg_addr(SADB_GET, $5, $3, $4, 0);
 			if (status < 0)
@@ -338,7 +338,7 @@ enc_alg
 				yyerror("unsupported algorithm");
 				return -1;
 			}
-			yyerror("WARNING: encryption algorithm is obsoleted.");
+			yyerror("WARNING: obsolete algorithm");
 			p_alg_enc = $1;
 
 			p_key_enc_len = 0;
@@ -352,7 +352,7 @@ enc_alg
 			}
 			p_alg_enc = $1;
 			if (p_ext & SADB_X_EXT_OLD) {
-				yyerror("algorithm mismatched.");
+				yyerror("algorithm mismatched");
 				return -1;
 			}
 			p_ext |= SADB_X_EXT_DERIV;
@@ -373,7 +373,7 @@ enc_alg
 			}
 			p_alg_enc = $1;
 			if (!(p_ext & SADB_X_EXT_OLD)) {
-				yyerror("algorithm mismatched.");
+				yyerror("algorithm mismatched");
 				return -1;
 			}
 			p_ext |= SADB_X_EXT_IV4B;
@@ -465,7 +465,7 @@ extension
 		{
 			if ((p_ext & SADB_X_EXT_OLD) != 0) {
 				yyerror("replay prevention cannot be used with "
-				    "ah/esp-old.");
+				    "ah/esp-old");
 				return -1;
 			}
 			p_replay = $2;
