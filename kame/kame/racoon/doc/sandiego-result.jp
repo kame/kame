@@ -90,7 +90,17 @@ vs network associates
 	ふつうの: ばっちり、rekey放題もばっちり
 		phase 1: pre-shared/sha1/3des/dh2/10min
 		phase 2: esp/md5/cast128/dh2/5min
-	明日dh5をやる予定。
+	明日dh5をやる予定。(1/12)
+	dh5成功。(1/13)
+
+	こっちがわ、byte lifetimeに虫あり。つねに設定の1024倍のproposalを
+	投げる。
+
+	どっちの挙動が望ましいのか?
+	racoon: lifetime、こっち側のconfig fileに関係なくネゴした結果を
+		kernelにいれる。
+	nai pgp client: lifetimeのネゴは普通に通すが、kernelにいれるのは
+		min(自分のポリシ, ネゴ結果)
 
 vs intel
 	base mode: initiator/responder共に敵がHASHの計算間違っているらしい。
@@ -142,3 +152,12 @@ kame
 
 	acquireをuserland側でフィルタするところで、フィルタしすぎに
 	なることがある。(ネゴるべきなのにネゴらない)
+
+	kernelでah use/esp useと書いてあるのにracoon側でespしかネゴしなかった
+	場合、永遠にahのacquireが上がり続ける。
+	で、ahのacquireがあがったにも係わらず、racoonはespのネゴをするので
+	永久にネゴが続く。
+	- kernel policyとracoon policyの整合性 - racoonがkernelに
+	  ポリシをつっこめばよい
+	- acquireの細かいチェック - ahが要求されているのにespをネゴらないように
+	が必要。
