@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.4 2000/07/21 12:33:34 jinmei Exp $	*/
+/*	$KAME: parser.y,v 1.5 2000/11/08 02:17:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -434,8 +434,8 @@ use_prefix_values:
 			rpu = (struct rr_pco_use *)(rpm + 1);
 			memset(rpu, 0, sizeof(*rpu));
 
-			rpu->rpu_vltime = DEF_VLTIME;
-			rpu->rpu_pltime = DEF_PLTIME;
+			rpu->rpu_vltime = htonl(DEF_VLTIME);
+			rpu->rpu_pltime = htonl(DEF_PLTIME);
 			rpu->rpu_ramask = 0;
 			rpu->rpu_flags = 0;
 		}
@@ -509,7 +509,7 @@ keeplen:
 vltime:
 		/* empty */
 		{
-			$$ = DEF_VLTIME;
+			$$ = htonl(DEF_VLTIME);
 		}
 	|	VLTIME_CMD lifetime
 		{
@@ -520,7 +520,7 @@ vltime:
 pltime:
 		/* empty */
 		{
-			$$ = DEF_PLTIME;
+			$$ = htonl(DEF_PLTIME);
 		}
 	|	PLTIME_CMD lifetime
 		{
