@@ -1,4 +1,4 @@
-.\"	$KAME: getaddrinfo.3,v 1.18 2000/07/25 02:22:06 itojun Exp $
+.\"	$KAME: getaddrinfo.3,v 1.19 2000/07/25 02:27:44 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -188,7 +188,9 @@ will raise error if you specify
 to
 .Fa ai_socktype
 while you specify
-.Dv IPPROTO_UDP .
+.Dv IPPROTO_UDP
+to
+.Fa ai_protocol .
 .It
 If you specify a
 .Fa servname
