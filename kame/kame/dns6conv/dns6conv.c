@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.10 2002/03/27 03:01:35 jinmei Exp $ */
+/*	$KAME: dns6conv.c,v 1.11 2002/04/10 09:04:36 jinmei Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -267,13 +267,14 @@ print_nibble(cp0, blen)
 	const char *cp = cp0 + pbyte;
 
 	if ((blen % 8) != 0) {
-		printf("%1x.", (*cp & 0xf0) / 16);
+		printf("%1x%s", (*cp & 0xf0) / 16, blen > 4 ? "." : "");
 		blen -= 4;
 	}
 
 	for (; blen > 0; blen -= 8) {
 		cp--;
-		printf("%1x.%1x.", *cp & 0x0f, ((*cp) & 0xf0) / 16);
+		printf("%1x.%1x%s", *cp & 0x0f, ((*cp) & 0xf0) / 16,
+		       blen > 8 ? "." : "");
 	}
 
 	printf("\n");
