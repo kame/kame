@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stat.h	8.12 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/sys/stat.h,v 1.15.2.1 1999/08/29 16:32:46 peter Exp $
+ * $FreeBSD: src/sys/sys/stat.h,v 1.15.2.2 2000/05/02 23:41:38 archie Exp $
  */
 
 #ifndef _SYS_STAT_H_
@@ -242,6 +242,7 @@ mode_t	umask __P((mode_t));
 int	chflags __P((const char *, u_long));
 int	fchflags __P((int, u_long));
 int	fchmod __P((int, mode_t));
+int	lchmod __P((const char *, mode_t));
 int	lstat __P((const char *, struct stat *));
 #endif
 __END_DECLS

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_balloc.c	8.8 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.21.2.1 1999/08/29 16:33:09 peter Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.21.2.4 2000/02/24 20:46:42 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -40,6 +40,7 @@
 #include <sys/lock.h>
 #include <sys/mount.h>
 #include <sys/vnode.h>
+#include <sys/proc.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -56,7 +57,7 @@
 int
 ffs_balloc(ap)
 	struct vop_balloc_args /* {
-		struct inode *a_ip;
+		struct vnode *a_vp;
 		ufs_daddr_t a_lbn;
 		int a_size;
 		struct ucred *a_cred;
@@ -64,8 +65,8 @@ ffs_balloc(ap)
 		struct buf *a_bpp;
 	} */ *ap;
 {
-	register struct inode *ip;
-	register ufs_daddr_t lbn;
+	struct inode *ip;
+	ufs_daddr_t lbn;
 	int size;
 	struct ucred *cred;
 	int flags;
@@ -77,6 +78,8 @@ ffs_balloc(ap)
 	ufs_daddr_t newb, *bap, pref;
 	int deallocated, osize, nsize, num, i, error;
 	ufs_daddr_t *allocib, *blkp, *allocblk, allociblk[NIADDR + 1];
+	int unwindidx = -1;
+	struct proc *p = curproc;	/* XXX */
 
 	vp = ap->a_vp;
 	ip = VTOI(vp);
@@ -269,6 +272,8 @@ ffs_balloc(ap)
 			}
 		}
 		bap[indirs[i - 1].in_off] = nb;
+		if (allocib == NULL && unwindidx < 0)
+			unwindidx = i - 1;
 		/*
 		 * If required, write synchronously, otherwise use
 		 * delayed write.
@@ -333,13 +338,41 @@ fail:
 	/*
 	 * If we have failed part way through block allocation, we
 	 * have to deallocate any indirect blocks that we have allocated.
+	 * We have to fsync the file before we start to get rid of all
+	 * of its dependencies so that we do not leave them dangling.
+	 * We have to sync it at the end so that the soft updates code
+	 * does not find any untracked changes. Although this is really
+	 * slow, running out of disk space is not expected to be a common
+	 * occurence. The error return from fsync is ignored as we already
+	 * have an error to return to the user.
 	 */
+	(void) VOP_FSYNC(vp, cred, MNT_WAIT, p);
 	for (deallocated = 0, blkp = allociblk; blkp < allocblk; blkp++) {
 		ffs_blkfree(ip, *blkp, fs->fs_bsize);
 		deallocated += fs->fs_bsize;
 	}
-	if (allocib != NULL)
+	if (allocib != NULL) {
 		*allocib = 0;
+	} else if (unwindidx >= 0) {
+		int r;
+
+		r = bread(vp, indirs[unwindidx].in_lbn, 
+		    (int)fs->fs_bsize, NOCRED, &bp);
+		if (r) {
+			panic("Could not unwind indirect block, error %d", r);
+			brelse(bp);
+		} else {
+			bap = (ufs_daddr_t *)bp->b_data;
+			bap[indirs[unwindidx].in_off] = 0;
+			if (flags & B_SYNC) {
+				bwrite(bp);
+			} else {
+				if (bp->b_bufsize == fs->fs_bsize)
+					bp->b_flags |= B_CLUSTEROK;
+				bdwrite(bp);
+			}
+		}
+	}
 	if (deallocated) {
 #ifdef QUOTA
 		/*
@@ -350,5 +383,6 @@ fail:
 		ip->i_blocks -= btodb(deallocated);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
+	(void) VOP_FSYNC(vp, cred, MNT_WAIT, p);
 	return (error);
 }

@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC98,v 1.63.2.23 1999/12/09 01:26:25 nyan Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC98,v 1.63.2.29 2000/03/16 12:04:36 nyan Exp $
 
 # GENERIC98 -- Generic PC98 machine with WD/SCSI disks
 
@@ -81,7 +81,7 @@ disk		fd2	at fdc0 drive 2
 disk		fd3	at fdc0 drive 3
 
 # IDE controller and disks
-#options		"CMD640"	# work around CMD640 chip deficiency
+#options 	"CMD640"	# work around CMD640 chip deficiency
 controller	wdc0	at isa? port "IO_WD1" bio irq 9
 disk		wd0	at wdc0 drive 0
 #disk		wd1	at wdc0 drive 1
@@ -89,8 +89,8 @@ disk		wd0	at wdc0 drive 0
 #disk		wd3	at wdc0 drive 3
 
 # ATAPI devices
-options		ATAPI		#Enable ATAPI support for IDE bus
-options		ATAPI_STATIC	#Don't do it as an LKM
+options 	ATAPI		#Enable ATAPI support for IDE bus
+options 	ATAPI_STATIC	#Don't do it as an LKM
 device		acd0		#IDE CD-ROM
 #device		wfd0		#IDE Floppy (e.g. LS-120)
 
@@ -98,6 +98,7 @@ device		acd0		#IDE CD-ROM
 # A single entry for any of these controllers (ncr, ahb, ahc) is
 # sufficient for any number of installed devices.
 controller	ncr0		# NCR/Symbios Logic
+#controller	sym0		# NCR/Symbios Logic (do not mix with ncr, it conflicts)
 controller	ahc0		# AHA2940 and onboard AIC7xxx devices
 controller	amd0		# AMD 53C974 (Teckram DC-390(T))
 controller	isp0		# Qlogic family
@@ -107,7 +108,7 @@ controller	adv0
 # WD33C93 SCSI card (55/92 like board)
 #
 
-options	BS_TARG_SAFEMODE
+options 	BS_TARG_SAFEMODE
 
 # PC-9801-92
 controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 flags 0
@@ -138,7 +139,7 @@ device		matcd0	at isa? port? bio
 
 # keyboard driver
 device		pckbd0	at isa? port IO_KBD tty irq 1
-#options	KBD_INSTALL_CDEV
+#options 	KBD_INSTALL_CDEV
 
 device		gdc0	at isa?
 
@@ -152,7 +153,7 @@ device		sc0	at isa? tty
 device		npx0	at isa? port IO_NPX irq 8
 
 # Power management support (see LINT for more options)
-device		apm0    at isa?	disable	flags 0x31 # Advanced Power Management
+#device		apm0    at isa?	disable	flags 0x31 # Advanced Power Management
 
 # PCCARD (PCMCIA) support
 #controller	card0
@@ -166,7 +167,7 @@ options 	COM_MULTIPORT
 # COM1
 device		sio0	at isa? port "IO_COM1" tty irq 4
 # COM2 (2nd CCU)
-device		sio1	at isa? port 0x238 tty irq 5 flags 0x12000000
+device		sio1	at isa? port 0x238 tty irq 5 flags 0x12000010
 # PC-9861K, PC-9801-101, MDC-926Rs
 #device		sio1	at isa? port "IO_COM2" tty irq 5 flags 0x01000000
 #device		sio2	at isa? port "IO_COM3" tty irq 6 flags 0x02000000
@@ -191,7 +192,7 @@ device		sio1	at isa? port 0x238 tty irq 5 flags 0x12000000
 device		mse0	at isa? port IO_MSE tty irq 13
 
 # NEW Parallel port
-device		ppc0	at isa? port? tty irq 14
+device		ppc0	at isa? port? tty irq 14 flags 0x40
 controller	ppbus0			# Parallel port bus (required)
 device		lpt0	at ppbus?	# Printer
 device		plip0	at ppbus?	# TCP/IP over parallel
@@ -228,7 +229,7 @@ device		xl0		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 #
 # DP8390 NIC
 #
-# ed0: generic driver
+# ed0: generic driver/EtherEZ98
 # ed1: LANEED LD-BDN
 # ed2: EGY-98
 # ed3: LGY-98
@@ -239,6 +240,7 @@ device		xl0		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 # ed8: C-NET(98)
 # ed9: C-NET(98)E/L
 # ed10: EC/EP-98X
+# ed11: SIU-98-D
 #
 # MB86960A NIC
 #
@@ -248,6 +250,7 @@ device		xl0		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 # FE_8BIT_SUPPORT is needed to support LAC-98
 #
 device ed0 at isa? port 0x00d0 net irq 6
+#device ed0 at isa? port 0x10d0 net irq 6 iomem 0xc8000	# SMC EtherEZ98
 device ed5 at isa? port 0x00d0 net irq 6 iomem 0xd0000 iosiz 16384 flags 0x600000
 device ed1 at isa? port 0x00d8 net irq 6 flags 0x200000
 device ed3 at isa? port 0x00d0 net irq 6 flags 0x400000
@@ -258,6 +261,7 @@ device ed6 at isa? port 0x0770 net irq 6 flags 0x800000
 device ed9 at isa? port 0x03d0 net irq 6 flags 0xb00000
 device ed8 at isa? port 0xa3d0 net irq 6 iomem 0xd0000 iosiz 16384 flags 0xa00000
 device ed10 at isa? port 0x00d0 net irq 3 flags 0xd10000
+device ed11 at isa? port 0x00d0 net irq 6 iomem 0xd0000 iosiz 32768 flags 0x610000
 device ep0 at isa? port 0x40d0 net irq 3
 device fe0 at isa? port 0x00d0 net irq 3
 device fe1 at isa? port 0x73d0 net irq 5

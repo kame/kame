@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.10.2.2 1999/08/29 16:28:26 peter Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.10.2.3 2000/05/03 22:48:38 archie Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -231,6 +231,14 @@ int	if_enq_drop __P((struct ifqueue *, struct mbuf *));
 #endif
 
 #endif
+
+/*
+ * 72 was chosen below because it is the size of a TCP/IP
+ * header (40) + the minimum mss (32).
+ */
+#define	IF_MINMTU	72
+#define	IF_MAXMTU	65535
+
 #endif /* KERNEL */
 
 /*

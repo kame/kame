@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_lnc.h,v 1.9.2.2 1999/08/29 16:07:23 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/if_lnc.h,v 1.9.2.4 2000/06/18 08:06:55 gj Exp $
  */
 
 #include <i386/isa/ic/Am7990.h>
@@ -107,6 +107,8 @@
 #define PCnet_PCI_II    8        /* Am79C970A */
 #define PCnet_FAST      9        /* Am79C971 */
 #define PCnet_FASTplus  10       /* Am79C972 */
+#define PCnet_Home	11	 /* Am79C978 */
+
 
 /* CSR88-89: Chip ID masks */
 #define AMD_MASK  0x003
@@ -119,6 +121,8 @@
 #define Am79C970A 0x2621
 #define Am79C971  0x2623
 #define Am79C972  0x2624
+#define Am79C973  0x2625
+#define Am79C978  0x2626
 
 /* Board types */
 #define UNKNOWN         0

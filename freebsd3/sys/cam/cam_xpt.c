@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.42.2.20 1999/10/16 23:45:28 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.42.2.22 2000/03/04 04:26:41 mjacob Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -954,7 +954,6 @@ xptioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 			}
 			/* FALLTHROUGH */
 		case XPT_SCAN_LUN:
-		case XPT_RESET_DEV:
 		case XPT_ENG_INQ:  /* XXX not implemented yet */
 		case XPT_ENG_EXEC:
 
@@ -2779,6 +2778,7 @@ xpt_action(union ccb *start_ccb)
 	}
 	case XPT_TARGET_IO:
 	case XPT_CONT_TARGET_IO:
+	case XPT_RESET_DEV:
 	case XPT_ENG_EXEC:
 	{
 		struct cam_path *path;
@@ -2832,7 +2832,6 @@ xpt_action(union ccb *start_ccb)
 		/* FALLTHROUGH */
 #endif
 	case XPT_ABORT:
-	case XPT_RESET_DEV:
 	case XPT_ACCEPT_TARGET_IO:
 	case XPT_EN_LUN:
 	case XPT_IMMED_NOTIFY:
@@ -4825,7 +4824,7 @@ xpt_scan_bus(struct cam_periph *periph, union ccb *request_ccb)
 		if (request_ccb->ccb_h.status != CAM_REQ_CMP) {
 			struct cam_ed *device;
 			struct cam_et *target;
-			int s;
+			int s, phl;
 
 			/*
 			 * If we already probed lun 0 successfully, or
@@ -4834,16 +4833,24 @@ xpt_scan_bus(struct cam_periph *periph, union ccb *request_ccb)
 			 * the next lun.
 			 */
 			target = request_ccb->ccb_h.path->target;
+			/*
+			 * We may touch devices that we don't
+			 * hold references too, so ensure they
+			 * don't disappear out from under us.
+			 * The target above is referenced by the
+			 * path in the request ccb.
+			 */
+			phl = 0;
 			s = splcam();
 			device = TAILQ_FIRST(&target->ed_entries);
-			if (device != NULL)
-				device = TAILQ_NEXT(device, links);
+			if (device != NULL) {
+				phl = device->quirk->quirks & CAM_QUIRK_HILUNS;
+				if (device->lun_id == 0)
+					device = TAILQ_NEXT(device, links);
+			}
 			splx(s);
-
 			if ((lun_id != 0) || (device != NULL)) {
-				/* Try the next lun */
-				if (lun_id < (CAM_SCSI2_MAXLUN-1) ||
-				    (device->quirk->quirks & CAM_QUIRK_HILUNS))
+				if (lun_id < (CAM_SCSI2_MAXLUN-1) || phl)
 					lun_id++;
 			}
 		} else {

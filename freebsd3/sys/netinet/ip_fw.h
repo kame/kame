@@ -11,7 +11,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.36.2.3 1999/08/29 16:29:45 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.36.2.5 2000/02/13 12:18:36 luigi Exp $
  */
 
 #ifndef _IP_FW_H
@@ -75,10 +75,12 @@ struct ip_fw {
 	struct sockaddr_in fu_fwd_ip;
     } fw_un;
     u_char fw_prot;			/* IP protocol */
-    u_char fw_nports;			/* N'of src ports and # of dst ports */
-					/* in ports array (dst ports follow */
-					/* src ports; max of 10 ports in all; */
-					/* count of 0 means match all ports) */
+	/*
+	 * N'of src ports and # of dst ports in ports array (dst ports
+	 * follow src ports; max of 10 ports in all; count of 0 means
+	 * match all ports)
+	 */
+    u_char fw_nports;
     void *pipe_ptr;                    /* Pipe ptr in case of dummynet pipe */
     void *next_rule_ptr ;              /* next rule in case of match */
     uid_t fw_uid;			/* uid to match */
@@ -100,7 +102,7 @@ struct ip_fw {
 struct ip_fw_ext {             /* extended structure */
     struct ip_fw rule;      /* must be at offset 0 */
     long    dont_match_prob;        /* 0x7fffffff means 1.0, always fail */
-    u_int   param1;         /* unused at the moment */
+    u_int   dyn_type;	/* type for dynamic rule */
 };
 
 #define IP_FW_GETNSRCP(rule)		((rule)->fw_nports & 0x0f)
@@ -124,6 +126,33 @@ struct ip_fw_chain {
         LIST_ENTRY(ip_fw_chain) chain;
         struct ip_fw    *rule;
 };
+
+/*
+ * Flow mask/flow id for each queue.
+ */
+struct ipfw_flow_id {
+    u_int32_t dst_ip, src_ip ;
+    u_int16_t dst_port, src_port ; 
+    u_int8_t proto ;    
+    u_int8_t flags ;    /* protocol-specific flags */
+} ;
+
+/*
+ * dynamic ipfw rule
+ */
+struct ipfw_dyn_rule {
+    struct ipfw_dyn_rule *next ;
+
+    struct ipfw_flow_id id ;
+    struct ipfw_flow_id mask ;
+    struct ip_fw_chain *chain ;	/* pointer to parent rule	*/
+    u_int32_t type ;		/* rule type			*/
+    u_int32_t expire ;		/* expire time			*/
+    u_int64_t pcnt, bcnt;	/* match counters		*/
+    u_int32_t bucket ;		/* which bucket in hash table	*/
+    u_int32_t state ;		/* state of this rule (typ. a	*/
+				/* combination of TCP flags)	*/
+} ;
 
 /*
  * Values for "flags" field .
@@ -169,8 +198,13 @@ struct ip_fw_chain {
 #define IP_FW_F_GID	0x00400000	/* filter by gid			*/
 
 #define IP_FW_F_RND_MATCH 0x00800000	/* probabilistic rule match		*/
+#define IP_FW_F_SMSK	0x01000000	/* src-port + mask 			*/
+#define IP_FW_F_DMSK	0x02000000	/* dst-port + mask 			*/
+#define IP_FW_BRIDGED	0x04000000	/* only match bridged packets		*/
+#define IP_FW_F_KEEP_S	0x08000000	/* keep state	 			*/
+#define IP_FW_F_CHECK_S	0x10000000	/* check state	 			*/
 
-#define IP_FW_F_MASK	0x00FFFFFF	/* All possible flag bits mask		*/
+#define IP_FW_F_MASK	0x1FFFFFFF	/* All possible flag bits mask		*/
 
 /*
  * For backwards compatibility with rules specifying "via iface" but
@@ -210,6 +244,9 @@ struct ip_fw_chain {
  */
 #ifdef KERNEL
 
+#define	IP_FW_PORT_DYNT_FLAG	0x10000
+#define	IP_FW_PORT_TEE_FLAG	0x20000
+
 /*
  * Function definitions.
  */
@@ -223,15 +260,9 @@ typedef	int ip_fw_chk_t __P((struct ip **, int, struct ifnet *, u_int16_t *,
 typedef	int ip_fw_ctl_t __P((struct sockopt *));
 extern	ip_fw_chk_t *ip_fw_chk_ptr;
 extern	ip_fw_ctl_t *ip_fw_ctl_ptr;
-
-/* IP NAT hooks */
-typedef	int ip_nat_t __P((struct ip **, struct mbuf **, struct ifnet *, int));
-typedef	int ip_nat_ctl_t __P((struct sockopt *));
-extern	ip_nat_t *ip_nat_ptr;
-extern	ip_nat_ctl_t *ip_nat_ctl_ptr;
-#define	IP_NAT_IN	0x00000001
-#define	IP_NAT_OUT	0x00000002
-
+extern int fw_one_pass;
+extern int fw_enable;
+extern struct ipfw_flow_id last_pkt ;
 #endif /* KERNEL */
 
 #endif /* _IP_FW_H */

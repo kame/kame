@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/kern/syscalls.master,v 1.55.2.2 1999/08/29 16:26:08 peter Exp $
+ $FreeBSD: src/sys/kern/syscalls.master,v 1.55.2.3 2000/05/01 11:17:45 peter Exp $
 ;	from: @(#)syscalls.master	8.2 (Berkeley) 1/13/94
 ;
 ; System call name/number master file.
@@ -342,7 +342,7 @@
 221	STD	BSD	{ int semget(key_t key, int nsems, int semflg); }
 222	STD	BSD	{ int semop(int semid, struct sembuf *sops, \
 			    u_int nsops); }
-223	STD	BSD	{ int semconfig(int flag); }
+223	UNIMPL	NOHIDE	semconfig
 224	STD	BSD	{ int msgctl(int msqid, int cmd, \
 			    struct msqid_ds *buf); }
 225	STD	BSD	{ int msgget(key_t key, int msgflg); }

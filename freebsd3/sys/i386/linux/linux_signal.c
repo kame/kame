@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_signal.c,v 1.14.2.3 1999/12/08 18:35:33 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_signal.c,v 1.14.2.4 2000/01/13 17:35:42 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -429,6 +429,31 @@ linux_sigsuspend(struct proc *p, struct linux_sigsuspend_args *args)
 #endif
     tmp.mask = linux_to_bsd_sigset(args->mask);
     return sigsuspend(p, &tmp);
+}
+
+int
+linux_rt_sigsuspend(p, uap)
+	struct proc *p;
+	struct linux_rt_sigsuspend_args *uap;
+{
+	linux_new_sigset_t lmask;
+	struct sigsuspend_args bsd;
+	int error;
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): rt_sigsuspend(%p, %d)\n", (long)p->p_pid,
+	    (void *)uap->newset, uap->sigsetsize);
+#endif
+
+	if (uap->sigsetsize != sizeof(linux_new_sigset_t))
+		return (EINVAL);
+
+	error = copyin(uap->newset, &lmask, sizeof(linux_new_sigset_t));
+	if (error)
+		return (error);
+
+	bsd.mask = linux_to_bsd_sigset(lmask.sig[0]);
+	return (sigsuspend(p, &bsd));
 }
 
 int

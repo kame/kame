@@ -37,6 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.43.2.2 2000/03/09 05:31:20 bde Exp $
  */
 
 #include "opt_quota.h"
@@ -104,6 +105,8 @@ VFS_SET(ext2fs_vfsops, ext2fs, 0);
 
 static int ext2fs_inode_hash_lock;
 
+static int	ext2_check_sb_compat __P((struct ext2_super_block *es,
+					  dev_t dev, int ronly));
 static int	compute_sb_data __P((struct vnode * devvp,
 				     struct ext2_super_block * es,
 				     struct ext2_sb_info * fs));
@@ -223,13 +226,16 @@ ext2_mount(mp, path, data, ndp, p)
 			error = ext2_reload(mp, ndp->ni_cnd.cn_cred, p);
 		if (error)
 			return (error);
+		devvp = ump->um_devvp;
+		if (ext2_check_sb_compat(fs->s_es, devvp->v_rdev,
+		    (mp->mnt_kern_flag & MNTK_WANTRDWR) == 0) != 0)
+			return (EPERM);
 		if (fs->s_rd_only && (mp->mnt_kern_flag & MNTK_WANTRDWR)) {
 			/*
 			 * If upgrade to read-write by non-root, then verify
 			 * that user has necessary permissions on the device.
 			 */
 			if (p->p_ucred->cr_uid != 0) {
-				devvp = ump->um_devvp;
 				vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, p);
 				if (error = VOP_ACCESS(devvp, VREAD | VWRITE,
 				    p->p_ucred, p)) {
@@ -380,6 +386,37 @@ static int ext2_check_descriptors (struct ext2_sb_info * sb)
         return 1;
 }
 
+static int
+ext2_check_sb_compat(es, dev, ronly)
+	struct ext2_super_block *es;
+	dev_t dev;
+	int ronly;
+{
+
+	if (es->s_magic != EXT2_SUPER_MAGIC) {
+		printf(
+		"ext2fs: dev %#lx: wrong magic number %#x (expected %#x)\n",
+		    (u_long)dev, es->s_magic, EXT2_SUPER_MAGIC);
+		return (1);
+	}
+	if (es->s_rev_level > EXT2_GOOD_OLD_REV) {
+		if (es->s_feature_incompat & ~EXT2_FEATURE_INCOMPAT_SUPP) {
+			printf(
+"WARNING: mount of dev %#lx denied due to unsupported optional features\n",
+			    (u_long)dev);
+			return (1);
+		}
+		if (!ronly &&
+		    (es->s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPP)) {
+			printf(
+"WARNING: R/W mount of dev %#lx denied due to unsupported optional features\n",
+			    (u_long)dev);
+			return (1);
+		}
+	}
+	return (0);
+}
+
 /*
  * this computes the fields of the  ext2_sb_info structure from the
  * data in the ext2_super_block structure read in
@@ -521,14 +558,7 @@ ext2_reload(mountp, cred, p)
 	if (error = bread(devvp, SBLOCK, SBSIZE, NOCRED, &bp))
 		return (error);
 	es = (struct ext2_super_block *)bp->b_data;
-	if (es->s_magic != EXT2_SUPER_MAGIC) {
-		if(es->s_magic == EXT2_PRE_02B_MAGIC)
-		    printf("This filesystem bears the magic number of a pre "
-			   "0.2b version of ext2. This is not supported by "
-			   "Lites.\n");
-		else
-		    printf("Wrong magic number: %x (expected %x for ext2 fs\n",
-			es->s_magic, EXT2_SUPER_MAGIC);
+	if (ext2_check_sb_compat(es, devvp->v_rdev, 0) != 0) {
 		brelse(bp);
 		return (EIO);		/* XXX needs translation */
 	}
@@ -641,14 +671,7 @@ ext2_mountfs(devvp, mp, p)
 	if (error = bread(devvp, SBLOCK, SBSIZE, NOCRED, &bp))
 		goto out;
 	es = (struct ext2_super_block *)bp->b_data;
-	if (es->s_magic != EXT2_SUPER_MAGIC) {
-		if(es->s_magic == EXT2_PRE_02B_MAGIC)
-		    printf("This filesystem bears the magic number of a pre "
-			   "0.2b version of ext2. This is not supported by "
-			   "Lites.\n");
-		else
-		    printf("Wrong magic number: %x (expected %x for EXT2FS)\n",
-			es->s_magic, EXT2_SUPER_MAGIC);
+	if (ext2_check_sb_compat(es, dev, ronly) != 0) {
 		error = EINVAL;		/* XXX needs translation */
 		goto out;
 	}

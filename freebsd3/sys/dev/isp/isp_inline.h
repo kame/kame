@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_inline.h,v 1.1.4.2 1999/12/03 07:34:27 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_inline.h,v 1.1.4.3 2000/03/04 04:41:34 mjacob Exp $ */
 /*
  * Qlogic Inline Functions
  *
@@ -274,5 +274,26 @@ isp_getrqentry(isp, iptrp, optrp, resultp)
 	*optrp = optr;
 	*iptrp = iptr;
 	return (0);
+}
+
+static INLINE void
+isp_print_qentry __P((struct ispsoftc *, char *, int, void *));
+
+static INLINE void
+isp_print_qentry(isp, msg, idx, arg)
+	struct ispsoftc *isp;
+	char *msg;
+	int idx;
+	void *arg;
+{
+	int amt, i, j;
+	u_int8_t *ptr = arg;
+	PRINTF("%s %s index %d:\n", isp->isp_name, msg, idx);
+	for (amt = i = 0; i < 4; i++) {
+		for (j = 0; j < (QENTRY_LEN >> 2); j++) {
+			PRINTF(" %02x", ptr[amt++] & 0xff);
+		}
+		PRINTF("\n");
+	}
 }
 #endif	/* _ISP_INLINE_H */

@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.219.2.6 1999/09/02 23:56:47 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.219.2.8 2000/04/28 19:28:01 luoqi Exp $
  */
 
 /*
@@ -372,10 +372,12 @@ pmap_bootstrap(firstaddr, loadaddr)
 
 
 	pgeflag = 0;
+#ifdef notyet
 #if !defined(SMP)
 	if (cpu_feature & CPUID_PGE) {
 		pgeflag = PG_G;
 	}
+#endif
 #endif
 	
 /*
@@ -432,15 +434,17 @@ pmap_bootstrap(firstaddr, loadaddr)
 		for (j = 0; j < 16; j++) {
 			/* same page frame as a previous IO apic? */
 			if (((vm_offset_t)SMP_prvpt[j + 16] & PG_FRAME) ==
-			    (io_apic_address[0] & PG_FRAME)) {
-				ioapic[i] = (ioapic_t *)&SMP_ioapic[j * PAGE_SIZE];
+			    (io_apic_address[i] & PG_FRAME)) {
+				ioapic[i] = (ioapic_t *)&SMP_ioapic[j * PAGE_SIZE
+				    + (io_apic_address[i] & PAGE_MASK)];
 				break;
 			}
 			/* use this slot if available */
 			if (((vm_offset_t)SMP_prvpt[j + 16] & PG_FRAME) == 0) {
 				SMP_prvpt[j + 16] = (pt_entry_t)(PG_V | PG_RW |
 				    pgeflag | (io_apic_address[i] & PG_FRAME));
-				ioapic[i] = (ioapic_t *)&SMP_ioapic[j * PAGE_SIZE];
+				ioapic[i] = (ioapic_t *)&SMP_ioapic[j * PAGE_SIZE
+				    + (io_apic_address[i] & PAGE_MASK)];
 				break;
 			}
 		}
@@ -473,6 +477,7 @@ pmap_set_opt(unsigned *pdir) {
 		}
 	}
 
+#ifdef notyet
 	if (pgeflag && (cpu_feature & CPUID_PGE)) {
 		load_cr4(rcr4() | CR4_PGE);
 		for(i = KPTDI; i < KPTDI + nkpt; i++) {
@@ -481,6 +486,7 @@ pmap_set_opt(unsigned *pdir) {
 			}
 		}
 	}
+#endif
 }
 
 /*

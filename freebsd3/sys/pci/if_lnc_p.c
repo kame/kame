@@ -17,7 +17,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/pci/if_lnc_p.c,v 1.7.2.2 1999/08/29 16:31:38 peter Exp $
+ * $FreeBSD: src/sys/pci/if_lnc_p.c,v 1.7.2.3 2000/01/20 06:17:00 rwatson Exp $
  */
 
 #include "pci.h"
@@ -32,7 +32,8 @@
 
 #include "lnc.h"
 
-#define PCI_DEVICE_ID_PCNet_PCI	0x20001022
+#define PCI_DEVICE_ID_PCNet_PCI		0x20001022
+#define PCI_DEVICE_ID_PCHome_PCI	0x20011022
 
 extern void *lnc_attach_ne2100_pci __P((int unit, unsigned iobase));
 
@@ -57,6 +58,9 @@ lnc_pci_probe (pcici_t tag, pcidi_t type)
 	switch(type) {
 	case PCI_DEVICE_ID_PCNet_PCI:
 		return ("PCNet/PCI Ethernet adapter");
+		break;
+	case PCI_DEVICE_ID_PCHome_PCI:
+		return ("PCHome/PCI Ethernet adapter");
 		break;
 	default:
 		break;

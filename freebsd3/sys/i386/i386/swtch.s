@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.75.2.2 1999/08/29 16:05:53 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.75.2.4 2000/04/27 16:58:45 dillon Exp $
  */
 
 #include "npx.h"
@@ -250,6 +250,7 @@ rem3id:	.asciz	"remrq.id"
  * to wait for something to come ready.
  */
 	ALIGN_TEXT
+	.type	_idle,@function
 _idle:
 	xorl	%ebp,%ebp
 	movl	%ebp,_switchtime
@@ -351,7 +352,6 @@ idle_loop:
 
 	/* enable intrs for a halt */
 	movl	$0, lapic_tpr			/* 1st candidate for an INT */
-	sti
 	call	*_hlt_vector			/* wait for interrupt */
 	cli
 	jmp	idle_loop
@@ -435,7 +435,6 @@ idle_loop:
 	call	_vm_page_zero_idle
 	testl	%eax, %eax
 	jnz	idle_loop
-	sti
 	call	*_hlt_vector			/* wait for interrupt */
 	jmp	idle_loop
 
@@ -444,6 +443,7 @@ idle_loop:
 CROSSJUMPTARGET(_idle)
 
 ENTRY(default_halt)
+	sti
 #ifndef SMP
 	hlt					/* XXX:	 until a wakeup IPI */
 #endif

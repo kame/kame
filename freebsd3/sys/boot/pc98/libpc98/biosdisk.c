@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/biosdisk.c,v 1.1.2.7 1999/09/24 11:55:03 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/biosdisk.c,v 1.1.2.9 2000/03/17 12:53:04 nyan Exp $
  */
 
 /*
@@ -95,7 +95,7 @@ static struct bdinfo
     int		bd_flags;
     int		bd_type;		/* BIOS 'drive type' (floppy only) */
 #ifdef PC98
-    int         bd_da_unit;		/* kernel unit number for da */
+    int		bd_da_unit;		/* kernel unit number for da */
 #endif
 } bdinfo [MAXBDDEV];
 static int nbdinfo = 0;
@@ -228,6 +228,7 @@ bd_init(void)
 static int
 bd_int13probe(struct bdinfo *bd)
 {
+
 #ifdef PC98
     int addr;
     if (bd->bd_flags & BD_FLOPPY){
@@ -536,6 +537,7 @@ bd_opendisk(struct open_disk **odp, struct i386_devdesc *dev)
 	od->od_boff = sector;		/* no partition, must be after the slice */
 	DEBUG("opening raw slice");
     } else {
+	
 	if (bd_read(od, sector + LABELSECTOR, 1, buf)) {
 	    DEBUG("error reading disklabel");
 	    error = EIO;
@@ -597,7 +599,7 @@ bd_bestslice(struct dos_partition *dptr)
     int		i;
     int		preflevel, pref;
 
-
+	
 #ifndef PC98	
     /*
      * Check for the historically bogus MBR found on true dedicated disks
@@ -700,10 +702,11 @@ static int
 bd_strategy(void *devdata, int rw, daddr_t dblk, size_t size, void *buf, size_t *rsize)
 {
     struct bcache_devdata	bcd;
-    
+    struct open_disk	*od = (struct open_disk *)(((struct i386_devdesc *)devdata)->d_kind.biosdisk.data);
+
     bcd.dv_strategy = bd_realstrategy;
     bcd.dv_devdata = devdata;
-    return(bcache_strategy(&bcd, rw, dblk, size, buf, rsize));
+    return(bcache_strategy(&bcd, od->od_unit, rw, dblk+od->od_boff, size, buf, rsize));
 }
 
 static int 
@@ -728,18 +731,18 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size, void *buf, siz
 
 
     blks = size / BIOSDISK_SECSIZE;
-    DEBUG("read %d from %d+%d to %p", blks, od->od_boff, dblk, buf);
+    DEBUG("read %d from %d to %p", blks, dblk, buf);
 
     if (rsize)
 	*rsize = 0;
-    if (blks && bd_read(od, dblk + od->od_boff, blks, buf)) {
+    if (blks && bd_read(od, dblk, blks, buf)) {
 	DEBUG("read error");
 	return (EIO);
     }
 #ifdef BD_SUPPORT_FRAGS
-    DEBUG("bd_strategy: frag read %d from %d+%d+d to %p", 
-	     fragsize, od->od_boff, dblk, blks, buf + (blks * BIOSDISK_SECSIZE));
-    if (fragsize && bd_read(od, dblk + od->od_boff + blks, 1, fragsize)) {
+    DEBUG("bd_strategy: frag read %d from %d+%d to %p", 
+	     fragsize, dblk, blks, buf + (blks * BIOSDISK_SECSIZE));
+    if (fragsize && bd_read(od, dblk + blks, 1, fragsize)) {
 	DEBUG("frag read error");
 	return(EIO);
     }
@@ -901,12 +904,12 @@ bd_getgeom(struct open_disk *od)
 
 #ifdef PC98
     if (od->od_flags & BD_FLOPPY) {
-        od->od_cyl = 79;
+	od->od_cyl = 79;
 	od->od_hds = 2;
 	od->od_sec = (od->od_unit & 0xf0) == 0x30 ? 18 : 15;
     }
     else {
-        v86.ctl = V86_FLAGS;
+	v86.ctl = V86_FLAGS;
 	v86.addr = 0x1b;
 	v86.eax = 0x8400 | od->od_unit;
 	v86int();
@@ -937,6 +940,60 @@ bd_getgeom(struct open_disk *od)
 
     DEBUG("unit 0x%x geometry %d/%d/%d", od->od_unit, od->od_cyl, od->od_hds, od->od_sec);
     return(0);
+}
+
+/*
+ * Return the BIOS geometry of a given "fixed drive" in a format
+ * suitable for the legacy bootinfo structure.  Since the kernel is
+ * expecting raw int 0x13/0x8 values for N_BIOS_GEOM drives, we
+ * prefer to get the information directly, rather than rely on being
+ * able to put it together from information already maintained for
+ * different purposes and for a probably different number of drives.
+ *
+ * For valid drives, the geometry is expected in the format (31..0)
+ * "000000cc cccccccc hhhhhhhh 00ssssss"; and invalid drives are
+ * indicated by returning the geometry of a "1.2M" PC-format floppy
+ * disk.  And, incidentally, what is returned is not the geometry as
+ * such but the highest valid cylinder, head, and sector numbers.
+ */
+u_int32_t
+bd_getbigeom(int bunit)
+{
+
+#ifdef PC98
+    int hds = 0;
+    int unit = 0x80;		/* IDE HDD */
+    u_int addr = 0xA155d;
+
+    while (unit < 0xa7) {
+	if (*(u_char *)PTOV(addr) & (1 << (unit & 0x0f)))
+	    if (hds++ == bunit)
+		break;
+	if (++unit == 0x84) {
+	    unit = 0xa0;	/* SCSI HDD */
+	    addr = 0xA1482;
+	}
+    }
+    if (unit == 0xa7)
+	return 0x4f010f;
+    v86.ctl = V86_FLAGS;
+    v86.addr = 0x1b;
+    v86.eax = 0x8400 | unit;
+    v86int();
+    if (v86.efl & 0x1)
+	return 0x4f010f;
+    return ((v86.ecx & 0xffff) << 16) | (v86.edx & 0xffff);
+#else
+    v86.ctl = V86_FLAGS;
+    v86.addr = 0x13;
+    v86.eax = 0x800;
+    v86.edx = 0x80 + bunit;
+    v86int();
+    if (v86.efl & 0x1)
+	return 0x4f010f;
+    return ((v86.ecx & 0xc0) << 18) | ((v86.ecx & 0xff00) << 8) |
+	   (v86.edx & 0xff00) | (v86.ecx & 0x3f);
+#endif
 }
 
 /*
@@ -1008,7 +1065,8 @@ bd_getdev(struct i386_devdesc *dev)
 	else
             unit = biosdev & 0xf;
 #else
-	unit = (biosdev & 0x7f) - unitofs;					/* allow for #wd compenstation in da case */
+/* allow for #wd compenstation in da case */
+	unit = (biosdev & 0x7f) - unitofs;
 #endif
     }
 

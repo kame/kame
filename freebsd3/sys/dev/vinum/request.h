@@ -20,7 +20,7 @@
  * 4. Neither the name of the Company nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- *  
+ *
  * This software is provided ``as is'', and any express or implied
  * warranties, including, but not limited to, the implied warranties of
  * merchantability and fitness for a particular purpose are disclaimed.
@@ -33,7 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $FreeBSD: src/sys/dev/vinum/request.h,v 1.6.2.5 1999/09/13 08:03:53 grog Exp $
+ * $Id: request.h,v 1.18 2000/05/07 04:05:33 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/request.h,v 1.6.2.6 2000/06/08 06:44:45 grog Exp $
  */
 
 /* Information needed to set up a transfer */
@@ -117,6 +118,7 @@ struct rqgroup {
     int badsdno;					    /* index of bad subdisk or -1 */
     enum xferinfo flags;				    /* description of transfer */
     struct rangelock *lock;				    /* lock for this transfer */
+    daddr_t lockbase;					    /* and lock address */
     struct rqelement rqe[0];				    /* and the elements of this request */
 };
 
@@ -142,7 +144,7 @@ struct request {
 
 /*
  * Extended buffer header for subdisk I/O.  Includes
- * a pointer to the user I/O request. 
+ * a pointer to the user I/O request.
  */
 struct sdbuf {
     struct buf b;					    /* our buffer */
@@ -178,6 +180,7 @@ enum rqinfo_type {
     loginfo_raid5_parity,				    /* write RAID-5 parity block */
     loginfo_sdio,					    /* subdisk I/O */
     loginfo_sdiol,					    /* subdisk I/O launch */
+    loginfo_sdiodone,					    /* subdisk iodone */
     loginfo_lockwait,					    /* wait for range lock */
     loginfo_lock,					    /* lock range */
     loginfo_unlock,					    /* unlock range */
@@ -233,6 +236,7 @@ union daemoninfo {					    /* and the request information */
 struct daemonq {
     struct daemonq *next;				    /* pointer to next element in queue */
     enum daemonrq type;					    /* type of request */
+    int privateinuse;					    /* private element, being used */
     union daemoninfo info;				    /* and the request information */
 };
 

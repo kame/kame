@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.49.2.4 1999/08/29 16:29:55 peter Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.49.2.5 2000/02/29 07:18:57 ps Exp $
  */
 
 #include "opt_compat.h"
@@ -220,8 +220,11 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	struct route sro;
 
 	if (tp) {
-		if (!(flags & TH_RST))
+		if (!(flags & TH_RST)) {
 			win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
+			if (win > (long)TCP_MAXWIN << tp->rcv_scale)
+				win = (long)TCP_MAXWIN << tp->rcv_scale;
+		}
 		ro = &tp->t_inpcb->inp_route;
 	} else {
 		ro = &sro;

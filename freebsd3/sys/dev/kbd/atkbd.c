@@ -23,13 +23,16 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.3.2.6 1999/08/29 16:23:34 peter Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.3.2.8 2000/02/02 13:03:22 yokota Exp $
  */
 
 #include "atkbd.h"
 #include "opt_kbd.h"
 #include "opt_atkbd.h"
 #include "opt_devfs.h"
+#ifdef __i386__
+#include "opt_vm86.h"
+#endif
 
 #if NATKBD > 0
 
@@ -42,6 +45,18 @@
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 
+#ifdef __i386__
+#ifdef VM86
+#include <machine/md_var.h>
+#include <machine/psl.h>
+#include <machine/vm86.h>
+#include <machine/pc/bios.h>
+
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#endif /* VM86 */
+#endif /* __i386__ */
+
 #include <dev/kbd/kbdreg.h>
 #include <dev/kbd/atkbdreg.h>
 #include <dev/kbd/atkbdcreg.h>
@@ -51,11 +66,6 @@
 #include <sys/bus.h>
 #include <isa/isareg.h>
 
-extern devclass_t atkbd_devclass;
-
-#define ATKBD_SOFTC(unit)		\
-	((atkbd_softc_t *)devclass_get_softc(atkbd_devclass, unit))
-
 #else /* __i386__ */
 
 #include <i386/isa/isa.h>
@@ -63,53 +73,9 @@ extern devclass_t atkbd_devclass;
 
 extern struct isa_driver 	atkbddriver;	/* XXX: a kludge; see below */
 
-static atkbd_softc_t		*atkbd_softc[NATKBD];
-
-#define ATKBD_SOFTC(unit)		\
-	(((unit) >= NATKBD) ? NULL : atkbd_softc[(unit)])
-
 #endif /* __i386__ */
 
 static timeout_t	atkbd_timeout;
-
-#ifdef KBD_INSTALL_CDEV
-
-static d_open_t		atkbdopen;
-static d_close_t	atkbdclose;
-static d_read_t		atkbdread;
-static d_ioctl_t	atkbdioctl;
-static d_poll_t		atkbdpoll;
-
-static struct  cdevsw atkbd_cdevsw = {
-	atkbdopen,	atkbdclose,	atkbdread,	nowrite,
-	atkbdioctl,	nostop,		nullreset,	nodevtotty,
-	atkbdpoll,	nommap,		NULL,		ATKBD_DRIVER_NAME,
-	NULL,		-1,
-};
-
-#endif /* KBD_INSTALL_CDEV */
-
-#ifdef __i386__
-
-atkbd_softc_t
-*atkbd_get_softc(int unit)
-{
-	atkbd_softc_t *sc;
-
-	if (unit >= sizeof(atkbd_softc)/sizeof(atkbd_softc[0]))
-		return NULL;
-	sc = atkbd_softc[unit];
-	if (sc == NULL) {
-		sc = atkbd_softc[unit]
-		   = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT);
-		if (sc == NULL)
-			return NULL;
-		bzero(sc, sizeof(*sc));
-	}
-	return sc;
-}
-
-#endif /* __i386__ */
 
 int
 atkbd_probe_unit(int unit, int port, int irq, int flags)
@@ -131,14 +97,11 @@ atkbd_probe_unit(int unit, int port, int irq, int flags)
 }
 
 int
-atkbd_attach_unit(int unit, atkbd_softc_t *sc, int port, int irq, int flags)
+atkbd_attach_unit(int unit, keyboard_t **kbd, int port, int irq, int flags)
 {
 	keyboard_switch_t *sw;
 	int args[2];
 	int error;
-
-	if (sc->flags & ATKBD_ATTACHED)
-		return 0;
 
 	sw = kbd_get_switch(ATKBD_DRIVER_NAME);
 	if (sw == NULL)
@@ -147,19 +110,18 @@ atkbd_attach_unit(int unit, atkbd_softc_t *sc, int port, int irq, int flags)
 	/* reset, initialize and enable the device */
 	args[0] = port;
 	args[1] = irq;
-	sc->kbd = NULL;
+	*kbd = NULL;
 	error = (*sw->probe)(unit, args, flags);
 	if (error)
 		return error;
-	error = (*sw->init)(unit, &sc->kbd, args, flags);
+	error = (*sw->init)(unit, kbd, args, flags);
 	if (error)
 		return error;
-	(*sw->enable)(sc->kbd);
+	(*sw->enable)(*kbd);
 
 #ifdef KBD_INSTALL_CDEV
 	/* attach a virtual keyboard cdev */
-	error = kbd_attach(makedev(0, ATKBD_MKMINOR(unit)), sc->kbd,
-			   &atkbd_cdevsw);
+	error = kbd_attach(*kbd);
 	if (error)
 		return error;
 #endif
@@ -168,12 +130,10 @@ atkbd_attach_unit(int unit, atkbd_softc_t *sc, int port, int irq, int flags)
 	 * This is a kludge to compensate for lost keyboard interrupts.
 	 * A similar code used to be in syscons. See below. XXX
 	 */
-	atkbd_timeout(sc->kbd);
+	atkbd_timeout(*kbd);
 
 	if (bootverbose)
-		(*sw->diag)(sc->kbd, bootverbose);
-
-	sc->flags |= ATKBD_ATTACHED;
+		(*sw->diag)(*kbd, bootverbose);
 	return 0;
 }
 
@@ -215,60 +175,6 @@ atkbd_timeout(void *arg)
 
 /* cdev driver functions */
 
-#ifdef KBD_INSTALL_CDEV
-
-static int
-atkbdopen(dev_t dev, int flag, int mode, struct proc *p)
-{
-	atkbd_softc_t *sc;
-
-	sc = ATKBD_SOFTC(ATKBD_UNIT(dev));
-	if (sc == NULL)
-		return ENXIO;
-	if (mode & (FWRITE | O_CREAT | O_APPEND | O_TRUNC))
-		return ENODEV;
-
-	/* FIXME: set the initial input mode (K_XLATE?) and lock state? */
-	return genkbdopen(&sc->gensc, sc->kbd, flag, mode, p);
-}
-
-static int
-atkbdclose(dev_t dev, int flag, int mode, struct proc *p)
-{
-	atkbd_softc_t *sc;
-
-	sc = ATKBD_SOFTC(ATKBD_UNIT(dev));
-	return genkbdclose(&sc->gensc, sc->kbd, flag, mode, p);
-}
-
-static int
-atkbdread(dev_t dev, struct uio *uio, int flag)
-{
-	atkbd_softc_t *sc;
-
-	sc = ATKBD_SOFTC(ATKBD_UNIT(dev));
-	return genkbdread(&sc->gensc, sc->kbd, uio, flag);
-}
-
-static int
-atkbdioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct proc *p)
-{
-	atkbd_softc_t *sc;
-
-	sc = ATKBD_SOFTC(ATKBD_UNIT(dev));
-	return genkbdioctl(&sc->gensc, sc->kbd, cmd, arg, flag, p);
-}
-
-static int
-atkbdpoll(dev_t dev, int event, struct proc *p)
-{
-	atkbd_softc_t *sc;
-
-	sc = ATKBD_SOFTC(ATKBD_UNIT(dev));
-	return genkbdpoll(&sc->gensc, sc->kbd, event, p);
-}
-
-#endif /* KBD_INSTALL_CDEV */
 
 /* LOW-LEVEL */
 
@@ -338,6 +244,7 @@ keyboard_switch_t atkbdsw = {
 KEYBOARD_DRIVER(atkbd, atkbdsw, atkbd_configure);
 
 /* local functions */
+static int		get_typematic(keyboard_t *kbd);
 static int		setup_kbd_port(KBDC kbdc, int port, int intr);
 static int		get_kbd_echo(KBDC kbdc);
 static int		probe_keyboard(KBDC kbdc, int flags);
@@ -345,6 +252,8 @@ static int		init_keyboard(KBDC kbdc, int *type, int flags);
 static int		write_kbd(KBDC kbdc, int command, int data);
 static int		get_kbd_id(KBDC kbdc);
 static int		typematic(int delay, int rate);
+static int		typematic_delay(int delay);
+static int		typematic_rate(int rate);
 
 /* local variables */
 
@@ -450,6 +359,7 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 	accentmap_t *accmap;
 	fkeytab_t *fkeymap;
 	int fkeymap_size;
+	int delay[2];
 	int *data = (int *)arg;
 
 	/* XXX */
@@ -533,6 +443,10 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 	    	    && (kbd->kb_config & KB_CONF_FAIL_IF_NO_KBD))
 			return ENXIO;
 		atkbd_ioctl(kbd, KDSETLED, (caddr_t)&state->ks_state);
+		get_typematic(kbd);
+		delay[0] = kbd->kb_delay1;
+		delay[1] = kbd->kb_delay2;
+		atkbd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
 		KBD_INIT_DONE(kbd);
 	}
 	if (!KBD_IS_CONFIGURED(kbd)) {
@@ -557,6 +471,7 @@ static int
 atkbd_intr(keyboard_t *kbd, void *arg)
 {
 	atkbd_state_t *state;
+	int delay[2];
 	int c;
 
 	if (KBD_IS_ACTIVE(kbd) && KBD_IS_BUSY(kbd)) {
@@ -578,6 +493,10 @@ atkbd_intr(keyboard_t *kbd, void *arg)
 			init_keyboard(state->kbdc, &kbd->kb_type,
 				      kbd->kb_config);
 			atkbd_ioctl(kbd, KDSETLED, (caddr_t)&state->ks_state);
+			get_typematic(kbd);
+			delay[0] = kbd->kb_delay1;
+			delay[1] = kbd->kb_delay2;
+			atkbd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
 			KBD_FOUND_DEVICE(kbd);
 		}
 	}
@@ -987,13 +906,23 @@ atkbd_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		if (!KBD_HAS_DEVICE(kbd))
 			return 0;
 		i = typematic(((int *)arg)[0], ((int *)arg)[1]);
-		return write_kbd(state->kbdc, KBDC_SET_TYPEMATIC, i);
+		error = write_kbd(state->kbdc, KBDC_SET_TYPEMATIC, i);
+		if (error == 0) {
+			kbd->kb_delay1 = typematic_delay(i);
+			kbd->kb_delay2 = typematic_rate(i);
+		}
+		return error;
 
 	case KDSETRAD:		/* set keyboard repeat rate (old interface) */
 		splx(s);
 		if (!KBD_HAS_DEVICE(kbd))
 			return 0;
-		return write_kbd(state->kbdc, KBDC_SET_TYPEMATIC, *(int *)arg);
+		error = write_kbd(state->kbdc, KBDC_SET_TYPEMATIC, *(int *)arg);
+		if (error == 0) {
+			kbd->kb_delay1 = typematic_delay(*(int *)arg);
+			kbd->kb_delay2 = typematic_rate(*(int *)arg);
+		}
+		return error;
 
 	case PIO_KEYMAP:	/* set keyboard translation table */
 	case PIO_KEYMAPENT:	/* set keyboard translation table entry */
@@ -1075,6 +1004,43 @@ atkbd_poll(keyboard_t *kbd, int on)
 }
 
 /* local functions */
+
+static int
+get_typematic(keyboard_t *kbd)
+{
+#ifdef __i386__
+#ifdef VM86
+	/*
+	 * Only some systems allow us to retrieve the keyboard repeat 
+	 * rate previously set via the BIOS...
+	 */
+	struct vm86frame vmf;
+	u_int32_t p;
+
+	bzero(&vmf, sizeof(vmf));
+	vmf.vmf_ax = 0xc000;
+	vm86_intcall(0x15, &vmf);
+	if ((vmf.vmf_eflags & PSL_C) || vmf.vmf_ah)
+		return ENODEV;
+        p = BIOS_PADDRTOVADDR(((u_int32_t)vmf.vmf_es << 4) + vmf.vmf_bx);
+	if ((readb(p + 6) & 0x40) == 0)	/* int 16, function 0x09 supported? */
+		return ENODEV;
+	vmf.vmf_ax = 0x0900;
+	vm86_intcall(0x16, &vmf);
+	if ((vmf.vmf_al & 0x08) == 0)	/* int 16, function 0x0306 supported? */
+		return ENODEV;
+	vmf.vmf_ax = 0x0306;
+	vm86_intcall(0x16, &vmf);
+	kbd->kb_delay1 = typematic_delay(vmf.vmf_bh << 5);
+	kbd->kb_delay2 = typematic_rate(vmf.vmf_bl);
+	return 0;
+#else
+	return ENODEV;
+#endif /* VM86 */
+#else
+	return ENODEV;
+#endif /* __i386__ */
+}
 
 static int
 setup_kbd_port(KBDC kbdc, int port, int intr)
@@ -1398,14 +1364,27 @@ get_kbd_id(KBDC kbdc)
 	return ((id2 << 8) | id1);
 }
 
+static int delays[] = { 250, 500, 750, 1000 };
+static int rates[] = {  34,  38,  42,  46,  50,  55,  59,  63,
+			68,  76,  84,  92, 100, 110, 118, 126,
+		       136, 152, 168, 184, 200, 220, 236, 252,
+		       272, 304, 336, 368, 400, 440, 472, 504 };
+
+static int
+typematic_delay(int i)
+{
+	return delays[(i >> 5) & 3];
+}
+
+static int
+typematic_rate(int i)
+{
+	return rates[i & 0x1f];
+}
+
 static int
 typematic(int delay, int rate)
 {
-	static int delays[] = { 250, 500, 750, 1000 };
-	static int rates[] = {  34,  38,  42,  46,  50,  55,  59,  63,
-				68,  76,  84,  92, 100, 110, 118, 126,
-			       136, 152, 168, 184, 200, 220, 236, 252,
-			       272, 304, 336, 368, 400, 440, 472, 504 };
 	int value;
 	int i;
 

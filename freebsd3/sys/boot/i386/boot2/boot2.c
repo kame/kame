@@ -14,7 +14,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.18.2.5 1999/08/29 16:20:44 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.18.2.6 2000/06/13 13:22:34 ru Exp $
  */
 
 #include <sys/param.h>
@@ -296,9 +296,9 @@ parse(char *arg)
     int drv, c, i;
 
     while ((c = *arg++)) {
-	if (c == ' ')
+	if (c == ' ' || c == '\t' || c == '\n')
 	    continue;
-	for (p = arg; *p && *p != '\n' && *p != ' '; p++);
+	for (p = arg; *p && *p != '\n' && *p != ' ' && *p != '\t'; p++);
 	if (*p)
 	    *p++ = 0;
 	if (c == '-') {

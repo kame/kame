@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.46.2.2 1999/08/29 16:24:07 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.46.2.3 2000/02/01 13:22:13 yokota Exp $
  */
 
 #ifndef _DEV_SYSCONS_SYSCONS_H_
@@ -100,7 +100,6 @@
 #define BELL_PITCH	800
 #define CONSOLE_BUFSIZE 1024
 #define PCBURST		128
-#define FONT_NONE	1
 #define FONT_8		2
 #define FONT_14		4
 #define FONT_16		8

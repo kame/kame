@@ -8,6 +8,7 @@
  * functioning of this software, nor does the author assume any
  * responsibility for damages incurred with its use.
  *
+ *	$FreeBSD: src/sys/i386/isa/ic/Am7990.h,v 1.2.12.1 2000/01/19 01:31:12 rwatson Exp $
  */
 
 /*
@@ -23,6 +24,11 @@
 #define CSR3	3
 #define CSR88	88
 #define CSR89	89
+
+#define BCR49	49
+#define BCR32	32
+#define BCR33	33
+#define BCR34	34
 
 
 /* Control and Status Register Masks */

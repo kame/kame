@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_misc.c,v 1.51.2.8 1999/08/29 16:07:51 peter Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_misc.c,v 1.51.2.9 2000/06/08 19:04:49 marcel Exp $
  */
 
 #include "opt_compat.h"
@@ -63,6 +63,9 @@
 #include <i386/linux/linux_util.h>
 
 #include <posix4/sched.h>
+
+#define BSD_TO_LINUX_SIGNAL(sig)	\
+	((sig) < NSIG ? bsd_to_linux_signal[sig] : sig)
 
 static unsigned int linux_to_bsd_resource[LINUX_RLIM_NLIMITS] = {
 	RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK,
@@ -997,12 +1000,13 @@ linux_waitpid(struct proc *p, struct linux_waitpid_args *args)
     if (args->status) {
 	if ((error = copyin(args->status, &tmpstat, sizeof(int))) != 0)
 	    return error;
+	tmpstat &= 0xffff;
 	if (WIFSIGNALED(tmpstat))
 	    tmpstat = (tmpstat & 0xffffff80) |
-		      bsd_to_linux_signal[WTERMSIG(tmpstat)];
+		      BSD_TO_LINUX_SIGNAL(WTERMSIG(tmpstat));
 	else if (WIFSTOPPED(tmpstat))
 	    tmpstat = (tmpstat & 0xffff00ff) |
-		      (bsd_to_linux_signal[WSTOPSIG(tmpstat)]<<8);
+		      (BSD_TO_LINUX_SIGNAL(WSTOPSIG(tmpstat)) << 8);
 	return copyout(&tmpstat, args->status, sizeof(int));
     } else
 	return 0;
@@ -1040,12 +1044,13 @@ linux_wait4(struct proc *p, struct linux_wait4_args *args)
     if (args->status) {
 	if ((error = copyin(args->status, &tmpstat, sizeof(int))) != 0)
 	    return error;
+	tmpstat &= 0xffff;
 	if (WIFSIGNALED(tmpstat))
 	    tmpstat = (tmpstat & 0xffffff80) |
-		  bsd_to_linux_signal[WTERMSIG(tmpstat)];
+		  BSD_TO_LINUX_SIGNAL(WTERMSIG(tmpstat));
 	else if (WIFSTOPPED(tmpstat))
 	    tmpstat = (tmpstat & 0xffff00ff) |
-		  (bsd_to_linux_signal[WSTOPSIG(tmpstat)]<<8);
+		  (BSD_TO_LINUX_SIGNAL(WSTOPSIG(tmpstat)) << 8);
 	return copyout(&tmpstat, args->status, sizeof(int));
     } else
 	return 0;

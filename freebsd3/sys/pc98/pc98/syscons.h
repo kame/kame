@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/syscons.h,v 1.28.2.3 1999/08/29 16:31:18 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/syscons.h,v 1.28.2.4 2000/02/02 13:05:50 nyan Exp $
  */
 
 #ifndef _PC98_PC98_SYSCONS_H_
@@ -111,7 +111,6 @@ static unsigned int BELL_PITCH = 1678;
 
 #define CONSOLE_BUFSIZE 1024
 #define PCBURST		128
-#define FONT_NONE	1
 #define FONT_8		2
 #define FONT_14		4
 #define FONT_16		8

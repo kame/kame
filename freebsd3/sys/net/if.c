@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.64.2.1 1999/08/29 16:28:14 peter Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.64.2.5 2000/05/03 22:48:37 archie Exp $
  */
 
 #include "opt_compat.h"
@@ -643,15 +643,13 @@ ifioctl(so, cmd, data, p)
 			return (error);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
-		/*
-		 * 72 was chosen below because it is the size of a TCP/IP
-		 * header (40) + the minimum mss (32).
-		 */
-		if (ifr->ifr_mtu < 72 || ifr->ifr_mtu > 65535)
+		if (ifr->ifr_mtu < IF_MINMTU || ifr->ifr_mtu > IF_MAXMTU)
 			return (EINVAL);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
-		if (error == 0)
+		if (error == 0) {
 			getmicrotime(&ifp->if_lastchange);
+			rt_ifmsg(ifp);
+		}
 		return(error);
 
 	case SIOCADDMULTI:
@@ -790,6 +788,8 @@ ifpromisc(ifp, pswitch)
 		if (--ifp->if_pcount > 0)
 			return (0);
 		ifp->if_flags &= ~IFF_PROMISC;
+		log(LOG_INFO, "%s%d: promiscuous mode disabled\n",
+		    ifp->if_name, ifp->if_unit);
 	}
 	ifr.ifr_flags = ifp->if_flags;
 	error = (*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
@@ -825,6 +825,7 @@ ifconf(cmd, data)
 		    "%s%d", ifp->if_name, ifp->if_unit);
 		if(ifnlen + 1 > sizeof ifr.ifr_name) {
 			error = ENAMETOOLONG;
+			break;
 		} else {
 			strcpy(ifr.ifr_name, workbuf);
 		}
@@ -857,9 +858,11 @@ ifconf(cmd, data)
 						sizeof (ifr));
 				ifrp++;
 			} else {
-				space -= sa->sa_len - sizeof(*sa);
-				if (space < sizeof (ifr))
+				if (space < sizeof (ifr) + sa->sa_len -
+					    sizeof(*sa))
 					break;
+				space -= sa->sa_len - sizeof(*sa);
+
 				error = copyout((caddr_t)&ifr, (caddr_t)ifrp,
 						sizeof (ifr.ifr_name));
 				if (error == 0)

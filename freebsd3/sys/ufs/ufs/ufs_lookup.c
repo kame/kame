@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lookup.c	8.15 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.26.2.2 1999/10/30 00:52:25 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.26.2.3 2000/03/09 18:57:17 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -310,7 +310,6 @@ searchloop:
 				}
 				dp->i_ino = ep->d_ino;
 				dp->i_reclen = ep->d_reclen;
-				brelse(bp);
 				goto found;
 			}
 		}
@@ -414,6 +413,7 @@ found:
 		dp->i_size = entryoffsetinblock + DIRSIZ(OFSFMT(vdp), ep);
 		dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
+	brelse(bp);
 
 	/*
 	 * Found component in pathname.

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.4.2.6 1999/12/08 19:44:08 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.4.2.7 2000/04/11 01:26:27 archie Exp $
  * $Whistle: ng_tty.c,v 1.21 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -229,7 +229,7 @@ ngt_open(dev_t dev, struct tty *tp)
 		FREE(sc, M_NETGRAPH);
 		goto done;
 	}
-	sprintf(name, "%s%d", typestruct.name, ngt_unit++);
+	snprintf(name, sizeof(name), "%s%d", typestruct.name, ngt_unit++);
 
 	/* Set back pointers */
 	sc->node->private = sc;

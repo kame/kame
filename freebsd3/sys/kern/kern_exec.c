@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.93.2.3 1999/08/29 16:25:58 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_exec.c,v 1.93.2.4 2000/01/20 22:01:56 imp Exp $
  */
 
 #include <sys/param.h>
@@ -281,6 +281,7 @@ interpret:
 		if (attr.va_mode & VSGID)
 			p->p_ucred->cr_gid = attr.va_gid;
 		setsugid(p);
+		setugidsafety(p);
 	} else {
 		if (p->p_ucred->cr_uid == p->p_cred->p_ruid &&
 		    p->p_ucred->cr_gid == p->p_cred->p_rgid)

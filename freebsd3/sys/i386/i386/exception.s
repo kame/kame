@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/exception.s,v 1.55.2.2 1999/08/29 16:05:39 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/exception.s,v 1.55.2.3 2000/02/02 03:50:18 bde Exp $
  */
 
 #include "npx.h"
@@ -72,7 +72,8 @@
 /*
  * Trap and fault vector routines
  */
-#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(_X,name); __CONCAT(_X,name):
+#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(_X,name); \
+			.type __CONCAT(_X,name),@function; __CONCAT(_X,name):
 #define	TRAP(a)		pushl $(a) ; jmp _alltraps
 
 /*
@@ -194,6 +195,7 @@ IDTVEC(align)
 
 	SUPERALIGN_TEXT
 	.globl	_alltraps
+	.type	_alltraps,@function
 _alltraps:
 	pushal
 	pushl	%ds

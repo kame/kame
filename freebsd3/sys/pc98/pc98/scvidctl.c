@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scvidctl.c,v 1.2.2.4 1999/12/09 12:00:30 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scvidctl.c,v 1.2.2.6 2000/02/02 13:58:59 nyan Exp $
  */
 
 #include "sc.h"
@@ -189,7 +189,7 @@ sc_set_graphics_mode(scr_stat *scp, struct tty *tp, int mode)
      * Don't change xsize and ysize; preserve the previous vty
      * and history buffers.
      */
-    scp->font_size = FONT_NONE;
+    scp->font_size = 0;
     /* move the mouse cursor at the center of the screen */
     sc_move_mouse(scp, scp->xpixel / 2, scp->ypixel / 2);
     splx(s);
@@ -223,15 +223,8 @@ sc_set_pixel_mode(scr_stat *scp, struct tty *tp, int xsize, int ysize,
     if ((*vidsw[scp->ad]->get_info)(scp->adp, scp->mode, &info))
 	return ENODEV;		/* this shouldn't happen */
 
-#ifdef SC_VIDEO_DEBUG
-    if (scp->scr_buf != NULL) {
-	printf("set_pixel_mode(): mode:%x, col:%d, row:%d, font:%d\n",
-	       scp->mode, xsize, ysize, fontsize);
-    }
-#endif
-
     /* adjust argument values */
-    if ((fontsize <= 0) || (fontsize == FONT_NONE))
+    if (fontsize <= 0)
 	fontsize = info.vi_cheight;
     if (fontsize < 14) {
 	fontsize = 8;
@@ -250,17 +243,6 @@ sc_set_pixel_mode(scr_stat *scp, struct tty *tp, int xsize, int ysize,
 	xsize = info.vi_width/8;
     if (ysize <= 0)
 	ysize = info.vi_height/fontsize;
-
-#ifdef SC_VIDEO_DEBUG
-    if (scp->scr_buf != NULL) {
-	printf("set_pixel_mode(): mode:%x, col:%d, row:%d, font:%d\n",
-	       scp->mode, xsize, ysize, fontsize);
-	printf("set_pixel_mode(): window:%x, %dx%d, xoff:%d, yoff:%d\n",
-	       scp->adp->va_window, info.vi_width, info.vi_height, 
-	       (info.vi_width/8 - xsize)/2,
-	       (info.vi_height/fontsize - ysize)/2);
-    }
-#endif
 
     if ((info.vi_width < xsize*8) || (info.vi_height < ysize*fontsize))
 	return EINVAL;
@@ -309,10 +291,6 @@ sc_set_pixel_mode(scr_stat *scp, struct tty *tp, int xsize, int ysize,
 	set_border(scp, scp->border);
 
     scp->status &= ~UNKNOWN_MODE;
-
-#ifdef SC_VIDEO_DEBUG
-    printf("set_pixel_mode(): status:%x\n", scp->status);
-#endif
 
     if (tp == NULL)
 	return 0;

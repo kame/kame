@@ -20,7 +20,7 @@
  * 4. Neither the name of the Company nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- *  
+ *
  * This software is provided ``as is'', and any express or implied
  * warranties, including, but not limited to, the implied warranties of
  * merchantability and fitness for a particular purpose are disclaimed.
@@ -33,12 +33,13 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $FreeBSD: src/sys/dev/vinum/vinumkw.h,v 1.6.2.5 1999/08/29 16:24:20 peter Exp $
+ * $Id: vinumkw.h,v 1.16 2000/02/19 06:52:46 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumkw.h,v 1.6.2.7 2000/06/08 06:44:46 grog Exp $
  */
 
 /*
  * Command keywords that vinum knows.  These include both user-level
- * and kernel-level stuff 
+ * and kernel-level stuff
  */
 
 /*
@@ -61,6 +62,8 @@ enum keyword {
     kw_lv,						    /* list volume */
     kw_set,
     kw_rm,
+    kw_mv,						    /* move object */
+    kw_move,						    /* synonym for mv */
     kw_start,
     kw_stop,
     kw_makedev,						    /* make /dev/vinum devices */
@@ -68,6 +71,7 @@ enum keyword {
     kw_getdaemon,					    /* set daemon flags */
     kw_help,
     kw_drive,
+    kw_partition,
     kw_sd,
     kw_subdisk = kw_sd,
     kw_plex,
@@ -79,6 +83,7 @@ enum keyword {
     kw_name,
     kw_concat,
     kw_striped,
+    kw_raid4,
     kw_raid5,
     kw_driveoffset,
     kw_plexoffset,
@@ -113,15 +118,16 @@ enum keyword {
     kw_detached,
 #ifdef VINUMDEBUG
     kw_debug,						    /* go into debugger */
+#endif
     kw_stripe,
     kw_mirror,
-#endif
     kw_info,
     kw_quit,
     kw_max,
     kw_setstate,
     kw_checkparity,
     kw_rebuildparity,
+    kw_dumpconfig,
     kw_invalid_keyword = -1
 };
 

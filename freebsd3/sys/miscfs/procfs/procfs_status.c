@@ -37,7 +37,7 @@
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.12.2.2 1999/08/29 16:26:54 peter Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.12.2.3 1999/12/27 16:05:11 peter Exp $
  */
 
 #include <sys/param.h>
@@ -75,7 +75,7 @@ procfs_dostatus(curp, p, pfs, uio)
 		return (EOPNOTSUPP);
 
 	pid = p->p_pid;
-	ppid = p->p_pptr ? p->p_pptr->p_pid : 0,
+	ppid = p->p_pptr ? p->p_pptr->p_pid : 0;
 	pgid = p->p_pgrp->pg_id;
 	sess = p->p_pgrp->pg_session;
 	sid = sess->s_leader ? sess->s_leader->p_pid : 0;

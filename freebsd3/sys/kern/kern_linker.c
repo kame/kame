@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_linker.c,v 1.21.2.3 1999/11/28 14:46:44 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_linker.c,v 1.21.2.4 2000/06/03 06:18:39 bp Exp $
  */
 
 #include "opt_ddb.h"
@@ -714,7 +714,8 @@ kldfind(struct proc* p, struct kldfind_args* uap)
     modulename = rindex(filename, '/');
     if (modulename == NULL)
 	modulename = filename;
-
+    else
+	modulename++;
     lf = linker_find_file_by_name(modulename);
     if (lf)
 	p->p_retval[0] = lf->id;

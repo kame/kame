@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/console.h,v 1.41.2.4 1999/08/29 15:56:51 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/console.h,v 1.41.2.6 2000/02/02 12:28:39 yokota Exp $
  *	from: i386/include console.h,v 1.43
  */
 
@@ -55,6 +55,7 @@
 #define KDRASTER	_IOW('K', 100, scr_size_t)
 #define KDGKBINFO	_IOR('K', 101, keyboard_info_t)
 #define KDSETREPEAT	_IOW('K', 102, keyboard_delay_t)
+#define KDGETREPEAT	_IOR('K', 103, keyboard_delay_t)
 
 #define GETFKEY		_IOWR('k', 0, fkeyarg_t)
 #define SETFKEY		_IOWR('k', 1, fkeyarg_t)
@@ -162,6 +163,7 @@ struct mouse_event {
 #define MOUSE_ACTION		0x07
 #define MOUSE_MOTION_EVENT	0x08
 #define MOUSE_BUTTON_EVENT	0x09
+#define MOUSE_MOUSECHAR		0x0a
 
 struct mouse_info {
 	int	operation;
@@ -169,6 +171,7 @@ struct mouse_info {
 		struct mouse_data data;
 		struct mouse_mode mode;
 		struct mouse_event event;
+		int mouse_char;
 	}u;
 };
 

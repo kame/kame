@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.57.2.8 1999/09/10 20:47:22 phk Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.57.2.13 2000/06/14 13:02:54 kato Exp $
  */
 
 #include "opt_cpu.h"
@@ -197,19 +197,16 @@ printcpuinfo(void)
 				        strcat(cpu_model, "Pentium Pro");
 					break;
 				case 0x30:
-				        strcat(cpu_model, "Pentium II");
-					cpu = CPU_PII;
-					break;
 				case 0x50:
-				        strcat(cpu_model, "Pentium II/Xeon/Celeron");
-					cpu = CPU_PII;
-					break;
 				case 0x60:
-				        strcat(cpu_model, "Celeron");
+				        strcat(cpu_model,
+				"Pentium II/Pentium II Xeon/Celeron");
 					cpu = CPU_PII;
 					break;
 				case 0x70:
-				        strcat(cpu_model, "Pentium III");
+				case 0x80:
+				        strcat(cpu_model,
+					"Pentium III/Pentium III Xeon/Celeron");
 					cpu = CPU_PIII;
 					break;
 				default:
@@ -504,21 +501,17 @@ printcpuinfo(void)
 #endif
 #if defined(I586_CPU)
 	case CPUCLASS_586:
-#ifndef SMP
 		printf("%d.%02d-MHz ",
 		       (tsc_freq + 4999) / 1000000,
 		       ((tsc_freq + 4999) / 10000) % 100);
-#endif
 		printf("586");
 		break;
 #endif
 #if defined(I686_CPU)
 	case CPUCLASS_686:
-#ifndef SMP
 		printf("%d.%02d-MHz ",
 		       (tsc_freq + 4999) / 1000000,
 		       ((tsc_freq + 4999) / 10000) % 100);
-#endif
 		printf("686");
 		break;
 #endif
@@ -663,6 +656,7 @@ __asm
 ("
 	.text
 	.p2align 2,0x90
+	.type	" __XSTRING(CNAME(bluetrap6)) ",@function
 " __XSTRING(CNAME(bluetrap6)) ":
 	ss
 	movl	$0xa8c1d," __XSTRING(CNAME(trap_by_rdmsr)) "
@@ -679,6 +673,7 @@ __asm
 ("
 	.text
 	.p2align 2,0x90
+	.type " __XSTRING(CNAME(bluetrap13)) ",@function
 " __XSTRING(CNAME(bluetrap13)) ":
 	ss
 	movl	$0xa89c4," __XSTRING(CNAME(trap_by_rdmsr)) "

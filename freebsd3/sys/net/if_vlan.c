@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.4.2.2 1999/12/13 02:02:23 jkh Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.4.2.3 1999/12/25 03:28:51 jkh Exp $
  */
 
 /*
@@ -514,7 +514,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			vlan_unconfig(ifp);
 			ifv->ifv_p = 0;
 			if_down(ifp);
-			ifv->if_flags &= ~(IFF_UP|IFF_RUNNING);
+			ifp->if_flags &= ~(IFF_UP|IFF_RUNNING);
 			break;
 		}
 		p = ifunit(vlr.vlr_parent);

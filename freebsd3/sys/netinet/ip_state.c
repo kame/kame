@@ -7,7 +7,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_state.c	1.8 6/5/96 (C) 1993-1995 Darren Reed";
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_state.c,v 1.4.2.1 1999/08/29 16:29:50 peter Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_state.c,v 1.4.2.2 2000/05/24 05:29:24 darrenr Exp $";
 #endif
 
 #include "opt_ipfilter.h"
@@ -269,6 +269,8 @@ u_int pass;
 	    {
 		register tcphdr_t *tcp = (tcphdr_t *)fin->fin_dp;
 
+		if (tcp->th_flags & TH_RST)
+			return NULL;
 		/*
 		 * The endian of the ports doesn't matter, but the ack and
 		 * sequence numbers do as we do mathematics on them later.

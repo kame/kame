@@ -1,7 +1,7 @@
 /*
  * extensions to ioctl_meteor.h for the bt848 cards
  *
- * $FreeBSD: src/sys/i386/include/ioctl_bt848.h,v 1.19.2.4 1999/09/08 08:43:08 roger Exp $
+ * $FreeBSD: src/sys/i386/include/ioctl_bt848.h,v 1.19.2.5 2000/01/25 02:48:12 roger Exp $
  */
 
 /*
@@ -15,8 +15,9 @@
 #define CHNLSET_JPNCABLE        6
 #define CHNLSET_XUSSR           7
 #define CHNLSET_AUSTRALIA       8
+#define CHNLSET_FRANCE          9
 #define CHNLSET_MIN	        CHNLSET_NABCST
-#define CHNLSET_MAX	        CHNLSET_AUSTRALIA
+#define CHNLSET_MAX	        CHNLSET_FRANCE
 
 
 /*

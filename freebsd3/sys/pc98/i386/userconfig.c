@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.13 1999/12/06 21:03:29 archie Exp $
+ ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.14 2000/02/28 11:46:54 nyan Exp $
  **/
 
 /**
@@ -2062,7 +2062,7 @@ static char *helptext[] =
     "Once the list of Active drivers only contains entries for the devices",
     "present in your system, you can set their parameters (Interrupt, DMA",
     "channel, I/O addresses).  To do this, select the driver and press",
-    "[!bENTER!n]: it is now possible to edit the settings the settings at the",
+    "[!bENTER!n]: it is now possible to edit the settings at the",
     "bottom of the screen.  Use [!bTAB!n] to change fields, and when you are",
     "finished, use [!bQ!n] to return to the list.",
     "",
@@ -2536,7 +2536,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.13 1999/12/06 21:03:29 archie Exp $
+ * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.14 2000/02/28 11:46:54 nyan Exp $
  */
 
 #include "scbus.h"

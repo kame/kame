@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_dl.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_dl.h,v 1.6.4.2 1999/08/29 16:28:16 peter Exp $
+ * $FreeBSD: src/sys/net/if_dl.h,v 1.6.4.3 2000/03/01 02:48:05 archie Exp $
  */
 
 #ifndef _NET_IF_DL_H_
@@ -60,7 +60,7 @@
  */
 struct sockaddr_dl {
 	u_char	sdl_len;	/* Total length of sockaddr */
-	u_char	sdl_family;	/* AF_DLI */
+	u_char	sdl_family;	/* AF_LINK */
 	u_short	sdl_index;	/* if != 0, system given index for interface */
 	u_char	sdl_type;	/* interface type */
 	u_char	sdl_nlen;	/* interface name length, no trailing 0 reqd. */

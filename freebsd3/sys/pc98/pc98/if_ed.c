@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/if_ed.c,v 1.58.2.7 1999/12/09 01:26:27 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/if_ed.c,v 1.58.2.9 2000/01/19 13:05:15 nyan Exp $
  */
 
 /*
@@ -1931,14 +1931,24 @@ static int ed_probe_SIC98(struct isa_device* pc98_dev)
 	/* reset card to force it into a known state. */
 	outb(sc->asic_addr, 0x00);
 	DELAY(100);
-	outb(sc->asic_addr, 0x94);
-	DELAY(100);
-	outb(sc->asic_addr, 0x94);
+	if (ED_TYPE98SUB(pc98_dev->id_flags) == 0) {
+		/* SIC-98/SIU-98 */
+		outb(sc->asic_addr, 0x94);
+		DELAY(100);
+		outb(sc->asic_addr, 0x94);
+	} else {
+		/* SIU-98-D */
+		outb(sc->asic_addr, 0x80);
+		DELAY(100);
+		outb(sc->asic_addr, 0x94);
+		DELAY(100);
+		outb(sc->asic_addr, 0x9e);
+	}
 	DELAY(100);
 
 	/* Here we check the card ROM, if the checksum passes, and the
 	 * type code and ethernet address check out, then we know we have
-	 * a SIC card.
+	 * an SIC card.
 	 */
 	for (sum = 0, i = 0; i < 7; ++i)
 		sum ^= sc->mem_start[i*2];
@@ -1961,7 +1971,10 @@ static int ed_probe_SIC98(struct isa_device* pc98_dev)
 	/*
 	 * SIC ram page 0x0000-0x3fff (or 0x7fff)
 	 */
-	outb(sc->asic_addr, 0x90);
+	if (ED_TYPE98SUB(pc98_dev->id_flags) == 0)
+		outb(sc->asic_addr, 0x90);
+	else
+		outb(sc->asic_addr, 0x8e);
 	DELAY(100);
 
 	sc->mem_size = memsize;
@@ -3635,6 +3648,9 @@ ed_get_packet(sc, buf, len, multicast)
 			ed_ring_copy(sc, buf+14, (char *)(eh+1), len - 14);
 		if (ifp != BDG_LOCAL )
 			bdg_forward(&m, ifp); /* not local, need forwarding */
+		if (m == NULL)
+			return ; /* dropped */
+		eh = mtod(m, struct ether_header *);
 		if (ifp == BDG_LOCAL || ifp == BDG_BCAST || ifp == BDG_MCAST)
 			goto getit ;
 		/* not local and not multicast, just drop it */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.c,v 1.9.2.9 1999/12/04 00:14:37 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.c,v 1.9.2.10 2000/01/25 17:47:10 ken Exp $
  */
 
 #include <sys/param.h>
@@ -1441,7 +1441,7 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 				      "CAM_AUTOSENSE_FAILED");
 				/* NOTREACHED */
 				error = EIO;
-			} else if (ccb->ccb_h.retry_count > 0) {
+			} else if (ccb->ccb_h.retry_count == 0) {
 				/*
 				 * XXX KDM shouldn't there be a better
 				 * argument to return??

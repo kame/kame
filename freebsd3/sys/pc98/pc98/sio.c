@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
- * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.76.2.10 1999/12/06 03:28:55 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.76.2.11 2000/04/05 11:13:25 nyan Exp $
  */
 
 #include "opt_comconsole.h"
@@ -4212,6 +4212,7 @@ static pnpid_t siopnp_ids[] = {
 	{ 0x01017256, "USR0101"},
 	{ 0x30207256, "USR2030"},
 	{ 0x31307256, "USR3031"},
+	{ 0x50307256, "USR3050"},
 	{ 0x90307256, "USR3090"},
 	{ 0x0100440e, "Cardinal MVP288IV"},
 	{ 0 }

@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@whistle.com>
  *
  * $Whistle: ng_parse.h,v 1.2 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.2.2.3 1999/12/03 07:44:24 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.2.2.4 2000/04/11 01:12:25 archie Exp $
  */
 
 #ifndef _NETGRAPH_PARSE_H_
@@ -126,7 +126,7 @@
     type for the whole structure ('//' comments used to avoid breakage).
 
     // Super-type info for 'label' field
-    struct ng_parse_fixedsstring_info foo_label_info = { 8 };
+    struct ng_parse_fixedstring_info foo_label_info = { 8 };
 
     // Parse type for 'label' field
     struct ng_parse_type foo_label_type = {
@@ -385,11 +385,11 @@ extern const struct ng_parse_type ng_parse_string_type;
  * a terminating NUL character.
  *
  *   Default value:		Empty string
- *   Additional info:		struct ng_parse_fixedsstring_info *
+ *   Additional info:		struct ng_parse_fixedstring_info *
  */
 extern const struct ng_parse_type ng_parse_fixedstring_type;
 
-struct ng_parse_fixedsstring_info {
+struct ng_parse_fixedstring_info {
 	int	bufSize;	/* size of buffer (including NUL) */
 };
 

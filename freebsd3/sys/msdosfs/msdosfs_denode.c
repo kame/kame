@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_denode.c,v 1.44.2.1 1999/08/29 16:28:05 peter Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_denode.c,v 1.44.2.2 2000/02/02 13:00:31 nyan Exp $ */
 /*	$NetBSD: msdosfs_denode.c,v 1.28 1998/02/10 14:10:00 mrg Exp $	*/
 
 /*-
@@ -299,7 +299,7 @@ deget(pmp, dirclust, diroffset, depp)
 			/* de_FileSize will be filled in further down */
 		else {
 			ldep->de_StartCluster = MSDOSFSROOT;
-			ldep->de_FileSize = pmp->pm_rootdirsize * pmp->pm_BytesPerSec;
+			ldep->de_FileSize = pmp->pm_rootdirsize * DEV_BSIZE;
 		}
 		/*
 		 * fill in time and date so that dos2unixtime() doesn't

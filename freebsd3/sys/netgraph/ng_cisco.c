@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.2.2.3 1999/12/08 19:44:04 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.2.2.4 2000/04/11 01:24:23 archie Exp $
  * $Whistle: ng_cisco.c,v 1.25 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -375,7 +375,7 @@ cisco_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 		goto out;
 	}
 	h = mtod(m, struct cisco_header *);
-	h->address = CISCO_MULTICAST;		/* broadcast address */
+	h->address = CISCO_UNICAST;
 	h->control = 0;
 
 	switch (pep->af) {

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.h,v 1.2.2.1 1999/11/17 07:23:33 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.h,v 1.2.2.2 2000/01/27 01:34:06 archie Exp $
  * $Whistle: ng_tee.h,v 1.2 1999/01/20 00:22:14 archie Exp $
  */
 
@@ -61,6 +61,17 @@ struct ng_tee_hookstat {
 	u_int64_t	outFrames;
 };
 
+/* Keep this in sync with the above structure definition */
+#define NG_TEE_HOOKSTAT_INFO	{				\
+	{							\
+	  { "inOctets",		&ng_parse_int64_type	},	\
+	  { "inFrames",		&ng_parse_int64_type	},	\
+	  { "outOctets",	&ng_parse_int64_type	},	\
+	  { "outFrames",	&ng_parse_int64_type	},	\
+	  { NULL },						\
+	}							\
+}
+
 /* Statistics structure returned by NGM_TEE_GET_STATS */
 struct ng_tee_stats {
 	struct ng_tee_hookstat	right;
@@ -68,6 +79,17 @@ struct ng_tee_stats {
 	struct ng_tee_hookstat	right2left;
 	struct ng_tee_hookstat	left2right;
 };
+
+/* Keep this in sync with the above structure definition */
+#define NG_TEE_STATS_INFO(hstype)	{			\
+	{							\
+	  { "right",		(hstype)		},	\
+	  { "left",		(hstype)		},	\
+	  { "right2left",	(hstype)		},	\
+	  { "left2right",	(hstype)		},	\
+	  { NULL },						\
+	}							\
+}
 
 /* Netgraph commands */
 enum {

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.18.2.2 1999/08/29 16:20:25 peter Exp $
+ * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.18.2.3 2000/03/16 18:22:50 jhb Exp $
  */
 
 #include <sys/types.h>
@@ -77,6 +77,7 @@ extern char	*strdupout(vm_offset_t str);
 
 /* bcache.c */
 extern int	bcache_init(int nblks, size_t bsize);
+extern void	bcache_flush();
 
 /*
  * Disk block cache

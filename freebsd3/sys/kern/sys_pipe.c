@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.46.2.4 1999/08/29 16:26:08 peter Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.46.2.5 2000/03/24 00:48:57 dillon Exp $
  */
 
 /*
@@ -789,10 +789,15 @@ pipe_write(fp, uio, cred, flags)
 				wpipe->pipe_state &= ~PIPE_WANTR;
 				wakeup(wpipe);
 			}
-			error = tsleep(wpipe,
-					PRIBIO|PCATCH, "pipbww", 0);
+			error = tsleep(wpipe, PRIBIO|PCATCH, "pipbww", 0);
+			if (wpipe->pipe_state & PIPE_EOF)
+				break;
 			if (error)
 				break;
+		}
+		if (wpipe->pipe_state & PIPE_EOF) {
+			error = EPIPE;
+			break;
 		}
 
 		space = wpipe->pipe_buffer.size - wpipe->pipe_buffer.cnt;

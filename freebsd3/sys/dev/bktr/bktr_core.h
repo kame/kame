@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_core.h,v 1.1.2.1 1999/10/01 17:14:10 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_core.h,v 1.1.2.2 2000/01/25 02:48:04 roger Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -52,10 +52,10 @@
 int		i2cWrite( bktr_ptr_t bktr, int addr, int byte1, int byte2 );
 int		i2cRead( bktr_ptr_t bktr, int addr );
 
-void            msp_reset( bktr_ptr_t bktr );
-unsigned int    msp_read(bktr_ptr_t bktr, unsigned char dev, unsigned int addr);
-void            msp_write( bktr_ptr_t bktr, unsigned char dev,
-				unsigned int addr, unsigned int data);
+void            msp_dpl_reset( bktr_ptr_t bktr, int i2d_addr );
+unsigned int    msp_dpl_read( bktr_ptr_t bktr, int i2c_addr, unsigned char dev, unsigned int addr );
+void            msp_dpl_write( bktr_ptr_t bktr, int i2c_addr, unsigned char dev,
+			       unsigned int addr, unsigned int data );
 
 
 /*

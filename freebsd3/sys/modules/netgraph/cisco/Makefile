@@ -1,9 +1,9 @@
-# $FreeBSD: src/sys/modules/netgraph/cisco/Makefile,v 1.1.2.2 1999/12/01 19:41:49 julian Exp $
+# $FreeBSD: src/sys/modules/netgraph/cisco/Makefile,v 1.1.2.3 2000/05/04 21:24:20 archie Exp $
 # $Whistle: Makefile,v 1.2 1999/01/19 19:39:20 archie Exp $
 
 KMOD=		ng_cisco
 SRCS= 		ng_cisco.c opt_inet.h opt_atalk.h opt_ipx.h
-MAN8=		ng_cisco.8
+MAN4=		ng_cisco.4
 KMODDEPS=	netgraph
 
 IFACE_INET?=		1	# 0/1 - requires INET configured in kernel

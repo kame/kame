@@ -36,8 +36,8 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.58.2.3 1999/11/18 08:09:08 dillon Exp $
- */
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.58.2.6 2000/01/21 07:01:21 imp Exp $
+*/
 
 #include "opt_compat.h"
 #include "opt_devfs.h"
@@ -981,6 +981,62 @@ fdfree(p)
 	vrele(fdp->fd_cdir);
 	vrele(fdp->fd_rdir);
 	FREE(fdp, M_FILEDESC);
+}
+
+/*
+ * For setugid programs, we don't want to people to use that setugidness
+ * to generate error messages which write to a file which otherwise would
+ * otherwise be off-limits to the process.
+ *
+ * This is a gross hack to plug the hole.  A better solution would involve
+ * a special vop or other form of generalized access control mechanism.  We
+ * go ahead and just reject all procfs file systems accesses as dangerous.
+ *
+ * Since setugidsafety calls this only for fd 0, 1 and 2, this check is
+ * sufficient.  We also don't for check setugidness since we know we are.
+ */
+static int
+is_unsafe(struct file *fp)
+{
+	if (fp->f_type == DTYPE_VNODE && 
+	    ((struct vnode *)(fp->f_data))->v_tag == VT_PROCFS)
+		return (1);
+	return (0);
+}
+
+/*
+ * Make this setguid thing safe, if at all possible.
+ */
+void
+setugidsafety(p)
+	struct proc *p;
+{
+	struct filedesc *fdp = p->p_fd;
+	struct file **fpp;
+	char *fdfp;
+	register int i;
+
+	/* Certain daemons might not have file descriptors. */
+	if (fdp == NULL)
+		return;
+
+	fpp = fdp->fd_ofiles;
+	fdfp = fdp->fd_ofileflags;
+	for (i = 0; i <= fdp->fd_lastfile; i++, fpp++, fdfp++) {
+		if (i > 2)
+			break;
+		if (*fpp != NULL && is_unsafe(*fpp)) {
+			if ((*fdfp & UF_MAPPED) != 0)
+				(void) munmapfd(p, i);
+			(void) closef(*fpp, p);
+			*fpp = NULL;
+			*fdfp = 0;
+			if (i < fdp->fd_freefile)
+				fdp->fd_freefile = i;
+		}
+	}
+	while (fdp->fd_lastfile > 0 && fdp->fd_ofiles[fdp->fd_lastfile] == NULL)
+		fdp->fd_lastfile--;
 }
 
 /*

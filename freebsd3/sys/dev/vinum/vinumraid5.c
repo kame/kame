@@ -38,7 +38,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $FreeBSD: src/sys/dev/vinum/vinumraid5.c,v 1.3.2.2 1999/08/29 16:24:22 peter Exp $
+ * $Id: vinumraid5.c,v 1.1.1.2 2000/06/24 21:00:37 sumikawa Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumraid5.c,v 1.3.2.3 2000/06/08 06:44:46 grog Exp $
  */
 #include <dev/vinum/vinumhdr.h>
 #include <dev/vinum/request.h>
@@ -113,7 +114,7 @@ void setrqebounds(struct rqelement *rqe, struct metrics *mp);
  * we use, and not looking at the others (index >=
  * prq->requests).
  */
-enum requeststatus 
+enum requeststatus
 bre5(struct request *rq,
     int plexno,
     daddr_t * diskaddr,
@@ -156,9 +157,12 @@ bre5(struct request *rq,
 	m.stripebase = *diskaddr - m.stripeoffset;
 
 	/* subdisk containing the parity stripe */
-	m.psdno = plex->subdisks - 1
-	    - (*diskaddr / (plex->stripesize * (plex->subdisks - 1)))
-	    % plex->subdisks;
+	if (plex->organization == plex_raid5)
+	    m.psdno = plex->subdisks - 1
+		- (*diskaddr / (plex->stripesize * (plex->subdisks - 1)))
+		% plex->subdisks;
+	else						    /* RAID-4 */
+	    m.psdno = plex->subdisks - 1;
 
 	/*
 	 * The number of the subdisk in which
@@ -463,8 +467,8 @@ bre5(struct request *rq,
 	/* Part C: build the requests */
 	rqg = allocrqg(rq, m.rqcount);			    /* get a request group */
 	if (rqg == NULL) {				    /* malloc failed */
-	    bp->b_flags |= B_ERROR;
 	    bp->b_error = ENOMEM;
+	    bp->b_flags |= B_ERROR;
 	    biodone(bp);
 	    return REQUEST_ENOMEM;
 	}
@@ -581,9 +585,10 @@ bre5(struct request *rq,
 	 * doing anything.  We don't have to be
 	 * performing a recovery operation: somebody
 	 * else could be doing so, and the results could
-	 * influence us.
+	 * influence us.  Note the fact here, we'll perform
+	 * the lock in launch_requests.
 	 */
-	rqg->lock = lockrange(m.stripebase, bp, plex);	    /* lock the stripe */
+	rqg->lockbase = m.stripebase;
 	if (*diskaddr < diskend)			    /* didn't finish the request on this stripe */
 	    plex->multistripe++;			    /* count another one */
     }
@@ -623,7 +628,7 @@ bre5(struct request *rq,
  * rôle.  Select this case by setting the
  * parameter forparity != 0
  */
-void 
+void
 setrqebounds(struct rqelement *rqe, struct metrics *mp)
 {
     /* parity block of a normal write */

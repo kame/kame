@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.118.2.4 1999/12/04 13:13:58 kato Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.118.2.5 2000/04/01 13:12:31 nyan Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -280,6 +280,9 @@ NON_GPROF_ENTRY(btext)
 	shrl	$17,%eax
 	movb	%al,R(_pc98_system_parameter)+1
 3:
+
+	movw	R(_pc98_system_parameter+0x86),%ax
+	movw	%ax,R(_cpu_id)
 #endif
 
 	call	identify_cpu

@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.16.2.15 1999/12/12 05:02:27 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.16.2.16 1999/12/20 21:38:48 gibbs Exp $
  */
 /*
  * A few notes on features of the driver.
@@ -5665,8 +5665,8 @@ bus_reset:
 				ahc_search_qinfifo(ahc, SCB_TARGET(scb),
 						   channel, SCB_LUN(scb),
 						   SCB_LIST_NULL,
-						   CAM_REQUEUE_REQ,
 						   ROLE_INITIATOR,
+						   CAM_REQUEUE_REQ,
 						   SEARCH_COMPLETE);
 				xpt_print_path(scb->ccb->ccb_h.path);
 				printf("Queuing a BDR SCB\n");
@@ -5855,7 +5855,7 @@ ahc_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 	active_scb = ahc_inb(ahc, SCBPTR);
 
 	found = ahc_search_qinfifo(ahc, target, channel, lun, tag,
-				   CAM_REQUEUE_REQ, role, SEARCH_COMPLETE);
+				   role, CAM_REQUEUE_REQ, SEARCH_COMPLETE);
 
 	/*
 	 * Search waiting for selection list.

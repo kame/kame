@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.2.2.2 1999/12/01 19:41:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.2.2.3 2000/05/05 17:22:39 archie Exp $
  * $Whistle: ng_message.h,v 1.12 1999/01/25 01:17:44 archie Exp $
  */
 
@@ -243,7 +243,7 @@ struct namelist {
 
 /* Structure used for NGM_LISTTYPES */
 struct typeinfo {
-	char		typename[NG_TYPELEN + 1];	/* name of type */
+	char		type_name[NG_TYPELEN + 1];	/* name of type */
 	u_int32_t	numnodes;			/* number alive */
 };
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.14.2.1 1999/08/29 16:26:05 peter Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.14.2.2 2000/06/14 16:01:57 bde Exp $
  */
 
 #include <sys/param.h>
@@ -385,8 +385,7 @@ devclass_alloc_unit(devclass_t dc, int *unitp)
 	device_t *newlist;
 	int newsize;
 
-	newsize = (dc->maxunit ? 2 * dc->maxunit
-		   : MINALLOCSIZE / sizeof(device_t));
+	newsize = roundup((unit + 1), MINALLOCSIZE / sizeof(device_t));
 	newlist = malloc(sizeof(device_t) * newsize, M_DEVBUF, M_NOWAIT);
 	if (!newlist)
 	    return ENOMEM;

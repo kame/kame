@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.3.2.5 1999/08/29 16:21:35 peter Exp $
+ * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.3.2.6 2000/01/08 04:15:52 ken Exp $
  */
 
 #ifndef _CAM_CAM_CCB_H
@@ -138,7 +138,7 @@ typedef enum {
 				/* Abort the specified CCB */
 	XPT_RESET_BUS		= 0x11 | XPT_FC_XPT_ONLY,
 				/* Reset the specified SCSI bus */
-	XPT_RESET_DEV		= 0x12,
+	XPT_RESET_DEV		= 0x12 | XPT_FC_QUEUED,
 				/* Bus Device Reset the specified SCSI device */
 	XPT_TERM_IO		= 0x13,
 				/* Terminate the I/O process */

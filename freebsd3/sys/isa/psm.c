@@ -20,7 +20,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/psm.c,v 1.2.2.5 1999/08/29 16:25:46 peter Exp $
+ * $FreeBSD: src/sys/isa/psm.c,v 1.2.2.6 2000/01/20 13:27:00 yokota Exp $
  */
 
 /*
@@ -2188,9 +2188,11 @@ enable_aglide(struct psm_softc *sc)
      * NOTE: ALPS produces several models of GlidePoint. Some of those
      * do not respond to this sequence, thus, cannot be detected this way.
      */
+    if (set_mouse_sampling_rate(sc->kbdc, 100) != 100)
+	return FALSE;
     if (!mouse_id_proc1(sc->kbdc, PSMD_RES_LOW, 2, status))
         return FALSE;
-    if ((status[0] & 0x10) || (status[1] == PSMD_RES_LOW)) 
+    if ((status[1] == PSMD_RES_LOW) || (status[2] == 100))
         return FALSE;
     return TRUE;
 }

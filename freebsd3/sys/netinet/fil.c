@@ -7,7 +7,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)fil.c	1.36 6/5/96 (C) 1993-1996 Darren Reed";
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/fil.c,v 1.4.2.1 1999/08/29 16:29:29 peter Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/fil.c,v 1.4.2.2 2000/05/10 12:02:40 darrenr Exp $";
 #endif
 
 #include "opt_ipfilter.h"
@@ -273,13 +273,19 @@ getports:
 		break;
 	}
 
-
-	for (s = (u_char *)(ip + 1), hlen -= sizeof(*ip); hlen; ) {
-		if (!(opt = *s))
+	for (s = (u_char *)(ip + 1), hlen -= (int)sizeof(*ip); hlen > 0; ) {
+		opt = *s;
+		if (opt == '\0')
 			break;
-		ol = (opt == IPOPT_NOP) ? 1 : (int)*(s+1);
-		if (opt > 1 && (ol < 2 || ol > hlen))
-			break;
+		else if (opt == IPOPT_NOP)
+			ol = 1;
+		else {
+			if (hlen < 2)
+				break;
+			ol = (int)*(s + 1);
+			if (ol < 2 || ol > hlen)
+				break;
+		}
 		for (i = 9, mv = 4; mv >= 0; ) {
 			op = ipopts + i;
 			if (opt == (u_char)op->ol_val) {
@@ -1098,7 +1104,7 @@ nodata:
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/fil.c,v 1.4.2.1 1999/08/29 16:29:29 peter Exp $
+ * $FreeBSD: src/sys/netinet/fil.c,v 1.4.2.2 2000/05/10 12:02:40 darrenr Exp $
  */
 /*
  * Copy data from an mbuf chain starting "off" bytes from the beginning,

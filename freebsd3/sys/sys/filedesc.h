@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/filedesc.h,v 1.15.2.1 1999/08/29 16:32:22 peter Exp $
+ * $FreeBSD: src/sys/sys/filedesc.h,v 1.15.2.2 2000/01/20 22:01:50 imp Exp $
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -139,6 +139,7 @@ pid_t	fgetown __P((struct sigio *));
 int	fsetown __P((pid_t, struct sigio **));
 void	funsetown __P((struct sigio *));
 void	funsetownlst __P((struct sigiolst *));
+void	setugidsafety __P((struct proc *p));
 #endif
 
 #endif

@@ -37,7 +37,7 @@
  * Authors: Julian Elischer <julian@whistle.com>
  *          Archie Cobbs <archie@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.6.2.9 1999/12/08 19:44:03 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.6.2.12 2000/05/05 17:22:39 archie Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -1432,7 +1432,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 				    __FUNCTION__, "types");
 				break;
 			}
-			strncpy(tp->typename, type->name, NG_TYPELEN);
+			strncpy(tp->type_name, type->name, NG_TYPELEN);
 			tp->numnodes = type->refs;
 			tl->numtypes++;
 		}
@@ -1519,7 +1519,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 		const struct ng_cmdlist *c;
 		const struct ng_parse_type *argstype;
 		struct ng_mesg *rp, *ascii, *binary;
-		int off;
+		int off = 0;
 
 		/* Data area must contain at least a struct ng_mesg + '\0' */
 		ascii = (struct ng_mesg *)msg->data;
@@ -1658,6 +1658,26 @@ ng_send_dataq(hook_p hook, struct mbuf *m, meta_p meta)
 		NG_FREE_DATA(m, meta);
 	}
 	return (error);
+}
+
+/*
+ * Copy a 'meta'.
+ *
+ * Returns new meta, or NULL if original meta is NULL or ENOMEM.
+ */
+meta_p
+ng_copy_meta(meta_p meta)
+{
+	meta_p meta2;
+
+	if (meta == NULL)
+		return (NULL);
+	MALLOC(meta2, meta_p, meta->used_len, M_NETGRAPH, M_NOWAIT);
+	if (meta2 == NULL)
+		return (NULL);
+	meta2->allocated_len = meta->used_len;
+	bcopy(meta, meta2, meta->used_len);
+	return (meta2);
 }
 
 /************************************************************************
@@ -1876,7 +1896,7 @@ ng_queue_data(hook_p hook, struct mbuf *m, meta_p meta)
  * put the msg onto a queue to be picked up by another PPL (probably splnet)
  */
 int
-ng_queue_msg(node_p here, struct ng_mesg * msg, int len, const char *address)
+ng_queue_msg(node_p here, struct ng_mesg *msg, const char *address)
 {
 	register struct ng_queue_entry *q;
 	int     s;

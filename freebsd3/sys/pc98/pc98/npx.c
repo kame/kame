@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/pc98/pc98/npx.c,v 1.42.2.1 1999/08/29 16:31:10 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/npx.c,v 1.42.2.2 2000/02/02 13:03:38 nyan Exp $
  */
 
 #include "npx.h"
@@ -162,6 +162,7 @@ inthand_t probeintr;
 __asm("								\n\
 	.text							\n\
 	.p2align 2,0x90						\n\
+	.type	" __XSTRING(CNAME(probeintr)) ",@function	\n\
 " __XSTRING(CNAME(probeintr)) ":				\n\
 	ss							\n\
 	incl	" __XSTRING(CNAME(npx_intrs_while_probing)) "	\n\
@@ -188,6 +189,7 @@ inthand_t probetrap;
 __asm("								\n\
 	.text							\n\
 	.p2align 2,0x90						\n\
+	.type	" __XSTRING(CNAME(probetrap)) ",@function	\n\
 " __XSTRING(CNAME(probetrap)) ":				\n\
 	ss							\n\
 	incl	" __XSTRING(CNAME(npx_traps_while_probing)) "	\n\

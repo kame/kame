@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/pc98/loader/main.c,v 1.1.2.4 1999/08/29 16:21:32 peter Exp $
+ * $FreeBSD: src/sys/boot/pc98/loader/main.c,v 1.1.2.5 2000/01/03 15:31:17 nyan Exp $
  */
 
 /*
@@ -53,11 +53,7 @@ static struct
 
 static u_int32_t	initial_howto;
 static u_int32_t	initial_bootdev;
-#ifdef PC98
-struct bootinfo	*initial_bootinfo;
-#else
 static struct bootinfo	*initial_bootinfo;
-#endif
 
 struct arch_switch	archsw;		/* MI/MD interface boundary */
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD: src/sys/sys/param.h,v 1.38.2.11 1999/12/05 20:57:55 obrien Exp $
+ * $FreeBSD: src/sys/sys/param.h,v 1.38.2.13 2000/06/20 16:18:47 jkh Exp $
  */
 
 #ifndef _SYS_PARAM_H_
@@ -46,7 +46,7 @@
 #define BSD4_3	1
 #define BSD4_4	1
 #undef __FreeBSD_version
-#define __FreeBSD_version 340000	/* Master, propagated to newvers */
+#define __FreeBSD_version 350000	/* Master, propagated to newvers */
 
 #ifndef NULL
 #define	NULL	0

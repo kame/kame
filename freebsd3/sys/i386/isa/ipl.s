@@ -36,7 +36,7 @@
  *
  *	@(#)ipl.s
  *
- * $FreeBSD: src/sys/i386/isa/ipl.s,v 1.24.2.1 1999/08/29 16:07:26 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/ipl.s,v 1.24.2.2 2000/02/02 03:50:24 bde Exp $
  */
 
 
@@ -107,6 +107,7 @@ _netisrs:
  * Handle return from interrupts, traps and syscalls.
  */
 	SUPERALIGN_TEXT
+	.type	_doreti,@function
 _doreti:
 #ifdef SMP
 	TEST_CIL
@@ -411,6 +412,7 @@ dummynetisr:
  */
 	ALIGN_TEXT
 	.globl	_swi_generic
+	.type	_swi_generic,@function
 _swi_generic:
 	pushl	%ecx
 	FAKE_MCOUNT(4(%esp))

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.c	8.3 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/conf/param.c,v 1.32.2.2 1999/08/29 16:22:04 peter Exp $
+ * $FreeBSD: src/sys/conf/param.c,v 1.32.2.3 2000/06/10 17:44:56 jlemon Exp $
  */
 
 #include <stddef.h>
@@ -82,6 +82,7 @@ int	maxprocperuid = NPROC-1;		/* maximum # of processes per user */
 int	maxfiles = MAXFILES;			/* system wide open files limit */
 int	maxfilesperproc = MAXFILES;		/* per-process open files limit */
 int	ncallout = 16 + NPROC + MAXFILES;	/* maximum # of timer events */
+int	mbuf_wait = 32;				/* mbuf sleep time */
 
 /* maximum # of mbuf clusters */
 #ifndef NMBCLUSTERS

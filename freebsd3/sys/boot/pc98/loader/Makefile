@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.1.2.6 1999/08/29 16:21:31 peter Exp $
+# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.1.2.7 2000/02/05 11:56:22 nyan Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -19,6 +19,7 @@ SRCS=		main.c conf.c
 HAVE_PNP=	yes
 HAVE_ISABUS=	yes
 
+.if !defined(NOFORTH)
 # Enable BootForth
 BOOT_FORTH=	yes
 CFLAGS+=	-DBOOT_FORTH -I${.CURDIR}/../../ficl
@@ -26,6 +27,7 @@ CFLAGS+=	-DBOOT_FORTH -I${.CURDIR}/../../ficl
 LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
 .else
 LIBFICL=	${.CURDIR}/../../ficl/libficl.a
+.endif
 .endif
 
 # Always add MI sources 

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbdcreg.h,v 1.1.2.1 1999/08/29 16:23:35 peter Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbdcreg.h,v 1.1.2.2 2000/04/09 03:09:04 yokota Exp $
  * from kbdio.h,v 1.8 1998/09/25 11:55:46 yokota Exp
  */
 
@@ -132,6 +132,9 @@
 #define PSM_MOUSE_ID		0
 #define PSM_BALLPOINT_ID	2
 #define PSM_INTELLI_ID		3
+#define PSM_EXPLORER_ID		4
+#define PSM_4DMOUSE_ID		6
+#define PSM_4DPLUS_ID		8
 
 #ifdef KERNEL
 
