@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.31 2001/05/22 06:03:06 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.32 2001/07/09 22:34:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,8 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int s, rtsock, maxfd, ch;
+	int s, maxfd, ch;
+	int rtsock;
 	int once = 0;
 	struct timeval *timeout;
 	struct fd_set fdset;
