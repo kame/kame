@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.49 2002/05/10 05:02:54 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.50 2002/05/10 05:23:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -741,7 +741,8 @@ get_delegated_prefixes(p, ep, optinfo)
 			"len %d", dhcpoptstr(opt), optlen);
 
 		if (np > ep) {
-			dprintf(LOG_INFO, "malformed DHCP options");
+			dprintf(LOG_INFO, "get_delegated_prefixes: "
+				"malformed DHCP options");
 			return -1;
 		}
 
@@ -749,12 +750,35 @@ get_delegated_prefixes(p, ep, optinfo)
 		case DH6OPT_PREFIX_INFORMATION:
 			if (optlen != sizeof(pi) - 4)
 				goto malformed;
+
 			memcpy(&pi, p, sizeof(pi));
+
 			if (pi.dh6_pi_plen > 128) {
-				dprintf(LOG_INFO, "  invalid prefix length "
+				dprintf(LOG_INFO, "get_delegated_prefixes: "
+					"invalid prefix length "
 					"(%d)", pi.dh6_pi_plen);
 				goto malformed;
 			}
+
+			/* clear padding bits in the prefix address */
+			prefix6_mask(&pi.dh6_pi_paddr, pi.dh6_pi_plen);
+
+			/* duplication check */
+			for (dp = TAILQ_FIRST(&optinfo->prefix); dp;
+			     dp = TAILQ_NEXT(dp, link)) {
+				if (pi.dh6_pi_plen == dp->prefix.plen &&
+				    IN6_ARE_ADDR_EQUAL(&pi.dh6_pi_paddr,
+						       &dp->prefix.addr)) {
+					dprintf(LOG_INFO,
+						"get_delegated_prefixes: "
+						"duplicated prefix: %s/%d",
+						in6addr2str(&pi.dh6_pi_paddr,
+							    0),
+						pi.dh6_pi_plen);
+					goto nextoption;
+				}
+			}
+
 			pi.dh6_pi_duration = ntohl(pi.dh6_pi_duration);
 			if (pi.dh6_pi_duration != DHCP6_DURATITION_INFINITE) {
 				dprintf(LOG_DEBUG, "  prefix information: "
@@ -780,6 +804,8 @@ get_delegated_prefixes(p, ep, optinfo)
 
 			TAILQ_INSERT_TAIL(&optinfo->prefix, dp, link);
 		}
+
+	  nextoption:
 	}
 
 	return(0);
