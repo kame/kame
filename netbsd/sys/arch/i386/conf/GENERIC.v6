@@ -14,7 +14,6 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/ IPSEC)
 options 	PULLDOWN_TEST
 # these options will become the default behavior soon.
 options 	NEW_STRUCT_ROUTE
-options 	FAKE_LOOPBACK_IF
 
 # for IPv6
 pseudo-device	gif		4

@@ -250,7 +250,6 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	NATM			#native mode ATM
 # these options will become the default behavior soon.
 options 	NEW_STRUCT_ROUTE
-options 	FAKE_LOOPBACK_IF
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
