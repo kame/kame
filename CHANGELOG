@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1679 2001/05/21 04:13:17 suz Exp $
+$KAME: CHANGELOG,v 1.1680 2001/05/21 14:06:55 jinmei Exp $
 
 <200105>
+2001-05-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_input): in the 'goto ours'
+	check, do not accept packet if the corresponding route has the
+	cloned bit.  This fix should solve the problem that some OSes
+	mistakenly accept a packet to fe80::2%lo0.
+	XXX: the added check is not intuitive, and I'm not 100% sure this
+	change will never introduce another kind of problem.  We might
+	reconsidr to solve the problem in a more explicit manner.
+	The fix was based on a report from Hajimu UMEMOTO
+	<ume@mahoroba.org>.
+
 Fri May 18 17:10:10 JST 2001 sakane@ydc.co.jp
 	* kame/racoon:
 	Fixed to copy "reqid" into a proposal table from policy entries.
