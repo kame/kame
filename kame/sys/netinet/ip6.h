@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.44 2003/04/23 09:15:49 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.45 2003/06/05 04:46:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -388,6 +388,7 @@ struct ip6m_binding_ack {
 
 /* Binding Ack status codes */
 #define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */
+#define IP6MA_STATUS_PREFIX_DISC           1	/* Prefix discovery necessary */
 #define IP6MA_STATUS_ERRORBASE             128	/* ERROR BASE */
 #define IP6MA_STATUS_UNSPECIFIED           128	/* Reason unspecified */
 #define IP6MA_STATUS_PROHIBIT              129	/* Administratively prohibited */
