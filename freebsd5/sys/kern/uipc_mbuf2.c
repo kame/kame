@@ -400,7 +400,9 @@ m_tag_copy(struct m_tag *t)
 {
 	struct m_tag *p;
 
+#if 0
 	MBUF_CHECKSLEEP(how);
+#endif
 	KASSERT(t, ("m_tag_copy: null tag"));
 	p = m_tag_alloc(t->m_tag_cookie, t->m_tag_id, t->m_tag_len, M_NOWAIT);
 	if (p == NULL)
@@ -435,7 +437,9 @@ m_tag_copy_chain(struct mbuf *to, struct mbuf *from)
 {
 	struct m_tag *p, *t, *tprev = NULL;
 
+#if 0
 	MBUF_CHECKSLEEP(how);
+#endif
 	KASSERT(to && from,
 		("m_tag_copy_chain: null argument, to %p from %p", to, from));
 	m_tag_delete_chain(to, NULL);

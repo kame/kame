@@ -308,8 +308,8 @@ m_dup_pkthdr(struct mbuf *to, struct mbuf *from)
 	M_ASSERTPKTHDR(to);
 	/* Note: with MAC, this may not be a good assertion. */
 	KASSERT(SLIST_EMPTY(&to->m_pkthdr.tags), ("m_dup_pkthdr: to has tags"));
-#endif
 	MBUF_CHECKSLEEP(how);
+#endif
 #ifdef MAC
 	if (to->m_flags & M_PKTHDR)
 		m_tag_delete_chain(to, NULL);
