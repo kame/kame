@@ -18,7 +18,7 @@
 
 BINDIR=	${PREFIX}/sbin
 PROG=	faithd
-SRCS=	faithd.c prefix.c
+SRCS=	faithd.c prefix.c tcp.c ftp.c
 
 # libevent 0.4
 SRCS+=	event.c select.c

@@ -1,4 +1,4 @@
-/*	$KAME: faithd.h,v 1.2 2002/06/13 06:35:08 itojun Exp $	*/
+/*	$KAME: faithd.h,v 1.3 2002/06/24 15:39:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -29,3 +29,10 @@
  * SUCH DAMAGE.
  */
 
+extern void logmsg __P((int, const char *, ...));
+
+/* tcp.c */
+extern void tcp_doaccept __P((int, short, void *));
+
+/* ftp.c */
+extern void ftp_doaccept __P((int, short, void *));
