@@ -1,5 +1,5 @@
-#	$KAME: Makefile,v 1.1 2000/11/01 09:36:29 itojun Exp $
+#	$KAME: Makefile,v 1.2 2000/11/01 14:03:36 itojun Exp $
 
-SUBDIR=	des
+SUBDIR=	des blowfish cast128
 
 .include <bsd.subdir.mk>

@@ -1,11 +1,11 @@
-#	$KAME: Makefile,v 1.2 2000/11/01 14:03:37 itojun Exp $
+#	$KAME: Makefile,v 1.1 2000/11/01 14:03:37 itojun Exp $
 
 .include "../Makefile.inc"
 .include <bsd.own.mk>
 
 WARNS?=	1
-PROG=	destest
-SRCS=	destest.c des_ecb.c des_setkey.c
+PROG=	casttest
+SRCS=	casttest.c cast128.c
 MKMAN=	no
 
 .if ${OPSYS} == "NetBSD"
@@ -14,9 +14,9 @@ CPPFLAGS+=	-I${SYSDIR}
 CFLAGS+=	-I${SYSDIR}
 .endif
 
-.PATH:	${SYSDIR}/crypto/des
+.PATH:	${SYSDIR}/crypto/cast128
 
 regress:
-	@./destest
+	@./casttest
 
 .include <bsd.prog.mk>
