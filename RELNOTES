@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/17 16:34:26 $
+		     $Date: 2000/04/19 02:49:22 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -51,5 +51,6 @@ and the next STABLE release,
   (2) ancillary data: due to RFC2292 and X/Open change in CMSG_xx
   You may experience some trouble running non-KAME binaries (like those
   shipped with stock *BSD) on top of KAME kernel.
+- with KAME/NetBSD, ipip pseudo interface does not work at all.
 
 							<end of RELNOTES>
