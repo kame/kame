@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.4 1999/08/23 10:41:39 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.5 1999/08/23 10:59:16 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367,
@@ -1894,8 +1894,8 @@ key_setsecidx(src0, dst0, idx, flag)
 	}
 
 	/* check max prefixlen */
-	if (_INALENBYAF(src->sa_family) < src0->sadb_address_prefixlen
-	 || _INALENBYAF(dst->sa_family) < dst0->sadb_address_prefixlen) {
+	if ((_INALENBYAF(src->sa_family) << 3) < src0->sadb_address_prefixlen
+	 || (_INALENBYAF(dst->sa_family) << 3) < dst0->sadb_address_prefixlen) {
 		printf("key_setsecidx: illegal prefixlen.\n");
 		return 1;
 	}
