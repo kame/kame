@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.61 2003/08/26 13:37:46 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.62 2003/08/27 11:51:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -442,6 +442,8 @@ hif_find_preferable_ha(hif)
 		if (!hif_prefix_list_find_withmha(&hif->hif_prefix_list_home,
 		    mha))
 			continue;
+		if (IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr.sin6_addr))
+			continue;
 		/* return the entry we have found first. */
 		return (mha);
 	}
@@ -602,7 +604,7 @@ hif_prefix_list_update_withhaaddr(sc, data)
 	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &nmha->mha_addr);
 	if (mha == NULL) {
 		mha = mip6_ha_create(&nmha->mha_addr, nmha->mha_flags,
-		    nmha->mha_pref, nmha->mha_lifetime);
+		    nmha->mha_pref, 0);
 		if (mha == NULL) {
 			mip6log((LOG_ERR,
 			    "%s:%d: mip6_ha memory allocation failed.\n",
@@ -614,9 +616,7 @@ hif_prefix_list_update_withhaaddr(sc, data)
 
 	mha->mha_addr = nmha->mha_addr;
 	mha->mha_flags = nmha->mha_flags;
-	mha->mha_pref = nmha->mha_pref;
-	mha->mha_lifetime = nmha->mha_lifetime;
-	mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+	mip6_ha_update_lifetime(mha, 0);
 
 	/* add mip6_prefix, if needed. */
 	mpfx = mip6_prefix_list_find_withprefix(&mha->mha_addr, 64 /* XXX */);
