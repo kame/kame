@@ -778,7 +778,7 @@ netname6(sa6, mask)
 			sin6.sin6_addr.s6_addr[i++] = 0x00;
 	}
 
-	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
+	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sin6.sin6_addr))
 		return("default");
 
 	if (illegal)
