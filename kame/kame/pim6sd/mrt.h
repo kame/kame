@@ -198,18 +198,20 @@ typedef struct grp_mask {
 } grp_mask_t;
 
 typedef struct rp_grp_entry {
-	struct rp_grp_entry 	*rp_grp_next;	/* Next entry for same RP         */
-	struct rp_grp_entry 	*rp_grp_prev;	/* Prev entry for same RP         */
+	struct rp_grp_entry 	*rp_grp_next;	/* Next entry for same RP */
+	struct rp_grp_entry 	*rp_grp_prev;	/* Prev entry for same RP */
 	struct rp_grp_entry 	*grp_rp_next;	/* Next entry for same grp prefix */
 	struct rp_grp_entry 	*grp_rp_prev;	/* Prev entry for same grp prefix */
-	struct grpentry			*grplink;	 	/* Link to all grps via this entry*/	
-	u_int16 				holdtime;	/* The RP holdtime                */
-	u_int16 				fragment_tag;   /* The fragment tag from the
-                                             			* received BSR message           */
+	struct grpentry		*grplink; 	/* Link to all grps via this entry*/	
+	u_int16			advholdtime;	/* The advertised holdtime */
+	u_int16 		holdtime;	/* The RP holdtime (will be aged) */
+	u_int16			fragment_tag;   /* The fragment tag from the
+                               			 * received BSR message
+						 */
 	
-	u_int8					priority;		/* The RP priority                */
-	grp_mask_t 				*group;			/* Pointer to (group,mask) entry  */
-	cand_rp_t 				*rp;			/* Pointer to the RP              */
+	u_int8			priority;	/* The RP priority */
+	grp_mask_t 		*group;		/* Pointer to (group,mask) entry  */
+	cand_rp_t 		*rp;		/* Pointer to the RP */
 } rp_grp_entry_t;
 
 typedef struct grpentry {

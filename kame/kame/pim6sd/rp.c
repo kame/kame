@@ -515,6 +515,7 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 	 */
 
 	grp_rp_entry_next->holdtime = rp_holdtime;
+	grp_rp_entry_next->advholdtime = rp_holdtime;
 	grp_rp_entry_next->fragment_tag = fragment_tag;
 	return (grp_rp_entry_next);
     }
@@ -543,6 +544,7 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
     cand_rp_ptr->rp_grp_next = grp_rp_entry_new;
 
     grp_rp_entry_new->holdtime = rp_holdtime;
+    grp_rp_entry_new->advholdtime = rp_holdtime;
     grp_rp_entry_new->fragment_tag = fragment_tag;
     grp_rp_entry_new->priority = rp_priority;
     grp_rp_entry_new->group = grp_mask_ptr;
@@ -723,8 +725,9 @@ delete_grp_mask(used_cand_rp_list, used_grp_mask_list, group_addr, group_mask)
 
 	if (inet6_greaterthan(&prefix_h2 , &prefix_h ))
 	    continue;
-	if (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_addr.sin6_addr , &group_addr->sin6_addr) &&
-	    IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_mask , &group_mask))	
+	if (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_addr.sin6_addr,
+			       &group_addr->sin6_addr) &&
+	    IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_mask, &group_mask))	
 	    break;
 	else
 	    return;		/* Not found */
@@ -1174,7 +1177,7 @@ create_pim6_bootstrap_message(send_buff)
 	     grp_rp_entry_ptr = grp_rp_entry_ptr->grp_rp_next)
 	{
 	    PUT_EUADDR6(grp_rp_entry_ptr->rp->rpentry->address.sin6_addr, data_ptr);
-	    PUT_HOSTSHORT(grp_rp_entry_ptr->holdtime, data_ptr);
+	    PUT_HOSTSHORT(grp_rp_entry_ptr->advholdtime, data_ptr);
 	    PUT_BYTE(grp_rp_entry_ptr->priority, data_ptr);
 	    PUT_BYTE(0, data_ptr);	/* The reserved field */
 	}

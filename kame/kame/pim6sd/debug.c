@@ -757,24 +757,25 @@ dump_rp_set(fp)
     grp_mask_t     *grp_mask;
 
     fprintf(fp, "---------------------------RP-Set----------------------------\n");
-    fprintf(fp, "Current BSR address: %s\n",
-	    inet6_fmt(&curr_bsr_address.sin6_addr));
-    fprintf(fp, "%-40s %-8s  Group prefix   Priority   Holdtime \n",
-	    "RP-address", "Incoming");
+    fprintf(fp, "Current BSR address: %s Priority: %d\n",
+	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority);
+    fprintf(fp, "%-40s %-3s  Group prefix   Prio Hold Age\n",
+	    "RP-address", "IN ");
 
     for (rp = cand_rp_list; rp != (cand_rp_t *) NULL; rp = rp->next)
     {
 
-	fprintf(fp, "%-40s %-4d      ",
+	fprintf(fp, "%-40s %-3d",
 		inet6_fmt(&rp->rpentry->address.sin6_addr),
 		rp->rpentry->incoming);
 	if ((rp_grp_entry = rp->rp_grp_next) != (rp_grp_entry_t *) NULL)
 	{
 	    grp_mask = rp_grp_entry->group;
-	    fprintf(fp, "%-14.14s %-3u        %-3u\n",
+	    fprintf(fp, "%-14.14s %-4u %-4u %-3u\n",
 		    net6name(&grp_mask->group_addr.sin6_addr,
 			     &grp_mask->group_mask),
-		    rp_grp_entry->priority, rp_grp_entry->holdtime);
+		    rp_grp_entry->priority, rp_grp_entry->advholdtime,
+		    rp_grp_entry->holdtime);
 
 	    for (rp_grp_entry = rp_grp_entry->rp_grp_next;
 		 rp_grp_entry != (rp_grp_entry_t *) NULL;
