@@ -1,7 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1711 2001/06/07 11:53:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.1712 2001/06/07 13:23:54 fujisawa Exp $
 
 <200106>
+2001-06-07  Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_tslot.c (checkTracerouteReturn):
+	- Translate incoming IPv4 ICMP_UNREACH packet when this
+	  ICMP_UNREACH returns from IPv4 network, and it is a error
+	  return for IPv6 host.	 Only return of traceroute was a
+	  target until now.
+
+	* kame/sys/netinet6/natpt_{dispatch.c,tslot.c,var.h}
+	- Changed routine name as follows due to modification
+	  mentioned above.
+	    checkTracerouteReturn() -> checkIncomingICMP()
+
 2001-06-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c: stop sending echo packets whenever the
 	upper limit is specified by the -c option, regardless of the -f
