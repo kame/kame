@@ -42,6 +42,8 @@ DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a \
 	-L${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 LDADD+=-ly -ll
+YFLAGS+=-d
+CLEANFILES+=	y.tab.h
 
 MAN=	pim6sd.8 pim6sd.conf.5
 
