@@ -38,6 +38,7 @@ struct ip6_opthdr {
 
 int all;
 int debug;
+extern int cflag;	/* defined in v6test.c */
 
 static u_short in_cksum __P((u_short *, u_short *, int));
 
@@ -59,6 +60,10 @@ cksum6(int linkhdrlen)
 	u_char *packet = (u_char *)(buf) + linkhdrlen;
 	u_char nxt = packet[6];
 	
+	/* does not generate checksum if "-c" is on */
+	if (cflag)
+		return;
+
 	ip = (struct ip6_hdr *)packet;
 	off = sizeof(*ip);
 	len = ntohs(ip->ip6_plen);

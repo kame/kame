@@ -1,4 +1,4 @@
-.\"	$KAME: v6test.1,v 1.7 2001/04/04 05:11:55 suz Exp $
+.\"	$KAME: v6test.1,v 1.8 2001/09/16 04:04:02 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -41,6 +41,7 @@
 .Op Fl d Ar dst
 .Op Fl f Ar configfile
 .Op Fl i Ar interface
+.Op Fl c
 .Ar testname ...
 .\"
 .Sh DESCRIPTION
@@ -73,6 +74,11 @@ in the current directory.
 .It Ar testname
 Specify a single test entry in the configuration file.
 You can specify multiple tests, to send contiguous test packets.
+.It Fl c
+Bypass automatic checksum calculation.  Useful only when you try to 
+configure checksum field manually.  By default, 
+.Nm
+calculates checksum automatically.
 .El
 .\"
 .Sh RETURN VALUES
