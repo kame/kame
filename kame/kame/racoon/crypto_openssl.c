@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.20 2000/02/22 12:52:21 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.21 2000/02/23 06:13:55 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -120,8 +120,8 @@
 #ifdef HAVE_SIGNING_C
 /* X509 Certificate */
 /*
- * get a certificate
- * first, trying to get PEM format.  Next DER format.
+ * get a X509 certificate from local file.
+ * a certificate must be PEM format.
  * Input:
  *	path to a certificate.
  * Output:
@@ -260,10 +260,10 @@ eay_check_x509sign(source, sig, cert)
 }
 
 /*
- * get ASN.1 Private Key of PEM format.
+ * get PKCS#1 Private Key of PEM format from local file.
  */
 vchar_t *
-eay_get_asn1privkey(path)
+eay_get_pkcs1privkey(path)
 	char *path;
 {
 	FILE *fp;
@@ -312,8 +312,11 @@ end:
 	return pkey;
 }
 
+/*
+ * get PKCS#1 Public Key of PEM format from local file.
+ */
 vchar_t *
-eay_get_asn1pubkey(path)
+eay_get_pkcs1pubkey(path)
 	char *path;
 {
 	FILE *fp;

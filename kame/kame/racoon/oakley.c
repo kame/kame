@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.22 2000/02/17 00:28:10 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.23 2000/02/23 06:13:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1349,7 +1349,7 @@ oakley_getsign(iph1)
 			idstr, PRIVKEYFILE);
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL, "filename: %s\n", path));
-		privkey = eay_get_asn1privkey(path);
+		privkey = eay_get_pkcs1privkey(path);
 		if (privkey == NULL) {
 			plog(logp, LOCATION, NULL,
 				"failed to get private key.\n");
