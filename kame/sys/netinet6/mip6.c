@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.139 2002/06/27 12:50:12 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.140 2002/07/10 05:09:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1373,6 +1373,12 @@ mip6_ioctl(cmd, data)
 				 "%s:%d: MN function enabled\n",
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MOBILENODE;
+			if (mip6_process_movement()) {
+				mip6log((LOG_WARNING,
+				    "%s:%d: mip6_process_movement failed.\n",
+				    __FILE__, __LINE__));
+				/* ignore this error... */
+			}
 			break;
 
 		case SIOCSMIP6CFG_DISABLEMN:
