@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.146 2001/01/21 06:12:55 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.147 2001/01/21 15:48:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2259,7 +2259,7 @@ do { \
 				    in6p->in6p_inputopts->head) {
 					struct mbuf *m;
 					m = m_copym(in6p->in6p_inputopts->head,
-					    M_COPYALL, M_WAIT);
+					    0, M_COPYALL, M_WAIT);
 					error = soopt_mcopyout(sopt, m);
 					if (error == 0)
 						m_freem(m);
