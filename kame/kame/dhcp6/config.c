@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.15 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.16 2002/05/23 03:30:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -609,7 +609,7 @@ add_options(opcode, ifc, cfl0)
 					dprintf(LOG_INFO, "%s"
 						"duplicated requested"
 						" option: %s", FNAME,
-						dhcpoptstr(cfl->type));
+						dhcp6optstr(cfl->type));
 					goto next; /* ignore it */
 				}
 			}

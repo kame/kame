@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.85 2002/05/23 02:27:51 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.86 2002/05/23 03:30:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -781,7 +781,7 @@ client6_send(ev)
 	}
 
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
-		dhcpmsgstr(dh6->dh6_msgtype),
+		dhcp6msgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&dst));
 
   end:
@@ -878,7 +878,7 @@ client6_send_renew(ev)
 	}
 
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
-		dhcpmsgstr(dh6->dh6_msgtype),
+		dhcp6msgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&dst));
 
   end:
@@ -970,7 +970,7 @@ client6_send_rebind(ev)
 	}
 
 	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
-		dhcpmsgstr(dh6->dh6_msgtype),
+		dhcp6msgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&dst));
 
   end:
@@ -1037,7 +1037,7 @@ client6_recv()
 	dh6 = (struct dhcp6 *)rbuf;
 
 	dprintf(LOG_DEBUG, "%s" "receive %s from %s on %s", FNAME,
-		dhcpmsgstr(dh6->dh6_msgtype),
+		dhcp6msgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&from), ifp->ifname);
 
 	/* get options */
@@ -1058,7 +1058,7 @@ client6_recv()
 		break;
 	default:
 		dprintf(LOG_INFO, "%s" "received an unexpected message (%s) "
-			"from %s", FNAME, dhcpmsgstr(dh6->dh6_msgtype),
+			"from %s", FNAME, dhcp6msgstr(dh6->dh6_msgtype),
 			addr2str((struct sockaddr *)&from));
 		break;
 	}
@@ -1212,7 +1212,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 {
-	struct dhcp6_listval *p;
+	struct dhcp6_listval *lv;
 	struct dhcp6_event *ev;
 
 	/* find the corresponding event based on the received xid */
@@ -1251,6 +1251,17 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		return -1;
 	}
 
+	/*
+	 * The client MAY choose to report any status code or message from the
+	 * status code option in the Reply message.
+	 * [dhcpv6-24 Section 18.1.6]
+	 */
+	for (lv = TAILQ_FIRST(&optinfo->stcode_list); lv;
+	     lv = TAILQ_NEXT(lv, link)) {
+		dprintf(LOG_INFO, "%s" "status code: %s",
+		    FNAME, dhcp6_stcodestr(lv->val_num));
+	}
+
 	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
 		struct dhcp6_listval *d;
 		int i = 0;
@@ -1270,14 +1281,14 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		 */
 		prefix6_update(ev, &optinfo->prefix_list, &optinfo->serverID);
 	} else {
-		for (p = TAILQ_FIRST(&optinfo->prefix_list); p;
-		     p = TAILQ_NEXT(p, link)) {
-			prefix6_add(ifp, &p->val_prefix6, &optinfo->serverID);
+		for (lv = TAILQ_FIRST(&optinfo->prefix_list); lv;
+		     lv = TAILQ_NEXT(lv, link)) {
+			prefix6_add(ifp, &lv->val_prefix6, &optinfo->serverID);
 		}
 	}
 
 	dhcp6_remove_event(ev);
-	dprintf(LOG_INFO, "%s" "got an expected reply, sleeping.", FNAME);
+	dprintf(LOG_DEBUG, "%s" "got an expected reply, sleeping.", FNAME);
 
 	return 0;
 }

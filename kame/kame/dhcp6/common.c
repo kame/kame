@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.57 2002/05/23 02:37:33 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.58 2002/05/23 03:30:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -794,7 +794,7 @@ dhcp6_get_options(p, ep, optinfo)
 		np = (struct dhcp6opt *)(cp + optlen);
 
 		dprintf(LOG_DEBUG, "%s" "get DHCP option %s, len %d",
-		    FNAME, dhcpoptstr(opt), optlen);
+		    FNAME, dhcp6optstr(opt), optlen);
 
 		/* option length field overrun */
 		if (np > ep) {
@@ -833,7 +833,8 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			memcpy(&val16, cp, sizeof(val16));
 			num = ntohs(val16);
-			dprintf(LOG_DEBUG, "  status code: %d", num);
+			dprintf(LOG_DEBUG, "  status code: %s",
+			    dhcp6_stcodestr(num));
 
 			/* need to check duplication? */
 
@@ -858,13 +859,13 @@ dhcp6_get_options(p, ep, optinfo)
 				num = ntohs(opttype);
 
 				dprintf(LOG_DEBUG, "  requested option: %s",
-					dhcpoptstr(num));
+					dhcp6optstr(num));
 
 				if (dhcp6_find_listval(&optinfo->reqopt_list,
 					&num, DHCP6_LISTVAL_NUM)) {
 					dprintf(LOG_INFO, "%s" "duplicated "
 					    "option type (%s)", FNAME,
-					    dhcpoptstr(opttype));
+					    dhcp6optstr(opttype));
 					goto nextoption;
 				}
 
@@ -918,7 +919,7 @@ dhcp6_get_options(p, ep, optinfo)
 			/* no option specific behavior */
 			dprintf(LOG_INFO, "%s"
 			    "unknown or unexpected DHCP6 option %s, len %d",
-			    FNAME, dhcpoptstr(opt), optlen);
+			    FNAME, dhcp6optstr(opt), optlen);
 			break;
 		}
 	}
@@ -954,7 +955,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		cp = p + sizeof(opth);
 		np = cp + optlen;
 		dprintf(LOG_DEBUG, "  prefix delegation option: %s, "
-			"len %d", dhcpoptstr(opt), optlen);
+			"len %d", dhcp6optstr(opt), optlen);
 
 		if (np > ep) {
 			dprintf(LOG_INFO, "%s" "malformed DHCP options",
@@ -1028,7 +1029,7 @@ get_delegated_prefixes(p, ep, optinfo)
 
 #define COPY_OPTION(t, l, v, p) do { \
 	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
-		dprintf(LOG_INFO, "%s" "option buffer short for %s", FNAME, dhcpoptstr((t))); \
+		dprintf(LOG_INFO, "%s" "option buffer short for %s", FNAME, dhcp6optstr((t))); \
 		goto fail; \
 	} \
 	opth.dh6opt_type = htons((t)); \
@@ -1038,7 +1039,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
  	(len) += sizeof(struct dhcp6opt) + (l); \
-	dprintf(LOG_DEBUG, "%s" "set %s", FNAME, dhcpoptstr((t))); \
+	dprintf(LOG_DEBUG, "%s" "set %s", FNAME, dhcp6optstr((t))); \
 } while (0)
 
 int
@@ -1319,7 +1320,7 @@ duidfree(duid)
 }
 
 char *
-dhcpoptstr(type)
+dhcp6optstr(type)
 	int type;
 {
 	static char genstr[sizeof("opt_65535") + 1]; /* XXX thread unsafe */
@@ -1353,7 +1354,7 @@ dhcpoptstr(type)
 }
 
 char *
-dhcpmsgstr(type)
+dhcp6msgstr(type)
 	int type;
 {
 	static char genstr[sizeof("msg255") + 1]; /* XXX thread unsafe */
@@ -1379,6 +1380,38 @@ dhcpmsgstr(type)
 	default:
 		sprintf(genstr, "msg%d", type);
 		return(genstr);
+	}
+}
+
+char *
+dhcp6_stcodestr(code)
+	int code;
+{
+	static char genstr[sizeof("code255") + 1]; /* XXX thread unsafe */
+
+	if (code > 255)
+		return "INVALID code";
+
+	switch(code) {
+	case DH6OPT_STCODE_SUCCESS:
+		return "success";
+	case DH6OPT_STCODE_UNSPECFAIL:
+		return "unspec failure";
+	case DH6OPT_STCODE_AUTHFAILED:
+		return "auth fail";
+	case DH6OPT_STCODE_ADDRUNAVAIL:
+		return "address unavailable";
+	case DH6OPT_STCODE_NOBINDING:
+		return "no binding";
+	case DH6OPT_STCODE_CONFNOMATCH:
+		return "confirm no match";
+	case DH6OPT_STCODE_NOTONLINK:
+		return "not on-link";
+	case DH6OPT_STCODE_USEMULTICAST:
+		return "use multicast";
+	  default:
+		  sprintf(genstr, "code%d", code);
+		  return(genstr);
 	}
 }
 

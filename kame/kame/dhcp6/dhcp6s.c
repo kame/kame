@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.82 2002/05/23 02:29:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.83 2002/05/23 03:30:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -497,7 +497,7 @@ server6_recv(s)
 	dh6 = (struct dhcp6 *)rdatabuf;
 
 	dprintf(LOG_DEBUG, "%s" "received %s from %s", FNAME,
-	    dhcpmsgstr(dh6->dh6_msgtype),
+	    dhcp6msgstr(dh6->dh6_msgtype),
 	    addr2str((struct sockaddr *)&from));
 
 	/*
@@ -533,7 +533,7 @@ server6_recv(s)
 		break;
 	default:
 		dprintf(LOG_INFO, "%s" "unknown or unsupported msgtype %s",
-		    FNAME, dhcpmsgstr(dh6->dh6_msgtype));
+		    FNAME, dhcp6msgstr(dh6->dh6_msgtype));
 		break;
 	}
 
@@ -699,17 +699,22 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 * containing a status code option with value UseMulticast and no other
 	 * options.
 	 * [dhcpv6-24 18.2.1]
-	 * (Our current implementation has never sent a unicast option.)
+	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
-		dprintf(LOG_INFO, "%s" "unexpected unicast message", FNAME);
+		int stcode = DH6OPT_STCODE_USEMULTICAST;
 
-		goto fail;	/* XXX */
-#ifdef notyet
+		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
+		    FNAME, addr2str(from));
+		if (dhcp6_add_listval(&roptinfo.stcode_list, &stcode,
+			DHCP6_LISTVAL_NUM) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to add a status code",
+			    FNAME);
+			goto fail;
+		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
 		    fromlen, &roptinfo);
 		goto end;
-#endif
 	}
 
 	/* get per-host configuration for the client, if any. */
@@ -761,6 +766,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
 			   &roptinfo);
 
+  end:
 	dhcp6_clear_options(&roptinfo);
 	return 0;
 
@@ -824,17 +830,22 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	 * containing a status code option with value UseMulticast and no other
 	 * options.
 	 * [dhcpv6-24 18.2.3]
-	 * (Our current implementation has never sent a unicast option.)
+	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
-		dprintf(LOG_INFO, "%s" "unexpected unicast message", FNAME);
+		int stcode = DH6OPT_STCODE_USEMULTICAST;
 
-		goto fail;	/* XXX */
-#ifdef notyet
+		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
+		    FNAME, addr2str(from));
+		if (dhcp6_add_listval(&roptinfo.stcode_list, &stcode,
+			DHCP6_LISTVAL_NUM) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to add a status code",
+			    FNAME);
+			goto fail;
+		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
 		    fromlen, &roptinfo);
 		goto end;
-#endif
 	}
 
 	/*
@@ -883,6 +894,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
 			   &roptinfo);
 
+  end:
 	dhcp6_clear_options(&roptinfo);
 	return 0;
 
@@ -1079,12 +1091,12 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,
 			replybuf, len) != 0) {
 		dprintf(LOG_ERR, "%s" "transmit %s to %s failed", FNAME,
-			dhcpmsgstr(type), addr2str((struct sockaddr *)&dst));
+			dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
 		return(-1);
 	}
 
 	dprintf(LOG_DEBUG, "%s" "transmit %s to %s", FNAME,
-		dhcpmsgstr(type), addr2str((struct sockaddr *)&dst));
+		dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
 
 	return 0;
 }
