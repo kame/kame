@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.44 2004/01/21 00:00:36 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.45 2004/01/24 09:13:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3240,7 +3240,14 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                 mbu->mbu_refresh = mbu->mbu_expire;
 
 	if (ip6ma->ip6mhba_status == IP6_MH_BAS_PRFX_DISCOV) {
-		/* XXX; Need prefix discovery */
+		if (mip6_icmp6_mp_sol_output(&mbu->mbu_haddr,
+			&mbu->mbu_paddr)) {
+			mip6log((LOG_ERR,
+			    "mip6_ip6ma_input:%d: sending a mpbile "
+			    "solicitation message failed\n",
+			    __LINE__));
+			/* proceed anyway... */
+		}
 	}
 
 	if (mbu->mbu_flags & IP6MU_HOME) {
