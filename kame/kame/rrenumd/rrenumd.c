@@ -488,7 +488,7 @@ rrenum_input(int s)
 		/* TODO: receiving result message */
 		break;
 	default:
-		syslog(LOG_ERR,	"<%s> received unknown code %d"
+		syslog(LOG_ERR,	"<%s> received unknown code %d",
 		       __FUNCTION__, rr->rr_code);
 		break;
 	}
