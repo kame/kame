@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.91 2001/01/23 07:55:51 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.92 2001/01/23 17:43:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -463,10 +463,15 @@ nd6_timer(ignored_arg)
 	s = splnet();
 #endif
 #ifdef MIP6
-	if (MIP6_EAGER_PREFIX)
+	if (MIP6_EAGER_PREFIX) {
+#ifdef __NetBSD__
+		callout_reset(&nd6_timer_ch, nd6_prune * hz / MIP6_EAGER_FREQ,
+		    nd6_timer, NULL);
+#else
 		timeout(nd6_timer, (caddr_t)0, 
 			nd6_prune * hz / MIP6_EAGER_FREQ);
-	else
+#endif
+	} else
 #endif
 #ifdef __NetBSD__
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,

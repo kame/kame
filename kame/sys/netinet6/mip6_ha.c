@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.11 2000/06/04 03:31:27 itojun Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.12 2001/01/23 17:43:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -77,6 +77,8 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 /* Declaration of Global variables. */
 struct callout_handle  mip6_timer_ll_handle;
+#elif defined(__NetBSD__)
+struct callout mip6_timer_ll_ch;
 #endif
 
 
@@ -123,7 +125,9 @@ mip6_ha_exit()
 	int                    s;
 
 	/* Cancel outstanding timeout function calls. */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __NetBSD__
+	callout_stop(&mip6_timer_ll_ch);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	untimeout(mip6_timer_ll, (void *)NULL, mip6_timer_ll_handle);
 #else
 	untimeout(mip6_timer_ll, (void *)NULL);
@@ -796,10 +800,14 @@ struct ifnet *ifp;
     splx(s);
 
     if (start_timer) {
+#ifdef __NetBSD__
+	callout_reset(&mip6_timer_ll_ch, hz, mip6_timer_ll, NULL);
+#else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
         mip6_timer_ll_handle =
 #endif
         timeout(mip6_timer_ll, (void *)0, hz);
+#endif
     }
     return llp;
 }
@@ -847,7 +855,9 @@ struct mip6_link_list  *llp_del;    /* Link list entry to be deleted */
 
             /* Remove the timer if the BC queue is empty */
             if (mip6_llq == NULL) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __NetBSD__
+		callout_stop(&mip6_timer_ll_ch);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
                 untimeout(mip6_timer_ll, (void *)NULL, mip6_timer_ll_handle);
                 callout_handle_init(&mip6_timer_ll_handle);
 #else
@@ -1093,10 +1103,14 @@ void  *arg;  /* Not used */
     splx(s);
 
     if (mip6_llq != NULL) {
+#ifdef __NetBSD__
+	callout_reset(&mip6_timer_ll_ch, hz, mip6_timer_ll, NULL);
+#else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
         mip6_timer_ll_handle =
 #endif
-        timeout(mip6_timer_ll, (void *)0, hz);
+	    timeout(mip6_timer_ll, (void *)0, hz);
+#endif
     }
 }
 
