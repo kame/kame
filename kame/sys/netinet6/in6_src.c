@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.71 2001/09/20 08:38:15 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.72 2001/09/21 11:31:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -545,7 +545,8 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 					RTFREE(ron->ro_rt);
 					ron->ro_rt = NULL;
 				}
-				return(EHOSTUNREACH);
+				error = EHOSTUNREACH;
+				goto done;
 			}
 		}
 		rt = ron->ro_rt;
@@ -644,15 +645,13 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 			if (!(ifp->if_flags & IFF_LOOPBACK) &&
 			    ifp->if_index !=
 			    opts->ip6po_pktinfo->ipi6_ifindex) {
-				return(EHOSTUNREACH);
+				error = EHOSTUNREACH;
+				goto done;
 			}
 		}
 	}
 
   done:
-	if (ifp == NULL) {
-		return(error);
-	}
 	if (retifp != NULL)
 		*retifp = ifp;
 	if (retrt != NULL)
