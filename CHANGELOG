@@ -1,12 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.248 1999/11/03 21:08:25 itojun Exp $
+$Id: CHANGELOG,v 1.249 1999/11/04 00:03:44 itojun Exp $
 
 <199911>
 Thu Nov  4 05:52:12 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ucd-snmp:
 	  use latest IPv6 patch.
 	* openbsd/ports/net/zebra: upgrade to 0.81.
+	* openbsd/ports/net/ucd-snmp: add ucd-snmp (4.0.1 + IPv6 patch).
 
 Wed Nov  3 22:11:16 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
