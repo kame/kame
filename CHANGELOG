@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.570 2000/02/17 07:54:03 sumikawa Exp $
+$Id: CHANGELOG,v 1.571 2000/02/17 13:37:17 sakane Exp $
 
 <200002>
+Thu Feb 17 22:30:13 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- support RSA signature authentication method on main/aggressive/base
+	  mode.  There is a tips in racoon/doc/README.certificate.
+	  Local test is done.  But between isakmp-test.ssh.fi and racoon,
+	  to verify signature is failed.
+	  TODO: to be check issuer of signature.
+
 Thu Feb 17 16:52:56 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* {freebsd[23]/ports, netbsd/pkgsrc/net}/rsync: upgrade to 2.4.1.
 
