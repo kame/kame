@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.69 1999/08/25 20:14:17 sumikawa Exp $
+$Id: CHANGELOG,v 1.70 1999/08/26 09:03:34 sumikawa Exp $
 
 <199908>
+Thu Aug 26 18:01:27 JST 1999  sumikawa@ebina.hitachi.co.jp
+	* kame/sys/netinet6/frag6.c (frag6_init): changed ip6_id setting
+	algorhytm. it is borrowed from ip6_init(). ip6_id(initialized
+	fragmentation value) was always 0 on FreeBSD/NetBSD(was 3 on BSDI)
+	since it seemes tv/time_second is not set when calling
+	frag6_init().
+
 Thu Aug 26 05:07:49 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* kame/tcpdump: print the idetification of fragment headers when
 	using -v flag
