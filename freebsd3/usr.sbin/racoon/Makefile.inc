@@ -27,7 +27,6 @@ CFLAGS+=-I/usr/local/include
 .elif exists(/usr/local/ssl/include/openssl)
 CFLAGS+=-I/usr/local/ssl/include
 .endif
-.endif
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
