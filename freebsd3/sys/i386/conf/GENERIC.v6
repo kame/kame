@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.27 2000/03/01 10:51:37 nik Exp $
-# $KAME: GENERIC.v6,v 1.24 2000/09/06 07:31:53 sakane Exp $
+# $KAME: GENERIC.v6,v 1.25 2000/09/11 11:23:01 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -47,7 +47,7 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 # these options will become the default behavior soon.
-options 	NEW_STRUCT_ROUTE
+#options 	NEW_STRUCT_ROUTE
 #options 	USE_FIXED_P2P_PLEN
 
 # IPv6 firewall
