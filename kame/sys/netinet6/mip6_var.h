@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.79 2003/01/21 05:45:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.80 2003/01/23 08:02:34 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -259,7 +259,7 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_TUNNEL_DELETE 2
 
 /* Macro for modulo 2^^16 comparison */
-#define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
+#define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)-1) < 0)
 
 struct mip6_config {
 	u_int8_t mcfg_type;
