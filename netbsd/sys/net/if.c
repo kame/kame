@@ -250,7 +250,7 @@ if_nulldrain(ifp)
 	/* Nothing. */
 }
 
-int if_index = 1;
+static int if_index = 1;
 struct ifnet_head ifnet;
 struct ifaddr **ifnet_addrs = NULL;
 size_t if_indexlim = 0;

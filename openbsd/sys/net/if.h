@@ -530,7 +530,6 @@ extern struct ifnet_head ifnet;
 extern int if_indexlim;
 extern struct ifnet **ifindex2ifnet;
 extern struct ifnet *lo0ifp;
-extern int if_index;
 
 void	ether_ifattach(struct ifnet *);
 void	ether_ifdetach(struct ifnet *);

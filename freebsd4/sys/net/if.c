@@ -135,7 +135,7 @@ ifinit(dummy)
 	if_slowtimo(0);
 }
 
-int if_index = 0;
+static int if_index = 0;
 struct ifaddr **ifnet_addrs;
 int if_indexlim = 8;
 struct ifnet **ifindex2ifnet = NULL;

@@ -98,7 +98,7 @@ static struct	if_clone *if_clone_lookup(const char *, int *);
 static int	if_clone_list(struct if_clonereq *);
 static int	ifhwioctl(u_long, struct ifnet *, caddr_t, struct thread *);
 
-int	if_index = 0;
+static int	if_index = 0;
 struct	ifindex_entry *ifindex_table = NULL;
 int	ifqmaxlen = IFQ_MAXLEN;
 struct	ifnethead ifnet;	/* depend on static init XXX */

@@ -731,7 +731,6 @@ extern struct ifnet **ifindex2ifnet;
 #if 0
 struct ifnet loif[];
 #endif
-extern int if_index;
 
 char	*ether_sprintf __P((const u_char *));
 
