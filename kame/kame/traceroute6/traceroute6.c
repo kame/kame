@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.46 2002/05/21 23:05:35 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.47 2002/05/26 00:57:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -340,7 +340,7 @@ char *hostname;
 int nprobes = 3;
 int first_hop = 1;
 int max_hops = 30;
-u_short ident;
+u_short srcport;
 u_short port = 32768+666;	/* start udp dest port # for probe packets */
 int options;			/* socket options */
 int verbose;
@@ -776,18 +776,13 @@ main(argc, argv)
 		close(dummy);
 	}
 
-#if 1
-	ident = (getpid() & 0xffff) | 0x8000;
-#else
-	ident = 0;	/*let the kernel pick one*/
-#endif
-	Src.sin6_port = htons(ident);
+	Src.sin6_port = htons(0);
 	if (bind(sndsock, (struct sockaddr *)&Src, Src.sin6_len) < 0) {
 		perror("bind");
 		exit(1);
 	}
 
-	if (ident == 0) {
+	{
 		int len;
 
 		len = sizeof(Src);
@@ -795,7 +790,7 @@ main(argc, argv)
 			perror("getsockname");
 			exit(1);
 		}
-		ident = ntohs(Src.sin6_port);
+		srcport = ntohs(Src.sin6_port);
 	}
 
 	/*
@@ -1140,8 +1135,8 @@ packet_ok(mhdr, cc, seq)
 
 	type = icp->icmp6_type;
 	code = icp->icmp6_code;
-	if ((type == ICMP6_TIME_EXCEEDED && code == ICMP6_TIME_EXCEED_TRANSIT)
-	 || type == ICMP6_DST_UNREACH) {
+	if ((type == ICMP6_TIME_EXCEEDED && code == ICMP6_TIME_EXCEED_TRANSIT) ||
+	    type == ICMP6_DST_UNREACH) {
 		struct ip6_hdr *hip;
 		struct udphdr *up;
 
@@ -1151,8 +1146,8 @@ packet_ok(mhdr, cc, seq)
 				warnx("failed to get upper layer header");
 			return(0);
 		}
-		if (up->uh_sport == htons(ident) &&
-		    up->uh_dport == htons(port+seq))
+		if (up->uh_sport == htons(srcport) &&
+		    up->uh_dport == htons(port + seq))
 			return (type == ICMP6_TIME_EXCEEDED ? -1 : code + 1);
 	}
 	if (verbose) {
