@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.195 2004/09/20 22:50:13 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.196 2004/11/27 10:47:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -44,7 +44,7 @@
  *   invalid.  current code - SEGV on freeaddrinfo(NULL)
  *
  * Note:
- * - The code filters out AFs that are not supported by the kernel,
+ * - The code filters out AFs for which IP addresses are not configured,
  *   when globbing NULL hostname (to loopback, or wildcard).  Is it the right
  *   thing to do?  What is the relationship with RFC3493 AI_ADDRCONFIG
  *   in ai_flags?
@@ -54,9 +54,20 @@
  *   RFC3493, the node has an IPv6 address configured means it has a non
  *   loopback address.  But is it enough?  What if the node only has link-local
  *   addresses?  Meanwhile, the default address selection defined in RFC3484
- *   may help the situation where AI_ADDRCONFIG is desired.  Given those,
- *   our current implementation simply checks if the corresponding AF is
- *   supported in the kernel.
+ *   may help some cases where AI_ADDRCONFIG is desired.  Unfortunately, it's
+ *   still not enough; DNS queries for AAAA themselves can cause troubles
+ *   (see draft-ietf-dnsop-misbehavior-against-aaaa).
+ *   Considering various tradeoffs, our current implementation works as
+ *   follows when AF_UNSPEC is specified:
+ *   + AI_ADDRCONFIG will work as described in RFC3493, while we suspect it is
+ *     not really helpful since we typically configure link-local addresses
+ *     as well when the kernel enables IPv6.
+ *   + if AI_ADDRCONFIG is not set, we issue AAAA DNS queries only when
+ *     the node configures itself with addresses other than the loopback and
+ *     link-local addresses.  Note that this behavior does not necessarily
+ *     break RFC3493.  It just says "a value of AF_UNSPEC for ai_family means
+ *     that the caller shall accept any address family."  That is, it does
+ *     mean the caller wants as many address families as available. 
  *
  * OS specific notes for bsdi3/freebsd2:
  * - We use getipnodebyname() just for thread-safeness.  There's no intent
@@ -111,6 +122,7 @@
 #include <arpa/nameser.h>
 #include <netdb.h>
 #include <resolv.h>
+#include <ifaddrs.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -206,6 +218,34 @@ static const struct explore explore[] = {
 	{ -1, 0, 0, NULL, 0 },
 };
 
+struct addrconfig {
+	/*
+	 * Binary flags identifying whether the corresponding address family
+	 * is available on the system; for AF_INET, this is true iff the node
+	 * has an IPv4 address; for AF_INET6, the flag value is determined by
+	 * arguments to getaddrinfo and address configuration.  If
+	 * AI_ADDRCONFIG is specified, this is true iff the node has non
+	 * loopback address.  Otherwise, this is true iff the node has
+	 * IPv6 addresses other than the loopback and link-local addresses.
+	 *
+	 * Notes:
+	 * - we may eventually want to extend the internal information for
+	 *   other address family, and want to have a more generic data
+	 *   structure to hold the information.  Thus, we should prepare and
+	 *   use a separate interface through a function call to these internal
+	 *   variables.
+	 * - we may also want to add a knob for /etc/resolv.conf so that the
+	 *   user can specify the preference on the required level for the
+	 *   determination.  For example, we may want to allow the user to
+	 *   explore IPv6 addresses even if the node only has link-local
+	 *   addresses. 
+	 */
+	int inet_config;	/* flag for AF_INET */
+	int inet6_config;	/* flag for AF_INET6 */
+
+	struct ifaddrs *addrs;	/* list of interface addresses */
+};
+
 #ifdef INET6
 #define PTON_MAX	16
 #else
@@ -266,7 +306,7 @@ static struct addrinfo *copy_ai __P((const struct addrinfo *));
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
-static int addrconfig __P((int));
+static int addrconfig __P((int, struct addrconfig *));
 static void set_source __P((struct ai_order *, struct policyhead *));
 static int comp_dst __P((const void *, const void *));
 #ifdef INET6
@@ -276,8 +316,9 @@ static int gai_addr2scopetype __P((struct sockaddr *));
 
 /* functions in OS dependent portion */
 static int explore_fqdn __P((const struct addrinfo *, const char *,
-	const char *, struct addrinfo **));
+	const char *, struct addrinfo **, struct addrconfig *));
 
+static int init __P((struct addrconfig *, int));
 static int reorder __P((struct addrinfo *));
 static void get_addrselectpolicy __P((struct policyhead *));
 static void free_addrselectpolicy __P((struct policyhead *));
@@ -424,11 +465,14 @@ getaddrinfo(hostname, servname, hints, res)
 	const struct explore *ex;
 	struct addrinfo *afailist[sizeof(afdl)/sizeof(afdl[0])];
 	struct addrinfo *afai_unspec;
+	struct addrconfig ac;
 	int found;
 	int numeric = 0;
 
 	/* ensure we return NULL on errors */
 	*res = NULL;
+
+	memset(&ai, 0, sizeof(ai));
 
 	memset(afailist, 0, sizeof(afailist));
 	afai_unspec = NULL;
@@ -492,6 +536,9 @@ getaddrinfo(hostname, servname, hints, res)
 		}
 	}
 
+	if ((error = init(&ac, pai->ai_flags)) != 0)
+		goto bad;
+
 	/*
 	 * check for special cases.  (1) numeric servname is disallowed if
 	 * socktype/protocol are left unspecified. (2) servname is disallowed
@@ -540,7 +587,7 @@ getaddrinfo(hostname, servname, hints, res)
 			 * filter out AFs that are not supported by the kernel
 			 * XXX errno?
 			 */
-			if (!addrconfig(pai->ai_family))
+			if (!addrconfig(pai->ai_family, &ac))
 				continue;
 			error = explore_null(pai, servname,
 			    &afailist[afd - afdl]);
@@ -579,7 +626,7 @@ getaddrinfo(hostname, servname, hints, res)
 	 * hostname as alphabetical name.
 	 */
 	*pai = ai0;
-	error = explore_fqdn(pai, hostname, servname, &afai_unspec);
+	error = explore_fqdn(pai, hostname, servname, &afai_unspec, &ac);
 
 globcopy:
 	for (ex = explore; ex->e_af >= 0; ex++) {
@@ -600,7 +647,7 @@ globcopy:
 		 * expected to return the address family or not.
 		 */
 		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
-		    !addrconfig(afd->a_af))
+		    !addrconfig(ex->e_af, &ac))
 			continue;
 
 		if ((pai->ai_flags & AI_PASSIVE) != 0 && WILD_PASSIVE(ex))
@@ -653,7 +700,7 @@ globcopy:
 			 * If the returned entry is for an active connection,
 			 * and the given name is not numeric, reorder the
 			 * list, so that the application would try the list
-			 * in the most efficient order. 
+			 * in the most efficient order.
 			 */
 			if (hints == NULL || !(hints->ai_flags & AI_PASSIVE)) {
 				if (!numeric)
@@ -674,7 +721,81 @@ bad:
 	if (!*res)
 		if (sentinel.ai_next)
 			freeaddrinfo(sentinel.ai_next);
-	return error;
+	if (ac.addrs != NULL)
+		freeifaddrs(ac.addrs);
+
+	return (error);
+}
+
+static int
+init(ac, flags)
+	struct addrconfig *ac;
+	int flags;
+{
+	int error;
+	int s;
+	struct ifaddrs *ifap0, *ifap;
+	struct sockaddr_in6 *sa6;
+	struct in6_ifreq ifr6;
+	u_int32_t flags6;
+
+	/*
+	 * XXX: getifaddrs(3) can be expensive for a node that has many
+	 * addresses.  We may want to delay this call until we are very sure
+	 * that we need it.
+	 */
+	if (getifaddrs(&ifap0) != 0)
+		return (EAI_SYSTEM);
+
+	for (ifap = ifap0; ifap != NULL; ifap = ifap->ifa_next) {
+		if (ac->inet_config != 0 && ac->inet6_config != 0) {
+			/* short-cut: we're already done */
+			break;
+		}
+		switch (ifap->ifa_addr->sa_family) {
+		case AF_INET:
+			ac->inet_config = 1;
+			continue;
+
+		case AF_INET6:
+			if (ac->inet6_config == 1)
+				continue; /* don't need further checks  */
+
+			sa6 = (struct sockaddr_in6 *)ifap->ifa_addr;
+
+			/* reject certain types of addresses */
+			s = socket(sa6->sin6_family, SOCK_DGRAM, 0);
+			if (s >= 0) {
+				strncpy(ifr6.ifr_name, ifap->ifa_name,
+				    sizeof(ifr6.ifr_name));
+				memcpy(&ifr6.ifr_addr, ifap->ifa_addr,
+				    ifap->ifa_addr->sa_len);
+				if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
+					flags6 = ifr6.ifr_ifru.ifru_flags6;
+					if ((flags6 & (IN6_IFF_NOTREADY|
+					    IN6_IFF_DETACHED|IN6_IFF_ANYCAST))
+					    != 0) {
+						close(s);
+						break;
+					}
+					close(s);
+				}
+			} else
+				break;
+
+			if ((flags & AI_ADDRCONFIG) &&
+			    !IN6_IS_ADDR_LOOPBACK(&sa6->sin6_addr)) {
+				ac->inet6_config = 1;
+			} else if (!IN6_IS_ADDR_LOOPBACK(&sa6->sin6_addr) &&
+			    !IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+				ac->inet6_config = 1;
+			}
+		}
+	}
+
+	ac->addrs = ifap0;
+
+	return (0);
 }
 
 static int
@@ -901,8 +1022,8 @@ set_source(aio, ph)
 		u_int32_t flags6;
 
 		/* XXX: interface name should not be hardcoded */
-		strncpy(ifr6.ifr_name, "lo0", sizeof(ifr6.ifr_name));
 		memset(&ifr6, 0, sizeof(ifr6));
+		strncpy(ifr6.ifr_name, "lo0", sizeof(ifr6.ifr_name));
 		memcpy(&ifr6.ifr_addr, ai.ai_addr, ai.ai_addrlen);
 		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
 			flags6 = ifr6.ifr_ifru.ifru_flags6;
@@ -1533,24 +1654,23 @@ find_afd(af)
 	return NULL;
 }
 
-/*
- * The semantics of AI_ADDRCONFIG is not defined well.  Right now, we simply 
- * check if the kernel supports the given address family.
- */
 static int
-addrconfig(af)
+addrconfig(af, ac)
 	int af;
+	struct addrconfig *ac;
 {
 	int s;
 
-	/* XXX errno */
-	s = socket(af, SOCK_DGRAM, 0);
-	if (s < 0) {
-		if (errno != EMFILE)
-			return 0;
-	} else
-		close(s);
-	return 1;
+	switch (af) {
+	case AF_INET:
+		return (ac->inet_config);
+	case AF_INET6:
+		return (ac->inet6_config);
+	default:
+		break;
+	}
+
+	return (0);		/* XXX: unexpected case */
 }
 
 #ifdef INET6
@@ -1645,11 +1765,12 @@ static int res_querydomainN __P((const char *, const char *,
  * FQDN hostname, DNS lookup
  */
 static int
-explore_fqdn(pai, hostname, servname, res)
+explore_fqdn(pai, hostname, servname, res, ac)
 	const struct addrinfo *pai;
 	const char *hostname;
 	const char *servname;
 	struct addrinfo **res;
+	struct addrconfig *ac;
 {
 	struct addrinfo *result;
 	struct addrinfo *cur;
@@ -1670,7 +1791,7 @@ explore_fqdn(pai, hostname, servname, res)
 		return 0;
 
 	switch (nsdispatch(&result, dtab, NSDB_HOSTS, "getaddrinfo",
-			default_dns_files, hostname, pai)) {
+			default_dns_files, hostname, pai, ac)) {
 	case NS_TRYAGAIN:
 		error = EAI_AGAIN;
 		goto free;
@@ -1919,14 +2040,16 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	va_list	 ap;
 {
 	struct addrinfo *ai;
-	querybuf *buf, *buf2, *bp;
+	querybuf *buf, *buf2, *bp, *buf_current;
 	const char *name;
 	const struct addrinfo *pai;
 	struct addrinfo sentinel, *cur;
-	struct res_target q, q2, *p;
+	struct res_target q, q2, *p, *qp;
+	struct addrconfig *ac;
 
 	name = va_arg(ap, char *);
 	pai = va_arg(ap, const struct addrinfo *);
+	ac = va_arg(ap, struct addrconfig *);
 
 	memset(&q, 0, sizeof(q));
 	memset(&q2, 0, sizeof(q2));
@@ -1947,18 +2070,28 @@ _dns_getaddrinfo(rv, cb_data, ap)
 
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
-		/* prefer IPv6 */
-		q.name = name;
-		q.qclass = C_IN;
-		q.qtype = T_AAAA;
-		q.answer = buf->buf;
-		q.anslen = sizeof(buf->buf);
-		q.next = &q2;
-		q2.name = name;
-		q2.qclass = C_IN;
-		q2.qtype = T_A;
-		q2.answer = buf2->buf;
-		q2.anslen = sizeof(buf2->buf);
+		qp = &q;
+		buf_current = buf;
+
+		if (addrconfig(AF_INET6, ac)) {
+			/* prefer IPv6 when available */
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_AAAA;
+			qp->answer = buf->buf;
+			qp->anslen = sizeof(buf_current->buf);
+			qp->next = &q2;
+
+			buf_current = buf2;
+			qp = &q2;
+		}
+		if (addrconfig(AF_INET, ac)) {
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_A;
+			qp->answer = buf_current->buf;
+			qp->anslen = sizeof(buf_current->buf);
+		}
 		break;
 	case AF_INET:
 		q.name = name;
@@ -2636,12 +2769,12 @@ static void _sethtent __P((void));
 static void _endhtent __P((void));
 static struct addrinfo * _gethtent __P((const char *, const struct addrinfo *));
 static struct addrinfo *_files_getaddrinfo __P((const char *,
-	const struct addrinfo *));
+	const struct addrinfo *, struct addrconfig *));
 
 #ifdef YP
 static struct addrinfo *_yphostent __P((char *, const struct addrinfo *));
 static struct addrinfo *_yp_getaddrinfo __P((const char *,
-	const struct addrinfo *));
+	const struct addrinfo *, struct addrconfig *));
 #endif
 
 static struct addrinfo *getanswer __P((const querybuf *, int, const char *,
@@ -2652,7 +2785,7 @@ static int res_searchN __P((const char *, struct res_target *));
 static int res_querydomainN __P((const char *, const char *,
 	struct res_target *));
 static struct addrinfo *_dns_getaddrinfo __P((const char *,
-	const struct addrinfo *));
+	const struct addrinfo *, struct addrconfig *));
 
 _THREAD_PRIVATE_MUTEX(getaddrinfo_explore_fqdn);
 
@@ -2660,11 +2793,12 @@ _THREAD_PRIVATE_MUTEX(getaddrinfo_explore_fqdn);
  * FQDN hostname, DNS lookup
  */
 static int
-explore_fqdn(pai, hostname, servname, res)
+explore_fqdn(pai, hostname, servname, res, ac)
 	const struct addrinfo *pai;
 	const char *hostname;
 	const char *servname;
 	struct addrinfo **res;
+	struct addrconfig *ac;
 {
 	struct addrinfo *result;
 	struct addrinfo *cur;
@@ -2696,14 +2830,14 @@ explore_fqdn(pai, hostname, servname, res)
 		switch (lookups[i]) {
 #ifdef YP
 		case 'y':
-			result = _yp_getaddrinfo(hostname, pai);
+			result = _yp_getaddrinfo(hostname, pai, ac);
 			break;
 #endif
 		case 'b':
-			result = _dns_getaddrinfo(hostname, pai);
+			result = _dns_getaddrinfo(hostname, pai, ac);
 			break;
 		case 'f':
-			result = _files_getaddrinfo(hostname, pai);
+			result = _files_getaddrinfo(hostname, pai, ac);
 			break;
 		}
 	}
@@ -2952,14 +3086,15 @@ getanswer(answer, anslen, qname, qtype, pai)
 
 /*ARGSUSED*/
 static struct addrinfo *
-_dns_getaddrinfo(name, pai)
+_dns_getaddrinfo(name, pai, ac)
 	const char *name;
 	const struct addrinfo *pai;
+	struct addrconfig *ac;
 {
 	struct addrinfo *ai;
-	querybuf *buf, *buf2;
+	querybuf *buf, *buf2, *buf_current;
 	struct addrinfo sentinel, *cur;
-	struct res_target q, q2;
+	struct res_target q, q2, *qp;
 
 	memset(&q, 0, sizeof(q));
 	memset(&q2, 0, sizeof(q2));
@@ -2980,18 +3115,28 @@ _dns_getaddrinfo(name, pai)
 
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
-		/* prefer IPv6 */
-		q.name = name;
-		q.qclass = C_IN;
-		q.qtype = T_AAAA;
-		q.answer = buf->buf;
-		q.anslen = sizeof(buf->buf);
-		q.next = &q2;
-		q2.name = name;
-		q2.qclass = C_IN;
-		q2.qtype = T_A;
-		q2.answer = buf2->buf;
-		q2.anslen = sizeof(buf2->buf);
+		qp = &q;
+		buf_current = buf;
+
+		if (addrconfig(AF_INET6, ac)) {
+			/* prefer IPv6 when available */
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_AAAA;
+			qp->answer = buf->buf;
+			qp->anslen = sizeof(buf_current->buf);
+			qp->next = &q2;
+
+			buf_current = buf2;
+			qp = &q2;
+		}
+		if (addrconfig(AF_INET, ac)) {
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_A;
+			qp->answer = buf_current->buf;
+			qp->anslen = sizeof(buf_current->buf);
+		}
 		break;
 	case AF_INET:
 		q.name = name;
@@ -3132,12 +3277,19 @@ found:
 
 /*ARGSUSED*/
 static struct addrinfo *
-_files_getaddrinfo(name, pai)
+_files_getaddrinfo(name, pai, ac)
 	const char *name;
 	const struct addrinfo *pai;
+	struct addrconfig *ac;
 {
 	struct addrinfo sentinel, *cur;
 	struct addrinfo *p;
+
+	/*
+	 * We don't use the information stored in addrconfig since the lookup
+	 * cost is very cheap.  Results will be filtered using the information
+	 * later.
+	 */
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -3250,9 +3402,10 @@ done:
 
 /*ARGSUSED*/
 static struct addrinfo *
-_yp_getaddrinfo(name, pai)
+_yp_getaddrinfo(name, pai, ac)
 	const char *name;
 	const struct addrinfo *pai;
+	struct addrconfig *ac;	/* XXX: unused */
 {
 	struct addrinfo sentinel, *cur;
 	struct addrinfo *ai = NULL;
@@ -3621,14 +3774,14 @@ static struct addrinfo *getanswer __P((const querybuf *, int, const char *,
 	int, const struct addrinfo *));
 
 static int _dns_getaddrinfo __P((const struct addrinfo *, const char *,
-	struct addrinfo **));
+	struct addrinfo **, struct addrconfig *));
 static struct addrinfo *_gethtent __P((FILE *fp, const char *,
 	const struct addrinfo *));
 static int _files_getaddrinfo __P((const struct addrinfo *, const char *,
-	struct addrinfo **));
+	struct addrinfo **, struct addrconfig *));
 #ifdef YP
 static int _nis_getaddrinfo __P((const struct addrinfo *, const char *,
-	 struct addrinfo **));
+	 struct addrinfo **, struct addrconfig *));
 #endif
 
 static int res_queryN __P((const char *, struct res_target *));
@@ -3647,7 +3800,7 @@ static int res_querydomainN __P((const char *, const char *,
 
 struct _hostconf {
 	int (*byname)(const struct addrinfo *, const char *,
-		      struct addrinfo **);
+		      struct addrinfo **, struct addrconfig *);
 };
 
 /* default order */
@@ -3666,11 +3819,12 @@ static void	_hostconf_init(void);
  * FQDN hostname, DNS lookup
  */
 static int
-explore_fqdn(pai, hostname, servname, res)
+explore_fqdn(pai, hostname, servname, res, ac)
 	const struct addrinfo *pai;
 	const char *hostname;
 	const char *servname;
 	struct addrinfo **res;
+	struct addrconfig *ac;
 {
 	struct addrinfo *result;
 	struct addrinfo *cur;
@@ -3691,7 +3845,7 @@ explore_fqdn(pai, hostname, servname, res)
 	for (i = 0; i < MAXHOSTCONF; i++) {
 		if (!_hostconf[i].byname)
 			continue;
-		error = (*_hostconf[i].byname)(pai, hostname, &result);
+		error = (*_hostconf[i].byname)(pai, hostname, &result, ac);
 		if (error != 0)
 			continue;
 		for (cur = result; cur; cur = cur->ai_next) {
@@ -3988,15 +4142,16 @@ getanswer(answer, anslen, qname, qtype, pai)
 
 /*ARGSUSED*/
 static int
-_dns_getaddrinfo(pai, hostname, res)
+_dns_getaddrinfo(pai, hostname, res, ac)
 	const struct addrinfo *pai;
 	const char *hostname;
 	struct addrinfo **res;
+	struct addrconfig *ac;
 {
 	struct addrinfo *ai;
-	querybuf *buf, *buf2;
+	querybuf *buf, *buf2, *buf_current;
 	struct addrinfo sentinel, *cur;
-	struct res_target q, q2;
+	struct res_target q, q2, *qp;
 
 	memset(&q, 0, sizeof(q));
 	memset(&q2, 0, sizeof(q2));
@@ -4017,18 +4172,28 @@ _dns_getaddrinfo(pai, hostname, res)
 
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
-		/* prefer IPv6 */
-		q.name = hostname;
-		q.qclass = C_IN;
-		q.qtype = T_AAAA;
-		q.answer = buf->buf;
-		q.anslen = sizeof(buf->buf);
-		q.next = &q2;
-		q2.name = hostname;
-		q2.qclass = C_IN;
-		q2.qtype = T_A;
-		q2.answer = buf2->buf;
-		q2.anslen = sizeof(buf2->buf);
+		qp = &q;
+		buf_current = buf;
+
+		if (addrconfig(AF_INET6, ac)) {
+			/* prefer IPv6 when available */
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_AAAA;
+			qp->answer = buf->buf;
+			qp->anslen = sizeof(buf_current->buf);
+			qp->next = &q2;
+
+			buf_current = buf2;
+			qp = &q2;
+		}
+		if (addrconfig(AF_INET, ac)) {
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_A;
+			qp->answer = buf_current->buf;
+			qp->anslen = sizeof(buf_current->buf);
+		}
 		break;
 	case AF_INET:
 		q.name = hostname;
@@ -4158,14 +4323,21 @@ found:
 
 /*ARGSUSED*/
 static int
-_files_getaddrinfo(pai, hostname, res)
+_files_getaddrinfo(pai, hostname, res, ac)
 	const struct addrinfo *pai;
 	const char *hostname;
 	struct addrinfo **res;
+	struct addrconfig *ac;
 {
 	FILE *hostf;
 	struct addrinfo sentinel, *cur;
 	struct addrinfo *p;
+
+	/*
+	 * We don't use the information stored in addrconfig since the lookup
+	 * cost is very cheap.  Results will be filtered using the information
+	 * later.
+	 */
 
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
@@ -4189,10 +4361,11 @@ _files_getaddrinfo(pai, hostname, res)
 #ifdef YP
 /*ARGSUSED*/
 static int
-_nis_getaddrinfo(pai, hostname, res)
+_nis_getaddrinfo(pai, hostname, res, ac)
 	const struct addrinfo *pai;
 	const char *hostname;
 	struct addrinfo **res;
+	struct addrconfig *ac;	/* XXX: unused */
 {
 	struct hostent *hp;
 	int h_error;
