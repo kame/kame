@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.37 2000/01/14 00:46:11 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.38 2000/01/14 02:04:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1613,7 +1613,7 @@ ipsecdoi_set_ld(type, buf)
 
 	switch (buf->l) {
 	case 2:
-		ld = ntohs(*(u_int16_t *)buf->v);
+		ld = *(u_int16_t *)buf->v;
 		break;
 	case 4:
 		ld = ntohl(*(u_int32_t *)buf->v);
