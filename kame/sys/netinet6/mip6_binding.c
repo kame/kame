@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.112 2002/07/29 11:22:24 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.113 2002/07/30 10:50:15 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -266,6 +266,9 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	} else {
 		mbu->mbu_lifetime = mpfx->mpfx_pltime;
 	}
+	if (mip6_config.mcfg_bu_maxlifetime > 0 &&
+	    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
+		mbu->mbu_lifetime = mip6_config.mcfg_bu_maxlifetime;
 	mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 	/* sanity check for overflow */
 	if (mbu->mbu_expire < time_second)
@@ -2611,6 +2614,7 @@ mip6_route_optimize(m)
 	struct mbuf *m;
 {
 	struct mbuf *n;
+	struct in6_ifaddr *ia;
 	struct ip6aux *ip6a;
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *sin6src, *sin6dst;
@@ -2637,6 +2641,12 @@ mip6_route_optimize(m)
 	    IN6_IS_ADDR_SITELOCAL(&sin6dst->sin6_addr) ||	/* XXX */
 	    IN6_IS_ADDR_MULTICAST(&sin6dst->sin6_addr)) {
 		return (0);
+	}
+
+	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr, &sin6src->sin6_addr)) {
+			return (0);
+		}
 	}
 
 	n = ip6_findaux(m);

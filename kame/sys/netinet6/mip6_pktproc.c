@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.35 2002/07/29 13:58:19 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.36 2002/07/30 10:50:15 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -192,7 +192,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_pproto = IPPROTO_NONE;
 	ip6mh->ip6mh_len = ip6mh_size >> 3;
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
-	ip6mh->ip6mh_nonce_index = htonl(nonce_index);
+	ip6mh->ip6mh_nonce_index = htons(nonce_index);
 	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
 	mip6_create_cookie(&dst->sin6_addr,
 			   &home_nodekey, &home_nonce, &ip6mh->ip6mh_cookie);
@@ -299,7 +299,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_pproto = IPPROTO_NONE;
 	ip6mc->ip6mc_len = ip6mc_size >> 3;
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
-	ip6mc->ip6mc_nonce_index = htonl(nonce_index);
+	ip6mc->ip6mc_nonce_index = htons(nonce_index);
 	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
 	mip6_create_cookie(&dst->sin6_addr,
 			   &careof_nodekey, &careof_nonce,
@@ -1305,6 +1305,15 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+#ifdef RR_DBG
+	extern void ipsec_hexdump __P((caddr_t, int));
+#define mip6_hexdump(m,l,a)			\
+		do {				\
+			printf("%s", (m));	\
+			ipsec_hexdump((caddr_t)(a),(l)); \
+			printf("\n");		\
+		} while (0)
+#endif
 
 	*pktopt_mobility = NULL;
 
@@ -1363,7 +1372,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		nonce_size += PADLEN(bu_size + nonce_size, 4, 2);
 		auth_size = AUTH_SIZE;
 		auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
-#if RR_DBG
+#ifdef RR_DBG
 printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, AUTH_SIZE);
 #endif
 	} else {
@@ -1459,14 +1468,14 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
 		mopt_auth->ip6moau_len = AUTH_SIZE;
 
-#if RR_DBG
-printf("MN: Home Cookie: %*D\n", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie, ":");
-printf("MN: Care-of Cookie: %*D\n", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie, ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: Home Cookie: ", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie);
+mip6_hexdump("MN: Care-of Cookie: ", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie);
 #endif
 		/* Calculate K_bu */
 		mip6_calculate_kbu(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie, key_bu);
-#if RR_DBG
-printf("MN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: K_bu: ", sizeof(key_bu), key_bu);
 #endif
 
 		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)
@@ -1479,17 +1488,17 @@ printf("MN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
 		hmac_loop(&hmac_ctx, (u_int8_t *)&busrc_sa->sin6_addr,
 			  sizeof(busrc_sa->sin6_addr));
-#if RR_DBG
-printf("MN: Auth: %*D\n", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_addr, ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_addr);
 #endif
 		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr,
 			  sizeof(dst->sin6_addr));
-#if RR_DBG
-printf("MN: Auth: %*D\n", sizeof(dst->sin6_addr), &dst->sin6_addr, ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", sizeof(dst->sin6_addr), &dst->sin6_addr);
 #endif
 		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
-#if RR_DBG
-printf("MN: Auth: %*D\n", bu_size + nonce_size, ip6mu, ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", bu_size + nonce_size, ip6mu);
 #endif
 		/* Eliminate authdata mobility option to calculate authdata 
 		   But it should be included padding area */
@@ -1501,13 +1510,13 @@ printf("MN: Auth: %*D\n", bu_size + nonce_size, ip6mu, ":");
 			hmac_loop(&hmac_ctx,
 				  (u_int8_t *)ip6mu + bu_size + nonce_size
 				  + AUTH_SIZE, auth_size - AUTH_SIZE);
-#if RR_DBG
-printf("MN: Auth: %*D\n", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE, ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE);
 #endif
 		}
 		hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
-#if RR_DBG
-printf("MN: Authdata: %*D\n", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1), ":");
+#ifdef RR_DBG
+mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
 #endif
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.150 2002/07/29 11:22:24 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.151 2002/07/30 10:50:15 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2648,6 +2648,15 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	u_int16_t cksum_backup;
 	HMAC_CTX hmac_ctx;
 	int restlen;
+#ifdef RR_DBG
+	extern void ipsec_hexdump __P((caddr_t, int));
+#define mip6_hexdump(m,l,a)			\
+		do {				\
+			printf("%s", (m));	\
+			ipsec_hexdump((caddr_t)(a),(l)); \
+			printf("\n");		\
+		} while (0)
+#endif
 
 	/* Nonce index & Auth. data mobility options are required */
 	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0) {
@@ -2668,8 +2677,8 @@ printf("CN: Careof Nonce IDX: %d\n", mopt->mopt_co_nonce_idx);
 		return (EINVAL);
 	}
 #ifdef RR_DBG
-printf("CN: Home   Nonce: %*D\n", sizeof(home_nonce), &home_nonce, ":");
-printf("CN: Careof Nonce: %*D\n", sizeof(careof_nonce), &careof_nonce, ":");
+mip6_hexdump("CN: Home   Nonce: ", sizeof(home_nonce), &home_nonce);
+mip6_hexdump("CN: Careof Nonce: ", sizeof(careof_nonce), &careof_nonce);
 #endif
 
 	if ((mip6_get_nodekey(mopt->mopt_ho_nonce_idx, &home_nodekey) != 0) ||
@@ -2680,28 +2689,28 @@ printf("CN: Careof Nonce: %*D\n", sizeof(careof_nonce), &careof_nonce, ":");
 		return (EINVAL);
 	}
 #ifdef RR_DBG
-printf("CN: Home   Nodekey: %*D\n", sizeof(home_nodekey), &home_nodekey, ":");
-printf("CN: Careof Nodekey: %*D\n", sizeof(coa_nodekey), &coa_nodekey, ":");
+mip6_hexdump("CN: Home   Nodekey: ", sizeof(home_nodekey), &home_nodekey);
+mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 #endif
 
 	/* Calculate home cookie */
 	mip6_create_cookie(&ip6mu->ip6mu_addr,
 			   &home_nodekey, &home_nonce, &home_cookie);
 #ifdef RR_DBG
-printf("CN: Home Cookie: %*D\n", sizeof(home_cookie), (u_int8_t *)&home_cookie, ":");
+mip6_hexdump("CN: Home Cookie: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
 #endif
 
 	/* Calculate care-of cookie */
 	mip6_create_cookie(&ip6->ip6_src, 
 			   &coa_nodekey, &careof_nonce, &careof_cookie);
 #ifdef RR_DBG
-printf("CN: Care-of Cookie: %*D\n", sizeof(careof_cookie), (u_int8_t *)&careof_cookie, ":");
+mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_cookie);
 #endif
 
 	/* Calculate K_bu */
 	mip6_calculate_kbu(&home_cookie, &careof_cookie, key_bu);
 #ifdef RR_DBG
-printf("CN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
+mip6_hexdump("CN: K_bu: ", sizeof(key_bu), key_bu);
 #endif
 
 	cksum_backup = ip6mu->ip6mu_cksum;
@@ -2711,17 +2720,17 @@ printf("CN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_src,
 		  sizeof(ip6->ip6_src));
 #ifdef RR_DBG
-printf("CN: Auth: %*D\n", sizeof(ip6->ip6_src), &ip6->ip6_src, ":");
+mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_src), &ip6->ip6_src);
 #endif
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_dst,
 		  sizeof(ip6->ip6_dst));
 #ifdef RR_DBG
-printf("CN: Auth: %*D\n", sizeof(ip6->ip6_dst), &ip6->ip6_dst, ":");
+mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_dst), &ip6->ip6_dst);
 #endif
 	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu,
 		  (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu);
 #ifdef RR_DBG
-printf("CN: Auth: %*D\n", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu, ":");
+mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu);
 #endif
 	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len);
 	if (restlen > 0) {
@@ -2729,13 +2738,13 @@ printf("CN: Auth: %*D\n", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu
 		      mopt->mopt_auth
 		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len, restlen); 
 #ifdef RR_DBG
-printf("CN: Auth: %*D\n", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len, ":");
+mip6_hexdump("CN: Auth: ", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len);
 #endif
 	}
 	bzero(authdata, sizeof(authdata));
 	hmac_result(&hmac_ctx, authdata);
 #ifdef RR_DBG
-printf("CN: Auth Data: %*D\n", sizeof(authdata), authdata, ":");
+mip6_hexdump("CN: Auth Data: ", sizeof(authdata), authdata);
 #endif
 	ip6mu->ip6mu_cksum = cksum_backup;
 
