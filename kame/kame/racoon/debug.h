@@ -26,11 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: debug.h,v 1.12 2000/06/28 05:29:18 sakane Exp $ */
+/* YIPS @(#)$Id: debug.h,v 1.13 2000/07/04 12:27:58 sakane Exp $ */
 
 #define DEBUG_INFO	0x00000002	/* force informational */
 #define DEBUG_NOTIFY	0x00000004	/* force notify */
-#define DEBUG_DEBUG	0x00000008	/* output plog() to stdout */
 
 #define DEBUG_DATE	0x00000010	/*XX*/
 #define DEBUG_ADDR	0x00000020	/*XX*/
@@ -74,6 +73,7 @@
 
 /* define by main.c */
 extern u_int32_t debug;
+extern int f_foreground;
 extern int f_debugcmd;
 extern int f_local;
 extern int vflag;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: plog.c,v 1.3 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: plog.c,v 1.4 2000/07/04 12:27:59 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -82,17 +82,21 @@ plog_common(struct log *lp, const char *func, struct sockaddr *sa)
 	tm = localtime(&t);
 	strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
 
-	YIPSDEBUG(DEBUG_DEBUG, printf("%s: ", tbuf));
+	if (f_foreground)
+		printf("%s: ", tbuf);
 	if (log_vprint(lp, "%s: ", tbuf) < 0)
 		warn("logging failed.");
 
-	YIPSDEBUG(DEBUG_FUNC|DEBUG_DEBUG, printf("%s: ", func));
-	YIPSDEBUG(DEBUG_FUNC, log_vprint(lp, "%s: ", func));
+	YIPSDEBUG(DEBUG_FUNC,
+		if (f_foreground)
+			printf("%s: ", func);
+		log_vprint(lp, "%s: ", func));
 
 	if (sa != NULL) {
 		/* don't use saddr2str() in order not to buffer overwrite */
 		GETNAMEINFO(sa, addr, port);
-	        YIPSDEBUG(DEBUG_DEBUG, printf("%s[%s] ", addr, port));
+		if (f_foreground)
+			printf("%s[%s] ", addr, port);
 	        if (log_vprint(lp, "%s ", addr, port) < 0)
 			warn("logging failed.");
 	};
@@ -107,7 +111,8 @@ plog(struct log *lp, const char *func, struct sockaddr *sa,
 	plog_common(lp, func, sa);
 
 	va_start(ap, fmt);
-        YIPSDEBUG(DEBUG_DEBUG, vprintf(fmt, ap));
+	if (f_foreground)
+		vprintf(fmt, ap);
 	log_vaprint(lp, fmt, ap);
 	va_end(ap);
 
@@ -120,7 +125,8 @@ plogv(struct log *lp, const char *func, struct sockaddr *sa,
 {
 	plog_common(lp, func, sa);
 
-        YIPSDEBUG(DEBUG_DEBUG, vprintf(fmt, ap));
+	if (f_foreground)
+		vprintf(fmt, ap);
 	log_vaprint(lp, fmt, ap);
 
 	return;
@@ -129,7 +135,8 @@ plogv(struct log *lp, const char *func, struct sockaddr *sa,
 void
 plognl()
 {
-	YIPSDEBUG(DEBUG_DEBUG, printf("\n"));
+	if (f_foreground)
+		printf("\n");
 	if (log_print(logp, "\n") < 0)
 		warn("logging failed.");
 }
@@ -137,7 +144,8 @@ plognl()
 void
 plogsp()
 {
-	YIPSDEBUG(DEBUG_DEBUG, printf(" "));
+	if (f_foreground)
+		printf(" ");
 	if (log_print(logp, " ") < 0)
 		warn("logging failed.");
 }
@@ -145,7 +153,8 @@ plogsp()
 void
 plogc(struct log *lp, unsigned char c)
 {
-	YIPSDEBUG(DEBUG_DEBUG, printf("%c", c));
+	if (f_foreground)
+		printf("%c", c);
 	if (log_vprint(lp, "%c", c) < 0)
 		warn("logging failed.");
 }
@@ -153,7 +162,8 @@ plogc(struct log *lp, unsigned char c)
 void
 plogh(struct log *lp, unsigned char c)
 {
-	YIPSDEBUG(DEBUG_DEBUG, printf("%02x", c));
+	if (f_foreground)
+		printf("%02x", c);
 	if (log_vprint(lp, "%02x", c) < 0)
 		warn("logging failed.");
 }

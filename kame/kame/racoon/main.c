@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.7 2000/06/28 05:23:47 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.8 2000/07/04 12:27:59 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -60,6 +60,7 @@
 
 /* debug flags */
 u_int32_t debug = 0;
+int f_foreground = 0;	/* force running in foreground. */
 int f_debugcmd = 0;	/* specifyed debug level by command line. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
@@ -86,7 +87,8 @@ Usage()
 	printf("   -a: You can specify a explicit port for administration.\n");
 	printf("   -f: specify a configuration file.\n");
 	printf("   -l: specify a log file.\n");
-	printf("   -d: is specified debug mode. i.e. excuted foreground.\n");
+	printf("   -d: is specified debug mode.\n");
+	printf("   -F: is forced running in foreground.\n");
 #ifdef INET6
 	printf("   -6: is specified IPv6 mode.\n");
 	printf("   -4: is specified IPv4 mode.\n");
@@ -128,8 +130,9 @@ main(ac, av)
 	/* re-parse to prefer to command line parameters. */
 	parse(ac, av);
 
-#if 0
-	if (!(debug & DEBUG_DEBUG)) {
+	if (f_foreground)
+		close(0);
+	else {
 		char *pid_file = _PATH_VARRUN "racoon.pid";
 		pid_t pid;
 		FILE *fp;
@@ -157,9 +160,7 @@ main(ac, av)
 		} else {
 			plog(logp, LOCATION, NULL, "cannot open %s", pid_file);
 		}
-	} else
-		close(0);
-#endif
+	}
 
 	session();
 
@@ -181,7 +182,7 @@ parse(ac, av)
 
 	pname = *av;
 
-	while ((c = getopt(ac, av, "hd:p:a:f:l:vZ"
+	while ((c = getopt(ac, av, "hd:Fp:a:f:l:vZ"
 #ifdef YYDEBUG
 			"y"
 #endif
@@ -199,6 +200,10 @@ parse(ac, av)
 			}
 			YIPSDEBUG(DEBUG_INFO,
 				printf("debug = 0x%08x\n", debug));
+			break;
+		case 'F':
+			printf("Foreground mode.\n");
+			f_foreground = 1;
 			break;
 		case 'p':
 			lcconf->port_isakmp = atoi(optarg);
