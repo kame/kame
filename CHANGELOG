@@ -1,10 +1,12 @@
-2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-
-	
-
-$Id: CHANGELOG,v 1.495 2000/01/28 05:43:18 jinmei Exp $
+$Id: CHANGELOG,v 1.496 2000/01/28 06:39:06 itojun Exp $
 
 <200001>
+Fri Jan 28 15:37:46 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet6/ipsec.c, kame/sys/netkey/key.c,
+	  */sys/netinet{,6}/ip{,6}_input.c: pass policy message buffer length
+	  down to key_msg2sp() to avoid buffer overrun on invalid input from
+	  the userland.
+
 2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/tcp6_usrreq.c (tcp6_usrreq):
 	* {bsdi4,netbsd,openbsd}/sys/netinet/tcp_usrreq.c (tcp_usrreq):
