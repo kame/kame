@@ -503,7 +503,7 @@ udp6_ctlinput(cmd, sa, d)
 #if 0
 	if (cmd == PRC_IFNEWADDR)
 		in6_mrejoin(&udb6);
-	} else
+	else
 #endif
 	if (!PRC_IS_REDIRECT(cmd) &&
 	    ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
