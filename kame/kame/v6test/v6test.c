@@ -35,7 +35,7 @@ char *iface = NULL;
 char *optsrc, *optdst, *srceaddr, *dsteaddr;
 static struct in6_addr ip6src, ip6dst;
 struct in6_addr *optsrcn, *optdstn;
-int iflag = 0, sflag = 0, dflag = 0, nflag = 0;
+int sflag = 0, dflag = 0, nflag = 0;
 static void usage __P((void));
 static int linkhdrlen __P((int, char *));
 static void form __P((int, char *));
@@ -46,8 +46,8 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: v6test [-d dstaddr] [-f configfile] [-i interface] "
-		"[-n] [-s srcaddr] testname [testname...]\n");
+		"usage: v6test [-d dstaddr] [-f configfile] "
+		"[-n] [-s srcaddr] -i interface testname [testname...]\n");
 	exit(1);
 }
 
@@ -81,7 +81,6 @@ main(argc, argv)
 			break;
 		case 'i':
 			iface = optarg;
-			iflag++;
 			break;
 		case 'n':
 			nflag++;
@@ -93,7 +92,7 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (/*iface == NULL || */ argc == 0) {
+	if (iface == NULL || argc == 0) {
 		usage();
 		/*NOTREACHED*/
 	}
@@ -139,10 +138,7 @@ bpf_open(char *iface)
 	}
 
 	bzero(&ifr, sizeof(ifr));
-	if (iflag)
-		strcpy(ifr.ifr_name, iface);
-	else
-		strcpy(ifr.ifr_name, DEFAULT_IF);
+	strcpy(ifr.ifr_name, iface);
 	if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
 		perror("ioctl(BIOCSETIF)");
 		return(-1);
