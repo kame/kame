@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.48 2001/07/24 16:16:25 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.49 2001/07/24 18:54:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,8 @@
  * The code will let you match protocol via src/dst address pair.
  */
 /* XXX is M_NETADDR correct? */
+
+#define USE_RADIX
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_mrouting.h"
@@ -126,17 +128,41 @@
 MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 #endif
 
+/* to lookup a pair of address using radix tree */
+struct sockaddr_pack {
+	u_int8_t sp_len;
+	u_int8_t sp_family;	/* not really used */
+	/* followed by variable-length data */
+} __attribute__((__packed__));
+
+struct pack4 {
+	struct sockaddr_pack p;
+	struct sockaddr_in mine;
+	struct sockaddr_in yours;
+} __attribute__((__packed__));
+struct pack6 {
+	struct sockaddr_pack p;
+	struct sockaddr_in6 mine;
+	struct sockaddr_in6 yours;
+} __attribute__((__packed__));
+
 #ifdef INET
 static struct encaptab *encap4_lookup __P((struct mbuf *, int, int));
 #endif
 #ifdef INET6
 static struct encaptab *encap6_lookup __P((struct mbuf *, int, int));
 #endif
-static void encap_add __P((struct encaptab *));
-static ssize_t encap_afpairlen __P((int));
+static int encap_add __P((struct encaptab *));
+static int encap_remove __P((struct encaptab *));
 static int encap_afcheck __P((int, const struct sockaddr *, const struct sockaddr *));
+#ifdef USE_RADIX
+static struct radix_node_head *encap_rnh __P((int));
+static int mask_matchlen __P((const u_int8_t *, size_t));
+#endif
+#ifndef USE_RADIX
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
+#endif
 static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
 
 #ifndef LIST_HEAD_INITIALIZER
@@ -144,6 +170,11 @@ static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
 LIST_HEAD(, encaptab) encaptab;
 #else
 LIST_HEAD(, encaptab) encaptab = LIST_HEAD_INITIALIZER(&encaptab);
+#endif
+
+#ifdef USE_RADIX
+extern int max_keylen;	/* radix.c */
+struct radix_node_head *encap_head[2];	/* 0 for AF_INET, 1 for AF_INET6 */
 #endif
 
 void
@@ -164,6 +195,21 @@ encap_init()
 	 */
 	LIST_INIT(&encaptab);
 #endif
+
+#ifdef USE_RADIX
+	/*
+	 * initialize radix lookup table.  
+	 * max_keylen initialization should happen before the call to rn_init().
+	 */
+	rn_inithead((void **)&encap_head[0], sizeof(struct sockaddr_pack) << 3);
+	if (sizeof(struct pack4) > max_keylen)
+		max_keylen = sizeof(struct pack4);
+#ifdef INET6
+	rn_inithead((void **)&encap_head[1], sizeof(struct sockaddr_pack));
+	if (sizeof(struct pack6) > max_keylen)
+		max_keylen = sizeof(struct pack6);
+#endif
+#endif
 }
 
 #ifdef INET
@@ -174,9 +220,15 @@ encap4_lookup(m, off, proto)
 	int proto;
 {
 	struct ip *ip;
-	struct sockaddr_in s, d;
+	struct pack4 pack;
+#define d	pack.mine
+#define s	pack.yours
 	struct encaptab *ep, *match;
 	int prio, matchprio;
+#ifdef USE_RADIX
+	struct radix_node_head *rnh = encap_rnh(AF_INET);
+	struct radix_node *rn;
+#endif
 
 #ifdef DIAGNOSTIC
 	if (m->m_len < sizeof(*ip))
@@ -184,17 +236,35 @@ encap4_lookup(m, off, proto)
 #endif
 	ip = mtod(m, struct ip *);
 
-	bzero(&s, sizeof(s));
+	bzero(&pack, sizeof(pack));
+	pack.p.sp_len = sizeof(pack);
 	s.sin_family = AF_INET;
 	s.sin_len = sizeof(struct sockaddr_in);
 	s.sin_addr = ip->ip_src;
-	bzero(&d, sizeof(d));
 	d.sin_family = AF_INET;
 	d.sin_len = sizeof(struct sockaddr_in);
 	d.sin_addr = ip->ip_dst;
 
 	match = NULL;
 	matchprio = 0;
+
+#ifdef USE_RADIX
+	rn = rnh->rnh_matchaddr((caddr_t)&pack, rnh);
+	if (rn && (rn->rn_flags & RNF_ROOT) == 0) {
+		match = (struct encaptab *)rn;
+		matchprio = mask_matchlen((const u_int8_t *)match->maskpack,
+		    match->maskpack->sa_len - 1);
+		/*
+		 * penalty: mask_matchlen will probably count 4 extra bytes
+		 * (for sa_len and sa_family), so subtract 32.
+		 */
+		if (matchprio > 32)
+			matchprio -= 32;
+		else
+			matchprio = 1;
+	}
+#endif
+
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
 		if (ep->af != AF_INET)
 			continue;
@@ -203,12 +273,16 @@ encap4_lookup(m, off, proto)
 		if (ep->func)
 			prio = (*ep->func)(m, off, proto, ep->arg);
 		else {
+#ifdef USE_RADIX
+			continue;
+#else
 			/*
 			 * it's inbound traffic, we need to match in reverse
 			 * order
 			 */
 			prio = mask_match(ep, (struct sockaddr *)&d,
 			    (struct sockaddr *)&s);
+#endif
 		}
 
 		/*
@@ -238,6 +312,8 @@ encap4_lookup(m, off, proto)
 	}
 
 	return match;
+#undef s
+#undef d
 }
 
 void
@@ -331,9 +407,15 @@ encap6_lookup(m, off, proto)
 	int proto;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 s, d;
+	struct pack6 pack;
+#define d	pack.mine
+#define s	pack.yours
 	int prio, matchprio;
 	struct encaptab *ep, *match;
+#ifdef USE_RADIX
+	struct radix_node_head *rnh = encap_rnh(AF_INET6);
+	struct radix_node *rn;
+#endif
 
 #ifdef DIAGNOSTIC
 	if (m->m_len < sizeof(*ip6))
@@ -341,17 +423,35 @@ encap6_lookup(m, off, proto)
 #endif
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	bzero(&s, sizeof(s));
+	bzero(&pack, sizeof(pack));
+	pack.p.sp_len = sizeof(pack);
 	s.sin6_family = AF_INET6;
 	s.sin6_len = sizeof(struct sockaddr_in6);
 	s.sin6_addr = ip6->ip6_src;
-	bzero(&d, sizeof(d));
 	d.sin6_family = AF_INET6;
 	d.sin6_len = sizeof(struct sockaddr_in6);
 	d.sin6_addr = ip6->ip6_dst;
 
 	match = NULL;
 	matchprio = 0;
+
+#ifdef USE_RADIX
+	rn = rnh->rnh_matchaddr((caddr_t)&pack, rnh);
+	if (rn && (rn->rn_flags & RNF_ROOT) == 0) {
+		match = (struct encaptab *)rn;
+		matchprio = mask_matchlen((const u_int8_t *)match->maskpack,
+		    match->maskpack->sa_len - 1);
+		/*
+		 * penalty: mask_matchlen will probably count 4 extra bytes
+		 * (for sa_len and sa_family), so subtract 32.
+		 */
+		if (matchprio > 32)
+			matchprio -= 32;
+		else
+			matchprio = 1;
+	}
+#endif
+
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
 		if (ep->af != AF_INET6)
 			continue;
@@ -360,12 +460,16 @@ encap6_lookup(m, off, proto)
 		if (ep->func)
 			prio = (*ep->func)(m, off, proto, ep->arg);
 		else {
+#ifdef USE_RADIX
+			continue;
+#else
 			/*
 			 * it's inbound traffic, we need to match in reverse
 			 * order
 			 */
 			prio = mask_match(ep, (struct sockaddr *)&d,
 			    (struct sockaddr *)&s);
+#endif
 		}
 
 		/* see encap4_lookup() for issues here */
@@ -378,6 +482,8 @@ encap6_lookup(m, off, proto)
 	}
 
 	return match;
+#undef s
+#undef d
 }
 
 int
@@ -414,30 +520,44 @@ encap6_input(mp, offp, proto)
 }
 #endif
 
-static void
+static int
 encap_add(ep)
 	struct encaptab *ep;
 {
+#ifdef USE_RADIX
+	struct radix_node_head *rnh = encap_rnh(ep->af);
+#endif
+	int error = 0;
 
 	LIST_INSERT_HEAD(&encaptab, ep, chain);
+#ifdef USE_RADIX
+	if (!ep->func && rnh) {
+		if (!rnh->rnh_addaddr((caddr_t)ep->addrpack,
+		    (caddr_t)ep->maskpack, rnh, ep->nodes))
+			error = EEXIST;
+	}
+#endif
+	return error;
 }
 
-static ssize_t
-encap_afpairlen(af)
-	int af;
+static int
+encap_remove(ep)
+	struct encaptab *ep;
 {
-	switch (af) {
-	case AF_INET:
-		return sizeof(struct sockaddr_pack) +
-		    sizeof(struct sockaddr_in) * 2;
-#ifdef INET6
-	case AF_INET6:
-		return sizeof(struct sockaddr_pack) +
-		    sizeof(struct sockaddr_in6) * 2;
+#ifdef USE_RADIX
+	struct radix_node_head *rnh = encap_rnh(ep->af);
 #endif
-	default:
-		return -1;
+	int error = 0;
+
+	LIST_REMOVE(ep, chain);
+#ifdef USE_RADIX
+	if (!ep->func && rnh) {
+		if (! rnh->rnh_deladdr((caddr_t)ep->addrpack,
+		    (caddr_t)ep->maskpack, rnh))
+			error = ESRCH;
 	}
+#endif
+	return error;
 }
 
 static int
@@ -496,6 +616,10 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	int error;
 	int s;
 	size_t l;
+	struct pack4 *pack4;
+#ifdef INET6
+	struct pack6 *pack6;
+#endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -532,25 +656,29 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 		goto fail;
 	}
 
-	l = encap_afpairlen(af);
+	switch (af) {
+	case AF_INET:
+		l = sizeof(*pack4);
+		break;
+	case AF_INET6:
+		l = sizeof(*pack6);
+		break;
+	}
+
 #ifdef DIAGNOSTIC
-	if (l != sizeof(*ep->addrpack) + sp->sa_len + dp->sa_len)
-		panic("encap_afpairlen mismatch");
-#endif
-	if (l > 1 << (8 * sizeof(ep->addrpack->sp_len))) {
+	/* if l exceeds the value sa_len can possibly express, it's wrong. */
+	if (l > (1 << (8 * sizeof(ep->addrpack->sa_len)))) {
 		error = EINVAL;
 		goto fail;
 	}
+#endif
 
-	ep = malloc(sizeof(*ep), M_NETADDR, M_NOWAIT);	/*XXX*/
+	ep = malloc(sizeof(*ep), M_NETADDR, M_NOWAIT);	/* M_NETADDR ok? */
 	if (ep == NULL) {
 		error = ENOBUFS;
 		goto fail;
 	}
 	bzero(ep, sizeof(*ep));
-
-	ep->af = af;
-	ep->proto = proto;
 	ep->addrpack = malloc(l, M_NETADDR, M_NOWAIT);
 	if (ep->addrpack == NULL) {
 		error = ENOBUFS;
@@ -561,15 +689,29 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 		error = ENOBUFS;
 		goto gc;
 	}
-	ep->addrpack->sp_len = l & 0xff;
-	ep->maskpack->sp_len = l & 0xff;
-	ep->src = (struct sockaddr *)((caddr_t)ep->addrpack +
-	    sizeof(*ep->addrpack));
-	ep->dst = (struct sockaddr *)((caddr_t)ep->src + ep->src->sa_len);
-	ep->srcmask = (struct sockaddr *)((caddr_t)ep->maskpack +
-	    sizeof(*ep->maskpack));
-	ep->dstmask = (struct sockaddr *)((caddr_t)ep->srcmask +
-	    ep->src->sa_len);
+
+	ep->af = af;
+	ep->proto = proto;
+	ep->addrpack->sa_len = l & 0xff;
+	ep->maskpack->sa_len = l & 0xff;
+	switch (af) {
+	case AF_INET:
+		pack4 = (struct pack4 *)ep->addrpack;
+		ep->src = (struct sockaddr *)&pack4->mine;
+		ep->dst = (struct sockaddr *)&pack4->yours;
+		pack4 = (struct pack4 *)ep->maskpack;
+		ep->srcmask = (struct sockaddr *)&pack4->mine;
+		ep->dstmask = (struct sockaddr *)&pack4->yours;
+		break;
+	case AF_INET6:
+		pack6 = (struct pack6 *)ep->addrpack;
+		ep->src = (struct sockaddr *)&pack6->mine;
+		ep->dst = (struct sockaddr *)&pack6->yours;
+		pack6 = (struct pack6 *)ep->maskpack;
+		ep->srcmask = (struct sockaddr *)&pack6->mine;
+		ep->dstmask = (struct sockaddr *)&pack6->yours;
+		break;
+	}
 
 	bcopy(sp, ep->src, sp->sa_len);
 	bcopy(sm, ep->srcmask, sp->sa_len);
@@ -578,7 +720,9 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	ep->psw = psw;
 	ep->arg = arg;
 
-	encap_add(ep);
+	error = encap_add(ep);
+	if (error)
+		goto gc;
 
 	error = 0;
 	splx(s);
@@ -636,7 +780,9 @@ encap_attach_func(af, proto, func, psw, arg)
 	ep->psw = psw;
 	ep->arg = arg;
 
-	encap_add(ep);
+	error = encap_add(ep);
+	if (error)
+		goto fail;
 
 	error = 0;
 	splx(s);
@@ -738,10 +884,13 @@ encap_detach(cookie)
 {
 	const struct encaptab *ep = cookie;
 	struct encaptab *p;
+	int error;
 
 	for (p = LIST_FIRST(&encaptab); p; p = LIST_NEXT(p, chain)) {
 		if (p == ep) {
-			LIST_REMOVE(p, chain);
+			error = encap_remove(p);
+			if (error)
+				return error;
 			if (!ep->func) {
 				free(p->addrpack, M_NETADDR);
 				free(p->maskpack, M_NETADDR);
@@ -754,6 +903,42 @@ encap_detach(cookie)
 	return EINVAL;
 }
 
+#ifdef USE_RADIX
+static struct radix_node_head *
+encap_rnh(af)
+	int af;
+{
+
+	switch (af) {
+	case AF_INET:
+		return encap_head[0];
+#ifdef INET6
+	case AF_INET6:
+		return encap_head[1];
+#endif
+	default:
+		return NULL;
+	}
+}
+
+static int
+mask_matchlen(p, l)
+	const u_int8_t *p;
+	size_t l;
+{
+	int matchlen;
+	int i;
+
+	matchlen = 0;
+	for (i = 0; i < l; i++) {
+		/* XXX rough estimate */
+		matchlen += (p[i] ? 8 : 0);
+	}
+	return matchlen;
+}
+#endif
+
+#ifndef USE_RADIX
 static int
 mask_match(ep, sp, dp)
 	const struct encaptab *ep;
@@ -810,6 +995,7 @@ mask_match(ep, sp, dp)
 	} else
 		return 0;
 }
+#endif
 
 static void
 encap_fillarg(m, ep)
