@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.33 2000/09/22 16:48:43 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.34 2000/09/22 20:16:21 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -223,6 +223,15 @@ vs NxNetworks
 	- even if using old SA, when old SA expire, packet may drop
 	  when both sides clock are different.
 
+vs Intel Canada
+	phase 1: main
+	    rsasig, 3des, sha1, DH group 2
+		entrust, subjectaltname = ipaddress
+	phase 2:
+	    3des, sha1, transport, pfs 2
+	- when kame did not send CR, then intel did not reply CERT.
+	  It makes sense.
+
 vs Intel (Packet Protect Pro/100S)
 	phase 1: main
 	    preshared, 3des-cbc, sha1, DH group 2
@@ -323,3 +332,13 @@ vs III
 	    kame sent 1492 bytes packet. but no response.
 	2: ah transport hmac-sha1
 	    1474 bytes packet was replyed from iii. in addition broken 46 bytes.
+
+vs IBM AIX
+	phase 1: responder main
+	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 600
+	    use subjectname as ID payload.
+	phase 2: PFS group 2
+	    ESP 3des-cbc, transport mode, lifetime 300
+	Notes:
+	    negotiation success on IPv6.
+	    we promise to test for IPv6 subjectaltname over 6bone.
