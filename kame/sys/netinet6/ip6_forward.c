@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.126 2003/10/02 20:39:24 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.127 2003/10/03 04:27:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -549,7 +549,11 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	if (sa6_src.sin6_scope_id != dstzone) {
+	if (sa6_src.sin6_scope_id != dstzone
+#ifdef IPSEC
+	    && !ipsecrt
+#endif
+	    ) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);
