@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.49 2003/08/14 15:29:36 t-momose Exp $	*/
+/*	$KAME: ip6.h,v 1.50 2003/09/09 00:43:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,8 +142,10 @@ struct ip6_dest {
 #define IP6OPT_JUMBO		0xC2	/* 11 0 00010 = 194 */
 #define IP6OPT_NSAP_ADDR	0xC3	/* 11 0 00011 */
 #define IP6OPT_TUNNEL_LIMIT	0x04	/* 00 0 00100 */
+#ifndef _KERNEL
 #define IP6OPT_RTALERT		0x05	/* 00 0 00101 (KAME definition) */
-#define IP6OPT_ROUTER_ALERT	0x05	/* (2292bis def, recommended) */
+#endif
+#define IP6OPT_ROUTER_ALERT	0x05	/* 00 0 00101 (2292bis, recommended) */
 
 #define IP6OPT_RTALERT_LEN	4
 #define IP6OPT_RTALERT_MLD	0	/* Datagram contains an MLD message */

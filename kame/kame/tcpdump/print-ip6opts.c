@@ -147,7 +147,7 @@ ip6_opt_print(const u_char *bp, int len)
 	    }
 	    optlen = bp[i + 1] + 2;
 	    break;
-	case IP6OPT_RTALERT:
+	case IP6OPT_ROUTER_ALERT:
 	    if (len - i < IP6OPT_RTALERT_LEN) {
 		printf("(rtalert: trunc)");
 		goto trunc;

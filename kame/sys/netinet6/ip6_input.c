@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.326 2003/09/06 02:36:48 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.327 2003/09/09 00:42:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1457,7 +1457,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			}
 			optlen = *(opt + 1) + 2;
 			break;
-		case IP6OPT_RTALERT:
+		case IP6OPT_ROUTER_ALERT:
 			/* XXX may need check for alignment */
 			if (hbhlen < IP6OPT_RTALERT_LEN) {
 				ip6stat.ip6s_toosmall++;
