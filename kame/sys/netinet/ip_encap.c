@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.61 2001/08/17 10:15:23 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.62 2001/08/17 10:29:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -827,7 +827,6 @@ encap6_ctlinput(cmd, sa, d)
 	struct ip6ctlparam *ip6cp = NULL;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	void *cmdarg;
-	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
 	int nxt;
 	struct encaptab *ep;
 	const struct ip6protosw *psw;
@@ -838,9 +837,7 @@ encap6_ctlinput(cmd, sa, d)
 
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return;
-	if (PRC_IS_REDIRECT(cmd))
-		notify = in6_rtchange, d = NULL;
-	else if (cmd == PRC_HOSTDEAD)
+	if (cmd == PRC_HOSTDEAD)
 		d = NULL;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	else if (cmd == PRC_MSGSIZE)
@@ -874,10 +871,8 @@ encap6_ctlinput(cmd, sa, d)
 #if 0
 		/*
 		 * Check to see if we have a valid encap configuration.
-		 * XXX chase extension headers, or pass final nxt value
-		 * from icmp6_notify_error()
-		 *
-		 * XXX m is not the correct arg to encap6_lookup here */
+		 * XXX m is useless at this point, since it is an outbound
+		 * traffic...
 		 */
 		match = encap6_lookup(m, off, nxt);
 #endif
