@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.3 1999/11/08 13:35:21 itojun Exp $ */
+/* KAME $Id: policy_parse.y,v 1.4 1999/11/08 13:39:11 itojun Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:
@@ -201,7 +201,8 @@ yyerror(msg)
 {
 	extern char *__libyytext;	/*XXX*/
 
-	fprintf(stderr, "%s parsing \"%s\"\n", msg, __libyytext);
+	fprintf(stderr, "libipsec: %s while parsing \"%s\"\n",
+		msg, __libyytext);
 
 	return;
 }
@@ -220,11 +221,13 @@ parse_sockaddr(buf)
 	hints.ai_flags = AI_NUMERICHOST;
 	error = getaddrinfo(buf->buf, serv, &hints, &res);
 	if (error != 0) {
+		yyerror("invalid IP address");
 		ipsec_set_strerror(gai_strerror(error));
 		return NULL;
 	}
 
 	if (res->ai_addr == NULL) {
+		yyerror("invalid IP address");
 		ipsec_set_strerror(gai_strerror(error));
 		return NULL;
 	}
