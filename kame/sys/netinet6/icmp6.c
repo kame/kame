@@ -2109,6 +2109,7 @@ icmp6_mtudisc_clone(dst)
 #if defined(__OpenBSD__)
 	timeout((void (*) __P((void *)))icmp6_mtudisc_timeout, rt,
 		hz * pmtu_expire);
+	error = 0;
 #elif defined(__NetBSD__)
 	error = rt_timer_add(rt, icmp6_mtudisc_rttimeout,
 			icmp6_mtudisc_timeout_q);
