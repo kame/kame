@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.73 2000/11/30 04:00:07 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.74 2000/11/30 04:04:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -629,9 +629,9 @@ udp6_ctlinput(cmd, sa, d)
 		}
 #endif
 
-		bzero(&sa6, sizeof(sa6));
+		bzero(&sa6, sizeof(sa6_src));
 		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6);
+		sa6_src.sin6_len = sizeof(sa6_src);
 		sa6_src.sin6_addr = ip6->ip6_src;
 		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 							 &ip6->ip6_src);
