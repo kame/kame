@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.10 1999/11/28 15:59:43 itojun Exp $ */
+/* $Id: name6.c,v 1.11 2000/01/02 13:56:38 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -1169,7 +1169,6 @@ _dns_ghbyname(const char *name, int af, int *errp)
 			cp += n;
 			break;
 		default:
-			DNS_ASSERT(0);
 			cp += n;
 			break;
 		}
