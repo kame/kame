@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.4 2000/01/31 15:52:42 itojun Exp $ */
+/* $Id: signing.c,v 1.5 2000/02/07 10:51:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,11 +49,6 @@
 #include <evp.h>
 #include <objects.h>
 #include <x509.h>
-#if 0	/* XXX where is apps.h ? */
-#include <openssl/apps.h>
-#else
-int apps_startup() { return 0;}
-#endif
 #include <bio.h>
 #include <err.h>
 #include <pem.h>
@@ -440,8 +435,6 @@ verify_certificate(CApath, CAfile, cert_to_check)
 	X509_STORE_set_verify_cb_func(cert_ctx,cb);
 
 	ERR_load_crypto_strings();
-
-	apps_startup();
 
 	if (bio_err == NULL)
 		if ((bio_err=BIO_new(BIO_s_file())) != NULL)
