@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.36 2001/06/23 02:01:14 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.37 2001/06/23 02:07:20 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -178,14 +178,23 @@ Then, configure
 .Xr resolv.conf 5
 to resolve IP addresses from names using
 .Nm Ns .
+Notice the presense of
+.Li itojun.org.local.arpa.
+and
+.Li local.arpa.
+From the speficiation, we can only resolve names using multicast DNS,
+iff names are under
+.Li local.arpa.
+domain.
 .Bd -literal -offset indent
-search itojun.org
+search itojun.org itojun.org.local.arpa local.arpa
 nameserver ::
 .Ed
 .Pp
 If you would like to contact unicast DNS servers as well, you may want to
 specify them on the command line.
-DNS queries will be sent to both multicast and unicast servers.
+DNS queries will be sent to unicast servers, if the DNS name is outside of
+.Li local.arpa.
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0 3ffe:501:4819::42
 .Ed
