@@ -65,7 +65,7 @@ fi
 # the identifiers, if you build the kernel with the ENABLE_DEFAULT_SCOPE
 # option. Under this configuration, the packets will go to the default
 # interface.
-# 
+#
 # If you configure site-locals without scope id (it is permissible config for
 # routers that are not on scope boundary), you may want to comment the latter
 # one out.
