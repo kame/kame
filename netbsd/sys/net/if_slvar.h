@@ -68,6 +68,7 @@ struct sl_softc {
 	struct	slcompress sc_comp;	/* tcp compression data */
 #endif
 	caddr_t	sc_bpf;			/* BPF data */
+	struct timeval sc_lastpacket;	/* for watchdog */
 };
 
 /* internal flags */

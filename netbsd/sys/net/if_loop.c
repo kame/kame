@@ -184,7 +184,6 @@ looutput(ifp, m, dst, rt)
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput: no header mbuf");
-	ifp->if_lastchange = time;
 #if NBPFILTER > 0
 	if (ifp->if_bpf && (ifp->if_flags & IFF_LOOPBACK)) {
 		/*

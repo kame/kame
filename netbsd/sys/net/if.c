@@ -759,6 +759,7 @@ if_down(ifp)
 	struct ifaddr *ifa;
 
 	ifp->if_flags &= ~IFF_UP;
+	microtime(&ifp->if_lastchange);
 	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL;
 	     ifa = TAILQ_NEXT(ifa, ifa_list))
 		pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
@@ -780,6 +781,7 @@ if_up(ifp)
 #endif
 
 	ifp->if_flags |= IFF_UP;
+	microtime(&ifp->if_lastchange);
 #ifdef notyet
 	/* this has no effect on IP, and will kill all ISO connections XXX */
 	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL;

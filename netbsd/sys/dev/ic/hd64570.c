@@ -809,7 +809,6 @@ sca_output(ifp, m, dst, rt0)
 #endif
 
 	error = 0;
-	ifp->if_lastchange = time;
 
 	if ((ifp->if_flags & IFF_UP) != IFF_UP) {
 		error = ENETDOWN;
@@ -917,7 +916,6 @@ sca_output(ifp, m, dst, rt0)
 		return (error);
 	}
 	ifp->if_obytes += len;
-	ifp->if_lastchange = time;
 	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
 
@@ -1621,7 +1619,6 @@ sca_frame_process(sca_port_t *scp)
 #endif
 
 	scp->sp_if.if_ipackets++;
-	scp->sp_if.if_lastchange = time;
 
 	hdlc = mtod(m, struct hdlc_header *);
 	switch (ntohs(hdlc->h_proto)) {

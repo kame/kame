@@ -174,7 +174,6 @@ x25_ifinput(m, v)
 	struct llinfo_x25 *lx = (struct llinfo_x25 *) lcp->lcd_upnext;
 	struct ifnet *ifp;
 	struct ifqueue *inq;
-	extern struct timeval time;
 	int             s, isr;
 
 	if (m == 0 || lcp->lcd_state != DATA_TRANSFER)
@@ -182,7 +181,6 @@ x25_ifinput(m, v)
 
 	pk_flowcontrol(lcp, 0, 1);	/* Generate RR */
 	ifp = m->m_pkthdr.rcvif;
-	ifp->if_lastchange = time;
 	switch (m->m_type) {
 	default:
 		if (m)

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.51 2001/06/13 08:28:40 sumikawa Exp $	*/
+/*	$KAME: if_gif.c,v 1.52 2001/06/14 07:53:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,11 +352,7 @@ gif_output(ifp, m, dst, rt)
 		goto end;
 	}
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	/*
-	 * BSD/OS and FreeBSD do not update if_lastchange when
-	 * processing packets for SNMP requirements.
-	 */
+#ifdef __OpenBSD__
 	ifp->if_lastchange = time;	
 #endif
 	m->m_flags &= ~(M_BCAST|M_MCAST);

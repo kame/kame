@@ -642,7 +642,6 @@ pppsyncstart(sc)
 			if (sc->sc_flags & SC_DEBUG)
 				pppdumpframe(sc,m,1);
 		}
-		microtime(&sc->sc_if.if_lastchange);
 		for(n=m,len=0;n!=NULL;n=n->m_next)
 			len += n->m_len;
 			
@@ -708,7 +707,6 @@ pppasyncstart(sc)
 
 	    /* Calculate the FCS for the first mbuf's worth. */
 	    sc->sc_outfcs = pppfcs(PPP_INITFCS, mtod(m, u_char *), m->m_len);
-	    sc->sc_if.if_lastchange = time;
 	}
 
 	for (;;) {

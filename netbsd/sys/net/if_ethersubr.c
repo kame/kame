@@ -184,7 +184,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 	if ((rt = rt0) != NULL) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = rtalloc1(dst, 1)) != NULL) {
@@ -539,7 +538,6 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 		ifp->if_imcasts++;
 	}
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 
 	etype = ntohs(eh->ether_type);
