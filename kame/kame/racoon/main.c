@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.29 2001/02/06 15:15:46 sakane Exp $	*/
+/*	$KAME: main.c,v 1.30 2001/02/26 09:47:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,7 +121,12 @@ main(ac, av)
 {
 	int error;
 
-	/* don't let anyone read files I write */
+	/*
+	 * Don't let anyone read files I write.  Although some files (such as
+	 * the PID file) can be other readable, we dare to use the global mask,
+	 * because racoon uses fopen(3), which can't specify the permission
+	 * at the creation time.
+	 */
 	umask(077);
 	if (umask(077) != 077) {
 		errx(1, "could not set umask");
