@@ -103,6 +103,11 @@ int if_clone_list __P((struct if_clonereq *));
 LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
 int if_cloners_count;
 
+#if defined(INET) || defined(INET6) || defined(NETATALK) || defined(NS) || \
+    defined(ISO) || defined(NATM)
+static void if_detach_queues __P((struct ifnet *, struct ifqueue *));
+#endif
+
 /*
  * Network interface utility routines.
  *
@@ -375,8 +380,82 @@ if_detach(ifp)
 
 	ifindex2ifnet[ifp->if_index] = NULL;
 	TAILQ_REMOVE(&ifnet, ifp, if_link);
+
+	/*
+	 * remove packets came from ifp, from software interrupt queues.
+	 * net/netisr_dispatch.h is not usable, as some of them use
+	 * strange queue names.
+	 */
+#define IF_DETACH_QUEUES(x) \
+do { \
+	extern struct ifqueue x; \
+	if_detach_queues(ifp, & x); \
+} while (0)
+#ifdef INET
+	if_detach_queues(ifp, &arpintrq);
+	if_detach_queues(ifp, &ipintrq);
+#endif
+#ifdef INET6
+	if_detach_queues(ifp, &ip6intrq);
+#endif
+#ifdef IPX
+	IF_DETACH_QUEUES(ipxintrq);
+#endif
+#ifdef NETATALK
+	IF_DETACH_QUEUES(atintrq1);
+	IF_DETACH_QUEUES(atintrq2);
+#endif
+#ifdef NS
+	IF_DETACH_QUEUES(nsintrq);
+#endif
+#ifdef ISO
+	IF_DETACH_QUEUES(clnlintrq);
+#endif
+#ifdef NATM
+	IF_DETACH_QUEUES(natmintrq);
+#endif
+#undef IF_DETACH_QUEUES
+
 	splx(s);
 }
+
+#if defined(INET) || defined(INET6) || defined(NETATALK) || defined(NS) || \
+    defined(ISO) || defined(NATM)
+static void
+if_detach_queues(ifp, q)
+	struct ifnet *ifp;
+	struct ifqueue *q;
+{
+	struct mbuf *m, *prev, *next;
+
+	prev = NULL;
+	for (m = q->ifq_head; m; m = next) {
+		next = m->m_nextpkt;
+#ifdef DIAGNOSTIC
+		if ((m->m_flags & M_PKTHDR) == 0) {
+			prev = m;
+			continue;
+		}
+#endif
+		if (m->m_pkthdr.rcvif != ifp) {
+			prev = m;
+			continue;
+		}
+
+		if (prev)
+			prev->m_nextpkt = m->m_nextpkt;
+		else
+			q->ifq_head = m->m_nextpkt;
+		if (q->ifq_tail == m)
+			q->ifq_tail = prev;
+		q->ifq_len--;
+
+		m->m_nextpkt = NULL;
+		m_freem(m);
+		IF_DROP(q);
+	}
+}
+#endif /* defined(INET) || ... */
 
 /*
  * Delete Routes for a Network Interface
@@ -1531,6 +1610,7 @@ if_addmulti(ifp, sa, retifma)
 		return (ENOBUFS);
 	}
 	dupsa_ll = 0;
+	ifma_ll = 0;
 	if (llsa != 0) {
 		LIST_FOREACH(ifma_ll, &ifp->if_multiaddrs, ifma_link) {
 			if (equal(ifma_ll->ifma_addr, llsa))
