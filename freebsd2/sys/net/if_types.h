@@ -127,6 +127,8 @@
 #define	IFT_PROPVIRTUAL	0x35		/* Proprietary Virtual/internal */
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
 
+#define IFT_IEEE1394	0x90		/* IEEE1394 High Performance SerialBus*/
+
 /* private use */
 #define	IFT_GIF		0xf0
 #define IFT_DUMMY	0xf1

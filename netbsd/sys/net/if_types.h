@@ -177,6 +177,8 @@
 #define IFT_DOCSCABLEUPSTREAM	   0x81 /* CATV Upstream interface */
 #define IFT_A12MPPSWITCH	   0x82	/* Avalon Parallel Processor */
 
+#define IFT_IEEE1394		   0x90	/* IEEE1394 High Performance SerialBus*/
+
 /* private usage... how should we define these? */
 #define IFT_GIF		0xf0
 #define IFT_DUMMY	0xf1
