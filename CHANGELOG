@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1332 2000/10/11 19:58:51 sakane Exp $
+$KAME: CHANGELOG,v 1.1333 2000/10/15 08:52:48 itojun Exp $
 
 <200010>
+Sun Oct 15 17:49:15 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 10/9 weekly snapshot.
+
 Thu Oct 12 04:56:24 JST 2000 sakane@ydc.co.jp
 	* kame/racoon: Added two directives, my_identifier and peers_identifer.
 	It can be define the identifiers by each peers.  Identifier directive
