@@ -211,6 +211,7 @@ get_socket(ai0, ifname, valid)
 			struct in_addr a;
 			struct ip_mreq mreq4;
 
+			/* XXX uses "0.0.0.0/8 for interface index" API */
 			a.s_addr = htonl(ifindex);
 			if (setsockopt(so, IPPROTO_IP, IP_MULTICAST_IF,
 			    &a, sizeof(a)) < 0) {

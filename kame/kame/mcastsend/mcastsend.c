@@ -129,6 +129,7 @@ main(ac, av)
 				err(1, "setsockopt(IPV6_MULTICAST_IF)");
 			break;
 		case AF_INET:
+			/* XXX uses "0.0.0.0/8 for interface index" API */
 			a.s_addr = htonl(ifindex);
 			error = setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF,
 					&a, sizeof(a));
