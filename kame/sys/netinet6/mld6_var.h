@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.7 2002/10/02 11:24:48 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.8 2003/06/06 05:54:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -99,12 +99,5 @@ void	mld_send_state_change_report(struct mbuf **, int *,
 int	mld_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #endif
 #endif /* _KERNEL */
-
-/* definitions to provide backward compatibility to old KAME applications */
-#ifndef _KERNEL
-#define MLD6_RANDOM_DELAY(X)	MLD_RANDOM_DELAY(X)
-#define MLD6_OTHERLISTENER	MLD_OTHERLISTENER
-#define MLD6_IREPORTEDLAST	MLD_IREPORTEDLAST
-#endif
 
 #endif /* _NETINET6_MLD6_VAR_H_ */
