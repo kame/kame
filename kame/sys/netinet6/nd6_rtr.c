@@ -67,7 +67,7 @@ static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 					       struct nd_defrouter *));
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
-static void pfxlist_onlink_check __P((void));
+static struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));
 static void nd6_detach_prefix __P((struct nd_prefix *));
 static void nd6_attach_prefix __P((struct nd_prefix *));
 
@@ -366,6 +366,13 @@ nd6_ra_input(m, off, icmp6len)
 	}
 
 	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen, ND_ROUTER_ADVERT, 0);
+
+	/*
+	 * Installing a link-layer address might change the state of the
+	 * router's neighbor cache, which might also affect our on-link
+	 * detection of adveritsed prefixes.
+	 */
+	pfxlist_onlink_check();
     }
 }
 
@@ -462,9 +469,11 @@ defrouter_lookup(addr, ifp)
 {
 	struct nd_defrouter *dr;
 
-	for(dr = nd_defrouter.lh_first; dr; dr = dr->dr_next)
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		if (dr->ifp == ifp && IN6_ARE_ADDR_EQUAL(addr, &dr->rtaddr))
 			return(dr);
+	}
 
 	return(NULL);		/* search failed */
 }
@@ -490,16 +499,8 @@ defrouter_delreq(dr, dofree)
 		  (struct sockaddr *)&mask,
 		  RTF_GATEWAY, (struct rtentry **)0);
 
-	if (dofree)
+	if (dofree)		/* XXX: necessary? */
 		free(dr, M_IP6NDP);
-
-	if (nd_defrouter.lh_first)
-		defrouter_addreq(nd_defrouter.lh_first);
-
-	/*
-	 * xxx update the Destination Cache entries for all
-	 * destinations using that neighbor as a router (7.2.5)
-	 */
 }
 
 void
@@ -518,10 +519,10 @@ defrtrlist_del(dr)
 		rt6_flush(&dr->rtaddr, dr->ifp);
 	}
 
-	if (dr == nd_defrouter.lh_first)
+	if (dr == TAILQ_FIRST(&nd_defrouter))
 		deldr = dr;	/* The router is primary. */
 
-	LIST_REMOVE(dr, dr_entry);
+	TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 
 	/*
 	 * Also delete all the pointers to the router in each prefix lists.
@@ -534,12 +535,77 @@ defrtrlist_del(dr)
 	pfxlist_onlink_check();
 
 	/*
-	 * If the router is the primary one, delete the default route
-	 * entry in the routing table.
+	 * If the router is the primary one, choose a new one.
+	 * Note that defrouter_select() will remove the current gateway
+	 * from the routing table.
 	 */
 	if (deldr)
-		defrouter_delreq(deldr, 0);
+		defrouter_select();
+
 	free(dr, M_IP6NDP);
+}
+
+/*
+ * Default Router Selection according to Section 6.3.6 of RFC 2461:
+ * 1) Routers that are reachable or probably reachable should be
+ *    preferred.
+ * 2) When no routers on the list are known to be reachable or
+ *    probably reachable, routers SHOULD be selected in a round-robin
+ *    fashion.
+ * 3) If the Default Router List is empty, assume that all
+ *    destinations are on-link.
+ */
+void
+defrouter_select()
+{
+#ifdef __NetBSD__
+	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
+	struct nd_defrouter *dr_head, *dr, anydr;
+	struct rtentry *rt = NULL;
+	struct llinfo_nd6 *ln = NULL;
+	struct sockaddr_in6 sin6_def;
+
+	/*
+	 * Search for a (probably) reachable router from the list.
+	 */
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+	     dr = TAILQ_NEXT(dr, dr_entry)) {
+		if ((rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
+		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
+		    ND6_IS_LLINFO_PROBREACH(ln)) {
+			/* Got it, and move it to the head */
+			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
+			TAILQ_INSERT_HEAD(&nd_defrouter, dr, dr_entry);
+			break;
+		}
+	}
+
+	if ((dr = TAILQ_FIRST(&nd_defrouter))) {
+		/*
+		 * De-install the previous default gateway and install
+		 * a new one.
+		 * Note that if there is no reachable router in the list,
+		 * the head entry will be used anyway.
+		 * XXX: do we have to check the current routing table entry?
+		 */
+		bzero(&anydr, sizeof(anydr));
+		defrouter_delreq(&anydr, 0);
+		defrouter_addreq(dr);
+	}
+	else {			/* The Default Router List is empty. */
+		/*
+		 * Install the default route to an inteface.
+		 * XXX: notyet, but will soon be implemented.
+		 */
+		printf("Default router list becomes empty\n");
+	}
+
+  done:
+	splx(s);
+	return;
 }
 
 static struct nd_defrouter *
@@ -581,13 +647,15 @@ defrtrlist_update(new)
 	}
 	bzero(n, sizeof(*n));
 	*n = *new;
-	if (nd_defrouter.lh_first == NULL) {
-		LIST_INSERT_HEAD(&nd_defrouter, n, dr_entry);
-		defrouter_addreq(n);
-	} else {
-		LIST_INSERT_AFTER(nd_defrouter.lh_first, n, dr_entry);
-		defrouter_addreq(n);
-	}
+
+	/*
+	 * Insert the new router at the end of the Default Router List.
+	 * If there is no other router, install it anyway. Otherwise,
+	 * just continue to use the current default router. 
+	 */
+	TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
+	if (TAILQ_FIRST(&nd_defrouter) == n)
+		defrouter_select();
 	splx(s);
 		
 	return(n);
@@ -922,6 +990,32 @@ prelist_update(new, dr, m)
 }
 
 /*
+ * A supplement function used in the on-link detection below;
+ * detect if a given prefix has a (probably) reachable advertising router.
+ * XXX: lengthy function name...
+ */
+static struct nd_pfxrouter *
+find_pfxlist_reachable_router(pr)
+	struct nd_prefix *pr;
+{
+	struct nd_pfxrouter *pfxrtr;
+	struct rtentry *rt;
+	struct llinfo_nd6 *ln;
+
+	for (pfxrtr = LIST_FIRST(&pr->ndpr_advrtrs); pfxrtr;
+	     pfxrtr = LIST_NEXT(pfxrtr, pfr_entry)) {
+		if ((rt = nd6_lookup(&pfxrtr->router->rtaddr, 0,
+				     pfxrtr->router->ifp)) &&
+		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
+		    ND6_IS_LLINFO_PROBREACH(ln))
+			break;	/* found */
+	}
+
+	return(pfxrtr);
+
+}
+
+/*
  * Check if each prefix in the prefix list has at least one available router
  * that advertised the prefix.
  * If the check fails, the prefix may be off-link because, for example,
@@ -933,38 +1027,43 @@ prelist_update(new, dr, m)
  * routers are simply dead or if we really moved from the network and there
  * is no router around us.
  */
-static void
+void
 pfxlist_onlink_check()
 {
 	struct nd_prefix *pr;
 
-	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next)
-		if (pr->ndpr_advrtrs.lh_first) /* pr has an available router */
+	/*
+	 * Check if there is a prefix that has a reachable advertising
+	 * router.
+	 */
+	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+		if (find_pfxlist_reachable_router(pr))
 			break;
+	}
 
 	if (pr) {
 		/*
-		 * There is at least one prefix that has a router. First,
-		 * detach prefixes which has no advertising router and then
-		 * attach other prefixes. The order is important since an
-		 * attached prefix and a detached prefix may have a same
-		 * interface route.
+		 * There is at least one prefix that has a reachable router.
+		 * First, detach prefixes which has no reachable advertising
+		 * router and then attach other prefixes.
+		 * The order is important since an attached prefix and a
+		 * detached prefix may have a same interface route.
 		 */
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-			if (pr->ndpr_advrtrs.lh_first == NULL &&
+			if (find_pfxlist_reachable_router(pr) == NULL &&
 			    pr->ndpr_statef_onlink) {
 				pr->ndpr_statef_onlink = 0;
 				nd6_detach_prefix(pr);
 			}
 		}
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-			if (pr->ndpr_advrtrs.lh_first &&
-				 pr->ndpr_statef_onlink == 0)
+			if (find_pfxlist_reachable_router(pr) &&
+			    pr->ndpr_statef_onlink == 0)
 				nd6_attach_prefix(pr);
 		}
 	}
 	else {
-		/* there is no prefix that has a router */
+		/* there is no prefix that has a reachable router */
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next)
 			if (pr->ndpr_statef_onlink == 0)
 				nd6_attach_prefix(pr);

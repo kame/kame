@@ -51,6 +51,8 @@ struct	llinfo_nd6 {
 #define ND6_LLINFO_DELAY	3
 #define ND6_LLINFO_PROBE	4
 
+#define ND6_IS_LLINFO_PROBREACH(n) ((n)->ln_state > ND6_LLINFO_INCOMPLETE)
+
 struct nd_ifinfo {
 	u_int32_t linkmtu;		/* LinkMTU */
 	u_int32_t maxmtu;		/* Upper bound of LinkMTU */
@@ -122,9 +124,9 @@ struct	in6_ndireq {
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (random() & \
 		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)
 
+TAILQ_HEAD(nd_drhead, nd_defrouter);
 struct	nd_defrouter {
-	LIST_ENTRY(nd_defrouter) dr_entry;
-#define dr_next dr_entry.le_next
+	TAILQ_ENTRY(nd_defrouter) dr_entry;
 	struct	in6_addr rtaddr;
 	u_char	flags;
 	u_short	rtlifetime;
@@ -202,7 +204,6 @@ struct nd_pfxrouter {
 	struct nd_defrouter *router;
 };
 
-LIST_HEAD(nd_drhead, nd_defrouter);
 LIST_HEAD(nd_prhead, nd_prefix);
 
 /* nd6.c */
@@ -290,10 +291,12 @@ void nd6_ra_input __P((struct mbuf *, int, int));
 void prelist_del __P((struct nd_prefix *));
 void defrouter_addreq __P((struct nd_defrouter *));
 void defrouter_delreq __P((struct nd_defrouter *, int));
+void defrouter_select __P((void));
 void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
 int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
 	struct mbuf *));
+void pfxlist_onlink_check __P((void));
 struct nd_defrouter *defrouter_lookup __P((struct in6_addr *,
 					   struct ifnet *));
 int in6_ifdel __P((struct ifnet *, struct in6_addr *));

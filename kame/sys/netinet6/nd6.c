@@ -110,7 +110,7 @@ static int nd6_inuse, nd6_allocated;
 
 struct llinfo_nd6 llinfo_nd6 = {&llinfo_nd6, &llinfo_nd6};
 struct nd_ifinfo *nd_ifinfo = NULL;
-struct nd_drhead nd_defrouter = { 0 };
+struct nd_drhead nd_defrouter;
 struct nd_prhead nd_prefix = { 0 };
 
 int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
@@ -136,6 +136,9 @@ nd6_init()
 	all1_sa.sin6_len = sizeof(struct sockaddr_in6);
 	for (i = 0; i < sizeof(all1_sa.sin6_addr); i++)
 		all1_sa.sin6_addr.s6_addr[i] = 0xff;
+
+	/* initialization of the default router list */
+	TAILQ_INIT(&nd_defrouter);
 
 	nd6_init_done = 1;
 
@@ -500,15 +503,15 @@ nd6_timer(ignored_arg)
 	}
 	
 	/* expire */
-	dr = nd_defrouter.lh_first;
+	dr = TAILQ_FIRST(&nd_defrouter);
 	while (dr) {
 		if (dr->expire && dr->expire < time_second) {
 			struct nd_defrouter *t;
-			t = dr->dr_next;
+			t = TAILQ_NEXT(dr, dr_entry);
 			defrtrlist_del(dr);
 			dr = t;
 		} else
-			dr = dr->dr_next;
+			dr = TAILQ_NEXT(dr, dr_entry);
 	}
 	pr = nd_prefix.lh_first;
 	while (pr) {
@@ -714,44 +717,71 @@ nd6_free(rt)
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	struct sockaddr_dl *sdl;
+	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
+	struct nd_defrouter *dr;
 
-	if (ln->ln_router) {
-		/* remove from default router list */
-		struct nd_defrouter *dr;
-		struct in6_addr *in6;
+	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		int s;
-		in6 = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
-
 #ifdef __NetBSD__
 		s = splsoftnet();
 #else
 		s = splnet();
 #endif
-		dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->
-				      sin6_addr,
+		dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 				      rt->rt_ifp);
-		if (dr)
-			defrtrlist_del(dr);
-		else if (!ip6_forwarding && ip6_accept_rtadv) {
+		if (ln->ln_router || dr) {
 			/*
-			 * rt6_flush must be called in any case.
-			 * see the comment in nd6_na_input().
+			 * rt6_flush must be called whether or not the neighbor
+			 * is in the Default Router List.
+			 * See a corresponding comment in nd6_na_input().
 			 */
-			rt6_flush(in6, rt->rt_ifp);
+			rt6_flush(&in6, rt->rt_ifp);
+		}
+
+		/* this is safe when dr is NULL */
+		if (dr) {
+			/*
+			 * Unreachablity of a router might affect the default
+			 * router selection and on-link detection of advertised
+			 * prefixes.
+			 */
+			if (dr == TAILQ_FIRST(&nd_defrouter)) {
+				/*
+				 * It is used as the current default router,
+				 * so we have to move it to the end of the
+				 * list and choose a new one.
+				 * XXX: it is not very efficient if this is
+				 *      the only router.
+				 */
+				TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
+				TAILQ_INSERT_TAIL(&nd_defrouter, dr, dr_entry);
+
+				/*
+				 * Temporarily fake the state to choose a
+				 * new default router. Below the state will be
+				 * set correctly, or the entry itself will be
+				 * deleted.
+				 */
+				ln->ln_state = ND6_LLINFO_INCOMPLETE;
+
+				defrouter_select();
+			}
+			pfxlist_onlink_check();
 		}
 		splx(s);
 	}
-	
+
 	if (rt->rt_refcnt > 0 && (sdl = SDL(rt->rt_gateway)) &&
-	   sdl->sdl_family == AF_LINK) {
+	    sdl->sdl_family == AF_LINK) {
 		sdl->sdl_alen = 0;
 		ln->ln_state = ND6_LLINFO_WAITDELETE;
 		ln->ln_asked = 0;
 		rt->rt_flags &= ~RTF_REJECT;
 		return;
 	}
-	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0, rt_mask(rt),
-		  0, (struct rtentry **)0);
+
+	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
+		  rt_mask(rt), 0, (struct rtentry **)0);
 }
 
 /*
@@ -1178,7 +1208,7 @@ nd6_ioctl(cmd, data, ifp)
 #else
 		s = splnet();
 #endif
-		dr = nd_defrouter.lh_first;
+		dr = TAILQ_FIRST(&nd_defrouter);
 		while (dr && i < DRLSTSIZ) {
 			drl->defrouter[i].rtaddr = dr->rtaddr;
 			if (IN6_IS_ADDR_LINKLOCAL(&drl->defrouter[i].rtaddr)) {
@@ -1196,7 +1226,7 @@ nd6_ioctl(cmd, data, ifp)
 			drl->defrouter[i].expire = dr->expire;
 			drl->defrouter[i].if_index = dr->ifp->if_index;
 			i++;
-			dr = dr->dr_next;
+			dr = TAILQ_NEXT(dr, dr_entry);
 		}
 		splx(s);
 		break;
@@ -1270,7 +1300,7 @@ nd6_ioctl(cmd, data, ifp)
 	case SIOCGIFINFO_IN6:
 		ndi->ndi = nd_ifinfo[ifp->if_index];
 		break;
-	case SIOCSNDFLUSH_IN6:
+	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
 		/* flush default router list */
 		/*
 		 * xxx sumikawa: should not delete route if default
@@ -1278,6 +1308,7 @@ nd6_ioctl(cmd, data, ifp)
 		 */
 		bzero(&any, sizeof(any));
 		defrouter_delreq(&any, 0);
+		defrouter_select();
 		/* xxx sumikawa: flush prefix list */
 		break;
 	case SIOCSPFXFLUSH_IN6:
@@ -1309,16 +1340,16 @@ nd6_ioctl(cmd, data, ifp)
 #else
 		s = splnet();
 #endif
-		if ((dr = nd_defrouter.lh_first) != NULL) {
+		if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
 			/*
 			 * The first entry of the list may be stored in
 			 * the routing table, so we'll delete it later.
 			 */
-			for (dr = dr->dr_next; dr; dr = next) {
-				next = dr->dr_next;
+			for (dr = TAILQ_NEXT(dr, dr_entry); dr; dr = next) {
+				next = TAILQ_NEXT(dr, dr_entry);
 				defrtrlist_del(dr);
 			}
-			defrtrlist_del(nd_defrouter.lh_first);
+			defrtrlist_del(TAILQ_FIRST(&nd_defrouter));
 		}
 		splx(s);
 		break;
