@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.39 2003/12/08 10:05:54 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.40 2004/11/26 07:10:45 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -323,7 +323,7 @@ scope6_setdefault(ifp)
 	struct ifnet *ifp;	/* note that this might be NULL */
 {
 	/*
-	 * Currently, this function just set the default "interfaces"
+	 * Currently, this function just sets the default "interfaces"
 	 * and "links" according to the given interface.
 	 * We might eventually have to separate the notion of "link" from
 	 * "interface" and provide a user interface to set the default.
