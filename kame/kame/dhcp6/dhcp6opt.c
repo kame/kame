@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <dhcp6opt.h>
 
 static struct dhcp6_opt dh6opttab[] = {
