@@ -266,8 +266,13 @@ ip_output(m0, va_alist)
 		mtu = ifp->if_mtu;
 		ip->ip_ttl = 1;
 	} else {
-		if (ro->ro_rt == 0)
+		if (ro->ro_rt == 0) {
+#ifdef RADIX_MPATH
+			rtalloc_mpath(ro, ntohl(ip->ip_dst.s_addr));
+#else
 			rtalloc(ro);
+#endif
+		}
 		if (ro->ro_rt == 0) {
 			ipstat.ips_noroute++;
 			error = EHOSTUNREACH;

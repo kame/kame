@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.2 2001/07/20 19:45:57 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.3 2001/07/20 21:29:06 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -140,6 +140,45 @@ rt_mpath_matchgate(rt, gate)
 		return NULL;
 
 	return (struct rtentry *)rn;
+}
+
+void
+rtalloc_mpath(ro, hash)
+	struct route *ro;
+	int hash;
+{
+	struct radix_node *rn0, *rn;
+	int n;
+
+	/*
+	 * XXX we don't attempt to lookup cached route again; what should
+	 * be done for sendto(3) case?
+	 */
+	if (ro->ro_rt && ro->ro_rt->rt_ifp && (ro->ro_rt->rt_flags & RTF_UP))
+		return;				 /* XXX */
+	ro->ro_rt = rtalloc1(&ro->ro_dst, 1);
+
+	/* if the route does not exist or it is not multipath, don't care */
+	if (!ro->ro_rt || !rn_mpath_next((struct radix_node *)ro->ro_rt))
+		return;
+
+	/* beyond here, we use rn as the master copy */
+	rn0 = rn = (struct radix_node *)ro->ro_rt;
+	n = rn_mpath_count(rn0);
+	hash %= n;	/* XXX is the hash policy good enough? */
+	while (hash-- > 0 && rn) {
+		/* stay within the multipath routes */
+		if (rn->rn_dupedkey && rn->rn_mask != rn->rn_dupedkey->rn_mask)
+			break;
+		rn = rn->rn_dupedkey;
+	}
+
+	/* XXX try to fill rt_gwroute and avoid nonexistent routes */
+	/* XXX try to avoid gw with L2 address resolution failures */
+
+	rtfree(ro->ro_rt);
+	ro->ro_rt = (struct rtentry *)rn;
+	ro->ro_rt->rt_refcnt++;
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.196 2001/07/15 05:16:53 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.197 2001/07/20 21:29:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -796,7 +796,12 @@ skip_ipsec2:;
 			 * non-bsdi always clone routes, if parent is
 			 * PRF_CLONING.
 			 */
+#ifdef RADIX_MPATH
+			rtalloc_mpath((struct route *)ro,
+			    ip6->ip6_dst.s6_addr32[3]);
+#else
 			rtalloc((struct route *)ro);
+#endif
 #else
 			if (ro == &ip6route)	/* xxx kazu */
 				rtalloc((struct route *)ro);
