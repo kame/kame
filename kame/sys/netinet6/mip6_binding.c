@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.50 2001/12/17 03:14:54 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.51 2001/12/17 08:36:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1774,11 +1774,11 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		mip6log((LOG_ERR,
 			 "%s:%d: sending ip packet error. (%d)\n",
 			 __FILE__, __LINE__, error));
-		free(opt.ip6po_dest2, M_TEMP);
+		free(opt.ip6po_dest2, M_IP6OPT);
 		return (error);
 	}
 
-	free(opt.ip6po_dest2, M_TEMP);
+	free(opt.ip6po_dest2, M_IP6OPT);
 	return (0);
 }
 

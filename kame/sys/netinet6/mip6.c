@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.90 2001/12/14 03:52:09 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.91 2001/12/17 08:36:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1409,7 +1409,7 @@ mip6_rthdr_create(pktopt_rthdr, coa)
 	size_t len;
 
 	len = sizeof(struct ip6_rthdr0) + sizeof(struct in6_addr);
-	rthdr0 = malloc(len, M_TEMP, M_NOWAIT);
+	rthdr0 = malloc(len, M_IP6OPT, M_NOWAIT);
 	if (rthdr0 == NULL) {
 		return (ENOMEM);
 	}
@@ -1581,7 +1581,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 #endif /* MIP6_DRAFT13 */
 
 	/* XXX MIP6_BUFFER_SIZE = IPV6_MIMMTU is OK?? */
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1674,7 +1674,7 @@ mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
 		coa = &hif_coa;
 	bcopy((caddr_t)coa, haddr_opt.ip6oh_addr, sizeof(*coa));
 
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1716,7 +1716,7 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 	}
 
 	/* XXX IPV6_MIMMTU is OK?? */
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1787,7 +1787,7 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	struct ip6_opt_binding_ack ba_opt;
 	struct mip6_buffer optbuf;
 
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1823,13 +1823,13 @@ mip6_destopt_discard(mip6opt)
 	struct mip6_pktopts *mip6opt;
 {
 	if (mip6opt->mip6po_rthdr)
-		free(mip6opt->mip6po_rthdr, M_TEMP);
+		free(mip6opt->mip6po_rthdr, M_IP6OPT);
 
 	if (mip6opt->mip6po_haddr)
-		free(mip6opt->mip6po_haddr, M_TEMP);
+		free(mip6opt->mip6po_haddr, M_IP6OPT);
 
 	if (mip6opt->mip6po_dest2)
-		free(mip6opt->mip6po_dest2, M_TEMP);
+		free(mip6opt->mip6po_dest2, M_IP6OPT);
 
 	return;
 }
