@@ -1,4 +1,4 @@
-/*	$NetBSD: pathconf.c,v 1.5 2000/04/14 06:03:40 simonb Exp $	*/
+/*	$NetBSD: pathconf.c,v 1.7 2004/03/25 19:36:27 atatat Exp $	*/
 
 /*
  * Copyright (c) 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)pathconf.c	8.1 (Berkeley) 6/6/93";
 #else
-static char rcsid[] = "$NetBSD: pathconf.c,v 1.5 2000/04/14 06:03:40 simonb Exp $";
+static char rcsid[] = "$NetBSD: pathconf.c,v 1.7 2004/03/25 19:36:27 atatat Exp $";
 #endif
 #endif /* not lint */
 
@@ -200,7 +196,7 @@ parse(pathname, string, flags)
  */
 findname(string, level, bufp, namelist)
 	char *string;
-	char *level;
+	const char *level;
 	char **bufp;
 	struct list *namelist;
 {

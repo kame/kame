@@ -1,4 +1,4 @@
-/*	$NetBSD: swap.c,v 1.14 2000/12/01 02:19:44 simonb Exp $	*/
+/*	$NetBSD: swap.c,v 1.17 2003/10/13 14:22:20 agc Exp $	*/
 
 /*-
  * Copyright (c) 1997 Matthew R. Green.  All rights reserved.
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
 #if 0
 static char sccsid[] = "@(#)swap.c	8.3 (Berkeley) 4/29/95";
 #endif
-__RCSID("$NetBSD: swap.c,v 1.14 2000/12/01 02:19:44 simonb Exp $");
+__RCSID("$NetBSD: swap.c,v 1.17 2003/10/13 14:22:20 agc Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -65,7 +61,7 @@ WINDOW *
 openswap(void)
 {
 
-	return (subwin(stdscr, LINES-5-1, 0, 5, 0));
+	return (subwin(stdscr, -1, 0, 5, 0));
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs.c,v 1.6 2000/02/04 10:43:34 jdolecek Exp $	*/
+/*	$NetBSD: ntfs.c,v 1.8 2003/02/02 02:35:58 christos Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: ntfs.c,v 1.6 2000/02/04 10:43:34 jdolecek Exp $");
+__RCSID("$NetBSD: ntfs.c,v 1.8 2003/02/02 02:35:58 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/time.h>

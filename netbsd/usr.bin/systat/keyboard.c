@@ -1,4 +1,4 @@
-/*	$NetBSD: keyboard.c,v 1.13 2000/12/01 02:19:44 simonb Exp $	*/
+/*	$NetBSD: keyboard.c,v 1.16 2004/03/27 00:53:59 martin Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)keyboard.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: keyboard.c,v 1.13 2000/12/01 02:19:44 simonb Exp $");
+__RCSID("$NetBSD: keyboard.c,v 1.16 2004/03/27 00:53:59 martin Exp $");
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -51,7 +47,7 @@ __RCSID("$NetBSD: keyboard.c,v 1.13 2000/12/01 02:19:44 simonb Exp $");
 #include "systat.h"
 #include "extern.h"
 
-int
+void
 keyboard(void)
 {
 	char ch, rch, *line;
@@ -103,6 +99,7 @@ keyboard(void)
 					move(CMDLINE, 0);
 					break;
 				    case 'Q':
+				    case 'q':
 					command("quit");
 					break;
 				    case ':':

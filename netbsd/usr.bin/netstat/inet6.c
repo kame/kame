@@ -1,4 +1,4 @@
-/*	$NetBSD: inet6.c,v 1.23 2001/10/18 09:26:16 itojun Exp $	*/
+/*	$NetBSD: inet6.c,v 1.31 2003/11/06 06:11:48 itojun Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 
 /*
@@ -42,11 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -68,7 +64,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$NetBSD: inet6.c,v 1.23 2001/10/18 09:26:16 itojun Exp $");
+__RCSID("$NetBSD: inet6.c,v 1.31 2003/11/06 06:11:48 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -154,30 +150,33 @@ ip6protopr(off, name)
 	u_long off;
 	char *name;
 {
-	struct in6pcb cb;
-	register struct in6pcb *prev, *next;
+	struct inpcbtable table;
+	struct in6pcb *head, *prev, *next;
 	int istcp;
 	static int first = 1;
 	int width = 22;
+
 	if (off == 0)
 		return;
 	istcp = strcmp(name, "tcp6") == 0;
-	kread(off, (char *)&cb, sizeof (struct in6pcb));
-	in6pcb = cb;
-	prev = (struct in6pcb *)off;
-	if (in6pcb.in6p_next == (struct in6pcb *)off)
-		return;
-	while (in6pcb.in6p_next != (struct in6pcb *)off) {
-		next = in6pcb.in6p_next;
-		kread((u_long)next, (char *)&in6pcb, sizeof (in6pcb));
-		if (in6pcb.in6p_prev != prev) {
+	kread(off, (char *)&table, sizeof (table));
+	head = prev =
+	    (struct in6pcb *)&((struct inpcbtable *)off)->inpt_queue.cqh_first;
+	next = (struct in6pcb *)table.inpt_queue.cqh_first;
+	while (next != head) {
+		kread((u_long)next, (char *)&in6pcb, sizeof in6pcb);
+		if ((struct in6pcb *)in6pcb.in6p_queue.cqe_prev != prev) {
 			printf("???\n");
 			break;
 		}
-		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr)) {
-			prev = next;
+		prev = next;
+		next = (struct in6pcb *)in6pcb.in6p_queue.cqe_next;
+
+		if (in6pcb.in6p_af != AF_INET6)
 			continue;
-		}
+
+		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr))
+			continue;
 		kread((u_long)in6pcb.in6p_socket, (char *)&sockb, sizeof (sockb));
 		if (istcp) {
 #ifdef TCP6
@@ -229,7 +228,6 @@ ip6protopr(off, name)
 #endif
 		}
 		putchar('\n');
-		prev = next;
 	}
 }
 
@@ -1120,7 +1118,7 @@ rip6_stats(off, name)
 #define	p(f, m) if (rip6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)rip6stat.f, plural(rip6stat.f))
 	p(rip6s_ipackets, "\t%llu message%s received\n");
-	p(rip6s_isum, "\t%llu checksum calcuration%s on inbound\n");
+	p(rip6s_isum, "\t%llu checksum calculation%s on inbound\n");
 	p(rip6s_badsum, "\t%llu message%s with bad checksum\n");
 	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
 	p(rip6s_nosockmcast,
@@ -1165,12 +1163,12 @@ do {\
 	if (vflag && width < strlen(inet6name(in6)))
 		width = strlen(inet6name(in6));
 	snprintf(line, sizeof(line), "%.*s.", width, inet6name(in6));
-	cp = index(line, '\0');
+	cp = strchr(line, '\0');
 	if (!numeric_port && port)
 		GETSERVBYPORT6(port, proto, sp);
 	if (sp || port == 0)
 		snprintf(cp, sizeof(line) - (cp - line),
-		    "%.8s", sp ? sp->s_name : "*");
+		    "%s", sp ? sp->s_name : "*");
 	else
 		snprintf(cp, sizeof(line) - (cp - line),
 		    "%d", ntohs((u_short)port));
@@ -1206,7 +1204,7 @@ inet6name(in6p)
 	if (first && !numeric_addr) {
 		first = 0;
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
-		    (cp = index(domain, '.')))
+		    (cp = strchr(domain, '.')))
 			(void) strlcpy(domain, cp + 1, sizeof(domain));
 		else
 			domain[0] = 0;
@@ -1215,7 +1213,7 @@ inet6name(in6p)
 	if (!numeric_addr && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
 		hp = gethostbyaddr((char *)in6p, sizeof(*in6p), AF_INET6);
 		if (hp) {
-			if ((cp = index(hp->h_name, '.')) &&
+			if ((cp = strchr(hp->h_name, '.')) &&
 			    !strcmp(cp + 1, domain))
 				*cp = 0;
 			cp = hp->h_name;
@@ -1230,10 +1228,11 @@ inet6name(in6p)
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_addr = *in6p;
-#ifdef KAME_SCOPEID
-		if (IN6_IS_ADDR_LINKLOCAL(in6p)) {
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(in6p) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(in6p)) {
 			sin6.sin6_scope_id =
-				ntohs(*(u_int16_t *)&in6p->s6_addr[2]);
+			    ntohs(*(u_int16_t *)&in6p->s6_addr[2]);
 			sin6.sin6_addr.s6_addr[2] = 0;
 			sin6.sin6_addr.s6_addr[3] = 0;
 		}

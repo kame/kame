@@ -1,9 +1,41 @@
-/*	$NetBSD: mroute.c,v 1.14 2001/05/28 04:22:56 assar Exp $	*/
+/*	$NetBSD: mroute.c,v 1.17 2003/08/07 11:15:21 agc Exp $	*/
+
+/*
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Stephen Deering of Stanford University.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)mroute.c	8.1 (Berkeley) 6/6/93
+ */
 
 /*
  * Copyright (c) 1989 Stephen Deering
- * Copyright (c) 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Stephen Deering of Stanford University.
@@ -44,7 +76,7 @@
 #if 0
 static char sccsid[] = "from: @(#)mroute.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: mroute.c,v 1.14 2001/05/28 04:22:56 assar Exp $");
+__RCSID("$NetBSD: mroute.c,v 1.17 2003/08/07 11:15:21 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -77,7 +109,7 @@ static char *
 pktscale(n)
 	u_long n;
 {
-	static char buf[8];
+	static char buf[20];
 	char t;
 
 	if (n < 1024)
@@ -246,26 +278,26 @@ mrt_stats(mrpaddr, mstaddr)
 
 	kread(mstaddr, (char *)&mrtstat, sizeof(mrtstat));
 	printf("multicast routing:\n");
-	printf("\t%ld datagram%s with no route for origin\n",
+	printf("\t%lu datagram%s with no route for origin\n",
 	    mrtstat.mrts_no_route, plural(mrtstat.mrts_no_route));
-	printf("\t%ld upcall%s made to mrouted\n",
+	printf("\t%lu upcall%s made to mrouted\n",
 	    mrtstat.mrts_upcalls, plural(mrtstat.mrts_upcalls));
-	printf("\t%ld datagram%s with malformed tunnel options\n",
+	printf("\t%lu datagram%s with malformed tunnel options\n",
 	    mrtstat.mrts_bad_tunnel, plural(mrtstat.mrts_bad_tunnel));
-	printf("\t%ld datagram%s with no room for tunnel options\n",
+	printf("\t%lu datagram%s with no room for tunnel options\n",
 	    mrtstat.mrts_cant_tunnel, plural(mrtstat.mrts_cant_tunnel));
-	printf("\t%ld datagram%s arrived on wrong interface\n",
+	printf("\t%lu datagram%s arrived on wrong interface\n",
 	    mrtstat.mrts_wrong_if, plural(mrtstat.mrts_wrong_if));
-	printf("\t%ld datagram%s dropped due to upcall Q overflow\n",
+	printf("\t%lu datagram%s dropped due to upcall Q overflow\n",
 	    mrtstat.mrts_upq_ovflw, plural(mrtstat.mrts_upq_ovflw));
-	printf("\t%ld datagram%s dropped due to upcall socket overflow\n",
+	printf("\t%lu datagram%s dropped due to upcall socket overflow\n",
 	    mrtstat.mrts_upq_sockfull, plural(mrtstat.mrts_upq_sockfull));
-	printf("\t%ld datagram%s cleaned up by the cache\n",
+	printf("\t%lu datagram%s cleaned up by the cache\n",
 	    mrtstat.mrts_cache_cleanups, plural(mrtstat.mrts_cache_cleanups));
-	printf("\t%ld datagram%s dropped selectively by ratelimiter\n",
+	printf("\t%lu datagram%s dropped selectively by ratelimiter\n",
 	    mrtstat.mrts_drop_sel, plural(mrtstat.mrts_drop_sel));
-	printf("\t%ld datagram%s dropped - bucket Q overflow\n",
+	printf("\t%lu datagram%s dropped - bucket Q overflow\n",
 	    mrtstat.mrts_q_overflow, plural(mrtstat.mrts_q_overflow));
-	printf("\t%ld datagram%s dropped - larger than bkt size\n",
+	printf("\t%lu datagram%s dropped - larger than bkt size\n",
 	    mrtstat.mrts_pkt2large, plural(mrtstat.mrts_pkt2large));
 }

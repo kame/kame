@@ -1,4 +1,4 @@
-/*	$NetBSD: mbuf.c,v 1.17 2002/03/09 23:26:51 sommerfeld Exp $	*/
+/*	$NetBSD: mbuf.c,v 1.22.2.1 2004/04/09 20:12:55 jmc Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)mbuf.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: mbuf.c,v 1.17 2002/03/09 23:26:51 sommerfeld Exp $");
+__RCSID("$NetBSD: mbuf.c,v 1.22.2.1 2004/04/09 20:12:55 jmc Exp $");
 #endif
 #endif /* not lint */
 
@@ -49,9 +45,13 @@ __RCSID("$NetBSD: mbuf.c,v 1.17 2002/03/09 23:26:51 sommerfeld Exp $");
 #include <sys/socket.h>
 #include <sys/mbuf.h>
 #include <sys/pool.h>
+#include <sys/sysctl.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <errno.h>
+#include <err.h>
 #include "netstat.h"
 
 #define	YES	1
@@ -75,8 +75,11 @@ static struct mbtypes {
 	{ 0, 0 }
 };
 
-int nmbtypes = sizeof(mbstat.m_mtypes) / sizeof(short);
+const int nmbtypes = sizeof(mbstat.m_mtypes) / sizeof(short);
 bool seen[256];			/* "have we seen this type yet?" */
+
+int mbstats_ctl[] = { CTL_KERN, KERN_MBUF, MBUF_STATS };
+int mowners_ctl[] = { CTL_KERN, KERN_MBUF, MBUF_MOWNERS };
 
 /*
  * Print mbuf statistics.
@@ -87,11 +90,14 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 	u_long msizeaddr, mclbaddr;
 	u_long mbpooladdr, mclpooladdr;
 {
-	int totmem, totused, totmbufs, totpct;
-	int i;
+	u_long totmem, totused, totpct;
+	u_int totmbufs;
+	int i, lines;
 	struct mbtypes *mp;
-
-	int	mclbytes,	msize;
+	size_t len;
+	void *data;
+	struct mowner *mo;
+	int mclbytes, msize;
 
 	if (nmbtypes != 256) {
 		fprintf(stderr,
@@ -99,6 +105,18 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 		        getprogname());
 		return;
 	}
+
+	if (use_sysctl) {
+		size_t mbstatlen = sizeof(mbstat);
+		if (sysctl(mbstats_ctl,
+			    sizeof(mbstats_ctl) / sizeof(mbstats_ctl[0]),
+			    &mbstat, &mbstatlen, NULL, 0) < 0) {
+			warn("mbstat: sysctl failed");
+			return;
+		}
+		goto printit;
+	}
+
 	if (mbaddr == 0) {
 		fprintf(stderr, "%s: mbstat: symbol not in namelist\n",
 		    getprogname());
@@ -133,6 +151,7 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 	if (kread(mclpooladdr, (char *)&mclpa, sizeof (mclpa)))
 		return;
 
+    printit:
 	totmbufs = 0;
 	for (mp = mbtypes; mp->mt_name; mp++)
 		totmbufs += mbstat.m_mtypes[mp->mt_type];
@@ -150,6 +169,9 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 			    mbstat.m_mtypes[i], i);
 		}
 
+	if (use_sysctl)		/* XXX */
+		goto dump_drain;
+
 	printf("%lu/%lu mapped pages in use\n",
 	       (u_long)(mclpool.pr_nget - mclpool.pr_nput),
 	       ((u_long)mclpool.pr_npages * mclpool.pr_itemsperpage));
@@ -157,10 +179,90 @@ mbpr(mbaddr, msizeaddr, mclbaddr, mbpooladdr, mclpooladdr)
 	    (mclpool.pr_npages << mclpa.pa_pageshift);
 	totused = (mbpool.pr_nget - mbpool.pr_nput) * mbpool.pr_size +
 	    (mclpool.pr_nget - mclpool.pr_nput) * mclpool.pr_size;
-	totpct = (totmem == 0)? 0 : ((totused * 100)/totmem);
-	printf("%u Kbytes allocated to network (%d%% in use)\n",
+	if (totmem == 0)
+		totpct = 0;
+	else if (totused < (ULONG_MAX/100))
+		totpct = (totused * 100)/totmem;
+	else {
+		u_long totmem1 = totmem/100;
+		u_long totused1 = totused/100;
+		totpct = (totused1 * 100)/totmem1;
+	}
+	
+	printf("%lu Kbytes allocated to network (%lu%% in use)\n",
 	    totmem / 1024, totpct);
 	printf("%lu requests for memory denied\n", mbstat.m_drops);
 	printf("%lu requests for memory delayed\n", mbstat.m_wait);
+
+dump_drain:
 	printf("%lu calls to protocol drain routines\n", mbstat.m_drain);
+
+ 	if (sflag < 2)
+		return;
+
+	if (!use_sysctl)
+		return;
+
+	if (sysctl(mowners_ctl, sizeof(mowners_ctl)/sizeof(mowners_ctl[0]),
+		    NULL, &len, NULL, 0) < 0) {
+		if (errno == ENOENT)
+			return;
+		warn("mowners: sysctl test");
+		return;
+	}
+	len += 10 * sizeof(mo);		/* add some slop */
+	data = malloc(len);
+	if (data == NULL) {
+		warn("malloc(%lu)", (u_long)len);
+		return;
+	}
+
+	if (sysctl(mowners_ctl, sizeof(mowners_ctl)/sizeof(mowners_ctl[0]),
+		    data, &len, NULL, 0) < 0) {
+		warn("mowners: sysctl get");
+		free(data);
+		return;
+	}
+
+	for (mo = (void *) data, lines = 0; len >= sizeof(*mo);
+	    len -= sizeof(*mo), mo++) {
+		char buf[32];
+		if (vflag == 1 &&
+		    mo->mo_claims == 0 &&
+		    mo->mo_ext_claims == 0 &&
+		    mo->mo_cluster_claims == 0)
+			continue;
+		if (vflag == 0 &&
+		    mo->mo_claims == mo->mo_releases &&
+		    mo->mo_ext_claims == mo->mo_ext_releases &&
+		    mo->mo_cluster_claims == mo->mo_cluster_releases)
+			continue;
+		snprintf(buf, sizeof(buf), "%16s %-13s",
+		    mo->mo_name, mo->mo_descr);
+		if ((lines % 24) == 0 || lines > 24) {
+			printf("%30s %-8s %10s %10s %10s\n",
+			    "", "", "small", "ext", "cluster");
+			lines = 1;
+		}
+		printf("%30s %-8s %10lu %10lu %10lu\n",
+		    buf, "inuse",
+		    mo->mo_claims - mo->mo_releases,
+		    mo->mo_ext_claims - mo->mo_ext_releases,
+		    mo->mo_cluster_claims - mo->mo_cluster_releases);
+		lines++;
+		if (vflag) {
+			printf("%30s %-8s %10lu %10lu %10lu\n",
+			    "", "claims",
+			    mo->mo_claims,
+			    mo->mo_ext_claims,
+			    mo->mo_cluster_claims);
+			printf("%30s %-8s %10lu %10lu %10lu\n",
+			    "", "releases",
+			    mo->mo_releases,
+			    mo->mo_ext_releases,
+			    mo->mo_cluster_releases);
+			lines += 2;
+		}
+	}
+	free(data);
 }

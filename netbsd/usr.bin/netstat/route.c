@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.59 2002/05/13 05:13:23 matt Exp $	*/
+/*	$NetBSD: route.c,v 1.63 2003/08/07 11:15:21 agc Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-__RCSID("$NetBSD: route.c,v 1.59 2002/05/13 05:13:23 matt Exp $");
+__RCSID("$NetBSD: route.c,v 1.63 2003/08/07 11:15:21 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -229,7 +225,7 @@ pr_family(af)
 #define	WID_GW(af)	18	/* width of gateway column */
 #else
 /* width of destination/gateway column */
-#ifdef KAME_SCOPEID
+#if 1
 /* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30, strlen("/128") == 4 */
 #define	WID_DST(af)	((af) == AF_INET6 ? (numeric_addr ? 34 : 18) : 18)
 #define	WID_GW(af)	((af) == AF_INET6 ? (numeric_addr ? 30 : 18) : 18)
@@ -449,7 +445,7 @@ p_sockaddr(sa, mask, flags, width)
 	case AF_INET6:
 	    {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
-#ifdef KAME_SCOPEID
+#ifdef __KAME__
 		struct in6_addr *in6 = &sa6->sin6_addr;
 
 		/*
@@ -493,7 +489,7 @@ p_sockaddr(sa, mask, flags, width)
 	case AF_LINK:
 		if (getnameinfo(sa, sa->sa_len, workbuf, sizeof(workbuf),
 		    NULL, 0, NI_NUMERICHOST) != 0)
-			strncpy(workbuf, "invalid", sizeof(workbuf));
+			strlcpy(workbuf, "invalid", sizeof(workbuf));
 		cp = workbuf;
 		break;
 
@@ -665,10 +661,9 @@ routename(in)
 			cp = hp->h_name;
 		}
 	}
-	if (cp) {
-		strncpy(line, cp, sizeof(line) - 1);
-		line[sizeof(line) - 1] = '\0';
-	} else {
+	if (cp)
+		strlcpy(line, cp, sizeof(line));
+	else {
 #define C(x)	((x) & 0xff)
 		in = ntohl(in);
 		snprintf(line, sizeof line, "%u.%u.%u.%u",
@@ -700,7 +695,7 @@ domask(dst, dlen, addr, mask)
 {
 	int b, i;
 
-	if (!mask || (forgemask(addr) == mask)) {
+	if (!mask) {
 		*dst = '\0';
 		return;
 	}
@@ -777,7 +772,7 @@ netname(in, mask)
 			cp = np->n_name;
 	}
 	if (cp)
-		strncpy(line, cp, sizeof(line) - 1);
+		strlcpy(line, cp, sizeof(line));
 	else if ((i & 0xffffff) == 0)
 		(void)snprintf(line, sizeof line, "%u", C(i >> 24));
 	else if ((i & 0xffff) == 0)
@@ -803,7 +798,7 @@ netname6(sa6, mask)
 	u_char *p, *q;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0;
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	int flag = NI_WITHSCOPEID;
 #else
 	int flag = 0;
@@ -895,7 +890,7 @@ routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
 	static char line[NI_MAXHOST];
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	int flag = NI_WITHSCOPEID;
 #else
 	int flag = 0;

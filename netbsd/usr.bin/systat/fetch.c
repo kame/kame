@@ -1,4 +1,4 @@
-/*	$NetBSD: fetch.c,v 1.9 2000/12/01 02:19:43 simonb Exp $	*/
+/*	$NetBSD: fetch.c,v 1.12 2003/12/07 07:27:09 christos Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)fetch.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: fetch.c,v 1.9 2000/12/01 02:19:43 simonb Exp $");
+__RCSID("$NetBSD: fetch.c,v 1.12 2003/12/07 07:27:09 christos Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -46,17 +42,18 @@ __RCSID("$NetBSD: fetch.c,v 1.9 2000/12/01 02:19:43 simonb Exp $");
 #include <sys/sysctl.h>
 
 #include <string.h>
+#include <errno.h>
 
 #include "systat.h"
 #include "extern.h"
 
 ssize_t
-kvm_ckread(void *a, void *b, size_t l)
+kvm_ckread(const void *a, void *b, size_t l, const char *name)
 {
 	if (kvm_read(kd, (u_long)a, b, l) != l) {
 		if (verbose)
-			error("error reading kmem at %lx\n",
-			   (u_long) a);
+			error("error reading kmem for %s at %p (%s)\n", name,
+			    a, strerror(errno));
 		return (0);
 	} else
 		return (1);

@@ -1,4 +1,4 @@
-/*	$NetBSD: disks.c,v 1.12 2000/12/01 02:19:43 simonb Exp $	*/
+/*	$NetBSD: disks.c,v 1.14 2003/09/12 17:32:31 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)disks.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: disks.c,v 1.12 2000/12/01 02:19:43 simonb Exp $");
+__RCSID("$NetBSD: disks.c,v 1.14 2003/09/12 17:32:31 mycroft Exp $");
 #endif /* not lint */
 
 #include <ctype.h>
@@ -59,7 +55,7 @@ disks_add(char *args)
 }
 
 void
-disks_delete(char *args)
+disks_remove(char *args)
 {
 
 	if (args)
@@ -71,10 +67,16 @@ disks_drives(char *args)
 {
 	int i;
 
-	move(CMDLINE, 0);
-	clrtoeol();
-	for (i = 0; i < dk_ndrive; i++)
-		printw("%s ", dr_name[i]);
+	if (args) {
+		for (i = 0; i < dk_ndrive; i++)
+			dk_select[i] = 0;
+		disks_add(args);
+	} else {
+		move(CMDLINE, 0);
+		clrtoeol();
+		for (i = 0; i < dk_ndrive; i++)
+			printw("%s ", dr_name[i]);
+	}
 }
 
 static void

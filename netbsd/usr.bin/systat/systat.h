@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,8 +57,8 @@ struct	command {
 #define	TCP	0x1
 #define	UDP	0x2
 
-#define KREAD(addr, buf, len)  kvm_ckread((addr), (buf), (len))
+#define KREAD(addr, buf, len)  kvm_ckread((addr), (buf), (len), # addr)
 #define NVAL(indx)  namelist[(indx)].n_value
 #define NPTR(indx)  (void *)NVAL((indx))
-#define NREAD(indx, buf, len) kvm_ckread(NPTR((indx)), (buf), (len))
+#define NREAD(indx, buf, len) kvm_ckread(NPTR((indx)), (buf), (len), # indx)
 #define LONG	(sizeof (long))

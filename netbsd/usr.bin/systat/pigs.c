@@ -1,4 +1,4 @@
-/*	$NetBSD: pigs.c,v 1.22 2002/05/04 18:44:27 thorpej Exp $	*/
+/*	$NetBSD: pigs.c,v 1.27 2004/02/13 11:36:24 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)pigs.c	8.2 (Berkeley) 9/23/93";
 #endif
-__RCSID("$NetBSD: pigs.c,v 1.22 2002/05/04 18:44:27 thorpej Exp $");
+__RCSID("$NetBSD: pigs.c,v 1.27 2004/02/13 11:36:24 wiz Exp $");
 #endif /* not lint */
 
 /*
@@ -77,7 +73,7 @@ WINDOW *
 openpigs(void)
 {
 
-	return (subwin(stdscr, LINES-5-1, 0, 5, 0));
+	return (subwin(stdscr, -1, 0, 5, 0));
 }
 
 void
@@ -104,7 +100,7 @@ showpigs(void)
 
 	if (pt == NULL)
 		return;
-	/* Accumulate the percent of cpu per user. */
+	/* Accumulate the percent of CPU per user. */
 	total = 0.0;
 	for (i = 0; i <= nproc; i++) {
 		/* Accumulate the percentage. */
@@ -216,8 +212,8 @@ fetchpigs(void)
 		pctp = &pt[i].pt_pctcpu;
 		time = k->p_swtime;
 		/* XXX - I don't like this */
-		if (k->p_swtime == 0 || (k->p_flag & P_INMEM) == 0 ||
-		    k->p_stat == SZOMB || k->p_stat == SDEAD)
+		if (k->p_swtime == 0 || (k->p_flag & L_INMEM) == 0 ||
+		    k->p_stat == SZOMB)
 			*pctp = 0;
 		else
 			*pctp = ((double) k->p_pctcpu / 

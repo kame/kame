@@ -1,4 +1,4 @@
-/*	$NetBSD: netstat.h,v 1.24 2002/02/27 03:55:14 lukem Exp $	*/
+/*	$NetBSD: netstat.h,v 1.28.2.1 2004/05/10 15:00:31 tron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,6 +48,7 @@ int	numeric_addr;	/* show addresses numerically */
 int	numeric_port;	/* show ports numerically */
 int	Pflag;		/* dump a PCB */
 int	pflag;		/* show given protocol */
+int	qflag;		/* show softintrq */
 int	rflag;		/* show routing tables (or routing stats) */
 int	sflag;		/* show protocol statistics */
 int	tflag;		/* show i/f watchdog timers */
@@ -62,11 +59,13 @@ int	interval;	/* repeat interval for i/f stats */
 char	*interface;	/* desired i/f for stats, or NULL for all i/fs */
 
 int	af;		/* address family */
+int	use_sysctl;	/* use sysctl instead of kmem */
 
 
 int	kread __P((u_long addr, char *buf, int size));
 char	*plural __P((int));
 char	*plurales __P((int));
+int	get_hardticks __P((void));
 
 void	protopr __P((u_long, char *));
 void	tcp_stats __P((u_long, char *));
@@ -77,7 +76,12 @@ void	icmp_stats __P((u_long, char *));
 void	igmp_stats __P((u_long, char *));
 void	arp_stats __P((u_long, char *));
 #ifdef IPSEC
+/* run-time selector for which  implementation (KAME, FAST_IPSEC) to show */
+void	ipsec_switch __P((u_long, char *));
+/* KAME ipsec version */
 void	ipsec_stats __P((u_long, char *));
+/* FAST_IPSEC version */
+void	fast_ipsec_stats __P((u_long, char *));
 #endif
 
 #ifdef INET6

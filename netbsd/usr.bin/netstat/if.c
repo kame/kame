@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.49 2001/10/06 18:48:30 bjh21 Exp $	*/
+/*	$NetBSD: if.c,v 1.57 2003/11/15 11:54:34 ragge Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,13 +34,14 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-__RCSID("$NetBSD: if.c,v 1.49 2001/10/06 18:48:30 bjh21 Exp $");
+__RCSID("$NetBSD: if.c,v 1.57 2003/11/15 11:54:34 ragge Exp $");
 #endif
 #endif /* not lint */
 
 #include <sys/types.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -99,7 +96,7 @@ intpr(interval, ifnetaddr, pfunc)
 	char name[IFNAMSIZ + 1];	/* + 1 for `*' */
 	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
 #ifdef INET6
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_NUMERICHOST;
@@ -182,14 +179,15 @@ intpr(interval, ifnetaddr, pfunc)
 			printf("%-17.17s ", "none");
 		} else {
 			char hexsep = '.';		/* for hexprint */
-			const char hexfmt[] = "%02x%c";	/* for hexprint */
+			static const char hexfmt[] = "%02x%c";	/* for hexprint */
 			if (kread(ifaddraddr, (char *)&ifaddr, sizeof ifaddr)) {
 				ifaddraddr = 0;
 				continue;
 			}
 #define CP(x) ((char *)(x))
 			cp = (CP(ifaddr.ifa.ifa_addr) - CP(ifaddraddr)) +
-				CP(&ifaddr); sa = (struct sockaddr *)cp;
+			    CP(&ifaddr);
+			sa = (struct sockaddr *)cp;
 			switch (sa->sa_family) {
 			case AF_UNSPEC:
 				printf("%-13.13s ", "none");
@@ -241,7 +239,7 @@ intpr(interval, ifnetaddr, pfunc)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
-#ifdef KAME_SCOPEID
+#ifdef __KAME__
 				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 					sin6->sin6_scope_id =
 						ntohs(*(u_int16_t *)
@@ -286,11 +284,15 @@ intpr(interval, ifnetaddr, pfunc)
 						sin6.sin6_len = sizeof(struct sockaddr_in6);
 						sin6.sin6_family = AF_INET6;
 						sin6.sin6_addr = inm.in6m_addr;
-						sin6.sin6_scope_id =
-						    ntohs(*(u_int16_t *)
-							&sin6.sin6_addr.s6_addr[2]);
-						sin6.sin6_addr.s6_addr[2] = 0;
-						sin6.sin6_addr.s6_addr[3] = 0;
+#ifdef __KAME__
+						if (IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr)) {
+							sin6.sin6_scope_id =
+							    ntohs(*(u_int16_t *)
+								&sin6.sin6_addr.s6_addr[2]);
+							sin6.sin6_addr.s6_addr[2] = 0;
+							sin6.sin6_addr.s6_addr[3] = 0;
+						}
+#endif
 						if (getnameinfo((struct sockaddr *)&sin6,
 						    sin6.sin6_len, hbuf,
 						    sizeof(hbuf), NULL, 0,
@@ -323,7 +325,7 @@ intpr(interval, ifnetaddr, pfunc)
 				struct sockaddr_ns *sns =
 					(struct sockaddr_ns *)sa;
 				u_long net;
-				char netnum[8];
+				char netnum[10];
 
 				*(union ns_net *)&net = sns->sns_addr.x_net;
 				(void)snprintf(netnum, sizeof(netnum), "%xH",
@@ -412,6 +414,7 @@ sidewaysintpr(interval, off)
 	unsigned interval;
 	u_long off;
 {
+	struct itimerval it;
 	struct ifnet ifnet;
 	u_long firstifnet;
 	struct iftot *ip, *total;
@@ -454,7 +457,11 @@ sidewaysintpr(interval, off)
 
 	(void)signal(SIGALRM, catchalarm);
 	signalled = NO;
-	(void)alarm(interval);
+
+	it.it_interval.tv_sec = it.it_value.tv_sec = interval;
+	it.it_interval.tv_usec = it.it_value.tv_usec = 0;
+	setitimer(ITIMER_REAL, &it, NULL);
+
 banner:
 	if (bflag)
 		printf("%7.7s in %8.8s %6.6s out %5.5s",
@@ -599,7 +606,6 @@ loop:
 	}
 	sigsetmask(oldmask);
 	signalled = NO;
-	(void)alarm(interval);
 	if (line == 21)
 		goto banner;
 	goto loop;

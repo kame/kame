@@ -1,4 +1,4 @@
-/* $NetBSD: vmstat.c,v 1.100.2.3 2003/10/02 09:37:52 tron Exp $ */
+/* $NetBSD: vmstat.c,v 1.122 2004/02/28 05:14:55 junyoung Exp $ */
 
 /*-
  * Copyright (c) 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -50,11 +50,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,7 +77,7 @@ __COPYRIGHT("@(#) Copyright (c) 1980, 1986, 1991, 1993\n\
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.2 (Berkeley) 3/1/95";
 #else
-__RCSID("$NetBSD: vmstat.c,v 1.100.2.3 2003/10/02 09:37:52 tron Exp $");
+__RCSID("$NetBSD: vmstat.c,v 1.122 2004/02/28 05:14:55 junyoung Exp $");
 #endif
 #endif /* not lint */
 
@@ -93,9 +89,9 @@ __RCSID("$NetBSD: vmstat.c,v 1.100.2.3 2003/10/02 09:37:52 tron Exp $");
 
 #include <sys/buf.h>
 #include <sys/device.h>
-#include <sys/dkstat.h>
 #include <sys/ioctl.h>
 #include <sys/malloc.h>
+#include <sys/mallocvar.h>
 #include <sys/namei.h>
 #include <sys/pool.h>
 #include <sys/proc.h>
@@ -134,6 +130,7 @@ __RCSID("$NetBSD: vmstat.c,v 1.100.2.3 2003/10/02 09:37:52 tron Exp $");
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <util.h>
 
 #include "dkstats.h"
 
@@ -159,7 +156,7 @@ struct nlist namelist[] =
 #define	X_EINTRCNT	7
 	{ "_eintrcnt" },
 #define	X_KMEMSTAT	8
-	{ "_kmemstats" },
+	{ "_kmemstatistics" },
 #define	X_KMEMBUCKETS	9
 	{ "_bucket" },
 #define	X_ALLEVENTS	10
@@ -171,10 +168,6 @@ struct nlist namelist[] =
 #define	X_TIME		13
 	{ "_time" },
 #define	X_END		14
-#if defined(pc532)
-#define	X_IVT		(X_END)
-	{ "_ivt" },
-#endif
 	{ NULL },
 };
 
@@ -195,33 +188,24 @@ struct nlist hashnl[] =
 	{ "_bufhash" },
 #define	X_BUFHASHTBL	5
 	{ "_bufhashtbl" },
-#define	X_PIDHASH	6
-	{ "_pidhash" },
-#define	X_PIDHASHTBL	7
-	{ "_pidhashtbl" },
-#define	X_PGRPHASH	8
-	{ "_pgrphash" },
-#define	X_PGRPHASHTBL	9
-	{ "_pgrphashtbl" },
-#define	X_UIHASH	10
+#define	X_UIHASH	6
 	{ "_uihash" },
-#define	X_UIHASHTBL	11
+#define	X_UIHASHTBL	7
 	{ "_uihashtbl" },
-#define	X_IFADDRHASH	12
+#define	X_IFADDRHASH	8
 	{ "_in_ifaddrhash" },
-#define	X_IFADDRHASHTBL	13
+#define	X_IFADDRHASHTBL	9
 	{ "_in_ifaddrhashtbl" },
-#define	X_NCHASH	14
+#define	X_NCHASH	10
 	{ "_nchash" },
-#define	X_NCHASHTBL	15
+#define	X_NCHASHTBL	11
 	{ "_nchashtbl" },
-#define	X_NCVHASH	16
+#define	X_NCVHASH	12
 	{ "_ncvhash" },
-#define	X_NCVHASHTBL	17
+#define	X_NCVHASHTBL	13
 	{ "_ncvhashtbl" },
-#define X_HASHNL_SIZE	18	/* must be last */
+#define X_HASHNL_SIZE	14	/* must be last */
 	{ NULL },
-
 };
 
 /*
@@ -264,7 +248,7 @@ void	domem(void);
 void	dopool(int);
 void	dopoolcache(struct pool *, int);
 void	dosum(void);
-void	dovmstat(u_int, int);
+void	dovmstat(struct timespec *, int);
 void	kread(int, void *, size_t);
 void	needhdr(int);
 long	getuptime(void);
@@ -289,7 +273,7 @@ int
 main(int argc, char *argv[])
 {
 	int c, todo, verbose;
-	u_int interval;
+	struct timespec interval;
 	int reps;
 	char errbuf[_POSIX2_LINE_MAX];
 	gid_t egid = getegid();
@@ -298,8 +282,10 @@ main(int argc, char *argv[])
 	histname = hashname = NULL;
 	(void)setegid(getgid());
 	memf = nlistf = NULL;
-	interval = reps = todo = verbose = 0;
-	while ((c = getopt(argc, argv, "c:efh:HilLM:mN:suUvw:")) != -1) {
+	reps = todo = verbose = 0;
+	interval.tv_sec = 0;
+	interval.tv_nsec = 0;
+	while ((c = getopt(argc, argv, "c:efh:HilLM:mN:su:Uvw:")) != -1) {
 		switch (c) {
 		case 'c':
 			reps = atoi(optarg);
@@ -347,7 +333,7 @@ main(int argc, char *argv[])
 			verbose++;
 			break;
 		case 'w':
-			interval = atoi(optarg);
+			interval.tv_sec = atol(optarg);
 			break;
 		case '?':
 		default:
@@ -382,7 +368,7 @@ main(int argc, char *argv[])
 		if (c == -1)
 			errx(1, "kvm_nlist: %s %s", "namelist", kvm_geterr(kd));
 		(void)fprintf(stderr, "vmstat: undefined symbols:");
-		for (c = 0; c < sizeof(namelist) / sizeof(namelist[0]); c++)
+		for (c = 0; c < sizeof(namelist) / sizeof(namelist[0])-1; c++)
 			if (namelist[c].n_type == 0)
 				fprintf(stderr, " %s", namelist[c].n_name);
 		(void)fputc('\n', stderr);
@@ -402,7 +388,7 @@ main(int argc, char *argv[])
 
 		argv = choosedrives(argv);	/* Select disks. */
 		winsize.ws_row = 0;
-		(void)ioctl(STDOUT_FILENO, TIOCGWINSZ, (char *)&winsize);
+		(void)ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize);
 		if (winsize.ws_row > 0)
 			winlines = winsize.ws_row;
 
@@ -410,17 +396,17 @@ main(int argc, char *argv[])
 
 #ifdef	BACKWARD_COMPATIBILITY
 	if (*argv) {
-		interval = atoi(*argv);
+		interval.tv_sec = atol(*argv);
 		if (*++argv)
 			reps = atoi(*argv);
 	}
 #endif
 
-	if (interval) {
+	if (interval.tv_sec) {
 		if (!reps)
 			reps = -1;
 	} else if (reps)
-		interval = 1;
+		interval.tv_sec = 1;
 
 
 	/*
@@ -470,10 +456,10 @@ main(int argc, char *argv[])
 
 			if (reps >= 0 && --reps <=0)
 				break;
-			sleep(interval);
+			nanosleep(&interval, NULL);
 		}
 	} else
-		dovmstat(interval, reps);
+		dovmstat(&interval, reps);
 	exit(0);
 }
 
@@ -502,7 +488,7 @@ choosedrives(char **argv)
 			break;
 		}
 	}
-	for (i = 0; i < dk_ndrive && ndrives < 4; i++) {
+	for (i = 0; i < dk_ndrive && ndrives < 3; i++) {
 		if (dk_select[i])
 			continue;
 		dk_select[i] = 1;
@@ -531,7 +517,7 @@ getuptime(void)
 int	hz, hdrcnt;
 
 void
-dovmstat(u_int interval, int reps)
+dovmstat(struct timespec *interval, int reps)
 {
 	struct vmtotal total;
 	time_t uptime, halfuptime;
@@ -571,11 +557,11 @@ dovmstat(u_int interval, int reps)
 				memset(&total, 0, sizeof(total));
 			}
 		}
-		(void)printf("%2d%2d%2d",
+		(void)printf("%2d %d %d",
 		    total.t_rq - 1, total.t_dw + total.t_pw, total.t_sw);
 #define	pgtok(a) (long)((a) * (pagesize >> 10))
 #define	rate(x)	(u_long)(((x) + halfuptime) / uptime)	/* round */
-		(void)printf(" %5ld %5ld ",
+		(void)printf(" %6ld %6ld ",
 		    pgtok(total.t_avm), pgtok(total.t_free));
 		(void)printf("%4lu ", rate(uvmexp.faults - ouvmexp.faults));
 		(void)printf("%3lu ", rate(uvmexp.pdreact - ouvmexp.pdreact));
@@ -595,13 +581,13 @@ dovmstat(u_int interval, int reps)
 		if (reps >= 0 && --reps <= 0)
 			break;
 		ouvmexp = uvmexp;
-		uptime = interval;
+		uptime = interval->tv_sec;
 		/*
 		 * We round upward to avoid losing low-frequency events
 		 * (i.e., >= 1 per interval but < 1 per second).
 		 */
 		halfuptime = uptime == 1 ? 0 : (uptime + 1) / 2;
-		(void)sleep(interval);
+		nanosleep(interval, NULL);
 	}
 }
 
@@ -610,7 +596,7 @@ printhdr(void)
 {
 	int i;
 
-	(void)printf(" procs   memory     page%*s", 23, "");
+	(void)printf(" procs    memory      page%*s", 23, "");
 	if (ndrives > 0)
 		(void)printf("%s %*sfaults      cpu\n",
 		    ((ndrives > 1) ? "disks" : "disk"),
@@ -619,7 +605,7 @@ printhdr(void)
 		(void)printf("%*s  faults   cpu\n",
 		    ndrives * 3, "");
 
-	(void)printf(" r b w   avm   fre  flt  re  pi   po   fr   sr ");
+	(void)printf(" r b w    avm    fre  flt  re  pi   po   fr   sr ");
 	for (i = 0; i < dk_ndrive; i++)
 		if (dk_select[i])
 			(void)printf("%c%c ", dr_name[i][0],
@@ -693,7 +679,7 @@ dosum(void)
 	(void)printf("%9u total faults taken\n", uvmexp.faults);
 	(void)printf("%9u traps\n", uvmexp.traps);
 	(void)printf("%9u device interrupts\n", uvmexp.intrs);
-	(void)printf("%9u cpu context switches\n", uvmexp.swtch);
+	(void)printf("%9u CPU context switches\n", uvmexp.swtch);
 	(void)printf("%9u software interrupts\n", uvmexp.softs);
 	(void)printf("%9u system calls\n", uvmexp.syscalls);
 	(void)printf("%9u pagein requests\n", uvmexp.pageins);
@@ -789,7 +775,8 @@ dkstats(void)
 	for (dn = 0; dn < dk_ndrive; ++dn) {
 		if (!dk_select[dn])
 			continue;
-		(void)printf("%2.0f ", cur.dk_xfer[dn] / etime);
+		(void)printf("%2.0f ",
+		    (cur.dk_rxfer[dn] + cur.dk_wxfer[dn]) / etime);
 	}
 }
 
@@ -798,6 +785,7 @@ cpustats(void)
 {
 	int state;
 	double pct, total;
+	double stat_us, stat_sy, stat_id;
 
 	total = 0;
 	for (state = 0; state < CPUSTATES; ++state)
@@ -806,48 +794,14 @@ cpustats(void)
 		pct = 100 / total;
 	else
 		pct = 0;
-	(void)printf("%2.0f ",
-	    (cur.cp_time[CP_USER] + cur.cp_time[CP_NICE]) * pct);
-	(void)printf("%2.0f ",
-	    (cur.cp_time[CP_SYS] + cur.cp_time[CP_INTR]) * pct);
-	(void)printf("%2.0f", cur.cp_time[CP_IDLE] * pct);
+	stat_us = (cur.cp_time[CP_USER] + cur.cp_time[CP_NICE]) * pct;
+	stat_sy = (cur.cp_time[CP_SYS] + cur.cp_time[CP_INTR]) * pct;
+	stat_id = cur.cp_time[CP_IDLE] * pct;
+	(void)printf("%*.0f ", ((stat_sy >= 100) ? 1 : 2), stat_us);
+	(void)printf("%*.0f ", ((stat_us >= 100 || stat_id >= 100) ? 1 : 2), stat_sy);
+	(void)printf("%2.0f", stat_id);
 }
 
-#if defined(pc532)
-/* To get struct iv ...*/
-#define	_KERNEL
-#include <machine/psl.h>
-#undef _KERNEL
-void
-dointr(int verbose)
-{
-	long i, j, inttotal, uptime;
-	static char iname[64];
-	struct iv ivt[32], *ivp = ivt;
-
-	iname[sizeof(iname)-1] = '\0';
-	uptime = getuptime();
-	kread(X_IVT, ivp, sizeof(ivt));
-
-	for (i = 0; i < 2; i++) {
-		(void)printf("%sware interrupts:\n", i ? "\nsoft" : "hard");
-		(void)printf("interrupt       total     rate\n");
-		inttotal = 0;
-		for (j = 0; j < 16; j++, ivp++) {
-			if (ivp->iv_vec && ivp->iv_use &&
-			    (ivp->iv_cnt || verbose)) {
-				deref_kptr(ivp->iv_use, iname, sizeof(iname)-1,
-				    "iv_use");
-				(void)printf("%-12s %8ld %8ld\n", iname,
-				    ivp->iv_cnt, ivp->iv_cnt / uptime);
-				inttotal += ivp->iv_cnt;
-			}
-		}
-		(void)printf("Total        %8ld %8ld\n",
-		    inttotal, inttotal / uptime);
-	}
-}
-#else
 void
 dointr(int verbose)
 {
@@ -906,7 +860,6 @@ dointr(int verbose)
 	(void)printf("%-34s %16llu %8llu\n", "Total", inttotal,
 	    (unsigned long long)(inttotal / uptime));
 }
-#endif
 
 void
 doevcnt(int verbose)
@@ -944,21 +897,16 @@ doevcnt(int verbose)
 	}
 }
 
-/*
- * These names are defined in <sys/malloc.h>.
- */
-char *kmemnames[] = INITKMEMNAMES;
+static char memname[64];
 
 void
 domem(void)
 {
 	struct kmembuckets *kp;
-	struct kmemstats *ks;
+	struct malloc_type ks, *ksp;
 	int i, j;
 	int len, size, first;
 	long totuse = 0, totfree = 0, totreq = 0;
-	char *name;
-	struct kmemstats kmemstats[M_LAST];
 	struct kmembuckets buckets[MINBUCKET + 16];
 
 	kread(X_KMEMBUCKETS, buckets, sizeof(buckets));
@@ -989,7 +937,6 @@ domem(void)
 		return;
 	}
 
-	kread(X_KMEMSTAT, kmemstats, sizeof(kmemstats));
 	(void)printf("\nMemory usage type by bucket size\n");
 	(void)printf("    Size  Type(s)\n");
 	kp = &buckets[MINBUCKET];
@@ -998,29 +945,26 @@ domem(void)
 			continue;
 		first = 1;
 		len = 8;
-		for (i = 0, ks = &kmemstats[0]; i < M_LAST; i++, ks++) {
-			if (ks->ks_calls == 0)
+		for (kread(X_KMEMSTAT, &ksp, sizeof(ksp));
+		     ksp != NULL; ksp = ks.ks_next) {
+			deref_kptr(ksp, &ks, sizeof(ks), "malloc type");
+			if (ks.ks_calls == 0)
 				continue;
-			if ((ks->ks_size & j) == 0)
+			if ((ks.ks_size & j) == 0)
 				continue;
-			if (kmemnames[i] == 0) {
-				kmemnames[i] = malloc(10);
-						/* strlen("undef/")+3+1);*/
-				snprintf(kmemnames[i], 10, "undef/%d", i);
-						/* same 10 as above!!! */
-			}
-			name = kmemnames[i];
-			len += 2 + strlen(name);
+			deref_kptr(ks.ks_shortdesc, memname,
+			    sizeof(memname), "malloc type name");
+			len += 2 + strlen(memname);
 			if (first)
-				printf("%8d  %s", j, name);
+				printf("%8d  %s", j, memname);
 			else
 				printf(",");
 			if (len >= 80) {
 				printf("\n\t ");
-				len = 10 + strlen(name);
+				len = 10 + strlen(memname);
 			}
 			if (!first)
-				printf(" %s", name);
+				printf(" %s", memname);
 			first = 0;
 		}
 		putchar('\n');
@@ -1030,18 +974,22 @@ domem(void)
 	    "\nMemory statistics by type                           Type  Kern\n");
 	(void)printf(
 "         Type  InUse MemUse HighUse  Limit Requests Limit Limit Size(s)\n");
-	for (i = 0, ks = &kmemstats[0]; i < M_LAST; i++, ks++) {
-		if (ks->ks_calls == 0)
+	for (kread(X_KMEMSTAT, &ksp, sizeof(ksp));
+	     ksp != NULL; ksp = ks.ks_next) {
+		deref_kptr(ksp, &ks, sizeof(ks), "malloc type");
+		if (ks.ks_calls == 0)
 			continue;
+		deref_kptr(ks.ks_shortdesc, memname,
+		    sizeof(memname), "malloc type name");
 		(void)printf("%14s%6ld%6ldK%7ldK%6ldK%9ld%5u%6u",
-		    kmemnames[i] ? kmemnames[i] : "undefined",
-		    ks->ks_inuse, (ks->ks_memuse + 1023) / 1024,
-		    (ks->ks_maxused + 1023) / 1024,
-		    (ks->ks_limit + 1023) / 1024, ks->ks_calls,
-		    ks->ks_limblocks, ks->ks_mapblocks);
+		    memname,
+		    ks.ks_inuse, (ks.ks_memuse + 1023) / 1024,
+		    (ks.ks_maxused + 1023) / 1024,
+		    (ks.ks_limit + 1023) / 1024, ks.ks_calls,
+		    ks.ks_limblocks, ks.ks_mapblocks);
 		first = 1;
 		for (j =  1 << MINBUCKET; j < 1 << (MINBUCKET + 16); j <<= 1) {
-			if ((ks->ks_size & j) == 0)
+			if ((ks.ks_size & j) == 0)
 				continue;
 			if (first)
 				printf("  %d", j);
@@ -1050,11 +998,11 @@ domem(void)
 			first = 0;
 		}
 		printf("\n");
-		totuse += ks->ks_memuse;
-		totreq += ks->ks_calls;
+		totuse += ks.ks_memuse;
+		totreq += ks.ks_calls;
 	}
-	(void)printf("\nMemory Totals:  In Use    Free    Requests\n");
-	(void)printf("              %7ldK %6ldK    %8ld\n",
+	(void)printf("\nMemory totals:  In Use    Free    Requests\n");
+	(void)printf("              %7ldK %6ldK    %8ld\n\n",
 	    (totuse + 1023) / 1024, (totfree + 1023) / 1024, totreq);
 }
 
@@ -1072,7 +1020,7 @@ dopool(int verbose)
 	kread(X_POOLHEAD, &pool_head, sizeof(pool_head));
 	addr = TAILQ_FIRST(&pool_head);
 
-	for (first = 1; addr != NULL; ) {
+	for (first = 1; addr != NULL; addr = TAILQ_NEXT(pp, pr_poollist) ) {
 		deref_kptr(addr, pp, sizeof(*pp), "pool chain trashed");
 		deref_kptr(pp->pr_alloc, &pa, sizeof(pa),
 		    "pool allocatior trashed");
@@ -1098,10 +1046,12 @@ dopool(int verbose)
 			    "Idle");
 			first = 0;
 		}
+		if (pp->pr_nget == 0 && !verbose)
+			continue;
 		if (pp->pr_maxpages == UINT_MAX)
-			sprintf(maxp, "inf");
+			snprintf(maxp, sizeof(maxp), "inf");
 		else
-			sprintf(maxp, "%u", pp->pr_maxpages);
+			snprintf(maxp, sizeof(maxp), "%u", pp->pr_maxpages);
 /*
  * Print single word.  `ovflow' is number of characters didn't fit
  * on the last word.  `fmt' is a format string to print this word.
@@ -1144,7 +1094,6 @@ dopool(int verbose)
 			total += pp->pr_npages * pa.pa_pagesz;
 		}
 		dopoolcache(pp, verbose);
-		addr = TAILQ_NEXT(pp, pr_poollist);
 	}
 
 	inuse /= 1024;
@@ -1179,8 +1128,18 @@ dopoolcache(struct pool *pp, int verbose)
 			    "pool cache group trashed");
 			printf("\t\tgroup %p: avail %d\n", pcg_addr,
 			    pcg->pcg_avail);
-			for (i = 0; i < PCG_NOBJECTS; i++)
-				printf("\t\t\t%p\n", pcg->pcg_objects[i]);
+			for (i = 0; i < PCG_NOBJECTS; i++) {
+				if (pcg->pcg_objects[i].pcgo_pa !=
+				    POOL_PADDR_INVALID) {
+					printf("\t\t\t%p, 0x%llx\n",
+					    pcg->pcg_objects[i].pcgo_va,
+					    (unsigned long long)
+					    pcg->pcg_objects[i].pcgo_pa);
+				} else {
+					printf("\t\t\t%p\n",
+					    pcg->pcg_objects[i].pcgo_va);
+				}
+			}
 		}
 	}
 
@@ -1230,14 +1189,6 @@ struct kernel_hash {
 		X_NFSNODE, X_NFSNODETBL,
 		HASH_LIST, offsetof(struct nfsnode, n_hash)
 	}, {
-		"process group (pgrp) hash",
-		X_PGRPHASH, X_PGRPHASHTBL,
-		HASH_LIST, offsetof(struct pgrp, pg_hash),
-	}, {
-		"process id (pid) hash",
-		X_PIDHASH, X_PIDHASHTBL,
-		HASH_LIST, offsetof(struct proc, p_hash)
-	}, {
 		"user info (uid -> used processes) hash",
 		X_UIHASH, X_UIHASHTBL,
 		HASH_LIST, offsetof(struct uidinfo, ui_hash),
@@ -1252,7 +1203,7 @@ dohashstat(int verbose, int todo, const char *hashname)
 	LIST_HEAD(, generic)	*hashtbl_list;
 	TAILQ_HEAD(, generic)	*hashtbl_tailq;
 	struct kernel_hash	*curhash;
-	void	*hashaddr, *hashbuf, *nextaddr;
+	void	*hashaddr, *hashbuf, *nhashbuf, *nextaddr;
 	size_t	elemsize, hashbufsize, thissize;
 	u_long	hashsize;
 	int	i, used, items, chain, maxchain;
@@ -1318,10 +1269,11 @@ dohashstat(int verbose, int todo, const char *hashname)
 			    (unsigned long long)elemsize);
 		thissize = hashsize * elemsize;
 		if (thissize > hashbufsize) {
-			hashbufsize = thissize;
-			if ((hashbuf = realloc(hashbuf, hashbufsize)) == NULL)
+			if ((nhashbuf = realloc(hashbuf, thissize)) == NULL)
 				errx(1, "malloc hashbuf %llu",
 				    (unsigned long long)hashbufsize);
+			hashbuf = nhashbuf;
+			hashbufsize = thissize;
 		}
 		deref_kptr(hashaddr, hashbuf, thissize,
 		    hashnl[curhash->hashtbl].n_name);
