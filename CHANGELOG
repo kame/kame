@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1838 2001/08/13 13:06:48 sakane Exp $
+$KAME: CHANGELOG,v 1.1839 2001/08/13 20:24:15 itojun Exp $
 
 <200108>
+Tue Aug 14 05:20:23 JST 2001  itojun@iijlab.net
+	* sys/netkey/key.c: drop support for byte lifetime.  byte lifetime
+	  is define in a very vague manner, and it can lead to unsynchronized
+	  SAs (= dangling SA left behind) with packet losses, byte count
+	  mismatches and other causes.  kernel returns EINVAL if non-zero
+	  byte lifetime is specified on ADD/UPDATE.
+
 Mon Aug 13 22:03:28 JST 2001 sakane@kame.net
 	* kame/racoon:
 	supported MODP 2048, 3072, 4096 and 8192-bit.
