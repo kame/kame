@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.38 2001/12/12 23:31:50 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.39 2001/12/14 03:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -264,6 +264,7 @@ struct mip6_bu *mip6_bu_create		__P((const struct in6_addr *,
 					     struct hif_softc *));
 int mip6_bu_list_insert			__P((struct mip6_bu_list *,
 					     struct mip6_bu *));
+int mip6_bu_list_remove_all		__P((struct mip6_bu_list *));
 struct mip6_bu *mip6_bu_list_find_withpaddr
 					__P((struct mip6_bu_list *,
 					     struct in6_addr *));

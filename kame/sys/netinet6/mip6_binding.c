@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.48 2001/12/12 15:56:50 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.49 2001/12/14 03:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -99,7 +99,6 @@ int mip6_use_ipsec = 0;
 
 /* binding update functions. */
 static int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
-static int mip6_bu_list_remove_all __P((struct mip6_bu_list *));
 static int mip6_bu_list_notify_binding_change __P((struct hif_softc *));
 static int mip6_bu_send_bu __P((struct mip6_bu *));
 static void mip6_bu_timeout __P((void *));
@@ -695,7 +694,7 @@ mip6_bu_list_remove(mbu_list, mbu)
 	return (0);
 }
 
-static int
+int
 mip6_bu_list_remove_all(mbu_list)
 	struct mip6_bu_list *mbu_list;
 {

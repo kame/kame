@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.89 2001/12/12 23:31:49 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.90 2001/12/14 03:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1139,10 +1139,30 @@ mip6_ioctl(cmd, data)
 
 	switch (cmd) {
 	case SIOCENABLEMN:
-		mip6log((LOG_INFO,
-			 "%s:%d: MN function enabled\n",
-			 __FILE__, __LINE__));
-		mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MN;
+	{
+		int on;
+		struct hif_softc *sc;
+
+		on = *(int *)data;
+		if (on == 1) {
+			mip6log((LOG_INFO,
+				 "%s:%d: MN function enabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MN;
+		} else {
+			mip6log((LOG_INFO,
+				 "%s:%d: MN function disabled\n",
+				 __FILE__, __LINE__));
+			for (sc = TAILQ_FIRST(&hif_softc_list);
+			     sc;
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				mip6_detach_haddrs(sc);
+				mip6_bu_list_remove_all(&sc->hif_bu_list);
+			}
+			hif_coa = in6addr_any;
+			mip6_config.mcfg_type = 0;
+		}
+	}
 		break;
 
 	case SIOCENABLEHA:
