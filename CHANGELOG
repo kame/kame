@@ -1,6 +1,12 @@
-$Id: CHANGELOG,v 1.514 2000/02/03 06:54:32 jinmei Exp $
+$Id: CHANGELOG,v 1.515 2000/02/03 11:24:29 itojun Exp $
 
 <200002>
+Thu Feb  3 20:23:06 JST 2000  itojun@iijlab.net
+	* sys/netinet6/{icmp6,nd6*}.c: implement m_pulldown cases for
+	  ND and redirect.
+	* sys/kern/uipc_mbuf2.c: add more m_pulldown statistics to compare
+	  its efficiency against m_pullup{,2}.
+
 2000-02-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6[ds]d/mld6.c (make_mld6_msg): corrected HBH header
 	length in the 2292bis case.
