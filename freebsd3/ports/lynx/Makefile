@@ -6,10 +6,10 @@
 #
 
 PORTNAME=	lynx
-PORTVERSION=    2.8.4d7
+PORTVERSION=    2.8.4d9
 CATEGORIES=	www ipv6
 MASTER_SITES=   http://lynx.isc.org/current/
-DISTNAME=       ${PORTNAME}2.8.4dev.7
+DISTNAME=       ${PORTNAME}2.8.4dev.9
 
 MAINTAINER=	k-sugyou@kame.net
 
@@ -21,7 +21,15 @@ NO_LATEST_LINK=	YES
 GNU_CONFIGURE=  YES
 CONFIGURE_ARGS= --with-screen=ncurses --with-zlib --libdir="${L_LIB}" \
 		--enable-nsl-fork --enable-persistent-cookies \
-		--enable-nls --enable-ipv6
+		--enable-nls
+
+.include <bsd.port.pre.mk>
+
+#.if ${OSVERSION} >= 400014
+CONFIGURE_ARGS+=--enable-ipv6
+#.else
+#CONFIGURE_ARGS+=--disable-ipv6
+#.endif
 CONFIGURE_ENV=  CC="${CC} -I${LOCALBASE}/include" LDFLAGS=-L${LOCALBASE}/lib
 MAKE_FLAGS=     helpdir=${L_HELP} docdir=${L_DOC} -f
 MAKEFILE=       makefile
@@ -37,4 +45,4 @@ post-install:
 	${CHOWN} -R ${SHAREOWN}:${SHAREGRP} ${L_HELP}
 	${CHOWN} ${SHAREOWN}:${SHAREGRP} ${L_LIB}/lynx.cfg
 
-.include <bsd.port.mk>
+.include <bsd.port.post.mk>
