@@ -91,6 +91,10 @@ struct rr_prhead rr_prefix;
 
 extern int	in6_interfaces;
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+extern struct proc *curproc;	/*XXX*/
+#endif
+
 static int create_ra_entry __P((struct rp_addr **rapp));
 
 /*
@@ -369,12 +373,8 @@ search_ifidwithprefix(struct rr_prefix *rpp, struct in6_addr *ifid)
 {
 	struct rp_addr *rap;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	LIST_FOREACH(rap, &rpp->rp_addrhead, ra_entry)
-#else
 	for (rap = rpp->rp_addrhead.lh_first; rap != NULL;
 	     rap = rap->ra_entry.le_next)
-#endif
 		if (rr_are_ifid_equal(ifid, &rap->ra_ifid,
 				      (sizeof(struct in6_addr) << 3) -
 				      rpp->rp_plen))
@@ -463,9 +463,6 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 	struct in6_ifaddr *ia6;
 	struct in6_aliasreq ifra;
 	int error;
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
-	extern struct proc *curproc;	/*XXX*/
-#endif
 
 	/* init ifra */
 	bzero(&ifra, sizeof(ifra));
@@ -653,13 +650,8 @@ rrpr_update(struct socket *so, struct rr_prefix *new)
 	 * If it existed but not pointing to the prefix yet,
 	 * init the prefix pointer.
 	 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	LIST_FOREACH(rap, &rpp->rp_addrhead, ra_entry)
-#else
 	for (rap = rpp->rp_addrhead.lh_first; rap != NULL;
-	     rap = rap->ra_entry.le_next)
-#endif
-	{
+	     rap = rap->ra_entry.le_next) {
 		if (rap->ra_addr != NULL) {
 			if (rap->ra_addr->ia6_ifpr == NULL)
 				rap->ra_addr->ia6_ifpr = rp2ifpr(rpp);
@@ -745,13 +737,8 @@ init_newprefix(struct in6_rrenumreq *irr, struct ifprefix *ifpr,
 			 irr->irr_u_uselen,
 			 min(ifpr->ifpr_plen - irr->irr_u_uselen,
 			     irr->irr_u_keeplen));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	LIST_FOREACH(orap, &ifpr2rp(ifpr)->rp_addrhead, ra_entry)
-#else
 	for (orap = (ifpr2rp(ifpr)->rp_addrhead).lh_first; orap != NULL;
-	     orap = orap->ra_entry.le_next)
-#endif
-	{
+	     orap = orap->ra_entry.le_next) {
 		struct rp_addr *rap;
 		int error = 0;
 
@@ -828,13 +815,8 @@ unprefer_prefix(struct rr_prefix *rpp)
 	long time_second = time.tv_sec;
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	LIST_FOREACH(rap, &rpp->rp_addrhead, ra_entry)
-#else
 	for (rap = rpp->rp_addrhead.lh_first; rap != NULL;
-	     rap = rap->ra_entry.le_next)
-#endif
-	{
+	     rap = rap->ra_entry.le_next) {
 		if (rap->ra_addr == NULL)
 			continue;
 		rap->ra_addr->ia6_lifetime.ia6t_preferred = time_second;
@@ -847,19 +829,11 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 {
 	struct in6_aliasreq ifra;
 	int error = 0;
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
-	extern struct proc *curproc;	/*XXX*/
-#endif
 
 	if (rpp->rp_origin > origin)
 		return(EPERM);
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	while (!LIST_EMPTY(&rpp->rp_addrhead))
-#else
-	while (rpp->rp_addrhead.lh_first != NULL)
-#endif
-	{
+	while (rpp->rp_addrhead.lh_first != NULL) {
 		struct rp_addr *rap;
 		int s;
 
