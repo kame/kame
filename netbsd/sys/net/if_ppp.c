@@ -76,16 +76,17 @@
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
 #include "ppp.h"
+
 #if NPPP > 0
+
+#include "opt_inet.h"
+#include "opt_gateway.h"
+#include "opt_ppp.h"
 
 #ifdef INET
 #define VJC
 #endif
 #define PPP_COMPRESS
-
-#include "opt_inet.h"
-#include "opt_gateway.h"
-#include "opt_ppp.h"
 
 #include <sys/param.h>
 #include <sys/proc.h>
