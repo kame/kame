@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.32 2004/06/02 05:53:14 itojun Exp $	*/
+/*	$KAME: in6_msf.c,v 1.33 2004/12/27 10:19:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2833,8 +2833,13 @@ dump_in6_multisrc(void)
 		struct in6_multi *in6m = NULL;
 		struct in6_multi_source *ims = NULL;
 
-		log(LOG_DEBUG, "interface %s\n", ifp->if_name);
-		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		log(LOG_DEBUG, "interface %s\n", if_name(ifp));
+#if __FreeBSD_version >= 503000
+		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) 
+#else
+		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) 
+#endif
+		{
 			if (ifma->ifma_addr == NULL) {
 				log(LOG_DEBUG, "\tEnd of Group\n");
 				continue;

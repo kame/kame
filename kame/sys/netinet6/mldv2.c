@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.26 2004/07/09 14:13:59 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.27 2004/12/27 10:19:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1106,9 +1106,9 @@ mld_sendbuf(mh, ifp)
 		mld_ghdr = (struct mld_group_record_hdr *)
 					((char *)mld_rhdr + len);
 		len += ghdrlen + SOURCE_RECORD_LEN(mld_ghdr->numsrc);
-		HTONS(mld_ghdr->numsrc);
+		mld_ghdr->numsrc = htons(mld_ghdr->numsrc);
 	}
-	HTONS(mld_rhdr->mld_grpnum);
+	mld_rhdr->mld_grpnum = htons(mld_rhdr->mld_grpnum);
 	mld_rhdr->mld_cksum = 0;
 
 	mld_rhdr->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
