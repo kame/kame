@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.24 1999/12/05 01:56:42 luoqi Exp $
-# $Id: GENERIC.v6,v 1.9 1999/12/28 05:12:08 sumikawa Exp $
+# $Id: GENERIC.v6,v 1.10 2000/01/27 07:04:16 fujisawa Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -78,6 +78,7 @@ options 	ALTQ		#alternate queueing
 # especially with 100baseT
 #options 	HZ=1000
 
+# Don't uncomment PM and NATPT at the same time.  It cause compile error.
 # Packet Management by SuMiRe
 #options 	PM			# SuMiRe (NAT).
 #options 	PM_USE_SOCKET		# Use socket instead of ioctl.
