@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.49 2003/09/06 02:42:50 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.50 2003/10/02 03:16:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -597,7 +597,7 @@ tcp6_ctlinput(cmd, sa, d)
 	else if (cmd == PRC_MSGSIZE)
 		notify = tcp6_mtudisc;
 	else if (!PRC_IS_REDIRECT(cmd) &&
-		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+		 ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
 		return;
 
 	/* if the parameter is from icmp6, decode it. */

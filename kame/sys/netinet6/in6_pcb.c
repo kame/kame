@@ -611,7 +611,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	int nmatch = 0;
 	u_int32_t flowinfo;
 
-	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
+	if ((unsigned)cmd >= PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 0;
 
 	sa6_dst = (struct sockaddr_in6 *)dst;
