@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.188 2004/05/18 07:39:09 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.189 2004/05/30 08:49:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,7 @@
  *   loopback address.  But is it enough?  What if the node only has link-local
  *   addresses?  Meanwhile, the default address selection defined in RFC3484
  *   may help the situation where AI_ADDRCONFIG is desired.  Given those,
- *   our current implementation simply check if the corresponding AF is
+ *   our current implementation simply checks if the corresponding AF is
  *   supported in the kernel.
  *
  * OS specific notes for bsdi3/freebsd2:
