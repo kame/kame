@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.86 2001/01/30 14:06:19 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.87 2001/02/01 13:36:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,6 +74,7 @@ unsigned long in6_maxmtu = 0;
 static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
+static int generate_anon_ifid __P((u_int8_t *, u_int8_t *, u_int8_t *));
 static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
@@ -173,6 +174,71 @@ get_rand_ifid(ifp, in6)
 
 	/* convert EUI64 into IPv6 interface identifier */
 	EUI64_TO_IFID(in6);
+
+	return 0;
+}
+
+static int
+generate_anon_ifid(seed0, curid, ret)
+	u_int8_t *seed0, *curid, *ret;
+{
+	MD5_CTX ctxt;
+	u_int8_t seed[16], digest[16], nullbuf[8];
+
+	bzero(nullbuf, sizeof(nullbuf));
+	if (bcmp(nullbuf, seed0, sizeof(nullbuf)) == 0) {
+		int i;
+		u_int32_t val32;
+#ifndef __OpenBSD__
+		struct timeval tv;
+#endif
+
+		for (i = 0; i < 2; i++) {
+#ifndef __OpenBSD__
+			microtime(&tv);
+			val32 = random() ^ tv.tv_usec;
+#else
+			val32 = arc4random();
+#endif
+			bcopy(&val32, seed + sizeof(val32) * i, sizeof(val32));
+		}
+	} else
+		bcopy(seed0, seed, 8);
+
+	/* copy the right-most 64-bits of the given address */
+	/* XXX assumption on the size of IFID */
+	bcopy(curid, &seed[8], 8);
+
+	/* generate 8 bytes of pseudo-random value. */
+	bzero(&ctxt, sizeof(ctxt));
+	MD5Init(&ctxt);
+	MD5Update(&ctxt, seed, sizeof(seed));
+	MD5Final(digest, &ctxt);
+
+	/*
+	 * addrconf-privacy-04 3.2.1. (3)
+	 * Take the left-most 64-bits of the MD5 digest and set bit 6 (the
+	 * left-most bit is numbered 0) to zero.
+	 */
+	bcopy(digest, ret, 8);
+	ret[0] &= ~EUI64_UBIT;
+
+	/*
+	 * addrconf-privacy-04 3.2.1. (4)
+	 * Take the rightmost 64-bits of the MD5 digest and save them in
+	 * stable storage as the history value to be used in the next
+	 * iteration of the algorithm. 
+	 */
+	bcopy(&digest[8], seed0, 8);
+
+	{			/* print it for debug */
+		int i;
+
+		printf("generate_anon_ifid: new randomized ID: ");
+		for (i = 0; i < 16; i++)
+			printf("%02x", digest[i]);
+		printf("\n");
+	}
 
 	return 0;
 }
@@ -1127,3 +1193,30 @@ in6_ifdetach(ifp)
 	}
 }
 #endif
+
+void
+in6_get_randifid(ifp, buf, generate, curid)
+	struct ifnet *ifp;
+	u_int8_t *buf;
+	const u_int8_t *curid;
+	int generate;
+{
+	u_int8_t nullbuf[8];
+	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
+
+	bzero(nullbuf, sizeof(nullbuf));
+	if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) == 0) {
+		/*
+		 * we've never created a random ID.  Create a new one, and
+		 * start a timer for regeneration.
+		 * XXX: implement timer.
+		 */
+		bcopy(curid, ndi->randomid, sizeof(ndi->randomid));
+		generate = 1;
+	}
+
+	if (generate) {
+		/* generate_anon_ifid will update seedn and buf */
+		(void)generate_anon_ifid(ndi->randomseed, ndi->randomid, buf);
+	}
+}

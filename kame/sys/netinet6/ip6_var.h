@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.53 2001/01/23 09:08:01 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.54 2001/02/01 13:36:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,6 +311,8 @@ extern int   ip6_anonportmin;		/* minimum ephemeral port */
 extern int   ip6_anonportmax;		/* maximum ephemeral port */
 extern int   ip6_lowportmin;		/* minimum reserved port */
 extern int   ip6_lowportmax;		/* maximum reserved port */
+
+extern int	ip6_tmpaddr;	/* whether to use temporary addresses. */
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct in6pcb;

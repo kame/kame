@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.78 2001/02/01 05:43:09 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.79 2001/02/01 13:36:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,6 +63,7 @@
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/in6_ifattach.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
@@ -97,6 +98,14 @@ extern int nd6_recalc_reachtm_interval;
 struct ifnet *nd6_defifp;
 int nd6_defifindex;
 
+#ifdef IPV6TMPADDR
+int ip6_tmpaddr = IPV6TMPADDR;
+#else
+int ip6_tmpaddr = 0;
+#endif
+
+static int anon_valid_lifetime = DEF_ANON_VALID_LIFETIME;
+static int anon_preferred_lifetime = DEF_ANON_PREFERRED_LIFETIME;
 
 #ifdef MIP6
 void (*mip6_select_defrtr_hook)(struct nd_prefix *,
@@ -1216,9 +1225,26 @@ prelist_update(new, dr, m)
 		if ((ia6 = in6_ifadd(pr)) != NULL) {
 			pr->ndpr_refcnt++;
 			ia6->ia6_ndpr = pr;
+
+			/*
+			 * When a new public address is created as described
+			 * RFC2462, also create a new temporary address.
+			 * addrconf-privacy-04 3.3 (2).
+			 */
+			if (ip6_tmpaddr) {
+				int e;
+				if ((e = in6_tmpifadd(ia6)) != 0) {
+					log(LOG_NOTICE, "prelist_update: "
+					    "failed to create a temporary "
+					    "address, errno=%d\n",
+					    e);
+				}
+			}
+
 			/*
 			 * A newly added address might affect the status
 			 * of other addresses, so we check and update it.
+			 * XXX: what if address duplication happens?
 			 */
 			pfxlist_onlink_check();
 		} else {
@@ -1786,6 +1812,86 @@ in6_ifadd(pr)
 
 	return(ia);		/* this must NOT be NULL. */
 }
+
+int
+in6_tmpifadd(ia0)
+	const struct in6_ifaddr *ia0; /* corresponding public address */
+{
+	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
+	struct in6_ifaddr *newia;
+	struct in6_aliasreq ifra;
+	int forcegen = 0, error;
+	int trylimit = 3;	/* XXX: adhoc value */
+	u_int32_t randid[2];
+
+	bzero(&ifra, sizeof(ifra));
+	strncpy(ifra.ifra_name, if_name(ifp), sizeof(ifra.ifra_name));
+	ifra.ifra_addr = ia0->ia_addr;
+	/* copy prefix mask */
+	ifra.ifra_prefixmask = ia0->ia_prefixmask;
+	/* clear old IFID */
+	ifra.ifra_addr.sin6_addr.s6_addr32[2]
+		&= ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[3]
+		&= ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[3]);
+
+  again:
+	in6_get_randifid(ifp, (u_int8_t *)randid, forcegen,
+			 (const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[2]
+		|= (randid[0] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]));
+	ifra.ifra_addr.sin6_addr.s6_addr32[3]
+		|= (randid[1] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[3]));
+
+	/*
+	 * If by chance the new temporary address is the same as an address
+	 * already assigned to the interface, generate a new randomized
+	 * interface identifier and repeat this step.
+	 * addrconf-privacy-04 3.3 (4).
+	 */
+	if (in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr) != NULL) {
+		if (trylimit-- == 0) {
+			log(LOG_NOTICE, "in6_tmpifadd: failed to find "
+			    "a unique random IFID\n");
+			return(EEXIST);
+		}
+		forcegen = 1;
+		goto again;
+	}
+
+	/*
+	 * The Valid Lifetime is the lower of the Valid Lifetime of the
+         * public address or ANON_VALID_LIFETIME.
+	 * The Preferred Lifetime is the lower of the Preferred Lifetime
+         * of the public address or ANON_PREFERRED_LIFETIME -
+         * RANDOM_DELAY.
+	 */
+	if (ia0->ia6_lifetime.ia6t_vltime < anon_valid_lifetime)
+		ifra.ifra_lifetime.ia6t_vltime = ia0->ia6_lifetime.ia6t_vltime;
+	else
+		ifra.ifra_lifetime.ia6t_vltime = anon_valid_lifetime;
+	if (ia0->ia6_lifetime.ia6t_pltime < anon_preferred_lifetime -
+	    nd_ifinfo[ifp->if_index].randomdelay)
+		ifra.ifra_lifetime.ia6t_pltime = ia0->ia6_lifetime.ia6t_pltime;
+	else {
+		ifra.ifra_lifetime.ia6t_pltime = anon_preferred_lifetime -
+			nd_ifinfo[ifp->if_index].randomdelay;
+	}
+
+	/* XXX: scope zone ID? */
+
+	ifra.ifra_flags |= (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
+	
+	/* allocate ifaddr structure, link into chain, etc. */
+	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0)
+		return(error);
+
+	newia = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);
+	newia->ia6_ndpr = ia0->ia6_ndpr;
+	ia0->ia6_ndpr->ndpr_refcnt++;
+
+	return(0);
+}	    
 
 int
 in6_init_prefix_ltimes(struct nd_prefix *ndpr)

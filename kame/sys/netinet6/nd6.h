@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.31 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.32 2001/02/01 13:36:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,6 +81,10 @@ struct nd_ifinfo {
 	int recalctm;			/* BaseReacable re-calculation timer */
 	u_int8_t chlim;			/* CurHopLimit */
 	u_int8_t receivedra;
+	/* the followings are for privacy extension for addrconf */
+	u_int8_t randomseed[8];
+	u_int8_t randomid[8];
+	int randomdelay; /* random delay to generate rand ID in seconds */
 };
 
 #define ND6_IFF_PERFORMNUD	0x1
@@ -153,6 +157,10 @@ struct	in6_ndifreq {
 #define RETRANS_TIMER			1000	/* msec */
 #define MIN_RANDOM_FACTOR		512	/* 1024 * 0.5 */
 #define MAX_RANDOM_FACTOR		1536	/* 1024 * 1.5 */
+#define DEF_ANON_VALID_LIFETIME		604800	/* 1 week */
+#define DEF_ANON_PREFERRED_LIFETIME	86400	/* 1 day */
+#define ANON_REGEN_ADVANCE		5	/* sec */
+#define MAX_ANON_RANDOM_DELAY		600	/* 10 min */
 #ifndef __OpenBSD__
 #define ND_COMPUTE_RTIME(x) \
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (random() & \
@@ -362,6 +370,7 @@ struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
 int nd6_setdefaultiface __P((int));
+int in6_tmpifadd __P((const struct in6_ifaddr *));
 
 #endif /* _KERNEL */
 
