@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2419 2003/06/27 23:16:39 itojun Exp $
+$KAME: CHANGELOG,v 1.2420 2003/06/28 03:57:10 itojun Exp $
 
 <200306>
+Sat Jun 28 12:54:50 JST 2003  itojun@iijlab.net
+	* netbsd/openbsd: no longer uses NEW_STRUCT_ROUTE
+
 Sat Jun 28 08:13:55 JST 2003  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: policy can be looked up by PF tags.  see
 	  (KAME-snap 7878) for more complete example.
