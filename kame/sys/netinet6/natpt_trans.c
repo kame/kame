@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.58 2001/10/31 05:26:49 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.59 2001/11/19 13:17:08 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -505,7 +505,7 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 	ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
 	icmp6 = cv6->pyld.icmp6;
 	icmpip6 = (struct ip6_hdr *)((caddr_t)icmp6 + sizeof(struct icmp6_hdr));
-	icmpip6pyld = natpt_pyldaddr(icmpip6, ip6end, NULL);
+	icmpip6pyld = natpt_pyldaddr(icmpip6, ip6end, NULL, NULL);
 	if (icmpip6pyld == NULL)
 		return ;
 

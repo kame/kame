@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.29 2001/10/17 07:02:48 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.30 2001/11/19 13:17:08 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -74,7 +74,7 @@ int		natpt_in6		__P((struct mbuf *, struct mbuf **));
 int		natpt_in4		__P((struct mbuf *, struct mbuf **));
 int		natpt_config6		__P((struct mbuf *, struct pcv *));
 int		natpt_config4		__P((struct mbuf *, struct pcv *));
-caddr_t		natpt_lastpyld		__P((struct mbuf *, int *, int *));
+caddr_t		natpt_lastpyld		__P((struct mbuf *, int *, int *, struct ip6_frag **));
 
 MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 
@@ -227,7 +227,7 @@ natpt_config6(struct mbuf *m, struct pcv *cv6)
 	cv6->m = m;
 	cv6->ip.ip6 = mtod(m, struct ip6_hdr *);
 
-	if ((tcpudp = natpt_lastpyld(m, &proto, &offset))) {
+	if ((tcpudp = natpt_lastpyld(m, &proto, &offset, &cv6->fh))) {
 		switch (proto) {
 		case IPPROTO_ICMP:
 		case IPPROTO_ICMPV6:
@@ -246,7 +246,7 @@ natpt_config6(struct mbuf *m, struct pcv *cv6)
 
 
 caddr_t
-natpt_lastpyld(struct mbuf *m, int *proto, int *offset)
+natpt_lastpyld(struct mbuf *m, int *proto, int *offset, struct ip6_frag **fh)
 {
 	struct ip6_hdr	*ip6;
 	caddr_t		 ip6end;
@@ -254,7 +254,7 @@ natpt_lastpyld(struct mbuf *m, int *proto, int *offset)
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
-	if ((pyld = natpt_pyldaddr(ip6, ip6end, proto)) == NULL)
+	if ((pyld = natpt_pyldaddr(ip6, ip6end, proto, fh)) == NULL)
 		return (NULL);
 	*offset = pyld - (caddr_t)ip6;
 	return (pyld);
@@ -262,13 +262,14 @@ natpt_lastpyld(struct mbuf *m, int *proto, int *offset)
 
 
 caddr_t
-natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto)
+natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag **fh)
 {
-	int			 nxt;
+	int		 nxt;
 	caddr_t		 ip6ext;
+	struct ip6_frag *ip6fh;
 
-	if (proto)
-		*proto = 0;
+	if (proto)	*proto = 0;
+	if (fh)		*fh = NULL;
 	ip6ext = (caddr_t)((struct ip6_hdr *)(ip6 + 1));
 
 	nxt = ip6->ip6_nxt;
@@ -277,7 +278,24 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto)
 		case IPPROTO_HOPOPTS:
 		case IPPROTO_ROUTING:
 		case IPPROTO_DSTOPTS:
+			nxt = ((struct ip6_ext *)ip6ext)->ip6e_nxt;
 			ip6ext += ((((struct ip6_ext *)ip6ext)->ip6e_len + 1) << 3);
+			break;
+
+		case IPPROTO_FRAGMENT:
+			/*
+			 * terminate parsing if it is not the first fragment,
+			 * it does not make sense to parse through it.
+			 */
+			ip6fh = (struct ip6_frag *)ip6ext;
+			if (fh != NULL)
+				*fh = ip6fh;
+			nxt = ((struct ip6_frag *)ip6ext)->ip6f_nxt;
+			if (proto)
+				*proto = nxt;
+			ip6ext += sizeof(struct ip6_frag);
+			if ((ip6fh->ip6f_offlg & IP6F_OFF_MASK) != 0)
+				return (ip6ext);
 			break;
 
 		case IPPROTO_ICMPV6:
