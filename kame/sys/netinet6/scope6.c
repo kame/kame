@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.32 2002/05/26 23:07:54 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.33 2002/05/27 22:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -106,7 +106,7 @@ scope6_ifdetach(sid)
 int
 scope6_set(ifp, idlist)
 	struct ifnet *ifp;
-	u_int32_t *idlist;
+	struct scope6_id *idlist;
 {
 	int i, s;
 	int error = 0;
@@ -132,19 +132,20 @@ scope6_set(ifp, idlist)
 #endif
 
 	for (i = 0; i < 16; i++) {
-		if (idlist[i] && idlist[i] != sid->s6id_list[i]) {
+		if (idlist->s6id_list[i] &&
+		    idlist->s6id_list[i] != sid->s6id_list[i]) {
 			/*
 			 * An interface zone ID must be the corresponding
 			 * interface index by definition.
 			 */
 			if (i == IPV6_ADDR_SCOPE_INTFACELOCAL &&
-			    idlist[i] != ifp->if_index) {
+			    idlist->s6id_list[i] != ifp->if_index) {
 				splx(s);
 				return(EINVAL);
 			}
 
 			if (i == IPV6_ADDR_SCOPE_LINKLOCAL &&
-			    idlist[i] > if_index) {
+			    idlist->s6id_list[i] > if_index) {
 				/*
 				 * XXX: theoretically, there should be no
 				 * relationship between link IDs and interface
@@ -160,7 +161,7 @@ scope6_set(ifp, idlist)
 			 * but we simply set the new value in this initial
 			 * implementation.
 			 */
-			sid->s6id_list[i] = idlist[i];
+			sid->s6id_list[i] = idlist->s6id_list[i];
 		}
 	}
 	splx(s);
@@ -168,18 +169,17 @@ scope6_set(ifp, idlist)
 	return(error);
 }
 
-/* NO BOUND CHECK, BAD API */
 int
 scope6_get(ifp, idlist)
 	struct ifnet *ifp;
-	u_int32_t *idlist;
+	struct scope6_id *idlist;
 {
 	struct scope6_id *sid = SID(ifp);
 
 	if (sid == NULL)	/* paranoid? */
 		return(EINVAL);
 
-	bcopy(sid->s6id_list, idlist, sizeof(sid->s6id_list));
+	*idlist = *sid;
 
 	return(0);
 }
@@ -337,13 +337,12 @@ scope6_setdefault(ifp)
 	}
 }
 
-/* NO BOUND CHECK, BAD API */
 int
 scope6_get_default(idlist)
-	u_int32_t *idlist;
+	struct scope6_id *idlist;
 {
 
-	bcopy(sid_default.s6id_list, idlist, sizeof(sid_default.s6id_list));
+	*idlist = sid_default;
 
 	return(0);
 }

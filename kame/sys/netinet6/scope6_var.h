@@ -1,4 +1,4 @@
-/*	$KAME: scope6_var.h,v 1.8 2002/05/26 23:07:54 itojun Exp $	*/
+/*	$KAME: scope6_var.h,v 1.9 2002/05/27 22:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -44,10 +44,10 @@ struct scope6_id {
 void	scope6_init __P((void));
 struct scope6_id *scope6_ifattach __P((struct ifnet *));
 void	scope6_ifdetach __P((struct scope6_id *));
-int	scope6_set __P((struct ifnet *, u_int32_t *));
-int	scope6_get __P((struct ifnet *, u_int32_t *));
+int	scope6_set __P((struct ifnet *, struct scope6_id *));
+int	scope6_get __P((struct ifnet *, struct scope6_id *));
 void	scope6_setdefault __P((struct ifnet *));
-int	scope6_get_default __P((u_int32_t *));
+int	scope6_get_default __P((struct scope6_id *));
 u_int32_t scope6_in6_addrscope __P((struct in6_addr *));
 u_int32_t scope6_addr2default __P((struct in6_addr *));
 int	scope6_setzoneid __P((struct ifnet *, struct sockaddr_in6 *));
