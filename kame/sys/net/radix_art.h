@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.h,v 1.3 2001/07/13 03:27:04 itojun Exp $	*/
+/*	$KAME: radix_art.h,v 1.4 2001/07/23 12:32:08 itojun Exp $	*/
 /*	$NetBSD: radix.h,v 1.10 2000/11/06 11:07:37 itojun Exp $	*/
 
 /*
@@ -76,6 +76,7 @@
  * ART: Allotment Routing Table, by Donald Knuth and Yoichi Hariguchi.
  */
 
+#ifdef _KERNEL
 #define ART_BITLEN	4	/* XXX pool allocator limit, don't increase */
 /*#define ART_BITLEN_CONSTANT*/
 #if 0 /*def ART_BITLEN_CONSTANT*/
@@ -143,5 +144,6 @@ struct radix_node
 			struct radix_node [2])),
 	 *rn_art_lookup __P((void *, void *, struct radix_node_head *)),
 	 *rn_art_match __P((void *, struct radix_node_head *));
+#endif
 
 #endif /* _NET_RADIX_ART_H_ */
