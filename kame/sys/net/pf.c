@@ -116,6 +116,9 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/udp6_var.h>
 #endif
+#ifdef __FreeBSD__
+#include <netinet6/in6_pcb.h>
+#endif
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 #endif /* INET6 */
@@ -125,8 +128,6 @@
 #endif
 
 #ifdef __FreeBSD__
-#undef KASSERT
-#define KASSERT(x)
 #define splsoftnet()	splnet()
 #define UID_MAX	-1
 #define GID_MAX	-1
@@ -521,7 +522,11 @@ pf_state_expires(const struct pf_state *state)
 	}
 	if (state->timeout == PFTM_UNTIL_PACKET)
 		return (0);
+#ifdef __FreeBSD__
+	KASSERT(state->timeout < PFTM_MAX, "pf_state_expires failed");
+#else
 	KASSERT(state->timeout < PFTM_MAX);
+#endif
 	timeout = state->rule.ptr->timeout[state->timeout];
 	if (!timeout)
 		timeout = pf_default_rule.timeout[state->timeout];
@@ -589,8 +594,14 @@ pf_purge_expired_states(void)
 			key.port[1] = cur->state->ext.port;
 
 			peer = RB_FIND(pf_state_tree, &tree_lan_ext, &key);
+#ifdef __FreeBSD__
+			KASSERT(peer, "pf_purge_expired_states failed");
+			KASSERT(peer->state == cur->state,
+				"pf_purge_expired_states failed");
+#else
 			KASSERT(peer);
 			KASSERT(peer->state == cur->state);
+#endif
 			RB_REMOVE(pf_state_tree, &tree_lan_ext, peer);
 
 #if NPFSYNC
@@ -1074,7 +1085,7 @@ pf_change_icmp(struct pf_addr *ia, u_int16_t *ip, struct pf_addr *oa,
 	/* Change inner protocol port, fix inner protocol checksum. */
 	if (ip != NULL) {
 		u_int16_t	oip = *ip;
-		u_int32_t	opc;
+		u_int32_t	opc = 0;
 
 		if (pc != NULL)
 			opc = *pc;
@@ -1156,12 +1167,12 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 	struct m_tag	*mtag;
 	int		 len, tlen;
 #ifdef INET
-	struct ip	*h;
+	struct ip	*h = NULL;
 #endif /* INET */
 #ifdef INET6
-	struct ip6_hdr	*h6;
+	struct ip6_hdr	*h6 = NULL;
 #endif /* INET6 */
-	struct tcphdr	*th;
+	struct tcphdr	*th = NULL;
 	char *opt;
 
 	/* maximum segment size tcp option */
@@ -1180,6 +1191,8 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 		len = sizeof(struct ip6_hdr) + tlen;
 		break;
 #endif /* INET6 */
+	default:
+		return;
 	}
 
 	/* create outgoing mbuf */
@@ -2033,7 +2046,7 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 	struct pf_addr		*saddr, *daddr;
 	u_int16_t		 sport, dport;
 #ifdef __FreeBSD__
-	struct inpcbhead	*tb;
+	struct inpcbinfo	*tb;
 #else
 	struct inpcbtable	*tb;
 #endif
@@ -2052,7 +2065,7 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 		sport = pd->hdr.tcp->th_sport;
 		dport = pd->hdr.tcp->th_dport;
 #ifdef __FreeBSD__
-		tb = &tcb;
+		tb = &tcbinfo;
 #else
 		tb = &tcbtable;
 #endif
@@ -2064,7 +2077,7 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 		sport = pd->hdr.udp->uh_sport;
 		dport = pd->hdr.udp->uh_dport;
 #ifdef __FreeBSD__
-		tb = &udb;
+		tb = &udbinfo;
 #else
 		tb = &udbtable;
 #endif
@@ -2263,7 +2276,7 @@ pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
 #endif
 #endif /* INET6 */
 	struct rtentry		*rt = NULL;
-	int			 hlen;
+	int			 hlen = 0;
 	u_int16_t		 mss = tcp_mssdflt;
 
 	switch (af) {
@@ -2963,6 +2976,8 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			state_icmp++;
 		break;
 #endif /* INET6 */
+	default:
+		return (PF_DROP);	/* XXX */
 	}
 
 	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
@@ -4036,6 +4051,8 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 			state_icmp++;
 		break;
 #endif /* INET6 */
+	default:
+		return (PF_DROP);	/* XXX */
 	}
 
 	if (!state_icmp) {
@@ -4211,6 +4228,8 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 			} while (!terminal);
 			break;
 #endif /* INET6 */
+		default:
+			return (PF_DROP);	/* XXX */
 		}
 
 		switch (pd2.proto) {
@@ -4710,7 +4729,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 {
 	struct mbuf		*m0, *m1;
 	struct route		 iproute;
-	struct route		*ro;
+	struct route		*ro = NULL;
 	struct sockaddr_in	*dst;
 	struct ip		*ip;
 	struct ifnet		*ifp = NULL;
@@ -4848,7 +4867,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			    (ip->ip_hl << 2) == sizeof(*ip)) {
 				ip->ip_sum = in_cksum_hdr(ip);
 			} else {
-				ip->ip_sum = in_cksum(m, ip->ip_hl << 2);
+				ip->ip_sum = in_cksum(m0, ip->ip_hl << 2);
 			}
 		}
 #else
@@ -4877,8 +4896,8 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	m0->m_pkthdr.csum_flags |= sw_csum;
 #endif
 	m1 = m0;
-#if defined(__FreeBSD__) && __FreeBSD_version != 501000
-	error = ip_fragment(m0, ifp, ifp->if_mtu, NULL, NULL);
+#if defined(__FreeBSD__)
+	error = ip_fragment(ip, &m0, ifp->if_mtu, ifp->if_hwassist, sw_csum);
 #else
 	error = ip_fragment(m0, ifp, ifp->if_mtu);
 #endif
@@ -5056,7 +5075,9 @@ bad:
 int
 pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t af)
 {
+#ifndef __FreeBSD__
 	u_int16_t flag_ok, flag_bad;
+#endif
 	u_int16_t sum;
 
 #ifndef __FreeBSD__
@@ -5105,7 +5126,7 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 		return (1);
 	if (m->m_pkthdr.len < off + len)
 		return (1);
-		switch (af) {
+	switch (af) {
 	case AF_INET:
 		if (p == IPPROTO_ICMP) {
 			if (m->m_len < off)
@@ -5118,7 +5139,11 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 		} else {
 			if (m->m_len < sizeof(struct ip))
 				return (1);
+#ifdef __FreeBSD__
+			sum = in_cksum_skip(m, len, off);
+#else
 			sum = in4_cksum(m, p, off, len);
+#endif
 		}
 		break;
 #ifdef INET6
@@ -5132,10 +5157,12 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 		return (1);
 	}
 	if (sum) {
+#ifndef __FreeBSD__
 #ifdef __OpenBSD__
 		m->m_pkthdr.csum |= flag_bad;
 #else
 		m->m_pkthdr.csum_flags |= flag_bad;
+#endif
 #endif
 		switch (p) {
 		case IPPROTO_TCP:
@@ -5155,10 +5182,12 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 		}
 		return (1);
 	}
+#ifndef __FreeBSD__
 #ifdef __OpenBSD__
 	m->m_pkthdr.csum |= flag_ok;
 #else
 	m->m_pkthdr.csum_flags |= flag_ok;
+#endif
 #endif
 	return (0);
 }
@@ -5169,7 +5198,7 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 {
 	u_short		   action, reason = 0, log = 0;
 	struct mbuf	  *m = *m0;
-	struct ip	  *h;
+	struct ip	  *h = NULL;
 	struct pf_rule	  *a = NULL, *r = &pf_default_rule, *tr;
 	struct pf_state	  *s = NULL;
 	struct pf_ruleset *ruleset = NULL;
@@ -5418,7 +5447,7 @@ done:
 	}
 #endif
 
-	if (log)
+	if (log && h)
 		PFLOG_PACKET(ifp, h, m, AF_INET, dir, reason, r, a, ruleset);
 
 	if (action == PF_SYNPROXY_DROP) {
@@ -5439,7 +5468,7 @@ pf_test6(int dir, struct ifnet *ifp, struct mbuf **m0)
 {
 	u_short		   action, reason = 0, log = 0;
 	struct mbuf	  *m = *m0;
-	struct ip6_hdr	  *h;
+	struct ip6_hdr	  *h = NULL;
 	struct pf_rule	  *a = NULL, *r = &pf_default_rule, *tr;
 	struct pf_state	  *s = NULL;
 	struct pf_ruleset *ruleset = NULL;
