@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.187 2001/06/22 14:22:02 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.188 2001/06/22 18:13:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1914,6 +1914,22 @@ do { \
 					break;
 
 				case IPV6_V6ONLY:
+					/*
+					 * make setsockopt(IPV6_V6ONLY)
+					 * available only prior to bind(2).
+					 * see ipng mailing list, Jun 22 2001.
+					 */
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+					if (inp->inp_lport ||
+					    !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr))
+#else
+					if (in6p->in6p_lport ||
+					    !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
+#endif
+					{
+						error = EINVAL;
+						break;
+					}
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 					/*
 					 * XXX: BINDV6ONLY should be integrated
