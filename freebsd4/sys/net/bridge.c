@@ -957,26 +957,6 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
 		m = m0 ; /* pass the original to dummynet */
 		m0 = NULL ; /* and nothing back to the caller */
 	    }
-#ifdef ALTQ
-	    if (ALTQ_IS_ENABLED(&last->if_snd)) {
-		    u_short	ether_type;
-
-		    /*
-		     * if the queueing discipline needs packet classification,
-		     * do it before prepending link headers.
-		     */
-		    ether_type = ntohs(eh->ether_type);
-		    if (ether_type == ETHERTYPE_IP)
-			    af = AF_INET;
-#ifdef INET6
-		    else if (ether_type == ETHERTYPE_IPV6)
-			    af = AF_INET6;
-#endif
-		    else
-			    af = AF_UNSPEC;
-		    IFQ_CLASSIFY(&last->if_snd, m, af, &pktattr);
-	    }
-#endif /* ALTQ */
 	    /*
 	     * Prepend the header, optimize for the common case of
 	     * eh pointing into the mbuf.
