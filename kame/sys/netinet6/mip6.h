@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.31 2001/11/29 04:38:38 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.32 2001/12/03 12:19:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -115,6 +115,9 @@ int mip6_process_nd_prefix		__P((struct in6_addr *,
 					     struct nd_defrouter *,
 					     struct mbuf *));
 int mip6_process_defrouter_change	__P((struct nd_defrouter *));
+void mip6_probe_routers			__P((void));
+int mip6_select_coa			__P((struct ifnet *));
+int mip6_process_movement		__P((void));
 
 int mip6_ifa_need_dad			__P((struct in6_ifaddr *));
 int64_t mip6_coa_get_lifetime		__P((struct in6_addr *));

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.12 2001/11/29 04:38:36 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.13 2001/12/03 12:19:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,7 +239,6 @@ hif_ioctl(ifp, cmd, data)
 	int s;
 	struct hif_softc *sc = (struct hif_softc *)ifp;
 	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
-	struct ifaddr *ifa = (struct ifaddr *)data;
 	struct ifreq *ifr = (struct ifreq *)data;
 	int error = 0;
 
@@ -252,8 +251,6 @@ hif_ioctl(ifp, cmd, data)
 	switch(cmd) {
 	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP | IFF_RUNNING;
-		ifa = (struct ifaddr *)data;
-		ifa->ifa_rtrequest = hif_rtrequest;
 		/*
 		 * Everything else is done at a higher level.
 		 */
@@ -590,7 +587,8 @@ hif_coa_get_ifaddr(hcoa)
 		if (ia6->ia6_flags &
 		    (IN6_IFF_ANYCAST
 		     /* XXX should not use DEATCHed addr */
-		     /* | IN6_IFF_TENTATIVE | IN6_IFF_DETACHED*/
+		     /* | IN6_IFF_TENTATIVE */
+		     | IN6_IFF_DETACHED
 		     | IN6_IFF_DUPLICATED
 		     | IN6_IFF_DEPRECATED))
 			continue;

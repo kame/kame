@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.41 2001/11/29 11:29:37 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.42 2001/12/03 12:19:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -273,7 +273,7 @@ mip6_home_registration(sc)
 		return (EINVAL);
 	}
 
-	/* check each BU entry that has a BUF flag on. */
+	/* check each BU entry that has a BUF_HOME flag on. */
 	for (mbu = LIST_FIRST(&sc->hif_bu_list);
 	     mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
@@ -300,6 +300,21 @@ mip6_home_registration(sc)
 		struct mip6_ha *mha;
 		struct mip6_subnet_prefix *mspfx;
 		struct mip6_prefix *mpfx;
+
+		if (sc->hif_location == HIF_LOCATION_HOME) {
+			/*
+			 * we are home and we have no binding update
+			 * entry for home registration.  this will
+			 * happen when either of the following two
+			 * cases happens.
+			 *
+			 * 1. enabling MN function at home subnet.
+			 * 2. returning home with expired home registration.
+			 *
+			 * in either case, we should do nothing.
+			 */
+			return (0);
+		}
 
 		/*
 		 * no home registration found.  create a new binding
@@ -511,17 +526,15 @@ mip6_bu_timeout(arg)
 
 			/* check expiration */
 			if (mbu->mbu_remain < 0) {
-				mip6log((LOG_INFO,
-					 "%s:%d: "
-					 "an BU entry (0x%p) expired.\n",
-					 __FILE__, __LINE__, mbu));
 				error = mip6_bu_list_remove(&sc->hif_bu_list,
 							    mbu);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s:%d: can't remove BU.\n",
-						 __FILE__, __LINE__));
-					continue;
+						 "%s:%d: "
+						 "can't remove a binding "
+						 "update entry (0x%p)\n",
+						 __FILE__, __LINE__, mbu));
+					/* continue anyway... */
 				}
 				continue;
 			}
@@ -540,11 +553,6 @@ mip6_bu_timeout(arg)
 			if ((mbu->mbu_flags & IP6_BUF_ACK)
 			    && (mbu->mbu_state & MIP6_BU_STATE_WAITACK)
 			    && (mbu->mbu_ackremain < 0)) {
-				mip6log((LOG_INFO,
-					 "%s:%d: "
-					 "ack for an BU (0x%p) timeout.\n",
-					 __FILE__, __LINE__,
-					 mbu));
 				mbu->mbu_acktimeout *= 2;
 				if (mbu->mbu_acktimeout > MIP6_BA_MAX_TIMEOUT)
 					mbu->mbu_acktimeout
@@ -570,14 +578,11 @@ mip6_bu_timeout(arg)
 
 			/* send pending BUs */
 			if (mbu->mbu_state & MIP6_BU_STATE_WAITSENT) {
-				mip6log((LOG_INFO,
-					 "%s:%d: "
-					 "we have a pending BU (0x%p)\n",
-					 __FILE__, __LINE__,
-					 mbu));
 				if (mip6_bu_send_bu(mbu)) {
 					mip6log((LOG_ERR,
-						 "%s:%d: sending BU from %s(%s) to %s failed.\n",
+						 "%s:%d: "
+						 "sending a binding update "
+						 "from %s(%s) to %s failed.\n",
 						 __FILE__, __LINE__,
 						 ip6_sprintf(&mbu->mbu_haddr),
 						 ip6_sprintf(&mbu->mbu_coa),
@@ -671,11 +676,6 @@ mip6_bu_list_remove(mbu_list, mbu)
 	if ((mbu_list == NULL) || (mbu == NULL)) {
 		return (EINVAL);
 	}
-
-	mip6log((LOG_INFO,
-		 "%s:%d: removing a BU entry (0x%p).\n",
-		 __FILE__, __LINE__,
-		 mbu));
 
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
