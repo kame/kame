@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.95 2003/01/09 02:54:44 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.96 2003/01/09 04:14:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1225,6 +1225,14 @@ stf_ioctl(ifp, cmd, data)
 				error = EEXIST;
 				return error;
 			}
+		}
+		switch (sc->sc_mode) {
+		case STFM_6TO4:
+		case STFM_ISATAP:
+			break;
+		default:
+			error = EINVAL;
+			return error;
 		}
 		bcopy(&ifr->ifr_data, &sc->sc_mode, sizeof(sc->sc_mode));
 		/* 
