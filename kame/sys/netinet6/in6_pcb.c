@@ -961,7 +961,7 @@ in6_pcbrtentry(in6p)
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	    !SA6_ARE_ADDR_EQUAL(&dst6, &in6p->in6p_fsa))) {
+	    !SA6_ARE_ADDR_EQUAL(dst6, &in6p->in6p_fsa))) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)NULL;
 	}
