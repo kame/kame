@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.24 2002/03/12 11:57:54 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.25 2002/05/14 13:37:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -776,14 +776,10 @@ buflg_sprintf(flags)
 	static char buf[] = "AHSO";
 
 	snprintf(buf, sizeof(buf), "%s%s%s%s",
-		 (flags & IP6_BUF_ACK ? "A" : ""),
-		 (flags & IP6_BUF_HOME ? "H" : ""),
-#ifdef MIP6_DRAFT13
-		 (flags & IP6_BUF_ROUTER ? "R" : ""),
-#else
-		 (flags & IP6_BUF_SINGLE ? "S" : ""),
-#endif
-		 (flags & IP6_BUF_DAD ? "D" : ""));
+		 (flags & IP6MU_ACK ? "A" : ""),
+		 (flags & IP6MU_HOME ? "H" : ""),
+		 (flags & IP6MU_SINGLE ? "S" : ""),
+		 (flags & IP6MU_DAD ? "D" : ""));
 
 	return buf;
 }
