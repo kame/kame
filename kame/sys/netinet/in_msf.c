@@ -3863,8 +3863,8 @@ sa_cmp(struct sockaddr *a, struct sockaddr *b)
 	diff = 0;
 	/* compare each byte in these addresses */
 	for (i = 0; i < size; i++) {
-		unsigned char byte_a = *addr_a++ 
-		unsigned char byte_b = *addr_b++ 
+		unsigned char byte_a = *addr_a++;
+		unsigned char byte_b = *addr_b++;
 		diff = byte_a - byte_b;
 		if (diff != 0)
 			return diff;
