@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.237 2002/05/18 23:16:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.238 2002/05/28 10:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4611,23 +4611,13 @@ key_timehandler(arg)
 static void
 key_srandom()
 {
-	struct timeval tv;
 #ifdef __bsdi__
+	struct timeval tv;
 	extern long randseed; /* it's defined at i386/i386/random.s */
-#endif /* __bsdi__ */
-#ifdef __NetBSD__
-	int i;
-#endif
 
 	microtime(&tv);
 
-#ifdef __FreeBSD__
-	srandom(tv.tv_usec);
-#elif defined(__bsdi__)
 	randseed = tv.tv_usec;
-#elif defined(__NetBSD__)
-	for (i = (int)((tv.tv_sec ^ tv.tv_usec) & 0x3ff); i > 0; i--)
-		(void)random();
 #endif
 
 	return;
@@ -4659,6 +4649,9 @@ key_randomfill(p, l)
 	n = l;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	n = (size_t)read_random_unlimited(p, (u_int)l);
+#elif !defined(__bsdi__)
+	*(u_int32_t *)p = arc4random();
+	n = sizeof(u_int32_t);
 #endif
 	/* last resort */
 	while (n < l) {
