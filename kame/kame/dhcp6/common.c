@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.111 2004/07/28 22:33:59 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.112 2004/08/11 02:36:51 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1308,7 +1308,7 @@ dhcp6_get_options(p, ep, optinfo)
 				if (dnsdecode((u_char **)&val,
 				    (u_char *)(cp + optlen), name,
 				    sizeof(name)) == NULL) {
-					dprintf(LOG_INFO, FNAME, "failed to"
+					dprintf(LOG_INFO, FNAME, "failed to "
 					    "decode a SIP domain name");
 					goto malformed;	/* or proceed? */
 				}
@@ -1318,7 +1318,7 @@ dhcp6_get_options(p, ep, optinfo)
 
 				if (dhcp6_add_listval(&optinfo->sipname_list,
 				    DHCP6_LISTVAL_VBUF, &vb, NULL) == NULL) {
-					dprintf(LOG_ERR, FNAME, "failed to"
+					dprintf(LOG_ERR, FNAME, "failed to "
 					    "copy a SIP domain name");
 					goto fail;
 				}
@@ -1384,7 +1384,7 @@ dhcp6_get_options(p, ep, optinfo)
 				if (dnsdecode((u_char **)&val,
 				    (u_char *)(cp + optlen), name,
 				    sizeof(name)) == NULL) {
-					dprintf(LOG_INFO, FNAME, "failed to"
+					dprintf(LOG_INFO, FNAME, "failed to "
 					    "decode a DNS name");
 					goto malformed;	/* or proceed? */
 				}
@@ -1394,7 +1394,7 @@ dhcp6_get_options(p, ep, optinfo)
 
 				if (dhcp6_add_listval(&optinfo->dnsname_list,
 				    DHCP6_LISTVAL_VBUF, &vb, NULL) == NULL) {
-					dprintf(LOG_ERR, FNAME, "failed to"
+					dprintf(LOG_ERR, FNAME, "failed to "
 					    "copy a DNS name");
 					goto fail;
 				}
