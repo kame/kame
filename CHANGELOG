@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1951 2001/10/26 09:29:48 keiichi Exp $
+$KAME: CHANGELOG,v 1.1952 2001/10/26 12:42:14 jinmei Exp $
 
 <200110>
+2001-10-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/usr.sbin/ppp/ipv6cp.c (ipcp_SetIPv6address): embedded the
+	link ID to the link-local addresses of both ends.
+	* freebsd4/usr.sbin/ppp/ncpaddr.c (adjust_linklocal): do not move
+	the embedded value to sin6_scope_id, since the kernel routing
+	engine does not understand this form.
+	* freebsd4/usr.sbin/ppp/ipv6cp.c (ipv6cp_Layer{Up,Down}): read
+	ppp.linkup and ppp.linkdown for IPv6.  I'm not 100% sure if this
+	can be done without other fixes.
+
 Fri Oct 26 18:27:29 JST 2001 keiichi@iij.ad.jp
 	* mip6
   	- changed the mip6 ioctl request structure. (this REQUIRES UPDATING
