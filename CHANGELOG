@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.813 2000/04/25 07:21:53 itojun Exp $
+$Id: CHANGELOG,v 1.814 2000/04/25 07:53:47 fujisawa Exp $
 
 <200004>
+Tue Apr 25 16:46:56 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* v4 traceroute (in NAT-PT w/ v4NAT) works.
+
 Tue Apr 25 16:21:24 JST 2000  itojun@iijlab.net
 	* netbsd/sys/netinet/ip_ipip.c: re-enable support for ipip interface.
 	  sync with netbsd-current.
