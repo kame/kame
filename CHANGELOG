@@ -1,6 +1,34 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1456 2000/12/27 23:53:25 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1457 2000/12/31 16:49:03 jinmei Exp $
+
+<200101>
+2001-01-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/lib/libinet6:
+	* bsdi4/contrib/bind/src/lib:
+	massive improvements on DNS resolver including
+	- IPv6 transport of DNS resolver. An IPv6 textual address can now
+	  be in the /etc/resolv.conf file as a DNS server.
+	- support of A6 and DNAME with bit string labels. They are still
+	  very experimental, and thus disabled by default. "options a6"
+	  and "options dname" in the /etc/resolv.conf file would enable A6
+	  and DNAME, respectively.
+	- EDNS0 OPT RR support with UDP buffer size negotiation. which is
+	  disabled by default, and would enabled by "options edns0" in the
+	  /etc/resolv.conf file.
+	- clarification on the relationship between address family and irs
+	  functions. For example, if you call getaddrinfo with AF_UNSPEC,
+	  and irs.conf specifies to consider the local hosts file first,
+	  then getaddrinfo would try to resolve an address in the
+	  following order:
+	  + IPv6 addresses in the hosts file.
+	  + IPv4 addresses in the hosts file.
+	  + IPv6 addresses via DNS.
+	  + IPv4 addresses via DNS.
+	  And, if one of the first two attempts succeeded, the remaining
+	  two methods would be skipped. This change of the behavior would
+	  be useful if you put both IPv6 and IPv4 addresses in the hosts
+	  file, and do not want to see redundant DNS packets.
 
 <200012>
 Thu Dec 28 08:48:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
