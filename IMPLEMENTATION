@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.149 2000/08/21 08:59:19 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.150 2000/08/21 09:00:49 jinmei Exp $
 
 1. IPv6
 
@@ -643,7 +643,7 @@ structure, as "struct ip6protosw" (see netinet6/ip6protosw.h).
 In addition to this, we restrict the number of extension headers
 (including the IPv6 header) in each incoming packet, in order to
 prevent a DoS attack that tries to send packets with a massive number
-of extension headers.  The upper limit can be configurable the sysctl
+of extension headers.  The upper limit can be configured by the sysctl
 value net.inet6.ip6.hdrnestlimit. In particular, if the value is 0,
 the node will allow an arbitrary number of headers. As of writing this
 document, the default value is 50.
