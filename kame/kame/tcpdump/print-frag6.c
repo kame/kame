@@ -70,7 +70,7 @@ frag6_print(register const u_char *bp, register const u_char *bp2)
 	TCHECK(dp->ip6f_offlg);
 
 	if (vflag) {
-		printf("frag (%08x:%d|%d) ",
+		printf("frag (0x%08x:%d|%d) ",
 		       ntohl(dp->ip6f_ident),
 		       ntohs(dp->ip6f_offlg & IP6F_OFF_MASK),
 		       sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen) -
