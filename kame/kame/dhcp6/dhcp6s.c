@@ -608,7 +608,7 @@ server6_react_request(agent, buf, siz)
 	if (opt && dnsserv) {
 		extbuf.dh6e_type = htons(opt->code);
 		extbuf.dh6e_len = htons(sizeof(struct in6_addr));
-		memcpy(ext + sizeof(extbuf), &extbuf, sizeof(extbuf));
+		memcpy(ext, &extbuf, sizeof(extbuf));
 		if (inet_pton(AF_INET6, dnsserv, ext + sizeof(extbuf),
 				sizeof(struct in6_addr)) != 1) {
 			errx(1, "inet_pton failed");
@@ -621,12 +621,12 @@ server6_react_request(agent, buf, siz)
 	/* DNS domain */
 	opt = dhcp6opttab_byname("Domain Name");
 	if (opt && dnsdom) {
-		int len;
+		int dnsdom_len;
 
-		len = strlen(dnsdom);
+		dnsdom_len = strlen(dnsdom);
 		extbuf.dh6e_type = htons(opt->code);
-		extbuf.dh6e_len = htons(len);	/*XXX alignment?*/
-		memcpy(ext + sizeof(extbuf), &extbuf, sizeof(extbuf));
+		extbuf.dh6e_len = htons(dnsdom_len);	/*XXX alignment?*/
+		memcpy(ext, &extbuf, sizeof(extbuf));
 		memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
 		strncpy(ext + sizeof(extbuf), dnsdom, ntohs(extbuf.dh6e_len));
 		ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
@@ -648,6 +648,7 @@ server6_react_request(agent, buf, siz)
 
 			extbuf.dh6e_type = htons(opt->code);
 			extbuf.dh6e_len = htons(sizeof(u_int32_t));
+			memcpy(ext, &extbuf, sizeof(extbuf));
 			*(u_int32_t *)(ext + sizeof(extbuf)) = tzoff.ui;
 			ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 			len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
@@ -655,11 +656,12 @@ server6_react_request(agent, buf, siz)
 
 		opt = dhcp6opttab_byname("IEEE 1003.1 POSIX Timezone");
 		if (opt) {
-			int len;
+			int zone_len;
 
-			len = strlen(tm->tm_zone);
+			zone_len = strlen(tm->tm_zone);
 			extbuf.dh6e_type = htons(opt->code);
-			extbuf.dh6e_len = htons(len);	/*XXX alignment?*/
+			extbuf.dh6e_len = htons(zone_len);	/*XXX alignment?*/
+			memcpy(ext, &extbuf, sizeof(extbuf));
 			memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
 			strncpy(ext + sizeof(extbuf), tm->tm_zone,
 				ntohs(extbuf.dh6e_len));
