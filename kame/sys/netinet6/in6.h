@@ -554,6 +554,10 @@ int	in6_addrscope __P((struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithscope __P((struct ifnet *, struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
+#ifdef MAPPED_ADDR_ENABLED
+void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
+			    struct sockaddr_in6 *sin6));
+#endif /* MAPPED_ADDR_ENABLED */
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))

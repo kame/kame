@@ -2081,3 +2081,20 @@ in6_setmaxmtu()
 	if (maxmtu)	/* update only when maxmtu is positive */
 		in6_maxmtu = maxmtu;
 }
+
+#ifdef MAPPED_ADDR_ENABLED
+/* 
+ * Convert sockaddr_in6 to sockaddr_in. Original sockaddr_in6 must be
+ * v4 mapped addr or v4 compat addr
+ */
+void
+in6_sin6_2_sin(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
+{
+	bzero(sin, sizeof(*sin));
+	sin->sin_len = sizeof(struct sockaddr_in);
+	sin->sin_family = AF_INET;
+	sin->sin_port = sin6->sin6_port;
+	sin->sin_addr.s_addr = sin6->sin6_addr.s6_addr32[3];	
+}
+#endif /* MAPPED_ADDR_ENABLED */
+

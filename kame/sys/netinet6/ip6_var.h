@@ -239,7 +239,11 @@ void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route_in6 *, int,
 			struct ip6_moptions *));
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
+#else
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+#endif
 int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	ip6_optlen __P((struct inpcb *));
@@ -256,7 +260,11 @@ void	frag6_drain __P((void));
 
 void	rip6_init __P((void));
 int	rip6_input __P((struct mbuf **mp, int *offp, int proto));
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	rip6_ctloutput __P((struct socket *so, struct sockopt *sopt));
+#else
 int	rip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+#endif
 int	rip6_output __P((struct mbuf *, ...));
 int	rip6_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
