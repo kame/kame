@@ -241,13 +241,17 @@ ip_output(m0, va_alist)
 	 * If there is a cached route,
 	 * check that it is to the same destination
 	 * and is still up.  If not, free it and try again.
+	 * The address family should also be checked in case of sharing the
+	 * cache with IPv6.
 	 */
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	    !in_hosteq(dst->sin_addr, ip->ip_dst))) {
+			  dst->sin_family != AF_INET || 
+			  !in_hosteq(dst->sin_addr, ip->ip_dst))) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
 	if (ro->ro_rt == 0) {
+		bzero(dst, sizeof(*dst));
 		dst->sin_family = AF_INET;
 		dst->sin_len = sizeof(*dst);
 		dst->sin_addr = ip->ip_dst;

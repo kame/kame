@@ -398,6 +398,8 @@ in_pcbconnect(v, nam)
 		/* 
 		 * If route is known or can be allocated now,
 		 * our src addr is taken from the i/f, else punt.
+		 * Note that we should check the address family of the cached
+		 * destination, in case of sharing the cache with IPv6.
 		 */
 		ro = &inp->inp_route;
 		if (ro->ro_rt &&
@@ -411,6 +413,7 @@ in_pcbconnect(v, nam)
 		    (ro->ro_rt == (struct rtentry *)0 ||
 		    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
 			/* No route yet, so try to acquire one */
+			bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 			ro->ro_dst.sa_family = AF_INET;
 			ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
 			satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;
@@ -908,6 +911,7 @@ in_pcbrtentry(inp)
 		 * No route yet, so try to acquire one.
 		 */
 		if (!in_nullhost(inp->inp_faddr)) {
+			bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 			ro->ro_dst.sa_family = AF_INET;
 			ro->ro_dst.sa_len = sizeof(ro->ro_dst);
 			satosin(&ro->ro_dst)->sin_addr = inp->inp_faddr;
@@ -942,6 +946,7 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	    (ro->ro_rt == (struct rtentry *)0 ||
 	    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
 		/* No route yet, so try to acquire one */
+		bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 		ro->ro_dst.sa_family = AF_INET;
 		ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
 		satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;
