@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.286 2002/02/28 13:25:09 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.287 2002/03/01 05:02:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -462,7 +462,7 @@ icmp6_error(m, type, code, param)
 	 * m_prepend below.
 	 *
 	 * XXX: We should consider the other candidate to keep the
-	 * icmp6 error packet correct that not swapping ip6_src and
+	 * icmp6 error packet correct in order to not swap ip6_src and
 	 * homeaddr in the dest6 processing.
 	 */
 	n = ip6_findaux(m);
