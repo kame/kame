@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1660 2001/05/01 07:50:41 itojun Exp $
+$KAME: CHANGELOG,v 1.1661 2001/05/01 17:02:15 itojun Exp $
 
 <200105>
+Wed May  2 02:01:25 JST 2001  itojun@iijlab.net
+	* sys/netkey/key.c: correct varaible initialization in inbound
+	  tunnel policy checking.  From: Gunther Schadow
+
 Tue May  1 16:49:24 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_forward.c: turn on PROHIBIT_P2PREDIRECT by default,
 	  based on discussion on ipngwg mailing list.  see changelog on
