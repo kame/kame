@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1828 2001/08/03 09:16:35 sakane Exp $
+$KAME: CHANGELOG,v 1.1829 2001/08/05 05:02:08 itojun Exp $
 
 <200108>
+Sun Aug  5 14:00:04 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: improve cached ipsec policy lookup on connected
+	  SOCK_STREAM PCBs.
+
 2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/advapitest/sender.c (main): added a new option '-n
 	nexthop' to test IPV6_NEXTHOP.
