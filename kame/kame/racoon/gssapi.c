@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.15 2001/01/29 23:24:54 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.16 2001/01/29 23:37:18 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -499,7 +499,10 @@ gssapi_wraphash(struct ph1handle *iph1)
 		return NULL;
 	}
 
-	gssapi_vm2gssbuf(iph1->hash, hash_in);
+	if (gssapi_vm2gssbuf(iph1->hash, hash_in) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL, "vm2gssbuf failed\n");
+		return NULL;
+	}
 
 	maj_stat = gss_wrap(&min_stat, gps->gss_context, 1, GSS_C_QOP_DEFAULT,
 	    hash_in, NULL, hash_out);
