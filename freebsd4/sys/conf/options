@@ -251,6 +251,7 @@ IP6_AUTO_LINKLOCAL	opt_inet6.h
 MIP6			opt_inet.h
 MIP6_DEBUG		opt_inet.h
 NATPT			opt_natpt.h
+NATPT_NAT		opt_natpt.h
 NEW_STRUCT_ROUTE	opt_global.h
 IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h
