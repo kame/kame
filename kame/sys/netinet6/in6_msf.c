@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.8 2002/10/17 10:26:07 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.9 2002/10/18 08:18:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2405,7 +2405,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	if (msf->msf_grpjoin != 0)
 		old_mode = MCAST_EXCLUDE;
 	else if (msf->msf_numsrc != 0) {
-		MALLOC(old_ss, struct sockaddr_storage *,
+		MALLOC(old_ss, struct sockaddr_in6 *,
 		       sizeof(*old_ss) * msf->msf_numsrc,
 		       M_IPMOPTS, M_NOWAIT);
 		if (old_ss == NULL) {
