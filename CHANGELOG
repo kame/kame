@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1318 2000/10/04 11:42:46 itojun Exp $
+$KAME: CHANGELOG,v 1.1319 2000/10/04 22:43:03 itojun Exp $
 
 <200010>
+Thu Oct  5 07:41:18 JST 2000  itojun@iijlab.net
+	* *bsd*/sys/net/if.c: make sure we have root privilege on SIOCSPHY*
+	  operation.  from: thorpej@netbsd.org
+	  ROGUE LOCAL USER MAY BE ABLE TO DO BAD THING, SO UPGRADE IS SUGGESTED
+
 Wed Oct  4 20:39:16 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: supply two sysctl variables,
 	  net.key.{esp,ah}_keymin, that control how ACQUIRE messages are
