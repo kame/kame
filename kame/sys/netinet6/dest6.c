@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.20 2001/01/23 09:19:11 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.21 2001/01/23 09:20:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,7 +129,7 @@ dest6_input(mp, offp, proto)
 
 #if 0
 			/* be picky about alignment: 8n+6 */
-			if ((opt - dstopt) % 8 != 6)
+			if ((opt - (u_int8_t *)dstopts) % 8 != 6)
 				goto bad;
 #endif
 
