@@ -193,6 +193,10 @@ in_pcballoc(so, v)
 		inp->inp_flags = INP_IPV6;
 		if (ip6_auto_flowlabel)
 			inp->inp_flags |= IN6P_AUTOFLOWLABEL;
+		inp->inp_fsa6.sin6_family =
+			inp->inp_lsa6.sin6_family = AF_INET6;
+		inp->inp_fsa6.sin6_len =
+			inp->inp_lsa6.sin6_len = sizeof(struct sockaddr_in6);
 	}
 	inp->in6p_cksum = -1;
 #endif /* INET6 */

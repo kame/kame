@@ -74,11 +74,18 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip_ipsp.h>
 
+#ifndef offsetof		/* XXX */
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
 union inpaddru {
-	struct in6_addr iau_addr6;
+	struct sockaddr_in6 iau_addr6;
 	struct {
-		uint8_t pad[12];
-		struct in_addr inaddr;	/* easier transition */
+		/* XXX */
+		u_int8_t pad1[offsetof(struct sockaddr_in6, sin6_addr)];
+		u_int8_t pad2[12];
+		/* I put the in_addr here because this makes */
+		/* transition easier. */
+		struct in_addr inaddr;
 	} iau_a4u;
 };
 
@@ -95,12 +102,14 @@ struct inpcb {
 	struct	  inpcbtable *inp_table;
 	union	  inpaddru inp_faddru;		/* Foreign address. */
 	union	  inpaddru inp_laddru;		/* Local address. */
-#define	inp_faddr	inp_faddru.iau_a4u.inaddr
-#define	inp_faddr6	inp_faddru.iau_addr6
-#define	inp_laddr	inp_laddru.iau_a4u.inaddr
-#define	inp_laddr6	inp_laddru.iau_addr6
-	u_int16_t inp_fport;		/* foreign port */
-	u_int16_t inp_lport;		/* local port */
+#define inp_faddr  inp_faddru.iau_a4u.inaddr
+#define inp_fsa6   inp_faddru.iau_addr6
+#define inp_faddr6 inp_faddru.iau_addr6.sin6_addr
+#define inp_laddr  inp_laddru.iau_a4u.inaddr
+#define inp_lsa6   inp_laddru.iau_addr6
+#define inp_laddr6 inp_laddru.iau_addr6.sin6_addr
+#define inp_lport  inp_laddru.iau_addr6.sin6_port
+#define inp_fport  inp_faddru.iau_addr6.sin6_port
 	struct	  socket *inp_socket;	/* back pointer to socket */
 	caddr_t	  inp_ppcb;		/* pointer to per-protocol pcb */
 	union {				/* Route (notice increased size). */
