@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.49 2001/09/10 08:09:17 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.50 2001/09/21 05:46:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -114,7 +114,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.49 2001/09/10 08:09:17 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.50 2001/09/21 05:46:05 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static char *bcastaddr = NULL;
@@ -639,10 +639,10 @@ sendtest(sa, sb, ai)
 		}
 	}
 #ifdef IPV6_V6ONLY
-	if (v6only && ai->ai_family == AF_INET6) {
-		int on = 1;
+	if (ai->ai_family == AF_INET6) {
+		int v = v6only ? 1 : 0;
 
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on))
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &v, sizeof(v))
 		    < 0) {
 			if (!summary) {
 				printf("\tfailed setsockopt(IPV6_V6ONLY) "
@@ -786,10 +786,10 @@ conntest(sa, sb, ai)
 		goto done;
 	}
 #ifdef IPV6_V6ONLY
-	if (v6only && ai->ai_family == AF_INET6) {
-		int on = 1;
+	if (ai->ai_family == AF_INET6) {
+		int v = v6only ? 1 : 0;
 
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on))
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &v, sizeof(v))
 		    < 0) {
 			if (!summary) {
 				printf("\tfailed setsockopt(IPV6_V6ONLY) "
