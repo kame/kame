@@ -225,24 +225,14 @@ ah_keyed_md5_init(state, sav)
 		panic("ah_keyed_md5_init: what?");
 
 	state->sav = sav;
-#ifdef HAVE_MD5
 	state->foo = (void *)malloc(sizeof(MD5_CTX), M_TEMP, M_NOWAIT);
 	if (state->foo == NULL)
 		panic("ah_keyed_md5_init: what?");
 	MD5Init((MD5_CTX *)state->foo);
-#else
-	state->foo = NULL;
-	md5_init();
-#endif
 	if (state->sav) {
-#ifdef HAVE_MD5
 		MD5Update((MD5_CTX *)state->foo, 
 			(u_int8_t *)_KEYBUF(state->sav->key_auth),
 			(u_int)_KEYLEN(state->sav->key_auth));
-#else
-		md5_loop((u_int8_t *)_KEYBUF(state->sav->key_auth),
-			(u_int)_KEYLEN(state->sav->key_auth));
-#endif
 
 	    {
 		/*
@@ -262,39 +252,23 @@ ah_keyed_md5_init(state, sav)
 		keybitlen *= 8;
 
 		buf[0] = 0x80;
-#ifdef HAVE_MD5
 		MD5Update((MD5_CTX *)state->foo, &buf[0], 1);
-#else
-		md5_loop(&buf[0], 1);
-#endif
 		padlen--;
 
 		bzero(buf, sizeof(buf));
 		while (sizeof(buf) < padlen) {
-#ifdef HAVE_MD5
 			MD5Update((MD5_CTX *)state->foo, &buf[0], sizeof(buf));
-#else
-			md5_loop(&buf[0], sizeof(buf));
-#endif
 			padlen -= sizeof(buf);
 		}
 		if (padlen) {
-#ifdef HAVE_MD5
 			MD5Update((MD5_CTX *)state->foo, &buf[0], padlen);
-#else
-			md5_loop(&buf[0], padlen);
-#endif
 		}
 
 		buf[0] = (keybitlen >> 0) & 0xff;
 		buf[1] = (keybitlen >> 8) & 0xff;
 		buf[2] = (keybitlen >> 16) & 0xff;
 		buf[3] = (keybitlen >> 24) & 0xff;
-#ifdef HAVE_MD5
 		MD5Update((MD5_CTX *)state->foo, buf, 8);
-#else
-		md5_loop(buf, 8);
-#endif
 	    }
 	}
 }
@@ -308,11 +282,7 @@ ah_keyed_md5_loop(state, addr, len)
 	if (!state)
 		panic("ah_keyed_md5_loop: what?");
 
-#ifdef HAVE_MD5
 	MD5Update((MD5_CTX *)state->foo, addr, len);
-#else
-	md5_loop((u_int8_t *)addr, (u_int)len);
-#endif
 }
 
 static void
@@ -326,22 +296,12 @@ ah_keyed_md5_result(state, addr)
 		panic("ah_keyed_md5_result: what?");
 
 	if (state->sav) {
-#ifdef HAVE_MD5
 		MD5Update((MD5_CTX *)state->foo, 
 			(u_int8_t *)_KEYBUF(state->sav->key_auth),
 			(u_int)_KEYLEN(state->sav->key_auth));
-#else
-		md5_loop((u_int8_t *)_KEYBUF(state->sav->key_auth),
-			(u_int)_KEYLEN(state->sav->key_auth));
-#endif
 	}
-#ifdef HAVE_MD5
 	MD5Final(&digest[0], (MD5_CTX *)state->foo);
 	free(state->foo, M_TEMP);
-#else
-	md5_pad();
-	md5_result(&digest[0]);
-#endif
 	bcopy(&digest[0], (void *)addr, sizeof(digest));
 }
 
@@ -498,42 +458,26 @@ ah_hmac_md5_init(state, sav)
 	u_char *key;
 	size_t keylen;
 	size_t i;
-#ifdef HAVE_MD5
 	MD5_CTX *ctxt;
-#endif
 
 	if (!state)
 		panic("ah_hmac_md5_init: what?");
 
 	state->sav = sav;
-#ifdef HAVE_MD5
 	state->foo = (void *)malloc(64 + 64 + sizeof(MD5_CTX), M_TEMP, M_NOWAIT);
-#else
-	state->foo = (void *)malloc(64 + 64, M_TEMP, M_NOWAIT);
-#endif
 	if (!state->foo)
 		panic("ah_hmac_md5_init: what?");
 
 	ipad = (u_char *)state->foo;
 	opad = (u_char *)(ipad + 64);
-#ifdef HAVE_MD5
 	ctxt = (MD5_CTX *)(opad + 64);
-#endif
 
 	/* compress the key if necessery */
 	if (64 < _KEYLEN(state->sav->key_auth)) {
-#ifdef HAVE_MD5
 		MD5Init(ctxt);
 		MD5Update(ctxt, _KEYBUF(state->sav->key_auth),
 			_KEYLEN(state->sav->key_auth));
 		MD5Final(&tk[0], ctxt);
-#else
-		md5_init();
-		md5_loop(_KEYBUF(state->sav->key_auth),
-			_KEYLEN(state->sav->key_auth));
-		md5_pad();
-		md5_result(&tk[0]);
-#endif
 		key = &tk[0];
 		keylen = 16;
 	} else {
@@ -550,13 +494,8 @@ ah_hmac_md5_init(state, sav)
 		opad[i] ^= 0x5c;
 	}
 
-#ifdef HAVE_MD5
 	MD5Init(ctxt);
 	MD5Update(ctxt, ipad, 64);
-#else
-	md5_init();
-	md5_loop(ipad, 64);
-#endif
 }
 
 static void
@@ -565,18 +504,12 @@ ah_hmac_md5_loop(state, addr, len)
 	caddr_t addr;
 	size_t len;
 {
-#ifdef HAVE_MD5
 	MD5_CTX *ctxt;
-#endif
 
 	if (!state || !state->foo)
 		panic("ah_hmac_md5_loop: what?");
-#ifdef HAVE_MD5
 	ctxt = (MD5_CTX *)(((caddr_t)state->foo) + 128);
 	MD5Update(ctxt, addr, len);
-#else
-	md5_loop((u_int8_t *)addr, (u_int)len);
-#endif
 }
 
 static void
@@ -587,16 +520,13 @@ ah_hmac_md5_result(state, addr)
 	u_char digest[16];
 	u_char *ipad;
 	u_char *opad;
-#ifdef HAVE_MD5
 	MD5_CTX *ctxt;
-#endif
 
 	if (!state || !state->foo)
 		panic("ah_hmac_md5_result: what?");
 
 	ipad = (u_char *)state->foo;
 	opad = (u_char *)(ipad + 64);
-#ifdef HAVE_MD5
 	ctxt = (MD5_CTX *)(opad + 64);
 
 	MD5Final(&digest[0], ctxt);
@@ -605,16 +535,6 @@ ah_hmac_md5_result(state, addr)
 	MD5Update(ctxt, opad, 64);
 	MD5Update(ctxt, &digest[0], sizeof(digest));
 	MD5Final(&digest[0], ctxt);
-#else
-	md5_pad();
-	md5_result(&digest[0]);
-
-	md5_init();
-	md5_loop(opad, 64);
-	md5_loop(&digest[0], sizeof(digest));
-	md5_pad();
-	md5_result(&digest[0]);
-#endif
 
 	bcopy(&digest[0], (void *)addr, HMACSIZE);
 
@@ -754,7 +674,6 @@ ah4_calccksum(m0, ahdat, algo, sav)
 	int hdrtype;
 	u_char *p;
 	size_t advancewidth;
-	int s;
 	struct ah_algorithm_state algos;
 	int tlen;
 	u_char sumbuf[AH_MAXSUMSIZE];
@@ -766,11 +685,6 @@ ah4_calccksum(m0, ahdat, algo, sav)
 
 	p = mtod(m, u_char *);
 
-#ifdef __NetBSD__
-	s = splsoftnet();	/*XXX crypt algorithms need splsoftnet() */
-#else
-	s = splnet();	/*XXX crypt algorithms need splsoftnet() */
-#endif
 	(algo->init)(&algos, sav);
 
 	advancewidth = 0;	/*safety*/
@@ -951,7 +865,6 @@ again:
 	(algo->result)(&algos, &sumbuf[0]);
 	bcopy(&sumbuf[0], ahdat, (*algo->sumsiz)(sav));
 
-	splx(s);
 	return error;
 }
 
@@ -971,7 +884,6 @@ ah6_calccksum(m0, ahdat, algo, sav)
 	int hdrtype;
 	u_char *p;
 	size_t advancewidth;
-	int s;
 	struct ah_algorithm_state algos;
 	int tlen;
 	int error = 0;
@@ -984,11 +896,6 @@ ah6_calccksum(m0, ahdat, algo, sav)
 
 	p = mtod(m, u_char *);
 
-#ifdef __NetBSD__
-	s = splsoftnet();	/*XXX crypt algorithms need splsoftnet() */
-#else
-	s = splnet();	/*XXX crypt algorithms need splsoftnet() */
-#endif
 	(algo->init)(&algos, sav);
 
 	advancewidth = 0;	/*safety*/
@@ -1229,11 +1136,9 @@ again:
 	(algo->result)(&algos, &sumbuf[0]);
 	bcopy(&sumbuf[0], ahdat, (*algo->sumsiz)(sav));
 
-	splx(s);
 	return(0);
 
   bad:
-	splx(s);
 	return(error);
 }
 #endif
