@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.h,v 1.2 2001/03/16 06:22:34 itojun Exp $	*/
+/*	$KAME: radix_art.h,v 1.3 2001/07/13 03:27:04 itojun Exp $	*/
 /*	$NetBSD: radix.h,v 1.10 2000/11/06 11:07:37 itojun Exp $	*/
 
 /*
@@ -76,12 +76,18 @@
  * ART: Allotment Routing Table, by Donald Knuth and Yoichi Hariguchi.
  */
 
-#define ART_BITLEN	8	/* XXX pool allocator limit, don't increase */
-#define ART_BITLEN_CONSTANT
-#define art_bitlen(t)	ART_BITLEN
+#define ART_BITLEN	4	/* XXX pool allocator limit, don't increase */
+/*#define ART_BITLEN_CONSTANT*/
+#if 0 /*def ART_BITLEN_CONSTANT*/
+#define art_bitlen(t)		ART_BITLEN
+#else
+#define art_bitlen(t)		((t)->art_bitlen)
+#define art_bitoffset(t)	((t)->art_bitoffset)
+#endif
 
 struct art_table {
-#if 0 /*ndef ART_BITLEN_CONSTANT*/
+#if 1 /*ndef ART_BITLEN_CONSTANT*/
+	int art_bitoffset;	/* bit offset on the left */
 	int art_bitlen;		/* bit length suppored by the table */
 #endif
 	void *art_table[1 << (ART_BITLEN + 1)];

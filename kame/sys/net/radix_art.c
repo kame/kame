@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.7 2001/03/16 06:25:54 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.8 2001/07/13 03:27:03 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -201,17 +201,17 @@ static void art_printaddr __P((u_int8_t *, size_t));
 #ifdef RADIX_ART_TRACE
 static void art_printidx __P((struct art_table *, artidx_t));
 #endif
-static struct art_table *art_newtable __P((void));
+static struct art_table *art_newtable __P((struct art_table *));
 static void art_deltable __P((struct art_table *));
-static inline artidx_t art_getidx __P((u_int8_t *, int));
-static artidx_t art_offset __P((u_int8_t *, int, struct art_table *));
+static inline artidx_t art_getidx __P((u_int8_t *, int, int));
+static artidx_t art_offset __P((u_int8_t *, int, int, struct art_table *));
 static struct radix_node *art_lookup __P((u_int8_t *, int, struct art_table *));
 static inline void art_changeleaf __P((struct art_table *, artidx_t, void *,
 	void *));
 static void art_change __P((struct art_table *, artidx_t, void *, void *));
 static int art_insert __P((u_int8_t *, int, struct art_table *, void *));
-static int art_gc __P((u_int8_t *, int, struct art_table *, struct art_table *,
-	artidx_t));
+static int art_gc __P((u_int8_t *, int, int, struct art_table *,
+	struct art_table *, artidx_t));
 static int art_delete __P((u_int8_t *, int, struct art_table *, void *));
 static int art_prefixlen __P((void *, struct radix_node_head *));
 
@@ -243,14 +243,22 @@ art_printidx(t, v)
 	artidx_t v;
 {
 
+#ifdef ART_BITLEN_CONSTANT
 	printf("(t=%p t.base=%p t.count=%lu v=%d+%d)",
 	    t, art_asradix(t, ART_BASEIDX), art_count(t),
 	    v / (1 << art_bitlen(t)), v % (1 << art_bitlen(t)));
+#else
+	printf("(t=%p %d/%d t.base=%p t.count=%lu v=%d+%d)",
+	    t, art_bitoffset(t), art_bitlen(t),
+	    art_asradix(t, ART_BASEIDX), art_count(t),
+	    v / (1 << art_bitlen(t)), v % (1 << art_bitlen(t)));
+#endif
 }
 #endif
 
 static struct art_table *
-art_newtable()
+art_newtable(parent)
+	struct art_table *parent;
 {
 	struct art_table *t;
 
@@ -263,6 +271,11 @@ art_newtable()
 		bzero(t, sizeof(*t));
 #ifndef ART_BITLEN_CONSTANT
 		t->art_bitlen = ART_BITLEN;
+		if (parent) {
+			t->art_bitoffset = art_bitoffset(parent) +
+			    art_bitlen(parent);
+		} else
+			t->art_bitoffset = 0;
 #endif
 	}
 #ifdef RADIX_ART_STAT
@@ -289,35 +302,46 @@ art_deltable(t)
 }
 
 static inline artidx_t
-art_getidx(p, l)
+art_getidx(p, off, l)
 	u_int8_t *p;
+	int off;
 	int l;
 {
+	u_int32_t v;
 
-	switch (l) {
-	case 8:
-		return *p;
-	case 16:
-		return ntohs(*(u_int16_t *)p);
-	case 32:
-		return ntohl(*(u_int32_t *)p);
-	default:
-		panic("ART: invalid value to art_getidx");
-		return ~0;
-	}
+	if (l > 32)
+		panic("ART: l is too big in art_getidx");
+	p += (off / 8);
+	off %= 8;
+	v = (u_int32_t)p[0] << 24;
+	if (off + l > 8)
+		v |= (u_int32_t)p[1] << 16;
+	if (off + l > 16)
+		v |= (u_int32_t)p[2] << 8;
+	if (off + l > 24)
+		v |= (u_int32_t)p[3];
+	v <<= off;
+	v >>= (32 - l);
+
+	return (artidx_t)v;
 }
 
 static artidx_t
-art_offset(p, prefixlen, t)
+art_offset(p, offset, prefixlen, t)
 	u_int8_t *p;
+	int offset;
 	int prefixlen;
 	struct art_table *t;
 {
 	int l;
 	artidx_t v;
 
+#ifdef ART_BITLEN_CONSTANT
 	l = prefixlen % art_bitlen(t);
-	v = art_getidx(p, art_bitlen(t));
+#else
+	l = prefixlen - art_bitoffset(t);
+#endif
+	v = art_getidx(p, offset, art_bitlen(t));
 	if (prefixlen == 0)
 		v = ART_BASEIDX;	/* base pointer */
 	else if (prefixlen < art_bitlen(t) && prefixlen > 0)
@@ -348,9 +372,11 @@ art_lookup(p, prefixlen, t)
 	artidx_t v;
 	int forever;
 	struct radix_node *top;
+	int offset;
 
 	forever = (prefixlen < 0) ? 1 : 0;
 	top = NULL;
+	offset = 0;
 
 #ifdef RADIX_ART_TRACE
 	printf("lookup start, %d: ", prefixlen);
@@ -362,7 +388,7 @@ again:
 #endif
 	if (art_asradix(t, ART_BASEIDX))
 		top = art_asradix(t, ART_BASEIDX);
-	v = art_offset(p, forever ? -1 : prefixlen, t);
+	v = art_offset(p, offset, forever ? -1 : prefixlen, t);
 
 #ifdef RADIX_ART_TRACE
 	art_printidx(t, v);
@@ -382,8 +408,12 @@ again:
 #ifdef DIAGNOSTIC
 		if (!art_leaf(t, v))
 			panic("non-leaf node has ART_TABLE");
+#ifndef ART_BITLEN_CONSTANT
+		if (art_bitoffset(t) + art_bitlen(t) != art_bitoffset(art_astable(t, v)))
+			panic("art_bitoffset mismatch");
 #endif
-		p += art_bitlen(t) / 8;
+#endif
+		offset += art_bitlen(t);
 		prefixlen -= art_bitlen(t);
 		t = art_astable(t, v);
 		goto again;
@@ -505,9 +535,10 @@ art_insert(p, prefixlen, t, n)
 {
 	artidx_t v;
 	struct art_table *child;
+	int offset = 0;
 
 again:
-	v = art_offset(p, prefixlen, t);
+	v = art_offset(p, offset, prefixlen, t);
 	if (prefixlen == 0) {
 		/*
 		 * special case for prefixlen == 0.
@@ -533,7 +564,7 @@ again:
 			/*
 			 * we already have a route here, expand the table
 			 */
-			child = art_newtable();
+			child = art_newtable(t);
 			if (child == NULL) {
 				/*
 				 * we exceeded the memory usage limit
@@ -553,8 +584,14 @@ again:
 #endif
 		}
 
-		p += art_bitlen(t) / 8;
+		offset += art_bitlen(t);
 		prefixlen -= art_bitlen(t);
+#ifdef DIAGNOSTIC
+#ifndef ART_BITLEN_CONSTANT
+		if (art_bitoffset(t) + art_bitlen(t) != art_bitoffset(child))
+			panic("art_bitoffset mismatch");
+#endif
+#endif
 		t = child;
 		goto again;
 	}
@@ -592,8 +629,9 @@ again:
 }
 
 static int
-art_gc(p, prefixlen, t, parent, pv)
+art_gc(p, offset, prefixlen, t, parent, pv)
 	u_int8_t *p;
+	int offset;
 	int prefixlen;
 	struct art_table *t;
 	struct art_table *parent;
@@ -601,11 +639,11 @@ art_gc(p, prefixlen, t, parent, pv)
 {
 	artidx_t v;
 
-	v = art_offset(p, prefixlen, t);
+	v = art_offset(p, offset, prefixlen, t);
 	switch (art_type(t, v)) {
 	case ART_TABLE:
-		(void)art_gc(p + art_bitlen(t) / 8, prefixlen - art_bitlen(t),
-		    art_astable(t, v), t, v);
+		(void)art_gc(p, offset + art_bitlen(t),
+		    prefixlen - art_bitlen(t), art_astable(t, v), t, v);
 		/* FALLTHROUGH */
 	case ART_RADIX:
 		if (art_count(t) != 0)
@@ -645,15 +683,17 @@ art_delete(p0, prefixlen0, t0, o)
 	u_int8_t *p;
 	int prefixlen;
 	struct art_table *t;
+	int offset;
 
 	p = p0;
 	prefixlen = prefixlen0;
 	t = t0;
+	offset = 0;
 
 	parent = NULL;
 
 again:
-	v = art_offset(p, prefixlen, t);
+	v = art_offset(p, offset, prefixlen, t);
 
 	switch (art_type(t, v)) {
 	case ART_RADIX:
@@ -709,7 +749,14 @@ again:
 #endif
 		/* if we did not find the entry yet, look at the child */
 		if (art_asradix(child, ART_BASEIDX) != o) {
-			p += art_bitlen(t) / 8;
+#ifdef DIAGNOSTIC
+#ifndef ART_BITLEN_CONSTANT
+			if (art_bitoffset(t) + art_bitlen(t) !=
+			    art_bitoffset(child))
+				panic("art_bitoffset mismatch");
+#endif
+#endif
+			offset += art_bitlen(t);
 			prefixlen -= art_bitlen(t);
 			parent = t;
 			t = child;
@@ -752,7 +799,7 @@ done:
 	 * original algorithm combines GC part into deletion, however,
 	 * it seemed overly complex and not very readable.
 	 */
-	art_gc(p0, prefixlen0, t0, NULL, 0);
+	art_gc(p0, 0, prefixlen0, t0, NULL, 0);
 	return 0;
 }
 
@@ -1012,7 +1059,7 @@ rn_art_inithead(head, off)
 	if (rnh == 0)
 		return (0);
 	Bzero(rnh, sizeof (*rnh));
-	rnh->art_top = art_newtable();
+	rnh->art_top = art_newtable(NULL);
 	rnh->art_limit = ~0U;
 	if (!rnh->art_top) {
 		Free(rnh);
