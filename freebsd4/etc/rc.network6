@@ -167,13 +167,6 @@ network6_pass1() {
 	# 6to4 setup
 	network6_stf_setup
 
-	# mobile ipv6 setup
-	case ${ipv6_mobile_enable} in
-	[Yy][Ee][Ss])
-		network6_mobile_setup
-		;;
-	esac
-
 	# install the "default interface" to kernel, which will be used
 	# as the default route when there's no router.
 	network6_default_interface_setup
@@ -309,15 +302,6 @@ network6_interface_setup() {
 			rtsol_interface=no
 			ifconfig $i inet6 ${ipv6_ifconfig} alias
 		fi
-		alias=0
-		while : ; do
-			eval ipv6_ifconfig=\$ipv6_ifconfig_${i}_alias${alias}
-			if [ -z "${ipv6_ifconfig}" ]; then
-				break;
-			fi
-			ifconfig $i inet6 ${ipv6_ifconfig} alias
-			alias=$((${alias} + 1))
-		done
 
 		if [ ${rtsol_available} = yes -a ${rtsol_interface} = yes ]
 		then
@@ -343,6 +327,18 @@ network6_interface_setup() {
 		ifconfig $1 up
 		rtsol $1
 	fi
+
+	for i in $interfaces; do
+		alias=0
+		while : ; do
+			eval ipv6_ifconfig=\$ipv6_ifconfig_${i}_alias${alias}
+			if [ -z "${ipv6_ifconfig}" ]; then
+				break;
+			fi
+			ifconfig $i inet6 ${ipv6_ifconfig} alias
+			alias=$((${alias} + 1))
+		done
+	done
 }
 
 network6_stf_setup() {
@@ -379,7 +375,6 @@ network6_stf_setup() {
 			esac
 			;;
 		esac
-		ifconfig stf0 create
 		ifconfig stf0 inet6 2002:${ipv4_in_hexformat}:${stf_interface_ipv6_slaid:-0}:${stf_interface_ipv6_ifid} \
 			prefixlen ${stf_prefixlen}
 		# disallow packets to malicious 6to4 prefix
@@ -419,6 +414,7 @@ network6_faith_setup() {
 		;;
 	*)
 		sysctl net.inet6.ip6.keepfaith=1
+		ifconfig faith0 create >/dev/null 2>&1
 		ifconfig faith0 up
 		for prefix in ${ipv6_faith_prefix}; do
 			prefixlen=`expr "${prefix}" : ".*/\(.*\)"`
@@ -514,30 +510,4 @@ network6_getladdr() {
 			esac
 		esac
 	done
-}
-
-network6_mobile_setup() {
-	case ${ipv6_mobile_nodetype} in
-	[Mm][Oo][Bb][Ii][Ll][Ee][Nn][Oo][Dd][Ee])
-		case ${ipv6_mobile_home_prefixes} in
-		'')
-			;;
-		*)
-			for home_prefix in ${ipv6_mobile_home_prefixes}
-			do
-				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
-				prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
-				mip6control -H ${prefix} -P ${prefixlen}
-			done
-			mip6control -m
-			rtsold -a -m
-			;;
-		esac
-		;;
-	[Hh][Oo][Mm][Ee][Aa][Gg][Ee][Nn][Tt])
-		mip6control -g
-		;;
-	*)
-		;;
-	esac
 }
