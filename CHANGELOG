@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1705 2001/06/02 18:52:38 jinmei Exp $
+$KAME: CHANGELOG,v 1.1706 2001/06/04 13:45:48 itojun Exp $
 
 <200106>
+Mon Jun  4 22:45:23 JST 2001  itojun@iijlab.net
+	* openbsd/sys: switch base version to 2.9.  will take a while to
+	  stabilize.
+
 2001-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): forced users to specify
 	router lifetimes explicitly.  "rtltimeN" must now explicitly be
