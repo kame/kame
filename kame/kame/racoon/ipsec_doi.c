@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.19 2000/01/11 19:09:36 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.20 2000/01/11 19:23:47 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -706,8 +706,10 @@ prop2ipsecsa_emit1(p)
 {
 	struct ipsecsa *q;
 
+#if 0
 	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param: %p\n", p);
 		print_proppair(p););
+#endif
 	q = CALLOC(sizeof(struct ipsecsa), struct ipsecsa *);
 	if (q == NULL)
 		return NULL;
@@ -724,9 +726,11 @@ prop2ipsecsa_emit1(p)
 		return NULL;
 	}
 
+#if 0
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL, "result: %p\n", q);
 		ipsecdoi_printsa(q););
+#endif
 
 	return q;
 }
@@ -743,10 +747,14 @@ prop2ipsecsa_emit(b, max, result)
 	memset(&top, 0, sizeof(top));
 	q = &top;
 	for (i = 0; i < max; i++) {
+#if 0
 		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param[%d]: %p\n", i, b[i]);
 			print_proppair(b[i]););
+#endif
 		q->bundles = prop2ipsecsa_emit1(b[i]);
+#if 0
 		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "got %p from %p\n", q->bundles, b[i]););
+#endif
 		if (q->bundles == NULL) {
 			delipsecsa(top.next);
 			return -1;
@@ -756,9 +764,11 @@ prop2ipsecsa_emit(b, max, result)
 	top.bundles->next = *result;
 	*result = top.bundles;
 
+#if 0
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL, "%p\n", *result);
 		ipsecdoi_printsa_bundle(*result););
+#endif
 
 	return 0;
 }
@@ -784,9 +794,11 @@ prop2ipsecsa_recurse(b0, b, l, max, result)
 				printf(" %d=%p", i, b[i]);
 			printf("\n");
 			ret = prop2ipsecsa_emit(b, max, result);
+#if 0
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL, "%p\n", result);
 				ipsecdoi_printsa(*result););
+#endif
 			if (ret)
 				break;
 		}
