@@ -506,6 +506,9 @@ struct pim6dstat {
 	u_quad_t out_pim6_register;
 	u_quad_t out_pim6_register_stop;
 	u_quad_t out_pim6_cand_rp;
+	/* SPT transition */
+	u_quad_t pim6_trans_spt_forward;
+	u_quad_t pim6_trans_spt_rp;
 	/* occurrences of timeouts */
 	u_quad_t pim6_bootstrap_timo;/* pim_bootstrap_timer */
 	u_quad_t pim6_rpgrp_timo; /* rp_grp_entry_ptr->holdtime */

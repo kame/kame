@@ -719,6 +719,7 @@ age_routes()
 				    }
 #endif				/* KERNEL_MFC_WC_G */
 
+				    pim6dstat.pim6_trans_spt_forward++;
 				    switch_shortest_path(&kernel_cache_ptr->source, &kernel_cache_ptr->group);
 				    did_switch_flag = TRUE;
 				}
@@ -742,6 +743,7 @@ age_routes()
 					continue;
 				    }
 #endif				/* KERNEL_MFC_WC_G */
+				pim6dstat.pim6_trans_spt_rp++;
 				switch_shortest_path(&kernel_cache_ptr->source,
 						   &kernel_cache_ptr->group);
 			    }

@@ -355,6 +355,11 @@ dump_stat()
 		pim6dstat.out_pim6_register_stop);
 	fprintf(fp, "\t%qu pim6 cand-RP sent\n", pim6dstat.out_pim6_cand_rp);
 
+	fprintf(fp, "\t%qu transitions of forwarder initiated SPT\n",
+		pim6dstat.pim6_trans_spt_forward);
+	fprintf(fp, "\t%qu transitions of RP initiated SPT\n",
+		pim6dstat.pim6_trans_spt_rp);
+
 	fprintf(fp, "\t%qu pim6 bootstrap timeouts\n",
 		pim6dstat.pim6_bootstrap_timo);
 	fprintf(fp, "\t%qu pim6 RP group entry timeouts\n",
