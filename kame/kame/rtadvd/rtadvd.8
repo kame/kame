@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.8,v 1.15 2000/12/22 08:54:29 jinmei Exp $
+.\"	$KAME: rtadvd.8,v 1.16 2001/01/22 02:08:40 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -35,8 +35,8 @@
 .Nd router advertisement daemon
 .Sh SYNOPSIS
 .Nm
-.Op Fl c Ar configfile
 .Op Fl dDfMmRs
+.Op Fl c Ar configfile
 .Ar interface ...
 .Sh DESCRIPTION
 .Nm
@@ -109,7 +109,7 @@ tries to join the first advertising interface appeared in the command
 line.
 This option has meaning only with the
 .Fl R
-option, which enables auto routing renumbering.
+option, which enables routing renumbering protocol support.
 .It Fl m
 Enables mobile IPv6 support.
 This changes the content of router advertisement option, as well as
@@ -117,6 +117,9 @@ permitted configuration directives.
 .It Fl R
 Accept router renumbering requests.
 If you enable it, certain IPsec setup is suggested for security reasons.
+On KAME-based systems,
+.Xr rrenumd 8
+generates router renumbering request packets.
 .It Fl s
 Do not add or delete prefixes dynamically.
 Only statically configured prefixes, if any, will be advertised.
@@ -155,9 +158,9 @@ in which
 dumps its internal state.
 .El
 .Sh SEE ALSO
-.Xr daemon 3 ,
 .Xr rtadvd.conf 5 ,
-.Xr rtsol 8
+.Xr rtsol 8 ,
+.Xr rrenumd 8
 .Sh HISTORY
 The
 .Nm
