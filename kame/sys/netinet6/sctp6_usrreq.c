@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.7 2002/06/09 14:44:03 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.8 2002/07/30 02:21:43 keiichi Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -906,14 +906,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if(
-#ifdef __FreeBSD__
-		   ip6_mapped_addr_on
-#else
-		   ip6_v6only
-#endif
-
-		   ) {
+		if(ip6_v6only) {
 			struct sockaddr_in sin;
 			/* convert v4-mapped into v4 addr and send */
 			in6_sin6_2_sin(&sin, sin6);
@@ -992,13 +985,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if(
-#ifdef __FreeBSD__
-		   ip6_mapped_addr_on
-#else
-		   ip6_v6only
-#endif
-		   ) {
+		if(ip6_v6only) {
 			/* convert v4-mapped into v4 addr */
 			in6_sin6_2_sin((struct sockaddr_in *)&ss, sin6);
 			addr = (struct sockaddr *)&ss;

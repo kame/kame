@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.48 2002/06/11 17:54:31 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.49 2002/07/30 02:21:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -549,7 +549,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
-	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
+	if (!ip6_v6only && (inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
 
 		sin6_p = (struct sockaddr_in6 *)nam;
@@ -585,7 +585,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (inp == 0)
 		return EINVAL;
 
-	if (ip6_mapped_addr_on) {
+	if (!ip6_v6only) {
 		struct sockaddr_in6 *sin6_p;
 
 		sin6_p = (struct sockaddr_in6 *)nam;
@@ -613,7 +613,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	error = in6_pcbconnect(inp, nam, p);
 	splx(s);
 	if (error == 0) {
-		if (ip6_mapped_addr_on) { /* should be non mapped addr */
+		if (!ip6_v6only) { /* should be non mapped addr */
 			inp->inp_vflag &= ~INP_IPV4;
 			inp->inp_vflag |= INP_IPV6;
 		}
@@ -689,7 +689,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		}
 	}
 
-	if (ip6_mapped_addr_on) {
+	if (!ip6_v6only) {
 		int hasv4addr;
 		struct sockaddr_in6 *sin6 = 0;
 

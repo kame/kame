@@ -235,7 +235,7 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
-	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
+	if (!ip6_v6only && (inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6p->sin6_addr))
 			inp->inp_vflag |= INP_IPV4;
@@ -285,8 +285,7 @@ tcp6_usr_listen(struct socket *so, struct proc *p)
 	COMMON_START();
 	if (inp->inp_lport == 0) {
 		inp->inp_vflag &= ~INP_IPV4;
-		if (ip6_mapped_addr_on &&
-		    (inp->inp_flags & IN6P_BINDV6ONLY) == 0)
+		if (!ip6_v6only && (inp->inp_flags & IN6P_BINDV6ONLY) == 0)
 			inp->inp_vflag |= INP_IPV4;
 		error = in6_pcbbind(inp, (struct sockaddr *)0, p);
 	}
@@ -354,8 +353,7 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
-	if (ip6_mapped_addr_on &&
-	    IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
+	if (!ip6_v6only && IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
 		struct sockaddr_in sin;
 
 		in6_sin6_2_sin(&sin, sin6p);
@@ -373,7 +371,7 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	error = tcp_output(tp);
 	if (error)
 		goto out;
-	if (ip6_mapped_addr_on)
+	if (!ip6_v6only)
 		inp->inp_vflag |= INP_IPV6;
 	COMMON_END(PRU_CONNECT);
 }

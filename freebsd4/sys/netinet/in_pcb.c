@@ -196,7 +196,7 @@ in_pcballoc(so, pcbinfo, p)
 #endif /*IPSEC*/
 #if defined(INET6)
 	if (INP_SOCKAF(so) == AF_INET6) {
-		if (!ip6_mapped_addr_on)
+		if (ip6_v6only)
 			inp->inp_flags |= IN6P_IPV6_V6ONLY;
 		inp->in6p_fsa.sin6_family =
 			inp->in6p_lsa.sin6_family = AF_INET6;

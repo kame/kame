@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.97 2002/06/09 14:44:00 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.98 2002/07/30 02:21:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -318,9 +318,6 @@ extern int	ip6_forward_srcrt;	/* forward src-routed? */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
 					 * walk list every 5 sec.    */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#define ip6_mapped_addr_on	(!ip6_v6only)
-#endif
 #if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2) || (defined(__bsdi__) && _BSDI_VERSION < 199802)
 extern const int	ip6_v6only;
 #else

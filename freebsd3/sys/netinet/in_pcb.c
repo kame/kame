@@ -232,7 +232,7 @@ in_pcbbind(inp, nam, p)
 				     (so->so_cred->p_ruid !=
 				      t->inp_socket->so_cred->p_ruid)) {
 #ifdef INET6
-					if (ip6_mapped_addr_on == 0 ||
+					if (ip6_v6only ||
 					    ntohl(sin->sin_addr.s_addr) !=
 					    INADDR_ANY ||
 					    ntohl(t->inp_laddr.s_addr) !=
@@ -248,7 +248,7 @@ in_pcbbind(inp, nam, p)
 			if (t &&
 			    (reuseport & t->inp_socket->so_options) == 0) {
 #ifdef INET6
-				if (ip6_mapped_addr_on == 0 ||
+				if (ip6_v6only ||
 				    ntohl(sin->sin_addr.s_addr) !=
 				    INADDR_ANY ||
 				    ntohl(t->inp_laddr.s_addr) !=
