@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.17 2002/02/21 21:17:31 sumikawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.18 2002/02/22 16:54:38 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -38,7 +38,7 @@
  */
 
 #define NATPT_SETIF	_IOW ('n', 0, struct natpt_msgBox) /* Set interface side */
-#define NATPT_GETIF	_IOWR('n', 1, struct natpt_msgBox) /* Get interface sidde */
+#define NATPT_GETIF	_IOWR('n', 1, struct natpt_msgBox) /* Get interface side */
 #define NATPT_ENBTRANS	_IOW ('n', 2, struct natpt_msgBox) /* Enable translation */
 #define NATPT_DSBTRANS	_IOW ('n', 3, struct natpt_msgBox) /* Disable translation */
 #define NATPT_SETRULES	_IOW ('n', 4, struct natpt_msgBox) /* Set rules */
@@ -55,7 +55,6 @@
 /*
  *
  */
-
 struct natpt_msgBox {
 	int size;
 	int flags;
