@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1614 2001/03/21 17:49:56 jinmei Exp $
+$KAME: CHANGELOG,v 1.1615 2001/03/21 19:17:21 itojun Exp $
 
 <200103>
+Thu Mar 22 04:15:43 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c (netbsd): inject packet to ipfilter
+	  only if it is wire format (not if it went through ipsec tunnel).
+	  http://www.netbsd.org/Documentation/network/ipsec/#ipf-interaction
+
 2001-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): allow router preference
 	values to be specified in the "raflags" directive.
