@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.45 2001/06/22 15:33:27 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.46 2001/06/22 19:24:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -171,10 +171,16 @@ encap4_lookup(m, off, proto)
 	int off;
 	int proto;
 {
-	struct ip *ip = mtod(m, struct ip *);
+	struct ip *ip;
 	struct sockaddr_in s, d;
 	struct encaptab *ep, *match;
 	int prio, matchprio;
+
+#ifdef DIAGNOSTIC
+	if (m->m_len < sizeof(*ip))
+		panic("encap4_lookup");
+#endif
+	ip = mtod(m, struct ip *);
 
 	bzero(&s, sizeof(s));
 	s.sin_family = AF_INET;
@@ -327,6 +333,10 @@ encap6_lookup(m, off, proto)
 	int prio, matchprio;
 	struct encaptab *ep, *match;
 
+#ifdef DIAGNOSTIC
+	if (m->m_len < sizeof(*ip6))
+		panic("encap6_lookup");
+#endif
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	bzero(&s, sizeof(s));
