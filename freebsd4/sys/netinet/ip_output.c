@@ -985,11 +985,11 @@ sendorfree:
 		ipstat.ips_fragmented++;
     }
 done:
+#ifdef IPSEC
 	if (ro == &iproute && ro->ro_rt) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = NULL;
 	}
-#ifdef IPSEC
 	if (sp != NULL) {
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 			printf("DP ip_output call free SP:%p\n", sp));
