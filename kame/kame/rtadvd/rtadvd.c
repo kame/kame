@@ -108,7 +108,6 @@ u_int32_t ndopt_flags[] = {
 };
 
 int main __P((int, char *[]));
-static void start __P((void));
 static void die __P((int));
 static void sock_open __P((void));
 static void rtsock_open __P((void));
@@ -215,7 +214,6 @@ main(argc, argv)
 
 	signal(SIGTERM, die);
 
-	start();
 	while (1) {
 		struct fd_set select_fd = fdset; /* reinitialize */
 
@@ -242,21 +240,6 @@ main(argc, argv)
 			rtadvd_input();
 	}
 	exit(0);		/* NOTREACHED */
-}
-
-static void
-start()
-{
-	struct rainfo *ra;
-
-	if (dflag > 1) {
-		syslog(LOG_DEBUG, "<%s> become an advertising router\n",
-		    __FUNCTION__);
-	}
-
-	for (ra = ralist; ra; ra = ra->next)
-		ra_output(ra);
-	sleep(MIN_DELAY_BETWEEN_RAS);
 }
 
 static void
