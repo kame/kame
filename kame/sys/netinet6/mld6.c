@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.104 2004/07/05 04:43:28 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.105 2004/07/05 06:23:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -87,8 +87,8 @@
 #include <sys/protosw.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
-#ifdef __FreeBSD__
 #include <sys/kernel.h>
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #ifdef __OpenBSD__
@@ -821,8 +821,8 @@ in6_addmulti(maddr6, ifp, errorp, delay)
 #elif defined(__OpenBSD__)
 		bzero(&in6m->in6m_timer_ch, sizeof(in6m->in6m_timer_ch));
 #endif
-		in6m->timer = delay;
-		if (in6m->timer > 0) {
+		in6m->in6m_timer = delay;
+		if (in6m->in6m_timer > 0) {
 			in6m->in6m_state = MLD_REPORTPENDING;
 			mld_starttimer(in6m);
 
