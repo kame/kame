@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2137 2002/04/24 07:56:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.2138 2002/04/24 12:25:04 itojun Exp $
 
 <200204>
+Wed Apr 24 21:23:43 JST 2002  itojun@iijlab.net
+	* faithd: correct connect(2) error handling.
+	  From: Yukiyo Akisada <Yukiyo.Akisada@jp.yokogawa.com>
+	  handle ECONNABORTED on accept(2).
+	  From: morito@double-fault.net
+
 2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6.h: removed the "dh6_servaddr" member from
 	the dhcp6{} structure, which had been removed from the
