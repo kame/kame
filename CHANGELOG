@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1367 2000/11/07 03:44:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1368 2000/11/07 16:29:15 itojun Exp $
 
 <200011>
+Wed Nov  8 01:27:40 JST 2000  itojun@iijlab.net
+	* route6d: do not advertise cloned/dynamic routes.
+
 Tue Nov  7 12:44:07 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/postfix: use 20001005 + IPv6 patch.
 
