@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.14 2002/08/09 08:49:39 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.15 2003/04/02 11:29:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <ifaddrs.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -187,6 +188,8 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	struct in6_pktinfo *pi;
 	struct cmsghdr *cmsgp;
 	u_short rtalert_code = htons(IP6OPT_RTALERT_MLD);
+	struct ifaddrs *ifa, *ifap;
+	struct in6_addr src;
 
 	dst.sin6_len = sizeof(dst);
 	dst.sin6_family = AF_INET6;
@@ -207,6 +210,29 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	mldh.mld_type = type & 0xff;
 	mldh.mld_maxdelay = htons(QUERY_RESPONSE_INTERVAL);
 	mldh.mld_addr = *addr;
+
+	/* MLD packet should be advertised from linklocal address */
+	getifaddrs(&ifa);
+	for (ifap = ifa; ifap; ifap = ifap->ifa_next) {
+		if (index != if_nametoindex(ifap->ifa_name))
+			continue;
+
+		if (ifap->ifa_addr->sa_family != AF_INET6)
+			continue;
+		if (!IN6_IS_ADDR_LINKLOCAL(&((struct sockaddr_in6 *)
+					    ifap->ifa_addr)->sin6_addr))
+			continue;
+		break;
+	}
+	if (ifap == NULL)
+		errx(1, "no linkocal address is available");
+	memcpy(&src, &((struct sockaddr_in6 *)ifap->ifa_addr)->sin6_addr,
+	       sizeof(src));
+	freeifaddrs(ifa);
+#ifdef __KAME__
+	/* remove embedded ifindex */
+	src.s6_addr[2] = src.s6_addr[3] = 0;
+#endif
 
 #ifdef USE_RFC2292BIS
 	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1)
@@ -234,7 +260,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	cmsgp->cmsg_type = IPV6_PKTINFO;
 	pi = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
 	pi->ipi6_ifindex = index;
-	memset(&pi->ipi6_addr, 0, sizeof(pi->ipi6_addr));
+	memcpy(&pi->ipi6_addr, &src, sizeof(pi->ipi6_addr));
 	/* specifiy to insert router alert option in a hop-by-hop opt hdr. */
 	cmsgp = CMSG_NXTHDR(&m, cmsgp);
 #ifdef USE_RFC2292BIS
