@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1956 2001/10/29 15:06:18 sakane Exp $
+$KAME: CHANGELOG,v 1.1957 2001/10/29 15:15:43 sakane Exp $
 
 <200110>
 Tue Oct 30 00:01:35 JST 2001 sakane@kame.net
@@ -27,6 +27,10 @@ Fri Oct 26 18:27:29 JST 2001 keiichi@iij.ad.jp
   	  the mip6control command you are using.)
   	- protected the mip6 ioctl path by splnet() during retreiving
   	  binding cache entries.
+
+Fri Oct 26 10:06:23 JST 2001
+	* kame/kame/racoon:
+	fixed that the negotiation of the tunnel mode always failed.
 
 2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs,rule,transtslot}.[ch]:
