@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.11 2000/02/08 18:36:22 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.12 2000/02/16 13:14:39 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -306,9 +306,12 @@ base_i2send(iph1, msg)
 				&iph1->dhpub, &iph1->dhpriv) < 0)
 		goto end;
 
-	/* generate SKEYID */
-	if (oakley_skeyid(iph1) < 0)
-		goto end;
+	/* generate SKEYID to compute hash if not signature mode */
+	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_RSASIG
+	 && iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_DSSSIG) {
+		if (oakley_skeyid(iph1) < 0)
+			goto end;
+	}
 
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
@@ -380,6 +383,14 @@ base_i3recv(iph1, msg)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+		case ISAKMP_NPTYPE_CERT:
+			if (oakley_savecert(iph1, pa->ptr) < 0)
+				goto end;
+			break;
+		case ISAKMP_NPTYPE_SIG:
+			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
+				goto end;
+			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
@@ -414,6 +425,13 @@ base_i3recv(iph1, msg)
 	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
 				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
 		goto end;
+
+	/* generate SKEYID to compute hash if signature mode */
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_RSASIG
+	 || iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_DSSSIG) {
+		if (oakley_skeyid(iph1) < 0)
+			goto end;
+	}
 
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_skeyid_dae(iph1) < 0)
@@ -705,6 +723,14 @@ base_r2recv(iph1, msg)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+		case ISAKMP_NPTYPE_CERT:
+			if (oakley_savecert(iph1, pa->ptr) < 0)
+				goto end;
+			break;
+		case ISAKMP_NPTYPE_SIG:
+			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
+				goto end;
+			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
@@ -720,13 +746,18 @@ base_r2recv(iph1, msg)
 		}
 	}
 
-	/* generate SKEYID */
-	if (oakley_skeyid(iph1) < 0)
-		goto end;
-
 	/* generate DH public value */
 	if (oakley_dh_generate(iph1->approval->dhgrp,
 				&iph1->dhpub, &iph1->dhpriv) < 0)
+		goto end;
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
+		goto end;
+
+	/* generate SKEYID */
+	if (oakley_skeyid(iph1) < 0)
 		goto end;
 
 	/* payload existency check */
@@ -803,11 +834,6 @@ base_r2send(iph1, msg)
 	if (iph1->sendbuf == NULL)
 		goto end;
 
-	/* compute sharing secret of DH */
-	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
-				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
-		goto end;
-
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_skeyid_dae(iph1) < 0)
 		goto end;
@@ -821,6 +847,11 @@ base_r2send(iph1, msg)
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
+
+	plog(logp, LOCATION, iph1->remote,
+		"established ISAKMP-SA, %s.\n",
+		isakmp_pindex(&iph1->index, 0));
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 
@@ -849,37 +880,85 @@ base_ir2sendmx(iph1)
 	int tlen;
 	int error = -1;
 
-	/* create buffer */
-	tlen = sizeof(struct isakmp)
-	     + sizeof(*gen) + iph1->dhpub->l
-	     + sizeof(*gen) + iph1->hash->l;
-	if (lcconf->vendorid) {
-		vidhash = oakley_hash(lcconf->vendorid, iph1);
-		tlen += sizeof(*gen) + vidhash->l;
+	tlen = sizeof(struct isakmp);
+
+	switch (iph1->approval->authmethod) {
+	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
+		tlen += sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->hash->l;
+		if (lcconf->vendorid) {
+			vidhash = oakley_hash(lcconf->vendorid, iph1);
+			tlen += sizeof(*gen) + vidhash->l;
+		}
+
+		buf = vmalloc(tlen);
+		if (buf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(buf, iph1, ISAKMP_NPTYPE_KE);
+		if (p == NULL)
+			goto end;
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_HASH);
+
+		/* create isakmp HASH payload */
+		p = set_isakmp_payload(p, iph1->hash,
+			vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+
+		/* append vendor id, if needed */
+		if (vidhash)
+			p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+		break;
+#ifdef HAVE_SIGNING_C
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		/* XXX if there is CR or not ? */
+
+		if (oakley_getmycert(iph1) < 0)
+			goto end;
+
+		if (oakley_getsign(iph1) < 0)
+			goto end;
+
+		tlen += sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->sig->l;
+		if (iph1->cert != NULL)
+			tlen += sizeof(*gen) + iph1->cert->l;
+
+		buf = vmalloc(tlen);
+		if (buf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(buf, iph1, ISAKMP_NPTYPE_KE);
+		if (p == NULL)
+			goto end;
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, iph1->cert != NULL
+							? ISAKMP_NPTYPE_CERT
+							: ISAKMP_NPTYPE_SIG);
+
+		/* add CERT payload if there */
+		if (iph1->cert != NULL)
+			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+		/* add SIG payload */
+		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
+		break;
+#endif
+	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
+		tlen += sizeof(*gen) + iph1->hash->l;
+		break;
 	}
-
-	buf = vmalloc(tlen);
-	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		goto end;
-	}
-
-	/* set isakmp header */
-	p = set_isakmp_header(buf, iph1, ISAKMP_NPTYPE_KE);
-	if (p == NULL)
-		goto end;
-
-	/* create isakmp KE payload */
-	p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_HASH);
-
-	/* create isakmp HASH payload */
-	p = set_isakmp_payload(p, iph1->hash,
-		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
-
-	/* append vendor id, if needed */
-	if (vidhash)
-		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);

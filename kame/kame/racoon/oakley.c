@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.20 2000/02/16 10:57:04 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.21 2000/02/16 13:14:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -806,12 +806,10 @@ end:
 
 /*
  * compute HASH_I on base mode.
- * base:psk
+ * base:psk,rsa
  *   HASH_I = prf(SKEYID, g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
  * base:sig
  *   HASH_I = prf(hash(Ni_b | Nr_b), g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
- * base:rsa
- *   HASH_I = prf(SKEYID, g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
  */
 vchar_t *
 oakley_ph1hash_base_i(iph1, sw)
@@ -819,6 +817,8 @@ oakley_ph1hash_base_i(iph1, sw)
 	int sw;
 {
 	vchar_t *buf = NULL, *res = NULL, *bp;
+	vchar_t *hashkey = NULL;
+	vchar_t *hash = NULL;	/* for signature mode */
 	char *p;
 	int len;
 	int error = -1;
@@ -830,19 +830,54 @@ oakley_ph1hash_base_i(iph1, sw)
 				"invalid etype for this hash function\n"));
 		return NULL;
 	}
-	if (iph1->skeyid == NULL) {
-		YIPSDEBUG(DEBUG_KEY,
-			plog(logp, LOCATION, NULL,
-				"no SKEYID found.\n"));
-		return NULL;
-	}
 
-	/* XXX psk only */
-	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
+	switch (iph1->approval->authmethod) {
+	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
+		if (iph1->skeyid == NULL) {
+			YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL,
+					"no SKEYID found.\n"));
+			return NULL;
+		}
+		hashkey = iph1->skeyid;
+		break;
+
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		/* make hash for seed */
+		len = iph1->nonce->l + iph1->nonce_p->l;
+		buf = vmalloc(len);
+		if (buf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+		p = buf->v;
+
+		bp = (sw == GENERATE ? iph1->nonce_p : iph1->nonce);
+		memcpy(p, bp->v, bp->l);
+		p += bp->l;
+
+		bp = (sw == GENERATE ? iph1->nonce : iph1->nonce_p);
+		memcpy(p, bp->v, bp->l);
+		p += bp->l;
+
+		hash = oakley_hash(buf, iph1);
+		if (hash == NULL)
+			goto end;
+		vfree(buf);
+		buf = NULL;
+
+		hashkey = hash;
+		break;
+
+	default:
 		plog(logp, LOCATION, NULL,
 			"not supported authentication method %d\n",
 			iph1->approval->authmethod);
 		return NULL;
+
 	}
 
 	len = (sw == GENERATE ? iph1->dhpub->l : iph1->dhpub_p->l)
@@ -877,7 +912,7 @@ oakley_ph1hash_base_i(iph1, sw)
 	YIPSDEBUG(DEBUG_KEY, PVDUMP(buf));
 
 	/* compute HASH */
-	res = oakley_prf(iph1->skeyid, buf, iph1);
+	res = oakley_prf(hashkey, buf, iph1);
 	if (res == NULL)
 		goto end;
 
@@ -887,6 +922,8 @@ oakley_ph1hash_base_i(iph1, sw)
 	YIPSDEBUG(DEBUG_KEY, PVDUMP(res));
 
 end:
+	if (hash != NULL)
+		vfree(hash);
 	if (buf != NULL)
 		vfree(buf);
 	return res;
@@ -915,9 +952,8 @@ oakley_ph1hash_base_r(iph1, sw)
 				"invalid etype for this hash function\n"));
 			return NULL;
 	}
-
-	/* XXX psk only */
-	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
+	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_DSSSIG
+	 && iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_RSASIG) {
 		plog(logp, LOCATION, NULL,
 			"not supported authentication method %d\n",
 			iph1->approval->authmethod);
