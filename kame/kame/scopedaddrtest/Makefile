@@ -28,13 +28,13 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
-CFLAGS = -DINET6 -Wall
+CFLAGS=	-DINET6 -Wall
 .if (${OPSYS} != "BSD/OS")
 CFLAGS+=-Werror
 .endif
-LIBS = -linet6
-TARGET = scopedaddrtest
-LDFLAGS = -L/usr/local/v6/lib
+LIBS=	-linet6
+TARGET=	scopedaddrtest
+LDFLAGS=-L/usr/local/v6/lib
 
 all: $(TARGET)
 
