@@ -1,6 +1,6 @@
 TODOs for new repository
 KAME project
-$Id: TODO.new-repository,v 1.3 1999/08/12 16:30:28 itojun Exp $
+$Id: TODO.new-repository,v 1.4 1999/08/16 03:59:10 itojun Exp $
 
 
 kernel part:
@@ -22,3 +22,5 @@ kernel part:
 	(they are totally different, so we need to sync)
 
 userland part:
+- import IPv6 install floppy generator (src/release for FreeBSD, src/distrib
+  for NetBSD)
