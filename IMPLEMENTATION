@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.184 2001/02/04 10:17:32 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.185 2001/02/04 17:43:52 jinmei Exp $
 
 1. IPv6
 
@@ -522,55 +522,59 @@ For a given set of addresses A,
   nonDEP(A): A - DEP(A).
 
 For a given sset of addresses A,
-  tmp(A): the set of temporary autoconfigured addresses in A.
+  tmp(A): the set of preferred temporary-autoconfigured or
+          manually-configure addresses in A.
 
 Also, the algorithm assumes that the outgoing interface for the
 destination D is determined. We call the interface "I".
 
 The algorithm is as follows. Selection proceeds step by step as
-described; For example, if an address is selected by item 1, item 2 or
+described; For example, if an address is selected by item 1, item 2 and
 later are not considered at all.
 
   0. If there is no address in the same scope zone as D, just give up;
      the packet will not be sent.
-  1. If A1 = nonDEP(samescope(D)) is not empty,
-     if tmp(A1) is not empty and we use temporary addresses, consider
-     addresses in tmp(A1) only. Otherwise, consider all addresses in A1.
-     Then choose an address that is on the interface I.  If every
+  1. If we do not prefer temporary addresses, go to 3.
+     Otherwise, and if tmp(samescope(D)) is not empty, 
+     then choose an address that is on the interface I.  If every
      address is on I, or every address is on a different interface
-     from I, choose arbitrary one provided that an address logest
+     from I, choose arbitrary one provided that an address longest
      matching against D is always preferred.
-  2. If A2 = nonDEP(largerscope(D)) is not empty,
-     if tmp(A2) is not empty and we use temporary addresses, consider
-     addresses in tmp(A2) only. Otherwise, consider all addresses in A2.
-     choose an address that has the smallest scope. If more than one
+  2. If tmp(largerscope(D)) is not empty,
+     then choose an address that has the smallest scope. If more than one
      address has the smallest scope, choose arbitrary one provided
-     that an address on I is always preferred.
-  3. If A3 = DEP(samescope(D)) is not empty,
-     if tmp(A3) is not empty and we use temporary addresses, consider
-     addresses in tmp(A3) only. Otherwise, consider all addresses in A3.
-     Then choose an address that is on the interface I.  If every
+     that addresses on I are always preferred.
+  3. If nonDEP(samescope(D)) is not empty,
+     then apply the same logic as of 1.
+  4. If nonDEP(largerscope(D)) is not empty,
+     then apply the same logic as of 2.
+  5. If we do not prefer temporary addresses, go to 7.
+     Otherwise, and if tmp(DEP(samescope(D))) is not empty,
+     then choose an address that is on the interface I.  If every
      address is on I, or every address is on a different interface
-     from I, choose arbitrary one provided that an address logest
+     from I, choose arbitrary one provided that an address longest
      matching against D is always preferred.
-  4. A4 = If DEP(largerscope(D)) is not empty,
-     if tmp(A4) is not empty and we use temporary addresses, consider
-     addresses in tmp(A4) only. Otherwise, consider all addresses in A4.
-     choose an address that has the smallest scope. If more than one
-     address has the smallest scope, choose arbitrary one provided
+  6. If tmp(DEP(largerscope(D))) is not empty,
+     then choose an address that has the smallest scope. If more than
+     one address has the smallest scope, choose arbitrary one provided
      that an address on I is always preferred.
-  5. if A5 = nonDEP(smallerscope(D)) is not empty,
-     if tmp(A5) is not empty and we use temporary addresses, consider
-     addresses in tmp(A5) only. Otherwise, consider all addresses in A5.
-     choose an address that has the largest scope. If more than one
-     address has the largest scope, choose arbitrary one provided
+  7. If DEP(samescope(D)) is not empty,
+     then apply the same logic as of 5.
+  8. If DEP(largerscope(D)) is not empty,
+     then apply the same logic as of 6.
+  9. If we do not prefer temporary addresses, go to 11.
+     Otherwise, and if tmp(nonDEP(smallerscope(D))) is not empty,
+     then choose an address that has the largest scope. If more than
+     one address has the largest scope, choose arbitrary one provided
      that an address on I is always preferred.
-  6. if A6 = DEP(smallerscope(D)) is not empty,
-     if tmp(A6) is not empty and we use temporary addresses, consider
-     addresses in tmp(A6) only. Otherwise, consider all addresses in A6.
-     choose an address that has the largest scope. If more than one
-     address has the largest scope, choose arbitrary one provided
+ 10. If tmp(DEP(smallerscope(D))) is not empty,
+     then choose an address that has the largest scope. If more than
+     one address has the largest scope, choose arbitrary one provided
      that an address on I is always preferred.
+ 11. If nonDEP(smallerscope(D)) is not empty,
+     then apply the same logic as of 9.
+ 12. If DEP(smallerscope(D)) is not empty,
+     then apply the same logic as of 10.
 
 There exists a document about source address selection
 (draft-ietf-ipngwg-default-addr-select-xx.txt). KAME's algorithm
@@ -1789,7 +1793,7 @@ to make the distribute develoment smooth.
 - the tab character should be 8 columns wide (tabstops are at 8, 16, 24, ...
   column).  With vi, use ":set ts=8 sw=8".
 - each line should be within 80 characters.
-- keep a single open/close bracket in a comment such as the following
+- keep a single open/close bracket in a comment such as in the following
   line:
 	putchar('(');	/* ) */
   without this, some vi users would have a hard time to match a pair of
@@ -1811,9 +1815,9 @@ to make the distribute develoment smooth.
   much as possible, even if the style does not follow the items above.
 
 When you want to contribute something to the KAME project, and if *you
-do not mind* the agreement, it would be helpful for the project to keep
-these rules.  Note, however, we would never intend to force you to
-adopt the our rules.  We would rather regard your own style,
+do not mind* the agreement, it would be helpful for the project to
+keep these rules.  Note, however, that we would never intend to force
+you to adopt our rules.  We would rather regard your own style,
 especially when you have a policy about the style.
 
 						 <end of IMPLEMENTATION>
