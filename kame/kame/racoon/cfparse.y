@@ -1061,7 +1061,8 @@ set_ipsec_proposal(spidx, prspec)
 
 		if (new) {
 			new->prev = p->prev;
-			p->prev->next = new;
+			if (p->prev)
+				p->prev->next = new;
 			new->next = p;
 			p->prev = new;
 			new = NULL;
