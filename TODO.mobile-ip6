@@ -1,11 +1,75 @@
+$KAME: TODO.mobile-ip6,v 1.13 2001/10/03 07:22:40 keiichi Exp $
+
 TODOs for mobile-ip6
 KAME project
-$KAME: TODO.mobile-ip6,v 1.12 2001/06/10 10:19:15 keiichi Exp $
 
-- provide a single mobile-ip6 stack.
 
+<<Notice>>
+
+This is the alpha version of MIP6 (draft-14) for KAME.  The code is
+tested with FreeBSD.  On Net/OpenBSD, MIP6 code is compilable but not
+tested.  I have not trid to make it on BSD/OS box yet.
+
+This version supports very basic functions of MIP6.  Current status is
+described below.
+
+
+<<Status>>
+
+todo
+- security mechanism.
+- DAD when registering CoA.
+- mobile prefix advertisement.
+- complete dynamic home agent discovery.
+- BR.
+- tunneled ICMP.
+- registration to the old AR.
+- path mtu discovery when triangle routing.
+- some timeout routines.
+- BSD/OS support.
+- draft-15.
+- may be others.
+
+MN side
+- movement detection by prefix announce.
+- binding update/home registration.
+- dynamic home agent discovery.
+
+CN side
+- recieve binding update.
+- insertion of a routing header.
+
+HA side
+- home registration.
+- encapsulate packets destined to MN.
+- dynamic home agent discovery.
+
+
+<<Usage>>
+
+- build kernel with MIP6 and hif pseudo-if
+	options MIP6
+	pseudo-device hif 1
+- build rtadvd with -DMIP6 for HA.  The easiest way is to add CFLAGS
+  (or CPPFLAGS) in kame/$OS/usr.sbin/rtadvd/Makefile and recompile rtadvd.
+	CFLAGS+=-DMIP6
+- build mip6control in kame/kame/mip6control.
+- to become a HA.
+	invode rtadvd with -m option
+	mip6control -g
+- to become a MN
+	mip6control -H your_home_prefix -P64
+	mip6control -m
+
+
+<<Old MIP6 code>>
 
 The Ericsson's code integrated before has been removed. Tha last
 kame-snap that includes MIP code is 20010604. You can also retreive a
 patch for the 20010611 snap from
 ftp://ftp.kame.net/pub/kame/contrib/mip6/ericsson.
+
+Also, NEC provides mipbile ipv6 (based on draft 13) patch for KAME.
+You can get it from www.6bone.nec.co.jp.
+
+[EOF]
