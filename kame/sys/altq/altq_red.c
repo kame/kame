@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.5 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.6 2000/08/14 08:03:01 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -58,7 +58,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.c,v 1.5 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_red.c,v 1.6 2000/08/14 08:03:01 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -645,7 +645,7 @@ red_enqueue(ifq, m, pktattr)
 {
 	red_queue_t *rqp = (red_queue_t *)ifq->altq_disc;
 
-	if (red_addq(rqp->rq_red, rqp->rq_q, m, pktattr) == 0)
+	if (red_addq(rqp->rq_red, rqp->rq_q, m, pktattr) < 0)
 		return ENOBUFS;
 	ifq->ifq_len++;
 	return 0;
