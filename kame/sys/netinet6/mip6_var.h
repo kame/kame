@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.76 2002/12/17 07:48:33 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.77 2003/01/09 10:59:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -563,11 +563,11 @@ int mip6_is_valid_bu(struct ip6_hdr *, struct ip6m_binding_update *, int,
     struct sockaddr_in6 *);
 int mip6_get_mobility_options(struct ip6_mobility *, int, int,
     struct mip6_mobility_options *);
-void mip6_create_cookie(struct in6_addr *, mip6_nodekey_t *, mip6_nonce_t *,
-    void *);
-void mip6_calculate_kbu(mip6_home_cookie_t *, mip6_careof_cookie_t *,
+void mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
+			      mip6_nonce_t *, u_int8_t, void *);
+void mip6_calculate_kbm(mip6_home_cookie_t *, mip6_careof_cookie_t *,
     u_int8_t *);
-int  mip6_calculate_kbu_from_index(struct sockaddr_in6 *,
+int  mip6_calculate_kbm_from_index(struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int8_t *);
 void mip6_calculate_authenticator(u_int8_t *, u_int8_t *, struct in6_addr *,
     struct in6_addr *, caddr_t, size_t, int, size_t);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.189 2002/12/17 07:48:32 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.190 2003/01/09 10:59:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2649,7 +2649,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa, *coa_sa;
 {
-	u_int8_t key_bu[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
+	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
 
@@ -2660,15 +2660,15 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 			 __FILE__, __LINE__, mopt->valid_options));
 		return (EINVAL);
 	}
-	if (mip6_calculate_kbu_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
-			mopt->mopt_co_nonce_idx, key_bu)) {
+	if (mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
+			mopt->mopt_co_nonce_idx, key_bm)) {
 		return (EINVAL);
 	}
 
 	cksum_backup = ip6mu->ip6mu_cksum;
 	ip6mu->ip6mu_cksum = 0;
 	/* Calculate authenticator */
-	mip6_calculate_authenticator(key_bu, authdata,
+	mip6_calculate_authenticator(key_bm, authdata,
 		&coa_sa->sin6_addr, &ip6->ip6_dst,
 		(caddr_t)ip6mu, ip6mulen, 
 		(u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata)
@@ -2746,15 +2746,16 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 	return (EINVAL);
 }
 
+/* Generatie keygen */
 void
-mip6_create_cookie(addr, nodekey, nonce, cookie)
+mip6_create_keygen_token(addr, nodekey, nonce, hc, cookie)
 	struct in6_addr *addr;
 	mip6_nodekey_t *nodekey;
 	mip6_nonce_t *nonce;
+	u_int8_t hc;
 	void *cookie;		/* 64 bit */
 {
-	/* Generatie cookie */
-	/* cookie = MAC_Kcn(saddr | nonce) */
+	/* keygen token = HMAC_SHA1(Kcn, addr | nonce | hc) */
 	HMAC_CTX hmac_ctx;
 	u_int8_t result[HMACSIZE];
 
@@ -2762,6 +2763,7 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 		  sizeof(mip6_nodekey_t), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr, sizeof(struct in6_addr));
 	hmac_loop(&hmac_ctx, (u_int8_t *)nonce, sizeof(mip6_nonce_t));
+	hmac_loop(&hmac_ctx, (u_int8_t *)&hc, sizeof(hc));
 	hmac_result(&hmac_ctx, result);
 	/* First64 */
 	bcopy(result, cookie, 8);
@@ -2769,12 +2771,12 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 
 /* For CN side function */
 int
-mip6_calculate_kbu_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bu)
+mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bm)
 	struct sockaddr_in6 *hoa_sa;
 	struct sockaddr_in6 *coa_sa;
 	u_int16_t ho_nonce_idx;	/* Home Nonce Index */
 	u_int16_t co_nonce_idx;	/* Care-of Nonce Index */
-	u_int8_t *key_bu;	/* needs at least MIP6_KBM_LEN bytes */
+	u_int8_t *key_bm;	/* needs at least MIP6_KBM_LEN bytes */
 {
 	mip6_nonce_t home_nonce, careof_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
@@ -2805,44 +2807,47 @@ mip6_hexdump("CN: Home   Nodekey: ", sizeof(home_nodekey), &home_nodekey);
 mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 #endif
 
-	/* Calculate home cookie */
-	mip6_create_cookie(&hoa_sa->sin6_addr,
-			   &home_nodekey, &home_nonce, &home_cookie);
+	/* Calculate home keygen token */
+	mip6_create_keygen_token(&hoa_sa->sin6_addr,
+			   &home_nodekey, &home_nonce, 0, &home_cookie);
 #ifdef RR_DBG
-mip6_hexdump("CN: Home Cookie: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
+mip6_hexdump("CN: Home keygen token: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
 #endif
 
-	/* Calculate care-of cookie */
-	mip6_create_cookie(&coa_sa->sin6_addr,
-			   &coa_nodekey, &careof_nonce, &careof_cookie);
+	/* Calculate care-of keygen token */
+	mip6_create_keygen_token(&coa_sa->sin6_addr,
+			   &coa_nodekey, &careof_nonce, 1, &careof_cookie);
 #ifdef RR_DBG
 mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_cookie);
 #endif
 
-	/* Calculate K_bu */
-	mip6_calculate_kbu(&home_cookie, &careof_cookie, key_bu);
+	/* Calculate K_bm */
+	mip6_calculate_kbm(&home_cookie,
+			   SA6_ARE_ADDR_EQUAL(hoa_sa, coa_sa) ? NULL : &careof_cookie,
+			   key_bm);
 #ifdef RR_DBG
-mip6_hexdump("CN: K_bu: ", sizeof(key_bu), key_bu);
+mip6_hexdump("CN: K_bm: ", sizeof(key_bm), key_bm);
 #endif
 
 	return (0);
 }
 
 void
-mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
+mip6_calculate_kbm(home_cookie, careof_cookie, key_bm)
 	mip6_home_cookie_t *home_cookie;
-	mip6_careof_cookie_t *careof_cookie;
-	u_int8_t *key_bu;	/* needs at least MIP6_KBM_LEN bytes */
+	mip6_careof_cookie_t *careof_cookie;	/* could be null */
+	u_int8_t *key_bm;	/* needs at least MIP6_KBM_LEN bytes */
 {
 	SHA1_CTX sha1_ctx;
 	u_int8_t result[SHA1_RESULTLEN];
 
 	SHA1Init(&sha1_ctx);
 	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(*home_cookie));
-	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
+	if (careof_cookie)
+		SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
 	SHA1Final(result, &sha1_ctx);
 	/* First 128 bit */
-	bcopy(result, key_bu, MIP6_KBM_LEN);
+	bcopy(result, key_bm, MIP6_KBM_LEN);
 }
 
 /*
@@ -2855,8 +2860,8 @@ mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
  *     exclude_offset
  */
 void
-mip6_calculate_authenticator(key_bu, result, addr1, addr2, data, datalen, exclude_offset, exclude_data_len)
-	u_int8_t *key_bu;		/* Key_bu */
+mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen, exclude_offset, exclude_data_len)
+	u_int8_t *key_bm;		/* Kbm */
 	u_int8_t *result;		/* */
 	struct in6_addr *addr1, *addr2;
 	caddr_t data;
@@ -2870,7 +2875,7 @@ mip6_calculate_authenticator(key_bu, result, addr1, addr2, data, datalen, exclud
 
 	/* Calculate authenticator (5.5.6) */
 	/* MAC_Kbm(addr1, | addr2 | (BU|BA) ) */
-	hmac_init(&hmac_ctx, key_bu, MIP6_KBM_LEN, HMAC_SHA1);
+	hmac_init(&hmac_ctx, key_bm, MIP6_KBM_LEN, HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr1, sizeof(*addr1));
 #ifdef RR_DBG
 mip6_hexdump("MN: Auth: ", sizeof(*addr1), addr1);

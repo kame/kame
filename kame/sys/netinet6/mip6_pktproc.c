@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.91 2002/12/17 07:48:32 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.92 2003/01/09 10:59:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -191,8 +191,8 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mh->ip6mh_hot_cookie, sizeof(ip6mh->ip6mh_hot_cookie));
-	mip6_create_cookie(&dst->sin6_addr,
-			   &home_nodekey, &home_nonce, ip6mh->ip6mh_cookie);
+	mip6_create_keygen_token(&dst->sin6_addr,
+			   &home_nodekey, &home_nonce, 0, ip6mh->ip6mh_cookie);
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -308,9 +308,9 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	ip6mc->ip6mc_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mc->ip6mc_cot_cookie, sizeof(ip6mc->ip6mc_cot_cookie));
-	mip6_create_cookie(&dst->sin6_addr,
-			   &careof_nodekey, &careof_nonce,
-			   ip6mc->ip6mc_cookie);
+	mip6_create_keygen_token(&dst->sin6_addr,
+				 &careof_nodekey, &careof_nonce, 1,
+				 ip6mc->ip6mc_cookie);
 
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
@@ -902,17 +902,17 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 
 	if (mopt.valid_options & MOPT_AUTHDATA) {
 		/* Check Autheticator */
-		u_int8_t key_bu[MIP6_KBM_LEN];
+		u_int8_t key_bm[MIP6_KBM_LEN];
 		u_int8_t authdata[MIP6_AUTHENTICATOR_LEN];
 		u_int16_t cksum_backup;
 
 		cksum_backup = ip6ma->ip6ma_cksum;
 		ip6ma->ip6ma_cksum = 0;
-		/* Calculate K_bu */
-		mip6_calculate_kbu(&mbu->mbu_home_cookie,
-				   &mbu->mbu_careof_cookie, key_bu);
+		/* Calculate Kbm */
+		mip6_calculate_kbm(&mbu->mbu_home_cookie,
+				   &mbu->mbu_careof_cookie, key_bm);
 		/* Calculate Authenticator */
-		mip6_calculate_authenticator(key_bu, authdata,
+		mip6_calculate_authenticator(key_bm, authdata,
 			&mbu->mbu_coa.sin6_addr, &ip6->ip6_dst,
 			(caddr_t)ip6ma, ip6malen,
 			(caddr_t)mopt.mopt_auth + 2 - (caddr_t)ip6ma,
@@ -1463,7 +1463,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int bu_size = 0, nonce_size = 0, auth_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
-	u_int8_t key_bu[MIP6_KBM_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1641,15 +1641,15 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 mip6_hexdump("MN: Home Cookie: ", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie);
 mip6_hexdump("MN: Care-of Cookie: ", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie);
 #endif
-		/* Calculate K_bu */
-		mip6_calculate_kbu(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie, key_bu);
+		/* Calculate Kbm */
+		mip6_calculate_kbm(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie, key_bm);
 #ifdef RR_DBG
-mip6_hexdump("MN: K_bu: ", sizeof(key_bu), key_bu);
+mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 #endif
 
 		/* Calculate authenticator (5.5.6) */
-		/* MAC_Kbu(coa, | cn | BU) */
-		mip6_calculate_authenticator(key_bu, (u_int8_t *)(mopt_auth + 1), 
+		/* HMAC_SHA1(Kbm, (coa, | cn | BU)) */
+		mip6_calculate_authenticator(key_bm, (u_int8_t *)(mopt_auth + 1), 
 			&mbu->mbu_coa.sin6_addr, &dst->sin6_addr, 
 			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 
 			bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) ,
@@ -1683,7 +1683,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	int need_auth = 0;
 	int ip6ma_size, pad;
 	int ba_size = 0, refresh_size = 0, auth_size = 0;
-	u_int8_t key_bu[MIP6_KBM_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 	u_int8_t *p;
 
 	*pktopt_mobility = NULL;
@@ -1698,9 +1698,9 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	}
 	if (mopt && 
 	    (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) &&
-	    mip6_calculate_kbu_from_index(dst, src, 
+	    mip6_calculate_kbm_from_index(dst, src, 
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
-		key_bu) == 0) {
+		key_bm) == 0) {
 		need_auth = 1;
 		if (refresh_size == 0)
 			ba_size += PADLEN(ba_size, 8, 2);
@@ -1765,7 +1765,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		/* authorization data processing. */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
 		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
-		mip6_calculate_authenticator(key_bu, (caddr_t)(mopt_auth + 1),
+		mip6_calculate_authenticator(key_bm, (caddr_t)(mopt_auth + 1),
 			&dst->sin6_addr, &src->sin6_addr,
 			(caddr_t)ip6ma, ip6ma_size,
 			ba_size + refresh_size + sizeof(struct ip6m_opt_authdata),
