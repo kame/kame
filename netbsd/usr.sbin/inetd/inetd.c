@@ -817,17 +817,6 @@ config(signo)
 				SWAP(char *, sep->se_argv[i], cp->se_argv[i]);
 #ifdef IPSEC
 			SWAP(char *, sep->se_policy, cp->se_policy);
-			if (sep->se_fd != -1) {
-				if (ipsecsetup(sep->se_family, sep->se_fd,
-				    sep->se_policy) < 0 && sep->se_policy) {
-					syslog(LOG_ERR, "%s/%s: "
-					    "ipsec initialization failed",
-					    sep->se_service, sep->se_proto);
-					sep->se_checked = 0;
-					sigsetmask(omask);
-					continue;
-				}
-			}
 #endif
 			SWAP(int, cp->se_type, sep->se_type);
 			SWAP(int, cp->se_max, sep->se_max);
@@ -1035,7 +1024,7 @@ void
 setup(sep)
 	struct servtab *sep;
 {
-	int on = 1;
+	int on = 1, off = 0;
 
 	if ((sep->se_fd = socket(sep->se_family, sep->se_socktype, 0)) < 0) {
 		if (debug)
@@ -1067,9 +1056,15 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 	    SO_RCVBUF, (char *)&sep->se_rcvbuf, sizeof(sep->se_rcvbuf)) < 0)
 		syslog(LOG_ERR, "setsockopt (SO_RCVBUF %d): %m",
 		    sep->se_rcvbuf);
-	if (sep->se_type == FAITH_TYPE && setsockopt(sep->se_fd, IPPROTO_IPV6,
-	    IPV6_FAITH, (char *)&on, sizeof(on)) < 0)
-		syslog(LOG_ERR, "setsockopt (IPV6_FAITH): %m");
+#ifdef INET6
+	if (sep->se_family == AF_INET6) {
+		int *v;
+		v = (sep->se_type == FAITH_TYPE) ? &on : &off;
+		if (setsockopt(sep->se_fd, IPPROTO_IPV6, IPV6_FAITH,
+		    (char *)v, sizeof(*v)) < 0)
+			syslog(LOG_ERR, "setsockopt (IPV6_FAITH): %m");
+	}
+#endif
 #ifdef IPSEC
 	if (ipsecsetup(sep->se_family, sep->se_fd, sep->se_policy) < 0 &&
 	    sep->se_policy) {
