@@ -471,9 +471,9 @@ do {									\
 	}								\
 	(ia) = (struct in6_ifaddr *)ifa;				\
 } while (0)
-#endif /* _KERNEL */
-
 #endif
+
+#endif /* _KERNEL */
 
 /*
  * Multi-cast membership entry.  One for each group/ifp that a PCB
