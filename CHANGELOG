@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1080 2000/07/02 07:55:56 jinmei Exp $
+$Id: CHANGELOG,v 1.1081 2000/07/02 08:47:47 itojun Exp $
 
 <200006>
 2000-07-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,8 +10,9 @@ $Id: CHANGELOG,v 1.1080 2000/07/02 07:55:56 jinmei Exp $
 	This change reflected recent discussion in the ipngwg ML.
 
 Sun Jul  2 11:24:52 JST 2000  itojun@iijlab.net
-	* netbsd/sys/netinet/tcp_input.c: repair faith support.  still have
-	  some issue with syn cache behaivior.
+	* netbsd/sys/netinet/tcp_input.c, kame/sys/netinet6/in6_pcb.c:
+	  repair netbsd faith support.  (1) tcp6_input dropped faith'ed
+	  connections (2) in6_pcblookup_connect() was too strict.
 
 Sat Jul  1 20:57:57 JST 2000  itojun@iijlab.net
 	* kame/faithd: make it possible to invoke faithd(8) from inetd(8).
