@@ -1134,49 +1134,71 @@ bgp_process_update(struct rpcb *bnp)
       /* Network Address of Next Hop          (variable)  */
       gnhaddr = *(struct in6_addr *)&bnp->rp_inpkt[i]; /* (normally) */
 
-#ifdef DEBUG
+#ifdef DEBUG_BGP
       syslog(LOG_DEBUG, "BGP+ RECV\t\tNextHop");
       syslog(LOG_DEBUG, "BGP+ RECV\t\t%s",
 	     inet_ntop(AF_INET6, &gnhaddr, in6txt, INET6_ADDRSTRLEN));
 #endif
 
-
-      if (IN6_IS_ADDR_LINKLOCAL(&gnhaddr)) {                /* link-local */
-	lnhaddr = gnhaddr;
-	memset(&gnhaddr, 0, sizeof(gnhaddr));
-#ifdef DEBUG
-	if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_laddr)) &&
-	    !(IN6_ARE_ADDR_EQUAL(&bnp->rp_laddr, &lnhaddr)))
-	  syslog(LOG_DEBUG,
-		 "<%s>: Third Party NextHop %s", __FUNCTION__,
-		 inet_ntop(AF_INET6, &lnhaddr, in6txt, INET6_ADDRSTRLEN));
-
-      } else {
-	if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr)) &&   /* global */
-	    !(IN6_ARE_ADDR_EQUAL(&bnp->rp_gaddr, &gnhaddr)))
-	  syslog(LOG_DEBUG,
-		 "<%s>: Third Party NextHop %s", __FUNCTION__,
-		 inet_ntop(AF_INET6, &gnhaddr, in6txt, INET6_ADDRSTRLEN));
-#endif
+      /*
+       * A BGP speaker shall advertise to its peer in the Network Address of
+       * Next Hop field the global IPv6 address of the next hop, potentially
+       * followed by the link-local IPv6 address of the next hop.
+       * [RFC 2545, Section 3]
+       */
+      if (IN6_IS_ADDR_LINKLOCAL(&gnhaddr)) { /* consider site-local as well? */
+	syslog(LOG_NOTICE,
+	       "<%s>: 1st next hop(%s) from %s is not global",
+	       __FUNCTION__, ip6str(&gnhaddr, 0), bgp_peerstr(bnp));
+	break;			/* go to next attribute */
       }
+
+#ifdef DEBUG_BGP
+      if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr)) &&   /* global */
+	  !(IN6_ARE_ADDR_EQUAL(&bnp->rp_gaddr, &gnhaddr)))
+	syslog(LOG_DEBUG,
+	       "<%s>: Third Party NextHop %s from %s", __FUNCTION__,
+	       ip6str(&gnhaddr, 0), bgp_peerstr(bnp));
+#endif
 
       i += sizeof(struct in6_addr);
 
 
       /*    RFC 2283,2545  bellow  */
       if (nhnalen == sizeof(struct in6_addr) * 2) {
-	if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)&bnp->rp_inpkt[i])) {
-	  /*                              I prefer linklocal nexthop      */
+	if (!IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)&bnp->rp_inpkt[i])) {
+	  syslog(LOG_NOTICE,
+		 "<%s>: 2nd next hop(%s) from %s is not link-local(ignored)",
+		 __FUNCTION__,
+		 ip6str((struct in6_addr *)&bnp->rp_inpkt[i], 0),
+		 bgp_peerstr(bnp));
+	}
+	else if ((bnp->rp_mode & BGPO_ONLINK) == 0) {
+	  /*
+	   * The link-local address shall be included in the Next Hop field
+	   * if and only if the BGP speaker shares a common subnet with the
+	   * entity identified by the global IPv6 address carried in the
+	   * Network Address of Next Hop field and the peer the route is
+	   * being advertised to.
+	   * [RFC 2545, Section 3.]
+	   */
+	  syslog(LOG_NOTICE,
+		 "<%s>: link-local next hop (%s) from an off-link peer(%s) "
+		 "(ignored)",
+		 ip6str((struct in6_addr *)&bnp->rp_inpkt[i], 0),
+		 bgp_peerstr(bnp)); 
+	}
+	else {
 	  lnhaddr = *(struct in6_addr *)&bnp->rp_inpkt[i];
-#ifdef DEBUG
+#ifdef DEBUG_BGP
 	  syslog(LOG_DEBUG, "BGP+ RECV\t\t%s",
-		 inet_ntop(AF_INET6, &lnhaddr, in6txt, INET6_ADDRSTRLEN));
+		 ip6str(&lnhaddr, 0));
 
 	  if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_laddr)) &&
 	      !(IN6_ARE_ADDR_EQUAL(&bnp->rp_laddr, &lnhaddr)))
 	    syslog(LOG_DEBUG,
 		   "<%s>: Third Party NextHop %s", __FUNCTION__,
-		   inet_ntop(AF_INET6, &lnhaddr, in6txt, INET6_ADDRSTRLEN));
+		   ip6str(&lnhaddr, 0));
 #endif
 	}
 	i += sizeof(struct in6_addr);
@@ -1274,8 +1296,13 @@ bgp_process_update(struct rpcb *bnp)
 	  }
 	}
 
-	/* XXX */
-	rte->rt_bgw = IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? gnhaddr : lnhaddr;
+
+	/*
+	 * XXX: A link-local next hop is sometimes more useful than global one,
+	 * but we can't trust that it's really on a link that we connect with,
+	 *so we always use a global next hop for safety...
+	 */
+	rte->rt_bgw = gnhaddr;
 	rte->rt_flags = RTF_UP|RTF_GATEWAY;
 	if (rte->rt_ripinfo.rip6_plen == 128)
 	  rte->rt_flags |= RTF_HOST;
@@ -1519,8 +1546,8 @@ bgp_process_update(struct rpcb *bnp)
 
   if (asp) {
     asp->asp_origin    = origin;
-    /* anyway, anymay:  */
-    asp->asp_nexthop   = IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? gnhaddr : lnhaddr;
+    asp->asp_nexthop   = gnhaddr;
+    asp->asp_nexthop_local = lnhaddr; /* may be unspecified */
     asp->asp_med       = med;            /* net  order      */
     asp->asp_localpref = localpref;      /* net  order      */
     asp->asp_atomagg   = aggregated;

@@ -138,6 +138,7 @@ struct aspath {
   struct aspath    *asp_prev;
   byte              asp_origin;
   struct in6_addr   asp_nexthop;  /* global address         */
+  struct in6_addr   asp_nexthop_local; /* link-local nexthop(just for refer) */
   u_int32_t         asp_med;
   u_int32_t         asp_localpref;
   byte              asp_atomagg;

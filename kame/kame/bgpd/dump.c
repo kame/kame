@@ -192,6 +192,10 @@ dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
 		ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 		rte->rt_ripinfo.rip6_plen);
 	fprintf(fp, "%s  Nexthop: %s\n", indent, ip6str(&rte->rt_bgw, 0));
+	if (rte->rt_aspath &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&rte->rt_aspath->asp_nexthop_local))
+		fprintf(fp, "%s  Nexhop(local): %s\n", indent,
+			ip6str(&rte->rt_aspath->asp_nexthop_local, 0));
 
 	fprintf(fp, "%s  ", indent); /* more indent */
 	fprintf(fp, "Gateway: %s ",
@@ -224,6 +228,12 @@ dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
 			fprintf(fp, "             %s)",
 				ip6str(&rte->rt_gwsrc_entry->rt_gw,
 				       rte->rt_gwif->ifi_ifn->if_index));
+			break;
+		case RTPROTO_BGP:
+			fprintf(fp, "gwsrc: bgp (link %s)\n",
+				rte->rt_proto.rtp_bgp->rp_ife ?
+				rte->rt_proto.rtp_bgp->rp_ife->ifi_ifn->if_name :
+				"??");
 			break;
 		default:
 			fprintf(fp, "gwsrc: unknown(%d)",

@@ -683,32 +683,25 @@ bgp_send_update(bnp, rte, headrte)
     i +=  sizeof(struct in6_addr);  \
   }
 
+  /*
+   * The link-local address shall be included in the Next Hop field if and
+   * only if the BGP speaker shares a common subnet with the entity
+   * identified by the global IPv6 address carried in the Network Address
+   * of Next Hop field and the peer the route is being advertised to.
+   *
+   * In all other cases a BGP speaker shall advertise to its peer in the
+   * Network Address field only the global IPv6 address of the next hop
+   * (the value of the Length of Network Address of Next Hop field shall
+   * be set to 16).
+   * [RFC 2545, Section 3]
+   */
   if (bnp->rp_mode & BGPO_IGP) {   /* to IBGP */
-
     if (rte->rt_aspath &&
 	!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_aspath->asp_nexthop) &&
 	(bnp->rp_mode & BGPO_NEXTHOPSELF) == 0) {
-      PUT_NEXTHOP(&rte->rt_aspath->asp_nexthop);
-    } else {
-
-      /* put my global */
-      if (!IN6_IS_ADDR_LINKLOCAL(&bnp->rp_myaddr.sin6_addr)) {
-	PUT_NEXTHOP(&bnp->rp_myaddr.sin6_addr);
-      } else {
-	if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_ife->ifi_gaddr))
-	  PUT_NEXTHOP(&bnp->rp_ife->ifi_gaddr);
-      }
-      /* put my linklocal */
-      if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_ife->ifi_laddr) &&
-	  (bnp->rp_mode & BGPO_ONLINK)) {
-	PUT_NEXTHOP(&bnp->rp_ife->ifi_laddr);
-      }
+      PUT_NEXTHOP(&rte->rt_aspath->asp_nexthop); /* must be global */
     }
-
-
   } else {                        /* to EBGP */
-
-
     if (rte->rt_aspath &&
 	!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_aspath->asp_nexthop)) {
       struct rt_entry *irte;
@@ -724,36 +717,37 @@ bgp_send_update(bnp, rte, headrte)
           break;
       }
     }
-    if (IN6_IS_ADDR_UNSPECIFIED((struct in6_addr *)&outpkt[lennh_p + 1])) {
-
-      /* put my global */
-      if (!IN6_IS_ADDR_LINKLOCAL(&bnp->rp_myaddr.sin6_addr)) {
-	PUT_NEXTHOP(&bnp->rp_myaddr.sin6_addr);
-      } else {
-	if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_ife->ifi_gaddr))
-	  PUT_NEXTHOP(&bnp->rp_ife->ifi_gaddr);
-      }
-      /* put my linklocal */
-      if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_ife->ifi_laddr) &&
-	  (bnp->rp_mode & BGPO_ONLINK)) {
-	PUT_NEXTHOP(&bnp->rp_ife->ifi_laddr);
-      }
+  }
+  /* If a global address to be included is not decided, choose one */
+  if (IN6_IS_ADDR_UNSPECIFIED((struct in6_addr *)&outpkt[lennh_p + 1])) {
+    /* put my global */
+    if (!IN6_IS_ADDR_LINKLOCAL(&bnp->rp_myaddr.sin6_addr)) {
+      PUT_NEXTHOP(&bnp->rp_myaddr.sin6_addr);
+    } else {
+      if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_ife->ifi_gaddr))
+	PUT_NEXTHOP(&bnp->rp_ife->ifi_gaddr);
     }
-  } /* EBGP end */
+  }
+  /*
+   * Put my linklocal for an on-link peer
+   * XXX: we suspect if it's really useful...see a comment in
+   * bgp_process_update().
+   */
+  if (IN6_IS_ADDR_LINKLOCAL(&bnp->rp_ife->ifi_laddr) &&
+      (bnp->rp_mode & BGPO_ONLINK)) {
+    PUT_NEXTHOP(&bnp->rp_ife->ifi_laddr);
+  }
 
-#ifdef DEBUG
+#ifdef DEBUG_BGP
   if (outpkt[lennh_p] == 0)
     syslog(LOG_DEBUG, "BGP+ SEND\t\t(I have no Nexthop address)");
   if (outpkt[lennh_p] >= 16)
     syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
-	   inet_ntop(AF_INET6, (struct in6_addr *)&outpkt[lennh_p + 1],
-		     in6txt, INET6_ADDRSTRLEN));
+	   ip6str((struct in6_addr *)&outpkt[lennh_p + 1], 0));
   if (outpkt[lennh_p] >= 32)
     syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
-	   inet_ntop(AF_INET6, (struct in6_addr *)&outpkt[lennh_p + 1 + 16],
-		     in6txt, INET6_ADDRSTRLEN));
+	   ip6str((struct in6_addr *)&outpkt[lennh_p + 1 + 16], 0));
 #endif
-
 
   /* Number of SNPAs (1 octet) */
   outpkt[i++] = 0;                           /* NOT implmntd  */ 
