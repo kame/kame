@@ -61,7 +61,9 @@
 #include <sys/socketvar.h>
 #include <sys/kernel.h>
 #include <sys/time.h>
+#ifndef __FreeBSD__
 #include <sys/pool.h>
+#endif
 #ifdef __NetBSD__
 #include <sys/callout.h>
 #endif
@@ -151,8 +153,10 @@ struct timeout		 pf_expire_to;			/* expire timeout */
 struct callout		 pf_expire_to;			/* expire timeout */
 #endif
 
+#ifndef __FreeBSD__
 struct pool		 pf_tree_pl, pf_rule_pl, pf_addr_pl;
 struct pool		 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
+#endif
 
 void			 pf_dynaddr_update(void *);
 void			 pf_print_host(struct pf_addr *, u_int16_t, u_int8_t);
@@ -2456,8 +2460,13 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		struct pf_state	*s = NULL;
 
 		len = pd->tot_len - off - (th->th_off << 2);
-		if (!r->max_states || r->states < r->max_states)
+		if (!r->max_states || r->states < r->max_states) {
+#ifdef __FreeBSD__
+			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
+#else
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
+#endif
+		}
 		if (s == NULL) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
@@ -2769,8 +2778,13 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		/* create new state */
 		struct pf_state	*s = NULL;
 
-		if (!r->max_states || r->states < r->max_states)
+		if (!r->max_states || r->states < r->max_states) {
+#ifdef __FreeBSD__
+			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
+#else
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
+#endif
+		}
 		if (s == NULL)
 			return (PF_DROP);
 		bzero(s, sizeof(*s));
@@ -3032,7 +3046,11 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		struct pf_state	*s = NULL;
 
 		if (!r->max_states || r->states < r->max_states)
+#ifdef __FreeBSD__
+			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
+#else
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
+#endif
 		if (s == NULL)
 			return (PF_DROP);
 		bzero(s, sizeof(*s));
@@ -3272,8 +3290,13 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 		/* create new state */
 		struct pf_state	*s = NULL;
 
-		if (!r->max_states || r->states < r->max_states)
+		if (!r->max_states || r->states < r->max_states) {
+#ifdef __FreeBSD__
+			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
+#else
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
+#endif
+		}
 		if (s == NULL)
 			return (PF_DROP);
 		bzero(s, sizeof(*s));
