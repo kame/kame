@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.53 2002/09/06 03:08:45 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.54 2002/09/06 03:14:34 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -182,6 +182,8 @@ static const struct sockaddr_in6 *all_routers_linklocal;
 #ifdef MLDV2
 static const struct sockaddr_in6 *all_v2routers_linklocal;
 #endif
+static const int ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & 
+			    ~IN6_IFF_TENTATIVE;
 
 #ifdef MLDV2
 static const int qhdrlen = MLD_V2_QUERY_MINLEN;	/* mldv2 query header */
@@ -580,7 +582,6 @@ mld6_input(m, off)
 #endif
 				m_freem(m);
 				return;
-				
 			}
 		}
 #endif
@@ -595,7 +596,7 @@ mld6_input(m, off)
 		 * - Use the value specified in the query message as
 		 *   the maximum timeout.
 		 */
-			
+
 		/*
 		 * XXX: System timer resolution is too low to handle Max
 		 * Response Delay, so set 1 to the internal timer even if
@@ -619,7 +620,7 @@ mld6_input(m, off)
 			break;
 		}
 #endif
-		
+
 #ifdef __FreeBSD__
 		for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
 		     ifma;
@@ -643,12 +644,12 @@ mld6_input(m, off)
 			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) <
 			    IPV6_ADDR_SCOPE_LINKLOCAL)
 				continue;
-			     
+     
 			if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
 			    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr,
 						&in6m->in6m_sa.sin6_addr))
 				continue;
-			
+
 			if (timer == 0) {
 				/* send a report immediately */
 				mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
@@ -672,7 +673,7 @@ mld6_input(m, off)
 			mld_set_hostcompat(ifp, rt6i, query_type);
 #endif
 		break;
-		
+
 	case MLD_LISTENER_REPORT:
 		/*
 		 * For fast leave to work, we have to know that we are the
@@ -761,7 +762,7 @@ mld6_fasttimeo()
 		}
 	}
 #endif
-	
+
 #ifndef MLDV2
 	if (!mld_group_timers_are_running)
 #else
@@ -772,7 +773,7 @@ mld6_fasttimeo()
 		splx(s);
 		return;
 	}
-	
+
 	mld_group_timers_are_running = 0;
 #ifdef MLDV2
 	mld_state_change_timers_are_running = 0;
@@ -784,7 +785,7 @@ mld6_fasttimeo()
 	while (in6m != NULL) {
 		if (in6m->in6m_timer == 0)
 			goto next_in6m; /* do nothing */
-		
+
 		--in6m->in6m_timer;
 		if (in6m->in6m_timer > 0) {
 			mld_group_timers_are_running = 1;
@@ -822,18 +823,18 @@ mld6_fasttimeo()
 
 		if (in6m->in6m_source->i6ms_timer == 0)
 			goto next_in6m; /* do nothing */
-		
+
 		--in6m->in6m_source->i6ms_timer;
 		if (in6m->in6m_source->i6ms_timer > 0) {
 			mld_state_change_timers_are_running = 1;
 			goto next_in6m;
 		}
-		
+
 		if ((sm != NULL) && (ifp != in6m->in6m_ifp)) {
 			mld_sendbuf(sm, ifp);
 			sm = NULL;
 		}
-		
+
 		/*
 		 * Check if this report was pending Source-List-Change
 		 * report or not. It is only the case that robvar was
@@ -850,7 +851,7 @@ mld6_fasttimeo()
 						     in6m, (u_int8_t)0, (int)0);
 			ifp = in6m->in6m_ifp;
 		}
-		
+
 		if (in6m->in6m_source->i6ms_robvar != 0) {
 			in6m->in6m_source->i6ms_timer =
 				MLD_RANDOM_DELAY(MLDV2_UNSOL_INTVL * PR_FASTHZ);
@@ -971,7 +972,6 @@ mld_allocbuf(mh, len, in6m, type, dst, ifp, ia)
 	struct mld_hdr *mldh;
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 src_sa, dst_sa;
-	int ignflags;
 
 #ifdef IFT_VRRP
 	if (ifp->if_type == IFT_VRRP) {
@@ -987,7 +987,6 @@ mld_allocbuf(mh, len, in6m, type, dst, ifp, ia)
 	 * We do not reject tentative addresses for MLD report to deal with
 	 * the case where we first join a link-local address.
 	 */
-	ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & ~IN6_IFF_TENTATIVE;
 	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL)
 		return NULL;
 	if ((ia->ia6_flags & IN6_IFF_TENTATIVE))
@@ -1078,7 +1077,6 @@ mld_sendbuf(mh, ifp)
 	u_int16_t i;
 	struct ip6_moptions im6o;
 	struct mbuf *m;
-	int ignflags;
 	struct in6_ifaddr *ia = NULL;
  
 #ifdef IFT_VRRP
@@ -1096,7 +1094,7 @@ mld_sendbuf(mh, ifp)
 		return;
 	}
 
-/* assumes MLD header is located in the 2nd mbuf */
+	/* assumes MLD header is located in the 2nd mbuf */
 	m = mh->m_next;
 
 	mld_rhdr = mtod(m, struct mld_report_hdr *);
@@ -1119,7 +1117,6 @@ mld_sendbuf(mh, ifp)
 	 * We do not reject tentative addresses for MLD report to deal with
 	 * the case where we first join a link-local address.
 	 */
-	ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & ~IN6_IFF_TENTATIVE;
 	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL) {
 #ifdef MLDV2_DEBUG
 		printf("mld_sendbuf(): cannot send pkt due to a lack of linklocal address at link#%d", ifp->if_index);
@@ -1807,7 +1804,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 
 		return;
 	}
-	
+
 	if (type == CHANGE_TO_INCLUDE_MODE) {
 		while (1) {
 			/* XXX Some security implication? */
@@ -1830,7 +1827,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			m = *m0;
 			*buflenp = 0;
 		}
-	
+
 		if (timer_init) {
 			mld_state_change_timers_are_running = 1;
 			mld_sendbuf(m, in6m->in6m_ifp);
