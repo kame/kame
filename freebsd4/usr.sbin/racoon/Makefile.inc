@@ -6,24 +6,24 @@ CFLAGS+=-DINET6 -DHAVE_FUNCTION_MACRO=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBL=1 -DHAVE_
 CFLAGS+=-DYY_NO_UNPUT
 YFLAGS+=-d
 
-.if exists(/usr/local/ssl/include/openssl/pem.h) || exists(/usr/local/include/openssl/pem.h)
+.if exists(/usr/local/ssl/include/openssl/pem.h) || exists(/usr/local/include/openssl/pem.h) || exists(/usr/include/openssl/pem.h)
 CFLAGS+=-DHAVE_OPENSSL_PEM_H=1
 .endif
-.if exists(/usr/local/ssl/include/openssl/x509.h) || exists(/usr/local/include/openssl/x509.h)
+.if exists(/usr/local/ssl/include/openssl/x509.h) || exists(/usr/local/include/openssl/x509.h) || exists(/usr/include/openssl/x509.h)
 CFLAGS+=-DHAVE_OPENSSL_X509_H=1
 .endif
-.if exists(/usr/local/include/openssl/rc5.h) || exists(/usr/local/ssl/include/openssl/rc5.h)
+.if exists(/usr/local/include/openssl/rc5.h) || exists(/usr/local/ssl/include/openssl/rc5.h) || exists(/usr/include/openssl/rc5.h)
 CFLAGS+=-DHAVE_OPENSSL_RC5_H=1
 .else
 CFLAGS+=-DNO_RC5=1
 .endif
-.if exists(/usr/local/include/openssl/idea.h) || exists(/usr/local/ssl/include/openssl/idea.h)
+.if exists(/usr/local/include/openssl/idea.h) || exists(/usr/local/ssl/include/openssl/idea.h) || exists(/usr/include/openssl/idea.h)
 CFLAGS+=-DHAVE_OPENSSL_IDEA_H=1
 .else
 CFLAGS+=-DNO_IDEA=1
 .endif
 
-.if exists(/usr/local/ssl/include/openssl/opensslv.h) || exists(/usr/local/include/openssl/opensslv.h)
+.if exists(/usr/local/ssl/include/openssl/opensslv.h) || exists(/usr/local/include/openssl/opensslv.h) || exists(/usr/include/openssl/opensslv.h)
 CFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 .endif
 
@@ -31,6 +31,8 @@ CFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 CFLAGS+=-I/usr/local/include
 .elif exists(/usr/local/ssl/include/openssl)
 CFLAGS+=-I/usr/local/ssl/include
+.elif exists(/usr/include/openssl)
+CFLAGS+=-I/usr/include
 .endif
 
 LDADD+=	-ly -ll
@@ -48,11 +50,17 @@ DPADD+= /usr/local/lib/libcrypto.a
 .elif exists(/usr/local/ssl/lib/libcrypto.a)
 LDADD+= -L/usr/local/ssl/lib -lcrypto
 DPADD+= /usr/local/ssl/lib/libcrypto.a
+.elif exists(/usr/lib/libcrypto.a)
+LDADD+= -lcrypto
+DPADD+= /usr/lib/libcrypto.a
 .endif
 # for USA resident
 .if exists(/usr/local/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
 LDADD+=	-L/usr/local/lib -lRSAglue -lrsaref
 DPADD+=	/usr/local/lib/libRSAglue.a /usr/local/lib/librsaref.a
+.elif exists(/usr/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
+LDADD+=	-lRSAglue -L/usr/local/lib -lrsaref
+DPADD+=	/usr/lib/libRSAglue.a /usr/local/lib/librsaref.a
 .endif
 
 .PATH:	${SRCDIR} ${SRCDIR}/../tcpdump
