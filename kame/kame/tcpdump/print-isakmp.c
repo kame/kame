@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.12 2000/09/22 20:36:19 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.13 2000/09/23 04:43:26 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -479,11 +479,12 @@ static char *isakmp_p_map[] = {
 
 static char *ah_p_map[] = {
 	NULL, "(reserved)", "md5", "sha", "1des",
+	"sha2-256", "sha2-384", "sha2-512",
 };
 
 static char *esp_p_map[] = {
 	NULL, "1des-iv64", "1des", "3des", "rc5", "idea", "cast",
-	"blowfish", "3idea", "1des-iv32", "rc4", "null"
+	"blowfish", "3idea", "1des-iv32", "rc4", "null", "aes"
 };
 
 static char *ipcomp_p_map[] = {
@@ -506,9 +507,10 @@ struct attrmap ipsec_t_map[] = {
 
 struct attrmap oakley_t_map[] = {
 	{ NULL,	0 },
-	{ "enc", 7,	{ NULL, "1des", "idea", "blowfish", "rc5",
-		 	  "3des", "cast"}, },
-	{ "hash", 4,	{ NULL, "md5", "sha1", "tiger", }, },
+	{ "enc", 8,	{ NULL, "1des", "idea", "blowfish", "rc5",
+		 	  "3des", "cast", "aes", }, },
+	{ "hash", 7,	{ NULL, "md5", "sha1", "tiger",
+			  "sha2-256", "sha2-384", "sha2-512", }, },
 	{ "auth", 6,	{ NULL, "preshared", "dss", "rsa sig", "rsa enc",
 			  "rsa enc revised", }, },
 	{ "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
