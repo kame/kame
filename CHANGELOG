@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.796 2000/04/20 09:22:58 itojun Exp $
+$Id: CHANGELOG,v 1.797 2000/04/20 12:28:11 jinmei Exp $
 
 <200004>
+2000-04-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/ripng.c (rip_sockinit): do not bind ff02::9 on
+	the RIPng socket. Without this fix, bgpd can't accept unicasted
+	RIPng messages.
+	In response to a report from masahito_endo@ydc.co.jp
+
 Thu Apr 20 18:22:26 JST 2000  itojun@iijlab.net
 	* libpcap/tcpdump pkgsrc (netbsd): upgrade to 4/17 snapshot.
 	* libpcap/tcpdump pkgsrc (openbsd): added port for 4/17 snapshot.
