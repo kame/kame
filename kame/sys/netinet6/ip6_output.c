@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.349 2002/11/14 03:17:39 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.350 2002/11/19 19:02:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1274,10 +1274,10 @@ skip_ipsec2:;
 	/*
 	 * The caller of this function may specify to use the minimum MTU
 	 * in some cases.
-	 * An advanced API option (IPV6_USE_MIN_MTU) can also overrides MTU
-	 * setting.  The logic is a bit complected; by default, unicast packets
-	 * will follow path MTU while multicast packets will be sent at the
-	 * minimum MTU.  If IP6PO_MINMTU_ALL is specified, all packets
+	 * An advanced API option (IPV6_USE_MIN_MTU) can also override MTU
+	 * setting.  The logic is a bit complicated; by default, unicast
+	 * packets will follow path MTU while multicast packets will be sent at
+	 * the minimum MTU.  If IP6PO_MINMTU_ALL is specified, all packets
 	 * including unicast ones will be sent at the minimum MTU.  Multicast
 	 * packets will always be sent at the minimum MTU unless
 	 * IP6PO_MINMTU_DISABLE is explicitly specified.
