@@ -185,7 +185,7 @@ udp6_input(mp, offp, proto)
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
 #else
-	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(struct udhpdr));
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(struct udphdr));
 	if (uh == NULL) {
 		udp6stat.udp6s_hdrops++;
 		return IPPROTO_DONE;
