@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.49 2002/09/17 11:18:15 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.50 2002/09/23 10:04:31 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -624,6 +624,8 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			mip6stat.mip6s_rrauthfail++;
 			return (EINVAL);
 		}
+		if (lifetime > MIP6_MAX_RR_BINDING_LIFE)
+			lifetime = MIP6_MAX_RR_BINDING_LIFE;
 	} else {
 		/* check a sequence number. */
 		if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
