@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.35 2000/10/18 21:28:01 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.36 2000/10/18 21:35:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,12 +64,16 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_ecn.h>
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/*1.5H*/
+#include <netinet/ip_icmp.h>
+#endif
 
 #include <netinet/ip6.h>
 
 #ifdef INET6
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
+#include <netinet6/ip6protosw.h>
 #endif
 
 #include <netinet6/ipsec.h>
