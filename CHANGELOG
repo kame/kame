@@ -1,7 +1,10 @@
-$Id: CHANGELOG,v 1.471 2000/01/21 12:18:12 itojun Exp $
+$Id: CHANGELOG,v 1.472 2000/01/21 17:02:36 sumikawa Exp $
 
 
 <200001>
+Sat Jan 22 02:01:57 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/lftp: new port: lftp-2.1.6, ftp client.
+
 Fri Jan 21 21:17:35 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/irc: upgrade to 2.10.3, make it buildable again.
 
