@@ -162,9 +162,7 @@ changeitems(args, onoff)
 		}
 		for (res = res0; res; res = res->ai_next)
 			selecthost(res->ai_addr, onoff);
-#if 0
 		freeaddrinfo(res0);
-#endif
 	}
 }
 
