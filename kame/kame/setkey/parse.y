@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.82 2004/04/15 08:03:57 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.83 2004/05/18 08:48:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1088,7 +1088,7 @@ setkeymsg_add(type, satype, srcs, dsts)
 		m_lt.sadb_lifetime_usetime = 0;
 
 		memcpy(buf + l, &m_lt, slen);
-		l += len;
+		l += slen;
 	}
 
 	/* set lifetime for SOFT */
@@ -1104,7 +1104,7 @@ setkeymsg_add(type, satype, srcs, dsts)
 		m_lt.sadb_lifetime_usetime = 0;
 
 		memcpy(buf + l, &m_lt, slen);
-		l += len;
+		l += slen;
 	}
 
 	len = sizeof(struct sadb_sa);
