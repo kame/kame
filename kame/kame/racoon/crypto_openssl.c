@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.35 2000/08/30 05:41:31 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.36 2000/08/30 08:33:14 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -87,6 +87,7 @@
 
 #ifdef HAVE_SIGNING_C
 static int cb_check_cert __P((int, X509_STORE_CTX *));
+static void eay_setgentype __P((char *, int *));
 static X509 *mem2x509 __P((vchar_t *));
 
 /* X509 Certificate */
@@ -276,20 +277,29 @@ eay_get_x509asn1subjectname(cert)
 }
 
 /*
- * get a subjectAltName from X509 certificate.
+ * get the subjectAltName from X509 certificate.
+ * the name is terminated by '\0'.
  */
 #include <openssl/x509v3.h>
-vchar_t *
-eay_get_x509subjectaltname(cert)
+int
+eay_get_x509subjectaltname(cert, altname, type)
 	vchar_t *cert;
+	char **altname;
+	int *type;
 {
 	X509 *x509 = NULL;
 	X509_EXTENSION *ext;
 	X509V3_EXT_METHOD *method = NULL;
-	vchar_t *altname = NULL;
+	STACK_OF(GENERAL_NAME) *name;
+	CONF_VALUE *cval = NULL;
+	STACK_OF(CONF_VALUE) *nval = NULL;
+	char *p;
 	u_char *bp;
 	int i;
 	int error = -1;
+
+	*altname = NULL;
+	*type = GENT_OTHERNAME;
 
 	bp = cert->v;
 
@@ -305,74 +315,58 @@ eay_get_x509subjectaltname(cert)
 	if(!method)
 		goto end;
 	
-	if(method->i2s) {
+	bp = ext->value->data;
+	name = method->d2i(NULL, &bp, ext->value->length);
+	if(!name)
+		goto end;
 
-		char *str = NULL;
+	nval = method->i2v(method, name, NULL);
+	method->ext_free(name);
+	name = NULL;
+	if(!nval)
+		goto end;
 
-		str = method->i2s(method, ext);
-		if(!str)
-			goto end;
-		altname = vmalloc(strlen(str));
-		if (!altname) {
-			free(str);
+	/*
+	 * XXX What is the subjectAltName which the function should
+	 * return if CERT has multiple subjectlatnames ?
+	 * At this moment, the function only returns 1st subjectaltname.
+	 *
+	 * #define MULTI_SUBJECTALTNAME
+	 * XXX The code to get multiple subjectname has not completed.
+	 */
+    {
+	int i = 0, tlen = 0, len = 0;
+#ifdef MULTI_SUBJECTALTNAME
+	for(i = 0; i < sk_CONF_VALUE_num(nval); i++) {
+#endif
+		cval = sk_CONF_VALUE_value(nval, i);
+		len = strlen(cval->value) + 1;	/* '\0' included */
+		p = realloc(*altname, tlen + len);
+		if (!p) {
+			sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
 			goto end;
 		}
-		memcpy(altname->v, str, altname->l);
-		free(str);
+		*altname = p;
+		(*altname)[tlen] = '\0';
+		strcat(*altname, cval->value);
 
-	} else {
+		/* set type of the name */
+		eay_setgentype(cval->name, type);
 
-		STACK_OF(GENERAL_NAME) *name;
-		CONF_VALUE *cval = NULL;
-		STACK_OF(CONF_VALUE) *nval = NULL;
-
-		bp = ext->value->data;
-		name = method->d2i(NULL, &bp, ext->value->length);
-		if(!name)
-			goto end;
-
-		nval = method->i2v(method, name, NULL);
-		method->ext_free(name);
-		name = NULL;
-		if(!nval)
-			goto end;
-
-		/*
-		 * XXX What is the subjectAltName which the function should
-		 * return if CERT has multiple subjectlatnames ?
-		 * At this moment, the function only returns 1st subjectaltname.
-		 *
-		 * #define MULTI_SUBJECTALTNAME
-		 */
-	    {
-		int i = 0, tlen = 0, len = 0;
 #ifdef MULTI_SUBJECTALTNAME
-		for(i = 0; i < sk_CONF_VALUE_num(nval); i++) {
-#endif
-			cval = sk_CONF_VALUE_value(nval, i);
-			len = strlen(cval->value);
-			altname = vrealloc(altname, tlen + len);
-			if (!altname) {
-				sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
-				method->ext_free(name);
-				goto end;
-			}
-			memcpy(altname->v + tlen, cval->value, len);
-#ifdef MULTI_SUBJECTALTNAME
-			tlen += len;
-		}
-#endif
-	    }
-		sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
+		tlen += len;
 	}
+#endif
+    }
+	sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
 
 	error = 0;
 
    end:
 	if (error) {
-		if (altname) {
-			vfree(altname);
-			altname = NULL;
+		if (*altname) {
+			free(*altname);
+			*altname = NULL;
 		}
 #ifndef EAYDEBUG
 		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
@@ -383,7 +377,28 @@ eay_get_x509subjectaltname(cert)
 	if (x509)
 		X509_free(x509);
 
-	return altname;
+	return error;
+}
+
+static void
+eay_setgentype(name, type)
+	char *name;
+	int *type;
+{
+	/* XXX It's needed effective code */
+	if(!name_cmp(name, "email")) {
+		*type = GENT_EMAIL;
+	} else if(!name_cmp(name, "URI")) {
+		*type = GENT_URI;
+	} else if(!name_cmp(name, "DNS")) {
+		*type = GENT_DNS;
+	} else if(!name_cmp(name, "RID")) {
+		*type = GENT_RID;
+	} else if(!name_cmp(name, "IP")) {
+		*type = GENT_IPADD;
+	} else {
+		*type = GENT_OTHERNAME;
+	}
 }
 
 /*

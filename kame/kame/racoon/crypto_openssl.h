@@ -26,13 +26,23 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: crypto_openssl.h,v 1.11 2000/08/30 04:40:35 sakane Exp $ */
+/* YIPS @(#)$Id: crypto_openssl.h,v 1.12 2000/08/30 08:33:14 sakane Exp $ */
 
 #ifdef HAVE_SIGNING_C
 /* X509 Certificate */
+#define GENT_OTHERNAME	0
+#define GENT_EMAIL	1
+#define GENT_DNS	2
+#define GENT_X400	3
+#define GENT_DIRNAME	4
+#define GENT_EDIPARTY	5
+#define GENT_URI	6
+#define GENT_IPADD	7
+#define GENT_RID	8
+
 extern int eay_check_x509cert __P((vchar_t *, char *));
-extern vchar_t *eay_get_x509subjectaltname __P((vchar_t *));
 extern vchar_t *eay_get_x509asn1subjectname __P((vchar_t *));
+extern int eay_get_x509subjectaltname __P((vchar_t *, char **, int *));
 extern char *eay_get_x509text __P((vchar_t *));
 extern vchar_t *eay_get_x509cert __P((char *));
 extern vchar_t *eay_get_x509sign __P((vchar_t *, vchar_t *, vchar_t *));

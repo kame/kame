@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.8 2000/08/30 04:40:35 sakane Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.9 2000/08/30 08:33:14 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -137,8 +137,9 @@ void
 certtest()
 {
 	vchar_t c;
-	char *text;
-	vchar_t *str;
+	char *str;
+	vchar_t *vstr;
+	int type;
 	int error;
 	int i;
 
@@ -157,27 +158,25 @@ certtest()
 		c.l = strlen(certs[i]);
 
 		/* print text */
-		text = eay_get_x509text(&c);
-		printf("%s", text);
-		free(text);
+		str = eay_get_x509text(&c);
+		printf("%s", str);
+		free(str);
 
 		/* print ASN.1 of subject name */
-		str = eay_get_x509asn1subjectname(&c);
-		if (!str)
+		vstr = eay_get_x509asn1subjectname(&c);
+		if (!vstr)
 			return;
-		PVDUMP(str);
+		PVDUMP(vstr);
 		printf("\n");
-		vfree(str);
+		vfree(vstr);
 
 		/* print subject alt name */
-		str = eay_get_x509subjectaltname(&c);
-		if (!str) {
+		error = eay_get_x509subjectaltname(&c, &str, &type);
+		if (error) {
 			printf("no subjectaltname found.\n");
 		} else {
-			printf("SubjectAltName: ");
-			bindump(str->v, str->l);
-			printf("\n");
-			vfree(str);
+			printf("SubjectAltName: %d: %s\n", type, str);
+			free(str);
 		}
 
 	    {
