@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.9 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_output.h,v 1.10 2003/12/17 02:20:02 itojun Exp $	*/
 
 #ifndef __sctp_output_h__
 #define __sctp_output_h__
@@ -96,8 +96,13 @@ void sctp_toss_old_asconf(struct sctp_tcb *);
 
 void sctp_fix_ecn_echo(struct sctp_association *);
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int sctp_output(struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
+	struct mbuf *, struct thread *);
+#else
 int sctp_output(struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
 	struct mbuf *, struct proc *);
+#endif
 
 int sctp_chunk_output(struct sctp_inpcb *, struct sctp_tcb *, int);
 void sctp_send_abort_tcb(struct sctp_tcb *, struct mbuf *);
@@ -143,7 +148,11 @@ sctp_sosend(struct socket *so,
 	    int flags
 #else
 	    int flags,
-	    struct proc *p
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	    struct thread *p
+#else
+            struct proc *p
+#endif
 #endif
 	);
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.c,v 1.6 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_sha1.c,v 1.7 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
@@ -32,6 +32,7 @@
  * SUCH DAMAGE.
  */
 #include <netinet/sctp_sha1.h>
+#include <sys/param.h>
 #include <sys/systm.h>
 void
 SHA1_Init(struct sha1_context *ctx)

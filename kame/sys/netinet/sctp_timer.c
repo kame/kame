@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.19 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.20 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -65,10 +65,18 @@
 #include <sys/domain.h>
 #endif
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#include <sys/limits.h>
+#else
 #include <machine/limits.h>
+#endif
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <vm/uma.h>
+#else
 #include <vm/vm_zone.h>
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -329,14 +337,14 @@ sctp_backoff_on_timeout(struct sctp_inpcb *ep,
 	int oldRTO;
 
 	oldRTO = net->RTO;
-#endif SCTP_DEBUG 
+#endif /* SCTP_DEBUG */
 	net->RTO <<= 1;
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_TIMER2) {
 		printf("Timer doubles from %d ms -to-> %d ms\n",
 		       oldRTO,net->RTO);
 	}
-#endif SCTP_DEBUG 
+#endif /* SCTP_DEBUG */
 
 	if (net->RTO > ep->sctp_ep.sctp_maxrto) {
 		net->RTO = ep->sctp_ep.sctp_maxrto;
@@ -345,7 +353,7 @@ sctp_backoff_on_timeout(struct sctp_inpcb *ep,
 			printf("Growth capped by maxrto %d\n",
 			       net->RTO);
 		}
-#endif SCTP_DEBUG 
+#endif /* SCTP_DEBUG */
 	}
 
 
@@ -403,7 +411,6 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 	/* none in flight now */
 	audit_tf = 0;
 	fir=0;
-
 	/* figure out how long a data chunk must be pending
 	 * before we can mark it ..
 	 */
@@ -449,7 +456,6 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 	sctp_log_fr(cur_rto, now.tv_sec, now.tv_usec, SCTP_FR_T3_MARK_TIME);
 	sctp_log_fr(0, min_wait.tv_sec, min_wait.tv_usec, SCTP_FR_T3_MARK_TIME);
 #endif
-
 	tcb->asoc.total_flight -= net->flight_size;
 	if (tcb->asoc.total_flight < 0) {
 		audit_tf = 1;
@@ -497,7 +503,11 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 				panic("Chunk count is going negative");
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -1139,7 +1149,7 @@ sctp_audit_stream_queues_for_size(struct sctp_inpcb *ep,
 		/* call the output queue function */
 		sctp_chunk_output(ep, tcb, 1);
 		if ((TAILQ_EMPTY(&tcb->asoc.send_queue)) &&
-		   (TAILQ_EMPTY(&tcb->asoc.sent_queue))) {
+		    (TAILQ_EMPTY(&tcb->asoc.sent_queue))) {
 			/* Probably should go in and make it go back through and add fragments allowed */
 			printf("Still nothing moved %d chunks are stuck\n", chks_in_queue);
 		}

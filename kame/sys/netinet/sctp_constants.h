@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.11 2003/11/25 06:40:52 ono Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.12 2003/12/17 02:20:01 itojun Exp $	*/
 
 #ifndef __sctp_constants_h__
 #define __sctp_constants_h__
@@ -707,8 +707,7 @@
 #define SCTP_PDRP_CRUPT	   76
 #define SCTP_PDRP_NEDAT    77
 #define SCTP_PDRP_PDBRK    78
-#define SCTP_RESV1
-
+#define SCTP_PREPENDS_FAST 79
 
 /*
  * This value defines the number of vtag block time wait entry's

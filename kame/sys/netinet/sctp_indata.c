@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.25 2003/11/25 07:29:19 ono Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.26 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -55,11 +55,19 @@
 #include <net/if.h>
 #include <net/route.h>
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#include <sys/limits.h>
+#else
 #include <machine/limits.h>
+#endif
 #include <machine/cpu.h>
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <vm/uma.h>
+#else
 #include <vm/vm_zone.h>
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -125,11 +133,11 @@ sctp_set_rwnd(struct sctp_tcb *stcb, struct sctp_association *asoc)
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INDATA4) {
 		printf("cc:%lu hiwat:%lu lowat:%lu mbcnt:%lu mbmax:%lu\n",
-		    stcb->sctp_socket->so_rcv.sb_cc,
-		    stcb->sctp_socket->so_rcv.sb_hiwat,
-		    stcb->sctp_socket->so_rcv.sb_lowat,
-		    stcb->sctp_socket->so_rcv.sb_mbcnt,
-		    stcb->sctp_socket->so_rcv.sb_mbmax);
+		    (u_long)stcb->sctp_socket->so_rcv.sb_cc,
+		    (u_long)stcb->sctp_socket->so_rcv.sb_hiwat,
+		    (u_long)stcb->sctp_socket->so_rcv.sb_lowat,
+		    (u_long)stcb->sctp_socket->so_rcv.sb_mbcnt,
+		    (u_long)stcb->sctp_socket->so_rcv.sb_mbmax);
 		printf("Setting rwnd to: sb:%ld - (del:%d + reasm:%d str:%d)\n",
 		    sctp_sbspace(&stcb->sctp_socket->so_rcv),
 		    asoc->size_on_delivery_queue,
@@ -170,7 +178,7 @@ sctp_set_rwnd(struct sctp_tcb *stcb, struct sctp_association *asoc)
 
 	/* SWS threshold */
 	if (asoc->my_rwnd &&
-	   (asoc->my_rwnd < stcb->sctp_ep->sctp_ep.sctp_sws_receiver)) {
+	    (asoc->my_rwnd < stcb->sctp_ep->sctp_ep.sctp_sws_receiver)) {
 		/* SWS engaged, tell peer none left */
 		asoc->my_rwnd = 1;
 #ifdef SCTP_DBUG
@@ -319,8 +327,8 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INDATA1) {
-		printf("I am now in Deliver data! (%x)\n",
-		       (u_int)chk);
+		printf("I am now in Deliver data! (%p)\n",
+		       chk);
 	}
 #endif
 	free_it = 0;
@@ -338,7 +346,11 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			chk->data = NULL;
 			sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -359,7 +371,11 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			/* Now free the address and data */
 			sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -408,8 +424,8 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INDATA1) {
-		printf("Now to the delivery with chk(%x)!\n",
-		       (u_int)chk);
+		printf("Now to the delivery with chk(%p)!\n",
+		       chk);
 	}
 #endif
 	/* XXX need to append PKTHDR to the socket buffer first */
@@ -518,7 +534,11 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 		/* Now free the address and data */
 		sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 		zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -568,7 +588,11 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 			/* Now free the address and data */
 			sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -582,7 +606,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 		}
 		return;
 	}
-	do{
+	do {
 		if (stcb->sctp_socket->so_rcv.sb_cc >= stcb->sctp_socket->so_rcv.sb_hiwat) {
 			if (cntDel) {
 				sctp_sorwakeup(stcb->sctp_ep, stcb->sctp_socket);
@@ -606,7 +630,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 		stream_no = chk->rec.data.stream_number;
 		nxt_todel = asoc->strmin[stream_no].last_sequence_delivered + 1;
 		if ((nxt_todel != chk->rec.data.stream_seq) &&
-		   ((chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED) == 0)) {
+		    ((chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED) == 0)) {
 			/* Not the next sequence to deliver in its stream OR unordered*/
 			if (cntDel) {
 				sctp_sorwakeup(stcb->sctp_ep, stcb->sctp_socket);
@@ -657,7 +681,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 			control = sctp_build_ctl(stcb, chk);
 			to = (struct sockaddr *)&chk->whoTo->ra._l_addr;
 			if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
-			   (to->sa_family == AF_INET)) {
+			    (to->sa_family == AF_INET)) {
 				in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
 				to = (struct sockaddr *)&sin6;
 			}
@@ -716,7 +740,11 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 		sctp_free_remote_addr(chk->whoTo);
 		chk->data = NULL;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 		zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -734,8 +762,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 			strm = &asoc->strmin[stream_no];
 			nxt_todel = strm->last_sequence_delivered + 1;
 			chk = TAILQ_FIRST(&strm->inqueue);
-			if ((chk) &&
-			   (nxt_todel == chk->rec.data.stream_seq)) {
+			if (chk && (nxt_todel == chk->rec.data.stream_seq)) {
 				while (chk != NULL) {
 					/* all delivered */
 					if (nxt_todel == chk->rec.data.stream_seq) {
@@ -817,7 +844,7 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 #endif
 	if (compare_with_wrap(strm->last_sequence_delivered,
 	    chk->rec.data.stream_seq, MAX_SEQ) ||
-	   (strm->last_sequence_delivered == chk->rec.data.stream_seq)) {
+	    (strm->last_sequence_delivered == chk->rec.data.stream_seq)) {
 		/* The incoming sseq is behind where we last delivered? */
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_INDATA1) {
@@ -928,7 +955,11 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 					sctp_pegs[SCTP_DUP_SSN_RCVD]++;
 					sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+                                       uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 					zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 					pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -1039,7 +1070,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 		asoc->cnt_on_reasm_queue++;
 		if (chk->rec.data.TSN_seq == cum_ackp1) {
 			if ((asoc->fragmented_delivery_inprogress == 0)  &&
-			   ((chk->rec.data.rcv_flags & SCTP_DATA_FIRST_FRAG) != SCTP_DATA_FIRST_FRAG)) {
+			    ((chk->rec.data.rcv_flags & SCTP_DATA_FIRST_FRAG) != SCTP_DATA_FIRST_FRAG)) {
 				/* An empty queue, no delivery inprogress, we hit the next one
 				 * and it does NOT have a FIRST fragment mark.
 				 */
@@ -1164,7 +1195,11 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 			chk->data = NULL;
 			sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+                       uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -1197,7 +1232,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 			 * is the NEXT. A bit of valdiation here.
 			 */
 			if (((prev->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK) == SCTP_DATA_FIRST_FRAG) ||
-			   ((prev->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK) == SCTP_DATA_MIDDLE_FRAG)) {
+			    ((prev->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK) == SCTP_DATA_MIDDLE_FRAG)) {
 				/* Insert chk MUST be a MIDDLE or LAST fragment */
 				if ((chk->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK) == SCTP_DATA_FIRST_FRAG) {
 #ifdef SCTP_DEBUG
@@ -1251,7 +1286,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 					return;
 				}
 				if (((prev->rec.data.rcv_flags & SCTP_DATA_UNORDERED) == 0) &&
-				   (chk->rec.data.stream_seq != prev->rec.data.stream_seq)) {
+				    (chk->rec.data.stream_seq != prev->rec.data.stream_seq)) {
 					/* Huh, need the correct STR here, they must
 					 * be the same.
 					 */
@@ -1400,7 +1435,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 					return;
 				}
 				if (((next->rec.data.rcv_flags & SCTP_DATA_UNORDERED) == 0) &&
-				   (chk->rec.data.stream_seq != next->rec.data.stream_seq)) {
+				    (chk->rec.data.stream_seq != next->rec.data.stream_seq)) {
 					/* Huh, need the correct STR here, they must
 					 * be the same.
 					 */
@@ -1853,7 +1888,12 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
  failed_express_del:
 	/* If we reach here this is a new chunk */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	chk = (struct sctp_tmit_chunk *)uma_zalloc(sctppcbinfo.ipi_zone_chunk,
+						   M_NOWAIT);
+#else
 	chk = (struct sctp_tmit_chunk *)zalloci(sctppcbinfo.ipi_zone_chunk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	chk = (struct sctp_tmit_chunk *)pool_get(&sctppcbinfo.ipi_zone_chunk,
@@ -2047,8 +2087,8 @@ sctp_sack_check(struct sctp_tcb *stcb, int ok_to_sack, int was_a_gap)
 			break;
 		}
 	}
-	if ((all_ones) || 
-	   ((asoc->cumulative_tsn == asoc->highest_tsn_inside_map) && (at >= 8))
+	if (all_ones || 
+	    ((asoc->cumulative_tsn == asoc->highest_tsn_inside_map) && (at >= 8))
 		) {
 		/* The complete array was completed by
 		 * a single FR.
@@ -2189,7 +2229,7 @@ sctp_service_queues(struct sctp_tcb *stcb, struct sctp_association *asoc)
 	/* Yes, reassembly delivery no longer in progress see if we
 	 * have some on the sb hold queue.
 	 */
-	do{
+	do {
 		if (stcb->sctp_socket->so_rcv.sb_cc >= stcb->sctp_socket->so_rcv.sb_hiwat) {
 			if (cntDel == 0)
 				sctp_sorwakeup(stcb->sctp_ep, stcb->sctp_socket);
@@ -2215,8 +2255,8 @@ sctp_service_queues(struct sctp_tcb *stcb, struct sctp_association *asoc)
 	}
 	nxt_todel = asoc->strmin[chk->rec.data.stream_number].last_sequence_delivered + 1;
 	if ((chk->rec.data.rcv_flags & SCTP_DATA_FIRST_FRAG) &&
-	   ((nxt_todel == chk->rec.data.stream_seq) ||
-	    (chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED))) {
+	    ((nxt_todel == chk->rec.data.stream_seq) ||
+	     (chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED))) {
 		/* Yep the first one is here. We setup to
 		 * start reception, by backing down the TSN
 		 * just in case we can't deliver.
@@ -2228,8 +2268,8 @@ sctp_service_queues(struct sctp_tcb *stcb, struct sctp_association *asoc)
 		 * can be delivered.
 		 */
 		if ((TAILQ_EMPTY(&asoc->delivery_queue)) &&
-		   ((sctp_is_all_msg_on_reasm(asoc, &tsize)) ||
-		    ((asoc->size_on_reasm_queue>= (stcb->sctp_socket->so_rcv.sb_hiwat >> 2)) &&
+		    ((sctp_is_all_msg_on_reasm(asoc, &tsize)) ||
+		     ((asoc->size_on_reasm_queue>= (stcb->sctp_socket->so_rcv.sb_hiwat >> 2)) &&
 		     tsize))
 			) {
 			asoc->fragmented_delivery_inprogress = 1;
@@ -2547,8 +2587,8 @@ sctp_handle_segments(struct sctp_tcb *stcb, struct sctp_association *asoc,
 							}
 						}
 						if ((tp1->sent <= SCTP_DATAGRAM_RESEND) &&
-						   (tp1->sent != SCTP_DATAGRAM_UNSENT) &&
-						   (compare_with_wrap(tp1->rec.data.TSN_seq, asoc->this_sack_highest_gap, MAX_TSN))) {
+						    (tp1->sent != SCTP_DATAGRAM_UNSENT) &&
+						    (compare_with_wrap(tp1->rec.data.TSN_seq, asoc->this_sack_highest_gap, MAX_TSN))) {
 							asoc->this_sack_highest_gap = tp1->rec.data.TSN_seq;
 							if (primary_flag_set) {
 								tp1->whoTo->cacc_saw_newack = 1;
@@ -2863,7 +2903,7 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
 	tp1 = TAILQ_FIRST(&asoc->sent_queue);
 	while (tp1) {
 		if ((tp1->sent != SCTP_FORWARD_TSN_SKIP) &&
-		   (tp1->sent != SCTP_DATAGRAM_RESEND)) {
+		    (tp1->sent != SCTP_DATAGRAM_RESEND)) {
 			/* no chance to advance, out of here */
 			break;
 		}
@@ -3220,7 +3260,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		send_s = tp1->rec.data.TSN_seq;
 	}
 	if ((cum_ack == send_s) ||
-	   (compare_with_wrap(cum_ack, send_s, MAX_TSN))) {
+	    (compare_with_wrap(cum_ack, send_s, MAX_TSN))) {
 		struct mbuf *oper;
 		/* no way, we have not even sent
 		 * this TSN out yet. Peer is hopelessly
@@ -3489,7 +3529,11 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 			panic("Chunk count is going negative");
 		}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_chunk, tp1);
+#else
 		zfreei(sctppcbinfo.ipi_zone_chunk, tp1);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_chunk, tp1);
@@ -4074,7 +4118,11 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 				}
 				sctp_free_remote_addr(chk->whoTo);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+				uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 				zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 				pool_put(&sctppcbinfo.ipi_zone_chunk, chk);

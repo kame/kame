@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.23 2003/11/25 07:30:00 ono Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.24 2003/12/17 02:20:03 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -522,7 +522,7 @@ sctp6_ctlinput(cmd, pktdst, d)
 		inp = NULL;
 		netp = NULL;
 		m_copydata(ip6cp->ip6c_m, ip6cp->ip6c_off, sizeof(sh),
-			   (caddr_t)&sh);
+		    (caddr_t)&sh);
 		ip6cp->ip6c_src->sin6_port = sh.src_port;
 		final.sin6_len = sizeof(final);
 		final.sin6_family = AF_INET6;
@@ -584,7 +584,11 @@ sctp6_getcred(SYSCTL_HANDLER_ARGS)
 	struct sctp_inpcb *inp;
 	int error, s;
 
+#if __FreeBSD_version >= 500000
+	error = suser(req->td);
+#else
 	error = suser(req->p);
+#endif
 	if (error)
 		return (error);
 
@@ -642,7 +646,11 @@ sctp6_abort(struct socket *so)
 }
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp6_attach(struct socket *so, int proto, struct thread *p)
+#else
 sctp6_attach(struct socket *so, int proto, struct proc *p)
+#endif
 {
 	struct in6pcb *inp6;
 	int s, error;
@@ -708,7 +716,11 @@ sctp6_attach(struct socket *so, int proto, struct proc *p)
 }
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp6_bind(struct socket *so, struct sockaddr *addr, struct thread *p)
+#else
 sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
+#endif
 {
 	struct sctp_inpcb *inp;
 	struct in6pcb *inp6;
@@ -928,13 +940,23 @@ sctp6_disconnect(struct socket *so)
 }
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
+	  struct mbuf *control, struct thread *p);
+#else
 sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	  struct mbuf *control, struct proc *p);
+#endif
 
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
+	   struct mbuf *control, struct thread *p)
+#else
 sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	   struct mbuf *control, struct proc *p)
+#endif
 {
 	struct sctp_inpcb *inp;
 	struct inpcb *in_inp;
@@ -1070,7 +1092,11 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 }
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp6_connect(struct socket *so, struct sockaddr *nam, struct thread *p)
+#else
 sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
+#endif
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
@@ -1536,19 +1562,19 @@ sctp6_usrreq(so, req, m, nam, control)
 		switch (family) {
 		case PF_INET:
 			error = in_control(so, (long)m, (caddr_t)nam,
-					   (struct ifnet *)control
+			    (struct ifnet *)control
 #if defined(__NetBSD__)
-					   , p
+			     , p
 #endif
-					   );
+			     );
 #ifdef INET6
 		case PF_INET6:
 			error = in6_control(so, (long)m, (caddr_t)nam,
-					    (struct ifnet *)control
+			    (struct ifnet *)control
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-					    , p
+			    , p
 #endif
-					    );
+			    );
 #endif
 		default:
 			error = EAFNOSUPPORT;
@@ -1661,11 +1687,11 @@ sctp6_usrreq(so, req, m, nam, control)
 			/* Flags are ignored */
 			error = sctp6_send(so, 0, m, name, control,
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-					   p
+			    p
 #else
-					   (struct proc *)NULL
+			    (struct proc *)NULL
 #endif
-					   );
+			    );
 		}
 		break;
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.7 2003/11/25 06:40:52 ono Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.8 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
@@ -34,6 +34,7 @@
 #ifndef __OpenBSD__
 #include "opt_sctp.h"
 #endif
+#include <sys/param.h>
 #include <netinet/sctp_crc32.h>
 
 #ifndef SCTP_USE_ADLER32

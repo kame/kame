@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.12 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.13 2003/12/17 02:20:02 itojun Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
@@ -46,6 +46,9 @@
  * We must have V6 so the size of the proto can be calculated. Otherwise
  * we would not allocate enough for Net/Open BSD :-<
  */
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#include <net/pfil.h>
+#endif
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
@@ -158,12 +161,21 @@ struct sctp_epinfo {
 
 	/* ep zone info */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	struct uma_zone *ipi_zone_ep;
+	struct uma_zone *ipi_zone_asoc;
+	struct uma_zone *ipi_zone_laddr;
+	struct uma_zone *ipi_zone_raddr;
+	struct uma_zone *ipi_zone_chunk;
+	struct uma_zone *ipi_zone_sockq;
+#else
 	struct vm_zone *ipi_zone_ep;
 	struct vm_zone *ipi_zone_asoc;
 	struct vm_zone *ipi_zone_laddr;
 	struct vm_zone *ipi_zone_raddr;
 	struct vm_zone *ipi_zone_chunk;
 	struct vm_zone *ipi_zone_sockq;
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct pool ipi_zone_ep;
@@ -366,7 +378,11 @@ struct sctp_nets *sctp_findnet(struct sctp_tcb *, struct sockaddr *);
 
 struct sctp_inpcb *sctp_pcb_findep(struct sockaddr *);
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct thread *);
+#else
 int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct proc *);
+#endif
 
 struct sctp_tcb *sctp_findassociation_addr(struct mbuf *, int,
 	struct sctp_inpcb **, struct sctp_nets **, uint32_t vtag);

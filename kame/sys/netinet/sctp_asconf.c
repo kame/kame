@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.14 2003/11/25 06:40:52 ono Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.15 2003/12/17 02:20:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -2090,16 +2090,16 @@ sctp_set_primary_ip_address_sa(struct sctp_tcb *stcb, struct sockaddr *sa) {
 		}
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
-			printf("set_primary_ip_address_sa: queued on tcb=%xh, ",
-			       (uint32_t)stcb);
+			printf("set_primary_ip_address_sa: queued on tcb=%p, ",
+			       stcb);
 			sctp_print_address(sa);
 		}
 #endif /* SCTP_DEBUG */
 	} else {
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
-			printf("set_primary_ip_address_sa: failed to add to queue on tcb=%xh, ",
-			       (uint32_t)stcb);
+			printf("set_primary_ip_address_sa: failed to add to queue on tcb=%p, ",
+			       stcb);
 			sctp_print_address(sa);
 		}
 #endif /* SCTP_DEBUG */
@@ -2140,8 +2140,8 @@ sctp_set_primary_ip_address(struct ifaddr *ifa) {
 				}
 #ifdef SCTP_DEBUG
 				if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
-					printf("set_primary_ip_address: queued on tcb=%xh, ",
-					       (uint32_t)tcb);
+					printf("set_primary_ip_address: queued on tcb=%p, ",
+					       tcb);
 					sctp_print_address(ifa->ifa_addr);
 				}
 #endif /* SCTP_DEBUG */
@@ -2695,7 +2695,7 @@ sctp_addr_in_initack(struct sctp_tcb *stcb,
 #endif /* INET6 */
 
 		if ((ptype == SCTP_IPV4_ADDRESS) &&
-			   (sa->sa_family == AF_INET)) {
+		    (sa->sa_family == AF_INET)) {
 			/* get the entire IPv4 address param */
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_ASCONF2) {

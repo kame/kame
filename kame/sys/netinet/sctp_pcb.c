@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.27 2003/11/25 07:29:20 ono Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.28 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -73,11 +73,19 @@
 #include <sys/callout.h>
 #endif
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#include <sys/limits.h>
+#else
 #include <machine/limits.h>
+#endif
 #include <machine/cpu.h>
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <vm/uma.h>
+#else
 #include <vm/vm_zone.h>
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -539,7 +547,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 			}
 			/* A V6 address and the endpoint is NOT bound V6 */
 			if ((nam->sa_family == AF_INET6) &&
-			   ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)) {
+			    ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)) {
 				continue;
 			}
 			return (ep);
@@ -589,20 +597,20 @@ sctp_endpoint_probe(struct sockaddr *nam,
 				}
 #ifdef SCTP_DEBUG
 				if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-					printf("Ok laddr->ifa:%x is possible, ",(u_int)laddr->ifa);
+					printf("Ok laddr->ifa:%p is possible, ", laddr->ifa);
 				}
 #endif
 				if (laddr->ifa->ifa_addr == NULL) {
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-						printf("Huh IFA as an ifa_addr=NULL, ",(u_int)laddr->ifa);
+						printf("Huh IFA as an ifa_addr=NULL, ");
 					}
 #endif
 					continue;
 				}
 #ifdef SCTP_DEBUG
 				if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-					printf("Ok laddr->ifa:%x is possible, ",(u_int)laddr->ifa->ifa_addr);
+					printf("Ok laddr->ifa:%p is possible, ", laddr->ifa->ifa_addr);
 					sctp_print_address(laddr->ifa->ifa_addr);
 					printf("looking for ");
 					sctp_print_address(nam);
@@ -617,7 +625,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 						    intf_addr->sin_addr.s_addr) {
 #ifdef SCTP_DEBUG
 							if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-								printf("YES, return ep:%x\n",(u_int)ep);
+								printf("YES, return ep:%p\n", ep);
 							}
 #endif
 							return (ep);
@@ -629,7 +637,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 									 &intf_addr6->sin6_addr)) {
 #ifdef SCTP_DEBUG
 							if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-								printf("YES, return ep:%x\n",(u_int)ep);
+								printf("YES, return ep:%p\n", ep);
 							}
 #endif
 							return (ep);
@@ -686,7 +694,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 	head = &sctppcbinfo.sctp_ephash[SCTP_PCBHASH_ALLADDR(lport, sctppcbinfo.hashmark)];
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		printf("Main hash to lookup at head:%x\n",(u_int)head);
+		printf("Main hash to lookup at head:%p\n", head);
 	}
 #endif
  	ep = sctp_endpoint_probe(nam, head, lport);
@@ -726,7 +734,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		printf("EP to return is %x\n",(u_int)(ep));
+		printf("EP to return is %p\n", ep);
 	}
 #endif
 	return (ep);
@@ -818,10 +826,9 @@ sctp_findassociation_special_addr(struct sctp_inpcb **ep,
 		if (ptype == SCTP_IPV4_ADDRESS) {
 			/* Get the rest of the address */
 			phdr = sctp_get_next_param(mpkt, at,
-						   (struct sctp_paramhdr *)&parms,
-						   plen);
+			    (struct sctp_paramhdr *)&parms, plen);
 			addrp = (u_int8_t *)((caddr_t)phdr +
-					     sizeof(struct sctp_paramhdr));
+			    sizeof(struct sctp_paramhdr));
 			memcpy(&sin4.sin_addr, addrp, sizeof(struct in_addr));
 			sa_touse = (struct sockaddr *)&sin4;
 			/* look it up */
@@ -834,15 +841,14 @@ sctp_findassociation_special_addr(struct sctp_inpcb **ep,
 		} else if (ptype == SCTP_IPV6_ADDRESS) {
 			/* Get the rest of the address */
 			phdr = sctp_get_next_param(mpkt, at,
-						   (struct sctp_paramhdr *)&parms,
-						   plen);
+			    (struct sctp_paramhdr *)&parms, plen);
 			addrp = (u_int8_t *)((caddr_t)phdr +
-					     sizeof(struct sctp_paramhdr));
+			    sizeof(struct sctp_paramhdr));
 			memcpy(&sin6.sin6_addr, addrp, sizeof(struct in6_addr));
 			sa_touse = (struct sockaddr *)&sin6;
 			/* look it up */
 			ret = sctp_findassociation_ep_addr(ep, sa_touse, netp,
-							   dest);
+			    dest);
 			if (ret != NULL) {
 				return (ret);
 			}
@@ -852,8 +858,8 @@ sctp_findassociation_special_addr(struct sctp_inpcb **ep,
 			at += SCTP_SIZE32(plen);
 		}
 		phdr = sctp_get_next_param(mpkt, at,
-					   (struct sctp_paramhdr *)&parms,
-					   sizeof(struct sctp_paramhdr));
+		    (struct sctp_paramhdr *)&parms,
+		    sizeof(struct sctp_paramhdr));
 	}
 	return (NULL);
 }
@@ -918,7 +924,6 @@ sctp_findassoc_by_vtag(struct sockaddr *from,
 	}
 	return (NULL);
 }
-
 
 /*
  * Find an association with the pointer to the inbound IP packet. This
@@ -1006,7 +1011,7 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		printf("ret:%x linp:%x\n",(u_int)ret,(u_int)linp);
+		printf("ret:%p linp:%p\n", ret, linp);
 	}
 #endif
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -1036,10 +1041,9 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 		/* Found a EP but not this address */
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-			printf("Found endpoint %x but not address state:%x\n",
-			       (unsigned int)linp,
-			       linp->sctp_flags
-			       );
+			printf("Found endpoint %p but not address state:%x\n",
+			       linp, linp->sctp_flags);
+			       
 		}
 #endif
     		chdr = (struct sctp_chunkhdr *)((caddr_t)sh +
@@ -1104,7 +1108,11 @@ sctp_inpcb_alloc(struct socket *so)
 
 	error = 0;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	inp = (struct sctp_inpcb *)uma_zalloc(sctppcbinfo.ipi_zone_ep, M_NOWAIT);
+#else
 	inp = (struct sctp_inpcb *)zalloci(sctppcbinfo.ipi_zone_ep);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	inp = (struct sctp_inpcb *)pool_get(&sctppcbinfo.ipi_zone_ep,
@@ -1146,7 +1154,11 @@ sctp_inpcb_alloc(struct socket *so)
 #endif
 	if (error != 0) {
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_ep, inp);
+#else
 		zfreei(sctppcbinfo.ipi_zone_ep, inp);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_ep, inp);
@@ -1189,7 +1201,11 @@ sctp_inpcb_alloc(struct socket *so)
 		 * it in protosw
 		 */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_ep, inp);
+#else
 		zfreei(sctppcbinfo.ipi_zone_ep, inp);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_ep, inp);
@@ -1208,7 +1224,11 @@ sctp_inpcb_alloc(struct socket *so)
 	if (inp->sctp_tcbhash == NULL) {
 		printf("Out of SCTP-INPCB->hashinit - no resources\n");
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_ep, inp);
+#else
 		zfreei(sctppcbinfo.ipi_zone_ep, inp);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_ep, inp);
@@ -1221,7 +1241,11 @@ sctp_inpcb_alloc(struct socket *so)
 	LIST_INIT(&inp->sctp_asoc_list);
 	TAILQ_INIT(&inp->sctp_queue_list);
 	/* Init the timer structure for signature change */
+#if __FreeBSD_version >= 500000
+	callout_init(&inp->sctp_ep.signature_change.timer, 0);
+#else
 	callout_init(&inp->sctp_ep.signature_change.timer);
+#endif
 
 	/* now init the actual endpoint default data */
 	m = &inp->sctp_ep;
@@ -1257,26 +1281,25 @@ sctp_inpcb_alloc(struct socket *so)
 	/* seed random number generator */
 	m->random_counter = 1;
 	m->store_at = SCTP_SIGNATURE_SIZE;
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) && __FreeBSD_version < 500000
 	read_random_unlimited(m->random_numbers, sizeof(m->random_numbers));
 #endif
 #if defined(__OpenBSD__)
 	get_random_bytes(m->random_numbers, sizeof(m->random_numbers));
 #endif
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 
-#if NRND > 0
+#if !defined(__FreeBSD__) && NRND > 0
 	rnd_extract_data(m->random_numbers, sizeof(m->random_numbers),
 			 RND_EXTRACT_ANY);
 #else
 	{
-		int *ranm, *ranp;
-		ranp = (int *)m->random_numbers;
-		ranm = (int *)((u_int)m->random_numbers +
-			       SCTP_SIGNATURE_ALOC_SIZE);
-		if ((u_int)ranp % 4) {
+		u_int32_t *ranm, *ranp;
+		ranp = (u_int32_t *)&m->random_numbers;
+		ranm = ranp + SCTP_SIGNATURE_ALOC_SIZE;
+		if ((u_long)ranp % 4) {
 			/* not a even boundary? */
-			ranp = (int *)((((u_int)ranp + 3) >> 2) << 2);
+			ranp = (u_int32_t *)((((u_long)ranp + 3) >> 2) << 2);
 		}
 		while (ranp < ranm) {
 			*ranp = random();
@@ -1357,7 +1380,11 @@ sctp_move_pcb_and_assoc(struct sctp_inpcb *old_inp,
 		/* Subset bound, so copy in the laddr list from the old_inp */
 		LIST_FOREACH(oladdr, &old_inp->sctp_addr_list, sctp_nxt_addr) {
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			laddr = (struct sctp_laddr *)uma_zalloc(sctppcbinfo.ipi_zone_laddr, M_NOWAIT);
+#else
 			laddr = (struct sctp_laddr *)zalloci(sctppcbinfo.ipi_zone_laddr);
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1402,12 +1429,12 @@ sctp_isport_inuse(struct sctp_inpcb *ep, u_short lport)
 			/* check the v6/v4 binding issue */
 			if ((lep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
 #if defined(__FreeBSD__)
-			   (((struct inpcb *)lep)->inp_flags & IN6P_IPV6_V6ONLY)
+			    (((struct inpcb *)lep)->inp_flags & IN6P_IPV6_V6ONLY)
 #else
 #if defined(__OpenBSD__)
-			   (0)	/* For open bsd we do dual bind only */
+			    (0)	/* For open bsd we do dual bind only */
 #else
-			   (((struct in6pcb *)lep)->in6p_flags & IN6P_IPV6_V6ONLY)
+			    (((struct in6pcb *)lep)->in6p_flags & IN6P_IPV6_V6ONLY)
 #endif
 #endif
 				) {
@@ -1427,12 +1454,12 @@ sctp_isport_inuse(struct sctp_inpcb *ep, u_short lport)
 				/* lep is bound only V4 */
 				if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
 #if defined(__FreeBSD__)
-				   (((struct inpcb *)ep)->inp_flags & IN6P_IPV6_V6ONLY)
+				    (((struct inpcb *)ep)->inp_flags & IN6P_IPV6_V6ONLY)
 #else
 #if defined(__OpenBSD__)
-				   (0)	/* For open bsd we do dual bind only */
+				    (0)	/* For open bsd we do dual bind only */
 #else
-				   (((struct in6pcb *)ep)->in6p_flags & IN6P_IPV6_V6ONLY)
+				    (((struct in6pcb *)ep)->in6p_flags & IN6P_IPV6_V6ONLY)
 #endif
 #endif
 					) {
@@ -1456,7 +1483,11 @@ extern void in6_sin6_2_sin (struct sockaddr_in *, struct sockaddr_in6 *sin6);
 
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct thread *p)
+#else
 sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
+#endif
 {
 	/* bind a ep to a socket address */
 	struct sctp_inpcb *ep, *lep;
@@ -1536,9 +1567,12 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 				bindall = 0;
 				/* KAME hack: embed scopeid */
 #if defined(__FreeBSD__)
+#ifdef SCTP_BASE_FREEBSD
+#else
 				error = scope6_check_id(sin6, ip6_use_defzone);
 				if (error != 0)
 					return (error);
+#endif
 #else
 				if (in6_embedscope(&sin6->sin6_addr, sin6) != 0) {
 					return (EINVAL);
@@ -1562,7 +1596,11 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		if (ntohs(lport) < IPPORT_RESERVED) {
 			if (p && (error =
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
+				  suser_cred(p->td_ucred, 0)
+#else
 				  suser(p)
+#endif
 #else
 				  suser(p->p_ucred, &p->p_acflag)
 #endif
@@ -1612,7 +1650,11 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		if (ip_inp->inp_flags & INP_LOWPORT) {
 			if (p && (error =
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
+				  suser_cred(p->td_ucred, 0)
+#else
 				  suser(p)
+#endif
 #else
 				  suser(p->p_ucred, &p->p_acflag)
 #endif
@@ -1782,7 +1824,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 	LIST_INSERT_HEAD(head, ep, sctp_hash);
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		printf("Main hash to bind at head:%x, bound port:%d\n",(u_int)head, ntohs(lport));
+		printf("Main hash to bind at head:%p, bound port:%d\n", head, ntohs(lport));
 	}
 #endif
 	/* set in the port */
@@ -1990,7 +2032,11 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 	while ((sq = TAILQ_FIRST(&ep->sctp_queue_list)) != NULL) {
 		TAILQ_REMOVE(&ep->sctp_queue_list, sq, next_sq);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_sockq, sq);
+#else
 		zfreei(sctppcbinfo.ipi_zone_sockq, sq);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_sockq, sq);
@@ -2040,7 +2086,11 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 		nladdr = LIST_NEXT(laddr, sctp_nxt_addr);
 		LIST_REMOVE(laddr, sctp_nxt_addr);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_laddr, laddr);
+#else
 		zfreei(sctppcbinfo.ipi_zone_laddr, laddr);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_laddr, laddr);
@@ -2056,7 +2106,11 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 
 	/* Now we must put the ep memory back into the zone pool */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	uma_zfree(sctppcbinfo.ipi_zone_ep, ep);
+#else
 	zfreei(sctppcbinfo.ipi_zone_ep, ep);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	pool_put(&sctppcbinfo.ipi_zone_ep, ep);
@@ -2269,7 +2323,11 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		return (-1);
 	}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	netp = (struct sctp_nets *)uma_zalloc(sctppcbinfo.ipi_zone_raddr, M_NOWAIT);
+#else
 	netp = (struct sctp_nets *)zalloci(sctppcbinfo.ipi_zone_raddr);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	netp = (struct sctp_nets *)pool_get(&sctppcbinfo.ipi_zone_raddr,
@@ -2285,7 +2343,11 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	memcpy(&netp->ra._l_addr, newaddr, newaddr->sa_len);
 #if defined(__FreeBSD__)
 	if (newaddr->sa_family == AF_INET6)
+#ifdef SCTP_BASE_FREEBSD
+		netp->addr_is_local = in6_localaddr(&(((struct sockaddr_in6 *)newaddr)->sin6_addr));
+#else
 		netp->addr_is_local = in6_localaddr((struct sockaddr_in6 *)newaddr);
+#endif
 	else
 		netp->addr_is_local = in_localaddr(((struct sockaddr_in *)newaddr)->sin_addr);
 #else
@@ -2313,7 +2375,11 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	netp->ref_count = 1;
 
 	/* Init the timer structure */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&netp->rxt_timer.timer, 0);
+#else
 	callout_init(&netp->rxt_timer.timer);
+#endif
 	/* Now generate a route for this guy */
 
 
@@ -2337,6 +2403,9 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		netp->cwnd = max((netp->mtu * 4), SCTP_INITIAL_CWND);
 	} else {
 		netp->cwnd = min((netp->mtu * 4), max((2*netp->mtu), SCTP_INITIAL_CWND));
+	}
+	if (netp->cwnd < (2*netp->mtu)) {
+		netp->cwnd = 2 * netp->mtu;
 	}
 	netp->ssthresh = tasoc->asoc.peers_rwnd;
 
@@ -2505,7 +2574,11 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		}
 #endif
 		if ((imp_ret = sctp_inpcb_bind(ep->sctp_socket, (struct sockaddr *)NULL,
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+					       (struct thread *)NULL))) {
+#else
 					       (struct proc *)NULL))) {
+#endif
 			/* bind error, probably perm */
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_PCB3) {
@@ -2518,7 +2591,11 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	}
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	tasoc = (struct sctp_tcb *)uma_zalloc(sctppcbinfo.ipi_zone_asoc, M_NOWAIT);
+#else
 	tasoc = (struct sctp_tcb *)zalloci(sctppcbinfo.ipi_zone_asoc);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	tasoc = (struct sctp_tcb *)pool_get(&sctppcbinfo.ipi_zone_asoc,
@@ -2543,7 +2620,11 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	if ((imp_ret = sctp_init_asoc(ep, asoc, for_a_init))) {
 		/* failed */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_asoc, tasoc);
+#else
 		zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2577,7 +2658,11 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		if (asoc->mapping_array)
 			free(asoc->mapping_array, M_PCB);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_asoc, tasoc);
+#else
 		zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2606,11 +2691,19 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	}
 
 	/* Init all the timers */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&asoc->hb_timer.timer, 0);
+	callout_init(&asoc->dack_timer.timer, 0);
+	callout_init(&asoc->asconf_timer.timer, 0);
+	callout_init(&asoc->shut_guard_timer.timer, 0);
+	callout_init(&asoc->autoclose_timer.timer, 0);
+#else
 	callout_init(&asoc->hb_timer.timer);
 	callout_init(&asoc->dack_timer.timer);
 	callout_init(&asoc->asconf_timer.timer);
 	callout_init(&asoc->shut_guard_timer.timer);
 	callout_init(&asoc->autoclose_timer.timer);
+#endif
 
 	LIST_INSERT_HEAD(&ep->sctp_asoc_list, tasoc, sctp_tcblist);
 
@@ -2621,7 +2714,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		printf("Association %x now allocated\n",(u_int)tasoc);
+		printf("Association %p now allocated\n", tasoc);
 	}
 #endif
 	return (tasoc);
@@ -2639,7 +2732,11 @@ sctp_free_remote_addr(struct sctp_nets *net)
 		callout_stop(&net->pmtu_timer.timer);
 		net->dest_state = SCTP_ADDR_NOT_REACHABLE;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_raddr, net);
+#else
 		zfreei(sctppcbinfo.ipi_zone_raddr, net);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_raddr, net);
@@ -2792,8 +2889,8 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	s = splnet();
 #endif
 	if (tasoc->asoc.state == 0) {
-		printf("Freeing already free association:%x - huh??\n",
-		       (u_int)tasoc);
+		printf("Freeing already free association:%p - huh??\n",
+			tasoc);
 		splx(s);
 		return;
 	}
@@ -2836,6 +2933,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 	TAILQ_FOREACH(net, &asoc->nets, sctp_next) {
 		callout_stop(&net->rxt_timer.timer);
+		callout_stop(&net->pmtu_timer.timer);
 	}
 	prev = NULL;
 	while (!TAILQ_EMPTY(&asoc->nets)) {
@@ -2849,7 +2947,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 		/* free it */
 		net->ref_count = 0;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_raddr, net);
+#else
 		zfreei(sctppcbinfo.ipi_zone_raddr, net);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_raddr, net);
@@ -2877,7 +2979,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 			chk->asoc = NULL;
 			/* Free the chunk */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2902,7 +3008,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 				chk->data = NULL;
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2925,7 +3035,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 				chk->data = NULL;
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2948,7 +3062,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 				chk->data = NULL;
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2970,7 +3088,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 				chk->data = NULL;
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2993,7 +3115,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 				chk->data = NULL;
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -3031,8 +3157,13 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 						chk->data = NULL;
 					}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+					uma_zfree(sctppcbinfo.ipi_zone_chunk,
+						  chk);
+#else
 					zfreei(sctppcbinfo.ipi_zone_chunk,
 					       chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 					pool_put(&sctppcbinfo.ipi_zone_chunk,
@@ -3056,7 +3187,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 		laddr = LIST_FIRST(&asoc->sctp_local_addr_list);
 		LIST_REMOVE(laddr, sctp_nxt_addr);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_laddr, laddr);
+#else
 		zfreei(sctppcbinfo.ipi_zone_laddr, laddr);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_laddr, laddr);
@@ -3077,7 +3212,11 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 
 	/* now clean up the tasoc itself */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	uma_zfree(sctppcbinfo.ipi_zone_asoc, tasoc);
+#else
 	zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	pool_put(&sctppcbinfo.ipi_zone_asoc, tasoc);
@@ -3085,7 +3224,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	sctppcbinfo.ipi_count_asoc--;
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	if ((ep->sctp_socket->so_snd.sb_cc) ||
-	   (ep->sctp_socket->so_snd.sb_mbcnt)) {
+	    (ep->sctp_socket->so_snd.sb_mbcnt)) {
 		/* This will happen when a abort is done */
 		ep->sctp_socket->so_snd.sb_cc = 0;
 		ep->sctp_socket->so_snd.sb_mbcnt = 0;
@@ -3391,7 +3530,11 @@ sctp_insert_laddr(struct sctpladdr *list, struct ifaddr *ifa) {
 #endif
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	laddr = (struct sctp_laddr *)uma_zalloc(sctppcbinfo.ipi_zone_laddr, M_NOWAIT);
+#else
 	laddr = (struct sctp_laddr *)zalloci(sctppcbinfo.ipi_zone_laddr);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	laddr = (struct sctp_laddr *)pool_get(&sctppcbinfo.ipi_zone_laddr,
@@ -3429,7 +3572,11 @@ sctp_remove_laddr(struct sctp_laddr *laddr)
 	/* remove from the list */
 	LIST_REMOVE(laddr, sctp_nxt_addr);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	uma_zfree(sctppcbinfo.ipi_zone_laddr, laddr);
+#else
 	zfreei(sctppcbinfo.ipi_zone_laddr, laddr);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	pool_put(&sctppcbinfo.ipi_zone_laddr, laddr);
@@ -3689,41 +3836,79 @@ sctp_pcb_init()
 
 #endif
 #if defined(__FreeBSD__)
-	sctppcbinfo.ipi_zone_ep = zinit("sctp_ep",
-					sizeof(struct sctp_inpcb),
-					maxsockets,
-					ZONE_INTERRUPT, 0);
+#if __FreeBSD_version >= 500000
+#define UMA_ZFLAG_FULL         0x0020
+	sctppcbinfo.ipi_zone_ep = uma_zcreate("sctp_ep",
+					      sizeof(struct sctp_inpcb),
+					      NULL, NULL, NULL, NULL,
+					      UMA_ALIGN_PTR, UMA_ZFLAG_FULL);
+	uma_zone_set_max(sctppcbinfo.ipi_zone_ep, maxsockets);
 
-	sctppcbinfo.ipi_zone_asoc = zinit("sctp_asoc",
-					  sizeof(struct sctp_tcb),
-					  sctp_max_number_of_assoc,
-					  ZONE_INTERRUPT, 0);
+	sctppcbinfo.ipi_zone_asoc = uma_zcreate("sctp_asoc",
+						sizeof(struct sctp_tcb),
+						NULL, NULL, NULL, NULL,
+						UMA_ALIGN_PTR, UMA_ZFLAG_FULL);
+
+	uma_zone_set_max(sctppcbinfo.ipi_zone_asoc, sctp_max_number_of_assoc);
+	sctppcbinfo.ipi_zone_laddr = uma_zcreate("sctp_laddr",
+						 sizeof(struct sctp_laddr),
+						 NULL, NULL, NULL, NULL,
+						 UMA_ALIGN_PTR, UMA_ZFLAG_FULL);
+	uma_zone_set_max(sctppcbinfo.ipi_zone_laddr,
+			 (sctp_max_number_of_assoc *
+			 sctp_scale_up_for_address));
+
+	sctppcbinfo.ipi_zone_raddr = uma_zcreate("sctp_raddr",
+						 sizeof(struct sctp_nets),
+						 NULL, NULL, NULL, NULL,
+						 UMA_ALIGN_PTR, UMA_ZFLAG_FULL);
+	uma_zone_set_max(sctppcbinfo.ipi_zone_raddr,
+			 (sctp_max_number_of_assoc *
+			 sctp_scale_up_for_address));
+
+	sctppcbinfo.ipi_zone_chunk = uma_zcreate("sctp_chunk",
+						 sizeof(struct sctp_tmit_chunk),
+						 NULL, NULL, NULL, NULL,
+						 UMA_ALIGN_PTR, UMA_ZFLAG_FULL);
+	uma_zone_set_max(sctppcbinfo.ipi_zone_chunk,
+			 (sctp_max_number_of_assoc *
+			 sctp_scale_up_for_address *
+			 sctp_chunkscale));
+
+	sctppcbinfo.ipi_zone_sockq = uma_zcreate("sctp_sockq",
+						 sizeof(struct sctp_socket_q_list),
+						 NULL, NULL, NULL, NULL,
+						 UMA_ALIGN_PTR, UMA_ZFLAG_FULL);
+	uma_zone_set_max(sctppcbinfo.ipi_zone_sockq,
+			 (sctp_max_number_of_assoc *
+			 sctp_scale_up_for_address *
+			 sctp_chunkscale));
+#else
+	sctppcbinfo.ipi_zone_ep = zinit("sctp_ep", sizeof(struct sctp_inpcb),
+	    maxsockets, ZONE_INTERRUPT, 0);
+
+	sctppcbinfo.ipi_zone_asoc = zinit("sctp_asoc", sizeof(struct sctp_tcb),
+	    sctp_max_number_of_assoc, ZONE_INTERRUPT, 0);
 	sctppcbinfo.ipi_zone_laddr = zinit("sctp_laddr",
-					   sizeof(struct sctp_laddr),
-					   (sctp_max_number_of_assoc *
-					    sctp_scale_up_for_address),
-					   ZONE_INTERRUPT,
-					   0);
+	    sizeof(struct sctp_laddr),
+	    (sctp_max_number_of_assoc * sctp_scale_up_for_address),
+	    ZONE_INTERRUPT, 0);
 
 	sctppcbinfo.ipi_zone_raddr = zinit("sctp_raddr",
-					   sizeof(struct sctp_nets),
-					   (sctp_max_number_of_assoc *
-					    sctp_scale_up_for_address),
-					   ZONE_INTERRUPT, 0);
+	    sizeof(struct sctp_nets),
+	    (sctp_max_number_of_assoc * sctp_scale_up_for_address),
+	    ZONE_INTERRUPT, 0);
 
 	sctppcbinfo.ipi_zone_chunk = zinit("sctp_chunk",
-					   sizeof(struct sctp_tmit_chunk),
-					   (sctp_max_number_of_assoc *
-					    sctp_scale_up_for_address *
-					    sctp_chunkscale),
-					   ZONE_INTERRUPT, 0);
+	    sizeof(struct sctp_tmit_chunk),
+	    (sctp_max_number_of_assoc * sctp_scale_up_for_address * sctp_chunkscale),
+	    ZONE_INTERRUPT, 0);
 
 	sctppcbinfo.ipi_zone_sockq = zinit("sctp_sockq",
-					   sizeof(struct sctp_socket_q_list),
-					   (sctp_max_number_of_assoc *
-					    sctp_scale_up_for_address *
-					    sctp_chunkscale),
-					   ZONE_INTERRUPT, 0);
+	    sizeof(struct sctp_socket_q_list),
+	    (sctp_max_number_of_assoc * sctp_scale_up_for_address * sctp_chunkscale),
+	    ZONE_INTERRUPT, 0);
+#endif
 
 
 #endif
@@ -3992,7 +4177,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 				if (lptype == SCTP_IPV4_ADDRESS) {
 					if (plen != sizeof(struct sctp_asconf_addrv4_param)) {
 						printf("Sizeof setprim in init/init ack not %d but %d - ignored\n",
-						       sizeof(struct sctp_asconf_addrv4_param),
+						       (int)sizeof(struct sctp_asconf_addrv4_param),
 						       plen);
 					} else {
 						memset(&lsin,0,sizeof(lsin));
@@ -4006,7 +4191,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 				} else if (lptype == SCTP_IPV6_ADDRESS) {
 					if (plen != sizeof(struct sctp_asconf_addr_param)) {
 						printf("Sizeof setprim (v6) in init/init ack not %d but %d - ignored\n",
-						       sizeof(struct sctp_asconf_addr_param),
+						       (int)sizeof(struct sctp_asconf_addr_param),
 						       plen);
 					} else {
 						memset(&lsin6,0,sizeof(lsin6));
@@ -4030,8 +4215,8 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 			break;
 		}
 		phdr = sctp_get_next_param(m, at,
-					   (struct sctp_paramhdr *)&s6_store,
-					   sizeof(struct sctp_paramhdr));
+		    (struct sctp_paramhdr *)&s6_store,
+		    sizeof(struct sctp_paramhdr));
 	}
 	/* Now check to see if we need to purge any addresses */
 	for (net = TAILQ_FIRST(&stcb->asoc.nets); net != NULL; net = net_tmp) {
@@ -4239,7 +4424,11 @@ sctp_drain_mbufs(register struct sctp_inpcb *inp,
 				chk->data = NULL;
 			}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -4282,7 +4471,11 @@ sctp_drain_mbufs(register struct sctp_inpcb *inp,
 					chk->data = NULL;
 				}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+				uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 				zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 				pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -4296,10 +4489,8 @@ sctp_drain_mbufs(register struct sctp_inpcb *inp,
 			chk = nchk;
 		}
 	}
-	printf("Harvest %d chunks from drain ep:%x - %d left\n",
-	       cnt,
-	       (u_int)inp,
-	       sctppcbinfo.ipi_count_chunk);
+	printf("Harvest %d chunks from drain ep:%p - %d left\n",
+	       cnt, inp, sctppcbinfo.ipi_count_chunk);
 	/*
 	 * Question, should we go through the delivery queue?
 	 * The only reason things are on here is the app not reading OR a
@@ -4366,7 +4557,12 @@ sctp_add_to_socket_q(struct sctp_inpcb *inp, struct sctp_tcb *tcb)
 		return (0);
 	}
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	sq = (struct sctp_socket_q_list *)uma_zalloc(sctppcbinfo.ipi_zone_sockq,
+						     M_NOWAIT);
+#else
 	sq = (struct sctp_socket_q_list *)zalloci(sctppcbinfo.ipi_zone_sockq);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	sq = (struct sctp_socket_q_list *)pool_get(&sctppcbinfo.ipi_zone_sockq,PR_NOWAIT);
@@ -4397,7 +4593,11 @@ sctp_remove_from_socket_q(struct sctp_inpcb *inp)
 	tcb = sq->tcb;
 	TAILQ_REMOVE(&inp->sctp_queue_list, sq, next_sq);
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	uma_zfree(sctppcbinfo.ipi_zone_sockq, sq);
+#else
 	zfreei(sctppcbinfo.ipi_zone_sockq, sq);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	pool_put(&sctppcbinfo.ipi_zone_sockq, sq);

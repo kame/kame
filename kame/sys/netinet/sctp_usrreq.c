@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.32 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.33 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -98,7 +98,11 @@
 #include <net/net_osdep.h>
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <vm/uma.h>
+#else
 #include <vm/vm_zone.h>
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -190,7 +194,11 @@ sctp_split_chunks(struct sctp_association *asoc,
 	/* First we need a chunk.
 	 */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+	new_chk = (struct sctp_tmit_chunk *)uma_zalloc(sctppcbinfo.ipi_zone_chunk, M_NOWAIT);
+#else
 	new_chk = (struct sctp_tmit_chunk *)zalloci(sctppcbinfo.ipi_zone_chunk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	new_chk = (struct sctp_tmit_chunk *)pool_get(&sctppcbinfo.ipi_zone_chunk,
@@ -210,7 +218,11 @@ sctp_split_chunks(struct sctp_association *asoc,
 		/* Can't split */
 		chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+		uma_zfree(sctppcbinfo.ipi_zone_chunk, new_chk);
+#else
 		zfreei(sctppcbinfo.ipi_zone_chunk, new_chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		pool_put(&sctppcbinfo.ipi_zone_chunk, new_chk);
@@ -526,7 +538,11 @@ sctp_getcred(SYSCTL_HANDLER_ARGS)
 	struct sctp_inpcb *inp;
 	int error, s;
 
+#if __FreeBSD_version >= 500000
+	error = suser(req->td);
+#else
 	error = suser(req->p);
+#endif
 	if (error)
 		return (error);
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
@@ -589,7 +605,11 @@ sctp_abort(struct socket *so)
 }
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_attach(struct socket *so, int proto, struct thread *p)
+#else
 sctp_attach(struct socket *so, int proto, struct proc *p)
+#endif
 {
 	struct sctp_inpcb *inp;
 	struct inpcb *ip_inp;
@@ -646,7 +666,11 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 }
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_bind(struct socket *so, struct sockaddr *addr, struct thread *p)
+#else
 sctp_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
+#endif
 {
 	struct sctp_inpcb *inp;
 	int s, error;
@@ -696,12 +720,22 @@ sctp_detach(struct socket *so)
 }
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
+	  struct mbuf *control, struct thread *p);
+#else
 sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	  struct mbuf *control, struct proc *p);
+#endif
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
+	  struct mbuf *control, struct thread *p)
+#else
 sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	  struct mbuf *control, struct proc *p)
+#endif
 {
 	struct sctp_inpcb *inp;
 	int error;
@@ -716,8 +750,8 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 	/* Got to have an to address if we are NOT a connected socket */
 	if ((addr == NULL) &&
-	   (((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == SCTP_PCB_FLAGS_CONNECTED) ||
-	    ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) == SCTP_PCB_FLAGS_TCPTYPE))) {
+	    (((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == SCTP_PCB_FLAGS_CONNECTED) ||
+	     ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) == SCTP_PCB_FLAGS_TCPTYPE))) {
 		goto connected_type;
 	} else if (addr == NULL) {
 		error = EDESTADDRREQ;
@@ -752,7 +786,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 	/* add it in possibly */
 	if ((inp->pkt) && 
-	   (inp->pkt->m_flags & M_PKTHDR)) {
+	    (inp->pkt->m_flags & M_PKTHDR)) {
 		struct mbuf *x;
 		int c_len;
 
@@ -1235,7 +1269,11 @@ static int
 sctp_do_connect_x(struct socket *so,
 		  struct sctp_inpcb *inp,
 		  struct mbuf *m,
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		  struct thread *p)
+#else
 		  struct proc *p)
+#endif
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
@@ -1312,7 +1350,7 @@ sctp_do_connect_x(struct socket *so,
 		return (EINVAL);
 	}
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
-	   (num_v4 > 0)) {
+	    (num_v4 > 0)) {
 		struct in6pcb *inp6;
 		inp6 = (struct in6pcb *)inp;
 		if (
@@ -1397,7 +1435,11 @@ static int
 sctp_optsget(struct socket *so,
 	     int opt,
 	     struct mbuf **mp,
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	     struct thread *p)
+#else
 	     struct proc *p)
+#endif
 {
 	struct sctp_inpcb *inp;
 	struct mbuf *m;
@@ -1864,9 +1906,8 @@ sctp_optsget(struct socket *so,
 			else
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 				tcb = sctp_findassociation_ep_addr(&inp,
-								   (struct sockaddr *)&paddrp->spp_address,
-								   &netp,
-								   NULL);
+				    (struct sockaddr *)&paddrp->spp_address,
+				    &netp, NULL);
 			if (tcb == NULL) {
 				error = ENOENT;
 				break;
@@ -1952,8 +1993,8 @@ sctp_optsget(struct socket *so,
 			} else {
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 				tcb = sctp_findassociation_ep_addr(&inp,
-								   (struct sockaddr *)&paddri->spinfo_address,
-								   &netp, NULL);
+				    (struct sockaddr *)&paddri->spinfo_address,
+				    &netp, NULL);
 			}
 		} else {
 			tcb = NULL;
@@ -2032,18 +2073,7 @@ sctp_optsget(struct socket *so,
 
 		sstat->sstat_instrms = tcb->asoc.streamincnt;
 		sstat->sstat_outstrms = tcb->asoc.streamoutcnt;
-		{
-			int ovh;
-			if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
-				ovh = SCTP_MED_OVERHEAD;
-			} else {
-				ovh = SCTP_MED_V4_OVERHEAD;
-			}
-			if (tcb->sctp_ep->sctp_frag_point > (tcb->asoc.smallest_mtu-ovh))
-				sstat->sstat_fragmentation_point = tcb->asoc.smallest_mtu;
-			else
-				sstat->sstat_fragmentation_point = tcb->sctp_ep->sctp_frag_point;
-		}
+		sstat->sstat_fragmentation_point = sctp_get_frag_point(tcb,&tcb->asoc);
 		memcpy(&sstat->sstat_primary.spinfo_address,
 		       &tcb->asoc.primary_destination->ra._l_addr,
 		       ((struct sockaddr *)(&tcb->asoc.primary_destination->ra._l_addr))->sa_len);
@@ -2214,8 +2244,8 @@ sctp_optsget(struct socket *so,
 			else
 #endif
 				tcb = sctp_findassociation_ep_addr(&inp,
-								   (struct sockaddr *)&ssp->ssp_addr,
-								   &netp, NULL);
+				    (struct sockaddr *)&ssp->ssp_addr,
+				    &netp, NULL);
 			if (tcb == NULL) {
 				error = EINVAL;
 				break;
@@ -2241,7 +2271,11 @@ static int
 sctp_optsset(struct socket *so,
 	     int opt,
 	     struct mbuf **mp,
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	     struct thread *p)
+#else
 	     struct proc *p)
+#endif
 {
 	int error, *mopt, set_opt;
 	struct mbuf *m;
@@ -2517,8 +2551,8 @@ sctp_optsset(struct socket *so,
 			} else
 #endif
 				tcb = sctp_findassociation_ep_addr(&inp,
-								   (struct sockaddr *)&paddrp->spp_address,
-								   &netp, NULL);
+				    (struct sockaddr *)&paddrp->spp_address,
+				    &netp, NULL);
 			if (tcb == NULL) {
 				error = ENOENT;
 				break;
@@ -2712,8 +2746,8 @@ sctp_optsset(struct socket *so,
 			else
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 				tcb = sctp_findassociation_ep_addr(&inp,
-								   (struct sockaddr *)&spa->ssp_addr,
-								   &net, NULL);
+				    (struct sockaddr *)&spa->ssp_addr,
+				    &net, NULL);
 			if (tcb == NULL) {
 				error = EINVAL;
 				break;
@@ -2787,7 +2821,7 @@ sctp_optsset(struct socket *so,
 				}
 				error = sctp_inpcb_bind(so,
 							(struct sockaddr *)addrs->addr,
-							(struct proc *)p);
+							p);
 				break;
 		}
 		if (addrs->sget_assoc_id == 0) {
@@ -2902,9 +2936,17 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 		m->m_len = sopt->sopt_valsize;
 	}
 	if (sopt->sopt_dir == SOPT_SET) {
+#if __FreeBSD_version >= 500000
+		error = sctp_optsset(so, sopt->sopt_name, &m, sopt->sopt_td);
+#else
 		error = sctp_optsset(so, sopt->sopt_name, &m, sopt->sopt_p);
+#endif
 	} else if (sopt->sopt_dir == SOPT_GET) {
+#if __FreeBSD_version >= 500000
+		error = sctp_optsget(so, sopt->sopt_name, &m, sopt->sopt_td);
+#else
 		error = sctp_optsget(so, sopt->sopt_name, &m, sopt->sopt_p);
+#endif
 	} else {
 		error = EINVAL;
 	}
@@ -2999,7 +3041,11 @@ sctp_ctloutput(op, so, level, optname, mp)
 #endif
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_connect(struct socket *so, struct sockaddr *nam, struct thread *p)
+#else
 sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
+#endif
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
@@ -3143,7 +3189,11 @@ sctp_usr_recvd(struct socket *so, int flags)
 			if (tcb->asoc.my_rwnd_control_len > 0x7fffffff)
 				tcb->asoc.my_rwnd_control_len = 0;
 		}
-		sctp_service_queues(tcb, &tcb->asoc);
+		if ((TAILQ_EMPTY(&tcb->asoc.delivery_queue) == 0) ||
+		    (TAILQ_EMPTY(&tcb->asoc.reasmqueue) == 0)) {
+			/* Deliver if there is something to be delivered */
+			sctp_service_queues(tcb, &tcb->asoc);
+		}
 		sctp_set_rwnd(tcb, &tcb->asoc);
 		/* if we increase by 1 or more MTU's (smallest MTUs of all nets)
 		 * we send a window update sack
@@ -3170,7 +3220,11 @@ sctp_usr_recvd(struct socket *so, int flags)
 }
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+sctp_listen(struct socket *so, struct thread *p)
+#else
 sctp_listen(struct socket *so, struct proc *p)
+#endif
 {
 	/*
 	 * Note this module depends on the protocol processing being
@@ -3561,22 +3615,22 @@ sctp_usrreq(so, req, m, nam, control)
 		switch (family) {
 		case PF_INET:
 			error = in_control(so, (long)m, (caddr_t)nam,
-					   (struct ifnet *)control
+			    (struct ifnet *)control
 #if defined(__NetBSD__)
-					   , p
+			    , p
 #endif
-				);
+			    );
 			break;
 #ifdef INET6
 		case PF_INET6:
 			error = in6_control(so, (long)m, (caddr_t)nam,
-					    (struct ifnet *)control
+			    (struct ifnet *)control
 #if defined(__NetBSD__)
-					    , p
+			     , p
 #else
-					    , (struct proc *)0
+			     , (struct proc *)0
 #endif
-				);
+			    );
 			break;
 #endif
 		default:

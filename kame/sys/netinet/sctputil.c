@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.22 2003/11/25 07:29:20 ono Exp $	*/
+/*	$KAME: sctputil.c,v 1.23 2003/12/17 02:20:03 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -74,10 +74,18 @@
 #endif
 #endif
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#include <sys/limits.h>
+#else
 #include <machine/limits.h>
+#endif
 
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <vm/uma.h>
+#else
 #include <vm/vm_zone.h>
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -857,10 +865,10 @@ sctp_timeout_handler(void *t)
 	if (ep) {
 		if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 			if (LIST_FIRST(&ep->sctp_asoc_list) == NULL) {
-				printf("Timer type %d fires on GONE enpoint:%x\n",
-				    tmr->type,(u_int)ep);
+				printf("Timer type %d fires on GONE enpoint:%p\n",
+				    tmr->type, ep);
 				if (tcb)
-					printf("tcb:%x\n",(u_int)tcb);
+					printf("tcb:%p\n", tcb);
 
 				printf("Hmm, all assoc's are gone?\n");
 			}
@@ -881,7 +889,6 @@ sctp_timeout_handler(void *t)
 		/* call the handler for the appropriate timer type */
 	case SCTP_TIMER_TYPE_SEND:
 		sctp_pegs[SCTP_TMIT_TIMER]++;
-
 		tcb->asoc.num_send_timers_up--;
 		if (tcb->asoc.num_send_timers_up < 0) {
 			tcb->asoc.num_send_timers_up = 0;
@@ -1264,8 +1271,8 @@ sctp_timer_start(int t_type, struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 	if ((to_ticks <= 0) || (tmr == NULL)) {
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_TIMER1) {
-			printf("sctp_timer_start:%d:software error to_ticks:%d tmr:%x not set ??\n",
-			       t_type, to_ticks, (u_int)tmr);
+			printf("sctp_timer_start:%d:software error to_ticks:%d tmr:%p not set ??\n",
+			       t_type, to_ticks, tmr);
 		}
 #endif /* SCTP_DEBUG */
 		return (EFAULT);
@@ -1432,17 +1439,18 @@ unsigned int update_adler32(u_int32_t adler,
 	/* Return the adler32 of the bytes buf[0..len-1] */
 	return ((s2 << 16) + s1);
 }
-#endif /* SCTP_USE_ADLER32 */
 
-#ifdef SCTP_WITH_NO_CSUM
+#endif
+
+#if defined(SCTP_WITH_NO_CSUM)
 
 u_int32_t
 sctp_calculate_sum(m, pktlen, offset)
-     struct mbuf *m;
-     int32_t *pktlen;
-     u_int32_t offset;
-
+	struct mbuf *m;
+	int32_t *pktlen;
+	u_int32_t offset;
 {
+
 	/*
 	 * given a mbuf chain with a packetheader offset by 'offset'
 	 * pointing at a sctphdr (with csum set to 0) go through
@@ -1467,8 +1475,44 @@ sctp_calculate_sum(m, pktlen, offset)
 	return (0);
 }
 
-#else
+#elif defined(SCTP_USE_INCHKSUM)
 
+#include <machine/in_cksum.h>
+
+u_int32_t
+sctp_calculate_sum(m, pktlen, offset)
+	struct mbuf *m;
+	int32_t *pktlen;
+	u_int32_t offset;
+{
+
+	/*
+	 * given a mbuf chain with a packetheader offset by 'offset'
+	 * pointing at a sctphdr (with csum set to 0) go through
+	 * the chain of m_next's and calculate the SCTP checksum.
+	 * This is currently Adler32 but will change to CRC32x
+	 * soon. Also has a side bonus calculate the total length
+	 * of the mbuf chain.
+	 * Note: if offset is greater than the total mbuf length,
+	 * checksum=1, pktlen=0 is returned (ie. no real error code)
+	 */
+	register int32_t tlen=0;
+	register struct mbuf *at;
+	register uint32_t the_sum,retsum;
+
+	at = m;
+	while (at) {
+		tlen += at->m_len;
+		at = at->m_next;
+	}
+	the_sum = (uint32_t)(in_cksum_skip(m, tlen, offset));
+	if (pktlen != NULL)
+		*pktlen = (tlen-offset);
+	retsum = htons(the_sum);
+	return (the_sum);
+}
+
+#else
 
 u_int32_t
 sctp_calculate_sum(m, pktlen, offset)
@@ -1823,8 +1867,7 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	 /* First if we are are going down dump everything we
 	  * can to the socket rcv queue.
 	  */
-	if ((event == SCTP_SHUTDOWN_COMP) ||
-	   (event == SCTP_COMM_LOST)) {
+	if ((event == SCTP_SHUTDOWN_COMP) || (event == SCTP_COMM_LOST)) {
 		sctp_deliver_data(stcb, &stcb->asoc, NULL);
 	}
 
@@ -2357,7 +2400,11 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 			chk->asoc = NULL;
 			/* Free the chunk */
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2384,7 +2431,11 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 				sctp_free_remote_addr(chk->whoTo);
 			chk->whoTo = NULL;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2412,7 +2463,11 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 				sctp_free_remote_addr(chk->whoTo);
 			chk->whoTo = NULL;
 #if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
+#else
 			zfreei(sctppcbinfo.ipi_zone_chunk, chk);
+#endif
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			pool_put(&sctppcbinfo.ipi_zone_chunk, chk);
@@ -2908,30 +2963,43 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
 		if (n->m_next == 0)	/* get pointer to last control buf */
 			break;
 	}
-	if (asa->sa_len > MLEN)
-		return (0);
+#ifdef  SCTP_TCP_MODEL_SUPPORT
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
+	    (inp->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
+#endif
+		if (asa->sa_len > MLEN)
+			return (0);
  try_again:
-	MGET(m, M_DONTWAIT, MT_SONAME);
-	if (m == 0)
-		return (0);
-        /* safety */
-	if (m == m0) {
-		printf("Duplicate mbuf allocated %x in and mget returned %x?\n",
-		       (u_int)m0,
-		       (u_int)m);
-		if (cnt) {
-		        panic("more than once");
+		MGET(m, M_DONTWAIT, MT_SONAME);
+		if (m == 0)
+			return (0);
+		/* safety */
+		if (m == m0) {
+			printf("Duplicate mbuf allocated %p in and mget returned %p?\n",
+			       m0, m);
+			if (cnt) {
+				panic("more than once");
+			}
+			cnt++;
+			goto try_again;
 		}
-		cnt++;
-		goto try_again;
+		m->m_len = asa->sa_len;
+		bcopy((caddr_t)asa, mtod(m, caddr_t), asa->sa_len);
 	}
-	m->m_len = asa->sa_len;
-	bcopy((caddr_t)asa, mtod(m, caddr_t), asa->sa_len);
+#ifdef  SCTP_TCP_MODEL_SUPPORT
+	else {
+		m = NULL;
+	}
+#endif
 	if (n)
 		n->m_next = m0;		/* concatenate data to control */
 	else
 		control = m0;
-	m->m_next = control;
+	if (m) {
+		m->m_next = control;
+	} else {
+		m = control;
+	}
 	for (n = m; n; n = n->m_next)
 		sballoc(sb, n);
 	n = sb->sb_mb;
@@ -3186,7 +3254,7 @@ sctp_rt_scan_dups(struct sockaddr *dst, struct rtentry *existing, int finalize)
 		 * prev points to the top of the chain.
 		 */
 		if (sctp_is_interior_node(cmp) ||
-		   (cmp->rn_flags & RNF_ROOT)) {
+		    (cmp->rn_flags & RNF_ROOT)) {
 			/* we expect this to break at the 
 			 * interior parent or in the case of
 			 * the default we will find a exterior
@@ -3262,7 +3330,7 @@ sctp_find_cloned_in(struct radix_node *entry, struct rtentry *rt)
 		/* Exterior node, compare the gateways */
 		while (entry) {
 			if (((struct rtentry *)(entry))->rt_flags & 
-			   (RTF_CLONING
+			    (RTF_CLONING
 #ifdef __FreeBSD__
 |RTF_PRCLONING
 #endif
@@ -3368,8 +3436,8 @@ sctp_find_cloned_from(struct sockaddr *dst,
 				topleft = topleft->rn_left;
 			}
 			if (topleft &&
-			   (topleft->rn_flags & RNF_ROOT) &&
-			   (sctp_is_interior_node(topleft) == 0)
+			    (topleft->rn_flags & RNF_ROOT) &&
+			    (sctp_is_interior_node(topleft) == 0)
 				) {
 				/* copy the dupedky .. it may be NULL. */
 				def = topleft->rn_dupedkey;
@@ -3453,7 +3521,7 @@ sctp_check_cloned_route(struct sockaddr *dst,
 		 * prev points to the top of the chain.
 		 */
 		if (sctp_is_interior_node(base) ||
-		   (base->rn_flags & RNF_ROOT)) {
+		    (base->rn_flags & RNF_ROOT)) {
 			/* we expect this to break at the 
 			 * interior parent or in the case of
 			 * the default we will find a exterior
@@ -3856,7 +3924,7 @@ sctp_free_bufspace(struct sctp_tcb *stcb,
 	}
 #ifdef  SCTP_TCP_MODEL_SUPPORT
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
-	   (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
+	    (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
 		if (stcb->sctp_socket->so_snd.sb_cc >= tp1->book_size) {
 			stcb->sctp_socket->so_snd.sb_cc -= tp1->book_size;
 		} else {

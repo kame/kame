@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.17 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctp_var.h,v 1.18 2003/12/17 02:20:02 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -134,7 +134,11 @@ int sctp_peeraddr(struct socket *,
 #endif
 );
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int sctp_listen(struct socket *, struct thread *);
+#else
 int sctp_listen(struct socket *, struct proc *);
+#endif
 
 int sctp_accept(struct socket *,
 #if defined(__FreeBSD__)
