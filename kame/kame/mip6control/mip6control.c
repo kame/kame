@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.30 2002/08/13 05:31:58 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.31 2002/08/28 13:35:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,9 +53,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
 
-#define _KERNEL 1
 #include <net/if_hif.h>
-#undef _KERNEL
 
 #include <fcntl.h>
 #include <kvm.h>
