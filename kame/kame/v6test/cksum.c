@@ -39,7 +39,7 @@ struct ip6_opthdr {
 int all;
 int debug;
 
-static u_short in_cksum(u_short *, u_short *, int);
+static u_short in_cksum __P((u_short *, u_short *, int));
 
 void
 cksum6()
@@ -137,7 +137,7 @@ cksum6()
  * in_cksum --
  *	Checksum routine for Internet Protocol family headers (C Version)
  */
-u_short
+static u_short
 in_cksum(u_short *addr, u_short *ph, int len)
 {
 	register int nleft = len;
