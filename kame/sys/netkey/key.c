@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.111 2000/05/22 06:24:48 itojun Exp $	*/
+/*	$KAME: key.c,v 1.112 2000/05/22 08:01:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -6001,7 +6001,7 @@ key_expire(sav)
  * m will always be freed.
  */
 static int
-key_flush(so, m ,mhp)
+key_flush(so, m, mhp)
 	struct socket *so;
 	struct mbuf *m;
 	const struct sadb_msghdr *mhp;
