@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.91 2001/11/21 07:59:24 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.92 2002/05/24 06:38:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1039,13 +1039,20 @@ ptr2in6(n, in6)
 	unsigned long x;
 	const char *ep;
 	int l;
-	const char *top = "ip6.int.";
+	const char *top1 = "ip6.int.";
+	const char *top2 = "ip6.arpa.";
 
 	l = strlen(n);
-	if (l != strlen(top) + 2 * 128 / 4)
+	if (l == strlen(top1) + 2 * 128 / 4)
+		;
+	else if (l == strlen(top2) + 2 * 128 / 4)
+		;
+	else
 		return -1;
-	if (l > strlen(top) && strcmp(n + l - strlen(top), top) == 0)
-		ep = n + l - strlen(top);
+	if (l > strlen(top1) && strcmp(n + l - strlen(top1), top1) == 0)
+		ep = n + l - strlen(top1);
+	else if (l > strlen(top2) && strcmp(n + l - strlen(top2), top2) == 0)
+		ep = n + l - strlen(top2);
 	else
 		return -1;
 
