@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2087 2002/02/24 07:10:10 suz Exp $
+$KAME: CHANGELOG,v 1.2088 2002/02/25 02:00:06 itojun Exp $
 
 <200202>
+Mon Feb 25 10:58:09 JST 2002  itojun@iijlab.net
+	* sys/netinet/ip_input.c: enforce ipsec policy checking on forwarding
+	  case (the portion was lost during transition to PR_LASTHDR).
+	  From: Greg Troxel <gdt@ir.bbn.com>
+
 2002-02-24  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
 	* kame/route6d/route6d.c:
 	not remove global addresses on loopback interface from routing
