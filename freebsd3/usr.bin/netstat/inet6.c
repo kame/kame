@@ -892,6 +892,7 @@ icmp6_stats(off, name)
 	p_5(icp6s_ounknown, "\t\t%qu unknown\n");
 
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
+	p(icp6s_nd_toomanyopt, "\t%qu message%s with too many ND options\n");
 #undef p
 #undef p_5
 }
