@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.21 2000/06/01 10:33:25 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.22 2000/06/04 01:05:48 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -158,7 +158,7 @@ will be 53.
 .Fl P
 is for debugging purposes only
 .Po
-for running two daemons on a single node for debugging
+for running two daemons on a single node
 .Pc .
 .It Ar userv
 Specify unicast DNS servers we may want to try sending queries.
@@ -190,11 +190,8 @@ nameserver ::
 If you would like to contact unicast DNS servers as well, you may want to
 specify them on the command line.
 DNS queries will be sent to both multicast and unicast servers.
-In the following example, the latter configuration will contact DNS server
-on the node itself, by unicast queries.
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0 3ffe:501:4819::42
-# mdnsd -i wi0 0.0.0.0
 .Ed
 .\"
 .Sh SEE ALSO
