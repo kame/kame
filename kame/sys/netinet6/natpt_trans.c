@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.116 2002/05/21 06:29:44 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.117 2002/05/24 05:01:30 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2555,11 +2555,10 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 				sizeof(struct ip6_frag);
 		else if (needFragment(cv4))
 			ip6->ip6_plen = IPV6_MMTU - sizeof(struct ip6_hdr);
-		else if (isNoDF(cv4))
+		else
 			ip6->ip6_plen = ip4->ip_len - sizeof(struct ip) +
 				sizeof(struct ip6_frag);
-		else
-			ip6->ip6_plen = IPV6_MMTU - sizeof(struct ip6_hdr);
+
 		HTONS(ip6->ip6_plen);
 		ip6->ip6_nxt  = IPPROTO_FRAGMENT;
 	}
