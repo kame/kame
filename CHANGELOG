@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1684 2001/05/22 05:59:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.1685 2001/05/22 08:04:31 itojun Exp $
 
 <200105>
+Tue May 22 17:00:41 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: repair mbuf alignment code in
+	  !PULLDOWN_TEST case (netbsd/openbsd are not affected).
+	  M_COPY_PKTHDR should have been used prior to MCLGET.
+
 2001-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtsold/rtsold.c (rtsol_timer_update): changed the
 	timeout period after sending MAX_RTR_SOLICITATIONS solicitation
