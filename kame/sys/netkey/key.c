@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.220 2001/11/05 17:38:39 sakane Exp $	*/
+/*	$KAME: key.c,v 1.221 2001/11/06 05:14:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -565,7 +565,7 @@ found:
 	KEY_CHKSPDIR(sp->spidx.dir, dir, "key_allocsp");
 
 	/* found a SPD entry */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	sp->lastused = time_second;
 #else
 	sp->lastused = time.tv_sec;
@@ -648,7 +648,7 @@ key_gettunnel(osrc, odst, isrc, idst)
 	return NULL;
 
 found:
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	sp->lastused = time_second;
 #else
 	sp->lastused = time.tv_sec;
@@ -1937,7 +1937,7 @@ key_spdadd(so, m, mhp)
 	}
 #endif
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	newsp->created = time_second;
 	newsp->lastused = time_second;
 #else
@@ -1956,7 +1956,7 @@ key_spdadd(so, m, mhp)
 		struct secspacq *spacq;
 		if ((spacq = key_getspacq(&spidx)) != NULL) {
 			/* reset counter in order to deletion by timehandler. */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			spacq->created = time_second;
 #else
 			spacq->created = time.tv_sec;
@@ -2866,7 +2866,7 @@ key_newsav(m, mhp, sah, errp)
 	}
 
 	/* reset created */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	newsav->created = time_second;
 #else
 	newsav->created = time.tv_sec;
@@ -3208,7 +3208,7 @@ key_setsaval(sav, m, mhp)
 	}
 
 	/* reset created */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	sav->created = time_second;
 #else
 	sav->created = time.tv_sec;
@@ -3228,7 +3228,7 @@ key_setsaval(sav, m, mhp)
 	sav->lft_c->sadb_lifetime_exttype = SADB_EXT_LIFETIME_CURRENT;
 	sav->lft_c->sadb_lifetime_allocations = 0;
 	sav->lft_c->sadb_lifetime_bytes = 0;
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	sav->lft_c->sadb_lifetime_addtime = time_second;
 #else
 	sav->lft_c->sadb_lifetime_addtime = time.tv_sec;
@@ -4860,7 +4860,7 @@ key_getspi(so, m, mhp)
 		struct secacq *acq;
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) != NULL) {
 			/* reset counter in order to deletion by timehandler. */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			acq->created = time_second;
 #else
 			acq->created = time.tv_sec;
@@ -6191,7 +6191,7 @@ key_newacq(saidx)
 	/* copy secindex */
 	bcopy(saidx, &newacq->saidx, sizeof(newacq->saidx));
 	newacq->seq = (acq_seq == ~0 ? 1 : ++acq_seq);
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	newacq->created = time_second;
 #else
 	newacq->created = time.tv_sec;
@@ -6246,7 +6246,7 @@ key_newspacq(spidx)
 
 	/* copy secindex */
 	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	acq->created = time_second;
 #else
 	acq->created = time.tv_sec;
@@ -6327,7 +6327,7 @@ key_acquire2(so, m, mhp)
 		}
 
 		/* reset acq counter in order to deletion by timehander. */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		acq->created = time_second;
 #else
 		acq->created = time.tv_sec;
@@ -7612,7 +7612,7 @@ key_sa_recordxfer(sav, m)
 	 *	<-----> SOFT
 	 */
     {
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	sav->lft_c->sadb_lifetime_usetime = time_second;
 #else
 	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;
