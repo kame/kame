@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.26 2002/05/29 10:15:54 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.27 2002/05/29 14:23:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -143,20 +143,19 @@ if_dump()
 		/* interface information */
 		if (rai->advlinkopt)
 			fprintf(fp, "  Link-layer address: %s\n",
-				ether_str(rai->sdl));
+			    ether_str(rai->sdl));
 		fprintf(fp, "  MTU: %d\n", rai->phymtu);
 
 		/* Router configuration variables */
-		fprintf(fp,
-			"  DefaultLifetime: %d, MaxAdvInterval: %d, "
-			"MinAdvInterval: %d\n",
-			rai->lifetime, rai->maxinterval, rai->mininterval);
+		fprintf(fp, "  DefaultLifetime: %d, MaxAdvInterval: %d, "
+		    "MinAdvInterval: %d\n", rai->lifetime, rai->maxinterval,
+		    rai->mininterval);
 		fprintf(fp, "  Flags: %s%s%s, ",
-			rai->managedflg ? "M" : "", rai->otherflg ? "O" : "",
+		    rai->managedflg ? "M" : "", rai->otherflg ? "O" : "",
 #ifdef MIP6
-			rai->haflg ? "H" :
+		    rai->haflg ? "H" :
 #endif
-			"");
+		    "");
 		fprintf(fp, "Preference: %s, ",
 			rtpref_str[(rai->rtpref >> 3) & 0xff]);
 		fprintf(fp, "MTU: %d\n", rai->linkmtu);
@@ -169,7 +168,7 @@ if_dump()
 #endif 
 		if (rai->clockskew)
 			fprintf(fp, "  Clock skew: %ldsec\n",
-				rai->clockskew);
+			    rai->clockskew);
 		for (first = 1, pfx = rai->prefix.next; pfx != &rai->prefix;
 		     pfx = pfx->next) {
 			if (first) {
@@ -177,9 +176,8 @@ if_dump()
 				first = 0;
 			}
 			fprintf(fp, "    %s/%d(",
-				inet_ntop(AF_INET6, &pfx->prefix,
-					  prefixbuf, sizeof(prefixbuf)),
-				pfx->prefixlen);
+			    inet_ntop(AF_INET6, &pfx->prefix, prefixbuf,
+			    sizeof(prefixbuf)), pfx->prefixlen);
 			switch (pfx->origin) {
 			case PREFIX_FROM_KERNEL:
 				fprintf(fp, "KERNEL, ");
