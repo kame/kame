@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.96 2000/07/04 10:07:40 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.97 2000/07/04 10:49:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -387,16 +387,12 @@ in6_control(so, cmd, data, ifp)
 #endif
 {
 	struct	in6_ifreq *ifr = (struct in6_ifreq *)data;
-	struct  ifaddr *ifa;
-	struct	in6_ifaddr *ia = NULL, *oia;
+	struct	in6_ifaddr *ia = NULL;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
-	struct	sockaddr_in6 dst6; /* XXX: used in very limited place only */
-	int error = 0, hostIsNew, prefixIsNew;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
 	int privileged;
-	int plen;		/* XXX: used in very limited place only */
 
 	privileged = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
@@ -595,71 +591,7 @@ in6_control(so, cmd, data, ifp)
 			return(EAFNOSUPPORT);
 		if (!privileged)
 			return(EPERM);
-		if (ia == NULL) {
-			ia = (struct in6_ifaddr *)
-				malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
-			if (ia == NULL)
-				return (ENOBUFS);
-			bzero((caddr_t)ia, sizeof(*ia));
-			/* Initialize the address and masks */
-			ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
-			ia->ia_addr.sin6_family = AF_INET6;
-			ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
-#if 1
-			if (ifp->if_flags & IFF_POINTOPOINT) {
-				ia->ia_ifa.ifa_dstaddr
-					= (struct sockaddr *)&ia->ia_dstaddr;
-				ia->ia_dstaddr.sin6_family = AF_INET6;
-				ia->ia_dstaddr.sin6_len = sizeof(ia->ia_dstaddr);
-			} else {
-				ia->ia_ifa.ifa_dstaddr = NULL;
-				bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
-			}
-#else  /* always initilize by NULL */
-			ia->ia_ifa.ifa_dstaddr = NULL;
-			bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
-#endif
-			ia->ia_ifa.ifa_netmask
-				= (struct sockaddr *)&ia->ia_prefixmask;
 
-			ia->ia_ifp = ifp;
-			if ((oia = in6_ifaddr) != NULL) {
-				for ( ; oia->ia_next; oia = oia->ia_next)
-					continue;
-				oia->ia_next = ia;
-			} else
-				in6_ifaddr = ia;
-			/* gain a refcnt for the link from in6_ifaddr */
-			ia->ia_ifa.ifa_refcnt++;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-			if ((ifa = ifp->if_addrlist) != NULL) {
-				for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
-					continue;
-				ifa->ifa_next = ia62ifa(ia);
-			} else
-				ifp->if_addrlist = ia62ifa(ia);
-#else
-			TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
-			    ifa_list);
-#endif
-			/* gain another refcnt for the link from if_addrlist */
-			ia->ia_ifa.ifa_refcnt++;
-		}
-
-		if (cmd == SIOCAIFADDR_IN6) {
-			/* sanity for overflow - beware unsigned */
-			struct in6_addrlifetime *lt;
-			lt = &ifra->ifra_lifetime;
-			if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-			 && lt->ia6t_vltime + time_second < time_second) {
-				return EINVAL;
-			}
-			if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
-			 && lt->ia6t_pltime + time_second < time_second) {
-				return EINVAL;
-			}
-		}
 		break;
 
 	case SIOCGIFADDR_IN6:
@@ -764,218 +696,7 @@ in6_control(so, cmd, data, ifp)
 		break;
 
 	case SIOCAIFADDR_IN6:
-		prefixIsNew = 0;
-		hostIsNew = 1;
-
-		/* Validate parameters */
-		/*
-		 * The destination address for a p2p link must have a family
-		 * of AF_UNSPEC or AF_INET6.
-		 */
-		if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
-		    ifra->ifra_dstaddr.sin6_family != AF_INET6 &&
-		    ifra->ifra_dstaddr.sin6_family != AF_UNSPEC) {
-			error = EAFNOSUPPORT;
-			goto unlink;
-		}
-		/*
-		 * The prefixmask must have a family of AF_UNSPEC or AF_INET6.
-		 */
-		if (ifra->ifra_prefixmask.sin6_family != AF_INET6 &&
-		    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC) {
-			error = EAFNOSUPPORT;
-			goto unlink;
-		}
-		/*
-		 * Because the IPv6 address architecture is classless,
-		 * prefix length must be specified for a new address. 
-		 */
-		if (hostIsNew && ifra->ifra_prefixmask.sin6_len == 0) {
-			error = EINVAL;
-			goto unlink;
-		}
-		/*
-		 * If the destination address on a p2p interface is specified,
-		 * and the address is a scoped one, validate/set the scope
-		 * zone identifier.
-		 * XXX: currently, only link-local address is supported.
-		 */
-		dst6 = ifra->ifra_dstaddr;
-		if ((ifp->if_flags & IFF_POINTOPOINT) &&
-		    (dst6.sin6_family == AF_INET6)) {
-			if (IN6_IS_ADDR_LINKLOCAL(&dst6.sin6_addr)) {
-				if (dst6.sin6_addr.s6_addr16[1] == 0) {
-					/* 
-					 * link ID is not embedded by the user.
-					 */
-					dst6.sin6_addr.s6_addr16[1]
-						= htons(ifp->if_index);
-				} else if (dst6.sin6_addr.s6_addr16[1] !=
-					   htons(ifp->if_index)) {
-					/* link id is contradict */
-					error = EINVAL;
-					goto unlink;
-				}
-			}
-		}
-
-		/* check if a new address is being added */
-		if (ia->ia_addr.sin6_len &&
-		    IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
-				       &ia->ia_addr.sin6_addr)) {
-			/*
-			 * The requested address is already in the list.
-			 * This means the user just wants to modify some
-			 * parameters of the existing address.
-			 */
-			hostIsNew = 0;
-		}
-
-		/* calculate the prefix length, which will be used later */
-		if (ifra->ifra_prefixmask.sin6_len)
-			plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr);
-		else
-			plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr);
-
-		/* set prefix mask */
-		if (ifra->ifra_prefixmask.sin6_len) {
-			/*
-			 * If the prefix length for an existing address
-			 * changes, (which should be rare in the current IPv6
-			 * address architecture, though) scrub the route
-			 * corresponding to the old prefix.
-			 */
-			if (ia->ia_prefixmask.sin6_len &&
-			    in6_mask2len(&ia->ia_prefixmask.sin6_addr) != plen)
-				in6_ifscrub(ifp, ia, 0);
-			ia->ia_prefixmask = ifra->ifra_prefixmask;
-		}
-
-		/*
-		 * Check if we have another address that shares the same prefix
-		 * of the address being configured.
-		 */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
-#else
-		for (ifa = ifp->if_addrlist.tqh_first; ifa;
-		     ifa = ifa->ifa_list.tqe_next)
-#endif
-		{
-			struct in6_ifaddr *ifa6;
-
-			if (ifa->ifa_addr->sa_family != AF_INET6)
-				continue;
-			if (ifa == (struct ifaddr *)ia)
-				continue;
-
-			ifa6 = (struct in6_ifaddr *)ifa;
-			if (in6_are_prefix_equal(&ifra->ifra_addr.sin6_addr,
-						 &ifa6->ia_addr.sin6_addr,
-						 plen))
-				break;
-		}
-		if (ifa == NULL)
-			prefixIsNew = 1;
-
-		/*
-		 * If a new destination address on a p2p link, scrub the
-		 * old one and install the new destination.
-		 */
-		if ((ifp->if_flags & IFF_POINTOPOINT) &&
-		    (dst6.sin6_family == AF_INET6) &&
-		    !IN6_ARE_ADDR_EQUAL(&dst6.sin6_addr,
-					&ia->ia_dstaddr.sin6_addr)) {
-			in6_ifscrub(ifp, ia, 0);
-			ia->ia_dstaddr = dst6;
-			prefixIsNew = 1; /* We lie; but effect's the same */
-		}
-
-		/* reset the interface and routing table appropriately. */
-		if ((error = in6_ifinit(ifp, ia, &ifra->ifra_addr,
-					hostIsNew, prefixIsNew)) != 0)
-			goto unlink;
-
-		/* update prefix list */
-		if (hostIsNew) {
-			int iilen;
-
-			iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
-				in6_mask2len(&ia->ia_prefixmask.sin6_addr);
-			if ((error = in6_prefix_add_ifid(iilen, ia)) != 0)
-				goto unlink;
-		}
-
-		if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
-			/*
-			 * join solicited multicast addr for new host id
-			 */
-			struct in6_addr llsol;
-			bzero(&llsol, sizeof(struct in6_addr));
-			llsol.s6_addr16[0] = htons(0xff02);
-			llsol.s6_addr16[1] = htons(ifp->if_index);
-			llsol.s6_addr32[1] = 0;
-			llsol.s6_addr32[2] = htonl(1);
-			llsol.s6_addr32[3] =
-				ifra->ifra_addr.sin6_addr.s6_addr32[3];
-			llsol.s6_addr8[12] = 0xff;
-			(void)in6_addmulti(&llsol, ifp, &error);
-			if (error != 0)
-				goto unlink;
-		}
-
-		ia->ia6_flags = ifra->ifra_flags;
-		ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
-		ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
-
-		ia->ia6_lifetime = ifra->ifra_lifetime;
-		/* for sanity */
-		if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
-			ia->ia6_lifetime.ia6t_expire =
-				time_second + ia->ia6_lifetime.ia6t_vltime;
-		} else
-			ia->ia6_lifetime.ia6t_expire = 0;
-		if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
-			ia->ia6_lifetime.ia6t_preferred =
-				time_second + ia->ia6_lifetime.ia6t_pltime;
-		} else
-			ia->ia6_lifetime.ia6t_preferred = 0;
-
-		/*
-		 * Perform DAD, if needed.
-		 * XXX It may be of use, if we can administratively
-		 * disable DAD.
-		 */
-		switch (ifp->if_type) {
-		case IFT_ARCNET:
-		case IFT_ETHER:
-		case IFT_FDDI:
-#if 0
-		case IFT_ATM:
-		case IFT_SLIP:
-		case IFT_PPP:
-#endif
-			/* Mobile IPv6 modification */
-			if ((ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
-				ia->ia6_flags |= IN6_IFF_TENTATIVE;
-				nd6_dad_start((struct ifaddr *)ia, NULL);
-			}
-			break;
-		case IFT_DUMMY:
-		case IFT_FAITH:
-		case IFT_GIF:
-		case IFT_LOOP:
-		default:
-			break;
-		}
-
-		return(error);
-
-	  unlink:
-		in6_unlink_ifa(ia, ifp);
-		return(error);
+		return(in6_update_ifa(ifp, ifra, ia));
 
 	case SIOCDIFADDR_IN6:
 		in6_purgeaddr(&ia->ia_ifa, ifp);
@@ -987,6 +708,305 @@ in6_control(so, cmd, data, ifp)
 		return((*ifp->if_ioctl)(ifp, cmd, data));
 	}
 	return(0);
+}
+
+/*
+ * Update parameters of an IPv6 interface address.
+ * If necessary, a new entry is created and linked into address chains.
+ * This function is separated from in6_control().
+ * XXX: should this be performed under splnet()?
+ */
+int
+in6_update_ifa(ifp, ifra, ia)
+	struct ifnet *ifp;
+	struct in6_aliasreq *ifra;
+	struct in6_ifaddr *ia;
+{
+	int error = 0, hostIsNew = 1, prefixIsNew = 0, plen;
+	struct ifaddr *ifa;
+	struct in6_ifaddr *oia;
+	struct sockaddr_in6 dst6;
+	struct in6_addrlifetime *lt;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	time_t time_second = (time_t)time.tv_sec;
+#endif
+
+	/* Validate parameters */
+	if (ifp == NULL || ifra == NULL)/* this maybe redundant */
+		return(EINVAL);
+
+	/*
+	 * The destination address for a p2p link must have a family
+	 * of AF_UNSPEC or AF_INET6.
+	 */
+	if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
+	    ifra->ifra_dstaddr.sin6_family != AF_INET6 &&
+	    ifra->ifra_dstaddr.sin6_family != AF_UNSPEC)
+		return(EAFNOSUPPORT);
+	/*
+	 * The prefixmask must have a family of AF_UNSPEC or AF_INET6.
+	 */
+	if (ifra->ifra_prefixmask.sin6_family != AF_INET6 &&
+	    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC)
+		return(EAFNOSUPPORT);
+	/*
+	 * Because the IPv6 address architecture is classless,
+	 * prefix length must be specified for a new address. 
+	 */
+	if (hostIsNew && ifra->ifra_prefixmask.sin6_len == 0)
+		return(EINVAL);
+	/*
+	 * If the destination address on a p2p interface is specified,
+	 * and the address is a scoped one, validate/set the scope
+	 * zone identifier.
+	 * XXX: currently, only link-local address is supported.
+	 */
+	dst6 = ifra->ifra_dstaddr;
+	if ((ifp->if_flags & IFF_POINTOPOINT) &&
+	    (dst6.sin6_family == AF_INET6)) {
+		if (IN6_IS_ADDR_LINKLOCAL(&dst6.sin6_addr)) {
+			if (dst6.sin6_addr.s6_addr16[1] == 0) {
+				/* 
+				 * link ID is not embedded by the user.
+				 */
+				dst6.sin6_addr.s6_addr16[1]
+					= htons(ifp->if_index);
+			} else if (dst6.sin6_addr.s6_addr16[1] !=
+				   htons(ifp->if_index)) {
+				/* link id is contradict */
+				return(EINVAL);
+			}
+		}
+	}
+
+	lt = &ifra->ifra_lifetime;
+	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
+	    && lt->ia6t_vltime + time_second < time_second) {
+		return EINVAL;
+	}
+	if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
+	    && lt->ia6t_pltime + time_second < time_second) {
+		return EINVAL;
+	}
+
+	/*
+	 * If this is a new address, allocate a new ifaddr and link it
+	 * into chains.
+	 */
+	if (ia == NULL) {
+		ia = (struct in6_ifaddr *)
+			malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
+		if (ia == NULL)
+			return (ENOBUFS);
+		bzero((caddr_t)ia, sizeof(*ia));
+		/* Initialize the address and masks */
+		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
+		ia->ia_addr.sin6_family = AF_INET6;
+		ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
+#if 1
+		if (ifp->if_flags & IFF_POINTOPOINT) {
+			ia->ia_ifa.ifa_dstaddr
+				= (struct sockaddr *)&ia->ia_dstaddr;
+			ia->ia_dstaddr.sin6_family = AF_INET6;
+			ia->ia_dstaddr.sin6_len = sizeof(ia->ia_dstaddr);
+		} else {
+			ia->ia_ifa.ifa_dstaddr = NULL;
+			bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
+		}
+#else  /* always initilize by NULL */
+		ia->ia_ifa.ifa_dstaddr = NULL;
+		bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
+#endif
+		ia->ia_ifa.ifa_netmask
+			= (struct sockaddr *)&ia->ia_prefixmask;
+
+		ia->ia_ifp = ifp;
+		if ((oia = in6_ifaddr) != NULL) {
+			for ( ; oia->ia_next; oia = oia->ia_next)
+				continue;
+			oia->ia_next = ia;
+		} else
+			in6_ifaddr = ia;
+		/* gain a refcnt for the link from in6_ifaddr */
+		ia->ia_ifa.ifa_refcnt++;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		if ((ifa = ifp->if_addrlist) != NULL) {
+			for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
+				continue;
+			ifa->ifa_next = ia62ifa(ia);
+		} else
+			ifp->if_addrlist = ia62ifa(ia);
+#else
+		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
+				  ifa_list);
+#endif
+		/* gain another refcnt for the link from if_addrlist */
+		ia->ia_ifa.ifa_refcnt++;
+	}
+
+	/* check if a new address is being added */
+	if (ia->ia_addr.sin6_len &&
+	    IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
+			       &ia->ia_addr.sin6_addr)) {
+		/*
+		 * The requested address is already in the list.
+		 * This means the user just wants to modify some
+		 * parameters of the existing address.
+		 */
+		hostIsNew = 0;
+	}
+
+	/* calculate the prefix length, which will be used later */
+	if (ifra->ifra_prefixmask.sin6_len)
+		plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr);
+	else
+		plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+
+	/* set prefix mask */
+	if (ifra->ifra_prefixmask.sin6_len) {
+		/*
+		 * If the prefix length for an existing address
+		 * changes, (which should be rare in the current IPv6
+		 * address architecture, though) scrub the route
+		 * corresponding to the old prefix.
+		 */
+		if (ia->ia_prefixmask.sin6_len &&
+		    in6_mask2len(&ia->ia_prefixmask.sin6_addr) != plen)
+			in6_ifscrub(ifp, ia, 0);
+		ia->ia_prefixmask = ifra->ifra_prefixmask;
+	}
+
+	/*
+	 * Check if we have another address that shares the same prefix
+	 * of the address being configured.
+	 */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
+#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa;
+	     ifa = ifa->ifa_list.tqe_next)
+#endif
+	{
+		struct in6_ifaddr *ifa6;
+
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		if (ifa == (struct ifaddr *)ia)
+			continue;
+
+		ifa6 = (struct in6_ifaddr *)ifa;
+		if (in6_are_prefix_equal(&ifra->ifra_addr.sin6_addr,
+					 &ifa6->ia_addr.sin6_addr,
+					 plen))
+			break;
+	}
+	if (ifa == NULL)
+		prefixIsNew = 1;
+
+	/*
+	 * If a new destination address on a p2p link, scrub the
+	 * old one and install the new destination.
+	 */
+	if ((ifp->if_flags & IFF_POINTOPOINT) &&
+	    (dst6.sin6_family == AF_INET6) &&
+	    !IN6_ARE_ADDR_EQUAL(&dst6.sin6_addr,
+				&ia->ia_dstaddr.sin6_addr)) {
+		in6_ifscrub(ifp, ia, 0);
+		ia->ia_dstaddr = dst6;
+		prefixIsNew = 1; /* We lie; but effect's the same */
+	}
+
+	/* reset the interface and routing table appropriately. */
+	if ((error = in6_ifinit(ifp, ia, &ifra->ifra_addr,
+				hostIsNew, prefixIsNew)) != 0)
+		goto unlink;
+
+	/* update prefix list */
+	if (hostIsNew) {
+		int iilen;
+
+		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
+			in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+		if ((error = in6_prefix_add_ifid(iilen, ia)) != 0)
+			goto unlink;
+	}
+
+	if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
+		/*
+		 * join solicited multicast addr for new host id
+		 */
+		struct in6_addr llsol;
+		bzero(&llsol, sizeof(struct in6_addr));
+		llsol.s6_addr16[0] = htons(0xff02);
+		llsol.s6_addr16[1] = htons(ifp->if_index);
+		llsol.s6_addr32[1] = 0;
+		llsol.s6_addr32[2] = htonl(1);
+		llsol.s6_addr32[3] =
+			ifra->ifra_addr.sin6_addr.s6_addr32[3];
+		llsol.s6_addr8[12] = 0xff;
+		(void)in6_addmulti(&llsol, ifp, &error);
+		if (error != 0)
+			goto unlink;
+	}
+
+	ia->ia6_flags = ifra->ifra_flags;
+	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
+	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
+
+	ia->ia6_lifetime = ifra->ifra_lifetime;
+	/* for sanity */
+	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
+		ia->ia6_lifetime.ia6t_expire =
+			time_second + ia->ia6_lifetime.ia6t_vltime;
+	} else
+		ia->ia6_lifetime.ia6t_expire = 0;
+	if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
+		ia->ia6_lifetime.ia6t_preferred =
+			time_second + ia->ia6_lifetime.ia6t_pltime;
+	} else
+		ia->ia6_lifetime.ia6t_preferred = 0;
+
+	/*
+	 * Perform DAD, if needed.
+	 * XXX It may be of use, if we can administratively
+	 * disable DAD.
+	 */
+	switch (ifp->if_type) {
+	case IFT_ARCNET:
+	case IFT_ETHER:
+	case IFT_FDDI:
+#if 0
+	case IFT_ATM:
+	case IFT_SLIP:
+	case IFT_PPP:
+#endif
+		/* Mobile IPv6 modification */
+		if ((ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
+			ia->ia6_flags |= IN6_IFF_TENTATIVE;
+			nd6_dad_start((struct ifaddr *)ia, NULL);
+		}
+		break;
+	case IFT_DUMMY:
+	case IFT_FAITH:
+	case IFT_GIF:
+	case IFT_LOOP:
+	default:
+		break;
+	}
+
+	return(error);
+
+  unlink:
+	/*
+	 * XXX: if a change of an existing address failed, keep the entry
+	 * anyway.
+	 */
+	if (hostIsNew)
+		in6_unlink_ifa(ia, ifp);
+	return(error);
 }
 
 void
