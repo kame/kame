@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.115 2003/04/11 07:13:21 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.116 2003/04/11 13:02:17 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -114,9 +114,6 @@ static int construct_reqdata __P((struct dhcp6_if *, struct dhcp6_optinfo *,
     struct dhcp6_event *));
 static void destruct_iadata __P((struct dhcp6_eventdata *));
 static void tv_sub __P((struct timeval *, struct timeval *, struct timeval *));
-#if 0
-static int sa2plen __P((struct sockaddr_in6 *));
-#endif
 
 struct dhcp6_timer *client6_timo __P((void *));
 int client6_ifinit __P((struct dhcp6_if *));
@@ -823,53 +820,6 @@ client6_signal(sig)
 		break;
 	}
 }
-
-#if 0
-static int
-sa2plen(sa6)
-	struct sockaddr_in6 *sa6;
-{
-	int masklen;
-	u_char *p, *lim;
-	
-	p = (u_char *)(&sa6->sin6_addr);
-	lim = (u_char *)sa6 + sa6->sin6_len;
-	for (masklen = 0; p < lim; p++) {
-		switch (*p) {
-		case 0xff:
-			masklen += 8;
-			break;
-		case 0xfe:
-			masklen += 7;
-			break;
-		case 0xfc:
-			masklen += 6;
-			break;
-		case 0xf8:
-			masklen += 5;
-			break;
-		case 0xf0:
-			masklen += 4;
-			break;
-		case 0xe0:
-			masklen += 3;
-			break;
-		case 0xc0:
-			masklen += 2;
-			break;
-		case 0x80:
-			masklen += 1;
-			break;
-		case 0x00:
-			break;
-		default:
-			return (-1);
-		}
-	}
-
-	return (masklen);
-}
-#endif
 
 void
 client6_send(ev)
