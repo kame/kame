@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.30 2000/10/07 03:12:34 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.31 2000/10/07 03:14:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -648,7 +648,7 @@ gif_ioctl(ifp, cmd, data)
 #ifdef INET
 		case SIOCGIFPSRCADDR:
 			dst = &ifr->ifr_addr;
-			size = sizeof(struct sockaddr_in);
+			size = sizeof(ifr->ifr_addr);
 			i = AF_INET;
 			break;
 #endif /* INET */
@@ -656,7 +656,7 @@ gif_ioctl(ifp, cmd, data)
 		case SIOCGIFPSRCADDR_IN6:
 			dst = (struct sockaddr *)
 				&(((struct in6_ifreq *)data)->ifr_addr);
-			size = sizeof(struct sockaddr_in6);
+			size = sizeof(((struct in6_ifreq *)data)->ifr_addr);
 			i = AF_INET6;
 			break;
 #endif /* INET6 */
@@ -668,7 +668,7 @@ gif_ioctl(ifp, cmd, data)
 			return EADDRNOTAVAIL;
 		if (src->sa_len > size)
 			return EINVAL;
-		bcopy((caddr_t)src, (caddr_t)dst, size);
+		bcopy((caddr_t)src, (caddr_t)dst, src->sa_len);
 		break;
 			
 	case SIOCGIFPDSTADDR:
@@ -684,7 +684,7 @@ gif_ioctl(ifp, cmd, data)
 #ifdef INET
 		case SIOCGIFPDSTADDR:
 			dst = &ifr->ifr_addr;
-			size = sizeof(struct sockaddr_in);
+			size = sizeof(ifr->ifr_addr);
 			i = AF_INET;
 			break;
 #endif /* INET */
@@ -692,7 +692,7 @@ gif_ioctl(ifp, cmd, data)
 		case SIOCGIFPDSTADDR_IN6:
 			dst = (struct sockaddr *)
 				&(((struct in6_ifreq *)data)->ifr_addr);
-			size = sizeof(struct sockaddr_in6);
+			size = sizeof(((struct in6_ifreq *)data)->ifr_addr);
 			i = AF_INET6;
 			break;
 #endif /* INET6 */
@@ -704,7 +704,7 @@ gif_ioctl(ifp, cmd, data)
 			return EADDRNOTAVAIL;
 		if (src->sa_len > size)
 			return EINVAL;
-		bcopy((caddr_t)src, (caddr_t)dst, size);
+		bcopy((caddr_t)src, (caddr_t)dst, src->sa_len);
 		break;
 
 	case SIOCSIFFLAGS:
