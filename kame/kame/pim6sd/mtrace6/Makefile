@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.1 1999/09/10 15:35:05 jinmei Exp $
+# $Id: Makefile,v 1.2 1999/09/13 01:23:22 jinmei Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -80,6 +80,10 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	mtrace6
+
+BINOWN  = root
+BINGRP  = bin
+BINMODE = 4555
 
 .if (${OPSYS} == "BSD/OS")
 CC=	gcc

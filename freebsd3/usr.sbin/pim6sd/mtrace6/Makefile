@@ -27,6 +27,10 @@
 BINDIR=	$(PREFIX)/sbin
 PROG=	mtrace6
 
+BINOWN  = root
+BINGRP  = bin
+BINMODE = 4555
+
 SRCDIR=	${.CURDIR}/../../../kame/pim6sd/mtrace6
 
 CFLAGS+= -I$(.CURDIR)/../../../kame/pim6sd
