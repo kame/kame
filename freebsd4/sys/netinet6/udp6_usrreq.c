@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.53 2002/09/05 08:09:34 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.54 2002/09/06 10:16:11 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -353,10 +353,10 @@ udp6_input(mp, offp, proto)
 			for (imm = LIST_FIRST(&im6o->im6o_memberships);
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
-				
+
 				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, &src_h))
 					continue;
-				
+
 				if (imm->i6mm_msf == NULL) {
 #ifdef MLDV2_DEBUG
 					printf("XXX: unexpected case occured at %s:%d",
@@ -364,18 +364,18 @@ udp6_input(mp, offp, proto)
 #endif
 					continue;
 				}
-				     
+
 				/* receive data from any source */
 				if (imm->i6mm_msf->msf_grpjoin != 0) {
 					PASS_TO_PCB6();
 					break;
 				}
 				goto search_allow_list;
-				     
+
 			search_allow_list:
 				if (imm->i6mm_msf->msf_numsrc == 0)
 					goto search_block_list;
-				     
+
 				LIST_FOREACH(msfsrc,
 					     imm->i6mm_msf->msf_head,
 					     list) {
@@ -388,11 +388,11 @@ udp6_input(mp, offp, proto)
 						 * will be no match */
 						break;
 					}
-					
+
 					PASS_TO_PCB6();
 					break;
 				}
-				
+
 			search_block_list:
 				if (imm->i6mm_msf->msf_blknumsrc == 0)
 					goto end_of_search;
@@ -409,7 +409,7 @@ udp6_input(mp, offp, proto)
 						 * with block list */
 						break;
 					}
-					
+
 					/* terminate search, as there will be
 					 * no match */
 					msfsrc = NULL;
@@ -419,7 +419,7 @@ udp6_input(mp, offp, proto)
 				 * list */
 				if (msfsrc == NULL)
 					PASS_TO_PCB6();
-				
+
 			end_of_search:
 				goto next_inp;
 			}
