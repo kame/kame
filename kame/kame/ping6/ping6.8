@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.7 1999/12/15 04:59:13 itojun Exp $
+.\"     $Id: ping6.8,v 1.8 1999/12/23 09:33:25 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -38,7 +38,7 @@ packets to network hosts
 .Sh SYNOPSIS
 .Nm
 .\" without ipsec, or new ipsec
-.Op Fl dfnqRrvw
+.Op Fl dfnqrvw
 .\" old ipsec
 .\" .Op Fl AdEfnqRrvw
 .Op Fl a Ar addrtype
@@ -173,22 +173,6 @@ specifies IPsec policy to be used for the probe.
 Quiet output.
 Nothing is displayed except the summary lines at startup time and
 when finished.
-.It Fl R
-Record route.
-Includes the
-.Tn RECORD_ROUTE
-option in the
-.Tn ECHO_REQUEST
-packet and displays
-the route buffer on returned packets.
-Note that the IP header is only large enough for nine such routes;
-the
-.Xr traceroute 8
-command is usually better at determining the route packets take to a
-particular destination.
-Many hosts ignore or discard the
-.Tn RECORD_ROUTE
-option.
 .It Fl r
 Bypass the normal routing tables and send directly to a host on an attached
 network.
