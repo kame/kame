@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.80 2001/01/21 08:00:10 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.81 2001/01/22 13:55:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,6 +35,7 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/kernel.h>
+#include <sys/syslog.h>
 #ifdef __bsdi__
 #include <crypto/md5.h>
 #elif defined(__OpenBSD__)
@@ -942,7 +943,8 @@ in6_ifattach(ifp, altifp)
 	 * usually, we require multicast capability to the interface
 	 */
 	if ((ifp->if_flags & IFF_MULTICAST) == 0) {
-		printf("%s: not multicast capable, IPv6 not enabled\n",
+		log(LOG_INFO, "in6_ifattach: "
+		    "%s is not multicast capable, IPv6 not enabled\n",
 		    if_name(ifp));
 		return;
 	}
