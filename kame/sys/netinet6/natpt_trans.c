@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.5 2000/01/17 09:08:00 itojun Exp $
+ *	$Id: natpt_trans.c,v 1.6 2000/01/29 13:53:35 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -965,6 +965,14 @@ translatingTCPv6To4(struct _cv *cv6, struct _pat *pata)
     updateTcpStatus(cv6);
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_TCP, cv6, &cv4);
 
+    /*
+     * Itojun said 'code fragment in "#ifdef recalculateTCP4Checksum"
+     * does not make sense to me'.  I agree, but
+     * adjustUpperLayerChecksum() cause checksum error sometime but
+     * not always, so I left its code.  After I fixed it, this code
+     * will become vanish.
+     */
+
 #ifdef recalculateTCP4Checksum
     {
 	int		 cksumAdj, cksumCks;
@@ -979,7 +987,8 @@ translatingTCPv6To4(struct _cv *cv6, struct _pat *pata)
 	iphlen = ip4->ip_hl << 2;
 
 	save_ip = *cv4._ip._ip4;
-	bzero(ti, sizeof(struct tcpiphdr));
+	ti->ti_next = ti->ti_prev = 0;
+	ti->ti_x1 = 0;
 	ti->ti_pr = IPPROTO_TCP;
 	ti->ti_len = htons(cv4.m->m_pkthdr.len - iphlen);
 	ti->ti_src = save_ip.ip_src;
