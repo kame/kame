@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.238 2002/04/10 12:42:38 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.239 2002/04/10 14:45:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2211,6 +2211,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 				}
 #endif
 			}
+#ifdef RTUSE		/* increment statistics for this implicit reference */
+			RTUSE(rt);
+#endif
 		}
 	}
 
