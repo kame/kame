@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.27 2000/06/17 20:34:24 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.28 2000/06/20 12:30:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -507,10 +507,23 @@ gif_ioctl(ifp, cmd, data)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif /* INET6 */
-		src = (struct sockaddr *)
-			&(((struct in_aliasreq *)data)->ifra_addr);
-		dst = (struct sockaddr *)
-			&(((struct in_aliasreq *)data)->ifra_dstaddr);
+		switch (cmd) {
+		case SIOCSIFPHYADDR:
+			src = (struct sockaddr *)
+				&(((struct in_aliasreq *)data)->ifra_addr);
+			dst = (struct sockaddr *)
+				&(((struct in_aliasreq *)data)->ifra_dstaddr);
+			break;
+#ifdef INET6
+		case SIOCSIFPHYADDR_IN6:
+			src = (struct sockaddr *)
+				&(((struct in6_aliasreq *)data)->ifra_addr);
+			dst = (struct sockaddr *)
+				&(((struct in6_aliasreq *)data)->ifra_dstaddr);
+			break;
+#endif
+		}
+
 		for (i = 0; i < ngif; i++) {
 			sc2 = gif + i;
 			if (sc2 == sc)
