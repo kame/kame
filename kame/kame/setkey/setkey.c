@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.29 2003/09/08 06:08:52 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.30 2003/09/08 10:14:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -165,7 +165,7 @@ main(argc, argv)
 	if (argc > 0) {
 		while (argc--)
 			if (fileproc(*argv++) < 0) {
-				errx(1, "%s: processing failed");
+				errx(1, "%s: processing failed", *argv[-1]);
 				/*NOTREACHED*/
 			}
 		exit(0);
