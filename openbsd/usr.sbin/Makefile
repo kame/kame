@@ -2,6 +2,6 @@
 
 SUBDIR+=inetd sysctl
 
-SUBDIR+=rtsold ifmcstat
+SUBDIR+=rtsold ifmcstat ndp
 
 .include <bsd.subdir.mk>
