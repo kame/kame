@@ -1,6 +1,9 @@
-$Id: CHANGELOG,v 1.485 2000/01/26 05:17:03 itojun Exp $
+$Id: CHANGELOG,v 1.486 2000/01/26 14:00:56 sumikawa Exp $
 
 <200001>
+Wed Jan 26 23:00:30 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/pchar: upgrade to 1.1.1.
+
 Wed Jan 26 14:16:00 JST 2000  itojun@iijlab.net
 	* kame/libinet6/getaddrinfo.c: from the specification, AI_CANONNAME
 	  does not imply reverse query.  ai_canonname has the same meaning as
