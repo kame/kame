@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.261 2001/12/24 17:52:05 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.262 2001/12/24 17:55:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3898,6 +3898,8 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		case IPV6_REACHCONF:
 		case IPV6_USE_MIN_MTU:
 		case IPV6_DONTFRAG:
+		case IPV6_OTCLASS:
+		case IPV6_TCLASS:
 			return(ENOPROTOOPT);
 		}
 	}
