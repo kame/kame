@@ -2388,6 +2388,7 @@ tn(argc, argv)
 	    portp++;
 	    telnetport = 1;
 	}
+	h_errno = 0;
 	error = getaddrinfo(hostp, portp, &hints, &res0);
 	if (error == EAI_SERVICE) {
 	    warn("tcp/%s: unknown service\n", portp);
@@ -2434,7 +2435,7 @@ tn(argc, argv)
 		freeaddrinfo(ares);
 		continue;
 	    }
-	    if (bind(net, res->ai_addr, res->ai_addrlen) < 0) {
+	    if (bind(net, ares->ai_addr, ares->ai_addrlen) < 0) {
 		perror(aliasp);
 		(void) close(net);   /* dump descriptor */
 		freeaddrinfo(ares);
@@ -2475,8 +2476,8 @@ tn(argc, argv)
 		    NULL, 0, niflags) != 0) {
 		strcpy(hbuf, "(invalid)");
 	    }
-	    fprintf(stderr, "telnet: connect to address %s: ", hbuf);
-	    perror("");
+	    fprintf(stderr, "telnet: connect to address %s: %s\n", hbuf,
+		strerror(errno));
 
 	    close(net);
 	    net = -1;
@@ -2875,6 +2876,7 @@ sourceroute(arg, cpp, lenp)
 		if (!c)
 			cp2 = 0;
 
+		h_errno = 0;
 		if ((tmp = inet_addr(cp)) != -1) {
 			sin_addr.s_addr = tmp;
 		} else if ((host = gethostbyname(cp))) {
