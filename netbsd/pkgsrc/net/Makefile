@@ -9,6 +9,7 @@
     SUBDIR += ethereal
     SUBDIR += gated-ipv6
     SUBDIR += irc
+    SUBDIR += mediator
     SUBDIR += mrt
     SUBDIR += mtr
     SUBDIR += ncftp3
