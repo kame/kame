@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.170 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.171 2001/10/25 07:54:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1308,8 +1308,6 @@ prelist_update(new, dr, m)
 		if (new->ndpr_raf_onlink == 0 && new->ndpr_raf_auto == 0)
 			goto end;
 
-		bzero(&new->ndpr_addr, sizeof(struct in6_addr));
-
 		error = nd6_prelist_add(new, dr, &newpr);
 		if (error != 0 || newpr == NULL) {
 			nd6log((LOG_NOTICE, "prelist_update: "
@@ -1517,11 +1515,6 @@ prelist_update(new, dr, m)
 			 */
 			pr->ndpr_refcnt++;
 			ia6->ia6_ndpr = pr;
-
-#if 0
-			/* XXXYYY Don't do this, according to Jinmei. */
-			pr->ndpr_addr = new->ndpr_addr;
-#endif
 
 			/*
 			 * draft-ietf-ipngwg-temp-addresses-v2-00 3.3 (2).
@@ -2072,13 +2065,6 @@ in6_ifadd(pr)
 	 * manipulation.
 	 */
 	ifra.ifra_flags |= IN6_IFF_NOPFX;
-
-	/*
-	 * keep the new address, regardless of the result of in6_update_ifa.
-	 * XXX: this address is now meaningless.
-	 * We should reconsider its role.
-	 */
-	pr->ndpr_addr = ifra.ifra_addr.sin6_addr;
 
 	/* allocate ifaddr structure, link into chain, etc. */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
