@@ -119,7 +119,7 @@ intpr(interval, ifnetaddr, pfunc)
 		return;
 	ifnetaddr = (u_long)ifhead.tqh_first;
 
-	if (!sflag) {
+	if (!sflag & !pflag) {
 		if (bflag) {
 			printf("%-5.5s %-5.5s %-13.13s %-17.17s "
 			       "%10.10s %10.10s",
