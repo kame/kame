@@ -1,0 +1,49 @@
+Installation procedure - preparation of the tree
+KAME project
+$Id: INSTALL,v 1.5.2.1 1999/09/21 07:20:11 itojun Exp $
+
+
+KAME build tree shares part of the tree among operating system
+platforms.  "kame" directory is shared among "netbsd", "freebsd2",
+and other platforms.  You'll first need to make a complete tree from
+distributed tree.
+
+NOTE: On some platforms it is possible to perform "make obj" before the
+build.  However, it is not recommended as it will cause trouble with
+anoncvs operation.  For example, "make update" target in the top-level
+Makefile will become unusable.  Do not perform "make obj" unless you are
+ready to tackle those troubles.
+
+
+0. If you have installed KAME kit in the past, you may need to remove
+   files under /usr/local/v6 to avoid conflicts or misuse of old file during
+   build process.  We recommend you to remove the following, at least:
+	/usr/local/v6/lib/*
+  
+1. Identify your target operating system, by looking at document named
+   "VERSION".  Suppose the target is "netbsd".
+
+2. Be sure to have complete tree under your target directory ("netbsd").
+   In some cases you'll need to bring in vanilla distribution into
+   subdirectories and perform "patch" operation.  Consult target directory-
+   dependent document for details.
+
+3. Invoke the following:
+	% make TARGET=netbsd prepare
+   This will create necessary symbolic links for the build (from TARGET
+   tree to "kame" tree).
+   NOTE: You'll need perl interpreter for invoking this.
+
+4. Some part of the tree will be compiled, only if there are certain libraries
+   installed beforehand:
+	usr.sbin/tcpdump:
+		If There is SSLeay or OpenSSL installed beforehand, 
+		tcpdump will let you look inside IPsec packet (-E option).
+	usr.bin/racoon:
+		Compiles only if SSLeay or OpenSSL is installed beforehand.
+   Please install those libraries before building KAME tree.
+   If you are using {Net,Free,Open}BSD, ports/packages may help you build
+   and install them.
+
+5. Go down to the target operating system you have specified, and read
+   document named "INSTALL".  Good luck!
