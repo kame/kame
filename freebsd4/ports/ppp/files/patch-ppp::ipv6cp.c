@@ -1,21 +1,106 @@
 --- ipv6cp.c	2002/06/03 06:37:11	1.1.1.1
-+++ ipv6cp.c	2002/06/03 13:37:40	1.3
-@@ -106,17 +106,18 @@
++++ ipv6cp.c	2002/06/10 11:51:48	1.4
+@@ -34,12 +34,15 @@
+ #include <net/route.h>
+ #include <sys/select.h>
+ #include <net/if.h>
++#include <net/if_types.h>
++#include <net/if_dl.h>
+ #include <sys/un.h>
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <termios.h>
++#include <ifaddrs.h>
+ 
+ #include "layer.h"
+ #include "defs.h"
+@@ -106,17 +109,87 @@
    fsm_NullRecvResetAck
  };
  
 -static u_int32_t
 -GenerateToken(void)
 +static void
-+SetInterfaceID(u_char *ifid)
++SetInterfaceID(u_char *ifid, int userandom)
  {
 -  /* Generate random number which will be used as negotiation token */
-+  /* use random numbers to generate uniqueue InterfaceID, RFC2472 -4.2 -3) */
-   randinit();
--
--  return random() + 1;
+-  randinit();
++  struct ifaddrs *ifa, *ifap = NULL;
++  struct sockaddr_dl *sdl;
++  const u_long i32_max = 0xffffffff;
++  u_long r1, r2;
++
++  /* configure an interface ID based on Section 4.1 of RFC 2472 */
 +  memset(ifid, 0, IPV6CP_IFIDLEN);
-+  sprintf(&ifid[IPV6CP_IFIDLEN-4], "%08lx", random()+1);
++
++  /*
++   * 1) If an IEEE global identifier (EUI-48 or EUI-64) is
++   * available anywhere on the node, it should be used to construct
++   * the tentative Interface-Identifier due to its uniqueness
++   * properties.
++   */
++  if (userandom)
++    goto randomid;
++  if (getifaddrs(&ifap) < 0)
++    goto randomid;
++	
++  for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
++    char *cp;
++
++    if (ifa->ifa_addr->sa_family != AF_LINK)
++      continue;
++
++    sdl = (struct sockaddr_dl *)ifa->ifa_addr;
++    if (sdl->sdl_alen < 6)
++      continue;
++    /* we're only interested in IEEE hardware addresses */
++    switch(sdl->sdl_type) {
++    case IFT_ETHER:
++    case IFT_FDDI:
++      /* XXX need more cases? */
++      break;
++    default:
++      continue;
++    }
++
++    cp = (char *)(sdl->sdl_data + sdl->sdl_nlen);
++    ifid[0] = cp[0];
++    ifid[0] ^= 0x02; /* reverse the u/l bit*/
++    ifid[1] = cp[1];
++    ifid[2] = cp[2];
++    ifid[3] = 0xff;
++    ifid[4] = 0xfe;
++    ifid[5] = cp[3];
++    ifid[6] = cp[4];
++    ifid[7] = cp[5];
++
++    freeifaddrs(ifap);
++    return;
++  }
++
++  freeifaddrs(ifap);
+ 
+-  return random() + 1;
++  /*
++   * 2) If an IEEE global identifier is not available a different source
++   * of uniqueness should be used.
++   * XXX: we skip this case.
++   */
++
++  /*
++   * 3) If a good source of uniqueness cannot be found, it is
++   * recommended that a random number be generated.  In this case the
++   * "u" bit of the interface identifier MUST be set to zero (0).
++   */
++ randomid:
++  randinit();
++  r1 = (((u_long)random()) % i32_max) + 1;
++  r2 = (((u_long)random()) % i32_max) + 1;
++  memcpy(ifid, &r1, sizeof(r1));
++  memcpy(ifid + 4, &r2, sizeof(r2));
++  ifid[0] &= 0xfd;
 +  return;
  }
  
@@ -25,7 +110,7 @@
  {
    struct bundle *bundle = ipv6cp->fsm.bundle;
    struct in6_addr myaddr, hisaddr;
-@@ -133,11 +134,17 @@
+@@ -133,11 +206,17 @@
  
    myaddr.s6_addr[0] = 0xfe;
    myaddr.s6_addr[1] = 0x80;
@@ -45,16 +130,16 @@
  
    ncpaddr_setip6(&ipv6cp->myaddr, &myaddr);
    ncpaddr_setip6(&ipv6cp->hisaddr, &hisaddr);
-@@ -187,17 +194,20 @@
+@@ -187,17 +266,20 @@
    ipv6cp->cfg.fsm.maxreq = DEF_FSMTRIES;
    ipv6cp->cfg.fsm.maxtrm = DEF_FSMTRIES;
  
 -  ipv6cp->my_token = GenerateToken();
 -  while ((ipv6cp->peer_token = GenerateToken()) == ipv6cp->my_token)
 -    ;
-+  SetInterfaceID(ipv6cp->my_ifid);
++  SetInterfaceID(ipv6cp->my_ifid, 0);
 +  do {
-+    SetInterfaceID(ipv6cp->his_ifid);
++    SetInterfaceID(ipv6cp->his_ifid, 1);
 +  } while (memcmp(ipv6cp->his_ifid, ipv6cp->my_ifid, IPV6CP_IFIDLEN) == 0);
  
    if (probe.ipv6_available) {
@@ -67,13 +152,13 @@
 +           !ipcp_SetIPv6address(ipv6cp, ipv6cp->my_ifid, ipv6cp->his_ifid)) {
 +      do {
 +	n--;
-+    	SetInterfaceID(ipv6cp->my_ifid);
++    	SetInterfaceID(ipv6cp->my_ifid, 1);
 +      } while (n
 +	&& memcmp(ipv6cp->his_ifid, ipv6cp->my_ifid, IPV6CP_IFIDLEN) == 0);
      }
    }
  
-@@ -296,7 +306,7 @@
+@@ -296,7 +378,7 @@
  int
  ipv6cp_InterfaceUp(struct ipv6cp *ipv6cp)
  {
@@ -82,7 +167,7 @@
      log_Printf(LogERROR, "ipv6cp_InterfaceUp: unable to set ipv6 address\n");
      return 0;
    }
-@@ -458,14 +468,14 @@
+@@ -458,14 +540,14 @@
    /* Send config REQ please */
    struct physical *p = link2physical(fp->link);
    struct ipv6cp *ipv6cp = fsm2ipv6cp(fp);
@@ -100,7 +185,7 @@
    }
  
    fsm_Output(fp, CODE_CONFIGREQ, fp->reqid, buff, (u_char *)o - buff,
-@@ -488,7 +498,7 @@
+@@ -488,7 +570,7 @@
  static const char *
  protoname(int proto)
  {
@@ -109,7 +194,7 @@
  
    if (proto > 0 && proto <= sizeof cftypes / sizeof *cftypes)
      return cftypes[proto - 1];
-@@ -497,18 +507,22 @@
+@@ -497,18 +579,22 @@
  }
  
  static void
@@ -120,15 +205,15 @@
  {
    struct fsm_opt opt;
 +  u_char zero[IPV6CP_IFIDLEN];
-+
-+  memset(zero, 0, IPV6CP_IFIDLEN);
  
 -  if (token != 0 && token != ipv6cp->my_token)
 -    ipv6cp->peer_token = token;
++  memset(zero, 0, IPV6CP_IFIDLEN);
+ 
 +  if (memcmp(ifid, zero, IPV6CP_IFIDLEN) != 0
 +      && memcmp(ifid, ipv6cp->my_ifid, IPV6CP_IFIDLEN) != 0)
 +    memcpy(ipv6cp->his_ifid, ifid, IPV6CP_IFIDLEN);
- 
++
    opt.hdr.id = TY_TOKEN;
 -  opt.hdr.len = 6;
 -  memcpy(opt.data, &ipv6cp->peer_token, 4);
@@ -139,7 +224,7 @@
      fsm_ack(dec, &opt);
    else
      fsm_nak(dec, &opt);
-@@ -522,9 +536,11 @@
+@@ -522,9 +608,11 @@
    struct ipv6cp *ipv6cp = fsm2ipv6cp(fp);
    int n;
    char tbuff[100];
@@ -152,7 +237,7 @@
    while (end - cp >= sizeof(opt->hdr)) {
      if ((opt = fsm_readopt(&cp)) == NULL)
        break;
-@@ -534,40 +550,51 @@
+@@ -534,40 +622,51 @@
  
      switch (opt->hdr.id) {
      case TY_TOKEN:
@@ -195,7 +280,7 @@
 +	  while (n && !ipcp_SetIPv6address(ipv6cp, ifid, ipv6cp->his_ifid)) {
 +	    do {
 +	      n--;
-+	      SetInterfaceID(ifid);
++	      SetInterfaceID(ifid, 1);
 +	    } while (n && memcmp(ifid, ipv6cp->his_ifid, IPV6CP_IFIDLEN) == 0);
 +	  }
  
@@ -222,7 +307,7 @@
              bundle_AdjustFilters(fp->bundle, &ipv6cp->myaddr, NULL);
            }
          }
-@@ -600,7 +627,8 @@
+@@ -600,7 +699,8 @@
           */
          ipv6cp->peer_tokenreq = 1;
        }
