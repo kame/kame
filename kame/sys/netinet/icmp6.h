@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.10 2000/03/25 07:23:35 sumikawa Exp $	*/
+/*	$KAME: icmp6.h,v 1.11 2000/05/09 17:06:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,6 +140,10 @@ struct icmp6_hdr {
 #define ICMP6_PARAMPROB_OPTION		2	/* unrecognized option */
 
 #define ICMP6_INFOMSG_MASK		0x80	/* all informational messages */
+
+#define ICMP6_NI_SUBJ_IPV6	0	/* Query Subject is an IPv6 address */
+#define ICMP6_NI_SUBJ_FQDN	1	/* Query Subject is a Domain name */
+#define ICMP6_NI_SUBJ_IPV4	2	/* Query Subject is an IPv4 address */
 
 #define ICMP6_NI_SUCESS		0	/* node information successful reply */
 #define ICMP6_NI_REFUSED	1	/* node information request is refused */
@@ -331,7 +335,6 @@ struct icmp6_nodeinfo {
 #define ni_cksum	icmp6_ni_hdr.icmp6_cksum
 #define ni_qtype	icmp6_ni_hdr.icmp6_data16[0]
 #define ni_flags	icmp6_ni_hdr.icmp6_data16[1]
-
 
 #define NI_QTYPE_NOOP		0 /* NOOP  */
 #define NI_QTYPE_SUPTYPES	1 /* Supported Qtypes */

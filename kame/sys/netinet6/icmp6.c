@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.82 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: icmp6.c,v 1.83 2000/05/09 17:06:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,7 +610,7 @@ icmp6_input(mp, offp, proto)
 
 		if (icmp6len == sizeof(struct icmp6_hdr) + 4)
 			mode = WRU;
-		else if (icmp6len >= sizeof(struct icmp6_hdr) + 8) /* XXX */
+		else if (icmp6len >= sizeof(struct icmp6_nodeinfo)) /* XXX */
 			mode = FQDN;
 		else
 			goto badlen;
@@ -1054,7 +1054,16 @@ icmp6_mtudisc_update(dst, icmp6, m)
 }
 
 /*
- * Process a Node Information Query
+ * Process a Node Information Query packet, (roughly) based on
+ * draft-ietf-ipngwg-icmp-name-lookups-05.
+ * 
+ * Spec incompatibilities:
+ * - IPv6 destionation address validation
+ * - IPv6 Subject address handling
+ * - FQDN Subject name handling (drop it if it's not for me)
+ * - IPv4 Subject address handling support missing
+ * - FQDN reply is not an DNS format, but plain string
+ * - Supported Qtypes packet support missing
  */
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)
@@ -1062,7 +1071,6 @@ icmp6_mtudisc_update(dst, icmp6, m)
 #ifndef offsetof		/* XXX */
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif
-
 static struct mbuf *
 ni6_input(m, off)
 	struct mbuf *m;
@@ -1071,11 +1079,15 @@ ni6_input(m, off)
 	struct icmp6_nodeinfo *ni6, *nni6;
 	struct mbuf *n = NULL;
 	u_int16_t qtype;
+	int subjlen;
 	int replylen = sizeof(struct ip6_hdr) + sizeof(struct icmp6_nodeinfo);
 	struct ni_reply_fqdn *fqdn;
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
+	struct sockaddr_in6 sin6;
+	struct ip6_hdr *ip6;
 
+	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
 	ni6 = (struct icmp6_nodeinfo *)(mtod(m, caddr_t) + off);
 #else
@@ -1085,38 +1097,131 @@ ni6_input(m, off)
 		return NULL;
 	}
 #endif
-	qtype = ntohs(ni6->ni_qtype);
 
-	switch(qtype) {
-	 case NI_QTYPE_NOOP:
-		 break;		/* no reply data */
-	 case NI_QTYPE_SUPTYPES:
-		 goto bad;	/* xxx: to be implemented */
-		 break;
-	 case NI_QTYPE_FQDN:
-		 replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_name) +
-			 hostnamelen;
-		 break;
-	 case NI_QTYPE_NODEADDR:
-		 addrs = ni6_addrs(ni6, m, &ifp);
-		 if ((replylen += addrs * sizeof(struct in6_addr)) > MCLBYTES)
-			 replylen = MCLBYTES; /* XXX: we'll truncate later */
-		
-		 break;
-	 default:
-		 /*
-		  * XXX: We must return a reply with the ICMP6 code
-		  * `unknown Qtype' in this case. However we regard the case
-		  * as an FQDN query for backward compatibility.
-		  * Older versions set a random value to this field,
-		  * so it rarely varies in the defined qtypes.
-		  * But the mechanism is not reliable...
-		  * maybe we should obsolete older versions.
-		  */
-		 qtype = NI_QTYPE_FQDN;
-		 replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_name) +
-			 hostnamelen;
-		 break;
+	/*
+	 * Validate IPv6 destination address.
+	 *
+	 * At this moment, we accept packets with any IPv6 destionation address.
+	 * This is a violation to last paragraph in icmp-name-lookups-05
+	 * page 4, which restricts IPv6 destionation address of a query to:
+	 * - Responder's unicast/anycast address,
+	 * - NI group address for a name belongs to the Responder, or
+	 * - NI group address for a name for which the Responder is providing
+	 *   proxy service.
+	 *
+	 * We allow any IPv6 destionation addrss, since "ping6 -w ff02::1" has
+	 * been really useful for us debugging our network.  Also this is
+	 * still questionable if the above restriction buy us security at all,
+	 * since RFC2463 permits echo packet to multicast destination.
+	 * Even if we forbid NI query to ff02::1, we can effectively get the
+	 * same result as "ping6 -w ff02::1" by the following steps:
+	 * - run "ping6 ff02::1", then
+	 * - run "ping6 -w" for all addresses replied.
+	 */
+#if 0
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	bcopy(&ip6->ip6_dst, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
+	/* XXX scopeid */
+	if (ifa_ifwithaddr((struct sockaddr *)&sin6))
+		break;
+	/* XXX check for NI group address */
+#endif
+
+	/* guess reply length */
+	qtype = ntohs(ni6->ni_qtype);
+	switch (qtype) {
+	case NI_QTYPE_NOOP:
+		break;		/* no reply data */
+	case NI_QTYPE_SUPTYPES:
+		goto bad;	/* xxx: to be implemented */
+		break;
+	case NI_QTYPE_FQDN:
+		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_name) +
+			hostnamelen;
+		break;
+	case NI_QTYPE_NODEADDR:
+		addrs = ni6_addrs(ni6, m, &ifp);
+		if ((replylen += addrs * sizeof(struct in6_addr)) > MCLBYTES)
+			replylen = MCLBYTES; /* XXX: we'll truncate later */
+		break;
+	default:
+		/*
+		 * XXX: We must return a reply with the ICMP6 code
+		 * `unknown Qtype' in this case. However we regard the case
+		 * as an FQDN query for backward compatibility.
+		 * Older versions set a random value to this field,
+		 * so it rarely varies in the defined qtypes.
+		 * But the mechanism is not reliable...
+		 * maybe we should obsolete older versions.
+		 */
+		qtype = NI_QTYPE_FQDN;
+		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_name) +
+			hostnamelen;
+		break;
+	}
+
+	/* validate query Subject field. */
+	subjlen = m->m_pkthdr.len - off - sizeof(struct icmp6_nodeinfo);
+	switch (qtype) {
+	case NI_QTYPE_NOOP:
+	case NI_QTYPE_SUPTYPES:
+		if (subjlen != 0)
+			goto bad;
+		break;
+
+	case NI_QTYPE_FQDN:
+	case NI_QTYPE_NODEADDR:
+		switch (ni6->ni_code) {
+		case ICMP6_NI_SUBJ_IPV6:
+#if ICMP6_NI_SUBJ_IPV6 != 0
+		case 0:
+#endif
+			/*
+			 * backward compatibility - try to accept 03 draft
+			 * format, where no Subject is present.
+			 */
+			if (subjlen == 0)
+				break;
+
+			if (subjlen != sizeof(sin6.sin6_addr))
+				goto bad;
+
+			/*
+			 * Validate Subject address.
+			 *
+			 * Not sure what exactly does "address belongs to the
+			 * node" means in the spec, is it just unicast, or what?
+			 *
+			 * At this moment we consider Subject address as
+			 * "belong to the node" if the Subject address equals
+			 * to the IPv6 destination address; validation for
+			 * IPv6 destination address should have done enough
+			 * check for us.
+			 *
+			 * We do not do proxy at this moment.
+			 */
+			/* m_pulldown instead of copy? */
+			m_copydata(m, off + sizeof(struct icmp6_nodeinfo),
+			    subjlen, (caddr_t)&sin6.sin6_addr);
+			if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &sin6.sin6_addr))
+				break;
+			goto bad;
+
+		case ICMP6_NI_SUBJ_FQDN:
+			/* XXX need validation */
+			break;
+
+		case ICMP6_NI_SUBJ_IPV4:	/* xxx: to be implemented? */
+		default:
+			goto bad;
+		}
+		break;
+
+	default:
+		/* should never be here due to "switch (qtype)" above */
+		goto bad;
 	}
 
 	/* allocate a mbuf to reply. */
@@ -1147,45 +1252,45 @@ ni6_input(m, off)
 
 	/* qtype dependent procedure */
 	switch (qtype) {
-	 case NI_QTYPE_NOOP:
-		 nni6->ni_flags = 0;
-		 break;
-	 case NI_QTYPE_SUPTYPES:
-		 goto bad;	/* xxx: to be implemented */
-		 break;
-	 case NI_QTYPE_FQDN:
-		 if (hostnamelen > 255) { /* XXX: rare case, but may happen */
-			 printf("ni6_input: "
+	case NI_QTYPE_NOOP:
+		nni6->ni_flags = 0;
+		break;
+	case NI_QTYPE_SUPTYPES:
+		goto bad;	/* xxx: to be implemented */
+		break;
+	case NI_QTYPE_FQDN:
+		if (hostnamelen > 255) { /* XXX: rare case, but may happen */
+			printf("ni6_input: "
 				"hostname length(%d) is too large for reply\n",
 				(int)hostnamelen);
-			 goto bad;
-		 }
-		 fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
-						 sizeof(struct ip6_hdr) +
-						 sizeof(struct icmp6_nodeinfo));
-		 nni6->ni_flags = 0; /* XXX: meaningless TTL */
-		 fqdn->ni_fqdn_ttl = 0;	/* ditto. */
-		 fqdn->ni_fqdn_namelen = hostnamelen;
-		 bcopy(hostname, &fqdn->ni_fqdn_name[0], hostnamelen);
-		 break;
-	 case NI_QTYPE_NODEADDR:
-	 {
-		 int lenlim, copied;
+			goto bad;
+		}
+		fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
+						sizeof(struct ip6_hdr) +
+						sizeof(struct icmp6_nodeinfo));
+		nni6->ni_flags = 0; /* XXX: meaningless TTL */
+		fqdn->ni_fqdn_ttl = 0;	/* ditto. */
+		fqdn->ni_fqdn_namelen = hostnamelen;
+		bcopy(hostname, &fqdn->ni_fqdn_name[0], hostnamelen);
+		break;
+	case NI_QTYPE_NODEADDR:
+	{
+		int lenlim, copied;
 
-		 if (n->m_flags & M_EXT)
-			 lenlim = MCLBYTES - sizeof(struct ip6_hdr) -
-				 sizeof(struct icmp6_nodeinfo);
-		 else
-			 lenlim = MHLEN - sizeof(struct ip6_hdr) -
-				 sizeof(struct icmp6_nodeinfo);
-		 copied = ni6_store_addrs(ni6, nni6, ifp, lenlim);
-		 /* XXX: reset mbuf length */
-		 n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
-			 sizeof(struct icmp6_nodeinfo) + copied;
-		 break;
-	 }
-	 default:
-		 break;		/* XXX impossible! */
+		if (n->m_flags & M_EXT)
+			lenlim = MCLBYTES - sizeof(struct ip6_hdr) -
+				sizeof(struct icmp6_nodeinfo);
+		else
+			lenlim = MHLEN - sizeof(struct ip6_hdr) -
+				sizeof(struct icmp6_nodeinfo);
+		copied = ni6_store_addrs(ni6, nni6, ifp, lenlim);
+		/* XXX: reset mbuf length */
+		n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
+			sizeof(struct icmp6_nodeinfo) + copied;
+		break;
+	}
+	default:
+		break;		/* XXX impossible! */
 	}
 
 	nni6->ni_type = ICMP6_NI_REPLY;
