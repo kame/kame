@@ -2261,8 +2261,12 @@ ip_setmopt_srcfilter(sop, imsfp)
 			return error;
 		}
 		for (j = 0; j < imsf->imsf_numsrc; j++) {
+			bzero(&src, sizeof(src));
+			src.sin_family = AF_INET;
+			src.sin_len = sizeof(src);
 			error = copyin((void *)&(*imsfp)->imsf_slist[j],
-				       (void *)&src, sizeof(struct sockaddr_in));
+				       (void *)&src.sin_addr,
+				       sizeof(src.sin_addr));
 			if (error != 0) /* EFAULT */
 				break;
 			if (IN_MULTICAST(SIN_ADDR(&src)) ||

@@ -1821,7 +1821,8 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 				i++, total++, mfreelen -= addrlen,
 				ias = LIST_NEXT(ias, ias_list))
 			bcopy(&ias->ias_addr.sin_addr,
-			      &igmp_ghdr->src[i].s_addr, ias->ias_addr.sin_len);
+			      &igmp_ghdr->src[i].s_addr,
+			      sizeof(igmp_ghdr->src[i]));
 	}
 
 	*done = total;
