@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.106 2001/03/15 10:34:35 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.107 2001/03/16 04:12:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,10 +204,20 @@ pfkey_handler()
 
 	/* validity check */
 	if (msg->sadb_msg_errno) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"pfkey %s failed %s\n",
+		int pri;
+
+		/* when SPD is empty, treat the state as no error. */
+		if (msg->sadb_msg_type == SADB_X_SPDDUMP &&
+		    msg->sadb_msg_errno == ENOENT)
+			pri = LLV_DEBUG;
+		else
+			pri = LLV_ERROR;
+
+		plog(pri, LOCATION, NULL,
+			"pfkey %s failed: %s\n",
 			s_pfkey_type(msg->sadb_msg_type),
 			strerror(msg->sadb_msg_errno));
+
 		goto end;
 	}
 
@@ -389,7 +399,8 @@ pfkey_init()
 
 	if (pfkey_send_spddump(lcconf->sock_pfkey) < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"libipsec failed regist ipcomp (%s)", ipsec_strerror());
+			"libipsec sending spddump failed: %s",
+			ipsec_strerror());
 		pfkey_close(lcconf->sock_pfkey);
 		return -1;
 	}
