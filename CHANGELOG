@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1107 2000/07/07 12:41:24 itojun Exp $
+$Id: CHANGELOG,v 1.1108 2000/07/08 00:44:18 itojun Exp $
 
 <200006>
+Sat Jul  8 09:43:26 JST 2000  itojun@iijlab.net
+	* {bsdi3,openbsd,netbsd}/libexec/ftpd: plug setproctitle issue in
+	  CERT Advisory CA-2000-13.  NOTE: bsdi3 uses wu-ftpd.  it may have
+	  other vulnerabilities left in the code.
+
 Fri Jul  7 21:39:33 JST 2000  itojun@iijlab.net
 	* various places: audit use of printf-like functions, including
 	  errx?, warnx?, setproctitle, and syslog.  if we pass user-supplied
