@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.48 2002/05/09 09:41:24 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.49 2002/05/09 14:05:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -567,18 +567,10 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	else /* AF_INET */
 		hport = ntohs(((struct sockaddr_in *)&dstaddr4)->sin_port);
 
-	switch (hport) {
-	case RLOGIN_PORT:
-	case RSH_PORT:
+	if (pflag)
 		s_dst = rresvport_af(&nresvport, sa4->sa_family);
-		break;
-	default:
-		if (pflag)
-			s_dst = rresvport_af(&nresvport, sa4->sa_family);
-		else
-			s_dst = socket(sa4->sa_family, SOCK_STREAM, 0);
-		break;
-	}
+	else
+		s_dst = socket(sa4->sa_family, SOCK_STREAM, 0);
 	if (s_dst < 0) {
 		exit_failure("socket: %s", strerror(errno));
 		/*NOTREACHED*/
