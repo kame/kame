@@ -419,6 +419,10 @@ in6_pcbconnect(in6p, nam)
 				error = EADDRNOTAVAIL;
 			return (error);
 		}
+		if (ifp && sin6->sin6_scope_id == 0 &&
+		    (error = scope6_setzoneid(ifp, sin6)) != 0) { /* XXX */
+			return (error);
+		}
 	}
 	if (in6p->in6p_route.ro_rt)
 		ifp = in6p->in6p_route.ro_rt->rt_ifp;
