@@ -1,0 +1,147 @@
+wyvern/etc/rc.d/wyvern.sh
+wyvern/etc/.admin_passwd
+wyvern/etc/.admin_passwd_md5
+wyvern/docs/AUTHORS
+wyvern/docs/ChangeLog
+wyvern/docs/LICENSE
+wyvern/docs/NEWS
+wyvern/docs/README
+wyvern/docs/TODO
+wyvern/conf/wyvern.conf
+wyvern/conf/mime.types
+wyvern/style/default.css
+wyvern/style/wyvern.css
+wyvern/icons/a.gif
+wyvern/icons/alert.black.gif
+wyvern/icons/alert.red.gif
+wyvern/icons/ball.blue.gif
+wyvern/icons/ball.gray.gif
+wyvern/icons/ball.green.gif
+wyvern/icons/ball.orange.gif
+wyvern/icons/ball.pink.gif
+wyvern/icons/ball.purple.gif
+wyvern/icons/ball.red.gif
+wyvern/icons/ball.white.gif
+wyvern/icons/ball.yellow.gif
+wyvern/icons/binary.gif
+wyvern/icons/binhex.gif
+wyvern/icons/bomb.gif
+wyvern/icons/box.gif
+wyvern/icons/broken.gif
+wyvern/icons/c.gif
+wyvern/icons/comp.gray.gif
+wyvern/icons/compressed.gif
+wyvern/icons/dir.gif
+wyvern/icons/dvi.gif
+wyvern/icons/f.gif
+wyvern/icons/folder.gif
+wyvern/icons/folder.open.gif
+wyvern/icons/folder.sec.gif
+wyvern/icons/generic.gif
+wyvern/icons/generic.red.gif
+wyvern/icons/generic.sec.gif
+wyvern/icons/image1.gif
+wyvern/icons/image2.gif
+wyvern/icons/index.gif
+wyvern/icons/layout.gif
+wyvern/icons/link.gif
+wyvern/icons/movie.gif
+wyvern/icons/p.gif
+wyvern/icons/patch.gif
+wyvern/icons/pdf.gif
+wyvern/icons/portal.gif
+wyvern/icons/ps.gif
+wyvern/icons/quill.gif
+wyvern/icons/screw.gif
+wyvern/icons/script.gif
+wyvern/icons/sound1.gif
+wyvern/icons/sound2.gif
+wyvern/icons/sphere2.gif
+wyvern/icons/tar.gif
+wyvern/icons/tex.gif
+wyvern/icons/text.gif
+wyvern/icons/transfer.gif
+wyvern/icons/unknown.gif
+wyvern/icons/uuencoded.gif
+wyvern/images/wyvern-logo.jpg
+wyvern/images/wyvern-logo2.jpg
+wyvern/images/wyvern-logo3.jpg
+wyvern/htdocs/index.html
+wyvern/samples/dot.waccess
+wyvern/samples/dot.wpasswd
+wyvern/samples/hosts.allow
+wyvern/samples/hosts.deny
+wyvern/bin/wpasswd
+wyvern/sbin/wyvern
+wyvern/sbin/wyvernctl
+wyvern/manual/wyvern.css
+wyvern/manual/wyvern.html
+wyvern/manual/wyvern000.html
+wyvern/manual/wyvern100.html
+wyvern/manual/wyvern1000.html
+wyvern/manual/wyvern200.html
+wyvern/manual/wyvern300.html
+wyvern/manual/wyvern310.html
+wyvern/manual/wyvern320.html
+wyvern/manual/wyvern330.html
+wyvern/manual/wyvern340.html
+wyvern/manual/wyvern350.html
+wyvern/manual/wyvern360.html
+wyvern/manual/wyvern370.html
+wyvern/manual/wyvern380.html
+wyvern/manual/wyvern390.html
+wyvern/manual/wyvern3A0.html
+wyvern/manual/wyvern3B0.html
+wyvern/manual/wyvern400.html
+wyvern/manual/wyvern410.html
+wyvern/manual/wyvern420.html
+wyvern/manual/wyvern430.html
+wyvern/manual/wyvern440.html
+wyvern/manual/wyvern450.html
+wyvern/manual/wyvern451.html
+wyvern/manual/wyvern452.html
+wyvern/manual/wyvern453.html
+wyvern/manual/wyvern460.html
+wyvern/manual/wyvern470.html
+wyvern/manual/wyvern480.html
+wyvern/manual/wyvern500.html
+wyvern/manual/wyvern600.html
+wyvern/manual/wyvern700.html
+wyvern/manual/wyvern800.html
+wyvern/manual/wyvern900.html
+wyvern/manual/config-ok.html
+wyvern/manual/config.html
+wyvern/manual/password-ok.html
+wyvern/manual/password.html
+wyvern/manual/roaming-ok.html
+wyvern/manual/roaming.html
+wyvern/manual/admin00.png
+wyvern/manual/admin01a.png
+wyvern/manual/admin01b.png
+wyvern/manual/admin02.png
+wyvern/manual/admin03.png
+wyvern/manual/roaming01.png
+wyvern/manual/roaming02.png
+wyvern/manual/index.html
+wyvern/cgi-bin/README.html
+wyvern/cgi-bin/dic-tools.cgi
+wyvern/cgi-bin/file-upload.cgi
+wyvern/cgi-bin/location.cgi
+wyvern/cgi-bin/printenv.cgi
+wyvern/cgi-bin/gateway.rb
+wyvern/cgi-bin/printenv.rb
+@dirrm wyvern/bin
+@dirrm wyvern/cgi-bin
+@dirrm wyvern/conf
+@dirrm wyvern/docs
+@dirrm wyvern/etc/rc.d
+@dirrm wyvern/etc
+@dirrm wyvern/htdocs
+@dirrm wyvern/icons
+@dirrm wyvern/images
+@dirrm wyvern/libexec
+@dirrm wyvern/manual
+@dirrm wyvern/samples
+@dirrm wyvern/sbin
+@dirrm wyvern/style
+@dirrm wyvern

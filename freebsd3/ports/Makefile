@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.28 2000/06/23 10:06:28 sumikawa Exp $
+# $Id: Makefile,v 1.29 2000/06/23 16:00:45 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -76,6 +76,7 @@ SUBDIR+=	wbd
 SUBDIR+=	wget
 SUBDIR+=	wu-ftpd
 SUBDIR+=	wwwoffle
+SUBDIR+=	wyvern
 SUBDIR+=	xtris
 SUBDIR+=	zebra
 
