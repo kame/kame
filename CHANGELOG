@@ -1,12 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1851 2001/08/28 11:53:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.1852 2001/08/28 14:57:21 jinmei Exp $
 
 <200108>
 2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (ifinfo):
-	- printed the value of ND6_IFF_ACCEPT_RTADV by 'ndp -i IF'
-	- allowed a user to specify the flag bit by
-	  'ndp -i IF [-]accept_rtadv'
+	- printed the values of ND6_IFF_ACCEPT_RTADV and
+	  ND6_IFF_PREFER_SOURCE by 'ndp -i IF'
+	- allowed a user to specify the flag bits by
+	  'ndp -i IF [-]accept_rtadv' or
+	  'ndp -i IF [-] prefer_source', respectively.
+
+2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.h:
+	* kame/sys/netinet6/in6_src.c (in6_selectsrc):
+	introduced a new flag bit "ND6_IFF_PREFER_SOURCE" in the nd_ifinfo
+	structure, in order to specify "preferred" interfaces for source
+	address selection.
 
 2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.[ch]:
