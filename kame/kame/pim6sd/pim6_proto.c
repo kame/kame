@@ -1288,7 +1288,7 @@ join_or_prune(mrtentry_ptr, upstream_router)
 
 /* TODO: when parsing, check if we go beyong message size */
 /* TODO: too long, simplify it! */
-#define PIM6_JOIN_PRUNE_MINLEN (PIM_MINLEN + 8)
+#define PIM6_JOIN_PRUNE_MINLEN (4 + PIM6_ENCODE_UNI_ADDR_LEN + 4)
 
 int
 receive_pim6_join_prune(src, dst, pim_message, datalen)
@@ -1391,7 +1391,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	    return(FALSE);
 	}
 	datalen -= (PIM6_ENCODE_GRP_ADDR_LEN + sizeof(u_int32_t));
-	data_ptr += (PIM6_ENCODE_GRP_ADDR_LEN + sizeof(u_int32_t));
+	data_ptr += PIM6_ENCODE_GRP_ADDR_LEN;
 
 	/* joined source addresses and pruned source addresses */
 	GET_HOSTSHORT(num_j_srcs, data_ptr);
