@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.107 2001/07/03 08:13:47 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.108 2001/07/03 08:24:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,8 +97,8 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #ifdef INET6
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/queue.h>
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <net/if_var.h>
 #endif
 #include <sys/ioctl.h>
