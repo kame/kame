@@ -1076,7 +1076,7 @@ out:
 		if (error == ENOBUFS) {
 			if (tp->t_inpcb)
 				tcp_quench(tp->t_inpcb, 0);
-#if 0 /*XXX def INET6*/
+#ifdef INET6
 			else if (tp->t_in6pcb)
 				tcp6_quench(tp->t_in6pcb, 0);
 #endif
