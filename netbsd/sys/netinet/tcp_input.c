@@ -1232,7 +1232,7 @@ after_listen:
 		struct ip6_recvpktopts opts;
 
 		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		ip6_savecontrol(in6p, ip6, m, &opts);
 		if (in6p->in6p_inputopts)
 			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
 		if (opts.head) {
@@ -3132,8 +3132,7 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 
 			bzero(&newopts, sizeof(newopts));
 			ip6 = mtod(m, struct ip6_hdr *);
-			ip6_savecontrol(in6p, ip6, m, &newopts,
-					&in6p->in6p_inputopts);
+			ip6_savecontrol(in6p, ip6, m, &newopts);
 			if (in6p->in6p_inputopts)
 				ip6_update_recvpcbopt(in6p->in6p_inputopts,
 						      &newopts);

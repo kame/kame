@@ -882,7 +882,7 @@ findpcb:
 		 * XXX: we'll soon make a more natural fix after getting a
 		 *      consensus.
 		 */
-		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
+		ip6_savecontrol(inp, ip6, m, &opts6);
 		if (inp->in6p_inputopts)
 			ip6_update_recvpcbopt(inp->in6p_inputopts, &opts6);
 		if (opts6.head) {

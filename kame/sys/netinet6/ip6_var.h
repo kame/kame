@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.79 2001/12/27 15:37:41 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.80 2002/01/10 12:21:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -376,14 +376,12 @@ int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 void	ip6_savecontrol __P((struct inpcb *, struct ip6_hdr *, struct mbuf *,
-			     struct ip6_recvpktopts *,
-			     struct ip6_recvpktopts **));
+			     struct ip6_recvpktopts *));
 void	ip6_notify_pmtu __P((struct inpcb *, struct sockaddr_in6 *,
 			     u_int32_t *));
 #else
 void	ip6_savecontrol __P((struct in6pcb *, struct ip6_hdr *, struct mbuf *,
-			     struct ip6_recvpktopts *,
-			     struct ip6_recvpktopts **));
+			     struct ip6_recvpktopts *));
 void	ip6_notify_pmtu __P((struct in6pcb *, struct sockaddr_in6 *,
 			     u_int32_t *));
 #endif

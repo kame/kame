@@ -507,7 +507,7 @@ udp6_sendup(m, off, src, so)
 		if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS
 			  || in6p->in6p_socket->so_options & SO_TIMESTAMP)) {
 			struct ip6_hdr *ip6 = mtod(n, struct ip6_hdr *);
-			ip6_savecontrol(in6p, ip6, n, &opts, NULL);
+			ip6_savecontrol(in6p, ip6, n, &opts);
 		}
 
 		m_adj(n, off);

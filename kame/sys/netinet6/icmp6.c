@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.270 2002/01/08 02:40:56 k-sugyou Exp $	*/
+/*	$KAME: icmp6.c,v 1.271 2002/01/10 12:21:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2274,8 +2274,7 @@ icmp6_rip6_input(mp, off)
 			struct	mbuf *n;
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
-					ip6_savecontrol(last, ip6, n, &opts,
-							NULL);
+					ip6_savecontrol(last, ip6, n, &opts);
 				/* strip intermediate headers */
 				m_adj(n, off);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -2295,7 +2294,7 @@ icmp6_rip6_input(mp, off)
 	}
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS)
-			ip6_savecontrol(last, ip6, m, &opts, NULL);
+			ip6_savecontrol(last, ip6, m, &opts);
 		/* strip intermediate headers */
 		m_adj(m, off);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,

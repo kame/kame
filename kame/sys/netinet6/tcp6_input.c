@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.44 2001/12/07 07:07:10 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.45 2002/01/10 12:21:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -777,7 +777,7 @@ after_listen:
 		struct ip6_recvpktopts opts;
 
 		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		ip6_savecontrol(in6p, ip6, m, &opts);
 		if (in6p->in6p_inputopts)
 			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
 		if (opts.head) {
@@ -2562,7 +2562,7 @@ syn_cache_get6(so, m, off, len)
 	in6p->in6p_faddr = sc->sc_src;
 	in6p->in6p_fport = sc->sc_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		ip6_savecontrol(in6p, ip6, m, &opts);
 		if (in6p->in6p_inputopts)
 			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
 		if (opts.head) {

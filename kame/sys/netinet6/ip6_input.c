@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.244 2002/01/10 11:59:49 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.245 2002/01/10 12:21:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1591,7 +1591,7 @@ ip6_unknown_opt(optp, m, off)
  * very first mbuf on the mbuf chain.
  */
 void
-ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
+ip6_savecontrol(in6p, ip6, m, ctl)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 	struct inpcb *in6p;
 #else
@@ -1599,7 +1599,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #endif
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
-	struct ip6_recvpktopts *ctl, **prevctlp;
+	struct ip6_recvpktopts *ctl;
 {
 #define IS2292(x, y)	((in6p->in6p_flags & IN6P_RFC2292) ? (x) : (y))
 	struct mbuf **mp;
