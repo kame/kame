@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.72 2004/02/04 01:01:10 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.73 2004/02/04 02:46:17 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -247,6 +247,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Construct sockaddr format source address.
 		 */
+		init_sin6(&fromsa, m);
 		fromsa.sin6_port = uh->uh_sport;
 		/*
 		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
@@ -511,6 +512,7 @@ udp6_input(mp, offp, proto)
 	 * Construct sockaddr format source address.
 	 * Stuff source address and datagram in user buffer.
 	 */
+	init_sin6(&fromsa, m);
 	fromsa.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 	    || in6p->in6p_socket->so_options & SO_TIMESTAMP)
@@ -591,13 +593,13 @@ udp6_ctlinput(cmd, sa, d)
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
-		(void) in6_pcbnotify(&udb, (const struct sockaddr *)sa,
+		(void) in6_pcbnotify(&udb, sa,
 				     uh.uh_dport, 
 				     (const struct sockaddr *)ip6cp->ip6c_src,
 				     uh.uh_sport, cmd, cmdarg, notify);
 	} else
-		(void) in6_pcbnotify(&udb, sa, 0, (struct sockaddr *)sa6_src,
-				     0, cmd, cmdarg, notify);
+		(void) in6_pcbnotify(&udb, sa, 0,
+		    (const struct sockaddr *)sa6_src, 0, cmd, cmdarg, notify);
 }
 
 static int
