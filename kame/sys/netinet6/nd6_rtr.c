@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.102 2001/02/27 08:38:38 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.103 2001/03/02 14:51:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -976,8 +976,14 @@ prelist_remove(pr)
 	/* make sure to invalidate the prefix until it is really freed. */
 	pr->ndpr_vltime = 0;
 	pr->ndpr_pltime = 0;
+#if 0
+	/*
+	 * Though these flags are now meaningless, we'd rather keep the value
+	 * not to confuse users when executing "ndp -p".
+	 */
 	pr->ndpr_raf_onlink = 0;
 	pr->ndpr_raf_auto = 0;
+#endif
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) != 0 &&
 	    (e = nd6_prefix_offlink(pr)) != 0) {
 		log(LOG_ERR, "prelist_remove: failed to make %s/%d offlink "
@@ -1044,9 +1050,6 @@ prelist_update(new, dr, m)
 	}
 
 	if ((pr = nd6_prefix_lookup(new)) != NULL) {
-		if (new->ndpr_raf_onlink == 0)
-			goto addrconf;
-
 		/*
 		 * nd6_prefix_lookup() ensures that pr and new have the same
 		 * prefix on a same interface.
@@ -1072,10 +1075,12 @@ prelist_update(new, dr, m)
 			pr->ndpr_raf_onlink = 1;
 		if (new->ndpr_raf_auto == 1)
 			pr->ndpr_raf_auto = 1;
-		pr->ndpr_vltime = new->ndpr_vltime;
-		pr->ndpr_pltime = new->ndpr_pltime;
-		pr->ndpr_preferred = new->ndpr_preferred;
-		pr->ndpr_expire = new->ndpr_expire;
+		if (new->ndpr_raf_onlink) {
+			pr->ndpr_vltime = new->ndpr_vltime;
+			pr->ndpr_pltime = new->ndpr_pltime;
+			pr->ndpr_preferred = new->ndpr_preferred;
+			pr->ndpr_expire = new->ndpr_expire;
+		}
 
 		if (new->ndpr_raf_onlink &&
 		    (pr->ndpr_stateflags & NDPRF_ONLINK) == 0) {
@@ -1106,20 +1111,6 @@ prelist_update(new, dr, m)
 		bzero(&new->ndpr_addr, sizeof(struct in6_addr));
 
 		error = nd6_prelist_add(new, dr, &newpr);
-
-		/*
-		 * XXX: we the ND point of view, we can ignore a prefix
-		 * with the on-link bit being zero.  However, we need a
-		 * prefix structure for references from autoconfigured
-		 * addresses.  Thus, we explicitly make the prefix itself
-		 * expires now.
-		 */
-		if (newpr->ndpr_raf_onlink == 0) {
-			newpr->ndpr_vltime = 0;
-			newpr->ndpr_pltime = 0;
-			in6_init_prefix_ltimes(newpr);
-		}
-
 		if (error != 0 || newpr == NULL) {
 			log(LOG_NOTICE, "prelist_update: "
 			    "nd6_prelist_add failed for %s/%d on %s "
@@ -1129,6 +1120,20 @@ prelist_update(new, dr, m)
 					error, newpr);
 			goto end; /* we should just give up in this case. */
 		}
+
+		/*
+		 * XXX: from the ND point of view, we can ignore a prefix
+		 * with the on-link bit being zero.  However, we need a
+		 * prefix structure for references from autoconfigured
+		 * addresses.  Thus, we explicitly make suret that the prefix
+		 * itself expires now.
+		 */
+		if (newpr->ndpr_raf_onlink == 0) {
+			newpr->ndpr_vltime = 0;
+			newpr->ndpr_pltime = 0;
+			in6_init_prefix_ltimes(newpr);
+		}
+
 		pr = newpr;
 	}
 
