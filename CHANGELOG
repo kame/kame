@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1921 2001/10/19 00:56:05 sakane Exp $
+$KAME: CHANGELOG,v 1.1922 2001/10/19 06:41:46 itojun Exp $
 
 <200110>
+Fri Oct 19 15:41:09 JST 2001  itojun@iijlab.net
+	* sys/netinet6/nd6.c: repair binary backward compatibility breakage
+	  for SIOCGPRLST_IN6 ioctl.
+
 Fri Oct 19 09:54:19 JST 2001 sakane@kame.net
 	* kame/sys/key.c:
 	the value of the prefixlen in the sadb_address structure is fixed.
