@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.4 2000/01/09 01:31:29 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.5 2000/01/14 00:31:33 itojun Exp $ */
 
 struct ipsecsa;
 
@@ -47,7 +47,7 @@ extern void pfkey_timeover __P((struct ph2handle *iph2));
 extern u_int pfkey2ipsecdoi_proto __P((u_int proto));
 
 extern int pfkey_convertfromipsecdoi __P((
-	u_int proto_id, u_int t_id, u_int hashtype,
+	u_int proto_id, u_int t_id, u_int hashtype, u_int comptype,
 	u_int *e_type, u_int *e_keylen, u_int *a_type, u_int *a_keylen,
 	u_int *flags));
 extern u_int32_t pk_getseq __P((void));

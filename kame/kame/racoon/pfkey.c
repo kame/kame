@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.16 2000/01/13 23:24:04 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.17 2000/01/14 00:31:33 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -672,11 +672,12 @@ keylen_ealg(t_id, encklen)
 	/*NOTREACHED*/
 }
 
-int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
+int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype, comptype,
 		e_type, e_keylen, a_type, a_keylen, flags)
 	u_int proto_id;
 	u_int t_id;
 	u_int hashtype;
+	u_int comptype;
 	u_int *e_type;
 	u_int *e_keylen;
 	u_int *a_type;
@@ -726,7 +727,7 @@ int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		break;
 
 	case IPSECDOI_PROTO_IPCOMP:
-		if ((*e_type = ipsecdoi2pfkey_calg(t_id)) == ~0)
+		if ((*e_type = ipsecdoi2pfkey_calg(comptype)) == ~0)
 			goto bad;
 		*e_keylen = 0;
 
@@ -961,12 +962,13 @@ pk_sendupdate(iph2)
 		}
 
 		/* set algorithm type and key length */
-		plog(logp, LOCATION, NULL, "%d %d %d\n", s->proto_id, s->enctype, s->authtype);
+		plog(logp, LOCATION, NULL, "%u %u %u\n", s->proto_id, s->enctype, s->authtype, s->comptype);
 		e_keylen = iph2->approval->encklen;
 		if (pfkey_convertfromipsecdoi(
 				s->proto_id,
 				s->enctype,
 				s->authtype,
+				s->comptype,
 				&e_type, &e_keylen,
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
@@ -1159,6 +1161,7 @@ pk_sendadd(iph2)
 				s->proto_id,
 				s->enctype,
 				s->authtype,
+				s->comptype,
 				&e_type, &e_keylen,
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
