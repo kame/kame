@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.111 2001/07/18 13:08:20 itojun Exp $
+$KAME: COVERAGE,v 1.112 2001/09/07 08:14:47 itojun Exp $
 
 
 x: supported/integrated
@@ -121,6 +121,9 @@ draft-ietf-ipngwg-p2p-pingpong-00.txt
 advanced API	2292bis	2292	2292	2292	2292	2292	2292	2292bis
 		(*1)
     (*1) 2292 API is supplied for binary backward compatibility
+
+CMSG_FIRSTHDR validates msg_controllen
+		x	x	-	-	-	-	-	-
 
 getifaddrs	x	x	x	x	x	x	x	x
 
