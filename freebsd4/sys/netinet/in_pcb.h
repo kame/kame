@@ -132,7 +132,10 @@ struct inpcb {
 	struct {
 		/* IP options */
 		struct	mbuf *inp6_options;
-		/* IP6 options for incoming packets */
+		/*
+		 * IP6 options for incoming packets.
+		 * XXX: currently unused but remained just in case.
+		 */
 		struct	ip6_recvpktopts *inp6_inputopts;
 		/* IP6 options for outgoing packets */
 		struct	ip6_pktopts *inp6_outputopts;
