@@ -3,7 +3,7 @@
 # Date created:		Fri Jul 10 17:29:13 JST 1998
 # Whom:			itojun
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:41 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/20 12:30:01 itojun Exp $
 #
 
 DISTNAME=	vat6
@@ -13,7 +13,7 @@ MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/ \
 		ftp://ftp.cs.tu-berlin.de/pub/local/kbs/tubmik/gsm/
 DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${GSM}${EXTRACT_SUFX}
 
-PATCH_SITES=	http://www.v6.csi.ad.jp/setup/mcast/patch/
+PATCH_SITES=	http://www.v6.csi2.net/setup/mcast/patch/
 PATCHFILES=	vat6-kame-19990420.patch
 PATCH_DIST_STRIP=	-p1
 
