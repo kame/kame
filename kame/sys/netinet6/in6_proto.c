@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.147 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.148 2004/05/20 08:15:54 suz Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -94,6 +94,9 @@
 #endif
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#include <net/pfil.h>
+#endif
 #include <net/radix.h>
 #ifdef RADIX_ART
 #include <net/radix_art.h>

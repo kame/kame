@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.77 2004/04/09 09:54:06 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.78 2004/05/20 08:15:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,6 +85,9 @@
 #include <sys/syslog.h>
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#include <net/pfil.h>
+#endif
 #include <net/route.h>
 #include <net/if_types.h>
 

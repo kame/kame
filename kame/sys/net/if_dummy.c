@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.25 2003/05/01 08:03:46 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.26 2004/05/20 08:15:53 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -162,6 +162,8 @@ dummyattach(dummy)
 		ifp = &dummyif[i];
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(ifp->if_xname, "dummy%d", i);
+#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+		if_initname(ifp, "dummy", i);
 #else
 		ifp->if_name = "dummy";
 		ifp->if_unit = i;
@@ -344,7 +346,7 @@ dummyrtrequest(cmd, rt, sa)
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
 		/*
 		 * For optimal performance, the send and receive buffers
 		 * should be at least twice the MTU plus a little more for

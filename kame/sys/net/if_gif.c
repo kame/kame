@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.105 2003/11/09 14:39:50 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.106 2004/05/20 08:15:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,9 @@
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
+#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#include <net/pfil.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -157,6 +160,8 @@ gifattach(dummy)
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		snprintf(sc->gif_if.if_xname, sizeof(sc->gif_if.if_xname),
 		    "gif%d", i);
+#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+		if_initname(&sc->gif_if, "gif", i);
 #else
 		sc->gif_if.if_name = "gif";
 		sc->gif_if.if_unit = i;

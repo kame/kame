@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.92 2004/02/10 12:34:57 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.93 2004/05/20 08:15:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,6 +92,9 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502000
+#include <net/pfil.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>

@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.19 2004/02/19 17:56:28 itojun Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.20 2004/05/20 08:15:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,7 +137,9 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		rt->rt_flags |= RTF_MULTICAST;
 
 	if (!(rt->rt_flags & (RTF_HOST | RTF_CLONING | RTF_MULTICAST))) {
+#ifdef RTF_PRCLONING
 		rt->rt_flags |= RTF_PRCLONING;
+#endif
 	}
 
 	/*
@@ -181,7 +183,10 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		rt->rt_rmx.rmx_recvpipe = tcp_recvspace;
 #endif
 
-	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)
+	if (!rt->rt_rmx.rmx_mtu 
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
+	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)
+#endif
 	    && rt->rt_ifp)
 		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 
@@ -194,7 +199,11 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		 * ARP entry and delete it if so.
 		 */
 		rt2 = rtalloc1((struct sockaddr *)sin6, 0,
-				RTF_CLONING | RTF_PRCLONING);
+				RTF_CLONING
+#ifdef RTF_PRCLONING
+				| RTF_PRCLONING
+#endif
+				);
 		if (rt2) {
 			if (rt2->rt_flags & RTF_LLINFO &&
 				rt2->rt_flags & RTF_HOST &&
@@ -224,7 +233,11 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		 *	This case should not raise an error.
 		 */
 		rt2 = rtalloc1((struct sockaddr *)sin6, 0,
-				RTF_CLONING | RTF_PRCLONING);
+				RTF_CLONING
+#ifdef RTF_PRCLONING
+				| RTF_PRCLONING
+#endif
+			      );
 		if (rt2) {
 			if ((rt2->rt_flags & (RTF_CLONING|RTF_HOST|RTF_GATEWAY))
 			    == RTF_CLONING && rt2->rt_gateway &&

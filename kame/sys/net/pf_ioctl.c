@@ -88,16 +88,24 @@
 #include <altq/altq.h>
 #endif
 
+#include <net/net_osdep.h>
+
 void			 pfattach(int);
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+int			 pfopen(dev_t, int, int, struct thread *);
+int			 pfclose(dev_t, int, int, struct thread *);
+int			 pfioctl(dev_t, u_long, caddr_t, int, struct thread *);
+#else
 int			 pfopen(dev_t, int, int, struct proc *);
 int			 pfclose(dev_t, int, int, struct proc *);
+int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
+#endif
 struct pf_pool		*pf_get_pool(char *, char *, u_int32_t,
 			    u_int8_t, u_int8_t, u_int8_t, u_int8_t, u_int8_t);
 int			 pf_get_ruleset_number(u_int8_t);
 void			 pf_init_ruleset(struct pf_ruleset *);
 void			 pf_mv_pool(struct pf_palist *, struct pf_palist *);
 void			 pf_empty_pool(struct pf_palist *);
-int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
 
 #ifdef __FreeBSD__
 #define splsoftnet()	splnet()
@@ -107,20 +115,21 @@ PSEUDO_SET(pfattach, pf);
 static struct cdevsw pf_cdevsw = {
 	.d_open =	pfopen,
 	.d_close =	pfclose,
-	.d_read =	noread,
+#if __FreeBSD_version < 502000
 	.d_write =	nowrite,
-	.d_ioctl =	pfioctl,
 	.d_poll  =	nopoll,
 	.d_mmap =	nommap,
 	.d_strategy =	nostrategy,
+	.d_dump =	nodump,
+	.d_kqfilter =	nokqfilter,
+#endif
+	.d_ioctl =	pfioctl,
 	.d_name =	"pf",
 	.d_maj =	CDEV_MAJOR,
-	.d_dump =	nodump,
-#if (__FreeBSD_version < 501000)
+#if __FreeBSD_version < 501000
 	.d_psize =	nopsize,
 #endif
 	.d_flags =	0,
-	.d_kqfilter =	nokqfilter
 };
 #endif
 
@@ -225,7 +234,11 @@ pfattach(int num)
 }
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+pfopen(dev_t dev, int flags, int fmt, struct thread *p)
+#else
 pfopen(dev_t dev, int flags, int fmt, struct proc *p)
+#endif
 {
 	if (minor(dev) >= 1)
 		return (ENXIO);
@@ -233,7 +246,11 @@ pfopen(dev_t dev, int flags, int fmt, struct proc *p)
 }
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+pfclose(dev_t dev, int flags, int fmt, struct thread *p)
+#else
 pfclose(dev_t dev, int flags, int fmt, struct proc *p)
+#endif
 {
 	if (minor(dev) >= 1)
 		return (ENXIO);
@@ -614,7 +631,11 @@ pf_qid_unref(u_int32_t qid)
 #endif /* ALTQ */
 
 int
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *p)
+#else
 pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
+#endif
 {
 	struct pf_pooladdr	*pa = NULL;
 	struct pf_pool		*pool = NULL;
@@ -708,13 +729,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pf_status.states = states;
 			pf_status.since = time.tv_sec;
 			if (status_ifp != NULL) {
-#ifdef __FreeBSD__
-				snprintf(pf_status.ifname, IFNAMSIZ, "%s%d",
-				    status_ifp->if_name, status_ifp->if_unit);
-#else
 				strlcpy(pf_status.ifname,
-				    status_ifp->if_xname, IFNAMSIZ);
-#endif
+				    if_name(status_ifp), IFNAMSIZ);
 			}
 			DPFPRINTF(PF_DEBUG_MISC, ("pf: started\n"));
 		}
@@ -1366,13 +1382,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		pf_status.since = since;
 		pf_status.debug = debug;
 		if (status_ifp != NULL) {
-#ifdef __FreeBSD__
-			snprintf(pf_status.ifname, IFNAMSIZ, "%s%d",
-			    status_ifp->if_name, status_ifp->if_unit);
-#else
 			strlcpy(pf_status.ifname,
-			    status_ifp->if_xname, IFNAMSIZ);
-#endif
+			    if_name(status_ifp), IFNAMSIZ);
 		}
 		break;
 	}

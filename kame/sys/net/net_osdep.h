@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.84 2004/01/26 03:54:49 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.85 2004/05/20 08:15:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -317,7 +317,7 @@
 #define __NET_NET_OSDEP_H_DEFINED_
 #ifdef _KERNEL
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__) && __FreeBSD_version >= 502000
 #define if_name(ifp)	((ifp)->if_xname)
 #else
 struct ifnet;

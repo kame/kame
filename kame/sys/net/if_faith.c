@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.36 2003/05/01 08:03:46 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.37 2004/05/20 08:15:53 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -149,6 +149,8 @@ faithattach(faith)
 		bzero(ifp, sizeof(faithif[i]));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(ifp->if_xname, "faith%d", i);
+#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+		if_initname(ifp, "faith", i);
 #else
 		ifp->if_name = "faith";
 		ifp->if_unit = i;
@@ -304,7 +306,7 @@ faithrtrequest(cmd, rt, sa)
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
 		/*
 		 * For optimal performance, the send and receive buffers
 		 * should be at least twice the MTU plus a little more for

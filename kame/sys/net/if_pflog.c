@@ -131,6 +131,8 @@ pflogattach(int npflog)
 		ifp = &pflogif[i].sc_if;
 #ifndef __FreeBSD__
 		snprintf(ifp->if_xname, sizeof ifp->if_xname, "pflog%d", i);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 502000
+		if_initname(ifp, "pflog", i);
 #else
 		ifp->if_name = "pflog";
 		ifp->if_unit = i;
@@ -246,12 +248,7 @@ pflog_packet(struct ifnet *ifp, struct mbuf *m, sa_family_t af, u_int8_t dir,
 	hdr.af = af;
 	hdr.action = rm->action;
 	hdr.reason = reason;
-#ifndef __FreeBSD__
-	memcpy(hdr.ifname, ifp->if_xname, sizeof(hdr.ifname));
-#else
-	snprintf(hdr.ifname, sizeof(hdr.ifname), "%s%d", ifp->if_name,
-	    ifp->if_unit);
-#endif
+	memcpy(hdr.ifname, if_name(ifp), sizeof(hdr.ifname));
 
 	if (am == NULL) {
 		hdr.rulenr = htonl(rm->nr);
@@ -290,7 +287,11 @@ pflog_packet(struct ifnet *ifp, struct mbuf *m, sa_family_t af, u_int8_t dir,
 #ifndef __FreeBSD__
 		bpf_mtap(ifn->if_bpf, &m1);
 #else
+#ifdef HAVE_NEW_BPF
 		bpf_mtap(ifn, &m1);
+#else
+		bpf_mtap(ifn->if_bpf, &m1);
+#endif
 #endif
 	}
 #endif

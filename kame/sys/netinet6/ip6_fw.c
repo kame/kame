@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.32 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.33 2004/05/20 08:15:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -362,12 +362,9 @@ iface_match(struct ifnet *ifp, union ip6_fw_if *ifu, int byname)
 {
 	/* Check by name or by IP address */
 	if (byname) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 502000)
 	    {
-		char xname[IFNAMSIZ];
-		snprintf(xname, sizeof(xname), "%s%d", ifu->fu_via_if.name,
-			ifu->fu_via_if.unit);
-		if (strcmp(ifp->if_xname, xname))
+		if (strncmp(if_name(ifp), ifu->fu_via_if.name, IP6FW_IFNLEN))
 			return (0);
 	    }
 #else

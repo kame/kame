@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.111 2004/05/06 09:19:47 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.112 2004/05/20 08:15:53 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -180,7 +180,13 @@ static int ip_gif_ttl = 40;	/*XXX*/
 extern struct domain inetdomain;
 struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input,	rip_output,	0,		rip_ctloutput,
+  in_stf_input,
+#if defined(__FreeBSD__) && __FreeBSD_version >= 050201
+ (pr_output_t *)rip_output,
+#else
+  rip_output,
+#endif
+  0,		rip_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -247,6 +253,8 @@ stfattach(dummy)
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
 			"stf%d", i);
+#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+		if_initname(&sc->sc_if, "stf", i);
 #else
 		sc->sc_if.if_name = "stf";
 		sc->sc_if.if_unit = i;
@@ -320,7 +328,11 @@ stf_encapcheck(m, off, proto, arg)
 		return 0;
 
 	/* LINTED const cast */
+#ifdef __FreeBSD__
+	m_copydata(m, 0, sizeof(ip), (caddr_t)&ip);
+#else
 	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
+#endif
 
 	if (ip.ip_v != 4)
 		return 0;

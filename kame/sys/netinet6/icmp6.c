@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.383 2004/04/20 10:13:00 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.384 2004/05/20 08:15:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,9 @@
 #include <sys/syslog.h>
 #include <sys/domain.h>
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502000
+#include <net/pfil.h>
+#endif
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_dl.h>
@@ -1506,7 +1509,11 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #else
 #ifdef __FreeBSD__
 	rt = rtalloc1((struct sockaddr *)dst, 0,
-		      RTF_CLONING | RTF_PRCLONING);
+		      RTF_CLONING 
+#if __FreeBSD_version < 502000
+		      | RTF_PRCLONING
+#endif
+		     );
 #else
 #ifdef __bsdi__
 	bcopy(dst, &ro6.ro_dst, sizeof(struct sockaddr_in6));
@@ -1521,7 +1528,9 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 
 	if (rt && (rt->rt_flags & RTF_HOST) &&
+#if defined( __FreeBSD__) && __FreeBSD_version < 502000
 	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
+#endif
 	    (rt->rt_rmx.rmx_mtu > mtu || rt->rt_rmx.rmx_mtu == 0)) {
 		if (mtu < IN6_LINKMTU(rt->rt_ifp)) {
 			icmp6stat.icp6s_pmtuchg++;
@@ -2996,13 +3005,15 @@ icmp6_redirect_input(m, off)
 
 		rtredirect((struct sockaddr *)&sdst, (struct sockaddr *)&sgw,
 		    (struct sockaddr *)NULL, RTF_GATEWAY | RTF_HOST,
-		    (struct sockaddr *)&ssrc,
+		    (struct sockaddr *)&ssrc
 #ifdef __bsdi__
-		    icmp_redirtimeout
+		    , icmp_redirtimeout
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
-		    &newrt
+		    , &newrt
+#elif defined(__FreeBSD__) && __FreeBSD_version > 502000
+		    /* empty */
 #else
-		    (struct rtentry **)NULL
+		    , (struct rtentry **)NULL
 #endif
 		    );
 
@@ -3658,7 +3669,9 @@ icmp6_mtudisc_timeout(rt, r)
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
 #ifdef __FreeBSD__
+#if __FreeBSD_version < 502000
 	if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
+#endif
 		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 #else /* openbsd/netbsd */
 	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==

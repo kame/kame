@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.108 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.109 2004/05/20 08:15:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,9 @@
 #endif
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#include <net/pfil.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>

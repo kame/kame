@@ -41,8 +41,8 @@
 # define DPFPRINTF(format, x...)		\
 	if (pf_status.debug >= PF_DEBUG_NOISY)	\
 		printf(format , ##x)
-#ifdef __FreeBSD__
-#define MAX(a, b)	(((a) > (b)) ? (a) : (b))
+#if defined(__FreeBSD__) && __FreeBSD_version < 500000
+#define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
 #endif
 
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.138 2004/04/09 05:37:46 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.139 2004/05/20 08:15:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -486,7 +486,7 @@ ip6_forward(m, srcrt)
 			}
 
 			/* this probably fails but give it a try again */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
 			rtalloc_ign((struct route *)&ip6_forward_rt,
 				    RTF_PRCLONING);
 #else
@@ -513,7 +513,7 @@ ip6_forward(m, srcrt)
 		}
 		dst->sin6_addr = ip6->ip6_dst;
 		dst->sin6_scope_id = 0;	/* XXX */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
 		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
 #else
 		rtalloc((struct route *)&ip6_forward_rt);

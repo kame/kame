@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.340 2004/04/16 05:23:42 fujisawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.341 2004/05/20 08:15:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,7 +109,7 @@
 #include <net/if_dl.h>
 #include <net/route.h>
 #include <net/netisr.h>
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 502000)
 #include <net/pfil.h>
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -273,7 +273,9 @@ ip6_init()
 		    pr->pr_protocol && pr->pr_protocol != IPPROTO_RAW)
 			ip6_protox[pr->pr_protocol] = pr - inet6sw;
 	ip6intrq.ifq_maxlen = ip6qmaxlen;
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 502000)
+	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq, 0);
+#elif (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq);
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	register_netisr(NETISR_IPV6, ip6intr);
@@ -817,7 +819,7 @@ ip6_input(m)
 		dst6->sin6_addr = ip6->ip6_dst;
 		dst6->sin6_scope_id = 0; /* XXX */
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
 		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
 #else
 		rtalloc((struct route *)&ip6_forward_rt);

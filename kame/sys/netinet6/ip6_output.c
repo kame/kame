@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.447 2004/04/21 13:22:23 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.448 2004/05/20 08:15:55 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -133,7 +133,7 @@
 
 #include <net/if.h>
 #include <net/route.h>
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#if defined(__NetBSD__) && defined(PFIL_HOOKS) || (defined(__FreeBSD__) && __FreeBSD_version > 502000)
 #include <net/pfil.h>
 #endif
 
@@ -1925,7 +1925,9 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			 * field isn't locked).
 			 */
 			mtu = ifmtu;
+#if defined(__FreeBSD__) && __FreeBSD_version < 502000
 			if (!(ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU))
+#endif
 				ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
 		}
 	} else if (ifp) {

@@ -129,6 +129,8 @@ pfsyncattach(int npfsync)
 	ifp = &pfsyncif.sc_if;
 #ifndef __FreeBSD__
 	strlcpy(ifp->if_xname, "pfsync0", sizeof ifp->if_xname);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 502000
+	if_initname(ifp, "pfsync", 0);
 #else
 	ifp->if_name = "pfsync";
 	ifp->if_unit = 0;
