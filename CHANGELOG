@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1375 2000/11/08 17:23:00 itojun Exp $
+$KAME: CHANGELOG,v 1.1376 2000/11/09 01:02:25 itojun Exp $
 
 <200011>
+Thu Nov  9 09:53:54 JST 2000  itojun@iijlab.net
+	* netbsd/libexec/{rshd,rlogind}: do not refer free'ed memory region.
+	  KAME PR 302 from ryo@iij.ad.jp
+
 Thu Nov  9 02:21:00 JST 2000  itojun@iijlab.net
 	* *bsd*/sys/sys/mbuf.h: make sure we nuke mbuf pointed to by m_aux,
 	  on MFREE().  under sys/kern, there are code which calls MFREE()
