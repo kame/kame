@@ -1,4 +1,4 @@
-.\"	$KAME: rtsold.8,v 1.13 2000/08/13 06:22:19 itojun Exp $
+.\"	$KAME: rtsold.8,v 1.14 2000/08/13 18:06:39 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -58,6 +58,11 @@ If a node (re)attaches to a link,
 sends some Router Solicitations on the link destined to the link-local scope
 all-routers multicast address to discover new routers
 and to get non link-local addresses.
+.Pp
+.Nm
+should be used on IPv6 host
+.Pq non-router node
+only.
 .Pp
 If you invoke the program as
 .Nm rtsol ,
@@ -133,9 +138,9 @@ Autoprobe outgoing interface.
 will try to find a non-loopback, non-p2p and IPv6-capable, interface.
 If
 .Nm
-finds multiple interfaces, it will fail.
-This is because IPv6 specification talks about single interface node,
-in autoconfiguration spec.
+finds multiple interfaces,
+.Nm
+will exit with error.
 .\"
 .It Fl d
 Enable debugging.
@@ -204,3 +209,12 @@ may not work if you reinsert a network card.
 In such a case,
 .Nm
 should be killed and restarted.
+.Pp
+IPv6 autoconfiguration specification assumes single interface host.
+You may see kernel error message if you try to autoconfigure a host with
+multiple interfaces.
+Also, it seems contradictory for
+.Nm
+to accept multiple
+.Ar interfaces
+in argument.
