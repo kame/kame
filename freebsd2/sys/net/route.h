@@ -200,6 +200,7 @@ struct ortentry {
 #define	RTF_BROADCAST	0x400000	/* route represents a bcast address */
 #define	RTF_MULTICAST	0x800000	/* route represents a mcast address */
 					/* 0x1000000 and up unassigned */
+#define RTF_CACHE	0x1000000	/* cached route in general */
 
 /*
  * Routing statistics.
