@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.63 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.64 2001/10/17 08:27:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1008,7 +1008,7 @@ mip6_add_haddrs(sc, ifp)
 				error = mip6_prefix_haddr_assign(mpfx, sc);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s:d: can't assign home address for prefix %s.\n",
+						 "%s:%d: can't assign home address for prefix %s.\n",
 						 __FILE__, __LINE__,
 						 ip6_sprintf(&mpfx->mpfx_prefix)));
 					return (error);
