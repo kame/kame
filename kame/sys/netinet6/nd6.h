@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.79 2002/02/04 04:53:12 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.80 2002/02/04 05:22:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -382,7 +382,7 @@ int nd6_is_addr_neighbor __P((struct sockaddr_in6 *, struct ifnet *));
 void nd6_option_init __P((void *, int, union nd_opts *));
 struct nd_opt_hdr *nd6_option __P((union nd_opts *));
 int nd6_options __P((union nd_opts *));
-struct	rtentry *nd6_lookup __P((struct in6_addr *, int, struct ifnet *));
+struct	rtentry *nd6_lookup __P((struct sockaddr_in6 *, int, struct ifnet *));
 void nd6_setmtu __P((struct ifnet *));
 void nd6_timer __P((void *));
 void nd6_purge __P((struct ifnet *));
@@ -395,7 +395,7 @@ void nd6_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 void nd6_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 #endif
 int nd6_ioctl __P((u_long, caddr_t, struct ifnet *));
-struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct in6_addr *,
+struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct sockaddr_in6 *,
 	char *, int, int, int));
 int nd6_output __P((struct ifnet *, struct ifnet *, struct mbuf *,
 		    struct sockaddr_in6 *, struct rtentry *));

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.279 2002/02/04 03:07:11 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.280 2002/02/04 05:22:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2798,8 +2798,7 @@ icmp6_redirect_input(m, off)
 	}
 
 	/* RFC 2461 8.3 */
-	nd6_cache_lladdr(ifp, &redtgt6.sin6_addr, lladdr, lladdrlen,
-			 ND_REDIRECT,
+	nd6_cache_lladdr(ifp, &redtgt6, lladdr, lladdrlen, ND_REDIRECT,
 			 is_onlink ? ND_REDIRECT_ONLINK : ND_REDIRECT_ROUTER);
 
 	if (!is_onlink) {	/* better router case.  perform rtredirect. */
@@ -3025,7 +3024,7 @@ icmp6_redirect_output(m0, rt)
 		struct nd_opt_hdr *nd_opt;
 		char *lladdr;
 
-		rt_router = nd6_lookup(&router_ll6->sin6_addr, 0, ifp);
+		rt_router = nd6_lookup(router_ll6, 0, ifp);
 		if (!rt_router)
 			goto nolladdropt;
 		len = sizeof(*nd_opt) + ifp->if_addrlen;

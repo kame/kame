@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.191 2002/02/03 11:27:07 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.192 2002/02/04 05:22:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,7 @@ nd6_rs_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	nd6_cache_lladdr(ifp, &src_sa6->sin6_addr, lladdr, lladdrlen,
+	nd6_cache_lladdr(ifp, src_sa6, lladdr, lladdrlen,
 			 ND_ROUTER_SOLICIT, 0);
 
  freeit:
@@ -505,8 +505,7 @@ nd6_ra_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	nd6_cache_lladdr(ifp, &src_sa6->sin6_addr, lladdr,
-			 lladdrlen, ND_ROUTER_ADVERT, 0);
+	nd6_cache_lladdr(ifp, src_sa6, lladdr, lladdrlen, ND_ROUTER_ADVERT, 0);
 
 	/*
 	 * Installing a link-layer address might change the state of the
@@ -923,7 +922,7 @@ defrouter_select()
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		if (!selected_dr &&
-		    (rt = nd6_lookup(&dr->rtaddr.sin6_addr, 0, dr->ifp)) &&
+		    (rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			selected_dr = dr;
@@ -951,7 +950,7 @@ defrouter_select()
 		else
  			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
 	} else if (installed_dr &&
-		   (rt = nd6_lookup(&installed_dr->rtaddr.sin6_addr, 0,
+		   (rt = nd6_lookup(&installed_dr->rtaddr, 0,
 				    installed_dr->ifp)) &&
 		   (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		   ND6_IS_LLINFO_PROBREACH(ln) &&
@@ -1604,7 +1603,7 @@ find_pfxlist_reachable_router(pr)
 
 	for (pfxrtr = LIST_FIRST(&pr->ndpr_advrtrs); pfxrtr;
 	     pfxrtr = LIST_NEXT(pfxrtr, pfr_entry)) {
-		if ((rt = nd6_lookup(&pfxrtr->router->rtaddr.sin6_addr, 0,
+		if ((rt = nd6_lookup(&pfxrtr->router->rtaddr, 0,
 				     pfxrtr->router->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln))

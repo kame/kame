@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.89 2002/02/03 11:27:07 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.90 2002/02/04 05:22:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -348,8 +348,8 @@ nd6_ns_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-	nd6_cache_lladdr(ifp, &saddr6->sin6_addr, lladdr,
-			 lladdrlen, ND_NEIGHBOR_SOLICIT, 0);
+	nd6_cache_lladdr(ifp, saddr6, lladdr, lladdrlen,
+			 ND_NEIGHBOR_SOLICIT, 0);
 
 	nd6_na_output(ifp, saddr6, &taddr6,
 		      ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE)
@@ -798,7 +798,7 @@ nd6_na_input(m, off, icmp6len)
 	/*
 	 * If no neighbor cache entry is found, NA SHOULD silently be discarded.
 	 */
-	rt = nd6_lookup(&taddr6.sin6_addr, 0, ifp);
+	rt = nd6_lookup(&taddr6, 0, ifp);
 	if ((rt == NULL) ||
 	   ((ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL) ||
 	   ((sdl = SDL(rt->rt_gateway)) == NULL))

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.225 2002/02/04 04:53:12 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.226 2002/02/04 05:22:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -902,22 +902,22 @@ nd6_purge(ifp)
 
 struct rtentry *
 nd6_lookup(addr6, create, ifp)
-	struct in6_addr *addr6;
+	struct sockaddr_in6 *addr6;
 	int create;
 	struct ifnet *ifp;
 {
 	struct rtentry *rt;
-	struct sockaddr_in6 sin6;
-
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *addr6;
-#ifdef SCOPEDROUTING
-	if (in6_addr2zoneid(ifp, addr6, &sin6.sin6_scope_id))
-		return(NULL);
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 addr6_tmp; /* XXX */
 #endif
-	rt = rtalloc1((struct sockaddr *)&sin6, create
+
+#ifndef SCOPEDROUTING
+	addr6_tmp = *addr6;
+	addr6_tmp.sin6_scope_id = 0;
+	addr6 = &addr6_tmp;
+#endif
+
+	rt = rtalloc1((struct sockaddr *)addr6, create
 #ifdef __FreeBSD__
 		      , 0UL
 #endif /* __FreeBSD__ */
@@ -946,7 +946,7 @@ nd6_lookup(addr6, create, ifp)
 			 * be covered by our own prefix.
 			 */
 			struct ifaddr *ifa =
-				ifaof_ifpforaddr((struct sockaddr *)&sin6, ifp);
+				ifaof_ifpforaddr((struct sockaddr *)addr6, ifp);
 			if (ifa == NULL)
 				return(NULL);
 
@@ -956,7 +956,7 @@ nd6_lookup(addr6, create, ifp)
 			 * destination in nd6_rtrequest which will be
 			 * called in rtrequest via ifa->ifa_rtrequest.
 			 */
-			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)&sin6,
+			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)addr6,
 					   ifa->ifa_addr,
 					   (struct sockaddr *)&all1_sa,
 					   (ifa->ifa_flags |
@@ -967,7 +967,7 @@ nd6_lookup(addr6, create, ifp)
 				log(LOG_ERR,
 				    "nd6_lookup: failed to add route for a "
 				    "neighbor(%s), errno=%d\n",
-				    ip6_sprintf(addr6), e);
+				    ip6_sprintf(addr6->sin6_addr), e);
 #endif
 				return(NULL);
 			}
@@ -993,8 +993,10 @@ nd6_lookup(addr6, create, ifp)
 	    rt->rt_gateway->sa_family != AF_LINK ||
 	    (ifp && rt->rt_ifa->ifa_ifp != ifp)) {
 		if (create) {
-			log(LOG_DEBUG, "nd6_lookup: failed to lookup %s (if = %s)\n",
-			    ip6_sprintf(addr6), ifp ? if_name(ifp) : "unspec");
+			log(LOG_DEBUG,
+			    "nd6_lookup: failed to lookup %s (if = %s)\n",
+			    ip6_sprintf(&addr6->sin6_addr),
+			    ifp ? if_name(ifp) : "unspec");
 		}
 		return(0);
 	}
@@ -1064,7 +1066,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * Even if the address matches none of our addresses, it might be
 	 * in the neighbor cache.
 	 */
-	if ((rt = nd6_lookup(&addr->sin6_addr, 0, ifp)) != NULL &&
+	if ((rt = nd6_lookup(addr, 0, ifp)) != NULL &&
 	    rt->rt_llinfo != NULL)
 		return(1);
 
@@ -1216,7 +1218,7 @@ nd6_nud_hint(rt, dst6, force)
 	if (!rt) {
 		if (!dst6)
 			return;
-		if (!(rt = nd6_lookup(&dst6->sin6_addr, 0, NULL)))
+		if (!(rt = nd6_lookup(dst6, 0, NULL)))
 			return;
 	}
 
@@ -1670,7 +1672,7 @@ nd6_ioctl(cmd, data, ifp)
 		defrouter_select();
 		break;
 	case SIOCSPFXFLUSH_IN6:
-	    {
+	{
 		/* flush all the prefix advertised by routers */
 		struct nd_prefix *pr, *next;
 
@@ -1702,9 +1704,9 @@ nd6_ioctl(cmd, data, ifp)
 		}
 		splx(s);
 		break;
-	    }
+	}
 	case SIOCSRTRFLUSH_IN6:
-	    {
+	{
 		/* flush all the default routers */
 		struct nd_defrouter *dr, *next;
 
@@ -1721,22 +1723,23 @@ nd6_ioctl(cmd, data, ifp)
 		defrouter_select();
 		splx(s);
 		break;
-	    }
+	}
 	case SIOCGNBRINFO_IN6:
-	    {
+	{
 		struct llinfo_nd6 *ln;
-		struct in6_addr nb_addr = nbi->addr; /* make local for safety */
+		struct sockaddr_in6 nb_addr;
 
-		/*
-		 * XXX: KAME specific hack for scoped addresses
-		 *      XXXX: for other scopes than link-local?
-		 */
-		if (IN6_IS_ADDR_LINKLOCAL(&nbi->addr) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(&nbi->addr)) {
-			u_int16_t *idp = (u_int16_t *)&nb_addr.s6_addr[2];
-
-			if (*idp == 0)
-				*idp = htons(ifp->if_index);
+		bzero(&nb_addr, sizeof(nb_addr));
+		nb_addr.sin6_family = AF_INET6;
+		nb_addr.sin6_len = sizeof(nb_addr);
+		nb_addr.sin6_addr = nbi->addr;
+		if ((error = in6_addr2zoneid(ifp, &nb_addr.sin6_addr,
+					     &nb_addr.sin6_scope_id)) != 0) {
+			return(error);
+		}
+		if ((error = in6_embedscope(&nb_addr.sin6_addr, &nb_addr))
+		    != 0) {
+			return(error);
 		}
 
 #ifdef __NetBSD__
@@ -1757,7 +1760,7 @@ nd6_ioctl(cmd, data, ifp)
 		splx(s);
 		
 		break;
-	    }
+	}
 	case SIOCGDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
 		ndif->ifindex = nd6_defifindex;
 		break;
@@ -1775,7 +1778,7 @@ nd6_ioctl(cmd, data, ifp)
 struct rtentry *
 nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 	struct ifnet *ifp;
-	struct in6_addr *from;
+	struct sockaddr_in6 *from;
 	char *lladdr;
 	int lladdrlen;
 	int type;	/* ICMP6 type */
@@ -1799,7 +1802,7 @@ nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 		panic("from == NULL in nd6_cache_lladdr");
 
 	/* nothing must be updated for unspecified address */
-	if (IN6_IS_ADDR_UNSPECIFIED(from))
+	if (IN6_IS_ADDR_UNSPECIFIED(&from->sin6_addr))
 		return NULL;
 
 	/*
@@ -2162,7 +2165,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		 * it is tolerable, because this should be a rare case.
 		 */
 		if (nd6_is_addr_neighbor(dst, ifp) &&
-		    (rt = nd6_lookup(&dst->sin6_addr, 1, ifp)) != NULL)
+		    (rt = nd6_lookup(dst, 1, ifp)) != NULL)
 			ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	}
 	if (!ln || !rt) {
