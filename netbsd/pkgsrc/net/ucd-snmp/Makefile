@@ -3,7 +3,7 @@
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.5 1999/10/28 00:23:55 itojun Exp $
+# $Id: Makefile,v 1.6 1999/10/28 03:42:36 itojun Exp $
 #
 
 DISTNAME=	ucd-snmp-4.0.1
@@ -18,6 +18,8 @@ PATCHFILES=	ucd-snmp-4.0.1-v6-19991028.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
+
+BUILD_DEPENDS+=	autoconf:../../devel/autoconf
 
 #CONFIGURE_ARGS+=	--enable-shared
 CONFIGURE_ARGS+=	--enable-ipv6
