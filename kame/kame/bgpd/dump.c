@@ -82,7 +82,7 @@ dump_rip_rtable(FILE *fp, struct rt_entry *base)
 			ip6str(&rte->rt_gw, 0));
 
 		if (rte->rt_riptime) {
-			fprintf(fp, " timeout=%d:%d",
+			fprintf(fp, " timeout=%d:%02d",
 				(int)(rte->rt_riptime->tsk_timeval.tv_sec / 60),
 				(int)(rte->rt_riptime->tsk_timeval.tv_sec % 60));
 		}
