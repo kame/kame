@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.172 2001/02/08 12:48:38 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.173 2001/02/08 15:48:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1219,6 +1219,9 @@ in6_update_ifa(ifp, ifra, ia)
 		/*
 		 * join node information group address
 		 */
+#ifdef __FreeBSD__
+#define hostnamelen	strlen(hostname)
+#endif
 		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
 		    == 0) {
 			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
@@ -1227,6 +1230,9 @@ in6_update_ifa(ifp, ifra, ia)
 				    ifp, &error);
 			}
 		}
+#ifdef __FreeBSD__
+#undef hostnamelen
+#endif
 
 		/*
 		 * join node-local all-nodes address, on loopback.
