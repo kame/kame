@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.102 2001/04/14 16:38:59 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.103 2001/05/24 07:14:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2545,6 +2545,8 @@ ipsec4_output(state, sp, flags)
 		/* make SA index for search proper SA */
 		ip = mtod(state->m, struct ip *);
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
+		saidx.mode = isr->saidx.mode;
+		saidx.reqid = isr->saidx.reqid;
 		sin = (struct sockaddr_in *)&saidx.src;
 		if (sin->sin_len == 0) {
 			sin->sin_len = sizeof(*sin);
@@ -2770,6 +2772,8 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 		/* make SA index for search proper SA */
 		ip6 = mtod(state->m, struct ip6_hdr *);
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
+		saidx.mode = isr->saidx.mode;
+		saidx.reqid = isr->saidx.reqid;
 		sin6 = (struct sockaddr_in6 *)&saidx.src;
 		if (sin6->sin6_len == 0) {
 			sin6->sin6_len = sizeof(*sin6);
