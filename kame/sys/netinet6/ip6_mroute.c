@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.63 2002/03/24 20:43:56 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.64 2002/04/12 05:11:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -95,6 +95,7 @@
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/nd6.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/pim6.h>
 #include <netinet6/pim6_var.h>
@@ -1648,6 +1649,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	static struct route_in6 ro;
 #endif
 	struct	in6_multi *in6m;
+	u_int32_t linkmtu;
 
 	/*
 	 * Make a new reference to the packet; make sure that
@@ -1704,7 +1706,8 @@ phyint_send(ip6, mifp, m, src, dst)
 	 * Put the packet into the sending queue of the outgoing interface
 	 * if it would fit in the MTU of the interface.
 	 */
-	if (mb_copy->m_pkthdr.len < ifp->if_mtu || ifp->if_mtu < IPV6_MMTU) {
+	linkmtu = nd_ifinfo[ifp->if_index].linkmtu;
+	if (mb_copy->m_pkthdr.len < linkmtu || linkmtu < IPV6_MMTU) {
 		/*
 		 * We just call if_output instead of nd6_output here, since
 		 * we need no ND for a multicast forwarded packet...right?
@@ -1718,7 +1721,7 @@ phyint_send(ip6, mifp, m, src, dst)
 #endif
 	} else {
 #ifdef MULTICAST_PMTUD
-		icmp6_error(mb_copy, ICMP6_PACKET_TOO_BIG, 0, ifp->if_mtu);
+		icmp6_error(mb_copy, ICMP6_PACKET_TOO_BIG, 0, linkmtu);
 #else
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)

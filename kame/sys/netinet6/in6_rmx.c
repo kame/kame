@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.13 2002/04/08 08:14:41 jinmei Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.14 2002/04/12 05:11:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,6 +94,7 @@
 #include <netinet6/ip6_var.h>
 
 #include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/tcp6.h>
@@ -182,7 +183,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 
 	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)
 	    && rt->rt_ifp)
-		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
+		rt->rt_rmx.rmx_mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
 
 	ret = rn_addroute(v_arg, n_arg, head, treenodes);
 	if (ret == NULL && rt->rt_flags & RTF_HOST) {

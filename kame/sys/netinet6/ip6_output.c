@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.293 2002/04/09 15:21:53 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.294 2002/04/12 05:11:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1310,7 +1310,8 @@ skip_ipsec2:;
 	 * as returning an error code (the latter is not described in the API
 	 * spec.)
 	 */
-	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG) && tlen > ifp->if_mtu
+	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG) &&
+	    tlen > nd_ifinfo[ifp->if_index].linkmtu
 #ifdef notyet
 	    && !(ifp->if_flags & IFF_FRAGMENTABLE)
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.298 2002/04/10 13:09:59 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.299 2002/04/12 05:11:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3660,8 +3660,10 @@ icmp6_mtudisc_timeout(rt, r)
 		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 	} else {
-		if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
-			rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
+		if (!(rt->rt_rmx.rmx_locks & RTV_MTU)) {
+			rt->rt_rmx.rmx_mtu =
+				nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
+		}
 	}
 
 #endif

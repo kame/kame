@@ -2820,7 +2820,11 @@ tcp_mssopt(tp)
 #endif /* INET6 */
 			tcp_mssdflt;
 
-	return rt->rt_ifp->if_mtu - min_protoh;
+	return
+#ifdef INET6
+		isipv6 ? nd_ifinfo[rt->rt_ifp->if_index].linkmtu :
+#endif
+		rt->rt_ifp->if_mtu - min_protoh;
 }
 
 
