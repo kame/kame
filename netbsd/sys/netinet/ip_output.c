@@ -205,7 +205,7 @@ ip_output(m0, va_alist)
 
 #ifdef IPSEC
 	so = ipsec_getsocket(m);
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 
 #ifdef	DIAGNOSTIC

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.56 2001/01/11 11:01:23 sumikawa Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.57 2001/01/23 15:23:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -489,7 +489,10 @@ rip6_output(m, va_alist)
 	}
 
 #ifdef IPSEC
-	ipsec_setsocket(m, so);
+	if (ipsec_setsocket(m, so) != 0) {
+		error = ENOBUFS;
+		goto bad;
+	}
 #endif /*IPSEC*/
 	
 	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions,

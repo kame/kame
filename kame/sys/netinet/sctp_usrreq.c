@@ -437,7 +437,10 @@ sctp_output(sp)
 	/* XXX sctp->sh_cksum */
 
 #ifdef IPSEC
-	ipsec_setsocket(m, inp->inp_socket);
+	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
+		m_freem(m);
+		return ENOBUFS;
+	}
 #endif
 
 	return ip_output(m, inp->inp_options, &inp->inp_route,

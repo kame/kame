@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.183 2001/01/23 08:59:37 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.184 2001/01/23 15:23:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2363,7 +2363,7 @@ icmp6_reflect(m, off)
 	m->m_flags &= ~(M_BCAST|M_MCAST);
 #ifdef IPSEC
 	/* Don't lookup socket */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 
 #ifdef COMPAT_RFC1885
@@ -2911,7 +2911,7 @@ noredhdropt:;
 	/* send the packet to outside... */
 #ifdef IPSEC
 	/* Don't lookup socket */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 	ip6_output(m, NULL, NULL, 0, NULL, &outif);
 	if (outif) {

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.11 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.12 2001/01/23 15:23:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -636,7 +636,10 @@ send:
 			       m->m_pkthdr.len - sizeof(struct ip6_hdr));
 
 #ifdef IPSEC
-	ipsec_setsocket(m, so);
+	if (ipsec_setsocket(m, so) != 0) {
+		error = ENOBUFS
+		goto out;
+	}
 #endif /*IPSEC*/
 
 #if BSD >= 43

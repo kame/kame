@@ -1024,7 +1024,10 @@ send:
 		}
 	}
 #ifdef IPSEC
-	ipsec_setsocket(m, so);
+	if (ipsec_setsocket(m, so) != 0) {
+		error = ENOBUFS;
+		goto out;
+	}
 #endif /*IPSEC*/
 
 	switch (af) {

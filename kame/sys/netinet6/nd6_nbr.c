@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.51 2001/01/20 17:27:00 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.52 2001/01/23 15:23:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -521,7 +521,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 
 #ifdef IPSEC
 	/* Don't lookup socket */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, &outif);
 	if (outif) {
@@ -977,7 +977,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 
 #ifdef IPSEC
 	/* Don't lookup socket */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 	ip6_output(m, NULL, NULL, 0, &im6o, &outif);
 	if (outif) {

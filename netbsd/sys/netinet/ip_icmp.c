@@ -807,7 +807,7 @@ icmp_send(m, opts)
 #endif
 #ifdef IPSEC
 	/* Don't lookup socket */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 	(void) ip_output(m, opts, NULL, 0, NULL);
 }

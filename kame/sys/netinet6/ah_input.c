@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.48 2001/01/23 08:59:37 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.49 2001/01/23 15:23:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -494,8 +494,11 @@ ah4_input(m, va_alist)
 #endif
 
 		key_sa_recordxfer(sav, m);
-		ipsec_addhist(m, IPPROTO_AH, spi);
-		ipsec_addhist(m, IPPROTO_IPV4, 0);
+		if (ipsec_addhist(m, IPPROTO_AH, spi) != 0 ||
+		    ipsec_addhist(m, IPPROTO_IPV4, 0) != 0) {
+			ipsecstat.in_nomem++;
+			goto fail;
+		}
 
 		s = splimp();
 		if (IF_QFULL(&ipintrq)) {
@@ -578,7 +581,10 @@ ah4_input(m, va_alist)
 		/* forget about IP hdr checksum, the check has already been passed */
 
 		key_sa_recordxfer(sav, m);
-		ipsec_addhist(m, IPPROTO_AH, spi);
+		if (ipsec_addhist(m, IPPROTO_AH, spi) != 0) {
+			ipsecstat.in_nomem++;
+			goto fail;
+		}
 
 		if (nxt != IPPROTO_DONE)
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
@@ -958,8 +964,11 @@ ah6_input(mp, offp, proto)
 #endif
 
 		key_sa_recordxfer(sav, m);
-		ipsec_addhist(m, IPPROTO_AH, spi);
-		ipsec_addhist(m, IPPROTO_IPV6, 0);
+		if (ipsec_addhist(m, IPPROTO_AH, spi) != 0 ||
+		    ipsec_addhist(m, IPPROTO_IPV6, 0) != 0) {
+			ipsec6stat.in_nomem++;
+			goto fail;
+		}
 
 		s = splimp();
 		if (IF_QFULL(&ip6intrq)) {
@@ -1038,7 +1047,10 @@ ah6_input(mp, offp, proto)
 		ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - stripsiz);
 
 		key_sa_recordxfer(sav, m);
-		ipsec_addhist(m, IPPROTO_AH, spi);
+		if (ipsec_addhist(m, IPPROTO_AH, spi) != 0) {
+			ipsec6stat.in_nomem++;
+			goto fail;
+		}
 	}
 
 	*offp = off;

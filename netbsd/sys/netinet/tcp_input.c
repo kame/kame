@@ -3472,7 +3472,10 @@ syn_cache_respond(sc, m)
 		else
 			so = NULL;
 		/* use IPsec policy on listening socket, on SYN ACK */
-		ipsec_setsocket(m, so);
+		if (ipsec_setsocket(m, so) != 0) {
+			m_freem(m);
+			return ENOBUFS;
+		}
 	}
 #endif
 	m->m_pkthdr.rcvif = NULL;

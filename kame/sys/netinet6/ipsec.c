@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.87 2001/01/23 08:59:38 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.88 2001/01/23 15:23:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3367,11 +3367,12 @@ ipsec_addaux(m)
 	struct mbuf *n;
 
 	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
-	if (!n) {
+	if (!n)
 		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
-		n->m_len = sizeof(struct socket *);
-		bzero(mtod(n, void *), n->m_len);
-	}
+	if (!n)
+		return n;	/* ENOBUFS */
+	n->m_len = sizeof(struct socket *);
+	bzero(mtod(n, void *), n->m_len);
 	return n;
 }
 
@@ -3413,7 +3414,7 @@ ipsec_optaux(m, n)
 		ipsec_delaux(m);
 }
 
-void
+int
 ipsec_setsocket(m, so)
 	struct mbuf *m;
 	struct socket *so;
@@ -3421,13 +3422,16 @@ ipsec_setsocket(m, so)
 	struct mbuf *n;
 
 	/* if so == NULL, don't insist on getting the aux mbuf */
-	if (so)
+	if (so) {
 		n = ipsec_addaux(m);
-	else
+		if (!n)
+			return ENOBUFS;
+	} else
 		n = ipsec_findaux(m);
 	if (n && n->m_len >= sizeof(struct socket *))
 		*mtod(n, struct socket **) = so;
 	ipsec_optaux(m, n);
+	return 0;
 }
 
 struct socket *
@@ -3443,7 +3447,7 @@ ipsec_getsocket(m)
 		return NULL;
 }
 
-void
+int
 ipsec_addhist(m, proto, spi)
 	struct mbuf *m;
 	int proto;
@@ -3453,13 +3457,16 @@ ipsec_addhist(m, proto, spi)
 	struct ipsec_history *p;
 
 	n = ipsec_addaux(m);
-	if (n && M_TRAILINGSPACE(n) > sizeof(*p)) {
-		p = (struct ipsec_history *)(mtod(n, caddr_t) + n->m_len);
-		n->m_len += sizeof(*p);
-		bzero(p, sizeof(*p));
-		p->ih_proto = proto;
-		p->ih_spi = spi;
-	}
+	if (!n)
+		return ENOBUFS;
+	if (M_TRAILINGSPACE(n) < sizeof(*p))
+		return ENOSPC;	/*XXX*/
+	p = (struct ipsec_history *)(mtod(n, caddr_t) + n->m_len);
+	n->m_len += sizeof(*p);
+	bzero(p, sizeof(*p));
+	p->ih_proto = proto;
+	p->ih_spi = spi;
+	return 0;
 }
 
 struct ipsec_history *

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.150 2001/01/23 08:59:37 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.151 2001/01/23 15:23:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -261,7 +261,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 
 	/* for AH processing. stupid to have "socket" variable in IP layer... */
 	so = ipsec_getsocket(m);
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 #endif /* IPSEC */
