@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.18 2000/09/21 16:30:30 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.19 2000/09/21 16:38:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -127,7 +127,6 @@ deflate_common(m, md, lenp, mode)
 
 #define MOREBLOCK() \
 do { \
-	printf("moreblock n=%p\n", n);	\
 	/* keep the reply buffer into our chain */		\
 	if (n) {						\
 		n->m_len = zs.total_out - offset;		\
