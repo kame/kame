@@ -151,6 +151,7 @@ struct igmpstat {
 
 #ifdef _KERNEL
 extern struct igmpstat igmpstat;
+extern struct router_info *rti_head;
 
 /*
  * Macro to compute a random timer value between 1 and (IGMP_MAX_REPORTING_

@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2434 2003/07/10 12:41:49 keiichi Exp $
+$KAME: CHANGELOG,v 1.2435 2003/07/12 06:06:18 suz Exp $
 
 <200307>
+Sat Jul 12 15:05:23 JST 2003	suz@crl.hitachi.co.jp
+	* openbsd/sys/netinet/igmp_var.h
+	makes IGMPV3-kernel compilable on openbsd.
+
 Thu Jul 10 21:35:04 JST 2003	keiichi@iij.ad.jp
 	* kame/kame/had/halist.c
 	fixed a bug that a DHAAD reply message only includes one global
