@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2499 2003/11/04 10:39:32 ono Exp $
+$KAME: CHANGELOG,v 1.2500 2003/11/05 14:10:33 suz Exp $
 
 <200310>
+2003-11-05  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/freebsd4: sync with FreeBSD 4.9-RELEASE
+
 2003-11-04  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* kame/sys/netinet/dccp_*, kame/sys/netinet6/dccp6_*:
 	makes DCCP compilable on netbsd.
