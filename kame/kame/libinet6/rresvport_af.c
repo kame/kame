@@ -36,9 +36,10 @@
 
 int
 rresvport_af(port, family)
-	int *port, family;
+	int *port;
+	int family;
 {
-	int i, s, len, err;
+	int i, s, len;
 	struct sockaddr_storage ss;
 	struct sockaddr *sa;
 	u_short *sport;
@@ -61,19 +62,30 @@ rresvport_af(port, family)
 	sa->sa_len = len;
 	sa->sa_family = family;
 
-	for (i = 1023; i > 512; i--) {
-		s = socket(family, SOCK_STREAM, 0);
-		if (s == -1)
+	s = socket(family, SOCK_STREAM, 0);
+	if (s == -1)
+		return -1;
+
+	*sport = htons(*port);
+	if (*port < IPPORT_RESERVED - 1) {
+		if (bind(s, sa, len) >= 0)
+			return s;
+		if (errno != EADDRINUSE) {
+			(void)close(s);
 			return -1;
+		}
+	}
+
+	for (i = IPPORT_RESERVED - 1; i > IPPORT_RESERVED / 2; i--) {
 		*sport = htons(i);
-		err = bind(s, (struct sockaddr *)&ss, len);
-		if (err != -1) {
+		if (bind(s, sa, len) >= 0) {
 			*port = i;
 			return s;
 		}
-		if (errno != EADDRINUSE)
+		if (errno != EADDRINUSE) {
+			(void)close(s);
 			return -1;
-		close(s);
+		}
 	}
 
 	errno = EAGAIN;
