@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.521 2000/02/04 18:25:19 jinmei Exp $
+$Id: CHANGELOG,v 1.522 2000/02/05 05:10:12 itojun Exp $
 
 <200002>
+Sat Feb  5 14:09:07 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/bind9: pkgsrc for bind9 beta.
+	* netbsd/pkgsrc/devel/unproven-pthreads: pthread package required
+	  for bind9.
+
 2000-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (explore_numeric_scope): 
 	* kame/kame/libinet6/getnameinfo.c (getnameinfo):
