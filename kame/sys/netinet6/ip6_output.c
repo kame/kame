@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.144 2000/12/20 06:27:05 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.145 2001/01/16 14:14:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,7 +160,6 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_dest2;
 };
 
-static void init_ip6pktopts __P((struct ip6_pktopts *));
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **, int));
 static int ip6_getpcbopt __P((struct ip6_pktopts *, int, void **, int *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -2691,7 +2690,7 @@ ip6_pcbopts(pktopt, m, so)
  * specifying behavior of outgoing packets.
  * XXX: The logic of this function is very similar to ip6_setpktoptions().
  */
-static void
+void
 init_ip6pktopts(opt)
 	struct ip6_pktopts *opt;
 {

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.50 2000/12/12 05:12:38 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.51 2001/01/16 14:14:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -356,6 +356,7 @@ int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
+void	init_ip6pktopts __P((struct ip6_pktopts *));
 int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int, int));
 void	ip6_clearpktopts __P((struct ip6_pktopts *, int, int));
 struct ip6_pktopts *ip6_copypktopts __P((struct ip6_pktopts *, int));

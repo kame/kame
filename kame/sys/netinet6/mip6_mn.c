@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.17 2001/01/15 15:42:45 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.18 2001/01/16 14:14:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1246,10 +1246,8 @@ struct mip6_subbuf   *subbuf;
 					      M_TEMP, M_NOWAIT);
 	if (pktopt == NULL)
 		return ENOBUFS;
-	bzero(pktopt, sizeof(struct ip6_pktopts));
+	init_ip6pktopts(pktopt);
 
-	pktopt->ip6po_hlim = -1;	/* -1 means to use default hop limit */
-	pktopt->ip6po_mtu = -1;		/* -1 means to use default mtu */
 	m_ip6 = mip6_create_ip6hdr(&bulp->bind_addr, &bulp->dst_addr,
 				   IPPROTO_NONE);
 	if(m_ip6 == NULL) {
@@ -2429,9 +2427,7 @@ mip6_outq_flush()
 				outp = outp->next;
 				continue;
 			}
-			bzero(pktopt, sizeof(struct ip6_pktopts));
-			pktopt->ip6po_hlim = -1; /* -1 use def hop limit */
-			pktopt->ip6po_mtu = -1;	 /* -1 use def mtu */
+			init_ip6pktopts(pktopt);
 
 			opt = (struct mip6_opt *)outp->opt;
 			off = 2;
@@ -2575,9 +2571,7 @@ void  *arg;  /* Not used */
 				outp = outp->next;
 				continue;
 			}
-			bzero(pktopt, sizeof(struct ip6_pktopts));
-			pktopt->ip6po_hlim = -1; /* -1 default hop limit */
-			pktopt->ip6po_mtu = -1;	 /* -1 default mtu */
+			init_ip6pktopts(pktopt);
 
 			opt = (struct mip6_opt *)outp->opt;
 			off = 2;

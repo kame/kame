@@ -1,4 +1,4 @@
-/*	$KAME: mip6_io.c,v 1.10 2001/01/15 15:42:45 itojun Exp $	*/
+/*	$KAME: mip6_io.c,v 1.11 2001/01/16 14:14:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -565,9 +565,7 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
                     malloc(sizeof(struct ip6_pktopts), M_TEMP, M_WAITOK);
                 if (opt == NULL)
                     return ENOBUFS;
-                bzero(opt, sizeof(struct ip6_pktopts));
-                opt->ip6po_hlim = -1;	/* -1 means to use default hop limit */
-                opt->ip6po_mtu = -1;	/* -1 means to use default mtu */
+		init_ip6pktopts(opt);
             }
 
             mip6_dest_offset(opt->ip6po_dest2, &off);
@@ -623,9 +621,7 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
                                            M_TEMP, M_WAITOK);
         if (opt == NULL)
             return ENOBUFS;
-        bzero(opt, sizeof(struct ip6_pktopts));
-        opt->ip6po_hlim = -1;	/* -1 means to use default hop limit */
-        opt->ip6po_mtu = -1;	/* -1 means to use default mtu */
+	init_ip6pktopts(opt);
     }
 
     mip6_dest_offset(opt->ip6po_dest2, &off);
@@ -708,9 +704,7 @@ struct mip6_bc       *bcp;  /* Binding Cache list entry */
                                                  M_TEMP, M_WAITOK);
         if (opt_local == NULL)
             return ENOBUFS;
-        bzero(opt_local, sizeof(struct ip6_pktopts));
-        opt_local->ip6po_hlim = -1;	/* -1 means to use default hop limit */
-        opt_local->ip6po_mtu = -1;	/* -1 means to use default mtu */
+	init_ip6pktopts(opt_local);
 
         opt_local->ip6po_rhinfo.ip6po_rhi_rthdr =
             mip6_create_rh(&bcp->coa, IPPROTO_IP);
