@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.133 2003/12/08 10:05:53 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.134 2003/12/12 04:53:17 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -873,14 +873,14 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 			} else {
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
-						     ->ro_dst, NULL, 0UL);
+						     ->ro_dst, 0, 0UL);
 #else
 #ifdef RADIX_MPATH
 				rtalloc_mpath((struct route *)ro,
 				    ntohl(dstsock->sin6_addr.s6_addr32[3]));
 #else
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
-						     ->ro_dst, NULL);
+						     ->ro_dst, 0);
 #endif /* RADIX_MPATH */
 #endif /* __FreeBSD__ */
 			}
