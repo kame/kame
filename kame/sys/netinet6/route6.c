@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.53 2004/11/17 15:10:37 suz Exp $	*/
+/*	$KAME: route6.c,v 1.54 2004/11/17 16:46:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -229,7 +229,7 @@ ip6_rthdr0(m, ip6, rh0)
 		) {
 		/*
 		 * Type 0 routing header can't contain more than 23 addresses.
-		 * RFC 2462: this limitation was removed since strict/loose
+		 * RFC 2460: this limitation was removed since strict/loose
 		 * bitmap field was deleted.
 		 */
 		ip6stat.ip6s_badoptions++;
