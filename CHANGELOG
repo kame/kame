@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1044 2000/06/20 02:44:59 itojun Exp $
+$Id: CHANGELOG,v 1.1045 2000/06/20 03:52:25 itojun Exp $
 
 <200006>
+Tue Jun 20 12:49:28 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_proto.c: disable rate limitation for ICMPv6 error,
+	  since (1) it makes no sense to put less-than-10ms value to here
+	  due to UNIX timer resolution, and (2) it seems wrong to rate-limit
+	  without considering content of the payload (like ICMPV6 type/code).
+	  we still have pps limitation.  based on comments from kjc.
+
 Tue Jun 20 11:44:19 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/bind9: use bind 9.0.0b4.
 

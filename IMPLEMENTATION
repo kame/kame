@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/06/12 09:29:16 $
+			$Date: 2000/06/20 03:52:25 $
 
 1. IPv6
 
@@ -644,7 +644,7 @@ limitation mechanisms, tunable via sysctl:
 - Minimum time interval between ICMPv6 error packets
 	KAME kernel will generate no more than one ICMPv6 error packet,
 	during configured time interval.  net.inet6.icmp6.errratelimit
-	controls the interval (default: 100us).
+	controls the interval (default: disabled).
 - Maximum ICMPv6 error packet-per-second
 	KAME kernel will generate no more than the configured number of
 	packets in one second.  net.inet6.icmp6.errppslimit controls the
