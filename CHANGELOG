@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1394 2000/11/20 17:48:06 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1395 2000/11/21 14:51:55 kawa Exp $
 
 <200011>
+2000-11-21  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
+	* kame/freebsd4: we now start to support 4.2-RELEASE.
+
 Tue Nov 21 02:45:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/wwwoffle: upgrade to 2.6.
 
