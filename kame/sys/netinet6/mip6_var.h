@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.64 2002/11/01 03:31:30 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.65 2002/11/01 05:53:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -141,7 +141,6 @@ struct mip6_bu {
 	struct sockaddr_in6 mbu_haddr;      /* HoA */
 	struct sockaddr_in6 mbu_coa;        /* CoA */
 	u_int16_t           mbu_lifetime;   /* BU lifetime */
-	time_t              mbu_expire;     /* expiration time of this BU. */
 	u_int16_t           mbu_refresh;    /* refresh frequency */
 	u_int16_t           mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
@@ -152,6 +151,7 @@ struct mip6_bu {
         mip6_careof_cookie_t mbu_careof_cookie;
 	u_int8_t            mbu_pri_fsm_state; /* primary fsm state. */
 	u_int8_t            mbu_sec_fsm_state; /* secondary fsm state. */
+	time_t              mbu_expire;     /* expiration time of this BU. */
 	time_t              mbu_retrans;    /* retrans/refresh timo value. */
 	u_int8_t            mbu_retrans_count;
 	time_t              mbu_failure;    /* failure timo value. */
@@ -159,8 +159,6 @@ struct mip6_bu {
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
-/* #define MIP6_BU_STATE_WAITSENT    0x01 */
-/* #define MIP6_BU_STATE_WAITACK     0x02 */
 #define MIP6_BU_STATE_BUNOTSUPP   0x04
 #define MIP6_BU_STATE_MIP6NOTSUPP 0x80
 
@@ -174,9 +172,9 @@ struct mip6_bu {
 #define MIP6_BU_PRI_FSM_STATE_WAITD	6
 #define MIP6_BU_PRI_FSM_STATE_BOUND	7
 #define MIP6_IS_BU_BOUND_STATE(mbu)					\
-	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
-	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND)	\
-	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO))
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND))
 #define MIP6_IS_BU_WAITA_STATE(mbu)					\
 	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITA)	\
 	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
@@ -209,12 +207,12 @@ struct mip6_bu {
 #define MIP6_BU_IS_PRI_FSM_EVENT(ev) ((ev) <= MIP6_BU_PRI_FSM_EVENT_FAILURE_TIMER)
 
 /* events for the secondary fsm. */
-#define MIP6_BU_SEC_FSM_EVENT_START_RR		12
-#define MIP6_BU_SEC_FSM_EVENT_START_HOME_RR	13
-#define MIP6_BU_SEC_FSM_EVENT_STOP_RR		14
-#define MIP6_BU_SEC_FSM_EVENT_HOT		15
-#define MIP6_BU_SEC_FSM_EVENT_COT		16
-#define MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER     17
+#define MIP6_BU_SEC_FSM_EVENT_START_RR		13
+#define MIP6_BU_SEC_FSM_EVENT_START_HOME_RR	14
+#define MIP6_BU_SEC_FSM_EVENT_STOP_RR		15
+#define MIP6_BU_SEC_FSM_EVENT_HOT		16
+#define MIP6_BU_SEC_FSM_EVENT_COT		17
+#define MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER     18
 #define MIP6_BU_IS_SEC_FSM_EVENT(ev) (!MIP6_BU_IS_PRI_FSM_EVENT((ev)))
 
 #define MIP6_BU_TIMEOUT_INTERVAL 1
