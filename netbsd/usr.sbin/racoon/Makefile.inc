@@ -13,8 +13,13 @@ YFLAGS+=-d
 .if exists(/usr/pkg/include/ssleay/idea.h) || exists(/usr/pkg/include/openssl/idea.h)
 CPPFLAGS+=-DHAVE_IDEA_H=1
 .endif
+.if exists(/usr/local/ssl/include/openssl)
+CFLAGS+=-I/usr/local/ssl/include/openssl -I/usr/local/ssl/include
+.elif exists(/usr/pkg/include/ssleay)
+CFLAGS+=-I/usr/pkg/include/ssleay
+.endif
 
-LDADD+=	-ly -ll -L/usr/pkg/lib -lcrypto
+LDADD+=	-ly -ll
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
 	-L${.CURDIR}/../../../lib/libipsec/obj \
 	-L/usr/local/v6/lib -lipsec
@@ -27,6 +32,12 @@ LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 DPADD+=	-L${.CURDIR}/../../../lib/libinet6/libinet6.a \
 	-L${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
+
+.if exists(/usr/local/ssl/lib/libcrypto.a)
+LDADD+=	-L/usr/local/ssl/lib -lcrypto
+.elif exists(/usr/pkg/lib/libcrypto.a)
+LDADD+=	-L/usr/pkg/lib -lcrypto
+.endif
 
 .PATH:	${SRCDIR} ${SRCDIR}/../tcpdump
 
