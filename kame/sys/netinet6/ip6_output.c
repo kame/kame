@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.80 2000/02/22 14:04:22 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.81 2000/03/08 18:45:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2001,7 +2001,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 				caddr_t req = NULL;
 				size_t len = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				struct mbuf *m;
+				struct mbuf *m = NULL;
 				struct mbuf **mp = &m;
 #endif
 				if (m) {

@@ -1274,14 +1274,10 @@ ip_ctloutput(so, sopt)
 #ifdef IPSEC
 		case IP_IPSEC_POLICY:
 		{
-			struct mbuf *m;
+			struct mbuf *m = NULL;
 			size_t len = 0;
 			caddr_t req = NULL;
 
-			if (m) {
-				req = mtod(m, caddr_t);
-				len = m->m_len;
-			}
 			error = ipsec4_get_policy(sotoinpcb(so), req, len, &m);
 			if (error == 0)
 				error = soopt_mcopyout(sopt, m); /* XXX */
