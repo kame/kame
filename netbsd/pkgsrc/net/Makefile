@@ -17,6 +17,7 @@
     SUBDIR += ncftp3
     SUBDIR += netperf
     SUBDIR += newbie
+    SUBDIR += p5-Socket6
     SUBDIR += pchar
     SUBDIR += rsync
     SUBDIR += socks64
