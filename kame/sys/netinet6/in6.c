@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.207 2001/07/24 08:55:27 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.208 2001/07/24 09:01:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -792,7 +792,7 @@ in6_control(so, cmd, data, ifp)
 		/*
 		 * If the address being deleted is the only one that owns
 		 * the corresponding prefix, expire the prefix as well.
-		 * XXX: theoretically, we don't have to warry about such
+		 * XXX: theoretically, we don't have to worry about such
 		 * relationship, since we separate the address management
 		 * and the prefix management.  We do this, however, to provide
 		 * as much backward compatibility as possible in terms of
