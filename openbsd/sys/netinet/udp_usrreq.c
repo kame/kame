@@ -115,16 +115,17 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
+#include <netinet/ip.h>
+#include <netinet/in_pcb.h>
 #if defined(IGMPV3) || defined(MLDV2)
 #include <netinet/in_msf.h>
 #endif
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 #include <netinet6/mld6_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#include <net/net_osdep.h>
 
 #include "faith.h"
 #if defined(NFAITH) && 0 < NFAITH
@@ -136,6 +137,9 @@
 #include <netinet/in.h>
 #endif
 #include <netinet6/ip6protosw.h>
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
 
 extern int ip6_defhlim;
 #endif /* INET6 */
@@ -218,18 +222,6 @@ udp_input(struct mbuf *m, ...)
 	struct tdb *tdb;
 	int error, s;
 #endif /* IPSEC */
-#if defined(IGMPV3) || defined(MLDV2)
-	struct sock_msf_source *msfsrc;
-#endif
-#ifdef IGMPV3
-	int i;
-	struct ip_moptions *imo;
-#endif
-#ifdef MLDV2
-	struct sock_msf *msf;
-	struct ip6_moptions *im6o;
-	struct in6_multi_mship *imm;
-#endif
 
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
@@ -487,246 +479,25 @@ udp_input(struct mbuf *m, ...)
 					continue;
 			}
 
-#if defined(IGMPV3) || defined(MLDV2)
-#ifdef INET6
-#define PASS_TO_PCB() \
-	do { \
-		struct mbuf *n; \
-		if (last != NULL) {  \
-			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) { \
-				opts = NULL; \
-				if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) { \
-					ip6_savecontrol(inp, n, &opts); \
-				} \
-				m_adj(n, iphlen); \
-				if (sbappendaddr(&last->so_rcv, \
-				    &srcsa.sa, n, opts) == 0) { \
-					m_freem(n); \
-					if (opts) \
-						m_freem(opts); \
-					udpstat.udps_fullsock++; \
-				} else \
-					sorwakeup(last); \
-				opts = NULL; \
-			} \
-			if (!ip6_setpktaddrs(m, &src_sa6, &dst_sa6)) \
-				goto bad; /* XXX */ \
-		} \
-		last = inp->inp_socket; \
-		if ((last->so_options & (SO_REUSEPORT|SO_REUSEADDR)) == 0) \
-			goto finish_inp_scan; \
-	} while (0)
-#else /* !INET6 */
-#define PASS_TO_PCB() \
-	do { \
-		struct mbuf *n; \
-		if (last != NULL) {  \
-			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) { \
-				opts = NULL; \
-				m_adj(n, iphlen); \
-				if (sbappendaddr(&last->so_rcv, \
-				    &srcsa.sa, n, opts) == 0) { \
-					m_freem(n); \
-					if (opts) \
-						m_freem(opts); \
-					udpstat.udps_fullsock++; \
-				} else \
-					sorwakeup(last); \
-				opts = NULL; \
-			}
-			if (!ip6_setpktaddrs(m, &src_sa6, &dst_sa6)) \
-				goto bad; /* XXX */ \
-		} \
-		last = inp->inp_socket; \
-		if ((last->so_options & (SO_REUSEPORT|SO_REUSEADDR)) == 0) \
-			goto finish_inp_scan; \
-	} while (0)
-#endif /* INET6 */
-
 			/*
 			 * Receive multicast data which fits MSF condition.
 			 * Broadcast data needs no further check.
 			 */
-#ifdef INET6
-			if (ip && !IN_MULTICAST(ip->ip_dst.s_addr))
-#else
-			if (!IN_MULTICAST(ip->ip_dst.s_addr))
-#endif
-			{
-				PASS_TO_PCB();
-				continue;
+#ifdef IGMPV3
+			if (ip) {
+				if (match_msf4_per_socket(inp, &ip->ip_src,
+				     &ip->ip_dst) == 0)
+					continue;
 			}
+#endif
 			
 #ifdef MLDV2
 			if (ip6) {
-				im6o = inp->in6p_moptions;
-				if (im6o == NULL)
+				if (match_msf6_per_socket(inp, &ip6->ip6_src,
+				     &ip6->ip6_dst) == 0)
 					continue;
-				goto scan_ipv6;
 			}
 #endif
-
-#ifdef INET6
-			if (!ip)
-				continue;
-#endif
-#ifdef IGMPV3
-			imo = inp->inp_moptions;
-			if (imo == NULL)
-				continue;
-			goto scan_ipv4;
-
-scan_ipv4:
-			for (i = 0; i < imo->imo_num_memberships; i++) {
-#ifdef INET6
-				if (ip && imo->imo_membership[i]->inm_addr.s_addr
-				    != ip->ip_dst.s_addr)
-#else
-				if (imo->imo_membership[i]->inm_addr.s_addr
-				    != ip->ip_dst.s_addr)
-#endif
-					continue;
-				
-				/* receive data from any source */
-				if (imo->imo_msf[i]->msf_grpjoin != 0) {
-					PASS_TO_PCB();
-					break;
-				}
-				goto search_allow_list;
-
-			search_allow_list:
-				if (imo->imo_msf[i]->msf_numsrc == 0)
-					goto search_block_list;
-				
-				LIST_FOREACH(msfsrc,
-					     imo->imo_msf[i]->msf_head,
-					     list) {
-					if (SS_CMP(&msfsrc->src, <, &srcsa)) {
-						continue;
-					}
-					if (SS_CMP(&msfsrc->src, >, &srcsa)) {
-						/* terminate search, as there
-						 * will be no match */
-						break;
-					}
-					
-					PASS_TO_PCB();
-					break;
-				}
-				
-			search_block_list:
-				if (imo->imo_msf[i]->msf_blknumsrc == 0)
-					goto end_of_search;
-
-				LIST_FOREACH(msfsrc,
-					     imo->imo_msf[i]->msf_blkhead,
-					     list) {
-					if (SS_CMP(&msfsrc->src, <, &srcsa)) {
-						continue;
-					}
-					if (SS_CMP(&msfsrc->src, ==, &srcsa)) {
-						/* blocks since the src matched
-						 * with block list */
-						break;
-					}
-					
-					/* terminate search, as there will be
-					 * no match */
-					msfsrc = NULL;
-					break;
-				}
-				/* blocks since the source matched with block
-				 * list */
-				if (msfsrc == NULL) {
-					PASS_TO_PCB();
-				}
-				
-			end_of_search:
-				goto next_inp;
-			}
-
-			if (i != imo->imo_num_memberships)
-				goto inp_found;
-
-			continue;
-#endif /* IGMPV3 */
-#ifdef MLDV2
-scan_ipv6:
-			for (imm = LIST_FIRST(&im6o->im6o_memberships);
-			     imm != NULL;
-			     imm = LIST_NEXT(imm, i6mm_chain)) {
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, &dstsa2))
-					continue;
-				
-				msf = imm->i6mm_msf;
-				if (msf == NULL) {
-					mldlog((LOG_DEBUG, "unexpected case occured at %s:%d",
-					       __FILE__, __LINE__));
-					continue;
-				}
-				/* receive data from any source */
-				if (msf->msf_grpjoin != 0) {
-					PASS_TO_PCB();
-					break;
-				}
-				goto search_allow_list6;
-
-			search_allow_list6:
-				if (msf->msf_numsrc == 0)
-					goto search_block_list6;
-				
-				LIST_FOREACH(msfsrc, msf->msf_head, list) {
-					if (SS_CMP(&msfsrc->src, <, &srcsa2)) {
-						continue;
-					}
-					if (SS_CMP(&msfsrc->src, >, &srcsa2)) {
-						/* terminate search, as there
-						 * will be no match */
-						break;
-					}
-					
-					PASS_TO_PCB();
-					break;
-				}
-				
-			search_block_list6:
-				if (msf->msf_blknumsrc == 0)
-					goto end_of_search6;
-
-				LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
-					if (msfsrc->src.ss_family != AF_INET6)
-						continue;
-					if (SS_CMP(&msfsrc->src, <, &srcsa2)) {
-						continue;
-					}
-					if (SS_CMP(&msfsrc->src, ==, &srcsa2)) {
-						/* blocks since the src matched
-						 * with block list */
-						break;
-					}
-					
-					/* terminate search, as there will be
-					 * no match */
-					msfsrc = NULL;
-					break;
-				}
-				/* blocks since the source matched with block
-				 * list */
-				if (msfsrc == NULL) {
-					PASS_TO_PCB();
-				}
-				
-			end_of_search6:
-				goto next_inp;
-			}
-
-			if (imm != NULL)
-				goto inp_found;
-
-			continue;
-#endif /* MLDV2 */
-#undef PASS_TO_PCB
-#else /* !IGMPV3 && !MLDV2 */
 			if (last != NULL) {
 				struct mbuf *n;
 
@@ -749,11 +520,7 @@ scan_ipv6:
 					opts = NULL;
 				}
 			}
-#endif /* IGMPV3 || MLDV2 */
 
-#if defined(IGMPV3) || defined(MLDV2)
-inp_found:
-#endif
 			last = inp->inp_socket;
 			/*
 			 * Don't look for additional matches if this one does
@@ -765,14 +532,8 @@ inp_found:
 			 */
 			if ((last->so_options&(SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
-#if defined(IGMPV3) || defined(MLDV2)
-		next_inp:;
-#endif
 		}
 
-#if defined(IGMPV3) || defined(MLDV2)
-	finish_inp_scan:
-#endif
 		if (last == NULL) {
 			/*
 			 * No matching pcb found; discard datagram.
