@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.563 2000/02/16 13:46:47 sakane Exp $
+$Id: CHANGELOG,v 1.564 2000/02/16 14:58:27 sumikawa Exp $
 
 <200002>
+Wed Feb 16 23:57:53 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd2/ports/mpg123: upgrade to latest IPv6 patch and sync
+	  with FreeBSD-current.
+
 Wed Feb 16 22:45:13 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	  stop racoon to start when it's failed to open addresses specified
