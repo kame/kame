@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.254 2001/12/18 02:23:44 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.255 2001/12/19 14:30:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -461,6 +461,14 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGETSGCNT_IN6:
 	case SIOCGETMIFCNT_IN6:
 		return (mrt6_ioctl(cmd, data));
+	}
+
+	switch(cmd) {
+	case SIOCASRCSEL_POLICY:
+	case SIOCDSRCSEL_POLICY:
+		if (!privileged)
+			return(EPERM);
+		return(in6_src_ioctl(cmd, data));
 	}
 
 #ifdef MIP6

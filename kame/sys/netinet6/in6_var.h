@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.72 2001/11/17 07:46:39 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.73 2001/12/19 14:30:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -455,6 +455,9 @@ struct	in6_rrenumreq {
 #define SIOCGETMIFCNT_IN6	_IOWR('u', 107, \
 				      struct sioc_mif_req6) /* get pkt cnt per if */
 
+#define SIOCASRCSEL_POLICY	_IOW('u', 108, struct in6_addrpolicy)
+#define SIOCDSRCSEL_POLICY	_IOW('u', 109, struct in6_addrpolicy)
+
 #define IN6_IFF_ANYCAST		0x01	/* anycast address */
 #define IN6_IFF_TENTATIVE	0x02	/* tentative address */
 #define IN6_IFF_DUPLICATED	0x04	/* DAD detected duplicate */
@@ -721,6 +724,7 @@ int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
 void in6_clearscope __P((struct in6_addr *));
+int in6_src_ioctl __P((u_long, caddr_t));
 
 #ifdef MEASURE_PERFORMANCE
 void in6h_hashinit __P((void));

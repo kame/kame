@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.92 2001/11/12 11:11:23 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.93 2001/12/19 14:30:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,8 +80,13 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
+#else
+#include <sys/sockio.h>
+#endif
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
 #endif
 #include <sys/errno.h>
 #include <sys/time.h>
@@ -140,15 +145,15 @@ static struct in6_addrpolicy *lookup_addrsel_policy __P((struct sockaddr_in6 *))
 #ifndef __FreeBSD__
 static int set_addrsel_policy __P((void *, size_t));
 static int get_addrsel_policy __P((void *, size_t *));
-static void clear_addrsel_policy __P((void));
+#endif
 
 static void init_policy_queue __P((void));
 static int add_addrsel_policyent __P((struct in6_addrpolicy *));
+static int delete_addrsel_policyent __P((struct in6_addrpolicy *));
 static int walk_addrsel_policy __P((int (*)(struct in6_addrpolicy *, void *),
 				    void *));
 static int dump_addrsel_policyent __P((struct in6_addrpolicy *, void *));
 static struct in6_addrpolicy *match_addrsel_policy __P((struct sockaddr_in6 *));
-#endif
 
 /*
  * Return an IPv6 address, which is the most appropriate for a given
@@ -1179,9 +1184,7 @@ in6_clearscope(addr)
 void
 addrsel_policy_init()
 {
-#ifndef __FreeBSD__
 	init_policy_queue();
-#endif
 
 	/* initialize the "last resort" policy */
 	bzero(&defaultaddrpolicy, sizeof(defaultaddrpolicy));
@@ -1194,9 +1197,7 @@ lookup_addrsel_policy(key)
 {
 	struct in6_addrpolicy *match = NULL;
 
-#ifndef __FreeBSD__
 	match = match_addrsel_policy(key);
-#endif
 
 	if (match == NULL)
 		match = &defaultaddrpolicy;
@@ -1209,14 +1210,20 @@ lookup_addrsel_policy(key)
 /*
  * Subroutines to manage the address selection policy table via sysctl. 
  */
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
+struct walkarg {
+	struct sysctl_req *w_req;
+};
+#else
 struct walkarg {
 	size_t	w_total;
 	size_t	w_given;
 	caddr_t	w_where;
 	caddr_t w_limit;
 };
+#endif
 
+#ifndef __FreeBSD__
 int
 in6_src_sysctl(oldp, oldlenp, newp, newlen)
 	void *oldp;
@@ -1233,19 +1240,29 @@ in6_src_sysctl(oldp, oldlenp, newp, newlen)
 	s = splnet();
 #endif
 
+	if (newp) {
+		error = EPERM;
+		goto end;
+	}
 	if (oldp && oldlenp == NULL) {
 		error = EINVAL;
 		goto end;
 	}
-	if ((oldp || oldlenp) &&
-	    (error = get_addrsel_policy(oldp, oldlenp)) != 0) {
-		goto end;
-	}
+	if (oldp || oldlenp) {
+		struct walkarg w;
+		size_t oldlen = (oldlenp ? *oldlenp : 0);
 
-	if (newp) {
-		/* a new set of policy is being specified. */
-		if ((error = set_addrsel_policy(newp, newlen)) != 0)
-			goto end;
+		bzero(&w, sizeof(w));
+		w.w_given = oldlen;
+		w.w_where = oldp;
+		if (oldp)
+			w.w_limit = (caddr_t)oldp + oldlen;
+
+		error = walk_addrsel_policy(dump_addrsel_policyent, &w);
+
+		*oldlenp = w.w_total;
+		if (oldp && w.w_total > oldlen && error == 0)
+			error = ENOMEM;
 	}
 
   end:
@@ -1253,83 +1270,70 @@ in6_src_sysctl(oldp, oldlenp, newp, newlen)
 
 	return(error);
 }
-
-static int
-set_addrsel_policy(buf, buflen)
-	void *buf;
-	size_t buflen;
-{
-	int error = 0;
-	struct in6_addrpolicy *ent, *ep;
-
-	/* before changing the table, validate the specified policy. */
-	ent = (struct in6_addrpolicy *)buf;
-	ep = (struct in6_addrpolicy *)((caddr_t)buf + buflen);
-	for (; ent && ent + 1 <= ep; ent++) {
-		if (ent->label == ADDR_LABEL_NOTAPP)
-			return(EINVAL);
-		/* check if the prefix mask is consecutive. */
-		if (in6_mask2len(&ent->addrmask.sin6_addr, NULL) < 0)
-			return(EINVAL);
-#if 0
-		/*
-		 * The "use" member can only be modified by the kernel.
-		 * Otherwise, we could issue an error, but we just ignore
-		 * the specified value and accept the configuration.
-		 */
-		if (ent->use)
-			return(EINVAL);
+#else  /* !FreeBSD */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+static int in6_src_sysctl(SYSCTL_HANDLER_ARGS);
+#else
+static int in6_src_sysctl SYSCTL_HANDLER_ARGS;
+#endif /* FreeBSD4 */
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_inet6_ip6);
 #endif
-	}
-
-	/* clear the entire policy table. */
-	clear_addrsel_policy();
-
-	/* finally, set the new policy. */
-	ent = (struct in6_addrpolicy *)buf;
-	ep = (struct in6_addrpolicy *)((caddr_t)buf + buflen);
-	for (; ent && ent + 1 <= ep; ent++) {
-		struct in6_addrpolicy ent0 = *ent;
-		int i;
-
-		/* clear trailing garbages (if any) of the prefix address. */
-		for (i = 0; i < 4; i++) {
-			ent0.addr.sin6_addr.s6_addr32[i] &=
-				ent0.addrmask.sin6_addr.s6_addr32[i];
-		}
-		
-		ent0.use = 0;	/* just in case */
-
-		if ((error = add_addrsel_policyent(&ent0)) != 0)
-			return(error);
-	}
-
-	return(error);
-}
+SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_ADDRSELPOLICY, addrselpolicy,
+	CTLFLAG_RD, in6_src_sysctl, "");
 
 static int
-get_addrsel_policy(oldp, oldlenp)
-	void *oldp;
-	size_t *oldlenp;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+in6_src_sysctl(SYSCTL_HANDLER_ARGS)
+#else
+in6_src_sysctl SYSCTL_HANDLER_ARGS
+#endif
 {
-	int error = 0;
 	struct walkarg w;
-	size_t oldlen = (oldlenp ? *oldlenp : 0);
+
+	if (req->newptr)
+		return EPERM;
 
 	bzero(&w, sizeof(w));
-	w.w_given = oldlen;
-	w.w_where = oldp;
-	if (oldp)
-		w.w_limit = (caddr_t)oldp + oldlen;
+	w.w_req = req;
 
-	error = walk_addrsel_policy(dump_addrsel_policyent, &w);
+	return(walk_addrsel_policy(dump_addrsel_policyent, &w));
+}
+#endif /* FreeBSD */
 
-	*oldlenp = w.w_total;
-	if (oldp && w.w_total > oldlen && error == 0) {
-		error = ENOMEM;
+int
+in6_src_ioctl(cmd, data)
+	u_long cmd;
+	caddr_t data;
+{
+	int i;
+	struct in6_addrpolicy ent0;
+
+	if (cmd != SIOCASRCSEL_POLICY && cmd != SIOCDSRCSEL_POLICY)
+		return(EOPNOTSUPP); /* check for safety */
+
+	ent0 = *(struct in6_addrpolicy *)data;
+
+	if (ent0.label == ADDR_LABEL_NOTAPP)
+		return(EINVAL);
+	/* check if the prefix mask is consecutive. */
+	if (in6_mask2len(&ent0.addrmask.sin6_addr, NULL) < 0)
+		return(EINVAL);
+	/* clear trailing garbages (if any) of the prefix address. */
+	for (i = 0; i < 4; i++) {
+		ent0.addr.sin6_addr.s6_addr32[i] &=
+			ent0.addrmask.sin6_addr.s6_addr32[i];
+	}
+	ent0.use = 0;
+
+	switch (cmd) {
+	case SIOCASRCSEL_POLICY:
+		return(add_addrsel_policyent(&ent0));
+	case SIOCDSRCSEL_POLICY:
+		return(delete_addrsel_policyent(&ent0));
 	}
 
-	return(error);
+	/* NOTREACHED */
 }
 
 /*
@@ -1353,24 +1357,22 @@ init_policy_queue()
 	TAILQ_INIT(&addrsel_policytab);
 }
 
-static void
-clear_addrsel_policy()
-{
-	struct addrsel_policyent *pol, *next;
-
-	for (pol = TAILQ_FIRST(&addrsel_policytab); pol; pol = next) {
-		next = TAILQ_NEXT(pol, ape_entry);
-
-		TAILQ_REMOVE(&addrsel_policytab, pol, ape_entry);
-		FREE(pol, M_IFADDR);
-	}
-}
-
 static int
 add_addrsel_policyent(newpolicy)
 	struct in6_addrpolicy *newpolicy;
 {
-	struct addrsel_policyent *new;
+	struct addrsel_policyent *new, *pol;
+
+	/* duplication check */
+	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
+	     pol = TAILQ_NEXT(pol, ape_entry)) {
+		if (SA6_ARE_ADDR_EQUAL(&newpolicy->addr,
+				       &pol->ape_policy.addr) &&
+		    SA6_ARE_ADDR_EQUAL(&newpolicy->addrmask,
+				       &pol->ape_policy.addrmask)) {
+			return(EEXIST);	/* or override it? */
+		}
+	}
 
 	MALLOC(new, struct addrsel_policyent *, sizeof(*new), M_IFADDR,
 	       M_WAITOK);
@@ -1380,6 +1382,29 @@ add_addrsel_policyent(newpolicy)
 	new->ape_policy = *newpolicy;
 
 	TAILQ_INSERT_TAIL(&addrsel_policytab, new, ape_entry);
+
+	return(0);
+}
+
+static int
+delete_addrsel_policyent(key)
+	struct in6_addrpolicy *key;
+{
+	struct addrsel_policyent *pol;
+
+	/* search for the entry in the table */
+	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
+	     pol = TAILQ_NEXT(pol, ape_entry)) {
+		if (SA6_ARE_ADDR_EQUAL(&key->addr, &pol->ape_policy.addr) &&
+		    SA6_ARE_ADDR_EQUAL(&key->addrmask,
+				       &pol->ape_policy.addrmask)) {
+			break;
+		}
+	}
+	if (pol == NULL)
+		return(ESRCH);
+
+	TAILQ_REMOVE(&addrsel_policytab, pol, ape_entry);
 
 	return(0);
 }
@@ -1409,12 +1434,16 @@ dump_addrsel_policyent(pol, arg)
 	int error = 0;
 	struct walkarg *w = arg;
 
+#ifdef __FreeBSD__
+	error = SYSCTL_OUT(w->w_req, pol, sizeof(*pol));
+#else
 	if (w->w_where && w->w_where + sizeof(*pol) <= w->w_limit) {
 		if ((error = copyout(pol, w->w_where, sizeof(*pol))) != 0)
 			return(error);
 		w->w_where += sizeof(*pol);
 	}
 	w->w_total += sizeof(*pol);
+#endif
 
 	return(error);
 }
@@ -1464,4 +1493,3 @@ match_addrsel_policy(key)
 
 	return(bestpol);
 }
-#endif /* !FreeBSD */
