@@ -113,6 +113,7 @@ struct secreplay {
 	u_int32_t seq;		/* used by sender */
 	u_int32_t lastseq;	/* used by receiver */
 	caddr_t bitmap;		/* used by receiver */
+	int overflow;		/* overflow flag */
 };
 
 /* socket table due to send PF_KEY messages. */ 

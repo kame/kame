@@ -375,7 +375,17 @@ esp_output(m, nexthdrp, md, isr, af)
 	if ((sav->flags & SADB_X_EXT_OLD) == 0) {
 		struct newesp *nesp;
 		nesp = (struct newesp *)esp;
-		sav->replay->count++;
+		if (sav->replay->count == ~0) {
+			if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
+				/* XXX Is it noisy ? */
+				log(LOG_AUTH, "replay counter overflowed. %s\n",
+					ipsec_logsastr(sav));
+				ipsecstat.out_inval++;
+				m_freem(m);
+				return EINVAL;
+			}
+			sav->replay->count++;
+		}
 		/*
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.

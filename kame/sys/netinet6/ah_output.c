@@ -245,7 +245,17 @@ ah4_output(m, isr)
 		ahdr->ah_nxt = ip->ip_p;
 		ahdr->ah_reserve = htons(0);
 		ahdr->ah_spi = spi;
-		sav->replay->count++;
+		if (sav->replay->count == ~0) {
+			if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
+				/* XXX Is it noisy ? */
+				log(LOG_AUTH, "replay counter overflowed. %s\n",
+					ipsec_logsastr(sav));
+				ipsecstat.out_inval++;
+				m_freem(m);
+				return EINVAL;
+			}
+			sav->replay->count++;
+		}
 		/*
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.
@@ -427,7 +437,17 @@ ah6_output(m, nexthdrp, md, isr)
 		ahdr->ah_len = (plen >> 2) + 1;	/* plus one for seq# */
 		ahdr->ah_reserve = htons(0);
 		ahdr->ah_spi = spi;
-		sav->replay->count++;
+		if (sav->replay->count == ~0) {
+			if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
+				/* XXX Is it noisy ? */
+				log(LOG_AUTH, "replay counter overflowed. %s\n",
+					ipsec_logsastr(sav));
+				ipsecstat.out_inval++;
+				m_freem(m);
+				return EINVAL;
+			}
+			sav->replay->count++;
+		}
 		/*
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.

@@ -2248,9 +2248,18 @@ ipsec_updatereplay(seq, sav)
 	}
 
 ok:
-	if (replay->count == ~0
-	 && (sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
-	 	return 1;	/* don't increment, no more packets accepted */
+	if (replay->count == ~0) {
+
+		/* set overflow flag */
+		replay->overflow++;
+
+		/* don't increment, no more packets accepted */
+		if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0)
+			return 1;
+
+		log(LOG_AUTH, "replay counter made %d cycle. %s\n",
+			replay->overflow,
+			ipsec_logsastr(sav));
 	}
 
 	replay->count++;
