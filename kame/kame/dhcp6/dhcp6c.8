@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.32 2004/07/29 23:39:26 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.33 2004/09/04 09:31:14 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -40,12 +40,19 @@
 .Op Fl Ddf
 .Op Fl p Ar pid-file
 .Ar interface
+.Op Ar interfaces...
 .\"
 .Sh DESCRIPTION
 .Nm
 works as a DHCPv6 client and gets information from DHCPv6 servers
 to configure the specified
 .Ar interface .
+Multiple
+.Ar interfaces
+can be specified separated by spaces or tabs,
+in which case
+.Nm
+will work on all the interfaces simultaneously.
 .Pp
 The command line options are:
 .Bl -tag -width indent
