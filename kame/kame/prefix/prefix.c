@@ -567,7 +567,7 @@ setlifetime(const char *atime, u_int32_t *btime)
 		return;
 	}
 	ttime = strtoul(atime, &check ,10) & 0xffffffff;
-	if (*check == '\0') {
+	if (*atime != '\0' && *check == '\0') {
 		*btime = ttime;
 		return;
 	}

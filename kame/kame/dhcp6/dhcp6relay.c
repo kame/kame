@@ -184,6 +184,11 @@ make_prefix(pstr0)
 	if ((p = strchr(pstr, '/')) == NULL)
 		plen = 128; /* assumes it as a host prefix */
 	else {
+		if (p[1] == '\0') {
+			dprintf(LOG_WARNING,
+				"no prefix length (ignored): %s", p + 1);
+			return(NULL);
+		}
 		plen = (int)strtoul(p + 1, &ep, 10);
 		if (*ep != '\0') {
 			dprintf(LOG_WARNING,
