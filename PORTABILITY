@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.62 2001/09/27 04:49:47 itojun Exp $
+	$KAME: PORTABILITY,v 1.63 2002/01/11 02:47:56 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -368,3 +368,6 @@ across those possibilities.
 		if (n < 0 || n >= ep - lp)
 			die();
 		lp += n;
+
+- daemon(3) with noclose arg = 0: must be used prior to socket/file descriptor
+  initialization.  otherwise daemon(3) can mess with opened file descriptors.
