@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2552 2004/03/03 15:04:31 suz Exp $
+$KAME: CHANGELOG,v 1.2553 2004/03/09 07:32:25 jinmei Exp $
 
 <200403>
+2004-03-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setmoptions): disallowed the
+	use of the unspecified address for IPV6_JOIN_GROUP and
+	IPV6_LEAVE_GROUP.  The special case is not documented in the
+	official API specification, and for whatever purpose, this should
+	actually have not been working for a long time.
+
 2004-03-04  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd4/sys/netinet/tcp*.c:
 	  FreeBSD Security Advisory: FreeBSD-SA-04:04.tcp
