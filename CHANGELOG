@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1762 2001/07/06 10:55:14 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1763 2001/07/09 14:00:29 sakane Exp $
 
 <200107>
+Mon Jul  9 23:01:10 JST 2001 sakane@kame.net
+	* kame/racoon:
+	- print all of rejected attributes in phase 1 proposal when no suitable
+	  proposal are found.  suggested by <mcr@sandelman.ottawa.on.ca>
+	- fixed not to increment the transform number in phase 1 proposal.
+	  it was degraded.
+
 Fri Jul  6 19:52:59 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet6/ip6_fw.c: fragmented packets processing logic
 	  was wrong. reviewd by: ume
