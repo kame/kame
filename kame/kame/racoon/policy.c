@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.43 2001/10/02 02:47:34 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.44 2001/10/02 04:10:17 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -168,36 +168,6 @@ getspbyspid(spid)
 	}
 
 	return NULL;
-}
-
-/*
- * compare policyindex.
- * a: subject b: db
- * OUT:	0:	equal
- *	1:	not equal
- */
-int
-cmpspidx(a, b)
-	struct policyindex *a, *b;
-{
-	plog(LLV_DEBUG, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
-	plog(LLV_DEBUG, LOCATION, NULL, "db :%p: %s\n", b, spidx2str(b));
-
-	/* XXX don't check direction now, but it's to be checked carefully. */
-	if (a->dir != b->dir
-	 || a->prefs != b->prefs
-	 || a->prefd != b->prefd
-	 || a->ul_proto != b->ul_proto)
-		return 1;
-
-	if (cmpsaddrwild((struct sockaddr *)&a->src,
-			   (struct sockaddr *)&b->src))
-		return 1;
-	if (cmpsaddrwild((struct sockaddr *)&a->dst,
-			   (struct sockaddr *)&b->dst))
-		return 1;
-
-	return 0;
 }
 
 /*
