@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.12 2002/09/05 08:12:23 suz Exp $
+ * $KAME: mld6v2.c,v 1.13 2002/10/02 06:28:08 suz Exp $
  */
 
 /*
@@ -114,7 +114,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
     struct listaddr *lstsrc = NULL;
     u_int8_t        misc = 0;	/*Resv+S flag + QRV */
     unsigned int    realnbr;
-    register int    vifi;
+    mifi_t vifi;
     struct uvif    *v;
     struct listaddr *g = NULL;
 
