@@ -6,7 +6,7 @@ SRCS=	inetd.c
 MAN8=	inetd.8
 MLINKS= inetd.8 inetd.conf.5 \
 	inetd.8 inet46d.8 \
-	inetd.8 inetd46.conf.5
+	inetd.8 inetd46d.conf.5
 COPTS+=	-Wall -DLOGIN_CAP -DLIBWRAP
 COPTS+=	-DIPSEC
 #COPTS+=	-DSANITY_CHECK
