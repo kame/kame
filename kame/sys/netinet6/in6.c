@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.91 2000/07/04 05:50:13 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.92 2000/07/04 05:57:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,9 +180,6 @@ struct multi6_kludge {
 static int
 in6_is_ifloop_auto(struct ifaddr *ifa)
 {
-#ifdef __OpenBSD__
-	return 0;
-#else
 #define SIN6(s) ((struct sockaddr_in6 *)s)
 	/*
 	 * If RTF_CLONING is unset, or (IFF_LOOPBACK | IFF_POINTOPOINT),
@@ -200,7 +197,6 @@ in6_is_ifloop_auto(struct ifaddr *ifa)
 	else
 		return 1;
 #undef SIN6
-#endif
 }
 
 /*
