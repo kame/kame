@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.9 2003/07/30 12:39:41 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.10 2003/07/30 12:45:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -793,7 +793,7 @@ mip6_dad_error(ifa, err)
 			    && (gmbc->mbc_llmbc == llmbc)) {
 				gmbc_next = LIST_NEXT(gmbc, mbc_entry);
 				if (MIP6_IS_BC_DAD_WAIT(gmbc)) {
-					mip6_stop_dad(gmbc);
+					mip6_dad_stop(gmbc);
 					gmbc->mbc_llmbc = NULL;
 					error = mip6_bc_list_remove(
 					    &mip6_bc_list, llmbc);
