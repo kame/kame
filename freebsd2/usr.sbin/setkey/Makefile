@@ -17,7 +17,7 @@ BINMODE=555
 all: ${PROG} scriptdump
 
 CFLAGS+=-DIPSEC_DEBUG -DINET6 -DYY_NO_UNPUT
-CFLAGS+=-I${.CURDIR} -I${SRCDIR} -I${.CURDIR}/../../lib/libipsec
+CFLAGS+=-I${.CURDIR} -I${SRCDIR}
 LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
