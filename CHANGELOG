@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.831 2000/04/28 07:57:42 jinmei Exp $
+$Id: CHANGELOG,v 1.832 2000/04/28 10:30:35 itojun Exp $
 
 <200004>
+Fri Apr 28 19:30:18 JST 2000  itojun@iijlab.net
+	* ports/pkgsrc for zebra (freebsd[23], netbsd): upgrade to 0.86.
+
 2000-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/traceroute6/traceroute6.c (main): always printed the
 	source address of proving packets.
