@@ -705,6 +705,49 @@ findpcb:
 				goto drop;
 			}
 #endif
+
+#ifdef INET6
+			/*
+			 * If deprecated address is forbidden,
+			 * we do not accept SYN to deprecated interface
+			 * address to prevent any new inbound connection from
+			 * getting established.
+			 * When we do not accept SYN, we send a TCP RST,
+			 * with deprecated source address (instead of dropping
+			 * it).  We compromise it as it is much better for peer
+			 * to send a RST, and RST will be the final packet
+			 * for the exchange.
+			 *
+			 * If we do not forbid deprecated addresses, we accept
+			 * the SYN packet.  RFC2462 does not suggest dropping
+			 * SYN in this case.
+			 * If we decipher RFC2462 5.5.4, it says like this:
+			 * 1. use of deprecated addr with existing
+			 *    communication is okay - "SHOULD continue to be
+			 *    used"
+			 * 2. use of it with new communication:
+			 *   (2a) "SHOULD NOT be used if alternate address
+			 *        with sufficient scope is available"
+			 *   (2b) nothing mentioned otherwise.
+			 * Here we fall into (2b) case as we have no choice in
+			 * our source address selection - we must obey the peer.
+			 *
+			 * The wording in RFC2462 is confusing, and there are
+			 * multiple description text for deprecated address
+			 * handling - worse, they are not exactly the same.
+			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
+			 */
+			if (isipv6 && !ip6_use_deprecated) {
+				struct in6_ifaddr *ia6;
+
+				if ((ia6 = ip6_getdstifaddr(m)) &&
+				    (ia6->ia6_flags & IN6_IFF_DEPRECATED)) {
+					tp = NULL;
+					goto dropwithreset;
+				}
+			}
+#endif
+
 			so2 = sonewconn(so, 0);
 			if (so2 == 0) {
 				tcpstat.tcps_listendrop++;
