@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1019 2000/06/14 17:32:45 itojun Exp $
+$Id: CHANGELOG,v 1.1020 2000/06/14 17:37:50 jinmei Exp $
+
 <200006>
+2000-06-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_msg): was added to tell
+	user processes changes about the default router (including
+	deletion). This function would be called from defrouter_addreq,
+	defrouter_addifreq, and defrouter_delreq.
+	Note: this is currently experimental and is only enable with the
+	ND6_USE_RTSOCK kernel compilation option.
+
 Thu Jun 15 02:18:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/zebra: upgrade to 0.87.
 	* freebsd3/ports/ruby: use 1.4.4.
