@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.341 2004/02/10 03:15:33 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.342 2004/02/11 10:40:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -985,14 +985,14 @@ nd6_lookup(addr6, create, ifp)
 	struct ifnet *ifp;
 {
 	struct rtentry *rt;
-	struct sockaddr_in6 sa6;
+	struct sockaddr_in6 sin6;
 
-	bzero(&sa6, sizeof(sa6));
-	sa6.sin6_family = AF_INET6;
-	sa6.sin6_len = sizeof(struct sockaddr_in6);
-	sa6.sin6_addr = *addr6;
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *addr6;
 
-	rt = rtalloc1((struct sockaddr *)&sa6, create
+	rt = rtalloc1((struct sockaddr *)&sin6, create
 #ifdef __FreeBSD__
 		      , 0UL
 #endif /* __FreeBSD__ */
@@ -1021,7 +1021,7 @@ nd6_lookup(addr6, create, ifp)
 			 * be covered by our own prefix.
 			 */
 			struct ifaddr *ifa =
-			    ifaof_ifpforaddr((struct sockaddr *)&sa6, ifp);
+			    ifaof_ifpforaddr((struct sockaddr *)&sin6, ifp);
 			if (ifa == NULL)
 				return (NULL);
 
@@ -1033,7 +1033,7 @@ nd6_lookup(addr6, create, ifp)
 			 * We also specify RTF_CACHE so that the entry
 			 * will be subject to cached route management.
 			 */
-			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)&sa6,
+			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)&sin6,
 			    ifa->ifa_addr, (struct sockaddr *)&all1_sa,
 			    (ifa->ifa_flags | RTF_HOST | RTF_LLINFO | RTF_CACHE) &
 			    ~RTF_CLONING, &rt)) != 0) {
