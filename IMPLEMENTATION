@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/03/12 10:25:14 $
+			$Date: 2000/03/22 07:52:30 $
 
 1. IPv6
 
@@ -99,7 +99,7 @@ draft-itojun-ipv6-tcp-to-anycast-00.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-yamamoto-wideipv6-comm-model-00.txt
     * See 1.6 in this document for details.
-draft-ietf-ipngwg-scopedaddr-format-??.txt:
+draft-ietf-ipngwg-scopedaddr-format-01.txt:
 	An Extension of Format for IPv6 Scoped Addresses
 draft-ietf-ipngwg-rfc2292bis-01.txt:
 	A revised version of the advanced API
@@ -242,7 +242,7 @@ Programs that use these APIs have to be prepared about differences
 in kernels anyway.
 
 getaddrinfo(3) and getnameinfo(3) are modified to support extended numeric
-IPv6 syntax, as documented in draft-ietf-ipngwg-scopedaddr-format-??.txt.
+IPv6 syntax, as documented in draft-ietf-ipngwg-scopedaddr-format-01.txt.
 You can specify outgoing link, by using name of the outgoing interface
 like "fe80::1%ne0".  This way you will be able to specify link-local scoped
 address without much trouble.
@@ -257,7 +257,7 @@ scope identifier.
 1.3.3 Interaction with users (command line)
 
 Some of the userland tools support extended numeric IPv6 syntax, as
-documented in draft-ietf-ipngwg-scopedaddr-format-??.txt.  In this case,
+documented in draft-ietf-ipngwg-scopedaddr-format-01.txt.  In this case,
 you can specify outgoing link, by using name of the outgoing interface like
 "fe80::1%ne0".
 
