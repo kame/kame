@@ -507,6 +507,7 @@ relay6_react_solicit(buf, siz, dev)
 	static struct iovec iov[2];
 	struct in6_addr myaddr;
 	int plen;
+	u_char *cp_plen;
 
 	dprintf((stderr, "relay6_react_solicit\n"));
 
@@ -552,9 +553,10 @@ relay6_react_solicit(buf, siz, dev)
 	 * for this address in the ``prefix-len'' field of the Solicit.
 	 * XXX: we blindly assume the length is 64 for now...
 	 */
+	cp_plen = (u_char *)&dh6s->dh6sol_plen_id;
 	plen = 64;		/* XXX */
-	dh6s->dh6sol_plen_id &= 0x01; /* clear prefix-len for safety */
-	dh6s->dh6sol_plen_id |= ((plen & 0xff) << 1);
+	*cp_plen &= 0x01; /* clear prefix-len for safety */
+	*cp_plen |= ((plen & 0xff) << 1);
 
 	/* set the source address and the outgoing interface */
 	memset(spktinfo, 0, sizeof(*spktinfo));
