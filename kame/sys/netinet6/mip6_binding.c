@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.28 2001/10/29 11:32:06 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.29 2001/11/06 01:20:29 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -105,7 +105,7 @@ static int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
 #ifdef MIP6_DRAFT13
 static struct mip6_bc *mip6_bc_create 
     __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
-	 u_int8_t, u_int8_t, u_int8_t, u_int32_t));
+	 u_int8_t, u_int8_t, MIP6_SEQNO_T, u_int32_t));
 #else
 static struct mip6_bc *mip6_bc_create 
     __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,

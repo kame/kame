@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.71 2001/10/26 13:26:33 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.72 2001/11/06 01:20:29 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1504,10 +1504,10 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	/* set the prefix length of this binding update. */
 	if (mbu->mbu_flags & IP6_BUF_HOME) {
 		/* register all ifid as a home address. */
-		bu_opt->ip6ou_prefixlen = 64;
+		bu_opt.ip6ou_prefixlen = 64;
 	} else {
 		/* when registering to a CN, the prefixlen must be 0. */ 
-		bu_opt->ip6ou_prefixlen = 0;
+		bu_opt.ip6ou_prefixlen = 0;
 	}
 #endif /* MIP6_DRAFT13 */
 	bu_opt.ip6ou_seqno = mbu->mbu_seqno;
