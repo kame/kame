@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-#	$Id: Makefile,v 1.92.2.1 1999/03/22 13:09:36 phk Exp $
+# $FreeBSD: src/include/Makefile,v 1.92.2.3 1999/11/22 07:08:04 julian Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -38,8 +38,8 @@ PFILES=	mqueue.h sched.h semaphore.h \
 
 LFILES=	aio.h errno.h fcntl.h inttypes.h linker_set.h poll.h syslog.h termios.h
 
-LDIRS=	cam msdosfs net netatalk netatm netinet netipx netkey netns nfs \
-	pccard posix4 sys vm
+LDIRS=	cam msdosfs net netatalk netatm netgraph netinet netipx netkey \
+	netns nfs pccard posix4 sys vm
 LDIRS+=	netinet6
 
 LNOHEADERDIRS=	isofs ufs
