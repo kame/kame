@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.65 2001/01/23 14:25:55 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.66 2001/01/23 14:27:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1452,7 +1452,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	/* prefixlen + ifidlen must be equal to 128 */
 	plen0 = in6_mask2len(&ib->ia_prefixmask.sin6_addr, NULL);
 	if (prefixlen != plen0) {
-		log(LOG_ERR, "in6_ifadd: wrong prefixlen for %s "
+		log(LOG_INFO, "in6_ifadd: wrong prefixlen for %s "
 		    "(prefix=%d ifid=%d)\n",
 		    if_name(ifp), prefixlen, 128 - plen0);
 		return NULL;
