@@ -1109,7 +1109,13 @@ nd6_rtrequest(req, rt, sa)
 		 * We don't do that here since llinfo is not ready yet here.
 		 * There are also couple of reasons:
 		 * - unsolicited NA code needs improvement beforehand
-		 * - RFC2461 does not require it, it seems
+		 * - RFC2461 says we MAY send multicast unsolicited NA
+		 *   (7.2.6 paragraph 4), however, it also says that we
+		 *   SHOULD provide a mechanism to prevent multicast NA storm.
+		 *   we don't have anything like it right now.
+		 *   note that the mechanism need a mutual agreement
+		 *   between proxies, which means that we need to implement
+		 *   a new protocol, or new kludge.
 		 * - from RFC2461 6.2.4, host MUST NOT do that.  if we do,
 		 *   we need to check ip6forwarding to be sure.
 		 */
