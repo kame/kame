@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1333 2000/10/15 08:52:48 itojun Exp $
+$KAME: CHANGELOG,v 1.1334 2000/10/15 09:11:11 itojun Exp $
 
 <200010>
 Sun Oct 15 17:49:15 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 10/9 weekly snapshot.
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}, freebsd2/ports/{libpcap,tcpdump}:
+	  use 10/9 weekly snapshot.
 
 Thu Oct 12 04:56:24 JST 2000 sakane@ydc.co.jp
 	* kame/racoon: Added two directives, my_identifier and peers_identifer.
