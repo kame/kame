@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.60 2000/09/11 11:36:41 sumikawa Exp $	*/
+/*	$KAME: in6.h,v 1.61 2000/10/30 14:41:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,7 +407,7 @@ struct route_in6 {
 #endif
 
 #define IPV6_CHECKSUM		26 /* int; checksum offset for raw socket */
-#define IPV6_BINDV6ONLY		27 /* bool; only bind INET6 at null bind */
+#define IPV6_BINDV6ONLY		27 /* bool; only bind INET6 at wildcard bind */
 
 #if 1 /*IPSEC*/
 #define IPV6_IPSEC_POLICY	28 /* struct; get/set security policy */
