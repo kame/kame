@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.758 2000/04/11 06:00:41 itojun Exp $
+$Id: CHANGELOG,v 1.759 2000/04/11 10:54:41 jinmei Exp $
 
 <200003>
+2000-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/net/if_gif.c (gif_ioctl): supported a new ioctl
+	SIOCDIFPHYADDR in order to allow a user to remove
+	already-specified physical addresses on a gif interface.
+
 Tue Apr 11 14:58:10 JST 2000
 	* sys/netinet6/in6_ifattach.c: revise interface identifier lookup.
 	  we no longer cache EUI64, due to KAME PR 236.
