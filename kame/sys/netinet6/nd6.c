@@ -615,7 +615,7 @@ nd6_purge(ifp)
 	 * Nuke neighbor cache entries for the ifp.
 	 * Note that rt->rt_ifp may not be the same as ifp,
 	 * due to KAME goto ours hack.  See RTM_RESOLVE case in
-	 * nd6_rtrequest(), and ip6_input()).
+	 * nd6_rtrequest(), and ip6_input().
 	 */
 	ln = llinfo_nd6.ln_next;
 	while (ln && ln != &llinfo_nd6) {
@@ -634,7 +634,8 @@ nd6_purge(ifp)
 	}
 
 	/*
-	 * Interface route will be retained by nd6_free().  Nuke it.
+	 * Neighbor cache entry for interface route will be retained
+	 * with ND6_LLINFO_WAITDELETE state, by nd6_free().  Nuke it.
 	 */
 	ln = llinfo_nd6.ln_next;
 	while (ln && ln != &llinfo_nd6) {
