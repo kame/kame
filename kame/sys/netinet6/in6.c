@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.289 2002/06/08 18:24:11 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.290 2002/06/08 19:18:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1314,7 +1314,7 @@ in6_update_ifa(ifp, ifra, ia)
 			}
 		}
 		if (!rt) {
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
 			struct rt_addrinfo info;
 
 			bzero(&info, sizeof(info));
@@ -1409,7 +1409,7 @@ in6_update_ifa(ifp, ifra, ia)
 			}
 		}
 		if (!rt) {
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
 			struct rt_addrinfo info;
 
 			bzero(&info, sizeof(info));

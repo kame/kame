@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.204 2002/06/08 06:57:11 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.205 2002/06/08 19:18:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -593,7 +593,7 @@ defrouter_addifreq(ifp)
 	struct ifaddr *ifa;
 	struct rtentry *newrt = NULL;
 	int error, flags;
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
 	struct rt_addrinfo info;
 #endif
 
@@ -621,7 +621,8 @@ defrouter_addifreq(ifp)
 
 	/* RTF_CLONING is necessary to make sure to perform ND */
 	flags = ifa->ifa_flags | RTF_CLONING;
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || de
+fined(__NetBSD__)
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
 	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)ifa->ifa_addr;
