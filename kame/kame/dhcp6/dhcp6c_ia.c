@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.26 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.27 2005/02/27 03:36:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -131,7 +131,7 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 		ia = get_ia(iatype, ifp, iac, iav, serverid);
 		if (ia == NULL) {
 			dprintf(LOG_WARNING, FNAME, "failed to get an IA "
-			    "type: %s, ID: %u", iac->type, iac->iaid);
+			    "type: %s, ID: %u", iastr(iac->type), iac->iaid);
 			continue;
 		}
 
@@ -139,7 +139,7 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 		if (update_authparam(ia, authparam)) {
 			dprintf(LOG_WARNING, FNAME, "failed to update "
 			    "authentication param for IA "
-			    "type: %s, ID: %u", iac->type, iac->iaid);
+			    "type: %s, ID: %u", iastr(iac->type), iac->iaid);
 			remove_ia(ia);
 			continue;
 		}
