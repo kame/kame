@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.129 2000/06/14 02:51:50 itojun Exp $	*/
+/*	$KAME: key.c,v 1.130 2000/06/15 05:46:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3909,7 +3909,7 @@ key_cmpspidx_withmask(spidx0, spidx1)
 
 	switch (spidx0->dst.ss_family) {
 	case AF_INET:
-		if (satosin(&spidx0->src)->sin_port != IPSEC_PORT_ANY
+		if (satosin(&spidx0->dst)->sin_port != IPSEC_PORT_ANY
 		 && satosin(&spidx0->dst)->sin_port !=
 		    satosin(&spidx1->dst)->sin_port)
 			return 0;
@@ -3918,7 +3918,7 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY
+		if (satosin6(&spidx0->dst)->sin6_port != IPSEC_PORT_ANY
 		 && satosin6(&spidx0->dst)->sin6_port !=
 		    satosin6(&spidx1->dst)->sin6_port)
 			return 0;
