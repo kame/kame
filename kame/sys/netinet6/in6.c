@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.215 2001/07/24 09:31:46 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.216 2001/07/24 09:36:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -523,7 +523,7 @@ in6_control(so, cmd, data, ifp)
 	 * code/API assumed at most 1 interface address per interface.
 	 * Since IPv6 allows a node to assign multiple addresses
 	 * on a single interface, we almost always look and check the
-	 * presense of ifra_addr, and reject invalid ones here.
+	 * presence of ifra_addr, and reject invalid ones here.
 	 * It also decreases duplicated code among SIOC*_IN6 operations.
 	 */
 	if (cmd == SIOCAIFADDR_IN6 || cmd == SIOCSIFPHYADDR_IN6)
