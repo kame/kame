@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.128 2003/03/28 08:11:23 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.129 2003/03/31 09:27:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -414,10 +414,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					mbu_ia_best = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
 						&ia_addr);
-					if (mbu_ia_best
-					    && !MIP6_IS_BU_WAITA_STATE(mbu_ia_best))
+					if (mbu_ia_best)
 						break;
-					mbu_ia_best = NULL;
 				}
 			}
 			if (ia->ia6_flags & IN6_IFF_HOME) {
@@ -437,12 +435,31 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					mbu_ia = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
 						&ia_addr);
-					if (mbu_ia
-					    && !MIP6_IS_BU_WAITA_STATE(mbu_ia))
+					if (mbu_ia)
 						break;
-					mbu_ia = NULL;
 				}
 			}
+
+			/*
+			 * even if the address is a home address, we
+			 * do not use them if they are not registered
+			 * (or re-registered) yet.  this condition is
+			 * not explicitly stated in the address
+			 * selection draft.
+			 */
+			if ((mbu_ia_best &&
+			    (mbu_ia_best->mbu_pri_fsm_state
+			    != MIP6_BU_PRI_FSM_STATE_BOUND))) {
+				/* XXX will break stat! */
+				REPLACE(0);
+			}
+			if ((mbu_ia &&
+			    (mbu_ia->mbu_pri_fsm_state
+			    != MIP6_BU_PRI_FSM_STATE_BOUND))) {
+				/* XXX will break stat! */
+				NEXT(0);
+			}
+
 			/*
 			 * if the binding update entry for a certain
 			 * address exists and its registration status
