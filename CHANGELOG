@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.757 2000/04/10 05:44:26 itojun Exp $
+$Id: CHANGELOG,v 1.758 2000/04/11 06:00:41 itojun Exp $
 
 <200003>
+Tue Apr 11 14:58:10 JST 2000
+	* sys/netinet6/in6_ifattach.c: revise interface identifier lookup.
+	  we no longer cache EUI64, due to KAME PR 236.
+	  NOTE: you may see interface identifier changes due to lookup
+	  policy change.  be careful when you upgrade the kernel (you may
+	  experience address mismatch with DNS database, for example)
+
 Mon Apr 10 14:38:00 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/sendmail.beta, freebsd2/ports/sendmail.beta:
 	  use 8.10.1. (not really beta already...)
