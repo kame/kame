@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.54 2002/09/25 13:18:24 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.55 2002/09/26 06:45:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -493,21 +493,22 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	int ip6mulen;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa, coa_sa, hoa_sa;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct mbuf *n;
 	struct ip6aux *ip6a = NULL;
-	u_int8_t ip6mu_flags;
-	u_int8_t isprotected;
-	u_int8_t haseen;
+	u_int8_t isprotected = 0;
+	u_int8_t haseen = 0;
 	struct mip6_bc *mbc;
-	u_int16_t seqno;
-	u_int32_t lifetime;
 
 	int error = 0;
 	u_int8_t bu_safe = 0;	/* To accept bu always without authentication, this value is set to non-zero */
 	struct mip6_mobility_options mopt;
+	struct mip6_bc bi;
 
 	mip6stat.mip6s_bu++;
+	bzero(&bi, sizeof(bi));
+	bi.mbc_status = IP6MA_STATUS_ACCEPTED;
+	bi.mbc_send_ba = ip6mu->ip6mu_flags & (IP6MU_ACK | ~IP6MU_DAD);
 
 #ifdef IPSEC
 	/*
@@ -527,6 +528,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		m_freem(m);
 		return (EINVAL);
 	}
+	bi.mbc_addr = *dst_sa;
 
 	/* packet length check. */
 	if (ip6mulen < sizeof(struct ip6m_binding_update)) {
@@ -542,16 +544,14 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EINVAL);
 	}
 
-	ip6mu_flags = isprotected = haseen = 0;
-
-	ip6mu_flags = ip6mu->ip6mu_flags;
+	bi.mbc_flags = ip6mu->ip6mu_flags;
 
 	if (((m->m_flags & M_DECRYPTED) != 0)
 	    || ((m->m_flags & M_AUTHIPHDR) != 0)) {
 		isprotected = 1;
 	}
 
-	coa_sa = *src_sa;
+	bi.mbc_pcoa = *src_sa;
 	n = ip6_findaux(m);
 	if (n == NULL) {
 		m_freem(m);
@@ -564,10 +564,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	}
 	if ((ip6a->ip6a_flags & IP6A_SWAP) != 0) {
 		haseen = 1;
-		coa_sa.sin6_addr = ip6a->ip6a_coa;
+		bi.mbc_pcoa.sin6_addr = ip6a->ip6a_coa;
 	}
 
-	if (!mip6_config.mcfg_use_ipsec && (ip6mu_flags & IP6MU_HOME)) {
+	if (!mip6_config.mcfg_use_ipsec && (bi.mbc_flags & IP6MU_HOME)) {
 		bu_safe = 1;
 		goto accept_binding_update;
 	}
@@ -578,7 +578,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		goto accept_binding_update;
 	}
 	if ((haseen == 1)
-	    && ((ip6mu_flags & IP6MU_HOME) == 0))
+	    && ((bi.mbc_flags & IP6MU_HOME) == 0))
 		goto accept_binding_update;	/* Must be checked its safety
 						 * with RR later */
 
@@ -591,10 +591,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	/* get home address. */
 	if (haseen) {
-		hoa_sa = *src_sa;
+		bi.mbc_phaddr = *src_sa;
 	} else {
-		hoa_sa = *src_sa;
-		hoa_sa.sin6_addr = ip6a->ip6a_coa;
+		bi.mbc_phaddr = *src_sa;
+		bi.mbc_phaddr.sin6_addr = ip6a->ip6a_coa;
 	}
 
 	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6mu,
@@ -608,31 +608,32 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 
 	if (mopt.valid_options & MOPT_ALTCOA)
-		coa_sa.sin6_addr = mopt.mopt_altcoa;
+		bi.mbc_pcoa.sin6_addr = mopt.mopt_altcoa;
 
-	seqno = ntohs(ip6mu->ip6mu_seqno);
-	lifetime = ntohs(ip6mu->ip6mu_lifetime) << 4;	/* units of 16secs */
+	bi.mbc_seqno = ntohs(ip6mu->ip6mu_seqno);
+	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 4;	/* units of 16secs */
 
 	/* ip6_src and HAO has been already swapped at this point. */
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi.mbc_phaddr);
 	if (mbc == NULL) {
-		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &hoa_sa, &coa_sa)) {
+		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &bi.mbc_phaddr, &bi.mbc_pcoa)) {
 			mip6log((LOG_ERR,
 				 "%s:%d: RR authentication was failed.\n",
 				 __FILE__, __LINE__));
 			m_freem(m);
 			mip6stat.mip6s_rrauthfail++;
-			return (EINVAL);
+			error = EINVAL;
+			goto send_ba;
 		}
-		if (lifetime > MIP6_MAX_RR_BINDING_LIFE)
-			lifetime = MIP6_MAX_RR_BINDING_LIFE;
+		if (bi.mbc_lifetime > MIP6_MAX_RR_BINDING_LIFE)
+			bi.mbc_lifetime = MIP6_MAX_RR_BINDING_LIFE;
 	} else {
 		/* check a sequence number. */
-		if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
+		if (MIP6_LEQ(bi.mbc_seqno, mbc->mbc_seqno)) {
 			mip6log((LOG_NOTICE,
 			    "%s:%d: received sequence no (%d) <= current "
 			    "seq no (%d) in BU from host %s.\n",
-			    __FILE__, __LINE__, seqno, mbc->mbc_seqno,
+			    __FILE__, __LINE__, bi.mbc_seqno, mbc->mbc_seqno,
 			    ip6_sprintf(&ip6->ip6_src)));
 			/*
 			 * the seqno of this binding update is smaller than the
@@ -643,19 +644,13 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 * addrress.  because the sending mobile node's coa
 			 * might have changed after it had registered before.
 			 */
-			error = mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
-			    &coa_sa, IP6MA_STATUS_SEQNO_TOO_SMALL, mbc->mbc_seqno,
-			    0, 0);
-			if (error) {
-				mip6log((LOG_ERR,
-				    "%s:%d: sending a binding ack failed (%d)\n",
-				    __FILE__, __LINE__, error));
-			}
+			bi.mbc_status = IP6MA_STATUS_SEQNO_TOO_SMALL;
+			bi.mbc_send_ba = 1;
 
 			/* discard. */
 			m_freem(m);
 			mip6stat.mip6s_seqno++;
-			return (EINVAL);
+			goto send_ba;
 		}
 	}
 
@@ -668,30 +663,24 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		if (!MIP6_IS_HA) {
 			/* this is not a homeagent. */
 			/* XXX */
-			mip6_bc_send_ba(dst_sa, src_sa, &coa_sa,
-					IP6MA_STATUS_NOT_SUPPORTED,
-					seqno, 0, 0);
-			return (0);
+			bi.mbc_status = IP6MA_STATUS_NOT_SUPPORTED;
+			bi.mbc_send_ba = 1;
+			goto send_ba;
 		}
 
 		/* limit the max duration of bindings. */
 		if (mip6_config.mcfg_hrbc_lifetime_limit > 0 &&
-		    lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
-			lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
+		    bi.mbc_lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
+			bi.mbc_lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
 
-		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, &coa_sa)) {
+		if (IS_REQUEST_TO_CACHE(bi.mbc_lifetime, &bi.mbc_phaddr, &bi.mbc_pcoa)) {
 			if (mbc != NULL && (mbc->mbc_flags & IP6MU_CLONED)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: invalied home re-registration\n",
 					 __FILE__, __LINE__));
 				/* XXX */
 			}
-			error = mip6_process_hrbu(&hoa_sa,
-						  &coa_sa,
-						  ip6mu->ip6mu_flags,
-						  seqno,
-						  lifetime,
-						  dst_sa);
+			error = mip6_process_hrbu(&bi);
 			if (error) {
 				mip6log((LOG_ERR,
 					 "%s:%d: home registration failed\n",
@@ -700,21 +689,15 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			}
 		} else {
 			if (mbc == NULL || (mbc->mbc_flags & IP6MU_CLONED)) {
-				mip6_bc_send_ba(dst_sa, src_sa, &coa_sa,
-						IP6MA_STATUS_NOT_HOME_AGENT,
-						seqno, 0, 0);
-				return (0);
+				bi.mbc_status = IP6MA_STATUS_NOT_HOME_AGENT;
+				bi.mbc_send_ba = 1;
+				goto send_ba;
 			}
 			/*
 			 * ignore 'S' bit (issue #66)
 			 * XXX 'L'?
 			 */
-			error = mip6_process_hurbu(&hoa_sa,
-						   &coa_sa,
-						   mbc->mbc_flags,
-						   seqno,
-						   lifetime,
-						   dst_sa);
+			error = mip6_process_hurbu(&bi);
 			if (error) {
 				mip6log((LOG_ERR,
 					 "%s:%d: home unregistration failed\n",
@@ -724,39 +707,36 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		}
 	} else {
 		/* request to cache/remove a binding for CN. */
-		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, &coa_sa)) {
+		if (IS_REQUEST_TO_CACHE(bi.mbc_lifetime, &bi.mbc_phaddr, &bi.mbc_pcoa)) {
 			if (mbc == NULL)
-				error = mip6_bc_register(&hoa_sa, &coa_sa, dst_sa,
+				error = mip6_bc_register(&bi.mbc_phaddr, &bi.mbc_pcoa, &bi.mbc_addr,
 							 ip6mu->ip6mu_flags,
-							 seqno, lifetime);
+							 bi.mbc_seqno, bi.mbc_lifetime);
 			else
 			  /* Update a cache */
-				error = mip6_bc_update(mbc, &coa_sa, dst_sa,
+				error = mip6_bc_update(mbc, &bi.mbc_pcoa, &bi.mbc_addr,
 						       ip6mu->ip6mu_flags,
-						       seqno, lifetime);
+					 		bi.mbc_seqno, bi.mbc_lifetime);
 		} else {
 			mip6_bc_delete(mbc);
 		}
+	}
 
-		if (ip6mu->ip6mu_flags & IP6MU_ACK) {
-			if (mip6_bc_send_ba(dst_sa,
-					    &hoa_sa,
-					    &coa_sa,
-					    IP6MA_STATUS_ACCEPTED, /* XXX */
-					    seqno,
-					    lifetime,
-					    0)) {
-				mip6log((LOG_ERR,
-					 "%s:%d: sending BA to %s(%s) failed. "
-					 "send it later.\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(&hoa_sa.sin6_addr),
-					 ip6_sprintf(&coa_sa.sin6_addr)));
-			}
+send_ba:
+	if (bi.mbc_send_ba) {
+		int ba_error;
+
+		ba_error = mip6_bc_send_ba(&bi.mbc_addr, &bi.mbc_phaddr,
+			    &bi.mbc_pcoa, bi.mbc_status, bi.mbc_seqno,
+			    bi.mbc_lifetime, bi.mbc_refresh);
+		if (ba_error) {
+			mip6log((LOG_ERR,
+			    "%s:%d: sending a binding ack failed (%d)\n",
+			    __FILE__, __LINE__, ba_error));
 		}
 	}
 
-	return (0);
+	return (error);
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.136 2002/09/25 11:41:24 itojun Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.137 2002/09/26 06:45:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -902,13 +902,8 @@ mip6_bu_list_remove_all(mbu_list)
  */
 
 int
-mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
-	struct sockaddr_in6 *haddr0;
-	struct sockaddr_in6 *coa;
-	u_int8_t flags;
-	u_int16_t seqno;
-	u_int32_t lifetime;
-	struct sockaddr_in6 *haaddr;
+mip6_process_hurbu(bi)
+	struct mip6_bc *bi;
 {
 	struct mip6_bc *mbc, *mbc_next;
 	struct nd_prefix *pr;
@@ -919,7 +914,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	for(pr = nd_prefix.lh_first;
 	    pr;
 	    pr = pr->ndpr_next) {
-		if (in6_are_prefix_equal(&haddr0->sin6_addr,
+		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
 					 &pr->ndpr_prefix.sin6_addr,
 					 pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
@@ -930,22 +925,13 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		 * the haddr0 doesn't have an online prefix.  return a
 		 * binding ack with an error NOT_HOME_SUBNET.
 		 */
-		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    IP6MA_STATUS_NOT_HOME_SUBNET,
-				    seqno,
-				    0,
-				    0)) {
-			mip6log((LOG_ERR,
-				 "%s:%d: sending BA to %s(%s) failed. "
-				 "send it later.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&haddr0->sin6_addr),
-				 ip6_sprintf(&coa->sin6_addr)));
-		}
+		bi->mbc_status = IP6MA_STATUS_NOT_HOME_SUBNET;
+		bi->mbc_send_ba = 1;
+		bi->mbc_lifetime = bi->mbc_refresh = 0;
 		return (0); /* XXX is 0 OK? */
 	}
 
-	if ((flags & IP6MU_SINGLE) == 0) {
+	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
 		int found = 0;
 
 		for(mbc = LIST_FIRST(&mip6_bc_list);
@@ -960,7 +946,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				continue;
 
 			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-						 &haddr0->sin6_addr,
+						 &bi->mbc_phaddr.sin6_addr,
 						 64 /* XXX */))
 				continue;
 
@@ -971,7 +957,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			else {
 				/* remove rtable for proxy ND */
 				error = mip6_bc_proxy_control(
-					&mbc->mbc_phaddr, haaddr, RTM_DELETE);
+					&mbc->mbc_phaddr, &bi->mbc_addr, RTM_DELETE);
 				if (error) {
 					mip6log((LOG_ERR,
 						 "%s:%d: proxy control error (%d)\n",
@@ -997,11 +983,9 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				mip6log((LOG_ERR,
 					 "%s:%d: can't remove BC.\n",
 					 __FILE__, __LINE__));
-				mip6_bc_send_ba(haaddr, haddr0, coa,
-						IP6MA_STATUS_UNSPECIFIED,
-						seqno,
-						0,
-						0);
+				bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+				bi->mbc_send_ba = 1;
+				bi->mbc_lifetime = bi->mbc_refresh = 0;
 				return (error);
 			}
 		}
@@ -1011,7 +995,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		 * S=1
 		 */
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   haddr0);
+						   &bi->mbc_phaddr);
 		if (mbc == NULL) {
 			/* XXX panic */
 			return (0);
@@ -1021,7 +1005,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		}
 		else {
 			/* remove rtable for proxy ND */
-			if (mip6_bc_proxy_control(haddr0, haaddr, RTM_DELETE)) {
+			if (mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_DELETE)) {
 				/* XXX UNSPECIFIED */
 				return (-1);
 			}
@@ -1042,16 +1026,14 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			mip6log((LOG_ERR,
 				 "%s:%d: can't remove BC.\n",
 				 __FILE__, __LINE__));
-			mip6_bc_send_ba(haaddr, haddr0, coa,
-					IP6MA_STATUS_UNSPECIFIED,
-					seqno,
-					0,
-					0);
+			bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+			bi->mbc_send_ba = 1;
+			bi->mbc_lifetime = bi->mbc_refresh = 0;
 			return (error);
 		}
 	}
 	mbc = NULL;
-	if ((flags & IP6MU_LINK) != 0) {
+	if ((bi->mbc_flags & IP6MU_LINK) != 0) {
 		for(mbc = LIST_FIRST(&mip6_bc_list);
 		    mbc;
 		    mbc = mbc_next) {
@@ -1064,7 +1046,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				break;
 
 			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-						 &haddr0->sin6_addr,
+						 &bi->mbc_phaddr.sin6_addr,
 						 64 /* XXX */))
 				continue;
 		}
@@ -1075,7 +1057,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		}
 		else {
 			/* remove rtable for proxy ND */
-			if (mip6_bc_proxy_control(haddr0, haaddr, RTM_DELETE)) {
+			if (mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_DELETE)) {
 				/* XXX UNSPECIFIED */
 				return (-1);
 			}
@@ -1096,28 +1078,16 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			mip6log((LOG_ERR,
 				 "%s:%d: can't remove BC.\n",
 				 __FILE__, __LINE__));
-			mip6_bc_send_ba(haaddr, haddr0, coa,
-					IP6MA_STATUS_UNSPECIFIED,
-					seqno,
-					0,
-					0);
+			bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+			bi->mbc_send_ba = 1;
+			bi->mbc_lifetime = bi->mbc_refresh = 0;
 			return (error);
 		}
 	}
 
 	/* return BA */
-	if (mip6_bc_send_ba(haaddr, haddr0, coa,
-			    IP6MA_STATUS_ACCEPTED,
-			    seqno,
-			    0,
-			    0)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: sending BA to %s(%s) failed.  send it later.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&haddr0->sin6_addr),
-			 ip6_sprintf(&coa->sin6_addr)));
-	}
-
+	bi->mbc_send_ba = 1;	/* Need it ? */
+	
 	return (0);
 }
 
@@ -1158,13 +1128,8 @@ mip6_are_ifid_equal(addr1, addr2, prefixlen)
 }
 
 int
-mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
-	struct sockaddr_in6 *haddr0;
-	struct sockaddr_in6 *coa;
-	u_int8_t flags;
-	u_int16_t seqno;
-	u_int32_t lifetime;
-	struct sockaddr_in6 *haaddr;
+mip6_process_hrbu(bi)
+	struct mip6_bc *bi;
 {
 	struct nd_prefix *pr, *llpr = NULL;
 	struct ifnet *hifp = NULL;
@@ -1179,7 +1144,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	for(pr = nd_prefix.lh_first;
 	    pr;
 	    pr = pr->ndpr_next) {
-		if (in6_are_prefix_equal(&haddr0->sin6_addr,
+		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
 					 &pr->ndpr_prefix.sin6_addr,
 					 pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
@@ -1194,22 +1159,12 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		 * the haddr0 doesn't have an online prefix.  return a
 		 * binding ack with an error NOT_HOME_SUBNET.
 		 */
-		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    IP6MA_STATUS_NOT_HOME_SUBNET,
-				    seqno,
-				    0,
-				    0)) {
-			mip6log((LOG_ERR,
-				 "%s:%d: sending BA to %s(%s) failed. "
-				 "send it later.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&haddr0->sin6_addr),
-				 ip6_sprintf(&coa->sin6_addr)));
-		}
+		bi->mbc_status = IP6MA_STATUS_NOT_HOME_SUBNET;
+		bi->mbc_send_ba = 1;
 		return (0); /* XXX is 0 OK? */
 	}
 
-	if ((flags & IP6MU_SINGLE) == 0) {
+	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
 		/* 10.2.
 		 * - However, if the `S' it field in the Binding Update is zero, the
 		     lifetime for each Binding Cache entry MUST NOT be greater
@@ -1238,27 +1193,26 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			 "%s:%d: invalid prefix lifetime %lu sec(s).",
 			 __FILE__, __LINE__,
 			 (u_long)prlifetime));
-		mip6_bc_send_ba(haaddr, haddr0, coa,
-				IP6MA_STATUS_UNSPECIFIED,
-				seqno,
-				0,
-				0);
+		bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+		bi->mbc_send_ba = 1;
+		bi->mbc_lifetime = 0;
+		bi->mbc_refresh = 0;
 		return (0); /* XXX is 0 OK? */
 	}
 	/* sanity check */
-	if (lifetime < 4) {
+	if (bi->mbc_lifetime < 4) {
 		/* XXX lifetime > DAD timer */
 		/* XXX lifetime > 4 (units of 4 secs) */
 		mip6log((LOG_ERR,
 			 "%s:%d: invalid lifetime %lu sec(s).",
 			 __FILE__, __LINE__,
-			 (u_long)lifetime));
+			 (u_long)bi->mbc_lifetime));
 		return (0); /* XXX is 0 OK? */
 	}
 
 	/* adjust lifetime */
-	if (lifetime > prlifetime)
-		lifetime = prlifetime;
+	if (bi->mbc_lifetime > prlifetime)
+		bi->mbc_lifetime = prlifetime;
 
 	/*
 	 * -  S=0 & L=0:  Defend all non link-local unicast addresses possible
@@ -1270,19 +1224,19 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	 *    address and the derived link-local.
 	 */
 
-	if ((flags & IP6MU_LINK) != 0 && llpr != NULL) {
+	if ((bi->mbc_flags & IP6MU_LINK) != 0 && llpr != NULL) {
 		mip6_create_addr(&haddr,
-				 (const struct sockaddr_in6 *)haddr0,
+				 (const struct sockaddr_in6 *)&bi->mbc_phaddr,
 				 llpr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &haddr);
 		if (mbc == NULL) {
 			/* create a BC entry. */
-			mbc = mip6_bc_create(&haddr, coa, haaddr, flags,
-					     seqno, lifetime, hifp);
+			mbc = mip6_bc_create(&haddr, &bi->mbc_pcoa, &bi->mbc_addr, bi->mbc_flags,
+					     bi->mbc_seqno, bi->mbc_lifetime, hifp);
 			if (mip6_bc_list_insert(&mip6_bc_list, mbc))
 				return (-1);
 
-			if ((flags & IP6MU_DAD)) {
+			if ((bi->mbc_flags & IP6MU_DAD)) {
 				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 				mip6_dad_start(mbc);
 			} else {
@@ -1293,14 +1247,14 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 						    &mbc->mbc_encap);
 
 				/* add rtable for proxy ND */
-				mip6_bc_proxy_control(&haddr, haaddr, RTM_ADD);
+				mip6_bc_proxy_control(&haddr, &bi->mbc_addr, RTM_ADD);
 			}
 		} else {
 			/* update a BC entry. */
-			mbc->mbc_pcoa = *coa;
-			mbc->mbc_flags = flags;
-			mbc->mbc_seqno = seqno;
-			mbc->mbc_lifetime = lifetime;
+			mbc->mbc_pcoa = bi->mbc_pcoa;
+			mbc->mbc_flags = bi->mbc_flags;
+			mbc->mbc_seqno = bi->mbc_seqno;
+			mbc->mbc_lifetime = bi->mbc_lifetime;
 			mbc->mbc_expire
 				= time_second + mbc->mbc_lifetime;
 			/* sanity check for overflow */
@@ -1317,7 +1271,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		mbc->mbc_flags |= IP6MU_CLONED;
 	}
 
-	if ((flags & IP6MU_SINGLE) == 0) {
+	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
 		/*
 		 * create/update binding cache entries for each
 		 * address derived from all the routing prefixes on
@@ -1333,25 +1287,25 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 				continue;
 			mip6_create_addr(&haddr,
-					 (const struct sockaddr_in6 *)haddr0,
+					 (const struct sockaddr_in6 *)&bi->mbc_phaddr,
 					 pr);
 			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 							   &haddr);
 			if (mbc == NULL) {
 				/* create a BC entry. */
 				mbc = mip6_bc_create(&haddr,
-						     coa,
-						     haaddr,
-						     flags,
-						     seqno,
-						     lifetime,
+						     &bi->mbc_pcoa,
+						     &bi->mbc_addr,
+						     bi->mbc_flags,
+						     bi->mbc_seqno,
+						     bi->mbc_lifetime,
 						     hifp);
 				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
 					return (-1);
 
-				if ((flags & IP6MU_DAD) != 0) {
+				if ((bi->mbc_flags & IP6MU_DAD) != 0) {
 					mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
-					if (SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
+					if (SA6_ARE_ADDR_EQUAL(&haddr, &bi->mbc_phaddr))
 						prim_mbc = mbc;
 					else
 						mip6_dad_start(mbc);
@@ -1364,15 +1318,15 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 							    &mbc->mbc_encap);
 
 					/* add rtable for proxy ND */
-					mip6_bc_proxy_control(&haddr, haaddr,
+					mip6_bc_proxy_control(&haddr, &bi->mbc_addr,
 							      RTM_ADD);
 				}
 			} else {
 				/* update a BC entry. */
-				mbc->mbc_pcoa = *coa;
-				mbc->mbc_flags = flags;
-				mbc->mbc_seqno = seqno;
-				mbc->mbc_lifetime = lifetime;
+				mbc->mbc_pcoa = bi->mbc_pcoa;
+				mbc->mbc_flags = bi->mbc_flags;
+				mbc->mbc_seqno = bi->mbc_seqno;
+				mbc->mbc_lifetime = bi->mbc_lifetime;
 				mbc->mbc_expire
 					= time_second + mbc->mbc_lifetime;
 				/* sanity check for overflow */
@@ -1386,7 +1340,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 						    mip6_bc_encapcheck,
 						    &mbc->mbc_encap);
 			}
-			if (!SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
+			if (!SA6_ARE_ADDR_EQUAL(&haddr, &bi->mbc_phaddr))
 				mbc->mbc_flags |= IP6MU_CLONED;
 
 		}
@@ -1397,15 +1351,15 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		 * for the only address specified by the sender.
 		 */
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   haddr0);
+						   &bi->mbc_phaddr);
 		if (mbc == NULL) {
 			/* create BC entry */
-			mbc = mip6_bc_create(haddr0,
-					     coa,
-					     haaddr,
-					     flags,
-					     seqno,
-					     lifetime,
+			mbc = mip6_bc_create(&bi->mbc_phaddr,
+					     &bi->mbc_pcoa,
+					     &bi->mbc_addr,
+					     bi->mbc_flags,
+					     bi->mbc_seqno,
+					     bi->mbc_lifetime,
 					     hifp);
 			if (mbc == NULL) {
 				/* XXX STATUS_RESOUCE */
@@ -1417,7 +1371,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				return (-1);
 			}
 
-			if (flags & IP6MU_DAD) {
+			if (bi->mbc_flags & IP6MU_DAD) {
 				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 				prim_mbc = mbc;
 			}
@@ -1432,14 +1386,14 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				}
 
 				/* add rtable for proxy ND */
-				mip6_bc_proxy_control(haddr0, haaddr, RTM_ADD);
+				mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_ADD);
 			}
 		} else {
 			/* update a BC entry. */
-			mbc->mbc_pcoa = *coa;
-			mbc->mbc_flags = flags;
-			mbc->mbc_seqno = seqno;
-			mbc->mbc_lifetime = lifetime;
+			mbc->mbc_pcoa = bi->mbc_pcoa;
+			mbc->mbc_flags = bi->mbc_flags;
+			mbc->mbc_seqno = bi->mbc_seqno;
+			mbc->mbc_lifetime = bi->mbc_lifetime;
 			mbc->mbc_expire = time_second + mbc->mbc_lifetime;
 			/* sanity check for overflow */
 			if (mbc->mbc_expire < time_second)
@@ -1462,22 +1416,12 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		mip6_dad_start(mbc);
 	} else {	/* D=0 or update */
 		/* return BA */
-		refresh = lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
-		if (refresh < MIP6_REFRESH_MINLIFETIME)
-			refresh = lifetime < MIP6_REFRESH_MINLIFETIME ?
-				  lifetime : MIP6_REFRESH_MINLIFETIME;
-		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    IP6MA_STATUS_ACCEPTED,
-				    seqno,
-				    lifetime,
-				    refresh)) {
-			mip6log((LOG_ERR,
-				 "%s:%d: sending BA to %s(%s) failed. "
-				 "send it later.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&mbc->mbc_phaddr.sin6_addr),
-				 ip6_sprintf(&mbc->mbc_pcoa.sin6_addr)));
-		}
+		bi->mbc_refresh = bi->mbc_lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
+		if (bi->mbc_refresh < MIP6_REFRESH_MINLIFETIME)
+			bi->mbc_refresh = bi->mbc_lifetime < MIP6_REFRESH_MINLIFETIME ?
+				  bi->mbc_lifetime : MIP6_REFRESH_MINLIFETIME;
+		bi->mbc_status = IP6MA_STATUS_ACCEPTED;
+		bi->mbc_send_ba = 1;
 	}
 
 	return (0);

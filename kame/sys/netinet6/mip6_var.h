@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.56 2002/09/25 13:18:24 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.57 2002/09/26 06:45:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -193,6 +193,8 @@ struct mip6_bc {
 	struct sockaddr_in6   mbc_pcoa;      /* peer coa */
 	struct sockaddr_in6   mbc_addr;      /* my addr (needed?) */
 	u_int8_t              mbc_status;    /* BA statue */
+	u_int8_t	      mbc_send_ba;   /* nonzero means BA should be sent */
+	u_int32_t             mbc_refresh;   /* Using for sending BA */
 	u_int8_t              mbc_flags;     /* recved BU flags */
 	u_int16_t             mbc_seqno;     /* recved BU seqno */
 	u_int32_t             mbc_lifetime;  /* recved BU lifetime */
@@ -382,14 +384,8 @@ int mip6_ip6me_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *,
 					     u_int8_t,
 					     struct sockaddr_in6 *));
-int mip6_process_hrbu __P((struct sockaddr_in6 *,
-			   struct sockaddr_in6 *,
-			   u_int8_t, u_int16_t, u_int32_t,
-			   struct sockaddr_in6 *));
-int mip6_process_hurbu __P((struct sockaddr_in6 *,
-			    struct sockaddr_in6 *,
-			    u_int8_t, u_int16_t, u_int32_t,
-			    struct sockaddr_in6 *));
+int mip6_process_hrbu __P((struct mip6_bc *));
+int mip6_process_hurbu __P((struct mip6_bc *));
 int mip6_bu_destopt_create		__P((struct ip6_dest **,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
