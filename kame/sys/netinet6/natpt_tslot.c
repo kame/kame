@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.41 2002/03/28 06:51:48 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.42 2002/04/15 05:34:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -38,6 +38,7 @@
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
+#include <sys/syslog.h>
 #include <sys/systm.h>
 
 #include <netinet/in.h>
@@ -303,6 +304,8 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 	TAILQ_INSERT_TAIL(&thl->tslhead, ats, tsl_hashl);
 	TAILQ_INSERT_TAIL(&thr->tslhead, ats, tsl_hashr);
 	splx(s);
+
+	natpt_logAccess(LOG_DEBUG, ats);
 
 	return (ats);
 }
