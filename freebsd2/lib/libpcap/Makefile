@@ -10,6 +10,8 @@ MAN=	pcap.3
 CFLAGS+=	-O2
 DEFS =  -DHAVE_SYS_IOCCOM_H=1 -DHAVE_SYS_SOCKIO_H=1 -DHAVE_ETHER_HOSTTON=1 -DHAVE_STRERROR=1 -DINET6=1 -DHAVE_SOCKADDR_SA_LEN=1 
 CFLAGS+=	${DEFS} -I${SRCDIR} -I${.CURDIR}
+# workaround for gnuc.h and net/bpf.h
+CFLAGS+=	-I${SRCDIR}/lbl -I${SRCDIR}/bpf
 YFLAGS+=	-d
 
 MKPIC=	no
@@ -34,7 +36,7 @@ version.c: VERSION
 	@rm -f $@
 	sed -e 's/.*/char pcap_version[] = "&";/' $> > $@
 
-.PATH:	${SRCDIR}
+.PATH:	${SRCDIR} ${SRCDIR}/bpf/net
 
 .include <bsd.lib.mk>
 
