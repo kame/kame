@@ -632,11 +632,13 @@ pass:
 			 * as expected when ip_mforward() is called from
 			 * ip_output().)
 			 */
+			ip->ip_id = htons(ip->ip_id);
 			if (ip_mforward(ip, m->m_pkthdr.rcvif, m, 0) != 0) {
 				ipstat.ips_cantforward++;
 				m_freem(m);
 				return;
 			}
+			ip->ip_id = ntohs(ip->ip_id);
 
 			/*
 			 * The process-level routing demon needs to receive
