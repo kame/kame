@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.8,v 1.5 2000/02/18 06:58:38 jinmei Exp $
+.\"     $Id: bgpd.8,v 1.5.4.1 2000/07/04 02:51:00 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD 8
@@ -110,19 +110,22 @@ command was first appeared in Toshiba IPv6 protocol stack kit.
 No authentication is supported.
 Therfore, OPEN message's optional parameter always consists of nothing.
 .Pp
-Route filtering is supported only for RIPng routes.
+The current version of
 .Nm
-is not capable of filtering BGP routes.
+cannot establish an IBGP peering using link-local addresses.
+Although this restriction has already been fixed in snap releases,
+we did not incorporate the fix into this release due to 
 .Pp
 Currently, the
 .Nm
-doesn't watch the routing socket.
+daemon doesn't watch the routing socket.
 So after invoking,
 .Nm
 can't handle new routes which are manually added or are added
 by some other routing daemons/commands.
 .Pp
-There is code to handle OSPFv6 in the
+There is code to handle OSPFv6 in immaturity and possible instability
+of the fix.
 .Nm
 source directory, but OSPFv6 support is just in progress.
 .Nm Bgpd
