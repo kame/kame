@@ -550,6 +550,7 @@ defpseudo faith: ifnet
 defpseudo stf: ifnet
 defpseudo altq: ifnet
 defpseudo sec: ifnet
+defpseudo hif: ifnet
 
 defpseudo sequencer
 
@@ -826,6 +827,7 @@ file net/if_faith.c			faith			needs-count
 file net/if_fddisubr.c			fddi			needs-flag
 file net/if_gif.c			gif			needs-count
 file net/if_gre.c			gre			needs-count	
+file net/if_hif.c			hif			needs-count
 file net/if_hippisubr.c                 hippi                   needs-flag
 file net/if_loop.c			loop			needs-count
 file net/if_media.c
