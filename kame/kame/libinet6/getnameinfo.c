@@ -92,6 +92,8 @@ struct sockinet {
 };
 
 #ifdef INET6
+static int ip6_parsenumeric __P((const struct sockaddr *, char *, char *,
+				 int, int));
 static int ip6_sa2str __P((struct sockaddr_in6 *, char *, size_t, int));
 #endif 
 
@@ -222,60 +224,29 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		/* NUMERICHOST and NAMEREQD conflicts with each other */
 		if (flags & NI_NAMEREQD)
 			return ENI_NOHOSTNAME;
-		if (inet_ntop(afd->a_af, addr, numaddr, sizeof(numaddr))
-		    == NULL)
-			return ENI_SYSTEM;
-		numaddrlen = strlen(numaddr);
-		if (numaddrlen + 1 > hostlen) /* don't forget terminator */
-			return ENI_MEMORY;
-		strcpy(host, numaddr);
-#if defined(INET6) && defined(NI_WITHSCOPEID)
-		if (afd->a_af == AF_INET6 &&
-#ifdef DONT_OPAQUE_SCOPEID
-		    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
-		     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
-#endif
-		    ((struct sockaddr_in6 *)sa)->sin6_scope_id) {
-#ifndef ALWAYS_WITHSCOPE
-			if (flags & NI_WITHSCOPEID)
-#endif /* !ALWAYS_WITHSCOPE */
-			{
-				char scopebuf[MAXHOSTNAMELEN];
-				int scopelen;
 
-				/* ip6_sa2str never fails */
-				scopelen = ip6_sa2str((struct sockaddr_in6 *)sa,
-						      scopebuf, sizeof(scopebuf),
-						      0);
-				if (scopelen + 1 + numaddrlen + 1 > hostlen)
-					return ENI_MEMORY;
+		switch(afd->a_af) {
+#ifdef INET6
+		case AF_INET6:
+		{
+			int error;
 
-#if 0
-				/*
-				 * construct <scopeid><delim><numeric-addr>
-				 */
-				/*
-				 * Shift the host string to allocate
-				 * space for the scope ID part.
-				 */
-				memmove(host + scopelen + 1, host,
-					numaddrlen);
-				/* copy the scope ID and the delimiter */
-				memcpy(host, scopebuf, scopelen);
-				host[scopelen] = SCOPE_DELIMITER;
-				host[scopelen + 1 + numaddrlen] = '\0';
-#else
-				/*
-				 * construct <numeric-addr><delim><scopeid>
-				 */
-				memcpy(host + numaddrlen + 1, scopebuf,
-				    scopelen);
-				host[numaddrlen] = SCOPE_DELIMITER;
-				host[numaddrlen + 1 + scopelen] = '\0';
-#endif
-			}
+			if ((error = ip6_parsenumeric(sa, addr, host,
+						      hostlen, flags)) != 0)
+				return(error);
+			break;
 		}
-#endif /* INET6 */
+#endif
+		default:
+			if (inet_ntop(afd->a_af, addr, numaddr, sizeof(numaddr))
+			    == NULL)
+				return ENI_SYSTEM;
+			numaddrlen = strlen(numaddr);
+			if (numaddrlen + 1 > hostlen) /* don't forget terminator */
+				return ENI_MEMORY;
+			strcpy(host, numaddr);
+			break;
+		}
 	} else {
 #ifdef USE_GETIPNODEBY
 		hp = getipnodebyaddr(addr, afd->a_addrlen, afd->a_af, &h_error);
@@ -313,9 +284,26 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		} else {
 			if (flags & NI_NAMEREQD)
 				return ENI_NOHOSTNAME;
-			if (inet_ntop(afd->a_af, addr, numaddr, sizeof(numaddr))
-			    == NULL)
-				return ENI_NOHOSTNAME;
+			switch(afd->a_af) {
+#ifdef INET6
+			case AF_INET6:
+			{
+				int error;
+
+				if ((error = ip6_parsenumeric(sa, addr, host,
+							      hostlen,
+							      flags)) != 0)
+					return(error);
+				break;
+			}
+#endif
+			default:
+				if (inet_ntop(afd->a_af, addr, numaddr,
+					      sizeof(numaddr))
+				    == NULL)
+					return ENI_NOHOSTNAME;
+				break;
+			}
 			if (strlen(numaddr) > hostlen)
 				return ENI_MEMORY;
 			strcpy(host, numaddr);
@@ -325,6 +313,72 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 }
 
 #ifdef INET6
+static int
+ip6_parsenumeric(sa, addr, host, hostlen, flags)
+	const struct sockaddr *sa;
+	char *addr, *host;
+	int flags, hostlen;
+{
+	int numaddrlen;
+	char numaddr[512];
+
+	if (inet_ntop(AF_INET6, addr, numaddr, sizeof(numaddr))
+	    == NULL)
+		return ENI_SYSTEM;
+
+	numaddrlen = strlen(numaddr);
+	if (numaddrlen + 1 > hostlen) /* don't forget terminator */
+		return ENI_MEMORY;
+	strcpy(host, numaddr);
+
+#ifdef NI_WITHSCOPEID
+	if (
+#ifdef DONT_OPAQUE_SCOPEID
+	    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
+	     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
+#endif
+	    ((struct sockaddr_in6 *)sa)->sin6_scope_id) {
+#ifndef ALWAYS_WITHSCOPE
+		if (flags & NI_WITHSCOPEID)
+#endif /* !ALWAYS_WITHSCOPE */
+		{
+			char scopebuf[MAXHOSTNAMELEN];
+			int scopelen;
+
+			/* ip6_sa2str never fails */
+			scopelen = ip6_sa2str((struct sockaddr_in6 *)sa,
+					      scopebuf, sizeof(scopebuf),
+					      0);
+			if (scopelen + 1 + numaddrlen + 1 > hostlen)
+				return ENI_MEMORY;
+#if 0
+			/*
+			 * construct <scopeid><delim><numeric-addr>
+			 */
+			/*
+			 * Shift the host string to allocate
+			 * space for the scope ID part.
+			 */
+			memmove(host + scopelen + 1, host,
+				numaddrlen);
+			/* copy the scope ID and the delimiter */
+			memcpy(host, scopebuf, scopelen);
+			host[scopelen] = SCOPE_DELIMITER;
+			host[scopelen + 1 + numaddrlen] = '\0';
+#else
+			/*
+			 * construct <numeric-addr><delim><scopeid>
+			 */
+			memcpy(host + numaddrlen + 1, scopebuf,
+			       scopelen);
+			host[numaddrlen] = SCOPE_DELIMITER;
+			host[numaddrlen + 1 + scopelen] = '\0';
+#endif
+		}
+	}
+#endif /* NI_WITHSCOPEID */
+}
+
 /* ARGSUSED */
 static int
 ip6_sa2str(sa6, buf, bufsiz, flags)
@@ -354,4 +408,4 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	/* last resort */
 	return(snprintf(buf, bufsiz, "%u", sa6->sin6_scope_id));
 }
-#endif 
+#endif /* INET6 */
