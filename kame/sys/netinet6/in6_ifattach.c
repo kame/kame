@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.38 2000/03/02 07:11:01 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.39 2000/03/02 09:24:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -555,17 +555,19 @@ in6_ifattach(ifp, type, laddr, noloop)
 		ib->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
 		ib->ia_addr.sin6_family = AF_INET6;
 		ib->ia_addr.sin6_addr = in6addr_loopback;
-#ifdef __bsdi__
+
 		/*
-		 * It is necessary to set the loopback address to the dstaddr
-		 * field at least for BSDI. Without this setting, the BSDI
-		 * version of ifa_ifwithroute() rejects to add a route
-		 * to the loopback interface. 
+		 * Always initialize ia_dstaddr (= broadcast address)
+		 * to loopback address, to make getifaddr happier.
+		 *
+		 * For BSDI, it is mandatory.  The BSDI version of
+		 * ifa_ifwithroute() rejects to add a route to the loopback
+		 * interface.  Even for other systems, loopback looks somewhat
+		 * special.
 		 */
 		ib->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
 		ib->ia_dstaddr.sin6_family = AF_INET6;
 		ib->ia_dstaddr.sin6_addr = in6addr_loopback;
-#endif
 
 		ib->ia_ifa.ifa_metric = ifp->if_metric;
 
