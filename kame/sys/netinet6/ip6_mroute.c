@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.98 2003/07/08 10:14:16 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.99 2003/07/08 10:15:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -396,7 +396,8 @@ ip6_mrouter_get(so, sopt)
 {
 	int error = 0;
 
-	if (so != ip6_mrouter) return (EACCES);
+	if (so != ip6_mrouter)
+		return (EACCES);
 
 	switch (sopt->sopt_name) {
 		case MRT6_PIM:
@@ -414,7 +415,8 @@ ip6_mrouter_get(cmd, so, m)
 {
 	struct mbuf *mb;
 
-	if (so != ip6_mrouter) return (EACCES);
+	if (so != ip6_mrouter)
+		return (EACCES);
 
 	*m = mb = m_get(M_WAIT, MT_SOOPTS);
 
@@ -556,7 +558,8 @@ ip6_mrouter_init(so, m, cmd)
 	if (*v != 1)
 		return (ENOPROTOOPT);
 
-	if (ip6_mrouter != NULL) return (EADDRINUSE);
+	if (ip6_mrouter != NULL)
+		return (EADDRINUSE);
 
 	ip6_mrouter = so;
 	ip6_mrouter_ver = cmd;
