@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.96 2000/05/17 11:31:03 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.97 2000/05/17 11:39:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1243,7 +1243,7 @@ ni6_input(m, off)
 			 * The behavior may need some debate, since:
 			 * - we are not sure if the node has FQDN as
 			 *   hostname (returned by gethostname(3)).
-			 * - the code does wildcard much for truncated names.
+			 * - the code does wildcard match for truncated names.
 			 *   however, we are not sure if we want to perform
 			 *   wildcard match, if gethostname(3) side has
 			 *   truncated hostname.
