@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.210 2001/04/27 17:28:42 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.211 2001/05/07 06:33:37 jinmei Exp $
 
 1. IPv6
 
@@ -1882,7 +1882,7 @@ are other implementations available:
 
 The KAME developers basically do not make a bother about coding
 style.  However, there is still some agreement on the style, in order
-to make the distribute develoment smooth.
+to make the distributed develoment smooth.
 
 - the tab character should be 8 columns wide (tabstops are at 8, 16, 24, ...
   column).  With vi, use ":set ts=8 sw=8".
