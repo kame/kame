@@ -40,6 +40,7 @@
 #include <netinet/tcp.h>
 #include <arpa/telnet.h>
 
+#include <limits.h>
 #include <err.h>
 #include <errno.h>
 #include <netdb.h>
@@ -167,9 +168,11 @@ main(int argc, char *argv[])
 		case 'u':
 			uflag = 1;
 			break;
+#ifdef IPPROTO_DCCP
 		case 'c':
 			uflag = 2;
 			break;
+#endif
 		case 'v':
 			vflag = 1;
 			break;
@@ -241,10 +244,12 @@ main(int argc, char *argv[])
 			hints.ai_socktype = SOCK_DGRAM;
 			hints.ai_protocol = IPPROTO_UDP;
 			break;
+#ifdef IPPROTO_DCCP
 		case 2:
 			hints.ai_socktype = SOCK_DGRAM;
 			hints.ai_protocol = IPPROTO_DCCP;
 			break;
+#endif
 		}
 		if (nflag)
 			hints.ai_flags |= AI_NUMERICHOST;
@@ -501,10 +506,12 @@ remote_connect(char *host, char *port, struct addrinfo hints)
 				ahints.ai_socktype = SOCK_DGRAM;
 				ahints.ai_protocol = IPPROTO_UDP;
 				break;
+#ifdef IPPROTO_DCCP
 			case 2:
 				ahints.ai_socktype = SOCK_DGRAM;
 				ahints.ai_protocol = IPPROTO_DCCP;
 				break;
+#endif
 			}
 			ahints.ai_flags = AI_PASSIVE;
 			if ((error = getaddrinfo(sflag, pflag, &ahints, &ares)))
