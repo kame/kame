@@ -2,6 +2,7 @@ PROG=	ping6
 MAN=	ping6.8
 
 CPPFLAGS+=-DINET6 -DIPSEC
+CFLAGS+=-Wall -Werror -Dlint
 
 BINOWN=	root
 BINGRP=	bin
@@ -16,6 +17,8 @@ DPADD+= ${.CURDIR}/../../lib/libipsec/libipsec.a \
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+LDADD+=	-lm
+DPADD+=	${LIBM}
 
 .PATH:	${.CURDIR}/../../kame/ping6
 

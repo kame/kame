@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.79 2000/08/16 08:08:44 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.80 2000/08/23 05:18:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,7 +122,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include <math.h>
 #endif
 #include <signal.h>
@@ -231,7 +231,7 @@ int timing;			/* flag to do timing */
 double tmin = 999999999.0;	/* minimum round trip time */
 double tmax = 0.0;		/* maximum round trip time */
 double tsum = 0.0;		/* sum of all times, for doing average */
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 double tsumsq = 0.0;		/* sum of all times squared, for std. dev. */
 #endif
 
@@ -1259,7 +1259,7 @@ pr_pack(buf, cc, mhdr)
 			triptime = ((double)tv.tv_sec) * 1000.0 +
 			    ((double)tv.tv_usec) / 1000.0;
 			tsum += triptime;
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 			tsumsq += triptime * triptime;
 #endif
 			if (triptime < tmin)
@@ -1846,7 +1846,7 @@ summary()
 		/* Only display average to microseconds */
 		double num = nreceived + nrepeats;
 		double avg = tsum / num;
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 		double dev = sqrt(tsumsq / num - avg * avg);
 		(void)printf(
 		    "round-trip min/avg/max/std-dev = %.3f/%.3f/%.3f/%.3f ms\n",
