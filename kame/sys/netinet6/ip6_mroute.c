@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.109 2003/11/09 14:17:01 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.110 2003/11/27 14:14:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1642,9 +1642,9 @@ ip6_mdq(m, ifp, rt)
 				}
 
 				for (mifp = mif6table, iif = 0;
-				     iif < nummifs && mifp &&
-					     mifp->m6_ifp != ifp;
-				     mifp++, iif++)
+				    iif < nummifs && mifp &&
+				    mifp->m6_ifp != ifp;
+				    mifp++, iif++)
 					;
 
 				switch (ip6_mrouter_ver) {
