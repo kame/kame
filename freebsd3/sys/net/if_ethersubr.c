@@ -838,9 +838,6 @@ ether_ifattach(ifp)
 	sdl->sdl_type = IFT_ETHER;
 	sdl->sdl_alen = ifp->if_addrlen;
 	bcopy(((struct arpcom *)ifp)->ac_enaddr, LLADDR(sdl), ifp->if_addrlen);
-#ifdef INET6
-	in6_ifattach_getifid(ifp);
-#endif
 #ifdef	NETGRAPH
 	ngether_init(ifp);
 #endif	/* NETGRAPH */

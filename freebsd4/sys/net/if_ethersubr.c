@@ -612,9 +612,6 @@ ether_ifattach(ifp)
 #ifdef	NETGRAPH
 	ngether_init(ifp);
 #endif /* NETGRAPH */
-#ifdef INET6
-	in6_ifattach_getifid(ifp);
-#endif
 }
 
 SYSCTL_DECL(_net_link);
