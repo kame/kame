@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2316 2003/01/21 13:01:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2317 2003/01/22 10:13:55 jinmei Exp $
 
 <200301>
+2003-01-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the elapsed time DHCPv6 option:
+	- the client now includes the option for all messages.
+	- the server logs the received option, though it does not care
+	about the option value.
+
 2003-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported the Release message:
 	- client now releases stateful resources before exiting or restarting
