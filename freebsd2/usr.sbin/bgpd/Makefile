@@ -8,7 +8,6 @@ MAN5=	bgpd.conf.5
 MAN8=	bgpd.8
 
 CFLAGS+=-I${.OBJDIR} -I${SRCDIR}
-CFLAGS+=-Wall -g
 CFLAGS+=-DHAVE_STDARG_H -DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
