@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.329 2003/03/10 12:51:19 t-momose Exp $
+	$KAME: IMPLEMENTATION,v 1.330 2003/03/18 04:05:00 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -324,7 +324,7 @@ commands like "ndp -I de0" as root.  Then the kernel will have a
 This default route will cause to make a neighbor cache entry for every
 destination that does not match an explicit route entry.
 
-Note that we intentionally disables configuring the default interface
+Note that we intentionally disable configuring the default interface
 by default.  This is because we found it sometimes caused inconvenient
 situation while it was rarely useful in practical usage.  For example,
 consider a destination that has both IPv4 and IPv6 addresses but is
