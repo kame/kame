@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.377 2004/11/28 12:02:19 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.378 2004/11/28 12:03:04 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -239,7 +239,7 @@ draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
     * host-side: only router preference is supported.
-draft-ietf-ipv6-scoping-arch-01.txt:
+draft-ietf-ipv6-scoping-arch-02.txt:
 	The architecture, text representation, and usage of IPv6
 	scoped addresses.
     * some part of the documentation (especially about the routing
