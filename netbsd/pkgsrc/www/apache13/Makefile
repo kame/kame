@@ -44,7 +44,7 @@ CONFIGURE_ARGS+=	--prefix=${PREFIX} --libexecdir=${PREFIX}/lib/httpd \
 			--disable-module=auth_dbm \
 			--with-perl=${PERL5}
 #			--enable-rule=EAPI --disable-module=ssl 
-CONFIGURE_SCRIPT=	${WRKSRC}/configure.v6
+CONFIGURE_SCRIPT=	configure.v6
 CONFIGURE_ENV+=		OPTIM="${OPTIM}"
 
 BUILD_DEFS+=		USE_INET6
