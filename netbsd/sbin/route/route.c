@@ -1047,7 +1047,7 @@ getaddr(which, s, hpp)
 		hints.ai_flags = AI_NUMERICHOST;
 		hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
 		if (getaddrinfo(s, "0", &hints, &res) != 0 ||
-		    res->ai_family != afamily ||
+		    res->ai_family != AF_INET6 ||
 		    res->ai_addrlen != sizeof(su->sin6)) {
 			(void) fprintf(stderr, "%s: bad value\n", s);
 			exit(1);
