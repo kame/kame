@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.1 2000/01/09 01:31:33 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.2 2000/01/10 16:02:15 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -244,7 +244,7 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 			continue;
 		}
 #endif
-#ifdef INET6
+#if defined(INET6) && defined(IPV6_RECVDSTADDR)
 		if (ss.ss_family == AF_INET6
 		      && cm->cmsg_level == IPPROTO_IPV6
 		      && cm->cmsg_type == IPV6_RECVDSTADDR
