@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.245 2001/12/07 07:54:11 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.246 2001/12/17 12:06:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -347,29 +347,37 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 */
 		if (mip6_exthdr_create(m, opt, &mip6opt))
 			goto freehdrs;
-		/*
-		 * mip6_exthdr_create() won't fill mip6po_rthdr if
-		 * opt->ip6po_rthdr is already filled.  therefore, we
-		 * won't insert dest1 twice.  yuck...
-		 */
-		if (mip6opt.mip6po_rthdr) {
-			/*
-			 * mip6po_rthdr will be only allocated when we
-			 * have no rthdr passed by the pktopt from the
-			 * upper layer. so, we don't care about the
-			 * duplicate allocation of ip6e_rthdr.
-			 */
-			/*
-			 * XXX: see the comments of
-			 * mip6.c:mip6_exthdr_create().
-			 */
-			MAKE_EXTHDR(mip6opt.mip6po_rthdr, &exthdrs.ip6e_rthdr);
-			
+
+		if (((opt != NULL) && (opt->ip6po_rthdr != NULL))
+		    || (mip6opt.mip6po_rthdr != NULL)) {
+			m_freem(exthdrs.ip6e_rthdr);
+			if (mip6opt.mip6po_rthdr != NULL) {
+				/*
+				 * there is no rthdr specified in the
+				 * ip6_pktopts.  but mip6 create a
+				 * rthdr for the router optimization
+				 * purpose.
+				 */
+				MAKE_EXTHDR(mip6opt.mip6po_rthdr,
+					    &exthdrs.ip6e_rthdr);
+			} else {
+				/*
+				 * there is a rthdr specified in the
+				 * ip6_pktopts.  if mip6 require the
+				 * route optimization, the rthdr for
+				 * that purpose is already included in
+				 * the ip6po_rthdr in the
+				 * mip6_destopt_create().
+				 */
+				MAKE_EXTHDR(opt->ip6po_rthdr,
+					    &exthdrs.ip6e_rthdr);
+			}
 			/*
 			 * if a routing header exists dest1 must be
 			 * inserted if it exists.
 			 */
-			if (opt) {
+			if ((opt != NULL) && (opt->ip6po_dest1)) {
+				m_freem(exthdrs.ip6e_dest1);
 				MAKE_EXTHDR(opt->ip6po_dest1,
 					    &exthdrs.ip6e_dest1);
 			}
