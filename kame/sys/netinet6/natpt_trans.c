@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.98 2002/04/18 15:52:17 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.99 2002/04/18 16:39:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1012,7 +1012,7 @@ natpt_icmp4Unreach(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		break;
 
 	case ICMP_UNREACH_SRCFAIL:
-		icmp6->icmp6_code = ICMP6_DST_UNREACH_NOTNEIGHBOR;
+		icmp6->icmp6_code = ICMP6_DST_UNREACH_NOROUTE;
 		break;
 
 	case ICMP_UNREACH_NET_UNKNOWN:
