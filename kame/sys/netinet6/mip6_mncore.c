@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.46 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.47 2004/02/06 06:48:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -213,7 +213,7 @@ mip6_mobile_node_stop(void)
 		mip6_ha_list_remove(&mip6_ha_list,
 		    TAILQ_FIRST(&mip6_ha_list));
 	mip6log((LOG_INFO,
-	    "mip6_mobile_node_stopt:%d: "
+	    "mip6_mobile_node_stop:%d: "
 	    "mobile node function disabled.\n",
 	    __LINE__));
 	mip6ctl_nodetype = MIP6_NODETYPE_CORRESPONDENT_NODE;
