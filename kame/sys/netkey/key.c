@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.100 2000/05/10 17:37:15 itojun Exp $	*/
+/*	$KAME: key.c,v 1.101 2000/05/11 00:53:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3305,7 +3305,6 @@ fail:
 
 /*
  * set data into sadb_msg.
- * `buf' must has been allocated sufficiently.
  */
 static struct mbuf *
 key_setsadbmsg_mbuf(type, tlen, satype, seq, pid, mode, reqid,
@@ -3398,7 +3397,6 @@ key_setsadbmsg(buf, type, tlen, satype, seq, pid, mode, reqid,
 
 /*
  * copy secasvar data into sadb_address.
- * `buf' must has been allocated sufficiently.
  */
 static struct mbuf *
 key_setsadbsa_mbuf(sav)
@@ -3461,7 +3459,6 @@ key_setsadbsa(buf, sav)
 
 /*
  * set data into sadb_address.
- * `buf' must has been allocated sufficiently.
  */
 static struct mbuf *
 key_setsadbaddr_mbuf(exttype, saddr, prefixlen, ul_proto)
@@ -6344,7 +6341,7 @@ key_parse(m, so)
 		m = n;
 	}
 
-	/* align the mbuf chain so that extension are in contiguous region. */
+	/* align the mbuf chain so that extensions are in contiguous region. */
 	error = key_align(m, &mh);
 	if (error)
 		return error;
@@ -6593,6 +6590,7 @@ key_senderror(so, m, code)
 /*
  * set the pointer to each header into message buffer.
  * m will be freed on error.
+ * XXX larger-than-MCLBYTES extension?
  */
 static int
 key_align(m, mhp)
@@ -6994,6 +6992,7 @@ key_appendmbuf(m0, len)
 }
 #endif
 
+/* XXX too much? */
 static struct mbuf *
 key_alloc_mbuf(l)
 	int l;
