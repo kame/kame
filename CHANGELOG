@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.206 1999/10/21 22:01:46 itojun Exp $
+$Id: CHANGELOG,v 1.207 1999/10/22 04:36:09 sumikawa Exp $
 
 <199910>
+Fri Oct 22 13:35:23 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/lib/libftpio: fix getaddrinfo() loop, so that the code
+	  will try to explore all the addresses returned after query.
+
 Thu Oct 21 15:00:15 PDT 1999  itojun@iijlab.net
 	* kame/sys/netinet/in_cksum4.c: fix computation algorithm for big
 	  packet.
