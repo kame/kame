@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.78 2003/05/19 09:46:50 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.79 2003/06/04 05:35:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -276,11 +276,11 @@ getconfig(intface)
 	}
 
 #ifdef MIP6
-	MAYHAVE(val, "rltime", tmp->maxuinterval / 1000 * 3);
+	MAYHAVE(val, "rltime", DEF_MAXRTRADVINTERVAL * 3);
 	if (val
 	    && (val < (tmp->maxuinterval / 1000) || val > MAXROUTERLIFETIME))
 #else
-	MAYHAVE(val, "rltime", tmp->maxinterval * 3);
+	MAYHAVE(val, "rltime", DEF_MAXRTRADVINTERVAL * 3);
 	if (val && (val < tmp->maxinterval || val > MAXROUTERLIFETIME))
 #endif
 	{
