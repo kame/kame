@@ -1,0 +1,20 @@
+*** src/bgp4mp/bgp4mp_rt.c	Sat Apr 29 00:16:10 2000
+--- src/bgp4mp/bgp4mp_rt.c.new	Sat May 13 10:19:17 2000
+***************
+*** 7986,7992 ****
+  		    byte *cpstart = cp;
+  
+  		    BGP_GET_BITCOUNT(bitlen, cp);
+! 		    if (!BGP_OKAY_BITCOUNT(bitlen, AF_INET)) {
+  			trace_log_tp(tp,
+  				     0,
+  				     LOG_ERR,
+--- 7986,7992 ----
+  		    byte *cpstart = cp;
+  
+  		    BGP_GET_BITCOUNT(bitlen, cp);
+! 		    if (!BGP_OKAY_BITCOUNT6(bitlen)) {
+  			trace_log_tp(tp,
+  				     0,
+  				     LOG_ERR,
+

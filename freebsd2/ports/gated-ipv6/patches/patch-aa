@@ -1,0 +1,36 @@
+*** src/bgp4mp/bgp4mp.c	Sat Apr 29 00:16:10 2000
+--- src/bgp4mp/bgp4mp.c.new	Sat May 13 10:17:18 2000
+***************
+*** 673,679 ****
+  			}
+  
+  			BGP_GET_BITCOUNT(bitlen, cp);
+! 			if (!BGP_OKAY_BITCOUNT(bitlen, AF_INET6)) {
+  			    if (done != 0) {
+  			        trace_only_tf(trp,
+  					      0,
+--- 673,679 ----
+  			}
+  
+  			BGP_GET_BITCOUNT(bitlen, cp);
+! 			if (!BGP_OKAY_BITCOUNT6(bitlen)) {
+  			    if (done != 0) {
+  			        trace_only_tf(trp,
+  					      0,
+***************
+*** 778,784 ****
+  			}
+  
+  			BGP_GET_BITCOUNT(bitlen, cp);
+! 			if (!BGP_OKAY_BITCOUNT(bitlen, AF_INET6)) {
+  			    if (done != 0) {
+  				trace_only_tf(trp,
+  					      0,
+--- 778,784 ----
+  			}
+  
+  			BGP_GET_BITCOUNT(bitlen, cp);
+! 			if (!BGP_OKAY_BITCOUNT6(bitlen)) {
+  			    if (done != 0) {
+  				trace_only_tf(trp,
+  					      0,
