@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1931 2001/10/23 12:31:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1932 2001/10/23 12:44:03 jinmei Exp $
 
 <200110>
 2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_gif.c (in6_gif_output):
 	* kame/sys/netinet/in_gif.c (in_gif_output):
-	Corrected the loop prevation algorithm.  The current one is not
-	effective, because it tries to detecte the loop condition only
+	Corrected the loop prevention algorithm.  The current one is not
+	effective, because it tries to detect the loop condition only
 	when generating a new route, and it does not remove the cached
 	route even when a loop is detected.
 	Luckily, the bug does not necessarily mean we'll see infinite
