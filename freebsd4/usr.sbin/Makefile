@@ -6,5 +6,6 @@ SUBDIR+=altqd pvcbridge pvcsif pvctxctl tbrconfig
 SUBDIR+=racoon
 SUBDIR+=mip6control had
 SUBDIR+=ip6addrctl
+SUBDIR+=natptconfig natptlog
 
 .include <bsd.subdir.mk>
