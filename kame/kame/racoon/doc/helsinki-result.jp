@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.40 2001/08/16 18:02:01 sakane Exp $
+$KAME: helsinki-result.jp,v 1.41 2001/08/16 18:22:17 sakane Exp $
 
 
 generic
@@ -96,9 +96,14 @@ IBM AIX 5.1
 	IPv6 testしようと言われるも、先方のマシン(遠隔地)にglobal addressなし。
 
 	Thu Aug 16 21:00 2001
+	IPv6だけ
 	phase1 pre-shared-key, 3des, sha1, dh2
 	phase2 esp transport, 3des, sha1, pfs2
-	こっちがinitiateすると問題なし
+	最初の1回は問題なし。
+	phase2 SAを消して再ネゴするとisakmpdがだんまりになる。
+	ibm isakmpd に問題あるっぽい。
+
+	san diegoでやった時は manual だったかな？
 
 F-Secure VPN+ 5.40
 	Tue Aug 14 19:44:15 JST 2001
