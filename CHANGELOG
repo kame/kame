@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1400 2000/11/25 09:45:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1401 2000/11/25 11:51:31 jinmei Exp $
 
 <200011>
+2000-11-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/route.c (add_leaf): just ignored an MLD report
+	if the node is not the DR for the corresponding subnet.
+	The fix was from toshiaki.nakatsu@fujixerox.co.jp.
+
 2000-11-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/pim6_proto.c (receive_pim6_bootstrap): even
 	when the BSR changes, just schedule an immediate advertisemnet of
