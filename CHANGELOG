@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1646 2001/04/11 11:57:10 sakane Exp $
+$KAME: CHANGELOG,v 1.1647 2001/04/12 17:23:51 jinmei Exp $
 
 <200104>
 Wed Apr 11 18:52:26 JST 2001 sakane@ydc.co.jp
@@ -303,11 +303,11 @@ Thu Mar 15 17:48:54 JST 2001  itojun@iijlab.net
 	above change, the function does not set the ifa_rtrequest
 	function.
 	* kame/sys/netinet6/in6.c (in6_ifloop_request): set the address
-	itself as gateway, and set the RTF_LLINFO flag to the
-	corresponding host route, so that the route would have the flag,
-	and thus applications (e.g. routing daemons) that assume
-	traditional kernel behavior would be happy.  Older versions made
-	the route to the node's own address like this:
+	itself as gateway, and set the corresponding host route to the
+	RTF_LLINFO, so that the route would have the flag, and thus
+	applications (e.g. routing daemons) that assume traditional kernel
+	behavior would be happy.  Older versions made the route to the
+	node's own address like this:
 	2001:200::3ca2:ffef:eff5:f9fd ::1  UH lo0
 	However, since some routing daemons try to install kernel internal
 	routes that do not have the RTF_LLINFO flag, this kind of entry
