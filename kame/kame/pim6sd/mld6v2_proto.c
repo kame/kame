@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.8 2002/01/21 02:44:32 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.9 2002/02/04 06:07:50 suz Exp $
  */
 
 /*
@@ -781,7 +781,7 @@ check_multicastV2_listener(v, group, g, source)
 	    continue;
 
 	for (s = (*g)->sources; s != NULL; s = s->al_next) {
-	    if (inet6_equal(source, &s->al_addr))
+	    if (source && inet6_equal(source, &s->al_addr))
 		return s;	/* group found, source found */
 	}
 	return NULL;	/* group found, source not found */
