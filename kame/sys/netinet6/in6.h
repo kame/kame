@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.148 2004/02/04 01:04:19 suz Exp $	*/
+/*	$KAME: in6.h,v 1.149 2004/02/25 16:08:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,7 +569,7 @@ struct ip6_mtuinfo {
  * Third level is protocol number.
  * Fourth level is desired variable within that protocol.
  */
-#define IPV6PROTO_MAXID	(IPPROTO_PIM + 1)	/* don't list to IPV6PROTO_MAX */
+#define IPV6PROTO_MAXID	(IPPROTO_MH + 1)	/* don't list to IPV6PROTO_MAX */
 
 #define CTL_IPV6PROTO_NAMES { \
 	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
@@ -605,7 +605,6 @@ struct ip6_mtuinfo {
 	{ "icmp6", CTLTYPE_NODE }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, { 0, 0 }, \
-	{ "mip6", CTLTYPE_NODE }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, { 0, 0 }, \
 	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
@@ -619,6 +618,14 @@ struct ip6_mtuinfo {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "pim6", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+        { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },\
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },\
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },\
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },\
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },\
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },\
+	{ "mip6", CTLTYPE_NODE }, \
 }
 
 /*
