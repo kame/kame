@@ -178,8 +178,8 @@
 #define IFT_A12MPPSWITCH	   0x82	/* Avalon Parallel Processor */
 
 /* private usage... how should we define these? */
-#define	IFT_GIF		0xf0
-#define	IFT_DUMMY	0xf1
+#define IFT_GIF		0xf0
+#define IFT_DUMMY	0xf1
 #define IFT_PVC		0xf2
 #define IFT_FAITH	0xf3
 #define IFT_STF		0xf4
