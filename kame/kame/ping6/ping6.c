@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.169 2003/07/25 06:01:47 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.170 2004/02/13 11:47:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1561,11 +1561,12 @@ pr_pack(buf, cc, mhdr)
 #ifdef SIN6_LEN
 				dstsa.sin6_len = sizeof(dstsa);
 #endif
-				dstsa.sin6_scope_id = pktinfo->ipi6_ifindex;
 				dstsa.sin6_addr = pktinfo->ipi6_addr;
-				(void)printf(" dst=%s",
+				(void)printf(" dstaddr=%s",
 				    pr_addr((struct sockaddr *)&dstsa,
 				    sizeof(dstsa)));
+				(void)printf(" dstifid=%u",
+				    pktinfo->ipi6_ifindex);
 			}
 			if (timing)
 				(void)printf(" time=%g ms", triptime);
