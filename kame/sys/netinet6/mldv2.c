@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.10 2004/03/16 03:15:33 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.11 2004/03/18 05:09:50 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -554,7 +554,7 @@ mld_input(m, off)
 		if (m->m_flags & M_LOOP) /* XXX: grotty flag, but efficient */
 			goto end;
 
-		if (!IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
+		if (!IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr))
 			goto end;
 
 		/*
@@ -576,8 +576,8 @@ mld_input(m, off)
 	if (ifp->if_flags & IFF_LOOPBACK)
 		goto end;
 
-	if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-	    !IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
+	if (!IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr) &&
+	    !IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr))
 		goto end;	/* print error or log stat? */
 
 	/* XXX: there should be no error here! */
@@ -616,7 +616,7 @@ mld_input(m, off)
 		goto end;
 
 	/* judge query type */
-	if (IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr)) {
 		if (mldv2h->mld_numsrc != 0) {
 			mldlog((LOG_DEBUG, "invalid general query(numsrc=%d)\n",
 				mldv2h->mld_numsrc));
@@ -626,7 +626,7 @@ mld_input(m, off)
 		mldlog((LOG_DEBUG, "MLDv2 general Query\n"));
 		goto set_timer;
 	} 
-	if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr)) {
+	if (IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr)) {
 		if (mldv2h->mld_numsrc == 0) {
 			query_type = MLD_V2_GROUP_QUERY;
 			mldlog((LOG_DEBUG, "MLDv2 group Query\n"));
@@ -679,8 +679,8 @@ mldv1_query:
 		    IPV6_ADDR_SCOPE_LINKLOCAL)
 			continue;
 
-		if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-		    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6m->in6m_addr))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr) &&
+		    !IN6_ARE_ADDR_EQUAL(&mc_sa.sin6_addr, &in6m->in6m_addr))
 			continue;
 
 		if (timer == 0) {
@@ -702,7 +702,7 @@ mldv1_query:
 	 * Timeout seconds whenever an MLDv1 General Query is received.
 	 */
 	if (mldalways_v2 == 0 &&
-	    IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6addr_any)) {
+	    IN6_ARE_ADDR_EQUAL(&mc_sa.sin6_addr, &in6addr_any)) {
 		mldlog((LOG_DEBUG, "shift to MLDv1-compat mode\n"));
 		mld_set_hostcompat(ifp, rt6i, query_ver);
 	}
