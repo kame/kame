@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.234 2001/09/25 08:07:42 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.235 2001/09/25 08:13:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1028,7 +1028,9 @@ in6_update_ifa(ifp, ifra, ia)
 	 * must be 128.
 	 */
 	if (ifra->ifra_dstaddr.sin6_family == AF_INET6) {
+#ifdef FORCE_P2PPLEN
 		int i;
+#endif
 
 		if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) == 0) {
 			/* XXX: noisy message */
@@ -1037,10 +1039,6 @@ in6_update_ifa(ifp, ifra, ia)
 			return(EINVAL);
 		}
 		if (plen != 128) {
-			/*
-			 * The following message seems noisy, but we dare to
-			 * add it for diagnosis.
-			 */
 			log(LOG_INFO, "in6_update_ifa: prefixlen should be "
 			    "128 when dstaddr is specified\n");
 		}
@@ -1995,7 +1993,11 @@ in6_ifinit(ifp, ia, sin6, newhost)
 	 * direct route.
 	 */
 	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL); /* XXX */
-	if (plen == 128 && ia->ia_dstaddr.sin6_family == AF_INET6) {
+	if (ia->ia_dstaddr.sin6_family == AF_INET6) {
+		if (plen != 128) {
+			log(LOG_INFO, "in6_ifinit: prefixlen must be 128 "
+			    "when dstaddr is specified\n");
+		}
 		if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD,
 				    RTF_UP | RTF_HOST)) != 0)
 			return(error);
