@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_blue.c,v 1.4 2002/10/27 03:19:35 kjc Exp $	*/
+/*	$KAME: qdisc_blue.c,v 1.5 2002/11/08 06:36:18 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -38,7 +38,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <math.h>
+#include <signal.h>
 #include <errno.h>
 #include <err.h>
 

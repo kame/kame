@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_priq.c,v 1.3 2002/10/27 03:19:36 kjc Exp $	*/
+/*	$KAME: qdisc_priq.c,v 1.4 2002/11/08 06:36:18 kjc Exp $	*/
 /*
  * Copyright (C) 2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -39,7 +39,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
-#include <math.h>
 #include <errno.h>
 #include <err.h>
 
