@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.25 2004/12/01 07:48:24 suz Exp $	*/
+/*	$KAME: keydb.h,v 1.26 2004/12/01 12:30:15 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,6 +36,7 @@
 
 #include <netkey/key_var.h>
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 #ifndef	_SOCKADDR_UNION_DEFINED
 #define	_SOCKADDR_UNION_DEFINED
 /*
@@ -47,6 +48,7 @@ union sockaddr_union {
 	struct sockaddr_in6	sin6;
 };
 #endif	/* _SOCKADDR_UNION_DEFINED */
+#endif  /* defined(__FreeBSD__) && __FreeBSD_version >= 503000 */
 
 /* Security Assocciation Index */
 /* NOTE: Ensure to be same address family */
