@@ -1,5 +1,5 @@
 /*	$NetBSD: policy_parse.y,v 1.14 2003/11/23 08:33:13 itojun Exp $	*/
-/*	$KAME: policy_parse.y,v 1.22 2004/06/18 17:42:07 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.23 2004/06/19 21:11:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -76,7 +76,6 @@ static int offset = 0;			/* offset of pbuf */
 struct _val;
 extern void yyerror __P((char *));
 static struct sockaddr *parse_sockaddr __P((struct _val *));
-static int rule_check __P((void));
 static int set_x_request __P((int, int, struct sockaddr *, struct sockaddr *,
 	int, int));
 static int init_x_policy __P((int, int));
