@@ -304,7 +304,15 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	ep->arg = arg;
 
 	/*
-	 * XXX order of insertion will determine the priority in lookup
+	 * Order of insertion will determine the priority in lookup.
+	 * We should be careful putting them in specific-one-first order.
+	 * The question is, since we have two "mask" portion, we cannot really
+	 * define total order between entries.
+	 * For example, which of these should be preferred?
+	 *	src=3ffe::/16, dst=3ffe:501::/32
+	 *	src=3ffe:501::/32, dst=3ffe::/16
+	 *
+	 * At this moment we don't care about the ordering.
 	 */
 	LIST_INSERT_HEAD(&encaptab, ep, chain);
 	error = 0;
