@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.738 2000/04/01 13:49:59 itojun Exp $
+$Id: CHANGELOG,v 1.739 2000/04/02 13:09:44 itojun Exp $
 
 <200003>
+Sun Apr  2 22:05:03 JST 2000  itojun@iijlab.net
+	* totd pkgsrc/ports (openbsd, netbsd, freebsd[23]): upgrade to 1.1p4.
+
 Sat Apr  1 22:47:12 JST 2000  itojun@iijlab.net
 	* sys/sys/socket.h (all platforms): avoid namespace pollution
 	  for CMSG_ALIGN().
