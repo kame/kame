@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.379 2004/03/24 06:47:54 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.380 2004/03/26 03:34:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -608,7 +608,8 @@ icmp6_input(mp, offp, proto)
 	IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off, sizeof(*icmp6));
 	if (icmp6 == NULL) {
 		icmp6stat.icp6s_tooshort++;
-		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
+		/* m is invalid */
+		/*icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);*/
 		return IPPROTO_DONE;
 	}
 #endif
