@@ -1,7 +1,22 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1698 2001/05/31 01:01:24 suz Exp $
+$KAME: CHANGELOG,v 1.1699 2001/05/31 14:07:13 fujisawa Exp $
 
 <200105>
+2001-05-31  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c:
+	- translate LPRT -> PORT.
+	- translate PORT result(*1) to LPRT result(*2).
+	    *1: 200 PORT command successful.
+	    *2: 200 LPRT command successful.
+
+	  You can connect IPv6 FTP client to IPv4 FTP server with
+	  passive mode or non passive mode.
+
+	  Restrictions:
+	  o When you use non passive mode, and IPv4 FTP server does
+	    not use port Number 20 as a destination port, your ftp
+	    session will fail.
+
 2001-05-31 suz@sdl.hitachi.co.jp
 	* sys/netinet6/{nd6.c, nd6.h, nd6_rtr.c, mip6_md.c}
 	  bsdi3/sys/i386/conf/GENERIC.v6
