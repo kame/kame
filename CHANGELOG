@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1222 2000/08/22 08:31:57 suz Exp $
+$KAME: CHANGELOG,v 1.1223 2000/08/23 01:44:32 sakane Exp $
 
 <200008>
+Wed Aug 23 10:43:07 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Enabled to check PFS group strictly.  It can be done by
+	defining "strict" to "proposal_check" in "remote" directive.
+
 Tue Aug 22 17:19:46 JST 2000	suz@sdl.hitachi.co.jp
 	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach): application 
 	using routing-socket (e.g. zebra) can detect automatic addition 
