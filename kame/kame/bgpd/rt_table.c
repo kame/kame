@@ -37,6 +37,11 @@
 #include "in6.h"
 #include "ripng.h"
 
+/* alignment constraint for routing socket messages */
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
 void
 krt_init()
 {
@@ -132,19 +137,19 @@ krt_entry(rtm)
 
   if (rtm->rtm_addrs & RTA_GATEWAY) {
     sin6_gw = (struct sockaddr_in6 *)rtmp;
-    rtmp += sin6_gw->sin6_len;
+    rtmp += ROUNDUP(sin6_gw->sin6_len);
   }
   if (rtm->rtm_addrs & RTA_NETMASK) {
     sin6_mask = (struct sockaddr_in6 *)rtmp;
-    rtmp += sin6_mask->sin6_len;
+    rtmp += ROUNDUP(sin6_mask->sin6_len);
   }
   if (rtm->rtm_addrs & RTA_GENMASK) {
     sin6_genmask = (struct sockaddr_in6 *)rtmp;
-    rtmp += sin6_genmask->sin6_len;
+    rtmp += ROUNDUP(sin6_genmask->sin6_len);
   }
   if (rtm->rtm_addrs & RTA_IFP) {
     sin6_ifp = (struct sockaddr_in6 *)rtmp;
-    rtmp += sin6_ifp->sin6_len;
+    rtmp += ROUNDUP(sin6_ifp->sin6_len);
   }
 
   /* checking previously added P-to-P self route (1998/04/24) */
@@ -462,19 +467,19 @@ addroute(rte, gw, ife)
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = np->rip6_dest;
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Gateway */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = *gw;
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
 	  SET_IN6_LINKLOCAL_IFINDEX(&sin->sin6_addr, ife->ifi_ifn->if_index);
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Netmask */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         mask_nset(&sin->sin6_addr, np->rip6_plen);
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Interface */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
@@ -576,18 +581,18 @@ delroute(rte, gw)
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = rp->rip6_dest;
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Gateway */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = *gw;
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Netmask */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         mask_nset(&sin->sin6_addr, rp->rip6_plen);
 
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	errno = 0;
         if (write(rtsock, buf, len) == len) {
 #ifdef DEBUG
@@ -680,19 +685,19 @@ chroute(rte, gw, ife)
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = np->rip6_dest;
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Gateway */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = *gw;
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
 	  SET_IN6_LINKLOCAL_IFINDEX(&sin->sin6_addr, ife->ifi_ifn->if_index);
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Netmask */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         mask_nset(&sin->sin6_addr, np->rip6_plen);
-        sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Interface */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
