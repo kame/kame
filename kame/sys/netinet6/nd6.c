@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.214 2001/10/25 10:01:32 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.215 2001/10/26 16:50:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1073,8 +1073,8 @@ nd6_is_addr_neighbor(addr, ifp)
 		return(1);
 
 	/*
-	 * If the address matches one of our addresses,
-	 * it should be a neighbor.
+	 * If the address matches one of our on-link prefixes, it should be a
+	 * neighbor.
 	 */
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 
@@ -1093,6 +1093,15 @@ nd6_is_addr_neighbor(addr, ifp)
 		if (i == 4)	/* full match */
 			return(1);
 	}
+
+	/*
+	 * If the default router list is empty, all addresses are regarded
+	 * as on-link, and thus, as a neighbor.
+	 * XXX: we restrict the condition to hosts, because routers usually do
+	 * not have the "default router list".
+	 */
+	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL)
+		return(1);
 
 	/*
 	 * Even if the address matches none of our addresses, it might be
@@ -2370,7 +2379,8 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 	sdl = SDL(rt->rt_gateway);
 	if (sdl->sdl_alen == 0) {
 		/* this should be impossible, but we bark here for debugging */
-		printf("nd6_storelladdr: sdl_alen == 0\n");
+		printf("nd6_storelladdr: sdl_alen == 0, dst=%s, if=%s\n",
+		       ip6_sprintf(&SIN6(dst)->sin6_addr), if_name(ifp));
 		m_freem(m);
 		return(0);
 	}
