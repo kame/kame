@@ -1,4 +1,5 @@
-/*	$KAME: sctp_indata.c,v 1.21 2003/08/09 17:06:39 suz Exp $	*/
+
+/*	$KAME: sctp_indata.c,v 1.22 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -2665,8 +2666,17 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb,
 
 			asoc->sent_queue_retran_cnt++;
 
+
+#ifdef SCTP_FR_TO_ALTERNATE
 			/* Can we find an alternate? */
 			alt = sctp_find_alternate_net(tcb, tp1->whoTo);
+#else
+			/* default behavior is to NOT retransmit FR's
+			 * to an alternate. Armando Caro's paper details
+			 * why.
+			 */
+			alt = tp1->whoTo;
+#endif
 			tp1->rec.data.doing_fast_retransmit = 1;
 			/* mark the sending seq for possible subsequent FR's */
 			tp1->rec.data.fast_retran_tsn = asoc->sending_seq;
@@ -2803,89 +2813,93 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
 
 #ifdef SCTP_HIGH_SPEED
 
+
 struct sctp_hs_raise_drop {
 	int32_t cwnd;
 	int32_t increase;
-	float drop_percent;
+	int32_t drop_percent;
 };
 
 #define SCTP_HS_TABLE_SIZE 73
 
 struct sctp_hs_raise_drop sctp_cwnd_adjust[SCTP_HS_TABLE_SIZE] = {
-	{38,1,0.50},	/* 0   */
-	{118,2,0.44},	/* 1   */
-	{221,3,0.41},	/* 2   */
-	{347,4,0.38},	/* 3   */
-	{495,5,0.37},	/* 4   */
-	{663,6,0.35},	/* 5   */
-	{851,7,0.34},	/* 6   */
-	{1058,8,0.33},	/* 7   */
-	{1284,9,0.32},	/* 8   */
-	{1529,10,0.31},	/* 9   */
-	{1793,11,0.30},	/* 10  */
-	{2076,12,0.29},	/* 11  */
-	{2378,13,0.28},	/* 12  */
-	{2699,14,0.28},	/* 13  */
-	{3039,15,0.27},	/* 14  */
-	{3399,16,0.27},	/* 15  */
-	{3778,17,0.26},	/* 16  */
-	{4177,18,0.26},	/* 17  */
-	{4596,19,0.25},	/* 18  */
-	{5036,20,0.25},	/* 19  */
-	{5497,21,0.24},	/* 20  */
-	{5979,22,0.24},	/* 21  */
-	{6483,23,0.23},	/* 22  */
-	{7009,24,0.23},	/* 23  */
-	{7558,25,0.22},	/* 24  */
-	{8130,26,0.22},	/* 25  */
-	{8726,27,0.22},	/* 26  */
-	{9346,28,0.21},	/* 27  */
-	{9991,29,0.21},	/* 28  */
-	{10661,30,0.21},/* 29  */
-	{11358,31,0.20},/* 30  */
-	{12082,32,0.20},/* 31  */
-	{12834,33,0.20},/* 32  */
-	{13614,34,0.19},/* 33  */
-	{14424,35,0.19},/* 34  */
-	{15265,36,0.19},/* 35  */
-	{16137,37,0.19},/* 36  */
-	{17042,38,0.18},/* 37  */
-	{17981,39,0.18},/* 38  */
-	{18955,40,0.18},/* 39  */
-	{19965,41,0.17},/* 40  */
-	{21013,42,0.17},/* 41  */
-	{22101,43,0.17},/* 42  */
-	{23230,44,0.17},/* 43  */
-	{24402,45,0.16},/* 44  */
-	{25618,46,0.16},/* 45  */
-	{26881,47,0.16},/* 46  */
-	{28193,48,0.16},/* 47  */
-	{29557,49,0.15},/* 48  */
-	{30975,50,0.15},/* 49  */
-	{32450,51,0.15},/* 50  */
-	{33986,52,0.15},/* 51  */
-	{35586,53,0.14},/* 52  */
-	{37253,54,0.14},/* 53  */
-	{38992,55,0.14},/* 54  */
-	{40808,56,0.14},/* 55  */
-	{42707,57,0.13},/* 56  */
-	{44694,58,0.13},/* 57  */
-	{46776,59,0.13},/* 58  */
-	{48961,60,0.13},/* 59  */
-	{51258,61,0.13},/* 60  */
-	{53677,62,0.12},/* 61  */
-	{56230,63,0.12},/* 62  */
-	{58932,64,0.12},/* 63  */
-	{61799,65,0.12},/* 64  */
-	{64851,66,0.11},/* 65  */
-	{68113,67,0.11},/* 66  */
-	{71617,68,0.11},/* 67  */
-	{75401,69,0.10},/* 68  */
-	{79517,70,0.10},/* 69  */
-	{84035,71,0.10},/* 70  */
-	{89053,72,0.10},/* 71  */
-	{94717,73,0.09} /* 72  */
+	{38,1,50},	/* 0   */
+	{118,2,44},	/* 1   */
+	{221,3,41},	/* 2   */
+	{347,4,38},	/* 3   */
+	{495,5,37},	/* 4   */
+	{663,6,35},	/* 5   */
+	{851,7,34},	/* 6   */
+	{1058,8,33},	/* 7   */
+	{1284,9,32},	/* 8   */
+	{1529,10,31},	/* 9   */
+	{1793,11,30},	/* 10  */
+	{2076,12,29},	/* 11  */
+	{2378,13,28},	/* 12  */
+	{2699,14,28},	/* 13  */
+	{3039,15,27},	/* 14  */
+	{3399,16,27},	/* 15  */
+	{3778,17,26},	/* 16  */
+	{4177,18,26},	/* 17  */
+	{4596,19,25},	/* 18  */
+	{5036,20,25},	/* 19  */
+	{5497,21,24},	/* 20  */
+	{5979,22,24},	/* 21  */
+	{6483,23,23},	/* 22  */
+	{7009,24,23},	/* 23  */
+	{7558,25,22},	/* 24  */
+	{8130,26,22},	/* 25  */
+	{8726,27,22},	/* 26  */
+	{9346,28,21},	/* 27  */
+	{9991,29,21},	/* 28  */
+	{10661,30,21},  /* 29  */
+	{11358,31,20},  /* 30  */
+	{12082,32,20},  /* 31  */
+	{12834,33,20},  /* 32  */
+	{13614,34,19},  /* 33  */
+	{14424,35,19},  /* 34  */
+	{15265,36,19},  /* 35  */
+	{16137,37,19},  /* 36  */
+	{17042,38,18},  /* 37  */
+	{17981,39,18},  /* 38  */
+	{18955,40,18},  /* 39  */
+	{19965,41,17},  /* 40  */
+	{21013,42,17},  /* 41  */
+	{22101,43,17},  /* 42  */
+	{23230,44,17},  /* 43  */
+	{24402,45,16},  /* 44  */
+	{25618,46,16},  /* 45  */
+	{26881,47,16},  /* 46  */
+	{28193,48,16},  /* 47  */
+	{29557,49,15},  /* 48  */
+	{30975,50,15},  /* 49  */
+	{32450,51,15},  /* 50  */
+	{33986,52,15},  /* 51  */
+	{35586,53,14},  /* 52  */
+	{37253,54,14},  /* 53  */
+	{38992,55,14},  /* 54  */
+	{40808,56,14},  /* 55  */
+	{42707,57,13},  /* 56  */
+	{44694,58,13},  /* 57  */
+	{46776,59,13},  /* 58  */
+	{48961,60,13},  /* 59  */
+	{51258,61,13},  /* 60  */
+	{53677,62,12},  /* 61  */
+	{56230,63,12},  /* 62  */
+	{58932,64,12},  /* 63  */
+	{61799,65,12},  /* 64  */
+	{64851,66,11},  /* 65  */
+	{68113,67,11},  /* 66  */
+	{71617,68,11},  /* 67  */
+	{75401,69,10},  /* 68  */
+	{79517,70,10},  /* 69  */
+	{84035,71,10},  /* 70  */
+	{89053,72,10},  /* 71  */
+	{94717,73,9}    /* 72  */
 };
+
+
+
 
 static void
 sctp_hs_cwnd_increase(struct sctp_nets *net)
@@ -2900,27 +2914,29 @@ sctp_hs_cwnd_increase(struct sctp_nets *net)
 		if (net->net_ack > net->mtu) {
 			net->cwnd += net->mtu;
 #ifdef SCTP_CWND_LOGGING
-			sctp_log_cwnd(net, net->mtu, SCTP_CWND_LOG_FROM_SS);
+			sctp_log_cwnd(net, net->mtu,
+				      SCTP_CWND_LOG_FROM_SS);
 #endif
 		} else {
 			net->cwnd += net->net_ack;
 #ifdef SCTP_CWND_LOGGING
-			sctp_log_cwnd(net, net->net_ack, SCTP_CWND_LOG_FROM_SS);
+			sctp_log_cwnd(net, net->net_ack,
+				      SCTP_CWND_LOG_FROM_SS);
 #endif
 		}
 	} else {
 #ifdef SCTP_DEBUG
 		printf("High speed increase curr idx:%d cur_val:%d cwnd:%d\n",
-		    net->last_hs_used, cur_val, net->cwnd);
+		       net->last_hs_used, cur_val, net->cwnd);
 #endif
-		for (i = net->last_hs_used; i < SCTP_HS_TABLE_SIZE; i++) {
+		for (i=net->last_hs_used; i<SCTP_HS_TABLE_SIZE; i++) {
 			if (cur_val < sctp_cwnd_adjust[i].cwnd) {
 				indx = i;
 				break;
 			}
 		}
 		net->last_hs_used = indx;
-		incr = (net->mtu * sctp_cwnd_adjust[indx].increase);
+		incr = ((sctp_cwnd_adjust[indx].increase) << 10);
 #ifdef SCTP_DEBUG
 		printf("New index is %d incr:%d\n", indx, incr);
 #endif
@@ -2948,27 +2964,35 @@ sctp_hs_cwnd_decrease(struct sctp_nets *net)
 		}
 		net->cwnd = net->ssthresh;
 #ifdef SCTP_CWND_LOGGING
-		sctp_log_cwnd(net,(net->cwnd-old_cwnd), SCTP_CWND_LOG_FROM_FR);
+		sctp_log_cwnd(net, (net->cwnd-old_cwnd),
+			      SCTP_CWND_LOG_FROM_FR);
 #endif
 	} else {
 		/* drop by the proper amount */
 #ifdef SCTP_DEBUG
-		printf("High speed decrease indx:%d\n", net->last_hs_used);
+		printf("High speed decrease indx:%d\n",
+		       net->last_hs_used);
 #endif
-		net->ssthresh = net->cwnd - (int)((float)net->cwnd * sctp_cwnd_adjust[net->last_hs_used].drop_percent);
+		net->ssthresh = net->cwnd - (int)((net->cwnd / 100) * sctp_cwnd_adjust[net->last_hs_used].drop_percent);
 		net->cwnd = net->ssthresh;
 		/* now where are we */
 		indx = net->last_hs_used;
 		cur_val = net->cwnd >> 10;
-		for (i = indx; i >= 0; i--) {
-			if (cur_val > sctp_cwnd_adjust[i].cwnd) {
-				break;
-			}
-		}
 		/* reset where we are in the table */
-		net->last_hs_used = indx;
+		if (cur_val < sctp_cwnd_adjust[0].cwnd) {
+			/* feel out of hs */
+			net->last_hs_used = 0;
+		} else {
+			for (i=indx; i>=1; i--) {
+				if (cur_val > sctp_cwnd_adjust[(i-1)].cwnd) {
+					break;
+				}
+			}
+			net->last_hs_used = indx;
+		}
 #ifdef SCTP_DEBUG
-		printf("New indx:%d cwnd:%d\n", net->last_hs_used, net->cwnd);
+		printf("New indx:%d cwnd:%d\n",
+		       net->last_hs_used, net->cwnd);
 #endif
 
 	}
@@ -3287,7 +3311,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 #endif
 
 			m_freem(tp1->data);
-			if (tp1->flags && SCTP_PR_SCTP_BUFFER) {
+			if (tp1->flags & SCTP_PR_SCTP_BUFFER) {
 				asoc->sent_queue_cnt_removeable--;
 			}
 

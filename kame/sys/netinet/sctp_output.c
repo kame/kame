@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.25 2003/06/24 05:36:49 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.26 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -3615,7 +3615,7 @@ sctp_prune_prsctp(struct sctp_tcb *tcb,
 				} /* end if right class */
 			} /* end if chk pr-sctp */
 			chk = nchk;
-		} /* end while(chk) */
+		} /* end while (chk) */
 	} /* if enabled in assoc */
 }
 
@@ -4419,7 +4419,11 @@ sctp_clean_up_datalist(struct sctp_tcb *stcb,
 		asoc->total_flight += data_list[i]->send_size;
 		asoc->total_flight_book += data_list[i]->book_size;
 		asoc->total_flight_count++;
-		asoc->peers_rwnd -= data_list[i]->send_size;
+		if (asoc->peers_rwnd > data_list[i]->send_size)
+			asoc->peers_rwnd -= data_list[i]->send_size;
+		else
+			asoc->peers_rwnd = 0;
+
 		if (asoc->peers_rwnd < stcb->sctp_ep->sctp_ep.sctp_sws_sender) {
 			/* SWS sender side engages */
 			asoc->peers_rwnd = 0;
@@ -6220,7 +6224,11 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 				asoc->total_flight += data_list[i]->send_size;
 				asoc->total_flight_book += data_list[i]->book_size;
 				asoc->total_flight_count++;
-				asoc->peers_rwnd -= data_list[i]->send_size;
+				if (asoc->peers_rwnd > data_list[i]->send_size)
+					asoc->peers_rwnd -= data_list[i]->send_size;
+				else
+					asoc->peers_rwnd = 0;
+
 				if (asoc->peers_rwnd < tcb->sctp_ep->sctp_ep.sctp_sws_sender) {
 					/* SWS sender side engages */
 					asoc->peers_rwnd = 0;
@@ -7746,7 +7754,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net, struct mbu
 	iph = mtod(m,struct ip *);
 	if (iph->ip_v == IPVERSION) {
 		/* IPv4 */
-		len = chk->send_size = iph->ip_len;
+		len = chk->send_size = (iph->ip_len - sizeof(struct ip));
 	} else {
 		struct ip6_hdr *ip6h;		
 		/* IPv6 */

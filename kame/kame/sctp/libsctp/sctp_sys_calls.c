@@ -1,4 +1,4 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.3 2003/06/24 05:36:00 itojun Exp $ */
+/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.4 2003/08/29 06:37:39 itojun Exp $ */
 
 /*
  * Copyright (C) 2002 Cisco Systems Inc,
@@ -44,53 +44,38 @@
 #include <sys/uio.h>
 
 int
-sctp_connectx(int fd, struct sockaddr_storage *addrs, int addrcnt)
+sctp_connectx(int fd, struct sockaddr *addrs, int addrcnt)
 {
-	int i, len, ret, *iptr, cnt = 0;
-	char *mchk, *cpyto;
+	int i,len,ret,cnt;
 	struct sockaddr *at;
 	len = sizeof(int);
+	at = addrs;
+	/* validate all the addresses and get the size */
 	for (i=0; i < addrcnt; i++) {
-		at = (struct sockaddr *)&addrs[i];
-		if (at->sa_family == AF_INET){
-			len += sizeof(struct sockaddr_in);
-			cnt++;
-		} else if (at->sa_family == AF_INET6) {
-			len += sizeof(struct sockaddr_in6);
-			cnt++;
+		if ((at->sa_family != AF_INET) &&
+		   (at->sa_family != AF_INET6)) {
+			errno = EINVAL;
+			return (-1);
 		}
+		len += at->sa_len;
+		at = (struct sockaddr *)((caddr_t)at + at->sa_len);
+		cnt++;
 	}
+	/* do we have any? */
 	if (cnt == 0) {
 		errno = EINVAL;
 		return(-1);
 	}
-	mchk = malloc(len);
-	if (mchk == NULL) {
-		return (-1);
-	}
-	iptr = (int *)mchk;
-	*iptr = cnt;
-	cpyto = &mchk[sizeof(int)];
-	for (i=0; i < addrcnt; i++) {
-		at = (struct sockaddr *)&addrs[i];
-		if (at->sa_family == AF_INET) {
-			memcpy(cpyto,at,sizeof(struct sockaddr_in));
-			cpyto += sizeof(struct sockaddr_in);
-		} else if (at->sa_family == AF_INET6) {
-			memcpy(cpyto,at,sizeof(struct sockaddr_in6));
-			cpyto += sizeof(struct sockaddr_in6);
-		}
-	}
-	ret = setsockopt(fd, IPPROTO_SCTP, SCTP_CONNECT_X, mchk, (unsigned int)len);
-	free(mchk);
+	ret = setsockopt(fd, IPPROTO_SCTP, SCTP_CONNECT_X, (void *)addrs, (unsigned int)len);
 	return (ret);
 }
 
 
 int
-sctp_bindx(int fd, struct sockaddr_storage *addrs, int addrcnt, int flags)
+sctp_bindx(int fd, struct sockaddr *addrs, int addrcnt, int flags)
 {
 	struct sctp_getaddresses *gaddrs;
+	struct sockaddr *sa;
 	int i, sz, fam, argsz;
 
 	if ((flags != SCTP_BINDX_ADD_ADDR) && 
@@ -106,21 +91,23 @@ sctp_bindx(int fd, struct sockaddr_storage *addrs, int addrcnt, int flags)
 		return(-1);
 	}
 	gaddrs->sget_assoc_id = 0;
+	sa = addrs;
 	for (i = 0; i < addrcnt; i++) {
-		sz = ((struct sockaddr *)&addrs[i])->sa_len;
-		fam = ((struct sockaddr *)&addrs[i])->sa_family;
-		((struct sockaddr_in *)&addrs[i])->sin_port = ((struct sockaddr_in *)&addrs[i])->sin_port;
+		sz = sa->sa_len;
+		fam = sa->sa_family;
+		((struct sockaddr_in *)&addrs[i])->sin_port = ((struct sockaddr_in *)sa)->sin_port;
 		if ((fam != AF_INET) && (fam != AF_INET6)) {
 			errno = EINVAL;
 			return(-1);
 		}
-		memcpy(gaddrs->addr, &addrs[i], sz);
+		memcpy(gaddrs->addr, sa, sz);
 		if (setsockopt(fd, IPPROTO_SCTP, flags, 
 			       gaddrs, (unsigned int)argsz) != 0) {
 			free(gaddrs);
 			return(-1);
 		}
 		memset(gaddrs->addr, 0, argsz);
+		sa = (struct sockaddr *)((caddr_t)sa + sz);
 	}
 	free(gaddrs);
 	return(0);
@@ -146,11 +133,11 @@ sctp_opt_info(int fd, sctp_assoc_t id, int opt, void *arg, size_t *size)
 }
 
 int
-sctp_getpaddrs(int fd, sctp_assoc_t id, struct sockaddr_storage **raddrs)
+sctp_getpaddrs(int fd, sctp_assoc_t id, struct sockaddr **raddrs)
 {
 	struct sctp_getaddresses *addrs;
 	struct sockaddr *sa;
-	struct sockaddr_storage *re;
+	struct sockaddr *re;
 	sctp_assoc_t asoc;
 	caddr_t lim;
 	unsigned int siz;
@@ -181,7 +168,7 @@ sctp_getpaddrs(int fd, sctp_assoc_t id, struct sockaddr_storage **raddrs)
 		free(addrs);
 		return(-1);
 	}
-	re = (struct sockaddr_storage *)&addrs->addr[0];
+	re = (struct sockaddr *)&addrs->addr[0];
 	*raddrs = re;
 	cnt = 0;
 	sa = (struct sockaddr *)&addrs->addr[0];
@@ -195,7 +182,7 @@ sctp_getpaddrs(int fd, sctp_assoc_t id, struct sockaddr_storage **raddrs)
 	return(cnt);
 }
 
-void sctp_freepaddrs(struct sockaddr_storage *addrs)
+void sctp_freepaddrs(struct sockaddr *addrs)
 {
 	/* Take away the hidden association id */
 	void *fr_addr;
@@ -205,10 +192,10 @@ void sctp_freepaddrs(struct sockaddr_storage *addrs)
 }
 
 int
-sctp_getladdrs (int fd, sctp_assoc_t id, struct sockaddr_storage **raddrs)
+sctp_getladdrs (int fd, sctp_assoc_t id, struct sockaddr **raddrs)
 {
 	struct sctp_getaddresses *addrs;
-	struct sockaddr_storage *re;
+	struct sockaddr *re;
 	caddr_t lim;
 	struct sockaddr *sa;
 	int size_of_addresses;
@@ -244,7 +231,7 @@ sctp_getladdrs (int fd, sctp_assoc_t id, struct sockaddr_storage **raddrs)
 		free(addrs);
 		return(-1);
 	}
-	re = (struct sockaddr_storage *)&addrs->addr[0];
+	re = (struct sockaddr *)&addrs->addr[0];
 	*raddrs = re;
 	cnt = 0;
 	sa = (struct sockaddr *)&addrs->addr[0];
@@ -258,7 +245,7 @@ sctp_getladdrs (int fd, sctp_assoc_t id, struct sockaddr_storage **raddrs)
 	return(cnt);
 }
 
-void sctp_freeladdrs(struct sockaddr_storage *addrs)
+void sctp_freeladdrs(struct sockaddr *addrs)
 {
 	/* Take away the hidden association id */
 	void *fr_addr;
@@ -305,7 +292,11 @@ sctp_sendmsg(int s,
 
 	cmsg->cmsg_level = IPPROTO_SCTP;
 	cmsg->cmsg_type = SCTP_SNDRCV;
-	cmsg->cmsg_len = CMSG_LEN(sizeof(struct sctp_sndrcvinfo));
+#ifdef __FreeBSD__
+	cmsg->cmsg_len = _ALIGN(sizeof(struct cmsghdr)) + sizeof(struct sctp_sndrcvinfo);
+#else
+	cmsg->cmsg_len = __CMSG_ALIGN(sizeof(struct cmsghdr)) + sizeof(struct sctp_sndrcvinfo);
+#endif
 	s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
 
 
@@ -355,14 +346,14 @@ sctp_recvmsg (int s,
 	s_info = NULL;
 	*msg_flags = msg.msg_flags;
 	*fromlen = msg.msg_namelen;
-	if ((msg.msg_controllen) && sinfo){
+	if ((msg.msg_controllen) && sinfo) {
 		/* parse through and see if we find
 		 * the sctp_sndrcvinfo (if the user wants it).
 		 */
 		cmsg = (struct cmsghdr *)controlVector;
-		while(cmsg){
-			if (cmsg->cmsg_level == IPPROTO_SCTP){
-				if (cmsg->cmsg_type == SCTP_SNDRCV){
+		while(cmsg) {
+			if (cmsg->cmsg_level == IPPROTO_SCTP) {
+				if (cmsg->cmsg_type == SCTP_SNDRCV) {
 					/* Got it */
 					s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
 					/* Copy it to the user */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.15 2003/06/24 05:36:50 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.16 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -120,7 +120,6 @@
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
 #endif /* SCTP_DEBUG */
-
 
 void
 sctp_audit_retranmission_queue(struct sctp_association *asoc)
@@ -410,7 +409,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 			if (chk->data) {
 				sctp_release_pr_sctp_chunk(tcb, chk, 0xffff,
 				    &tcb->asoc.sent_queue);
-				if (chk->flags && SCTP_PR_SCTP_BUFFER) {
+				if (chk->flags & SCTP_PR_SCTP_BUFFER) {
 					tcb->asoc.sent_queue_cnt_removeable--;
 				}
 			}
@@ -455,7 +454,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 				continue;
 			}
 			if ((chk->sent != SCTP_DATAGRAM_RESEND) && 
-			    (chk->sent != SCTP_FORWARD_TSN_SKIP)){
+			    (chk->sent != SCTP_FORWARD_TSN_SKIP)) {
  				tcb->asoc.sent_queue_retran_cnt++;
  				num_mk++;
 				if (fir == 0) {
@@ -505,12 +504,15 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 
 #ifdef SCTP_DEBUG
 	if (num_mk) {
-
 		printf("LAST TSN marked was %x\n", tsnlast);
-	}
-	if (tcb->asoc.peers_rwnd)
 		printf("Num marked for retransmission was %d peer-rwd:%ld\n",
 		    num_mk, (u_long)tcb->asoc.peers_rwnd);
+		printf("LAST TSN marked was %x\n",tsnlast);
+		printf("Num marked for retransmission was %d peer-rwd:%d\n",
+		       num_mk,
+		       (int)tcb->asoc.peers_rwnd
+			);
+	}
 #endif
 	*num_marked = num_mk;
 	if (tcb->asoc.sent_queue_retran_cnt != cnt_mk) {
@@ -1028,7 +1030,7 @@ sctp_heartbeat_timer(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 	}
 	TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
 		if ((net->dest_state & SCTP_ADDR_UNCONFIRMED) &&
-		    (net->dest_state & SCTP_ADDR_REACHABLE)){
+		    (net->dest_state & SCTP_ADDR_REACHABLE)) {
 			cnt_of_unconf++;
 		}
 	}
@@ -1184,8 +1186,6 @@ void sctp_autoclose_timer(struct sctp_inpcb *ep,
 					    tcb->sctp_ep, tcb,
 					    asoc->primary_destination);
 				}
-			} else {
-				asoc->state |= SCTP_STATE_SHUTDOWN_PENDING;
 			}
 		} else {
 			/*

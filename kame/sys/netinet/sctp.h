@@ -1,4 +1,4 @@
-/*    $KAME: sctp.h,v 1.12 2003/06/24 05:36:49 itojun Exp $    */
+/*    $KAME: sctp.h,v 1.13 2003/08/29 06:37:38 itojun Exp $    */
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 
@@ -219,6 +219,8 @@ struct sctp_error_unrecognized_chunk {
 #define HAVE_SCTP_ADDIP			1
 #define HAVE_SCTP_CANSET_PRIMARY	1
 #define HAVE_SCTP_SAT_NETWORK_CAPABILITY1
+#define HAVE_SCTP_MULTIBUF              1
+#define HAVE_SCTP_NOCONNECT             0
 
 #include <netinet/sctp_uio.h>
 

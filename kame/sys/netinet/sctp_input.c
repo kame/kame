@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.13 2003/06/24 05:36:49 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.14 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -535,6 +535,7 @@ static void
 sctp_handle_abort(struct sctp_abort_chunk *cp, struct sctp_tcb *stcb,
 		  struct sctp_nets *netp)
 {
+	struct sctp_inpcb *ep;
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INPUT2) {
 		printf("sctp_handle_abort: handling ABORT\n");
@@ -550,12 +551,13 @@ sctp_handle_abort(struct sctp_abort_chunk *cp, struct sctp_tcb *stcb,
 	/* notify user of the abort and clean up... */
 	sctp_abort_notification(stcb, 0);
 	/* free the tcb */
+	ep = stcb->sctp_ep;
 	sctp_free_assoc(stcb->sctp_ep, stcb);
-	if (stcb && (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
+	if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 		/* Yes, so can we purge ourself now */
-		if (LIST_FIRST(&stcb->sctp_ep->sctp_asoc_list) == NULL) {
+		if (LIST_FIRST(&ep->sctp_asoc_list) == NULL) {
 			/* finish the job now */
-			sctp_inpcb_free(stcb->sctp_ep, 1);
+			sctp_inpcb_free(ep, 1);
 		}
 	}
 
@@ -655,6 +657,7 @@ sctp_handle_shutdown_ack(struct sctp_shutdown_ack_chunk *cp,
 			 struct sctp_tcb *stcb, struct sctp_nets *netp)
 {
 	struct sctp_association *assoc;
+	struct sctp_inpcb *ep;
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INPUT2) {
 		printf("sctp_handle_shutdown_ack: handling SHUTDOWN ACK\n");
@@ -690,14 +693,15 @@ sctp_handle_shutdown_ack(struct sctp_shutdown_ack_chunk *cp,
 		  soisdisconnected(stcb->sctp_ep->sctp_socket);
 		}
 #endif
-	/* free the TCB */
+	/* free the TCB but first save off the ep */
+ 	ep = stcb->sctp_ep;
 	sctp_free_assoc(stcb->sctp_ep, stcb);
 	/* is the socket gone ? */
-	if (stcb && (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
+	if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 		/* Yes, so can we purge ourself now */
-		if (LIST_FIRST(&stcb->sctp_ep->sctp_asoc_list) == NULL) {
+		if (LIST_FIRST(&ep->sctp_asoc_list) == NULL) {
 			/* finish the job now */
-			sctp_inpcb_free(stcb->sctp_ep, 1);
+			sctp_inpcb_free(ep, 1);
 		}
 	}
 }
@@ -2653,10 +2657,15 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd, s
 			incr = on_queue - bottle_bw;
 			/* its a decrement */
 			netp->cwnd -= incr;
-
 			/* we will NOT add more */
-			if (netp->cwnd > netp->flight_size)
+			if (netp->cwnd > netp->flight_size) {
+				/* the cwnd needs to shrink or we will add more */
 				netp->cwnd = netp->flight_size;
+			}
+			if (netp->cwnd <= netp->mtu) {
+				/* You always get at least a MTU no matter what */
+				netp->cwnd = netp->mtu;
+			}
 		} else {
 			/* Take 1/4 of the space left, only
 			 * twice in any two RTTs.

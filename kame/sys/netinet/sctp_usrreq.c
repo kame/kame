@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.29 2003/06/24 05:36:50 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.30 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -1437,6 +1437,7 @@ sctp_optsget(struct socket *so,
 		if (error == 0) {
 			/* return the option value */
 			*mtod(m, int *) = optval;
+			m->m_len = sizeof(optval);
 		}
 		break;
 	case SCTP_GET_SNDBUF_USE:
@@ -1459,6 +1460,7 @@ sctp_optsget(struct socket *so,
 								    asoc->size_on_reasm_queue +
 								    asoc->size_on_all_streams);
 				error = 0;
+				m->m_len = sizeof(struct sctp_sockstat);
 			}
 		}
 		break;
@@ -1467,6 +1469,7 @@ sctp_optsget(struct socket *so,
 		u_int8_t *burst;
 		burst = mtod(m, u_int8_t *);
 		*burst = inp->sctp_ep.max_burst;
+		m->m_len = sizeof(u_int8_t);
 	}
 	break;
 	case SCTP_MAXSEG:
@@ -1474,6 +1477,7 @@ sctp_optsget(struct socket *so,
 		u_int32_t *segsize;
 		segsize = mtod(m, u_int32_t *);
 		*segsize = inp->sctp_frag_point - SCTP_MAX_OVERHEAD;
+		m->m_len = sizeof(u_int32_t);
 	}
 	break;
 
@@ -1488,6 +1492,7 @@ sctp_optsget(struct socket *so,
 		level = mtod(m, u_int32_t *);
 		error = 0;
 		*level = sctp_debug_on;
+		m->m_len = sizeof(u_int32_t);
 		printf("Returning DEBUG LEVEL %x is set\n",
 		       (u_int)sctp_debug_on);
 	}
@@ -1511,6 +1516,7 @@ sctp_optsget(struct socket *so,
 		}
 		pt = mtod(m, u_int32_t *);
 		memcpy(pt, sctp_pegs, sizeof(sctp_pegs));
+		m->m_len = sizeof(sctp_pegs);
 	}
 	break;
 	case SCTP_EVENTS:
@@ -1558,6 +1564,7 @@ sctp_optsget(struct socket *so,
 
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_ADAPTIONEVNT)
 			events->sctp_adaption_layer_event = 1;
+		m->m_len = sizeof(struct sctp_event_subscribe);
 
 	}
 	break;
@@ -1573,6 +1580,7 @@ sctp_optsget(struct socket *so,
 		}
 #endif /* SCTP_DEBUG */
 		*mtod(m, int *) = inp->sctp_ep.adaption_layer_indicator;
+		m->m_len = sizeof(int);
 		break;
 	case SCTP_SET_INITIAL_DBG_SEQ:
 		if (m->m_len < sizeof(int)) {
@@ -1585,6 +1593,7 @@ sctp_optsget(struct socket *so,
 		}
 #endif /* SCTP_DEBUG */
 		*mtod(m, int *) = inp->sctp_ep.initial_sequence_debug;
+		m->m_len = sizeof(int);
 		break;
 	case SCTP_GET_LOCAL_ADDR_SIZE:
 		if (m->m_len < sizeof(int)) {
@@ -1597,6 +1606,7 @@ sctp_optsget(struct socket *so,
 		}
 #endif /* SCTP_DEBUG */
 		*mtod(m, int *) = sctp_count_max_addresses(inp);
+		m->m_len = sizeof(int);
 		break;
 	case SCTP_GET_REMOTE_ADDR_SIZE:
 	{
@@ -1638,12 +1648,13 @@ sctp_optsget(struct socket *so,
 			}
 		}
 		*val = sz;
+		m->m_len = sizeof(u_int32_t);
 	}
 	break;
 	case SCTP_GET_PEER_ADDRESSES:
 		/*
-		 * Get the address information, an array of sockaddr_storage
-		 * is passed in to fill up.
+		 * Get the address information, an array
+		 * is passed in to fill up we pack it.
 		 */
 	{
 		int cpsz, left;
@@ -1850,6 +1861,7 @@ sctp_optsget(struct socket *so,
 			paddrp->spp_hbinterval = inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_HEARTBEAT];
 			paddrp->spp_assoc_id = (sctp_assoc_t)0;
 		}
+		m->m_len = sizeof(struct sctp_paddrparams);
 	}
 	break;
 	case SCTP_GET_PEER_ADDR_INFO:
@@ -1890,6 +1902,7 @@ sctp_optsget(struct socket *so,
 			break;
 		}
 		
+		m->m_len = sizeof(struct sctp_paddrinfo);
 		paddri->spinfo_state = netp->dest_state & SCTP_REACHABLE_MASK;
 		paddri->spinfo_cwnd = netp->cwnd;
 		paddri->spinfo_srtt = ((netp->lastsa >> 2) + netp->lastsv) >> 1;
@@ -1911,6 +1924,7 @@ sctp_optsget(struct socket *so,
 		}
 		spcb = mtod(m, struct sctp_pcbinfo *);
 		sctp_fill_pcbinfo(spcb);
+		m->m_len = sizeof(struct sctp_pcbinfo);
 	}
 	break;
 	case SCTP_STATUS:
@@ -1983,6 +1997,7 @@ sctp_optsget(struct socket *so,
 		sstat->sstat_primary.spinfo_rto = net->RTO;
 		sstat->sstat_primary.spinfo_mtu = net->mtu;
 		sstat->sstat_primary.spinfo_assoc_id = (sctp_assoc_t)tcb;
+		m->m_len = sizeof(*sstat);
 	}
 	break;
 	case SCTP_RTOINFO:
@@ -2018,6 +2033,7 @@ sctp_optsget(struct socket *so,
 		srto->srto_initial = tcb->asoc.initial_rto;
 		srto->srto_max = inp->sctp_ep.sctp_maxrto;
 		srto->srto_min = inp->sctp_ep.sctp_minrto;
+		m->m_len = sizeof(*srto);
 	}
 	break;
 	case SCTP_ASSOCINFO:
@@ -2061,6 +2077,7 @@ sctp_optsget(struct socket *so,
 			sasoc->sasoc_local_rwnd = sbspace(&inp->sctp_socket->so_rcv);
 			sasoc->sasoc_cookie_life = inp->sctp_ep.def_cookie_life;
 		}
+		m->m_len = sizeof(*sasoc);
 	}
 	break;
 	case SCTP_DEFAULT_SEND_PARAM:
@@ -2084,6 +2101,7 @@ sctp_optsget(struct socket *so,
 		}
 		/* Copy it out */
 		*s_info = tcb->asoc.def_send;
+		m->m_len = sizeof(*s_info);
 	}
 	case SCTP_INITMSG:
 	{
@@ -2102,6 +2120,7 @@ sctp_optsget(struct socket *so,
 		sinit->sinit_max_instreams = inp->sctp_ep.max_open_streams_intome;
 		sinit->sinit_max_attempts = inp->sctp_ep.max_init_times;
 		sinit->sinit_max_init_timeo = inp->sctp_ep.initial_init_rto_max;
+		m->m_len = sizeof(*sinit);
 	}
 	break;
 	case SCTP_PRIMARY_ADDR:
@@ -2146,10 +2165,12 @@ sctp_optsget(struct socket *so,
 		       &tcb->asoc.primary_destination->ra._l_addr,
 		       ((struct sockaddr *)&tcb->asoc.primary_destination->ra._l_addr)->sa_len);
 
+		m->m_len = sizeof(*ssp);
 	}
 	break;
 	default:
 		error = ENOPROTOOPT;
+		m->m_len = 0;
 		break;
 	} /* end switch(sopt->sopt_name) */
 	return (error);

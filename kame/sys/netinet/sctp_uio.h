@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.7 2003/06/24 05:36:50 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.8 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -327,12 +327,12 @@ struct sctp_cwnd_log_req{
 
 __BEGIN_DECLS
 int	sctp_peeloff	__P((int, sctp_assoc_t *));
-int	sctp_bindx	__P((int, struct sockaddr_storage *, int, int));
-int     sctp_connectx   __P((int, struct sockaddr_storage *, int));
-int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
-void	sctp_freepaddrs	__P((struct sockaddr_storage *));
-int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
-void	sctp_freeladdrs	__P((struct sockaddr_storage *));
+int	sctp_bindx	__P((int, struct sockaddr *, int, int));
+int     sctp_connectx   __P((int, struct sockaddr *, int));
+int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr **));
+void	sctp_freepaddrs	__P((struct sockaddr *));
+int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr **));
+void	sctp_freeladdrs	__P((struct sockaddr *));
 int     sctp_opt_info   __P((int, sctp_assoc_t, int, void *, size_t *));
 int     sctp_sendmsg    __P((int, void *, size_t, struct sockaddr *,
 	socklen_t, uint32_t, uint32_t, uint16_t, uint32_t, uint32_t));

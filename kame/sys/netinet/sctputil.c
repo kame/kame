@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.18 2003/06/24 05:36:50 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.19 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -162,7 +162,7 @@ int
 sctp_fill_cwnd_log(struct mbuf *m)
 {
 	struct sctp_cwnd_log_req *req;
-	int size_limit, num, i, at;
+	int size_limit, num, i, at, cnt_out=0;
 
 	if (m == NULL)
 		return (EINVAL);
@@ -222,10 +222,12 @@ sctp_fill_cwnd_log(struct mbuf *m)
 	}
 	for (i = 0, at = req->start_at; i < req->num_ret; i++) {
 		req->log[i] = sctp_clog[at];
+		cnt_out++;
 		at++;
 		if (at >= SCTP_CWND_LOG_SIZE)
 			at = 0;
 	}
+	m->m_len = (cnt_out * sizeof(struct sctp_cwnd_log_req)) + sizeof(struct sctp_cwnd_log_req);
 	return (0);
 }
 
@@ -868,6 +870,7 @@ sctp_timeout_handler(void *t)
 		break;
 	case SCTP_TIMER_TYPE_AUTOCLOSE:
 		sctp_autoclose_timer(ep, tcb, net);
+		sctp_chunk_output(ep, tcb, 10);
 		did_output = 0;
 		break;
 	default:
@@ -883,7 +886,6 @@ sctp_timeout_handler(void *t)
 	sctp_audit_log(0xF1,(u_int8_t)tmr->type);
 	sctp_auditing(5, ep, tcb, net);
 #endif
-	splx(s);
 	if (did_output) {
 		/*
 		 * Now we need to clean up the control chunk chain if an
@@ -899,6 +901,7 @@ sctp_timeout_handler(void *t)
 		printf("Timer now complete (type %d)\n", typ);
 	}
 #endif /* SCTP_DEBUG */
+	splx(s);
 }
 
 int
@@ -3706,7 +3709,7 @@ sctp_release_pr_sctp_chunk(struct sctp_tcb *tcb, struct sctp_tmit_chunk *tp1,
 			tp1->data = NULL;
 			sctp_sowwakeup(tcb->sctp_ep, tcb->sctp_socket);
 		}
-		if (tp1->flags && SCTP_PR_SCTP_BUFFER) {
+		if (tp1->flags & SCTP_PR_SCTP_BUFFER) {
 			tcb->asoc.sent_queue_cnt_removeable--;
 		}
 		if (queue == &tcb->asoc.send_queue) {
@@ -3729,7 +3732,7 @@ sctp_release_pr_sctp_chunk(struct sctp_tcb *tcb, struct sctp_tmit_chunk *tp1,
 			notdone = 1;
 			tp1 = TAILQ_NEXT(tp1, sctp_next);
 		}
-	} while(tp1 && notdone);
+	} while (tp1 && notdone);
 	if ((foundeom == 0) && (queue == &tcb->asoc.sent_queue)) {
 		/* The multi-part message was scattered 
 		 * across the send and sent queue.

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.22 2003/06/24 05:36:50 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.23 2003/08/29 06:37:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1154,7 +1154,7 @@ sctp_inpcb_alloc(struct socket *so)
 	    M_WAITOK,
 #endif
 	    &inp->sctp_hashmark);
-	if(inp->sctp_tcbhash == NULL) {
+	if (inp->sctp_tcbhash == NULL) {
 		printf("Out of SCTP-INPCB->hashinit - no resources\n");
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_ep, inp);
@@ -1938,7 +1938,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 		cnt++;
 		sctp_free_assoc(ep, asoc);
 	}
-	while((sq = TAILQ_FIRST(&ep->sctp_queue_list)) != NULL){
+	while ((sq = TAILQ_FIRST(&ep->sctp_queue_list)) != NULL) {
 		TAILQ_REMOVE(&ep->sctp_queue_list, sq, next_sq);
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_sockq, sq);
@@ -2147,7 +2147,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 				tasoc->asoc.site_scope = 1;
 			}
 		} else {
-			if(from == 8) {
+			if (from == 8) {
 				/* From connectx */
 				if (sctp_is_address_on_local_host(newaddr)) {
 					tasoc->asoc.loopback_scope = 1;
@@ -2194,7 +2194,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 				tasoc->asoc.site_scope = 1;
 			}
 		} else {
-			if(from == 8) {
+			if (from == 8) {
 				/* From connectx */
 				if (sctp_is_address_on_local_host(newaddr)) {
 					tasoc->asoc.loopback_scope = 1;
@@ -2253,7 +2253,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		netp->dest_state = (SCTP_ADDR_REACHABLE |
 				    SCTP_ADDR_OUT_OF_SCOPE);
 	} else {
-		if(from == 8)
+		if (from == 8)
 			/* 8 is passed by connect_x */
 			netp->dest_state = SCTP_ADDR_REACHABLE;
 		else 
@@ -2270,16 +2270,16 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 
 	netp->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&netp->ra._l_addr,
 					   NULL, 0);
-	if((netp->ra.ro_rt) && 
-	   (netp->ra.ro_rt->rt_ifp)){
+	if ((netp->ra.ro_rt) && 
+	    (netp->ra.ro_rt->rt_ifp)) {
 		netp->mtu = netp->ra.ro_rt->rt_ifp->if_mtu;
-		if(from == 1) {
+		if (from == 1) {
 			tasoc->asoc.smallest_mtu = netp->mtu;
 		}
 	} else {
 		netp->mtu = tasoc->asoc.smallest_mtu;
 	}
-	if(tasoc->asoc.smallest_mtu > netp->mtu) {
+	if (tasoc->asoc.smallest_mtu > netp->mtu) {
 		tasoc->asoc.smallest_mtu = netp->mtu;
 	}
 	if (netp->addr_is_local) {
@@ -2370,14 +2370,14 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	 *  Caller has done a sctp_findassociation_ep_addr(ep, addr's);
 	 *  to make sure the address does not exist already.
 	 */
-	if(sctppcbinfo.ipi_count_asoc >= SCTP_MAX_NUM_OF_ASOC) {
+	if (sctppcbinfo.ipi_count_asoc >= SCTP_MAX_NUM_OF_ASOC) {
 		/* Hit max assoc, sorry no more */
 		*error = ENOBUFS;
 		return(NULL);
 	}
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
-	if(ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) {
+	if (ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) {
 		/* If its in the TCP pool, its NOT allowed
 		 * to create an association. The parent listener
 		 * needs to call sctp_alloc_assoc.. or the one1-2-many
@@ -2486,7 +2486,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 
 	bzero((caddr_t)tasoc, sizeof(*tasoc));
 	asoc = &tasoc->asoc;
-	if((imp_ret = sctp_init_asoc(ep, asoc, for_a_init))) {
+	if ((imp_ret = sctp_init_asoc(ep, asoc, for_a_init))) {
 		/* failed */
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
@@ -2513,9 +2513,9 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 
 	if ((imp_ret = sctp_add_remote_addr(tasoc, firstaddr, 1, 1))) {
 		/* failure.. memory error? */
-		if(asoc->strmout)
+		if (asoc->strmout)
 			free(asoc->strmout, M_PCB);
-		if(asoc->mapping_array)
+		if (asoc->mapping_array)
 			free(asoc->mapping_array, M_PCB);
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
@@ -2731,7 +2731,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 #endif
 	/* Null all of my entry's on the socket q */
 	TAILQ_FOREACH(sq, &ep->sctp_queue_list, next_sq) {
-		if(sq->tcb == tasoc) {
+		if (sq->tcb == tasoc) {
 			sq->tcb = NULL;
 		}
 	}
@@ -2739,7 +2739,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	if (ep->sctp_tcb_at_block == (void *)tasoc) {
 		ep->error_on_block = ECONNRESET;
 	}
-	if(ep->sctp_tcbhash){
+	if (ep->sctp_tcbhash) {
 		LIST_REMOVE(tasoc, sctp_tcbhash);
 	}
 	/* Now lets remove it from the list of ALL associations in the EP */
@@ -2936,7 +2936,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 			chk = TAILQ_FIRST(&asoc->delivery_queue);
 		}
 	}
-	if(asoc->mapping_array) {
+	if (asoc->mapping_array) {
 		free(asoc->mapping_array, M_PCB);
 		asoc->mapping_array = NULL;
 	}
@@ -3784,12 +3784,12 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 		/* no scope set here since we have a tcb already. */
 		if ((sa->sa_family == AF_INET) &&
 		    (stcb->asoc.ipv4_addr_legal)) {
-			if(sctp_add_remote_addr(stcb, sa, 0, 2)) {
+			if (sctp_add_remote_addr(stcb, sa, 0, 2)) {
 				return (-1);
 			}	
 		} else if ((sa->sa_family == AF_INET6) &&
 			   (stcb->asoc.ipv6_addr_legal)) {
-			if(sctp_add_remote_addr(stcb, sa, 0, 3)) {
+			if (sctp_add_remote_addr(stcb, sa, 0, 3)) {
 				return (-1);
 			}
 		}
@@ -3834,7 +3834,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 						(ep == NULL))) {
 				/* we must add the source address */
 				/* no scope set since we have a tcb already */
-				if(sctp_add_remote_addr(stcb, sa, 0, 4)) {
+				if (sctp_add_remote_addr(stcb, sa, 0, 4)) {
 					return(-1);
 				}
 			} else if (t_tcb == stcb) {
@@ -3865,7 +3865,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 			if ((t_tcb == NULL) && ((ep == stcb->sctp_ep) ||
 						(ep == NULL))) {
 				/* we must add the address, no scope set */
-				if(sctp_add_remote_addr(stcb, sa, 0, 5)) {
+				if (sctp_add_remote_addr(stcb, sa, 0, 5)) {
 					return(-1);
 				}
 			} else if (t_tcb == stcb) {
@@ -3899,15 +3899,15 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 										    at,
 										    (struct sctp_paramhdr *)&lstore,
 										    plen);
-			if(fee){
+			if (fee) {
 				int lptype;
 				struct sockaddr_in lsin;
 				struct sockaddr_in6 lsin6;
 				struct sockaddr *lsa = NULL;
 
 				lptype = ntohs(fee->addrp.ph.param_type);
-				if(lptype == SCTP_IPV4_ADDRESS) {
-					if(plen != sizeof(struct sctp_asconf_addrv4_param)) {
+				if (lptype == SCTP_IPV4_ADDRESS) {
+					if (plen != sizeof(struct sctp_asconf_addrv4_param)) {
 						printf("Sizeof setprim in init/init ack not %d but %d - ignored\n",
 						       sizeof(struct sctp_asconf_addrv4_param),
 						       plen);
@@ -3921,7 +3921,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 						lsin.sin_port = stcb->rport;
 					}
 				} else if (lptype == SCTP_IPV6_ADDRESS) {
-					if(plen != sizeof(struct sctp_asconf_addr_param)) {
+					if (plen != sizeof(struct sctp_asconf_addr_param)) {
 						printf("Sizeof setprim (v6) in init/init ack not %d but %d - ignored\n",
 						       sizeof(struct sctp_asconf_addr_param),
 						       plen);
@@ -3934,7 +3934,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 						lsin.sin_port = stcb->rport;
 					}
 				}
-				if(lsa) {
+				if (lsa) {
 					sctp_set_primary_addr(stcb, lsa);
 				}
 			}
@@ -4267,7 +4267,7 @@ sctp_add_to_socket_q(struct sctp_inpcb *inp, struct sctp_tcb *tcb)
 {
 	struct sctp_socket_q_list *sq;
 
-	if((inp == NULL) || (tcb == NULL)) {
+	if ((inp == NULL) || (tcb == NULL)) {
 		/* I am paranoid */
 		return(0);
 	}
@@ -4277,7 +4277,7 @@ sctp_add_to_socket_q(struct sctp_inpcb *inp, struct sctp_tcb *tcb)
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	sq = (struct sctp_socket_q_list *)pool_get(&sctppcbinfo.ipi_zone_sockq,PR_NOWAIT);
 #endif
-	if(sq == NULL) {
+	if (sq == NULL) {
 		/* out of sq structs */
 		return(0);
 	}
@@ -4297,7 +4297,7 @@ sctp_remove_from_socket_q(struct sctp_inpcb *inp)
 	struct sctp_socket_q_list *sq;
 
 	sq = TAILQ_FIRST(&inp->sctp_queue_list);
-	if(sq == NULL)
+	if (sq == NULL)
 		return(tcb);
 
 	tcb = sq->tcb;
