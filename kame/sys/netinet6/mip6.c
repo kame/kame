@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.166 2002/09/17 05:56:04 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.167 2002/09/18 08:06:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1668,8 +1668,15 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * we have a valid binding cache entry for the mobile node who
 	 * have sent the corresponding HoTI message.
 	 */
+	/*
+	 * 6.1.6 Care-of Test (CoT) Message
+	 * The CoT message is always sent with the Destnation Address set to
+	 * the care-of address of the mobile node; it is sent directly to the
+	 * mobile node.
+	 */
 	if ((opt != NULL) && (opt->ip6po_mobility != NULL)) {
-		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST)
+		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST ||
+		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST)
 			goto skip_rthdr2;
 	}
 
@@ -1748,6 +1755,9 @@ mip6_exthdr_create(m, opt, mip6opt)
 	if (opt && opt->ip6po_mobility != NULL) {
 		if (opt->ip6po_mobility->ip6m_type == IP6M_BINDING_UPDATE)
 			need_hao = 1;
+		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST_INIT ||
+		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST_INIT)
+			goto noneed;
 	}
 	else if (ip6->ip6_nxt == IPPROTO_NONE) {
 		/* create a binding update mobility header. */
