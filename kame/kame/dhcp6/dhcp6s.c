@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.130 2004/06/17 23:48:03 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.131 2004/07/29 16:55:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1377,8 +1377,11 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * Identifier option from the client message and no other options.
 	 * [RFC3315 18.2.1]
 	 * (Our current implementation never sends a unicast option.)
+	 * Note: a request message encapsulated in a relay server option can be
+	 * unicasted.
 	 */
-	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
+	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr) &&
+	    TAILQ_EMPTY(relayinfohead)) {
 		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
 
 		dprintf(LOG_INFO, FNAME, "unexpected unicast message from %s",
@@ -1565,7 +1568,8 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * [RFC3315 18.2.3]
 	 * (Our current implementation never sends a unicast option.)
 	 */
-	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
+	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr) &&
+	    TAILQ_EMPTY(relayinfohead)) {
 		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
 
 		dprintf(LOG_INFO, FNAME, "unexpected unicast message from %s",
@@ -1788,7 +1792,8 @@ react_release(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * [RFC3315 18.2.6]
 	 * (Our current implementation never sends a unicast option.)
 	 */
-	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
+	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr) &&
+	    TAILQ_EMPTY(relayinfohead)) {
 		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
 
 		dprintf(LOG_INFO, FNAME, "unexpected unicast message from %s",
