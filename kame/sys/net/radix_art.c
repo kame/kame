@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.13 2002/07/04 01:57:01 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.14 2002/10/10 06:19:58 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -464,7 +464,7 @@ art_changeleaf(t, v, o, n)
 
 #ifdef DIAGNOSTIC
 	if (!art_leaf(t, v))
-		panic("nonleaf passed to art_changeleaf\n");
+		panic("nonleaf passed to art_changeleaf");
 #endif
 	switch (art_type(t, v)) {
 	case ART_TABLE:

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.325 2002/09/25 11:41:23 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.326 2002/10/10 06:19:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3173,7 +3173,7 @@ icmp6_redirect_output(m0, rt)
 		 * and truncates if not.
 		 */
 		if (m0->m_next || m0->m_pkthdr.len != m0->m_len)
-			panic("assumption failed in %s:%d\n", __FILE__,
+			panic("assumption failed in %s:%d", __FILE__,
 			      __LINE__);
 
 		if (len - sizeof(*nd_opt_rh) < m0->m_pkthdr.len) {

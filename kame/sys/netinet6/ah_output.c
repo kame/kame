@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.35 2002/09/11 03:45:31 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.36 2002/10/10 06:19:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,7 +98,7 @@ ah_hdrsiz(isr)
 
 	/* sanity check */
 	if (isr == NULL)
-		panic("ah_hdrsiz: NULL was passed.\n");
+		panic("ah_hdrsiz: NULL was passed.");
 
 	if (isr->saidx.proto != IPPROTO_AH)
 		panic("unsupported mode passed to ah_hdrsiz");

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.82 2002/10/01 07:04:42 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.83 2002/10/10 06:19:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2084,7 +2084,7 @@ m_copy_withpktaddrs(m, off, len)
 	struct sockaddr_in6 *src, *dst;
 
 	if (!(m->m_flags & M_PKTHDR) || !(aux = m->m_pkthdr.aux))
-		panic("ip6_mloopback: null mbuf aux\n");
+		panic("ip6_mloopback: null mbuf aux");
 
 	if (ip6_getpktaddrs(m, &src, &dst))
 		return (NULL);	/* XXX: impossible! */

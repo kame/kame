@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.12 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.13 2002/10/10 06:19:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,7 +122,7 @@ in6_cksum(m, nxt, off, len)
 
 	/* sanity check */
 	if (m->m_pkthdr.len < off + len) {
-		panic("in6_cksum: mbuf len (%d) < off+len (%d+%d)\n",
+		panic("in6_cksum: mbuf len (%d) < off+len (%d+%d)",
 			m->m_pkthdr.len, off, len);
 	}
 
@@ -307,7 +307,7 @@ in6_cksum(m, nxt, off, len)
 			s_util.c[0] = *(char *)w;
 	}
 	if (len)
-		panic("in6_cksum: out of data\n");
+		panic("in6_cksum: out of data");
 	if (mlen == -1) {
 		/* The last mbuf has odd # of bytes. Follow the
 		   standard (the odd byte may be shifted left by 8 bits

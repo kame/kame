@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.46 2002/08/09 08:49:03 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.47 2002/10/10 06:19:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,7 +99,7 @@ esp_hdrsiz(isr)
 
 	/* sanity check */
 	if (isr == NULL)
-		panic("esp_hdrsiz: NULL was passed.\n");
+		panic("esp_hdrsiz: NULL was passed.");
 
 	sav = isr->sav;
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.341 2002/10/10 05:36:22 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.342 2002/10/10 06:19:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4841,7 +4841,7 @@ ip6_mloopback(ifp, m, dst)
 	struct ip6_hdr *ip6;
 
 	if (!(m->m_flags & M_PKTHDR) || !(aux = m->m_pkthdr.aux))
-		panic("ip6_mloopback: null mbuf aux\n");
+		panic("ip6_mloopback: null mbuf aux");
 
 	/*
 	 * Copy the packet.  The process of mbuf aux is sensitive; since
