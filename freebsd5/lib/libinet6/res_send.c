@@ -352,11 +352,12 @@ res_queriesmatch(buf1, eom1, buf2, eom2)
 }
 
 int
-res_send(buf, buflen, ans, anssiz)
+res_send_timeout(buf, buflen, ans, anssiz, timo_limit)
 	const u_char *buf;
 	int buflen;
 	u_char *ans;
 	int anssiz;
+	struct timeval *timo_limit;
 {
 	HEADER *hp = (HEADER *) buf;
 	HEADER *anhp = (HEADER *) ans;
@@ -721,9 +722,35 @@ read_len:
 			if ((long) timeout.tv_sec <= 0)
 				timeout.tv_sec = 1;
 			timeout.tv_usec = 0;
+#if original
 			TIMEVAL_TO_TIMESPEC(&timeout, &ts);
 			(void) gettimeofday(&ctv, NULL);
 			timeradd(&timeout, &ctv, &timeout);
+#endif
+			gettimeofday(&ctv, NULL);
+			if (timo_limit != NULL) {
+				struct timeval diff_to_limit;
+
+				if (timercmp(timo_limit, &ctv, <)) {
+					/*
+					 * We have reached the limit of
+					 * timeouts.  Give up immediately.
+					 */
+					Dprint(_res.options & RES_DEBUG,
+					    (stdout, ";; timeouts limit\n"));
+					res_close();
+					_close(kq);
+					errno = ETIMEDOUT;
+					return (-1);
+				}
+
+				timersub(timo_limit, &ctv, &diff_to_limit);
+				if (timercmp(&diff_to_limit, &timeout, <))
+					timeout = diff_to_limit;
+			}
+			TIMEVAL_TO_TIMESPEC(&timeout, &ts);
+			timeradd(&ctv, &timeout, &timeout);
+
     wait:
 			if (s < 0) {
 				Perror(stderr, "s out-of-bounds", EMFILE);
@@ -911,6 +938,16 @@ read_len:
 	} else
 		errno = terrno;
 	return (-1);
+}
+
+int
+res_send(buf, buflen, ans, anssiz)
+	const u_char *buf;
+	int buflen;
+	u_char *ans;
+	int anssiz;
+{
+	res_send_timeout(buf, buflen, ans, anssiz, NULL);
 }
 
 /*
