@@ -1,4 +1,4 @@
-interface=ne2
+interface=`ifconfig -l | awk '{print $1}'`
 
 echo '==> valid IPv4 address'
 ./v6regex 127.0.0.1
