@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.25 2000/07/12 12:58:02 jinmei Exp $	*/
+/*	$KAME: frag6.c,v 1.26 2000/11/10 13:01:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -636,7 +636,7 @@ frag6_remque(p6)
 }
 
 /*
- * IP timer processing;
+ * IPv6 reassembling timer processing;
  * if a timer expires on a reassembly
  * queue, discard it.
  */
