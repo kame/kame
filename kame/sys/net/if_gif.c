@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.58 2001/07/25 00:55:46 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.59 2001/07/25 02:38:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,21 +167,6 @@ gifattach(dummy)
 #endif
 
 		sc->encap_cookie4 = sc->encap_cookie6 = NULL;
-#ifdef INET
-		if (in_gif_attach(sc) != 0) {
-			printf("%s: inet attach failed\n",
-			    if_name(&sc->gif_if));
-			continue;
-		}
-#endif
-#ifdef INET6
-		if (in6_gif_attach(sc) != 0) {
-			in_gif_detach(sc);
-			printf("%s: inet6 attach failed\n",
-			    if_name(&sc->gif_if));
-			continue;
-		}
-#endif
 
 		sc->gif_if.if_mtu    = GIF_MTU;
 		sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
@@ -526,6 +511,7 @@ gif_ioctl(ifp, cmd, data)
 	struct ifreq     *ifr = (struct ifreq*)data;
 	int error = 0, size;
 	struct sockaddr *dst, *src;
+	struct sockaddr *odst, *osrc;
 	struct sockaddr *sa;
 	int i;
 	int s;
@@ -707,17 +693,56 @@ gif_ioctl(ifp, cmd, data)
 #endif
 		}
 
+		/* XXX we can detach from both, but be polite just in case */
 		if (sc->gif_psrc)
-			free((caddr_t)sc->gif_psrc, M_IFADDR);
+			switch (sc->gif_psrc->sa_family) {
+#ifdef INET
+			case AF_INET:
+				(void)in_gif_detach(sc);
+				break;
+#endif
+#ifdef INET6
+			case AF_INET6:
+				(void)in6_gif_detach(sc);
+				break;
+#endif
+			}
+
+		osrc = sc->gif_psrc;
 		sa = (struct sockaddr *)malloc(src->sa_len, M_IFADDR, M_WAITOK);
 		bcopy((caddr_t)src, (caddr_t)sa, src->sa_len);
 		sc->gif_psrc = sa;
 
-		if (sc->gif_pdst)
-			free((caddr_t)sc->gif_pdst, M_IFADDR);
+		odst = sc->gif_pdst;
 		sa = (struct sockaddr *)malloc(dst->sa_len, M_IFADDR, M_WAITOK);
 		bcopy((caddr_t)dst, (caddr_t)sa, dst->sa_len);
 		sc->gif_pdst = sa;
+
+		switch (sc->gif_psrc->sa_family) {
+#ifdef INET
+		case AF_INET:
+			error = in_gif_attach(sc);
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			error = in6_gif_attach(sc);
+			break;
+#endif
+		}
+		if (error) {
+			/* rollback */
+			free((caddr_t)sc->gif_psrc, M_IFADDR);
+			free((caddr_t)sc->gif_pdst, M_IFADDR);
+			sc->gif_psrc = osrc;
+			sc->gif_pdst = odst;
+			break;
+		}
+
+		if (osrc)
+			free((caddr_t)osrc, M_IFADDR);
+		if (odst)
+			free((caddr_t)odst, M_IFADDR);
 
 #ifdef __NetBSD__
 		s = splsoftnet();
@@ -741,6 +766,13 @@ gif_ioctl(ifp, cmd, data)
 			free((caddr_t)sc->gif_pdst, M_IFADDR);
 			sc->gif_pdst = NULL;
 		}
+		/* it is safe to detach from both */
+#ifdef INET
+		(void)in_gif_detach(sc);
+#endif
+#ifdef INET6
+		(void)in6_gif_detach(sc);
+#endif
 		/* change the IFF_{UP, RUNNING} flag as well? */
 		break;
 #endif
