@@ -179,6 +179,10 @@ __KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.79.4.1 2002/06/14 17:32:59 lukem Ex
 #include <netinet6/nd6.h>
 #endif
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif
+
 #include <netinet/tcp.h>
 #define	TCPOUTFLAGS
 #include <netinet/tcp_fsm.h>

@@ -68,9 +68,6 @@
 #define _NETINET_IN_PCB_H_
 
 #include <sys/queue.h>
-#if 1	/*IPSEC*/
-#include <netinet6/ipsec.h>
-#endif
 
 /*
  * Common structure pcb for internet protocol implementation.
@@ -79,6 +76,8 @@
  * up (to a socket structure) and down (to a protocol-specific)
  * control block.
  */
+struct inpcbpolicy;
+
 struct inpcb {
 	LIST_ENTRY(inpcb) inp_hash;
 	CIRCLEQ_ENTRY(inpcb) inp_queue;
@@ -95,7 +94,7 @@ struct inpcb {
 	int	  inp_errormtu;		/* MTU of last xmit status = EMSGSIZE */
 	struct	  inpcbtable *inp_table;
 #if 1 /*IPSEC*/
-	struct inpcbpolicy *inp_sp;     /* security policy. */
+	struct inpcbpolicy *inp_sp;	/* security policy. */
 #endif
 };
 #define	inp_faddr	inp_ip.ip_dst

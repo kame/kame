@@ -124,6 +124,7 @@ __KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp
  */
 
 #ifdef IPSEC
+#include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
