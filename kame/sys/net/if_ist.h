@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.h,v 1.1 2004/11/30 18:05:40 suz Exp $	*/
+/*	$KAME: if_ist.h,v 1.2 2004/12/10 01:01:12 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -47,6 +47,8 @@ struct ist_softc {
 #define sc_ro	__sc_ro46.__sc_ro4
 	const struct encaptab *encap_cookie;
 	LIST_ENTRY(ist_softc) sc_list; /* all ist's are linked */
+
+	time_t rtcache_expire;	/* expiration time of the cached route */
 };
  	 
 struct isatap_rtr {	

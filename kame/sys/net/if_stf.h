@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.h,v 1.9 2004/06/02 06:03:50 itojun Exp $	*/
+/*	$KAME: if_stf.h,v 1.10 2004/12/10 01:01:12 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -47,6 +47,8 @@ struct stf_softc {
 #define sc_ro	__sc_ro46.__sc_ro4
 	const struct encaptab *encap_cookie;
 	LIST_ENTRY(stf_softc) sc_list; /* all stf's are linked */
+
+	time_t rtcache_expire;	/* expiration time of the cached route */
 };
 #endif
 
