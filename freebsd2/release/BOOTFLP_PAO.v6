@@ -12,6 +12,14 @@ cpu		"I686_CPU"
 ident		BOOTFLP_PAO
 maxusers	10
 
+# INET6 and IPSEC are orthogonal.  Therefore:
+#                               IPv4    IPv6    IPsec4  IPsec6
+#                               ---     ---     ---     ---
+#       no INET6 nor IPSEC:     yes     no      no      no
+#       INET6 and no IPSEC:     yes     yes     no      no
+#       IPSEC and no INET6:     yes     no      yes     no
+#       INET6 and IPSEC:        yes     yes     yes     yes
+
 ## The following options are not really tested with INET6.
 ## please send success/failure reports to KAME bug database.
 ##	IPDIVERT MROUTING BRIDGE DUMMYNET
@@ -27,10 +35,6 @@ options         IPSEC_ESP               #IP security (crypto; define w/ IPSEC)
 
 # special kernel for TAHI test team - not for general users
 ###options		TAHI
-
-# for code sharing - mandatory
-options         _KERNEL
-options         "TCP6"
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
