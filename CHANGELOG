@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1084 2000/07/03 03:37:53 itojun Exp $
+$Id: CHANGELOG,v 1.1085 2000/07/03 12:19:31 jinmei Exp $
 
 <200006>
+2000-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/bgp.c (connect_try): made sure to zero-clear a
+	newly allocated buffer.
+	Report from: Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
 Mon Jul  3 11:50:12 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet/icmp6.h: avoid bitfields in router renumbering packet
 	  declaration.  XXX standards?
