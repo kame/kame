@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.7 2001/10/19 08:00:58 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.8 2001/10/19 08:01:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -632,13 +632,12 @@ ni6_input(from, fromlen, buf, l)
 		 * maybe we should obsolete older versions.
 		 */
 		qtype = NI_QTYPE_FQDN;
-		/* XXX will append an mbuf */
 		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
 		oldfqdn++;
 		break;
 	}
 
-	/* copy mbuf header and IPv6 + Node Information base headers */
+	/* copy IPv6 + Node Information base headers */
 	nni6 = (struct icmp6_nodeinfo *)replybuf;
 	memcpy(nni6, ni6, sizeof(*nni6));
 
@@ -697,7 +696,7 @@ ni6_input(from, fromlen, buf, l)
 }
 
 /*
- * make a mbuf with DNS-encoded string.  no compression support.
+ * make a DNS-encoded string.  no compression support.
  *
  * XXX names with less than 2 dots (like "foo" or "foo.section") will be
  * treated as truncated name (two \0 at the end).  this is a wild guess.
@@ -751,7 +750,7 @@ ni6_nametodns(name, cp0, buf, buflen, old)
 			i = 0;
 			for (q = p; q < name + namelen && *q && *q != '.'; q++)
 				i++;
-			/* result does not fit into mbuf */
+			/* result does not fit into buf */
 			if (cp + i + 1 >= ep)
 				goto fail;
 			/*
