@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass.c,v 1.1 2000/01/18 07:29:14 kjc Exp $ */
+/* $Id: altq_rmclass.c,v 1.2 2000/01/29 10:10:33 kjc Exp $ */
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.
@@ -34,7 +34,7 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.1 2000/01/18 07:29:14 kjc Exp $
+ * $Id: altq_rmclass.c,v 1.2 2000/01/29 10:10:33 kjc Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"
@@ -913,6 +913,7 @@ rmc_under_limit(cl, now)
 
 		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
 		cl->sleeping_ = 0;
+		cl->undertime_.tv_sec = 0;
 		return (1);
 	}
 
@@ -1085,6 +1086,7 @@ _rmc_wrr_dequeue_next(ifd, mode)
 	if (cl->sleeping_)
 		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
 	cl->sleeping_ = 0;
+	cl->undertime_.tv_sec = 0;
 #endif
 	ifd->borrowed_[ifd->qi_] = cl->borrow_;
 	ifd->cutoff_ = cl->borrow_->depth_;
@@ -1203,6 +1205,7 @@ _rmc_prr_dequeue_next(ifd, mode)
 	if (cl->sleeping_)
 		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
 	cl->sleeping_ = 0;
+	cl->undertime_.tv_sec = 0;
 #endif
 	ifd->borrowed_[ifd->qi_] = cl->borrow_;
 	ifd->cutoff_ = cl->borrow_->depth_;
@@ -1606,6 +1609,7 @@ rmc_restart(cl)
 	s = splimp();
 	if (cl->sleeping_) {
 		cl->sleeping_ = 0;
+		cl->undertime_.tv_sec = 0;
 	
 		if (ifd->queued_ < ifd->maxqueued_) {
 			CBQTRACE(rmc_restart, 'trts', cl->stats_.handle);
