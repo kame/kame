@@ -1631,7 +1631,8 @@ ip_multicast_if(a, ifindexp)
 		*ifindexp = 0;
 	if (ntohl(a->s_addr) >> 24 == 0) {
 		ifindex = ntohl(a->s_addr) & 0xffffff;
-		if (ifindex < 0 || if_index < ifindex)
+		if (ifindex < 0 || if_indexlim <= ifindex ||
+		    !ifindex2ifnet[ifindex])
 			return NULL;
 		ifp = ifindex2ifnet[ifindex];
 		if (ifindexp)
