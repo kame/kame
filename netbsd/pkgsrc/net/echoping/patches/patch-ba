@@ -1,0 +1,11 @@
+--- Makefile-	Sun Jan 30 15:25:33 2000
++++ Makefile	Sun Jan 30 15:25:37 2000
+@@ -23,7 +23,7 @@
+ #LDFLAGS = -o echoping -lsocket -lnsl
+ 
+ # KAME IPv6 stack
+-#LDFLAGS+= -L/usr/local/v6/lib -linet6
++LDFLAGS+= -L/usr/local/v6/lib -linet6
+ 
+ INSTALL=install -c
+ INSTALL_BIN_FLAGS=-m 755

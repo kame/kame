@@ -1,0 +1,35 @@
+--- Makefile.orig	Mon Aug 31 23:57:28 1998
++++ Makefile	Sun Jan 30 15:29:04 2000
+@@ -1,5 +1,5 @@
+ # Choose your C compiler
+-CC = gcc 
++#CC = gcc 
+ #CC = cc 
+ 
+ # Possible options:
+@@ -12,9 +12,9 @@
+ OPTIONS =  -DHTTP -DUSE_SIGACTION
+ 
+ # Flags for gcc
+-CFLAGS = -c  -O3 $(OPTIONS) -Wall
++#CFLAGS = -c  -O3 $(OPTIONS) -Wall
+ # Flags for cc
+-#CFLAGS = -c -O $(OPTIONS)
++CFLAGS = -c -O $(OPTIONS)
+ 
+ # Flags for the linker
+ LD = $(CC) 
+@@ -22,11 +22,11 @@
+ # For Solaris
+ #LDFLAGS = -o echoping -lsocket -lnsl
+ 
+-INSTALL=install
++INSTALL=install -c
+ INSTALL_BIN_FLAGS=-m 755
+ INSTALL_MAN_FLAGS=-m 644
+ 
+-ROOT=/usr/local
++ROOT=${PREFIX}
+ DESTBIN=$(ROOT)/bin
+ DESTMAN=$(ROOT)/man/man1
+ 
