@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.8 2001/01/27 19:43:11 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.9 2001/01/29 17:37:52 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -69,8 +69,6 @@
 
 #include "gssapi.h"
 
-gss_cred_id_t gss_racoon_cred;
-
 static int gssapi_get_default_name(struct ph1handle *, int, gss_name_t *);
 
 static void
@@ -115,7 +113,7 @@ gssapi_init(struct ph1handle *iph1)
 	gps->gss_context = GSS_C_NO_CONTEXT;
 	gps->gss_cred = GSS_C_NO_CREDENTIAL;
 
-	iph1->gssapi_state = gps;
+	gssapi_set_state(iph1, gps);
 
 	if (iph1->rmconf->proposal->gssid != NULL) {
 		id_token.length = iph1->rmconf->proposal->gssid->l;
@@ -185,10 +183,10 @@ gssapi_get_itoken(struct ph1handle *iph1, int *lenp)
 	OM_uint32 maj_stat, min_stat;
 	gss_name_t partner;
 
-	if (iph1->gssapi_state == NULL && gssapi_init(iph1) < 0)
+	if (gssapi_get_state(iph1) == NULL && gssapi_init(iph1) < 0)
 		return -1;
 
-	gps = iph1->gssapi_state;
+	gps = gssapi_get_state(iph1);
 
 	empty.length = 0;
 	empty.value = NULL;
@@ -249,10 +247,10 @@ gssapi_get_rtoken(struct ph1handle *iph1, int *lenp)
 	OM_uint32 min_stat, maj_stat;
 	gss_name_t client_name;
 
-	if (iph1->gssapi_state == NULL && gssapi_init(iph1) < 0)
+	if (gssapi_get_state(iph1) == NULL && gssapi_init(iph1) < 0)
 		return -1;
 
-	gps = iph1->gssapi_state;
+	gps = gssapi_get_state(iph1);
 
 	rtoken = &gps->gss_p[gps->gsscnt_p - 1];
 	itoken = &gps->gss[gps->gsscnt];
@@ -323,7 +321,7 @@ gssapi_save_received_token(struct ph1handle *iph1, vchar_t *token)
 	gss_buffer_t gsstoken;
 	int ret;
 
-	if (iph1->gssapi_state == NULL && gssapi_init(iph1) < 0)
+	if (gssapi_get_state(iph1) == NULL && gssapi_init(iph1) < 0)
 		return -1;
 
 	gps = gssapi_get_state(iph1);
@@ -557,7 +555,7 @@ gssapi_free_state(struct ph1handle *iph1)
 	if (gps == NULL)
 		return;
 
-	iph1->gssapi_state = NULL;
+	gssapi_set_state(iph1, NULL);
 
 	if (gps->gss_cred != GSS_C_NO_CREDENTIAL)
 		gss_release_cred(&min_stat, &gps->gss_cred);

@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.h,v 1.2 2001/01/27 19:43:11 thorpej Exp $	*/
+/*	$KAME: gssapi.h,v 1.3 2001/01/29 17:37:52 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -63,11 +63,14 @@ struct gssapi_ph1_state {
 #define GSSFLAG_ID_RCVD		0x0001
 };
 
-extern gss_cred_id_t gss_racoon_cred;
+#define	gssapi_get_state(ph)						\
+	((struct gssapi_ph1_state *)((ph)->gssapi_state))
 
-#define gssapi_get_state(ph) ((struct gssapi_ph1_state *)((ph)->gssapi_state))
-#define gssapi_more_tokens(ph) \
-  ((gssapi_get_state(ph)->gss_status & GSS_S_CONTINUE_NEEDED) != 0)
+#define	gssapi_set_state(ph, st)					\
+	(ph)->gssapi_state = (st)
+
+#define	gssapi_more_tokens(ph)						\
+	((gssapi_get_state(ph)->gss_status & GSS_S_CONTINUE_NEEDED) != 0)
 
 int gssapi_get_itoken __P((struct ph1handle *, int *));
 int gssapi_get_rtoken __P((struct ph1handle *, int *));
