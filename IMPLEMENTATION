@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/10 04:51:31 $
+			$Date: 2000/02/11 05:03:20 $
 
 1. IPv6
 
@@ -85,6 +85,8 @@ RFC2711: IPv6 router alert option
 RFC2732: Format for Literal IPv6 Addresses in URL's
     * The spec is implemented in programs that handle URLs
       (like freebsd ftpio(3) and fetch(1), or netbsd ftp(1))
+RFC2766: Network Address Translation - Protocol Translation (NAT-PT)
+    * Section 4.2 is implemented by totd (see ports/totd, or pkgsrc/net/totd).
 draft-ietf-ipngwg-router-renum-08: Router renumbering for IPv6
 draft-ietf-ipngwg-icmp-namelookups-02: IPv6 Name Lookups Through ICMP
 draft-ietf-ipngwg-icmp-name-lookups-03: IPv6 Name Lookups Through ICMP
