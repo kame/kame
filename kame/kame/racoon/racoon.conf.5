@@ -260,11 +260,6 @@ define the group of Diffie-Hellman exponentiations.
 .Ar group
 is one of following:
 .Ic modp768 , modp1024 , modp1536 .
-.\"
-.It Ic strength Ar level ;
-specifies strength of cryptographic algorithm.
-.Ar level
-is one of following: extra_high, high, normal.
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
 define lifetime of phase 1 SA eay proposal.
@@ -350,9 +345,6 @@ is one of following:
 .Ic tunnel
 must be with perr's address.
 .\"
-.It Ic strength Ar level ;
-specifies strength of cryptographic algorithm.
-.\"
 .It Ic nonce_size Ar number ;
 define the byte size of random value.
 .\"
@@ -361,33 +353,6 @@ Ar type is one of followings: second or KB.
 But in the case of oakley, KB is not supported now.
 .El
 .El
-.El
-.El
-.\"
-.Ss Algorithm Strength Specification
-.Bl -tag -width Ds -compact
-.It Ic algorithm_strength { Ar statements Ic }
-specifies algorithm strength.  These are extracted into attribute of
-proposal to negotiate SA.  There are seven type of class;
-ISAKMP authentication method,
-ISAKMP encryption algorithm,
-ISAKMP hash algorithm,
-ISAKMP DH group,
-IPsec encryption algorithm,
-IPsec authentication algorithm,
-IPsec compression algorithm.
-.Pp
-.Bl -tag -width Ds -compact
-.It Ic algorithm_class { Ar statements Ic }
-.Ic Algorithm_class
-is one of following:
-isakmp_auth_method isakmp_encryption, isakmp_hash,
-isakmp_dh_group, ipsec_encryption, ipsec_authentication,
-ipsec_ipcomp.
-Each class can be defined three level; "normal", "high" and "extra_high".
-Each level can be omited.  If so, it is interpreted that there is no
-algorithm appropreately for use in its level.  algorithm type may be
-defined at multiple level.
 .El
 .El
 .\"
@@ -451,11 +416,13 @@ remote 172.168.2.2 [7000]
 	lifetime byte 5 MB;	# B,KB,GB
 
 	proposal {
-		strength normal;
+		encryption_algorithm 3des;
+		hash_algorithm md5;
 		authentication_method rsasig ;
 	}
 	proposal {
-		strength high;
+		encryption_algorithm 3des;
+		hash_algorithm md5;
 		authentication_method pre_shared_key ;
 
 		# they can be defined individually.
@@ -509,9 +476,10 @@ policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 			# specifyed carefully.
 			mode tunnel 172.168.2.2;
 
-			# "strength" defines a strength of algorithm in use.
-			# This is either "extra_high", "high" or "normal".
-			strength high ;
+			# algorithm for ESP encryption
+			encryption_algorithm 3des;
+			# algorithm for ESP authentication
+			authentication_algorithm hmac_sha1;
 		}
 	}
 
@@ -526,14 +494,18 @@ policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 		protocol esp {
 			level require ;
 			mode tunnel 172.168.2.2;
-			strength high ;
+
+			# algorithm for ESP encryption
+			encryption_algorithm 3des;
 		}
 
 		# "ah" means AH.
 		protocol ah {
 			level require ;
 			mode transport ;	# NOTE: not tunnel.
-			strength high ;
+
+			# algorithm for AH
+			authentication_algorithm hmac_sha1;
 		}
 	}
 }
