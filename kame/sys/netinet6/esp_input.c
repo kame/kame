@@ -238,13 +238,7 @@ esp4_input(m, va_alist)
 		ipsecstat.in_inval++;
 		goto bad;
 	}
-	if (siz <= n->m_len - len)
-		bcopy(mtod(n, u_char *) + len, &sum0[0], siz);
-	else {
-		printf("packet continuity problem; drop it for simplicity\n");
-		ipsecstat.in_inval++;
-		goto bad;
-	}
+	m_copydata(n, len, siz, &sum0[0]);
 
 	if (esp_auth(m, off, m->m_pkthdr.len - off - siz, sa, sum)) {
 		log(LOG_AUTH, "auth fail in IPv4 ESP input: %s %s\n",
@@ -721,13 +715,7 @@ esp6_input(mp, offp, proto)
 		ipsec6stat.in_inval++;
 		goto bad;
 	}
-	if (siz <= n->m_len - len)
-		bcopy(mtod(n, u_char *) + len, &sum0[0], sizeof(sum0));
-	else {
-		printf("packet continuity problem; drop it for simplicity\n");
-		ipsec6stat.in_inval++;
-		goto bad;
-	}
+	m_copydata(n, len, siz, &sum0[0]);
 
 	if (esp_auth(m, off, m->m_pkthdr.len - off - siz, sa, sum)) {
 		log(LOG_AUTH, "auth fail in IPv6 ESP input: %s %s\n",
