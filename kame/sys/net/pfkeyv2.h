@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.12 2000/05/07 14:59:43 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.13 2000/05/12 19:23:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.12 2000/05/07 14:59:43 itojun Exp $ */
+/* $Id: pfkeyv2.h,v 1.13 2000/05/12 19:23:20 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -370,14 +370,9 @@ struct sadb_x_ipsecrequest {
 #define PFKEY_ADDR_SADDR(ext) \
 	((struct sockaddr *)((caddr_t)(ext) + sizeof(struct sadb_address)))
 
-#if 1
 /* in 64bits */
 #define	PFKEY_UNUNIT64(a)	((a) << 3)
 #define	PFKEY_UNIT64(a)		((a) >> 3)
-#else
-#define	PFKEY_UNUNIT64(a)	(a)
-#define	PFKEY_UNIT64(a)		(a)
-#endif
 
 #ifndef _KERNEL
 extern void pfkey_sadump __P((struct sadb_msg *));
