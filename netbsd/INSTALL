@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.23 2002/09/26 07:11:22 itojun Exp $
+$Id: INSTALL,v 1.24 2005/01/05 07:38:47 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -68,6 +68,7 @@ C-1. Invoke "make includes" as root.  This will populate KAME-ready include
 	# make includes
 
 C-2. As normal user (or root, if you prefer) perform "make".
+     WARNING: do not perform "make obj", it is not supported.
 	% make
 
 C-3. As root, perform "make install".  This will install necessary userland
