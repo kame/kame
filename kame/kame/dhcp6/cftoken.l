@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.23 2003/08/01 00:27:44 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.24 2003/08/01 00:40:29 jinmei Exp $	*/
 
 %{
 /*
@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/time.h>
