@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.9 2004/12/16 11:29:28 t-momose Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.10 2005/01/20 05:06:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -543,26 +543,20 @@ dccp6_usrreq(struct socket *so, int req, struct mbuf *m,
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
 		struct ifnet *ifn = (struct ifnet *)control;
-		switch (family) {
-		case PF_INET6:
-			in6_pcbpurgeif0(&dccpb6, ifn);
-			in6_purgeif (ifn);
-			in6_pcbpurgeif(&dccpb6, ifn);
-			break;
-		default:
-			return (EAFNOSUPPORT);
-		}
+		in6_pcbpurgeif0(&dccpbtable, ifn);
+		in6_purgeif (ifn);
+		in6_pcbpurgeif(&dccpbtable, ifn);
 		return (0);
 	}
 #endif
+
+	s = splsoftnet();
 
 	if (in6p == 0 && req != PRU_ATTACH)
 	{
 		error = EINVAL;
 		goto release;
 	}
-
-	s = splsoftnet();
 
 	switch (req) {
 	case PRU_ATTACH:

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.19 2004/12/16 08:26:28 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.20 2005/01/20 05:06:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -269,6 +269,8 @@ extern u_long	dccp_recvspace;
 extern struct	dccpstat dccpstat; /* dccp statistics */
 extern int	dccp_log_in_vain; /* if we should log connections to
 				     ports w/o listeners */
+
+extern struct inpcbtable dccpbtable;
 
 /* These four functions are called from inetsw (in_proto.c) */
 void	dccp_init(void);

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.42 2005/01/19 09:29:41 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.43 2005/01/20 05:06:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -265,9 +265,9 @@ dccp_input(struct mbuf *m, ...)
 	int iphlen;
 	struct ip *ip = NULL;
 	struct dccphdr *dh;
-	struct inpcb *inp, *oinp;
+	struct inpcb *inp = NULL, *oinp = NULL;
 #ifdef __NetBSD__
-	struct in6pcb *in6p, *oin6p;
+	struct in6pcb *in6p = NULL, *oin6p = NULL;
 #endif
 	struct dccpcb *dp;
 	struct ipovly *ipov = NULL;
@@ -1125,7 +1125,7 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 	void (*notify)(struct inpcb *, int) = dccp_notify;
 #endif
 	struct in_addr faddr;
-	struct inpcb *inp;
+	struct inpcb *inp = NULL;
 	int s;
 
 	faddr = ((struct sockaddr_in *)sa)->sin_addr;
@@ -1845,13 +1845,15 @@ again:
 
 #ifdef __FreeBSD__
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
-		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL, inp);
+		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL,
+		    inp);
 #elif defined(__OpenBSD__)
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
 		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL);
 #else
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
-		    (in6p->in6p_socket->so_options & SO_DONTROUTE), NULL, NULL);
+		    (in6p->in6p_socket->so_options & SO_DONTROUTE), NULL, NULL,
+		    NULL);
 #endif
 	} else
 #endif
@@ -3370,7 +3372,7 @@ SYSCTL_PROC(_net_inet_dccp, DCCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
     dccp_pcblist, "S,xdccpcb", "List of active DCCP sockets");
 #endif
 
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
 int
 dccp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	int *name;
@@ -3604,22 +3606,10 @@ dccp_usrreq(so, req, m, nam, control)
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
 		struct ifnet *ifn = (struct ifnet *)control;
-		switch (family) {
-		case PF_INET:
-			in_pcbpurgeif0(&dccpbtable, ifn);
-			in_purgeif (ifn);
-			in_pcbpurgeif(&dccpbtable, ifn);
-			break;
-#ifdef INET6
-		case PF_INET6:
-			in6_pcbpurgeif0(&dccpb6, ifn);
-			in6_purgeif (ifn);
-			in6_pcbpurgeif(&dccpb6, ifn);
-			break;
-#endif /* INET6 */
-		default:
-			return (EAFNOSUPPORT);
-		}
+
+		in_pcbpurgeif0(&dccpbtable, ifn);
+		in_purgeif (ifn);
+		in_pcbpurgeif(&dccpbtable, ifn);
 		return (0);
 	}
 #endif
