@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.132 2001/07/24 09:57:03 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.133 2001/07/24 09:57:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,7 +569,7 @@ in6_ifattach_linklocal(ifp, altifp)
 	ifra.ifra_prefixmask.sin6_family = AF_INET6;
 	ifra.ifra_prefixmask.sin6_addr = in6mask64;
 #ifdef SCOPEDROUTING
-	/* take into accound the sin6_scope_id field for routing */
+	/* take into account the sin6_scope_id field for routing */
 	ifra.ifra_prefixmask.sin6_scope_id = 0xffffffff;
 #endif
 	/* link-local addresses should NEVER expire. */
