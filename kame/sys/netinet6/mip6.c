@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.61 2001/10/17 05:10:37 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.62 2001/10/17 07:26:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1184,12 +1184,10 @@ mip6_create_ip6hdr(ip6_src, ip6_dst, next, plen)
 }
 
 int
-mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
+mip6_exthdr_create(m, opt, mip6opt)
 	struct mbuf *m;                   /* ip datagram */
 	struct ip6_pktopts *opt;          /* pktopt passed to ip6_output */
-	struct ip6_rthdr **pktopt_rthdr;  /* rthdr to be returned */
-	struct ip6_dest **pktopt_haddr;   /* hoa destopt to be returned */
-	struct ip6_dest **pktopt_binding; /* destination opt to be returned */
+	struct mip6_pktopts *mip6opt;
 {
 	struct ip6_hdr *ip6;
 	struct in6_addr *src;
@@ -1199,9 +1197,9 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	struct mip6_bc *mbc;
 	int error = 0;
 
-	*pktopt_rthdr = NULL;
-	*pktopt_haddr = NULL;
-	*pktopt_binding = NULL;
+	mip6opt->mip6po_rthdr = NULL;
+	mip6opt->mip6po_haddr = NULL;
+	mip6opt->mip6po_dest2 = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	src = &ip6->ip6_src; /* if this node is MN, src = HoA */
@@ -1227,7 +1225,7 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 		 * 2001 12:51:34 -0700 with the subject 'Coexistence
 		 * with other uses for routing header'.
 		 */
-		error = mip6_rthdr_create_withdst(pktopt_rthdr, dst);
+		error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s: rthdr creation failed.\n",
@@ -1281,7 +1279,8 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	}
 
 	/* create bu destopt. */
-	error = mip6_bu_destopt_create(pktopt_binding, src, dst, opt, sc);
+	error = mip6_bu_destopt_create(&mip6opt->mip6po_dest2,
+				       src, dst, opt, sc);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s: BU destopt insertion failed.\n",
@@ -1290,7 +1289,8 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	}
 
 	/* create haddr destopt. */
-	error = mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc);
+	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
+					  src, dst, sc);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s: homeaddress insertion failed.\n",
@@ -1534,19 +1534,17 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 }
 
 int
-mip6_destopt_discard(pktopt_rthdr, pktopt_haddr, pktopt_mip6dest2)
-	struct ip6_rthdr *pktopt_rthdr;
-	struct ip6_dest *pktopt_haddr;
-	struct ip6_dest *pktopt_mip6dest2;
+mip6_destopt_discard(mip6opt)
+	struct mip6_pktopts *mip6opt;
 {
-	if (pktopt_rthdr)
-		free(pktopt_rthdr, M_TEMP);
+	if (mip6opt->mip6po_rthdr)
+		free(mip6opt->mip6po_rthdr, M_TEMP);
 
-	if (pktopt_haddr)
-		free(pktopt_haddr, M_TEMP);
+	if (mip6opt->mip6po_haddr)
+		free(mip6opt->mip6po_haddr, M_TEMP);
 
-	if (pktopt_mip6dest2)
-		free(pktopt_mip6dest2, M_TEMP);
+	if (mip6opt->mip6po_dest2)
+		free(mip6opt->mip6po_dest2, M_TEMP);
 
 	return (0);
 }

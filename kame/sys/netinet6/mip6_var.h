@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.7 2001/10/11 12:58:21 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.8 2001/10/17 07:26:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -163,6 +163,13 @@ struct mip6_config {
 
 #define MIP6_IS_MN (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MN)
 #define MIP6_IS_HA (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_HA)
+
+/* packet options used by the mip6 packet output processing routine */
+struct mip6_pktopts {
+	struct ip6_rthdr *mip6po_rthdr;
+	struct ip6_dest *mip6po_haddr;
+	struct ip6_dest *mip6po_dest2;
+};
 
 /* Buffer for storing a consequtive sequence of sub-options */
 struct mip6_buffer {

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.228 2001/10/17 05:14:56 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.229 2001/10/17 07:26:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -257,8 +257,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct ifnet *loifp = &loif;
 #endif
 #ifdef MIP6
-	struct ip6_dest *pktopt_haddr, *pktopt_mip6dest2;
-	struct ip6_rthdr *pktopt_mip6rthdr;
+	struct mip6_pktopts mip6opt;
 #ifdef NEW_STRUCT_ROUTE
 	struct route mip6_ip6route;
 #else
@@ -330,17 +329,17 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	 * insert HA, BU, BA, BR options if necessary.
 	 */
 	/* XXX TODO */
-	if (mip6_exthdr_create(m, opt, &pktopt_mip6rthdr, &pktopt_haddr,
-			       &pktopt_mip6dest2))
+	bzero((caddr_t)&mip6opt, sizeof(mip6opt));
+	if (mip6_exthdr_create(m, opt, &mip6opt))
 		goto freehdrs;
 	/*
-	 * mip6_exthdr_create() won't fill pktopt_mip6rthdr if opt->ip6po_rthdr
+	 * mip6_exthdr_create() won't fill mip6po_rthdr if opt->ip6po_rthdr
 	 * is already filled.  therefore, we won't insert dest1 twice.
 	 * yuck...
 	 */
-	if (pktopt_mip6rthdr) {
+	if (mip6opt.mip6po_rthdr) {
 		/*
-		 * pktopt_mip6rthdr will be only allocated when we
+		 * mip6po_rthdr will be only allocated when we
 		 * have no rthdr passed by the pktopt from the upper
 		 * layer. so, we don't care about the duplicate
 		 * allocation of ip6e_rthdr.
@@ -349,7 +348,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 * XXX: see the comments of
 		 * mip6.c:mip6_exthdr_create().
 		 */
-		MAKE_EXTHDR(pktopt_mip6rthdr, &exthdrs.ip6e_rthdr);
+		MAKE_EXTHDR(mip6opt.mip6po_rthdr, &exthdrs.ip6e_rthdr);
 
 		/*
 		 * if a routing header exists dest1 must be inserted
@@ -357,10 +356,10 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 */
 		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
 	}
-	MAKE_EXTHDR(pktopt_haddr, &exthdrs.ip6e_haddr);
-	if (pktopt_mip6dest2) {
+	MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
+	if (mip6opt.mip6po_dest2) {
 		m_freem(exthdrs.ip6e_dest2);
-		MAKE_EXTHDR(pktopt_mip6dest2, &exthdrs.ip6e_dest2);
+		MAKE_EXTHDR(mip6opt.mip6po_dest2, &exthdrs.ip6e_dest2);
 	}
 #endif /* MIP6 */
 
@@ -1521,16 +1520,14 @@ done:
 #endif /* IPSEC */
 
 #ifdef MIP6
-	mip6_destopt_discard(pktopt_mip6rthdr, pktopt_haddr,
-			     pktopt_mip6dest2);
+	mip6_destopt_discard(&mip6opt);
 #endif /* MIP6 */
 
 	return(error);
 
 freehdrs:
 #ifdef MIP6
-	mip6_destopt_discard(pktopt_mip6rthdr, pktopt_haddr,
-			     pktopt_mip6dest2);
+	mip6_destopt_discard(&mip6opt);
 #endif /* MIP6 */
 	m_freem(exthdrs.ip6e_hbh);	/* m_freem will check if mbuf is 0 */
 	m_freem(exthdrs.ip6e_dest1);
