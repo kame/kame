@@ -1,12 +1,12 @@
 # New ports collection makefile for:    ruby
-# Version required:     1.2.5
+# Version required:     1.4.3
 # Date created:         04 September 1997
 # Whom:                 Eiji-usagi-MATSUmoto <usagi@ruby.club.or.jp>
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:32 itojun Exp $
+# $FreeBSD: ports/lang/ruby/Makefile,v 1.15 1999/12/24 04:30:26 steve Exp $
 #
 
-DISTNAME=	ruby-1.2.5
+DISTNAME=	ruby-1.4.3
 CATEGORIES=	lang
 MASTER_SITES=	ftp://ftp.netlab.co.jp/pub/lang/ruby/${BRANCH_NAME}/ \
 		ftp://ftp.TokyoNet.AD.JP/pub/misc/ruby/${BRANCH_NAME}/ \
@@ -15,21 +15,53 @@ MASTER_SITES=	ftp://ftp.netlab.co.jp/pub/lang/ruby/${BRANCH_NAME}/ \
 		ftp://ftp.krnet.ne.jp/pub/ruby/${BRANCH_NAME}/ \
 		ftp://mirror.nucba.ac.jp/mirror/ruby/${BRANCH_NAME}/
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	ruby-125-v6-19990509.diff.gz
-PATCH_DIST_STRIP=	-p1
-
-MAINTAINER=	itojun@kame.net
+MAINTAINER=	yasuf@big.or.jp
 
 GNU_CONFIGURE=	yes
-#USE_AUTOCONF=	yes
+CONFIGURE_ARGS+= --disable-shared
+#.if defined(USE_INET6)
+CONFIGURE_ARGS+= --enable-ipv6
+#.endif
 MAN1=		ruby.1
+PLIST_SUB+=	RUBY_VER="${RUBY_VER}" RUBY_ARCH="${RUBY_ARCH}"
 
-BRANCH_NAME=	1.2
+RUBY_VER=	1.4
+RUBY_ARCH=	${ARCH}-freebsd${OSREL}
+
+BRANCH_NAME=	1.4
+
+DOCDIR=		${PREFIX}/share/doc/ruby
+EXAMPLESDIR=	${PREFIX}/share/examples/ruby
+
+post-patch:
+	${RM} -f ${WRKSRC}/ext/tcltklib/MANIFEST
+	${RM} -f ${WRKSRC}/ext/tk/MANIFEST
+	${RM} -rf ${WRKSRC}/lib/irb ${WRKSRC}/sample/irb.rb
 
 post-install:
 	strip ${PREFIX}/bin/ruby
+	${MKDIR} ${EXAMPLESDIR}
+	${INSTALL_DATA} ${WRKSRC}/sample/* ${EXAMPLESDIR}
+	${MKDIR} ${EXAMPLESDIR}/misc
+	${INSTALL_DATA} ${WRKSRC}/misc/* ${EXAMPLESDIR}/misc
+	${MKDIR} ${EXAMPLESDIR}/curses
+	${INSTALL_DATA} ${WRKSRC}/ext/curses/hello.rb ${WRKSRC}/ext/curses/rain.rb ${WRKSRC}/ext/curses/view.rb ${EXAMPLESDIR}/curses
+	${MKDIR} ${EXAMPLESDIR}/pty
+	${INSTALL_DATA} ${WRKSRC}/ext/pty/expect_sample.rb ${WRKSRC}/ext/pty/script.rb ${WRKSRC}/ext/pty/shl.rb ${EXAMPLESDIR}/pty
+.if !defined(NOPORTDOCS)
+	${MKDIR} ${DOCDIR}
+	${INSTALL_DATA} ${WRKSRC}/README* ${DOCDIR}
+	${MKDIR} ${DOCDIR}/etc
+	${INSTALL_DATA} ${WRKSRC}/ext/etc/etc.txt* ${DOCDIR}/etc
+	${MKDIR} ${DOCDIR}/md5
+	${INSTALL_DATA} ${WRKSRC}/ext/md5/md5.txt* ${DOCDIR}/md5
+	${MKDIR} ${DOCDIR}/pty
+	${INSTALL_DATA} ${WRKSRC}/ext/pty/README* ${DOCDIR}/pty
+	${MKDIR} ${DOCDIR}/readline
+	${INSTALL_DATA} ${WRKSRC}/ext/readline/README ${DOCDIR}/readline
+.endif
+	${SETENV} OBJFORMAT=${PORTOBJFORMAT} ${LDCONFIG} -m ${PREFIX}/lib
+	@${CAT} ${PKGMESSAGE}
 
 test:
 	@(cd ${WRKSRC}; make test)
