@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.44 2000/12/02 07:30:37 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.45 2000/12/02 16:01:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1256,7 +1256,7 @@ nd6_dad_timer(ifa)
 			ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 
 #ifdef ND6_DEBUG
-			log(LOG_INFO,
+			log(LOG_DEBUG,
 			    "%s: DAD complete for %s - no duplicates found\n",
 			    if_name(ifa->ifa_ifp),
 			    ip6_sprintf(&ia->ia_addr.sin6_addr));
