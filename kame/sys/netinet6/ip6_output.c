@@ -1671,6 +1671,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_IPSEC_POLICY:
 			    {
 				caddr_t req = NULL;
+				size_t len = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 #endif
@@ -1681,14 +1682,16 @@ ip6_ctloutput(op, so, level, optname, mp)
 				if (error = soopt_mcopyin(sopt, m)) /* XXX */
 					break;
 #endif
-				if (m != 0)
+				if (m) {
 					req = mtod(m, caddr_t);
+					len = m->m_len;
+				}
 #ifdef HAVE_NRL_INPCB
 				error = ipsec6_set_policy(inp, optname, req,
-				                          privileged);
+							  len, privileged);
 #else
 				error = ipsec6_set_policy(in6p, optname, req,
-				                          privileged);
+				                          len, privileged);
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				m_freem(m);
@@ -1969,19 +1972,19 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_IPSEC_POLICY:
 			  {
 				caddr_t req = NULL;
-				int len = 0;
+				size_t len = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 				struct mbuf **mp = &m;
 #endif
-				if (m != 0) {
+				if (m) {
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
 #ifdef HAVE_NRL_INPCB
-				error = ipsec6_get_policy(inp, req, mp);
+				error = ipsec6_get_policy(inp, req, len, mp);
 #else
-				error = ipsec6_get_policy(in6p, req, mp);
+				error = ipsec6_get_policy(in6p, req, len, mp);
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)

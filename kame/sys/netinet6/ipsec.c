@@ -201,7 +201,7 @@ static struct inpcbpolicy *ipsec_newpcbpolicy __P((void));
 static void ipsec_delpcbpolicy __P((struct inpcbpolicy *));
 static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *src));
 static int ipsec_set_policy __P((struct secpolicy **pcb_sp,
-	int optname, caddr_t request, int priv));
+	int optname, caddr_t request, size_t len, int priv));
 static int ipsec_get_policy __P((struct secpolicy *pcb_sp, struct mbuf **mp));
 static void vshiftl __P((unsigned char *, int, int));
 static int ipsec_in_reject __P((struct secpolicy *, struct mbuf *));
@@ -1255,19 +1255,23 @@ fail:
 
 /* set policy and ipsec request if present. */
 static int
-ipsec_set_policy(pcb_sp, optname, request, priv)
+ipsec_set_policy(pcb_sp, optname, request, len, priv)
 	struct secpolicy **pcb_sp;
 	int optname;
 	caddr_t request;
+	size_t len;
 	int priv;
 {
-	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct sadb_x_policy *xpl;
 	struct secpolicy *newsp = NULL;
 	int error;
 
 	/* sanity check. */
 	if (pcb_sp == NULL || *pcb_sp == NULL || xpl == NULL)
 		return EINVAL;
+	if (len < sizeof(*xpl))
+		return EINVAL;
+	xpl = (struct sadb_x_policy *)request;
 
 	KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
 		printf("ipsec_set_policy: passed policy\n");
@@ -1284,7 +1288,7 @@ ipsec_set_policy(pcb_sp, optname, request, priv)
 		return EACCES;
 
 	/* allocation new SP entry */
-	if ((newsp = key_msg2sp(xpl, &error)) == NULL)
+	if ((newsp = key_msg2sp(xpl, len, &error)) == NULL)
 		return error;
 
 	newsp->state = IPSEC_SPSTATE_ALIVE;
@@ -1328,18 +1332,22 @@ ipsec_get_policy(pcb_sp, mp)
 }
 
 int
-ipsec4_set_policy(inp, optname, request, priv)
+ipsec4_set_policy(inp, optname, request, len, priv)
 	struct inpcb *inp;
 	int optname;
 	caddr_t request;
+	size_t len;
 	int priv;
 {
-	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct sadb_x_policy *xpl;
 	struct secpolicy **pcb_sp;
 
 	/* sanity check. */
 	if (inp == NULL || request == NULL)
 		return EINVAL;
+	if (len < sizeof(*xpl))
+		return EINVAL;
+	xpl = (struct sadb_x_policy *)request;
 
 	/* select direction */
 	switch (xpl->sadb_x_policy_dir) {
@@ -1355,21 +1363,25 @@ ipsec4_set_policy(inp, optname, request, priv)
 		return EINVAL;
 	}
 
-	return ipsec_set_policy(pcb_sp, optname, request, priv);
+	return ipsec_set_policy(pcb_sp, optname, request, len, priv);
 }
 
 int
-ipsec4_get_policy(inp, request, mp)
+ipsec4_get_policy(inp, request, len, mp)
 	struct inpcb *inp;
 	caddr_t request;
+	size_t len;
 	struct mbuf **mp;
 {
-	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct sadb_x_policy *xpl;
 	struct secpolicy *pcb_sp;
 
 	/* sanity check. */
 	if (inp == NULL || request == NULL || mp == NULL)
 		return EINVAL;
+	if (len != sizeof(*xpl))
+		return EINVAL;
+	xpl = (struct sadb_x_policy *)request;
 
 	/* select direction */
 	switch (xpl->sadb_x_policy_dir) {
@@ -1415,18 +1427,22 @@ ipsec4_delete_pcbpolicy(inp)
 
 #ifdef INET6
 int
-ipsec6_set_policy(in6p, optname, request, priv)
+ipsec6_set_policy(in6p, optname, request, len, priv)
 	struct in6pcb *in6p;
 	int optname;
 	caddr_t request;
+	size_t len;
 	int priv;
 {
-	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct sadb_x_policy *xpl;
 	struct secpolicy **pcb_sp;
 
 	/* sanity check. */
 	if (in6p == NULL || request == NULL)
 		return EINVAL;
+	if (len < sizeof(*xpl))
+		return EINVAL;
+	xpl = (struct sadb_x_policy *)request;
 
 	/* select direction */
 	switch (xpl->sadb_x_policy_dir) {
@@ -1442,21 +1458,25 @@ ipsec6_set_policy(in6p, optname, request, priv)
 		return EINVAL;
 	}
 
-	return ipsec_set_policy(pcb_sp, optname, request, priv);
+	return ipsec_set_policy(pcb_sp, optname, request, len, priv);
 }
 
 int
-ipsec6_get_policy(in6p, request, mp)
+ipsec6_get_policy(in6p, request, len, mp)
 	struct in6pcb *in6p;
 	caddr_t request;
+	size_t len;
 	struct mbuf **mp;
 {
-	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct sadb_x_policy *xpl;
 	struct secpolicy *pcb_sp;
 
 	/* sanity check. */
 	if (in6p == NULL || request == NULL || mp == NULL)
 		return EINVAL;
+	if (len != sizeof(*xpl))
+		return EINVAL;
+	xpl = (struct sadb_x_policy *)request;
 
 	/* select direction */
 	switch (xpl->sadb_x_policy_dir) {

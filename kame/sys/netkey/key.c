@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.60 2000/01/17 14:38:21 sumikawa Exp $ */
+/* KAME $Id: key.c,v 1.61 2000/01/28 06:36:59 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -512,8 +512,10 @@ key_checkrequest(isr, saidx)
 	/* there is no SA */
 	if ((error = key_acquire(saidx, &isr->sp->spidx)) != 0) {
 		/* XXX What I do ? */
+#ifdef IPSEC_DEBUG
 		printf("key_checkrequest: error %d returned "
 			"from key_acquire.\n", error);
+#endif
 		return error;
 	}
 
@@ -773,8 +775,10 @@ key_freeso(so)
 		break;
 #endif /* INET6 */
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_freeso: unknown address family=%d.\n",
 			so->so_proto->pr_domain->dom_family);
+#endif
 		return;
 	}
 
@@ -931,8 +935,9 @@ key_newsp()
  * so must be set properly later.
  */
 struct secpolicy *
-key_msg2sp(xpl0, error)
+key_msg2sp(xpl0, len, error)
 	struct sadb_x_policy *xpl0;
+	size_t len;
 	int *error;
 {
 	struct secpolicy *newsp;
@@ -940,6 +945,15 @@ key_msg2sp(xpl0, error)
 	/* sanity check */
 	if (xpl0 == NULL)
 		panic("key_msg2sp: NULL pointer was passed.\n");
+	if (len < sizeof(*xpl0))
+		panic("key_msg2sp: invalid length.\n");
+	if (len != PFKEY_EXTLEN(xpl0)) {
+#ifdef IPSEC_DEBUG
+		printf("key_msg2sp: Invalid msg length.\n");
+#endif
+		*error = EINVAL;
+		return NULL;
+	}
 
 	if ((newsp = key_newsp()) == NULL) {
 		*error = ENOBUFS;
@@ -966,7 +980,9 @@ key_msg2sp(xpl0, error)
 
 		/* validity check */
 		if (PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
+#ifdef IPSEC_DEBUG
 			printf("key_msg2sp: Invalid msg length.\n");
+#endif
 			key_freesp(newsp);
 			*error = EINVAL;
 			return NULL;
@@ -979,8 +995,10 @@ key_msg2sp(xpl0, error)
 
 			/* length check */
 			if (xisr->sadb_x_ipsecrequest_len < sizeof(*xisr)) {
+#ifdef IPSEC_DEBUG
 				printf("key_msg2sp: "
 					"invalid ipsecrequest length.\n");
+#endif
 				key_freesp(newsp);
 				*error = EINVAL;
 				return NULL;
@@ -989,7 +1007,9 @@ key_msg2sp(xpl0, error)
 			/* allocate request buffer */
 			KMALLOC(*p_isr, struct ipsecrequest *, sizeof(**p_isr));
 			if ((*p_isr) == NULL) {
+#ifdef IPSEC_DEBUG
 				printf("key_msg2sp: No more memory.\n");
+#endif
 				key_freesp(newsp);
 				*error = ENOBUFS;
 				return NULL;
@@ -1007,8 +1027,10 @@ key_msg2sp(xpl0, error)
 #endif
 				break;
 			default:
+#ifdef IPSEC_DEBUG
 				printf("key_msg2sp: invalid proto type=%u\n",
 					xisr->sadb_x_ipsecrequest_proto);
+#endif
 				key_freesp(newsp);
 				*error = EPROTONOSUPPORT;
 				return NULL;
@@ -1021,8 +1043,10 @@ key_msg2sp(xpl0, error)
 				break;
 			case IPSEC_MODE_ANY:
 			default:
+#ifdef IPSEC_DEBUG
 				printf("key_msg2sp: invalid mode=%u\n",
 					xisr->sadb_x_ipsecrequest_mode);
+#endif
 				key_freesp(newsp);
 				*error = EINVAL;
 				return NULL;
@@ -1042,10 +1066,12 @@ key_msg2sp(xpl0, error)
 				 */
 				if (xisr->sadb_x_ipsecrequest_reqid
 						> IPSEC_MANUAL_REQID_MAX) {
+#ifdef IPSEC_DEBUG
 					printf("key_msg2sp: reqid=%d "
 						"range violation, "
 						"updated by kernel.\n",
 						xisr->sadb_x_ipsecrequest_reqid);
+#endif
 					xisr->sadb_x_ipsecrequest_reqid = 0;
 				}
 
@@ -1067,8 +1093,10 @@ key_msg2sp(xpl0, error)
 				break;
 
 			default:
+#ifdef IPSEC_DEBUG
 				printf("key_msg2sp: invalid level=%u\n",
 					xisr->sadb_x_ipsecrequest_level);
+#endif
 				key_freesp(newsp);
 				*error = EINVAL;
 				return NULL;
@@ -1084,8 +1112,10 @@ key_msg2sp(xpl0, error)
 				/* validity check */
 				if (paddr->sa_len
 				    > sizeof((*p_isr)->saidx.src)) {
+#ifdef IPSEC_DEBUG
 					printf("key_msg2sp: invalid request "
 						"address length.\n");
+#endif
 					key_freesp(newsp);
 					*error = EINVAL;
 					return NULL;
@@ -1099,8 +1129,10 @@ key_msg2sp(xpl0, error)
 				/* validity check */
 				if (paddr->sa_len
 				    > sizeof((*p_isr)->saidx.dst)) {
+#ifdef IPSEC_DEBUG
 					printf("key_msg2sp: invalid request "
 						"address length.\n");
+#endif
 					key_freesp(newsp);
 					*error = EINVAL;
 					return NULL;
@@ -1118,7 +1150,9 @@ key_msg2sp(xpl0, error)
 
 			/* validity check */
 			if (tlen < 0) {
+#ifdef IPSEC_DEBUG
 				printf("key_msg2sp: becoming tlen < 0.\n");
+#endif
 				key_freesp(newsp);
 				*error = EINVAL;
 				return NULL;
@@ -1130,7 +1164,9 @@ key_msg2sp(xpl0, error)
 	    }
 		break;
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_msg2sp: invalid policy type.\n");
+#endif
 		key_freesp(newsp);
 		*error = EINVAL;
 		return NULL;
@@ -1265,7 +1301,9 @@ key_spdadd(mhp)
 	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_spdadd: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -1289,7 +1327,9 @@ key_spdadd(mhp)
 	case IPSEC_DIR_OUTBOUND:
 		break;
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_spdadd: Invalid SP direction.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -1298,7 +1338,9 @@ key_spdadd(mhp)
 	newsp = key_getsp(&spidx);
 	if (newsp != NULL) {
 		key_freesp(newsp);
+#ifdef IPSEC_DEBUG
 		printf("key_spdadd: a SP entry exists already.\n");
+#endif
 		msg0->sadb_msg_errno = EEXIST;
 		return NULL;
 	}
@@ -1307,13 +1349,15 @@ key_spdadd(mhp)
 	/* key_spdadd() accepts DISCARD, NONE and IPSEC. */
 	if (xpl0->sadb_x_policy_type == IPSEC_POLICY_ENTRUST
 	 || xpl0->sadb_x_policy_type == IPSEC_POLICY_BYPASS) {
+#ifdef IPSEC_DEBUG
 		printf("key_spdadd: Invalid policy type.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
 
 	/* allocation new SP entry */
-	if ((newsp = key_msg2sp(xpl0, &error)) == NULL) {
+	if ((newsp = key_msg2sp(xpl0, PFKEY_EXTLEN(xpl0), &error)) == NULL) {
 		msg0->sadb_msg_errno = error;
 		return NULL;
 	}
@@ -1343,7 +1387,9 @@ key_spdadd(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_spdadd: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -1400,7 +1446,9 @@ key_spddelete(mhp)
 	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_spddelete: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -1424,14 +1472,18 @@ key_spddelete(mhp)
 	case IPSEC_DIR_OUTBOUND:
 		break;
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_spddelete: Invalid SP direction.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
 
 	/* Is there SP in SPD ? */
 	if ((sp = key_getsp(&spidx)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_spddelete: no SP found.\n");
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
@@ -1452,7 +1504,9 @@ key_spddelete(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_spddelete: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -1514,7 +1568,9 @@ key_spdflush(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_spdflush: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -1853,7 +1909,9 @@ key_newsav(mhp, sah)
 
 	KMALLOC(newsav, struct secasvar *, sizeof(struct secasvar));
 	if (newsav == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_newsa: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -1877,7 +1935,9 @@ key_newsav(mhp, sah)
 		/* sanity check */
 		if (mhp[SADB_EXT_SA] == NULL) {
 			KFREE(newsav);
+#ifdef IPSEC_DEBUG
 			printf("key_newsa: invalid message is passed.\n");
+#endif
 			msg0->sadb_msg_errno = EINVAL;
 			return NULL;
 		}
@@ -1997,7 +2057,9 @@ key_checkspidup(saidx, spi)
 
 	/* check address family */
 	if (saidx->src.ss_family != saidx->dst.ss_family) {
+#ifdef IPSEC_DEBUG
 		printf("key_checkspidup: address family mismatched.\n");
+#endif
 		return NULL;
 	}
 
@@ -2038,10 +2100,12 @@ key_getsavbyspi(sah, spi)
 
 			/* sanity check */
 			if (sav->state != state) {
+#ifdef IPSEC_DEBUG
 				printf("key_getsavbyspi: "
 					"invalid sav->state "
 					"(queue: %d SA: %d)\n",
 					state, sav->state);
+#endif
 				continue;
 			}
 
@@ -2099,7 +2163,9 @@ key_setsaval(sav, mhp)
 		if ((sa0->sadb_sa_flags & SADB_X_EXT_OLD) == 0) {
 			sav->replay = keydb_newsecreplay(sa0->sadb_sa_replay);
 			if (sav->replay == NULL) {
+#ifdef IPSEC_DEBUG
 				printf("key_setsaval: No more memory.\n");
+#endif
 				error = ENOBUFS;
 				goto err;
 			}
@@ -2133,13 +2199,17 @@ key_setsaval(sav, mhp)
 			break;
 		}
 		if (error) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: invalid key_auth values.\n");
+#endif
 			goto err;
 		}
 
 		sav->key_auth = (struct sadb_key *)key_newbuf(key0, len);
 		if (sav->key_auth == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: No more memory.\n");
+#endif
 			error = ENOBUFS;
 			goto err;
 		}
@@ -2176,13 +2246,17 @@ key_setsaval(sav, mhp)
 			break;
 		}
 		if (error) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsatval: invalid key_enc value.\n");
+#endif
 			goto err;
 		}
 
 		sav->key_enc = (struct sadb_key *)key_newbuf(key0, len);
 		if (sav->key_enc == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: No more memory.\n");
+#endif
 			error = ENOBUFS;
 			goto err;
 		}
@@ -2205,7 +2279,9 @@ key_setsaval(sav, mhp)
 			sav->ivlen = (*algo->ivlen)(sav);
 		KMALLOC(sav->iv, caddr_t, sav->ivlen);
 		if (sav->iv == 0) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: No more memory.\n");
+#endif
 			error = ENOBUFS;
 			goto err;
 		}
@@ -2221,7 +2297,9 @@ key_setsaval(sav, mhp)
 #endif
 		break;
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_setsaval: invalid SA type.\n");
+#endif
 		error = EINVAL;
 		goto err;
 	}
@@ -2236,7 +2314,9 @@ key_setsaval(sav, mhp)
 	KMALLOC(sav->lft_c, struct sadb_lifetime *,
 		sizeof(struct sadb_lifetime));
 	if (sav->lft_c == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_setsaval: No more memory.\n");
+#endif
 		error = ENOBUFS;
 		goto err;
 	}
@@ -2261,7 +2341,9 @@ key_setsaval(sav, mhp)
 		sav->lft_h = (struct sadb_lifetime *)key_newbuf(lft0,
 				sizeof(*lft0));
 		if (sav->lft_h == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: No more memory.\n");
+#endif
 			error = ENOBUFS;
 			goto err;
 		}
@@ -2273,7 +2355,9 @@ key_setsaval(sav, mhp)
 		sav->lft_s = (struct sadb_lifetime *)key_newbuf(lft0,
 				sizeof(*lft0));
 		if (sav->lft_s == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: No more memory.\n");
+#endif
 			error = ENOBUFS;
 			goto err;
 		}
@@ -2287,7 +2371,9 @@ key_setsaval(sav, mhp)
 	case SADB_EALG_DESCBC:
         	if (des_key_sched((C_Block *)_KEYBUF(sav->key_enc),
 		                  (des_key_schedule)sav->misc1) != 0) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: error des_key_sched.\n");
+#endif
 			sav->misc1 = NULL;
 			/* THROUGH */
 		}
@@ -2299,7 +2385,9 @@ key_setsaval(sav, mhp)
 		                  (des_key_schedule)sav->misc2) != 0
         	 || des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16),
 		                  (des_key_schedule)sav->misc3) != 0) {
+#ifdef IPSEC_DEBUG
 			printf("key_setsaval: error des_key_sched.\n");
+#endif
 			sav->misc1 = NULL;
 			sav->misc2 = NULL;
 			sav->misc3 = NULL;
@@ -2906,7 +2994,9 @@ key_newbuf(src, len)
 
 	KMALLOC(new, caddr_t, len);
 	if (new == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_newbuf: No more memory.\n");
+#endif
 		return NULL;
 	}
 	bcopy((caddr_t)src, new, len);
@@ -3037,7 +3127,9 @@ key_isloopback(family, addr)
 		break;
 #endif /* INET6 */
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_isloopback: unknown address family=%d.\n", family);
+#endif
 		return 0;
 	}
 
@@ -3331,8 +3423,10 @@ key_timehandler(void)
 
 			/* sanity check */
 			if (sav->lft_c == NULL) {
+#ifdef IPSEC_DEBUG
 				printf("key_timehandler: "
 					"There is no CURRENT time, why?\n");
+#endif
 				continue;
 			}
 
@@ -3391,8 +3485,10 @@ key_timehandler(void)
 
 			/* sanity check */
 			if (sav->lft_c == NULL) {
+#ifdef IPSEC_DEBUG
 				printf("key_timehandler: "
 					"There is no CURRENT time, why?\n");
+#endif
 				continue;
 			}
 
@@ -3437,11 +3533,13 @@ key_timehandler(void)
 
 			/* sanity check */
 			if (sav->state != SADB_SASTATE_DEAD) {
+#ifdef IPSEC_DEBUG
 				printf("key_timehandler: "
 					"invalid sav->state "
 					"(queue: %d SA: %d): "
 					"kill it anyway\n",
 					SADB_SASTATE_DEAD, sav->state);
+#endif
 			}
 
 			/*
@@ -3599,7 +3697,9 @@ key_getspi(mhp)
 
 	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_getspi: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3609,7 +3709,9 @@ key_getspi(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_getspi: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3629,7 +3731,9 @@ key_getspi(mhp)
 
 		/* create a new SA index */
 		if ((newsah = key_newsah(&saidx)) == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_getspi: No more memory.\n");
+#endif
 			msg0->sadb_msg_errno = ENOBUFS;
 			return NULL;
 		}
@@ -3670,7 +3774,9 @@ key_getspi(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_getspi: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -3736,7 +3842,9 @@ key_do_getnewspi(spirange, saidx)
 
 	if (min == max) {
 		if (key_checkspidup(saidx, min) != NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_do_getnewspi: SPI %u exists already.\n", min);
+#endif
 			return 0;
 		}
 
@@ -3758,7 +3866,9 @@ key_do_getnewspi(spirange, saidx)
 		}
 
 		if (count == 0 || newspi == 0) {
+#ifdef IPSEC_DEBUG
 			printf("key_do_getnewspi: to allocate spi is failed.\n");
+#endif
 			return 0;
 		}
 	}
@@ -3805,7 +3915,9 @@ key_update(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3821,7 +3933,9 @@ key_update(mhp)
 	  && mhp[SADB_EXT_LIFETIME_SOFT] == NULL)
 	 || (mhp[SADB_EXT_LIFETIME_HARD] == NULL
 	  && mhp[SADB_EXT_LIFETIME_SOFT] != NULL)) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3834,7 +3948,9 @@ key_update(mhp)
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: no SA index found.\n");
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
@@ -3847,15 +3963,19 @@ key_update(mhp)
 #ifdef IPSEC_DOSEQCHECK
 	if (msg0->sadb_msg_seq != 0
 	 && (sav = key_getsavbyseq(sah, msg0->sadb_msg_seq)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: no larval SA with sequence %u exists.\n",
 			msg0->sadb_msg_seq);
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
 #else
 	if ((sav = key_getsavbyspi(sah, sa0->sadb_sa_spi)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: no such a SA found (spi:%u)\n",
 			(u_int32_t)ntohl(sa0->sadb_sa_spi));
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3863,23 +3983,29 @@ key_update(mhp)
 
 	/* validity check */
 	if (sav->sah->saidx.proto != proto) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: protocol mismatched (DB=%u param=%u)\n",
 			sav->sah->saidx.proto, proto);
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
 #ifdef IPSEC_DOSEQCHECK
 	if (sav->spi != sa0->sadb_sa_spi) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: SPI mismatched (DB:%u param:%u)\n",
 			(u_int32_t)ntohl(sav->spi),
 			(u_int32_t)ntohl(sa0->sadb_sa_spi));
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
 #endif
 	if (sav->pid != msg0->sadb_msg_pid) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: pid mismatched (DB:%u param:%u)\n",
 			sav->pid, msg0->sadb_msg_pid);
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3901,7 +4027,9 @@ key_update(mhp)
 
 	/* set msg buf from mhp */
 	if ((newmsg = key_getmsgbuf_x1(mhp)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_update: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -3983,7 +4111,9 @@ key_add(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_add: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -3999,7 +4129,9 @@ key_add(mhp)
 	  && mhp[SADB_EXT_LIFETIME_SOFT] == NULL)
 	 || (mhp[SADB_EXT_LIFETIME_HARD] == NULL
 	  && mhp[SADB_EXT_LIFETIME_SOFT] != NULL)) {
+#ifdef IPSEC_DEBUG
 		printf("key_add: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4015,7 +4147,9 @@ key_add(mhp)
 
 		/* create a new SA header */
 		if ((newsah = key_newsah(&saidx)) == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_add: No more memory.\n");
+#endif
 			msg0->sadb_msg_errno = ENOBUFS;
 			return NULL;
 		}
@@ -4028,7 +4162,9 @@ key_add(mhp)
 	/* create new SA entry. */
 	/* We can create new SA only if SPI is differenct. */
 	if (key_getsavbyspi(newsah, sa0->sadb_sa_spi)) {
+#ifdef IPSEC_DEBUG
 		printf("key_add: SA already exists.\n");
+#endif
 		msg0->sadb_msg_errno = EEXIST;
 		return NULL;
 	}
@@ -4051,7 +4187,9 @@ key_add(mhp)
 
 	/* set msg buf from mhp */
 	if ((newmsg = key_getmsgbuf_x1(mhp)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_add: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -4085,7 +4223,9 @@ key_setident(sah, mhp)
 	
 	if (mhp[SADB_EXT_IDENTITY_SRC] == NULL
 	 || mhp[SADB_EXT_IDENTITY_DST] == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_setident: invalid identity.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return -1;
 	}
@@ -4097,7 +4237,9 @@ key_setident(sah, mhp)
 
 	/* validity check */
 	if (idsrc->sadb_ident_type != iddst->sadb_ident_type) {
+#ifdef IPSEC_DEBUG
 		printf("key_setident: ident type mismatch.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return -1;
 	}
@@ -4108,7 +4250,9 @@ key_setident(sah, mhp)
 		    sizeof(*idsrc) + ((struct sockaddr *)(idsrc + 1))->sa_len
 		 || iddstlen !=
 		    sizeof(*iddst) + ((struct sockaddr *)(iddst + 1))->sa_len) {
+#ifdef IPSEC_DEBUG
 			printf("key_setident: invalid length is passed.\n");
+#endif
 			msg0->sadb_msg_errno = EINVAL;
 			return -1;
 		}
@@ -4116,14 +4260,18 @@ key_setident(sah, mhp)
 				sizeof(struct sockaddr_storage)
 		 || ((struct sockaddr *)(iddst + 1))->sa_len >
 				sizeof(struct sockaddr_storage)) {
+#ifdef IPSEC_DEBUG
 			printf("key_setident: invalid sa_len is passed.\n");
+#endif
 			msg0->sadb_msg_errno = EINVAL;
 			return -1;
 		}
 #define __IDENTXID(a) ((union sadb_x_ident_id *)&(a)->sadb_ident_id)
 		if (__IDENTXID(idsrc)->sadb_x_ident_id_addr.ul_proto
 		 != __IDENTXID(iddst)->sadb_x_ident_id_addr.ul_proto) {
+#ifdef IPSEC_DEBUG
 			printf("key_setident: ul_proto mismatch.\n");
+#endif
 			msg0->sadb_msg_errno = EINVAL;
 			return -1;
 		}
@@ -4142,14 +4290,18 @@ key_setident(sah, mhp)
 	/* make structure */
 	KMALLOC(sah->idents, struct sadb_ident *, idsrclen);
 	if (sah->idents == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_setident: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return -1;
 	}
 	KMALLOC(sah->identd, struct sadb_ident *, iddstlen);
 	if (sah->identd == NULL) {
 		KFREE(sah->idents);
+#ifdef IPSEC_DEBUG
 		printf("key_setident: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return -1;
 	}
@@ -4249,7 +4401,9 @@ key_delete(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_delete: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4257,7 +4411,9 @@ key_delete(mhp)
 	if (mhp[SADB_EXT_SA] == NULL 
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_delete: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4269,7 +4425,9 @@ key_delete(mhp)
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_delete: no SA found.\n");
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
@@ -4277,7 +4435,9 @@ key_delete(mhp)
 	/* get a SA with SPI. */
 	sav = key_getsavbyspi(sah, sa0->sadb_sa_spi);
 	if (sav == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_delete: no alive SA found.\n");
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
@@ -4299,7 +4459,9 @@ key_delete(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_delete: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -4352,7 +4514,9 @@ key_get(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_get: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4360,7 +4524,9 @@ key_get(mhp)
 	if (mhp[SADB_EXT_SA] == NULL 
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_get: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4372,7 +4538,9 @@ key_get(mhp)
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_get: no SA found.\n");
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
@@ -4380,7 +4548,9 @@ key_get(mhp)
 	/* get a SA with SPI. */
 	sav = key_getsavbyspi(sah, sa0->sadb_sa_spi);
 	if (sav == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_get: no SA with state of mature found.\n");
+#endif
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
@@ -4392,7 +4562,9 @@ key_get(mhp)
 
 	/* map proto to satype */
 	if ((satype = key_proto2satype(sah->saidx.proto)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_get: there was invalid proto in SAD.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4402,7 +4574,9 @@ key_get(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_get: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -4497,7 +4671,9 @@ key_acquire(saidx, spidx)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_acquire: No more memory.\n");
+#endif
 		return ENOBUFS;
 	}
 	bzero((caddr_t)newmsg, len);
@@ -4627,8 +4803,10 @@ key_acquire(saidx, spidx)
 #endif
 
 	error = key_sendall(newmsg, len);
+#ifdef IPSEC_DEBUG
 	if (error != 0)
 		printf("key_acquire: key_sendall returned %d\n", error);
+#endif
 	return error;
     }
 
@@ -4645,7 +4823,9 @@ key_newacq(saidx)
 	/* get new entry */
 	KMALLOC(newacq, struct secacq *, sizeof(struct secacq));
 	if (newacq == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_newacq: No more memory.\n");
+#endif
 		return NULL;
 	}
 	bzero(newacq, sizeof(*newacq));
@@ -4733,13 +4913,17 @@ key_acquire2(mhp)
 
 		/* check sequence number */
 		if (msg0->sadb_msg_seq == 0) {
+#ifdef IPSEC_DEBUG
 			printf("key_acquire2: must specify sequence number.\n");
+#endif
 			return (struct sadb_msg *)~0;
 		}
 
 		if ((acq = key_getacqbyseq(msg0->sadb_msg_seq)) == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_acquire2: "
 				"invalid sequence number is passed.\n");
+#endif
 			return (struct sadb_msg *)~0;
 		}
 
@@ -4757,7 +4941,9 @@ key_acquire2(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_acquire2: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4766,7 +4952,9 @@ key_acquire2(mhp)
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_EXT_PROPOSAL] == NULL) {
 		/* error */
+#ifdef IPSEC_DEBUG
 		printf("key_acquire2: invalid message is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -4777,15 +4965,19 @@ key_acquire2(mhp)
 
 	/* get a SA index */
 	if ((sah = key_getsah(&saidx)) != NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_acquire2: a SA exists already.\n");
+#endif
 		msg0->sadb_msg_errno = EEXIST;
 		return NULL;
 	}
 
 	msg0->sadb_msg_errno = key_acquire(&saidx, NULL);
 	if (msg0->sadb_msg_errno != 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_acquire2: error %d returned "
 			"from key_acquire.\n", msg0->sadb_msg_errno);
+#endif
 		return NULL;
 	}
 
@@ -4798,7 +4990,9 @@ key_acquire2(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_acquire2: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -4851,7 +5045,9 @@ key_register(mhp, so)
 	/* check whether existing or not */
 	LIST_FOREACH(reg, &regtree[msg0->sadb_msg_satype], chain) {
 		if (reg->so == so) {
+#ifdef IPSEC_DEBUG
 			printf("key_register: socket exists already.\n");
+#endif
 			msg0->sadb_msg_errno = EEXIST;
 			return NULL;
 		}
@@ -4860,7 +5056,9 @@ key_register(mhp, so)
 	/* create regnode */
 	KMALLOC(newreg, struct secreg *, sizeof(struct secreg));
 	if (newreg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_register: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -4896,7 +5094,9 @@ key_register(mhp, so)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_register: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -5049,7 +5249,9 @@ key_expire(sav)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_expire: No more memory.\n");
+#endif
 		splx(s);
 		return ENOBUFS;
 	}
@@ -5134,7 +5336,9 @@ key_flush(mhp)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_flush: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -5178,7 +5382,9 @@ key_flush(mhp)
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_flush: No more memory.\n");
+#endif
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -5229,7 +5435,9 @@ key_dump(mhp, so, target)
 
 	/* map satype to proto */
 	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_dump: invalid satype is passed.\n");
+#endif
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
@@ -5266,7 +5474,9 @@ key_dump(mhp, so, target)
 
 		/* map proto to satype */
 		if ((satype = key_proto2satype(sah->saidx.proto)) == 0) {
+#ifdef IPSEC_DEBUG
 			printf("key_dump: there was invalid proto in SAD.\n");
+#endif
 			msg0->sadb_msg_errno = EINVAL;
 			return NULL;
 		}
@@ -5281,7 +5491,9 @@ key_dump(mhp, so, target)
 				len = key_getmsglen(sav);
 				KMALLOC(newmsg, struct sadb_msg *, len);
 				if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
 					printf("key_dump: No more memory.\n");
+#endif
 					return ENOBUFS;
 				}
 				bzero((caddr_t)newmsg, len);
@@ -5388,12 +5600,14 @@ key_sendall(msg, len)
 	LIST_FOREACH(reg, &regtree[msg->sadb_msg_satype], chain) {
 		error = key_sendup(reg->so, msg, len, KEY_SENDUP_ONE);
 		if (error != 0) {
+#ifdef IPSEC_DEBUG
 			if (error == ENOBUFS)
 				printf("key_sendall: No more memory.\n");
 			else {
 				printf("key_sendall: key_sendup returned %d\n",
 					error);
 			}
+#endif
 			KFREE(msg);
 			return error;
 		}

@@ -925,6 +925,7 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;
+			size_t len = 0;
 			int priv = 0;
 #ifdef __NetBSD__
 			if (p == 0 || suser(p->p_ucred, &p->p_acflag))
@@ -934,9 +935,11 @@ ip_ctloutput(op, so, level, optname, mp)
 #else
 			priv = (in6p->in6p_socket->so_state & SS_PRIV);
 #endif
-			if (m != 0)
+			if (m) {
 				req = mtod(m, caddr_t);
-			error = ipsec4_set_policy(inp, optname, req, priv);
+				len = m->m_len;
+			}
+			error = ipsec4_set_policy(inp, optname, req, len, priv);
 			break;
 		    }
 #endif /*IPSEC*/
@@ -1010,10 +1013,13 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;
+			size_t len = 0;
 
-			if (m != 0)
+			if (m) {
 				req = mtod(m, caddr_t);
-			error = ipsec4_get_policy(inp, req, mp);
+				len = m->m_len;
+			}
+			error = ipsec4_get_policy(inp, req, len, mp);
 			break;
 		}
 #endif /*IPSEC*/
