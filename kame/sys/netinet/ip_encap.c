@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.62 2001/08/17 10:29:45 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.63 2001/08/22 10:28:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,11 +156,15 @@ struct pack6 {
 	struct sockaddr_in6 yours;
 } __attribute__((__packed__));
 
+enum direction { INBOUND, OUTBOUND };
+
 #ifdef INET
-static struct encaptab *encap4_lookup __P((struct mbuf *, int, int));
+static struct encaptab *encap4_lookup __P((struct mbuf *, int, int,
+	enum direction));
 #endif
 #ifdef INET6
-static struct encaptab *encap6_lookup __P((struct mbuf *, int, int));
+static struct encaptab *encap6_lookup __P((struct mbuf *, int, int,
+	enum direction));
 #endif
 static int encap_add __P((struct encaptab *));
 static int encap_remove __P((struct encaptab *));
@@ -224,15 +228,14 @@ encap_init()
 
 #ifdef INET
 static struct encaptab *
-encap4_lookup(m, off, proto)
+encap4_lookup(m, off, proto, dir)
 	struct mbuf *m;
 	int off;
 	int proto;
+	enum direction dir;
 {
 	struct ip *ip;
 	struct pack4 pack;
-#define d	pack.mine
-#define s	pack.yours
 	struct encaptab *ep, *match;
 	int prio, matchprio;
 #ifdef USE_RADIX
@@ -248,12 +251,15 @@ encap4_lookup(m, off, proto)
 
 	bzero(&pack, sizeof(pack));
 	pack.p.sp_len = sizeof(pack);
-	s.sin_family = AF_INET;
-	s.sin_len = sizeof(struct sockaddr_in);
-	s.sin_addr = ip->ip_src;
-	d.sin_family = AF_INET;
-	d.sin_len = sizeof(struct sockaddr_in);
-	d.sin_addr = ip->ip_dst;
+	pack.mine.sin_family = pack.yours.sin_family = AF_INET;
+	pack.mine.sin_len = pack.yours.sin_len = sizeof(struct sockaddr_in);
+	if (dir == INBOUND) {
+		pack.mine.sin_addr = ip->ip_dst;
+		pack.yours.sin_addr = ip->ip_src;
+	} else {
+		pack.mine.sin_addr = ip->ip_src;
+		pack.yours.sin_addr = ip->ip_dst;
+	}
 
 	match = NULL;
 	matchprio = 0;
@@ -286,12 +292,8 @@ encap4_lookup(m, off, proto)
 #ifdef USE_RADIX
 			continue;
 #else
-			/*
-			 * it's inbound traffic, we need to match in reverse
-			 * order
-			 */
-			prio = mask_match(ep, (struct sockaddr *)&d,
-			    (struct sockaddr *)&s);
+			prio = mask_match(ep, (struct sockaddr *)&pack.mine,
+			    (struct sockaddr *)&pack.yours);
 #endif
 		}
 
@@ -358,7 +360,7 @@ encap4_input(m, va_alist)
 	proto = ip->ip_p;
 #endif
 
-	match = encap4_lookup(m, off, proto);
+	match = encap4_lookup(m, off, proto, INBOUND);
 
 	if (match) {
 		/* found a match, "match" has the best one */
@@ -413,15 +415,14 @@ encap4_input(m, va_alist)
 
 #ifdef INET6
 static struct encaptab *
-encap6_lookup(m, off, proto)
+encap6_lookup(m, off, proto, dir)
 	struct mbuf *m;
 	int off;
 	int proto;
+	enum direction dir;
 {
 	struct ip6_hdr *ip6;
 	struct pack6 pack;
-#define d	pack.mine
-#define s	pack.yours
 	int prio, matchprio;
 	struct encaptab *ep, *match;
 #ifdef USE_RADIX
@@ -437,12 +438,15 @@ encap6_lookup(m, off, proto)
 
 	bzero(&pack, sizeof(pack));
 	pack.p.sp_len = sizeof(pack);
-	s.sin6_family = AF_INET6;
-	s.sin6_len = sizeof(struct sockaddr_in6);
-	s.sin6_addr = ip6->ip6_src;
-	d.sin6_family = AF_INET6;
-	d.sin6_len = sizeof(struct sockaddr_in6);
-	d.sin6_addr = ip6->ip6_dst;
+	pack.mine.sin6_family = pack.yours.sin6_family = AF_INET6;
+	pack.mine.sin6_len = pack.yours.sin6_len = sizeof(struct sockaddr_in6);
+	if (dir == INBOUND) {
+		pack.mine.sin6_addr = ip6->ip6_dst;
+		pack.yours.sin6_addr = ip6->ip6_src;
+	} else {
+		pack.mine.sin6_addr = ip6->ip6_src;
+		pack.yours.sin6_addr = ip6->ip6_dst;
+	}
 
 	match = NULL;
 	matchprio = 0;
@@ -475,12 +479,8 @@ encap6_lookup(m, off, proto)
 #ifdef USE_RADIX
 			continue;
 #else
-			/*
-			 * it's inbound traffic, we need to match in reverse
-			 * order
-			 */
-			prio = mask_match(ep, (struct sockaddr *)&d,
-			    (struct sockaddr *)&s);
+			prio = mask_match(ep, (struct sockaddr *)&pack.mine,
+			    (struct sockaddr *)&pack.yours);
 #endif
 		}
 
@@ -508,7 +508,7 @@ encap6_input(mp, offp, proto)
 	const struct ip6protosw *psw;
 	struct encaptab *match;
 
-	match = encap6_lookup(m, *offp, proto);
+	match = encap6_lookup(m, *offp, proto, INBOUND);
 
 	if (match) {
 		/* found a match */
@@ -816,11 +816,12 @@ fail:
 #endif
 
 void
-encap6_ctlinput(cmd, sa, d)
+encap6_ctlinput(cmd, sa, d0)
 	int cmd;
 	struct sockaddr *sa;
-	void *d;
+	void *d0;
 {
+	void *d = d0;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
@@ -868,14 +869,10 @@ encap6_ctlinput(cmd, sa, d)
 		int valid = 0;
 		struct encaptab *match;
 
-#if 0
 		/*
 		 * Check to see if we have a valid encap configuration.
-		 * XXX m is useless at this point, since it is an outbound
-		 * traffic...
 		 */
-		match = encap6_lookup(m, off, nxt);
-#endif
+		match = encap6_lookup(m, off, nxt, OUTBOUND);
 
 		if (match)
 			valid++;
@@ -905,6 +902,8 @@ encap6_ctlinput(cmd, sa, d)
 		if (psw && psw->pr_ctlinput)
 			(*psw->pr_ctlinput)(cmd, sa, d);
 	}
+
+	rip6_ctlinput(cmd, sa, d0);
 }
 #endif
 

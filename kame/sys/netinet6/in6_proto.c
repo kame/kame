@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.104 2001/08/16 12:11:23 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.105 2001/08/22 10:28:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -391,7 +391,7 @@ struct ip6protosw inet6sw[] = {
 #endif /* IPSEC */
 #ifdef INET
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap6_input,	rip6_output, 	0,		rip6_ctloutput,
+  encap6_input,	rip6_output, 	encap6_ctlinput, rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -404,7 +404,7 @@ struct ip6protosw inet6sw[] = {
 },
 #endif /* INET */
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap6_input, rip6_output,	0,		rip6_ctloutput,
+  encap6_input, rip6_output,	encap6_ctlinput, rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -417,7 +417,7 @@ struct ip6protosw inet6sw[] = {
 },
 #if defined(__NetBSD__) && defined(ISO)
 { SOCK_RAW,	&inet6domain,	IPPROTO_EON,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap6_input,	rip6_output,	0,		rip6_ctloutput,
+  encap6_input,	rip6_output,	encap6_ctlinput, rip6_ctloutput,
   rip6_usrreq,	/* XXX */
   encap_init,	0,		0,		0,
 },
