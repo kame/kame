@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.48 1998/12/10 15:10:48 christos Exp $	*/
+/*	$NetBSD: if.c,v 1.48.2.1 1999/08/24 19:19:30 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@
 #include "opt_compat_linux.h"
 #include "opt_compat_svr4.h"
 #include "opt_compat_43.h"
+#include "opt_atalk.h"
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
@@ -88,6 +89,11 @@
 #ifdef INET6
 /*XXX*/
 #include <netinet/in.h>
+#endif
+
+#ifdef NETATALK
+#include <netatalk/at_extern.h>
+#include <netatalk/at.h>
 #endif
 
 int	ifqmaxlen = IFQ_MAXLEN;
@@ -279,6 +285,17 @@ ifa_ifwithnet(addr)
 	    if (sdl->sdl_index && sdl->sdl_index <= if_index)
 		return (ifnet_addrs[sdl->sdl_index]);
 	}
+#ifdef NETATALK
+	if (af == AF_APPLETALK) {
+		for (ifp = ifnet.tqh_first; ifp != 0;
+		    ifp = ifp->if_list.tqe_next) {
+			ifa = at_ifawithnet((struct sockaddr_at *)addr, ifp);
+			if (ifa)
+				return ifa;
+		}
+		return NULL;
+	}
+#endif
 	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
 		for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
 			register char *cp, *cp2, *cp3;

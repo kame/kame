@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.82.2.2 1999/05/03 22:22:42 perry Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.82.2.5 2000/03/02 10:24:18 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -408,6 +408,16 @@ ip_input(struct mbuf *m)
 		}
 		ip = mtod(m, struct ip *);
 	}
+
+	/*
+	 * RFC1122: packets with a multicast source address are
+	 * not allowed.
+	 */
+	if (IN_MULTICAST(ip->ip_src.s_addr)) {
+		/* XXX stat */
+		goto bad;
+	}
+
 	if (in_cksum(m, hlen) != 0) {
 		ipstat.ips_badsum++;
 		goto bad;
@@ -963,11 +973,11 @@ ip_dooptions(m)
 	struct mbuf *m;
 {
 	register struct ip *ip = mtod(m, struct ip *);
-	register u_char *cp;
+	register u_char *cp, *cp0;
 	register struct ip_timestamp *ipt;
 	register struct in_ifaddr *ia;
 	int opt, optlen, cnt, off, code, type = ICMP_PARAMPROB, forward = 0;
-	struct in_addr *sin, dst;
+	struct in_addr dst;
 	n_time ntime;
 
 	dst = ip->ip_dst;
@@ -1097,7 +1107,7 @@ ip_dooptions(m)
 					goto bad;
 				break;
 			}
-			sin = (struct in_addr *)(cp + ipt->ipt_ptr - 1);
+			cp0 = (cp + ipt->ipt_ptr - 1);
 			switch (ipt->ipt_flg) {
 
 			case IPOPT_TS_TSONLY:
@@ -1112,8 +1122,8 @@ ip_dooptions(m)
 							    m->m_pkthdr.rcvif);
 				if (ia == 0)
 					continue;
-				bcopy((caddr_t)&ia->ia_addr.sin_addr,
-				    (caddr_t)sin, sizeof(struct in_addr));
+				bcopy(&ia->ia_addr.sin_addr,
+				    cp0, sizeof(struct in_addr));
 				ipt->ipt_ptr += sizeof(struct in_addr);
 				break;
 
@@ -1121,7 +1131,7 @@ ip_dooptions(m)
 				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
 				    sizeof(struct in_addr) > ipt->ipt_len)
 					goto bad;
-				bcopy((caddr_t)sin, (caddr_t)&ipaddr.sin_addr,
+				bcopy(cp0, &ipaddr.sin_addr,
 				    sizeof(struct in_addr));
 				if (ifa_ifwithaddr((SA)&ipaddr) == 0)
 					continue;
@@ -1132,7 +1142,8 @@ ip_dooptions(m)
 				goto bad;
 			}
 			ntime = iptime();
-			bcopy((caddr_t)&ntime, (caddr_t)cp + ipt->ipt_ptr - 1,
+			cp0 = (u_char *) &ntime;	/* XXX GCC BUG */
+			bcopy(cp0, (caddr_t)cp + ipt->ipt_ptr - 1,
 			    sizeof(n_time));
 			ipt->ipt_ptr += sizeof(n_time);
 		}
@@ -1347,7 +1358,7 @@ ip_forward(m, srcrt)
 		    ntohl(ip->ip_src.s_addr),
 		    ntohl(ip->ip_dst.s_addr), ip->ip_ttl);
 #endif
-	if (m->m_flags & M_BCAST || in_canforward(ip->ip_dst) == 0) {
+	if (m->m_flags & (M_BCAST|M_MCAST) || in_canforward(ip->ip_dst) == 0) {
 		ipstat.ips_cantforward++;
 		m_freem(m);
 		return;

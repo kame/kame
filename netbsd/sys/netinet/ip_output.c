@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.58.2.1 1999/06/22 17:05:50 perry Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.58.2.2 1999/12/20 15:48:26 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

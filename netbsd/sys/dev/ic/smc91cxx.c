@@ -1,4 +1,4 @@
-/*	$NetBSD: smc91cxx.c,v 1.16 1999/03/25 23:20:22 thorpej Exp $	*/
+/*	$NetBSD: smc91cxx.c,v 1.16.2.1 1999/09/16 03:36:59 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
