@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.51 2000/03/13 10:28:35 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.52 2000/03/22 20:46:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1049,7 +1049,7 @@ isakmp_open()
 	err_and_next:
 		free(p->addr);
 		p->addr = NULL;
-		if (lcconf->strict_address)
+		if (! lcconf->autograbaddr && lcconf->strict_address)
 			return -1;
 		continue;
 	}
