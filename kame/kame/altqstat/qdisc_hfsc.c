@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qdisc_hfsc.c,v 1.1 2000/01/18 07:29:01 kjc Exp $
+ * $Id: qdisc_hfsc.c,v 1.2 2000/02/28 09:38:31 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -105,7 +105,7 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 			total = sp->total - lp->total;
 			cumul = sp->cumul - lp->cumul;
 
-			printf("[%2d %s] handle:%#x [rt %uK %ums %uK][ls %uK %ums %uK]\n",
+			printf("[%2d %s] handle:%#lx [rt %uK %ums %uK][ls %uK %ums %uK]\n",
 			       sp->class_id, clnames[i], sp->class_handle,
 			       sp->rsc.m1/1000, sp->rsc.d, sp->rsc.m2/1000,
 			       sp->fsc.m1/1000, sp->fsc.d, sp->fsc.m2/1000);
