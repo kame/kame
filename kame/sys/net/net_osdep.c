@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.7 2000/07/16 17:09:57 jinmei Exp $	*/
+/*	$KAME: net_osdep.c,v 1.8 2000/12/03 00:39:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,7 +58,7 @@ if_name(ifp)
 {
 	static char nam[8][IFNAMSIZ + 10];	/*enough?*/
 	static int ifbufround = 0;
-	register char *cp;
+	char *cp;
 
 	ifbufround = (ifbufround + 1) & 7;
 	cp = nam[ifbufround];

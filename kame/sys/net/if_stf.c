@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.45 2000/11/06 11:49:41 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.46 2000/12/03 00:39:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -646,7 +646,7 @@ void
 in_stf_input(struct mbuf *m, ...)
 #else
 in_stf_input(m, va_alist)
-	register struct mbuf *m;
+	struct mbuf *m;
 #endif
 {
 	int off, proto;

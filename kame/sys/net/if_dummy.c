@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.12 2000/06/21 15:02:01 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.13 2000/12/03 00:39:27 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -123,8 +123,8 @@ static int dummyioctl __P((struct ifnet *, int, caddr_t));
 #else
 static int dummyioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
-int dummyoutput __P((struct ifnet *, register struct mbuf *, struct sockaddr *,
-	register struct rtentry *));
+int dummyoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
+	struct rtentry *));
 #ifdef __bsdi__
 static void dummyrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
@@ -155,8 +155,8 @@ dummyattach(dummy)
 	int dummy;
 #endif
 {
-	register struct ifnet *ifp;
-	register int i;
+	struct ifnet *ifp;
+	int i;
 
 	for (i = 0; i < NDUMMY; i++) {
 		ifp = &dummyif[i];
@@ -194,12 +194,12 @@ dummyattach(dummy)
 int
 dummyoutput(ifp, m, dst, rt)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	int s, isr;
-	register struct ifqueue *ifq = 0;
+	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("dummyoutput no HDR");
@@ -334,7 +334,7 @@ dummyrtrequest(cmd, rt, sa)
 /* ARGSUSED */
 static int
 dummyioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 	int cmd;
 #else
@@ -342,9 +342,9 @@ dummyioctl(ifp, cmd, data)
 #endif
 	caddr_t data;
 {
-	register struct ifaddr *ifa;
-	register struct ifreq *ifr = (struct ifreq *)data;
-	register int error = 0;
+	struct ifaddr *ifa;
+	struct ifreq *ifr = (struct ifreq *)data;
+	int error = 0;
 
 	switch (cmd) {
 

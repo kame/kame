@@ -1,4 +1,4 @@
-/*	$KAME: rtsock_mip.c,v 1.4 2000/02/22 14:01:47 itojun Exp $	*/
+/*	$KAME: rtsock_mip.c,v 1.5 2000/12/03 00:39:27 itojun Exp $	*/
 
 /* to be included from net/rtsock.c - ugly but necessary for portability */
 /*
@@ -9,12 +9,12 @@ void
 rt_mip6msg(cmd, ifp, rt)
 	int cmd;
 	struct ifnet *ifp;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	struct rt_addrinfo info;
 	struct sockaddr *sa = 0;
 	struct mbuf *m = 0;
-	register struct rt_msghdr *rtm;
+	struct rt_msghdr *rtm;
 
 #ifdef MIP6_DEBUG
 	printf("route_cb.any_count = %d\n", route_cb.any_count);

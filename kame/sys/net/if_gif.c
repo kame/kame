@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.36 2000/10/10 17:04:21 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.37 2000/12/03 00:39:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,8 +137,8 @@ gifattach(dummy)
 	int dummy;
 #endif
 {
-	register struct gif_softc *sc;
-	register int i;
+	struct gif_softc *sc;
+	int i;
 
 #ifdef __NetBSD__
 	ngif = dummy;
@@ -264,7 +264,7 @@ gif_output(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;	/* added in net2 */
 {
-	register struct gif_softc *sc = (struct gif_softc*)ifp;
+	struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
 
@@ -355,7 +355,7 @@ gif_input(m, af, gifp)
 	struct ifnet *gifp;
 {
 	int s, isr;
-	register struct ifqueue *ifq = 0;
+	struct ifqueue *ifq = 0;
 
 	if (gifp == NULL) {
 		/* just in case */
