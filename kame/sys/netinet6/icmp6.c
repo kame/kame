@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.93 2000/05/15 09:33:24 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.94 2000/05/15 09:34:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1361,7 +1361,6 @@ ni6_nametodns(name, namelen, old)
 	char *cp, *ep;
 	const char *p, *q;
 	int i, len, nterm;
-	struct ni_reply_fqdn *fqdn;
 
 	if (old)
 		len = namelen + 1;
