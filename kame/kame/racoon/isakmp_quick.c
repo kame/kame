@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.37 2000/06/08 06:43:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.38 2000/06/08 08:59:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -492,8 +492,16 @@ end:
 		vfree(hbuf);
 	if (pbuf)
 		vfree(pbuf);
-	if (msg != NULL)
+	if (msg)
 		vfree(msg);
+
+	if (error) {
+		VPTRINIT(iph2->sa_ret);
+		VPTRINIT(iph2->nonce_p);
+		VPTRINIT(iph2->dhpub_p);
+		VPTRINIT(iph2->id);
+		VPTRINIT(iph2->id_p);
+	}
 
 	return error;
 }
@@ -1051,12 +1059,20 @@ quick_r1recv(iph2, msg0)
 	error = 0;
 
 end:
-	if (hbuf != NULL)
+	if (hbuf)
 		vfree(hbuf);
-	if (msg != NULL)
+	if (msg)
 		vfree(msg);
 	if (pbuf)
 		vfree(pbuf);
+
+	if (error) {
+		VPTRINIT(iph2->sa);
+		VPTRINIT(iph2->nonce_p);
+		VPTRINIT(iph2->dhpub_p);
+		VPTRINIT(iph2->id);
+		VPTRINIT(iph2->id_p);
+	}
 
 	return error;
 }
