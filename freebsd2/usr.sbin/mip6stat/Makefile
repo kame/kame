@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2000/02/08 04:23:09 itojun Exp $
+# $Id: Makefile,v 1.2 2000/02/09 13:12:33 itojun Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/mip6stat
 
@@ -11,8 +11,8 @@ CFLAGS+=-DINET6 -Wall
 DPADD+=	${LIBKVM}
 LDADD+=	-lkvm
 
-DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a /usr/local/v6/lib/libinet6.a
-LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a /usr/local/v6/lib/libinet6.a
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 -L/usr/local/v6/lib -linet6
 
 MAN8=	mip6stat.8
 
