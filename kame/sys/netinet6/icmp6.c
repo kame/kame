@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.248 2001/10/15 12:36:49 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.249 2001/10/16 03:15:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3339,44 +3339,42 @@ icmp6_recover_src(m)
 				    (dstoptlen < IP6OPT_MINLEN || *(opt + 1) + 2 > dstoptlen)) {
 					error = EINVAL;
 					goto bad;
-				    }
-				    switch (*opt) {
-				    case IP6OPT_PAD1:
-					    optlen = 1;
-					    break;
-				    case IP6OPT_PADN:
-					    optlen = *(opt + 1) + 2;
-					    break;
-				    case IP6OPT_HOME_ADDRESS:
-					    haopt = (struct ip6_opt_home_address *)opt;
-					    optlen = haopt->ip6oh_len + 2;
-					    if (optlen < sizeof(*haopt)) {
-						    error = EINVAL;
-						    goto bad;
-					    }
+				}
+				switch (*opt) {
+				case IP6OPT_PAD1:
+					optlen = 1;
+					break;
+				case IP6OPT_PADN:
+					optlen = *(opt + 1) + 2;
+					break;
+				case IP6OPT_HOME_ADDRESS:
+					haopt = (struct ip6_opt_home_address *)opt;
+					optlen = haopt->ip6oh_len + 2;
+					if (optlen < sizeof(*haopt)) {
+						error = EINVAL;
+						goto bad;
+					}
 
-					    /* swap */
-					    bcopy(&haopt->ip6oh_addr,
-						  &t,
-						  sizeof(haopt->ip6oh_addr));
-					    bcopy(&oip6->ip6_src,
-						  &haopt->ip6oh_addr,
-						  sizeof(oip6->ip6_src));
-					    bcopy(&t,
-						  &oip6->ip6_src,
-						  sizeof(t));
-					    finished = 1;
-					    break;
-				    default:
-					    optlen = ip6_unknown_opt(opt, m,
-						opt - mtod(m, u_int8_t *));
-					    if (optlen == -1) {
-						    error = EINVAL;
-						    goto bad;
-					    }
-					    optlen += 2;
-					    break;
-				    }
+					/* swap */
+					bcopy(&haopt->ip6oh_addr, &t,
+					      sizeof(haopt->ip6oh_addr));
+					bcopy(&oip6->ip6_src,
+					      &haopt->ip6oh_addr,
+					      sizeof(oip6->ip6_src));
+					bcopy(&t, &oip6->ip6_src,
+					      sizeof(t));
+					finished = 1;
+					break;
+				default:
+					optlen = ip6_unknown_opt(opt, m,
+					    opt - mtod(m, u_int8_t *));
+					if (optlen == -1) {
+						error = EINVAL;
+						goto bad;
+					}
+					optlen += 2;
+					break;
+				}
 			}
 			break;
 
