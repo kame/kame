@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1118 2000/07/10 12:44:26 jinmei Exp $
+$Id: CHANGELOG,v 1.1119 2000/07/10 12:45:35 jinmei Exp $
 
 <200006>
+2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (rt6_deleteroute): do not
+	(automatically) delete the static route in rt6_deleteroute(), even
+	if it uses a dead router.
+
 2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c: some clarifications about neighbor
 	cache manipulation (this change does not affect behavior from the
