@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.10 1999/11/04 00:32:25 sakane Exp $ */
+/* $Id: keyv2.h,v 1.11 1999/12/22 05:44:12 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -77,7 +77,9 @@ you leave this credit intact on any copies of this file.
 #define SADB_X_SPDACQUIRE 17	/* not yet */
 #define SADB_X_SPDDUMP    18
 #define SADB_X_SPDFLUSH   19
-#define SADB_MAX          19
+#define SADB_X_SPDSETIDX  20	/* add only SPD selector */
+#define SADB_X_SPDEXPIRE  21	/* not yet */
+#define SADB_MAX          21
 
 struct sadb_msg {
   u_int8_t sadb_msg_version;
