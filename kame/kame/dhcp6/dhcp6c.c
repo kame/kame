@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.113 2003/03/14 11:06:27 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.114 2003/04/08 11:47:27 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -421,7 +421,7 @@ ifinit_all()
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		if (client6_ifinit(ifp))
-			exit (1); /* initialization failure.  we give up. */
+			exit(1); /* initialization failure.  we give up. */
 	}
 }
 
