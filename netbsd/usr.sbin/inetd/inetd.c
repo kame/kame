@@ -823,6 +823,7 @@ config(signo)
 					    "ipsec initialization failed",
 					    sep->se_service, sep->se_proto);
 					sep->se_checked = 0;
+					sigsetmask(omask);
 					continue;
 				}
 			}
