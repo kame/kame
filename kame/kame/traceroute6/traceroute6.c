@@ -292,6 +292,11 @@ static char sccsid[] = "@(#)traceroute.c	8.1 (Berkeley) 6/6/93";
 #define Sprintf (void)sprintf
 #define Printf (void)printf
 
+#ifndef HAVE_GETIPNODEBY
+#define getipnodebyname(x, y, z, u)	gethostbyname2((x), (y))
+#define freehostent(x)
+#endif
+
 /*
  * format of a (udp) probe packet.
  */
