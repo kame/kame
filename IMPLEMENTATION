@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.288 2001/12/20 09:07:23 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.289 2001/12/20 09:14:15 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -673,11 +673,19 @@ sent from a user application as follows:
    the packet.  If it fails, the source address selection also fails.
    If the kernel can find an interface, choose the most appropriate
    address based on the algorithm described in
-   draft-ietf-ipngwg-default-addr-select-xx.txt .  This draft allows
-   an implementation to add implementation-specific rules with higher
-   precedence than the rule "Use longest matching prefix."  KAME's
-   implementation has the following additional rules (applied in the
-   appeared order):
+   draft-ietf-ipngwg-default-addr-select-xx.txt .
+
+   The policy table used in this algorithm is stored in the kernel.
+   To install or view the installed policy, use the addrselect(8)
+   command.  (Note that the command name is experimental and may be
+   changed in the future.)  The kernel does not have pre-installed
+   policy.  It is expected that the default policy described in the
+   draft should be installed at the bootstrap time using this command.
+
+   This draft allows an implementation to add implementation-specific
+   rules with higher precedence than the rule "Use longest matching
+   prefix."  KAME's implementation has the following additional rules
+   (applied in the appeared order):
 
    - prefer addresses on alive interfaces, that is, interfaces with
      the UP flag being on.  This rule is particularly useful for
