@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.42 2000/09/15 21:37:46 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.43 2000/09/19 02:31:50 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -364,6 +364,14 @@ directive.
 .\"
 .Ss Policy Specifications
 The policy directive is obsoleted, policies are now in the SPD.
+.Xr racoon 8
+will obey the policy configured into the kernel by
+.Xr setkey 8 ,
+and will construct phase 2 proposals by combining
+.Ic sainfo
+specifications in
+.Nm Ns ,
+and policies in the kernel.
 .\"
 .Ss Sainfo Specifications
 .Bl -tag -width Ds -compact
