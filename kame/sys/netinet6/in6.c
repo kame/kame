@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.326 2002/11/04 06:26:36 suz Exp $	*/
+/*	$KAME: in6.c,v 1.327 2002/11/04 06:27:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2206,8 +2206,9 @@ in6_purgemkludge(ifp)
 }
 
 /*
- * Add an address to the list of IP6 multicast addresses for a
- * given interface.
+ * Add an address to the list of IP6 multicast addresses for a given interface.
+ * Add source addresses to the list also, if upstream router is MLDv2 capable
+ * and the number of source is not 0.
  */
 struct	in6_multi *
 #ifdef MLDV2
@@ -2921,8 +2922,9 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 #else /* not FreeBSD3 */
 
 /*
- * Add an address to the list of IP6 multicast addresses for a
- * given interface.
+ * Add an address to the list of IP6 multicast addresses for a given interface.
+ * Add source addresses to the list also, if upstream router is MLDv2 capable
+ * and the number of source is not 0.
  */
 struct	in6_multi *
 #ifdef MLDV2
