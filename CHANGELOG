@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1371 2000/11/07 17:13:16 sakane Exp $
+$KAME: CHANGELOG,v 1.1372 2000/11/07 22:39:12 jinmei Exp $
 
 <200011>
+2000-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/if_indextoname.c (if_indextoname): made sure
+	to set ENXIO to errno if an appropriate interface is not found.
+	(to be conformant to RFC2553 and its bis)
+
 Wed Nov  8 02:14:22 JST 2000 sakane@ydc.co.jp
 	* racoon:
 	Fixed to bind a address which is added right now to the kernel. 
