@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.94 2000/05/15 09:34:26 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.95 2000/05/17 11:25:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1218,6 +1218,12 @@ ni6_input(m, off)
 			/* m_pulldown instead of copy? */
 			m_copydata(m, off + sizeof(struct icmp6_nodeinfo),
 			    subjlen, (caddr_t)&sin6.sin6_addr);
+			/* XXX kame scope hack */
+			if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr) &&
+			    (m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
+				sin6.sin6_addr.s6_addr16[1] =
+				    htons(m->m_pkthdr.rcvif->if_index);
+			}
 			if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &sin6.sin6_addr))
 				break;
 			goto bad;
