@@ -103,6 +103,10 @@ m_pulldown(m, off, len, offp)
 	struct mbuf *n, *o;
 	int hlen, tlen, olen;
 	int sharedcluster;
+#if defined(PULLDOWN_STAT) && defined(INET6)
+	static struct mbuf *prev = NULL;
+	int prevlen = 0, prevmlen = 0;
+#endif
 
 	/* check invalid arguments. */
 	if (m == NULL)
@@ -121,54 +125,59 @@ m_pulldown(m, off, len, offp)
 	if (off + len > MHLEN)
 		ip6stat.ip6s_pullup_fail++;
 	else {
+		int dlen, mlen;
+
+		dlen = (prev == m) ? prevlen : m->m_len;
+		mlen = (prev == m) ? prevmlen : m->m_len + M_TRAILINGSPACE(m);
+
 		if ((m->m_flags & M_EXT) != 0) {
 			ip6stat.ip6s_pullup_alloc++;
 			ip6stat.ip6s_pullup_copy++;
 		} else {
-			if (m->m_len >= off + len)
+			if (dlen >= off + len)
 				;
-			if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
+			if (mlen >= off + len)
 				ip6stat.ip6s_pullup_copy++;
 			else {
 				ip6stat.ip6s_pullup_alloc++;
 				ip6stat.ip6s_pullup_copy++;
 			}
 		}
+
+		prevlen = off + len;
+		prevmlen = MHLEN;
 	}
 
 	/* statistics for m_pullup2 */
 	if (off + len > MCLBYTES)
 		ip6stat.ip6s_pullup2_fail++;
-	else if (off + len > MHLEN) {
+	else {
+		int dlen, mlen;
+
+		dlen = (prev == m) ? prevlen : m->m_len;
+		mlen = (prev == m) ? prevmlen : m->m_len + M_TRAILINGSPACE(m);
+		prevlen = off + len;
+		prevmlen = mlen;
+
 		if ((m->m_flags & M_EXT) != 0) {
 			ip6stat.ip6s_pullup2_alloc++;
 			ip6stat.ip6s_pullup2_copy++;
+			prevmlen = (off + len > MHLEN) ? MCLBYTES : MHLEN;
 		} else {
-			if (m->m_len >= off + len)
+			if (dlen >= off + len)
 				;
-			else if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
+			else if (mlen >= off + len)
 				ip6stat.ip6s_pullup2_copy++;
 			else {
 				ip6stat.ip6s_pullup2_alloc++;
 				ip6stat.ip6s_pullup2_copy++;
-			}
-		}
-	} else {
-		/* for <= MHLEN, call m_pullup() */
-		if ((m->m_flags & M_EXT) != 0) {
-			ip6stat.ip6s_pullup2_alloc++;
-			ip6stat.ip6s_pullup2_copy++;
-		} else {
-			if (m->m_len >= off + len)
-				;
-			else if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
-				ip6stat.ip6s_pullup2_copy++;
-			else {
-				ip6stat.ip6s_pullup2_alloc++;
-				ip6stat.ip6s_pullup2_copy++;
+				prevmlen = (off + len > MHLEN) ? MCLBYTES
+							       : MHLEN;
 			}
 		}
 	}
+
+	prev = m;
 #endif
 
 #ifdef PULLDOWN_DEBUG
