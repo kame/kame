@@ -407,7 +407,8 @@ doit(fromp)
 
 	if (errorstr ||
 	    (pwd->pw_passwd != 0 && *pwd->pw_passwd != '\0' &&
-		iruserok_sa(fromp, pwd->pw_uid == 0, remuser, locuser) < 0)) {
+		iruserok_sa(fromp, fromp->sa_len, pwd->pw_uid == 0, remuser,
+			locuser) < 0)) {
 		if (__rcmd_errstr)
 			syslog(LOG_INFO|LOG_AUTH,
 			    "%s@%s as %s: permission denied (%s). cmd='%.80s'",

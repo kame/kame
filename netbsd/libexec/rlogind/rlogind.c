@@ -639,7 +639,8 @@ do_rlogin(dest, host)
 		return (-1);
 	}
 
-	retval = iruserok_sa(dest, pwd->pw_uid == 0, rusername, lusername);
+	retval = iruserok_sa(dest, dest->sa_len, pwd->pw_uid == 0, rusername,
+		lusername);
 /* XXX put inet_ntoa(dest->sin_addr.s_addr) into all messages below */
 	if (retval == 0) {
 		if (log_success)

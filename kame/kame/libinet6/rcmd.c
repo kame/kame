@@ -91,11 +91,11 @@ extern int innetgr __P(( const char *, const char *, const char *, const char * 
 #define max(a, b)	((a > b) ? a : b)
 
 int __ivaliduser_af __P((FILE *, const void *, const char *, const char *, int, int));
-int __ivaliduser_sa __P((FILE *, const struct sockaddr *, const char *, const char *));
+int __ivaliduser_sa __P((FILE *, const struct sockaddr *, int, const char *, const char *));
 #if 0
 static int __icheckhost __P((const void *, const char *, int, int));
 #endif
-static int __icheckhost_sa __P((const struct sockaddr *, const char *));
+static int __icheckhost_sa __P((const struct sockaddr *, int, const char *));
 
 char paddr[INET6_ADDRSTRLEN];
 
@@ -314,7 +314,8 @@ ruserok(rhost, superuser, ruser, luser)
 		return (-1);
 	ret = -1;
 	for (res = res0; res; res = res->ai_next) {
-		if (iruserok_sa(res->ai_addr, superuser, ruser, luser) == 0) {
+		if (iruserok_sa(res->ai_addr, res->ai_addrlen, superuser,
+				ruser, luser) == 0) {
 			ret = 0;
 			break;
 		}
@@ -441,7 +442,7 @@ again:
 	}
 
 	sa = (struct sockaddr *)&ss;
-	return iruserok_sa(sa, superuser, ruser, luser);
+	return iruserok_sa(sa, sa->sa_len, superuser, ruser, luser);
 #endif
 }
 
@@ -455,8 +456,9 @@ again:
  * Returns 0 if ok, -1 if not ok.
  */
 int
-iruserok_sa(raddr, superuser, ruser, luser)
-	const struct sockaddr *raddr;
+iruserok_sa(ra, rlen, superuser, ruser, luser)
+	const void *ra;
+	int rlen;
 	int superuser;
 	const char *ruser, *luser;
 {
@@ -467,12 +469,20 @@ iruserok_sa(raddr, superuser, ruser, luser)
 	uid_t uid;
 	int first;
 	char pbuf[MAXPATHLEN];
+	const struct sockaddr *raddr;
+	struct sockaddr_storage ss;
+
+	/* avoid alignment issue */
+	if (rlen > sizeof(ss)) 
+		return(-1);
+	memcpy(&ss, ra, rlen);
+	raddr = (struct sockaddr *)&ss;
 
 	first = 1;
 	hostf = superuser ? NULL : fopen(_PATH_HEQUIV, "r");
 again:
 	if (hostf) {
-		if (__ivaliduser_sa(hostf, raddr, luser, ruser) == 0) {
+		if (__ivaliduser_sa(hostf, raddr, rlen, luser, ruser) == 0) {
 			(void)fclose(hostf);
 			return (0);
 		}
@@ -542,7 +552,8 @@ iruserok(raddr, superuser, ruser, luser)
 	sin.sin_family = AF_INET;
 	sin.sin_len = sizeof(struct sockaddr_in);
 	memcpy(&sin.sin_addr, &raddr, sizeof(sin.sin_addr));
-	return iruserok_sa((struct sockaddr *)&sin, superuser, ruser, luser);
+	return iruserok_sa((struct sockaddr *)&sin, sin.sin_len, superuser,
+		ruser, luser);
 #endif
 }
 
@@ -706,7 +717,7 @@ __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
 	}
 
 	sa = (struct sockaddr *)&ss;
-	return __ivaliduser_sa(hostf, sa, luser, ruser);
+	return __ivaliduser_sa(hostf, sa, sa->sa_len, luser, ruser);
 #endif
 }
 
@@ -714,9 +725,10 @@ __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
  * Returns 0 if ok, -1 if not ok.
  */
 int
-__ivaliduser_sa(hostf, raddr, luser, ruser)
+__ivaliduser_sa(hostf, raddr, rlen, luser, ruser)
 	FILE *hostf;
 	const struct sockaddr *raddr;
+	int rlen;
 	const char *luser, *ruser;
 {
 	register char *user, *p;
@@ -735,8 +747,8 @@ __ivaliduser_sa(hostf, raddr, luser, ruser)
 #endif
 
 	/* We need to get the damn hostname back for netgroup matching. */
-	if (getnameinfo(raddr, raddr->sa_len, hname, sizeof(hname),
-			NULL, 0, NI_NAMEREQD) != 0)
+	if (getnameinfo(raddr, rlen, hname, sizeof(hname), NULL, 0,
+			NI_NAMEREQD) != 0)
 		return (-1);
 
 	while (fgets(buf, sizeof(buf), hostf)) {
@@ -779,7 +791,8 @@ __ivaliduser_sa(hostf, raddr, luser, ruser)
 				hostok = innetgr((char *)&buf[2],
 					(char *)&hname, NULL, ypdomain);
 			else		/* match a host by addr */
-				hostok = __icheckhost_sa(raddr, (char *)&buf[1]);
+				hostok = __icheckhost_sa(raddr, rlen,
+					(char *)&buf[1]);
 			break;
 		case '-':     /* reject '-' hosts and all their users */
 			if (buf[1] == '@') {
@@ -787,12 +800,13 @@ __ivaliduser_sa(hostf, raddr, luser, ruser)
 					      (char *)&hname, NULL, ypdomain))
 					return(-1);
 			} else {
-				if (__icheckhost_sa(raddr, (char *)&buf[1]))
+				if (__icheckhost_sa(raddr, rlen,
+						(char *)&buf[1]))
 					return(-1);
 			}
 			break;
 		default:  /* if no '+' or '-', do a simple match */
-			hostok = __icheckhost_sa(raddr, buf);
+			hostok = __icheckhost_sa(raddr, rlen, buf);
 			break;
 		}
 		switch(*user) {
@@ -846,7 +860,8 @@ __ivaliduser(hostf, raddr, luser, ruser)
 	sin.sin_family = AF_INET;
 	sin.sin_len = sizeof(struct sockaddr_in);
 	memcpy(&sin.sin_addr, &raddr, sizeof(sin.sin_addr));
-	return __ivaliduser_sa(hostf, (struct sockaddr *)&sin, luser, ruser);
+	return __ivaliduser_sa(hostf, (struct sockaddr *)&sin, sin.sin_len,
+		luser, ruser);
 #endif
 }
 
@@ -895,8 +910,9 @@ __icheckhost(raddr, lhost, af, len)
  * Returns "true" if match, 0 if no match.
  */
 static int
-__icheckhost_sa(raddr, lhost)
+__icheckhost_sa(raddr, rlen, lhost)
 	const struct sockaddr *raddr;
+	int rlen;
         const char *lhost;
 {
 	int match;
@@ -904,7 +920,7 @@ __icheckhost_sa(raddr, lhost)
 	int error;
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
 
-	if (getnameinfo(raddr, raddr->sa_len, h1, sizeof(h1), NULL, 0,
+	if (getnameinfo(raddr, rlen, h1, sizeof(h1), NULL, 0,
 			NI_NUMERICHOST) != 0)
 		return (0);
 	memset(&hints, 0, sizeof(hints));
@@ -917,7 +933,7 @@ __icheckhost_sa(raddr, lhost)
 	match = 0;
 	for (res = res0; res && match == 0; res = res->ai_next) {
 		if (res->ai_family != raddr->sa_family
-		 || res->ai_addrlen != raddr->sa_len)
+		 || res->ai_addrlen != rlen)
 			continue;
 		if (getnameinfo(res->ai_addr, res->ai_addrlen, h2, sizeof(h2),
 				NULL, 0, NI_NUMERICHOST) != 0)

@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)rcmd.3	8.1 (Berkeley) 6/4/93
-.\"	$Id: rresvport_af.3,v 1.3 2000/01/05 04:36:21 itojun Exp $
+.\"	$Id: rresvport_af.3,v 1.4 2000/01/05 06:36:01 itojun Exp $
 .\"
 .Dd February 15, 1996
 .Dt RCMD 3
@@ -59,7 +59,7 @@
 .Ft int
 .Fn iruserok_af "u_long raddr" "int superuser" "const char *ruser" "const char *luser" "int af"
 .Ft int
-.Fn iruserok_sa "struct sockaddr *sa raddr" "int superuser" "const char *ruser" "const char *luser"
+.Fn iruserok_sa "const void *sa" "int salen" "int superuser" "const char *ruser" "const char *luser"
 .Sh DESCRIPTION
 The
 .Fn rcmd
@@ -198,6 +198,7 @@ argument must be filled with
 .Dv AF_INET
 or
 .Dv AF_INET6 .
+.Pp
 .Fn iruserok_sa
 is similar to
 .Fn iruserok ,
@@ -206,6 +207,12 @@ but it takes
 as its argument and therefore can handle non
 .Dv AF_INET
 case as well.
+First argument is typed as
+.Fa "void *"
+to avoid dependency between
+.Aq Li unistd.h
+and
+.Aq Li sys/socket.h .
 .Fn iruserok_sa
 is recommended over
 .Fn iruserok_af .
