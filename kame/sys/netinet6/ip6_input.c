@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.112 2000/08/15 02:33:47 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.113 2000/08/15 02:52:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -830,13 +830,6 @@ ip6_input(m)
 	}
 
   hbhcheck:
-#ifdef MEASURE_PERFORMANCE
-	ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-	if (ip6->ip6_nxt == IPPROTO_UDP)
-#endif
-		add_performance_log(ctr_end - ctr_beg);
-#endif
 	/*
 	 * Process Hop-by-Hop options header if it's contained.
 	 * m may be modified in ip6_hopopts_input().
