@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.832 2000/04/28 10:30:35 itojun Exp $
+$Id: CHANGELOG,v 1.833 2000/04/28 13:49:25 jinmei Exp $
 
 <200004>
+2000-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd: filled the suggested hash mask length in
+	bootstrap messages. Also, that field is now configurable.
+	In response to a report from Olivier TOGNI
+	<togni@dpt-info.u-strasbg.fr>.
+
 Fri Apr 28 19:30:18 JST 2000  itojun@iijlab.net
 	* ports/pkgsrc for zebra (freebsd[23], netbsd): upgrade to 0.86.
 
