@@ -443,7 +443,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		tcp_trace(TA_OUTPUT, 0, tp, mtod(m, void *), th, 0);
 #endif
 #ifdef IPSEC
-	ipsec_setsocket(m, tp->t_inpcb->inp_socket);
+	ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL);
 #endif
 #ifdef INET6
 	if (isipv6) {
