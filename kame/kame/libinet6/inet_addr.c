@@ -70,7 +70,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)inet_addr.c	8.1 (Berkeley) 6/17/93";
-static char rcsid[] = "$Id: inet_addr.c,v 1.1 1999/08/19 06:03:33 itojun Exp $";
+static char rcsid[] = "$Id: inet_addr.c,v 1.2 1999/09/16 08:38:58 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -85,7 +85,11 @@ static char rcsid[] = "$Id: inet_addr.c,v 1.1 1999/08/19 06:03:33 itojun Exp $";
  * Ascii internet address interpretation routine.
  * The value returned is in network order.
  */
+#ifdef __OpenBSD__
+in_addr_t
+#else
 u_long
+#endif
 inet_addr(const char *cp) {
 	struct in_addr val;
 

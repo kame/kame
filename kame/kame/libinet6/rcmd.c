@@ -419,7 +419,7 @@ again:
 
 int
 iruserok(raddr, superuser, ruser, luser)
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	u_int32_t raddr;
 #else
 	u_long raddr;
