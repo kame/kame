@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.7 2005/02/12 15:22:39 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.8 2005/02/17 10:17:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -98,11 +98,13 @@ static void had_init_homeprefix(char *, int);
 /*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
 static void terminate(int);
+static void command_show_hal(int, char *);
 
 struct command_table show_command_table[] = {
 	{"bc", command_show_bc, "binding chache"},
 	{"kbc", command_show_kbc, "binding chache in kernel"},
 	{"stat", command_show_stat, "statisticts"},
+	{"hal", command_show_hal, "Home Agent List"},
 	{"callout", show_callout_table, "show callout table "},
 	{NULL}
 };
@@ -675,6 +677,15 @@ command_flush(s, arg)
 		write(s, msg, strlen(msg));
 	}
 }
+
+static void
+command_show_hal(s, dummy)
+	int s;
+	char *dummy;
+{
+	show_hal(s, &hpfx_head);
+}
+
 
 
 static void

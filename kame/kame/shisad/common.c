@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.11 2005/02/12 15:22:39 t-momose Exp $  */
+/*      $KAME: common.c,v 1.12 2005/02/17 10:17:21 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -303,8 +303,6 @@ mip6_delete_hal(hpfx_entry, gladdr)
 	return;
 }
 
-
-
 struct home_agent_list *
 mip6_get_hal(hpfx, global)
 	struct mip6_hpfxl *hpfx;
@@ -332,7 +330,6 @@ hal_set_expire_timer(hal, tick)
         hal->hal_expire = new_callout_entry(tick, hal_expire_timer,
 					    (void *)hal, "hal_expire_timer");
 }
-
 
 void
 hal_stop_expire_timer(hal)
@@ -383,7 +380,6 @@ mip6_delete_hpfxlist(home_prefix, home_prefixlen, hpfxhead)
 	
 	return;
 }
-
 
 struct mip6_hpfxl *
 mip6_get_hpfxlist(prefix, prefixlen, hpfxhead) 
@@ -1820,4 +1816,30 @@ command_show_stat(s, line)
 	PS("Home Address Option", mip6stat.mip6s_ohao);
 	PS("Routing Header type 2", mip6stat.mip6s_orthdr2);
 	PS("reverse tunneled output", mip6stat.mip6s_orevtunnel);
+}
+
+void
+show_hal(s, head)
+	int s;
+	struct mip6_hpfx_list *head;
+{
+        struct mip6_hpfxl *hpfx;
+        struct home_agent_list *hal = NULL;
+
+	LIST_FOREACH(hpfx, head, hpfx_entry) {
+		command_printf(s, "%s/%d\n ", ip6_sprintf(&hpfx->hpfx_prefix),
+			       hpfx->hpfx_prefixlen);
+		LIST_FOREACH(hal, &hpfx->hpfx_hal_head, hal_entry) {
+			command_printf(s, "\t%s ", ip6_sprintf(&hal->hal_ip6addr));
+			command_printf(s, "\t%s\n", 
+				ip6_sprintf(&hal->hal_lladdr));
+#ifdef MIP_HA
+			command_printf(s,
+				       "\t\tlif=%d pref=%d flag=%s %s\n",
+				       hal->hal_lifetime, hal->hal_preference, 
+				       (hal->hal_flag & MIP6_HAL_OWN)  ? "mine" : "",
+				       (hal->hal_flag & MIP6_HAL_STATIC)  ? "static" : "");
+#endif /* MIP_HA */
+		}
+	}
 }

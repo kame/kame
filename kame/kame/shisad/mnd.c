@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.7 2005/02/12 15:22:39 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.8 2005/02/17 10:17:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1463,30 +1463,11 @@ command_show_hal(s, dummy)
 	int s;
 	char *dummy;
 {
-        struct home_agent_list *hal = NULL, *haln = NULL;
-        struct mip6_hpfxl *hpfx;
 	struct mip6_mipif *mipif = NULL;
 
         LIST_FOREACH(mipif, &mipifhead, mipif_entry) {
-		LIST_FOREACH(hpfx, &mipif->mipif_hprefx_head, hpfx_entry) {
-			for (hal = LIST_FIRST(&hpfx->hpfx_hal_head); hal; hal = haln) {
-				haln =  LIST_NEXT(hal, hal_entry);
-				
-				command_printf(s, "%s ", ip6_sprintf(&hal->hal_ip6addr));
-				command_printf(s, "%s\n", 
-					ip6_sprintf(&hal->hal_lladdr));
-#ifdef MIP_HA
-				command_printf(s,
-					"     lif=%d pref=%d flag=%s%s\n",
-					hal->hal_lifetime, hal->hal_preference, 
-					(hal->hal_flag & MIP6_HA_OWN)  ? "mine" : ""
-					(hal->hal_flag & MIP6_HA_STATIC)  ? "static" : "");
-#endif /* MIP_HA */
-			}
-		}
+		show_hal(s, &mipif->mipif_hprefx_head);
 	}
-
-	return;
 }
 
 /* Flush BC should be done by cnd */

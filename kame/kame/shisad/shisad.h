@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.8 2005/02/12 15:22:40 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.9 2005/02/17 10:17:21 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -463,6 +463,7 @@ void hal_set_expire_timer(struct home_agent_list *, int);
 void hal_stop_expire_timer(struct home_agent_list *);
 void hal_expire_timer(void *);
 void command_show_stat(int, char *);
+void show_hal(int, struct mip6_hpfx_list *);
 
 /* mnd.c */
 int mipsock_bul_request(struct binding_update_list *, u_char);
