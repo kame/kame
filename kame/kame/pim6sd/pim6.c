@@ -299,10 +299,10 @@ accept_pim6(pimlen)
          receive_pim6_hello(src, (char *)(pim), pimlen);
          break;
      case PIM_REGISTER:
-       	receive_pim6_register(src, &dst , (char *)(pim), pimlen);  
+       	receive_pim6_register(src, &dst, (char *)(pim), pimlen);  
 		break;
      case PIM_REGISTER_STOP:
-       	 receive_pim6_register_stop(src , &dst, (char *)(pim), pimlen);  
+       	 receive_pim6_register_stop(src, &dst, (char *)(pim), pimlen);  
          break;
      case PIM_JOIN_PRUNE:
          receive_pim6_join_prune(src, &dst, (char *)(pim), pimlen);
