@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.17 2001/06/01 17:11:37 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.18 2001/10/09 11:56:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -163,6 +163,7 @@ void ra_timer_update __P((void *, struct timeval *));
 
 int prefix_match __P((struct in6_addr *, int, struct in6_addr *, int));
 struct rainfo *if_indextorainfo __P((int));
+struct prefix *find_prefix __P((struct rainfo *, struct in6_addr *, int));
 
 extern struct in6_addr in6a_site_allrouters;
 #ifdef MIP6
