@@ -720,7 +720,7 @@ client6_recvreply(s, serv)
 		cp += sizeof(struct in6_addr);
 	ep = rbuf + len;
 	for (; cp < ep; cp += elen + 4) {
-		if (cp + 4 >= ep) {
+		if (cp + 4 > ep) {
 			dprintf((stderr,
 				 "client6_recvreply: malformed extension\n"));
 			break;
@@ -731,7 +731,7 @@ client6_recvreply(s, serv)
 			elen = ntohs(*(u_int16_t *)&cp[2]);
 		else
 			elen = 0;
-		if (cp + 4 + elen >= ep) {
+		if (cp + 4 + elen > ep) {
 			dprintf((stderr,
 				 "client6_recvreply: malformed extension\n"));
 			break;
