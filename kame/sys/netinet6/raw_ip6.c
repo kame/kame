@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.75 2001/04/29 03:14:43 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.76 2001/04/29 13:45:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -622,7 +622,8 @@ rip6_ctloutput(op, so, level, optname, mp)
 	int error = 0;
 	int optval;
 	struct in6pcb *in6p;
-	struct mbuf *m = *mp;
+	struct mbuf *m;
+	const int icmp6off = offsetof(struct icmp6_hdr, icmp6_cksum);
 
 	switch (level) {
 	case IPPROTO_IPV6:
@@ -644,47 +645,41 @@ rip6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 			return (error);
 		case IPV6_CHECKSUM:
+			/*
+			 * for ICMPv6 sockets, no modification allowed for
+			 * checksum offset, permit "no change" values to
+			 * help existing apps.
+			 */
 			in6p = sotoin6pcb(so);
-			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
-				int off;
-
-				/*
-				 * no modification to checksum offset, permit
-				 * "no change" values to help existing apps.
-				 */
-				off = offsetof(struct icmp6_hdr, icmp6_cksum);
-				if (op == PRCO_SETOPT) {
-					if (!m || m->m_len != sizeof(int))
-						return EINVAL;
+			error = 0;
+			if (op == PRCO_SETOPT) {
+				m = *mp;
+				if (m && m->m_len == sizeof(int)) {
 					optval = *mtod(m, int *);
-					(void)m_free(m);
-					if (optval != off)
-						return EINVAL;
-				} else if (op == PRCO_GETOPT) {
-					*mp = m = m_get(M_WAIT, MT_SOOPTS);
-					m->m_len = sizeof(int);
-					*mtod(m, int *) = off;
+					if (so->so_proto->pr_protocol ==
+					    IPPROTO_ICMPV6) {
+						if (optval != icmp6off)
+							error = EINVAL;
+					} else
+						in6p->in6p_cksum = optval;
 				} else
 					error = EINVAL;
-			} else {
-				if (op == PRCO_SETOPT) {
-					if (!m || m->m_len != sizeof(int))
-						return EINVAL;
-					optval = *mtod(m, int *);
-					(void)m_free(m);
-					in6p->in6p_cksum = optval;
-				} else if (op == PRCO_GETOPT) {
+				if (m)
+					m_free(m);
+			} else if (op == PRCO_GETOPT) {
+				if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
+					optval = icmp6off;
+				else
 					optval = in6p->in6p_cksum;
-					*mp = m = m_get(M_WAIT, MT_SOOPTS);
-					m->m_len = sizeof(int);
-					*mtod(m, int *) = optval;
-				} else
-					error = EINVAL;
-			}
-			return (error);
+				*mp = m = m_get(M_WAIT, MT_SOOPTS);
+				m->m_len = sizeof(int);
+				*mtod(m, int *) = optval;
+			} else
+				error = EINVAL;
+			return error;
+		default:
+			return (ip6_ctloutput(op, so, level, optname, mp));
 		}
-		return (ip6_ctloutput(op, so, level, optname, mp));
-		/* NOTREACHED */
 
 	case IPPROTO_ICMPV6:
 		/*
@@ -695,8 +690,8 @@ rip6_ctloutput(op, so, level, optname, mp)
 
 	default:
 		if (op == PRCO_SETOPT && *mp)
-			(void)m_free(*mp);
-		return(EINVAL);
+			m_free(*mp);
+		return EINVAL;
 	}
 }
 
