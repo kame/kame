@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1650 2001/04/17 18:40:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.1651 2001/04/19 09:31:22 sakane Exp $
 
 <200104>
+Thu Apr 19 18:26:49 JST 2001 sakane@ydc.co.jp
+	* sys/netinet6/ah_input.c:
+	Fixed to mismatch AH checksum on FreeBSD4.  ip->ip_id was reversed
+	before calculating IPv4 ah checksum, but this operation is not
+	necessary for FreeBSD4.  Only FreeBSD[23], openbsd and bsdi3 need.
+	The problem doesn't appear on the FreeBSD original tree.
+
 2001-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6[ds]d/mld6_proto.c: clarifications and cleanups;
 	  - removed an incorrect check in accept_listener_query(), which was
