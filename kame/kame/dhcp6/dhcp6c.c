@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.139 2004/07/28 22:34:00 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.140 2004/07/28 22:47:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1579,7 +1579,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 			}
 		}
 	}
-#endif USE_DH6OPT_LIFETIME
+#endif /* USE_DH6OPT_LIFETIME */
 
 	/* update stateful configuration information */
 	if (state != DHCP6S_RELEASE) {
