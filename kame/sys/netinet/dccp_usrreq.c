@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.16 2003/10/30 07:36:53 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.17 2003/10/31 03:54:43 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1762,6 +1762,16 @@ again:
 #ifdef INET6
 	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Calling ip_output6, mbuf->m_len = %u, mbuf->m_pkthdr.len = %u\n", m->m_len, m->m_pkthdr.len));
+
+		/* attach the full sockaddr_in6 addresses to the packet. */
+#ifdef __FreeBSD__
+                if (!ip6_setpktaddrs(m, &inp->in6p_lsa, &inp->in6p_fsa)) {
+#else
+                if (!ip6_setpktaddrs(m, &in6p->in6p_lsa, &in6p->in6p_fsa)) {
+#endif
+                        error = ENOBUFS;
+                        goto release;
+                }
 #ifdef __FreeBSD__
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
 		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL, inp);
