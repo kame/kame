@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.16 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.17 2002/11/29 07:47:59 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -71,6 +71,7 @@
 #include <machine/clock.h>
 #endif
 #if defined(__i386__)
+#include <machine/cpufunc.h>		/* for pentium tsc */
 #include <machine/specialreg.h>		/* for CPUID_TSC */
 #ifdef __FreeBSD__
 #include <machine/md_var.h>		/* for cpu_feature */
@@ -1505,14 +1506,12 @@ write_dsfield(m, pktattr, dsfield)
  *  - 64-bit-long monotonically-increasing counter
  *  - frequency range is 100M-4GHz (CPU speed)
  */
+/* if pcc is not available or disabled, emulate 256MHz using microtime() */
+#define	MACHCLK_SHIFT	8
+
+int machclk_usepcc;
 u_int32_t machclk_freq = 0;
 u_int32_t machclk_per_tick = 0;
-
-#if (defined(__i386__) || defined(__alpha__)) && !defined(ALTQ_NOPCC)
-
-#if defined(__FreeBSD__) && defined(SMP)
-#error SMP system!  use ALTQ_NOPCC option.
-#endif
 
 #ifdef __alpha__
 #ifdef __FreeBSD__
@@ -1528,14 +1527,32 @@ extern u_int64_t cpu_tsc_freq;
 void
 init_machclk(void)
 {
-	/* sanity check */
+	machclk_usepcc = 1;
+
+#if (!defined(__i386__) && !defined(__alpha__)) || defined(ALTQ_NOPCC)
+	machclk_usepcc = 0;
+#endif
+#if defined(__FreeBSD__) && defined(SMP)
+	machclk_usepcc = 0;
+#endif
+#if defined(__NetBSD__) && defined(MULTIPROCESSOR)
+	machclk_usepcc = 0;
+#endif
 #ifdef __i386__
 	/* check if TSC is available */
-	if ((cpu_feature & CPUID_TSC) == 0) {
-		printf("altq: TSC isn't available! use ALTQ_NOPCC option.\n");
+	if (machclk_usepcc == 1 && (cpu_feature & CPUID_TSC) == 0)
+		machclk_usepcc = 0;
+#endif
+
+	if (machclk_usepcc == 0) {
+		/* emulate 256MHz using microtime() */
+		machclk_freq = 1000000 << MACHCLK_SHIFT;
+		machclk_per_tick = machclk_freq / hz;
+#ifdef ALTQ_DEBUG
+		printf("altq: emulate %uHz cpu clock\n", machclk_freq);
+#endif
 		return;
 	}
-#endif
 
 	/*
 	 * if the clock frequency (of Pentium TSC or Alpha PCC) is
@@ -1589,33 +1606,50 @@ init_machclk(void)
 #endif
 }
 
-#ifdef __alpha__
-/*
- * make a 64bit counter value out of the 32bit alpha processor cycle counter.
- * read_machclk must be called within a half of its wrap-around cycle
- * (about 5 sec for 400MHz cpu) to properly detect a counter wrap-around.
- * tbr_timeout calls read_machclk once a second.
- */
+#if defined(__OpenBSD__) && defined(__i386__)
+static __inline u_int64_t
+rdtsc(void)
+{
+	u_int64_t rv;
+	__asm __volatile(".byte 0x0f, 0x31" : "=A" (rv));
+	return (rv);
+}
+#endif /* __OpenBSD__ && __i386__ */
+
 u_int64_t
 read_machclk(void)
 {
-	static u_int32_t last_pcc, upper;
-	u_int32_t pcc;
+	u_int64_t val;
 
-	pcc = (u_int32_t)alpha_rpcc();
-	if (pcc <= last_pcc)
-		upper++;
-	last_pcc = pcc;
-	return (((u_int64_t)upper << 32) + pcc);
+	if (machclk_usepcc) {
+#if defined(__i386__)
+		val = rdtsc();
+#elif defined(__alpha__)
+		static u_int32_t last_pcc, upper;
+		u_int32_t pcc;
+
+		/*
+		 * for alpha, make a 64bit counter value out of the 32bit
+		 * alpha processor cycle counter.
+		 * read_machclk must be called within a half of its
+		 * wrap-around cycle (about 5 sec for 400MHz cpu) to properly
+		 * detect a counter wrap-around.
+		 * tbr_timeout calls read_machclk once a second.
+		 */
+		pcc = (u_int32_t)alpha_rpcc();
+		if (pcc <= last_pcc)
+			upper++;
+		last_pcc = pcc;
+		val = ((u_int64_t)upper << 32) + pcc;
+#else
+		panic("read_machclk");
+#endif
+	} else {
+		struct timeval tv;
+
+		microtime(&tv);
+		val = (((u_int64_t)(tv.tv_sec - boottime.tv_sec) * 1000000
+		    + tv.tv_usec) << MACHCLK_SHIFT);
+	}
+	return (val);
 }
-#endif /* __alpha__ */
-#else /* !i386  && !alpha */
-/* use microtime() for now */
-void
-init_machclk(void)
-{
-	machclk_freq = 1000000 << MACHCLK_SHIFT;
-	machclk_per_tick = machclk_freq / hz;
-	printf("altq: emulate %uHz cpu clock\n", machclk_freq);
-}
-#endif /* !i386 && !alpha */

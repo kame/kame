@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.12 2002/11/06 04:29:49 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.13 2002/11/29 07:47:59 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -99,49 +99,11 @@ struct acc_classifier {
  * machine dependent clock
  * a 64bit high resolution time counter.
  */
+extern int machclk_usepcc;
 extern u_int32_t machclk_freq;
 extern u_int32_t machclk_per_tick;
 extern void init_machclk(void);
-
-#ifdef __OpenBSD__
-#if defined(__i386__) && !defined(I586_CPU) && !defined(I686_CPU)
-#ifndef ALTQ_NOPCC
-#define	ALTQ_NOPCC	/* TSC is not available, ALTQ_NOPCC needed */
-#endif
-#endif
-#endif
-
-#if defined(__i386__) && !defined(ALTQ_NOPCC)
-/* for pentium tsc */
-#include <machine/cpufunc.h>
-
-#define	read_machclk()		rdtsc()
-#ifdef __OpenBSD__
-static __inline u_int64_t
-rdtsc(void)
-{
-	u_int64_t rv;
-	__asm __volatile(".byte 0x0f, 0x31" : "=A" (rv));
-	return (rv);
-}
-#endif /* __OpenBSD__ */
-
-#elif defined(__alpha__) && !defined(ALTQ_NOPCC)
-/* for alpha rpcc */
 extern u_int64_t read_machclk(void);
-
-#else /* !i386 && !alpha */
-/* emulate 256MHz using microtime() */
-#define	MACHCLK_SHIFT	8
-static __inline u_int64_t
-read_machclk(void)
-{
-	struct timeval tv;
-	microtime(&tv);
-	return (((u_int64_t)(tv.tv_sec - boottime.tv_sec) * 1000000
-		 + tv.tv_usec) << MACHCLK_SHIFT);
-}
-#endif /* !i386 && !alpha */
 
 /*
  * debug support
