@@ -36,6 +36,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl v46
+.Op Fl s Ar source
 .Ar interface
 .Ar address
 .Ar port
@@ -74,6 +75,11 @@ By default,
 .Nm
 uses IPv6.
 .\"
+.Pp
+With
+.Fl s
+.Ar source
+option, you can also specify the sender address of the multicast packet.  If your kernel supports IGMPv3 / MLDv2, this source information is passed to the upstream multicast router.
 .Sh RETURN VALUES
 .Nm
 will exit with positive value on errors.

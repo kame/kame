@@ -49,7 +49,7 @@ int vflag = 0;
 int af = AF_INET6;
 
 void recvloop __P((void));
-int get_socket __P((struct addrinfo *, char *, struct addrinfo **));
+int get_socket __P((struct addrinfo *, char *, char *, struct addrinfo **));
 void usage __P((void));
 
 int
@@ -57,13 +57,13 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	char *ifname, *servname, *address;
+	char *ifname, *servname, *address, *srclist = NULL;
 	struct addrinfo hints;
 	struct addrinfo *ai, *ai_valid;
 	int c;
 	int error;
 
-	while ((c = getopt(argc, argv, "v46")) != -1) {
+	while ((c = getopt(argc, argv, "s:v46")) != -1) {
 		switch (c) {
 		case 'v':
 			vflag++;
@@ -73,6 +73,11 @@ main(argc, argv)
 			break;
 		case '6':
 			af = AF_INET6;
+			break;
+		case 's':
+			if ((srclist = strdup(optarg)) == 0) {
+				err(1, "strdup");
+			}
 			break;
 		default:
 			usage();
@@ -104,7 +109,7 @@ main(argc, argv)
 	if ((error = getaddrinfo(address, servname, &hints, &ai)) != 0)
 		errx(1, "getaddrinfo: %s\n", gai_strerror(error));
 
-	if ((recvsock = get_socket(ai, ifname, &ai_valid)) < 0)
+	if ((recvsock = get_socket(ai, ifname, srclist, &ai_valid)) < 0)
 		errx(1, "can't allocate socket");
 
 	freeaddrinfo(ai);
@@ -137,9 +142,10 @@ recvloop(void)
 }
 
 int
-get_socket(ai0, ifname, valid)
+get_socket(ai0, ifname, srclist, valid)
 	struct addrinfo *ai0;
 	char *ifname;
+	char *srclist;
 	struct addrinfo **valid;
 {
 	int so = -1;
@@ -147,6 +153,7 @@ get_socket(ai0, ifname, valid)
 	char *emsg = NULL;
 	char hbuf[1024];
 	int ifindex = if_nametoindex(ifname);
+	int error;
 
 	for (ai = ai0; ai; ai = ai->ai_next) {
 		if (getnameinfo(ai->ai_addr, ai->ai_addrlen, hbuf, sizeof(hbuf),
@@ -179,6 +186,63 @@ get_socket(ai0, ifname, valid)
 
 		/* join multicast group */
 
+		/* in case of SSM join, you can use protocol-independent API */
+		if (srclist != NULL) {
+			struct addrinfo hints, *res, *ptr;
+			struct group_source_req gsreq;
+			int level;
+
+			memset(&hints, 0, sizeof(hints));
+			hints.ai_family = ai->ai_family;
+			hints.ai_protocol = ai->ai_protocol;
+			if ((error = getaddrinfo(srclist, NULL, &hints, &res)) != 0) {
+				emsg = gai_strerror(error);
+				if (vflag)
+					warn("%s", emsg);
+				close(so);
+				so = -1;
+				continue;
+			}
+
+			memset(&gsreq, 0, sizeof(gsreq));
+			gsreq.gsr_interface = ifindex;
+			memcpy(&gsreq.gsr_group, ai->ai_addr, ai->ai_addrlen);
+
+			switch (ai->ai_family) {
+			case AF_INET6:
+				level = IPPROTO_IPV6;
+				break;
+			case AF_INET:
+				level = IPPROTO_IP;
+				break;
+			default:
+				if (vflag)
+					warn("unsupported address family %d\n", ai->ai_family);
+				continue;
+			}
+
+			for (ptr = res; ptr; ptr = ptr->ai_next) {
+				memcpy(&gsreq.gsr_source, ptr->ai_addr, ptr->ai_addrlen);
+				if (setsockopt(so, level, MCAST_JOIN_SOURCE_GROUP,
+					       &gsreq, sizeof(gsreq))) {
+					emsg = "setsockopt(MCAST_JOIN_SOURCE_GROUP)";
+					if (vflag)
+						warn("%s", emsg);
+					close(so);
+					so = -1;
+					continue;
+				}
+			}
+			freeaddrinfo(res);
+
+			if (vflag)
+				warnx("using (S,G)=(%s,%s)", srclist, hbuf);
+
+			*valid = ai;
+			return so;
+		}
+
+		/* in case of ASM join, you have to use protocol-dependent API */
 		switch (ai->ai_family) {
 		case AF_INET6:
 		    {
@@ -267,7 +331,7 @@ void
 usage(void)
 {
 	fprintf(stderr,
-		"usage: mcastread [-v46] interface multicastaddr port [file]\n");
+		"usage: mcastread [-v46] [-s source] interface multicastaddr port [file]\n");
 	exit(1);
 	/*NOTREACHED*/
 }
