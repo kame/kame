@@ -27,7 +27,7 @@
 # SUCH DAMAGE.
 
 # get options
-while getopts "df:p:w:" option
+while getopts "df:p:sw:" option
 do
 	case $option in
 	d)
@@ -36,6 +36,8 @@ do
 	    dumpfile="${OPTARG}";;
 	p)
 	    pidfile="${OPTARG}";;
+        s)
+	    statmode="YES";;
 	w)
 	    waittime="${OPTARG}";;
 	*)			# (error msg printed by getopts)
@@ -57,15 +59,29 @@ if [ X"${waittime}" = X ]; then
     waittime=1
 fi
 
+if [ X"${statmode}" = X"YES" ]; then
+    signame=-INFO
+else
+    signame=-USR1
+fi
+
 if [ X"${dumpfile}" = X ]; then
-    if [ X"${densemode}" = X"YES" ]; then
-	dumpfile=/var/tmp/pim6dd.dump
+    if [ X"${statmode}" = X"YES" ]; then
+	if [ X"${densemode}" = X"YES" ]; then
+	    dumpfile=/var/tmp/pim6dd.stat
+	else
+	    dumpfile=/var/tmp/pim6sd.stat
+	fi
     else
-	dumpfile=/var/tmp/pim6sd.dump
+	if [ X"${densemode}" = X"YES" ]; then
+	    dumpfile=/var/tmp/pim6dd.dump
+	else
+	    dumpfile=/var/tmp/pim6sd.dump
+	fi
     fi
 fi
 
 # execution
-kill -USR1 `cat ${pidfile}`
+kill ${signame} `cat ${pidfile}`
 sleep ${waittime}
 cat ${dumpfile} 
