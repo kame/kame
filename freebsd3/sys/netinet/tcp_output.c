@@ -374,7 +374,7 @@ send:
 	 * NOTE: we assume that the IP/TCP header plus TCP options
 	 * always fit in a single mbuf, leaving room for a maximum
 	 * link header, i.e.
-	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MHLEN
+	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MCLBYTES
 	 */
 	optlen = 0;
 #ifdef INET6
@@ -533,7 +533,7 @@ send:
 	}
 
 /*#ifdef DIAGNOSTIC*/
- 	if (max_linkhdr + hdrlen > MHLEN)
+ 	if (max_linkhdr + hdrlen > MCLBYTES)
 		panic("tcphdr too big");
 /*#endif*/
 
@@ -570,9 +570,14 @@ send:
 			goto out;
 		}
 #ifdef INET6
-		if (isipv6 && (MHLEN < hdrlen + max_linkhdr)) {
-			MH_ALIGN(m, hdrlen);
-		} else
+ 		if (MHLEN < hdrlen + max_linkhdr) {
+ 			MCLGET(m, M_DONTWAIT);
+ 			if ((m->m_flags & M_EXT) == 0) {
+ 				m_freem(m);
+ 				error = ENOBUFS;
+ 				goto out;
+ 			}
+		}
 #endif
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
