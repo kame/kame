@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.126 2002/09/02 06:08:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.127 2002/09/02 11:25:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1510,11 +1510,15 @@ mip6_dad_start(mbc, lladdr)
 	ia->ia6_flags |= IN6_IFF_TENTATIVE;
 	if (!lladdr || IN6_IS_ADDR_UNSPECIFIED(lladdr)) {
 		sa6_copy_addr(&mbc->mbc_phaddr, &ia->ia_addr);
-#ifndef SCOPEDROUTING
-		ia->ia_addr.sin6_scope_id = 0;
-#endif
-	} else
+	} else {
 		ia->ia_addr.sin6_addr = *lladdr;
+	}
+	if (in6_addr2zoneid(ia->ia_ifp, &ia->ia_addr.sin6_addr,
+			    &ia->ia_addr.sin6_scope_id)) {
+		free(ia, M_IFADDR);
+		return (EINVAL);
+	}
+	in6_embedscope(&ia->ia_addr.sin6_addr, &ia->ia_addr);
 	IFAREF(&ia->ia_ifa);
 	mbc->mbc_dad = ia;
 	nd6_dad_start((struct ifaddr *)ia, NULL);
@@ -1630,35 +1634,34 @@ mip6_dad_error(ifa, err)
 	struct ifaddr *ifa;
 	int err;
 {
-	struct  mip6_bc *mbc, *mbc_next, *prim= NULL;
+	struct  mip6_bc *mbc, *mbc_next, *my, *prim= NULL;
 
-	for(mbc = LIST_FIRST(&mip6_bc_list);
-	    mbc;
-	    mbc = LIST_NEXT(mbc, mbc_entry)) {
-		if (mbc->mbc_dad == ifa)
+	for(my = LIST_FIRST(&mip6_bc_list);
+	    my;
+	    my = LIST_NEXT(my, mbc_entry)) {
+		if (my->mbc_dad == ifa)
 			break;
 	}
-	if (!mbc)
+	if (!my)
 		return (ENOENT);
 
-#ifndef MIP6_DAD_ON_ALL_PREFIX
-	prim = mbc;
+#ifdef MIP6_DAD_ON_ALL_PREFIX
+	if ((mbc->mbc_flags & IP6MU_CLONED) == 0)
 #endif
+	prim = my;
 	free(ifa, M_IFADDR);
-	mbc->mbc_dad = NULL;
+	my->mbc_dad = NULL;
 	for(mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
-#ifndef MIP6_DAD_ON_ALL_PREFIX
-		if (prim == mbc)
+		if (my == mbc)
 			continue;
-#endif
-		if (mbc->mbc_ifp != prim->mbc_ifp ||
+		if (mbc->mbc_ifp != my->mbc_ifp ||
 		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
 			continue;
 		if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-					 &prim->mbc_phaddr.sin6_addr,
+					 &my->mbc_phaddr.sin6_addr,
 					 64))
 			continue;
 #ifdef MIP6_DAD_ON_ALL_PREFIX
@@ -1671,6 +1674,11 @@ mip6_dad_error(ifa, err)
 		mbc->mbc_state &= ~MIP6_BC_STATE_DAD_WAIT;
 		mip6_bc_list_remove(&mip6_bc_list, mbc);
 	}
+#ifdef MIP6_DAD_ON_ALL_PREFIX
+	if (prim != my) {
+		mip6_bc_list_remove(&mip6_bc_list, my);
+	}
+#endif
 
 	if (prim == NULL)
 		return (ENOENT);	/* XXX or panic */
@@ -1745,7 +1753,7 @@ mip6_bc_proxy_control(target, local, cmd)
 #else /* __FreeBSD__ */
 		rt = rtalloc1((struct sockaddr *)&sa6, 1);
 #endif /* __FreeBSD__ */
-		if (rt == NULL)
+		if (rt == NULL || (rt->rt_flags & RTF_ANNOUNCE) == 0)
 			return EHOSTUNREACH;
 
 		error = rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
