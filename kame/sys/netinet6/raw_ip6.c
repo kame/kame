@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.88 2001/07/26 06:53:19 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.89 2001/07/26 06:59:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -862,13 +862,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 #endif
-		/*
-		 * Currently, ifa_ifwithaddr tends to fail for a link-local
-		 * address, since it implicitly expects that the link ID
-		 * for the address is embedded in the sin6_addr part.
-		 * For now, we'd rather keep this "as is". We'll eventually fix
-		 * this in a more natural way.
-		 */
 		if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0) {
 			error = EADDRNOTAVAIL;
