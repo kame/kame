@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.30 2000/04/24 11:40:48 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.31 2000/04/24 14:03:06 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1770,6 +1770,7 @@ addnewsp(mhp)
 	}
 
 	new->spidx.dir = xpl->sadb_x_policy_dir;
+	new->id = xpl->sadb_x_policy_id;
 	new->policy = xpl->sadb_x_policy_type;
 
 	/* check policy */
