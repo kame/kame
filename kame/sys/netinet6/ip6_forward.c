@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.53 2000/09/12 08:26:25 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.54 2000/09/13 09:07:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,9 +543,8 @@ ip6_forward(m, srcrt)
 			m_freem(m);
 			return;
 		}
-		else
 #endif
-			type = ND_REDIRECT;
+		type = ND_REDIRECT;
 	}
 
 #ifdef IPV6FIREWALL
