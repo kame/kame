@@ -1,4 +1,4 @@
-/*	$KAME: advcap.c,v 1.6 2001/06/08 04:46:19 jinmei Exp $	*/
+/*	$KAME: advcap.c,v 1.7 2002/05/29 09:36:07 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -160,7 +160,7 @@ getent(bp, name, cp)
 				}
 				break;
 			}
-			if (cp >= bp+BUFSIZ) {
+			if (cp >= bp + BUFSIZ) {
 				write(2,"Remcap entry too long\n", 23);
 				break;
 			} else
@@ -204,7 +204,7 @@ tnchktc()
 	/* p now points to beginning of last field */
 	if (p[0] != 't' || p[1] != 'c')
 		return (1);
-	strcpy(tcname, p+3);
+	strlcpy(tcname, p + 3, sizeof tcname);
 	q = tcname;
 	while (*q && *q != ':')
 		q++;
