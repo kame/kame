@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.83 2001/10/02 03:34:43 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.84 2001/10/02 04:19:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,13 +114,18 @@
 #if NGIF > 0
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
+TAILQ_HEAD(gifhead, gif_softc) gifs = TAILQ_HEAD_INITIALIZER(gifs);
+#else
+TAILQ_HEAD(gifhead, gif_softc) gifs;	/* depends on bss initialization */
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #define GIFNAME		"gif"
 #define GIFDEV		"if_gif"
 #define GIF_MAXUNIT	0x7fff	/* ifp->if_unit is only 15 bits */
 
 static MALLOC_DEFINE(M_GIF, "gif", "Generic Tunnel Interface");
 static struct rman gifunits[1];
-TAILQ_HEAD(gifhead, gif_softc) gifs = TAILQ_HEAD_INITIALIZER(gifs);
 
 int	gif_clone_create __P((struct if_clone *, int *));
 void	gif_clone_destroy __P((struct ifnet *));
@@ -310,6 +315,7 @@ gifattach(dummy)
 		sc->gif_if.if_unit = i;
 #endif
 		gifattach0(sc);
+		TAILQ_INSERT_TAIL(&gifs, sc, gif_link);
 	}
 }
 #endif
@@ -555,19 +561,12 @@ gif_output(ifp, m, dst, rt)
 void
 gifnetisr()
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	int i;
-
-	for (i = 0; i < ngif; i++)
-		gifintr(gif_softc + i);
-#else
 	struct gif_softc *sc;
 
 	for (sc = TAILQ_FIRST(&gifs);
 	     sc;
 	     sc = TAILQ_NEXT(sc, gif_link))
 		gifintr(sc);
-#endif
 }
 #endif
 
@@ -1023,17 +1022,9 @@ gif_set_tunnel(ifp, src, dst)
 	s = splnet();
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	for (i = 0; i < ngif; i++)
-#else
 	for (sc2 = TAILQ_FIRST(&gifs);
 	     sc2;
-	     sc2 = TAILQ_NEXT(sc2, gif_link))
-#endif
-	{
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-		sc2 = gif_softc + i;
-#endif
+	     sc2 = TAILQ_NEXT(sc2, gif_link)) {
 		if (sc2 == sc)
 			continue;
 		if (!sc2->gif_pdst || !sc2->gif_psrc)

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.25 2001/09/26 06:13:02 keiichi Exp $	*/
+/*	$KAME: if_gif.h,v 1.26 2001/10/02 04:19:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,8 +66,8 @@ struct gif_softc {
 	const struct encaptab *encap_cookie6;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	struct resource *r_unit;	/* resource allocated for this unit */
-	TAILQ_ENTRY(gif_softc) gif_link; /* all gif's are linked */
 #endif
+	TAILQ_ENTRY(gif_softc) gif_link; /* all gif's are linked */
 };
 
 #define gif_ro gifsc_gifscr.gifscr_ro
