@@ -1,6 +1,11 @@
-$Id: CHANGELOG,v 1.513 2000/02/02 17:23:55 itojun Exp $
+$Id: CHANGELOG,v 1.514 2000/02/03 06:54:32 jinmei Exp $
 
 <200002>
+2000-02-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6[ds]d/mld6.c (make_mld6_msg): corrected HBH header
+	length in the 2292bis case.
+	In response to: kit/198 from ryuji-so@is.aist-nara.ac.jp
+
 Thu Feb  3 02:22:03 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6.c: improve multicast kludge list management.
 	  clear dangling pointer, update ifnet refcnt correctly.
