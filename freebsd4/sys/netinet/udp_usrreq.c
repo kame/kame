@@ -378,9 +378,12 @@ udp_input(m, off)
 #endif /* IPSEC */
 			/*
 			 * Receive multicast data which fits MSF condition.
+			 * Broadcast data needs no further check.
 			 */
-			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
-				continue;
+			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
+				PASS_TO_PCB();
+				goto next_inp;
+			}
 			
 			if ((imo = inp->inp_moptions) == NULL)
 				continue;
@@ -474,6 +477,9 @@ udp_input(m, off)
 			}
 #endif /* IGMPV3 */
 
+#ifdef IGMPV3
+		next_inp:
+#endif
 			last = inp;
 			/*
 			 * Don't look for additional matches if this one does
@@ -486,9 +492,6 @@ udp_input(m, off)
 			if ((last->inp_socket->so_options&(SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
 
-#ifdef IGMPV3
-		next_inp:;
-#endif
 		}
 
 		if (last == NULL) {

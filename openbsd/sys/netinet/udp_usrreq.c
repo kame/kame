@@ -564,6 +564,7 @@ udp_input(struct mbuf *m, ...)
 
 			/*
 			 * Receive multicast data which fits MSF condition.
+			 * Broadcast data needs no further check.
 			 */
 #ifdef INET6
 			if (ip && !IN_MULTICAST(ip->ip_dst.s_addr))

@@ -713,9 +713,12 @@ udp4_realinput(src, dst, m, off)
 	} while (0)
 			/*
 			 * Receive multicast data which fits MSF condition.
+			 * Broadcast data needs no further check.
 			 */
-			if (!IN_MULTICAST(dst4->s_addr))
-				goto bypass_msf_condition_check;
+			if (!IN_MULTICAST(dst4->s_addr)) {
+				PASS_TO_PCB();
+				goto next_inp;
+			}
 			
 			if ((imo = inp->inp_moptions) == NULL)
 				continue;
@@ -780,7 +783,8 @@ udp4_realinput(src, dst, m, off)
 			end_of_search:
 				break;
 			}
-		bypass_msf_condition_check:
+			if (i == imo->imo_num_memberships)
+				continue;
 #undef PASS_TO_PCB
 #else
 			last = inp;
@@ -789,6 +793,9 @@ udp4_realinput(src, dst, m, off)
 			rcvcnt++;
 #endif
 
+#ifdef IGMPV3
+		next_inp:
+#endif
 			/*
 			 * Don't look for additional matches if this one does
 			 * not have either the SO_REUSEPORT or SO_REUSEADDR
