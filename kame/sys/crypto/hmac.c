@@ -1,4 +1,4 @@
-/*	$KAME: hmac.c,v 1.1 2002/06/27 12:44:32 t-momose Exp $	*/
+/*	$KAME: hmac.c,v 1.2 2002/06/28 09:19:58 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -27,6 +27,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+/* RFC2104   HMAC: Keyed-Hashing for Message Authentication */
 
 /* Some of operating systems have standard crypto checksum library */
 #ifdef __NetBSD__
@@ -134,7 +136,7 @@ hmac_init(ctx, hmac_key, hmac_keylen, hash)
 	size_t keylen;
 	size_t i;
 
-	if (!ctx)
+	if (!ctx || !hmac_key || hmac_keylen == 0 || !hash)
 		return (EINVAL);
 
 	bzero(ctx, sizeof(*ctx));
@@ -203,7 +205,7 @@ hmac_loop(ctx, addr, len)
 	u_int8_t *addr;
 	int len;
 {
-	if (!ctx || ctx->foo)
+	if (!ctx || !ctx->foo)
 		return (EINVAL);
 
 	ctx->hash_ctx = ((caddr_t)ctx->foo) + 128;
@@ -222,7 +224,7 @@ hmac_result(ctx, addr)
 	u_char *opad;
 	int error = 0;
 
-	if (!ctx || ctx->foo)
+	if (!ctx || !ctx->foo)
 		return (EINVAL);
 
 	ipad = (u_char *)ctx->foo;
