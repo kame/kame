@@ -5326,7 +5326,7 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 		if (action == PF_PASS) {
 			r = s->rule.ptr;
 			r->packets++;
-#ifdef __OpeNBSD__
+#ifdef __OpenBSD__
 			r->bytes += ntohs(h->ip_len);
 #else
 			r->bytes += h->ip_len;
@@ -5334,7 +5334,7 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 			a = s->anchor.ptr;
 			if (a != NULL) {
 				a->packets++;
-#ifdef __OpeNBSD__
+#ifdef __OpenBSD__
 				a->bytes += ntohs(h->ip_len);
 #else
 				a->bytes += h->ip_len;
