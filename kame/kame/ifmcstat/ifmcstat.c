@@ -47,7 +47,7 @@
 #include <net/if_dl.h>
 #include <netinet/in.h>
 #include <netinet/igmp.h>
-#ifdef IGMP_V3_MEMBERSHIP_REPORT
+#ifdef IGMP_v3_MEMBERSHIP_REPORT
 #include <netinet/in_msf.h>
 #endif
 #ifdef MCAST_JOIN_SOURCE_GROUP
@@ -97,7 +97,7 @@ struct in6_multi * in6_multientry __P((struct in6_multi *));
 void if_addrlist(struct ifaddr *);
 void in_multilist(struct in_multi *);
 struct in_multi * in_multientry(struct in_multi *);
-#ifdef IGMP_V3_MEMBERSHIP_REPORT
+#ifdef IGMP_v3_MEMBERSHIP_REPORT
 void in_addr_slistentry(struct in_addr_slist *ias, char *heading);
 #endif
 #ifdef MCAST_JOIN_SOURCE_GROUP
@@ -577,7 +577,7 @@ in_multientry(mc)
 {
 	struct in_multi multi;
 	struct router_info rti;
-#ifdef IGMP_V3_MEMBERSHIP_REPORT
+#ifdef IGMP_v3_MEMBERSHIP_REPORT
 	struct in_multi_source src;
 #endif
 
@@ -586,14 +586,14 @@ in_multientry(mc)
 
 	KREAD(multi.inm_rti, &rti, struct router_info);
 	switch (rti.rti_type) {
-	case IGMP_V1_MEMBERSHIP_REPORT:
+	case IGMP_v1_MEMBERSHIP_REPORT:
 		printf("\tigmp_ver 1");
 		break;
-	case IGMP_V2_MEMBERSHIP_REPORT:
+	case IGMP_v2_MEMBERSHIP_REPORT:
 		printf("\tigmp_ver 2");
 		break;
-#ifdef IGMP_V3_MEMBERSHIP_REPORT
-	case IGMP_V3_MEMBERSHIP_REPORT:
+#ifdef IGMP_v3_MEMBERSHIP_REPORT
+	case IGMP_v3_MEMBERSHIP_REPORT:
 		printf("\tigmp_ver 3");
 		break;
 #endif
@@ -602,7 +602,7 @@ in_multientry(mc)
 		break;
 	}
 
-#ifdef IGMP_V3_MEMBERSHIP_REPORT
+#ifdef IGMP_v3_MEMBERSHIP_REPORT
 	if (multi.inm_source == NULL) {
 		printf("\n");
 		return(multi.inm_list.le_next);
@@ -633,7 +633,7 @@ in_multientry(mc)
 #endif
 }
 
-#ifdef IGMP_V3_MEMBERSHIP_REPORT
+#ifdef IGMP_v3_MEMBERSHIP_REPORT
 void
 in_addr_slistentry(struct in_addr_slist *ias, char *heading)
 {
