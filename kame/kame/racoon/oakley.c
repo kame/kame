@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.81 2001/04/10 23:43:40 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.82 2001/04/11 06:11:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@
 #include "sainfo.h"
 #include "proposal.h"
 #include "crypto_openssl.h"
+#include "dnssec.h"
 #include "sockmisc.h"
 #include "strnames.h"
 #include "gcmalloc.h"
@@ -1172,31 +1173,72 @@ oakley_validate_auth(iph1)
 				"no SIG payload was passed.\n");
 			return ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		}
-		if (iph1->cert_p == NULL && iph1->rmconf->peerscertfile == NULL) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"no CERT payload found "
-				"even though CR sent.\n");
-			return -1;
-		}
+
 		plog(LLV_DEBUG, LOCATION, NULL, "SIGN passed:\n");
 		plogdump(LLV_DEBUG, iph1->sig_p->v, iph1->sig_p->l);
 
-		/* get peer's certificate if no there */
-		if (iph1->cert_p == NULL
-		 && iph1->rmconf->peerscertfile != NULL) {
+		/* get peer's cert */
+		switch (iph1->rmconf->getcert_method) {
+		case ISAKMP_GETCERT_PAYLOAD:
+			if (iph1->cert_p == NULL) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"no peer's CERT payload found "
+					"even though CR sent.\n");
+				return -1;
+			}
+			break;
+		case ISAKMP_GETCERT_LOCALFILE:
+			if (iph1->rmconf->peerscertfile == NULL) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"no peer's CERT file found.\n");
+				return -1;
+			}
+
+			/* don't cache cert */
+			if (iph1->cert_p != NULL) {
+				oakley_delcert(iph1->cert_p);
+				iph1->cert_p = NULL;
+			}
+
 			error = get_cert_fromlocal(iph1, 0);
 			if (error)
 				return -1;
+			break;
+		case ISAKMP_GETCERT_DNS:
+			if (iph1->rmconf->peerscertfile != NULL) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"why peer's CERT file is defined "
+					"though getcert method is dns ?\n");
+				return -1;
+			}
+
+			/* don't cache cert */
+			if (iph1->cert_p != NULL) {
+				oakley_delcert(iph1->cert_p);
+				iph1->cert_p = NULL;
+			}
+
+			iph1->cert_p = dnssec_getcert(iph1->id_p);
+			if (iph1->cert_p == NULL) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"no CERT RR found.\n");
+				return -1;
+			}
+			break;
+		default:
+			plog(LLV_ERROR, LOCATION, NULL,
+				"invalid getcert_mothod: %d\n",
+				iph1->rmconf->getcert_method);
+			return -1;
 		}
 
-		/* don't cache the certificate passed. */
+		/* compare ID payload and certificate name */
+		if (iph1->rmconf->verify_cert && oakley_check_certid(iph1))
+			return error;
 
-		/* check ID payload and certificate name */
-		if (iph1->rmconf->verify_cert) {
-			error = oakley_check_certid(iph1);
-			if (error)
-				return error;
-
+		/* verify certificate */
+		if (iph1->rmconf->verify_cert
+		 && iph1->rmconf->getcert_method == ISAKMP_GETCERT_PAYLOAD) {
 			switch (iph1->rmconf->certtype) {
 			case ISAKMP_CERT_X509SIGN:
 				error = eay_check_x509cert(&iph1->cert_p->cert,
@@ -1214,9 +1256,11 @@ oakley_validate_auth(iph1)
 					"Invalid authority of the CERT.\n");
 				return ISAKMP_NTYPE_INVALID_CERT_AUTHORITY;
 			}
-			plog(LLV_DEBUG, LOCATION, NULL, "CERT validated\n");
 		}
 
+		plog(LLV_DEBUG, LOCATION, NULL, "CERT validated\n");
+
+		/* compute hash */
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:
 		case ISAKMP_ETYPE_AGG:
@@ -1236,8 +1280,10 @@ oakley_validate_auth(iph1)
 		if (my_hash == NULL)
 			return -1;
 
+		/* check signature */
 		switch (iph1->rmconf->certtype) {
 		case ISAKMP_CERT_X509SIGN:
+		case ISAKMP_CERT_DNS:
 			error = eay_check_x509sign(my_hash,
 					iph1->sig_p,
 					&iph1->cert_p->cert);
@@ -1363,7 +1409,7 @@ get_cert_fromlocal(iph1, my)
 
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
-
+	case ISAKMP_CERT_DNS:
 		/* make public file name */
 		getpathname(path, sizeof(path), LC_PATHTYPE_CERT, certfile);
 		cert = eay_get_x509cert(path);
@@ -1374,6 +1420,7 @@ get_cert_fromlocal(iph1, my)
 			racoon_free(p);
 		};
 		break;
+
 	default:
 		plog(LLV_ERROR, LOCATION, NULL,
 			"not supported certtype %d\n",
@@ -1431,6 +1478,7 @@ oakley_getsign(iph1)
 
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
+	case ISAKMP_CERT_DNS:
 		if (iph1->rmconf->myprivfile == NULL) {
 			plog(LLV_ERROR, LOCATION, NULL, "no cert defined.\n");
 			goto end;
@@ -1676,9 +1724,13 @@ oakley_savecert(iph1, gen)
 	type = *(u_int8_t *)(gen + 1) & 0xff;
 
 	switch (type) {
+	case ISAKMP_CERT_DNS:
+		plog(LLV_WARNING, LOCATION, NULL,
+			"CERT payload is unnecessary in DNSSEC. "
+			"ignore this CERT payload.\n");
+		return 0;
 	case ISAKMP_CERT_PKCS7:
 	case ISAKMP_CERT_PGP:
-	case ISAKMP_CERT_DNS:
 	case ISAKMP_CERT_X509SIGN:
 	case ISAKMP_CERT_KERBEROS:
 	case ISAKMP_CERT_SPKI:
@@ -1700,8 +1752,10 @@ oakley_savecert(iph1, gen)
 	}
 
 	/* XXX choice the 1th cert, ignore after the cert. */ 
+	/* XXX should be processed. */
 	if (*c) {
-		plog(LLV_WARNING, LOCATION, NULL, "ignore the cert.\n");
+		plog(LLV_WARNING, LOCATION, NULL,
+			"ignore 2nd CERT payload.\n");
 		return 0;
 	}
 
@@ -1713,9 +1767,13 @@ oakley_savecert(iph1, gen)
 	}
 
 	switch ((*c)->type) {
+	case ISAKMP_CERT_DNS:
+		plog(LLV_WARNING, LOCATION, NULL,
+			"CERT payload is unnecessary in DNSSEC. "
+			"ignore it.\n");
+		return 0;
 	case ISAKMP_CERT_PKCS7:
 	case ISAKMP_CERT_PGP:
-	case ISAKMP_CERT_DNS:
 	case ISAKMP_CERT_X509SIGN:
 	case ISAKMP_CERT_KERBEROS:
 	case ISAKMP_CERT_SPKI:
@@ -1758,9 +1816,12 @@ oakley_savecr(iph1, gen)
 	type = *(u_int8_t *)(gen + 1) & 0xff;
 
 	switch (type) {
+	case ISAKMP_CERT_DNS:
+		plog(LLV_WARNING, LOCATION, NULL,
+			"CERT payload is unnecessary in DNSSEC\n");
+		/*FALLTHRU*/
 	case ISAKMP_CERT_PKCS7:
 	case ISAKMP_CERT_PGP:
-	case ISAKMP_CERT_DNS:
 	case ISAKMP_CERT_X509SIGN:
 	case ISAKMP_CERT_KERBEROS:
 	case ISAKMP_CERT_SPKI:

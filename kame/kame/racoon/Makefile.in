@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.31 2001/01/31 05:32:55 sakane Exp $
+#	$KAME: Makefile.in,v 1.32 2001/04/11 06:11:54 sakane Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -26,7 +26,7 @@ PROG=	racoon eaytest
 OBJS=	main.o session.o isakmp.o handler.o random.o \
 	isakmp_ident.o isakmp_agg.o isakmp_base.o \
 	isakmp_quick.o isakmp_inf.o isakmp_newg.o \
-	gssapi.o \
+	gssapi.o dnssec.o getcertsbyname.o \
 	pfkey.o admin.o ipsec_doi.o oakley.o grabmyaddr.o vendorid.o \
 	policy.o localconf.o remoteconf.o crypto_openssl.o algorithm.o \
 	proposal.o sainfo.o cfparse.o cftoken.o strnames.o \

@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.78 2001/04/06 14:23:48 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.79 2001/04/11 06:11:55 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -303,10 +303,19 @@ means a file name of certificate.
 means a file name of secret key.
 .El
 .\"
-.It Ic peers_certfile Ar certfile ;
-When the peer does not send a certificate,
+.It Ic peers_certfile ( dnssec \*(Ba Ar certfile ) ;
+If
+.Ic dnssec
+is defined,
 .Xr racoon 8
-can use this certificate as the peer's certificate.
+will ignore the CERT payload from the peer,
+and try to get the peer's certificate from DNS instead.
+If
+.Ar certfile
+is defined,
+.Xr racoon 8
+will ignore the CERT payload from the peer,
+and will use this certificate as the peer's certificate.
 .\"
 .It Ic send_cert (on \(ba off) ;
 If you do not want to send a certificate for some reason, set this to off.

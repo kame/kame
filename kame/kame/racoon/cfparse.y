@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.97 2001/04/04 02:35:18 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.98 2001/04/11 06:11:55 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -145,7 +145,7 @@ static int fix_lifebyte __P((u_long));
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
 %token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT SEND_CR
 %token IDENTIFIERTYPE MY_IDENTIFIER PEERS_IDENTIFIER
-%token CERT_X509
+%token DNSSEC CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
 %token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
 %token GENERATE_POLICY SUPPORT_MIP6
@@ -995,8 +995,20 @@ remote_spec
 	|	PEERS_CERTFILE QUOTEDSTRING
 		{
 #ifdef HAVE_SIGNING_C
+			cur_rmconf->getcert_method = ISAKMP_GETCERT_LOCALFILE;
 			cur_rmconf->peerscertfile = strdup($2->v);
 			vfree($2);
+#else
+			yyerror("directive not supported");
+			return -1;
+#endif
+		}
+		EOS
+	|	PEERS_CERTFILE DNSSEC
+		{
+#ifdef HAVE_SIGNING_C
+			cur_rmconf->getcert_method = ISAKMP_GETCERT_DNS;
+			cur_rmconf->peerscertfile = NULL;
 #else
 			yyerror("directive not supported");
 			return -1;

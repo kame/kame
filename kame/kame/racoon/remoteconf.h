@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.23 2001/04/06 14:23:48 sakane Exp $	*/
+/*	$KAME: remoteconf.h,v 1.24 2001/04/11 06:11:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,7 @@ struct remoteconf {
 	char *mycertfile;		/* file name of my certificate */
 	char *myprivfile;		/* file name of my private key file */
 	char *peerscertfile;		/* file name of peer's certifcate */
+	int getcert_method;		/* the way to get peer's certificate */
 	int send_cert;			/* send to CERT or not */
 	int send_cr;			/* send to CR or not */
 	int verify_cert;		/* verify a CERT strictly */
