@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/06/22 04:29:30 $
+			$Date: 2000/06/27 16:49:16 $
 
 1. IPv6
 
@@ -73,9 +73,9 @@ RFC2545: Use of BGP-4 Multiprotocol Extensions for IPv6 Inter-Domain Routing
 RFC2553: Basic Socket Interface Extensions for IPv6
     * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
       socket (3.8) are,
-	- supported on KAME/FreeBSD3x,
-	- supported on KAME/NetBSD,
-	- supported on KAME/BSDI4,
+	- supported and turned on by default on KAME/FreeBSD[34]x
+	  and KAME/BSDI4,
+	- supported but turned off by default on KAME/NetBSD,
 	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
       see 1.12 in this document for details.
 RFC2671: Extension Mechanisms for DNS (EDNS0)
@@ -755,6 +755,8 @@ KAME/BSDI3	not supported		not supported
 KAME/FreeBSD228	not supported		not supported
 KAME/FreeBSD3x	configurable		supported
 		default: enabled
+KAME/FreeBSD4x	configurable		supported
+		default: enabled
 KAME/NetBSD	configurable		supported
 		default: disabled 
 KAME/BSDI4	enabled			supported
@@ -828,12 +830,13 @@ and initiating side).  AF_INET6 and AF_INET sockets are totally separated.
 
 Port number space is totally separate between AF_INET and AF_INET6 sockets. 
 
-1.12.2 KAME/FreeBSD3x
+1.12.2 KAME/FreeBSD[34]x
 
-KAME/FreeBSD3x uses shared tcp4/6 code (from sys/netinet/tcp*) and shared
-udp4/6 code (from sys/netinet/udp*).  It uses unified inpcb/in6pcb structure.
+KAME/FreeBSD3x and KAME/FreeBSD4x use shared tcp4/6 code (from
+sys/netinet/tcp*) and shared udp4/6 code (from sys/netinet/udp*).
+They use unified inpcb/in6pcb structure.
 
-1.12.2.1 KAME/FreeBSD3x, listening side
+1.12.2.1 KAME/FreeBSD[34]x, listening side
 
 The platform can be configured to support IPv4 mapped address/special
 AF_INET6 wildcard bind (enabled by default).  There is no kernel compilation
@@ -848,7 +851,7 @@ conditions are satisfied:
 
 (XXX need checking)
 
-1.12.2.2 KAME/FreeBSD3x, initiating side
+1.12.2.2 KAME/FreeBSD[34]x, initiating side
 
 KAME/FreeBSD3x supports outgoing connection to IPv4 mapped address
 (::ffff:10.1.1.1), if the node is configured to accept IPv4 connections
@@ -860,8 +863,8 @@ by AF_INET6 socket.
 
 KAME/NetBSD uses shared tcp4/6 code (from sys/netinet/tcp*) and shared
 udp4/6 code (from sys/netinet/udp*).  The implementation is made differently
-from KAME/FreeBSD3x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
-while KAME/FreeBSD3x uses merged inpcb structure.
+from KAME/FreeBSD[34]x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
+while KAME/FreeBSD[34]x uses merged inpcb structure.
 
 1.12.3.1 KAME/NetBSD, listening side
 
