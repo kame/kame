@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2663 2004/08/12 07:26:34 jinmei Exp $
+$KAME: CHANGELOG,v 1.2664 2004/08/12 07:56:25 jinmei Exp $
 
 <200408>
 Thu Aug 12 12:54:25 JST 2004	keiichi@iij.ad.jp
@@ -17,9 +17,9 @@ Thu Aug 12 12:54:25 JST 2004	keiichi@iij.ad.jp
 	* kame/sys/netinet6/nd6_nbr.c (nd6_dad_duplicated):
 	* kame/sys/netinet6/ip6_input.c (ip6intr):
 	* kame/sys/netinet6/nd6.c (nd6_output):
-	disabled IPv6 operation if DAD fails if the interface identifier
-	is based on EUI-64 ID which is supposed to be unique
-	(clarification in rfc2462bis).
+	disabled IPv6 operation if DAD fails for an address whose
+	interface identifier is based on an EUI-64 ID which is supposed to
+	be unique (a clarification in rfc2462bis).
 
 2004-08-11  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd5/sbin/ifconfig/ifconfig.c: stopped unnecessary kernel
