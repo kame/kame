@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.3 2001/11/13 09:37:12 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.4 2001/11/13 10:15:14 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -138,4 +138,6 @@ inet_zoneid(family, type, ifname, identp)
 	default:
 		return(0);	/* XXX */
 	}
+
+	return(0);
 }
