@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.696 2000/03/16 13:35:40 itojun Exp $
+$Id: CHANGELOG,v 1.697 2000/03/16 14:09:58 itojun Exp $
 
 <200003>
 Thu Mar 16 22:33:52 JST 2000  itojun@iijlab.net
@@ -8,6 +8,7 @@ Thu Mar 16 22:33:52 JST 2000  itojun@iijlab.net
 	  try to visit all of the requests given.  don't stop even if
 	  AAAA query returns SERVFAIL.  some of old name servers return
 	  SERVFAIL or NXDOMAIN on AAAA queries, if there's no AAAA records.
+	  NetBSD PR: 9621
 
 2000-03-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/cfparse.y: correclty parsed data_timeout
