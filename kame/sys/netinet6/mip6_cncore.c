@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.61 2004/02/06 07:49:54 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.62 2004/02/06 08:32:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2938,7 +2938,7 @@ mip6_tunnel_control(action, entry, func, ep)
 		/* XXX scope_id? */
 
 		bzero(&addr_sa, sizeof(addr_sa));
-		addr_sa.sin6_len = sizeof(paddr_sa);
+		addr_sa.sin6_len = sizeof(addr_sa);
 		addr_sa.sin6_family = AF_INET6;
 		addr_sa.sin6_addr = mbc->mbc_addr;
 		/* XXX scope_id? */
