@@ -1,5 +1,5 @@
 /*	$OpenBSD: getaddrinfo.c,v 1.23 2000/05/15 10:49:55 itojun Exp $	*/
-/*	$KAME: getaddrinfo.c,v 1.28 2000/07/09 04:27:27 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.29 2000/07/09 04:35:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -290,9 +290,11 @@ str_isnumber(p)
 {
 	char *ep;
 
+	if (*p == '\0')
+		return NO;
 	ep = NULL;
 	(void)strtoul(p, &ep, 10);
-	if (*p != '\0' && ep && *ep == '\0')
+	if (ep && *ep == '\0')
 		return YES;
 	else
 		return NO;
