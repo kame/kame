@@ -20,7 +20,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	BSDI getifaddrs.c,v 2.11 1999/03/15 20:57:20 jch Exp
+ *	BSDI getifaddrs.c,v 2.12 2000/02/23 14:51:59 dab Exp
  */
 /*
  * NOTE: SIOCGIFCONF case is not LP64 friendly.  it also does not perform
@@ -364,6 +364,12 @@ getifaddrs(struct ifaddrs **pif)
 		ift->ifa_next = NULL;
 		*pif = ifa;
 	} else {
+}
+
+void
+freeifaddrs(struct ifaddrs *ifp)
+{
+	free(ifp);
 		*pif = NULL;
 		free(ifa);
 	}

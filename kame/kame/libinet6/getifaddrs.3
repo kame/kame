@@ -1,4 +1,4 @@
-.\"	BSDI	getifaddrs.3,v 2.4 1999/03/15 20:57:20 jch Exp
+.\"	BSDI	getifaddrs.3,v 2.5 2000/02/23 14:51:59 dab Exp
 .\"
 .\" Copyright (c) 1995, 1999
 .\"	Berkeley Software Design, Inc.  All rights reserved.
@@ -31,6 +31,8 @@
 .Fd #include <ifaddrs.h>
 .Ft int
 .Fn getifaddrs "struct ifaddrs **ifap"
+.Ft void
+.Fn freeifaddrs "struct ifaddrs *ifp"
 .Sh DESCRIPTION
 The
 .Fn getifaddrs
@@ -119,8 +121,7 @@ which contains per-address interface statistics.
 The data returned by
 .Fn getifaddrs
 is dynamically allocated and should be freed using
-.Fn free
-.Pq see Xr free 3
+.Fn freeifaddrs
 when no longer needed.
 .Sh RETURN VALUES
 Upon successful completion, a value of 0 is returned.

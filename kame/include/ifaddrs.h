@@ -20,7 +20,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	BSDI ifaddrs.h,v 2.4 1999/03/15 20:59:28 jch Exp
+ *	BSDI ifaddrs.h,v 2.5 2000/02/23 14:51:59 dab Exp
  */
 
 #ifndef	_IFADDRS_H_
@@ -48,6 +48,7 @@ struct ifaddrs {
 
 __BEGIN_DECLS
 extern int getifaddrs __P((struct ifaddrs **));
+extern void freeifaddrs __P((struct ifaddrs *));
 __END_DECLS
 
 #endif
