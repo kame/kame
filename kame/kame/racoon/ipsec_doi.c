@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.36 2000/01/14 00:24:43 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.37 2000/01/14 00:46:11 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -971,7 +971,15 @@ found:
 			delipsecsa(q1);
 			return -1;
 		}
-		if (q1->spisize != sizeof(k->spi_p)) {
+		/* special case for IPComp CPI - accept two-byte CPI */
+		if (q1->spisize == 2 && q1->proto_id == IPSECDOI_PROTO_IPCOMP) {
+			u_int16_t t[2];
+			memset(&t, 0, sizeof(t));
+			memcpy(&t[1], &q1->spi, q1->spisize);
+			memset(&q1->spi, 0, sizeof(q1->spi));
+			memcpy(&q1->spi, &t, sizeof(t));
+			q1->spisize = sizeof(t);
+		} else if (q1->spisize != sizeof(k->spi_p)) {
 			plog(logp, LOCATION, NULL,
 				"spi size mismatch, %d/%d\n",
 				q1->spisize, sizeof(k->spi_p));
@@ -1730,7 +1738,7 @@ check_spi_size(proto_id, size)
 		return 0;
 
 	case IPSECDOI_PROTO_IPCOMP:
-		if (size != 4) {
+		if (size != 2 && size != 4) {
 			plog(logp, LOCATION, NULL,
 				"invalid SPI size=%d for IPCOMP proposal.\n",
 				size);
