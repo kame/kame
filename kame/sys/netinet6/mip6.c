@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.202 2003/03/31 02:19:26 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.203 2003/04/01 12:18:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -234,7 +234,6 @@ mip6_init()
 	mip6_config.mcfg_hrbc_lifetime_limit = MIP6_CONFIG_HRBC_LIFETIME_LIMIT;
 	mip6_config.mcfg_bu_maxlifetime = MIP6_CONFIG_BU_MAXLIFETIME;
 	mip6_config.mcfg_hrbu_maxlifetime = MIP6_CONFIG_HRBU_MAXLIFETIME;
-	mip6_config.mcfg_bu_use_single = MIP6_CONFIG_BU_USE_SINGLE;
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&mip6_pfx_ch, NULL);
@@ -478,21 +477,23 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		tmpmpfx.mpfx_prefix.sin6_len = sizeof(tmpmpfx.mpfx_prefix);
 		tmpmpfx.mpfx_prefix.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 		tmpmpfx.mpfx_prefixlen = ndopt_pi->nd_opt_pi_prefix_len;
+		tmpmpfx.mpfx_vltime = ntohl(ndopt_pi->nd_opt_pi_valid_time);
+		tmpmpfx.mpfx_pltime = ntohl(ndopt_pi->nd_opt_pi_preferred_time);
 		mpfx_is_new = 0;
 		mpfx = mip6_prefix_list_find(&tmpmpfx);
 		if (mpfx) {
 			/* found an existing entry.  just update it. */
-			mpfx->mpfx_vltime = ndopt_pi->nd_opt_pi_valid_time;
+			mpfx->mpfx_vltime = tmpmpfx.mpfx_vltime;
 			mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
-			mpfx->mpfx_pltime = ndopt_pi->nd_opt_pi_preferred_time;
+			mpfx->mpfx_pltime = tmpmpfx.mpfx_pltime;
 			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 			/* XXX mpfx->mpfx_haddr; */
 		} else {
 			/* this is a new prefix. */
 			mpfx = mip6_prefix_create(&tmpmpfx.mpfx_prefix,
 			    tmpmpfx.mpfx_prefixlen,
-			    ndopt_pi->nd_opt_pi_valid_time,
-			    ndopt_pi->nd_opt_pi_preferred_time);
+			    tmpmpfx.mpfx_vltime,
+			    tmpmpfx.mpfx_pltime);
 			if (mpfx == NULL) {
 				mip6log((LOG_ERR,
 				    "%s:%d: "

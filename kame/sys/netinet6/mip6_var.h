@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.86 2003/03/31 02:19:26 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.87 2003/04/01 12:18:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -278,7 +278,6 @@ struct mip6_config {
 	u_int32_t mcfg_hrbc_lifetime_limit;
 	u_int32_t mcfg_bu_maxlifetime;
 	u_int32_t mcfg_hrbu_maxlifetime;
-	u_int8_t mcfg_bu_use_single;
 };
 #define MIP6_CONFIG_TYPE_MOBILENODE 1
 #define MIP6_CONFIG_TYPE_HOMEAGENT 2
