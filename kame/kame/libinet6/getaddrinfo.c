@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.211 2005/01/19 07:21:56 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.212 2005/01/28 02:12:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2215,7 +2215,7 @@ _dns_getaddrinfo(rv, cb_data, ap)
 		 * returned by getaddrinfo().
 		 */
 		if (addrconfig(AF_INET, ac)) {
-			qp->name = hostname;
+			qp->name = name;
 			qp->qclass = C_IN;
 			qp->qtype = T_A;
 			qp->answer = buf_current->buf;
@@ -2228,7 +2228,7 @@ _dns_getaddrinfo(rv, cb_data, ap)
 			}
 		}
 		if (addrconfig(AF_INET6, ac)) {
-			qp->name = hostname;
+			qp->name = name;
 			qp->qclass = C_IN;
 			qp->qtype = T_AAAA;
 			qp->answer = buf_current->buf;
