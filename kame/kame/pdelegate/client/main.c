@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.10 2001/09/07 08:37:38 itojun Exp $	*/
+/*	$KAME: main.c,v 1.11 2001/09/07 08:38:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -404,6 +404,7 @@ receive_initreq(s, from, fromlenp, ecode)
 	const int niflags = NI_NUMERICHOST;
 #endif
 	struct sockaddr_in6 sin6;
+	unsigned int plen;	/* delegated prefixlen */
 
 	*ecode = 0;
 
@@ -426,11 +427,10 @@ receive_initreq(s, from, fromlenp, ecode)
 		return -1;
 	case ICMP6_PD_PREFIX_DELEGATED:
 		/* we assume prefixlen to match up */
-		if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK) != 
-		    prefixlen) {
+		plen = p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK;
+		if (plen != prefixlen) {
 			warnx("bogus prefixlen %u != requested %d",
-			    p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK,
-			    prefixlen);
+			    plen, prefixlen);
 			return -1;
 		}
 		memset(&sin6, 0, sizeof(sin6));
@@ -440,7 +440,7 @@ receive_initreq(s, from, fromlenp, ecode)
 		if (getnameinfo((struct sockaddr *)&sin6, sizeof(sin6),
 		    hbuf, sizeof(hbuf), NULL, 0, niflags) != 0)
 			return -1;
-		printf("%s", hbuf);
+		printf("%s/%u", hbuf, plen);
 		return 0;
 	default:
 		*ecode = p->icmp6_pd_hdr.icmp6_code;
