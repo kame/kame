@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.67 2000/02/22 14:04:21 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.68 2000/03/09 00:46:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1691,6 +1691,113 @@ ip6_get_prevhdr(m, off)
 			return(&ip6e->ip6e_nxt);
 		else
 			return NULL;
+	}
+}
+
+/*
+ * get next header offset.  m will be retained.
+ */
+int
+ip6_nexthdr(m, off, proto, nxtp)
+	struct mbuf *m;
+	int off;
+	int proto;
+	int *nxtp;
+{
+	struct ip6_hdr ip6;
+	struct ip6_ext ip6e;
+	struct ip6_frag fh;
+
+	/* just in case */
+	if (m == NULL)
+		panic("ip6_nexthdr: m == NULL");
+	if ((m->m_flags & M_PKTHDR) == 0 || m->m_pkthdr.len < off)
+		return -1;
+
+	switch (proto) {
+	case IPPROTO_IPV6:
+		if (m->m_pkthdr.len < off + sizeof(ip6))
+			return -1;
+		m_copydata(m, off, sizeof(ip6), (caddr_t)&ip6);
+		if (nxtp)
+			*nxtp = ip6.ip6_nxt;
+		off += sizeof(ip6);
+		return off;
+
+	case IPPROTO_FRAGMENT:
+		/*
+		 * terminate parsing if it is not the first fragment,
+		 * it does not make sense to parse through it.
+		 */
+		if (m->m_pkthdr.len < off + sizeof(fh))
+			return -1;
+		m_copydata(m, off, sizeof(fh), (caddr_t)&fh);
+		if ((ntohs(fh.ip6f_offlg) & IP6F_OFF_MASK) != 0)
+			return -1;
+		if (nxtp)
+			*nxtp = fh.ip6f_nxt;
+		off += sizeof(struct ip6_frag);
+		return off;
+
+	case IPPROTO_AH:
+		if (m->m_pkthdr.len < off + sizeof(ip6e))
+			return -1;
+		m_copydata(m, off, sizeof(ip6e), (caddr_t)&ip6e);
+		if (nxtp)
+			*nxtp = ip6e.ip6e_nxt;
+		off += (ip6e.ip6e_len + 2) << 2;
+		return off;
+
+	case IPPROTO_HOPOPTS:
+	case IPPROTO_ROUTING:
+	case IPPROTO_DSTOPTS:
+		if (m->m_pkthdr.len < off + sizeof(ip6e))
+			return -1;
+		m_copydata(m, off, sizeof(ip6e), (caddr_t)&ip6e);
+		if (nxtp)
+			*nxtp = ip6e.ip6e_nxt;
+		off += (ip6e.ip6e_len + 1) << 3;
+		return off;
+
+	case IPPROTO_NONE:
+	case IPPROTO_ESP:
+	case IPPROTO_IPCOMP:
+		/* give up */
+		return -1;
+
+	default:
+		return -1;
+	}
+
+	return -1;
+}
+
+/*
+ * get offset for the last header in the chain.  m will be kept untainted.
+ */
+int
+ip6_lasthdr(m, off, proto, nxtp)
+	struct mbuf *m;
+	int off;
+	int proto;
+	int *nxtp;
+{
+	int newoff;
+	int nxt;
+
+	if (!nxtp) {
+		nxt = -1;
+		nxtp = &nxt;
+	}
+	while (1) {
+		newoff = ip6_nexthdr(m, off, proto, nxtp);
+		if (newoff < 0 || newoff < off)
+			return -1;
+		else if (newoff == off)
+			return newoff;
+
+		off = newoff;
+		proto = *nxtp;
 	}
 }
 

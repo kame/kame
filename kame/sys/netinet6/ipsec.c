@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.51 2000/03/01 11:52:23 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.52 2000/03/09 00:46:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -819,10 +819,7 @@ ipsec6_get_ulp(m, spidx)
 	struct mbuf *m;
 	struct secpolicyindex *spidx;
 {
-	struct ip6_hdr *ip6;
-	struct ip6_ext *ip6e;
 	int off, nxt;
-	int len;
 
 	/* sanity check */
 	if (m == NULL)
@@ -836,64 +833,36 @@ ipsec6_get_ulp(m, spidx)
 	_INPORTBYSA(&spidx->src) = IPSEC_PORT_ANY;
 	_INPORTBYSA(&spidx->dst) = IPSEC_PORT_ANY;
 
-	ip6 = mtod(m, struct ip6_hdr *);
-	nxt = ip6->ip6_nxt;
-	off = sizeof(struct ip6_hdr);
-	len = m->m_len;
+	nxt = -1;
+	off = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt);
+	if (off < 0 || m->m_pkthdr.len < off)
+		return;
 
-	while (off < len) {
-		ip6e = (struct ip6_ext *)((caddr_t) ip6 + off);
-		if (m->m_len < off + sizeof(*ip6e)) {
-			ipseclog((LOG_DEBUG, "ipsec6_get_ulp: all exthdr are "
-			    "not in single mbuf.\n"));
-			return;
+	switch (nxt) {
+	case IPPROTO_TCP:
+		spidx->ul_proto = nxt;
+		if (off + sizeof(struct tcphdr) <= m->m_pkthdr.len) {
+			struct tcphdr th;
+			m_copydata(m, off, sizeof(th), (caddr_t)&th);
+			_INPORTBYSA(&spidx->src) = th.th_sport;
+			_INPORTBYSA(&spidx->dst) = th.th_dport;
 		}
-
-		switch(nxt) {
-		case IPPROTO_TCP:
-			spidx->ul_proto = nxt;
-			_INPORTBYSA(&spidx->src) =
-			    ((struct tcphdr *)((caddr_t)ip6 + off))->th_sport;
-			_INPORTBYSA(&spidx->dst) =
-			    ((struct tcphdr *)((caddr_t)ip6 + off))->th_dport;
-			return;
-		case IPPROTO_UDP:
-			spidx->ul_proto = nxt;
-			_INPORTBYSA(&spidx->src) =
-			    ((struct udphdr *)((caddr_t)ip6 + off))->uh_sport;
-			_INPORTBYSA(&spidx->dst) =
-			    ((struct udphdr *)((caddr_t)ip6 + off))->uh_dport;
-			return;
-		case IPPROTO_ICMPV6:
-			spidx->ul_proto = nxt;
-			return;
-		case IPPROTO_FRAGMENT:
-			off += sizeof(struct ip6_frag);
-			break;
-		case IPPROTO_AH:
-			off += (ip6e->ip6e_len + 2) << 2;
-			break;
-		default:
-			switch (nxt) {
-			case IPPROTO_HOPOPTS:
-			case IPPROTO_ROUTING:
-			case IPPROTO_NONE:
-			case IPPROTO_DSTOPTS:
-				break;
-			case IPPROTO_ESP:
-			case IPPROTO_IPCOMP:
-				/* give up */
-				return;
-			default:
-				return;	/* XXX */
-			}
-			off += (ip6e->ip6e_len + 1) << 3;
-			break;
+		break;
+	case IPPROTO_UDP:
+		spidx->ul_proto = nxt;
+		if (off + sizeof(struct udphdr) <= m->m_pkthdr.len) {
+			struct udphdr uh;
+			m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
+			_INPORTBYSA(&spidx->src) = uh.uh_sport;
+			_INPORTBYSA(&spidx->dst) = uh.uh_dport;
 		}
-		nxt = ip6e->ip6e_nxt;
+		break;
+	case IPPROTO_ICMPV6:
+		spidx->ul_proto = nxt;
+		break;
+	default:
+		break;
 	}
-
-	return;
 }
 #endif
 
@@ -955,7 +924,7 @@ ipsec4_setspidx_ipaddr(m, spidx)
 
 	/* sanity check 1 for minimum ip header length */
 	if (m == NULL)
-		panic("ipsec4_setspidx_in6pcb: m == 0 passed.\n");
+		panic("ipsec4_setspidx_ipaddr: m == 0 passed.\n");
 
 	if (m->m_pkthdr.len < sizeof(struct ip)) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,

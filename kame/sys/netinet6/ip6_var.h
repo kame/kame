@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.27 2000/02/22 14:04:22 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.28 2000/03/09 00:46:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,6 +303,8 @@ void	ip6_freepcbopts __P((struct ip6_pktopts *));
 void	ip6_freemoptions __P((struct ip6_moptions *));
 int	ip6_unknown_opt __P((u_int8_t *, struct mbuf *, int));
 char *	ip6_get_prevhdr __P((struct mbuf *, int));
+int	ip6_nexthdr __P((struct mbuf *, int, int, int *));
+int	ip6_lasthdr __P((struct mbuf *, int, int, int *));
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
