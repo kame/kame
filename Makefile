@@ -25,7 +25,7 @@ bsdi3:
 bsdi4:
 	(cd ${.CURDIR}; set CVSROOT=cvs.kame.net:/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi4 -P kame/bsdi4)
 
-PLAT=	freebsd2 freebsd3 kame netbsd openbsd bsdi3 bsdi4
+PLAT=	freebsd2 freebsd3 freebsd4 kame netbsd openbsd bsdi3 bsdi4
 # DOCS is defined in Makefile.inc
 TOOLS=	Makefile Makefile.inc prepare.pl
 
