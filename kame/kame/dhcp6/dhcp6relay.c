@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.40 2003/07/16 15:24:26 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.41 2003/07/16 16:01:20 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -783,7 +783,7 @@ relay_to_client(dh6relay, len, from)
 
 	/* A relay reply message must include a relay message option */
 	if (optinfo.relaymsg_msg == NULL) {
-		dprintf(LOG_INFO, FNAME, "relay reply from %s message "
+		dprintf(LOG_INFO, FNAME, "relay reply message from %s "
 		    "without a relay message", addr2str(from));
 		goto end;
 	}
