@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.42 2000/06/12 12:16:21 itojun Exp $
+$Id: COVERAGE,v 1.43 2000/06/12 16:21:23 itojun Exp $
 
 
 x: supported/integrated
@@ -53,7 +53,7 @@ advanced API	2292bis	2292	2292	2292	notyet	2292	2292
 
 getifaddrs	x	x	x	-	notyet	x	-
 
-icmp6 nodeinfo	05	05-	05-	05-	notyet	05-	05-
+icmp6 nodeinfo	05	05	05-	05-	notyet	05-	05-
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
 
 nd6_proxyall	-	-	-	x	notyet	-	x
