@@ -426,8 +426,10 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		   sizeof(struct ip6_hdr), ((struct ip6_hdr *)ti)->ip6_plen);
 		HTONS(((struct ip6_hdr *)ti)->ip6_plen);
 		ip6oflags = 0;
-		if (tp && (tp->t_inpcb->inp_flags & IN6P_MINMTU))
+		if (tp && tp->t_inpcb->in6p_outputopts &&
+		    (tp->t_inpcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
 			ip6oflags |= IPV6_MINMTU;
+		}
 #ifdef NEW_STRUCT_ROUTE
 		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
 		    ro, ip6oflags, NULL, NULL);

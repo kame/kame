@@ -1071,8 +1071,10 @@ send:
 			ipv6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
 		}
 		ip6oflags = so->so_options & SO_DONTROUTE;
-		if (tp->t_inpcb->inp_flags & IN6P_MINMTU)
+		if (tp->t_inpcb->in6p_outputopts &&
+		    (tp->t_inpcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
 			ip6oflags |= IPV6_MINMTU;
+		}
 		error = ip6_output(m, tp->t_inpcb->inp_outputopts6,
 		    &tp->t_inpcb->inp_route6, ip6oflags, NULL, NULL);
 		break;
