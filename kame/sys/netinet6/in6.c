@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.377 2004/07/09 13:29:49 suz Exp $	*/
+/*	$KAME: in6.c,v 1.378 2004/07/12 05:31:25 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1462,7 +1462,11 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 			    32 / 8)) {
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+				RTFREE_LOCKED(rt);
+#else
 				RTFREE(rt);
+#endif
 				rt = NULL;
 			}
 		}
