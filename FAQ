@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.21 2001/07/13 02:05:12 itojun Exp $
+$KAME: FAQ,v 1.22 2001/07/13 02:09:59 jinmei Exp $
 
 
 GENERAL
@@ -25,7 +25,7 @@ Q: What is the KAME project?
 
 Q: How can I contribute?
 	- Implementing "ports" or "pkgsrc" for IPv6 apps
-	  Sometimes it needs a nontrivial steps to install IPv6 applications,
+	  Sometimes it needs nontrivial steps to install IPv6 applications,
 	  because IPv6 patches are redistributed separately from the original
 	  application.  Please create FreeBSD/OpenBSD "ports", or NetBSD
 	  "pkgsrc" and contribute those to *BSD projects.
@@ -37,7 +37,7 @@ Q: How can I contribute?
 	- Reviewing documents
 	  Since KAME core team consists of native Japanese speakers,
 	  documents in English include many typos, wording mistake,
-	  and so forth.  We will be very greatful if you review our
+	  and so forth.  We will be very grateful if you review our
 	  documents and send us updates.
 
 Q: What is the standard document the KAME code is based upon?
@@ -99,7 +99,7 @@ install KAME patches?
 	topic in more detail.
 
 Q: I replaced kernel and rebooted, and lost IPv4 connectivity.  Why is it?
-	There are several possibiltiies, but it is almost always
+	There are several possibilities, but it is almost always
 	due to the kernel configuration differences.  If you have
 	been using specific kernel configuration for your IPv4
 	kernel, and you have installed GENERIC.v6 kernel, you lost
@@ -109,7 +109,7 @@ Q: I replaced kernel and rebooted, and lost IPv4 connectivity.  Why is it?
 	your original configuration file FOO into FOO.v6, (2)
 	incorporate difference between GENERIC and GENERIC.v6 into
 	FOO.v6, (3) carefully look at FOO.v6 and configure a new
-	kenrel from that one.
+	kernel from that one.
 
 Q: Is anything special required for network interface card drivers?
 	(freebsd and bsdi) For efficient processing of IPv6 chained headers,
@@ -136,7 +136,7 @@ Q: Is anything special required for network interface card drivers?
 
 	Even though it is better to have hardware multicast packet
 	filter, it is not mandatory; in most cases it is just fine
-	to use promisc mode as the last resort, if there's no
+	to use promiscuous mode as the last resort, if there's no
 	multicast packet filter support.
 
 
@@ -182,7 +182,7 @@ Q: Does KAME support site-local addresses?
 
 	Site-local address itself (the spec itself, not KAME) has
 	bunch of issues/twists to be solved, such as site-border management
-	and nameservers.  We are trying very hard to solve it.
+	and name servers.  We are trying very hard to solve it.
 
 Q: How can I implement address-family independent applications?
 Q: How can I modify my application to support IPv6 as well as IPv4?
@@ -376,7 +376,7 @@ Q: What is the crypto export/import situation in Japan?
 	NOTE: the following description does not reflect intentions
 	of KAME participating companies, employers of KAME core
 	team or KAME contributors, or such.  KAME project and other
-	partieis are completely separate entity.  Please do not
+	parties are completely separate entity.  Please do not
 	misinterpret.
 
 	As far as I checked, there's no legal restriction for
@@ -388,9 +388,9 @@ Q: What is the crypto export/import situation in Japan?
 	law.  It says that business parties must acquire approval
 	for crypto export order larger than 50000JPY.
 
-	We checked with several attoneys to get answers which vary
+	We checked with several attorneys to get answers which vary
 	widely.  The answer reflected how aggressive/defensive the
-	attoney is :-)
+	attorney is :-)
 
 	See "crypto law survey page",
 	http://cwis.kub.nl/~frw/people/koops/cls2.htm#ja, for more
@@ -398,7 +398,7 @@ Q: What is the crypto export/import situation in Japan?
 
 Q: Can I download KAME without infringing crypto law?
 	The question can be separated into two parts: export from
-	Japan and import to your conutry.
+	Japan and import to your country.
 
 	For export to Japan, it looks that there's no restriction,
 	for free software.  See faqomatic:37 for more info.
@@ -451,7 +451,7 @@ Q: What is "KAME"?  Why did you choose the name?
 	two letters and last two letters from KArigoME.  Yea, you
 	got KAME.
 
-	Official answer #2: In asian/indian mythology, the world
+	Official answer #2: In Asian/Indian mythology, the world
 	is on a tray supported by elephants, and the elephants are
 	on a giant turtle and a giant snake.  The universe consists
 	of the turtle and the snake.  We are trying to shake the
