@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.14 2001/09/20 11:35:19 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.15 2001/09/20 11:40:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -74,7 +74,6 @@
 #include <netinet/ip_esp.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
-#include <net/pfkeyv2.h>
 #else
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
