@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.96 2000/07/12 12:58:03 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.97 2000/07/24 00:16:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1184,6 +1184,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 	register struct mbuf *m;
 	struct ip6_recvpktopts *ctl, **prevctlp;
 {
+#define IS2292(x, y)	((in6p->in6p_flags & IN6P_RFC2292) ? (x) : (y))
 	register struct mbuf **mp;
 	struct cmsghdr *cm = NULL;
 	struct ip6_recvpktopts *prevctl = NULL;
@@ -1275,9 +1276,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		 */
 		if (prevpi == NULL || bcmp(prevpi, &pi6, sizeof(pi6))) {
 			*mp = sbcreatecontrol((caddr_t) &pi6,
-					      sizeof(struct in6_pktinfo),
-					      IPV6_PKTINFO,
-					      IPPROTO_IPV6);
+			     sizeof(struct in6_pktinfo),
+			     IS2292(IPV6_2292PKTINFO, IPV6_PKTINFO),
+			     IPPROTO_IPV6);
 			if (*mp) {
 				ctl->pktinfo = *mp;
 				mp = &(*mp)->m_next;
@@ -1294,9 +1295,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		}
 
 		if (oldhlim < 0 || hlim != oldhlim) {
-			*mp = sbcreatecontrol((caddr_t) &hlim,
-					      sizeof(int), IPV6_HOPLIMIT,
-					      IPPROTO_IPV6);
+			*mp = sbcreatecontrol((caddr_t) &hlim, sizeof(int),
+			    IS2292(IPV6_2292HOPLIMIT, IPV6_HOPLIMIT),
+			    IPPROTO_IPV6);
 			if (*mp) {
 				ctl->hlim = *mp;
 				mp = &(*mp)->m_next;
@@ -1366,8 +1367,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				 * 2292bis.
 				 */
 				*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
-						      IPV6_HOPOPTS,
-						      IPPROTO_IPV6);
+				    IS2292(IPV6_2292HOPOPTS, IPV6_HOPOPTS),
+				    IPPROTO_IPV6);
 				if (*mp) {
 					ctl->hbh = *mp;
 					mp = &(*mp)->m_next;
@@ -1488,7 +1489,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
-							      elen,
+							      elen, 
 							      IPV6_RTHDRDSTOPTS,
 							      IPPROTO_IPV6);
 					if (ctl->dest1 == NULL)
@@ -1518,9 +1519,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
-							      elen,
-							      IPV6_DSTOPTS,
-							      IPPROTO_IPV6);
+					    elen,
+					    IS2292(IPV6_2292DSTOPTS, IPV6_DSTOPTS),
+					    IPPROTO_IPV6);
 					if (ctl->dest2 == NULL)
 						ctl->dest2 = *mp;
 
@@ -1556,8 +1557,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-						      IPV6_RTHDR,
-						      IPPROTO_IPV6);
+				    IS2292(IPV6_2292RTHDR, IPV6_RTHDR),
+				    IPPROTO_IPV6);
 				if (ctl->rthdr == NULL)
 					ctl->rthdr = *mp;
 				if (*mp)
@@ -1600,6 +1601,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #ifdef __OpenBSD__
 # undef in6p_flags
 #endif
+#undef IS2292
 }
 
 #ifdef PULLDOWN_TEST

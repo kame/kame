@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.116 2000/07/12 12:58:04 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.117 2000/07/24 00:16:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1393,7 +1393,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 		case PRCO_SETOPT:
 #endif
 			switch (optname) {
+			case IPV6_2292PKTOPTIONS:
+#ifdef IPV6_PKTOPTIONS
 			case IPV6_PKTOPTIONS:
+#endif
 			{
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
@@ -1418,6 +1421,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif /* FreeBSD >= 3 */
 				break;
 			}
+
 			/*
 			 * Use of some Hop-by-Hop options or some
 			 * Destination options, might require special
@@ -1454,138 +1458,243 @@ ip6_ctloutput(op, so, level, optname, mp)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
 #endif
-				if (optlen != sizeof(int))
+				if (optlen != sizeof(int)) {
 					error = EINVAL;
-				else {
+					break;
+				}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-					error = sooptcopyin(sopt, &optval,
-						sizeof optval, sizeof optval);
-					if (error)
-						break;
+				error = sooptcopyin(sopt, &optval,
+					sizeof optval, sizeof optval);
+				if (error)
+					break;
 #else
-					optval = *mtod(m, int *);
+				optval = *mtod(m, int *);
 #endif
-					switch (optname) {
+				switch (optname) {
 
-					case IPV6_UNICAST_HOPS:
-						if (optval < -1 || optval >= 256)
-							error = EINVAL;
-						else {
-							/* -1 = kernel default */
+				case IPV6_UNICAST_HOPS:
+					if (optval < -1 || optval >= 256)
+						error = EINVAL;
+					else {
+						/* -1 = kernel default */
 #ifdef HAVE_NRL_INPCB
-							inp->inp_hops = optval;
+						inp->inp_hops = optval;
 #else
-							in6p->in6p_hops = optval;
+						in6p->in6p_hops = optval;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-							if ((in6p->in6p_vflag &
-							     INP_IPV4) != 0)
-								in6p->inp_ip_ttl = optval;
+						if ((in6p->in6p_vflag &
+						     INP_IPV4) != 0)
+							in6p->inp_ip_ttl = optval;
 #endif
 #endif
-						}
-						break;
+					}
+					break;
 #ifdef HAVE_NRL_INPCB
 #define OPTSET(bit) \
+do { \
 	if (optval) \
 		inp->inp_flags |= (bit); \
 	else \
-		inp->inp_flags &= ~(bit);
-#else
+		inp->inp_flags &= ~(bit); \
+} while (0)
+#define OPTSET2292(bit) \
+do { \
+	inp->inp_flags |= IN6P_RFC2292; \
+	if (optval) \
+		inp->inp_flags |= (bit); \
+	else \
+		inp->inp_flags &= ~(bit); \
+} while (0)
+#else /*HAVE_NRL_INPCB*/
 #define OPTSET(bit) \
+do { \
 	if (optval) \
 		in6p->in6p_flags |= (bit); \
 	else \
-		in6p->in6p_flags &= ~(bit);
-#endif
+		in6p->in6p_flags &= ~(bit); \
+} while (0)
+#define OPTSET2292(bit) \
+do { \
+	in6p->in6p_flags |= IN6P_RFC2292; \
+	if (optval) \
+		in6p->in6p_flags |= (bit); \
+	else \
+		in6p->in6p_flags &= ~(bit); \
+} while (0)
+#endif /*HAVE_NRL_INPCB*/
 #ifdef HAVE_NRL_INPCB
 #define OPTBIT(bit) (inp->inp_flags & (bit) ? 1 : 0)
 #else
 #define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
 #endif
 
-					case IPV6_RECVPKTINFO:
-						OPTSET(IN6P_PKTINFO);
-						if (OPTBIT(IN6P_PKTINFO) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
+				case IPV6_RECVPKTINFO:
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
 						break;
-
-					case IPV6_HOPLIMIT:
-					{
-#ifdef COMPAT_RFC2292
-						OPTSET(IN6P_HOPLIMIT);
-						if (OPTBIT(IN6P_HOPLIMIT) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
-						break;
-#else  /* new advanced API (2292bis) */
-						struct ip6_pktopts **optp;
-#ifdef HAVE_NRL_INPCB
-						optp = &inp->inp_outputopts6;
-#else
-						optp = &in6p->in6p_outputopts;
-#endif
-
-						error = ip6_pcbopt(IPV6_HOPLIMIT,
-								   (u_char *)&optval,
-								   sizeof(optval),
-								   optp,
-								   privileged);
-						break;
-#endif
 					}
+					OPTSET(IN6P_PKTINFO);
+					if (OPTBIT(IN6P_PKTINFO) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
+					break;
 
-					case IPV6_RECVHOPLIMIT:
-						OPTSET(IN6P_HOPLIMIT);
-						if (OPTBIT(IN6P_HOPLIMIT) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
+				case IPV6_HOPLIMIT:
+				{
+					struct ip6_pktopts **optp;
+
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
 						break;
-
-					case IPV6_RECVHOPOPTS:
-						OPTSET(IN6P_HOPOPTS);
-						if (OPTBIT(IN6P_HOPOPTS) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
-						break;
-
-					case IPV6_RECVDSTOPTS:
-						OPTSET(IN6P_DSTOPTS);
-						if (OPTBIT(IN6P_DSTOPTS) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
-						break;
-
-					case IPV6_RECVRTHDRDSTOPTS:
-						OPTSET(IN6P_RTHDRDSTOPTS);
-						if (OPTBIT(IN6P_RTHDRDSTOPTS) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
-						break;
-
-					case IPV6_RECVRTHDR:
-						OPTSET(IN6P_RTHDR);
-						if (OPTBIT(IN6P_RTHDR) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
-						break;
-
-					case IPV6_CHECKSUM:
+					}
 #ifdef HAVE_NRL_INPCB
-						inp->inp_csumoffset = optval;
+					optp = &inp->inp_outputopts6;
 #else
-						in6p->in6p_cksum = optval;
+					optp = &in6p->in6p_outputopts;
 #endif
-						break;
 
-					case IPV6_FAITH:
-						OPTSET(IN6P_FAITH);
-						break;
+					error = ip6_pcbopt(IPV6_HOPLIMIT,
+							   (u_char *)&optval,
+							   sizeof(optval),
+							   optp,
+							   privileged);
+					break;
+				}
 
-					case IPV6_USE_MIN_MTU:
-						OPTSET(IN6P_MINMTU);
+				case IPV6_RECVHOPLIMIT:
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
 						break;
+					}
+					OPTSET(IN6P_HOPLIMIT);
+					if (OPTBIT(IN6P_HOPLIMIT) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
+					break;
+
+				case IPV6_RECVHOPOPTS:
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
+						break;
+					}
+					OPTSET(IN6P_HOPOPTS);
+					if (OPTBIT(IN6P_HOPOPTS) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
+					break;
+
+				case IPV6_RECVDSTOPTS:
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
+						break;
+					}
+					OPTSET(IN6P_DSTOPTS);
+					if (OPTBIT(IN6P_DSTOPTS) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
+					break;
+
+				case IPV6_RECVRTHDRDSTOPTS:
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
+						break;
+					}
+					OPTSET(IN6P_RTHDRDSTOPTS);
+					if (OPTBIT(IN6P_RTHDRDSTOPTS) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
+					break;
+
+				case IPV6_RECVRTHDR:
+					/* cannot mix with RFC2292 */
+					if (OPTBIT(IN6P_RFC2292)) {
+						error = EINVAL;
+						break;
+					}
+					OPTSET(IN6P_RTHDR);
+					if (OPTBIT(IN6P_RTHDR) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
+					break;
+
+				case IPV6_CHECKSUM:
+#ifdef HAVE_NRL_INPCB
+					inp->inp_csumoffset = optval;
+#else
+					in6p->in6p_cksum = optval;
+#endif
+					break;
+
+				case IPV6_FAITH:
+					OPTSET(IN6P_FAITH);
+					break;
+
+				case IPV6_USE_MIN_MTU:
+					OPTSET(IN6P_MINMTU);
+					break;
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
-					case IPV6_BINDV6ONLY:
-						OPTSET(IN6P_BINDV6ONLY);
-						break;
+				case IPV6_BINDV6ONLY:
+					OPTSET(IN6P_BINDV6ONLY);
+					break;
 #endif
+				}
+				break;
+			case IPV6_2292PKTINFO:
+			case IPV6_2292HOPLIMIT:
+			case IPV6_2292HOPOPTS:
+			case IPV6_2292DSTOPTS:
+			case IPV6_2292RTHDR:
+				/* RFC 2292 */
+				if (optlen != sizeof(int)) {
+					error = EINVAL;
+					break;
+				}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyin(sopt, &optval,
+					sizeof optval, sizeof optval);
+				if (error)
+					break;
+#else
+				optval = *mtod(m, int *);
+#endif
+				switch(optname) {
+				case IPV6_2292PKTINFO:
+					OPTSET2292(IN6P_PKTINFO);
+					if (OPTBIT(IN6P_PKTINFO) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
+					break;
+				case IPV6_2292HOPLIMIT:
+					OPTSET2292(IN6P_HOPLIMIT);
+					if (OPTBIT(IN6P_HOPLIMIT) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
+					break;
+				case IPV6_2292HOPOPTS:
+					/*
+					 * Check super-user privilege.
+					 * See comments for IPV6_RECVHOPOPTS.
+					 */
+					if (!privileged)
+						return(EPERM);
+					OPTSET2292(IN6P_HOPOPTS);
+					if (OPTBIT(IN6P_HOPOPTS) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
+					break;
+				case IPV6_2292DSTOPTS:
+					if (!privileged)
+						return(EPERM);
+					OPTSET2292(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS); /* XXX */
+					if (OPTBIT(IN6P_DSTOPTS) == 0) {
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
 					}
+					break;
+				case IPV6_2292RTHDR:
+					OPTSET2292(IN6P_RTHDR);
+					if (OPTBIT(IN6P_RTHDR) == 0)
+						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
+					break;
 				}
 				break;
 			case IPV6_PKTINFO:
@@ -1593,84 +1702,46 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RTHDR:
 			case IPV6_DSTOPTS:
 			case IPV6_RTHDRDSTOPTS:
-				if (optlen == sizeof(int)) {
-					/* RFC 2292 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-					error = sooptcopyin(sopt, &optval,
-						sizeof optval, sizeof optval);
-					if (error)
-						break;
-#else
-					optval = *mtod(m, int *);
-#endif
-					switch(optname) {
-					case IPV6_PKTINFO:
-						OPTSET(IN6P_PKTINFO);
-						if (OPTBIT(IN6P_PKTINFO) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
-						break;
-					case IPV6_HOPOPTS:
-						/*
-						 * Check super-user privilege.
-						 * See comments for
-						 * IPV6_RECVHOPOPTS.
-						 */
-						if (!privileged)
-							return(EPERM);
-						OPTSET(IN6P_HOPOPTS);
-						if (OPTBIT(IN6P_HOPOPTS) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
-						break;
-					case IPV6_DSTOPTS:
-						if (!privileged)
-							return(EPERM);
-						OPTSET(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS); /* XXX */
-						if (OPTBIT(IN6P_DSTOPTS) == 0) {
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
-						}
-						break;
-					case IPV6_RTHDR:
-						OPTSET(IN6P_RTHDR);
-						if (OPTBIT(IN6P_RTHDR) == 0)
-							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
-						break;
-					}
+			{
+				/* new advanced API (2292bis) */
+				u_char *optbuf;
+				int optlen;
+				struct ip6_pktopts **optp;
+
+				/* cannot mix with RFC2292 */
+				if (OPTBIT(IN6P_RFC2292)) {
+					error = EINVAL;
 					break;
-				} else {
-					/* new advanced API (2292bis) */
-					u_char *optbuf;
-					int optlen;
-					struct ip6_pktopts **optp;
+				}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-					optbuf = sopt->sopt_val;
-					optlen = sopt->sopt_valsize;
+				optbuf = sopt->sopt_val;
+				optlen = sopt->sopt_valsize;
 #else  /* !fbsd3 */
-					if (m && m->m_next) {
-						error = EINVAL;	/* XXX */
-						break;
-					}
-					if (m) {
-						optbuf = mtod(m, u_char *);
-						optlen = m->m_len;
-					} else {
-						optbuf = NULL;
-						optlen = 0;
-					}
+				if (m && m->m_next) {
+					error = EINVAL;	/* XXX */
+					break;
+				}
+				if (m) {
+					optbuf = mtod(m, u_char *);
+					optlen = m->m_len;
+				} else {
+					optbuf = NULL;
+					optlen = 0;
+				}
 #endif
 
 #ifdef HAVE_NRL_INPCB
-					optp = &inp->inp_outputopts6;
+				optp = &inp->inp_outputopts6;
 #else
-					optp = &in6p->in6p_outputopts;
+				optp = &in6p->in6p_outputopts;
 #endif
 
-					error = ip6_pcbopt(optname,
-							   optbuf, optlen,
-							   optp, privileged);
-				}
+				error = ip6_pcbopt(optname,
+						   optbuf, optlen,
+						   optp, privileged);
 				break;
+			}
 #undef OPTSET
 
 			case IPV6_MULTICAST_IF:
@@ -1843,7 +1914,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 			switch (optname) {
 
+			case IPV6_2292PKTOPTIONS:
+#ifdef IPV6_PKTOPTIONS
 			case IPV6_PKTOPTIONS:
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (in6p->in6p_inputopts &&
 				    in6p->in6p_inputopts->head) {
@@ -1978,34 +2052,35 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 				break;
 
-			case IPV6_PKTINFO:
-			case IPV6_HOPOPTS:
-			case IPV6_RTHDR:
-			case IPV6_DSTOPTS:
-			case IPV6_RTHDRDSTOPTS:
-#ifdef COMPAT_RFC2292
-				if (optname == IPV6_HOPOPTS ||
-				    optname == IPV6_DSTOPTS ||
+			case IPV6_2292PKTINFO:
+			case IPV6_2292HOPLIMIT:
+			case IPV6_2292HOPOPTS:
+			case IPV6_2292RTHDR:
+			case IPV6_2292DSTOPTS:
+				if (optname == IPV6_2292HOPOPTS ||
+				    optname == IPV6_2292DSTOPTS ||
 				    !privileged)
 					return(EPERM);
 				switch(optname) {
-				case IPV6_PKTINFO:
-					optbit = OPTBIT(IN6P_PKTINFO);
+				case IPV6_2292PKTINFO:
+					optval = OPTBIT(IN6P_PKTINFO);
 					break;
-				case IPV6_HOPLIMIT:
+				case IPV6_2292HOPLIMIT:
 					optval = OPTBIT(IN6P_HOPLIMIT);
 					break;
-				case IPV6_HOPOPTS:
-					optbit = OPTBIT(IN6P_HOPOPTS);
+				case IPV6_2292HOPOPTS:
+					if (!privileged)
+						return(EPERM);
+					optval = OPTBIT(IN6P_HOPOPTS);
 					break;
-				case IPV6_RTHDR:
-					optbit = OPTBIT(IN6P_RTHDR);
+				case IPV6_2292RTHDR:
+					optval = OPTBIT(IN6P_RTHDR);
 					break;
-				case IPV6_DSTOPTS:
-					optbit = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
+				case IPV6_2292DSTOPTS:
+					if (!privileged)
+						return(EPERM);
+					optval = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
 					break;
-				case IPV6_RTHDRDSTOPTS:	/* in 2292bis only */
-					return(EOPNOTSUPP);
 				}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = sooptcopyout(sopt, &optval,
@@ -2015,7 +2090,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 				m->m_len = sizeof(int);
 				*mtod(m, int *) = optval;
 #endif /* FreeBSD3 */
-#else  /* new advanced API */
+				break;
+			case IPV6_PKTINFO:
+			case IPV6_HOPOPTS:
+			case IPV6_RTHDR:
+			case IPV6_DSTOPTS:
+			case IPV6_RTHDRDSTOPTS:
 #ifdef HAVE_NRL_INPCB
 #define in6p inp
 #define in6p_outputopts inp_outputopts6
@@ -2043,7 +2123,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 #undef in6p
 #undef in6p_outputopts
 #endif
-#endif /* COMPAT_RFC2292 */
 				break;
 
 			case IPV6_MULTICAST_IF:
@@ -3028,7 +3107,11 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 		if (cm->cmsg_level != IPPROTO_IPV6)
 			continue;
 
-		switch(cm->cmsg_type) {
+		/*
+		 * XXX should check if RFC2292 API is mixed with 2292bis API
+		 */
+		switch (cm->cmsg_type) {
+		case IPV6_2292PKTINFO:
 		case IPV6_PKTINFO:
 			if (cm->cmsg_len != CMSG_LEN(sizeof(struct in6_pktinfo)))
 				return(EINVAL);
@@ -3071,6 +3154,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			}
 			break;
 
+		case IPV6_2292HOPLIMIT:
 		case IPV6_HOPLIMIT:
 			if (cm->cmsg_len != CMSG_LEN(sizeof(int)))
 				return(EINVAL);
@@ -3080,6 +3164,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				return(EINVAL);
 			break;
 
+		case IPV6_2292NEXTHOP:
 		case IPV6_NEXTHOP:
 			if (!priv)
 				return(EPERM);
@@ -3101,6 +3186,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 					(struct sockaddr *)CMSG_DATA(cm);
 			break;
 
+		case IPV6_2292HOPOPTS:
 		case IPV6_HOPOPTS:
 		{
 			struct ip6_hbh *hbh;
@@ -3122,6 +3208,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			break;
 		}
 
+		case IPV6_2292DSTOPTS:
 		case IPV6_DSTOPTS:
 		{
 			struct ip6_dest *dest;
@@ -3160,6 +3247,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			break;
 		}
 
+		case IPV6_2292RTHDR:
 		case IPV6_RTHDR:
 		{
 			struct ip6_rthdr *rth;

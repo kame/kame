@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.52 2000/07/15 15:28:02 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.53 2000/07/24 00:16:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -393,14 +393,17 @@ struct route_in6 {
 #define IPV6_LEAVE_GROUP	13 /* ip6_mreq; leave a group membership */
 #define IPV6_PORTRANGE		14 /* int; range to choose for unspec port */
 #define ICMP6_FILTER		18 /* icmp6_filter; icmp6 filter */
-#define IPV6_PKTINFO		19 /* in6_pktinfo; send if, src addr */
-#define IPV6_HOPLIMIT		20 /* int; send hop limit */
-#define IPV6_NEXTHOP		21 /* sockaddr; next hop addr */
-#define IPV6_HOPOPTS		22 /* ip6_hbh; send hop-by-hop option */
-#define IPV6_DSTOPTS		23 /* ip6_dest; send dst option befor rthdr */
-#define IPV6_RTHDR		24 /* ip6_rthdr; send routing header */
-#define IPV6_PKTOPTIONS		25 /* buf/cmsghdr; set/get IPv6 options */
-				   /* obsoleted by 2292bis */
+/* RFC2292 options */
+#ifdef _KERNEL
+#define IPV6_2292PKTINFO	19 /* bool; send/recv if, src/dst addr */
+#define IPV6_2292HOPLIMIT	20 /* bool; hop limit */
+#define IPV6_2292NEXTHOP	21 /* bool; next hop addr */
+#define IPV6_2292HOPOPTS	22 /* bool; hop-by-hop option */
+#define IPV6_2292DSTOPTS	23 /* bool; destinaion option */
+#define IPV6_2292RTHDR		24 /* bool; routing header */
+#define IPV6_2292PKTOPTIONS	25 /* buf/cmsghdr; set/get IPv6 options */
+#endif
+
 #define IPV6_CHECKSUM		26 /* int; checksum offset for raw socket */
 #define IPV6_BINDV6ONLY		27 /* bool; only bind INET6 at null bind */
 
@@ -433,6 +436,18 @@ struct route_in6 {
 /* the followings are used as cmsg type only */
 #define IPV6_PATHMTU		44 /* 4 bytes int; MTU notification */
 #define IPV6_REACHCONF		45 /* no data; ND reachability confirm */
+
+/* more new socket options introduced in RFC2292bis */
+#define IPV6_PKTINFO		46 /* in6_pktinfo; send if, src addr */
+#define IPV6_HOPLIMIT		47 /* int; send hop limit */
+#define IPV6_NEXTHOP		48 /* sockaddr; next hop addr */
+#define IPV6_HOPOPTS		49 /* ip6_hbh; send hop-by-hop option */
+#define IPV6_DSTOPTS		50 /* ip6_dest; send dst option befor rthdr */
+#define IPV6_RTHDR		51 /* ip6_rthdr; send routing header */
+#if 0
+#define IPV6_PKTOPTIONS		25 /* buf/cmsghdr; set/get IPv6 options */
+				   /* obsoleted by 2292bis */
+#endif
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
 #define IPV6_RTHDR_STRICT    1 /* this hop must be a neighbor. XXX old spec */
