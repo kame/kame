@@ -58,6 +58,7 @@ options 	RADIX_MPATH
 pseudo-device 	pf			# PF packet filter
 pseudo-device 	pflog
 pseudo-device 	pfsync
+#pseudo-device 	ist	1		# ISATAP
 
 # Datagram Congestion Control Protocol
 options 	DCCP
