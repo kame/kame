@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.28 2002/08/23 05:06:31 sakane Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.29 2003/06/27 05:20:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,6 +254,16 @@ struct sadb_x_ipsecrequest {
    */
 };
 
+/*
+ * IPsec policy-by-PF-tag extension
+ */
+struct sadb_x_tag {
+  u_int16_t sadb_x_tag_len;
+  u_int16_t sadb_x_tag_exttype;
+  u_int16_t sadb_x_tag_tag;
+  u_int16_t sadb_x_tag_reserved;
+};
+
 #define SADB_EXT_RESERVED             0
 #define SADB_EXT_SA                   1
 #define SADB_EXT_LIFETIME_CURRENT     2
@@ -274,7 +284,8 @@ struct sadb_x_ipsecrequest {
 #define SADB_X_EXT_KMPRIVATE          17
 #define SADB_X_EXT_POLICY             18
 #define SADB_X_EXT_SA2                19
-#define SADB_EXT_MAX                  19
+#define SADB_X_EXT_TAG                19
+#define SADB_EXT_MAX                  20
 
 #define SADB_SATYPE_UNSPEC	0
 #define SADB_SATYPE_AH		2
