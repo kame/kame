@@ -10,7 +10,7 @@ MASTER_SITES=	ftp://rsync.samba.org/pub/rsync/old-versions/ \
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	rsync-231-v6-19990902a.diff.gz
+PATCHFILES=	rsync-231-v6-19990903a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=     itojun@itojun.org
