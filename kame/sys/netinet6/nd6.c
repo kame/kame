@@ -620,10 +620,11 @@ nd6_lookup(addr6, create, ifp)
 	}
 	rt->rt_refcnt--;
 	if ((rt->rt_flags & RTF_GATEWAY) || (rt->rt_flags & RTF_LLINFO) == 0 ||
-	   rt->rt_gateway->sa_family != AF_LINK) {
+	    rt->rt_gateway->sa_family != AF_LINK ||
+	    (ifp && rt->rt_ifp != ifp)) {
 		if (create) {
-			log(LOG_DEBUG, "nd6_lookup: failed to lookup %s\n",
-			    ip6_sprintf(addr6));
+			log(LOG_DEBUG, "nd6_lookup: failed to lookup %s (if = %s)\n",
+			    ip6_sprintf(addr6), ifp ? if_name(ifp) : "unspec");
 			/* xxx more logs... kazu */
 		}
 		return(0);
@@ -1096,7 +1097,7 @@ nd6_p2p_rtrequest(req, rt, sa)
 			SDL(gate)->sdl_index = ifp->if_index;
 			break;
 		}
-		/* Announce a new entry if rqquested. */
+		/* Announce a new entry if requested. */
 		if (rt->rt_flags & RTF_ANNOUNCE)
 			nd6_na_output(ifp,
 				      &SIN6(rt_key(rt))->sin6_addr,
