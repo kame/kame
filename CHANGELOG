@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.944 2000/05/27 12:09:43 itojun Exp $
+$Id: CHANGELOG,v 1.945 2000/05/27 14:07:37 itojun Exp $
 
 <200005>
+Sat May 27 23:05:00 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.8.
+
 2000-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dtcp/dtcpc.rb: added a new option "-r (static|solict)"
 	to specifiy how the default route should be configured.
