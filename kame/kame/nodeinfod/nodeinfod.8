@@ -1,0 +1,83 @@
+.\"	$KAME: nodeinfod.8,v 1.1 2001/07/20 05:13:06 itojun Exp $
+.\"
+.\" Copyright (C) 2001 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd July 20, 2001
+.Dt NODEINFOD 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm nodeinfod
+.Nd responds to ICMPv6 node information queries
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Fl n Ar name
+.\"
+.Sh DESCRIPTION
+.Nm
+responds to ICMPv6 node information queries.
+.Pp
+By default,
+.Nm
+will use the result from
+.Xr gethostname 3
+as the node name
+.Pq or FQDN .
+With
+.Fl n ,
+you can specify alternate hostname by an addional argument,
+.Ar name .
+.\"
+.Sh RETURN VALUES
+.Nm
+exits with 0 on success, and non-zero on errors.
+.\"
+.Sh SEE ALSO
+.Xr icmp6 4
+.Pp
+.Rs
+.%A Matt Crawford
+.%T IPv6 Node Information Queries
+.%D August 2000
+.%B Internet Draft
+.%N draft-ietf-ipngwg-icmp-name-lookups-07.txt
+.%O work in progress
+.Re
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+At this moment, there is no way for users to suppress node information
+responses from the KAME kernel.
+Therefore, if you run
+.Nm
+on KAME kernel, you will see two responses.
