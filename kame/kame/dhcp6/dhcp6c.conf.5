@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.6 2003/01/06 06:09:22 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.7 2003/01/23 03:26:47 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -174,10 +174,39 @@ If omitted, the value 0 will be used by default.
 is a sequence of statements that specifies configuration parameters
 for this IA.
 Each statement may or may not be specific to the type of IA.
-Currently only prefix interface statements
-.Pq see below
-are available for an IA of type
+The followings are possible
+.Ar substatements
+for an IA of type
 .Ic pd .
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic Ar prefix_interface_statement
+;
+.Xc
+specifies the client's local configuration of how delegated prefixes
+should be used
+.Pq see below .
+.It Ic prefix Ar ipv6-prefix pltime Op Ar vltime ;
+specifies a prefix and related parameters that the client wants to be
+delegated.
+Multiple prefixes can be specified, each of which is described as a
+separate
+.Ic prefix
+substatement.
+.Nm dhcp6c
+will include all the prefixes
+.Pq and related parameters
+in Solicit messages,
+as an IA_PD prefix option encapsulated in the corresponding IA_PD
+option.
+Note, however, that the server may or may not respect the specified
+prefix parameters.
+For parameters of the
+.Ic prefix
+substatement,
+see
+.Xr dhcp6s.conf 5 .
+.El
 .El
 .\"
 .Sh Prefix interface statement
@@ -263,6 +292,7 @@ id-assoc pd {
 };
 .Ed
 .Sh SEE ALSO
+.Xr dhcp6s.conf 5
 .Xr dhcp6c 8
 .\"
 .Sh HISTORY
