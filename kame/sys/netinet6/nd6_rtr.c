@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.99 2001/02/10 13:18:25 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.100 2001/02/24 17:47:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -566,8 +566,6 @@ defrouter_addifreq(ifp)
 	}
 
 	flags = ifa->ifa_flags;
-	if ((ifp->if_flags & IFF_POINTOPOINT) != 0)
-		flags &= ~RTF_CLONING;
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
@@ -1615,7 +1613,8 @@ nd6_prefix_onlink(pr)
 		log(LOG_NOTICE,
 		    "nd6_prefix_onlink: failed to find any ifaddr"
 		    " to add route for a prefix(%s/%d) on %s\n",
-		    ip6_sprintf(&pr->ndpr_addr), pr->ndpr_plen, if_name(ifp));
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
+		    pr->ndpr_plen, if_name(ifp));
 		return(0);
 	}
 
@@ -1624,7 +1623,9 @@ nd6_prefix_onlink(pr)
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_len = sizeof(mask6);
 	mask6.sin6_addr = pr->ndpr_mask;
-	rtflags = ifa->ifa_flags | RTF_CLONING | RTF_UP;
+	rtflags = ifa->ifa_flags | RTF_UP;
+	if (!nd6_need_cache(ifp))
+		rtflags &= ~RTF_CLONING;
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&pr->ndpr_prefix,
 			  ifa->ifa_addr, (struct sockaddr *)&mask6,
 			  rtflags, &rt);

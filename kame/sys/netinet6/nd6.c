@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.131 2001/02/21 16:28:18 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.132 2001/02/24 17:47:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2107,26 +2107,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr))
 		goto sendpkt;
 
-	/*
-	 * XXX: we currently do not make neighbor cache on any interface
-	 * other than ARCnet, Ethernet, FDDI and GIF.
-	 *
-	 * RFC2893 says:
-	 * - unidirectional tunnels needs no ND
-	 */
-	switch (ifp->if_type) {
-	case IFT_ARCNET:
-	case IFT_ETHER:
-	case IFT_FDDI:
-	case IFT_IEEE1394:
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:
-#endif
-	case IFT_GIF:		/* XXX need more cases? */
-		break;
-	default:
+	if (nd6_need_cache(ifp) == 0)
 		goto sendpkt;
-	}
 
 	/*
 	 * next hop determination. This routine is derived from ether_outpout.
@@ -2299,6 +2281,32 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	return (error);
 }	
 #undef senderr
+
+int
+nd6_need_cache(ifp)
+	struct ifnet *ifp;
+{
+	/*
+	 * XXX: we currently do not make neighbor cache on any interface
+	 * other than ARCnet, Ethernet, FDDI and GIF.
+	 *
+	 * RFC2893 says:
+	 * - unidirectional tunnels needs no ND
+	 */
+	switch (ifp->if_type) {
+	case IFT_ARCNET:
+	case IFT_ETHER:
+	case IFT_FDDI:
+	case IFT_IEEE1394:
+#ifdef IFT_IEEE80211
+	case IFT_IEEE80211:
+#endif
+	case IFT_GIF:		/* XXX need more cases? */
+		return(1);
+	default:
+		return(0);
+	}
+}
 
 int
 nd6_storelladdr(ifp, rt, m, dst, desten)
