@@ -650,6 +650,15 @@ ip6_input(m)
 	/*
 	 * Tell launch routine the next header
 	 */
+#if defined(__NetBSD__) && defined(IFA_STATS)
+	if (IFA_STATS && deliverifp != NULL) {
+		struct in6_ifaddr *ia6;
+		ip6 = mtod(m, struct ip6_hdr *);
+		ia6 = in6_ifawithifp(deliverifp, &ip6->ip6_dst);
+		if (ia6)
+			ia6->ia_ifa.ifa_data.ifad_inbytes += m->m_pkthdr.len;
+	}
+#endif
 	ip6stat.ip6s_delivered++;
 	in6_ifstat_inc(deliverifp, ifs6_in_deliver);
 	nest = 0;

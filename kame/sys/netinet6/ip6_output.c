@@ -880,6 +880,17 @@ skip_ipsec2:;
 #endif
 	    )
 	{
+#if defined(__NetBSD__) && defined(IFA_STATS)
+		if (IFA_STATS) {
+			struct in6_ifaddr *ia6;
+			ip6 = mtod(m, struct ip6_hdr *);
+			ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
+			if (ia6) {
+				ia->ia_ifa.ifa_data.ifad_outbytes +=
+					m->m_pkthdr.len;
+			}
+		}
+#endif
 #ifdef OLDIP6OUTPUT
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
 					  ro->ro_rt);
@@ -1004,6 +1015,17 @@ sendorfree:
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
 		if (error == 0) {
+#if defined(__NetBSD__) && defined(IFA_STATS)
+			if (IFA_STATS) {
+				struct in6_ifaddr *ia6;
+				ip6 = mtod(m, struct ip6_hdr *);
+				ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
+				if (ia6) {
+					ia->ia_ifa.ifa_data.ifad_outbytes +=
+						m->m_pkthdr.len;
+				}
+			}
+#endif
 #ifdef OLDIP6OUTPUT
 			error = (*ifp->if_output)(ifp, m,
 						  (struct sockaddr *)dst,
