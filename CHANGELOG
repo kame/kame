@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2295 2002/12/24 04:47:30 suz Exp $
+$KAME: CHANGELOG,v 1.2296 2003/01/05 17:13:59 jinmei Exp $
+
+<200301>
+2003-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: upgraded base specification of DHCPv6 and prefix
+	delegation using DHCPv6 according to the latest drafts.
+	Note that backward compatibility to older versions of prefix
+	delegation was not provided.
 
 <200212>
 Tue Dec 24 13:43:12 JST 2002	suz@crl.hitachi.co.jp
