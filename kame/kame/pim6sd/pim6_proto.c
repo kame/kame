@@ -1288,6 +1288,7 @@ join_or_prune(mrtentry_ptr, upstream_router)
 
 /* TODO: when parsing, check if we go beyong message size */
 /* TODO: too long, simplify it! */
+#define PIM6_JOIN_PRUNE_MINLEN (PIM_MINLEN + 8)
 
 int
 receive_pim6_join_prune(src, dst, pim_message, datalen)
@@ -1352,10 +1353,18 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	return (FALSE);		/* Shoudn't come on this interface */
     }
 
+    /* sanity check for the minimum length */
+    if (datalen < PIM6_JOIN_PRUNE_MINLEN) {
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_join_prune: Join/Prune message size(%u) is"
+		" too short from %s on %s",
+		datalen, inet6_fmt(&src->sin6_addr), v->uv_name);
+	    return(FALSE);
+    }
+    datalen -= PIM6_JOIN_PRUNE_MINLEN;
     data_ptr = (u_int8 *) (pim_message + sizeof(struct pim));
 
     /* Get the target address */
-
     GET_EUADDR6(&uni_target_addr, data_ptr);
     GET_BYTE(reserved, data_ptr);
     GET_BYTE(num_groups, data_ptr);
@@ -1367,6 +1376,39 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     target.sin6_addr = uni_target_addr.unicast_addr;
     target.sin6_scope_id = inet6_uvif2scopeid(&target, v);
 
+    /* Sanity check for the message length through all the groups */
+    num_groups_tmp = num_groups;
+    data_ptr_start = data_ptr;
+    while (num_groups_tmp--) {
+	int srclen;
+
+	/* group addr + #join + #src */
+	if (datalen < PIM6_ENCODE_GRP_ADDR_LEN + sizeof(u_int32_t)) {
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_join_prune: Join/Prune message from %s on %s is"
+		" too short to contain enough data",
+		inet6_fmt(&src->sin6_addr), v->uv_name);
+	    return(FALSE);
+	}
+	datalen -= (PIM6_ENCODE_GRP_ADDR_LEN + sizeof(u_int32_t));
+	data_ptr += (PIM6_ENCODE_GRP_ADDR_LEN + sizeof(u_int32_t));
+
+	/* joined source addresses and pruned source addresses */
+	GET_HOSTSHORT(num_j_srcs, data_ptr);
+	GET_HOSTSHORT(num_p_srcs, data_ptr);
+	srclen = (num_j_srcs + num_p_srcs) * PIM6_ENCODE_SRC_ADDR_LEN;
+	if (datalen < srclen) {
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_join_prune: Join/Prune message from %s on %s is"
+		" too short to contain enough data",
+		inet6_fmt(&src->sin6_addr), v->uv_name);
+	    return(FALSE);
+	}
+	datalen -= srclen;
+	data_ptr += srclen;
+    }
+    data_ptr = data_ptr_start;
+    num_groups_tmp = num_groups;
 
     if (!inet6_localif_address(&target, v) &&
 	!IN6_IS_ADDR_UNSPECIFIED(&uni_target_addr.unicast_addr))
@@ -1796,22 +1838,25 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 
    	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
 	{
-		log(LOG_DEBUG,0,"Group to process : %s",inet6_fmt(&encod_group.mcast_addr));
-		log(LOG_DEBUG,0,"Number of join   : %d",num_j_srcs );
-		log(LOG_DEBUG,0,"Number of prune  : %d",num_p_srcs );
-	}	
-
+		log(LOG_DEBUG, 0,
+		    "Group to process : %s",inet6_fmt(&encod_group.mcast_addr));
+		log(LOG_DEBUG, 0,
+		    "Number of join   : %d",num_j_srcs );
+		log(LOG_DEBUG, 0,
+		    "Number of prune  : %d",num_p_srcs );
+	}
 
 	if (!(inet6_equal(&group,&sockaddr6_d))
 	    || (encod_src.masklen != STAR_STAR_RP_MSK6LEN))
 	{
 	    /* This is not (*,*,RP). Jump to the next group. */
-		data_ptr += (num_j_srcs + num_p_srcs) * sizeof(pim6_encod_src_addr_t);
-		IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
+	    data_ptr += (num_j_srcs + num_p_srcs) * sizeof(pim6_encod_src_addr_t);
+	    IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
 		{
-			log(LOG_DEBUG,0,"I'm looking for the (*,*,RP) entry , skip to next entry");
+		    log(LOG_DEBUG, 0,
+			"I'm looking for the (*,*,RP) entry , skip to next entry");
 		}
-		continue;
+	    continue;
 	}
 
 	/*
