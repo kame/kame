@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.9 2000/07/02 21:01:32 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.10 2000/07/02 21:25:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,7 +333,7 @@ do {									\
 	if (((m)->m_flags & M_LOOP) &&					\
 	    ((m)->m_len < (off) + (hlen)) &&				\
 	    (((m) = m_pullup((m), (off) + (hlen))) == NULL)) {		\
-		IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrtoolong++;		\
+		IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrtoolong++);		\
 		return ret;						\
 	} else if ((m)->m_flags & M_EXT) {				\
 		if ((m)->m_len < (off) + (hlen)) {			\
