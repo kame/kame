@@ -1,4 +1,4 @@
-/*	$KAME: mchat.c,v 1.17 2003/04/15 07:38:42 itojun Exp $	*/
+/*	$KAME: mchat.c,v 1.18 2003/11/13 20:48:50 keiichi Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
@@ -501,7 +501,7 @@ sendstr(s, sa, msg)
 	error = sendto(s, buf, strlen(buf), 0, sa, sa->sa_len);
 	if (error < 0) {
 		strcpy(buf, "(unknown)");
-		getnameinfo(sa, sa->sa_len, buf, sizeof(buf), 0, NULL,
+		getnameinfo(sa, sa->sa_len, buf, sizeof(buf), NULL, 0,
 			NI_NUMERICHOST);
 		wrecv_print(">> sendto %s: %s\n", buf, strerror(errno));
 	}
@@ -587,13 +587,13 @@ cmd_who(buf, sa)
 	int error;
 
 	getnameinfo(sa, sa->sa_len,
-		abuf, sizeof(abuf), 0, NULL, NI_NUMERICHOST);
+		abuf, sizeof(abuf), NULL, 0, NI_NUMERICHOST);
 	wrecv_print(">> who request from %s\n", abuf);
 
 	src = getsrc(sa);
 	if (src) {
 		error = getnameinfo((struct sockaddr *)src, src->sa_len,
-			abuf, sizeof(abuf), 0, NULL, NI_NUMERICHOST);
+			abuf, sizeof(abuf), NULL, 0, NI_NUMERICHOST);
 		if (error)
 			strcpy(abuf, "unknown");
 	} else
@@ -684,7 +684,7 @@ cmd_secret(buf, sa)
 	src = getsrc(res->ai_addr);
 	if (src) {
 		error = getnameinfo((struct sockaddr *)src, src->sa_len,
-			myaddr, sizeof(myaddr), 0, NULL, NI_NUMERICHOST);
+			myaddr, sizeof(myaddr), NULL, 0, NI_NUMERICHOST);
 		if (error)
 			strcpy(myaddr, "unknown");
 	} else
@@ -727,7 +727,7 @@ cmd_file(fname, sa)
 				sa, sa->sa_len);
 		if (error < 0) {
 			strcpy(buf, "(unknown)");
-			getnameinfo(sa, sa->sa_len, buf, sizeof(buf), 0, NULL,
+			getnameinfo(sa, sa->sa_len, buf, sizeof(buf), NULL, 0,
 				NI_NUMERICHOST);
 			wstat_print(">> sendto %s: %s\n", buf, strerror(errno));
 		}
