@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.34 2002/09/27 09:31:12 k-sugyou Exp $	*/
+/*	$KAME: if_hif.c,v 1.35 2002/09/27 09:38:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,7 +204,7 @@ hifattach(dummy)
 		sc->hif_if.if_output = hif_output;
 		sc->hif_if.if_type = IFT_HIF;
 #ifdef __NetBSD__
-		sc->sc_if.if_dlt = DLT_NULL;
+		sc->hif_if.if_dlt = DLT_NULL;
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		IFQ_SET_MAXLEN(&sc->hif_if.if_snd, ifqmaxlen);

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.94 2002/09/27 09:31:12 k-sugyou Exp $	*/
+/*	$KAME: if_gif.c,v 1.95 2002/09/27 09:38:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,7 +338,7 @@ gifattach0(sc)
 	sc->gif_if.if_output = gif_output;
 	sc->gif_if.if_type   = IFT_GIF;
 #ifdef __NetBSD__
-	sc->sc_if.if_dlt = DLT_NULL;
+	sc->gif_if.if_dlt = DLT_NULL;
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	IFQ_SET_MAXLEN(&sc->gif_if.if_snd, IFQ_MAXLEN);
