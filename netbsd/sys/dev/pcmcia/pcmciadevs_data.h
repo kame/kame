@@ -297,11 +297,18 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    "Xircom CreditCard CE2 Ethernet"	},
 	},
 	{
-	    PCMCIA_VENDOR_TDK, PCMCIA_PRODUCT_TDK_XIR_CNW,
-	    PCMCIA_CIS_TDK_XIR_CNW,
+	    PCMCIA_VENDOR_TDK, PCMCIA_PRODUCT_TDK_XIR_CNW_801,
+	    PCMCIA_CIS_TDK_XIR_CNW_801,
 	    0,
 	    "TDK Corporation",
-	    "Xircom CreditCard Netwave"	},
+	    "Xircom CreditCard Netwave (Canada)"	},
+	},
+	{
+	    PCMCIA_VENDOR_TDK, PCMCIA_PRODUCT_TDK_XIR_CNW_802,
+	    PCMCIA_CIS_TDK_XIR_CNW_802,
+	    0,
+	    "TDK Corporation",
+	    "Xircom CreditCard Netwave (US)"	},
 	},
 	{
 	    PCMCIA_VENDOR_NEWMEDIA, PCMCIA_PRODUCT_NEWMEDIA_BASICS,

@@ -9,4 +9,7 @@ INCS=	pcmciachip.h pcmciareg.h pcmciavar.h
 # if_wi.c
 INCS+=	if_wi_ieee.h
 
+# if_cnw.c
+INCS+=	if_cnwioctl.h
+
 .include <bsd.kinc.mk>
