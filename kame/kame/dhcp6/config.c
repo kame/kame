@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.38 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.39 2004/05/13 13:58:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -530,7 +530,7 @@ configure_global_option()
 		    &name_vbuf, 0)) {
 			dprintf(LOG_INFO, FNAME,
 			    "%s:%d duplicated SIP name: %s",
-			    configfilename, cl->line);
+			    configfilename, cl->line, name_vbuf.dv_buf);
 			dhcp6_vbuf_free(&name_vbuf);
 			goto bad;
 		}
@@ -586,7 +586,7 @@ configure_global_option()
 		    &name_vbuf, 0)) {
 			dprintf(LOG_INFO, FNAME,
 			    "%s:%d duplicated DNS name: %s",
-			    configfilename, cl->line);
+			    configfilename, cl->line, name_vbuf.dv_buf);
 			dhcp6_vbuf_free(&name_vbuf);
 			goto bad;
 		}
