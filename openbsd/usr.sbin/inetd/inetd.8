@@ -1,3 +1,4 @@
+.\"	$OpenBSD: inetd.8,v 1.27 2004/06/30 07:58:12 otto Exp $
 .\" Copyright (c) 1985, 1991 The Regents of the University of California.
 .\" All rights reserved.
 .\"
@@ -9,11 +10,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -30,7 +27,6 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     from: @(#)inetd.8	6.7 (Berkeley) 3/16/91
-.\"	$Id: inetd.8,v 1.18 2001/01/29 11:38:32 deraadt Exp $
 .\"
 .Dd March 16, 1991
 .Dt INETD 8
@@ -83,7 +79,6 @@ Comments are denoted by a
 .Dq #
 at the beginning
 of a line.
-There must be an entry for each field.
 The fields of the configuration file are as follows:
 .Pp
 .Bd -unfilled -offset indent -compact
@@ -143,9 +138,12 @@ is implicitly provided at the top of the file; thus, traditional
 configuration files (which have no host address specifiers) will be
 interpreted in the traditional manner, with all services listened for
 on all local addresses.
+If the protocol is
+.Dq unix ,
+this value is ignored.
 .Pp
 The
-.Em service-name
+.Em service name
 entry is the name of a valid service in
 the file
 .Pa /etc/services .
@@ -166,9 +164,12 @@ is the RPC version number.
 This can simply be a single numeric argument or a range of versions.
 A range is bounded by the low version to the high version -
 .Dq rusers/1-3 .
+For
+.Ux
+domain sockets this field specifies the path name of the socket.
 .Pp
 The
-.Em socket-type
+.Em socket type
 should be one of
 .Dq stream ,
 .Dq dgram ,
@@ -197,11 +198,18 @@ and
 .Dq udp
 will be recognized as
 .Dq TCP or UDP over default IP version .
-It is currently IPv4, but in the future it will be IPv6.
+This is currently IPv4, but in the future it will be IPv6.
 If you need to specify IPv4 or IPv6 explicitly, use something like
 .Dq tcp4
 or
 .Dq udp6 .
+A
+.Em protocol
+of
+.Dq unix
+is used to specify a socket in the
+.Ux
+domain.
 .Pp
 The
 .Em wait/nowait
@@ -266,8 +274,6 @@ out and exit when no more connections are active.
 will continue to
 listen on the master socket for connections, so the server should not close
 it when it exits.
-.Xr identd 8
-is usually the only stream server marked as wait.
 .Pp
 The
 .Em user
@@ -284,7 +290,7 @@ is specified and user is not root, the supplementary groups associated with
 that user will still be set.
 .Pp
 The
-.Em server-program
+.Em server program
 entry should contain the pathname of the program which is to be
 executed by
 .Nm inetd
@@ -335,15 +341,15 @@ creates a file
 that contains its process identifier.
 .Ss IPv6 TCP/UDP behavior
 If you wish to run a server for IPv4 and IPv6 traffic,
-you'll need to run two separate process for the same server program,
-specified as two separate lines on 
+you'll need to run two separate processes for the same server program,
+specified as two separate lines in
 .Pa inetd.conf ,
 for
 .Dq tcp4
 and
 .Dq tcp6 .
 .Pp
-Under various combination of IPv4/v6 daemon settings,
+Under various combinations of IPv4/v6 daemon settings,
 .Nm
 will behave as follows:
 .Bl -bullet -compact
@@ -366,6 +372,25 @@ If you have only one server on
 .Dq tcp6 ,
 only IPv6 traffic will be routed to the server.
 .El
+.Sh SEE ALSO
+.Xr comsat 8 ,
+.Xr fingerd 8 ,
+.Xr ftp-proxy 8 ,
+.Xr ftpd 8 ,
+.Xr identd 8 ,
+.Xr rshd 8 ,
+.Xr talkd 8 ,
+.Xr telnetd 8 ,
+.Xr tftpd 8
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Bx 4.3 .
+Support for Sun-RPC
+based services is modelled after that
+provided by SunOS 4.1.
+IPv6 support was added by the KAME project in 1999.
 .Sh BUGS
 Host address specifiers, while they make conceptual sense for RPC
 services, do not work entirely correctly.
@@ -383,21 +408,3 @@ or
 .Dq tcpmux
 on IPv6 is not tested enough.
 Kerberos support on IPv6 is not tested.
-.Sh SEE ALSO
-.Xr comsat 8 ,
-.Xr fingerd 8 ,
-.Xr ftpd 8 ,
-.Xr rexecd 8 ,
-.Xr rlogind 8 ,
-.Xr rshd 8 ,
-.Xr telnetd 8 ,
-.Xr tftpd 8
-.Sh HISTORY
-The
-.Nm
-command appeared in
-.Bx 4.3 .
-Support for Sun-RPC
-based services is modeled after that
-provided by SunOS 4.1.
-IPv6 support and IPsec hack was made by KAME project, in 1999.
