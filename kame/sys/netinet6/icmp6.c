@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.206 2001/03/23 06:07:43 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.207 2001/03/23 06:36:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -772,7 +772,7 @@ icmp6_input(mp, offp, proto)
 			u_char *p;
 			int maxlen, maxhlen;
 
-			if ((icmp6_nodeinfo & 1) == 0)
+			if ((icmp6_nodeinfo & 5) != 5) 
 				break;
 
 			if (code != 0)
