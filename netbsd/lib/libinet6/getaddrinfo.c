@@ -223,7 +223,9 @@ static struct addrinfo *get_ai __P((const struct addrinfo *,
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
+#if 0
 static int addrconfig __P((const struct addrinfo *));
+#endif
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif 
@@ -582,12 +584,16 @@ explore_fqdn(pai, hostname, servname, res)
 
 	result = NULL;
 
+#if 0
 	/*
 	 * If AI_ADDRCONFIG is specified, check if we are expected to
 	 * return the address family or not.
+	 * XXX does not handle PF_UNSPEC - should filter out result from
+	 * nsdispatch()
 	 */
 	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(pai))
 		return 0;
+#endif
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -980,6 +986,7 @@ find_afd(af)
 	return NULL;
 }
 
+#if 0
 /*
  * post-2553: AI_ADDRCONFIG check.  if we use getipnodeby* as backend, backend
  * will take care of it.
@@ -999,6 +1006,7 @@ addrconfig(pai)
 	close(s);
 	return 1;
 }
+#endif
 
 #ifdef INET6
 /* convert a string to a scope identifier. XXX: IPv6 specific */
