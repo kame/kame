@@ -504,13 +504,14 @@ tcp6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
+	struct in6_ifaddr *ia6;
+	struct ip6_hdr *ip6;
 
 	/*
 	 * draft-itojun-ipv6-tcp-to-anycast
-	 * better place to put this in?
 	 */
-	if (m->m_flags & M_ANYCAST6) {
-		struct ip6_hdr *ip6;
+	ia6 = ip6_getdstifaddr(m);
+	if (ia6 && (ia6->ia6_flags & IN6_IFF_ANYCAST)) {
 		if (m->m_len < sizeof(struct ip6_hdr)) {
 			if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == NULL) {
 				tcpstat.tcps_rcvshort++;
@@ -518,9 +519,8 @@ tcp6_input(mp, offp, proto)
 			}
 		}
 		ip6 = mtod(m, struct ip6_hdr *);
-		icmp6_error(m, ICMP6_DST_UNREACH,
-			ICMP6_DST_UNREACH_ADDR,
-			(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
+		icmp6_error(m, ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_ADDR,
+		    (caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
 		return IPPROTO_DONE;
 	}
 
@@ -1050,6 +1050,47 @@ findpcb:
 				/*
 				 * Received a SYN.
 				 */
+
+#ifdef INET6
+				/*
+				 * If deprecated address is forbidden, we do
+				 * not accept SYN to deprecated interface
+				 * address to prevent any new inbound
+				 * connection from getting established.  So
+				 * drop the SYN packet.  Note that we cannot
+				 * issue a RST as we cannot use the address as
+				 * the source.
+				 *
+				 * If we do not forbid deprecated addresses, we
+				 * accept the SYN packet.  RFC2462 does not
+				 * suggest dropping SYN in this case.
+				 * If we decipher RFC2462 5.5.4, it says like
+				 * this:
+				 * 1. use of deprecated addr with existing
+				 *    communication is okay - "SHOULD continue
+				 *    to be used"
+				 * 2. use of it with new communication:
+				 *   (2a) "SHOULD NOT be used if alternate
+				 *        address with sufficient scope is
+				 *        available"
+				 *   (2b) nothing mentioned otherwise.
+				 * Here we fall into (2b) case as we have no
+				 * choice in our souce address selection - we
+				 * must obey the peer.
+				 *
+				 * The wording in RFC2462 is confusing, and
+				 * there are multiple description text for
+				 * deprecated address handling - worse, they
+				 * are not exactly the same.  I believe 5.5.4
+				 * is the best one, so we follow 5.5.4.
+				 */
+				if (af == AF_INET6 && !ip6_use_deprecated) {
+					struct in6_ifaddr *ia6;
+					if ((ia6 = ip6_getdstifaddr(m)) &&
+					    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
+						goto drop;
+				}
+#endif
 
 				/*
 				 * LISTEN socket received a SYN
@@ -2054,9 +2095,7 @@ dropwithreset:
 	if (ip && IN_MULTICAST(ip->ip_dst.s_addr))
 		goto drop;
 #ifdef INET6
-	if (m->m_flags & M_ANYCAST6)
-		goto drop;
-	else if (ip6 && IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+	if (ip6 && IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		goto drop;
 #endif
     {
@@ -3155,10 +3194,6 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 	 */
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		return 0;
-#ifdef INET6
-	if (m->m_flags & M_ANYCAST6)
-		return 0;
-#endif
 
 	switch (src->sa_family) {
 	case AF_INET:
