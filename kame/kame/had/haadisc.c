@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.15 2004/01/20 04:18:20 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.16 2004/01/22 09:45:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.15 2004/01/20 04:18:20 t-momose Exp $
+ * $Id: haadisc.c,v 1.16 2004/01/22 09:45:26 t-momose Exp $
  */
 
 /*
@@ -735,8 +735,7 @@ ra_input(len, ra, pinfo, from)
 	    }
 
 	    /* onlink and R bit is set XXX */
-	    if ((pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK)
-		&& (pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
+	    if ((pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER) != 0) {
 		    /* IMPLID:MIP6HA#14 */
 		    lastp = hal_gaddr_add(halp, lastp, pi);
 	    }
