@@ -544,11 +544,7 @@ routename(sa, nm, flags)
 		struct sockaddr_in6 sin6;
 		int niflags;
 
-#ifdef NI_WITHSCOPEID
-		niflags = NI_WITHSCOPEID;
-#else
 		niflags = 0;
-#endif
 		if (nflag)
 			niflags |= NI_NUMERICHOST;
 		memset(&sin6, 0, sizeof(sin6));
@@ -702,11 +698,7 @@ netname(sa, nm)
 		struct sockaddr_in6 sin6;
 		int niflags;
 
-#ifdef NI_WITHSCOPEID
-		niflags = NI_WITHSCOPEID;
-#else
 		niflags = 0;
-#endif
 		if (nflag)
 			niflags |= NI_NUMERICHOST;
 		memset(&sin6, 0, sizeof(sin6));

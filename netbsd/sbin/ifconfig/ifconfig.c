@@ -2098,11 +2098,7 @@ tunnel_status()
 	char psrcaddr[NI_MAXHOST];
 	char pdstaddr[NI_MAXHOST];
 	const char *ver = "";
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST;
-#endif
 	struct if_laddrreq req;
 
 	psrcaddr[0] = pdstaddr[0] = '\0';
@@ -2309,11 +2305,7 @@ in6_alias(creq)
 	char hbuf[NI_MAXHOST];
 	u_int32_t scopeid;
 	struct in6_addrlifetime lifetime0, *lifetime;
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST;
-#endif
 
 	/* Get the non-alias address for this interface. */
 	getsock(AF_INET6);
