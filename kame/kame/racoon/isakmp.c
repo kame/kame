@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.58 2000/05/22 21:40:57 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.59 2000/05/23 12:49:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1971,7 +1971,7 @@ copy_ph1addresses(iph1, rmconf, remote)
 	struct remoteconf *rmconf;
 	struct sockaddr *remote;
 {
-	u_short port = 0;
+	u_short *port = NULL;
 
 	/* address portion must be grabbed from real remote address "remote" */
 	iph1->remote = dupsaddr(remote);
@@ -1989,23 +1989,23 @@ copy_ph1addresses(iph1, rmconf, remote)
 	 */
 	switch (iph1->remote->sa_family) {
 	case AF_INET:
-		port = ((struct sockaddr_in *)iph1->remote)->sin_port;
-		if (port)
+		port = &((struct sockaddr_in *)iph1->remote)->sin_port;
+		if (*port)
 			break;
-		port = ((struct sockaddr_in *)rmconf->remote)->sin_port;
-		if (port)
+		*port = ((struct sockaddr_in *)rmconf->remote)->sin_port;
+		if (*port)
 			break;
-		port = htons(PORT_ISAKMP);
+		*port = htons(PORT_ISAKMP);
 		break;
 #ifdef INET6
 	case AF_INET6:
-		port = ((struct sockaddr_in6 *)iph1->remote)->sin6_port;
-		if (port)
+		port = &((struct sockaddr_in6 *)iph1->remote)->sin6_port;
+		if (*port)
 			break;
-		port = ((struct sockaddr_in6 *)rmconf->remote)->sin6_port;
-		if (port)
+		*port = ((struct sockaddr_in6 *)rmconf->remote)->sin6_port;
+		if (*port)
 			break;
-		port = htons(PORT_ISAKMP);
+		*port = htons(PORT_ISAKMP);
 		break;
 #endif
 	default:
