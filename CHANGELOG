@@ -1,9 +1,7 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2583 2004/04/03 17:15:56 suz Exp $
+$KAME: CHANGELOG,v 1.2584 2004/04/06 10:43:32 jinmei Exp $
 
 <200404>
-
-<200403>
 2004-04-04  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd5: makes it compilable.
 
@@ -30,6 +28,7 @@ Fri Apr  2 16:27:00 JST 2004 sakane@kame.net
 	a endian problem within kernel.
 	ToDo: code refinement to share IGMPv3 codes among *BSDs.
 
+<200403>
 Mar 31 JST 2004  itojun@iijlab.net
 	* *bsd*/sys/netinet*/udp*_usrreq.c: forbid IPv6 UDP packet without
 	  checksum.  found by keiichi@kame.net
