@@ -657,10 +657,15 @@ privileged port numbers.
 It maintains an effective user id of the logged in user, reverting
 to the super-user only when binding addresses to sockets.
 .Pp
-When running on IPv6, connection from IPv4 mapped address
-.Pq IPv4 connection to IPv6 socket
-is not very stable yet.
-Please run two daemons, one for IPv4 and one for IPv6, for the moment.
+.Nm
+may have trouble handling connections from scoped IPv6 addresses, or
+IPv4 mapped addresses
+.Pq IPv4 connection on
+.Dv AF_INET6
+socket .
+For the latter case, running daemons,
+one for IPv4 and one for IPv6, will avoid the problem.
+for IPv4 and IPv6
 .Sh SECURITY CONSIDERATIONS
 .Cm RFC 959
 provides no restrictions on the PORT command, and this can lead
