@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.38 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.39 2002/09/27 09:17:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -359,7 +359,7 @@ ip6_rthdr2(m, ip6, rh2)
 			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 				continue;
 
-			/* XXX registration status ? */
+			/* XXX should we check a registration status? */
 
 			if (rh2->ip6r2_segleft == 0) {
 				struct mbuf *n;
