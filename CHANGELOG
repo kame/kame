@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.194 1999/10/18 23:01:21 itojun Exp $
+$Id: CHANGELOG,v 1.195 1999/10/19 04:50:49 sakane Exp $
 
 <199910>
+Tue Oct 19 13:43:27 JST 1999  sakane@ydc.co.jp
+	* kame/sys/netinet,netinet6,netkey:
+	- Save uid who created socket, and decision socket based policy
+	  with this uid.  At FreeBSD3, so->so_cred->p_svuid is saved
+	  as this uid.
+	- New identify type; SADB_X_IDENTTYPE_ADDR.  This is suitable
+	  to identify clients of SA, not SA peers, rather than using
+	  SADB_IDENTTYPE_FQDN when kernel send SADB_ACQUIRE.
+
 Tue Oct 19 07:13:02 JST 1999  itojun@iijlab.net
 	* kame/dhcp6: server passes timezone information to clients.
 
