@@ -61,7 +61,7 @@ if [ X"$defaultiface" = X"" ]; then
 fi
 # Disallow unicast packets without outgoing scope identifiers.
 # However, if you set "defaultiface", "ndp -I $defaultiface", which will be
-# called later in this file for the host case, will allow you to ommit
+# called later in this file for the host case, will allow you to omit
 # the identifiers. Then such packets will go to the default interface.
 #
 # If you configure site-locals without scope id (it is permissible config for
