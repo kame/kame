@@ -1,5 +1,12 @@
 TARGET?=	bogus
 
+DEVELOPER=	NO
+.if ${DEVELOPER} == "YES"
+CVSHOST=	cvs.kame.net
+.else
+CVSHOST=	anoncvs.kame.net
+.endif
+
 all:
 	@(echo '**** WARNING: Read through INSTALL and platform/INSTALL, '; \
 	echo '    and follow the steps documented'.; \
