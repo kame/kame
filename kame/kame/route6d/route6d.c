@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.46 2001/01/22 10:11:15 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.47 2001/01/22 11:25:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.46 2001/01/22 10:11:15 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.47 2001/01/22 11:25:15 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -147,13 +147,13 @@ int	ripsock;	/* socket to send/receive RIP datagram */
 struct	rip6 *ripbuf;	/* packet buffer for sending */
 
 /*
- * Maintain the routes in a linked list. When the number of the routes
+ * Maintain the routes in a linked list.  When the number of the routes
  * grows, somebody would like to introduce a hash based or a radix tree
- * based strucutre. I believe the number of routes handled by RIP is
+ * based structure.  I believe the number of routes handled by RIP is
  * limited and I don't have to manage a complex data structure, however.
  *
  * One of the major drawbacks of the linear linked list is the difficulty
- * of representing the relationship between a couple of routes. This may
+ * of representing the relationship between a couple of routes.  This may
  * be a significant problem when we have to support route aggregation with
  * supressing the specifices covered by the aggregate.
  */
@@ -511,7 +511,7 @@ rtdexit(sig)
  * Called periodically:
  *	1. age out the learned route. remove it if necessary.
  *	2. submit RIP6_RESPONSE packets.
- * Invoked in every SUPPLY_INTERVAL6 (30) seconds. I believe we don't have
+ * Invoked in every SUPPLY_INTERVAL6 (30) seconds.  I believe we don't have
  * to invoke this function in every 1 or 5 or 10 seconds only to age the
  * routes more precisely.
  */
@@ -906,7 +906,7 @@ sendpacket(sin, len)
 {
 	/*
 	 * MSG_DONTROUTE should not be specified when it responds with a
-	 * RIP6_REQUEST message. SO_DONTROUTE has been specified to
+	 * RIP6_REQUEST message.  SO_DONTROUTE has been specified to
 	 * other sockets.
 	 */
 	struct msghdr m;
@@ -960,7 +960,7 @@ sendpacket(sin, len)
 }
 
 /*
- * Receive and process RIP packets. Update the routes/kernel forwarding
+ * Receive and process RIP packets.  Update the routes/kernel forwarding
  * table if necessary.
  */
 void
@@ -1193,7 +1193,7 @@ riprecv()
 			}
 			/* 
 			 * if nq->rip6_metric == HOPCNT_INFINITY6 then
-			 * do not update age value. Do nothing.
+			 * do not update age value.  Do nothing.
 			 */
 		} else if (np->rip6_metric < HOPCNT_INFINITY6) {
 			/* Got a new valid route */
@@ -2940,7 +2940,7 @@ rtdump(sig)
 
 /*
  * Parse the -A (and -O) options and put corresponding filter object to the
- * specified interface structures. Each of the -A/O option has the following
+ * specified interface structures.  Each of the -A/O option has the following
  * syntax:	-A 5f09:c400::/32,ef0,ef1  (aggregate)
  * 		-O 5f09:c400::/32,ef0,ef1  (only when match)
  */
@@ -3086,7 +3086,7 @@ ifa_match(ifcp, ia, plen)
 /*
  * Return a pointer to riprt structure whose address and prefix length
  * matches with the address and prefix length found in the argument.
- * Note: This is not a rtalloc(). Therefore exact match is necessary.
+ * Note: This is not a rtalloc().  Therefore exact match is necessary.
  */
 
 struct riprt *
