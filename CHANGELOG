@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.184 1999/10/13 05:39:17 jinmei Exp $
+$Id: CHANGELOG,v 1.185 1999/10/13 12:51:27 jinmei Exp $
 
 <199910>
+1999-10-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_ctloutput): fixed mbuf leak on
+	setsockopt(ICMP6_FILTER).
+	(found by: k-sugyo@kame)
+
 1999-10-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/bgp_util.c (bgp_peerstr): was added to print a
 	BGP-peer address (link-local or global).
