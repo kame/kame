@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.201 2001/07/27 09:54:52 itojun Exp $	*/
+/*	$KAME: key.c,v 1.202 2001/07/27 14:41:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1816,12 +1816,12 @@ key_spdadd(so, m, mhp)
 
 	/* sanity check on addr pair */
 	if (((struct sockaddr *)(src0 + 1))->sa_family !=
-			((struct sockaddr *)(dst0+ 1))->sa_family) {
+			((struct sockaddr *)(dst0 + 1))->sa_family) {
 		keydb_delsecpolicy(newsp);
 		return key_senderror(so, m, EINVAL);
 	}
 	if (((struct sockaddr *)(src0 + 1))->sa_len !=
-			((struct sockaddr *)(dst0+ 1))->sa_len) {
+			((struct sockaddr *)(dst0 + 1))->sa_len) {
 		keydb_delsecpolicy(newsp);
 		return key_senderror(so, m, EINVAL);
 	}
@@ -1862,13 +1862,21 @@ key_spdadd(so, m, mhp)
 		for (req = newsp->req; req; req = req->next) {
 			struct ifnet *ifp;
 			int s;
+			struct sockaddr *me, *you;
 
 			if (req->saidx.mode != IPSEC_MODE_TUNNEL)
 				continue;
 
+			if (newsp->spidx.dir == IPSEC_DIR_OUTBOUND) {
+				me = (struct sockaddr *)&req->saidx.src;
+				you = (struct sockaddr *)&req->saidx.dst;
+			} else {
+				me = (struct sockaddr *)&req->saidx.dst;
+				you = (struct sockaddr *)&req->saidx.src;
+			}
+
 			s = splimp();
-			ifp = sec_establish((struct sockaddr *)&req->saidx.src,
-			    (struct sockaddr *)&req->saidx.dst);
+			ifp = sec_establish(me, you);
 			splx(s);
 			if (!ifp) {
 				keydb_delsecpolicy(newsp);
