@@ -765,7 +765,13 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		if (icmp6len < sizeof(struct nd_redirect))
 			goto badlen;
-		icmp6_redirect_input(m, off);
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
+			/* give up local */
+			icmp6_redirect_input(m, off);
+			m = NULL;
+			goto freeit;
+		}
+		icmp6_redirect_input(n, off);
 		/* m stays. */
 		break;
 
@@ -1696,7 +1702,7 @@ icmp6_redirect_input(m, off)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct nd_redirect *nd_rd = (struct nd_redirect *)((caddr_t)ip6 + off);
+	struct nd_redirect *nd_rd;
 	int icmp6len = ntohs(ip6->ip6_plen);
 	char *lladdr = NULL;
 	int lladdrlen = 0;
@@ -1706,8 +1712,8 @@ icmp6_redirect_input(m, off)
 	int is_router;
 	int is_onlink;
 	struct in6_addr src6 = ip6->ip6_src;
-	struct in6_addr redtgt6 = nd_rd->nd_rd_target;
-	struct in6_addr reddst6 = nd_rd->nd_rd_dst;
+	struct in6_addr redtgt6;
+	struct in6_addr reddst6;
 	union nd_opts ndopts;
 
 	if (!m || !ifp)
@@ -1715,28 +1721,41 @@ icmp6_redirect_input(m, off)
 
 	/* XXX if we are router, we don't update route by icmp6 redirect */
 	if (ip6_forwarding)
-		return;
+		goto freeit;
 	if (!icmp6_rediraccept)
-		return;
+		goto freeit;
 
 	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
 		redtgt6.s6_addr16[1] = htons(ifp->if_index);
 	if (IN6_IS_ADDR_LINKLOCAL(&reddst6))
 		reddst6.s6_addr16[1] = htons(ifp->if_index);
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	nd_rd = (struct nd_redirect *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(nd_rd, struct nd_redirect *, m, off, icmp6len);
+	if (nd_rd == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return;
+	}
+#endif
+	redtgt6 = nd_rd->nd_rd_target;
+	reddst6 = nd_rd->nd_rd_dst;
+
 	/* validation */
 	if (!IN6_IS_ADDR_LINKLOCAL(&src6)) {
 		log(LOG_ERR,
 			"ICMP6 redirect sent from %s rejected; "
 			"must be from linklocal\n", ip6_sprintf(&src6));
-		return;
+		goto freeit;
 	}
 	if (ip6->ip6_hlim != 255) {
 		log(LOG_ERR,
 			"ICMP6 redirect sent from %s rejected; "
 			"hlim=%d (must be 255)\n",
 			ip6_sprintf(&src6), ip6->ip6_hlim);
-		return;
+		goto freeit;
 	}
     {
 	/* ip6->ip6_src must be equal to gw for icmp6->icmp6_reddst */
@@ -1762,14 +1781,14 @@ icmp6_redirect_input(m, off)
 				ip6_sprintf(gw6),
 				icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
 			RTFREE(rt);
-			return;
+			goto freeit;
 		}
 	} else {
 		log(LOG_ERR,
 			"ICMP6 redirect rejected; "
 			"no route found for redirect dst: %s\n",
 			icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
-		return;
+		goto freeit;
 	}
 	RTFREE(rt);
 	rt = NULL;
@@ -1779,7 +1798,7 @@ icmp6_redirect_input(m, off)
 			"ICMP6 redirect rejected; "
 			"redirect dst must be unicast: %s\n",
 			icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
-		return;
+		goto freeit;
 	}
 
 	is_router = is_onlink = 0;
@@ -1792,7 +1811,7 @@ icmp6_redirect_input(m, off)
 			"ICMP6 redirect rejected; "
 			"neither router case nor onlink case: %s\n",
 			icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
-		return;
+		goto freeit;
 	}
 	/* validation passed */
 
@@ -1802,7 +1821,7 @@ icmp6_redirect_input(m, off)
 		log(LOG_INFO, "icmp6_redirect_input: "
 			"invalid ND option, rejected: %s\n",
 			icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
-		return;
+		goto freeit;
 	}
 
 	if (ndopts.nd_opts_tgt_lladdr) {
@@ -1887,6 +1906,9 @@ icmp6_redirect_input(m, off)
 	key_sa_routechange((struct sockaddr *)&sdst);
 #endif
     }
+
+ freeit:
+	m_freem(m);
 }
 
 void

@@ -131,7 +131,6 @@ nd6_ns_input(m, off, icmp6len)
 		}
 	}
 
-	/* XXX too strong requirement */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len,);
 	nd_ns = (struct nd_neighbor_solicit *)((caddr_t)ip6 + off);
@@ -543,7 +542,6 @@ nd6_na_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-	/* XXX too strong requirement */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len,);
 	nd_na = (struct nd_neighbor_advert *)((caddr_t)ip6 + off);

@@ -133,7 +133,6 @@ nd6_rs_input(m, off, icmp6len)
 	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6))
 		goto freeit;
 
-	/* XXX too strong requirement */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len,);
 	nd_rs = (struct nd_router_solicit *)((caddr_t)ip6 + off);
@@ -212,7 +211,6 @@ nd6_ra_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-	/* XXX too strong requirement */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len,);
 	nd_ra = (struct nd_router_advert *)((caddr_t)ip6 + off);

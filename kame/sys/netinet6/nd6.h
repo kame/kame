@@ -234,7 +234,7 @@ extern struct nd_prhead nd_prefix;
 extern int nd6_defifindex;
 
 union nd_opts {
-	struct nd_opt_hdr *nd_opt_array[9];
+	struct nd_opt_hdr *nd_opt_array[6];	/*max = ND_OPT_MTU*/
 	struct {
 		struct nd_opt_hdr *zero;
 		struct nd_opt_hdr *src_lladdr;
