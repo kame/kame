@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 4.x
 KAME project
-$Id: INSTALL,v 1.6 2000/11/22 10:57:07 itojun Exp $
+$Id: INSTALL,v 1.7 2001/04/26 18:14:26 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -87,7 +87,8 @@ E. Configurations, in short
 ===========================
 E-0. You should configure IPv6 programs in this snapshot instead of the 
      ones in original FreeBSD 4.x, because some of them do not work 
-     on this snapshot. (We'll handle this problem in the near future)
+     on this snapshot.
+     See E-3 for more details.
 
 E-1. Most of configuration files are shipped with normal OS distribution,
      and are in located in /etc.  If you need special configuration file for
@@ -106,6 +107,13 @@ E-3. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      Make sure to make them used before /usr/bin or /usr/sbin,
      otherwise you end up using OS-supplied commands, which might not
      work as mentioned in E-0.
+
+     In particular, FreeBSD 4.2's ifconfig(8) has a serious bug, which
+     prevents IPv6 addresses from being configured.  Since address
+     configuration is usually done in the boot sequence, you should
+     probably add the following line to your /etc/rc.conf:
+
+     PATH=/usr/local/v6/sbin:/usr/local/v6/bin:${PATH}
 
 E-4. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  They are more recent than those
