@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2592 2004/04/17 11:01:20 kjc Exp $
+$KAME: CHANGELOG,v 1.2593 2004/04/18 11:41:32 jinmei Exp $
 
 <200404>
+2004-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (explore_numeric): re-enabled
+	the special case for AF_INET (use inet_aton instead of inet_pton)
+	as required in RFC3493.  getaddrinfo now accepts the "classful"
+	form of IPv4 addresses.
+
 2004-04-17  kjc@csl.sony.co.jp
 	* kame/sys/altq/
 	build altq under freebsd5-current.
