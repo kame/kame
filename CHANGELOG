@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2354 2003/03/06 12:34:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2355 2003/03/10 06:03:04 itojun Exp $
 
 <200303>
+Mon Mar 10 15:02:05 JST 2003  itojun@iijlab.net
+	* sctp: merged patch 7 from randall.
+
 2003-03-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c.c (client6_send): made sure that the
 	elapsed time does not overflow, according to dhcpv6-interop-00.
