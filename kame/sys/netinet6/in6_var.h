@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.26 2000/02/24 05:55:26 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.27 2000/02/24 16:34:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -638,7 +638,6 @@ struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));
 void	in6_ifscrub __P((struct ifnet *, struct in6_ifaddr *));
-extern int in6_ifaddproxy __P((struct in6_ifaddr *));  /* XXXXYYY Added */
 extern int in6_ifindex2scopeid __P((int));
 extern int in6_mask2len __P((struct in6_addr *));
 extern void in6_len2mask __P((struct in6_addr *, int));

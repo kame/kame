@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.39 2000/02/22 14:04:19 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.40 2000/02/24 16:34:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -717,8 +717,6 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_MMAXTRIES,
 	nd6_mmaxtries, CTLFLAG_RW,	&nd6_mmaxtries,	0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK,
 	nd6_useloopback, CTLFLAG_RW,	&nd6_useloopback, 0, "");
-SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_PROXYALL,
-	nd6_proxyall, CTLFLAG_RW,	&nd6_proxyall, 0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO,
 	nodeinfo, CTLFLAG_RW,	&icmp6_nodeinfo,	0, "");
 

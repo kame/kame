@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.15 2000/02/22 14:04:30 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.16 2000/02/24 16:34:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -235,7 +235,6 @@ extern int nd6_delay;
 extern int nd6_umaxtries;
 extern int nd6_mmaxtries;
 extern int nd6_useloopback;
-extern int nd6_proxyall;
 extern struct llinfo_nd6 llinfo_nd6;
 extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.67 2000/02/24 09:27:29 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.68 2000/02/24 16:34:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2485,7 +2485,6 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	ICMPV6CTL_ND6_UMAXTRIES:
 	ICMPV6CTL_ND6_MMAXTRIES:
 	ICMPV6CTL_ND6_USELOOPBACK:
-	ICMPV6CTL_ND6_PROXYALL:
 		/* need to check the value. */
 #endif
 	case ICMPV6CTL_STATS:
@@ -2541,8 +2540,6 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_ND6_USELOOPBACK:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&nd6_useloopback);
-	case ICMPV6CTL_ND6_PROXYALL:
-		return sysctl_int(oldp, oldlenp, newp, newlen, &nd6_proxyall);
 	case ICMPV6CTL_NODEINFO:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &icmp6_nodeinfo);
 	default:

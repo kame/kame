@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.14 2000/02/22 14:04:24 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.15 2000/02/24 16:34:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.14 2000/02/22 14:04:24 itojun Exp $
+ * $Id: mip6.c,v 1.15 2000/02/24 16:34:50 itojun Exp $
  *
  */
 
@@ -1684,14 +1684,6 @@ mip6_add_ifaddr(struct in6_addr *addr,
 			ifra->ifra_addr.sin6_addr.s6_addr32[3];
 		llsol.s6_addr8[12] = 0xff;
 		(void)in6_addmulti(&llsol, ifp, &error_local);
-		if (error == 0)
-			error = error_local;
-	}
-	/* Join dstaddr's solicited multicast if necessary. */
-	if (nd6_proxyall && hostIsNew) {
-		int error_local;
-		
-		error_local = in6_ifaddproxy(ia);
 		if (error == 0)
 			error = error_local;
 	}

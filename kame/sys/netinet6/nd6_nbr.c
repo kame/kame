@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.26 2000/02/22 14:04:30 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.27 2000/02/24 16:34:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -226,17 +226,6 @@ nd6_ns_input(m, off, icmp6len)
 				proxy = 1;
 				proxydl = SDL(rt->rt_gateway);
 			}
-		} else if (rt && nd6_proxyall && rt->rt_ifp != ifp) {
-			/*
-			 * proxy NDP for the whole interface
-			 *
-			 * search link local addr for ifp, and use it
-			 * for proxy NA.
-			 */
-			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
-				IN6_IFF_NOTREADY|IN6_IFF_ANYCAST);
-			if (ifa)
-				proxy = 1;
 		}
 		if (rt)
 			rtfree(rt);

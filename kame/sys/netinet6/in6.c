@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.53 2000/02/24 07:09:24 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.54 2000/02/24 16:34:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -283,90 +283,6 @@ in6_ifremloop(struct ifaddr *ifa)
 		if (ia_count == 1)
 			in6_ifloop_request(RTM_DELETE, ifa);
 	}
-}
-
-/*
- * Subroutine for in6_ifaddproxy() and in6_ifremproxy().
- * This routine does actual work.
- * call in6_addmulti() when cmd == 1.
- * call in6_delmulti() when cmd == 2.
- */
-static int
-in6_ifproxy_request(int cmd, struct in6_ifaddr *ia)
-{
-	int error = 0;
-
-	/*
-	 * If we have an IPv6 dstaddr on adding p2p interface,
-	 * join dstaddr's solicited multicast on necessary interface.
-	 */
-	if ((ia->ia_ifp->if_flags & IFF_POINTOPOINT) &&
-	    ia->ia_dstaddr.sin6_family == AF_INET6 &&
-	    !IN6_IS_ADDR_LINKLOCAL(&ia->ia_dstaddr.sin6_addr)) {
-		struct in6_ifaddr *ia_lan;
-
-		/*
-		 * TODO: Join only on some specified interfaces by some
-		 * configuration.
-		 * Unsolicited Neighbor Advertisements will be also necessary.
-		 *
-		 * Now, join on interfaces which meets following.
-		 *   -IFF_BROADCAST and IFF_MULTICAST
-		 *    (NBMA is out of scope)
-		 *   -the prefix value is same as p2p dstaddr
-		 */
-		for (ia_lan = in6_ifaddr; ia_lan; ia_lan = ia_lan->ia_next) {
-			struct in6_addr llsol;
-
-			if ((ia_lan->ia_ifp->if_flags &
-			     (IFF_BROADCAST|IFF_MULTICAST)) !=
-			    (IFF_BROADCAST|IFF_MULTICAST))
-				continue;
-			if (!IN6_ARE_MASKED_ADDR_EQUAL(IA6_IN6(ia),
-						       IA6_IN6(ia_lan),
-						       IA6_MASKIN6(ia_lan)))
-				continue;
-			if (ia_lan->ia_ifp == ia->ia_ifp)
-				continue;
-
-			/* init llsol */
-			bzero(&llsol, sizeof(struct in6_addr));
-			llsol.s6_addr16[0] = htons(0xff02);
-			llsol.s6_addr16[1] = htons(ia_lan->ia_ifp->if_index);
-			llsol.s6_addr32[1] = 0;
-			llsol.s6_addr32[2] = htonl(1);
-			llsol.s6_addr32[3] =
-				ia->ia_dstaddr.sin6_addr.s6_addr32[3];
-			llsol.s6_addr8[12] = 0xff;
-
-			if (cmd == 1)
-				(void)in6_addmulti(&llsol,
-						   ia_lan->ia_ifp,
-						   &error);
-			else if (cmd == 2) {
-				struct in6_multi *in6m;
-
-				IN6_LOOKUP_MULTI(llsol,
-						 ia_lan->ia_ifp,
-						 in6m);
-				if (in6m)
-					in6_delmulti(in6m);
-			}
-		}
-	}
-	return error;
-}
-
-int
-in6_ifaddproxy(struct in6_ifaddr *ia)
-{
-	return(in6_ifproxy_request(1, ia));
-}
-
-static void
-in6_ifremproxy(struct in6_ifaddr *ia)
-{
-	in6_ifproxy_request(2, ia);
 }
 
 int
@@ -931,14 +847,6 @@ in6_control(so, cmd, data, ifp)
 			if (error == 0)
 				error = error_local;
 		}
-		/* Join dstaddr's solicited multicast if necessary. */
-		if (nd6_proxyall && hostIsNew) {
-			int error_local;
-
-			error_local = in6_ifaddproxy(ia);
-			if (error == 0)
-				error = error_local;
-		}
 
 		ia->ia6_flags = ifra->ifra_flags;
 		ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
@@ -1038,9 +946,6 @@ in6_purgeaddr(ifa, ifp)
 		if (in6m)
 			in6_delmulti(in6m);
 	}
-	/* Leave dstaddr's solicited multicast if necessary. */
-	if (nd6_proxyall)
-		in6_ifremproxy(ia);
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	if ((ifa = ifp->if_addrlist) == ia62ifa(ia))
