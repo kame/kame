@@ -47,7 +47,6 @@ struct req_t {
 	int result;	/* expected result; 0:ok 1:ng */
 	char *str;
 } reqs[] = {
-#if 0
 { 1, "must_error" },
 { 1, "in ipsec must_error" },
 { 1, "out ipsec esp/must_error" },
@@ -63,12 +62,11 @@ struct req_t {
 { 0, "in ipsec esp / transport / 10.0.0.1-10.0.0.2" },
 { 0, "in ipsec esp/tunnel/::1-::2" },
 { 1, "in ipsec esp/tunnel/10.0.0.1-::2" },
-#endif
 { 0, "in ipsec esp/tunnel/::1-::2/require" },
-#if 0
 { 0, "out ipsec ah/transport//use" },
-{ 0, "out ipsec ah/transport esp/use" },
+{ 1, "out ipsec ah/transport esp/use" },
 { 1, "in ipsec ah/transport esp/tunnel" },
+{ 0, "in ipsec ah/transport esp/tunnel/::1-::1" },
 { 0, "in ipsec
 	ah / transport
 	esp / tunnel / ::1-::2" },
@@ -78,7 +76,6 @@ struct req_t {
 	ah/transport/::1-::2 esp/tunnel/::3-::4/use ah/transport/::5-::6/require
 	" },
 { 0, "out ipsec esp/transport/fec0::10-fec0::11/use" },
-#endif
 };
 
 int test1 __P((struct req_t *req));
@@ -118,10 +115,6 @@ test1(req)
 		return 1;
 	}
 
-#if 0
-	printf("\tsetlen:%d\n", ipsec_get_policylen(buf));
-#endif
-
 	if (test1sub(buf, PF_INET) != 0
 	 || test1sub(buf, PF_INET6) != 0) {
 		free(buf);
@@ -160,6 +153,10 @@ test1sub(policy, family)
 		err(1, "socket");
 
 	len = ipsec_get_policylen(policy);
+#if 0
+	printf("\tsetlen:%d\n", len);
+#endif
+
 	if (setsockopt(so, proto, optname, policy, len) < 0) {
 		printf("fail to set sockopt; %s\n", strerror(errno));
 		close(so);
@@ -186,8 +183,9 @@ test1sub(policy, family)
 		close(so);
 		return 1;
 	}
-
+#if 0
 	printf("\t[%s]\n", buf);
+#endif
 	free(buf);
     }
 
