@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.152 2001/12/13 04:43:41 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.153 2001/12/13 18:36:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -825,6 +825,7 @@ ipsecdoi_checkph2proposal(iph2)
 		goto end;
 
 	/* make a SA to be replayed. */
+	vfree(iph2->sa_ret);
 	iph2->sa_ret = get_sabyproppair(p, iph2->ph1);
 	free_proppair0(p);
 	if (iph2->sa_ret == NULL)
