@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.15 2004/06/01 12:59:33 jinmei Exp $	*/
+/*	$KAME: ip6opt.c,v 1.16 2005/01/05 04:51:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,8 +110,10 @@ inet6_option_append(cmsg, typep, multx, plusy)
 		return(-1);
 	if (plusy < 0 || plusy > 7)
 		return(-1);
+#if 0 /* always false */
 	if (typep[0] > 255)
 		return(-1);
+#endif
 
 	/*
 	 * If this is the first option, allocate space for the
@@ -419,7 +421,11 @@ inet6_opt_append(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 	 * The option type must have a value from 2 to 255, inclusive.
 	 * (0 and 1 are reserved for the Pad1 and PadN options, respectively.)
 	 */
+#if 0 /* always false */
 	if (type < 2 || type > 255)
+#else
+	if (type < 2)
+#endif
 		return(-1);
 
 	/*
