@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2380 2003/04/11 11:51:43 t-momose Exp $
+$KAME: CHANGELOG,v 1.2381 2003/04/11 12:37:40 jinmei Exp $
 
 <200304>
+2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtsold/if.c (interface_status): considered IEEE 802.11
+	interfaces correctly.
+
 2003-04-11  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
 
 	* kame/kame/had: a part of handling MPA is divided to another
