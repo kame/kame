@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.76 2002/09/06 03:31:13 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.77 2002/10/17 13:54:14 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -877,7 +877,7 @@ struct icmp6stat {
 	0, \
 	&mldmaxsrcfilter, \
 	&mldsomaxsrc, \
-	&mldalwaysv2, \
+	&mldalways_v2, \
 }
 #endif
 

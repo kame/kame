@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.326 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.327 2002/10/17 13:54:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1371,6 +1371,10 @@ icmp6_notify_error(m, off, icmp6len, code)
 	return (-1);
 }
 
+
+#ifdef __bsdi__
+extern int pmtu_expire;
+#endif
 void
 icmp6_mtudisc_update(ip6cp, dst, validated)
 	struct ip6ctlparam *ip6cp;
@@ -1487,6 +1491,11 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 				rt_timer_add(rt, icmp6_mtudisc_timeout,
 					     icmp6_mtudisc_timeout_q);
 			}
+#endif
+#ifdef __bsdi__
+			rt_timer_add(rt, pmtu_expire ?
+				     time.tv_sec + pmtu_expire : 0,
+				     icmp6_mtuexpire, NULL);
 #endif
 		}
 	}

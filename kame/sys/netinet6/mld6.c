@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.62 2002/10/04 12:00:44 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.63 2002/10/17 13:54:14 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -118,6 +118,10 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/protosw.h>
+#ifdef __bsdi__
+#include <vm/vm.h>
+#include <sys/proc.h>
+#endif
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
