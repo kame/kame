@@ -359,12 +359,12 @@ div_attach(struct socket *so, int proto, struct proc *p)
 	if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return error;
 
+	error = soreserve(so, div_sendspace, div_recvspace);
+	if (error)
+		return error;
 	s = splnet();
 	error = in_pcballoc(so, &divcbinfo, p);
 	splx(s);
-	if (error)
-		return error;
-	error = soreserve(so, div_sendspace, div_recvspace);
 	if (error)
 		return error;
 	inp = (struct inpcb *)so->so_pcb;
@@ -374,9 +374,14 @@ div_attach(struct socket *so, int proto, struct proc *p)
 	   we always know "where" to send the packet */
 	so->so_state |= SS_ISCONNECTED;
 #ifdef IPSEC
-	error = ipsec_init_policy(&inp->inp_sp);
-	if (error)
+	if ((error = ipsec_init_policy(&inp->inp_sp_in)) != 0) {
+		in_pcbdetach(inp);
 		return error;
+	}
+	if ((error = ipsec_init_policy(&inp->inp_sp_out)) != 0) {
+		in_pcbdetach(inp);
+		return error;
+	}
 #endif /*IPSEC*/
 	return 0;
 }

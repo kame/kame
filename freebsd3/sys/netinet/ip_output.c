@@ -1168,7 +1168,7 @@ ip_ctloutput(so, sopt)
 			int len;
 			int priv;
 			struct mbuf *m;
-			struct secpolicy **spp;
+			struct secpolicy **spp = 0;
 			int optname;
 
 			if (error = soopt_getm(sopt, &m)) /* XXX */
