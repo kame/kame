@@ -27,6 +27,7 @@
 
 # PROVIDE: network_ipv6_mobile
 # REQUIRE: network_ipv6
+# REQUIRE: SERVERS
 
 PATH=/usr/local/v6/bin:/usr/local/v6/sbin:${PATH}
 . /etc/rc.subr
@@ -37,6 +38,8 @@ rcvar=`set_rcvar ipv6_mobile`
 start_cmd="network_ipv6_mobile_start"
 
 ${ipv6_mobile_enable:=NO}
+${ipv6_mobile_virtual_home_interfaces:=mip0}
+${ipv6_mobile_mdd_program:=babymdd}
 
 network_ipv6_mobile_start()
 {
@@ -65,10 +68,6 @@ network_ipv6_mobile_start()
 		;;
 	esac
 
-	if [ -z ${mdd_program} ]; then
-		mdd_program=babymdd
-	fi
-
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1
@@ -85,11 +84,14 @@ network_ipv6_mobile_start()
 		fi
 
 		echo -n ' mnd'
-		echo -n " ${mdd_program}"
-		for mip_interface in ${ipv6_mobile_virtual_home_interfaces:=mip0}
+		for mip_interface in ${ipv6_mobile_virtual_home_interfaces}
 		do
 			mnd -n -i ${mip_interface}
-			${mdd_program} -h ${mip_interface}
+		done
+		echo -n " ${ipv6_mobile_mdd_program}"
+		for mip_interface in ${ipv6_mobile_virtual_home_interfaces}
+		do
+			${ipv6_mobile_mdd_program} -h ${mip_interface}
 		done
 		echo -n ' cnd'
 		cnd -n
