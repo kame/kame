@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.47 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.48 2002/08/01 08:10:36 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -86,7 +86,13 @@
 #include <dev/rndvar.h>
 #endif
 
+#include <net/ethernet.h>
 #include <net/if.h>
+#include <net/if_arp.h>
+#include <net/if_types.h>
+#ifdef IFT_VRRP
+#include <net/if_vrrp_var.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -480,6 +486,11 @@ mld6_sendpkt(in6m, type, dst)
 	struct sockaddr_in6 src_sa, dst_sa;
 	int ignflags;
 
+#ifdef IFT_VRRP
+	if (ifp->if_type == IFT_VRRP) {
+		ifp = ((struct ifvrrp *)ifp->if_softc)->ifv_p;
+	}
+#endif
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
