@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.153 2001/08/11 10:03:58 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.154 2001/08/13 14:33:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -400,7 +400,7 @@ isakmp_main(msg, remote, local)
 					sizeof(cookie_t)) != 0) {
 
 					plog(LLV_DEBUG, LOCATION, remote,
-						"malformed cookie received"
+						"malformed cookie received "
 						"or the spi expired.\n");
 					return -1;
 				}
