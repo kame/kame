@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.7 2004/06/17 13:11:28 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.8 2004/06/19 13:09:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -103,6 +103,9 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
+	if (argc == 0)
+		usage();
+
 	memset(&key, 0, sizeof(key));
 	digestlen = 0;
 	if (setup_auth(keyfile, &key, &digestlen) != 0)
@@ -124,6 +127,8 @@ main(argc, argv)
 	error = getaddrinfo(ctladdr, ctlport, &hints, &res0);
 	if (error != 0)
 		errx(1, "getaddrinfo failed: %s", gai_strerror(error));
+
+	s = -1;
 	for (res = res0; res != NULL; res = res->ai_next) {
 		s = socket(res->ai_family, res->ai_socktype,
 		    res->ai_protocol);
@@ -283,9 +288,8 @@ make_command(argc, argv, bufp, lenp, key, authlen)
 	struct dhcp6ctl ctl;
 	char commandbuf[4096];	/* XXX: ad-hoc value */
 	char *bp, *buf, *mac;
-	int buflen, len, duidlen;
+	int buflen, len;
 	int argc_passed = 0, passed;
-	u_int32_t p32;
 	time_t now;
 
 	if (argc == 0) {
@@ -424,7 +428,7 @@ make_ia_object(argc, argv, bpp, lenp)
 {
 	struct dhcp6ctl_iaspec iaspec;
 	int duidlen, dummylen = 0;
-	int argc_passed = 0, passed = 0;
+	int argc_passed = 0;
 	char *dummy = NULL;
 
 	if (argc < 3) {
@@ -531,7 +535,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: dhcp6sctl [-k keyfile] [-p port] "
-	    "[-s server_address] commands...\n");
+	    "[-s server_address] command...\n");
 
 	exit(1);
 }
