@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.77 2001/09/24 17:21:21 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.78 2001/10/01 10:57:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -205,7 +205,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
 		return(laddr);
 
-#ifdef MIP6
+#ifdef MIP6_OLD_ADDRSELECT
 	/*
 	 * XXX
 	 * how to select a src address when we want to use home
@@ -355,20 +355,89 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 * XXX: This is a TODO.  We should probably merge the MIP6
 		 * case above.
 		 */
-#ifdef XXX_MIP6_CONSIDERING
+#ifdef MIP6
 		/*
-		 * XXX TODO:
-		 *
-		 * 1. how to select a home address when we have many
-		 * home addresses for different home links?
-		 * 
-		 * 2. how to handle the home address that has not
-		 * been registered yet.  such an address should not be
-		 * selected ?
+		 * If Source(DA) is simultaneously a home address and
+		 * care-of address and Source(DB) is not, then sort DA
+		 * before DB. Similarly, if Source(DB) is
+		 * simultaneously a home address and care-of address
+		 * and Source(DA) is not, then sort DB before DA.
+		*/
+	{
+		struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
+		struct hif_softc *sc;
+
+		if (ia_best->ia6_flags & IN6_IFF_HOME) {
+			/*
+			 * find a binding update entry for ia_best.
+			 */
+			for (sc = TAILQ_FIRST(&hif_softc_list);
+			     sc;
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				mbu_ia_best = mip6_bu_list_find_withhaddr(
+					&sc->hif_bu_list,
+					&ia->ia_addr.sin6_addr);
+				if (mbu_ia_best)
+					break;
+			
+			}
+		}
+		if (ia->ia6_flags & IN6_IFF_HOME) {
+			/*
+			 * find a binding update entry for ia.
+			 */
+			for (sc = TAILQ_FIRST(&hif_softc_list);
+			     sc;
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				mbu_ia = mip6_bu_list_find_withhaddr(
+					&sc->hif_bu_list,
+					&ia->ia_addr.sin6_addr);
+				if (mbu_ia)
+					break;
+			
+			}
+		}
+		/*
+		 * if the binding update entry for a certain address
+		 * exists and its registration status is
+		 * MIP6_BU_REG_STATE_NOTREG, the address is a home
+		 * address and a care of addres simultaneously.
 		 */
-		if (ia_best->ia6_flags & IN6_IFF_HOME)
+		if ((mbu_ia_best &&
+		     (mbu_ia_best->mbu_reg_state
+		      == MIP6_BU_REG_STATE_NOTREG))
+		    &&
+		    !(mbu_ia &&
+		      (mbu_ia->mbu_reg_state
+		       == MIP6_BU_REG_STATE_NOTREG))) {
+			NEXT(4);
+		}
+		if (!(mbu_ia_best &&
+		      (mbu_ia_best->mbu_reg_state
+		       == MIP6_BU_REG_STATE_NOTREG))
+		    &&
+		    (mbu_ia &&
+		     (mbu_ia->mbu_reg_state
+		      == MIP6_BU_REG_STATE_NOTREG))) {
 			REPLACE(4);
-#endif /* XXX_MIP6_CONSIDERING */
+		}
+	}
+		/*
+		 * If Source(DA) is just a home address and Source(DB)
+		 * is just a care- of address, then sort DA before
+		 * DB. Similarly, if Source(DA) is just a care-of
+		 * address and Source(DB) is just a home address, then
+		 * sort DB before DA.
+		 */
+		if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+		    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+			NEXT(4);
+		}
+		if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+		    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
+			REPLACE(4);
+		}
+#endif /* MIP6 */
 
 		/* Rule 5: Prefer outgoing interface */
 		if (ia_best->ia_ifp == ifp && ia->ia_ifp != ifp)
