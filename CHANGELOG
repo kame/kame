@@ -1,12 +1,8 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045.2.13 2000/07/03 02:42:48 itojun Exp $
+$Id: CHANGELOG,v 1.1045.2.14 2000/07/03 03:37:31 itojun Exp $
 
 <200006>
-Mon Jul  3 11:40:29 JST 2000  itojun@iijlab.net
-	* libinet6/name6.c: make sure to fill h_name on reverse query.
-	  From: Kris Kennaway <kris@FreeBSD.org>
-
 Thu Jun 29 10:14:47 JST 2000  itojun@iijlab.net
 	* faithd/faithd.c, natptd/main.c, natptlog/natptlog.c: be more careful
 	  about arg to syslog(3), to prevent possible buffer overrun.
