@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.226 2002/02/04 05:22:19 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.227 2002/02/09 06:49:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1475,20 +1475,27 @@ nd6_rtrequest(req, rt, sa)
 
 			/* join solicited node multicast for proxy ND */
 			if (ifp->if_flags & IFF_MULTICAST) {
-				struct in6_addr llsol;
+				struct sockaddr_in6 llsol;
 				int error;
 
-				llsol = SIN6(rt_key(rt))->sin6_addr;
-				llsol.s6_addr16[0] = htons(0xff02);
-				llsol.s6_addr16[1] = htons(ifp->if_index);
-				llsol.s6_addr32[1] = 0;
-				llsol.s6_addr32[2] = htonl(1);
-				llsol.s6_addr8[12] = 0xff;
-
-				if (!in6_addmulti(&llsol, ifp, &error)) {
+				llsol = *SIN6(rt_key(rt));
+				llsol.sin6_addr.s6_addr32[0] =
+					htonl(0xff020000);
+				llsol.sin6_addr.s6_addr32[1] = 0;
+				llsol.sin6_addr.s6_addr32[2] = htonl(1);
+				llsol.sin6_addr.s6_addr8[12] = 0xff;
+				error = in6_addr2zoneid(ifp, &llsol.sin6_addr,
+							&llsol.sin6_scope_id);
+				if (error)
+					break;
+				in6_embedscope(&llsol.sin6_addr,
+					       &llsol); /* XXX */
+				if (in6_addmulti(&llsol, ifp, &error)) {
 					nd6log((LOG_ERR, "%s: failed to join "
-					    "%s (errno=%d)\n", if_name(ifp),
-					    ip6_sprintf(&llsol), error));
+						"%s (errno=%d)\n",
+						if_name(ifp),
+						ip6_sprintf(&llsol.sin6_addr),
+						error));
 				}
 			}
 		}
@@ -1500,19 +1507,22 @@ nd6_rtrequest(req, rt, sa)
 		/* leave from solicited node multicast for proxy ND */
 		if ((rt->rt_flags & RTF_ANNOUNCE) != 0 &&
 		    (ifp->if_flags & IFF_MULTICAST) != 0) {
-			struct in6_addr llsol;
+			struct sockaddr_in6 llsol;
 			struct in6_multi *in6m;
 
-			llsol = SIN6(rt_key(rt))->sin6_addr;
-			llsol.s6_addr16[0] = htons(0xff02);
-			llsol.s6_addr16[1] = htons(ifp->if_index);
-			llsol.s6_addr32[1] = 0;
-			llsol.s6_addr32[2] = htonl(1);
-			llsol.s6_addr8[12] = 0xff;
-
-			IN6_LOOKUP_MULTI(llsol, ifp, in6m);
-			if (in6m)
-				in6_delmulti(in6m);
+			llsol = *SIN6(rt_key(rt));
+			llsol.sin6_addr.s6_addr32[0] = htonl(0xff020000);
+			llsol.sin6_addr.s6_addr32[1] = 0;
+			llsol.sin6_addr.s6_addr32[2] = htonl(1);
+			llsol.sin6_addr.s6_addr8[12] = 0xff;
+			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
+					    &llsol.sin6_scope_id) == 0) {
+				IN6_LOOKUP_MULTI(&llsol, ifp, in6m);
+				if (in6m)
+					in6_delmulti(in6m);
+			} else {
+				/* XXX: this should not fail.  bark here? */
+			}
 		}
 		nd6_inuse--;
 		ln->ln_next->ln_prev = ln->ln_prev;

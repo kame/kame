@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.284 2002/02/03 08:48:13 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.285 2002/02/09 06:49:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1108,7 +1108,7 @@ skip_ipsec2:;
 			error = ENETUNREACH;
 			goto bad;
 		}
-		IN6_LOOKUP_MULTI(ip6->ip6_dst, ifp, in6m);
+		IN6_LOOKUP_MULTI(dst_sa, ifp, in6m);
 		if (in6m != NULL &&
 		   (im6o == NULL || im6o->im6o_multicast_loop)) {
 			/*
@@ -3326,12 +3326,12 @@ ip6_setmoptions(optname, im6op, m)
 	struct ipv6_mreq *mreq;
 	struct ifnet *ifp;
 	struct ip6_moptions *im6o = *im6op;
+	struct sockaddr_in6 sa6_mc;
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
 	struct route_in6 ro;
 #endif
-	struct sockaddr_in6 *dst;
 	struct in6_multi_mship *imm;
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 	struct proc *p = PCPU(curproc);	/* XXX */
@@ -3450,6 +3450,11 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 
+		bzero(&sa6_mc, sizeof(sa6_mc));
+		sa6_mc.sin6_family = AF_INET6;
+		sa6_mc.sin6_len = sizeof(sa6_mc);
+		sa6_mc.sin6_addr = mreq->ipv6mr_multiaddr;
+
 		/*
 		 * If the interface is specified, validate it.
 		 */
@@ -3463,6 +3468,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * appropriate one according to the given multicast address.
 		 */
 		if (mreq->ipv6mr_interface == 0) {
+			struct sockaddr_in6 *dst;
+
 			/*
 			 * Look up the routing table for the
 			 * address, and choose the outgoing interface.
@@ -3470,10 +3477,10 @@ ip6_setmoptions(optname, im6op, m)
 			 */
 			ro.ro_rt = NULL;
 			dst = (struct sockaddr_in6 *)&ro.ro_dst;
-			bzero(dst, sizeof(*dst));
-			dst->sin6_len = sizeof(struct sockaddr_in6);
-			dst->sin6_family = AF_INET6;
-			dst->sin6_addr = mreq->ipv6mr_multiaddr;
+			*dst = sa6_mc;
+#ifndef SCOPEDROUTING	/* XXX this is actually unnecessary here */
+			dst->sin6_scope_id = 0;
+#endif
 			rtalloc((struct route *)&ro);
 			if (ro.ro_rt == NULL) {
 				error = EADDRNOTAVAIL;
@@ -3497,24 +3504,23 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		/*
-		 * Put interface index into the multicast address,
-		 * if the address has interface/link-local scope.
-		 * XXX: the embedded form is a KAME-local hack. 
-		 */
-		if (IN6_IS_ADDR_MC_INTFACELOCAL(&mreq->ipv6mr_multiaddr) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
-			mreq->ipv6mr_multiaddr.s6_addr16[1]
-				= htons(mreq->ipv6mr_interface);
+
+		/* Fill in the scope zone ID */
+		if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
+				    &sa6_mc.sin6_scope_id)) {
+			error = ENXIO; /* XXX: should not happen */
+			break;
 		}
+		in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
+
 		/*
 		 * See if the membership already exists.
 		 */
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next)
 			if (imm->i6mm_maddr->in6m_ifp == ifp &&
-			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
-					       &mreq->ipv6mr_multiaddr))
+			    SA6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_sa,
+					       &sa6_mc))
 				break;
 		if (imm != NULL) {
 			error = EADDRINUSE;
@@ -3524,7 +3530,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Everything looks good; add a new record to the multicast
 		 * address list for the given interface.
 		 */
-		imm = in6_joingroup(ifp, &mreq->ipv6mr_multiaddr, &error);
+		imm = in6_joingroup(ifp, &sa6_mc, &error);
 		if (!imm)
 			break;
 		LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
@@ -3554,6 +3560,12 @@ ip6_setmoptions(optname, im6op, m)
 			error = EINVAL;
 			break;
 		}
+
+		bzero(&sa6_mc, sizeof(sa6_mc));
+		sa6_mc.sin6_family = AF_INET6;
+		sa6_mc.sin6_len = sizeof(sa6_mc);
+		sa6_mc.sin6_addr = mreq->ipv6mr_multiaddr;
+
 		/*
 		 * If an interface address was specified, get a pointer
 		 * to its ifnet structure.
@@ -3568,15 +3580,15 @@ ip6_setmoptions(optname, im6op, m)
 #else
 		ifp = ifindex2ifnet[mreq->ipv6mr_interface];
 #endif
-		/*
-		 * Put interface index into the multicast address,
-		 * if the address has interface/link-local scope.
-		 */
-		if (IN6_IS_ADDR_MC_INTFACELOCAL(&mreq->ipv6mr_multiaddr) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
-			mreq->ipv6mr_multiaddr.s6_addr16[1]
-				= htons(mreq->ipv6mr_interface);
+
+		/* Fill in the scope zone ID */
+		if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
+				    &sa6_mc.sin6_scope_id)) {
+			error = ENXIO; /* XXX: should not happen */
+			break;
 		}
+		in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
+
 		/*
 		 * Find the membership in the membership list.
 		 */
@@ -3584,8 +3596,8 @@ ip6_setmoptions(optname, im6op, m)
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL ||
 			     imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
-					       &mreq->ipv6mr_multiaddr))
+			    SA6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_sa,
+					       &sa6_mc))
 				break;
 		}
 		if (imm == NULL) {

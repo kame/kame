@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.75 2002/01/31 14:14:51 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.76 2002/02/09 06:49:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -555,7 +555,7 @@ struct in6_multi_mship {
 
 struct	in6_multi {
 	LIST_ENTRY(in6_multi) in6m_entry; /* list glue */
-	struct	in6_addr in6m_addr;	/* IP6 multicast address */
+	struct	sockaddr_in6 in6m_sa;	/* IP6 multicast address */
 	struct	ifnet *in6m_ifp;	/* back pointer to ifnet */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct	in6_ifaddr *in6m_ia;	/* back pointer to in6_ifaddr */
@@ -590,7 +590,7 @@ struct	in6_multistep {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
-/* struct in6_addr addr; */					\
+/* struct sockaddr_in6 *addr; */					\
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
 do { \
@@ -598,8 +598,8 @@ do { \
 	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
 	     ifma = ifma->ifma_link.le_next) { \
 		if (ifma->ifma_addr->sa_family == AF_INET6 \
-		    && IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
-					  &(addr))) \
+		    && SA6_ARE_ADDR_EQUAL((struct sockaddr_in6 *)ifma->ifma_addr, \
+					  (addr))) \
 			break; \
 	} \
 	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
@@ -631,7 +631,7 @@ do { \
 #else /* not FreeBSD3 */
 
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
-/* struct in6_addr addr; */					\
+/* struct sockaddr_in6 *addr; */				\
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
 do {								\
@@ -643,7 +643,7 @@ do {								\
 	else							\
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;	\
 		     (in6m) != NULL &&				\
-		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &(addr));	\
+		     !SA6_ARE_ADDR_EQUAL(&(in6m)->in6m_sa, (addr));	\
 		     (in6m) = in6m->in6m_entry.le_next)		\
 			continue;				\
 } while (0)
@@ -683,11 +683,11 @@ do {						\
 
 #endif /* not FreeBSD3 */
 
-struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
+struct	in6_multi *in6_addmulti __P((struct sockaddr_in6 *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));
-struct in6_multi_mship *in6_joingroup __P((struct ifnet *, struct in6_addr *,
-	int *));
+struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
+					   struct sockaddr_in6 *, int *));
 int in6_leavegroup __P((struct in6_multi_mship *));
 extern int in6_ifindex2scopeid __P((int));
 extern int in6_mask2len __P((struct in6_addr *, u_char *));

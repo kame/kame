@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.264 2002/02/08 15:26:09 sakane Exp $	*/
+/*	$KAME: in6.c,v 1.265 2002/02/09 06:49:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1229,29 +1229,39 @@ in6_update_ifa(ifp, ifra, ia)
 
 	if ((ifp->if_flags & IFF_MULTICAST) != 0) {
 		struct sockaddr_in6 mltaddr, mltmask;
+#ifndef SCOPEDROUTING
+		u_int32_t zoneid = 0;
+#endif
 
 		if (hostIsNew) {
-			/*
-			 * join solicited multicast addr for new host id
-			 */
-			struct in6_addr llsol;
-			bzero(&llsol, sizeof(struct in6_addr));
-			llsol.s6_addr16[0] = htons(0xff02);
-			llsol.s6_addr16[1] = htons(ifp->if_index);
-			llsol.s6_addr32[1] = 0;
-			llsol.s6_addr32[2] = htonl(1);
-			llsol.s6_addr32[3] =
+			/* join solicited multicast addr for new host id */
+			struct sockaddr_in6 llsol;
+
+			bzero(&llsol, sizeof(llsol));
+			llsol.sin6_family = AF_INET6;
+			llsol.sin6_len = sizeof(llsol);
+			llsol.sin6_addr.s6_addr32[0] = htonl(0xff020000);
+			llsol.sin6_addr.s6_addr32[1] = 0;
+			llsol.sin6_addr.s6_addr32[2] = htonl(1);
+			llsol.sin6_addr.s6_addr32[3] =
 				ifra->ifra_addr.sin6_addr.s6_addr32[3];
-			llsol.s6_addr8[12] = 0xff;
+			llsol.sin6_addr.s6_addr8[12] = 0xff;
+			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
+					    &llsol.sin6_scope_id)) {
+				/* XXX: should not happen */
+				log(LOG_ERR, "in6_update_ifa: "
+				    "in6_addr2zoneid failed\n");
+				goto cleanup;
+			}
+			in6_embedscope(&llsol.sin6_addr, &llsol); /* XXX */
 			imm = in6_joingroup(ifp, &llsol, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-				    i6mm_chain);
+						 i6mm_chain);
 			} else {
-				log(LOG_ERR,
-				    "in6_update_ifa: addmulti failed for "
-				    "%s on %s (errno=%d)\n",
-				    ip6_sprintf(&llsol), 
+				log(LOG_ERR, "in6_update_ifa: addmulti "
+				    "failed for %s on %s (errno=%d)\n",
+				    ip6_sprintf(&llsol.sin6_addr), 
 				    if_name(ifp), error);
 				goto cleanup;
 			}
@@ -1269,15 +1279,32 @@ in6_update_ifa(ifp, ifra, ia)
 		mltaddr.sin6_len = sizeof(struct sockaddr_in6);
 		mltaddr.sin6_family = AF_INET6;
 		mltaddr.sin6_addr = in6addr_linklocal_allnodes;
-		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
+				    &mltaddr.sin6_scope_id)) {
+			goto cleanup; /* XXX: should not fail */
+		}
+		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
+#ifndef SCOPEDROUTING		/* XXX */
+		zoneid = mltaddr.sin6_scope_id;
+		mltaddr.sin6_scope_id = 0;
+#endif
 
+		/*
+		 * XXX: do we really need this automatic routes?
+		 * We should probably reconsider this stuff.  Most applications
+		 * actually do not need the routes, since they usually specify
+		 * the outgoing interface.
+		 */
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0, 0UL);
 #else
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0);
 #endif
 		if (rt) {
-			/* 32bit came from "mltmask" */
+			/*
+			 * 32bit came from "mltmask"
+			 * XXX: only works in !SCOPEDROUTING case.
+			 */
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 			    32 / 8)) {
@@ -1313,7 +1340,10 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+#ifndef SCOPEDROUTING
+		mltaddr.sin6_scope_id = zoneid;	/* XXX */
+#endif
+		imm = in6_joingroup(ifp, &mltaddr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 			    i6mm_chain);
@@ -1332,9 +1362,9 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)
 #endif
-		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
+		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr)
 		    == 0) {
-			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+			imm = in6_joingroup(ifp, &mltaddr, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
@@ -1356,7 +1386,17 @@ in6_update_ifa(ifp, ifra, ia)
 		 * (ff01::1%ifN, and ff01::%ifN/32)
 		 */
 		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
-		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
+				    &mltaddr.sin6_scope_id)) {
+			goto cleanup; /* XXX: should not fail */
+		}
+		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
+#ifndef SCOPEDROUTING		/* XXX */
+		zoneid = mltaddr.sin6_scope_id;
+		mltaddr.sin6_scope_id = 0;
+#endif
+
+		/* XXX: again, do we really need the route? */
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0, 0UL);
 #else
@@ -1398,8 +1438,10 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-
-		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+#ifndef SCOPEDROUTING
+		mltaddr.sin6_scope_id = zoneid;	/* XXX */
+#endif
+		imm = in6_joingroup(ifp, &mltaddr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 			    i6mm_chain);
@@ -2137,7 +2179,7 @@ in6_purgemkludge(ifp)
  */
 struct	in6_multi *
 in6_addmulti(maddr6, ifp, errorp)
-	struct in6_addr *maddr6;
+	struct sockaddr_in6 *maddr6;
 	struct ifnet *ifp;
 	int *errorp;
 {
@@ -2154,7 +2196,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	/*
 	 * See if address already in list.
 	 */
-	IN6_LOOKUP_MULTI(*maddr6, ifp, in6m);
+	IN6_LOOKUP_MULTI(maddr6, ifp, in6m);
 	if (in6m != NULL) {
 		/*
 		 * Found it; just increment the refrence count.
@@ -2266,12 +2308,11 @@ in6_delmulti(in6m)
  */
 struct	in6_multi *
 in6_addmulti(maddr6, ifp, errorp)
-	struct in6_addr *maddr6;
+	struct sockaddr_in6 *maddr6;
 	struct ifnet *ifp;
 	int *errorp;
 {
 	struct	in6_multi *in6m;
-	struct sockaddr_in6 sin6;
 	struct ifmultiaddr *ifma;
 	int	s = splnet();
 
@@ -2282,11 +2323,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	 * refcount.  It wants addresses in the form of a sockaddr,
 	 * so we build one here (being careful to zero the unused bytes).
 	 */
-	bzero(&sin6, sizeof sin6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_len = sizeof sin6;
-	sin6.sin6_addr = *maddr6;
-	*errorp = if_addmulti(ifp, (struct sockaddr *)&sin6, &ifma);
+	*errorp = if_addmulti(ifp, (struct sockaddr *)maddr6, &ifma);
 	if (*errorp) {
 		splx(s);
 		return 0;
@@ -2308,7 +2345,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	}
 
 	bzero(in6m, sizeof *in6m);
-	in6m->in6m_addr = *maddr6;
+	in6m->in6m_sa = *maddr6;
 	in6m->in6m_ifp = ifp;
 	in6m->in6m_ifma = ifma;
 	ifma->ifma_protospec = in6m;
@@ -2352,7 +2389,7 @@ in6_delmulti(in6m)
 struct in6_multi_mship *
 in6_joingroup(ifp, addr, errorp)
 	struct ifnet *ifp;
-	struct in6_addr *addr;
+	struct sockaddr_in6 *addr;
 	int *errorp;
 {
 	struct in6_multi_mship *imm;

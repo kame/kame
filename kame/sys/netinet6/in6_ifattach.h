@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.h,v 1.16 2001/08/31 05:13:40 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.h,v 1.17 2002/02/09 06:49:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,7 +39,8 @@ void in6_ifattach __P((struct ifnet *, struct ifnet *));
 void in6_ifdetach __P((struct ifnet *));
 int in6_get_tmpifid __P((struct ifnet *, u_int8_t *, const u_int8_t *, int));
 void in6_tmpaddrtimer __P((void *));
-int in6_nigroup __P((struct ifnet *, const char *, int, struct in6_addr *));
+int in6_nigroup __P((struct ifnet *, const char *, int,
+		     struct sockaddr_in6 *));
 #ifdef MIP6
 int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 #endif /* MIP6 */

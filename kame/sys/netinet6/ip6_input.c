@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.263 2002/02/04 06:51:10 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.264 2002/02/09 06:49:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -729,7 +729,7 @@ ip6_input(m)
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
 		 */
-		IN6_LOOKUP_MULTI(sa6_dst.sin6_addr, m->m_pkthdr.rcvif, in6m);
+		IN6_LOOKUP_MULTI(&sa6_dst, m->m_pkthdr.rcvif, in6m);
 		if (in6m)
 			ours = 1;
 		else if (!ip6_mrouter) {

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.228 2002/01/31 14:51:03 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.229 2002/02/09 06:49:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3998,15 +3998,14 @@ key_ismyaddr6(sin6)
 		 * XXX Multicast
 		 * XXX why do we care about multlicast here while we don't care
 		 * about IPv4 multicast??
-		 * XXX scope
 		 */
 		in6m = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		IN6_LOOKUP_MULTI(sin6->sin6_addr, ia->ia_ifp, in6m);
+		IN6_LOOKUP_MULTI(sin6, ia->ia_ifp, in6m);
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
-		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &sin6->sin6_addr);
+		     !SA6_ARE_ADDR_EQUAL(&(in6m)->in6m_sa, sin6);
 		     (in6m) = in6m->in6m_entry.le_next)
 			continue;
 #endif

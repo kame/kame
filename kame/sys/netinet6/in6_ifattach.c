@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.150 2002/01/31 14:14:51 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.151 2002/02/09 06:49:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -617,12 +617,7 @@ in6_ifattach_linklocal(ifp, altifp)
 
 	ifra.ifra_addr.sin6_family = AF_INET6;
 	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
-	ifra.ifra_addr.sin6_addr.s6_addr16[0] = htons(0xfe80);
-#ifdef SCOPEDROUTING
-	ifra.ifra_addr.sin6_addr.s6_addr16[1] = 0
-#else
-	ifra.ifra_addr.sin6_addr.s6_addr16[1] = htons(ifp->if_index); /* XXX */
-#endif
+	ifra.ifra_addr.sin6_addr.s6_addr32[0] = htonl(0xfe800000);
 	ifra.ifra_addr.sin6_addr.s6_addr32[1] = 0;
 	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
 		ifra.ifra_addr.sin6_addr.s6_addr32[2] = 0;
@@ -634,11 +629,13 @@ in6_ifattach_linklocal(ifp, altifp)
 			return(-1);
 		}
 	}
-#ifdef SCOPEDROUTING
 	if (in6_addr2zoneid(ifp, &ifra.ifra_addr.sin6_addr,
 			    &ifra.ifra_addr.sin6_scope_id)) {
 		return(-1);
 	}
+	in6_embedscope(&ifra.ifra_addr.sin6_addr, &ifra.ifra_addr); /* XXX */
+#ifndef SCOPEDROUTING
+	ifra.ifra_addr.sin6_scope_id = 0; /* XXX */
 #endif
 
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
@@ -797,11 +794,11 @@ in6_ifattach_loopback(ifp)
  * when ifp == NULL, the caller is responsible for filling scopeid.
  */
 int
-in6_nigroup(ifp, name, namelen, in6)
+in6_nigroup(ifp, name, namelen, sa6)
 	struct ifnet *ifp;
 	const char *name;
 	int namelen;
-	struct in6_addr *in6;
+	struct sockaddr_in6 *sa6;
 {
 	const char *p;
 	u_char *q;
@@ -833,12 +830,17 @@ in6_nigroup(ifp, name, namelen, in6)
 	MD5Update(&ctxt, n, l);
 	MD5Final(digest, &ctxt);
 
-	bzero(in6, sizeof(*in6));
-	in6->s6_addr16[0] = htons(0xff02);
-	if (ifp)
-		in6->s6_addr16[1] = htons(ifp->if_index);
-	in6->s6_addr8[11] = 2;
-	bcopy(digest, &in6->s6_addr32[3], sizeof(in6->s6_addr32[3]));
+	bzero(sa6, sizeof(*sa6));
+	sa6->sin6_family = AF_INET6;
+	sa6->sin6_len = sizeof(*sa6);
+	sa6->sin6_addr.s6_addr32[0] = htonl(0xff020000);
+	sa6->sin6_addr.s6_addr8[11] = 2;
+	bcopy(digest, &sa6->sin6_addr.s6_addr32[3],
+	      sizeof(sa6->sin6_addr.s6_addr32[3]));
+	if (in6_addr2zoneid(ifp, &sa6->sin6_addr, &sa6->sin6_scope_id) ||
+	    in6_embedscope(&sa6->sin6_addr, sa6)) { /* XXX */
+		return -1; /* XXX: should not fail */
+	}
 
 	return 0;
 }
@@ -857,7 +859,7 @@ in6_nigroup_attach(name, namelen)
 	bzero(&mltaddr, sizeof(mltaddr));
 	mltaddr.sin6_family = AF_INET6;
 	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
+	if (in6_nigroup(NULL, name, namelen, &mltaddr) != 0)
 		return;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -866,10 +868,14 @@ in6_nigroup_attach(name, namelen)
 	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
 #endif
 	{
-		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
+				    &mltaddr.sin6_scope_id)) {
+			continue;
+		}
+		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
+		IN6_LOOKUP_MULTI(&mltaddr, ifp, in6m);
 		if (!in6m) {
-			if (!in6_addmulti(&mltaddr.sin6_addr, ifp, &error)) {
+			if (!in6_addmulti(&mltaddr, ifp, &error)) {
 				nd6log((LOG_ERR, "%s: failed to join %s "
 				    "(errno=%d)\n", if_name(ifp),
 				    ip6_sprintf(&mltaddr.sin6_addr), 
@@ -891,7 +897,7 @@ in6_nigroup_detach(name, namelen)
 	bzero(&mltaddr, sizeof(mltaddr));
 	mltaddr.sin6_family = AF_INET6;
 	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
+	if (in6_nigroup(NULL, name, namelen, &mltaddr) != 0)
 		return;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -900,8 +906,12 @@ in6_nigroup_detach(name, namelen)
 	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
 #endif
 	{
-		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
+				    &mltaddr.sin6_scope_id)) {
+			continue; /* XXX: impossible */
+		}
+		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
+		IN6_LOOKUP_MULTI(&mltaddr, ifp, in6m);
 		if (in6m)
 			in6_delmulti(in6m);
 	}
@@ -1226,7 +1236,14 @@ in6_ifdetach(ifp)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = in6addr_linklocal_allnodes;
-	sin6.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+	if (in6_addr2zoneid(ifp, &sin6.sin6_addr, &sin6.sin6_scope_id)) {
+		/* XXX: should not fail */
+		return;
+	}
+	in6_embedscope(&sin6.sin6_addr, &sin6);	/* XXX */
+#ifndef SCOPEDROUTING
+	sin6.sin6_scope_id = 0;	/* XXX */
+#endif
 #ifndef __FreeBSD__
 	rt = rtalloc1((struct sockaddr *)&sin6, 0);
 #else
