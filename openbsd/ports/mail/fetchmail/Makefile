@@ -12,7 +12,9 @@ CONFIGURE_ARGS+= --disable-nls
 .if exists(/usr/lib/libkrb.a) && defined(MAKE_EBONES)
 CONFIGURE_ARGS+= --with-kerberos=yes
 .endif
-CONFIGURE_ENV=	LDFLAGS="${CFLAGS}"
+CONFIGURE_ARGS+= --enable-inet6
+#CONFIGURE_ENV=	LDFLAGS="${CFLAGS}"
+CONFIGURE_ENV=	LDFLAGS="${CFLAGS} ${LDFLAGS} -L/usr/local/v6/lib"
 
 FDOC=   ${PREFIX}/share/doc/fetchmail
 
