@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.68 2001/06/30 05:57:33 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.69 2001/07/04 04:54:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -462,12 +462,12 @@ decode_name(bufp, len)
 			goto fail;
 
 		if (*q == 0) {
-			if (p - str + 1 < len) {
-				/* full qualified domain name */
-				*p = '\0';
-				q++;
-			} else
+			if (p - str + 1 > len)
 				goto fail;
+
+			/* full qualified domain name */
+			*p = '\0';
+			q++;
 
 			*bufp = q;
 			return str;
@@ -1197,6 +1197,8 @@ getans_icmp6(buf, len, from)
 	if (!n) {
 		int nl, i;
 
+		dprintf("decode_name failed\n");
+
 		/*
 		 * older KAME code uses non-DNS name encoding (len + name)
 		 */
@@ -1213,6 +1215,8 @@ getans_icmp6(buf, len, from)
 		memcpy(n, d, nl);
 		n[nl] = '\0';
 	}
+
+	dprintf("name=%s\n", n);
 
 	for (qc = LIST_FIRST(&qcache); qc; qc = LIST_NEXT(qc, link)) {
 		if (memcmp(ni6->icmp6_ni_nonce, &qc->id, sizeof(qc->id)) == 0)
