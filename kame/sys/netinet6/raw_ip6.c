@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.133 2002/12/08 13:06:09 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.134 2003/02/05 05:39:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -285,16 +285,6 @@ rip6_input(mp, offp, proto)
 				} else
 					sorwakeup(last->in6p_socket);
 				bzero(&opts, sizeof(opts));
-			}
-			/*
-			 * XXX: m_copy above removes m_aux that
-			 * contains the packet addresses, while we
-			 * still need them for IPsec.
-			 */
-			if (!ip6_setpktaddrs(m, src, dst)) {
-				m_freem(m);
-				ip6stat.ip6s_delivered--;
-				return (IPPROTO_DONE); /* XXX */
 			}
 		}
 		last = in6p;

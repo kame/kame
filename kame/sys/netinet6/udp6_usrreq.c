@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.109 2002/10/24 09:18:03 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.110 2003/02/05 05:39:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -330,13 +330,6 @@ udp6_input(mp, offp, proto)
 						sorwakeup(last->in6p_socket);
 					bzero(&opts, sizeof(opts));
 				}
-				/*
-				 * XXX: m_copy above removes m_aux that
-				 * contains the packet addresses, while we
-				 * still need them for IPsec.
-				 */
-				if (!ip6_setpktaddrs(m, src, dst))
-					goto bad; /* XXX */
 			}
 			last = in6p;
 			/*
