@@ -31,6 +31,7 @@ LHDRS=	aio.h errno.h fcntl.h linker_set.h poll.h stdint.h syslog.h \
 LDIRS=	cam net netatalk netatm netgraph netinet netinet6 netipsec \
 	netipx netkey netnatm netncp netns netsmb nfs nfsclient nfsserver \
 	pccard posix4 sys vm
+LDIRS+=	altq
 
 LSUBDIRS=	cam/scsi dev/an dev/ic dev/iicbus dev/firewire dev/ofw \
 	dev/ppbus dev/smbus dev/usb dev/wi fs/devfs \

@@ -195,7 +195,7 @@ main(int argc, char *argv[])
 	 * The problem with tftpd running in "nowait" mode is that
 	 * inetd may get one or more successful "selects" on the
 	 * tftp port before we do our receive, so more than one
-	 * instance of tftpd may be started up.  Worse, if tftpd
+	 * instance of tftpd may be started up.	 Worse, if tftpd
 	 * break before doing the above "recvfrom", inetd would
 	 * spawn endless instances, clogging the system.
 	 */
@@ -253,7 +253,7 @@ main(int argc, char *argv[])
 			unmappedaddr((struct sockaddr_in6 *)&ss);
 			getnameinfo((struct sockaddr *)&ss, ss.ss_len,
 				    hbuf, sizeof(hbuf), NULL, 0,
-				    NI_NUMERICHOST | NI_WITHSCOPEID);
+				    NI_NUMERICHOST);
 			asprintf(&tempchroot, "%s/%s", chroot_dir, hbuf);
 			statret = stat(tempchroot, &sb);
 			if ((sb.st_mode & S_IFDIR) &&
@@ -433,7 +433,7 @@ option_fail:
 
 		getnameinfo((struct sockaddr *)&from, from.ss_len,
 			    hbuf, sizeof(hbuf), NULL, 0, 
-			    NI_WITHSCOPEID);
+			    NULL);
 		syslog(LOG_INFO, "%s: %s request for %s: %s", hbuf,
 			tp->th_opcode == WRQ ? "write" : "read",
 			filename, errtomsg(ecode));

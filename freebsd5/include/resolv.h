@@ -198,6 +198,16 @@ struct res_sym {
 	char *	humanname;	/* Its fun name, like "mail exchanger" */
 };
 
+/* XXX this shouldn't be used by normal users */
+struct res_target {
+	struct res_target *next;
+	const char *name;	/* domain name */
+	int qclass, qtype;	/* class and type of query */
+	u_char *answer;		/* buffer to put answer */
+	int anslen;		/* size of answer buffer */
+	int n;			/* result length */
+};
+
 extern struct __res_state _res;
 /* for INET6 */
 extern struct __res_state_ext _res_ext;

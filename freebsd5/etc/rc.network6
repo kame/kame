@@ -120,6 +120,13 @@ network6_pass1() {
 		;;
 	esac
 
+	# install the policy of the address selection algorithm.
+	if [ -f /usr/local/v6/etc/ip6addrctl.conf ]; then
+		ip6addrctl flush
+		ip6addrctl install /usr/local/v6/etc/ip6addrctl.conf
+		ip6addrctl
+	fi
+
 	case ${ipv6_network_interfaces} in
 	[Aa][Uu][Tt][Oo])
 		#
@@ -347,6 +354,25 @@ network6_interface_setup() {
 		# You can configure only single interface, as
 		# specification assumes that autoconfigured host has
 		# single interface only.
+
+		# whether to use the privacy extension for autoconf.
+      		# the parameters should be set before accepting RAs.
+	    	case ${ip6tempaddr} in
+		[Yy][Ee][Ss])
+			sysctl net.inet6.ip6.use_tempaddr=1 >/dev/null
+			case ${ip6prefertempaddr} in
+			[Yy][Ee][Ss])
+				sysctl net.inet6.ip6.prefer_tempaddr=1
+			;;
+			esac
+			if [ -n "${ip6temppltime}" ]; then
+				sysctl net.inet6.ip6.temppltime=${ip6temppltime} >/dev/null
+			fi
+			if [ -n "${ip6tempvltime}" ]; then
+				sysctl net.inet6.ip6.tempvltime=${ip6tempvltime} >/dev/null
+			fi
+		esac
+
 		sysctl net.inet6.ip6.accept_rtadv=1
 		set ${rtsol_interfaces}
 		ifconfig $1 up

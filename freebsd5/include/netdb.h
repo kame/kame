@@ -149,13 +149,13 @@ struct addrinfo {
 /*
  * Error return codes from getaddrinfo()
  */
-#define	EAI_ADDRFAMILY	 1	/* address family for hostname not supported */
+/* #define	EAI_ADDRFAMILY	 1	(obsoleted) */
 #define	EAI_AGAIN	 2	/* temporary failure in name resolution */
 #define	EAI_BADFLAGS	 3	/* invalid value for ai_flags */
 #define	EAI_FAIL	 4	/* non-recoverable failure in name resolution */
 #define	EAI_FAMILY	 5	/* ai_family not supported */
 #define	EAI_MEMORY	 6	/* memory allocation failure */
-#define	EAI_NODATA	 7	/* no address associated with hostname */
+/* #define	EAI_NODATA	 7	(obsoleted) */
 #define	EAI_NONAME	 8	/* hostname nor servname provided, or not known */
 #define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
 #define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
@@ -195,12 +195,50 @@ struct addrinfo {
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
+#if 0 /* obsolete */
 #define NI_WITHSCOPEID	0x00000020
+#endif
+#define NI_NUMERICSCOPE	0x00000040
 
 /*
  * Scope delimit character
  */
 #define	SCOPE_DELIMITER	'%'
+
+/*
+ * Flags for getrrsetbyname()
+ */
+#define RRSET_VALIDATED		1
+
+/*
+ * Return codes for getrrsetbyname()
+ */
+#define ERRSET_SUCCESS		0
+#define ERRSET_NOMEMORY		1
+#define ERRSET_FAIL		2
+#define ERRSET_INVAL		3
+#define ERRSET_NONAME		4
+#define ERRSET_NODATA		5
+
+/*
+ * Structures used by getrrsetbyname() and freerrset()
+ */
+struct rdatainfo {
+	unsigned int		rdi_length;	/* length of data */
+	unsigned char		*rdi_data;	/* record data */
+};
+
+struct rrsetinfo {
+	unsigned int		rri_flags;	/* RRSET_VALIDATED ... */
+	unsigned int		rri_rdclass;	/* class number */
+	unsigned int		rri_rdtype;	/* RR type number */
+	unsigned int		rri_ttl;	/* time to live */
+	unsigned int		rri_nrdatas;	/* size of rdatas array */
+	unsigned int		rri_nsigs;	/* size of sigs array */
+	char			*rri_name;	/* canonical name */
+	struct rdatainfo	*rri_rdatas;	/* individual records */
+	struct rdatainfo	*rri_sigs;	/* individual signatures */
+};
 
 __BEGIN_DECLS
 void		endhostent(void);
@@ -240,6 +278,9 @@ void		freeaddrinfo(struct addrinfo *);
 char		*gai_strerror(int);
 void		setnetgrent(const char *);
 void		setservent(int);
+int		getrrsetbyname(const char *, unsigned int, unsigned int,
+			unsigned int, struct rrsetinfo **);
+void		freerrset(struct rrsetinfo *);
 
 /*
  * PRIVATE functions specific to the FreeBSD implementation
