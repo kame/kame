@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.21 2001/05/08 01:59:11 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.22 2001/05/08 02:12:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -102,6 +102,7 @@ static void conntest __P((int, int, struct testitem *));
 
 static char *port = NULL;
 static int socktype = SOCK_DGRAM;
+static int v6only = 0;
 static int summary = 0;
 static int reuseaddr = 0;
 static int reuseport = 0;
@@ -117,13 +118,19 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "12APp:st")) != EOF) {
+	while ((ch = getopt(argc, argv, "126APp:st")) != EOF) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;
 			break;
 		case '2':
 			connect2nd = 1;
+			break;
+		case '6':
+#ifndef IPV6_V6ONLY
+			errx(1, "IPV6_V6ONLY is not supported");
+#endif
+			v6only = 1;
 			break;
 		case 'A':
 			reuseaddr = 1;
@@ -177,6 +184,9 @@ main(argc, argv)
 	    socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM",
 	    reuseaddr ? ", SO_REUSEADDR" : "",
 	    reuseport ? ", SO_REUSEPORT" : "");
+#ifdef IPV6_V6ONLY
+	printf("%s", v6only ? ", V6ONLY" : "");
+#endif
 	if (socktype == SOCK_STREAM && (connect1st != 0 || connect2nd != 0))
 		printf(" , connect to %s", (connect1st != 0) ? "1st" : "2nd");
 	putchar('\n');
@@ -201,7 +211,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: bindtest [-[1|2]APst] -p port\n");
+	fprintf(stderr, "usage: bindtest [-[1|2]6APst] -p port\n");
 }
 
 static struct addrinfo *
@@ -328,6 +338,33 @@ test(t1, t2)
 				    strerror(errno));
 			else
 				printf("\t!P");
+			goto fail;
+		}
+	}
+#endif
+
+#ifdef IPV6_V6ONLY
+	if (v6only) {
+		if (a->ai_family == AF_INET6 &&
+		    setsockopt(sa, IPPROTO_IPV6, IPV6_V6ONLY, &yes,
+			       sizeof(yes)) < 0) {
+			if (!summary)
+				printf("\tfailed setsockopt(IPV6_V6ONLY) "
+				    "for %s, %s\n", printres(a),
+				    strerror(errno));
+			else
+				printf("\t?6");
+			goto fail;
+		}
+		if (b->ai_family == AF_INET6 &&
+		    setsockopt(sb, IPPROTO_IPV6, IPV6_V6ONLY, &yes,
+			       sizeof(yes)) < 0) {
+			if (!summary)
+				printf("\tfailed setsockopt(IPV6_V6ONLY) "
+				    "for %s, %s\n", printres(b),
+				    strerror(errno));
+			else
+				printf("\t?6");
 			goto fail;
 		}
 	}
