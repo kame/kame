@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.98 2001/06/27 15:50:05 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.99 2001/07/02 08:56:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -654,7 +654,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 
 		/*
 		 * Detect if we should notify the error. If no source and
-		 * destination ports are specifed, but non-zero flowinfo and
+		 * destination ports are specified, but non-zero flowinfo and
 		 * local address match, notify the error. This is the case
 		 * when the error is delivered with an encrypted buffer
 		 * by ESP. Otherwise, just compare addresses and ports
