@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.115 2004/08/21 10:49:07 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.116 2004/08/22 01:58:06 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2290,8 +2290,10 @@ dhcp6_set_options(optbp, optep, optinfo)
 				optinfo->delayedauth_offset =
 				    ((char *)p - (char *)optbp) + authlen - 16;
 
-				dprintf(LOG_DEBUG, FNAME, "key ID %x, offset %d",
-				    optinfo->delayedauth_keyid, optinfo->delayedauth_offset); 
+				dprintf(LOG_DEBUG, FNAME,
+				    "key ID %x, offset %d",
+				    optinfo->delayedauth_keyid,
+				    optinfo->delayedauth_offset); 
 				break;
 #ifdef notyet
 			case DHCP6_AUTHPROTO_RECONFIG:
