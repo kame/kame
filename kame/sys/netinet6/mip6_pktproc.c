@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.28 2002/07/24 10:13:11 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.29 2002/07/26 02:36:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -634,7 +634,7 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa;
-	struct sockaddr_in6 *coa_sa, coa_storage;
+	struct sockaddr_in6 *coa_sa, coa_storage, hoa_sa;
 	struct mbuf *n;
 	struct ip6aux *ip6a;
 	u_int32_t lifetime;
@@ -660,7 +660,8 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 
 	/* XXX find alt CoA. */
 	coa_storage = *src_sa;
-	coa_storage.sin6_addr = ip6a->ip6a_coa;
+	if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0)
+		coa_storage.sin6_addr = ip6a->ip6a_coa;
 	coa_sa = &coa_storage;
 
 	lifetime = ntohl(ip6mu->ip6mu_lifetime);
@@ -713,10 +714,12 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 			}
 		}
 	} else {
+		hoa_sa = *src_sa;
+		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
 		/* request to cache/remove a binding for CN. */
-		if (IS_REQUEST_TO_CACHE(lifetime, src_sa, coa_sa)) {
+		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, coa_sa)) {
 			if (mbc == NULL)
-				error = mip6_bc_register(mbc, src_sa, coa_sa,
+				error = mip6_bc_register(mbc, &hoa_sa, coa_sa,
 							 dst_sa,
 							 ip6mu->ip6mu_flags,
 							 seqno, lifetime);
