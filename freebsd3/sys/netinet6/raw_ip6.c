@@ -131,7 +131,7 @@ rip6_input(mp, offp, proto)
 	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	register struct inpcb *in6p;
 	struct inpcb *last = 0;
-	struct mbuf *opts = 0;
+	struct ip6_recvpktopts opts;
 	struct sockaddr_in6 rip6src;
 
 #if defined(NFAITH) && 0 < NFAITH
@@ -144,6 +144,7 @@ rip6_input(mp, offp, proto)
 	}
 #endif
 	init_sin6(&rip6src, m); /* general init */
+	bzero(&opts, sizeof(opts));
 
 	LIST_FOREACH(in6p, &ripcb, inp_list) {
 		if ((in6p->in6p_vflag & INP_IPV6) == NULL)
@@ -168,19 +169,20 @@ rip6_input(mp, offp, proto)
 			if (n) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS ||
 				    last->in6p_socket->so_options & SO_TIMESTAMP)
-					ip6_savecontrol(last, &opts, ip6, n);
+					ip6_savecontrol(last, ip6, n, &opts,
+							NULL);
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
 						(struct sockaddr *)&rip6src,
-						 n, opts) == 0) {
+						 n, opts.head) == 0) {
 					/* should notify about lost packet */
 					m_freem(n);
-					if (opts)
-						m_freem(opts);
+					if (opts.head)
+						m_freem(opts.head);
 				} else
 					sorwakeup(last->in6p_socket);
-				opts = NULL;
+				bzero(&opts, sizeof(opts));
 			}
 		}
 		last = in6p;
@@ -188,14 +190,14 @@ rip6_input(mp, offp, proto)
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS ||
 		    last->in6p_socket->so_options & SO_TIMESTAMP)
-			ip6_savecontrol(last, &opts, ip6, m);
+			ip6_savecontrol(last, ip6, m, &opts, NULL);
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&rip6src, m, opts) == 0) {
+				(struct sockaddr *)&rip6src, m, opts.head) == 0) {
 			m_freem(m);
-			if (opts)
-				m_freem(opts);
+			if (opts.head)
+				m_freem(opts.head);
 		} else
 			sorwakeup(last->in6p_socket);
 	} else {

@@ -716,9 +716,9 @@ in6_pcbdetach(inp)
 	in_pcbremlists(inp);
 	sotoinpcb(so) = 0;
 	sofree(so);
-	if (inp->in6p_options)
-		m_freem(inp->in6p_options);
 
+	if (inp->in6p_inputopts.head) /* Free all received options. */
+		m_freem(inp->in6p_inputopts.head);
 	ip6_freepcbopts(inp->in6p_outputopts);
 	ip6_freemoptions(inp->in6p_moptions);
 
