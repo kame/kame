@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.110 2001/02/09 07:02:55 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.111 2001/02/10 14:30:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,8 +74,8 @@ size_t in6_ifstatmax = 0;
 size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
 
-#ifdef IP6_AUTO_LINLLOCAL
-int ip6_auto_linklocal = IP6_LINLLOCAL_AUTO;
+#ifdef IP6_AUTO_LINKLOCAL
+int ip6_auto_linklocal = IP6_LINKLOCAL_AUTO;
 #else
 int ip6_auto_linklocal = 1;	/* enable by default */
 #endif
