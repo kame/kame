@@ -1,8 +1,30 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1007 2000/06/13 05:30:52 itojun Exp $
+$Id: CHANGELOG,v 1.1008 2000/06/13 10:17:52 jinmei Exp $
 
 <200006>
+2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_purgeaddr): tried to restore an
+	interface direct route if we have an address that shares the same
+	prefix with the deleted address.
+	This would improve behavior in multi-address environments;
+	if you assigned multple addresses that shared a same prefix and
+	then remove one of them, the interface direct route corresponding
+	to the address would still remain.
+
+2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_ifremloop): always called
+	in6_ifloop_request regardless of the result of
+	in6_is_ifloop_auto(), in order to make sure to invalidate a stale
+	route entry for a deleted address.
+	Note: bsdi doesn't need this fix.
+
+2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_input): avoided to use the
+	cached route for forwarding, if it is down.
+	This fix would prevent the input routine from accepting a packet
+	to already removed address.
+
 Tue Jun 13 14:29:12 JST 2000  itojun@iijlab.net
 	* netbsd/sbin/setkey: move setkey from usr.sbin/setkey to sbin/setkey.
 	  we need it for encrypted NFS (sync better with netbsd-current).
