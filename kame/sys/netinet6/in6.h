@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.80 2001/02/26 09:20:38 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.81 2001/03/02 04:54:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,6 +73,8 @@
 
 /*
  * Identification of the network protocol stack
+ * for *BSD-current/release: http://www.kame.net/dev/cvsweb.cgi/kame/COVERAGE
+ * has the table of implementation/integration differences.
  */
 #define __KAME__
 #define __KAME_VERSION		"from cvs repository"
