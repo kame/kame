@@ -793,6 +793,12 @@ in_rtchange(inp, errno)
 /*
  * Lookup a PCB based on the local address and port.
  */
+/*
+ * we never select the pcb which has INP_IPV6 flag if we have other
+ * candidates those matche the specified address and port number
+ * passed as arguments.
+ */
+#define INP_LOOKUP_SHARED_PCB_COST 10 /* XXX */
 struct inpcb *
 in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 	struct inpcbinfo *pcbinfo;
@@ -801,11 +807,15 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 	int wild_okay;
 {
 	register struct inpcb *inp;
-	int matchwild = 3, wildcard;
+	int matchwild = 3 + INP_LOOKUP_SHARED_PCB_COST;
+	int wildcard;
 	u_short lport = lport_arg;
 
 	if (!wild_okay) {
 		struct inpcbhead *head;
+#ifdef INET6
+		struct inpcb *inp_shared = NULL;
+#endif
 		/*
 		 * Look for an unconnected (wildcard foreign addr) PCB that
 		 * matches the local address and port we're looking for.
@@ -819,11 +829,21 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 			if (inp->inp_faddr.s_addr == INADDR_ANY &&
 			    inp->inp_laddr.s_addr == laddr.s_addr &&
 			    inp->inp_lport == lport) {
+#ifdef INET6
+				if ((inp->inp_vflag & INP_IPV6) != 0) {
+					inp_shared = inp;
+					continue;
+				}
+#endif
 				/*
 				 * Found.
 				 */
 				return (inp);
 			}
+#ifdef INET6
+			if ((inp == NULL) && (inp_shared != NULL))
+				return (inp_shared);
+#endif
 		}
 		/*
 		 * Not found.
@@ -855,6 +875,8 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 #ifdef INET6
 				if ((inp->inp_vflag & INP_IPV4) == 0)
 					continue;
+				if ((inp->inp_vflag & INP_IPV6) != 0)
+					wildcard += INP_LOOKUP_SHARED_PCB_COST;
 #endif
 				if (inp->inp_faddr.s_addr != INADDR_ANY)
 					wildcard++;
