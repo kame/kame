@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.358 1999/12/22 07:11:28 jinmei Exp $
+$Id: CHANGELOG,v 1.359 1999/12/22 07:12:22 jinmei Exp $
 
 <199912>
 1999-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,7 +13,7 @@ $Id: CHANGELOG,v 1.358 1999/12/22 07:11:28 jinmei Exp $
 	statements for non-standard socket options (IPV6_RECVOPTS,
 	IPV6_RECVRETOPTS, and IPV6_RECVDSTADDR).
 	Since they are still defined in netinet6/in6.h, applications that
-	use these options should still be compiled. But the applications
+	use these options should still be compilable. But the applications
 	will not work correctly any more because of this fix.
 	If your applications use these non-standard options, I strognly
 	recommend you to change the applications not to use the options.
