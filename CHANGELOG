@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1081 2000/07/02 08:47:47 itojun Exp $
+$Id: CHANGELOG,v 1.1082 2000/07/03 02:42:17 itojun Exp $
 
 <200006>
+Mon Jul  3 11:40:29 JST 2000  itojun@iijlab.net
+	* libinet6/name6.c: make sure to fill h_name on reverse query.
+	  From: Kris Kennaway <kris@FreeBSD.org>
+
 2000-07-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_input): immediately discarded
 	a packet to an unready (i.e. tentative or duplicated) address with
