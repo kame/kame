@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1068 2000/06/27 16:18:05 itojun Exp $
+$Id: CHANGELOG,v 1.1069 2000/06/27 16:19:32 suz Exp $
 
 <200006>
+Wed Jun 28 01:16:41 JST 2000	SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
+	* freebsd4/INSTALL
+	write up configuration-related matters for FreeBSD-4.0
+
 Wed Jun 28 01:12:59 JST 2000  itojun@iijlab.net
 	* libinet6/name6.c: correct error handling in DNS name lookups.
 
