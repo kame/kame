@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.87 2001/12/12 00:32:53 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.88 2001/12/12 21:48:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -111,8 +111,12 @@ static int mip6_remove_haddrs __P((struct hif_softc *, struct ifnet *));
 static int mip6_remove_addr __P((struct ifnet *, struct in6_ifaddr *));
 
 /* ipv6 header manipuration functions */
+static int mip6_rthdr_create __P((struct ip6_rthdr **,
+				  struct in6_addr *,
+				  struct ip6_pktopts *));
 static int mip6_rthdr_create_withdst __P((struct ip6_rthdr **,
-					  struct in6_addr *));
+					  struct in6_addr *,
+					  struct ip6_pktopts *));
 static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 					  struct in6_addr *,
 					  struct hif_softc *));
@@ -1262,40 +1266,38 @@ mip6_exthdr_create(m, opt, mip6opt)
 	dst = &ip6->ip6_dst; /* final destination */
 
 	/*
-	 * create a rthdr if an BC entry for the destination address exists.
+	 * add the routing header for the route optimization if there
+	 * exists a valid binding cache entry for this destination
+	 * node.
 	 */
-	if ((opt == NULL) || (opt->ip6po_rthdr == NULL)) {
-		/* 
-		 * only when no rthdr is specified from the upper
-		 * layer, we add a rthdr for route optimization when
-		 * needed.  if a rthdr from the upper layer already
-		 * exists, we use it (not route optimized).
-		 */
-		/*
-		 * XXX: todo.
-		 *
-		 * recent discussion in the mobileip-wg concluded that
-		 * the multiple rthdrs (one is specified by the caller
-		 * of ip6_output, and the other is MIP6's) should be
-		 * merged.  see the thread of discussion on the
-		 * mopbile-ip mailing list started at 'Tue, 04 Sep
-		 * 2001 12:51:34 -0700' with the subject 'Coexistence
-		 * with other uses for routing header'.
-		 */
 #ifdef __NetBSD__
-		s = splsoftnet();
+	s = splsoftnet();
 #else
-		s = splnet();
+	s = splnet();
 #endif
-		error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: rthdr creation failed.\n",
-				 __FILE__, __LINE__));
-			splx(s);
-			goto bad;
-		}
+	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst, opt);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s:%d: rthdr creation failed.\n",
+			 __FILE__, __LINE__));
 		splx(s);
+		goto bad;
+	}
+	splx(s);
+
+	if ((opt != NULL) &&
+	    (opt->ip6po_rthdr != NULL) &&
+	    (mip6opt->mip6po_rthdr != NULL)) {
+		/*
+		 * if the upper layer specify something special
+		 * routing header by using ip6_pktopts, we replace it
+		 * with the merged routing header that includes the
+		 * original (the upper-layer specified) routing header
+		 * and our routing header for the route optimization.
+		 */
+		free(opt->ip6po_rthdr, M_IP6OPT);
+		opt->ip6po_rthdr = mip6opt->mip6po_rthdr;
+		mip6opt->mip6po_rthdr = NULL;
 	}
 
 	/*
@@ -1380,37 +1382,65 @@ mip6_exthdr_create(m, opt, mip6opt)
 	return (error);
 }
 
-int
-mip6_rthdr_create(pktopt_rthdr, coa)
+static int
+mip6_rthdr_create(pktopt_rthdr, coa, opt)
 	struct ip6_rthdr **pktopt_rthdr;
 	struct in6_addr *coa;
+	struct ip6_pktopts *opt;
 {
-	struct ip6_rthdr0 *rthdr0;
+	struct ip6_rthdr0 *rthdr0, *orthdr0;
+	int osegleft;
+	struct in6_addr *ointhop = NULL, *inthop;
 	size_t len;
+	int i;
 
-	len = sizeof(struct ip6_rthdr0) + sizeof(struct in6_addr);
-	rthdr0 = malloc(len, M_TEMP, M_NOWAIT);
+	/*
+	 * recent discussion in the mobileip-wg concluded that the
+	 * multiple rthdrs (one is specified by the caller of
+	 * ip6_output, and the other is MIP6's) should be merged.  see
+	 * the thread of discussion on the mopbile-ip mailing list
+	 * started at 'Tue, 04 Sep 2001 12:51:34 -0700' with the
+	 * subject 'Coexistence with other uses for routing header'.
+	 *
+	 * if we have a type0 routing header pktopt already, we should
+	 * * merge them.
+	 */
+	orthdr0 = opt ? (struct ip6_rthdr0 *)opt->ip6po_rthdr : NULL;
+	if ((orthdr0 != NULL) && (orthdr0->ip6r0_type == 0)) {
+		osegleft = orthdr0->ip6r0_segleft;
+		ointhop = (struct in6_addr *)(orthdr0 + 1);
+	} else
+		osegleft = 0;
+
+	len = sizeof(struct ip6_rthdr0) + (sizeof(struct in6_addr) * osegleft);
+	rthdr0 = malloc(len, M_IP6OPT, M_NOWAIT);
 	if (rthdr0 == NULL) {
 		return (ENOMEM);
 	}
 	bzero(rthdr0, len);
 
 	/* rthdr0->ip6r0_nxt = will be filled later in ip6_output */
-	rthdr0->ip6r0_len = 2;
+	rthdr0->ip6r0_len = 2 + (osegleft * 2);
 	rthdr0->ip6r0_type = 0;
-	rthdr0->ip6r0_segleft = 1;
+	rthdr0->ip6r0_segleft = osegleft + 1;
 	rthdr0->ip6r0_reserved = 0;
-	bcopy(coa, (caddr_t)rthdr0 + sizeof(struct ip6_rthdr0),
-	      sizeof(struct in6_addr));
+	inthop = (struct in6_addr *)((caddr_t)rthdr0 + sizeof(rthdr0));
+	for (i = 0; i < osegleft; ointhop++, inthop++) {
+		bcopy((caddr_t)ointhop, (caddr_t)inthop,
+		      sizeof(struct in6_addr));
+		i++;
+	}
+	bcopy((caddr_t)coa, (caddr_t)inthop, sizeof(struct in6_addr));
 	*pktopt_rthdr = (struct ip6_rthdr *)rthdr0;
 
 	return (0);
 }
 
 static int
-mip6_rthdr_create_withdst(pktopt_rthdr, dst)
+mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 	struct ip6_rthdr **pktopt_rthdr;
 	struct in6_addr *dst;
+	struct ip6_pktopts *opt;
 {
 	struct mip6_bc *mbc;
 	int error = 0;
@@ -1421,7 +1451,7 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst)
 		return (0);
 	}
 
-	error = mip6_rthdr_create(pktopt_rthdr, &mbc->mbc_pcoa);
+	error = mip6_rthdr_create(pktopt_rthdr, &mbc->mbc_pcoa, opt);
 	if (error) {
 		return (error);
 	}
@@ -1561,7 +1591,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 #endif /* MIP6_DRAFT13 */
 
 	/* XXX MIP6_BUFFER_SIZE = IPV6_MIMMTU is OK?? */
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1654,7 +1684,7 @@ mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
 		coa = &hif_coa;
 	bcopy((caddr_t)coa, haddr_opt.ip6oh_addr, sizeof(*coa));
 
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1696,7 +1726,7 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 	}
 
 	/* XXX IPV6_MIMMTU is OK?? */
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1767,7 +1797,7 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	struct ip6_opt_binding_ack ba_opt;
 	struct mip6_buffer optbuf;
 
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
 	}
@@ -1803,13 +1833,13 @@ mip6_destopt_discard(mip6opt)
 	struct mip6_pktopts *mip6opt;
 {
 	if (mip6opt->mip6po_rthdr)
-		free(mip6opt->mip6po_rthdr, M_TEMP);
+		free(mip6opt->mip6po_rthdr, M_IP6OPT);
 
 	if (mip6opt->mip6po_haddr)
-		free(mip6opt->mip6po_haddr, M_TEMP);
+		free(mip6opt->mip6po_haddr, M_IP6OPT);
 
 	if (mip6opt->mip6po_dest2)
-		free(mip6opt->mip6po_dest2, M_TEMP);
+		free(mip6opt->mip6po_dest2, M_IP6OPT);
 
 	return;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.36 2001/12/12 00:32:53 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.37 2001/12/12 21:48:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -130,8 +130,6 @@ struct mbuf *mip6_create_ip6hdr		 __P((struct in6_addr *,
 int mip6_exthdr_create			 __P((struct mbuf *,
 					      struct ip6_pktopts *,
 					      struct mip6_pktopts *));
-int mip6_rthdr_create			__P((struct ip6_rthdr **,
-					     struct in6_addr *));
 int mip6_ba_destopt_create		 __P((struct ip6_dest **,
 					      u_int8_t,
 					      MIP6_SEQNO_T,
