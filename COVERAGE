@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.107 2001/06/04 14:38:40 itojun Exp $
+$KAME: COVERAGE,v 1.108 2001/06/19 07:56:53 itojun Exp $
 
 
 x: supported/integrated
@@ -63,7 +63,7 @@ Kernel PPP	x	?	-	-	x	?	?
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net15	open29	free43	bsdi42
+		*BSD	net	open	free	net151	open29	free43	bsdi42
 		--	--	--	--	--	--	--	---
 KAME IPv6 as of	latest	early	early	early	early	early	early	apr00
 			jun00	jun00	jul00	jun00	jun00	jun00
@@ -201,7 +201,7 @@ IPv6 RPC	-	x	-	-	x	-	-	-
 IPv6 NFS	-	x	-	-	x	-	-	-
 
 NIS ipnodes map support for hostname lookup
-		-	x	-	-	-	-	-	-
+		-	x	-	-	x	-	-	-
 
 resolver support for IPv6 transport
 		(+)	(*1)	(*1)	x	(*1)	(*1)	x	-
@@ -218,12 +218,12 @@ ipsec socket passing to ip{6,}_output
 		aux	aux	-	aux	aux	-	aux	aux
 
 ipsec esp, encryption logic
-		new	new	(*1)	old	old	(*1)	old	old
+		new	new	(*1)	old	new	(*1)	old	old
     new: unified cbc logic, old: per-algorithm cbc logic
     (*1): not based on kame
 
 ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
-		new	new	(*1)	old	old	(*1)	old	old
+		new	new	(*1)	old	new	(*1)	old	old
     (*1): not based on kame
 
 ipsec esp, rijndael support
@@ -240,7 +240,7 @@ router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
 		x	x	x	x	x	x	x	-
 
 router renumbering bit declaration conforms RFC2894/2292bis-02
-		x	x	x	-	-	-	-	-
+		x	x	x	-	x	x	-	-
 
 source address selection
 		latest	may00	may00	may00	may00	may00	may00	apr00?
@@ -259,8 +259,8 @@ basic userland	x	x	x	x	x	x	x	(*1)
 route6d		x	x	x	x	x	x	x	x
 hroute6d	x	-	-	-	-	-	-	x
 bgpd		x	-	-	-	-	-	-	x
-pim6dd		x	x	-	x	x	-	x	x
-pim6sd		x	x	-	x	x	-	x	x
+pim6dd		x	-	-	x	-	-	x	x
+pim6sd		x	-	-	x	-	-	x	x
 
 rtsol/rtsold	x	x	x	x	x	x	x	x
 rtadvd		x	x	x	x	x	x	x	x
