@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/05 10:55:04 $
+		     $Date: 1999/10/06 05:04:49 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -40,6 +40,6 @@ those platforms.  Here is a brief list of important differences:
 	No KAME IPsec support in:	KAME/OpenBSD25
 		(you can enjoy OpenBSD IPsec for IPv4)
 - TCP
-	see kit/IMPLEMENTATION for details.
+	see IMPLEMENTATION for details.
 
 							<end of RELNOTES>
