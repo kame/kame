@@ -4,7 +4,7 @@
 # Whom:                 itojun@itojun.org
 # Modified by:		doi@sfc.wide.ad.jp	(1999/08/16)
 #
-# $Id: Makefile,v 1.2 1999/08/19 19:19:17 sumikawa Exp $
+# $Id: Makefile,v 1.3 1999/12/07 13:54:24 sumikawa Exp $
 #
 
 DISTNAME=       newbie-0.22
@@ -13,11 +13,6 @@ CATEGORIES=	net
 MASTER_SITES=   http://www.sfc.wide.ad.jp/~doi/softs/newbie/
 
 MAINTAINER=     itojun@itojun.org
-
-PATCH_DIST_ARGS=	-d ${WRKSRC}/.. -E ${PATCH_DIST_STRIP}
-.if !defined(PATCH_DEBUG)
-PATCH_DIST_ARGS+=	--forward --quiet
-.endif
 
 RESTRICTED=	"alpha test period, no redistribution allowed"
 WRKSRC=		${WRKDIR}/${DISTNAME}/src
