@@ -1,4 +1,4 @@
-/*	$OpenBSD: ftpd.c,v 1.53 1999/02/26 00:15:54 art Exp $	*/
+/*	$OpenBSD: ftpd.c,v 1.57 1999/09/22 05:00:46 deraadt Exp $	*/
 /*	$NetBSD: ftpd.c,v 1.15 1995/06/03 22:46:47 mycroft Exp $	*/
 
 /*
@@ -257,6 +257,7 @@ static struct passwd *
 static char	*sgetsave __P((char *));
 static void	 reapchild __P((int));
 static int	 check_host __P((struct sockaddr *));
+static void	 usage __P((void));
 
 void	 logxfer __P((char *, off_t, time_t));
 
@@ -273,6 +274,16 @@ curdir()
 	return (guest ? path+1 : path);
 }
 
+char *argstr = "AdDhlMSt:T:u:UvP46";
+
+static void
+usage()
+{
+	syslog(LOG_ERR,
+	    "usage: ftpd [-AdDhlMSUv] [-t timeout] [-T maxtimeout] [-u mask]");
+	exit(2);
+}
+
 int
 main(argc, argv, envp)
 	int argc;
@@ -282,7 +293,6 @@ main(argc, argv, envp)
 	int addrlen, ch, on = 1, tos;
 	char *cp, line[LINE_MAX];
 	FILE *fd;
-	char *argstr = "AdDhlMSt:T:u:UvP46";
 	struct hostent *hp;
 
 	tzset();	/* in case no timezone database in ~ftp */
@@ -339,11 +349,15 @@ main(argc, argv, envp)
 		case 'u':
 		    {
 			long val = 0;
+			char *p;
 
-			val = strtol(optarg, &optarg, 8);
-			if (*optarg != '\0' || val < 0 || (val & ~ACCESSPERMS))
-				warnx("bad value for -u");
-			else
+			val = strtol(optarg, &p, 8);
+			if (*p != '\0' || val < 0 || (val & ~ACCESSPERMS)) {
+				syslog(LOG_ERR,
+				    "ftpd: %s is a bad value for -u, aborting..",
+				    optarg);
+				exit(2);
+			} else
 				defumask = val;
 			break;
 		    }
@@ -365,7 +379,7 @@ main(argc, argv, envp)
 			break;
 
 		default:
-			warnx("unknown flag -%c ignored", optopt);
+			usage();
 			break;
 		}
 	}
@@ -1517,11 +1531,19 @@ receive_data(instr, outstr)
 
 	case TYPE_I:
 	case TYPE_L:
-		while ((cnt = read(fileno(instr), buf, sizeof(buf))) > 0) {
-			if (write(fileno(outstr), buf, cnt) != cnt)
-				goto file_err;
-			byte_count += cnt;
-		}
+		signal (SIGALRM, lostconn);
+
+		do {
+			(void) alarm ((unsigned) timeout);
+			cnt = read(fileno(instr), buf, sizeof(buf));
+			(void) alarm (0);
+
+			if (cnt > 0) {
+				if (write(fileno(outstr), buf, cnt) != cnt)
+					goto file_err;
+				byte_count += cnt;
+			}
+		} while (cnt > 0);
 		if (cnt < 0)
 			goto data_err;
 		transflag = 0;
@@ -2030,6 +2052,7 @@ myoob(signo)
 		longjmp(urgcatch, 1);
 	}
 	if (strcmp(cp, "STAT\r\n") == 0) {
+		tmpline[0] = '\0';
 		if (file_size != (off_t) -1)
 			reply(213, "Status: %qd of %qd bytes transferred",
 			    byte_count, file_size);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: telnetd.c,v 1.16 1998/12/19 01:27:07 deraadt Exp $	*/
+/*	$OpenBSD: telnetd.c,v 1.18 1999/08/17 09:13:13 millert Exp $	*/
 /*	$NetBSD: telnetd.c,v 1.6 1996/03/20 04:25:57 tls Exp $	*/
 
 /*
@@ -45,7 +45,7 @@ static char copyright[] =
 static char sccsid[] = "@(#)telnetd.c	8.4 (Berkeley) 5/30/95";
 static char rcsid[] = "$NetBSD: telnetd.c,v 1.5 1996/02/28 20:38:23 thorpej Exp $";
 #else
-static char rcsid[] = "$OpenBSD: telnetd.c,v 1.16 1998/12/19 01:27:07 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: telnetd.c,v 1.18 1999/08/17 09:13:13 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -107,7 +107,6 @@ int	registerd_host_only = 0;
 /* make sure we don't get the bsd version */
 # include "/usr/include/sys/tty.h"
 # include <sys/ptyvar.h>
-
 
 /*
  * Because of the way ptyibuf is used with streams messages, we need
@@ -539,44 +538,43 @@ main(argc, argv)
 	void
 usage()
 {
-	fprintf(stderr, "Usage: telnetd");
+	syslog(LOG_ERR, "usage: telnetd"
 #ifdef	AUTHENTICATION
-	fprintf(stderr, " [-a (debug|other|user|valid|off|none)]\n\t");
+	" [-a (debug|other|user|valid|off|none)]"
 #endif
 #ifdef BFTPDAEMON
-	fprintf(stderr, " [-B]");
+	" [-B]"
 #endif
-	fprintf(stderr, " [-debug]");
+	" [-debug]"
 #ifdef DIAGNOSTICS
-	fprintf(stderr, " [-D (options|report|exercise|netdata|ptydata)]\n\t");
+	" [-D (options|report|exercise|netdata|ptydata)]\n\t"
 #endif
 #ifdef	AUTHENTICATION
-	fprintf(stderr, " [-edebug]");
+	" [-edebug]"
 #endif
-	fprintf(stderr, " [-h]");
+	" [-h]"
 #if	defined(CRAY) && defined(NEWINIT)
-	fprintf(stderr, " [-Iinitid]");
+	" [-Iinitid]"
 #endif
 #if	defined(LINEMODE) && defined(KLUDGELINEMODE)
-	fprintf(stderr, " [-k]");
+	" [-k]"
 #endif
 #ifdef LINEMODE
-	fprintf(stderr, " [-l]");
+	" [-l]"
 #endif
-	fprintf(stderr, " [-n]");
+	" [-n]"
 #ifdef	CRAY
-	fprintf(stderr, " [-r[lowpty]-[highpty]]");
+	" [-r[lowpty]-[highpty]]"
 #endif
-	fprintf(stderr, "\n\t");
 #ifdef	HAS_GETTOS
-	fprintf(stderr, " [-S tos]");
+	" [-S tos]"
 #endif
 #ifdef	AUTHENTICATION
-	fprintf(stderr, " [-X auth-type]");
+	" [-X auth-type]"
 #endif
-	fprintf(stderr, " [-u utmp_hostname_length] [-U]");
-	fprintf(stderr, " [port]\n");
-	exit(1);
+	" [-u utmp_hostname_length] [-U]"
+	" [port]");
+	exit(2);
 }
 
 /*
@@ -809,7 +807,7 @@ doit(who)
 	char user_name[256];
 	char *ap;
 	size_t alen;
-	char hbuf[MAXHOSTNAMELEN];
+	char hbuf[NI_MAXHOST];
 
 	/*
 	 * Find an available pty to use.
@@ -826,7 +824,7 @@ doit(who)
 		if ((lp = getpty()) == NULL)
 			fatal(net, "Out of ptys");
 
-		if ((pty = open(lp, 2)) >= 0) {
+		if ((pty = open(lp, O_RDWR)) >= 0) {
 			strncpy(line, lp, sizeof line -1);
 			line[sizeof line -1] = '\0';
 			line[5] = 't';
@@ -879,8 +877,11 @@ doit(who)
 								 : utmp_len))) {
 		host = hp->h_name;
 	} else {
-		getnameinfo(who, who->sa_len, hbuf, sizeof(hbuf), NULL, 0,
-			NI_NUMERICHOST);
+		if (getnameinfo(who, who->sa_len, hbuf, sizeof(hbuf), NULL, 0,
+				NI_NUMERICHOST) != 0) {
+			fatal(net, "Couldn't resolve your address into a host name.\r\n\
+	 Please contact your net administrator");
+		}
 		host = hbuf;
 	}
 	/*
