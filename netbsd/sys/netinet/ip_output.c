@@ -577,6 +577,10 @@ skip_ipsec:
 		HTONS(ip->ip_off);
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(m, hlen);
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
 		error = (*ifp->if_output)(ifp, m, sintosa(dst), ro->ro_rt);
 		goto done;
 	}
@@ -700,6 +704,10 @@ sendorfree:
 				ia->ia_ifa.ifa_data.ifad_outbytes +=
 					ntohs(ip->ip_len);
 			}
+#endif
+#ifdef IPSEC
+			/* clean ipsec history once it goes out of the node */
+			ipsec_delaux(m);
 #endif
 			error = (*ifp->if_output)(ifp, m, sintosa(dst),
 			    ro->ro_rt);

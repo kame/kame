@@ -583,6 +583,10 @@ skip_ipsec:
 			ip->ip_sum = in_cksum(m, hlen);
 		}
 
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
 		error = (*ifp->if_output)(ifp, m,
 				(struct sockaddr *)dst, ro->ro_rt);
 		goto done;
@@ -688,6 +692,10 @@ sendorfree:
 	for (m = m0; m; m = m0) {
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
 		if (error == 0)
 			error = (*ifp->if_output)(ifp, m,
 			    (struct sockaddr *)dst, ro->ro_rt);
