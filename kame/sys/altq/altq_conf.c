@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.9 2000/12/02 04:51:36 itojun Exp $	*/
+/*	$KAME: altq_conf.c,v 1.10 2000/12/14 08:12:45 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altq_conf.c,v 1.9 2000/12/02 04:51:36 itojun Exp $
  */
 
 #ifdef ALTQ

@@ -1,4 +1,4 @@
-/*	$KAME: altq.h,v 1.5 2000/10/26 15:46:11 kjc Exp $	*/
+/*	$KAME: altq.h,v 1.6 2000/12/14 08:12:45 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altq.h,v 1.5 2000/10/26 15:46:11 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_H_
 #define	_ALTQ_ALTQ_H_

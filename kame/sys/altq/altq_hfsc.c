@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.7 2000/10/18 09:15:23 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.8 2000/12/14 08:12:46 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -31,8 +31,6 @@
  * software to return any improvements or extensions that they make,
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
- *
- * $Id: altq_hfsc.c,v 1.7 2000/10/18 09:15:23 kjc Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,

@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.h,v 1.5 2000/10/18 09:15:23 kjc Exp $	*/
+/*	$KAME: altq_fifoq.h,v 1.6 2000/12/14 08:12:45 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altq_fifoq.h,v 1.5 2000/10/18 09:15:23 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_FIFOQ_H_

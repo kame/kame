@@ -1,4 +1,4 @@
-/*	$KAME: altq_flowvalve.h,v 1.3 2000/07/25 10:12:30 kjc Exp $	*/
+/*	$KAME: altq_flowvalve.h,v 1.4 2000/12/14 08:12:46 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altq_flowvalve.h,v 1.3 2000/07/25 10:12:30 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_FLOWVALVE_H_
