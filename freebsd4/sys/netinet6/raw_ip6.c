@@ -369,7 +369,7 @@ rip6_output(m, so, dstsock, control)
 		goto bad;
 
 	/* Source address selection. */
-	if ((in6 = in6_selectsrc(dst, optp, in6p->in6p_moptions,
+	if ((in6 = in6_selectsrc(dstsock, optp, in6p->in6p_moptions,
 	    &in6p->in6p_route, &in6p->in6p_laddr, &oifp, &error)) == NULL) {
 		if (error == 0)
 			error = EADDRNOTAVAIL;
@@ -648,7 +648,7 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return(error);
 
 	/* Source address selection. XXX: need pcblookup? */
-	in6a = in6_selectsrc(&addr->sin6_addr, inp->in6p_outputopts,
+	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
 			     inp->in6p_moptions, &inp->in6p_route,
 			     &inp->in6p_laddr, &ifp, &error);
 	if (in6a == NULL)

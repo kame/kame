@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.368 2004/02/03 07:25:21 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.369 2004/02/09 18:55:32 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2463,6 +2463,7 @@ icmp6_reflect(m, off)
 	int plen;
 	int type, code;
 	struct ifnet *outif = NULL;
+	struct sockaddr_in6 sa6_src;
 	struct in6_addr t, *src = NULL;
 
 	/* too short to reflect */
@@ -2517,6 +2518,11 @@ icmp6_reflect(m, off)
 	 */
 	ip6->ip6_dst = ip6->ip6_src;
 
+	bzero(&sa6_src, sizeof(sa6_src));
+	sa6_src.sin6_family = AF_INET6;
+	sa6_src.sin6_len = sizeof(sa6_src);
+	in6_recoverscope(&sa6_src, &ip6->ip6_dst, m->m_pkthdr.rcvif);
+
 	/*
 	 * If the incoming packet was addressed directly to us (i.e. unicast),
 	 * use dst as the src for the reply.
@@ -2555,7 +2561,7 @@ icmp6_reflect(m, off)
 		 * source address of the erroneous packet.
 		 */
 		bzero(&ro, sizeof(ro));
-		src = in6_selectsrc(&ip6->ip6_dst, NULL, NULL, &ro, NULL,
+		src = in6_selectsrc(&sa6_src, NULL, NULL, &ro, NULL,
 		    &outif, &e);
 		if (ro.ro_rt) { /* XXX: see comments in icmp6_mtudisc_update */
 			RTFREE(ro.ro_rt); /* XXX: we could use this */

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.422 2004/02/06 07:29:07 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.423 2004/02/09 18:55:32 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -314,7 +314,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct route_in6 ip6route;
 #endif
 	struct rtentry *rt = NULL;
-	struct sockaddr_in6 *dst;
+	struct sockaddr_in6 *dst, dst_sa;
 	struct in6_addr finaldst;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
@@ -1080,7 +1080,13 @@ skip_ipsec2:;
 		clone = 1;
 #endif
 
-	if ((error = in6_selectroute(&ip6->ip6_dst, opt, im6o, ro,
+	bzero(&dst_sa, sizeof(dst_sa));
+	dst_sa.sin6_family = AF_INET6;
+	dst_sa.sin6_len = sizeof(dst_sa);
+	in6_recoverscope(&dst_sa, &ip6->ip6_dst, NULL);
+	in6_embedscope(&dst_sa.sin6_addr, &dst_sa);
+	
+	if ((error = in6_selectroute(&dst_sa, opt, im6o, ro,
 	    &ifp, &rt, clone)) != 0) {
 		switch (error) {
 		case EHOSTUNREACH:

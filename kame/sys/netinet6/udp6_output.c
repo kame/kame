@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.75 2004/02/04 03:14:07 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.76 2004/02/09 18:55:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,7 +294,7 @@ udp6_output(in6p, m, addr6, control)
 		}
 
 		if (!IN6_IS_ADDR_V4MAPPED(faddr6)) {
-			laddr6 = in6_selectsrc(&fsa6->sin6_addr, optp,
+			laddr6 = in6_selectsrc(fsa6, optp,
 			    in6p->in6p_moptions, &in6p->in6p_route,
 			    &in6p->in6p_laddr, &oifp, &error);
 			if (oifp && fsa6->sin6_scope_id == 0 &&

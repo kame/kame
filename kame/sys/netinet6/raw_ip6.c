@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.147 2004/02/03 09:37:32 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.148 2004/02/09 18:55:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -518,7 +518,7 @@ rip6_output(m, va_alist)
 		goto bad;
 
 	/* Source address selection. */
-	if ((in6 = in6_selectsrc(&ip6->ip6_dst, optp,
+	if ((in6 = in6_selectsrc(dstsock, optp,
 	    in6p->in6p_moptions, &in6p->in6p_route, &in6p->in6p_laddr, &oifp,
 	    &error)) == 0) {
 		if (error == 0)
@@ -853,7 +853,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 
 		/* Source address selection. XXX: need pcblookup? */
-		src = in6_selectsrc(&in6, in6p->in6p_outputopts,
+		src = in6_selectsrc(&addr, in6p->in6p_outputopts,
 		    in6p->in6p_moptions, &in6p->in6p_route,
 		    &in6p->in6p_laddr, &ifp, &error);
 		if (src == NULL) {

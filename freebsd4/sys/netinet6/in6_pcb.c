@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.62 2004/02/04 02:46:17 keiichi Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.63 2004/02/05 11:01:43 suz Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -308,7 +308,7 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	{
 		struct ifnet *ifp = NULL;
 
-		*plocal_addr6 = in6_selectsrc(&sin6->sin6_addr, inp->in6p_outputopts,
+		*plocal_addr6 = in6_selectsrc(sin6, inp->in6p_outputopts,
 					      inp->in6p_moptions,
 					      &inp->in6p_route,
 					      &inp->in6p_laddr, &ifp, &error);

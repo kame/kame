@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.136 2004/02/05 05:55:05 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.137 2004/02/09 18:55:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -393,7 +393,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
 	struct nd_neighbor_solicit *nd_ns;
-	struct in6_addr *src, src_in, dst;
+	struct in6_addr *src, src_in;
 	struct sockaddr_in6 dst_sa;
 	struct ip6_moptions im6o;
 	int icmp6len;
@@ -489,10 +489,10 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	dst_sa.sin6_family = AF_INET6;
 	dst_sa.sin6_len = sizeof(struct sockaddr_in6);
 	if (daddr6)
-		dst = *daddr6;
+		dst_sa.sin6_addr = *daddr6;
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	else if (unicast_ns)
-		dst = *taddr6;
+		dst_sa.sin6_addr = *taddr6;
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 	else {
 		dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
@@ -505,9 +505,9 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 				    &dst_sa.sin6_scope_id)) {
 			goto bad; /* XXX */
 		}
-		in6_embedscope(&dst, &dst_sa); /* XXX */
+		in6_embedscope(&dst_sa.sin6_addr, &dst_sa); /* XXX */
 	}
-	ip6->ip6_dst = dst;
+	ip6->ip6_dst = dst_sa.sin6_addr;
 	if (!dad) {
 		/*
 		 * RFC2461 7.2.2:
@@ -543,7 +543,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			ip6_initpktopts(&opts);
 			opts.ip6po_flags |= IP6PO_USECOA;
 #endif /* MIP6 */
-			src = in6_selectsrc(&ip6->ip6_dst,
+			src = in6_selectsrc(&dst_sa,
 #ifdef MIP6
 			    &opts,
 #else /* !MIP6 */
@@ -554,7 +554,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 				nd6log((LOG_DEBUG,
 				    "nd6_ns_output: source can't be "
 				    "determined: dst=%s, error=%d\n",
-				    ip6_sprintf(&dst), error));
+				    ip6_sprintf(&dst_sa.sin6_addr), error));
 				goto bad;
 			}
 		}
@@ -1064,7 +1064,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	opts.ip6po_flags |= IP6PO_USECOA;
 #endif /* MIP6 */
 	bcopy(&dst_sa, &ro.ro_dst, sizeof(dst_sa));
-	src = in6_selectsrc(&dst_sa.sin6_addr,
+	src = in6_selectsrc(&dst_sa,
 #ifdef MIP6
 	    &opts,
 #else /* !MIP6 */

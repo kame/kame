@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.137 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.138 2004/02/09 18:55:32 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,10 +141,10 @@ struct mip6_unuse_hoa_list mip6_unuse_hoa;
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 
 #ifdef NEW_STRUCT_ROUTE
-static int in6_selectif __P((struct in6_addr *, struct ip6_pktopts *,
+static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route *ro, struct ifnet **));
 #else
-static int in6_selectif __P((struct in6_addr *, struct ip6_pktopts *,
+static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route_in6 *ro, struct ifnet **));
 #endif
 
@@ -186,8 +186,8 @@ static struct in6_addrpolicy *match_addrsel_policy __P((struct sockaddr_in6 *));
 } while(0)
 
 struct in6_addr *
-in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
-	struct in6_addr *dst, *laddr;
+in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
+	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
 #ifdef NEW_STRUCT_ROUTE
@@ -195,10 +195,11 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 #else
 	struct route_in6 *ro;
 #endif
+	struct in6_addr *laddr;
 	struct ifnet **ifpp;
 	int *errorp;
 {
-	struct sockaddr_in6 dstsock;
+	struct in6_addr *dst;
 	struct ifnet *ifp = NULL;
 	struct in6_ifaddr *ia = NULL, *ia_best = NULL;
 	struct in6_pktinfo *pi = NULL;
@@ -212,10 +213,7 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 	u_int8_t usecoa = 0;
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 
-	bzero(&dstsock, sizeof(dstsock));
-	dstsock.sin6_family = AF_INET6;
-	dstsock.sin6_len = sizeof(struct sockaddr_in6);
-	in6_recoverscope(&dstsock, dst, NULL);
+	dst = &dstsock->sin6_addr;
 	*errorp = 0;
 	if (ifpp)
 		*ifpp = NULL;
@@ -232,7 +230,7 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 		struct in6_ifaddr *ia6;
 
 		/* get the outgoing interface */
-		if ((*errorp = in6_selectif(dst, opts, mopts, ro, &ifp))
+		if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp))
 		    != 0) {
 			return (NULL);
 		}
@@ -282,7 +280,7 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 	 * the outgoing interface and the destination address.
 	 */
 	/* get the outgoing interface */
-	if ((*errorp = in6_selectif(dst, opts, mopts, ro, &ifp)) != 0)
+	if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp)) != 0)
 		return (NULL);
 
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
@@ -305,7 +303,7 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 	     uh = LIST_NEXT(uh, unuse_entry)) {
 		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr)
 			 || IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr))
-		    && (!uh->unuse_port || (dstsock.sin6_port == uh->unuse_port))) {
+		    && (!uh->unuse_port || (dstsock->sin6_port == uh->unuse_port))) {
 			usecoa = 1;
 			break;
 		}
@@ -536,7 +534,7 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 		 * Note that best_policy should be non-NULL here.
 		 */
 		if (dst_policy == NULL)
-			dst_policy = lookup_addrsel_policy(&dstsock);
+			dst_policy = lookup_addrsel_policy(dstsock);
 		if (dst_policy->label != ADDR_LABEL_NOTAPP) {
 			new_policy = lookup_addrsel_policy(&ia->ia_addr);
 			if (dst_policy->label == best_policy->label &&
@@ -655,8 +653,8 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 #undef NEXT
 
 static int
-in6_selectif(dst, opts, mopts, ro, retifp)
-	struct in6_addr *dst;
+in6_selectif(dstsock, opts, mopts, ro, retifp)
+	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
 #ifdef NEW_STRUCT_ROUTE
@@ -669,8 +667,8 @@ in6_selectif(dst, opts, mopts, ro, retifp)
 	int error, clone;
 	struct rtentry *rt = NULL;
 
-	clone = IN6_IS_ADDR_MULTICAST(dst) ? 0 : 1;
-	if ((error = in6_selectroute(dst, opts, mopts, ro, retifp,
+	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
+	if ((error = in6_selectroute(dstsock, opts, mopts, ro, retifp,
 	    &rt, clone)) != 0) {
 		return (error);
 	}
@@ -709,8 +707,8 @@ in6_selectif(dst, opts, mopts, ro, retifp)
 }
 
 int
-in6_selectroute(dst, opts, mopts, ro, retifp, retrt, clone)
-	struct in6_addr *dst;
+in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
+	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
 #ifdef NEW_STRUCT_ROUTE
@@ -727,12 +725,9 @@ in6_selectroute(dst, opts, mopts, ro, retifp, retrt, clone)
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *sin6_next;
 	struct in6_pktinfo *pi = NULL;
-	struct sockaddr_in6 dstsock;
+	struct in6_addr *dst;
 
-	bzero(&dstsock, sizeof(dstsock));
-	dstsock.sin6_family = AF_INET6;
-	dstsock.sin6_len = sizeof(struct sockaddr_in6);
-	in6_recoverscope(&dstsock, dst, NULL);
+	dst = &dstsock->sin6_addr;
 
 #if 0
 	if (dstsock->sin6_addr.s6_addr32[0] == 0 &&
@@ -757,10 +752,10 @@ in6_selectroute(dst, opts, mopts, ro, retifp, retrt, clone)
 #endif
 		if (ifp != NULL && IN6_IS_SCOPE_LINKLOCAL(dst)) {
 			/* mismatch case will be handled later on */
-			if (dstsock.sin6_scope_id == 0)
-				dstsock.sin6_scope_id = pi->ipi6_ifindex;
+			if (dstsock->sin6_scope_id == 0)
+				dstsock->sin6_scope_id = pi->ipi6_ifindex;
 
-			in6_embedscope(dst, &dstsock);
+			in6_embedscope(dst, dstsock);
 		}
 		if (ifp != NULL && !retrt && IN6_IS_ADDR_MULTICAST(dst)) {
 			/*
@@ -861,9 +856,8 @@ in6_selectroute(dst, opts, mopts, ro, retifp, retrt, clone)
 			/* No route yet, so try to acquire one */
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 			sa6 = (struct sockaddr_in6 *)&ro->ro_dst;
-			sa6->sin6_family = AF_INET6;
-			sa6->sin6_len = sizeof(struct sockaddr_in6);
-			sa6->sin6_addr = *dst;
+			in6_embedscope(&dstsock->sin6_addr, dstsock);
+			*sa6 = *dstsock;
 			if (clone) {
 #ifdef __bsdi__
 				rtcalloc((struct route *)ro);

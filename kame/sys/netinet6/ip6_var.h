@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.124 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: ip6_var.h,v 1.125 2004/02/09 18:55:32 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -478,17 +478,17 @@ int	mobility6_send_be __P((struct in6_addr *, struct in6_addr *,
 			       u_int8_t, struct in6_addr *));
 
 #ifdef NEW_STRUCT_ROUTE
-struct in6_addr *in6_selectsrc __P((struct in6_addr *,
+struct in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route *,
 	struct in6_addr *, struct ifnet **, int *));
-int in6_selectroute __P((struct in6_addr *, struct ip6_pktopts *,
+int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route *, struct ifnet **,
 	struct rtentry **, int));
 #else
-struct in6_addr *in6_selectsrc __P((struct in6_addr *,
+struct in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route_in6 *,
 	struct in6_addr *, struct ifnet **, int *));
-int in6_selectroute __P((struct in6_addr *, struct ip6_pktopts *,
+int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
 	struct rtentry **, int));
 #endif
