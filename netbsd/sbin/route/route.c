@@ -382,7 +382,7 @@ routename(sa)
 	static int first = 1;
 	struct in_addr in;
 #ifdef INET6
-	char ntop_buf[NI_MAXHOST];
+	static char ntop_buf[NI_MAXHOST];
 #endif
 
 	if (first) {
@@ -480,7 +480,7 @@ netname(sa)
 	int subnetshift;
 	struct in_addr in;
 #ifdef INET6
-	char ntop_buf[NI_MAXHOST];
+	static char ntop_buf[NI_MAXHOST];
 #endif
 
 	switch (sa->sa_family) {
