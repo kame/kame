@@ -1971,7 +1971,6 @@ sctp_peeloff(p, uap)
 	 * out from under us.
 	 */
 	if (error) {
-		
 		if (fdp->fd_ofiles[fd] == nfp) {
 			fdp->fd_ofiles[fd] = NULL;
 			fdrop(nfp, p);
