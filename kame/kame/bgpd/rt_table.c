@@ -290,7 +290,72 @@ find_rte(key, base)
   return rte;
 }
 
+int
+set_nexthop(dst, ret_rte)
+     struct in6_addr *dst;
+     struct rt_entry *ret_rte;
+{
+  struct ifinfo   *ife;
+  struct rt_entry *rte;
+  struct ripif    *ripif;
+  char             in6txt[INET6_ADDRSTRLEN];
 
+  extern byte           ripyes;
+  extern struct ifinfo *ifentry;
+  extern struct ripif  *ripifs;
+
+  /* flush old nexthop */
+  memset(&ret_rte->rt_gw, 0, sizeof(struct in6_addr));
+  ret_rte->rt_gwif = NULL;
+  ret_rte->rt_gwsrc_type = RTPROTO_NONE;
+  ret_rte->rt_gwsrc_entry = NULL;
+
+  ife = ifentry; /* global */
+  while(ife) {
+    rte = ife->ifi_rte;
+    while(rte) {
+      if (IN6_ARE_PRFX_EQUAL(dst,
+			     &rte->rt_ripinfo.rip6_dest,
+			     rte->rt_ripinfo.rip6_plen)  &&
+	  (rte->rt_flags & RTF_UP)) {
+	memcpy(&ret_rte->rt_gw, &rte->rt_gw, sizeof(struct in6_addr));
+	ret_rte->rt_gwif = ife;
+	ret_rte->rt_gwsrc_type = RTPROTO_IF;
+	ret_rte->rt_gwsrc_entry = rte;
+	return 1;
+      }
+      if ((rte = rte->rt_next) == ife->ifi_rte)
+	break;
+    }
+    if ((ife = ife->ifi_next) == ifentry)
+      break;
+  }
+
+  if (ripyes) {
+    ripif = ripifs; /* global */
+    while(ripif) {
+      rte = ripif->rip_adj_ribs_in;
+      while(rte) {
+	if (IN6_ARE_PRFX_EQUAL(dst,
+			       &rte->rt_ripinfo.rip6_dest,
+			       rte->rt_ripinfo.rip6_plen)  &&
+	    (rte->rt_flags & RTF_UP)) {
+	  memcpy(&ret_rte->rt_gw, &rte->rt_gw, sizeof(struct in6_addr));
+	  ret_rte->rt_gwif = ripif->rip_ife;
+	  ret_rte->rt_gwsrc_type = RTPROTO_RIP;
+	  ret_rte->rt_gwsrc_entry = rte;
+	  return 1;
+	}
+	if ((rte = rte->rt_next) == ripif->rip_adj_ribs_in)
+	  break;
+      }
+      if ((ripif = ripif->rip_next) == ripifs)
+	break;
+    }
+  }
+
+  return 0;  /* not found */
+}
 
 /*
  *    find_nexthop()
@@ -306,12 +371,10 @@ find_nexthop(dst, gw, i)
   struct ifinfo   *ife;
   struct rt_entry *rte;
   struct ripif    *ripif;
-  struct rpcb     *bnp;
   char             in6txt[INET6_ADDRSTRLEN];
 
-  extern byte           bgpyes, ripyes;
+  extern byte           ripyes;
   extern struct ifinfo *ifentry;
-  extern struct rpcb   *bgb;
   extern struct ripif  *ripifs;
 
   ife = ifentry; /* global */
@@ -354,6 +417,11 @@ find_nexthop(dst, gw, i)
     }
   }
 
+#if 0
+  /*
+   * It is not a good idea to refer BGP routes in order to find the nexthop
+   * gateway for a BGP route. It is not only meaningless but could be harmful.
+   */
   if (bgpyes) {
     bnp = bgb; /* global */
     while(bnp) {
@@ -374,7 +442,7 @@ find_nexthop(dst, gw, i)
         break;
     }
   }
-
+#endif
 
   syslog(LOG_NOTICE, "<find_nexthop>: not found: %s",
 	 inet_ntop(AF_INET6, &dst->s6_addr, in6txt, INET6_ADDRSTRLEN));
@@ -768,6 +836,9 @@ igp_enable_rte(rte)
       syslog(LOG_ERR, "%s: route couldn't be added.", __FUNCTION__);
       return NULL;
     }
+
+  /* check if some BGP routes can be enabled by this route */
+  bgp_enable_rte_by_igp(rte);
 
   if (*adj_ribs_in)
     insque(rte, *adj_ribs_in);

@@ -92,6 +92,7 @@ struct ifinfo {
   struct rt_entry     *ifi_rte;    /* I/F direct RTEs */
   int                  ifi_flags;  /* I/F flags */
 
+#define               RTPROTO_NONE  0
 #define               RTPROTO_IF    1
 #define               RTPROTO_RIP   2
 #define               RTPROTO_OSPF  3
@@ -139,3 +140,8 @@ struct rt_entry *find_rte     __P((struct rt_entry *, struct rt_entry *));
 struct rtproto  *find_rtp     __P((struct rtproto  *, struct rtproto *));
 int              find_nexthop __P((struct in6_addr *, struct in6_addr *,
 				   struct ifinfo *));
+
+/*
+ * nexthop resolution
+ */
+int set_nexthop __P((struct in6_addr *, struct rt_entry *));

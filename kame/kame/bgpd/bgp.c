@@ -1253,9 +1253,9 @@ bgp_process_update(struct rpcb *bnp)
 	  }
 	}
 
-	rte->rt_gw                  = IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ?
-	                                                   gnhaddr : lnhaddr;
-	rte->rt_flags               = RTF_UP|RTF_GATEWAY;
+	/* XXX */
+	rte->rt_bgw = IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? gnhaddr : lnhaddr;
+	rte->rt_flags = RTF_UP|RTF_GATEWAY;
 	if (rte->rt_ripinfo.rip6_plen == 128)
 	  rte->rt_flags |= RTF_HOST;
 
@@ -1498,7 +1498,8 @@ bgp_process_update(struct rpcb *bnp)
 
   if (asp) {
     asp->asp_origin    = origin;
-    asp->asp_nexthop   = gnhaddr;        /* anyway, anymay  */
+    /* anyway, anymay:  */
+    asp->asp_nexthop   = IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? gnhaddr : lnhaddr;
     asp->asp_med       = med;            /* net  order      */
     asp->asp_localpref = localpref;      /* net  order      */
     asp->asp_atomagg   = aggregated;

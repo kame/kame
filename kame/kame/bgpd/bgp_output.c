@@ -790,7 +790,7 @@ bgp_send_update(bnp, rte, headrte)
       memcpy(&outpkt[i], agg->rt_ripinfo.rip6_dest.s6_addr, poctets);
       i +=  poctets;
 #ifdef DEBUG_BGP
-      syslog(LOG_NOTICE, "BGP+ SEND MP_REACH\t\t%s/%d to %s",
+      syslog(LOG_NOTICE, "BGP+ SENDING MP_REACH\t\t%s/%d to %s",
 	     ip6str(&agg->rt_ripinfo.rip6_dest, 0), agg->rt_ripinfo.rip6_plen,
 	     bgp_peerstr(bnp));
 #endif
@@ -804,10 +804,8 @@ bgp_send_update(bnp, rte, headrte)
       goto next_rte;
 
     if (rtp->rtp_type == RTPROTO_RIP &&
-	(  rt->rt_flags & RTF_IGP_EGP_SYNC ||
-	 !(rt->rt_flags & RTF_UP)))
+	(rt->rt_flags & RTF_IGP_EGP_SYNC || !(rt->rt_flags & RTF_UP)))
       goto next_rte;
-
 
 #ifdef DEBUG
     syslog(LOG_DEBUG, "BGP+ SEND\t\t%s/%d",
@@ -818,34 +816,23 @@ bgp_send_update(bnp, rte, headrte)
 
 
     if (rtp->rtp_type == RTPROTO_BGP) {
-      if (rtp->rtp_bgp->rp_mode & BGPO_IGP) {
-	if (rtp->rtp_bgp->rp_mode & BGPO_NOSYNC) {
-	  if (!(rt->rt_flags & RTF_UP)) {
+      if (rt->rt_flags & (RTF_UP|RTF_INSTALLED) != (RTF_UP|RTF_INSTALLED)) {
 #ifdef DEBUG
-	    syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped)");
+	    syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped since unavaiable)");
 #endif
 	    goto next_rte;
-	  }
-	} else {
-	    if (!(rt->rt_flags & RTF_IGP_EGP_SYNC &&
-		  rt->rt_flags & RTF_UP)) {
+      }
+
+      /* XXX: is there any case of INSTALLED but not SYNCHRONIZED? */
+      if ((rtp->rtp_bgp->rp_mode & BGPO_IGP) &&
+	  !(rtp->rtp_bgp->rp_mode & BGPO_NOSYNC) &&
+	  (!(rt->rt_flags & RTF_IGP_EGP_SYNC))) {
 #ifdef DEBUG
-	      syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped)");
+	      syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped since not synchronized)");
 #endif
 	      goto next_rte;
 	    }
-	}
-      } else {
-	if (!(rt->rt_flags & RTF_UP)) {
-#ifdef DEBUG
-	  syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped)");
-#endif
-	  goto next_rte;
-	}
-      }
     }
-
-
 
     poctets = POCTETS(rt->rt_ripinfo.rip6_plen);
 

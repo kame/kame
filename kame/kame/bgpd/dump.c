@@ -168,10 +168,12 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 		fprintf(fp, "    "); /* indentation */
 		fprintf(fp, "%s/%d nexthop: %s\n",
 			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-			rte->rt_ripinfo.rip6_plen, ip6str(&ap->asp_nexthop, 0));
+			rte->rt_ripinfo.rip6_plen, ip6str(&rte->rt_bgw, 0));
 
 		fprintf(fp, "      "); /* more indent */
-		fprintf(fp, "Gateway: %s ", ip6str(&rte->rt_gw, 0));
+		fprintf(fp, "Gateway: %s ",
+			ip6str(&rte->rt_gw,
+			       rte->rt_gwif ? rte->rt_gwif->ifi_ifn->if_index : 0));
 		fprintf(fp, "Flags:");
 		if (rte->rt_flags & RTF_UP) fprintf(fp, " UP");
 		if (rte->rt_flags & RTF_GATEWAY) fprintf(fp, " GW");
@@ -179,7 +181,32 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 		if (rte->rt_flags & RTF_IGP_EGP_SYNC) fprintf(fp, " IESYNC");
 		if (rte->rt_flags & RTF_NH_NOT_LLADDR)
 			fprintf(fp, " NONLOCAL");
+		if (rte->rt_flags & RTF_INSTALLED) fprintf(fp, " INSTALLED");
 		fputc('\n', fp);
+		if (!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_gw)) {
+			fprintf(fp, "        "); /* more^2 indent */
+			switch(rte->rt_gwsrc_type) {
+			case RTPROTO_IF:
+				fprintf(fp, "gwsrc: ifroute(%s/%d on %s)",
+					ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
+					rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
+					rte->rt_gwif->ifi_ifn->if_name);
+				break;
+			case RTPROTO_RIP:
+				fprintf(fp, "gwsrc: ripng(%s/%d on %s, gw=%s)",
+					ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
+					rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
+					rte->rt_gwif->ifi_ifn->if_name,
+					ip6str(&rte->rt_gwsrc_entry->rt_gw,
+					       rte->rt_gwif->ifi_ifn->if_index));
+				break;
+			default:
+				fprintf(fp, "gwsrc: unknown(%d)",
+					rte->rt_gwsrc_type);
+				break;
+			}
+			fputc('\n', fp);
+		}
 
 		fprintf(fp, "      "); /* more indent */
 		fprintf(fp, "MED: %d localpref: %d origin: ID=%s,code=%s\n",

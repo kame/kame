@@ -73,7 +73,8 @@ void             propagate            __P((struct rt_entry *));
 int              bgp_enable_rte       __P((struct rt_entry *));
 void             bgp_disable_rte      __P((struct rt_entry *));
 void             bgp_recover_rte      __P((struct rt_entry *));
-
+void             bgp_enable_rte_by_igp  __P((struct rt_entry *));
+void             bgp_disable_rte_by_igp __P((struct rt_entry *));
 
 /*
  *    aspath

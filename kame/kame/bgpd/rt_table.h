@@ -54,7 +54,16 @@ struct rt_entry {
   struct rt_entry     *rt_next;
   struct rt_entry     *rt_prev;
   struct ripinfo6      rt_ripinfo;  /* RIPng's formatted info             */
+  struct in6_addr      rt_bgw;	/* BGP next hop(XXX: too many members...) */
   struct in6_addr      rt_gw;       /* gateway   (linklocal or global)    */
+  struct {
+    struct in6_addr	_rt_gw;
+    struct ifinfo	*_rt_gwif;
+  } rt_gwinfo;
+  struct { /* source of the gateway (for BGP routes only) */
+    int type;
+    struct rt_entry *entry;
+  } rt_gwsrc;
   u_long               rt_flags;    /* rtm_flags                          */
   task                *rt_riptime;  /* RIPng timer                        */
   struct rtproto       rt_proto;    /* protocol from which this route got */
@@ -62,7 +71,13 @@ struct rt_entry {
   struct aggrinfo      rt_aggr;     /* aggregate info                     */
 };
 
-/* ad-hoc */
+#define rt_gw rt_gwinfo._rt_gw
+#define rt_gwif rt_gwinfo._rt_gwif
+#define rt_gwsrc_type rt_gwsrc.type
+#define rt_gwsrc_entry rt_gwsrc.entry
+
+/* bgpd internal flags for a route entry */
+#define RTF_INSTALLED		0x01000000
 #define RTF_IGP_EGP_SYNC        0x10000000
 #define RTF_NH_NOT_LLADDR       0x20000000
 #define RTF_SENDANYWAY          0x40000000

@@ -165,7 +165,6 @@ bgp_enable_rte(rte)
    struct rt_entry *rte;
 {
   struct rpcb   *bnp;
-  struct ifinfo  ife;
   struct ifinfo *ifep = NULL;
 
   bnp = rte->rt_proto.rtp_bgp; /* come from */
@@ -175,98 +174,87 @@ bgp_enable_rte(rte)
   /* Add kernel table */
   if (rte->rt_flags & RTF_UP) {
       if (!(bnp->rp_mode & BGPO_IGP)) { /* eBGP */
-	      if (!in6_is_addr_onlink(&rte->rt_gw, &ifep)) {
+	      if (!in6_is_addr_onlink(&rte->rt_bgw, &ifep)) {
 		      /* currently we do not support multi-hop EBGP */
 		      syslog(LOG_INFO, "<%s>: EBGP next hop %s is not on-link"
 			     "(not activated)",
-			     __FUNCTION__, ip6str(&rte->rt_gw, 0));
+			     __FUNCTION__, ip6str(&rte->rt_bgw, 0));
 		      rte->rt_flags &= ~RTF_UP;
 		      return 0;	/* continue to next rte */
 	      }
+	      rte->rt_gw = rte->rt_bgw;
+	      rte->rt_gwsrc_type = RTPROTO_BGP;
 	      if (ifep == NULL)
 		      ifep = bnp->rp_ife;
 
-	      if (addroute(rte, &rte->rt_gw, ifep) != 0) {
+	      if (addroute(rte, &rte->rt_bgw, ifep) != 0) {
 		      /* If the next hop is inaccessible, do not consider it. */
 		      /*                                             [cisco]  */
-		      rte->rt_flags &= ~RTF_UP;
 		      return 0; /* continue to next rte */
 	      }
+	      rte->rt_flags |= RTF_INSTALLED;
       } else {                          /* iBGP */
 	      /*
-	       * In IBGP cases, we try to install a route as the
-	       * following order:
-	       * 1. If the next-hop learned from IBGP is on-link,
-	       *    just try to install it. Otherwise, try the next step.
-	       * 2. Try to resolve an on-link gateway to the next-hop.
-	       *    It will succeed if an IGP(e.g. RIPng) works well.
-	       *    If a gateway is resolved, try to install it.
-	       *    If no gateway is found or the installation fails,
-	       *    try to the final step below.
-	       * 3. Try the above 2 steps for the IBGP peer instead of
-	       *    the next-hop learned from IBGP.
+	       * In IBGP cases, try to resolve an on-link gateway to the
+	       * next-hop. It will succeed if an IGP(e.g. RIPng) works well.
+	       * If a gateway is resolved, try to install it.
 	       */
-	      if (in6_is_addr_onlink(&rte->rt_gw, &ifep)) {
+	      if (IN6_IS_ADDR_LINKLOCAL(&rte->rt_bgw)) {
+		      /* we reject link-local nex hop for IBGP */
+		      rte->rt_flags &= ~RTF_UP;
+		      return 0; 
+	      }
+	      if (set_nexthop(&rte->rt_bgw, rte) == 1) {
+		  if (addroute(rte, &rte->rt_gw, rte->rt_gwif) == 0) {
+#ifdef DEBUG
+			  syslog(LOG_DEBUG, "<%s>:succeed (maybe third-party)",
+				 __FUNCTION__);
+#endif
+			  rte->rt_flags |= RTF_INSTALLED;
+		  }
+		  else {
+			  syslog(LOG_ERR,
+				 "<%s>: failed to add a route dst: %s/%d, "
+				 "gw: %s if: %s", __FUNCTION__,
+				 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+				 rte->rt_ripinfo.rip6_plen,
+				 ip6str(&rte->rt_gw,
+					rte->rt_gwif->ifi_ifn->if_index));
+			  return 0; /* continue to next rte */
+		  }
+	      }
+	      else {
+		      syslog(LOG_ERR,
+			     "<%s>: failed to set a gateway for nexthop %s",
+			     __FUNCTION__, ip6str(&rte->rt_bgw, 0));
+		      return 0;
+	      }
+#if 0				/* 991013 */
+	      if (in6_is_addr_onlink(&rte->rt_bgw, &ifep)) {
 		      if (ifep == NULL)
 			      ifep = bnp->rp_ife;
-		      if (addroute(rte, &rte->rt_gw, ifep)) {
+		      if (addroute(rte, &rte->rt_bgw, ifep)) {
 			      syslog(LOG_ERR,
 				     "<%s>: failed to add a route dst: %s/%d, gw: %s",
 				     __FUNCTION__,
 				     ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 				     rte->rt_ripinfo.rip6_plen,
-				     ip6str(&rte->rt_gw,
+				     ip6str(&rte->rt_bgw,
 					    ifep->ifi_ifn ? ifep->ifi_ifn->if_index : 0));
 			      rte->rt_flags &= ~RTF_UP;
 			      return 0; /* continue to next rte */
 		      }
 	      }
 	      else {
-		      if ((find_nexthop(&rte->rt_gw, &rte->rt_gw, &ife) == 1) &&
+		      if ((set_nexthop(rte) == 1) &&
 			  (addroute(rte, &rte->rt_gw, &ife) == 0)) {
 #ifdef DEBUG
 			      syslog(LOG_DEBUG, "<%s>:succeed (maybe third-party)",
 				     __FUNCTION__);
 #endif
 		      }
-		      else {
-			      /* try to forward to the iBGP peer */
-
-			      rte->rt_flags |= RTF_UP;    /* re-UP */
-			      rte->rt_gw = IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_laddr) ?
-				      bnp->rp_gaddr: bnp->rp_laddr;
-
-			      if (in6_is_addr_onlink(&rte->rt_gw, &ifep)) {
-				      if (ifep == NULL)
-					      ifep = bnp->rp_ife;
-				      if (addroute(rte, &rte->rt_gw, ifep)
-					  == 0) {
-#ifdef DEBUG
-					      syslog(LOG_DEBUG,
-						     "<%s>:succeed (forward to the iBGP peer %s)",
-						     __FUNCTION__,
-						     ip6str(&rte->rt_gw,
-							    ifep->ifi_ifn ? ifep->ifi_ifn->if_index : 0));
-#endif
-				      }
-				      else {
-					      rte->rt_flags &= ~RTF_UP;
-					      return 0;
-				      }
-			      } else {
-				      if (find_nexthop(&rte->rt_gw, &rte->rt_gw,
-						       &ife) == 0) {
-					      rte->rt_flags &= ~RTF_UP;
-					      return 0;
-				      }
-				      if (addroute(rte, &rte->rt_gw, &ife)
-					  != 0) {
-					      rte->rt_flags &= ~RTF_UP;
-					      return 0;
-				      }
-			      }
-		      }
 	      }
+#endif /* 0 991013 */
       }
   }
 
@@ -290,9 +278,6 @@ bgp_enable_rte(rte)
   return 1; /* succeed */
 }
 
-
-
-
 /*
  *  bgp_disable_rte()
  */
@@ -303,15 +288,18 @@ bgp_disable_rte(rte)
   if (rte->rt_proto.rtp_type != RTPROTO_BGP)
     fatalx("<bgp_disable_rte>: BUG !");
 
-  if (rte->rt_flags & RTF_UP) {
+  if (rte->rt_flags & RTF_INSTALLED) {
 #ifdef DEBUG
-    syslog(LOG_DEBUG, "<bgp_disable_rte>: delroute()...");
+    syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
 #endif
     if (delroute(rte, &rte->rt_gw) != 0)
-      syslog(LOG_ERR, "<bgp_disable_rte>: route couldn't be deleted.");
+	    syslog(LOG_ERR, "<%s>: route couldn't be deleted: dst=%s/%d, "
+		   "gw=%s", __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen,
+		   ip6str(&rte->rt_gw, 0));
 
-
-    rte->rt_flags &= ~RTF_UP;          /* down */
+    rte->rt_flags &= ~RTF_INSTALLED;          /* down */
     rte->rt_ripinfo.rip6_metric = RIPNG_METRIC_UNREACHABLE;
   }
 }
@@ -430,6 +418,134 @@ bgp_preferred_rte(rte, orte)
 		return(0);
 
 	return(0);
+}
+
+/*
+ * If an IGP route (including an interface route) is being newly installed,
+ * check each BGP routes that is up but does not have a proper gateway. 
+ * If the IGP route can be used as a gateway for a BGP route, enable the
+ * BGP route.
+ */
+void
+bgp_enable_rte_by_igp(rte)
+	struct rt_entry *rte;
+{
+	struct rpcb *bnp;
+	struct rt_entry *brte;
+	extern byte bgpyes;
+	extern struct rpcb *bgb;
+
+	if (!bgpyes)
+		return;
+
+	switch(rte->rt_proto.rtp_type) {
+	case RTPROTO_RIP:
+	case RTPROTO_IF:
+#ifdef notyet
+	case RTPROTO_OSPF:
+#endif 
+		bnp = bgb;
+		while(bnp) {
+			/* XXX: bnp might be invalidated during redistribution */
+			struct rpcb *bnext = bnp->rp_next;
+
+			brte = bnp->rp_adj_ribs_in;
+			if ((brte->rt_flags & (RTF_UP|RTF_INSTALLED)) == RTF_UP) {
+				/* try to enable */
+				if (bgp_enable_rte(brte) == 1) {
+					struct rt_entry crte;
+#ifdef DEBUG_BGP
+					syslog(LOG_NOTICE,
+					       "<%s>: BGP route(%s/%d) was "
+					       "enabled",
+					       __FUNCTION__,
+					       ip6str(&brte->rt_ripinfo.rip6_dest,
+						      0),
+					       brte->rt_ripinfo.rip6_plen);
+#endif 
+					/* redistribute this route */
+					crte = *brte;
+					crte.rt_next = crte.rt_prev = &crte;
+					redistribute(&crte);
+				}
+			}
+
+			if (bnext == bgb)
+				break;
+		}
+		break;
+	default:
+		fatalx("<bgp_enable_rte_by_igp>: rt_proto.rtp_type corrupted");
+		/* NOTREACHED */
+	}
+}
+
+/*
+ * If an IGP route (including an interface route) is being removed,
+ * all BGP routes that refer to the IGP route should also be disabled.
+ * XXX: The routes are withdrawn even when an alternative IGP route are
+ *      soon avaiable...
+ */
+void
+bgp_disable_rte_by_igp(rte)
+	struct rt_entry *rte;
+{
+	struct rpcb *bnp;
+	struct rt_entry *brte;
+	extern byte bgpyes;
+	extern struct rpcb *bgb;
+
+	if (!bgpyes)
+		return;
+
+	switch(rte->rt_proto.rtp_type) {
+	case RTPROTO_RIP:
+	case RTPROTO_IF:
+#ifdef notyet
+	case RTPROTO_OSPF:
+#endif 
+		bnp = bgb;
+		while(bnp) {
+			/* XXX: bnp might be invalidated during propagation */
+			struct rpcb *bnext = bnp->rp_next;
+
+			brte = bnp->rp_adj_ribs_in;
+			if (brte->rt_gwsrc_type ==
+			    rte->rt_proto.rtp_type && /* sanity? */
+			    brte->rt_gwsrc_entry == rte &&
+			    (brte->rt_flags & (RTF_UP|RTF_INSTALLED)) ==
+			    (RTF_UP|RTF_INSTALLED)) {
+				struct rt_entry crte;
+#ifdef DEBUG_BGP
+				syslog(LOG_NOTICE,
+				       "<%s>: BGP route(%s/%d) was disabled",
+				       __FUNCTION__,
+				       ip6str(&brte->rt_ripinfo.rip6_dest, 0),
+				       brte->rt_ripinfo.rip6_plen);
+#endif 
+			  	/* XXX: this might break bnp.. */
+				bgp_disable_rte(brte);
+
+				/* flush gateway information */
+				brte->rt_gwsrc_type = RTPROTO_NONE;
+				brte->rt_gwsrc_entry = NULL;
+				memset(&brte->rt_gw, 0, sizeof(struct in6_addr));
+				brte->rt_gwif = NULL;
+
+				/* withdraw this route */
+				crte = *brte;
+				crte.rt_next = crte.rt_prev = &crte;
+				propagate(&crte);
+			}
+
+			if (bnext == bgb)
+				break;
+		}
+		break;
+	default:
+		fatalx("<bgp_disable_rte_by_igp>: rt_proto.rtp_type corrupted");
+		/* NOTREACHED */
+	}
 }
 
 struct rpcb *

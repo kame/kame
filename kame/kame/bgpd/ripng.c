@@ -953,7 +953,7 @@ rip_process_response(ripif, nn)
 			     in6txt, INET6_ADDRSTRLEN),
 		   rte->rt_ripinfo.rip6_plen, ifname);
 #endif
-	    bgp_disable_rte(orte);
+	    bgp_disable_rte(orte); /* XXX: do not have to propagate? */
 	  }
 	  else {
 	    /**   route synchronization  (1998/06/27)  **/
@@ -1016,7 +1016,7 @@ rip_process_response(ripif, nn)
 #ifdef DEBUG
 		  syslog(LOG_DEBUG, "<%s>: tag differ.", __FUNCTION__);
 #endif
-		  bgp_disable_rte(orte);
+		  bgp_disable_rte(orte); /* XXX: do not have to propagate? */
 		} else {
 		  /* don't touch srte's RTF_UP. No need. */
 		  obnp = NULL;   /* I mean "continue to next rte" */
@@ -1142,16 +1142,14 @@ rip_process_response(ripif, nn)
 
 	  } else {
 #ifdef DEBUG
-	    char oldgw[INET6_ADDRSTRLEN], newgw[INET6_ADDRSTRLEN];
-
 	    syslog(LOG_DEBUG, "<%s>: nexthop for %s/%d changes "
 		   "from %s to %s on %d",
 		   __FUNCTION__,
 		   inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
 			     in6txt, INET6_ADDRSTRLEN),
 		   rte->rt_ripinfo.rip6_plen,
-		   inet_ntop(AF_INET6, &orte->rt_gw, oldgw, INET6_ADDRSTRLEN),
-		   inet_ntop(AF_INET6, &rte->rt_gw, newgw, INET6_ADDRSTRLEN),
+		   ip6str(&orte->rt_gw, oripif->rip_ife->ifi_ifn->if_index),
+		   ip6str(&rte->rt_gw, ripif->rip_ife->ifi_ifn->if_index),
 		   ifname);
 #endif
 	    ALTER_RTE;
@@ -1629,6 +1627,9 @@ rip_disable_rte(rte)
   rte->rt_flags &= ~RTF_UP;          /* down */
   rte->rt_ripinfo.rip6_metric = RIPNG_METRIC_UNREACHABLE;
 
+  /* also disable BGP routes that use this route to resolve the nexthop */
+  bgp_disable_rte_by_igp(rte);
+
   MALLOC(crte, struct rt_entry);
   memcpy(crte, rte, sizeof(struct rt_entry));
 
@@ -1657,6 +1658,8 @@ rip_erase_rte(rte)
   if (delroute(rte, &rte->rt_gw) != 0)
     syslog(LOG_ERR, "<%s>: route couldn't be deleted.", __FUNCTION__);
 
+  /* also disable BGP routes that use this route to resolve the nexthop */
+  bgp_disable_rte_by_igp(rte);
 
   if ((ripif = rte->rt_proto.rtp_rip) == NULL)
     fatalx("<rip_erase_rte>: BUG !");
