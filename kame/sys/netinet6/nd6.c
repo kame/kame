@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.195 2001/09/13 15:56:19 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.196 2001/09/14 06:05:11 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,10 +237,19 @@ nd6_ifattach(ifp)
 		return;
 
 #ifdef DIAGNOSTIC
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+	if (!ifnet_byindex(ifp->if_index))
+		panic("nd6_ifattach: ifnet_byindex is NULL");
+#else
 	if (!ifindex2ifnet[ifp->if_index])
 		panic("nd6_ifattach: ifindex2ifnet is NULL");
 #endif
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+	ND.linkmtu = ifnet_byindex(ifp->if_index)->if_mtu;
+#else
 	ND.linkmtu = ifindex2ifnet[ifp->if_index]->if_mtu;
+#endif
 	ND.chlim = IPV6_DEFHLIM;
 	ND.basereachable = REACHABLE_TIME;
 	ND.reachable = ND_COMPUTE_RTIME(ND.basereachable);

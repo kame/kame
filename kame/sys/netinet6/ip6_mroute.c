@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.51 2001/09/12 16:52:39 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.52 2001/09/14 06:05:10 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -675,7 +675,12 @@ add_m6if(mifcp)
 	 * XXX: some OSes can remove ifp and clear ifindex2ifnet[id]
 	 * even for id between 0 and if_index.
 	 */
-	if ((ifp = ifindex2ifnet[mifcp->mif6c_pifi]) == NULL)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+	ifp = ifnet_byindex(mifcp->mif6c_pifi);
+#else
+	ifp = ifindex2ifnet[mifcp->mif6c_pifi];
+#endif
+	if (ifp == NULL)
 		return ENXIO;
 
 	if (mifcp->mif6c_flags & MIFF_REGISTER) {

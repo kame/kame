@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.220 2001/09/13 16:02:36 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.221 2001/09/14 06:05:10 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1163,12 +1163,25 @@ skip_ipsec2:;
 		 * future.
 		 */
 		origifp = NULL;
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			origifp = ifnet_byindex(ntohs(ip6->ip6_src.s6_addr16[1]));
+#else
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
-		else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
+#endif
+		} else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			origifp = ifnet_byindex(ntohs(ip6->ip6_dst.s6_addr16[1]));
+#else
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
-		else if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst))
+#endif
+		} else if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst)) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			origifp = ifnet_byindex(ntohs(ip6->ip6_dst.s6_addr16[1]));
+#else
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+#endif
+		}
 
 		/*
 		 * XXX: origifp can be NULL even in those two cases above.
@@ -3188,7 +3201,11 @@ ip6_setmoptions(optname, im6op, m)
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		ifp = ifnet_byindex(ifindex);
+#else
 		ifp = ifindex2ifnet[ifindex];
+#endif
 		if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0) {
 			error = EADDRNOTAVAIL;
 			break;
@@ -3294,8 +3311,13 @@ ip6_setmoptions(optname, im6op, m)
 			}
 			ifp = ro.ro_rt->rt_ifp;
 			rtfree(ro.ro_rt);
-		} else
+		} else {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			ifp = ifnet_byindex(mreq->ipv6mr_interface);
+#else
 			ifp = ifindex2ifnet[mreq->ipv6mr_interface];
+#endif
+		}
 
 		/*
 		 * See if we found an interface, and confirm that it
@@ -3371,7 +3393,11 @@ ip6_setmoptions(optname, im6op, m)
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		ifp = ifnet_byindex(mreq->ipv6mr_interface);
+#else
 		ifp = ifindex2ifnet[mreq->ipv6mr_interface];
+#endif
 		/*
 		 * Put interface index into the multicast address,
 		 * if the address has interface/link-local scope.
@@ -3636,9 +3662,14 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		    pktinfo->ipi6_ifindex < 0) {
 			 return(ENXIO);
 		}
-		if (pktinfo->ipi6_ifindex &&
-		    (ifp = ifindex2ifnet[pktinfo->ipi6_ifindex]) == NULL) {
-			return(ENXIO);
+		if (pktinfo->ipi6_ifindex) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			ifp = ifnet_byindex(pktinfo->ipi6_ifindex);
+#else
+			ifp = ifindex2ifnet[pktinfo->ipi6_ifindex];
+#endif
+			if (ifp == NULL)
+				return(ENXIO);
 		}
 
 		/*

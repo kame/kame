@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.93 2001/09/04 17:34:18 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.94 2001/09/14 06:05:11 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -544,7 +544,11 @@ rip6_output(m, va_alist)
 		ip6->ip6_src = *in6a;
 		if (in6p->in6p_route.ro_rt) {
 			/* what if oifp contradicts ? */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
+#else
 			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
+#endif
 		}
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.68 2001/09/12 16:52:38 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.69 2001/09/14 06:05:10 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,7 +473,11 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	/* If the caller specify the outgoing interface explicitly, use it. */
 	if (opts && (pi = opts->ip6po_pktinfo) != NULL && pi->ipi6_ifindex) {
 		/* XXX boundary check is assumed to be already done. */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		ifp = ifnet_byindex(pi->ipi6_ifindex);
+#else
 		ifp = ifindex2ifnet[pi->ipi6_ifindex];
+#endif
 		if (ifp != NULL &&
 		    (retrt == NULL || IN6_IS_ADDR_MULTICAST(dst))) {
 			/*
@@ -949,7 +953,11 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 		if (in6p && in6p->in6p_outputopts &&
 		    (pi = in6p->in6p_outputopts->ip6po_pktinfo) &&
 		    pi->ipi6_ifindex) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			ifp = ifnet_byindex(pi->ipi6_ifindex);
+#else
 			ifp = ifindex2ifnet[pi->ipi6_ifindex];
+#endif
 			in6->s6_addr16[1] = htons(pi->ipi6_ifindex);
 		} else if (in6p && IN6_IS_ADDR_MULTICAST(in6) &&
 			   in6p->in6p_moptions &&
@@ -960,7 +968,11 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 			/* boundary check */
 			if (scopeid < 0 || if_index < scopeid)
 				return ENXIO;  /* XXX EINVAL? */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			ifp = ifnet_byindex(scopeid);
+#else
 			ifp = ifindex2ifnet[scopeid];
+#endif
 			/* XXX assignment to 16bit from 32bit variable */
 			in6->s6_addr16[1] = htons(scopeid & 0xffff);
 		}
