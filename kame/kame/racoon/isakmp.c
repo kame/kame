@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.156 2001/08/16 14:37:29 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.157 2001/09/11 14:55:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,15 +253,7 @@ isakmp_handler(so_isakmp)
 	}
 	if (port == 0) {
 		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
-			"possible attack: src port == 0 "
-			"(valid as UDP but not with IKE)\n");
-		goto end;
-	}
-	if (cmpsaddrwild((struct sockaddr *)&local,
-			(struct sockaddr *)&remote) == 0) {
-		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
-			"possible attack: "
-			"local addr/port == remote addr/port\n");
+			"src port == 0 (valid as UDP but not with IKE)\n");
 		goto end;
 	}
 
