@@ -97,18 +97,18 @@ esp_hdrsiz(isr)
 		panic("unsupported mode passed to esp_hdrsiz");
 
 	if (sav == NULL)
-		goto contrive;
+		goto estimate;
 	if (sav->state != SADB_SASTATE_MATURE
 	 && sav->state != SADB_SASTATE_DYING)
-		goto contrive;
+		goto estimate;
 
 	/* we need transport mode ESP. */
 	algo = &esp_algorithms[sav->alg_enc];
 	if (!algo)
-		goto contrive;
+		goto estimate;
 	ivlen = sav->ivlen;
 	if (ivlen < 0)
-		goto contrive;
+		goto estimate;
 
 	/*
 	 * XXX
@@ -131,14 +131,14 @@ esp_hdrsiz(isr)
 
 	return hdrsiz;
 
-   contrive:
+   estimate:
 	/*
 	 * ASSUMING:
 	 *	sizeof(struct newesp) > sizeof(struct esp).
 	 *	8 = ivlen for CBC mode (RFC2451).
-	 *	9 = (maximum padding length without random Padding length)
+	 *	9 = (maximum padding length without random padding length)
 	 *	   + (Pad Length field) + (Next Header field).
-	 *	16 = maximum ICV we supported.
+	 *	16 = maximum ICV we support.
 	 */
 	return sizeof(struct newesp) + 8 + 9 + 16;
 }

@@ -93,15 +93,15 @@ ah_hdrsiz(isr)
 		panic("unsupported mode passed to ah_hdrsiz");
 
 	if (isr->sav == NULL)
-		goto contrive;
+		goto estimate;
 	if (isr->sav->state != SADB_SASTATE_MATURE
 	 && isr->sav->state != SADB_SASTATE_DYING)
-		goto contrive;
+		goto estimate;
 
 	/* we need transport mode AH. */
 	algo = &ah_algorithms[isr->sav->alg_auth];
 	if (!algo)
-		goto contrive;
+		goto estimate;
 
 	/*
 	 * XXX
@@ -118,7 +118,7 @@ ah_hdrsiz(isr)
 
 	return hdrsiz;
 
-    contrive:
+    estimate:
 	/* ASSUMING:
 	 *	sizeof(struct newah) > sizeof(struct ah).
 	 *	16 = (16 + 3) & ~(4 - 1).
