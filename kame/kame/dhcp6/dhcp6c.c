@@ -144,6 +144,7 @@ static void client6_sleep __P((void));
 void client6_hup __P((int));
 static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
+static void tvfix __P((struct timeval *));
 
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
 
@@ -330,18 +331,6 @@ client6_init()
 	if ((rtsock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0)
 		err(1, "open a routing socket");
 }
-
-#if 0
-static void
-tvfix(tv)
-	struct timeval *tv;
-{
-	long s;
-	s = tv->tv_usec / (1000 * 1000);
-	tv->tv_usec %= (1000 * 1000);
-	tv->tv_sec += s;
-}
-#endif
 
 static void
 client6_mainloop()
@@ -690,7 +679,7 @@ static int
 client6_getreply(p)
 	struct servtab *p;
 {
-	struct timeval w;
+	struct timeval w, finish;
 	fd_set r;
 	int timeo;
 	int ret;
@@ -709,14 +698,28 @@ client6_getreply(p)
 
 	timeo = 0;
 	reply_msg_timeo_usec = REPLY_MSG_TIMEOUT * 100;
+	if (gettimeofday(&finish, NULL) < 0)
+		err(1, "gettimeofday");
+	finish.tv_sec += reply_msg_timeo_usec / 1000000;
+	finish.tv_usec += reply_msg_timeo_usec % 1000000;
+	tvfix(&finish);
+	client6_sendrequest(outsock, p);
 	while (1) {
 		/* 11.4.2. Time out and retransmission of Request Messages */
-		w.tv_sec = reply_msg_timeo_usec / 1000000;
-		w.tv_usec = reply_msg_timeo_usec % 1000000;
-		client6_sendrequest(outsock, p);
 		FD_ZERO(&r);
 		FD_SET(insock, &r);
-		ret = select(insock + 1, &r, NULL, NULL, &w);
+		if (gettimeofday(&w, NULL) < 0)
+			err(1, "gettimeofday");
+		w.tv_sec = finish.tv_sec - w.tv_sec;
+		w.tv_usec = finish.tv_usec - w.tv_usec;
+		if (w.tv_usec < 0) {
+			w.tv_sec--;
+			w.tv_usec += 1000000;
+		}
+		if (w.tv_sec < 0)
+			ret = 0;
+		else
+			ret = select(insock + 1, &r, NULL, NULL, &w);
 		switch (ret) {
 		case -1:
 			err(1, "select");
@@ -730,9 +733,16 @@ client6_getreply(p)
 					"are received. give up.");
 				return(-1);
 			}
+			/* re-compute timeout */
+			if (gettimeofday(&finish, NULL) < 0)
+				err(1, "gettimeofday");
+			finish.tv_sec += reply_msg_timeo_usec / 1000000;
+			finish.tv_usec += reply_msg_timeo_usec % 1000000;
+			tvfix(&finish);
+			client6_sendrequest(outsock, p);
 			break;
 		default:
-			if (client6_recvreply(insock, p) <0)
+			if (client6_recvreply(insock, p) < 0)
 				continue;
 			return(0);
 		}
@@ -1196,4 +1206,15 @@ client6_recvreply(s, serv)
 	}
 
 	return(0);
+}
+
+static void
+tvfix(tv)
+	struct timeval *tv;
+{
+	long s;
+
+	s = tv->tv_usec / (1000 * 1000);
+	tv->tv_usec %= (1000 * 1000);
+	tv->tv_sec += s;
 }
