@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.3 2000/01/09 01:31:28 itojun Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.4 2000/02/16 07:29:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,6 +55,7 @@
 #include "localconf.h"
 #include "session.h"
 #include "oakley.h"
+#include "crypto_openssl.h"
 
 /* debug flags */
 u_int32_t debug = 0;
@@ -102,6 +103,7 @@ main(ac, av)
 	initlcconf();
 	initrmconf();
 	oakley_dhinit();
+	eay_init_error();
 
 	parse(ac, av);
 
