@@ -879,7 +879,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	int cmd;
 	void (*notify) __P((struct inpcb *, int));
 {
-	struct inpcb *inp, *oinp;
+	struct inpcb *inp, *ninp;
 	struct in6_addr faddr6;
 	u_short	fport = fport_arg, lport = lport_arg;
 	int errno, s;
@@ -910,33 +910,45 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		 * Keep the old notify function to store a soft error
 		 * in each PCB.
 		 */
-		if (cmd == PRC_HOSTDEAD)
+		if (cmd == PRC_HOSTDEAD && notify != in6_rtchange)
 			notify2 = notify;
 
 		notify = in6_rtchange;
 	}
 	errno = inet6ctlerrmap[cmd];
 	s = splnet();
-	for (inp = LIST_FIRST(head); inp != NULL;) {
-		if ((inp->inp_vflag & INP_IPV6) == NULL) {
-			inp = LIST_NEXT(inp, inp_list);
+	for (inp = LIST_FIRST(head); inp != NULL; inp = ninp) {
+		ninp = LIST_NEXT(inp, inp_list);
+
+		if ((inp->inp_vflag & INP_IPV6) == NULL)
 			continue;
+
+		if (notify == in6_rtchange) {
+			/*
+			 * Since a non-connected PCB might have a cached route,
+			 * we always call in6_rtchange without matching
+			 * the PCB to the src/dst pair.
+			 *
+			 * XXX: we assume in6_rtchange does not free the PCB.
+			 */
+			if (IN6_ARE_ADDR_EQUAL(&inp->in6p_route.ro_dst.sin6_addr,
+					       &faddr6))
+				in6_rtchange(inp, errno);
+
+			if (notify2 != NULL)
+				continue;
 		}
+
 		if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
 		   inp->inp_socket == 0 ||
 		   (lport && inp->inp_lport != lport) ||
 		   (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
 		    !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr6)) ||
-		   (fport && inp->inp_fport != fport)) {
-			inp = LIST_NEXT(inp, inp_list);
+		   (fport && inp->inp_fport != fport))
 			continue;
-		}
-		oinp = inp;
-		inp = LIST_NEXT(inp, inp_list);
-		if (notify)
-			(*notify)(oinp, errno);
+
 		if (notify2)
-			(*notify2)(oinp, errno);
+			(*notify2)(inp, errno);
 	}
 	splx(s);
 }
