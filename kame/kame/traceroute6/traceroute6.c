@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.54 2002/06/29 07:38:00 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.55 2002/06/29 07:38:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -490,7 +490,7 @@ main(argc, argv)
 				fprintf(stderr, "traceroute6: port.\n");
 				exit(1);
 			}
-			if (lport == 0 || lport != lport & 0xffff) {
+			if (lport == 0 || lport != (lport & 0xffff)) {
 				fprintf(stderr,
 				    "traceroute6: port out of range.\n");
 				exit(1);
