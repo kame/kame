@@ -223,9 +223,11 @@ protopr(proto, name, af)
 			else
 				printf("%8lx ", (u_long)so->so_pcb);
 		}
-		printf("%-3.3s%s%s %6ld %6ld ", name,
-		       (inp->inp_vflag & INP_IPV4) ? "4" : "",
-		       (inp->inp_vflag & INP_IPV6) ? "6" : "",
+		printf("%-3.3s%-2.2s %6ld %6ld ", name,
+		       ((inp->inp_vflag & INP_IPV4) &&
+			(inp->inp_vflag & INP_IPV6)) ? "46" :
+		       (inp->inp_vflag & INP_IPV4) ? "4" :
+		       (inp->inp_vflag & INP_IPV6) ? "6" : "?",
 		       so->so_rcv.sb_cc,
 		       so->so_snd.sb_cc);
 		if (nflag) {
