@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.5 1998/11/23 03:32:54 mickey Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.9 1999/09/18 20:05:55 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -39,30 +39,28 @@
 #define	USRTEXT		0x00002000		/* Start of user .text */
 #define	USRSTACK	0x68FF3000		/* Start of user stack */
 #define	BTOPUSRSTACK	btop(USRSTACK)		/* btop(USRSTACK) */
-#define	P1PAGES		0
+#define	P1PAGES		2
 #define	LOWPAGES	0
 #define	HIGHPAGES	UPAGES
 #define	SYSCALLGATE	0xC0000000		/* syscall gateway page */
-
-#define	INTSTACK_SIZE	(5 * NBPG)		/* interrupt stack size */
 
 /*
  * Virtual memory related constants, all in bytes
  */
 #ifndef MAXTSIZ
-#define	MAXTSIZ		(64*1024*1024)		/* max text size */
+#define	MAXTSIZ		(0x40000000)		/* max text size */
 #endif
 #ifndef DFLDSIZ
 #define	DFLDSIZ		(16*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(64*1024*1024)		/* max data size */
+#define	MAXDSIZ		(USRSTACK-MAXTSIZ)	/* max data size */
 #endif
 #ifndef	DFLSSIZ
 #define	DFLSSIZ		(512*1024)		/* initial stack size limit */
 #endif
 #ifndef	MAXSSIZ
-#define	MAXSSIZ		MAXDSIZ			/* max stack size */
+#define	MAXSSIZ		(UADDR-USRSTACK)	/* max stack size */
 #endif
 
 /*
@@ -116,24 +114,31 @@
  * that we don't consider it worthwhile and swap it out to disk which costs
  * $30/mb or about $0.75.
  */
-#define	SAFERSS		(16384/NBPG)	/* nominal ``small'' resident set size
+#define	SAFERSS		(0x4000/NBPG)	/* nominal ``small'' resident set size
 					   protected against replacement */
 
 /* user/kernel map constants */
-#define	VM_MIN_ADDRESS		((vm_offset_t)0)
-#define	VM_MAXUSER_ADDRESS	((vm_offset_t)0xc0000000)
+#define	VM_MIN_ADDRESS		((vaddr_t)0)
+#define	VM_MAXUSER_ADDRESS	((vaddr_t)0xc0000000)
 #define	VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
-#define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0)
-#define	VM_MAX_KERNEL_ADDRESS	((vm_offset_t)0xF0000000)
+#define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)0)
+#define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xf0000000)
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
 #define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
 #define VM_PHYS_SIZE		(USRIOSIZE*CLBYTES)
 
-#define MACHINE_NEW_NONCONTIG	/* VM <=> pmap interface modifier */
-
 #define	VM_PHYSSEG_MAX	8	/* this many physmem segments */
 #define	VM_PHYSSEG_STRAT	VM_PSTRAT_BIGFIRST
+
+#define	VM_PHYSSEG_NOADD	/* XXX until uvm code is fixed */
+
+#define	VM_NFREELIST		2
+#define	VM_FREELIST_DEFAULT	0
+#define	VM_FREELIST_FIRST16	1
+
+#define	MACHINE_NEW_NONCONTIG	1	/* defined this until we rely on vm */
+#define	PMAP_NEW
 
 #endif	/* _MACHINE_VMPARAM_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.h,v 1.6 1999/02/25 17:28:58 mickey Exp $	*/
+/*	$OpenBSD: autoconf.h,v 1.9 1999/08/16 02:48:40 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -46,17 +46,9 @@ struct confargs {
 
 #define	hppacf_irq	cf_loc[0]
 
-/* this is used for hppa_knownboards table
- * describing known to this port boards
- */
-struct hppa_board_info {
-	int	bi_id;
-	char	*bi_label;
-	char	*bi_name;
-};
-
 /* this is used for hppa_knownmodules table
- * describing known to this port modules
+ * describing known to this port modules,
+ * system boards, cpus, fpus and busses
  */
 struct hppa_mod_info {
 	int	mi_type;
@@ -71,7 +63,8 @@ void	pdc_scanbus __P((struct device *, struct confargs *, int bus, int));
 int	mbprint __P((void *, const char *));
 int	mbsubmatch __P((struct device *, void *, void *));
 void	*cpu_intr_establish __P((int pri, int, int (*handler) __P((void *)),
-				void *arg, const char *name));
+				void *arg, struct device *name));
+int	clock_intr __P((void *));
 
 void	configure	__P((void));
 void	dumpconf	__P((void));

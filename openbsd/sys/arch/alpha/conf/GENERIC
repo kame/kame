@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.39 1999/01/13 13:03:02 niklas Exp $
+#	$OpenBSD: GENERIC,v 1.44 1999/09/26 17:53:52 jason Exp $
 #	$NetBSD: GENERIC,v 1.31 1996/12/03 17:25:29 cgd Exp $
 #
 # Generic Alpha kernel.  Enough to get booted, etc., but not much more.
@@ -73,6 +73,9 @@ fxp*	at 	pci? dev ? function ?		# EtherExpress 10/100B ethernet
 #en*	at	pci? dev ? function ?		# ENI PCI ATM (untested)
 ep*	at	pci? dev ? function ?		# 3COM 3c59x
 xl*	at	pci? dev ? function ?		# 3COM 3c9xx
+pn*	at	pci? dev ? function ?		# Lite-On PNIC ethernet
+rl*	at	pci? dev ? function ?		# RealTek 81[23]9 ethernet
+tl*	at	pci? dev ? function ?		# Compaq Thunderlan ethernet
 fpa*	at	pci? dev ? function ?		# DEC DEFPA FDDI cards
 le*	at	pci? dev ? function ?		# PCI LANCE Ethernet (untested)
 ncr*	at	pci? dev ? function ?		# NCR 53c8xx SCSI
@@ -84,11 +87,12 @@ tga*	at	pci? dev ? function ?		# DEC ZLXp-E[123] graphics
 #cy*	at	pci?				# PCI cyclom card
 
 # Media Independent Interface (mii) drivers
-#exphy*	at mii? phy ?				# 3Com internal PHYs
+exphy*	at mii? phy ?				# 3Com internal PHYs
 inphy*	at mii? phy ?				# Intel 82555 PHYs
 #icsphy*	at mii? phy ?				# ICS 1890 PHYs
 #lxtphy*	at mii? phy ?				# Level1 LXT970 PHYs
 nsphy*	at mii? phy ?				# NS and compatible PHYs
+rlphy*	at mii? phy ?				# RealTek 8139 internal PHYs
 #qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
 #sqphy*	at mii? phy ?				# Seeq 8x220 PHYs
 #mtdphy*	at mii? phy ?				# Myson MTD972 PHYs
@@ -118,8 +122,6 @@ ne1	at	isa? port 0x300 irq 10		# NE[12]000 ethernet cards
 ne2	at	isa? port 0x280 irq 9		# NE[12]000 ethernet cards
 ep*	at	isa? port ? irq ?		# 3C509 ethernet cards
 #wss*	at	isa? port 0x530 irq 9 drq 0	# Windows Sound System
-wdc0	at	isa? port 0x1f0 irq 14		# ST506, ESDI, and IDE
-wdc1	at	isa? port 0x170 irq 15		# controllers
 cy0     at	isa? iomem 0xd4000 irq 12	# ISA cyclom card
 #aic0	at	isa? port 0x340 irq 11		# Adaptec 152[02] SCSI
 # option for using CD1400 handshaking for incoming data
@@ -131,13 +133,17 @@ cy0     at	isa? iomem 0xd4000 irq 12	# ISA cyclom card
 fea*	at	eisa? slot ?			# DEC DEFEA FDDI cards
 #ahc*	at	eisa? slot ?			# Adaptec 274x, aic7770 SCSI
 
-# devices/busses hanging of IDE controllers
-atapibus* at	wdc?				# Virtual ATAPI bus
-wd*	at	wdc? drive ?			# ST506/ESDI/IDE disks
+# IDE
+#pciide* at pci ? dev ? function ? flags 0x0000
+wdc0	at isa? port 0x1f0 irq 14 flags 0x00
+wdc1	at isa? port 0x170 irq 15 flags 0x00
+wd*	at wdc? channel ? drive ? flags 0x0000
+#wd*	at pciide? channel ? drive ? flags 0x0000
 
-# ATAPI devices
-acd*	at	atapibus? drive?		# ATAPI CD-ROM
-
+atapiscsi* at wdc? channel ?
+#atapiscsi* at pciide? channel ?
+scsibus* at atapiscsi?
+ 
 # SCSI bus support
 scsibus* at	esp?
 scsibus* at	ncr?

@@ -1,8 +1,8 @@
-/*	$OpenBSD: ukphy.c,v 1.1 1998/11/11 19:34:50 jason Exp $	*/
-/*	$NetBSD: ukphy.c,v 1.1 1998/11/05 00:36:48 thorpej Exp $	*/
+/*	$OpenBSD: ukphy.c,v 1.5 1999/09/17 01:38:56 jason Exp $	*/
+/*	$NetBSD: ukphy.c,v 1.1.6.1 1999/04/23 15:39:00 perry Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -77,6 +77,7 @@
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
+#include <sys/errno.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -152,13 +153,9 @@ ukphyattach(parent, self, aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
-	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
-	else
+	if (sc->mii_capabilities & BMSR_MEDIAMASK)
 		mii_add_media(mii, sc->mii_capabilities,
 		    sc->mii_inst);
-	printf("\n");
 #undef ADD
 }
 
@@ -204,7 +201,7 @@ ukphy_service(sc, mii, cmd)
 			 */
 			if (PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN)
 				return (0);
-			(void) mii_phy_auto(sc);
+			(void) mii_phy_auto(sc, 1);
 			break;
 		case IFM_100_T4:
 			/*
@@ -258,7 +255,8 @@ ukphy_service(sc, mii, cmd)
 		
 		sc->mii_ticks = 0;
 		mii_phy_reset(sc);
-		(void) mii_phy_auto(sc);
+		if (mii_phy_auto(sc, 0) == EJUSTRETURN)
+			return (0);
 		break;
 	}
 

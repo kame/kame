@@ -1,10 +1,10 @@
-.\" $OpenBSD: pcvt.4,v 1.7 1998/09/07 16:44:37 aaron Exp $
-.\" 
+.\" $OpenBSD: pcvt.4,v 1.18 1999/10/16 18:56:37 aaron Exp $
+.\"
 .\"  Copyright (c) 1992, 1995 Hellmuth Michaelis, Brian Dunford-Shore,
 .\"                           Joerg Wunsch and Holger Veit.
-.\" 
+.\"
 .\"  All rights reserved.
-.\" 
+.\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -42,9 +42,9 @@
 .\" updated for final rel 3.00 (-hm)
 .\" removed references to 386BSD (-hm)
 .\"
-.Dd Auguest 10, 1998
-.Os
+.Dd August 10, 1998
 .Dt PCVT 4
+.Os
 .Sh NAME
 .Nm pcvt
 .Nd PC console virtual screen system
@@ -83,17 +83,37 @@ functionality. See
 .Sx Features
 for a detailed description.
 
+.Sy Note:
+As of
+.Ox 2.6 ,
+.Nm
+does not do character mapping by default in favor of a traditional PC display
+where 16 colors are available and the standard IBM font is used.
+See the
+.Fl o
+flag in
+.Xr scon 1
+to toggle between this mode and the old mode.
+
 .Ss VT Keys
-Despite the complexity of options, if installed in a normal OpenBSD
+Despite the complexity of options, if installed in a normal
+.Ox
 configuration with the default options, on a standard i386 architecture
 system, you can use multiple virtual terminals.
 The key sequence used to move among virtual terminals are,
-at least on a North American keyboard, 
+at least on a North American keyboard,
 .Em CTRL+ALT+Fn,
-where 
+where
 .Em n
 can be from one to four on the standard system, and higher if you
 have created addition /dev/ttyC* entries.
+
+One can also cycle through all available screens by using
+.Em ALT+F12
+
+To use the scrollback feature, press
+.Em LEFT_SHIFT+PGUP/PGDN
+(more info further)
 
 .Ss Features
 .Bl -bullet
@@ -114,7 +134,7 @@ Completely independent virtual terminals for MDA/HGC/CGA/EGA and VGA
 .It
 Fully remappable keyboard to support national keyboards
 .It
-All VT220 character sets plus ISO Latin-1 and DEC technical supported 
+All VT220 character sets plus ISO Latin-1 and DEC technical supported
 .It
 VT220 downloadable character set supported when run on EGA/VGA
 .It
@@ -130,6 +150,8 @@ Display function codes functionality
 Support for MDA, CGA, EGA and VGA display adaptors
 .It
 Support for 132 column operation on VGA chipsets
+.It
+Scrollback buffer
 .It
 X Window Support for XFree86 >= 1.2 using the pccons model, or
 for XFree86 >= 2.0 using the syscons model
@@ -206,7 +228,7 @@ documentation directory for a full description.
 Default: off
 
 .It Em PCVT_SCREENSAVER
-Enables the builtin screensaver feature.
+Enables the built-in screensaver feature.
 .br
 Default: on
 
@@ -224,7 +246,11 @@ If enabled, the key combination
 .Aq Em Del
 invokes a CPU reset.
 .br
-Default: off
+Default: off (To change this, check
+.Nm sysctl.conf
+, set value of 
+.Em machdep.kbdreset
+to 1)
 
 .It Em PCVT_USEKBDSEC
 Do NOT override a security lock for the keyboard.
@@ -354,7 +380,7 @@ internal LED flags.
 
 One important feature of the
 .Nm pcvt
-driver is its ability to overload the builtin key definition.
+driver is its ability to overload the built-in key definition.
 
 .Bl -tag -width 20n -offset indent -compact
 .It KBDGCKEY
@@ -413,7 +439,7 @@ caps shift - swaps case of letter,
 ASCII code generating key,
 .It KBD_SCROLL
 stop output,
-.It KBD_FUNC    
+.It KBD_FUNC
 function key,
 .It KBD_KP
 keypad keys,
@@ -628,17 +654,17 @@ struct screeninfo {
     int pure_vt_mode;   /* flag, pure VT mode or HP/VT mode    */
                         /* on write, if -1, no change          */
     int screen_size;    /* screen size                         */
-                        /* on write, if -1, no change          */    
+                        /* on write, if -1, no change          */
     int force_24lines;  /* force 24 lines if 25 lines VT mode  */
                         /* or 28 lines HP mode to get pure     */
                         /* VT220 screen size                   */
                         /* on write, if -1, no change          */
     int vga_family;     /* if adaptor_type = VGA, this reflects*/
                         /* the chipset family after a read     */
-                        /* nothing happenes on write ...       */
+                        /* nothing happens on write ...        */
     int vga_type;       /* if adaptor_type = VGA, this reflects*/
                         /* the chipset after a read            */
-                        /* nothing happenes on write ...       */
+                        /* nothing happens on write ...        */
     int vga_132;        /* set to 1 if driver has support for  */
                         /* 132 column operation for chipset    */
                         /* currently ignored on write          */
@@ -709,7 +735,7 @@ struct pcvtid {
 	int rmajor;			/* revision number, major	*/
 #define PCVTIDMAJOR   3
 	int rminor;			/* revision number, minor	*/
-#define PCVTIDMINOR   00	
+#define PCVTIDMINOR   00
 };
 .Ed
 
@@ -759,6 +785,24 @@ kind of adaptor if configured in by the
 .Xr config 8
 option
 .Dq PCVT_SCREENSAVER
+
+.Em Scrollback buffer
+
+It is often useful to be able to review text that has already scrolled off the
+screen.
+By default, 8 pages of scrollback buffer are available by navigating with the
+.Em LEFT_SHIFT+PGUP/PGDN
+keys.
+The scrollback buffer is destroyed when
+switching virtual terminals, changing line modes, or switching between 80/132
+columns.
+To increase the number of pages stored, see the
+.Fl b
+option for
+.Xr scon 1 .
+
+Scrollback support was added in
+.Ox 2.6 .
 
 .Em Compatibility commands for USL-style VT's
 
@@ -820,9 +864,17 @@ implementation
 Holger Veit
 .Pq veit@du9ds3.uni-duisburg.de, now veit@first.gmd.de
 .Sh SEE ALSO
-.Xr config 8 ,
+.Xr cursor 1 ,
+.Xr fed 1 ,
+.Xr fontedit 1 ,
+.Xr kcon 1 ,
+.Xr loadfont 1 ,
+.Xr mcon 1 ,
+.Xr scon 1 ,
 .Xr intro 2 ,
-.Xr ioctl 2
+.Xr ioctl 2 ,
+.Xr config 8 ,
+.Xr ispcvt 8
 .Sh BUGS
 Certainly existent. See the file
 .Pa BugList

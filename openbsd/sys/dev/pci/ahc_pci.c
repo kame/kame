@@ -1,4 +1,4 @@
-/*	$OpenBSD: ahc_pci.c,v 1.9 1998/01/07 11:03:25 deraadt Exp $	*/
+/*	$OpenBSD: ahc_pci.c,v 1.11 1999/09/22 21:57:08 deraadt Exp $	*/
 /*	$NetBSD: ahc_pci.c,v 1.9 1996/10/21 22:56:24 thorpej Exp $	*/
 
 /*
@@ -89,6 +89,7 @@
 #endif /* defined(__NetBSD__) */
 
 #define PCI_DEVICE_ID_ADAPTEC_3940U	0x82789004ul
+#define PCI_DEVICE_ID_ADAPTEC_398XU	0x83789004ul
 #define PCI_DEVICE_ID_ADAPTEC_2944U	0x84789004ul
 #define PCI_DEVICE_ID_ADAPTEC_2940U	0x81789004ul
 #define PCI_DEVICE_ID_ADAPTEC_2940AU	0x61789004ul
@@ -100,6 +101,7 @@
 #define PCI_DEVICE_ID_ADAPTEC_AIC7860	0x60789004ul
 #define PCI_DEVICE_ID_ADAPTEC_AIC7855	0x55789004ul
 #define PCI_DEVICE_ID_ADAPTEC_AIC7850	0x50789004ul
+#define PCI_DEVICE_ID_ADAPTEC_2940UWPro	0x87789004ul
 
 #define	DEVCONFIG		0x40
 #define		MPORTMODE	0x00000400ul	/* aic7870 only */
@@ -242,6 +244,9 @@ aic7870_probe (pcici_t tag, pcidi_t type)
 		case PCI_DEVICE_ID_ADAPTEC_AIC7855:
 			return ("Adaptec aic7855 SCSI host adapter");
 			break;
+		case PCI_DEVICE_ID_ADAPTEC_2940UWPro:
+			return ("Adaptec 2940UW Pro Ultra SCSI host adapter");
+			break;
 		case PCI_DEVICE_ID_ADAPTEC_AIC7850:
 			return ("Adaptec aic7850 SCSI host adapter");
 			break;
@@ -270,6 +275,7 @@ ahc_pci_probe(parent, match, aux)
 
 	switch (pa->pa_id) {
 	case PCI_DEVICE_ID_ADAPTEC_3940U:
+	case PCI_DEVICE_ID_ADAPTEC_398XU:
 	case PCI_DEVICE_ID_ADAPTEC_2944U:
 	case PCI_DEVICE_ID_ADAPTEC_2940U:
 	case PCI_DEVICE_ID_ADAPTEC_2940AU:
@@ -281,6 +287,7 @@ ahc_pci_probe(parent, match, aux)
 	case PCI_DEVICE_ID_ADAPTEC_AIC7860:
 	case PCI_DEVICE_ID_ADAPTEC_AIC7855:
 	case PCI_DEVICE_ID_ADAPTEC_AIC7850:
+	case PCI_DEVICE_ID_ADAPTEC_2940UWPro:
 		return 1;
 	}
 	return 0;
@@ -354,6 +361,7 @@ ahc_pci_attach(parent, self, aux)
 			break;
 		case PCI_DEVICE_ID_ADAPTEC_2944U:
 		case PCI_DEVICE_ID_ADAPTEC_2940U:
+		case PCI_DEVICE_ID_ADAPTEC_2940UWPro:
 			ahc_t = AHC_294U;
 			break;
 		case PCI_DEVICE_ID_ADAPTEC_2944:
@@ -363,6 +371,7 @@ ahc_pci_attach(parent, self, aux)
 		case PCI_DEVICE_ID_ADAPTEC_2940AU:
 			ahc_t = AHC_294AU;
 			break;
+		case PCI_DEVICE_ID_ADAPTEC_398XU:	/* XXX */
 		case PCI_DEVICE_ID_ADAPTEC_AIC7880:
 			ahc_t = AHC_AIC7880;
 			break;

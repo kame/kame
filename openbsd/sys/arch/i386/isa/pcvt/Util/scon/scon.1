@@ -1,4 +1,4 @@
-.\"	$OpenBSD: scon.1,v 1.4 1999/01/13 07:26:06 niklas Exp $
+.\"	$OpenBSD: scon.1,v 1.10 1999/10/16 18:56:37 aaron Exp $
 .\"
 .\" Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch
 .\"
@@ -33,14 +33,15 @@
 .\" @(#)scon.1, 3.30, Last Edit-Date: [Mon Jul  3 11:25:13 1995]
 .\"
 .Dd December 31, 1993
+.Dt SCON 1 i386
 .Os
-.Dt SCON 1
 .Sh NAME
 .Nm scon
 .Nd controls screen modes for pcvt video driver
 .Sh SYNOPSIS
 .Nm scon
 .Op Fl a
+.Op Fl b Ar num
 .Op Fl c Ar screenno
 .Op Fl d Ar device
 .Op Fl f Ar on|off
@@ -48,6 +49,7 @@
 .Op Fl H
 .Op Fl l
 .Op Fl m
+.Op Fl o
 .Op Fl v
 .Op Fl V
 .Op Fl s Ar lines
@@ -81,13 +83,17 @@ driver.
 The options are as follows:
 .Bl -tag -width Ds
 .It Fl a
-Returns a string describing the video adaptor found by pcvt, the string 
+Returns a string describing the video adaptor found by pcvt, the string
 returned could be MDA, HGC, CGA, EGA, VGA or UNKNOWN.
+.It Fl b
+Set the number of scrollback buffer pages to
+.Ar num .
+The minimum value is 2, maximum 100.
 .It Fl c
-Specify the screen number the current (displayed) screen should be switched 
+Specify the screen number the current (displayed) screen should be switched
 to.
 .It Fl d
-Specify the device filename (i.e. /dev/ttyC2) further operations specified on 
+Specify the device filename (i.e. /dev/ttyC2) further operations specified on
 the command line should be applied to.
 .It Fl f
 Some programs which silently assume 24 lines when they run on a VT220 show
@@ -117,6 +123,15 @@ any HP escape sequences and without displaying function key labels.
 Switch the specified/current screen into a mixed HP/VT220 mode. That is, that
 in addition to the full VT220 emulation, the HP function key labels and the
 escape sequences for handling the labels are available to the user.
+.It Fl o
+Toggle
+.Dq legacy
+pcvt mode with traditional PC display mode.
+As of
+.Ox 2.6 ,
+character mapping is turned off by default in favour of a traditional PC
+display with 16 colors and the standard IBM font.
+This option has no effect in line modes other than 25.
 .It Fl s
 Specify the number of character lines on the screen. Possible parameters are
 25, 28, 35, 40, 43 or 50. To use all this screen sizes, the fonts required
@@ -187,7 +202,7 @@ Sets 132 columns mode
 Sets 80 columns mode.
 .El
 .Pp
-When switching between HP and VT mode, when switching the force 24 lines 
+When switching between HP and VT mode, when switching the force 24 lines
 mode on and off, or when switching between 80 and 132 columns operation,
 the screen is cleared, the scrolling
 region is reset and the cursor is placed in the home position.
@@ -206,12 +221,12 @@ Invoking
 will result in green on gray output for normal text.
 Note that normal text color is light gray, and not white as one might expect.
 .Sh BUGS
-the
+The
 .Fl c
 and
 .Fl d
 options collide somehow, this will change in a future release.
 .Sh SEE ALSO
-.Xr loadfont 1 ,
 .Xr cursor 1 ,
+.Xr loadfont 1 ,
 .Xr pcvt 4

@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.17 1997/10/02 19:53:20 niklas Exp $ */
+/* $OpenBSD: machdep.c,v 1.19 1999/05/24 23:09:09 jason Exp $ */
 /* $NetBSD: machdep.c,v 1.45 1997/07/26 10:12:49 ragge Exp $	 */
 
 /*
@@ -90,6 +90,7 @@
 #include <netns/ns_var.h>
 #endif
 #include "ppp.h"	/* For NERISR_PPP */
+#include "bridge.h"	/* For NERISR_BRIDGE */
 #if NPPP > 0
 #include <net/ppp_defs.h>
 #include <net/if_ppp.h>
@@ -342,7 +343,6 @@ allocsys(v)
 	valloc(cfree, struct cblock, nclist);
 #endif
 	valloc(callout, struct callout, ncallout);
-	valloc(swapmap, struct map, nswapmap = maxproc * 2);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -721,6 +721,11 @@ netintr()
 #if NPPP > 0
 	if (netisr & (1 << NETISR_PPP)) {
 		pppintr();
+	}
+#endif
+#if NBRIDGE > 0
+	if (netisr & (1 << NETISR_BRIDGE)) {
+		bridgeintr();
 	}
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.20 1999/03/12 17:49:37 deraadt Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.24 1999/08/17 10:32:18 niklas Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*
@@ -54,6 +54,7 @@
 #include <sys/file.h>
 #include <sys/acct.h>
 #include <sys/ktrace.h>
+#include <sys/sched.h>
 #include <dev/rndvar.h>
 
 #include <sys/syscallargs.h>
@@ -77,7 +78,7 @@ sys_fork(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	return (fork1(p, ISFORK, 0, retval));
+	return (fork1(p, ISFORK, 0, NULL, 0, retval));
 }
 
 /*ARGSUSED*/
@@ -87,7 +88,7 @@ sys_vfork(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	return (fork1(p, ISVFORK, 0, retval));
+	return (fork1(p, ISVFORK, 0, NULL, 0, retval));
 }
 
 int
@@ -100,14 +101,16 @@ sys_rfork(p, v, retval)
 		syscallarg(int) flags;
 	} */ *uap = v;
 
-	return (fork1(p, ISRFORK, SCARG(uap, flags), retval));
+	return (fork1(p, ISRFORK, SCARG(uap, flags), NULL, 0, retval));
 }
 
 int
-fork1(p1, forktype, rforkflags, retval)
+fork1(p1, forktype, rforkflags, stack, stacksize, retval)
 	register struct proc *p1;
 	int forktype;
 	int rforkflags;
+	void *stack;
+	size_t stacksize;
 	register_t *retval;
 {
 	register struct proc *p2;
@@ -117,7 +120,7 @@ fork1(p1, forktype, rforkflags, retval)
 	int count;
 	static int pidchecked = 0;
 	int dupfd = 1, cleanfd = 0;
-	vm_offset_t uaddr;
+	vaddr_t uaddr;
 
 	if (forktype == ISRFORK) {
 		dupfd = 0;
@@ -302,7 +305,7 @@ again:
 	 * XXX should move p_estcpu into the region of struct proc which gets
 	 * copied.
 	 */
-	p2->p_estcpu = p1->p_estcpu;
+	scheduler_fork_hook(p1, p2);
 
 	/*
 	 * This begins the section where we must prevent the parent
@@ -333,7 +336,7 @@ again:
 	 */
 	retval[0] = 0;
 	retval[1] = 1;
-	if (vm_fork(p1, p2))
+	if (vm_fork(p1, p2, stack, stacksize))
 		return (0);
 #else
 	/*
@@ -341,9 +344,11 @@ again:
 	 * different path later.
 	 */
 #if defined(UVM)
-	uvm_fork(p1, p2, (forktype == ISRFORK && (rforkflags & RFMEM)) ? TRUE : FALSE);
+	uvm_fork(p1, p2,
+	    (forktype == ISRFORK && (rforkflags & RFMEM)) ? TRUE : FALSE,
+	    stack, stacksize);
 #else /* UVM */
-	vm_fork(p1, p2);
+	vm_fork(p1, p2, stack, stacksize);
 #endif /* UVM */
 #endif
 	vm = p2->p_vmspace;
@@ -378,13 +383,11 @@ again:
 	 */
 	p1->p_holdcnt--;
 
-#if defined(UVM) /* ART_UVM_XXX */
+#if defined(UVM)
 	uvmexp.forks++;
-#ifdef notyet
-	if (rforkflags & FORK_PPWAIT)
+	if (forktype == ISVFORK)
 		uvmexp.forks_ppwait++;
-#endif
-	if (rforkflags & RFMEM)
+	if (forktype == ISRFORK && (rforkflags & RFMEM))
 		uvmexp.forks_sharevm++;
 #endif
 

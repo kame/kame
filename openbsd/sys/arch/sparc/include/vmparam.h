@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.6 1998/08/23 23:07:04 marc Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.11 1999/07/09 21:33:37 art Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.13 1997/07/12 16:20:03 perry Exp $	*/
 
 /*
@@ -63,7 +63,7 @@
 #define	MAXTSIZ		(16*1024*1024)		/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(16*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(24*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
 #define	MAXDSIZ		(128*1024*1024)		/* max data size */
@@ -133,20 +133,44 @@
  * IO space virtual base, which must be the same as VM_MAX_KERNEL_ADDRESS:
  * tread with care.
  */
-#define VM_MIN_ADDRESS		((vm_offset_t)0)
-#define VM_MAX_ADDRESS		((vm_offset_t)KERNBASE)
-#define VM_MAXUSER_ADDRESS	((vm_offset_t)KERNBASE)
-#define VM_MIN_KERNEL_ADDRESS	((vm_offset_t)KERNBASE)
-#define VM_MAX_KERNEL_ADDRESS	((vm_offset_t)0xfe000000)
+#define VM_MIN_ADDRESS		((vaddr_t)0)
+#define VM_MAX_ADDRESS		((vaddr_t)KERNBASE)
+#define VM_MAXUSER_ADDRESS	((vaddr_t)KERNBASE)
+#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)KERNBASE)
+#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xfe000000)
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
 #define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
 
+#if defined(UVM)
+#define MACHINE_NEW_NONCONTIG
+#endif
+
+#ifndef MACHINE_NEW_NONCONTIG
 #define MACHINE_NONCONTIG	/* VM <=> pmap interface modifier */
+#endif
+
+#ifdef MACHINE_NEW_NONCONTIG
+
+#define VM_PHYSSEG_MAX		32	/* we only have one "hole" */
+#define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
+#define VM_PHYSSEG_NOADD		/* can't add RAM after vm_mem_init */
+
+/*
+ * pmap specific data stored in the vm_physmem[] array
+ */
+struct pmap_physseg {
+	/* NULL */
+};
+
+#define VM_NFREELIST		1
+#define VM_FREELIST_DEFAULT	0
+
+#endif
 
 #if defined (_KERNEL) && !defined(_LOCORE)
 struct vm_map;
-vm_offset_t	dvma_mapin __P((struct vm_map *, vm_offset_t, int, int));
-void		dvma_mapout __P((vm_offset_t, vm_offset_t, int));
+vaddr_t		dvma_mapin __P((struct vm_map *, vaddr_t, int, int));
+void		dvma_mapout __P((vaddr_t, vaddr_t, int));
 #endif

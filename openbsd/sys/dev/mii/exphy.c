@@ -1,8 +1,8 @@
-/*	$OpenBSD: exphy.c,v 1.2 1998/11/11 19:34:44 jason Exp $	*/
-/*	$NetBSD: exphy.c,v 1.15 1998/11/05 00:19:32 thorpej Exp $	*/
+/*	$OpenBSD: exphy.c,v 1.5 1999/09/26 17:50:41 jason Exp $	*/
+/*	$NetBSD: exphy.c,v 1.15.6.1 1999/04/23 15:39:33 perry Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -125,9 +125,9 @@ exphymatch(parent, match, aux)
 		return (0);
 
 	/*
-	 * Make sure the parent is an `ex'.
+	 * Make sure the parent is an `xl'.
 	 */
-	if (strcmp(parent->dv_cfdata->cf_driver->cd_name, "ex") != 0)
+	if (strcmp(parent->dv_cfdata->cf_driver->cd_name, "xl") != 0)
 		return (0);
 
 	return (10);
@@ -174,13 +174,9 @@ exphyattach(parent, self, aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
-	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
-	else
+	if (sc->mii_capabilities & BMSR_MEDIAMASK)
 		mii_add_media(mii, sc->mii_capabilities,
 		    sc->mii_inst);
-	printf("\n");
 #undef ADD
 }
 
@@ -216,7 +212,7 @@ exphy_service(sc, mii, cmd)
 			 */
 			if (PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN)
 				return (0);
-			(void) mii_phy_auto(sc);
+			(void) mii_phy_auto(sc, 1);
 			break;
 		case IFM_100_T4:
 			/*

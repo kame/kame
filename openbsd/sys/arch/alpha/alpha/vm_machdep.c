@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.9 1999/01/10 13:34:17 niklas Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.12 1999/09/14 11:41:18 kstailey Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.21 1996/11/13 21:13:15 cgd Exp $	*/
 
 /*
@@ -133,8 +133,10 @@ cpu_exit(p)
  * the frame pointers on the stack after copying.
  */
 void
-cpu_fork(p1, p2)
+cpu_fork(p1, p2, stack, stacksize)
 	register struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
 {
 	struct user *up = p2->p_addr;
 	pt_entry_t *ptep;
@@ -196,7 +198,11 @@ printf("NEW PROCESS %d USP = %p\n", p2->p_pid, p2->p_addr->u_pcb.pcb_hw.apcb_usp
 	 * is started, to resume here, returning nonzero from setjmp.
 	 */
 #ifdef DIAGNOSTIC
-	if (p1 != curproc)
+	/*
+	 * If p1 != curproc && p1 == &proc0, we are creating a kernel
+	 * thread.
+	 */
+	if (p1 != curproc && p1 != &proc0)
 		panic("cpu_fork: curproc");
 	if ((up->u_pcb.pcb_hw.apcb_flags & ALPHA_PCB_FLAGS_FEN) != 0)
 		printf("DANGER WILL ROBINSON: FEN SET IN cpu_fork!\n");
@@ -227,6 +233,12 @@ printf("FORK CHILD: pc = %p, ra = %p\n", p2tf->tf_regs[FRAME_PC], p2tf->tf_regs[
 		p2tf->tf_regs[FRAME_V0] = p1->p_pid;	/* parent's pid */
 		p2tf->tf_regs[FRAME_A3] = 0;		/* no error */
 		p2tf->tf_regs[FRAME_A4] = 1;		/* is child */
+
+		/*
+		 * If specificed, give the child a different stack.
+		 */
+		if (stack != NULL)
+			p2tf->tf_regs[FRAME_SP] = (u_long)stack + stacksize;
 
 		/*
 		 * Arrange for continuation at child_return(), which
@@ -410,7 +422,7 @@ vmapbuf(bp, len)
 		if (pa == 0)
 			panic("vmapbuf: null page frame");
 		pmap_enter(vm_map_pmap(phys_map), taddr, trunc_page(pa),
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE);
+		    VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 	}

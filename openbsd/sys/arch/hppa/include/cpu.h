@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.6 1998/12/14 01:19:18 mickey Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.11 1999/09/18 20:02:42 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -50,22 +50,37 @@
 #define	HPPA_NMODSPBUS	64
 
 #define	clockframe	trapframe
-#define	CLKF_BASEPRI(framep)	((framep)->eiem)
-#define	CLKF_PC(framep)		((framep)->iioq_head)
+#define	CLKF_BASEPRI(framep)	((framep)->tf_eiem == ~0U)
+#define	CLKF_PC(framep)		((framep)->tf_iioq_head)
 #define	CLKF_INTR(framep)	(0)	/* XXX */
-#define	CLKF_USERMODE(framep)	(USERMODE((framep)->iioq_head))
+#define	CLKF_USERMODE(framep)	(USERMODE((framep)->tf_iioq_head))
 
 #define	signotify(p)		(void)(p)
 #define	need_resched()		{(void)1;}
 #define	need_proftick(p)	{(void)(p);}
 
+#ifndef _LOCORE
 #ifdef _KERNEL
 #define DELAY(x) delay(x)
-void	delay __P((u_int));
-void	hppa_init __P((void));
-void	trap __P((int, struct trapframe *));
-int	kvtop __P((const caddr_t));
-int	dma_cachectl __P((caddr_t, int));
+void	delay __P((u_int us));
+void	hppa_init __P((paddr_t start));
+void	trap __P((int type, struct trapframe *frame));
+int	kvtop __P((const caddr_t va));
+int	dma_cachectl __P((caddr_t p, int size));
+int	spcopy __P((pa_space_t ssp, const void *src,
+		    pa_space_t dsp, void *dst, size_t size));
+int	spstrcpy __P((pa_space_t ssp, const void *src,
+		      pa_space_t dsp, void *dst, size_t size, size_t *rsize));
+int	copy_on_fault __P((void));
+void child_return __P((struct proc *p));
+void	switch_trampoline __P((void));
+void	switch_exit __P((struct proc *p));
+#define	cpu_wait(p)	/* so, nobody uses it nomore */
+#if 0
+#define	cpu_swapin(p)	/* nothing */
+#endif
+int	cpu_dumpsize __P((void));
+int	cpu_dump __P((void));
 #endif
 
 /*
@@ -85,5 +100,6 @@ int	dma_cachectl __P((caddr_t, int));
 	{ 0, 0 }, \
 	{ "console_device", CTLTYPE_STRUCT }, \
 }
+#endif
 
 #endif /* _MACHINE_CPU_H_ */

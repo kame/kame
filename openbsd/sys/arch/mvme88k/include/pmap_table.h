@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_table.h,v 1.4 1999/02/09 06:36:27 smurph Exp $ */
+/*	$OpenBSD: pmap_table.h,v 1.5 1999/09/27 20:46:19 smurph Exp $ */
 /* 
  * Mach Operating System
  * Copyright (c) 1992 Carnegie Mellon University
@@ -34,12 +34,16 @@
 /* end of list is indicated by pm_size 0xffffffff */
 
 typedef struct {
-  vm_offset_t	phys_start;   /* in bytes */
-  vm_offset_t   virt_start;   /* in bytes */
+  vm_offset_t phys_start;   /* in bytes */
+  vm_offset_t virt_start;   /* in bytes */
   unsigned int	size;      /* in bytes */
   unsigned int  prot;	      /* vm_prot_read, vm_prot_write */
   unsigned int  cacheability; /* none, writeback, normal */
 } pmap_table_entry;
 
 typedef pmap_table_entry *pmap_table_t;
+
+pmap_table_t pmap_table_build __P((unsigned memory_size));
+
+
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kbd.c,v 1.8 1998/04/25 00:31:23 deraadt Exp $	*/
+/*	$OpenBSD: kbd.c,v 1.11 1999/07/20 07:38:33 maja Exp $	*/
 /*	$NetBSD: kbd.c,v 1.28 1997/09/13 19:12:18 pk Exp $ */
 
 /*
@@ -99,7 +99,15 @@
 #define	KEY_RSHIFT	0x82
 #define	KEY_CONTROL	0x83
 #define	KEY_ALLUP	0x84		/* all keys are now up; also reset */
-
+#define	KEY_ALTGR	0x85
+#define	KEY_UMLAUT	0x86
+#define	KEY_CFLEX	0x87
+#define	KEY_TILDE	0x88
+#define	KEY_CEDILLA	0x89
+#define	KEY_ACUTE	0x8a
+#define	KEY_GRAVE	0x8b
+#define	KEY_COMPOSE	0x8c
+#define	KEY_MAGIC_LAST	0x8c
 /*
  * Decode tables for type 2, 3, and 4 keyboards
  * (stolen from Sprite; see also kbd.h).
@@ -108,7 +116,7 @@ static u_char kbd_unshifted[] = {
 /*   0 */	KEY_IGNORE,	KEY_L1,		KEY_IGNORE,	KEY_IGNORE,
 /*   4 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*   8 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
-/*  12 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  12 */	KEY_IGNORE,	KEY_ALTGR,	KEY_IGNORE,	KEY_IGNORE,
 /*  16 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  20 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  24 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
@@ -121,7 +129,7 @@ static u_char kbd_unshifted[] = {
 /*  52 */	KEY_IGNORE,	'\t',		'q',		'w',
 /*  56 */	'e',		'r',		't',		'y',
 /*  60 */	'u',		'i',		'o',		'p',
-/*  64 */	'[',		']',		'\177',		KEY_IGNORE,
+/*  64 */	'[',		']',		'\177',		KEY_COMPOSE,
 /*  68 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  72 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  76 */	KEY_CONTROL,	'a',		's',		'd',
@@ -143,7 +151,7 @@ static u_char kbd_shifted[] = {
 /*   0 */	KEY_IGNORE,	KEY_L1,		KEY_IGNORE,	KEY_IGNORE,
 /*   4 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*   8 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
-/*  12 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  12 */	KEY_IGNORE,	KEY_ALTGR,	KEY_IGNORE,	KEY_IGNORE,
 /*  16 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  20 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  24 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
@@ -156,7 +164,7 @@ static u_char kbd_shifted[] = {
 /*  52 */	KEY_IGNORE,	'\t',		'Q',		'W',
 /*  56 */	'E',		'R',		'T',		'Y',
 /*  60 */	'U',		'I',		'O',		'P',
-/*  64 */	'{',		'}',		'\177',		KEY_IGNORE,
+/*  64 */	'{',		'}',		'\177',		KEY_COMPOSE,
 /*  68 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  72 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
 /*  76 */	KEY_CONTROL,	'A',		'S',		'D',
@@ -174,6 +182,159 @@ static u_char kbd_shifted[] = {
 /* 124 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_ALLUP,
 };
 
+static u_char kbd_altgraph[] = {
+/*   0 */	KEY_IGNORE,	KEY_L1,		KEY_IGNORE,	KEY_IGNORE,
+/*   4 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*   8 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  12 */	KEY_IGNORE,	KEY_ALTGR,	KEY_IGNORE,	KEY_IGNORE,
+/*  16 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  20 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  24 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  28 */	KEY_IGNORE,	'\033',		KEY_IGNORE,	KEY_IGNORE,
+/*  32 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  36 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  40 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	'\b',
+/*  44 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  48 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  52 */	KEY_IGNORE,	'\t',		KEY_IGNORE,	KEY_IGNORE,
+/*  56 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  60 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  64 */	KEY_IGNORE,	KEY_IGNORE,	'\177',		KEY_COMPOSE,
+/*  68 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  72 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  76 */	KEY_CONTROL,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  80 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  84 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  88 */	KEY_IGNORE,	'\r',		KEY_IGNORE,	KEY_IGNORE,
+/*  92 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  96 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_LSHIFT,
+/* 100 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/* 104 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/* 108 */	KEY_IGNORE,	KEY_IGNORE,	KEY_RSHIFT,	'\n',
+/* 112 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/* 116 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_CAPSLOCK,
+/* 120 */	KEY_IGNORE,	' ',		KEY_IGNORE,	KEY_IGNORE,
+/* 124 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_ALLUP,
+};
+
+static u_char kbd_ctrl[] = {
+/*   0 */	KEY_IGNORE,	KEY_L1,		KEY_IGNORE,	KEY_IGNORE,
+/*   4 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*   8 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  12 */	KEY_IGNORE,	KEY_ALTGR,	KEY_IGNORE,	KEY_IGNORE,
+/*  16 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  20 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  24 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  28 */	KEY_IGNORE,	'\033',		'1',		'\000',
+/*  32 */	'3',		'4',		'5',		'\036',
+/*  36 */	'7',		'8',		'9',		'0',
+/*  40 */	'\037',		'=',		'\036',		'\b',
+/*  44 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  48 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  52 */	KEY_IGNORE,	'\t',		'\021',		'\027',
+/*  56 */	'\005',		'\022',		'\024',		'\031',
+/*  60 */	'\025',		'\t',		'\017',		'\020',
+/*  64 */	'\033',		'\035',		'\177',		KEY_COMPOSE,
+/*  68 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  72 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  76 */	KEY_CONTROL,	'\001',		'\023',		'\004',
+/*  80 */	'\006',		'\007',		'\b',		'\n',
+/*  84 */	'\013',		'\014',		';',		'\'',
+/*  88 */	'\034',		'\r',		KEY_IGNORE,	KEY_IGNORE,
+/*  92 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/*  96 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_LSHIFT,
+/* 100 */	'\032',		'\030',		'\003',		'\026',
+/* 104 */	'\002',		'\016',		'\r',		',',
+/* 108 */	'.',		'\037',		KEY_RSHIFT,	'\n',
+/* 112 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,
+/* 116 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_CAPSLOCK,
+/* 120 */	KEY_IGNORE,	'\000',		KEY_IGNORE,	KEY_IGNORE,
+/* 124 */	KEY_IGNORE,	KEY_IGNORE,	KEY_IGNORE,	KEY_ALLUP,
+};
+
+static u_char kbd_accent[] = {
+	0, KEY_UMLAUT,
+		' ', '¨',
+		'A', 'Ä', 'E', 'Ë', 'I', 'Ï', 'O', 'Ö', 'U', 'Ü',
+		'a', 'ä', 'e', 'ë', 'i', 'ï', 'o', 'ö',	'u', 'ü', 'y', 'ÿ',
+	0, KEY_CFLEX,
+		' ', '^',
+		'A', 'Â', 'E', 'Ê', 'I', 'Î', 'O', 'Ô', 'U', 'Û',
+		'a', 'â', 'e', 'ê', 'i', 'î', 'o', 'ô',	'u', 'û',
+	0, KEY_TILDE,
+		' ', '~',
+		'A', 'Ã', 'N', 'Ñ', 'O', 'Õ',
+		'a', 'ã', 'n', 'ñ', 'o', 'õ',
+	0, KEY_CEDILLA,
+		' ', '¸',
+		'C', 'Ç',
+		'c', 'ç',
+	0, KEY_ACUTE,
+		' ', '´',
+		'A', 'Á', 'E', 'É', 'I', 'Í', 'O', 'Ó',	'U', 'Ú', 'Y', 'Ý',
+		'a', 'á', 'e', 'é', 'i', 'í', 'o', 'ó',	'u', 'ú', 'y', 'ý',
+	0, KEY_GRAVE,
+		' ', '`',
+		'A', 'À', 'E', 'È', 'I', 'Ì', 'O', 'Ò',	'U', 'Ù',
+		'a', 'à', 'e', 'è', 'i', 'ì', 'o', 'ò',	'u', 'ù',
+	0, 0
+};
+
+static u_char kbd_compose[] = {
+	0, ' ', ' ', ' ',
+	0, '!', '!', '¡',
+	0, '"', '"', '¨',
+	0, '+', '-', '±',
+	0, ',', ',', '¸',
+	0, '-', ',', '¬', '-', '­', ':', '÷', 'A', 'ª', 'a', 'ª', '|', '¬',
+	0, '/', 'u', 'µ',
+	0, '0', 'X', '¤', 'x', '¤',
+	0, '1', '2', '½', '4', '¼',
+	0, '3', '4', '¾',
+	0, '<', '<', '«',
+	0, '>', '>', '»',
+	0, '?', '?', '¿',
+	0, 'A', '"', 'Ä', '*', 'Å', 'E', 'Æ', '^', 'Â',
+		'`', 'À', '~', 'Ã', '´', 'Á',
+	0, 'C', ',', 'Ç', '/', '¢', 'O', '©',
+	0, 'D', '-', 'Ð',
+	0, 'E', '"', 'Ë', '^', 'Ê', '`', 'È', '´', 'É',
+	0, 'I', '"', 'Ï', '^', 'Î', '`', 'Ì', '´', 'Í',
+	0, 'L', '-', '£',
+	0, 'N', '~', 'Ñ',
+	0, 'O', '"', 'Ö', '/', 'Ø', 'X', '¤', '^', 'Ô',
+		'`', 'Ò', '~', 'Õ', '´', 'Ó',
+	0, 'P', '!', '¶', '|', 'Þ',
+	0, 'R', 'O', '®',
+	0, 'S', 'O', '§',
+	0, 'T', 'H', 'Þ',
+	0, 'U', '"', 'Ü', '^', 'Û', '`', 'Ù', '´', 'Ú',
+	0, 'Y', '-', '¥', '´', 'Ý',
+	0, '\\','\\','´',
+	0, '^', '*', '°', '-', '¯', '.', '·', '0', '°',
+		'1', '¹', '2', '²', '3', '³',
+	0, '_', 'O', 'º', 'o', 'º',
+	0, 'a', '"', 'ä', '*', 'å', '^', 'â', '`', 'à',
+		'e', 'æ', '~', 'ã', '´', 'á',
+	0, 'c', ',', 'ç', '/', '¢', 'o', '©',
+	0, 'd', '-', 'ð',
+	0, 'e', '"', 'ë', '^', 'ê', '`', 'è', '´', 'é',
+	0, 'i', '"', 'ï', '^', 'î', '`', 'ì', '´', 'í',
+	0, 'l', '-', '£',
+	0, 'n', '~', 'ñ',
+	0, 'o', '"', 'ö', '/', 'ø', '^', 'ô', '`', 'ò',
+		'x', '¤', '~', 'õ', '´', 'ó',
+	0, 'p', '!', '¶', '|', 'þ',
+	0, 'r', 'o', '®',
+	0, 's', 'o', '§', 's', 'ß',
+	0, 't', 'h', 'þ',
+	0, 'u', '"', 'ü', '^', 'û', '`', 'ù', '´', 'ú',
+	0, 'x', 'x', '×',
+	0, 'y', '"', 'ÿ', '-', '¥', '´', 'ý',
+	0, '|', '|', '¦',
+	0, 0
+};
+
 /*
  * We need to remember the state of the keyboard's shift and control
  * keys, and we need a per-type translation table.
@@ -181,6 +342,8 @@ static u_char kbd_shifted[] = {
 struct kbd_state {
 	const u_char *kbd_unshifted;	/* unshifted keys */
 	const u_char *kbd_shifted;	/* shifted keys */
+	const u_char *kbd_altgraph;	/* alt gr keys */
+	const u_char *kbd_ctrl;		/* control keys */
 	const u_char *kbd_cur;	/* current keys (either of the preceding) */
 	union {
 		char	c[2];	/* left and right shift keys */
@@ -190,7 +353,10 @@ struct kbd_state {
 #define	kbd_rshift	kbd_shift.c[1]
 #define	kbd_anyshift	kbd_shift.s
 	char	kbd_control;	/* true => ctrl down */
+	char	kbd_altgr;	/* true => alt gr down */
 	char	kbd_click;	/* true => keyclick enabled */
+	u_char	kbd_faccent;	/* "floating accent" character pressed */
+	u_short	kbd_compose;	/* compose state */
 	u_char	kbd_pending;	/* Another code from the keyboard is due */
 	u_char	kbd_id;		/* a place to store the ID */
 	u_char	kbd_layout;	/* a place to store layout */
@@ -224,6 +390,8 @@ void	kbd_reset __P((struct kbd_state *));
 static	int kbd_translate __P((int, struct kbd_state *));
 void	kbdattach __P((int));
 void	kbd_repeat __P((void *arg));
+u_short	kbd_cnv_entry __P((u_short));
+u_short	kbd_cnv_out __P((u_short));
 
 /* set in kbdattach() */
 int kbd_repeat_start;
@@ -300,7 +468,7 @@ kbdattach(kbd)
 			printf("kbd: reset failed\n");
 			kbd_reset(&kbd_softc.k_state);
 		}
-		printf("kbd: type = %d, layout = %d\n",
+		printf("kbd: type = %d, layout = 0x%x\n",
 		    kbd_softc.k_state.kbd_id, kbd_softc.k_state.kbd_layout);
 	}
 }
@@ -315,6 +483,10 @@ kbd_reset(ks)
 	if (ks->kbd_unshifted == NULL) {
 		ks->kbd_unshifted = kbd_unshifted;
 		ks->kbd_shifted = kbd_shifted;
+		ks->kbd_altgraph = kbd_altgraph;
+		ks->kbd_ctrl = kbd_ctrl;
+		ks->kbd_faccent = 0;
+		ks->kbd_compose = 0;
 		ks->kbd_cur = ks->kbd_unshifted;
 	}
 
@@ -352,6 +524,8 @@ kbd_translate(c, ks)
 	register struct kbd_state *ks;
 {
 	register int down;
+	register u_char *p;
+	register int r;
 
 	if (ks->kbd_cur == NULL) {
 		/*
@@ -362,7 +536,7 @@ kbd_translate(c, ks)
 	}
 	down = !KEY_UP(c);
 	c = ks->kbd_cur[KEY_CODE(c)];
-	if (c & KEY_MAGIC) {
+	if ((c >= KEY_MAGIC) && (c <= KEY_MAGIC_LAST)) {
 		switch (c) {
 
 		case KEY_LSHIFT:
@@ -376,12 +550,29 @@ kbd_translate(c, ks)
 		case KEY_ALLUP:
 			ks->kbd_anyshift = 0;
 			ks->kbd_control = 0;
+			ks->kbd_altgr = 0;
+			break;
+
+		case KEY_ALTGR:
+			ks->kbd_altgr = down;
 			break;
 
 		case KEY_CONTROL:
 			ks->kbd_control = down;
-			/* FALLTHROUGH */
+			break;
 
+		case KEY_UMLAUT:
+		case KEY_CFLEX:
+		case KEY_TILDE:
+		case KEY_CEDILLA:
+		case KEY_ACUTE:
+		case KEY_GRAVE:
+			ks->kbd_faccent = c;
+			return (-1);
+
+		case KEY_COMPOSE:
+			ks->kbd_compose = 0xffff;
+			
 		case KEY_IGNORE:
 			return (-1);
 
@@ -392,20 +583,69 @@ kbd_translate(c, ks)
 			ks->kbd_cur = ks->kbd_shifted;
 		else
 			ks->kbd_cur = ks->kbd_unshifted;
+		if (ks->kbd_control) {
+			ks->kbd_cur = ks->kbd_ctrl;
+		} else if (ks->kbd_altgr) {
+			ks->kbd_cur = ks->kbd_altgraph;
+		}
 		return (-1);
 	}
 	if (!down)
 		return (-1);
-	if (ks->kbd_control) {
-		/* control space and unshifted control atsign return null */
-		if (c == ' ' || c == '2')
-			return (0);
-		/* unshifted control hat */
-		if (c == '6')
-			return ('^' & 0x1f);
-		/* standard controls */
-		if (c >= '@' && c < 0x7f)
-			return (c & 0x1f);
+	if (ks->kbd_faccent) {
+		r = -1;
+		p = &kbd_accent[0];
+		while (p != NULL) {
+			if (*p == 0) {
+				if (*++p == 0)
+					break;
+				if (*p++ != ks->kbd_faccent)
+					while(*(p+=2) != 0);
+			} else {
+			  	if (*p++ == (u_char)c) {
+					r = (int) *p;
+					break;
+			  	}
+				p++;
+			}
+		}
+		ks->kbd_faccent = 0;
+		if (r == -1) return(r);
+		c = r;
+	}
+	if (ks->kbd_compose) {
+		p = &kbd_compose[0];
+		if (ks->kbd_compose == 0xffff) {
+			r = 0;
+			while (p != NULL) {
+				if (*++p == 0)
+					break;
+				if (*p++ == (u_char)c) {
+					r = (int)c;
+					break;
+				}
+				while (*(p+=2) != 0);
+			}
+			ks->kbd_compose = (u_short)r;
+			return (-1);
+		} else {
+			r = -1;
+			while (p != NULL) {
+				if (*p == 0) {
+					if (*++p == 0)
+						break;
+					if (*p++ != (u_char) ks->kbd_compose)
+						while (*(p+=2) != 0);
+				} else {
+					if (*p++ == (u_char)c) {
+						r = (int) *p;
+						break;
+					}
+				}
+			}
+			ks->kbd_compose = 0;
+			return (r);
+		}
 	}
 	return (c);
 }
@@ -527,6 +767,97 @@ kbd_rint(c)
 	fe->time = time;
 	k->k_events.ev_put = put;
 	EV_WAKEUP(&k->k_events);
+}
+
+u_short
+kbd_cnv_entry(entry)
+	u_short entry;
+{
+	u_short s;
+
+	s = entry;
+
+	if ((entry >= 0x100) && (entry < 0x800)) {
+
+		if (entry == SHIFTKEYS+CAPSLOCK) {
+			s = KEY_CAPSLOCK;
+		} else if (entry == SHIFTKEYS+LEFTSHIFT) {
+			s = KEY_LSHIFT;
+		} else if (entry == SHIFTKEYS+RIGHTSHIFT) {
+			s = KEY_RSHIFT;
+		} else if ((entry == SHIFTKEYS+LEFTCTRL) ||
+			   (entry == SHIFTKEYS+RIGHTCTRL)) {
+			s = KEY_CONTROL;
+		} else if (entry == SHIFTKEYS+ALTGRAPH) {
+			s = KEY_ALTGR;
+		} else if (entry == BUCKYBITS+SYSTEMBIT) {
+			s = KEY_L1;
+		} else if (entry == IDLE) {
+			s = KEY_ALLUP;
+		} else if (entry == COMPOSE) {
+			s = KEY_COMPOSE;
+		} else if (entry == FA_UMLAUT) {
+			s = KEY_UMLAUT;
+		} else if (entry == FA_CFLEX) {
+			s = KEY_CFLEX;
+		} else if (entry == FA_TILDE) {
+			s = KEY_TILDE;
+		} else if (entry == FA_CEDILLA) {
+			s = KEY_CEDILLA;
+		} else if (entry == FA_ACUTE) {
+			s = KEY_ACUTE;
+		} else if (entry == FA_GRAVE) {
+			s = KEY_GRAVE;
+		} else {
+			s = KEY_IGNORE;
+		}
+	       
+	}
+
+	return(s);
+}
+
+u_short
+kbd_cnv_out(entry)
+	u_short entry;
+{
+	u_short s;
+
+	s = entry;
+
+	if (entry == KEY_IGNORE) {
+		s = NOP;
+	} else if (entry == KEY_L1) {
+		s = BUCKYBITS+SYSTEMBIT;
+	} else if (entry == KEY_CAPSLOCK) {
+		s = SHIFTKEYS+CAPSLOCK;
+	} else if (entry == KEY_LSHIFT) {
+		s = SHIFTKEYS+LEFTSHIFT;
+	} else if (entry == KEY_RSHIFT) {
+		s = SHIFTKEYS+RIGHTSHIFT;
+	} else if (entry == KEY_CONTROL) {
+		s = SHIFTKEYS+LEFTCTRL;
+	} else if (entry == KEY_ALLUP) {
+		s = IDLE;
+	} else if (entry == KEY_ALTGR) {
+		s = SHIFTKEYS+ALTGRAPH;
+	} else if (entry == KEY_UMLAUT) {
+		s = FA_UMLAUT;
+	} else if (entry == KEY_CFLEX) {
+		s = FA_CFLEX;
+	} else if (entry == KEY_TILDE) {
+		s = FA_TILDE;
+	} else if (entry == KEY_CEDILLA) {
+		s = FA_CEDILLA;
+	} else if (entry == KEY_ACUTE) {
+		s = FA_ACUTE;
+	} else if (entry == KEY_GRAVE) {
+		s = FA_GRAVE;
+	} else if (entry == KEY_COMPOSE) {
+		s = COMPOSE;
+	}
+
+	return(s);
 }
 
 int
@@ -658,11 +989,18 @@ kbdioctl(dev, cmd, data, flag, p)
 		case KIOC_SHIFTMASK:
 			tp = kbd_shifted;
 			break;
+		case KIOC_CTRLMASK:
+			tp = kbd_ctrl;
+			break;
+		case KIOC_ALTGMASK:
+			tp = kbd_altgraph;
+			break;
 		default:
 			/* Silently ignore unsupported masks */
 			return (0);
 		}
-		if (kmp->kio_entry & 0xff80)
+		kmp->kio_entry = kbd_cnv_entry(kmp->kio_entry);
+		if (kmp->kio_entry & 0xff00)
 			/* Silently ignore funny entries */
 			return (0);
 
@@ -679,10 +1017,16 @@ kbdioctl(dev, cmd, data, flag, p)
 		case KIOC_SHIFTMASK:
 			tp = kbd_shifted;
 			break;
+		case KIOC_CTRLMASK:
+			tp = kbd_ctrl;
+			break;
+		case KIOC_ALTGMASK:
+			tp = kbd_altgraph;
+			break;
 		default:
 			return (0);
 		}
-		kmp->kio_entry = tp[kmp->kio_station] & ~KEY_MAGIC;
+		kmp->kio_entry = kbd_cnv_out(tp[kmp->kio_station]);
 		return (0);
 
 	case KIOCCMD:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: aic_pcmcia.c,v 1.2 1998/10/14 07:34:43 fgsch Exp $	*/
+/*	$OpenBSD: aic_pcmcia.c,v 1.8 1999/09/13 13:07:00 deraadt Exp $	*/
 /*	$NetBSD: aic_pcmcia.c,v 1.6 1998/07/19 17:28:15 christos Exp $	*/
 
 /*
@@ -68,35 +68,19 @@ struct cfattach aic_pcmcia_ca = {
 };
 
 struct aic_pcmcia_product {
-	u_int32_t	app_vendor;		/* PCMCIA vendor ID */
-	u_int32_t	app_product;		/* PCMCIA product ID */
+	u_int16_t	app_vendor;		/* PCMCIA vendor ID */
+	u_int16_t	app_product;		/* PCMCIA product ID */
 	int		app_expfunc;		/* expected function number */
-	const char	*app_name;		/* device name */
-} aic_pcmcia_products[] = {
+} aic_pcmcia_prod[] = {
 	{ PCMCIA_VENDOR_ADAPTEC,	PCMCIA_PRODUCT_ADAPTEC_APA1460_1,
-	  0,				PCMCIA_STR_ADAPTEC_APA1460_1 },
+	  0 },
+
 	{ PCMCIA_VENDOR_ADAPTEC,	PCMCIA_PRODUCT_ADAPTEC_APA1460_2,
-	  0,				PCMCIA_STR_ADAPTEC_APA1460_2 },
-	{ 0,				0,
-	  0,				NULL },
+	  0 },
+
+	{ PCMCIA_VENDOR_NEWMEDIA,	PCMCIA_PRODUCT_NEWMEDIA_BUSTOASTER,
+	  0 }
 };
-
-struct aic_pcmcia_product *aic_pcmcia_lookup __P((struct pcmcia_attach_args *));
-
-struct aic_pcmcia_product *
-aic_pcmcia_lookup(pa)
-	struct pcmcia_attach_args *pa;
-{
-	struct aic_pcmcia_product *app;
-
-	for (app = aic_pcmcia_products; app->app_name != NULL; app++) {
-		if (pa->manufacturer == app->app_vendor &&
-		    pa->product == app->app_product &&
-		    pa->pf->number == app->app_expfunc)
-			return (app);
-	}
-	return (NULL);
-}
 
 int
 aic_pcmcia_match(parent, match, aux)
@@ -104,9 +88,13 @@ aic_pcmcia_match(parent, match, aux)
 	void *match, *aux;
 {
 	struct pcmcia_attach_args *pa = aux;
+	int i;
 
-	if (aic_pcmcia_lookup(pa) != NULL)
-		return (1);
+	for (i = 0; i < sizeof(aic_pcmcia_prod)/sizeof(aic_pcmcia_prod[0]); i++)
+		if (pa->manufacturer == aic_pcmcia_prod[i].app_vendor &&
+		    pa->product == aic_pcmcia_prod[i].app_product &&
+		    pa->pf->number == aic_pcmcia_prod[i].app_expfunc)
+			return (1);
 	return (0);
 }
 
@@ -120,9 +108,6 @@ aic_pcmcia_attach(parent, self, aux)
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
 	struct pcmcia_function *pf = pa->pf;
-#if 0
-	struct aic_pcmcia_product *app;
-#endif
 
 	psc->sc_pf = pf;
 
@@ -132,8 +117,16 @@ aic_pcmcia_attach(parent, self, aux)
 		    cfe->num_iospace != 1)
 			continue;
 
+		/* The bustoaster has a default config as first
+		 * entry, we don't want to use that. */
+
+		if (pa->manufacturer == PCMCIA_VENDOR_NEWMEDIA &&
+		    pa->product == PCMCIA_PRODUCT_NEWMEDIA_BUSTOASTER &&
+		    cfe->iospace[0].start == 0)
+			continue;
+
 		if (pcmcia_io_alloc(pa->pf, cfe->iospace[0].start,
-		    cfe->iospace[0].length, 0, &psc->sc_pcioh) == 0)
+		    cfe->iospace[0].length, AIC_NPORTS, &psc->sc_pcioh) == 0)
 			break;
 	}
 
@@ -159,28 +152,22 @@ aic_pcmcia_attach(parent, self, aux)
 		return;
 	}
 
+	printf(" port 0x%lx/%d", psc->sc_pcioh.addr, psc->sc_pcioh.size);
+
 	if (!aic_find(sc->sc_iot, sc->sc_ioh)) {
 		printf(": unable to detect chip!\n");
 		return;
 	}
 
-#if 0
-	app = aic_pcmcia_lookup(pa);
-	if (app == NULL) {
-		printf("\n");
-		panic("aic_pcmcia_attach: impossible");
+	/* Establish the interrupt handler. */
+	psc->sc_ih = pcmcia_intr_establish(pa->pf, IPL_BIO, aicintr, sc);
+	if (psc->sc_ih == NULL) {
+		printf(": couldn't establish interrupt\n");
+		return;
 	}
 
-	printf(": %s\n", app->app_name);
-#else
 	printf("\n");
-#endif
 
 	aicattach(sc);
 
-	/* Establish the interrupt handler. */
-	psc->sc_ih = pcmcia_intr_establish(pa->pf, IPL_BIO, aicintr, sc);
-	if (psc->sc_ih == NULL)
-		printf("%s: couldn't establish interrupt\n",
-		    sc->sc_dev.dv_xname);
 }

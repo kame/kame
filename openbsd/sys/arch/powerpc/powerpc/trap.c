@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.13 1999/03/13 01:49:07 rahnds Exp $	*/
+/*	$OpenBSD: trap.c,v 1.15 1999/07/05 20:29:14 rahnds Exp $	*/
 /*	$NetBSD: trap.c,v 1.3 1996/10/13 03:31:37 christos Exp $	*/
 
 /*
@@ -57,15 +57,16 @@
 
 volatile int want_resched;
 
-#ifdef PPC_WANT_BACKTRACE
-u_int32_t dumpframe(u_int32_t);
+#ifdef DDB
+u_int32_t db_dumpframe(u_int32_t);
 void
 ppc_dumpbt(struct trapframe *frame)
 {
+	u_int32_t addr;
 	/* dumpframe is defined in db_trace.c */
 	addr=frame->fixreg[1];
 	while (addr != 0) {
-		addr = dumpframe(addr);
+		addr = db_dumpframe(addr);
 	}
 	return;
 }
@@ -133,7 +134,7 @@ trap(frame)
 				ftype = VM_PROT_READ;
 			if (vm_fault(map, trunc_page(va), ftype, FALSE)
 			    == KERN_SUCCESS)
-				break;
+				return;
 			if (fb = p->p_addr->u_pcb.pcb_onfault) {
 				p->p_addr->u_pcb.pcb_onfault = 0;
 				frame->srr0 = fb->pc;		/* PC */
@@ -163,7 +164,6 @@ printf("kern dsi on addr %x iar %x\n", frame->dar, frame->srr0);
 printf("dsi on addr %x iar %x lr %x\n", frame->dar, frame->srr0,frame->lr);
 /*
  * keep this for later in case we want it later.
-ppc_dumpbt(frame);
 */
 			sv.sival_int = frame->dar;
 			trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
@@ -465,8 +465,10 @@ badaddr(addr, len)
 	faultbuf env;
 	u_int32_t v;
 
-	if (setfault(env))
+	if (setfault(env)) {
+		curpcb->pcb_onfault = 0;
 		return EACCES;
+	}
 	switch(len) {
 	case 4:
 		v = *((volatile u_int32_t *)addr);
@@ -492,8 +494,10 @@ copyin(udaddr, kaddr, len)
 	size_t l;
 	faultbuf env;
 
-	if (setfault(env))
+	if (setfault(env)) {
+		curpcb->pcb_onfault = 0;
 		return EACCES;
+	}
 	while (len > 0) {
 		p = USER_ADDR + ((u_int)udaddr & ~SEGMENT_MASK);
 		l = (USER_ADDR + SEGMENT_LENGTH) - p;
@@ -520,6 +524,7 @@ copyout(kaddr, udaddr, len)
 	faultbuf env;
 
 	if (setfault(env)) {
+		curpcb->pcb_onfault = 0;
 		return EACCES;
 	}
 	while (len > 0) {

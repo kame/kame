@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.36 1999/03/11 19:47:25 deraadt Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.41 1999/08/20 15:37:13 art Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -222,7 +222,6 @@ vfs_rootmountalloc(fstypename, devname, mpp)
 	mp->mnt_flag = MNT_RDONLY;
 	mp->mnt_vnodecovered = NULLVP;
 	vfsp->vfc_refcount++;
-	mp->mnt_stat.f_type = vfsp->vfc_typenum;
 	mp->mnt_flag |= vfsp->vfc_flags & MNT_VISFLAGMASK;
 	strncpy(mp->mnt_stat.f_fstypename, vfsp->vfc_name, MFSNAMELEN);
 	mp->mnt_stat.f_mntonname[0] = '/';
@@ -779,9 +778,9 @@ vput(vp)
 #endif
 	vputonfreelist(vp);
 
-	VOP_INACTIVE(vp, p);
-
 	simple_unlock(&vp->v_interlock);
+
+	VOP_INACTIVE(vp, p);
 }
 
 /*
@@ -1212,6 +1211,23 @@ vfinddev(dev, type, vpp)
 	}
 	simple_unlock(&spechash_slock);
 	return (rc);
+}
+
+/*
+ * Revoke all the vnodes corresponding to the specified minor number
+ * range (endpoints inclusive) of the specified major.
+ */
+void
+vdevgone(maj, minl, minh, type)
+	int maj, minl, minh;
+	enum vtype type;
+{
+	struct vnode *vp;
+	int mn;
+
+	for (mn = minl; mn <= minh; mn++)
+		if (vfinddev(makedev(maj, mn), type, &vp))
+			VOP_REVOKE(vp, REVOKEALL);
 }
 
 /*
@@ -1727,9 +1743,6 @@ vfs_unmountall()
 void
 vfs_shutdown()
 {
-	register struct buf *bp;
-	int iter, nbusy;
-
 	/* XXX Should suspend scheduling. */
 	(void) spl0();
 
@@ -1751,24 +1764,40 @@ vfs_shutdown()
 		vfs_unmountall();
 	}
 
-	/* Sync again after unmount, just in case. */
-	sys_sync(&proc0, (void *)0, (register_t *)0);
+	if (vfs_syncwait(1))
+		printf("giving up\n");
+	else
+		printf("done\n");
+}
 
+/*
+ * perform sync() operation and wait for buffers to flush.
+ * assumtions: called w/ scheduler disabled and physical io enabled
+ * for now called at spl0() XXX
+ */
+int
+vfs_syncwait(verbose)
+	int verbose;
+{
+	register struct buf *bp;
+	int iter, nbusy;
+
+	sys_sync(&proc0, (void *)0, (register_t *)0);
+ 
 	/* Wait for sync to finish. */
 	for (iter = 0; iter < 20; iter++) {
 		nbusy = 0;
 		for (bp = &buf[nbuf]; --bp >= buf; )
 			if ((bp->b_flags & (B_BUSY|B_INVAL)) == B_BUSY)
 				nbusy++;
-		if (nbusy == 0)
-			break;
-		printf("%d ", nbusy);
-		DELAY(40000 * iter);
-	}
-	if (nbusy)
-		printf("giving up\n");
-	else
-		printf("done\n");
+			if (nbusy == 0)
+				break;
+			if (verbose)
+				printf("%d ", nbusy);
+			DELAY(40000 * iter);
+	}   
+
+	return nbusy;
 }
 
 /*
@@ -2094,7 +2123,7 @@ vfs_register(vfs)
 
 #ifdef DIAGNOSTIC
 	/* Paranoia? */
-	if (vfs->vfc_refcount > 0)
+	if (vfs->vfc_refcount != 0)
 		printf("vfs_register called with vfc_refcount > 0\n");
 #endif
 

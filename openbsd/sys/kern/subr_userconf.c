@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_userconf.c,v 1.15 1998/03/03 05:43:03 deraadt Exp $	*/
+/*	$OpenBSD: subr_userconf.c,v 1.18 1999/10/04 20:04:31 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996 Mats O Jansson <moj@stacken.kth.se>
@@ -52,12 +52,20 @@ int userconf_totdev = -1;			/* # of device slots        */
 int userconf_maxlocnames = -1;			/* # of locnames            */
 int userconf_cnt = -1;				/* Line counter for ...     */
 int userconf_lines = 12;			/* ... # of lines per page  */
+int userconf_histlen = 0;
+int userconf_histcur = 0;
+char userconf_history[1024];
+int userconf_histsz = sizeof(userconf_history);
 char userconf_argbuf[40];			/* Additional input         */
 char userconf_cmdbuf[40];			/* Command line             */
+char userconf_histbuf[40];
 
 void userconf_init __P((void));
 int userconf_more __P((void));
 void userconf_modify __P((char *, int*));
+void userconf_hist_cmd __P((char));
+void userconf_hist_int __P((int));
+void userconf_hist_eoc __P((void));
 void userconf_pnum __P((int));
 void userconf_pdevnam __P((short));
 void userconf_pdev __P((short));
@@ -98,6 +106,7 @@ char *userconf_cmds[] = {
 	"lines",	"L",
 	"quit",		"q",
 	"show",		"s",
+	"verbose",	"v",
 	"?",		"h",
 	"",		 "",
 };
@@ -134,7 +143,7 @@ int
 userconf_more()
 {
 	int quit = 0;
-	char c;
+	char c = '\0';
 
 	if (userconf_cnt != -1) {
 		if (userconf_cnt == userconf_lines) {
@@ -148,6 +157,40 @@ userconf_more()
 			quit = 1;
 	}
 	return (quit);
+}
+
+void
+userconf_hist_cmd(cmd)
+	char cmd;
+{
+	userconf_histcur = userconf_histlen;
+	if (userconf_histcur < userconf_histsz) {
+		userconf_history[userconf_histcur] = cmd;
+		userconf_histcur++;
+	}
+}
+
+void
+userconf_hist_int(val)
+	int val;
+{
+	sprintf(userconf_histbuf," %d",val);
+	if ((userconf_histcur + strlen(userconf_histbuf)) < userconf_histsz) {
+		bcopy(userconf_histbuf,
+		      &userconf_history[userconf_histcur],
+		      strlen(userconf_histbuf));
+		userconf_histcur = userconf_histcur + strlen(userconf_histbuf);
+	}
+}
+
+void
+userconf_hist_eoc()
+{
+	if (userconf_histcur < userconf_histsz) {
+		userconf_history[userconf_histcur] = '\n';
+		userconf_histcur++;
+		userconf_histlen = userconf_histcur;
+	}
 }
 
 void
@@ -418,7 +461,11 @@ userconf_change(devno)
 
 		if (c == 'y' || c == 'Y') {
 			int share = 0, i, *lk;
-
+			
+			/* XXX add cmd 'c' <devno> */
+			userconf_hist_cmd('c');
+			userconf_hist_int(devno);
+			
 			cd = &cfdata[devno];
 			l = cd->cf_loc;
 			ln = cd->cf_locnames;
@@ -442,6 +489,10 @@ userconf_change(devno)
 			while (locnamp[ln] != -1) {
 				userconf_modify(locnames[locnamp[ln]],
 						l);
+				
+				/* XXX add *l */
+				userconf_hist_int(*l);
+				
 				ln++;
 				l++;
 			}
@@ -457,6 +508,10 @@ userconf_change(devno)
 			userconf_pdevnam(devno);
 			printf(" changed\n");
 			userconf_pdev(devno);
+
+			/* XXX add eoc */
+			userconf_hist_eoc();
+			
 		}
 	} else {
 		printf("Unknown devno (max is %d)\n", userconf_maxdev);
@@ -488,8 +543,14 @@ userconf_disable(devno)
 
 		printf("%3d ", devno);
 		userconf_pdevnam(devno);
-		if (done)
+		if (done) {
 			printf(" already");
+		} else {
+			/* XXX add cmd 'd' <devno> eoc */
+			userconf_hist_cmd('d');
+			userconf_hist_int(devno);
+			userconf_hist_eoc();
+		}
 		printf(" disabled\n");
 	} else {
 		printf("Unknown devno (max is %d)\n", userconf_maxdev);
@@ -521,8 +582,14 @@ userconf_enable(devno)
 
 		printf("%3d ", devno);
 		userconf_pdevnam(devno);
-		if (done)
+		if (done) {
 			printf(" already");
+		} else {
+			/* XXX add cmd 'e' <devno> eoc */
+			userconf_hist_cmd('d');
+			userconf_hist_int(devno);
+			userconf_hist_eoc();
+		}
 		printf(" enabled\n");
 	} else {
 		printf("Unknown devno (max is %d)\n", userconf_maxdev);
@@ -537,7 +604,7 @@ userconf_help()
 	printf("command   args                description\n");
 	while (*userconf_cmds[j] != '\0') {
 		printf(userconf_cmds[j]);
-		k=strlen(userconf_cmds[j]);
+		k = strlen(userconf_cmds[j]);
 		while (k < 10) {
 			printf(" ");
 			k++;
@@ -576,6 +643,9 @@ userconf_help()
 		case 's':
 			printf("[attr [val]]        %s",
 			   "show attributes (or devices with an attribute)");
+			break;
+		case 'v':
+			printf("                    toggle verbose booting");
 			break;
 		default:
 			printf("                    don't know");
@@ -844,7 +914,8 @@ userconf_add_read(prompt, field, dev, len, val)
 					printf("Unknown devno (max is %d)\n",
 					    userconf_maxdev);
 				} else if (strncasecmp(dev,
-				    cfdata[a].cf_driver->cd_name, len) != 0) {
+				    cfdata[a].cf_driver->cd_name, len) != 0 &&
+					field == 'a') {
 					printf("Not same device type\n");
 				} else {
 					*val = a;
@@ -872,7 +943,7 @@ userconf_add(dev, len, unit, state)
 {
 	int i = 0, found = 0;
 	struct cfdata new;
-	int  val, max_unit;
+	int  val, max_unit, orig;
 
 	bzero(&new, sizeof(struct cfdata));
 
@@ -882,7 +953,7 @@ userconf_add(dev, len, unit, state)
 	}
 
 	if (state == FSTATE_FOUND) {
-		printf("Device not complete number or * is missing/n");
+		printf("Device not complete number or * is missing\n");
 		return;
 	}
 
@@ -900,6 +971,7 @@ userconf_add(dev, len, unit, state)
 	    'a', dev, len, &val);
 
 	if (val != -1) {
+		orig = val;
 		new = cfdata[val];
 		new.cf_unit = unit;
 		new.cf_fstate = state;
@@ -908,7 +980,15 @@ userconf_add(dev, len, unit, state)
 	}
 
 	if (val != -1) {
-
+		
+		/* XXX add cmd 'a' <orig> <val> eoc */
+		userconf_hist_cmd('a');
+		userconf_hist_int(orig);
+		userconf_hist_int(unit);
+		userconf_hist_int(state);
+		userconf_hist_int(val);
+		userconf_hist_eoc();
+		
 		/* Insert the new record */
 		for (i = userconf_maxdev; val <= i; i--)
 			cfdata[i+1] = cfdata[i];
@@ -1093,6 +1173,9 @@ userconf_parse(cmd)
 				printf("Unknown argument\n");
 			break;
 		case 'q':
+			/* XXX add cmd 'q' eoc */
+			userconf_hist_cmd('q');
+			userconf_hist_eoc();
 			return(-1);
 			break;
 		case 's':
@@ -1100,6 +1183,11 @@ userconf_parse(cmd)
 				userconf_show();
 			else
 				userconf_show_attr(c);
+			break;
+		case 'v':
+			autoconf_verbose = !autoconf_verbose;
+			printf("autoconf verbose %sabled\n",
+			    autoconf_verbose ? "en" : "dis");
 			break;
 		default:
 			printf("Unknown command\n");

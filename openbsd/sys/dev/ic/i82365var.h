@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365var.h,v 1.2 1999/01/03 10:05:52 deraadt Exp $	*/
+/*	$OpenBSD: i82365var.h,v 1.5 1999/08/08 01:07:02 niklas Exp $	*/
 /*	$NetBSD: i82365var.h,v 1.4 1998/05/23 18:32:29 matt Exp $	*/
 
 /*
@@ -37,11 +37,23 @@
 
 #include <dev/ic/i82365reg.h>
 
+struct proc;
+
+struct pcic_event {
+	SIMPLEQ_ENTRY(pcic_event) pe_q;
+	int	pe_type;
+};
+
+/* pe_type */
+#define PCIC_EVENT_INSERTION	0
+#define PCIC_EVENT_REMOVAL	1
+
 struct pcic_handle {
 	struct pcic_softc *sc;
 	int	vendor;
 	int	sock;
 	int	flags;
+	int	laststate;
 	int	memalloc;
 	struct {
 		bus_addr_t	addr;
@@ -57,10 +69,18 @@ struct pcic_handle {
 	} io[PCIC_IO_WINS];
 	int	ih_irq;
 	struct device *pcmcia;
+
+	int	shutdown;
+	struct proc *event_thread;
+	SIMPLEQ_HEAD(, pcic_event) events;
 };
 
 #define	PCIC_FLAG_SOCKETP	0x0001
 #define	PCIC_FLAG_CARDP		0x0002
+
+#define PCIC_LASTSTATE_PRESENT	0x0002
+#define PCIC_LASTSTATE_HALF	0x0001
+#define PCIC_LASTSTATE_EMPTY	0x0000
 
 #define	C0SA PCIC_CHIP0_BASE+PCIC_SOCKETA_INDEX
 #define	C0SB PCIC_CHIP0_BASE+PCIC_SOCKETB_INDEX
@@ -121,7 +141,6 @@ struct pcic_softc {
 
 int	pcic_ident_ok __P((int));
 int	pcic_vendor __P((struct pcic_handle *));
-char	*pcic_vendor_to_string __P((int));
 
 void	pcic_attach __P((struct pcic_softc *));
 void	pcic_attach_sockets __P((struct pcic_softc *));
@@ -171,5 +190,7 @@ pcic_write(h, idx, data)
 	if (idx != -1)
 		bus_space_write_1(h->sc->iot, h->sc->ioh, PCIC_REG_INDEX,
 		    h->sock + idx);
-	bus_space_write_1(h->sc->iot, h->sc->ioh, PCIC_REG_DATA, (data));
+	if (data != -1)
+		bus_space_write_1(h->sc->iot, h->sc->ioh, PCIC_REG_DATA,
+		   (data));
 }

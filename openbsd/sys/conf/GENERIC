@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.47 1999/04/11 19:47:10 niklas Exp $
+#	$OpenBSD: GENERIC,v 1.57 1999/10/06 05:25:27 millert Exp $
 #
 #	Machine-independent option; used by all architectures for their
 #	GENERIC kernel
@@ -14,13 +14,15 @@ option		DEVPAGER	# mmap() of devices
 
 option		DDB		# in-kernel debugger
 #makeoptions	DEBUG="-g"	# compile full symbol table
+#makeoptions	PROF="-pg"	# build profiled kernel
+#option		GPROF		# kernel profiling, kgmon(8)
 option		DIAGNOSTIC	# internal consistency checks
 option		KTRACE		# system call tracing, a la ktrace(1)
+option		KMEMSTATS	# collect malloc(9) statistics
 
 option		SYSVMSG		# System V-like message queues
 option		SYSVSEM		# System V-like semaphores
 option		SYSVSHM		# System V-like memory sharing
-#option		SHMMAXPGS=1024	# 1024 pages is the default
 
 #option		COMPAT_09	# Kernel compatibility with NetBSD 0.9,
 #option		COMPAT_10	# NetBSD 1.0,
@@ -37,8 +39,9 @@ option		EXT2FS		# Second Extended Filesystem
 option		MFS		# memory file system
 #option		XFS		# xfs filesystem
 
-#option		TCP_SACK	# Selective Acknowledgements for TCP
+option		TCP_SACK	# Selective Acknowledgements for TCP
 #option		TCP_FACK	# Forward Acknowledgements for TCP
+#option		TCP_SIGNATURE	# TCP MD5 Signatures, for BGP routing sessions
 
 option		NFSCLIENT	# Network File System client
 option		NFSSERVER	# Network File System server
@@ -64,6 +67,7 @@ option		IPSEC		# IPsec
 #option		IPXIP		# IPX tunneling over IP
 #option		ISO,TPIP	# OSI
 #option		EON		# OSI tunneling over IP
+#option		NETATALK	# AppleTalk
 #option		CCITT,LLC,HDLC	# X.25
 option		IPFILTER	# IP packet filter for security
 option		IPFILTER_LOG	# use /dev/ipl to log IPF
@@ -74,6 +78,7 @@ pseudo-device	loop	2	# network loopback
 pseudo-device	bpfilter 8	# packet filter
 pseudo-device	sl	2	# CSLIP
 pseudo-device	ppp	2	# PPP
+pseudo-device	sppp		# Sync PPP/HDLC
 pseudo-device	tun	2	# network tunneling over tty
 pseudo-device	enc	1	# IPSEC needs the encapsulation interface
 #pseudo-device	strip	1	# Starmode Radio IP interface

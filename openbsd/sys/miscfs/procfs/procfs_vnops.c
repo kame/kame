@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_vnops.c,v 1.12 1998/08/06 19:34:46 csapuntz Exp $	*/
+/*	$OpenBSD: procfs_vnops.c,v 1.14 1999/08/13 07:05:46 csapuntz Exp $	*/
 /*	$NetBSD: procfs_vnops.c,v 1.40 1996/03/16 23:52:55 christos Exp $	*/
 
 /*
@@ -825,11 +825,11 @@ procfs_readdir(v)
 
 	if (uio->uio_resid < UIO_MX)
 		return (EINVAL);
-	if (uio->uio_offset < 0)
-		return (EINVAL);
 
 	error = 0;
 	i = uio->uio_offset;
+	if (i < 0)
+		return (EINVAL);
 	bzero((caddr_t)&d, UIO_MX);
 	d.d_reclen = UIO_MX;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_generic.c,v 1.18 1999/03/22 02:22:15 deraadt Exp $	*/
+/*	$OpenBSD: sys_generic.c,v 1.20 1999/08/04 19:18:13 deraadt Exp $	*/
 /*	$NetBSD: sys_generic.c,v 1.24 1996/03/29 00:25:32 cgd Exp $	*/
 
 /*
@@ -767,7 +767,7 @@ pollscan(p, pl, nfd, retval)
 	register struct filedesc *fdp = p->p_fd;
 	register int msk, i;
 	struct file *fp;
-	int n = 0;
+	int x, n = 0;
 	static int flag[3] = { FREAD, FWRITE, 0 };
 	static int pflag[3] = { POLLIN|POLLRDNORM, POLLOUT, POLLERR };
 
@@ -783,15 +783,17 @@ pollscan(p, pl, nfd, retval)
 			}
 			continue;
 		}
-		for (msk = 0; msk < 3; msk++) {
+		for (x = msk = 0; msk < 3; msk++) {
 			if (pl[i].events & pflag[msk]) {
 				if ((*fp->f_ops->fo_select)(fp, flag[msk], p)) {
 					pl[i].revents |= pflag[msk] &
 					    pl[i].events;
-					n++;
+					x++;
 				}
 			}
 		}
+		if (x)
+			n++;
 	}
 	*retval = n;
 }
@@ -808,7 +810,7 @@ sys_poll(p, v, retval)
 {
 	struct sys_poll_args *uap = v;
 	size_t sz;
-	struct pollfd *pl;
+	struct pollfd pfds[4], *pl = pfds;
 	int msec = SCARG(uap, timeout);
 	struct timeval atv;
 	int timo, ncoll, i, s, error, error2;
@@ -819,7 +821,9 @@ sys_poll(p, v, retval)
 		SCARG(uap, nfds) = p->p_fd->fd_nfiles;
 	sz = sizeof(struct pollfd) * SCARG(uap, nfds);
 	
-	pl = (struct pollfd *) malloc(sz, M_TEMP, M_WAITOK);
+	/* optimize for the default case, of a small nfds value */
+	if (sz > sizeof(pfds))
+		pl = (struct pollfd *) malloc(sz, M_TEMP, M_WAITOK);
 
 	if ((error = copyin(SCARG(uap, fds), pl, sz)) != 0)
 		goto bad;
@@ -878,6 +882,7 @@ done:
 	if ((error2 = copyout(pl, SCARG(uap, fds), sz)) != 0)
 		error = error2;
 bad:
-	free((char *) pl, M_TEMP);
+	if (pl != pfds)
+		free((char *) pl, M_TEMP);
 	return (error);
 }

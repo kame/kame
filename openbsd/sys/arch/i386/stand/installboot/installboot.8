@@ -1,4 +1,4 @@
-.\"	$OpenBSD: installboot.8,v 1.15 1999/01/24 15:55:31 mickey Exp $
+.\"	$OpenBSD: installboot.8,v 1.21 1999/07/09 13:35:33 aaron Exp $
 .\"
 .\" Copyright (c) 1997 Michael Shalayeff
 .\" All rights reserved.
@@ -17,8 +17,8 @@
 .\" 4. The name of the author may not be used to endorse or promote products
 .\"    derived from this software without specific prior written permission.
 .\"
-.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
-.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 .\" WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 .\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
 .\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -30,9 +30,9 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd 1 Sep 1997
-.Dt INSTALLBOOT 8
-.Os 
+.Dd September 1, 1997
+.Dt INSTALLBOOT 8 i386
+.Os
 .Sh NAME
 .Nm installboot
 .Nd install a bootstrap on a FFS disk or partition
@@ -143,7 +143,6 @@ and
 you can use the boot block command:
 .Pp
 .Dl boot> machine diskinfo
-.Pp
 .Sh BUGS
 The disklabel
 .Va d_type
@@ -156,7 +155,7 @@ for a drive/partition other than the one you want the
 .Pa /boot
 to be loaded from.
 .Sh SEE ALSO
+.Xr biosboot 8 ,
 .Xr disklabel 8 ,
-.Xr init 8 ,
 .Xr fdisk 8 ,
-.Xr biosboot 8 .
+.Xr init 8

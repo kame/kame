@@ -1,4 +1,4 @@
-/*	$OpenBSD: rz.c,v 1.17 1998/10/04 20:40:08 millert Exp $	*/
+/*	$OpenBSD: rz.c,v 1.19 1999/08/20 16:22:04 maja Exp $	*/
 /*	$NetBSD: rz.c,v 1.38 1998/05/08 00:05:19 simonb Exp $	*/
 
 /*
@@ -69,6 +69,7 @@
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsi_disk.h>
+#include <scsi/cd.h>
 #include <scsi/scsi_cd.h>
 #include <scsi/scsiconf.h>
 
@@ -194,7 +195,7 @@ int	rzdebug = RZB_ERROR;
 struct scsi_mode_sense_data {
 	struct scsi_mode_header header;
 	struct scsi_blk_desc blk_desc;
-	union disk_pages pages;
+	union scsi_disk_pages pages;
 };
 
 /*

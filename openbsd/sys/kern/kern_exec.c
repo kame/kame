@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.26 1999/02/26 05:05:38 art Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.33 1999/08/09 12:19:07 millert Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -285,7 +285,7 @@ sys_execve(p, v, retval)
 	argp = (char *)kmem_alloc_wait(exec_map, NCARGS);
 #endif
 #ifdef DIAGNOSTIC
-	if (argp == (vm_offset_t) 0)
+	if (argp == (vaddr_t) 0)
 		panic("execve: argp == NULL");
 #endif
 	dp = argp;
@@ -373,22 +373,27 @@ sys_execve(p, v, retval)
 	/* adjust "active stack depth" for process VSZ */
 	pack.ep_ssize = len;	/* maybe should go elsewhere, but... */
 
+	/*
+	 * Prepare vmspace for remapping. Note that uvmspace_exec can replace
+	 * p_vmspace!
+	 */
 #if defined(UVM)
 	uvmspace_exec(p);
 #else
 	/* Unmap old program */
-#ifdef sparc
+#ifdef __sparc__
 	kill_user_windows(p);		/* before stack addresses go away */
 #endif
 	/* Kill shared memory and unmap old program */
 #ifdef SYSVSHM
-	if (vm->vm_shm)
-		shmexit(p);
+	if (vm->vm_shm && vm->vm_refcnt == 1)
+		shmexit(vm);
 #endif
 	vm_deallocate(&vm->vm_map, VM_MIN_ADDRESS,
 	    VM_MAXUSER_ADDRESS - VM_MIN_ADDRESS);
 #endif
 
+	vm = p->p_vmspace;
 	/* Now map address space */
 	vm->vm_taddr = (char *)pack.ep_taddr;
 	vm->vm_tsize = btoc(pack.ep_tsize);
@@ -434,6 +439,7 @@ sys_execve(p, v, retval)
 	    ((char *)PS_STRINGS) - szsigcode, szsigcode))
 		goto exec_abort;
 
+	stopprofclock(p);	/* stop profiling */
 	fdcloseexec(p);		/* handle close on exec */
 	execsigs(p);		/* reset catched signals */
 
@@ -512,7 +518,7 @@ sys_execve(p, v, retval)
 				    "/dev/null", p);
 				if ((error = vn_open(&nd, flags, 0)) != 0) {
 					ffree(fp);
-					p->p_fd->fd_ofiles[indx] = NULL;
+					fdremove(p->p_fd, indx);
 					break;
 				}
 				fp->f_flag = flags;
@@ -545,7 +551,7 @@ sys_execve(p, v, retval)
 #if defined(UVM)
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 #else
-	kmem_free_wakeup(exec_map, (vm_offset_t)argp, NCARGS);
+	kmem_free_wakeup(exec_map, (vaddr_t)argp, NCARGS);
 #endif
 
 	FREE(nid.ni_cnd.cn_pnbuf, M_NAMEI);
@@ -586,7 +592,7 @@ bad:
 #if defined(UVM)
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 #else
-	kmem_free_wakeup(exec_map, (vm_offset_t) argp, NCARGS);
+	kmem_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 #endif
 
 freehdr:
@@ -614,7 +620,7 @@ exec_abort:
 #if defined(UVM)
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 #else
-	kmem_free_wakeup(exec_map, (vm_offset_t) argp, NCARGS);
+	kmem_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 #endif
 
 free_pack_abort:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.2 1998/10/30 19:28:13 mickey Exp $	*/
+/*	$OpenBSD: param.h,v 1.6 1999/09/18 19:01:56 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -30,8 +30,8 @@
  * Machine dependent constants for PA-RISC.
  */
 
-#define	_MACHINE	hp700
-#define MACHINE		"hp700"
+#define	_MACHINE	hppa
+#define	MACHINE		"hppa"
 #define	_MACHINE_ARCH	hppa
 #define	MACHINE_ARCH	"hppa"
 #define	MID_MACHINE	MID_HPUX800
@@ -41,7 +41,7 @@
  * data types (int, long, ...).   The result is u_int and must be cast to
  * any desired pointer type.
  */
-#define	ALIGNBYTES	3
+#define	ALIGNBYTES	7
 #define	ALIGN(p)	(((u_long)(p) + ALIGNBYTES) &~ ALIGNBYTES)
 
 #define	NBPG		4096		/* bytes/page */
@@ -60,7 +60,7 @@
 #define BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
 
-#define	STACK_GROWS_UP	1		/* stack grows to higher addresses */
+#define	MACHINE_STACK_GROWS_UP	1	/* stack grows to higher addresses */
 
 #define	CLSIZE		1
 #define	CLSIZELOG2	0
@@ -69,8 +69,10 @@
 #define	SSIZE		(1)		/* initial stack size/NBPG */
 #define	SINCR		(1)		/* increment of stack/NBPG */
 
-#define	UPAGES		(2)		/* pages of u-area */
-#define	USPACE		(UPAGES * NBPG)	/* pages for user struct */
+#define	UADDR		0x7ffe6000	/* u-area lives here */
+#define	USHIFT		(3)		/* log2(UPAGES) */
+#define	UPAGES		(1<<USHIFT)	/* pages of u-area */
+#define	USPACE		(UPAGES * NBPG)	/* pages for user struct and kstack */
 
 /*
  * Constants related to network buffer management.

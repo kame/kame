@@ -1,4 +1,4 @@
-/*	$OpenBSD: dp8390.c,v 1.3 1999/03/02 06:12:33 fgsch Exp $	*/
+/*	$OpenBSD: dp8390.c,v 1.5 1999/08/13 21:10:14 deraadt Exp $	*/
 /*	$NetBSD: dp8390.c,v 1.13 1998/07/05 06:49:11 jonathan Exp $	*/
 
 /*
@@ -136,6 +136,7 @@ dp8390_config(sc, media, nmedia, defmedia)
 		ifp->if_watchdog = dp8390_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	/* Initialize media goo. */
 	ifmedia_init(&sc->sc_media, 0, dp8390_mediachange, dp8390_mediastatus);
@@ -165,7 +166,7 @@ dp8390_config(sc, media, nmedia, defmedia)
 #endif
 
 	/* Print additional info when attached. */
-	printf("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
+	printf("%s: address %s\n", sc->sc_dev.dv_xname,
 #ifdef __NetBSD__
 	    ether_sprintf(sc->sc_enaddr));
 #else

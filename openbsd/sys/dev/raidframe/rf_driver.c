@@ -1,5 +1,41 @@
-/*	$OpenBSD: rf_driver.c,v 1.2 1999/02/16 00:02:41 niklas Exp $	*/
-/*	$NetBSD: rf_driver.c,v 1.6 1999/02/05 00:06:10 oster Exp $	*/
+/*	$OpenBSD: rf_driver.c,v 1.5 1999/08/04 13:10:54 peter Exp $	*/
+/*	$NetBSD: rf_driver.c,v 1.12 1999/07/19 01:36:07 oster Exp $	*/
+/*-
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Greg Oster
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *        This product includes software developed by the NetBSD
+ *        Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -118,6 +154,13 @@ static void clean_rad(RF_RaidAccessDesc_t *);
 static void rf_ShutdownRDFreeList(void *);
 static int rf_ConfigureRDFreeList(RF_ShutdownList_t **);
 
+void rf_UnconfigureVnodes( RF_Raid_t * );
+ 
+/* XXX move these to their own .h file! */
+int raidwrite_component_label(dev_t, struct vnode *, RF_ComponentLabel_t *);
+int raidread_component_label(dev_t, struct vnode *, RF_ComponentLabel_t *);
+int raidmarkclean(dev_t dev, struct vnode *b_vp,int);
+void rf_update_component_labels( RF_Raid_t *);
 
 RF_DECLARE_MUTEX(rf_printf_mutex)	/* debug only:  avoids interleaved
 					 * printfs by different stripes */
@@ -126,7 +169,7 @@ RF_DECLARE_GLOBAL_THREADID	/* declarations for threadid.h */
 
 #define SIGNAL_QUIESCENT_COND(_raid_)  wakeup(&((_raid_)->accesses_suspended))
 #define WAIT_FOR_QUIESCENCE(_raid_) \
-	tsleep(&((_raid_)->accesses_suspended),PRIBIO|PCATCH,"raidframe quiesce", 0);
+	tsleep(&((_raid_)->accesses_suspended),PRIBIO,"raidframe quiesce", 0);
 
 #if DKUSAGE > 0
 #define IO_BUF_ERR(bp, err, unit) { \
@@ -157,7 +200,8 @@ RF_DECLARE_STATIC_MUTEX(configureMutex)	/* used to lock the configuration
 	static int rf_ConfigureRDFreeList(RF_ShutdownList_t ** listp);
 
 /* called at system boot time */
-	int     rf_BootRaidframe()
+int
+rf_BootRaidframe()
 {
 	int     rc;
 
@@ -247,10 +291,6 @@ int
 rf_Shutdown(raidPtr)
 	RF_Raid_t *raidPtr;
 {
-	int     r, c;
-
-	struct proc *p;
-
 	if (!raidPtr->valid) {
 		RF_ERRORMSG("Attempt to shut down unconfigured RAIDframe driver.  Aborting shutdown\n");
 		return (EINVAL);
@@ -276,6 +316,23 @@ rf_Shutdown(raidPtr)
 
 	raidPtr->valid = 0;
 
+	rf_update_component_labels(raidPtr);
+
+	rf_UnconfigureVnodes(raidPtr);
+
+	rf_ShutdownList(&raidPtr->shutdownList);
+
+	rf_UnconfigureArray();
+
+	return (0);
+}
+
+void
+rf_UnconfigureVnodes( raidPtr )
+	RF_Raid_t *raidPtr;
+{
+	int r,c; 
+	struct proc *p;
 
 	/* We take this opportunity to close the vnodes like we should.. */
 
@@ -285,8 +342,10 @@ rf_Shutdown(raidPtr)
 		for (c = 0; c < raidPtr->numCol; c++) {
 			printf("Closing vnode for row: %d col: %d\n", r, c);
 			if (raidPtr->raid_cinfo[r][c].ci_vp) {
-				(void) vn_close(raidPtr->raid_cinfo[r][c].ci_vp,
-				    FREAD | FWRITE, p->p_ucred, p);
+				VOP_UNLOCK(raidPtr->raid_cinfo[r][c].ci_vp, 0, p);
+ 				(void) vn_close(raidPtr->raid_cinfo[r][c].ci_vp,
+ 				    FREAD | FWRITE, p->p_ucred, p);
+				raidPtr->raid_cinfo[r][c].ci_vp = NULL;
 			} else {
 				printf("vnode was NULL\n");
 			}
@@ -296,20 +355,14 @@ rf_Shutdown(raidPtr)
 	for (r = 0; r < raidPtr->numSpare; r++) {
 		printf("Closing vnode for spare: %d\n", r);
 		if (raidPtr->raid_cinfo[0][raidPtr->numCol + r].ci_vp) {
+			VOP_UNLOCK(raidPtr->raid_cinfo[0][raidPtr->numCol + r].ci_vp, 0, p);
 			(void) vn_close(raidPtr->raid_cinfo[0][raidPtr->numCol + r].ci_vp,
 			    FREAD | FWRITE, p->p_ucred, p);
+			raidPtr->raid_cinfo[0][raidPtr->numCol + r].ci_vp = NULL;
 		} else {
 			printf("vnode was NULL\n");
 		}
 	}
-
-
-
-	rf_ShutdownList(&raidPtr->shutdownList);
-
-	rf_UnconfigureArray();
-
-	return (0);
 }
 
 #define DO_INIT_CONFIGURE(f) { \
@@ -324,6 +377,7 @@ rf_Shutdown(raidPtr)
 }
 
 #define DO_RAID_FAIL() { \
+	rf_UnconfigureVnodes(raidPtr); \
 	rf_ShutdownList(&raidPtr->shutdownList); \
 	rf_UnconfigureArray(); \
 }
@@ -387,7 +441,6 @@ rf_Configure(raidPtr, cfgPtr)
 		rf_clear_debug_print_buffer();
 
 		DO_INIT_CONFIGURE(rf_ConfigureAllocList);
-		DO_INIT_CONFIGURE(rf_ConfigureEtimer);
 		/*
 	         * Yes, this does make debugging general to the whole system instead
 	         * of being array specific. Bummer, drag.
@@ -692,14 +745,14 @@ bp_in is a buf pointer.  void * to facilitate ignoring it outside the kernel
 		IO_BUF_ERR(bp, EINVAL, raidPtr->raidid);
 		return (EINVAL);
 	}
-#if defined(KERNEL) && DFSTRACE > 0
+#if defined(_KERNEL) && DFSTRACE > 0
 	if (rf_DFSTraceAccesses) {
 		dfsrecord.raidAddr = raidAddress;
 		dfsrecord.numBlocks = numBlocks;
 		dfsrecord.type = type;
 		dfs_log(DFS_NOTE, (char *) &dfsrecord, sizeof(dfsrecord), 0);
 	}
-#endif				/* KERNEL && DFSTRACE > 0 */
+#endif				/* _KERNEL && DFSTRACE > 0 */
 
 	rf_get_threadid(tid);
 	if (rf_accessDebug) {
@@ -910,8 +963,6 @@ rf_ConfigureDebug(cfgPtr)
 }
 /* performance monitoring stuff */
 
-#define TIMEVAL_TO_US(t) (((long) t.tv_sec) * 1000000L + (long) t.tv_usec)
-
 #if !defined(_KERNEL) && !defined(SIMULATE)
 
 /*
@@ -960,7 +1011,7 @@ rf_StopThroughputStats(RF_Raid_t * raidPtr)
 	if (raidPtr->throughputstats.num_out_ios == 0) {
 		RF_GETTIME(raidPtr->throughputstats.stop);
 		RF_TIMEVAL_DIFF(&raidPtr->throughputstats.start, &raidPtr->throughputstats.stop, &diff);
-		raidPtr->throughputstats.sum_io_us += TIMEVAL_TO_US(diff);
+		raidPtr->throughputstats.sum_io_us += RF_TIMEVAL_TO_US(diff);
 	}
 	RF_UNLOCK_MUTEX(raidPtr->throughputstats.mutex);
 }
@@ -974,7 +1025,7 @@ rf_PrintThroughputStats(RF_Raid_t * raidPtr)
 		    / (raidPtr->throughputstats.sum_io_us / 1000000.0));
 	}
 }
-#endif				/* !KERNEL && !SIMULATE */
+#endif				/* !_KERNEL && !SIMULATE */
 
 void 
 rf_StartUserStats(RF_Raid_t * raidPtr)
@@ -1009,7 +1060,7 @@ rf_PrintUserStats(RF_Raid_t * raidPtr)
 	struct timeval diff;
 
 	RF_TIMEVAL_DIFF(&raidPtr->userstats.start, &raidPtr->userstats.stop, &diff);
-	elapsed_us = TIMEVAL_TO_US(diff);
+	elapsed_us = RF_TIMEVAL_TO_US(diff);
 
 	/* 2000 sectors per megabyte, 10000000 microseconds per second */
 	if (elapsed_us)

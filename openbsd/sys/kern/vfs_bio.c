@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_bio.c,v 1.21 1998/11/29 01:46:58 art Exp $	*/
+/*	$OpenBSD: vfs_bio.c,v 1.24 1999/09/10 22:14:39 art Exp $	*/
 /*	$NetBSD: vfs_bio.c,v 1.44 1996/06/11 11:15:36 pk Exp $	*/
 
 /*-
@@ -144,7 +144,7 @@ bufinit()
 
 	for (dp = bufqueues; dp < &bufqueues[BQUEUES]; dp++)
 		TAILQ_INIT(dp);
-	bufhashtbl = hashinit(nbuf, M_CACHE, &bufhash);
+	bufhashtbl = hashinit(nbuf, M_CACHE, M_WAITOK, &bufhash);
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
 	for (i = 0; i < nbuf; i++) {
@@ -632,11 +632,11 @@ allocbuf(bp, size)
 	struct buf *bp;
 	int size;
 {
-	struct buf      *nbp;
-	vm_size_t       desired_size;
-	int	     s;
+	struct buf	*nbp;
+	vsize_t		desired_size;
+	int		s;
 
-	desired_size = roundup(size, CLBYTES);
+	desired_size = clrnd(round_page(size));
 	if (desired_size > MAXBSIZE)
 		panic("allocbuf: buffer larger than MAXBSIZE requested");
 

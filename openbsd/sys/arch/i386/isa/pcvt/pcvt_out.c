@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcvt_out.c,v 1.7 1999/01/13 07:26:02 niklas Exp $	*/
+/*	$OpenBSD: pcvt_out.c,v 1.14 1999/10/20 19:15:51 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -80,6 +80,7 @@ static void wrfkl ( int num, u_char *string, struct video_state *svsp );
 static void writefkl ( int num, u_char *string, struct video_state *svsp );
 static __inline void write_char (struct	video_state *, u_short, u_short ch);
 
+static int check_scrollback ( struct video_state *svsp );
 
 /*---------------------------------------------------------------------------*
  *	do character set transformation and write to display memory (inline)
@@ -91,6 +92,11 @@ static __inline void write_char (svsp, attrib, ch)
 struct	video_state *svsp;
 u_short	attrib, ch;
 {
+	if (pcdisp && pcdisp_special == 0) {
+		*video = attrib | ch;
+		return;
+	}
+
 	if ((ch >= 0x20) && (ch <= 0x7f))	/* use GL if ch >= 0x20 */
 	{
 		if(!svsp->ss)		/* single shift G2/G3 -> GL ? */
@@ -147,6 +153,7 @@ void
 sput (u_char *s, U_char kernel, int len, int page)
 {
     register struct video_state *svsp;
+    int		extra;
     u_short	attrib;
     u_short	ch;
 
@@ -269,6 +276,18 @@ sput (u_char *s, U_char kernel, int len, int page)
 				case 0x0a:	/* LF */
 				case 0x0b:	/* VT */
 				case 0x0c:	/* FF */
+					if (check_scrollback(svsp))
+					{
+						extra = (svsp->cur_offset %
+							svsp->maxcol) ?
+							svsp->col : 0;
+						bcopy(svsp->Crtat +
+						      svsp->cur_offset - extra,
+						      svsp->Scrollback +
+					              (svsp->scr_offset *
+						      svsp->maxcol),
+						      svsp->maxcol * CHR);
+					}
 					if(svsp->lnm)
 					{
 						svsp->cur_offset -= svsp->col;
@@ -421,6 +440,16 @@ sput (u_char *s, U_char kernel, int len, int page)
 					svsp->cur_offset++;
 					svsp->col = 0;
 					svsp->lastchar = 0;
+					if (check_scrollback(svsp))
+					{
+						bcopy(svsp->Crtat +
+						      svsp->cur_offset -
+						      svsp->maxcol,
+		      				      svsp->Scrollback +
+						      (svsp->scr_offset *
+						      svsp->maxcol),
+		      				      svsp->maxcol * CHR);
+					}
 					check_scroll(svsp);
 				}
 
@@ -813,6 +842,9 @@ sput (u_char *s, U_char kernel, int len, int page)
 					case 'K':	/* erase line */
 						vt_clreol(svsp);
 						svsp->state = STATE_INIT;
+						if (svsp->scr_offset > 0 &&
+						    svsp == vsp)
+							svsp->scr_offset--;
 						break;
 
 					case 'L':	/* insert line */
@@ -990,6 +1022,8 @@ vt_coldinit(void)
 	struct video_state *svsp;
 
 	do_initialization = 0;		/* reset init necessary flag */
+	pcdisp = 1;			/* turn on traditional pc colors/font */
+	pcdisp_special = 0;
 
 	/* get the equipment byte from the RTC chip */
 
@@ -1094,6 +1128,9 @@ vt_coldinit(void)
 	{
 		svsp->Crtat = Crtat;		/* all same until malloc'ed */
 		svsp->Memory = Crtat;		/* until malloc'ed */
+		svsp->Scrollback = 0;		/* until malloc'ed */
+		svsp->scr_offset = 0;		/* scrollback offset (lines) */
+		svsp->scrolling = 0;		/* current scrollback page */
 		svsp->cur_offset = 0;		/* cursor offset */
 		svsp->c_attr = user_attr;	/* non-kernel attributes */
 		svsp->bell_on = 1;		/* enable bell */
@@ -1128,6 +1165,7 @@ vt_coldinit(void)
 #endif /* PCVT_24LINESDEF */
 
 		svsp->screen_rowsize = 25;	/* default 25 rows on screen */
+		svsp->max_off =  svsp->screen_rowsize * SCROLLBACK_PAGES - 1;
 		svsp->scrr_beg = 0;		/* scrolling region begin row*/
 		svsp->scrr_len = svsp->screen_rows; /* scrolling region length*/
 		svsp->scrr_end = svsp->scrr_len - 1;/* scrolling region end */
@@ -1361,6 +1399,14 @@ vt_coldmalloc(void)
 					MAXROW_VGA * MAXCOL_VGA * CHR;
 	}
 
+	scrollback_pages = SCROLLBACK_PAGES;
+	if ((Scrollbuffer = (u_short *)malloc(vs[0].maxcol *
+	     vs[0].screen_rows * scrollback_pages * CHR, M_DEVBUF,
+	     M_WAITOK)) == NULL)
+	{
+		printf("pcvt: scrollback memory malloc failed\n");
+	}
+
 	for(nscr = 0; nscr < PCVT_NSCREENS; nscr++)
 	{
 		if((vs[nscr].Memory =
@@ -1372,6 +1418,7 @@ vt_coldmalloc(void)
 			       PCVT_NSCREENS, nscr);
 			break;
 		}
+		vs[nscr].Scrollback = Scrollbuffer;
 		if(nscr != 0)
 		{
 			vs[nscr].Crtat = vs[nscr].Memory;
@@ -1421,6 +1468,27 @@ check_scroll(struct video_state *svsp)
 		if (svsp->cur_offset >= svsp->screen_rows * svsp->maxcol)
 			svsp->cur_offset -= svsp->maxcol;
 	}
+}
+
+static int
+check_scrollback(struct video_state *svsp)
+{
+	/* still waiting for scrollback memory or not on current page */
+	if (!svsp->Scrollback || svsp != vsp)
+		return 0;
+
+	/* remove first line of scrollback buffer to make room for new line */
+	if (svsp->scr_offset == svsp->max_off)
+	{
+		bcopy(svsp->Scrollback + svsp->maxcol, svsp->Scrollback,
+		      svsp->maxcol * svsp->max_off * CHR);
+	}
+	else
+	{
+		/* still room left, increase scroll offset (lines) */
+		svsp->scr_offset++;
+	}
+	return 1;
 }
 
 /*---------------------------------------------------------------------------*
@@ -1877,8 +1945,8 @@ vt_col(struct video_state *svsp, int cols)
 
 	clr_parms(svsp);		/* escape parameter init */
 	svsp->state = STATE_INIT;	/* initial state */
-	svsp->col = 0;			/* init row */
-	svsp->row = 0;			/* init col */
+	svsp->col = 0;			/* init col */
+	svsp->row = 0;			/* init row */
 	svsp->cur_offset = 0;		/* cursor offset init */
 	svsp->sc_flag = 0;		/* invalidate saved cursor position */
 	svsp->scrr_beg = 0;		/* reset scrolling region */
@@ -1906,6 +1974,7 @@ vt_col(struct video_state *svsp, int cols)
 #endif /* PCVT_SIGWINCH */
 
 	}
+	reallocate_scrollbuffer(svsp, scrollback_pages);
 	return(1);
 }
 

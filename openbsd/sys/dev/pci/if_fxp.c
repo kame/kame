@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fxp.c,v 1.19 1999/02/26 17:05:53 jason Exp $	*/
+/*	$OpenBSD: if_fxp.c,v 1.21 1999/10/14 18:28:39 jason Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -323,6 +323,7 @@ fxp_match(parent, match, aux)
 
 	switch (PCI_PRODUCT(pa->pa_id)) {
 	case PCI_PRODUCT_INTEL_82557:
+	case PCI_PRODUCT_INTEL_82559:
 		return (1);
 	}
 
@@ -1172,6 +1173,10 @@ fxp_stats_update(arg)
 		sp->rx_rnr_errors = 0;
 		sp->rx_overrun_errors = 0;
 	}
+
+	/* Tick the MII clock. */
+	mii_tick(&sc->sc_mii);
+
 	splx(s);
 	/*
 	 * Schedule another timeout one second from now.

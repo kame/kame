@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.105 1999/03/16 08:34:40 deraadt Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.118 1999/11/01 20:50:44 deraadt Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -168,6 +168,23 @@ extern struct proc *npxproc;
 
 #include "bios.h"
 
+/*
+ * The following defines are for the code in setup_buffers that tries to
+ * ensure that enough ISA DMAable memory is still left after the buffercache
+ * has been allocated.
+ */
+#define CHUNKSZ		(3 * 1024 * 1024)
+#define ISADMA_LIMIT	(16 * 1024 * 1024)	/* XXX wrong place */
+#ifdef UVM
+#define ALLOC_PGS(sz, limit, pgs) \
+    uvm_pglistalloc((sz), 0, (limit), CLBYTES, 0, &(pgs), 1, 0)
+#define FREE_PGS(pgs) uvm_pglistfree(&(pgs))
+#else
+#define ALLOC_PGS(sz, limit, pgs) \
+    vm_page_alloc_memory((sz), 0, (limit), CLBYTES, 0, &(pgs), 1, 0)
+#define FREE_PGS(pgs) vm_page_free_memory(&(pgs))
+#endif
+
 /* the following is used externally (sysctl_hw) */
 char machine[] = "i386";		/* cpu "architecture" */
 char machine_arch[] = "i386";		/* machine == machine_arch */
@@ -208,9 +225,8 @@ vm_map_t buffer_map;
 
 extern	vm_offset_t avail_start, avail_end;
 vm_offset_t hole_start, hole_end;
-#if !defined(MACHINE_NEW_NONCONTIG)
-static	vm_offset_t avail_next;
-#endif
+
+int kbd_reset;
 
 /*
  * Extent maps to manage I/O and ISA memory hole space.  Allocate
@@ -292,8 +308,10 @@ cpu_startup()
 	/* avail_end was pre-decremented in pmap_bootstrap to compensate */
 	for (i = 0; i < btoc(sizeof(struct msgbuf)); i++, pa += NBPG)
 		pmap_enter(pmap_kernel(),
-		    (vm_offset_t)((caddr_t)msgbufp + i * NBPG),
-		    pa, VM_PROT_ALL, TRUE);
+		    (vm_offset_t)((caddr_t)msgbufp + i * NBPG), pa,
+		    VM_PROT_READ|VM_PROT_WRITE, TRUE,
+		    VM_PROT_READ|VM_PROT_WRITE);
+
 	msgbufmapped = 1;
 
 	/* Boot arguments are in page 1 */
@@ -301,8 +319,9 @@ cpu_startup()
 		pa = (vm_offset_t)bootargv;
 		for (i = 0; i < btoc(bootargc); i++, pa += NBPG)
 			pmap_enter(pmap_kernel(),
-			    (vm_offset_t)((caddr_t)bootargp + i * NBPG),
-			    pa, VM_PROT_READ|VM_PROT_WRITE, TRUE);
+			    (vm_offset_t)((caddr_t)bootargp + i * NBPG), pa,
+			    VM_PROT_READ|VM_PROT_WRITE, TRUE,
+			    VM_PROT_READ|VM_PROT_WRITE);
 	} else
 		bootargp = NULL;
 
@@ -447,7 +466,6 @@ allocsys(v)
 	valloc(cfree, struct cblock, nclist);
 #endif
 	valloc(callout, struct callout, ncallout);
-	valloc(swapmap, struct map, nswapmap = maxproc * 2);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -514,9 +532,9 @@ setup_buffers(maxaddr)
 {
 	vm_size_t size;
 	vm_offset_t addr;
-	int base, residual, left, i;
-	struct pglist pgs, freepgs;
-	vm_page_t pg, *last, *last2;
+	int base, residual, left, chunk, i;
+	struct pglist pgs, saved_pgs;
+	vm_page_t pg;
 
 	size = MAXBSIZE * nbuf;
 #if defined(UVM)
@@ -551,52 +569,51 @@ setup_buffers(maxaddr)
 	 * reside there as that lowers the probability of them needing to
 	 * bounce, but we have to set aside some space for DMA buffers too.
 	 *
-	 * The current strategy is to grab hold of 2MB chunks at a time as long
-	 * as they fit below 16MB, and as soon as that fail, give back the
-	 * last one and allocate the rest above 16MB.  That should guarantee
-	 * at least 2MB below 16MB left for DMA buffers.
+	 * The current strategy is to grab hold of one 3MB chunk below 16MB
+	 * first, which we are saving for DMA buffers, then try to get
+	 * one chunk at a time for fs buffers, until that is not possible
+	 * anymore, at which point we get the rest wherever we may find it.
+	 * After that we give our saved area back. That will guarantee at
+	 * least 3MB below 16MB left for drivers' attach routines, among
+	 * them isadma.  However we still have a potential problem of PCI
+	 * devices attached earlier snatching that memory.  This can be
+	 * solved by making the PCI DMA memory allocation routines go for
+	 * memory above 16MB first.
 	 */
+
+	left = bufpages;
+
+	/*
+	 * First, save ISA DMA bounce buffer area so we won't lose that
+	 * capability.
+	 */
+	TAILQ_INIT(&saved_pgs);
 	TAILQ_INIT(&pgs);
-	last = last2 = 0;
-	addr = 0;
-	for (left = bufpages; left > 2 * 1024 * 1024 / CLBYTES;
-	    left -= 2 * 1024 * 1024 / CLBYTES) {
-#if defined(UVM)
-		if (uvm_pglistalloc(2 * 1024 * 1024, 0, 16 * 1024 * 1024,
-		    CLBYTES, 0, &pgs, 1, 0)) {
-#else
-		if (vm_page_alloc_memory(2 * 1024 * 1024, 0, 16 * 1024 * 1024,
-		    CLBYTES, 0, &pgs, 1, 0)) {
-#endif
-			if (last2) {
-				TAILQ_INIT(&freepgs);
-				freepgs.tqh_first = *last2;
-				freepgs.tqh_last = pgs.tqh_last;
-				(*last2)->pageq.tqe_prev = &freepgs.tqh_first;
-				pgs.tqh_last = last2;
-				*last2 = NULL;
-#if defined(UVM)
-				uvm_pglistfree(&freepgs);
-#else
-				vm_page_free_memory(&freepgs);
-#endif
-				left += 2 * 1024 * 1024 / CLBYTES;
-				addr = 16 * 1024 * 1024;
-			}
-			break;
+	if (!ALLOC_PGS(CHUNKSZ, ISADMA_LIMIT, saved_pgs)) {
+		/*
+		 * Then, grab as much ISA DMAable memory as possible
+		 * for the buffer * cache as it is nice to not need to
+		 * bounce all buffer I/O.
+		 */
+		for (left = bufpages; left > 0; left -= chunk) {
+			chunk = min(left, CHUNKSZ / CLBYTES);
+			if (ALLOC_PGS(chunk * CLBYTES, ISADMA_LIMIT, pgs))
+				break;
 		}
-		last2 = last ? last : &pgs.tqh_first;
-		last = pgs.tqh_last;
 	}
-	if (left > 0)
-#if defined(UVM)
-		if (uvm_pglistalloc(left * CLBYTES, addr, avail_end,
-		    CLBYTES, 0, &pgs, 1, 0))
-#else
-		if (vm_page_alloc_memory(left * CLBYTES, addr, avail_end,
-		    CLBYTES, 0, &pgs, 1, 0))
-#endif
-			panic("cannot get physical memory for buffer cache");
+
+	/*
+	 * If we need more pages for the buffer cache, get them from anywhere.
+	 */
+	if (left > 0 && ALLOC_PGS(left * CLBYTES, avail_end, pgs))
+		panic("cannot get physical memory for buffer cache");
+
+	/*
+	 * Finally, give back the ISA DMA bounce buffer area, so it can be
+	 * allocated by the isadma driver later.
+	 */
+	if (!TAILQ_EMPTY(&saved_pgs))
+		FREE_PGS(saved_pgs);
 
 	pg = pgs.tqh_first;
 	for (i = 0; i < nbuf; i++) {
@@ -611,7 +628,8 @@ setup_buffers(maxaddr)
 		for (size = CLBYTES * (i < residual ? base + 1 : base);
 		     size > 0; size -= NBPG, addr += NBPG) {
 			pmap_enter(pmap_kernel(), addr, pg->phys_addr,
-			    VM_PROT_READ|VM_PROT_WRITE, TRUE);
+			    VM_PROT_READ|VM_PROT_WRITE, TRUE,
+			    VM_PROT_READ|VM_PROT_WRITE);
 			pg = pg->pageq.tqe_next;
 		}
 	}
@@ -678,9 +696,11 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_586,
 			{
-				0, "Pentium", "Pentium (P54C)",
-				"Pentium (P24T)", "Pentium/MMX", "Pentium", 0,
-				"Pentium (P54C)", 0, 0, 0, 0, 0, 0, 0, 0,
+				"Pentium (P5 A-step)", "Pentium (P5)",
+				"Pentium (P54C)", "Pentium (P24T)",
+				"Pentium/MMX", "Pentium", 0,
+				"Pentium (P54C)", "Pentium/MMX (Tillamook)",
+				0, 0, 0, 0, 0, 0, 0,
 				"Pentium"	/* Default */
 			},
 			intel586_cpu_setup
@@ -689,8 +709,10 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_686,
 			{
-				0, "Pentium Pro", 0, "Pentium II",
-				"Pentium Pro", "Pentium II", "Celeron",
+				"Pentium Pro (A-step)", "Pentium Pro", 0,
+				"Pentium II (Klamath)", "Pentium Pro",
+				"Pentium II (Deschutes)",
+				"Pentium II (Celeron)",
 				"Pentium III", 0, 0, 0, 0, 0, 0, 0, 0,
 				"Pentium Pro"	/* Default */
 			},
@@ -725,13 +747,13 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			},
 			NULL
 		},
-		/* Family 6, not yet available from AMD */
+		/* Family 6 */
 		{
 			CPUCLASS_686,
 			{
-				0, 0, 0, 0, 0, 0, 0,
+				0, "K7 (Athlon)", 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0, 0, 0, 0,
-				"686 class"		/* Default */
+				"K7 (Athlon)"		/* Default */
 			},
 			NULL
 		} }
@@ -767,6 +789,76 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 				"6x86MX (M2)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0,
 				"M2 class"	/* Default */
+			},
+			NULL
+		} }
+	},
+	{
+		"CentaurHauls",
+		CPUVENDOR_IDT,
+		"IDT",
+		/* Family 4, not yet available from IDT */
+		{ {
+			CPUCLASS_486, 
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"486 class"		/* Default */
+			},
+			NULL
+		},
+		/* Family 5 */
+		{
+			CPUCLASS_586,
+			{
+				0, 0, 0, 0, "WinChip C6", 0, 0, 0,
+				"WinChip 2", "WinChip 3", 0, 0, 0, 0, 0, 0,
+				"WinChip"		/* Default */
+			},
+			NULL
+		},
+		/* Family 6, not yet available from IDT */
+		{
+			CPUCLASS_686,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"686 class"		/* Default */
+			},
+			NULL
+		} }
+	},
+	{
+		"RiseRiseRise",
+		CPUVENDOR_RISE,
+		"Rise",
+		/* Family 4, not yet available from Rise */
+		{ {
+			CPUCLASS_486, 
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"486 class"		/* Default */
+			},
+			NULL
+		},
+		/* Family 5 */
+		{
+			CPUCLASS_586,
+			{
+				"mP6", 0, "mP6", 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"mP6"			/* Default */
+			},
+			NULL
+		},
+		/* Family 6, not yet available from Rise */
+		{
+			CPUCLASS_686,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"686 class"		/* Default */
 			},
 			NULL
 		} }
@@ -808,6 +900,7 @@ cyrix6x86_cpu_setup(cpu_device, model, step)
 	extern int cpu_feature;
 
 	switch (model) {
+	case -1: /* M1 w/o cpuid */
 	case 2:	/* M1 */
 		/* set up various cyrix registers */
 		/* Enable suspend on halt */
@@ -950,6 +1043,8 @@ identifycpu()
 		name = i386_nocpuid_cpus[cpu].cpu_name;
 		vendor = i386_nocpuid_cpus[cpu].cpu_vendor;
 		vendorname = i386_nocpuid_cpus[cpu].cpu_vendorname;
+		model = -1;
+		step = -1;
 		class = i386_nocpuid_cpus[cpu].cpu_class;
 		cpu_setup = i386_nocpuid_cpus[cpu].cpu_setup;
 		modifier = "";
@@ -1869,25 +1964,23 @@ init386(first_avail)
 #endif
 
 	/*
+	 * BIOS leaves data in low memory and VM system doesn't work with
+	 * phys 0,  /boot leaves arguments at page 1.
+	 */
+	avail_start = bootapiver & BAPIV_VECTOR?
+		i386_round_page(bootargv+bootargc): NBPG;
+	avail_end = extmem ? IOM_END + extmem * 1024
+		: cnvmem * 1024;	/* just temporary use */
+
+	/*
 	 * Allocate the physical addresses used by RAM from the iomem
 	 * extent map.  This is done before the addresses are
 	 * page rounded just to make sure we get them all.
 	 */
-	if (extent_alloc_region(iomem_ex, 0, IOM_BEGIN, EX_NOWAIT)) {
+	if (extent_alloc_region(iomem_ex, avail_start, IOM_BEGIN, EX_NOWAIT)) {
 		/* XXX What should we do? */
 		printf("WARNING: CAN'T ALLOCATE BASE RAM FROM IOMEM EXTENT MAP!\n");
 	}
-
-	/*
-	 * BIOS leaves data in low memory and VM system doesn't work with
-	 * phys 0,  /boot leaves arguments at page 1.
-	 */
-#if !defined(MACHINE_NEW_NONCONTIG)
-	avail_next =
-#endif
-	avail_start = bootapiver >= 2? i386_round_page(bootargv+bootargc): NBPG;
-	avail_end = extmem ? IOM_END + extmem * 1024
-		: cnvmem * 1024;	/* just temporary use */
 
 	if (avail_end > IOM_END && extent_alloc_region(iomem_ex, IOM_END,
 	    (avail_end - IOM_END), EX_NOWAIT)) {
@@ -1939,13 +2032,6 @@ init386(first_avail)
 
 	/* call pmap initialization to make new kernel address space */
 	pmap_bootstrap((vm_offset_t)atdevbase + IOM_SIZE);
-
-#if !defined(MACHINE_NEW_NONCONTIG)
-	/*
-	 * Initialize for pmap_free_pages and pmap_next_page
-	 */
-	avail_next = avail_start;
-#endif
 
 #ifdef DDB
 	ddb_init();
@@ -2011,47 +2097,6 @@ cpu_exec_aout_makecmds(p, epp)
 {
 	return ENOEXEC;
 }
-
-#if !defined(MACHINE_NEW_NONCONTIG)
-u_int
-pmap_free_pages()
-{
-
-	if (avail_next <= hole_start)
-		return ((hole_start - avail_next) / NBPG +
-			(avail_end - hole_end) / NBPG);
-	else
-		return ((avail_end - avail_next) / NBPG);
-}
-
-int
-pmap_next_page(addrp)
-	vm_offset_t *addrp;
-{
-
-	if (avail_next + NBPG > avail_end)
-		return FALSE;
-
-	if (avail_next + NBPG > hole_start && avail_next < hole_end)
-		avail_next = hole_end;
-
-	*addrp = avail_next;
-	avail_next += NBPG;
-	return TRUE;
-}
-
-int
-pmap_page_index(pa)
-	vm_offset_t pa;
-{
-
-	if (pa >= avail_start && pa < hole_start)
-		return i386_btop(pa - avail_start);
-	if (pa >= hole_end && pa < avail_end)
-		return i386_btop(pa - hole_end + hole_start - avail_start);
-	return -1;
-}
-#endif
 
 /*
  * consinit:
@@ -2169,6 +2214,13 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case CPU_APMWARN:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &cpu_apmwarn));
 #endif
+	case CPU_KBDRESET:
+		if (securelevel > 0) 
+			return (sysctl_rdint(oldp, oldlenp, newp, 
+			    kbd_reset));
+		else
+			return (sysctl_int(oldp, oldlenp, newp, newlen, 
+			    &kbd_reset));
 	default:
 		return EOPNOTSUPP;
 	}
@@ -2339,7 +2391,8 @@ bus_mem_add_mapping(bpa, size, cacheable, bshp)
 
 	for (; pa < endpa; pa += NBPG, va += NBPG) {
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, TRUE);
+		    VM_PROT_READ | VM_PROT_WRITE, TRUE,
+		    VM_PROT_READ | VM_PROT_WRITE);
 		if (!cacheable)
 			pmap_changebit(pa, PG_N, ~0);
 		else
@@ -2746,13 +2799,8 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,
-			    VM_PROT_READ | VM_PROT_WRITE, TRUE);
-#if 0
-			if (flags & BUS_DMAMEM_NOSYNC)
-				pmap_changebit(addr, PG_N, ~0);
-			else
-				pmap_changebit(addr, 0, ~PG_N);
-#endif
+			    VM_PROT_READ | VM_PROT_WRITE, TRUE,
+			    VM_PROT_READ | VM_PROT_WRITE);
 		}
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcvt_hdr.h,v 1.21 1998/09/06 23:00:03 niklas Exp $	*/
+/*	$OpenBSD: pcvt_hdr.h,v 1.27 1999/10/20 19:15:51 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -603,6 +603,9 @@
 #define SYS_FKL		0	/* in hp mode, sys-fkls are active */
 #define USR_FKL		1	/* in hp mode, user-fkls are active */
 
+/* initial default scrollback buffer size (in pages) */
+#define SCROLLBACK_PAGES	8
+
 /* variables */
 
 #ifdef EXTERN
@@ -614,6 +617,8 @@
 EXTERN	u_char	*more_chars;		/* response buffer via kbd */
 EXTERN	int	char_count;		/* response char count */
 EXTERN	u_char	color;			/* color or mono display */
+EXTERN	u_char	pcdisp;			/* vt220 or traditional pc features */
+EXTERN	u_char	pcdisp_special;		/* are we printing special chars */
 
 EXTERN	u_short	kern_attr;		/* kernel messages char attributes */
 EXTERN	u_short	user_attr;		/* character attributes */
@@ -646,6 +651,10 @@ struct rgb {
 typedef struct video_state {
 	u_short	*Crtat;			/* video page start addr */
 	u_short *Memory;		/* malloc'ed memory start address */
+	u_short *Scrollback;		/* scrollback buffer */
+	u_short scr_offset;		/* current scrollback offset (lines) */
+	short scrolling;		/* current scrollback page */
+	u_short max_off;		/* maximum scrollback offset */
 	struct tty *vs_tty;		/* pointer to this screen's tty */
 	u_char	maxcol;			/* 80 or 132 cols on screen */
 	u_char 	row, col;		/* current cursor position */
@@ -821,6 +830,9 @@ struct tty *pcconsp;		/* ptr to current device, see pcattach() */
 
 u_short *Crtat;			/* screen start address */
 
+u_short *Scrollbuffer;		/* scrollback buffer */
+u_short scrollback_pages;	/* size of scrollback buffer (pages) */
+
 #if PCVT_EMU_MOUSE
 struct mousestat	mouse = {{0}};
 struct mousedefs	mousedef = {0x3b, 0x3c, 0x3d, 0,     250000};
@@ -978,6 +990,9 @@ extern u_char		vga_family;
 extern u_char		keyboard_is_initialized;
 extern u_char		kbd_polling;
 
+extern u_short		*Scrollbuffer;
+extern u_short		scrollback_pages;
+
 #if PCVT_SHOWKEYS
 extern u_char		keyboard_show;
 #endif /* PCVT_SHOWKEYS */
@@ -1073,6 +1088,7 @@ void	set_2ndcharset ( void );
 void	set_charset ( struct video_state *svsp, int curvgacs );
 void	set_emulation_mode ( struct video_state *svsp, int mode );
 void	set_screen_size ( struct video_state *svsp, int size );
+void	reallocate_scrollbuffer ( struct video_state *svsp, int pages );
 u_char *sgetc ( int noblock );
 void	sixel_vga ( struct sixels *charsixel, u_char *charvga );
 void	sput ( u_char *s, U_char attrib, int len, int page );

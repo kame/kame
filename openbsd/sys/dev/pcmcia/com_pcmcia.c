@@ -1,4 +1,4 @@
-/*	$OpenBSD: com_pcmcia.c,v 1.12 1999/01/28 04:58:29 fgsch Exp $	*/
+/*	$OpenBSD: com_pcmcia.c,v 1.21 1999/08/16 16:51:19 deraadt Exp $	*/
 /*	$NetBSD: com_pcmcia.c,v 1.15 1998/08/22 17:47:58 msaitoh Exp $	*/
 
 /*-
@@ -96,41 +96,35 @@
 
 #include <dev/isa/isavar.h>
 
-#include <dev/ic/comreg.h>
+#include "com.h"
 #ifdef i386
+#include "pccom.h"
+#endif
+
+#include <dev/ic/comreg.h>
+#if NPCCOM > 0
 #include <i386/isa/pccomvar.h>
-#else
+#endif
+#if NCOM > 0
 #include <dev/ic/comvar.h>
 #endif
 #include <dev/ic/ns16550reg.h>
 
 #include <dev/isa/isareg.h>
 
-#include "com.h"
-#ifdef i386
-#include "pccom.h"
-#endif
-
 #define	com_lcr		com_cfcr
 #define	SET(t, f)	(t) |= (f)
 
-struct com_dev {
-	char *name;
-	char *cis1_info[4];
-};
-
 /* Devices that we need to match by CIS strings */
-static struct com_dev com_devs[] = {
-	{ PCMCIA_STR_MEGAHERTZ_XJ2288,
-	  PCMCIA_CIS_MEGAHERTZ_XJ2288 },
+struct com_pcmcia_product {
+	char *cis1_info[4];
+} com_pcmcia_prod[] = {
+	{ PCMCIA_CIS_MEGAHERTZ_XJ2288 },
 };
-
-
-static int com_devs_size = sizeof(com_devs) / sizeof(com_devs[0]);
-static struct com_dev *com_dev_match __P((struct pcmcia_card *));
 
 int com_pcmcia_match __P((struct device *, void *, void *));
 void com_pcmcia_attach __P((struct device *, struct device *, void *));
+int com_pcmcia_detach __P((struct device *, int));
 void com_pcmcia_cleanup __P((void *));
 
 int com_pcmcia_enable __P((struct com_softc *));
@@ -152,43 +146,24 @@ struct com_pcmcia_softc {
 
 #if NCOM_PCMCIA
 struct cfattach com_pcmcia_ca = {
-	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach
+	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach,
+	com_pcmcia_detach, com_activate
 };
 #elif NPCCOM_PCMCIA
 struct cfattach pccom_pcmcia_ca = {
-	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach
+	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach,
+	com_pcmcia_detach, com_activate
 };
 #endif
-
-/* Look for pcmcia cards with particular CIS strings */
-static struct com_dev *
-com_dev_match(card)
-	struct pcmcia_card *card;
-{
-	int i, j;
-
-	for (i = 0; i < com_devs_size; i++) {
-		for (j = 0; j < 4; j++)
-			if (com_devs[i].cis1_info[j] &&
-			    strcmp(com_devs[i].cis1_info[j],
-				   card->cis1_info[j]))
-				break;
-		if (j == 4)
-			return &com_devs[i];
-	}
-
-	return NULL;
-}
-
 
 int
 com_pcmcia_match(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
-	int comportmask;
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
+	int i, j, comportmask;
 
 	/* 1. Does it claim to be a serial device? */
 	if (pa->pf->function == PCMCIA_FUNCTION_SERIAL)
@@ -218,8 +193,16 @@ com_pcmcia_match(parent, match, aux)
 		return 1;
 
 	/* 3. Is this a card we know about? */
-	if (com_dev_match(pa->card) != NULL)
-		return 1;
+	for (i = 0; i < sizeof(com_pcmcia_prod)/sizeof(com_pcmcia_prod[0]);
+	    i++) {
+		for (j = 0; j < 4; j++)
+			if (com_pcmcia_prod[i].cis1_info[j] &&
+			    strcmp(com_pcmcia_prod[i].cis1_info[j],
+			    pa->card->cis1_info[j]))
+				break;
+		if (j == 4)
+			return 1;
+	}
 
 	return 0;
 }
@@ -256,8 +239,7 @@ retry:
 
 		if (!pcmcia_io_alloc(pa->pf,
 		    autoalloc ? 0 : cfe->iospace[0].start,
-		    cfe->iospace[0].length, (1 << cfe->iomask),
-		    &psc->sc_pcioh)) {
+		    cfe->iospace[0].length, COM_NPORTS, &psc->sc_pcioh)) {
 			goto found;
 		}
 	}
@@ -278,9 +260,7 @@ found:
 	if (com_pcmcia_enable1(sc))
 		printf(": function enable failed\n");
 
-#ifdef notyet
 	sc->enabled = 1;
-#endif
 
 	/* map in the io space */
 
@@ -291,30 +271,48 @@ found:
 		return;
 	}
 
-	sc->sc_iobase = -1;
-#ifdef notyet
-	sc->sc_frequency = COM_FREQ;
+	printf(" port 0x%lx/%d", psc->sc_pcioh.addr, psc->sc_pcioh.size);
 
+	sc->sc_iobase = -1;
 	sc->enable = com_pcmcia_enable;
 	sc->disable = com_pcmcia_disable;
 	
-	printf(": serial device");
+#ifdef notyet
+	sc->sc_frequency = COM_FREQ;
 
 	com_attach_subr(sc);
 #endif
-	com_attach(sc);
-
 	/* establish the interrupt. */
 	psc->sc_ih = pcmcia_intr_establish(pa->pf, IPL_TTY, comintr, sc);
 	if (psc->sc_ih == NULL)
-		printf("%s: couldn't establish interrupt\n",
-		    sc->sc_dev.dv_xname);
+		printf(", couldn't establish interrupt");
+
+	com_attach(sc);
 
 #ifdef notyet
 	sc->enabled = 0;
 	
 	com_pcmcia_disable1(sc);
 #endif
+}
+
+int
+com_pcmcia_detach(dev, flags)
+	struct device *dev;
+	int flags;
+{
+	struct com_pcmcia_softc *psc = (struct com_pcmcia_softc *)dev;
+	int error;
+
+	/* Release all resources.  */
+	error = com_detach(dev, flags);
+	if (error)
+	    return (error);
+
+	pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
+	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
+
+	return (0);
 }
 
 int
@@ -346,7 +344,8 @@ com_pcmcia_enable1(sc)
 	    return(ret);
 
 	if ((psc->sc_pf->sc->card.product == PCMCIA_PRODUCT_3COM_3C562) ||
-	    (psc->sc_pf->sc->card.product == PCMCIA_PRODUCT_3COM_3CXEM556)) {
+	    (psc->sc_pf->sc->card.product == PCMCIA_PRODUCT_3COM_3CXEM556) ||
+	    (psc->sc_pf->sc->card.product == PCMCIA_PRODUCT_3COM_3CXEM556B)) {
 		int reg;
 
 		/* turn off the ethernet-disable bit */
@@ -432,6 +431,7 @@ com_attach(sc)
 		}
 	}
 
+#if NPCCOM > 0
 #ifdef i386
 	if (sc->sc_uarttype == COM_UART_ST16650V2) {	/* Probe for XR16850s */
 		u_int8_t dlbl, dlbh;
@@ -454,6 +454,7 @@ com_attach(sc)
 		bus_space_write_1(iot, ioh, com_dlbl, dlbl);
 		bus_space_write_1(iot, ioh, com_dlbh, dlbh);
 	}
+#endif
 #endif
 	
 	/* Reset the LCR (latch access is probably enabled). */
@@ -502,12 +503,14 @@ com_attach(sc)
 		SET(sc->sc_hwflags, COM_HW_FIFO);
 		sc->sc_fifolen = 32;
 		break;
+#if NPCCOM > 0
 #ifdef i386
 	case COM_UART_XR16850:
 		printf(": xr16850 (rev %d), 128 byte fifo\n", sc->sc_uartrev);
 		SET(sc->sc_hwflags, COM_HW_FIFO);
 		sc->sc_fifolen = 128;
 		break;
+#endif
 #endif
 	default:
 		panic("comattach: bad fifo type");

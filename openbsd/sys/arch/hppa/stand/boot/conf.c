@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.6 1999/01/25 21:53:31 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.11 1999/08/14 04:47:47 todd Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -32,17 +32,16 @@
 
 #include <sys/types.h>
 #include <libsa.h>
-#include <machine/lifvar.h>
 #include <lib/libsa/ufs.h>
 #include <lib/libsa/cd9660.h>
 #include <lib/libsa/exec.h>
 #include <dev/cons.h>
 
-const char version[] = "0.04";
-int	debug = 1;
+const char version[] = "0.5";
+int	debug = 0;
 
 const struct x_sw execsw[] = {
-	{ "elf", elf_probe,	elf_load,	elf_ldsym },
+	{ "elf", elf_probe,	elf_load/*,	elf_ldsym */ },
 /*	{ "som", som_probe,	som_load,	som_ldsym }, */
 	{ ""   , NULL,		NULL },
 };
@@ -59,7 +58,7 @@ int nfsys = NENTS(file_system);
 
 struct devsw devsw[] = {
 	{ "ct",	iodcstrategy, ctopen, ctclose, noioctl },
-	{ "sd",	iodcstrategy, dkopen, dkclose, noioctl },
+	{ "dk",	iodcstrategy, dkopen, dkclose, noioctl },
 	{ "lf", iodcstrategy, lfopen, lfclose, noioctl }
 };
 int	ndevs = NENTS(devsw);

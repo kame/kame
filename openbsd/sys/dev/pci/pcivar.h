@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcivar.h,v 1.14 1999/02/01 16:35:49 pefo Exp $	*/
+/*	$OpenBSD: pcivar.h,v 1.16 1999/07/18 03:20:18 csapuntz Exp $	*/
 /*	$NetBSD: pcivar.h,v 1.23 1997/06/06 23:48:05 thorpej Exp $	*/
 
 /*
@@ -54,25 +54,25 @@ struct pcibus_attach_args;
 /*
  * Machine-dependent definitions.
  */
-#if (alpha + atari + i386 + arc + powerpc + galileo != 1)
+#if (__alpha__ + __atari__ + __i386__ + __arc__ + __powerpc__ + __galileo__ != 1)
 ERROR: COMPILING FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
 #endif
-#if alpha
+#if __alpha__
 #include <alpha/pci/pci_machdep.h>
 #endif
-#if atari
+#if __atari__
 #include <atari/pci/pci_machdep.h>
 #endif
-#if i386
+#if __i386__
 #include <i386/pci/pci_machdep.h>
 #endif
-#if arc
+#if __arc__
 #include <arc/pci/pci_machdep.h>
 #endif
-#if powerpc
+#if __powerpc__
 #include <powerpc/pci/pci_machdep.h>
 #endif
-#if galileo
+#if __galileo__
 #include <galileo/pci/pci_machdep.h>
 #endif
 
@@ -104,6 +104,7 @@ struct pci_attach_args {
 	bus_space_tag_t pa_memt;	/* pci mem space tag */
 	bus_dma_tag_t pa_dmat;		/* DMA tag */
 	pci_chipset_tag_t pa_pc;
+	int		pa_flags;	/* flags; see below */
 
 	u_int		pa_device;
 	u_int		pa_function;
@@ -125,6 +126,14 @@ struct pci_attach_args {
 };
 
 /*
+ * Flags given in the bus and device attachment args.
+ *
+ * OpenBSD doesn't actually use them yet -- csapuntz@cvs.openbsd.org
+ */
+#define	PCI_FLAGS_IO_ENABLED	0x01		/* I/O space is enabled */
+#define	PCI_FLAGS_MEM_ENABLED	0x02		/* memory space is enabled */
+
+/*
  * Locators devices that attach to 'pcibus', as specified to config.
  */
 #define	pcibuscf_bus		cf_loc[0]
@@ -143,10 +152,24 @@ struct pci_attach_args {
  * Configuration space access and utility functions.  (Note that most,
  * e.g. make_tag, conf_read, conf_write are declared by pci_machdep.h.)
  */
+/*
+ * Configuration space access and utility functions.  (Note that most,
+ * e.g. make_tag, conf_read, conf_write are declared by pci_machdep.h.)
+ */
+int	pci_mapreg_info __P((pci_chipset_tag_t, pcitag_t, int, pcireg_t,
+	    bus_addr_t *, bus_size_t *, int *));
+int	pci_mapreg_map __P((struct pci_attach_args *, int, pcireg_t, int,
+	    bus_space_tag_t *, bus_space_handle_t *, bus_addr_t *,
+	    bus_size_t *));
+
+
 int	pci_io_find __P((pci_chipset_tag_t, pcitag_t, int, bus_addr_t *,
 	    bus_size_t *));
 int	pci_mem_find __P((pci_chipset_tag_t, pcitag_t, int, bus_addr_t *,
 	    bus_size_t *, int *));
+
+int pci_get_capability __P((pci_chipset_tag_t, pcitag_t, int,
+			    int *, pcireg_t *));
 
 /*
  * Helper functions for autoconfiguration.

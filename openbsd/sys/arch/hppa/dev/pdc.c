@@ -1,7 +1,7 @@
-/*	$OpenBSD: pdc.c,v 1.5 1998/12/29 21:40:21 mickey Exp $	*/
+/*	$OpenBSD: pdc.c,v 1.9 1999/09/07 03:25:13 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998,1999 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,7 +54,7 @@ struct pdc_softc {
 
 pdcio_t pdc;
 int pdcret[32] PDC_ALIGNMENT;
-char pdc_consbuf[MINIOSIZ] PDC_ALIGNMENT;
+char pdc_consbuf[IODC_MINIOSIZ] PDC_ALIGNMENT;
 iodcio_t pdc_cniodc, pdc_kbdiodc;
 pz_device_t *pz_kbd, *pz_cons;
 struct tty *pdc_tty[1];
@@ -243,7 +243,7 @@ void
 pdccninit(cn)
 	struct consdev *cn;
 {
-#ifdef DEBUG
+#ifdef PDC_DEBUG
 	printf("pdc0: console init\n");
 #endif
 }
@@ -321,30 +321,29 @@ pdc_call(func, pdc_flag)
 	iodcio_t func;
 	int pdc_flag;
 {
-	register register_t ret, psw;
+	register register_t ret, opsw;
 	va_list va;
-	int args[11], i;
+	int args[10], i, s;
 
 	va_start(va, pdc_flag);
 	for (i = 0; i < sizeof(args)/sizeof(args[0]); i++)
 		args[i] = va_arg(va, int);
 	va_end(va);
-	
-	if (kernelmapped) {
-		psw = PSW_Q;
-		
-		if (!pdc_flag && args[0] == PDC_PIM)
-			psw |= PSW_M;
 
-		set_psw(psw);
+	if (kernelmapped) {
+		s = splhigh();
+		opsw = set_psw(PSW_Q |
+			       ((!pdc_flag && args[0] == PDC_PIM)? PSW_M:0));
 	}
 
 	ret = (func)((void *)args[0], args[1], args[2], args[3], args[4],
-		     args[5], args[6], args[7], args[8], args[9], args[10]);
+		     args[5], args[6], args[7], args[8], args[9]);
 
 	if (kernelmapped) {
-		set_psw(KERNEL_PSW);
+		set_psw(opsw);
+		splx(s);
 	}
 
 	return ret;
 }
+

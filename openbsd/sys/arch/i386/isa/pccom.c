@@ -1,4 +1,4 @@
-/*	$OpenBSD: pccom.c,v 1.29 1999/02/08 23:43:54 rees Exp $	*/
+/*	$OpenBSD: pccom.c,v 1.32 1999/08/08 01:34:15 niklas Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
 /*
@@ -86,6 +86,7 @@
 #include <sys/syslog.h>
 #include <sys/types.h>
 #include <sys/device.h>
+#include <sys/vnode.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -119,9 +120,8 @@ void pccom_xr16850_fifo_init __P((bus_space_tag_t, bus_space_handle_t));
  */
 int	comprobe __P((struct device *, void *, void *));
 void	comattach __P((struct device *, struct device *, void *));
-void	com_absent_notify __P((struct com_softc *sc));
-void	comstart_pending __P((void *));
 void	compwroff __P((struct com_softc *));
+void	com_raisedtr __P((void *));
 
 #if NPCCOM_ISA
 struct cfattach pccom_isa_ca = {
@@ -200,225 +200,6 @@ extern int kgdb_debug_init;
 #else
 #define IS_ISAPNP(parent)	0
 #endif
-
-#if 0
-#if NPCCOM_PCMCIA
-#include <dev/pcmcia/pcmciavar.h>
-
-int	com_pcmcia_match __P((struct device *, void *, void *));
-void	com_pcmcia_attach __P((struct device *, struct device *, void *));
-int	com_pcmcia_detach __P((struct device *));
-
-struct cfattach pccom_pcmcia_ca = {
-	sizeof(struct com_softc), com_pcmcia_match, comattach,
-	com_pcmcia_detach
-};
-
-int	com_pcmcia_mod __P((struct pcmcia_link *pc_link, struct device *self,
-	    struct pcmcia_conf *pc_cf, struct cfdata *cf));
-
-/* additional setup needed for pcmcia devices */
-/* modify config entry */
-int 
-com_pcmcia_mod(pc_link, self, pc_cf, cf)
-    struct pcmcia_link *pc_link;
-    struct device *self;
-    struct pcmcia_conf *pc_cf; 
-    struct cfdata *cf;
-{               
-    int err; 
-    if (!(err = PCMCIA_BUS_CONFIG(pc_link->adapter, pc_link, self,
-				  pc_cf, cf))) {
-        pc_cf->memwin = 0;
-	if (pc_cf->cfgtype == 0) 
-	    pc_cf->cfgtype = CFGENTRYID; /* determine from ioaddr */
-    }
-    return err;
-}
-
-int com_pcmcia_isa_attach __P((struct device *, void *, void *,
-			       struct pcmcia_link *));
-int com_pcmcia_remove __P((struct pcmcia_link *, struct device *));
-
-static struct pcmcia_com {
-    struct pcmcia_device pcd;
-} pcmcia_com =  {
-    {"PCMCIA Modem card", com_pcmcia_mod, com_pcmcia_isa_attach,
-     NULL, com_pcmcia_remove}
-};          
-
-
-struct pcmciadevs pcmcia_com_devs[] = {
-  { "pccom", 0,
-  NULL, "*MODEM*", NULL, NULL,
-  NULL, (void *)&pcmcia_com 
-  },
-  { "pccom", 0,
-  NULL, "*Modem*", NULL, NULL,
-  NULL, (void *)&pcmcia_com   
-  },
-  { "pccom", 0,
-  NULL, "*modem*", NULL, NULL,
-  NULL, (void *)&pcmcia_com   
-  },
-  { "pccom", 0,
-  NULL, NULL, "*MODEM*", NULL,
-  NULL, (void *)&pcmcia_com 
-  },
-  { "pccom", 0,
-  NULL, NULL, "*Modem*", NULL,
-  NULL, (void *)&pcmcia_com   
-  },
-  { "pccom", 0,
-  NULL, NULL, "*modem*", NULL,
-  NULL, (void *)&pcmcia_com   
-  },
-  { "pccom", 0,
-  NULL, NULL, NULL, "*MODEM*",
-  NULL, (void *)&pcmcia_com 
-  },
-  { "pccom", 0,
-  NULL, NULL, NULL, "*Modem*",
-  NULL, (void *)&pcmcia_com   
-  },
-  { "pccom", 0,
-  NULL, NULL, NULL, "*modem*",
-  NULL, (void *)&pcmcia_com   
-  },
-  {NULL}
-};
-#define ncom_pcmcia_devs sizeof(pcmcia_com_devs)/sizeof(pcmcia_com_devs[0])
-
-int
-com_pcmcia_match(parent, match, aux)
-	struct device *parent;
-	void *match, *aux;
-{
-	return pcmcia_slave_match(parent, match, aux, pcmcia_com_devs,
-				  ncom_pcmcia_devs);
-}
-
-int
-com_pcmcia_isa_attach(parent, match, aux, pc_link)
-	struct device *parent;
-	void *match;
-	void *aux;
-	struct pcmcia_link *pc_link;
-{
-	struct isa_attach_args *ia = aux;
-	struct com_softc *sc = match;
-
-	int rval;
-	if ((rval = comprobe(parent, sc->sc_dev.dv_cfdata, ia))) {
-		if (ISSET(pc_link->flags, PCMCIA_REATTACH)) {
-#ifdef PCCOM_DEBUG
-			printf("comreattach, hwflags=%x\n", sc->sc_hwflags);
-#endif
-			sc->sc_hwflags = COM_HW_REATTACH |
-				(sc->sc_hwflags & (COM_HW_ABSENT_PENDING|COM_HW_CONSOLE));
-		} else
-			sc->sc_hwflags = 0;
-		sc->sc_ic = ia->ia_ic;
-	}
-	return rval;
-}
-
-
-/*
- * Called by config_detach attempts, shortly after com_pcmcia_remove
- * was called.
- */
-int
-com_pcmcia_detach(self)
-	struct device *self;
-{
-	struct com_softc *sc = (void *)self;
-
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT_PENDING)) {
-		/* don't let it really be detached, it is still open */
-		return EBUSY;
-	}
-	return 0;		/* OK! */
-}
-
-/*
- * called by pcmcia framework to accept/reject remove attempts.
- * If we return 0, then the detach will proceed.
- */
-int
-com_pcmcia_remove(pc_link, self)
-	struct pcmcia_link *pc_link;
-	struct device *self;
-{
-	struct com_softc *sc = (void *)self;
-	struct tty *tp;
-	int s;
-
-	if (!sc->sc_tty)
-		goto ok;
-	tp = sc->sc_tty;
-
-	/* not in use ?  if so, return "OK" */
-	if (!ISSET(tp->t_state, TS_ISOPEN) &&
-	    !ISSET(tp->t_state, TS_WOPEN)) {
-		ttyfree(sc->sc_tty);
-		sc->sc_tty = NULL;
-    ok:
-		isa_intr_disestablish(sc->sc_ic, sc->sc_ih);
-		sc->sc_ih = NULL;
-		SET(sc->sc_hwflags, COM_HW_ABSENT);
-		return 0;		/* OK! */
-	}
-	/*
-	 * Not easily removed.  Put device into a dead state, clean state
-	 * as best we can.  notify all waiters.
-	 */
-	SET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING);
-#ifdef PCCOM_DEBUG
-	printf("pending detach flags %x\n", sc->sc_hwflags);
-#endif
-
-	s = spltty();
-	com_absent_notify(sc);
-	splx(s);
-
-	return 0;
-}
-
-#if 0
-void
-com_pcmcia_attach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
-{
-	struct pcmcia_attach_args *paa = aux;
-	
-	printf("com_pcmcia_attach %p %p %p\n", parent, self, aux);
-	delay(2000000);
-	if (!pcmcia_configure(parent, self, paa->paa_link)) {
-		struct com_softc *sc = (void *)self;
-		sc->sc_hwflags |= COM_HW_ABSENT;
-		printf(": not attached\n");
-	}
-}
-#endif
-#endif
-#endif
-
-/*
- * must be called at spltty() or higher.
- */
-void
-com_absent_notify(sc)
-	struct com_softc *sc;
-{
-	struct tty *tp = sc->sc_tty;
-
-	if (tp) {
-		CLR(tp->t_state, TS_CARR_ON|TS_BUSY);
-		ttyflush(tp, FREAD|FWRITE);
-	}
-}
 
 int
 comspeed(speed)
@@ -623,13 +404,7 @@ comattach(parent, self, aux)
 	 * XXX for commulti attach, with a helper function that contains
 	 * XXX most of the interesting stuff.
 	 */
-	if (ISSET(sc->sc_hwflags, COM_HW_REATTACH)) {
-		int s;
-		s = spltty();
-		com_absent_notify(sc);
-		splx(s);
-	} else
-	    sc->sc_hwflags = 0;
+	sc->sc_hwflags = 0;
 	sc->sc_swflags = 0;
 /* #if NPCCOM_ISA || NPCCOM_PCMCIA || NPCCOM_ISAPNP */
 #if NPCCOM_ISA || NPCCOM_ISAPNP
@@ -894,6 +669,83 @@ comattach(parent, self, aux)
 	/* XXX maybe move up some? */
 	if (ISSET(sc->sc_hwflags, COM_HW_CONSOLE))
 		printf("%s: console\n", sc->sc_dev.dv_xname);
+
+	/*
+	 * If there are no enable/disable functions, assume the device
+	 * is always enabled.
+	 */
+#ifdef notyet
+	if (!sc->enable)
+#endif
+		sc->enabled = 1;
+}
+
+int
+com_detach(self, flags)
+	struct device *self;
+	int flags;
+{
+	struct com_softc *sc = (struct com_softc *)self;
+	int maj, mn;
+
+	/* locate the major number */
+	for (maj = 0; maj < nchrdev; maj++)
+		if (cdevsw[maj].d_open == comopen)
+			break;
+
+	/* Nuke the vnodes for any open instances. */
+	mn = self->dv_unit;
+	vdevgone(maj, mn, mn, VCHR);
+
+	/* XXX a symbolic constant for the cua bit would be nicer. */
+	mn |= 0x80;
+	vdevgone(maj, mn, mn, VCHR);
+
+	/* Detach and free the tty. */
+	if (sc->sc_tty) {
+		tty_detach(sc->sc_tty);
+		ttyfree(sc->sc_tty);
+	}
+
+	untimeout(com_raisedtr, sc);
+	untimeout(comdiag, sc);
+
+	return (0);
+}
+
+int
+com_activate(self, act)
+	struct device *self;
+	enum devact act;
+{
+	struct com_softc *sc = (struct com_softc *)self;
+	int s, rv = 0;
+
+	/* XXX splserial, when we get that.  */
+	s = spltty();
+	switch (act) {
+	case DVACT_ACTIVATE:
+		rv = EOPNOTSUPP;
+		break;
+
+	case DVACT_DEACTIVATE:
+#ifdef notyet
+		if (sc->sc_hwflags & (COM_HW_CONSOLE|COM_HW_KGDB)) {
+#else
+		if (sc->sc_hwflags & (COM_HW_CONSOLE)) {
+#endif
+			rv = EBUSY;
+			break;
+		}
+
+		if (sc->disable != NULL && sc->enabled != 0) {
+			(*sc->disable)(sc);
+			sc->enabled = 0;
+		}
+		break;
+	}
+	splx(s);
+	return (rv);
 }
 
 int
@@ -913,7 +765,7 @@ comopen(dev, flag, mode, p)
 	if (unit >= pccom_cd.cd_ndevs)
 		return ENXIO;
 	sc = pccom_cd.cd_devs[unit];
-	if (!sc || ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING))
+	if (!sc)
 		return ENXIO;
 
 	s = spltty();
@@ -1111,9 +963,13 @@ comopen(dev, flag, mode, p)
 			       (!ISSET(tp->t_cflag, CLOCAL) &&
 				!ISSET(tp->t_state, TS_CARR_ON))) {
 				SET(tp->t_state, TS_WOPEN);
-				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
-						 ttopen, 0);
-				if (error) {
+				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen, 0);
+				/*
+				 * If TS_WOPEN has been reset, that means the cua device
+				 * has been closed.  We don't want to fail in that case,
+				 * so just go around again.
+				 */
+				if (error && ISSET(tp->t_state, TS_WOPEN)) {
 					CLR(tp->t_state, TS_WOPEN);
 					if (!sc->sc_cua && !ISSET(tp->t_state, TS_ISOPEN))
 						compwroff(sc);
@@ -1135,6 +991,8 @@ comclose(dev, flag, mode, p)
 {
 	int unit = DEVUNIT(dev);
 	struct com_softc *sc = pccom_cd.cd_devs[unit];
+	bus_space_tag_t iot = sc->sc_iot;
+	bus_space_handle_t ioh = sc->sc_ioh;
 	struct tty *tp = sc->sc_tty;
 	int s;
 
@@ -1144,19 +1002,19 @@ comclose(dev, flag, mode, p)
 
 	(*linesw[tp->t_line].l_close)(tp, flag);
 	s = spltty();
-	if (!ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING))
+	if (ISSET(tp->t_state, TS_WOPEN)) {
+		/* tty device is waiting for carrier; drop dtr then re-raise */
+		CLR(sc->sc_mcr, MCR_DTR | MCR_RTS);
+		bus_space_write_1(iot, ioh, com_mcr, sc->sc_mcr);
+		timeout(com_raisedtr, sc, hz * 2);
+	} else {
+		/* no one else waiting; turn off the uart */
 		compwroff(sc);
+	}
 	CLR(tp->t_state, TS_BUSY | TS_FLUSH);
 	sc->sc_cua = 0;
 	splx(s);
 	ttyclose(tp);
-#ifdef PCCOM_DEBUG
-	/* mark it ready for more use if reattached earlier */
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT_PENDING)) {
-	    printf("comclose pending cleared\n");
-	}
-#endif
-	CLR(sc->sc_hwflags, COM_HW_ABSENT_PENDING);
 
 #ifdef notyet /* XXXX */
 	if (ISSET(sc->sc_hwflags, COM_HW_CONSOLE)) {
@@ -1181,7 +1039,8 @@ compwroff(sc)
 	if (ISSET(tp->t_cflag, HUPCL) &&
 	    !ISSET(sc->sc_swflags, COM_SW_SOFTCAR)) {
 		/* XXX perhaps only clear DTR */
-		bus_space_write_1(iot, ioh, com_mcr, 0);
+		sc->sc_mcr = 0;
+		bus_space_write_1(iot, ioh, com_mcr, sc->sc_mcr);
 	}
 
 	/*
@@ -1211,6 +1070,16 @@ compwroff(sc)
 	}
 }
 
+void
+com_raisedtr(arg)
+	void *arg;
+{
+	struct com_softc *sc = arg;
+
+	SET(sc->sc_mcr, MCR_DTR | MCR_RTS);
+	bus_space_write_1(sc->sc_iot, sc->sc_ioh, com_mcr, sc->sc_mcr);
+}
+
 int
 comread(dev, uio, flag)
 	dev_t dev;
@@ -1220,13 +1089,6 @@ comread(dev, uio, flag)
 	struct com_softc *sc = pccom_cd.cd_devs[DEVUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING)) {
-		int s = spltty();
-		com_absent_notify(sc);
-		splx(s);
-		return EIO;
-	}
-
 	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
 }
  
@@ -1239,13 +1101,6 @@ comwrite(dev, uio, flag)
 	struct com_softc *sc = pccom_cd.cd_devs[DEVUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING)) {
-		int s = spltty();
-		com_absent_notify(sc);
-		splx(s);
-		return EIO;
-	}
-
 	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
 }
 
@@ -1286,13 +1141,6 @@ comioctl(dev, cmd, data, flag, p)
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	int error;
-
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING)) {
-		int s = spltty();
-		com_absent_notify(sc);
-		splx(s);
-		return EIO;
-	}
 
 	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
 	if (error >= 0)
@@ -1407,13 +1255,6 @@ comparam(tp, t)
 	u_int8_t lcr;
 	tcflag_t oldcflag;
 	int s;
-
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING)) {
-		int s = spltty();
-		com_absent_notify(sc);
-		splx(s);
-		return EIO;
-	}
 
 	/* check requested parameters */
 	if (ospeed < 0 || (t->c_ispeed && t->c_ispeed != t->c_ospeed))
@@ -1575,18 +1416,6 @@ comparam(tp, t)
 	return 0;
 }
 
-void
-comstart_pending(arg)
-	void *arg;
-{
-	struct com_softc *sc = arg;
-	int s;
-
-	s = spltty();
-	com_absent_notify(sc);
-	splx(s);
-}
-
 /*
  * (un)block input via hw flowcontrol
  */
@@ -1641,16 +1470,6 @@ comstart(tp)
 	int s, count;
 
 	s = spltty();
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT|COM_HW_ABSENT_PENDING)) {
-		/*
-		 * not quite good enough: if caller is ttywait() it will
-		 * go to sleep immediately, so hang out a bit and then
-		 * prod caller again.
-		 */
-		com_absent_notify(sc);
-		timeout(comstart_pending, sc, 1);
-		goto out;
-	}
 	if (ISSET(tp->t_state, TS_BUSY))
 		goto out;
 	if (ISSET(tp->t_state, TS_TIMEOUT | TS_TTSTOP) || sc->sc_halt > 0)
@@ -1850,7 +1669,7 @@ comintr(arg)
 	u_int8_t lsr;
 	u_int	rxput;
 
-	if (ISSET(sc->sc_hwflags, COM_HW_ABSENT) || !sc->sc_tty)
+	if (!sc->sc_tty)
 		return (0);	/* can't do squat. */
 
 	if (ISSET(bus_space_read_1(iot, ioh, com_iir), IIR_NOPEND))

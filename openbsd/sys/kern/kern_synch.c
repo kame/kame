@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.14 1999/02/26 05:10:40 art Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.17 1999/09/05 22:20:45 tholo Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*-
@@ -49,6 +49,7 @@
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
 #include <vm/vm.h>
+#include <sys/sched.h>
 
 #if defined(UVM)
 #include <uvm/uvm_extern.h>
@@ -178,6 +179,15 @@ schedcpu(arg)
 	register struct proc *p;
 	register int s;
 	register unsigned int newcpu;
+	int phz;
+
+	/*
+	 * If we have a statistics clock, use that to calculate CPU
+	 * time, otherwise revert to using the profiling clock (which,
+	 * in turn, defaults to hz if there is no separate profiling
+	 * clock available)
+	 */
+	phz = stathz ? stathz : profhz;
 
 	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
 		/*
@@ -199,21 +209,21 @@ schedcpu(arg)
 		/*
 		 * p_pctcpu is only for ps.
 		 */
+		KASSERT(phz);
 #if	(FSHIFT >= CCPU_SHIFT)
-		p->p_pctcpu += (hz == 100)?
+		p->p_pctcpu += (phz == 100)?
 			((fixpt_t) p->p_cpticks) << (FSHIFT - CCPU_SHIFT):
                 	100 * (((fixpt_t) p->p_cpticks)
-				<< (FSHIFT - CCPU_SHIFT)) / hz;
+				<< (FSHIFT - CCPU_SHIFT)) / phz;
 #else
 		p->p_pctcpu += ((FSCALE - ccpu) *
-			(p->p_cpticks * FSCALE / hz)) >> FSHIFT;
+			(p->p_cpticks * FSCALE / phz)) >> FSHIFT;
 #endif
 		p->p_cpticks = 0;
-		newcpu = (u_int) decay_cpu(loadfac, p->p_estcpu) + p->p_nice;
-		p->p_estcpu = min(newcpu, UCHAR_MAX);
+		newcpu = (u_int) decay_cpu(loadfac, p->p_estcpu);
+		p->p_estcpu = newcpu;
 		resetpriority(p);
 		if (p->p_priority >= PUSER) {
-#define	PPQ	(128 / NQS)		/* priorities per queue */
 			if ((p != curproc) &&
 			    p->p_stat == SRUN &&
 			    (p->p_flag & P_INMEM) &&
@@ -253,7 +263,7 @@ updatepri(p)
 		p->p_slptime--;	/* the first time was done in schedcpu */
 		while (newcpu && --p->p_slptime)
 			newcpu = (int) decay_cpu(loadfac, newcpu);
-		p->p_estcpu = min(newcpu, UCHAR_MAX);
+		p->p_estcpu = newcpu;
 	}
 	resetpriority(p);
 }
@@ -691,11 +701,36 @@ resetpriority(p)
 {
 	register unsigned int newpriority;
 
-	newpriority = PUSER + p->p_estcpu / 4 + 2 * p->p_nice;
+	newpriority = PUSER + p->p_estcpu + NICE_WEIGHT * (p->p_nice - NZERO);
 	newpriority = min(newpriority, MAXPRI);
 	p->p_usrpri = newpriority;
 	if (newpriority < curpriority)
 		need_resched();
+}
+
+/*
+ * We adjust the priority of the current process.  The priority of a process
+ * gets worse as it accumulates CPU time.  The cpu usage estimator (p_estcpu)
+ * is increased here.  The formula for computing priorities (in kern_synch.c)
+ * will compute a different value each time p_estcpu increases. This can
+ * cause a switch, but unless the priority crosses a PPQ boundary the actual
+ * queue will not change.  The cpu usage estimator ramps up quite quickly
+ * when the process is running (linearly), and decays away exponentially, at
+ * a rate which is proportionally slower when the system is busy.  The basic
+ * principal is that the system will 90% forget that the process used a lot
+ * of CPU time in 5 * loadav seconds.  This causes the system to favor
+ * processes which haven't run much recently, and to round-robin among other
+ * processes.
+ */
+
+void
+schedclock(p)
+	struct proc *p;
+{
+	p->p_estcpu = ESTCPULIM(p->p_estcpu + 1);
+	resetpriority(p);
+	if (p->p_priority >= PUSER)
+		p->p_priority = p->p_usrpri;
 }
 
 #ifdef DDB
@@ -734,15 +769,15 @@ db_show_all_procs(addr, haddr, count, modif)
 	switch (*mode) {
 
 	case 'a':
-		db_printf("PID        %10s %18s %18s %18s\n",
+		db_printf("  PID  %-10s  %18s  %18s  %18s\n",
 		    "COMMAND", "STRUCT PROC *", "UAREA *", "VMSPACE/VM_MAP");
 		break;
 	case 'n':
-		db_printf("PID        %10s %10s %10s S %7s %16s %7s\n",
-		    "PPID", "PGRP", "UID", "FLAGS", "COMMAND", "WAIT");
+		db_printf("  PID  %5s  %5s  %5s  S  %10s  %-9s  %-16s\n",
+		    "PPID", "PGRP", "UID", "FLAGS", "WAIT", "COMMAND");
 		break;
 	case 'w':
-		db_printf("PID        %16s %8s %18s %s\n",
+		db_printf("  PID  %-16s  %-8s  %18s  %s\n",
 		    "COMMAND", "EMUL", "WAIT-CHANNEL", "WAIT-MSG");
 		break;
 	}
@@ -751,25 +786,26 @@ db_show_all_procs(addr, haddr, count, modif)
 		pp = p->p_pptr;
 		if (p->p_stat) {
 
-			db_printf("%-10d ", p->p_pid);
+			db_printf("%5d  ", p->p_pid);
 
 			switch (*mode) {
 
 			case 'a':
-				db_printf("%10.10s %18p %18p %18p\n",
+				db_printf("%-10.10s  %18p  %18p  %18p\n",
 				    p->p_comm, p, p->p_addr, p->p_vmspace);
 				break;
 
 			case 'n':
-				db_printf("%10d %10d %10d %d %#7x %16s %7.7s\n",
+				db_printf("%5d  %5d  %5d  %d  %#10x  "
+				    "%-9.9s  %-16s\n",
 				    pp ? pp->p_pid : -1, p->p_pgrp->pg_id,
 				    p->p_cred->p_ruid, p->p_stat, p->p_flag,
-				    p->p_comm, (p->p_wchan && p->p_wmesg) ?
-					p->p_wmesg : "");
+				    (p->p_wchan && p->p_wmesg) ?
+					p->p_wmesg : "", p->p_comm);
 				break;
 
 			case 'w':
-				db_printf("%16s %8s %18p %s\n", p->p_comm,
+				db_printf("%-16s  %-8s  %18p  %s\n", p->p_comm,
 				    p->p_emul->e_name, p->p_wchan,
 				    (p->p_wchan && p->p_wmesg) ? 
 					p->p_wmesg : "");

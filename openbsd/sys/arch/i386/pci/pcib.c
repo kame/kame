@@ -42,15 +42,18 @@
 #include <sys/device.h>
 
 #include <machine/bus.h>
+#include <dev/isa/isavar.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 
 #include <dev/pci/pcidevs.h>
 
+#include "isa.h"
+
 int	pcibmatch __P((struct device *, void *, void *));
 void	pcibattach __P((struct device *, struct device *, void *));
-
+void	pcib_callback __P((struct device *));
 int	pcib_print __P((void *, const char *));
 
 struct cfattach pcib_ca = {
@@ -60,7 +63,6 @@ struct cfattach pcib_ca = {
 struct cfdriver pcib_cd = {
 	NULL, "pcib", DV_DULL
 };
-
 
 int
 pcibmatch(parent, match, aux)
@@ -82,6 +84,12 @@ pcibmatch(parent, match, aux)
 			/* The above bridges mis-identify themselves */
 			return (1);
 		}
+	case PCI_VENDOR_SIS:
+		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_SIS_85C503:
+			/* mis-identifies itself as a miscellaneous prehistoric */
+			return (1);
+		}
 	}
 
 	return (0);
@@ -96,4 +104,36 @@ pcibattach(parent, self, aux)
 	 * Cannot attach isa bus now; must postpone for various reasons
 	 */
 	printf("\n");
+
+	config_defer(self, pcib_callback);
+}
+
+void
+pcib_callback(self)
+	struct device *self;
+{
+	struct isabus_attach_args iba;
+
+	/*
+	 * Attach the ISA bus behind this bridge.
+	 */
+	memset(&iba, 0, sizeof(iba));
+	iba.iba_busname = "isa";
+	iba.iba_iot = I386_BUS_SPACE_IO;
+	iba.iba_memt = I386_BUS_SPACE_MEM;
+#if NISA > 0
+	iba.iba_dmat = &isa_bus_dma_tag;
+#endif
+	config_found(self, &iba, pcib_print);
+}
+
+int
+pcib_print(aux, pnp)
+	void *aux;
+	const char *pnp;
+{
+	/* Only ISAs can attach to pcib's; easy. */
+	if (pnp)
+		printf("isa at %s", pnp);
+	return (UNCONF);
 }

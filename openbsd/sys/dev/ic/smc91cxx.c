@@ -1,4 +1,4 @@
-/*	$OpenBSD: smc91cxx.c,v 1.3 1999/02/28 03:23:37 jason Exp $	*/
+/*	$OpenBSD: smc91cxx.c,v 1.6 1999/08/16 08:27:15 fgsch Exp $	*/
 /*	$NetBSD: smc91cxx.c,v 1.11 1998/08/08 23:51:41 mycroft Exp $	*/
 
 /*-
@@ -98,18 +98,11 @@
 
 #include <net/if.h>
 #include <net/if_dl.h>
-#ifdef __NetBSD__
-#include <net/if_ether.h>
-#endif
 #include <net/if_media.h> 
 
 #ifdef INET
 #include <netinet/in.h> 
-#ifdef __NetBSD__
-#include <netinet/if_inarp.h>
-#else
 #include <netinet/if_ether.h>
-#endif
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
@@ -141,6 +134,7 @@
 
 #define ETHER_ADDR_LEN		6
 
+#ifdef SMC_DEBUG
 const char *smc91cxx_idstrs[] = {
 	NULL,				/* 0 */
 	NULL,				/* 1 */
@@ -159,6 +153,7 @@ const char *smc91cxx_idstrs[] = {
 	NULL,				/* 14 */
 	NULL,				/* 15 */
 };
+#endif
 
 /* Supported media types. */
 const int smc91cxx_media[] = {
@@ -210,23 +205,19 @@ smc91cxx_attach(sc, myea)
 	struct smc91cxx_softc *sc;
 	u_int8_t *myea;
 {
-#ifdef __NetBSD__
-	struct ifnet *ifp = &sc->sc_ec.ec_if;
-#else
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-#endif
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	const char *idstr;
 	u_int16_t tmp;
-#ifdef __NetBSD__
-	u_int8_t enaddr[ETHER_ADDR_LEN];
-#endif
 	int i, aui;
+#ifdef SMC_DEBUG
+	const char *idstr;
+#endif
 
 	/* Make sure the chip is stopped. */
 	smc91cxx_stop(sc);
 
+#ifdef SMC_DEBUG
 	SMC_SELECT_BANK(sc, 3);
 	tmp = bus_space_read_2(bst, bsh, REVISION_REG_W);
 	idstr = smc91cxx_idstrs[RR_ID(tmp)];
@@ -236,41 +227,27 @@ smc91cxx_attach(sc, myea)
 	else
 		printf("unknown chip id %d, ", RR_ID(tmp));
 	printf("revision %d\n", RR_REV(tmp));
+#endif
 
 	/* Read the station address from the chip. */
 	SMC_SELECT_BANK(sc, 1);
 	if (myea == NULL) {
-#ifdef __NetBSD__
-		myea = enaddr;
-#endif
 		for (i = 0; i < ETHER_ADDR_LEN; i += 2) {
 			tmp = bus_space_read_2(bst, bsh, IAR_ADDR0_REG_W + i);
-#ifdef __NetBSD__
-			myea[i + 1] = (tmp >> 8) & 0xff;
-			myea[i] = tmp & 0xff;
-#else
 			sc->sc_arpcom.ac_enaddr[i + 1] = (tmp >>8) & 0xff;
 			sc->sc_arpcom.ac_enaddr[i] = tmp & 0xff;
-#endif
 		}
-#ifdef __NetBSD__
-	}
-#else
 	} else {
 		bcopy(myea, sc->sc_arpcom.ac_enaddr, ETHER_ADDR_LEN);
 	}
-#endif
-	printf("%s: MAC address %s, ", sc->sc_dev.dv_xname,
-#ifdef __NetBSD__
-	    ether_sprintf(myea));
-#else
+
+	printf(": address %s, ",
 	    ether_sprintf(sc->sc_arpcom.ac_enaddr));
-#endif
 
 	/* ..and default media. */
 	tmp = bus_space_read_2(bst, bsh, CONFIG_REG_W);
-	printf("default media %s\n", (aui = (tmp & CR_AUI_SELECT)) ?
-	    "AUI" : "UTP");
+	printf("utp/aui (default %s)\n", (aui = (tmp & CR_AUI_SELECT)) ?
+	    "aui" : "utp");
 
 	/* Initialize the ifnet structure. */
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
@@ -280,14 +257,11 @@ smc91cxx_attach(sc, myea)
 	ifp->if_watchdog = smc91cxx_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	/* Attach the interface. */
 	if_attach(ifp);
-#ifdef __NetBSD__
-	ether_ifattach(ifp, myea);
-#else
 	ether_ifattach(ifp);
-#endif
 
 	/* Initialize the media structures. */
 	ifmedia_init(&sc->sc_media, 0, smc91cxx_mediachange,
@@ -390,17 +364,10 @@ void
 smc91cxx_init(sc)
 	struct smc91cxx_softc *sc;
 {
-#ifdef __NetBSD__
-	struct ifnet *ifp = &sc->sc_ec.ec_if;
-#else
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-#endif
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 	u_int16_t tmp;
-#ifdef __NetBSD__
-	u_int8_t *enaddr;
-#endif
 	int s, i;
 
 	s = splnet();
@@ -422,17 +389,9 @@ smc91cxx_init(sc)
 
 	/* Set the Ethernet address. */
 	SMC_SELECT_BANK(sc, 1);
-#ifdef __NetBSD__
-	enaddr = (u_int8_t *)LLADDR(ifp->if_sadl);
-	for (i = 0; i < ETHER_ADDR_LEN; i += 2) {
-		tmp = enaddr[i + 1] << 8 | enaddr[i];
-		bus_space_write_2(bst, bsh, IAR_ADDR0_REG_W + i, tmp);
-	}
-#else
 	for (i = 0; i < ETHER_ADDR_LEN; i++ )
 		bus_space_write_1(bst, bsh, IAR_ADDR0_REG_W + i,
 		    sc->sc_arpcom.ac_enaddr[i]);
-#endif
 
 	/*
 	 * Set the control register to automatically release successfully
@@ -705,11 +664,7 @@ smc91cxx_intr(arg)
 	void *arg;
 {
 	struct smc91cxx_softc *sc = arg;
-#ifdef __NetBSD__
-	struct ifnet *ifp = &sc->sc_ec.ec_if;
-#else
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-#endif
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 	u_int8_t mask, interrupts, status;
@@ -902,11 +857,7 @@ void
 smc91cxx_read(sc)
 	struct smc91cxx_softc *sc;
 {
-#ifdef __NetBSD__
-	struct ifnet *ifp = &sc->sc_ec.ec_if;
-#else
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-#endif
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 	struct ether_header *eh;
@@ -1045,11 +996,7 @@ smc91cxx_ioctl(ifp, cmd, data)
 #ifdef INET
 		case AF_INET:
 		smc91cxx_init(sc);
-#ifdef __NetBSD__
-		arp_ifinit(ifp, ifa);
-#else
 		arp_ifinit(&sc->sc_arpcom, ifa);
-#endif
 		break;
 #endif
 #ifdef NS
@@ -1128,13 +1075,8 @@ smc91cxx_ioctl(ifp, cmd, data)
 		}
 
 		error = (cmd == SIOCADDMULTI) ?
-#ifdef __NetBSD__
-		    ether_addmulti(ifr, &sc->sc_ec) :
-		    ether_delmulti(ifr, &sc->sc_ec);
-#else
 		    ether_addmulti(ifr, &sc->sc_arpcom) :
 		    ether_delmulti(ifr, &sc->sc_arpcom);
-#endif
 		if (error == ENETRESET) {
 			/*
 			 * Multicast list has changed; set the hardware
@@ -1184,11 +1126,7 @@ smc91cxx_watchdog(ifp)
 	struct smc91cxx_softc *sc = ifp->if_softc;
 
 	log(LOG_ERR, "%s: device timeout\n", sc->sc_dev.dv_xname);
-#ifdef __NetBSD__
-	ifp->if_oerrors++;
-#else
 	++sc->sc_arpcom.ac_if.if_oerrors;
-#endif
 
 	smc91cxx_reset(sc);
 }
@@ -1219,11 +1157,7 @@ smc91cxx_stop(sc)
 	/*
 	 * Cancel watchdog timer.
 	 */
-#ifdef __NetBSD__
-	sc->sc_ec.ec_if.if_timer = 0;
-#else
 	sc->sc_arpcom.ac_if.if_timer = 0;
-#endif
 }
 
 /*

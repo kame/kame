@@ -1,10 +1,10 @@
-/*	$OpenBSD: miidevs.h,v 1.6 1999/02/08 13:31:21 jason Exp $	*/
+/*	$OpenBSD: miidevs.h,v 1.8 1999/10/12 16:56:04 jason Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: miidevs,v 1.4 1999/02/08 13:29:04 jason Exp 
+ *	OpenBSD: miidevs,v 1.6 1999/10/12 16:55:34 jason Exp 
  */
 /* $NetBSD: miidevs,v 1.3 1998/11/05 03:43:43 thorpej Exp $ */
 
@@ -53,11 +53,13 @@
 #define	MII_OUI_DAVICOM	0x006040	/* Davicom Semiconductor */
 #define	MII_OUI_ICS	0x00057d	/* Integrated Circuit Systems */
 #define	MII_OUI_INTEL	0x00aa00	/* Intel */
+#define	MII_OUI_INTEL_ALT	0x00f800	/* Intel (alt) */
 #define	MII_OUI_LEVEL1	0x1e0400	/* Level 1 */
 #define	MII_OUI_MYSON	0x00c0b4	/* Myson Technology */
 #define	MII_OUI_NATSEMI	0x080017	/* National Semiconductor */
 #define	MII_OUI_QUALSEMI	0x006051	/* Quality Semiconductor */
 #define	MII_OUI_SEEQ	0x0005be	/* Seeq */
+#define	MII_OUI_SIS	0x000760	/* Silicon Integrated Systems */
 #define	MII_OUI_TI	0x100014	/* Texas Instruments */
 
 /*
@@ -79,6 +81,10 @@
 /* Intel PHYs */
 #define	MII_MODEL_INTEL_I82555	0x0015
 #define	MII_STR_INTEL_I82555	"i82555 10/100 media interface"
+#define	MII_MODEL_INTEL_I82553	0x0035
+#define	MII_STR_INTEL_I82553	"i82553 10/100 media interface"
+#define	MII_MODEL_INTEL_ALT_I82553	0x0000
+#define	MII_STR_INTEL_ALT_I82553	"i82553 10/100 media interface"
 
 /* Level 1 PHYs */
 #define	MII_MODEL_LEVEL1_LXT970	0x0000
@@ -103,6 +109,10 @@
 #define	MII_STR_SEEQ_80220	"Seeq 80220 10/100 media interface"
 #define	MII_MODEL_SEEQ_84220	0x0004
 #define	MII_STR_SEEQ_84220	"Seeq 84220 10/100 media interface"
+
+/* Silicon Integrated Systems PHYs */
+#define	MII_MODEL_SIS_900	0x0000
+#define	MII_STR_SIS_900	"SiS 900 10/100 media interface"
 
 /* Texas Instruments PHYs */
 #define	MII_MODEL_TI_TLAN10T	0x0001

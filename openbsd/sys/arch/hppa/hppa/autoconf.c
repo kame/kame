@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.2 1999/02/25 19:13:31 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.5 1999/08/14 03:17:32 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -67,6 +67,7 @@ void	dumpconf __P((void));
 
 static int findblkmajor __P((struct device *dv));
 
+void (*cold_hook) __P((void)); /* see below */
 
 /*
  * configure:
@@ -80,12 +81,17 @@ configure()
 	splhigh();
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
+	/* in spl*() we trust */
 	spl0();
-
+	__asm __volatile("nop\n\tnop\n\tssm %0, %%r0\n\tnop\n\tnop\n\tnop"
+			 :: "i" (PSW_I));
 
 	setroot();
 	swapconf();
+	dumpconf();
 	cold = 0;
+	if (cold_hook)
+		(*cold_hook)();
 }
 
 /*
@@ -109,14 +115,52 @@ swapconf()
 			swp->sw_nblks = ctod(dtoc(swp->sw_nblks));
 		}
 	}
-	dumpconf();
 }
 
+/*
+ * This is called by configure to set dumplo and dumpsize.
+ * Dumps always skip the first CLBYTES of disk space
+ * in case there might be a disk label stored there.
+ * If there is extra space, put dump at the end to
+ * reduce the chance that swapping trashes it.
+ */
 void
 dumpconf()
 {
-}
+	extern int dumpsize;
+	int nblks, dumpblks;	/* size of dump area */
+	int maj;
 
+	if (dumpdev == NODEV)
+		goto bad;
+	maj = major(dumpdev);
+	if (maj < 0 || maj >= nblkdev)
+		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
+	if (bdevsw[maj].d_psize == NULL)
+		goto bad;
+	nblks = (*bdevsw[maj].d_psize)(dumpdev);
+	if (nblks <= ctod(1))
+		goto bad;
+	dumpblks = cpu_dumpsize();
+	if (dumpblks < 0)  
+		goto bad;
+	dumpblks += ctod(physmem);
+
+	/* If dump won't fit (incl. room for possible label), punt. */
+	if (dumpblks > (nblks - ctod(1)))
+		goto bad;
+
+	/* Put dump at end of partition */
+	dumplo = nblks - dumpblks;
+
+	/* dumpsize is in page units, and doesn't include headers. */
+	dumpsize = physmem;
+	return;
+
+bad:
+	dumpsize = 0;
+	return;
+}
 
 struct nam2blk {
 	char *name;
@@ -134,7 +178,7 @@ struct nam2blk {
 };
 
 #ifdef RAMDISK_HOOKS
-static struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };
+/*static struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };*/
 #endif
 
 static int
@@ -315,7 +359,7 @@ hppa_mod_info(type, sv)
 	     (mi->mi_type != type || mi->mi_sv != sv); mi++);
 
 	if (mi->mi_type < 0) {
-		sprintf(fakeid, "type %d, sv %d", type, sv);
+		sprintf(fakeid, "type %x, sv %x", type, sv);
 		return fakeid;
 	} else
 		return mi->mi_name;

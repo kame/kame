@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.h,v 1.8 1998/06/26 09:13:11 deraadt Exp $	*/
+/*	$OpenBSD: bpf.h,v 1.12 1999/08/08 00:43:00 niklas Exp $	*/
 /*	$NetBSD: bpf.h,v 1.15 1996/12/13 07:57:33 mikel Exp $	*/
 
 /*
@@ -99,7 +99,7 @@ struct bpf_version {
  * BPF ioctls
  *
  * The first set is for compatibility with Sun's pcc style
- * header files.  If your using gcc, we assume that you
+ * header files.  If you're using gcc, we assume that you
  * have run fixincludes so the latter set should work.
  */
 #if (defined(sun) || defined(ibm032)) && !defined(__GNUC__)
@@ -181,9 +181,12 @@ struct bpf_hdr {
 #define DLT_ATM_RFC1483	11	/* LLC/SNAP encapsulated atm */
 #define DLT_LOOP	12	/* loopback type (af header) */
 #define DLT_ENC		13	/* IPSEC enc type (af header, spi, flags) */
+#define DLT_RAW		14	/* raw IP */
+#define DLT_SLIP_BSDOS	15	/* BSD/OS Serial Line IP */
+#define DLT_PPP_BSDOS	16	/* BSD/OS Point-to-point Protocol */
 
 /*
- * The instruction encondings.
+ * The instruction encodings.
  */
 /* instruction classes */
 #define BPF_CLASS(code) ((code) & 0x07)
@@ -259,6 +262,7 @@ int	 bpf_validate __P((struct bpf_insn *, int));
 void	 bpf_tap __P((caddr_t, u_char *, u_int));
 void	 bpf_mtap __P((caddr_t, struct mbuf *));
 void	 bpfattach __P((caddr_t *, struct ifnet *, u_int, u_int));
+void	 bpfdetach __P((struct ifnet *));
 void	 bpfilterattach __P((int));
 u_int	 bpf_filter __P((struct bpf_insn *, u_char *, u_int, u_int));
 #endif

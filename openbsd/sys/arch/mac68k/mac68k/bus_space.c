@@ -1,4 +1,4 @@
-/*	$OpenBSD: bus_space.c,v 1.2 1999/01/11 05:11:36 millert Exp $	*/
+/*	$OpenBSD: bus_space.c,v 1.4 1999/09/03 18:01:11 art Exp $	*/
 /*	$NetBSD: bus_space.c,v 1.2 1998/04/24 05:27:24 scottr Exp $	*/
 
 /*-
@@ -87,8 +87,8 @@ bus_space_map(t, bpa, size, flags, bshp)
 	if (error)
 		return (error);
 
-	pa = mac68k_trunc_page(bpa + t);
-	endpa = mac68k_round_page((bpa + t + size) - 1);
+	pa = m68k_trunc_page(bpa + t);
+	endpa = m68k_round_page((bpa + t + size) - 1);
 
 #ifdef DIAGNOSTIC
 	if (endpa <= pa)
@@ -166,8 +166,8 @@ bus_mem_add_mapping(bpa, size, flags, bshp)
 	u_long pa, endpa;
 	vm_offset_t va;
 
-	pa = mac68k_trunc_page(bpa);
-	endpa = mac68k_round_page((bpa + size) - 1);
+	pa = m68k_trunc_page(bpa);
+	endpa = m68k_round_page((bpa + size) - 1);
 
 #ifdef DIAGNOSTIC
 	if (endpa <= pa)
@@ -186,7 +186,7 @@ bus_mem_add_mapping(bpa, size, flags, bshp)
 
 	for (; pa < endpa; pa += NBPG, va += NBPG) {
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, TRUE);
+		    VM_PROT_READ | VM_PROT_WRITE, TRUE, 0);
 		if (!(flags & BUS_SPACE_MAP_CACHEABLE))
 			pmap_changebit(pa, PG_CI, TRUE);
 	}
@@ -203,8 +203,8 @@ bus_space_unmap(t, bsh, size)
 	vm_offset_t	va, endva;
 	bus_addr_t bpa;
 
-	va = mac68k_trunc_page(bsh);
-	endva = mac68k_round_page((bsh + size) - 1);
+	va = m68k_trunc_page(bsh);
+	endva = m68k_round_page((bsh + size) - 1);
 
 #ifdef DIAGNOSTIC
 	if (endva <= va)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.35 1999/02/04 23:00:24 niklas Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.38 1999/09/03 18:00:41 art Exp $	*/
 /*	$NetBSD: machdep.c,v 1.94 1997/06/12 15:46:29 mrg Exp $	*/
 
 /*
@@ -249,7 +249,8 @@ cpu_startup()
 	 */
 	for (i = 0; i < btoc(sizeof (struct msgbuf)); i++)
 		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp,
-		    avail_end + i * NBPG, VM_PROT_ALL, TRUE);
+		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
+		    VM_PROT_READ|VM_PROT_WRITE);
 	msgbufmapped = 1;
 
 	/*
@@ -401,7 +402,6 @@ allocsys(v)
 	valloc(cfree, struct cblock, nclist);
 #endif
 	valloc(callout, struct callout, ncallout);
-	valloc(swapmap, struct map, nswapmap = maxproc * 2);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -857,7 +857,7 @@ dumpconf()
 	cpu_kcore_hdr.ram_segs[0].size = ctob(dumpsize);
 	cpu_kcore_hdr.mmutype = mmutype;
 	cpu_kcore_hdr.kernel_pa = lowram;
-	cpu_kcore_hdr.sysseg_pa = 0; /* XXX */
+	cpu_kcore_hdr.sysseg_pa = pmap_kernel()->pm_stpa;
 #endif	/* HP300_NEWKVM */
 
 	/* Always skip the first CLBYTES, in case there is a label there. */
@@ -973,7 +973,7 @@ dumpsys()
 			printf("%d ", pg / NPGMB);
 #undef NPGMB
 		pmap_enter(pmap_kernel(), (vm_offset_t)vmmap, maddr,
-		    VM_PROT_READ, TRUE);
+		    VM_PROT_READ, TRUE, 0);
 
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
 		switch (error) {
@@ -1271,7 +1271,7 @@ parityerrorfind()
 	ecacheoff();
 	for (pg = btoc(lowram); pg < btoc(lowram)+physmem; pg++) {
 		pmap_enter(pmap_kernel(), (vm_offset_t)vmmap, ctob(pg),
-		    VM_PROT_READ, TRUE);
+		    VM_PROT_READ, TRUE, VM_PROT_READ);
 		ip = (int *)vmmap;
 		for (o = 0; o < NBPG; o += sizeof(int))
 			i = *ip++;

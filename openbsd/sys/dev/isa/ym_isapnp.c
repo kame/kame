@@ -1,4 +1,4 @@
-/*	$OpenBSD: ym_isapnp.c,v 1.4 1999/03/08 11:16:49 deraadt Exp $ */
+/*	$OpenBSD: ym_isapnp.c,v 1.7 1999/08/05 05:32:41 deraadt Exp $ */
 
 
 /*
@@ -32,6 +32,8 @@
  *  and Pentium (II) motherboards.
  */
 
+#include "midi.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -42,6 +44,7 @@
 
 #include <sys/audioio.h>
 #include <dev/audio_if.h>
+#include <dev/midi_if.h>
 
 #include <dev/isa/isavar.h>
 #include <dev/isa/isadmavar.h>
@@ -51,6 +54,7 @@
 
 #include <dev/ic/cs4231reg.h>
 #include <dev/isa/cs4231var.h>
+#include <dev/ic/mpuvar.h>
 
 #include <dev/isa/wssreg.h>
 #include <dev/isa/ymvar.h>
@@ -61,7 +65,6 @@ void	ym_isapnp_attach __P((struct device *, struct device *, void *));
 struct cfattach ym_isapnp_ca = {
 	sizeof(struct ym_softc), ym_isapnp_match, ym_isapnp_attach
 };
-
 
 /*
  * Probe / attach routines.
@@ -75,7 +78,10 @@ ym_isapnp_match(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
+	struct isa_attach_args *ia = aux;
 
+	if (ia->ipa_nio < 5)
+		return 0;
 	return 1;
 }
 
@@ -90,11 +96,6 @@ ym_isapnp_attach(parent, self, aux)
 {
 	struct ym_softc *sc = (struct ym_softc *)self;
 	struct isa_attach_args *ia = aux;
-
-	if (ia->ipa_nio < 5) {
-		printf ("Insufficient I/O ports... not really attached\n");
-		return;
-	}
 
 	sc->sc_iot = ia->ia_iot;
 	sc->sc_ioh = ia->ipa_io[1].h;
@@ -113,6 +114,10 @@ ym_isapnp_attach(parent, self, aux)
 	sc->sc_ad1848.mode = 2;
 	sc->sc_ad1848.MCE_bit = MODE_CHANGE_ENABLE;
 
+#if NMIDI > 0
+	sc->sc_mpu_sc.iobase = ia->ipa_io[3].base;
+	sc->sc_mpu_sc.ioh = ia->ipa_io[3].h;
+#endif
+
 	ym_attach(sc);
 }
-

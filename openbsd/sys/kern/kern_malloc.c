@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_malloc.c,v 1.12 1999/02/26 04:54:00 art Exp $	*/
+/*	$OpenBSD: kern_malloc.c,v 1.17 1999/09/10 22:14:39 art Exp $	*/
 /*	$NetBSD: kern_malloc.c,v 1.15.4.2 1996/06/13 17:10:56 cgd Exp $	*/
 
 /*
@@ -54,12 +54,10 @@ vm_map_t kmem_map = NULL;
 #endif
 
 struct kmembuckets bucket[MINBUCKET + 16];
-#ifdef KMEMSTATS
 struct kmemstats kmemstats[M_LAST];
-#endif
 struct kmemusage *kmemusage;
 char *kmembase, *kmemlimit;
-#if defined(KMEMSTATS) || defined(DIAGNOSTIC)
+#if defined(KMEMSTATS) || defined(DIAGNOSTIC) || defined(FFS_SOFTUPDATES)
 char *memname[] = INITKMEMNAMES;
 #endif
 
@@ -147,7 +145,7 @@ malloc(size, type, flags)
 	if (kbp->kb_next == NULL) {
 		kbp->kb_last = NULL;
 		if (size > MAXALLOCSAVE)
-			allocsize = roundup(size, CLBYTES);
+			allocsize = clrnd(round_page(size));
 		else
 			allocsize = 1 << indx;
 		npg = clrnd(btoc(allocsize));
@@ -156,7 +154,7 @@ malloc(size, type, flags)
 				(vsize_t)ctob(npg), 
 				(flags & M_NOWAIT) ? UVM_KMF_NOWAIT : 0);
 #else
-		va = (caddr_t) kmem_malloc(kmem_map, (vm_size_t)ctob(npg),
+		va = (caddr_t) kmem_malloc(kmem_map, (vsize_t)ctob(npg),
 					   !(flags & M_NOWAIT));
 #endif
 		if (va == NULL) {
@@ -342,7 +340,7 @@ free(addr, type)
 #if defined(UVM)
 		uvm_km_free(kmem_map, (vaddr_t)addr, ctob(kup->ku_pagecnt));
 #else
-		kmem_free(kmem_map, (vm_offset_t)addr, ctob(kup->ku_pagecnt));
+		kmem_free(kmem_map, (vaddr_t)addr, ctob(kup->ku_pagecnt));
 #endif
 #ifdef KMEMSTATS
 		size = kup->ku_pagecnt << PGSHIFT;
@@ -430,8 +428,10 @@ kmeminit()
 		ERROR!_kmeminit:_MAXALLOCSAVE_too_small
 #endif
 
+#ifdef DIAGNOSTIC
 	if (sizeof(struct freelist) > (1 << MINBUCKET))
-		panic("minbucket too small/struct freelist too big");
+		panic("kmeminit: minbucket too small/struct freelist too big");
+#endif
 
 	npg = VM_KMEM_SIZE/ NBPG;
 #if defined(UVM)
@@ -442,9 +442,9 @@ kmeminit()
 			FALSE, FALSE, &kmem_map_store);
 #else
 	kmemusage = (struct kmemusage *) kmem_alloc(kernel_map,
-		(vm_size_t)(npg * sizeof(struct kmemusage)));
-	kmem_map = kmem_suballoc(kernel_map, (vm_offset_t *)&kmembase,
-		(vm_offset_t *)&kmemlimit, (vm_size_t)(npg * NBPG), FALSE);
+		(vsize_t)(npg * sizeof(struct kmemusage)));
+	kmem_map = kmem_suballoc(kernel_map, (vaddr_t *)&kmembase,
+		(vaddr_t *)&kmemlimit, (vsize_t)(npg * NBPG), FALSE);
 #endif
 #ifdef KMEMSTATS
 	for (indx = 0; indx < MINBUCKET + 16; indx++) {

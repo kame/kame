@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_revent.c,v 1.2 1999/02/16 00:03:24 niklas Exp $	*/
-/*	$NetBSD: rf_revent.c,v 1.3 1999/02/05 00:06:17 oster Exp $	*/
+/*	$OpenBSD: rf_revent.c,v 1.6 1999/08/03 13:56:38 peter Exp $	*/
+/*	$NetBSD: rf_revent.c,v 1.4 1999/03/14 21:53:31 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -51,7 +51,7 @@ static RF_FreeList_t *rf_revent_freelist;
 
 extern int hz;
 
-#define DO_WAIT(_rc)   tsleep(&(_rc)->eventQueue, PRIBIO | PCATCH, "raidframe eventq", 0)
+#define DO_WAIT(_rc)   tsleep(&(_rc)->eventQueue, PRIBIO, "raidframe eventq", 0)
 
 #define DO_SIGNAL(_rc)     wakeup(&(_rc)->eventQueue)
 
@@ -66,8 +66,9 @@ rf_GetNextReconEvent(RF_RaidReconDesc_t *,
     RF_RowCol_t, void (*continueFunc) (void *),
     void *);
 
-	static void rf_ShutdownReconEvent(ignored)
-	void   *ignored;
+static void
+rf_ShutdownReconEvent(ignored)
+void   *ignored;
 {
 	RF_FREELIST_DESTROY(rf_revent_freelist, next, (RF_ReconEvent_t *));
 }
@@ -116,39 +117,35 @@ rf_GetNextReconEvent(reconDesc, row, continueFunc, continueArg)
 										 * must be equivalent
 										 * conditions */
 
-
 	rctrl->continueFunc = continueFunc;
 	rctrl->continueArg = continueArg;
 
 
-/* mpsleep timeout value: secs = timo_val/hz.  'ticks' here is defined as cycle-counter ticks, not softclock ticks */
-#define MAX_RECON_EXEC_TICKS 15000000	/* 150 Mhz => this many ticks in 100
-					 * ms */
-#define RECON_DELAY_MS 25
-#define RECON_TIMO     ((RECON_DELAY_MS * hz) / 1000)
+#define MAX_RECON_EXEC_USECS		(100 * 1000)	/* 100 ms */
+#define RECON_DELAY_MS			25
+#define RECON_TIMO    			((RECON_DELAY_MS * hz) / 1000)
 
 	/* we are not pre-emptible in the kernel, but we don't want to run
-	 * forever.  If we run w/o blocking for more than MAX_RECON_EXEC_TICKS
-	 * ticks of the cycle counter, delay for RECON_DELAY before
-	 * continuing. this may murder us with context switches, so we may
-	 * need to increase both the MAX...TICKS and the RECON_DELAY_MS. */
+	 * forever. If we run w/o blocking for more than MAX_RECON_EXEC_USECS
+	 * delay for RECON_DELAY_MS before continuing. this may murder us with
+	 * context switches, so we may need to increase both the
+	 * MAX...TICKS and the RECON_DELAY_MS. */
 	if (reconDesc->reconExecTimerRunning) {
-		int     status;
+		int	status;
 
 		RF_ETIMER_STOP(reconDesc->recon_exec_timer);
 		RF_ETIMER_EVAL(reconDesc->recon_exec_timer);
-		reconDesc->reconExecTicks += RF_ETIMER_VAL_TICKS(reconDesc->recon_exec_timer);
-		if (reconDesc->reconExecTicks > reconDesc->maxReconExecTicks)
-			reconDesc->maxReconExecTicks = reconDesc->reconExecTicks;
-		if (reconDesc->reconExecTicks >= MAX_RECON_EXEC_TICKS) {
-			/* we've been running too long.  delay for
-			 * RECON_DELAY_MS */
+		reconDesc->reconExecuSecs += RF_ETIMER_VAL_US(reconDesc->recon_exec_timer);
+		if (reconDesc->reconExecuSecs > reconDesc->maxReconExecuSecs)
+			reconDesc->maxReconExecuSecs = reconDesc->reconExecuSecs;
+		if (reconDesc->reconExecuSecs >= MAX_RECON_EXEC_USECS) {
+			/* we've been running too long - sleep */
 #if RF_RECON_STATS > 0
 			reconDesc->numReconExecDelays++;
-#endif				/* RF_RECON_STATS > 0 */
-			status = tsleep(&reconDesc->reconExecTicks, PRIBIO | PCATCH, "recon delay", RECON_TIMO);
+#endif /* RF_RECON_STATS > 0 */
+			status = tsleep(&reconDesc->reconExecuSecs, PRIBIO, "recon delay", RECON_TIMO);
 			RF_ASSERT(status == EWOULDBLOCK);
-			reconDesc->reconExecTicks = 0;
+			reconDesc->reconExecuSecs = 0;
 		}
 	}
 	while (!rctrl->eventQueue) {
@@ -156,11 +153,11 @@ rf_GetNextReconEvent(reconDesc, row, continueFunc, continueArg)
 		reconDesc->numReconEventWaits++;
 #endif				/* RF_RECON_STATS > 0 */
 		DO_WAIT(rctrl);
-		reconDesc->reconExecTicks = 0;	/* we've just waited */
+		reconDesc->reconExecuSecs = 0;	/* we've just waited */
 	}
 
-	reconDesc->reconExecTimerRunning = 1;
 	RF_ETIMER_START(reconDesc->recon_exec_timer);
+	reconDesc->reconExecTimerRunning = 1;
 
 	event = rctrl->eventQueue;
 	rctrl->eventQueue = event->next;

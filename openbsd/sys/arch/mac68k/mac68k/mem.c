@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.5 1998/08/31 17:42:32 millert Exp $	*/
+/*	$OpenBSD: mem.c,v 1.8 1999/09/03 18:01:14 art Exp $	*/
 /*	$NetBSD: mem.c,v 1.11 1996/05/05 06:18:41 briggs Exp $	*/
 
 /*
@@ -133,7 +133,7 @@ mmrw(dev, uio, flags)
 			v = uio->uio_offset;
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE);
+			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
@@ -195,6 +195,11 @@ mmmmap(dev, off, prot)
 	dev_t dev;
 	int off, prot;
 {
+	extern int numranges;
+	extern u_long low[8];
+	extern u_long high[8];
+	int seg;
+	
 	/*
 	 * /dev/mem is the only one that makes sense through this
 	 * interface.  For /dev/kmem any physaddr we return here
@@ -210,8 +215,10 @@ mmmmap(dev, off, prot)
 	 *
 	 * XXX could be extended to allow access to IO space but must
 	 * be very careful.
-	if ((unsigned)off < lowram || (unsigned)off >= 0xFFFFFFFC)
-		return (-1);
 	 */
-	return (mac68k_btop(off));
+	for (seg = 0; seg < numranges; seg++) {
+		if (((u_long)off >= low[seg]) && ((u_long)off <= high[seg]))
+			return (m68k_btop(off));
+	}
+	return (-1);
 }

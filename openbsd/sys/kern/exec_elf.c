@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.c,v 1.24 1999/02/10 08:07:20 deraadt Exp $	*/
+/*	$OpenBSD: exec_elf.c,v 1.27 1999/08/12 20:37:16 niklas Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -77,17 +77,17 @@ struct elf_probe_entry {
 	int os_mask;
 } elf_probes[] = {
 #ifdef COMPAT_FREEBSD
-	{ freebsd_elf_probe, OOS_FREEBSD },
-#endif
-#ifdef COMPAT_LINUX
-	{ linux_elf_probe, OOS_LINUX },
+	{ freebsd_elf_probe, 1 << OOS_FREEBSD },
 #endif
 #ifdef COMPAT_SVR4
 	{ svr4_elf_probe,
 	    1 << OOS_SVR4 | 1 << OOS_ESIX | 1 << OOS_SOLARIS | 1 << OOS_SCO |
 	    1 << OOS_DELL | 1 << OOS_NCR },
 #endif
-	{ 0, OOS_OPENBSD }
+#ifdef COMPAT_LINUX
+	{ linux_elf_probe, 1 << OOS_LINUX },
+#endif
+	{ 0, 1 << OOS_OPENBSD }
 };
 
 int elf_load_file __P((struct proc *, char *, struct exec_package *,
@@ -402,7 +402,7 @@ elf_load_file(p, path, epp, ap, last)
 	for (i = 0; i < eh.e_phnum; i++) {
 		u_long size = 0;
 		int prot = 0;
-#ifdef mips
+#if defined(__mips__)
 		if (*last == ELF32_NO_ADDR)
 			addr = ELF32_NO_ADDR;	/* GRRRRR!!!!! */
 #endif
@@ -598,7 +598,7 @@ exec_elf_makecmds(p, epp)
 		}
 	}
 
-#if !defined(mips)
+#if !defined(__mips__)
 	/*
 	 * If no position to load the interpreter was set by a probe
 	 * function, pick the same address that a non-fixed mmap(0, ..)

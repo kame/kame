@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_diskqueue.c,v 1.2 1999/02/16 00:02:39 niklas Exp $	*/
-/*	$NetBSD: rf_diskqueue.c,v 1.6 1999/02/05 00:06:09 oster Exp $	*/
+/*	$OpenBSD: rf_diskqueue.c,v 1.4 1999/08/04 13:10:54 peter Exp $	*/
+/*	$NetBSD: rf_diskqueue.c,v 1.7 1999/06/04 01:51:00 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -148,7 +148,7 @@ static RF_DiskQueueSW_t diskqueuesw[] = {
 		rf_RandomDequeue,
 		rf_RandomPeek,
 	rf_FifoPromote},
-#endif				/* !KERNEL && RF_INCLUDE_QUEUE_RANDOM > 0 */
+#endif				/* !_KERNEL && RF_INCLUDE_QUEUE_RANDOM > 0 */
 };
 #define NUM_DISK_QUEUE_TYPES (sizeof(diskqueuesw)/sizeof(RF_DiskQueueSW_t))
 
@@ -182,7 +182,12 @@ clean_dqd(dqd)
 	free(dqd->bp, M_RAIDFRAME);
 }
 /* configures a single disk queue */
-static int 
+int config_disk_queue(RF_Raid_t *, RF_DiskQueue_t *, RF_RowCol_t, 
+		      RF_RowCol_t, RF_DiskQueueSW_t *,
+		      RF_SectorCount_t, dev_t, int, 
+		      RF_ShutdownList_t **,
+		      RF_AllocListElem_t *);
+int 
 config_disk_queue(
     RF_Raid_t * raidPtr,
     RF_DiskQueue_t * diskqueue,
@@ -286,7 +291,10 @@ rf_ConfigureDiskQueues(
 	}
 	raidPtr->Queues = diskQueues;
 	for (r = 0; r < raidPtr->numRow; r++) {
-		RF_CallocAndAdd(diskQueues[r], raidPtr->numCol + ((r == 0) ? raidPtr->numSpare : 0), sizeof(RF_DiskQueue_t), (RF_DiskQueue_t *), raidPtr->cleanupList);
+		RF_CallocAndAdd(diskQueues[r], raidPtr->numCol + 
+				 ((r == 0) ? RF_MAXSPARE : 0), 
+				sizeof(RF_DiskQueue_t), (RF_DiskQueue_t *), 
+				raidPtr->cleanupList);
 		if (diskQueues[r] == NULL)
 			return (ENOMEM);
 		for (c = 0; c < raidPtr->numCol; c++) {

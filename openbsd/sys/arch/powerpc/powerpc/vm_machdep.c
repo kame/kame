@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.6 1999/01/23 19:41:33 rahnds Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.8 1999/09/03 18:01:51 art Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.1 1996/09/30 16:34:57 ws Exp $	*/
 
 /*
@@ -47,8 +47,10 @@
  * Finish a fork operation, with process p2 nearly set up.
  */
 void
-cpu_fork(p1, p2)
+cpu_fork(p1, p2, stack, stacksize)
 	struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
 {
 	struct trapframe *tf;
 	struct callframe *cf;
@@ -71,6 +73,13 @@ cpu_fork(p1, p2)
 	stktop1 = (caddr_t)trapframe(p1);
 	stktop2 = (caddr_t)trapframe(p2);
 	bcopy(stktop1, stktop2, sizeof(struct trapframe));
+
+	/*
+	 * If specified, give the child a different stack.
+	 */
+	if (stack != NULL)
+		tf->fixreg[1] = (register_t)stack + stacksize;
+
 	stktop2 = (caddr_t)((u_long)stktop2 & ~15);	/* Align stack pointer */
 	
 	/*
@@ -139,7 +148,8 @@ pagemove(from, to, size)
 		pa = pmap_extract(pmap_kernel(), va);
 		pmap_remove(pmap_kernel(), va, va + NBPG);
 		pmap_enter(pmap_kernel(), (vm_offset_t)to, pa,
-			   VM_PROT_READ | VM_PROT_WRITE, 1);
+			   VM_PROT_READ | VM_PROT_WRITE, 1,
+			   VM_PROT_READ | VM_PROT_WRITE);
 		va += NBPG;
 		to += NBPG;
 	}
@@ -230,7 +240,7 @@ vmapbuf(bp, len)
 	for (; len > 0; len -= NBPG) {
 		pa = pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map), faddr);
 		pmap_enter(vm_map_pmap(phys_map), taddr, pa,
-			   VM_PROT_READ | VM_PROT_WRITE, 1);
+			   VM_PROT_READ | VM_PROT_WRITE, 1, 0);
 		faddr += NBPG;
 		taddr += NBPG;
 	}

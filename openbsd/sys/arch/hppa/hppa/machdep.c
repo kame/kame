@@ -1,7 +1,7 @@
-/*	$OpenBSD: machdep.c,v 1.4 1999/02/17 03:51:43 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.14 1999/09/20 21:40:14 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998,1999 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,8 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * follows are the copyrights of other sources used in this file.
  */
 /*
  * Copyright 1996 1995 by Open Software Foundation, Inc.   
@@ -77,6 +79,8 @@
  * 	Utah $Hdr: model_dep.c 1.34 94/12/14$
  */
 
+#undef	BTLBDEBUG
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/signalvar.h>
@@ -115,7 +119,8 @@
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
-#include <vm/vm_page.h>
+#include <uvm/uvm_page.h>
+#include <uvm/uvm.h>
 
 #include <dev/cons.h>
 
@@ -125,6 +130,11 @@
 #include <machine/reg.h>
 #include <machine/cpufunc.h>
 #include <machine/autoconf.h>
+#include <machine/kcore.h>
+
+#ifdef COMPAT_HPUX
+#include <compat/hpux/hpux.h>
+#endif
 
 #ifdef DDB
 #include <machine/db_machdep.h>
@@ -133,39 +143,62 @@
 #include <ddb/db_extern.h>
 #endif
 
-#include <hppa/dev/boards.h>
-#include <hppa/dev/boards_data.h>
+#include <hppa/dev/cpudevs.h>
+#include <hppa/dev/cpudevs_data.h>
 
 /*
- * Declare these as initialized data so we can patch them.
+ * Patchable buffer cache parameters
  */
-int	nswbuf = 0;
+int nswbuf = 0;
+#ifdef NBUF
+int nbuf = NBUF;
+#else
+int nbuf = 0;
+#endif
+#ifdef BUFPAGES
+int bufpages = BUFPAGES;
+#else
+int bufpages = 0;
+#endif
 
-
-vm_offset_t istackptr;
-int cold = 1;
-int kernelmapped;		/* set when kernel is mapped */
-int msgbufmapped;		/* set when safe to use msgbuf */
+/*
+ * Different kinds of flags used throughout the kernel.
+ */
+int cold = 1;		/* unset when engine is up to go */
+int kernelmapped;	/* set when kernel is mapped */
+int msgbufmapped;	/* set when safe to use msgbuf */
+int hppa_malloc_ok;	/* set when safe to use malloc */
+int intr_recurse;	/* interrupt/trap recursion level */
 
 /*
  * used in locore.S
  */
-struct pdc_cache pdc_cache PDC_ALIGNMENT;
 int icache_stride;
 int dcache_stride;
 int dcache_line_mask;
 int dcache_size;
 double fpu_zero = 0.0;
 
+/*
+ * CPU params
+ */
+struct pdc_cache pdc_cache PDC_ALIGNMENT;
+struct pdc_btlb pdc_btlb PDC_ALIGNMENT;
+
 /* the following is used externally (sysctl_hw) */
-char	machine[] = "hppa";
+char	machine[] = MACHINE_ARCH;
 char	cpu_model[128];
+#ifdef COMPAT_HPUX
+int	cpu_model_hpux; /* contains HPUX_SYSCONF_CPU* kind of value */
+#endif
+
 u_int	cpu_ticksnum, cpu_ticksdenom, cpu_hzticks;
 dev_t	bootdev;
 int	totalphysmem, physmem, resvmem, esym;
+
 struct user *proc0paddr;
+struct proc *fpu_curproc;
 int copr_sfu_config;
-int fpcopr_version;
 
 #ifdef TLB_STATS
 struct dtlb_stats dtlb_stats;
@@ -173,22 +206,30 @@ struct itlb_stats itlb_stats;
 struct tlbd_stats tlbd_stats;
 #endif
 
-int hppa_malloc_ok;
+vm_map_t exec_map = NULL;
+vm_map_t mb_map = NULL;
+vm_map_t phys_map = NULL;
+
 struct extent *hppa_ex;
 static long mem_ex_storage[EXTENT_FIXED_STORAGE_SIZE(8) / sizeof(long)];
 
 void delay_init __P((void));
 static __inline void fall __P((int, int, int, int, int)); 
+void dumpsys __P((void));
 int bus_mem_add_mapping __P((bus_addr_t bpa, bus_size_t size, int cacheable,
 			     bus_space_handle_t *bshp));
 
+/* wide used hardware params */
+struct pdc_hwtlb pdc_hwtlb PDC_ALIGNMENT;
+struct pdc_coproc pdc_coproc PDC_ALIGNMENT;
+struct pdc_coherence pdc_coherence PDC_ALIGNMENT;
+
 void
-hppa_init()
+hppa_init(start)
+	paddr_t start;
 {
-	extern int kernel_text, end;
-	struct pdc_hwtlb pdc_hwtlb PDC_ALIGNMENT;
-	struct pdc_coproc pdc_coproc PDC_ALIGNMENT;
-	vm_offset_t v, vstart, vend;
+	extern int kernel_text;
+	vaddr_t v, vstart, vend;
 	register int pdcerr;
 	int usehpt;
 
@@ -204,7 +245,7 @@ hppa_init()
 	 */
 	if ((pdcerr = pdc_call((iodcio_t)pdc, 0, PDC_CACHE, PDC_CACHE_DFLT,
 			       &pdc_cache)) < 0) {
-#ifdef DIAGNOSTIC
+#ifdef DEBUG
                 printf("Warning: PDC_CACHE call Ret'd %d\n", pdcerr);
 #endif
 	}
@@ -215,6 +256,28 @@ hppa_init()
 	icache_stride = pdc_cache.ic_stride;
 
 	/*
+	 * get cache coherence parameters
+	 */
+	pdcerr = pdc_call((iodcio_t)pdc, 0, PDC_CACHE, PDC_CACHE_SETCS,
+			  &pdc_coherence, 1, 1, 1, 1);
+#ifdef DEBUG
+	printf ("PDC_CACHE_SETCS: %d, %d, %d, %d (%d)\n",
+		pdc_coherence.ia_cst, pdc_coherence.da_cst,
+		pdc_coherence.ita_cst, pdc_coherence.dta_cst,
+		pdcerr);
+#endif
+
+	/*
+	 * Fetch BTLB params
+	 */
+	if ((pdcerr = pdc_call((iodcio_t)pdc, 0, PDC_BLOCK_TLB,
+			       PDC_BTLB_DEFAULT, &pdc_btlb)) < 0) {
+#ifdef DEBUG
+                printf("WARNING: PDC_BTLB call Ret'd %d\n", pdcerr);
+#endif
+	}
+
+	/*
 	 * purge TLBs and flush caches
 	 */
 	if (pdc_call((iodcio_t)pdc, 0, PDC_BLOCK_TLB, PDC_BTLB_PURGE_ALL) < 0)
@@ -222,90 +285,19 @@ hppa_init()
 	ptlball();
 	fcacheall();
 
-	/* calculate HPT size */
-	hpt_hashsize = PAGE0->imm_max_mem / NBPG;
-	mtctl(hpt_hashsize - 1, CR_HPTMASK);
-
-	/*
-	 * If we want to use the HW TLB support, ensure that it exists.
-	 */
-	if (pdc_call((iodcio_t)pdc, 0, PDC_TLB, PDC_TLB_INFO, &pdc_hwtlb) &&
-	    !pdc_hwtlb.min_size && !pdc_hwtlb.max_size) {
-		printf("WARNING: no HW tlb walker\n");
-		usehpt = 0;
-	} else {
-		usehpt = 1;
-#ifdef DEBUG
-		printf("hwtlb: %u-%u, %u/",
-		       pdc_hwtlb.min_size, pdc_hwtlb.max_size, hpt_hashsize);
-#endif
-		if (hpt_hashsize > pdc_hwtlb.max_size)
-			hpt_hashsize = pdc_hwtlb.max_size;
-		else if (hpt_hashsize < pdc_hwtlb.min_size)
-			hpt_hashsize = pdc_hwtlb.min_size;
-#ifdef DEBUG
-		printf("%u (0x%x)\n", hpt_hashsize,
-		       hpt_hashsize * sizeof(struct hpt_entry));
-#endif
-	}
-	
 	totalphysmem = PAGE0->imm_max_mem / NBPG;
 	resvmem = ((vm_offset_t)&kernel_text) / NBPG;
 
-	vstart = hppa_round_page(&end);
-	vend = VM_MAX_KERNEL_ADDRESS;
-
-	/* we hope this won't fail */
-	hppa_ex = extent_create("mem", 0x0, 0xffffffff, M_DEVBUF,
-				(caddr_t)mem_ex_storage,
-				sizeof(mem_ex_storage),
-				EX_NOCOALESCE|EX_NOWAIT);
-	if (extent_alloc_region(hppa_ex, 0, (vm_offset_t)PAGE0->imm_max_mem,
-				EX_NOWAIT))
-		panic("cannot reserve main memory");
-
-	/*
-	 * Allocate space for system data structures.  We are given
-	 * a starting virtual address and we return a final virtual
-	 * address; along the way we set each data structure pointer.
-	 *
-	 * We call allocsys() with 0 to find out how much space we want,
-	 * allocate that much and fill it with zeroes, and the call
-	 * allocsys() again with the correct base virtual address.
-	 */
-
-	v = vstart;
-#define	valloc(name, type, num)	\
-	    (name) = (type *)v; v = (vm_offset_t)((name)+(num))
-
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(callout, struct callout, ncallout);
-	nswapmap = maxproc * 2;
-	valloc(swapmap, struct map, nswapmap);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM 
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns); 
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-
+	/* calculate buffer cache size */
 #ifndef BUFCACHEPERCENT
 #define BUFCACHEPERCENT 10
 #endif /* BUFCACHEPERCENT */
-
-	if (bufpages == 0)
-		bufpages = totalphysmem / BUFCACHEPERCENT / CLSIZE;
+	if (bufpages == 0) {
+		if (totalphysmem <= 0x1000) /* 16M */
+			bufpages = totalphysmem / 100 * 5;
+		else
+			bufpages = totalphysmem / 100 * BUFCACHEPERCENT;
+	}
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -323,14 +315,75 @@ hppa_init()
 		bufpages = nbuf * MAXBSIZE / CLBYTES;
 
 	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) & ~1;	/* force even */
+		nswbuf = (nbuf / 2) &~ 1;
 		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
+			nswbuf = 256;
 	}
 
-	valloc(swbuf, struct buf, nswbuf);
+	/* calculate HPT size */
+	for (usehpt = 1; usehpt < totalphysmem; usehpt *= 2);
+	mtctl(usehpt - 1, CR_HPTMASK);
+
+	/*
+	 * If we want to use the HW TLB support, ensure that it exists.
+	 */
+	if (pdc_call((iodcio_t)pdc, 0, PDC_TLB, PDC_TLB_INFO, &pdc_hwtlb) &&
+	    !pdc_hwtlb.min_size && !pdc_hwtlb.max_size) {
+		printf("WARNING: no HW tlb walker\n");
+		usehpt = 0;
+	} else {
+#ifdef PMAPDEBUG
+		printf("hwtlb: %u-%u, %u/",
+		       pdc_hwtlb.min_size, pdc_hwtlb.max_size, usehpt);
+#endif
+		if (usehpt > pdc_hwtlb.max_size)
+			usehpt = pdc_hwtlb.max_size;
+		else if (usehpt < pdc_hwtlb.min_size)
+			usehpt = pdc_hwtlb.min_size;
+#ifdef PMAPDEBUG
+		printf("%u\n", usehpt);
+#endif
+		mtctl(usehpt - 1, CR_HPTMASK);
+	}
+	
+	vstart = hppa_round_page(start);
+	vend = VM_MAX_KERNEL_ADDRESS;
+
+	/* we hope this won't fail */
+	hppa_ex = extent_create("mem", 0x0, 0xffffffff, M_DEVBUF,
+				(caddr_t)mem_ex_storage,
+				sizeof(mem_ex_storage),
+				EX_NOCOALESCE|EX_NOWAIT);
+	if (extent_alloc_region(hppa_ex, 0, (vm_offset_t)PAGE0->imm_max_mem,
+				EX_NOWAIT))
+		panic("cannot reserve main memory");
+
+	v = vstart;
+#define	valloc(name, type, num)	(name) = (type *)v; v = (vaddr_t)((name)+(num))
+
+#ifdef REAL_CLISTS
+	valloc(cfree, struct cblock, nclist);
+#endif
+	valloc(callout, struct callout, ncallout);
 	valloc(buf, struct buf, nbuf);
+
+#ifdef SYSVSHM
+	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
+#endif
+#ifdef SYSVSEM 
+	valloc(sema, struct semid_ds, seminfo.semmni);
+	valloc(sem, struct sem, seminfo.semmns); 
+	/* This is pretty disgusting! */
+	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
+#endif
+#ifdef SYSVMSG
+	valloc(msgpool, char, msginfo.msgmax);
+	valloc(msgmaps, struct msgmap, msginfo.msgseg);
+	valloc(msghdrs, struct msg, msginfo.msgtql);
+	valloc(msqids, struct msqid_ds, msginfo.msgmni);
+#endif
 #undef valloc
+	v = hppa_round_page(v);
 	bzero ((void *)vstart, (v - vstart));
 	vstart = v;
 
@@ -343,21 +396,25 @@ hppa_init()
 		panic("cannot allocate msgbuf");
 	msgbufmapped = 1;
 
-#ifdef DEBUG
+#ifdef PMAPDEBUG
 	printf("mem: %x+%x, %x\n", physmem, resvmem, totalphysmem);
 #endif
 	/* Turn on the HW TLB assist */
 	if (usehpt) {
+		int hpt, hptsize;
+		mfctl(CR_VTOP, hpt);
+		mfctl(CR_HPTMASK, hptsize);
+		hptsize++;
 		if ((pdcerr = pdc_call((iodcio_t)pdc, 0, PDC_TLB,
-				       PDC_TLB_CONFIG, &pdc_hwtlb, hpt_table,
-				       sizeof(struct hpt_entry) * hpt_hashsize,
-				       PDC_TLB_WORD3)) < 0) {
+				       PDC_TLB_CONFIG, &pdc_hwtlb, hpt,
+				       hptsize, PDC_TLB_CURRPDE)) < 0) {
 			printf("Warning: HW TLB init failed (%d), disabled\n",
 			       pdcerr);
-			usehpt = 0;
 		} else
+#ifdef PMAPDEBUG
 			printf("HW TLB(%d entries at 0x%x) initialized (%d)\n",
-			       hpt_hashsize, hpt_table, pdcerr);
+			       hptsize / sizeof(struct hpt_entry), hpt, pdcerr);
+#endif
 	}
 
         /*
@@ -376,11 +433,7 @@ hppa_init()
 	}
         copr_sfu_config = pdc_coproc.ccr_enable;
         mtctl(copr_sfu_config & CCR_MASK, CR_CCR);
-/*
-        fprinit(&fpcopr_version);
-	fpcopr_version = (fpcopr_version & 0x003ff800) >> 11;
-        mtctl(CR_CCR, 0);
-*/
+
         /*
          * Clear the FAULT light (so we know when we get a real one)
          * PDC_COPROC apparently turns it on (for whatever reason).
@@ -400,8 +453,7 @@ hppa_init()
 void
 cpu_startup()
 {
-	struct pdc_model pdc_model;
-	register const struct hppa_board_info *bip;
+	struct pdc_model pdc_model PDC_ALIGNMENT;
 	vm_offset_t minaddr, maxaddr;
 	vm_size_t size;
 	int base, residual;
@@ -423,22 +475,36 @@ cpu_startup()
 		printf("WARNING: PDC_MODEL failed (%d)\n", err);
 #endif
 	} else {
-		i = pdc_model.hvers >> 4; /* board type */
-		for (bip = hppa_knownboards;
-		     bip->bi_id >= 0 && bip->bi_id != i; bip++);
-		if (bip->bi_id >= 0) {
-			char *p;
-			switch(pdc_model.arch_rev) {
-			case  0:  p = "1.0";	break;
-			case  4:  p = "1.1";	break;
-			case  8:  p = "2.0";	break;
-			default:  p = "?.?";	break;
-			}
-			/* my babe said: 6010, 481, 0, 0, 77b657b1, 0, 4 */
-			sprintf(cpu_model, "HP9000/%s PA-RISC %s",
-				bip->bi_name, p);
-		} else
-			sprintf(cpu_model, "HP9000/(UNKNOWN %x)", i);
+		const char *p, *q;
+		i = pdc_model.hvers >> 4;
+		p = hppa_mod_info(HPPA_TYPE_BOARD, i);
+		switch (pdc_model.arch_rev) {
+		default:
+		case 0:
+			q = "1.0";
+#ifdef COMPAT_HPUX
+			cpu_model_hpux = HPUX_SYSCONF_CPUPA10;
+#endif
+			break;
+		case 4:
+			q = "1.1";
+#ifdef COMPAT_HPUX
+			cpu_model_hpux = HPUX_SYSCONF_CPUPA11;
+#endif
+			break;
+		case 8:
+			q = "2.0";
+#ifdef COMPAT_HPUX
+			cpu_model_hpux = HPUX_SYSCONF_CPUPA20;
+#endif
+			break;
+		}
+
+		if (p)
+			sprintf(cpu_model, "HP9000/%s PA-RISC %s", p, q);
+		else
+			sprintf(cpu_model, "HP9000/(UNKNOWN %x) PA-RISC %s",
+				i, q);
 		printf("%s\n", cpu_model);
 	}
 
@@ -450,16 +516,19 @@ cpu_startup()
 	 * in that they usually occupy more virtual memory than physical.
 	 */
 	size = MAXBSIZE * nbuf;
-	buffer_map = kmem_suballoc(kernel_map, (vm_offset_t *)&buffers,
-				   &maxaddr, size, TRUE);
-	minaddr = (vm_offset_t)buffers;
-	if (vm_map_find(buffer_map, vm_object_allocate(size), (vm_offset_t)0,
-			&minaddr, size, FALSE) != KERN_SUCCESS)
-		panic("cpu_startup: cannot allocate buffers");
-
+	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
+		    NULL, UVM_UNKNOWN_OFFSET,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+		panic("cpu_startup: cannot allocate VM for buffers");
+	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
 	for (i = 0; i < nbuf; i++) {
+		vsize_t curbufsize;
+		vaddr_t curbuf;
+		struct vm_page *pg;
+
 		/*
 		 * First <residual> buffers get (base+1) physical pages
 		 * allocated for them.  The rest get (base) physical pages.
@@ -467,24 +536,34 @@ cpu_startup()
 		 * The rest of each buffer occupies virtual space,
 		 * but has no physical memory allocated for it.
 		 */
-		vm_map_pageable(buffer_map, minaddr, minaddr +
-				CLBYTES * (base + (i < residual)), FALSE);
-		vm_map_simplify(buffer_map, minaddr);
-		minaddr += MAXBSIZE;
+		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
+		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+
+		while (curbufsize) {
+			if ((pg = uvm_pagealloc(NULL, 0, NULL, 0)) == NULL)
+				panic("cpu_startup: not enough memory for "
+				      "buffer cache");
+			pmap_enter(kernel_map->pmap, curbuf,
+				   VM_PAGE_TO_PHYS(pg),
+				   VM_PROT_READ|VM_PROT_WRITE, TRUE,
+				   VM_PROT_READ|VM_PROT_WRITE);
+			curbuf += PAGE_SIZE;
+			curbufsize -= PAGE_SIZE;
+		}
 	}
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
-	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
-				 16*NCARGS, TRUE);
+	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+				   16*NCARGS, TRUE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
-	phys_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_PHYS_SIZE, TRUE);
+	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+				   VM_PHYS_SIZE, TRUE, FALSE, NULL);
 
 	/*
 	 * Finally, allocate mbuf pool.  Since mclrefcnt is an off-size
@@ -493,8 +572,8 @@ cpu_startup()
 	mclrefcnt = (char *)malloc(NMBCLUSTERS+CLBYTES/MCLBYTES,
 				   M_MBUF, M_NOWAIT);
 	bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
-	mb_map = kmem_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
-			       VM_MBUF_SIZE, FALSE);
+	mb_map = uvm_km_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
+			         VM_MBUF_SIZE, FALSE, FALSE, NULL);
 
 	/*
 	 * Initialize callouts
@@ -507,7 +586,7 @@ cpu_startup()
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %ld\n", ptoa(cnt.v_free_count));
+	printf("avail mem = %ld\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n",
 		nbuf, bufpages * CLBYTES);
 
@@ -564,7 +643,7 @@ delay(us)
 
 	mfctl(CR_ITMR, start);
 	while (us) {
-		n = min(100, us);
+		n = min(1000, us);
 		end = start + n * cpu_ticksnum / cpu_ticksdenom;
 
 		/* N.B. Interval Timer may wrap around */
@@ -653,29 +732,21 @@ ptlball()
 int
 btlb_insert(space, va, pa, lenp, prot)
 	pa_space_t space;
-	vm_offset_t va, pa;
+	vaddr_t va;
+	paddr_t pa;
 	vm_size_t *lenp;
 	u_int prot;
 {
 	static u_int32_t mask;
-	struct pdc_btlb pdc_btlb PDC_ALIGNMENT;
 	register vm_size_t len;
 	register int pdcerr, i;
-
-	if ((pdcerr = pdc_call((iodcio_t)pdc, 0, PDC_BLOCK_TLB,
-			       PDC_BTLB_DEFAULT, &pdc_btlb)) < 0) {
-#ifdef DEBUG
-                printf("WARNING: PDC_BTLB call Ret'd %d\n", pdcerr);
-#endif
-		return -1;
-	}
 
 	/* align size */
 	for (len = pdc_btlb.min_size << PGSHIFT; len < *lenp; len <<= 1);
 	len >>= PGSHIFT;
 	i = ffs(~mask) - 1;
 	if (len > pdc_btlb.max_size || i < 0) {
-#ifdef DEBUG
+#ifdef BTLBDEBUG
 		printf("btln_insert: too big (%u < %u < %u)\n",
 		       pdc_btlb.min_size, len, pdc_btlb.max_size);
 #endif
@@ -693,13 +764,13 @@ btlb_insert(space, va, pa, lenp, prot)
 	if ((pa & 0xF0000) == 0xF0000)
 		prot |= TLB_UNCACHEABLE;
 
-#ifdef DEBUG
-	printf ("btlb_insert(%d): %x:%x, %x, %x, %x\n",
+#ifdef BTLBDEBUG
+	printf ("btlb_insert(%d): %x:%x=%x[%x,%x]\n",
 		i, space, va, pa, len, prot);
 #endif
-	if (pdc_call((iodcio_t)pdc, 0, PDC_BLOCK_TLB, PDC_BTLB_INSERT,
-		     space, va, pa, len, prot, i) < 0) {
-#ifdef DEBUG
+	if ((pdcerr = pdc_call((iodcio_t)pdc, 0, PDC_BLOCK_TLB,PDC_BTLB_INSERT,
+				space, va, pa, len, prot, i)) < 0) {
+#ifdef BTLBDEBUG
 		printf("WARNING: BTLB insert failed (%d)\n", pdcerr);
 #endif
 		return -(EINVAL);
@@ -717,19 +788,12 @@ bus_space_map (t, bpa, size, cacheable, bshp)
 	int cacheable;
 	bus_space_handle_t *bshp;
 {
-	extern u_int virtual_avail;
 	register int error;
 
 	bpa += HPPA_BUS_TAG_BASE(t);
 	if ((error = extent_alloc_region(hppa_ex, bpa, size, EX_NOWAIT |
 					 (hppa_malloc_ok? EX_MALLOCOK : 0))))
 		return (error);
-
-	if ((bpa > 0 && bpa < virtual_avail) ||
-	    (bpa > HPPA_IOBEGIN)) {
-		*bshp = bpa;
-		return 0;
-	}
 
 	if ((error = bus_mem_add_mapping(bpa, size, cacheable, bshp))) {
 		if (extent_free(hppa_ex, bpa, size, EX_NOWAIT |
@@ -762,7 +826,7 @@ bus_space_unmap (t, bsh, size)
 
 	bpa = kvtop((caddr_t)bsh);
 	if (bpa != bsh)
-		kmem_free(kernel_map, sva, eva - sva);
+		uvm_km_free(kernel_map, sva, eva - sva);
 
 	if (extent_free(hppa_ex, bpa, size, EX_NOWAIT |
 			(hppa_malloc_ok? EX_MALLOCOK : 0))) {
@@ -781,7 +845,30 @@ bus_space_alloc (t, rstart, rend, size, align, bndary, cacheable, addrp, bshp)
 	bus_addr_t *addrp;
 	bus_space_handle_t *bshp;
 {
-	return -1;
+	u_long bpa;
+	int error;
+
+	if (rstart < hppa_ex->ex_start || rend > hppa_ex->ex_end)
+		panic("bus_space_alloc: bad region start/end");
+
+	if ((error = extent_alloc_subregion(hppa_ex, rstart, rend, size,
+					    align, bndary, EX_NOWAIT | 
+					    (hppa_malloc_ok? EX_MALLOCOK:0),
+					    &bpa)))
+		return (error);
+
+	if ((error = bus_mem_add_mapping(bpa, size, cacheable, bshp))) {
+		if (extent_free(hppa_ex, bpa, size, EX_NOWAIT |
+				(hppa_malloc_ok ? EX_MALLOCOK : 0))) {
+			printf("bus_space_alloc: pa 0x%lx, size 0x%lx\n",
+				bpa, size);
+			printf("bus_space_alloc: can't free region\n");
+		}
+	}
+
+	*addrp = bpa;
+
+	return error;
 }
 
 void
@@ -790,7 +877,8 @@ bus_space_free(t, bsh, size)
 	bus_space_handle_t bsh;
 	bus_size_t size;
 {
-
+	/* bus_space_unmap() does all that we need to do. */
+	bus_space_unmap(t, bsh, size);
 }
 
 int
@@ -800,29 +888,90 @@ bus_mem_add_mapping(bpa, size, cacheable, bshp)
 	int cacheable;
 	bus_space_handle_t *bshp;
 {
-	register u_long spa, epa;
-	register vm_offset_t va;
+	extern u_int virtual_avail;
+	register u_int64_t spa, epa;
+	int bank, off;
 
-	spa = hppa_trunc_page(bpa);
-	epa = hppa_round_page(bpa + size);
+	if (bpa > 0 && bpa < virtual_avail)
+		*bshp = bpa;
+	else if ((bank = vm_physseg_find(atop(bpa), &off)) < 0) {
+		/*
+		 * determine if we are mapping IO space, or beyond the physmem
+		 * region. use block mapping then
+		 *
+		 * we map the whole bus module (there are 1024 of those max)
+		 * so, check here if it's mapped already, map if needed.
+		 * all mappings a equal mappings.
+		 */
+		static u_int8_t bmm[1024/8];
+		int flex = HPPA_FLEX(bpa);
+
+		/* need a new mapping */
+		if (!(bmm[flex / 8] & (1 << (flex & 3)))) {
+			spa = bpa & FLEX_MASK;
+			epa = ((u_long)((u_int64_t)bpa + size +
+				~FLEX_MASK - 1) & FLEX_MASK) - 1;
+#ifdef BTLBDEBUG
+			printf ("bus_mem_add_mapping: adding flex=%x "
+				"%qx-%qx, ", flex, spa, epa);
+#endif
+			while (spa < epa) {
+				vm_size_t len = epa - spa;
+				u_int64_t pa;
+				if (len > pdc_btlb.max_size << PGSHIFT)
+					len = pdc_btlb.max_size << PGSHIFT;
+				if (btlb_insert(kernel_pmap->pmap_space, spa,
+						spa, &len,
+						kernel_pmap->pmap_pid |
+					    	pmap_prot(kernel_pmap,
+							  VM_PROT_ALL)) < 0)
+					return -1;
+				pa = spa + len - 1;
+#ifdef BTLBDEBUG
+				printf ("------ %d/%d, %qx, %qx-%qx",
+					flex, HPPA_FLEX(pa), pa, spa, epa);
+#endif
+				/* do the mask */
+				for (; flex <= HPPA_FLEX(pa); flex++) {
+#ifdef BTLBDEBUG
+					printf ("mask %x ", flex);
+#endif
+					bmm[flex / 8] |= (1 << (flex & 3));
+				}
+				spa = pa;
+			}
+#ifdef BTLBDEBUG
+			printf ("\n");
+#endif
+		}
+		*bshp = bpa;
+	} else {
+		register vm_offset_t va;
+
+#ifdef PMAPDEBUG
+		printf ("%d, %d, %x\n", bank, off, vm_physmem[0].end);
+#endif
+		spa = hppa_trunc_page(bpa);
+		epa = hppa_round_page(bpa + size);
 
 #ifdef DIAGNOSTIC
-	if (epa <= spa)
-		panic("bus_mem_add_mapping: overflow");
+		if (epa <= spa)
+			panic("bus_mem_add_mapping: overflow");
 #endif
 
-	if (!(va = kmem_alloc_pageable(kernel_map, epa - spa)))
-		return (ENOMEM);
+		if (!(va = uvm_km_valloc(kernel_map, epa - spa)))
+			return (ENOMEM);
 
-	*bshp = (bus_space_handle_t)(va + (bpa & PGOFSET));
+		*bshp = (bus_space_handle_t)(va + (bpa & PGOFSET));
 
-	for (; spa < epa; spa += NBPG, va += NBPG) {
-		pmap_enter(pmap_kernel(), va, spa,
-			   VM_PROT_READ | VM_PROT_WRITE, TRUE);
-		if (!cacheable)
-			pmap_changebit(spa, TLB_UNCACHEABLE, ~0);
-		else
-			pmap_changebit(spa, 0, ~TLB_UNCACHEABLE);
+		for (; spa < epa; spa += NBPG, va += NBPG) {
+			pmap_enter(pmap_kernel(), va, spa,
+				   VM_PROT_READ | VM_PROT_WRITE, TRUE, 0);
+			if (!cacheable)
+				pmap_changebit(spa, TLB_UNCACHEABLE, ~0);
+			else
+				pmap_changebit(spa, 0, ~TLB_UNCACHEABLE);
+		}
 	}
  
 	return 0;
@@ -853,15 +1002,44 @@ flush_cache(tag, h, off, l, op)
 }
 #endif
 
+int waittime = -1;
+
 void
 boot(howto)
 	int howto;
 {
-	/* TODO: probably save howto into stable storage */
+	if (cold)
+		howto |= RB_HALT;
+	else {
+		boothowto = howto | (boothowto & RB_HALT);
+
+		if (!(howto & RB_NOSYNC) && waittime < 0) {
+			extern struct proc proc0;
+
+			/* protect against curproc->p_stats refs in sync XXX */
+			if (curproc == NULL)
+				curproc = &proc0;
+
+			waittime = 0;
+			vfs_shutdown();
+			if ((howto & RB_TIMEBAD) == 0)
+				resettodr();
+			else
+				printf("WARNING: not updating battery clock\n");
+		}
+	}
+
+	/* XXX probably save howto into stable storage */
+
+	splhigh();
+
+	if ((howto & (RB_DUMP /* | RB_HALT */)) == RB_DUMP)
+		dumpsys();
+
+	doshutdownhooks();
 
 	if (howto & RB_HALT) {
 		printf("System halted!\n");
-		splhigh();
 		__asm __volatile("stwas %0, 0(%1)"
 				 :: "r" (CMD_STOP),
 				    "r" (LBCAST_ADDR + iomod_command));
@@ -877,6 +1055,135 @@ boot(howto)
 	/* NOTREACHED */
 }
 
+u_long	dumpmag = 0x8fca0101;	/* magic number */
+int	dumpsize = 0;		/* pages */
+long	dumplo = 0;		/* blocks */
+
+/*
+ * cpu_dumpsize: calculate size of machine-dependent kernel core dump headers.
+ */
+int
+cpu_dumpsize()
+{
+	int size;
+
+	size = ALIGN(sizeof(kcore_seg_t)) + ALIGN(sizeof(cpu_kcore_hdr_t));
+	if (roundup(size, dbtob(1)) != dbtob(1))
+		return -1;
+
+	return 1;
+}
+
+int
+cpu_dump()
+{
+	long buf[dbtob(1) / sizeof (long)];
+	kcore_seg_t	*segp;
+	cpu_kcore_hdr_t	*cpuhdrp;
+
+	segp = (kcore_seg_t *)buf;
+	cpuhdrp = (cpu_kcore_hdr_t *)&buf[ALIGN(sizeof(*segp)) / sizeof (long)];
+
+	/*
+	 * Generate a segment header.
+	 */
+	CORE_SETMAGIC(*segp, KCORE_MAGIC, MID_MACHINE, CORE_CPU);
+	segp->c_size = dbtob(1) - ALIGN(sizeof(*segp));
+
+	/*
+	 * Add the machine-dependent header info
+	 */
+	/* nothing for now */
+
+	return (bdevsw[major(dumpdev)].d_dump)
+			(dumpdev, dumplo, (caddr_t)buf, dbtob(1));
+}
+
+/*
+ * Dump the kernel's image to the swap partition.
+ */
+#define	BYTES_PER_DUMP	NBPG
+
+void
+dumpsys()
+{
+	int psize, bytes, i, n;
+	register caddr_t maddr;
+	register daddr_t blkno;
+	register int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	register int error;
+
+	/* Save registers
+	savectx(&dumppcb); */
+
+	if (dumpsize == 0)
+		dumpconf();
+	if (dumplo <= 0) {
+		printf("\ndump to dev %x not possible\n", dumpdev);
+		return;
+	}
+	printf("\ndumping to dev %x, offset %ld\n", dumpdev, dumplo);
+
+	psize = (*bdevsw[major(dumpdev)].d_psize)(dumpdev);
+	printf("dump ");
+	if (psize == -1) {
+		printf("area unavailable\n");
+		return;
+	}
+
+	if (!(error = cpu_dump())) {
+
+		bytes = ctob(physmem);
+		maddr = NULL;
+		blkno = dumplo + cpu_dumpsize();
+		dump = bdevsw[major(dumpdev)].d_dump;
+		/* TODO block map the whole memory */
+		for (i = 0; i < bytes; i += n) {
+		
+			/* Print out how many MBs we to go. */
+			n = bytes - i;
+			if (n && (n % (1024*1024)) == 0)
+				printf("%d ", n / (1024 * 1024));
+
+			/* Limit size for next transfer. */
+
+			if (n > BYTES_PER_DUMP)
+				n =  BYTES_PER_DUMP;
+
+			if ((error = (*dump)(dumpdev, blkno, maddr, n)))
+				break;
+			maddr += n;
+			blkno += btodb(n);
+		}
+	}
+
+	switch (error) {
+	case ENXIO:	printf("device bad\n");			break;
+	case EFAULT:	printf("device not ready\n");		break;
+	case EINVAL:	printf("area improper\n");		break;
+	case EIO:	printf("i/o error\n");			break;
+	case EINTR:	printf("aborted from console\n");	break;
+	case 0:		printf("succeeded\n");			break;
+	default:	printf("error %d\n", error);		break;
+	}
+}
+
+/* bcopy(), error on fault */
+int
+kcopy(from, to, size)
+	const void *from;
+	void *to;
+	size_t size;
+{
+	register void *oldh = curproc->p_addr->u_pcb.pcb_onfault;
+
+	curproc->p_addr->u_pcb.pcb_onfault = &copy_on_fault;
+	bcopy(from, to, size);
+	curproc->p_addr->u_pcb.pcb_onfault = oldh;
+
+	return 0;
+}
+
 int
 copystr(src, dst, size, lenp)
 	const void *src;
@@ -884,7 +1191,8 @@ copystr(src, dst, size, lenp)
 	size_t size;
 	size_t *lenp;
 {
-	return 0;
+	return spstrcpy(HPPA_SID_KERNEL, src,
+			HPPA_SID_KERNEL, dst, size, lenp);
 }
 
 int
@@ -894,7 +1202,8 @@ copyinstr(src, dst, size, lenp)
 	size_t size;
 	size_t *lenp;
 {
-	return 0;
+	return spstrcpy(curproc->p_addr->u_pcb.pcb_space, src,
+			HPPA_SID_KERNEL, dst, size, lenp);
 }
 
 
@@ -905,7 +1214,8 @@ copyoutstr(src, dst, size, lenp)
 	size_t size;
 	size_t *lenp;
 {
-	return 0;
+	return spstrcpy(HPPA_SID_KERNEL, src,
+			curproc->p_addr->u_pcb.pcb_space, dst, size, lenp);
 }
 
 
@@ -915,7 +1225,8 @@ copyin(src, dst, size)
 	void *dst;
 	size_t size;
 {
-	return 0;
+	return spcopy(curproc->p_addr->u_pcb.pcb_space, src,
+		      HPPA_SID_KERNEL, dst, size);
 }
 
 int
@@ -924,100 +1235,8 @@ copyout(src, dst, size)
 	void *dst;
 	size_t size;
 {
-	return 0;
-}
-
-int
-fubyte(addr)
-	const void *addr;
-{
-	return 0;
-}
-
-int
-subyte(addr, val)
-	void *addr;
-	int val;
-{
-	return 0;
-}
-
-int
-suibyte(addr, val)
-	void *addr;
-	int val;
-{
-	return 0;
-}
-
-long
-fuword(addr)
-	const void *addr;
-{
-	return 0;
-}
-
-long
-fuiword(addr)
-	const void *addr;
-{
-	return 0;
-}
-
-int
-suword(addr, val)
-	void *addr;
-	long val;
-{
-	return 0;
-}
-
-int
-suiword(addr, val)
-	void *addr;
-	long val;
-{
-	return 0;
-}
-
-int
-fuswintr(addr)
-	const caddr_t addr;
-{
-	return 0;
-}
-
-int
-suswintr(addr, val)
-	caddr_t addr;
-	u_int val;
-{
-	return 0;
-}
-
-
-/*
- * setrunqueue(p)
- *      proc *p;
- * 
- * Call should be made at splclock(), and p->p_stat should be SRUN.
- */ 
-void
-setrunqueue(p)
-struct proc *p;
-{
-
-}
-
-/*
- * remrunqueue(p)
- * 
- * Call should be made at splclock().
- */
-void
-remrunqueue(p)
-	struct proc *p;
-{
+	return spcopy(HPPA_SID_KERNEL, src,
+		      curproc->p_addr->u_pcb.pcb_space, dst, size);
 }
 
 /*
@@ -1030,6 +1249,28 @@ setregs(p, pack, stack, retval)
 	u_long stack;
 	register_t *retval;
 {
+	register struct trapframe *tf;
+
+	/* FPU: setup regs */
+
+	tf = p->p_md.md_regs;
+	/* tf->tf_r??? = PS_STRINGS */
+	tf->tf_ipsw = PSW_C | PSW_Q | PSW_P | PSW_D | PSW_I;
+	tf->tf_iioq_head = tf->tf_iioq_tail = pack->ep_entry;
+	tf->tf_iisq_head = tf->tf_iisq_tail = p->p_addr->u_pcb.pcb_space;
+	tf->tf_sp = stack;
+	tf->tf_rp = 0;
+	tf->tf_eiem = 0;
+	tf->tf_sr4 = p->p_addr->u_pcb.pcb_space;
+	tf->tf_sr5 = p->p_addr->u_pcb.pcb_space;
+	tf->tf_sr6 = p->p_addr->u_pcb.pcb_space;
+	tf->tf_sr7 = HPPA_SID_KERNEL;
+	tf->tf_pidr1 = p->p_vmspace->vm_map.pmap->pmap_pid;
+	tf->tf_pidr2 = p->p_vmspace->vm_map.pmap->pmap_pid;
+	tf->tf_pidr3 = p->p_vmspace->vm_map.pmap->pmap_pid;
+	tf->tf_pidr4 = p->p_vmspace->vm_map.pmap->pmap_pid;
+
+	retval[1] = 0;
 }
 
 /*
@@ -1043,7 +1284,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	int type;
 	union sigval val;
 {
-
+	/* TODO send signal */
 }
 
 int
@@ -1052,6 +1293,7 @@ sys_sigreturn(p, v, retval)
 	void *v;
 	register_t *retval;
 {
+	/* TODO sigreturn */
 	return EINVAL;
 }
 

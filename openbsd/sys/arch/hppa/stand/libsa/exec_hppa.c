@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_hppa.c,v 1.5 1999/02/13 04:35:07 mickey Exp $	*/
+/*	$OpenBSD: exec_hppa.c,v 1.7 1999/05/06 02:13:15 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -54,8 +54,8 @@ machdep_exec(xp, howto, loadaddr)
 	int howto;
 	void *loadaddr;
 {
-	extern int debug;
 #ifdef EXEC_DEBUG
+	extern int debug;
 	register int i;
 #endif
 	size_t ac = BOOTARG_LEN;
@@ -63,8 +63,6 @@ machdep_exec(xp, howto, loadaddr)
 #ifdef notyet
 	makebootargs(av, &ac);
 #endif
-
-	fcacheall();
 
 #ifdef EXEC_DEBUG
 	if (debug) {
@@ -80,6 +78,8 @@ machdep_exec(xp, howto, loadaddr)
 		printf("\b\b ]\n");
 	}
 #endif
+
+	fcacheall();
 
 	__asm("mtctl %r0, %cr17");
 	__asm("mtctl %r0, %cr17");

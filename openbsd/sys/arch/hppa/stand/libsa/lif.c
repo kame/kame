@@ -1,4 +1,4 @@
-/*	$OpenBSD: lif.c,v 1.3 1999/01/25 20:15:23 mickey Exp $	*/
+/*	$OpenBSD: lif.c,v 1.6 1999/05/31 02:41:11 todd Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -31,9 +31,8 @@
  */
 
 #include <sys/param.h>
-#include <lib/libsa/stand.h>
-
-#include <machine/lifvar.h>
+#include <sys/disklabel.h>
+#include "libsa.h"
 
 extern int debug;
 
@@ -59,7 +58,7 @@ lif_open (path, f)
 	register struct file *fp;
 	register struct lifdir *dp;
 	register char *p = NULL, *q = NULL; /* XXX shut up gcc */
-	struct load load;
+	struct lif_load load;
 	int err, buf_size, l;
 
 #ifdef LIFDEBUG
@@ -68,6 +67,7 @@ lif_open (path, f)
 #endif
 
 	fp = alloc(sizeof(*fp));
+	/* XXX we're assuming here that sizeof(fp->f_buf) >= LIF_FILESTART */
 	if ((err = (f->f_dev->dv_strategy)(f->f_devdata, F_READ, 0,
 	    sizeof(fp->f_buf), &fp->f_buf, &buf_size)) ||
 	    buf_size != sizeof(fp->f_buf)) {
@@ -75,7 +75,7 @@ lif_open (path, f)
 		if (debug)
 			printf("lif_open: unable to read LIF header (%d)\n", err);
 #endif
-	} else if ((fp->f_lp = (struct lifvol *)fp->f_buf)->vol_id == VOL_ID) {
+	} else if ((fp->f_lp = (struct lifvol *)fp->f_buf)->vol_id == LIF_VOL_ID) {
 		f->f_fsdata = fp;
 		fp->f_ld = (struct lifdir *)(fp->f_buf + LIF_DIRSTART);
 		fp->f_seek = 0;
@@ -98,8 +98,8 @@ lif_open (path, f)
 		fp->f_isdir = 0;
 		err = ENOENT;
 		for (dp = fp->f_ld; dp < &fp->f_ld[fp->f_nfiles]; dp++) {
-			if (debug)
 #ifdef LIFDEBUG
+			if (debug)
 				printf("lif_open: "
 				       "%s <--> '%c%c%c%c%c%c%c%c%c%c'\n",
 				       path, dp->dir_name[0], dp->dir_name[1], 

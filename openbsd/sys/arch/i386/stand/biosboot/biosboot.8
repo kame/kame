@@ -1,4 +1,4 @@
-.\"	$OpenBSD: biosboot.8,v 1.7 1998/09/07 16:44:38 aaron Exp $
+.\"	$OpenBSD: biosboot.8,v 1.12 1999/09/23 04:12:08 alex Exp $
 .\"
 .\" Copyright (c) 1997 Michael Shalayeff
 .\" All rights reserved.
@@ -17,13 +17,13 @@
 .\" 4. The name of the author may not be used to endorse or promote products
 .\"    derived from this software without specific prior written permission.
 .\"
-.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
-.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 .\" WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 .\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
 .\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 .\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" OR SERVICES; LOSS OF MIND, USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 .\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 .\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
@@ -31,11 +31,11 @@
 .\"
 .Dd September 1, 1997
 .Dt BIOSBOOT 8 i386
-.Os OpenBSD 2.1
+.Os
 .Sh NAME
 .Nm biosboot
 .Nd
-first-stage system bootstrap
+i386-specific first-stage system bootstrap
 .Sh DESCRIPTION
 This small program (roughly 256 bytes of code) is responsible for
 loading the second stage
@@ -48,17 +48,17 @@ In order for
 to load the second-stage bootstrap, it has a table inside it which
 describes
 .Xr boot 8 's
-location. 
+location.
 .Nm
 must be installed by, and have its block table filled in by, the
 .Xr installboot 8
-program.  As this data is BIOS dependant, you must re-run 
+program.  As this data is BIOS dependent, you must re-run
 .Xr installboot 8
 each time you reinstall
 .Xr boot 8
 or move your disk or software between machines and/or controllers.
 .Pp
-When 
+When
 .Nm
 receives control from either the BIOS or the MBR it will print the message:
 .Pp
@@ -90,7 +90,7 @@ has been used in
 for the device you are booting from.
 .Sh NOTES
 The practice of making OpenBSD use the whole disk (ie: having
-.Nm                                                                            
+.Nm
 as the MBR) has been deprecated, and will not work on certain BIOS versions.
 There is a lot of strange behaviour with different BIOS's, one of well
 known lobotomy cases is that the BIOS does not pass the right boot drive
@@ -111,13 +111,11 @@ secondary bootstrap
 system code
 .El
 .Sh SEE ALSO
+.Xr boot 8 ,
 .Xr boot_i386 8 ,
 .Xr fdisk 8 ,
-.Xr installboot 8 ,
-.Xr boot 8 .
+.Xr installboot 8
 .Sh BUGS
-It contains a fake partition table and associated things that it should not.
-.Pp
 It should do a checksum over the loaded /boot image, and check that against
 a value that
 .Xr installboot 8

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.sparc,v 1.28 1999/03/17 05:34:14 mjacob Exp $
+#	$OpenBSD: files.sparc,v 1.34 1999/09/07 02:58:49 jason Exp $
 #	$NetBSD: files.sparc,v 1.44 1997/08/31 21:29:16 pk Exp $
 
 # @(#)files.sparc	8.1 (Berkeley) 7/19/93
@@ -72,8 +72,9 @@ attach fd at fdc
 file	arch/sparc/dev/fd.c			fdc | fd needs-flag
 file	arch/sparc/sparc/bsd_fdintr.s		fdc
 
+device xbox {}
 device sbus { slot = -1, offset = -1 }
-attach sbus at mainbus, iommu
+attach sbus at mainbus, iommu, sbus, xbox
 file	arch/sparc/dev/sbus.c			sbus
 
 #
@@ -131,6 +132,10 @@ attach audioamd at mainbus, obio, sbus
 file	arch/sparc/dev/amd7930.c	audio
 file	arch/sparc/sparc/amd7930intr.s	audio
 
+device audiocs: audio, auconv
+attach audiocs at sbus
+file	arch/sparc/dev/cs4231.c		audiocs
+
 # Brooktree DAC attribute
 define bt_dac
 
@@ -168,11 +173,15 @@ file	arch/sparc/dev/cgfourteen.c	cgfourteen needs-flag
 
 file	arch/sparc/dev/bt_subr.c	bt_dac
 
+# Onboard Weitek p9100 found on Tadpole 3GS/3GX
+device pnozz
+attach pnozz at sbus: bt_dac
+file	arch/sparc/dev/p9100.c		pnozz needs-flag
+
 # device definition in sys/conf/files
 attach le at sbus, ledma, lebuffer, obio
 file	arch/sparc/dev/if_le.c		le
 
-device ie: ifnet, ether
 attach ie at obio, vmes, vmel
 file	arch/sparc/dev/if_ie.c		ie
 
@@ -298,4 +307,32 @@ file	arch/sparc/dev/spif.c		spif | stty | sbpp needs-flag
 
 device bpp {}
 attach bpp at sbus
-file    arch/sparc/dev/bpp.c          bpp needs-flag
+file    arch/sparc/dev/bpp.c		bpp needs-flag
+
+attach xbox at sbus
+file	arch/sparc/dev/xbox.c		xbox
+
+# sysconfig registers on Force CPU-5V
+device scf {}
+attach scf at mainbus
+file	arch/sparc/dev/scf.c		scf needs-flag
+
+# flash memory on Force CPU-5V
+device flash {}
+attach flash at obio
+file	arch/sparc/dev/flash.c		flash needs-flag
+
+# VME/SBus bridge on Force CPU-5V
+device fga {}
+attach fga at iommu
+device fvme { [addr = -1], [level = -1], [vect = -1] }
+attach fvme at fga
+file	arch/sparc/dev/fga.c		fga needs-flag
+
+device daadio {}
+attach daadio at fvme
+file	arch/sparc/dev/daadio.c		daadio
+
+device tctrl {}
+attach tctrl at obio
+file	arch/sparc/dev/tctrl.c		tctrl needs-flag

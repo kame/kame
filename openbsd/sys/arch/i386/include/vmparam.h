@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.11 1999/02/26 04:17:20 art Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.14 1999/10/03 21:08:16 niklas Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.15 1994/10/27 04:16:34 cgd Exp $	*/
 
 /*-
@@ -64,13 +64,13 @@
  */
 #define	MAXTSIZ		(64*1024*1024)		/* max text size */
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(32*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(64*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
 #define	MAXDSIZ		(1*1024*1024*1024)	/* max data size */
 #endif
 #ifndef	DFLSSIZ
-#define	DFLSSIZ		(2*1024*1024)		/* initial stack size limit */
+#define	DFLSSIZ		(4*1024*1024)		/* initial stack size limit */
 #endif
 #ifndef	MAXSSIZ
 #define	MAXSSIZ		(32*1024*1024)		/* max stack size */
@@ -89,7 +89,7 @@
  * Size of shared memory map
  */
 #ifndef SHMMAXPGS
-#define SHMMAXPGS	1024
+#define SHMMAXPGS	2048
 #endif
 
 /*
@@ -132,14 +132,10 @@
 
 /* user/kernel map constants */
 #define VM_MIN_ADDRESS		((vm_offset_t)0)
-/* PTDPTDI<<PDSHIFT - USPACE */
-#define VM_MAXUSER_ADDRESS	((vm_offset_t)0xefbfe000)
-/* PTDPTDI<<PDSHIFT + PTDPTDI<<PGSHIFT */
-#define VM_MAX_ADDRESS		((vm_offset_t)0xeffdf000)
-/* KPTDI<<PDSHIFT */
-#define VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0xf0000000)
-/* APTDPTDI<<PDSHIFT */
-#define VM_MAX_KERNEL_ADDRESS	((vm_offset_t)0xffc00000)
+#define VM_MAXUSER_ADDRESS	((vm_offset_t)((PTDPTDI<<PDSHIFT) - USPACE))
+#define VM_MAX_ADDRESS		((vm_offset_t)((PTDPTDI<<PDSHIFT) + (PTDPTDI<<PGSHIFT)))
+#define VM_MIN_KERNEL_ADDRESS	((vm_offset_t)KERNBASE)
+#define VM_MAX_KERNEL_ADDRESS	((vm_offset_t)(APTDPTDI<<PDSHIFT))
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)

@@ -1,7 +1,7 @@
-/*	$OpenBSD: clock.c,v 1.2 1999/02/07 20:24:51 mickey Exp $	*/
+/*	$OpenBSD: clock.c,v 1.6 1999/09/07 20:50:24 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998,1999 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,19 +45,16 @@
 #include <machine/cpufunc.h>
 #include <machine/autoconf.h>
 
+#if defined(DDB)
+#include <vm/vm.h>
+#include <machine/db_machdep.h>
+#include <ddb/db_sym.h>
+#include <ddb/db_extern.h>
+#endif
+
 struct timeval time;
 
 void startrtclock __P((void));
-
-/*
- * Return the best possible estimate of the current time.
- */
-void
-microtime(tvp)
-	struct timeval *tvp;
-{
-
-}
 
 void
 cpu_initclocks()
@@ -78,6 +75,30 @@ cpu_initclocks()
 	mtctl(time_inval + cpu_hzticks, CR_ITMR);
 }
 
+int
+clock_intr (v)
+	void *v;
+{
+	struct trapframe *frame = v;
+
+/*	printf ("#"); */
+
+	/* printf ("clock int 0x%x @ 0x%x for %p\n", t,
+	   frame->tf_iioq_head, curproc); */
+
+	cpu_initclocks();
+	hardclock(frame);
+
+#if 0
+	ddb_regs = *frame;
+	db_show_regs(NULL, 0, 0, NULL);
+#endif
+
+	/* printf ("clock out 0x%x\n", t); */
+
+	return 1;
+}
+
 
 /*
  * initialize the system time from the time of day clock
@@ -86,17 +107,35 @@ void
 inittodr(t)
 	time_t t;
 {
-	static struct pdc_tod tod;
+	struct pdc_tod tod PDC_ALIGNMENT;
+	int 	tbad = 0;
+	long	dt;
+
+	if (t < 5*SECYR) {
+		printf ("WARNING: preposterous time in file system");
+		t = 6*SECYR + 186*SECDAY + SECDAY/2;
+		tbad = 1;
+	}
 
 	pdc_call((iodcio_t)PAGE0->mem_pdc, 1, PDC_TOD, PDC_TOD_READ,
 		&tod, 0, 0, 0, 0, 0);
 
-	time = *(struct timeval *)&tod;
+	time.tv_sec = tod.sec;
+	time.tv_usec = tod.usec;
 
-	if ((long)time.tv_sec < 0) {
-		time.tv_sec = SECYR * (1990 - 1970);
-		printf("WARNING: clock not initialized -- check and reset\n");
+	if (!tbad) {
+		dt = time.tv_sec - t;
+
+		if (dt < 0)
+			dt = -dt;
+
+		if (dt < 2 * SECDAY)
+			return;
+		printf ("WARNING: clock %s %d days",
+			time.tv_sec < t? "lost" : "gained", dt / SECDAY);
 	}
+
+	printf (" -- CHECK AND RESET THE DATE!\n");
 }
 
 /*

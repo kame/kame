@@ -1,4 +1,4 @@
-#	$OpenBSD: files.i386,v 1.51 1999/01/21 08:26:48 niklas Exp $
+#	$OpenBSD: files.i386,v 1.58 1999/10/06 07:36:55 deraadt Exp $
 #	$NetBSD: files.i386,v 1.73 1996/05/07 00:58:36 thorpej Exp $
 #
 # new style config file for i386 architecture
@@ -62,8 +62,8 @@ major	{rd = 17}
 # Machine-independent ATAPI drivers
 #
 
-include "../../../dev/atapi/files.atapi"
-
+include "../../../dev/atapiscsi/files.atapiscsi"
+include "../../../dev/ata/files.ata"
 
 #
 # System bus types
@@ -84,6 +84,7 @@ file	arch/i386/i386/mainbus.c	mainbus
 
 include "../../../dev/pci/files.pci"
 file	arch/i386/pci/pci_machdep.c	pci
+file	arch/i386/pci/pciide_machdep.c	pciide
 file	arch/i386/pci/pci_compat.c	pci	# XXX compatibility
 
 # PCI-Host bridge chipsets
@@ -92,7 +93,7 @@ attach	pchb at pci
 file	arch/i386/pci/pchb.c		pchb
 
 # PCI-ISA bridge chipsets
-device	pcib:	pcibus
+device	pcib:	isabus
 attach	pcib at pci
 file	arch/i386/pci/pcib.c		pcib
 
@@ -110,6 +111,7 @@ file	arch/i386/isa/isa_machdep.c	isabus
 
 # PC clock
 file	arch/i386/isa/clock.c		isabus
+file	dev/clock_subr.c		isabus
 
 # Numeric Processing Extension; Math Co-processor
 device	npx
@@ -275,3 +277,8 @@ include "dev/pcmcia/files.pcmcia"
 
 # i386-specific PCMCIA drivers
 attach	pccom at pcmcia with pccom_pcmcia
+
+#
+# Machine-independent USB drivers
+#
+include "dev/usb/files.usb"

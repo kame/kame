@@ -1,8 +1,8 @@
-/*	$OpenBSD: icsphy.c,v 1.1 1998/11/11 19:34:45 jason Exp $	*/
-/*	$NetBSD: icsphy.c,v 1.8 1998/11/05 04:08:01 thorpej Exp $	*/
+/*	$OpenBSD: icsphy.c,v 1.4 1999/09/07 10:05:15 niklas Exp $	*/
+/*	$NetBSD: icsphy.c,v 1.8.6.1 1999/04/23 15:40:56 perry Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -94,9 +94,10 @@ int	icsphymatch __P((struct device *, struct cfdata *, void *));
 int	icsphymatch __P((struct device *, void *, void *));
 #endif
 void	icsphyattach __P((struct device *, struct device *, void *));
+int	icsphydetach __P((struct device *, int));
 
 struct cfattach icsphy_ca = {
-	sizeof(struct mii_softc), icsphymatch, icsphyattach
+	sizeof(struct mii_softc), icsphymatch, icsphyattach, icsphydetach
 };
 
 #ifdef __OpenBSD__
@@ -156,14 +157,18 @@ icsphyattach(parent, self, aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
-	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
-	else
+	if (sc->mii_capabilities & BMSR_MEDIAMASK)
 		mii_add_media(mii, sc->mii_capabilities,
 		    sc->mii_inst);
-	printf("\n");
 #undef ADD
+}
+
+int
+icsphydetach(dev, flags)
+	struct device *dev;
+	int flags;
+{
+	return (0);
 }
 
 int
@@ -208,7 +213,7 @@ icsphy_service(sc, mii, cmd)
 			 */
 			if (PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN)
 				return (0);
-			(void) mii_phy_auto(sc);
+			(void) mii_phy_auto(sc, 1);
 			break;
 		case IFM_100_T4:
 			/*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.2 1998/12/23 17:55:36 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.5 1999/05/05 02:43:17 mickey Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -54,10 +54,15 @@ bdev_decl(sw);
 #include "ch.h"
 #include "ss.h"
 #include "uk.h"
+#if 0
 #include "fd.h"
+#include "ft.h"
+#else
+#define NFD 0
+#define NFT 0
+#endif
 bdev_decl(fd);
 cdev_decl(fd);
-#include "ft.h"
 bdev_decl(ft);
 cdev_decl(ft);
 
@@ -86,17 +91,35 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #define cdev_wscons_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttselect /* ttpoll */, dev_init(c,n,mmap), D_TTY }
+	dev_init(c,n,tty), ttselect /* ttpoll */, dev_init(c,n,mmap) }
+
+#define	cdev_lpt_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+	dev_init(c,n,write), dev_init(c,n,ioctl),(dev_type_stop((*))) enodev, \
+	0, seltrue, (dev_type_mmap((*))) enodev }
 
 #define mmread  mmrw
 #define mmwrite mmrw
 cdev_decl(mm);
 cdev_decl(sw);
 #include "pty.h"
-#include "wscons.h"
-cdev_decl(wscons);
+#if 0
+#include "wsdisplay.h"
+#include "wskbd.h"
+#include "wsmouse.h"
+#else
+#define	NWSKBD 0
+#define	NWSDISPLAY 0
+#define	NWSMOUSE 0
+#endif
 #include "bpfilter.h"   
 #include "tun.h"
+
+#include "ksyms.h"
+cdev_decl(ksyms);
+
+#include "lpt.h"
+cdev_decl(lpt);
 
 #include "com.h"
 cdev_decl(com);
@@ -131,12 +154,23 @@ struct cdevsw   cdevsw[] =
 	cdev_lkm_init(NLKM,lkm),        /* 19: loadable module driver */
 	cdev_random_init(1,random),     /* 20: random generator */
 	cdev_gen_ipf(NIPF,ipl),         /* 21: ip filtering */
-	cdev_wscons_init(NWSCONS,wscons), /* 22: workstation console */
-	cdev_tty_init(1,pdc),		/* 23: PDC device */
-	cdev_tty_init(NCOM,com),	/* 24: RS232 */
-	cdev_disk_init(NFD,fd),		/* 25: floppy drive */
-	cdev_tape_init(NFT,ft),		/* 26: floppy tape */
-					/* 27 */
+	cdev_tty_init(1,pdc),		/* 22: PDC device */
+	cdev_tty_init(NCOM,com),	/* 23: RS232 */
+	cdev_disk_init(NFD,fd),		/* 24: floppy drive */
+	cdev_tape_init(NFT,ft),		/* 25: floppy tape */
+	cdev_ksyms_init(NKSYMS,ksyms),	/* 26: Kernel symbols device */
+	cdev_lpt_init(NLPT,lpt),	/* 27: parallel printer */
+#ifdef XFS
+	cdev_xfs_init(NXFS,xfs_dev),	/* 28: xfs communication device */
+#else
+	cdev_notdef(),			/* 28 */
+#endif
+					/* 29 */
+#if 0
+	cdev_wsdisplay_init(NWSDISPLAY,wsdisplay), /* : workstation console */
+	cdev_mouse_init(NWSKBD,wskbd),	/* : keyboards */
+	cdev_mouse_init(NWSMOUSE,wsmouse), /* : mice */
+#endif
 	cdev_lkm_dummy(),
 	cdev_lkm_dummy(),
 	cdev_lkm_dummy(),
@@ -247,12 +281,12 @@ iskmemdev(dev)
 #include <dev/cons.h>
 
 cons_decl(pdc);
-cons_decl(wscons);
+/*cons_decl(wscons);*/
 cons_decl(com);
 
 struct  consdev constab[] = {
 	cons_init(pdc),		/* XXX you'd better leave it here for pdc.c */
-#if NWSCONS > 0
+#if NWSCONS1 > 0
 	cons_init(wscons),
 #endif
 #if NCOM > 0

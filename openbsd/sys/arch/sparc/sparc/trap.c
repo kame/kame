@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.14 1998/05/11 05:42:31 deraadt Exp $	*/
+/*	$OpenBSD: trap.c,v 1.19 1999/08/17 16:09:21 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.58 1997/09/12 08:55:01 pk Exp $ */
 
 /*
@@ -275,22 +275,26 @@ static __inline void share_fpu(p, tf)
  */
 void
 trap(type, psr, pc, tf)
-	register unsigned type;
-	register int psr, pc;
-	register struct trapframe *tf;
+	unsigned type;
+	int psr, pc;
+	struct trapframe *tf;
 {
-	register struct proc *p;
-	register struct pcb *pcb;
-	register int n;
+	struct proc *p;
+	struct pcb *pcb;
+	int n;
 	u_quad_t sticks;
-	register union sigval sv;
+	union sigval sv;
 
         sv.sival_int = pc; /* XXX fix for parm five of trapsignal() */
 
 	/* This steps the PC over the trap. */
 #define	ADVANCE (n = tf->tf_npc, tf->tf_pc = n, tf->tf_npc = n + 4)
 
+#if defined(UVM)
+	uvmexp.traps++;
+#else
 	cnt.v_trap++;
+#endif
 	/*
 	 * Generally, kernel traps cause a panic.  Any exceptions are
 	 * handled early here.
@@ -300,7 +304,6 @@ trap(type, psr, pc, tf)
 		if (type == T_BREAKPOINT) {
 			write_all_windows();
 			if (kdb_trap(type, tf)) {
-				ADVANCE;
 				return;
 			}
 		}
@@ -387,7 +390,7 @@ badtrap:
 		break;
 
 	case T_FPDISABLED: {
-		register struct fpstate *fs = p->p_md.md_fpstate;
+		struct fpstate *fs = p->p_md.md_fpstate;
 
 		if (fs == NULL) {
 			fs = malloc(sizeof *fs, M_SUBPROC, M_WAITOK);
@@ -586,11 +589,11 @@ badtrap:
  */
 int
 rwindow_save(p)
-	register struct proc *p;
+	struct proc *p;
 {
-	register struct pcb *pcb = &p->p_addr->u_pcb;
-	register struct rwindow *rw = &pcb->pcb_rw[0];
-	register int i;
+	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct rwindow *rw = &pcb->pcb_rw[0];
+	int i;
 
 	i = pcb->pcb_nsaved;
 	if (i < 0) {
@@ -648,23 +651,27 @@ kill_user_windows(p)
  */
 void
 mem_access_fault(type, ser, v, pc, psr, tf)
-	register unsigned type;
-	register int ser;
-	register u_int v;
-	register int pc, psr;
-	register struct trapframe *tf;
+	unsigned type;
+	int ser;
+	u_int v;
+	int pc, psr;
+	struct trapframe *tf;
 {
 #if defined(SUN4) || defined(SUN4C)
-	register struct proc *p;
-	register struct vmspace *vm;
-	register vm_offset_t va;
-	register int rv;
+	struct proc *p;
+	struct vmspace *vm;
+	vaddr_t va;
+	int rv;
 	vm_prot_t ftype;
 	int onfault;
 	u_quad_t sticks;
 	union sigval sv;
 
+#if defined(UVM)
+	uvmexp.traps++;
+#else
 	cnt.v_trap++;
+#endif
 	if ((p = curproc) == NULL)	/* safety check */
 		p = &proc0;
 	sticks = p->p_sticks;
@@ -708,8 +715,13 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 		if (cold)
 			goto kfault;
 		if (va >= KERNBASE) {
+#if defined(UVM)
+			if (uvm_fault(kernel_map, va, 0, ftype) == KERN_SUCCESS)
+				return;
+#else
 			if (vm_fault(kernel_map, va, ftype, 0) == KERN_SUCCESS)
 				return;
+#endif
 			goto kfault;
 		}
 	} else
@@ -729,7 +741,11 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 		goto out;
 
 	/* alas! must call the horrible vm code */
-	rv = vm_fault(&vm->vm_map, (vm_offset_t)va, ftype, FALSE);
+#if defined(UVM)
+	rv = uvm_fault(&vm->vm_map, (vaddr_t)va, 0, ftype);
+#else
+	rv = vm_fault(&vm->vm_map, (vaddr_t)va, ftype, FALSE);
+#endif
 
 	/*
 	 * If this was a stack access we keep track of the maximum
@@ -799,24 +815,28 @@ int dfdebug = 0;
 
 void
 mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
-	register unsigned type;
-	register u_int sfsr;
-	register u_int sfva;
-	register u_int afsr;
-	register u_int afva;
-	register struct trapframe *tf;
+	unsigned type;
+	u_int sfsr;
+	u_int sfva;
+	u_int afsr;
+	u_int afva;
+	struct trapframe *tf;
 {
-	register int pc, psr;
-	register struct proc *p;
-	register struct vmspace *vm;
-	register vm_offset_t va;
-	register int rv;
+	int pc, psr;
+	struct proc *p;
+	struct vmspace *vm;
+	vaddr_t va;
+	int rv;
 	vm_prot_t ftype;
 	int onfault;
 	u_quad_t sticks;
 	union sigval sv;
 
+#if defined(UVM)
+	uvmexp.traps++;
+#else
 	cnt.v_trap++;
+#endif
 	if ((p = curproc) == NULL)	/* safety check */
 		p = &proc0;
 	sticks = p->p_sticks;
@@ -869,6 +889,8 @@ mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
 	 */
 	if ((sfsr & SFSR_FT) == SFSR_FT_NONE)
 		goto out;	/* No fault. Why were we called? */
+
+	ftype = sfsr & SFSR_AT_STORE ? VM_PROT_WRITE : VM_PROT_READ;
 
 	/*
 	 * NOTE: the per-CPU fault status register readers (in locore)
@@ -923,7 +945,6 @@ mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
 
 	/* Now munch on protections... */
 
-	ftype = sfsr & SFSR_AT_STORE ? VM_PROT_WRITE : VM_PROT_READ;
 	if (psr & PSR_PS) {
 		extern char Lfsbail[];
 		if (sfsr & SFSR_AT_TEXT || type == T_TEXTFAULT) {
@@ -948,8 +969,13 @@ mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
 		if (cold)
 			goto kfault;
 		if (va >= KERNBASE) {
+#if defined(UVM)
+			if (uvm_fault(kernel_map, va, 0, ftype) == KERN_SUCCESS)
+				return;
+#else
 			if (vm_fault(kernel_map, va, ftype, 0) == KERN_SUCCESS)
 				return;
+#endif
 			goto kfault;
 		}
 	} else
@@ -958,8 +984,11 @@ mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
 	vm = p->p_vmspace;
 
 	/* alas! must call the horrible vm code */
-	rv = vm_fault(&vm->vm_map, (vm_offset_t)va, ftype, FALSE);
-
+#if defined(UVM)
+	rv = uvm_fault(&vm->vm_map, (vaddr_t)va, 0, ftype);
+#else
+	rv = vm_fault(&vm->vm_map, (vaddr_t)va, ftype, FALSE);
+#endif
 	/*
 	 * If this was a stack access we keep track of the maximum
 	 * accessed stack size.  Also, if vm_fault gets a protection
@@ -1020,12 +1049,12 @@ out:
 void
 syscall(code, tf, pc)
 	register_t code;
-	register struct trapframe *tf;
+	struct trapframe *tf;
 	register_t pc;
 {
-	register int i, nsys, *ap, nap;
-	register struct sysent *callp;
-	register struct proc *p;
+	int i, nsys, *ap, nap;
+	struct sysent *callp;
+	struct proc *p;
 	int error, new;
 	struct args {
 		register_t i[8];
@@ -1036,7 +1065,11 @@ syscall(code, tf, pc)
 	extern struct pcb *cpcb;
 #endif
 
+#if defined(UVM)
+	uvmexp.syscalls++;
+#else
 	cnt.v_syscall++;
+#endif
 	p = curproc;
 #ifdef DIAGNOSTIC
 	if (tf->tf_psr & PSR_PS)

@@ -1,13 +1,14 @@
 #	from: @(#)Makefile	8.1 (Berkeley) 6/10/93
-#	$OpenBSD: Makefile,v 1.4 1998/12/15 06:32:33 smurph Exp $
+#	$OpenBSD: Makefile,v 1.6 1999/09/27 19:29:58 smurph Exp $
 
-RELOC=0xCF0000 
-
+# 8Meg - 64K
+RELOC=0x7F0000
+      
 S=	${.CURDIR}/../../../..
 DEFS= 
 INCPATH=-I${.CURDIR} -I${.CURDIR}/../libsa -I${.CURDIR}/../libbug \
 	-I${.CURDIR}/../../include -I${S} -I${S}/lib/libsa
-CFLAGS=	-O2 ${INCPATH} ${DEFS} ${COPTS}
+CFLAGS=-O0 ${INCPATH} ${DEFS} ${COPTS}
 LDFLAGS=-N -T ${RELOC}
 CLEANFILES+=bootsd
 
@@ -18,7 +19,7 @@ CLEANFILES+=bootsd
 
 SRCS=   boot.c conf.c version.c
 
-LIBS=	${LIBSA} ${LIBBUG} ${LIBZ} -lgcc -lc -lgcc
+LIBS=	${LIBSA} ${LIBBUG} ${LIBZ} ${LIBGCC}
 
 OBJS= ${SRCS:N*.h:R:S/$/.o/g}
 
@@ -27,10 +28,10 @@ ALL=	${BOOTS}
 
 all: ${ALL}
 
-bootsd: ${OBJS} ${BUGCRT} ${LIBS}
+bootsd: ${OBJS} ${SDCRT} ${LIBS}
 	${LD} ${LDFLAGS} -o $@ \
 		${SDCRT} ${OBJS} ${LIBS}
-#${SRTOBJ}
+
 install:
 	install -c -m 555 -g bin -o bin ${BOOTS} ${DESTDIR}${MDEC_DIR}
 

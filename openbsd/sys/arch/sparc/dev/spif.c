@@ -1,4 +1,4 @@
-/*	$OpenBSD: spif.c,v 1.4 1999/02/23 23:47:46 jason Exp $	*/
+/*	$OpenBSD: spif.c,v 1.6 1999/04/22 12:33:18 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -111,7 +111,7 @@ struct cfattach spif_ca = {
 };
 
 struct cfdriver spif_cd = {
-	NULL, "spif", DV_IFNET
+	NULL, "spif", DV_DULL
 };
 
 struct cfattach stty_ca = {
@@ -176,11 +176,11 @@ spifattach(parent, self, aux)
 	sc->sc_osc = getpropint(sc->sc_node, "verosc", 0);
 	switch (sc->sc_osc) {
 	case SPIF_OSC10:
-		sc->sc_osc = 10;
+		sc->sc_osc = 10000000;
 		break;
 	case SPIF_OSC9:
 	default:
-		sc->sc_osc = 9;
+		sc->sc_osc = 9830400;
 		break;
 	}
 
@@ -202,13 +202,9 @@ spifattach(parent, self, aux)
 	sc->sc_regs->stc.pprh = CD180_PPRH;
 	sc->sc_regs->stc.pprl = CD180_PPRL;
 
-	printf(": rev %x chiprev %x osc %dMhz stcpri %d ppcpri %d softpri %d\n",
-	    sc->sc_rev, sc->sc_rev2, sc->sc_osc, stcpri, ppcpri, PIL_TTY);
-
-	if (sc->sc_osc == 10)
-		sc->sc_osc = 10000000;
-	else
-		sc->sc_osc = 9830400;
+	printf(": rev %x chiprev %x osc %sMhz stcpri %d ppcpri %d softpri %d\n",
+	    sc->sc_rev, sc->sc_rev2, clockfreq(sc->sc_osc),
+	    stcpri, ppcpri, PIL_TTY);
 
 	(void)config_found(self, sttymatch, NULL);
 	(void)config_found(self, sbppmatch, NULL);
@@ -224,6 +220,8 @@ spifattach(parent, self, aux)
 	sc->sc_softih.ih_fun = spifsoftintr;
 	sc->sc_softih.ih_arg = sc;
 	intr_establish(PIL_TTY, &sc->sc_softih);
+
+	sbus_establish(&sc->sc_sd, &sc->sc_dev);
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.6 1998/05/28 13:30:14 mickey Exp $	*/
+/*	$OpenBSD: param.h,v 1.8 1999/09/20 17:06:00 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1996/03/04 05:04:26 cgd Exp $	*/
 
 /*-
@@ -70,11 +70,8 @@
 #define	PGOFSET		(NBPG-1)	/* byte offset into page */
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
-#define	KERNBASE	0xf0000000	/* start of kernel virtual space */
-#if 0
-#define	KERNSIZE	0x01800000	/* size of kernel virtual space */
-#endif
-#define	KERNTEXTOFF	0xf0100000	/* start of kernel text */
+#define	KERNBASE	0xe0000000		/* start of kernel virtual space */
+#define	KERNTEXTOFF	(KERNBASE+0x100000)	/* start of kernel text */
 #define	BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
 
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
@@ -104,18 +101,14 @@
 #define	MCLOFSET	(MCLBYTES - 1)	/* offset within a m_buf cluster */
 
 #ifndef NMBCLUSTERS
-#ifdef GATEWAY
-#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
-#else
-#define	NMBCLUSTERS	512		/* map size, max cluster allocation */
-#endif
+#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
 #endif
 
 /*
  * Size of kernel malloc arena in CLBYTES-sized logical pages
  */ 
 #ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(8 * 1024 * 1024 / CLBYTES)
+#define	NKMEMCLUSTERS	(16 * 1024 * 1024 / CLBYTES)
 #endif
 
 /* pages ("clicks") to disk blocks */

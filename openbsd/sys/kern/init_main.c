@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.37 1999/03/01 04:41:38 deraadt Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.41 1999/09/12 19:44:04 weingart Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -123,6 +123,7 @@ struct	proc *initproc;
 int	cmask = CMASK;
 extern	struct user *proc0paddr;
 
+void	(*md_diskconf) __P((void)) = NULL;
 struct	vnode *rootvp, *swapdev_vp;
 int	boothowto;
 struct	timeval boottime;
@@ -364,16 +365,9 @@ main(framep)
 	roundrobin(NULL);
 	schedcpu(NULL);
 
-#ifdef i386
-#include "bios.h"
-#if NBIOS
-	/* XXX This is only a transient solution */
-	{
-		extern void dkcsumattach __P((void));
-		dkcsumattach();
-	}
-#endif
-#endif
+	/* Configure root/swap devices */
+	if (md_diskconf)
+		(*md_diskconf)();
 
 	/* Mount the root file system. */
 	if (vfs_mountroot())
@@ -405,7 +399,7 @@ main(framep)
 	siginit(p);
 
 	/* Create process 1 (init(8)). */
-	if (fork1(p, ISFORK, 0, rval))
+	if (fork1(p, ISFORK, 0, NULL, 0, rval))
 		panic("fork init");
 #ifdef cpu_set_init_frame			/* XXX should go away */
 	if (rval[1]) {
@@ -422,7 +416,7 @@ main(framep)
 
 	/* Create process 2, the pageout daemon kernel thread. */
 	if (kthread_create(start_pagedaemon, NULL, NULL, "pagedaemon"))
-		panic("fork pager");
+		panic("fork pagedaemon");
 
 	/* Create process 3, the update daemon kernel thread. */
 	if (kthread_create(start_update, NULL, NULL, "update")) {
@@ -484,7 +478,7 @@ start_init(arg)
 	void *arg;
 {
 	struct proc *p = arg;
-	vm_offset_t addr;
+	vaddr_t addr;
 	struct sys_execve_args /* {
 		syscallarg(char *) path;
 		syscallarg(char **) argp;
@@ -526,7 +520,7 @@ start_init(arg)
 		!= KERN_SUCCESS)
 		panic("init: couldn't allocate argument space");
 #else
-	if (vm_allocate(&p->p_vmspace->vm_map, &addr, (vm_size_t)PAGE_SIZE,
+	if (vm_allocate(&p->p_vmspace->vm_map, &addr, (vsize_t)PAGE_SIZE,
 	    FALSE) != 0)
 		panic("init: couldn't allocate argument space");
 #endif

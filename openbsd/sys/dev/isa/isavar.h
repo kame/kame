@@ -1,4 +1,4 @@
-/*	$OpenBSD: isavar.h,v 1.34 1999/01/20 18:21:00 niklas Exp $	*/
+/*	$OpenBSD: isavar.h,v 1.39 1999/08/09 17:38:45 deraadt Exp $	*/
 /*	$NetBSD: isavar.h,v 1.26 1997/06/06 23:43:57 thorpej Exp $	*/
 
 /*-
@@ -122,28 +122,28 @@
  */
 struct isabus_attach_args;
 
-#if (alpha + amiga + i386 + arc + wgrisc + powerpc + hppa != 1)
+#if (__alpha__ + amiga + __i386__ + arc + __wgrisc__ + __powerpc__ + __hppa__ != 1)
 #error "COMPILING ISA FOR UNSUPPORTED MACHINE, OR MORE THAN ONE."
 #endif
-#ifdef alpha
+#ifdef __alpha__
 #include <alpha/isa/isa_machdep.h>
 #endif
 #ifdef amiga
 #include <amiga/isa/isa_machdep.h>
 #endif
-#ifdef i386
+#ifdef __i386__
 #include <i386/isa/isa_machdep.h>
 #endif
 #ifdef arc
 #include <arc/isa/isa_machdep.h>
 #endif
-#ifdef wgrisc
+#ifdef __wgrisc__
 #include <wgrisc/isa/isa_machdep.h>
 #endif
-#ifdef powerpc
+#ifdef __powerpc__
 #include <powerpc/isa/isa_machdep.h>
 #endif
-#ifdef hppa
+#ifdef __hppa__
 #include <hppa/isa/isa_machdep.h>
 #endif
 
@@ -155,11 +155,14 @@ struct isabus_attach_args;
  */
 struct isapnp_softc;
 
-#if (i386 != 1)
+#if (__i386__ != 1 && __alpha__ != 1)
 ERROR: COMPILING ISAPNP FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
 #endif
-#if i386
+#if __i386__
 #include <i386/isa/isapnp_machdep.h>
+#endif
+#if __alpha__
+#include <alpha/isa/isapnp_machdep.h>
 #endif
 #endif	/* NISAPNP */
 
@@ -194,12 +197,16 @@ ERROR: COMPILING ISAPNP FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
  */
 struct isapnp_softc {
 	struct device		sc_dev;
-	int			sc_read_port;
-	bus_space_tag_t		sc_iot;
-	bus_space_tag_t		sc_memt;
+	TAILQ_HEAD(, isadev)
+		sc_subdevs;		/* list of all children */
+
+	bus_space_tag_t sc_iot;		/* isa io space tag */
+	bus_space_tag_t sc_memt;	/* isa mem space tag */
 #if NISADMA > 0
-	bus_dma_tag_t		sc_dmat;
-#endif
+	bus_dma_tag_t sc_dmat;		/* isa DMA tag */
+#endif /* NISADMA > 0 */
+
+	int			sc_read_port;
 	bus_space_handle_t	sc_addr_ioh;
 	bus_space_handle_t	sc_wrdata_ioh;
 	bus_space_handle_t	sc_read_ioh;
@@ -290,12 +297,12 @@ struct isa_attach_args {
 	 */
 #define ia_iobase	ipa_io[0].base
 #define ia_iosize	ipa_io[0].length
+#define ia_ioh		ipa_io[0].h
 #define ia_irq		ipa_irq[0].num
 #define	ia_drq		ipa_drq[0].num
 #define	ia_drq2		ipa_drq[1].num
 #define ia_maddr	ipa_mem[0].base
 #define ia_msize	ipa_mem[0].length
-#define ia_ioh		ipa_io[0].h
 #define ia_memh		ipa_mem[0].h
 
 	void	*ia_aux;		/* driver specific */

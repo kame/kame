@@ -1,4 +1,4 @@
-/*	$OpenBSD: srt0.S,v 1.4 1999/01/25 21:53:31 mickey Exp $	*/
+/*	$OpenBSD: srt0.S,v 1.6 1999/05/06 02:29:56 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -82,18 +82,19 @@ boff
 	ldo	R%edata(%r3),%r3	; Get address of edata.
 	ldil	L%begin,%r1
 	ldo	R%begin(%r1),%r1	; Get address of begin
-	sub	%r3,%r1,%r3		; Subtract to get # to bytes to copy
+	sub	%r3,%r1,%r3		; Subtract to get # of bytes to copy
 copyloop				; do
 	ldwm	4(%r5),%r1		;   *r4++ = *r5++;
 	addib,>= -4,%r3,copyloop	; while (--r3 >= 0);
 	stwm	%r1,4(%r4)
 
 	; here we zero the .bss
-	ldil	L%end, %r3		; the end of all
-	ldil	L%__bss_start, %r4	; .bss is here
-	sub	%r3,%r4,%r3
+	ldil	L%__bss_start, %r4
+	ldo	R%__bss_start(%r4), %r4
+	ldil	L%__bss_end, %r3
+	ldo	R%__bss_end(%r3), %r3
 zeroloop
-	addib,>= -4,%r3,zeroloop	; while (--r3 >= 0);
+	combf,<,n %r3,%r4, zeroloop	; while (r4 < r3);
 	stwm	%r0,4(%r4)		;	*r4++ = 0;
 
 	ldil	L%$global$,%dp
@@ -119,8 +120,8 @@ zeroloop
 	ldo	-1(%r21),%r21
 	fdc	%r21(0,%r22)
 loop	addib,>,n -16,%r21,loop		; Decrement by cache line size (16).
-	fdc	%r21(0,%r22)
-	fdc	0(0,%r22)		; Flush first word at addr to handle
+	fdc	%r21(%sr0,%r22)
+	fdc	0(%sr0,%r22)		; Flush first word at addr to handle
 	sync				;   arbitrary cache line boundary.
 	nop				; Prevent prefetching.
 	nop
@@ -129,15 +130,17 @@ loop	addib,>,n -16,%r21,loop		; Decrement by cache line size (16).
 	nop
 	nop
 	nop
+	bv	0(rp)
+	nop
 EXIT(begin)				/* jump to relocated code */
 
 start
-	ldil	L%stack_base,%sp
-	ldo	R%stack_base(%sp),%sp
-	dep	%r0,31,6,%sp		;   and ensure maximum alignment.	
+	ldil	L%HEAP_LIMIT, %sp
+	ldo	R%HEAP_LIMIT(%sp), %sp
 
 	b	boot			; Call boot(),
 	copy	%r0, arg0		; use default boot device
+	nop
 
 /*
  * rtt - restart the box
@@ -149,12 +152,8 @@ ENTRY(_rtt)
 forever                                 ; Loop until bus reset takes effect.
 	b,n     forever
 
+	bv	0(rp)
 	ldo     -48(sp),sp
 EXIT(_rtt)
-
-	.SPACE	$PRIVATE$
-	.EXPORT	$global$
-$global$
-	.WORD	0
 
 	.end

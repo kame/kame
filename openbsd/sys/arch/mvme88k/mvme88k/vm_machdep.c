@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.7 1999/02/09 06:36:30 smurph Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.11 1999/09/27 19:13:24 smurph Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -42,7 +42,7 @@
  *	from: Utah $Hdr: vm_machdep.c 1.21 91/04/06$
  *	from: @(#)vm_machdep.c	7.10 (Berkeley) 5/7/91
  *	vm_machdep.c,v 1.3 1993/07/07 07:09:32 cgd Exp
- *	$Id: vm_machdep.c,v 1.7 1999/02/09 06:36:30 smurph Exp $
+ *	$Id: vm_machdep.c,v 1.11 1999/09/27 19:13:24 smurph Exp $
  */
 
 #include <sys/param.h>
@@ -59,12 +59,11 @@
 #include <vm/vm_map.h>
 
 #include <machine/cpu.h>
+#include <machine/cpu_number.h>
 #include <machine/pte.h>
 
-#ifdef XXX_FUTURE
 extern struct map *iomap;
-#endif
-extern struct map extiomap;
+extern vm_map_t   iomap_map;
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -75,16 +74,18 @@ extern struct map extiomap;
  * address in each process; in the future we will probably relocate
  * the frame pointers on the stack after copying.
  */
+#undef pcb_sp
 
 #ifdef __FORK_BRAINDAMAGE
 int
 #else
 void
 #endif
-cpu_fork(struct proc *p1, struct proc *p2)
+cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize)
 {
 	struct switchframe *p2sf;
 	int off, ssz;
+   int cpu;
 	struct ksigframe {
 		void (*func)(struct proc *);
 		void *proc;
@@ -92,7 +93,8 @@ cpu_fork(struct proc *p1, struct proc *p2)
 	extern void proc_do_uret(), child_return();
 	extern void proc_trampoline();
 	
-	savectx(p1->p_addr);
+	cpu = cpu_number();
+   savectx(p1->p_addr);
 
 	bcopy((void *)&p1->p_addr->u_pcb, (void *)&p2->p_addr->u_pcb, sizeof(struct pcb));
 	p2->p_addr->u_pcb.kernel_state.pcb_ipl = 0;
@@ -102,7 +104,7 @@ cpu_fork(struct proc *p1, struct proc *p2)
 	/*XXX these may not be necessary nivas */
 	save_u_area(p2, p2->p_addr);
 #ifdef notneeded 
-	PMAP_ACTIVATE(&p2->p_vmspace->vm_pmap, &p2->p_addr->u_pcb, 0);
+	PMAP_ACTIVATE(&p2->p_vmspace->vm_pmap, &p2->p_addr->u_pcb, cpu);
 #endif /* notneeded */
 
 	/*
@@ -113,6 +115,12 @@ cpu_fork(struct proc *p1, struct proc *p2)
 	p2sf->sf_pc = (u_int)proc_do_uret;
 	p2sf->sf_proc = p2;
 	p2->p_addr->u_pcb.kernel_state.pcb_sp = (u_int)p2sf;
+
+	/*
+	 * If specified, give the child a different stack.
+	 */
+	if (stack != NULL)
+		USER_REGS(p2)->r[31] = (u_int)stack + stacksize;
 
 	ksfp = (struct ksigframe *)p2->p_addr->u_pcb.kernel_state.pcb_sp - 1;
 
@@ -258,7 +266,7 @@ vmapbuf(struct buf *bp, vm_size_t len)
 		if (pa == 0)
 			panic("vmapbuf: null page frame");
 		pmap_enter(vm_map_pmap(phys_map), kva, pa,
-			   VM_PROT_READ|VM_PROT_WRITE, TRUE);
+			   VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
 		addr += PAGE_SIZE;
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
@@ -304,35 +312,48 @@ iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
 	if (len == 0)
 		return NULL;
 	
-	off = (u_long)pa & PGOFSET;
+	ppa = pa;
+   off = (u_long)ppa & PGOFSET;
 
 	len = round_page(off + len);
 
 	s = splimp();
 	for (;;) {
-		iova = rmalloc(&extiomap, len);
+		iova = rmalloc(iomap, len);
 		if (iova != 0)
 			break;
 		if (canwait) {
-			(void)tsleep(&extiomap, PRIBIO+1, "iomapin", 0);
+			(void)tsleep(iomap, PRIBIO+1, "iomapin", 0);
 			continue;
 		}
 		splx(s);
 		return NULL;
 	}
 	splx(s);
+	
+   cmmu_flush_tlb(1, iova, len);
 
+   ppa = trunc_page(ppa);
+
+#ifndef NEW_MAPPING
 	tva = iova;
-	pa = trunc_page(pa);
+#else
+   tva = ppa;
+#endif 
 
-	while (len) {
-		pmap_enter(kernel_pmap, tva, pa,
-		    	VM_PROT_READ|VM_PROT_WRITE, 1);
+   while (len>0) {
+		pmap_enter(vm_map_pmap(iomap_map), tva, ppa,
+		    	VM_PROT_WRITE|VM_PROT_READ|(CACHE_INH << 16), 1, 0);
 		len -= PAGE_SIZE;
 		tva += PAGE_SIZE;
 		ppa += PAGE_SIZE;
 	}
+#ifndef NEW_MAPPING
 	return (iova + off);
+#else
+	return (pa + off);
+#endif 
+
 }
 
 /*
@@ -348,11 +369,11 @@ iomap_mapout(vm_offset_t kva, vm_size_t len)
 	kva = trunc_page(kva);
 	len = round_page(off + len);
 
-	pmap_remove(kernel_pmap, kva, kva + len);
+	pmap_remove(vm_map_pmap(iomap_map), kva, kva + len);
 
 	s = splimp();
-	rmfree(&extiomap, len, kva);
-	wakeup(&extiomap);
+	rmfree(iomap, len, kva);
+	wakeup(iomap);
 	splx(s);
 	return 1;
 }
@@ -399,7 +420,7 @@ mapiospace(caddr_t pa, int len)
 	pa = (caddr_t)trunc_page(pa);
 
 	pmap_enter(kernel_pmap, phys_map_vaddr1, (vm_offset_t)pa,
-		   VM_PROT_READ|VM_PROT_WRITE, 1);
+		   VM_PROT_READ|VM_PROT_WRITE, 1, 0);
 	
 	return (phys_map_vaddr1 + off);
 }
@@ -484,7 +505,8 @@ pagemove(caddr_t from, caddr_t to, size_t size)
 		pmap_remove(kernel_pmap,
 			    (vm_offset_t)from, (vm_offset_t)from + NBPG);
 		pmap_enter(kernel_pmap,
-			   (vm_offset_t)to, pa, VM_PROT_READ|VM_PROT_WRITE, 1);
+			   (vm_offset_t)to, pa, VM_PROT_READ|VM_PROT_WRITE, 1,
+			   VM_PROT_READ|VM_PROT_WRITE);
 		from += NBPG;
 		to += NBPG;
 		size -= NBPG;

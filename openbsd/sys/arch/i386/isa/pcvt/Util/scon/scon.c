@@ -1,4 +1,4 @@
-/*	$OpenBSD: scon.c,v 1.11 1999/01/13 07:26:06 niklas Exp $	*/
+/*	$OpenBSD: scon.c,v 1.16 1999/10/16 18:56:37 aaron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch
@@ -68,8 +68,11 @@ static char *id =
 #define DEFAULTFD 0
 
 int aflag = -1;
+int bflag = -1;
+unsigned int scrollback_pages = 8;
 int lflag = -1;
 int mflag = -1;
+int oflag = -1;
 int current = -1;
 int pflag = -1;
 int hflag = -1;
@@ -206,12 +209,17 @@ char *argv[];
 	int c;
 	int fd;
 	
-	while( (c = getopt(argc, argv, "ac:d:f:HVlms:t:vp:18")) != -1)
+	while( (c = getopt(argc, argv, "ab:c:d:f:HVlmos:t:vp:18")) != -1)
 	{
 		switch(c)
 		{
 			case 'a':
 				aflag = 1;
+				break;
+
+			case 'b':
+				bflag = 1;
+				scrollback_pages = atoi(optarg);
 				break;
 				
 			case 'l':
@@ -261,6 +269,10 @@ char *argv[];
 
 			case 'v':
 				vflag++;
+				break;
+
+			case 'o':
+				oflag = 1;
 				break;
 
 			case 'p':
@@ -336,7 +348,7 @@ char *argv[];
 
 	if(dflag == -1 && lflag == -1 && current == -1 && pflag == -1 &&
 	   hflag == -1 && res == -1 && Pflag == 0 && tflag == 0 && fflag == -1
-	   && colms == 0 && mflag == -1)
+	   && colms == 0 && mflag == -1 && bflag == -1 && oflag == -1)
 	{
 		lflag = 1;
 	}
@@ -353,7 +365,7 @@ char *argv[];
 		{
 			char buffer[80];
 			strcpy(buffer,"ERROR opening ");
-			strcat(buffer,device);
+			strncat(buffer,device,sizeof(buffer) - strlen(buffer));
 			perror(buffer);
 			exit(1);
 		}
@@ -364,6 +376,31 @@ char *argv[];
 	if(aflag == 1)	/* return adaptor type */
 	{
 		printadaptor(fd);
+		exit(0);
+	}
+
+	if (bflag == 1)
+	{
+		if(vflag) {
+			printf("Setting number of scrollback buffer pages ");
+			printf("to %d.\n", scrollback_pages);
+		}
+
+		if(ioctl(fd, SETSCROLLSIZE, &scrollback_pages) < 0)
+		{
+			perror("ioctl(SETSCROLLSIZE)");
+			exit(2);
+		}
+		exit(0);
+	}
+
+	if (oflag == 1)
+	{
+		if (ioctl(fd, TOGGLEPCDISP, &oflag) < 0)
+		{
+			perror("ioctl(TOGGLEPCDISP)");
+			exit(2);
+		}
 		exit(0);
 	}
 
@@ -538,9 +575,10 @@ success:
 
 void usage()
 {
-	fprintf(stderr,"usage: scon [-almvVH18] [-c n] [-d dev] [-f [on|off] [-s n]\n");
-	fprintf(stderr,"    [-p [default | list | i,r,g,b]] | [-t sec]\n");
+	fprintf(stderr,"usage: scon [-almvVH18] [-b n] [-c n] [-d dev] [-f [on|off] [-s n]\n");
+	fprintf(stderr,"            [-p [default | list | i,r,g,b]] | [-t sec]\n");
 	fprintf(stderr,"       -a              list video adaptor type (MDA,CGA,EGA or VGA)\n");
+	fprintf(stderr,"       -b <num>        set number of scrollback buffer pages to <num>\n");
 	fprintf(stderr,"       -c <screen no>  switch current virtual screen to <screen no>\n");
 	fprintf(stderr,"       -d <device>     set parameters(-V|-H|-s) for virtual device\n");
 	fprintf(stderr,"       -f <on|off>     force 24 lines in VT 25 lines and HP 28 lines mode\n");

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.hppa,v 1.11 1999/02/25 16:59:24 mickey Exp $
+#	$OpenBSD: files.hppa,v 1.15 1999/08/18 00:26:28 mickey Exp $
 #
 # hppa-specific configuration info
 
@@ -7,17 +7,11 @@ maxpartitions 16
 
 maxusers 2 8 64
 
-defopt	HP7100
-defopt	HP7100LC
-defopt	HP7150
-defopt	HP7200
-defopt	FPEMUL
-
 # 
 # "workstation console" routines
 #
 
-include "dev/wscons/files.wscons"
+#include "dev/wscons/files.wscons"
 
 #
 # Machine-independent SCSI drivers
@@ -30,7 +24,8 @@ major	{ cd = 6 }
 #
 # MI ATAPI drivers
 #
-include "dev/atapi/files.atapi"
+#include "dev/atapiscsi/files.atapiscsi"
+#include "dev/ata/files.ata"
 
 #
 # ISA Bus support
@@ -74,29 +69,37 @@ device	cpu
 attach	cpu at mainbus
 file	arch/hppa/dev/cpu.c		cpu
 
+device	fpu
+attach	fpu at mainbus
+file	arch/hppa/dev/fpu.c		fpu
+
+# 1FT1-0002, 1FU2-0002
+# as goes w/ 7100LC, 7300LC, 7200, 8000, 8200, 8500
 device	lasi: gscbus
 attach	lasi at mainbus
 file	arch/hppa/dev/lasi.c		lasi
 
+# all the older systems
 device	asp: gscbus
 attach	asp at mainbus
 file	arch/hppa/dev/asp.c		asp
 
+# 1FT4-0001, ASIC used on gecko cards
 device	wax: gscbus, eisabus
 attach	wax at mainbus
 file	arch/hppa/dev/wax.c		wax
 
-device	eba: eisabus
-attach	eba at mainbus
-file	arch/hppa/dev/eba.c		eba
+device	mongoose: eisabus
+attach	mongoose at mainbus
+file	arch/hppa/dev/mongoose.c	mongoose
 
 device	dino: pcibus
 attach	dino at mainbus
 file	arch/hppa/dev/dino.c		dino
 
-device	sti: wsemuldisplaydev
-attach	sti at mainbus
-file	arch/hppa/dev/sti.c		sti
+#device	sti: wsemuldisplaydev
+#attach	sti at mainbus
+#file	arch/hppa/dev/sti.c		sti
 
 ###
 
@@ -117,19 +120,19 @@ device	gsc {[irq = -1]}
 attach	gsc at gscbus
 file	arch/hppa/gsc/gscbus.c		gsc
 
+# com and lpt are both on WD 16C552
 attach	com at gsc with com_gsc
 file	arch/hppa/gsc/com_gsc.c		com
 
 attach	lpt at gsc with lpt_gsc
 file	arch/hppa/gsc/lpt_gsc.c		lpt
 
-include "dev/fdc/files.fdc"
-major	{ fd = 7 }
-major	{ ft = 8 }
-attach	fdc at gsc with fdc_gsc
-file	arch/hppa/gsc/fdc_gsc.c		fdc
+#include "dev/fdc/files.fdc"
+#major	{ fd = 7 }
+#major	{ ft = 8 }
+#attach	fdc at gsc with fdc_gsc
+#file	arch/hppa/gsc/fdc_gsc.c		fdc
 
-#device	ie: ether, i82586
 attach	ie at gsc with ie_gsc
 file	arch/hppa/gsc/if_ie_gsc.c	ie_gsc
 
@@ -141,8 +144,8 @@ device	hil: tty
 attach	hil at gsc
 file	arch/hppa/gsc/hil.c		hil
 
-attach	pckbc at gsc with pckbc_gsc
-file	arch/hppa/gsc/pckbc_gsc.c	pckbc_gsc
+#attach	pckbc at gsc with pckbc_gsc
+#file	arch/hppa/gsc/pckbc_gsc.c	pckbc_gsc
 
 # PSB 2160-N based 8bit mono audio (705, 710, 745i/*, 747i/*)
 device	aone: audio, mulaw, auconv
@@ -154,7 +157,13 @@ device	atwo: audio, mulaw, auconv
 attach	atwo at gsc
 file	arch/hppa/gsc/atwo.c		atwo
 
+# HPA4011A/B w/ TMS380C26PQL, TMS38054FNL
+#device	tms: tokenring
+#attach	tms at gsc
+#file	arch/hppa/gsc/if_tms.c		tms
+
 # these we don't know yet
+# AMD Supernet2 FDDI ?
 #device	medusa: fddi
 #attach	medusa at gsc
 #file	arch/hppa/gsc/medusa.c		medusa
@@ -169,7 +178,7 @@ file	arch/hppa/gsc/atwo.c		atwo
 # PC Keyboard controller (ps2)
 #
 
-include "dev/pckbc/files.pckbc"
+#include "dev/pckbc/files.pckbc"
 
 #
 # Compatibility
@@ -179,6 +188,7 @@ file	arch/hppa/hppa/hpux_machdep.c		compat_hpux
 include "compat/osf1/files.osf1"
 file	arch/hppa/hppa/osf1_machdep.c		compat_osf1
 include	"compat/linux/files.linux"
+include "compat/ossaudio/files.ossaudio"
 file	arch/hppa/hppa/linux_machdep.c		compat_linux
 
 # FP emulation
@@ -200,9 +210,10 @@ file	arch/hppa/hppa/process_machdep.c
 file	arch/hppa/hppa/sys_machdep.c
 file	arch/hppa/hppa/trap.c
 file	arch/hppa/hppa/vm_machdep.c
-#file	arch/hppa/hppa/in_cksum.s		inet
+#file	arch/hppa/hppa/in_cksum.S		inet
 file	netinet/in_cksum.c			inet
 file	arch/hppa/dev/clock.c
+#file	arch/hppa/hppa/fpemu.S			fpemul
 
 file	dev/cons.c
 file	dev/cninit.c

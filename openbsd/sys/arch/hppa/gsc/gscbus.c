@@ -1,4 +1,4 @@
-/*	$OpenBSD: gscbus.c,v 1.2 1999/02/25 21:07:48 mickey Exp $	*/
+/*	$OpenBSD: gscbus.c,v 1.8 1999/08/16 04:05:38 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -28,6 +28,45 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
+ * Sample IO layouts:
+ * 712:
+ *
+ * f0100000 -- lasi0
+ * f0102000 -- lpt0
+ * f0104000 -- audio0
+ * f0105000 -- com0
+ * f0106000 -- siop0
+ * f0107000 -- ie0
+ * f0108000 -- kbd0
+ * f0108100 -- pms0
+ * f010a000 -- fdc0
+ * f010c000 -- *lasi0
+ * f0200000 -- wax0
+ * f8000000 -- sti0
+ * fffbe000 -- cpu0
+ * fffbf000 -- mem0
+ *
+ * 725/50:
+ *
+ * f0820000 -- dma
+ * f0821000 -- hil
+ * f0822000 -- com1
+ * f0823000 -- com0
+ * f0824000 -- lpt0
+ * f0825000 -- siop0
+ * f0826000 -- ie0
+ * f0827000 -- dma reset
+ * f0828000 -- timers
+ * f0829000 -- domain kbd
+ * f082f000 -- asp0
+ * f1000000 -- audio0
+ * fc000000 -- eisa0
+ * fffbe000 -- cpu0
+ * fffbf000 -- mem0
+ *
  */
 
 #define GSCDEBUG
@@ -103,8 +142,8 @@ gscattach(parent, self, aux)
 
 	printf ("\n");
 
-	sc->sc_ih = cpu_intr_establish(IPL_HIGH, ga->ga_irq,
-				       gsc_intr, sc, sc->sc_dev.dv_xname);
+	sc->sc_ih = cpu_intr_establish(IPL_IO, ga->ga_irq,
+				       gsc_intr, sc, &sc->sc_dev);
 	/* DMA guts */
 	sc->sc_dmatag._cookie = sc;
 	sc->sc_dmatag._dmamap_create = gsc_dmamap_create;
@@ -135,13 +174,13 @@ gscprint(aux, pnp)
 
 
 void *
-gsc_intr_establish(sc, pri, irq, handler, arg, name)
+gsc_intr_establish(sc, pri, irq, handler, arg, dv)
 	struct gsc_softc *sc;
 	int pri;
 	int irq;
 	int (*handler) __P((void *v));
 	void *arg;
-	const char *name;
+	struct device *dv;
 {
 	register struct gscbus_intr *iv;
 	register u_int32_t mask;
@@ -159,10 +198,10 @@ gsc_intr_establish(sc, pri, irq, handler, arg, name)
 	iv->pri = pri;
 	iv->handler = handler;
 	iv->arg = arg;
-	evcnt_attach(&sc->sc_dev, name, &iv->evcnt);
+	evcnt_attach(dv, dv->dv_xname, &iv->evcnt);
 	(sc->sc_ic->gsc_intr_establish)(sc->sc_ic->gsc_dv, mask);
 #ifdef GSCDEBUG
-	printf("gsc_intr_stablish: mask=0x%08x irq=%d iv=%p\n", mask, irq, iv);
+	printf("gsc_intr_establish: mask=0x%08x irq=%d iv=%p\n", mask, irq, iv);
 #endif
 
 	return &sc->sc_intrvs[irq];
@@ -191,7 +230,7 @@ gsc_intr(v)
 	register u_int32_t mask;
 	int ret;
 
-#ifdef GSCDEBUG
+#ifdef GSCDEBUG_INTR
 	printf("gsc_intr(%p)\n", v);
 #endif
 	ret = 0;
@@ -202,17 +241,24 @@ gsc_intr(v)
 		i = ffs(mask) - 1;
 		iv = &sc->sc_intrvs[i];
 
-#ifdef GSCDEBUG
+#ifdef GSCDEBUG_INTR
 		printf("gsc_intr: got mask=0x%08x i=%d iv=%p\n", mask, i, iv);
 #endif
 		if (iv->handler) {
 			int s;
-#ifdef GSCDEBUG
+#ifdef GSCDEBUG_INTR
 			printf("gsc_intr: calling %p for irq %d\n", v, i);
 #endif
+			iv->evcnt.ev_count++;
 			s = splx(iv->pri);
-			ret += (iv->handler)(iv->arg);
+			ret = (iv->handler)(iv->arg);
 			splx(s);
+#ifdef DEBUG
+			if (!ret)
+				printf ("%s: can't handle interrupt\n",
+					iv->evcnt.ev_name);
+#endif
+			ret = 1;
 		} else
 			printf("%s: stray interrupt %d\n",
 			       sc->sc_dev.dv_xname, i);

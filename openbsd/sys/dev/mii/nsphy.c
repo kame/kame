@@ -1,8 +1,8 @@
-/*	$OpenBSD: nsphy.c,v 1.4 1999/01/04 04:44:05 jason Exp $	*/
-/*	$NetBSD: nsphy.c,v 1.16 1998/11/05 04:08:02 thorpej Exp $	*/
+/*	$OpenBSD: nsphy.c,v 1.6 1999/07/23 12:39:11 deraadt Exp $	*/
+/*	$NetBSD: nsphy.c,v 1.18 1999/07/14 23:57:36 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -78,6 +78,7 @@
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
+#include <sys/errno.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -167,13 +168,9 @@ nsphyattach(parent, self, aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
-	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
-	else
+	if (sc->mii_capabilities & BMSR_MEDIAMASK)
 		mii_add_media(mii, sc->mii_capabilities,
 		    sc->mii_inst);
-	printf("\n");
 #undef ADD
 }
 
@@ -228,11 +225,10 @@ nsphy_service(sc, mii, cmd)
 		reg |= PCR_CIMDIS;
 
 		/*
-		 * Make sure "force link good" is not set.  It's only
-		 * intended for debugging, but sometimes it's set
-		 * after a reset.
+		 * Make sure "force link good" is set to normal mode.
+		 * It's only intended for debugging.
 		 */
-		reg &= ~PCR_FLINK100;
+		reg |= PCR_FLINK100;
 
 #if 0
 		/*
@@ -253,7 +249,7 @@ nsphy_service(sc, mii, cmd)
 			 */
 			if (PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN)
 				return (0);
-			(void) mii_phy_auto(sc);
+			(void) mii_phy_auto(sc, 1);
 			break;
 		case IFM_100_T4:
 			/*
@@ -325,7 +321,8 @@ nsphy_service(sc, mii, cmd)
 
 		sc->mii_ticks = 0;
 		nsphy_reset(sc);
-		(void) mii_phy_auto(sc);
+		if (mii_phy_auto(sc, 0) == EJUSTRETURN)
+			return (0);
 		break;
 	}
 

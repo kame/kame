@@ -1,4 +1,4 @@
-/*	$OpenBSD: ad1848.c,v 1.16 1999/01/24 15:58:53 mickey Exp $	*/
+/*	$OpenBSD: ad1848.c,v 1.19 1999/07/29 09:45:04 niklas Exp $	*/
 /*	$NetBSD: ad1848.c,v 1.45 1998/01/30 02:02:38 augustss Exp $	*/
 
 /*
@@ -301,7 +301,9 @@ ad1848_probe(sc)
     struct ad1848_softc *sc;
 {
     u_char tmp, tmp1 = 0xff, tmp2 = 0xff;
+#if 0
     int i;
+#endif
     
     /* Is there an ad1848 chip ? */
     sc->MCE_bit = MODE_CHANGE_ENABLE;
@@ -394,6 +396,12 @@ ad1848_probe(sc)
 	DPRINTF(("ad1848: unknown codec version %#02X\n", (tmp1 & 0x8f)));
     }	
     
+#if 0
+    /*
+     * XXX I don't know why, but this probe fails on an otherwise well-working
+     * AW35/pro card, so I'll just take it out for now. [niklas@openbsd.org]
+     */
+
     /*
      * The original AD1848/CS4248 has just 16 indirect registers. This means
      * that I0 and I16 should return the same value (etc.).
@@ -404,9 +412,12 @@ ad1848_probe(sc)
 
     for (i = 0; i < 16; i++)
 	if ((tmp1 = ad_read(sc, i)) != (tmp2 = ad_read(sc, i + 16))) {
-	    DPRINTF(("ad_detect_F(%d/%x/%x)\n", i, tmp1, tmp2));
-	    goto bad;
+	    if (i != SP_TEST_AND_INIT) {
+	        DPRINTF(("ad_detect_F(%d/%x/%x)\n", i, tmp1, tmp2));
+	        goto bad;
+	    }
 	}
+#endif
 
     /*
      * Try to switch the chip to mode2 (CS4231) by setting the MODE2 bit
@@ -438,14 +449,15 @@ ad1848_probe(sc)
 	    if ((tmp1 & 0x8f) == 0x8a) {
 		tmp1 = ad_read(sc, CS_VERSION_ID);
 		switch (tmp1 & 0xe7) {
-       		case 0xA0:
+		case 0xA0:
 		    sc->chip_name = "CS4231A";
 		    break;
-       		case 0x80:
+		case 0x80:
 		    /*  XXX I25 no good, AD1845 same as CS4231 */
 		    sc->chip_name = "CS4231 or AD1845";
 		    break;
-       		case 0x82:
+		case 0x82:
+		case 0xa2:
 		    sc->chip_name = "CS4232";
 		    break;
 		case 0x03:

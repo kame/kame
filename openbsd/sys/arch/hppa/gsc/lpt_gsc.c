@@ -1,4 +1,4 @@
-/*	$OpenBSD: lpt_gsc.c,v 1.2 1998/11/30 21:16:32 mickey Exp $	*/
+/*	$OpenBSD: lpt_gsc.c,v 1.5 1999/08/16 02:48:39 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -64,6 +64,10 @@
 
 #include <hppa/dev/cpudevs.h>
 
+#include <hppa/gsc/gscbusvar.h>
+
+#define	LPTGSC_OFFSET	0x800
+
 int	lpt_gsc_probe __P((struct device *, void *, void *));
 void	lpt_gsc_attach __P((struct device *, struct device *, void *));
 
@@ -112,16 +116,14 @@ lpt_gsc_probe(parent, match, aux)
 	do {								     \
 		printf("lpt_gsc_probe: mask %x data %x failed\n", mask,	     \
 		    data);						     \
-		goto out;						     \
+		return 0;						     \
 	} while (0)
 #else
-#define	ABORT	goto out
+#define	ABORT	return 0
 #endif
 
-	base = ca->ca_hpa;
-	if (bus_space_map(ca->ca_iot, base, IOMOD_HPASIZE, 0, &ioh))
-		return 0;
-	ioh |= IOMOD_DEVOFFSET;
+	base = ca->ca_hpa + LPTGSC_OFFSET;
+	ioh = ca->ca_hpa + LPTGSC_OFFSET;
 
 	rv = 0;
 	mask = 0xff;
@@ -149,12 +151,7 @@ lpt_gsc_probe(parent, match, aux)
 	bus_space_write_1(ca->ca_iot, ioh, lpt_data, 0);
 	bus_space_write_1(ca->ca_iot, ioh, lpt_control, 0);
 
-	rv = 1;
-
-out:
-	ioh &= ~IOMOD_DEVOFFSET;
-	bus_space_unmap(ca->ca_iot, ioh, IOMOD_HPASIZE);
-	return rv;
+	return 1;
 }
 
 void
@@ -163,18 +160,19 @@ lpt_gsc_attach(parent, self, aux)
 	void *aux;
 {
 	register struct lpt_softc *sc = (void *)self;
-	register struct confargs *ca = aux;
+	register struct gsc_attach_args *ga = aux;
 
-	sc->sc_flags |= LPT_POLLED;
-	printf(": polled\n");
+	/* sc->sc_flags |= LPT_POLLED; */
 
 	sc->sc_state = 0;
 
-	sc->sc_iot = ca->ca_iot;
-	if (bus_space_map(sc->sc_iot, ca->ca_hpa, IOMOD_HPASIZE,
-			  0, &sc->sc_ioh))
-		panic("lpt_gsc_attach: couldn't map I/O ports");
-	sc->sc_ioh |= IOMOD_DEVOFFSET;
+	sc->sc_iot = ga->ga_iot;
+	sc->sc_ioh = ga->ga_hpa + LPTGSC_OFFSET;
+
+	printf("\n");
 
 	bus_space_write_1(sc->sc_iot, sc->sc_ioh, lpt_control, LPC_NINIT);
+
+	sc->sc_ih = gsc_intr_establish((struct gsc_softc *)parent, IPL_TTY,
+				       ga->ga_irq, lptintr, sc, &sc->sc_dev);
 }

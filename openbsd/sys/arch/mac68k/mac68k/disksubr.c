@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.10 1999/01/08 04:29:07 millert Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.12 1999/07/17 23:12:08 deraadt Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.22 1997/11/26 04:18:20 briggs Exp $	*/
 
 /*
@@ -161,7 +161,10 @@ whichType(part)
 		if (bzb->bzbFlags & BZB_ROOTFS)
 			return ROOT_PART;
 
-		if (bzb->bzbFlags & BZB_USRFS)
+		if ((bzb->bzbFlags & BZB_USRFS)
+		    || (bzb->bzbFlags & BZB_EXFS4)
+		    || (bzb->bzbFlags & BZB_EXFS5)
+		    || (bzb->bzbFlags & BZB_EXFS6))
 			return UFS_PART;
 
 		if (bzb->bzbType == BZB_TYPESWAP)
@@ -488,9 +491,8 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
 
-	if (lp->d_secpercyl == 0) {
-		return msg = "Zero secpercyl";
-	}
+	if (lp->d_secpercyl == 0)
+		return (msg = "Zero secpercyl");
 
 	/* don't read the on-disk label if we are in spoofed-only mode */
 	if (spoofonly)

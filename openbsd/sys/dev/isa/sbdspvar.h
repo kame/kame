@@ -1,4 +1,4 @@
-/*	$OpenBSD: sbdspvar.h,v 1.9 1999/01/02 00:02:47 niklas Exp $	*/
+/*	$OpenBSD: sbdspvar.h,v 1.11 1999/08/05 05:32:41 deraadt Exp $	*/
 /*	$NetBSD: sbdspvar.h,v 1.37 1998/08/10 00:20:39 mycroft Exp $	*/
 
 /*
@@ -37,7 +37,7 @@
 
 #include "midi.h"
 #if NMIDI > 0
-#include <dev/isa/mpu401var.h>
+#include <dev/ic/mpuvar.h>
 #endif
 
 #define SB_MASTER_VOL	0
@@ -178,7 +178,7 @@ struct sbdsp_softc {
 
 #if NMIDI > 0
 	int	sc_hasmpu;
-	struct	mpu401_softc sc_mpu_sc;	/* MPU401 Uart state */
+	struct	mpu_softc sc_mpu_sc;	/* MPU401 Uart state */
 #endif
 };
 

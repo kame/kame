@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_stat.c,v 1.11 1998/02/09 04:32:13 tholo Exp $	 */
+/*	$OpenBSD: svr4_stat.c,v 1.17 1999/10/07 16:14:28 brad Exp $	 */
 /*	$NetBSD: svr4_stat.c,v 1.21 1996/04/22 01:16:07 christos Exp $	 */
 
 /*
@@ -60,7 +60,7 @@
 #include <compat/svr4/svr4_time.h>
 #include <compat/svr4/svr4_socket.h>
 
-#ifdef sparc
+#ifdef __sparc__
 /* 
  * Solaris-2.4 on the sparc has the old stat call using the new
  * stat data structure...
@@ -69,6 +69,7 @@
 #endif
 
 static void bsd_to_svr4_xstat __P((struct stat *, struct svr4_xstat *));
+static void bsd_to_svr4_stat64 __P((struct stat *, struct svr4_stat64 *));
 int svr4_ustat __P((struct proc *, void *, register_t *));
 static int svr4_to_bsd_pathconf __P((int));
 
@@ -88,13 +89,13 @@ bsd_to_svr4_stat(st, st4)
 	struct svr4_stat 	*st4;
 {
 	bzero(st4, sizeof(*st4));
-	st4->st_dev = st->st_dev;
+	st4->st_dev = bsd_to_svr4_odev_t(st->st_dev);
 	st4->st_ino = st->st_ino;
 	st4->st_mode = BSD_TO_SVR4_MODE(st->st_mode);
 	st4->st_nlink = st->st_nlink;
 	st4->st_uid = st->st_uid;
 	st4->st_gid = st->st_gid;
-	st4->st_rdev = st->st_rdev;
+	st4->st_rdev = bsd_to_svr4_odev_t(st->st_rdev);
 	st4->st_size = st->st_size;
 	st4->st_atim = st->st_atimespec.tv_sec;
 	st4->st_mtim = st->st_mtimespec.tv_sec;
@@ -103,20 +104,19 @@ bsd_to_svr4_stat(st, st4)
 #endif
 
 
-
 static void
 bsd_to_svr4_xstat(st, st4)
 	struct stat		*st;
 	struct svr4_xstat	*st4;
 {
 	bzero(st4, sizeof(*st4));
-	st4->st_dev = st->st_dev;
+	st4->st_dev = bsd_to_svr4_dev_t(st->st_dev);
 	st4->st_ino = st->st_ino;
 	st4->st_mode = BSD_TO_SVR4_MODE(st->st_mode);
 	st4->st_nlink = st->st_nlink;
 	st4->st_uid = st->st_uid;
 	st4->st_gid = st->st_gid;
-	st4->st_rdev = st->st_rdev;
+	st4->st_rdev = bsd_to_svr4_dev_t(st->st_rdev);
 	st4->st_size = st->st_size;
 	st4->st_atim = st->st_atimespec;
 	st4->st_mtim = st->st_mtimespec;
@@ -124,6 +124,28 @@ bsd_to_svr4_xstat(st, st4)
 	st4->st_blksize = st->st_blksize;
 	st4->st_blocks = st->st_blocks;
 	strcpy(st4->st_fstype, "unknown");
+}
+
+static void
+bsd_to_svr4_stat64(st, st4)
+	struct stat		*st;
+	struct svr4_stat64	*st4;
+{
+	bzero(st4, sizeof(*st4));
+        st4->st_dev = bsd_to_svr4_dev_t(st->st_dev);
+        st4->st_ino = st->st_ino;
+        st4->st_mode = BSD_TO_SVR4_MODE(st->st_mode); 
+        st4->st_nlink = st->st_nlink;
+        st4->st_uid = st->st_uid;
+        st4->st_gid = st->st_gid;
+        st4->st_rdev = bsd_to_svr4_dev_t(st->st_rdev);
+        st4->st_size = st->st_size;
+        st4->st_atim = st->st_atimespec;
+        st4->st_mtim = st->st_mtimespec;  
+        st4->st_ctim = st->st_ctimespec;
+        st4->st_blksize = st->st_blksize;
+        st4->st_blocks = st->st_blocks;
+        strcpy(st4->st_fstype, "unknown");
 }
 
 
@@ -358,6 +380,39 @@ svr4_sys_fxstat(p, v, retval)
 	return 0;
 }
 
+
+int
+svr4_sys_fstat64(p, v, retval)
+	register struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct svr4_sys_fstat64_args *uap = v;
+	struct stat		st;
+	struct svr4_stat64	svr4_st;
+	struct sys_fstat_args	cup;
+	int			error;
+
+	caddr_t sg = stackgap_init(p->p_emul);
+
+	SCARG(&cup, fd) = SCARG(uap, fd);
+	SCARG(&cup, sb) = stackgap_alloc(&sg, sizeof(struct stat));
+
+	if ((error = sys_fstat(p, &cup, retval)) != 0)
+		return error;
+
+	if ((error = copyin(SCARG(&cup, sb), &st, sizeof st)) != 0)
+		return error;   
+
+	bsd_to_svr4_stat64(&st, &svr4_st);
+
+	if ((error = copyout(&svr4_st, SCARG(uap, sb), sizeof svr4_st)) != 0)
+		return error;
+
+	return 0;
+}
+
+
 struct svr4_ustat_args {
 	syscallarg(svr4_dev_t)		dev;
 	syscallarg(struct svr4_ustat *) name;
@@ -403,13 +458,13 @@ svr4_sys_uname(p, v, retval)
 
 	bzero(&sut, sizeof(sut));
 
-	strncpy(sut.sysname, ostype, sizeof(sut.sysname));
+	strncpy(sut.sysname, ostype, sizeof(sut.sysname)-1);
 	sut.sysname[sizeof(sut.sysname) - 1] = '\0';
 
-	strncpy(sut.nodename, hostname, sizeof(sut.nodename));
+	strncpy(sut.nodename, hostname, sizeof(sut.nodename)-1);
 	sut.nodename[sizeof(sut.nodename) - 1] = '\0';
 
-	strncpy(sut.release, osrelease, sizeof(sut.release));
+	strncpy(sut.release, osrelease, sizeof(sut.release)-1);
 	sut.release[sizeof(sut.release) - 1] = '\0';
 
 	dp = sut.version;
@@ -424,7 +479,7 @@ svr4_sys_uname(p, v, retval)
 		*dp++ = *cp;
 	*dp = '\0';
 
-	strncpy(sut.machine, machine, sizeof(sut.machine));
+	strncpy(sut.machine, machine, sizeof(sut.machine)-1);
 	sut.machine[sizeof(sut.machine) - 1] = '\0';
 
 	return copyout((caddr_t) &sut, (caddr_t) SCARG(uap, name),
@@ -443,7 +498,10 @@ svr4_sys_systeminfo(p, v, retval)
 	int error;
 	long len;
 	extern char ostype[], hostname[], osrelease[],
-		    version[], machine[], domainname[], cpu_model[];
+		    version[], machine[], domainname[];
+#ifdef __sparc__
+	extern char *cpu_class;
+#endif
 
 	u_int rlen = SCARG(uap, len);
 
@@ -485,7 +543,11 @@ svr4_sys_systeminfo(p, v, retval)
 		break;
 
 	case SVR4_SI_PLATFORM:
-		str = cpu_model;
+#ifdef __sparc__
+		str = cpu_class;
+#else
+		str = machine;
+#endif
 		break;
 
 	case SVR4_SI_KERB_REALM:
@@ -512,9 +574,21 @@ svr4_sys_systeminfo(p, v, retval)
 		return ENOSYS;
 	}
 
+	/* on success, sysinfo() returns byte count including \0 */
+	/* result is not diminished if user buffer was too small */
 	len = strlen(str) + 1;
-	if (len > rlen)
-		len = rlen;
+	*retval = len;
+
+	/* nothing to copy if user buffer is empty */
+	if (rlen == 0)
+		return 0;
+
+	if (len > rlen) {
+		/* if str overruns buffer, put NUL in last place */
+		len = rlen - 1;
+		if (subyte(SCARG(uap, buf) + len, 0) < 0)
+			return EFAULT;
+	}
 
 	return copyout(str, SCARG(uap, buf), len);
 }

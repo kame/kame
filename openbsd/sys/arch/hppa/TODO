@@ -18,26 +18,28 @@ hardware and installation notes (distrib/notes/hppa/*):	fries@
          BOOT_ADMIN> boot lan isl
 
 hardware manuals (man4.hppa/*):				mickey@
-* some written (not in the repo yet)
+* ie manual
+* siop manual
+* sti manual
+* hil manual
 
 gcc/egcs/binutils:					espie@ mickey@
-* move to egcs (not yet)
 * move to binutils 2.9.1
 
 boots (sys/arch/hppa/stand/*):				mickey@ fries@
-* stucky keyboard problem on !712 models
-* w/ all the debugging code turned off hangs early (;
+* loading elf symbol table, i have some code, testing
+* almost could be considered working/done, fixes and such (;
 
 kernel (sys/arch/hppa/*):				mickey@
-* sync mickey's sources to the repo
-* user-land support
-* ddb (stack trace, breakpoints left, fix disasm)
-* some MI files/changes to integrate into the repo
+* HPPA STACK GROWS UP, major kernel cleanup (diffs mickey@)
 * several harware problems (ie non-functional drivers)
-  (floppy controller, audio, x.25 card, fddi's)
+* user-land support (signal stuff)
+* ddb (breakpoints left)
+* some MI files/changes to integrate into the repo
 * wscons devices (sti, hil/*, pckbc/*) unfinished
-* "original snakes" (700,705,710) support
 * 7300lc-based machines, 8k-based machines
+* "original snakes" (700,705,710,...) support
+* advanced audio driver
 * general cleanup (far-east future)
 
 ramdisk development edition (distrib/hppa/*):		mickey@
@@ -48,14 +50,14 @@ libc (lib/libc/arch/hppa/*):				mickey@
 * MD syscalls (postponed until kernel part's ready)
 
 userland (*):						mickey@
-* libc_r done (not verifiyed)
+* libc_r done (not verified)
 * libkvm (awaits her kernel counterpart)
 * no shared libs support (not needed until on ramdisk ;) (? ldso from pefo?)
 
 X11 (X11/*):						fries@ mickey@
 * patch is available, nothing to run at tho (;
 
-$OpenBSD: TODO,v 1.1 1999/03/24 12:59:39 todd Exp $
+$OpenBSD: TODO,v 1.5 1999/08/14 04:40:59 mickey Exp $
 
 --
 	paranoic mickey

@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.20 1999/02/10 08:01:52 deraadt Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.24 1999/06/14 06:47:54 deraadt Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*
@@ -287,7 +287,29 @@ bsd_to_linux_statfs(bsp, lsp)
 	struct linux_statfs *lsp;
 {
 
-	lsp->l_ftype = bsp->f_type;
+	/*
+	 * Convert BSD filesystem names to Linux filesystem type numbers
+	 * where possible.  Linux statfs uses a value of -1 to indicate
+	 * an unsupported field.
+	 */
+	if (!strcmp(bsp->f_fstypename, MOUNT_FFS) ||
+	    !strcmp(bsp->f_fstypename, MOUNT_MFS))
+		lsp->l_ftype = 0x11954;
+	else if (!strcmp(bsp->f_fstypename, MOUNT_NFS))
+		lsp->l_ftype = 0x6969;
+	else if (!strcmp(bsp->f_fstypename, MOUNT_MSDOS))
+		lsp->l_ftype = 0x4d44;
+	else if (!strcmp(bsp->f_fstypename, MOUNT_PROCFS))
+		lsp->l_ftype = 0x9fa0;
+	else if (!strcmp(bsp->f_fstypename, MOUNT_EXT2FS))
+		lsp->l_ftype = 0xef53;
+	else if (!strcmp(bsp->f_fstypename, MOUNT_CD9660))
+		lsp->l_ftype = 0x9660;
+	else if (!strcmp(bsp->f_fstypename, MOUNT_NCPFS))
+		lsp->l_ftype = 0x6969;
+	else
+		lsp->l_ftype = -1;
+
 	lsp->l_fbsize = bsp->f_bsize;
 	lsp->l_fblocks = bsp->f_blocks;
 	lsp->l_fbfree = bsp->f_bfree;
@@ -617,11 +639,12 @@ linux_sys_pipe(p, v, retval)
 		syscallarg(int *) pfds;
 	} */ *uap = v;
 	int error;
+	int pfds[2];
 #ifdef __i386__
 	int reg_edx = retval[1];
 #endif /* __i386__ */
 
-	if ((error = sys_pipe(p, 0, retval))) {
+	if ((error = sys_opipe(p, 0, retval))) {
 #ifdef __i386__
 		retval[1] = reg_edx;
 #endif /* __i386__ */
@@ -630,10 +653,14 @@ linux_sys_pipe(p, v, retval)
 
 	/* Assumes register_t is an int */
 
-	if ((error = copyout(retval, SCARG(uap, pfds), 2 * sizeof (int)))) {
+	pfds[0] = retval[0];
+	pfds[1] = retval[1];
+	if ((error = copyout(pfds, SCARG(uap, pfds), 2 * sizeof (int)))) {
 #ifdef __i386__
 		retval[1] = reg_edx;
 #endif /* __i386__ */
+		fdrelease(p, retval[0]);
+		fdrelease(p, retval[1]);
 		return error;
 	}
 
