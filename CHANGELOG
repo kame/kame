@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1559 2001/02/18 23:37:29 itojun Exp $
+$KAME: CHANGELOG,v 1.1560 2001/02/19 02:49:59 itojun Exp $
 
 <200102>
+Mon Feb 19 11:49:29 JST 2001  itojun@iijlab.net
+	* netbsd/usr.sbin/pppd: sync with 1.5 tree.
+
 2001-02-19  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* freebsd4/sys/netinet/ip_input.c: Add a NATPT hook into ip_input().
 	* freebsd4/sys/netinet/ip_proto.c: Add a NATPT entry into struct
