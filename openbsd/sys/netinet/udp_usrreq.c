@@ -339,7 +339,6 @@ udp_input(m, va_alist)
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
-		dstsa.sin6.sin6_addr = ipv6->ip6_dst;
 		/* KAME hack: recover scopeid */
 		(void)in6_recoverscope(&dstsa.sin6, &ipv6->ip6_dst,
 		    m->m_pkthdr.rcvif);
