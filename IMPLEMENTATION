@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.342 2003/07/30 23:36:15 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.343 2003/07/31 08:24:23 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -211,10 +211,6 @@ RFC3542: Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
-draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
-    * the draft is not explicit about padding and string termination.
-      at IETF48, the author confirmed that there's no padding/termination
-      (and extensions can appear unaligned).  our code follows the comment.
 draft-ietf-mobileip-ipv6-21.txt: Mobility Support in IPv6
     * See section 6.
 draft-ietf-ipngwg-router-selection-01.txt:
