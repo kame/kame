@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.98 2003/01/23 03:06:21 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.99 2003/01/23 05:53:40 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -139,8 +139,8 @@ static int server6_send __P((int, struct dhcp6_if *, struct dhcp6 *,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct dhcp6_optinfo *));
 static int make_ia_stcode __P((int, u_int32_t, u_int16_t,
     struct dhcp6_list *));
-static int make_binding_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
-    struct dhcp6_optinfo *));
+static int make_binding_ia __P((int, struct dhcp6_listval *,
+    struct dhcp6_list *, struct dhcp6_optinfo *));
 static int release_binding_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
     struct dhcp6_optinfo *));
 static int make_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
@@ -1004,8 +1004,10 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	 */
 	for (iapd = TAILQ_FIRST(&optinfo->iapd_list); iapd;
 	    iapd = TAILQ_NEXT(iapd, link)) {
-		if (make_binding_ia(iapd, &roptinfo.iapd_list, optinfo))
+		if (make_binding_ia(DH6_RENEW, iapd, &roptinfo.iapd_list,
+		    optinfo)) {
 			goto fail;
+		}
 	}
 
 	/* add other configuration information */
@@ -1076,11 +1078,21 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	 */
 	for (iapd = TAILQ_FIRST(&optinfo->iapd_list); iapd;
 	    iapd = TAILQ_NEXT(iapd, link)) {
-		if (make_binding_ia(iapd, &roptinfo.iapd_list, optinfo))
+		if (make_binding_ia(DH6_REBIND, iapd, &roptinfo.iapd_list,
+		    optinfo)) {
 			goto fail;
+		}
 	}
+	/*
+	 * If the returned iapd_list is empty, we do not have an explicit
+	 * knowledge about validity nor invalidity for any IA_PD information
+	 * in the Rebind message.  In this case, we should rather ignore the
+	 * message than to send a Reply with empty information back to the
+	 * client, which may annoy the recipient.  However, if we have at least
+	 * one useful information, either positive or negative, based on some
+	 * explicit knowledge, we should reply with the responsible part.
+	 */
 	if (TAILQ_EMPTY(&roptinfo.iapd_list)) {
-		/* XXX: need a clean-up and additional comments */
 		dprintf(LOG_INFO, "%s" "no useful information for a rebind",
 		    FNAME);
 		goto fail;	/* discard the rebind */
@@ -1214,7 +1226,8 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 }
 
 static int
-make_binding_ia(iapd, retlist, optinfo)
+make_binding_ia(msgtype, iapd, retlist, optinfo)
+	int msgtype;
 	struct dhcp6_listval *iapd;
 	struct dhcp6_list *retlist;
 	struct dhcp6_optinfo *optinfo;
@@ -1237,18 +1250,28 @@ make_binding_ia(iapd, retlist, optinfo)
 		 * Status Code option set to NoBinding in the Reply
 		 * message.
 		 * [dhcpv6-opt-prefix-delegation-01 Section 11.2]
-		 * See also: [dhcpv6-28 Section 18.2.3]
+		 * See also: [dhcpv6-28 Section 18.2.3, 18.2.4]
+		 *
+		 * Additional note: according to the spec author, the behavior
+		 * should be different between renew and rebind.  For the case
+		 * of renew, the message is only sent to this node, so we
+		 * should always return a NoBinding error.  For the case of
+		 * rebind, the message is delivered to all possible servers.
+		 * In this case, we should not include the error unless we have
+		 * an explicit knowledge that the binding has been invalidated.
 		 */
 		struct dhcp6_list *stcode_list;
 
-#if 0
-		if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
+		dprintf(LOG_INFO, "%s" "no binding found for %s", FNAME,
+		    duidstr(&optinfo->clientID));
+
+		if (msgtype == DH6_RENEW &&
+		    make_ia_stcode(iapd->type, iapd->val_ia.iaid,
 		    DH6OPT_STCODE_NOBINDING, retlist)) {
 			dprintf(LOG_NOTICE, "%s"
 			    "failed to make an option list" FNAME);
 			return (-1);
 		}
-#endif
 	} else {	/* we found a binding */
 		struct dhcp6_list ialist;
 		struct dhcp6_listval *lv;
