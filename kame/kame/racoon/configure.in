@@ -247,6 +247,18 @@ if test "$ipseclib" != "none"; then
 	fi
 fi
 
+AC_MSG_CHECKING(if --with-libpfkey option is specified)
+AC_ARG_WITH(libpfkey, [  --with-libpfkey=DIR     specify libpfkey],
+	[libpfkey_dir=$withval], [libpfkey_dir=no])
+AC_MSG_RESULT(${libpfkey_dir})
+if test "$libpfkey_dir" != "no"; then
+	if test "x$libpfkey_dir" = "x"; then
+		RACOON_PATH_LIBS(pfkey_send_spdsetidx, pfkey)
+	else
+		RACOON_PATH_LIBS(pfkey_send_spdsetidx, pfkey, $libpfkey_dir)
+	fi
+fi
+
 AC_MSG_CHECKING([whether to enable ipv6])
 AC_ARG_ENABLE(ipv6,
 [  --enable-ipv6           Enable ipv6 (with ipv4) support
