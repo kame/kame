@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.35 2004/06/08 10:45:09 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.36 2004/06/09 13:44:48 suz Exp $
  */
 
 /*
@@ -177,8 +177,7 @@ SendQueryV2spec(arg)
      */
 
     if (cbk->g->al_rob > 0) {
-        timer_setTimer((MLD6_LAST_LISTENER_QUERY_INTERVAL /
-                        MLD6_TIMER_SCALE) / MLD6_ROBUSTNESS_VARIABLE,
+        timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
                        SendQueryV2spec, cbk);
     }
     else
