@@ -420,7 +420,7 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 	    {
 		u_int mtu = ntohl(icmp6->icmp6_mtu);
-		struct rtentry *rt;
+		struct rtentry *rt = NULL;
 		struct sockaddr_in6 sin6;
 #ifdef __bsdi__
 		struct route_in6 ro6;
