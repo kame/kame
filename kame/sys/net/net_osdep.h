@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.28 2000/12/02 18:01:24 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.29 2000/12/12 18:03:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,9 +64,9 @@
  *	OpenBSD, BSDI [34], FreeBSD 2
  *		do not need struct proc *
  * - bpf:
- *	OpenBSD, NetBSD, BSDI [34]
+ *	OpenBSD, NetBSD 1.5, BSDI [34]
  *		need caddr_t * (= if_bpf **) and struct ifnet *
- *	FreeBSD 2, FreeBSD 3
+ *	FreeBSD 2, FreeBSD 3, NetBSD 1.6? (1.5N and later)
  *		need only struct ifnet * as argument
  * - struct ifnet
  *			use queue.h?	member names	if name
