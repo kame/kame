@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.30 2004/06/10 10:42:58 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.31 2004/06/11 12:22:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -814,16 +814,26 @@ static void
 cleanup()
 {
 	cleanup_namelist(iflist_head);
+	iflist_head = NULL;
 	cleanup_namelist(hostlist_head);
+	hostlist_head = NULL;
 	cleanup_namelist(iapdlist_head);
+	iapdlist_head = NULL;
 	cleanup_namelist(authinfolist_head);
+	authinfolist_head = NULL;
 	cleanup_namelist(keylist_head);
+	keylist_head = NULL;
 
 	cleanup_cflist(cf_sip_list);
+	cf_sip_list = NULL;
 	cleanup_cflist(cf_sip_name_list);
+	cf_sip_name_list = NULL;
 	cleanup_cflist(cf_dns_list);
+	cf_dns_list = NULL;
 	cleanup_cflist(cf_dns_name_list);
+	cf_dns_name_list = NULL;
 	cleanup_cflist(cf_ntp_list);
+	cf_ntp_list = NULL;
 }
 
 static void

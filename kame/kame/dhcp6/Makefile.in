@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.31 2004/06/10 07:28:28 jinmei Exp $
+# $Id: Makefile.in,v 1.32 2004/06/11 12:22:55 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -34,7 +34,7 @@ LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@ -ly -ll
 CC=	@CC@
-TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6lc
+TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6lc dhcp6sctl
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
@@ -60,9 +60,10 @@ SERVOBJS=	dhcp6s.o common.o if.o config.o timer.o \
 	base64.o auth.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o timer.o
 LITECLIENTOBJS=	dhcp6lc.o common.o if.o timer.o dhcp6c_script.o
+SERVERCTLOBJS= dhcp6sctl.o
 CLEANFILES+=	y.tab.h
 
-all:	$(TARGET) 
+all:	$(TARGET)
 dhcp6c:	$(CLIENTOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o dhcp6c $(CLIENTOBJS) $(LIBOBJS) $(LIBS) 
 dhcp6s:	$(SERVOBJS) $(LIBOBJS)
@@ -71,6 +72,8 @@ dhcp6relay: $(RELAYOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(RELAYOBJS) $(LIBOBJS) $(LIBS) 
 dhcp6lc:$(LITECLIENTOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(LITECLIENTOBJS) $(LIBOBJS) $(LIBS)
+dhcp6sctl: $(SERVERCTLOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(SERVERCTLOBJS) $(LIBOBJS) $(LIBS)
 
 cfparse.c y.tab.h: cfparse.y
 	yacc -d cfparse.y
