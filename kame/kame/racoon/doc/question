@@ -1,4 +1,4 @@
-$Id: question,v 1.6 2000/01/10 22:35:01 itojun Exp $
+$Id: question,v 1.7 2000/01/11 15:55:21 sakane Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -74,3 +74,7 @@ Q. What kind of policy configuration is desired?
      configuration?
      if we respect our configuration, non-tcp traffic will be dropped on
      the peer.
+
+Q. Waht's msgid of informational exchange for error notify message during
+   phase2 ?  Is it same as msgid of phase2 negotiation caused error ?
+   Or new msgid created ?  If later case, spi must be conveyed.
