@@ -67,6 +67,7 @@
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 #include "opt_tcpdebug.h"
 #include "opt_tcp_input.h"
 

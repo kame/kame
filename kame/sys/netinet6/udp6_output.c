@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.2 2000/04/18 07:47:49 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.3 2000/05/05 13:27:15 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,6 +63,10 @@
  *
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
  */
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_ipsec.h"
+#endif
 
 #ifdef __NetBSD__	/*XXX*/
 #include "opt_ipsec.h"

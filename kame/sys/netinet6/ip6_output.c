@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.97 2000/05/05 11:01:01 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.98 2000/05/05 13:27:14 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@
 #if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 #endif
 #endif
 #ifdef __NetBSD__

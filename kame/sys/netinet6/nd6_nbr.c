@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.34 2000/05/05 11:01:04 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.35 2000/05/05 13:27:15 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,6 +32,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"

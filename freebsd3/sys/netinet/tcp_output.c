@@ -66,6 +66,7 @@
 #include "opt_tcpdebug.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 
 #define _IP_VHL
 

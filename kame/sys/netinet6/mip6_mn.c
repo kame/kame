@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.13 2000/05/05 11:01:02 sumikawa Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.14 2000/05/05 13:27:15 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -40,6 +40,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"

@@ -73,6 +73,7 @@
 #include "opt_ipfilter.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 #include "opt_ipstealth.h"
 #include "opt_pm.h"
 #include "opt_natpt.h"
