@@ -1,4 +1,4 @@
-SUBDIR+=ftp netstat rlogin rsh telnet fetch tftp
-SUBDIR+=mcastsend mcastread mchat v6test altqstat
+SUBDIR+=altqstat fetch ftp fstat mcastsend mcastread mchat
+SUBDIR+=netstat rlogin rsh sockstat telnet tftp v6test
 
 .include <bsd.subdir.mk>
