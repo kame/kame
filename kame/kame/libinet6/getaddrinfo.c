@@ -175,6 +175,7 @@ static struct addrinfo *get_ai __P((const struct addrinfo *,
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
+static int addrconfig __P((const struct addrinfo *));
 
 static char *ai_errlist[] = {
 	"Success",
@@ -504,10 +505,11 @@ explore_fqdn(pai, hostname, servname, res)
 	cur = &sentinel;
 
 	/*
-	 * Do not filter unsupported AFs here.  We need to honor content of
-	 * databases (/etc/hosts, DNS and others).  Otherwise we cannot
-	 * replace gethostbyname() by getaddrinfo().
+	 * If AI_ADDRCONFIG is specified, check if we are expected to
+	 * return the address family or not.
 	 */
+	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(pai))
+		return 0;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -973,4 +975,28 @@ find_afd(af)
 			return afd;
 	}
 	return NULL;
+}
+
+/*
+ * post-2553: AI_ADDRCONFIG check.  if we use getipnodeby* as backend, backend
+ * will take care of it.
+ * the semantics of AI_ADDRCONFIG is not defined well.  we are not sure
+ * if the code is right or not.
+ */
+static int
+addrconfig(pai)
+	const struct addrinfo *pai;
+{
+#ifdef USE_GETIPNODEBY
+	return 1;
+#else
+	int s;
+
+	/* XXX errno */
+	s = socket(pai->ai_family, SOCK_DGRAM, 0);
+	if (s < 0)
+		return 0;
+	close(s);
+	return 1;
+#endif
 }
