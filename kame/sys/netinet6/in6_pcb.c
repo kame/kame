@@ -949,6 +949,10 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 }
 
 #ifndef TCP6
+/*
+ * WARNING: return value (rtentry) could be IPv4 one if in6pcb is connected to
+ * IPv4 mapped address.
+ */
 struct rtentry *
 in6_pcbrtentry(in6p)
 	struct in6pcb *in6p;
@@ -959,15 +963,9 @@ in6_pcbrtentry(in6p)
 	struct route_in6 *ro;
 #endif
 	struct sockaddr_in6 *dst6;
-#if defined(__NetBSD__) && defined(INET)
-	struct sockaddr_in *dst;
-#endif
 
 	ro = &in6p->in6p_route;
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
-#if defined(__NetBSD__) && defined(INET)
-	dst = (struct sockaddr_in *)&ro->ro_dst;
-#endif
 
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
 	    !SA6_ARE_ADDR_EQUAL(dst6, &in6p->in6p_fsa))) {
@@ -977,6 +975,8 @@ in6_pcbrtentry(in6p)
 #if defined(__NetBSD__) && defined(INET)
 	if (ro->ro_rt == (struct rtentry *)NULL &&
 	    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_fsa.sin6_addr)) {
+		struct sockaddr_in *dst = (struct sockaddr_in *)&ro->ro_dst;
+
 		bzero(dst, sizeof(*dst));
 		dst->sin_family = AF_INET;
 		dst->sin_len = sizeof(struct sockaddr_in);
