@@ -1,4 +1,4 @@
-/*	$KAME: casttest.c,v 1.3 2001/11/28 01:43:17 itojun Exp $	*/
+/*	$KAME: casttest.c,v 1.4 2001/11/28 01:44:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -157,8 +157,10 @@ test1(rounds)
 again:
 
 	for (z = 0; z < 3; z++) {
+#if 0
 		if (k_len[z] != 16)
 			continue;
+#endif
 
 		set_cast128_subkey(subkey, k, k_len[z]);
 
