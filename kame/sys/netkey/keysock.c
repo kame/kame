@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.7 2000/01/16 18:26:42 sumikawa Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.8 2000/01/16 18:30:58 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -628,43 +628,8 @@ key_attach(struct socket *so, int proto, struct proc *p)
 	if (kp->kp_raw.rcb_proto.sp_protocol == PF_KEY) /* XXX: AF_KEY */
 		key_cb.key_count++;
 	key_cb.any_count++;
-#ifndef __bsdi__
 	kp->kp_raw.rcb_laddr = &key_src;
 	kp->kp_raw.rcb_faddr = &key_dst;
-#else
-	/*
-	 * XXX rcb_faddr must be dynamically allocated, otherwise
-	 * raw_disconnect() will be angry.
-	 */
-	{
-		struct mbuf *m, *n;
-		MGET(m, M_WAITOK, MT_DATA);
-		if (!m) {
-			error = ENOBUFS;
-			printf("key_usrreq: key_usrreq results %d\n", error);
-			free((caddr_t)kp, M_PCB);
-			so->so_pcb = (caddr_t) 0;
-			splx(s);
-			return(error);
-		}
-		MGET(n, M_WAITOK, MT_DATA);
-		if (!n) {
-			error = ENOBUFS;
-			m_freem(m);
-			printf("key_usrreq: key_usrreq results %d\n", error);
-			free((caddr_t)kp, M_PCB);
-			so->so_pcb = (caddr_t) 0;
-			splx(s);
-			return(error);
-		}
-		m->m_len = sizeof(key_src);
-		kp->kp_raw.rcb_laddr = mtod(m, struct sockaddr *);
-		bcopy(&key_src, kp->kp_raw.rcb_laddr, sizeof(key_src));
-		n->m_len = sizeof(key_dst);
-		kp->kp_raw.rcb_faddr = mtod(n, struct sockaddr *);
-		bcopy(&key_dst, kp->kp_raw.rcb_faddr, sizeof(key_dst));
-	}
-#endif
 	soisconnected(so);
 	so->so_options |= SO_USELOOPBACK;
 
