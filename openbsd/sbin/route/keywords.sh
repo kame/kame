@@ -1,5 +1,5 @@
 #!/bin/sh
-# $OpenBSD: keywords.sh,v 1.3 1997/08/26 13:49:37 niklas Exp $
+# $OpenBSD: keywords.sh,v 1.4 1999/12/08 07:55:54 itojun Exp $
 # $NetBSD: keywords.sh,v 1.2 1996/11/15 18:57:21 gwr Exp $
 # @(#)keywords	8.2 (Berkeley) 3/19/94
 #
