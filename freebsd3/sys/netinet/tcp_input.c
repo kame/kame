@@ -1045,9 +1045,9 @@ findpcb:
 	 */
 	case TCPS_LISTEN: {
 		register struct sockaddr_in *sin;
-#ifdef INET6
+#if 0
 		register struct sockaddr_in6 *sin6;
-#endif /* INET6 */
+#endif
 
 		if (thflags & TH_RST)
 			goto drop;
