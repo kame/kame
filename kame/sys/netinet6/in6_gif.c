@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.72 2001/10/02 04:19:47 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.73 2001/10/02 04:34:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,7 +92,7 @@ static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 
 extern struct ip6protosw in6_gif_protosw;
 
-extern TAILQ_HEAD(gifhead, gif_softc) gifs;
+extern LIST_HEAD(, gif_softc) gif_softc_list;
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)
@@ -616,9 +616,8 @@ in6_gif_ctlinput(cmd, sa, d)
 	 * XXX slow.  sc (or sc->encap_cookie6) should be passed from
 	 * ip_encap.c.
 	 */
-	for (sc = TAILQ_FIRST(&gifs);
-	     sc;
-	     sc = TAILQ_NEXT(sc, gif_link)) {
+	for (sc = LIST_FIRST(&gif_softc_list); sc;
+	     sc = LIST_NEXT(sc, gif_list)) {
 		if ((sc->gif_if.if_flags & IFF_RUNNING) == 0)
 			continue;
 		if (sc->gif_psrc->sa_family != AF_INET6)

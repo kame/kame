@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.84 2001/10/02 04:19:46 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.85 2001/10/02 04:34:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,11 +113,7 @@
 
 #if NGIF > 0
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-TAILQ_HEAD(gifhead, gif_softc) gifs = TAILQ_HEAD_INITIALIZER(gifs);
-#else
-TAILQ_HEAD(gifhead, gif_softc) gifs;	/* depends on bss initialization */
-#endif
+LIST_HEAD(, gif_softc) gif_softc_list;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #define GIFNAME		"gif"
@@ -203,7 +199,7 @@ gif_clone_create(ifc, unit)
 	sc->r_unit = r;
 
 	gifattach0(sc);
-	TAILQ_INSERT_TAIL(&gifs, sc, gif_link);
+	LIST_INSERT_HEAD(&gif_softc_list, sc, gif_list);
 	ngif++;
 	return (0);
 }
@@ -217,7 +213,7 @@ gif_clone_destroy(ifp)
 
 	gif_delete_tunnel(ifp);
 	ngif--;
-	TAILQ_REMOVE(&gifs, sc, gif_link);
+	LIST_REMOVE(sc, gif_list);
 	if (sc->encap_cookie4 != NULL) {
 		err = encap_detach(sc->encap_cookie4);
 		KASSERT(err == 0, ("Unexpected error detaching encap_cookie4"));
@@ -264,12 +260,14 @@ gifmodevent(mod, type, data)
 		ip6_gif_hlim = GIF_HLIM;
 #endif
 
+		LIST_INIT(&gif_softc_list);
+
 		break;
 	case MOD_UNLOAD:
 		if_clone_detach(&gif_cloner);
 
-		while (!TAILQ_EMPTY(&gifs))
-			gif_clone_destroy(&TAILQ_FIRST(&gifs)->gif_if);
+		while (!LIST_EMPTY(&gif_softc_list))
+			gif_clone_destroy(&LIST_FIRST(&gif_softc_list)->gif_if);
 
 		err = rman_fini(gifunits);
 		if (err != 0)
@@ -299,6 +297,8 @@ gifattach(dummy)
 	struct gif_softc *sc;
 	int i;
 
+	LIST_INIT(&gif_softc_list);
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	ngif = dummy;
 #else
@@ -315,7 +315,7 @@ gifattach(dummy)
 		sc->gif_if.if_unit = i;
 #endif
 		gifattach0(sc);
-		TAILQ_INSERT_TAIL(&gifs, sc, gif_link);
+		LIST_INSERT_HEAD(&gif_softc_list, sc, gif_list);
 	}
 }
 #endif
@@ -563,10 +563,10 @@ gifnetisr()
 {
 	struct gif_softc *sc;
 
-	for (sc = TAILQ_FIRST(&gifs);
-	     sc;
-	     sc = TAILQ_NEXT(sc, gif_link))
+	for (sc = LIST_FIRST(&gif_softc_list); sc != NULL;
+	     sc = LIST_NEXT(sc, gif_list)) {
 		gifintr(sc);
+	}
 }
 #endif
 
@@ -1022,9 +1022,8 @@ gif_set_tunnel(ifp, src, dst)
 	s = splnet();
 #endif
 
-	for (sc2 = TAILQ_FIRST(&gifs);
-	     sc2;
-	     sc2 = TAILQ_NEXT(sc2, gif_link)) {
+	for (sc2 = LIST_FIRST(&gif_softc_list); sc2 != NULL;
+	     sc2 = LIST_NEXT(sc2, gif_list)) {
 		if (sc2 == sc)
 			continue;
 		if (!sc2->gif_pdst || !sc2->gif_psrc)
