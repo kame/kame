@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.310 2002/09/22 02:20:47 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.311 2002/09/24 14:09:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -800,13 +800,9 @@ in6_control(so, cmd, data, ifp)
 		struct nd_prefix pr0, *pr;
 
 		/* reject read-only flags */
-		if ((ifra->ifra_flags & IN6_IFF_DUPLICATED) != 0 ||
-		    (ifra->ifra_flags & IN6_IFF_DETACHED) != 0 ||
-		    (ifra->ifra_flags & IN6_IFF_NODAD) != 0 ||
-		    (ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0 ||
-		    (ifra->ifra_flags & IN6_IFF_TEMPORARY) != 0) {
+		if ((ifra->ifra_flags & IN6_IFF_READONLY))
 			return (EINVAL);
-		}
+
 		/*
 		 * first, make or update the interface address structure,
 		 * and link it to the list.
@@ -1240,8 +1236,9 @@ in6_update_ifa(ifp, ifra, ia)
 
 	/*
 	 * configure address flags.
+	 * when changing the flags, preserve read-only flags. 
 	 */
-	ia->ia6_flags = ifra->ifra_flags;
+	ia->ia6_flags = ifra->ifra_flags | (ia->ia6_flags & IN6_IFF_READONLY);
 	/*
 	 * backward compatibility - if IN6_IFF_DEPRECATED is set from the
 	 * userland, make it deprecated.
