@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.431 2004/02/28 06:37:04 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.432 2004/02/28 10:22:51 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3815,7 +3815,15 @@ ip6_setmoptions(optname, im6op, m)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-		} else {
+		} else if (mreq->ipv6mr_interface != 0) {
+			/*
+			 * This case happens when the (positive) index is in
+			 * the valid range, but the corresponding interface has
+			 * been detached dynamically (XXX).
+			 */
+			error = EADDRNOTAVAIL;
+			break;	    
+		} else {	/* ipv6mr_interface == 0 */
 			/*
 			 * The API spec says as follows:
 			 *  If the interface index is specified as 0, the
