@@ -112,7 +112,6 @@ contrib/ipfilter/netinet/ip_proxy.c	optional ipfilter inet
 contrib/ipfilter/netinet/ip_state.c	optional ipfilter inet
 contrib/ipfilter/netinet/mlfk_ipl.c	optional ipfilter inet
 crypto/blowfish/bf_skey.c	optional ipsec ipsec_esp
-crypto/blowfish/bf_enc.c       optional ipsec ipsec_esp
 crypto/blowfish/bf_ecb.c       optional ipsec ipsec_esp
 crypto/cast128/cast128.c	optional ipsec ipsec_esp
 crypto/des/des_ecb.c	optional ipsec ipsec_esp
@@ -1449,7 +1448,6 @@ libkern/strtoq.c	standard
 libkern/strtoul.c	standard
 libkern/strtouq.c	standard
 crypto/blowfish/bf_skey.c	optional crypto
-crypto/blowfish/bf_enc.c       optional crypto
 crypto/blowfish/bf_ecb.c       optional crypto
 crypto/cast128/cast128.c	optional crypto
 crypto/des/des_ecb.c	optional crypto
