@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.31 2001/04/06 14:23:48 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.32 2001/05/18 08:10:17 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -992,7 +992,10 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 		req = sp_in->req;
 		pr = newpp->head;
 		while (req && pr) {
-			pr->reqid_in = req->saidx.reqid;
+			if (iph2->side == INITIATOR)
+				pr->reqid_in = req->saidx.reqid;
+			else
+				pr->reqid_out = req->saidx.reqid;
 			pr = pr->next;
 			req = req->next;
 		}
@@ -1005,6 +1008,8 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	}
 
 	iph2->proposal = newpp;
+
+	printsaprop0(LLV_DEBUG, newpp);
 
 	return 0;
 err:
