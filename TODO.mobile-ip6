@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.25 2002/01/17 07:04:39 k-sugyou Exp $
+$KAME: TODO.mobile-ip6,v 1.26 2002/01/21 12:25:53 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -89,18 +89,21 @@ provided home agent node functions
 KAME/MIP6 supports both the IPsec and the authentication data
 sub-option (appered in draft-15) mechanism.  Since we do not provide
 any key distribution mechanisms, setting SAs must be done by hand.  If
-you use the IPsec, you just set up IPsec spd/sa database as usual.
-Since the IPsec protection is disabled by default, you must modify
-kernel code to enable the IPsec. See mip6.c:mip6_init().  We must
-provide a sysctl switch soon. If you choose authdata sub-option, set
-up spd with protocol number 60(ipv6-opts, this is subject to change),
-and set up sa with protocol AH.  for example,
+you use the IPsec, you just set up IPsec spd/sa database as usual.  If
+you choose authdata sub-option, set up spd with protocol number
+60(ipv6-opts, this is subject to change), and set up sa with protocol
+AH.  for example,
 
 add mn::host hacn::host ah 1500 -m transport -A hmac-sha1
 	"AH SA configuration!";
 add hacn::host mn::host ah 1600 -m transport -A hmac-sha1
 	"AH SA configuration!";
 spdadd ::/0[any] ::/0[any] ipv6-opts -P out ipsec ah/transport//require;
+
+The IPsec protection/validation and the authentication sub-option
+protection/validation is enabled by default.  To control those
+protection/validation code, use mip6control.  For more detail see the
+man page of mip6control(8).
 
 
 <<Schedule>>
