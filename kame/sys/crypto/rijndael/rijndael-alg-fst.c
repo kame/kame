@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-alg-fst.c,v 1.7 2001/05/27 00:23:23 itojun Exp $	*/
+/*	$KAME: rijndael-alg-fst.c,v 1.8 2001/06/19 08:48:43 itojun Exp $	*/
 
 /*
  * rijndael-alg-fst.c   v2.3   April '2000
@@ -98,31 +98,31 @@ int rijndaelKeyEncToDec(word8 W[MAXROUNDS+1][4][4], int ROUNDS) {
 	for (r = 1; r < ROUNDS; r++) {
 		w = W[r][0];
 		*((word32*)w) =
-			  *((word32*)U1[w[0]])
-			^ *((word32*)U2[w[1]])
-			^ *((word32*)U3[w[2]])
-			^ *((word32*)U4[w[3]]);
+			  *((const word32*)U1[w[0]])
+			^ *((const word32*)U2[w[1]])
+			^ *((const word32*)U3[w[2]])
+			^ *((const word32*)U4[w[3]]);
 
 		w = W[r][1];
 		*((word32*)w) =
-			  *((word32*)U1[w[0]])
-			^ *((word32*)U2[w[1]])
-			^ *((word32*)U3[w[2]])
-			^ *((word32*)U4[w[3]]);
+			  *((const word32*)U1[w[0]])
+			^ *((const word32*)U2[w[1]])
+			^ *((const word32*)U3[w[2]])
+			^ *((const word32*)U4[w[3]]);
 
 		w = W[r][2];
 		*((word32*)w) =
-			  *((word32*)U1[w[0]])
-			^ *((word32*)U2[w[1]])
-			^ *((word32*)U3[w[2]])
-			^ *((word32*)U4[w[3]]);
+			  *((const word32*)U1[w[0]])
+			^ *((const word32*)U2[w[1]])
+			^ *((const word32*)U3[w[2]])
+			^ *((const word32*)U4[w[3]]);
 
 		w = W[r][3];
 		*((word32*)w) =
-			  *((word32*)U1[w[0]])
-			^ *((word32*)U2[w[1]])
-			^ *((word32*)U3[w[2]])
-			^ *((word32*)U4[w[3]]);
+			  *((const word32*)U1[w[0]])
+			^ *((const word32*)U2[w[1]])
+			^ *((const word32*)U3[w[2]])
+			^ *((const word32*)U4[w[3]]);
 	}
 	return 0;
 }	
@@ -150,44 +150,44 @@ int rijndaelEncrypt(word8 in[16], word8 out[16], word8 rk[MAXROUNDS+1][4][4], in
     *((word32*)temp[1]) = *((word32*)(a+ 4)) ^ *((word32*)rk[0][1]);
     *((word32*)temp[2]) = *((word32*)(a+ 8)) ^ *((word32*)rk[0][2]);
     *((word32*)temp[3]) = *((word32*)(a+12)) ^ *((word32*)rk[0][3]);
-    *((word32*)(b    )) = *((word32*)T1[temp[0][0]])
-						^ *((word32*)T2[temp[1][1]])
-						^ *((word32*)T3[temp[2][2]]) 
-						^ *((word32*)T4[temp[3][3]]);
-    *((word32*)(b + 4)) = *((word32*)T1[temp[1][0]])
-						^ *((word32*)T2[temp[2][1]])
-						^ *((word32*)T3[temp[3][2]]) 
-						^ *((word32*)T4[temp[0][3]]);
-    *((word32*)(b + 8)) = *((word32*)T1[temp[2][0]])
-						^ *((word32*)T2[temp[3][1]])
-						^ *((word32*)T3[temp[0][2]]) 
-						^ *((word32*)T4[temp[1][3]]);
-    *((word32*)(b +12)) = *((word32*)T1[temp[3][0]])
-						^ *((word32*)T2[temp[0][1]])
-						^ *((word32*)T3[temp[1][2]]) 
-						^ *((word32*)T4[temp[2][3]]);
+    *((word32*)(b    )) = *((const word32*)T1[temp[0][0]])
+					^ *((const word32*)T2[temp[1][1]])
+					^ *((const word32*)T3[temp[2][2]]) 
+					^ *((const word32*)T4[temp[3][3]]);
+    *((word32*)(b + 4)) = *((const word32*)T1[temp[1][0]])
+					^ *((const word32*)T2[temp[2][1]])
+					^ *((const word32*)T3[temp[3][2]]) 
+					^ *((const word32*)T4[temp[0][3]]);
+    *((word32*)(b + 8)) = *((const word32*)T1[temp[2][0]])
+					^ *((const word32*)T2[temp[3][1]])
+					^ *((const word32*)T3[temp[0][2]]) 
+					^ *((const word32*)T4[temp[1][3]]);
+    *((word32*)(b +12)) = *((const word32*)T1[temp[3][0]])
+					^ *((const word32*)T2[temp[0][1]])
+					^ *((const word32*)T3[temp[1][2]]) 
+					^ *((const word32*)T4[temp[2][3]]);
 	for (r = 1; r < ROUNDS-1; r++) {
 		*((word32*)temp[0]) = *((word32*)(b   )) ^ *((word32*)rk[r][0]);
 		*((word32*)temp[1]) = *((word32*)(b+ 4)) ^ *((word32*)rk[r][1]);
 		*((word32*)temp[2]) = *((word32*)(b+ 8)) ^ *((word32*)rk[r][2]);
 		*((word32*)temp[3]) = *((word32*)(b+12)) ^ *((word32*)rk[r][3]);
 
-		*((word32*)(b    )) = *((word32*)T1[temp[0][0]])
-							^ *((word32*)T2[temp[1][1]])
-							^ *((word32*)T3[temp[2][2]]) 
-							^ *((word32*)T4[temp[3][3]]);
-		*((word32*)(b + 4)) = *((word32*)T1[temp[1][0]])
-							^ *((word32*)T2[temp[2][1]])
-							^ *((word32*)T3[temp[3][2]]) 
-							^ *((word32*)T4[temp[0][3]]);
-		*((word32*)(b + 8)) = *((word32*)T1[temp[2][0]])
-							^ *((word32*)T2[temp[3][1]])
-							^ *((word32*)T3[temp[0][2]]) 
-							^ *((word32*)T4[temp[1][3]]);
-		*((word32*)(b +12)) = *((word32*)T1[temp[3][0]])
-							^ *((word32*)T2[temp[0][1]])
-							^ *((word32*)T3[temp[1][2]]) 
-							^ *((word32*)T4[temp[2][3]]);
+		*((word32*)(b    )) = *((const word32*)T1[temp[0][0]])
+					^ *((const word32*)T2[temp[1][1]])
+					^ *((const word32*)T3[temp[2][2]]) 
+					^ *((const word32*)T4[temp[3][3]]);
+		*((word32*)(b + 4)) = *((const word32*)T1[temp[1][0]])
+					^ *((const word32*)T2[temp[2][1]])
+					^ *((const word32*)T3[temp[3][2]]) 
+					^ *((const word32*)T4[temp[0][3]]);
+		*((word32*)(b + 8)) = *((const word32*)T1[temp[2][0]])
+					^ *((const word32*)T2[temp[3][1]])
+					^ *((const word32*)T3[temp[0][2]]) 
+					^ *((const word32*)T4[temp[1][3]]);
+		*((word32*)(b +12)) = *((const word32*)T1[temp[3][0]])
+					^ *((const word32*)T2[temp[0][1]])
+					^ *((const word32*)T3[temp[1][2]]) 
+					^ *((const word32*)T4[temp[2][3]]);
 	}
 	/* last round is special */   
 	*((word32*)temp[0]) = *((word32*)(b   )) ^ *((word32*)rk[ROUNDS-1][0]);
@@ -243,22 +243,22 @@ int rijndaelEncryptRound(word8 a[4][4], word8 rk[MAXROUNDS+1][4][4], int ROUNDS,
 	*((word32*)a[3]) = *((word32*)a[3]) ^ *((word32*)rk[0][3]);
 
 	for (r = 1; (r <= rounds) && (r < ROUNDS); r++) {
-		*((word32*)temp[0]) = *((word32*)T1[a[0][0]])
-           ^ *((word32*)T2[a[1][1]])
-           ^ *((word32*)T3[a[2][2]]) 
-           ^ *((word32*)T4[a[3][3]]);
-		*((word32*)temp[1]) = *((word32*)T1[a[1][0]])
-           ^ *((word32*)T2[a[2][1]])
-           ^ *((word32*)T3[a[3][2]]) 
-           ^ *((word32*)T4[a[0][3]]);
-		*((word32*)temp[2]) = *((word32*)T1[a[2][0]])
-           ^ *((word32*)T2[a[3][1]])
-           ^ *((word32*)T3[a[0][2]]) 
-           ^ *((word32*)T4[a[1][3]]);
-		*((word32*)temp[3]) = *((word32*)T1[a[3][0]])
-           ^ *((word32*)T2[a[0][1]])
-           ^ *((word32*)T3[a[1][2]]) 
-           ^ *((word32*)T4[a[2][3]]);
+		*((word32*)temp[0]) = *((const word32*)T1[a[0][0]])
+					   ^ *((const word32*)T2[a[1][1]])
+					   ^ *((const word32*)T3[a[2][2]]) 
+					   ^ *((const word32*)T4[a[3][3]]);
+		*((word32*)temp[1]) = *((const word32*)T1[a[1][0]])
+					   ^ *((const word32*)T2[a[2][1]])
+					   ^ *((const word32*)T3[a[3][2]]) 
+					   ^ *((const word32*)T4[a[0][3]]);
+		*((word32*)temp[2]) = *((const word32*)T1[a[2][0]])
+					   ^ *((const word32*)T2[a[3][1]])
+					   ^ *((const word32*)T3[a[0][2]]) 
+					   ^ *((const word32*)T4[a[1][3]]);
+		*((word32*)temp[3]) = *((const word32*)T1[a[3][0]])
+					   ^ *((const word32*)T2[a[0][1]])
+					   ^ *((const word32*)T3[a[1][2]]) 
+					   ^ *((const word32*)T4[a[2][3]]);
 		*((word32*)a[0]) = *((word32*)temp[0]) ^ *((word32*)rk[r][0]);
 		*((word32*)a[1]) = *((word32*)temp[1]) ^ *((word32*)rk[r][1]);
 		*((word32*)a[2]) = *((word32*)temp[2]) ^ *((word32*)rk[r][2]);
@@ -435,28 +435,28 @@ int rijndaelDecryptRound(word8 a[4][4], word8 rk[MAXROUNDS+1][4][4], int ROUNDS,
 		*(word32 *)a[3] ^= *(word32 *)rk[r][3];
 
 		*((word32*)a[0]) =
-			  *((word32*)U1[a[0][0]])
-			^ *((word32*)U2[a[0][1]])
-			^ *((word32*)U3[a[0][2]])
-			^ *((word32*)U4[a[0][3]]);
+			  *((const word32*)U1[a[0][0]])
+			^ *((const word32*)U2[a[0][1]])
+			^ *((const word32*)U3[a[0][2]])
+			^ *((const word32*)U4[a[0][3]]);
 
 		*((word32*)a[1]) =
-			  *((word32*)U1[a[1][0]])
-			^ *((word32*)U2[a[1][1]])
-			^ *((word32*)U3[a[1][2]])
-			^ *((word32*)U4[a[1][3]]);
+			  *((const word32*)U1[a[1][0]])
+			^ *((const word32*)U2[a[1][1]])
+			^ *((const word32*)U3[a[1][2]])
+			^ *((const word32*)U4[a[1][3]]);
 
 		*((word32*)a[2]) =
-			  *((word32*)U1[a[2][0]])
-			^ *((word32*)U2[a[2][1]])
-			^ *((word32*)U3[a[2][2]])
-			^ *((word32*)U4[a[2][3]]);
+			  *((const word32*)U1[a[2][0]])
+			^ *((const word32*)U2[a[2][1]])
+			^ *((const word32*)U3[a[2][2]])
+			^ *((const word32*)U4[a[2][3]]);
 
 		*((word32*)a[3]) =
-			  *((word32*)U1[a[3][0]])
-			^ *((word32*)U2[a[3][1]])
-			^ *((word32*)U3[a[3][2]])
-			^ *((word32*)U4[a[3][3]]);
+			  *((const word32*)U1[a[3][0]])
+			^ *((const word32*)U2[a[3][1]])
+			^ *((const word32*)U3[a[3][2]])
+			^ *((const word32*)U4[a[3][3]]);
 		for (i = 0; i < 4; i++) {
 			a[i][0] = Si[a[i][0]];
 			a[i][1] = Si[a[i][1]];
