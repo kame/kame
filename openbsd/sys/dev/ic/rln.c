@@ -770,10 +770,15 @@ rlnget(sc, hdr, totlen)
 			}
 			len = MLEN;
 		}
-		if (top && totlen >= MINCLSIZE) {
+		if (totlen >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT)
+			if (m->m_flags & M_EXT) {
 				len = MCLBYTES;
+				if (!top) {
+					m->m_data += pad;
+					len -= pad;
+				}
+			}
 		}
 		len = min(totlen, len);
 		rln_rx_pdata(sc, mtod(m, u_int8_t *), len, &pd);
