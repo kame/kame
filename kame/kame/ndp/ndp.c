@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.90 2002/06/02 15:21:37 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.91 2002/06/02 15:22:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -159,7 +159,7 @@ void harmonize_rtr __P((void));
 static void getdefif __P((void));
 static void setdefif __P((char *));
 #endif
-static char *sec2str __P((time_t t));
+static char *sec2str __P((time_t));
 static char *ether_str __P((struct sockaddr_dl *));
 static void ts_print __P((const struct timeval *));
 
