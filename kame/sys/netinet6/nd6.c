@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.174 2001/07/23 16:23:59 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.175 2001/07/23 18:51:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1661,24 +1661,12 @@ nd6_ioctl(cmd, data, ifp)
 #else
 		s = splnet();
 #endif
-		if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
-			/*
-			 * We remove default router list entries with
-			 * routing entry, afterwards.
-			 */
-			for (; dr; dr = next) {
-				next = TAILQ_NEXT(dr, dr_entry);
-				if (dr->installed)
-					continue;
-				defrtrlist_del(dr);
-			}
-			for (; dr; dr = next) {
-				next = TAILQ_NEXT(dr, dr_entry);
-				if (!dr->installed)
-					continue;
-				defrtrlist_del(dr);
-			}
+		defrouter_reset();
+		for (dr = TAILQ_FIRST(&nd_defrouter); dr; dr = next) {
+			next = TAILQ_NEXT(dr, dr_entry);
+			defrtrlist_del(dr);
 		}
+		defrouter_select();
 		splx(s);
 		break;
 	    }
