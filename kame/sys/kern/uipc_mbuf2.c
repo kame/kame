@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.40 2003/01/21 06:33:03 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.41 2003/01/21 07:11:32 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -70,12 +70,19 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/kernel.h>
+#endif
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 
 #ifndef __NetBSD__
 /* can't call it m_dup(), as freebsd[34] uses m_dup() with different arg */
 static struct mbuf *m_dup1 __P((struct mbuf *, int, int, int));
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+MALLOC_DEFINE(M_PACKET_TAGS, "packet tags", "Packet tags");
 #endif
 
 /*
@@ -375,6 +382,11 @@ m_dup1(m, off, len, wait)
 
 	return n;
 }
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+/* duplicated use of name m_tag_id */
+#undef m_tag_id
 #endif
 
 /* Get a packet tag structure along with specified data following. */

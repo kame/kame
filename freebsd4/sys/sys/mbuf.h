@@ -37,6 +37,8 @@
 #ifndef _SYS_MBUF_H_
 #define	_SYS_MBUF_H_
 
+#include <sys/queue.h>
+
 /*
  * Mbufs are of a single size, MSIZE (machine/param.h), which
  * includes overhead.  An mbuf may add a single "mbuf cluster" of size
@@ -48,6 +50,13 @@
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 #define	MINCLSIZE	(MHLEN + 1)	/* smallest amount to put in cluster */
 #define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
+
+/* Packet tags structure */
+struct m_tag {
+        SLIST_ENTRY(m_tag)      m_tag_link;     /* List of packet tags */
+        u_int16_t               m_tag_id;       /* Tag ID */
+        u_int16_t               m_tag_len;      /* Length of data */
+};
 
 /*
  * Macros for type conversion:
@@ -79,13 +88,13 @@ struct m_hdr {
  */
 struct pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
+	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
 	int	len;			/* total packet length */
 	/* variables for ip and tcp reassembly */
 	void	*header;		/* pointer to packet header */
 	/* variables for hardware checksum */
 	int	csum_flags;		/* flags regarding checksum */
 	int	csum_data;		/* data field used by csum routines */
-	struct	mbuf *aux;		/* extra data buffer; ipsec/others */
 };
 
 /*
@@ -151,7 +160,6 @@ struct mbuf {
 #define	M_FIRSTFRAG	0x0800	/* packet is first fragment */
 #define	M_LASTFRAG	0x1000	/* packet is last fragment */
 
-#define M_AUX		0x4000	/* mbufs pointed to by m->m_pkthdr.aux */
 #define M_NOTIFICATION	0x8000	/* notification event */
 
 /*
@@ -159,7 +167,7 @@ struct mbuf {
  */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3| \
 			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG| \
-			    M_AUX|M_NOTIFICATION)
+			    M_NOTIFICATION)
 
 /*
  * Flags indicating hw checksum support and sw checksum requirements.
@@ -363,6 +371,7 @@ union mcluster {
 		_mm->m_data = _mm->m_pktdat;				\
 		_mm->m_flags = M_PKTHDR;				\
 		bzero(&(_mm)->m_pkthdr, sizeof((_mm)->m_pkthdr));	\
+		SLIST_INIT(&(_mm)->m_pkthdr.tags);			\
 		(m) = _mm;						\
 		splx(_ms);						\
 	} else {							\
@@ -452,7 +461,6 @@ union mcluster {
 /*
  * Copy mbuf pkthdr from "from" to "to".
  * from must have M_PKTHDR set, and to must be empty.
- * aux pointer will be moved to `to'.
  */
 #define	M_COPY_PKTHDR(to, from) do {					\
 	struct mbuf *_mfrom = (from);					\
@@ -461,7 +469,8 @@ union mcluster {
 	_mto->m_data = _mto->m_pktdat;					\
 	_mto->m_flags = _mfrom->m_flags & M_COPYFLAGS;			\
 	_mto->m_pkthdr = _mfrom->m_pkthdr;				\
-	_mfrom->m_pkthdr.aux = (struct mbuf *)NULL;			\
+	SLIST_INIT(&(_mto)->m_pkthdr.tags);				\
+	m_tag_copy_chain((_mto), (_mfrom));				\
 } while (0)
 
 /*
@@ -556,15 +565,6 @@ union mcluster {
 #define	m_copy(m, o, l)	m_copym((m), (o), (l), M_DONTWAIT)
 
 /*
- * pkthdr.aux type tags.
- */
-struct mauxtag {
-	int	af;
-	int	type;
-	void	*p;
-};
-
-/*
  * Some packet tags to identify different mbuf annotations.
  *
  * Eventually, these annotations will end up in an appropriate chain
@@ -588,21 +588,14 @@ struct mauxtag {
 
 /* Packet tag types -- first ones are from NetBSD */
 
-#define	PACKET_TAG_NONE				0  /* Nadda */
-#define	PACKET_TAG_IPSEC_IN_DONE		1  /* IPsec applied, in */
-#define	PACKET_TAG_IPSEC_OUT_DONE		2  /* IPsec applied, out */
-#define	PACKET_TAG_IPSEC_IN_CRYPTO_DONE		3  /* NIC IPsec crypto done */
-#define	PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED	4  /* NIC IPsec crypto req'ed */
-#define	PACKET_TAG_IPSEC_IN_COULD_DO_CRYPTO	5  /* NIC notifies IPsec */
-#define	PACKET_TAG_IPSEC_PENDING_TDB		6  /* Reminder to do IPsec */
-#define	PACKET_TAG_BRIDGE			7  /* Bridge processing done */
-#define	PACKET_TAG_GIF				8  /* GIF processing done */
-#define	PACKET_TAG_GRE				9  /* GRE processing done */
-#define	PACKET_TAG_IN_PACKET_CHECKSUM		10 /* NIC checksumming done */
-#define	PACKET_TAG_ENCAP			11 /* Encap.  processing */
-#define	PACKET_TAG_IPSEC_SOCKET			12 /* IPSEC socket ref */
-#define	PACKET_TAG_IPSEC_HISTORY		13 /* IPSEC history */
-#define	PACKET_TAG_IPV6_INPUT			14 /* IPV6 input processing */
+#define PACKET_TAG_NONE				0  /* Nothing */
+#define PACKET_TAG_VLAN				1  /* VLAN ID */
+#define PACKET_TAG_ENCAP			2  /* encapsulation data */
+#define PACKET_TAG_ESP				3  /* ESP information */
+#define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
+#define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
+#define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
+#define PACKET_TAG_PF_QID			14 /* PF queue id */
 
 /* Packet tags used in the FreeBSD network stack */
 #define	PACKET_TAG_DUMMYNET			15 /* dummynet info */
@@ -610,7 +603,9 @@ struct mauxtag {
 #define	PACKET_TAG_DIVERT			17 /* divert info */
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
 
-#define	PACKET_TAG_MAX				19
+#define PACKET_TAG_INET6			19 /* IPv6 info */
+
+#define	PACKET_TAG_MAX				20
 
 #ifdef _KERNEL
 extern	u_int		 m_clalloc_wid;	/* mbuf cluster wait count */
@@ -631,11 +626,6 @@ extern	int		 nmbufs;
 extern	int		 nsfbufs;
 
 void		 m_adj(struct mbuf *, int);
-struct	mbuf	*m_aux_add(struct mbuf *, int, int);
-struct	mbuf	*m_aux_add2(struct mbuf *, int, int, void *);
-void		 m_aux_delete(struct mbuf *, struct mbuf *);
-struct	mbuf	*m_aux_find(struct mbuf *, int, int);
-struct	mbuf	*m_aux_find2(struct mbuf *, int, int, void *);
 void		 m_cat(struct mbuf *, struct mbuf *);
 int		 m_clalloc(int, int);
 caddr_t		 m_clalloc_wait(void);
@@ -662,6 +652,20 @@ struct	mbuf	*m_pullup(struct mbuf *, int);
 struct	mbuf	*m_retry(int, int);
 struct	mbuf	*m_retryhdr(int, int);
 struct	mbuf	*m_split(struct mbuf *, int, int);
+
+/* Packet tag routines */
+struct	m_tag *m_tag_get(int, int, int);
+void	m_tag_free(struct m_tag *);
+void	m_tag_prepend(struct mbuf *, struct m_tag *);
+void	m_tag_unlink(struct mbuf *, struct m_tag *);
+void	m_tag_delete(struct mbuf *, struct m_tag *);
+void	m_tag_delete_chain(struct mbuf *, struct m_tag *);
+struct	m_tag *m_tag_find(struct mbuf *, int, struct m_tag *);
+struct	m_tag *m_tag_copy(struct m_tag *);
+int	m_tag_copy_chain(struct mbuf *, struct mbuf *);
+void	m_tag_init(struct mbuf *);
+struct	m_tag *m_tag_first(struct mbuf *);
+struct	m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MBUF_H_ */

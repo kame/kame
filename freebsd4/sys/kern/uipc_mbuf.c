@@ -666,20 +666,14 @@ failed:
  * MFREE(struct mbuf *m, struct mbuf *n)
  * Free a single mbuf and associated external storage.
  * Place the successor, if any, in n.
- *
- * we do need to check non-first mbuf for m_aux, since some of existing
- * code does not call M_PREPEND properly.
- * (example: call to bpf_mtap from drivers)
  */
 #define	MFREE(m, n) MBUFLOCK(						\
 	struct mbuf *_mm = (m);						\
 									\
 	KASSERT(_mm->m_type != MT_FREE, ("freeing free mbuf"));		\
 	mbtypes[_mm->m_type]--;						\
-	if ((_mm->m_flags & M_PKTHDR) != 0 && _mm->m_pkthdr.aux) {	\
-		m_freem(_mm->m_pkthdr.aux);				\
-		_mm->m_pkthdr.aux = NULL;				\
-	}								\
+	if ((_mm->m_flags & M_PKTHDR) != 0)				\
+		m_tag_delete_chain((_mm), NULL);			\
 	if (_mm->m_flags & M_EXT)					\
 		MEXTFREE1(m);						\
 	(n) = _mm->m_next;						\
@@ -711,18 +705,15 @@ m_freem(m)
 	 * device drivers. A good candidate is a M_PKTHDR buffer with
 	 * only one cluster attached. Other mbufs, or those exceeding
 	 * the pool size, are just m_free'd in the usual way.
-	 * The following code makes sure that m_next, m_type,
-	 * m_pkthdr.aux and m_ext.* are properly initialized.
+	 * The following code makes sure that m_next, m_type
+	 * and m_ext.* are properly initialized.
 	 * Other fields in the mbuf are initialized in m_getcl()
 	 * upon allocation.
 	 */
         if (mcl_pool_now < mcl_pool_max && m && m->m_next == NULL &&
             (m->m_flags & (M_PKTHDR|M_EXT)) == (M_PKTHDR|M_EXT) &&
             m->m_type == MT_DATA && M_EXT_WRITABLE(m) ) {
-		if (m->m_pkthdr.aux) {
-			m_freem(m->m_pkthdr.aux);
-			m->m_pkthdr.aux = NULL;
-		}
+		m_tag_delete_chain((m), NULL);
                 m->m_nextpkt = mcl_pool;
                 mcl_pool = m;
                 mcl_pool_now++;
