@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.157 2002/05/30 21:32:30 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.158 2002/05/31 01:11:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2187,7 +2187,7 @@ summary()
 		(void)printf("+%ld duplicates, ", nrepeats);
 	if (ntransmitted) {
 		if (nreceived > ntransmitted)
-			(void)printf("-- somebody's printing up packets!");
+			(void)printf("-- somebody's duplicating packets!");
 		else
 			(void)printf("%d%% packet loss",
 			    (int) (((ntransmitted - nreceived) * 100) /
