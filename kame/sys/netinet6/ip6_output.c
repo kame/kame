@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.292 2002/04/08 08:14:41 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.293 2002/04/09 15:21:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1044,7 +1044,11 @@ skip_ipsec2:;
 	}
 	if (rt != NULL) {
 		ia = (struct in6_ifaddr *)(rt->rt_ifa);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		RTUSE(rt);
+#else
 		rt->rt_use++;
+#endif
 	}
 
 	/*

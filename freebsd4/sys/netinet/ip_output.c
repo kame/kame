@@ -274,7 +274,11 @@ ip_output(m0, opt, ro, flags, imo)
 		}
 		ia = ifatoia(ro->ro_rt->rt_ifa);
 		ifp = ro->ro_rt->rt_ifp;
+#ifdef RTUSE			/* for statistics */
+		RTUSE(ro->ro_rt);
+#else
 		ro->ro_rt->rt_use++;
+#endif
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst = (struct sockaddr_in *)ro->ro_rt->rt_gateway;
 		if (ro->ro_rt->rt_flags & RTF_HOST)
@@ -745,7 +749,11 @@ skip_ipsec:
 
 			ia = ifatoia(ro_fwd->ro_rt->rt_ifa);
 			ifp = ro_fwd->ro_rt->rt_ifp;
+#ifdef RTUSE			/* for statistics */
+			RTUSE(ro_fwd->ro_rt);
+#else
 			ro_fwd->ro_rt->rt_use++;
+#endif
 			if (ro_fwd->ro_rt->rt_flags & RTF_GATEWAY)
 				dst = (struct sockaddr_in *)ro_fwd->ro_rt->rt_gateway;
 			if (ro_fwd->ro_rt->rt_flags & RTF_HOST)
