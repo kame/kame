@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.20 2001/11/27 07:00:32 suz Exp $	*/
+/*	$KAME: pim6.c,v 1.21 2001/11/27 07:26:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -271,7 +271,7 @@ accept_pim6(pimlen)
     int pimlen;
 {   
     register struct pim *pim;
-    struct sockaddr_in6 dst;
+    struct sockaddr_in6 dst = {sizeof(dst), AF_INET6};
     struct in6_pktinfo *pi=NULL;
     struct sockaddr_in6 *src = (struct sockaddr_in6 *)rcvmhpim.msg_name;
     struct cmsghdr *cm;	
