@@ -165,6 +165,12 @@ struct	rtstat {
 	short	rts_newgateway;		/* routes modified by redirects */
 	short	rts_unreach;		/* lookups which failed */
 	short	rts_wildcard;		/* lookups satisfied by a wildcard */
+	u_quad_t rts_art_lookups;	/* ART: total lookups */
+	u_quad_t rts_art_invalid;	/* ART: result to invalid entry */
+	u_quad_t rts_art_mismatch;	/* ART: mismatch with radix */
+	u_quad_t rts_art_alloc;		/* ART: # of table allocations */
+	u_quad_t rts_art_free;		/* ART: # of table free */
+	u_quad_t rts_art_table;		/* ART: # of table resident */
 };
 /*
  * Structures for routing messages.
