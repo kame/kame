@@ -267,7 +267,6 @@ const struct cmd {
 	{ "vlan",	NEXTARG,	0,		setvlan } ,
 	{ "vlanif",	NEXTARG,	0,		setvlanif } ,
 	{ "-vlanif",	0,		0,		unsetvlanif } ,
-	{ "deletetunnel", 0,		0,		deletetunnel },
 #if 0
 	/* XXX `create' special-cased below */
 	{ "create",	0,		0,		clone_create } ,
