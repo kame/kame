@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.118 2002/08/13 05:31:59 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.119 2002/08/21 06:04:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1146,23 +1146,11 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 					 &pr->ndpr_prefix.sin6_addr,
 					 pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
+			prlifetime = pr->ndpr_vltime;
 		}
 		/* save linklocal prefix */
 		if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 			llpr = pr;
-	}
-	/* XXX really stupid to loop twice? */
-	prlifetime = 0xffffffff;
-	for(pr = nd_prefix.lh_first;
-	    pr;
-	    pr = pr->ndpr_next) {
-		if (pr->ndpr_ifp != hifp) {
-			/* this prefix is not a home prefix. */
-			continue;
-		}
-		/* save minimum prefix lifetime for later use. */
-		if (prlifetime > pr->ndpr_vltime)
-			prlifetime = pr->ndpr_vltime;
 	}
 	if (hifp == NULL) {
 		/*
@@ -1181,6 +1169,53 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				 ip6_sprintf(&haddr0->sin6_addr),
 				 ip6_sprintf(&coa->sin6_addr)));
 		}
+		return (0); /* XXX is 0 OK? */
+	}
+
+	if ((flags & IP6MU_SINGLE) == 0) {
+		/* 10.2.
+		 * - However, if the `S' it field in the Binding Update is zero, the
+		     lifetime for each Binding Cache entry MUST NOT be greater
+		     then the minimum remaining valid lifetime for all subnet prefixes
+		     on the mobile node's home link.
+		 */
+		/* XXX really stupid to loop twice? */
+		for(pr = nd_prefix.lh_first;
+		    pr;
+		    pr = pr->ndpr_next) {
+			if (pr->ndpr_ifp != hifp) {
+				/* this prefix is not a home prefix. */
+				continue;
+			}
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
+				continue;
+			/* save minimum prefix lifetime for later use. */
+			if (prlifetime > pr->ndpr_vltime)
+				prlifetime = pr->ndpr_vltime;
+		}
+	}
+
+	if (prlifetime < 4) {	/* lifetime in units of 4 sec */
+		/* XXX BA's lifetime is zero */
+		mip6log((LOG_ERR,
+			 "%s:%d: invalid prefix lifetime %lu sec(s).",
+			 __FILE__, __LINE__,
+			 (u_long)prlifetime));
+		mip6_bc_send_ba(haaddr, haddr0, coa,
+				IP6MA_STATUS_UNSPECIFIED,
+				seqno,
+				0,
+				0);
+		return (0); /* XXX is 0 OK? */
+	}
+	/* sanity check */
+	if (lifetime < 4) {
+		/* XXX lifetime > DAD timer */
+		/* XXX lifetime > 4 (units of 4 secs) */
+		mip6log((LOG_ERR,
+			 "%s:%d: invalid lifetime %lu sec(s).",
+			 __FILE__, __LINE__,
+			 (u_long)lifetime));
 		return (0); /* XXX is 0 OK? */
 	}
 
