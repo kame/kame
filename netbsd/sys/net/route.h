@@ -57,9 +57,9 @@
 struct route {
 	struct	rtentry *ro_rt;
 	struct sockaddr ro_dst;
-	/* trailing pad to store at least IPv6 socket address safely */
-	u_int8_t ro_pad[28 > sizeof(struct sockaddr) ?
-	    (28 - sizeof(struct sockaddr)) : 0];
+	/* trailing pad to store sockaddr_iso safely */
+	u_int8_t ro_pad[32 > sizeof(struct sockaddr) ?
+	    (32 - sizeof(struct sockaddr)) : 0];
 };
 #else
 struct route {
