@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.237 2002/04/05 15:33:56 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.238 2002/04/10 12:42:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1558,8 +1558,15 @@ nd6_rtdrain(rt, rtt)
 {
 	struct llinfo_nd6 *ln, *ln_next;
 
-	if ((ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL)
-		panic("nd6_rtdrain: not an ND entry");
+	if ((ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL) {
+		/*
+		 * This case can happen when the route was somehow invalidated
+		 * but there are still positive references to this entry,
+		 * including the case where the parent route that cloned this
+		 * route was deleted.
+		 */
+		return;
+	}
 
 	/* if this entry is still used actively, just keep it. */
 	switch(ln->ln_state) {
