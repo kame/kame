@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.20 2000/09/19 16:04:55 itojun Exp $	*/
+/*	$KAME: kmpstat.c,v 1.21 2000/09/22 18:13:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.20 2000/09/19 16:04:55 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.21 2000/09/22 18:13:40 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -214,7 +214,7 @@ main(ac, av)
 
 	combuf = get_combuf(ac, av);
 	if (!combuf)
-		err(1, "get_combuf");
+		err(1, "kmpstat");
 
 	if (debug)
 		hexdump(combuf, ((struct admin_com *)combuf)->ac_len);
@@ -445,7 +445,7 @@ f_reload(ac, av)
 
 	buf = vmalloc(sizeof(*head));
 	if (buf == NULL)
-		return NULL;
+		errx(1, "not enough core");
 
 	head = (struct admin_com *)buf->v;
 	head->ac_len = buf->l;
@@ -466,7 +466,7 @@ f_getsched(ac, av)
 
 	buf = vmalloc(sizeof(*head));
 	if (buf == NULL)
-		return NULL;
+		errx(1, "not enough core");
 
 	head = (struct admin_com *)buf->v;
 	head->ac_len = buf->l;
@@ -488,14 +488,14 @@ f_getsa(ac, av)
 
 	/* need protocol */
 	if (ac != 1)
-		return NULL;
+		errx(1, "insufficient arguments");
 	proto = get_proto(*av);
 	if (proto == -1)
-		return NULL;
+		errx(1, "unknown protocol %s", *av);
 
 	buf = vmalloc(sizeof(*head));
 	if (buf == NULL)
-		return NULL;
+		errx(1, "not enough core");
 
 	head = (struct admin_com *)buf->v;
 	head->ac_len = buf->l;
@@ -517,14 +517,14 @@ f_flushsa(ac, av)
 
 	/* need protocol */
 	if (ac != 1)
-		return NULL;
+		errx(1, "insufficient arguments");
 	proto = get_proto(*av);
 	if (proto == -1)
-		return NULL;
+		errx(1, "unknown protocol %s", *av);
 
 	buf = vmalloc(sizeof(*head));
 	if (buf == NULL)
-		return NULL;
+		errx(1, "not enough core");
 
 	head = (struct admin_com *)buf->v;
 	head->ac_len = buf->l;
@@ -545,13 +545,11 @@ f_deletesa(ac, av)
 	int proto;
 
 	/* need protocol */
-	if (ac < 1) {
-		errno = EINVAL;
-		return NULL;
-	}
+	if (ac < 1)
+		errx(1, "insufficient arguments");
 	proto = get_proto(*av);
 	if (proto == -1)
-		return NULL;
+		errx(1, "unknown protocol %s", *av);
 
 	/* get index(es) */
 	av++;
@@ -596,12 +594,10 @@ f_exchangesa(ac, av)
 	int proto;
 
 	/* need protocol */
-	if (ac < 1) {
-		errno = EINVAL;
-		return NULL;
-	}
+	if (ac < 1)
+		errx(1, "insufficient arguments");
 	if ((proto = get_proto(*av)) == -1)
-		return NULL;
+		errx(1, "unknown protocol %s", *av);
 
 	/* get index(es) */
 	av++;
