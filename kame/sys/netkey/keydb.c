@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.14 1999/10/19 21:37:41 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.15 1999/10/20 13:26:27 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -874,13 +874,13 @@ key_msg2sp(xpl0)
 		caddr_t paddr;
 
 		/* validity check */
-		if (PFKEY_UNUNIT64(xpl0->sadb_x_policy_len) <= sizeof(*xpl0)) {
+		if (PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
 			printf("key_msg2sp: Invalid msg length.\n");
 			key_freesp(newsp);
 			return NULL;
 		}
 
-		tlen = PFKEY_UNUNIT64(xpl0->sadb_x_policy_len) - sizeof(*xpl0);
+		tlen = PFKEY_EXTLEN(xpl0) - sizeof(*xpl0);
 		xisr = (struct sadb_x_ipsecrequest *)(xpl0 + 1);
 
 		while (tlen > 0) {
@@ -979,9 +979,11 @@ key_msg2sp(xpl0)
 			tlen -= xisr->sadb_x_ipsecrequest_len;
 
 			/* sanity check */
-			if (tlen < 0)
-				panic("key_msg2sp: "
-				       "becoming tlen < 0.\n");
+			if (tlen < 0) {
+				printf("key_msg2sp: becoming tlen < 0.\n");
+				key_freesp(newsp);
+				return NULL;
+			}
 
 			xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
 			                 + xisr->sadb_x_ipsecrequest_len);
