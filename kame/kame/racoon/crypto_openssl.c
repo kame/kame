@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.62 2001/08/14 12:26:05 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.63 2001/08/16 06:09:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -386,16 +386,16 @@ eay_get_x509asn1subjectname(cert)
 
    end:
 	if (error) {
-		if (name) {
-			vfree(name);
-			name = NULL;
-		}
-	}
 #ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
 #else
 		printf("%s\n", eay_strerror());
 #endif
+		if (name) {
+			vfree(name);
+			name = NULL;
+		}
+	}
 	if (x509)
 		X509_free(x509);
 
