@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.29 2000/06/07 05:59:38 itojun Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.30 2000/06/12 14:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -430,7 +430,7 @@ search_ifidwithprefix(struct rr_prefix *rpp, struct in6_addr *ifid)
 }
 
 static int
-assigne_ra_entry(struct rr_prefix *rpp, int iilen, struct in6_ifaddr *ia)
+assign_ra_entry(struct rr_prefix *rpp, int iilen, struct in6_ifaddr *ia)
 {
 	int error = 0;
 	struct rp_addr *rap;
@@ -584,7 +584,7 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 		ia->ia6_ifpr = ifpr;
 		return 0;
 	}
-	error = assigne_ra_entry(ifpr2rp(ifpr), iilen, ia);
+	error = assign_ra_entry(ifpr2rp(ifpr), iilen, ia);
 	if (error == 0)
 		ia->ia6_ifpr = ifpr;
 	return (error);
@@ -1186,7 +1186,7 @@ link_stray_ia6s(struct rr_prefix *rpp)
 				    rpp->rp_plen);
 			continue;
 		}
-		if ((error = assigne_ra_entry(rpp,
+		if ((error = assign_ra_entry(rpp,
 					      (sizeof(rap->ra_ifid) << 3) -
 					      rpp->rp_plen,
 					      (struct in6_ifaddr *)ifa)) != 0)
