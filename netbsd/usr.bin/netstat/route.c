@@ -139,9 +139,6 @@ static void p_rtentry __P((struct rtentry *));
 static void ntreestuff __P((void));
 static u_long forgemask __P((u_long));
 static void domask __P((char *, size_t, u_long, u_long));
-#ifdef INET6
-char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-#endif 
 
 /*
  * Print routing tables.
