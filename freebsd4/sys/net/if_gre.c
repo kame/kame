@@ -48,6 +48,7 @@
 
 #include "opt_atalk.h"
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #include "opt_ns.h"
 
 #include <sys/param.h>
@@ -78,6 +79,9 @@
 #include <netinet/ip_encap.h>
 #else
 #error "Huh? if_gre without inet?"
+#endif
+#ifdef INET
+#include <netinet6/in6_var.h>
 #endif
 
 #include <net/bpf.h>
@@ -370,6 +374,11 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 			etype = ETHERTYPE_NS;
 			break;
 #endif
+#ifdef INET6
+		case AF_INET6:
+			etype = ETHERTYPE_IPV6;
+			break;
+#endif
 		default:
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
@@ -404,8 +413,10 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		gh->gi_dst = sc->g_dst;
 		((struct ip*)gh)->ip_hl = (sizeof(struct ip)) >> 2;
 		((struct ip*)gh)->ip_ttl = GRE_TTL;
-		((struct ip*)gh)->ip_tos = ip->ip_tos;
-		((struct ip*)gh)->ip_id = ip->ip_id;
+		if (ip != NULL) {
+			((struct ip*)gh)->ip_tos = ip->ip_tos;
+			((struct ip*)gh)->ip_id = ip->ip_id;
+		}
 		gh->gi_len = m->m_pkthdr.len;
 	}
 
@@ -620,6 +631,9 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		memcpy(&lifr->dstaddr, &si, sizeof(si));
 		break;
 	case SIOCGIFPSRCADDR:
+#ifdef INET6
+	case SIOCGIFPSRCADDR_IN6:
+#endif
 		if (sc->g_src.s_addr == INADDR_ANY) {
 			error = EADDRNOTAVAIL;
 			break;
@@ -631,6 +645,9 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		bcopy(&si, &ifr->ifr_addr, sizeof(ifr->ifr_addr));
 		break;
 	case SIOCGIFPDSTADDR:
+#ifdef INET6
+	case SIOCGIFPDSTADDR_IN6:
+#endif
 		if (sc->g_dst.s_addr == INADDR_ANY) {
 			error = EADDRNOTAVAIL;
 			break;
