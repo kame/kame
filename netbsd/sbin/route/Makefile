@@ -6,6 +6,7 @@ MAN=	route.8
 SRCS=	route.c show.c keywords.c ccitt_addr.c
 
 CPPFLAGS+=-DINET6
+CPPFLAGS+=-I${.CURDIR}/../../sys -I${.CURDIR}/../../include
 
 # The Makefile over in ../../distrib/utils/x_route
 # would like keywords.[ch] to always exist here, so

@@ -377,11 +377,15 @@ main(int argc, char *argv[])
 #ifdef IPSEC_POLICY_IPSEC
 		case 'E':
 			pingflags |= F_POLICY;
-			if (!strncmp("in", optarg, 2))
+			if (!strncmp("in", optarg, 2)) {
 				policy_in = strdup(optarg);
-			else if (!strncmp("out", optarg, 3))
+				if (!policy_in)
+					err(1, "strdup");
+			} else if (!strncmp("out", optarg, 3)) {
 				policy_out = strdup(optarg);
-			else
+				if (!policy_out)
+					err(1, "strdup");
+			} else
 				errx(1, "invalid security policy");
 			break;
 #else
@@ -436,6 +440,7 @@ main(int argc, char *argv[])
 		(void) memcpy(&send_addr, &whereto, sizeof(send_addr));
 
 	loc_addr.sin_family = AF_INET;
+	loc_addr.sin_len = sizeof(struct sockaddr_in);
 	loc_addr.sin_addr.s_addr = htonl((127<<24)+1);
 
 	if (datalen >= PHDR_LEN)	/* can we time them? */
@@ -1773,6 +1778,7 @@ gethost(const char *arg,
 
 	(void)memset(sa, 0, sizeof(*sa));
 	sa->sin_family = AF_INET;
+	sa->sin_len = sizeof(struct sockaddr_in);
 
 	/* If it is an IP address, try to convert it to a name to
 	 * have something nice to display.

@@ -544,11 +544,7 @@ routename(sa, nm, flags)
 		struct sockaddr_in6 sin6;
 		int niflags;
 
-#ifdef NI_WITHSCOPEID
-		niflags = NI_WITHSCOPEID;
-#else
 		niflags = 0;
-#endif
 		if (nflag)
 			niflags |= NI_NUMERICHOST;
 		memset(&sin6, 0, sizeof(sin6));
@@ -702,11 +698,7 @@ netname(sa, nm)
 		struct sockaddr_in6 sin6;
 		int niflags;
 
-#ifdef NI_WITHSCOPEID
-		niflags = NI_WITHSCOPEID;
-#else
 		niflags = 0;
-#endif
 		if (nflag)
 			niflags |= NI_NUMERICHOST;
 		memset(&sin6, 0, sizeof(sin6));
@@ -935,14 +927,8 @@ newroute(argc, argv)
 				break;
 			case K_PREFIXLEN:
 				if (!--argc)
-					usage(1+*argv);
-				if (prefixlen(*++argv) == 128) {
-					forcenet = 0;
-					ishost = 1;
-				} else {
-					forcenet = 1;
-					ishost = 0;
-				}
+					usage((char *)NULL);
+				ishost = prefixlen(*++argv);
 				break;
 			case K_MTU:
 			case K_HOPCOUNT:
@@ -1371,7 +1357,7 @@ prefixlen(s)
 		break;
 #endif
 	}
-	return(len);
+	return(len == max);
 }
 
 #ifndef SMALL
