@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1750 2001/06/28 06:16:43 sakane Exp $
+$KAME: CHANGELOG,v 1.1751 2001/06/28 12:59:33 sakane Exp $
 
 <200106>
+Thu Jun 28 21:56:12 JST 2001 sakane@kame.net
+	* kame/libipsec/pfkey.c:
+	Fixed to calculate the length of the sadb extension in the function
+	pfkey_send_x5().  Calling pfkey_send_spddelete2() and
+	pfkey_send_spdget() had a problem.  reported by <R.P.Koster@kpn.com>
+
 Thu Jun 28 15:12:09 JST 2001 sakane@kame.net
 	* sys/netkey/key.c:
 	the behavior of SPDUPDATE has been changed.  the kernel always add
