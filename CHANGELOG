@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1486 2001/01/20 16:03:26 jinmei Exp $
+$KAME: CHANGELOG,v 1.1487 2001/01/20 16:05:16 jinmei Exp $
 
 <200101>
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/udp_usrreq.c (udp_input):
 	* bsdi4/sys/netinet/tcp_input.c (tcp_input):
-	made a local copy of the ipv6 header and call in6_clearscope()
+	made a local copy of the IPv6 header and called in6_clearscope()
 	(which was newly implemented with this change) to remove
 	(possibly) embedded scope identifier.
 	XXX: this change would reduce efficiency, but is necessary to
