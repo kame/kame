@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.12 2001/07/11 09:16:28 suz Exp $
+#	$KAME: Makefile,v 1.13 2002/04/03 05:32:18 itojun Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -115,6 +115,8 @@ SRCS+= y.tab.h
 .if (${OPSYS} == "NetBSD")
 YFLAGS+=-d
 .endif
+
+CLEANFILES+=	y.tab.h cfparse.h
 
 .if (${OPSYS} != "NetBSD")
 MAN5=	pim6sd.conf.5
