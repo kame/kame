@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.652 2000/03/03 17:01:51 itojun Exp $
+$Id: CHANGELOG,v 1.653 2000/03/05 02:43:16 itojun Exp $
 
 <200003>
+Sun Mar  5 11:41:24 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: correct SA lookup, so that we can always get/use
+	  proper SA even if we use sendto(2).
+	  From: Greg Troxel <gdt@ir.bbn.com>
+
 Sat Mar  4 02:01:16 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.4.
 
