@@ -4,19 +4,19 @@ OPENSSLVER!=	/usr/local/ssl/bin/openssl version
 .else
 OPENSSLVER!=	openssl version
 .endif
-.if defined(OPENSSLVER) && (${OPENSSLVER} == "OpenSSL 0.9.4 09 Aug 1999" || ${OPENSSLVER} == "OpenSSL 0.9.5a 1 Apr 2000")
+.if defined(OPENSSLVER) && ${OPENSSLVER} == "OpenSSL 0.9.5a 1 Apr 2000"
 SUBDIR+=racoon kmpstat
 .else
 SUBDIR=
 all:
-	@echo "===> Please use OpenSSL 0.9.4."
+	@echo "===> Please use OpenSSL 0.9.5a."
 .endif
 .else
 SUBDIR=
 
 all:
 	@echo "===> usr.sbin/racoon is not compiled as you do not have "
-	@echo "     OpenSSL 0.9.4 on the system."
+	@echo "     OpenSSL 0.9.5a on the system."
 .endif
 
 .include <bsd.subdir.mk>
