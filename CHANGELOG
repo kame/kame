@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2147 2002/05/01 13:43:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.2148 2002/05/07 09:36:38 sakane Exp $
 
 <200205>
+Tue May  7 18:37:13 JST 2002 sakane@kame.net
+	* kame/racoon:
+	fixed the behavior when
+	- when the "unique" level policy was used, racoon in the responder side
+	mis-configured the SAs.  <yvan.vanhullebus@netasq.com> reported and
+	donated the patch.
+
 2002-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.h: declared sockaddr in all supported OSes
 	(KAME PR 418).
