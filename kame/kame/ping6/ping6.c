@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.119 2001/01/26 15:45:55 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.120 2001/01/26 18:28:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2018,7 +2018,7 @@ get_pathmtu(mhdr)
 					printf("path MTU for %s is notified. "
 					       "(ignored)\n",
 					   pr_addr((struct sockaddr *)&mtuctl->ip6m_addr,
-					   sizeof(mtuctl->ip6m_addr));
+					   sizeof(mtuctl->ip6m_addr)));
 				}
 				return(0);
 			}
