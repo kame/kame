@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.888 2000/05/17 09:06:45 itojun Exp $
+$Id: CHANGELOG,v 1.889 2000/05/17 10:10:16 sumikawa Exp $
 
 <200005>
+Wed May 17 19:09:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/ports/{squid11, qmail}: upgrade to latest IPv6
+	  patch.
+
 2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scope6config/scope6config.c: added a new syntax
 	"scope6config default" to see the default zones.
