@@ -93,6 +93,7 @@ extern void setrpcent __P((int));
 extern void endrpcent __P((void));
 extern int get_myaddress __P((struct sockaddr_in *));
 extern int bindresvport __P((int, struct sockaddr_in *));
+extern int bindresvport_af __P((int, struct sockaddr *, int));
 extern int registerrpc __P((int, int, int, char *(*) __P((char [UDPMSGSIZE])),
     xdrproc_t, xdrproc_t));
 extern int callrpc __P((char *, int, int, int, xdrproc_t, char *,

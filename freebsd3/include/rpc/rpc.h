@@ -28,7 +28,7 @@
  *
  *	from: @(#)rpc.h 1.9 88/02/08 SMI
  *	from: @(#)rpc.h	2.4 89/07/11 4.0 RPCSRC
- *	$Id: rpc.h,v 1.9 1997/05/28 04:45:12 wpaul Exp $
+ * $FreeBSD: src/include/rpc/rpc.h,v 1.9.2.1 1999/08/29 14:39:07 peter Exp $
  */
 
 /*
@@ -87,6 +87,7 @@ extern void setrpcent __P((int));
 extern void endrpcent __P((void));
 
 extern int bindresvport __P((int, struct sockaddr_in *));
+extern int bindresvport_af __P((int, struct sockaddr *, int));
 extern int get_myaddress __P((struct sockaddr_in *));
 __END_DECLS
 
