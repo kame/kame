@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.301 2002/04/03 13:43:12 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.302 2002/04/12 01:28:24 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -192,6 +192,10 @@ RFC3056: Connection of IPv6 Domains via IPv4 Clouds
 RFC3142: An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
       details.
+RFC3152: Delegation of IP6.ARPA
+    * libinet6 resolvers contained in the KAME snaps support to use
+      the ip6.arpa domain (with the nibble format) for IPv6 reverse
+      lookups.
 draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-15.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
