@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.332 2002/11/11 05:52:37 suz Exp $	*/
+/*	$KAME: in6.c,v 1.333 2002/11/21 01:18:50 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2321,6 +2321,8 @@ in6_addmulti(maddr6, ifp, errorp)
 			*errorp = ENOBUFS;
 			return (NULL);
 		}
+
+		bzero(in6m, sizeof(*in6m));
 		in6m->in6m_sa = *maddr6;
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_refcount = 1;
@@ -2781,6 +2783,8 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		splx(s);
 		return NULL;
 	    }
+
+	    bzero(in6m, sizeof(*in6m));
 	    in6m->in6m_sa = *ap;
 	    in6m->in6m_ifp = ifp;
 	    in6m->in6m_refcount = 1;
@@ -3472,6 +3476,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	    }
 	    *error = if_addmulti(ifp, (struct sockaddr *)ap, &ifma);
 	    if (*error) {
+		free(in6m, M_IPMADDR);
 		splx(s);
 		return NULL;
 	    }
@@ -3479,6 +3484,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 #ifdef MLDV2_DEBUG
 		printf("in6_modmulti: there's a corresponding if_multiaddr although IN6_LOOKUP_MULTI fails \n");
 #endif
+		free(in6m, M_IPMADDR);
 		splx(s);
 		return NULL;
 	    }
@@ -3583,6 +3589,7 @@ in6_joingroup(ifp, addr, errorp)
 		return NULL;
 	}
 
+	bzero(imm, sizeof(*imm));
 #ifdef MLDV2
 	IMO_MSF_ALLOC(imm->i6mm_msf);
 	if (error != 0) {
