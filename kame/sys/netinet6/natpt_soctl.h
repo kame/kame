@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.13 2002/01/29 14:10:23 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.14 2002/02/01 08:54:45 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -62,6 +62,7 @@ struct natpt_msgBox
 	int	flags;
 #define NATPT_FLUSH		0
 #define NATPT_FLUSHALL		1
+#define	NATPT_FLUSHPREFIX	2
 
 #define	NATPT_DEBUG		1
 #define	NATPT_DUMP		2

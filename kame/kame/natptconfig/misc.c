@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.24 2002/01/31 13:42:35 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.25 2002/02/01 08:54:45 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -74,12 +74,17 @@ setPrefix(struct addrinfo *prefix)
 	struct natpt_msgBox	 mBox;
 
 	bzero(&mBox, sizeof(struct natpt_msgBox));
-	mBox.m_in6addr = SIN6(prefix->ai_addr)->sin6_addr;
+	if (prefix == NULL) {
+		mBox.flags = NATPT_FLUSHPREFIX;
+	} else {
+		mBox.m_in6addr = SIN6(prefix->ai_addr)->sin6_addr;
+	}
 
 	if (soctl(sfd, NATPT_SETPREFIX, &mBox) < 0)
 		soctlFailure(fn);
 
-	freeaddrinfo(prefix);
+	if (prefix)
+		freeaddrinfo(prefix);
 }
 
 

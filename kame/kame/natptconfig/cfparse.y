@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.24 2002/02/01 07:15:30 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.25 2002/02/01 08:54:45 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -228,6 +228,8 @@ prefix
 		    { printHelp(SPREFIX, NULL); }
 		| SPREFIX ipv6addr
 		    { setPrefix($2); }
+		| SPREFIX SFLUSH
+		    { setPrefix(NULL); }
 		;
 
 

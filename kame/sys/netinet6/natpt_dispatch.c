@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.41 2002/01/13 12:33:21 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.42 2002/02/01 08:54:45 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -495,8 +495,15 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 int
 natpt_setPrefix(caddr_t addr)
 {
-	natpt_prefix = ((struct natpt_msgBox *)addr)->m_in6addr;
-	natpt_logIN6addr(LOG_INFO, "NATPT prefix: ", &natpt_prefix);
+	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
+
+	if (mbox->flags == NATPT_FLUSHPREFIX) {
+		bzero(&natpt_prefix, sizeof(struct in6_addr));
+		natpt_logMsg(LOG_INFO, "flushed natpt prefix");
+	} else {
+		natpt_prefix = ((struct natpt_msgBox *)addr)->m_in6addr;
+		natpt_logIN6addr(LOG_INFO, "NATPT prefix: ", &natpt_prefix);
+	}
 
 	return (0);
 }
