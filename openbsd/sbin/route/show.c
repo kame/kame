@@ -1,4 +1,4 @@
-/*	$OpenBSD: show.c,v 1.22 2003/03/13 09:09:27 deraadt Exp $	*/
+/*	$OpenBSD: show.c,v 1.26 2003/08/26 08:33:12 itojun Exp $	*/
 /*	$NetBSD: show.c,v 1.1 1996/11/15 18:01:41 gwr Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: show.c,v 1.22 2003/03/13 09:09:27 deraadt Exp $";
+static char *rcsid = "$OpenBSD: show.c,v 1.26 2003/08/26 08:33:12 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -80,7 +76,7 @@ extern int nflag;
  * Definitions for showing gateway flags.
  */
 struct bits {
-	short	b_mask;
+	int	b_mask;
 	char	b_val;
 };
 static const struct bits bits[] = {
@@ -99,6 +95,8 @@ static const struct bits bits[] = {
 	{ RTF_STATIC,	'S' },
 	{ RTF_PROTO1,	'1' },
 	{ RTF_PROTO2,	'2' },
+	{ RTF_PROTO3,	'3' },
+	{ RTF_CLONED,	'c' },
 	{ 0 }
 };
 
@@ -110,14 +108,13 @@ static void pr_family(int);
 
 int	keyword(char *);
 void	usage(char *);
+void	show(int argc, char *argv[]);
 
 /*
  * Print routing tables.
  */
 void
-show(argc, argv)
-	int argc;
-	char **argv;
+show(int argc, char *argv[])
 {
 	struct rt_msghdr *rtm;
 	char *buf = NULL, *next, *lim = NULL;

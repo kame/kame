@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.56 2003/03/13 09:09:27 deraadt Exp $	*/
+/*	$OpenBSD: route.c,v 1.60 2003/08/26 08:33:12 itojun Exp $	*/
 /*	$NetBSD: route.c,v 1.16 1996/04/15 18:27:05 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,7 +40,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)route.c	8.3 (Berkeley) 3/19/94";
 #else
-static const char rcsid[] = "$OpenBSD: route.c,v 1.56 2003/03/13 09:09:27 deraadt Exp $";
+static const char rcsid[] = "$OpenBSD: route.c,v 1.60 2003/08/26 08:33:12 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -92,7 +88,7 @@ union	sockunion {
 typedef union sockunion *sup;
 pid_t	pid;
 int	rtm_addrs, s;
-int	forcehost, forcenet, doflush, nflag, af, qflag, tflag, keyword();
+int	forcehost, forcenet, doflush, nflag, af, qflag, tflag, keyword(char *);
 int	iflag, verbose, aflen = sizeof (struct sockaddr_in);
 int	locking, lockrest, debugonly;
 struct	rt_metrics rt_metrics;
@@ -119,6 +115,14 @@ static int inet6_makenetandmask(struct sockaddr_in6 *);
 int	 getaddr(int, char *, struct hostent **);
 int	 rtmsg(int, int);
 int	 x25_makemask(void);
+__dead void usage(char *cp);
+void	quit(char *s);
+char	*any_ntoa(const struct sockaddr *sa);
+void	set_metric(char *value, int key);
+void	inet_makenetandmask(u_int32_t net, struct sockaddr_in *sin, int bits);
+char	*ns_print(struct sockaddr_ns *sns);
+char	*ipx_print(struct sockaddr_ipx *sipx);
+void	interfaces(void);
 
 extern void show(int, char **);	/* XXX - from show.c */
 
@@ -365,8 +369,6 @@ routename(struct sockaddr *sa)
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN];
 	static int first = 1;
-	char *ns_print();
-	char *ipx_print();
 #ifdef INET6
 	static char ntop_buf[NI_MAXHOST];	/*for inet_ntop()*/
 #endif
@@ -472,8 +474,8 @@ netname(struct sockaddr *sa)
 	static char line[MAXHOSTNAMELEN];
 	struct netent *np = 0;
 	in_addr_t net, mask, subnetshift;
-	char *ns_print();
-	char *ipx_print();
+	char *ns_print(struct sockaddr_ns *);
+	char *ipx_print(struct sockaddr_ipx *);
 #ifdef INET6
 	static char ntop_buf[NI_MAXHOST];	/*for inet_ntop()*/
 #endif
@@ -915,10 +917,7 @@ int
 getaddr(int which, char *s, struct hostent **hpp)
 {
 	sup su = NULL;
-	struct ns_addr ns_addr();
-	struct ipx_addr ipx_addr();
-	struct iso_addr *iso_addr();
-	struct ccitt_addr *ccitt_addr();
+	struct ccitt_addr *ccitt_addr(char *, struct sockaddr_x25 *);
 	struct hostent *hp;
 	struct netent *np;
 	u_long val;
@@ -1466,7 +1465,7 @@ char *msgtypes[] = {
 char metricnames[] =
 "\011pksent\010rttvar\7rtt\6ssthresh\5sendpipe\4recvpipe\3expire\2hopcount\1mtu";
 char routeflags[] =
-"\1UP\2GATEWAY\3HOST\4REJECT\5DYNAMIC\6MODIFIED\7DONE\010MASK_PRESENT\011CLONING\012XRESOLVE\013LLINFO\014STATIC\017PROTO2\020PROTO1";
+"\1UP\2GATEWAY\3HOST\4REJECT\5DYNAMIC\6MODIFIED\7DONE\010MASK_PRESENT\011CLONING\012XRESOLVE\013LLINFO\014STATIC\017PROTO2\020PROTO1\040CLONED";
 char ifnetflags[] =
 "\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5PTP\6NOTRAILERS\7RUNNING\010NOARP\011PPROMISC\012ALLMULTI\013OACTIVE\014SIMPLEX\015LINK0\016LINK1\017LINK2\020MULTICAST";
 char addrnames[] =
