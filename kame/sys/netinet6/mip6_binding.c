@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.55 2001/12/28 06:18:55 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.56 2001/12/28 07:30:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -546,17 +546,25 @@ mip6_bu_timeout(arg)
 
 			/* check expiration */
 			if (mbu->mbu_remain < 0) {
-				error = mip6_bu_list_remove(&sc->hif_bu_list,
-							    mbu);
-				if (error) {
-					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "can't remove a binding "
-						 "update entry (0x%p)\n",
-						 __FILE__, __LINE__, mbu));
-					/* continue anyway... */
+				if ((mbu->mbu_flags & IP6_BUF_HOME) != 0) {
+					/*
+					 * the binding update entry for
+					 * the home registration
+					 * should not be removed.
+					 */
+					mip6_home_registration(mbu->mbu_hif);
+				} else {
+					error = mip6_bu_list_remove(
+						&sc->hif_bu_list, mbu);
+					if (error) {
+						mip6log((LOG_ERR,
+							 "%s:%d: can't remove a binding update entry (0x%p)\n",
+							 __FILE__, __LINE__,
+							 mbu));
+						/* continue anyway... */
+					}
+					continue;
 				}
-				continue;
 			}
 
 			/* check if the peer supports BU */
