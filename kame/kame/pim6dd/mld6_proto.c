@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.8 2001/04/17 18:18:09 jinmei Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.9 2001/04/17 18:33:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -108,23 +108,11 @@ void
 query_groups(v)
 	register struct uvif *v;
 {
-	register struct listaddr *g;
-    
 	v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 	if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0)
 		send_mld6(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 			  NULL, (struct in6_addr *)&in6addr_any,
 			  v->uv_ifindex, MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);
-
-	/*
-	 * Decrement the old-hosts-present timer for each
-	 * active group on that vif.
-	 */
-	for (g = v->uv_groups; g != NULL; g = g->al_next)
-		if (g->al_old > TIMER_INTERVAL)
-			g->al_old -= TIMER_INTERVAL;
-		else
-			g->al_old = 0;
 }
 
 
@@ -301,7 +289,6 @@ accept_listener_report(src, dst, group)
 			log(LOG_ERR, 0, "ran out of memory");    /* fatal */
 
 		g->al_addr   = group_sa;
-		g->al_old = 0;
 
 		/** set a timer for expiration **/
 		g->al_query     = 0;
@@ -356,16 +343,9 @@ accept_listener_done(src, dst, group)
 		if (inet6_equal(&group_sa, &g->al_addr)) {
 			IF_DEBUG(DEBUG_MLD)
 				log(LOG_DEBUG, 0,
-				    "[accept_done_message] %d %ld\n",
-				    g->al_old, g->al_query);
+				    "[accept_done_message] %ld\n",
+				    g->al_query);
 
-			/*
-			 * Ignore the done message if there are old
-			 * hosts present
-			 */
-			if (g->al_old)
-				return;
-	    
 			/*
 			 * still waiting for a reply to a query,
 			 * ignore the done

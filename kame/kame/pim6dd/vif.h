@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.4 2001/02/21 03:49:56 itojun Exp $	*/
+/*	$KAME: vif.h,v 1.5 2001/04/17 18:33:37 jinmei Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -254,7 +254,6 @@ struct listaddr {
     } al_alu;
     u_char	     al_pv;		/* router protocol version	    */
     u_char	     al_mv;		/* router mrouted version	    */
-    u_char	     al_old; /* time since heard old report: unnecessary for mld */
     u_char	     al_index;		/* neighbor index		    */
     u_long	     al_timerid;        /* timer for group membership	    */
     u_long	     al_query;		/* timer for repeated leave query   */
