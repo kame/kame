@@ -1,4 +1,4 @@
-.\"	$KAME: rrenumd.conf.5,v 1.6 2001/02/06 02:10:29 itojun Exp $
+.\"	$KAME: rrenumd.conf.5,v 1.7 2001/02/06 02:13:47 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -102,13 +102,27 @@ specifies how many router renumbering messages are sent repeatedly.
 .El
 .It Op Ic add|change|setglobal
 .Cm match-prefix Ar match-prefix-val
+.Bk -words
 .Op /match-prefix-len
+.Ek
+.Bk -words
 .Op Cm maxlen Ar maxlen-val
+.Ek
+.Bk -words
 .Op Cm minlen Ar minlen-val
+.Ek
+.Bk -words
 .Op Cm use-prefix Ar use-prefix-val
+.Ek
+.Bk -words
 .Op /use-prefix-len
+.Ek
+.Bk -words
 .Op Cm keeplen Ar keeplen-val
+.Ek
+.Bk -words
 .Op Ar use-prefix-values ;
+.Ek
 .Pp
 Specifies contents of sending router renumbering message with seqnum 0.
 If
@@ -121,11 +135,21 @@ has following syntax.
 .Pp
 {
 .Op Cm vltime Ar vltime-val
+.Bk -words
 .Op Cm pltime Ar pltime-val
+.Ek
+.Bk -words
 .Op Cm raf_onlink Cm on|off
+.Ek
+.Bk -words
 .Op Cm raf_auto Cm on|off
+.Ek
+.Bk -words
 .Op Cm rrf_decrprefd Cm on|off
+.Ek
+.Bk -words
 .Op Cm rrf_decrvalid Cm on|off
+.Ek
 }
 .Pp
 Each value has following meaning.
