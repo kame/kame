@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.135 2000/11/18 07:41:14 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.136 2000/11/21 12:29:32 kawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,7 +133,7 @@
 #include <netinet6/mip6.h>
 #endif
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/ip6_fw.h>
 #endif
 
@@ -207,10 +207,13 @@ int ip6_ours_check_algorithm;
 #endif
 
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 /* firewall hooks */
 ip6_fw_chk_t *ip6_fw_chk_ptr;
 ip6_fw_ctl_t *ip6_fw_ctl_ptr;
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+int ip6_fw_enable = 1;
 #endif
 
 struct ip6stat ip6stat;
@@ -295,8 +298,11 @@ ip6_init()
 #endif
 	nd6_init();
 	frag6_init();
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#else
 #ifdef IPV6FIREWALL
 	ip6_fw_init();
+#endif
 #endif
 #ifndef __OpenBSD__
 	/*
@@ -473,11 +479,15 @@ ip6_input(m)
 
 	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*
 	 * Check with the firewall...
 	 */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	if (ip6_fw_enable && ip6_fw_chk_ptr) {
+#else
 	if (ip6_fw_chk_ptr) {
+#endif
 		u_short port = 0;
 		/* If ipfw says divert, we have to just drop packet */
 		/* use port as a dummy argument */
@@ -2475,7 +2485,11 @@ extern int ip6_forward_cache_miss;
 #define IPV6CTL_OURSALG IPV6CTL_DEFMTU
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+sysctl_ip6_oursalg(SYSCTL_HANDLER_ARGS)
+#else
 sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
+#endif
 {
 	int error = 0;
 	int oldalg;
