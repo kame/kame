@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.20 2001/05/05 11:19:04 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.21 2001/06/07 13:22:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -325,7 +325,7 @@ natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
 #endif	/* if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)	*/
 
     cv.ats = lookingForIncomingV4Hash(&cv);
-    if ((ats = checkTracerouteReturn(&cv)) != NULL)
+    if ((ats = checkIncomingICMP(&cv)) != NULL)
 	cv.ats = ats;
 
     if (cv.ats == NULL)

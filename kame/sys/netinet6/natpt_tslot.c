@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.18 2001/05/28 16:12:08 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.19 2001/06/07 13:22:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -546,12 +546,12 @@ openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 
 
 struct _tSlot *
-checkTracerouteReturn(struct _cv *cv4)
+checkIncomingICMP(struct _cv *cv4)
 {
     int			 hv;
     Cell		*p;
     struct ip		*icmpip4;
-    struct udphdr	*icmpudp4;
+    struct udphdr	*icmpudp4 = NULL;
     struct sockaddr_in	 src, dst;
     struct _tSlot	*ats;
 
@@ -560,31 +560,35 @@ checkTracerouteReturn(struct _cv *cv4)
 	    && (cv4->_payload._icmp4->icmp_type != ICMP_TIMXCEED)))
 	return (NULL);
 
-    icmpip4 = &cv4->_payload._icmp4->icmp_ip;
-    if (icmpip4->ip_p != IPPROTO_UDP)
-	return (NULL);
-
-    icmpudp4 = (struct udphdr *)((caddr_t)icmpip4 + (icmpip4->ip_hl << 2));
-
     bzero(&src, sizeof(struct sockaddr_in));
     bzero(&dst, sizeof(struct sockaddr_in));
+    icmpip4 = &cv4->_payload._icmp4->icmp_ip;
     src.sin_addr = icmpip4->ip_src;
-    src.sin_port = icmpudp4->uh_sport;
     dst.sin_addr = icmpip4->ip_dst;
-    dst.sin_port = icmpudp4->uh_dport;
+
+    if ((icmpip4->ip_p == IPPROTO_UDP)
+	|| (icmpip4->ip_p == IPPROTO_TCP))
+    {
+	icmpudp4 = (struct udphdr *)((caddr_t)icmpip4 + (icmpip4->ip_hl << 2));
+
+	src.sin_port = icmpudp4->uh_sport;
+	dst.sin_port = icmpudp4->uh_dport;
+    }
+
     hv = ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % NATPT_MAXHASH);
     for (p = _outsideHash[hv]; p; p = CDR(p))
     {
 	ats = (struct _tSlot *)CAR(p);
 
 	if (ats->remote.ip_p != IPPROTO_IPV4)				continue;
-	if (ats->ip_payload  != IPPROTO_UDP)				continue;
-
 	if (icmpip4->ip_src.s_addr != ats->remote.in4src.s_addr)	continue;
 	if (icmpip4->ip_dst.s_addr != ats->remote.in4dst.s_addr)	continue;
 
-	if (icmpudp4->uh_sport != ats->remote._sport)			continue;
-	if (icmpudp4->uh_dport != ats->remote._dport)			continue;
+	if (icmpudp4)
+	{
+	    if (icmpudp4->uh_sport != ats->remote._sport)		continue;
+	    if (icmpudp4->uh_dport != ats->remote._dport)		continue;
+	}
 
 	cv4->flags |= NATPT_TRACEROUTE;
 	return (ats);
