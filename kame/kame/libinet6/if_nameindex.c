@@ -1,4 +1,4 @@
-/*	$KAME: if_nameindex.c,v 1.7 2000/11/24 08:17:20 itojun Exp $	*/
+/*	$KAME: if_nameindex.c,v 1.8 2000/11/24 08:20:01 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -43,8 +43,8 @@
  *    header.
  *
  *       struct if_nameindex {
- *         unsigned int   if_index;  /* 1, 2, ... */
- *         char          *if_name;   /* null terminated name: "le0", ... */
+ *         unsigned int   if_index;
+ *         char          *if_name;
  *       };
  *
  *    The final function returns an array of if_nameindex structures, one
