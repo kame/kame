@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.169 2001/02/05 14:33:40 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.170 2001/02/06 02:31:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1107,11 +1107,11 @@ in6_update_ifa(ifp, ifra, ia)
 	}
 
 	/*
-	 * If a new destination address is on a p2p link, scrub the
-	 * old one and install the new destination.
+	 * If a new destination address is specified, scrub the old one and
+	 * install the new destination.  Note that the interface must be
+	 * p2p or loopback (see the check above.) 
 	 */
-	if ((ifp->if_flags & IFF_POINTOPOINT) &&
-	    (dst6.sin6_family == AF_INET6) &&
+	if (dst6.sin6_family == AF_INET6 &&
 	    !IN6_ARE_ADDR_EQUAL(&dst6.sin6_addr,
 				&ia->ia_dstaddr.sin6_addr)) {
 		int e;
@@ -1263,10 +1263,11 @@ in6_purgeaddr(ifa)
 	/* stop DAD processing */
 	nd6_dad_stop(ifa);
 
-	/* delete route to the other end (i.e. destination) on a p2p link. */
-	if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
-	    (ia->ia_flags & IFA_ROUTE) != 0 &&
-	    ia->ia_dstaddr.sin6_len != 0) {
+	/*
+	 * delete route to the destination of the address being purged.
+	 * The interface must be p2p or loopback in this case.
+	 */
+	if ((ia->ia_flags & IFA_ROUTE) != 0 && ia->ia_dstaddr.sin6_len != 0) {
 		int e;
 
 		if ((e = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST))
