@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.64 2002/03/28 09:30:09 jinmei Exp $
+	$KAME: PORTABILITY,v 1.65 2002/05/29 15:02:03 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -366,3 +366,8 @@ across those possibilities.
 
 - daemon(3) with noclose arg = 0: must be used prior to socket/file descriptor
   initialization.  otherwise daemon(3) can mess with opened file descriptors.
+
+- mandoc(7) rule is different in every *BSD.
+	NetBSD - for commands, use EXIT STATUS rather than RETURN VALUES.
+		no CAVEATS section.  has SECURITY CONSIDERATIONS section.
+	OpenBSD - has CAVEATS section.
