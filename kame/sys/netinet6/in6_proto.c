@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.118 2002/05/26 23:07:53 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.119 2002/05/27 21:40:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -581,8 +581,10 @@ int	ip6_defmcasthlim = IPV6_DEFAULT_MULTICAST_HOPS;
 int	ip6_accept_rtadv = 0;	/* "IPV6FORWARDING ? 0 : 1" is dangerous */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 int	ip6_maxfragpackets;	/* initialized in frag6.c:frag6_init() */
+int	ip6_maxfrags;	/* initialized in frag6.c:frag6_init() */
 #else
 int	ip6_maxfragpackets = 200;
+int	ip6_maxfrags = 200;
 #endif
 int	ip6_log_interval = 5;
 int	ip6_hdrnestlimit = 50;	/* appropriate? */
@@ -872,6 +874,8 @@ SYSCTL_OID(_net_inet6_ip6, IPV6CTL_PMTU_EXPIRE, pmtu_expire,
 	   CTLTYPE_INT|CTLFLAG_RW, &pmtu_expire, 0,
 	   sysctl_ip6_pmtu_expire, "I", "");
 #endif
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAXFRAGS,
+	maxfrags, CTLFLAG_RW,		&ip6_maxfrags,	0, "");
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

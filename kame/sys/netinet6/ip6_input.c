@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.276 2002/05/27 11:37:41 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.277 2002/05/27 21:40:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2310,6 +2310,8 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_USE_DEFAULTZONE:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip6_use_defzone);
+	case IPV6CTL_MAXFRAGS:
+		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_maxfrags);
 	default:
 		return EOPNOTSUPP;
 	}

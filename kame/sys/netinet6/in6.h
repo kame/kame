@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.125 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: in6.h,v 1.126 2002/05/27 21:40:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -680,10 +680,11 @@ struct ip6_mtuinfo {
 #define IPV6CTL_ADDRCTLPOLICY	38	/* get/set address selection policy */
 #define IPV6CTL_USE_DEFAULTZONE	39	/* use default scope zone */
 #define IPV6CTL_PMTU_EXPIRE	40	/* path MTU expiration timer */
+#define IPV6CTL_MAXFRAGS	41	/* max fragments */
 
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
-#define IPV6CTL_MAXID		41
+#define IPV6CTL_MAXID		42
 
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
@@ -797,6 +798,7 @@ struct ip6_mtuinfo {
 	{ "prefer_tempaddr", CTLTYPE_INT }, \
 	{ 0, 0 }, \
 	{ "use_defaultzone", CTLTYPE_INT }, \
+	{ "maxfrags", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -841,6 +843,7 @@ struct ip6_mtuinfo {
 	&ip6_prefer_tempaddr, \
 	0, \
 	&ip6_use_defzone,\
+	&ip6_maxfrags,\
 }
 #endif
 #endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
