@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.119 2003/06/26 09:59:45 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.120 2003/06/26 10:01:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,7 @@
 #endif
 #endif
 #ifdef __NetBSD__
+#include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
 #if defined(__OpenBSD__) || defined(__NetBSD__)
