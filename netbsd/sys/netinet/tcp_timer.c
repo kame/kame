@@ -361,6 +361,16 @@ tcp_timer_rexmt(void *arg)
 	 */
 	if (tp->t_state == TCPS_SYN_SENT)
 		tp->t_flags |= TF_SYN_REXMT;
+#ifdef TCP_ECN
+	/*
+	 * if ECN is enabled, there might be a broken firewall which
+	 * blocks ecn packets.  fall back to non-ecn.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT ||
+	    tp->t_state == TCPS_SYN_RECEIVED) &&
+	    tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+		tp->t_flags |= TF_DISABLE_ECN;
+#endif
 	/*
 	 * Close the congestion window down to one segment
 	 * (we'll open it by one segment for each ack we get).
@@ -393,6 +403,13 @@ tcp_timer_rexmt(void *arg)
 	tp->snd_cwnd = tp->t_segsz;
 	tp->snd_ssthresh = win * tp->t_segsz;
 	tp->t_dupacks = 0;
+#ifdef TCP_ECN
+	tp->snd_recover = tp->snd_max;
+	tp->t_flags |= TF_SEND_CWR;
+#endif
+#if 1 /* TCP_ECN */
+	tcpstat.tcps_cwr_timeout++;
+#endif
 	}
 	(void) tcp_output(tp);
 
