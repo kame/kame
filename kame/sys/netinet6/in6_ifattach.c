@@ -71,7 +71,7 @@ unsigned long in6_maxmtu = 0;
 
 int found_first_ifid = 0;
 #define IFID_LEN 8
-static char first_ifid[IFID_LEN];
+static u_int8_t first_ifid[IFID_LEN];
 
 static int laddr_to_eui64 __P((u_int8_t *, u_int8_t *, size_t));
 static int gen_rand_eui64 __P((u_int8_t *));
@@ -222,10 +222,10 @@ found:
 		printf("%s: supplying EUI64: "
 			"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
 			if_name(ifp),
-			first_ifid[0] & 0xff, first_ifid[1] & 0xff,
-			first_ifid[2] & 0xff, first_ifid[3] & 0xff,
-			first_ifid[4] & 0xff, first_ifid[5] & 0xff,
-			first_ifid[6] & 0xff, first_ifid[7] & 0xff);
+			first_ifid[0], first_ifid[1],
+			first_ifid[2], first_ifid[3],
+			first_ifid[4], first_ifid[5],
+			first_ifid[6], first_ifid[7]);
 
 		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
 		first_ifid[0] ^= 0x02;
@@ -271,10 +271,10 @@ in6_ifattach(ifp, type, laddr, noloop)
 			printf("%s: using random value as EUI64: "
 				"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
 				if_name(ifp),
-				first_ifid[0] & 0xff, first_ifid[1] & 0xff,
-				first_ifid[2] & 0xff, first_ifid[3] & 0xff,
-				first_ifid[4] & 0xff, first_ifid[5] & 0xff,
-				first_ifid[6] & 0xff, first_ifid[7] & 0xff);
+				first_ifid[0], first_ifid[1],
+				first_ifid[2], first_ifid[3],
+				first_ifid[4], first_ifid[5],
+				first_ifid[6], first_ifid[7]);
 			/*
 			 * invert u bit to convert EUI64 to RFC2373 interface
 			 * ID.
