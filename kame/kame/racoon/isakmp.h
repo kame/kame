@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.4 2000/01/02 12:54:01 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.5 2000/01/02 13:08:53 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -114,7 +114,6 @@ struct isakmp {
 
 #define ISAKMP_MAJOR_VERSION  1
 #define ISAKMP_MINOR_VERSION  0
-/* ISAKMP_MAJOR_VERSION << 4 | ISAKMP_MINOR_VERSION */
 #define ISAKMP_VERSION_NUMBER  0x10
 
 /* Exchange Type */
