@@ -32,4 +32,3 @@ pseudo-device	ist	1	# ISATAP interface
 
 # Datagram Congestion Control Protocol
 option		DCCP
-#option		DCCP_TFRC

@@ -347,4 +347,3 @@ device		ist	1	# ISATAP
 
 # Datagram Congestion Control Protocol
 #options 	DCCP
-#options	DCCP_TFRC
