@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.150 2004/02/10 07:12:57 keiichi Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.151 2004/02/11 10:30:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,11 +183,11 @@ rip6_input(mp, offp, proto)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
-	struct sockaddr_in6 fromsa;
+	struct sockaddr_in6 rip6src;
 
 	rip6stat.rip6s_ipackets++;
 
-	if (in6_recoverscope(&fromsa, &ip6->ip6_src, m->m_pkthdr.rcvif)) {
+	if (in6_recoverscope(&rip6src, &ip6->ip6_src, m->m_pkthdr.rcvif)) {
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -256,7 +256,7 @@ rip6_input(mp, offp, proto)
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
-				    (struct sockaddr *)&fromsa, n, opts) == 0) {
+				    (struct sockaddr *)&rip6src, n, opts) == 0) {
 					m_freem(n);
 					if (opts)
 						m_freem(opts);
@@ -285,7 +285,7 @@ rip6_input(mp, offp, proto)
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-		    (struct sockaddr *)&fromsa, m, opts) == 0) {
+		    (struct sockaddr *)&rip6src, m, opts) == 0) {
 			m_freem(m);
 			if (opts)
 				m_freem(opts);
