@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.16 2003/06/06 06:35:25 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.17 2003/06/06 06:36:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -211,8 +211,8 @@ inet6_rthdr_segments(cmsg)
 
 struct in6_addr *
 inet6_rthdr_getaddr(cmsg, idx)
-    struct cmsghdr *cmsg;
-    int idx;
+	struct cmsghdr *cmsg;
+	int idx;
 {
 	struct ip6_rthdr *rthdr;
 
