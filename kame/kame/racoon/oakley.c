@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.14 2000/02/10 03:15:50 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.15 2000/02/16 03:45:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1105,6 +1105,9 @@ oakley_validate_auth(iph1)
 					lcconf->pathinfo[LC_PATHTYPE_CERT],
 					s_ipsecdoi_ident(iph1->rmconf->identtype),
 					idstr, CERTFILE);
+				YIPSDEBUG(DEBUG_CERT,
+					plog(logp, LOCATION, NULL,
+						"filename: %s", path));
 				cert = eay_get_x509cert(path);
 				break;
 			default:
@@ -1233,7 +1236,7 @@ oakley_getmycert(iph1)
 		return -1;
 	}
 	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get idstr:"));
-	YIPSDEBUG(DEBUG_DCERT, hexdump(idstr, strlen(idstr)));
+	YIPSDEBUG(DEBUG_CERT, hexdump(idstr, strlen(idstr)));
 
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
@@ -1242,6 +1245,8 @@ oakley_getmycert(iph1)
 			lcconf->pathinfo[LC_PATHTYPE_CERT],
 			s_ipsecdoi_ident(iph1->rmconf->identtype),
 			idstr, CERTFILE);
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "filename: %s", path));
 		cert = eay_get_x509cert(path);
 		break;
 	default:
@@ -1291,7 +1296,7 @@ oakley_getsign(iph1)
 		return -1;
 	}
 	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get idstr:"));
-	YIPSDEBUG(DEBUG_DCERT, hexdump(idstr, strlen(idstr)));
+	YIPSDEBUG(DEBUG_CERT, hexdump(idstr, strlen(idstr)));
 
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
@@ -1300,6 +1305,8 @@ oakley_getsign(iph1)
 			lcconf->pathinfo[LC_PATHTYPE_CERT],
 			s_ipsecdoi_ident(iph1->rmconf->identtype),
 			idstr, PRIVKEYFILE);
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "filename: %s", path));
 		privkey = eay_get_asn1privkey(path);
 		if (privkey == NULL) {
 			plog(logp, LOCATION, NULL,
@@ -1359,6 +1366,54 @@ oakley_getidstr(id, len)
 	return idstr;
 }
 #endif
+
+int
+oakley_savecert(iph1, gen)
+	struct ph1handle *iph1;
+	struct isakmp_gen *gen;
+{
+	u_int8_t type = *(u_int8_t *)(gen + 1) & 0xff;
+	int len = ntohs(gen->len) - sizeof(*gen) - 1;
+	caddr_t data = (caddr_t)(gen + 1) + 1;
+
+	switch (type) {
+	case ISAKMP_CERT_PKCS7:
+	case ISAKMP_CERT_PGP:
+	case ISAKMP_CERT_DNS:
+	case ISAKMP_CERT_X509SIGN:
+	case ISAKMP_CERT_KERBEROS:
+	case ISAKMP_CERT_SPKI:
+		iph1->cert_p = vmalloc(len);
+		if (iph1->cert_p == NULL) {
+			plog(logp, LOCATION, NULL,
+				"Failed to copy certificate from packet.\n");
+			return -1;
+		}
+		memcpy(iph1->cert_p->v, data, len);
+		break;
+	case ISAKMP_CERT_CRL:
+		iph1->crl_p = vmalloc(len);
+		if (iph1->crl_p == NULL) {
+			plog(logp, LOCATION, NULL,
+				"Failed to copy CRL from packet.\n");
+			return -1;
+		}
+		memcpy(iph1->crl_p->v, data, len);
+		break;
+	case ISAKMP_CERT_X509KE:
+	case ISAKMP_CERT_X509ATTR:
+	case ISAKMP_CERT_ARL:
+		plog(logp, LOCATION, NULL,
+			"No supported CERT type %d\n", type);
+		return -1;
+	default:
+		plog(logp, LOCATION, NULL,
+			"Invalid CERT type %d\n", type);
+		return -1;
+	}
+
+	return 0;
+}
 
 /*
  * compute SKEYID

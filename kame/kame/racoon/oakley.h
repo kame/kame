@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.7 2000/02/09 05:18:09 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.8 2000/02/16 03:45:34 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -161,6 +161,9 @@ extern int oakley_validate_auth __P((struct ph1handle *iph1));
 extern int oakley_getmycert __P((struct ph1handle *iph1));
 extern int oakley_getsign __P((struct ph1handle *iph1));
 #endif
+struct isakmp_gen;
+extern int oakley_savecert __P((struct ph1handle *, struct isakmp_gen *));
+
 extern int oakley_skeyid __P((struct ph1handle *iph1));
 extern int oakley_skeyid_dae __P((struct ph1handle *iph1));
 

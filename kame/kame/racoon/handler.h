@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.11 2000/02/09 05:18:07 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.12 2000/02/16 03:45:33 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -140,6 +140,7 @@ struct ph1handle {
 	vchar_t *sig_p;			/* peer's SIG minus general header */
 	vchar_t *cert;			/* CERT minus general header */
 	vchar_t *cert_p;		/* peer's CERT minus general header */
+	vchar_t *crl_p;			/* peer's CRL minus general header */
 	vchar_t *id;			/* ID minus gen header */
 	vchar_t *id_p;			/* partner's ID minus general header */
 					/* i.e. strut ipsecdoi_id_b*. */

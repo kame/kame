@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.18 2000/02/09 05:18:09 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.19 2000/02/16 03:45:34 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -522,7 +522,7 @@ ident_i4recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CERT:
-			if (isakmp_p2ph(&iph1->cert_p, pa->ptr) < 0)
+			if (oakley_savecert(iph1, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_SIG:
@@ -1029,7 +1029,7 @@ ident_r3recv(iph1, msg0)
 				"peer transmitted Certificate Request.\n");
 			break;
 		case ISAKMP_NPTYPE_CERT:
-			if (isakmp_p2ph(&iph1->cert_p, pa->ptr) < 0)
+			if (oakley_savecert(iph1, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_SIG:

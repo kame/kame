@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.12 2000/02/09 05:18:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.13 2000/02/16 03:45:34 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -210,10 +210,10 @@ struct isakmp_pl_id {
 /* 3.9 Certificate Payload */
 struct isakmp_pl_cert {
 	struct isakmp_gen h;
-#if 0
-	u_int8_t encode;	/* Cert Encoding */
-#endif
-	/* cert data follows immediately without padding */
+	/*
+	 * Encoding type of 1 octet follows immediately,
+	 * variable length CERT data follows encoding type.
+	 */
 };
 
 /* Certificate Type */
