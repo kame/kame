@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.28 2001/08/12 11:50:05 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.29 2001/08/16 14:25:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -684,7 +684,7 @@ void
 kdebug_sockaddr(addr)
 	struct sockaddr *addr;
 {
-	struct sockaddr_in *sin;
+	struct sockaddr_in *sin4;
 #ifdef INET6
 	struct sockaddr_in6 *sin6;
 #endif
@@ -698,9 +698,9 @@ kdebug_sockaddr(addr)
 
 	switch (addr->sa_family) {
 	case AF_INET:
-		sin = (struct sockaddr_in *)addr;
-		printf(" port=%u\n", ntohs(sin->sin_port));
-		ipsec_hexdump((caddr_t)&sin->sin_addr, sizeof(sin->sin_addr));
+		sin4 = (struct sockaddr_in *)addr;
+		printf(" port=%u\n", ntohs(sin4->sin_port));
+		ipsec_hexdump((caddr_t)&sin4->sin_addr, sizeof(sin4->sin_addr));
 		break;
 #ifdef INET6
 	case AF_INET6:
