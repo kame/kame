@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.8 2002/05/08 15:53:18 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.9 2002/05/09 01:54:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -81,25 +81,24 @@ struct dhcp6_ifconf {
 struct prefix_ifconf {
 	struct prefix_ifconf *next;
 
-	char *ifname;
-
-	int sla_len;
-	u_int32_t sla_id;  /* need more than 32bits? */
-	int ifid_len;
+	char *ifname;		/* interface name such as ne0 */
+	int sla_len;		/* SLA ID length in bits */
+	u_int32_t sla_id;	/* need more than 32bits? */
+	int ifid_len;		/* interface ID length in bits */
 	int ifid_type;		/* EUI-64 and manual (unused?) */
-	char ifid[16];		/* up to 128bits */
+	char ifid[16];		/* Interface ID, up to 128bits */
 };
+#define IFID_LEN_DEFAULT 64
 
 /* per-host configuration */
 struct host_conf {
 	struct host_conf *next;
 
-	char *name;
+	char *name;		/* host name to identify the host */
+	struct duid duid;	/* DUID for the host */
+	/* delegated prefixes for the host: */
 	struct delegated_prefix_list prefix;
-	struct duid duid;
 };
-
-#define IFID_LEN_DEFAULT 64
 
 /* DHCP option information */
 struct dhcp6_optconf {
