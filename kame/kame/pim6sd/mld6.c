@@ -464,9 +464,10 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
     int datalen;		/* for trace packets only */
 {
     int setloop = 0;
-    struct sockaddr_in6 *dstp; = (struct sockaddr_in6 *)sndmh.msg_name;
+    struct sockaddr_in6 *dstp;
 	
     make_mld6_msg(type, code, src, dst, group, index, delay, datalen, alert);
+    dstp = (struct sockaddr_in6 *)sndmh.msg_name;
     if (IN6_ARE_ADDR_EQUAL(&dstp->sin6_addr, &allnodes_group.sin6_addr)) {
 	setloop = 1;
 	k_set_loop(mld6_socket, TRUE);
