@@ -1,5 +1,5 @@
 /*	$OpenBSD: getaddrinfo.c,v 1.23 2000/05/15 10:49:55 itojun Exp $	*/
-/*	$KAME: getaddrinfo.c,v 1.32 2001/01/05 03:58:58 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.33 2001/01/05 04:22:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,7 +37,7 @@
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
  * - IPv4 classful (shortened) form.  RFC2553 is silent about it.  XNET 5.2
- *   says to use inet_aton() to convert IPv4 numeric to binary (alows
+ *   says to use inet_aton() to convert IPv4 numeric to binary (allows
  *   classful form as a result).
  *   current code - disallow classful form for IPv4 (due to use of inet_pton).
  * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
@@ -127,7 +127,7 @@ static const struct afd {
 	int a_socklen;
 	int a_off;
 	const char *a_addrany;
-	const char *a_loopback;	
+	const char *a_loopback;
 	int a_scoped;
 } afdl [] = {
 #ifdef INET6
@@ -216,7 +216,7 @@ static struct addrinfo *copy_ai __P((const struct addrinfo *));
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
-static int addrconfig __P((const struct addrinfo *));
+static int addrconfig __P((int));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
@@ -361,8 +361,8 @@ getaddrinfo(hostname, servname, hints, res)
 					continue;
 				if (ex->e_protocol == ANY)
 					continue;
-				if (pai->ai_socktype == ex->e_socktype
-				 && pai->ai_protocol != ex->e_protocol) {
+				if (pai->ai_socktype == ex->e_socktype &&
+				    pai->ai_protocol != ex->e_protocol) {
 					ERR(EAI_BADHINTS);
 				}
 			}
@@ -436,10 +436,17 @@ getaddrinfo(hostname, servname, hints, res)
 		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 			pai->ai_protocol = ex->e_protocol;
 
-		if (hostname == NULL)
+		if (hostname == NULL) {
+			/*
+			 * filter out AFs that are not supported by the kernel
+			 * XXX errno?
+			 */
+			if (!addrconfig(pai->ai_family))
+				continue;
 			error = explore_null(pai, servname, &cur->ai_next);
-		else
-			error = explore_numeric_scope(pai, hostname, servname, &cur->ai_next);
+		} else
+			error = explore_numeric_scope(pai, hostname, servname,
+			    &cur->ai_next);
 
 		if (error)
 			goto free;
@@ -480,20 +487,31 @@ getaddrinfo(hostname, servname, hints, res)
 		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
 			continue;
 
+#ifdef AI_ADDRCONFIG
+		/*
+		 * If AI_ADDRCONFIG is specified, check if we are
+		 * expected to return the address family or not.
+		 */
+		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
+		    !addrconfig(afd->a_af))
+			continue;
+#endif
+
 		for (ex = explore; ex->e_af >= 0; ex++) {
 			*pai = ai0;
 
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = afd->a_af;
 
-			if (!MATCH_FAMILY(pai->ai_family, ex->e_af, WILD_AF(ex)))
+			if (!MATCH_FAMILY(pai->ai_family, ex->e_af,
+			    WILD_AF(ex)))
 				continue;
 			if (!MATCH(pai->ai_socktype, ex->e_socktype,
-					WILD_SOCKTYPE(ex))) {
+			    WILD_SOCKTYPE(ex))) {
 				continue;
 			}
 			if (!MATCH(pai->ai_protocol, ex->e_protocol,
-					WILD_PROTOCOL(ex))) {
+			    WILD_PROTOCOL(ex))) {
 				continue;
 			}
 
@@ -682,13 +700,6 @@ explore_null(pai, servname, res)
 	*res = NULL;
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
-
-	/*
-	 * filter out AFs that are not supported by the kernel
-	 * XXX errno?
-	 */
-	if (!addrconfig(pai))
-		return 0;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -1060,13 +1071,13 @@ find_afd(af)
  * if the code is right or not.
  */
 static int
-addrconfig(pai)
-	const struct addrinfo *pai;
+addrconfig(af)
+	int af;
 {
 	int s;
 
 	/* XXX errno */
-	s = socket(pai->ai_family, SOCK_DGRAM, 0);
+	s = socket(af, SOCK_DGRAM, 0);
 	if (s < 0) {
 		if (errno != EMFILE)
 			return 0;

@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.17 2000/12/26 13:01:22 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.18 2001/01/05 04:22:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -176,9 +176,6 @@ static const struct explore explore[] = {
 	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
 	{ PF_INET, SOCK_RAW, ANY, NULL, 0x05 },
-	{ PF_UNSPEC, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
-	{ PF_UNSPEC, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
-	{ PF_UNSPEC, SOCK_RAW, ANY, NULL, 0x05 },
 	{ -1, 0, 0, NULL, 0 },
 };
 
@@ -213,6 +210,8 @@ struct res_target {
 static int str_isnumber __P((const char *));
 static int explore_fqdn __P((const struct addrinfo *, const char *,
 	const char *, struct addrinfo **));
+static int explore_copy __P((const struct addrinfo *, const struct addrinfo *,
+	struct addrinfo **));
 static int explore_null __P((const struct addrinfo *,
 	const char *, struct addrinfo **));
 static int explore_numeric __P((const struct addrinfo *, const char *,
@@ -223,31 +222,32 @@ static int get_canonname __P((const struct addrinfo *,
 	struct addrinfo *, const char *));
 static struct addrinfo *get_ai __P((const struct addrinfo *,
 	const struct afd *, const char *));
+static struct addrinfo *copy_ai __P((const struct addrinfo *));
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
-static int addrconfig __P((const struct addrinfo *));
+static int addrconfig __P((int));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
 
 static struct addrinfo *getanswer __P((const querybuf *, int, const char *,
-				       int, const struct addrinfo *));
+	int, const struct addrinfo *));
 static int _dns_getaddrinfo __P((const struct addrinfo *, const char *,
-				 struct addrinfo **));
+	struct addrinfo **));
 static struct addrinfo *_gethtent __P((FILE *fp, const char *,
-				       const struct addrinfo *));
+	const struct addrinfo *));
 static int _files_getaddrinfo __P((const struct addrinfo *, const char *,
-				   struct addrinfo **));
+	struct addrinfo **));
 #ifdef YP
 static int _nis_getaddrinfo __P((const struct addrinfo *, const char *,
-				 struct addrinfo **));
+	 struct addrinfo **));
 #endif
 
 static int res_queryN __P((const char *, struct res_target *));
 static int res_searchN __P((const char *, struct res_target *));
 static int res_querydomainN __P((const char *, const char *,
-				 struct res_target *));
+	struct res_target *));
 
 
 static char *ai_errlist[] = {
@@ -391,7 +391,9 @@ getaddrinfo(hostname, servname, hints, res)
 	struct addrinfo ai;
 	struct addrinfo ai0;
 	struct addrinfo *pai;
+	const struct afd *afd;
 	const struct explore *ex;
+	struct addrinfo *afai[sizeof(afdl)/sizeof(afdl[0])];
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -442,8 +444,8 @@ getaddrinfo(hostname, servname, hints, res)
 					continue;
 				if (ex->e_protocol == ANY)
 					continue;
-				if (pai->ai_socktype == ex->e_socktype
-				 && pai->ai_protocol != ex->e_protocol) {
+				if (pai->ai_socktype == ex->e_socktype &&
+				    pai->ai_protocol != ex->e_protocol) {
 					ERR(EAI_BADHINTS);
 				}
 			}
@@ -503,17 +505,11 @@ getaddrinfo(hostname, servname, hints, res)
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
-		/* PF_UNSPEC entries are prepared for DNS queries only */
-		if (ex->e_af == PF_UNSPEC)
-			continue;
-
 		if (!MATCH_FAMILY(pai->ai_family, ex->e_af, WILD_AF(ex)))
 			continue;
-		if (!MATCH(pai->ai_socktype, ex->e_socktype,
-			   WILD_SOCKTYPE(ex)))
+		if (!MATCH(pai->ai_socktype, ex->e_socktype, WILD_SOCKTYPE(ex)))
 			continue;
-		if (!MATCH(pai->ai_protocol, ex->e_protocol,
-			   WILD_PROTOCOL(ex)))
+		if (!MATCH(pai->ai_protocol, ex->e_protocol, WILD_PROTOCOL(ex)))
 			continue;
 
 		if (pai->ai_family == PF_UNSPEC)
@@ -523,11 +519,17 @@ getaddrinfo(hostname, servname, hints, res)
 		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 			pai->ai_protocol = ex->e_protocol;
 
-		if (hostname == NULL)
+		if (hostname == NULL) {
+			/*
+			 * filter out AFs that are not supported by the kernel
+			 * XXX errno?
+			 */
+			if (!addrconfig(pai->ai_family))
+				continue;
 			error = explore_null(pai, servname, &cur->ai_next);
-		else
+		} else
 			error = explore_numeric_scope(pai, hostname, servname,
-						      &cur->ai_next);
+			    &cur->ai_next);
 
 		if (error)
 			goto free;
@@ -554,60 +556,63 @@ getaddrinfo(hostname, servname, hints, res)
 	 * we would like to prefer AF_INET6 than AF_INET, so we'll make a
 	 * outer loop by AFs.
 	 */
-	for (ex = explore; ex->e_af >= 0; ex++) {
+
+	/* first, try to query DNS */
+	memset(afai, 0, sizeof(afai));
+	*pai = ai0;
+	error = explore_fqdn(pai, hostname, servname, &afai[0]);
+	if (error)
+		goto free;
+
+	for (afd = afdl; afd->a_af; afd++) {
 		*pai = ai0;
 
-		/* require exact match for family field */
-		if (pai->ai_family != ex->e_af)
+		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
 			continue;
-
-		if (!MATCH(pai->ai_socktype, ex->e_socktype,
-			   WILD_SOCKTYPE(ex))) {
-			continue;
-		}
-		if (!MATCH(pai->ai_protocol, ex->e_protocol,
-			   WILD_PROTOCOL(ex))) {
-			continue;
-		}
-
-		if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
-			pai->ai_socktype = ex->e_socktype;
-		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
-			pai->ai_protocol = ex->e_protocol;
-
-		error = explore_fqdn(pai, hostname, servname,
-			&cur->ai_next);
 
 #ifdef AI_ADDRCONFIG
 		/*
-		 * If AI_ADDRCONFIG is specified, check if we are expected to
-		 * return the address family or not.
+		 * If AI_ADDRCONFIG is specified, check if we are
+		 * expected to return the address family or not.
 		 */
-		if ((pai->ai_flags & AI_ADDRCONFIG) != 0) {
-			struct addrinfo *prev, *next, *p;
-
-			prev = NULL;
-			for (p = cur->ai_next; p; p = next) {
-				next = p->ai_next;
-				if (addrconfig(p)) {
-					prev = p;
-					continue;
-				}
-
-				if (prev == NULL)
-					cur->ai_next = next;
-				else
-					prev->ai_next = next;
-				p->ai_next = NULL;
-				freeaddrinfo(p);
-				p = NULL;	/*just in case*/
-			}
-		}
+		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
+		    !addrconfig(afd->a_af))
+			continue;
 #endif
 
-		while (cur && cur->ai_next)
-			cur = cur->ai_next;
+		for (ex = explore; ex->e_af >= 0; ex++) {
+			*pai = ai0;
+
+			if (pai->ai_family == PF_UNSPEC)
+				pai->ai_family = afd->a_af;
+
+			if (!MATCH_FAMILY(pai->ai_family, ex->e_af,
+			    WILD_AF(ex)))
+				continue;
+			if (!MATCH(pai->ai_socktype, ex->e_socktype,
+			    WILD_SOCKTYPE(ex))) {
+				continue;
+			}
+			if (!MATCH(pai->ai_protocol, ex->e_protocol,
+			    WILD_PROTOCOL(ex))) {
+				continue;
+			}
+
+			if (pai->ai_family == PF_UNSPEC)
+				pai->ai_family = ex->e_af;
+			if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
+				pai->ai_socktype = ex->e_socktype;
+			if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
+				pai->ai_protocol = ex->e_protocol;
+
+			error = explore_copy(pai, afai[0], &cur->ai_next);
+
+			while (cur && cur->ai_next)
+				cur = cur->ai_next;
+		}
 	}
+
+	freeaddrinfo(afai[0]);
 
 	/* XXX */
 	if (sentinel.ai_next)
@@ -753,6 +758,47 @@ free:
 	return error;
 }
 
+static int
+explore_copy(pai, src, res)
+	const struct addrinfo *pai;	/*seed*/
+	const struct addrinfo *src;	/*source*/
+	struct addrinfo **res;
+{
+	int error;
+	struct addrinfo sentinel, *cur;
+
+	error = 0;
+	sentinel.ai_next = NULL;
+	cur = &sentinel;
+
+	while (cur && src) {
+		if (src->ai_family != pai->ai_family) {
+			src = src->ai_next;
+			continue;
+		}
+
+		cur->ai_next = copy_ai(src);
+		if (!cur->ai_next) {
+			error = EAI_MEMORY;
+			goto fail;
+		}
+
+		cur->ai_next->ai_socktype = pai->ai_socktype;
+		cur->ai_next->ai_protocol = pai->ai_protocol;
+
+		src = src->ai_next;
+		while (cur && cur->ai_next)
+			cur = cur->ai_next;
+	}
+
+	*res = sentinel.ai_next;
+	return 0;
+
+fail:
+	freeaddrinfo(sentinel.ai_next);
+	return error;
+}
+
 /*
  * hostname == NULL.
  * passive socket -> anyaddr (0.0.0.0 or ::)
@@ -772,13 +818,6 @@ explore_null(pai, servname, res)
 	*res = NULL;
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
-
-	/*
-	 * filter out AFs that are not supported by the kernel
-	 * XXX errno?
-	 */
-	if (!addrconfig(pai))
-		return 0;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -1051,6 +1090,39 @@ get_ai(pai, afd, addr)
 	return ai;
 }
 
+/* XXX need to malloc() the same way we do from other functions! */
+static struct addrinfo *
+copy_ai(pai)
+	const struct addrinfo *pai;
+{
+	struct addrinfo *ai;
+	size_t l;
+
+	l = sizeof(*ai) + pai->ai_addrlen;
+	if ((ai = (struct addrinfo *)malloc(l)) == NULL)
+		return NULL;
+	memset(ai, 0, l);
+	memcpy(ai, pai, sizeof(*ai));
+	ai->ai_addr = (struct sockaddr *)(void *)(ai + 1);
+	memcpy(ai->ai_addr, pai->ai_addr, pai->ai_addrlen);
+
+	if (pai->ai_canonname) {
+		l = strlen(pai->ai_canonname) + 1;
+		if ((ai->ai_canonname = malloc(l)) == NULL) {
+			free(ai);
+			return NULL;
+		}
+		strlcpy(ai->ai_canonname, pai->ai_canonname, l);
+	} else {
+		/* just to make sure */
+		ai->ai_canonname = NULL;
+	}
+
+	ai->ai_next = NULL;
+
+	return ai;
+}
+
 static int
 get_portmatch(ai, servname)
 	const struct addrinfo *ai;
@@ -1163,13 +1235,13 @@ find_afd(af)
  * if the code is right or not.
  */
 static int
-addrconfig(pai)
-	const struct addrinfo *pai;
+addrconfig(af)
+	int af;
 {
 	int s;
 
 	/* XXX errno */
-	s = socket(pai->ai_family, SOCK_DGRAM, 0);
+	s = socket(af, SOCK_DGRAM, 0);
 	if (s < 0) {
 		if (errno != EMFILE)
 			return 0;
