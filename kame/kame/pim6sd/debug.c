@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.56 2003/01/11 07:49:17 suz Exp $	*/
+/*	$KAME: debug.c,v 1.57 2003/01/23 00:26:46 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -311,6 +311,7 @@ fdump(i)
 	dump_vifs(fp);
 	dump_nbrs(fp);
 	dump_mldqueriers(fp);
+	dump_mldgroups(fp);
 	dump_pim_mrt(fp);
 	dump_rp_set(fp);
 	(void) fclose(fp);
@@ -587,6 +588,39 @@ dump_mldqueriers(fp)
 		}
 	}
 
+	fprintf(fp, "\n");
+} 
+
+void
+dump_mldgroups(fp)
+	FILE *fp;
+{
+	struct uvif *v;
+	mifi_t vifi;
+	struct listaddr *grp, *src;
+
+	fprintf(fp, "Reported MLD Group\n");
+	fprintf(fp, " %-3s %6s %-40s\n", "Mif", "PhyIF", "Group/Source");
+
+	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
+		for (grp = v->uv_groups; grp; grp = grp->al_next) {
+			fprintf(fp, " %-3u %6s %-40s\n", vifi,
+				(v->uv_flags & MIFF_REGISTER) ? 
+				    "regist" : v->uv_name,
+				sa6_fmt(&grp->al_addr));
+
+			src = grp->sources;
+			if (src == NULL) {
+				fprintf(fp, " %-3s %6s   %-40s\n", "", "",
+					"(any source)");
+				continue;
+			}
+			for ( ; src; src = src->al_next) {
+				fprintf(fp, " %-3s %6s   %-40s\n", "", "",
+					sa6_fmt(&src->al_addr));
+			}
+		}
+	}
 	fprintf(fp, "\n");
 } 
 

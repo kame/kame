@@ -1,4 +1,4 @@
-/*	$KAME: debug.h,v 1.11 2000/12/04 06:45:29 itojun Exp $	*/
+/*	$KAME: debug.h,v 1.12 2003/01/23 00:26:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -145,6 +145,7 @@ extern void cdump           __P((int i));
 extern void dump_vifs       __P((FILE *fp));
 extern void dump_nbrs       __P((FILE *fp));
 extern void dump_mldqueriers    __P((FILE *fp));
+extern void dump_mldgroups	__P((FILE *fp));
 extern void dump_pim_mrt        __P((FILE *fp));
 extern int  dump_rp_set     __P((FILE *fp));
 extern void dump_stat __P((void));
