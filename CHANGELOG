@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1627 2001/03/29 07:32:28 itojun Exp $
+$KAME: CHANGELOG,v 1.1628 2001/03/29 07:33:45 jinmei Exp $
 
 <200103>
+2001-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h (IN6_IS_ADDR_xxx): made the macros safe
+	to the gcc's -Wcast-qual option.
+	Based on a comment from Brian Wellington
+	<Brian.Wellington@nominum.com>.
+
 Thu Mar 29 16:31:34 JST 2001  itojun@iijlab.net
 	* sys/netinet6/mip6*: bring in latest ericsson mobile-ip6 code.
 	  based on revision 13 of the mobile-ip6 draft.  see TODO.mobile-ip6
