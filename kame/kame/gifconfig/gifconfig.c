@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.9 2000/05/17 04:26:38 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.10 2000/05/22 02:53:21 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -104,7 +104,9 @@ char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
 void setifpsrc __P((char *, int));
 void setifpdst __P((char *, int));
 void setifflags __P((char *, int));
+#ifdef SIOCDIFPHYADDR
 void delifaddrs __P((char *, int));
+#endif
 
 #define	NEXTARG		0xffffff
 
@@ -115,7 +117,9 @@ struct	cmd {
 } cmds[] = {
 	{ "up",		IFF_UP,		setifflags } ,
 	{ "down",	-IFF_UP,	setifflags },
+#ifdef SIOCDIFPHYADDR
 	{ "delete",	0,		delifaddrs },
+#endif
 	{ 0,		0,		setifpsrc },
 	{ 0,		0,		setifpdst },
 };
@@ -459,6 +463,7 @@ setifflags(vname, value)
 		Perror(vname);
 }
 
+#ifdef SIOCDIFPHYADDR
 /* ARGSUSED */
 void
 delifaddrs(vname, param)
@@ -471,6 +476,7 @@ delifaddrs(vname, param)
 	if (ioctl(s, SIOCDIFPHYADDR, (caddr_t)&ifr) < 0)
 		err(1, "ioctl(SIOCDIFPHYADDR)");
 }
+#endif
 
 #define	IFFBITS \
 "\020\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5POINTOPOINT\6NOTRAILERS\7RUNNING\10NOARP\
