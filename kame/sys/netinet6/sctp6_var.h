@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_var.h,v 1.1 2002/04/15 08:34:08 itojun Exp $	*/
+/*	$KAME: sctp6_var.h,v 1.2 2002/04/15 10:24:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_var.h,v 1.13 2002/04/04 19:23:44 randall Exp	*/
 
 /*
@@ -44,10 +44,10 @@ int	sctp6_ctloutput __P((struct socket *, struct sockopt *));
 #else
 int	sctp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-int	sctp6_usrreqs __P((struct socket *, int, struct mbuf *, struct mbuf *,
+int	sctp6_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 			   struct mbuf *, struct proc *));
 #else
-int	sctp6_usrreqs __P((struct socket *, int, struct mbuf *, struct mbuf *,
+int	sctp6_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 			   struct mbuf *));
 #endif /* __NetBSD */
 #endif /* __FreeBSD */

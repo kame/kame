@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.9 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.10 2002/04/15 10:24:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -3123,14 +3123,14 @@ struct pr_usrreqs sctp_usrreqs = {
 #else
 #if defined(__NetBSD__)
 int
-sctp_usrreqs(so, req, m, nam, control, p)
+sctp_usrreq(so, req, m, nam, control, p)
      struct socket *so;
      int req;
      struct mbuf *m, *nam, *control;
      struct proc *p;
 #else
-     int
-     sctp_usrreqs(so, req, m, nam, control)
+int
+sctp_usrreq(so, req, m, nam, control)
      struct socket *so;
      int req;
      struct mbuf *m, *nam, *control;

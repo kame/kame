@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.3 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.4 2002/04/15 10:24:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef _NETINET_SCTP_VAR_H_
@@ -98,10 +98,10 @@ extern struct	pr_usrreqs sctp_usrreqs;
 #else /* to __FreeBSD__ */
 
 #if defined(__NetBSD__)
-int sctp_usrreqs __P((struct socket *, int, struct mbuf *, struct mbuf *,
+int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 		      struct mbuf *, struct proc *));
 #else /* to __NetBSD__ */
-int sctp_usrreqs __P((struct socket *, int, struct mbuf *, struct mbuf *,
+int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 		      struct mbuf *));
 #endif /* __NetBSD__/else */
 

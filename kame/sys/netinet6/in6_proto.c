@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.115 2002/04/15 08:34:08 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.116 2002/04/15 10:24:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,7 +311,7 @@ struct ip6protosw inet6sw[] = {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
-  sctp6_usrreqs,
+  sctp6_usrreq,
 #endif
   0,		0,		0,		sctp_drain,
 #ifndef __FreeBSD__
@@ -327,7 +327,7 @@ struct ip6protosw inet6sw[] = {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
-  sctp6_usrreqs,
+  sctp6_usrreq,
 #endif
   0,		0,		0,		sctp_drain,
 #ifndef __FreeBSD__

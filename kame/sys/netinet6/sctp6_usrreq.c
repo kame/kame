@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.1 2002/04/15 08:34:08 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.2 2002/04/15 10:24:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -1268,13 +1268,13 @@ struct pr_usrreqs sctp6_usrreqs = {
 
 int
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-sctp6_usrreqs(so, req, m, nam, control, p)
+sctp6_usrreq(so, req, m, nam, control, p)
      struct socket *so;
      int req;
      struct mbuf *m, *nam, *control;
      struct proc *p;
 #else
-     sctp6_usrreqs(so, req, m, nam, control)
+sctp6_usrreq(so, req, m, nam, control)
      struct socket *so;
      int req;
      struct mbuf *m, *nam, *control;
