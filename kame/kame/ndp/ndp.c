@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.79 2001/09/21 09:44:08 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.80 2001/10/25 13:08:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -621,6 +621,9 @@ again:;
 		 * (and the kernel workaround)...
 		 */
 		if (sdl->sdl_family != AF_LINK)
+			continue;
+
+		if (!(rtm->rtm_flags & RTF_HOST))
 			continue;
 
 		if (addr) {
