@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/01/30 12:26:32 $
+		     $Date: 2000/02/04 02:24:15 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -34,6 +34,8 @@ and the next STABLE release,
   specific operating system platform (openbsd, and maybe freebsd[23]).
   It is not KAME problem, it is problem in fxp driver.
   KAME/OpenBSD contains workaround for this.
+- IPv6 reassembly does not work for architecture like alpha, where
+  sizeof(void *) != 4.
 
 PLATFORM DIFFERENCES
 ====================
