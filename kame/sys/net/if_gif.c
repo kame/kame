@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.22 2000/04/26 06:38:20 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.23 2000/04/27 17:30:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,6 +182,9 @@ gifattach(dummy)
 		sc->gif_if.if_ioctl  = gif_ioctl;
 		sc->gif_if.if_output = gif_output;
 		sc->gif_if.if_type   = IFT_GIF;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+#endif
 		if_attach(&sc->gif_if);
 #if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF

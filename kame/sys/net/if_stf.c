@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.35 2000/04/26 06:38:21 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.36 2000/04/27 17:30:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -231,6 +231,9 @@ stfattach(dummy)
 		sc->sc_if.if_ioctl  = stf_ioctl;
 		sc->sc_if.if_output = stf_output;
 		sc->sc_if.if_type   = IFT_STF;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+#endif
 		if_attach(&sc->sc_if);
 #if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF
