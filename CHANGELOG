@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2603 2004/05/14 02:39:05 suz Exp $
+$KAME: CHANGELOG,v 1.2604 2004/05/16 05:57:29 jinmei Exp $
 
 <200405>
+2004-05-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/include/netdb.h: added a new error code EAI_OVERFLOW
+	defined in RFC3493.
+	* kame/kame/libinet6/getaddrinfo.c: supported EAI_OVERFLOW in
+	gai_strerror().
+	* kame/kame/libinet6/getnameinfo.c: use EAI_OVERFLOW (instead of
+	EAI_MEMORY) for the error of short buffers.
+
 2004-05-14  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/mldv2_proto.c: receives MLDv2 TO_EX{NULL} report
 	properly.
