@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.725 2000/03/24 08:38:33 itojun Exp $
+$Id: CHANGELOG,v 1.726 2000/03/25 05:53:12 sumikawa Exp $
 
 <200003>
+Sat Mar 25 14:52:06 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/socks64: upgrade to latest patch.
+
 Thu Mar 23 02:36:12 JST 2000  itojun@iijlab.net
 	* kame/route6d: don't advertise reject/blackhole static routes.
 
