@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.93 2001/07/26 06:53:20 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.94 2001/08/30 11:19:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -588,7 +588,7 @@ udp6_ctlinput(cmd, sa, d)
 			/*
 			 * Depending on the value of "valid" and routing table
 			 * size (mtudisc_{hi,lo}wat), we will:
-			 * - recalcurate the new MTU and create the
+			 * - recalculate the new MTU and create the
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
