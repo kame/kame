@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.59 2002/05/22 01:47:22 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.60 2002/05/22 01:51:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,12 +162,12 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		if (sp) {
 			if (strlen(sp->s_name) + 1 > servlen)
 				return EAI_MEMORY;
-			strlcpy(serv, sp->s_name, sizeof(serv));
+			strlcpy(serv, sp->s_name, servlen);
 		} else {
 			snprintf(numserv, sizeof(numserv), "%d", ntohs(port));
 			if (strlen(numserv) + 1 > servlen)
 				return EAI_MEMORY;
-			strlcpy(serv, numserv, sizeof(serv));
+			strlcpy(serv, numserv, servlen);
 		}
 	}
 
@@ -240,7 +240,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			numaddrlen = strlen(numaddr);
 			if (numaddrlen + 1 > hostlen) /* don't forget terminator */
 				return EAI_MEMORY;
-			strlcpy(host, numaddr, sizeof(host));
+			strlcpy(host, numaddr, hostlen);
 			break;
 		}
 	} else {
@@ -274,7 +274,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #endif
 				return EAI_MEMORY;
 			}
-			strlcpy(host, hp->h_name, sizeof(host));
+			strlcpy(host, hp->h_name, hostlen);
 #ifdef USE_GETIPNODEBY
 			freehostent(hp);
 #endif
@@ -323,7 +323,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 	numaddrlen = strlen(numaddr);
 	if (numaddrlen + 1 > hostlen) /* don't forget terminator */
 		return EAI_MEMORY;
-	strlcpy(host, numaddr, sizeof(host));
+	strlcpy(host, numaddr, hostlen);
 
 	if (((const struct sockaddr_in6 *)sa)->sin6_scope_id) {
 		char zonebuf[MAXHOSTNAMELEN];
