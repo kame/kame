@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.11 2002/04/20 08:18:02 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.12 2002/05/08 05:41:36 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -861,6 +861,16 @@ init_v(cl, len)
 			/* already active */
 			break;
 
+		/*
+		 * if parent became idle while this class was idle.
+		 * reset vt and the runtime service curve.
+		 */
+		if (cl->cl_parent->cl_nactive == 0 ||
+		    cl->cl_parent->cl_vtperiod != cl->cl_parentperiod) {
+			cl->cl_vt = 0;
+			rtsc_init(&cl->cl_virtual, cl->cl_fsc,
+				  0, cl->cl_total);
+		}
 		min_cl = actlist_first(cl->cl_parent->cl_actc);
 		if (min_cl != NULL) {
 			u_int64_t vt;
@@ -875,14 +885,10 @@ init_v(cl, len)
 			if (cl->cl_parent->cl_vtperiod != cl->cl_parentperiod
 			    || vt > cl->cl_vt)
 				cl->cl_vt = vt;
-		} else {
-			/* no packet is backlogged.  set vt to 0 */
-			cl->cl_vt = 0;
 		}
 
 		/* update the virtual curve */
-		rtsc_min(&cl->cl_virtual, cl->cl_fsc,
-			 cl->cl_vt, cl->cl_total);
+		rtsc_min(&cl->cl_virtual, cl->cl_fsc, cl->cl_vt, cl->cl_total);
 
 		cl->cl_vtperiod++;  /* increment vt period */
 		cl->cl_parentperiod = cl->cl_parent->cl_vtperiod;
