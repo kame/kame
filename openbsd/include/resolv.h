@@ -245,7 +245,7 @@ struct res_sym {
 struct res_target {
 	struct res_target *next;
 	const char *name;	/* domain name */
-	int class, type;	/* class and type of query */
+	int qclass, qtype;	/* class and type of query */
 	u_char *answer;		/* buffer to put answer */
 	int anslen;		/* size of answer buffer */
 	int n;			/* result length */

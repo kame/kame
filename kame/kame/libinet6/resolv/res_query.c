@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.11 2000/05/05 16:26:07 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.12 2000/06/14 15:24:01 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -138,8 +138,8 @@ res_queryN(name, target)
 		hp->rcode = NOERROR;	/* default */
 
 		/* make it easier... */
-		class = t->class;
-		type = t->type;
+		class = t->qclass;
+		type = t->qtype;
 		answer = t->answer;
 		anslen = t->anslen;
 
@@ -438,8 +438,8 @@ res_search(name, class, type, answer, anslen)
 	struct res_target target;
 
 	memset(&target, 0, sizeof(target));
-	target.class = class;
-	target.type = type;
+	target.qclass = class;
+	target.qtype = type;
 	target.answer = answer;
 	target.anslen = anslen;
 
@@ -506,8 +506,8 @@ res_querydomain(name, domain, class, type, answer, anslen)
 	struct res_target target;
 
 	memset(&target, 0, sizeof(target));
-	target.class = class;
-	target.type = type;
+	target.qclass = class;
+	target.qtype = type;
 	target.answer = answer;
 	target.anslen = anslen;
 
