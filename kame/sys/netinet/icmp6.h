@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.57 2001/07/11 09:30:42 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.58 2001/07/24 01:52:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -630,7 +630,12 @@ struct icmp6stat {
 	u_quad_t icp6s_tooshort;	/* packet < sizeof(struct icmp6_hdr) */
 	u_quad_t icp6s_checksum;	/* bad checksum */
 	u_quad_t icp6s_badlen;		/* calculated bound mismatch */
-	u_quad_t icp6s_reflect;		/* number of responses */
+	/*
+	 * number of responses: this member is inherited from IPv4, but
+	 * has less meaning in the latest IPv6 code.  (although it is still
+	 * incremented)
+	 */
+	u_quad_t icp6s_reflect;
 	u_quad_t icp6s_inhist[256];	
 	u_quad_t icp6s_nd_toomanyopt;	/* too many ND options */
 	struct icmp6errstat icp6s_outerrhist;
