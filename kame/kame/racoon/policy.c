@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.30 2000/09/19 00:11:26 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.31 2000/09/19 05:08:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.30 2000/09/19 00:11:26 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.31 2000/09/19 05:08:36 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -223,7 +223,14 @@ cmpspidx_wild(a, b)
 	if (!(b->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;
 
-	if (!(a->ul_proto == IPSEC_PROTO_ANY || b->ul_proto == IPSEC_PROTO_ANY || a->ul_proto == b->ul_proto))
+	if (!(a->ul_proto == IPSEC_PROTO_ANY ||
+	      b->ul_proto == IPSEC_PROTO_ANY ||
+	      a->ul_proto == b->ul_proto))
+		return 1;
+
+	if (a->src.ss_family != b->src.ss_family)
+		return 1;
+	if (a->dst.ss_family != b->dst.ss_family)
 		return 1;
 
 	/* compare src address */
