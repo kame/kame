@@ -1039,8 +1039,9 @@ tcp6_ctlinput(cmd, sa, d)
 		bzero(&th, sizeof(th));
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 
-		in6_pcbnotify(&tcb, sa, th.th_dport, ip6cp->ip6c_src,
-			      th.th_sport, cmd, NULL, notify);
+		in6_pcbnotify(&tcb, sa, th.th_dport,
+		    (struct sockaddr *)ip6cp->ip6c_src,
+		    th.th_sport, cmd, NULL, notify);
 	} else
 		in6_pcbnotify(&tcb, sa, 0, (struct sockaddr *)sa6_src,
 			      0, cmd, NULL, notify);
