@@ -509,7 +509,7 @@ rtadvd_input()
 				if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			 return;
 		 }
-		 if (i < sizeof(struct nd_router_solicit) {
+		 if (i < sizeof(struct nd_router_solicit)) {
 			 syslog(LOG_NOTICE,
 				"<%s> RS from %s on %s does not have enough "
 				"length (len = %d)",
@@ -546,7 +546,7 @@ rtadvd_input()
 				if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			 return;
 		 }
-		 if (i < sizeof(struct nd_router_advert) {
+		 if (i < sizeof(struct nd_router_advert)) {
 			 syslog(LOG_NOTICE,
 				"<%s> RA from %s on %s does not have enough "
 				"length (len = %d)",
