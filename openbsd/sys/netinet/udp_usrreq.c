@@ -1180,6 +1180,7 @@ udp6_usrreq(so, req, m, addr, control, p)
 	struct mbuf *m, *addr, *control;
 	struct proc *p;
 {
+
 	return udp_usrreq(so, req, m, addr, control);
 }
 #endif
