@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.29 2001/08/16 05:02:13 itojun Exp $
+$KAME: helsinki-result.jp,v 1.30 2001/08/16 05:56:28 sakane Exp $
 
 
 generic
@@ -11,7 +11,9 @@ generic
 	tunnel modeのproposal比較。see F-Secure
 
 	phase 1でのAES/SHA2 support要。
-	AES/MD5のIVの計算方法。
+	Q. 暗号化した結果がIV長より短い場合は？そんなのありえない？
+
+	phase 1で鍵長のネゴができない。
 
 	IPsecでのSHA2 support確認(添付するbit数)。
 
