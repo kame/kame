@@ -154,7 +154,8 @@ main(argc, argv)
   krt_init();
 
 #ifdef USE_LEX_YACC
-  cfparse(0, conf ? conf : CONFFILENAME);
+  if (cfparse(1, conf ? conf : CONFFILENAME))
+    exit(1);
 #else
   conf_check(conf ? conf : CONFFILENAME);
 #endif

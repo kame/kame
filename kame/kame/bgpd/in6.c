@@ -310,3 +310,14 @@ get_in6_addr(addr, sap)
 	freeaddrinfo(res0);
 	return(error);
 }
+
+int
+sa6_equal(sa1, sa2)
+	struct sockaddr_in6 *sa1, *sa2;
+{
+	if (IN6_ARE_ADDR_EQUAL(&sa1->sin6_addr, &sa2->sin6_addr) &&
+	    sa1->sin6_scope_id == sa2->sin6_scope_id)
+		return(1);
+
+	return(0);
+}
