@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.3 2002/10/02 06:24:06 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.4 2004/01/21 06:49:57 suz Exp $	*/
 
 %{
 /*
@@ -38,6 +38,7 @@
 #endif
 
 int lineno = 1;
+static int af;
 
 extern int yylex __P((void));
 %}
@@ -48,7 +49,8 @@ ws		[ \t]+
 comment		\#.*
 semi		\;
 string		[a-zA-Z0-9\._][a-zA-Z0-9\._]*
-v6addr		[a-fA-F0-9:\.][a-fA-F0-9:\.]*
+v6addr		[a-fA-F0-9:\.]*:[a-fA-F0-9:\.]*
+v4addr		[0-9\.]*
 digit		[0-9]
 integer 	{digit}+
 number		{integer}|({digit}*\.{integer})
@@ -58,25 +60,33 @@ hexstring	0[xX]{hexpair}+
 ifname		[a-zA-Z]+[0-9]+
 slash		\/
 
+%s INTF
+
 %%
+<INTF>to {  return(TO); }
+<INTF>{string} {
+	yylval.string = strdup(yytext);
+	switch (af) {
+	case AF_INET:
+		return(INTERFACE4);
+	case AF_INET6:
+		return(INTERFACE6);
+	default:
+		break;
+	}
+}
+
 	/* misc */
 {ws}		{ ; }
 {nl}		{ lineno++; }
 {comment}	{ ; }
-{semi} {  return(EOS); }
 from   {  return(FROM); }
 to     {  return(TO); }
-@      {  return('@'); }
+@      {  BEGIN INTF; return('@'); }
+{semi} {  af = AF_UNSPEC; BEGIN INITIAL; return(EOS); }
+{v4addr} { af = AF_INET; yylval.string = strdup(yytext); return(V4ADDR); }
+{v6addr} { af = AF_INET6; yylval.string = strdup(yytext); return(V6ADDR); }
 
-{v6addr} {
-		yylval.string = strdup(yytext);
-		return(V6ADDR);
-	}
-	/* last resort */
-{string} {
-		yylval.string = strdup(yytext);
-		return(STRING);
-	}
 %%
 void
 parse_conf(const char *conf)

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.2 2002/09/15 08:17:20 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.3 2004/01/21 06:49:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -30,21 +30,29 @@
  */
 %{
 #include "mfc.h"
+
+#ifdef __FreeBSD__
+#define SIN_ADDR(x) (ntohl(((struct sockaddr_in *) &(x))->sin_addr.s_addr))
+#else
+#define SIN_ADDR(x) (((struct sockaddr_in *) &(x))->sin_addr.s_addr)
+#endif
+#define SIN6_ADDR(x) (&(((struct sockaddr_in6 *) &(x))->sin6_addr))
+
 extern int yylex __P((void));
 %}
 
 %union {
-	struct sockaddr_in6 in6;
+	struct sockaddr_storage addr;
 	mifi_t	ifindex;
 	struct if_set ifset;
 	char *string;
 }
 
 %token EOS FROM	TO
-%token <string> STRING V6ADDR
-%type <in6> srcaddr, dstaddr, ipv6addr
+%token <string> INTERFACE INTERFACE4 INTERFACE6 V6ADDR V4ADDR
+%type <addr> srcaddr6, dstaddr6, ipv6addr, srcaddr4, dstaddr4, ipv4addr
 %type <ifset> interface_list
-%type <ifindex> interface
+%type <ifindex> interface, interface4, interface6
 
 %%
 statements:
@@ -57,30 +65,54 @@ statement:
 	;
 
 route_statement:
-	dstaddr	FROM srcaddr '@' interface TO interface_list EOS
+	  dstaddr6 FROM srcaddr6 '@' interface6 TO interface_list EOS
 	{
-		add_mfc((struct sockaddr *)&$3, (struct sockaddr *)&$1,
-			$5, &$7);
+		add_mfc6((struct sockaddr *)&$3, (struct sockaddr *)&$1,
+			 $5, &$7);
+	}
+	| dstaddr4 FROM srcaddr4 '@' interface4 TO interface_list EOS
+	{
+		add_mfc4((struct sockaddr *)&$3, (struct sockaddr *)&$1,
+			 $5, &$7);
 	}
 	;
 
-srcaddr: 
+srcaddr6:
 	ipv6addr 
 	{
-		if (IN6_IS_ADDR_MULTICAST(&$1.sin6_addr))
-			errx(1, "src address should not be multicast\n");
-		if (IN6_IS_ADDR_LINKLOCAL(&$1.sin6_addr))
-			errx(1, "src address should not be linklocal\n");
+		if (IN6_IS_ADDR_MULTICAST(SIN6_ADDR($1)))
+			errx(1, "src address should not be IPv6 multicast\n");
+		if (IN6_IS_ADDR_LINKLOCAL(SIN6_ADDR($1)))
+			errx(1, "src address should not be IPv6 linklocal\n");
 
 		$$ = $1;
 	}
 	;
 
-dstaddr:
+srcaddr4:
+	ipv4addr 
+	{
+		if (IN_MULTICAST(SIN_ADDR($1)))
+			errx(1, "src address should not be IPv4 multicast\n");
+
+		$$ = $1;
+	}
+	;
+
+dstaddr6:
 	 ipv6addr
 	{
-		if (!IN6_IS_ADDR_MULTICAST(&$1.sin6_addr))
-			errx(1, "dst address should be multicast\n");
+		if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR($1)))
+			errx(1, "dst address should be IPv6 multicast\n");
+		$$ = $1;
+	}
+	;
+
+dstaddr4:
+	 ipv4addr
+	{
+		if (!IN_MULTICAST(SIN_ADDR($1)))
+			errx(1, "dst address should be IPv4 multicast\n");
 		$$ = $1;
 	}
 	;
@@ -92,6 +124,22 @@ ipv6addr:	V6ADDR
 
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_flags = AI_PASSIVE;
+		if ((error = getaddrinfo($1, NULL, &hints, &res)) != 0)
+			errx(1, "getaddrinfo: %s\n", gai_strerror(error));
+		bzero(&$$, sizeof($$));
+		bcopy(res->ai_addr, &$$, res->ai_addrlen);
+	}
+	;
+
+ipv4addr:	V4ADDR
+	{
+		struct addrinfo hints, *res;
+		int error;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_DGRAM;
 		hints.ai_flags = AI_PASSIVE;
 		if ((error = getaddrinfo($1, NULL, &hints, &res)) != 0)
@@ -115,13 +163,18 @@ interface_list:
 	 ;
 
 interface: 	
-	   STRING
+	   interface6
+	 | interface4
+	 ;
+
+interface6:
+	   INTERFACE6
 	 {
 		int ifindex;
 
 		if (strlen($1) == strlen("reg0") &&
 		    strcmp($1, "reg0") == 0) {
-			$$ = add_reg_mif();
+			$$ = add_reg_mif6();
 			if ($$ == NULL)
 				errx(1, "something wrong with register I/F");
 			break;
@@ -130,8 +183,20 @@ interface:
 		if (ifindex == 0)
 			errx(1, "invalid interface %s", $1);
 
-		$$ = add_mif($1);
+		$$ = add_mif6($1);
 	 }
 	 ;
-	 
+
+interface4:
+	   INTERFACE4
+	 {
+		int ifindex;
+
+		ifindex = if_nametoindex($1);
+		if (ifindex == 0)
+			errx(1, "invalid interface %s", $1);
+
+		$$ = add_mif4($1);
+	 }
+	 ;
 %%

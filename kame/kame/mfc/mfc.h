@@ -1,4 +1,4 @@
-/*	$KAME: mfc.h,v 1.1 2001/07/11 08:36:59 suz Exp $	*/
+/*	$KAME: mfc.h,v 1.2 2004/01/21 06:49:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -35,9 +35,12 @@
 #include <sys/ioctl.h>
 
 #include <net/if.h>
+#include <net/route.h>
 #include <netinet/in.h>
+#include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 
+#include <ifaddrs.h>
 #include <stdlib.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -46,7 +49,11 @@
 #include <errno.h>
 #include <err.h>
 
-extern mifi_t add_mif(const char *ifname);
-extern void add_mroute(struct sockaddr *src, struct sockaddr *dst, mifi_t in, 
-	               struct if_set *out);
+extern mifi_t add_mif4(const char *ifname);
+extern mifi_t add_mif6(const char *ifname);
+extern mifi_t add_reg_mif6(void);
+extern void add_mfc4(struct sockaddr *src, struct sockaddr *dst, mifi_t in, 
+	             struct if_set *out);
+extern void add_mfc6(struct sockaddr *src, struct sockaddr *dst, mifi_t in, 
+	             struct if_set *out);
 extern void parse_conf(const char *conf);
