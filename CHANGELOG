@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2498 2003/10/22 09:40:12 itojun Exp $
+$KAME: CHANGELOG,v 1.2499 2003/11/04 10:39:32 ono Exp $
 
 <200310>
+2003-11-04  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
+	* kame/sys/netinet/dccp_*, kame/sys/netinet6/dccp6_*:
+	makes DCCP compilable on netbsd.
+
 Wed Oct 22 18:35:16 JST 2003  itojun@iijlab.net
 	* netbsd/sys/sys/null.h: define NULL as (void *)0.  misuse of NULL as
 	  integer value will be punished with compilation error.
