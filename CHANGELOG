@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1664 2001/05/05 11:51:56 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1665 2001/05/05 12:12:25 fujisawa Exp $
 
 <200105>
+2001-05-05  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* sys/netinet6/natpt_{log,trans}.c
+	  Remove warning in compilation.
+
 2001-05-05  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* sys/netinet6/natpt_*.[ch]
 	* kame/natptconfig/*.[chly]
