@@ -1,28 +1,16 @@
---- src/support/apachectl.orig	Wed Feb 10 03:00:34 1999
-+++ src/support/apachectl	Fri Mar 26 02:38:11 1999
-@@ -39,6 +39,8 @@
- # --------------------                              --------------------
- # ||||||||||||||||||||   END CONFIGURATION SECTION  ||||||||||||||||||||
+$NetBSD: patch-ak,v 1.2 1999/09/01 07:41:03 itojun Exp $
+
+--- src/support/apxs.pl.orig	Sat Jul 24 11:05:02 1999
++++ src/support/apxs.pl	Wed Sep  1 00:06:50 1999
+@@ -426,8 +426,9 @@
+         my $t = $f;
+         $t =~ s|^.+/([^/]+)$|$1|;
+         if ($opt_i) {
+-	    push(@cmds, "cp $f $CFG_LIBEXECDIR/$t");
+-	    push(@cmds, "chmod 755 $CFG_LIBEXECDIR/$t");
++#	    push(@cmds, "cp $f $CFG_LIBEXECDIR/$t");
++#	    push(@cmds, "chmod 755 $CFG_LIBEXECDIR/$t");
++	    push(@cmds, "install -c -m 555 -o root -g wheel $f $CFG_LIBEXECDIR/$t");
+         }
  
-+#eval `limits -e -C daemon` >/dev/null 2>&1
-+
- ERROR=0
- ARGV="$@"
- if [ "x$ARGV" = "x" ] ; then 
-@@ -50,7 +52,7 @@
-     # check for pidfile
-     if [ -f $PIDFILE ] ; then
- 	PID=`cat $PIDFILE`
--	if [ ! "x$PID" = "x" ] && kill -0 $PID; then
-+	if [ ! "x$PID" = "x" ] && kill -0 $PID > /dev/null 2>&1; then
- 	    STATUS="httpd (pid $PID) running"
- 	    RUNNING=1
- 	else
-@@ -82,6 +84,7 @@
- 	fi
- 	if kill $PID ; then
- 	    echo "$0 $ARG: httpd stopped"
-+	    rm $PIDFILE
- 	else
- 	    echo "$0 $ARG: httpd could not be stopped"
- 	    ERROR=4
+         #   determine module symbolname and filename

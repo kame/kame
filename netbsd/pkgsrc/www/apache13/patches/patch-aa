@@ -1,24 +1,28 @@
---- configure.orig	Sat Jan  2 05:19:41 1999
-+++ configure	Tue Jan 12 06:02:12 1999
-@@ -1012,8 +1012,8 @@
-     echo "       DEFAULT_PIDLOG: ${runtimedir_relative}${thetarget}.pid"
-     echo "   DEFAULT_SCOREBOARD: ${runtimedir_relative}${thetarget}.scoreboard"
-     echo "     DEFAULT_LOCKFILE: ${runtimedir_relative}${thetarget}.lock"
--    echo "      DEFAULT_XFERLOG: ${logfiledir_relative}access_log"
--    echo "     DEFAULT_ERRORLOG: ${logfiledir_relative}error_log"
-+    echo "      DEFAULT_XFERLOG: ${logfiledir_relative}http-access_log"
-+    echo "     DEFAULT_ERRORLOG: ${logfiledir_relative}http-error_log"
-     echo "    TYPES_CONFIG_FILE: ${sysconfdir_relative}mime.types"
-     echo "   SERVER_CONFIG_FILE: ${sysconfdir_relative}${thetarget}.conf"
-     echo "   ACCESS_CONFIG_FILE: ${sysconfdir_relative}access.conf"
-@@ -1091,8 +1091,8 @@
- echo "echo '-DDEFAULT_PIDLOG=\"${runtimedir_relative}${thetarget}.pid\"'" >>$src/apaci
- echo "echo '-DDEFAULT_SCOREBOARD=\"${runtimedir_relative}${thetarget}.scoreboard\"'" >>$src/apaci
- echo "echo '-DDEFAULT_LOCKFILE=\"${runtimedir_relative}${thetarget}.lock\"'" >>$src/apaci
--echo "echo '-DDEFAULT_XFERLOG=\"${logfiledir_relative}access_log\"'" >>$src/apaci
--echo "echo '-DDEFAULT_ERRORLOG=\"${logfiledir_relative}error_log\"'" >>$src/apaci
-+echo "echo '-DDEFAULT_XFERLOG=\"${logfiledir_relative}http-access_log\"'" >>$src/apaci
-+echo "echo '-DDEFAULT_ERRORLOG=\"${logfiledir_relative}http-error_log\"'" >>$src/apaci
- echo "echo '-DTYPES_CONFIG_FILE=\"${sysconfdir_relative}mime.types\"'" >>$src/apaci
- echo "echo '-DSERVER_CONFIG_FILE=\"${sysconfdir_relative}${thetarget}.conf\"'" >>$src/apaci
- echo "echo '-DACCESS_CONFIG_FILE=\"${sysconfdir_relative}access.conf\"'" >>$src/apaci
+$NetBSD: patch-aa,v 1.3 1999/09/01 07:41:03 itojun Exp $
+
+--- Makefile.tmpl.orig	Thu Aug 12 23:58:18 1999
++++ Makefile.tmpl	Wed Sep  1 00:08:27 1999
+@@ -450,12 +450,13 @@
+ 		find $(root)$(htdocsdir)/ -type d -exec chmod a+rx {} \; ; \
+ 		find $(root)$(htdocsdir)/ -type f -exec chmod a+r {} \; ; \
+ 	fi
+-	-@if [ -f $(root)$(cgidir)/printenv ]; then \
++	-@if false; then \
+ 		echo "[PRESERVING EXISTING DATA SUBDIR: $(root)$(cgidir)/]"; \
+ 	else \
+ 		for script in printenv test-cgi; do \
+ 			cat $(TOP)/cgi-bin/$${script} |\
+ 			sed -e 's;^#!/.*perl;#!$(PERL);' \
++			-e 's;LD_LIBRARY_PATH=.*;LD_LIBRARY_PATH=/usr/lib:$(prefix)/lib:/usr/local/lib;' \
+ 			> $(TOP)/$(SRC)/.apaci.install.tmp; \
+ 			echo "$(INSTALL_DATA) $(TOP)/conf/$${script}[*] $(root)$(cgidir)/$${script}"; \
+ 			$(INSTALL_DATA) $(TOP)/$(SRC)/.apaci.install.tmp $(root)$(cgidir)/$${script}; \
+@@ -472,7 +473,7 @@
+ #   and initial config files while preserving existing ones.
+ install-config:
+ 	@echo "===> [config: Installing Apache configuration files]"
+-	-@for conf in httpd.conf access.conf srm.conf; do \
++	-@for conf in httpd.conf; do \
+ 		if [ .$$conf = .httpd.conf ]; then \
+ 			target_conf="$(TARGET).conf"; \
+ 		else \
