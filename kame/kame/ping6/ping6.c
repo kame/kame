@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.120 2001/01/26 18:28:18 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.121 2001/02/01 16:43:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1369,7 +1369,8 @@ pr_pack(buf, cc, mhdr)
 
 	(void)gettimeofday(&tv, NULL);
 
-	if (!mhdr || !mhdr->msg_name || mhdr->msg_namelen != sizeof(*from) ||
+	if (!mhdr || !mhdr->msg_name ||
+	    mhdr->msg_namelen != sizeof(struct sockaddr_in6) ||
 	    ((struct sockaddr *)mhdr->msg_name)->sa_family != AF_INET6) {
 		if (options & F_VERBOSE)
 			warnx("invalid peername\n");
