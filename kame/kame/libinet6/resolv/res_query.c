@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.5 2000/04/26 02:56:27 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.6 2000/04/26 05:58:46 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -71,6 +71,7 @@ static char rcsid[] = "$Id: res_query.c,v 1.5 2000/04/26 02:56:27 itojun Exp $";
 #include <errno.h>
 # include <stdlib.h>
 # include <string.h>
+#include <unistd.h>
 #include "res_config.h"
 
 #if defined(USE_OPTIONS_H)
@@ -386,9 +387,13 @@ hostalias(name)
 	file = getenv("HOSTALIASES");
 	if (file == NULL || (fp = fopen(file, "r")) == NULL)
 		return (NULL);
-#if 0	/*XXX*/
-	setbuf(fp, NULL);
-#endif
+	/*
+	 * if a setuid binary dumps core in weak privilege, malicious user
+	 * may try to use $HOSTALIASES to peep content of protected files.
+	 * be cautious.
+	 */
+	if (getuid() != geteuid() || getgid() != getegid())
+		setbuf(fp, NULL);
 	buf[sizeof(buf) - 1] = '\0';
 	while (fgets(buf, sizeof(buf), fp)) {
 		for (cp1 = buf; *cp1 && !isspace(*cp1); ++cp1)
