@@ -347,11 +347,12 @@ udp_input(m, va_alist)
 #ifdef INET6
 	if ((ipv6 && IN6_IS_ADDR_MULTICAST(&ipv6->ip6_dst)) ||
 	    (ip && IN_MULTICAST(ip->ip_dst.s_addr)) ||
-	    (ip && in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))) {
+	    (ip && in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif)))
 #else /* INET6 */
 	if (IN_MULTICAST(ip->ip_dst.s_addr) ||
-	    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif)) {
+	    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
 #endif /* INET6 */
+	{
 		struct socket *last;
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
