@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.10 2003/04/17 05:38:50 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.11 2003/04/18 06:50:07 jinmei Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -40,7 +40,7 @@
 #include <sys/socketvar.h>
 #endif
 
-#if 0
+#ifdef __FreeBSD__
 #include <netinet/sctp_pcb.h>
 #include <netinet/sctp_uio.h>
 #endif
