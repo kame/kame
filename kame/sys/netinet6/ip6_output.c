@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.438 2004/03/12 12:07:21 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.439 2004/03/12 13:23:45 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -765,63 +765,71 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 */
 		exthdrs.ip6e_dest2 = NULL;
 
-	    {
-		struct ip6_rthdr *rh = NULL;
-		int segleft_org = 0;
+		{
+			struct ip6_rthdr *rh = NULL;
+			int segleft_org = 0;
 #ifdef MIP6
-		int segleft2_org = 0;
+			int segleft2_org = 0;
 #endif
-		struct ipsec_output_state state;
+			struct ipsec_output_state state;
 
-		if (exthdrs.ip6e_rthdr) {
-			rh = mtod(exthdrs.ip6e_rthdr, struct ip6_rthdr *);
-			segleft_org = rh->ip6r_segleft;
-			rh->ip6r_segleft = 0;
-		}
-#ifdef MIP6
-		if (exthdrs.ip6e_rthdr2) {
-			rh = mtod(exthdrs.ip6e_rthdr2, struct ip6_rthdr *);
-			segleft2_org = rh->ip6r_segleft;
-			rh->ip6r_segleft = 0;
-		}
-#endif /* MIP6 */
-
-		bzero(&state, sizeof(state));
-		state.m = m;
-		error = ipsec6_output_trans(&state, nexthdrp, mprev, sp, flags,
-		    &needipsectun);
-		m = state.m;
-		if (error) {
-			/* mbuf is already reclaimed in ipsec6_output_trans. */
-			m = NULL;
-			switch (error) {
-			case EHOSTUNREACH:
-			case ENETUNREACH:
-			case EMSGSIZE:
-			case ENOBUFS:
-			case ENOMEM:
-				break;
-			default:
-				printf("ip6_output (ipsec): error code %d\n", error);
-				/* FALLTHROUGH */
-			case ENOENT:
-				/* don't show these error codes to the user */
-				error = 0;
-				break;
+			if (exthdrs.ip6e_rthdr) {
+				rh = mtod(exthdrs.ip6e_rthdr,
+				    struct ip6_rthdr *);
+				segleft_org = rh->ip6r_segleft;
+				rh->ip6r_segleft = 0;
 			}
-			goto bad;
-		}
-		if (exthdrs.ip6e_rthdr) {
-			/* ah6_output doesn't modify mbuf chain */
-			rh->ip6r_segleft = segleft_org;
-		}
 #ifdef MIP6
-		if (exthdrs.ip6e_rthdr2) {
-			/* ah6_output doesn't modify mbuf chain */
-			rh->ip6r_segleft = segleft2_org;
-		}
+			if (exthdrs.ip6e_rthdr2) {
+				rh = mtod(exthdrs.ip6e_rthdr2,
+				    struct ip6_rthdr *);
+				segleft2_org = rh->ip6r_segleft;
+				rh->ip6r_segleft = 0;
+			}
 #endif /* MIP6 */
-	    }
+
+			bzero(&state, sizeof(state));
+			state.m = m;
+			error = ipsec6_output_trans(&state, nexthdrp, mprev,
+			    sp, flags, &needipsectun);
+			m = state.m;
+			if (error) {
+				/*
+				 * mbuf is already reclaimed in
+				 * ipsec6_output_trans.
+				 */
+				m = NULL;
+				switch (error) {
+				case EHOSTUNREACH:
+				case ENETUNREACH:
+				case EMSGSIZE:
+				case ENOBUFS:
+				case ENOMEM:
+					break;
+				default:
+					printf("ip6_output (ipsec): error code %d\n", error);
+					/* FALLTHROUGH */
+				case ENOENT:
+					/*
+					 * don't show these error
+					 * codes to the user
+					 */
+					error = 0;
+					break;
+				}
+				goto bad;
+			}
+			if (exthdrs.ip6e_rthdr) {
+				/* ah6_output doesn't modify mbuf chain */
+				rh->ip6r_segleft = segleft_org;
+			}
+#ifdef MIP6
+			if (exthdrs.ip6e_rthdr2) {
+				/* ah6_output doesn't modify mbuf chain */
+				rh->ip6r_segleft = segleft2_org;
+			}
+#endif /* MIP6 */
+		}
 skip_ipsec2:;
 #endif
 	}
@@ -856,60 +864,65 @@ skip_ipsec2:;
 	 * If there is a routing header, replace the destination address field
 	 * with the first hop of the routing header.
 	 */
-    {
-	struct ip6_rthdr *rh;
+	{
+		struct ip6_rthdr *rh;
 
-	rh = NULL;
-	if (exthdrs.ip6e_rthdr)
-		rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
-		    struct ip6_rthdr *));
+		rh = NULL;
+		if (exthdrs.ip6e_rthdr)
+			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
+			    struct ip6_rthdr *));
 #ifdef MIP6
-	if (exthdrs.ip6e_rthdr2)
-		rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr2,
-		    struct ip6_rthdr *));
+		else if (exthdrs.ip6e_rthdr2)
+			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr2,
+			    struct ip6_rthdr *));
 #endif /* MIP6 */
-	if (rh) {
-		struct ip6_rthdr0 *rh0;
-		struct in6_addr *addr;
-		struct sockaddr_in6 sa;
+		if (rh) {
+			struct ip6_rthdr0 *rh0;
+			struct in6_addr *addr;
+			struct sockaddr_in6 sa;
 
-		finaldst = ip6->ip6_dst;
-		switch (rh->ip6r_type) {
+			finaldst = ip6->ip6_dst;
+			switch (rh->ip6r_type) {
 #ifdef MIP6
-		case IPV6_RTHDR_TYPE_2:
+			case IPV6_RTHDR_TYPE_2:
 #endif /* MIP6 */
-		case IPV6_RTHDR_TYPE_0:
-			 rh0 = (struct ip6_rthdr0 *)rh;
-			 addr = (struct in6_addr *)(rh0 + 1);
+			case IPV6_RTHDR_TYPE_0:
+				rh0 = (struct ip6_rthdr0 *)rh;
+				addr = (struct in6_addr *)(rh0 + 1);
 
-			/*
-			 * construct a sockaddr_in6 form of the first hop.
-			 * XXX: we may not have enough information about
-			 * its scope zone; there is no standard API to pass
-			 * the information from the application.
-			 */
-			 bzero(&sa, sizeof(sa));
-			 sa.sin6_family = AF_INET6;
-			 sa.sin6_len = sizeof(sa);
-			 sa.sin6_addr = addr[0];
-			 if ((error = scope6_check_id(&sa, ip6_use_defzone))
-			     != 0) {
-				 goto bad;
-			 }
-			 ip6->ip6_dst = sa.sin6_addr;
-			 bcopy(&addr[1], &addr[0], sizeof(struct in6_addr) *
-			     (rh0->ip6r0_segleft - 1));
-			 addr[rh0->ip6r0_segleft - 1] = finaldst;
-			 /* XXX */
-			 in6_clearscope(addr + rh0->ip6r0_segleft - 1);
+				/*
+				 * construct a sockaddr_in6 form of
+				 * the first hop.
+				 *
+				 * XXX: we may not have enough
+				 * information about its scope zone;
+				 * there is no standard API to pass
+				 * the information from the
+				 * application.
+				 */
+				bzero(&sa, sizeof(sa));
+				sa.sin6_family = AF_INET6;
+				sa.sin6_len = sizeof(sa);
+				sa.sin6_addr = addr[0];
+				if ((error = scope6_check_id(&sa,
+				    ip6_use_defzone)) != 0) {
+					goto bad;
+				}
+				ip6->ip6_dst = sa.sin6_addr;
+				bcopy(&addr[1], &addr[0],
+				    sizeof(struct in6_addr)
+				    * (rh0->ip6r0_segleft - 1));
+				addr[rh0->ip6r0_segleft - 1] = finaldst;
+				/* XXX */
+				in6_clearscope(addr + rh0->ip6r0_segleft - 1);
 
-			 break;
-		default:	/* is it possible? */
-			 error = EINVAL;
-			 goto bad;
+				break;
+			default:	/* is it possible? */
+				error = EINVAL;
+				goto bad;
+			}
 		}
 	}
-    }
 
 	/* Source address validation */
 	if (!(flags & IPV6_UNSPECSRC) &&
