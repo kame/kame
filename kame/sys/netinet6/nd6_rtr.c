@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.177 2001/10/31 11:25:43 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.178 2001/11/04 14:01:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -906,12 +906,22 @@ defrouter_select()
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			selected_dr = dr;
 		}
+
 		if (dr->installed && !installed_dr)
 			installed_dr = dr;
+		else if (dr->installed && installed_dr) {
+			/* this should not happen.  warn for diagnosis. */
+			log(LOG_ERR, "defrouter_select: more than one router"
+			    " is installed\n");
+		}
 	}
 	/*
 	 * If none of the default routers was found to be reachable,
 	 * round-robin the list regardless of preference.
+	 * Otherwise, if we have an installed router, check if the selected
+	 * (reachable) router should really be preferred to the installed one.
+	 * We only prefer the new router when the old one is not reachable
+	 * or when the new one has a really higher preference value.
 	 */
 	if (!selected_dr) {
 		if (!installed_dr ||
@@ -919,6 +929,13 @@ defrouter_select()
 			selected_dr = TAILQ_FIRST(&nd_defrouter);
 		else
  			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
+	} else if (installed_dr &&
+		   (rt = nd6_lookup(&installed_dr->rtaddr, 0,
+				    installed_dr->ifp)) &&
+		   (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
+		   ND6_IS_LLINFO_PROBREACH(ln) &&
+		   rtpref(selected_dr) <= rtpref(installed_dr)) {
+			selected_dr = installed_dr;
 	}
 
 	/*
