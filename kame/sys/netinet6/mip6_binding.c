@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.88 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.89 2002/02/20 06:39:43 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1610,8 +1610,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				 "%s:%d: sending BA to %s(%s) failed. "
 				 "send it later.\n",
 				 __FILE__, __LINE__,
-				 ip6_sprintf(haddr0),
-				 ip6_sprintf(coa)));
+				 ip6_sprintf(&haddr0->sin6_addr),
+				 ip6_sprintf(&coa->sin6_addr)));
 		}
 		return (0); /* XXX is 0 OK? */
 	}
@@ -1621,8 +1621,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			 "%s:%d: IP6_BUF_ROUTER is not supported"
 			 " from host %s(%s)\n",
 			 __FILE__, __LINE__,
-			 ip6_sprintf(haddr0),
-			 ip6_sprintf(coa)));
+			 ip6_sprintf(&haddr0->sin6_addr),
+			 ip6_sprintf(&coa->sin6_addr)));
 		/* XXX ignore? */
 	}
 #endif /* MIP6_DRAFT13 */
