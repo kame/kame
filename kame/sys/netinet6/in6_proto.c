@@ -438,13 +438,12 @@ int	ip6_gif_hlim = 0;
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec.    */
-#ifdef MAPPED_ADDR_ENABLED
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
 int	ip6_mapped_addr_on = 1;
-#else
-int	ip6_mapped_addr_on = MAPPED_ADDR_ENABLED;
 #endif
-#endif /* MAPPED_ADDR_ENABLED */
+#if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
+int	ip6_bindv6only = 1;
+#endif
 
 u_int32_t ip6_id = 0UL;
 int	ip6_keepfaith = 0;
@@ -646,7 +645,7 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEPRECATED,
 	use_deprecated, CTLFLAG_RW,	&ip6_use_deprecated,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RR_PRUNE,
 	rr_prune, CTLFLAG_RW,	&ip6_rr_prune,			0, "");
-#ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAPPED_ADDR,
 	mapped_addr, CTLFLAG_RW,	&ip6_mapped_addr_on,	0, "");
 #endif /* MAPPED_ADDR_ENABLED */

@@ -130,9 +130,11 @@ in6_pcballoc(so, head)
 	in6p->in6p_prev = head;
 	in6p->in6p_next->in6p_prev = in6p;
 #endif
-#ifdef MAPPED_ADDR_ENABLED
-	if (!ip6_mapped_addr_on)
+#if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
+	if (ip6_bindv6only)
 		in6p->in6p_flags |= IN6P_BINDV6ONLY;
+#else
+	in6p->in6p_flags |= IN6P_BINDV6ONLY;	/*just for safety*/
 #endif
 	so->so_pcb = (caddr_t)in6p;
 	return(0);
@@ -971,9 +973,21 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 				wildcard++;
 			else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))
 				continue;
-		} else {
+		}
+#ifndef TCP6
+		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
+			&& in6p->in6p_laddr.s6_addr32[3] == 0) {
+			if (!IN6_IS_ADDR_V4MAPPED(laddr6))
+				continue;
+			if (laddr6->s6_addr32[3] == 0)
+				;
+			else
+				wildcard++;
+		}
+#endif
+		else {
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
-#ifdef MAPPED_ADDR_ENABLED
+#if !defined(TCP6) && !defined(INET6_BINDV6ONLY)
 				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
 					continue;
 				else
@@ -990,9 +1004,21 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 			else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, faddr6)
 			      || in6p->in6p_fport != fport)
 				continue;
-		} else {
+		}
+#ifndef TCP6
+		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr)
+			&& in6p->in6p_faddr.s6_addr32[3] == 0) {
+			if (!IN6_IS_ADDR_V4MAPPED(faddr6))
+				continue;
+			if (faddr6->s6_addr32[3] == 0)
+				;
+			else
+				wildcard++;
+		}
+#endif
+		else {
 			if (IN6_IS_ADDR_V4MAPPED(faddr6)) {
-#ifdef MAPPED_ADDR_ENABLED
+#if !defined(TCP6) && !defined(INET6_BINDV6ONLY)
 				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
 					continue;
 				else
@@ -1099,7 +1125,7 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
-#ifdef MAPPED_ADDR_ENABLED
+#if !defined(TCP6) && !defined(INET6_BINDV6ONLY)
 				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
 					continue;
 				else

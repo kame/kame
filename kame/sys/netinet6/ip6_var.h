@@ -201,9 +201,12 @@ extern int	ip6_gif_hlim;		/* Hop limit for gif encap packet */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
 					 * walk list every 5 sec.    */
-#ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
 extern int	ip6_mapped_addr_on;
 #endif /* MAPPED_ADDR_ENABLED */
+#if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
+extern int	ip6_bindv6only;
+#endif
 
 extern struct socket *ip6_mrouter; 	/* multicast routing daemon */
 extern int	ip6_sendredirects;	/* send IP redirects when forwarding? */

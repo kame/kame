@@ -2207,8 +2207,7 @@ in6_setmaxmtu()
 		in6_maxmtu = maxmtu;
 }
 
-#ifdef MAPPED_ADDR_ENABLED
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
 /* 
  * Convert sockaddr_in6 to sockaddr_in. Original sockaddr_in6 must be
  * v4 mapped addr or v4 compat addr
@@ -2268,4 +2267,3 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	*nam = (struct sockaddr *)sin6_p;
 }
 #endif /*freebsd3*/
-#endif /* MAPPED_ADDR_ENABLED */

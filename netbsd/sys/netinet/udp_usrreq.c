@@ -276,7 +276,7 @@ udp_input(m, va_alist)
 	dst.sin_port = uh->uh_dport;
 
 	n = udp4_realinput(&src, &dst, m, iphlen);
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#if defined(INET6) && !defined(INET6_BINDV6ONLY)
 	if (IN_MULTICAST(ip->ip_dst.s_addr) || n == 0) {
 		struct sockaddr_in6 src6, dst6;
 
@@ -765,7 +765,7 @@ udp6_realinput(af, src, dst, m, off)
 				 && !in6_mcmatch(in6p, dst6, m->m_pkthdr.rcvif))
 					continue;
 			}
-#ifdef MAPPED_ADDR_ENABLED
+#ifndef INET6_BINDV6ONLY
 			else {
 				if (IN6_IS_ADDR_V4MAPPED(dst6)
 				 && (in6p->in6p_flags & IN6P_BINDV6ONLY))
@@ -777,7 +777,7 @@ udp6_realinput(af, src, dst, m, off)
 				 || in6p->in6p_fport != *sport)
 					continue;
 			}
-#ifdef MAPPED_ADDR_ENABLED
+#ifndef INET6_BINDV6ONLY
 			else {
 				if (IN6_IS_ADDR_V4MAPPED(src6)
 				 && (in6p->in6p_flags & IN6P_BINDV6ONLY))

@@ -1364,9 +1364,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
 #endif 
-#ifdef MAPPED_ADDR_ENABLED
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 				if (optlen != sizeof(int))
 					error = EINVAL;
 				else {
@@ -1390,12 +1390,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 							in6p->in6p_hops = optval;
 
-#if defined(MAPPED_ADDR_ENABLED)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
 							if ((in6p->in6p_vflag &
 							     INP_IPV4) != 0)
 								in6p->inp_ip_ttl = optval;
-#endif
 #endif
 #endif
 						}
@@ -1471,11 +1469,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 						OPTSET(IN6P_FAITH);
 						break;
 
-#ifdef MAPPED_ADDR_ENABLED
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 					case IPV6_BINDV6ONLY:
 						OPTSET(IN6P_BINDV6ONLY);
 						break;
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 					}
 				}
 				break;
@@ -1786,9 +1784,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif 
 
 			case IPV6_FAITH:
-#ifdef MAPPED_ADDR_ENABLED
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 #ifndef __bsdi__
 			case IPV6_PORTRANGE:
 #endif
@@ -1840,11 +1838,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 					optval = OPTBIT(IN6P_FAITH);
 					break;
 
-#ifdef MAPPED_ADDR_ENABLED
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 				case IPV6_BINDV6ONLY:
 					optval = OPTBIT(IN6P_BINDV6ONLY);
 					break;
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 
 #ifndef __bsdi__
 				case IPV6_PORTRANGE:
