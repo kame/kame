@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.252 2002/07/08 10:57:29 sakane Exp $	*/
+/*	$KAME: key.c,v 1.253 2002/07/12 10:10:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -435,7 +435,7 @@ static int key_ismyaddr6 __P((struct sockaddr_in6 *));
 /* flags for key_cmpsaidx() */
 #define CMP_HEAD	1	/* protocol, addresses. */
 #define CMP_MODE_REQID	2	/* additionally HEAD, reqid, mode. */
-#define CMP_REQID	3	/* additionally HEAD, reaid. */
+#define CMP_REQID	3	/* additionally HEAD, reqid. not used */
 #define CMP_EXACTLY	4	/* all elements. */
 static int key_cmpsaidx
 	__P((struct secasindex *, struct secasindex *, int));
@@ -2855,7 +2855,7 @@ key_getsah(saidx)
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx(&sah->saidx, saidx, CMP_REQID))
+		if (key_cmpsaidx(&sah->saidx, saidx, CMP_MODE_REQID))
 			return sah;
 	}
 
@@ -3971,8 +3971,8 @@ key_cmpsaidx(saidx0, saidx1, flag)
 			return 0;
 	} else {
 
-		/* CMP_MODE_REQID, CMP_REQID, CMP_HEAD */
-		if (flag == CMP_MODE_REQID || flag == CMP_REQID) {
+		/* CMP_MODE_REQID, CMP_HEAD */
+		if (flag == CMP_MODE_REQID) {
 			/*
 			 * If reqid of SPD is non-zero, unique SA is required.
 			 * The result must be of same reqid in this case.
