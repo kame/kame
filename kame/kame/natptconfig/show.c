@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.17 2001/12/20 04:59:26 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.18 2002/01/13 12:48:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -106,7 +106,7 @@ showPrefix()
 	struct in6_addr	prefix;
 	char		in6txt[INET6_ADDRSTRLEN];
 
-	if (readNL((void *)&prefix, sizeof(prefix), NL_PREFIX) <= 0)
+	if (getValue(NATPTCTL_PREFIX, (caddr_t)&prefix) <= 0)
 		err(1, "%s(): failure on read prefix", fn);
 
 	inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
@@ -225,23 +225,33 @@ writeXlateHeader(int type)
 void
 showVariables()
 {
-	showVariable(NL_TR,    TYPE_INT);
-	showVariable(NL_DEBUG, TYPE_INT);
-	showVariable(NL_DUMP,  TYPE_INT);
-}
+	const char *fn = __FUNCTION__;
 
+	int			 idx, val;
+	char			 Bow[128];
+	char			 Wow[INET6_ADDRSTRLEN];
+	struct natptctl_names	 ctlnames[] = NATPTCTL_NAMES;
 
-void
-showVariable(int n_idx, int type)
-{
-	int	val;
+	for (idx = 0; ctlnames[idx].ctl_name; idx++) {
+		if (getValue(idx, (caddr_t)&Bow) <= 0) {
+			err(errno, "%s(): getvalue failure", fn);
+		}
 
-	switch (type) {
-	case TYPE_INT:
-		readNL(&val, sizeof(int), n_idx);
-		printf("%16s: 0x%08x (%d)\n",
-		       nl[n_idx].n_name+1, val, val);
-		break;
+		printf("%16s: ", ctlnames[idx].ctl_name);
+
+		switch (ctlnames[idx].ctl_type) {
+		case NATPTCTL_INT:
+			val = *(int *)&Bow;
+			printf("0x%08x (%d)", val, val);
+			break;
+
+		case NATPTCTL_IN6ADDR:
+			inet_ntop(AF_INET6, &Bow, Wow, sizeof(Wow));
+			printf("%s", Wow);
+			break;
+		}
+
+		printf("\n");
 	}
 }
 

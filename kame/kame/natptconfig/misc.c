@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.20 2001/10/31 08:07:24 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.21 2002/01/13 12:48:11 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -237,6 +237,35 @@ setValue(char *name, int val)
 
 	if (soctl(sfd, SIOCSETVALUE, &mBox) < 0)
 		soctlFailure(fn);
+}
+
+
+int
+getValue(int ctlName, caddr_t val)
+{
+	const char *fn = __FUNCTION__;
+
+	struct natpt_msgBox	 mBox;
+	struct natptctl_names	 ctlnames[] = NATPTCTL_NAMES;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.flags = ctlName;
+	if (soctl(sfd, SIOCGETVALUE, &mBox) < 0) {
+		soctlFailure(fn);
+		return (0);
+	}
+
+	switch (ctlnames[ctlName].ctl_type) {
+	case NATPTCTL_INT:
+		*(int *)val = mBox.m_uint;
+		break;
+
+	case NATPTCTL_IN6ADDR:
+		*(struct in6_addr *)val = mBox.m_in6addr;
+		break;
+	}
+
+	return (1);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: miscvar.h,v 1.6 2001/09/02 19:32:28 fujisawa Exp $	*/
+/*	$KAME: miscvar.h,v 1.7 2002/01/13 12:48:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -34,6 +34,7 @@ void		 setRules		__P((int type, struct ruletab *));
 void		 flushRules		__P((int));
 void		 setOnOff		__P((int));
 void		 setValue		__P((char *, int));
+int		 getValue		__P((int, caddr_t));
 void		 testLog		__P((char *));
 void		 debugBreak		__P((void));
 int		 soctl			__P((int, u_long, ...));
