@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.72 2000/12/02 17:20:31 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.73 2000/12/04 05:36:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,17 +151,20 @@
 #include <netinet6/in6_prefix.h>
 #endif
 
-#ifdef __OpenBSD__ /*KAME IPSEC*/
-#undef IPSEC
-#endif
-
 #ifdef IPSEC
+#ifdef __OpenBSD__
+#include <netinet/ip_ipsp.h>
+#include <netinet/ip_ah.h>
+#include <netinet/ip_esp.h>
+#include <netinet/ip_ipip.h>
+#else
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
 #endif
 #include <netinet6/ipcomp.h>
+#endif
 #endif /*IPSEC*/
 
 #include <netinet6/ip6protosw.h>
@@ -333,7 +336,9 @@ struct ip6protosw inet6sw[] = {
   0,
   0,	
   0,		0,		0,		0,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
+  ah_sysctl,
+#elif !defined(__FreeBSD__)
   ipsec6_sysctl,
 #else
 # if __FreeBSD__ >= 3
@@ -348,7 +353,9 @@ struct ip6protosw inet6sw[] = {
   0,
   0,
   0,		0,		0,		0,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
+  esp_sysctl,
+#elif !defined(__FreeBSD__)
   ipsec6_sysctl,
 #else
 # if __FreeBSD__ >= 3
@@ -357,6 +364,7 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif
+#ifndef __OpenBSD__
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
   ipcomp6_input, 0,	 	0,		0,
   0,	
@@ -369,6 +377,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
+#endif /* !OpenBSD */
 #endif /* IPSEC */
 #ifdef INET
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,

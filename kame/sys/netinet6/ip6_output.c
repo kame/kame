@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.138 2000/12/04 04:27:41 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.139 2000/12/04 05:36:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,16 +116,26 @@
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
 
-#ifdef __OpenBSD__ /*KAME IPSEC*/
-#undef IPSEC
-#endif
-
 #ifdef IPSEC
+#ifdef __OpenBSD__
+#include <netinet/ip_ah.h>
+#include <netinet/ip_esp.h>
+#include <netinet/udp.h>
+#include <netinet/tcp.h>
+#include <net/pfkeyv2.h>
+
+extern u_int8_t get_sa_require  __P((struct inpcb *));
+
+extern int ipsec_auth_default_level;
+extern int ipsec_esp_trans_default_level;
+extern int ipsec_esp_network_default_level;
+#else
 #include <netinet6/ipsec.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
 #include <netinet6/ipsec6.h>
 #endif
 #include <netkey/key.h>
+#endif
 #endif /* IPSEC */
 
 #ifndef __bsdi__
@@ -232,7 +242,21 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
+#ifdef __OpenBSD__
+	u_int8_t sproto = 0;
+#endif
 #ifdef IPSEC
+#ifdef __OpenBSD__
+	union sockaddr_union sdst;
+	u_int32_t sspi;
+	struct inpcb *inp;
+	struct tdb *tdb;
+	int s;
+
+	inp = NULL;     /*XXX*/
+	if (inp && (inp->inp_flags & INP_IPV6) == 0)
+		panic("ip6_output: IPv4 pcb is passed");
+#else
 	int needipsectun = 0;
 	struct socket *so;
 	struct secpolicy *sp = NULL;
@@ -241,6 +265,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	so = ipsec_getsocket(m);
 	ipsec_setsocket(m, NULL);
 	ip6 = mtod(m, struct ip6_hdr *);
+#endif
 #endif /* IPSEC */
 
 #define MAKE_EXTHDR(hp, mp)						\
@@ -287,6 +312,91 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	}
 
 #ifdef IPSEC
+#ifdef __OpenBSD__
+	/* Disallow nested IPsec for now */
+	if (flags & IPV6_ENCAPSULATED)
+		goto done_spd;
+
+	/*
+	 * splnet is chosen over spltdb because we are not allowed to
+	 * lower the level, and udp6_output calls us in splnet(). XXX check
+	 */
+	s = splnet();
+
+	/*
+	 * Check if there was an outgoing SA bound to the flow
+	 * from a transport protocol.
+	 */
+	ip6 = mtod(m, struct ip6_hdr *);
+	if (inp && inp->inp_tdb &&
+	    inp->inp_tdb->tdb_dst.sa.sa_family == AF_INET6 &&
+	    IN6_ARE_ADDR_EQUAL(&inp->inp_tdb->tdb_dst.sin6.sin6_addr,
+		  &ip6->ip6_dst)) {
+	        tdb = inp->inp_tdb;
+	} else {
+	        tdb = ipsp_spd_lookup(m, AF_INET6, sizeof(struct ip6_hdr),
+	            &error, IPSP_DIRECTION_OUT, NULL, NULL);
+	}
+
+	if (tdb == NULL) {
+	        splx(s);
+
+		if (error == 0) {
+		        /*
+			 * No IPsec processing required, we'll just send the
+			 * packet out.
+			 */
+		        sproto = 0;
+
+			/* Fall through to routing/multicast handling */
+		} else {
+		        /*
+			 * -EINVAL is used to indicate that the packet should
+			 * be silently dropped, typically because we've asked
+			 * key management for an SA.
+			 */
+		        if (error == -EINVAL) /* Should silently drop packet */
+				error = 0;
+
+			goto freehdrs;
+		}
+	} else {
+	        /* We need to do IPsec */
+	        bcopy(&tdb->tdb_dst, &sdst, sizeof(sdst));
+		sspi = tdb->tdb_spi;
+		sproto = tdb->tdb_sproto;
+
+		/*
+		 * If the socket has set the bypass flags and SA destination
+		 * matches the IP destination, skip IPsec. This allows
+		 * IKE packets to travel through IPsec tunnels.
+		 */
+		if (inp != NULL && 
+		    inp->inp_seclevel[SL_AUTH] == IPSEC_LEVEL_BYPASS &&
+		    inp->inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_BYPASS &&
+		    inp->inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_BYPASS &&
+		    sdst.sa.sa_family == AF_INET6 &&
+		    IN6_ARE_ADDR_EQUAL(&sdst.sin6.sin6_addr, &ip6->ip6_dst)) {
+		        splx(s);
+		        sproto = 0; /* mark as no-IPsec-needed */
+			goto done_spd;
+		}
+
+		/* XXX Take into consideration socket requirements ? */
+
+#if 1 /* XXX */
+		/* if we have any extension header, we cannot perform IPsec */
+		if (exthdrs.ip6e_hbh || exthdrs.ip6e_dest1 ||
+		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2) {
+			error = EHOSTUNREACH;
+			goto freehdrs;
+		}
+#endif
+	}
+
+	/* Fall through to the routing/multicast handling code */
+ done_spd:
+#else
 	/* get a security policy for this packet */
 	if (so == NULL)
 		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
@@ -328,6 +438,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	default:
 		printf("ip6_output: Invalid policy found. %d\n", sp->policy);
 	}
+#endif /* OpenBSD */
 #endif /* IPSEC */
 
 	/*
@@ -346,7 +457,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	 * If we need IPsec, or there is at least one extension header,
 	 * separate IP6 header from the payload.
 	 */
-	if ((needipsec || optlen) && !hdrsplit) {
+#ifdef __OpenBSD__
+	if ((needipsec || optlen) && !hdrsplit)
+#else
+	if ((sproto || optlen) && !hdrsplit)
+#endif
+	{
 		if ((error = ip6_splithdr(m, &exthdrs)) != 0) {
 			m = NULL;
 			goto freehdrs;
@@ -435,7 +551,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		MAKE_CHAIN(exthdrs.ip6e_rthdr, mprev,
 			   nexthdrp, IPPROTO_ROUTING);
 
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 		if (!needipsec)
 			goto skip_ipsec2;
 
@@ -568,6 +684,47 @@ skip_ipsec2:;
 #endif
 	}
 #ifdef IPSEC
+#ifdef __OpenBSD__
+	/*
+	 * Check if the packet needs encapsulation.
+	 * ipsp_process_packet will never come back to here.
+	 */
+	if (sproto != 0) {
+	        s = splnet();
+
+		/* fill in IPv6 header which would be filled later */
+		if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+			if (opt && opt->ip6po_hlim != -1)
+				ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
+		} else {
+			if (im6o != NULL)
+				ip6->ip6_hlim = im6o->im6o_multicast_hlim;
+			else
+				ip6->ip6_hlim = ip6_defmcasthlim;
+			if (opt && opt->ip6po_hlim != -1)
+				ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
+
+			/*
+			 * XXX what should we do if ip6_hlim == 0 and the packet
+			 * gets tunnelled?
+			 */
+		}
+
+		tdb = gettdb(sspi, &sdst, sproto);
+		if (tdb == NULL) {
+			error = EHOSTUNREACH;
+			m_freem(m);
+			goto done;
+		}
+
+		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
+
+		/* Callee frees mbuf */
+		error = ipsp_process_packet(m, tdb, AF_INET6, 0);
+		splx(s);
+		return error;  /* Nothing more to be done */
+	}
+#else
 	if (needipsec && needipsectun) {
 		struct ipsec_output_state state;
 
@@ -620,6 +777,7 @@ skip_ipsec2:;
 
 		exthdrs.ip6e_ip6 = m;
 	}
+#endif /*OpenBSD*/
 #endif /*IPSEC*/
 
 	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
@@ -1211,7 +1369,7 @@ done:
 		RTFREE(ro_pmtu->ro_rt);
 	}
 
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 	if (sp != NULL)
 		key_freesp(sp);
 #endif /* IPSEC */
@@ -1422,6 +1580,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 	int privileged, optdatalen;
 	void *optdata;
 	struct ip6_recvpktopts *rcvopts;
+#if defined(IPSEC) && defined(__OpenBSD__)
+	struct proc *p = curproc; /* XXX */
+	struct tdb *tdb;
+	struct tdb_ident *tdbip, tdbi;
+	int s;
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct inpcb *in6p = sotoinpcb(so);
 	int error, optval;
@@ -1932,7 +2096,80 @@ do { \
 				break;
 #endif
 
-#ifdef IPSEC
+#ifdef __OpenBSD__
+			case IPSEC6_OUTSA:
+#ifndef IPSEC
+				error = EINVAL;
+#else
+				s = spltdb();
+				if (m == 0 || m->m_len != sizeof(struct tdb_ident)) {
+					error = EINVAL;
+				} else {
+					tdbip = mtod(m, struct tdb_ident *);
+					tdb = gettdb(tdbip->spi, &tdbip->dst,
+					    tdbip->proto);
+					if (tdb == NULL)
+						error = ESRCH;
+					else
+						tdb_add_inp(tdb, inp);
+				}
+				splx(s);
+#endif
+				break;
+
+			case IPV6_AUTH_LEVEL:
+			case IPV6_ESP_TRANS_LEVEL:
+			case IPV6_ESP_NETWORK_LEVEL:
+#ifndef IPSEC
+				error = EINVAL;
+#else
+				if (m == 0 || m->m_len != sizeof(int)) {
+					error = EINVAL;
+					break;
+				}
+				optval = *mtod(m, int *);
+
+				if (optval < IPSEC_LEVEL_BYPASS || 
+				    optval > IPSEC_LEVEL_UNIQUE) {
+					error = EINVAL;
+					break;
+				}
+					
+				switch (optname) {
+				case IP_AUTH_LEVEL:
+				        if (optval < ipsec_auth_default_level &&
+					    suser(p->p_ucred, &p->p_acflag)) {
+						error = EACCES;
+						break;
+					}
+					inp->inp_seclevel[SL_AUTH] = optval;
+					break;
+
+				case IP_ESP_TRANS_LEVEL:
+				        if (optval < ipsec_esp_trans_default_level &&
+					    suser(p->p_ucred, &p->p_acflag)) {
+						error = EACCES;
+						break;
+					}
+					inp->inp_seclevel[SL_ESP_TRANS] = optval;
+					break;
+
+				case IP_ESP_NETWORK_LEVEL:
+				        if (optval < ipsec_esp_network_default_level &&
+					    suser(p->p_ucred, &p->p_acflag)) {
+						error = EACCES;
+						break;
+					}
+					inp->inp_seclevel[SL_ESP_NETWORK] = optval;
+					break;
+				}
+				if (!error)
+					inp->inp_secrequire = get_sa_require(inp);
+#endif
+				break;
+#endif /*OpenBSD*/
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
 			case IPV6_IPSEC_POLICY:
 			    {
 				caddr_t req = NULL;
@@ -1963,7 +2200,7 @@ do { \
 #endif
 			    }
 				break;
-#endif /* IPSEC */
+#endif /* KAME IPSEC */
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 			case IPV6_FW_ADD:
@@ -2255,7 +2492,56 @@ do { \
 #endif
 				break;
 
-#ifdef IPSEC
+#ifdef __OpenBSD__
+			case IPSEC6_OUTSA:
+#ifndef IPSEC
+				error = EINVAL;
+#else
+				s = spltdb();
+				if (inp->inp_tdb == NULL) {
+					error = ENOENT;
+				} else {
+					tdbi.spi = inp->inp_tdb->tdb_spi;
+					tdbi.dst = inp->inp_tdb->tdb_dst;
+					tdbi.proto = inp->inp_tdb->tdb_sproto;
+					*mp = m = m_get(M_WAIT, MT_SOOPTS);
+					m->m_len = sizeof(tdbi);
+					bcopy((caddr_t)&tdbi, mtod(m, caddr_t),
+					    (unsigned)m->m_len);
+				}
+				splx(s);
+#endif
+				break;
+
+			case IPV6_AUTH_LEVEL:
+			case IPV6_ESP_TRANS_LEVEL:
+			case IPV6_ESP_NETWORK_LEVEL:
+#ifndef IPSEC
+				m->m_len = sizeof(int);
+				*mtod(m, int *) = IPSEC_LEVEL_NONE;
+#else
+				m->m_len = sizeof(int);
+				switch (optname) {
+				case IP_AUTH_LEVEL:
+					optval = inp->inp_seclevel[SL_AUTH];
+					break;
+
+				case IP_ESP_TRANS_LEVEL:
+					optval =
+					    inp->inp_seclevel[SL_ESP_TRANS];
+					break;
+
+				case IP_ESP_NETWORK_LEVEL:
+					optval =
+					    inp->inp_seclevel[SL_ESP_NETWORK];
+					break;
+				}
+				*mtod(m, int *) = optval;
+#endif
+				break;
+#endif /*OpenBSD*/
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
 			case IPV6_IPSEC_POLICY:
 			  {
 				caddr_t req = NULL;
@@ -2287,7 +2573,7 @@ do { \
 #endif
 				break;
 			  }
-#endif /* IPSEC */
+#endif /* KAME IPSEC */
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 			case IPV6_FW_GET:

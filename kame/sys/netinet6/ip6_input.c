@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.143 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.144 2000/12/04 05:36:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,10 +153,6 @@
 #endif
 
 #include <net/net_osdep.h>
-
-#ifdef __OpenBSD__ /*KAME IPSEC*/
-#undef IPSEC
-#endif
 
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
@@ -433,7 +429,7 @@ ip6_input(m)
 	int rv;
 #endif	/* PFIL_HOOKS */
 
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 	/*
 	 * should the inner packet be considered authentic?
 	 * see comment in ah4_input().
