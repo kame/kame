@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.25 2003/08/05 13:19:23 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.26 2003/08/06 17:16:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -323,6 +323,14 @@ mip6_ioctl(cmd, data)
 				sc->hif_coa_ifa = NULL;
 				mip6_detach_haddrs(sc);
 				mip6_bu_list_remove_all(&sc->hif_bu_list, 1);
+				while (!LIST_EMPTY(&sc->hif_ha_list_home))
+					hif_ha_list_remove(
+					    &sc->hif_ha_list_home,
+					    LIST_FIRST(&sc->hif_ha_list_home));
+				while (!LIST_EMPTY(&sc->hif_ha_list_foreign))
+					hif_ha_list_remove(
+					    &sc->hif_ha_list_foreign,
+					    LIST_FIRST(&sc->hif_ha_list_foreign));
 				while (!LIST_EMPTY(&mip6_prefix_list))
 					mip6_prefix_list_remove(
 					    &mip6_prefix_list,
