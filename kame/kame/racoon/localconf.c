@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.7 2000/04/26 20:05:24 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.8 2000/04/28 14:29:45 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -103,7 +103,7 @@ initlcconf()
 	lcconf->default_af = AF_INET;
 	lcconf->pad_random = LC_DEFAULT_PAD_RANDOM;
 	lcconf->pad_maxsize = LC_DEFAULT_PAD_MAXSIZE;
-	lcconf->pad_restrict = LC_DEFAULT_PAD_STRICT;
+	lcconf->pad_strict = LC_DEFAULT_PAD_STRICT;
 	lcconf->pad_excltail = LC_DEFAULT_PAD_EXCLTAIL;
 	lcconf->retry_counter = LC_DEFAULT_RETRY_COUNTER;
 	lcconf->retry_interval = LC_DEFAULT_RETRY_INTERVAL;

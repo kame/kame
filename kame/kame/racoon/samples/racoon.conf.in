@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.6 2000/04/26 20:07:12 sakane Exp $
+# $KAME: racoon.conf.in,v 1.7 2000/04/28 14:29:46 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -25,7 +25,7 @@ log debug4;
 padding {
 	maximum_length 20;	# maximum padding length.
 	randomize off;		# enable randomize length.
-	restrict_check off;	# enable restrict check.
+	strict_check off;	# enable strict check.
 	exclusive_tail off;	# extract last one octet.
 }
 

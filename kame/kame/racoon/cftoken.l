@@ -140,7 +140,7 @@ octetstring	{octet}({dot}{octet})+
 <S_PAD>{bcl}		{ return(BOC); }
 <S_PAD>maximum_length	{ YYD; return(PAD_MAXLEN); }
 <S_PAD>randomize	{ YYD; return(PAD_RANDOMIZE); }
-<S_PAD>restrict_check	{ YYD; return(PAD_RESTRICT); }
+<S_PAD>strict_check	{ YYD; return(PAD_STRICT); }
 <S_PAD>exclusive_tail	{ YYD; return(PAD_EXCLTAIL); }
 <S_PAD>{ecl}		{ BEGIN S_INI; return(EOC); }
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.30 2000/04/24 21:13:54 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.31 2000/04/28 14:29:45 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2264,7 +2264,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 			"padding len=%u\n", padlen));
 
 	/* trim padding */
-	if (lcconf->pad_restrict) {
+	if (lcconf->pad_strict) {
 		if (padlen > new->l) {
 			plog(logp, LOCATION, NULL,
 				"invalied padding len=%u, buflen=%u.\n",

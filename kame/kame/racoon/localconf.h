@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.6 2000/04/26 08:35:19 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.7 2000/04/28 14:29:45 sakane Exp $ */
 
 /* local configuration */
 
@@ -80,7 +80,7 @@ struct localconf {
 
 	int pad_random;
 	int pad_maxsize;
-	int pad_restrict;
+	int pad_strict;
 	int pad_excltail;
 
 	int retry_counter;		/* initial value */

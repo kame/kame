@@ -133,7 +133,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	/* logging */
 %token LOGGING LOGLEV
 	/* padding */
-%token PADDING PAD_MAXLEN PAD_RANDOMIZE PAD_RESTRICT PAD_EXCLTAIL
+%token PADDING PAD_MAXLEN PAD_RANDOMIZE PAD_STRICT PAD_EXCLTAIL
 	/* listen */
 %token LISTEN X_ISAKMP X_ADMIN STRICT_ADDRESS
 	/* timer */
@@ -297,7 +297,7 @@ padding_stmts
 padding_stmt
 	:	PAD_RANDOMIZE SWITCH EOS { lcconf->pad_random = $2; }
 	|	PAD_MAXLEN NUMBER EOS { lcconf->pad_maxsize = $2; }
-	|	PAD_RESTRICT SWITCH EOS { lcconf->pad_restrict = $2; }
+	|	PAD_STRICT SWITCH EOS { lcconf->pad_strict = $2; }
 	|	PAD_EXCLTAIL SWITCH EOS { lcconf->pad_excltail = $2; }
 	;
 
