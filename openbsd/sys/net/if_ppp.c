@@ -136,6 +136,9 @@ static void	ppp_ccp __P((struct ppp_softc *, struct mbuf *m, int rcvd));
 static void	ppp_ccp_closed __P((struct ppp_softc *));
 static void	ppp_inproc __P((struct ppp_softc *, struct mbuf *));
 static void	pppdumpm __P((struct mbuf *m0));
+#ifdef ALTQ
+static void	ppp_ifstart __P((struct ifnet *ifp));
+#endif
 
 /*
  * Some useful mbuf macros not in mbuf.h.
@@ -200,6 +203,9 @@ pppattach()
 	sc->sc_if.if_hdrlen = PPP_HDRLEN;
 	sc->sc_if.if_ioctl = pppsioctl;
 	sc->sc_if.if_output = pppoutput;
+#ifdef ALTQ
+	sc->sc_if.if_start = ppp_ifstart;
+#endif
 	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, ifqmaxlen);
 	sc->sc_inq.ifq_maxlen = ifqmaxlen;
 	sc->sc_fastq.ifq_maxlen = ifqmaxlen;
@@ -1503,5 +1509,21 @@ done:
     *bp = 0;
     printf("%s\n", buf);
 }
+
+#ifdef ALTQ
+/*
+ * a wrapper to transmit a packet from if_start since ALTQ uses
+ * if_start to send a packet.
+ */
+static void
+ppp_ifstart(ifp)
+	struct ifnet *ifp;
+{
+	struct ppp_softc *sc;
+
+	sc = ifp->if_softc;
+	(*sc->sc_start)(sc);
+}
+#endif
 
 #endif	/* NPPP > 0 */

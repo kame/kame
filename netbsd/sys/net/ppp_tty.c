@@ -892,6 +892,15 @@ pppstart(tp)
     if ((CCOUNT(&tp->t_outq) >= PPP_LOWAT)
 	&& ((sc == NULL) || (sc->sc_flags & SC_TIMEOUT)))
 	return 0;
+#ifdef ALTQ
+    /*
+     * if ALTQ is enabled, don't invoke NETISR_PPP.
+     * pppintr() could loop without doing anything useful
+     * under rate-limiting.
+     */
+    if (ALTQ_IS_ENABLED(&sc->sc_if.if_snd))
+	return 0;
+#endif
     if (!((tp->t_state & TS_CARR_ON) == 0 && (tp->t_cflag & CLOCAL) == 0)
 	&& sc != NULL && tp == (struct tty *) sc->sc_devp) {
 	ppp_restart(sc);
