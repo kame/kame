@@ -1,11 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1128 2000/07/13 13:29:30 itojun Exp $
+$Id: CHANGELOG,v 1.1129 2000/07/13 17:18:14 itojun Exp $
 
 <200006>
 Thu Jul 13 22:27:18 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet6/raw_ipv6.c: enable IPv6 multicast routing
 	  related setsockopt.
+	* kame/sys/netinet6/ip6_mroute.c: to enable openbsd users to perform
+	  netstat -g, make mif6table a non-static variable.  on openbsd
+	  file static variables will not appear in kernel symbol table.
 
 Thu Jul 13 16:09:57 JST 2000  itojun@iiljab.net
 	* netbsd/pkgsrc/net/bind9: upgrade to 9.0.0rc1.
