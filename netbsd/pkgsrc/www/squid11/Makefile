@@ -3,7 +3,7 @@
 # Date created:		Thu Nov  7 00:53:18 WST 1996
 # Whom:			Peter Wemm <peter@freebsd.org>
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/10 09:15:01 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/12 05:38:38 itojun Exp $
 #
 
 DISTNAME=	squid-1.1.22
@@ -21,6 +21,8 @@ PATCHFILES=	squid-1.1.22-v6-19990218.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	k-sugyou@kame.net
+
+BROKEN=		"uses nonstandard struct field"
 
 DIST_SUBDIR=	squid1.1.22
 GNU_CONFIGURE=	yes
