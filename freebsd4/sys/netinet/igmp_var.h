@@ -121,9 +121,9 @@ struct igmpstat {
 /*
  * States for the IGMPv3's state table.
  */
-#define	IGMP_QUERY_PENDING_MEMBER	6	/* pending General Query */
-#define	IGMP_G_QUERY_PENDING_MEMBER	7	/* pending Grp-specific Query */
-#define	IGMP_SG_QUERY_PENDING_MEMBER	8	/* pending Grp-Src-specific Q.*/
+#define	IGMP_QUERY_PENDING_MEMBER	2	/* pending General Query */
+#define	IGMP_G_QUERY_PENDING_MEMBER	3	/* pending Grp-specific Query */
+#define	IGMP_SG_QUERY_PENDING_MEMBER	4	/* pending Grp-Src-specific Q.*/
 
 /*
  * We must remember what version the subnet's querier is.
