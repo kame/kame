@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.137 2001/08/19 05:52:27 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.138 2001/09/18 02:33:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -475,7 +475,6 @@ main(argc, argv)
 			errx(1, "-R is not supported in this configuration");
 #endif
 		case 'S':
-			/* XXX: use getaddrinfo? */
 			bzero(&hints, sizeof(struct addrinfo));
 			hints.ai_flags = AI_NUMERICHOST; /* allow hostname? */
 			hints.ai_family = AF_INET6;
