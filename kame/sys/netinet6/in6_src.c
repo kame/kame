@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.21 2000/06/09 00:06:15 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.22 2000/06/09 00:22:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,6 +102,9 @@
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h> 
+#endif
 
 #include <net/net_osdep.h>
 
@@ -632,8 +635,10 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 	struct ifnet **ifpp;
 {
 	struct ifnet *ifp = NULL;
+	u_int32_t scopeid;
 
 	*in6 = sin6->sin6_addr;
+	scopeid = sin6->sin6_scope_id;
 	if (ifpp)
 		*ifpp = NULL;
 
@@ -641,6 +646,11 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 	 * don't try to read sin6->sin6_addr beyond here, since the caller may
 	 * ask us to overwrite existing sockaddr_in6
 	 */
+
+#ifdef ENABLE_DEFAULT_SCOPE
+	if (scopeid == 0)
+		scopeid = scope6_addr2default(in6);
+#endif
 
 	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
 		struct in6_pktinfo *pi;
@@ -659,14 +669,13 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 			&& in6p->in6p_moptions->im6o_multicast_ifp) {
 			ifp = in6p->in6p_moptions->im6o_multicast_ifp;
 			in6->s6_addr16[1] = htons(ifp->if_index);
-		} else if (sin6->sin6_scope_id) {
+		} else if (scopeid) {
 			/* boundary check */
-			if (sin6->sin6_scope_id < 0 ||
-			    if_index < sin6->sin6_scope_id)
+			if (scopeid < 0 || if_index < scopeid)
 				return ENXIO;  /* XXX EINVAL? */
-			ifp = ifindex2ifnet[sin6->sin6_scope_id];
+			ifp = ifindex2ifnet[scopeid];
 			/*XXX assignment to 16bit from 32bit variable */
-			in6->s6_addr16[1] = htons(sin6->sin6_scope_id & 0xffff);
+			in6->s6_addr16[1] = htons(scopeid & 0xffff);
 		}
 
 		if (ifpp)

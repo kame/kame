@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.47 2000/06/07 03:31:41 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.48 2000/06/08 12:39:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,9 +92,6 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
-#ifdef ENABLE_DEFAULT_SCOPE
-#include <netinet6/scope6_var.h> 
-#endif
 
 #ifndef __bsdi__
 #include "loop.h"
@@ -195,42 +192,10 @@ in6_pcbbind(in6p, nam)
 			return(EADDRNOTAVAIL);
 #endif
 
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (sin6->sin6_scope_id == 0)
-			sin6->sin6_scope_id =
-				scope6_addr2default(&sin6->sin6_addr);
-#endif
-
-		/*
-		 * If the scope of the destination is link-local, embed the
-		 * interface index in the address.
-		 */
-		if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr)) {
-			/* XXX boundary check is assumed to be already done. */
-			/* XXX sin6_scope_id is weaker than advanced-api. */
-			struct in6_pktinfo *pi;
-			if (in6p->in6p_outputopts &&
-			    (pi = in6p->in6p_outputopts->ip6po_pktinfo) &&
-			    pi->ipi6_ifindex) {
-				sin6->sin6_addr.s6_addr16[1]
-					= htons(pi->ipi6_ifindex);
-			} else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)
-				&& in6p->in6p_moptions
-				&& in6p->in6p_moptions->im6o_multicast_ifp) {
-				sin6->sin6_addr.s6_addr16[1] =
-					htons(in6p->in6p_moptions->im6o_multicast_ifp->if_index);
-			} else if (sin6->sin6_scope_id) {
-				/* boundary check */
-				if (sin6->sin6_scope_id < 0
-				 || if_index < sin6->sin6_scope_id) {
-					return ENXIO;  /* XXX EINVAL? */
-				}
-				sin6->sin6_addr.s6_addr16[1]
-					= htons(sin6->sin6_scope_id & 0xffff);/*XXX*/
-				/* this must be cleared for ifa_ifwithaddr() */
-				sin6->sin6_scope_id = 0;
-			}
-		}
+		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
+			return EINVAL;
+		/* this must be cleared for ifa_ifwithaddr() */
+		sin6->sin6_scope_id = 0;
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -335,7 +300,6 @@ in6_pcbconnect(in6p, nam)
 {
 	struct in6_addr *in6a = NULL;
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
-	struct in6_pktinfo *pi;
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
 	struct in6_addr mapped;
@@ -365,42 +329,8 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
-#ifdef ENABLE_DEFAULT_SCOPE
-	/* do not override if already specified */
-	if (sin6->sin6_scope_id == 0)
-		sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
-#endif
-
-	/*
-	 * If the scope of the destination is link-local, embed the interface
-	 * index in the address.
-	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr)) {
-		/* XXX boundary check is assumed to be already done. */
-		/* XXX sin6_scope_id is weaker than advanced-api. */
-		if (in6p->in6p_outputopts &&
-		    (pi = in6p->in6p_outputopts->ip6po_pktinfo) &&
-		    pi->ipi6_ifindex) {
-			sin6->sin6_addr.s6_addr16[1] = htons(pi->ipi6_ifindex);
-			ifp = ifindex2ifnet[pi->ipi6_ifindex];
-		}
-		else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) &&
-			 in6p->in6p_moptions &&
-			 in6p->in6p_moptions->im6o_multicast_ifp) {
-			sin6->sin6_addr.s6_addr16[1] =
-				htons(in6p->in6p_moptions->im6o_multicast_ifp->if_index);
-			ifp = ifindex2ifnet[in6p->in6p_moptions->im6o_multicast_ifp->if_index];
-		} else if (sin6->sin6_scope_id) {
-			/* boundary check */
-			if (sin6->sin6_scope_id < 0
-			 || if_index < sin6->sin6_scope_id) {
-				return ENXIO;  /* XXX EINVAL? */
-			}
-			sin6->sin6_addr.s6_addr16[1]
-				= htons(sin6->sin6_scope_id & 0xffff);/*XXX*/
-			ifp = ifindex2ifnet[sin6->sin6_scope_id];
-		}
-	}
+	if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, &ifp) != 0)
+		return EINVAL;
 
 	/* Source address selection. */
 	if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)

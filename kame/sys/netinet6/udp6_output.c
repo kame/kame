@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.11 2000/06/08 12:39:16 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.12 2000/06/09 00:22:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,9 +103,6 @@
 #endif
 #include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
-#ifdef ENABLE_DEFAULT_SCOPE
-#include <netinet6/scope6_var.h>
-#endif
 
 #ifdef __OpenBSD__
 #undef IPSEC
@@ -240,50 +237,9 @@ udp6_output(in6p, m, addr6, control)
 
 		faddr = &sin6->sin6_addr;
 		fport = sin6->sin6_port; /* allow 0 port */
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (sin6->sin6_scope_id == 0)
-			sin6->sin6_scope_id =
-				scope6_addr2default(&sin6->sin6_addr);
-#endif
 
-		/*
-		 * If the scope of the destination is link-local,
-		 * embed the interface index in the address.
-		 *
-		 * XXX advanced-api value overrides sin6_scope_id
-		 */
-		if (IN6_IS_ADDR_LINKLOCAL(faddr) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(faddr)) {
-			struct ip6_pktopts *optp = in6p->in6p_outputopts;
-			struct in6_pktinfo *pi = NULL;
-			struct ifnet *oifp = NULL;
-			struct ip6_moptions *mopt = NULL;
-
-			/*
-			 * XXX Boundary check is assumed to be already done in
-			 * ip6_setpktoptions().
-			 */
-			if (optp && (pi = optp->ip6po_pktinfo) &&
-			    pi->ipi6_ifindex) {
-				faddr->s6_addr16[1] = htons(pi->ipi6_ifindex);
-				oifp = ifindex2ifnet[pi->ipi6_ifindex];
-			} else if (IN6_IS_ADDR_MULTICAST(faddr) &&
-				 (mopt = in6p->in6p_moptions) &&
-				 mopt->im6o_multicast_ifp) {
-				oifp = mopt->im6o_multicast_ifp;
-				faddr->s6_addr16[1] = htons(oifp->if_index);
-			} else if (sin6->sin6_scope_id) {
-				/* boundary check */
-				if (sin6->sin6_scope_id < 0
-				    || if_index < sin6->sin6_scope_id) {
-					error = ENXIO;  /* XXX EINVAL? */
-					goto release;
-				}
-				/* XXX */
-				faddr->s6_addr16[1] =
-					htons(sin6->sin6_scope_id & 0xffff);
-			}
-		}
+		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
+			return EINVAL;
 
 		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
 			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
