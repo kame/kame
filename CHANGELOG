@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1397 2000/11/24 06:15:29 itojun Exp $
+$KAME: CHANGELOG,v 1.1398 2000/11/24 08:30:18 itojun Exp $
 
 <200011>
+Fri Nov 24 17:29:30 JST 2000  itojun@iijlab.net
+	* libinet6/if_nametoindex.c: conform to RFC2553 (ENXIO if the interface
+	  is not found).
+
 Fri Nov 24 15:14:37 JST 2000  itojun@iijlab.net
 	* libinet6: compile strl{cpy,cat} for better code sharing.
 	  (freebsd2/netbsd142/bsdi3/bsdi4)
