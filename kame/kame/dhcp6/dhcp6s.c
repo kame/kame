@@ -391,7 +391,7 @@ server6_react_informreq(buf, siz, from, fromlen)
 {
 	struct dhcp6 *dh6r;
 	struct dhcp6 *dh6p;
-	char sbuf[BUFSIZ], ifnam[IF_NAMESIZE];
+	char sbuf[BUFSIZ];
 	ssize_t len;
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;

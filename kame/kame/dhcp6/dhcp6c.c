@@ -543,15 +543,12 @@ static void
 client6_sendinform(s)
 	int s;
 {
-	int offlinkserv = 0, direct;
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
-	struct in6_addr myaddr;
 	char buf[BUFSIZ];
 	struct dhcp6 *dh6;
 	struct dhcp6opt *opt;
-	const int firsttime = 1; /* currently we don't implement any cache */
 	ssize_t len, l;
 	char *p, *p0, *ep;
 
@@ -620,7 +617,6 @@ client6_recvreply(s)
 	socklen_t fromlen;
 	char *cp;
 	struct dhcp6opt *p, *ep, *np;
-	u_int16_t code, elen;
 	int i;
 	struct in6_addr in6;
 
