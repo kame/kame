@@ -929,6 +929,7 @@ tcp6_ctlinput(cmd, sa, d)
 	struct sockaddr_in6 sa6;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
+	struct ip6ctlparam *ip6cp = NULL;
 	int off = 0;
 	struct tcp_portonly {
 		u_int16_t th_sport;
@@ -949,7 +950,7 @@ tcp6_ctlinput(cmd, sa, d)
 
 	/* if the parameter is from icmp6, decode it. */
 	if (d != NULL) {
-		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		ip6cp = (struct ip6ctlparam *)d;
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
@@ -958,22 +959,39 @@ tcp6_ctlinput(cmd, sa, d)
 		ip6 = NULL;
 	}
 
-	/* translate addresses into internal form */
-	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
-		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+	if (ip6cp && ip6cp->ip6c_finaldst) {
+		bzero(&sa6, sizeof(sa6));
+		sa6.sin6_family = AF_INET6;
+		sa6.sin6_len = sizeof(sa6);
+		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
+		/* XXX: assuming M is valid in this case */
+		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+						     ip6cp->ip6c_finaldst);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("tcp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	} else {
+		/* XXX: translate addresses into internal form */
+		sa6 = *(struct sockaddr_in6 *)sa;
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("tcp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	}
 
 	if (ip6) {
 		/*
 		 * XXX: We assume that when IPV6 is non NULL,
 		 * M and OFF are valid.
 		 */
-		struct in6_addr s;
-
-		/* translate addresses into internal form */
-		memcpy(&s, &ip6->ip6_src, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+		struct sockaddr_in6 sa6_src;
 
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*thp))
@@ -981,9 +999,24 @@ tcp6_ctlinput(cmd, sa, d)
 
 		bzero(&th, sizeof(th));
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
-		
+
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
+			/* should be impossbile */
+			printf("tcp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+
 		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, th.th_dport,
-			      &s, th.th_sport, cmd, NULL, notify);
+			      &sa6_src.sin6_addr, th.th_sport, cmd,
+			      NULL, notify);
 	} else
 		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, 0, &zeroin6_addr,
 			      0, cmd, NULL, notify);
