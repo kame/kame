@@ -678,6 +678,12 @@ rip6_ctloutput (op, so, level, optname, m)
       break;
 
     case ICMP6_FILTER:
+      if (level != IPPROTO_ICMPV6) {
+	if (op == PRCO_SETOPT && *m)
+	  (void)m_free(*m);
+	RETURN_ERROR(EINVAL);
+      }
+
       if (op == PRCO_SETOPT || op == PRCO_GETOPT) {
         if (op == PRCO_SETOPT) {
           if (!m || !*m || (*m)->m_len != sizeof(struct icmp6_filter))
