@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.24 2001/10/18 23:12:36 suz Exp $	*/
+/*	$KAME: main.c,v 1.25 2002/04/03 02:17:32 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -96,7 +96,7 @@ static char 		genidfilename[] = _PATH_PIM6D_GENID;
 */
 static char     	pidfilename[] = _PATH_PIM6D_PID;
 
-FILE			*log_fp = stderr;
+FILE			*log_fp;
 char           		*progname;
 
 static int		foreground = 0;
@@ -236,6 +236,7 @@ main(argc, argv)
     char            c;
     int             tmpd;
 
+    log_fp = stderr;
     setlinebuf(stderr);
 
     if (geteuid() != 0)
