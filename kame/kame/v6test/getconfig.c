@@ -1045,7 +1045,7 @@ make_raw(char *name)
 {
 	char rawbuf[MAXPKTSIZ], area[MAXPKTSIZ];
 	char *bp = area, *upper_data;
-	short val16 = -1;
+	int val = -1;
 
 	if (tgetent(rawbuf, name) <= 0) {
 		fprintf(stderr, "v6test: unknown header %s\n", name);
@@ -1056,9 +1056,9 @@ make_raw(char *name)
 	 * fulfills next header field in previous option only when raw_proto
 	 * is specified
 	 */
-	tgetnum("raw_proto", rawbuf, &val16);
-	if (nxthdrp && val16 >= 0)
-		*nxthdrp = (uint8_t) (val16 & 0xff);
+	tgetnum("raw_proto", rawbuf, &val);
+	if (nxthdrp && val >= 0)
+		*nxthdrp = (uint8_t) (val & 0xff);
 	nxthdrp = 0;
 	if ((upper_data = tgetstr("raw_data", &bp, rawbuf)) != NULL) {
 		gethex(upper_data);
