@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.16 2001/04/10 15:08:31 suz Exp $	*/
+/*	$KAME: rtadvd.h,v 1.17 2001/06/01 17:11:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -92,7 +92,7 @@ struct rtinfo {
 	struct rtinfo *next;	/* forward link */
 
 	u_int32_t ltime;	/* route lifetime */
-	u_int rtpref;		/* router preference */
+	u_int rtpref;		/* route preference */
 	int prefixlen;
 	struct in6_addr prefix;
 };
