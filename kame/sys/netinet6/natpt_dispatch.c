@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.54 2002/05/10 11:47:49 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.55 2002/05/15 06:45:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -498,7 +498,6 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 	 * According to RFC2765 3.1.
 	 */
 	if ((ip->ip_off & IP_DF) == 0) {
-		cv4->flags |= NO_DF;
 		hdrsz += sizeof(struct ip6_frag);
 	}
 

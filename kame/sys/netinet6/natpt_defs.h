@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.47 2002/04/16 05:17:05 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.48 2002/05/15 06:45:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -143,15 +143,14 @@ struct pcv {
 #define	NATPT_TO		1
 
 	u_char	 flags;
-#define	NATPT_TRACEROUTE		0x01
+#define	NATPT_TRACEROUTE	0x01
 
 /* The following flags are used in IPv4->IPv6 translation */
-#define	FIRST_FRAGMENT		0x02	/* is first fragment? */
-#define	NEXT_FRAGMENT		0x04	/* is fragment after the first? */
-#define	NEED_FRAGMENT		0x08	/* need fragment? */
+#define	ZERO_OFFSET		0x08	/* fragment offset == 0 */
+#define	FIRST_FRAGMENT		0x10	/* is first fragment? */
+#define	NEXT_FRAGMENT		0x20	/* is fragment after the first? */
+#define	NEED_FRAGMENT		0x40	/* need fragment? */
 #define	SET_DF			0x80	/* is DF bit set? */
-#define	NO_DF			0x40	/* DF flag is not set */
-#define	ZERO_OFFSET		0x10	/* fragment offset == 0 */
 
 #define	IS_FRAGMENT		(FIRST_FRAGMENT | NEXT_FRAGMENT)
 
@@ -160,7 +159,7 @@ struct pcv {
 #define	isNextFragment(cv)	((cv)->flags & NEXT_FRAGMENT)
 #define	needFragment(cv)	((cv)->flags & NEED_FRAGMENT)
 #define	isDFset(cv)		((cv)->flags & SET_DF)
-#define isNoDF(cv)		((cv)->flags & NO_DF)
+#define isNoDF(cv)		(!isDFset(cv))
 #define	isZeroOffset(cv)	((cv)->flags & ZERO_OFFSET)
 
 	u_int16_t	poff;		/* payload offset */
