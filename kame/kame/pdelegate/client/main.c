@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.6 2001/03/27 02:41:59 itojun Exp $	*/
+/*	$KAME: main.c,v 1.7 2001/09/06 05:31:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -294,7 +294,7 @@ send_discover(s)
 #error kame systems only
 #endif
 	if (dflag)
-		snprintf(dest, sizeof(dest), "ff02::1%%%s", iface);	/*XXX*/
+		snprintf(dest, sizeof(dest), "ff02::2%%%s", iface);	/*XXX*/
 	else {
 		/* XXX local agreement */
 		snprintf(dest, sizeof(dest), "%s%%%s", ALLDELEGATORS, iface);

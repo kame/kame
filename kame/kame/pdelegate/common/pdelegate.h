@@ -1,4 +1,4 @@
-/*	$KAME: pdelegate.h,v 1.4 2001/03/05 12:41:30 itojun Exp $	*/
+/*	$KAME: pdelegate.h,v 1.5 2001/09/06 05:31:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -58,7 +58,7 @@
 struct icmp6_prefix_request {
 	struct icmp6_hdr icmp6_pr_hdr;
 	struct in6_addr	icmp6_pr_prefix;
-};
+} __attribute__((__packed__));
 #define icmp6_pr_flaglen	icmp6_data8[0]
 #define ICMP6_PR_FLAGS_SCOPE	0x80
 #define ICMP6_PR_LEN_MASK	0x7f
@@ -70,7 +70,7 @@ struct icmp6_prefix_delegation {
 	struct in6_addr	icmp6_pd_prefix;
 	u_int16_t icmp6_pd_rtlen;
 	/* variable-length routing information follows */
-};
+} __attribute__((__packed__));
 #define icmp6_pd_flaglen	icmp6_data8[0]
 #define ICMP6_PD_FLAGS_SCOPE	0x80
 #define ICMP6_PD_LEN_MASK	0x7f
