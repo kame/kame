@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.64 2003/11/13 02:30:20 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.65 2003/11/13 19:11:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -609,9 +609,6 @@ ident_i4recv(iph1, msg0)
 
 	/* payload existency check */
 
-	/* see handler.h about IV synchronization. */
-	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
-
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
@@ -643,6 +640,9 @@ ident_i4recv(iph1, msg0)
 
 	plog(LLV_DEBUG, LOCATION, iph1->remote, "peer's ID:");
 	plogdump(LLV_DEBUG, iph1->id_p->v, iph1->id_p->l);
+
+	/* see handler.h about IV synchronization. */
+	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
 
 	/*
 	 * If we got a GSS token, we need to this roundtrip again.
@@ -1205,9 +1205,6 @@ ident_r3recv(iph1, msg0)
 	}
     }
 
-	/* see handler.h about IV synchronization. */
-	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
-
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
@@ -1246,6 +1243,9 @@ ident_r3recv(iph1, msg0)
 
 	plog(LLV_DEBUG, LOCATION, iph1->remote, "peer's ID\n");
 	plogdump(LLV_DEBUG, iph1->id_p->v, iph1->id_p->l);
+
+	/* see handler.h about IV synchronization. */
+	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
 
 #ifdef HAVE_GSSAPI
 	iph1->status = gsstoken != NULL ? PHASE1ST_MSG2RECEIVED :
