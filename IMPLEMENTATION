@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.154 2000/08/29 10:56:12 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.155 2000/09/06 00:37:25 itojun Exp $
 
 1. IPv6
 
@@ -844,6 +844,9 @@ and initiating side).  AF_INET6 and AF_INET sockets are totally separated.
 
 Port number space is totally separate between AF_INET and AF_INET6 sockets. 
 
+It should be noted that KAME/BSDI3 and KAME/FreeBSD228 are not conformant
+to RFC2553 section 3.7 and 3.8.  It is due to code sharing reasons.
+
 1.12.2 KAME/FreeBSD[34]x
 
 KAME/FreeBSD3x and KAME/FreeBSD4x use shared tcp4/6 code (from
@@ -879,6 +882,10 @@ KAME/NetBSD uses shared tcp4/6 code (from sys/netinet/tcp*) and shared
 udp4/6 code (from sys/netinet/udp*).  The implementation is made differently
 from KAME/FreeBSD[34]x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
 while KAME/FreeBSD[34]x uses merged inpcb structure.
+
+It should be noted that the default configuration of KAME/NetBSD is not
+conformant to RFC2553 section 3.8.  It is intentionally turned off by default
+for security reasons.
 
 1.12.3.1 KAME/NetBSD, listening side
 
@@ -939,6 +946,9 @@ KAME/BSDi4 supports connection initiation to IPv4 mapped address
 
 KAME/OpenBSD uses NRL-based TCP/UDP stack and inpcb source code,
 which was derived from NRL IPv6/IPsec stack.
+
+It should be noted that KAME/OpenBSD is not conformant to RFC2553 section 3.7
+and 3.8.  It is intentionally omitted for security reasons.
 
 1.12.5.1 KAME/OpenBSD, listening side
 
