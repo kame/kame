@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.9 2000/10/25 05:48:19 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.10 2000/11/08 12:01:22 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -185,10 +185,16 @@ is more than 0.
 (num) Valid lifetime field
 .Pq unit: seconds .
 The default value is 2592000(30 days).
+.It Cm \&vltimedecr
+(bool) This item means the advertised valid lifetime will decrements
+in real time, which is disabled by default.
 .It Cm \&pltime
 (num) Preferred lifetime field
 .Pq unit: seconds .
 The default value is 604800(7 days).
+.It Cm \&pltimedecr
+(bool) This item means the advertised preferred lifetime will decrements
+in real time, which is disabled by default.
 .El
 .Pp
 The following item is for ICMPv6 MTU option,
