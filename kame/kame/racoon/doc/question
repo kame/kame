@@ -1,4 +1,4 @@
-$Id: question,v 1.24 2000/09/23 05:31:24 itojun Exp $
+$Id: question,v 1.25 2000/09/27 23:32:32 sakane Exp $
 
 Q: how may policy matters are.  can we interoperate ?
 
@@ -366,7 +366,42 @@ Q: Certificate Request.
        certificate authority requested, this field SHOULD not be
        included.
 
-retransmission method (implementation issue)
+Message-Id: <200009262047.XAA10637@torni.hel.fi.ssh.com>
+Subject: CERT_REQ_PAYLOAD usage
+From: Tero Kivinen <kivinen@ssh.fi>
+Date: Tue, 26 Sep 2000 23:47:00 +0300 (EET DST)
+
+	1) If you absolutely need certificates from the other side for
+	the authentication to work, you MUST send certificate request
+	payload.
+
+	2) If the authentication can succeed without the other end
+	sending certificates (you have some certificate for the other
+	end, or you can fetch the certificate from the certificate
+	repository), you MAY send certificate request.
+
+	3) If you just want any certificate without specifying the CA
+	root, send certificate request having empty CA name.
+
+	4) When you receive certificate request you MUST send your own
+	certificate for that CA.
+
+	5) If you receive empty certificate request you MUST send the
+	certificate you are going use in the authentication. If you
+	have multiple certificates for the same private key, you
+	SHOULD send all of them.
+
+	6) If you do not receive certificate request, you SHOULD NOT
+	send any certificates, unless you have reason to belive that
+	the other end has wrong certificate for you (for example you
+	have enrolled a new certificate recently).
+
+	7) You MAY include extra certificates, CRLs etc if you have
+	them available (I.e include your other certificates also
+	(certificate pre-loading), include sub-CA certificates,
+	include CRLs etc.
+
+Q: retransmission method (implementation issue)
 	how can I realize that the last packet in phase 1 was dropped.
 	main/base mode:
 		no problem in initiator side.
@@ -401,6 +436,11 @@ Q: checks against retransmission
 	check ISAKPM header only (watanabe)
 	check MD5(msg)
 
+Sender: owner-ipsec@lists.tislabs.com
+Message-Id: <200007170936.e6H9a2J113489@thunk.east.sun.com>
+Subject: Re: simplifying rekeying [draft-jenkins-ipsec-rekeying-06.txt]
+From: Bill Sommerfeld <sommerfeld@East.Sun.COM>
+
 	pedants may need to worry about the following case:
 
             initiator          responder
@@ -420,11 +460,6 @@ Q: checks against retransmission
 		|            +---->|
 		|                  |
 		:                  :
-
-		Sender: owner-ipsec@lists.tislabs.com
-		Message-Id: <200007170936.e6H9a2J113489@thunk.east.sun.com>
-		Subject: Re: simplifying rekeying [draft-jenkins-ipsec-rekeying-06.txt]
-		From: Bill Sommerfeld <sommerfeld@East.Sun.COM>
 
 Q: Nonce size
 	a size of value MUST be 4 - 252 (RFC2409)
