@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.45 2001/07/25 04:47:34 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.46 2001/08/16 08:52:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -729,6 +729,25 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		if (hasv4addr) {
 			struct pr_usrreqs *pru;
 
+			if (inp->inp_flags & IN6P_IPV6_V6ONLY) {
+				/* 
+				 * since a user of this socket set an
+				 * IPV6_V6ONLY flag, we discard this
+				 * datagram destined to a v4 addr.
+				 */
+				return EINVAL;
+			}
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
+			    && !IN6_IS_ADDR_V4MAPPED(&inp->in6p_laddr)) {
+				/*
+				 * when remote addr is IPv4-mapped
+				 * address, local addr should not be
+				 * an IPv6 address; since you cannot
+				 * determine how to map IPv6 source
+				 * address to IPv4.
+				 */
+				return EINVAL;
+			}
 			if (sin6)
 				in6_sin6_2_sin_in_sock(addr);
 			pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
