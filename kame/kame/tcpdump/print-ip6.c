@@ -209,8 +209,7 @@ ip6_print(register const u_char *bp, register int length)
 	if (vflag) {
 		printf(" (");
 		(void)printf("len %d", len);
-		if (ip6->ip6_hlim > 1)
-			(void)printf(", hlim %d", (int)ip6->ip6_hlim);
+		(void)printf(", hlim %d", (int)ip6->ip6_hlim);
 		printf(")");
 	}
 }
