@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.10 2000/01/12 04:24:28 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.11 2000/01/12 07:21:16 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -376,6 +376,8 @@ delipsecsa(s)
 		delipsecsa(s->bundles);
 	if (s->next)
 		delipsecsa(s->next);
+	if (s->ipsp && s->ipsp->proposal == s)
+		s->ipsp->proposal = NULL;
 	free(s);
 }
 

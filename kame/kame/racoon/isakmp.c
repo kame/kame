@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.40 2000/01/12 03:42:37 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.41 2000/01/12 07:21:16 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

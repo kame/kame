@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.21 2000/01/11 19:45:04 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.22 2000/01/12 07:21:16 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -671,6 +671,8 @@ get_ph2approval(iph2, pair)
 		return NULL;
 	}
 
+	if (iph2->approval)
+		delipsecsa(iph2->approval);
 	iph2->approval = NULL;
 
 	for (i = 0; i < MAXPROPPAIRLEN; i++) {
@@ -694,8 +696,11 @@ get_ph2approval(iph2, pair)
 
 found:
 	newsa = get_sabyproppair(s);
-	if (newsa == NULL)
+	if (newsa == NULL) {
+		if (iph2->approval)
+			delipsecsa(iph2->approval);
 		iph2->approval = NULL;
+	}
 
 	return newsa;
 }
@@ -906,6 +911,7 @@ found:
 
 	/* duplicate the result for future modification */
 	r = dupipsecsa(q1);
+	r->ipsp = NULL;
 	delipsecsa(r->bundles);
 	r->bundles = NULL;
 
@@ -914,6 +920,8 @@ found:
     }
 
 	if (iph2->side == RESPONDER) {
+		if (iph2->approval)
+			delipsecsa(iph2->approval);
 		iph2->approval = r;
 		/* ipsecsa keys from approval */
 		if (ipsecdoi_initsakeys(iph2) < 0) {
@@ -947,6 +955,8 @@ found:
 	memcpy(&k->spi_p, p->prop + 1, sizeof(k->spi_p));
     }
 
+	if (iph2->approval)
+		delipsecsa(iph2->approval);
 	iph2->approval = r;
 
 	return 0;

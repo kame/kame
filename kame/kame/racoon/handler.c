@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.14 2000/01/12 06:09:32 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.15 2000/01/12 07:21:15 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -363,6 +363,10 @@ initph2(iph2)
 	if (iph2->ivm) {
 		oakley_delivm(iph2->ivm);
 		iph2->ivm = NULL;
+	}
+	if (iph2->approval) {
+		delipsecsa(iph2->approval);
+		iph2->approval = NULL;
 	}
 	if (iph2->sce)
 		SCHED_KILL(iph2->sce);
