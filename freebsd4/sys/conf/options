@@ -243,6 +243,7 @@ ETHER_8022		opt_ef.h
 ETHER_SNAP		opt_ef.h
 MROUTING		opt_mrouting.h
 INET			opt_inet.h
+RTPREF			opt_inet.h
 INET6			opt_inet6.h
 ENABLE_DEFAULT_SCOPE	opt_inet6.h
 IP6_AUTO_LINKLOCAL	opt_inet6.h
