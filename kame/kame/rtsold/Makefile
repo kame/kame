@@ -18,7 +18,7 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	rtsold
-SRCS=	rtsold.c rtsol.c if.c probe.c
+SRCS=	rtsold.c rtsol.c if.c probe.c dump.c
 
 CC=	gcc
 

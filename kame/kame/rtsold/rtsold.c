@@ -35,11 +35,13 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 
+#include <signal.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
 #include <err.h>
 #include <stdarg.h>
 #include "rtsold.h"
@@ -72,9 +74,14 @@ static int fflag = 0;
 /* a == b */
 #define TIMEVAL_EQ(a, b) (((a).tv_sec==(b).tv_sec) && ((a).tv_usec==(b).tv_usec))
 
+int main __P((int argc, char *argv[]));
+
 /* static variables and functions */
 static int mobile_node = 0;
-int main __P((int argc, char *argv[]));
+static int do_dump;
+static char *dumpfilename = "/var/tmp/rtsold.dump"; /* XXX: should be configurable */
+static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
+
 static int ifconfig __P((char *ifname));
 static int make_packet __P((struct ifinfo *ifinfo));
 static struct timeval *rtsol_check_timer __P((void));
@@ -82,6 +89,8 @@ static void TIMEVAL_ADD __P((struct timeval *a, struct timeval *b,
 			     struct timeval *result));
 static void TIMEVAL_SUB __P((struct timeval *a, struct timeval *b,
 			     struct timeval *result));
+
+static void rtsold_set_dump_file __P(());
 static void usage __P((char *progname));
 
 int
@@ -157,6 +166,10 @@ main(argc, argv)
 	if (!getinet6sysctl(IPV6CTL_ACCEPT_RTADV))
 		warnx("kernel is configured not to accept RAs");
 
+	/* initialization to dump internal status to a file */
+	if (signal(SIGUSR1, (void *)rtsold_set_dump_file) < 0)
+		errx(1, "failed to set signal for dump status");
+
 	/* configuration per interface */
 	if (ifinit())
 		errx(1, "failed to initilizatoin interfaces");
@@ -177,6 +190,21 @@ main(argc, argv)
 	if (!fflag)
 		daemon(0, 0);		/* act as a daemon */
 
+	/* dump the current pid */
+	if (!once) {
+		pid_t pid = getpid();
+		FILE *fp;
+
+		if ((fp = fopen(pidfilename, "w")) == NULL)
+			warnmsg(LOG_ERR, __FUNCTION__,
+				"failed to open a log file(%s)",
+				pidfilename, strerror(errno));
+		else {
+			fprintf(fp, "%d\n", pid);
+			fclose(fp);
+		}
+	}
+
 	FD_ZERO(&fdset);
 	FD_SET(s, &fdset);
 	while (1) {		/* main loop */
@@ -184,6 +212,11 @@ main(argc, argv)
 		int e;
 		struct fd_set select_fd = fdset;
 
+		if (do_dump) {	/* SIGUSR1 */
+			do_dump = 0;
+			rtsold_dump_file(dumpfilename);
+		}
+			
 		timeout = rtsol_check_timer();
 
 		if (once) {
@@ -528,7 +561,7 @@ TIMEVAL_ADD(struct timeval *a, struct timeval *b, struct timeval *result)
  * result = a - b
  * XXX: this function assumes that a >= b.
  */
-static void
+void
 TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
 {
 	long l;
@@ -541,6 +574,12 @@ TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
 		result->tv_usec = MILLION + l;
 		result->tv_sec = a->tv_sec - b->tv_sec - 1;
 	}
+}
+
+static void
+rtsold_set_dump_file()
+{
+	do_dump = 1;
 }
 
 static void

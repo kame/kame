@@ -83,3 +83,6 @@ extern void rtsol_input __P((int s));
 /* probe.c */
 extern int probe_init __P((void));
 extern void defrouter_probe __P((int ifindex));
+
+/* dump.c */
+extern void rtsold_dump_file __P((char *));
