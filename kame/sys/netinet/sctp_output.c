@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.27 2003/09/17 07:17:11 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.28 2003/09/17 08:37:56 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -1928,7 +1928,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 			ip->ip_off = IP_DF;
 		else
 			ip->ip_off = 0;
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 		ip->ip_id = htons(ip_randomid());
 #else
 		ip->ip_id = htons(ip_id++);
