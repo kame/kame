@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.24 2000/06/04 05:30:59 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.25 2000/06/05 15:00:44 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -247,3 +247,11 @@ same time.
 Instead,
 .Nm
 should add some delay between subsequent transmissions.
+.Pp
+.Nm
+requires interface
+.Ar intface
+to be available and in
+.Dv IFF_UP
+state, on invocation.
+This may be too much to ask for laptop usage.
