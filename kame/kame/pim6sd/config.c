@@ -222,17 +222,19 @@ config_vifs_from_kernel()
 			}
 		}
 
-		/*
-		 * Hack for KAME kernel.
-		 * Set sin6_scope_id field of a link local address and clear
-		 * the index embedded in the address.
-		 */
 		if (IN6_IS_ADDR_LINKLOCAL(&addr.sin6_addr))
 		{
-			addr.sin6_scope_id =
-				ntohs(*(u_int16_t *)&addr.sin6_addr.s6_addr[2]);
+			addr.sin6_scope_id = if_nametoindex(ifrp->ifr_name);
+#ifdef __KAME__
+			/*
+			 * Hack for KAME kernel.
+			 * Set sin6_scope_id field of a link local address and clear
+			 * the index embedded in the address.
+			 */
+			/* clear interface index */
 			addr.sin6_addr.s6_addr[2] = 0;
 			addr.sin6_addr.s6_addr[3] = 0;
+#endif
 		}
 
 		/*
