@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.17 2000/11/07 17:26:10 jinmei Exp $	*/
+/*	$KAME: rrenumd.c,v 1.18 2000/11/07 17:46:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,6 +61,8 @@
 
 #define LL_ALLROUTERS "ff02::2"
 #define SL_ALLROUTERS "ff05::2"
+
+#define RR_MCHLIM_DEFAULT 64
 
 #ifndef IN6_IS_SCOPE_LINKLOCAL
 #define IN6_IS_SCOPE_LINKLOCAL(a)	\
@@ -411,8 +413,8 @@ rrenum_output(struct payload_list *pl, struct dst_list *dl)
 		sin6 = (struct sockaddr_in6 *)dl->dl_dst;
 
 	if (sin6 != NULL &&
-	    IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr)) {
-		int hoplimit = 255;
+	    IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
+		int hoplimit = RR_MCHLIM_DEFAULT;
 
 		cm = CMSG_FIRSTHDR(&sndmhdr);
 		/* specify the outgoing interface */
