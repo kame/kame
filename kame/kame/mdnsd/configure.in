@@ -1,0 +1,111 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(mdnsd.c)
+
+dnl Checks for programs.
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+AC_PROG_CC
+AC_PROG_CPP
+
+dnl Checks for libraries.
+dnl AC_CHECK_LIB(c, kvm_open, [], [AC_CHECK_LIB(kvm, kvm_open)])
+dnl AC_CHECK_LIB(mld, nlist)
+
+dnl pcap library
+dnl CFLAGS="-I. $CFLAGS"
+dnl AC_MSG_CHECKING(for pcap library/header)
+dnl for dir in /usr/local/libpcap /usr/local/v6 /usr/local \
+dnl 		../libpcap* ../../libpcap*; do
+dnl 	ac_cv_pcap_lib=no
+dnl 	ac_cv_pcap_include=no
+dnl 	if test -d $dir -a -f $dir/libpcap.a; then
+dnl 		ac_cv_pcap_lib="$dir"
+dnl 	elif test -d $dir/lib -a -f $dir/lib/libpcap.a; then
+dnl 		ac_cv_pcap_lib="$dir/lib"
+dnl 	fi
+dnl 	if test -d $dir -a -f $dir/pcap.h; then
+dnl 		ac_cv_pcap_include="$dir"
+dnl 	elif test -d $dir/include -a -f $dir/include/pcap.h; then
+dnl 		ac_cv_pcap_include="$dir/include"
+dnl 	fi
+dnl 	if test "$ac_cv_pcap_lib" != "no" -a "$ac_cv_pcap_include" != "no"; then
+dnl 		LIBS="-L$ac_cv_pcap_lib $LIBS"
+dnl 		CFLAGS="-I$ac_cv_pcap_include $CFLAGS"
+dnl 		break
+dnl 	fi
+dnl done
+dnl if test "$ac_cv_pcap_lib" = "no" -a "$ac_cv_pcap_include" = "no"; then
+dnl 	AC_MSG_RESULT(no)
+dnl else
+dnl 	AC_MSG_RESULT($ac_cv_pcap_lib and $ac_cv_pcap_include)
+dnl fi
+dnl AC_CHECK_LIB(pcap, pcap_lookupdev, [],
+dnl 	[echo "Fatal: libpcap.a not found"
+dnl 	exit 1])
+dnl AC_TRY_COMPILE([#include <pcap.h>], [], [], [dnl
+dnl 	echo "Fatal: pcap.h not found"
+dnl 	exit 1])
+
+CFLAGS="$CFLAGS -I\$(srcdir)"
+
+AC_MSG_CHECKING(for getaddrinfo/getnameinfo library)
+AC_EGREP_CPP(yes,
+[#include <netinet/in.h>
+#ifdef __KAME__
+ yes
+#endif], [result=kame])
+AC_MSG_RESULT($result)
+case $result in
+kame)	CFLAGS="-DINET6 $CFLAGS"
+	o_LIBS="$LIBS"
+	LIBS="$LIBS -L/usr/local/v6/lib"
+	AC_CHECK_LIB(inet6, getaddrinfo, [], [LIBS="$o_LIBS"])
+	;;
+*)	;;
+esac
+
+AC_REPLACE_FUNCS(getaddrinfo)
+AC_REPLACE_FUNCS(getnameinfo)
+AC_REPLACE_FUNCS(getifaddrs)
+AC_CHECK_FUNCS(if_nametoindex)
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(fcntl.h sys/ioctl.h sys/time.h syslog.h unistd.h ifaddrs.h)
+AC_MSG_CHECKING(for socklen_t)
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <sys/socket.h>],
+	[socklen_t x;  x = 1; return x;],
+	[AC_MSG_RESULT(yes)],
+	[AC_MSG_RESULT(no)
+	AC_CHECK_TYPE(socklen_t, unsigned int)])
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+AC_STRUCT_TIMEZONE
+
+dnl Checks for library functions.
+AC_FUNC_GETPGRP
+AC_PROG_GCC_TRADITIONAL
+AC_FUNC_SETPGRP
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(mktime select socket)
+
+dnl Checks for optinal parameters
+AC_MSG_CHECKING(if --enable-mediator option is specified)
+AC_ARG_WITH(mediator, [  --with-mediator         build with mediator],
+	[CFLAGS="-DMEDIATOR $CFLAGS"; with_mediator=yes], [with_mediator=no])
+AC_MSG_RESULT($with_mediator);
+
+dnl Checks for optinal parameters
+AC_MSG_CHECKING(if --enable-pedant option is specified)
+AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
+	[if test "$enableval" = "yes"; then
+		CFLAGS="-Wall -Werror $CFLAGS"
+	fi], [enableval=no])
+AC_MSG_RESULT($enableval);
+
+AC_OUTPUT(Makefile)
