@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $KAME: ip6fw.c,v 1.10 2001/05/08 07:17:41 sumikawa Exp $
+ * $KAME: ip6fw.c,v 1.11 2001/05/08 08:54:24 sumikawa Exp $
  *
  */
 
@@ -414,18 +414,25 @@ list(ac, av)
 	int	ac;
 	char 	**av;
 {
-	struct ip6_fw *r;
-	struct ip6_fw rules[1024];
+ 	struct ip6_fw *r, *rules;
 	int l,i;
 	unsigned long rulenum;
-	int bytes;
+ 	int nalloc, bytes, maxbytes;
 
-	/* extract rules from kernel */
-	memset(rules,0,sizeof rules);
-	bytes = sizeof rules;
-	i = getsockopt(s, IPPROTO_IPV6, IPV6_FW_GET, rules, &bytes);
-	if (i < 0)
-		err(EX_OSERR,"getsockopt(IPV6_FW_GET)");
+ 	/* extract rules from kernel, resizing array as necessary */
+ 	rules = NULL;
+ 	nalloc = sizeof *rules;
+ 	bytes = nalloc;
+ 	maxbytes = 65536 * sizeof *rules;
+ 	while (bytes >= nalloc) {
+ 		nalloc = nalloc * 2 + 200;
+ 		bytes = nalloc;
+ 		if ((rules = realloc(rules, bytes)) == NULL)
+ 			err(EX_OSERR, "realloc");
+ 		i = getsockopt(s, IPPROTO_IPV6, IPV6_FW_GET, rules, &bytes);
+ 		if ((i < 0 && errno != EINVAL) || nalloc > maxbytes)
+ 			err(EX_OSERR, "getsockopt(IPV6_FW_GET)");
+ 	}
 	if (!ac) {
 		/* display all rules */
 		for (r = rules, l = bytes; l >= sizeof rules[0]; 
