@@ -1,7 +1,9 @@
+/*	$KAME: udp6_usrreq.c,v 1.23 2000/03/29 15:52:18 sumikawa Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -62,9 +64,9 @@
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
-#endif
+#include "opt_inet6.h"
+#include "opt_ipsec.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -78,9 +80,7 @@
 #include <sys/stat.h>
 #include <sys/systm.h>
 #include <sys/syslog.h>
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/proc.h>
-#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -89,21 +89,21 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet/icmp6.h>
-#include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/ip6protosw.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
+#include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
 
 #include "faith.h"
@@ -114,22 +114,12 @@
  */
 
 extern	struct protosw inetsw[];
-
 static	int in6_mcmatch __P((struct inpcb *, struct in6_addr *, struct ifnet *));
 static	int udp6_detach __P((struct socket *so));
-#if 0
-static	struct mbuf *udp6_saveopt __P((caddr_t, int, int));
-static	void udp6_saveopts __P((struct inpcb *, struct mbuf **,
-				struct ip6_hdr *, struct mbuf *));
-#endif
 
 static int
 in6_mcmatch(in6p, ia6, ifp)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct inpcb *in6p;
-#else
-	struct in6pcb *in6p;
-#endif
 	register struct in6_addr *ia6;
 	struct ifnet *ifp;
 {
@@ -158,11 +148,7 @@ udp6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	register struct ip6_hdr *ip6;
 	register struct udphdr *uh;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	register struct inpcb *in6p;
-#else
-	register struct in6pcb *in6p;
-#endif
 	struct ip6_recvpktopts opts;
 	int off = *offp;
 	int plen, ulen;
@@ -181,12 +167,12 @@ udp6_input(mp, offp, proto)
 	bzero(&opts, sizeof(opts));
 
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-	
+
 	ip6 = mtod(m, struct ip6_hdr *);
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
 	ulen = ntohs((u_short)uh->uh_ulen);
-	
+
 	if (plen != ulen) {
 		udpstat.udps_badlen++;
 		goto bad;
@@ -231,7 +217,7 @@ udp6_input(mp, offp, proto)
 		 * matches one of the multicast groups specified in the socket.
 		 */
 
-		/* 
+		/*
 		 * Construct sockaddr format source address.
 		 */
 		init_sin6(&udp_in6, m); /* general init */
@@ -247,7 +233,7 @@ udp6_input(mp, offp, proto)
 		 */
 		last = NULL;
 		LIST_FOREACH(in6p, &udb, inp_list) {
-			if ((in6p->inp_vflag & INP_IPV6) == NULL)
+			if ((in6p->inp_vflag & INP_IPV6) == 0)
 				continue;
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
@@ -410,89 +396,6 @@ bad:
 		m_freem(opts.head);
 	return IPPROTO_DONE;
 }
-
-#if 0
-/*
- * Create the "control" list for this pcb
- */
-static void
-udp6_saveopts(in6p, mp, ip6, m)
-	register struct inpcb *in6p;
-	register struct mbuf **mp;
-	register struct ip6_hdr *ip6;
-	register struct mbuf *m;
-{
-	struct in6_ifaddr *ia;
-
-	if (in6p->in6p_flags & IN6P_RECVDSTADDR) {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-		*mp = udp6_saveopt((caddr_t) &ip6->ip6_dst,
-				sizeof(struct in6_addr), IPV6_RECVDSTADDR);
-#endif /*__FreeBSD__ || _NetBSD__*/
-#ifdef __bsdi__
-		*mp = so_cmsg((caddr_t)&ip6->ip6_dst, sizeof(struct in6_addr),
-				IPV6_RECVDSTADDR, IPPROTO_IPV6);
-#endif /*__bsdi__*/
-		if (*mp)
-			mp = &(*mp)->m_next;
-	}
-#ifdef noyet
-	/* options were tossed above */
-	if (in6p->in6p_flags & IN6P_RECVOPTS) {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-		*mp = udp6_saveopt((caddr_t) opts_deleted_above,
-				sizeof(struct in6_addr), IPV6_RECVOPTS);
-#endif /*__FreeBSD__ || _NetBSD__*/
-#ifdef __bsdi__
-		*mp = so_cmsg((caddr_t)&ip6->ip6_dst, sizeof(struct in6_addr),
-				IPV6_RECVOPTS, IPPROTO_IPV6);
-#endif /*__bsdi__*/
-		if (*mp)
-			mp = &(*mp)->m_next;
-	}
-	/* ip6_srcroute doesn't do what we want here, need to fix */
-	if (in6p->in6p_flags & IPV6P_RECVRETOPTS) {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-		*mp = udp6_saveopt((caddr_t)ip6_srcrouter(),
-				sizeof(struct in6_addr), IPV6_RECVRETOPTS);
-#endif /*__FreeBSD__ || _NetBSD__*/
-#ifdef __bsdi__
-		*mp = so_cmsg((caddr_t)&ip6->ip6_dst, sizeof(struct in6_addr),
-				IPV6_RECVRETOPTS, IPPROTO_IPV6);
-#endif /*__bsdi__*/
-		if (*mp)
-			mp = &(*mp)->m_next;
-	}
-#endif
-}
-
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-/*
- * Create a "control" mbuf containing the specified data
- * with the specified type for presentation with a datagram.
- */
-static	struct mbuf *
-udp6_saveopt(p, size, type)
-	caddr_t	p;
-	register int size;
-	int type;
-{
-	register struct cmsghdr *cp;
-	struct	mbuf *m;
-
-	if ((m = m_get(M_DONTWAIT, MT_CONTROL)) == NULL)
-		return((struct mbuf *)NULL);
-	cp = (struct cmsghdr *)mtod(m, struct cmsghdr *);
-	bcopy(p, CMSG_DATA(cp), size);
-	size += sizeof(*cp);
-	m->m_len = size;
-	cp->cmsg_len = size;
-	cp->cmsg_level = IPPROTO_IPV6;
-	cp->cmsg_type = type;
-	return(m);
-}
-#endif /*__FreeBSD__||__NetBSD__*/
-#endif
 
 void
 udp6_ctlinput(cmd, sa, d)
@@ -785,7 +688,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
-	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_BINDV6ONLY) == NULL) {
+	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
 
 		sin6_p = (struct sockaddr_in6 *)nam;
@@ -834,7 +737,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			s = splnet();
 			error = in_pcbconnect(inp, (struct sockaddr *)&sin, p);
 			splx(s);
-			if (error == NULL) {
+			if (error == 0) {
 				inp->inp_vflag |= INP_IPV4;
 				inp->inp_vflag &= ~INP_IPV6;
 				soisconnected(so);
@@ -853,7 +756,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	}
 	splx(s);
-	if (error == NULL) {
+	if (error == 0) {
 		if (ip6_mapped_addr_on) { /* should be non mapped addr */
 			inp->inp_vflag &= ~INP_IPV4;
 			inp->inp_vflag |= INP_IPV6;
@@ -938,10 +841,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 			pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
 			error = ((*pru->pru_send)(so, flags, m, addr, control,
 						  p));
-#if 0 /* XXX: should not necessary. addr will just be freed in sendit(). */
-			if (sin6)
-				in6_sin_2_v4mapsin6_in_sock(addr);
-#endif
+			/* addr will just be freed in sendit(). */
 			return error;
 		}
 	}
@@ -950,8 +850,8 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 }
 
 struct pr_usrreqs udp6_usrreqs = {
-	udp6_abort, pru_accept_notsupp, udp6_attach, udp6_bind, udp6_connect, 
-	pru_connect2_notsupp, in6_control, udp6_detach, udp6_disconnect, 
+	udp6_abort, pru_accept_notsupp, udp6_attach, udp6_bind, udp6_connect,
+	pru_connect2_notsupp, in6_control, udp6_detach, udp6_disconnect,
 	pru_listen_notsupp, in6_mapped_peeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, udp6_send, pru_sense_null, udp_shutdown,
 	in6_mapped_sockaddr, sosend, soreceive, sopoll
