@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.295 2002/04/08 13:51:54 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.296 2002/04/08 14:15:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1460,8 +1460,8 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 				rt_timer_add(rt, icmp6_mtudisc_timeout,
 					     icmp6_mtudisc_timeout_q);
 			}
-		}
 #endif
+		}
 	}
 	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
 		RTFREE(rt);
