@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.216 2004/02/19 18:01:13 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.217 2004/04/08 13:08:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1232,13 +1232,14 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	struct secpolicyindex *spidx;
 {
 	struct sockaddr_in6 *sin6;
-	struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6, ip6buf;
 
-#ifdef DIAGNOSTIC
-	if (m->m_len < sizeof(*ip6))
-		panic("too short mbuf on ipsec6_tunnel_validate");
-#endif
-	ip6 = mtod(m, struct ip6_hdr *);
+	if (m->m_len >= sizeof(*ip6))
+		ip6 = mtod(m, struct ip6_hdr *);
+	else {
+		m_copydata(m, 0, sizeof(ip6buf), (caddr_t)&ip6buf);
+		ip6 = &ip6buf;
+	}
 
 	sin6 = (struct sockaddr_in6 *)&spidx->src;
 	bzero(sin6, sizeof(*sin6));
