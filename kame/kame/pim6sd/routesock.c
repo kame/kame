@@ -375,7 +375,8 @@ getmsg(rtm, msglen, rpfinfop)
 
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
 	/* get the number of the interface by matching the name */
-	if (!(strncmp(v->uv_name, ifp->sdl_data, ifp->sdl_nlen)))
+	if ((strlen(v->uv_name) == ifp->sdl_nlen) &&
+	    !(strncmp(v->uv_name,ifp->sdl_data,ifp->sdl_nlen)))
 	    break;
 
     IF_DEBUG(DEBUG_RPF)

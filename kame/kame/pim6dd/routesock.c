@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: routesock.c,v 1.3 1999/09/16 08:33:21 jinmei Exp $
+ *  $Id: routesock.c,v 1.4 1999/11/19 04:05:48 sumikawa Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -322,7 +322,8 @@ getmsg(rtm, msglen, rpfinfop)
     
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) 
 	/* get the number of the interface by matching the name */
-	if (!(strncmp(v->uv_name,ifp->sdl_data,ifp->sdl_nlen)))
+	if ((strlen(v->uv_name) == ifp->sdl_nlen) &&
+	    !(strncmp(v->uv_name,ifp->sdl_data,ifp->sdl_nlen)))
 	    break;
     
     IF_DEBUG(DEBUG_RPF)
