@@ -6,6 +6,7 @@ MAN=	faithd.8
 #CPPFLAGS+= -DFAITH4
 
 LDADD+=	-lutil
+DPADD+=	${LIBUTIL}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
