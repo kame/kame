@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.218 2002/12/10 11:58:58 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.219 2002/12/10 11:59:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1415,7 +1415,6 @@ prelist_update(new, dr, m)
 #endif
 	{
 		struct in6_ifaddr *ifa6;
-		int ifa_plen;
 		u_int32_t storedlifetime;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		long time_second = time.tv_sec;
