@@ -1344,7 +1344,11 @@ more:
 	hostdelim = strrchr(arg, ':');
 	if (hostdelim) {
 		*hostdelim = '\0';
-		sep->se_hostaddr = newstr(arg);
+		if (arg[0] == '[' && hostdelim > arg && hostdelim[-1] == ']') {
+			hostdelim[-1] = '\0';
+			sep->se_hostaddr = newstr(arg + 1);
+		} else
+			sep->se_hostaddr = newstr(arg);
 		arg = hostdelim + 1;
 		/*
 		 * If the line is of the form `host:', then just change the
