@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.46 2001/09/18 04:48:48 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.47 2001/10/24 22:21:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -586,7 +586,7 @@ parse_pim6_hello(pim_message, datalen, src, opts)
     pim_hello_message = (u_int8 *) (pim_message + sizeof(struct pim));
     end_of_message = (u_int8 *) (pim_message + datalen);
 
-    for (data_ptr = pim_hello_message; data_ptr + sizeof(pim_hello_t) < end_of_message; )
+    for (data_ptr = pim_hello_message; data_ptr + sizeof(pim_hello_t) <= end_of_message; )
     {
 	/* Ignore any data if shorter than (pim_hello header) */
 	GET_HOSTSHORT(option_type, data_ptr);
