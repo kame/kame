@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.53 2001/09/20 07:53:06 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.54 2001/10/05 10:00:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -42,6 +42,11 @@
  * Modified by Bill Fenenr, PARC, April 1994
  *
  * MROUTING Revision: 3.5.1.2 + PIM-SMv2 (pimd) Support
+ */
+
+/*
+ * XXX it seems that home address option processing should be reverted
+ * before calls to socket_send().  see sys/netinet6/dest6.c for details.
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
