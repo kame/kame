@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.194 2001/02/20 17:26:55 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.195 2001/02/23 00:11:21 itojun Exp $
 
 1. IPv6
 
@@ -1652,7 +1652,8 @@ Currently supported algorithms are:
 	3DES-CBC with explicit IV (rfc2451.txt)
 	BLOWFISH CBC (rfc2451.txt)
 	CAST128 CBC (rfc2451.txt)
-	RIJNDAEL CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt)
+	RIJNDAEL/AES CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt,
+		uses IANA-assigned protocol number)
 	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt)
 	each of the above can be combined with:
 	    ESP authentication with HMAC-MD5(96bit)
