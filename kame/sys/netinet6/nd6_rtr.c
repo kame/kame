@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.131 2001/07/21 03:56:02 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.132 2001/07/21 04:44:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,6 +111,12 @@ int ip6_temp_preferred_lifetime = 800;
 static int ip6_temp_valid_lifetime = 1800;
 */
 int ip6_temp_regen_advance = TEMPADDR_REGEN_ADVANCE;
+
+/* RTPREF_MEDIUM has to be 0! */
+#define RTPREF_HIGH	1
+#define RTPREF_MEDIUM	0
+#define RTPREF_LOW	(-1)
+#define RTPREF_INVALID	(-2)
 
 /*
  * Receive Router Solicitation Message - just for routers.
@@ -774,7 +780,7 @@ defrouter_select()
 		return;
 	}
 
-	installedpref = -2;	/* invalid preference XXX should #define */
+	installedpref = RTPREF_INVALID;
 	installcount = 0;
 
 	/*
@@ -799,7 +805,7 @@ defrouter_select()
 			 * same preference as the previously instaled one,
 			 * we install it.
 			 */
-			if (installedpref == -2) {
+			if (installedpref == RTPREF_INVALID) {
 				installedpref = rtpref(dr);
 				install++;
 			} else if (installedpref == rtpref(dr))
@@ -888,20 +894,20 @@ rtpref(struct nd_defrouter *dr)
 #ifdef RTPREF
 	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
-		return 1;
+		return RTPREF_HIGH;
 	case ND_RA_FLAG_RTPREF_MEDIUM:
 	case ND_RA_FLAG_RTPREF_RSV:
-		return 0;
+		return RTPREF_MEDIUM;
 	case ND_RA_FLAG_RTPREF_LOW:
-		return -1;
+		return RTPREF_LOW;
 	default:
 		nd6log((LOG_ERR, "rtpref: impossible RA flag %x",
 		       dr->flags));
-		return -2;
+		return RTPREF_INVALID;
 	}
 	/* NOT REACH HERE */
 #else
-	return 0;
+	return RTPREF_MEDIUM;
 #endif
 }
 
