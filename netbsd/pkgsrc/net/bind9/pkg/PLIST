@@ -8,8 +8,8 @@ sbin/dnssec-makekeyset
 sbin/dnssec-keygen
 sbin/rndc
 sbin/named
-@exec ln sbin/named sbin/lwresd
-@unexec rm sbin/lwresd
+@exec ln %D/sbin/named %D/sbin/lwresd
+@unexec rm %D/sbin/lwresd
 lib/libomapi.a
 lib/liblwres.a
 lib/libdns.a
