@@ -8,6 +8,12 @@ SRCS=	ftpd.c ftpcmd.c logutmp.c logwtmp.c popen.c
 MAN=	ftpd.8
 CLEANFILES+=ftpcmd.c y.tab.h
 
+CPPFLAGS+=-DINET6
+LDADD+= -L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 .include <bsd.own.mk>
 
 # our internal version of ls.
@@ -23,18 +29,18 @@ LDADD+= -lskey
 DPADD+= ${LIBSKEY}
 .endif
 
-.if (${KERBEROS} == "yes")
-SRCS+= klogin.c
-.PATH:	${.CURDIR}/../../usr.bin/login
-CFLAGS+= -DKERBEROS
-LDADD+= -lkrb -ldes -lkafs
-DPADD+= ${LIBKRB} ${LIBKRB} ${LIBKAFS}
-.endif
+#.if (${KERBEROS} == "yes")
+#SRCS+= klogin.c
+#.PATH:	${.CURDIR}/../../usr.bin/login
+#CFLAGS+= -DKERBEROS
+#LDADD+= -lkrb -ldes -lkafs
+#DPADD+= ${LIBKRB} ${LIBKRB} ${LIBKAFS}
+#.endif
 
-.if (${TCP_WRAPPERS} == "yes")
-CFLAGS+=-DTCPWRAPPERS
-LDADD+=	-lwrap
-DPADD+=	${LIBWRAP}
-.endif
+#.if (${TCP_WRAPPERS} == "yes")
+#CFLAGS+=-DTCPWRAPPERS
+#LDADD+=	-lwrap
+#DPADD+=	${LIBWRAP}
+#.endif
 
 .include <bsd.prog.mk>
