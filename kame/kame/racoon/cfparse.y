@@ -126,7 +126,7 @@ log_specs:
 	|	log_specs HEXSTRING
 		{
 			if (!f_debug)
-				debug |= (int)hexstr2val($2.v, $2.l);
+				debug |= (u_long)hexstr2val($2.v, $2.l);
 		}
 	|	log_specs LOGLEV
 		{
