@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.71 2001/07/23 13:00:53 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.72 2001/07/24 10:04:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1147,7 +1147,7 @@ nd6_dad_start(ifa, tick)
 	dp->dad_count = ip6_dad_count;
 	dp->dad_ns_icount = dp->dad_na_icount = 0;
 	dp->dad_ns_ocount = dp->dad_ns_tcount = 0;
-	if (!tick) {
+	if (tick == NULL) {
 		nd6_dad_ns_output(dp, ifa);
 		nd6_dad_starttimer(dp, 
 		    nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000);
