@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.87 2004/08/24 05:37:36 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.88 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -980,6 +980,12 @@ void
 eay_init_error()
 {
 	ERR_load_crypto_strings();
+}
+
+void
+eay_close_error()
+{
+	ERR_free_strings();
 }
 
 /*

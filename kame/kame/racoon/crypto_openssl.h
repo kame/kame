@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.30 2004/06/16 11:55:36 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.31 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,6 +67,7 @@ extern vchar_t *eay_get_pkcs1pubkey __P((char *));
 /* string error */
 extern char *eay_strerror __P((void));
 extern void eay_init_error __P((void));
+extern void eay_close_error __P((void));
 
 /* DES */
 extern vchar_t *eay_des_encrypt __P((vchar_t *, vchar_t *, vchar_t *));

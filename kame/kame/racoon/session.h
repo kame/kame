@@ -1,4 +1,4 @@
-/*	$KAME: session.h,v 1.4 2000/10/04 17:41:04 itojun Exp $	*/
+/*	$KAME: session.h,v 1.5 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,3 +31,4 @@
 
 extern int session __P((void));
 extern RETSIGTYPE signal_handler __P((int));
+extern void exit_program __P((int, const char *, ...));

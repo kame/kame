@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.32 2003/09/24 02:01:17 jinmei Exp $	*/
+/*	$KAME: session.c,v 1.33 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,7 @@
 #include "vmbuf.h"
 #include "plog.h"
 #include "debug.h"
+#include "err.h"
 
 #include "schedule.h"
 #include "session.h"
@@ -77,6 +78,7 @@
 #include "handler.h"
 #include "localconf.h"
 #include "remoteconf.h"
+#include "crypto_openssl.h"
 #include "backupsa.h"
 
 static void close_session __P((void));
@@ -109,13 +111,13 @@ session(void)
 #ifdef ENABLE_ADMINPORT
 	/* debug port has no authentication, do not open it */
 	if (admin_init() < 0)
-		exit(1);
+		return -1;
 #endif
 
 	initmyaddr();
 
 	if (isakmp_init() < 0)
-		exit(1);
+		return -1;
 
 	initfds();
 
@@ -167,6 +169,7 @@ session(void)
 			initfds();
 		}
 	}
+	/*NOTREACHED*/
 }
 
 /* clear all status and exit program. */
@@ -178,7 +181,24 @@ close_session()
 	backupsa_clean();
 
 	plog(LLV_INFO, LOCATION, NULL, "racoon shutdown\n");
-	exit(0);
+	exit_program(0, NULL);
+}
+
+void
+exit_program(int code, const char *fmt, ...)
+{
+	va_list ap;
+
+	eay_close_error();
+	oakley_dhclean();
+
+	if (fmt == NULL)
+	      exit(code);
+	else {
+	      va_start(ap, fmt);
+	      verrx(code, fmt, ap);
+	      va_end(ap);
+	}
 }
 
 static void

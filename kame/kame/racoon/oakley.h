@@ -1,4 +1,4 @@
-/*	$KAME: oakley.h,v 1.30 2003/12/14 04:13:11 itojun Exp $	*/
+/*	$KAME: oakley.h,v 1.31 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,6 +143,7 @@ struct isakmp_ivm;
 extern int oakley_get_defaultlifetime __P((void));
 
 extern int oakley_dhinit __P((void));
+extern void oakley_dhclean __P((void));
 extern void oakley_dhgrp_free __P((struct dhgroup *));
 extern int oakley_dh_compute __P((const struct dhgroup *,
 	vchar_t *, vchar_t *, vchar_t *, vchar_t **));

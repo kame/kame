@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.119 2004/08/24 06:47:27 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.120 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,19 @@ oakley_dhinit()
 		OAKLEY_ATTR_GRP_DESC_MODP8192, OAKLEY_ATTR_GRP_TYPE_MODP);
 
 	return 0;
+}
+
+void
+oakley_dhclean()
+{
+	vfree(dh_modp768.prime);
+	vfree(dh_modp1024.prime);
+	vfree(dh_modp1536.prime);
+	vfree(dh_modp2048.prime);
+	vfree(dh_modp3072.prime);
+	vfree(dh_modp4096.prime);
+	vfree(dh_modp6144.prime);
+	vfree(dh_modp8192.prime);
 }
 
 void

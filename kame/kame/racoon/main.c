@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.48 2002/11/20 02:06:07 itojun Exp $	*/
+/*	$KAME: main.c,v 1.49 2004/08/24 06:52:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,7 +127,7 @@ usage()
 	printf("   -f: pathname for configuration file.\n");
 	printf("   -l: pathname for log file.\n");
 	printf("   -p: port number for isakmp (default: %d).\n", PORT_ISAKMP);
-	exit(1);
+	exit_program(1, NULL);
 }
 
 int
@@ -177,7 +177,7 @@ main(ac, av)
 	    "\n", eay_version());
 
 	if (pfkey_init() < 0) {
-		errx(1, "something error happened "
+		exit_program(1, "something error happened "
 			"while pfkey initializing.");
 		/* NOTREACHED*/
 	}
@@ -189,7 +189,7 @@ main(ac, av)
 	save_params();
 	error = cfparse();
 	if (error != 0)
-		errx(1, "failed to parse configuration file.");
+		exit_program(1, "failed to parse configuration file.");
 	restore_params();
 
 	/*
@@ -198,7 +198,7 @@ main(ac, av)
 	 */
 	if (loading_sa && !f_local) {
 		if (backupsa_from_file() != 0)
-			errx(1, "something error happened "
+			exit_program(1, "something error happened "
 				"SA recovering.");
 	}
 
@@ -209,7 +209,7 @@ main(ac, av)
 		FILE *fp;
 
 		if (daemon(0, 0) < 0) {
-			errx(1, "failed to be daemon. (%s)",
+			exit_program(1, "failed to be daemon. (%s)",
 				strerror(errno));
 		}
 		/*
@@ -226,10 +226,10 @@ main(ac, av)
 		fp = fopen(pid_file, "w");
 		if (fp) {
 			if (fchmod(fileno(fp),
-				S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
-				syslog(LOG_ERR, "%s", strerror(errno));
+			    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
 				fclose(fp);
 				exit(1);
+				exit_program(1, "%s", strerror(errno));
 			}
 			fprintf(fp, "%ld\n", (long)racoon_pid);
 			fclose(fp);
@@ -249,7 +249,7 @@ main(ac, av)
 
 	session();
 
-	exit(0);
+	exit_program(0, NULL);
 }
 
 #if 0
