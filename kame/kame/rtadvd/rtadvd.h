@@ -84,7 +84,7 @@ struct	rainfo {
 	/* timer related parameters */
 	struct rtadvd_timer *timer;
 	int initcounter; /* counter for the first few advertisements */
-	struct timeval lastsent; /* timestamp when the lates RA was sent */
+	struct timeval lastsent; /* timestamp when the latest RA was sent */
 	int waiting;		/* number of RS waiting for RA */
 
 	/* interface information */
