@@ -379,11 +379,34 @@ main(argc, argv)
 		exit(5);
 	}
 
+	/* set a minimum set of socket options */
+	on = 1;
+	/* specify to tell receiving interface */
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_PKTINFO)");
+#endif 
+
+	/* specify to tell value of hoplimit field of received IP6 hdr */
+#ifdef IPV6_RECVHOPLIMIT
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
+#else  /* old adv. API */
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_HOPLIMIT)");
+#endif 
+
 	/* revoke privs */
 	seteuid(getuid());
 	setuid(getuid());
 
-	on = 1;
 	seq = 0;
 	
 	while ((ch = getopt(argc, argv, "dlm:np:q:rs:w:vg:")) != EOF)
@@ -543,28 +566,6 @@ main(argc, argv)
 	}
 	rcvmhdr.msg_control = (caddr_t) rcvcmsgbuf;
 	rcvmhdr.msg_controllen = rcvcmsglen;
-
-	/* specify to tell receiving interface */
-#ifdef IPV6_RECVPKTINFO
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVPKTINFO)");
-#else  /* old adv. API */
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_PKTINFO)");
-#endif 
-
-	/* specify to tell value of hoplimit field of received IP6 hdr */
-#ifdef IPV6_RECVHOPLIMIT
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
-#else  /* old adv. API */
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_HOPLIMIT)");
-#endif 
 
 	if (options & SO_DEBUG)
 		(void) setsockopt(rcvsock, SOL_SOCKET, SO_DEBUG,
@@ -1068,9 +1069,12 @@ packet_ok(mhdr, cc, seq)
 	}
 	if (rcvpktinfo == NULL || hlimp == NULL) {
 		warnx("failed to get received hop limit or packet info");
+#if 0
 		return(0);
+#endif
 	}
-	rcvhlim = *hlimp;
+	else
+		rcvhlim = *hlimp;
  
 	type = icp->icmp6_type;
 	code = icp->icmp6_code;
