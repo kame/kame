@@ -27,12 +27,13 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: bindtest.c,v 1.5 1999/10/06 07:48:58 itojun Exp $
+ * $Id: bindtest.c,v 1.6 1999/10/06 08:07:24 itojun Exp $
  */
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,29 +99,23 @@ main(argc, argv)
 
 	printf("starting tests, socktype = %s\n",
 		socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM");
-#define TESTIT(x, y)	test(#x " then " #y, (x), (y));
-	TESTIT(wild4, wild6);
-	TESTIT(wild6, wild4);
-	TESTIT(loop4, loop6);
-	TESTIT(loop6, loop4);
-	TESTIT(wild4, loop4);
-	TESTIT(loop4, wild4);
-	TESTIT(wild6, loop6);
-	TESTIT(loop6, wild6);
-	TESTIT(wild4, loop6);
-	TESTIT(loop6, wild4);
-	TESTIT(wild6, loop4);
-	TESTIT(loop4, wild6);
-	TESTIT(one4, loop6);
-	TESTIT(loop6, one4);
-	TESTIT(wild4, map4);
-	TESTIT(map4, wild4);
-	TESTIT(wild6, map4);
-	TESTIT(map4, wild6);
-	TESTIT(loop4, map4);
-	TESTIT(map4, loop4);
-	TESTIT(loop6, map4);
-	TESTIT(map4, loop6);
+#define TESTIT(x, y)	test(#x " then " #y, (x), (y))
+#define TESTALL(x) \
+do { \
+	TESTIT(x, wild4); \
+	TESTIT(x, wild6); \
+	TESTIT(x, loop4); \
+	TESTIT(x, loop6); \
+	TESTIT(x, one4); \
+	TESTIT(x, map4); \
+} while (0)
+
+	TESTALL(wild4);
+	TESTALL(wild6);
+	TESTALL(loop4);
+	TESTALL(loop6);
+	TESTALL(one4);
+	TESTALL(map4);
 
 	exit(0);
 }
