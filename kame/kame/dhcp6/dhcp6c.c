@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.93 2002/06/21 11:02:14 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.94 2002/06/23 05:42:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -550,7 +550,7 @@ select_server(ifp)
 	struct dhcp6_serverinfo *s;
 
 	/*
-	 * pick the best server according to dhcpv6-24 Section 17.1.3
+	 * pick the best server according to dhcpv6-26 Section 17.1.3
 	 * XXX: we currently just choose the one that is active and has the
 	 * highest preference.
 	 */
@@ -666,7 +666,7 @@ client6_send(ev)
 	if (ev->timeouts == 0) {
 		/*
 		 * A client MUST leave the transaction-ID unchanged in
-		 * retransmissions of a message. [dhcpv6-24 15.1]
+		 * retransmissions of a message. [dhcpv6-26 15.1]
 		 */
 		ev->xid = random() & DH6_XIDMASK;
 		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
@@ -733,7 +733,7 @@ client6_send(ev)
 	/*
 	 * Unless otherwise specified, a client sends DHCP messages to the
 	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
-	 * [dhcpv6-24 Section 13.]
+	 * [dhcpv6-26 Section 13.]
 	 * Our current implementation always follows the case.
 	 */
 	dst = *sa6_allagent;
@@ -830,7 +830,7 @@ client6_send_renew(ev)
 	/*
 	 * Unless otherwise specified, a client sends DHCP messages to the
 	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
-	 * [dhcpv6-24 Section 13.]
+	 * [dhcpv6-26 Section 13.]
 	 * Our current implementation always follows the case.
 	 */
 	dst = *sa6_allagent;
@@ -922,7 +922,7 @@ client6_send_rebind(ev)
 	/*
 	 * Unless otherwise specified, a client sends DHCP messages to the
 	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
-	 * [dhcpv6-24 Section 13.]
+	 * [dhcpv6-26 Section 13.]
 	 * Our current implementation always follows the case.
 	 */
 	dst = *sa6_allagent;
@@ -1056,7 +1056,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		return -1;
 	}
 
-	/* packet validation based on Section 15.3 of dhcpv6-24. */
+	/* packet validation based on Section 15.3 of dhcpv6-26. */
 	if (optinfo0->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
 		return -1;
@@ -1076,8 +1076,8 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 
 	/*
 	 * The client MUST ignore any Advertise message that includes a Status
-	 * Code option containing the value AddrUnavail.
-	 * [dhcpv6-24, Section 17.1.3].
+	 * Code option containing the value NoAddrsAvail.
+	 * [dhcpv6-26, Section 17.1.3].
 	 * XXX: we should not follow this when we do not need addresses!!
 	 */
 	;
@@ -1218,7 +1218,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	/*
 	 * The client MAY choose to report any status code or message from the
 	 * status code option in the Reply message.
-	 * [dhcpv6-24 Section 18.1.6]
+	 * [dhcpv6-26 Section 18.1.8]
 	 */
 	for (lv = TAILQ_FIRST(&optinfo->stcode_list); lv;
 	     lv = TAILQ_NEXT(lv, link)) {
