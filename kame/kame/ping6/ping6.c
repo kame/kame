@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.69 2000/08/11 04:46:39 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.70 2000/08/11 04:50:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1328,19 +1328,20 @@ pr_pack(buf, cc, mhdr)
 				break;
 			} else {
 				size_t clen;
-				u_int32_t *lp;
+				u_int32_t v;
 				cp = (u_char *)(ni + 1);
 				clen = (size_t)(end - cp);
-				if (clen == 0 || clen > 8192 ||
-				    clen % sizeof(*lp)){
-					printf(", invalid length(%u)", clen);
+				if (clen == 0 || clen > 8192 || clen % 4) {
+					printf(", invalid length(%lu)",
+					    (u_long)clen);
 					break;
 				}
 				printf(", bitmap = 0x");
-				lp = (u_int32_t *)end;
-				lp--;
-				while (lp >= (u_int32_t *)cp)
-					printf("%08x", (u_int32_t)ntohl(*lp--));
+				for (dp = end - 4; dp >= cp; dp -= 4) {
+					memcpy(&v, dp, sizeof(v));
+					v = (u_int32_t)ntohl(v);
+					printf("%08x", v);
+				}
 			}
 			break;
 		case NI_QTYPE_NODEADDR:
