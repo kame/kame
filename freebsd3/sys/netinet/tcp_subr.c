@@ -246,7 +246,7 @@ tcp_template(tp)
 		n->tt_flow &= ~IPV6_FLOWLABEL_MASK;
 		n->tt_flow |= (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	}
-	n->tt_vfc = IPV6_VERSION;
+	n->tt_vfc |= IPV6_VERSION;
 	n->tt_pr6 = IPPROTO_TCP;
 	n->tt_len6 = n->tt_len;
 	n->tt_src6 = inp->in6p_laddr;

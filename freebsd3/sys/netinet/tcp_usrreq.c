@@ -817,6 +817,12 @@ tcp6_connect(tp, nam, p)
 		inp->in6p_laddr = *addr6;
 	inp->in6p_faddr = sin6->sin6_addr;
 	inp->inp_fport = sin6->sin6_port;
+	/*
+	 * xxx kazu flowlabel is necessary for connect?
+	 * but if this line is missing, the garbage value remains.
+	 */
+	inp->in6p_flowinfo = sin6->sin6_flowinfo;
+
 	in_pcbrehash(inp);
 
 	tp->t_template = tcp_template(tp);
