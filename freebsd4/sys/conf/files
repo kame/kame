@@ -683,6 +683,8 @@ netinet/in_proto.c	optional inet
 netinet/in_rmx.c	optional inet
 netinet/ip_ecn.c	optional inet
 netinet/ip_ecn.c	optional inet6
+netinet/ip_encap.c      optional inet
+netinet/ip_encap.c      optional inet6
 netinet/ip_divert.c	optional ipdivert
 netinet/ip_dummynet.c	optional dummynet
 netinet/ip_flow.c	optional inet
