@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.212 2005/01/28 02:12:53 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.213 2005/03/02 05:22:52 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -502,7 +502,7 @@ getaddrinfo(hostname, servname, hints, res)
 	/* ensure we return NULL on errors */
 	*res = NULL;
 
-	/* ac must be initilized before using ERR() */
+	/* ac must be initialized before using ERR() */
 	memset(&ac, 0, sizeof(ac));
 
 	memset(&ai, 0, sizeof(ai));
@@ -602,7 +602,7 @@ getaddrinfo(hostname, servname, hints, res)
 
 	/*
 	 * NULL hostname, or numeric hostname.
-	 * If numreic representation of AF1 can be interpreted as FQDN
+	 * If numeric representation of AF1 can be interpreted as FQDN
 	 * representation of AF2, we need to think again about the code below.
 	 */
 	found = 0;
@@ -1294,7 +1294,7 @@ gai_addr2scopetype(sa)
 		}
 		/*
 		 * Unicast addresses: map scope type to corresponding scope
-		 * value defined for multcast addresses.
+		 * value defined for multicast addresses.
 		 * XXX: hardcoded scope type values are bad...
 		 */
 		if (IN6_IS_ADDR_LOOPBACK(&sa6->sin6_addr))
