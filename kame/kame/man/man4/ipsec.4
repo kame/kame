@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: ipsec.4,v 1.1 1999/08/08 23:30:37 itojun Exp $
+.\"	$Id: ipsec.4,v 1.2 1999/10/07 03:55:08 itojun Exp $
 .\"
 .Dd January 29, 1999
 .Dt IPSEC 4
@@ -41,10 +41,12 @@
 .Nm
 is a security protocol in Internet Protocol layer.
 .Nm
-is defined for both IPv4
-.Pq Xr inet 4
-and IPv6
-.Pq Xr inet6 4 .
+is defined for both IPv4 and IPv6
+.Po
+.Xr inet 4
+and
+.Xr inet6 4
+.Pc .
 .Nm
 consists of two sub-protocols, namely
 ESP
@@ -74,16 +76,17 @@ The
 .Dv PF_KEY
 socket API is defined in RFC2367.
 .Pp
-Policy engine can be controlled by
+Policy engine can be controlled by extended part of
 .Dv PF_KEY
 API,
 .Xr setsockopt 2
 operations, and
 .Xr sysctl 3
 interface.
+The kernel implements
+extended version of 
 .Dv PF_KEY
-interface is an extension to RFC2367,
-and defines IPsec policy like per-packet filters.
+interface, and allows you to define IPsec policy like per-packet filters.
 .Xr setsockopt 2
 interface is used to define per-socket behavior, and
 .Xr sysctl 3
@@ -92,36 +95,54 @@ interface is used to define host-wide default behavior.
 The kernel code does not implement dynamic encryption key exchange protocol
 like IKE
 .Pq Internet Key Exchange .
-That should be implemented as userland programs, or daemons, by using
-the above described APIs.
+That should be implemented as userland programs
+.Pq usually as daemons ,
+by using the above described APIs.
 .\"
 .Sh POLICY MANAGEMENT
-The policy management code is experimental, but this is almostly
-conformed to RFC2401.  You can manage the SPD by two way.  One is the way to use
-.Xr setkey 8 ,
-and other is the way to use
+The kernel implements experimental policy management code.
+You can manage the IPsec policy in two ways.
+One is to configure per-socket policy using 
 .Xr setsockopt 3 .
-.Xr setkey 8
-can define either
-.Nm default , use
-or
-.Nm require
-like filtering rule.
-and
-.Xr setsockopt 3
-can define either
-.Nm entrust , ipsec
-or
-.Nm bypass
-as Security level per socket.
+The other is to configure kernel packet filter-based policy using
+.Dv PF_KEY
+interface, via
+.Xr setkey 8 .
+In both cases, IPsec policy must be specified with syntax described in
+.Xr ipsec_set_policy 3 .
 .Pp
-When
-.Nm default
-(or
-.Nm entrust
-)
-is defined, Policy engine consults to system wide default defined
+With
+.Xr setsockopt 3 ,
+you can define IPsec policy in per-socket basis.
+You can enforce particular IPsec policy onto packets that go through
+particular socket.
+.Pp
+With
+.Xr setkey 8
+you can define IPsec policy against packets,
+using sort of packet filtering rule.
+Refer to
+.Xr setkey 8
+on how to use it.
+.Pp
+In the latter case,
+.Dq Li default
+policy is allowed for use with
+.Xr setkey 8 .
+By configuring policy to
+.Li default ,
+you can refer system-wide
 .Xr sysctl 8
+variable for default settings.
+The following variables are available.
+.Li 1
+means
+.Dq Li use ,
+and
+.Li 2
+means
+.Dq Li require
+in the syntax.
 .Bl -column net.inet6.ipsec6.esp_trans_deflev integerxxx
 .It Sy Name	Type	Changeable
 .It net.inet.ipsec.esp_trans_deflev	integer	yes
@@ -134,17 +155,22 @@ is defined, Policy engine consults to system wide default defined
 .It net.inet6.ipsec6.ah_net_deflev	integer	yes
 .El
 .Pp
-They are 1:use or 2:require.
-.Pp
-If kernel doesn't find out policy entry, then system wide default is applied.
-You can specify the system wide default as discarding packet or not to do IPsec.
+If kernel finds no matching policy system wide default value is applied.
+System wide default is specified by the following
+.Xr sysctl 8
+variables.
+.Li 0
+means
+.Dq Li discard
+which asks the kernel to drop the packet.
+.Li 1
+means
+.Dq Li none .
 .Bl -column net.inet6.ipsec6.def_policy integerxxx
 .It Sy Name	Type	Changeable
 .It net.inet.ipsec.def_policy	integer	yes
 .It net.inet6.ipsec6.def_policy	integer	yes
 .El
-.Pp
-They are 0:discard or 1:none.
 .\"
 .Sh PROTOCOLS
 The
@@ -174,14 +200,17 @@ routines from looking into IP payload.
 .Sh SEE ALSO
 .Xr ioctl 2 ,
 .Xr socket 2 ,
-.Xr sysctl 3 ,
+.Xr ipsec_set_policy 3 ,
 .Xr icmp6 4 ,
 .Xr intro 4 ,
 .Xr ip6 4 ,
 .Xr setkey 8 ,
-.Xr racoon 8
+.Xr sysctl 8 ,
+.Xr racoon 8 .
 .Pp
+.Rs
 .%T RFC2367
+.Re
 .Rs
 .%A "D. L. McDonald"
 .%T "A Simple IP Security API Extension to BSD Sockets"
@@ -189,7 +218,7 @@ routines from looking into IP payload.
 .%O "internet draft"
 .Re
 .Sh CAVEAT
-The IPsec support is subject to change as the Internet protocols develop.
+The IPsec support is subject to change as the IPsec protocols develop.
 .Pp
 There is no single standard for policy engine API,
 so the policy engine API described herein is just for KAME implementation.
