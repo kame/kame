@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.37 2002/05/14 10:50:56 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.38 2002/06/27 14:35:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -78,9 +78,9 @@
 do { \
 	if (sizeof((str)[0]) == 0 \
 	 || num >= sizeof(str)/sizeof((str)[0])) \
-		printf("%d ", (num)); \
+		printf("%u ", (num)); \
 	else if (strlen((str)[(num)]) == 0) \
-		printf("%d ", (num)); \
+		printf("%u ", (num)); \
 	else \
 		printf("%s ", (str)[(num)]); \
 } while (0)
@@ -95,7 +95,7 @@ do { \
 	if (p && p->str) \
 		printf("%s ", p->str); \
 	else \
-		printf("%d ", (num)); \
+		printf("%u ", (num)); \
 } while (0)
 
 static char *str_ipaddr __P((struct sockaddr *));
@@ -539,7 +539,7 @@ str_upperspec(ulp, p1, p2)
 	else if (ulp == IPPROTO_ICMPV6) {
 		printf("icmp6");
 		if (!(p1 == IPSEC_PORT_ANY && p2 == IPSEC_PORT_ANY))
-			printf(" %d,%d", p1, p2);
+			printf(" %u,%u", p1, p2);
 	} else {
 		struct protoent *ent;
 
@@ -552,7 +552,7 @@ str_upperspec(ulp, p1, p2)
 			if (ent)
 				printf("%s", ent->p_name);
 			else
-				printf("%d", ulp);
+				printf("%u", ulp);
 
 			endprotoent();
 			break;
