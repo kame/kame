@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.13 2000/08/13 06:14:59 itojun Exp $	*/
+/*	$KAME: if.c,v 1.14 2001/04/04 00:52:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -293,6 +293,7 @@ if_nametosdl(char *name)
 		return(NULL);
 	memcpy((caddr_t)ret_sdl, (caddr_t)sdl, sdl->sdl_len);
 
+	free(buf);
 	return(ret_sdl);
 }
 
