@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.120 2004/06/11 12:22:55 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.121 2004/06/12 10:46:00 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -71,6 +71,7 @@
 #include <timer.h>
 #include <auth.h>
 #include <control.h>
+#include <dhcp6_ctl.h>
 
 #define DUID_FILE "/etc/dhcp6s_duid"
 #define DHCP6S_CONF "/usr/local/v6/etc/dhcp6s.conf"
@@ -122,7 +123,8 @@ int insock;			/* inbound UDP port */
 int outsock;			/* outbound UDP port */
 int ctlsock;			/* control TCP port */
 char *ctladdr = DEFAULT_CONTROL_ADDR;
-char *ctlport = DEFAULT_CONTROL_PORT;
+/*char *ctlport = DEFAULT_CONTROL_PORT;*/
+char *ctlport = "none";	/* disable by default until implementing auth */
 
 static const struct sockaddr_in6 *sa6_any_downstream, *sa6_any_relay;
 static struct msghdr rmh;
@@ -136,7 +138,7 @@ static struct dhcp6_list arg_dnslist;
 static void usage __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
-static void server6_accept_command __P((int));
+static int server6_do_command __P((char *, ssize_t));
 static void server6_reload __P((void));
 static void server6_recv __P((int));
 static void free_relayinfo __P((struct relayinfo *));
@@ -500,6 +502,10 @@ server6_init()
 	freeaddrinfo(res);
 
 	/* open control socket */
+	if (strcmp(ctlport, "none") == 0) {
+		dprintf(LOG_NOTICE, FNAME, "skip opening control port");
+		return;
+	}
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_STREAM;
@@ -535,6 +541,12 @@ server6_init()
 		    strerror(errno));
 		exit(1);
 	}
+
+	if (dhcp6_ctl_init(DHCP6CTL_DEF_COMMANDQUEUELEN)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to initialize control channel");
+		exit(1);
+	}
 }
 
 static void
@@ -545,13 +557,17 @@ server6_mainloop()
 	fd_set r;
 	int maxsock;
 
-	maxsock = (insock > ctlsock) ? insock : ctlsock;
+	
 	while (1) {
 		w = dhcp6_check_timer();
 
 		FD_ZERO(&r);
 		FD_SET(insock, &r);
 		FD_SET(ctlsock, &r);
+		maxsock = (insock > ctlsock) ? insock : ctlsock;
+
+		(void)dhcp6_ctl_setreadfds(&r, &maxsock);
+
 		ret = select(maxsock + 1, &r, NULL, NULL, w);
 		switch (ret) {
 		case -1:
@@ -567,90 +583,57 @@ server6_mainloop()
 		if (FD_ISSET(insock, &r))
 			server6_recv(insock);
 		if (FD_ISSET(ctlsock, &r))
-			server6_accept_command(ctlsock);
+			dhcp6_ctl_acceptcommand(ctlsock, server6_do_command);
+		dhcp6_ctl_readcommand(&r);
 	}
 }
 
-static void
-server6_accept_command(s0)
-	int s0;
+static int
+server6_do_command(buf, len)
+	char *buf;
+	ssize_t len;
 {
-	int s, cc, minlen;
-	struct sockaddr_storage from_ss;
-	struct sockaddr *from = (struct sockaddr *)&from_ss;
-	socklen_t fromlen;
-	struct dhcp6ctl ctlhead;
+	struct dhcp6ctl *ctlhead;
 	struct dhcp6ctl_iaspec iaspec;
 	u_int16_t command, commandlen;
 	u_int32_t p32, iaid, duidlen;
-	char commandbuf[1024];	/* XXX */
 	struct duid duid;
 	struct dhcp6_binding *binding;
+	int minlen;
 	char *bp;
 
-	fromlen = sizeof(from_ss);
-	if ((s = accept(s0, from, &fromlen)) < 0) {
-		dprintf(LOG_WARNING, FNAME,
-		    "failed to accept control connection: %s",
-		    strerror(errno));
-		return;
+	ctlhead = (struct dhcp6ctl *)buf;
+
+	command = ntohs(ctlhead->command);
+	commandlen = ntohs(ctlhead->len);
+	if (len != commandlen + sizeof(struct dhcp6ctl)) {
+		dprintf(LOG_ERR, FNAME,
+		    "assumption failure: command length mismatch");
+		return (DHCP6CTL_R_FAILURE);
 	}
 
-	dprintf(LOG_DEBUG, FNAME, "accept control connection from %s",
-	    addr2str(from));
-
-	/* XXX: this can block. need to implement asynchronous communication */
-	cc = read(s, &ctlhead, sizeof(ctlhead));
-	if (cc < 0) {
-		dprintf(LOG_WARNING, FNAME, "read failed: %s",
-		    strerror(errno));
-		goto close;
-	}
-	if (cc != sizeof(struct dhcp6ctl)) { /* XXX */
-		dprintf(LOG_WARNING, FNAME, "unexpected input");
-		goto close;
-	}
-
-	command = ntohs(ctlhead.command);
-	commandlen = ntohs(ctlhead.len);
 	switch (command) {
 	case DHCP6CTL_COMMAND_RELOAD:
 		if (commandlen != 0) {
 			dprintf(LOG_INFO, FNAME, "invalid command length "
 			    "for reload: %d", commandlen);
-			goto close;
+			return (DHCP6CTL_R_DONE);
 		}
 		server6_reload();
 		break;
 	case DHCP6CTL_COMMAND_REMOVE:
 		minlen = 8 + sizeof(iaspec);
-		if (commandlen > sizeof(commandbuf)) {
-			dprintf(LOG_INFO, FNAME, "control command too long "
-			    "(%d bytes)", commandlen);
-			goto close;
-		}
 		if (commandlen < minlen) {
 			dprintf(LOG_INFO, FNAME, "control command too short "
 			    "(%d bytes)", commandlen);
-			goto close;
+			return (DHCP6CTL_R_FAILURE);
 		}
-		cc = read(s, commandbuf, commandlen);
-		if (cc < 0) {
-			dprintf(LOG_WARNING, FNAME, "read failed: %s",
-			    strerror(errno));
-			goto close;
-		}
-		if (cc < commandlen) {
-			dprintf(LOG_INFO, FNAME, "short command");
-			goto close;
-		}
-
-		bp = commandbuf;
+		bp = buf + sizeof(*ctlhead);
 		memcpy(&p32, bp, sizeof(bp));
 		p32 = ntohl(p32);
 		if (p32 != DHCP6CTL_BINDING) {
 			dprintf(LOG_INFO, FNAME, "unknown remove target");
-			goto close;
+			return (DHCP6CTL_R_FAILURE);
 		}
 		bp += sizeof(p32);
 
@@ -658,23 +641,23 @@ server6_accept_command(s0)
 		p32 = ntohl(p32);
 		if (p32 != DHCP6CTL_BINDING_IA) {
 			dprintf(LOG_INFO, FNAME, "unknown binding type");
-			goto close;
+			return (DHCP6CTL_R_FAILURE);
 		}
 		bp += sizeof(p32);
 
 		memcpy(&iaspec, bp, sizeof(iaspec));
 		if (ntohl(iaspec.type) != DHCP6CTL_IA_PD) {
 			dprintf(LOG_INFO, FNAME, "unknown IA type");
-			goto close;
+			return (DHCP6CTL_R_FAILURE);
 		}
 		bp += sizeof(iaspec);
 
 		iaid = ntohl(iaspec.id);
 		duidlen = ntohl(iaspec.duidlen);
 
-		if (duidlen + minlen != cc) {
+		if (duidlen + minlen != commandlen) {
 			dprintf(LOG_INFO, FNAME, "ill-formated command");
-			goto close;
+			return (DHCP6CTL_R_FAILURE);
 		}
 
 		duid.duid_len = (size_t)duidlen;
@@ -684,7 +667,7 @@ server6_accept_command(s0)
 		    DHCP6_LISTVAL_IAPD, iaid);
 		if (binding == NULL) {
 			dprintf(LOG_INFO, FNAME, "no such binding");
-			goto close;
+			return (DHCP6CTL_R_FAILURE);
 		}
 		remove_binding(binding);
 		    
@@ -693,12 +676,11 @@ server6_accept_command(s0)
 		dprintf(LOG_INFO, FNAME,
 		    "unknown control command: %d (len=%d)",
 		    (int)command, (int)commandlen);
+		return (DHCP6CTL_R_FAILURE);
 		break;
 	}
 
-  close:
-	close(s);
-	return;
+  	return (DHCP6CTL_R_DONE);
 }
 
 static void

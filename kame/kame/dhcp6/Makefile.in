@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.32 2004/06/11 12:22:55 jinmei Exp $
+# $Id: Makefile.in,v 1.33 2004/06/12 10:46:00 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -57,7 +57,7 @@ GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
 	dhcp6c_script.o if.o base64.o auth.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o if.o config.o timer.o \
-	base64.o auth.o $(GENSRCS:%.c=%.o)
+	base64.o auth.o dhcp6_ctl.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o timer.o
 LITECLIENTOBJS=	dhcp6lc.o common.o if.o timer.o dhcp6c_script.o
 SERVERCTLOBJS= dhcp6sctl.o
