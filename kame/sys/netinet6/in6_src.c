@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.39 2001/06/04 12:03:43 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.40 2001/06/06 09:52:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -396,9 +396,6 @@ in6_pcbsetport(laddr, in6p)
 	int wild = 0;
 	void *t;
 	u_int16_t min, max;
-#ifdef __NetBSD__
-	struct proc *p = curproc;		/* XXX */
-#endif
 
 	/* XXX: this is redundant when called from in6_pcbbind */
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
@@ -409,6 +406,8 @@ in6_pcbsetport(laddr, in6p)
 	if (in6p->in6p_flags & IN6P_LOWPORT) {
 #ifdef __NetBSD__
 #ifndef IPNOPRIVPORTS
+		struct proc *p = curproc;		/* XXX */
+
 		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
 			return (EACCES);
 #endif
