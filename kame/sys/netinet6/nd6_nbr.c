@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.64 2001/05/17 03:48:30 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.65 2001/06/19 14:24:41 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -994,6 +994,9 @@ nd6_ifptomac(ifp)
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_IEEE1394:
+#ifdef IFT_PROPVIRTUAL
+	case IFT_PROPVIRTUAL:
+#endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
 #endif

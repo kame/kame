@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.150 2001/06/18 01:32:00 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.151 2001/06/19 14:24:41 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2210,6 +2210,9 @@ nd6_need_cache(ifp)
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_IEEE1394:
+#ifdef IFT_PROPVIRTUAL
+	case IFT_PROPVIRTUAL:
+#endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
 #endif
@@ -2235,6 +2238,9 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 		switch (ifp->if_type) {
 		case IFT_ETHER:
 		case IFT_FDDI:
+#ifdef IFT_PROPVIRTUAL
+		case IFT_PROPVIRTUAL:
+#endif
 #ifdef IFT_IEEE80211
 		case IFT_IEEE80211:
 #endif
