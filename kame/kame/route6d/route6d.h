@@ -1,4 +1,4 @@
-/*	$KAME: route6d.h,v 1.7 2003/05/28 09:09:35 itojun Exp $	*/
+/*	$KAME: route6d.h,v 1.8 2003/05/28 09:11:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,7 @@ struct	rip6 {
 #define	NEXTHOP_METRIC		0xff
 #define	RIP6_MAXMTU		1500
 
-#define	IFMINMTU		576
+#define	IFMINMTU		1280
 
 #ifndef	DEBUG
 #define	SUPPLY_INTERVAL6	30
