@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.121 2004/11/28 11:43:35 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.122 2004/12/03 05:48:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1307,7 +1307,7 @@ dhcp6_get_options(p, ep, optinfo)
 				struct dhcp6_vbuf vb;
 				char name[MAXDNAME + 1];
 
-				if (dnsdecode((u_char **)&val,
+				if (dnsdecode((u_char **)(void *)&val,
 				    (u_char *)(cp + optlen), name,
 				    sizeof(name)) == NULL) {
 					dprintf(LOG_INFO, FNAME, "failed to "
@@ -1383,7 +1383,7 @@ dhcp6_get_options(p, ep, optinfo)
 				struct dhcp6_vbuf vb;
 				char name[MAXDNAME + 1];
 
-				if (dnsdecode((u_char **)&val,
+				if (dnsdecode((u_char **)(void *)&val,
 				    (u_char *)(cp + optlen), name,
 				    sizeof(name)) == NULL) {
 					dprintf(LOG_INFO, FNAME, "failed to "
@@ -1821,10 +1821,10 @@ sprint_uint64(buf, buflen, i64)
 {
 	u_int16_t rd0, rd1, rd2, rd3;
 
-	rd0 = ntohs(*(u_int16_t *)&i64);
-	rd1 = ntohs(*((u_int16_t *)&i64 + 1));
-	rd2 = ntohs(*((u_int16_t *)&i64 + 2));
-	rd3 = ntohs(*((u_int16_t *)&i64 + 3));
+	rd0 = ntohs(*(u_int16_t *)(void *)&i64);
+	rd1 = ntohs(*((u_int16_t *)(void *)(&i64 + 1)));
+	rd2 = ntohs(*((u_int16_t *)(void *)(&i64 + 2)));
+	rd3 = ntohs(*((u_int16_t *)(void *)(&i64 + 3)));
 
 	snprintf(buf, buflen, "%04x %04x %04x %04x", rd0, rd1, rd2, rd3);
 
@@ -2445,7 +2445,7 @@ copyout_option(p, ep, optval)
 		memset(&ia, 0, sizeof(ia));
 		headlen = sizeof(ia);
 		opttype = DH6OPT_IA_PD;
-		opt = (struct dhcp6opt *)&ia;
+		opt = (struct dhcp6opt *)(void *)&ia;
 		break;
 	case DHCP6_LISTVAL_PREFIX6:
 		memset(&pd_prefix, 0, sizeof(pd_prefix));
@@ -2457,7 +2457,7 @@ copyout_option(p, ep, optval)
 		memset(&stcodeopt, 0, sizeof(stcodeopt));
 		headlen = sizeof(stcodeopt);
 		opttype = DH6OPT_STATUS_CODE;
-		opt = (struct dhcp6opt *)&stcodeopt;
+		opt = (struct dhcp6opt *)(void *)&stcodeopt;
 		break;
 	default:
 		/*
