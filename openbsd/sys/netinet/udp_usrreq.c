@@ -285,6 +285,13 @@ udp_input(m, va_alist)
 	savesum = uh->uh_sum;
 #ifdef INET6
 	if (ipv6) {
+		/* Be proactive about malicious use of IPv4 mapped address */
+		if (IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_src) ||
+		    IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_dst)) {
+			/* XXX stat */
+			goto bad;
+		}
+
 		/*
 		 * In IPv6, the UDP checksum is ALWAYS used.
 		 */

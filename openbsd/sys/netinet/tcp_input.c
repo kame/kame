@@ -487,6 +487,13 @@ tcp_input(m, va_alist)
 	  ti = NULL;
 	  ipv6 = mtod(m, struct ip6_hdr *);
 
+		/* Be proactive about malicious use of IPv4 mapped address */
+		if (IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_src) ||
+		    IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_dst)) {
+			/* XXX stat */
+			goto drop;
+		}
+
 	  if (in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr), tlen)) {
 	    tcpstat.tcps_rcvbadsum++;
 	    goto drop;
