@@ -142,6 +142,8 @@ main(argc, argv)
 	}
 	device = argv[0];
 
+	relay6_init();
+
 	if (foreground == 0) {
 		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 		if (daemon(0, 0) < 0)
@@ -149,7 +151,6 @@ main(argc, argv)
 	}
 	setloglevel(debug);
 
-	relay6_init();
 	relay6_loop();
 
 	exit(0);
