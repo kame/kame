@@ -267,7 +267,7 @@ int in6_gif_input(mp, offp, proto)
 #else
     {
 	struct mbuf *n;
-	n = m_aux_find(m, AF_INET, IPPROTO_IPV6);
+	n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
 	if (n) {
 		gifp = *mtod(n, struct ifnet **);
 		m_aux_delete(m, n);

@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.12 2000/02/20 08:28:38 itojun Exp $
+ * $Id: mip6.c,v 1.13 2000/02/22 05:25:50 itojun Exp $
  *
  */
 
@@ -1913,8 +1913,19 @@ mip6_tunnel_input(mp, offp, proto)
  * XXXYYY
  * Can this be used for checking on tunnelled packets from HA?
  */
+#if 0
 	esm = m->m_pkthdr.aux;
 	m->m_pkthdr.aux = NULL;
+#else
+    {
+	struct mbuf *n;
+	n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
+	if (n) {
+		esm = *mtod(n, struct mip6_esm **);
+		m_aux_delete(m, n);
+	}
+    }
+#endif
 
 	if (esm == NULL) {
 		m_freem(m);

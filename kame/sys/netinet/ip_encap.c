@@ -226,7 +226,7 @@ encap6_input(mp, offp, proto)
 			m->m_pkthdr.aux = ep->arg;	/*XXX*/
 #else
 			struct mbuf *n;
-			n = m_aux_add(m, AF_INET, IPPROTO_IPV6);
+			n = m_aux_add(m, AF_INET6, IPPROTO_IPV6);
 			if (n)
 				*mtod(n, void **) = ep->arg;
 #endif
