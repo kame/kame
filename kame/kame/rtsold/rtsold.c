@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.33 2001/09/19 04:16:33 sakane Exp $	*/
+/*	$KAME: rtsold.c,v 1.34 2001/09/19 04:34:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -807,21 +807,17 @@ autoifprobe()
 		if (found)
 			continue;
 
-		if (n == 0) {
-			a = (char **)realloc(argv, (n + 1) * sizeof(char **));
-			if (a == NULL)
-				err(1, "realloc");
-			argv = a;
-			argv[n] = (char *)malloc(1 + strlen(ifa->ifa_name));
-			strcpy(argv[n], ifa->ifa_name);
-			n++;
-		} else {
-			/* if we find multiple candidates, failure. */
-			if (dflag > 1)
-				warnx("multiple interfaces found");
-			target = NULL;
-			break;
-		}
+		/* if we find multiple candidates, just warn. */
+		if (n != 0 && dflag > 1)
+			warnx("multiple interfaces found");
+
+		a = (char **)realloc(argv, (n + 1) * sizeof(char **));
+		if (a == NULL)
+			err(1, "realloc");
+		argv = a;
+		argv[n] = (char *)malloc(1 + strlen(ifa->ifa_name));
+		strcpy(argv[n], ifa->ifa_name);
+		n++;
 	}
 
 	if (n) {
