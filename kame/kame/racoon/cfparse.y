@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.100 2001/05/24 08:09:57 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.101 2001/06/01 10:12:55 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -334,11 +334,11 @@ listen_stmt
 			lcconf->autograbaddr = 0;
 		}
 		EOS
-	|	X_ADMIN PORT
+	|	X_ADMIN
 		{
-			lcconf->port_admin = $2;
+			yyerror("admin directive is obsoleted.");
 		}
-		EOS
+		PORT EOS
 	|	STRICT_ADDRESS { lcconf->strict_address = TRUE; } EOS
 	;
 ike_addrinfo_port

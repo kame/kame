@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.32 2001/04/11 06:11:54 sakane Exp $
+#	$KAME: Makefile.in,v 1.33 2001/06/01 10:12:55 sakane Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -20,8 +20,7 @@ exec_prefix=	@exec_prefix@
 sysconfdir=	@sysconfdir@
 INSTALL=@INSTALL@
 
-PROG=	racoon eaytest
-#PROG+=	kmpstat
+PROG=	racoon racoonctl eaytest
 #PROG+=	pfkey
 OBJS=	main.o session.o isakmp.o handler.o random.o \
 	isakmp_ident.o isakmp_agg.o isakmp_base.o \
@@ -40,7 +39,7 @@ all: $(PROG)
 racoon: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-kmpstat: kmpstat.o misc_noplog.o vmbuf.o str2val.o
+racoonctl: kmpstat.o misc_noplog.o vmbuf.o str2val.o
 	$(CC) $(LDFLAGS) -o $@ kmpstat.o misc_noplog.o vmbuf.o str2val.o $(LIBS)
 
 pfkey: dummy.o
