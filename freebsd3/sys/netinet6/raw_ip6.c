@@ -262,13 +262,8 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
-	if (ip6) {
- 		(void) in6_pcbnotify(&ripcb, sa, 0,
-				     (struct sockaddr *)ip6cp->ip6c_src,
-				     0, cmd, cmdarg, notify);
-	} else
-		(void) in6_pcbnotify(&ripcb, sa, 0, (struct sockaddr *)sa6_src,
-				     0, cmd, cmdarg, notify);
+	(void) in6_pcbnotify(&ripcb, sa, 0, (struct sockaddr *)sa6_src,
+			     0, cmd, cmdarg, notify);
 }
 
 /*
