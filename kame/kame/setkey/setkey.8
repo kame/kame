@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.46 2001/05/18 04:59:48 sakane Exp $
+.\"	$KAME: setkey.8,v 1.47 2001/05/18 05:35:01 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -383,12 +383,13 @@ They must be in numeric form.
 .Pp
 .It Ar upperspec
 Upper-layer protocol to be used.
-Currently
-.Li icmp ,
+You can use one of words in
+.Pa /etc/protocol
+as
+.Ar upperspec .
+Or
 .Li icmp6 ,
 .Li ip4 ,
-.Li tcp ,
-.Li udp
 and
 .Li any
 can be specified.

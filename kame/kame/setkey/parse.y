@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.34 2001/02/16 23:48:45 thorpej Exp $	*/
+/*	$KAME: parse.y,v 1.35 2001/05/18 05:35:01 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -106,7 +106,7 @@ extern void yyerror __P((const char *));
 %token F_EXT EXTENSION NOCYCLICSEQ
 %token ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %token F_LIFETIME_HARD F_LIFETIME_SOFT
-%token DECSTRING QUOTEDSTRING HEXSTRING ANY
+%token DECSTRING QUOTEDSTRING HEXSTRING STRING ANY
 	/* SPD management */
 %token SPDADD SPDDELETE SPDDUMP SPDFLUSH
 %token F_POLICY PL_REQUESTS
@@ -117,7 +117,7 @@ extern void yyerror __P((const char *));
 %type <num> DECSTRING
 %type <val> ADDRESS PL_REQUESTS
 %type <val> key_string policy_requests
-%type <val> QUOTEDSTRING HEXSTRING
+%type <val> QUOTEDSTRING HEXSTRING STRING
 
 %%
 commands
@@ -551,10 +551,24 @@ port
 upper_spec
 	:	DECSTRING { p_upper = $1; }
 	|	UP_PROTO { p_upper = $1; }
-	|	PR_ESP { p_upper = IPPROTO_ESP; };
-	|	PR_AH { p_upper = IPPROTO_AH; };
-	|	PR_IPCOMP { p_upper = IPPROTO_IPCOMP; };
 	|	ANY { p_upper = IPSEC_ULPROTO_ANY; }
+	|	STRING
+		{
+			struct protoent *ent;
+
+			ent = getprotobyname($1.buf);
+			if (!ent) {
+				if (strcmp("icmp6", $1.buf) == 0) {
+					p_upper = IPPROTO_ICMPV6;
+				} else if(strcmp("ip4", $1.buf) == 0) {
+					p_upper = IPPROTO_IPV4;
+				}
+				yyerror("invalid upper layer protocol");
+				free($1.buf);
+				return -1;
+			}
+			p_upper = ent->p_proto;
+		}
 	;
 
 policy_spec
