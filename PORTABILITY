@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.17 1999/10/31 23:34:55 itojun Exp $
+$Id: PORTABILITY,v 1.18 1999/11/06 15:25:46 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -170,5 +170,15 @@ across those possibilities.
 
 - It is better to avoid insque() and rmque(), they are from old VAX days
   and some platform now tries to avoid these.
+
+- To identify FreeBSD3, use the following:
+	#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		this is freebsd3.
+	#endif
+
+- To identify BSDI4, use the following:
+	#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+		this is bsdi4.
+	#endif
 
 - For portability in networking code, look at kame/sys/net/net_osdep.h.
