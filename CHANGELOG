@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2243 2002/10/02 11:24:48 suz Exp $
+$KAME: CHANGELOG,v 1.2244 2002/10/07 13:19:41 jinmei Exp $
 
 <200210>
+2002-10-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.h: experimentally added a trailing pad in
+	the route structure instead of having the sockaddr_storage
+	structure in order to
+	1. keep it as small as possible, and
+	2. avoid redefining "ro_dst" that caused a compatibility issue.
+
 Wed Oct  2 20:20:17 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/mld6.c, mld6_var.h: fixed MLDv2-related timer
 	  calculation bug.
