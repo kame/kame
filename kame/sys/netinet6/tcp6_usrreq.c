@@ -143,7 +143,11 @@ tcp6_usrreq(so, req, m, nam, control, p)
 		return (EINVAL);
 	}
 
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	in6p = sotoin6pcb(so);
 	/*
 	 * When a TCP6 is attached to a socket, then there will be
@@ -419,7 +423,11 @@ tcp6_ctloutput(op, so, level, optname, mp)
 	register struct mbuf *m;
 	register int i;
 
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	in6p = sotoin6pcb(so);
 	if (in6p == NULL) {
 		splx(s);

@@ -116,7 +116,11 @@ void
 tcp6_fasttimo()
 {
 	register struct tcp6cb *t6p, *t6pnext;
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
 
 	for (t6p = tcp6_delacks.lh_first; t6p; t6p = t6pnext) {
 		t6pnext = t6p->t_delacks.le_next;
@@ -138,7 +142,11 @@ tcp6_slowtimo()
 {
 	register struct in6pcb *ip6, *ip6nxt;
 	register struct tcp6cb *t6p = (struct tcp6cb *)NULL;
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
 	register int i;
 #if 0
 	extern int tcp6_msltime;

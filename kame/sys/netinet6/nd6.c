@@ -82,6 +82,8 @@
 extern struct ifnet loif[NLOOP];
 #endif
 
+#include <net/net_osdep.h>
+
 #define ND6_SLOWTIMER_INTERVAL (60 * 60) /* 1 hour */
 #define ND6_RECALC_REACHTM_INTERVAL (60 * 120) /* 2 hours */
 
@@ -373,7 +375,11 @@ nd6_timer(ignored_arg)
 	register struct nd_defrouter *dr;
 	register struct nd_prefix *pr;
 	
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	timeout(nd6_timer, (caddr_t)0, nd6_prune * hz);
 
 	ln = llinfo_nd6.ln_next;
@@ -640,7 +646,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * If the address matches one of our addresses,
 	 * it should be a neighbor.
 	 */
-#ifdef __bsdi__
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first;
@@ -688,7 +694,11 @@ nd6_free(rt)
 		int s;
 		in6 = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->
 				      sin6_addr,
 				      rt->rt_ifp);
@@ -848,10 +858,17 @@ nd6_resolve(ifp, rt, m, dst, desten)
 }
 
 void
+#ifdef __bsdi__
+nd6_rtrequest(req, rt, info)
+	int	req;
+	struct rtentry *rt;
+	struct rt_addrinfo *info; /* xxx unused */
+#else
 nd6_rtrequest(req, rt, sa)
 	int	req;
 	struct rtentry *rt;
 	struct sockaddr *sa; /* xxx unused */
+#endif
 {
 	struct sockaddr *gate = rt->rt_gateway;
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo;
@@ -1015,10 +1032,17 @@ nd6_rtrequest(req, rt, sa)
 }
 
 void
+#ifdef __bsdi__
+nd6_p2p_rtrequest(req, rt, info)
+	int	req;
+	struct rtentry *rt;
+	struct rt_addrinfo *info; /* xxx unused */
+#else
 nd6_p2p_rtrequest(req, rt, sa)
 	int	req;
 	struct rtentry *rt;
 	struct sockaddr *sa; /* xxx unused */
+#endif
 {
 	struct sockaddr *gate = rt->rt_gateway;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
@@ -1098,7 +1122,11 @@ nd6_ioctl(cmd, data, ifp)
 	switch (cmd) {
 	case SIOCGDRLST_IN6:
 		bzero(drl, sizeof(*drl));
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		dr = nd_defrouter.lh_first;
 		while (dr && i < DRLSTSIZ) {
 			drl->defrouter[i].rtaddr = dr->rtaddr;
@@ -1123,7 +1151,11 @@ nd6_ioctl(cmd, data, ifp)
 		break;
 	case SIOCGPRLST_IN6:
 		bzero(prl, sizeof(*prl));
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		pr = nd_prefix.lh_first;
 		while (pr && i < PRLSTSIZ) {
 			struct nd_pfxrouter *pfr;
@@ -1183,7 +1215,11 @@ nd6_ioctl(cmd, data, ifp)
 		/* flush all the prefix advertised by routers */
 		struct nd_prefix *pr, *next;
 
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		for (pr = nd_prefix.lh_first; pr; pr = next) {
 			next = pr->ndpr_next;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
@@ -1198,7 +1234,11 @@ nd6_ioctl(cmd, data, ifp)
 		/* flush all the default routers */
 		struct nd_defrouter *dr, *next;
 
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		if ((dr = nd_defrouter.lh_first) != NULL) {
 			/*
 			 * The first entry of the list may be stored in
@@ -1215,21 +1255,25 @@ nd6_ioctl(cmd, data, ifp)
 	    }
 	case SIOCGNBRINFO_IN6:
 	    {
-		  struct llinfo_nd6 *ln;
+		struct llinfo_nd6 *ln;
 
-		  s = splsoftnet();
-		  if ((rt = nd6_lookup(&nbi->addr, 0, ifp)) == NULL) {
-			  error = EINVAL;
-			  break;
-		  }
-		  ln = (struct llinfo_nd6 *)rt->rt_llinfo;
-		  nbi->state = ln->ln_state;
-		  nbi->asked = ln->ln_asked;
-		  nbi->isrouter = ln->ln_router;
-		  nbi->expire = ln->ln_expire;
-		  splx(s);
-		  
-		  break;
+#ifdef __NetBSD__
+		s = splsoftnet();
+#else
+		s = splnet();
+#endif
+		if ((rt = nd6_lookup(&nbi->addr, 0, ifp)) == NULL) {
+			error = EINVAL;
+			break;
+		}
+		ln = (struct llinfo_nd6 *)rt->rt_llinfo;
+		nbi->state = ln->ln_state;
+		nbi->asked = ln->ln_asked;
+		nbi->isrouter = ln->ln_router;
+		nbi->expire = ln->ln_expire;
+		splx(s);
+		
+		break;
 	    }
 	}
 	return(error);
@@ -1441,7 +1485,11 @@ static void
 nd6_slowtimo(ignored_arg)
     void *ignored_arg;
 {
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
 	register int i;
 	register struct nd_ifinfo *nd6if;
 

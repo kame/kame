@@ -59,6 +59,8 @@
 #include <netinet6/nd6.h>
 #include <netinet6/icmp6.h>
 
+#include <net/net_osdep.h>
+
 #define SDL(s) ((struct sockaddr_dl *)s)
 
 #if 0
@@ -678,7 +680,11 @@ nd6_na_input(m, off, icmp6len)
 			int s;
 
 			in6 = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
+#ifdef __NetBSD__
 			s = splsoftnet();
+#else
+			s = splnet();
+#endif
 			dr = defrouter_lookup(in6, rt->rt_ifp);
 			if (dr)
 				defrtrlist_del(dr);
@@ -881,7 +887,7 @@ nd6_dad_start(ifa, tick)
 		printf("nd6_dad_start: called with non-tentative address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
-			ifa->ifa_ifp ? ifa->ifa_ifp->if_xname : "???");
+			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
 		return;
 	}
 	if (ia->ia6_flags & IN6_IFF_ANYCAST) {
@@ -906,14 +912,15 @@ nd6_dad_start(ifa, tick)
 		printf("nd6_dad_start: memory allocation failed for "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
-			ifa->ifa_ifp ? ifa->ifa_ifp->if_xname : "???");
+			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
 		return;
 	}
 	bzero(dp, sizeof(*dp));
 	TAILQ_INSERT_TAIL(&dadq, (struct dadq *)dp, dad_list);
 
-	printf("performing DAD for %s(%s)\n",
-		ip6_sprintf(&ia->ia_addr.sin6_addr), ifa->ifa_ifp->if_xname);
+	/* XXXJRT This is probably a purely debugging message. */
+	printf("%s: starting DAD for %s\n", if_name(ifa->ifa_ifp),
+	    ip6_sprintf(&ia->ia_addr.sin6_addr));
 
 	/*
 	 * Send NS packet for DAD, ip6_dad_count times.
@@ -959,7 +966,11 @@ nd6_dad_timer(ifa)
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct dadq *dp;
 
+#ifdef __NetBSD__
 	s = splsoftnet();	/*XXX*/
+#else
+	s = splnet();		/*XXX*/
+#endif
 
 	/* Sanity check */
 	if (ia == NULL) {
@@ -975,14 +986,14 @@ nd6_dad_timer(ifa)
 		printf("nd6_dad_timer: called with duplicated address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
-			ifa->ifa_ifp ? ifa->ifa_ifp->if_xname : "???");
+			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
 		goto done;
 	}
 	if ((ia->ia6_flags & IN6_IFF_TENTATIVE) == 0) {
 		printf("nd6_dad_timer: called with non-tentative address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
-			ifa->ifa_ifp ? ifa->ifa_ifp->if_xname : "???");
+			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
 		goto done;
 	}
 
@@ -1033,7 +1044,7 @@ nd6_dad_timer(ifa)
 				log(LOG_INFO, "DAD questionable for %s(%s): "
 					"network card loops back multicast?\n",
 					ip6_sprintf(&ia->ia_addr.sin6_addr),
-					ifa->ifa_ifp->if_xname);
+					if_name(ifa->ifa_ifp));
 				/* XXX consider it a duplicate or not? */
 				/* duplicate++; */
 			} else {
@@ -1057,9 +1068,11 @@ nd6_dad_timer(ifa)
 			 */
 			ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 
-			printf("DAD success for %s(%s)\n",
-				ip6_sprintf(&ia->ia_addr.sin6_addr),
-				ifa->ifa_ifp->if_xname);
+			/* XXXJRT This is probably a purely debugging message */
+			printf("%s: DAD complete for %s - no duplicates "
+			    "found\n", if_name(ifa->ifa_ifp),
+			    ip6_sprintf(&ia->ia_addr.sin6_addr));
+
 			TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 			free(dp, M_IP6NDP);
 			dp = NULL;
@@ -1084,10 +1097,10 @@ nd6_dad_duplicated(ifa)
 		return;
 	}
 
-	log(LOG_ERR, "DAD detected duplicate IP6 address %s(%s): "
-		"got %d NS and %d NA\n", ip6_sprintf(&ia->ia_addr.sin6_addr),
-		ifa->ifa_ifp->if_xname,
-		dp->dad_ns_icount, dp->dad_na_icount);
+	log(LOG_ERR, "%s: DAD detected duplicate IPv6 address %s: %d NS, "
+	    "%d NA\n", if_name(ifa->ifa_ifp),
+	    ip6_sprintf(&ia->ia_addr.sin6_addr),
+	    dp->dad_ns_icount, dp->dad_na_icount);
 
 	ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 	ia->ia6_flags |= IN6_IFF_DUPLICATED;
@@ -1099,9 +1112,10 @@ nd6_dad_duplicated(ifa)
 #endif
 		);
 
-	printf("DAD failed for %s(%s): manual operation required\n",
-		ip6_sprintf(&ia->ia_addr.sin6_addr),
-		ifa->ifa_ifp->if_xname);
+	printf("%s: DAD complete for %s - duplicate found\n",
+	    if_name(ifa->ifa_ifp), ip6_sprintf(&ia->ia_addr.sin6_addr));
+	printf("%s: manual intervention required\n", if_name(ifa->ifa_ifp));
+
 	TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 	free(dp, M_IP6NDP);
 	dp = NULL;
@@ -1137,7 +1151,7 @@ nd6_dad_ns_input(ifa)
 	if (dad_ignore_ns) {
 		log(LOG_INFO, "nd6_dad_ns_input: ignoring DAD NS packet for "
 		    "address %s(%s)\n", ip6_sprintf(taddr6),
-		    ifa->ifa_ifp->if_xname);
+		    if_name(ifa->ifa_ifp));
 		return;
 	}
 

@@ -273,8 +273,13 @@ struct rtdetq {		/* XXX: rtdetq is also defined in ip_mroute.h */
 
 #define MAX_UPQ6	4		/* max. no of pkts in upcall Q */
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	ip6_mrouter_set __P((struct socket *so, struct sockopt *sopt));
+int	ip6_mrouter_get __P((struct socket *so, struct sockopt *sopt));
+#else
 int	ip6_mrouter_set __P((int, struct socket *, struct mbuf *));
 int	ip6_mrouter_get __P((int, struct socket *, struct mbuf **));
+#endif
 int	ip6_mrouter_done __P((void));
 int	mrt6_ioctl __P((int, caddr_t));
 #endif /* KERNEL */

@@ -57,7 +57,7 @@ struct nd_ifinfo {
 	u_int32_t basereachable;	/* BaseReachableTime */
 	u_int32_t reachable;		/* Reachable Time */
 	u_int32_t retrans;		/* Retrans Timer */
-	int	recalctm;		/* BaseReacable re-calculation timer */
+	int recalctm;			/* BaseReacable re-calculation timer */
 	u_int8_t chlim;			/* CurHopLimit */
 	u_int8_t receivedra;
 };
@@ -267,8 +267,13 @@ void nd6_free __P((struct rtentry *));
 void nd6_nud_hint __P((struct rtentry *, struct in6_addr *));
 int nd6_resolve __P((struct ifnet *, struct rtentry *,
 		     struct mbuf *, struct sockaddr *, u_char *));
+#ifdef __bsdi__
+void nd6_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+void nd6_p2p_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+#else
 void nd6_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 void nd6_p2p_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+#endif
 int nd6_ioctl __P((u_long, caddr_t, struct ifnet *));
 struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct in6_addr *,
 	char *, int, int, int));

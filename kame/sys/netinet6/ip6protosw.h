@@ -79,6 +79,9 @@ struct socket;
 struct domain;
 struct proc;
 struct ip6_hdr;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+struct pr_usrreqs;
+#endif
 
 struct ip6protosw {
 	int 	pr_type;		/* socket type used for */
@@ -89,8 +92,12 @@ struct ip6protosw {
 /* protocol-protocol hooks */
 	int	(*pr_input)		/* input to protocol (from below) */
 			__P((struct mbuf **, int *, int));
+#ifdef __bsdi__
+	int	(*pr_output)();		/* output to protocol (from above) */
+#else
 	int	(*pr_output)		/* output to protocol (from above) */
 			__P((struct mbuf *, ...));
+#endif
 	void	(*pr_ctlinput)		/* control input (from below) */
 			__P((int, struct sockaddr *, struct ip6_hdr *,
 				struct mbuf *, int));
@@ -98,9 +105,15 @@ struct ip6protosw {
 			__P((int, struct socket *, int, int, struct mbuf **));
 
 /* user-protocol hook */
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 	int	(*pr_usrreq)		/* user request: see list below */
 			__P((struct socket *, int, struct mbuf *,
 			     struct mbuf *, struct mbuf *, struct proc *));
+#else
+	int	(*pr_usrreq)		/* user request: see list below */
+			__P((struct socket *, int, struct mbuf *,
+			     struct mbuf *, struct mbuf *));
+#endif
 
 /* utility hooks */
 	void	(*pr_init)		/* initialization hook */
@@ -112,9 +125,14 @@ struct ip6protosw {
 			__P((void));
 	void	(*pr_drain)		/* flush any excess space possible */
 			__P((void));
+#ifdef __FreeBSD__
+#if __FreeBSD__ >= 3
+	struct  pr_usrreqs *pr_usrreqs;	/* supersedes pr_usrreq() */
+#endif
+#else
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));
+#endif
 };
-
 
 #endif /* !_NETINET6_IP6PROTOSW_H_ */

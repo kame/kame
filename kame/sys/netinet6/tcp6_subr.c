@@ -120,7 +120,9 @@ extern int ip_next_mtu __P((int, int));	/*XXX netinet/ip_icmp.c */
 
 extern struct in6pcb *tcp6_last_in6pcb;
 
+#ifdef __NetBSD__
 static struct pool tcp6_template_pool;
+#endif
 
 /*
  * Tcp initialization
@@ -128,8 +130,10 @@ static struct pool tcp6_template_pool;
 void
 tcp6_init()
 {
+#ifdef __NetBSD__
 	pool_init(&tcp6_template_pool, sizeof(struct ip6tcp), 0, 0, 0,
 		"tcp6tmpl", 0, NULL, NULL, M_MBUF);
+#endif
 	tcp6_iss = random();	/* wrong, but better than a constant */
 	tcb6.in6p_next = tcb6.in6p_prev = &tcb6;
 	if (max_protohdr < sizeof(struct ip6tcp)) /* xxx */
@@ -152,7 +156,11 @@ tcp6_template(t6p)
 	register struct ip6tcp *n;
 
 	if ((n = t6p->t_template) == 0) {
+#ifdef __NetBSD__
 		n = pool_get(&tcp6_template_pool, PR_NOWAIT);
+#else
+		n = malloc(sizeof(*n), M_TEMP, M_NOWAIT);
+#endif
 		if (n == NULL)
 			return (NULL);
 	}
@@ -436,8 +444,13 @@ tcp6_close(t6p)
 		remque(t->i6tr_prev);
 		m_freem(m);
 	}
-	if (t6p->t_template)
+	if (t6p->t_template) {
+#ifdef __NetBSD__
 		pool_put(&tcp6_template_pool, t6p->t_template);
+#else
+		free(t6p->t_template, M_TEMP);
+#endif
+	}
 	tcp6_delack_done(t6p);	/* just in case */
 	if (t6p->t_state == TCP6S_TIME_WAIT)
 		tcp6_cancel2msl(in6p, t6p);

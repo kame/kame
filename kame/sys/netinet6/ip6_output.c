@@ -103,6 +103,8 @@
 
 #include "loop.h"
 
+#include <net/net_osdep.h>
+
 struct ip6_exthdrs {
 	struct mbuf *ip6e_ip6;
 	struct mbuf *ip6e_hbh;
@@ -622,14 +624,12 @@ skip_ipsec2:;
 		 */
 		if (ifp == NULL) {
 			if (ro->ro_rt == 0) {
+				ro->ro_rt = rtalloc1((struct sockaddr *)
+						&ro->ro_dst, 0
 #ifdef __FreeBSD__
-				ro->ro_rt = rtalloc1((struct sockaddr *)
-						&ro->ro_dst, 0, 0UL);
-#endif /*__FreeBSD__*/
-#if defined(__bsdi__) || defined(__NetBSD__)
-				ro->ro_rt = rtalloc1((struct sockaddr *)
-						&ro->ro_dst, 0);
-#endif /*__bsdi__*/
+						, 0UL
+#endif
+						);
 			}
 			if (ro->ro_rt == 0) {
 				ip6stat.ip6s_noroute++;
@@ -1113,27 +1113,70 @@ ip6_insertfraghdr(m0, m, hlen, frghdrp)
 /*
  * IP6 socket option processing.
  */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int
+ip6_ctloutput(so, sopt)
+	struct socket *so;
+	struct sockopt *sopt;
+#else
 int
 ip6_ctloutput(op, so, level, optname, mp)
 	int op;
 	struct socket *so;
 	int level, optname;
 	struct mbuf **mp;
+#endif
 {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	register struct inpcb *in6p = sotoinpcb(so);
+	int error, optval;
+	int level, op, optname;
+	int optlen;
+	struct proc *p;
+
+	if (sopt) {
+		level = sopt->sopt_level;
+		op = sopt->sopt_dir;
+		optname = sopt->sopt_name;
+		optlen = sopt->sopt_valsize;
+		p = sopt->sopt_p;
+	} else {
+		level = op = optname = optlen = 0;
+		p = NULL;
+	}
+#else
 	register struct in6pcb *in6p = sotoin6pcb(so);
 	register struct mbuf *m = *mp;
-	register int optval = 0;
-	int error = 0;
+	int error, optval;
+	int optlen;
 	struct proc *p = curproc;	/* XXX */
 
-	if (level == IPPROTO_IPV6)
+	optlen = m ? m->m_len : 0;
+#endif
+	error = optval = 0;
+
+	if (level == IPPROTO_IPV6) {
 		switch (op) {
 
 		case PRCO_SETOPT:
 			switch (optname) {
 			case IPV6_PKTOPTIONS:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			    {
+				struct mbuf *m;
+
+				error = ip6_getm_for_soopt(sopt, &m); /* XXX */
+				if (error != NULL)
+					break;
+				error = sooptcopyin(sopt, mtod(m, char *), m->m_len,
+						    m->m_len);
+				return (ip6_pcbopts(&in6p->inp_outputopts, m, so,
+						    sopt));
+			    }
+#else
 				return(ip6_pcbopts(&in6p->in6p_outputopts,
 						   m, so));
+#endif
 			case IPV6_HOPOPTS:
 			case IPV6_DSTOPTS:
 				if (p == 0 || suser(p->p_ucred, &p->p_acflag)) {
@@ -1150,10 +1193,17 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
-				if (!m || m->m_len != sizeof(int))
+				if (optlen != sizeof(int))
 					error = EINVAL;
 				else {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+					error = sooptcopyin(sopt, &optval,
+						sizeof optval, sizeof optval);
+					if (error)
+						break;
+#else
 					optval = *mtod(m, int *);
+#endif
 					switch (optname) {
 
 					case IPV6_UNICAST_HOPS:
@@ -1219,7 +1269,28 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_MULTICAST_LOOP:
 			case IPV6_JOIN_GROUP:
 			case IPV6_LEAVE_GROUP:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			    {
+				struct mbuf *m;
+				if (sopt->sopt_valsize > MLEN) {
+					error = EMSGSIZE;
+					break;
+				}
+				/* XXX */
+				MGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT, MT_HEADER);
+				if (m == 0) {
+					error = ENOBUFS;
+					break;
+				}
+				m->m_len = sopt->sopt_valsize;
+				error = sooptcopyin(sopt, mtod(m, char *), m->m_len,
+						    m->m_len);
+				error =	ip6_setmoptions(sopt->sopt_name, in6p,
+							&in6p->inp_moptions6, m);
+			    }
+#else
 				error =	ip6_setmoptions(optname, &in6p->in6p_moptions, m);
+#endif
 				break;
 
 #ifdef IPSEC
@@ -1251,8 +1322,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 				error = ENOPROTOOPT;
 				break;
 			}
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 			if (m)
 				(void)m_free(m);
+#endif
 			break;
 
 		case PRCO_GETOPT:
@@ -1260,6 +1333,16 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_OPTIONS:
 			case IPV6_RETOPTS:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				if (in6p->inp_options) {
+					error = sooptcopyout(sopt, 
+						     mtod(in6p->inp_options,
+							  char *),
+						     in6p->inp_options->m_len);
+				} else
+					sopt->sopt_valsize = 0;
+				break;
+#else
 #if 0
 				*mp = m = m_get(M_WAIT, MT_SOOPTS);
 				if (in6p->in6p_options) {
@@ -1274,8 +1357,18 @@ ip6_ctloutput(op, so, level, optname, mp)
 				error = ENOPROTOOPT;
 				break;
 #endif
+#endif
 
 			case IPV6_PKTOPTIONS:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				if (in6p->inp_options) {
+					error = sooptcopyout(sopt, 
+						     mtod(in6p->inp_options,
+							  char *),
+						     in6p->inp_options->m_len);
+				} else
+					sopt->sopt_valsize = 0;
+#else
 				if (in6p->in6p_options) {
 					*mp = m_copym(in6p->in6p_options, 0,
 						      M_COPYALL, M_WAIT);
@@ -1283,6 +1376,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 					*mp = m_get(M_WAIT, MT_SOOPTS);
 					(*mp)->m_len = 0;
 				}
+#endif
 				break;
 
 			case IPV6_HOPOPTS:
@@ -1301,8 +1395,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
-				*mp = m = m_get(M_WAIT, MT_SOOPTS);
-				m->m_len = sizeof(int);
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
@@ -1351,7 +1443,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 					optval = OPTBIT(IN6P_FAITH);
 					break;
 				}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyout(sopt, &optval,
+					sizeof optval);
+#else
+				*mp = m = m_get(M_WAIT, MT_SOOPTS);
+				m->m_len = sizeof(int);
 				*mtod(m, int *) = optval;
+#endif
 				break;
 
 			case IPV6_MULTICAST_IF:
@@ -1359,7 +1458,18 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_MULTICAST_LOOP:
 			case IPV6_JOIN_GROUP:
 			case IPV6_LEAVE_GROUP:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			    {
+				struct mbuf *m;
+				error = ip6_getmoptions(sopt->sopt_name,
+						in6p->inp_moptions6, &m);
+				if (error == 0)
+					error = sooptcopyout(sopt,
+						mtod(m, char *), m->m_len);
+			    }
+#else
 				error = ip6_getmoptions(optname, in6p->in6p_moptions, mp);
+#endif
 				break;
 
 #ifdef IPSEC
@@ -1374,10 +1484,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 			}
 			break;
 		}
-	else {
+	} else {
 		error = EINVAL;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (op == PRCO_SETOPT && *mp)
 			(void)m_free(*mp);
+#endif
 	}
 	return(error);
 }
@@ -1729,7 +1841,11 @@ ip6_getmoptions(optname, im6o, mp)
 {
 	u_int *hlim, *loop, *ifindex;
 
+#ifdef __FreeBSD__
+	*mp = m_get(M_WAIT, MT_HEADER);		/*XXX*/
+#else
 	*mp = m_get(M_WAIT, MT_SOOPTS);
+#endif
 
 	switch (optname) {
 
@@ -1958,8 +2074,13 @@ ip6_mloopback(ifp, m, dst)
 	struct	mbuf *copym;
 
 	copym = m_copy(m, 0, M_COPYALL);
-	if (copym != NULL)
+	if (copym != NULL) {
+#ifdef __FreeBSD__
+		(void)if_simloop(ifp, copym, (struct sockaddr *)dst, NULL);
+#else
 		(void)looutput(ifp, copym, (struct sockaddr *)dst, NULL);
+#endif
+	}
 }
 
 /*

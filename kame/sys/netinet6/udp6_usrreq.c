@@ -504,7 +504,11 @@ udp6_output(in6p, m, addr6, control)
 		/*
 		 * Must block input while temporarily connected.
 		 */
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		error = in6_pcbconnect(in6p, addr6);
 		if (error) {
 			splx(s);
@@ -621,7 +625,11 @@ udp6_usrreq(so, req, m, addr6, control, p)
 			error = EINVAL;
 			break;
 		}
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		error = in6_pcballoc(so, &udb6);
 		splx(s);
 		if (error)
@@ -642,7 +650,11 @@ udp6_usrreq(so, req, m, addr6, control, p)
 		break;
 
 	case PRU_BIND:
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		error = in6_pcbbind(in6p, addr6);
 		splx(s);
 		break;
@@ -656,7 +668,11 @@ udp6_usrreq(so, req, m, addr6, control, p)
 			error = EISCONN;
 			break;
 		}
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		error = in6_pcbconnect(in6p, addr6);
 		if (ip6_auto_flowlabel) {
 			in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
@@ -681,7 +697,11 @@ udp6_usrreq(so, req, m, addr6, control, p)
 			error = ENOTCONN;
 			break;
 		}
+#ifdef __NetBSD__
 		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		in6_pcbdisconnect(in6p);
 		bzero((caddr_t)&in6p->in6p_laddr, sizeof(in6p->in6p_laddr));
 		splx(s);
@@ -744,7 +764,11 @@ static void
 udp6_detach(in6p)
 	struct in6pcb *in6p;
 {
-	int	s = splsoftnet();
+#ifdef __NetBSD__
+	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
 
 	if (in6p == udp6_last_in6pcb)
 		udp6_last_in6pcb = &udb6;
