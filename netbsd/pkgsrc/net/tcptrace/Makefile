@@ -1,23 +1,20 @@
 # New ports collection makefile for:	tcptrace
-# Version required:	5.1.0
+# Version required:	5.2.1
 # Date created:		3 March 1997
 # Whom:			fenner
 #
-# $Id: Makefile,v 1.1 1999/08/08 23:59:28 itojun Exp $
+# $Id: Makefile,v 1.2 1999/09/16 00:37:23 itojun Exp $
 #
 
-DISTNAME=	tcptrace.5.1.0
-PKGNAME=	tcptrace-5.1.0
+DISTNAME=	tcptrace.5.2.1
+PKGNAME=	tcptrace-5.2.1
 CATEGORIES=	net
-MASTER_SITES=	http://jarok.cs.ohiou.edu/software/tcptrace/files/5.1.0/
+MASTER_SITES=	http://jarok.cs.ohiou.edu/software/tcptrace/files/5.2.1/
 
-PATCHFILES=	tcptrace-5.1.0-IPv6-19990119.diff.gz
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-
-MAINTAINER=	fenner@FreeBSD.ORG
+MAINTAINER=	itojun@kame.net
 
 GNU_CONFIGURE=	yes
-WRKSRC=		${WRKDIR}/tcptrace_5.1.0
+WRKSRC=		${WRKDIR}/tcptrace_5.2.1
 ALL_TARGET=	tcptrace
 
 DOCFILES=	ARGS BUGS CHANGES COPYRIGHT FAQ README README.mailing_list \
@@ -32,4 +29,4 @@ do-install:
 .endfor
 .endif
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"
