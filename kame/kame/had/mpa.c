@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.6 2003/08/20 12:44:36 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.7 2003/10/02 14:08:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.6 2003/08/20 12:44:36 keiichi Exp $
+ * $Id: mpa.c,v 1.7 2003/10/02 14:08:42 t-momose Exp $
  */
 
 #include <sys/param.h>
@@ -524,10 +524,10 @@ examine_mpaexp_bc()
         mpi_advert_output(&mip6_bc.mbc_phaddr, hagent_addr, haif, 0);
 
 	/* Update mpa expiration time */
-	/* XXX ; These constants should be custamized  */
+	/* XXX ; These constants should be customized  */
 	max_sched_delay = min(MIP6_MAX_MOB_PFX_ADV_INTERVAL, galp->hagent_pltime);
 	rand_adv_delay = MIP6_MIN_MOB_PFX_ADV_INTERVAL
-			 + (random() % abs(max_sched_delay - MIP6_MAX_MOB_PFX_ADV_INTERVAL));
+			 + (random() % abs(max_sched_delay - MIP6_MIN_MOB_PFX_ADV_INTERVAL));
 	mip6_bc.mbc_mpa_exp = time_second + rand_adv_delay;
 	KWRITE(&mbc->mbc_mpa_exp, mip6_bc.mbc_mpa_exp, mip6_bc.mbc_mpa_exp);
     }
