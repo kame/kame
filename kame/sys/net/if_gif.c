@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.70 2001/08/16 16:30:29 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.71 2001/08/16 16:50:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,9 @@
 #include <sys/syslog.h>
 #include <sys/protosw.h>
 #include <machine/cpu.h>
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+#include <machine/intr.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -111,6 +114,10 @@ void gifattach __P((void *));
 #else
 void gifattach __P((int));
 #endif
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+void gifnetisr __P((void));
+#endif
+void gifintr __P((void *));
 #if defined(__NetBSD__) && defined(ISO)
 static struct mbuf *gif_eon_encap(struct mbuf *);
 static struct mbuf *gif_eon_decap(struct ifnet *, struct mbuf *);
@@ -203,13 +210,13 @@ PSEUDO_SET(gifattach, if_gif);
 #ifdef __OpenBSD__
 void
 gif_start(ifp)
-        struct ifnet *ifp;
+	struct ifnet *ifp;
 {
 #if NBRIDGE > 0
-        struct sockaddr dst;
+	struct sockaddr dst;
 #endif /* NBRIDGE */
 
-        struct mbuf *m;
+	struct mbuf *m;
 	int s;
 
 #if NBRIDGE > 0
@@ -224,7 +231,7 @@ gif_start(ifp)
 #endif /* NBRIDGE */
 
 	for (;;) {
-	        s = splimp();
+		s = splimp();
 		IF_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
 
@@ -312,6 +319,12 @@ gif_output(ifp, m, dst, rt)
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
+#ifdef ALTQ
+	struct altq_pktattr pktattr;
+#endif
+	int s;
+
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	/*
 	 * gif may cause infinite recursion calls when misconfigured.
@@ -337,32 +350,6 @@ gif_output(ifp, m, dst, rt)
 		goto end;
 	}
 
-#if NBPFILTER > 0
-	if (ifp->if_bpf) {
-		/*
-		 * We need to prepend the address family as
-		 * a four byte field.  Cons up a dummy header
-		 * to pacify bpf.  This is safe because bpf
-		 * will only read from the mbuf (i.e., it won't
-		 * try to free it or keep a pointer a to it).
-		 */
-		struct mbuf m0;
-		u_int32_t af = dst->sa_family;
-
-		m0.m_next = m;
-		m0.m_len = 4;
-		m0.m_data = (char *)&af;
-		
-#ifdef HAVE_OLD_BPF
-		bpf_mtap(ifp, &m0);
-#else
-		bpf_mtap(ifp->if_bpf, &m0);
-#endif
-	}
-#endif
-	ifp->if_opackets++;	
-	ifp->if_obytes += m->m_pkthdr.len;
-
 	/* inner AF-specific encapsulation */
 	switch (dst->sa_family) {
 #if defined(__NetBSD__) && defined(ISO)
@@ -380,29 +367,118 @@ gif_output(ifp, m, dst, rt)
 
 	/* XXX should we check if our outer source is legal? */
 
-	/* dispatch to output logic based on outer AF */
-	switch (sc->gif_psrc->sa_family) {
-#ifdef INET
-	case AF_INET:
-		error = in_gif_output(ifp, dst->sa_family, m);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		error = in6_gif_output(ifp, dst->sa_family, m);
-		break;
-#endif
-	default:
-		m_freem(m);		
-		error = ENETDOWN;
+	/* use DLT_NULL encapsulation here to pass inner af type */
+	M_PREPEND(m, sizeof(int), M_DONTWAIT);
+	if (!m) {
+		error = ENOBUFS;
 		goto end;
 	}
+	*mtod(m, int *) = dst->sa_family;
+
+	s = splnet();
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		splx(s);
+		goto end;
+	}
+	splx(s);
+
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	softintr_schedule(sc->gif_si);
+#else
+	/* XXX bad spl level? */
+	gifnetisr();
+#endif
+	error = 0;
 
   end:
 	called = 0;		/* reset recursion counter */
 	if (error)
 		ifp->if_oerrors++;
 	return error;
+}
+
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+void
+gifnetisr()
+{
+	int i;
+
+	for (i = 0; i < ngif; i++)
+		gifintr(gif_softc + i);
+}
+#endif
+
+void
+gifintr(arg)
+	void *arg;
+{
+	struct gif_softc *sc;
+	struct ifnet *ifp;
+	struct mbuf *m;
+	int family;
+	int len;
+	int s;
+	int error;
+
+	sc = (struct gif_softc *)arg;
+	ifp = &sc->gif_if;
+
+	/* output processing */
+	while (1) {
+		s = splnet();
+		IF_DEQUEUE(&sc->gif_if.if_snd, m);
+		splx(s);
+		if (m == NULL)
+			break;
+
+		/* grab and chop off inner af type */
+		if (sizeof(int) > m->m_len) {
+			m = m_pullup(m, sizeof(int));
+			if (!m) {
+				ifp->if_oerrors++;
+				continue;
+			}
+		}
+		family = *mtod(m, int *);
+#if NBPFILTER > 0
+		if (ifp->if_bpf) {
+#ifdef HAVE_OLD_BPF
+			bpf_mtap(ifp, m);
+#else
+			bpf_mtap(ifp->if_bpf, m);
+#endif
+		}
+#endif
+		m_adj(m, sizeof(int));
+
+		len = m->m_pkthdr.len;
+
+		/* dispatch to output logic based on outer AF */
+		switch (sc->gif_psrc->sa_family) {
+#ifdef INET
+		case AF_INET:
+			error = in_gif_output(ifp, family, m);
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			error = in6_gif_output(ifp, family, m);
+			break;
+#endif
+		default:
+			m_freem(m);		
+			error = ENETDOWN;
+			break;
+		}
+
+		if (error)
+			ifp->if_oerrors++;
+		else {
+			ifp->if_opackets++;	
+			ifp->if_obytes += len;
+		}
+	}
 }
 
 #ifndef __OpenBSD__	/* on openbsd, ipip_input() does it instead */
@@ -498,8 +574,6 @@ gif_input(m, af, ifp)
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
 	splx(s);
-
-	return;
 }
 #endif /*!OpenBSD*/
 
@@ -822,6 +896,14 @@ gif_set_tunnel(ifp, src, dst)
 #endif
 		}
 
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	sc->gif_si = softintr_establish(IPL_SOFTNET, gifintr, sc);
+	if (sc->gif_si == NULL) {
+		error = ENOMEM;
+		goto bad;
+	}
+#endif
+
 	osrc = sc->gif_psrc;
 	sa = (struct sockaddr *)malloc(src->sa_len, M_IFADDR, M_WAITOK);
 	bcopy((caddr_t)src, (caddr_t)sa, src->sa_len);
@@ -861,6 +943,10 @@ gif_set_tunnel(ifp, src, dst)
 	error = 0;
 
  bad:
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	if (sc->gif_si)
+		softintr_disestablish(sc->gif_si);
+#endif
 	if (sc->gif_psrc && sc->gif_pdst)
 		ifp->if_flags |= IFF_RUNNING;
 	else
@@ -883,6 +969,10 @@ gif_delete_tunnel(ifp)
 	s = splnet();
 #endif
 
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	if (sc->gif_si)
+		softintr_disestablish(sc->gif_si);
+#endif
 	if (sc->gif_psrc) {
 		free((caddr_t)sc->gif_psrc, M_IFADDR);
 		sc->gif_psrc = NULL;
