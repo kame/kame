@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.63 2000/10/10 12:47:06 itojun Exp $
+	$KAME: RELNOTES,v 1.64 2000/10/11 00:42:20 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -94,5 +94,9 @@ Many of old ones have been solved.
   and kame/netbsd.
 
 - libinet6 resolver code does not support NIS lookup.
+
+- freebsd4/alpha: kernel fails to boot if you reach certain kernel size.
+  this is because of some kernel memory management issue, and is under
+  discussion in freebsd mailing list(s).
 
 							<end of RELNOTES>
