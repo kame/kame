@@ -133,13 +133,27 @@ if test "x$openssl_compile_failed" = "xyes"; then
 fi
 dnl AC_MSG_RESULT("$ssleay_lib and $ssleay_include")
 
+AC_MSG_CHECKING(openssl version)
+if test "x$include_path_openssl" = "x"; then
+	AC_EGREP_CPP(yes, [#include <opensslv.h>
+#if OPENSSL_VERSION_NUMBER >= 0x0940
+yes
+#endif], [AC_MSG_RESULT(ok)], [AC_MSG_RESULT(too old)
+		echo
+		echo "FATAL: OpenSSL version must be 0.9.4 or higher."
+		exit 1])
+else
+	AC_EGREP_CPP(yes, [#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER >= 0x0940
+yes
+#endif], [AC_MSG_RESULT(ok)], [AC_MSG_RESULT(too old)
+		echo
+		echo "FATAL: OpenSSL version must be 0.9.4 or higher."
+		exit 1])
+fi
+
 dnl AC_MSG_CHECKING(for libssl)
-AC_CHECK_LIB(ssl, ssl_ok, [dnl
-	echo
-	echo "Warning: OpenSSL 0.9.1c has some problem in bignum library."
-	echo "	consult http://www.openssl.org/ for workarounds."
-	echo
-	], [], -lcrypto)
+AC_CHECK_LIB(ssl, ssl_ok, [], [], -lcrypto)
 
 AC_CHECK_LIB(crypto, des_cbc_encrypt)
 AC_CHECK_LIB(l, yywrap)
