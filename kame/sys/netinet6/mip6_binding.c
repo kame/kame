@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.16 2001/09/21 08:46:49 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.17 2001/10/03 08:19:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -756,6 +756,13 @@ mip6_bu_send_bu(mbu)
 	struct mbuf *m;
 	int error = 0;
 
+	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_haddr)) {
+		mip6log((LOG_INFO,
+			 "%s: no home agent.  start ha discovery.\n",
+			 __FUNCTION__));
+		mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
+		return (0);
+	}
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
 			       IPPROTO_NONE, 0);
 
@@ -2034,11 +2041,20 @@ mip6_bc_list_remove(mbc_list, mbc)
 	struct mip6_bc_list *mbc_list;
 	struct mip6_bc *mbc;
 {
+	int error = 0;
+
 	if ((mbc_list == NULL) || (mbc == NULL)) {
 		return (EINVAL);
 	}
 
 	LIST_REMOVE(mbc, mbc_entry);
+	error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL, RTM_DELETE);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s: can't delete a proxy ND entry for %s.\n",
+			 __FUNCTION__,
+			 ip6_sprintf(&mbc->mbc_phaddr)));
+	}
 	FREE(mbc, M_TEMP);
 
 	mip6_bc_count--;
@@ -2325,10 +2341,6 @@ mip6_tunnel_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
-#if 0
-	struct mbuf *n;
-	struct ip6aux *ip6a;
-#endif
 	struct ip6_hdr *ip6;
 	int s, af = 0;
 	u_int32_t otos;
@@ -2347,20 +2359,6 @@ mip6_tunnel_input(mp, offp, proto)
 			if (!m)
 				return (IPPROTO_DONE);
 		}
-
-#if 0
-		/* Tell MN that this packet was tunnelled. */
-		n = ip6_addaux(m);
-		if (!n) {
-			goto bad;	
-		}
-		ip6a = mtod(n, struct ip6aux *);
-		if ((ip6a->ip6a_flags & IP6A_MIP6TUNNELED) != 0) {
-			/* ip6 in ip6 in ip6 ?? */
-			goto bad;
-		}
-		ip6a->ip6a_flags |= IP6A_MIP6TUNNELED;
-#endif
 
 		ip6 = mtod(m, struct ip6_hdr *);
 

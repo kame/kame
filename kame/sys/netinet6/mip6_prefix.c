@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.8 2001/09/17 12:42:39 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.9 2001/10/03 08:19:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -252,7 +252,6 @@ static void
 mip6_prefix_timeout(dummy)
 	void *dummy;
 {
-	struct mip6_subnet *ms, *ms_next;
 	int s;
 
 #ifdef __NetBSD__
@@ -260,13 +259,7 @@ mip6_prefix_timeout(dummy)
 #else
 	s = splnet();
 #endif
-	for(ms = LIST_FIRST(&mip6_subnet_list); ms; ms = ms_next) {
-		ms_next = LIST_NEXT(ms, ms_entry);
-		
-	}			    
-
 	mip6_prefix_starttimer();
-
 
 	splx(s);
 }

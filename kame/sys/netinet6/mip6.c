@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.56 2001/09/20 07:46:12 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.57 2001/10/03 08:19:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -133,6 +133,7 @@ void
 mip6_init()
 {
 	mip6_config.mcfg_debug = 1;
+	mip6_config.mcfg_type = 0;
 
 	mip6_dr = NULL;
 
@@ -1386,6 +1387,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mip6log((LOG_INFO,
 			 "%s: the peer addr is unspecified.\n",
 			 __FUNCTION__));
+		mip6_icmp6_ha_discov_req_output(sc);
 		return (0);
 	}
 	if (!(mbu->mbu_state & MIP6_BU_STATE_WAITSENT)) {

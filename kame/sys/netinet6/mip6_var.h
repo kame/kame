@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.4 2001/09/05 02:33:08 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.5 2001/10/03 08:19:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -154,8 +154,8 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_LEQ(a,b)   ((int8_t)((a)-(b)) <= 0)
 
 struct mip6_config {
-	u_int32_t mcfg_type;
 	u_int32_t mcfg_debug;
+	u_int32_t mcfg_type;
 };
 #define MIP6_CONFIG_TYPE_MN 1
 #define MIP6_CONFIG_TYPE_HA 2
