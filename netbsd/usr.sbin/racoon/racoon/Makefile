@@ -11,7 +11,8 @@ SRCS=	main.c session.c isakmp.c handler.c random.c \
 	policy.c localconf.c remoteconf.c crypto_openssl.c algorithm.c \
 	cfparse.c cftoken.c strnames.c \
 	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c \
-	proposal.c sainfo.c vendorid.c safefile.c backupsa.c
+	proposal.c sainfo.c vendorid.c safefile.c backupsa.c \
+	dnssec.c getcertsbyname.c
 
 MAN=	racoon.8 racoon.conf.5
 
