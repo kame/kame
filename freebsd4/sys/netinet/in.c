@@ -1224,8 +1224,10 @@ in_delmulti(inm)
 		 * to IGMPv3. XXX
 		 */
 		in_clear_all_pending_report(inm);
-		if (ifma->ifma_refcount == 0)
+		if (ifma->ifma_refcount == 0) {
+			inm->inm_source->ims_robvar = 0;
 			igmp_leavegroup(inm);
+		}
 	}
 
 	if (ifma->ifma_refcount == 0) {
