@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.57 2000/07/16 05:34:29 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.58 2000/07/16 09:15:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,6 +246,8 @@ const char *pr_addr __P((struct sockaddr_in6 *));
 void	 pr_icmph __P((struct icmp6_hdr *, u_char *));
 void	 pr_iph __P((struct ip6_hdr *));
 void	 pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
+int	 myechoreply __P((const struct icmp6_hdr *));
+int	 mynireply __P((const struct icmp6_nodeinfo *));
 void	 pr_pack __P((u_char *, int, struct msghdr *));
 void	 pr_exthdrs __P((struct msghdr *));
 void	 pr_ip6opt __P((void *));
@@ -308,6 +310,7 @@ main(argc, argv)
 		 {
 			 char *cp;
 
+			 options &= ~F_NOUSERDATA;
 			 options |= F_NODEADDR;
 			 for (cp = optarg; *cp != '\0'; cp++) {
 				 switch(*cp) {
@@ -438,9 +441,11 @@ main(argc, argv)
 			options |= F_VERBOSE;
 			break;
 		case 'w':
+			options &= ~F_NOUSERDATA;
 			options |= F_FQDN;
 			break;
 		case 'W':
+			options &= ~F_NOUSERDATA;
 			options |= F_FQDNOLD;
 			break;
 #ifdef IPSEC
@@ -1061,6 +1066,28 @@ pinger()
 		(void)write(STDOUT_FILENO, &DOT, 1);
 }
 
+int
+myechoreply(icp)
+	const struct icmp6_hdr *icp;
+{
+	if (ntohs(icp->icmp6_id) == ident)
+		return 1;
+	else
+		return 0;
+}
+
+int
+mynireply(nip)
+	const struct icmp6_nodeinfo *nip;
+{
+	if (memcmp(nip->icmp6_ni_nonce + sizeof(u_int16_t),
+	    nonce + sizeof(u_int16_t),
+	    sizeof(nonce) - sizeof(u_int16_t)) == 0)
+		return 1;
+	else
+		return 0;
+}
+
 /*
  * pr_pack --
  *	Print out the packet, if it came from us.  This logic is necessary
@@ -1076,6 +1103,7 @@ pr_pack(buf, cc, mhdr)
 {
 #define safeputc(c)	printf((isprint((c)) ? "%c" : "\\%03o"), c)
 	struct icmp6_hdr *icp;
+	struct icmp6_nodeinfo *ni;
 	int i;
 	int hoplim;
 	struct sockaddr_in6 *from = (struct sockaddr_in6 *)mhdr->msg_name;
@@ -1086,6 +1114,7 @@ pr_pack(buf, cc, mhdr)
 	int dupflag;
 	size_t off;
 	int oldfqdn;
+	u_int16_t seq;
 
 	(void)gettimeofday(&tv, NULL);
 
@@ -1096,6 +1125,7 @@ pr_pack(buf, cc, mhdr)
 		return;
 	}
 	icp = (struct icmp6_hdr *)buf;
+	ni = (struct icmp6_nodeinfo *)buf;
 	off = 0;
 
 	if ((hoplim = get_hoplim(mhdr)) == -1) {
@@ -1107,11 +1137,8 @@ pr_pack(buf, cc, mhdr)
 		return;
 	}
 
-	if (icp->icmp6_type == ICMP6_ECHO_REPLY) {
-		/* XXX the following line overwrites the original packet */
-		icp->icmp6_seq = ntohs(icp->icmp6_seq);
-		if (ntohs(icp->icmp6_id) != ident)
-			goto generic;		/* It was not our ECHO */
+	if (icp->icmp6_type == ICMP6_ECHO_REPLY && myechoreply(icp)) {
+		seq = ntohs(icp->icmp6_seq);
 		++nreceived;
 		if (timing) {
 			tp = (struct timeval *)(icp + 1);
@@ -1125,12 +1152,12 @@ pr_pack(buf, cc, mhdr)
 				tmax = triptime;
 		}
 
-		if (TST(icp->icmp6_seq % mx_dup_ck)) {
+		if (TST(seq % mx_dup_ck)) {
 			++nrepeats;
 			--nreceived;
 			dupflag = 1;
 		} else {
-			SET(icp->icmp6_seq % mx_dup_ck);
+			SET(seq % mx_dup_ck);
 			dupflag = 0;
 		}
 
@@ -1141,8 +1168,7 @@ pr_pack(buf, cc, mhdr)
 			(void)write(STDOUT_FILENO, &BSPACE, 1);
 		else {
 			(void)printf("%d bytes from %s, icmp_seq=%u", cc,
-				     pr_addr(from),
-				     icp->icmp6_seq);
+			    pr_addr(from), seq);
 			(void)printf(" hlim=%d", hoplim);
 			if ((options & F_VERBOSE) != 0) {
 				struct sockaddr_in6 dstsa;
@@ -1168,15 +1194,8 @@ pr_pack(buf, cc, mhdr)
 				}
 			}
 		}
-	} else if (icp->icmp6_type == ICMP6_NI_REPLY) { /* ICMP6_NI_REPLY */
-		struct icmp6_nodeinfo *ni = (struct icmp6_nodeinfo *)(buf + off);
-		u_int16_t seq;
-
+	} else if (icp->icmp6_type == ICMP6_NI_REPLY && mynireply(ni)) {
 		seq = ntohs(*(u_int16_t *)ni->icmp6_ni_nonce);
-		if (memcmp(ni->icmp6_ni_nonce + sizeof(seq),
-		    nonce + sizeof(seq), sizeof(nonce) - sizeof(seq)) != 0) {
-			goto generic;		/* It was not our query */
-		}
 		++nreceived;
 		if (TST(seq % mx_dup_ck)) {
 			++nrepeats;
@@ -1310,7 +1329,6 @@ pr_pack(buf, cc, mhdr)
 			;
 		}
 	} else {
-generic:
 		/* We've got something other than an ECHOREPLY */
 		if (!(options & F_VERBOSE))
 			return;
@@ -1798,10 +1816,11 @@ pr_addr(addr)
 	flag |= NI_WITHSCOPEID;
 #endif
 
-	getnameinfo((struct sockaddr *)addr, addr->sin6_len, buf, sizeof(buf),
-		NULL, 0, flag);
-
-	return (buf);
+	if (getnameinfo((struct sockaddr *)addr, addr->sin6_len,
+	    buf, sizeof(buf), NULL, 0, flag) == 0)
+		return (buf);
+	else
+		return "?";
 }
 
 /*
@@ -1972,10 +1991,8 @@ nigroup(name)
 	MD5Update(&ctxt, name, p - name);
 	MD5Final(digest, &ctxt);
 
-	bzero(&in6, sizeof(in6));
-	in6.s6_addr[0] = 0xff;
-	in6.s6_addr[1] = 0x02;
-	in6.s6_addr[11] = 0x02;
+	if (inet_pton(AF_INET6, "ff02::2:0000:0000", &in6) != 1)
+		return NULL;	/*XXX*/
 	bcopy(digest, &in6.s6_addr[12], 4);
 
 	if (inet_ntop(AF_INET6, &in6, hbuf, sizeof(hbuf)) == NULL)
