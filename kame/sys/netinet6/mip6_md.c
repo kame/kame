@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.6 2000/02/12 07:34:09 itojun Exp $
+ * $Id: mip6_md.c,v 1.7 2000/02/12 07:35:40 itojun Exp $
  *
  */
 
@@ -554,38 +554,6 @@ mip6_select_defrtr()
                       ip6_sprintf(&(satosin6(rt_key(rt))->sin6_addr)));
 #endif
                 
-/* XXXYYY KAME team: sorry for the mess below, but this is the nightmare 
-   part, a.k.a. the cached route problem. /Mattias */
-                /* Code taken from icmp6_redirect_input(). */
-                /* finally update cached route in each socket via pfctlinput */
-                
-                /*
-                 * do not use pfctlinput() here, we have different prototype 
-                 * for xx_ctlinput() in ip6proto.
-                 */
-#if 0
-                for (pr = (struct ip6protosw *)inet6domain.dom_protosw;
-                     pr < (struct ip6protosw *)inet6domain.dom_protoswNPROTOSW;
-                     pr++) {
-                    if (pr->pr_ctlinput) {
-                        /* 
-                           Try PRC_REDIRECT, though the correct command would
-                           probably be PRC_ROUTEDEAD. The important thing is
-                           that in6_rtchange() is called to delete every
-                           cached route in pcbs that use rt. 
-                        */
-                        mip6_debug("Removing cached routes for protocol %d. "
-                              "Ref count = %d\n", pr->pr_protocol, 
-                              rt->rt_refcnt);
-                        mip6_debug("Removing cached routes for all protocols, "
-                          "Ref count = %d\n", rt->rt_refcnt);*/
-                        (*pr->pr_ctlinput)(PRC_REDIRECT_HOST, rt_key(rt),
-                                           NULL, NULL, 0);
-                        pfctlinput(PRC_REDIRECT_HOST, rt_key(rt));
-                    }
-                }
-#endif
-                
 #ifdef IPSEC
 #ifndef __OpenBSD__
                 key_sa_routechange(rt_key(rt));
@@ -595,7 +563,9 @@ mip6_select_defrtr()
 #ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now pfctlinput\n", rt->rt_refcnt);
 #endif
+
                 pfctlinput(PRC_REDIRECT_HOST, rt_key(rt)); /* New era */
+
 #ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now rt_mip6msg\n", rt->rt_refcnt);
 #endif
