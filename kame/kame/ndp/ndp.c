@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.113 2004/12/09 02:18:26 t-momose Exp $	*/
+/*	$KAME: ndp.c,v 1.114 2005/03/14 08:56:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -982,6 +982,23 @@ ifinfo(ifname, argc, argv)
 				newflags |= (f);\
 		}\
 	} while (0)
+#define SETVALUE(f, v) \
+	do { \
+		char *valptr; \
+		unsigned long newval; \
+		v = 0; /* unspecified */ \
+		if (strncmp(cp, f, strlen(f)) == 0) { \
+			valptr = strchr(cp, '='); \
+			if (valptr == NULL) \
+				err(1, "syntax error in %s field", (f)); \
+			errno = 0; \
+			newval = strtoul(++valptr, NULL, 0); \
+			if (errno) \
+				err(1, "syntax error in %s's value", (f)); \
+			v = newval; \
+		} \
+	} while (0)
+
 #ifdef ND6_IFF_IFDISABLED
 		SETFLAG("disabled", ND6_IFF_IFDISABLED);
 #endif
@@ -995,13 +1012,24 @@ ifinfo(ifname, argc, argv)
 #ifdef ND6_IFF_DONT_SET_IFROUTE
 		SETFLAG("dont_set_ifroute", ND6_IFF_DONT_SET_IFROUTE);
 #endif
+		SETVALUE("basereachable", ND.basereachable);
+		SETVALUE("retrans", ND.retrans);
+		SETVALUE("curhlim", ND.chlim);
 
 		ND.flags = newflags;
+#ifdef SIOCSIFINFO_IN6
+		if (ioctl(s, SIOCSIFINFO_IN6, (caddr_t)&nd) < 0) {
+			err(1, "ioctl(SIOCSIFINFO_IN6)");
+			/* NOTREACHED */
+		}
+#else
 		if (ioctl(s, SIOCSIFINFO_FLAGS, (caddr_t)&nd) < 0) {
 			err(1, "ioctl(SIOCSIFINFO_FLAGS)");
 			/* NOTREACHED */
 		}
+#endif
 #undef SETFLAG
+#undef SETVALUE
 	}
 
 	if (!ND.initialized) {
@@ -1009,6 +1037,10 @@ ifinfo(ifname, argc, argv)
 		/* NOTREACHED */
 	}
 
+	if (ioctl(s, SIOCGIFINFO_IN6, (caddr_t)&nd) < 0) {
+		err(1, "ioctl(SIOCGIFINFO_IN6)");
+		/* NOTREACHED */
+	}
 	printf("linkmtu=%d", ND.linkmtu);
 	printf(", maxmtu=%d", ND.maxmtu);
 	printf(", curhlim=%d", ND.chlim);
