@@ -605,7 +605,7 @@ explore_fqdn(pai, hostname, servname, res)
 	for (i = 0; aplist[i] != NULL; i++) {
 		af = hp->h_addrtype;
 		ap = aplist[i];
-#ifdef AF_INET6
+#ifdef INET6
 		if (af == AF_INET6
 		 && IN6_IS_ADDR_V4MAPPED((struct in6_addr *)ap)) {
 			af = AF_INET;
