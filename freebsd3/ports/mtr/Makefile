@@ -1,28 +1,34 @@
 # New ports collection makefile for:   mtr
-# Version required:    0.28
+# Version required:    0.42
 # Date created:        12 August 1998
 # Whom:                Bill Fumerola <billf@chc-chimes.com>
 #
-# $FreeBSD$
+# $FreeBSD: ports/net/mtr/Makefile,v 1.17 2000/01/13 07:02:21 sumikawa Exp $
 #
 
-DISTNAME=	mtr-0.41
+DISTNAME=	mtr-0.42
+PKGNAME=	mtr-0.42
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.bitwizard.nl/mtr/ \
 		http://www.giovannelli.it/~gmarco/files/
 
-PATCHFILES=	mtr-041-v6-19990903b.diff.gz
+#.if defined(USE_INET6)
+PATCHFILES=	mtr-042-v6-20000507.diff.gz
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 PATCH_DIST_STRIP=	-p1
+#.endif
 
 MAINTAINER=	itojun@kame.net
 
-BROKEN=		"security issues"
-
-GNU_CONFIGURE=	yes
-CONFIGURE_ARGS+=--enable-ipv6
-
+USE_GMAKE=	yes
+HAS_CONFIGURE=	yes
 MAN8=	mtr.8
+
+#.if defined(USE_INET6)
+CONFIGURE_ARGS+=--enable-ipv6
+#.else
+#CONFIGURE_ARGS+=--disable-ipv6
+#.endif
 
 pre-patch:
 .if !defined(USE_GTK)
@@ -45,7 +51,7 @@ post-install:
 	@${ECHO} ""
 	@${ECHO} "${PREFIX}/sbin/mtr is setuid \"root\" "
 	@${ECHO} ""
-	@${ECHO} "Please read about potential security iussues"
+	@${ECHO} "Please read about potential security issues"
 	@${ECHO} "in file ${WRKSRC}/SECURITY (not installed)"
 	@${ECHO} ""
 
