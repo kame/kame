@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.17 2002/05/01 08:05:07 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.18 2002/05/01 10:53:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -39,7 +39,6 @@ extern char *device;
 extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *,
 			  int, int, int));
 extern int transmit_sa __P((int, struct sockaddr *, int, char *, size_t));
-extern int transmit __P((int, char *, char *, int, char *, size_t));
 extern long random_between __P((long, long));
 extern char *addr2str __P((struct sockaddr *));
 extern char *in6addr2str __P((struct in6_addr *, int));

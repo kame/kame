@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.36 2002/05/01 08:05:07 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.37 2002/05/01 10:53:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -246,45 +246,14 @@ transmit_sa(s, sa, hlim, buf, len)
 		hlim = 64;
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim,
 			sizeof(hlim)) < 0) {
-		err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
-		/*NOTREACHED*/
+		dprintf(LOG_ERR, "setsockopt(IPV6_MULTICAST_HOPS): %s",
+			strerror(errno));
+		exit(1);	/* XXX */
 	}
 
 	error = sendto(s, buf, len, 0, sa, sa->sa_len);
 
 	return (error != len) ? -1 : 0;
-}
-
-int
-transmit(s, addr, port, hlim, buf, len)
-	int s;
-	char *addr;
-	char *port;
-	int hlim;
-	char *buf;
-	size_t len;
-{
-	struct addrinfo hints, *res;
-	int error;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
-	error = getaddrinfo(addr, port, &hints, &res);
-	if (error) {
-		errx(1, "getaddrinfo(%s): %s", addr, gai_strerror(error));
-		/*NOTREACHED*/
-	}
-	if (res->ai_next) {
-		errx(1, "getaddrinfo(%s): %s", addr,
-			"resolved to multiple addrs");
-		/*NOTREACHED*/
-	}
-
-	error = transmit_sa(s, res->ai_addr, hlim, buf, len);
-
-	freeaddrinfo(res);
-	return error;
 }
 
 long
