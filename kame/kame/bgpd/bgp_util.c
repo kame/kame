@@ -221,15 +221,12 @@ bgp_enable_rte(rte)
 				 ip6str(&rte->rt_gw,
 					rte->rt_gwif->ifi_ifn->if_index),
 				 rte->rt_gwif->ifi_ifn->if_name);
-			  return 1; /* keep this route anyway */
 		  }
 	      }
 	      else {
 		      syslog(LOG_ERR,
 			     "<%s>: failed to set a gateway for nexthop %s",
 			     __FUNCTION__, ip6str(&rte->rt_bgw, 0));
-		      /* but keep it anyway */
-		      return 1;
 	      }
       }
   }
@@ -237,20 +234,6 @@ bgp_enable_rte(rte)
   if (!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_gw) &&
       !IN6_IS_ADDR_LINKLOCAL(&rte->rt_gw))
     rte->rt_flags |= RTF_NH_NOT_LLADDR;
-
-  /* (1998/06/30) */
-#if 0
-  if (errno == 0) {
-    /* Put "rte" into adj_ribs_in.  Don't care of RTF_UP  */
-    if (bnp->rp_adj_ribs_in) {
-      insque(rte, bnp->rp_adj_ribs_in);
-    } else {
-      rte->rt_next = rte;
-      rte->rt_prev = rte;
-      bnp->rp_adj_ribs_in = rte;
-    };
-  }
-#endif
 
   return 1; /* succeed */
 }
@@ -446,7 +429,8 @@ bgp_enable_rte_by_igp(rte)
 				if ((brte->rt_flags & (RTF_UP|RTF_INSTALLED)) ==
 				    RTF_UP) {
 					/* try to enable */
-					if (bgp_enable_rte(brte) == 1) {
+					if (bgp_enable_rte(brte) == 1 &&
+					    (brte->rt_flags & RTF_INSTALLED)) {
 						struct rt_entry crte;
 #ifdef DEBUG_BGP
 						syslog(LOG_NOTICE,
@@ -538,7 +522,6 @@ bgp_disable_rte_by_igp(rte)
 						      0),
 					       brte->rt_ripinfo.rip6_plen);
 #endif 
-			  		/* XXX: this might break bnp.. */
 					bgp_disable_rte(brte);
 
 					/* flush gateway information */

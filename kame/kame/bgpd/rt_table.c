@@ -338,7 +338,8 @@ set_nexthop(dst, ret_rte)
 	if (IN6_ARE_PRFX_EQUAL(dst,
 			       &rte->rt_ripinfo.rip6_dest,
 			       rte->rt_ripinfo.rip6_plen)  &&
-	    (rte->rt_flags & RTF_UP)) {
+	    (rte->rt_flags & RTF_UP) &&
+	    rte->rt_ripinfo.rip6_metric != RIPNG_METRIC_UNREACHABLE) {
 	  memcpy(&ret_rte->rt_gw, &rte->rt_gw, sizeof(struct in6_addr));
 	  ret_rte->rt_gwif = ripif->rip_ife;
 	  ret_rte->rt_gwsrc_type = RTPROTO_RIP;
