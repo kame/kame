@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.131 2004/05/13 14:00:10 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.132 2004/05/13 14:05:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1101,7 +1101,7 @@ client6_recv()
 	}
 
 	if (len < sizeof(*dh6)) {
-		dprintf(LOG_INFO, FNAME, "short packet");
+		dprintf(LOG_INFO, FNAME, "short packet (%d bytes)", len);
 		return;
 	}
 

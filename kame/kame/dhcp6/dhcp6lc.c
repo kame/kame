@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6lc.c,v 1.1 2003/10/31 05:51:46 suz Exp $	*/
+/*	$KAME: dhcp6lc.c,v 1.2 2004/05/13 14:05:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -580,7 +580,7 @@ client6_recv()
 	}
 
 	if (len < sizeof(*dh6)) {
-		dprintf(LOG_INFO, FNAME, "short packet");
+		dprintf(LOG_INFO, FNAME, "short packet (%d bytes)", len);
 		return -1;
 	}
 

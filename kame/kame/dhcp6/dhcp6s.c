@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.117 2004/05/13 14:04:14 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.118 2004/05/13 14:05:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -575,7 +575,7 @@ server6_recv(s)
 	dh6 = (struct dhcp6 *)rdatabuf;
 
 	if (len < sizeof(*dh6)) {
-		dprintf(LOG_INFO, FNAME, "short packet");
+		dprintf(LOG_INFO, FNAME, "short packet (%d bytes)", len);
 		return;
 	}
 
@@ -730,7 +730,8 @@ process_relayforw(dh6p, optendp, relayinfohead, from)
 	/* relay message must contain a DHCPv6 message. */
 	len = optinfo.relaymsg_len;
 	if (len < sizeof (struct dhcp6)) {
-		dprintf(LOG_INFO, FNAME, "short packet in relay message");
+		dprintf(LOG_INFO, FNAME,
+		    "short packet (%d bytes) in relay message", len);
 		return (-1);
 	}
 
