@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.22 2000/04/24 20:01:15 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.23 2000/04/24 21:01:25 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -603,8 +603,9 @@ ident_i4send(iph1, msg)
 	/* add to the schedule to expire, and seve back pointer. */
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
-	plog(logp, LOCATION, iph1->remote,
-		"established ISAKMP-SA, %s.\n",
+	plog(logp, LOCATION, NULL,
+		"established ISAKMP-SA to %s spi:%s.\n",
+		saddr2str(iph1->remote),
 		isakmp_pindex(&iph1->index, 0));
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
@@ -1143,8 +1144,9 @@ ident_r3send(iph1, msg0)
 	/* add to the schedule to expire, and seve back pointer. */
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
-	plog(logp, LOCATION, iph1->remote,
-		"established ISAKMP-SA, %s.\n",
+	plog(logp, LOCATION, NULL,
+		"established ISAKMP-SA to %s spi:%s.\n",
+		saddr2str(iph1->remote),
 		isakmp_pindex(&iph1->index, 0));
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
