@@ -168,7 +168,7 @@ static int ipsec_setspidx_mbuf
 static void ipsec4_setspidx_inpcb __P((struct mbuf *, struct inpcb *pcb));
 static void ipsec4_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #ifdef INET6
-static u_int16_t ipsec6_get_ulp __P((struct mbuf *m));
+static void ipsec6_get_ulp __P((struct mbuf *m, struct secpolicyindex *));
 static void ipsec6_setspidx_in6pcb __P((struct mbuf *, struct in6pcb *pcb));
 static void ipsec6_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #endif
@@ -794,9 +794,7 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 		bcopy(&ip6_hdr->ip6_dst, _INADDRBYSA(&spidx->dst),
 			sizeof(ip6_hdr->ip6_dst));
 
-		spidx->ul_proto = ipsec6_get_ulp(m);
-		_INPORTBYSA(&spidx->src) = IPSEC_PORT_ANY;
-		_INPORTBYSA(&spidx->dst) = IPSEC_PORT_ANY;
+		ipsec6_get_ulp(m, spidx);
 		break;
 	}
 #endif /* INET6 */
@@ -818,12 +816,15 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 
 #ifdef INET6
 /*
- * Get the number of upper layer protocol.
+ * Get upper layer protocol number and port number if there.
  * Assumed all extension headers are in single mbuf.
  */
-static u_int16_t
-ipsec6_get_ulp(m)
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+static void
+ipsec6_get_ulp(m, spidx)
 	struct mbuf *m;
+	struct secpolicyindex *spidx;
 {
 	struct ip6_hdr *ip6;
 	struct ip6_ext *ip6e;
@@ -837,6 +838,11 @@ ipsec6_get_ulp(m)
 	KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
 		printf("ipsec6_get_ulp:\n"); kdebug_mbuf(m));
 
+	/* set default */
+	spidx->ul_proto = IPSEC_ULPROTO_ANY;
+	_INPORTBYSA(&spidx->src) = IPSEC_PORT_ANY;
+	_INPORTBYSA(&spidx->dst) = IPSEC_PORT_ANY;
+
 	ip6 = mtod(m, struct ip6_hdr *);
 	nxt = ip6->ip6_nxt;
 	off = sizeof(struct ip6_hdr);
@@ -847,14 +853,27 @@ ipsec6_get_ulp(m)
 		if (m->m_len < off + sizeof(*ip6e)) {
 			printf("ipsec6_get_ulp: all exthdr are not "
 				"in single mbuf.\n");
-			return IPSEC_PORT_ANY;
+			return;
 		}
 
 		switch(nxt) {
 		case IPPROTO_TCP:
+			spidx->ul_proto = nxt;
+			_INPORTBYSA(&spidx->src) =
+			    ((struct tcphdr *)((caddr_t)ip6 + off))->th_sport;
+			_INPORTBYSA(&spidx->dst) =
+			    ((struct tcphdr *)((caddr_t)ip6 + off))->th_dport;
+			return;
 		case IPPROTO_UDP:
+			spidx->ul_proto = nxt;
+			_INPORTBYSA(&spidx->src) =
+			    ((struct udphdr *)((caddr_t)ip6 + off))->uh_sport;
+			_INPORTBYSA(&spidx->dst) =
+			    ((struct udphdr *)((caddr_t)ip6 + off))->uh_dport;
+			return;
 		case IPPROTO_ICMPV6:
-			return nxt;
+			spidx->ul_proto = nxt;
+			return;
 		case IPPROTO_FRAGMENT:
 			off += sizeof(struct ip6_frag);
 			break;
@@ -865,12 +884,14 @@ ipsec6_get_ulp(m)
 			switch (nxt) {
 			case IPPROTO_HOPOPTS:
 			case IPPROTO_ROUTING:
-			case IPPROTO_ESP:
 			case IPPROTO_NONE:
 			case IPPROTO_DSTOPTS:
 				break;
+			case IPPROTO_ESP:
+				/* give up */
+				return;
 			default:
-				return nxt;	/* XXX */
+				return;	/* XXX */
 			}
 			off += (ip6e->ip6e_len + 1) << 3;
 			break;
@@ -878,7 +899,7 @@ ipsec6_get_ulp(m)
 		nxt = ip6e->ip6e_nxt;
 	}
 
-	return IPSEC_PORT_ANY;
+	return;
 }
 #endif
 
