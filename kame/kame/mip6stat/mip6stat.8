@@ -1,5 +1,5 @@
 .\"
-.\"	$KAME: mip6stat.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
+.\"	$KAME: mip6stat.8,v 1.4 2001/01/22 10:39:14 itojun Exp $
 .\"
 .Dd Nov 22, 1999
 .Dt MIP6STAT 8
@@ -68,6 +68,7 @@ Print static address list.
 Clear static address list.
 .It Fl m
 Print home address.
+See below for state descriptions.
 .It Fl M
 Clear home address.
 .It Fl p
@@ -87,5 +88,19 @@ Show more infomation.
 This option
 may be used with any of the display formats.
 .El
-.Sh AUTHOR
-Magnus Braathen <magnus.braathen@era.ericsson.se>
+.Sh MOBILE NODE STATES
+The Mobile Node can be in the following states (returned by
+.Nm
+.Fl m
+)
+.Bl -column XXXXX de-registering:
+Undef	Undefined:	No routers in sight
+Home	Home:		Home, and successfully de-registered
+Dereg	De-registering:	At home and waiting for Binding Ack
+Notrg	Not registed:	At foreign and waiting for Binding Ack
+Reg'd	Registered:	At foreign and registered
+Rereg	Re-registering:	At same foreign and waiting for Binding Ack
+NewCO	New C/O Addr:	At new foreign and waiting for Binding Ack
+.El
+.Sh AUTHORS
+Magnus Braathen, Mattias Pettersson <mattias.pettersson@era.ericsson.se>

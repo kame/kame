@@ -116,7 +116,7 @@
 	implemented previously. The new features are only shown in verbose 
 	(-v) mode.
 
-
+	(Note: tcpdump is not supported by Kame any more.)
 
 3.0	PREPARATIONS BEFORE RUNNING MOBILE IPv6
 
@@ -172,7 +172,7 @@
 
 	The Router Advertisement daemon must be started including Mobile IPv6
 	flag:
-	    ``rtadvd -m <interfaces>''
+	    ``/usr/local/v6/sbin/rtadvd -m <interfaces>''
 
 	The Home Agent code can be activated by: 
 	    ``mip6config -g''
@@ -247,4 +247,4 @@
 	   * -q  (Enable sending BR to the MN)
 	   * -a  (Allow autoconfiguration of Home address)
 
-$KAME: README_MIP6.txt,v 1.3 2000/04/29 04:06:33 itojun Exp $
+$KAME: README_MIP6.txt,v 1.4 2001/01/22 10:39:13 itojun Exp $

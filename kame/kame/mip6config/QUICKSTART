@@ -3,7 +3,8 @@
 
 KERNEL
 ------
-Use FreeBSD 3.4-RELEASE (well tested).
+Use FreeBSD 4.2-RELEASE (a number of scenarios tested successfully).
+FreeBSD 3.4 with 2000-06-19 snap is most tested but being phased out.
 
 Add the following lines to your kernel config file:
 	options	"MIP6"
@@ -88,14 +89,18 @@ Sometimes needed options:
 	Home Agent is not Default Router of subnet:
 	:rltime#0:
 
-Home Agent needs to run ``rtadvd'' with option -m. Change this in
-/usr/local/v6/etc/rc.net6.
+Home Agent needs to run ``rtadvd'' with option -m. This is only supported in
+the snap version of rtadvd. In /etc/rc.network6, change line
+	rtadvd ${rtadvd_interfaces}
+to
+	/usr/local/v6/sbin/rtadvd -m ${rtadvd_interfaces}
 
 Any Default Router that you wish to support Advertisement Interval option
 must also be started as
-	rtadvd -m <interfaces>
+	/usr/local/v6/sbin/rtadvd -m <interfaces>
 
-
+Note that the snap version of rtadvd still uses a default config file at
+the /usr/local/v6/etc/ location.
 
 OTHER
 -----
@@ -105,4 +110,5 @@ kernel on what is going on.
 See README_MIP6.txt and the manual pages for ``mip6config'' and ``mip6stat''
 for more information. There are more options.
 
-$KAME: QUICKSTART,v 1.1 2000/04/29 04:06:33 itojun Exp $
+$KAME: QUICKSTART,v 1.2 2001/01/22 10:39:13 itojun Exp $
+

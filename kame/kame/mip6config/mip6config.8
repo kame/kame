@@ -1,4 +1,4 @@
-.\"	$KAME: mip6config.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
+.\"	$KAME: mip6config.8,v 1.4 2001/01/22 10:39:13 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -126,22 +126,14 @@ different sub-networks while maintaining transport and higher layer
 connections.
 A node may not act as mobile node and home agent simultaneously.
 .Pp
-There are two different ways of including the Mobile IPv6 software in the
-kernel.
-The first alternative is to add it during compilation.
-The 
-correspondent node part must always be included and the optional parts can
-be included if desired.
-The second alternative is to add the correspondent node
-part at compilation time and add the optional parts as modules during 
-runtime.
+The Mobile IPv6 protocol must be supported in the kernel before configuration
+starts.
+Please see instructions in 
+.Pa /usr/local/v6/share/doc/kame/{README_MIP6.txt,QUICKSTART} .
 .Pp
 The
 .Nm
-command is used for configuration of the Mobile IPv6 code.
-Depending on which 
-part of the code that has been loaded in the kernel, different options will 
-be enabled/disabled.
+command is used for configuration of the Mobile IPv6 protocol.
 .\"
 .Ss USAGE
 The
@@ -195,15 +187,21 @@ De-activate Mobile Node/Home Agent functionality (exit).
 .Sh EXAMPLES
 This section contains some simple examples.
 .Pp
-To load and activate the Mobile IPv6 functionality, type
+First add this to your kernel config file
 .Bd -literal -offset indent
-# kldload ./mip6.ko
-# mip6config <...>
+options MIP6
+options MIP6_DEBUG
 .Ed
 .Pp
-To deactivate the module and unload it from the kernel, type
+To configure and start a Mobile Node, type
 .Bd -literal -offset indent
-# kldunload -n mip6
+# mip6config -H home-addr/64@ep0%home-agent
 .Ed
-.Sh AUTHOR
-Magnus Braathen <magnus.braathen@era.ericsson.se>
+.Pp
+To configure and start a Home Agent, type
+.Bd -literal -offset indent
+# mip6config -g
+.Ed
+.Sh AUTHORS
+Magnus Braathen,
+Mattias Pettersson <mattias.pettersson@era.ericsson.se>
