@@ -985,17 +985,9 @@ pfr_unroute_kentry(struct pfr_ktable *kt, struct pfr_kentry *ke)
 	s = splsoftnet();
 	if (KENTRY_NETWORK(ke)) {
 		pfr_prepare_network(&mask, ke->pfrke_af, ke->pfrke_net);
-#ifdef __OpenBSD__
 		rn = rn_delete(&ke->pfrke_sa, &mask, head, NULL);
-#else
-		rn = rn_delete(&ke->pfrke_sa, &mask, head);
-#endif
 	} else
-#ifdef __OpenBSD__
 		rn = rn_delete(&ke->pfrke_sa, NULL, head, NULL);
-#else
-		rn = rn_delete(&ke->pfrke_sa, NULL, head);
-#endif
 	splx(s);
 
 	if (rn == NULL) {

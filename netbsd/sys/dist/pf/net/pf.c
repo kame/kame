@@ -5425,7 +5425,7 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p,
 		return (1);
 	if (m->m_pkthdr.len < off + len)
 		return (1);
-#ifdef __NetBSD__
+#if 0 /*def __NetBSD__*/
 	switch (p) {
 	case IPPROTO_TCP: {
 			struct tcphdr th; /* XXX */

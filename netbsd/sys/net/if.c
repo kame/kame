@@ -160,6 +160,10 @@ int if_clone_list __P((struct if_clonereq *));
 LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
 int if_cloners_count;
 
+#ifdef PFIL_HOOKS
+struct pfil_head if_pfil;	/* packet filtering hook for interfaces */
+#endif
+
 #if defined(INET) || defined(INET6) || defined(NETATALK) || defined(NS) || \
     defined(ISO) || defined(CCITT) || defined(NATM)
 static void if_detach_queues __P((struct ifnet *, struct ifqueue *));
@@ -177,6 +181,12 @@ ifinit()
 
 	callout_init(&if_slowtimo_ch);
 	if_slowtimo(NULL);
+#ifdef PFIL_HOOKS
+	if_pfil.ph_type = PFIL_TYPE_IFNET;
+	if_pfil.ph_ifnet = NULL;
+	if (pfil_head_register(&if_pfil) != 0)
+		printf("WARNING: unable to register pfil hook\n");
+#endif
 }
 
 /*
@@ -464,6 +474,8 @@ if_attach(ifp)
 	if (pfil_head_register(&ifp->if_pfil) != 0)
 		printf("%s: WARNING: unable to register pfil hook\n",
 		    ifp->if_xname);
+	(void)pfil_run_hooks(&if_pfil,
+	    (struct mbuf **)PFIL_IFNET_ATTACH, ifp, PFIL_IFNET);
 #endif
 
 	/*
@@ -584,6 +596,8 @@ if_detach(ifp)
 #endif
 
 #ifdef PFIL_HOOKS
+	(void)pfil_run_hooks(&if_pfil,
+	    (struct mbuf **)PFIL_IFNET_DETACH, ifp, PFIL_IFNET);
 	(void) pfil_head_unregister(&ifp->if_pfil);
 #endif
 
