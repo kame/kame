@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.311 1999/12/02 15:49:05 itojun Exp $
+$Id: CHANGELOG,v 1.312 1999/12/02 18:01:00 itojun Exp $
 
 <199912>
+Fri Dec  3 02:57:50 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6: enable KAME goto ours hack on openbsd.
+
 Fri Dec  3 00:44:57 JST 1999  itojun@iijlab.net
 	* netbsd/usr.sbin/syslogd: add IPv6 support.  NetBSD PR 8934 by
 	  Feico Dillema <dillema@acm.org>.
