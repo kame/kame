@@ -1,7 +1,7 @@
 PROG=	altqstat
 SRCS=	altqstat.c qdisc_blue.c qdisc_cbq.c qdisc_cdnr.c qdisc_conf.c \
-	qdisc_fifoq.c qdisc_hfsc.c qdisc_priq.o qdisc_red.c qdisc_rio.c \
-	qdisc_wfq.c quip_client.c
+	qdisc_fifoq.c qdisc_hfsc.c qdisc_jobs.c qdisc_priq.c qdisc_red.c \
+	qdisc_rio.c qdisc_wfq.c quip_client.c
 
 MAN1=	altqstat.1
 
@@ -12,8 +12,8 @@ LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-LDADD+=	-lcurses
-DPADD+=	${LIBCURSES}
+LDADD+=	-lm -lcurses
+DPADD+=	${LIBM} ${LIBCURSES}
 
 .PATH:	${.CURDIR}/../../kame/altqstat
 
