@@ -1,4 +1,4 @@
-/*	$KAME: sha2.h,v 1.1 2001/08/08 09:56:28 sakane Exp $	*/
+/*	$KAME: sha2.h,v 1.2 2001/08/08 22:09:27 sakane Exp $	*/
 
 /*
  * sha2.h
@@ -131,6 +131,10 @@ void SHA512_Update __P((SHA512_CTX*, const u_int8_t*, size_t));
 void SHA512_Final __P((u_int8_t[SHA512_DIGEST_LENGTH], SHA512_CTX*));
 char* SHA512_End __P((SHA512_CTX*, char[SHA512_DIGEST_STRING_LENGTH]));
 char* SHA512_Data __P((const u_int8_t*, size_t, char[SHA512_DIGEST_STRING_LENGTH]));
+
+struct env_md_st *EVP_sha2_256 __P((void));
+struct env_md_st *EVP_sha2_384 __P((void));
+struct env_md_st *EVP_sha2_512 __P((void));
 
 #ifdef	__cplusplus
 }

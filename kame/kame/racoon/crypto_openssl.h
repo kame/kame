@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.20 2001/08/08 10:02:53 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.21 2001/08/08 22:09:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,6 +97,19 @@ extern vchar_t *eay_aes_decrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern int eay_aes_weakkey __P((vchar_t *));
 
 /* hash */
+/* HMAC SHA2 */
+extern vchar_t *eay_hmacsha2_512_one __P((vchar_t *, vchar_t *));
+extern caddr_t eay_hmacsha2_512_init __P((vchar_t *));
+extern void eay_hmacsha2_512_update __P((caddr_t, vchar_t *));
+extern vchar_t *eay_hmacsha2_512_final __P((caddr_t));
+extern vchar_t *eay_hmacsha2_384_one __P((vchar_t *, vchar_t *));
+extern caddr_t eay_hmacsha2_384_init __P((vchar_t *));
+extern void eay_hmacsha2_384_update __P((caddr_t, vchar_t *));
+extern vchar_t *eay_hmacsha2_384_final __P((caddr_t));
+extern vchar_t *eay_hmacsha2_256_one __P((vchar_t *, vchar_t *));
+extern caddr_t eay_hmacsha2_256_init __P((vchar_t *));
+extern void eay_hmacsha2_256_update __P((caddr_t, vchar_t *));
+extern vchar_t *eay_hmacsha2_256_final __P((caddr_t));
 /* HMAC SHA1 */
 extern vchar_t *eay_hmacsha1_one __P((vchar_t *, vchar_t *));
 extern caddr_t eay_hmacsha1_init __P((vchar_t *));
@@ -107,6 +120,20 @@ extern vchar_t *eay_hmacmd5_one __P((vchar_t *, vchar_t *));
 extern caddr_t eay_hmacmd5_init __P((vchar_t *));
 extern void eay_hmacmd5_update __P((caddr_t, vchar_t *));
 extern vchar_t *eay_hmacmd5_final __P((caddr_t));
+
+/* SHA2 functions */
+extern caddr_t eay_sha2_512_init __P((void));
+extern void eay_sha2_512_update __P((caddr_t, vchar_t *));
+extern vchar_t *eay_sha2_512_final __P((caddr_t));
+extern vchar_t *eay_sha2_512_one __P((vchar_t *));
+extern caddr_t eay_sha2_384_init __P((void));
+extern void eay_sha2_384_update __P((caddr_t, vchar_t *));
+extern vchar_t *eay_sha2_384_final __P((caddr_t));
+extern vchar_t *eay_sha2_384_one __P((vchar_t *));
+extern caddr_t eay_sha2_256_init __P((void));
+extern void eay_sha2_256_update __P((caddr_t, vchar_t *));
+extern vchar_t *eay_sha2_256_final __P((caddr_t));
+extern vchar_t *eay_sha2_256_one __P((vchar_t *));
 
 /* SHA functions */
 extern caddr_t eay_sha1_init __P((void));

@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.34 2001/08/08 10:02:03 sakane Exp $
+#	$KAME: Makefile.in,v 1.35 2001/08/08 22:09:26 sakane Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -70,6 +70,8 @@ rijndael-api-fst.o: $(srcdir)/missing/crypto/rijndael/$*.c
 	$(CC) $(CFLAGS) -c $(srcdir)/missing/crypto/rijndael/$*.c
 rijndael-alg-fst.o: $(srcdir)/missing/crypto/rijndael/$*.c
 	$(CC) $(CFLAGS) -c $(srcdir)/missing/crypto/rijndael/$*.c
+sha2.o: $(srcdir)/missing/crypto/sha2/$*.c
+	$(CC) $(CFLAGS) -c $(srcdir)/missing/crypto/sha2/$*.c
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<

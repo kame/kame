@@ -632,9 +632,16 @@ AC_CHECK_HEADERS(openssl/cversion.h openssl/opensslv.h)
 
 dnl checking rijndael
 AC_SUBST(CRYPTOBJS)
-AC_CHECK_HEADERS(openssl/rijndael.h, [], [
+AC_CHECK_HEADER(openssl/rijndael.h, [], [
 	CPPFLAGS="$CPPFLAGS -I./missing"
 	CRYPTOBJS="$CRYPTOBJS rijndael-api-fst.o rijndael-alg-fst.o"
+])
+
+dnl checking sha2
+AC_SUBST(CRYPTOBJS)
+AC_CHECK_HEADER(openssl/sha2.h, [], [
+	CPPFLAGS="$CPPFLAGS -I./missing"
+	CRYPTOBJS="$CRYPTOBJS sha2.o"
 ])
 
 dnl Checks for typedefs, structures, and compiler characteristics.

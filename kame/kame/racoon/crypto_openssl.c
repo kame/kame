@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.57 2001/08/08 10:02:53 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.58 2001/08/08 22:09:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,6 +78,11 @@
 #include <openssl/rijndael.h>
 #else
 #include "crypto/rijndael/rijndael-api-fst.h"
+#endif
+#ifdef HAVE_OPENSSL_SHA2_H
+#include <openssl/sha2.h>
+#else
+#include "crypto/sha2/sha2.h"
 #endif
 
 #include "var.h"
@@ -1373,6 +1378,66 @@ eay_hmac_init(key, md)
 }
 
 /*
+ * HMAC SHA2-256
+ */
+vchar_t *
+eay_hmacsha2_256_one(key, data)
+	vchar_t *key, *data;
+{
+	vchar_t *res;
+	caddr_t ctx;
+
+	ctx = eay_hmacsha2_256_init(key);
+	eay_hmacsha2_256_update(ctx, data);
+	res = eay_hmacsha2_256_final(ctx);
+
+	return(res);
+}
+
+caddr_t
+eay_hmacsha2_256_init(key)
+	vchar_t *key;
+{
+	return eay_hmac_init(key, EVP_sha2_256());
+}
+
+void
+eay_hmacsha2_256_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	HMAC_Update((HMAC_CTX *)c, data->v, data->l);
+}
+
+vchar_t *
+eay_hmacsha2_256_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+	unsigned int l;
+
+	if ((res = vmalloc(SHA256_DIGEST_LENGTH)) == 0)
+		return NULL;
+
+	HMAC_Final((HMAC_CTX *)c, res->v, &l);
+	res->l = l;
+	(void)racoon_free(c);
+
+	if (SHA256_DIGEST_LENGTH != res->l) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL,
+			"hmac sha2_256 length mismatch %d.\n", res->l);
+#else
+		printf("hmac sha2_256 length mismatch %d.\n", res->l);
+#endif
+		vfree(res);
+		return NULL;
+	}
+
+	return(res);
+}
+
+/*
  * HMAC SHA1
  */
 vchar_t *
@@ -1488,6 +1553,162 @@ eay_hmacmd5_final(c)
 		vfree(res);
 		return NULL;
 	}
+
+	return(res);
+}
+
+/*
+ * SHA512 functions
+ */
+caddr_t
+eay_sha2_512_init()
+{
+	SHA512_CTX *c = racoon_malloc(sizeof(*c));
+
+	SHA512_Init(c);
+
+	return((caddr_t)c);
+}
+
+void
+eay_sha2_512_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	SHA512_Update((SHA512_CTX *)c, data->v, data->l);
+
+	return;
+}
+
+vchar_t *
+eay_sha2_512_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+
+	if ((res = vmalloc(SHA512_DIGEST_LENGTH)) == 0)
+		return(0);
+
+	SHA512_Final(res->v, (SHA512_CTX *)c);
+	(void)racoon_free(c);
+
+	return(res);
+}
+
+vchar_t *
+eay_sha2_512_one(data)
+	vchar_t *data;
+{
+	caddr_t ctx;
+	vchar_t *res;
+
+	ctx = eay_sha2_512_init();
+	eay_sha2_512_update(ctx, data);
+	res = eay_sha2_512_final(ctx);
+
+	return(res);
+}
+
+/*
+ * SHA384 functions
+ */
+caddr_t
+eay_sha2_384_init()
+{
+	SHA384_CTX *c = racoon_malloc(sizeof(*c));
+
+	SHA384_Init(c);
+
+	return((caddr_t)c);
+}
+
+void
+eay_sha2_384_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	SHA384_Update((SHA384_CTX *)c, data->v, data->l);
+
+	return;
+}
+
+vchar_t *
+eay_sha2_384_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+
+	if ((res = vmalloc(SHA384_DIGEST_LENGTH)) == 0)
+		return(0);
+
+	SHA384_Final(res->v, (SHA384_CTX *)c);
+	(void)racoon_free(c);
+
+	return(res);
+}
+
+vchar_t *
+eay_sha2_384_one(data)
+	vchar_t *data;
+{
+	caddr_t ctx;
+	vchar_t *res;
+
+	ctx = eay_sha2_384_init();
+	eay_sha2_384_update(ctx, data);
+	res = eay_sha2_384_final(ctx);
+
+	return(res);
+}
+
+/*
+ * SHA256 functions
+ */
+caddr_t
+eay_sha2_256_init()
+{
+	SHA256_CTX *c = racoon_malloc(sizeof(*c));
+
+	SHA256_Init(c);
+
+	return((caddr_t)c);
+}
+
+void
+eay_sha2_256_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	SHA256_Update((SHA256_CTX *)c, data->v, data->l);
+
+	return;
+}
+
+vchar_t *
+eay_sha2_256_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+
+	if ((res = vmalloc(SHA256_DIGEST_LENGTH)) == 0)
+		return(0);
+
+	SHA256_Final(res->v, (SHA256_CTX *)c);
+	(void)racoon_free(c);
+
+	return(res);
+}
+
+vchar_t *
+eay_sha2_256_one(data)
+	vchar_t *data;
+{
+	caddr_t ctx;
+	vchar_t *res;
+
+	ctx = eay_sha2_256_init();
+	eay_sha2_256_update(ctx, data);
+	res = eay_sha2_256_final(ctx);
 
 	return(res);
 }

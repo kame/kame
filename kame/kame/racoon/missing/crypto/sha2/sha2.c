@@ -1,4 +1,4 @@
-/*	$KAME: sha2.c,v 1.1 2001/08/08 09:56:28 sakane Exp $	*/
+/*	$KAME: sha2.c,v 1.2 2001/08/08 22:09:27 sakane Exp $	*/
 
 /*
  * sha2.c
@@ -38,9 +38,14 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
-#include <sys/systm.h>
 #include <machine/endian.h>
 #include <crypto/sha2/sha2.h>
+#include <openssl/evp.h>
+
+#include <err.h>
+#define bcopy(a, b, c) memcpy((b), (a), (c))
+#define bzero(a, b) memset((a), 0, (b))
+#define panic(a) err(1, (a))
 
 /*
  * ASSERT NOTE:
@@ -1045,3 +1050,54 @@ char* SHA384_Data(const sha2_byte* data, size_t len, char digest[SHA384_DIGEST_S
 	return SHA384_End(&context, digest);
 }
 
+/*glue*/
+static struct env_md_st sha2_256_md = {
+	0, /*NID_sha1*/
+	0, /*NID_sha1WithRSAEncryption*/
+	SHA256_DIGEST_LENGTH,
+	SHA256_Init,
+	SHA256_Update,
+	SHA256_Final,
+	NULL, NULL, {0, 0, 0, 0},
+	SHA256_BLOCK_LENGTH,
+	sizeof(struct env_md_st *) + sizeof(SHA256_CTX),
+};
+
+struct env_md_st *EVP_sha2_256(void)
+{
+	return(&sha2_256_md);
+}
+
+static struct env_md_st sha2_384_md = {
+	0, /*NID_sha1*/
+	0, /*NID_sha1WithRSAEncryption*/
+	SHA384_DIGEST_LENGTH,
+	SHA384_Init,
+	SHA384_Update,
+	SHA384_Final,
+	NULL, NULL, {0, 0, 0, 0},
+	SHA384_BLOCK_LENGTH,
+	sizeof(struct env_md_st *) + sizeof(SHA384_CTX),
+};
+
+struct env_md_st *EVP_sha2_384(void)
+{
+	return(&sha2_384_md);
+}
+
+static struct env_md_st sha2_512_md = {
+	0, /*NID_sha1*/
+	0, /*NID_sha1WithRSAEncryption*/
+	SHA512_DIGEST_LENGTH,
+	SHA512_Init,
+	SHA512_Update,
+	SHA512_Final,
+	NULL, NULL, {0, 0, 0, 0}, /*EVP_PKEY_RSA_method*/
+	SHA512_BLOCK_LENGTH,
+	sizeof(struct env_md_st *) + sizeof(SHA512_CTX),
+};
+
+struct env_md_st *EVP_sha2_512(void)
+{
+	return(&sha2_512_md);
+}
