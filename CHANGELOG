@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.903 2000/05/19 00:27:15 sumikawa Exp $
+$Id: CHANGELOG,v 1.904 2000/05/19 02:42:25 itojun Exp $
 
 <200005>
+Fri May 19 11:41:05 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_mroute.[ch]: add backward compatibility code with
+	  for 2000/4/12 mrt6msg change (is not used in kame tree).
+	  freebsd40 and openbsd27 are shipped with old declaration, so we
+	  need to provide backward compat to some degree.
+
 Fri May 19 09:26:28 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/{usr.bin/fetch, lib/libftpio}: support IPv6.
 	  From: ume@mahoroba.org
