@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.1 2000/11/14 17:27:46 jinmei Exp $ */
+/*	$KAME: common.c,v 1.2 2000/11/15 02:28:42 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -166,7 +166,7 @@ print_options(mh)
 		print_opthdr(dst2);
 	}
 	if (mtuinfo) {
-		printf("  Path MTU: destination=%s, from=%s, mtu=%lu",
+		printf("  Path MTU: destination=%s, from=%s, mtu=%lu\n",
 		       ip6str(&mtuinfo->ip6mtu_dst),
 		       ip6str((struct sockaddr_in6 *)mh->msg_name),
 		       ntohl(mtuinfo->ip6mtu_mtu)); /* byte order? */
