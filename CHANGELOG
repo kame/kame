@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.154 1999/10/05 09:49:24 itojun Exp $
+$Id: CHANGELOG,v 1.155 1999/10/05 09:56:41 jinmei Exp $
 
 <199910>
+1999-10-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test/getconfig.c (make_padnopt): added a new
+	attribute(padoptreallen) for the PadN option so that v6test could
+	fake the option length.
+	* kame/kame/v6test/conf/ext.conf (illhdrlen): added a new test.
+
 Mon Oct  4 18:59:06 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/www/w3m: new port for W3M, simple text based WWW
 	  client.
