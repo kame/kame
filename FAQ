@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.26 2001/07/13 03:09:45 jinmei Exp $
+$KAME: FAQ,v 1.27 2001/07/13 03:16:23 jinmei Exp $
 
 
 GENERAL
@@ -255,22 +255,22 @@ Is it possible to configure KAME for this?
 Q: IPv6 ping from other OSes do not seem to work.
 	Are you using link-local address for that? (fe80::x) If
 	so, be sure to clear the 2nd 16-bit field to 0.  KAME kernel
-	uses those bits internally, and ifconfig shows the value,
-	but the value MUST NOT appear on the wire.
+	uses those bits internally, and some older versions of ifconfig shows
+	the value, but the value MUST NOT appear on the wire.
 
-	If ifconfig command shows that your KAME host have the
+	If ifconfig command shows that your KAME host has the
 	following address:
 
 	fe80:1::x:y:z:u
 
-	the address the host actually have is
+	the address the host actually has is
 
 	fe80::x:y:z:u
 
 	Also, on many of existing operating systems, it is suggested (or even
-	mandatory) to specify outgoing interface, when you try to ping
+	mandatory) to specify the outgoing link, when you try to ping
 	(or ping6) link-local addresses.  This is to disambiguate link-local
-	addresses on multiple interfaces.
+	addresses on multiple links.
 
 Q: How do I configure IPv6-over-IPv4 tunnel?
 	Simplest way to do this is to configure outer IPv4 address only, by the
