@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.836 2000/04/28 17:17:06 itojun Exp $
+$Id: CHANGELOG,v 1.837 2000/04/29 06:06:59 jinmei Exp $
 
 <200004>
+2000-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_output): do not try NUD unless the
+	gateway is a real neighbor. We can now enable NUD on a p2p link
+	even when
+	- assigning a pair of source and destinaion addresses on a p2p
+	  link (with the /128 mask), or
+	- installing a direct route to the p2p link using an AF_LINK
+	  gateway or a node's own address on another interface.
+
 Sat Apr 29 02:11:18 JST 2000  itojun@iijlab.net
 	* freebsd4: fix various kame/freebsd4 sync issue, including KAME
 	  PR 244.  there can be more issues left - pls report if you find one.
