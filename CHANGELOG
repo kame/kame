@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2328 2003/02/04 03:01:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.2329 2003/02/05 01:36:06 keiichi Exp $
 
 <200302>
+Wed Feb  5 10:31:48 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/ip6_forward.c,ip6_output.c
+	* freebsd4/sys/sys/mbuf.h
+	- changed m_copy() behavior of freebsd4.  m_copy() now copies
+	  mtags.
+
 2003-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c.c (client6_timo): changed the upper bound
 	of retransmissions according to Section 14 of dhcpv6-28, so that
