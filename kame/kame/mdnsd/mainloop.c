@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.35 2000/05/31 17:39:11 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.36 2000/06/01 10:33:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -63,6 +63,7 @@
 #include <ctype.h>
 
 #include <arpa/nameser.h>
+#include <arpa/inet.h>
 
 #include "mdnsd.h"
 #include "db.h"
@@ -74,6 +75,9 @@ static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
 static int dnsdump __P((const char *, const char *, int,
 	const struct sockaddr *));
+static int ptr2in __P((const char *, struct in_addr *));
+static int ptr2in6 __P((const char *, struct in6_addr *));
+static int match_ptrquery __P((const char *));
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
 	int, int, int *, int));
 #if 0
@@ -85,6 +89,10 @@ static int serve __P((struct sockdb *, char *, int, struct sockaddr *));
 
 #ifndef INADDR_LOOPBACK
 #define INADDR_LOOPBACK	0x7f000001
+#endif
+
+#ifndef offsetof
+#define offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif
 
 void
@@ -350,7 +358,7 @@ dnsdump(title, buf, len, from)
 	}
 
 	printf("host %s port %s myaddr %d\n", hbuf, pbuf, ismyaddr(from));
-#if 0
+#if 1
 	for (i = 0; i < len; i++) {
 		if (i % 16 == 0)
 			printf("%08x: ", i);
@@ -429,6 +437,151 @@ dnsdump(title, buf, len, from)
 		}
 	}
 
+	return 0;
+}
+
+static int
+ptr2in(n, in)
+	const char *n;
+	struct in_addr *in;
+{
+	const char *p;
+	char *q;
+	unsigned long x;
+	const char *ep;
+	char a[4];
+	int l;
+	const char *top = "in-addr.arpa.";
+
+	l = strlen(n);
+	if (l > strlen(top) && strcmp(n + l - strlen(top), top) == 0)
+		ep = n + l - strlen(top);
+	else
+		return -1;
+
+	l = 0;
+	p = n;
+	while (l < 4 && p < ep) {
+		q = NULL;
+		x = strtoul(p, &q, 10);
+		if (x & ~0xff)
+			return -1;
+		if (*q != '.')
+			return -1;
+		q++;
+		a[3 - l] = x & 0xff;
+		l++;
+
+		p = q;
+	}
+
+	if (l != 4)
+		return -1;
+	memcpy(in, a, sizeof(*in));
+	return 0;
+}
+
+static int
+ptr2in6(n, in6)
+	const char *n;
+	struct in6_addr *in6;
+{
+	const char *p;
+	char *q;
+	unsigned long x;
+	const char *ep;
+	int l;
+	const char *top = "ip6.int.";
+
+	l = strlen(n);
+	if (l != strlen(top) + 2 * 128 / 4)
+		return -1;
+	if (l > strlen(top) && strcmp(n + l - strlen(top), top) == 0)
+		ep = n + l - strlen(top);
+	else
+		return -1;
+
+	l = 0;
+	p = n;
+	while (l < 128 / 4 && p < ep) {
+		q = NULL;
+		if (!isxdigit(*p))
+			return -1;
+		x = strtoul(p, &q, 16);
+		if (x & ~0xf)
+			return -1;
+		if (p + 1 != q || *q != '.')
+			return -1;
+		q++;
+		if (l % 2)
+			in6->s6_addr[15 - l / 2] |= (x & 0xf) << 4;
+		else
+			in6->s6_addr[15 - l / 2] = x & 0xf;
+		l++;
+
+		p = q;
+	}
+
+	if (l != 128 / 4)
+		return -1;
+	return 0;
+}
+
+static int
+match_ptrquery(n)
+	const char *n;
+{
+	struct ifaddrs *ifap = NULL, *ifa;
+	struct in_addr in;
+	struct in6_addr in6;
+	int af, alen, off;
+	char *addr;
+	const char *ifmatch;
+
+	ifmatch = NULL;
+	if (ptr2in(n, &in) == 0) {
+		af = AF_INET;
+		alen = sizeof(in);
+		addr = (char *)&in;
+		off = offsetof(struct sockaddr_in, sin_addr);
+	} else if (ptr2in6(n, &in6) == 0) {
+		af = AF_INET6;
+		alen = sizeof(in6);
+		addr = (char *)&in6;
+		off = offsetof(struct sockaddr_in6, sin6_addr);
+
+		if (IN6_IS_ADDR_LOOPBACK(&in6) || IN6_IS_ADDR_V4MAPPED(&in6) ||
+		    IN6_IS_ADDR_V4COMPAT(&in6) || IN6_IS_ADDR_MULTICAST(&in6)) {
+			goto fail;
+		}
+		if (IN6_IS_ADDR_LINKLOCAL(&in6)) {
+#ifdef __KAME__
+			*(u_int16_t *)&in6.s6_addr[2] =
+			    htons(if_nametoindex(intface));
+#endif
+			ifmatch = intface;
+		}
+	} else
+		goto fail;
+
+	if (getifaddrs(&ifap) != 0)
+		goto fail;
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != af)
+			continue;
+		if (ifmatch && strcmp(ifa->ifa_name, ifmatch) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_len < off + alen)
+			continue;
+		if (memcmp(((char *)ifa->ifa_addr) + off, addr, alen) == 0) {
+			freeifaddrs(ifap);
+			return 1;
+		}
+	}
+
+fail:
+	if (ifap)
+		freeifaddrs(ifap);
 	return 0;
 }
 
@@ -811,6 +964,50 @@ serve(sd, buf, len, from)
 
 		if (dflag)
 			dnsdump("serve O", replybuf, p - replybuf, from);
+
+		if (p - replybuf > PACKETSZ) {
+			p = replybuf + PACKETSZ;
+			hp->tc = 1;
+		}
+		sendto(sd->s, replybuf, p - replybuf, 0, from, from->sa_len);
+
+		if (n) {
+			/* LINTED const cast */
+			free((char *)n);
+		}
+		return 0;
+	} else if (type == T_PTR && match_ptrquery(n)) {
+		/* ptr record for reverse query - advertise my name */
+		memcpy(replybuf, buf, d - buf);
+		hp = (HEADER *)replybuf;
+		p = replybuf + (d - buf);
+		hp->qr = 1;	/* it is response */
+		hp->aa = 1;	/* authoritative answer */
+		hp->ra = 0;	/* recursion not available */
+		hp->rcode = NOERROR;
+
+		count = 0;
+		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), n)
+		    == NULL)
+			goto fail;
+		/* XXX alignment */
+		*(u_int16_t *)p = htons(type);
+		p += sizeof(u_int16_t);
+		*(u_int16_t *)p = htons(class);
+		p += sizeof(u_int16_t);
+		*(int32_t *)p = htonl(30);	/*TTL*/
+		p += sizeof(int32_t);
+		q = p;
+		*(u_int16_t *)p = htons(0);	/*filled later*/
+		p += sizeof(u_int16_t);
+		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), hostname)
+		    == NULL)
+			goto fail;
+		*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
+		hp->ancount = htons(1);
+
+		if (dflag)
+			dnsdump("serve P", replybuf, p - replybuf, from);
 
 		if (p - replybuf > PACKETSZ) {
 			p = replybuf + PACKETSZ;

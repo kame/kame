@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.20 2000/05/31 17:49:56 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.21 2000/06/01 10:33:25 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -76,7 +76,7 @@ will reply to multicast DNS queries from other nodes,
 to advertise mapping between the name of the local node and the addresses
 of the local node.
 If two or more nodes on the same link are running
-.Nm ,
+.Nm Ns ,
 they can resolve their addresses without having to configure unicast
 DNS servers.
 Users just need to know the FQDN name for the neighboring node.
@@ -114,6 +114,8 @@ will serve against incoming unicast/multicast queries.
 If ommitted, result from
 .Xr gethostname 3
 will be used.
+.Ar hostname
+must be an FQDN, terminated by dot.
 .It Fl i Ar intface
 .Ar intface
 specifies outgoing interface for multicast queries.

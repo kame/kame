@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.22 2000/05/31 17:27:11 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.23 2000/06/01 10:33:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -243,6 +243,17 @@ main(argc, argv)
 			err(1, "gethostname");
 			/*NOTREACHED*/
 		}
+
+		/* append trailing dot to make it look like FQDN */
+		if (strlen(hostnamebuf) > 0 &&
+		    hostnamebuf[strlen(hostnamebuf) - 1] != '.' &&
+		    strlen(hostnamebuf) + 2 < sizeof(hostnamebuf)) {
+			char *p;
+			p = hostnamebuf + strlen(hostnamebuf);
+			*p++ = '.';
+			*p = '\0';
+		}
+
 		hostname = hostnamebuf;
 	}
 	dprintf("hostname=\"%s\"\n", hostname);
