@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.327 2004/02/05 12:38:12 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.328 2004/04/02 08:27:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5408,14 +5408,8 @@ key_getsavbyseq(sah, seq)
 
 		KEY_CHKSASTATE(state, sav->state, "key_getsabyseq");
 
-		if (sav->seq == seq) {
-			sav->refcnt++;
-			KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-				printf("DP key_getsavbyseq cause "
-					"refcnt++:%d SA:%p\n",
-					sav->refcnt, sav));
+		if (sav->seq == seq)
 			return sav;
-		}
 	}
 
 	return NULL;
