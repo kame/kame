@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.44 2000/03/09 00:30:34 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.45 2000/03/12 14:39:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1841,6 +1841,11 @@ nd6_output(ifp, m0, dst, rt0)
 	/*
 	 * XXX: we currently do not make neighbor cache on any interface
 	 * other than ARCnet, Ethernet and FDDI.
+	 *
+	 * draft-ietf-ngtrans-mech-04.txt says:
+	 * - unidirectional tunnels needs no ND
+	 * - bidir tunnels MUST accept NUD packet, and SHOULD send NUD packet
+	 * so IFT_GIF may need NUD.
 	 */
 	switch (ifp->if_type) {
 	case IFT_ARCNET:
