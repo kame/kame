@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.103 2002/02/02 08:48:34 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.104 2002/02/04 06:20:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -541,7 +541,9 @@ udp6_ctlinput(cmd, sa, d)
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*uhp)) {
 			if (cmd == PRC_MSGSIZE)
-				icmp6_mtudisc_update((struct ip6ctlparam *)d, 0);
+				icmp6_mtudisc_update((struct ip6ctlparam *)d,
+						     (struct sockaddr_in6 *)sa,
+						     0);
 			return;
 		}
 
@@ -582,7 +584,8 @@ udp6_ctlinput(cmd, sa, d)
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d,
+					     (struct sockaddr_in6 *)sa, valid);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),

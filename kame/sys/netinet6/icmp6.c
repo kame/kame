@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.280 2002/02/04 05:22:19 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.281 2002/02/04 06:20:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1316,7 +1316,6 @@ icmp6_notify_error(m, off, icmp6len, code)
 		ip6cp.ip6c_icmp6 = icmp6;
 		ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
 		ip6cp.ip6c_off = eoff;
-		ip6cp.ip6c_finaldst = finaldst;
 		ip6cp.ip6c_src = &icmp6src;
 		ip6cp.ip6c_nxt = nxt;
 
@@ -1324,7 +1323,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 			notifymtu = ntohl(icmp6->icmp6_mtu);
 			ip6cp.ip6c_cmdarg = (void *)&notifymtu;
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
-			icmp6_mtudisc_update(&ip6cp, 1);	/* XXX */
+			icmp6_mtudisc_update(&ip6cp, &icmp6dst, 1); /* XXX */
 #endif
 		}
 
@@ -1343,20 +1342,22 @@ icmp6_notify_error(m, off, icmp6len, code)
 }
 
 void
-icmp6_mtudisc_update(ip6cp, validated)
+icmp6_mtudisc_update(ip6cp, dst, validated)
 	struct ip6ctlparam *ip6cp;
+	struct sockaddr_in6 *dst;
 	int validated;
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	unsigned long rtcount;
 	struct icmp6_mtudisc_callback *mc;
 #endif
-	struct in6_addr *dst = ip6cp->ip6c_finaldst;
 	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
 	struct mbuf *m = ip6cp->ip6c_m;	/* will be necessary for scope issue */
 	u_int mtu = ntohl(icmp6->icmp6_mtu);
 	struct rtentry *rt = NULL;
-	struct sockaddr_in6 sin6;
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 dst_tmp;
+#endif
 #ifdef __bsdi__
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro6;
@@ -1389,25 +1390,22 @@ icmp6_mtudisc_update(ip6cp, validated)
 		return;
 #endif
 
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_family = PF_INET6;
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_addr = *dst;
-	/* XXX normally, this won't happen */
-	if (IN6_IS_ADDR_LINKLOCAL(dst)) {
-		sin6.sin6_addr.s6_addr16[1] =
-		    htons(m->m_pkthdr.rcvif->if_index);
-	}
+#ifndef SCOPEDROUTING		/* XXX */
+	dst_tmp = *dst;
+	dst_tmp.sin6_scope_id = 0;
+	dst = &dst_tmp;
+#endif
+
 	/* sin6.sin6_scope_id = XXX: should be set if DST is a scoped addr */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	rt = icmp6_mtudisc_clone((struct sockaddr *)&sin6);
+	rt = icmp6_mtudisc_clone((struct sockaddr *)dst);
 #else
 #ifdef __FreeBSD__
-	rt = rtalloc1((struct sockaddr *)&sin6, 0,
+	rt = rtalloc1((struct sockaddr *)dst, 0,
 		      RTF_CLONING | RTF_PRCLONING);
 #else
 #ifdef __bsdi__
-	bcopy(&sin6, &ro6.ro_dst, sizeof(struct sockaddr_in6));
+	bcopy(dst, &ro6.ro_dst, sizeof(struct sockaddr_in6));
 	ro6.ro_rt = 0;
 	/* rtcalloc((struct route *)&ro6); */
 	rtalloc((struct route *)&ro6);
@@ -1440,7 +1438,7 @@ icmp6_mtudisc_update(ip6cp, validated)
 	 */
 	for (mc = LIST_FIRST(&icmp6_mtudisc_callbacks); mc != NULL;
 	     mc = LIST_NEXT(mc, mc_list))
-		(*mc->mc_func)(&sin6.sin6_addr);
+		(*mc->mc_func)(&dst->sin6_addr);
 #endif
 }
 

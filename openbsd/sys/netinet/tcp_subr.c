@@ -867,7 +867,8 @@ tcp6_ctlinput(cmd, sa, d)
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d,
+					     (struct sockaddr_in6 *)sa, valid);
 
 			return;
 		}

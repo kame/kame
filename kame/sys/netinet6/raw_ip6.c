@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.116 2002/02/02 07:06:13 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.117 2002/02/04 06:20:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -442,7 +442,8 @@ rip6_ctlinput(cmd, sa, d)
 		 *   corresponding routing entry, or
 		 * - ignore the MTU change notification.
 		 */
-		icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+		icmp6_mtudisc_update((struct ip6ctlparam *)d,
+				     (struct sockaddr_in6 *)sa, valid);
 
 		/*
 		 * regardless of if we called icmp6_mtudisc_update(),

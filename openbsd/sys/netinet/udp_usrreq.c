@@ -773,7 +773,8 @@ udp6_ctlinput(cmd, sa, d)
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*uhp)) {
 			if (cmd == PRC_MSGSIZE)
-				icmp6_mtudisc_update((struct ip6ctlparam *)d, 0);
+				icmp6_mtudisc_update((struct ip6ctlparam *)d,
+						     sa6, 0);
 
 			return;
 		}
@@ -820,7 +821,8 @@ udp6_ctlinput(cmd, sa, d)
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d,
+					     sa, valid);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),

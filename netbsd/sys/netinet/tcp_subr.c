@@ -1234,7 +1234,9 @@ tcp6_ctlinput(cmd, sa, d)
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(th)) {
 			if (cmd == PRC_MSGSIZE)
-				icmp6_mtudisc_update((struct ip6ctlparam *)d, 0);
+				icmp6_mtudisc_update((struct ip6ctlparam *)d,
+						     (struct sockaddr_in6 *)sa,
+						     0);
 			return;
 		}
 
@@ -1261,7 +1263,8 @@ tcp6_ctlinput(cmd, sa, d)
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d,
+					     (struct sockaddr_in6 *)sa, valid);
 
 			/*
 			 * no need to call in6_pcbnotify, it should have been

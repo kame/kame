@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.63 2002/01/31 14:14:50 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.64 2002/02/04 06:20:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1072,7 +1072,8 @@ esp6_ctlinput(cmd, sa, d)
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d,
+					     (struct sockaddr_in6 *)sa, valid);
 		}
 	} else {
 		/* we normally notify any pcb here */
