@@ -22,3 +22,8 @@ $TEST -p '' tftp
 $TEST -p '' 80
 $TEST -S '' 80
 $TEST -D '' 80
+
+$TEST ::1 ''
+$TEST 127.0.0.1 ''
+$TEST localhost ''
+$TEST '' ''
