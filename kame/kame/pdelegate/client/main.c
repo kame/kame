@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.7 2001/09/06 05:31:47 itojun Exp $	*/
+/*	$KAME: main.c,v 1.8 2001/09/06 05:33:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -58,8 +58,8 @@ static void send_initreq __P((int, const struct sockaddr *, int));
 static int receive_initreq __P((int, struct sockaddr *, int *, int *));
 static int receive __P((int, char *, size_t, struct sockaddr *, int *));
 static int sethops __P((int, int));
-static int cmpsockaddr __P((const struct sockaddr *, int, const struct sockaddr *,
-	int));
+static int cmpsockaddr __P((const struct sockaddr *, int,
+	const struct sockaddr *, int));
 
 int dflag = 0;
 const char *iface;
@@ -101,6 +101,7 @@ main(argc, argv)
 		struct icmp6_filter filt;
 
 		ICMP6_FILTER_SETBLOCKALL(&filt);
+		ICMP6_FILTER_SETPASS(ICMP6_PREFIX_REQUEST, &filt);
 		ICMP6_FILTER_SETPASS(ICMP6_PREFIX_DELEGATION, &filt);
 		if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		    sizeof(filt)) < 0) {
