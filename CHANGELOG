@@ -1,9 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.104 1999/09/08 17:12:30 itojun Exp $
+$Id: CHANGELOG,v 1.105 1999/09/09 12:27:50 jinmei Exp $
 
 
 <199909>
+1999-09-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtsold/rtsol.c (sendpacket): not call warnmsg even if
+	sendmsg fails (unless the error is a serious one). This change is
+	for a situation where a node has multiple interface cards and some
+	of the cards may be disabled.
+
 Thu Sep  9 02:10:21 JST 1999  itojun@iijlab.net
 	* netbsd/sys/net/if_ethersubr.c: grab IEEE802 MAC address as
 	  seed of IPv6 interface index, on ether_ifattach().
