@@ -369,6 +369,12 @@ lo_altqstart(ifp)
 			isr = NETISR_IP;
 			break;
 #endif
+#ifdef INET6
+		case AF_INET6:
+			ifq = &ip6intrq;
+			isr = NETISR_IPV6;
+			break;
+#endif
 #ifdef IPX
 		case AF_IPX:
 			ifq = &ipxintrq;
