@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.24 2000/08/28 06:52:26 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.25 2000/08/28 07:00:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,9 +109,6 @@ static int esp_3descbc_schedule __P((const struct esp_algorithm *,
 static int esp_cipher_ivlen __P((const struct esp_algorithm *,
 	struct secasvar *));
 static void esp_increment_iv __P((struct secasvar *));
-#if 0
-static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
-#endif
 
 const struct esp_algorithm *
 esp_algorithm_lookup(idx)
@@ -1005,34 +1002,6 @@ esp_increment_iv(sav)
 		x++;
 	}
 }
-
-#if 0
-static caddr_t
-mbuf_find_offset(m, off, len)
-	struct mbuf *m;
-	size_t off;
-	size_t len;
-{
-	struct mbuf *n;
-	size_t cnt;
-
-	if (m->m_pkthdr.len < off || m->m_pkthdr.len < off + len)
-		return (caddr_t)NULL;
-	cnt = 0;
-	for (n = m; n; n = n->m_next) {
-		if (cnt + n->m_len <= off) {
-			cnt += n->m_len;
-			continue;
-		}
-		if (cnt <= off && off < cnt + n->m_len &&
-		    cnt <= off + len && off + len <= cnt + n->m_len) {
-			return mtod(n, caddr_t) + off - cnt;
-		} else
-			return (caddr_t)NULL;
-	}
-	return (caddr_t)NULL;
-}
-#endif
 
 /*------------------------------------------------------------*/
 
