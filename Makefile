@@ -1,4 +1,4 @@
-TARGET?=	netbsd
+TARGET?=	bogus
 
 all:
 	@(echo '**** WARNING: Read through INSTALL and platform/INSTALL, '; \
