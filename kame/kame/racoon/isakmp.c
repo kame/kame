@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.73 2000/06/14 18:25:21 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.74 2000/06/14 18:31:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -379,6 +379,17 @@ isakmp_main(msg, remote, local)
 			}
 		}
 
+		/* acceptable check */
+		if (iph1->etype != isakmp->etype) {
+			plog(logp, LOCATION, iph1->remote,
+				"NOTICE: exchange type is mismatched: "
+				"db=%s packet=%s, ignore it.\n",
+				s_isakmp_etype(iph1->etype),
+				s_isakmp_etype(isakmp->etype));
+			/* ignore it */
+			return -1;
+		}
+
 		/* call main process of phase 1 */
 		if (ph1_main(iph1, msg) < 0) {
 			plog(logp, LOCATION, iph1->remote,
@@ -512,17 +523,6 @@ ph1_main(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
-	struct isakmp *isakmp = (struct isakmp *)msg->v;
-
-	/* acceptable check */
-	if (iph1->etype != isakmp->etype) {
-		plog(logp, LOCATION, iph1->remote,
-			"ERROR: exchange type changed. db=%s packet=%s\n",
-			s_isakmp_etype(iph1->etype),
-			s_isakmp_etype(isakmp->etype));
-		return -1;
-	}
-
 	/* receive */
 	if (ph1exchange[etypesw1(iph1->etype)]
 		       [iph1->side]
