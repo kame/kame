@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.446 2000/01/16 17:48:51 itojun Exp $
+$Id: CHANGELOG,v 1.447 2000/01/16 18:41:14 sumikawa Exp $
 
 <200001>
+Mon Jan 17 03:36:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/sys/netkey/keysock.c: this file was removed. Now
+	  freebsd3 use shared one, kame/sys/netkey/keysock.c
+
+	  NOTICE: If you use freebsd3 via cvsup/anoncvs, you must clean
+	  your source tree and relink shared sources.
+	  % cd kame; make TARGET=freebsd3 clean prepare
+
 Mon Jan 17 02:25:54 JST 2000  itojun@iijlab.net
 	* {netbsd,bsdi3,freebsd2}/netstat: try to share souce code across OS
 	  platforms as much as possible.  we are able to share ipsec.c without
