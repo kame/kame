@@ -28,7 +28,7 @@
  */
 
 /*
- *  $Id: mip6.h,v 1.3 2000/02/09 13:31:02 itojun Exp $
+ *  $Id: mip6.h,v 1.4 2000/02/16 11:52:48 itojun Exp $
  */
 
 
@@ -277,7 +277,7 @@ struct mip6_bu_data {
 struct mip6_opt {
     u_int8_t  type;   /* Option type */
     u_int8_t  len;    /* Option length (octets) excl. type and length */
-};
+} __attribute__ ((packed));
 
 
 /* List of prefixes extracted from Router Advertisments being sent by
@@ -288,7 +288,7 @@ struct mip6_prefix {
     struct in6_addr     prefix;     /* Announced prefix (on-link) */
     u_int8_t            prefix_len; /* Prefix length for IP address */
     u_int32_t           valid_time; /* Remaining (s) until prefix expires */
-};
+} __attribute__ ((packed));
 
 
 /* Binding Update destination option format */
@@ -299,7 +299,7 @@ struct mip6_opt_bu {
     u_int8_t    prefix_len;  /* Prefix length for IP address */
     u_int16_t   seqno;       /* Sequence number */
     u_int32_t   lifetime;    /* Seconds remaining until the binding expires */
-};
+} __attribute__ ((packed));
 
 
 /* Binding Acknowledgement destination option format */
@@ -310,14 +310,14 @@ struct mip6_opt_ba {
     u_int16_t  seqno;     /* Sequence number */
     u_int32_t  lifetime;  /* Granted lifetime (s) for the BU in the BC */
     u_int32_t  refresh;   /* Interval for MN to send BU to refresh BC */
-};
+} __attribute__ ((packed));
 
 
 /* Binding Request destination option format */
 struct mip6_opt_br {
     u_int8_t   type;   /* Option type */
     u_int8_t   len;    /* Option length (octets) excl. type and length */
-};
+} __attribute__ ((packed));
 
 
 /* Home Address option format */
@@ -325,7 +325,7 @@ struct mip6_opt_ha {
     u_int8_t        type;       /* Option type */
     u_int8_t        len;        /* Option length excl. type and length */
     struct in6_addr home_addr;  /* Home Addr of the MN sending the packet */
-};
+} __attribute__ ((packed));
 
 
 /* Unique Identifier sub-option format */
@@ -333,7 +333,7 @@ struct mip6_subopt_id {
     u_int8_t   type;  /* Sub-option type */
     u_int8_t   len;   /* Sub-option length (octets) excl. type and length */
     u_int16_t  id;    /* Unique identifier */
-};
+} __attribute__ ((packed));
 
 
 /* Home Agents list sub-option format */
@@ -341,7 +341,7 @@ struct mip6_subopt_hal {
     u_int8_t        type;      /* Sub-option type */
     u_int8_t        len;       /* Sub-option length excl. type and length */
     struct in6_addr halist[1]; /* List of HA's on the home link */
-};
+} __attribute__ ((packed));
 
 
 /* Alternate Care-of Address sub-option format */
@@ -349,7 +349,7 @@ struct mip6_subopt_coa {
     u_int8_t        type; /* Sub-option type */
     u_int8_t        len;  /* Length (octets) excl. type and len fields */
     struct in6_addr coa;  /* Alternate COA */
-};
+} __attribute__ ((packed));
 
 
 /* Buffer for storing a consequtive sequence of sub-options */
