@@ -416,287 +416,6 @@ int
 in6_pcbconnect(inp, nam)
 	register struct inpcb *inp;
 	struct mbuf *nam;
-#if 0
-{
-  struct in6_ifaddr *i6a;
-  struct sockaddr_in6 *ifaddr = NULL;
-
-  register struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
-  if (nam->m_len != sizeof(struct sockaddr_in6))
-    return (EINVAL);
-
-  if (sin6->sin6_len != sizeof(struct sockaddr_in6))
-    return (EINVAL);
-  if (sin6->sin6_family != AF_INET6)
-    return (EAFNOSUPPORT);
-  if (sin6->sin6_port == 0)
-    return (EADDRNOTAVAIL);
-
-  if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
-    {
-      struct domain hackdomain, *save;
-      struct mbuf hackmbuf;
-      struct sockaddr_in *sin;
-      int rc;
-
-
-      /*
-       * Hmmm, if this is a v4-mapped v6 address, re-call in_pcbconnect
-       * with a fake domain for now.  Then re-adjust the socket, and
-       * return out of here.  Since this is called at splnet(), I don't
-       * think temporarily altering the socket will matter.  XXX
-       */
-
-      /*
-       * Can't have v6 talking to v4, now can we!
-       */
-      if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) && 
-	  !IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6))
-	return EINVAL;  
-
-      bzero(&hackdomain,sizeof(hackdomain));
-      bzero(&hackmbuf,sizeof(hackmbuf));
-      save = inp->inp_socket->so_proto->pr_domain;
-      inp->inp_socket->so_proto->pr_domain = &hackdomain;
-      hackdomain.dom_family = PF_INET;
-      hackmbuf.m_hdr = nam->m_hdr;
-      hackmbuf.m_len = sizeof(*sin);
-      hackmbuf.m_data = hackmbuf.m_dat;
-
-      sin = mtod(&hackmbuf,struct sockaddr_in *);
-      sin->sin_len = sizeof(*sin);
-      sin->sin_family = AF_INET;
-      sin->sin_port = sin6->sin6_port;
-      sin->sin_addr.s_addr = sin6->sin6_addr.s6_addr32[3];
-
-      rc = in_pcbconnect(inp,&hackmbuf);
-
-      inp->inp_socket->so_proto->pr_domain = save;
-
-      if (rc == 0)
-	{
-	  inp->inp_laddr6.s6_addr32[2] = htonl(0xffff);
-	  inp->inp_faddr6.s6_addr32[2] = htonl(0xffff);
-	  inp->inp_flags |= INP_IPV6_MAPPED;
-	  inp->inp_flags &= ~INP_IPV6_UNDEC;
-	}
-
-      return rc;
-    }
-
-  if (in6_ifaddr && IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
-    {
-      /*
-       * If the destination address is all 0's,
-       * use the first non-loopback (and if possibly, non-link-local, else
-       * use the LAST link-local, non-loopback) address as the destination.
-       */
-#define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
-#define sin6tosa(sin6)	((struct sockaddr *)(sin6))
-#define ifatoi6a(ifa)	((struct in6_ifaddr *)(ifa))
-      struct in6_ifaddr *ti6a = NULL;
-
-      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
-        {
-          /* Find first (non-link-local if possible) address for
-             source usage.  If multiple link-locals, use last one found. */
-	  if (IN6_IS_ADDR_LINKLOCAL(&IA6_SIN6(i6a)->sin6_addr))
-	    ti6a=i6a;
-	  else if (!IN6_IS_ADDR_LOOPBACK(&IA6_SIN6(i6a)->sin6_addr))
-	    break;
-        }
-      if (i6a == NULL && ti6a != NULL)
-	i6a = ti6a;
-    }
-
-  if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-    {
-      register struct route_in6 *ro;
-
-      i6a = NULL;
-      /* 
-       * If route is known or can be allocated now,
-       * our src addr is taken from the rt_ifa, else punt.
-       */
-      ro = &inp->inp_route6;
-      if (ro->ro_rt &&
-	  (ro->ro_dst.sin6_family != sin6->sin6_family ||	
-	   rt_key(ro->ro_rt)->sa_family != sin6->sin6_family ||
-	   !IN6_ARE_ADDR_EQUAL(&ro->ro_dst.sin6_addr, &sin6->sin6_addr) ||
-	   inp->inp_socket->so_options & SO_DONTROUTE))
-	{
-	  RTFREE(ro->ro_rt);
-	  ro->ro_rt = NULL;
-	}
-      if ((inp->inp_socket->so_options & SO_DONTROUTE) == 0 && /*XXX*/
-	  (ro->ro_rt == NULL || ro->ro_rt->rt_ifp == NULL))
-	{
-	  /* No route yet, try and acquire one. */
-	  ro->ro_dst.sin6_family = AF_INET6;  /* Is ro blanked out? */
-	  ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-	  ro->ro_dst.sin6_addr = sin6->sin6_addr;
-	  /* 
-	   *  Need to wipe out the flowlabel for ifa_ifwith*
-	   *  but don't need to for rtalloc.
-	   */
-	  rtalloc((struct route *)ro);
-	}
-
-#if 0 /* NRL IPv6*/
-      if (ro->ro_rt == NULL)
-	{
-	  /*
-	   * No route of any kind, so spray neighbor solicits out all
-	   * interfaces, unless it's a multicast address.
-	   */
-	  if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
-	    return ENETUNREACH;
-	  ipv6_onlink_query((struct sockaddr_in6 *)&ro->ro_dst);
-	  rtalloc((struct route *)ro);
-	}
-#endif
-      if (ro->ro_rt == NULL)
-	{
-	  /*
-	   * ipv6_onlink_query() should've added a route.  It probably
-	   * failed.
-	   */
-	  DPRINTF(GROSSEVENT, ("v6_output: onlink_query didn't add route!\n"));
-	  return ENETUNREACH;
-	}
-
-#if 0	/*NRL IPv6*/
-      if (ro->ro_rt->rt_ifa == NULL)
-	{
-	  /*
-	   * We have a route where we don't quite know which interface 
-	   * the neighbor belongs to yet.  If I get here, I know that this
-	   * route is not pre-allocated (such as done by in6_pcbconnect()),
-	   * because those pre-allocators will do the same ipv6_onlink_query()
-	   * and ipv6_verify_onlink() in advance.
-	   *
-	   * I can therefore free the route, and get it again.
-	   */
-	  int error;
-
-	  RTFREE(ro->ro_rt);
-	  ro->ro_rt = NULL;
-	  switch (error = ipv6_verify_onlink(&ro->ro_dst))
-	    {
-	    case -1:
-	      return ENETUNREACH;
-	    case 0:
-	      break;
-	    default:
-	      return error;
-	    }
-	  rtalloc((struct route *)ro);
-	  if (ro->ro_rt == NULL || ro->ro_rt->rt_ifa == NULL)
-	    panic("Oops2, I'm forgetting something after verify_onlink().");
-	}
-#endif
-
-
-      /*
-       * If we found a route, use the address
-       * corresponding to the outgoing interface
-       * unless it is the loopback (in case a route
-       * to our address on another net goes to loopback).
-       *
-       * This code may be simplified if the above gyrations work.
-       */
-      if (ro->ro_rt && ro->ro_rt->rt_ifp &&
-		!(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
-	i6a = ifatoi6a(ro->ro_rt->rt_ifa);
-      if (i6a == NULL)
-	{
-	  u_short fport = sin6->sin6_port;
-
-	  /*
-	   * Source address selection when there is no route.
-	   *
-	   * If ND out all if's is to be used, this is the point to do it.
-	   * (Similar to when the route lookup fails in ipv6_output.c, and
-	   * the 'on-link' assumption kicks in.)
-	   *
-	   * For multicast, use i6a of mcastdef.
-	   */
-
-	  sin6->sin6_port = 0;
-	  i6a = ifatoi6a(ifa_ifwithdstaddr(sin6tosa(sin6)));
-	  if (i6a == NULL)
-	    i6a = ifatoi6a(ifa_ifwithnet(sin6tosa(sin6)));
-	  sin6->sin6_port = fport;
-	  if (i6a == NULL)
-	    {
-	      struct in6_ifaddr *ti6a = NULL;
-	      
-	      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
-		{
-		  /* Find first (non-local if possible) address for
-		     source usage.  If multiple locals, use last one found. */
-		  if (IN6_IS_ADDR_LINKLOCAL(&IA6_SIN6(i6a)->sin6_addr))
-		    ti6a=i6a;
-		  else if (!IN6_IS_ADDR_LOOPBACK(&IA6_SIN6(i6a)->sin6_addr))
-		    break;
-		}
-	      if (i6a == NULL && ti6a != NULL)
-		i6a = ti6a;
-	    }
-	  if (i6a == NULL)
-	    return EADDRNOTAVAIL;
-	}
-
-      /*
-       * If I'm "connecting" to a multicast address, gyrate properly to
-       * get a source address based upon the user-requested mcast interface.
-       */
-      if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) && inp->inp_moptions6 != NULL &&
-	  (inp->inp_flags & INP_IPV6_MCAST))
-	{
-	  struct ip6_moptions *im6o;
-	  struct ifnet *ifp;
-	  
-	  im6o = inp->inp_moptions6;
-	  if (im6o->im6o_multicast_ifp != NULL)
-	    {
-	      ifp = im6o->im6o_multicast_ifp;
-	      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
-		if (i6a->ia_ifp == ifp)  /* Linkloc vs. global? */
-		  break;
-	      if (i6a == NULL)
-		return EADDRNOTAVAIL;
-	    }
-	}
-
-      ifaddr = (struct sockaddr_in6 *)&i6a->ia_addr;
-    }
-
-  if (in_pcblookup(inp->inp_table, ((IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6)) ?
-    	(struct in_addr *)&ifaddr->sin6_addr :
-	(struct in_addr *)&inp->inp_laddr6),
-    	sin6->sin6_port, (struct in_addr *)&sin6->sin6_addr,
-	inp->inp_lport, INPLOOKUP_IPV6)) return EADDRINUSE;
-
-  if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-    {
-      if (inp->inp_lport == 0)
-	(void)in6_pcbbind(inp, NULL);  /* To find free port & bind to it. */
-      inp->inp_laddr6 = ifaddr->sin6_addr;
-    }
-  inp->inp_faddr6 = sin6->sin6_addr;
-  inp->inp_fport = sin6->sin6_port;
-
-  /*
-   * Assumes user specify flowinfo in network order.
-   */
-  inp->inp_ipv6.ip6_flow = htonl(0x60000000) | 
-    (sin6->sin6_flowinfo & htonl(0x0fffffff));
-
-  
-  return 0;
-}
-#else
 {
 	struct in6_addr *in6a = NULL;
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
@@ -704,6 +423,7 @@ in6_pcbconnect(inp, nam)
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
 	struct in6_addr mapped;
+	struct sockaddr_in6 tmp;
 
 	(void)&in6a;				/* XXX fool gcc */
 
@@ -725,9 +445,14 @@ in6_pcbconnect(inp, nam)
 			return EINVAL;
 	}
 
+	/* protect *sin6 from overwrites */
+	tmp = *sin6;
+	sin6 = &tmp;
+
 #ifdef ENABLE_DEFAULT_SCOPE
-      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
-	sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
+	/* do not override if already specified */
+	if (sin6->sin6_scope_id == 0)
+		sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
 #endif
 
 	/*
@@ -834,7 +559,6 @@ in6_pcbconnect(inp, nam)
 	in_pcbrehash(inp);
 	return(0);
 }
-#endif
 
 /*----------------------------------------------------------------------
  * Pass some notification to all connections of a protocol
