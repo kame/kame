@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.39 2003/01/10 08:41:23 suz Exp $	*/
+/*	$KAME: if_hif.c,v 1.40 2003/01/23 06:23:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1042,31 +1042,44 @@ hif_output(ifp, m, dst, rt)
 	 * this kind of code should be avoided.
 	 * XXX: fails to join if interface MTU > MCLBYTES.  jumbogram?
 	 */
-	if (m && m->m_next != NULL && m->m_pkthdr.len < MCLBYTES) {
-		struct mbuf *n;
+	if (m->m_len != m->m_pkthdr.len) {
+		struct mbuf *n = NULL;
+		int maxlen;
 
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (!n)
-			goto contiguousfail;
-		MCLGET(n, M_DONTWAIT);
-		if (! (n->m_flags & M_EXT)) {
-			m_freem(n);
-			goto contiguousfail;
+		maxlen = MHLEN;
+		if (n)
+			M_COPY_PKTHDR(n, m);
+		if (n && m->m_pkthdr.len > maxlen) {
+			MCLGET(n, M_DONTWAIT);
+			maxlen = MCLBYTES;
+			if ((n->m_flags & M_EXT) == 0) {
+				m_free(n);
+				n = NULL;
+			}
+		}
+		if (!n) {
+			printf("looutput: mbuf allocation failed\n");
+			m_freem(m);
+			return ENOBUFS;
 		}
 
-		m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
-		n->m_pkthdr = m->m_pkthdr;
-		n->m_len = m->m_pkthdr.len;
-		n->m_pkthdr.aux = m->m_pkthdr.aux;
-		m->m_pkthdr.aux = (struct mbuf *)NULL;
-		m_freem(m);
+		if (m->m_pkthdr.len <= maxlen) {
+			m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
+			n->m_len = m->m_pkthdr.len;
+			n->m_next = NULL;
+			m_freem(m);
+		} else {
+			m_copydata(m, 0, maxlen, mtod(n, caddr_t));
+			m_adj(m, maxlen);
+			n->m_len = maxlen;
+			n->m_next = m;
+			m->m_flags &= ~M_PKTHDR;
+		}
 		m = n;
 	}
-	if (0) {
-contiguousfail:
-		printf("hif_output: mbuf allocation failed\n");
-	}
 #endif
+
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
 
