@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.167 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.168 2002/06/11 07:01:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -661,10 +661,10 @@ in6_ifattach_linklocal(ifp, altifp)
 		 * suppress it.  (jinmei@kame.net 20010130)
 		 */
 		if (error != EAFNOSUPPORT)
-			log(LOG_NOTICE, "in6_ifattach_linklocal: failed to "
+			nd6log((LOG_NOTICE, "in6_ifattach_linklocal: failed to "
 			    "configure a link-local address on %s "
 			    "(errno=%d)\n",
-			    if_name(ifp), error);
+			    if_name(ifp), error));
 		return(-1);
 	}
 
@@ -769,9 +769,9 @@ in6_ifattach_loopback(ifp)
 	 * NULL to the 3rd arg.
 	 */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
-		log(LOG_ERR, "in6_ifattach_loopback: failed to configure "
+		nd6log((LOG_ERR, "in6_ifattach_loopback: failed to configure "
 		    "the loopback address on %s (errno=%d)\n",
-		    if_name(ifp), error);
+		    if_name(ifp), error));
 		return(-1);
 	}
 
@@ -878,8 +878,12 @@ in6_ifattach(ifp, altifp)
 	 * remember there could be some link-layer that has special
 	 * fragmentation logic.
 	 */
-	if (ifp->if_mtu < IPV6_MMTU)
+	if (ifp->if_mtu < IPV6_MMTU) {
+		nd6log((LOG_INFO, "in6_ifattach: "
+		    "%s has too small MTU, IPv6 not enabled\n",
+		    if_name(ifp)));
 		return;
+	}
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	/* create a multicast kludge storage (if we have not had one) */
@@ -908,9 +912,9 @@ in6_ifattach(ifp, altifp)
 	 * usually, we require multicast capability to the interface
 	 */
 	if ((ifp->if_flags & IFF_MULTICAST) == 0) {
-		log(LOG_INFO, "in6_ifattach: "
+		nd6log((LOG_INFO, "in6_ifattach: "
 		    "%s is not multicast capable, IPv6 not enabled\n",
-		    if_name(ifp));
+		    if_name(ifp)));
 		return;
 	}
 
