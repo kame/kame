@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.19 2003/07/20 18:01:20 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.20 2003/08/05 12:21:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,7 +78,7 @@ struct ah_algorithm {
 	void (*result) __P((struct ah_algorithm_state *, u_int8_t *, size_t));
 };
 
-#define	AH_MAXSUMSIZE	16
+#define	AH_MAXSUMSIZE	(512 / 8)
 
 extern const struct ah_algorithm *ah_algorithm_lookup __P((int));
 
