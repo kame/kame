@@ -191,6 +191,9 @@ nd6_setmtu(ifp)
 	u_long oldlinkmtu = ndi->linkmtu;
 
 	switch(ifp->if_type) {
+	 case IFT_ARCNET:	/* XXX MTU handling needs more work */
+		 ndi->maxmtu = MIN(60480, ifp->if_mtu);
+		 break;
 	 case IFT_ETHER:
 		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
 		 break;
@@ -807,6 +810,10 @@ nd6_resolve(ifp, rt, m, dst, desten)
 		case IFT_FDDI:			
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);
+			return(1);
+			break;
+		case IFT_ARCNET:
+			*desten = 0;
 			return(1);
 			break;
 		default:
@@ -1576,10 +1583,16 @@ nd6_output(ifp, m0, dst, rt0)
 
 	/*
 	 * XXX: we currently do not make neighbor cache on any interface
-	 * other than Ethernet and FDDI.
+	 * other than ARCnet, Ethernet and FDDI.
 	 */
-	if (ifp->if_type != IFT_ETHER && ifp->if_type != IFT_FDDI)
+	switch (ifp->if_type) {
+	case IFT_ARCNET:
+	case IFT_ETHER:
+	case IFT_FDDI:
+		break;
+	default:
 		goto sendpkt;
+	}
 
 	/*
 	 * next hop determination. This routine is derived from ether_outpout. 
@@ -1724,6 +1737,9 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 						 desten);
 			return(1);
 			break;
+		case IFT_ARCNET:
+			*desten = 0;
+			return(1);
 		default:
 			return(0);
 		}

@@ -888,6 +888,7 @@ in6_control(so, cmd, data, ifp)
 		 * disable DAD.
 		 */
 		switch (ifp->if_type) {
+		case IFT_ARCNET:
 		case IFT_ETHER:
 		case IFT_FDDI:
 #if 0
@@ -2140,6 +2141,14 @@ in6_if_up(ifp)
 			break;
 		off = sdl->sdl_nlen;
 		if (bcmp(&sdl->sdl_data[off], &ea, sizeof(ea)) != 0)
+			in6_ifattach(ifp, type, LLADDR(sdl), 0);
+		break;
+	case IFT_ARCNET:
+		type = IN6_IFT_ARCNET;
+		if (sdl == NULL)
+			break;
+		off = sdl->sdl_nlen;
+		if (sdl->sdl_data[off] != 0)	/* XXX ?: */
 			in6_ifattach(ifp, type, LLADDR(sdl), 0);
 		break;
 	default:

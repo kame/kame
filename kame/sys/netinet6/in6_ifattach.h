@@ -44,5 +44,6 @@ void in6_ifdetach __P((struct ifnet *));
 #define IN6_IFT_P2P	2
 #define IN6_IFT_802	3
 #define IN6_IFT_P2P802	4
+#define IN6_IFT_ARCNET	5
 
 #endif /* _NETINET6_IN6_IFATTACH_H_ */
