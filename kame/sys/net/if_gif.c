@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.60 2001/07/25 08:42:17 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.61 2001/07/25 09:20:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -511,12 +511,7 @@ gif_ioctl(ifp, cmd, data)
 	struct ifreq     *ifr = (struct ifreq*)data;
 	int error = 0, size;
 	struct sockaddr *dst, *src;
-	struct sockaddr *odst, *osrc;
-	struct sockaddr *sa;
-	int i;
-	int s;
-	struct gif_softc *sc2;
-		
+
 	switch (cmd) {
 	case SIOCSIFADDR:
 		break;
@@ -652,108 +647,7 @@ gif_ioctl(ifp, cmd, data)
 			break;
 		}
 
-		for (i = 0; i < ngif; i++) {
-			sc2 = gif + i;
-			if (sc2 == sc)
-				continue;
-			if (!sc2->gif_pdst || !sc2->gif_psrc)
-				continue;
-			if (sc2->gif_pdst->sa_family != dst->sa_family ||
-			    sc2->gif_pdst->sa_len != dst->sa_len ||
-			    sc2->gif_psrc->sa_family != src->sa_family ||
-			    sc2->gif_psrc->sa_len != src->sa_len)
-				continue;
-#ifndef XBONEHACK
-			/* can't configure same pair of address onto two gifs */
-			if (bcmp(sc2->gif_pdst, dst, dst->sa_len) == 0 &&
-			    bcmp(sc2->gif_psrc, src, src->sa_len) == 0) {
-				error = EADDRNOTAVAIL;
-				goto bad;
-			}
-#endif
-
-			/* can't configure multiple multi-dest interfaces */
-#define multidest(x) \
-	(((struct sockaddr_in *)(x))->sin_addr.s_addr == INADDR_ANY)
-#ifdef INET6
-#define multidest6(x) \
-	(IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)(x))->sin6_addr))
-#endif
-			if (dst->sa_family == AF_INET &&
-			    multidest(dst) && multidest(sc2->gif_pdst)) {
-				error = EADDRNOTAVAIL;
-				goto bad;
-			}
-#ifdef INET6
-			if (dst->sa_family == AF_INET6 &&
-			    multidest6(dst) && multidest6(sc2->gif_pdst)) {
-				error = EADDRNOTAVAIL;
-				goto bad;
-			}
-#endif
-		}
-
-		/* XXX we can detach from both, but be polite just in case */
-		if (sc->gif_psrc)
-			switch (sc->gif_psrc->sa_family) {
-#ifdef INET
-			case AF_INET:
-				(void)in_gif_detach(sc);
-				break;
-#endif
-#ifdef INET6
-			case AF_INET6:
-				(void)in6_gif_detach(sc);
-				break;
-#endif
-			}
-
-		osrc = sc->gif_psrc;
-		sa = (struct sockaddr *)malloc(src->sa_len, M_IFADDR, M_WAITOK);
-		bcopy((caddr_t)src, (caddr_t)sa, src->sa_len);
-		sc->gif_psrc = sa;
-
-		odst = sc->gif_pdst;
-		sa = (struct sockaddr *)malloc(dst->sa_len, M_IFADDR, M_WAITOK);
-		bcopy((caddr_t)dst, (caddr_t)sa, dst->sa_len);
-		sc->gif_pdst = sa;
-
-		switch (sc->gif_psrc->sa_family) {
-#ifdef INET
-		case AF_INET:
-			error = in_gif_attach(sc);
-			break;
-#endif
-#ifdef INET6
-		case AF_INET6:
-			error = in6_gif_attach(sc);
-			break;
-#endif
-		}
-		if (error) {
-			/* rollback */
-			free((caddr_t)sc->gif_psrc, M_IFADDR);
-			free((caddr_t)sc->gif_pdst, M_IFADDR);
-			sc->gif_psrc = osrc;
-			sc->gif_pdst = odst;
-			break;
-		}
-
-		if (osrc)
-			free((caddr_t)osrc, M_IFADDR);
-		if (odst)
-			free((caddr_t)odst, M_IFADDR);
-
-#ifdef __NetBSD__
-		s = splsoftnet();
-#else
-		s = splnet();
-#endif
-		ifp->if_flags |= IFF_RUNNING;
-		if_up(ifp);		/* send up RTM_IFINFO */
-		splx(s);
-
-		error = 0;
+		error = gif_set_tunnel(&sc->gif_if, src, dst);
 		break;
 
 #ifdef SIOCDIFPHYADDR
@@ -863,6 +757,128 @@ gif_ioctl(ifp, cmd, data)
 	return error;
 }
 
+int
+gif_set_tunnel(ifp, src, dst)
+	struct ifnet *ifp;
+	struct sockaddr *src;
+	struct sockaddr *dst;
+{
+	struct gif_softc *sc = (struct gif_softc *)ifp;
+	struct gif_softc *sc2;
+	struct sockaddr *osrc, *odst, *sa;
+	int s, i;
+	int error;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	for (i = 0; i < ngif; i++) {
+		sc2 = gif + i;
+		if (sc2 == sc)
+			continue;
+		if (!sc2->gif_pdst || !sc2->gif_psrc)
+			continue;
+		if (sc2->gif_pdst->sa_family != dst->sa_family ||
+		    sc2->gif_pdst->sa_len != dst->sa_len ||
+		    sc2->gif_psrc->sa_family != src->sa_family ||
+		    sc2->gif_psrc->sa_len != src->sa_len)
+			continue;
+#ifndef XBONEHACK
+		/* can't configure same pair of address onto two gifs */
+		if (bcmp(sc2->gif_pdst, dst, dst->sa_len) == 0 &&
+		    bcmp(sc2->gif_psrc, src, src->sa_len) == 0) {
+			error = EADDRNOTAVAIL;
+			goto bad;
+		}
+#endif
+
+		/* can't configure multiple multi-dest interfaces */
+#define multidest(x) \
+(((struct sockaddr_in *)(x))->sin_addr.s_addr == INADDR_ANY)
+#ifdef INET6
+#define multidest6(x) \
+(IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)(x))->sin6_addr))
+#endif
+		if (dst->sa_family == AF_INET &&
+		    multidest(dst) && multidest(sc2->gif_pdst)) {
+			error = EADDRNOTAVAIL;
+			goto bad;
+		}
+#ifdef INET6
+		if (dst->sa_family == AF_INET6 &&
+		    multidest6(dst) && multidest6(sc2->gif_pdst)) {
+			error = EADDRNOTAVAIL;
+			goto bad;
+		}
+#endif
+	}
+
+	/* XXX we can detach from both, but be polite just in case */
+	if (sc->gif_psrc)
+		switch (sc->gif_psrc->sa_family) {
+#ifdef INET
+		case AF_INET:
+			(void)in_gif_detach(sc);
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			(void)in6_gif_detach(sc);
+			break;
+#endif
+		}
+
+	osrc = sc->gif_psrc;
+	sa = (struct sockaddr *)malloc(src->sa_len, M_IFADDR, M_WAITOK);
+	bcopy((caddr_t)src, (caddr_t)sa, src->sa_len);
+	sc->gif_psrc = sa;
+
+	odst = sc->gif_pdst;
+	sa = (struct sockaddr *)malloc(dst->sa_len, M_IFADDR, M_WAITOK);
+	bcopy((caddr_t)dst, (caddr_t)sa, dst->sa_len);
+	sc->gif_pdst = sa;
+
+	switch (sc->gif_psrc->sa_family) {
+#ifdef INET
+	case AF_INET:
+		error = in_gif_attach(sc);
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		error = in6_gif_attach(sc);
+		break;
+#endif
+	}
+	if (error) {
+		/* rollback */
+		free((caddr_t)sc->gif_psrc, M_IFADDR);
+		free((caddr_t)sc->gif_pdst, M_IFADDR);
+		sc->gif_psrc = osrc;
+		sc->gif_pdst = odst;
+		goto bad;
+	}
+
+	if (osrc)
+		free((caddr_t)osrc, M_IFADDR);
+	if (odst)
+		free((caddr_t)odst, M_IFADDR);
+
+	error = 0;
+
+ bad:
+	if (sc->gif_psrc && sc->gif_pdst)
+		ifp->if_flags |= IFF_RUNNING;
+	else
+		ifp->if_flags &= ~IFF_RUNNING;
+	splx(s);
+
+	return error;
+}
+
 void
 gif_delete_tunnel(ifp)
 	struct ifnet *ifp;
@@ -891,8 +907,11 @@ gif_delete_tunnel(ifp)
 #ifdef INET6
 	(void)in6_gif_detach(sc);
 #endif
-	/* change the IFF_{UP, RUNNING} flag as well? */
 
+	if (sc->gif_psrc && sc->gif_pdst)
+		ifp->if_flags |= IFF_RUNNING;
+	else
+		ifp->if_flags &= ~IFF_RUNNING;
 	splx(s);
 }
 
