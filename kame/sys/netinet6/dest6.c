@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.49 2002/08/26 12:59:13 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.50 2002/09/26 14:02:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,8 +207,7 @@ dest6_input(mp, offp, proto)
 				 * cache entry for the home address
 				 * includes in this HAO.
 				 */
-				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
-				    src_sa))
+				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa, src_sa))
 					verified = 1;
 			}
 			/*
@@ -250,9 +249,9 @@ dest6_input(mp, offp, proto)
 #ifdef MIP6
 static int
 dest6_swap_hao(ip6, ip6a, haopt)
-struct ip6_hdr *ip6;
-struct ip6aux *ip6a;
-struct ip6_opt_home_address *haopt;
+	struct ip6_hdr *ip6;
+	struct ip6aux *ip6a;
+	struct ip6_opt_home_address *haopt;
 {
 
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
@@ -310,18 +309,20 @@ dest6_nextopt(m, off, ip6o)
 
 int
 dest6_mip6_hao(m, mhoff, nxt)
-struct mbuf *m;
-int mhoff, nxt;
+	struct mbuf *m;
+	int mhoff, nxt;
 {
 	struct ip6_hdr *ip6;
 	struct ip6aux *ip6a;
 	struct ip6_opt ip6o;
 	struct mbuf *n;
 	struct sockaddr_in6 home_sa;
-	struct ip6_opt_home_address haopt;
+	struct ip6_opt_home_address *haopt;
 	struct ip6_mobility mh;
 	int newoff, off, proto, swap;
 
+	/* XXX should care about destopt1 and destopt2.  in destopt2,
+           hao and src must be swapped. */
 	if ((nxt == IPPROTO_HOPOPTS) || (nxt == IPPROTO_DSTOPTS)) {
 		return (0);
 	}
@@ -357,7 +358,7 @@ int mhoff, nxt;
 		if (ip6o.ip6o_type == IP6OPT_HOME_ADDRESS)
 			break;
 	}
-	m_copydata(m, off, sizeof(haopt), (caddr_t)&haopt);
+	haopt = (struct ip6_opt_home_address *)(mtod(m, caddr_t) + off);
 
 	swap = 0;
 	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP)
@@ -369,12 +370,12 @@ int mhoff, nxt;
 	}
 
 	if (swap)
-		return dest6_swap_hao(ip6, ip6a, &haopt);
+		return dest6_swap_hao(ip6, ip6a, haopt);
 
 	/* reject */
 	mip6stat.mip6s_unverifiedhao++;
 	home_sa = ip6a->ip6a_src;
-	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
+	home_sa.sin6_addr = *(struct in6_addr *)haopt->ip6oh_addr;
 	dest6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src, &home_sa);
 
 	return (-1);
