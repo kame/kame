@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.53 2000/07/26 16:57:21 itojun Exp $
+	$KAME: RELNOTES,v 1.54 2000/08/16 01:34:34 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -39,6 +39,7 @@ Many of old ones have been solved.
 - "faithd" sometimes fail to relay rsh/rlogin connection properly.
   Some part of data connection seems to be lost.  rlogin session may
   fail to propagate screen size information to the peer.
+  (You should not use rsh/rlogin over tcp relay, anyways, for security reasons)
 
 - Some of the userland tool may not work properly, if you configure
   more than 500 interfaces.  (libinet6 is fixed for this, but there
