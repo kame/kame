@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.125 2004/06/12 13:19:42 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.126 2004/06/12 13:20:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -585,10 +585,11 @@ server6_mainloop()
 		if (FD_ISSET(insock, &r))
 			server6_recv(insock);
 		if (ctlsock >= 0) {
-			if (FD_ISSET(ctlsock, &r))
-				dhcp6_ctl_acceptcommand(ctlsock,
+			if (FD_ISSET(ctlsock, &r)) {
+				(void)dhcp6_ctl_acceptcommand(ctlsock,
 				    server6_do_command);
-			dhcp6_ctl_readcommand(&r);
+			}
+			(void)dhcp6_ctl_readcommand(&r);
 		}
 	}
 }
