@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.7 2002/07/26 12:48:26 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.8 2002/07/29 06:50:19 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,7 @@ mobility6_input(mp, offp, proto)
 	struct ip6_hdr *ip6;
 	struct ip6_mobility *mh6;
 	int off = *offp, mh6len;
+	int sum;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -99,6 +100,9 @@ mobility6_input(mp, offp, proto)
 		return (IPPROTO_DONE);
 	}
 
+	/*
+	 * calculate the checksum
+	 */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, mh6len, IPPROTO_DONE);
 	mh6 = (struct ip6_mobility *)(mtod(m, caddr_t) + off);
@@ -107,6 +111,15 @@ mobility6_input(mp, offp, proto)
 	if (mh6 == NULL)
 		return (IPPROTO_DONE);
 #endif
+	if ((sum = in6_cksum(m, IPPROTO_MOBILITY, off, mh6len)) != 0) {
+		mip6log((LOG_ERR,
+		    "%s:%d: Mobility Header checksum error(%d|%x) %s\n",
+		    __FILE__, __LINE__,
+		    mh6->ip6m_type, sum, ip6_sprintf(&ip6->ip6_src)));
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
+
 	off += mh6len;
 
 	/* XXX sanity check. */
