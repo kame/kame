@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1967 2001/11/06 11:07:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.1968 2001/11/06 11:22:46 jinmei Exp $
 
 <200111>
+2001-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_purge): corrected purging the
+	default router list in nd6_purge(), so that both two loops would
+	surely start from the head of the list.  Otherwise, we'd see some
+	garbage routers after purging the interface.
+
 2001-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa): set address lifetimes
 	before calling in6_ifinit().  The previous code should be correct,
