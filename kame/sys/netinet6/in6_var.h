@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.71 2001/11/12 07:41:11 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.72 2001/11/17 07:46:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -724,7 +724,7 @@ void in6_clearscope __P((struct in6_addr *));
 
 #ifdef MEASURE_PERFORMANCE
 void in6h_hashinit __P((void));
-void in6h_addifa __P((const struct in6_ifaddr *));
+void in6h_addifa __P((struct in6_ifaddr *));
 struct in6hash *in6h_lookup __P((const struct in6_addr *, struct ifnet *));
 void in6h_rebuild __P((int));
 #endif

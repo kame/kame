@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.229 2001/11/10 09:56:27 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.230 2001/11/17 07:46:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -787,7 +787,7 @@ ip6_input(m)
 			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
 					       &ip6->ip6_dst)) {
 				/* record address information into m_aux. */
-				(void)ip6_setdstifaddr(m, ia6);
+				(void)ip6_setdstifaddr(m, ia);
 #ifdef MEASURE_PERFORMANCE
 				ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
@@ -815,7 +815,7 @@ ip6_input(m)
 		    NULL &&
 		    (ia = ih->in6h_ifa) != NULL) {
 			/* record address information into m_aux. */
-			(void)ip6_setdstifaddr(m, ia6);
+			(void)ip6_setdstifaddr(m, ia);
 
 #ifdef MEASURE_PERFORMANCE
 			ctr_end = read_tsc();
@@ -2815,6 +2815,20 @@ extern int ip6_forward_cache_miss;
 /* we lie, but it's rather safe for this temporary purpose... */
 #define IPV6CTL_DEFMTU		4	/* default MTU */
 #define IPV6CTL_OURSALG IPV6CTL_DEFMTU
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+static int sysctl_ip6_oursalg(SYSCTL_HANDLER_ARGS);
+#else
+static int sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS;
+#endif
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_inet6_ip6);
+#endif
+#if 0
+SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_OURSALG, oursalg,
+	    CTLFLAG_RW, sysctl_ip6_oursalg, "");
+#endif 
 
 static int
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4

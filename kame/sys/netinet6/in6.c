@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.247 2001/11/12 07:41:10 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.248 2001/11/17 07:46:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,7 +187,7 @@ struct multi6_kludge {
 #endif
 
 #ifdef MEASURE_PERFORMANCE
-static void in6h_delifa __P((struct in6_ifaddr *));
+static void in6h_delifa __P((const struct in6_ifaddr *));
 static void in6h_addhash __P((struct in6hash *));
 static void in6h_delhash __P((struct in6hash *));
 #endif
