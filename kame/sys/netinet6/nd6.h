@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.25 2000/12/02 07:30:37 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.26 2000/12/05 01:40:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -332,6 +332,7 @@ void nd6_ns_output __P((struct ifnet *, struct in6_addr *,
 			struct in6_addr *, struct llinfo_nd6 *, int));
 caddr_t nd6_ifptomac __P((struct ifnet *));
 void nd6_dad_start __P((struct ifaddr *, int *));
+void nd6_dad_stop __P((struct ifaddr *));
 void nd6_dad_duplicated __P((struct ifaddr *));
 
 /* nd6_rtr.c */

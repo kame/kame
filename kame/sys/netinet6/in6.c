@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.117 2000/12/03 00:53:58 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.118 2000/12/05 01:40:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1047,6 +1047,9 @@ in6_purgeaddr(ifa, ifp)
 	struct ifnet *ifp;
 {
 	struct in6_ifaddr *ia = (void *) ifa;
+
+	/* stop DAD processing */
+	nd6_dad_stop(ifa);
 
 	in6_ifscrub(ifp, ia, 1);
 
