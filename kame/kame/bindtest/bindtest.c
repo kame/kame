@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.10 2000/10/20 16:46:48 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.11 2000/10/20 16:49:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI Project.
@@ -80,12 +80,12 @@ static struct testitem{
 } testitems[] = {
 	{ "wild4",	AF_INET,	NULL,			NULL },
 	{ "wild6",	AF_INET6,	NULL,			NULL },
-	{ "wildm",	AF_INET6,	"::ffff:0.0.0.0",	NULL },
 	{ "loop4",	AF_INET,	"127.0.0.1",		NULL },
 	{ "loop6",	AF_INET6,	"::1",			NULL },
+	{ "wildm",	AF_INET6,	"::ffff:0.0.0.0",	NULL },
 	{ "loopm",	AF_INET6,	"::ffff:127.0.0.1",	NULL },
-	{ "one4",	AF_INET,	"0.0.0.1",		NULL },
 	{ "onem",	AF_INET6,	"::ffff:0.0.0.1",	NULL },
+	{ "one4",	AF_INET,	"0.0.0.1",		NULL },
 	{ NULL,		0,		NULL,			NULL }
 };
 
