@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1742 2001/06/25 07:16:57 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1743 2001/06/27 05:40:00 itojun Exp $
 
 <200106>
+Wed Jun 27 14:35:00 JST 2001  itojun@iijlab.net
+	* openbsd/sys/netinet/tcp_input.c: make faithd work on openbsd.
+	  OpenBSD 2.9 has been working okay, this is KAME/openbsd29 issue.
+
 Mon Jun 25 16:15:06 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet6/ip6_fw.c: use syslog(3) interface for logging
 	  from kuriyama@FreeBSD.org
