@@ -884,10 +884,10 @@ void	m_claimm(struct mbuf *, struct mowner *);
 #endif
 void	m_clget(struct mbuf *, int);
 int	m_mballoc(int, int);
-void	m_copyback(struct mbuf *, int, int, caddr_t);
-struct	mbuf *m_copyback_cow(struct mbuf *, int, int, caddr_t, int);
+void	m_copyback(struct mbuf *, int, int, const void *);
+struct	mbuf *m_copyback_cow(struct mbuf *, int, int, const void *, int);
 int 	m_makewritable(struct mbuf **, int, int, int);
-void	m_copydata(struct mbuf *, int, int, caddr_t);
+void	m_copydata(struct mbuf *, int, int, void *);
 void	m_freem(struct mbuf *);
 void	m_reclaim(void *, int);
 void	mbinit(void);
@@ -931,8 +931,10 @@ struct	m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define	PACKET_TAG_IPSEC_SOCKET			22 /* IPSEC socket ref */
 #define	PACKET_TAG_IPSEC_HISTORY		23 /* IPSEC history */
 
-#define PACKET_TAG_INET6			24 /* IPv6 info */
-#define PACKET_TAG_GIF				25 /* gif infinite loop check */
+#define PACKET_TAG_PF_TRANSLATE_LOCALHOST	24 /* translated to localhost */
+
+#define PACKET_TAG_INET6			25 /* IPv6 info */
+#define PACKET_TAG_GIF				26 /* gif infinite loop check */
 
 /*
  * Return the number of bytes in the mbuf chain, m.
