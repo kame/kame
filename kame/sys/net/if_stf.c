@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.110 2003/10/22 09:18:43 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.111 2004/05/06 09:19:47 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -113,7 +113,6 @@
 #include <net/route.h>
 #include <net/netisr.h>
 #include <net/if_types.h>
-#include <net/if_stf.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -134,6 +133,7 @@
 
 #include <machine/stdarg.h>
 
+#include <net/if_stf.h>
 #include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -245,7 +245,8 @@ stfattach(dummy)
 		sc = &stf[i];
 		bzero(sc, sizeof(*sc));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-		sprintf(sc->sc_if.if_xname, "stf%d", i);
+		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
+			"stf%d", i);
 #else
 		sc->sc_if.if_name = "stf";
 		sc->sc_if.if_unit = i;
@@ -1037,16 +1038,12 @@ stf_ioctl(ifp, cmd, data)
 #endif
 	caddr_t data;
 {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	struct proc *p = curproc;	/* XXX */
-#endif
 	struct ifaddr *ifa;
 	struct ifreq *ifr;
-	struct stf_softc *sc, *scp;
+	struct stf_softc *sc;
 	struct sockaddr_in6 *sin6;
 	struct in_addr addr;
 	int error;
-	int s;
 
 	error = 0;
 	ifr = (struct ifreq *)data;
