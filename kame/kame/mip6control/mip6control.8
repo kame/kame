@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.1 2001/08/27 08:12:14 keiichi Exp $
+.\"	$KAME: mip6control.8,v 1.2 2001/10/12 07:29:50 keiichi Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -33,12 +33,73 @@
 .\"
 .Sh NAME
 .Nm mip6control
-.Nd control KAME/MIPv6 features
+.Nd control KAME/MIP6 features
 .\"
 .Sh SYNOPSIS
 .Nm
 .Op -i ifname
-.Ar args ...
+.Op -abcghlm
+.Oo
+-H
+.Ar home_prefix
+-P
+.Ar prefixlen
+.Oc
 .\"
 .Sh DESCRIPTION
-to be written...
+.Nm
+sets/gets KAME/MIP6 related information.
+.Bl -tag -width Ds
+.It Fl i Ar ifname
+Speify home interface of the mobile node.
+The default value is hif0.
+.It Fl H Ar home_prefix
+Set
+.Ar home_prefix
+as a home prefix of the mobile node.
+You must specify the prefix length of
+.Ar home_prefix
+with
+.Fl P
+option.
+.It Fl P Ar prefixlen
+Specify the length of the prefix to be assinged to the mobile node.
+Use with
+.Fl H
+option.
+.It Fl m
+Start acting as a mobile node.
+.It Fl h
+Show the home prefixes currently set to this mobile node.
+.It Fl a
+Show the home agents list.
+.It Fl b
+Show the binding update list.
+.It Fl g
+Start acting as a home agent.
+.It Fl c
+Show the binding cache entries.
+.It Fl l
+Show information in a long format.
+.\"
+.Sh EXAMPLES
+To make a node act as a mobile node, issue the following commands as a root.
+.Bd -literal
+root# mip6control -i hif0 -H 2001:200:1:1:: -P 64
+root# mip6control -m
+.Ed
+.Pp
+Replace 2001:200:1:1:: with your home network prefix.
+.Pp
+To make a node act as a home agent, issue the following commands as a root.
+.Bd -literal
+root# mip6control -g
+.Ed
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+Many :).
