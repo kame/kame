@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.73 2000/04/06 08:06:35 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.74 2000/04/11 16:21:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2416,82 +2416,13 @@ in6_if_up(ifp)
 {
 	struct ifaddr *ifa;
 	struct in6_ifaddr *ia;
-	struct sockaddr_dl *sdl;
-	int type;
-#ifdef __bsdi__
-	u_char ea[ETHER_ADDR_LEN];
-#else
-	struct ether_addr ea;
-#endif
-	int off;
 	int dad_delay;		/* delay ticks before DAD output */
 
-	bzero(&ea, sizeof(ea));
-	sdl = NULL;
+	/*
+	 * special cases, like 6to4, are handled in in6_ifattach
+	 */
+	in6_ifattach(ifp);
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
-		if (ifa->ifa_addr->sa_family == AF_INET6
-		 && IN6_IS_ADDR_LINKLOCAL(&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr)) {
-			goto dad;
-		}
-		if (ifa->ifa_addr->sa_family != AF_LINK)
-			continue;
-		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
-		break;
-	}
-
-	switch (ifp->if_type) {
-	case IFT_LOOP:
-		in6_ifattach(ifp, IN6_IFT_LOOP, NULL, 1);
-		break;
-	case IFT_SLIP:
-	case IFT_PPP:
-	case IFT_DUMMY:
-	case IFT_GIF:
-	case IFT_FAITH:
-		type = IN6_IFT_P2P;
-		in6_ifattach(ifp, type, 0, 1);
-		break;
-#ifdef IFT_STF
-	case IFT_STF:
-		/*
-		 * This is VERY awkward to call nd6_ifattach while we will
-		 * not do ND at all on the interface.  It is necessary for
-		 * initializing default hoplimit, and ND mtu.
-		 */
-		nd6_ifattach(ifp);
-		break;
-#endif
-	case IFT_ETHER:
-	case IFT_FDDI:
-	case IFT_ATM:
-		type = IN6_IFT_802;
-		if (sdl == NULL)
-			break;
-		off = sdl->sdl_nlen;
-		if (bcmp(&sdl->sdl_data[off], &ea, sizeof(ea)) != 0)
-			in6_ifattach(ifp, type, LLADDR(sdl), 0);
-		break;
-	case IFT_ARCNET:
-		type = IN6_IFT_ARCNET;
-		if (sdl == NULL)
-			break;
-		off = sdl->sdl_nlen;
-		if (sdl->sdl_data[off] != 0)	/* XXX ?: */
-			in6_ifattach(ifp, type, LLADDR(sdl), 0);
-		break;
-	default:
-		break;
-	}
-
-dad:
 	dad_delay = 0;
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
