@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.109 2001/12/13 07:14:20 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.110 2001/12/19 21:48:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2028,7 +2028,8 @@ oakley_skeyid(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		if (iph1->etype != ISAKMP_ETYPE_IDENT) {
 			iph1->authstr = getpskbyname(iph1->id_p);
-			if (iph1->rmconf->verify_identifier) {
+			if (iph1->authstr == NULL &&
+			    iph1->rmconf->verify_identifier) {
 				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"couldn't find pskey.\n");
 				goto end;
