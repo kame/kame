@@ -400,6 +400,62 @@ dccp_stats(off, name)
 	u_long off;
 	char *name;
 {
+	struct dccpstat dccpstat;
+
+	if (off == 0)
+		return;
+	printf("%s:\n", name);
+	kread(off, (char *)&dccpstat, sizeof (dccpstat));
+
+#define	p(f, m) if (dccpstat.f || sflag <= 1) \
+    printf(m, dccpstat.f, plural(dccpstat.f))
+#define	p1a(f, m) if (dccpstat.f || sflag <= 1) \
+    printf(m, dccpstat.f)
+	p(dccps_ipackets, "\t%lu packet%s received\n");
+	p(dccps_ibytes, "\t%lu byte%s received\n");
+	p(dccps_connattempt, "\t%lu connection request%s\n");
+	p(dccps_connects, "\t%lu connection%s established\n");
+	p(dccps_drops, "\t%lu packet%s dropped\n");
+	p(dccps_badlen, "\t%lu packet%s with bad data length field\n");
+	p(dccps_badsum, "\t%lu packet%s with bad checksum\n");
+	p(dccps_badseq, "\t%lu packet%s with bad sequencenumber\n");
+	p(dccps_noport, "\t%lu packet%s dropped due to no socket\n");
+	p(dccps_opackets, "\t%lu packet%s output\n");
+	p(dccps_obytes, "\t%lu byte%s output\n");
+
+	printf("\n\tTFRC Sender:\n");
+	p(tfrcs_send_conn, "\t%lu connection%s established\n");
+	p(tfrcs_send_fbacks, "\t%lu correct feedback packet%s received\n");
+	p(tfrcs_send_noopt, "\t%lu dropped feedback packet%s (missing option)\n");
+	p(tfrcs_send_nomem, "\t%lu send%s refused (no memory for history)\n");
+	p(tfrcs_send_erropt, "\t%lu send%s refused (unable to add option)\n");
+
+	printf("\tTFRC Receiver:\n");
+	p(tfrcs_recv_conn, "\t%lu connection%s established\n");
+	p(tfrcs_recv_fbacks, "\t%lu correct feedback packet%s received\n");
+	p(tfrcs_recv_losts, "\t%lu lost packet%s\n");
+	p(tfrcs_recv_noopt, "\t%lu dropped packet%s (missing option)\n");
+	p(tfrcs_recv_nomem, "\t%lu dropped packet%s (no memory for history)\n");
+	p(tfrcs_recv_erropt, "\t%lu feedback packet%s failed option adding%s on feedback packet\n");
+
+	printf("\n\tTCPlike Sender:\n");
+	p(tcplikes_send_conn, "\t%lu connection%s established\n");
+	p(tcplikes_send_reploss, "\t%lu data packet%s reported lost\n");
+	p(tcplikes_send_assloss, "\t%lu data packet%s assumed lost\n");
+	p(tcplikes_send_ackrecv, "\t%lu acknowledgement%s received\n");
+	p(tcplikes_send_missack, "\t%lu ack packet%s assumed lost\n");
+	p(tcplikes_send_badseq, "\t%lu bad sequence number on outgoing packet%s\n");
+	p(tcplikes_send_memerr, "\t%lu memory allocation error%s\n");
+
+	printf("\tTCPlike Receiver:\n");
+	p(tcplikes_recv_conn, "\t%lu connection%s established\n");
+	p(tcplikes_recv_datarecv, "\t%lu data packet%s received\n");
+	p(tcplikes_recv_ackack, "\t%lu Ack-on-ack%s received\n");
+	p(tcplikes_recv_acksent, "\t%lu acknowledgement packet%s sent\n");
+	p(tcplikes_recv_memerr, "\t%lu memory allocation error%s\n");
+
+#undef p
+#undef p1a
 }
 #endif
 
