@@ -439,13 +439,10 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			th = (struct tcphdr *)(ip6 + 1);
 			break;
 #endif
-		default:	/*pacify gcc*/
-			ip = NULL;
-#ifdef INET6
-			ip6 = NULL;
-#endif
-			th = NULL;
-			break;
+		default:
+			/* noone will visit here */
+			m_freem(m);
+			return EAFNOSUPPORT;
 		}
 		flags = TH_ACK;
 	} else {
@@ -462,8 +459,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			break;
 #endif
 		default:
-			if (m)
-				m_freem(m);
+			m_freem(m);
 			return EAFNOSUPPORT;
 		}
 
@@ -495,7 +491,9 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			break;
 #endif
 		default:
-			th = NULL;
+			/* noone will visit here */
+			m_freem(m);
+			return EAFNOSUPPORT;
 		}
 		*th = *th0;
 		xchg(th->th_dport, th->th_sport, u_int16_t);
