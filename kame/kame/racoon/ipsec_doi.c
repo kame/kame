@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.128 2001/02/26 07:03:02 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.129 2001/04/03 08:32:01 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3097,7 +3097,7 @@ ipsecdoi_setid1(iph1)
 			if (oakley_getmycert(iph1) < 0) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to get own CERT.\n");
-				return 0;
+				goto err;
 			}
 			ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
 		}
