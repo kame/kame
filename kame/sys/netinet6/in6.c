@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.216 2001/07/24 09:36:00 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.217 2001/07/24 09:37:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -526,11 +526,35 @@ in6_control(so, cmd, data, ifp)
 	 * presence of ifra_addr, and reject invalid ones here.
 	 * It also decreases duplicated code among SIOC*_IN6 operations.
 	 */
-	if (cmd == SIOCAIFADDR_IN6 || cmd == SIOCSIFPHYADDR_IN6)
+	switch (cmd) {
+	case SIOCAIFADDR_IN6:
+	case SIOCSIFPHYADDR_IN6:
 		sa6 = &ifra->ifra_addr;
-	else
+		break;
+	case SIOCSIFADDR_IN6:
+	case SIOCGIFADDR_IN6:
+	case SIOCSIFDSTADDR_IN6:
+	case SIOCSIFNETMASK_IN6:
+	case SIOCGIFDSTADDR_IN6:
+	case SIOCGIFNETMASK_IN6:
+	case SIOCDIFADDR_IN6:
+	case SIOCGIFPSRCADDR_IN6:
+	case SIOCGIFPDSTADDR_IN6:
+	case SIOCGIFAFLAG_IN6:
+	case SIOCSNDFLUSH_IN6:
+	case SIOCSPFXFLUSH_IN6:
+	case SIOCSRTRFLUSH_IN6:
+	case SIOCGIFALIFETIME_IN6:
+	case SIOCSIFALIFETIME_IN6:
+	case SIOCGIFSTAT_IN6:
+	case SIOCGIFSTAT_ICMP6:
 		sa6 = &ifr->ifr_addr;
-	if (sa6->sin6_family == AF_INET6) {
+		break;
+	default:
+		sa6 = NULL;
+		break;
+	}
+	if (sa6 && sa6->sin6_family == AF_INET6) {
 		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
 			if (sa6->sin6_addr.s6_addr16[1] == 0) {
 				/* link ID is not embedded by the user */
@@ -548,7 +572,8 @@ in6_control(so, cmd, data, ifp)
 			}
 		}
 		ia = in6ifa_ifpwithaddr(ifp, &sa6->sin6_addr);
-	}
+	} else
+		ia = NULL;
 
 	switch (cmd) {
 	case SIOCSIFADDR_IN6:
