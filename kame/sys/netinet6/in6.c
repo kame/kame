@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.305 2002/09/20 13:05:59 suz Exp $	*/
+/*	$KAME: in6.c,v 1.306 2002/09/20 13:30:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2215,6 +2215,8 @@ in6_addmulti(maddr6, ifp, errorp)
 	u_int	newmode;		/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
+	int	timer_init = 1;		/* indicate timer initialization */
+	int	buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct	router6_info *rt6i;
 #endif
@@ -2459,11 +2461,14 @@ in6_delmulti(in6m)
 {
 	struct	in6_ifreq ifr;
 #ifdef MLDV2
+	struct	mbuf *m = NULL;
 	struct	i6as_head *newhead = NULL;/* this may become new current head */
 	u_int	curmode;		/* current filter mode */
 	u_int	newmode;		/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
+	int	timer_init = 1;		/* indicate timer initialization */
+	int	buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2638,6 +2643,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	int init;			/* indicate initial join by socket */
 	u_int grpjoin;			/* on/off of (*,G) join by socket */
 {
+	struct mbuf *m = NULL;
 	struct in6_multi *in6m;
 	struct ifreq ifr;
 	struct in6_ifaddr *ia;
@@ -2646,6 +2652,8 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	u_int newmode;			/* newly calculated filter mode */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
 	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
+	int timer_init = 1;		/* indicate timer initialization */
+	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router6_info *rti;
 	int s;
