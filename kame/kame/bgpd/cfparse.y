@@ -1518,7 +1518,8 @@ bgp_config()
 				    bnp->rp_ife->ifi_ifn->if_index) {
 					warnx("BGP peer address(%s) "
 					      "condradicts interface(%s)",
-					      ip6str2(&bnp->rp_addr));
+					      ip6str2(&bnp->rp_addr),
+					      attr->attru.str);
 					return(-1);
 				}
 				    
