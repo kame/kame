@@ -155,7 +155,8 @@ void plist __P((void));
 void pfx_flush __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
-#ifdef SIOCSDEFIFACE_IN6
+#ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
+static void getdefif __P(());
 static void setdefif __P((char *));
 #endif
 static char *sec2str __P((time_t t));
@@ -175,7 +176,7 @@ main(argc, argv)
 
 	pid = getpid();
 	thiszone = gmt2local(0);
-	while ((ch = getopt(argc, argv, "acndfI:ilprstA:HPR")) != EOF)
+	while ((ch = getopt(argc, argv, "acndfIilprstA:HPR")) != EOF)
 		switch ((char)ch) {
 		case 'a':
 			aflag = 1;
@@ -188,8 +189,10 @@ main(argc, argv)
 			dflag = 1;
 			break;
 		case 'I':
-#ifdef SIOCSDEFIFACE_IN6
-			setdefif(optarg);
+#ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
+			if (argc > 2)
+				setdefif(argv[2]);
+			getdefif(); /* always call it to print the result */
 			exit(0);
 #else
 			errx(1, "not supported yet");
@@ -742,7 +745,7 @@ usage()
 	printf("       ndp -f[nt] filename\n");
 	printf("       ndp -i interface\n");
 #ifdef SIOCSDEFIFACE_IN6
-	printf("       ndp -I interface\n");
+	printf("       ndp -I [interface|delete]\n");
 #endif
 	printf("       ndp -p\n");
 	printf("       ndp -r\n");
@@ -1009,7 +1012,7 @@ harmonize_rtr()
 	int s;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-		err(1, "ndp: socket");
+		err(1, "socket");
 	strcpy(dummyif, "lo0"); /* dummy */
 	if (ioctl(s, SIOCSNDFLUSH_IN6, (caddr_t)&dummyif) < 0)
  		err(1, "ioctl (SIOCSNDFLUSH_IN6)");
@@ -1017,18 +1020,57 @@ harmonize_rtr()
 	close(s);
 }
 
-#ifdef SIOCSDEFIFACE_IN6
+#ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
 static void
 setdefif(ifname)
 	char *ifname;
 {
-	int s;
+	struct in6_ndifreq ndifreq;
+	unsigned int ifindex;
+
+	if (strcasecmp(ifname, "delete") == 0)
+		ifindex = 0;
+	else {
+		if ((ifindex = if_nametoindex(ifname)) == 0)
+			err(1, "failed to resolve i/f index for %s", ifname);
+	}
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) 
-		err(1, "ndp: socket");
+		err(1, "socket");
 
-	if (ioctl(s, SIOCSDEFIFACE_IN6, (caddr_t)ifname) < 0)
+	strcpy(ndifreq.ifname, "lo0"); /* dummy */
+	ndifreq.ifindex = ifindex;
+
+	if (ioctl(s, SIOCSDEFIFACE_IN6, (caddr_t)&ndifreq) < 0)
  		err(1, "ioctl (SIOCSDEFIFACE_IN6)");
+
+	close(s);
+}
+
+static void
+getdefif()
+{
+	struct in6_ndifreq ndifreq;
+	unsigned int ifindex;
+	char ifname[IFNAMSIZ+8];
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) 
+		err(1, "socket");
+
+	memset(&ndifreq, 0, sizeof(ndifreq));
+	strcpy(ndifreq.ifname, "lo0"); /* dummy */
+
+	if (ioctl(s, SIOCGDEFIFACE_IN6, (caddr_t)&ndifreq) < 0)
+ 		err(1, "ioctl (SIOCGDEFIFACE_IN6)");
+
+	if (ndifreq.ifindex == 0)
+		printf("No default interface.\n");
+	else {
+		if ((if_indextoname(ndifreq.ifindex, ifname)) == NULL)
+			err(1, "failed to resolve ifname for index %d",
+			    ndifreq.ifindex);
+		printf("ND default interface = %s\n", ifname);
+	}
 
 	close(s);
 }
