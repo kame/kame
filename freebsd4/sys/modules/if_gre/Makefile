@@ -3,10 +3,13 @@
 .PATH: ${.CURDIR}/../../net ${.CURDIR}/../../netinet 
 
 KMOD=	if_gre
-SRCS=	if_gre.c ip_gre.c opt_inet.h opt_ns.h opt_atalk.h
+SRCS=	if_gre.c ip_gre.c opt_inet.h opt_inet6.h opt_ns.h opt_atalk.h
 
 opt_inet.h:
 	echo "#define INET 1" > ${.TARGET}
+
+opt_inet6.h:
+	echo "#define INET6 1" > ${.TARGET}
 
 opt_ns.h:
 	echo "#define NS 1" > ${.TARGET}
