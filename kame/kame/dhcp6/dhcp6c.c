@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.126 2004/01/20 07:24:45 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.127 2004/01/22 11:48:59 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -172,11 +172,9 @@ main(argc, argv)
 	}
 	device = argv[0];
 
-	if (foreground == 0) {
-		if (daemon(0, 0) < 0)
-			err(1, "daemon");
+	if (foreground == 0)
 		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
-	}
+
 	setloglevel(debug);
 
 	/* dump current PID */
@@ -193,6 +191,10 @@ main(argc, argv)
 		exit(1);
 	}
 
+	if (foreground == 0) {
+		if (daemon(0, 0) < 0)
+			err(1, "daemon");
+	}
 	client6_init();
 	ifinit_all();
 

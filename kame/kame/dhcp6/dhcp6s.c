@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.114 2004/01/21 11:13:39 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.115 2004/01/22 11:48:59 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -243,11 +243,9 @@ main(argc, argv)
 	}
 	device = argv[0];
 
-	if (foreground == 0) {
-		if (daemon(0, 0) < 0)
-			err(1, "daemon");
+	if (foreground == 0)
 		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
-	}
+
 	setloglevel(debug);
 
 	ifinit(device);
@@ -255,6 +253,11 @@ main(argc, argv)
 	if ((cfparse(conffile)) != 0) {
 		dprintf(LOG_ERR, FNAME, "failed to parse configuration file");
 		exit(1);
+	}
+
+	if (foreground == 0) {
+		if (daemon(0, 0) < 0)
+			err(1, "daemon");
 	}
 	/* prohibit a mixture of old and new style of DNS server config */
 	if (!TAILQ_EMPTY(&arg_dnslist)) {
