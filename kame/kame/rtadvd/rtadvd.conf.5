@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.21 2001/01/18 05:13:43 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.22 2001/01/18 05:40:04 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -289,11 +289,27 @@ for details on the capability.
 #       would usually work well without a configuration file.
 #       See also: rtadvd(8)
 
+#       We explicitly write the default values down below, just as
+#       references. Please do not forget there is no need to uncomment
+#       the followings in your configuration file (even if any). rtadvd
+#       will automatically use the default values without any explicit
+#       configuration.
+
 #default:\\
 #	:chlim#64:raflags#0:rltime#1800:rtime#0:retrans#0:\\
 #	:pinfoflags#192:vltime#2592000:pltime#604800:mtu#1500:
 #ether:\\
 #	:mtu#1500:tc=default:
+
+#      You may sometimes want to change the default values. For example,
+#      if you only want to advertise network parameters, and do not
+#      want to let your box forward packets, you can manually set zero
+#      to the router lifetime (rltime) like:
+#ne0:rltime#0:
+#      where ne0 is the advertising interface of your box. Again,
+#      PLEASE DO NOT FORGET THAT THIS IS NOT A TYPICAL EXAMPLE. Do not
+#      just cut and (edit and) paste the above example into your
+#      configuration unless you understand its meaning.
 
 # per-interface definitions.
 #   Mainly IPv6 prefixes are configured in this part. However, rtadvd
