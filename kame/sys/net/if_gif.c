@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.38 2001/01/22 17:58:42 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.39 2001/02/20 07:40:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -375,7 +375,7 @@ gif_input(m, af, gifp)
 		 * try to free it or keep a pointer a to it).
 		 */
 		struct mbuf m0;
-		u_int af = AF_INET6;
+		u_int af1 = af;
 		
 		m0.m_next = m;
 		m0.m_len = 4;
