@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.14 2001/08/13 13:02:41 sakane Exp $	*/
+/*	$KAME: algorithm.h,v 1.15 2001/08/13 13:54:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,36 +49,54 @@ enum {
 enum {
 	/* enc */
 	algtype_nothing = 0,
-	algtype_des_iv64, algtype_des, algtype_3des,
-	algtype_rc5, algtype_idea, algtype_cast128, algtype_blowfish,
-	algtype_3idea, algtype_des_iv32, algtype_rc4, algtype_null_enc,
-	algtype_rijndael, algtype_twofish,
+	algtype_des_iv64,
+	algtype_des,
+	algtype_3des,
+	algtype_rc5,
+	algtype_idea,
+	algtype_cast128,
+	algtype_blowfish,
+	algtype_3idea,
+	algtype_des_iv32,
+	algtype_rc4,
+	algtype_null_enc,
+	algtype_rijndael,
+	algtype_twofish,
 };
 
 enum {
 	/* ipsec auth */
 	/* 0 is defined as algtype_nothing above. */
-	algtype_hmac_md5 = 1, algtype_hmac_sha1, algtype_des_mac, algtype_kpdk,
+	algtype_hmac_md5 = 1,
+	algtype_hmac_sha1,
+	algtype_des_mac,
+	algtype_kpdk,
 	algtype_non_auth,
 };
 
 enum {
 	/* ipcomp */
 	/* 0 is defined as algtype_nothing above. */
-	algtype_oui = 1, algtype_deflate, algtype_lzs,
+	algtype_oui = 1,
+	algtype_deflate,
+	algtype_lzs,
 };
 
 enum {
 	/* hash */
 	/* 0 is defined as algtype_nothing above. */
-	algtype_md5 = 1, algtype_sha1, algtype_tiger,
+	algtype_md5 = 1,
+	algtype_sha1,
+	algtype_tiger,
 };
 
 enum {
 	/* dh_group */
 	/* 0 is defined as algtype_nothing above. */
-	algtype_modp768 = 1, algtype_modp1024,
-	algtype_ec2n155, algtype_ec2n185,
+	algtype_modp768 = 1,
+	algtype_modp1024,
+	algtype_ec2n155,
+	algtype_ec2n185,
 	algtype_modp1536,
 	algtype_modp2048,
 	algtype_modp3072,
@@ -89,8 +107,12 @@ enum {
 enum {
 	/* authentication method. */
 	/* 0 is defined as algtype_nothing above. */
-	algtype_psk = 1, algtype_dsssig, algtype_rsasig,
-	algtype_rsaenc, algtype_rsarev, algtype_gssapikrb
+	algtype_psk = 1,
+	algtype_dsssig,
+	algtype_rsasig,
+	algtype_rsaenc,
+	algtype_rsarev,
+	algtype_gssapikrb
 };
 
 extern int default_keylen __P((int, int));
