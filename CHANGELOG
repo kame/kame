@@ -1,8 +1,34 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.217 1999/10/26 09:51:19 itojun Exp $
+$Id: CHANGELOG,v 1.218 1999/10/26 17:19:18 sumikawa Exp $
 
 <199910>
+Tue Oct 26 23:45:15 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* bsdi3/libexec/ftpd/ftpd/ftpcmd.y: appllied Y2K patch of
+	  ftpd(wu-ftpd)
+	  From: http://www.cetis.hvu.nl/~koos/wu-ftpd-faq.html#QA35
+
+	* bsdi3/usr.bin/ftp/cmds.c: One more Y2K patch. M310-055 is not
+	enough for newer checking. e.g.:
+	% touch -t 200107221100 tmp/test
+	% touch -t 199907221130 test
+	% ftp 127.0.0.1
+	Connected to 127.0.0.1.
+	220 rapunzel.net.ebina.hitachi.co.jp FTP server (Version wu-2.4(1)\
+	Fri Jan 17 12:05:30 MST 1997) ready.
+	Name (127.0.0.1:sumikawa):
+	331 Password required for sumikawa.
+	Password:
+	230 User sumikawa logged in.
+	Remote system type is UNIX.
+	Using binary mode to transfer files.
+	ftp> cd tmp
+	250 CWD command successful.
+	ftp> newer test
+	Local file "test" is newer than remote file "test"
+
+	Reported by: takenaka@ebina.hitachi.co.jp
+	
 Tue Oct 26 18:50:16 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/ip_input.c: disable ipflow (IPv4 fast forwading)
 	  if IPsec is configured in the kernel.
