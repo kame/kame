@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.18 2000/07/12 16:07:16 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.19 2000/07/12 16:33:25 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -66,10 +66,6 @@
  */
 
 /*#define PULLDOWN_DEBUG*/
-
-#ifndef __NetBSD__
-#undef PULLDOWN_STAT
-#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.11 2000/07/12 16:07:16 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.12 2000/07/12 16:33:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,7 +352,7 @@ do {									\
     }									\
 } while (0)
 
-#if defined(PULLDOWN_STAT) && defined(__NetBSD__)
+#ifdef PULLDOWN_STAT
 #define IP6_EXTHDR_STAT(x)	x
 #else
 #define IP6_EXTHDR_STAT(x)
