@@ -16,9 +16,9 @@ dtcpc: dtcpc.rb
 
 realinstall:
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m 555 dtcps \
-		${BINDIR}/dtcps
+		${DESTDIR}${BINDIR}/dtcps
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m 555 dtcpc \
-		${BINDIR}/dtcpc
+		${DESTDIR}${BINDIR}/dtcpc
 
 .PATH:	${SRCDIR}
 
