@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.35 2003/09/06 09:13:52 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.36 2003/10/01 12:16:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -636,9 +636,16 @@ mip6_exthdr_create(m, opt, mip6opt)
 	if ((opt != NULL) && (opt->ip6po_mobility != NULL)) {
 		if (opt->ip6po_mobility->ip6m_type == IP6M_BINDING_UPDATE)
 			need_hao = 1;
-		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST_INIT ||
-		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST_INIT)
+		else {
+			/*
+			 * From 6.1 Mobility Header: "Mobility Header
+			 * messages * also MUST NOT be used with a
+			 * Home Address * destination option, except
+			 * as described in Section * 11.7.1 and
+			 * Section 11.7.2 for Binding Update."
+			 */
 			goto skip_hao;
+		}
 	}
 	if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 		/* to my home agent. */
