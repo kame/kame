@@ -697,9 +697,11 @@ grab_myaddrs()
 	unsigned int maxif;
 	struct ifreq *iflist;
 	struct ifconf ifconf;
-	struct ifreq *ifr, *ifr_end;
+	struct ifreq *ifr, *ifrp, *ifr_end;
 	struct myaddrs *p;
 	struct sockaddr_in6 *sin6;
+	size_t siz;
+	char ifrbuf[sizeof(struct ifreq) + 1024];
 
 	maxif = if_maxindex() + 1;
 	iflist = (struct ifreq *)malloc(maxif * BUFSIZ);	/* XXX */
@@ -723,10 +725,21 @@ grab_myaddrs()
 
 	/* Look for this interface in the list */
 	ifr_end = (struct ifreq *) (ifconf.ifc_buf + ifconf.ifc_len);
-	for (ifr = ifconf.ifc_req;
-	     ifr < ifr_end;
-	     ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-				    + ifr->ifr_addr.sa_len)) {
+	for (ifrp = ifconf.ifc_req;
+	     ifrp < ifr_end;
+	     ifrp = (struct ifreq *)((char *)ifrp + siz)) {
+		memcpy(ifrbuf, ifrp, sizeof(*ifrp));
+		siz = ((struct ifreq *)ifrbuf)->ifr_addr.sa_len;
+		if (siz < sizeof(ifrp->ifr_addr))
+			siz = sizeof(ifrp->ifr_addr);
+		siz += (sizeof(*ifrp) - sizeof(ifrp->ifr_addr));
+		if (siz > sizeof(ifrbuf)) {
+			/* ifr too big */
+			break;
+		}
+		memcpy(ifrbuf, ifrp, siz);
+		ifr = (struct ifreq *)ifrbuf;
+
 		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 		case AF_INET6:
