@@ -8,9 +8,9 @@ SUBDIR=	lib libexec sbin usr.bin usr.sbin share
 #	$(MAKE) install
 
 includes:
-	(cd include; $(MAKE))
+	(cd ${.CURDIR}/include; $(MAKE))
 install-includes:
-	(cd include; $(MAKE) install)
+	(cd ${.CURDIR}/include; $(MAKE) install)
 
 PREFIX= /usr/local/v6
 DIRS=	$(PREFIX) $(PREFIX)/bin $(PREFIX)/sbin $(PREFIX)/lib $(PREFIX)/etc \
