@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2051 2002/01/20 10:41:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.2052 2002/01/20 11:39:30 jinmei Exp $
 
 <200201>
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	improved the support of IPv6 scoped addresses:
+	* kame/sys/netinet6/ip6_var.h: added sockaddr_in6 structures to
+	record source and destinaion addresses with scope information.
+	* kame/sys/netinet6/ip6_input.c (ip6_input): recorded the
+	addresses.
+	* kame/sys/netinet6/ip6_forward.c(ip6_forward): used the recorded
+	addresses to check scope breakage and to get a route.
+
 2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/udp6_output.c (udp6_output): corrected the
 	length argument to in_cksum (bsdi4 only).
