@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2588 2004/04/09 16:34:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.2589 2004/04/13 12:53:55 jinmei Exp $
 
 <200404>
+2004-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): clean-up:
+	removed the definition of the AI_V4MAPPED and AI_ALL flags (when
+	they are defined), and removed incomplete support for the flags.
+
+2004-04-13  itojun
+	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): added support
+	for the AI_NUMERICSERV flag.
+
 2004-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (reorder): made sure to call
 	set_source() to set the source address information for each
