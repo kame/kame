@@ -65,6 +65,7 @@
  */
 
 #include "opt_ipsec.h"
+#include "opt_inet6.h"
 
 #include <stddef.h>
 
