@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.108 2002/05/09 12:04:31 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.109 2002/05/09 12:20:06 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -164,7 +164,6 @@ MALLOC_DECLARE(M_NATPT);
 /* IPv6 -> IPv4 */
 struct mbuf	*natpt_translateICMPv6To4	__P((struct pcv *, struct pAddr *));
 void		 natpt_icmp6DstUnreach	__P((struct pcv *, struct pcv *));
-void		 natpt_icmp6PacketTooBig	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp6TimeExceed	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp6ParamProb	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp6EchoRequest	__P((struct pcv *, struct pcv *));
@@ -310,7 +309,10 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 		break;
 
 	case ICMP6_PACKET_TOO_BIG:
-		natpt_icmp6PacketTooBig(cv6, &cv4);
+		icmp4 = cv4.pyld.icmp4;
+		icmp4->icmp_type = ICMP_UNREACH;
+		icmp4->icmp_code = ICMP_UNREACH_NEEDFRAG;
+		natpt_icmp6MimicPayload(cv6, &cv4, pad);
 		break;
 
 	case ICMP6_TIME_EXCEEDED:
@@ -425,16 +427,6 @@ natpt_icmp6DstUnreach(struct pcv *cv6, struct pcv *cv4)
 		icmp4->icmp_code = ICMP_UNREACH_PORT;
 		break;
 	}
-}
-
-
-void
-natpt_icmp6PacketTooBig(struct pcv *cv6, struct pcv *cv4)
-{
-	struct icmp	*icmp4 = cv4->pyld.icmp4;
-
-	icmp4->icmp_type = ICMP_UNREACH;
-	icmp4->icmp_code = ICMP_UNREACH_NEEDFRAG; /* do more */
 }
 
 
