@@ -8,5 +8,6 @@
     SUBDIR += lynx
     SUBDIR += squid11
     SUBDIR += w3m
+    SUBDIR += wwwoffle
 
 .include "../mk/bsd.pkg.subdir.mk"
