@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.10 2001/11/13 12:38:44 jinmei Exp $ */
+/*	$KAME: common.c,v 1.11 2001/12/25 02:53:40 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -36,13 +36,17 @@
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include <err.h>
 #include <stdio.h>
 
 #include "common.h"
+
+static void print_icmp6_filter __P((struct icmp6_filter *));
 
 char *
 ip6str(sa6)
@@ -62,6 +66,286 @@ ip6str(sa6)
 		return(invalid);
 
 	return(cp);
+}
+
+void
+dump_localopt(s, socktype, proto)
+	int s, socktype, proto;
+{
+	char optbuf[4096];
+	char ntopbuf[INET6_ADDRSTRLEN];
+	struct in6_pktinfo *pktinfo;
+	int optlen;
+
+#ifdef IPV6_PKTINFO
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, optbuf, &optlen))
+		warn("getsockopt(IPV6_PKTINFO)");
+	else if (optlen == sizeof(*pktinfo)) {
+		pktinfo = (struct in6_pktinfo *)optbuf;
+		printf("IPV6_PKTINFO: %s, %d\n",
+		       inet_ntop(AF_INET6, &pktinfo->ipi6_addr, ntopbuf,
+				 sizeof(ntopbuf)),
+		       pktinfo->ipi6_ifindex);
+	} else
+		warnx("IPV6_PKTINFO: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_HOPLIMIT
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, optbuf, &optlen))
+		warn("getsockopt(IPV6_HOPLIMIT)");
+	else if (optlen == sizeof(int))
+		printf("IPV6_HOPLIMIT: %d\n", *(int *)optbuf);
+	else {
+		/* this should be the case in rfc2292bis-03 */
+		warnx("IPV6_HOPLIMIT: invalid option length: %d", optlen);
+	}
+#endif
+
+#ifdef IPV6_NEXTHOP
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_NEXTHOP, optbuf, &optlen))
+		warn("getsockopt(IPV6_NEXTHOP)");
+	/* XXX: we assume the kernel only supports AF_NET6 nexthops */
+	else if (optlen == sizeof(struct sockaddr_in6))
+		printf("IPV6_NEXTHOP: %s\n",
+		       ip6str((struct sockaddr_in6 *)optbuf));
+	else
+		warnx("IPV6_NEXTHOP: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RTHDR
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RTHDR, optbuf, &optlen))
+		warn("getsockopt(IPV6_RTHDR)");
+	else {
+		printf("IPV6_RTHDR:");
+		if (optlen) {
+			print_rthdr(optbuf);
+		} else
+			printf(" no option\n");
+	}
+#endif
+
+#ifdef IPV6_HOPOPTS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_HOPOPTS, optbuf, &optlen))
+		warn("getsockopt(IPV6_HOPOPTS)");
+	else {
+		printf("IPV6_HOPOPTS:");
+		if (optlen) {
+			print_opthdr(optbuf);
+		} else
+			printf(" no option\n");
+	}
+#endif
+
+#ifdef IPV6_DSTOPTS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, optbuf, &optlen))
+		warn("getsockopt(IPV6_DSTOPTS)");
+	else {
+		printf("IPV6_DSTOPTS:");
+		if (optlen) {
+			print_opthdr(optbuf);
+		} else
+			printf(" no option\n");
+	}
+#endif
+
+#ifdef IPV6_RTHDRDSTOPTS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RTHDRDSTOPTS, optbuf, &optlen))
+		warn("getsockopt(IPV6_RTHDRDSTOPTS)");
+	else {
+		printf("IPV6_RTHDRDSTOPTS:");
+		if (optlen) {
+			print_opthdr(optbuf);
+		} else
+			printf(" no option\n");
+	}
+#endif
+
+#ifdef IPV6_TCLASS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_TCLASS, optbuf, &optlen))
+		warn("getsockopt(IPV6_TCLASS)");
+	else if (optlen == sizeof(int))
+		printf("IPV6_TCLASS: %d\n", *(int *)optbuf);
+	else
+		warnx("IPV6_TCLASS: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_USE_MIN_MTU
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, optbuf, &optlen))
+		warn("getsockopt(IPV6_USE_MIN_MTU)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_USE_MIN_MTU: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_USE_MIN_MTU: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_DONTFRAG
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, optbuf, &optlen))
+		warn("getsockopt(IPV6_DONTFRAG)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_DONTFRAG: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_DONTFRAG: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVPKTINFO
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVPKTINFO)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVPKTINFO: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVPKTINFO: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVHOPLIMIT
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVHOPLIMIT)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVHOPLIMIT: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVHOPLIMIT: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVRTHDR
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVRTHDR)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVRTHDR: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVRTHDR: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVHOPOPTS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVHOPOPTS)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVHOPOPTS: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVHOPOPTS: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVRTHDRDSTOPTS	/* rfc2292bis-03 obsoleted this option. */
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVRTHDRDSTOPTS)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVRTHDRDSTOPTS: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVRTHDRDSTOPTS: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVDSTOPTS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVDSTOPTS)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVDSTOPTS: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVDSTOPTS: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVTCLASS
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVTCLASS, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVTCLASS)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVTCLASS: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVTCLASS: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_RECVPATHMTU
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, optbuf, &optlen))
+		warn("getsockopt(IPV6_RECVPATHMTU)");
+	else if (optlen == sizeof(int)) {
+		printf("IPV6_RECVPATHMTU: %s\n",
+		       *(int *)optbuf ? "on" : "off");
+	}
+	else
+		warnx("IPV6_RECVPATHMTU: invalid option length: %d", optlen);
+#endif
+
+#ifdef IPV6_CHECKSUM
+	if (socktype == SOCK_RAW) {
+		optlen = sizeof(optbuf);
+		if (getsockopt(s, IPPROTO_IPV6, IPV6_CHECKSUM, optbuf,
+			       &optlen))
+			warn("getsockopt(IPV6_CHECKSUM)");
+		else if (optlen == sizeof(int))
+			printf("IPV6_CHECKSUM: %d\n", *(int *)optbuf);
+		else
+			warnx("IPV6_CHECKSUM: invalid option length: %d",
+			      optlen);
+	}
+#endif
+
+#ifdef ICMP6_FILTER
+	if (proto == IPPROTO_ICMPV6) {
+		optlen = sizeof(optbuf);
+		if (getsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER, optbuf,
+			       &optlen))
+			warn("getsockopt(ICMP6_FILTER)");
+		else if (optlen == sizeof(struct icmp6_filter))
+			print_icmp6_filter((struct icmp6_filter *)optbuf);
+		else
+			warnx("ICMP6_FILTER: invalid option length: %d",
+			      optlen);
+	}
+#endif
+}
+
+static void
+print_icmp6_filter(filter)
+	struct icmp6_filter *filter;
+{
+	int i, j;
+	char *indent ="ICMP6_FILTER:[";
+
+	printf("%s", indent);
+	for (i = 0; i < 4; i++) {
+		for (j = 0; j < 64; j++) {
+			if (ICMP6_FILTER_WILLPASS(j, filter))
+				putchar('1');
+			else
+				putchar('0');
+		}
+		if (i < 3)	/* XXX */
+			printf("\n%*s", strlen(indent), "");
+		else
+			printf("]\n");
+	}
 }
 
 void
@@ -238,7 +522,7 @@ print_opthdr(void *extbuf)
 			break;
 #endif
 		default:
-			printf("    Received Opt %u len %u\n", type, len);
+			printf("    Opt %u len %u\n", type, len);
 			break;
 		}
 	}

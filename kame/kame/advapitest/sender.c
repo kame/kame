@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.25 2001/12/24 18:21:24 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.26 2001/12/25 02:53:40 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -94,6 +94,7 @@ main(argc, argv)
 	int sticky = 0;
 	int socktype = SOCK_DGRAM;
 	int proto = IPPROTO_UDP;
+	int verbose = 0;
 
 #define STICKYCHECK \
 	do { \
@@ -106,7 +107,7 @@ main(argc, argv)
 		} \
 	} while (0)
 
-	while ((ch = getopt(argc, argv, "D:d:f:h:l:Mm:n:Pp:s:t:")) != -1)
+	while ((ch = getopt(argc, argv, "D:d:f:h:l:M:m:n:Pp:s:t:v")) != -1)
 		switch(ch) {
 		case 'D':
 			STICKYCHECK;
@@ -177,6 +178,9 @@ main(argc, argv)
 				stickytclassp = optarg;
 			else
 				tclassp = optarg;
+			break;
+		case 'v':
+			verbose++;
 			break;
 		default:
 			usage();
@@ -290,6 +294,16 @@ main(argc, argv)
 #endif
 	finaldst = argv[argc - 1];
 
+	if (strcmp(portstr, "echo") == 0) {
+		struct icmp6_hdr *icmp6 = (struct icmp6_hdr *)databuf;
+
+		socktype = SOCK_RAW;
+		proto = IPPROTO_ICMPV6;
+		portstr = NULL;
+
+		icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
+	}
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = socktype;
@@ -301,6 +315,11 @@ main(argc, argv)
 	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol))
 	    < 0)
 		err(1, "socket");
+
+	if (verbose) {
+		printf("default values of socket options: \n");
+		dump_localopt(s, socktype, proto);
+	}
 
 #ifdef IPV6_HOPLIMIT
 	if (hlimp != NULL) {
@@ -467,22 +486,17 @@ main(argc, argv)
 	}
 #endif
 
+	if (verbose) {
+		printf("\nsocket option values after configuring them: \n");
+		dump_localopt(s, socktype, proto);
+	}
+
 #if 0
 	bzero(&local, sizeof(local));
 	local.sin6_family = AF_INET6;
 	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0)
 		err(1, "bind");
 #endif
-
-	if (strcmp(portstr, "echo") == 0) {
-		struct icmp6_hdr *icmp6 = (struct icmp6_hdr *)databuf;
-
-		socktype = SOCK_RAW;
-		proto = IPPROTO_ICMPV6;
-		portstr = NULL;
-
-		icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
-	}
 
 	if (!isconnected) {
 		msg.msg_name = (void *)res->ai_addr;
@@ -605,6 +619,7 @@ usage()
 		"              [-p portnum|\'echo\']\n"
 		"              [-s packetsize]\n"
 		"              [-t tclass] [-t sticky sticky_tclass]\n"
+		"              [-v] (verbose output)\n"
 		"              IPv6addrs...\n");
 	exit(1);
 }
