@@ -7,9 +7,8 @@
 # $FreeBSD: ports/net/rsync/Makefile,v 1.37 2000/02/17 07:37:23 sumikawa Exp $
 #
 
-DISTNAME=       rsync-2.4.1
-#CATEGORIES=	net ipv6
-CATEGORIES=	net
+DISTNAME=       rsync-2.4.3
+CATEGORIES=	net #ipv6
 MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 		ftp://sunsite.auc.dk/pub/unix/rsync/  \
 		ftp://ftp.sunet.se/pub/unix/admin/rsync/  \
@@ -17,7 +16,7 @@ MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 
 PATCH_SITES=    ftp://ftp.kame.net/pub/kame/misc/ \
                 ftp://ftp.pasta.cs.uit.no/pub/IPv6/misc/
-PATCHFILES=     rsync-241-v6-20000217.diff.gz
+PATCHFILES=     rsync-243-v6-20000428.diff.gz
 PATCH_DIST_STRIP=       -p1
 
 MAINTAINER=     itojun@itojun.org
