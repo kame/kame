@@ -1180,9 +1180,12 @@ pf_normalize_ip6(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 		r->packets++;
 
 	/* Check for illegal packets */
-	if (ntohs(h->ip6_plen) == 0)
-		; /* jumbo payload option must be present */
-	else if (sizeof(struct ip6_hdr) + ntohs(h->ip6_plen) != m->m_pkthdr.len)
+	if (ntohs(h->ip6_plen) == 0) {
+		/* jumbo payload option must be present */
+		if (sizeof(struct ip6_hdr) + IPV6_MAXPACKET >= m->m_pkthdr.len)
+			goto drop;
+	} else if (sizeof(struct ip6_hdr) + ntohs(h->ip6_plen) !=
+	    m->m_pkthdr.len)
 		goto drop;
 
 	off = sizeof(struct ip6_hdr);
