@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.874 2000/05/14 17:37:11 sumikawa Exp $
+$Id: CHANGELOG,v 1.875 2000/05/15 03:50:16 itojun Exp $
 
 <200005>
 Mon May 15 02:35:41 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -68,10 +68,6 @@ Thu May 11 19:28:22 JST 2000 sakane@ydc.co.jp
 	- update version to 20000501 means proposal parser is fixed.
 
 	They are reported from <Francis.Dupont@enst-bretagne.fr>.
-
-Wed May 10 JST 2000  itojun@iijlab.net
-	* sys/netinet6/ip6_input.c: drop packet with jumbo payload option,
-	  if ip6_plen != 0.  it is to improve conformance to RFC2675.
 
 Wed May 10 14:07:22 JST 2000  itojun@iijlab.net
 	* sys/netinet/* (all platforms): correct more boundary checking issues
