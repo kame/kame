@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.23 2000/01/13 23:12:46 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.24 2000/01/14 21:41:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -467,11 +467,10 @@ isakmp_info_send_n1(iph1, type, data)
  * send Notification payload (for IPsec SA) in Informational exchange
  */
 int
-isakmp_info_send_n2(iph2, type, data, flags)
+isakmp_info_send_n2(iph2, type, data)
 	struct ph2handle *iph2;
 	int type;
 	vchar_t *data;
-	int flags;
 {
 	struct ph1handle *iph1 = iph2->ph1;
 	vchar_t *payload = NULL;
@@ -510,8 +509,8 @@ isakmp_info_send_n2(iph2, type, data, flags)
 			&iph2->keys->spi, sizeof(iph2->keys->spi));
 	}
 
-	flags |= ISAKMP_FLAG_E;	/* XXX Should we do FLAG_A ? */
-	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, flags);
+	iph2->flags |= ISAKMP_FLAG_E;	/* XXX Should we do FLAG_A ? */
+	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, iph2->flags);
 	vfree(payload);
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));

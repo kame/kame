@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.44 2000/01/12 23:09:30 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.45 2000/01/14 21:41:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -500,7 +500,7 @@ isakmp_main(msg, remote, local)
 				plog(logp, LOCATION, remote,
 					"failed to pre-process packet.\n"));
 			if (error != ISAKMP_INTERNAL_ERROR)
-				isakmp_info_send_n1(iph1, error, NULL);
+				isakmp_info_send_n2(iph2, error, NULL);
 			/* don't release handler */
 			return -1;
 		}
@@ -753,7 +753,7 @@ isakmp_ph2begin_r(iph1, msg)
 			plog(logp, LOCATION, iph1->remote,
 				"failed to pre-process packet.\n"));
 		if (error != ISAKMP_INTERNAL_ERROR)
-			isakmp_info_send_n1(iph1, error, NULL);
+			isakmp_info_send_n2(iph2, error, NULL);
 		/*
 		 * release handler because it's wrong that ph2handle is kept
 		 * after failed to check message for responder's.
