@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.83 2000/03/09 13:15:01 sakane Exp $	*/
+/*	$KAME: ip6_output.c,v 1.84 2000/03/11 13:27:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -584,7 +584,7 @@ skip_ipsec2:;
 
 		exthdrs.ip6e_ip6 = m;
 	}
-#endif /*IPESC*/
+#endif /*IPSEC*/
 
 	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		/* Unicast */
