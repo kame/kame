@@ -150,17 +150,6 @@ struct mrt6msg {
 };
 
 /*
- * Argument structure used by mrouted to get src-grp pkt counts
- */
-struct sioc6_sg_req {
-	struct in6_addr src;
-	struct in6_addr grp;
-	u_quad_t pktcnt;
-	u_quad_t bytecnt;
-	u_quad_t wrong_if;
-};
-
-/*
  * Argument structure used by multicast routing daemon to get src-grp
  * packet counts
  */
