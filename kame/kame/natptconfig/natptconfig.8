@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.20 2002/02/17 09:42:09 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.21 2002/02/17 10:16:33 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -135,14 +135,17 @@ vertical bar
 is used to indicate a choice between optional
 parameters.
 .Pp
-The following directives are available in interactive use.
+You can put all directives into file and process using
+.Fl f
+option, here we describe directives mainly executed from command line.
+The following directives are available.
 .Bl -tag -width Ds -offset indent
 .\"
 .It Xo Sy \&?
 .Xc
 Show available actions on each stage.
 .\"
-.It Xo Sy delete Ar number
+.It Xo Sy map delete Ar number
 .Xc
 Delete translation rule specified by
 .Ar number .
