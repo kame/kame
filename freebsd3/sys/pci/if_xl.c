@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_xl.c,v 1.22.2.12 1999/05/05 17:10:48 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_xl.c,v 1.22.2.21 1999/08/29 16:31:50 peter Exp $
  */
 
 /*
@@ -50,6 +50,7 @@
  * 3Com 3c905B-COMBO	10/100Mbps/RJ-45,AUI,BNC
  * 3Com 3c905B-TX	10/100Mbps/RJ-45
  * 3Com 3c905B-FL/FX	10/100Mbps/Fiber-optic
+ * 3Com 3c905C-TX	10/100Mbps/RJ-45
  * 3Com 3c980-TX	10/100Mbps server adapter
  * 3Com 3cSOHO100-TX	10/100Mbps/RJ-45
  * Dell Optiplex GX1 on-board 3c918 10/100Mbps/RJ-45
@@ -159,7 +160,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-	"$Id: if_xl.c,v 1.22.2.12 1999/05/05 17:10:48 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_xl.c,v 1.22.2.21 1999/08/29 16:31:50 peter Exp $";
 #endif
 
 /*
@@ -190,6 +191,8 @@ static struct xl_type xl_devs[] = {
 		"3Com 3c905B-FX/SC Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_CYCLONE_10_100_COMBO,
 		"3Com 3c905B-COMBO Fast Etherlink XL" },
+	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT,
+		"3Com 3c905C-TX Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_HURRICANE_10_100BT_SERV,
 		"3Com 3c980 Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_HURRICANE_SOHO100TX,
@@ -1228,8 +1231,16 @@ static void xl_reset(sc)
 	if (i == XL_TIMEOUT)
 		printf("xl%d: reset didn't complete\n", sc->xl_unit);
 
+	DELAY(100000);
+
+	/* Reset TX and RX. */
+	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RX_RESET);
+	xl_wait(sc);
+	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_TX_RESET);
+	xl_wait(sc);
+
 	/* Wait a little while for the chip to get its brains in order. */
-	DELAY(1000);
+	DELAY(100000);
         return;
 }
 
@@ -1350,6 +1361,7 @@ static void xl_mediacheck(sc)
 	case TC_DEVICEID_HURRICANE_10_100BT:	/* 3c905B-TX */
 	case TC_DEVICEID_HURRICANE_10_100BT_SERV:/*3c980-TX */
 	case TC_DEVICEID_HURRICANE_SOHO100TX:	/* 3cSOHO100-TX */
+	case TC_DEVICEID_TORNADO_10_100BT:	/* 3c905C-TX */
 		sc->xl_media = XL_MEDIAOPT_BTX;
 		sc->xl_xcvr = XL_XCVR_AUTO;
 		printf("xl%d: guessing 10/100 internal\n", sc->xl_unit);
@@ -1462,9 +1474,9 @@ xl_attach(config_id, unit)
 	if (!pci_map_port(config_id, XL_PCI_LOIO,
 				(u_short *)&(sc->xl_bhandle))) {
 		printf ("xl%d: couldn't map port\n", unit);
-		printf ("xl%d: WARNING: this shouldn't happen! "
-		    "Possible PCI support code bug!", unit);
-		printf ("xl%d: attempting to map iobase manually", unit);
+		printf ("xl%d: WARNING: check your BIOS and "
+		    "set 'Plug & Play OS' to 'no'\n", unit);
+		printf ("xl%d: attempting to map iobase manually\n", unit);
 		sc->xl_bhandle =
 		    pci_conf_read(config_id, XL_PCI_LOIO) & 0xFFFFFFE0;
 		/*goto fail;*/
@@ -1783,6 +1795,7 @@ xl_attach(config_id, unit)
 	}
 
 	ifmedia_set(&sc->ifmedia, media);
+	xl_stop(sc);
 
 	/*
 	 * Call MI attach routines.
@@ -1909,7 +1922,7 @@ static void xl_rxeof(sc)
         struct ifnet		*ifp;
 	struct xl_chain_onefrag	*cur_rx;
 	int			total_len = 0;
-	u_int16_t		rxstat;
+	u_int32_t		rxstat;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -2424,7 +2437,7 @@ static void xl_start(ifp)
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_STALL);
 	xl_wait(sc);
 
-	if (CSR_READ_4(sc, XL_DOWNLIST_PTR)) {
+	if (sc->xl_cdata.xl_tx_head != NULL) {
 		sc->xl_cdata.xl_tx_tail->xl_next = start_tx;
 		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_next =
 					vtophys(start_tx->xl_ptr);
@@ -2434,8 +2447,10 @@ static void xl_start(ifp)
 	} else {
 		sc->xl_cdata.xl_tx_head = start_tx;
 		sc->xl_cdata.xl_tx_tail = cur_tx;
-		CSR_WRITE_4(sc, XL_DOWNLIST_PTR, vtophys(start_tx->xl_ptr));
 	}
+	if (!CSR_READ_4(sc, XL_DOWNLIST_PTR))
+		CSR_WRITE_4(sc, XL_DOWNLIST_PTR, vtophys(start_tx->xl_ptr));
+
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 
 	XL_SEL_WIN(7);
@@ -2854,6 +2869,7 @@ static void xl_watchdog(ifp)
 	xl_txeoc(sc);
 	xl_txeof(sc);
 	xl_rxeof(sc);
+	xl_reset(sc);
 	xl_init(sc);
 
 #ifdef ALTQ

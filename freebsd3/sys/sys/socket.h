@@ -64,7 +64,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $Id: socket.h,v 1.27 1998/11/05 14:28:25 dg Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.27.2.1 1999/08/29 16:32:44 peter Exp $
  */
 
 #ifndef _SYS_SOCKET_H_

@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
- * $Id: udp_var.h,v 1.16 1998/11/17 10:53:37 dfr Exp $
+ * $FreeBSD: src/sys/netinet/udp_var.h,v 1.16.2.2 1999/08/29 16:29:59 peter Exp $
  */
 
 #ifndef _NETINET_UDP_VAR_H_
@@ -140,12 +140,11 @@ extern u_long	udp_recvspace;
 extern struct udpstat udpstat;
 extern int	log_in_vain;
 
-void	udp_ctlinput __P((int, struct sockaddr *, void *));
-void	udp_init __P((void));
-void	udp_input __P((struct mbuf *, int, int));
-
-void	udp_notify __P((struct inpcb *inp, int errno));
-int	udp_shutdown __P((struct socket *so));
+void	 udp_ctlinput __P((int, struct sockaddr *, void *));
+void	 udp_init __P((void));
+void	 udp_input __P((struct mbuf *, int, int));
+void	 udp_notify __P((struct inpcb *inp, int errno));
+int	 udp_shutdown __P((struct socket *so));
 #endif
 
 #endif

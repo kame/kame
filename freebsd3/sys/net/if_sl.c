@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $Id: if_sl.c,v 1.70 1998/07/15 02:32:23 bde Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.70.2.2 1999/09/14 09:07:00 ru Exp $
  */
 
 /*
@@ -1014,7 +1014,7 @@ slioctl(ifp, cmd, data)
 		 */
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			if (sl_softc[ifp->if_unit].sc_ttyp != NULL)
-				if_up(ifp);
+				ifp->if_flags |= IFF_UP;
 		} else {
 			error = EAFNOSUPPORT;
 		}

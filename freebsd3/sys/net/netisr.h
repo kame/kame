@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netisr.h	8.1 (Berkeley) 6/10/93
- * $Id: netisr.h,v 1.14 1998/06/07 11:52:17 bde Exp $
+ * $FreeBSD: src/sys/net/netisr.h,v 1.14.2.1 1999/08/29 16:28:28 peter Exp $
  */
 
 #ifndef _NET_NETISR_H_

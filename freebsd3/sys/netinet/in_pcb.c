@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- *	$Id: in_pcb.c,v 1.46 1998/12/07 21:58:37 archie Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.46.2.3 1999/08/29 16:29:35 peter Exp $
  */
 
 #include "opt_inet.h"
@@ -213,7 +213,7 @@ in_pcbbind(inp, nam, p)
 			if (ntohs(lport) < IPPORT_RESERVED && p &&
 			    suser(p->p_ucred, &p->p_acflag))
 				return (EACCES);
-			if (so->so_uid &&
+			if (so->so_cred && so->so_cred->p_ruid != 0 &&
 			    !IN_MULTICAST(ntohl(sin->sin_addr.s_addr))) {
 				t = in_pcblookup_local(inp->inp_pcbinfo,
 				    sin->sin_addr, lport, INPLOOKUP_WILDCARD);
@@ -222,7 +222,9 @@ in_pcbbind(inp, nam, p)
 				     ntohl(t->inp_laddr.s_addr) != INADDR_ANY ||
 				     (t->inp_socket->so_options &
 					 SO_REUSEPORT) == 0) &&
-				    (so->so_uid != t->inp_socket->so_uid)) {
+				     (t->inp_socket->so_cred) &&
+				     (so->so_cred->p_ruid !=
+				      t->inp_socket->so_cred->p_ruid)) {
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 					if (ip6_mapped_addr_on == 0 ||
 					    ntohl(sin->sin_addr.s_addr) !=
@@ -485,8 +487,11 @@ in_pcbconnect(inp, nam, p)
 		return (EADDRINUSE);
 	}
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
-		if (inp->inp_lport == 0)
-			(void)in_pcbbind(inp, (struct sockaddr *)0, p);
+		if (inp->inp_lport == 0) {
+			error = in_pcbbind(inp, (struct sockaddr *)0, p);
+			if (error)
+				return (error);
+		}
 		inp->inp_laddr = ifaddr->sin_addr;
 	}
 	inp->inp_faddr = sin->sin_addr;

@@ -1,4 +1,4 @@
-#	$Id: options,v 1.121.2.5 1999/05/11 05:35:28 mjacob Exp $
+# $FreeBSD: src/sys/conf/options,v 1.121.2.13 1999/08/29 16:22:03 peter Exp $
 #
 #        On the handling of kernel options   
 # 
@@ -36,6 +36,9 @@ AHC_ALLOW_MEMIO		opt_aic7xxx.h	# Allow PCI devices to use memory
 
 AHC_TMODE_ENABLE	opt_aic7xxx.h	# Bitmap of units to enable
 					# targetmode operations.
+
+AHC_DUMP_EEPROM		opt_aic7xxx.h	# Dump the contents of our
+					# configuration prom.
 
 ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
 					# mapped I/O
@@ -167,10 +170,13 @@ SCSI_NO_OP_STRINGS	opt_scsi.h
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
 CHANGER_MAX_BUSY_SECONDS	opt_cd.h
 
-# Options used only in cam/scsi/sa.c.
+# Options used only in cam/scsi/scsi_sa.c.
 SA_SPACE_TIMEOUT	opt_sa.h
 SA_REWIND_TIMEOUT	opt_sa.h
 SA_ERASE_TIMEOUT	opt_sa.h
+
+# Options used only in cam/scsi/scsi_pt.c
+SCSI_PT_DEFAULT_TIMEOUT	opt_pt.h
 
 # Options used only in pci/ncr.c
 SCSI_NCR_DEBUG		opt_ncr.h
@@ -185,9 +191,11 @@ SCSI_ISP_NO_NVRAM_MASK	opt_isp.h
 SCSI_ISP_PREFER_MEM_MAP	opt_isp.h
 SCSI_ISP_FABRIC		opt_isp.h
 SCSI_ISP_SCCLUN		opt_isp.h
+SCSI_ISP_FCDUPLEX	opt_isp.h
 ISP_DISABLE_1020_SUPPORT	opt_isp.h
 ISP_DISABLE_1080_SUPPORT	opt_isp.h
 ISP_DISABLE_2100_SUPPORT	opt_isp.h
+ISP_DISABLE_2200_SUPPORT	opt_isp.h
 
 # Resource limits.
 DFLDSIZ			opt_rlimit.h
@@ -350,14 +358,26 @@ NFS_MUIDHASHSIZ		opt_nfs.h
 NFS_NOSERVER		opt_nfs.h
 NFS_DEBUG		opt_nfs.h
 
-# give bktr an opt_bktr.h file
-OVERRIDE_CARD		opt_bktr.h
-OVERRIDE_TUNER		opt_bktr.h
-OVERRIDE_DBX		opt_bktr.h
-OVERRIDE_MSP		opt_bktr.h
-BROOKTREE_SYSTEM_DEFAULT opt_bktr.h
-BKTR_USE_PLL		opt_bktr.h
-
+# For the Bt848/Bt848A/Bt849/Bt878/Bt879 driver
+OVERRIDE_CARD		opt_bktr.h	#Override the bootup card detection
+OVERRIDE_TUNER		opt_bktr.h	#Override the bootup tuner detection
+OVERRIDE_DBX		opt_bktr.h	#Override the bootup DBX detection
+OVERRIDE_MSP		opt_bktr.h	#Override the bootup MSP detection
+BROOKTREE_SYSTEM_DEFAULT opt_bktr.h	#Set to BROOKTREE_PAL or BROOKTREE_NTSC
+					#can prevent hang with Captivator card
+BKTR_USE_PLL		opt_bktr.h	#Use PLL mode for PAL users
+					#handy for newer bt878 cards for PAL
+BKTR_GPIO_ACCESS	opt_bktr.h	#Enable IOCTLs which give user level
+					#access to the GPIO port.
+BKTR_NO_MSP_RESET	opt_bktr.h	#Prevent MSP34xx reset. Handy if you
+					#initialise the chip in another OS first
+BKTR_430_FX_MODE	opt_bktr.h	#Switch Bt878 cards into Intel 430FX
+					#chipset compatibility mode
+BKTR_SIS_VIA_MODE	opt_bktr.h	#Switch Bt878 cards into SIS/VIA chipset
+					#compatibility mode. Good for older
+					#SiS/VIA chipsets, older OPTi chipsets
+					#and those with bad PCI 2.1 support.
+					#As a rough guess, old = before mid 1998
 
 # meteor opt_meteor.h
 METEOR_ALLOC_PAGES	opt_meteor.h
@@ -373,11 +393,21 @@ SIMOS			opt_simos.h
 BUS_DEBUG		opt_bus.h
 
 # options for USB support
+UHCI_DEBUG		opt_usb.h
+OHCI_DEBUG		opt_usb.h
 USB_DEBUG		opt_usb.h
-USBVERBOSE		opt_usb.h
+UGEN_DEBUG		opt_usb.h 
+UHID_DEBUG		opt_usb.h
+UHUB_DEBUG		opt_usb.h
+UKBD_DEBUG		opt_usb.h
+ULPT_DEBUG		opt_usb.h
+UMS_DEBUG		opt_usb.h
 
 # Vinum options
 VINUMDEBUG		opt_vinum.h
 
 # Include LKM compatability module
 LKM
+
+# Embedded system options
+INIT_PATH		opt_init_path.h

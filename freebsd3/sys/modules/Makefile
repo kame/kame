@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.47.2.2 1999/04/24 03:10:59 obrien Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.47.2.3 1999/08/29 16:27:04 peter Exp $
 
 # XXX present but broken: ip_mroute_mod
 # XXX not yet completed porting: acd

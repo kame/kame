@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $Id: in.h,v 1.38.2.1 1999/05/04 16:23:55 luigi Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.38.2.3 1999/08/29 16:29:34 peter Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -373,6 +373,7 @@ struct ip_opts {
 #define IP_FW_ZERO    		53   /* clear single/all firewall counter(s) */
 #define IP_FW_GET     		54   /* get entire firewall rule chain */
 #define IP_NAT			55   /* set/get NAT opts */
+#define IP_FW_RESETLOG		56   /* reset logging counters */
 
 #define	IP_DUMMYNET_CONFIGURE	60   /* add/configure a dummynet pipe */
 #define	IP_DUMMYNET_DEL		61   /* delete a dummynet pipe from chain */

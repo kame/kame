@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $Id: if_ethersubr.c,v 1.54 1999/01/12 12:07:00 eivind Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.54.2.1 1999/08/29 16:28:17 peter Exp $
  */
 #ifdef ALTQ
 #include "opt_altq.h"

@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- *	$Id: tcp_subr.c,v 1.49.2.1 1999/02/04 06:40:28 msmith Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.49.2.4 1999/08/29 16:29:55 peter Exp $
  */
 
 #include "opt_compat.h"
@@ -74,6 +74,7 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/domain.h>
+#include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
@@ -775,10 +776,15 @@ tcp_pcblist SYSCTL_HANDLER_ARGS
 		inp = inp_list[i];
 		if (inp->inp_gencnt <= gencnt) {
 			struct xtcpcb xt;
+			caddr_t inp_ppcb;
 			xt.xt_len = sizeof xt;
 			/* XXX should avoid extra copy */
 			bcopy(inp, &xt.xt_inp, sizeof *inp);
-			bcopy(inp->inp_ppcb, &xt.xt_tp, sizeof xt.xt_tp);
+			inp_ppcb = inp->inp_ppcb;
+			if (inp_ppcb != NULL)
+				bcopy(inp_ppcb, &xt.xt_tp, sizeof xt.xt_tp);
+			else
+				bzero((char *) &xt.xt_tp, sizeof xt.xt_tp);
 			if (inp->inp_socket)
 				sotoxsocket(inp->inp_socket, &xt.xt_socket);
 			error = SYSCTL_OUT(req, &xt, sizeof xt);
@@ -805,6 +811,42 @@ tcp_pcblist SYSCTL_HANDLER_ARGS
 
 SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
 	    tcp_pcblist, "S,xtcpcb", "List of active TCP connections");
+
+static int
+tcp_getcred SYSCTL_HANDLER_ARGS
+{
+	struct sockaddr_in addrs[2];
+	struct inpcb *inp;
+	int error, s;
+
+	error = suser(req->p->p_ucred, &req->p->p_acflag);
+	if (error)
+		return (error);
+
+	if (req->newlen != sizeof(addrs))
+		return (EINVAL);
+	if (req->oldlen != sizeof(struct ucred))
+		return (EINVAL);
+	error = SYSCTL_IN(req, addrs, sizeof(addrs));
+	if (error)
+		return (error);
+	s = splnet();
+	inp = in_pcblookup_hash(&tcbinfo, addrs[1].sin_addr, addrs[1].sin_port,
+				addrs[0].sin_addr, addrs[0].sin_port, 0);
+	if (!inp || !inp->inp_socket || !inp->inp_socket->so_cred) {
+		error = ENOENT;
+		goto out;
+	}
+	error = SYSCTL_OUT(req, inp->inp_socket->so_cred->pc_ucred,
+		sizeof(struct ucred));
+
+out:
+	splx(s);
+	return (error);
+}
+
+SYSCTL_PROC(_net_inet_tcp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW, 0, 0,
+    tcp_getcred, "S,ucred", "Get the ucred of a TCP connection");
 
 void
 tcp_ctlinput(cmd, sa, vip)

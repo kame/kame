@@ -1,3 +1,4 @@
+# $FreeBSD: src/sys/conf/files,v 1.190.2.12 1999/09/11 15:46:07 gibbs Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -196,6 +197,7 @@ dev/vinum/vinumioctl.c		optional vinum device-driver
 dev/vinum/vinumlock.c		optional vinum device-driver
 dev/vinum/vinummemory.c		optional vinum device-driver
 dev/vinum/vinumparser.c		optional vinum device-driver
+dev/vinum/vinumraid5.c		optional vinum device-driver
 dev/vinum/vinumrequest.c	optional vinum device-driver
 dev/vinum/vinumrevive.c		optional vinum device-driver
 dev/vinum/vinumstate.c		optional vinum device-driver
@@ -397,6 +399,7 @@ net/if.c		standard
 net/if_atmsubr.c	optional atm
 net/if_disc.c		optional disc
 net/if_ethersubr.c	optional ether
+net/if_iso88025subr.c	optional token
 net/if_fddisubr.c	optional fddi
 net/if_loop.c		optional loop
 net/if_media.c		standard
@@ -599,6 +602,7 @@ nfs/krpc_subr.c		optional bootp
 pccard/pccard.c		optional card
 pccard/pccard_beep.c	optional card
 pccard/pcic.c		optional pcic device-driver
+pci/amd.c		optional amd device-driver
 pci/pcic_p.c		optional pcic device-driver
 pci/adv_pci.c		optional adv device-driver
 pci/adw_pci.c		optional adw device-driver
@@ -609,6 +613,7 @@ pci/bt848_i2c.c		optional bktr device-driver
 pci/bt_pci.c		optional bt device-driver
 pci/dpt_pci.c		optional pci dpt device-driver
 pci/cy_pci.c		optional cy device-driver
+pci/if_al.c		optional al device-driver
 pci/if_ax.c		optional ax device-driver
 pci/if_de.c		optional de device-driver
 pci/if_ed_p.c		optional ed device-driver
@@ -619,6 +624,8 @@ pci/if_mx.c		optional mx device-driver
 pci/if_pn.c		optional pn device-driver
 pci/if_fpa.c		optional fpa device-driver
 pci/if_rl.c		optional rl device-driver
+pci/if_sf.c		optional sf device-driver
+pci/if_sk.c		optional sk device-driver
 pci/if_sr_p.c		optional sr device-driver
 pci/if_ti.c		optional ti device-driver
 pci/if_tl.c		optional tl device-driver
@@ -772,6 +779,7 @@ dev/usb/usbdi_util.c	optional usb device-driver
 dev/usb/usb_subr.c	optional usb device-driver
 dev/usb/usb_quirks.c	optional usb device-driver
 dev/usb/hid.c		optional usb device-driver
+dev/usb/uhub.c		optional usb device-driver
 # ordering in the list of drivers below is important and should
 # be the inverse of the wanted one (MAKE_SET)
 dev/usb/ugen.c		optional ugen device-driver
@@ -779,4 +787,3 @@ dev/usb/uhid.c		optional hid device-driver
 dev/usb/ums.c		optional ums device-driver
 dev/usb/ulpt.c		optional ulpt device-driver
 dev/usb/ukbd.c		optional ukbd device-driver
-dev/usb/uhub.c		optional uhub device-driver

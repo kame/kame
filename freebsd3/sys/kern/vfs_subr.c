@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $Id: vfs_subr.c,v 1.182.2.1 1999/02/19 17:46:00 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.182.2.3 1999/09/16 02:02:15 alfred Exp $
  */
 
 /*
@@ -487,6 +487,7 @@ getnewvnode(tag, mp, vops, vpp)
 		vp->v_socket = 0;
 		vp->v_writecount = 0;	/* XXX */
 		vp->v_maxio = 0;
+		vp->v_cache_dst_count = 0;
 	} else {
 		simple_unlock(&vnode_free_list_slock);
 		vp = (struct vnode *) zalloc(vnode_zone);

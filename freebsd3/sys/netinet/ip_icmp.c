@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- *	$Id: ip_icmp.c,v 1.33.2.1 1999/03/06 23:11:41 archie Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.33.2.2 1999/08/29 16:29:45 peter Exp $
  */
 
 #include "opt_inet.h"
