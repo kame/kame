@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.74 2001/09/23 12:40:33 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.75 2001/10/26 05:47:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.74 2001/09/23 12:40:33 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.75 2001/10/26 05:47:22 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -137,7 +137,6 @@ int	nifc;		/* number of valid ifc's */
 struct	ifc **index2ifc;
 int	nindex2ifc;
 struct	ifc *loopifcp = NULL;	/* pointing to loopback */
-int	loopifindex = 0;	/* ditto */
 fd_set	sockvec;	/* vector to select() for receiving */
 int	rtsock;		/* the routing socket */
 int	ripsock;	/* socket to send/receive RIP datagram */
@@ -376,7 +375,6 @@ main(argc, argv)
 		fatal("No loopback found");
 		/*NOTREACHED*/
 	}
-	loopifindex = loopifcp->ifc_index;
 	for (ifcp = ifc; ifcp; ifcp = ifcp->ifc_next)
 		ifrt(ifcp, 0);
 	filterconfig();
@@ -3083,7 +3081,7 @@ ifonly:
 		rrt->rrt_flags = RTF_UP | RTF_REJECT;
 		rrt->rrt_rflags = RRTF_AGGREGATE;
 		rrt->rrt_t = 0;
-		rrt->rrt_index = loopifindex;
+		rrt->rrt_index = loopifcp->ifc_index;
 #if 0
 		if (getroute(&rrt->rrt_info, &gw)) {
 #if 0
