@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1471 2001/01/09 07:51:50 itojun Exp $
+$KAME: CHANGELOG,v 1.1472 2001/01/09 15:21:15 itojun Exp $
 
 <200101>
+Wed Jan 10 00:19:59 JST 2001  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: fix SEGV on icmp6 redirect input.
+	  openbsd/netbsd only.  was introduced early Dec2000.
+
 Tue Jan  9 16:50:07 JST 2001  itojun@iijlab.net
 	* kame/libinet6/getaddrinfo.c: share getaddrinfo source code (again)
 	  across all platforms we have.  though we have a jumbo #ifdef at the
