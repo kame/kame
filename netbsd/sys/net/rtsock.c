@@ -530,6 +530,8 @@ rt_msg1(type, rtinfo)
 	register struct sockaddr *sa;
 	int len, dlen;
 
+	if (sizeof(struct rt_msghdr) > MHLEN)
+		panic("rt_msg1: assumption failed");
 	m = m_gethdr(M_DONTWAIT, MT_DATA);
 	if (m == 0)
 		return (m);
@@ -562,8 +564,8 @@ rt_msg1(type, rtinfo)
 		m->m_pkthdr.len = m->m_len = len;
 	}
 	m->m_pkthdr.rcvif = 0;
-	m_copyback(m, 0, datalen, data);
 	rtm = mtod(m, struct rt_msghdr *);
+	bzero(rtm, sizeof(*rtm));
 	for (i = 0; i < RTAX_MAX; i++) {
 		if ((sa = rtinfo->rti_info[i]) == NULL)
 			continue;
