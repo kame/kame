@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.108 2000/05/28 02:19:53 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.109 2000/05/28 12:06:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1946,7 +1946,7 @@ icmp6_reflect(m, off)
 	/*
 	 * If the incoming packet was addressed directly to us(i.e. unicast),
 	 * use dst as the src for the reply.
-	 * The IN6_IFF_NOTREADY case would be VERY rare, but is possible when
+	 * The IN6_IFF_NOTREADY case would be VERY rare, but is possible
 	 * (for example) when we encounter an error while forwarding procedure
 	 * destined to a duplicated address of ours.
 	 */
