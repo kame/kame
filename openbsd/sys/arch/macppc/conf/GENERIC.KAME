@@ -1,4 +1,4 @@
-include	"arch/i386/conf/GENERIC"
+include	"arch/macppc/conf/GENERIC"
 
 #option		ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
