@@ -735,9 +735,14 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 			if (verbose)
 				fprintf(ttyout, "Requesting %s\n", url);
 			fprintf(fin, "GET %s HTTP/1.1\r\n", path);
-			if (strchr(host, ':'))
-				fprintf(fin, "Host: [%s]:%s\r\n", host, port);
-			else
+			if (strchr(host, ':')) {
+				char *h, *p;
+				h = xstrdup(host);
+				if ((p = strchr(h, '%')) != NULL)
+					*p = '\0';
+				fprintf(fin, "Host: [%s]:%s\r\n", h, port);
+				free(h);
+			} else
 				fprintf(fin, "Host: %s:%s\r\n", host, port);
 			fprintf(fin, "Accept: */*\r\n");
 			if (uname(&unam) != -1) {
