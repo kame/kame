@@ -1,14 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1114 2000/07/09 12:52:52 itojun Exp $
+$Id: CHANGELOG,v 1.1115 2000/07/09 13:09:16 itojun Exp $
 
 <200006>
 Sun Jul  9 21:50:54 JST 2000  itojun@iijlab.net
-	* *bsd*/sys/netinet/tcp_input.c: be more cautious about tcp option
-	  length field.  drop bogus ones earlier.
+	* *bsd*/sys/netinet/tcp_input.c, kame/sys/netinet6/tcp6_input.c:
+	  be more cautious about tcp option length field.  drop bogus ones
+	  earlier.
 	  not sure if there is a real threat or not, but it seems that there's
 	  possibility for overrun/underrun (like non-NOP option with
-	  optlen > cnt).
+	  optlen > cnt).  the bug is from 4.4BSD.
 
 Sun Jul  9 13:39:22 JST 2000  itojun@iijlab.net
 	* libinet6/getaddrinfo.c: do not mistakenly accept empty scopeid.
