@@ -1,0 +1,48 @@
+/*
+ * draft-ietf-dhc-v6exts-10
+ */
+
+#ifndef __DHCP6OPT_H_DEFINED
+#define __DHCP6OPT_H_DEFINED
+
+#define OL6_N	-1
+#define OL6_16N	-2
+#define OL6_Z	-3
+
+#define OT6_NONE	0
+#define OT6_V6		1
+#define OT6_STR		2
+#define OT6_NUM		3
+
+struct dhcp6_opt {
+	u_int code;
+	int len;
+	char *name;
+	int type;
+};
+
+/* index to parameters */
+#define DH6T_CLIENT_ADV_WAIT		1	/* milliseconds */
+#define DH6T_DEFAULT_SOLICIT_HOPCOUNT	2	/* times */
+#define DH6T_SERVER_MIN_ADV_DELAY	3	/* milliseconds */
+#define DH6T_SERVER_MAX_ADV_DELAY	4	/* milliseconds */
+#define DH6T_REQUEST_MSG_MIN_RETRANS	5	/* retransmissions */
+#define DH6T_REPLY_MSG_TIMEOUT		6	/* milliseconds */
+#define DH6T_REPLY_MSG_RETRANS_INTERVAL	7	/* milliseconds */
+#define DH6T_RECONF_MSG_TIMEOUT		8	/* milliseconds */
+#define DH6T_RECONF_MSG_MIN_RETRANS	9	/* retransmissions */
+#define DH6T_RECONF_MSG_RETRANS_INTERVAL 10	/* milliseconds */
+#define DH6T_RECONF_MMSG_MIN_RESP	11	/* milliseconds */
+#define DH6T_RECONF_MMSG_MAX_RESP	12	/* milliseconds */
+#define DH6T_MIN_SOLICIT_DELAY		13	/* milliseconds */
+#define DH6T_MAX_SOLICIT_DELAY		14	/* milliseconds */
+#define DH6T_XID_TIMEOUT		15	/* milliseconds */
+
+extern struct dhcp6_opt *dh6o_pad;
+extern struct dhcp6_opt *dh6o_end;
+extern int dhcp6_param[];
+extern void dhcp6opttab_init __P((void));
+extern struct dhcp6_opt *dhcp6opttab_byname __P((char *));
+extern struct dhcp6_opt *dhcp6opttab_bycode __P((u_int));
+
+#endif /*__DHCP6OPT_H_DEFINED*/

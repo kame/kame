@@ -1,0 +1,94 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(dhcp6c.c)
+
+dnl Checks for programs.
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+AC_PROG_CC
+AC_PROG_CPP
+
+dnl Checks for libraries.
+AC_CHECK_LIB(c, kvm_open, [], [AC_CHECK_LIB(kvm, kvm_open)])
+AC_CHECK_LIB(mld, nlist)
+
+dnl pcap library
+CFLAGS="-I. $CFLAGS"
+AC_MSG_CHECKING(for pcap library/header)
+for dir in /usr/local/libpcap /usr/local/v6 /usr/local \
+		../libpcap* ../../libpcap*; do
+	ac_cv_pcap_lib=no
+	ac_cv_pcap_include=no
+	if test -d $dir -a -f $dir/libpcap.a; then
+		ac_cv_pcap_lib="$dir"
+	elif test -d $dir/lib -a -f $dir/lib/libpcap.a; then
+		ac_cv_pcap_lib="$dir/lib"
+	fi
+	if test -d $dir -a -f $dir/pcap.h; then
+		ac_cv_pcap_include="$dir"
+	elif test -d $dir/include -a -f $dir/include/pcap.h; then
+		ac_cv_pcap_include="$dir/include"
+	fi
+	if test "$ac_cv_pcap_lib" != "no" -a "$ac_cv_pcap_include" != "no"; then
+		LIBS="-L$ac_cv_pcap_lib $LIBS"
+		CFLAGS="-I$ac_cv_pcap_include $CFLAGS"
+		break
+	fi
+done
+if test "$ac_cv_pcap_lib" = "no" -a "$ac_cv_pcap_include" = "no"; then
+	AC_MSG_RESULT(no)
+else
+	AC_MSG_RESULT($ac_cv_pcap_lib and $ac_cv_pcap_include)
+fi
+AC_CHECK_LIB(pcap, pcap_lookupdev, [],
+	[echo "Fatal: libpcap.a not found"
+	exit 1])
+AC_TRY_COMPILE([#include <pcap.h>], [], [], [dnl
+	echo "Fatal: pcap.h not found"
+	exit 1])
+
+AC_MSG_CHECKING(for getaddrinfo/getnameinfo library)
+AC_EGREP_CPP(yes,
+[#include <netinet/in.h>
+#ifdef __KAME__
+ yes
+#endif], [result=kame])
+AC_MSG_RESULT($result)
+case $result in
+kame)	CFLAGS="-DINET6 $CFLAGS"
+	o_LIBS="$LIBS"
+	LIBS="$LIBS -L/usr/local/v6/lib"
+	AC_CHECK_LIB(inet6, getaddrinfo, [], [LIBS="$o_LIBS"])
+	;;
+*)	;;
+esac
+
+AC_REPLACE_FUNCS(getaddrinfo)
+AC_REPLACE_FUNCS(getnameinfo)
+AC_CHECK_FUNCS(if_nametoindex)
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(fcntl.h sys/ioctl.h sys/time.h syslog.h unistd.h)
+AC_MSG_CHECKING(for socklen_t)
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <sys/socket.h>],
+	[socklen_t x;  x = 1; return x;],
+	[AC_MSG_RESULT(yes)],
+	[AC_MSG_RESULT(no)
+	AC_CHECK_TYPE(socklen_t, unsigned int)])
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+AC_STRUCT_TIMEZONE
+
+dnl Checks for library functions.
+AC_FUNC_GETPGRP
+AC_PROG_GCC_TRADITIONAL
+AC_FUNC_SETPGRP
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(mktime select socket)
+
+AC_OUTPUT(Makefile)
