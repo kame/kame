@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.98 2001/08/16 12:19:15 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.99 2001/08/22 07:34:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -493,6 +493,10 @@ struct route_in6 {
 #define IPV6_RECVTCLASS		57 /* bool; recv traffic class values */
 #define IPV6_TCLASS		58 /* u_int8_t; send traffic class value */
 #define IPV6_AUTOFLOWLABEL	59 /* bool; attach flowlabel automagically */
+
+#ifdef __OpenBSD__
+#define IPV6_IPCOMP_LEVEL	60   /* int; compression */
+#endif
 
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
 
