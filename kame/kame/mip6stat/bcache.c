@@ -1,3 +1,5 @@
+/*	$KAME: bcache.c,v 1.6 2001/03/29 03:28:34 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -32,9 +34,6 @@
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
- *
- * $Id: bcache.c,v 1.5 2000/08/06 23:04:17 itojun Exp $
- *
  */
 
 #include <sys/types.h>

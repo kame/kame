@@ -1,3 +1,5 @@
+/*	$KAME: mip6config.c,v 1.9 2001/03/29 03:28:33 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -33,9 +35,6 @@
  *
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
- *
- * $Id: mip6config.c,v 1.8 2000/06/04 03:31:28 itojun Exp $
- *
  */
 
 #include <sys/types.h>

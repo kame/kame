@@ -1,3 +1,5 @@
+/*	$KAME: mip6stat.c,v 1.7 2001/03/29 03:28:34 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -36,9 +38,6 @@
  * TODO: This program should only print/clear automaticly created lists,
  *       like Binding cache, HA list, BU list. Other functions should be
  *       moved to config program.
- *
- * $Id: mip6stat.c,v 1.6 2000/06/04 03:31:29 itojun Exp $
- *
  */
 
 #include <sys/types.h>

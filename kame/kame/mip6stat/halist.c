@@ -1,3 +1,5 @@
+/*	$KAME: halist.c,v 1.4 2001/03/29 03:28:34 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -32,9 +34,6 @@
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
- *
- * $Id: halist.c,v 1.3 2000/08/06 23:08:39 itojun Exp $
- *
  */
 
 #include <sys/types.h>

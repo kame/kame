@@ -1,3 +1,5 @@
+/*	$KAME: utils.c,v 1.4 2001/03/29 03:28:33 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -33,9 +35,6 @@
  *
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
- *
- * $Id: utils.c,v 1.3 2000/02/09 16:02:20 itojun Exp $
- *
  */
 
 #include <sys/types.h>
