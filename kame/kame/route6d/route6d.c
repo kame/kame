@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.7 1999/12/21 12:18:56 jinmei Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.8 1999/12/30 08:48:24 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.7 1999/12/21 12:18:56 jinmei Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.8 1999/12/30 08:48:24 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1237,6 +1237,8 @@ ifconfig()
 		fatal("ioctl: SIOCGIFCONF");
 	i = ifconf.ifc_len;
 	while (1) {
+		char *newbuf;
+
 		ifconf.ifc_buf = buf;
 		ifconf.ifc_len = bufsiz;
 		if (ioctl(s, SIOCGIFCONF, (char *)&ifconf) < 0)
@@ -1245,8 +1247,11 @@ ifconfig()
 			break;
 		i = ifconf.ifc_len;
 		bufsiz *= 2;
-		if ((buf = (char *)realloc(buf, bufsiz)) == NULL)
+		if ((newbuf = (char *)realloc(buf, bufsiz)) == NULL) {
+			free(buf);
 			fatal("realloc");
+		}
+		buf = newbuf;
 	}
 	for (i = 0; i < ifconf.ifc_len; ) {
 		ifrp = (struct ifreq *)(buf + i);
