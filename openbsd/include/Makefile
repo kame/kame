@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.81 2000/03/10 22:04:18 niklas Exp $
+#	$OpenBSD: Makefile,v 1.86 2000/10/10 12:12:28 hugh Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -8,31 +8,36 @@
 
 # Missing: mp.h
 
-FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h ctype.h \
-	curses.h db.h dbm.h des.h dirent.h disktab.h elf_abi.h err.h fnmatch.h \
-	fstab.h fts.h glob.h grp.h ieeefp.h ifaddrs.h inttypes.h iso646.h \
-	kvm.h langinfo.h libgen.h limits.h locale.h malloc.h math.h md4.h \
-	md5.h memory.h mpool.h ndbm.h netdb.h netgroup.h nlist.h nl_types.h \
-	olf_abi.h paths.h poll.h pwd.h ranlib.h re_comp.h regex.h resolv.h \
-	rmd160.h search.h setjmp.h sgtty.h sha1.h skipjack.h signal.h stab.h \
-	stdbool.h stddef.h stdio.h stdlib.h string.h strings.h struct.h sysexits.h \
-	tar.h time.h ttyent.h tzfile.h unistd.h utime.h utmp.h vis.h
+FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h \
+	ctype.h curses.h db.h dbm.h des.h dirent.h disktab.h elf_abi.h err.h \
+	fnmatch.h fstab.h fts.h glob.h grp.h ifaddrs.h inttypes.h \
+	iso646.h kvm.h langinfo.h libgen.h limits.h locale.h login_cap.h \
+	malloc.h math.h md4.h md5.h memory.h mpool.h ndbm.h netdb.h netgroup.h \
+	nlist.h nl_types.h olf_abi.h paths.h poll.h pwd.h ranlib.h re_comp.h \
+	regex.h resolv.h rmd160.h search.h setjmp.h sgtty.h sha1.h skipjack.h \
+	signal.h stab.h stdbool.h stddef.h stdio.h stdlib.h string.h strings.h \
+	struct.h sysexits.h tar.h time.h ttyent.h tzfile.h unistd.h utime.h \
+	utmp.h vis.h
 
 .if (${MACHINE_ARCH} != "alpha") && (${MACHINE_ARCH} != "mips") && \
 	(${MACHINE_ARCH} != "powerpc")
 FILES+=	dlfcn.h link.h
 .endif
 
+.if (${MACHINE_ARCH} != "vax")
+FILES+= ieeefp.h
+.endif
+
 MFILES=	float.h frame.h stdarg.h varargs.h
 LFILES=	errno.h fcntl.h syslog.h termios.h
 
-.if (${MACHINE_ARCH} == "mips")
+.if (${MACHINE_ARCH} == "mips" || ${MACHINE_ARCH} == "powerpc")
 MFILES+= link.h dlfcn.h
 .endif
 
 DIRS=	arpa protocols rpc rpcsvc
 LDIRS=	crypto ddb dev isofs miscfs net netatalk netccitt netinet \
-	netinet6 netipx netiso netns nfs scsi sys ufs uvm vm xfs
+	netinet6 netipx netiso netnatm netns nfs scsi sys ufs uvm vm xfs
 
 # Directories with an includes target
 RDIRS=	../lib/libc_r ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
@@ -58,7 +63,7 @@ NOOBJ=	noobj
 # Change SYS_INCLUDE in bsd.own.mk to "symlinks" if you don't want copies
 .include <bsd.own.mk>
 SYS_INCLUDE?=	copies
-.if (${KERBEROS} == "yes")
+.if (${KERBEROS:L} == "yes")
 RDIRS+=	../kerberosIV/lib
 PRDIRS+=../kerberosIV/lib/kadm ../kerberosIV/lib/krb
 .endif

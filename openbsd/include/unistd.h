@@ -1,4 +1,4 @@
-/*	$OpenBSD: unistd.h,v 1.31 2000/04/20 06:34:18 deraadt Exp $ */
+/*	$OpenBSD: unistd.h,v 1.33 2000/09/12 17:30:45 millert Exp $ */
 /*	$NetBSD: unistd.h,v 1.26.4.1 1996/05/28 02:31:51 mrg Exp $	*/
 
 /*-
@@ -85,6 +85,7 @@ pid_t	 getpgrp __P((void));
 pid_t	 getpid __P((void));
 pid_t	 getpgid __P((pid_t));
 pid_t	 getppid __P((void));
+pid_t	 getsid __P((pid_t));
 uid_t	 getuid __P((void));
 int	 isatty __P((int));
 int	 link __P((const char *, const char *));
@@ -132,6 +133,7 @@ void	 endusershell __P((void));
 int	 exect __P((const char *, char * const *, char * const *));
 int	 fchdir __P((int));
 int	 fchown __P((int, uid_t, gid_t));
+char	*fflagstostr __P((u_int32_t));
 int	 fsync __P((int));
 int	 ftruncate __P((int, off_t));
 int	 getdomainname __P((char *, size_t));
@@ -194,6 +196,7 @@ int	 setreuid __P((int, int));
 int	 setrgid __P((gid_t));
 int	 setruid __P((uid_t));
 void	 setusershell __P((void));
+int	 strtofflags __P((char **, u_int32_t *, u_int32_t *));
 void	 swab __P((const void *, void *, size_t));
 int	 swapon __P((const char *));
 int	 swapctl __P((int cmd, const void *arg, int misc));
