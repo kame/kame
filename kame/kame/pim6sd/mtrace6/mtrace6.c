@@ -223,6 +223,32 @@ mtrace_loop()
 	}
 }
 
+char *fwd_code[] = {"NOERR", "WRONGIF", "SPRUNE", "RPRUNE", "SCOPED", "NORT",
+		    "WRONGLH", "NOFWD", "RP", "RPFIF", "NOMC", "HIDDEN"};
+char *fwd_errcode[] = {"", "NOSPC", "OLD", "ADMIN"};
+
+static char *
+str_rflags(flag)
+	int flag;
+{
+	if (0x80 & flag) {	/* fatal error */
+		flag &= ~0x80;
+		if (flag >= sizeof(fwd_errcode) / sizeof(char *) ||
+		    flag == 0) {
+			warnx("unknown error code(%d)", flag);
+			return("UNKNOWN");
+		}
+		return(fwd_errcode[flag]);
+	}
+
+	/* normal code */
+	if (flag >= sizeof(fwd_code) / sizeof(char *)) {
+		warnx("unknown forward code(%d)", flag);
+		return("UNKNOWN");
+	}
+	return(fwd_code[flag]);
+}
+
 static void
 show_ip6_result(from6, datalen)
 	struct sockaddr_in6 *from6;
@@ -281,7 +307,9 @@ show_ip6_result(from6, datalen)
 			       pr_addr((struct sckaddr *)&sa_upstream),
 			       ntohl(rp->tr_inifid), ntohl(rp->tr_outifid));
 			/* multicast routing protocol type */
-			printf("%s", proto_type(rp->tr_rproto));
+			printf("%s ", proto_type(rp->tr_rproto));
+			/* forwarding error code */
+			printf("%s", str_rflags(rp->tr_rflags & 0xff));
 
 			putchar('\n');
 		}
