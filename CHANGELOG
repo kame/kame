@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1303 2000/09/29 03:13:34 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1304 2000/09/30 15:10:04 itojun Exp $
 
 <200009>
+Sun Sep 30 JST 2000  itojun@iijlab.net
+	* racoon: disable rc5/idea support by default, due to patent twists.
+
 Fri Sep 29 12:12:16 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/fetchmail: upgrade to 5.5.3.
 	* freebsd3/ports/lftp: upgrade to 2.3.2.
