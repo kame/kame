@@ -1,3 +1,5 @@
+/*	$KAME: gifconfig.c,v 1.6 2000/05/13 07:27:59 itojun Exp $	*/
+
 /*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -530,7 +532,7 @@ status()
 			}
 		} else for (p = afs; p->af_name; p++) {
 			if (p->af_af == info.rti_info[RTAX_IFA]->sa_family &&
-			    p->af_status != ether_status) 
+			    p->af_status != ether_status)
 				(*p->af_status)(0);
 		}
 	}
@@ -571,7 +573,7 @@ phys_status(force)
 
 	if (0 <= ioctl(s, srccmd, (caddr_t)ifrp)) {
 		getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
-			    hostname, NI_MAXHOST, 0, 0, flags);
+			    hostname, sizeof(hostname), 0, 0, flags);
 #ifdef INET6
 		if (ifrp->ifr_addr.sa_family == AF_INET6)
 			ver = "6";
@@ -580,7 +582,7 @@ phys_status(force)
 	}
 	if (0 <= ioctl(s, dstcmd, (caddr_t)ifrp)) {
 		getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
-			    hostname, NI_MAXHOST, 0, 0, flags);
+			    hostname, sizeof(hostname), 0, 0, flags);
 		sprintf(pdstaddr, "%s", hostname);
 	}
 	printf("\tphysical address %s --> %s\n", psrcaddr, pdstaddr);
@@ -658,7 +660,7 @@ in6_status(force)
 	}
 #endif
 	getnameinfo((struct sockaddr *)sin, sin->sin6_len,
-		    hostname, NI_MAXHOST, 0, 0, niflags);
+		    hostname, sizeof(hostname), 0, 0, niflags);
 	printf("\tinet6 %s ", hostname);
 
 	if (flags & IFF_POINTOPOINT) {
@@ -678,7 +680,7 @@ in6_status(force)
 			}
 #endif
 			getnameinfo((struct sockaddr *)sin, sin->sin6_len,
-				    hostname, NI_MAXHOST, 0, 0, flags);
+				    hostname, sizeof(hostname), 0, 0, flags);
 			printf("--> %s ", hostname);
 		}
 	}
