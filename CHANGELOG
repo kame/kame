@@ -1,12 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2252 2002/10/16 15:23:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2253 2002/10/17 09:09:22 jinmei Exp $
 
 <200210>
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* netbsd/sys/net/route.h: used padding in the route structure
 	instead of using sockaddr_storage.  (See the change on Oct 7 below.)
-	* netbsd/sys/netiso: backed out considerations about
-	NEW_STRUCT_ROUTE cases, since there is no compatibility issue with
 	the change above.
 
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
