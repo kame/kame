@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfctl.c,v 1.177 2003/06/13 12:10:42 cedric Exp $ */
+/*	$OpenBSD: pfctl.c,v 1.179 2003/07/03 09:13:06 cedric Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -49,7 +49,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include "pfctl_parser.h"
 #include "pfctl.h"
@@ -919,10 +918,13 @@ pfctl_rules(int dev, char *filename, int opts, char *anchorname,
 	struct pfioc_rule	pr[PF_RULESET_MAX];
 	struct pfioc_altq	pa;
 	struct pfctl		pf;
+	struct pfr_buffer	ab;
 	int			i;
 
 	memset(&pa, 0, sizeof(pa));
 	memset(&pf, 0, sizeof(pf));
+	memset(&ab, 0, sizeof(ab));
+	ab.pfrb_type = PFRB_ADDRS;
 	for (i = 0; i < PF_RULESET_MAX; i++) {
 		memset(&pr[i], 0, sizeof(pr[i]));
 		memcpy(pr[i].anchor, anchorname, sizeof(pr[i].anchor));
@@ -971,6 +973,7 @@ pfctl_rules(int dev, char *filename, int opts, char *anchorname,
 	pf.opts = opts;
 	pf.loadopt = loadopt;
 	pf.paltq = &pa;
+	pf.ab = &ab;
 	for (i = 0; i < PF_RULESET_MAX; i++) {
 		pf.prule[i] = &pr[i];
 	}
@@ -1512,8 +1515,6 @@ main(int argc, char *argv[])
 		case 'T':
 			pfctl_show_tables(anchorname, rulesetname, opts);
 			break;
-		default:
-			assert(0);
 		}
 	}
 
@@ -1545,8 +1546,6 @@ main(int argc, char *argv[])
 		case 'T':
 			pfctl_clear_tables(anchorname, rulesetname, opts);
 			break;
-		default:
-			assert(0);
 		}
 	}
 	if (state_killers)
@@ -1577,8 +1576,6 @@ main(int argc, char *argv[])
 		case 'm':
 			pfctl_debug(dev, PF_DEBUG_MISC, opts);
 			break;
-		default:
-			assert(0);
 		}
 	}
 
