@@ -44,7 +44,7 @@ devpath=/dev
 # altq uses character device major number 96 (defined in sys/net/altq_conf.c).
 # minors assigned as follows:
 #	0:(reserved) 1:cbq 2:wfq 3:afmap 4:fifoq 5:red 6:rio 7:localq 8:hfsc
-#	9:cdnr
+#	9:cdnr 10:blue 11:priq
 #
 osname=`uname -sm`
 case ${osname} in
