@@ -55,7 +55,6 @@ static int foreground = 0;
 
 int main __P((int, char **));
 static void usage __P((void));
-static void sighandler __P((int));
 
 int
 main(argc, argv)
@@ -168,7 +167,7 @@ main(argc, argv)
 			/*NOTREACHED*/
 		}
 
-	signal(SIGPIPE, sighandler);
+	signal(SIGPIPE, SIG_IGN);
 
 	event_init();
 	for (i = 0; i < smax; i++) {
@@ -209,12 +208,4 @@ logmsg(int level, const char *msg, ...)
 	} else
 		vsyslog(level, msg, ap);
 	va_end(ap);
-}
-
-static void
-sighandler(sig)
-	int sig;
-{
-
-	logmsg(LOG_WARNING, "got signal %d", sig);
 }
