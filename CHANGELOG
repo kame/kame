@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1029 2000/06/15 20:04:27 itojun Exp $
+$Id: CHANGELOG,v 1.1030 2000/06/16 01:45:51 itojun Exp $
 
 <200006>
 Fri Jun 16 05:01:24 JST 2000  itojun@iijlab.net
@@ -8,7 +8,12 @@ Fri Jun 16 05:01:24 JST 2000  itojun@iijlab.net
 	  limitation: if you configure gif interface, kernel does not compile.
 	  this is because OpenBSD integrates gif into OpenBSD IPsec tunnel
 	  code.  we will need to resolve it.
-	  TODO: userland cleanup.  tests.
+	  TODO: userland cleanup.  tests (i386/conf/GENERIC.KAME compiles but
+	  not tested).
+
+	  If you wish to upgrade to KAME-on-OpenBSD 2.7, make sure to
+	  perform "make clean" at the top level to nuke symlinks, like:
+	  % make TARGET=openbsd clean update prepare
 
 Thu Jun 15 22:41:16 JST 2000  itojun@iijlab.net
 	* kame/sys/netkey/key.c: correct compilation without IPSEC_ESP.
