@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.127 2004/06/17 06:22:27 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.128 2004/06/17 06:41:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -134,6 +134,9 @@ static char *conffile = DHCP6S_CONF;
 static char *rmsgctlbuf;
 static struct duid server_duid;
 static struct dhcp6_list arg_dnslist;
+
+static inline int get_val32 __P((char **, int *, u_int32_t *));
+static inline int get_val __P((char **, int *, void *, size_t));
 
 static void usage __P((void));
 static void server6_init __P((void));
@@ -594,6 +597,49 @@ server6_mainloop()
 	}
 }
 
+static inline int
+get_val32(bpp, lenp, valp)
+	char **bpp;
+	int *lenp;
+	u_int32_t *valp;
+{
+	char *bp = *bpp;
+	int len = *lenp;
+	u_int32_t i32;
+
+	if (len < sizeof(*valp))
+		return (-1);
+
+	memcpy(&i32, bp, sizeof(i32));
+	*valp = ntohl(i32);
+
+	*bpp = bp + sizeof(*valp);
+	*lenp = len - sizeof(*valp);
+
+	return (0);
+}
+
+static inline int
+get_val(bpp, lenp, valp, vallen)
+	char **bpp;
+	int *lenp;
+	void *valp;
+	size_t vallen;
+{
+	char *bp = *bpp;
+	int len = *lenp;
+
+	if (len < vallen)
+		return (-1);
+
+	memcpy(valp, bp, vallen);
+
+	*bpp = bp + vallen;
+	*lenp = len - vallen;
+
+	return (0);
+}
+
 static int
 server6_do_command(buf, len)
 	char *buf;
@@ -601,17 +647,17 @@ server6_do_command(buf, len)
 {
 	struct dhcp6ctl *ctlhead;
 	struct dhcp6ctl_iaspec iaspec;
-	u_int16_t command, commandlen, version;
+	u_int16_t command, version;
 	u_int32_t p32, iaid, duidlen;
 	struct duid duid;
 	struct dhcp6_binding *binding;
-	int minlen;
+	int commandlen;
 	char *bp;
 
 	ctlhead = (struct dhcp6ctl *)buf;
 
 	command = ntohs(ctlhead->command);
-	commandlen = ntohs(ctlhead->len);
+	commandlen = (int)(ntohs(ctlhead->len));
 	version = ntohs(ctlhead->version);
 	if (len != commandlen + sizeof(struct dhcp6ctl)) {
 		dprintf(LOG_ERR, FNAME,
@@ -634,44 +680,35 @@ server6_do_command(buf, len)
 		server6_reload();
 		break;
 	case DHCP6CTL_COMMAND_REMOVE:
-		minlen = 8 + sizeof(iaspec);
-		if (commandlen < minlen) {
-			dprintf(LOG_INFO, FNAME, "control command too short "
-			    "(%d bytes)", commandlen);
-			return (DHCP6CTL_R_FAILURE);
-		}
 		bp = buf + sizeof(*ctlhead);
-		memcpy(&p32, bp, sizeof(bp));
-		p32 = ntohl(p32);
+
+		if (get_val32(&bp, &commandlen, &p32))
+			return (DHCP6CTL_R_FAILURE);
 		if (p32 != DHCP6CTL_BINDING) {
 			dprintf(LOG_INFO, FNAME,
 			    "unknown remove target: %ul", p32);
-			return (DHCP6CTL_R_FAILURE);
 		}
-		bp += sizeof(p32);
 
-		memcpy(&p32, bp, sizeof(bp));
-		p32 = ntohl(p32);
+		if (get_val32(&bp, &commandlen, &p32))
+			return (DHCP6CTL_R_FAILURE);
 		if (p32 != DHCP6CTL_BINDING_IA) {
 			dprintf(LOG_INFO, FNAME, "unknown binding type: %ul",
 			    p32);
 			return (DHCP6CTL_R_FAILURE);
 		}
-		bp += sizeof(p32);
 
-		memcpy(&iaspec, bp, sizeof(iaspec));
+		if (get_val(&bp, &commandlen, &iaspec, sizeof(iaspec)))
+			return (DHCP6CTL_R_FAILURE);
 		if (ntohl(iaspec.type) != DHCP6CTL_IA_PD) {
 			dprintf(LOG_INFO, FNAME, "unknown IA type: %ul",
 			    ntohl(iaspec.type));
 			return (DHCP6CTL_R_FAILURE);
 		}
-		bp += sizeof(iaspec);
-
 		iaid = ntohl(iaspec.id);
 		duidlen = ntohl(iaspec.duidlen);
 
-		if (duidlen + minlen != commandlen) {
-			dprintf(LOG_INFO, FNAME, "ill-formated command");
+		if (duidlen > commandlen) {
+			dprintf(LOG_INFO, FNAME, "DUID length mismatch");
 			return (DHCP6CTL_R_FAILURE);
 		}
 
@@ -690,7 +727,7 @@ server6_do_command(buf, len)
 	default:
 		dprintf(LOG_INFO, FNAME,
 		    "unknown control command: %d (len=%d)",
-		    (int)command, (int)commandlen);
+		    (int)command, commandlen);
 		return (DHCP6CTL_R_FAILURE);
 		break;
 	}
