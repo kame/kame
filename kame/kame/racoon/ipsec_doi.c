@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.151 2001/12/12 18:23:42 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.152 2001/12/13 04:43:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2806,6 +2806,8 @@ ipsecdoi_setph2proposal(iph2)
 			if (iph2->sa == NULL) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to allocate my sa buffer\n");
+				if (q)
+					vfree(q);
 				return -1;
 			}
 			memcpy(iph2->sa->v + iph2->sa->l - q->l, q->v, q->l);
