@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.57 2001/11/13 12:38:46 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.58 2001/11/15 04:44:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -329,15 +329,17 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 		char zonebuf[MAXHOSTNAMELEN];
 		int zonelen;
 
-		zonelen = ip6_sa2str((const struct sockaddr_in6 *)sa,
-				      zonebuf, sizeof(zonebuf), flags);
+		zonelen = ip6_sa2str(
+		    (const struct sockaddr_in6 *)(const void *)sa,
+		    zonebuf, sizeof(zonebuf), flags);
 		if (zonelen < 0)
 			return EAI_MEMORY;
 		if (zonelen + 1 + numaddrlen + 1 > hostlen)
 			return EAI_MEMORY;
 
 		/* construct <numeric-addr><delim><zoneid> */
-		memcpy(host + numaddrlen + 1, zonebuf, zonelen);
+		memcpy(host + numaddrlen + 1, zonebuf,
+		    (size_t)zonelen);
 		host[numaddrlen] = SCOPE_DELIMITER;
 		host[numaddrlen + 1 + zonelen] = '\0';
 	}
