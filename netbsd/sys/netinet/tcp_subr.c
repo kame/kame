@@ -262,7 +262,13 @@ tcp_template(tp)
 	if (hlen + sizeof(struct tcphdr) > MCLBYTES)
 		panic("mclbytes too small for t_template");
 #endif
-	if ((m = tp->t_template) == 0) {
+	m = tp->t_template;
+	if (m && m->m_len == hlen + sizeof(struct tcphdr))
+		;
+	else {
+		if (m)
+			m_freem(m);
+		m = tp->t_template = NULL;
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
 		if (m && hlen + sizeof(struct tcphdr) > MHLEN) {
 			MCLGET(m, M_DONTWAIT);
