@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.1 2000/03/06 04:39:07 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.2 2000/03/06 06:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -165,7 +165,7 @@ stfattach(dummy)
 		sc->sc_if.if_unit = i;
 #endif
 		sc->sc_if.if_mtu    = IPV6_MMTU;
-		sc->sc_if.if_flags  = IFF_MULTICAST;
+		sc->sc_if.if_flags  = 0;
 		sc->sc_if.if_ioctl  = stf_ioctl;
 		sc->sc_if.if_output = stf_output;
 		sc->sc_if.if_type   = IFT_STF;
