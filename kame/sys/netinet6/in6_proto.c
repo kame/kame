@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.110 2001/12/07 07:07:09 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.111 2001/12/21 03:32:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,6 +182,11 @@
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
+
+#include "gif.h"
+#if NGIF > 0
+#include <netinet6/in6_gif.h>
+#endif
 
 #ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
@@ -516,11 +521,6 @@ int	ip6_hdrnestlimit = 50;	/* appropriate? */
 int	ip6_dad_count = 1;	/* DupAddrDetectionTransmits */
 u_int32_t ip6_flow_seq;
 int	ip6_auto_flowlabel = 1;
-#if NGIF > 0
-int	ip6_gif_hlim = GIF_HLIM;
-#else
-int	ip6_gif_hlim = 0;
-#endif
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec. */

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.74 2001/12/20 13:59:13 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.75 2001/12/21 03:32:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -298,7 +298,6 @@ extern int	ip6_defhlim;		/* default hop limit */
 extern int	ip6_defmcasthlim;	/* default multicast hop limit */
 extern int	ip6_forwarding;		/* act as router? */
 extern int	ip6_forward_srcrt;	/* forward src-routed? */
-extern int	ip6_gif_hlim;		/* Hop limit for gif encap packet */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
 					 * walk list every 5 sec.    */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.h,v 1.9 2001/08/22 10:56:05 itojun Exp $	*/
+/*	$KAME: in6_gif.h,v 1.10 2001/12/21 03:32:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #define _NETINET6_IN6_GIF_H_
 
 #define GIF_HLIM	30
+extern int	ip6_gif_hlim;		/* Hop limit for gif encap packet */
 
 struct gif_softc;
 struct sockaddr;
