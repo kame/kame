@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1511 2001/01/25 16:41:07 itojun Exp $
+$KAME: CHANGELOG,v 1.1512 2001/01/27 06:34:31 jinmei Exp $
 
 <200101>
+2001-01-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c: obsoleted EAI_ADDRFAMILY and
+	EAI_NODATA according to the rfc2553bis-02 draft.
+	* {bsdi3, freebsd4}/include/netdb.h:
+	* bsdi4/contrib/bind/src/include/netdb.h:
+	removed the definition of the obsoleted error types. In order to
+	minimize the possibility of binary compatibily breakage, we did
+	not reorder the error number sequence.
+
 Fri Jan 26 00:12:48 JST 2001  itojun@iijlab.net
 	* bsdi3: support ART routing table lookup algorithm.
 	* bsdi4: support ART routing table lookup algorithm.  inet6 only
