@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1971 2001/11/07 14:15:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.1972 2001/11/07 15:37:02 fujisawa Exp $
 
 <200111>
+2001-11-08 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/kame/natptconfig/{cfparse,yylex}.[cy]:
+	- Keyword "proto" is necessary before protocol when you write
+	  protocol dependant rule.  It is written that "proto" is
+	  necessary in man page, and "natptconfig show rules" command
+	  also indicates "proto".
+
 2001-11-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa): when a user (perhaps
 	mistakenly) tried to install an IPv6 address with 0 valid
