@@ -1,4 +1,4 @@
-@comment $NetBSD$
+@comment $NetBSD: PLIST,v 1.1.1.1 1999/11/29 08:06:33 itojun Exp $
 libexec/smtpfeed
 share/doc/smtpfeed/COPYRIGHT
 share/doc/smtpfeed/FEATURES

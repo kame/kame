@@ -1,4 +1,4 @@
-$NetBSD$
+$NetBSD: patch-aa,v 1.1.1.1 1999/11/29 08:06:32 itojun Exp $
 
 --- Makefile.in.orig	Sun Jan 18 23:02:21 1998
 +++ Makefile.in	Sun Jan 18 23:02:34 1998

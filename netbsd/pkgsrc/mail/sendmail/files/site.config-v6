@@ -1,0 +1,3 @@
+PREPENDDEF(`confENVDEF', ``-DNETINET6=1'')
+APPENDDEF(`confLIBS', ``-linet6'')
+PREPENDDEF(`confLIBDIRS', ``-L/usr/local/v6/lib'')

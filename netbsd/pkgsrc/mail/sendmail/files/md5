@@ -1,3 +1,4 @@
-MD5 (sendmail.8.9.1.tar.gz) = ff2af12abd17b8f2cbf456ca415f5d5b
-MD5 (sendmail.8.9.1a.patch) = 30c667434afe57b488cf02c84b5c0075
-MD5 (sendmail891+3.1W.patch.gz) = 1eef9bc092f8682eb152678fb158c721
+$NetBSD: md5,v 1.2 2000/01/02 17:46:47 itojun Exp $
+
+MD5 (sendmail.8.9.3.tar.gz) = efedacfbce84a71d1cfb0e617b84596e
+MD5 (sendmail893+3.2W.patch.gz) = 77e2183c40e304a2b1410a5bb041cd46

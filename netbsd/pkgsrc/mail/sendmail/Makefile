@@ -1,55 +1,85 @@
-# New ports collection makefile for:    sendmail6
-# Version required:	8.9.x+IPv6 patch x
-# Date created:		1 Oct 1997
-# Whom:			itojun@itojun.org
-#
-# $Id: Makefile,v 1.4 1999/11/02 09:01:35 itojun Exp $
-#
+# $NetBSD: Makefile,v 1.12 2000/01/09 01:29:07 wiz Exp $
 
-DISTNAME=	sendmail.${SENDMAILVER}
-PKGNAME=	sendmail6-${SENDMAILVER}${PATCHVER}
+DISTNAME=	sendmail.8.9.3
+PKGNAME=	sendmail-8.9.3
 CATEGORIES=	mail
-MASTER_SITES=	ftp://ftp.kyoto.wide.ad.jp/pub/mail/smtpfeed/ \
-		ftp://ftp.kyoto.wide.ad.jp/pub/mail/sendmail/ \
-		ftp://ftp.sendmail.org/pub/sendmail/
-DISTFILES=	${DISTNAME}${EXTRACT_SUFX}
-EXTRACT_ONLY=	${DISTNAME}${EXTRACT_SUFX}
+MASTER_SITES=	ftp://ftp.sendmail.org/pub/sendmail/ \
+		ftp://ftp.cert.dfn.de/pub/tools/net/sendmail/ \
+		ftp://ftp.kyoto.wide.ad.jp/pub/mail/sendmail/
 
-PATCH_SITES=	${MASTER_SITES}
-#PATCHFILES+=	sendmail.${SENDMAILVER}${PATCHVER}.patch
-PATCHFILES+=	sendmail${WIDEPATCHVER}.patch.gz
+PATCH_SITES=	ftp://ftp.kyoto.wide.ad.jp/pub/mail/sendmail/
+PATCHFILES=	sendmail893+3.2W.patch.gz
+PATCH_DIST_ARGS=-d ${WRKSRC}/src -E ${PATCH_DIST_STRIP}
+.if !(defined(PATCH_DEBUG) || defined(PKG_VERBOSE))
+PATCH_DIST_ARGS+=--forward --quiet
+.endif
 
-# ipsec hack
-#MASTER_SITES+=	ftp://ftp.kame.net/pub/kame/misc/
-#IPSECHACK=	sendmail.893+W3.2.kame-ipsec.19990521.diff.gz
-#DISTFILES+=	${IPSECHACK}
+MAINTAINER=	packages@netbsd.org
+HOMEPAGE=	http://www.sendmail.org/
 
-MAINTAINER=	itojun@itojun.org
+LICENSE=	no-profit
 
-SENDMAILVER=	8.9.3
-#PATCHVER=	a
-WIDEPATCHVER=	893+3.2W
+NO_CONFIGURE=	yes
+MAKE_ENV+=	BSD_BINOWN="${BINOWN}" BSD_BINGRP="${BINGRP}" \
+		BSD_MANOWN="${MANOWN}" BSD_MANGRP="${MANGRP}"
 
-WRKSRC=		${WRKDIR}/sendmail-${SENDMAILVER}/src
+MESSAGE_FILE=	${WRKDIR}/MESSAGE
+WRKSRC=		${WRKDIR}/${PKGNAME}
+
+BUILD_DEFS+=    USE_INET6
+USE_INET6?=	YES
+CHOWN?=		chown
+
+.include "../../mk/bsd.prefs.mk"
+
+.if defined(USE_INET6) && ${USE_INET6} == YES
+MAKE_ENV+=	CONFIG="-f ${WRKSRC}/site.config-v6"
+.endif
+
+USE_DB2?=	NO
+
+.if ${USE_DB2} == YES
+DEPENDS+=	db-2.7.7:../../databases/db
+
+MAKE_ENV+=	DB_ENVDEF="-I${LOCALBASE}/include/db2" \
+		DB_LIBS="-L${LOCALBASE}/lib -ldb2"
+PLIST_SRC=	${WRKDIR}/PLIST
+.else
+MAKE_ENV+=	DB_ENVDEF="" DB_LIBS=""
+.endif
 
 post-patch:
-	${CAT} ${FILESDIR}/site.config.m4 >> ${WRKSRC}/site.config-v6.kame
-#	@(cd ${WRKSRC}/..; ${GUNZIP_CMD} -c ${DISTDIR}/${IPSECHACK} | ${PATCH} -p1 -f --quiet)
+.if defined(USE_INET6) && ${USE_INET6} == YES
+	@(${CP} ${FILESDIR}/site.config-v6 ${WRKSRC})
+.endif
 
-do-build:
-	@(cd ${WRKSRC}; ./Build -f site.config-v6.kame)
+post-build:
+	${SED} -e 's#@@PREFIX@@#${PREFIX}#g' \
+	  <${FILESDIR}/mailer.conf >${WRKDIR}/mailer.conf.sendmail
+	${SED} -e 's#@@PKGNAME@@#${PKGNAME}#g' \
+	  -e 's#@@PREFIX@@#${PREFIX}#g' \
+	  <${PKGDIR}/MESSAGE >${MESSAGE_FILE}
+.if ${USE_DB2} == YES
+	${ECHO} >>${MESSAGE_FILE} ""
+	${ECHO} >>${MESSAGE_FILE} "If you are upgrading from \"sendmail\" 8.8.x don't forget to rebuild all"
+	${ECHO} >>${MESSAGE_FILE} "databases with \"${PREFIX}/bin/newaliases\" and \"${PREFIX}/sbin/makemap\"."
+	${CP} ${PKGDIR}/PLIST ${PLIST_SRC}
+	${ECHO} >>${PLIST_SRC} "@exec mv -f /usr/sbin/makemap /usr/sbin/makemap.8.8 || true"
+	${ECHO} >>${PLIST_SRC} "@unexec mv -f /usr/sbin/makemap.8.8 /usr/sbin/makemap || true"
+.endif
 
-do-install:
-	${INSTALL} -c -o root -g kmem -m 6555 ${WRKSRC}/obj.NetBSD.*/sendmail \
-		${PREFIX}/sbin/sendmail6
-	${MKDIR} ${PREFIX}/share/doc/sendmail${SENDMAILVER}
-	for i in FAQ LICENSE README; do \
-		${INSTALL_DATA} ${WRKSRC}/../$$i \
-			${PREFIX}/share/doc/sendmail${SENDMAILVER}; \
-	done
-	for i in 00READ_ME.WIDE 00READ_ME.WIDE.j 00READ_ME.v6; do \
-		${INSTALL_DATA} ${WRKSRC}/$$i \
-			${PREFIX}/share/doc/sendmail${SENDMAILVER}; \
-	done
+pre-install:
+	${MKDIR} ${PREFIX}/libexec/sendmail
+
+post-install:
+	${INSTALL_DATA} ${WRKDIR}/mailer.conf.sendmail ${PREFIX}/etc
+	${CP} -pr ${WRKSRC}/cf ${PREFIX}/share/sendmail
+	${CHOWN} -R ${BINOWN}:${BINGRP} ${PREFIX}/share/sendmail
+.if ${USE_DB2} == YES
+	${MV} -f /usr/sbin/makemap /usr/sbin/makemap.8.8 || ${TRUE}
+.endif
 
 .include "../../mk/bsd.pkg.mk"
+
+# has to be below include for bsd.pkg.mk, else substition fails
+OBJDIR!=	${ECHO} obj.`uname -srm | ${TR} \  .`
