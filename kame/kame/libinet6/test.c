@@ -4,11 +4,18 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <unistd.h>
 
 struct addrinfo ai;
 
-char host[1024];
-char serv[1024];
+char host[NI_MAXHOST];
+char serv[NI_MAXSERV];
+
+static void
+usage()
+{
+	fprintf(stderr, "usage: test [-DpS46] host serv\n");
+}
 
 int
 main(argc, argv)
@@ -18,24 +25,44 @@ main(argc, argv)
 	struct addrinfo *res;
 	int error, i;
 	char *p, *q;
+	extern int optind;
+	int c;
 
-	if (argc != 3){
-		fprintf(stderr, "error: argc\n");
+	memset(&ai, 0, sizeof(ai));
+	ai.ai_family = PF_UNSPEC;
+	ai.ai_flags |= AI_CANONNAME;
+	while ((c = getopt(argc, argv, "DpS46")) != EOF) {
+		switch (c) {
+		case 'D':
+			ai.ai_socktype = SOCK_DGRAM;
+			break;
+		case 'p':
+			ai.ai_flags |= AI_PASSIVE;
+			break;
+		case 'S':
+			ai.ai_socktype = SOCK_STREAM;
+			break;
+		case '4':
+			ai.ai_family = PF_INET;
+			break;
+		case '6':
+			ai.ai_family = PF_INET6;
+			break;
+		default:
+			usage();
+			exit(1);
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 2){
+		usage();
 		exit(1);
 	}
 
-	memset(&ai, 0, sizeof(ai));
-	ai.ai_flags |= AI_CANONNAME;
-	ai.ai_family = PF_UNSPEC;
-#if 0
-	ai.ai_socktype = SOCK_STREAM;
-#endif
-#if 0
-	ai.ai_flags = AI_PASSIVE;
-#endif
-		
-	p = *argv[1] ? argv[1] : NULL;
-	q = *argv[2] ? argv[2] : NULL;
+	p = *argv[0] ? argv[0] : NULL;
+	q = *argv[1] ? argv[1] : NULL;
 	error = getaddrinfo(p, q, &ai, &res);
 	if (error) {
 		printf("%s\n", gai_strerror(error));
