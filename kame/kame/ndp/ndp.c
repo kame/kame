@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.111 2004/08/11 10:29:57 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.112 2004/10/12 05:42:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1033,6 +1033,8 @@ ifinfo(ifname, argc, argv)
 				printf("\nRandom ID:      ");
 				rbuf = ND.randomid;
 				break;
+			default:
+				errx(1, "impossible case for tempaddr display");
 			}
 			for (j = 0; j < 8; j++)
 				printf("%02x", rbuf[j]);
