@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.1 2001/08/03 10:40:19 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.2 2001/08/03 13:01:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1084,6 +1084,8 @@ hif_output(ifp, m, dst, rt)
 		return (rt->rt_flags & RTF_BLACKHOLE ? 0 :
 		        rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
 	}
+
+#ifndef PULLDOWN_TEST
 	/*
 	 * KAME requires that the packet to be contiguous on the
 	 * mbuf.  We need to make that sure.
@@ -1114,6 +1116,7 @@ hif_output(ifp, m, dst, rt)
 contiguousfail:
 		printf("hif_output: mbuf allocation failed\n");
 	}
+#endif
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
 #if 1
