@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.12 2000/05/05 11:01:01 sumikawa Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.13 2000/08/26 02:56:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -98,7 +98,7 @@ deflate_alloc(aux, items, siz)
 	u_int siz;
 {
 	void *ptr;
-	MALLOC(ptr, void *, items * siz, M_TEMP, M_NOWAIT);
+	ptr = malloc(items * siz, M_TEMP, M_NOWAIT);
 	return ptr;
 }
 
@@ -107,7 +107,7 @@ deflate_free(aux, ptr)
 	void *aux;
 	void *ptr;
 {
-	FREE(ptr, M_TEMP);
+	free(ptr, M_TEMP);
 }
 
 static int
