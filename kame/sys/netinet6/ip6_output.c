@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.109 2000/05/31 05:03:09 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.110 2000/06/03 12:43:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1277,7 +1277,7 @@ ip6_insertfraghdr(m0, m, hlen, frghdrp)
 		;
 
 	if ((mlast->m_flags & M_EXT) == 0 &&
-	    M_TRAILINGSPACE(mlast) < sizeof(struct ip6_frag)) {
+	    M_TRAILINGSPACE(mlast) >= sizeof(struct ip6_frag)) {
 		/* use the trailing space of the last mbuf for the fragment hdr */
 		*frghdrp =
 			(struct ip6_frag *)(mtod(mlast, caddr_t) + mlast->m_len);
