@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1404 2000/11/26 19:25:44 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1405 2000/11/27 14:21:16 jinmei Exp $
 
 <200011>
+2000-11-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c: added a new ancillary data item
+	"IPV6_USE_MTU," which allows an application to specify the MTU of
+	the outgoing packet. This item is currently experimental.
+
 Mon Nov 27 04:20:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lftp: upgrade to 2.3.5.
 
