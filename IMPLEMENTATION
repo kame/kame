@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/13 02:12:27 $
+			$Date: 2000/01/15 15:29:35 $
 
 1. IPv6
 
@@ -1190,12 +1190,14 @@ For more information, please refer to:
 4.6 Interoperability
 
 Here are (some of) platforms we have tested IPsec/IKE interoperability
-in the past.  Note that both ends (KAME and others) may have modified their
-implementation, so use the following list just for reference purposes.
-	Altiga, Ashley-laurent (vpcom.com), Data Fellows (F-Secure), Ericsson
-	ACC, FreeS/WAN, HITACHI, IBM AIX, IIJ, Intel, Microsoft WinNT, NIST
-	(linux IPsec + plutoplus), Netscreen, OpenBSD, RedCreek, Routerware,
-	SSH, Secure Computing, Soliton, Toshiba, VPNet, Yamaha RT100i
+in the past, no particular order.  Note that both ends (KAME and
+others) may have modified their implementation, so use the following
+list just for reference purposes.
+	Altiga, Ashley-laurent (vpcom.com), Data Fellows (F-Secure),
+	BlueSteel, CISCO, Ericsson, ACC, Fitel, FreeS/WAN, HITACHI, IBM
+	AIX, IIJ, Intel, Microsoft WinNT, NIST (linux IPsec + plutoplus),
+	Netscreen, OpenBSD, Radguard, RedCreek, Routerware, SSH, Secure
+	Computing, Soliton, Toshiba, TIS/NAI Gauntret, VPNet, Yamaha RT100i
 
 5. IPComp
 
@@ -1208,6 +1210,8 @@ The protocol design of IPComp is very similar to IPsec.
 KAME implements the following specifications:
 - RFC2393: IP Payload Compression Protocol (IPComp)
 - RFC2394: IP Payload Compression Using DEFLATE
+
+5.1 Pointes to be noted
 
 Here are some points to be noted:
 - IPComp is treated as part of IPsec protocol suite, and SPI and
@@ -1234,6 +1238,14 @@ Here are some points to be noted:
   (should it be sysctl accessible?  or per-SAD configurable?)
 - Tunnel mode IPComp is not working right.  KAME box can generate tunnelled
   IPComp packet, however, cannot accept tunneled IPComp packet.
+
+5.2 Interoperability
+
+Here are (some of) platforms we have tested IPsec/IKE interoperability
+in the past, no particular order.  Note that both ends (KAME and
+others) may have modified their implementation, so use the following
+list just for reference purposes.
+	IRE
 
 6. ALTQ
 
