@@ -1,5 +1,5 @@
 /* 
- * $Id: input.c,v 1.2 1999/08/17 14:23:31 itojun Exp $
+ * $Id: input.c,v 1.3 1999/10/04 14:55:42 itojun Exp $
  */
 
 /*
@@ -401,7 +401,7 @@ process_kernel_msg(char *buf, int nbytes)
 		    || IN6_IS_ADDR_V4COMPAT(&dt->sin6_addr))
 			break;
 
-#ifndef __NetBSD__
+#if !defined(__NetBSD__) && !defined(__OpenBSD__)
 		if (rtm->rtm_flags & RTF_CLONED)
 			break;	/* verbose host-route omitted */
 		/* virtual network-address may be assigned to real interface */

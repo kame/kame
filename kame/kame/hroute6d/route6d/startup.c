@@ -1,5 +1,5 @@
 /* 
- * $Id: startup.c,v 1.2 1999/08/17 14:23:31 itojun Exp $
+ * $Id: startup.c,v 1.3 1999/10/04 14:55:42 itojun Exp $
  */
 
 /*
@@ -715,7 +715,7 @@ install_routes(void)
 		r_mask = NULL;
 
 		rtm = (struct rt_msghdr *)p;
-#ifndef __NetBSD__
+#if !defined( __NetBSD__) && !defined(__OpenBSD__)
 		if ((rtm->rtm_flags & RTF_UP) == 0 ||
 		    (rtm->rtm_flags &
 		     (RTF_CLONED | RTF_XRESOLVE |
