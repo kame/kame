@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.73 2000/08/13 20:13:49 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.74 2000/08/14 02:48:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1396,7 +1396,7 @@ pr_pack(buf, cc, mhdr)
 					 * name-lookup special handling for
 					 * truncated name
 					 */
-					if (cp + 1 < end && !*cp &&
+					if (cp + 1 <= end && !*cp &&
 					    strlen(dnsname) > 0) {
 						dnsname[strlen(dnsname) - 1] = '\0';
 						cp++;
