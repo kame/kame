@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.32 2000/04/21 02:39:43 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.33 2000/04/21 11:45:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -333,6 +333,10 @@ stf_getsrcifa6(ifp)
 		for (ia4 = in_ifaddr.tqh_first;
 		     ia4;
 		     ia4 = ia4->ia_list.tqe_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		for (ia4 = TAILQ_FIRST(&in_ifaddrhead);
+		     ia4;
+		     ia4 = TAILQ_NEXT(ia4, ia_link))
 #else
 		for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next)
 #endif
@@ -460,6 +464,10 @@ stf_checkaddr4(in, ifp)
 	 */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+	for (ia4 = TAILQ_FIRST(&in_ifaddrhead);
+	     ia4;
+	     ia4 = TAILQ_NEXT(ia4, ia_link))
 #else
 	for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next)
 #endif
