@@ -1626,8 +1626,10 @@ ip_setmoptions(optname, imop, m)
 		/*
 		 * Remove the gap in the membership array.
 		 */
-		for (++i; i < imo->imo_num_memberships; ++i)
+		for (++i; i < imo->imo_num_memberships; ++i) {
 			imo->imo_membership[i-1] = imo->imo_membership[i];
+			imo->imo_msf[i-1] = imo->imo_msf[i];
+		}
 		--imo->imo_num_memberships;
 		break;
 
@@ -1714,8 +1716,10 @@ ip_setmoptions(optname, imop, m)
 		/*
 		 * Remove the gap in the membership array.
 		 */
-		for (++i; i < imo->imo_num_memberships; ++i)
+		for (++i; i < imo->imo_num_memberships; ++i) {
 			imo->imo_membership[i-1] = imo->imo_membership[i];
+			imo->imo_msf[i-1] = imo->imo_msf[i];
+		}
 		--imo->imo_num_memberships;
 		break;
 
@@ -1867,9 +1871,11 @@ ip_setmoptions(optname, imop, m)
 		 * msf member.
 		 */
 		if (final) {
-			for (++i; i < imo->imo_num_memberships; ++i)
+			for (++i; i < imo->imo_num_memberships; ++i) {
 				imo->imo_membership[i-1]
 						= imo->imo_membership[i];
+				imo->imo_msf[i-1] = imo->imo_msf[i];
+			}
 			--imo->imo_num_memberships;
 		}
 		break;
@@ -2027,9 +2033,11 @@ ip_setmoptions(optname, imop, m)
 		 * msf member.
 		 */
 		if (final) {
-			for (++i; i < imo->imo_num_memberships; ++i)
+			for (++i; i < imo->imo_num_memberships; ++i) {
 				imo->imo_membership[i-1]
 						= imo->imo_membership[i];
+				imo->imo_msf[i-1] = imo->imo_msf[i];
+			}
 			--imo->imo_num_memberships;
 		}
 		break;

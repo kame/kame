@@ -2535,9 +2535,11 @@ ip_setmopt_srcfilter(sop, imsfp)
 		 */
 		if (final) {
 			IMO_MSF_FREE(imop->imo_msf[i]);
-			for (++i; i < imop->imo_num_memberships; ++i)
+			for (++i; i < imop->imo_num_memberships; ++i) {
 				imop->imo_membership[i-1]
 						= imop->imo_membership[i];
+				imop->imo_msf[i-1] = imop->imo_msf[i];
+			}
 			--imop->imo_num_memberships;
 		}
 	} else if (imop->imo_msf[i]->msf_grpjoin)
@@ -3108,9 +3110,11 @@ sock_setmopt_srcfilter(sop, grpfp)
 		 */
 		if (final) {
 			IMO_MSF_FREE(imop->imo_msf[i]);
-			for (++i; i < imop->imo_num_memberships; ++i)
+			for (++i; i < imop->imo_num_memberships; ++i) {
 				imop->imo_membership[i-1]
 						= imop->imo_membership[i];
+				imop->imo_msf[i-1] = imop->imo_msf[i];
+			}
 			--imop->imo_num_memberships;
 		}
 	} else if (imop->imo_msf[i]->msf_grpjoin)
