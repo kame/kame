@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.16 2001/01/29 23:37:18 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.17 2001/01/29 23:42:57 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -522,7 +522,14 @@ gssapi_wraphash(struct ph1handle *iph1)
 	if (GSS_ERROR(maj_stat))
 		gssapi_error(maj_stat, LOCATION, "release hash_in buffer\n");
 
-	gssapi_gss2vmbuf(hash_out, &outbuf);
+	if (gssapi_gss2vmbuf(hash_out, &outbuf) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL, "gss2vmbuf failed\n");
+		maj_stat = gss_release_buffer(&min_stat, hash_out);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release hash_out buffer\n");
+		return NULL;
+	}
 	maj_stat = gss_release_buffer(&min_stat, hash_out);
 	if (GSS_ERROR(maj_stat))
 		gssapi_error(maj_stat, LOCATION, "release hash_out buffer\n");
@@ -560,7 +567,14 @@ gssapi_unwraphash(struct ph1handle *iph1)
 		return NULL;
 	}
 
-	gssapi_gss2vmbuf(hash_out, &outbuf);
+	if (gssapi_gss2vmbuf(hash_out, &outbuf) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL, "gss2vmbuf failed\n");
+		maj_stat = gss_release_buffer(&min_stat, hash_out);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release hash_out buffer\n");
+		return NULL;
+	}
 	maj_stat = gss_release_buffer(&min_stat, hash_out);
 	if (GSS_ERROR(maj_stat))
 		gssapi_error(maj_stat, LOCATION, "release hash_out buffer\n");
@@ -672,7 +686,13 @@ gssapi_get_default_id(struct ph1handle *iph1)
 	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
 	    id->length, id->value);
 
-	gssapi_gss2vmbuf(id, &vmbuf);
+	if (gssapi_gss2vmbuf(id, &vmbuf) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL, "gss2vmbuf failed\n");
+		maj_stat = gss_release_buffer(&min_stat, id);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION, "release id buffer\n");
+		return NULL;
+	}
 	maj_stat = gss_release_buffer(&min_stat, id);
 	if (GSS_ERROR(maj_stat))
 		gssapi_error(maj_stat, LOCATION, "release id buffer\n");
