@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2423 2003/07/01 02:58:09 itojun Exp $
+$KAME: CHANGELOG,v 1.2424 2003/07/04 01:01:40 itojun Exp $
 
 <200307>
+Fri Jul  4 10:00:51 JST 2003  itojun@iijlab.net
+	* sys/netinet6/{ipcomp,esp}_input.c: critical missing length check/typo
+	  found by markus@openbsd.
+
 Tue Jul  1 11:56:46 JST 2003  itojun@iijlab.net
 	* kame/sys/net/pf.c: PF now available on freebsd4 too.
 	* {net,open}bsd/sys/netinet/ip_mroute.c: better protection against
