@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.24 1999/08/17 12:27:37 jinmei Exp $
+$Id: CHANGELOG,v 1.25 1999/08/18 13:05:36 itojun Exp $
 
 <199908>
+Wed Aug 18 22:02:14 JST 1999  itojun@iijlab.net
+	* sys/netinet6/in6_var.h: Based on RFC2465, IPv6 per-interface
+	  statistics framework is implemented.  Actual statistics support
+	  is ongoing.  ioctl(SIOCGIFSTAT_IN6) will let you peek the
+	  statistics from the userland.
+
+	  NOTE: rebuild all userland tools as struct in6_ifreq is changed
+	  its size.
+
 1999-08-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/libinet6/ip6opt.c (inet6_option_append, inet6_option_alloc): 
 	adjust pad length to avoid unnecessary pad.
