@@ -4868,7 +4868,11 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	m0->m_pkthdr.csum_flags |= sw_csum;
 #endif
 	m1 = m0;
+#ifdef __FreeBSD__
+	error = ip_fragment(m0, ifp, ifp->if_mtu, NULL, NULL);
+#else
 	error = ip_fragment(m0, ifp, ifp->if_mtu);
+#endif
 	if (error == EMSGSIZE)
 		goto bad;
 
