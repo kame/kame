@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.142 2001/01/22 13:38:33 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.143 2001/01/22 16:07:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,13 @@
 #else
 #include <netinet/if_ether.h>
 #endif
+#ifndef SCOPEDROUTING
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/in_pcb.h>
+#endif
+#endif
 
 #include <netinet6/nd6.h>
 #include <netinet/ip6.h>
@@ -109,6 +116,11 @@
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
+#ifndef SCOPEDROUTING
+#if !(defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
+#include <netinet6/in6_pcb.h>
+#endif
+#endif
 
 #include "gif.h"
 #if NGIF > 0
@@ -337,8 +349,8 @@ in6_ifremloop(struct ifaddr *ifa)
 			      , 0
 #endif /* __FreeBSD__ */
 			);
-		if (rt != NULL && (rt->rt_flags & RTF_HOST) != 0 ||
-		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
+		if (rt != NULL && ((rt->rt_flags & RTF_HOST) != 0 ||
+		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0)) {
 			rt->rt_refcnt--;
 			in6_ifloop_request(RTM_DELETE, ifa);
 		}
@@ -1700,7 +1712,6 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	 * We therefore return the error immediately on failure.
 	 */
 	if (newprefix) {
-		int flags = RTF_UP;
 		if ((error = in6_ifaddroute(ifp, ia, plen)) != 0)
 			return(error);
 	}
