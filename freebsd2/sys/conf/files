@@ -481,13 +481,13 @@ netinet6/mld6.c		optional inet6
 netinet6/nd6.c		optional inet6
 netinet6/nd6_nbr.c	optional inet6
 netinet6/nd6_rtr.c	optional inet6
-netinet6/ptr_dispatch.c	optional inet6 ptr
-netinet6/ptr_list.c	optional inet6 ptr
-netinet6/ptr_log.c	optional inet6 ptr
-netinet6/ptr_rule.c	optional inet6 ptr
-netinet6/ptr_trans.c	optional inet6 ptr
-netinet6/ptr_tslot.c	optional inet6 ptr
-netinet6/ptr_usrreq.c	optional inet6 ptr
+netinet6/natpt_dispatch.c optional inet6 natpt
+netinet6/natpt_list.c	optional inet6 natpt
+netinet6/natpt_log.c	optional inet6 natpt
+netinet6/natpt_rule.c	optional inet6 natpt
+netinet6/natpt_trans.c	optional inet6 natpt
+netinet6/natpt_tslot.c	optional inet6 natpt
+netinet6/natpt_usrreq.c	optional inet6 natpt
 netinet6/raw_ip6.c	optional inet6
 netinet6/tcp6_debug.c	optional inet6
 netinet6/tcp6_input.c	optional inet6
