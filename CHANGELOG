@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1811 2001/07/24 18:55:54 itojun Exp $
+$KAME: CHANGELOG,v 1.1812 2001/07/25 02:57:06 itojun Exp $
 
 <200107>
+Wed Jul 25 11:52:34 JST 2001  itojun@iijlab.net
+	* sys/netinet/if_gif.c: use encap_attach(), instead of
+	  encap_attach_func().  enables us to use radix address match in
+	  ip_encap.c.
+
 Wed Jul 25 03:51:34 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_encap.c: use radix table lookup for entries registered
 	  through encap_attach() API (address pairs).  still not sure if it
