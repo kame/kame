@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.29 2003/08/14 15:29:37 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.30 2003/08/20 12:57:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -335,15 +335,13 @@ mip6_ioctl(cmd, data)
 					hif_site_prefix_list_remove(
 					    &sc->hif_sp_list,
 					    LIST_FIRST(&sc->hif_sp_list));
-				while (!LIST_EMPTY(&mip6_prefix_list))
-					mip6_prefix_list_remove(
-					    &mip6_prefix_list,
-					    LIST_FIRST(&mip6_prefix_list));
-				while (!LIST_EMPTY(&mip6_ha_list))
-					mip6_ha_list_remove(
-					    &mip6_ha_list,
-					    LIST_FIRST(&mip6_ha_list));
 			}
+			while (!LIST_EMPTY(&mip6_prefix_list))
+				mip6_prefix_list_remove(&mip6_prefix_list,
+				    LIST_FIRST(&mip6_prefix_list));
+			while (!LIST_EMPTY(&mip6_ha_list))
+				mip6_ha_list_remove(&mip6_ha_list,
+				    LIST_FIRST(&mip6_ha_list));
 			mip6_config.mcfg_type = 0;
 			break;
 #endif /* MIP6_MOBILE_NODE */
