@@ -747,26 +747,20 @@ udp6_realinput(af, src, dst, m, off)
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, dst6)
 				 && !in6_mcmatch(in6p, dst6, m->m_pkthdr.rcvif))
 					continue;
-			}
-#ifndef INET6_BINDV6ONLY
-			else {
+			} else {
 				if (IN6_IS_ADDR_V4MAPPED(dst6)
 				 && (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 			}
-#endif
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, src6)
 				 || in6p->in6p_fport != *sport)
 					continue;
-			}
-#ifndef INET6_BINDV6ONLY
-			else {
+			} else {
 				if (IN6_IS_ADDR_V4MAPPED(src6)
 				 && (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 			}
-#endif
 
 			last = in6p;
 			udp6_sendup(m, off, (struct sockaddr *)src,

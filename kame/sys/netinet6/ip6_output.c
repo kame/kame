@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.186 2001/06/20 12:31:26 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.187 2001/06/22 14:22:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1914,7 +1914,7 @@ do { \
 					break;
 
 				case IPV6_V6ONLY:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 					/*
 					 * XXX: BINDV6ONLY should be integrated
 					 * into V6ONLY.
@@ -2396,7 +2396,7 @@ do { \
 					break;
 
 				case IPV6_V6ONLY:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 					/* XXX: see the setopt case. */
 					optval = OPTBIT(IN6P_BINDV6ONLY);
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
