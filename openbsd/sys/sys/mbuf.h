@@ -141,7 +141,6 @@ struct mbuf {
 #endif
 
 /* KAME IPv6 */
-#define M_ANYCAST6	0x4000	/* received as IPv6 anycast */
 #if 0 /*KAME IPSEC*/
 #define M_AUTHIPHDR	0x0010	/* data origin authentication for IP header */
 #define M_DECRYPTED	0x0020	/* confidentiality */
@@ -152,7 +151,7 @@ struct mbuf {
 #endif
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_ANYCAST6|M_LOOP)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_LOOP)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

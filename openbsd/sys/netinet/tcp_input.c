@@ -329,6 +329,7 @@ tcp6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct in6_ifaddr *ia6;
 
 #if defined(NFAITH) && 0 < NFAITH
 	if (faithprefix(&ip6->ip6_dst)) {
@@ -340,14 +341,14 @@ tcp6_input(mp, offp, proto)
 
 	/*
 	 * draft-itojun-ipv6-tcp-to-anycast
-	 * better place to put this in?
 	 */
-	if (m->m_flags & M_ANYCAST6) {
-		if (m->m_len >= sizeof(struct ip6_hdr)) {
+	ia6 = ip6_getdstifaddr(m);
+	if (ia6 && (ia6->ia6_flags & IN6_IFF_ANYCAST)) {
+		if (m->m_len >= sizeof(struct ip6_hdr))
 			icmp6_error(m, ICMP6_DST_UNREACH,
-				ICMP6_DST_UNREACH_ADDR,
-				(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
-		} else
+			    ICMP6_DST_UNREACH_ADDR,
+			    (caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
+		else
 			m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -702,6 +703,41 @@ findpcb:
 		}
 		if (so->so_options & SO_ACCEPTCONN) {
 			struct socket *so1;
+
+			/*
+			 * If deprecated address is forbidden,
+			 * we do not accept SYN to deprecated interface
+			 * address to prevent any new inbound connection from
+			 * getting established.  So drop the SYN packet.
+			 * Note that we cannot issue a RST as we cannot use
+			 * the address as the source.
+			 *
+			 * If we do not forbid deprecated addresses, we accept
+			 * the SYN packet.  RFC2462 does not suggest dropping
+			 * SYN in this case.
+			 * If we decipher RFC2462 5.5.4, it says like this:
+			 * 1. use of deprecated addr with existing
+			 *    communication is okay - "SHOULD continue to be
+			 *    used"
+			 * 2. use of it with new communication:
+			 *   (2a) "SHOULD NOT be used if no alternate address
+			 *        with sufficient scope is available"
+			 *   (2b) nothing mentioned otherwise.
+			 * Here we fall into (2b) case as we have no choice in
+			 * our souce address selection - we must obey the peer.
+			 *
+			 * The wording in RFC2462 is confusing, and there are
+			 * multiple description text for deprecated address
+			 * handling - worse, they are not exactly the same.
+			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
+			 */
+			if (!ip6_use_deprecated) {
+				struct in6_ifaddr *ia6;
+
+				if ((ia6 = ip6_getdstifaddr(m)) &&
+				    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
+					goto drop;
+			}
 
 			so1 = sonewconn(so, 0);
 			if (so1 == NULL) {
