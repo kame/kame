@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.34 2000/09/22 20:16:21 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.35 2000/09/23 15:37:37 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -342,3 +342,16 @@ vs IBM AIX
 	Notes:
 	    negotiation success on IPv6.
 	    we promise to test for IPv6 subjectaltname over 6bone.
+
+common problem:
+- KAME/FreeBSD3 presents strange behavior with outgoing fragmented packet.
+  (1) it cannot ping with some specific sizes, on loopback interface
+      (around 16300 or so).
+  (2) first fragmented packet is never get replied by the peer.
+  this depends on operating system type.
+- need more checks about kernel ACQUIRE rate-limiting policy.
+  (1) is the behavior sane when a DELETE/FLUSH is issued?
+      i have seen no ACQUIRE is passed right after DELETE payload is sent.
+  (2) should we use ppsratecheck (per-SA) or whatever?  shouldn't it be
+      integrated into SPD/SAD entries?
+- IPv6 ND and policy lookup (chicken-and-egg).
