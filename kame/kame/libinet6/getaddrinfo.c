@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.96 2001/01/09 08:06:54 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.97 2001/01/21 08:38:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -854,6 +854,8 @@ explore_numeric_scope(pai, hostname, servname, res)
 			sin6 = (struct sockaddr_in6 *)(void *)cur->ai_addr;
 			if ((scopeid = ip6_str2scopeid(scope, sin6)) == -1) {
 				free(hostname2);
+				freeaddrinfo(*res);
+				*res = NULL;
 				return(EAI_NODATA); /* XXX: is return OK? */
 			}
 			sin6->sin6_scope_id = scopeid;
@@ -862,6 +864,10 @@ explore_numeric_scope(pai, hostname, servname, res)
 
 	free(hostname2);
 
+	if (error && *res) {
+		freeaddrinfo(*res);
+		*res = NULL;
+	}
 	return error;
 #endif
 }
