@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.h,v 1.1 2000/01/18 07:29:11 kjc Exp $
+ * $Id: altq_cdnr.h,v 1.2 2000/02/02 06:39:36 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_CDNR_H_
@@ -40,6 +40,7 @@
 #define TCETYPE_TBMETER		3	/* token bucket meter */
 #define TCETYPE_TRTCM		4	/* (two-rate) three color marker */
 #define TCETYPE_TBRIO		5	/* token-bucket rio */
+#define TCETYPE_TSWTCM		6	/* time sliding window 3-color maker */
 
 /*
  * traffic conditioner action
@@ -145,7 +146,7 @@ struct cdnr_modify_trtcm {
 	int			coloraware;	/* color-aware/color-blind */
 };
 
-struct cdnr_trtcm_stats {
+struct cdnr_tcm_stats {
 	struct cdnr_interface	iface;
 	u_long			cdnr_handle;
 	struct cdnr_stats	green_stats;
@@ -194,6 +195,27 @@ struct cdnr_tbrio_params {
 	int	lowat;		/* low watermark: should be larger than MTU */
 };
 
+/* time sliding window three-color marker operations */
+struct cdnr_add_tswtcm {
+	struct cdnr_interface	iface;
+	u_int32_t		cmtd_rate;	/* committed rate (bits/sec) */
+	u_int32_t		peak_rate;	/* peak rate (bits/sec) */
+	u_int32_t		avg_interval;	/* averaging interval (msec) */
+	struct tc_action	green_action;	/* action for green packets */
+	struct tc_action	yellow_action;	/* action for yellow packets */
+	struct tc_action	red_action;	/* action for red packets */
+
+	u_long			cdnr_handle;	/* return value */
+};
+
+struct cdnr_modify_tswtcm {
+	struct cdnr_interface	iface;
+	u_long			cdnr_handle;
+	u_int32_t		cmtd_rate;	/* committed rate (bits/sec) */
+	u_int32_t		peak_rate;	/* peak rate (bits/sec) */
+	u_int32_t		avg_interval;	/* averaging interval (msec) */
+};
+
 struct cdnr_add_filter {
 	struct cdnr_interface	iface;
 	u_long			cdnr_handle;
@@ -234,7 +256,7 @@ struct cdnr_get_stats {
 #define	CDNR_TBM_STATS		_IOWR('Q', 9, struct cdnr_tbmeter_stats)
 #define	CDNR_ADD_TCM		_IOWR('Q', 10, struct cdnr_add_trtcm)
 #define	CDNR_MOD_TCM		_IOWR('Q', 11, struct cdnr_modify_trtcm)
-#define	CDNR_TCM_STATS		_IOWR('Q', 12, struct cdnr_trtcm_stats)
+#define	CDNR_TCM_STATS		_IOWR('Q', 12, struct cdnr_tcm_stats)
 #define	CDNR_ADD_FILTER		_IOWR('Q', 13, struct cdnr_add_filter)
 #define	CDNR_DEL_FILTER		_IOW('Q', 14, struct cdnr_delete_filter)
 #define	CDNR_GETSTATS		_IOWR('Q', 15, struct cdnr_get_stats)
@@ -243,6 +265,8 @@ struct cdnr_get_stats {
 #define	CDNR_TBRIO_STATS	_IOWR('Q', 18, struct cdnr_tbrio_stats)
 #define	CDNR_TBRIO_GETDEFAULTS	_IOWR('Q', 19, struct cdnr_tbrio_params)
 #define	CDNR_TBRIO_SETDEFAULTS	_IOW('Q', 20, struct cdnr_tbrio_params)
+#define	CDNR_ADD_TSW		_IOWR('Q', 21, struct cdnr_add_tswtcm)
+#define	CDNR_MOD_TSW		_IOWR('Q', 22, struct cdnr_modify_tswtcm)
 
 #ifndef DSCP_EF
 /* diffserve code points */
@@ -362,6 +386,27 @@ struct tbrio {
 	u_int8_t		red_dscp;
 
 	struct cdnr_stats	stats[TBRIO_CINDEX_NUM][TBRIO_DTYPE_NUM];
+};
+
+/* time sliding window three-color marker structure */
+struct tswtcm {
+	struct cdnr_block	cdnrblk;	/* conditioner block */
+
+	u_int32_t		avg_rate;	/* average rate (bytes/sec) */
+	u_int64_t		t_front;	/* timestamp of last update */
+
+	u_int64_t		timewin;	/* average interval */
+	u_int32_t		cmtd_rate;	/* committed target rate */
+	u_int32_t		peak_rate;	/* peak target rate */
+	struct tc_action	green_action;
+	struct tc_action	yellow_action;
+	struct tc_action	red_action;
+	u_int8_t		green_dscp;
+	u_int8_t		yellow_dscp;
+	u_int8_t		red_dscp;
+	struct cdnr_stats	green_stats;
+	struct cdnr_stats	yellow_stats;
+	struct cdnr_stats	red_stats;
 };
 
 extern int (*altq_input) __P((struct mbuf *, int));

@@ -1,4 +1,4 @@
-/* $Id: parser.c,v 1.1 2000/01/18 07:29:04 kjc Exp $ */
+/* $Id: parser.c,v 1.2 2000/02/02 06:39:37 kjc Exp $ */
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -1387,6 +1387,43 @@ tc_action_parser(char *ifname, char **cpp, struct tc_action *action)
 
 		if (qcmd_cdnr_add_tbrio(action, ifname, NULL, &profile[0],
 					&action[1], &action[2]) != 0)
+			return (0);
+	}
+	else if (EQUAL(type, "tswtcm")) {
+		u_int32_t cmtd_rate, peak_rate, avg_interval;
+		
+		if (!next_word(&cp, w)) {
+			LOG(LOG_ERR, 0, "missing cmtd rate in %s, line %d\n",
+			    altqconfigfile, line_no);
+			return (0);
+		}
+		cmtd_rate = atobps(w);
+
+		if (!next_word(&cp, w)) {
+			LOG(LOG_ERR, 0, "missing peak rate in %s, line %d\n",
+			    altqconfigfile, line_no);
+			return (0);
+		}
+		peak_rate = atobps(w);
+
+		if (!next_word(&cp, w)) {
+			LOG(LOG_ERR, 0, "missing avg interval in %s, line %d\n",
+			    altqconfigfile, line_no);
+			return (0);
+		}
+		avg_interval = (u_int32_t)strtoul(w, NULL, 0);
+
+		if (tc_action_parser(ifname, &cp, &action[1]) == 0)
+			return (0);
+		if (tc_action_parser(ifname, &cp, &action[2]) == 0)
+			return (0);
+		if (tc_action_parser(ifname, &cp, &action[3]) == 0)
+			return (0);
+
+		if (qcmd_cdnr_add_tswtcm(action, ifname, NULL,
+					 cmtd_rate, peak_rate, avg_interval,
+					 &action[1], &action[2], &action[3])
+		    != 0)
 			return (0);
 	}
 	else {

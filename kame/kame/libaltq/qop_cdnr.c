@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_cdnr.c,v 1.1 2000/01/18 07:29:05 kjc Exp $
+ * $Id: qop_cdnr.c,v 1.2 2000/02/02 06:39:38 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -248,6 +248,43 @@ qcmd_cdnr_add_tbrio(struct tc_action *rp, const char *ifname,
 	
 	rp->tca_code = TCACODE_HANDLE;
 	rp->tca_handle = clinfo->handle;
+	return (0);
+}
+
+int
+qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
+		     const char *cdnr_name, const u_int32_t cmtd_rate,
+		     const u_int32_t peak_rate, const u_int32_t avg_interval,
+		     struct tc_action *green_action,
+		     struct tc_action *yellow_action,
+		     struct tc_action *red_action)
+{
+	struct ifinfo		*ifinfo;
+	struct classinfo	*clinfo;
+	int error;
+
+	if ((ifinfo = cdnr_ifname2ifinfo(ifname)) == NULL)
+		return (QOPERR_BADIF);
+
+	if (cmtd_rate > peak_rate) {
+		LOG(LOG_ERR, 0,
+		    "add tswtcm: cmtd_rate larger than peak_rate!\n");
+		return (QOPERR_INVAL);
+	}
+
+	if ((error = qop_cdnr_add_tswtcm(&clinfo, cdnr_name, ifinfo,
+					cmtd_rate, peak_rate, avg_interval,
+					green_action, yellow_action,
+					red_action)) != 0) {
+		LOG(LOG_ERR, errno, "%s: add tswtcm failed!\n",
+		    qoperror(error));
+		return (error);
+	}
+	
+	if (rp != NULL) {
+		rp->tca_code = TCACODE_HANDLE;
+		rp->tca_handle = clinfo->handle;
+	}
 	return (0);
 }
 
@@ -624,6 +661,79 @@ qop_cdnr_modify_tbrio(struct classinfo *clinfo, struct tb_profile *profile)
 	return qop_modify_class(clinfo, NULL);
 }
 
+int 
+qop_cdnr_add_tswtcm(struct classinfo **rp, const char *cdnr_name,
+		    struct ifinfo *ifinfo, const u_int32_t cmtd_rate,
+		    const u_int32_t peak_rate, const u_int32_t avg_interval,
+		    struct tc_action *green_action,
+		    struct tc_action *yellow_action,
+		    struct tc_action *red_action)
+{
+	struct classinfo *clinfo, *clist[4];
+	struct cdnrinfo *cdnrinfo = NULL;
+	int n, error;
+
+	n = 0;
+	if (green_action->tca_code == TCACODE_HANDLE) {
+		clist[n] = clhandle2clinfo(ifinfo, green_action->tca_handle);
+		if (clist[n] == NULL)
+			return (QOPERR_BADCLASS);
+		n++;
+	}
+	if (yellow_action->tca_code == TCACODE_HANDLE) {
+		clist[n] = clhandle2clinfo(ifinfo, yellow_action->tca_handle);
+		if (clist[n] == NULL)
+			return (QOPERR_BADCLASS);
+		n++;
+	}
+	if (red_action->tca_code == TCACODE_HANDLE) {
+		clist[n] = clhandle2clinfo(ifinfo, yellow_action->tca_handle);
+		if (clist[n] == NULL)
+			return (QOPERR_BADCLASS);
+		n++;
+	}
+	clist[n] = NULL;
+
+	if ((cdnrinfo = calloc(1, sizeof(*cdnrinfo))) == NULL)
+		return (QOPERR_NOMEM);
+
+	cdnrinfo->tce_type = TCETYPE_TSWTCM;
+	cdnrinfo->tce_un.tswtcm.cmtd_rate = cmtd_rate;
+	cdnrinfo->tce_un.tswtcm.peak_rate = peak_rate;
+	cdnrinfo->tce_un.tswtcm.avg_interval = avg_interval;
+	cdnrinfo->tce_un.tswtcm.green_action = *green_action;
+	cdnrinfo->tce_un.tswtcm.yellow_action = *yellow_action;
+	cdnrinfo->tce_un.tswtcm.red_action = *red_action;
+
+	if ((error = qop_add_cdnr(&clinfo, cdnr_name, ifinfo, clist,
+				  cdnrinfo)) != 0)
+		goto err_ret;
+
+	if (rp != NULL)
+		*rp = clinfo;
+	return (0);
+
+ err_ret:
+	if (cdnrinfo != NULL)
+		free(cdnrinfo);
+	return (error);
+}
+
+int 
+qop_cdnr_modify_tswtcm(struct classinfo *clinfo, const u_int32_t cmtd_rate,
+		       const u_int32_t peak_rate, const u_int32_t avg_interval)
+{
+	struct cdnrinfo *cdnrinfo = clinfo->private;
+
+	if (cdnrinfo->tce_type != TCETYPE_TSWTCM)
+		return (QOPERR_CLASS_INVAL);
+	cdnrinfo->tce_un.tswtcm.cmtd_rate = cmtd_rate;
+	cdnrinfo->tce_un.tswtcm.peak_rate = peak_rate;
+	cdnrinfo->tce_un.tswtcm.avg_interval = avg_interval;
+	
+	return qop_modify_class(clinfo, NULL);
+}
+
 /*
  *  system call interfaces for qdisc_ops
  */
@@ -702,6 +812,7 @@ cdnr_add_class(struct classinfo *clinfo)
 	struct cdnr_add_tbmeter tbmeter_add;
 	struct cdnr_add_trtcm   trtcm_add;
 	struct cdnr_add_tbrio   tbrio_add;
+	struct cdnr_add_tswtcm  tswtcm_add;
 	struct cdnrinfo *cdnrinfo;
 	
 	cdnrinfo = clinfo->private;
@@ -770,6 +881,23 @@ cdnr_add_class(struct classinfo *clinfo)
 		clinfo->handle = tbrio_add.cdnr_handle;
 		break;
 
+	case TCETYPE_TSWTCM:
+		memset(&tswtcm_add, 0, sizeof(tswtcm_add));
+		strncpy(tswtcm_add.iface.cdnr_ifname,
+			clinfo->ifinfo->ifname+1, IFNAMSIZ);
+		tswtcm_add.cmtd_rate = cdnrinfo->tce_un.tswtcm.cmtd_rate;
+		tswtcm_add.peak_rate = cdnrinfo->tce_un.tswtcm.peak_rate;
+		tswtcm_add.avg_interval = cdnrinfo->tce_un.tswtcm.avg_interval;
+		tswtcm_add.green_action = cdnrinfo->tce_un.tswtcm.green_action;
+		tswtcm_add.yellow_action = cdnrinfo->tce_un.tswtcm.yellow_action;
+		tswtcm_add.red_action = cdnrinfo->tce_un.tswtcm.red_action;
+		if (ioctl(cdnr_fd, CDNR_ADD_TSW, &tswtcm_add) < 0) {
+			clinfo->handle = CDNR_NULL_HANDLE;
+			return (QOPERR_SYSCALL);
+		}
+		clinfo->handle = tswtcm_add.cdnr_handle;
+		break;
+
 	default:
 		return (QOPERR_CLASS_INVAL);
 	}
@@ -782,6 +910,7 @@ cdnr_modify_class(struct classinfo *clinfo, void *arg)
 	struct cdnr_modify_tbmeter tbmeter_modify;
 	struct cdnr_modify_trtcm   trtcm_modify;
 	struct cdnr_modify_tbrio   tbrio_modify;
+	struct cdnr_modify_tswtcm  tswtcm_modify;
 	struct cdnrinfo *cdnrinfo;
 
 	cdnrinfo = clinfo->private;
@@ -818,6 +947,18 @@ cdnr_modify_class(struct classinfo *clinfo, void *arg)
 		tbrio_modify.cdnr_handle = clinfo->handle;
 		tbrio_modify.profile = cdnrinfo->tce_un.tbmeter.profile;
 		if (ioctl(cdnr_fd, CDNR_MOD_TBRIO, &tbrio_modify) < 0)
+			return (QOPERR_SYSCALL);
+		break;
+
+	case TCETYPE_TSWTCM:
+		memset(&tswtcm_modify, 0, sizeof(tswtcm_modify));
+		strncpy(tswtcm_modify.iface.cdnr_ifname,
+			clinfo->ifinfo->ifname+1, IFNAMSIZ);
+		tswtcm_modify.cdnr_handle = clinfo->handle;
+		tswtcm_modify.cmtd_rate = cdnrinfo->tce_un.tswtcm.cmtd_rate;
+		tswtcm_modify.peak_rate = cdnrinfo->tce_un.tswtcm.peak_rate;
+		tswtcm_modify.avg_interval = cdnrinfo->tce_un.tswtcm.avg_interval;
+		if (ioctl(cdnr_fd, CDNR_MOD_TSW, &tswtcm_modify) < 0)
 			return (QOPERR_SYSCALL);
 		break;
 

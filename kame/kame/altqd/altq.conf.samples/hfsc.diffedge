@@ -19,8 +19,9 @@ conditioner pvc1 af2x_cdnr \
 	<trtcm 3M 32K 10M 64K <mark 0x48><mark 0x50><mark 0x58> colorblind>
 conditioner pvc1 af3x_cdnr \
 	<trtcm 3M 32K 10M 64K <mark 0x68><mark 0x70><mark 0x78> colorblind>
+# tswtcm
 conditioner pvc1 af4x_cdnr \
-	<trtcm 3M 32K 10M 64K <mark 0x88><mark 0x90><mark 0x98> colorblind>
+	<tswtcm 3M 10M 500 <mark 0x88><mark 0x90><mark 0x98>>
 
 	filter pvc1 af1x_cdnr 0 0 172.16.4.176 0 0
 	filter pvc1 af2x_cdnr 0 0 172.16.4.177 0 0

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.c,v 1.1 2000/01/18 07:29:10 kjc Exp $
+ * $Id: altq_cdnr.c,v 1.2 2000/02/02 06:39:36 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -113,6 +113,12 @@ static struct tbrio *tbrio_create __P((struct top_cdnr *, struct tb_profile *,
 static int tbrio_destroy __P((struct tbrio *));
 static struct tc_action *tbrio_input __P((struct cdnr_block *,
 					  struct cdnr_pktinfo *));
+static struct tswtcm *tswtcm_create __P((struct top_cdnr *,
+		  u_int32_t, u_int32_t, u_int32_t,
+		  struct tc_action *, struct tc_action *, struct tc_action *));
+static int tswtcm_destroy __P((struct tswtcm *));
+static struct tc_action *tswtcm_input __P((struct cdnr_block *,
+					   struct cdnr_pktinfo *));
 
 static int cdnrcmd_if_attach __P((char *));
 static int cdnrcmd_if_detach __P((char *));
@@ -125,12 +131,14 @@ static int cdnrcmd_modify_tbm __P((struct cdnr_modify_tbmeter *));
 static int cdnrcmd_tbm_stats __P((struct cdnr_tbmeter_stats *));
 static int cdnrcmd_add_trtcm __P((struct cdnr_add_trtcm *));
 static int cdnrcmd_modify_trtcm __P((struct cdnr_modify_trtcm *));
-static int cdnrcmd_trtcm_stats __P((struct cdnr_trtcm_stats *));
+static int cdnrcmd_tcm_stats __P((struct cdnr_tcm_stats *));
 static int cdnrcmd_add_tbrio __P((struct cdnr_add_tbrio *));
 static int cdnrcmd_modify_tbrio __P((struct cdnr_modify_tbrio *));
 static int cdnrcmd_tbrio_stats __P((struct cdnr_tbrio_stats *));
 static int cdnrcmd_tbrio_getdef __P((struct cdnr_tbrio_params *));
 static int cdnrcmd_tbrio_setdef __P((struct cdnr_tbrio_params *));
+static int cdnrcmd_add_tswtcm __P((struct cdnr_add_tswtcm *));
+static int cdnrcmd_modify_tswtcm __P((struct cdnr_modify_tswtcm *));
 static int cdnrcmd_get_stats __P((struct cdnr_get_stats *));
 
 /*
@@ -285,6 +293,9 @@ cdnr_cballoc(top, type, input_func)
 	case TCETYPE_TBRIO:
 		size = sizeof(struct tbrio);
 		break;
+	case TCETYPE_TSWTCM:
+		size = sizeof(struct tswtcm);
+		break;
 	default:
 		return (NULL);
 	}
@@ -362,6 +373,9 @@ generic_element_destroy(cb)
 		break;
 	case TCETYPE_TBRIO:
 		error = tbrio_destroy((struct tbrio *)cb);
+		break;
+	case TCETYPE_TSWTCM:
+		error = tswtcm_destroy((struct tswtcm *)cb);
 		break;
 	default:
 		error = EINVAL;
@@ -966,6 +980,139 @@ tbrio_input(cb, pktinfo)
 }
 
 /*
+ * time sliding window three color marker
+ * as described in draft-fang-diffserv-tc-tswtcm-00.txt
+ */
+static struct tswtcm *
+tswtcm_create(top, cmtd_rate, peak_rate, avg_interval,
+	      green_action, yellow_action, red_action)
+	struct top_cdnr *top;
+	u_int32_t	cmtd_rate, peak_rate, avg_interval;
+	struct tc_action *green_action, *yellow_action, *red_action;
+{
+	struct tswtcm *tsw;
+
+	if (tca_verify_action(green_action) < 0
+	    || tca_verify_action(yellow_action) < 0
+	    || tca_verify_action(red_action) < 0)
+		return (NULL);
+
+	if ((tsw = cdnr_cballoc(top, TCETYPE_TSWTCM,
+				tswtcm_input)) == NULL)
+		return (NULL);
+
+	tca_import_action(&tsw->green_action, green_action);
+	tca_import_action(&tsw->yellow_action, yellow_action);
+	tca_import_action(&tsw->red_action, red_action);
+
+	/* set dscps to use */
+	if (tsw->green_action.tca_code == TCACODE_MARK)
+		tsw->green_dscp = tsw->green_action.tca_dscp & DSCP_MASK;
+	else
+		tsw->green_dscp = DSCP_AF11;
+	if (tsw->yellow_action.tca_code == TCACODE_MARK)
+		tsw->yellow_dscp = tsw->yellow_action.tca_dscp & DSCP_MASK;
+	else
+		tsw->yellow_dscp = DSCP_AF12;
+	if (tsw->red_action.tca_code == TCACODE_MARK)
+		tsw->red_dscp = tsw->red_action.tca_dscp & DSCP_MASK;
+	else
+		tsw->red_dscp = DSCP_AF13;
+
+	/* convert rates from bits/sec to bytes/sec */
+	tsw->cmtd_rate = cmtd_rate / 8;
+	tsw->peak_rate = peak_rate / 8;
+	tsw->avg_rate = 0;
+
+	/* timewin is converted from msec to machine clock unit */
+	tsw->timewin = (u_int64_t)machclk_freq * avg_interval / 1000;
+
+	return (tsw);
+}
+
+static int
+tswtcm_destroy(tsw)
+	struct tswtcm *tsw;
+{
+	if (tsw->cdnrblk.cb_ref > 0)
+		return (EBUSY);
+
+	tca_invalidate_action(&tsw->green_action);
+	tca_invalidate_action(&tsw->yellow_action);
+	tca_invalidate_action(&tsw->red_action);
+
+	cdnr_cbdestroy(tsw);
+	return (0);
+}
+
+static struct tc_action *
+tswtcm_input(cb, pktinfo)
+	struct cdnr_block *cb;
+	struct cdnr_pktinfo *pktinfo;
+{
+	struct tswtcm	*tsw = (struct tswtcm *)cb;
+	int		len;
+	u_int32_t	avg_rate;
+	u_int64_t	interval, now, tmp;
+
+	/*
+	 * rate estimator
+	 */
+	len = pktinfo->pkt_len;
+	now = read_machclk();
+
+	interval = now - tsw->t_front;
+	/*
+	 * calculate average rate:
+	 *	avg = (avg * timewin + pkt_len)/(timewin + interval)
+	 * pkt_len needs to be multiplied by machclk_freq in order to
+	 * get (bytes/sec).
+	 * note: when avg_rate (bytes/sec) and timewin (machclk unit) are
+	 * less than 32 bits, the following 64-bit operation has enough
+	 * precision.
+	 */
+	tmp = ((u_int64_t)tsw->avg_rate * tsw->timewin
+	       + (u_int64_t)len * machclk_freq) / (tsw->timewin + interval);
+	tsw->avg_rate = avg_rate = (u_int32_t)tmp;
+	tsw->t_front = now;
+
+	/*
+	 * marker
+	 */
+	if (avg_rate > tsw->cmtd_rate) {
+		u_int32_t randval = random() % avg_rate;
+		
+		if (avg_rate > tsw->peak_rate) {
+			if (randval < avg_rate - tsw->peak_rate) {
+				/* mark red */
+				pktinfo->pkt_dscp = tsw->red_dscp;
+				tsw->red_stats.packets++;
+				tsw->red_stats.bytes += len;
+				return (&tsw->red_action);
+			}
+			else if (randval < avg_rate - tsw->cmtd_rate)
+				goto mark_yellow;
+		}
+		else {
+			/* peak_rate >= avg_rate > cmtd_rate */
+			if (randval < avg_rate - tsw->cmtd_rate) {
+			mark_yellow:
+				pktinfo->pkt_dscp = tsw->yellow_dscp;
+				tsw->yellow_stats.packets++;
+				tsw->yellow_stats.bytes += len;
+				return (&tsw->yellow_action);
+			}
+		}
+	}
+
+	/* mark green */
+	pktinfo->pkt_dscp = tsw->green_dscp;
+	tsw->green_stats.packets++;
+	tsw->green_stats.bytes += len;
+	return (&tsw->green_action);
+}
+
+/*
  * ioctl requests
  */
 static int
@@ -1148,17 +1295,30 @@ cdnrcmd_modify_trtcm(ap)
 }
 
 static int
-cdnrcmd_trtcm_stats(ap)
-	struct cdnr_trtcm_stats *ap;
+cdnrcmd_tcm_stats(ap)
+	struct cdnr_tcm_stats *ap;
 {
-	struct trtcm *tcm;
+	struct cdnr_block *cb;
 
-	if ((tcm = (struct trtcm *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
+	if ((cb = cdnr_handle2cb(ap->cdnr_handle)) == NULL)
 		return (EINVAL);
 
-	ap->green_stats = tcm->green_stats;
-	ap->yellow_stats = tcm->yellow_stats;
-	ap->red_stats = tcm->red_stats;
+	if (cb->cb_type == TCETYPE_TRTCM) {
+	    struct trtcm *tcm = (struct trtcm *)cb;
+	    
+	    ap->green_stats = tcm->green_stats;
+	    ap->yellow_stats = tcm->yellow_stats;
+	    ap->red_stats = tcm->red_stats;
+	}
+	else if (cb->cb_type == TCETYPE_TSWTCM) {
+	    struct tswtcm *tsw = (struct tswtcm *)cb;
+	    
+	    ap->green_stats = tsw->green_stats;
+	    ap->yellow_stats = tsw->yellow_stats;
+	    ap->red_stats = tsw->red_stats;
+	}
+	else
+	    return (EINVAL);
 
 	return (0);
 }
@@ -1241,6 +1401,54 @@ cdnrcmd_tbrio_setdef(ap)
 }
 
 static int
+cdnrcmd_add_tswtcm(ap)
+	struct cdnr_add_tswtcm *ap;
+{
+	struct top_cdnr *top;
+	struct tswtcm *tsw;
+
+	if ((top = tcb_lookup(ap->iface.cdnr_ifname)) == NULL)
+		return (EBADF);
+
+	if (ap->cmtd_rate > ap->peak_rate)
+		return (EINVAL);
+
+	tsw = tswtcm_create(top, ap->cmtd_rate, ap->peak_rate,
+			    ap->avg_interval, &ap->green_action,
+			    &ap->yellow_action, &ap->red_action);
+	if (tsw == NULL)
+	    return (EINVAL);
+
+	/* return a class handle to the user */
+	ap->cdnr_handle = cdnr_cb2handle(&tsw->cdnrblk);
+	return (0);
+}
+
+static int
+cdnrcmd_modify_tswtcm(ap)
+	struct cdnr_modify_tswtcm *ap;
+{
+	struct tswtcm *tsw;
+
+	if ((tsw = (struct tswtcm *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
+		return (EINVAL);
+
+	if (ap->cmtd_rate > ap->peak_rate)
+		return (EINVAL);
+
+	/* convert rates from bits/sec to bytes/sec */
+	tsw->cmtd_rate = ap->cmtd_rate / 8;
+	tsw->peak_rate = ap->peak_rate / 8;
+	tsw->avg_rate = 0;
+
+	/* timewin is converted from msec to machine clock unit */
+	tsw->timewin = (u_int64_t)machclk_freq * ap->avg_interval / 1000;
+
+	return (0);
+}
+
+
+static int
 cdnrcmd_get_stats(ap)
 	struct cdnr_get_stats *ap;
 {
@@ -1249,6 +1457,7 @@ cdnrcmd_get_stats(ap)
 	struct tbmeter *tbm;
 	struct trtcm *tcm;
 	struct tbrio *tbrio;
+	struct tswtcm *tsw;
 	struct tce_stats tce, *usp;
 	int error, n, nskip, nelements;
 
@@ -1294,6 +1503,12 @@ cdnrcmd_get_stats(ap)
 			/* XXX return prob using drop count for green */
 			tce.tce_stats[1].packets = tbrio->prob;
 #endif
+			break;
+		case TCETYPE_TSWTCM:
+			tsw = (struct tswtcm *)cb;
+			tce.tce_stats[0] = tsw->green_stats;
+			tce.tce_stats[1] = tsw->yellow_stats;
+			tce.tce_stats[2] = tsw->red_stats;
 			break;
 		default:
 			continue;
@@ -1443,7 +1658,7 @@ cdnrioctl(dev, cmd, addr, flag, p)
 		break;
 
 	case CDNR_TCM_STATS:
-		error = cdnrcmd_trtcm_stats((struct cdnr_trtcm_stats *)addr);
+		error = cdnrcmd_tcm_stats((struct cdnr_tcm_stats *)addr);
 		break;
 
 	case CDNR_ADD_FILTER:
@@ -1476,6 +1691,14 @@ cdnrioctl(dev, cmd, addr, flag, p)
 
 	case CDNR_TBRIO_SETDEFAULTS:
 		error = cdnrcmd_tbrio_setdef((struct cdnr_tbrio_params *)addr);
+		break;
+
+	case CDNR_ADD_TSW:
+		error = cdnrcmd_add_tswtcm((struct cdnr_add_tswtcm *)addr);
+		break;
+
+	case CDNR_MOD_TSW:
+		error = cdnrcmd_modify_tswtcm((struct cdnr_modify_tswtcm *)addr);
 		break;
 
 	default:

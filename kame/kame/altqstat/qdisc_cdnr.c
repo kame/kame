@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qdisc_cdnr.c,v 1.1 2000/01/18 07:28:58 kjc Exp $
+ * $Id: qdisc_cdnr.c,v 1.2 2000/02/02 06:39:40 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -52,7 +52,8 @@
 struct tce_stats	elements[NELEMENTS], last[NELEMENTS];
 static char cdnrnames[NELEMENTS][128];
 
-char *element_names[] = { "none", "top", "element", "tbmeter", "trtcm", "tbrio" };
+char *element_names[] = { "none", "top", "element", "tbmeter", "trtcm",
+			  "tbrio", "tswtcm" };
 char *tbmprof_names[] = { "in:    ", "out:   " };
 char *tcmprof_names[] = { "green: ", "yellow:", "red:   " };
 char *tbrioprof_names[] = { "g(pass):", "g(drop):", 
@@ -166,6 +167,7 @@ cdnr_stat_loop(int fd, const char *ifname, int count, int interval)
 				profile_names = tbmprof_names;
 				break;
 			case TCETYPE_TRTCM:
+			case TCETYPE_TSWTCM:
 				nprofile = 3;
 				profile_names = tcmprof_names;
 				break;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_cdnr.h,v 1.1 2000/01/18 07:29:05 kjc Exp $
+ * $Id: qop_cdnr.h,v 1.2 2000/02/02 06:39:38 kjc Exp $
  */
 
 /*
@@ -55,6 +55,14 @@ struct cdnrinfo {
 			struct tc_action	in_action;
 			struct tc_action	out_action;
 		} tbrio;
+		struct {
+			u_int32_t		cmtd_rate;
+			u_int32_t		peak_rate;
+			u_int32_t		avg_interval;
+			struct tc_action	green_action;
+			struct tc_action	yellow_action;
+			struct tc_action	red_action;
+		} tswtcm;
 	} tce_un;
 };
 
@@ -79,6 +87,13 @@ int qcmd_cdnr_add_tbrio(struct tc_action *rp, const char *ifname,
 			struct tb_profile *profile,
 			struct tc_action *in_action,
 			struct tc_action *out_action);
+int qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
+			 const char *cdnr_name, const u_int32_t cmtd_rate,
+			 const u_int32_t peak_rate,
+			 const u_int32_t avg_interval, 
+			 struct tc_action *green_action,
+			 struct tc_action *yellow_action,
+			 struct tc_action *red_action);
 
 int qop_add_cdnr(struct classinfo **rp, const char *cdnr_name,
 		 struct ifinfo *ifinfo, struct classinfo **childlist,
@@ -97,6 +112,13 @@ int qop_cdnr_add_trtcm(struct classinfo **rp, const char *cdnr_name,
 int qop_cdnr_add_tbrio(struct classinfo **rp, const char *cdnr_name,
 		struct ifinfo *ifinfo, struct tb_profile *profile,
 		struct tc_action *in_action, struct tc_action *out_action);
+int qop_cdnr_add_tswtcm(struct classinfo **rp, const char *cdnr_name,
+			struct ifinfo *ifinfo, const u_int32_t cmtd_rate,
+			const u_int32_t peak_rate,
+			const u_int32_t avg_interval,
+			struct tc_action *green_action,
+			struct tc_action *yellow_action,
+			struct tc_action *red_action);
 int qop_cdnr_modify_tbmeter(struct classinfo *clinfo,
 			    struct tb_profile *profile);
 int qop_cdnr_modify_trtcm(struct classinfo *clinfo,
@@ -104,3 +126,7 @@ int qop_cdnr_modify_trtcm(struct classinfo *clinfo,
 			  struct tb_profile *peak_profile, int coloraware);
 int qop_cdnr_modify_tbrio(struct classinfo *clinfo,
 			    struct tb_profile *profile);
+int qop_cdnr_modify_tswtcm(struct classinfo *clinfo,
+			   const u_int32_t cmtd_rate,
+			   const u_int32_t peak_rate,
+			   const u_int32_t avg_interval);
