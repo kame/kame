@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.37 2001/12/27 07:24:09 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.38 2002/01/18 08:14:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -952,6 +952,8 @@ natpt_removeTSlotEntry(struct tSlot *ats)
  *
  */
 
+extern caddr_t	natptctl_vars[NATPTCTL_NUM];
+
 void
 natpt_init_tslot()
 {
@@ -980,4 +982,12 @@ natpt_init_tslot()
 		TAILQ_INIT(&tslhashl[iter].tslhead);
 		TAILQ_INIT(&tslhashr[iter].tslhead);
 	}
+
+	natptctl_vars[NATPTCTL_MAXTTYANY]   = (caddr_t)&maxTTLany;
+	natptctl_vars[NATPTCTL_MAXTTYICMP]  = (caddr_t)&maxTTLicmp;
+	natptctl_vars[NATPTCTL_MAXTTYUDP]   = (caddr_t)&maxTTLudp;
+	natptctl_vars[NATPTCTL_MAXTTYTCP]   = (caddr_t)&maxTTLtcp;
+	natptctl_vars[NATPTCTL_TCPT_2MSL]   = (caddr_t)&natpt_TCPT_2MSL;
+	natptctl_vars[NATPTCTL_TCP_MAXIDLE] = (caddr_t)&natpt_tcp_maxidle;
+	natptctl_vars[NATPTCTL_MAXFRAGMENT] = (caddr_t)&maxFragment;
 }
