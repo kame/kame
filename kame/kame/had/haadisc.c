@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.3 2002/01/22 16:32:38 karino Exp $	*/
+/*	$KAME: haadisc.c,v 1.4 2002/02/22 08:17:53 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.3 2002/01/22 16:32:38 karino Exp $
+ * $Id: haadisc.c,v 1.4 2002/02/22 08:17:53 k-sugyou Exp $
  */
 
 /*
@@ -608,9 +608,11 @@ ra_input(len, ra, pi, from)
     /* lookup home agent interface info from receiving ifindex */
     haif = haif_find(pi->ipi6_ifindex);
     if (haif == NULL) {
-	syslog(LOG_NOTICE, "ra_input: RA received on ifindex %d"
-	       " which is not home link, ignored\n",
-	       pi->ipi6_ifindex);
+#ifdef DEBUG
+	fprintf(stderr, "<x:ra_input: RA received on ifindex %d"
+		" which is not home link, ignored>\n",
+		pi->ipi6_ifindex);
+#endif
 	goto done;
     }
 
