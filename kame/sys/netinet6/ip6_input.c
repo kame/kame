@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.235 2001/12/18 02:47:58 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.236 2001/12/21 03:46:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,6 +157,9 @@
 #include "gif.h"
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include "bpfilter.h"
+#endif
+#if NGIF > 0
+#include <netinet6/in6_gif.h>
 #endif
 
 #ifdef MIP6
