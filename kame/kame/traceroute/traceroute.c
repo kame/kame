@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.6 1999/09/03 03:12:11 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.7 1999/10/20 11:50:24 sakane Exp $ (LBL)";
 #endif
 
 /*
@@ -329,6 +329,7 @@ int	str2val(const char *, const char *, int, int);
 void	tvsub(struct timeval *, struct timeval *);
 __dead	void usage(void);
 int	wait_for_reply(int, struct sockaddr_in *, struct timeval *);
+int	setpolicy(int so, char *policy);
 
 int
 main(int argc, char **argv)
@@ -574,25 +575,14 @@ main(int argc, char **argv)
 		    sizeof(on));
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-    {
-	int len;
-	char buf[16];
-
 	/*
 	 * do not raise error even if setsockopt fails, kernel may have ipsec
 	 * turned off.
 	 */
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
-		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+	if (setpolicy(s, "in bypass") < 0)
 		exit(1);
-	}
-	(void)setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
-		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+	if (setpolicy(s, "out bypass") < 0)
 		exit(1);
-	}
-	(void)setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
-    }
 #else
     {
 	int level = IPSEC_LEVEL_AVAIL;
@@ -629,25 +619,10 @@ main(int argc, char **argv)
 
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-    {
-	int len;
-	char buf[16];
-
-	/*
-	 * do not raise error even if setsockopt fails, kernel may have ipsec
-	 * turned off.
-	 */
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
-		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+	if (setpolicy(sndsock, "in bypass") < 0)
 		exit(1);
-	}
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
-		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+	if (setpolicy(sndsock, "out bypass") < 0)
 		exit(1);
-	}
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
-    }
 #else
     {
 	int level = IPSEC_LEVEL_BYPASS;
@@ -948,6 +923,30 @@ wait_for_reply(register int sock, register struct sockaddr_in *fromp,
 
 	return(cc);
 }
+
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+int
+setpolicy(so, policy)
+	int so;
+	char *policy;
+{
+	char *buf;
+
+	buf = ipsec_set_policy(policy, strlen(policy));
+	if (buf == NULL) {
+		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+		return -1;
+	}
+	(void)setsockopt(so, IPPROTO_IP, IP_IPSEC_POLICY,
+		buf, ipsec_get_policylen(buf));
+
+	free(buf);
+
+	return 0;
+}
+#endif
+#endif
 
 void
 send_probe(register int seq, int ttl, register struct timeval *tp)

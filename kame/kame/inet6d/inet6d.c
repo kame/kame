@@ -717,11 +717,10 @@ ipsecsetup(sep)
 	else
 		policy = sep->se_policy;
 
-	len = ipsec_get_policylen(policy);
-	if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
-		ipsec_set_policy(buf, len, policy);
+	buf = ipsec_set_policy(policy, strlen(policy));
+	if (buf == NULL) {
 		if (setsockopt(sep->se_fd, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-				buf, len) < 0) {
+				buf, ipsec_get_policylen(buf)) < 0) {
 			syslog(LOG_ERR, "setsockopt (IPV6_IPSEC_POLICY, %s): %m",
 				policy);
 		}
@@ -817,13 +816,14 @@ more:
 		/* lines starting with #@ is not a comment, but the policy */
 		if (cp[0] == '#' && cp[1] == '@') {
 			char *p;
+			char *dmy;
 			for (p = cp + 2; p && *p && isspace(*p); p++)
 				;
 			if (*p == '\0') {
 				if (policy)
 					free(policy);
 				policy = NULL;
-			} else if (ipsec_get_policylen(p) >= 0) {
+			} else if ((dmy = ipsec_set_policy(p, strlen(p)))) {
 				if (policy)
 					free(policy);
 				policy = newstr(p);

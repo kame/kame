@@ -264,15 +264,13 @@ sock6_open(struct flags *flags
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	if (flags->policy) {
-		int len;
 		char *buf;
 		buf = ipsec_set_policy(policy, strlen(policy));
 		if (buf == NULL)
 			errx(1, ipsec_strerror());
-		len = ipsec_get_policylen(buf);
 		/* XXX should handle in/out bound policy. */
 		if (setsockopt(s6, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-				buf, len) < 0)
+				buf, ipsec_get_policylen(buf)) < 0)
 			err(1, NULL);
 		free(buf);
 	}
@@ -328,15 +326,13 @@ sock4_open(struct flags *flags
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	if (flags->policy) {
-		int len;
 		char *buf;
 		buf = ipsec_set_policy(policy, strlen(policy));
 		if (buf == NULL)
 			errx(1, ipsec_strerror());
-		len = ipsec_get_policylen(buf);
 		/* XXX should handle in/out bound policy. */
 		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY, 
-				buf, len) < 0)
+				buf, ipsec_get_policylen(buf)) < 0)
 			err(1, NULL);
 		free(buf);
 	}

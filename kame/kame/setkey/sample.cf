@@ -45,7 +45,7 @@
 spdadd fec0::10[any] fec0::11[110] tcp -P out ipsec
 	esp/transport/fec0::10-fec0::11/use ;
 spdadd fec0::11[110] fec0::10[any] tcp -P in ipsec
-	esp/fec0::11-fec0::10/use ;
+	esp/transport/fec0::11-fec0::10/use ;
 add fec0::10 fec0::11 esp 0x10001
 	-m transport
 	-E blowfish-cbc "kamekame"

@@ -307,6 +307,7 @@ struct opacket	*outpacket;	/* last output (udp) packet */
 
 int	main __P((int, char *[]));
 int	wait_for_reply __P((int, struct msghdr *));
+int	setpolicy __P((int so, char *policy));
 void	send_probe __P((int, int));
 struct udphdr *get_udphdr __P((struct ip6_hdr *, u_char *));
 int	get_hoplim __P((struct msghdr *));
@@ -513,21 +514,14 @@ main(argc, argv)
 				  (char *)&on, sizeof(on));
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-    {
-	int len;
-	char buf[16];
-
 	/*
 	 * do not raise error even if setsockopt fails, kernel may have ipsec
 	 * turned off.
 	 */
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0)
+	if (setpolicy(rcvsock, "in bypass") < 0)
 		errx(1, ipsec_strerror());
-	(void)setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0)
+	if (setpolicy(rcvsock, "out bypass") < 0)
 		errx(1, ipsec_strerror());
-	(void)setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
-    }
 #else
     {
 	int level = IPSEC_LEVEL_NONE;
@@ -578,21 +572,14 @@ main(argc, argv)
 	}
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-    {
-	int len;
-	char buf[16];
-
 	/*
 	 * do not raise error even if setsockopt fails, kernel may have ipsec
 	 * turned off.
 	 */
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0)
+	if (setpolicy(sndsock, "in bypass") < 0)
 		errx(1, ipsec_strerror());
-	(void)setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0)
+	if (setpolicy(sndsock, "out bypass") < 0)
 		errx(1, ipsec_strerror());
-	(void)setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
-    }
 #else
     {
 	int level = IPSEC_LEVEL_BYPASS;
@@ -751,6 +738,29 @@ wait_for_reply(sock, mhdr)
 	return(cc);
 }
 
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+int
+setpolicy(so, policy)
+	int so;
+	char *policy;
+{
+	char *buf;
+
+	buf = ipsec_set_policy(policy, strlen(policy));
+	if (buf == NULL) {
+		warnx(ipsec_strerror());
+		return -1;
+	}
+	(void)setsockopt(so, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
+		buf, ipsec_get_policylen(buf));
+
+	free(buf);
+
+	return 0;
+}
+#endif
+#endif
 
 void
 send_probe(seq, hops)

@@ -234,6 +234,7 @@ void	 pr_pack __P((u_char *, int, struct msghdr *));
 void	 pr_retip __P((struct ip6_hdr *, u_char *));
 void	 summary __P((void));
 void	 tvsub __P((struct timeval *, struct timeval *));
+int	 setpolicy __P((int, char *));
 void	 usage __P((void));
 
 int
@@ -472,28 +473,10 @@ main(argc, argv)
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	if (options & F_POLICY) {
-		int len;
-		char *buf;
-		if (policy_in != NULL) {
-			buf = ipsec_set_policy(policy_in, strlen(policy_in));
-			if (buf == NULL)
-				errx(1, ipsec_strerror());
-			len = ipsec_get_policylen(buf);
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-					buf, len) < 0)
-				warnx("Unable to set IPSec policy");
-			free(buf);
-		}
-		if (policy_out != NULL) {
-			buf = ipsec_set_policy(policy_out, strlen(policy_out));
-			if (buf == NULL)
-				errx(1, ipsec_strerror());
-			len = ipsec_get_policylen(buf);
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-					buf, len) < 0)
-				warnx("Unable to set IPSec policy");
-			free(buf);
-		}
+		if (setpolicy(s, policy_in) < 0)
+			errx(1, ipsec_strerror());
+		if (setpolicy(s, policy_out) < 0)
+			errx(1, ipsec_strerror());
 	}
 #else
 	if (options & F_AUTHHDR) {
@@ -1515,6 +1498,31 @@ fill(bp, patp)
 		(void)printf("\n");
 	}
 }
+
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+int
+setpolicy(so, policy)
+	int so;
+	char *policy;
+{
+	char *buf;
+
+	if (policy == NULL)
+		return -1;
+
+	buf = ipsec_set_policy(policy, strlen(policy));
+	if (buf == NULL)
+		errx(1, ipsec_strerror());
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
+			buf, ipsec_get_policylen(buf)) < 0)
+		warnx("Unable to set IPSec policy");
+	free(buf);
+
+	return 0;
+}
+#endif
+#endif
 
 void
 usage()

@@ -300,7 +300,6 @@ main(argc, argv)
 		err(1, "bind");
 	if (session->s_upolicy) {
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-		int len;
 		char *buf;
 		int level, optname;
 
@@ -308,7 +307,6 @@ main(argc, argv)
 			strlen(session->s_upolicy));
 		if (buf == NULL)
 			errx(1, ipsec_strerror());
-		len = ipsec_get_policylen(buf);
 		switch (res->ai_family) {
 		case AF_INET6:
 			level = IPPROTO_IPV6;
@@ -319,7 +317,8 @@ main(argc, argv)
 			break;
 		}
 		if (level) {
-			if (setsockopt(s, level, optname, buf, len) < 0)
+			if (setsockopt(s, level, optname,
+					buf, ipsec_get_policylen(buf)) < 0)
 				warnx("Unable to set IPSec policy");
 		} else
 			errx(1, "unsupported address family %d", res->ai_family);
