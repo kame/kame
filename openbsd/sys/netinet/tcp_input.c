@@ -617,6 +617,20 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
+#ifdef INET6
+	/* save packet options if user wanted */
+	/* XXX use inp_options, or separate inp_options6? */
+	if (is_ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+		if (inp->inp_options) {
+			m_freem(inp->inp_options);
+			inp->inp_options = 0;
+		}
+#if 0
+		ip6_savecontrol(inp, &inp->inp_options, ipv6, m);
+#endif
+	}
+#endif
+
 	so = inp->inp_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 		if (so->so_options & SO_DEBUG) {
@@ -664,20 +678,21 @@ findpcb:
 			}
 #endif /* IPSEC */
 #ifdef INET6
-			/*
-			 * inp still has the OLD in_pcb stuff, set the
-			 * v6-related flags on the new guy, too.   This is
-			 * done particularly for the case where an AF_INET6
-			 * socket is bound only to a port, and a v4 connection
-			 * comes in on that port.
-			 * we also copy the flowinfo from the original pcb 
-			 * to the new one.
-			 */
 			{
 			  int flags = inp->inp_flags;
 			  struct inpcb *oldinpcb = inp;
 			  
 			  inp = (struct inpcb *)so->so_pcb;
+
+			  /*
+			   * inp still has the OLD in_pcb stuff, set the
+			   * v6-related flags on the new guy, too.   This is
+			   * done particularly for the case where an AF_INET6
+			   * socket is bound only to a port, and a v4 connection
+			   * comes in on that port.
+			   * we also copy the flowinfo from the original pcb 
+			   * to the new one.
+			   */
 			  inp->inp_flags |= (flags & (INP_IPV6 | INP_IPV6_UNDEC
 						      | INP_IPV6_MAPPED));
 			  if ((inp->inp_flags & INP_IPV6) &&
@@ -687,10 +702,23 @@ findpcb:
 			    inp->inp_ipv6.ip6_flow = 
 			      oldinpcb->inp_ipv6.ip6_flow;
 			  }
+
+			  /* inherit socket options from the listening socket */
+			  if (ipv6) {
+			    inp->inp_flags |=
+				(oldinpcb->inp_flags & IN6P_CONTROLOPTS);
+			    if (inp->inp_flags & IN6P_CONTROLOPTS) {
+			      m_freem(inp->inp_options);
+			      inp->inp_options = NULL;
+			    }
+#if 0
+			    ip6_savecontrol(inp, &inp->inp_options,
+			      mtod(m, struct ip6_hdr *), m);
+#endif
+			  }
 			}
-#else /* INET6 */
-			inp = (struct inpcb *)so->so_pcb;
 #endif /* INET6 */
+			inp = (struct inpcb *)so->so_pcb;
 			inp->inp_lport = th->th_dport;
 #ifdef INET6
 			if (is_ipv6) {
