@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.24 2001/12/28 06:34:47 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.25 2002/01/17 07:04:39 k-sugyou Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -66,6 +66,7 @@ provided home agent node functions
 - build kernel with MIP6 and hif pseudo-if.
 	options MIP6
 	pseudo-device hif 1
+- build had in kame/kame/had.
 - build rtadvd with -DMIP6 to become a home agent.  The easiest way is
   to add CFLAGS (or CPPFLAGS) in kame/$OS/usr.sbin/rtadvd/Makefile and
   recompile rtadvd.
@@ -75,6 +76,7 @@ provided home agent node functions
 	ifconfig de0 inet6 home_agent_address
 	ifconfig de0 inet6 home_prefix:fdff:ffff:ffff:fffe anycast
 	sysctl -w net.inet6.ip6.forwarding=1
+	had interfaces (e.g., had de0)
 	invoke rtadvd with -m option
 	mip6control -g
 - to become a mobile node.
