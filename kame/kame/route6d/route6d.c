@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.71 2001/08/09 09:50:08 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.72 2001/08/09 22:21:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.71 2001/08/09 09:50:08 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.72 2001/08/09 22:21:23 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2558,11 +2558,7 @@ rt_entry(rtm, again)
 	rrt->rrt_t = time(NULL);
 	if (aflag == 0 && (rtm->rtm_flags & RTF_STATIC))
 		rrt->rrt_t = 0;	/* Don't age static routes */
-#if 0
-	np->rip6_tag = htons(routetag & 0xffff);
-#else
 	np->rip6_tag = 0;
-#endif
 	np->rip6_metric = rtm->rtm_rmx.rmx_hopcount;
 	if (np->rip6_metric < 1)
 		np->rip6_metric = 1;
