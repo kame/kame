@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.75 2002/09/05 08:09:35 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.76 2002/09/06 03:31:13 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -258,8 +258,10 @@ struct mldv2_hdr {
 	struct in6_addr		mld_src[1];	/* source address list */	
 } __attribute__((__packed__));
 
-#define MLD_EXP(x)	((ntohs(x) >> 12) & 0x0007)
-#define MLD_MANT(x)	(ntohs(x) & 0x0fff)
+#define MLD_MRC_EXP(x)	((ntohs(x) >> 12) & 0x0007)
+#define MLD_MRC_MANT(x)	(ntohs(x) & 0x0fff)
+#define MLD_QQIC_EXP(x)	(((x) >> 4) & 0x07)
+#define MLD_QQIC_MANT(x)	((x) & 0x0f)
 #define MLD_QRESV(x)	(((x) >> 4) & 0x0f)
 #define MLD_SFLAG(x)	(((x) >> 3) & 0x01)
 #define MLD_QRV(x)	((x) & 0x07)	/* querier's robustness variable   */

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.55 2002/09/06 03:15:26 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.56 2002/09/06 03:31:13 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1168,11 +1168,10 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	    (rti->rt6i_qrv > 7))
 		rti->rt6i_qrv = MLD_DEF_RV;
 	if ((mldh->mld_qqi > 0) && (mldh->mld_qqi < 128))
-		/* XXXXX 128??? CHECK!!! */
 		rti->rt6i_qqi = mldh->mld_qqi;
 	else if (mldh->mld_qqi >= 128)
-		rti->rt6i_qqi = ((MLD_MANT(mldh->mld_qqi) | 0x10)
-				<< (MLD_EXP(mldh->mld_qqi) + 3));
+		rti->rt6i_qqi = ((MLD_QQIC_MANT(mldh->mld_qqi) | 0x10)
+				<< (MLD_QQIC_EXP(mldh->mld_qqi) + 3));
 	else
 		rti->rt6i_qqi = MLD_DEF_QI;
 	rti->rt6i_qri = mldh->mld_code;
@@ -1182,11 +1181,11 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	else
 		rti->rt6i_qri /= MLD_TIMER_SCALE;
 
-	if ((mldh->mld_code > 0) && (mldh->mld_code < 128))
+	if ((mldh->mld_code > 0) && (mldh->mld_code < 32768))
 		timer = mldh->mld_code;
 	else
-		timer = (MLD_MANT(mldh->mld_code) | 0x10)
-			<< (MLD_EXP(mldh->mld_code) + 3);
+		timer = (MLD_MRC_MANT(mldh->mld_code) | 0x1000)
+			<< (MLD_MRC_EXP(mldh->mld_code) + 3);
 
 	/*
 	 * Set interface timer if the query is Generic Query.
