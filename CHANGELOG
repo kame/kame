@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1668 2001/05/09 11:27:24 itojun Exp $
+$KAME: CHANGELOG,v 1.1669 2001/05/10 06:22:55 jinmei Exp $
 
 <200105>
+2001-05-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.bin/telnet/commands.c (tn): corrected a loop for
+	connect(2) after getaddrinfo(3).
+	The fix was from <murakami@pana.net>
+
 Wed May  9 20:15:22 JST 2001  itojun@iijlab.net
 	* ping6/ping6.c: correct signal handling with
 	  "ping6 -f <nonexisting peer>".  from hash@iij.ad.jp.
