@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.4 2003/09/06 03:32:01 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.5 2003/09/06 03:54:11 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -110,6 +110,7 @@
 #endif
 
 struct randomtab {
+	const int	ru_bits; /* resulting bits */
 	const long	ru_out;	/* Time after wich will be reseeded */
 	const u_int32_t ru_max;	/* Uniq cycle, avoid blackjack prediction */
 	const u_int32_t ru_gen;	/* Starting generator */
@@ -129,6 +130,7 @@ struct randomtab {
 };
 
 static struct randomtab randomtab_32 = {
+	32,			/* resulting bits */
 	180,			/* Time after wich will be reseeded */
 	1000000000,		/* Uniq cycle, avoid blackjack prediction */
 	2,			/* Starting generator */
@@ -139,6 +141,7 @@ static struct randomtab randomtab_32 = {
 };
 
 static struct randomtab randomtab_20 = {
+	20,			/* resulting bits */
 	180,			/* Time after wich will be reseeded */
 	200000,			/* Uniq cycle, avoid blackjack prediction */
 	2,			/* Starting generator */
@@ -227,7 +230,7 @@ initid(struct randomtab *p)
 #else
 	p->ru_reseed = time.tv_sec + p->ru_out;
 #endif
-	p->ru_msb = p->ru_msb == 0x80000000 ? 0 : 0x80000000;
+	p->ru_msb = p->ru_msb ? 0 : (1U << (p->ru_bits - 1));
 }
 
 static u_int32_t
