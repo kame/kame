@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.229 2002/02/09 06:49:47 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.230 2002/03/01 02:29:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -851,16 +851,14 @@ key_do_allocsa_policy(sah, state)
 		 * permanent.
 		 */
 		if (d->lft_c->sadb_lifetime_addtime != 0) {
-
 			struct mbuf *m, *result;
 
 			key_sa_chgstate(d, SADB_SASTATE_DEAD);
-			key_freesav(d);
 
 			m = key_setsadbmsg(SADB_DELETE, 0,
-					sav->sah->saidx.proto, 0, 0, d->refcnt);
+			    sav->sah->saidx.proto, 0, 0, d->refcnt - 1);
 			if (!m)
-				return NULL;
+				goto msgfail;
 			result = m;
 
 			/* set sadb_address for saidx's. */
@@ -868,7 +866,7 @@ key_do_allocsa_policy(sah, state)
 				(struct sockaddr *)&d->sah->saidx.src,
 				FULLMASK, IPSEC_ULPROTO_ANY);
 			if (!m)
-				return NULL;
+				goto msgfail;
 			m_cat(result, m);
 
 			/* set sadb_address for saidx's. */
@@ -876,20 +874,20 @@ key_do_allocsa_policy(sah, state)
 				(struct sockaddr *)&d->sah->saidx.dst,
 				FULLMASK, IPSEC_ULPROTO_ANY);
 			if (!m)
-				return NULL;
+				goto msgfail;
 			m_cat(result, m);
 
 			/* create SA extension */
 			m = key_setsadbsa(d);
 			if (!m)
-				return NULL;
+				goto msgfail;
 			m_cat(result, m);
 
 			if (result->m_len < sizeof(struct sadb_msg)) {
 				result = m_pullup(result,
 						sizeof(struct sadb_msg));
 				if (result == NULL)
-					return NULL;
+					goto msgfail;
 			}
 
 			result->m_pkthdr.len = 0;
@@ -900,7 +898,9 @@ key_do_allocsa_policy(sah, state)
 
 			if (key_sendup_mbuf(NULL, result,
 					KEY_SENDUP_REGISTERED))
-				return NULL;
+				goto msgfail;
+		 msgfail:
+			key_freesav(d);
 		}
 	}
 
