@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.50 2004/08/25 08:07:31 sakane Exp $	*/
+/*	$KAME: main.c,v 1.51 2004/09/10 04:55:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -250,6 +250,9 @@ main(ac, av)
 	(void)session();
 
 	exit_program(0, NULL);
+
+	/*NOTREACHED*/
+	exit(0);
 }
 
 #if 0
