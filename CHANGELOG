@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2590 2004/04/15 01:36:22 suz Exp $
+$KAME: CHANGELOG,v 1.2591 2004/04/16 04:57:46 fujisawa Exp $
 
 <200404>
+2004-04-16  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* freebsd4/sys/netinet/ip_input.c:
+	* kame/sys/netinet6/natpt_trans.c:
+	- Fixed a compile error when you enable a NATPT/NATPT-NAT kernel
+	  option.
+
 2004-04-15  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet/icmp6.h: ICMPv6 Type number of MLDv2-Listener-
 	REPORT has been changed to the official one (=143)! 
