@@ -96,12 +96,6 @@ vs network associates
 	こっちがわ、byte lifetimeに虫あり。つねに設定の1024倍のproposalを
 	投げる。
 
-	どっちの挙動が望ましいのか?
-	racoon: lifetime、こっち側のconfig fileに関係なくネゴした結果を
-		kernelにいれる。
-	nai pgp client: lifetimeのネゴは普通に通すが、kernelにいれるのは
-		min(自分のポリシ, ネゴ結果)
-
 vs intel
 	base mode: initiator/responder共に敵がHASHの計算間違っているらしい。
 		再戦予定。
@@ -161,3 +155,16 @@ kame
 	  ポリシをつっこめばよい
 	- acquireの細かいチェック - ahが要求されているのにespをネゴらないように
 	が必要。
+
+	byte lifetime問題。
+	- 片方向だけたくさんtrafficがあると、片方向だけexpireする。
+	  で、ネゴすると逆側はちっともexpireしないので鍵がたくさん溜っていく。
+	- パケットロスがあると、出し側はexpireするのに受け側はexpireしない
+	  場合がある。(問題にはならないと思うが)
+
+	どっちの挙動が望ましいのか?
+	racoon: lifetime、こっち側のconfig fileに関係なくネゴした結果を
+		kernelにいれる。
+	nai pgp client: lifetimeのネゴは普通に通すが、kernelにいれるのは
+		min(自分のポリシ, ネゴ結果)
+
