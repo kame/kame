@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.5 2000/01/10 18:52:19 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.6 2000/01/10 19:48:13 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -374,7 +374,7 @@ ident_i3recv(iph1, msg)
 	/* payload existency check */
 	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
+			"few isakmp message received.\n");
 		goto end;
 	}
 
@@ -869,7 +869,7 @@ ident_r2recv(iph1, msg)
 	/* payload existency check */
 	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
+			"few isakmp message received.\n");
 		goto end;
 	}
 
@@ -1064,7 +1064,7 @@ ident_r3recv(iph1, msg0)
 	}
 	if (ng) {
 		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
+			"few isakmp message received.\n");
 		goto end;
 	}
     }

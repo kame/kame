@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.4 2000/01/10 18:52:18 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.5 2000/01/10 19:48:13 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -276,7 +276,7 @@ agg_i2recv(iph1, msg)
 	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL
 	 || iph1->id_p == NULL || iph1->pl_hash == NULL) {
 		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
+			"few isakmp message received.\n");
 		goto end;
 	}
 
@@ -504,7 +504,7 @@ agg_r1recv(iph1, msg)
 	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL
 	 || iph1->id_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
+			"few isakmp message received.\n");
 		goto end;
 	}
 
