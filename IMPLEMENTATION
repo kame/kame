@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.327 2003/03/08 07:51:28 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.328 2003/03/08 07:56:34 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -775,7 +775,7 @@ related to deprecated address is described in RFC2462 5.5.4 (NOTE:
 there is some debate underway in IETF ipngwg on how to use
 "deprecated" address).
 
-As documented in the source address selection draft, temporary
+As documented in the source address selection document, temporary
 addresses for privacy extension are less preferred to public addresses
 by default.  However, for administrators who are particularly aware of
 the privacy, there is a system-wide sysctl(3) variable
