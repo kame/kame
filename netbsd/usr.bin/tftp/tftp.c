@@ -1,4 +1,4 @@
-/*	$NetBSD: tftp.c,v 1.9.2.1 2000/01/23 12:10:09 he Exp $	*/
+/*	$NetBSD: tftp.c,v 1.11 2000/01/21 17:08:36 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)tftp.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: tftp.c,v 1.9.2.1 2000/01/23 12:10:09 he Exp $");
+__RCSID("$NetBSD: tftp.c,v 1.11 2000/01/21 17:08:36 mycroft Exp $");
 #endif
 #endif /* not lint */
 

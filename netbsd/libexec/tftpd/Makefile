@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.7 1997/10/22 06:03:55 lukem Exp $
+#	$NetBSD: Makefile,v 1.8 1999/07/12 20:17:09 itojun Exp $
 #	from: @(#)Makefile	8.1 (Berkeley) 6/4/93
 
 PROG=	tftpd
