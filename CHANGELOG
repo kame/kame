@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1927 2001/10/23 01:11:39 sakane Exp $
+$KAME: CHANGELOG,v 1.1928 2001/10/23 11:02:11 jinmei Exp $
 
 <200110>
+2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test: removed the -c option introduced on
+	2001-09-16, just because we do not need the function.
+
 Tue Oct 23 10:11:07 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
 	racoon gives up the negotiation when racoon cannot find any pre-shared
