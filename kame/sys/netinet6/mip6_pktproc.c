@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.64 2002/10/03 09:28:17 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.65 2002/10/04 08:58:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1430,7 +1430,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct ip6m_opt_nonce *mopt_nonce = NULL;
 	struct ip6m_opt_authdata *mopt_auth = NULL;
 	int ip6mu_size, pad;
-	int bu_size, nonce_size, auth_size;
+	int bu_size = 0, nonce_size = 0, auth_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
 #if 0
@@ -1513,7 +1513,6 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 #ifdef RR_DBG
 printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, AUTH_SIZE);
 #endif
-	} else {
 		bu_size += PADLEN(bu_size, 8, 0);
 		nonce_size = auth_size = 0;
 	}
@@ -1712,11 +1711,13 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 {
 	struct ip6m_binding_ack *ip6ma;
 	struct ip6m_opt_refresh *mopt_refresh = NULL;
+	struct ip6m_opt_authdata *mopt_auth = NULL;
 	int need_refresh = 0;
 	int need_auth = 0;
 	int ip6ma_size, pad;
-	int ba_size = 0, refresh_size = 0;
+	int ba_size = 0, refresh_size = 0, auth_size = 0;
 	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t *p;
 
 	*pktopt_mobility = NULL;
 
@@ -1725,9 +1726,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		need_refresh = 1;
 		ba_size += PADLEN(ba_size, 2, 0);
 		refresh_size = sizeof(struct ip6m_opt_refresh);
-		refresh_size += PADLEN(ba_size + refresh_size, 8, 0);
 	} else {
-		ba_size += PADLEN(ba_size, 8, 0);
 		refresh_size = 0;
 	}
 	if (mopt && 
@@ -1736,8 +1735,14 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
 		key_bu) == 0) {
 		need_auth = 1;
+		if (refresh_size == 0)
+			ba_size += PADLEN(ba_size, 8, 6);
+		else
+			refresh_size += PADLEN(ba_size + refresh_size, 8, 6);
+		auth_size = AUTH_SIZE;
 	}
-	ip6ma_size = ba_size + refresh_size;
+	ip6ma_size = ba_size + refresh_size + auth_size;
+	ip6ma_size += PADLEN(ip6ma_size, 8, 0);
 
 	MALLOC(ip6ma, struct ip6m_binding_ack *,
 	       ip6ma_size, M_IP6OPT, M_NOWAIT);
@@ -1746,6 +1751,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	if (need_refresh) {
 		mopt_refresh = (struct ip6m_opt_refresh *)((u_int8_t *)ip6ma + ba_size);
 	}
+	if (need_auth)
+		mopt_auth = (struct ip6m_opt_authdata *)((u_int8_t *)ip6ma + ba_size + refresh_size);
 
 	bzero(ip6ma, ip6ma_size);
 
@@ -1758,10 +1765,26 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		htons((u_int16_t)(lifetime >> 2));	/* units of 4 secs */
 
 	/* padN */
+	p = (u_int8_t *)ip6ma + sizeof(struct ip6m_binding_ack);
 	if ((pad = ba_size - sizeof(struct ip6m_binding_ack)) >= 2) {
-		u_char *p = (u_int8_t *)ip6ma + sizeof(struct ip6m_binding_ack);
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
+	}
+	if (refresh_size && 
+	    (p = (u_int8_t *)ip6ma + ba_size + sizeof(struct ip6m_opt_refresh)),
+	    (pad = refresh_size - sizeof(struct ip6m_opt_refresh)) >= 2) {
+		*p = IP6MOPT_PADN;
+		*(p + 1) = pad - 2;
+	}
+	if (auth_size && 
+	    (p = (u_int8_t *)ip6ma + ba_size + refresh_size + AUTH_SIZE),
+	    (pad = auth_size - AUTH_SIZE) >= 2) {
+		*p = IP6MOPT_PADN;
+		*(p + 1) = pad - 2;
+	}
+	if (pad + (pad = ip6ma_size - ba_size + refresh_size + auth_size) >= 2) {
+		*p = IP6MOPT_PADN;
+		*(p + 1) += pad - 2;
 	}
 
 	/* binding refresh advice option */
@@ -1776,9 +1799,17 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	}
 
 	if (need_auth) {
-		/* XXX authorization data processing. */
+		/* authorization data processing. */
+		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
+		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
+		mip6_calculate_authenticator(key_bu, (caddr_t)(mopt_auth + 1),
+			&dst->sin6_addr, &src->sin6_addr,
+			(caddr_t)ip6ma, ip6ma_size,
+			ba_size + refresh_size + sizeof(struct ip6m_opt_authdata),
+			AUTH_SIZE - 2);
 	}
 
+#if 0
 	/* padN */
 	if (refresh_size) {
 		if ((pad = refresh_size - sizeof(struct ip6m_opt_refresh)) >= 2) {
@@ -1788,6 +1819,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 			*(p + 1) = pad - 2;
 		}
 	}
+#endif
 
 	/* calculate checksum. */
 	ip6ma->ip6ma_cksum = mip6_cksum(src, dst, ip6ma_size,
