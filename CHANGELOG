@@ -1,16 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.60 1999/08/24 17:32:33 sumikawa Exp $
+$Id: CHANGELOG,v 1.61 1999/08/24 18:57:53 sumikawa Exp $
 
 <199908>
-Wed Aug 25 02:31:54 JST 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+Wed Aug 25 02:31:54 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* freebsd3/ports/pfs: add pfs(personal file system)
+	* freebsd[23]/ports/emacs20: more sophisticated IPv6
+	supporting. Patched by: wolfgang@wsrcc.com
 
 1999-08-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6dd/debug.c (dump_lcl_grp): added to show status of
 	local listeners with some timer values.
 
-Wed Aug 25 00:12:56 JST 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+Wed Aug 25 00:12:56 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* freebsd[23]/ports/netperf, netbsd/pkgsrc/net/netperf: upgrade to
 	latest IPv6 patch
 
