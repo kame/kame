@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.39 2002/02/09 06:49:46 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.40 2002/02/09 07:30:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -114,8 +114,8 @@
 
 static struct ip6_pktopts ip6_opts;
 static int mld6_timers_are_running;
-static struct sockaddr_in6 all_nodes_linklocal;
-static struct sockaddr_in6 all_routers_linklocal;
+static const struct sockaddr_in6 *all_nodes_linklocal;
+static const struct sockaddr_in6 *all_routers_linklocal;
 
 static void mld6_sendpkt __P((struct in6_multi *, int,
 			      const struct sockaddr_in6 *));
@@ -126,6 +126,9 @@ mld6_init()
 	static u_int8_t hbh_buf[8];
 	struct ip6_hbh *hbh = (struct ip6_hbh *)hbh_buf;
 	u_int16_t rtalert_code = htons((u_int16_t)IP6OPT_RTALERT_MLD);
+
+	static struct sockaddr_in6 all_nodes_linklocal0;
+	static struct sockaddr_in6 all_routers_linklocal0;
 
 	mld6_timers_are_running = 0;
 
@@ -139,13 +142,17 @@ mld6_init()
 	hbh_buf[5] = IP6OPT_RTALERT_LEN - 2;
 	bcopy((caddr_t)&rtalert_code, &hbh_buf[6], sizeof(u_int16_t));
 
-	all_nodes_linklocal.sin6_family = AF_INET6;
-	all_nodes_linklocal.sin6_len = sizeof(struct sockaddr_in6);
-	all_nodes_linklocal.sin6_addr = in6addr_linklocal_allnodes;
+	all_nodes_linklocal0.sin6_family = AF_INET6;
+	all_nodes_linklocal0.sin6_len = sizeof(struct sockaddr_in6);
+	all_nodes_linklocal0.sin6_addr = in6addr_linklocal_allnodes;
 
-	all_routers_linklocal.sin6_family = AF_INET6;
-	all_routers_linklocal.sin6_len = sizeof(struct sockaddr_in6);
-	all_routers_linklocal.sin6_addr = in6addr_linklocal_allrouters;
+	all_nodes_linklocal = &all_nodes_linklocal0;
+
+	all_routers_linklocal0.sin6_family = AF_INET6;
+	all_routers_linklocal0.sin6_len = sizeof(struct sockaddr_in6);
+	all_routers_linklocal0.sin6_addr = in6addr_linklocal_allrouters;
+
+	all_routers_linklocal = &all_routers_linklocal0;
 
 	init_ip6pktopts(&ip6_opts);
 	ip6_opts.ip6po_hbh = hbh;
@@ -169,7 +176,7 @@ mld6_start_listening(in6m)
 	 * MLD messages are never sent for multicast addresses whose scope is 0
 	 * (reserved) or 1 (node-local).
 	 */
-	all_sa = all_nodes_linklocal;
+	all_sa = *all_nodes_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
 			    &all_sa.sin6_scope_id) ||
 	    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
@@ -196,9 +203,9 @@ void
 mld6_stop_listening(in6m)
 	struct in6_multi *in6m;
 {
-	struct sockaddr_in6 all_sa;
+	struct sockaddr_in6 all_sa, allrouter_sa;
 
-	all_sa = all_nodes_linklocal;
+	all_sa = *all_nodes_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
 			    &all_sa.sin6_scope_id) ||
 	    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
@@ -206,14 +213,13 @@ mld6_stop_listening(in6m)
 		return;
 	}
 	/* XXX: necessary when mrouting */
-	if (in6_addr2zoneid(in6m->in6m_ifp,
-			    &all_routers_linklocal.sin6_addr,
-			    &all_routers_linklocal.sin6_scope_id)) {
+	allrouter_sa = *all_routers_linklocal;
+	if (in6_addr2zoneid(in6m->in6m_ifp, &allrouter_sa.sin6_addr,
+			    &allrouter_sa.sin6_scope_id)) {
 		/* XXX impossible */
 		return;
 	}
-	if (in6_embedscope(&all_routers_linklocal.sin6_addr,
-			   &all_routers_linklocal)) {
+	if (in6_embedscope(&allrouter_sa.sin6_addr, &allrouter_sa)) {
 		/* XXX impossible */
 		return;
 	}
@@ -222,7 +228,7 @@ mld6_stop_listening(in6m)
 	    !SA6_ARE_ADDR_EQUAL(&in6m->in6m_sa, &all_sa) &&
 	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) >
 	    IPV6_ADDR_SCOPE_INTFACELOCAL) {
-		mld6_sendpkt(in6m, MLD_LISTENER_DONE, &all_routers_linklocal);
+		mld6_sendpkt(in6m, MLD_LISTENER_DONE, &allrouter_sa);
 	}
 }
 
@@ -304,7 +310,7 @@ mld6_input(m, off)
 		    !IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
 			break;	/* print error or log stat? */
 
-		all_sa = all_nodes_linklocal;
+		all_sa = *all_nodes_linklocal;
 		if (in6_addr2zoneid(ifp, &all_sa.sin6_addr,
 				    &all_sa.sin6_scope_id) ||
 		    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
