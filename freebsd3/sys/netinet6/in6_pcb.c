@@ -1097,3 +1097,22 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 	 */
 	return (NULL);
 }
+
+void
+init_sin6(struct sockaddr_in6 *sin6, struct mbuf *m)
+{
+	struct ip6_hdr *ip;
+
+	ip = mtod(m, struct ip6_hdr *);
+	bzero(sin6, sizeof(*sin6));
+	sin6->sin6_len = sizeof(*sin6);
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_addr = ip->ip6_src;
+	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
+		sin6->sin6_addr.s6_addr16[1] = 0;
+	sin6->sin6_scope_id =
+		(m->m_pkthdr.rcvif && IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
+		? m->m_pkthdr.rcvif->if_index : 0;
+
+	return;
+}
