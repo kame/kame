@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.230 2005/02/15 19:05:59 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.231 2005/02/23 22:59:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2695,15 +2695,15 @@ ipsec4_logpacketstr(ip, spi)
 
 	p = buf;
 	snprintf(buf, sizeof(buf), "packet(SPI=%u ", (u_int32_t)ntohl(spi));
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), "src=%u.%u.%u.%u",
 		s[0], s[1], s[2], s[3]);
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), " dst=%u.%u.%u.%u",
 		d[0], d[1], d[2], d[3]);
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), ")");
 
@@ -2721,15 +2721,15 @@ ipsec6_logpacketstr(ip6, spi)
 
 	p = buf;
 	snprintf(buf, sizeof(buf), "packet(SPI=%u ", (u_int32_t)ntohl(spi));
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), "src=%s",
 		ip6_sprintf(&ip6->ip6_src));
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), " dst=%s",
 		ip6_sprintf(&ip6->ip6_dst));
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), ")");
 
@@ -2752,7 +2752,7 @@ ipsec_logsastr(sav)
 
 	p = buf;
 	snprintf(buf, sizeof(buf), "SA(SPI=%u ", (u_int32_t)ntohl(sav->spi));
-	while (p && *p)
+	while (*p)
 		p++;
 	if (((struct sockaddr *)&saidx->src)->sa_family == AF_INET) {
 		u_int8_t *s, *d;
@@ -2767,14 +2767,14 @@ ipsec_logsastr(sav)
 		snprintf(p, sizeof(buf) - (p - buf),
 			"src=%s",
 			ip6_sprintf(&((struct sockaddr_in6 *)&saidx->src)->sin6_addr));
-		while (p && *p)
+		while (*p)
 			p++;
 		snprintf(p, sizeof(buf) - (p - buf),
 			" dst=%s",
 			ip6_sprintf(&((struct sockaddr_in6 *)&saidx->dst)->sin6_addr));
 	}
 #endif
-	while (p && *p)
+	while (*p)
 		p++;
 	snprintf(p, sizeof(buf) - (p - buf), ")");
 
