@@ -40,6 +40,7 @@
 struct fetch_state {
 	const char *fs_status;
 	const char *fs_outputfile;
+	int fs_family;		/* -4, -6 option */
 	int fs_verbose;		/* -q, -v option */
 	int fs_newtime;		/* -n option */
 	int fs_mirror;		/* -m option */

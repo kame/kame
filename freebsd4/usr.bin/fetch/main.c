@@ -27,6 +27,7 @@
 /* $FreeBSD: src/usr.bin/fetch/main.c,v 1.55 2000/03/08 13:02:11 cracauer Exp $ */
 
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #include <err.h>
 #include <errno.h>
@@ -52,7 +53,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-		"usage: fetch [-ADHILMNPRTVablFmnpqrstv] [-o outputfile] "
+		"usage: fetch [-46ADHILMNPRTVablFmnpqrstv] [-o outputfile] "
 		"[-S bytes]\n"
 		"             [-f file -h host [-c dir] | URL]\n");
 	exit(EX_USAGE);
@@ -71,14 +72,27 @@ main(int argc, char *const *argv)
 
     init_schemes();
     fs = clean_fetch_state;
+#ifdef INET6
+    fs.fs_family = AF_UNSPEC;
+#else
+    fs.fs_family = AF_INET;
+#endif
     fs.fs_verbose = 1;
     fs.fs_reportsize = 0;
     fs.fs_expectedsize = -1;
     change_to_dir = file_to_get = hostname = 0;
 
-#define OPT_STRING	"Aabc:D:Ff:h:HIlLmMnNo:pPqRrS:stT:vV:"
+#define OPT_STRING	"46Aabc:D:Ff:h:HIlLmMnNo:pPqRrS:stT:vV:"
     while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 	    switch (c) {
+	    case '4':
+		    fs.fs_family = AF_INET;
+		    break;
+
+	    case '6':
+		    fs.fs_family = AF_INET6;
+		    break;
+
 	    case 'A':
 		    fs.fs_auto_retry = -1;
 		    break;

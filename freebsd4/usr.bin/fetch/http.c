@@ -131,6 +131,7 @@ http_parse(struct fetch_state *fs, const char *u)
 	char *hostname, *hosthdr, *trimmed_name, *uri, *ques, saveq = 0;
 	unsigned port;
 	struct http_state *https;
+	const char *hint;	/* hint pointer for hostname termination */
 
 	uri = alloca(strlen(u) + 1);
 	strcpy(uri, u);
@@ -145,13 +146,25 @@ http_parse(struct fetch_state *fs, const char *u)
 
 	p += 2;
 
-	if ((ques = strpbrk(p, "?#")) != NULL) {
+	hint = p;
+#ifdef INET6
+	if (p[0] == '[') {
+		q = strchr(p, ']');
+		if (!q) {
+			warnx("`%s': malformed `http' URL", uri);
+			return EX_USAGE;
+		}
+		hint = q + 1;
+	}
+#endif /* INET6 */
+
+	if ((ques = strpbrk(hint, "?#")) != NULL) {
 		saveq = *ques;
 		*ques = '\0';
 	}
 
-	colon = strchr(p, ':');
-	slash = strchr(p, '/');
+	colon = strchr(hint, ':');
+	slash = strchr(hint, '/');
 	if (colon && slash && colon < slash)
 		q = colon;
 	else
@@ -160,6 +173,16 @@ http_parse(struct fetch_state *fs, const char *u)
 		warnx("`%s': malformed `http' URL", uri);
 		return EX_USAGE;
 	}
+#ifdef INET6
+	if (p[0] == '[') {
+		if (q != hint) {
+			warnx("`%s': malformed `http' URL", uri);
+			return EX_USAGE;
+		}
+		p++;
+		q--;
+	} 
+#endif
 	hostname = alloca(q - p + 1);
 	hostname[0] = '\0';
 	strncat(hostname, p, q - p);
@@ -424,8 +447,8 @@ http_retrieve(struct fetch_state *fs)
 {
 	struct http_state *https;
 	FILE *remote, *local;
-	int s;
-	struct sockaddr_in sin;
+	int s = -1, gai_err;
+	struct addrinfo hints, *res, *res0;
 	struct msghdr msg;
 #define NIOV	16	/* max is currently 14 */
 	struct iovec iov[NIOV];
@@ -473,28 +496,21 @@ http_retrieve(struct fetch_state *fs)
 		timo = 0;
 	}
 
-	memset(&sin, 0, sizeof sin);
-	sin.sin_family = AF_INET;
-	sin.sin_len = sizeof sin;
-	sin.sin_port = htons(https->http_port);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = fs->fs_family;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
 
 	fs->fs_status = "looking up hostname";
-	if (inet_aton(https->http_hostname, &sin.sin_addr) == 0) {
-		struct hostent *hp;
-
-		/* XXX - do timeouts for name resolution? */
-		hp = gethostbyname2(https->http_hostname, AF_INET);
-		if (hp == 0) {
-			warnx("`%s': cannot resolve: %s", https->http_hostname,
-			      hstrerror(h_errno));
-			return EX_NOHOST;
-		}
-		memcpy(&sin.sin_addr, hp->h_addr_list[0], sizeof sin.sin_addr);
+	/* XXX - do timeouts for name resolution? */
+	gai_err = getaddrinfo(https->http_hostname, NULL, &hints, &res0);
+	if (gai_err) {
+		warnx("`%s': cannot resolve: %s", https->http_hostname,
+		      gai_strerror(gai_err));
+		return EX_NOHOST;
 	}
 
 	fs->fs_status = "creating request message";
-	msg.msg_name = (caddr_t)&sin;
-	msg.msg_namelen = sizeof sin;
 	msg.msg_iov = iov;
 	n = 0;
 	msg.msg_control = 0;
@@ -588,9 +604,42 @@ retry:
 	if (n >= NIOV)
 		err(EX_SOFTWARE, "request vector length exceeded: %d", n);
 
-	s = socket(PF_INET, SOCK_STREAM, 0);
+	fs->fs_status = "sending request message";
+	setup_sigalrm();
+
+	for (res = res0; res; res = res->ai_next) {
+		alarm(timo);
+		msg.msg_name = (caddr_t)res->ai_addr;
+		msg.msg_namelen = res->ai_addrlen;
+		((struct sockaddr_in *) res->ai_addr)->sin_port = htons(https->http_port); /* XXX */
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0)
+			continue;
+		/*
+		 * Some hosts do not correctly handle data in SYN segments.
+		 * If no connect(2) is done, the TCP stack will send our
+		 * initial request as such a segment.  fs_use_connect works
+		 * around these broken server TCPs by avoiding this case.
+		 * It is not the default because we want to exercise this
+		 * code path, and in any case the majority of hosts handle
+		 * our default correctly.
+		 */
+#ifdef __KAME__
+		/* not support T/TCP */
+		if (!fs->fs_use_connect && res->ai_family != AF_INET6)
+			break;
+#else /* __KAME__ */
+		if (!fs->fs_use_connect)
+			break;
+#endif /* __KAME__ */
+		if (connect(s, res->ai_addr, res->ai_addrlen) >= 0)
+			break;
+		close(s);
+	}
+	freeaddrinfo(res0);
 	if (s < 0) {
-		warn("socket");
+		warn("connect: %s", https->http_hostname);
+		unsetup_sigalrm();
 		return EX_OSERR;
 	}
 
@@ -601,26 +650,7 @@ retry:
 		return EX_OSERR;
 	}
 
-	fs->fs_status = "sending request message";
-	setup_sigalrm();
 	alarm(timo);
-
-	/*
-	 * Some hosts do not correctly handle data in SYN segments.
-	 * If no connect(2) is done, the TCP stack will send our
-	 * initial request as such a segment.  fs_use_connect works
-	 * around these broken server TCPs by avoiding this case.
-	 * It is not the default because we want to exercise this
-	 * code path, and in any case the majority of hosts handle
-	 * our default correctly.
-	 */
-	if (fs->fs_use_connect && (connect(s, (struct sockaddr *)&sin, 
-                                   sizeof(struct sockaddr_in)) < 0)) {
-		warn("connect: %s", https->http_hostname);
-		fclose(remote);
-		return EX_OSERR;
-	}
-
 	if (sendmsg(s, &msg, fs->fs_linux_bug ? 0 : MSG_EOF) < 0) {
 		warn("sendmsg: %s", https->http_hostname);
 		fclose(remote);
