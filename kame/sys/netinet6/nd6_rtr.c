@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.113 2001/05/31 03:59:29 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.114 2001/05/31 04:25:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1382,7 +1382,7 @@ prelist_update(new, dr, m)
 		 * XXX: from the ND point of view, we can ignore a prefix
 		 * with the on-link bit being zero.  However, we need a
 		 * prefix structure for references from autoconfigured
-		 * addresses.  Thus, we explicitly make suret that the prefix
+		 * addresses.  Thus, we explicitly make sure that the prefix
 		 * itself expires now.
 		 */
 		if (newpr->ndpr_raf_onlink == 0) {
