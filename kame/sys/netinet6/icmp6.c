@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.380 2004/03/26 03:34:16 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.381 2004/04/03 12:16:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,11 +144,11 @@
 #endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
+#include <net/net_osdep.h>
+
 #ifdef MLDV2
 #include <netinet6/in6_msf.h>
 #endif
-
-#include <net/net_osdep.h>
 
 #ifdef HAVE_NRL_INPCB
 /* inpcb members */

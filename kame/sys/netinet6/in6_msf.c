@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.26 2004/03/24 09:03:29 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.27 2004/04/03 12:16:20 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -96,11 +96,11 @@
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/mld6_var.h>
-#include <netinet6/in6_msf.h>
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4) || defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <net/net_osdep.h>
+#include <netinet6/in6_msf.h>
 
 #ifdef HAVE_NRL_INPCB
 #define in6pcb		inpcb
