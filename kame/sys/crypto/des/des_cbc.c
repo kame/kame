@@ -1,4 +1,4 @@
-/*	$KAME: des_cbc.c,v 1.4 2000/06/14 10:41:17 itojun Exp $	*/
+/*	$KAME: des_cbc.c,v 1.5 2000/08/31 07:27:27 itojun Exp $	*/
 
 /*
  * heavily modified by Yoshifumi Nishida <nishida@sfc.wide.ad.jp>.
@@ -52,6 +52,10 @@
  * [including the GNU Public Licence.]
  */
 
+#include <sys/param.h>
+#include <sys/malloc.h>
+#include <sys/systm.h>
+#include <sys/mbuf.h>
 #include <crypto/des/des_locl.h>
 
 #define panic(x) do {printf(x); return EINVAL;} while (0)
