@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2681 2004/11/18 08:37:06 jinmei Exp $
+$KAME: CHANGELOG,v 1.2682 2004/11/19 04:51:50 jinmei Exp $
 
 <200411>
 2004-11-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -11,8 +11,7 @@ $KAME: CHANGELOG,v 1.2681 2004/11/18 08:37:06 jinmei Exp $
 
 2004-11-18  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/route6.c (route6_input): removed the previous
-	fix on Nov 12, since it can lead to a buffer overrun. (RFC2460 
-	section 4.4 needs an update)
+	fix on Nov 12, since it can lead to a buffer overrun.
 
 Tue Nov 16 14:50:50 JST 2004  itojun@iijlab.net
 	* openbsd: switch to 3.6.
