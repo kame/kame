@@ -2,10 +2,22 @@
 
 			     KAME Project
 
-		     $Date: 2000/02/17 07:07:49 $
+		     $Date: 2000/03/30 06:44:17 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
+
+BACKWARD COMPATIBILITY NOTICE
+=============================
+Please understand that the KAME kit is, from its nature, a distribution of
+very experimental set of software.  Do not assume ANY backward copmatibility,
+for source, binary nor configuration file, between different version of
+KAME kits.  This means that, to make sure code works, you MUST recompile
+everything every time you upgrade KAME kit.  We are not ignoring backward
+compatibility issues, however, we do not necessarily provide it.
+
+The caveat does not apply to KAME code merged into *BSD - merged code will
+obey the backward compatibility policy decided by *BSD team.
 
 KNOWN BUGS/TWISTS
 =================
