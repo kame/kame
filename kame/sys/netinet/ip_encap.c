@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.85 2002/10/25 22:56:45 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.86 2003/01/11 07:11:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -400,7 +400,7 @@ encap4_input(m, va_alist)
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off);
-#else
+#else /* freebsd2, freebsd3, bsdi3, bsdi4 */
 #ifdef MROUTING
 	if (proto == IPPROTO_IPV4) {
 		ipip_input(m, off, proto);
@@ -409,7 +409,7 @@ encap4_input(m, va_alist)
 #endif
 
 	/* last resort: inject to raw socket */
-	rip_input(m, off);
+	rip_input(m, off, proto);
 #endif
 }
 #endif
