@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.7 2002/09/24 14:20:50 itojun Exp $	*/
+/*	$KAME: prefixconf.c,v 1.8 2002/12/12 09:46:58 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -501,7 +501,7 @@ add_ifprefix(siteprefix, prefix, pconf)
 	    ifpfx->plen + pconf->ifid_len > 128) {
 		dprintf(LOG_INFO, FNAME
 			"invalid prefix length %d + %d + %d",
-			prefix->plen, ifpfx->plen, pconf->ifid_len);
+			prefix->plen, pconf->sla->plen, pconf->ifid_len);
 		goto bad;
 	}
 
