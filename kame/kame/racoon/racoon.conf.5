@@ -232,6 +232,9 @@ define default lifetime of phase 1 SA.
 .It Ic keepalive
 Not yet.
 .\"
+.It Ic initial_contact (on \(ba off) ;
+enable to send INITIAL-CONTACT message.
+.\"
 .It Ic nonce_size Ar number ;
 define the byte size of nonce value.
 .\"
@@ -352,10 +355,15 @@ specifyed padding format.
 The followings are the list of statements.
 .Bl -tag -width Ds -compact
 .It Ic randomize (on \(ba off) ;
+enable to randomize a value in padding.
 .It Ic randomize_length (on \(ba off) ;
+enable to randomize length of padding.
 .It Ic maximum_length Ar number ;
-.It Ic strict_check (on \(ba off) ;
+define a maximum length of padding.
 .It Ic exclusive_tail (on \(ba off) ;
+means to set the number of pad bytes minus one into last part of the padding.
+.It Ic strict_check (on \(ba off) ;
+means to be constrained the peer to set the number of pad bytes.
 .El
 .El
 .\"
