@@ -2968,8 +2968,12 @@ int
 ip6_optlen(in6p)
 	struct in6pcb *in6p;
 {
-	int len = 0;
+	int len;
 
+        if (!in6p->in6p_outputopts)
+                return 0;
+
+	len = 0;
 #define elen(x) \
     (((struct ip6_ext *)(x)) ? (((struct ip6_ext *)(x))->ip6e_len + 1) << 3 : 0)
 
