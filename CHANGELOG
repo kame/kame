@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2059 2002/01/23 05:16:39 jinmei Exp $
+$KAME: CHANGELOG,v 1.2060 2002/01/26 02:52:15 sakane Exp $
 
 <200201>
+Sat Jan 26 11:50:54 JST 2002 sakane@kame.net
+	* kame/kame/racoon:
+	the port number in the phase1 identifier is set 500
+	when the identifier type is the ip address
+	although it is described ambiguity in RFC2407 4.6.2.
+
 2002-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): checked the
 	IPV6_MINMTU flag in ip6_output as well as the IP6PO_MINMTU flag in
