@@ -1,7 +1,7 @@
 Configuring FAITH IPv6-to-IPv4 TCP relay
 
 Kazu Yamamoto and Jun-ichiro itojun Hagino
-$Id: README,v 1.2 1999/12/21 01:37:06 itojun Exp $
+$KAME: README,v 1.3 2000/05/31 03:08:04 itojun Exp $
 
 
 Introduction
