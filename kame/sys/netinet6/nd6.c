@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.351 2004/04/09 05:40:56 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.352 2004/04/09 05:43:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1558,8 +1558,8 @@ nd6_rtrequest(req, rt, sa)
 					break;
 				if (in6_embedscope(&llsol.sin6_addr, &llsol))
 					break;
-				if (in6_addmulti(&llsol.sin6_addr, ifp, &error) == NULL)
-				{
+				if (in6_addmulti(&llsol.sin6_addr, ifp, &error)
+				    == NULL) {
 					nd6log((LOG_ERR, "%s: failed to join "
 					    "%s (errno=%d)\n", if_name(ifp),
 					    ip6_sprintf(&llsol.sin6_addr),
