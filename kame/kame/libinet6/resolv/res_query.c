@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.8 2000/04/27 01:34:47 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.9 2000/04/27 16:33:02 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -388,7 +388,11 @@ hostalias(name)
 	 * forbid hostaliases for setuid binray, due to possible security
 	 * breach.
 	 */
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	if (issetugid())
+#else
 	if (getuid() != geteuid() || getgid() != getegid())
+#endif
 		return (NULL);
 	file = getenv("HOSTALIASES");
 	if (file == NULL || (fp = fopen(file, "r")) == NULL)
