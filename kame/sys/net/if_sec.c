@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.9 2001/07/26 20:11:53 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.10 2001/07/27 08:25:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -186,7 +186,7 @@ sec_destroy(ifp)
 
 	return ENOENT;
 #else
-	return EOPNOTUSPP;
+	return EOPNOTSUPP;
 #endif
 }
 
