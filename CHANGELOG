@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2683 2004/11/27 12:22:10 jinmei Exp $
+$KAME: CHANGELOG,v 1.2684 2004/11/27 12:56:49 jinmei Exp $
 
 <200411>
+2004-11-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (set_source): fixed a bug that
+	deprecated source addresses was not correctly identified for
+	address ordering (RFC3484).
+
 2004-11-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c: suppress AAAA queries if the
 	node does not have IPv6 addresses other than the loopback and
