@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_cbq.c,v 1.2 2000/10/18 09:15:16 kjc Exp $	*/
+/*	$KAME: qdisc_cbq.c,v 1.3 2000/12/29 06:39:27 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -121,8 +121,8 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 			printf(" offtime: %d [us] wrr_allot: %d bytes\n",
 			       sp->offtime, sp->wrr_allot);
 			printf("\tnsPerByte: %d", sp->ns_per_byte);
-			printf("\t(%s Mbps),", rate2str(flow_bps));
-			printf("\tMeasured: %s [Mbps]\n",
+			printf("\t(%sbps),", rate2str(flow_bps));
+			printf("\tMeasured: %s [bps]\n",
 			       rate2str(calc_rate(sp->xmit_cnt.bytes,
 						  lp->xmit_cnt.bytes, sec)));
 			printf("\tpkts: %llu,\tbytes: %llu\n",
