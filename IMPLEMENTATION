@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/19 12:06:16 $
+			$Date: 2000/01/20 12:07:50 $
 
 1. IPv6
 
@@ -101,6 +101,10 @@ draft-ietf-ipngwg-rfc2292bis-01.txt:
 	A revised version of the advanced API
     * Some of the draft have not been implemented. See TODO.2292bis
       for more details.
+draft-ietf-ngtrans-tcpudp-relay-00.txt:
+	An IPv6-to-IPv4 transport relay translator
+    * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
+      details.
 
 1.2 Neighbor Discovery
 
