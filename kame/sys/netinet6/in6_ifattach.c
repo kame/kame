@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.122 2001/07/10 09:14:43 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.123 2001/07/10 09:59:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1109,10 +1109,12 @@ in6_ifdetach(ifp)
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	/* leave from all multicast groups joined */
+
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	in6_pcbpurgeif0(LIST_FIRST(udbinfo.listhead), ifp);
 	in6_pcbpurgeif0(LIST_FIRST(ripcbinfo.listhead), ifp);
-#else
+#endif
+
 	for (in6m = LIST_FIRST(&in6_multihead); in6m; in6m = in6m_next) {
 		in6m_next = LIST_NEXT(in6m, in6m_entry);
 		if (in6m->in6m_ifp != ifp)
@@ -1120,7 +1122,6 @@ in6_ifdetach(ifp)
 		in6_delmulti(in6m);
 		in6m = NULL;
 	}
-#endif
 #endif
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
