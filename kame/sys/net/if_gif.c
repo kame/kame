@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.97 2002/11/11 18:25:24 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.98 2003/01/10 08:24:33 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,7 +204,7 @@ gifattach0(sc)
 #endif
 	IFQ_SET_READY(&sc->gif_if.if_snd);
 	if_attach(&sc->gif_if);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	if_alloc_sadl(&sc->gif_if);
 #endif
 #if NBPFILTER > 0
