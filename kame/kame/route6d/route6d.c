@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.30 2000/06/04 06:48:03 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.31 2000/07/10 07:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.30 2000/06/04 06:48:03 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.31 2000/07/10 07:24:48 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -56,9 +56,7 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.30 2000/06/04 06:48:03 itojun Exp $
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
-#ifdef ADVAPI
 #include <sys/uio.h>
-#endif
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
@@ -515,10 +513,7 @@ ripalarm(sig)
 void
 init()
 {
-#ifdef ADVAPI
-	int	i;
-#endif
-	int	int0, int255, error;
+	int	i, int0, int255, error;
 	struct	addrinfo hints, *res;
 	char	port[10];
 
@@ -550,7 +545,7 @@ init()
 	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
 		&int0, sizeof(int0)) < 0)
 		fatal("rip IPV6_MULTICAST_LOOP");
-#ifdef ADVAPI
+
 	i = 1;
 #ifdef IPV6_RECVPKTINFO
 	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &i,
@@ -561,7 +556,6 @@ init()
 		       sizeof(i)) < 0)
 		fatal("rip IPV6_PKTINFO");
 #endif 
-#endif /*ADVAPI*/
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
@@ -830,7 +824,6 @@ sendpacket(sin, len)
 	 * RIP6_REQUEST message. SO_DONTROUTE has been specified to
 	 * other sockets.
 	 */
-#ifdef ADVAPI
 	struct msghdr m;
 	struct cmsghdr *cm;
 	struct iovec iov[2];
@@ -877,13 +870,7 @@ sendpacket(sin, len)
 		trace(1, "sendmsg: %s\n", strerror(errno));
 		return errno;
 	}
-#else
-	if (sendto(ripsock, ripbuf, len, 0 /*MSG_DONTROUTE*/,
-		(struct sockaddr *)sin, sizeof(struct sockaddr_in6)) < 0) {
-		trace(1, "sendto: %s\n", strerror(errno));
-		return errno;
-	}
-#endif
+
 	return 0;
 }
 
@@ -901,24 +888,19 @@ riprecv()
 	struct	netinfo6 *np, *nq;
 	struct	riprt *rrt;
 	int	len, nn, need_trigger, index;
-#ifndef ADVAPI
-	int	flen;
-#endif
 	char	buf[4 * RIP6_MAXMTU];
 	time_t	t;
-#ifdef ADVAPI
 	struct msghdr m;
 	struct cmsghdr *cm;
 	struct iovec iov[2];
 	u_char cmsgbuf[256];
 	struct in6_pktinfo *pi;
-#endif /*ADVAPI*/
 	struct iff *iffp;
 	struct in6_addr ia;
 	int ok;
 
 	need_trigger = 0;
-#ifdef ADVAPI
+
 	m.msg_name = (caddr_t)&fsock;
 	m.msg_namelen = sizeof(fsock);
 	iov[0].iov_base = (caddr_t)buf;
@@ -943,16 +925,6 @@ riprecv()
 	}
 	if (index && IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr))
 		SET_IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr, index);
-#else
-	flen = sizeof(struct sockaddr_in6);
-	if ((len = recvfrom(ripsock, buf, sizeof(buf), 0,
-		(struct sockaddr *)&fsock, &flen)) < 0)
-		fatal("recvfrom");
-	if (IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr))
-		index = IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr);
-	else
-		index = 0;
-#endif /*ADVAPI*/
 
 	nh = fsock.sin6_addr;
 	nn = (len - sizeof(struct rip6) + sizeof(struct netinfo6)) /
