@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.28 2000/01/11 01:57:55 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.29 2000/01/11 02:03:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1803,7 +1803,7 @@ copy_ph1addresses(iph1, rmconf)
 		return -1;
 	}
 	_INPORTBYSA(iph1->remote) = _INPORTBYSA(rmconf->remote);
-	iph1->local = getlocaladdr(rmconf->remote);
+	iph1->local = getlocaladdr(iph1->remote);
 	if (iph1->local == NULL) {
 		delph1(iph1);
 		return -1;
