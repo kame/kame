@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.77 2001/07/31 04:06:47 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.78 2001/08/02 15:54:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1095,16 +1095,20 @@ getans_dns(buf, len, from)
 	if (dflag)
 		dnsdump("getans I", buf, len, from);
 
-	/* we handle successful replies only  XXX negative cache */
-	if (hp->qr != 1 || hp->rcode != NOERROR)
-		return -1;
-
 	for (qc = LIST_FIRST(&qcache); qc; qc = LIST_NEXT(qc, link)) {
 		if (hp->id == qc->id)
 			break;
 	}
 	if (!qc)
 		return -1;
+
+	/*
+	 * only handle successful replies over multicast, any reply
+         * over unicast
+         */
+	if (hp->qr != 1 || (qc->type == N_MULTICAST && hp->rcode != NOERROR))
+		return -1;
+
 	ohp = (HEADER *)qc->qbuf;
 
 	/* validate reply against original query */
@@ -1549,7 +1553,8 @@ relay_dns(sd, buf, len, from)
 
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query - relay it */
-		qc = newqcache(from, buf, len);
+		qc = newqcache(from, buf, len,
+		    multicast ? N_MULTICAST : N_UNICAST);
 		gettimeofday(&qc->ttq, NULL);
 		qc->ttq.tv_sec += MDNS_TIMEO;
 		qc->sd = sd;
@@ -1713,7 +1718,7 @@ relay_icmp6(sd, buf, len, from)
 		dnsdump("relay I", buf, len, from);
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query - relay it */
-		qc = newqcache(from, buf, len);
+		qc = newqcache(from, buf, len, N_MULTICAST);
 		gettimeofday(&qc->ttq, NULL);
 		qc->ttq.tv_sec += MDNS_TIMEO;
 		qc->sd = sd;

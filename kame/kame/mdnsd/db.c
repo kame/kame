@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.12 2001/07/30 23:38:33 itojun Exp $	*/
+/*	$KAME: db.c,v 1.13 2001/08/02 15:54:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -150,10 +150,11 @@ dbtimeo()
 }
 
 struct qcache *
-newqcache(from, buf, len)
+newqcache(from, buf, len, type)
 	const struct sockaddr *from;
 	char *buf;
 	int len;
+	enum nstype type;
 {
 	struct qcache *qc;
 
@@ -174,6 +175,7 @@ newqcache(from, buf, len)
 	memcpy(qc->from, from, from->sa_len);
 	memcpy(qc->qbuf, buf, len);
 	qc->qlen = len;
+	qc->type = type;
 
 	LIST_INSERT_HEAD(&qcache, qc, link);
 	return qc;

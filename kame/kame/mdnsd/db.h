@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.16 2001/07/30 23:38:33 itojun Exp $	*/
+/*	$KAME: db.h,v 1.17 2001/08/02 15:54:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,6 +30,7 @@
  */
 
 struct sockdb;
+enum nstype { N_UNICAST, N_MULTICAST };
 struct qcache {
 	LIST_ENTRY(qcache) link;
 	struct sockaddr_storage from_ss;
@@ -40,6 +41,7 @@ struct qcache {
 	struct sockdb *sd;	/* inbound socket for query */
 	struct timeval ttq;	/* time to quit */
 	size_t rbuflen;	/* receive buffer size of the querier - for EDNS0 */
+	enum nstype type;	/* mcast or unicast */
 };
 
 struct acache {
@@ -58,7 +60,6 @@ struct scache {
 	int sockidx;
 };
 
-enum nstype { N_UNICAST, N_MULTICAST };
 struct nsdb {
 	LIST_ENTRY(nsdb) link;
 	struct sockaddr_storage addr_ss;
@@ -91,7 +92,8 @@ extern LIST_HEAD(nshead, nsdb) nsdb;
 extern LIST_HEAD(sockhead, sockdb) sockdb;
 
 extern int dbtimeo __P((void));
-extern struct qcache *newqcache __P((const struct sockaddr *, char *, int));
+extern struct qcache *newqcache __P((const struct sockaddr *, char *, int,
+	enum nstype));
 extern void delqcache __P((struct qcache *));
 extern struct scache *newscache __P((int, const struct sockaddr *,
 	const struct sockaddr *, char *, int));
