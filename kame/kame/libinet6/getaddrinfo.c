@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.173 2004/04/15 15:15:57 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.174 2004/04/18 08:19:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1363,7 +1363,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 		for (cur = *res; cur; cur = cur->ai_next) {
 			if (cur->ai_family != AF_INET6)
 				continue;
-			sin6 = (struct sockaddr_in6 *)(void *)cur->ai_addr;
+			sin6 = (struct sockaddr_in6 *)cur->ai_addr;
 			if (ip6_str2scopeid(scope, sin6, &scopeid) == -1) {
 				free(hostname2);
 				freeaddrinfo(*res);
