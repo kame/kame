@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.69 2001/10/01 11:33:43 keiichi Exp $	*/
+/*	$KAME: in6_gif.c,v 1.70 2001/10/02 03:36:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -619,12 +619,15 @@ in6_gif_ctlinput(cmd, sa, d)
 	 * ip_encap.c.
 	 */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	for (i = 0; i < ngif; i++) {
-		sc = gif_softc + i;
+	for (i = 0; i < ngif; i++
 #else
 	for (sc = TAILQ_FIRST(&gifs);
 	     sc;
-	     sc = TAILQ_NEXT(sc, gif_link)) {
+	     sc = TAILQ_NEXT(sc, gif_link))
+#endif
+	{
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+		sc = gif_softc + i;
 #endif
 
 		if ((sc->gif_if.if_flags & IFF_RUNNING) == 0)
