@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.352 2003/06/28 03:56:15 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.353 2003/08/06 14:45:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3200,8 +3200,8 @@ icmp6_redirect_output(m0, rt)
 		m->m_pkthdr.len = m->m_len = p - (u_char *)ip6;
 
 		/* connect m0 to m */
-		m_cat(m, m0);
 		m->m_pkthdr.len += m0->m_pkthdr.len;
+		m_cat(m, m0);
 		m0 = NULL;
 	}
 noredhdropt:

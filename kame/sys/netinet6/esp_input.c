@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.82 2003/07/09 04:02:46 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.83 2003/08/06 14:45:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -923,9 +923,9 @@ noreplaycheck:
 				goto bad;
 			}
 			m_adj(n, stripsiz);
-			m_cat(m, n);
 			/* m_cat does not update m_pkthdr.len */
 			m->m_pkthdr.len += n->m_pkthdr.len;
+			m_cat(m, n);
 		}
 
 #ifndef PULLDOWN_TEST
