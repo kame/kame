@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.65 1999/08/25 11:01:04 sumikawa Exp $
+$Id: CHANGELOG,v 1.66 1999/08/25 13:48:22 itojun Exp $
 
 <199908>
+Wed Aug 25 22:45:15 JST 1999  itojun@iijlab.net
+	* kame/rtsold: Fix segv when invoked as normal user, not root.
+	  do not wait forever if -1 is specified (or invoked as rtsol).
+	  From: Takashi_Tanaka@yokogawa.co.jp
+
 Wed Aug 25 19:59:49 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp3: upgrade to
 	latest IPv6 patch
