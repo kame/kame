@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.88 2000/09/05 06:50:04 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.89 2000/09/05 13:35:59 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,7 +672,7 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_RECVDSTOPTS)");
-#else  /* olad adv. API */
+#else  /* old adv. API */
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_DSTOPTS)");
@@ -781,7 +781,7 @@ main(argc, argv)
 
 			if ((error = getaddrinfo(argv[hops], NULL, &hints, &iaip)))
 				errx(1, gai_strerror(error));
-			if (SIN6(res->ai_addr)->sin6_family != AF_INET6)
+			if (SIN6(iaip->ai_addr)->sin6_family != AF_INET6)
 				errx(1,
 				     "bad addr family of an intermediate addr");
 
@@ -795,6 +795,7 @@ main(argc, argv)
 					    IPV6_RTHDR_LOOSE))
 				errx(1, "can't add an intermediate node");
 #endif /* USE_RFC2292BIS */
+			freeaddrinfo(iaip);
 		}
 
 #ifndef USE_RFC2292BIS
