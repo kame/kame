@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.27 2000/02/26 09:43:07 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.28 2000/02/26 09:44:10 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -335,7 +335,7 @@ udp6_stats(off, name)
 	p1(udp6s_nosum, "\t%llu with no checksum\n");
 	p1(udp6s_noport, "\t%llu dropped due to no socket\n");
 	p(udp6s_noportmcast,
-		"\t%llu multicast datagram%s dropped due to no socket\n");
+	    "\t%llu multicast datagram%s dropped due to no socket\n");
 	p1(udp6s_fullsock, "\t%llu dropped due to full socket buffers\n");
 	delivered = udp6stat.udp6s_ipackets -
 		    udp6stat.udp6s_hdrops -
