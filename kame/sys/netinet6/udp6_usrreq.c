@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.78 2000/11/30 16:00:06 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.79 2000/11/30 16:37:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -500,12 +500,12 @@ udp6_ctlinput(cmd, sa, d)
 {
 	struct udphdr uh;
 	register struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sa = (struct sockaddr_in6 *)sa;
+	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
 	void *cmdarg;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	void (*notify) __P((struct in6pcb *, int)) = udp6_notify;
 	struct udp_portonly {
 		u_int16_t uh_sport;
@@ -568,8 +568,9 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, sa6->sin6_addr,
-			    uh.uh_dport, &sa6_src->sin6_addr, uh.uh_sport, 0))
+			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
+			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
+			    uh.uh_sport, 0))
 				updatemtu = 1;
 #if 0
 			/*
@@ -604,11 +605,12 @@ udp6_ctlinput(cmd, sa, d)
 		}
 #endif
 
-		(void) in6_pcbnotify(&udb6, sa, uh.uh_dport, sa6_src,
-				     uh.uh_sport, cmd, cmdarg, notify);
+		(void) in6_pcbnotify(&udb6, sa, uh.uh_dport,
+		    (struct sockaddr *)sa6_src, uh.uh_sport, cmd, cmdarg,
+		    notify);
 	} else {
-		(void) in6_pcbnotify(&udb6, sa, 0, sa6_src, 0, cmd,
-				     cmdarg, notify);
+		(void) in6_pcbnotify(&udb6, sa, 0, (struct sockaddr *)sa6_src,
+		    0, cmd, cmdarg, notify);
 	}
 }
 
