@@ -1,4 +1,4 @@
-.\"	$KAME: ping6.8,v 1.41 2001/06/28 01:20:18 suz Exp $
+.\"	$KAME: ping6.8,v 1.42 2001/06/28 06:29:43 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -454,8 +454,8 @@ ping command for both IPv4 and IPv6.
 The followings are an answer to the request.
 .Pp
 From a developer's point of view:
-since the underling API is totally different between IPv4 and IPv6,
-we would end up having two types of code base.
+since the underling raw sockets API is totally different between IPv4
+and IPv6, we would end up having two types of code base.
 There would actually be less benefit to uniform the two commands
 into a single command from the developer's standpoint.
 .Pp
