@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.130 2003/04/23 09:15:49 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.131 2003/06/23 08:33:49 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,7 +842,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	if (ro) {
 		if (ro->ro_rt &&
 		    (!(ro->ro_rt->rt_flags & RTF_UP) ||
-		     ro->ro_dst.sa_family != AF_INET6 ||
+		     ((struct sockaddr *)(&ro->ro_dst))->sa_family != AF_INET6 ||
 #ifdef SCOPEDROUTING
 		     !SA6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst), dstsock)
 #else
