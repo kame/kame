@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.12 2000/01/10 21:16:46 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.13 2000/01/11 01:57:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -368,7 +368,7 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	iph1->msgid = 0;	/* XXX */
 
 	/* copy remote address */
-	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
+	if (copy_ph1addresses(iph1, rmconf) < 0)
 		return -1;
 
 	tlen = sizeof(*n) + spisiz;
