@@ -44,13 +44,20 @@ static const char rcsid[] =
 #include <netinet/tcp.h>
 
 #ifdef CRYPTO
-#include <des.h>
-#include <blowfish.h>
+#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER < 0x0940
+#undef CRYPTO
+#endif
+#endif
+
+#ifdef CRYPTO
+#include <openssl/des.h>
+#include <openssl/blowfish.h>
 #ifdef HAVE_RC5_H
-#include <rc5.h>
+#include <openssl/rc5.h>
 #endif
 #ifdef HAVE_CAST_H
-#include <cast.h>
+#include <openssl/cast.h>
 #endif
 #endif
 
