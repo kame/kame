@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2732 2005/03/07 14:04:22 itojun Exp $
+$KAME: CHANGELOG,v 1.2733 2005/03/07 20:38:35 sakane Exp $
 
 <200503>
+Tue Mar  8 05:31:52 JST 2005
+	* kame/kame/racoon/isakmp.c:
+	one of buffer overrun problem was fixed.  from ipsec-tools team.
+
 Mon Mar  6 2005  itojun@iijlab.net
 	* kame/sys/netinet{,6}/sctp*: new patch from randall
 
