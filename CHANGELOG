@@ -1,4 +1,4 @@
-$Id: CHANGELOG,v 1.498 2000/01/30 06:31:39 itojun Exp $
+$Id: CHANGELOG,v 1.499 2000/01/30 08:42:09 itojun Exp $
 
 <200001>
 Sun Jan 30 15:30:14 JST 2000  itojun@iijlab.net
@@ -13,14 +13,14 @@ Sat Jan 29 16:20:31 JST 2000  itojun@iijlab.net
 	  prototypes and #define KERNEL.
 	* kame/sys/netinet6/ip6_input.c: fix ip6_savecontrol() to be friendly
 	  with m_pulldown() environment.  now it does not modify mbuf chain
-	  at all so calling ip6_savecontrol() will not invalidate pointers
-	  into mbuf chain (like "uh" in udp6_input).
+	  at all.  therefore, calling ip6_savecontrol() will not invalidate
+	  pointers into mbuf chain (like "uh" in udp6_input).
 
 Fri Jan 28 15:37:46 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/ipsec.c, kame/sys/netkey/key.c,
 	  */sys/netinet{,6}/ip{,6}_input.c: pass policy message buffer length
-	  down to key_msg2sp() to avoid buffer overrun on invalid input from
-	  the userland.
+	  down.  this is to avoid key_msg2sp() from making buffer overrun
+	  on invalid input from the userland.
 
 2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/tcp6_usrreq.c (tcp6_usrreq):
