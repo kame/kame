@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.61 2000/06/13 08:15:27 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.62 2000/07/21 06:42:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1002,7 +1002,10 @@ statinit:;
 
 /*
  * NOTE: in6_ifdetach() does not support loopback if at this moment.
+ * We don't need this function in bsdi, because interfaces are never removed
+ * from the ifnet list in bsdi.
  */
+#ifndef __bsdi__
 void
 in6_ifdetach(ifp)
 	struct ifnet *ifp;
@@ -1155,3 +1158,4 @@ in6_ifdetach(ifp)
 		rtfree(rt);
 	}
 }
+#endif
