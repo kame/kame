@@ -1339,6 +1339,7 @@ txp_start(ifp)
 		IFQ_POLL(&ifp->if_snd, m);
 		if (m == NULL)
 			break;
+		mnew = NULL;
 
 		firstprod = prod;
 		firstcnt = cnt;
@@ -1360,6 +1361,7 @@ txp_start(ifp)
 			}
 			m_copydata(m, 0, m->m_pkthdr.len, mtod(mnew, caddr_t));
 			mnew->m_pkthdr.len = mnew->m_len = m->m_pkthdr.len;
+			IFQ_DEQUEUE(&ifp->if_snd, m);
 			m_freem(m);
 			m = mnew;
 			if (bus_dmamap_load_mbuf(sc->sc_dmat, sd->sd_map, m,
@@ -1437,8 +1439,12 @@ txp_start(ifp)
 
 		}
 
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m);
+		/*
+		 * if mnew isn't NULL, we already dequeued and copied
+		 * the packet.
+		 */
+		if (mnew == NULL)
+			IFQ_DEQUEUE(&ifp->if_snd, m);
 
 		ifp->if_timer = 5;
 
