@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.292 2002/04/08 09:39:43 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.293 2002/04/08 10:11:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,7 +239,7 @@ void
 icmp6_init()
 {
 	mld6_init();
-#ifndef __bsdi__
+#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1449,7 +1449,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 		icmp6stat.icp6s_pmtuchg++;
 		rt->rt_rmx.rmx_mtu = mtu;
 
-#ifdef __FreeBSD__
+#if defined( __FreeBSD__) && __FreeBSD__ >= 4
 		/*
 		 * We intentionally ignore the error case of rt_timer_add(),
 		 * because the only bad effect is that we won't be able to
