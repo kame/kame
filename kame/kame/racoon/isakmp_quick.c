@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.18 2000/01/17 06:43:42 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.19 2000/01/31 23:23:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1082,7 +1082,7 @@ quick_r1recv(iph2, msg0)
 		_INPORTBYSA(&spidxtmp.dst) = 0;
 		spidxtmp.prefd = _INALENBYAF(iph2->ph1->local->sa_family) << 3;
 
-		spidxtmp.ul_proto = 0;
+		spidxtmp.ul_proto = IPSEC_ULPROTO_ANY;
 	}
 	spidxtmp.action = IPSEC_POLICY_IPSEC;
 	spidxtmp.dir = IPSEC_DIR_OUTBOUND;	/* XXX */
