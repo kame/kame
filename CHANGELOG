@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1948 2001/10/25 12:31:38 jinmei Exp $
+$KAME: CHANGELOG,v 1.1949 2001/10/25 12:49:28 jinmei Exp $
 
 <200110>
+2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtrequest): ignored a route when it
+	is created by cloning and is not a neighbor.  Otherwise, it could
+	mistakenly regard a cloned route to an off-link destination as
+	an on-link neighbor, and create a neighbor cache.  Then we'd see
+	some strange neighbor solicitations to the destination.
+	Some additional clarifications on this file were made with this
+	fix.
+
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_gif.c (in6_gif_output):	let ip6_output()
 	(and a subroutine) to validate the cache and to make a new one, in
