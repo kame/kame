@@ -39,30 +39,54 @@
 #include <string.h>
 #include <err.h>
 
+void usage __P(());
+
 int
 main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int s, ret_ga;
+	int ch, s, ret_ga, hlim = -1;
 	struct addrinfo hints, *res;
-	char readbuf[1024];
+	char readbuf[1024], *port = NULL;
 
-	if (argc < 3) {
-		fprintf(stderr, "usage: connect addr port\n");
-		exit(1);
+	while((ch = getopt(argc, argv, "h:p:")) != -1)
+		switch(ch) {
+		case 'h':
+			hlim = atoi(optarg);
+			break;
+		case 'p':
+			port = optarg;
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	argc -= optind;
+	argv += optind;
+	if (argc < 1)
+		usage();
+	if (port == NULL) {
+		static char portbuf[16];
+		sprintf(portbuf, "%d", DEFAULTPORT); /* XXX */
+		port = portbuf;
 	}
 
 	bzero(&hints, sizeof(struct addrinfo));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
-	ret_ga = getaddrinfo(argv[1], argv[2], &hints, &res);
+	ret_ga = getaddrinfo(argv[0], port, &hints, &res);
 	if (ret_ga)
 		errx(1, "connect: %s\n", gai_strerror(ret_ga));
 
 	if ((s = socket(res->ai_family, res->ai_socktype, 0)) < 0)
 		err(1, "socket");
+
+	if (hlim > 0 &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &hlim, sizeof(hlim))) {
+		warn("setsockopt(IPV6_HOPLIMIT %d)", hlim); /* assert? */
+	}
 
 	if (connect(s, res->ai_addr, res->ai_addr->sa_len) < 0)
 		err(1, "connect");
@@ -77,7 +101,7 @@ main(argc, argv)
 		if (strncasecmp(readbuf, "quit", 4) == 0)
 			break;
 		if (strncasecmp(readbuf, "hlim", 4) == 0) {
-			int hlim = atoi(&readbuf[4]);
+			hlim = atoi(&readbuf[4]);
 
 			if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT,
 				       &hlim, sizeof(hlim)))
@@ -120,4 +144,10 @@ main(argc, argv)
 	}
 	
 	exit(0);
+}
+
+void
+usage()
+{
+	fprintf(stderr, "usage: connect [-h hoplimit] [-p port] addr\n");
 }

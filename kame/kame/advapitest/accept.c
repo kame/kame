@@ -63,7 +63,7 @@ main(argc, argv)
 	char recvbuf[1024];	/* xxx hardcoding */
 
 	if (argc < 2)
-		port = 33333;
+		port = DEFAULTPORT;
 	else
 		port = (short)atoi(argv[1]);
 

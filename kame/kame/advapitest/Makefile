@@ -28,7 +28,7 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
-CFLAGS = -DINET6 -DKAME_SCOPEID -Wall
+CFLAGS = -DINET6 -DKAME_SCOPEID -Wall -DDEFAULTPORT=33333
 .if (${OPSYS} != "BSD/OS")
 CFLAGS+=-Werror
 .endif
