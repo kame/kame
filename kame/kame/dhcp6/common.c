@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.48 2002/05/09 13:07:32 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.49 2002/05/10 05:02:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -636,6 +636,25 @@ dhcp6_get_options(p, ep, optinfo)
 			reqopts = optlen / 2;
 			for (i = 0, val = cp; i < reqopts;
 			     i++, val += sizeof(u_int16_t)) {
+				struct dhcp6_optconf *opt;
+				u_int16_t opttype;
+
+				memcpy(&opttype, val, sizeof(u_int16_t));
+				opttype = ntohs(opttype);
+
+				/* duplication check */
+				for (opt = optinfo->requests; opt;
+				     opt = opt->next) {
+					if (opt->type == opttype) {
+						dprintf(LOG_INFO,
+							"dhcp6_get_options: "
+							"duplicated option "
+							"type (%s)",
+							dhcpoptstr(opttype));
+						goto nextoption;
+					}
+				}
+
 				optconf = (struct dhcp6_optconf *)
 					malloc(sizeof(*optconf));
 				if (optconf == NULL) {
@@ -645,12 +664,13 @@ dhcp6_get_options(p, ep, optinfo)
 					goto fail;
 				}
 				memset(optconf, 0, sizeof(*optconf));
-				memcpy(&optconf->type, val, sizeof(u_int16_t));
-				optconf->type = ntohs(optconf->type);
+				optconf->type = opttype;
 				dprintf(LOG_DEBUG, "  requested option: %s",
 					dhcpoptstr(optconf->type));
 				optconf->next = optinfo->requests;
 				optinfo->requests = optconf;
+
+			  nextoption:
 			}
 			break;
 		case DH6OPT_RAPID_COMMIT:
