@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.60 2001/01/22 09:59:19 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.61 2001/01/23 11:50:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1044,7 +1044,7 @@ prelist_update(new, dr, m)
 			 * (2) We have seen the prefix advertised before and
 			 * we have performed autoconfig in the past, but
 			 * we seem to have no interface address right now.
-			 * This is because the interface address have expired.
+			 * This is because the interface address has expired.
 			 *
 			 * This prefix is fresh, with respect to autoconfig
 			 * process.
