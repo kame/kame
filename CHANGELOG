@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2222 2002/08/30 21:25:21 suz Exp $
+$KAME: CHANGELOG,v 1.2223 2002/09/03 13:06:43 suz Exp $
 
 <200208>
+Tue Sep  3 22:03:08 JST 2002	suz@crl.hitachi.co.jp
+	* {freebsd/netbsd/openbsd}/sys/netinet/in.h: protocol-independent 
+	  multicast API sockopts (MCAST_*) number should not be 
+	  duplicated with IPv6-level sockopts.
+	 
 Sat Aug 31 06:20:11 JST 2002	suz@crl.hitachi.co.jp
 	* openbsd/sys, openbsd/sbin/sysctl, openbsd/usr.bin/netstat,
 	  kame/sys/netinet/in_msf.[ch]:

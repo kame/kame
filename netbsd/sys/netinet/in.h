@@ -284,12 +284,14 @@ struct ip_opts {
 #define	IP_UNBLOCK_SOURCE	24   /* ip_mreq_source; undo block filter */
 #define	IP_ADD_SOURCE_MEMBERSHIP 25  /* ip_mreq_source; add a single source */
 #define	IP_DROP_SOURCE_MEMBERSHIP 26 /* ip_mreq_source; drop a single source */
-#define	MCAST_JOIN_GROUP	27   /* group_req; */
-#define	MCAST_BLOCK_SOURCE	28   /* group_source_req; */
-#define	MCAST_UNBLOCK_SOURCE	29   /* group_source_req; */
-#define	MCAST_LEAVE_GROUP	30   /* group_req; */
-#define	MCAST_JOIN_SOURCE_GROUP	31   /* group_source_req; */
-#define	MCAST_LEAVE_SOURCE_GROUP 32  /* group_source_req; */
+
+/* MCAST_* sockopts number should not be duplicated with IPv6-level sockopts */
+#define	MCAST_JOIN_GROUP	70   /* group_req; */
+#define	MCAST_BLOCK_SOURCE	71   /* group_source_req; */
+#define	MCAST_UNBLOCK_SOURCE	72   /* group_source_req; */
+#define	MCAST_LEAVE_GROUP	73   /* group_req; */
+#define	MCAST_JOIN_SOURCE_GROUP	74   /* group_source_req; */
+#define	MCAST_LEAVE_SOURCE_GROUP 75  /* group_source_req; */
 
 /*
  * Defaults and limits for options

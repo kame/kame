@@ -312,6 +312,7 @@ struct ip_opts {
 #define	IP_ADD_SOURCE_MEMBERSHIP 32  /* ip_mreq_source; add a single source */
 #define	IP_DROP_SOURCE_MEMBERSHIP 33 /* ip_mreq_source; drop a single source */
 
+/* MCAST_* sockopts number should not be duplicated with IPv6-level sockopts */
 #define	MCAST_JOIN_GROUP	70   /* group_req; */
 #define	MCAST_BLOCK_SOURCE	71   /* group_source_req; */
 #define	MCAST_UNBLOCK_SOURCE	72   /* group_source_req; */
