@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.13 2000/11/04 10:16:38 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.14 2000/11/11 18:22:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI Project.
@@ -143,8 +143,11 @@ main(argc, argv)
 		exit(1);
 	}
 
-	for (testi = testitems; testi->name; testi++)
+	for (testi = testitems; testi->name; testi++) {
 		testi->res = getres(testi->family, testi->host, port);
+		if (!testi->res)
+			errx(1, "getaddrinfo failed");
+	}
 
 	printf("starting tests, socktype = %s%s%s\n",
 	    socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM",
