@@ -1,35 +1,20 @@
-*** lib/isc/unix/socket.c	2000/05/24 01:06:31	1.1.1.2
---- lib/isc/unix/socket.c	2000/06/06 05:41:45
-***************
-*** 1162,1174 ****
---- 1162,1191 ----
-  #endif /* SO_TIMESTAMP */
-  
-  #if defined(ISC_PLATFORM_HAVEIPV6)
-+ #if defined(IPV6_RECVPKTINFO)	/* based on RFC2292bis */
-  		if ((pf == AF_INET6)
-+ 		    && (setsockopt(sock->fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-+ 				   (void *)&on, sizeof (on)) < 0)) {
-+ 			UNEXPECTED_ERROR(__FILE__, __LINE__,
-+ 					 "setsockopt(%d) failed: %s",
-+ 					 sock->fd, strerror(errno));
-+ 		}
-+ #else  /* old advanced API */
-+ 		if ((pf == AF_INET6)
-  		    && (setsockopt(sock->fd, IPPROTO_IPV6, IPV6_PKTINFO,
-  				   (void *)&on, sizeof (on)) < 0)) {
-  			UNEXPECTED_ERROR(__FILE__, __LINE__,
-  					 "setsockopt(%d) failed: %s",
-  					 sock->fd, strerror(errno));
-  		}
-+ #endif /* IPV6_RECVPKTINFO */
-+ #ifdef IPV6_USE_MIN_MTU	/*2292bis, not too common yet*/
-+ 		/* use minimum MTU */
-+ 		if (pf == AF_INET6) {
-+ 			(void)setsockopt(sock->fd, IPPROTO_IPV6,
-+ 			    IPV6_USE_MIN_MTU, (void *)&on, sizeof (on));
-+ 		}
-+ #endif
-  #endif /* ISC_PLATFORM_HAVEIPV6 */
-  
-  	}
+--- lib/isc/unix/socket.c.orig	Tue Jun 27 06:28:21 2000
++++ lib/isc/unix/socket.c	Sat Jul  8 11:29:29 2000
+@@ -1177,2 +1177,13 @@
+ #if defined(ISC_PLATFORM_HAVEIPV6)
++#ifdef IPV6_RECVPKTINFO
++		/* 2292bis */
++		if ((pf == AF_INET6)
++		    && (setsockopt(sock->fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
++				   (void *)&on, sizeof (on)) < 0)) {
++			UNEXPECTED_ERROR(__FILE__, __LINE__,
++					 "setsockopt(%d, IPV6_RECVPKTINFO) failed: %s",
++					 sock->fd, strerror(errno));
++		}
++#else
++		/* 2292 */
+ 		if ((pf == AF_INET6)
+@@ -1184,2 +1195,3 @@
+ 		}
++#endif
+ 

@@ -1,9 +1,15 @@
-sbin/named
-sbin/dig
-sbin/dnssec-keygen
-sbin/dnssec-makekeyset
-sbin/dnssec-signkey
+bin/dig
+bin/host
+bin/isc-config.sh
+bin/nsupdate
 sbin/dnssec-signzone
+sbin/dnssec-signkey
+sbin/dnssec-makekeyset
+sbin/dnssec-keygen
+sbin/rndc
+sbin/named
+@exec ln sbin/named sbin/lwresd
+@unexec rm sbin/lwresd
 lib/libomapi.a
 lib/liblwres.a
 lib/libdns.a
@@ -87,6 +93,68 @@ include/dns/zt.h
 include/dst/dst.h
 include/dst/lib.h
 include/dst/result.h
+include/isc/app.h
+include/isc/assertions.h
+include/isc/base64.h
+include/isc/bitstring.h
+include/isc/boolean.h
+include/isc/buffer.h
+include/isc/bufferlist.h
+include/isc/commandline.h
+include/isc/condition.h
+include/isc/dir.h
+include/isc/error.h
+include/isc/event.h
+include/isc/eventclass.h
+include/isc/file.h
+include/isc/formatcheck.h
+include/isc/fsaccess.h
+include/isc/heap.h
+include/isc/int.h
+include/isc/interfaceiter.h
+include/isc/lang.h
+include/isc/lex.h
+include/isc/lfsr.h
+include/isc/lib.h
+include/isc/list.h
+include/isc/log.h
+include/isc/magic.h
+include/isc/md5.h
+include/isc/mem.h
+include/isc/msgcat.h
+include/isc/mutex.h
+include/isc/mutexblock.h
+include/isc/net.h
+include/isc/netaddr.h
+include/isc/netdb.h
+include/isc/offset.h
+include/isc/once.h
+include/isc/ondestroy.h
+include/isc/os.h
+include/isc/platform.h
+include/isc/print.h
+include/isc/quota.h
+include/isc/random.h
+include/isc/ratelimiter.h
+include/isc/region.h
+include/isc/result.h
+include/isc/resultclass.h
+include/isc/rwlock.h
+include/isc/serial.h
+include/isc/sha1.h
+include/isc/sockaddr.h
+include/isc/socket.h
+include/isc/stdio.h
+include/isc/stdtime.h
+include/isc/string.h
+include/isc/symtab.h
+include/isc/task.h
+include/isc/taskpool.h
+include/isc/thread.h
+include/isc/time.h
+include/isc/timer.h
+include/isc/types.h
+include/isc/util.h
 include/lwres/context.h
 include/lwres/int.h
 include/lwres/ipv6.h
@@ -105,7 +173,8 @@ include/omapi/omapi.h
 include/omapi/private.h
 include/omapi/result.h
 include/omapi/types.h
-@dirrm include/omapi
-@dirrm include/lwres
-@dirrm include/dst
 @dirrm include/dns
+@dirrm include/dst
+@dirrm include/isc
+@dirrm include/lwres
+@dirrm include/omapi
