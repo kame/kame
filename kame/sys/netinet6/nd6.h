@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.93 2002/06/05 00:56:22 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.94 2002/06/07 02:31:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,7 @@ struct nd_ifinfo {
 #define IN6_LINKMTU(ifp) \
 	((ND_IFINFO(ifp)->linkmtu && ND_IFINFO(ifp)->linkmtu < (ifp)->if_mtu) \
 	    ? ND_IFINFO(ifp)->linkmtu \
-	    : ((ND_IFINFO(ifp)->maxmtu < (ifp)->if_mtu) \
+	    : ((ND_IFINFO(ifp)->maxmtu && ND_IFINFO(ifp)->maxmtu < (ifp)->if_mtu) \
 		? ND_IFINFO(ifp)->maxmtu : (ifp)->if_mtu))
 #endif
 
