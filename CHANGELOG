@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1669 2001/05/10 06:22:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.1670 2001/05/13 08:44:46 jinmei Exp $
 
 <200105>
+2001-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/INSTALL: added a note about ppp.diff
+	based on a comment from <murakami@pana.net>.
+
 2001-05-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.bin/telnet/commands.c (tn): corrected a loop for
 	connect(2) after getaddrinfo(3).
