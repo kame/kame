@@ -44,7 +44,7 @@ devpath=/dev
 # altq uses character device major number 96 (defined in sys/net/altq_conf.c).
 # minors assigned as follows:
 #	0:(reserved) 1:cbq 2:wfq 3:afmap 4:fifoq 5:red 6:rio 7:localq 8:hfsc
-#	9:cdnr 10:blue 11:priq
+#	9:cdnr 10:blue 11:priq 12:jobs
 #
 osname=`uname -sm`
 case ${osname} in
@@ -97,12 +97,13 @@ all)
 	sh MAKEDEV.altq cdnr
 	sh MAKEDEV.altq blue
 	sh MAKEDEV.altq priq
+	sh MAKEDEV.altq jobs
 	;;
 
 altq)
 	rm -f ${devpath}/altq/altq
 	mknod ${devpath}/altq/altq c $altqchr 0
-	chown root.wheel ${devpath}/altq/altq
+	chown root:wheel ${devpath}/altq/altq
 	chmod 644 ${devpath}/altq/altq
 	;;
 
@@ -110,7 +111,7 @@ cbq)
 	rm -f ${devpath}/cbq
 	rm -f ${devpath}/altq/cbq
 	mknod ${devpath}/altq/cbq c $altqchr 1
-	chown root.wheel ${devpath}/altq/cbq
+	chown root:wheel ${devpath}/altq/cbq
 	chmod 644 ${devpath}/altq/cbq
 	;;
 
@@ -118,7 +119,7 @@ wfq)
 	rm -f ${devpath}/wfq
 	rm -f ${devpath}/altq/wfq
 	mknod ${devpath}/altq/wfq c $altqchr 2
-	chown root.wheel ${devpath}/altq/wfq
+	chown root:wheel ${devpath}/altq/wfq
 	chmod 644 ${devpath}/altq/wfq
 	;;
 
@@ -126,7 +127,7 @@ afmap)
 	rm -f ${devpath}/afmap
 	rm -f ${devpath}/altq/afmap
 	mknod ${devpath}/altq/afmap c $altqchr 3
-	chown root.wheel ${devpath}/altq/afmap
+	chown root:wheel ${devpath}/altq/afmap
 	chmod 644 ${devpath}/altq/afmap
 	;;
 
@@ -134,7 +135,7 @@ fifoq)
 	rm -f ${devpath}/fifoq
 	rm -f ${devpath}/altq/fifoq
 	mknod ${devpath}/altq/fifoq c $altqchr 4
-	chown root.wheel ${devpath}/altq/fifoq
+	chown root:wheel ${devpath}/altq/fifoq
 	chmod 644 ${devpath}/altq/fifoq
 	;;
 
@@ -142,7 +143,7 @@ red)
 	rm -f ${devpath}/red
 	rm -f ${devpath}/altq/red
 	mknod ${devpath}/altq/red c $altqchr 5
-	chown root.wheel ${devpath}/altq/red
+	chown root:wheel ${devpath}/altq/red
 	chmod 644 ${devpath}/altq/red
 	;;
 
@@ -150,7 +151,7 @@ rio)
 	rm -f ${devpath}/rio
 	rm -f ${devpath}/altq/rio
 	mknod ${devpath}/altq/rio c $altqchr 6
-	chown root.wheel ${devpath}/altq/rio
+	chown root:wheel ${devpath}/altq/rio
 	chmod 644 ${devpath}/altq/rio
 	;;
 
@@ -158,7 +159,7 @@ localq)
 	rm -f ${devpath}/localq
 	rm -f ${devpath}/altq/localq
 	mknod ${devpath}/altq/localq c $altqchr 7
-	chown root.wheel ${devpath}/altq/localq
+	chown root:wheel ${devpath}/altq/localq
 	chmod 644 ${devpath}/altq/localq
 	;;
 
@@ -166,7 +167,7 @@ hfsc)
 	rm -f ${devpath}/hfsc
 	rm -f ${devpath}/altq/hfsc
 	mknod ${devpath}/altq/hfsc c $altqchr 8
-	chown root.wheel ${devpath}/altq/hfsc
+	chown root:wheel ${devpath}/altq/hfsc
 	chmod 644 ${devpath}/altq/hfsc
 	;;
 
@@ -174,7 +175,7 @@ cdnr)
 	rm -f ${devpath}/cdnr
 	rm -f ${devpath}/altq/cdnr
 	mknod ${devpath}/altq/cdnr c $altqchr 9
-	chown root.wheel ${devpath}/altq/cdnr
+	chown root:wheel ${devpath}/altq/cdnr
 	chmod 644 ${devpath}/altq/cdnr
 	;;
 
@@ -182,16 +183,24 @@ blue)
 	rm -f ${devpath}/blue
 	rm -f ${devpath}/altq/blue
 	mknod ${devpath}/altq/blue c $altqchr 10
-	chown root.wheel ${devpath}/altq/blue
+	chown root:wheel ${devpath}/altq/blue
 	chmod 644 ${devpath}/altq/blue
 	;;
 
 priq)
-	rm -f ${devpath}/blue
+	rm -f ${devpath}/priq
 	rm -f ${devpath}/altq/priq
 	mknod ${devpath}/altq/priq c $altqchr 11
-	chown root.wheel ${devpath}/altq/priq
+	chown root:wheel ${devpath}/altq/priq
 	chmod 644 ${devpath}/altq/priq
+	;;
+
+jobs)
+	rm -f ${devpath}/jobs
+	rm -f ${devpath}/altq/jobs
+	mknod ${devpath}/altq/jobs c $altqchr 12
+	chown root:wheel ${devpath}/altq/jobs
+	chmod 644 ${devpath}/altq/jobs
 	;;
 
 *)
