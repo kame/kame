@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2591 2004/04/16 04:57:46 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2592 2004/04/17 11:01:20 kjc Exp $
 
 <200404>
+2004-04-17  kjc@csl.sony.co.jp
+	* kame/sys/altq/
+	build altq under freebsd5-current.
+	submitted by Max Laier <max@love2party.net>
+
 2004-04-16  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* freebsd4/sys/netinet/ip_input.c:
 	* kame/sys/netinet6/natpt_trans.c:
