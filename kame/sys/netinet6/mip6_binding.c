@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.96 2002/03/13 17:00:47 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.97 2002/03/13 17:03:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -156,7 +156,9 @@ static int mip6_tunnel_control __P((int, void *,
 				    int (*) __P((const struct mbuf *,
 						 int, int, void *)),
 				    const struct encaptab **));
+#ifdef MIP6_BDT
 static int mip6_bdt_delete __P((struct sockaddr_in6 *));
+#endif /* MIP6_BDT */
 static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
 				    u_int8_t));
 #if defined(IPSEC) && !defined(__OpenBSD__)

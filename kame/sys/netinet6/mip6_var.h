@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.29 2002/03/13 17:00:47 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.30 2002/03/13 17:03:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -297,8 +297,10 @@ int mip6_icmp6_tunnel_input		__P((struct mbuf *, int, int));
 int mip6_icmp6_ha_discov_req_output	__P((struct hif_softc *));
 int mip6_icmp6_mp_sol_output		__P((struct mip6_prefix *,
 					     struct mip6_ha *));
+#ifdef MIP6_BDT
 int mip6_bdt_create			__P((struct hif_softc *,
 					     struct sockaddr_in6 *));
+#endif /* MIP6_BDT */
 #if 0
 int mip6_tunneled_rs_output		__P((struct hif_softc *,
 					     struct mip6_pfx *));
