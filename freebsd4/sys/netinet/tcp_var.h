@@ -95,6 +95,12 @@ struct tcpcb {
 #define	TF_SENDCCNEW	0x08000		/* send CCnew instead of CC in SYN */
 #define	TF_MORETOCOME	0x10000		/* More data to be appended to sock */
 #define	TF_LQ_OVERFLOW	0x20000		/* listen queue overflow */
+#ifdef TCP_ECN
+#define TF_ECN_PERMIT	0x00040000	/* other side said I could ECN */
+#define TF_RCVD_CE	0x00080000	/* send ECE in subsequent segs */
+#define TF_SEND_CWR	0x00100000	/* send CWR in next seg */
+#define TF_DISABLE_ECN	0x00200000	/* disable ECN for this connection */
+#endif
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */
@@ -305,6 +311,18 @@ struct	tcpstat {
 	u_long	tcps_badsyn;		/* bogus SYN, e.g. premature ACK */
 	u_long	tcps_mturesent;		/* resends due to MTU discovery */
 	u_long	tcps_listendrop;	/* listen queue overflows */
+
+	/* ECN stats */
+	u_long tcps_ecn_accepts;	/* ecn connections accepted */
+	u_long tcps_ecn_rcvece;		/* # of rcvd ece */
+	u_long tcps_ecn_rcvcwr;		/* # of rcvd cwr */
+	u_long tcps_ecn_rcvce;		/* # of rcvd ce in ip header */
+	u_long tcps_ecn_sndect;		/* # of cwr sent */
+	u_long tcps_ecn_sndece;		/* # of ece sent */
+	u_long tcps_ecn_sndcwr;		/* # of cwr sent */
+	u_long tcps_cwr_ecn;		/* # of cwnd reduced by ecn */
+	u_long tcps_cwr_frecovery;	/* # of cwnd reduced by fastrecovery */
+	u_long tcps_cwr_timeout;	/* # of cwnd reduced by timeout */
 };
 
 /*
@@ -369,6 +387,7 @@ extern	struct tcpstat tcpstat;	/* tcp statistics */
 extern	int tcp_mssdflt;	/* XXX */
 extern	int tcp_delack_enabled;
 extern	int tcp_do_newreno;
+extern	int tcp_do_ecn;		/* RFC3168 ECN enabled/disabled? */
 extern	int ss_fltsz;
 extern	int ss_fltsz_local;
 

@@ -243,6 +243,19 @@ do {									\
 	NTOHS((th)->th_urp);						\
 } while (0)
 
+#ifdef TCP_ECN
+/*
+ * ECN (Explicit Congestion Notification) support based on RFC3168
+ *	by Kenjiro Cho <kjc@csl.sony.co.jp>
+ * implementation note:
+ *   snd_recover is used to track a recovery phase.
+ *   when cwnd is reduced, snd_recover is set to snd_max.
+ *   while snd_recover > snd_una, the sender is in a recovery phase and
+ *   its cwnd should not be reduced again.
+ *   snd_recover follows snd_una when not in a recovery phase.
+ */
+#endif
+
 int
 tcp_reass(tp, th, m, tlen)
 	struct tcpcb *tp;
@@ -579,6 +592,9 @@ tcp_input(m, va_alist)
 	va_list ap;
 	int af;		/* af on the wire */
 	struct mbuf *tcp_saveti = NULL;
+#ifdef TCP_ECN
+	u_char iptos;
+#endif
 
 	va_start(ap, m);
 	toff = va_arg(ap, int);
@@ -653,6 +669,10 @@ tcp_input(m, va_alist)
 		/* We do the checksum after PCB lookup... */
 		len = ip->ip_len;
 		tlen = len - toff;
+#ifdef TCP_ECN
+		/* save ip_tos before clearing it for checksum */
+		iptos = ip->ip_tos;
+#endif
 		break;
 #ifdef INET6
 	case 6:
@@ -711,6 +731,9 @@ tcp_input(m, va_alist)
 		/* We do the checksum after PCB lookup... */
 		len = m->m_pkthdr.len;
 		tlen = len - toff;
+#ifdef TCP_ECN
+		iptos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
+#endif
 		break;
 #endif
 	default:
@@ -1243,6 +1266,13 @@ after_listen:
 	if (optp)
 		tcp_dooptions(tp, optp, optlen, th, &opti);
 
+#ifdef TCP_ECN
+	/* if congestion experienced, set ECE bit in subsequent packets. */
+	if ((iptos & IPTOS_ECN_MASK) == IPTOS_ECN_CE) {
+		tp->t_flags |= TF_RCVD_CE;
+		tcpstat.tcps_ecn_rcvce++;
+	}
+#endif
 	/* 
 	 * Header prediction: check for the two common cases
 	 * of a uni-directional data xfer.  If the packet has
@@ -1258,7 +1288,11 @@ after_listen:
 	 * the socket buffer and note that we need a delayed ack.
 	 */
 	if (tp->t_state == TCPS_ESTABLISHED &&
+#ifdef TCP_ECN
+	    (tiflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ECE|TH_CWR|TH_ACK)) == TH_ACK &&
+#else
 	    (tiflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ACK)) == TH_ACK &&
+#endif
 	    (!opti.ts_present || TSTMP_GEQ(opti.ts_val, tp->ts_recent)) &&
 	    th->th_seq == tp->rcv_nxt &&
 	    tiwin && tiwin == tp->snd_wnd &&
@@ -1295,12 +1329,22 @@ after_listen:
 				tcpstat.tcps_rcvackbyte += acked;
 				ND6_HINT(tp);
 				sbdrop(&so->so_snd, acked);
+#ifdef TCP_ECN
+				tp->snd_una = th->th_ack;
+				/*
+				 * if not in recovery, sync snd_recover with
+				 * snd_una to avoid wraparound problems.
+				 */
+				if (SEQ_GT(tp->snd_una, tp->snd_recover))
+					tp->snd_recover = tp->snd_una;
+#else
 				/*
 				 * We want snd_recover to track snd_una to
 				 * avoid sequence wraparound problems for
 				 * very large transfers.
 				 */
 				tp->snd_una = tp->snd_recover = th->th_ack;
+#endif
 				m_freem(m);
 
 				/*
@@ -1394,6 +1438,11 @@ after_listen:
 		     SEQ_GT(th->th_ack, tp->snd_max)))
 			goto dropwithreset;
 		if (tiflags & TH_RST) {
+#ifdef TCP_ECN
+			/* if ECN is enabled, fall back to non-ecn at rexmit */
+			if (tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+				goto drop;
+#endif
 			if (tiflags & TH_ACK)
 				tp = tcp_drop(tp, ECONNREFUSED);
 			goto drop;
@@ -1410,6 +1459,23 @@ after_listen:
 		tcp_rcvseqinit(tp);
 		tp->t_flags |= TF_ACKNOW;
 		tcp_mss_from_peer(tp, opti.maxseg);
+
+#ifdef TCP_ECN
+		/*
+		 * if ECE is set but CWR is not set for SYN-ACK, or
+		 * both ECE and CWR are set for simultaneous open,
+		 * peer is ECN capable.
+		 */
+		if (tcp_do_ecn) {
+			if ((tiflags & (TH_ACK|TH_ECE|TH_CWR))
+			    == (TH_ACK|TH_ECE) ||
+			    (tiflags & (TH_ACK|TH_ECE|TH_CWR))
+			    == (TH_ECE|TH_CWR)) {
+				tp->t_flags |= TF_ECN_PERMIT;
+				tcpstat.tcps_ecn_accepts++;
+			}
+		}
+#endif
 
 		/*
 		 * Initialize the initial congestion window.  If we
@@ -1469,6 +1535,12 @@ after_listen:
 	 *	and generate an RST.  See page 36, rfc793
 	 */
 	case TCPS_SYN_RECEIVED:
+#ifdef TCP_ECN
+		/* if ECN is enabled, fall back to non-ecn at rexmit */
+		if ((tiflags & TH_RST) &&
+		    tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+			goto drop;
+#endif
 		if ((tiflags & TH_ACK) &&
 		    (SEQ_LEQ(th->th_ack, tp->iss) ||
 		     SEQ_GT(th->th_ack, tp->snd_max)))
@@ -1718,6 +1790,39 @@ after_listen:
 	case TCPS_LAST_ACK:
 	case TCPS_TIME_WAIT:
 
+#ifdef TCP_ECN
+		/*
+		 * if we receive ECE and are not already in recovery phase,
+		 * reduce cwnd by half but don't slow-start.
+		 * advance snd_recover to snd_max not to reduce cwnd again
+		 * until all outstanding packets are acked.
+		 */
+		if (tcp_do_ecn && (tiflags & TH_ECE)) {
+			if ((tp->t_flags & TF_ECN_PERMIT) &&
+			    SEQ_GEQ(tp->snd_una, tp->snd_recover)) {
+				u_int win;
+
+				win = min(tp->snd_wnd, tp->snd_cwnd) / tp->t_segsz;
+				if (win > 1) {
+					tp->snd_ssthresh = win / 2 * tp->t_segsz;
+					tp->snd_cwnd = tp->snd_ssthresh;
+					tp->snd_recover = tp->snd_max;
+					tp->t_flags |= TF_SEND_CWR;
+					tcpstat.tcps_cwr_ecn++;
+				}
+			}
+			tcpstat.tcps_ecn_rcvece++;
+		}
+		/*
+		 * if we receive CWR, we know that the peer has reduced
+		 * its congestion window.  stop sending ecn-echo.
+		 */
+		if ((tiflags & TH_CWR)) {
+			tp->t_flags &= ~TF_RCVD_CE;
+			tcpstat.tcps_ecn_rcvcwr++;
+		}
+#endif /* TCP_ECN */
+
 		if (SEQ_LEQ(th->th_ack, tp->snd_una)) {
 			if (tlen == 0 && tiwin == tp->snd_wnd) {
 				tcpstat.tcps_rcvdupack++;
@@ -1753,8 +1858,12 @@ after_listen:
 					u_int win =
 					    min(tp->snd_wnd, tp->snd_cwnd) / 
 					    2 /	tp->t_segsz;
-					if (tcp_do_newreno && SEQ_LT(th->th_ack,
-					    tp->snd_recover)) {
+					if ((tcp_do_newreno
+#ifdef TCP_ECN
+					     || tcp_do_ecn
+#endif
+						) && SEQ_LT(th->th_ack,
+							    tp->snd_recover)) {
 						/*
 						 * False fast retransmit after
 						 * timeout.  Do not cut window.
@@ -1773,6 +1882,12 @@ after_listen:
 					tp->t_rtt = 0;
 					tp->snd_nxt = th->th_ack;
 					tp->snd_cwnd = tp->t_segsz;
+#ifdef TCP_ECN
+					tp->t_flags |= TF_SEND_CWR;
+#endif
+#if 1 /* TCP_ECN */
+					tcpstat.tcps_cwr_frecovery++;
+#endif
 					(void) tcp_output(tp);
 					tp->snd_cwnd = tp->snd_ssthresh +
 					       tp->t_segsz * tp->t_dupacks;
@@ -1874,12 +1989,19 @@ after_listen:
 			ourfinisacked = 0;
 		}
 		sowwakeup(so);
+#ifdef TCP_ECN
+		tp->snd_una = th->th_ack;
+		/* sync snd_recover with snd_una */
+		if (SEQ_GT(tp->snd_una, tp->snd_recover))
+			tp->snd_recover = tp->snd_una;
+#else
 		/*
 		 * We want snd_recover to track snd_una to
 		 * avoid sequence wraparound problems for
 		 * very large transfers.
 		 */
 		tp->snd_una = tp->snd_recover = th->th_ack;
+#endif
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
 
@@ -3110,6 +3232,12 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 	}
 	if (sc->sc_flags & SCF_TIMESTAMP)
 		tp->t_flags |= TF_RCVD_TSTMP;
+#ifdef TCP_ECN
+	if (sc->sc_flags & SCF_ECN) {
+		tp->t_flags |= TF_ECN_PERMIT;
+		tcpstat.tcps_ecn_accepts++;
+	}
+#endif
 
 	tp->t_template = tcp_template(tp);
 	if (tp->t_template == 0) {
@@ -3366,6 +3494,14 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 		sc->sc_requested_s_scale = 15;
 		sc->sc_request_r_scale = 15;
 	}
+#ifdef TCP_ECN
+	/*
+	 * if both ECE and CWR flag bits are set, peer is ECN capable.
+	 */
+	if (tcp_do_ecn &&
+	    (th->th_flags & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR))
+		sc->sc_flags |= SCF_ECN;
+#endif
 	sc->sc_tp = tp;
 	if (syn_cache_respond(sc, m) == 0) {
 		syn_cache_insert(sc, tp);
@@ -3496,6 +3632,11 @@ syn_cache_respond(sc, m)
 	th->th_ack = htonl(sc->sc_irs + 1);
 	th->th_off = (sizeof(struct tcphdr) + optlen) >> 2;
 	th->th_flags = TH_SYN|TH_ACK;
+#ifdef TCP_ECN
+	/* if peer is ECN-capable, use ECN */
+	if (tcp_do_ecn && (sc->sc_flags & SCF_ECN))
+		th->th_flags |= TH_ECE;
+#endif
 	th->th_win = htons(sc->sc_win);
 	/* th_sum already 0 */
 	/* th_urp already 0 */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34 2000/01/09 19:17:27 shin Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.11 2001/08/22 00:59:12 silby Exp $
  */
 
 #include "opt_compat.h"
@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/mbuf.h>
 #include <sys/sysctl.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -68,7 +69,7 @@
 #endif
 
 static int
-sysctl_msec_to_ticks SYSCTL_HANDLER_ARGS
+sysctl_msec_to_ticks(SYSCTL_HANDLER_ARGS)
 {
 	int error, s, tt;
 
@@ -132,11 +133,6 @@ tcp_slowtimo()
 
 	tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
 
-	tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
-#ifdef TCP_COMPAT_42
-	if ((int)tcp_iss < 0)
-		tcp_iss = TCP_ISSINCR;			/* XXX */
-#endif
 	splx(s);
 }
 
@@ -152,6 +148,9 @@ tcp_canceltimers(tp)
 	callout_stop(tp->tt_keep);
 	callout_stop(tp->tt_rexmt);
 }
+
+int	tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] =
+    { 1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64, 64, 64 };
 
 int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
     { 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64 };
@@ -169,7 +168,7 @@ tcp_timer_delack(xtp)
 	int s;
 
 	s = splnet();
-	if (callout_pending(tp->tt_delack)) {
+	if (callout_pending(tp->tt_delack) || !callout_active(tp->tt_delack)) {
 		splx(s);
 		return;
 	}
@@ -193,7 +192,7 @@ tcp_timer_2msl(xtp)
 	ostate = tp->t_state;
 #endif
 	s = splnet();
-	if (callout_pending(tp->tt_2msl)) {
+	if (callout_pending(tp->tt_2msl) || !callout_active(tp->tt_2msl)) {
 		splx(s);
 		return;
 	}
@@ -224,6 +223,7 @@ tcp_timer_keep(xtp)
 	void *xtp;
 {
 	struct tcpcb *tp = xtp;
+	struct tcptemp *t_template;
 	int s;
 #ifdef TCPDEBUG
 	int ostate;
@@ -231,7 +231,7 @@ tcp_timer_keep(xtp)
 	ostate = tp->t_state;
 #endif
 	s = splnet();
-	if (callout_pending(tp->tt_keep)) {
+	if (callout_pending(tp->tt_keep) || !callout_active(tp->tt_keep)) {
 		splx(s);
 		return;
 	}
@@ -261,19 +261,13 @@ tcp_timer_keep(xtp)
 		 * correspondent TCP to respond.
 		 */
 		tcpstat.tcps_keepprobe++;
-#ifdef TCP_COMPAT_42
-		/*
-		 * The keepalive packet must have nonzero length
-		 * to get a 4.2 host to respond.
-		 */
-		tcp_respond(tp, tp->t_template->tt_ipgen,
-			    &tp->t_template->tt_t, (struct mbuf *)NULL,
-			    tp->rcv_nxt - 1, tp->snd_una - 1, 0);
-#else
-		tcp_respond(tp, tp->t_template->tt_ipgen,
-			    &tp->t_template->tt_t, (struct mbuf *)NULL,
-			    tp->rcv_nxt, tp->snd_una - 1, 0);
-#endif
+		t_template = tcp_maketemplate(tp);
+		if (t_template) {
+			tcp_respond(tp, t_template->tt_ipgen,
+				    &t_template->tt_t, (struct mbuf *)NULL,
+				    tp->rcv_nxt, tp->snd_una - 1, 0);
+			(void) m_free(dtom(t_template));
+		}
 		callout_reset(tp->tt_keep, tcp_keepintvl, tcp_timer_keep, tp);
 	} else
 		callout_reset(tp->tt_keep, tcp_keepidle, tcp_timer_keep, tp);
@@ -310,7 +304,7 @@ tcp_timer_persist(xtp)
 	ostate = tp->t_state;
 #endif
 	s = splnet();
-	if (callout_pending(tp->tt_persist)) {
+	if (callout_pending(tp->tt_persist) || !callout_active(tp->tt_persist)){
 		splx(s);
 		return;
 	}
@@ -341,7 +335,7 @@ tcp_timer_persist(xtp)
 
 out:
 #ifdef TCPDEBUG
-	if (tp->t_inpcb->inp_socket->so_options & SO_DEBUG)
+	if (tp && tp->t_inpcb->inp_socket->so_options & SO_DEBUG)
 		tcp_trace(TA_USER, ostate, tp, (void *)0, (struct tcphdr *)0,
 			  PRU_SLOWTIMO);
 #endif
@@ -361,7 +355,7 @@ tcp_timer_rexmt(xtp)
 	ostate = tp->t_state;
 #endif
 	s = splnet();
-	if (callout_pending(tp->tt_rexmt)) {
+	if (callout_pending(tp->tt_rexmt) || !callout_active(tp->tt_rexmt)) {
 		splx(s);
 		return;
 	}
@@ -393,9 +387,31 @@ tcp_timer_rexmt(xtp)
 		tp->t_badrxtwin = ticks + (tp->t_srtt >> (TCP_RTT_SHIFT + 1));
 	}
 	tcpstat.tcps_rexmttimeo++;
-	rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
+	if (tp->t_state == TCPS_SYN_SENT)
+		rexmt = TCP_REXMTVAL(tp) * tcp_syn_backoff[tp->t_rxtshift];
+	else
+		rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 	TCPT_RANGESET(tp->t_rxtcur, rexmt,
 		      tp->t_rttmin, TCPTV_REXMTMAX);
+	/*
+	 * Disable rfc1323 and rfc1644 if we havn't got any response to
+	 * our third SYN to work-around some broken terminal servers 
+	 * (most of which have hopefully been retired) that have bad VJ 
+	 * header compression code which trashes TCP segments containing 
+	 * unknown-to-them TCP options.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT) && (tp->t_rxtshift == 3))
+		tp->t_flags &= ~(TF_REQ_SCALE|TF_REQ_TSTMP|TF_REQ_CC);
+#ifdef TCP_ECN
+	/*
+	 * if ECN is enabled, there might be a broken firewall which
+	 * blocks ecn packets.  fall back to non-ecn.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT ||
+	     tp->t_state == TCPS_SYN_RECEIVED) &&
+	    tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+		tp->t_flags |= TF_DISABLE_ECN;
+#endif
 	/*
 	 * If losing, let the lower level know and try for
 	 * a better route.  Also, if we backed off this far,
@@ -415,6 +431,17 @@ tcp_timer_rexmt(xtp)
 		tp->t_srtt = 0;
 	}
 	tp->snd_nxt = tp->snd_una;
+	/*
+	 * Note:  We overload snd_recover to function also as the
+	 * snd_last variable described in RFC 2582
+	 */
+	tp->snd_recover = tp->snd_max;
+#ifdef TCP_ECN
+	tp->t_flags |= TF_SEND_CWR;
+#endif
+#if 1 /* TCP_ECN */
+	tcpstat.tcps_cwr_timeout++;
+#endif
 	/*
 	 * Force a segment to be sent.
 	 */

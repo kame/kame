@@ -936,6 +936,11 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case TCPCTL_RSTPPSLIMIT:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &tcp_rst_ppslim));
+#ifdef TCP_ECN
+	case TCPCTL_ECN:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &tcp_do_ecn));
+#endif
 	default:
 		return (ENOPROTOOPT);
 	}

@@ -133,6 +133,9 @@ int    tcp_do_rfc1323 = TCP_DO_RFC1323;
 #endif
 #endif
 int    tcp_do_sack = TCP_DO_SACK;		/* RFC 2018 selective ACKs */
+#if 1 /* TCP_ECN */
+int	tcp_do_ecn = 0;		/* RFC3168 ECN enabled/disabled? */
+#endif
 
 #ifndef TCBHASHSIZE
 #define	TCBHASHSIZE	128

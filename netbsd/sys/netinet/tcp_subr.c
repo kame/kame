@@ -174,6 +174,9 @@ int	tcp_compat_42 = 1;
 #else
 int	tcp_compat_42 = 0;
 #endif
+#if 1 /* TCP_ECN */
+int	tcp_do_ecn = 0;		/* RFC3168 ECN enabled/disabled? */
+#endif
 
 #ifndef TCBHASHSIZE
 #define	TCBHASHSIZE	128

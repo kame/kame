@@ -68,7 +68,11 @@ struct tcpcb {
 	short	t_dupacks;		/* consecutive dup acks recd */
 	u_short	t_maxseg;		/* maximum segment size */
 	char	t_force;		/* 1 if forcing out a byte */
+#if 1 /* TCP_ECN */
+	u_int	t_flags;
+#else
 	u_short	t_flags;
+#endif
 #define	TF_ACKNOW	0x0001		/* ack peer immediately */
 #define	TF_DELACK	0x0002		/* ack, but try to delay it */
 #define	TF_NODELAY	0x0004		/* don't delay packets to coalesce */
@@ -80,6 +84,12 @@ struct tcpcb {
 #define	TF_RCVD_TSTMP	0x0100		/* a timestamp was received in SYN */
 #define	TF_SACK_PERMIT	0x0200		/* other side said I could SACK */
 #define	TF_SIGNATURE	0x0400		/* require TCP MD5 signature */
+#ifdef TCP_ECN
+#define TF_ECN_PERMIT	0x00008000	/* other side said I could ECN */
+#define TF_RCVD_CE	0x00010000	/* send ECE in subsequent segs */
+#define TF_SEND_CWR	0x00020000	/* send CWR in next seg */
+#define TF_DISABLE_ECN	0x00040000	/* disable ECN for this connection */
+#endif
 
 	struct	mbuf *t_template;	/* skeletal packet for transmit */
 	struct	inpcb *t_inpcb;		/* back pointer to internet pcb */
@@ -106,7 +116,7 @@ struct tcpcb {
 	int retran_data;		/* amount of outstanding retx. data  */
 #endif /* TCP_FACK */
 #endif /* TCP_SACK */
-#if defined(TCP_SACK)
+#if defined(TCP_SACK) || defined(TCP_ECN)
 	tcp_seq snd_last;		/* for use in fast recovery */
 #endif
 /* receive sequence variables */
@@ -277,6 +287,18 @@ struct	tcpstat {
 	u_int64_t tcps_rcvgoodsig;	/* rcvd good TCP signatures */
 	u_int32_t tcps_inhwcsum;	/* input hardware-checksummed packets */
 	u_int32_t tcps_outhwcsum;	/* output hardware-checksummed packets */
+
+	/* ECN stats */
+	u_int32_t tcps_ecn_accepts;	/* ecn connections accepted */
+	u_int32_t tcps_ecn_rcvece;	/* # of rcvd ece */
+	u_int32_t tcps_ecn_rcvcwr;	/* # of rcvd cwr */
+	u_int32_t tcps_ecn_rcvce;	/* # of rcvd ce in ip header */
+	u_int32_t tcps_ecn_sndect;	/* # of cwr sent */
+	u_int32_t tcps_ecn_sndece;	/* # of ece sent */
+	u_int32_t tcps_ecn_sndcwr;	/* # of cwr sent */
+	u_int32_t tcps_cwr_ecn;		/* # of cwnd reduced by ecn */
+	u_int32_t tcps_cwr_frecovery;	/* # of cwnd reduced by fastrecovery */
+	u_int32_t tcps_cwr_timeout;	/* # of cwnd reduced by timeout */
 };
 
 /*
@@ -295,7 +317,8 @@ struct	tcpstat {
 #define	TCPCTL_SACK	       10 /* selective acknowledgement, rfc 2018 */
 #define TCPCTL_MSSDFLT	       11 /* Default maximum segment size */
 #define	TCPCTL_RSTPPSLIMIT     12 /* RST pps limit */
-#define	TCPCTL_MAXID	       13
+#define	TCPCTL_ECN	       13 /* RFC3168 ECN */
+#define	TCPCTL_MAXID	       14
 
 #define	TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -311,6 +334,7 @@ struct	tcpstat {
 	{ "sack",	CTLTYPE_INT }, \
 	{ "mssdflt",	CTLTYPE_INT }, \
 	{ "rstppslimit",	CTLTYPE_INT }, \
+	{ "ecn", 	CTLTYPE_INT }, \
 }
 
 struct tcp_ident_mapping {
@@ -327,6 +351,7 @@ extern	int tcp_mssdflt;	/* default maximum segment size */
 #ifdef TCP_SACK
 extern	int tcp_do_sack;	/* SACK enabled/disabled */
 #endif
+extern	int tcp_do_ecn;		/* RFC3168 ECN enabled/disabled? */
 
 int	 tcp_attach __P((struct socket *));
 void	 tcp_canceltimers __P((struct tcpcb *));

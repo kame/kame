@@ -808,6 +808,39 @@ send:
 		bcopy((caddr_t)opt, (caddr_t)(th + 1), optlen);
 		th->th_off = (sizeof (struct tcphdr) + optlen) >> 2;
 	}
+#ifdef TCP_ECN
+	if (tcp_do_ecn) {
+		/*
+		 * if we have received congestion experienced segs,
+		 * set ECE bit.
+		 */
+		if (tp->t_flags & TF_RCVD_CE) {
+			flags |= TH_ECE;
+			tcpstat.tcps_ecn_sndece++;
+		}
+		if (!(tp->t_flags & TF_DISABLE_ECN)) {
+			/*
+			 * if this is a SYN seg, set ECE and CWR.
+			 * set only ECE for SYN-ACK if peer supports ECN.
+			 */
+			if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
+				flags |= (TH_ECE|TH_CWR);
+			else if ((tp->t_flags & TF_ECN_PERMIT) &&
+				 (flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
+				flags |= TH_ECE;
+		}
+		/*
+		 * if we have reduced the congestion window, notify
+		 * the peer by setting CWR bit.
+		 */
+		if ((tp->t_flags & TF_ECN_PERMIT) &&
+		    (tp->t_flags & TF_SEND_CWR)) {
+			flags |= TH_CWR;
+			tp->t_flags &= ~TF_SEND_CWR;
+			tcpstat.tcps_ecn_sndcwr++;
+		}
+	}
+#endif
 	th->th_flags = flags;
 	/*
 	 * Calculate receive window.  Don't shrink window,
@@ -973,6 +1006,30 @@ send:
 		break;
 #endif
 	}
+
+#ifdef TCP_ECN
+	/*
+	 * if peer is ECN capable, set the ECT bit in the IP header.
+	 * but don't set ECT for a pure ack, a retransmit or a window probe.
+	 */
+	if (tcp_do_ecn && (tp->t_flags & TF_ECN_PERMIT)) {
+		if (len == 0 || SEQ_LT(tp->snd_nxt, tp->snd_max) ||
+		    (tp->t_force && len == 1)) {
+			; /* don't set ECT */
+		} else switch (af) {
+		case AF_INET:
+			ip->ip_tos |= IPTOS_ECN_ECT0;
+			tcpstat.tcps_ecn_sndect++;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			ip6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
+			tcpstat.tcps_ecn_sndect++;
+			break;
+#endif
+		}
+	}
+#endif
 
 	/*
 	 * If we're doing Path MTU discovery, we need to set DF unless
