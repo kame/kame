@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.313 1999/12/03 01:10:56 itojun Exp $
+$Id: CHANGELOG,v 1.314 1999/12/03 04:39:23 itojun Exp $
 
 <199912>
+Fri Dec  3 13:35:37 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/nd6_nbr.c: if an interface is not
+	  IFF_RUNNING|IFF_UP, wait for it becomes IFF_RUNNING|IFF_UP before
+	  sending DAD probes.  some of wireless network cards does not become
+	  IFF_RUNNING even if it is made IFF_UP (due to a long chip
+	  initialization time - netbsd "awi" needs 2 or 3 seconds).
+		
+	  the code does not do the trick if the driver sets IFF_RUNNING without
+	  care (like netbsd cnw).
+
+	  current code waits for 15 seconds.  maybe we need to provide
+	  sysctl access to the timing parameter.
+		      
 Fri Dec  3 10:07:22 JST 1999  itojun@iijlab.net
 	* all-os/sbin/route/route.c: do not perform "-prefixlen 64" as defualt
 	  behavior on "-inet6".  this does not make sense, and this changes
