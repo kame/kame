@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.777 2000/04/17 04:33:34 itojun Exp $
+$Id: CHANGELOG,v 1.778 2000/04/17 06:52:38 itojun Exp $
 
 <200003>
+Mon Apr 17 15:52:19 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.7.
+
 Mon Apr 17 13:32:48 JST 2000  itojun@iijlab.net
 	* kame/ndp/ndp.c: remove leftover from IPv4 arp logic in set() and
 	  delete().  this caused infinite loop in certain oruting setup.
