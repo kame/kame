@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.c,v 1.53 2000/06/30 16:00:10 millert Exp $	*/
+/*	$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $	*/
 /*	$NetBSD: sysctl.c,v 1.9 1995/09/30 07:12:50 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)sysctl.c	8.5 (Berkeley) 5/9/95";
 #else
-static char *rcsid = "$OpenBSD: sysctl.c,v 1.53 2000/06/30 16:00:10 millert Exp $";
+static char *rcsid = "$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $";
 #endif
 #endif /* not lint */
 
@@ -54,6 +54,8 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.53 2000/06/30 16:00:10 millert Exp 
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/socket.h>
+#include <sys/malloc.h>
+#include <sys/dkstat.h>
 #include <vm/vm_param.h>
 #include <machine/cpu.h>
 #include <net/route.h>
@@ -121,6 +123,7 @@ struct ctlname netname[] = CTL_NET_NAMES;
 struct ctlname hwname[] = CTL_HW_NAMES;
 struct ctlname username[] = CTL_USER_NAMES;
 struct ctlname debugname[CTL_DEBUG_MAXID];
+struct ctlname kernmallocname[] = CTL_KERN_MALLOC_NAMES;
 struct ctlname *vfsname;
 #ifdef CTL_MACHDEP_NAMES
 struct ctlname machdepname[] = CTL_MACHDEP_NAMES;
@@ -167,6 +170,8 @@ int	Aflag, aflag, nflag, wflag;
 #define	BIOSDEV		0x00000080
 #define	MAJ2DEV		0x00000100
 #define	UNSIGNED	0x00000200
+#define	KMEMBUCKETS	0x00000400
+#define	LONGARRAY	0x00000800
 
 /* prototypes */
 void debuginit __P((void));
@@ -247,8 +252,7 @@ listall(prefix, lp)
 
 	if (lp->list == NULL)
 		return;
-	(void)strncpy(name, prefix, BUFSIZ-1);
-	name[BUFSIZ-1] = '\0';
+	(void)strlcpy(name, prefix, BUFSIZ);
 	cp = &name[strlen(name)];
 	*cp++ = '.';
 	for (lvl2 = 0; lvl2 < lp->size; lvl2++) {
@@ -271,15 +275,14 @@ parse(string, flags)
 {
 	int indx, type, state, intval, len;
 	size_t size, newsize = 0;
-	int special = 0;
+	int lal = 0, special = 0;
 	void *newval = 0;
 	quad_t quadval;
 	struct list *lp;
 	int mib[CTL_MAXNAME];
 	char *cp, *bufp, buf[BUFSIZ];
 
-	(void)strncpy(buf, string, sizeof(buf) - 1);
-	buf[sizeof(buf) - 1] = '\0';
+	(void)strlcpy(buf, string, sizeof(buf));
 	bufp = buf;
 	if ((cp = strchr(string, '=')) != NULL) {
 		if (!wflag)
@@ -331,6 +334,14 @@ parse(string, flags)
 				(void)printf("%s = %s\n", string,
 				    state == GMON_PROF_OFF ? "off" : "running");
 			return;
+		case KERN_MALLOCSTATS:
+			len = sysctl_malloc(string, &bufp, mib, flags, &type);
+			if (len < 0)
+				return;
+			if (mib[2] == KERN_MALLOC_BUCKET)
+				special |= KMEMBUCKETS;
+			newsize = 0;
+			break;
 		case KERN_VNODE:
 		case KERN_FILE:
 			if (flags == 0)
@@ -360,6 +371,10 @@ parse(string, flags)
 		case KERN_ARND:
 			special |= UNSIGNED;
 			break;
+		case KERN_CPTIME:
+			special |= LONGARRAY;
+			lal = CPUSTATES;
+			break;
 		}
 		break;
 
@@ -379,8 +394,8 @@ parse(string, flags)
 		} else if (mib[1] == VM_PSSTRINGS) {
 			struct _ps_strings _ps;
 
-			len = sizeof(_ps);
-			if (sysctl(mib, 2, &_ps, &len, NULL, 0) == -1) {
+			size = sizeof(_ps);
+			if (sysctl(mib, 2, &_ps, &size, NULL, 0) == -1) {
 				if (flags == 0)
 					return;
 				if (!nflag)
@@ -523,7 +538,7 @@ parse(string, flags)
 	default:
 		warnx("illegal top level value: %d", mib[0]);
 		return;
-	
+
 	}
 	if (bufp) {
 		warnx("name %s in %s is unknown", bufp, string);
@@ -559,7 +574,7 @@ parse(string, flags)
 		}
 	}
 	size = BUFSIZ;
-	if (sysctl(mib, len, buf, &size, newsize ? newval : 0, newsize) == -1) {
+	if (sysctl(mib, len, buf, &size, newval, newsize) == -1) {
 		if (flags == 0)
 			return;
 		switch (errno) {
@@ -579,6 +594,13 @@ parse(string, flags)
 			warn("%s", string);
 			return;
 		}
+	}
+	if (special & KMEMBUCKETS) {
+		struct kmembuckets *kb = (struct kmembuckets *)buf;
+		if (!nflag)
+			(void)printf("%s = ", string);
+		(void)printf("calls = %qu, total_allocated = %qu, total_free = %qu, elements = %qu, high_watermark = %qu, could_free = %qu\n", kb->kb_calls, kb->kb_total, kb->kb_totalfree, kb->kb_elmpercl, kb->kb_highwat, kb->kb_couldfree);
+		return;
 	}
 	if (special & CLOCK) {
 		struct clockinfo *clkp = (struct clockinfo *)buf;
@@ -713,6 +735,15 @@ parse(string, flags)
 		(void)putchar('\n');
 		return;
 	}
+	if (special & LONGARRAY) {
+		long *la = (long *)buf;
+		if (!nflag)
+			printf("%s = ", string, lal);
+		while (lal--)
+			printf("%ld%s", *la++, lal? ",":"");
+		putchar('\n');
+		return;
+	}
 	switch (type) {
 	case CTLTYPE_INT:
 		if (newsize == 0) {
@@ -728,7 +759,7 @@ parse(string, flags)
 		return;
 
 	case CTLTYPE_STRING:
-		if (newsize == 0) {
+		if (newval == NULL) {
 			if (!nflag)
 				(void)printf("%s = ", string);
 			(void)puts(buf);
@@ -1060,7 +1091,7 @@ sysctl_bios(string, bufpp, mib, flags, typep)
 		}
 		mib[3] = atoi(name);
 		*typep = CTLTYPE_STRUCT;
-		return 4;
+		return(4);
 	} else {
 		*typep = bioslist.list[indx].ctl_type;
 		return(3);
@@ -1210,6 +1241,65 @@ struct list inetvars[] = {
 	{ 0, 0 },
 	{ etheripname, ETHERIPCTL_MAXID },
 };
+
+struct list kernmalloclist = { kernmallocname, KERN_MALLOC_MAXID };
+
+/*
+ * handle malloc statistics
+ */
+int
+sysctl_malloc(string, bufpp, mib, flags, typep)
+	char *string;
+	char **bufpp;
+	int mib[];
+	int flags;
+	int *typep;
+{
+	int indx, size, stor, i;
+	char *name, bufp[BUFSIZ], *buf;
+	struct list lp;
+
+	if (*bufpp == NULL) {
+		listall(string, &kernmalloclist);
+		return(-1);
+	}
+	if ((indx = findname(string, "third", bufpp, &kernmalloclist)) == -1)
+		return (-1);
+	mib[2] = indx;
+	if (mib[2] == KERN_MALLOC_BUCKET) {
+		if ((name = strsep(bufpp, ".")) == NULL) {
+			size = BUFSIZ;
+			stor = mib[2];
+			mib[2] = KERN_MALLOC_BUCKETS;
+			buf = bufp;
+			if (sysctl(mib, 3, buf, &size, NULL, 0) < 0)
+				return(-1);
+			mib[2] = stor;
+			for (stor = 0, i = 0; i < size; i++)
+				if (buf[i] == ',')
+					stor++;
+			lp.list = calloc(stor + 2, sizeof(struct ctlname));
+			if (lp.list == NULL)
+				return(-1);
+			lp.size = stor + 2;
+			for (i = 1;
+			     (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL;
+			     i++) {
+				lp.list[i].ctl_type = CTLTYPE_STRUCT;
+			}
+			lp.list[i].ctl_name = buf;
+			lp.list[i].ctl_type = CTLTYPE_STRUCT;
+			listall(string, &lp);
+			free(lp.list);
+			return(-1);
+		}
+		mib[3] = atoi(name);
+		return(4);
+	} else {
+		*typep = CTLTYPE_STRING;
+		return(3);
+	}
+}
 
 /*
  * handle internet requests
