@@ -38,7 +38,7 @@
 #include "ripng.h"
 
 #define BGP_LOG_SEND(type, len) IFLOG(LOG_BGPOUTPUT) \
-          { syslog(LOG_DEBUG,\
+          do { syslog(LOG_DEBUG,\
 		   "BGP+ SEND %s+%d -> %s+%d",\
 		   ip6str2(&bnp->rp_myaddr),\
 		   ntohs(bnp->rp_myaddr.sin6_port),\
@@ -47,7 +47,7 @@
 	      syslog(LOG_DEBUG,\
 		     "BGP+ SEND message type %d (%s) length %d",\
 		     (type), bgp_msgstr[(type)], (len));\
-	  }
+	  } while (0)
 
 /*
  *   bgp_send_open()
@@ -409,7 +409,8 @@ bgp_send_update(bnp, rte, headrte)
     break;
   default:
     fatalx("BUG ! Invalid origin protocol");
-    break;
+    origin = 0;	/*pacify gcc*/
+    /*NOTREACHED*/
   }
 
 

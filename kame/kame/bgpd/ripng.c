@@ -66,16 +66,15 @@ rip_init()
   int hops;
 #endif
   struct ifinfo     *ife;
-  struct timeb      *ttt;              /* random seed   */
+  struct timeval    tv;
 
   extern struct ifinfo *ifentry;
 
   ripifs = NULL;
 
   /* random seed */
-  MALLOC(ttt, struct timeb);
-  ftime(ttt);
-  srandom(ttt->millitm);
+  gettimeofday(&tv, NULL);
+  srandom(tv.tv_usec ^ tv.tv_sec);
 
   ife = ifentry;
   while (ife) {   /*  for each available I/F  */
@@ -648,6 +647,7 @@ rip_process_request(ripif, nn)
 	break;
       default:
 	fatalx("<rip_process_request>: BUG !");
+	base = NULL;	/*pacify gcc*/
 	break;			/* NOTREACHED */
       }
       rte = find_rte(&key, base);

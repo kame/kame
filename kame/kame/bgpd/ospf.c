@@ -747,7 +747,8 @@ ospf_process_dd(oh, nbr)
 
 	  /**  check I/F routes **/
 	  ife = ifentry;
-	  while(ife) {
+	  orte = NULL;
+	  while (ife) {
 	    if ((orte = find_rte(rte, ife->ifi_rte)))
 	      break;
 	    if ((ife = ife->ifi_next) == ifentry)
