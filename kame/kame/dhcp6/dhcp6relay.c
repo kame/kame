@@ -53,7 +53,9 @@ static int icmp6sock;		/* socket to receive ICMPv6 errors */
 static int maxfd;		/* maxi file descriptor for select(2) */
 
 static int debug = 0;
+#ifndef dprintf
 #define dprintf(x)	do { if (debug) fprintf x; } while (0)
+#endif
 
 char *device = NULL;		/* must be global */
 
@@ -90,6 +92,8 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
+	extern int optind;
+	extern char *optarg;
 	int ch;
 
 	while((ch = getopt(argc, argv, "dhH:")) != EOF) {
