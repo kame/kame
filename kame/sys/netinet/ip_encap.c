@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.67 2001/09/04 08:43:18 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.68 2001/09/04 08:51:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -384,7 +384,7 @@ encap4_input(m, va_alist)
 	}
 
 	/* for backward compatibility - messy... */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 5)
+#if defined(__NetBSD__)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 #elif defined(__OpenBSD__)
@@ -397,7 +397,10 @@ encap4_input(m, va_alist)
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
-#else
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 5)
+	/* last resort: inject to raw socket */
+	rip_input(m, off);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 #ifdef MROUTING
 	if (proto == IPPROTO_IPV4) {
 		ipip_input(m, off);
@@ -407,6 +410,16 @@ encap4_input(m, va_alist)
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off);
+#else
+#ifdef MROUTING
+	if (proto == IPPROTO_IPV4) {
+		ipip_input(m, off, proto);
+		return;
+	}
+#endif
+
+	/* last resort: inject to raw socket */
+	rip_input(m, off, proto);
 #endif
 }
 #endif
