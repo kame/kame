@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.43 2001/10/15 09:19:52 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.44 2001/10/24 10:15:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -171,7 +171,6 @@ udp6_output(in6p, m, addr6, control)
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
 	struct in6_addr *laddr, *faddr;
-	struct in6_addr laddr_mapped; /* XXX ugly */
 	u_short fport;
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
@@ -292,6 +291,7 @@ udp6_output(in6p, m, addr6, control)
 					      &in6p->in6p_laddr, &error);
 		} else {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			struct in6_addr laddr_mapped; /* XXX ugly */
 			/*
 			 * XXX: freebsd[34] does not have in_selectsrc, but
 			 * we can omit the whole part because freebsd4 calls
