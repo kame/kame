@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.396 2000/01/04 10:03:21 sakane Exp $
+$Id: CHANGELOG,v 1.397 2000/01/04 11:45:10 jinmei Exp $
 
 <200001>
+2000-01-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{various files}: implemented the new advanced
+	API (rfc2292bis). The kernel part is now alrmost finished (see
+	TODO.2292bis for more details).
+	Note about lower compatibility: I believe the new kernel is
+	compatible with the old API (i.e RFC2292) except the IPV6_HOPLIMIT
+	socket option. You won't have to adjust your application unless
+	you use the socket option. If you use the option but don't want to
+	migrate to the new API, use IPV6_RECVHOPLIMIT instead of
+	IPV6_HOPLIMIT and just keep the other code.
+
 Tue Jan  4 18:59:08 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey:
 	  don't check sequence number at key_update() even if SA initiator.
