@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1886 2001/09/21 12:05:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.1887 2001/09/21 12:23:26 fujisawa Exp $
 
 <200109>
 2001-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -42,7 +42,7 @@ Fri Sep 21 14:19:02 JST 2001 sakane@kame.net
 	The fist two were based on comments from Yutaka Shimizu
 	<jacky@open.tjsys.co.jp>.
 
-2001-09-03 Shin'ichi Fujisawa	<fujisawa@kame.net>
+2001-09-19 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* freebsd4/sys/netinet/udp_usrreq.c:
 	- Remove 'static' attribute from variable "udpcksum".
 	* kame/kame/sys/netinet6/natpt_trans.c:
