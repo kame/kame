@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.51 2001/12/12 05:56:58 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.52 2002/02/22 15:18:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -2529,6 +2529,10 @@ bypass_rp:
 		     grpentry_ptr != (grpentry_t *) NULL;
 		     grpentry_ptr = grpentry_ptr->rpnext)
 		{
+		    /* Ignore the existing (*,*,RP) entry */
+		    if (grpentry_ptr->grp_route == NULL)
+			continue;
+
 		    /* Update the (*,G) entry */
 		    change_interfaces(grpentry_ptr->grp_route,
 				      grpentry_ptr->grp_route->incoming,

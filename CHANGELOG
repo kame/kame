@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2084 2002/02/21 14:50:51 sakane Exp $
+$KAME: CHANGELOG,v 1.2085 2002/02/22 15:18:53 suz Exp $
 
 <200202>
+2002-02-23  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/pim6sd/{pim6_proto.c, route.c}:
+	pim6sd doesn't crash now when receiving (*,*,RP) entry.
+
 Thu Feb 21 23:48:38 JST 2002 sakane@kame.net
 	* kame/kame/racoon:
 	to specify the identifier in "sainfo" directive is deprecated.

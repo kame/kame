@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.18 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: route.c,v 1.19 2002/02/22 15:18:53 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -468,8 +468,8 @@ calc_oifs(mrtentry_ptr, oifs_ptr)
     }
     IF_ZERO(&oifs);
 
-    if (SSMGROUP(&mrtentry_ptr->group->group))
-	goto bypass_pmbr;
+    if (!mrtentry_ptr->group || SSMGROUP(&mrtentry_ptr->group->group))
+	goto bypass_oif_inheritance;
 
     if (!(mrtentry_ptr->flags & MRTF_PMBR))
     {
@@ -497,7 +497,7 @@ calc_oifs(mrtentry_ptr, oifs_ptr)
 	}
     }
 
-bypass_pmbr:
+bypass_oif_inheritance:
     /* Calculate my own stuff */
     IF_MERGE(&oifs, &mrtentry_ptr->joined_oifs, &oifs);
     IF_CLR_MASK(&oifs, &mrtentry_ptr->pruned_oifs);
