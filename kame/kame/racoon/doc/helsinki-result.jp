@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.39 2001/08/16 17:05:02 sakane Exp $
+$KAME: helsinki-result.jp,v 1.40 2001/08/16 18:02:01 sakane Exp $
 
 
 generic
@@ -30,6 +30,7 @@ generic
 
 	長いKEYMATの計算のとき、必要鍵長の計算にbugあり (修正済)
 
+	ndpをbypassさせるフラグかポリシがあった方がいいかも。
 
 latest isakmpd on KAME
 	Tue Aug 14 01:42:55 JST 2001
@@ -93,6 +94,11 @@ Sun
 IBM AIX 5.1
 	Tue Aug 14 17:33:43 JST 2001
 	IPv6 testしようと言われるも、先方のマシン(遠隔地)にglobal addressなし。
+
+	Thu Aug 16 21:00 2001
+	phase1 pre-shared-key, 3des, sha1, dh2
+	phase2 esp transport, 3des, sha1, pfs2
+	こっちがinitiateすると問題なし
 
 F-Secure VPN+ 5.40
 	Tue Aug 14 19:44:15 JST 2001
