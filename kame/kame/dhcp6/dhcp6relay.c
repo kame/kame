@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.35 2003/07/10 15:13:56 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.36 2003/07/14 09:28:06 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -64,7 +64,9 @@ static int maxfd;		/* maxi file descriptor for select(2) */
 
 static int debug = 0;
 
-char *device = NULL;		/* must be global */
+static char *device;
+static char *relaydevice;
+static char *boundaddr;
 
 static char *rmsgctlbuf, *smsgctlbuf;
 static int rmsgctllen, smsgctllen;
@@ -94,12 +96,15 @@ static void relay6_loop __P((void));
 static void relay6_recv __P((int, int));
 static void relay_to_server __P((struct dhcp6 *, ssize_t,
     struct sockaddr_in6 *, char *, unsigned int));
+static void relay_to_client __P((struct dhcp6_relay *, ssize_t,
+    struct sockaddr *));
 
 static void
 usage()
 {
 	fprintf(stderr,
-	    "usage: dhcp6relay [-dDf] [-H hoplim] intface\n");
+	    "usage: dhcp6relay [-dDf] [-b boundaddr] [-H hoplim] "
+	    "[-r relay-IF] IF\n");
 	exit(0);
 }
 
@@ -117,8 +122,11 @@ main(argc, argv)
 	else
 		progname++;
 
-	while((ch = getopt(argc, argv, "dDfH:")) != -1) {
+	while((ch = getopt(argc, argv, "b:dDfH:r:")) != -1) {
 		switch(ch) {
+		case 'b':
+			boundaddr = optarg;
+			break;
 		case 'd':
 			debug = 1;
 			break;
@@ -140,6 +148,9 @@ main(argc, argv)
 				/* NOTREACHED */
 			}
 			break;
+		case 'r':
+			relaydevice = optarg;
+			break;
 		default:
 			usage();
 			exit(0);
@@ -153,6 +164,8 @@ main(argc, argv)
 		/* NOTREACHED */
 	}
 	device = argv[0];
+	if (relaydevice == NULL)
+		relaydevice = device;
 
 	if (foreground == 0) {
 		if (daemon(0, 0) < 0)
@@ -305,7 +318,8 @@ relay6_init()
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s", gai_strerror(error));
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
 		goto failexit;
 	}
 	csock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
@@ -380,13 +394,18 @@ relay6_init()
 	/*
 	 * Setup a socket to communicate with servers.
 	 */
+	ifidx = if_nametoindex(relaydevice);
+	if (ifidx == 0)
+		dprintf(LOG_ERR, FNAME, "invalid interface %s", device);
+
 	hints.ai_flags = AI_PASSIVE;
-	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
+	error = getaddrinfo(boundaddr, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
 		    gai_strerror(error));
 		goto failexit;
 	}
+	memcpy(&sa6_client, res->ai_addr, sizeof (sa6_client));
 	ssock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (ssock < 0) {
 		dprintf(LOG_ERR, FNAME, "socket(outsock): %s",
@@ -413,7 +432,6 @@ relay6_init()
 		dprintf(LOG_ERR, FNAME, "bind(ssock): %s", strerror(errno));
 		goto failexit;
 	}
-	memcpy(&sa6_client, res->ai_addr, sizeof (sa6_client));
 	freeaddrinfo(res);
 
 	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
@@ -569,7 +587,7 @@ relay6_recv(s, fromclient)
 		case DH6_RELAY_FORW:
 			relay_to_server(dh6, len,
 			    (struct sockaddr_in6 *)&from,
-			    ifname, pi->ipi6_ifindex);
+			    ifname, htonl(pi->ipi6_ifindex));
 			break;
 		default:
 			dprintf(LOG_INFO, FNAME,
@@ -586,6 +604,8 @@ relay6_recv(s, fromclient)
 			    addr2str((struct sockaddr *)&from));
 			return;
 		}
+		relay_to_client((struct dhcp6_relay *)dh6, len,
+		    (struct sockaddr *)&from);
 	}
 }
 
@@ -601,6 +621,7 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	struct dhcp6_relay *dh6relay;
 	struct in6_addr linkaddr;
 	struct prefix_list *p;
+	struct sockaddr_in6 next_agent;
 	int optlen, relaylen;
 	int cc;
 	u_char relaybuf[sizeof (*dh6relay) + BUFSIZ];
@@ -644,7 +665,7 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	memset(&linkaddr, 0, sizeof (linkaddr));
 	for (p = TAILQ_FIRST(&global_prefixes); p; p = TAILQ_NEXT(p, plink)) {
 		if (getifaddr(&linkaddr, ifname, &p->paddr.sin6_addr,
-			      p->plen, 0, IN6_IFF_INVALID) == 0) /* found */
+			      p->plen, 1, IN6_IFF_INVALID) == 0) /* found */
 			break;
 	}
 	if (p == NULL) {
@@ -685,16 +706,143 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	/*
 	 * Forward the message.
 	 */
+	next_agent = sa6_all_servers; /* XXX: fixed for now */
 	if ((cc = sendto(ssock, relaybuf, relaylen, 0,
-	    (struct sockaddr *)&sa6_all_servers,
-	    sizeof (sa6_all_servers))) < 0) {
+	    (struct sockaddr *)&next_agent, sizeof (sa6_all_servers))) < 0) {
 		dprintf(LOG_WARNING, FNAME,
-		    "sendto failed: %s", strerror(errno));
+		    "sendto %s failed: %s",
+		    addr2str((struct sockaddr *)&next_agent), strerror(errno));
 	} else if (cc != relaylen) {
 		dprintf(LOG_WARNING, FNAME,
-		    "failed to send a complete packet");
+		    "failed to send a complete packet to %s",
+		    addr2str((struct sockaddr *)&next_agent));
+	} else {
+		dprintf(LOG_DEBUG, FNAME,
+		    "relay a message to a server %s",
+		    addr2str((struct sockaddr *)&next_agent));
 	}
 
   out:
 	dhcp6_clear_options(&optinfo);
+}
+
+static void
+relay_to_client(dh6relay, len, from)
+	struct dhcp6_relay *dh6relay;
+	ssize_t len;
+	struct sockaddr *from;
+{
+	struct dhcp6_optinfo optinfo;
+	struct sockaddr_in6 peer;
+	unsigned int ifid;
+	char ifnamebuf[IFNAMSIZ];
+	int cc;
+	static struct iovec iov[2];
+
+	dprintf(LOG_DEBUG, FNAME,
+	    "dhcp6 relay reply: hop=%d, linkaddr=%s, peeraddr=%s",
+	    dh6relay->dh6relay_hcnt,
+	    in6addr2str(&dh6relay->dh6relay_linkaddr, 0),
+	    in6addr2str(&dh6relay->dh6relay_peeraddr, 0));
+
+	/*
+	 * parse and validate options in the relay forward message.
+	 */
+	dhcp6_init_options(&optinfo);
+	if (dhcp6_get_options((struct dhcp6opt *)(dh6relay + 1),
+	    (struct dhcp6opt *)((char *)dh6relay + len), &optinfo) < 0) {
+		dprintf(LOG_INFO, FNAME, "failed to parse options");
+		return;
+	}
+
+	/* A relay reply message must include a relay message option */
+	if (optinfo.relaymsg_msg == NULL) {
+		dprintf(LOG_INFO, FNAME, "relay reply from %s message "
+		    "without a relay message", addr2str(from));
+		goto end;
+	}
+
+	/* minimum validation for the inner message */
+	if (optinfo.relaymsg_len < sizeof (struct dhcp6)) {
+		dprintf(LOG_INFO, FNAME, "short relay message from %s",
+		    addr2str(from));
+		goto end;
+	}
+
+	/*
+	 * Extract interface ID which should be included in relay reply
+	 * messages to us.
+	 */
+	ifid = 0;
+	if (optinfo.ifidopt_id) {
+		if (optinfo.ifidopt_len != sizeof (ifid)) {
+			dprintf(LOG_INFO, FNAME,
+			    "unexpected length (%d) for Interface ID from %s",
+			    optinfo.ifidopt_len, addr2str(from));
+		}
+		memcpy(&ifid, optinfo.ifidopt_id, sizeof (ifid));
+		ifid = ntohl(ifid);
+
+		/* validation for ID */
+		if ((if_indextoname(ifid, ifnamebuf)) == NULL) {
+			dprintf(LOG_INFO, FNAME,
+			    "invalid interface ID: %x", ifid);
+		}
+	} else {
+		dprintf(LOG_INFO, FNAME,
+		    "Interface ID is not included from %s",
+		    addr2str(from));
+		/*
+		 * the responding server should be buggy, but we deal with it.
+		 */
+	}
+
+	/*
+	 * If we fail, try to get the interface from the link address.
+	 */
+	if (ifid == 0 &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&dh6relay->dh6relay_linkaddr) &&
+	    !IN6_IS_ADDR_LINKLOCAL(&dh6relay->dh6relay_linkaddr)) {
+		if (getifidfromaddr(&dh6relay->dh6relay_linkaddr, &ifid))
+			ifid = 0;
+	}
+
+	if (ifid == 0) {
+		dprintf(LOG_INFO, FNAME, "failed to determine relay link");
+		goto end;
+	}
+
+	peer = sa6_client;
+	memcpy(&peer.sin6_addr, &dh6relay->dh6relay_peeraddr,
+	    sizeof (peer.sin6_addr));
+	if (IN6_IS_ADDR_LINKLOCAL(&peer.sin6_addr))
+		peer.sin6_scope_id = ifid; /* XXX: we assume a 1to1 map */
+
+	/* construct a message structure specifying the outgoing interface */
+	iov[0].iov_base = optinfo.relaymsg_msg;
+	iov[0].iov_len = optinfo.relaymsg_len;
+	smh.msg_iov = iov;
+	smh.msg_iovlen = 1;
+	smh.msg_name = &peer;
+	smh.msg_namelen = sizeof (peer);
+	memset(spktinfo, 0, sizeof (*spktinfo));
+	spktinfo->ipi6_ifindex = ifid;
+
+	if ((cc = sendmsg(csock, &smh, 0)) < 0) {
+		dprintf(LOG_WARNING, FNAME,
+		    "sendmsg to %s failed: %s",
+		    addr2str((struct sockaddr *)&peer), strerror(errno));
+	} else if (cc != optinfo.relaymsg_len) {
+		dprintf(LOG_WARNING, FNAME,
+		    "failed to send a complete packet to %s",
+		    addr2str((struct sockaddr *)&peer));
+	} else {
+		dprintf(LOG_DEBUG, FNAME,
+		    "relay a message to a client %s",
+		    addr2str((struct sockaddr *)&peer));
+	}
+
+  end:
+	dhcp6_clear_options(&optinfo);
+	return;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.33 2003/03/14 11:06:26 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.34 2003/07/14 09:28:06 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -55,11 +55,14 @@ extern struct dhcp6_listval *dhcp6_find_listval __P((struct dhcp6_list *,
     dhcp6_listval_type_t, void *, int));
 extern struct dhcp6_listval *dhcp6_add_listval __P((struct dhcp6_list *,
     dhcp6_listval_type_t, void *, struct dhcp6_list *));
+extern int dhcp6_vbuf_copy __P((struct dhcp6_vbuf *, struct dhcp6_vbuf *));
+extern void dhcp6_vbuf_free __P((struct dhcp6_vbuf *));
 extern struct dhcp6_event *dhcp6_create_event __P((struct dhcp6_if *, int));
 extern void dhcp6_remove_event __P((struct dhcp6_event *));
 extern void dhcp6_remove_evdata __P((struct dhcp6_event *));
 extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *,
 			  int, int, int));
+extern int getifidfromaddr __P((struct in6_addr *, unsigned int *));
 extern int transmit_sa __P((int, struct sockaddr *, char *, size_t));
 extern long random_between __P((long, long));
 extern int prefix6_mask __P((struct in6_addr *, int));

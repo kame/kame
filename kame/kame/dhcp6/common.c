@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.82 2003/07/10 15:13:56 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.83 2003/07/14 09:28:06 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -266,6 +266,30 @@ dhcp6_add_listval(head, type, val, sublist)
 	return (NULL);
 }
 
+int
+dhcp6_vbuf_copy(dst, src)
+	struct dhcp6_vbuf *dst, *src;
+{
+	dst->dv_buf = malloc(src->dv_len);
+	if (dst->dv_buf == NULL)
+		return (-1);
+
+	dst->dv_len = src->dv_len;
+	memcpy(dst->dv_buf, src->dv_buf, dst->dv_len);
+
+	return (0);
+}
+
+void
+dhcp6_vbuf_free(vbuf)
+	struct dhcp6_vbuf *vbuf;
+{
+	free(vbuf->dv_buf);
+
+	vbuf->dv_len = 0;
+	vbuf->dv_buf = NULL;
+}
+
 struct dhcp6_event *
 dhcp6_create_event(ifp, state)
 	struct dhcp6_if *ifp;
@@ -361,8 +385,8 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 	int error = -1;
 
 	if (getifaddrs(&ifap) != 0) {
-		err(1, "getifaddr: getifaddrs");
-		/*NOTREACHED*/
+		dprintf(LOG_WARNING, "getifaddrs failed: %s", strerror(errno));
+		return (-1);
 	}
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -422,6 +446,45 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 
 	freeifaddrs(ifap);
 	return (error);
+}
+
+int
+getifidfromaddr(addr, ifidp)
+	struct in6_addr *addr;
+	unsigned int *ifidp;
+{
+	struct ifaddrs *ifap, *ifa;
+	struct sockaddr_in6 *sa6;
+	unsigned int ifid;
+	int retval = -1;
+
+	if (getifaddrs(&ifap) != 0) {
+		dprintf(LOG_WARNING, "getifaddrs failed: %s", strerror(errno));
+		return (-1);
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		sa6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+		if (IN6_ARE_ADDR_EQUAL(addr, &sa6->sin6_addr))
+			break;
+	}
+
+	if (ifa != NULL) {
+		if ((ifid = if_nametoindex(ifa->ifa_name)) == 0) {
+			dprintf(LOG_ERR, FNAME,
+			    "if_nametoindex failed for %s", ifa->ifa_name);
+			goto end;
+		}
+		retval = 0;
+		*ifidp = ifid;
+	}
+
+  end:
+	freeifaddrs(ifap);
+	return (retval);
 }
 
 int
@@ -1007,10 +1070,22 @@ dhcp6_get_options(p, ep, optinfo)
 			} else
 				optinfo->elapsed_time = val16;
 			break;
+		case DH6OPT_RELAY_MSG:
+			if ((optinfo->relaymsg_msg = malloc(optlen)) == NULL)
+				goto fail;
+			memcpy(optinfo->relaymsg_msg, cp, optlen);
+			optinfo->relaymsg_len = optlen;
+			break;
 		case DH6OPT_RAPID_COMMIT:
 			if (optlen != 0)
 				goto malformed;
 			optinfo->rapidcommit = 1;
+			break;
+		case DH6OPT_INTERFACE_ID:
+			if ((optinfo->ifidopt_id = malloc(optlen)) == NULL)
+				goto fail;
+			memcpy(optinfo->ifidopt_id, cp, optlen);
+			optinfo->ifidopt_len = optlen;
 			break;
 		case DH6OPT_DNS:
 			if (optlen % sizeof(struct in6_addr) || optlen == 0)

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.101 2003/03/14 11:06:27 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.102 2003/07/14 09:28:06 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -98,6 +98,17 @@ struct dhcp6_binding {
 };
 static TAILQ_HEAD(, dhcp6_binding) dhcp6_binding_head;
 
+struct relayinfo {
+	TAILQ_ENTRY(relayinfo) link;
+
+	u_int hcnt;		/* hop count */
+	struct in6_addr linkaddr; /* link address */
+	struct in6_addr peeraddr; /* peer address */
+	struct dhcp6_vbuf relay_ifid; /* Interface ID (if provided) */
+	struct dhcp6_vbuf relay_msg; /* relay message */
+};
+TAILQ_HEAD(relayinfolist, relayinfo);
+
 static int debug = 0;
 
 const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_SERVER;
@@ -119,24 +130,28 @@ static struct dhcp6_list arg_dnslist;
 static void usage __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
-static int server6_recv __P((int));
-static int server6_react_solicit __P((struct dhcp6_if *, struct dhcp6 *,
-    struct dhcp6_optinfo *, struct sockaddr *, int));
-static int server6_react_request __P((struct dhcp6_if *,
-    struct in6_pktinfo *, struct dhcp6 *, struct dhcp6_optinfo *,
-    struct sockaddr *, int));
-static int server6_react_renew __P((struct dhcp6_if *,
-    struct in6_pktinfo *, struct dhcp6 *, struct dhcp6_optinfo *,
-    struct sockaddr *, int));
-static int server6_react_rebind __P((struct dhcp6_if *,
-    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int));
-static int server6_react_release __P((struct dhcp6_if *,
-    struct in6_pktinfo *, struct dhcp6 *, struct dhcp6_optinfo *,
-    struct sockaddr *, int));
-static int server6_react_informreq __P((struct dhcp6_if *, struct dhcp6 *,
-    struct dhcp6_optinfo *, struct sockaddr *, int));
+static void server6_recv __P((int));
+static void free_relayinfo __P((struct relayinfo *));
+static int process_relayforw __P((struct dhcp6 **, struct dhcp6opt **,
+    struct relayinfolist *, struct sockaddr *));
+static int react_solicit __P((struct dhcp6_if *, struct dhcp6 *,
+    struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
+static int react_request __P((struct dhcp6_if *, struct in6_pktinfo *,
+    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int,
+    struct relayinfolist *));
+static int react_renew __P((struct dhcp6_if *, struct in6_pktinfo *,
+    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int,
+    struct relayinfolist *));
+static int react_rebind __P((struct dhcp6_if *, struct dhcp6 *,
+    struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
+static int react_release __P((struct dhcp6_if *, struct in6_pktinfo *,
+    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int,
+    struct relayinfolist *));
+static int react_informreq __P((struct dhcp6_if *, struct dhcp6 *,
+    struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
 static int server6_send __P((int, struct dhcp6_if *, struct dhcp6 *,
-    struct dhcp6_optinfo *, struct sockaddr *, int, struct dhcp6_optinfo *));
+    struct dhcp6_optinfo *, struct sockaddr *, int, struct dhcp6_optinfo *,
+    struct relayinfolist *));
 static int make_ia_stcode __P((int, u_int32_t, u_int16_t,
     struct dhcp6_list *));
 static int make_binding_ia __P((int, struct dhcp6_listval *,
@@ -475,7 +490,7 @@ server6_mainloop()
 	}
 }
 
-static int
+static void
 server6_recv(s)
 	int s;
 {
@@ -490,6 +505,11 @@ server6_recv(s)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo optinfo;
+	struct dhcp6opt *optend;
+	struct relayinfolist relayinfohead;
+	struct relayinfo *relayinfo;
+
+	TAILQ_INIT(&relayinfohead);
 
 	memset(&iov, 0, sizeof(iov));
 	memset(&mhdr, 0, sizeof(mhdr));
@@ -505,7 +525,7 @@ server6_recv(s)
 
 	if ((len = recvmsg(insock, &mhdr, 0)) < 0) {
 		dprintf(LOG_ERR, FNAME, "recvmsg: %s", strerror(errno));
-		return (-1);
+		return;
 	}
 	fromlen = mhdr.msg_namelen;
 
@@ -519,20 +539,20 @@ server6_recv(s)
 	}
 	if (pi == NULL) {
 		dprintf(LOG_NOTICE, FNAME, "failed to get packet info");
-		return (-1);
+		return;
 	}
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
 		dprintf(LOG_INFO, FNAME, "unexpected interface (%d)",
 		    (unsigned int)pi->ipi6_ifindex);
-		return (-1);
+		return;
 	}
+
+	dh6 = (struct dhcp6 *)rdatabuf;
 
 	if (len < sizeof(*dh6)) {
 		dprintf(LOG_INFO, FNAME, "short packet");
-		return (-1);
+		return;
 	}
-	
-	dh6 = (struct dhcp6 *)rdatabuf;
 
 	dprintf(LOG_DEBUG, FNAME, "received %s from %s",
 	    dhcp6msgstr(dh6->dh6_msgtype),
@@ -550,43 +570,64 @@ server6_recv(s)
 	    dh6->dh6_msgtype == DH6_REBIND ||
 	    dh6->dh6_msgtype == DH6_INFORM_REQ)) {
 		dprintf(LOG_INFO, FNAME, "invalid unicast message");
-		return (-1);
+		return;
 	}
 
 	/*
-	 * parse and validate options in the request
+	 * A server nemver receives a relay reply message.  Since a relay
+	 * replay messages will annoy option parser below, we explicitly
+	 * reject them here.
+	 */
+	if (dh6->dh6_msgtype == DH6_RELAY_REPLY) {
+		dprintf(LOG_INFO, FNAME, "relay reply message from %s",
+		    addr2str((struct sockaddr *)&from));
+		return;
+		
+	}
+
+	optend = (struct dhcp6opt *)(rdatabuf + len);
+	if (dh6->dh6_msgtype == DH6_RELAY_FORW) {
+		if (process_relayforw(&dh6, &optend, &relayinfohead,
+		    (struct sockaddr *)&from)) {
+			goto end;
+		}
+		/* dh6 and optend should have been updated. */
+	}
+
+	/*
+	 * parse and validate options in the message
 	 */
 	dhcp6_init_options(&optinfo);
 	if (dhcp6_get_options((struct dhcp6opt *)(dh6 + 1),
-	    (struct dhcp6opt *)(rdatabuf + len), &optinfo) < 0) {
+	    optend, &optinfo) < 0) {
 		dprintf(LOG_INFO, FNAME, "failed to parse options");
-		return (-1);
+		goto end;
 	}
 
 	switch (dh6->dh6_msgtype) {
 	case DH6_SOLICIT:
-		(void)server6_react_solicit(ifp, dh6, &optinfo,
-		    (struct sockaddr *)&from, fromlen);
+		(void)react_solicit(ifp, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_REQUEST:
-		(void)server6_react_request(ifp, pi, dh6, &optinfo,
-		    (struct sockaddr *)&from, fromlen);
+		(void)react_request(ifp, pi, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_RENEW:
-		(void)server6_react_renew(ifp, pi, dh6, &optinfo,
-		    (struct sockaddr *)&from, fromlen);
+		(void)react_renew(ifp, pi, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_REBIND:
-		(void)server6_react_rebind(ifp, dh6, &optinfo,
-		    (struct sockaddr *)&from, fromlen);
+		(void)react_rebind(ifp, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_RELEASE:
-		(void)server6_react_release(ifp, pi, dh6, &optinfo,
-		    (struct sockaddr *)&from, fromlen);
+		(void)react_release(ifp, pi, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_INFORM_REQ:
-		(void)server6_react_informreq(ifp, dh6, &optinfo,
-		    (struct sockaddr *)&from, fromlen);
+		(void)react_informreq(ifp, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	default:
 		dprintf(LOG_INFO, FNAME, "unknown or unsupported msgtype (%s)",
@@ -596,16 +637,128 @@ server6_recv(s)
 
 	dhcp6_clear_options(&optinfo);
 
-	return (0);
+  end:
+	while ((relayinfo = TAILQ_FIRST(&relayinfohead)) != NULL) {
+		TAILQ_REMOVE(&relayinfohead, relayinfo, link);
+		free_relayinfo(relayinfo);
+	}
+
+	return;
+}
+
+static void
+free_relayinfo(relayinfo)
+	struct relayinfo *relayinfo;
+{
+	if (relayinfo->relay_ifid.dv_buf)
+		dhcp6_vbuf_free(&relayinfo->relay_ifid);
+
+	if (relayinfo->relay_msg.dv_buf)
+		dhcp6_vbuf_free(&relayinfo->relay_msg);
+
+	free(relayinfo);
 }
 
 static int
-server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
+process_relayforw(dh6p, optendp, relayinfohead, from)
+	struct dhcp6 **dh6p;
+	struct dhcp6opt **optendp;
+	struct relayinfolist *relayinfohead;
+	struct sockaddr *from;
+{
+	struct dhcp6_relay *dh6relay = (struct dhcp6_relay *)*dh6p;
+	struct dhcp6opt *optend = *optendp;
+	struct relayinfo *relayinfo;
+	struct dhcp6_optinfo optinfo;
+	int len;
+
+  again:
+	len = (void *)optend - (void *)dh6relay;
+	if (len < sizeof (*dh6relay)) {
+		dprintf(LOG_INFO, FNAME, "short relay message from %s",
+		    addr2str(from));
+		return (-1);
+	}
+	dprintf(LOG_DEBUG, FNAME,
+	    "dhcp6 relay: hop=%d, linkaddr=%s, peeraddr=%s",
+	    dh6relay->dh6relay_hcnt,
+	    in6addr2str(&dh6relay->dh6relay_linkaddr, 0),
+	    in6addr2str(&dh6relay->dh6relay_peeraddr, 0));
+
+	/*
+	 * parse and validate options in the relay forward message.
+	 */
+	dhcp6_init_options(&optinfo);
+	if (dhcp6_get_options((struct dhcp6opt *)(dh6relay + 1),
+	    optend, &optinfo) < 0) {
+		dprintf(LOG_INFO, FNAME, "failed to parse options");
+		return (-1);
+	}
+
+	/* A relay forward message must include a relay message option */
+	if (optinfo.relaymsg_msg == NULL) {
+		dprintf(LOG_INFO, FNAME, "relay forward from %s message "
+		    "without a relay message", addr2str(from));
+		return (-1);
+	}
+
+	/* relay message must contain a DHCPv6 message. */
+	len = optinfo.relaymsg_len;
+	if (len < sizeof (struct dhcp6)) {
+		dprintf(LOG_INFO, FNAME, "short packet in relay message");
+		return (-1);
+	}
+
+	if ((relayinfo = malloc(sizeof (*relayinfo))) == NULL) {
+		dprintf(LOG_ERR, FNAME, "failed to allocate relay info");
+		return (-1);
+	}
+	memset(relayinfo, 0, sizeof (*relayinfo));
+
+	relayinfo->hcnt = dh6relay->dh6relay_hcnt;
+	memcpy(&relayinfo->linkaddr, &dh6relay->dh6relay_linkaddr,
+	    sizeof (relayinfo->linkaddr));
+	memcpy(&relayinfo->peeraddr, &dh6relay->dh6relay_peeraddr,
+	    sizeof (relayinfo->peeraddr));
+
+	if (dhcp6_vbuf_copy(&relayinfo->relay_msg, &optinfo.relay_msg))
+		goto fail;
+	if (optinfo.ifidopt_id &&
+	    dhcp6_vbuf_copy(&relayinfo->relay_ifid, &optinfo.ifidopt)) {
+		goto fail;
+	}
+
+	TAILQ_INSERT_HEAD(relayinfohead, relayinfo, link);
+	dh6relay = (struct dhcp6_relay *)relayinfo->relay_msg.dv_buf;
+
+	dhcp6_clear_options(&optinfo);
+
+	optend = (struct dhcp6opt *)(relayinfo->relay_msg.dv_buf + len);
+	dh6relay = (struct dhcp6_relay *)relayinfo->relay_msg.dv_buf;
+
+	if (dh6relay->dh6relay_msgtype != DH6_RELAY_FORW) {
+		*dh6p = (struct dhcp6 *)dh6relay;
+		*optendp = optend;
+		return (0);
+	}
+
+	goto again;
+
+  fail:
+	free_relayinfo(relayinfo);
+	dhcp6_clear_options(&optinfo);
+
+	return (-1);
+}
+
+static int
+react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
@@ -730,7 +883,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 		resptype = DH6_ADVERTISE;
 
 	error = server6_send(resptype, ifp, dh6, optinfo, from, fromlen,
-			     &roptinfo);
+			     &roptinfo, relayinfohead);
 	dhcp6_clear_options(&roptinfo);
 	return (error);
 
@@ -740,13 +893,14 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 }
 
 static int
-server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
+react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct in6_pktinfo *pi;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
@@ -806,7 +960,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-		    fromlen, &roptinfo);
+		    fromlen, &roptinfo, relayinfohead);
 		goto end;
 	}
 
@@ -904,7 +1058,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* send a reply message. */
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-			   &roptinfo);
+	    &roptinfo, relayinfohead);
 
   end:
 	dhcp6_clear_options(&roptinfo);
@@ -916,13 +1070,14 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 }
 
 static int
-server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
+react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct in6_pktinfo *pi;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
@@ -982,7 +1137,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-		    fromlen, &roptinfo);
+		    fromlen, &roptinfo, relayinfohead);
 		goto end;
 	}
 
@@ -1007,7 +1162,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	}
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-			   &roptinfo);
+	    &roptinfo, relayinfohead);
 
   end:
 	dhcp6_clear_options(&roptinfo);
@@ -1019,12 +1174,13 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 }
 
 static int
-server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
+react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
@@ -1093,7 +1249,7 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	}
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-			   &roptinfo);
+	    &roptinfo, relayinfohead);
 
 	dhcp6_clear_options(&roptinfo);
 	return (0);
@@ -1104,13 +1260,14 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 }
 
 static int
-server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
+react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct in6_pktinfo *pi;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
@@ -1171,7 +1328,7 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-		    fromlen, &roptinfo);
+		    fromlen, &roptinfo, relayinfohead);
 		goto end;
 	}
 
@@ -1199,7 +1356,7 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 	}
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-			   &roptinfo);
+	    &roptinfo, relayinfohead);
 
   end:
 	dhcp6_clear_options(&roptinfo);
@@ -1385,12 +1542,13 @@ release_binding_ia(iapd, retlist, optinfo)
 }
 
 static int
-server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
+react_informreq(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
 	int error;
@@ -1438,7 +1596,7 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 	}
 
 	error = server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-	    &roptinfo);
+	    &roptinfo, relayinfohead);
 
 	dhcp6_clear_options(&roptinfo);
 	return (error);
@@ -1449,18 +1607,22 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 }
 
 static int
-server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
+server6_send(type, ifp, origmsg, optinfo, from, fromlen,
+    roptinfo, relayinfohead)
 	int type;
 	struct dhcp6_if *ifp;
 	struct dhcp6 *origmsg;
 	struct dhcp6_optinfo *optinfo, *roptinfo;
 	struct sockaddr *from;
 	int fromlen;
+	struct relayinfolist *relayinfohead;
 {
 	char replybuf[BUFSIZ];
 	struct sockaddr_in6 dst;
 	int len, optlen;
 	struct dhcp6 *dh6;
+	struct dhcp6_relay *dh6relay;
+	struct relayinfo *relayinfo;
 
 	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
 		dprintf(LOG_ERR, FNAME, "buffer size assumption failed");
@@ -1475,20 +1637,63 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 
 	/* set options in the reply message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
-					(struct dhcp6opt *)(replybuf +
-							    sizeof(replybuf)),
-					roptinfo)) < 0) {
+	    (struct dhcp6opt *)(replybuf + sizeof(replybuf)), roptinfo)) < 0) {
 		dprintf(LOG_INFO, FNAME, "failed to construct reply options");
 		return (-1);
 	}
 	len += optlen;
+
+	/* construct a relay chain, if necessary */
+	for (relayinfo = TAILQ_FIRST(relayinfohead); relayinfo;
+	    relayinfo = TAILQ_NEXT(relayinfo, link)) {
+		struct dhcp6_optinfo relayopt;
+		struct dhcp6_vbuf relaymsgbuf;
+		struct dhcp6_relay *dh6relay;
+
+		dhcp6_init_options(&relayopt);
+
+		relaymsgbuf.dv_len = len;
+		relaymsgbuf.dv_buf = replybuf;
+		if (dhcp6_vbuf_copy(&relayopt.relay_msg, &relaymsgbuf))
+			return (-1);
+		if (relayinfo->relay_ifid.dv_buf &&
+		    dhcp6_vbuf_copy(&relayopt.ifidopt,
+		    &relayinfo->relay_ifid)) {
+			dhcp6_vbuf_free(&relayopt.relay_msg);
+			return (-1);
+		}
+
+		/* we can safely reuse replybuf here */
+		dh6relay = (struct dhcp6_relay *)replybuf;
+		memset(dh6relay, 0, sizeof (*dh6relay));
+		dh6relay->dh6relay_msgtype = DH6_RELAY_REPLY;
+		dh6relay->dh6relay_hcnt = relayinfo->hcnt;
+		memcpy(&dh6relay->dh6relay_linkaddr, &relayinfo->linkaddr,
+		    sizeof (dh6relay->dh6relay_linkaddr));
+		memcpy(&dh6relay->dh6relay_peeraddr, &relayinfo->peeraddr,
+		    sizeof (dh6relay->dh6relay_peeraddr));
+
+		len = sizeof(*dh6relay);
+		if ((optlen = dhcp6_set_options(
+		    (struct dhcp6opt *)(dh6relay + 1),
+		    (struct dhcp6opt *)(replybuf + sizeof(replybuf)),
+		    &relayopt)) < 0) {
+			dprintf(LOG_INFO, FNAME,
+			    "failed to construct relay message");
+			dhcp6_clear_options(&relayopt);
+			return (-1);
+		}
+		len += optlen;
+
+		dhcp6_clear_options(&relayopt);
+	}
 
 	/* specify the destination and send the reply */
 	dst = *sa6_any_downstream;
 	dst.sin6_addr = ((struct sockaddr_in6 *)from)->sin6_addr;
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,
-			replybuf, len) != 0) {
+	    replybuf, len) != 0) {
 		dprintf(LOG_ERR, FNAME, "transmit %s to %s failed",
 		    dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
 		return (-1);

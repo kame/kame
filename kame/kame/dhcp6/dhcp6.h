@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.39 2003/07/10 15:13:56 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.40 2003/07/14 09:28:06 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -84,8 +84,13 @@
 
 /* DUID: DHCP unique Identifier */
 struct duid {
-	int duid_len;		/* length */
+	size_t duid_len;	/* length */
 	char *duid_id;		/* variable length ID value (must be opaque) */
+};
+
+struct dhcp6_vbuf {		/* generic variable length buffer */
+	int dv_len;
+	caddr_t dv_buf;
 };
 
 /* option information */
@@ -143,19 +148,13 @@ struct dhcp6_optinfo {
 	struct dhcp6_list dns_list; /* DNS server list */
 	struct dhcp6_list prefix_list; /* prefix list */
 
-	struct {		/* relay message */
-		size_t len;
-		void *msg;
-	} relay_msg;
-#define relaymsg_len relay_msg.len
-#define relaymsg_msg relay_msg.msg
+	struct dhcp6_vbuf relay_msg; /* relay message */
+#define relaymsg_len relay_msg.dv_len
+#define relaymsg_msg relay_msg.dv_buf
 
-	struct {		/* Interface-id */
-		size_t len;
-		void *id;
-	} ifidopt;
-#define ifidopt_len ifidopt.len
-#define ifidopt_id ifidopt.id
+	struct dhcp6_vbuf ifidopt; /* Interface-id */
+#define ifidopt_len ifidopt.dv_len
+#define ifidopt_id ifidopt.dv_buf
 };
 
 /* DHCP6 base packet format */
