@@ -804,7 +804,9 @@ udp_output(m, va_alist)
 #endif /* INET6 */
 
 	if (addr) {
+#ifdef INET6
 		sin6 = mtod(addr, struct sockaddr_in6 *);
+#endif
 
 	        /*
 		 * Save current PCB flags because they may change during
@@ -822,10 +824,11 @@ udp_output(m, va_alist)
 #ifdef INET6
 		if (((inp->inp_flags & INP_IPV6) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) ||
-		    (inp->inp_faddr.s_addr != INADDR_ANY)) {
+		    (inp->inp_faddr.s_addr != INADDR_ANY))
 #else /* INET6 */
-		if (inp->inp_faddr.s_addr != INADDR_ANY) {
+		if (inp->inp_faddr.s_addr != INADDR_ANY)
 #endif /* INET6 */
+		{
 			error = EISCONN;
 			goto release;
 		}
