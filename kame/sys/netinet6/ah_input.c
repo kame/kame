@@ -356,6 +356,7 @@ ah4_input(m, va_alist)
 			ipsec4_logpacketstr(ip, spi),
 			ipsec_logsastr(sav));
 		ipsecstat.in_ahauthfail++;
+		goto fail;
 	}
 
 	/*
@@ -724,6 +725,7 @@ ah6_input(mp, offp, proto)
 			ipsec6_logpacketstr(ip6, spi),
 			ipsec_logsastr(sav));
 		ipsec6stat.in_ahauthfail++;
+		goto fail;
 	}
 
 	/*
