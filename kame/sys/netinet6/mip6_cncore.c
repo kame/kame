@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.54 2003/12/11 18:55:52 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.55 2003/12/17 01:32:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -800,7 +800,6 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	mbc->mbc_lifetime = lifetime;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 	mbc->mbc_mpa_exp = time_second;	/* set to current time to send mpa as soon as created it */
-	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
 	mbc->mbc_llmbc = NULL;
 	mbc->mbc_refcnt = 0;

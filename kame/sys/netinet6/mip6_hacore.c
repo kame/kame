@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.21 2003/12/11 18:55:52 t-momose Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.22 2003/12/17 01:32:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -88,6 +88,8 @@ int
 mip6_process_hrbu(bi)
 	struct mip6_bc *bi;
 {
+	struct ifaddr *destifa = NULL;
+	struct ifnet *destifp = NULL;
 	struct nd_prefix *pr, *llpr = NULL;
 	struct ifnet *hifp = NULL;
 	struct sockaddr_in6 lladdr;
@@ -102,8 +104,19 @@ mip6_process_hrbu(bi)
 
 	bi->mbc_status = IP6_MH_BAS_ACCEPTED;
 
+	/* find the interface which the destination address belongs to. */
+	destifa = ifa_ifwithaddr((struct sockaddr *)&bi->mbc_addr);
+	if (!destifa) {
+		bi->mbc_status = IP6_MH_BAS_NOT_HOME_SUBNET;
+		bi->mbc_send_ba = 1;
+		return (0); /* XXX is 0 OK? */
+	}
+	destifp = destifa->ifa_ifp;
+
 	/* find the home ifp of this homeaddress. */
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+		if (pr->ndpr_ifp != destifp)
+			continue;
 		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
 			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
@@ -308,18 +321,28 @@ int
 mip6_process_hurbu(bi)
 	struct mip6_bc *bi;
 {
+	struct ifaddr *destifa = NULL;
+	struct ifnet *destifp = NULL;
 	struct mip6_bc *mbc;
 	struct nd_prefix *pr;
 	struct ifnet *hifp = NULL;
 	int error = 0;
 
+	/* find the interface which the destination address belongs to. */
+	destifa = ifa_ifwithaddr((struct sockaddr *)&bi->mbc_addr);
+	if (!destifa) {
+		bi->mbc_status = IP6_MH_BAS_NOT_HOME_SUBNET;
+		bi->mbc_send_ba = 1;
+		return (0); /* XXX is 0 OK? */
+	}
+	destifp = destifa->ifa_ifp;
+
 	/* find the home ifp of this homeaddress. */
-	for (pr = nd_prefix.lh_first;
-	    pr;
-	    pr = pr->ndpr_next) {
+	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+		if (pr->ndpr_ifp != destifp)
+			continue;
 		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
-					 &pr->ndpr_prefix.sin6_addr,
-					 pr->ndpr_plen)) {
+			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 		}
 	}
