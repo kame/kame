@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.699 2000/03/17 16:38:17 itojun Exp $
+$Id: CHANGELOG,v 1.700 2000/03/18 01:27:45 itojun Exp $
 
 <200003>
+Sat Mar 18 10:27:03 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/mtr: install binary as non-suid root.
+	  unbroken pkgsrc.
+
 Sat Mar 18 01:16:26 JST 2000  itojun@iiljab.net
 	* ports/packages for mtr and lynx: mark them BROKEN for vulnerability
 	  reported on bugtraq.  we recommend you to remove them from your KAME
