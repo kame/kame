@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.c,v 1.7 2003/02/25 10:37:59 ono Exp $	*/
+/*	$KAME: vrrp_state.c,v 1.8 2003/04/16 10:59:03 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -101,10 +101,10 @@ vrrp_state_set_master(struct vrrp_vr * vr)
 {
 	if (vr->tm)
 		vrrp_remove_timer(&vr->tm);
-	vrrp_interface_up(vr->vrrpif_name);
-	vrrp_network_send_advertisement(vr);
 	if (vrrp_interface_vripaddr_set(vr) == -1)
 		return -1;
+	vrrp_interface_up(vr->vrrpif_name);
+	vrrp_network_send_advertisement(vr);
 	if (vrrp_network_send_neighbor_advertisement(vr) == -1)
 	    return -1;
 	vr->tm = vrrp_add_timer(vrrp_state_master_expire,
@@ -123,8 +123,8 @@ vrrp_state_set_backup(struct vrrp_vr * vr)
 	if (vr->tm)
 		vrrp_remove_timer(&vr->tm);
 
-	vrrp_interface_down(vr->vrrpif_name);
 	vrrp_interface_vripaddr_delete(vr);
+	vrrp_interface_down(vr->vrrpif_name);
 	vr->skew_time = (256 - vr->priority) / 256;
 	vr->master_down_int = (3 * vr->adv_int) + vr->skew_time;
 
