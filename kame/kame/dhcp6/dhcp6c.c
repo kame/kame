@@ -23,7 +23,7 @@
 
 struct servtab {
 	TAILQ_ENTRY(servtab) st_list;
-	u_int32_t st_pref;
+	u_int8_t st_pref;
 	struct in6_addr st_llcli;
 	struct in6_addr st_relay;
 	struct in6_addr st_serv;
@@ -472,7 +472,7 @@ client6_findserv()
 				break;
 			}
 			client6_addserv(p);
-			if (p->st_pref == ~0)
+			if (p->st_pref == 255)
 				goto found;
 			break;
 		}
@@ -546,27 +546,14 @@ client6_recvadvert(s, serv)
 	if (len < sizeof(*dh6a))
 		return -1;
 	dh6a = (struct dhcp6_advert *)buf;
-	if ((dh6a->dh6adv_flags & DH6ADV_SERVPREF) == 0) {
-		serv->st_pref = ~0;
-		if ((dh6a->dh6adv_flags & DH6ADV_SERVPRESENT) == 0)
-			serv->st_serv = dh6a->dh6adv_relayaddr;
-		else {
-			serv->st_relay = dh6a->dh6adv_relayaddr;
-			serv->st_serv = dh6a->dh6adv_serveraddr;
-		}
-		serv->st_llcli = dh6a->dh6adv_cliaddr;
-	} else {
-		struct dhcp6_advert_pref *dh6ap;
-		dh6ap = (struct dhcp6_advert_pref *)dh6a;
-		serv->st_pref = ntohl(dh6ap->dh6adv_pref);
-		if ((dh6ap->dh6adv_flags & DH6ADV_SERVPRESENT) == 0)
-			serv->st_serv = dh6ap->dh6adv_relayaddr;
-		else {
-			serv->st_relay = dh6ap->dh6adv_relayaddr;
-			serv->st_serv = dh6ap->dh6adv_serveraddr;
-		}
-		serv->st_llcli = dh6ap->dh6adv_cliaddr;
+	serv->st_pref = dh6a->dh6adv_pref;
+	if ((dh6a->dh6adv_flags & DH6ADV_SERVPRESENT) == 0)
+		serv->st_serv = dh6a->dh6adv_relayaddr;
+	else {
+		serv->st_relay = dh6a->dh6adv_relayaddr;
+		serv->st_serv = dh6a->dh6adv_serveraddr;
 	}
+	serv->st_llcli = dh6a->dh6adv_cliaddr;
 	if (IN6_IS_ADDR_MULTICAST(&serv->st_serv)) {
 		memset(serv, 0, sizeof(*serv));
 		return -1;
