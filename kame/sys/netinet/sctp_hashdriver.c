@@ -1,4 +1,4 @@
-/*	$KAME: sctp_hashdriver.c,v 1.4 2003/11/25 06:40:52 ono Exp $	*/
+/*	$KAME: sctp_hashdriver.c,v 1.5 2004/01/19 09:48:26 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
@@ -62,9 +62,8 @@
  * that is what the FIP-180.1 web page says.
  */
 
-void sctp_hash_digest(char *key, int key_len,
-		      char *text, int text_len,
-		      unsigned char *digest)
+void sctp_hash_digest(char *key, int key_len, char *text, int text_len,
+    unsigned char *digest)
 {
 #ifdef USE_MD5
 	md5_ctxt context;
@@ -77,6 +76,7 @@ void sctp_hash_digest(char *key, int key_len,
 	unsigned char k_opad[65];
 	unsigned char tk[20];
 	int i;
+
 	if (key_len > 64) {
 #ifdef USE_MD5
 		md5_ctxt tctx;
@@ -125,7 +125,6 @@ void sctp_hash_digest(char *key, int key_len,
 	MD5Update(&context, k_ipad, 64);	/* start with inner pad */
 	MD5Update(&context, text, text_len);	/* then text of datagram */
 	MD5Final(digest, &context);		/* finish up 1st pass */
-
 #else
 	SHA1_Init(&context);			/* init context for 1st pass */
 	SHA1_Process(&context, k_ipad, 64);	/* start with inner pad */
@@ -149,12 +148,10 @@ void sctp_hash_digest(char *key, int key_len,
 #endif /* USE_MD5 */
 }
 
-void sctp_hash_digest_m(char *key, int key_len,
-			struct mbuf *m, int offset,
-			unsigned char *digest)
+void sctp_hash_digest_m(char *key, int key_len, struct mbuf *m, int offset,
+    unsigned char *digest)
 {
 	struct mbuf *m_at;
-
 #ifdef USE_MD5
 	md5_ctxt context;
 #else
@@ -166,6 +163,7 @@ void sctp_hash_digest_m(char *key, int key_len,
 	unsigned char k_opad[65];
 	unsigned char tk[20];
 	int i;
+
 	if (key_len > 64) {
 #ifdef USE_MD5
 		md5_ctxt tctx;

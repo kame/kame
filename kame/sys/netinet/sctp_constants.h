@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.12 2003/12/17 02:20:01 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.13 2004/01/19 09:48:25 itojun Exp $	*/
 
 #ifndef __sctp_constants_h__
 #define __sctp_constants_h__
@@ -616,14 +616,14 @@
 
 /* modular comparison */
 /* True if a > b (mod = M) */
-#define compare_with_wrap(a, b, M) ((a > b) && ((a - b) < ((M >> 1)+1))) || \
-              ((b > a) && ((b - a) > ((M >> 1)+1)))
+#define compare_with_wrap(a, b, M) (((a > b) && ((a - b) < ((M >> 1) + 1))) || \
+              ((b > a) && ((b - a) > ((M >> 1) + 1))))
 
 
 /* Mapping array manipulation routines */
-#define SCTP_IS_TSN_PRESENT(arry, gap) ((arry[(gap>>3)] >> (gap&0x07)) & 0x01)
-#define SCTP_SET_TSN_PRESENT(arry, gap) (arry[(gap>>3)] |= (0x01 << ((gap&0x07))))
-#define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap>>3)] &= ((~(0x01 << ((gap&0x07)))) & 0xff))
+#define SCTP_IS_TSN_PRESENT(arry, gap) ((arry[(gap >> 3)] >> (gap & 0x07)) & 0x01)
+#define SCTP_SET_TSN_PRESENT(arry, gap) (arry[(gap >> 3)] |= (0x01 << ((gap & 0x07))))
+#define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap >> 3)] &= ((~(0x01 << ((gap & 0x07)))) & 0xff))
 
 /* pegs */
 #define SCTP_NUMBER_OF_PEGS 80

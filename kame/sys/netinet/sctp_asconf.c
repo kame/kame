@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.16 2004/01/19 08:39:25 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.17 2004/01/19 09:48:25 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1038,7 +1038,9 @@ sctp_asconf_queue_add(struct sctp_tcb *tcb, struct ifaddr *ifa, uint16_t type)
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 		aa->ap.addrp.ph.param_type = SCTP_IPV6_ADDRESS;
 		aa->ap.addrp.ph.param_length = (sizeof(struct sctp_ipv6addr_param));
-		aa->ap.aph.ph.param_length = sizeof(struct sctp_asconf_paramhdr) + sizeof(struct sctp_ipv6addr_param);
+		aa->ap.aph.ph.param_length =
+		    sizeof(struct sctp_asconf_paramhdr) +
+		    sizeof(struct sctp_ipv6addr_param);
 		memcpy(&aa->ap.addrp.addr, &sin6->sin6_addr,
 		    sizeof(struct in6_addr));
 #ifdef SCTP_DEBUG
@@ -1050,7 +1052,9 @@ sctp_asconf_queue_add(struct sctp_tcb *tcb, struct ifaddr *ifa, uint16_t type)
 		struct sockaddr_in *sin = (struct sockaddr_in *)ifa->ifa_addr;
 		aa->ap.addrp.ph.param_type = SCTP_IPV4_ADDRESS;
 		aa->ap.addrp.ph.param_length = (sizeof(struct sctp_ipv4addr_param));
-		aa->ap.aph.ph.param_length = sizeof(struct sctp_asconf_paramhdr) + sizeof(struct sctp_ipv4addr_param);
+		aa->ap.aph.ph.param_length =
+		    sizeof(struct sctp_asconf_paramhdr) +
+		    sizeof(struct sctp_ipv4addr_param);
 		memcpy(&aa->ap.addrp.addr, &sin->sin_addr,
 		    sizeof(struct in_addr));
 #ifdef SCTP_DEBUG

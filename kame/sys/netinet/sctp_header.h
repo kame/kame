@@ -1,4 +1,4 @@
-/*	$KAME: sctp_header.h,v 1.10 2004/01/16 09:56:00 itojun Exp $	*/
+/*	$KAME: sctp_header.h,v 1.11 2004/01/19 09:48:26 itojun Exp $	*/
 
 #ifndef __sctp_header_h__
 #define __sctp_header_h__
@@ -34,8 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 #include <netinet/sctp.h>
 #include <netinet/sctp_constants.h>
+
 /*
  * Parameter structures
  */

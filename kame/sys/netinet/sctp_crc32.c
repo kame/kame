@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.8 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.9 2004/01/19 09:48:25 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
@@ -40,7 +40,7 @@
 #ifndef SCTP_USE_ADLER32
 
 #define SCTP_CRC32C_POLY 0x1EDC6F41
-#define SCTP_CRC32C(c, d) (c=(c>>8)^sctp_crc_c[(c^(d))&0xFF])
+#define SCTP_CRC32C(c, d) (c = ((c) >> 8) ^ sctp_crc_c[((c) ^ (d)) & 0xFF])
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* Copyright 2001, D. Otis.  Use this program, code or tables    */
@@ -135,6 +135,7 @@ update_crc32(u_int32_t crc32,
 	     unsigned int length)
 {
 	int i;
+
 	for (i = 0; i < length; i++) {
 		SCTP_CRC32C(crc32, buffer[i]);
 	}
@@ -161,10 +162,7 @@ sctp_csum_finalize(u_int32_t crc32)
 	byte1 = (result >> 8) & 0x000000ff;
 	byte2 = (result >> 16) & 0x000000ff;
 	byte3 = (result >> 24) & 0x000000ff;
-	result = ((byte0 << 24) |
-		  (byte1 << 16) |
-		  (byte2 << 8) |
-		  byte3);
+	result = ((byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3);
 	crc32 = htonl(result);
 #else
 	/*
@@ -178,18 +176,3 @@ sctp_csum_finalize(u_int32_t crc32)
 }
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

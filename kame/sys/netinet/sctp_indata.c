@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.28 2004/01/19 03:52:07 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.29 2004/01/19 09:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -131,6 +131,7 @@ void
 sctp_set_rwnd(struct sctp_tcb *stcb, struct sctp_association *asoc)
 {
 	long calc;
+
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INDATA4) {
 		printf("cc:%lu hiwat:%lu lowat:%lu mbcnt:%lu mbmax:%lu\n",
@@ -861,6 +862,7 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb, struct sctp_association *asoc,
 		if (oper) {
 			struct sctp_paramhdr *ph;
 			int *ippp;
+
 			oper->m_len = sizeof(struct sctp_paramhdr) + 4;
 			ph = mtod(oper, struct sctp_paramhdr *);
 			ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
@@ -1101,6 +1103,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				if (oper) {
 					struct sctp_paramhdr *ph;
 					int *ippp;
+
 					oper->m_len =
 					    sizeof(struct sctp_paramhdr) + 4;
 					ph = mtod(oper, struct sctp_paramhdr *);
@@ -1129,6 +1132,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				if (oper) {
 					struct sctp_paramhdr *ph;
 					int *ippp;
+
 					oper->m_len =
 					    sizeof(struct sctp_paramhdr) + 4;
 					ph = mtod(oper, struct sctp_paramhdr *);
@@ -1149,17 +1153,21 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_INDATA1) {
 						printf("Gak, Evil plot, it IS not same stream number %d vs %d\n",
-						    chk->rec.data.stream_number, asoc->str_of_pdapi);
+						    chk->rec.data.stream_number,
+						    asoc->str_of_pdapi);
 					}
 #endif
 					MGET(oper, M_DONTWAIT, MT_DATA);
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1183,10 +1191,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1290,10 +1301,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1321,10 +1335,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1354,11 +1371,15 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
-						ph->param_length = htons(oper->m_len);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_length =
+						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
 						*ippp = 0x10000007;
 					}
@@ -1382,10 +1403,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1423,10 +1447,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1456,10 +1483,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1487,10 +1517,13 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 						ph->param_length =
 						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
@@ -1520,7 +1553,9 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
 						ph->param_type =
@@ -1829,6 +1864,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb, struct sctp_association *asoc,
 		if (oper) {
 			struct sctp_paramhdr *ph;
 			int *ippp;
+
 			oper->m_len = sizeof(struct sctp_paramhdr) + 4;
 			ph = mtod(oper, struct sctp_paramhdr *);
 			ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
@@ -2013,6 +2049,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				if (oper) {
 					struct sctp_paramhdr *ph;
 					int *ippp;
+
 					oper->m_len =
 					    sizeof(struct sctp_paramhdr) + 4;
 					ph = mtod(oper, struct sctp_paramhdr *);
@@ -2034,11 +2071,15 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
-						oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+
+						oper->m_len =
+						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
 						    struct sctp_paramhdr *);
-						ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
-						ph->param_length = htons(oper->m_len);
+						ph->param_type =
+						    htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
+						ph->param_length =
+						    htons(oper->m_len);
 						ippp = (int *)(ph +1);
 						*ippp = 0x20000003;
 					}
@@ -2063,6 +2104,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					if (oper) {
 						struct sctp_paramhdr *ph;
 						int *ippp;
+
 						oper->m_len =
 						    sizeof(struct sctp_paramhdr) + 4;
 						ph = mtod(oper,
@@ -2474,6 +2516,7 @@ sctp_process_data(struct mbuf **mm, struct sctp_inpcb *inp,
 			if (oper) {
 				struct sctp_paramhdr *ph;
 				int *ippp;
+
 				oper->m_len = sizeof(struct sctp_paramhdr) + 4;
 				ph = mtod(oper, struct sctp_paramhdr *);
 				ph->param_type =
@@ -2701,11 +2744,11 @@ sctp_handle_segments(struct sctp_tcb *stcb, struct sctp_association *asoc,
 								}
 							}
 						}
-						if ((tp1->sent <= SCTP_DATAGRAM_RESEND) &&
-						    (tp1->sent != SCTP_DATAGRAM_UNSENT) &&
-						    (compare_with_wrap(tp1->rec.data.TSN_seq,
+						if (tp1->sent <= SCTP_DATAGRAM_RESEND &&
+						    tp1->sent != SCTP_DATAGRAM_UNSENT &&
+						    compare_with_wrap(tp1->rec.data.TSN_seq,
 						    asoc->this_sack_highest_gap,
-						    MAX_TSN))) {
+						    MAX_TSN)) {
 							asoc->this_sack_highest_gap =
 							    tp1->rec.data.TSN_seq;
 							if (primary_flag_set) {
@@ -2910,7 +2953,8 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb, struct sctp_association *asoc,
 #endif
 				if ((compare_with_wrap(biggest_tsn_newly_acked,
 				    tp1->rec.data.fast_retran_tsn, MAX_TSN)) || 
-				    (biggest_tsn_newly_acked == tp1->rec.data.fast_retran_tsn)) {
+				    (biggest_tsn_newly_acked ==
+				     tp1->rec.data.fast_retran_tsn)) {
 					/*
 					 * Strike the TSN, since this ack is
 					 * beyond where things were when we did
@@ -3269,6 +3313,7 @@ sctp_hs_cwnd_decrease(struct sctp_nets *net)
 #ifdef SCTP_CWND_LOGGING
 	int old_cwnd = net->cwnd;
 #endif
+
 	cur_val = net->cwnd >> 10;
 	indx = net->last_hs_used;
 	if (cur_val < sctp_cwnd_adjust[0].cwnd) {
@@ -3330,9 +3375,10 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	int marking_allowed = 1;
 	int will_exit_fast_recovery=0;
 	int a_rwnd, xxxx;
-
 	struct sctp_nets *net = NULL;
+
 	asoc = &stcb->asoc;
+
 	/*
 	 * Handle the incoming sack on data I have
 	 * been sending.
@@ -3355,6 +3401,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	}
 
 	sctp_service_queues(stcb, asoc);
+
 	/*
 	 * Now perform the actual SACK handling:
 	 * 1) Verify that it is not an old sack, if so discard.
@@ -3377,8 +3424,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	 * 11) Apply any FR penalties.
 	 * 12) Assure we will SACK if in shutdown_recv state.
 	 */
-	j = 0;
 
+	j = 0;
 
 	if (ntohs(ch->ch.chunk_length) < sizeof(struct sctp_sack_chunk)) {
 #ifdef SCTP_DEBUG
@@ -3399,8 +3446,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		tp1 = TAILQ_FIRST(&asoc->send_queue);
 		send_s = tp1->rec.data.TSN_seq;
 	}
-	if ((cum_ack == send_s) ||
-	    (compare_with_wrap(cum_ack, send_s, MAX_TSN))) {
+	if (cum_ack == send_s ||
+	    compare_with_wrap(cum_ack, send_s, MAX_TSN)) {
 		struct mbuf *oper;
 		/*
 		 * no way, we have not even sent
@@ -3414,6 +3461,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		if (oper) {
 			struct sctp_paramhdr *ph;
 			int *ippp;
+
 			oper->m_len = sizeof(struct sctp_paramhdr) + 4;
 			ph = mtod(oper, struct sctp_paramhdr *);
 			ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
@@ -3545,7 +3593,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 						if (tp1->do_rtt) {
 							tp1->whoTo->RTO =
 							    sctp_calculate_rto(stcb,
-							    asoc, tp1->whoTo, &tp1->sent_rcv_time);
+							    asoc, tp1->whoTo,
+							    &tp1->sent_rcv_time);
 							tp1->whoTo->rto_pending = 0;
 							tp1->do_rtt = 0;
 						}
@@ -3585,10 +3634,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	/*******************************************/
 	if (accum_moved) {
 		TAILQ_FOREACH(net, &asoc->nets, sctp_next) {
-			sctp_timer_stop(SCTP_TIMER_TYPE_SEND,
-					stcb->sctp_ep,
-					stcb,
-					net);
+			sctp_timer_stop(SCTP_TIMER_TYPE_SEND, stcb->sctp_ep,
+			    stcb, net);
 		}
 	}
 	biggest_tsn_newly_acked = biggest_tsn_acked = last_tsn;
@@ -3747,7 +3794,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 				/* now was it the primary? if so restore */
 				if (net->dest_state & SCTP_ADDR_WAS_PRIMARY) {
 					stcb->asoc.primary_destination = net;
-					net->dest_state &= ~SCTP_ADDR_WAS_PRIMARY;
+					net->dest_state &=
+					    ~SCTP_ADDR_WAS_PRIMARY;
 				}
 			}
 		}
@@ -3803,21 +3851,29 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 				}
 			} else {
 				/* We are in congestion avoidance */
-				if (net->flight_size + net->net_ack >= net->cwnd ||
-				    asoc->burst_limit_applied) {
+				if (net->flight_size + net->net_ack >=
+				    net->cwnd || asoc->burst_limit_applied) {
 					/*
 					 * add to pba only if we
 					 * had a cwnd's worth (or so) in flight
 					 * OR the burst limit was applied.
 					 */
-					net->partial_bytes_acked += net->net_ack;
+					net->partial_bytes_acked +=
+					    net->net_ack;
 			
-					/* Do we need to increase (if pba is > cwnd)? */
-					if (net->partial_bytes_acked >= net->cwnd) {
-						if (net->cwnd < net->partial_bytes_acked) {
-							net->partial_bytes_acked -= net->cwnd;
+					/*
+					 * Do we need to increase
+					 * (if pba is > cwnd)?
+					 */
+					if (net->partial_bytes_acked >=
+					    net->cwnd) {
+						if (net->cwnd <
+						    net->partial_bytes_acked) {
+							net->partial_bytes_acked -=
+							    net->cwnd;
 						} else {
-							net->partial_bytes_acked = 0;
+							net->partial_bytes_acked =
+							    0;
 						}
 						net->cwnd += net->mtu;
 #ifdef SCTP_CWND_LOGGING
@@ -3886,7 +3942,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		}
 	}
 	if (TAILQ_EMPTY(&asoc->send_queue) && TAILQ_EMPTY(&asoc->sent_queue) &&
-	    (some_on_streamwheel == 0)) {
+	    some_on_streamwheel == 0) {
 		/* nothing left on sendqueue.. consider done */
 		/* stop all timers */
 		asoc->peers_rwnd = a_rwnd;
@@ -3935,7 +3991,6 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	if ((num_seg > 0) && marking_allowed) {
 		sctp_strike_gap_ack_chunks(stcb, asoc, biggest_tsn_acked,
 		    strike_enabled, biggest_tsn_newly_acked, accum_moved);
-
 	}
 
 	/*********************************************/
@@ -4025,7 +4080,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		asoc->sat_t3_loss_recovery = 0;
 	}
 	/* Adjust and set the new rwnd value */
-	xxxx = asoc->total_flight + (asoc->sent_queue_cnt * sizeof(struct mbuf));;
+	xxxx = asoc->total_flight +
+	    (asoc->sent_queue_cnt * sizeof(struct mbuf));
 	if (a_rwnd > xxxx)
 		asoc->peers_rwnd =  a_rwnd - xxxx;
 	else
@@ -4042,15 +4098,16 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	TAILQ_FOREACH(net, &asoc->nets, sctp_next) {
 		struct sctp_tmit_chunk *chk;
 		TAILQ_FOREACH(chk, &asoc->sent_queue, sctp_next) {
-			if ((chk->whoTo == net) &&
-			    ((chk->sent < SCTP_DATAGRAM_ACKED) ||
-			     (chk->sent == SCTP_FORWARD_TSN_SKIP))) {
-				/* Not ack'ed and still outstanding to this
+			if (chk->whoTo == net &&
+			    (chk->sent < SCTP_DATAGRAM_ACKED ||
+			     chk->sent == SCTP_FORWARD_TSN_SKIP)) {
+				/*
+				 * Not ack'ed and still outstanding to this
 				 * destination or marked and must be
 				 * sacked after fwd-tsn sent.
 				 */
 				sctp_timer_start(SCTP_TIMER_TYPE_SEND,
-						 stcb->sctp_ep, stcb, net);
+				    stcb->sctp_ep, stcb, net);
 				break;
 			}
 		}
@@ -4070,7 +4127,8 @@ sctp_update_acked(struct sctp_tcb *stcb, struct sctp_shutdown_chunk *cp,
 	sack.ch.chunk_type = SCTP_SELECTIVE_ACK;
 	sack.ch.chunk_flags = 0;
 	sack.ch.chunk_length = ntohs(sizeof(struct sctp_sack_chunk));
-	sack.sack.a_rwnd = htonl(stcb->asoc.peers_rwnd + stcb->asoc.total_flight);
+	sack.sack.a_rwnd =
+	    htonl(stcb->asoc.peers_rwnd + stcb->asoc.total_flight);
 	/*
 	 * no gaps in this one. This may cause a temporal view to reneging,
 	 * but hopefully the second chunk is a true SACK in the packet and
@@ -4130,7 +4188,8 @@ sctp_kick_prsctp_reorder_queue(struct sctp_tcb *stcb,
 			asoc->size_on_all_streams -= chk->send_size;
 			asoc->cnt_on_all_streams--;
 			/* deliver it to at least the delivery-q */
-			strmin->last_sequence_delivered = chk->rec.data.stream_seq;
+			strmin->last_sequence_delivered =
+			    chk->rec.data.stream_seq;
 			sctp_deliver_data(stcb, &stcb->asoc, chk);
 			tt = strmin->last_sequence_delivered + 1;
 		} else {
@@ -4194,8 +4253,8 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 	/*************************************************************/
 	new_cum_tsn = ntohl(fwd->new_cumulative_tsn);
 
-	if ((compare_with_wrap(asoc->cumulative_tsn, new_cum_tsn, MAX_TSN)) ||
-	    (asoc->cumulative_tsn == new_cum_tsn)) {
+	if (compare_with_wrap(asoc->cumulative_tsn, new_cum_tsn, MAX_TSN) ||
+	    asoc->cumulative_tsn == new_cum_tsn) {
 		/* Already got there ... */
 		return;
 	}
@@ -4239,10 +4298,11 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 	for (i = 0; i <= gap; i++) {
 		SCTP_SET_TSN_PRESENT(asoc->mapping_array, i);
 	}
-	/* Now after marking all, slide thing forward but no
+	/*
+	 * Now after marking all, slide thing forward but no
 	 * sack please.
 	 */
-	sctp_sack_check(stcb,0,0);
+	sctp_sack_check(stcb, 0, 0);
 
 	if (cumack_set_flag) {
 		/*
@@ -4280,24 +4340,29 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 		chk = TAILQ_FIRST(&asoc->reasmqueue);
 		while (chk) {
 			at = TAILQ_NEXT(chk, sctp_next);
-			if ((compare_with_wrap(asoc->cumulative_tsn,
-			    chk->rec.data.TSN_seq, MAX_TSN)) ||
-			    (asoc->cumulative_tsn == chk->rec.data.TSN_seq)) {
+			if (compare_with_wrap(asoc->cumulative_tsn,
+			    chk->rec.data.TSN_seq, MAX_TSN) ||
+			    asoc->cumulative_tsn == chk->rec.data.TSN_seq) {
 				/* It needs to be tossed */
 				TAILQ_REMOVE(&asoc->reasmqueue, chk, sctp_next);
 				if (compare_with_wrap(chk->rec.data.TSN_seq,
 				    asoc->tsn_last_delivered, MAX_TSN)) {
-					asoc->tsn_last_delivered = chk->rec.data.TSN_seq;
-					asoc->str_of_pdapi = chk->rec.data.stream_number;
-					asoc->ssn_of_pdapi = chk->rec.data.stream_seq;
-					asoc->fragment_flags = chk->rec.data.rcv_flags;
+					asoc->tsn_last_delivered =
+					    chk->rec.data.TSN_seq;
+					asoc->str_of_pdapi =
+					    chk->rec.data.stream_number;
+					asoc->ssn_of_pdapi =
+					    chk->rec.data.stream_seq;
+					asoc->fragment_flags =
+					    chk->rec.data.rcv_flags;
 				}
 				asoc->size_on_reasm_queue -= chk->send_size;
 				asoc->cnt_on_reasm_queue--;
 				cnt_gone++;
 
 				/* Clear up any stream problem */
-				if (((chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED) != SCTP_DATA_UNORDERED) &&
+				if ((chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED) !=
+				    SCTP_DATA_UNORDERED &&
 				    (compare_with_wrap(chk->rec.data.stream_seq,
 				    asoc->strmin[chk->rec.data.stream_number].last_sequence_delivered,
 				    MAX_SEQ))) {
@@ -4382,7 +4447,8 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 		num_str = fwd_sz/sizeof(struct sctp_strseq);
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_INDATA1) {
-			printf("Using NEW method, %d strseq's reported in FWD-TSN\n", num_str);
+			printf("Using NEW method, %d strseq's reported in FWD-TSN\n",
+			    num_str);
 		}
 #endif
 		for (i = 0; i < num_str; i++) {
@@ -4415,7 +4481,8 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 			if (compare_with_wrap(stseq[i].sequence,
 			    strm->last_sequence_delivered, MAX_SEQ)) {
 				/* Update the sequence number */
-				strm->last_sequence_delivered = stseq[i].sequence;
+				strm->last_sequence_delivered =
+				    stseq[i].sequence;
 			}
 			/* now kick the stream the new way */
 			sctp_kick_prsctp_reorder_queue(stcb, strm);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_callout.h,v 1.4 2003/11/25 06:40:52 ono Exp $	*/
+/*	$KAME: sctp_callout.h,v 1.5 2004/01/19 09:48:25 itojun Exp $	*/
 
 #ifndef __SCTP_CALLOUT__
 #define __SCTP_CALLOUT__
@@ -59,4 +59,3 @@ void	callout_reset __P((struct callout *, int, void (*)(void *), void *));
 int	callout_stop __P((struct callout *));
 
 #endif
-
