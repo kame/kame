@@ -448,6 +448,10 @@ if_attach(struct ifnet *ifp)
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
 
+	/*
+	 * dom_ifattach[] will be called here.  functions must not expect
+	 * that other initialization is done (such as ether_ifattach).
+	 */
 	if (domains)
 		if_attachdomain1(ifp);
 
