@@ -9,6 +9,7 @@ SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
 SUBDIR+=racoon
 SUBDIR+=vrrp6d
+SUBDIR+=dhcp6
 
 SUBDIR+=mip6control had mip6stat
 
