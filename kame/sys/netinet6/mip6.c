@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.111 2002/01/31 14:14:53 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.112 2002/02/01 14:46:24 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1748,7 +1748,14 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		/* no security association. */
 		mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; /* XXX */
 		mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK; /* XXX */
-		mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP; /* XXX */
+		if ((mbu->mbu_flags & IP6_BUF_HOME) == 0) {
+			/* XXX */
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+		}
+		else {
+			/* XXX */
+			mbu->mbu_expire = time_second + MIP6_BU_SAWAIT_INTERVAL;
+		}
 		error = EACCES;
 		goto freesp;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.22 2002/01/21 11:37:51 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.23 2002/02/01 14:46:24 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -134,6 +134,7 @@ struct mip6_bu {
 #define MIP6_BU_STATE_MIP6NOTSUPP 0x80
 
 #define MIP6_BU_TIMEOUT_INTERVAL 1
+#define MIP6_BU_SAWAIT_INTERVAL 10
 
 struct mip6_bc {
 	LIST_ENTRY(mip6_bc)   mbc_entry;
