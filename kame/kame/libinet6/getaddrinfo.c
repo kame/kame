@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.197 2004/11/27 12:55:26 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.198 2004/11/28 05:57:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2127,7 +2127,7 @@ _dns_getaddrinfo(rv, cb_data, ap)
 			qp->name = hostname;
 			qp->qclass = C_IN;
 			qp->qtype = T_AAAA;
-			qp->answer = buf->buf;
+			qp->answer = buf_current->buf;
 			qp->anslen = sizeof(buf_current->buf);
 			qp->next = &q2;
 
@@ -3172,7 +3172,7 @@ _dns_getaddrinfo(name, pai, ac)
 			qp->name = hostname;
 			qp->qclass = C_IN;
 			qp->qtype = T_AAAA;
-			qp->answer = buf->buf;
+			qp->answer = buf_current->buf;
 			qp->anslen = sizeof(buf_current->buf);
 			qp->next = &q2;
 
@@ -3839,6 +3839,57 @@ static int res_querydomainN __P((const char *, const char *,
 	struct res_target *));
 
 /*
+ * timeval calculation routines used below.
+ * XXX: these are not OS specific, but are only used for FreeBSD right now.
+ */
+static int timeval_lt __P((struct timeval *, struct timeval *));
+static void timeval_add __P((struct timeval *, struct timeval *,
+    struct timeval *));
+static void timeval_sub __P((struct timeval *, struct timeval *,
+    struct timeval *));
+static void timeval_fix __P((struct timeval *));
+
+static int
+timeval_lt(t1, t2)
+	struct timeval *t1, *t2;
+{
+	return ((t1->tv_sec < t2->tv_sec) ||
+	    (t1->tv_sec == t2->tv_sec && t1->tv_usec < t2->tv_usec));
+}
+
+static void
+timeval_add(t1, t2, tr)
+	struct timeval *t1, *t2, *tr;
+{
+	tr->tv_sec = t1->tv_sec + t2->tv_sec;
+	tr->tv_usec = t1->tv_usec + t2->tv_usec;
+	timeval_fix(tr);
+}
+
+static void
+timeval_sub(t1, t2, tr)
+	struct timeval *t1, *t2, *tr;
+{
+	tr->tv_sec = t1->tv_sec - t2->tv_sec;
+	tr->tv_usec = t1->tv_usec - t2->tv_usec;
+	timeval_fix(tr);
+}
+
+static void
+timeval_fix(t)
+	struct timeval *t;
+{
+	if (t->tv_usec < 0) {
+		t->tv_sec--;
+		t->tv_usec += 1000000;
+	}
+	if (t->tv_usec >= 1000000) {
+		t->tv_sec++;
+		t->tv_usec -= 1000000;
+	}
+}
+
+/*
  * Select order host function.
  */
 #define MAXHOSTCONF	4
@@ -4224,22 +4275,27 @@ _dns_getaddrinfo(pai, hostname, res, ac)
 		qp = &q;
 		buf_current = buf;
 
-		if (addrconfig(AF_INET6, ac)) {
-			/* prefer IPv6 when available */
-			qp->name = hostname;
-			qp->qclass = C_IN;
-			qp->qtype = T_AAAA;
-			qp->answer = buf->buf;
-			qp->anslen = sizeof(buf_current->buf);
-			qp->next = &q2;
-
-			buf_current = buf2;
-			qp = &q2;
-		}
+		/*
+		 * Since queries for AAAA can cause unexpected misbehavior,
+		 * we first send A queries.  Note that the query ordering
+		 * is independent from the ordering of the resulting addresses
+		 * returned by getaddrinfo().
+		 */
 		if (addrconfig(AF_INET, ac)) {
 			qp->name = hostname;
 			qp->qclass = C_IN;
 			qp->qtype = T_A;
+			qp->answer = buf_current->buf;
+			qp->anslen = sizeof(buf_current->buf);
+			qp->next = &q2;
+
+			qp = &q2;
+			buf_current = buf2;
+		}
+		if (addrconfig(AF_INET6, ac)) {
+			qp->name = hostname;
+			qp->qclass = C_IN;
+			qp->qtype = T_AAAA;
 			qp->answer = buf_current->buf;
 			qp->anslen = sizeof(buf_current->buf);
 		}
@@ -4505,6 +4561,7 @@ res_queryN(name, target)
 	struct res_target *t;
 	int rcode;
 	int ancount;
+	struct timeval now, rtt, limit, *limitp;
 
 	rcode = NOERROR;
 	ancount = 0;
@@ -4513,6 +4570,9 @@ res_queryN(name, target)
 		h_errno = NETDB_INTERNAL;
 		return (-1);
 	}
+
+	rtt.tv_sec = 0;
+	rtt.tv_usec = 0;
 
 	for (t = target; t; t = t->next) {
 		int class, type;
@@ -4542,13 +4602,47 @@ res_queryN(name, target)
 			h_errno = NO_RECOVERY;
 			return (n);
 		}
-		n = res_send(buf, n, answer, anslen);
-#if 0
-		if (n < 0) {
+
+		/*
+		 * Set an appropriate limit of query timeouts.  We let the
+		 * resolver routine decide the timeout policy until we get
+		 * the first positive response.  After that, we explicitly
+		 * set the maximum limit of timeouts to the larger one
+		 * between 1 second and twice the round trip time of the
+		 * previous successful query.  This way, we can mitigate
+		 * hopeless delay due to misbehaving DNS servers that ignore
+		 * AAAA queries (or queries of "unknown" types in general).
+		 */
+		limitp = NULL;
+		gettimeofday(&now, NULL);
+		if (!(rtt.tv_sec == 0 && rtt.tv_usec == 0)) {
+			long rtt_usec;
+
+			rtt_usec = rtt.tv_sec * 1000000 + rtt.tv_usec;
+			rtt_usec *= 2;
+			rtt.tv_sec = rtt_usec / 1000000;
+			rtt.tv_usec = rtt_usec % 1000000;
+
+			limit.tv_sec = 1;
+			limit.tv_usec = 0;
+
+			if (timeval_lt(&limit, &rtt))
+				limit = rtt;
+			timeval_add(&now, &limit, &limit);
+			limitp = &limit;
+		}
+
+		rtt.tv_sec = 0;
+		rtt.tv_usec = 0;
+		n = res_send_timeout(buf, n, answer, anslen, limitp);
+		if (hp->ancount > 0) {
+			gettimeofday(&rtt, NULL);
+			timeval_sub(&rtt, &now, &rtt);
+		}
+
 #ifdef DEBUG
-			if (_res.options & RES_DEBUG)
+		if (n < 0 && _res.options & RES_DEBUG)
 				printf(";; res_query: send error\n");
-#endif
 			h_errno = TRY_AGAIN;
 			return (n);
 		}
@@ -4782,4 +4876,4 @@ res_querydomainN(name, domain, target)
 	return (res_queryN(longname, target));
 }
 
-#endif	/* os dependent portion */
+#endif	/* OS dependent portion */
