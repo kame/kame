@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.8,v 1.11 2001/03/02 02:10:49 jinmei Exp $
+.\"	$KAME: pim6sd.8,v 1.12 2001/03/06 05:50:41 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -162,4 +162,7 @@ Be sure to set
 .Li net.inet6.ip6.forwarding
 variable to 1 with
 .Xr sysctl 8 .
+.Pp
+.Nm
+requires the node running the daemon to have an IPv6 global address.
 .\"
