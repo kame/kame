@@ -2973,6 +2973,8 @@ ip6_optlen(in6p)
 #define elen(x) \
     (((struct ip6_ext *)(x)) ? (((struct ip6_ext *)(x))->ip6e_len + 1) << 3 : 0)
 
+	if (!in6p->in6p_outputopts)
+		return len;
 	len += elen(in6p->in6p_outputopts->ip6po_hbh);
 	len += elen(in6p->in6p_outputopts->ip6po_dest1);
 	len += elen(in6p->in6p_outputopts->ip6po_rthdr);
