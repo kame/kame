@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.119 2000/07/03 14:16:46 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.120 2000/07/06 11:47:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1970,10 +1970,9 @@ icmp6_reflect(m, off)
 	if (icmp6_reflect_rt.ro_rt == 0 ||
 	    ! (IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &ip6->ip6_dst))) {
 		if (icmp6_reflect_rt.ro_rt) {
-#ifdef __FreeBSD__
+#ifndef __bsdi__
 			RTFREE(icmp6_reflect_rt.ro_rt);
-#endif
-#ifdef __bsdi__
+#else
 			rtfree(icmp6_reflect_rt.ro_rt);
 #endif
 			icmp6_reflect_rt.ro_rt = 0;
