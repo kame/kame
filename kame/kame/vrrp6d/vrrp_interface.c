@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.c,v 1.4 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_interface.c,v 1.5 2002/08/23 12:29:37 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -69,8 +69,11 @@ vrrp_interface_owner_verify(struct vrrp_vr * vr)
 
 	for (cpt = 0; cpt < vr->cnt_ip; cpt++)
 		for (cpt2 = 0; cpt2 < vr->vr_if->nb_ip; cpt2++)
-		  if (memcmp(&vr->vr_ip[cpt].addr, &vr->vr_if->ip_addrs[cpt2], sizeof(struct in6_addr)) == 0)
+			if (memcmp(&vr->vr_ip[cpt].addr, &vr->vr_if->ip_addrs[cpt2], sizeof(struct in6_addr)) == 0) {
 				vr->vr_ip[cpt].owner = VRRP_INTERFACE_IPADDR_OWNER;
+				strncpy(vr->vrrpif_name, vr->vr_if->if_name, sizeof vr->vrrpif_name);
+				vr->vrrpif_index = vr->vr_if->if_index;
+			}
 
 	return;
 }
@@ -251,9 +254,8 @@ vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 	struct in6_addr mask;
 
 	for (cpt = 0; cpt < vr->cnt_ip; cpt++) {
-		if (!vr->vr_ip[cpt].owner) {
+		if (vr->vr_ip[cpt].owner != VRRP_INTERFACE_IPADDR_OWNER) {
 			vrrp_interface_vrrif_set(vr->vrrpif_name,vr->vr_if->if_index);
-//			vrrp_interface_ethaddr_set(vr->vrrpif_name, &vr->ethaddr);
 			vrrp_interface_compute_netmask(vr->vr_netmask[cpt],&mask);
 			if (vrrp_interface_ipaddr_set(vr->vrrpif_name, &vr->vr_ip[cpt].addr, &mask) == -1) {
 				if (errno != EEXIST) {
@@ -262,6 +264,8 @@ vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 					return -1;
 				}
 			}
+		} else {
+			vrrp_interface_ethaddr_set(vr->vr_if->if_name, &vr->ethaddr);
 		}
 	}
 
@@ -284,8 +288,9 @@ vrrp_interface_vripaddr_delete(struct vrrp_vr * vr)
 				}
 			}
 			vrrp_network_delete_local_route(&vr->vr_ip[cpt].addr);
-//			vrrp_interface_ethaddr_set(vr->vrrpif->if_name, &vr->vr_if->ethaddr);
 			vrrp_interface_vrrif_delete(vr->vrrpif_name);
+		} else {
+			vrrp_interface_ethaddr_set(vr->vr_if->if_name, &vr->vr_if->ethaddr);
 		}
 	}
 
