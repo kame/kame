@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.41 2000/06/17 20:34:24 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.42 2000/06/20 16:11:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -417,8 +417,8 @@ in_gif_input(m, va_alist)
 		return;
 	}
 	gif_input(m, af, gifp);
-#endif /*openbsd*/
 	return;
+#endif /*openbsd*/
 }
 
 /*
