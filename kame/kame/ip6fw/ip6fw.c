@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.4 1999/08/19 12:02:35 itojun Exp $
+ * $Id: ip6fw.c,v 1.5 1999/10/26 08:51:36 itojun Exp $
  *
  */
 
@@ -816,7 +816,7 @@ fill_iface(char *which, union ip6_fw_if *ifu, int *byname, int ac, char *arg)
 		ifu->fu_via_if.unit = (*q == '*') ? -1 : atoi(q);
 		*q = '\0';
 		verify_interface(ifu);
-	} else if (!inet_pton(AF_INET6, arg, &ifu->fu_via_ip6)) {
+	} else if (inet_pton(AF_INET6, arg, &ifu->fu_via_ip6) != 1) {
 		show_usage("bad ip6 address ``%s''", arg);
 	} else
 		*byname = 0;
