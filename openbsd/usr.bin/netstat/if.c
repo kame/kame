@@ -258,7 +258,7 @@ intpr(int interval, u_long ifnetaddr)
 						memset(&m6, 0, sizeof(m6));
 						m6.sin6_len = sizeof(struct sockaddr_in6);
 						m6.sin6_family = AF_INET6;
-						m6.sin6_addr = inm.in6m_sa.sin6_addr;
+						m6.sin6_addr = inm.in6m_addr;
 #ifdef __KAME__
 						if (IN6_IS_ADDR_MC_LINKLOCAL(&m6.sin6_addr)) {
 							m6.sin6_scope_id =
