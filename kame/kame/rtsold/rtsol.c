@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.25 2003/05/27 06:43:26 jinmei Exp $	*/
+/*	$KAME: rtsol.c,v 1.26 2003/05/27 06:48:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,7 @@ static struct msghdr sndmhdr;
 static struct iovec rcviov[2];
 static struct iovec sndiov[2];
 static struct sockaddr_in6 from;
+static int rcvcmsglen;
 
 int rssock;
 
@@ -79,7 +80,7 @@ int
 sockopen()
 {
 	static u_char *rcvcmsgbuf = NULL, *sndcmsgbuf = NULL;
-	int rcvcmsglen, sndcmsglen, on;
+	int sndcmsglen, on;
 	static u_char answer[1500];
 	struct icmp6_filter filt;
 
@@ -160,11 +161,9 @@ sockopen()
 	rcviov[0].iov_base = (caddr_t)answer;
 	rcviov[0].iov_len = sizeof(answer);
 	rcvmhdr.msg_name = (caddr_t)&from;
-	rcvmhdr.msg_namelen = sizeof(from);
 	rcvmhdr.msg_iov = rcviov;
 	rcvmhdr.msg_iovlen = 1;
 	rcvmhdr.msg_control = (caddr_t) rcvcmsgbuf;
-	rcvmhdr.msg_controllen = rcvcmsglen;
 
 	/* initialize msghdr for sending packets */
 	sndmhdr.msg_namelen = sizeof(struct sockaddr_in6);
@@ -265,7 +264,9 @@ rtsol_input(int s)
 	struct nd_router_advert *nd_ra;
 	struct cmsghdr *cm;
 
-	/* get message */
+	/* get message.  namelen and controllen must always be initialized. */
+	rcvmhdr.msg_namelen = sizeof(from);
+	rcvmhdr.msg_controllen = rcvcmsglen;
 	if ((i = recvmsg(s, &rcvmhdr, 0)) < 0) {
 		warnmsg(LOG_ERR, __func__, "recvmsg: %s", strerror(errno));
 		return;
