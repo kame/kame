@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.47 2002/05/24 07:04:49 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.48 2002/05/29 02:01:00 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1009,8 +1009,11 @@ natpt_init_tslot()
 	natpt_TCPT_2MSL	  = 120;			/* [sec] */
 	natpt_tcp_maxidle = 600;			/* [sec] */
 
-	maxTTLicmp = maxTTLudp = natpt_TCPT_2MSL;
-	maxTTLtcp  = maxTTLany = 86400;			/* [sec] */
+	maxTTLany = 86400;
+
+	maxTTLicmp = maxTTLudp = 10;
+	maxTTLtcp  = 1800;
+	
 
 	TAILQ_INIT(&frg_head);
 	TAILQ_INIT(&tsl_head);
