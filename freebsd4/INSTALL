@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 4.x
 KAME project
-$Id: INSTALL,v 1.8 2001/11/22 06:18:17 keiichi Exp $
+$Id: INSTALL,v 1.9 2001/11/22 06:19:05 keiichi Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -109,7 +109,7 @@ E-5. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      shell) and /etc/rc's PATH definition.
      Make sure to make them used before /usr/bin or /usr/sbin,
      otherwise you end up using OS-supplied commands, which might not
-     work as mentioned in E-1.
+     work as mentioned in E-2.
 
      You should probably add the following line to your /etc/rc.conf:
 
