@@ -11,8 +11,6 @@ LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
-LDADD+=	-lcompat
-DPADD+=	${LIBCOMPAT}
 LDADD+= -ll -ly
 DPADD+=	${LIBL} ${LIBY}
 
