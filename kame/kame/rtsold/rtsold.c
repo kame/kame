@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.30 2001/05/22 06:02:42 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.31 2001/05/22 06:03:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,7 +610,7 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		else {
 			/*
 			 * After sending MAX_RTR_SOLICITATIONS solicitations,
-			 * we're just waiting for a possible replies; there
+			 * we're just waiting for possible replies; there
 			 * will be no more solicatation.  Thus, we change
 			 * the timer value to MAX_RTR_SOLICITATION_DELAY based
 			 * on RFC 2461, Section 6.3.7.
