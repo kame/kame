@@ -1,10 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1334 2000/10/15 09:11:11 itojun Exp $
+$KAME: CHANGELOG,v 1.1335 2000/10/15 10:25:06 sumikawa Exp $
 
 <200010>
+Sun Oct 15 19:18:45 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/squid11: use latest IPv6 patch.
+	* freebsd3/ports/lftp: upgrade to 2.3.4.
+
 Sun Oct 15 17:49:15 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{libpcap,tcpdump}, freebsd2/ports/{libpcap,tcpdump}:
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}, freebsd[23]/ports/{libpcap,tcpdump}:
 	  use 10/9 weekly snapshot.
 
 Thu Oct 12 04:56:24 JST 2000 sakane@ydc.co.jp
