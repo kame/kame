@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.60 2002/07/08 07:03:06 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.61 2002/08/23 03:48:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,9 +184,9 @@ struct ipsecaux {
  * DISCARD, IPSEC and NONE are allowed for setkey() in SPD.
  * DISCARD and NONE are allowed for system default.
  */
-#define IPSEC_POLICY_DISCARD	0	/* discarding packet */
-#define IPSEC_POLICY_NONE	1	/* through IPsec engine */
-#define IPSEC_POLICY_IPSEC	2	/* do IPsec */
+#define IPSEC_POLICY_DISCARD	0	/* discard the packet */
+#define IPSEC_POLICY_NONE	1	/* bypass IPsec engine */
+#define IPSEC_POLICY_IPSEC	2	/* pass to IPsec */
 #define IPSEC_POLICY_ENTRUST	3	/* consulting SPD if present. */
 #define IPSEC_POLICY_BYPASS	4	/* only for privileged socket. */
 
