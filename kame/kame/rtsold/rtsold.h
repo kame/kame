@@ -56,6 +56,7 @@ struct ifinfo {
 #define IFS_TENTATIVE	4
 
 /* rtsold.c */
+extern int dflag;
 struct ifinfo *find_ifinfo __P((int ifindex));
 void rtsol_timer_update __P((struct ifinfo *ifinfo));
 #ifdef __STDC__

@@ -170,7 +170,8 @@ sendprobe(struct in6_addr *addr, int ifindex)
 	       if_indextoname(ifindex, ifnamebuf));
 
 	if (sendmsg(probesock, &sndmhdr, 0))
-		warnmsg(LOG_ERR, __FUNCTION__, "sendmsg: %s", strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "sendmsg on %s: %s",
+			if_indextoname(ifindex, ifnamebuf), strerror(errno));
 
 	return;
 }

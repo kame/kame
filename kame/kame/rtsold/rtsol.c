@@ -174,8 +174,15 @@ sendpacket(struct ifinfo *ifinfo)
 
 	i = sendmsg(rssock, &sndmhdr, 0);
 
-	if (i < 0 || i != ifinfo->rs_datalen)
-		warnmsg(LOG_ERR, __FUNCTION__, "sendmsg: %s", strerror(errno));
+	if (i < 0 || i != ifinfo->rs_datalen) {
+		/*
+		 * ENETDOWN is not so serious, especially when using several
+		 * network cards on a mobile node. We ignore it.
+		 */
+		if (errno != ENETDOWN || dflag > 0)
+			warnmsg(LOG_ERR, __FUNCTION__, "sendmsg on %s: %s",
+				ifinfo->ifname, strerror(errno));
+	}
 
 	/* update counter */
 	ifinfo->probes++;
