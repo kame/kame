@@ -323,4 +323,8 @@ int	 rtrequest __P((int, struct sockaddr *,
 			struct sockaddr *, struct sockaddr *, int,
 			struct rtentry **));
 void	 ipv4_tunnelsetup __P((struct rtentry *));
+
+#ifdef MIP6
+void	 rt_mip6msg __P((int, struct ifnet *, struct rtentry *));
+#endif
 #endif /* _KERNEL */
