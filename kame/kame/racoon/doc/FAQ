@@ -1,13 +1,13 @@
 racoon FAQ
 KAME team
-$KAME: FAQ,v 1.7 2000/09/23 15:08:46 itojun Exp $
+$KAME: FAQ,v 1.8 2000/09/24 13:52:44 itojun Exp $
 
 
 Q: With what other IKE/IPsec implementation racoon is known to be interoperable?
 
 A:
 	See "IMPLEMENTATION" document supplied with KAME kit, or:
-	http://www.kame.net/dev/cvsweb.cgi/kame/IMPLMENTATION
+	http://www.kame.net/dev/cvsweb.cgi/kame/IMPLEMENTATION
 	As we have tested/got test reports in the past, and our end and
 	the other end may have changed their implemenations, we are not sure
 	if we can interoperate with them today (we hope them to interoperate,
