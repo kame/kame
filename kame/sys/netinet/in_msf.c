@@ -3744,7 +3744,7 @@ in_freemopt_source_list(msf, msf_head, msf_blkhead)
 
 	if (msf == NULL)
 		return;
- 
+
 	if (msf_head != NULL) {
 		for (msfsrc = LIST_FIRST(msf_head); msfsrc; msfsrc = nmsfsrc) {
 			nmsfsrc = LIST_NEXT(msfsrc, list);
@@ -3817,7 +3817,7 @@ static void
 print_in_addr_slist(struct in_addr_slist *ias, char *heading)
 {
 	struct in_addr_source *tmp;
-	
+
 	if (ias == NULL) {
 		printf("\t\t%s(none)\n", heading);
 		return;
@@ -3831,7 +3831,7 @@ print_in_addr_slist(struct in_addr_slist *ias, char *heading)
 		    inet_ntoa(dummy), tmp->ias_refcount);
 	}
 }
-	
+
 void
 dump_in_multisrc(void)
 {
