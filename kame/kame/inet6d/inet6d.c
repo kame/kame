@@ -713,7 +713,7 @@ ipsecsetup(sep)
 	char *policy;
 
 	if (!sep->se_policy || sep->se_policy[0] == '\0')
-		policy = "entrust";
+		policy = "out entrust";
 	else
 		policy = sep->se_policy;
 
