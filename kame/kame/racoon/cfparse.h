@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.h,v 1.9 2001/01/31 05:43:42 sakane Exp $	*/
+/*	$KAME: cfparse.h,v 1.10 2001/01/31 05:45:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,12 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#define CF_PLADDR_ASSOCIATION	0
-#define CF_PLADDR_NEGOTIATION	1
-
-#define CF_SIDE_LOCAL		0
-#define CF_SIDE_REMOTE		1
 
 #define CF_LIFETYPE_TIME	0
 #define CF_LIFETYPE_BYTE	1
