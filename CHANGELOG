@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1683 2001/05/21 14:15:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.1684 2001/05/22 05:59:20 jinmei Exp $
 
 <200105>
+2001-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtsold/rtsold.c (rtsol_timer_update): changed the
+	timeout period after sending MAX_RTR_SOLICITATIONS solicitation
+	from RTR_SOLICITATION_INTERVAL to MAX_RTR_SOLICITATION_DELAY
+	according to the last paragraph of RFC 2461 Section 6.3.7.
+	In response to: a comment from Pekka Savola <pekkas@netcore.fi>
+
 2001-05-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/udp6_output.c (udp6_output): if the
 	destination address is an IPv4-mapped IPv6 address which is
