@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.122 2001/02/15 14:21:25 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.123 2001/02/15 23:31:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2323,7 +2323,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		return EINVAL;
 	ol = oldlenp ? *oldlenp : 0;
 	switch (name) {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
 	case ICMPV6CTL_ND6_DRLIST:
 		if (oldp) {
 			d = (struct in6_defrouter *)oldp;

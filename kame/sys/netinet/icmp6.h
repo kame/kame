@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.40 2001/02/15 11:01:29 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.41 2001/02/15 23:31:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -591,7 +591,7 @@ struct icmp6stat {
 #define ICMPV6CTL_MTUDISC_HIWAT	16
 #define ICMPV6CTL_MTUDISC_LOWAT	17
 #define ICMPV6CTL_ND6_DEBUG	18
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
 #define ICMPV6CTL_ND6_DRLIST	19
 #endif
 #define ICMPV6CTL_MAXID		20

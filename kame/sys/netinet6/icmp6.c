@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.199 2001/02/15 11:01:27 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.200 2001/02/15 23:31:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3269,6 +3269,8 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &icmp6stat,
 		    sizeof(icmp6stat));
+	case ICMPV6CTL_ND6_DRLIST:
+		return nd6_sysctl(name[0], oldp, oldlenp, newp, newlen);
 	default:
 		return (sysctl_int_arr(icmp6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));
