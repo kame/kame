@@ -260,7 +260,9 @@ cmd
 			      IPPORT_RESERVED) ||
 			    memcmp(&data_dest.su_sin6.sin6_addr,
 				   &his_addr.su_sin6.sin6_addr,
-			    sizeof(data_dest.su_sin6.sin6_addr)) != 0)) {
+			    sizeof(data_dest.su_sin6.sin6_addr)) != 0 ||
+			    data_dest.su_sin6.sin6_scope_id !=
+				his_addr.su_sin6.sin6_scope_id)) {
 				reply(500, "Illegal LPRT command rejected");
 				return (NULL);
 			}
@@ -373,6 +375,9 @@ cmd
 					fail += memcmp(&data_dest.su_sin6.sin6_addr,
 					    &his_addr.su_sin6.sin6_addr,
 					    sizeof(data_dest.su_sin6.sin6_addr));
+			    		if (data_dest.su_sin6.sin6_scope_id !=
+					    his_addr.su_sin6.sin6_scope_id)
+						fail++;
 					break;
 				default:
 					fail++;
