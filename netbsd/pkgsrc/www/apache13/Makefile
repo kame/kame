@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.5 1999/09/01 07:41:01 itojun Exp $
+# $NetBSD: Makefile,v 1.19 2000/11/14 19:58:05 itojun Exp $
 #
 # The fourth number in the PKGNAME version indicates a NetBSD pkg revision
 # (to indicate changes in the shipped third party patches such as the mod_ssl
@@ -10,8 +10,8 @@
 # sanity fixes in apache module API (for example, avoid u_long for IPv4 addrs)
 #
 
-DISTNAME=		apache_1.3.12
-PKGNAME=		apache-1.3.12
+DISTNAME=		apache_1.3.14
+PKGNAME=		apache6-1.3.14
 CATEGORIES=		www
 MASTER_SITES=		http://www.apache.org/dist/ \
 			ftp://ftp.modssl.org/source/ \
@@ -21,7 +21,7 @@ DISTFILES=		${DISTNAME}${EXTRACT_SUFX} \
 #			${SSL_DISTNAME}${EXTRACT_SUFX}
 
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=		apache-1.3.12-v6-20000908a.diff.gz
+PATCHFILES=		apache-1.3.14-v6-20001114.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		itojun@itojun.org
@@ -29,7 +29,7 @@ HOMEPAGE=		http://www.apache.org/
 
 CONFLICTS=		apache-*modssl-* apache-*
 
-SSL_DISTNAME=		mod_ssl-2.6.3-1.3.12
+#SSL_DISTNAME=		mod_ssl-2.6.3-1.3.12
 
 EXTRACT_ONLY=		${DISTFILES:N*.gif}
 HAS_CONFIGURE=		YES
@@ -42,18 +42,20 @@ CONFIGURE_ARGS+=	--prefix=${PREFIX} --libexecdir=${PREFIX}/lib/httpd \
 			--enable-module=most \
 			--enable-module=auth_db \
 			--disable-module=auth_dbm \
-			--with-perl=${PREFIX}/bin/perl
+			--with-perl=${PERL5}
 #			--enable-rule=EAPI --disable-module=ssl 
-CONFIGURE_SCRIPT=	configure.v6
+CONFIGURE_SCRIPT=	${WRKSRC}/configure.v6
 CONFIGURE_ENV+=		OPTIM="${OPTIM}"
+
+BUILD_DEFS+=		USE_INET6
+
+CHMOD?=			chmod
 
 .include "../../mk/bsd.prefs.mk"
 
-CHMOD?=	chmod
-
-#.if !defined(USE_INET6)
-#BROKEN=			"IPv6 only build"
-#.endif
+.if !defined(USE_INET6) || ${USE_INET6} != YES
+IGNORE=			"IPv6 only build"
+.endif
 
 .if defined(APACHE_SUEXEC) && ${APACHE_SUEXEC} == YES
 CONFIGURE_ARGS+=	--enable-suexec --suexec-caller=www \
@@ -64,6 +66,13 @@ CONFIGURE_ARGS+=	--enable-suexec --suexec-caller=www \
 CONFIGURE_ARGS+=	--disable-rule=STATUS
 OPTIM+=			-DBUFFERED_LOGS
 CFLAGS+=		-O6 -fomit-frame-pointer -fexpensive-optimizations
+.endif
+
+.if (${OPSYS} == "SunOS")
+DEPENDS+=		db-2.7.7:../../databases/db
+LDFLAGS+=		-Wl,-R/usr/ucblib -L/usr/ucblib -Wl,-R${LOCALBASE}/lib -L${LOCALBASE}/lib
+CONFIGURE_ENV+=		INCLUDES="-I${LOCALBASE}/include/db2"
+CONFIGURE_ENV+=		LIBS="-ldbm -ldb2"
 .endif
 
 PLIST_SRC=		${WRKDIR}/PLIST
@@ -86,13 +95,13 @@ BUILD_DEFS+=		APACHE_PERF_TUNING APACHE_SUEXEC USE_INET6
 #		../${SSL_DISTNAME}/pkg.sslmod/sslmod.patch \
 #		../${SSL_DISTNAME}/pkg.sslsup/sslsup.patch \
 #		| ${PATCH} ${PATCH_ARGS}
-#	@cd ${WRKSRC} && tail +129 \
+#	@cd ${WRKSRC} && ${TAIL} +129 \
 #		../${SSL_DISTNAME}/pkg.ssldoc/ssldoc.patch \
 #		| ${PATCH} ${PATCH_ARGS}
 
 post-patch:
-	@find ${WRKSRC}/htdocs -name '*.orig' | xargs ${RM}
-	@${CHMOD} +x ${WRKSRC}/${CONFIGURE_SCRIPT}
+	@${FIND} ${WRKSRC}/htdocs -name '*.orig' | xargs ${RM} -f
+	@${CHMOD} +x ${CONFIGURE_SCRIPT}
 
 post-build:
 	${SED} s#@PREFIX@#${PREFIX}#g <${FILESDIR}/apache.sh \
@@ -101,13 +110,13 @@ post-build:
 post-install:
 	${INSTALL_DATA} ${DISTDIR}/sitedrivenby.gif \
 	  ${PREFIX}/share/httpd/htdocs
-	${INSTALL_SCRIPT} ${WRKDIR}/apache.sh ${PREFIX}/etc/rc.d/apache.sh
+	${INSTALL_SCRIPT} ${WRKDIR}/apache.sh ${PREFIX}/etc/rc.d/apache
 	@${MV} ${PREFIX}/lib/httpd/libproxy.so \
 	  ${PREFIX}/lib/httpd/mod_proxy.so 2>/dev/null || \
 	  ${MKDIR} ${PREFIX}/lib/httpd
 	@${CP} ${PKGDIR}/PLIST ${PLIST_SRC}
 .for FILE in man/man8/suexec.8 sbin/suexec
-	@if [ -e ${PREFIX}/${FILE} ]; then \
+	@if ${TEST} -e ${PREFIX}/${FILE} ; then \
 	  ${ECHO} ${FILE} >>${PLIST_SRC}; \
 	fi
 .endfor
