@@ -141,6 +141,7 @@ struct mbuf {
 #define M_COMP		0x1000  /* payload was compressed (IPCOMP) */
 #define M_AUTH_AH	0x2000  /* header was authenticated (AH) */
 #define M_TUNNEL	0x4000  /* IP-in-IP added by tunnel mode IPsec */
+#define M_NOTIFICATION	0x8000	/* Notification Event */
 
 /* Checksumming flags */
 #define	M_IPV4_CSUM_OUT		0x0001	/* IPv4 checksum needed */
@@ -158,7 +159,8 @@ struct mbuf {
 
 /* flags copied when copying m_pkthdr */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|\
-			 M_AUTH|M_COMP|M_ANYCAST6|M_LOOP|M_TUNNEL)
+			 M_AUTH|M_COMP|M_ANYCAST6|M_LOOP|M_TUNNEL|\
+			 M_NOTIFICATION)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
