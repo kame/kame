@@ -487,7 +487,6 @@ if test "x$include_path_openssl" = "x"; then
 else
 	AC_CHECK_HEADERS(openssl/idea.h openssl/rc5.h openssl/rsa.h openssl/pem.h openssl/evp.h openssl/x509.h,
 		[], [nosymbol=`echo $ac_hdr | sed -e 's/.h$//' -e 's/^openssl.//' -e 's/^/NO_/' | tr 'a-z' 'A-Z'`
-		echo $nosymbol
 		CPPFLAGS="$CPPFLAGS -D$nosymbol=1"
 		signing=no])
 fi
