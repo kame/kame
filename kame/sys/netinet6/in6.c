@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.331 2002/11/09 03:21:00 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.332 2002/11/11 05:52:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3590,6 +3590,7 @@ in6_joingroup(ifp, addr, errorp)
 		return NULL;
 	}
 	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp, 0, NULL, MCAST_EXCLUDE, 1);
+	imm->i6mm_msf->msf_grpjoin++;
 	if (*errorp != 0) {
 		IMO_MSF_FREE(imm->i6mm_msf);
 		LIST_REMOVE(imm, i6mm_chain);
