@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2002/01/12 08:35:25 jinmei Exp $
+#	$KAME: Makefile,v 1.2 2002/01/21 07:42:45 jinmei Exp $
 # Copyright (c) 2002 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -45,9 +45,9 @@ BINMODE=4555
 CFLAGS+= -Wall
 .endif
 .if (${OPSYS} != "NetBSD")
-CFLAGS+= -DINET6
+CFLAGS+= -DINET6 -DHAVE_SCOPELIB
 .else
-CPPFLAGS+= -DINET6
+CPPFLAGS+= -DINET6 -DHAVE_SCOPELIB
 .endif
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
