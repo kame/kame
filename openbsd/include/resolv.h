@@ -1,4 +1,4 @@
-/*	$OpenBSD: resolv.h,v 1.5 2001/01/04 21:37:11 todd Exp $	*/
+/*	$OpenBSD: resolv.h,v 1.7 2001/07/31 22:02:18 jakob Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -194,6 +194,8 @@ struct __res_state_ext {
 #define	RES_USE_INET6	0x00002000	/* use/map IPv6 in gethostbyname() */
 /* KAME extensions: use higher bit to avoid conflict with ISC use */
 #define	RES_USE_EDNS0	0x40000000	/* use EDNS0 */
+/* DNSSEC extensions: use higher bit to avoid conflict with ISC use */
+#define	RES_USE_DNSSEC	0x20000000	/* use DNSSEC using OK bit in OPT */
 
 #define RES_DEFAULT	(RES_RECURSE | RES_DEFNAMES | RES_DNSRCH)
 
@@ -296,6 +298,7 @@ extern const struct res_sym __p_type_syms[];
 #define	res_nameinquery	__res_nameinquery
 #define	res_queriesmatch __res_queriesmatch
 #define	res_close	__res_close
+#define	res_opt		__res_opt
 
 #ifdef BIND_RES_POSIX3
 #define	dn_expand	__dn_expand

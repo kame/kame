@@ -1,4 +1,4 @@
-/*	$OpenBSD: nameser.h,v 1.3 1997/03/13 19:11:54 downsj Exp $	*/
+/*	$OpenBSD: nameser.h,v 1.6 2001/07/31 22:02:18 jakob Exp $	*/
 
 /*
  * ++Copyright++ 1983, 1989, 1993
@@ -185,7 +185,7 @@
 #define T_NAPTR		35		/* Naming Authority PoinTeR */
 #define T_A6		38
 #define T_DNAME		39
-#define T_OPT		41		/* OPT pseudo-RR, RFC2761 */
+#define T_OPT		41		/* OPT pseudo-RR, RFC2671 */
 	/* non standard */
 #define T_UINFO		100		/* user (finger) information */
 #define T_UID		101		/* user ID */
@@ -249,6 +249,11 @@
 #define	MAX_MD5RSA_KEY_BYTES		((MAX_MD5RSA_KEY_PART_BITS+7/8)*2+3)
 					/* Max length of text sig block */
 #define	MAX_KEY_BASE64			(((MAX_MD5RSA_KEY_BYTES+2)/3)*4)
+
+/*
+ * EDNS0 Z-field extended flags
+ */
+#define DNS_MESSAGEEXTFLAG_DO	0x8000U
 
 /*
  * Status return codes for T_UNSPEC conversion routines
