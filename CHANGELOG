@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1814 2001/07/25 06:37:33 itojun Exp $
+$KAME: CHANGELOG,v 1.1815 2001/07/25 09:24:26 suz Exp $
 
 <200107>
+Wed Jul 25 18:15:37 JST 2001	suz@sdl.hitachi.co.jp
+	* kame/sys/netinet6/udp6_output.c, freebsd4/sys/netinet6/udp_usrreq.c:
+	rejects IPv6 packet toward IPv4-mapped address if its source
+	address is not an IPv4-mapped IPv6 address, since the
+	converted IPv4 packets would have an unexpected IPv4 source 
+	address.
+	(TCP6 might have the same bug)
+
 Wed Jul 25 15:33:06 JST 2001  itojun@iijlab.net
 	* netbsd/sys/net/route.c: do not fill rmx_mtu too much on RTM_ADD/
 	  RTM_RESOLVE.  this was merged by mistake during past kame work.

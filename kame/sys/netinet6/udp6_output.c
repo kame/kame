@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.33 2001/06/22 19:07:54 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.34 2001/07/25 09:24:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,8 +263,19 @@ udp6_output(in6p, m, addr6, control)
 				 */
 				error = EINVAL;
 				goto release;
-			} else
-				af = AF_INET;
+			}
+			if (!IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)) {
+				/*
+				 * when remote addr is IPv4-mapped address, 
+				 * local addr should not be an IPv6 address;
+				 * since you cannot determine how to map IPv6 
+				 * source address to IPv4.
+				 */
+				error = EINVAL;
+				goto release;
+			}
+
+			af = AF_INET;
 		}
 
 		/* KAME hack: embed scopeid */
