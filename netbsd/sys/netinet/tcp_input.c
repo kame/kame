@@ -1908,8 +1908,8 @@ dodata:							/* XXX */
 			TCP_SETUP_ACK(tp, th);
 			tp->rcv_nxt += tlen;
 			tiflags = th->th_flags & TH_FIN;
-			tcpstat.tcps_rcvpack++;\
-			tcpstat.tcps_rcvbyte += tlen;\
+			tcpstat.tcps_rcvpack++;
+			tcpstat.tcps_rcvbyte += tlen;
 #ifdef DEFER_MADJ
 			m_adj(m, hdroptlen);
 #endif
