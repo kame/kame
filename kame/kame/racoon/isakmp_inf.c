@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.37 2000/07/06 11:19:21 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.38 2000/07/06 13:46:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -611,6 +611,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 				iph2->ivm->iv);
 		if (tmp == NULL) {
 			vfree(iph2->sendbuf);
+			iph2->sendbuf = NULL;
 			goto err;
 		}
 		vfree(iph2->sendbuf);
@@ -620,6 +621,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	/* HDR*, HASH(1), N */
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0) {
 		vfree(iph2->sendbuf);
+		iph2->sendbuf = NULL;
 		goto err;
 	}
 
@@ -635,6 +637,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	/* XXX If Acknowledged Informational required, don't delete ph2handle */
 	error = 0;
 	vfree(iph2->sendbuf);
+	iph2->sendbuf = NULL;
 	goto err;	/* XXX */
 
 end:

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.27 2000/07/04 17:23:16 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.28 2000/07/06 13:46:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -189,106 +189,42 @@ delph1(iph1)
 		iph1->local = NULL;
 	}
 
-	if (iph1->authstr) {
-		vfree(iph1->authstr);
-		iph1->authstr = NULL;
-	}
+	VPTRINIT(iph1->authstr);
 
 	if (iph1->sce)
 		SCHED_KILL(iph1->sce);
 	if (iph1->scr)
 		SCHED_KILL(iph1->scr);
+	VPTRINIT(iph1->sendbuf);
 
-	if (iph1->dhpriv) {
-		vfree(iph1->dhpriv);
-		iph1->dhpriv = NULL;
-	}
-	if (iph1->dhpub) {
-		vfree(iph1->dhpub);
-		iph1->dhpub = NULL;
-	}
-	if (iph1->dhpub_p) {
-		vfree(iph1->dhpub_p);
-		iph1->dhpub_p = NULL;
-	}
-	if (iph1->dhgxy) {
-		vfree(iph1->dhgxy);
-		iph1->dhgxy = NULL;
-	}
-	if (iph1->nonce) {
-		vfree(iph1->nonce);
-		iph1->nonce = NULL;
-	}
-	if (iph1->nonce_p) {
-		vfree(iph1->nonce_p);
-		iph1->nonce_p = NULL;
-	}
-	if (iph1->skeyid) {
-		vfree(iph1->skeyid);
-		iph1->skeyid = NULL;
-	}
-	if (iph1->skeyid_d) {
-		vfree(iph1->skeyid_d);
-		iph1->skeyid_d = NULL;
-	}
-	if (iph1->skeyid_a) {
-		vfree(iph1->skeyid_a);
-		iph1->skeyid_a = NULL;
-	}
-	if (iph1->skeyid_e) {
-		vfree(iph1->skeyid_e);
-		iph1->skeyid_e = NULL;
-	}
-	if (iph1->key) {
-		vfree(iph1->key);
-		iph1->key = NULL;
-	}
-	if (iph1->hash) {
-		vfree(iph1->hash);
-		iph1->hash = NULL;
-	}
-	if (iph1->sig) {
-		vfree(iph1->sig);
-		iph1->sig = NULL;
-	}
-	if (iph1->sig_p) {
-		vfree(iph1->sig_p);
-		iph1->sig_p = NULL;
-	}
-	if (iph1->cert) {
-		vfree(iph1->cert);
-		iph1->cert = NULL;
-	}
-	if (iph1->cert_p) {
-		vfree(iph1->cert_p);
-		iph1->cert_p = NULL;
-	}
-	if (iph1->crl_p) {
-		vfree(iph1->crl_p);
-		iph1->crl_p = NULL;
-	}
-	if (iph1->id) {
-		vfree(iph1->id);
-		iph1->id = NULL;
-	}
-	if (iph1->id_p) {
-		vfree(iph1->id_p);
-		iph1->id_p = NULL;
-	}
+	VPTRINIT(iph1->dhpriv);
+	VPTRINIT(iph1->dhpub);
+	VPTRINIT(iph1->dhpub_p);
+	VPTRINIT(iph1->dhgxy);
+	VPTRINIT(iph1->nonce);
+	VPTRINIT(iph1->nonce_p);
+	VPTRINIT(iph1->skeyid);
+	VPTRINIT(iph1->skeyid_d);
+	VPTRINIT(iph1->skeyid_a);
+	VPTRINIT(iph1->skeyid_e);
+	VPTRINIT(iph1->key);
+	VPTRINIT(iph1->hash);
+	VPTRINIT(iph1->sig);
+	VPTRINIT(iph1->sig_p);
+	VPTRINIT(iph1->cert);
+	VPTRINIT(iph1->cert_p);
+	VPTRINIT(iph1->crl_p);
+	VPTRINIT(iph1->cr_p);
+	VPTRINIT(iph1->id);
+	VPTRINIT(iph1->id_p);
 
 	if (iph1->ivm) {
 		oakley_delivm(iph1->ivm);
 		iph1->ivm = NULL;
 	}
 
-	if (iph1->sa) {
-		vfree(iph1->sa);
-		iph1->sa = NULL;
-	}
-	if (iph1->sa_ret) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
+	VPTRINIT(iph1->sa);
+	VPTRINIT(iph1->sa_ret);
 
 	free(iph1);
 }
@@ -474,17 +410,21 @@ newph2()
 	return iph2;
 }
 
-/* initialize ph2handle */
+/*
+ * initialize ph2handle
+ * NOTE: don't initialize src/dst.
+ *       SPI in the proposal is cleared.
+ */
 void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
-	/* NOTE: don't initialize src/dst */
-
 	if (iph2->sce)
 		SCHED_KILL(iph2->sce);
 	if (iph2->scr)
 		SCHED_KILL(iph2->scr);
+
+	VPTRINIT(iph2->sendbuf);
 
 	/* clear spi, keep variables in the proposal */
 	if (iph2->proposal) {
@@ -504,39 +444,17 @@ initph2(iph2)
 		iph2->pfsgrp = NULL;
 	}
 
-	if (iph2->dhpriv) {
-		vfree(iph2->dhpub_p);
-		iph2->dhpub_p = NULL;
-	}
-	if (iph2->dhpub) {
-		vfree(iph2->dhpub_p);
-		iph2->dhpub_p = NULL;
-	}
-	if (iph2->dhgxy) {
-		vfree(iph2->dhgxy);
-		iph2->dhgxy = NULL;
-	}
-	if (iph2->id) {
-		vfree(iph2->id);
-		iph2->id = NULL;
-	}
-	if (iph2->id_p) {
-		vfree(iph2->id_p);
-		iph2->id_p = NULL;
-	}
-	if (iph2->nonce_p) {
-		vfree(iph2->nonce_p);
-		iph2->nonce_p = NULL;
-	}
-
-	if (iph2->sa) {
-		vfree(iph2->sa);
-		iph2->sa = NULL;
-	}
-	if (iph2->sa_ret) {
-		vfree(iph2->sa_ret);
-		iph2->sa_ret = NULL;
-	}
+	VPTRINIT(iph2->dhpriv);
+	VPTRINIT(iph2->dhpub);
+	VPTRINIT(iph2->dhpub_p);
+	VPTRINIT(iph2->dhgxy);
+	VPTRINIT(iph2->id);
+	VPTRINIT(iph2->id_p);
+	VPTRINIT(iph2->nonce);
+	VPTRINIT(iph2->nonce_p);
+	VPTRINIT(iph2->hash);
+	VPTRINIT(iph2->sa);
+	VPTRINIT(iph2->sa_ret);
 
 	if (iph2->ivm) {
 		oakley_delivm(iph2->ivm);
@@ -553,11 +471,6 @@ delph2(iph2)
 {
 	initph2(iph2);
 
-	if (iph2->proposal) {
-		flushsaprop(iph2->proposal);
-		iph2->proposal = NULL;
-	}
-
 	if (iph2->src) {
 		free(iph2->src);
 		iph2->src = NULL;
@@ -565,6 +478,11 @@ delph2(iph2)
 	if (iph2->dst) {
 		free(iph2->dst);
 		iph2->dst = NULL;
+	}
+
+	if (iph2->proposal) {
+		flushsaprop(iph2->proposal);
+		iph2->proposal = NULL;
 	}
 
 	free(iph2);
