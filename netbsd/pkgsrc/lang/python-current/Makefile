@@ -1,27 +1,33 @@
 # $NetBSD: Makefile,v 1.18 2000/01/09 01:19:11 wiz Exp $
 #
 
-DISTNAME=	py152
-PKGNAME=	python-1.5.2
+DISTNAME=	Python-1.6b1
+PKGNAME=	python-1.6b1
 CATEGORIES=	lang
-MASTER_SITES=	ftp://ftp.python.org/pub/python/src/
 EXTRACT_SUFX=	.tgz
 
-MAINTAINER=	tsarna@netbsd.org
+PATCHFILES=	python-16b1-v6-20000815.diff.gz
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCH_DIST_STRIP=	-p1
+
+MAINTAINER=	itojun@kame.net
 HOMEPAGE=	http://www.python.org/
+HOMEPAGE_AGREEMENT=	http://www.python.org/1.6/download.html
+
+FIND?=		/usr/bin/find
 
 PLIST_SRC=	${WRKDIR}/.PLIST_SRC
 
 DIST_SUBDIR=	python
 
-WRKSRC=		${WRKDIR}/Python-1.5.2
+WRKSRC=		${WRKDIR}/Python-1.6b1
 GNU_CONFIGURE=	yes
 
 # Make sure having environment variable OPT doesn't affect the
 # installed module-building Makefile
-MAKE_ENV+=	'OPT=${CFLAGS}'
-CONFIGURE_ENV+=	'OPT=${CFLAGS}'
-SCRIPTS_ENV+=	'OPT=${CFLAGS}'
+#MAKE_ENV+=	'OPT=${CFLAGS}'
+#CONFIGURE_ENV+=	'OPT=${CFLAGS}'
+#SCRIPTS_ENV+=	'OPT=${CFLAGS}'
 
 # Handle the module setup file:
 #   - disable a few broken modules on 64 bit platforms (nothing important)
@@ -40,6 +46,13 @@ ZOULARIS?=	${PREFIX}/bsd
 MODADD=		-I${ZOULARIS}/include -L${ZOULARIS}/lib -R${ZOULARIS}/lib
 .endif
 
+pre-fetch:
+	@if test ! -f ${_DISTDIR}/${DISTNAME}${EXTRACT_SUFX}; then \
+		${ECHO_MSG} "===> you must fetch ${DISTNAME}${EXTRACT_SUFX} manually from:"; \
+		${ECHO_MSG} "     ${HOMEPAGE_AGREEMENT}"; \
+		exit 1; \
+	fi
+
 post-configure:
 	${SED}  -e 's,@NO64BIT@,${NO64BIT},g' \
 		-e 's,@NOSHARED@,${NOSHARED},g' \
@@ -48,15 +61,15 @@ post-configure:
 
 post-install:
 	${CAT} ${PKGDIR}/PLIST.pre >${PLIST_SRC}
-	(cd ${PREFIX}; ${FIND} lib/python1.5 -type f -print >>${PLIST_SRC})
-	(cd ${PREFIX}; ${FIND} include/python1.5 -type f -print \
+	(cd ${PREFIX}; ${FIND} lib/python1.6 -type f -print >>${PLIST_SRC})
+	(cd ${PREFIX}; ${FIND} include/python1.6 -type f -print \
 		>>${PLIST_SRC})
-	(cd ${PREFIX}; ${FIND} -d include/python1.5 -type d -print | \
+	(cd ${PREFIX}; ${FIND} -d include/python1.6 -type d -print | \
 		${SED} -e "s/^/@dirrm /" >>${PLIST_SRC})
-	${ECHO} "@unexec ${RM} -rf %D/lib/python1.5" >>${PLIST_SRC}
+	${ECHO} "@unexec ${RM} -rf %D/lib/python1.6" >>${PLIST_SRC}
 	# Reinstall Python binary to get it stripped
-	${RM} ${PREFIX}/bin/python ${PREFIX}/bin/python1.5
+	${RM} ${PREFIX}/bin/python ${PREFIX}/bin/python1.6
 	${INSTALL_PROGRAM} ${WRKSRC}/python ${PREFIX}/bin
-	${LN} ${PREFIX}/bin/python ${PREFIX}/bin/python1.5
+	${LN} ${PREFIX}/bin/python ${PREFIX}/bin/python1.6
 
 .include "../../mk/bsd.pkg.mk"

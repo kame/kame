@@ -5,6 +5,7 @@
 .include "../mk/bsd.prefs.mk"
 
     SUBDIR += python
+    SUBDIR += python-current
     SUBDIR += ruby
 
 .include "../mk/bsd.pkg.subdir.mk"
