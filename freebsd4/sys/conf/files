@@ -77,18 +77,12 @@ cam/scsi/scsi_ses.c	optional ses
 cam/scsi/scsi_target.c	optional targ
 cam/scsi/scsi_targ_bh.c	optional targbh
 crypto/sha1.c		optional ipsec
-crypto/des/des_cbc.c	optional ipsec ipsec_esp
 crypto/des/des_ecb.c	optional ipsec ipsec_esp
 crypto/des/des_setkey.c	optional ipsec ipsec_esp
-crypto/des/des_3cbc.c	optional ipsec ipsec_esp
-crypto/blowfish/bf_cbc.c	optional ipsec ipsec_esp
-crypto/blowfish/bf_cbc_m.c	optional ipsec ipsec_esp
 crypto/blowfish/bf_enc.c	optional ipsec ipsec_esp
 crypto/blowfish/bf_skey.c	optional ipsec ipsec_esp
 crypto/cast128/cast128.c	optional ipsec ipsec_esp
-crypto/cast128/cast128_cbc.c	optional ipsec ipsec_esp
 #crypto/rc5/rc5.c		optional ipsec ipsec_esp
-#crypto/rc5/rc5_cbc.c		optional ipsec ipsec_esp
 crypto/rijndael/rijndael-alg-fst.c	optional ipsec_esp
 crypto/rijndael/rijndael-api-fst.c	optional ipsec_esp
 crypto/twofish/twofish2.c	optional ipsec_esp
