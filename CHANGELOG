@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.810 2000/04/24 18:56:52 sakane Exp $
+$Id: CHANGELOG,v 1.811 2000/04/24 19:09:45 sakane Exp $
 
 <200004>
+Tue Apr 25 04:09:09 JST 2000 sakane@kame.net
+	* kame/kame/racoon:
+	* kame/kame/setkey:
+	In the case of ICMP{,V6}, check address family and upper layer protocol.
+
 Tue Apr 25 03:54:32 JST 2000 sakane@kame.net
 	* kame/kame/racoon:
 	enable VPN negotiation again.
