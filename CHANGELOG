@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.706 2000/03/20 15:00:16 itojun Exp $
+$Id: CHANGELOG,v 1.707 2000/03/21 09:21:22 itojun Exp $
 
 <200003>
+Tue Mar 21 18:23:14 JST 2000  itojun@iilab.net
+	* sys/netinet6/ip6_input.c: disable too strong check against
+	  packets with IPv4 compatible address.  this (wrongly) forbids
+	  auto tunnel relaying case in RFC1933.  we may want to re-enable it
+	  whenever mech-xx discussion goes to more secure settings.
+
 Mon Mar 20 21:16:30 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump},
 	  freebsd[23]/ports/{libpcap,tcpdump}: upgrade to weekly snapshot
