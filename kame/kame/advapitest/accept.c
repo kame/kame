@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.13 2001/02/07 05:18:15 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.14 2001/02/09 08:31:24 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -28,9 +28,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/types.h>
-#ifdef __FreeBSD__
-#include <sys/param.h>
-#endif
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/ioctl.h>

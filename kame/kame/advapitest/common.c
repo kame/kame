@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.6 2001/02/07 05:18:15 jinmei Exp $ */
+/*	$KAME: common.c,v 1.7 2001/02/09 08:31:24 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,9 +30,6 @@
  */
 
 #include <sys/types.h>
-#ifdef __FreeBSD__
-#include <sys/param.h>
-#endif
 #include <sys/socket.h>
 
 #include <net/if.h>

@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.12 2001/02/07 13:03:50 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.13 2001/02/09 08:31:24 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
