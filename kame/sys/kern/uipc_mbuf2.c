@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.19 2000/07/12 16:33:25 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.20 2000/08/28 02:44:40 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -80,6 +80,9 @@
  * if offp != NULL, the target will start at <retval, *offp> on resulting chain.
  *
  * on error return (NULL return value), original "m" will be freed.
+ *
+ * be aware that the mbuf pointed to by the return value may be a shared
+ * cluster.  so, in some cases it is unsafe to overwrite the mbuf.
  *
  * XXX M_TRAILINGSPACE/M_LEADINGSPACE on shared cluster (sharedcluster)
  */
