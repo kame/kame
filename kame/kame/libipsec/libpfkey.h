@@ -1,4 +1,4 @@
-/*	$KAME: libpfkey.h,v 1.2 2000/08/31 06:16:35 sakane Exp $	*/
+/*	$KAME: libpfkey.h,v 1.3 2000/08/31 07:48:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,6 +35,7 @@ extern void pfkey_spdump __P((struct sadb_msg *));
 struct sockaddr;
 int ipsec_check_keylen __P((u_int, u_int, u_int));
 int ipsec_check_keylen2 __P((u_int, u_int, u_int));
+int ipsec_get_keylen __P((u_int, u_int, struct sadb_alg *));
 u_int pfkey_set_softrate __P((u_int, u_int));
 u_int pfkey_get_softrate __P((u_int));
 int pfkey_send_getspi __P((int, u_int, u_int, struct sockaddr *,
