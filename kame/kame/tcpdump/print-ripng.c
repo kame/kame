@@ -47,14 +47,16 @@ static const char rcsid[] =
 #include "interface.h"
 #include "addrtoname.h"
 
-static void
+static int
 rip6_entry_print(register const struct netinfo6 *ni, int metric)
 {
-	printf(" %s/%d", ip6addr_string(&ni->rip6_dest), ni->rip6_plen);
+	int l;
+	l = printf("%s/%d", ip6addr_string(&ni->rip6_dest), ni->rip6_plen);
 	if (ni->rip6_tag)
-		printf(" [%d]", ntohs(ni->rip6_tag));
+		l += printf(" [%d]", ntohs(ni->rip6_tag));
 	if (metric)
-		printf(" (%d)", ni->rip6_metric);
+		l += printf(" (%d)", ni->rip6_metric);
+	return l;
 }
 
 void
@@ -86,8 +88,13 @@ ripng_print(const u_char *dat, int length)
 		else
 			printf(" ripng-req %d:", j);
 		trunc = ((i / sizeof(*ni)) * sizeof(*ni) != i);
-		for (ni = rp->rip6_nets; (i -= sizeof(*ni)) >= 0; ++ni)
+		for (ni = rp->rip6_nets; (i -= sizeof(*ni)) >= 0; ++ni) {
+			if (vflag)
+				printf("\n\t");
+			else
+				printf(" ");
 			rip6_entry_print(ni, 0);
+		}
 		break;
 	case RIP6_RESPONSE:
 		j = length / sizeof(*ni);
@@ -96,8 +103,13 @@ ripng_print(const u_char *dat, int length)
 		else
 			printf(" ripng-resp %d:", j);
 		trunc = ((i / sizeof(*ni)) * sizeof(*ni) != i);
-		for (ni = rp->rip6_nets; (i -= sizeof(*ni)) >= 0; ++ni)
+		for (ni = rp->rip6_nets; (i -= sizeof(*ni)) >= 0; ++ni) {
+			if (vflag)
+				printf("\n\t");
+			else
+				printf(" ");
 			rip6_entry_print(ni, ni->rip6_metric);
+		}
 		if (trunc)
 			printf("[|rip]");
 		break;
